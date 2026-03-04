@@ -1,0 +1,2283 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>AMBAR</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<style>
+:root{
+  --gold:#C9A96E;--gold2:#E8C98A;--gold3:#F5E0B0;
+  --bg:#07070E;--bg2:#0C0C18;--bg3:#111120;
+  --card:#121224;--card2:#161628;
+  --border:rgba(201,169,110,.16);--border2:rgba(255,255,255,.06);
+  --text:#EDE9E0;--sub:#9896AA;--muted:#54526A;
+  --red:#E05555;--green:#4CAF7D;
+  --r:16px;--r2:12px;--r3:10px;
+  --safe-bottom:env(safe-area-inset-bottom,0px);
+}
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
+html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;height:100%;overflow:hidden}
+button,input{font-family:'DM Sans',sans-serif;outline:none}
+img{display:block}
+.page{position:fixed;top:0;left:0;right:0;height:calc(var(--tg-h,100vh) - 60px - var(--safe-bottom));overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;opacity:1;transition:opacity .2s,transform .2s}
+.page.hidden{opacity:0;pointer-events:none;transform:translateY(8px)}
+.hdr{position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(7,7,14,.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);flex-shrink:0}
+.logo{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:700;letter-spacing:7px;background:linear-gradient(135deg,var(--gold),var(--gold2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
+.logo-sub{font-size:7px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);margin-top:-1px;font-family:'DM Sans',sans-serif;font-weight:400;text-align:center}
+.logo-grp{display:inline-flex;flex-direction:column;align-items:center;gap:2px}
+.logo-line{height:1px;background:linear-gradient(90deg,transparent 0%,rgba(201,169,110,.45) 50%,transparent 100%);flex-shrink:0}
+.hdr-right{display:flex;gap:6px;align-items:center}
+.cart-pill{display:flex;align-items:center;gap:4px;background:var(--card2);border:1px solid var(--border);border-radius:50px;padding:0 10px;height:30px;position:relative;cursor:pointer;transition:.15s;white-space:nowrap}
+.cart-pill:active{transform:scale(.93)}
+.cart-txt{font-size:12px;font-weight:600;color:var(--gold2);white-space:nowrap}
+.cart-dot{position:absolute;top:-5px;right:-5px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;border-radius:50%;width:18px;height:18px;font-size:9px;font-weight:700;display:none;align-items:center;justify-content:center;border:2px solid var(--bg)}
+.lang-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--border2);background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;transition:.15s}
+.lang-btn:active{transform:scale(.85)}
+.fav-btn{width:34px;height:34px;border-radius:50%;border:1px solid var(--border2);background:var(--card2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;position:relative}
+.fav-btn:active{transform:scale(.85)}
+.fav-btn svg{width:16px;height:16px;transition:.15s}
+.fav-btn.has-favs svg{fill:none;stroke:#e05555}
+.fav-dot{position:absolute;top:-4px;right:-4px;background:#e05555;color:#fff;border-radius:50%;width:16px;height:16px;font-size:8px;font-weight:700;display:none;align-items:center;justify-content:center;border:2px solid var(--bg)}
+.fav-dot.on{display:flex}
+.pfav{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.5);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;z-index:2}
+.pfav:active{transform:scale(.8)}
+.pfav svg{width:14px;height:14px;transition:.15s}
+.pfav.on svg{fill:#e05555;stroke:#e05555}
+
+/* Active address pill on catalog */
+.addr-pill{display:flex;flex-direction:column;align-items:center;background:transparent;border:none;padding:0;cursor:pointer;transition:.15s;min-width:0;max-width:100%}
+.addr-pill:active{opacity:.6}
+.addr-pill-sub{font-size:8px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;font-weight:500;white-space:nowrap}
+.addr-pill-row{display:flex;align-items:center;gap:3px;min-width:0;max-width:100%}
+.addr-pill-txt{font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.addr-pill-dot{display:none}
+
+/* Address selector modal */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-overlay.show{opacity:1;pointer-events:all}
+.modal-sheet{width:100%;background:var(--bg2);border-radius:20px 20px 0 0;padding:0 0 calc(16px + var(--safe-bottom));max-height:70vh;overflow-y:auto;transform:translateY(60px);transition:transform .25s cubic-bezier(.34,1,.64,1)}
+.modal-overlay.show .modal-sheet{transform:translateY(0)}
+.modal-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:12px auto 16px}
+.modal-title{font-family:'DM Sans',sans-serif;font-size:18px;color:var(--gold2);padding:0 16px 12px;border-bottom:1px solid var(--border2)}
+.modal-addr-item{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border2);cursor:pointer;transition:.15s}
+.modal-addr-item:active{background:rgba(255,255,255,.03)}
+.modal-addr-item.active{background:rgba(201,169,110,.06)}
+.mai-icon{font-size:22px;flex-shrink:0}
+.mai-info{flex:1;min-width:0}
+.mai-label{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mai-addr{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mai-check{color:var(--gold);font-size:18px;flex-shrink:0}
+.modal-add-btn{display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;color:var(--gold);font-size:13px;font-weight:600}
+
+.bnav{position:fixed;bottom:0;left:0;right:0;z-index:40;display:flex;background:rgba(7,7,14,.97);border-top:1px solid var(--border);padding-bottom:var(--safe-bottom)}
+.nb{flex:1;display:flex;flex-direction:column;align-items:center;padding:9px 4px 7px;gap:3px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:.15s}
+.nb.on{color:var(--gold)}
+.nb i{font-size:20px;line-height:1}
+.nb span{font-size:9px;letter-spacing:.5px;font-weight:500}
+
+.chips{display:flex;gap:7px;padding:8px 14px 6px;overflow-x:auto;scrollbar-width:none;flex-shrink:0}
+.chips::-webkit-scrollbar{display:none}
+.sort-opt{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--border2);cursor:pointer;transition:.15s;font-size:14px;color:var(--text)}
+.sort-opt:active{background:rgba(255,255,255,.03)}
+.sort-opt.on{color:var(--gold)}
+.sort-opt-check{font-size:18px;color:var(--gold);opacity:0;transition:.15s}
+.sort-opt.on .sort-opt-check{opacity:1}
+.sort-btn{width:34px;height:34px;border-radius:50%;border:1px solid var(--border2);background:var(--card2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s}
+.sort-btn:active{transform:scale(.85)}
+.sort-btn.active{border-color:var(--gold);color:var(--gold)}
+.search-wrap{display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border2);border-radius:50px;padding:0 14px;gap:8px;transition:.2s}
+.search-wrap:focus-within{border-color:rgba(201,169,110,.5)}
+.search-ico{width:15px;height:15px;color:var(--muted);flex-shrink:0}
+.search-inp{flex:1;background:transparent;border:none;outline:none;font-size:13px;color:var(--text);padding:9px 0;font-family:inherit}
+.search-inp::placeholder{color:var(--muted)}
+.search-clr{background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:0;line-height:1;flex-shrink:0}
+.chip{white-space:nowrap;padding:7px 14px;border-radius:50px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-size:11px;font-weight:500;cursor:pointer;transition:.15s}
+.chip.on{background:rgba(201,169,110,.1);border-color:var(--gold);color:var(--gold);font-weight:700}
+.sec-h{padding:10px 14px 8px;font-family:'DM Sans',sans-serif;font-size:20px;display:flex;align-items:center;gap:10px;flex-shrink:0}
+.sec-h::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border2),transparent)}
+.cat-section-hdr{padding:16px 14px 8px;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:var(--gold);display:flex;align-items:center;gap:10px;letter-spacing:2.5px;text-transform:uppercase}
+.cat-section-hdr::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(201,169,110,.3),transparent)}
+.grid-group{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 12px 4px}
+.grid{padding:2px 0 16px}
+@media(min-width:460px){.grid{grid-template-columns:repeat(3,1fr)}}
+.pcard{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;transition:.15s}
+.pcard:active{transform:scale(.97)}
+.pimg-box{height:148px;background:linear-gradient(155deg,#0E0E1E,#090916);display:flex;align-items:center;justify-content:center;padding:10px;position:relative;overflow:hidden}
+.pimg{max-height:128px;max-width:90%;object-fit:contain;filter:drop-shadow(0 6px 20px rgba(0,0,0,.7))}
+.pbadge{position:absolute;font-size:8px;letter-spacing:1px;text-transform:uppercase;padding:3px 7px;border-radius:6px;font-weight:700;z-index:2}
+.pbadge.oos{left:8px;top:8px;background:rgba(0,0,0,.7);border:1px solid var(--border2);color:var(--muted)}
+.pimg-box.oos .pimg{filter:grayscale(1) opacity(.55) drop-shadow(0 6px 20px rgba(0,0,0,.7))}
+.oos-overlay{position:absolute;inset:0;z-index:1;background:rgba(0,0,0,.38);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.6);font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase}
+.pbadge.isnew{right:8px;top:8px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E}
+.pinfo{padding:10px 11px 12px;flex:1;display:flex;flex-direction:column;gap:4px}
+.pcat{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);font-weight:600}
+.pname{font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;line-height:1.2}
+.pdesc{font-size:10px;color:var(--muted);line-height:1.45;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.pfoot{display:flex;align-items:center;justify-content:space-between;margin-top:auto;padding-top:8px}
+.pprice{font-size:16px;font-weight:700;color:var(--gold2)}
+.pprice small{font-size:9px;color:var(--muted);font-weight:400}
+.add-btn{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;color:#07070E;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.13s}
+.add-btn:active{transform:scale(.75)}
+.add-btn:disabled{background:var(--card2);color:var(--muted);cursor:not-allowed}
+.qctrl{display:flex;align-items:center;gap:5px}
+.qb{width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--gold);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.12s}
+.qb:active{transform:scale(.75)}
+.qn{font-size:13px;font-weight:700;min-width:20px;text-align:center;color:var(--gold2)}
+.empty{text-align:center;padding:60px 20px;color:var(--muted)}
+.empty-icon{font-size:54px;margin-bottom:14px;opacity:.3}
+#cart-empty{flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;gap:0}
+.ce-line{width:270px;height:1px;background:linear-gradient(90deg,transparent 0%,rgba(201,169,110,.5) 50%,transparent 100%)}
+.ce-brand-bg{font-size:80px;font-weight:700;font-family:'Cormorant Garamond',serif;letter-spacing:16px;color:rgba(201,169,110,.08);pointer-events:none;user-select:none;white-space:nowrap;line-height:1;padding:1px 0;margin:-2px 0}
+.ce-title{display:none}
+.ce-btn{background:rgba(201,169,110,.07);border:1px solid rgba(201,169,110,.2);color:rgba(201,169,110,.7);font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;padding:0 18px;height:34px;border-radius:8px;display:flex;align-items:center;gap:6px;letter-spacing:.5px;margin-top:22px;transition:.15s}
+.ce-btn:active{opacity:.5;transform:scale(.96)}
+.ci{display:flex;align-items:center;gap:11px;padding:13px 16px;border-bottom:1px solid var(--border2)}
+.ci-img{width:50px;height:60px;object-fit:contain;background:var(--card);border-radius:10px;padding:5px;flex-shrink:0}
+.ci-info{flex:1;min-width:0}
+.ci-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ci-price{font-size:12px;color:var(--gold);font-weight:600;margin-top:2px}
+.tip-wrap{padding:14px 16px;border-top:1px solid var(--border2)}
+.tip-label{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:10px}
+.tip-row{display:flex;flex-wrap:wrap;gap:7px}
+.tip-chip{padding:8px 14px;border-radius:50px;border:1px solid var(--border2);background:transparent;color:var(--sub);font-size:12px;font-weight:500;cursor:pointer;transition:.15s}
+.tip-chip.on{background:rgba(201,169,110,.1);border-color:var(--gold);color:var(--gold);font-weight:700}
+.tip-input{width:100%;margin-top:10px;background:var(--bg3);border:1.5px solid var(--border2);border-radius:var(--r3);padding:11px 14px;color:var(--text);font-size:14px;display:none;transition:.2s}
+.tip-input:focus{border-color:var(--gold)}
+.tip-done-btn{width:100%;margin-top:7px;height:38px;border-radius:var(--r3);border:1.5px solid var(--gold);background:rgba(201,169,110,.08);color:var(--gold);font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;display:none;transition:.15s}
+.tip-done-btn:active{background:rgba(201,169,110,.22)}
+.cart-foot{padding:14px 16px;background:var(--bg2);border-top:1px solid var(--border)}
+.total-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
+.total-lbl{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);font-weight:600}
+.total-val{font-family:'DM Sans',sans-serif;font-size:28px;color:var(--gold2);font-weight:600}
+.btn-main{width:100%;background:linear-gradient(135deg,var(--gold),var(--gold2),var(--gold3));color:#07070E;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.3px;transition:.15s}
+.btn-main:active{transform:scale(.98);opacity:.9}
+.btn-main:disabled{opacity:.3;cursor:not-allowed}
+.btn-outline{width:100%;background:transparent;border:1.5px solid var(--border);color:var(--sub);border-radius:14px;padding:13px;font-size:14px;font-weight:500;cursor:pointer;margin-top:8px;transition:.15s}
+.btn-outline:active{border-color:var(--gold);color:var(--gold)}
+
+/* Cart layout — inner scrollable list + sticky bottom panel */
+#pg-cart{overflow:hidden}
+.cart-list-wrap{flex:0 0 auto;min-height:0;position:relative;margin:0 12px 4px;border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;transition:margin-bottom .2s}
+.cart-list-wrap.tip-kbd{flex:0 0 0;min-height:0;margin-bottom:0;border-color:transparent}
+.cart-list-wrap::after{content:'';position:absolute;bottom:0;left:0;right:0;height:56px;background:linear-gradient(to bottom,transparent,var(--card));pointer-events:none}
+.cart-list-wrap::before{content:'';position:absolute;right:4px;top:8px;bottom:8px;width:3px;background:rgba(201,169,110,.18);border-radius:2px;z-index:3;pointer-events:none;display:none}
+.cart-list-wrap.can-scroll::before{display:block}
+#cart-thumb{position:absolute;right:4px;width:3px;background:rgba(201,169,110,.6);border-radius:2px;z-index:4;pointer-events:none;transition:top .08s,height .08s;display:none}
+#cart-list{height:auto;max-height:calc(var(--tg-h,100vh) - 510px);overflow-y:auto;overscroll-behavior:contain;background:var(--card);scrollbar-width:none}
+#cart-list::-webkit-scrollbar{display:none}
+#cart-list .ci:last-child{border-bottom:none}
+#tip-section,#cart-foot{flex-shrink:0}
+#tip-section{margin-top:auto}
+
+/* Cart active address banner */
+.cart-topbar{display:flex;align-items:center;gap:8px;padding:10px 16px 8px}
+.cart-back-btn{flex-shrink:0;height:36px;padding:0 14px;border-radius:8px;border:1px solid var(--border2);background:transparent;color:var(--sub);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;transition:.15s;font-family:'DM Sans',sans-serif}
+.cart-back-btn:active{border-color:var(--gold);color:var(--gold)}
+.cart-addr-bar{flex:1;min-width:0;background:var(--card);border:1px solid var(--border2);border-radius:8px;padding:0 12px;height:36px;display:flex;align-items:center;gap:8px;cursor:pointer;transition:.15s}
+.cart-addr-bar:active{border-color:rgba(201,169,110,.5)}
+.cab-icon{font-size:13px;flex-shrink:0}
+.cab-info{flex:1;min-width:0}
+.cab-label{display:none}
+.cab-addr{font-size:13px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cab-change{display:flex;align-items:center;color:var(--gold);flex-shrink:0}
+
+/* ADDRESS PAGE */
+.addr-page-body{padding:14px 16px}
+.addr-form-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;margin-bottom:14px}
+.addr-form-head{padding:13px 15px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--border2)}
+.addr-form-title{font-size:14px;font-weight:600}
+.addr-form-body{padding:14px 15px}
+.flabel{display:block;font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);margin-bottom:7px;font-weight:600}
+.finput{width:100%;background:var(--bg3);border:1.5px solid var(--border2);border-radius:var(--r3);padding:12px 14px;color:var(--text);font-size:14px;transition:.2s}
+.finput:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(201,169,110,.07)}
+.finput::placeholder{color:var(--muted)}
+.finput.err{border-color:var(--red)!important}
+.ferr{font-size:11px;color:var(--red);margin-top:6px;display:none}
+.ferr.on{display:block}
+
+/* Method tabs */
+.mtabs{display:flex;gap:8px;margin-bottom:14px}
+.mtab{flex:1;padding:10px 6px;background:var(--bg3);border:1.5px solid var(--border2);border-radius:var(--r2);cursor:pointer;color:var(--muted);font-size:11px;font-weight:600;text-align:center;display:flex;flex-direction:column;align-items:center;gap:4px;transition:.15s}
+.mtab i{font-size:20px}
+.mtab.on{border-color:var(--gold);background:rgba(201,169,110,.08);color:var(--gold)}
+.mtab:active{transform:scale(.95)}
+.mpanel{display:none}
+.mpanel.show{display:block}
+.gps-btn{display:flex;align-items:center;gap:10px;width:100%;background:rgba(201,169,110,.07);border:1.5px solid rgba(201,169,110,.25);border-radius:var(--r2);padding:14px 15px;cursor:pointer;color:var(--gold);font-size:13px;font-weight:600;transition:.2s;margin-bottom:10px}
+.gps-btn:active{transform:scale(.97)}
+.gps-status{font-size:12px;padding:9px 12px;border-radius:9px;display:none;margin-bottom:10px}
+.gps-status.ok{display:block;background:rgba(76,175,125,.1);color:var(--green);border:1px solid rgba(76,175,125,.2)}
+.gps-status.fail{display:block;background:rgba(224,85,85,.08);color:var(--red);border:1px solid rgba(224,85,85,.18)}
+.type-chips{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:12px}
+.type-chip{padding:8px 13px;border-radius:50px;border:1px solid var(--border2);background:transparent;color:var(--sub);font-size:12px;cursor:pointer;transition:.15s}
+.type-chip.on{background:rgba(201,169,110,.1);border-color:var(--gold);color:var(--gold);font-weight:600}
+.frow{display:flex;gap:8px;margin-bottom:10px}
+.frow>div{flex:1;min-width:0}
+
+
+/* Saved addr cards */
+.saved-cards-wrap{position:relative;margin-bottom:12px}
+.saved-cards-wrap::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(to bottom,transparent,var(--card));pointer-events:none;border-radius:0 0 var(--r2) var(--r2);z-index:1}
+.saved-cards-wrap::before{content:'';position:absolute;right:4px;top:8px;bottom:8px;width:3px;background:rgba(201,169,110,.18);border-radius:2px;z-index:3;pointer-events:none}
+#sc-thumb{position:absolute;right:4px;width:3px;background:rgba(201,169,110,.6);border-radius:2px;z-index:4;pointer-events:none;transition:top .08s,height .08s;display:none}
+.saved-cards-wrap.few::after{display:none}
+.saved-cards-wrap.few::before{display:none}
+#saved-cards{max-height:162px;overflow-y:scroll;scrollbar-width:none;background:var(--card);border:1.5px solid var(--border2);border-radius:var(--r2)}
+#saved-cards::-webkit-scrollbar{display:none}
+.saved-card{padding:10px 12px;cursor:pointer;transition:background .15s;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border2);border-left:3px solid transparent}
+.saved-card:last-child{border-bottom:none}
+.saved-card:active{background:rgba(255,255,255,.03)}
+.saved-card.active-addr{border-left-color:var(--green);background:rgba(76,175,125,.05)}
+.sc-radio{width:16px;height:16px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:.2s}
+.saved-card.active-addr .sc-radio{border-color:var(--green);background:var(--green)}
+.sc-radio-dot{width:5px;height:5px;border-radius:50%;background:#fff;opacity:0;transform:scale(0);transition:.15s}
+.saved-card.active-addr .sc-radio-dot{opacity:1;transform:scale(1)}
+.sc-icon{font-size:16px;flex-shrink:0}
+.sc-info{flex:1;min-width:0}
+.sc-row1{display:flex;align-items:baseline;gap:5px;min-width:0}
+.sc-label{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;max-width:45%}
+.sc-sep{font-size:10px;color:var(--muted);flex-shrink:0}
+.sc-addr{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.sc-comment{font-size:10px;color:var(--sub);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
+.sc-actions{display:flex;gap:4px;flex-shrink:0}
+.sc-edit-btn,.sc-del-btn{width:28px;height:28px;border-radius:7px;border:1px solid var(--border2);background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;font-size:12px;font-family:'DM Sans',sans-serif}
+.sc-edit-btn{color:var(--gold)}
+.sc-del-btn{color:var(--red)}
+.sc-edit-btn:active{background:rgba(201,169,110,.15)}
+.sc-del-btn:active{background:rgba(224,85,85,.1)}
+
+/* Confirm modal */
+.confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .2s}
+.confirm-overlay.show{opacity:1;pointer-events:all}
+.confirm-box{background:var(--card2);border:1px solid var(--border);border-radius:var(--r);padding:24px;width:100%;max-width:320px}
+.confirm-icon{font-size:36px;text-align:center;margin-bottom:12px}
+.confirm-title{font-family:'DM Sans',sans-serif;font-size:18px;color:var(--gold2);text-align:center;margin-bottom:8px}
+.confirm-msg{font-size:13px;color:var(--sub);text-align:center;line-height:1.5;margin-bottom:20px}
+.confirm-btns{display:flex;gap:10px}
+.confirm-btns button{flex:1;padding:12px;border-radius:var(--r3);border:none;font-size:13px;font-weight:700;cursor:pointer;transition:.15s}
+.confirm-yes{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E}
+.confirm-no{background:var(--bg3);border:1px solid var(--border)!important;color:var(--sub)}
+
+/* Orders */
+.co-body{padding:14px 16px}
+.co-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);margin-bottom:12px;overflow:hidden}
+.co-head{padding:13px 15px;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border2)}
+.co-num{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.co-title{font-size:14px;font-weight:600}
+.co-inner{padding:14px 15px}
+.sum-card{background:var(--card);border:1px solid var(--border);border-radius:var(--r);padding:14px 16px;margin:0 16px 14px}
+.sum-title{font-family:'DM Sans',sans-serif;font-size:17px;color:var(--gold2);margin-bottom:10px}
+.sum-line{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin-bottom:5px}
+.sum-div{height:1px;background:var(--border2);margin:8px 0}
+.sum-total{display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:var(--gold2)}
+.co-foot{padding:0 16px 16px}
+.ocard{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);margin:0 14px 10px;overflow:hidden;border-left-width:3px;border-left-style:solid}
+.ocard.sp{border-left-color:rgba(201,169,110,.55)}
+.ocard.sc2{border-left-color:rgba(76,175,125,.55)}
+.ocard.sd{border-left-color:rgba(100,160,220,.55)}
+.ocard.sx{border-left-color:rgba(224,85,85,.45)}
+.ocard-inner{padding:0}
+/* top meta bar */
+.ocard-meta{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border-bottom:1px solid var(--border2)}
+.o-id{font-size:12px;letter-spacing:.5px;color:var(--text);font-family:'DM Sans',sans-serif;font-weight:600}
+.o-date{font-size:10px;color:var(--muted);letter-spacing:.2px}
+/* items body */
+.o-rows{display:flex;flex-direction:column;padding:10px 14px 10px}
+.o-row{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:4px 0}
+.o-row:not(:last-child){border-bottom:1px solid rgba(255,255,255,.03)}
+.o-row-name{font-size:13px;color:var(--text);font-weight:400;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.o-row-qty{font-size:12px;font-weight:600;color:var(--sub);flex-shrink:0;background:var(--bg3);border-radius:6px;padding:2px 7px}
+/* bottom bar: status left, total right */
+.ocard-foot{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border-top:1px solid var(--border2)}
+.o-status{font-size:11px;font-weight:600;display:flex;align-items:center;gap:6px;letter-spacing:.2px}
+.o-status-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.sp .o-status{color:var(--gold)}
+.sp .o-status-dot{background:var(--gold);box-shadow:0 0 5px rgba(201,169,110,.6)}
+.sc2 .o-status{color:var(--green)}
+.sc2 .o-status-dot{background:var(--green);box-shadow:0 0 5px rgba(76,175,125,.6)}
+.sd .o-status{color:#64a0dc}
+.sd .o-status-dot{background:#64a0dc;box-shadow:0 0 5px rgba(100,160,220,.5)}
+.sx .o-status{color:var(--red)}
+.sx .o-status-dot{background:var(--red);box-shadow:0 0 5px rgba(224,85,85,.5)}
+.o-total{display:flex;align-items:baseline;gap:3px}
+.o-total-num{font-size:18px;font-weight:700;color:var(--gold2);font-family:'DM Sans',sans-serif;line-height:1}
+.o-total-cur{font-size:10px;font-weight:600;color:var(--gold);letter-spacing:.8px}
+.profile-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:20px;margin:14px}
+.profile-avatar{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px;font-family:'DM Sans',sans-serif;color:#07070E;font-weight:700}
+.profile-name{text-align:center;font-family:'DM Sans',sans-serif;font-size:20px;color:var(--gold2)}
+.profile-stat{display:flex;border-top:1px solid var(--border2);margin-top:14px}
+.ps{flex:1;text-align:center;padding:12px 6px;border-right:1px solid var(--border2)}
+.ps:last-child{border-right:none}
+.ps-n{font-size:20px;font-weight:700;color:var(--gold2)}
+.ps-l{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:2px}
+/* Product Detail Modal */
+.pdm-overlay{position:fixed;inset:0;background:rgba(0,0,0,0);z-index:150;display:flex;align-items:flex-end;pointer-events:none;transition:background .25s}
+.pdm-overlay.show{background:rgba(0,0,0,.82);pointer-events:all}
+.pdm-sheet{width:100%;background:var(--bg2);border-radius:24px 24px 0 0;padding-bottom:0;max-height:92vh;overflow-y:auto;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1,.64,1)}
+.pdm-overlay.show .pdm-sheet{transform:translateY(0)}
+.pdm-handle{width:40px;height:4px;background:var(--border);border-radius:2px;margin:14px auto 0}
+.pdm-close{position:absolute;top:14px;right:16px;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.5);border:1px solid var(--border2);color:var(--sub);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2}
+.pdm-close:active{transform:scale(.85)}
+.pdm-img-box{height:300px;background:linear-gradient(155deg,#0E0E1E,#090916);display:flex;align-items:center;justify-content:center;padding:10px;position:relative;overflow:hidden;touch-action:none}
+.pdm-img{max-height:260px;max-width:85%;object-fit:contain;filter:drop-shadow(0 12px 32px rgba(0,0,0,.8));transform-origin:center center;will-change:transform;user-select:none;pointer-events:none}
+.pdm-zoom-hint{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:rgba(255,255,255,.3);pointer-events:none;white-space:nowrap}
+.pdm-body{padding:20px 18px 0}
+.pdm-cat{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:6px}
+.pdm-name{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;line-height:1.15;letter-spacing:-.3px;margin-bottom:6px}
+.pdm-name-price{font-family:'DM Sans',sans-serif;font-size:20px;font-weight:600;color:var(--gold);margin-bottom:12px}
+.pdm-desc{font-size:14px;color:var(--sub);line-height:1.7;margin-bottom:8px}
+.pdm-footer{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-top:4px}
+.pdm-price{font-family:'DM Sans',sans-serif;font-size:32px;font-weight:700;color:var(--gold2);line-height:1}
+.pdm-price small{font-size:13px;color:var(--muted);font-weight:400;font-family:'DM Sans',sans-serif}
+.pdm-ctrl{flex-shrink:0}
+.pdm-add-row{padding:12px 18px calc(16px + var(--safe-bottom))}
+.pdm-add-btn{height:52px;padding:0 28px;border-radius:16px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;color:#07070E;font-size:15px;font-weight:700;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.13s;width:100%}
+.pdm-add-btn:active{transform:scale(.97)}
+.pdm-add-btn:disabled{background:var(--card2);color:var(--muted);cursor:not-allowed}
+.pdm-qctrl-full{display:flex;align-items:center;justify-content:center;gap:20px;height:52px;width:100%}
+.pdm-qctrl{display:flex;align-items:center;gap:8px}
+.pdm-qb{width:40px;height:40px;border-radius:11px;border:1px solid var(--border);background:var(--bg3);color:var(--gold);font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.12s}
+.pdm-qb:active{transform:scale(.75)}
+.pdm-qn{font-size:18px;font-weight:700;min-width:28px;text-align:center;color:var(--gold2)}
+.pdm-oos{height:44px;padding:0 20px;border-radius:12px;background:var(--card2);border:1px solid var(--border2);color:var(--muted);font-size:13px;font-weight:600;display:flex;align-items:center;cursor:not-allowed}
+
+/* Toast */
+.toast{position:fixed;bottom:calc(76px + var(--safe-bottom));left:16px;right:16px;transform:translateY(14px);background:var(--card2);border:1px solid var(--border2);border-left:3px solid var(--border2);color:var(--text);padding:13px 16px;border-radius:var(--r2);font-size:13px;font-weight:500;z-index:600;pointer-events:none;box-shadow:0 10px 36px rgba(0,0,0,.75);opacity:0;visibility:hidden;transition:opacity .2s,transform .28s cubic-bezier(.34,1,.64,1),visibility .2s;display:flex;align-items:center;gap:10px}
+.toast.show{opacity:1;visibility:visible;transform:translateY(0)}
+.toast.ok{border-left-color:var(--green)}
+.toast.err{border-left-color:var(--red)}
+.toast.pdm-mode{bottom:auto;top:20px;transform:translateY(-14px)}
+.toast.pdm-mode.show{transform:translateY(0)}
+.toast-icon{font-size:16px;flex-shrink:0;line-height:1}
+.toast-msg{flex:1;min-width:0}
+/* Refresh spin */
+@keyframes spin{to{transform:rotate(360deg)}}
+.spinning{animation:spin .65s linear infinite!important;opacity:.7}
+</style>
+</head>
+<body>
+
+<!-- ═══ CATALOG ═══ -->
+<div id="pg-catalog" class="page">
+  <div style="position:sticky;top:0;z-index:40;background:rgba(7,7,14,.96);backdrop-filter:blur(20px)">
+    <!-- Row 1: Logo + address centered + controls -->
+    <div style="display:flex;align-items:center;padding:10px 14px;gap:4px">
+      <div style="flex:1;min-width:0"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub">Premium Spirits</div></div></div>
+      <div style="flex:1;display:flex;justify-content:center;min-width:0;padding:0 6px">
+        <div class="addr-pill" onclick="openAddrModal()" id="addr-pill">
+          <span class="addr-pill-sub" id="addr-pill-label">АДРЕС</span>
+          <div class="addr-pill-row">
+            <span class="addr-pill-txt" id="addr-pill-txt">Добавьте адрес</span>
+            <span style="color:var(--gold);font-size:11px;flex-shrink:0">▾</span>
+          </div>
+        </div>
+      </div>
+      <div class="hdr-right" style="flex:1;justify-content:flex-end">
+        <div class="cart-pill" onclick="go('cart')">🛒 <span class="cart-txt" id="hdr-tot">0 AED</span><span class="cart-dot" id="hdr-dot">0</span></div>
+        <button class="lang-btn" onclick="flipLang()" id="lbtn">🇷🇺</button>
+      </div>
+    </div>
+    <!-- Row 2: Search bar -->
+    <div style="padding:0 14px 8px">
+      <div class="search-wrap">
+        <svg class="search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input class="search-inp" id="search-inp" type="text" placeholder="Поиск..." oninput="onSearch(this.value)">
+        <button class="search-clr" id="search-clr" onclick="clearSearch()" style="display:none">✕</button>
+      </div>
+    </div>
+    <!-- Row 3: Heart + Sort (fixed left) + category chips (scrollable) -->
+    <div style="display:flex;align-items:center;border-bottom:1px solid var(--border2)">
+      <button class="fav-btn" id="fav-hdr-btn" onclick="toggleFavFilter()" style="flex-shrink:0;margin-left:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="fav-dot" id="fav-dot"></span></button>
+      <button class="sort-btn" id="sort-btn" onclick="cycleSort()" style="flex-shrink:0;margin-left:6px">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <div style="width:1px;height:20px;background:var(--border2);flex-shrink:0;margin:0 6px"></div>
+      <div class="chips" id="cat-chips" style="flex:1"></div>
+    </div>
+  </div>
+  <div class="grid" id="p-grid"></div>
+</div>
+
+<!-- ═══ CART ═══ -->
+<div id="pg-cart" class="page hidden">
+  <div class="hdr">
+    <div><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-cart">ваша корзина</div></div></div>
+    <div class="hdr-right"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
+  </div>
+  <!-- Cart top bar -->
+  <div class="cart-topbar">
+    <button class="cart-back-btn" id="back-catalog-btn" onclick="go('catalog')">← В каталог</button>
+    <div class="cart-addr-bar" onclick="openAddrModal()" id="cab">
+      <span class="cab-icon">📍</span>
+      <div class="cab-info">
+        <div class="cab-label" id="cab-label">АДРЕС ДОСТАВКИ</div>
+        <div class="cab-addr" id="cab-addr">Не выбран — нажмите чтобы добавить</div>
+      </div>
+      <span class="cab-change"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg></span>
+    </div>
+  </div>
+  <div id="cart-empty">
+    <div class="ce-line"></div>
+    <div class="ce-brand-bg">AMBAR</div>
+    <div class="ce-line"></div>
+    <button class="ce-btn" id="ce-btn" onclick="go('catalog')">каталог →</button>
+    <div id="ce-title" style="display:none"></div>
+  </div>
+  <div class="cart-list-wrap">
+    <div id="cart-list"></div>
+    <div id="cart-thumb"></div>
+  </div>
+  <div id="tip-section" style="display:none">
+    <div class="tip-wrap">
+      <div class="tip-label" id="tip-lbl">ЧАЕВЫЕ</div>
+      <div class="tip-row" id="tip-row"></div>
+      <input class="tip-input" id="tip-input" type="text" inputmode="decimal" enterkeyhint="done" pattern="[0-9]*">
+      <button class="tip-done-btn" id="tip-done-btn" onclick="el('tip-input').blur()">Готово ✓</button>
+    </div>
+  </div>
+  <div id="cart-foot" style="display:none">
+    <div class="cart-foot">
+      <div class="total-row"><span class="total-lbl" id="tot-lbl">ИТОГО</span><span class="total-val"><span id="tot-n">0</span> AED</span></div>
+      <button class="btn-main" id="co-btn" onclick="tryOrder()">Оформить заказ →</button>
+      <button class="btn-outline" id="clear-btn" onclick="clearCart()">🗑 Очистить корзину</button>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ADDRESS PAGE ═══ -->
+<div id="pg-address" class="page hidden">
+  <div class="hdr">
+    <div><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-addr">ваши адреса</div></div></div>
+    <div class="hdr-right"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
+  </div>
+  <div class="addr-page-body">
+    <!-- Saved addresses list -->
+    <div class="sec-h" id="sh-saved-addr">Сохранённые адреса</div>
+    <div class="saved-cards-wrap" id="saved-cards-wrap">
+      <div id="saved-cards"></div>
+      <div id="sc-thumb"></div>
+    </div>
+
+    <!-- Add new address form -->
+    <div class="addr-form-card" id="addr-form-card">
+      <div class="addr-form-head">
+        <span class="addr-form-title" id="add-form-title">➕ Добавить адрес</span>
+      </div>
+      <div class="addr-form-body">
+        <!-- Method tabs -->
+        <div class="mtabs">
+          <button class="mtab on" id="mtab-gps" onclick="switchMethod('gps')"><i>📍</i><span id="mtl-gps">GPS</span></button>
+          <button class="mtab" id="mtab-manual" onclick="switchMethod('manual')"><i>✏️</i><span id="mtl-manual">Вручную</span></button>
+        </div>
+
+        <!-- GPS panel -->
+        <div class="mpanel show" id="mpanel-gps">
+          <button class="gps-btn" onclick="grabGPS()" id="gps-btn"><span style="font-size:22px">📍</span><span id="gps-lbl">Поделиться геолокацией</span></button>
+          <div class="gps-status" id="gps-status"></div>
+          <div id="gps-extra" style="display:none">
+            <label class="flabel" id="lbl-type-gps">ТИП АДРЕСА</label>
+            <div class="type-chips" id="tchips-gps"></div>
+          </div>
+        </div>
+
+        <!-- Manual panel -->
+        <div class="mpanel" id="mpanel-manual">
+          <label class="flabel" id="lbl-area">РАЙОН / ЗОНА</label>
+          <div class="type-chips" id="area-chips" style="margin-bottom:12px"></div>
+          <div style="display:flex;gap:8px;margin-bottom:12px">
+            <div style="flex:2;min-width:0">
+              <label class="flabel" id="lbl-street">УЛИЦА</label>
+              <input class="finput" id="man-street" type="text" enterkeyhint="next" placeholder="Jumeirah St">
+            </div>
+            <div style="flex:1;min-width:0">
+              <label class="flabel" id="lbl-building">ДОМ / №</label>
+              <input class="finput" id="man-building" type="text" enterkeyhint="next" placeholder="12B">
+            </div>
+          </div>
+          <label class="flabel" id="lbl-type-man">ТИП АДРЕСА</label>
+          <div class="type-chips" id="tchips-man"></div>
+        </div>
+
+
+        <div class="ferr" id="addr-form-err"></div>
+
+        <!-- Name label -->
+        <label class="flabel" style="margin-top:14px" id="lbl-addr-name">НАЗВАНИЕ АДРЕСА</label>
+        <input class="finput" id="addr-name-in" type="text" enterkeyhint="next" placeholder="Дом / Офис / JVC...">
+        <button class="tip-done-btn" id="addr-name-done-btn" style="display:none" onpointerdown="event.preventDefault()" onclick="el('addr-name-in').blur()">Готово ✓</button>
+
+        <label class="flabel" style="margin-top:14px" id="lbl-addr-comment">КОММЕНТАРИЙ ДЛЯ КУРЬЕРА</label>
+        <textarea class="finput" id="addr-comment-in" rows="3" placeholder="" enterkeyhint="done" style="resize:none;height:76px;padding-top:10px"></textarea>
+        <button class="tip-done-btn" id="addr-done-btn" style="display:none" onpointerdown="event.preventDefault()" onclick="el('addr-comment-in').blur()">Готово ✓</button>
+
+        <button class="btn-main" style="margin-top:14px" onclick="saveNewAddress()" id="save-addr-btn">💾 Сохранить адрес</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ ORDERS ═══ -->
+<div id="pg-orders" class="page hidden" style="overflow:hidden">
+  <div class="hdr">
+    <div><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-ord">ваша история</div></div></div>
+    <div class="hdr-right"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
+  </div>
+  <div style="display:flex;align-items:center;padding:10px 14px 8px;gap:10px;flex-shrink:0">
+    <span style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:var(--gold);letter-spacing:2.5px;text-transform:uppercase" id="sh-orders">История</span>
+    <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(201,169,110,.3),transparent)"></div>
+    <button id="refresh-btn" onclick="syncOrders(true)" title="Обновить" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--border2);background:var(--card2);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:opacity .15s" onpointerdown="this.style.opacity='.5'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
+    </button>
+  </div>
+  <div id="orders-list" style="flex:1;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none"></div>
+  <div id="clear-history-wrap" style="display:none;flex-shrink:0;padding:10px 14px 16px;background:linear-gradient(to bottom,transparent,var(--bg) 35%)">
+    <button id="clear-history-btn" onclick="confirmClearHistory()" style="width:100%;background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.3);color:var(--gold);font-size:13px;font-weight:600;padding:14px;border-radius:14px;cursor:pointer;font-family:'DM Sans',sans-serif;letter-spacing:.3px;transition:.15s" onpointerdown="this.style.opacity='.6'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">Очистить историю</button>
+  </div>
+</div>
+
+<!-- ═══ PROFILE ═══ -->
+<div id="pg-profile" class="page hidden">
+  <div class="hdr">
+    <div><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-prof">ваш профиль</div></div></div>
+    <div class="hdr-right"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
+  </div>
+  <div class="profile-card">
+    <div class="profile-avatar" id="prof-av">A</div>
+    <div class="profile-name" id="prof-name">—</div>
+    <div class="profile-stat">
+      <div class="ps"><div class="ps-n" id="stat-total">0</div><div class="ps-l" id="stat-lbl1">ЗАКАЗОВ</div></div>
+      <div class="ps"><div class="ps-n" id="stat-active">0</div><div class="ps-l" id="stat-lbl2">АКТИВНЫХ</div></div>
+      <div class="ps"><div class="ps-n" id="stat-spent">0</div><div class="ps-l" id="stat-lbl3">AED</div></div>
+    </div>
+  </div>
+  <div style="padding:0 14px 14px">
+    <div class="cat-section-hdr" id="sh-active" style="padding:0 0 10px">Активные заказы</div>
+    <div id="active-list"></div>
+  </div>
+</div>
+
+<!-- CHECKOUT (hidden, used by placeOrder) -->
+<div id="pg-checkout" class="page hidden">
+  <div class="hdr">
+    <div><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-co">Оформление</div></div></div>
+    <div class="hdr-right"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
+  </div>
+  <div class="co-body">
+    <div class="co-card">
+      <div class="co-head"><div class="co-num">1</div><div class="co-title" id="co-addr-title">Адрес доставки</div></div>
+      <div class="co-inner" id="co-addr-preview" style="font-size:13px;color:var(--sub);line-height:1.6"></div>
+    </div>
+    <div class="co-card">
+      <div class="co-head"><div class="co-num">2</div><div class="co-title" id="ct2">Номер телефона</div></div>
+      <div class="co-inner">
+        <label class="flabel" id="phone-lbl">ТОЛЬКО ЦИФРЫ, 10–15 ЗНАКОВ</label>
+        <div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r2);overflow:hidden">
+          <span style="padding:0 10px;font-size:15px;font-weight:600;color:var(--sub);flex-shrink:0;border-right:1px solid var(--border2);height:100%;display:flex;align-items:center;line-height:48px">+</span>
+          <input class="finput" id="phone-in" type="tel" inputmode="numeric" placeholder="971501234567" style="border:none;border-radius:0;background:transparent;flex:1" oninput="this.classList.remove('err');el('phone-err').classList.remove('on');localStorage.setItem('ambar_phone',this.value.trim())">
+        </div>
+        <div class="ferr" id="phone-err"></div>
+      </div>
+    </div>
+  </div>
+  <div class="sum-card">
+    <div class="sum-title" id="sum-title">Ваш заказ</div>
+    <div id="sum-items"></div>
+    <div class="sum-div"></div>
+    <div class="sum-line" id="sum-tip-row" style="display:none"><span id="sum-tip-lbl">Чаевые</span><span id="sum-tip-val">0 AED</span></div>
+    <div class="sum-total"><span id="sum-tot-lbl">Итого</span><span id="sum-tot-val">0 AED</span></div>
+  </div>
+  <div class="co-foot"><button class="btn-main" id="place-btn" onclick="placeOrder()">✅ Подтвердить заказ</button></div>
+</div>
+
+<!-- NAV -->
+<div class="bnav">
+  <button class="nb on" id="nb-catalog" onclick="go('catalog')"><i>🍾</i><span id="nbl-cat">Каталог</span></button>
+  <button class="nb" id="nb-cart" onclick="go('cart')"><i>🛒</i><span id="nbl-cart">Корзина</span></button>
+  <button class="nb" id="nb-address" onclick="fromCart=false;go('address')"><i>📍</i><span id="nbl-addr">Адреса</span></button>
+  <button class="nb" id="nb-orders" onclick="go('orders')"><i>📦</i><span id="nbl-ord">История</span></button>
+  <button class="nb" id="nb-profile" onclick="go('profile');buildProfile()"><i>👤</i><span id="nbl-prof">Профиль</span></button>
+</div>
+
+<!-- Address selector modal -->
+<div class="modal-overlay" id="addr-modal" onclick="closeAddrModal(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="modal-title">Адрес доставки</div>
+    <div id="modal-addr-list"></div>
+    <div class="modal-add-btn" onclick="closeAddrModal();go('address')">
+      <span style="font-size:20px">➕</span><span id="modal-add-lbl">Добавить новый адрес</span>
+    </div>
+  </div>
+</div>
+
+<!-- Location mismatch confirm -->
+<div class="confirm-overlay" id="loc-confirm">
+  <div class="confirm-box">
+    <div class="confirm-icon">📍</div>
+    <div class="confirm-title" id="lc-title">Вы там?</div>
+    <div class="confirm-msg" id="lc-msg">Похоже, вы находитесь далеко от выбранного адреса. Оформить заказ туда?</div>
+    <div class="confirm-btns">
+      <button class="confirm-yes" onclick="confirmLocYes()" id="lc-yes">Да, заказать</button>
+      <button class="confirm-no" onclick="confirmLocNo()" id="lc-no">Отмена</button>
+    </div>
+  </div>
+</div>
+
+<!-- Product Detail Modal -->
+<div class="pdm-overlay" id="pdm-overlay" onclick="closePDM(event)">
+  <div class="pdm-sheet" id="pdm-sheet" style="position:relative">
+    <div class="pdm-handle"></div>
+    <button class="pdm-close" onclick="closePDMDirect()">✕</button>
+    <div class="pdm-img-box" id="pdm-img-box">
+      <img class="pdm-img" id="pdm-img" src="" alt="" draggable="false">
+      <div class="pdm-zoom-hint" id="pdm-zoom-hint">👌 Pinch to zoom</div>
+    </div>
+    <div class="pdm-body">
+      <div class="pdm-cat" id="pdm-cat"></div>
+      <div class="pdm-name" id="pdm-name"></div>
+      <div class="pdm-desc" id="pdm-desc"></div>
+    </div>
+    <div class="pdm-add-row" id="pdm-add-row"></div>
+  </div>
+</div>
+
+<!-- Back to cart prompt -->
+<div class="modal-overlay" id="back-cart-overlay" onclick="closeBackToCart(event)">
+  <div class="modal-sheet" style="padding:20px 16px calc(20px + var(--safe-bottom))">
+    <div class="modal-handle"></div>
+    <div style="font-size:22px;text-align:center;margin:8px 0 10px">🛒</div>
+    <div id="back-cart-msg" style="font-family:'DM Sans',sans-serif;font-size:20px;color:var(--gold2);text-align:center;margin-bottom:20px"></div>
+    <button class="btn-main" id="back-cart-yes" onclick="go('cart');closeBackToCartDirect()"></button>
+    <button class="btn-outline" id="back-cart-no" onclick="closeBackToCartDirect()" style="margin-top:10px"></button>
+  </div>
+</div>
+
+<!-- ═══ SORT SHEET ═══ -->
+<div class="modal-overlay" id="sort-overlay" onclick="closeSortSheet(event)">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-title" id="sort-sheet-title">Сортировка</div>
+    <div id="sort-options"></div>
+  </div>
+</div>
+
+<!-- Toasts (two elements to avoid stuck animation) -->
+<div class="toast" id="toast0"></div>
+<div class="toast" id="toast1"></div>
+
+<script>
+// ── OFFICES ───────────────────────────────────────────────────────────────────
+const OFFICES=[
+  {id:'office_central',name:'Ambar Central',lat:25.0969,lon:55.1587},
+  {id:'office_north',  name:'Ambar North',  lat:25.0474,lon:55.2386},
+];
+const AREAS={
+  ru:[
+    {lbl:'Центр / Downtown',   office:'office_central'},
+    {lbl:'Дейра / Бур-Дубай', office:'office_central'},
+    {lbl:'Марина / JBR',       office:'office_north'},
+    {lbl:'JLT / Jumeirah',     office:'office_north'},
+    {lbl:'Бизнес Бэй',         office:'office_central'},
+    {lbl:'JVC / JVT',          office:'office_north'},
+    {lbl:'Другой район',       office:'office_central'},
+  ],
+  en:[
+    {lbl:'Downtown / DIFC',   office:'office_central'},
+    {lbl:'Deira / Bur Dubai', office:'office_central'},
+    {lbl:'Marina / JBR',      office:'office_north'},
+    {lbl:'JLT / Jumeirah',    office:'office_north'},
+    {lbl:'Business Bay',      office:'office_central'},
+    {lbl:'JVC / JVT',         office:'office_north'},
+    {lbl:'Other area',        office:'office_central'},
+  ],
+};
+const TYPES={
+  ru:[
+    {id:'home',  icon:'🏠',lbl:'Дом / Вилла',fields:[
+      {k:'villa',   l:'ВИЛЛА / ДОМ',       p:'Вилла 54  или  Mimosa Cluster, Villa 63',req:true},
+      {k:'street',  l:'УЛИЦА / ОРИЕНТИР',   p:'Jumeirah St, рядом с парком',            req:false},
+    ]},
+    {id:'apt',   icon:'🏢',lbl:'Квартира',fields:[
+      {k:'complex', l:'ЖК / ЗДАНИЕ',        p:'Marina Heights',                         req:true},
+      {k:'apt',     l:'НОМЕР КВАРТИРЫ',     p:'702',                                    req:true},
+      {k:'floor',   l:'ЭТАЖ',              p:'7',                                      req:false},
+      {k:'entrance',l:'ПОДЪЕЗД / ВХОД',    p:'B',                                      req:false},
+    ]},
+    {id:'office',icon:'💼',lbl:'Офис',fields:[
+      {k:'building',l:'БЦ / ЗДАНИЕ',        p:'DIFC Gate Building',                     req:true},
+      {k:'floor',   l:'ЭТАЖ',              p:'12',                                     req:false},
+      {k:'room',    l:'ОФИС',              p:'305',                                    req:false},
+    ]},
+    {id:'other', icon:'📌',lbl:'Другое',fields:[
+      {k:'details', l:'ОПИСАНИЕ / ОРИЕНТИР',p:'Любые детали...',                        req:true},
+    ]},
+  ],
+  en:[
+    {id:'home',  icon:'🏠',lbl:'House / Villa',fields:[
+      {k:'villa',   l:'VILLA / HOUSE',      p:'Villa 54  or  Mimosa Cluster, Villa 63', req:true},
+      {k:'street',  l:'STREET / LANDMARK',  p:'Jumeirah St, near the park',             req:false},
+    ]},
+    {id:'apt',   icon:'🏢',lbl:'Apartment',fields:[
+      {k:'complex', l:'BUILDING / COMPLEX', p:'Marina Heights',                         req:true},
+      {k:'apt',     l:'APARTMENT NO.',      p:'702',                                    req:true},
+      {k:'floor',   l:'FLOOR',             p:'7',                                      req:false},
+      {k:'entrance',l:'ENTRANCE / GATE',   p:'B',                                      req:false},
+    ]},
+    {id:'office',icon:'💼',lbl:'Office',fields:[
+      {k:'building',l:'BUILDING / TOWER',   p:'DIFC Gate Building',                     req:true},
+      {k:'floor',   l:'FLOOR',             p:'12',                                     req:false},
+      {k:'room',    l:'OFFICE / UNIT',     p:'305',                                    req:false},
+    ]},
+    {id:'other', icon:'📌',lbl:'Other',fields:[
+      {k:'details', l:'DESCRIPTION',        p:'Any details, landmarks...',              req:true},
+    ]},
+  ],
+};
+
+function hav(a,b,c,d){const R=6371,dl=(c-a)*Math.PI/180,dm=(d-b)*Math.PI/180,e=Math.sin(dl/2)**2+Math.cos(a*Math.PI/180)*Math.cos(c*Math.PI/180)*Math.sin(dm/2)**2;return R*2*Math.atan2(Math.sqrt(e),Math.sqrt(1-e));}
+function nearestOffice(lat,lon){return OFFICES.reduce((b,o)=>{const d=hav(lat,lon,o.lat,o.lon);return(!b||d<b._d)?{...o,_d:d}:b;},null);}
+
+// ── CATALOG ───────────────────────────────────────────────────────────────────
+const CATALOG_FALLBACK=[{"id": "p1", "cat": "Водка", "catE": "Vodka", "name": "Absolut 1 ltr", "nameE": "Absolut 1 ltr", "price": 280, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/photo_2026-02-25%2023.48.27.jpeg", "desc": "Шведская водка с чистым, мягким вкусом и лёгкими зерновыми нотами.", "descE": "Swedish vodka with a clean, smooth profile and subtle grain notes."}, {"id": "p2", "cat": "Водка", "catE": "Vodka", "name": "Stolichnaya 1 ltr", "nameE": "Stolichnaya 1 ltr", "price": 230, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/photo_2026-02-25%2023.48.40.jpeg", "desc": "Классическая водка в русском стиле: мягкая, нейтральная и очень универсальная.", "descE": "Classic Russian-style vodka: smooth, neutral and highly versatile."}, {"id": "p3", "cat": "Водка", "catE": "Vodka", "name": "Russian Standard 1 ltr", "nameE": "Russian Standard 1 ltr", "price": 260, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/photo_2026-02-25%2023.48.37.jpeg", "desc": "Премиальная русская водка с холодной чистотой и аккуратным, сухим финишем.", "descE": "Premium Russian vodka with icy clarity and a crisp, dry finish."}, {"id": "p4", "cat": "Водка", "catE": "Vodka", "name": "Skyy Vodka 1 ltr", "nameE": "Skyy Vodka 1 ltr", "price": 320, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/photo_2026-02-25%2023.48.42.jpeg", "desc": "Американская водка с подчёркнутой мягкостью — идеально для коктейлей.", "descE": "American vodka known for extra smoothness—ideal for cocktails."}, {"id": "p5", "cat": "Водка", "catE": "Vodka", "name": "Smirnoff Vodka 1 ltr", "nameE": "Smirnoff Vodka 1 ltr", "price": 350, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/photo_2026-02-25%2023.48.40.jpeg", "desc": "Лёгкая и сбалансированная водка с чистым финишем для миксов и шотов.", "descE": "Light, well-balanced vodka with a clean finish for mixes and shots."}, {"id": "p6", "cat": "Водка", "catE": "Vodka", "name": "Beluga 0.7 ltr", "nameE": "Beluga 0.7 ltr", "price": 140, "stock": false, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/photo_2026-02-25%2023.48.33.jpeg", "desc": "Элитная водка с бархатистой текстурой и деликатными солодовыми нюансами.", "descE": "Elite vodka with a velvety texture and delicate malt nuances."}, {"id": "p7", "cat": "Водка", "catE": "Vodka", "name": "Grey Goose 1 ltr", "nameE": "Grey Goose 1 ltr", "price": 160, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/photo_2026-02-25%2023.48.39.jpeg", "desc": "Французская премиум‑водка с шелковистой текстурой и мягкой сладостью зерна.", "descE": "French premium vodka with a silky texture and gentle grain sweetness."}, {"id": "p8", "cat": "Водка", "catE": "Vodka", "name": "Belvedere 1 ltr", "nameE": "Belvedere 1 ltr", "price": 200, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/photo_2026-02-25%2023.48.34.jpeg", "desc": "Польская ржаная водка с пряными акцентами и долгим, чистым послевкусием.", "descE": "Polish rye vodka with subtle spice and a long, clean finish."}, {"id": "p9", "cat": "Водка", "catE": "Vodka", "name": "Ciroc 1 ltr", "nameE": "Ciroc 1 ltr", "price": 150, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/photo_2026-02-25%2023.48.36.jpeg", "desc": "Французская водка на основе винограда с мягким фруктовым характером.", "descE": "French grape-based vodka with a smooth, lightly fruity character."}, {"id": "p10", "cat": "Виски", "catE": "Whisky", "name": "Red Label 1 ltr", "nameE": "Red Label 1 ltr", "price": 210, "stock": true, "isNew": false, "img": "", "desc": "Знаменитый шотландский купаж с нотами карамели, специй и лёгкого дыма.", "descE": "Iconic Scotch blend with caramel, spice and a touch of smoke."}, {"id": "p11", "cat": "Виски", "catE": "Whisky", "name": "Black Label 1 ltr", "nameE": "Black Label 1 ltr", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Шотландский купаж 12-летней выдержки: тёплые специи, ваниль и лёгкий дым.", "descE": "Aged 12-year Scotch blend with warm spice, vanilla and gentle smoke."}, {"id": "p12", "cat": "Виски", "catE": "Whisky", "name": "Jack Daniels 1 ltr", "nameE": "Jack Daniels 1 ltr", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Легендарный теннессийский виски, смягчённый угольной фильтрацией, с нотами ванили и дуба.", "descE": "Legendary Tennessee whiskey, charcoal mellowed, with vanilla and oak notes."}, {"id": "p13", "cat": "Виски", "catE": "Whisky", "name": "Chivas Regal 12Y 1 ltr", "nameE": "Chivas Regal 12Y 1 ltr", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Классический 12-летний купаж: мёд, спелые яблоки и сливочная мягкость.", "descE": "Classic 12-year blend with honey, ripe apple and creamy smoothness."}, {"id": "p14", "cat": "Виски", "catE": "Whisky", "name": "Jameson 1 ltr", "nameE": "Jameson 1 ltr", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Мягкий ирландский виски тройной дистилляции с лёгкими цветочными и ореховыми нотами.", "descE": "Smooth triple-distilled Irish whiskey with light floral and nutty notes."}, {"id": "p15", "cat": "Виски", "catE": "Whisky", "name": "Ballantines Finest 1 ltr", "nameE": "Ballantines Finest 1 ltr", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Лёгкий и дружелюбный скотч‑бленд с ванилью, мёдом и мягким дымком.", "descE": "Easy-drinking Scotch blend with vanilla, honey and a soft hint of smoke."}, {"id": "p16", "cat": "Виски", "catE": "Whisky", "name": "Double Black 1 ltr", "nameE": "Double Black 1 ltr", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Более насыщенный и дымный стиль: обжаренный дуб, специи и тёмный шоколад.", "descE": "Richer, smokier style with toasted oak, spice and dark chocolate."}, {"id": "p17", "cat": "Виски", "catE": "Whisky", "name": "Gold Label 1 ltr", "nameE": "Gold Label 1 ltr", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Элегантный купаж с кремовой текстурой, мёдом и нотами сухофруктов.", "descE": "Elegant blend with a creamy texture, honey and dried-fruit notes."}, {"id": "p18", "cat": "Виски", "catE": "Whisky", "name": "Chivas Regal 18Y 1 ltr", "nameE": "Chivas Regal 18Y 1 ltr", "price": 100, "stock": true, "isNew": false, "img": "", "desc": "Премиальный 18-летний купаж: сухофрукты, тёмный шоколад и мягкий дуб.", "descE": "Premium 18-year blend with dried fruit, dark chocolate and soft oak."}, {"id": "p19", "cat": "Виски", "catE": "Whisky", "name": "Jack Daniels Honey 1 ltr", "nameE": "Jack Daniels Honey 1 ltr", "price": 200, "stock": true, "isNew": false, "img": "", "desc": "Теннессийский виски с натуральным мёдом: сладкий, мягкий и ароматный.", "descE": "Tennessee whiskey with real honey—sweet, smooth and aromatic."}, {"id": "p20", "cat": "Виски", "catE": "Whisky", "name": "Gentleman Jack 1 ltr", "nameE": "Gentleman Jack 1 ltr", "price": 200, "stock": true, "isNew": false, "img": "", "desc": "Дважды смягчённый теннессийский виски с особенно мягким, округлым вкусом.", "descE": "Double-mellowed Tennessee whiskey with an exceptionally smooth, rounded taste."}, {"id": "p21", "cat": "Виски", "catE": "Whisky", "name": "Blue Label 1 ltr", "nameE": "Blue Label 1 ltr", "price": 250, "stock": true, "isNew": false, "img": "", "desc": "Коллекционный купаж с глубиной: сухофрукты, дым, пряности и долгий финиш.", "descE": "Collectible blend with depth—dried fruit, smoke, spice and a long finish."}, {"id": "p22", "cat": "Виски", "catE": "Whisky", "name": "Chivas Royal Salute 21Y 1 ltr", "nameE": "Chivas Royal Salute 21Y 1 ltr", "price": 350, "stock": true, "isNew": false, "img": "", "desc": "Королевский 21-летний купаж: мёд, фрукты, орехи и благородные древесные ноты.", "descE": "Royal 21-year blend with honey, fruit, nuts and refined oak."}, {"id": "p23", "cat": "Виски", "catE": "Whisky", "name": "J&B 1 ltr", "nameE": "J&B 1 ltr", "price": 400, "stock": true, "isNew": false, "img": "", "desc": "Лёгкий шотландский купаж с нотами цитруса, ванили и свежего зерна.", "descE": "Light Scotch blend with citrus, vanilla and fresh-grain notes."}, {"id": "p24", "cat": "Виски", "catE": "Whisky", "name": "Chivas Regal 25Y 0.7 ltr", "nameE": "Chivas Regal 25Y 0.7 ltr", "price": 250, "stock": true, "isNew": false, "img": "", "desc": "Редкий 25-летний купаж: густые сухофрукты, шоколад и шелковистая текстура.", "descE": "Rare 25-year blend with dense dried fruit, chocolate and a silky texture."}, {"id": "p25", "cat": "Виски", "catE": "Whisky", "name": "Glenfiddich 12Y 1 ltr", "nameE": "Glenfiddich 12Y 1 ltr", "price": 1400, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/Glenfiddich%2012%20Years%201L.jpg", "desc": "Односолодовый виски с яркой грушей, зелёным яблоком и мягкой дубовой ванилью.", "descE": "Single malt with bright pear, green apple and gentle oaky vanilla."}, {"id": "p26", "cat": "Виски", "catE": "Whisky", "name": "Glenfiddich 15Y 1 ltr", "nameE": "Glenfiddich 15Y 1 ltr", "price": 0, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/Glenfiddich%2015%20Years%201L.jpg", "desc": "Выдержка в разных бочках дарит ноты мёда, пряностей и спелых фруктов.", "descE": "Multi-cask maturation brings honey, spice and ripe fruit notes."}, {"id": "p27", "cat": "Виски", "catE": "Whisky", "name": "Glenfiddich 18Y 0.75 ltr", "nameE": "Glenfiddich 18Y 0.75 ltr", "price": 300, "stock": true, "isNew": false, "img": "", "desc": "Глубокий односолодовый: сухофрукты, тёмный дуб и аккуратные специи.", "descE": "Deep single malt with dried fruit, dark oak and refined spice."}, {"id": "p28", "cat": "Виски", "catE": "Whisky", "name": "Macallan 12Y 0.7 ltr", "nameE": "Macallan 12Y 0.7 ltr", "price": 400, "stock": true, "isNew": false, "img": "", "desc": "Односолодовый виски с оттенками шери, ванили и мягких специй.", "descE": "Single malt with sherry tones, vanilla and gentle spice."}, {"id": "p29", "cat": "Виски", "catE": "Whisky", "name": "Macallan 15Y 0.7 ltr", "nameE": "Macallan 15Y 0.7 ltr", "price": 500, "stock": true, "isNew": false, "img": "", "desc": "Богатый профиль: сухофрукты, апельсиновая цедра и тёплый дуб.", "descE": "Rich profile with dried fruit, orange peel and warm oak."}, {"id": "p30", "cat": "Виски", "catE": "Whisky", "name": "Macallan 18Y 0.75 ltr", "nameE": "Macallan 18Y 0.75 ltr", "price": 150, "stock": true, "isNew": false, "img": "", "desc": "Премиальный односолодовый с глубокой шери‑сладостью и долгим пряным финишем.", "descE": "Premium single malt with deep sherry sweetness and a long spicy finish."}, {"id": "p31", "cat": "Пиво", "catE": "Beer", "name": "Heineken 0.33 can", "nameE": "Heineken 0.33 can", "price": 150, "stock": true, "isNew": false, "img": "", "desc": "Нидерландский лагер с хрустящей свежестью и лёгкой хмелевой горчинкой.", "descE": "Dutch lager with crisp freshness and a light hoppy bitterness."}, {"id": "p59", "cat": "Пиво", "catE": "Beer", "name": "Heineken 0.33 bottle", "nameE": "Heineken 0.33 bottle", "price": 100, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/Heineken%20330ml%20Bottle.jpg", "desc": "Нидерландский лагер с хрустящей свежестью и лёгкой хмелевой горчинкой. (2)", "descE": "Dutch lager with crisp freshness and a light hoppy bitterness. (2)"}, {"id": "p33", "cat": "Пиво", "catE": "Beer", "name": "Budweiser 0.33 can", "nameE": "Budweiser 0.33 can", "price": 1100, "stock": true, "isNew": false, "img": "", "desc": "Американский лагер с чистым, мягким вкусом и лёгкой сладостью солода.", "descE": "American lager with a clean, smooth taste and light malt sweetness."}, {"id": "p61", "cat": "Пиво", "catE": "Beer", "name": "Budweiser 0.33 bottle", "nameE": "Budweiser 0.33 bottle", "price": 250, "stock": true, "isNew": false, "img": "https://github.com/frubo69/Ambar_Pictures/blob/main/Budweiser%20330ml%20Bottle.jpg?raw=true", "desc": "Американский лагер с чистым, мягким вкусом и лёгкой сладостью солода. (2)", "descE": "American lager with a clean, smooth taste and light malt sweetness. (2)"}, {"id": "p39", "cat": "Пиво", "catE": "Beer", "name": "Stella Artois 0.33 can", "nameE": "Stella Artois 0.33 can", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Бельгийский лагер с благородной горчинкой и аккуратным зерновым ароматом.", "descE": "Belgian lager with a refined bitterness and clean grain aroma."}, {"id": "p63", "cat": "Пиво", "catE": "Beer", "name": "Stella Artois 0.33 bottle", "nameE": "Stella Artois 0.33 bottle", "price": 200, "stock": true, "isNew": false, "img": "https://github.com/frubo69/Ambar_Pictures/blob/main/Asahi%20Super%20Dry%20330ml.jpg?raw=true", "desc": "Бельгийский лагер с благородной горчинкой и аккуратным зерновым ароматом. (2)", "descE": "Belgian lager with a refined bitterness and clean grain aroma. (2)"}, {"id": "p37", "cat": "Пиво", "catE": "Beer", "name": "Red Horse 0.5 can", "nameE": "Red Horse 0.5 can", "price": 350, "stock": true, "isNew": false, "img": "", "desc": "Филиппинское крепкое пиво с насыщенным солодовым вкусом и выраженным характером.", "descE": "Filipino strong beer with bold malt flavor and a distinctive character."}, {"id": "p41", "cat": "Пиво", "catE": "Beer", "name": "Amstel Light 0.33 can", "nameE": "Amstel Light 0.33 can", "price": 0, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/Amstel%20Light%20330ml%20Can.jpg", "desc": "Лёгкий лагер с освежающим вкусом и пониженной калорийностью.", "descE": "Light lager with a refreshing taste and reduced calories."}, {"id": "p43", "cat": "Пиво", "catE": "Beer", "name": "Guinness 0.44 can", "nameE": "Guinness 0.44 can", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Ирландский стаут с кремовой пеной и нотами кофе, какао и поджаренного солода.", "descE": "Irish stout with a creamy head and notes of coffee, cocoa and roasted malt."}, {"id": "p45", "cat": "Пиво", "catE": "Beer", "name": "XXL Vodka 0.25 can", "nameE": "XXL Vodka 0.25 can", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Готовый напиток на основе водки: яркий, сладковатый и удобный для вечеринок.", "descE": "Ready-to-drink vodka mix: bold, slightly sweet and party-friendly."}, {"id": "p47", "cat": "Пиво", "catE": "Beer", "name": "Asahi Super Dry 0.33 bottle", "nameE": "Asahi Super Dry 0.33 bottle", "price": 0, "stock": true, "isNew": false, "img": "https://github.com/frubo69/Ambar_Pictures/blob/main/Asahi%20Super%20Dry%20330ml.jpg?raw=true", "desc": "Японский лагер в стиле «super dry»: чистый, сухой и очень освежающий.", "descE": "Japanese 'super dry' lager: clean, dry and highly refreshing."}, {"id": "p49", "cat": "Пиво", "catE": "Beer", "name": "Hoegaarden 0.33 bottle", "nameE": "Hoegaarden 0.33 bottle", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Бельгийское пшеничное нефильтрованное пиво с апельсином и кориандром.", "descE": "Belgian unfiltered wheat beer with orange peel and coriander."}, {"id": "p51", "cat": "Пиво", "catE": "Beer", "name": "Corona Extra 0.355 bottle", "nameE": "Corona Extra 0.355 bottle", "price": 0, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/Amstel%20Light%20330ml%20Can.jpg", "desc": "Мексиканский светлый лагер — лучше всего с долькой лайма.", "descE": "Mexican pale lager—best enjoyed with a wedge of lime."}, {"id": "p53", "cat": "Пиво", "catE": "Beer", "name": "Peroni Nastro Azzurro 0.33 bottle", "nameE": "Peroni Nastro Azzurro 0.33 bottle", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Итальянский лагер с лёгкими цитрусовыми нотами и сухим, чистым послевкусием.", "descE": "Italian lager with light citrus notes and a dry, clean finish."}, {"id": "p55", "cat": "Пиво", "catE": "Beer", "name": "Smirnoff Ice 0.275 bottle", "nameE": "Smirnoff Ice 0.275 bottle", "price": 100, "stock": true, "isNew": false, "img": "", "desc": "Слабоалкогольный микс со сладко‑цитрусовым вкусом, подаётся хорошо охлаждённым.", "descE": "Light alcopop with a sweet citrus taste, best served well chilled."}, {"id": "p57", "cat": "Пиво", "catE": "Beer", "name": "Bacardi Breezer Melon 0.275 bottle", "nameE": "Bacardi Breezer Melon 0.275 bottle", "price": 150, "stock": true, "isNew": false, "img": "", "desc": "Фруктовый слабоалкогольный микс со вкусом дыни — лёгкий и освежающий.", "descE": "Fruity alcopop with melon flavor—light and refreshing."}, {"id": "p65", "cat": "Ром", "catE": "Rum", "name": "Bacardi White 1 ltr", "nameE": "Bacardi White 1 ltr", "price": 250, "stock": true, "isNew": false, "img": "https://github.com/frubo69/Ambar_Pictures/blob/main/Bacardi%20White%20Rum%201L.jpg?raw=true", "desc": "Лёгкий белый ром для коктейлей: чистый вкус и сухой финиш.", "descE": "Light white rum for cocktails with a clean taste and dry finish."}, {"id": "p66", "cat": "Ром", "catE": "Rum", "name": "Bacardi Black 1 ltr", "nameE": "Bacardi Black 1 ltr", "price": 300, "stock": true, "isNew": false, "img": "https://github.com/frubo69/Ambar_Pictures/blob/main/Bacardi%20Black%20Rum%201L.jpg?raw=true", "desc": "Тёмный ром с насыщенными нотами карамели, дуба и лёгкого дыма.", "descE": "Dark rum with rich caramel, oak and a faint smoky touch."}, {"id": "p67", "cat": "Ром", "catE": "Rum", "name": "Bacardi Gold 1 ltr", "nameE": "Bacardi Gold 1 ltr", "price": 250, "stock": true, "isNew": false, "img": "https://github.com/frubo69/Ambar_Pictures/blob/main/Bacardi%20Gold%20Rum%201L.jpg?raw=true", "desc": "Золотой ром средней выдержки с мягкой ванилью и карамельным оттенком.", "descE": "Medium-aged golden rum with soft vanilla and caramel notes."}, {"id": "p68", "cat": "Ром", "catE": "Rum", "name": "Captain Morgan Black 1 ltr", "nameE": "Captain Morgan Black 1 ltr", "price": 100, "stock": true, "isNew": false, "img": "", "desc": "Тёмный ром с пряным характером: карамель, тёплые специи и оттенки дуба.", "descE": "Dark rum with a spicy profile—caramel, warm spices and oak notes."}, {"id": "p69", "cat": "Ром", "catE": "Rum", "name": "Captain Morgan Gold 1 ltr", "nameE": "Captain Morgan Gold 1 ltr", "price": 100, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/Captain%20Morgan%20Gold%201L.jpg", "desc": "Золотой ром со сбалансированной сладостью, ванилью и мягкими древесными нотами.", "descE": "Golden rum with balanced sweetness, vanilla and gentle woody notes."}, {"id": "p70", "cat": "Ром", "catE": "Rum", "name": "Malibu 1 ltr", "nameE": "Malibu 1 ltr", "price": 200, "stock": true, "isNew": false, "img": "", "desc": "Карибский ромовый ликёр с натуральным кокосовым вкусом для тропических коктейлей.", "descE": "Caribbean rum liqueur with natural coconut flavor for tropical cocktails."}, {"id": "p71", "cat": "Вермут", "catE": "Vermouth", "name": "Martini Bianco 1 ltr", "nameE": "Martini Bianco 1 ltr", "price": 300, "stock": true, "isNew": false, "img": "", "desc": "Качественный напиток с гармоничным вкусом и характерным ароматом.", "descE": "A quality drink with a balanced taste and distinctive aroma."}, {"id": "p72", "cat": "Джин", "catE": "Gin", "name": "Gordon's 1 ltr", "nameE": "Gordon's 1 ltr", "price": 350, "stock": true, "isNew": false, "img": "", "desc": "Классический лондонский сухой джин с можжевельником и цитрусом.", "descE": "Classic London Dry Gin with juniper and citrus."}, {"id": "p73", "cat": "Джин", "catE": "Gin", "name": "Bombay Sapphire 1 ltr", "nameE": "Bombay Sapphire 1 ltr", "price": 350, "stock": true, "isNew": false, "img": "https://github.com/frubo69/Ambar_Pictures/blob/main/Bombay%20Sapphire%20Gin%201L.jpg?raw=true", "desc": "Сухой джин с ярким можжевельником и цитрусовыми оттенками из ботаникалов.", "descE": "Dry gin with bold juniper and citrus tones from classic botanicals."}, {"id": "p74", "cat": "Джин", "catE": "Gin", "name": "Hendrick's 1 ltr", "nameE": "Hendrick's 1 ltr", "price": 0, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/Hendricks%20Gin%201L.jpg", "desc": "Шотландский джин с фирменными нотами огурца и розы — идеально с тоником.", "descE": "Scottish gin with signature cucumber and rose notes—perfect with tonic."}, {"id": "p75", "cat": "Джин", "catE": "Gin", "name": "Gordon Pink 0.7 ltr", "nameE": "Gordon Pink 0.7 ltr", "price": 0, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/Gordon%20Premium%20Pink%20Gin%200.7L.jpg", "desc": "Розовый джин с ягодным акцентом и лёгкой сладостью для освежающих миксов.", "descE": "Pink gin with a berry-forward note and light sweetness for refreshing mixes."}, {"id": "p76", "cat": "Джин", "catE": "Gin", "name": "Tanqueray 1 ltr", "nameE": "Tanqueray 1 ltr", "price": 1500, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/Heineken%20330ml%20Bottle.jpg", "desc": "Премиальный лондонский джин с выразительным можжевельником и сухим финишем.", "descE": "Premium London gin with pronounced juniper and a dry finish."}, {"id": "p77", "cat": "Джин", "catE": "Gin", "name": "Monkey 47 0.5 ltr", "nameE": "Monkey 47 0.5 ltr", "price": 1700, "stock": true, "isNew": false, "img": "", "desc": "Немецкий джин из 47 ботаникалов со сложным ароматом трав и цитруса.", "descE": "German gin crafted from 47 botanicals with complex herbal and citrus aroma."}, {"id": "p78", "cat": "Джин", "catE": "Gin", "name": "Malfy Con Arancia 0.7 ltr", "nameE": "Malfy Con Arancia 0.7 ltr", "price": 450, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/Malfy%20Con%20Arancia%20Gin%200.7L.jpg", "desc": "Итальянский джин с сицилийской апельсиновой цедрой — яркий и солнечный профиль.", "descE": "Italian gin infused with Sicilian orange peel for a bright, sunny profile."}, {"id": "p79", "cat": "Джин", "catE": "Gin", "name": "Malfy Rosa 0.7 ltr", "nameE": "Malfy Rosa 0.7 ltr", "price": 1600, "stock": true, "isNew": false, "img": "", "desc": "Итальянский розовый джин с грейпфрутом и ревенем — свежий и ароматный.", "descE": "Italian pink gin with grapefruit and rhubarb—fresh and aromatic."}, {"id": "p80", "cat": "Джин", "catE": "Gin", "name": "Drumshanbo Gunpowder 0.7 ltr", "nameE": "Drumshanbo Gunpowder 0.7 ltr", "price": 400, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/Drumshanbo%20Gunpowder%20Irish%20Gin%20.png", "desc": "Ирландский джин с нотами «gunpowder» чая, цитруса и специй — необычный и свежий.", "descE": "Irish gin with gunpowder tea, citrus and spice notes—distinctive and fresh."}, {"id": "p81", "cat": "Текила", "catE": "Tequila", "name": "Jose Cuervo Silver 1 ltr", "nameE": "Jose Cuervo Silver 1 ltr", "price": 150, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/Jose%20Cuervo%20Especial%20Gold%201L.jpg", "desc": "Классическая серебряная текила: чистый агавовый вкус и свежий, сухой финиш.", "descE": "Classic silver tequila with pure agave flavor and a crisp, dry finish."}, {"id": "p82", "cat": "Текила", "catE": "Tequila", "name": "Jose Cuervo Gold 1 ltr", "nameE": "Jose Cuervo Gold 1 ltr", "price": 150, "stock": true, "isNew": false, "img": "https://github.com/frubo69/Ambar_Pictures/blob/main/Bacardi%20White%20Rum%201L.jpg?raw=true", "desc": "Золотая текила с мягкой сладостью, карамелью и лёгкими древесными нотами.", "descE": "Gold tequila with gentle sweetness, caramel and light woody notes."}, {"id": "p83", "cat": "Текила", "catE": "Tequila", "name": "Patron XO Cafe 0.75 ltr", "nameE": "Patron XO Cafe 0.75 ltr", "price": 200, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/Patron%20XO%20Cafe%20750ml.jpg", "desc": "Кофейный ликёр на основе текилы с насыщенным эспрессо‑вкусом и лёгкой горчинкой.", "descE": "Tequila-based coffee liqueur with rich espresso flavor and a gentle bitterness."}, {"id": "p84", "cat": "Текила", "catE": "Tequila", "name": "Patron Silver 0.75 ltr", "nameE": "Patron Silver 0.75 ltr", "price": 250, "stock": true, "isNew": false, "img": "https://github.com/frubo69/Ambar_Pictures/blob/main/Bacardi%20Gold%20Rum%201L.jpg?raw=true", "desc": "Премиальная бланко‑текила 100% агавы: свежая, цитрусовая и перечная.", "descE": "Premium 100% agave blanco tequila: fresh, citrusy and peppery."}, {"id": "p85", "cat": "Текила", "catE": "Tequila", "name": "Patron Gold 0.75 ltr", "nameE": "Patron Gold 0.75 ltr", "price": 150, "stock": true, "isNew": false, "img": "", "desc": "Выдержанная текила с округлым вкусом, ванилью и тёплыми дубовыми акцентами.", "descE": "Aged tequila with a rounded taste, vanilla and warm oak accents."}, {"id": "p86", "cat": "Текила", "catE": "Tequila", "name": "Don Julio Blanco 70/75cl", "nameE": "Don Julio Blanco 70/75cl", "price": 100, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/Captain%20Morgan%20Gold%201L.jpg", "desc": "Премиальная бланко‑текила: чистая агава, цитрус и мягкий перечный финиш.", "descE": "Premium blanco tequila: clean agave, citrus and a soft peppery finish."}, {"id": "p87", "cat": "Текила", "catE": "Tequila", "name": "Don Julio Reposado 70/75cl", "nameE": "Don Julio Reposado 70/75cl", "price": 150, "stock": true, "isNew": false, "img": "", "desc": "Репосадо‑текила с нотами ванили, карамели и аккуратного дуба после выдержки.", "descE": "Reposado tequila with vanilla, caramel and gentle oak from maturation."}, {"id": "p88", "cat": "Текила", "catE": "Tequila", "name": "Don Julio Anejo 70/75cl", "nameE": "Don Julio Anejo 70/75cl", "price": 300, "stock": true, "isNew": false, "img": "", "desc": "Аньехо‑текила с глубокой карамелью, дубом и тёплыми пряностями в послевкусии.", "descE": "Añejo tequila with deep caramel, oak and warm spice on the finish."}, {"id": "p89", "cat": "Текила", "catE": "Tequila", "name": "Don Julio 1942 70/75cl", "nameE": "Don Julio 1942 70/75cl", "price": 400, "stock": true, "isNew": false, "img": "", "desc": "Ультрапремиальная аньехо‑текила: ваниль, тостированный дуб и долгий шёлковый финиш.", "descE": "Ultra-premium añejo: vanilla, toasted oak and a long silky finish."}, {"id": "p90", "cat": "Текила", "catE": "Tequila", "name": "Clase Azul Reposado 70/75cl", "nameE": "Clase Azul Reposado 70/75cl", "price": 500, "stock": true, "isNew": false, "img": "", "desc": "Иконная репосадо‑текила с бархатистой сладостью, ванилью и богатым дубовым профилем.", "descE": "Iconic reposado tequila with velvety sweetness, vanilla and rich oak character."}, {"id": "p91", "cat": "Коньяк", "catE": "Cognac", "name": "Hennessy VS 1 ltr", "nameE": "Hennessy VS 1 ltr", "price": 450, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/Hendricks%20Gin%201L.jpg", "desc": "Классический VS с яркими фруктовыми нотами и лёгкой древесной пряностью.", "descE": "Classic VS with lively fruit notes and a touch of woody spice."}, {"id": "p92", "cat": "Коньяк", "catE": "Cognac", "name": "Hennessy VSOP 1 ltr", "nameE": "Hennessy VSOP 1 ltr", "price": 1500, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/Gordon%20Premium%20Pink%20Gin%200.7L.jpg", "desc": "Коньяк VSOP с гармонией дуба и фруктов: ваниль, специи и мягкое тепло.", "descE": "VSOP cognac balancing oak and fruit with vanilla, spice and gentle warmth."}, {"id": "p93", "cat": "Коньяк", "catE": "Cognac", "name": "Hennessy XO 1 ltr", "nameE": "Hennessy XO 1 ltr", "price": 800, "stock": true, "isNew": false, "img": "", "desc": "Выразительный XO: сухофрукты, тёмные специи и длительное бархатное послевкусие.", "descE": "Bold XO with dried fruit, dark spice and a long velvety finish."}, {"id": "p94", "cat": "Коньяк", "catE": "Cognac", "name": "Remy Martin VSOP 1 ltr", "nameE": "Remy Martin VSOP 1 ltr", "price": 150, "stock": true, "isNew": false, "img": "", "desc": "Элегантный VSOP с цветочными и фруктовыми нюансами и мягкой дубовой ванилью.", "descE": "Elegant VSOP with floral-fruity nuances and soft oaky vanilla."}, {"id": "p95", "cat": "Ликёр", "catE": "Liqueur", "name": "Baileys 1 ltr", "nameE": "Baileys 1 ltr", "price": 200, "stock": true, "isNew": false, "img": "https://github.com/frubo69/Ambar_Pictures/blob/main/Baileys%20Irish%20Cream%201L.jpg?raw=true", "desc": "Сливочный ирландский ликёр с нотами какао, кофе и мягкого виски.", "descE": "Irish cream liqueur with cocoa, coffee and smooth whiskey notes."}, {"id": "p96", "cat": "Ликёр", "catE": "Liqueur", "name": "Amarula 1 ltr", "nameE": "Amarula 1 ltr", "price": 250, "stock": true, "isNew": false, "img": "https://github.com/frubo69/Ambar_Pictures/blob/main/Amarula%20Cream%201L.jpg?raw=true", "desc": "Сливочный ликёр из марулы с карамельными и тропическими фруктовыми оттенками.", "descE": "Cream liqueur from marula fruit with caramel and tropical fruit notes."}, {"id": "p97", "cat": "Ликёр", "catE": "Liqueur", "name": "Jagermeister 1 ltr", "nameE": "Jagermeister 1 ltr", "price": 0, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/Drumshanbo%20Gunpowder%20Irish%20Gin%20.png", "desc": "Немецкий травяной ликёр на смеси специй и трав: пряный, насыщенный и согревающий.", "descE": "German herbal liqueur of herbs and spices—spicy, bold and warming."}, {"id": "p98", "cat": "Ликёр", "catE": "Liqueur", "name": "Aperol 1 ltr", "nameE": "Aperol 1 ltr", "price": 0, "stock": true, "isNew": false, "img": "https://github.com/frubo69/Ambar_Pictures/blob/main/Aperol%20Aperitivo%201L.jpg?raw=true", "desc": "Итальянский аперитив с горько‑сладким апельсином и лёгкой травяной свежестью.", "descE": "Italian aperitivo with bittersweet orange and a light herbal freshness."}, {"id": "p99", "cat": "Арак", "catE": "Arak", "name": "Arak Touma 0.75 ltr", "nameE": "Arak Touma 0.75 ltr", "price": 100, "stock": true, "isNew": false, "img": "https://github.com/frubo69/Ambar_Pictures/blob/main/Arak%20Touma%20750ml.jpg?raw=true", "desc": "Ливанский арак с выраженным анисовым ароматом — традиционно подают с водой и льдом.", "descE": "Lebanese arak with pronounced anise aroma—traditionally served with water and ice."}, {"id": "p100", "cat": "Арак", "catE": "Arak", "name": "Efe Raki 1 ltr", "nameE": "Efe Raki 1 ltr", "price": 100, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/Patron%20XO%20Cafe%20750ml.jpg", "desc": "Турецкий ракы с насыщенным анисовым вкусом и мягким, согревающим послевкусием.", "descE": "Turkish raki with rich anise flavor and a smooth warming finish."}, {"id": "p101", "cat": "Шампанское", "catE": "Champagne", "name": "Moet Brut 0.75", "nameE": "Moet Brut 0.75", "price": 200, "stock": true, "isNew": false, "img": "", "desc": "Классическое брют‑шампанское: яблоко, цитрус и тонкие дрожжевые оттенки.", "descE": "Classic brut champagne with apple, citrus and subtle yeasty notes."}, {"id": "p102", "cat": "Шампанское", "catE": "Champagne", "name": "Moet Rose 0.75", "nameE": "Moet Rose 0.75", "price": 100, "stock": true, "isNew": false, "img": "", "desc": "Розовое шампанское с нотами клубники, малины и свежих цветов.", "descE": "Rosé champagne with strawberry, raspberry and fresh floral notes."}, {"id": "p103", "cat": "Шампанское", "catE": "Champagne", "name": "Moet Ice 0.75", "nameE": "Moet Ice 0.75", "price": 250, "stock": true, "isNew": false, "img": "", "desc": "Шампанское, созданное для льда: сочные фрукты, мягкая сладость и свежесть.", "descE": "Champagne designed for ice: juicy fruit, gentle sweetness and freshness."}, {"id": "p104", "cat": "Шампанское", "catE": "Champagne", "name": "Veuve Clicquot 0.75", "nameE": "Veuve Clicquot 0.75", "price": 100, "stock": true, "isNew": false, "img": "", "desc": "Знаменитый дом: структурное брют‑шампанское с цитрусом, бриошью и минеральностью.", "descE": "Iconic house: structured brut champagne with citrus, brioche and minerality."}, {"id": "p105", "cat": "Шампанское", "catE": "Champagne", "name": "Ruinart Blanc 0.75", "nameE": "Ruinart Blanc 0.75", "price": 250, "stock": true, "isNew": false, "img": "", "desc": "Элегантный Blanc de Blancs: белые цветы, цитрус и чистая минеральная линия.", "descE": "Elegant Blanc de Blancs with white flowers, citrus and a clean mineral line."}, {"id": "p106", "cat": "Шампанское", "catE": "Champagne", "name": "Dom Perignon 0.75", "nameE": "Dom Perignon 0.75", "price": 200, "stock": true, "isNew": false, "img": "", "desc": "Винтажное шампанское с глубиной: тост, цитрус, миндаль и долгий финиш.", "descE": "Vintage champagne with depth—toast, citrus, almond and a long finish."}, {"id": "p107", "cat": "Просекко", "catE": "Prosecco", "name": "Bottega Prosecco 0.75", "nameE": "Bottega Prosecco 0.75", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Итальянское просекко: свежая груша, белые цветы и лёгкая минеральность.", "descE": "Italian prosecco with fresh pear, white flowers and light minerality."}, {"id": "p108", "cat": "Просекко", "catE": "Prosecco", "name": "Bottega Rose 0.75", "nameE": "Bottega Rose 0.75", "price": 200, "stock": true, "isNew": false, "img": "", "desc": "Розовое просекко с ягодными нотами и мягкой кремовой текстурой пузырьков.", "descE": "Rosé prosecco with berry notes and a softly creamy mousse."}, {"id": "p109", "cat": "Просекко", "catE": "Prosecco", "name": "Bottega Gold 0.75", "nameE": "Bottega Gold 0.75", "price": 100, "stock": true, "isNew": false, "img": "", "desc": "Просекко в культовой золотой бутылке: яблоко, цитрус и цветочная свежесть.", "descE": "Prosecco in the iconic gold bottle with apple, citrus and floral freshness."}, {"id": "p110", "cat": "Просекко", "catE": "Prosecco", "name": "Martini Asti 0.75", "nameE": "Martini Asti 0.75", "price": 200, "stock": true, "isNew": false, "img": "", "desc": "Сладкое игристое Asti: мускат, персик и нежная медовая сладость.", "descE": "Sweet Asti sparkling wine with Muscat, peach and gentle honeyed sweetness."}, {"id": "p111", "cat": "Просекко", "catE": "Prosecco", "name": "Zonin Prosecco 0.75", "nameE": "Zonin Prosecco 0.75", "price": 150, "stock": true, "isNew": false, "img": "", "desc": "Сухое просекко с чистым цветочно‑фруктовым ароматом и освежающим финишем.", "descE": "Dry prosecco with clean floral-fruit aroma and a refreshing finish."}, {"id": "p112", "cat": "Вино", "catE": "Wine", "name": "Jacob Creek Chardonnay 0.75", "nameE": "Jacob Creek Chardonnay 0.75", "price": 150, "stock": true, "isNew": false, "img": "https://github.com/frubo69/Ambar_Pictures/blob/main/Baileys%20Irish%20Cream%201L.jpg?raw=true", "desc": "Белое вино Шардоне с нотами тропических фруктов, цитруса и лёгкого дуба.", "descE": "Chardonnay with tropical fruit, citrus notes and a touch of oak."}, {"id": "p113", "cat": "Вино", "catE": "Wine", "name": "Pinot Grigio Cesari 0.75", "nameE": "Pinot Grigio Cesari 0.75", "price": 200, "stock": true, "isNew": false, "img": "https://github.com/frubo69/Ambar_Pictures/blob/main/Amarula%20Cream%201L.jpg?raw=true", "desc": "Лёгкое Пино Гриджо с зелёным яблоком, грушей и свежей минеральностью.", "descE": "Light Pinot Grigio with green apple, pear and a fresh mineral edge."}, {"id": "p114", "cat": "Вино", "catE": "Wine", "name": "Le Grand Noir Sauvignon Blanc 0.75", "nameE": "Le Grand Noir Sauvignon Blanc 0.75", "price": 200, "stock": true, "isNew": false, "img": "", "desc": "Совиньон Блан с ярким цитрусом, свежей травой и хрустящим финишем.", "descE": "Sauvignon Blanc with bright citrus, fresh herbs and a crisp finish."}, {"id": "p115", "cat": "Вино", "catE": "Wine", "name": "Rimapere Sauvignon Blanc 0.75", "nameE": "Rimapere Sauvignon Blanc 0.75", "price": 0, "stock": true, "isNew": false, "img": "https://github.com/frubo69/Ambar_Pictures/blob/main/Aperol%20Aperitivo%201L.jpg?raw=true", "desc": "Совиньон Блан с ярким цитрусом, свежей травой и хрустящим финишем. (2)", "descE": "Sauvignon Blanc with bright citrus, fresh herbs and a crisp finish. (2)"}, {"id": "p116", "cat": "Вино", "catE": "Wine", "name": "Calvet Sancerre 0.75", "nameE": "Calvet Sancerre 0.75", "price": 100, "stock": true, "isNew": false, "img": "https://github.com/frubo69/Ambar_Pictures/blob/main/Arak%20Touma%20750ml.jpg?raw=true", "desc": "Элегантное белое с минеральностью, цитрусом и чистой кислотностью.", "descE": "Elegant white with minerality, citrus and clean acidity."}, {"id": "p117", "cat": "Вино", "catE": "Wine", "name": "Louis Moreau Chablis 0.75", "nameE": "Louis Moreau Chablis 0.75", "price": 100, "stock": true, "isNew": false, "img": "", "desc": "Элегантное белое с минеральностью, цитрусом и чистой кислотностью. (2)", "descE": "Elegant white with minerality, citrus and clean acidity. (2)"}, {"id": "p118", "cat": "Вино", "catE": "Wine", "name": "Bourgogne Louis Jadot 0.75", "nameE": "Bourgogne Louis Jadot 0.75", "price": 250, "stock": true, "isNew": false, "img": "", "desc": "Вино с гармоничным вкусом и выразительным сортовым характером.", "descE": "A well-balanced wine with a clear varietal character."}, {"id": "p119", "cat": "Вино", "catE": "Wine", "name": "Gavi Di Gavi 0.75", "nameE": "Gavi Di Gavi 0.75", "price": 150, "stock": true, "isNew": false, "img": "", "desc": "Элегантное белое с минеральностью, цитрусом и чистой кислотностью. (3)", "descE": "Elegant white with minerality, citrus and clean acidity. (3)"}, {"id": "p120", "cat": "Вино", "catE": "Wine", "name": "Oyster Bay Sauvignon Blanc 0.75", "nameE": "Oyster Bay Sauvignon Blanc 0.75", "price": 200, "stock": true, "isNew": false, "img": "", "desc": "Совиньон Блан с ярким цитрусом, свежей травой и хрустящим финишем. (3)", "descE": "Sauvignon Blanc with bright citrus, fresh herbs and a crisp finish. (3)"}, {"id": "p121", "cat": "Вино", "catE": "Wine", "name": "Jacob Creek Shiraz 0.75", "nameE": "Jacob Creek Shiraz 0.75", "price": 800, "stock": true, "isNew": false, "img": "", "desc": "Красный Шираз с чёрными ягодами, перцем и тёплыми пряностями.", "descE": "Shiraz with dark berries, black pepper and warm spice."}, {"id": "p122", "cat": "Вино", "catE": "Wine", "name": "Le Grand Noir Merlot 0.75", "nameE": "Le Grand Noir Merlot 0.75", "price": 250, "stock": true, "isNew": false, "img": "", "desc": "Мерло с сочной сливой, вишней и мягкими бархатистыми танинами.", "descE": "Merlot with juicy plum, cherry and soft velvety tannins."}, {"id": "p123", "cat": "Вино", "catE": "Wine", "name": "Castel Barreyres 0.75", "nameE": "Castel Barreyres 0.75", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Вино с гармоничным вкусом и выразительным сортовым характером. (2)", "descE": "A well-balanced wine with a clear varietal character. (2)"}, {"id": "p124", "cat": "Вино", "catE": "Wine", "name": "Chateau Perron 0.75", "nameE": "Chateau Perron 0.75", "price": 100, "stock": true, "isNew": false, "img": "", "desc": "Классическое красное с нотами красных ягод, дуба и благородной структуры.", "descE": "Classic red with red-berry notes, oak and a structured finish."}, {"id": "p125", "cat": "Вино", "catE": "Wine", "name": "Chateau Saint Leon 0.75", "nameE": "Chateau Saint Leon 0.75", "price": 200, "stock": true, "isNew": false, "img": "", "desc": "Классическое красное с нотами красных ягод, дуба и благородной структуры. (2)", "descE": "Classic red with red-berry notes, oak and a structured finish. (2)"}, {"id": "p126", "cat": "Вино", "catE": "Wine", "name": "Campo Viejo Reserva 0.75", "nameE": "Campo Viejo Reserva 0.75", "price": 150, "stock": true, "isNew": false, "img": "", "desc": "Вино с гармоничным вкусом и выразительным сортовым характером. (3)", "descE": "A well-balanced wine with a clear varietal character. (3)"}, {"id": "p127", "cat": "Вино", "catE": "Wine", "name": "Chateau Des Laurets 0.75", "nameE": "Chateau Des Laurets 0.75", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Классическое красное с нотами красных ягод, дуба и благородной структуры. (3)", "descE": "Classic red with red-berry notes, oak and a structured finish. (3)"}, {"id": "p128", "cat": "Вино", "catE": "Wine", "name": "La Celia Malbec 0.75", "nameE": "La Celia Malbec 0.75", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Мальбек с нотами ежевики, спелой сливы и лёгкими дубовыми специями.", "descE": "Malbec with blackberry, ripe plum and gentle oak spice."}, {"id": "p129", "cat": "Вино", "catE": "Wine", "name": "Campo Viejo Gran Reserva 0.75", "nameE": "Campo Viejo Gran Reserva 0.75", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Вино с гармоничным вкусом и выразительным сортовым характером. (4)", "descE": "A well-balanced wine with a clear varietal character. (4)"}, {"id": "p130", "cat": "Вино", "catE": "Wine", "name": "Chateau Lagrange 0.75", "nameE": "Chateau Lagrange 0.75", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Классическое красное с нотами красных ягод, дуба и благородной структуры. (4)", "descE": "Classic red with red-berry notes, oak and a structured finish. (4)"}, {"id": "p131", "cat": "Вино", "catE": "Wine", "name": "Mateus Rose 0.75", "nameE": "Mateus Rose 0.75", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Освежающее розе с ягодными нотами, белыми цветами и сухим финишем.", "descE": "Refreshing rosé with berry notes, white florals and a dry finish."}, {"id": "p132", "cat": "Вино", "catE": "Wine", "name": "Minuty Rose 0.75", "nameE": "Minuty Rose 0.75", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Освежающее розе с ягодными нотами, белыми цветами и сухим финишем. (2)", "descE": "Refreshing rosé with berry notes, white florals and a dry finish. (2)"}, {"id": "p133", "cat": "Вино", "catE": "Wine", "name": "Chateau Ksara Rose 0.75", "nameE": "Chateau Ksara Rose 0.75", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Классическое красное с нотами красных ягод, дуба и благородной структуры. (5)", "descE": "Classic red with red-berry notes, oak and a structured finish. (5)"}, {"id": "p134", "cat": "Вино", "catE": "Wine", "name": "Whispering Angel 0.75", "nameE": "Whispering Angel 0.75", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Вино с гармоничным вкусом и выразительным сортовым характером. (5)", "descE": "A well-balanced wine with a clear varietal character. (5)"}, {"id": "p135", "cat": "Вино", "catE": "Wine", "name": "Saint Maur Rose 0.75", "nameE": "Saint Maur Rose 0.75", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Освежающее розе с ягодными нотами, белыми цветами и сухим финишем. (3)", "descE": "Refreshing rosé with berry notes, white florals and a dry finish. (3)"}, {"id": "p136", "cat": "Вино", "catE": "Wine", "name": "MiP Collection Rose 0.75", "nameE": "MiP Collection Rose 0.75", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Освежающее розе с ягодными нотами, белыми цветами и сухим финишем. (4)", "descE": "Refreshing rosé with berry notes, white florals and a dry finish. (4)"}, {"id": "p137", "cat": "Вино", "catE": "Wine", "name": "Drostdy Hof Premier Grand Cru 5 ltr", "nameE": "Drostdy Hof Premier Grand Cru 5 ltr", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Вино с гармоничным вкусом и выразительным сортовым характером. (6)", "descE": "A well-balanced wine with a clear varietal character. (6)"}, {"id": "p138", "cat": "Вино", "catE": "Wine", "name": "Drostdy Hof Claret Select 5 ltr", "nameE": "Drostdy Hof Claret Select 5 ltr", "price": 0, "stock": true, "isNew": false, "img": "", "desc": "Вино с гармоничным вкусом и выразительным сортовым характером. (7)", "descE": "A well-balanced wine with a clear varietal character. (7)"}, {"id": "p139", "cat": "Ликёр", "catE": "Liqueur", "name": "Tequila Rose Strawberry Cream 0.7 ltr", "nameE": "Tequila Rose Strawberry Cream 0.7 ltr", "price": 200, "stock": true, "isNew": false, "img": "https://raw.githubusercontent.com/frubo69/Ambar_Pictures/refs/heads/main/Liqueur%20De%20Tequila%20Rose%20Strawberry%20Cream%201L.jpg", "desc": "Сливочный ликёр на основе текилы с клубничным вкусом — сладкий и соблазнительный.", "descE": "Tequila-based cream liqueur with strawberry flavor—sweet and indulgent."}];
+let P=[];
+async function loadCatalog(){
+  try{
+    const r=await fetch('catalog.json?t='+Date.now());
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    P=await r.json();
+  }catch(e){
+    console.warn('Catalog fetch failed, using embedded fallback');
+    P=CATALOG_FALLBACK;
+  }
+  buildChips();renderGrid();
+}
+const TIP_OPTS=[0,50,100,200,500];
+
+// ── TRANSLATIONS ──────────────────────────────────────────────────────────────
+const TX={
+ru:{
+  catalog:'Каталог',favs:'Избранное',cart:'Корзина',addrPage:'Адреса',orders:'История',profile:'Профиль',
+  cartSub:'ваша корзина',addrSub:'ваши адреса',ordersSub:'ваша история',profileSub:'ваш профиль',
+  all:'Все',total:'ИТОГО',tip:'ЧАЕВЫЕ',noTip:'Без чаевых',customTip:'✏️ Своя',
+  coBtn:'Оформить заказ →',clearCart:'🗑 Очистить корзину',backCatalog:'← В каталог',
+  addrPill:'Добавьте адрес',addrPillChange:'Изменить',
+  modalTitle:'Адрес доставки',modalAdd:'Добавить новый адрес',
+  cabLabel:'АДРЕС ДОСТАВКИ',cabNoAddr:'Не выбран — нажмите чтобы добавить',cabChange:'Изменить',
+  shSaved:'Сохранённые адреса',addFormTitle:'➕ Добавить адрес',
+  lblArea:'РАЙОН / ЗОНА',lblStreet:'УЛИЦА',lblBuilding:'ДОМ / №',lblTypeGps:'ТИП АДРЕСА',lblTypeMan:'ТИП АДРЕСА',
+  gpsBtn:'Поделиться геолокацией',gpsBtnLoading:'⏳ Определяем...',
+  gpsOk:'✅ Геолокация получена — введите название адреса',gpsFail:'⚠️ Не удалось получить геолокацию',
+  addrLabelReq:'❌ Введите название адреса',
+  lblAddrName:'НАЗВАНИЕ АДРЕСА',saveAddrBtn:'💾 Сохранить адрес',updateAddrBtn:'✏️ Обновить адрес',doneBtn:'Готово ✓',
+  addrSaved:'Адрес сохранён ✓',addrUpdated:'Адрес обновлён ✓',addrDeleted:'Адрес удалён',addrSelected:'Адрес выбран',
+  nearOffice:'Ближайший офис',
+  addrFormErr:'❌ Заполните обязательные поля',areaErr:'❌ Выберите район',
+  noSaved:'Нет сохранённых адресов — добавьте первый!',
+  activeAddrLabel:'АКТИВНЫЙ',
+  ct2:'Номер телефона',phoneLbl:'ТОЛЬКО ЦИФРЫ, 10–15 ЗНАКОВ',phoneErr:'❌ Введите корректный номер (10–15 цифр)',
+  sumTitle:'Ваш заказ',tipLbl:'Чаевые',totLbl:'Итого',placeBtn:'✅ Подтвердить заказ',
+  coAddrTitle:'Адрес доставки',
+  noOrders:'Заказов пока нет',noActive:'Нет активных заказов',
+  stP:'🟡 Ожидает',stC:'🟢 Принят',stD:'✅ Доставлен',stX:'❌ Отменён',
+  added:'Добавлено',emptyCart:'Корзина пуста',
+  placed:'✅ Заказ оформлен! Ожидайте звонка.',
+  activeOrders:'Активные заказы',oos:'НЕТ',oosLabel:'Нет в наличии',
+  statOrders:'ЗАКАЗОВ',statActive:'АКТИВНЫХ',statSpent:'ПОТРАЧЕНО',
+  noAddrWarning:'Сначала добавьте адрес доставки',
+  lcTitle:'Вы там?',
+  lcMsg:'Похоже, вы сейчас далеко от выбранного адреса. Всё равно оформить заказ туда?',
+  lcYes:'Да, оформить',lcNo:'Отмена',
+},
+en:{
+  catalog:'Catalog',favs:'Favourites',cart:'Cart',addrPage:'Addresses',orders:'History',profile:'Profile',
+  cartSub:'your cart',addrSub:'your addresses',ordersSub:'your history',profileSub:'your profile',
+  all:'All',total:'TOTAL',tip:'TIP',noTip:'No tip',customTip:'✏️ Custom',
+  coBtn:'Checkout →',clearCart:'🗑 Clear cart',backCatalog:'← Back to catalog',
+  addrPill:'Add address',addrPillChange:'Change',
+  modalTitle:'Delivery address',modalAdd:'Add new address',
+  cabLabel:'DELIVERY ADDRESS',cabNoAddr:'Not set — tap to add',cabChange:'Change',
+  shSaved:'Saved addresses',addFormTitle:'➕ Add address',
+  lblArea:'AREA / ZONE',lblStreet:'STREET',lblBuilding:'BUILDING / №',lblTypeGps:'ADDRESS TYPE',lblTypeMan:'ADDRESS TYPE',
+  gpsBtn:'Share my location',gpsBtnLoading:'⏳ Getting location...',
+  gpsOk:'✅ Location received — enter address label',gpsFail:'⚠️ Could not get location',
+  addrLabelReq:'❌ Enter address label',
+  lblAddrName:'ADDRESS LABEL',saveAddrBtn:'💾 Save address',updateAddrBtn:'✏️ Update address',doneBtn:'Done ✓',
+  addrSaved:'Address saved ✓',addrUpdated:'Address updated ✓',addrDeleted:'Address removed',addrSelected:'Address selected',
+  nearOffice:'Nearest office',
+  addrFormErr:'❌ Fill in required fields',areaErr:'❌ Select an area',
+  noSaved:'No saved addresses — add your first one!',
+  activeAddrLabel:'ACTIVE',
+  ct2:'Phone Number',phoneLbl:'DIGITS ONLY, 10–15 DIGITS',phoneErr:'❌ Enter a valid phone (10–15 digits)',
+  sumTitle:'Your order',tipLbl:'Tip',totLbl:'Total',placeBtn:'✅ Confirm order',
+  coAddrTitle:'Delivery address',
+  noOrders:'No orders yet',noActive:'No active orders',
+  stP:'🟡 Pending',stC:'🟢 Confirmed',stD:'✅ Delivered',stX:'❌ Cancelled',
+  added:'Added',emptyCart:'Cart is empty',
+  placed:'✅ Order placed! We\'ll call you.',
+  activeOrders:'Active orders',oos:'N/A',oosLabel:'Out of stock',
+  statOrders:'ORDERS',statActive:'ACTIVE',statSpent:'SPENT AED',
+  noAddrWarning:'Please add a delivery address first',
+  lcTitle:'Are you there?',
+  lcMsg:'It looks like you\'re not near the selected address. Order there anyway?',
+  lcYes:'Yes, order',lcNo:'Cancel',
+},
+};
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let lang='ru',cart={},beerPcs={},catF='all',tip=0; // beerPcs: {id: 12|24}
+let sortMode='none';
+let catFilter=null; // null = all, string = selected category
+let favs=new Set(JSON.parse(localStorage.getItem('ambar_favs')||'[]'));
+let showFavOnly=false;
+let curMethod='gps',selTypeGps=null,selTypeMan=null,selArea=null;
+let locInfo=null,editingAddrIdx=null;
+let activeAddrIdx=null;
+let fromCart=false; // flag: user was redirected here from cart
+let orders=JSON.parse(localStorage.getItem('ambar_orders')||'[]');
+// API base URL — resolved from: ?api= query param → localStorage → window global → same origin.
+const AMBAR_API=(()=>{
+  try{const u=new URLSearchParams(window.location.search).get('api');if(u)return u.replace(/\/$/,'');}catch(e){}
+  try{const s=localStorage.getItem('ambar_api_url');if(s)return s.replace(/\/$/,'');}catch(e){}
+  return window.AMBAR_API_URL||window.location.origin;
+})();
+let curPg='catalog';
+let pendingOrderConfirmed=false; // for location mismatch flow
+const tg=window.Telegram?.WebApp||null;
+
+// ── LOGO SUB ALIGN ────────────────────────────────────────────────────────────
+function alignLogoSubs(){
+  document.querySelectorAll('.logo-grp').forEach(g=>{
+    const logo=g.querySelector('.logo');
+    const sub=g.querySelector('.logo-sub');
+    if(!logo)return;
+    const lw=logo.offsetWidth;
+    if(!lw)return;
+    g.querySelectorAll('.logo-line').forEach(l=>l.style.width=lw+'px');
+    if(!sub)return;
+    sub.style.letterSpacing='0px';
+    const sw=sub.scrollWidth;
+    if(!sw)return;
+    const n=sub.textContent.trim().length;
+    if(n<1)return;
+    sub.style.letterSpacing=((lw-sw-10)/n)+'px';
+  });
+}
+
+// ── BOOT ──────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded',()=>{
+  if(tg){tg.ready();tg.expand();tg.setHeaderColor&&tg.setHeaderColor('#07070E');tg.setBackgroundColor&&tg.setBackgroundColor('#07070E');tg.enableClosingConfirmation&&tg.enableClosingConfirmation();}
+  // Restore active address index
+  const saved=localStorage.getItem('ambar_active_addr');
+  if(saved!==null) activeAddrIdx=parseInt(saved);
+  // Validate it still exists
+  if(activeAddrIdx!==null&&!getSaved()[activeAddrIdx]) activeAddrIdx=null;
+  buildTips();syncOrders();applyLang();loadCatalog();updateFavBtn();updateSortBtn();
+  alignLogoSubs();
+  document.fonts?.ready?.then(alignLogoSubs);
+  // Pre-fill saved phone
+  const savedPhone=localStorage.getItem('ambar_phone');
+  if(savedPhone)el('phone-in').value=savedPhone;
+  updateAddrPill();updateCartAddrBar();
+  // Tip input keyboard handling
+  const ti=el('tip-input'),clw=document.querySelector('.cart-list-wrap');
+  ti.addEventListener('focus',()=>{if(clw)clw.classList.add('tip-kbd');el('tip-done-btn').style.display='block';});
+  ti.addEventListener('blur',()=>{if(clw)clw.classList.remove('tip-kbd');setTimeout(()=>el('tip-done-btn').style.display='none',150);});
+  ti.addEventListener('keydown',e=>{if(e.key==='Enter'||e.keyCode===13)ti.blur();});
+  // Address form keyboard handling
+  const ac=el('addr-comment-in'),adb=el('addr-done-btn');
+  ac.addEventListener('focus',()=>{adb.style.display='block';setTimeout(()=>ac.scrollIntoView({behavior:'smooth',block:'center'}),300);});
+  ac.addEventListener('blur',()=>{setTimeout(()=>adb.style.display='none',150);});
+  const an=el('addr-name-in'),andb=el('addr-name-done-btn');
+  an.addEventListener('focus',()=>{andb.style.display='block';setTimeout(()=>an.scrollIntoView({behavior:'smooth',block:'center'}),300);});
+  an.addEventListener('blur',()=>{setTimeout(()=>andb.style.display='none',150);});
+  // Scroll any focused input into view when keyboard opens/closes
+  el('pg-address').addEventListener('focusin',e=>{
+    if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')
+      setTimeout(()=>e.target.scrollIntoView({behavior:'smooth',block:'center'}),300);
+  });
+  function updVph(){document.documentElement.style.setProperty('--tg-h',(tg?tg.viewportHeight:window.innerHeight)+'px');}
+  updVph();
+  window.addEventListener('resize',updVph);
+  if(tg) tg.onEvent('viewportChanged',()=>{
+    updVph();
+    const ae=document.activeElement;
+    if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))
+      setTimeout(()=>ae.scrollIntoView({behavior:'smooth',block:'center'}),120);
+  });
+  const scEl=el('saved-cards');
+  if(scEl) scEl.addEventListener('scroll',updateScThumb);
+  const clEl=el('cart-list');
+  if(clEl) clEl.addEventListener('scroll',updateCartThumb);
+});
+
+// ── HELPERS ───────────────────────────────────────────────────────────────────
+function t(k){return TX[lang][k]||TX.ru[k]||k;}
+function el(id){return document.getElementById(id);}
+function set(id,v){const e=el(id);if(e)e.textContent=v;}
+
+// ── LANGUAGE ──────────────────────────────────────────────────────────────────
+function flipLang(){
+  lang=lang==='ru'?'en':'ru';
+  applyLang();buildChips();renderGrid();buildTips();renderOrders();renderCart();buildSummary();buildProfile();updateSortBtn();
+  buildTypeChips('gps');buildTypeChips('man');buildAreaChips();renderSavedCards();updateAddrPill();updateCartAddrBar();
+}
+function applyLang(){
+  const f=lang==='ru'?'🇷🇺':'🇬🇧';
+  document.querySelectorAll('.lang-btn').forEach(b=>b.textContent=f);
+  set('catalog-page-title',showFavOnly?t('favs'):t('catalog'));set('ls-cart',t('cartSub'));set('ls-addr',t('addrSub'));
+  set('ls-ord',t('ordersSub'));set('ls-prof',t('profileSub'));
+  alignLogoSubs();
+  set('sh-orders',t('orders'));set('sh-active',t('activeOrders'));
+  set('nbl-cat',t('catalog'));set('nbl-cart',t('cart'));set('nbl-addr',t('addrPage'));
+  set('nbl-ord',t('orders'));set('nbl-prof',t('profile'));
+  set('tot-lbl',t('total'));set('co-btn',t('coBtn'));set('clear-btn',t('clearCart'));set('back-catalog-btn',t('backCatalog'));
+  set('modal-title',t('modalTitle'));set('modal-add-lbl',t('modalAdd'));
+  set('sh-saved-addr',t('shSaved'));set('add-form-title',t('addFormTitle'));
+  set('lbl-area',t('lblArea'));set('lbl-street',t('lblStreet'));set('lbl-building',t('lblBuilding'));
+  set('lbl-type-gps',t('lblTypeGps'));set('lbl-type-man',t('lblTypeMan'));
+  set('gps-lbl',t('gpsBtn'));
+  set('lbl-addr-name',t('lblAddrName'));set('save-addr-btn',t('saveAddrBtn'));
+  set('addr-name-done-btn',t('doneBtn'));set('addr-done-btn',t('doneBtn'));set('tip-done-btn',t('doneBtn'));
+  set('cab-label',t('cabLabel'));
+  set('ct2',t('ct2'));set('phone-lbl',t('phoneLbl'));
+  el('phone-in').placeholder=lang==='ru'?'79001234567':'971501234567';
+  const si=el('search-inp');if(si)si.placeholder=lang==='ru'?'Поиск...':'Search...';
+  el('man-street').placeholder=lang==='ru'?'Jumeirah St':'Jumeirah St';
+  el('man-building').placeholder=lang==='ru'?'12B':'12B';
+  el('addr-name-in').placeholder=lang==='ru'?'Дом / Офис / JVC...':'Home / Office / JVC...';
+  set('lbl-addr-comment',lang==='ru'?'КОММЕНТАРИЙ ДЛЯ КУРЬЕРА':'COMMENT FOR COURIER');
+  el('addr-comment-in').placeholder = lang==='ru' ? 'Например: проедьте чуть дальше шлагбаума, я встречу вас там...' : 'For example: drive a bit past the barrier, I will meet you there...';
+  set('sum-title',t('sumTitle'));set('sum-tip-lbl',t('tipLbl'));set('sum-tot-lbl',t('totLbl'));
+  set('place-btn',t('placeBtn'));set('tip-lbl',t('tip'));set('co-addr-title',t('coAddrTitle'));
+  el('tip-input').placeholder=lang==='ru'?'Введите сумму...':'Enter amount...';
+  set('mtl-gps','GPS');set('mtl-manual',lang==='ru'?'Вручную':'Manual');
+  set('lc-title',t('lcTitle'));set('lc-msg',t('lcMsg'));set('lc-yes',t('lcYes'));set('lc-no',t('lcNo'));
+}
+
+// ── PAGES ─────────────────────────────────────────────────────────────────────
+const PAGES=['catalog','cart','address','orders','profile','checkout'];
+function go(p){
+  dismissToast();
+  PAGES.forEach(id=>{
+    el('pg-'+id)?.classList.toggle('hidden',id!==p);
+    el('nb-'+id)?.classList.toggle('on',id===p);
+  });
+  curPg=p;
+  if(p==='cart'){renderCart();updateCartAddrBar();}
+  if(p==='orders')syncOrders();  // fetch latest from API, fall back to localStorage
+  if(p==='address'){renderSavedCards();buildAreaChips();buildTypeChips('man'); /* GPS uses label+comment only */}
+  if(p==='profile'){syncOrders();}
+  if(p==='checkout')buildSummary();
+}
+
+// ── SAVED ADDRESSES ───────────────────────────────────────────────────────────
+function getSaved(){return JSON.parse(localStorage.getItem('ambar_saved')||'[]');}
+function setSaved(a){localStorage.setItem('ambar_saved',JSON.stringify(a.slice(0,10)));}
+function setActiveAddr(idx){
+  activeAddrIdx=idx;
+  if(idx===null)localStorage.removeItem('ambar_active_addr');
+  else localStorage.setItem('ambar_active_addr',String(idx));
+  updateAddrPill();updateCartAddrBar();
+}
+
+function updateAddrPill(){
+  const arr=getSaved();
+  const txt=el('addr-pill-txt');
+  const lbl=el('addr-pill-label');
+  if(!txt)return;
+  if(activeAddrIdx!==null&&arr[activeAddrIdx]){
+    if(lbl)lbl.textContent=lang==='ru'?'ДОСТАВКА В':'DELIVER TO';
+    txt.textContent=arr[activeAddrIdx].label||arr[activeAddrIdx].address;
+    txt.style.color='var(--text)';
+  } else {
+    if(lbl)lbl.textContent=lang==='ru'?'АДРЕС':'ADDRESS';
+    txt.textContent=t('addrPill');
+    txt.style.color='var(--muted)';
+  }
+}
+
+function updateCartAddrBar(){
+  const arr=getSaved();
+  const cab=el('cab-addr');if(!cab)return;
+  if(activeAddrIdx!==null&&arr[activeAddrIdx]){
+    const a=arr[activeAddrIdx];
+    let street=a.street||'';
+    if(!street&&!a.address.startsWith('📍 GPS:')&&!a.address.match(/^\d{2,3}\.\d/))
+      street=a.address.split('|')[0].split('—').pop().trim();
+    const display=a.label&&street?a.label+' · '+street:a.label||street||a.address;
+    cab.textContent=display;
+    cab.style.color='var(--text)';
+  } else {
+    cab.textContent=t('cabNoAddr');
+    cab.style.color='var(--muted)';
+  }
+}
+
+function renderSavedCards(){
+  const arr=getSaved();
+  const wrap=el('saved-cards');if(!wrap)return;
+  const wrapOuter=el('saved-cards-wrap');
+  if(wrapOuter) wrapOuter.classList.toggle('few', arr.length<=3);
+  if(!arr.length){
+    wrap.innerHTML=`<div class="empty" style="padding:24px 0"><div class="empty-icon">📍</div><div>${t('noSaved')}</div></div>`;
+    return;
+  }
+  wrap.innerHTML=arr.map((a,i)=>{
+    const isActive=i===activeAddrIdx;
+    const typeIcon=a.typeIcon||'📍';
+    const commentHtml=a.comment?`<div class="sc-comment">💬 ${a.comment}</div>`:'';
+    const addrShort=a.label&&a.label!==a.address?a.address:'';
+    return`<div class="saved-card${isActive?' active-addr':''}" onclick="selectAddr(${i})">
+      <div class="sc-radio"><div class="sc-radio-dot"></div></div>
+      <span class="sc-icon">${typeIcon}</span>
+      <div class="sc-info">
+        <div class="sc-row1">
+          <span class="sc-label">${a.label||a.address}</span>
+          ${addrShort?`<span class="sc-sep">·</span><span class="sc-addr">${addrShort}</span>`:''}
+        </div>
+        ${commentHtml}
+      </div>
+      <div class="sc-actions">
+        <button class="sc-edit-btn" onclick="event.stopPropagation();editAddr(${i})">✏️</button>
+        <button class="sc-del-btn" onclick="event.stopPropagation();deleteAddr(${i})">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+  updateScThumb();
+}
+function updateScThumb(){
+  const sc=el('saved-cards'),thumb=el('sc-thumb');
+  if(!sc||!thumb)return;
+  const ratio=sc.clientHeight/sc.scrollHeight;
+  if(ratio>=1){thumb.style.display='none';return;}
+  const trackH=sc.clientHeight-16;
+  const thumbH=Math.max(16,trackH*ratio);
+  const maxScroll=sc.scrollHeight-sc.clientHeight;
+  const pos=maxScroll>0?sc.scrollTop/maxScroll:0;
+  const thumbTop=8+pos*(trackH-thumbH);
+  thumb.style.display='block';
+  thumb.style.height=thumbH+'px';
+  thumb.style.top=thumbTop+'px';
+}
+
+function selectAddr(i){
+  setActiveAddr(i);
+  renderSavedCards();
+  closeAddrModal();
+  showToast(t('addrSelected')+': '+(getSaved()[i]?.label||''),'ok');
+}
+
+function deleteAddr(i){
+  const arr=getSaved();arr.splice(i,1);setSaved(arr);
+  // Adjust active index
+  if(activeAddrIdx===i) setActiveAddr(arr.length?0:null);
+  else if(activeAddrIdx!==null&&activeAddrIdx>i) setActiveAddr(activeAddrIdx-1);
+  renderSavedCards();renderModalAddrList();
+  showToast(t('addrDeleted'),'ok');
+}
+function editAddr(i){
+  const a=getSaved()[i];if(!a)return;
+  resetAddrForm();
+  editingAddrIdx=i;
+  set('add-form-title',lang==='ru'?'✏️ Редактировать адрес':'✏️ Edit address');
+  set('save-addr-btn',t('updateAddrBtn'));
+  el('addr-name-in').value=a.label||'';
+  el('addr-comment-in').value=a.comment||'';
+  const isGps=!!(a.lat&&a.lon);
+  if(isGps){
+    switchMethod('gps');
+    locInfo={lat:a.lat,lon:a.lon,office_id:a.office_id||'office_central',office_name:a.office_name||OFFICES[0].name,street:a.street||''};
+    const stat=el('gps-status');stat.className='gps-status ok';stat.textContent=t('gpsOk');
+    el('gps-extra').style.display='block';
+    if(a.typeId){selTypeGps=a.typeId;buildTypeChips('gps');}
+  } else {
+    switchMethod('manual');
+    if(a.areaIdx!==null&&a.areaIdx!==undefined)pickArea(a.areaIdx);
+    el('man-street').value=a.streetPart||a.street||'';
+    el('man-building').value=a.buildingPart||'';
+    if(a.typeId){selTypeMan=a.typeId;buildTypeChips('man');}
+  }
+  setTimeout(()=>el('addr-form-card')?.scrollIntoView({behavior:'smooth',block:'start'}),100);
+}
+
+// ── ADDRESS MODAL ─────────────────────────────────────────────────────────────
+function openAddrModal(){
+  renderModalAddrList();
+  el('addr-modal').classList.add('show');
+}
+function closeAddrModal(e){
+  if(e&&e.target!==el('addr-modal'))return;
+  el('addr-modal').classList.remove('show');
+}
+function renderModalAddrList(){
+  const arr=getSaved();
+  const list=el('modal-addr-list');if(!list)return;
+  if(!arr.length){
+    list.innerHTML=`<div style="padding:20px 16px;font-size:13px;color:var(--muted)">${t('noSaved')}</div>`;return;
+  }
+  list.innerHTML=arr.map((a,i)=>`
+    <div class="modal-addr-item${i===activeAddrIdx?' active':''}" onclick="selectAddr(${i})">
+      <span class="mai-icon">${a.typeIcon||'📍'}</span>
+      <div class="mai-info">
+        <div class="mai-label">${a.label||a.address}</div>
+        <div class="mai-addr">${a.label&&a.label!==a.address?a.address:a.office_name||''}</div>
+      </div>
+      ${i===activeAddrIdx?'<span class="mai-check">✓</span>':''}
+    </div>
+  `).join('');
+}
+
+// ── METHOD TABS ───────────────────────────────────────────────────────────────
+function switchMethod(m){
+  curMethod=m;
+  ['gps','manual'].forEach(id=>{
+    el('mtab-'+id)?.classList.toggle('on',id===m);
+    el('mpanel-'+id)?.classList.toggle('show',id===m);
+  });
+  if(m==='manual'){buildAreaChips();buildTypeChips('man');}
+  if(m==='gps'){
+    // GPS-only flow: do not show address type/street fields.
+    const ge=el('gps-extra'); if(ge) ge.style.display='none';
+    const gf=el('tfields-gps'); if(gf) gf.innerHTML='';
+    selTypeGps=null;
+  }
+  const ae=el('addr-form-err');if(ae){ae.classList.remove('on');ae.textContent='';}
+}
+
+// ── AREA CHIPS ────────────────────────────────────────────────────────────────
+function buildAreaChips(){
+  const ac=el('area-chips');if(!ac)return;
+  ac.innerHTML=AREAS[lang].map((a,i)=>`
+    <button class="type-chip${selArea===i?' on':''}" onclick="pickArea(${i})">${a.lbl}</button>
+  `).join('');
+}
+function pickArea(i){
+  selArea=i;buildAreaChips();
+  const area=AREAS[lang][i];
+  const off=OFFICES.find(o=>o.id===area.office)||OFFICES[0];
+  locInfo={lat:0,lon:0,office_id:off.id,office_name:off.name};
+}
+
+// ── TYPE CHIPS ────────────────────────────────────────────────────────────────
+function buildTypeChips(p){
+  const types=TYPES[lang];
+  const sel=p==='gps'?selTypeGps:selTypeMan;
+  const chipsEl=el('tchips-'+p);
+  if(!chipsEl)return;
+  chipsEl.innerHTML=types.map(tp=>`
+    <button class="type-chip${tp.id===sel?' on':''}" onclick="pickType('${p}','${tp.id}')">${tp.icon} ${tp.lbl}</button>
+  `).join('');
+}
+function pickType(p,id){
+  if(p==='gps')selTypeGps=id;else selTypeMan=id;
+  buildTypeChips(p);
+}
+function renderFields(p,tp){
+  const el_=el('tfields-'+p);if(!el_)return;
+  let html='';
+  for(let i=0;i<tp.fields.length;i+=2){
+    const a=tp.fields[i],b=tp.fields[i+1];
+    const optA=!a.req?` <span style="color:var(--muted);font-size:8px">(${lang==='ru'?'необяз.':'opt.'})</span>`:'';
+    const optB=b&&!b.req?` <span style="color:var(--muted);font-size:8px">(${lang==='ru'?'необяз.':'opt.'})</span>`:'';
+    html+=`<div class="frow">
+      <div><label class="flabel">${a.l}${optA}</label><input class="finput" id="f-${p}-${a.k}" type="text" placeholder="${a.p}"></div>
+      ${b?`<div><label class="flabel">${b.l}${optB}</label><input class="finput" id="f-${p}-${b.k}" type="text" placeholder="${b.p}"></div>`:''}
+    </div>`;
+  }
+  el_.innerHTML=html;
+}
+
+// ── GPS ───────────────────────────────────────────────────────────────────────
+function grabGPS(){
+  const btn=el('gps-btn'),stat=el('gps-status');
+  btn.style.opacity='0.6';set('gps-lbl',t('gpsBtnLoading'));stat.className='gps-status';
+  if(!navigator.geolocation){fail();return;}
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const{latitude:lat,longitude:lon}=pos.coords;
+    const off=nearestOffice(lat,lon);
+    locInfo={lat,lon,office_id:off.id,office_name:off.name,street:''};
+    btn.style.opacity='1';set('gps-lbl',t('gpsBtn'));
+    stat.className='gps-status ok';stat.textContent=t('gpsOk');
+    selTypeGps=null;
+    el('gps-extra').style.display='none';
+    el('tfields-gps').innerHTML='';
+    // Reverse geocode to get street name
+    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`)
+      .then(r=>r.json())
+      .then(d=>{
+        const a=d.address||{};
+        const road=a.road||a.pedestrian||a.suburb||a.neighbourhood||'';
+        const num=a.house_number||'';
+        locInfo.street=(road+(num?' '+num:'')).trim();
+      })
+      .catch(()=>{});
+  },()=>fail(),{timeout:10000,maximumAge:60000,enableHighAccuracy:true});
+  function fail(){btn.style.opacity='1';set('gps-lbl',t('gpsBtn'));stat.className='gps-status fail';stat.textContent=t('gpsFail');}
+}
+
+
+
+// ── BUILD ADDRESS STRING ──────────────────────────────────────────────────────
+function buildAddrStr(p){
+  const types=TYPES[lang];
+  const sel=p==='gps'?selTypeGps:selTypeMan;
+  if(!sel)return null;
+  const tp=types.find(x=>x.id===sel);if(!tp)return null;
+  // Check required
+  const missing=tp.fields.filter(f=>f.req&&!(el('f-'+p+'-'+f.k)?.value||'').trim());
+  if(missing.length)return null;
+  const parts=[];
+  if(p==='manual'){
+    if(selArea!==null){const area=AREAS[lang][selArea];if(area)parts.push(area.lbl);}
+    const s=(el('man-street')?.value||'').trim();if(s)parts.push(s);
+  }
+  tp.fields.forEach(f=>{const v=(el('f-'+p+'-'+f.k)?.value||'').trim();if(v)parts.push(f.l+': '+v);});
+  if(!parts.length)return null;
+  return tp.icon+' '+tp.lbl+' — '+parts.join(' | ');
+}
+
+// ── SAVE NEW ADDRESS ──────────────────────────────────────────────────────────
+function saveNewAddress(){
+  const ae=el('addr-form-err');ae.classList.remove('on');ae.textContent='';
+
+  // Validate method
+  if(curMethod==='manual'&&selArea===null){
+    ae.textContent=t('areaErr');ae.classList.add('on');return;
+  }
+  if(curMethod==='gps'&&!locInfo){
+    ae.textContent=t('gpsFail');ae.classList.add('on');return;
+  }
+
+  const label=(el('addr-name-in')?.value||'').trim();
+  if(!label){ae.textContent=t('addrLabelReq');ae.classList.add('on');return;}
+
+  const comment=(el('addr-comment-in')?.value||'').trim();
+
+  // Build address string
+  let addrStr='';
+  let typeIcon='📍';
+  let streetShort='';
+  if(curMethod==='gps'){
+    const lat=Number(locInfo?.lat||0);
+    const lon=Number(locInfo?.lon||0);
+    streetShort=locInfo?.street||'';
+    addrStr=streetShort||`${lat.toFixed(5)}, ${lon.toFixed(5)}`;
+  } else {
+    const street=(el('man-street')?.value||'').trim();
+    const building=(el('man-building')?.value||'').trim();
+    if(!street&&!building){ae.textContent=t('addrFormErr');ae.classList.add('on');return;}
+    const tp=TYPES[lang].find(x=>x.id===selTypeMan);
+    typeIcon=tp?.icon||'📍';
+    const areaPart=selArea!==null?(AREAS[lang][selArea]?.lbl||''):'';
+    streetShort=[street,building].filter(Boolean).join(' ');
+    addrStr=[areaPart,street,building].filter(Boolean).join(', ');
+  }
+
+  const newAddr={
+    label:label,
+    address:addrStr,
+    street:streetShort,
+    streetPart:curMethod==='manual'?(el('man-street')?.value||'').trim():'',
+    buildingPart:curMethod==='manual'?(el('man-building')?.value||'').trim():'',
+    areaIdx:curMethod==='manual'?selArea:null,
+    typeId:curMethod==='gps'?selTypeGps:selTypeMan,
+    typeIcon:typeIcon,
+    lat:curMethod==='gps'?(locInfo?.lat||0):0,
+    lon:curMethod==='gps'?(locInfo?.lon||0):0,
+    office_id:curMethod==='gps'?(locInfo?.office_id||'office_central'):'office_central',
+    office_name:curMethod==='gps'?(locInfo?.office_name||OFFICES[0].name):OFFICES[0].name,
+    comment:comment,
+  };
+
+  const arr=getSaved();
+  if(editingAddrIdx!==null){
+    const idx=editingAddrIdx;
+    arr[idx]=newAddr;
+    setSaved(arr);
+    if(activeAddrIdx===idx){updateCartAddrBar();updateAddrPill();}
+    resetAddrForm();
+    renderSavedCards();
+    if(fromCart){fromCart=false;setTimeout(()=>{const msg=lang==='ru'?'Вернуться в корзину и оформить заказ?':'Go back to cart and place order?';const yes=lang==='ru'?'В корзину →':'To cart →';const no=lang==='ru'?'Остаться':'Stay';showBackToCartPrompt(msg,yes,no);},400);}
+    else showToast(t('addrUpdated'),'ok');
+    return;
+  }
+  arr.unshift(newAddr);
+  setSaved(arr);
+
+  // Auto-select the newly added one
+  setActiveAddr(0);
+
+  // Reset form
+  resetAddrForm();
+  renderSavedCards();
+
+  // If redirected from cart, show back-to-cart prompt instead of toast
+  if(fromCart){
+    fromCart=false;
+    setTimeout(()=>{
+      const msg=lang==='ru'?'Вернуться в корзину и оформить заказ?':'Go back to cart and place order?';
+      const yes=lang==='ru'?'В корзину →':'To cart →';
+      const no=lang==='ru'?'Остаться':'Stay';
+      showBackToCartPrompt(msg,yes,no);
+    },400);
+  } else {
+    showToast(t('addrSaved'),'ok');
+  }
+}
+
+function resetAddrForm(){
+  curMethod='gps';selTypeGps=null;selTypeMan=null;selArea=null;locInfo=null;editingAddrIdx=null;
+  set('save-addr-btn',t('saveAddrBtn'));set('add-form-title',t('addFormTitle'));
+  el('gps-status').className='gps-status';
+  el('gps-extra').style.display='none';
+
+  el('addr-name-in').value='';el('addr-comment-in').value='';
+  el('man-street').value='';el('man-building').value='';
+  el('addr-form-err').classList.remove('on');el('addr-form-err').textContent='';
+  set('gps-lbl',t('gpsBtn'));
+  switchMethod('gps');buildTypeChips('gps');buildAreaChips();buildTypeChips('man');
+}
+
+// ── CATALOG CHIPS & GRID ──────────────────────────────────────────────────────
+// ── SEARCH ────────────────────────────────────────────────────────────────────
+let searchQ='';
+
+// Transliteration: both directions
+const RU2EN={а:'a',б:'b',в:'v',г:'g',д:'d',е:'e',ё:'yo',ж:'zh',з:'z',и:'i',й:'y',к:'k',л:'l',м:'m',н:'n',о:'o',п:'p',р:'r',с:'s',т:'t',у:'u',ф:'f',х:'kh',ц:'ts',ч:'ch',ш:'sh',щ:'sch',ъ:'',ы:'y',ь:'',э:'e',ю:'yu',я:'ya'};
+const EN2RU={a:'а',b:'б',v:'в',g:'г',d:'д',e:'е',z:'з',i:'и',y:'й',k:'к',l:'л',m:'м',n:'н',o:'о',p:'п',r:'р',s:'с',t:'т',u:'у',f:'ф',zh:'ж',kh:'х',ts:'ц',ch:'ч',sh:'ш',sch:'щ',yu:'ю',ya:'я',yo:'ё'};
+
+function translit(str){
+  // Convert Cyrillic → Latin
+  let ru2en=str.split('').map(c=>RU2EN[c]||c).join('');
+  // Convert Latin → Cyrillic (try longer sequences first)
+  let en2ru='';
+  let i=0;
+  while(i<str.length){
+    let found=false;
+    for(let len=3;len>=1;len--){
+      const chunk=str.slice(i,i+len);
+      if(EN2RU[chunk]){en2ru+=EN2RU[chunk];i+=len;found=true;break;}
+    }
+    if(!found){en2ru+=str[i];i++;}
+  }
+  return[str,ru2en,en2ru];
+}
+
+// ── SEARCH ALIASES (Russian names → product IDs) ─────────────────────────────
+const ALIASES={
+  // Водка
+  'абсолют':['p1'],'absolut':['p1'],
+  'столичная':['p2'],'stolichnaya':['p2'],
+  'русский стандарт':['p3'],'russian standard':['p3'],
+  'скай':['p4'],'skyy':['p4'],
+  'смирнофф':['p5'],'смирнов':['p5'],'smirnoff':['p5'],
+  'белуга':['p6'],'beluga':['p6'],
+  'серый гусь':['p7'],'grey goose':['p7'],
+  'бельведер':['p8'],'belvedere':['p8'],
+  'сирок':['p9'],'ciroc':['p9'],
+  // Виски
+  'красная этикетка':['p10'],'рэд лейбл':['p10'],'red label':['p10'],
+  'чёрная этикетка':['p11'],'черная этикетка':['p11'],'блэк лейбл':['p11'],'black label':['p11'],
+  'джек дэниэлс':['p12','p19'],'джек даниэлс':['p12','p19'],'jack daniels':['p12','p19'],
+  'чивас':['p13','p18','p22','p24'],'chivas':['p13','p18','p22','p24'],
+  'джеймсон':['p14'],'jameson':['p14'],
+  'баллантайнс':['p15'],'ballantines':['p15'],
+  'дабл блэк':['p16'],'double black':['p16'],
+  'голд лейбл':['p17'],'gold label':['p17'],
+  'джек мёд':['p19'],'jack honey':['p19'],
+  'джентльмен джек':['p20'],'gentleman jack':['p20'],
+  'синяя этикетка':['p21'],'блю лейбл':['p21'],'blue label':['p21'],
+  'роял салют':['p22'],'royal salute':['p22'],
+  'гленфиддик':['p25','p26','p27'],'glenfiddich':['p25','p26','p27'],
+  'макаллан':['p28','p29','p30'],'макалан':['p28','p29','p30'],'macallan':['p28','p29','p30'],
+  // Пиво
+  'хайнекен':['p31','p32','p59','p60'],'heineken':['p31','p32','p59','p60'],
+  'бадвайзер':['p33','p34','p61','p62'],'budweiser':['p33','p34','p61','p62'],
+  'карлсберг':['p35','p36'],'carlsberg':['p35','p36'],
+  'ред хорс':['p37','p38'],'red horse':['p37','p38'],
+  'стелла артуа':['p39','p40','p63','p64'],'stella artois':['p39','p40','p63','p64'],'стелла':['p39','p40','p63','p64'],
+  'амстел':['p41','p42'],'amstel':['p41','p42'],
+  'гиннесс':['p43','p44'],'guinness':['p43','p44'],
+  'корона':['p51','p52'],'corona':['p51','p52'],
+  'перони':['p53','p54'],'peroni':['p53','p54'],
+  'смирнофф айс':['p55','p56'],'smirnoff ice':['p55','p56'],
+  'бакарди бризер':['p57','p58'],'bacardi breezer':['p57','p58'],
+  'асахи':['p47','p48'],'asahi':['p47','p48'],
+  'хугарден':['p49','p50'],'hoegaarden':['p49','p50'],
+  // Ром
+  'бакарди белый':['p65'],'bacardi white':['p65'],
+  'бакарди чёрный':['p66'],'bacardi black':['p66'],
+  'бакарди голд':['p67'],'bacardi gold':['p67'],
+  'бакарди':['p65','p66','p67'],'bacardi':['p65','p66','p67'],
+  'капитан морган':['p68','p69'],'captain morgan':['p68','p69'],
+  'малибу':['p70'],'malibu':['p70'],
+  // Вермут
+  'мартини бьянко':['p71'],'martini bianco':['p71'],'мартини':['p71','p110'],
+  // Джин
+  'гордонс':['p72','p75'],'gordons':['p72','p75'],'gordon':['p72','p75'],
+  'бомбей сапфир':['p73'],'bombay sapphire':['p73'],'бомбей':['p73'],
+  'хендрикс':['p74'],'hendricks':['p74'],
+  'розовый гордон':['p75'],'gordon pink':['p75'],
+  'танкерей':['p76'],'tanqueray':['p76'],
+  'манки 47':['p77'],'monkey 47':['p77'],
+  'малфи апельсин':['p78'],'malfy arancia':['p78'],
+  'малфи роза':['p79'],'malfy rosa':['p79'],
+  'малфи':['p78','p79'],'malfy':['p78','p79'],
+  'драмшанбо':['p80'],'drumshanbo':['p80'],'gunpowder':['p80'],
+  // Текила
+  'хосе куэрво серебро':['p81'],'jose cuervo silver':['p81'],
+  'хосе куэрво голд':['p82'],'jose cuervo gold':['p82'],
+  'хосе куэрво':['p81','p82'],'jose cuervo':['p81','p82'],
+  'патрон':['p83','p84','p85'],'patron':['p83','p84','p85'],
+  'дон хулио бланко':['p86'],'don julio blanco':['p86'],
+  'дон хулио репосадо':['p87'],'don julio reposado':['p87'],
+  'дон хулио аньехо':['p88'],'don julio anejo':['p88'],
+  'дон хулио 1942':['p89'],'don julio 1942':['p89'],
+  'дон хулио':['p86','p87','p88','p89'],'don julio':['p86','p87','p88','p89'],
+  'класе азул':['p90'],'clase azul':['p90'],
+  // Коньяк
+  'хеннесси':['p91','p92','p93'],'hennessy':['p91','p92','p93'],
+  'хеннесси вс':['p91'],'hennessy vs':['p91'],
+  'хеннесси всоп':['p92'],'hennessy vsop':['p92'],
+  'хеннесси хо':['p93'],'hennessy xo':['p93'],
+  'реми мартен':['p94'],'remy martin':['p94'],'реми мартин':['p94'],
+  // Ликёр
+  'бейлис':['p95'],'baileys':['p95'],
+  'амарула':['p96'],'amarula':['p96'],
+  'егермейстер':['p97'],'егерь':['p97'],'jagermeister':['p97'],
+  'апероль':['p98'],'aperol':['p98'],
+  // Арак
+  'арак тума':['p99'],'arak touma':['p99'],
+  'эфе раки':['p100'],'efe raki':['p100'],'раки':['p100'],
+  // Шампанское
+  'моэт брют':['p101'],'moet brut':['p101'],
+  'моэт розе':['p102'],'moet rose':['p102'],
+  'моэт айс':['p103'],'moet ice':['p103'],
+  'моэт':['p101','p102','p103'],'moet':['p101','p102','p103'],
+  'вёв клико':['p104'],'вдова клико':['p104'],'veuve clicquot':['p104'],
+  'руинар':['p105'],'ruinart':['p105'],
+  'дом периньон':['p106'],'dom perignon':['p106'],
+  // Просекко
+  'боттега':['p107','p108','p109'],'bottega':['p107','p108','p109'],
+  'мартини асти':['p110'],'martini asti':['p110'],
+  'зонин':['p111'],'zonin':['p111'],
+  // Вино
+  'джейкоб крик':['p112','p121'],'jacob creek':['p112','p121'],
+  'пино гриджо':['p113'],'pinot grigio':['p113'],
+  'совиньон блан':['p114','p115','p120'],'sauvignon blanc':['p114','p115','p120'],
+  'сансер':['p116'],'sancerre':['p116'],
+  'шабли':['p117'],'chablis':['p117'],
+  'мерло':['p122'],'merlot':['p122'],
+  'шираз':['p121'],'shiraz':['p121'],
+  'мальбек':['p128'],'malbec':['p128'],
+  'шато':['p124','p125','p127','p130','p133'],'chateau':['p124','p125','p127','p130','p133'],
+  'ангел':['p134'],'whispering angel':['p134'],
+  'дростди хоф':['p137','p138'],'drostdy hof':['p137','p138'],
+};
+
+function matchSearch(p,q){
+  if(!q)return true;
+  // 1. Direct alias match
+  for(const[alias,ids]of Object.entries(ALIASES)){
+    if(q.includes(alias)||alias.includes(q)){
+      if(ids.includes(p.id))return true;
+    }
+  }
+  // 2. Plain text match across all fields + transliteration
+  const haystack=(p.name+' '+(p.nameE||'')+' '+(p.cat||'')+' '+(p.catE||'')+' '+(p.desc||'')+' '+(p.descE||'')).toLowerCase();
+  const variants=translit(q);
+  return variants.some(v=>v&&haystack.includes(v));
+}
+
+function onSearch(val){
+  searchQ=val.trim().toLowerCase();
+  el('search-clr').style.display=searchQ?'block':'none';
+  renderGrid();
+}
+function clearSearch(){
+  el('search-inp').value='';
+  searchQ='';
+  el('search-clr').style.display='none';
+  renderGrid();
+}
+
+// ── FAVOURITES ────────────────────────────────────────────────────────────────
+function saveFavs(){localStorage.setItem('ambar_favs',JSON.stringify([...favs]));}
+function toggleFav(id){
+  if(favs.has(id))favs.delete(id);else favs.add(id);
+  saveFavs();
+  // update card heart
+  const btn=el('pfav-'+id);
+  if(btn)btn.classList.toggle('on',favs.has(id));
+  updateFavBtn();
+}
+function updateFavBtn(){
+  const btn=el('fav-hdr-btn'),dot=el('fav-dot');
+  if(!btn)return;
+  btn.classList.toggle('has-favs',favs.size>0);
+  if(dot){dot.textContent=favs.size;dot.classList.toggle('on',favs.size>0);}
+}
+function toggleFavFilter(){
+  showFavOnly=!showFavOnly;
+  el('fav-hdr-btn').style.background=showFavOnly?'rgba(224,85,85,.2)':'';
+  el('fav-hdr-btn').style.borderColor=showFavOnly?'#e05555':'';
+  renderGrid();
+}
+
+const SORT_OPTIONS=[
+  {key:'none',   ru:'По умолчанию',      en:'Default'},
+  {key:'asc',    ru:'Цена: сначала дешевле', en:'Price: low to high'},
+  {key:'desc',   ru:'Цена: сначала дороже',  en:'Price: high to low'},
+  {key:'name',   ru:'По названию (А–Я)',     en:'Name (A–Z)'},
+  {key:'stock',  ru:'Сначала в наличии',     en:'In stock first'},
+];
+
+function openSortSheet(){
+  el('sort-sheet-title').textContent=lang==='ru'?'Сортировка':'Sort by';
+  el('sort-options').innerHTML=SORT_OPTIONS.map(o=>`
+    <div class="sort-opt${sortMode===o.key?' on':''}" onclick="applySort('${o.key}')">
+      <span>${lang==='ru'?o.ru:o.en}</span>
+      <svg class="sort-opt-check" viewBox="0 0 24 24" fill="none" stroke="#c9a96e" stroke-width="2.5" width="20" height="20"><polyline points="20 6 9 17 4 12"/></svg>
+    </div>`).join('');
+  el('sort-overlay').classList.add('show');
+}
+function closeSortSheet(e){
+  if(e&&e.target!==el('sort-overlay'))return;
+  el('sort-overlay').classList.remove('show');
+}
+function applySort(key){
+  sortMode=key;
+  if(key==='none')catFilter=null;
+  el('sort-overlay').classList.remove('show');
+  updateSortBtn();buildChips();renderGrid();
+  el('pg-catalog').scrollTop=0;
+}
+function cycleSort(){openSortSheet();}
+function updateSortBtn(){
+  const btn=el('sort-btn');
+  if(!btn)return;
+  btn.classList.toggle('active',sortMode!=='none');
+}
+
+function buildChips(){
+  const cats=[...new Set(P.map(p=>p.cat))];
+  el('cat-chips').innerHTML=cats.map(c=>{
+    const label=lang==='ru'?c:(P.find(p=>p.cat===c)?.catE||c);
+    const isOn=catFilter===c;
+    return`<button class="chip${isOn?' on':''}" data-cat="${c}" onclick="setCat('${c}',this)">${label}</button>`;
+  }).join('');
+}
+function setCat(c,btn){
+  if(showFavOnly||searchQ||sortMode!=='none'){
+    // toggle category filter
+    catFilter=catFilter===c?null:c;
+    buildChips();
+    renderGrid();
+    return;
+  }
+  // default mode: scroll to section
+  catFilter=null;
+  const hdr=document.querySelector(`#p-grid .cat-section-hdr[data-cat="${c}"]`);
+  const page=el('pg-catalog');
+  if(!hdr||!page)return;
+  const stickyH=page.querySelector('[style*="sticky"]')?.offsetHeight||160;
+  page.scrollTop=hdr.offsetTop-stickyH+1;
+}
+function renderGrid(){
+  let list=[...P];
+  if(catFilter)list=list.filter(p=>p.cat===catFilter);
+  if(showFavOnly)list=list.filter(p=>favs.has(p.id));
+  if(searchQ)list=list.filter(p=>matchSearch(p,searchQ));
+  if(sortMode==='asc')list=[...list].sort((a,b)=>a.price-b.price);
+  else if(sortMode==='desc')list=[...list].sort((a,b)=>b.price-a.price);
+  else if(sortMode==='name')list=[...list].sort((a,b)=>(lang==='ru'?a.name:a.nameE).localeCompare(lang==='ru'?b.name:b.nameE));
+  else if(sortMode==='stock')list=[...list].sort((a,b)=>(b.stock?1:0)-(a.stock?1:0));
+
+  // Empty state
+  if(list.length===0){
+    const isSearch=!!searchQ;
+    const isFav=showFavOnly;
+    let emoji,title,sub;
+    if(isFav){
+      el('p-grid').innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(var(--tg-h,100vh) - 210px);overflow:hidden;text-align:center">
+        <div class="ce-line"></div>
+        <div class="ce-brand-bg">AMBAR</div>
+        <div class="ce-line"></div>
+        <div style="margin-top:20px;font-size:14px;font-weight:500;color:var(--sub);font-family:'Space Grotesk',sans-serif;letter-spacing:-.1px">${lang==='ru'?'Oops, избранное пусто':'Oops, no favourites yet'}</div>
+        <div style="margin-top:6px;font-size:11px;font-weight:400;color:var(--muted);font-family:'DM Sans',sans-serif;letter-spacing:.4px;display:flex;align-items:center;justify-content:center;gap:4px">${lang==='ru'?'Нажмите':'Tap'} <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:.7"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> ${lang==='ru'?'на товаре, чтобы сохранить':'on any product to save it here'}</div>
+      </div>`;
+      initScrollSpy();return;
+    } else if(isSearch){
+      emoji='🔍';
+      title=lang==='ru'?'Ничего не найдено':'Nothing found';
+      sub=lang==='ru'?'Попробуйте другой запрос':'Try a different search';
+    } else {
+      emoji='📦';
+      title=lang==='ru'?'Нет товаров':'No products';
+      sub='';
+    }
+    el('p-grid').innerHTML=`<div style="text-align:center;padding:60px 24px;color:var(--muted)">
+      <div style="font-size:48px;margin-bottom:16px">${emoji}</div>
+      <div style="font-family:'DM Sans',sans-serif;font-size:20px;color:var(--text);margin-bottom:8px">${title}</div>
+      <div style="font-size:13px">${sub}</div>
+    </div>`;
+    initScrollSpy();
+    return;
+  }
+
+  // Build HTML with category section headers when showing all
+  let html='';
+  if(!catFilter&&!searchQ&&sortMode==='none'){
+    let lastCat=null;
+    list.forEach(p=>{
+      const cat=lang==='ru'?p.cat:p.catE;
+      if(cat!==lastCat){
+        if(lastCat!==null)html+='</div>'; // close previous grid-group
+        html+=`<div class="cat-section-hdr" data-cat="${p.cat}">${cat}</div><div class="grid-group">`;
+        lastCat=cat;
+      }
+      html+=renderCard(p);
+    });
+    if(lastCat!==null)html+='</div>';
+  } else {
+    html='<div class="grid-group">'+list.map(renderCard).join('')+'</div>';
+  }
+  el('p-grid').innerHTML=html;
+  initScrollSpy();
+}
+
+function renderCard(p){
+  const qty=cart[p.id]||0;
+  const desc=lang==='ru'?p.desc:p.descE;
+  const catVal=lang==='ru'?p.cat:p.catE;
+  return`<div class="pcard" onclick="openPDM('${p.id}')" style="cursor:pointer" data-cat="${p.cat}">
+    <div class="pimg-box${!p.stock?' oos':''}">
+      ${!p.stock?`<div class="oos-overlay">${t('oosLabel')}</div>`:''}
+      ${p.isNew?`<span class="pbadge isnew">NEW</span>`:''}
+      <button class="pfav${favs.has(p.id)?' on':''}" id="pfav-${p.id}" onclick="event.stopPropagation();toggleFav('${p.id}')" style="z-index:3"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
+      <img class="pimg" src="${p.img}" alt="${p.name}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><text y=%2268%22 font-size=%2264%22>🍾</text></svg>'">
+    </div>
+    <div class="pinfo">
+      <div class="pcat">${catVal}</div>
+      <div class="pname">${lang==='ru'?p.name:p.nameE}</div>
+      <div class="pdesc">${desc}</div>
+      <div class="pfoot"><div class="pprice">${p.price}<small> AED</small></div><div id="ctrl-${p.id}" onclick="event.stopPropagation()">${ctrlHTML(p,qty)}</div></div>
+    </div>
+  </div>`;
+}
+
+// ── SCROLL SPY ────────────────────────────────────────────────────────────────
+let _spyObserver=null;
+function initScrollSpy(){
+  if(_spyObserver)_spyObserver.disconnect();
+  const page=el('pg-catalog');
+  if(!page)return;
+  if(searchQ||sortMode!=='none'){
+    if(!catFilter){
+      document.querySelectorAll('#cat-chips .chip').forEach(b=>b.classList.remove('on'));
+    }
+    page.onscroll=null;
+    return;
+  }
+  page.onscroll=()=>{
+    const headers=[...document.querySelectorAll('#p-grid .cat-section-hdr')];
+    if(!headers.length)return;
+    const stickyH=170;
+    const scrollTop=page.scrollTop;
+    let active=null;
+    for(const h of headers){
+      if(h.offsetTop-stickyH<=scrollTop+1)active=h;
+    }
+    highlightChip(active?active.dataset.cat:null);
+  };
+}
+function highlightChip(cat){
+  const chips=document.querySelectorAll('#cat-chips .chip');
+  chips.forEach(btn=>{
+    const match=btn.dataset.cat===cat;
+    btn.classList.toggle('on',match);
+    if(match){
+      // scroll only the chips container, not the page
+      const container=el('cat-chips');
+      const btnLeft=btn.offsetLeft;
+      const btnWidth=btn.offsetWidth;
+      const containerWidth=container.offsetWidth;
+      const target=btnLeft-(containerWidth/2)+(btnWidth/2);
+      container.scrollTo({left:target,behavior:'smooth'});
+    }
+  });
+}
+
+function ctrlHTML(p,qty){
+  if(qty===0)return`<button class="add-btn"${!p.stock?' disabled':''} onclick="addItem('${p.id}')">+</button>`;
+  return`<div class="qctrl"><button class="qb" onclick="chgQty('${p.id}',-1)">−</button><span class="qn">${qty}</span><button class="qb" onclick="chgQty('${p.id}',1)">+</button></div>`;
+}
+function addItem(id){
+  const p=P.find(x=>x.id===id);if(!p||!p.stock)return;
+  if(isBeer(p)){openPDM(id);return;}
+  const max=p.stockQty||999;
+  if((cart[id]||0)>=max){showToast(lang==='ru'?`Доступно: ${max}`:`Only ${max} available`,'err');return;}
+  cart[id]=1;syncCtrl(id);updHdr();showToast(t('added')+': '+p.name,'ok');
+}
+function chgQty(id,d){
+  const p=P.find(x=>x.id===id),max=p?(p.stockQty||999):999,nq=(cart[id]||0)+d;
+  if(d>0&&nq>max){showToast(lang==='ru'?`Доступно: ${max}`:`Only ${max} available`,'err');return;}
+  if(nq<=0)delete cart[id];else cart[id]=nq;
+  syncCtrl(id);updHdr();if(curPg==='cart')renderCart();
+}
+function syncCtrl(id){const e=el('ctrl-'+id);if(!e)return;const p=P.find(x=>x.id===id);e.innerHTML=ctrlHTML(p,cart[id]||0);}
+function cartSub(){return Object.entries(cart).reduce((s,[id,qty])=>{const p=P.find(x=>x.id===id);if(!p)return s;const pcs=isBeer(p)?beerPcs[id]:null;const unitPrice=pcs===24?Math.round(p.price*1.8):p.price;return s+unitPrice*qty;},0);}
+function updHdr(){
+  const cnt=Object.values(cart).reduce((a,b)=>a+b,0);
+  el('hdr-tot').textContent=cartSub()+' AED';
+  const dot=el('hdr-dot');dot.textContent=cnt;dot.style.display=cnt>0?'flex':'none';
+}
+
+// ── CART ──────────────────────────────────────────────────────────────────────
+function renderCart(){
+  const entries=Object.entries(cart).filter(([,q])=>q>0);
+  const foot=el('cart-foot'),tipSec=el('tip-section');
+  const topbar=document.querySelector('.cart-topbar');
+  if(!entries.length){
+    el('cart-empty').style.display='flex';
+    document.querySelector('.cart-list-wrap').style.display='none';
+    if(topbar)topbar.style.display='none';
+    el('ce-title').textContent=lang==='ru'?'пусто':'empty';
+    el('ce-btn').textContent=lang==='ru'?'каталог →':'catalog →';
+    foot.style.display='none';tipSec.style.display='none';return;
+  }
+  el('cart-empty').style.display='none';
+  document.querySelector('.cart-list-wrap').style.display='';
+  if(topbar)topbar.style.display='';
+  el('cart-list').innerHTML=entries.map(([id,qty])=>{
+    const p=P.find(x=>x.id===id);if(!p)return'';
+    const isBeerItem=isBeer(p);
+    const pcs=isBeerItem?(beerPcs[id]||''):null;
+    const displayPrice=isBeerItem?(pcs===24?Math.round(p.price*1.8):p.price)*qty:p.price*qty;
+    const nameLabel=isBeerItem?`${p.name} <span style="color:var(--gold);font-size:12px">${pcs} ${lang==='ru'?'шт':'pcs'}</span>`:p.name;
+    return`<div class="ci"><img class="ci-img" src="${p.img}" alt="${p.name}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 52 62%22><text y=%2248%22 font-size=%2240%22>🍾</text></svg>'">
+      <div class="ci-info"><div class="ci-name">${nameLabel}</div><div class="ci-price">${displayPrice} AED</div></div>
+      <div class="qctrl"><button class="qb" onclick="chgQty('${id}',-1)">−</button><span class="qn">${qty}</span><button class="qb" onclick="chgQty('${id}',1)">+</button></div>
+    </div>`;
+  }).join('');
+  el('tot-n').textContent=cartSub()+tip;foot.style.display='block';tipSec.style.display='block';
+  setTimeout(updateCartThumb,0);
+}
+function updateCartThumb(){
+  const sc=el('cart-list'),thumb=el('cart-thumb');
+  const wrap=document.querySelector('.cart-list-wrap');
+  if(!sc||!thumb||!wrap)return;
+  const ratio=sc.clientHeight/sc.scrollHeight;
+  if(ratio>=1){thumb.style.display='none';wrap.classList.remove('can-scroll');return;}
+  wrap.classList.add('can-scroll');
+  const trackH=sc.clientHeight-16;
+  const thumbH=Math.max(16,trackH*ratio);
+  const maxScroll=sc.scrollHeight-sc.clientHeight;
+  const pos=maxScroll>0?sc.scrollTop/maxScroll:0;
+  thumb.style.display='block';
+  thumb.style.height=thumbH+'px';
+  thumb.style.top=(8+pos*(trackH-thumbH))+'px';
+}
+function clearCart(){cart={};beerPcs={};tip=0;updHdr();renderCart();buildTips();}
+
+// ── TIPS ──────────────────────────────────────────────────────────────────────
+function buildTips(){
+  el('tip-row').innerHTML=TIP_OPTS.map((v,i)=>{
+    const isLast=i===TIP_OPTS.length-1,lbl=isLast?t('customTip'):(v===0?t('noTip'):`${v} AED`);
+    return`<button class="tip-chip${v===tip&&!isLast?' on':''}" onclick="pickTip(${v},${isLast},this)">${lbl}</button>`;
+  }).join('');
+  el('tip-input').placeholder=lang==='ru'?'Введите сумму...':'Enter amount...';
+}
+function pickTip(v,isCustom,btn){
+  document.querySelectorAll('.tip-chip').forEach(b=>b.classList.remove('on'));btn.classList.add('on');
+  const inp=el('tip-input');
+  if(isCustom){inp.style.display='block';inp.focus();inp.oninput=()=>{tip=Math.max(0,parseFloat(inp.value)||0);updCartTot()};}
+  else{inp.style.display='none';el('tip-done-btn').style.display='none';tip=v;updCartTot();}
+}
+function updCartTot(){el('tot-n').textContent=cartSub()+tip;buildSummary();}
+
+// ── SUMMARY ───────────────────────────────────────────────────────────────────
+function buildSummary(){
+  const entries=Object.entries(cart).filter(([,q])=>q>0),sub=cartSub();
+  el('sum-items').innerHTML=entries.map(([id,qty])=>{
+    const p=P.find(x=>x.id===id);if(!p)return'';
+    const pcs=isBeer(p)?beerPcs[id]:null;
+    const unitPrice=pcs===24?Math.round(p.price*1.8):p.price;
+    const label=pcs?`${p.name} <span style="color:var(--gold);font-size:11px">(${pcs} ${lang==='ru'?'шт':'pcs'})</span>`:p.name;
+    return`<div class="sum-line"><span>${label} ×${qty}</span><span>${unitPrice*qty} AED</span></div>`;
+  }).join('');
+  const tr=el('sum-tip-row');
+  if(tip>0){tr.style.display='flex';el('sum-tip-val').textContent=tip+' AED';}else tr.style.display='none';
+  el('sum-tot-val').textContent=(sub+tip)+' AED';
+}
+
+// ── ORDER FLOW ────────────────────────────────────────────────────────────────
+function tryOrder(){
+  const entries=Object.entries(cart).filter(([,q])=>q>0);
+  if(!entries.length){showToast(t('emptyCart'),'err');return;}
+
+  // No address → send to address page
+  if(activeAddrIdx===null||!getSaved()[activeAddrIdx]){
+    showToast(t('noAddrWarning'),'err');
+    fromCart=true;
+    setTimeout(()=>go('address'),600);return;
+  }
+
+  // Check location mismatch
+  const addr=getSaved()[activeAddrIdx];
+  if(addr.lat&&addr.lon&&navigator.geolocation&&!pendingOrderConfirmed){
+    navigator.geolocation.getCurrentPosition(pos=>{
+      const dist=hav(pos.coords.latitude,pos.coords.longitude,addr.lat,addr.lon);
+      if(dist>15){ // more than 15km away → warn
+        showLocConfirm();
+      } else {
+        proceedToCheckout();
+      }
+    },()=>{proceedToCheckout();},{timeout:5000,maximumAge:120000});
+  } else {
+    proceedToCheckout();
+  }
+}
+
+function showLocConfirm(){
+  el('loc-confirm').classList.add('show');
+}
+function confirmLocYes(){
+  el('loc-confirm').classList.remove('show');
+  pendingOrderConfirmed=true;
+  proceedToCheckout();
+}
+function confirmLocNo(){
+  el('loc-confirm').classList.remove('show');
+}
+
+function proceedToCheckout(){
+  pendingOrderConfirmed=false;
+  // Show address preview in checkout
+  const addr=getSaved()[activeAddrIdx];
+  el('co-addr-preview').innerHTML=`<strong>${addr.label||''}</strong>${addr.label?'<br>':''}${addr.address}<br><span style="color:var(--gold);font-size:11px">🏢 ${addr.office_name}</span>`;
+  buildSummary();
+  go('checkout');
+}
+
+function placeOrder(){
+  const entries=Object.entries(cart).filter(([,q])=>q>0);
+  if(!entries.length){showToast(t('emptyCart'),'err');return;}
+
+  const addr=getSaved()[activeAddrIdx];
+  if(!addr){showToast(t('noAddrWarning'),'err');return;}
+
+  const raw=el('phone-in').value.trim(),digits=raw.replace(/\D/g,'');
+  if(digits.length<10||digits.length>15){
+    el('phone-in').classList.add('err');el('phone-err').textContent=t('phoneErr');el('phone-err').classList.add('on');
+    el('phone-in').focus();return;
+  }
+
+  const items=entries.map(([id,qty])=>{
+    const p=P.find(x=>x.id===id);
+    const pcs=isBeer(p)?beerPcs[id]:null;
+    const unitPrice=pcs===24?Math.round(p.price*1.8):p.price;
+    const displayName=pcs?`${p.name} (${pcs} ${lang==='ru'?'шт':'pcs'})`:p.name;
+    return{id,name:displayName,price:unitPrice,qty,line_total:unitPrice*qty,pcs:pcs||null};
+  });
+  const sub=cartSub(),total=sub+tip,oid='AMB'+Date.now().toString().slice(-7);
+  const payload={
+    action:'order',order_id:oid,items,subtotal:sub,tip,total,currency:'AED',
+    phone:'+'+digits,address:addr.address,address_label:addr.label,comment:addr.comment||'',
+    location:{lat:addr.lat||0,lon:addr.lon||0},
+    office_id:addr.office_id||'office_central',
+    office_name:addr.office_name||OFFICES[0].name,lang,
+  };
+
+  orders.unshift({order_id:oid,items,total,address:addr.label||addr.address,status:'pending',timestamp:new Date().toISOString()});
+  localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
+
+  if(tg?.sendData)tg.sendData(JSON.stringify(payload));
+  else console.log('ORDER:',JSON.stringify(payload,null,2));
+
+  cart={};beerPcs={};tip=0;el('phone-err').classList.remove('on');el('phone-in').classList.remove('err');
+  updHdr();buildTips();showToast(t('placed'),'ok');
+  setTimeout(()=>go('orders'),1400);
+}
+
+// ── ORDERS ────────────────────────────────────────────────────────────────────
+function confirmClearHistory(){
+  const msg=lang==='ru'?'Удалить завершённые заказы?':'Remove completed orders?';
+  if(!confirm(msg))return;
+  // Persist delivered total so the profile stat survives the wipe
+  const removable=orders.filter(o=>o.status==='delivered'||o.status==='declined');
+  const spent=removable.filter(o=>o.status==='delivered').reduce((s,o)=>s+o.total,0);
+  const prev=parseInt(localStorage.getItem('ambar_spent_total')||'0');
+  localStorage.setItem('ambar_spent_total',prev+spent);
+  // Remember cleared IDs so syncOrders() won't pull them back from the API
+  const clearedIds=removable.map(o=>o.order_id);
+  const prevCleared=JSON.parse(localStorage.getItem('ambar_cleared_ids')||'[]');
+  localStorage.setItem('ambar_cleared_ids',JSON.stringify([...new Set([...prevCleared,...clearedIds])]));
+  orders=orders.filter(o=>o.status==='pending'||o.status==='confirmed');
+  localStorage.setItem('ambar_orders',JSON.stringify(orders));
+  renderOrders();
+  buildProfile();
+}
+function renderOrders(){
+  const ordHdr=el('sh-orders');
+  const clearWrap=el('clear-history-wrap');
+  if(!orders.length){
+    if(ordHdr)ordHdr.style.display='none';
+    if(clearWrap)clearWrap.style.display='none';
+    el('orders-list').innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(var(--tg-h,100vh) - 120px);overflow:hidden">
+      <div class="ce-line"></div>
+      <div class="ce-brand-bg">AMBAR</div>
+      <div class="ce-line"></div>
+      <div style="margin-top:20px;font-size:14px;font-weight:500;color:var(--sub);font-family:'Space Grotesk',sans-serif;letter-spacing:-.1px">${lang==='ru'?'Oops, заказов пока нет':'Oops, no orders yet'}</div>
+      <div style="margin-top:6px;font-size:11px;font-weight:400;color:var(--muted);font-family:'DM Sans',sans-serif;letter-spacing:.4px">${lang==='ru'?'Ваши заказы появятся здесь':'Your orders will appear here'}</div>
+    </div>`;
+    return;
+  }
+  if(ordHdr)ordHdr.style.display='';
+  const hasClearable=orders.some(o=>o.status==='delivered'||o.status==='declined');
+  if(clearWrap)clearWrap.style.display=hasClearable?'block':'none';
+  const cls={pending:'sp',confirmed:'sc2',delivered:'sd',declined:'sx'};
+  const lbl={pending:()=>t('stP'),confirmed:()=>t('stC'),delivered:()=>t('stD'),declined:()=>t('stX')};
+  const lbl2={pending:()=>lang==='ru'?'Ожидает':'Pending',confirmed:()=>lang==='ru'?'Принят':'Confirmed',delivered:()=>lang==='ru'?'Доставлен':'Delivered',declined:()=>lang==='ru'?'Отменён':'Cancelled'};
+  const months=lang==='ru'?['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек']:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function fmtDate(ts){if(!ts)return'';const d=new Date(ts);return`${d.getDate()} ${months[d.getMonth()]} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
+  el('orders-list').innerHTML=orders.map(o=>{
+    const st=cls[o.status]||'sp';
+    const rows=o.items.map(i=>`<div class="o-row"><span class="o-row-name">${i.name}</span><span class="o-row-qty">${i.qty} ${lang==='ru'?'шт':'pcs'}</span></div>`).join('');
+    return`<div class="ocard ${st}"><div class="ocard-inner"><div class="ocard-meta"><span class="o-id">#${o.order_id}</span><span class="o-date">${fmtDate(o.timestamp)}</span></div><div class="o-rows">${rows}</div><div class="ocard-foot"><span class="o-status"><span class="o-status-dot"></span>${(lbl2[o.status]||lbl2.pending)()}</span><div class="o-total"><span class="o-total-num">${o.total}</span><span class="o-total-cur">AED</span></div></div></div></div>`;
+  }).join('');
+}
+
+// ── SYNC ORDERS FROM API ──────────────────────────────────────────────────────
+// Fetches real order statuses from the backend (api_server.py /api/orders).
+// Falls back silently to localStorage if Telegram initData is unavailable (dev)
+// or if the network call fails.
+async function syncOrders(spin=false){
+  const btn=el('refresh-btn');
+  if(spin&&btn) btn.querySelector('svg').classList.add('spinning');
+
+  const initData=tg?.initData;
+  if(!initData){
+    // Dev mode — no Telegram context, just render what's in localStorage
+    if(spin&&btn) btn.querySelector('svg').classList.remove('spinning');
+    renderOrders();buildProfile();return;
+  }
+
+  try{
+    const resp=await fetch(`${AMBAR_API}/api/orders`,{
+      headers:{'Authorization':'tma '+initData},
+    });
+    if(!resp.ok) throw new Error(resp.status);
+    const {orders:apiOrders=[]}=await resp.json();
+
+    // Backend uses "approved", mini app uses "confirmed" — normalise
+    apiOrders.forEach(o=>{if(o.status==='approved')o.status='confirmed';});
+
+    // IDs the user deliberately cleared locally (delivered/declined)
+    const cleared=new Set(JSON.parse(localStorage.getItem('ambar_cleared_ids')||'[]'));
+
+    // Keep API orders, but skip ones the user cleared (unless they're active again)
+    const fresh=apiOrders.filter(o=>{
+      if(!cleared.has(o.order_id))return true;
+      return o.status==='pending'||o.status==='confirmed'; // re-activate if status changed
+    });
+
+    // Keep any local orders not yet visible in the API (just placed, in-flight)
+    const apiIds=new Set(fresh.map(o=>o.order_id));
+    const localOnly=orders.filter(o=>!apiIds.has(o.order_id)&&!cleared.has(o.order_id));
+
+    orders=[...localOnly,...fresh];
+    orders.sort((a,b)=>new Date(b.timestamp||0)-new Date(a.timestamp||0));
+    localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
+  }catch(e){
+    // Network error or no API — silently use cached data
+    console.log('[AMBAR] sync failed:',e.message);
+  }
+
+  if(spin&&btn) btn.querySelector('svg').classList.remove('spinning');
+  renderOrders();buildProfile();
+}
+
+// ── PROFILE ───────────────────────────────────────────────────────────────────
+function buildProfile(){
+  const name=tg?.initDataUnsafe?.user?.first_name||'Guest';
+  el('prof-av').textContent=name[0]?.toUpperCase()||'A';el('prof-name').textContent=name;
+  const active=orders.filter(o=>['pending','confirmed'].includes(o.status));
+  const spentCurrent=orders.filter(o=>o.status==='delivered').reduce((s,o)=>s+o.total,0);
+  const spentPersisted=parseInt(localStorage.getItem('ambar_spent_total')||'0');
+  const spent=spentCurrent+spentPersisted;
+  el('stat-total').textContent=orders.length;el('stat-active').textContent=active.length;el('stat-spent').textContent=spent;
+  set('stat-lbl1',t('statOrders'));set('stat-lbl2',t('statActive'));set('stat-lbl3',t('statSpent'));
+  if(!active.length){el('active-list').innerHTML=`<div class="empty" style="padding:20px 0"><div>${t('noActive')}</div></div>`;return;}
+  const months2=lang==='ru'?['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек']:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+  function fmtDate2(ts){if(!ts)return'';const d=new Date(ts);return`${d.getDate()} ${months2[d.getMonth()]} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
+  el('active-list').innerHTML=active.map(o=>{
+    const st=o.status==='confirmed'?'sc2':'sp';
+    const lbl=o.status==='confirmed'?(lang==='ru'?'Принят':'Confirmed'):(lang==='ru'?'Ожидает':'Pending');
+    const rows=o.items.map(i=>`<div class="o-row"><span class="o-row-name">${i.name}</span><span class="o-row-qty">${i.qty} ${lang==='ru'?'шт':'pcs'}</span></div>`).join('');
+    return`<div class="ocard ${st}"><div class="ocard-inner"><div class="ocard-meta"><span class="o-id">#${o.order_id}</span><span class="o-date">${fmtDate2(o.timestamp)}</span></div><div class="o-rows">${rows}</div><div class="ocard-foot"><span class="o-status"><span class="o-status-dot"></span>${lbl}</span><div class="o-total"><span class="o-total-num">${o.total}</span><span class="o-total-cur">AED</span></div></div></div></div>`;
+  }).join('');
+}
+
+// ── BEER PICKER ───────────────────────────────────────────────────────────────
+// Any product with cat === 'Пиво' gets a 12/24 pcs picker.
+// _beerPcs stores the chosen pack size per product id: { 'p31': 12, 'p31': 24 }
+let _beerProduct=null, _beerPcsChoice=null, _beerPendingQty=1;
+
+function isBeer(p){ return p && p.cat==='Пиво'; }
+
+function renderBeerPDM(p){
+  const row=el('pdm-add-row');if(!row)return;
+  const inCart=(cart[p.id]||0)>0;
+  const chosen=inCart?(beerPcs[p.id]||_beerPcsChoice):_beerPcsChoice;
+  const price12=p.price_12||p.price||0;
+  const price24=p.price_24||Math.round(price12*1.8);
+
+  let html='<div style="display:flex;gap:10px;margin-bottom:12px">';
+  for(const pcs of [12,24]){
+    const isActive=chosen===pcs;
+    const priceLabel=(pcs===12?price12:price24);
+    html+=`<button onclick="beerSelectPcs(${pcs})" style="flex:1;padding:16px 10px;border-radius:14px;border:2px solid ${isActive?'var(--gold)':'var(--border2)'};background:${isActive?'rgba(201,169,110,.1)':'var(--card2)'};cursor:pointer;transition:.15s">
+      <div style="font-size:22px;font-weight:700;color:${isActive?'var(--gold)':'var(--text)'}">${pcs}</div>
+      <div style="font-size:11px;color:var(--muted);margin:2px 0 6px">${lang==='ru'?'шт':'pcs'}</div>
+      <div style="font-size:14px;font-weight:600;color:var(--text)">${priceLabel?priceLabel+' AED':''}</div>
+    </button>`;
+  }
+  html+='</div>';
+
+  if(chosen){
+    // _beerPendingQty: staging counter (not yet in cart until button pressed)
+    const pendingQty=_beerPendingQty||1;
+    const unitPrice=chosen===12?price12:price24;
+    const totalPrice=unitPrice*pendingQty;
+    const cartQty=cart[p.id]||0;
+    const btnLabel=lang==='ru'?'В корзину':'Add to cart';
+
+    html+=`<div style="display:flex;align-items:center;gap:10px">
+      <button class="pdm-add-btn" onclick="beerAddPending()" style="flex:1">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <span>${btnLabel}</span>
+          <span style="font-size:12px;font-weight:500;opacity:.75">${totalPrice?totalPrice+' AED':''}</span>
+        </div>
+      </button>
+      <div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <button class="pdm-qb" style="width:36px;height:36px;font-size:16px" onclick="beerPendingChg(-1)">−</button>
+        <span class="pdm-qn" style="min-width:20px;text-align:center;font-size:16px">${pendingQty}</span>
+        <button class="pdm-qb" style="width:36px;height:36px;font-size:16px" onclick="beerPendingChg(1)">+</button>
+      </div>
+    </div>`;
+  } else {
+    html+=`<button class="pdm-add-btn" disabled style="opacity:.35;cursor:not-allowed">
+      ${lang==='ru'?'Выберите упаковку':'Choose pack size'}
+    </button>`;
+  }
+
+  row.innerHTML=html;
+}
+
+function beerSelectPcs(pcs){
+  _beerPcsChoice=pcs;
+  if(_beerProduct && cart[_beerProduct.id]>0) _beerPendingQty=cart[_beerProduct.id];
+  else _beerPendingQty=1;
+  if(_beerProduct) renderBeerPDM(_beerProduct);
+}
+
+function beerPendingChg(d){
+  const p=_beerProduct; if(!p) return;
+  const nq=(_beerPendingQty||1)+d;
+  if(nq<=0){
+    // Remove from cart and reset
+    delete cart[p.id];
+    delete beerPcs[p.id];
+    _beerPcsChoice=null;
+    _beerPendingQty=1;
+    syncCtrl(p.id); updHdr();
+    renderBeerPDM(p);
+    if(curPg==='cart') renderCart();
+    return;
+  }
+  _beerPendingQty=nq;
+  if(_beerProduct) renderBeerPDM(_beerProduct);
+}
+
+function beerAddPending(){
+  const p=_beerProduct; if(!p||!_beerPcsChoice) return;
+  cart[p.id]=_beerPendingQty;
+  beerPcs[p.id]=_beerPcsChoice;
+  syncCtrl(p.id); updHdr();
+  if(curPg==='cart') renderCart();
+  showToast(t('added')+': '+(lang==='ru'?p.name:p.nameE)+' ('+_beerPcsChoice+' '+(lang==='ru'?'шт':'pcs')+' × '+_beerPendingQty+')','ok');
+  closePDMDirect();
+}
+
+
+function beerChg(d){
+  const p=_beerProduct; if(!p) return;
+  const nq=(cart[p.id]||0)+d;
+  if(nq<=0){
+    delete cart[p.id];
+    delete beerPcs[p.id];
+    _beerPcsChoice=null;
+  } else {
+    cart[p.id]=nq;
+  }
+  syncCtrl(p.id); updHdr();
+  renderBeerPDM(p);
+  if(curPg==='cart') renderCart();
+}
+
+// ── PRODUCT DETAIL MODAL ─────────────────────────────────────────────────────
+let pdmId=null, _pdmPendingQty=1;
+function openPDM(id){
+  const p=P.find(x=>x.id===id);if(!p)return;
+  _beerProduct=isBeer(p)?p:null;
+  _beerPcsChoice=(cart[p.id]>0)?beerPcs[p.id]:null;
+  _beerPendingQty=(cart[p.id]>0)?cart[p.id]:1;
+  _pdmPendingQty=(cart[p.id]>0)?cart[p.id]:1;
+  pdmId=id;
+  const img=el('pdm-img');
+  img.src=p.img||'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><text y="68" font-size="64">🍾</text></svg>';
+  img.onerror=function(){this.src='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><text y="68" font-size="64">🍾</text></svg>';};
+  img.style.transform='scale(1)';
+  el('pdm-cat').textContent=lang==='ru'?p.cat:p.catE;
+  // For beer pairs show the base name without "– 12 pcs" suffix
+  el('pdm-name').textContent=lang==='ru'?p.name:p.nameE;
+  el('pdm-desc').textContent=lang==='ru'?p.desc:p.descE;
+  if(isBeer(p)){renderBeerPDM(p);}else{updatePDMCtrl(p);}
+  dismissToast();
+  el('pdm-overlay').classList.add('show');
+  document.body.style.overflow='hidden';
+  initPinchZoom();
+}
+function updatePDMCtrl(p){
+  const row=el('pdm-add-row');if(!row)return;
+  const qty=cart[p.id]||0;
+  if(!p.stock){
+    row.innerHTML=`<div style="text-align:center;padding:14px 0;color:var(--muted);font-size:13px;letter-spacing:1.5px;text-transform:uppercase">${t('oosLabel')}</div>`;
+  } else {
+    const pendingQty=_pdmPendingQty||1;
+    const totalPrice=p.price*pendingQty;
+    row.innerHTML=`<div style="display:flex;align-items:center;gap:10px">
+      <button class="pdm-add-btn" onclick="pdmAdd('${p.id}')" style="flex:1">
+        <div style="display:flex;flex-direction:column;align-items:center;gap:2px">
+          <span>${lang==='ru'?'В корзину':'Add to cart'}</span>
+          <span style="font-size:12px;font-weight:500;opacity:.75">${totalPrice} AED</span>
+        </div>
+      </button>
+      ${qty>0?`<div style="display:flex;align-items:center;gap:6px;flex-shrink:0">
+        <button class="pdm-qb" style="width:36px;height:36px;font-size:16px" onclick="pdmPendingChg(-1)">−</button>
+        <span class="pdm-qn" style="min-width:20px;text-align:center;font-size:16px">${pendingQty}</span>
+        <button class="pdm-qb" style="width:36px;height:36px;font-size:16px" onclick="pdmPendingChg(1)">+</button>
+      </div>`:''}
+    </div>`;
+  }
+}
+function initPinchZoom(){
+  const box=el('pdm-img-box');
+  const img=el('pdm-img');
+  const hint=el('pdm-zoom-hint');
+  let scale=1,startDist=0,startScale=1;
+  box.ontouchstart=e=>{
+    if(e.touches.length===2){
+      e.preventDefault();
+      startDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+      startScale=scale;
+      if(hint)hint.style.opacity='0';
+    }
+  };
+  box.ontouchmove=e=>{
+    if(e.touches.length===2){
+      e.preventDefault();
+      const dist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
+      scale=Math.min(4,Math.max(1,startScale*(dist/startDist)));
+      img.style.transform=`scale(${scale})`;
+    }
+  };
+  // double-tap to reset zoom
+  let lastTap=0;
+  box.onclick=e=>{
+    const now=Date.now();
+    if(now-lastTap<300){scale=1;img.style.transform='scale(1)';}
+    lastTap=now;
+  };
+}
+function pdmAdd(id){
+  const p=P.find(x=>x.id===id);if(!p||!p.stock)return;
+  const max=p.stockQty||999;
+  const qty=_pdmPendingQty||1;
+  if(qty>max){showToast(lang==='ru'?`Доступно: ${max}`:`Only ${max} available`,'err');return;}
+  cart[id]=qty;
+  syncCtrl(id);updHdr();
+  showToast(t('added')+': '+(lang==='ru'?p.name:p.nameE),'ok');
+  closePDMDirect();
+}
+function pdmPendingChg(d){
+  const p=P.find(x=>x.id===pdmId);if(!p)return;
+  const nq=(_pdmPendingQty||1)+d;
+  if(nq<=0){
+    delete cart[p.id];
+    _pdmPendingQty=1;
+    syncCtrl(p.id);updHdr();updatePDMCtrl(p);
+    if(curPg==='cart')renderCart();
+    return;
+  }
+  _pdmPendingQty=nq;
+  updatePDMCtrl(p);
+}
+function pdmChg(id,d){
+  const p=P.find(x=>x.id===id),max=p?(p.stockQty||999):999,nq=(cart[id]||0)+d;
+  if(d>0&&nq>max){showToast(lang==='ru'?`Доступно: ${max}`:`Only ${max} available`,'err');return;}
+  if(nq<=0)delete cart[id];else cart[id]=nq;
+  syncCtrl(id);updHdr();updatePDMCtrl(p);if(curPg==='cart')renderCart();
+}
+function closePDM(e){
+  if(e&&e.target!==el('pdm-overlay'))return;
+  closePDMDirect();
+}
+function closePDMDirect(){
+  el('pdm-overlay').classList.remove('show');
+  document.body.style.overflow='';
+  pdmId=null;
+  _pdmPendingQty=1;
+}
+
+// ── BACK TO CART PROMPT ───────────────────────────────────────────────────────
+function showBackToCartPrompt(msg,yes,no){
+  el('back-cart-msg').textContent=msg;
+  el('back-cart-yes').textContent=yes;
+  el('back-cart-no').textContent=no;
+  el('back-cart-overlay').classList.add('show');
+}
+function closeBackToCart(e){
+  if(e&&e.target!==el('back-cart-overlay'))return;
+  closeBackToCartDirect();
+}
+function closeBackToCartDirect(){
+  el('back-cart-overlay').classList.remove('show');
+}
+
+let _tt,_ti=0;
+function dismissToast(){
+  clearTimeout(_tt);
+  el('toast0')?.classList.remove('show');
+  el('toast1')?.classList.remove('show');
+}
+function showToast(msg,type=''){
+  clearTimeout(_tt);
+  _ti=1-_ti;
+  const cur=el('toast'+_ti),other=el('toast'+(1-_ti));
+  if(other)other.className='toast';
+  if(!cur)return;
+  cur.className='toast';
+  const icon=type==='ok'?'✓':type==='err'?'✕':'·';
+  const iconColor=type==='ok'?'var(--green)':type==='err'?'var(--red)':'var(--gold)';
+  cur.innerHTML=`<span class="toast-icon" style="color:${iconColor}">${icon}</span><span class="toast-msg">${msg}</span>`;
+  setTimeout(()=>{cur.className='toast'+(type?' '+type:'')+' show';},16);
+  _tt=setTimeout(()=>cur.classList.remove('show'),2800);
+}
+
+</script>
+</body>
+</html>

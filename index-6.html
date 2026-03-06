@@ -70,6 +70,8 @@ img{display:block}
 .mai-addr{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mai-check{color:var(--gold);font-size:18px;flex-shrink:0}
 .modal-add-btn{display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;color:var(--gold);font-size:13px;font-weight:600}
+#modal-addr-list .saved-card{padding:10px 14px}
+#modal-addr-list .saved-card:last-child{border-bottom:1px solid var(--border2)}
 
 .bnav{position:fixed;bottom:0;left:0;right:0;z-index:40;display:flex;background:rgba(7,7,14,.97);border-top:1px solid var(--border);padding-bottom:var(--safe-bottom)}
 .nb{flex:1;display:flex;flex-direction:column;align-items:center;padding:9px 4px 7px;gap:3px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:.15s}
@@ -304,6 +306,11 @@ img{display:block}
 .o-total{display:flex;align-items:baseline;gap:3px}
 .o-total-num{font-size:18px;font-weight:700;color:var(--gold2);font-family:'DM Sans',sans-serif;line-height:1}
 .o-total-cur{font-size:10px;font-weight:600;color:var(--gold);letter-spacing:.8px}
+.ocard-actions{display:flex;gap:8px;padding:8px 14px 10px;border-top:1px solid var(--border2)}
+.ocard-repeat-btn{flex:1;padding:10px;border-radius:var(--r3);border:1px solid rgba(201,169,110,.3);background:rgba(201,169,110,.08);color:var(--gold);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:.15s;font-family:'DM Sans',sans-serif}
+.ocard-repeat-btn:active{background:rgba(201,169,110,.2);transform:scale(.97)}
+.ocard-del-btn{width:40px;flex-shrink:0;padding:10px;border-radius:var(--r3);border:1px solid rgba(224,85,85,.2);background:rgba(224,85,85,.06);color:var(--red);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s}
+.ocard-del-btn:active{background:rgba(224,85,85,.15);transform:scale(.97)}
 .profile-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:20px;margin:14px}
 .profile-avatar{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px;font-family:'DM Sans',sans-serif;color:#07070E;font-weight:700}
 .profile-name{text-align:center;font-family:'DM Sans',sans-serif;font-size:20px;color:var(--gold2)}
@@ -363,10 +370,10 @@ img{display:block}
 <div id="pg-catalog" class="page">
   <div style="position:sticky;top:0;z-index:40;background:rgba(7,7,14,.96);backdrop-filter:blur(20px)">
     <!-- Row 1: Logo + address centered + controls -->
-    <div style="display:flex;align-items:center;padding:10px 14px;gap:4px">
-      <div style="flex:1;min-width:0"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub">Premium Spirits</div></div></div>
-      <div style="flex:1;display:flex;justify-content:center;min-width:0;padding:0 6px">
-        <div class="addr-pill" onclick="openAddrModal()" id="addr-pill">
+    <div style="display:flex;align-items:center;padding:10px 14px;gap:4px;position:relative">
+      <!-- Left: Address pill -->
+      <div style="flex:1;min-width:0;display:flex;align-items:center">
+        <div class="addr-pill" onclick="openAddrModal()" id="addr-pill" style="align-items:flex-start">
           <span class="addr-pill-sub" id="addr-pill-label">АДРЕС</span>
           <div class="addr-pill-row">
             <span class="addr-pill-txt" id="addr-pill-txt">Добавьте адрес</span>
@@ -374,6 +381,11 @@ img{display:block}
           </div>
         </div>
       </div>
+      <!-- Center: Logo (absolute center) -->
+      <div style="position:absolute;left:50%;transform:translateX(-50%);pointer-events:none;z-index:1">
+        <div class="logo-grp" style="pointer-events:auto"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub">Premium Spirits</div></div>
+      </div>
+      <!-- Right: Cart + Lang -->
       <div class="hdr-right" style="flex:1;justify-content:flex-end">
         <div class="cart-pill" onclick="go('cart')">🛒 <span class="cart-txt" id="hdr-tot">0 AED</span><span class="cart-dot" id="hdr-dot">0</span></div>
         <button class="lang-btn" onclick="flipLang()" id="lbtn">🇷🇺</button>
@@ -403,8 +415,9 @@ img{display:block}
 <!-- ═══ CART ═══ -->
 <div id="pg-cart" class="page hidden">
   <div class="hdr">
-    <div><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-cart">ваша корзина</div></div></div>
-    <div class="hdr-right"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
+    <div style="flex:1"></div>
+    <div style="flex:0 0 auto"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-cart">ваша корзина</div></div></div>
+    <div class="hdr-right" style="flex:1;justify-content:flex-end"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
   </div>
   <!-- Cart top bar -->
   <div class="cart-topbar">
@@ -449,8 +462,9 @@ img{display:block}
 <!-- ═══ ADDRESS PAGE ═══ -->
 <div id="pg-address" class="page hidden">
   <div class="hdr">
-    <div><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-addr">ваши адреса</div></div></div>
-    <div class="hdr-right"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
+    <div style="flex:1"></div>
+    <div style="flex:0 0 auto"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-addr">ваши адреса</div></div></div>
+    <div class="hdr-right" style="flex:1;justify-content:flex-end"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
   </div>
   <div class="addr-page-body">
     <!-- Saved addresses list -->
@@ -521,8 +535,9 @@ img{display:block}
 <!-- ═══ ORDERS ═══ -->
 <div id="pg-orders" class="page hidden" style="overflow:hidden">
   <div class="hdr">
-    <div><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-ord">ваша история</div></div></div>
-    <div class="hdr-right"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
+    <div style="flex:1"></div>
+    <div style="flex:0 0 auto"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-ord">ваша история</div></div></div>
+    <div class="hdr-right" style="flex:1;justify-content:flex-end"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
   </div>
   <div style="display:flex;align-items:center;padding:10px 14px 8px;gap:10px;flex-shrink:0">
     <span style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:var(--gold);letter-spacing:2.5px;text-transform:uppercase" id="sh-orders">История</span>
@@ -540,8 +555,9 @@ img{display:block}
 <!-- ═══ PROFILE ═══ -->
 <div id="pg-profile" class="page hidden">
   <div class="hdr">
-    <div><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-prof">ваш профиль</div></div></div>
-    <div class="hdr-right"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
+    <div style="flex:1"></div>
+    <div style="flex:0 0 auto"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-prof">ваш профиль</div></div></div>
+    <div class="hdr-right" style="flex:1;justify-content:flex-end"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
   </div>
   <div class="profile-card">
     <div class="profile-avatar" id="prof-av">A</div>
@@ -561,8 +577,9 @@ img{display:block}
 <!-- CHECKOUT (hidden, used by placeOrder) -->
 <div id="pg-checkout" class="page hidden">
   <div class="hdr">
-    <div><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-co">Оформление</div></div></div>
-    <div class="hdr-right"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
+    <div style="flex:1"></div>
+    <div style="flex:0 0 auto"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-co">Оформление</div></div></div>
+    <div class="hdr-right" style="flex:1;justify-content:flex-end"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
   </div>
   <div class="co-body">
     <div class="co-card">
@@ -1129,16 +1146,37 @@ function renderModalAddrList(){
   if(!arr.length){
     list.innerHTML=`<div style="padding:20px 16px;font-size:13px;color:var(--muted)">${t('noSaved')}</div>`;return;
   }
-  list.innerHTML=arr.map((a,i)=>`
-    <div class="modal-addr-item${i===activeAddrIdx?' active':''}" onclick="selectAddr(${i})">
-      <span class="mai-icon">${a.typeIcon||'📍'}</span>
-      <div class="mai-info">
-        <div class="mai-label">${a.label||a.address}</div>
-        <div class="mai-addr">${a.label&&a.label!==a.address?a.address:a.office_name||''}</div>
+  list.innerHTML=arr.map((a,i)=>{
+    const isActive=i===activeAddrIdx;
+    const typeIcon=a.typeIcon||'📍';
+    const commentHtml=a.comment?`<div class="sc-comment">💬 ${a.comment}</div>`:'';
+    const addrShort=a.label&&a.label!==a.address?a.address:'';
+    return`<div class="saved-card${isActive?' active-addr':''}" onclick="selectAddr(${i})">
+      <div class="sc-radio"><div class="sc-radio-dot"></div></div>
+      <span class="sc-icon">${typeIcon}</span>
+      <div class="sc-info">
+        <div class="sc-row1">
+          <span class="sc-label">${a.label||a.address}</span>
+          ${addrShort?`<span class="sc-sep">·</span><span class="sc-addr">${addrShort}</span>`:''}
+        </div>
+        ${commentHtml}
       </div>
-      ${i===activeAddrIdx?'<span class="mai-check">✓</span>':''}
-    </div>
-  `).join('');
+      <div class="sc-actions">
+        <button class="sc-edit-btn" onclick="event.stopPropagation();modalEditAddr(${i})">✏️</button>
+        <button class="sc-del-btn" onclick="event.stopPropagation();modalDeleteAddr(${i})">🗑</button>
+      </div>
+    </div>`;
+  }).join('');
+}
+function modalEditAddr(i){
+  closeAddrModal();
+  go('address');
+  setTimeout(()=>editAddr(i),200);
+}
+function modalDeleteAddr(i){
+  deleteAddr(i);
+  renderModalAddrList();
+  haptic.light();
 }
 
 // ── METHOD TABS ───────────────────────────────────────────────────────────────
@@ -1943,6 +1981,44 @@ function confirmClearHistory(){
   renderOrders();
   buildProfile();
 }
+function repeatOrder(idx){
+  const o=orders[idx];if(!o)return;
+  let addedCount=0;
+  o.items.forEach(item=>{
+    let p=P.find(x=>x.id===item.id);
+    if(!p)p=P.find(x=>x.name===item.name||x.nameE===item.name);
+    if(p&&p.stock){
+      const max=p.stockQty||999;
+      const qty=Math.min(item.qty,max);
+      cart[p.id]=(cart[p.id]||0)+qty;
+      if(item.pcs&&isBeer(p))beerPcs[p.id]=item.pcs;
+      addedCount+=qty;
+    }
+  });
+  if(addedCount>0){
+    updHdr();if(curPg==='cart')renderCart();
+    haptic.success();
+    showToast(`${lang==='ru'?'Заказ':'Order'} #${o.order_id} ${lang==='ru'?'добавлен в корзину':'added to cart'}`,'ok');
+  } else {
+    haptic.error();
+    showToast(lang==='ru'?'Товары недоступны':'Items unavailable','err');
+  }
+}
+function deleteOrder(idx){
+  const o=orders[idx];if(!o)return;
+  if(o.status==='delivered'){
+    const prev=parseInt(localStorage.getItem('ambar_spent_total')||'0');
+    localStorage.setItem('ambar_spent_total',prev+o.total);
+  }
+  const prevCleared=JSON.parse(localStorage.getItem('ambar_cleared_ids')||'[]');
+  prevCleared.push(o.order_id);
+  localStorage.setItem('ambar_cleared_ids',JSON.stringify([...new Set(prevCleared)]));
+  orders.splice(idx,1);
+  localStorage.setItem('ambar_orders',JSON.stringify(orders));
+  haptic.light();
+  renderOrders();buildProfile();
+  showToast(`${lang==='ru'?'Заказ':'Order'} #${o.order_id} ${lang==='ru'?'удалён':'deleted'}`,'ok');
+}
 function renderOrders(){
   const ordHdr=el('sh-orders');
   const clearWrap=el('clear-history-wrap');
@@ -1966,10 +2042,12 @@ function renderOrders(){
   const lbl2={pending:()=>lang==='ru'?'Ожидает':'Pending',confirmed:()=>lang==='ru'?'Принят':'Confirmed',delivered:()=>lang==='ru'?'Доставлен':'Delivered',declined:()=>lang==='ru'?'Отменён':'Cancelled'};
   const months=lang==='ru'?['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек']:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   function fmtDate(ts){if(!ts)return'';const d=new Date(ts);return`${d.getDate()} ${months[d.getMonth()]} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
-  el('orders-list').innerHTML=orders.map(o=>{
+  el('orders-list').innerHTML=orders.map((o,idx)=>{
     const st=cls[o.status]||'sp';
     const rows=o.items.map(i=>`<div class="o-row"><span class="o-row-name">${i.name}</span><span class="o-row-qty">${i.qty} ${lang==='ru'?'шт':'pcs'}</span></div>`).join('');
-    return`<div class="ocard ${st}"><div class="ocard-inner"><div class="ocard-meta"><span class="o-id">#${o.order_id}</span><span class="o-date">${fmtDate(o.timestamp)}</span></div><div class="o-rows">${rows}</div><div class="ocard-foot"><span class="o-status"><span class="o-status-dot"></span>${(lbl2[o.status]||lbl2.pending)()}</span><div class="o-total"><span class="o-total-num">${o.total}</span><span class="o-total-cur">AED</span></div></div></div></div>`;
+    const isFinished=o.status==='delivered'||o.status==='declined';
+    const actionsHtml=isFinished?`<div class="ocard-actions"><button class="ocard-repeat-btn" onclick="event.stopPropagation();repeatOrder(${idx})">🔁 ${lang==='ru'?'Повторить':'Repeat'}</button><button class="ocard-del-btn" onclick="event.stopPropagation();deleteOrder(${idx})">🗑</button></div>`:'';
+    return`<div class="ocard ${st}"><div class="ocard-inner"><div class="ocard-meta"><span class="o-id">#${o.order_id}</span><span class="o-date">${fmtDate(o.timestamp)}</span></div><div class="o-rows">${rows}</div><div class="ocard-foot"><span class="o-status"><span class="o-status-dot"></span>${(lbl2[o.status]||lbl2.pending)()}</span><div class="o-total"><span class="o-total-num">${o.total}</span><span class="o-total-cur">AED</span></div></div></div>${actionsHtml}</div>`;
   }).join('');
 }
 
@@ -2163,7 +2241,7 @@ function openPDM(id){
   const img=el('pdm-img');
   img.src=p.img||'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><text y="68" font-size="64">🍾</text></svg>';
   img.onerror=function(){this.src='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><text y="68" font-size="64">🍾</text></svg>';};
-  img.style.transform='scale(1)';
+  img.style.transform='translate(0px,0px) scale(1)';img.style.transition='';
   el('pdm-cat').textContent=lang==='ru'?p.cat:p.catE;
   // For beer pairs show the base name without "– 12 pcs" suffix
   el('pdm-name').textContent=lang==='ru'?p.name:p.nameE;
@@ -2173,6 +2251,7 @@ function openPDM(id){
   el('pdm-overlay').classList.add('show');
   document.body.style.overflow='hidden';
   initPinchZoom();
+  initPDMSwipe();
 }
 function updatePDMCtrl(p){
   const row=el('pdm-add-row');if(!row)return;
@@ -2202,12 +2281,33 @@ function initPinchZoom(){
   const img=el('pdm-img');
   const hint=el('pdm-zoom-hint');
   let scale=1,startDist=0,startScale=1;
+  let tx=0,ty=0,panStartX=0,panStartY=0,isPanning=false,resetTimer=null;
+  function applyTf(animate){
+    if(animate){img.style.transition='transform .4s cubic-bezier(.25,.8,.25,1)';}
+    else{img.style.transition='none';}
+    img.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`;
+  }
+  function scheduleReset(){
+    clearTimeout(resetTimer);
+    resetTimer=setTimeout(()=>{
+      scale=1;tx=0;ty=0;
+      applyTf(true);
+      setTimeout(()=>{img.style.transition='';},420);
+    },1000);
+  }
+  function cancelReset(){clearTimeout(resetTimer);}
   box.ontouchstart=e=>{
+    cancelReset();
     if(e.touches.length===2){
       e.preventDefault();
       startDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
       startScale=scale;
       if(hint)hint.style.opacity='0';
+    } else if(e.touches.length===1&&scale>1){
+      e.preventDefault();
+      isPanning=true;
+      panStartX=e.touches[0].clientX-tx;
+      panStartY=e.touches[0].clientY-ty;
     }
   };
   box.ontouchmove=e=>{
@@ -2215,14 +2315,26 @@ function initPinchZoom(){
       e.preventDefault();
       const dist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
       scale=Math.min(4,Math.max(1,startScale*(dist/startDist)));
-      img.style.transform=`scale(${scale})`;
+      applyTf(false);
+    } else if(e.touches.length===1&&isPanning&&scale>1){
+      e.preventDefault();
+      tx=e.touches[0].clientX-panStartX;
+      ty=e.touches[0].clientY-panStartY;
+      const maxPan=(scale-1)*150;
+      tx=Math.max(-maxPan,Math.min(maxPan,tx));
+      ty=Math.max(-maxPan,Math.min(maxPan,ty));
+      applyTf(false);
     }
   };
-  // double-tap to reset zoom
+  box.ontouchend=e=>{
+    if(isPanning){isPanning=false;if(scale>1)scheduleReset();}
+    if(e.touches.length===0&&scale>1)scheduleReset();
+    if(scale<=1){scale=1;tx=0;ty=0;applyTf(true);setTimeout(()=>{img.style.transition='';},420);}
+  };
   let lastTap=0;
   box.onclick=e=>{
     const now=Date.now();
-    if(now-lastTap<300){scale=1;img.style.transform='scale(1)';}
+    if(now-lastTap<300){cancelReset();scale=1;tx=0;ty=0;applyTf(true);setTimeout(()=>{img.style.transition='';},420);}
     lastTap=now;
   };
 }
@@ -2262,8 +2374,68 @@ function closePDM(e){
 function closePDMDirect(){
   el('pdm-overlay').classList.remove('show');
   document.body.style.overflow='';
+  const sh=el('pdm-sheet'),ov=el('pdm-overlay');
+  if(sh){sh.style.transition='';sh.style.transform='';}
+  if(ov){ov.style.transition='';ov.style.background='';}
   pdmId=null;
   _pdmPendingQty=1;
+}
+
+// ── SWIPE TO CLOSE PDM ──────────────────────────────────────────────────────
+let _pdmSwipeInit=false;
+function initPDMSwipe(){
+  if(_pdmSwipeInit)return;
+  _pdmSwipeInit=true;
+  const sheet=el('pdm-sheet');
+  const overlay=el('pdm-overlay');
+  if(!sheet)return;
+  let startY=0,currentY=0,isDragging=false;
+  sheet.addEventListener('touchstart',function(e){
+    if(sheet.scrollTop>0)return;
+    if(e.touches.length!==1)return;
+    // Don't swipe if zoomed image
+    const img=el('pdm-img');
+    if(img&&img.style.transform&&!img.style.transform.includes('scale(1)'))return;
+    startY=e.touches[0].clientY;
+    currentY=startY;
+    isDragging=false;
+  },{passive:true});
+  sheet.addEventListener('touchmove',function(e){
+    if(e.touches.length!==1)return;
+    currentY=e.touches[0].clientY;
+    const deltaY=currentY-startY;
+    if(deltaY<0||sheet.scrollTop>0){isDragging=false;return;}
+    if(deltaY>8){
+      isDragging=true;
+      e.preventDefault();
+      const resistance=0.6;
+      sheet.style.transition='none';
+      sheet.style.transform=`translateY(${deltaY*resistance}px)`;
+      const opacity=Math.max(0,0.82-(deltaY*resistance)/500);
+      overlay.style.background=`rgba(0,0,0,${opacity})`;
+    }
+  },{passive:false});
+  sheet.addEventListener('touchend',function(){
+    if(!isDragging)return;
+    const deltaY=currentY-startY;
+    if(deltaY>120){
+      sheet.style.transition='transform .25s ease-out';
+      sheet.style.transform='translateY(100%)';
+      overlay.style.transition='background .25s ease-out';
+      overlay.style.background='rgba(0,0,0,0)';
+      haptic.light();
+      setTimeout(()=>{
+        closePDMDirect();
+      },260);
+    } else {
+      sheet.style.transition='transform .25s cubic-bezier(.34,1,.64,1)';
+      sheet.style.transform='translateY(0)';
+      overlay.style.transition='background .25s ease';
+      overlay.style.background='rgba(0,0,0,.82)';
+      setTimeout(()=>{sheet.style.transition='';overlay.style.transition='';},260);
+    }
+    isDragging=false;
+  },{passive:true});
 }
 
 // ── BACK TO CART PROMPT ───────────────────────────────────────────────────────

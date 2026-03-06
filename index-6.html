@@ -370,7 +370,7 @@ img{display:block}
 <div id="pg-catalog" class="page">
   <div style="position:sticky;top:0;z-index:40;background:rgba(7,7,14,.96);backdrop-filter:blur(20px)">
     <!-- Row 1: Logo + address centered + controls -->
-    <div style="display:flex;align-items:center;padding:8px 14px;gap:4px;position:relative">
+    <div style="display:flex;align-items:center;padding:10px 14px;gap:4px;position:relative">
       <!-- Left: Address pill -->
       <div style="flex:1;min-width:0;display:flex;align-items:center">
         <div class="addr-pill" onclick="openAddrModal()" id="addr-pill" style="align-items:flex-start">
@@ -381,9 +381,9 @@ img{display:block}
           </div>
         </div>
       </div>
-      <!-- Center: Logo (absolute center, compact) -->
+      <!-- Center: Logo (absolute center) -->
       <div style="position:absolute;left:50%;transform:translateX(-50%);pointer-events:none;z-index:1">
-        <div class="logo-grp" style="pointer-events:auto"><div class="logo-line"></div><div class="logo" style="font-size:17px;letter-spacing:5px">AMBAR</div><div class="logo-line"></div><div class="logo-sub" style="font-size:5.5px;letter-spacing:2px">Premium Spirits</div></div>
+        <div class="logo-grp" style="pointer-events:auto"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub">Premium Spirits</div></div>
       </div>
       <!-- Right: Cart + Lang -->
       <div class="hdr-right" style="flex:1;justify-content:flex-end">
@@ -392,7 +392,7 @@ img{display:block}
       </div>
     </div>
     <!-- Row 2: Search bar -->
-    <div style="padding:0 14px 8px">
+    <div style="padding:0 14px 8px;margin-top:6px">
       <div class="search-wrap">
         <svg class="search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input class="search-inp" id="search-inp" type="text" placeholder="Поиск..." oninput="onSearch(this.value)">
@@ -2303,12 +2303,12 @@ function initPinchZoom(){
   box.ontouchstart=e=>{
     cancelReset();
     if(e.touches.length===2){
-      e.preventDefault();
+      e.preventDefault();e.stopPropagation();
       startDist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
       startScale=scale;
       if(hint)hint.style.opacity='0';
     } else if(e.touches.length===1&&scale>1){
-      e.preventDefault();
+      e.preventDefault();e.stopPropagation();
       isPanning=true;
       panStartX=e.touches[0].clientX-tx;
       panStartY=e.touches[0].clientY-ty;
@@ -2316,12 +2316,12 @@ function initPinchZoom(){
   };
   box.ontouchmove=e=>{
     if(e.touches.length===2){
-      e.preventDefault();
+      e.preventDefault();e.stopPropagation();
       const dist=Math.hypot(e.touches[0].clientX-e.touches[1].clientX,e.touches[0].clientY-e.touches[1].clientY);
       scale=Math.min(4,Math.max(1,startScale*(dist/startDist)));
       applyTf(false);
     } else if(e.touches.length===1&&isPanning&&scale>1){
-      e.preventDefault();
+      e.preventDefault();e.stopPropagation();
       tx=e.touches[0].clientX-panStartX;
       ty=e.touches[0].clientY-panStartY;
       const maxPan=(scale-1)*150;
@@ -2331,6 +2331,7 @@ function initPinchZoom(){
     }
   };
   box.ontouchend=e=>{
+    if(isPanning||scale>1)e.stopPropagation();
     if(isPanning){isPanning=false;if(scale>1)scheduleReset();}
     if(e.touches.length===0&&scale>1)scheduleReset();
     if(scale<=1){scale=1;tx=0;ty=0;applyTf(true);setTimeout(()=>{img.style.transition='';_pdmImgZoomed=false;},420);}

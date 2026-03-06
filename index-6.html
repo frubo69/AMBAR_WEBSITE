@@ -1894,12 +1894,23 @@ function placeOrder(){
   orders.unshift({order_id:oid,items,total,address:addr.label||addr.address,status:'pending',timestamp:new Date().toISOString()});
   localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
 
-  if(tg?.sendData)tg.sendData(JSON.stringify(payload));
-  else console.log('ORDER:',JSON.stringify(payload,null,2));
+  // Send order via API (works from both menu button and reply keyboard)
+  const body={...payload, initData: tg?.initData||''};
+  fetch(`${AMBAR_API}/api/order`,{
+    method:'POST',
+    headers:{'Content-Type':'application/json'},
+    body:JSON.stringify(body)
+  }).then(r=>r.json()).then(res=>{
+    if(res.ok){
+      console.log('Order sent via API:', res.order_id);
+    } else {
+      console.error('Order API error:', res.error);
+    }
+  }).catch(err=>console.error('Order fetch error:', err));
 
   cart={};beerPcs={};tip=0;el('phone-err').classList.remove('on');el('phone-in').classList.remove('err');
   updHdr();buildTips();showToast(t('placed'),'ok');
-  setTimeout(()=>go('orders'),1400);
+  setTimeout(()=>{go('orders'); if(tg?.close) tg.close();},1400);
 }
 
 // ── ORDERS ────────────────────────────────────────────────────────────────────

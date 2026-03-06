@@ -4,7 +4,7 @@ import os, json, time, logging
 from datetime import datetime
 from pathlib import Path
 from dotenv import load_dotenv
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, KeyboardButton, ReplyKeyboardMarkup, WebAppInfo, MenuButtonWebApp
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, WebAppInfo, MenuButtonWebApp
 from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
 
 load_dotenv()
@@ -93,14 +93,6 @@ def deduct_stock(items):
     return True
 
 # ── Keyboards ─────────────────────────────────────────────────────────────────
-def kb_open(lang="ru"):
-    catalog_label = "🍾 Оформить заказ" if lang == "ru" else "🍾 Place Order"
-    support_label = "🆘 Поддержка" if lang == "ru" else "🆘 Support"
-    row = [KeyboardButton(catalog_label, web_app=WebAppInfo(url=WEBAPP_URL))]
-    if SUPPORT_BOT_USERNAME:
-        row.append(KeyboardButton(support_label))
-    return ReplyKeyboardMarkup([row], resize_keyboard=True)
-
 def kb_review(cid, lang):
     return InlineKeyboardMarkup([[InlineKeyboardButton(str(i), callback_data=f"rev_{i}_{cid}_{lang}") for i in range(1, 6)]])
 
@@ -134,7 +126,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"⚡️ Быстрая доставка — привезём в кратчайшие сроки\n"
         f"🥃 Тщательно подобранный ассортимент — только проверенные бренды и редкие позиции\n"
         f"💎 Честные цены — premium качество без лишних наценок\n\n"
-        f"Нажмите *🍾 Оформить заказ* чтобы открыть каталог 👇"
+        f"Нажмите *🍾 Заказать* слева от поля ввода 👇"
         if lang == "ru" else
         f"👋 Hey, {name}!\n\n"
         f"Welcome to *AMBAR* — premium spirits delivery, right to your door.\n\n"
@@ -142,132 +134,10 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"⚡️ Fast delivery — we'll be there in no time\n"
         f"🥃 Curated selection — trusted brands and rare finds\n"
         f"💎 Fair pricing — premium quality, no unnecessary markups\n\n"
-        f"Tap *🍾 Place Order* to open the catalog 👇"
+        f"Tap *🍾 Order* to the left of the input field 👇"
     )
 
-    await update.message.reply_text(text, parse_mode="Markdown", reply_markup=kb_open(lang))
-
-async def handle_webapp(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    uid = update.effective_user.id
-    if is_banned(uid):
-        await update.effective_message.reply_text("🚫 Ваш аккаунт заблокирован.")
-        return
-
-    raw = update.effective_message.web_app_data
-    if not raw: return
-    try: data = json.loads(raw.data)
-    except Exception as e: log.error(f"WebApp parse: {e}"); return
-
-    lang = data.get("lang", "ru")
-    ctx.user_data["lang"] = lang
-    u = update.effective_user
-
-    if data.get("action") != "order": return
-
-    # ── Clean up previous rating/review messages before new order ─────────────
-    ustate = get_ustate(uid)
-    for mid in ustate.get("to_delete_on_order", []):
-        try: await ctx.bot.delete_message(uid, mid)
-        except: pass
-    set_ustate(uid, {})  # reset state for this user
-
-    oid       = data.get("order_id", f"AMB{int(time.time())%100000:05d}")
-    items     = data.get("items", [])
-    phone     = data.get("phone", "—")
-    address   = data.get("address", "—")
-    tip       = data.get("tip", 0)
-    total     = data.get("total", 0)
-    loc       = data.get("location", {})
-    office_id = data.get("office_id", "office_central")
-    office_nm = data.get("office_name", "Ambar")
-    save_addr = data.get("save_address", False)
-    comment   = data.get("comment", "")
-
-    item_lines = "\n".join(f"  • {i['name']} ×{i['qty']} = {i.get('line_total', i['price']*i['qty'])} AED" for i in items)
-
-    # Save address if requested
-    if save_addr and address and address != "—":
-        save_user_address(uid, {
-            "label":       data.get("address_label", address),
-            "address":     address,
-            "lat":         loc.get("lat", 0),
-            "lon":         loc.get("lon", 0),
-            "office_id":   office_id,
-            "office_name": office_nm,
-        })
-
-    save_order(oid, {
-        "order_id": oid, "customer_id": uid,
-        "customer_name": u.full_name, "username": u.username or "—",
-        "phone": phone, "address": address, "location": loc,
-        "items": items, "item_lines": item_lines,
-        "tip": tip, "total": total, "lang": lang,
-        "office_id": office_id, "office_name": office_nm,
-        "comment": comment,
-        "status": "pending", "timestamp": datetime.now().isoformat(),
-    })
-
-
-    if lang == "ru":
-        item_lines_str = "\n".join(f"  • {i['name']} ×{i['qty']} = {i.get('line_total', i['price']*i['qty'])} AED" for i in items)
-        confirm = (
-            f"✅ *Заказ #{oid} оформлен!*\n\n"
-            f"🏠 {address}\n"
-            f"📞 {phone}\n\n"
-            f"🛒 *Позиции:*\n{item_lines_str}\n\n"
-            f"🎁 Чаевые: {tip} AED\n"
-            f"💰 *Итого: {total} AED*\n\n"
-            f"⏳ Оператор позвонит вам для подтверждения."
-        )
-    else:
-        item_lines_str = "\n".join(f"  • {i['name']} ×{i['qty']} = {i.get('line_total', i['price']*i['qty'])} AED" for i in items)
-        confirm = (
-            f"✅ *Order #{oid} placed!*\n\n"
-            f"🏠 {address}\n"
-            f"📞 {phone}\n\n"
-            f"🛒 *Items:*\n{item_lines_str}\n\n"
-            f"🎁 Tip: {tip} AED\n"
-            f"💰 *Total: {total} AED*\n\n"
-            f"⏳ Our operator will call you to confirm."
-        )
-    conf_msg = await update.effective_message.reply_text(confirm, parse_mode="Markdown")
-    # Store message_id so operator_bot can delete it when order is delivered
-    update_order(oid, customer_msg_ids=[conf_msg.message_id])
-
-    loc_str = f"\n📍 {loc.get('lat','?'):.5f}, {loc.get('lon','?'):.5f}" if loc.get("lat") else ""
-    op_text = (
-        f"🆕 *НОВЫЙ ЗАКАЗ #{oid}*\n\n"
-        f"🏢 Офис: *{office_nm}*\n\n"
-        f"👤 *{u.full_name}*\n"
-        f"📞 `{phone}`\n"
-        f"🔗 @{u.username or '—'} | ID: `{uid}`\n"
-        f"🏠 Адрес: {address}{loc_str}\n\n"
-        f"🛒 *Позиции:*\n{item_lines}\n\n"
-        f"🎁 Чаевые: {tip} AED\n"
-        f"💰 *Итого: {total} AED*"
-        + (f"\n\n💬 *Комментарий:* {comment}" if comment else "")
-    )
-    op_kb = InlineKeyboardMarkup([
-        [
-            InlineKeyboardButton("✅ Принять",   callback_data=f"acc_{oid}_{uid}"),
-            InlineKeyboardButton("❌ Отклонить", callback_data=f"dec_{oid}_{uid}"),
-        ],
-        [
-            InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{oid}"),
-            InlineKeyboardButton("📍 Геолокация",    callback_data=f"loc_{oid}"),
-        ],
-        [InlineKeyboardButton("🚫 Забанить клиента", callback_data=f"ban_{oid}_{uid}")],
-    ])
-
-    from telegram import Bot as TGBot
-    op_bot = TGBot(token=OPERATOR_BOT_TOKEN)
-    async with op_bot:
-        for op_id in OPERATOR_IDS:
-            try:
-                await op_bot.send_message(op_id, op_text, parse_mode="Markdown", reply_markup=op_kb)
-                log.info(f"Notified operator {op_id} for order {oid}")
-            except Exception as e:
-                log.error(f"Operator notify {op_id}: {e}")
+    await update.message.reply_text(text, parse_mode="Markdown", reply_markup=ReplyKeyboardRemove())
 
 async def cb_review(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     q = update.callback_query
@@ -354,7 +224,6 @@ def main():
     if not WEBAPP_URL: print("❌ WEBAPP_URL missing"); return
     app = Application.builder().token(BOT_TOKEN).build()
     app.add_handler(CommandHandler("start", cmd_start))
-    app.add_handler(MessageHandler(filters.StatusUpdate.WEB_APP_DATA, handle_webapp))
     app.add_handler(CallbackQueryHandler(cb_review, pattern=r"^rev_"))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fallback))
     log.info("🍾 AMBAR Customer Bot started!")

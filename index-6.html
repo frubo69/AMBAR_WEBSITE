@@ -846,6 +846,17 @@ let curPg='catalog';
 let pendingOrderConfirmed=false; // for location mismatch flow
 const tg=window.Telegram?.WebApp||null;
 
+// ── HAPTIC FEEDBACK (Taptic Engine) ──────────────────────────────────────────
+const haptic={
+  light(){try{tg?.HapticFeedback?.impactOccurred('light')}catch(e){}},
+  medium(){try{tg?.HapticFeedback?.impactOccurred('medium')}catch(e){}},
+  heavy(){try{tg?.HapticFeedback?.impactOccurred('heavy')}catch(e){}},
+  select(){try{tg?.HapticFeedback?.selectionChanged()}catch(e){}},
+  success(){try{tg?.HapticFeedback?.notificationOccurred('success')}catch(e){}},
+  error(){try{tg?.HapticFeedback?.notificationOccurred('error')}catch(e){}},
+  warning(){try{tg?.HapticFeedback?.notificationOccurred('warning')}catch(e){}},
+};
+
 // ── LOGO SUB ALIGN ────────────────────────────────────────────────────────────
 function alignLogoSubs(){
   document.querySelectorAll('.logo-grp').forEach(g=>{
@@ -960,6 +971,7 @@ function applyLang(){
 const PAGES=['catalog','cart','address','orders','profile','checkout'];
 function go(p){
   dismissToast();
+  if(p!==curPg)haptic.select();
   PAGES.forEach(id=>{
     el('pg-'+id)?.classList.toggle('hidden',id!==p);
     el('nb-'+id)?.classList.toggle('on',id===p);
@@ -1719,13 +1731,13 @@ function addItem(id){
   if(isBeer(p)){openPDM(id);return;}
   const max=p.stockQty||999;
   if((cart[id]||0)>=max){showToast(lang==='ru'?`Доступно: ${max}`:`Only ${max} available`,'err');return;}
-  cart[id]=1;syncCtrl(id);updHdr();showToast(t('added')+': '+p.name,'ok');
+  cart[id]=1;syncCtrl(id);updHdr();haptic.light();showToast(t('added')+': '+p.name,'ok');
 }
 function chgQty(id,d){
   const p=P.find(x=>x.id===id),max=p?(p.stockQty||999):999,nq=(cart[id]||0)+d;
   if(d>0&&nq>max){showToast(lang==='ru'?`Доступно: ${max}`:`Only ${max} available`,'err');return;}
   if(nq<=0)delete cart[id];else cart[id]=nq;
-  syncCtrl(id);updHdr();if(curPg==='cart')renderCart();
+  haptic.light();syncCtrl(id);updHdr();if(curPg==='cart')renderCart();
 }
 function syncCtrl(id){const e=el('ctrl-'+id);if(!e)return;const p=P.find(x=>x.id===id);e.innerHTML=ctrlHTML(p,cart[id]||0);}
 function cartSub(){return Object.entries(cart).reduce((s,[id,qty])=>{const p=P.find(x=>x.id===id);if(!p)return s;const pcs=isBeer(p)?beerPcs[id]:null;const unitPrice=pcs===24?Math.round(p.price*1.8):p.price;return s+unitPrice*qty;},0);}
@@ -1909,7 +1921,7 @@ function placeOrder(){
   }).catch(err=>console.error('Order fetch error:', err));
 
   cart={};beerPcs={};tip=0;el('phone-err').classList.remove('on');el('phone-in').classList.remove('err');
-  updHdr();buildTips();showToast(t('placed'),'ok');
+  updHdr();buildTips();haptic.success();showToast(t('placed'),'ok');
   setTimeout(()=>{go('orders'); if(tg?.close) tg.close();},1400);
 }
 
@@ -2119,7 +2131,7 @@ function beerAddPending(){
   beerPcs[p.id]=_beerPcsChoice;
   syncCtrl(p.id); updHdr();
   if(curPg==='cart') renderCart();
-  showToast(t('added')+': '+(lang==='ru'?p.name:p.nameE)+' ('+_beerPcsChoice+' '+(lang==='ru'?'шт':'pcs')+' × '+_beerPendingQty+')','ok');
+  haptic.medium();showToast(t('added')+': '+(lang==='ru'?p.name:p.nameE)+' ('+_beerPcsChoice+' '+(lang==='ru'?'шт':'pcs')+' × '+_beerPendingQty+')','ok');
   closePDMDirect();
 }
 
@@ -2221,7 +2233,7 @@ function pdmAdd(id){
   if(qty>max){showToast(lang==='ru'?`Доступно: ${max}`:`Only ${max} available`,'err');return;}
   cart[id]=qty;
   syncCtrl(id);updHdr();
-  showToast(t('added')+': '+(lang==='ru'?p.name:p.nameE),'ok');
+  haptic.medium();showToast(t('added')+': '+(lang==='ru'?p.name:p.nameE),'ok');
   closePDMDirect();
 }
 function pdmPendingChg(d){
@@ -2276,6 +2288,7 @@ function dismissToast(){
   el('toast1')?.classList.remove('show');
 }
 function showToast(msg,type=''){
+  if(type==='err')haptic.error();
   clearTimeout(_tt);
   _ti=1-_ti;
   const cur=el('toast'+_ti),other=el('toast'+(1-_ti));

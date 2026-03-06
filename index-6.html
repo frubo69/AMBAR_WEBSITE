@@ -370,7 +370,7 @@ img{display:block}
 <div id="pg-catalog" class="page">
   <div style="position:sticky;top:0;z-index:40;background:rgba(7,7,14,.96);backdrop-filter:blur(20px)">
     <!-- Row 1: Logo + address centered + controls -->
-    <div style="display:flex;align-items:center;padding:10px 14px;gap:4px;position:relative">
+    <div style="display:flex;align-items:center;padding:8px 14px;gap:4px;position:relative">
       <!-- Left: Address pill -->
       <div style="flex:1;min-width:0;display:flex;align-items:center">
         <div class="addr-pill" onclick="openAddrModal()" id="addr-pill" style="align-items:flex-start">
@@ -381,9 +381,9 @@ img{display:block}
           </div>
         </div>
       </div>
-      <!-- Center: Logo (absolute center) -->
+      <!-- Center: Logo (absolute center, compact) -->
       <div style="position:absolute;left:50%;transform:translateX(-50%);pointer-events:none;z-index:1">
-        <div class="logo-grp" style="pointer-events:auto"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub">Premium Spirits</div></div>
+        <div class="logo-grp" style="pointer-events:auto"><div class="logo-line"></div><div class="logo" style="font-size:17px;letter-spacing:5px">AMBAR</div><div class="logo-line"></div><div class="logo-sub" style="font-size:5.5px;letter-spacing:2px">Premium Spirits</div></div>
       </div>
       <!-- Right: Cart + Lang -->
       <div class="hdr-right" style="flex:1;justify-content:flex-end">
@@ -1983,6 +1983,8 @@ function confirmClearHistory(){
 }
 function repeatOrder(idx){
   const o=orders[idx];if(!o)return;
+  // Clear cart first — replace, don't stack
+  cart={};beerPcs={};
   let addedCount=0;
   o.items.forEach(item=>{
     let p=P.find(x=>x.id===item.id);
@@ -1990,15 +1992,16 @@ function repeatOrder(idx){
     if(p&&p.stock){
       const max=p.stockQty||999;
       const qty=Math.min(item.qty,max);
-      cart[p.id]=(cart[p.id]||0)+qty;
+      cart[p.id]=qty;
       if(item.pcs&&isBeer(p))beerPcs[p.id]=item.pcs;
       addedCount+=qty;
     }
   });
   if(addedCount>0){
-    updHdr();if(curPg==='cart')renderCart();
+    updHdr();
     haptic.success();
     showToast(`${lang==='ru'?'Заказ':'Order'} #${o.order_id} ${lang==='ru'?'добавлен в корзину':'added to cart'}`,'ok');
+    setTimeout(()=>go('cart'),600);
   } else {
     haptic.error();
     showToast(lang==='ru'?'Товары недоступны':'Items unavailable','err');
@@ -2286,13 +2289,14 @@ function initPinchZoom(){
     if(animate){img.style.transition='transform .4s cubic-bezier(.25,.8,.25,1)';}
     else{img.style.transition='none';}
     img.style.transform=`translate(${tx}px,${ty}px) scale(${scale})`;
+    _pdmImgZoomed=scale>1;
   }
   function scheduleReset(){
     clearTimeout(resetTimer);
     resetTimer=setTimeout(()=>{
       scale=1;tx=0;ty=0;
       applyTf(true);
-      setTimeout(()=>{img.style.transition='';},420);
+      setTimeout(()=>{img.style.transition='';_pdmImgZoomed=false;},420);
     },1000);
   }
   function cancelReset(){clearTimeout(resetTimer);}
@@ -2329,12 +2333,12 @@ function initPinchZoom(){
   box.ontouchend=e=>{
     if(isPanning){isPanning=false;if(scale>1)scheduleReset();}
     if(e.touches.length===0&&scale>1)scheduleReset();
-    if(scale<=1){scale=1;tx=0;ty=0;applyTf(true);setTimeout(()=>{img.style.transition='';},420);}
+    if(scale<=1){scale=1;tx=0;ty=0;applyTf(true);setTimeout(()=>{img.style.transition='';_pdmImgZoomed=false;},420);}
   };
   let lastTap=0;
   box.onclick=e=>{
     const now=Date.now();
-    if(now-lastTap<300){cancelReset();scale=1;tx=0;ty=0;applyTf(true);setTimeout(()=>{img.style.transition='';},420);}
+    if(now-lastTap<300){cancelReset();scale=1;tx=0;ty=0;_pdmImgZoomed=false;applyTf(true);setTimeout(()=>{img.style.transition='';},420);}
     lastTap=now;
   };
 }
@@ -2379,10 +2383,11 @@ function closePDMDirect(){
   if(ov){ov.style.transition='';ov.style.background='';}
   pdmId=null;
   _pdmPendingQty=1;
+  _pdmImgZoomed=false;
 }
 
 // ── SWIPE TO CLOSE PDM ──────────────────────────────────────────────────────
-let _pdmSwipeInit=false;
+let _pdmSwipeInit=false,_pdmImgZoomed=false;
 function initPDMSwipe(){
   if(_pdmSwipeInit)return;
   _pdmSwipeInit=true;
@@ -2393,9 +2398,8 @@ function initPDMSwipe(){
   sheet.addEventListener('touchstart',function(e){
     if(sheet.scrollTop>0)return;
     if(e.touches.length!==1)return;
-    // Don't swipe if zoomed image
-    const img=el('pdm-img');
-    if(img&&img.style.transform&&!img.style.transform.includes('scale(1)'))return;
+    // Don't swipe if image is zoomed
+    if(_pdmImgZoomed)return;
     startY=e.touches[0].clientY;
     currentY=startY;
     isDragging=false;

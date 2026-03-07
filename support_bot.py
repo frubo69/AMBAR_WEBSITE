@@ -153,13 +153,7 @@ async def handle_admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE)
     if not user_id:
         return
 
-    # Send admin reply to user DM (existing behavior)
-    try:
-        await msg.copy(chat_id=user_id)
-    except Exception as e:
-        print(f"⚠️ Could not send reply to user {user_id}: {e}")
-
-    # If this was a mini app conversation, save reply to shared messages file
+    # If this was a mini app conversation, save reply to shared file only (user sees it in the app)
     if conv_info:
         conv_key = conv_info["conv_key"]
         msgs = _load_json(SUPPORT_MSGS_FILE)
@@ -171,6 +165,13 @@ async def handle_admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE)
             "ts": datetime.now().isoformat(),
         })
         _save_json(SUPPORT_MSGS_FILE, msgs)
+        return
+
+    # Direct bot conversation — send reply to user DM
+    try:
+        await msg.copy(chat_id=user_id)
+    except Exception as e:
+        print(f"⚠️ Could not send reply to user {user_id}: {e}")
 
 
 def main():

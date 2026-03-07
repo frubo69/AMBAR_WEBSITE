@@ -138,9 +138,11 @@ img{display:block}
 /* Swipe-to-delete cart items */
 .ci-swipe-wrap{position:relative;overflow:hidden;border-bottom:1px solid var(--border2)}
 .ci-swipe-wrap:last-child{border-bottom:none}
-.ci-del-bg{position:absolute;top:0;right:0;bottom:0;width:80px;background:var(--red);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px}
+.ci-del-bg{position:absolute;top:0;right:0;bottom:0;width:80px;background:var(--red);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:opacity .15s}
+.ci-del-bg svg{width:22px;height:22px;stroke:#fff;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
 .ci-swipe-inner{position:relative;z-index:1;background:var(--card);transition:transform .25s cubic-bezier(.34,1,.64,1);will-change:transform}
 .ci-swipe-inner.no-trans{transition:none}
+.ci-swipe-inner.revealed{transform:translateX(-80px)!important}
 .ci{display:flex;align-items:center;gap:11px;padding:13px 16px}
 .ci-img{width:50px;height:60px;object-fit:contain;background:var(--card);border-radius:10px;padding:5px;flex-shrink:0}
 .ci-info{flex:1;min-width:0}
@@ -380,30 +382,28 @@ img{display:block}
 <!-- ═══ CATALOG ═══ -->
 <div id="pg-catalog" class="page">
   <div style="position:sticky;top:0;z-index:40;background:rgba(7,7,14,.96);backdrop-filter:blur(20px)">
-    <!-- Row 1: Logo + address centered + controls -->
-    <div style="display:flex;align-items:center;padding:10px 14px;gap:4px;position:relative">
+    <!-- Single row: Address | Logo | Cart + Lang -->
+    <div style="display:flex;align-items:center;padding:10px 14px;gap:6px">
       <!-- Left: Address pill -->
-      <div style="flex:1;min-width:0;display:flex;align-items:center">
-        <div class="addr-pill" onclick="openAddrModal()" id="addr-pill" style="align-items:flex-start">
-          <span class="addr-pill-sub" id="addr-pill-label">АДРЕС</span>
-          <div class="addr-pill-row">
-            <span class="addr-pill-txt" id="addr-pill-txt">Добавьте адрес</span>
-            <span style="color:var(--gold);font-size:11px;flex-shrink:0">▾</span>
-          </div>
+      <div class="addr-pill" onclick="openAddrModal()" id="addr-pill" style="align-items:flex-start;flex-shrink:1;min-width:0">
+        <span class="addr-pill-sub" id="addr-pill-label">АДРЕС</span>
+        <div class="addr-pill-row">
+          <span class="addr-pill-txt" id="addr-pill-txt">Добавьте адрес</span>
+          <span style="color:var(--gold);font-size:11px;flex-shrink:0">▾</span>
         </div>
       </div>
-      <!-- Center: Logo (absolute center) -->
-      <div style="position:absolute;left:50%;transform:translateX(-50%);pointer-events:none;z-index:1">
-        <div class="logo-grp" style="pointer-events:auto"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div></div>
+      <!-- Center: Logo -->
+      <div style="flex:1;display:flex;justify-content:center;min-width:0">
+        <div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div></div>
       </div>
       <!-- Right: Cart + Lang -->
-      <div class="hdr-right" style="flex:1;justify-content:flex-end">
+      <div class="hdr-right" style="flex-shrink:0">
         <div class="cart-pill" onclick="go('cart')">🛒 <span class="cart-txt" id="hdr-tot">0 AED</span><span class="cart-dot" id="hdr-dot">0</span></div>
         <button class="lang-btn" onclick="flipLang()" id="lbtn">🇷🇺</button>
       </div>
     </div>
     <!-- Row 2: Search bar -->
-    <div style="padding:0 14px 8px;margin-top:6px">
+    <div style="padding:0 14px 8px">
       <div class="search-wrap">
         <svg class="search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
         <input class="search-inp" id="search-inp" type="text" placeholder="Поиск..." oninput="onSearch(this.value)">
@@ -1831,7 +1831,7 @@ function renderCart(){
     const pcs=isBeerItem?(beerPcs[id]||''):null;
     const displayPrice=isBeerItem?(pcs===24?Math.round(p.price*1.8):p.price)*qty:p.price*qty;
     const nameLabel=isBeerItem?`${p.name} <span style="color:var(--gold);font-size:12px">${pcs} ${lang==='ru'?'шт':'pcs'}</span>`:p.name;
-    return`<div class="ci-swipe-wrap" data-cid="${id}"><div class="ci-del-bg">🗑</div><div class="ci-swipe-inner"><div class="ci"><img class="ci-img" src="${p.img}" alt="${p.name}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 52 62%22><text y=%2248%22 font-size=%2240%22>🍾</text></svg>'">
+    return`<div class="ci-swipe-wrap" data-cid="${id}"><div class="ci-del-bg" onclick="confirmSwipeDel('${id}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></div><div class="ci-swipe-inner"><div class="ci"><img class="ci-img" src="${p.img}" alt="${p.name}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 52 62%22><text y=%2248%22 font-size=%2240%22>🍾</text></svg>'">
       <div class="ci-info"><div class="ci-name">${nameLabel}</div><div class="ci-price">${displayPrice} AED</div></div>
       <div class="qctrl"><button class="qb" onclick="chgQty('${id}',-1)">−</button><span class="qn">${qty}</span><button class="qb" onclick="chgQty('${id}',1)">+</button></div>
     </div></div></div>`;
@@ -1855,17 +1855,20 @@ function updateCartThumb(){
   thumb.style.height=thumbH+'px';
   thumb.style.top=(8+pos*(trackH-thumbH))+'px';
 }
-function clearCart(){cart={};beerPcs={};tip=0;updHdr();renderCart();buildTips();}
+function clearCart(){const ids=Object.keys(cart);cart={};beerPcs={};tip=0;ids.forEach(id=>syncCtrl(id));updHdr();renderCart();buildTips();}
 
 // ── SWIPE-TO-DELETE CART ITEMS ───────────────────────────────────────────────
+let _revealedWrap=null; // currently revealed swipe item
 function initCartSwipe(){
   document.querySelectorAll('.ci-swipe-wrap').forEach(wrap=>{
     const inner=wrap.querySelector('.ci-swipe-inner');
-    const cid=wrap.dataset.cid;
     let startX=0,startY=0,dx=0,swiping=false,locked=false;
 
     inner.addEventListener('touchstart',e=>{
+      // If another item is revealed, close it first
+      if(_revealedWrap&&_revealedWrap!==wrap) closeRevealedSwipe();
       const t=e.touches[0];startX=t.clientX;startY=t.clientY;dx=0;swiping=false;locked=false;
+      inner.classList.remove('revealed');
       inner.classList.add('no-trans');
     },{passive:true});
 
@@ -1873,30 +1876,53 @@ function initCartSwipe(){
       if(locked)return;
       const t=e.touches[0];
       const diffX=t.clientX-startX, diffY=t.clientY-startY;
-      // If vertical scroll is dominant, don't swipe
       if(!swiping&&Math.abs(diffY)>Math.abs(diffX)){locked=true;return;}
       if(Math.abs(diffX)>6)swiping=true;
       if(!swiping)return;
       e.preventDefault();
-      dx=Math.min(0,diffX); // only left swipe
+      dx=Math.min(0,Math.max(-80,diffX)); // clamp to -80px
       inner.style.transform=`translateX(${dx}px)`;
     },{passive:false});
 
     inner.addEventListener('touchend',()=>{
       inner.classList.remove('no-trans');
-      if(dx<-70){
-        // Delete item
-        inner.style.transform='translateX(-100%)';
-        setTimeout(()=>{
-          delete cart[cid];delete beerPcs[cid];
-          haptic.medium();updHdr();renderCart();
-        },200);
-      } else {
+      if(dx<-40){
+        // Snap open — reveal the red delete area
+        inner.classList.add('revealed');
         inner.style.transform='';
+        _revealedWrap=wrap;
+        haptic.light();
+      } else {
+        // Snap back
+        inner.style.transform='';
+        inner.classList.remove('revealed');
+        if(_revealedWrap===wrap) _revealedWrap=null;
       }
       dx=0;swiping=false;
     },{passive:true});
   });
+
+  // Tap anywhere else to close the revealed item
+  el('cart-list').addEventListener('click',e=>{
+    if(_revealedWrap&&!_revealedWrap.contains(e.target)){
+      closeRevealedSwipe();
+    }
+  });
+}
+function closeRevealedSwipe(){
+  if(!_revealedWrap)return;
+  const inner=_revealedWrap.querySelector('.ci-swipe-inner');
+  if(inner){inner.classList.remove('revealed');inner.style.transform='';}
+  _revealedWrap=null;
+}
+function confirmSwipeDel(cid){
+  delete cart[cid];delete beerPcs[cid];
+  haptic.medium();
+  _revealedWrap=null;
+  updHdr();
+  // Sync catalog card controls so it shows "+" instead of "-qty+"
+  syncCtrl(cid);
+  renderCart();
 }
 
 // ── TIPS ──────────────────────────────────────────────────────────────────────
@@ -2050,8 +2076,12 @@ function confirmClearHistory(){
 }
 function repeatOrder(idx){
   const o=orders[idx];if(!o)return;
+  // Remember old cart IDs to reset their catalog controls
+  const oldCartIds=Object.keys(cart);
   // Clear cart first — replace, don't stack
   cart={};beerPcs={};
+  // Reset old catalog controls to "+"
+  oldCartIds.forEach(id=>syncCtrl(id));
   let addedCount=0;
   o.items.forEach(item=>{
     let p=P.find(x=>x.id===item.id);
@@ -2066,6 +2096,8 @@ function repeatOrder(idx){
   });
   if(addedCount>0){
     updHdr();
+    // Sync all catalog card controls so they show the correct qty
+    Object.keys(cart).forEach(id=>syncCtrl(id));
     haptic.success();
     showToast(`${lang==='ru'?'Заказ':'Order'} #${o.order_id} ${lang==='ru'?'добавлен в корзину':'added to cart'}`,'ok');
     setTimeout(()=>go('cart'),600);

@@ -381,6 +381,35 @@ img{display:block}
 .ptr-indicator.no-trans{transition:none}
 .ptr-indicator svg{color:var(--gold);opacity:.7}
 .ptr-indicator.refreshing svg{animation:spin .65s linear infinite}
+/* ── Support Chat Overlay ── */
+.support-overlay{position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;flex-direction:column;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1,.64,1)}
+.support-overlay.show{transform:translateY(0)}
+.support-hdr{display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(7,7,14,.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);flex-shrink:0}
+.support-back{width:32px;height:32px;border-radius:50%;border:1px solid var(--border2);background:var(--card2);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--sub);flex-shrink:0;transition:.15s}
+.support-back:active{transform:scale(.85)}
+.support-hdr-info{flex:1;min-width:0}
+.support-hdr-title{font-size:14px;font-weight:600;color:var(--gold2)}
+.support-hdr-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.support-msgs{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:8px;overscroll-behavior:contain}
+.support-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted);font-size:13px;text-align:center}
+.support-empty-icon{font-size:36px;opacity:.5}
+.msg-bubble{max-width:80%;padding:10px 14px;font-size:13px;line-height:1.45;word-break:break-word}
+.msg-bubble.user{align-self:flex-end;background:rgba(201,169,110,.12);border:1px solid rgba(201,169,110,.2);border-radius:16px 16px 4px 16px;color:var(--text)}
+.msg-bubble.operator{align-self:flex-start;background:var(--card);border:1px solid var(--border2);border-radius:16px 16px 16px 4px;color:var(--text)}
+.msg-ts{font-size:10px;color:var(--muted);margin-top:3px}
+.msg-bubble.user .msg-ts{text-align:right}
+.msg-bubble.operator .msg-ts{text-align:left}
+.support-input-bar{display:flex;align-items:flex-end;gap:8px;padding:10px 14px calc(10px + var(--safe-bottom));background:rgba(7,7,14,.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);flex-shrink:0}
+.support-input{flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:20px;padding:10px 16px;font-size:13px;color:var(--text);font-family:inherit;resize:none;max-height:100px;line-height:1.4;overflow-y:auto}
+.support-input::placeholder{color:var(--muted)}
+.support-input:focus{border-color:rgba(201,169,110,.5)}
+.support-send{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:.15s}
+.support-send:active{transform:scale(.85)}
+.support-send:disabled{opacity:.4;cursor:not-allowed}
+.support-send svg{width:16px;height:16px;fill:#07070E}
+/* Support button on order cards */
+.ocard-support-btn{flex:1;padding:10px;border-radius:var(--r3);border:1px solid rgba(201,169,110,.3);background:rgba(201,169,110,.08);color:var(--gold);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:.15s;font-family:'DM Sans',sans-serif}
+.ocard-support-btn:active{background:rgba(201,169,110,.2);transform:scale(.97)}
 </style>
 </head>
 <body>
@@ -700,6 +729,31 @@ img{display:block}
   </div>
 </div>
 
+<!-- Support Chat Overlay -->
+<div class="support-overlay" id="support-overlay">
+  <div class="support-hdr">
+    <button class="support-back" onclick="closeSupportChat()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div class="support-hdr-info">
+      <div class="support-hdr-title" id="support-hdr-title">Поддержка</div>
+      <div class="support-hdr-sub" id="support-hdr-sub"></div>
+    </div>
+  </div>
+  <div class="support-msgs" id="support-msgs">
+    <div class="support-empty" id="support-empty">
+      <div class="support-empty-icon">💬</div>
+      <div id="support-empty-txt">Задайте вопрос по заказу</div>
+    </div>
+  </div>
+  <div class="support-input-bar">
+    <textarea class="support-input" id="support-input" rows="1" placeholder="Введите сообщение..." maxlength="1000" enterkeyhint="send"></textarea>
+    <button class="support-send" id="support-send-btn" onclick="sendSupportMsg()">
+      <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
+    </button>
+  </div>
+</div>
+
 <!-- Toasts (two elements to avoid stuck animation) -->
 <div class="toast" id="toast0"></div>
 <div class="toast" id="toast1"></div>
@@ -826,6 +880,7 @@ ru:{
   lcTitle:'Вы там?',
   lcMsg:'Похоже, вы сейчас далеко от выбранного адреса. Всё равно оформить заказ туда?',
   lcYes:'Да, оформить',lcNo:'Отмена',
+  supportBtn:'💬 Поддержка',supportTitle:'Поддержка',supportEmpty:'Задайте вопрос по заказу',supportPlaceholder:'Введите сообщение...',
 },
 en:{
   catalog:'Catalog',favs:'Favourites',cart:'Cart',addrPage:'Addresses',orders:'History',profile:'Profile',
@@ -859,6 +914,7 @@ en:{
   lcTitle:'Are you there?',
   lcMsg:'It looks like you\'re not near the selected address. Order there anyway?',
   lcYes:'Yes, order',lcNo:'Cancel',
+  supportBtn:'💬 Support',supportTitle:'Support',supportEmpty:'Ask us about your order',supportPlaceholder:'Type a message...',
 },
 };
 
@@ -923,7 +979,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   if(saved!==null) activeAddrIdx=parseInt(saved);
   // Validate it still exists
   if(activeAddrIdx!==null&&!getSaved()[activeAddrIdx]) activeAddrIdx=null;
-  buildTips();syncOrders();applyLang();loadCatalog();updateFavBtn();updateSortBtn();
+  buildTips();syncOrders();applyLang();loadCatalog();updateFavBtn();updateSortBtn();initSupportInput();
   alignLogoSubs();
   document.fonts?.ready?.then(alignLogoSubs);
   // Pre-fill saved phone
@@ -2254,7 +2310,12 @@ function renderOrders(){
     const st=cls[o.status]||'sp';
     const rows=o.items.map(i=>`<div class="o-row"><span class="o-row-name">${i.name}</span><span class="o-row-qty">${i.qty} ${lang==='ru'?'шт':'pcs'}</span></div>`).join('');
     const isFinished=o.status==='delivered'||o.status==='declined';
-    const actionsHtml=isFinished?`<div class="ocard-actions"><button class="ocard-repeat-btn" onclick="event.stopPropagation();repeatOrder(${idx})">🔁 ${lang==='ru'?'Повторить':'Repeat'}</button></div>`:'';
+    const isActive=o.status==='pending'||o.status==='confirmed';
+    const actionsHtml=isFinished
+      ?`<div class="ocard-actions"><button class="ocard-repeat-btn" onclick="event.stopPropagation();repeatOrder(${idx})">🔁 ${lang==='ru'?'Повторить':'Repeat'}</button></div>`
+      :isActive
+        ?`<div class="ocard-actions"><button class="ocard-support-btn" onclick="event.stopPropagation();openSupportChat('${o.order_id}')">${t('supportBtn')}</button></div>`
+        :'';
     const cardHtml=`<div class="ocard ${st}"><div class="ocard-inner"><div class="ocard-meta"><span class="o-id">#${o.order_id}</span><span class="o-date">${fmtDate(o.timestamp)}</span></div><div class="o-rows">${rows}</div><div class="ocard-foot"><span class="o-status"><span class="o-status-dot"></span>${(lbl2[o.status]||lbl2.pending)()}</span><div class="o-total"><span class="o-total-num">${o.total}</span><span class="o-total-cur">AED</span></div></div></div>${actionsHtml}</div>`;
     if(isFinished){
       return`<div class="ocard-swipe-wrap" data-oidx="${idx}"><div class="ocard-swipe-del" onclick="confirmOrderDel(${idx})"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></div><div class="ocard-swipe-body">${cardHtml}</div></div>`;
@@ -2384,7 +2445,7 @@ function buildProfile(){
     const st=o.status==='confirmed'?'sc2':'sp';
     const lbl=o.status==='confirmed'?(lang==='ru'?'Принят':'Confirmed'):(lang==='ru'?'Ожидает':'Pending');
     const rows=o.items.map(i=>`<div class="o-row"><span class="o-row-name">${i.name}</span><span class="o-row-qty">${i.qty} ${lang==='ru'?'шт':'pcs'}</span></div>`).join('');
-    return`<div class="ocard ${st}"><div class="ocard-inner"><div class="ocard-meta"><span class="o-id">#${o.order_id}</span><span class="o-date">${fmtDate2(o.timestamp)}</span></div><div class="o-rows">${rows}</div><div class="ocard-foot"><span class="o-status"><span class="o-status-dot"></span>${lbl}</span><div class="o-total"><span class="o-total-num">${o.total}</span><span class="o-total-cur">AED</span></div></div></div></div>`;
+    return`<div class="ocard ${st}"><div class="ocard-inner"><div class="ocard-meta"><span class="o-id">#${o.order_id}</span><span class="o-date">${fmtDate2(o.timestamp)}</span></div><div class="o-rows">${rows}</div><div class="ocard-foot"><span class="o-status"><span class="o-status-dot"></span>${lbl}</span><div class="o-total"><span class="o-total-num">${o.total}</span><span class="o-total-cur">AED</span></div></div></div><div class="ocard-actions"><button class="ocard-support-btn" onclick="event.stopPropagation();openSupportChat('${o.order_id}')">${t('supportBtn')}</button></div></div>`;
   }).join('');
 }
 
@@ -2704,6 +2765,127 @@ function initPDMSwipe(){
     }
     isDragging=false;
   },{passive:true});
+}
+
+// ── SUPPORT CHAT ─────────────────────────────────────────────────────────────
+let _supportConvKey='',_supportOrderId='',_supportPollTimer=null,_supportLastTs='';
+
+function openSupportChat(orderId){
+  const uid=tg?.initDataUnsafe?.user?.id;
+  if(!uid){showToast('No Telegram context','err');return;}
+  _supportOrderId=orderId;
+  _supportConvKey=uid+'_'+orderId;
+  _supportLastTs='';
+
+  el('support-hdr-title').textContent=t('supportTitle');
+  el('support-hdr-sub').textContent='#'+orderId;
+  el('support-input').placeholder=t('supportPlaceholder');
+  el('support-empty-txt').textContent=t('supportEmpty');
+
+  // Reset messages area to empty state
+  el('support-msgs').innerHTML=`<div class="support-empty" id="support-empty"><div class="support-empty-icon">💬</div><div id="support-empty-txt">${t('supportEmpty')}</div></div>`;
+
+  el('support-overlay').classList.add('show');
+  haptic.select();
+
+  // Fetch existing messages
+  fetchSupportMsgs();
+  // Poll every 3 seconds
+  _supportPollTimer=setInterval(fetchSupportMsgs,3000);
+
+  setTimeout(()=>el('support-input').focus(),350);
+}
+
+function closeSupportChat(){
+  el('support-overlay').classList.remove('show');
+  clearInterval(_supportPollTimer);
+  _supportPollTimer=null;
+  _supportConvKey='';_supportOrderId='';
+  // Blur input to dismiss keyboard
+  el('support-input').blur();
+}
+
+function _escHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
+function _fmtTime(ts){const d=new Date(ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+
+async function fetchSupportMsgs(){
+  if(!_supportConvKey)return;
+  const initData=tg?.initData;if(!initData)return;
+  try{
+    let url=`${AMBAR_API}/api/support/messages?conv_key=${encodeURIComponent(_supportConvKey)}`;
+    if(_supportLastTs) url+=`&after=${encodeURIComponent(_supportLastTs)}`;
+    const resp=await fetch(url,{headers:{'Authorization':'tma '+initData}});
+    if(!resp.ok)return;
+    const{messages=[]}=await resp.json();
+    if(!messages.length&&!_supportLastTs)return; // no messages yet
+    if(messages.length){
+      if(!_supportLastTs){
+        // First load — replace empty state
+        el('support-msgs').innerHTML='';
+      }
+      const container=el('support-msgs');
+      messages.forEach(m=>{
+        const bubble=document.createElement('div');
+        bubble.className='msg-bubble '+m.role;
+        bubble.innerHTML=`<div>${_escHtml(m.text)}</div><div class="msg-ts">${_fmtTime(m.ts)}</div>`;
+        container.appendChild(bubble);
+      });
+      _supportLastTs=messages[messages.length-1].ts;
+      container.scrollTop=container.scrollHeight;
+      // Haptic for new operator messages
+      if(messages.some(m=>m.role==='operator'))haptic.light();
+    }
+  }catch(e){console.log('[AMBAR] support poll:',e.message);}
+}
+
+async function sendSupportMsg(){
+  const inp=el('support-input');
+  const text=(inp.value||'').trim();
+  if(!text)return;
+  const initData=tg?.initData;
+  if(!initData){showToast('No Telegram context','err');return;}
+
+  const btn=el('support-send-btn');
+  btn.disabled=true;
+
+  // Remove empty state if present
+  const emptyEl=el('support-empty');if(emptyEl)emptyEl.remove();
+
+  // Optimistically add bubble
+  const container=el('support-msgs');
+  const bubble=document.createElement('div');
+  bubble.className='msg-bubble user';
+  const now=new Date();
+  bubble.innerHTML=`<div>${_escHtml(text)}</div><div class="msg-ts">${_fmtTime(now.toISOString())}</div>`;
+  container.appendChild(bubble);
+  container.scrollTop=container.scrollHeight;
+
+  inp.value='';
+  _autoResizeSupport(inp);
+  haptic.light();
+
+  try{
+    const resp=await fetch(`${AMBAR_API}/api/support/send`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({initData,order_id:_supportOrderId,text})
+    });
+    const res=await resp.json();
+    if(!res.ok){showToast('Send failed','err');bubble.style.opacity='.5';}
+    else{_supportLastTs=now.toISOString();}
+  }catch(e){showToast('Network error','err');bubble.style.opacity='.5';}
+  btn.disabled=false;
+}
+
+function _autoResizeSupport(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,100)+'px';}
+
+// Wire up support input events (called from DOMContentLoaded)
+function initSupportInput(){
+  const inp=el('support-input');if(!inp)return;
+  inp.addEventListener('input',()=>_autoResizeSupport(inp));
+  inp.addEventListener('keydown',e=>{
+    if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();sendSupportMsg();}
+  });
 }
 
 // ── BACK TO CART PROMPT ───────────────────────────────────────────────────────

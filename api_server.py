@@ -17,8 +17,11 @@ from dotenv import load_dotenv
 load_dotenv()
 BOT_TOKEN          = os.getenv("BOT_TOKEN", "")
 OPERATOR_BOT_TOKEN = os.getenv("OPERATOR_BOT_TOKEN", "")
+SUPPORT_BOT_TOKEN  = os.getenv("SUPPORT_BOT_TOKEN", "")
 OPERATOR_IDS       = [int(x.strip()) for x in os.getenv("OPERATOR_IDS", "").split(",") if x.strip().isdigit()]
 ORDERS_FILE        = os.getenv("ORDERS_FILE", "orders.json")
+SUPPORT_MSGS_FILE  = Path(__file__).parent / "support_messages.json"
+SUPPORT_MAP_FILE   = Path(__file__).parent / "support_map.json"
 PORT               = int(os.getenv("WEBAPP_PORT", "8080"))
 STATIC_DIR         = Path(__file__).parent
 
@@ -68,6 +71,25 @@ def update_order(oid, **kw):
     if oid in orders:
         orders[oid].update(kw)
         Path(ORDERS_FILE).write_text(json.dumps(orders, ensure_ascii=False, indent=2))
+
+# ── Support file helpers ──────────────────────────────────────────────────────
+def load_support_msgs() -> dict:
+    try:
+        return json.loads(SUPPORT_MSGS_FILE.read_text())
+    except:
+        return {}
+
+def save_support_msgs(data: dict):
+    SUPPORT_MSGS_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+
+def load_support_map() -> dict:
+    try:
+        return json.loads(SUPPORT_MAP_FILE.read_text())
+    except:
+        return {}
+
+def save_support_map(data: dict):
+    SUPPORT_MAP_FILE.write_text(json.dumps(data, ensure_ascii=False, indent=2))
 
 # ── Telegram Bot API helper ──────────────────────────────────────────────────
 async def tg_send(token, chat_id, text, parse_mode="Markdown", reply_markup=None):
@@ -228,6 +250,100 @@ async def handle_orders(request: web.Request) -> web.Response:
     log.info(f"[orders] user={uid} count={len(user_orders)}")
     return web.json_response({"orders": user_orders}, headers=CORS_HEADERS)
 
+# ── API: POST /api/support/send — user sends support message from mini app ────
+async def handle_support_send(request: web.Request) -> web.Response:
+    if request.method == "OPTIONS":
+        return web.Response(status=200, headers=CORS_HEADERS)
+
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid json"}, status=400, headers=CORS_HEADERS)
+
+    init_data = data.get("initData", "")
+    user = validate_init_data(init_data)
+    if not user:
+        return web.json_response({"error": "auth failed"}, status=401, headers=CORS_HEADERS)
+
+    uid       = user.get("id")
+    user_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
+    username  = user.get("username", "—")
+    order_id  = data.get("order_id", "")
+    text      = (data.get("text", "") or "").strip()
+
+    if not text:
+        return web.json_response({"error": "empty message"}, status=400, headers=CORS_HEADERS)
+
+    conv_key = f"{uid}_{order_id}" if order_id else str(uid)
+
+    # 1. Save to support_messages.json
+    msgs = load_support_msgs()
+    if conv_key not in msgs:
+        msgs[conv_key] = []
+    msgs[conv_key].append({
+        "role": "user",
+        "text": text,
+        "ts": datetime.now().isoformat(),
+    })
+    save_support_msgs(msgs)
+
+    # 2. Forward to operators via SUPPORT_BOT_TOKEN
+    header = (
+        f"💬 *Чат поддержки (Mini App)*\n\n"
+        f"📦 Заказ: `#{order_id}`\n"
+        f"👤 {user_name} (@{username}, ID: `{uid}`)\n\n"
+        f"💬 {text}"
+    )
+
+    smap = load_support_map()
+    token = SUPPORT_BOT_TOKEN or BOT_TOKEN  # fallback to main bot if no support token
+    for op_id in OPERATOR_IDS:
+        try:
+            result = await tg_send(token, op_id, header)
+            fwd_id = result.get("result", {}).get("message_id")
+            if fwd_id:
+                smap[str(fwd_id)] = {
+                    "user_id": uid,
+                    "conv_key": conv_key,
+                    "order_id": order_id,
+                }
+        except Exception as e:
+            log.error(f"Support forward to {op_id}: {e}")
+
+    save_support_map(smap)
+    log.info(f"[support] user={uid} order={order_id} msg='{text[:50]}'")
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+# ── API: GET /api/support/messages — fetch conversation for a conv_key ────────
+async def handle_support_messages(request: web.Request) -> web.Response:
+    if request.method == "OPTIONS":
+        return web.Response(status=200, headers=CORS_HEADERS)
+
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("tma "):
+        return web.json_response({"error": "missing auth"}, status=401, headers=CORS_HEADERS)
+
+    user = validate_init_data(auth[4:])
+    if not user:
+        return web.json_response({"messages": []}, headers=CORS_HEADERS)
+
+    uid = user.get("id")
+    conv_key = request.query.get("conv_key", "")
+
+    # Security: conv_key must belong to this user
+    if not conv_key.startswith(str(uid)):
+        return web.json_response({"error": "forbidden"}, status=403, headers=CORS_HEADERS)
+
+    msgs = load_support_msgs()
+    conversation = msgs.get(conv_key, [])
+
+    # Optional: filter by "after" timestamp for incremental polling
+    after = request.query.get("after", "")
+    if after:
+        conversation = [m for m in conversation if m.get("ts", "") > after]
+
+    return web.json_response({"messages": conversation}, headers=CORS_HEADERS)
+
 # ── Static file handler ───────────────────────────────────────────────────────
 async def handle_static(request: web.Request) -> web.Response:
     path = request.match_info.get("path", "") or "index-6.html"
@@ -261,6 +377,10 @@ def main():
     app.router.add_get("/api/orders", handle_orders)
     app.router.add_route("OPTIONS", "/api/order", handle_create_order)
     app.router.add_post("/api/order", handle_create_order)
+    app.router.add_route("OPTIONS", "/api/support/send", handle_support_send)
+    app.router.add_post("/api/support/send", handle_support_send)
+    app.router.add_route("OPTIONS", "/api/support/messages", handle_support_messages)
+    app.router.add_get("/api/support/messages", handle_support_messages)
     app.router.add_get("/", handle_static)
     app.router.add_get("/{path:.+}", handle_static)
 

@@ -135,7 +135,13 @@ img{display:block}
 .ce-title{display:none}
 .ce-btn{background:rgba(201,169,110,.07);border:1px solid rgba(201,169,110,.2);color:rgba(201,169,110,.7);font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;padding:0 18px;height:34px;border-radius:8px;display:flex;align-items:center;gap:6px;letter-spacing:.5px;margin-top:22px;transition:.15s}
 .ce-btn:active{opacity:.5;transform:scale(.96)}
-.ci{display:flex;align-items:center;gap:11px;padding:13px 16px;border-bottom:1px solid var(--border2)}
+/* Swipe-to-delete cart items */
+.ci-swipe-wrap{position:relative;overflow:hidden;border-bottom:1px solid var(--border2)}
+.ci-swipe-wrap:last-child{border-bottom:none}
+.ci-del-bg{position:absolute;top:0;right:0;bottom:0;width:80px;background:var(--red);display:flex;align-items:center;justify-content:center;color:#fff;font-size:20px}
+.ci-swipe-inner{position:relative;z-index:1;background:var(--card);transition:transform .25s cubic-bezier(.34,1,.64,1);will-change:transform}
+.ci-swipe-inner.no-trans{transition:none}
+.ci{display:flex;align-items:center;gap:11px;padding:13px 16px}
 .ci-img{width:50px;height:60px;object-fit:contain;background:var(--card);border-radius:10px;padding:5px;flex-shrink:0}
 .ci-info{flex:1;min-width:0}
 .ci-name{font-size:13px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -169,7 +175,7 @@ img{display:block}
 #cart-thumb{position:absolute;right:4px;width:3px;background:rgba(201,169,110,.6);border-radius:2px;z-index:4;pointer-events:none;transition:top .08s,height .08s;display:none}
 #cart-list{height:auto;max-height:calc(var(--tg-h,100vh) - 510px);overflow-y:auto;overscroll-behavior:contain;background:var(--card);scrollbar-width:none}
 #cart-list::-webkit-scrollbar{display:none}
-#cart-list .ci:last-child{border-bottom:none}
+#cart-list .ci-swipe-wrap:last-child{border-bottom:none}
 #tip-section,#cart-foot{flex-shrink:0}
 #tip-section{margin-top:auto}
 
@@ -362,6 +368,11 @@ img{display:block}
 /* Refresh spin */
 @keyframes spin{to{transform:rotate(360deg)}}
 .spinning{animation:spin .65s linear infinite!important;opacity:.7}
+/* Pull-to-refresh */
+.ptr-indicator{text-align:center;overflow:hidden;height:0;transition:height .25s cubic-bezier(.34,1,.64,1);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.ptr-indicator.no-trans{transition:none}
+.ptr-indicator svg{color:var(--gold);opacity:.7}
+.ptr-indicator.refreshing svg{animation:spin .65s linear infinite}
 </style>
 </head>
 <body>
@@ -383,7 +394,7 @@ img{display:block}
       </div>
       <!-- Center: Logo (absolute center) -->
       <div style="position:absolute;left:50%;transform:translateX(-50%);pointer-events:none;z-index:1">
-        <div class="logo-grp" style="pointer-events:auto"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub">Premium Spirits</div></div>
+        <div class="logo-grp" style="pointer-events:auto"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div></div>
       </div>
       <!-- Right: Cart + Lang -->
       <div class="hdr-right" style="flex:1;justify-content:flex-end">
@@ -546,6 +557,7 @@ img{display:block}
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
     </button>
   </div>
+  <div class="ptr-indicator" id="ptr-indicator"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg></div>
   <div id="orders-list" style="flex:1;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none"></div>
   <div id="clear-history-wrap" style="display:none;flex-shrink:0;padding:10px 14px 16px;background:linear-gradient(to bottom,transparent,var(--bg) 35%)">
     <button id="clear-history-btn" onclick="confirmClearHistory()" style="width:100%;background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.3);color:var(--gold);font-size:13px;font-weight:600;padding:14px;border-radius:14px;cursor:pointer;font-family:'DM Sans',sans-serif;letter-spacing:.3px;transition:.15s" onpointerdown="this.style.opacity='.6'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">Очистить историю</button>
@@ -612,7 +624,7 @@ img{display:block}
 <div class="bnav">
   <button class="nb on" id="nb-catalog" onclick="go('catalog')"><i>🍾</i><span id="nbl-cat">Каталог</span></button>
   <button class="nb" id="nb-cart" onclick="go('cart')"><i>🛒</i><span id="nbl-cart">Корзина</span></button>
-  <button class="nb" id="nb-address" onclick="fromCart=false;go('address')"><i>📍</i><span id="nbl-addr">Адреса</span></button>
+  <button class="nb" id="nb-address" onclick="fromCart=false;_fromCatalogModal=false;go('address')"><i>📍</i><span id="nbl-addr">Адреса</span></button>
   <button class="nb" id="nb-orders" onclick="go('orders')"><i>📦</i><span id="nbl-ord">История</span></button>
   <button class="nb" id="nb-profile" onclick="go('profile');buildProfile()"><i>👤</i><span id="nbl-prof">Профиль</span></button>
 </div>
@@ -666,7 +678,7 @@ img{display:block}
     <div class="modal-handle"></div>
     <div style="font-size:22px;text-align:center;margin:8px 0 10px">🛒</div>
     <div id="back-cart-msg" style="font-family:'DM Sans',sans-serif;font-size:20px;color:var(--gold2);text-align:center;margin-bottom:20px"></div>
-    <button class="btn-main" id="back-cart-yes" onclick="go('cart');closeBackToCartDirect()"></button>
+    <button class="btn-main" id="back-cart-yes" onclick="go(_backPromptTarget||'cart');closeBackToCartDirect()"></button>
     <button class="btn-outline" id="back-cart-no" onclick="closeBackToCartDirect()" style="margin-top:10px"></button>
   </div>
 </div>
@@ -852,6 +864,8 @@ let curMethod='gps',selTypeGps=null,selTypeMan=null,selArea=null;
 let locInfo=null,editingAddrIdx=null;
 let activeAddrIdx=null;
 let fromCart=false; // flag: user was redirected here from cart
+let _backPromptTarget='cart'; // which page the back-prompt button goes to
+let _fromCatalogModal=false; // flag: user came from catalog address modal
 let orders=JSON.parse(localStorage.getItem('ambar_orders')||'[]');
 // API base URL — resolved from: ?api= query param → localStorage → window global → same origin.
 const AMBAR_API=(()=>{
@@ -895,7 +909,7 @@ function alignLogoSubs(){
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',()=>{
-  if(tg){tg.ready();tg.expand();tg.setHeaderColor&&tg.setHeaderColor('#07070E');tg.setBackgroundColor&&tg.setBackgroundColor('#07070E');tg.enableClosingConfirmation&&tg.enableClosingConfirmation();}
+  if(tg){tg.ready();tg.expand();tg.setHeaderColor&&tg.setHeaderColor('#07070E');tg.setBackgroundColor&&tg.setBackgroundColor('#07070E');tg.enableClosingConfirmation&&tg.enableClosingConfirmation();tg.disableVerticalSwipes&&tg.disableVerticalSwipes();}
   // Restore active address index
   const saved=localStorage.getItem('ambar_active_addr');
   if(saved!==null) activeAddrIdx=parseInt(saved);
@@ -995,7 +1009,7 @@ function go(p){
   });
   curPg=p;
   if(p==='cart'){renderCart();updateCartAddrBar();}
-  if(p==='orders')syncOrders();  // fetch latest from API, fall back to localStorage
+  if(p==='orders'){syncOrders();initPullToRefresh();}  // fetch latest from API, fall back to localStorage
   if(p==='address'){renderSavedCards();buildAreaChips();buildTypeChips('man'); /* GPS uses label+comment only */}
   if(p==='profile'){syncOrders();}
   if(p==='checkout')buildSummary();
@@ -1170,6 +1184,7 @@ function renderModalAddrList(){
 }
 function modalEditAddr(i){
   closeAddrModal();
+  _fromCatalogModal=true;
   go('address');
   setTimeout(()=>editAddr(i),200);
 }
@@ -1349,7 +1364,8 @@ function saveNewAddress(){
     if(activeAddrIdx===idx){updateCartAddrBar();updateAddrPill();}
     resetAddrForm();
     renderSavedCards();
-    if(fromCart){fromCart=false;setTimeout(()=>{const msg=lang==='ru'?'Вернуться в корзину и оформить заказ?':'Go back to cart and place order?';const yes=lang==='ru'?'В корзину →':'To cart →';const no=lang==='ru'?'Остаться':'Stay';showBackToCartPrompt(msg,yes,no);},400);}
+    if(fromCart){fromCart=false;setTimeout(()=>{const msg=lang==='ru'?'Вернуться в корзину и оформить заказ?':'Go back to cart and place order?';const yes=lang==='ru'?'В корзину →':'To cart →';const no=lang==='ru'?'Остаться':'Stay';showBackToCartPrompt(msg,yes,no,'cart');},400);}
+    else if(_fromCatalogModal){_fromCatalogModal=false;setTimeout(()=>{const msg=lang==='ru'?'Адрес обновлён! Вернуться в каталог?':'Address updated! Go back to catalog?';const yes=lang==='ru'?'В каталог →':'To catalog →';const no=lang==='ru'?'Остаться':'Stay';showBackToCartPrompt(msg,yes,no,'catalog');},400);}
     else showToast(t('addrUpdated'),'ok');
     return;
   }
@@ -1370,7 +1386,15 @@ function saveNewAddress(){
       const msg=lang==='ru'?'Вернуться в корзину и оформить заказ?':'Go back to cart and place order?';
       const yes=lang==='ru'?'В корзину →':'To cart →';
       const no=lang==='ru'?'Остаться':'Stay';
-      showBackToCartPrompt(msg,yes,no);
+      showBackToCartPrompt(msg,yes,no,'cart');
+    },400);
+  } else if(_fromCatalogModal){
+    _fromCatalogModal=false;
+    setTimeout(()=>{
+      const msg=lang==='ru'?'Адрес сохранён! Вернуться в каталог?':'Address saved! Go back to catalog?';
+      const yes=lang==='ru'?'В каталог →':'To catalog →';
+      const no=lang==='ru'?'Остаться':'Stay';
+      showBackToCartPrompt(msg,yes,no,'catalog');
     },400);
   } else {
     showToast(t('addrSaved'),'ok');
@@ -1807,11 +1831,12 @@ function renderCart(){
     const pcs=isBeerItem?(beerPcs[id]||''):null;
     const displayPrice=isBeerItem?(pcs===24?Math.round(p.price*1.8):p.price)*qty:p.price*qty;
     const nameLabel=isBeerItem?`${p.name} <span style="color:var(--gold);font-size:12px">${pcs} ${lang==='ru'?'шт':'pcs'}</span>`:p.name;
-    return`<div class="ci"><img class="ci-img" src="${p.img}" alt="${p.name}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 52 62%22><text y=%2248%22 font-size=%2240%22>🍾</text></svg>'">
+    return`<div class="ci-swipe-wrap" data-cid="${id}"><div class="ci-del-bg">🗑</div><div class="ci-swipe-inner"><div class="ci"><img class="ci-img" src="${p.img}" alt="${p.name}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 52 62%22><text y=%2248%22 font-size=%2240%22>🍾</text></svg>'">
       <div class="ci-info"><div class="ci-name">${nameLabel}</div><div class="ci-price">${displayPrice} AED</div></div>
       <div class="qctrl"><button class="qb" onclick="chgQty('${id}',-1)">−</button><span class="qn">${qty}</span><button class="qb" onclick="chgQty('${id}',1)">+</button></div>
-    </div>`;
+    </div></div></div>`;
   }).join('');
+  initCartSwipe();
   el('tot-n').textContent=cartSub()+tip;foot.style.display='block';tipSec.style.display='block';
   setTimeout(updateCartThumb,0);
 }
@@ -1831,6 +1856,48 @@ function updateCartThumb(){
   thumb.style.top=(8+pos*(trackH-thumbH))+'px';
 }
 function clearCart(){cart={};beerPcs={};tip=0;updHdr();renderCart();buildTips();}
+
+// ── SWIPE-TO-DELETE CART ITEMS ───────────────────────────────────────────────
+function initCartSwipe(){
+  document.querySelectorAll('.ci-swipe-wrap').forEach(wrap=>{
+    const inner=wrap.querySelector('.ci-swipe-inner');
+    const cid=wrap.dataset.cid;
+    let startX=0,startY=0,dx=0,swiping=false,locked=false;
+
+    inner.addEventListener('touchstart',e=>{
+      const t=e.touches[0];startX=t.clientX;startY=t.clientY;dx=0;swiping=false;locked=false;
+      inner.classList.add('no-trans');
+    },{passive:true});
+
+    inner.addEventListener('touchmove',e=>{
+      if(locked)return;
+      const t=e.touches[0];
+      const diffX=t.clientX-startX, diffY=t.clientY-startY;
+      // If vertical scroll is dominant, don't swipe
+      if(!swiping&&Math.abs(diffY)>Math.abs(diffX)){locked=true;return;}
+      if(Math.abs(diffX)>6)swiping=true;
+      if(!swiping)return;
+      e.preventDefault();
+      dx=Math.min(0,diffX); // only left swipe
+      inner.style.transform=`translateX(${dx}px)`;
+    },{passive:false});
+
+    inner.addEventListener('touchend',()=>{
+      inner.classList.remove('no-trans');
+      if(dx<-70){
+        // Delete item
+        inner.style.transform='translateX(-100%)';
+        setTimeout(()=>{
+          delete cart[cid];delete beerPcs[cid];
+          haptic.medium();updHdr();renderCart();
+        },200);
+      } else {
+        inner.style.transform='';
+      }
+      dx=0;swiping=false;
+    },{passive:true});
+  });
+}
 
 // ── TIPS ──────────────────────────────────────────────────────────────────────
 function buildTips(){
@@ -2102,6 +2169,59 @@ async function syncOrders(spin=false){
 
   if(spin&&btn) btn.querySelector('svg').classList.remove('spinning');
   renderOrders();buildProfile();
+}
+
+// ── PULL TO REFRESH (ORDERS) ─────────────────────────────────────────────
+let _ptrInit=false;
+function initPullToRefresh(){
+  if(_ptrInit)return;_ptrInit=true;
+  const list=el('orders-list'), ind=el('ptr-indicator');
+  if(!list||!ind)return;
+  let startY=0, pulling=false, dy=0;
+  const MAX=80, THRESH=60;
+
+  list.addEventListener('touchstart',e=>{
+    if(list.scrollTop<=0){
+      startY=e.touches[0].clientY;pulling=true;
+      ind.classList.add('no-trans');
+    }
+  },{passive:true});
+
+  list.addEventListener('touchmove',e=>{
+    if(!pulling)return;
+    dy=Math.max(0,e.touches[0].clientY-startY);
+    if(dy>6&&list.scrollTop<=0){
+      const h=Math.min(MAX,dy*0.5);
+      ind.style.height=h+'px';
+      // Rotate icon based on pull progress
+      const svg=ind.querySelector('svg');
+      if(svg)svg.style.transform=`rotate(${Math.min(360,h/MAX*360)}deg)`;
+    }
+  },{passive:true});
+
+  list.addEventListener('touchend',async()=>{
+    if(!pulling){return;}
+    pulling=false;
+    ind.classList.remove('no-trans');
+    if(dy*0.5>=THRESH){
+      // Trigger refresh
+      ind.style.height='40px';
+      ind.classList.add('refreshing');
+      haptic.light();
+      await syncOrders(false);
+      setTimeout(()=>{
+        ind.classList.remove('refreshing');
+        ind.style.height='0';
+        const svg=ind.querySelector('svg');
+        if(svg)svg.style.transform='';
+      },400);
+    } else {
+      ind.style.height='0';
+      const svg=ind.querySelector('svg');
+      if(svg)svg.style.transform='';
+    }
+    dy=0;
+  },{passive:true});
 }
 
 // ── PROFILE ───────────────────────────────────────────────────────────────────
@@ -2444,10 +2564,14 @@ function initPDMSwipe(){
 }
 
 // ── BACK TO CART PROMPT ───────────────────────────────────────────────────────
-function showBackToCartPrompt(msg,yes,no){
+function showBackToCartPrompt(msg,yes,no,target){
+  _backPromptTarget=target||'cart';
   el('back-cart-msg').textContent=msg;
   el('back-cart-yes').textContent=yes;
   el('back-cart-no').textContent=no;
+  // Update icon: 🛒 for cart, 📋 for catalog
+  const iconEl=document.querySelector('#back-cart-overlay .modal-sheet div[style*="font-size:22px"]');
+  if(iconEl) iconEl.textContent=_backPromptTarget==='catalog'?'📋':'🛒';
   el('back-cart-overlay').classList.add('show');
 }
 function closeBackToCart(e){

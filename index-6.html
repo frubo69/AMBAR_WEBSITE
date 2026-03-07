@@ -2872,7 +2872,12 @@ async function sendSupportMsg(){
     });
     const res=await resp.json();
     if(!res.ok){showToast('Send failed','err');bubble.style.opacity='.5';}
-    else{_supportLastTs=now.toISOString();}
+    else if(res.ts){
+      _supportLastTs=res.ts;
+      // Update bubble timestamp to server time
+      const tsEl=bubble.querySelector('.msg-ts');
+      if(tsEl)tsEl.textContent=_fmtTime(res.ts);
+    }
   }catch(e){showToast('Network error','err');bubble.style.opacity='.5';}
   btn.disabled=false;
 }

@@ -277,13 +277,14 @@ async def handle_support_send(request: web.Request) -> web.Response:
     conv_key = f"{uid}_{order_id}" if order_id else str(uid)
 
     # 1. Save to support_messages.json
+    server_ts = datetime.now().isoformat()
     msgs = load_support_msgs()
     if conv_key not in msgs:
         msgs[conv_key] = []
     msgs[conv_key].append({
         "role": "user",
         "text": text,
-        "ts": datetime.now().isoformat(),
+        "ts": server_ts,
     })
     save_support_msgs(msgs)
 
@@ -312,7 +313,7 @@ async def handle_support_send(request: web.Request) -> web.Response:
 
     save_support_map(smap)
     log.info(f"[support] user={uid} order={order_id} msg='{text[:50]}'")
-    return web.json_response({"ok": True}, headers=CORS_HEADERS)
+    return web.json_response({"ok": True, "ts": server_ts}, headers=CORS_HEADERS)
 
 # ── API: GET /api/support/messages — fetch conversation for a conv_key ────────
 async def handle_support_messages(request: web.Request) -> web.Response:

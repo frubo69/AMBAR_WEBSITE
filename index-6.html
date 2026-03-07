@@ -2780,9 +2780,9 @@ function openSupportChat(orderId){
   el('support-hdr-title').textContent=t('supportTitle');
   el('support-hdr-sub').textContent='#'+orderId;
   el('support-input').placeholder=t('supportPlaceholder');
-  el('support-empty-txt').textContent=t('supportEmpty');
+  el('support-input').value='';
 
-  // Reset messages area to empty state
+  // Reset messages area to empty state (includes support-empty-txt)
   el('support-msgs').innerHTML=`<div class="support-empty" id="support-empty"><div class="support-empty-icon">💬</div><div id="support-empty-txt">${t('supportEmpty')}</div></div>`;
 
   el('support-overlay').classList.add('show');

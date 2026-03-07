@@ -169,6 +169,7 @@ img{display:block}
 
 /* Cart layout — inner scrollable list + sticky bottom panel */
 #pg-cart{overflow:hidden}
+#pg-cart.kbd-open{overflow-y:auto!important}
 .cart-list-wrap{flex:0 0 auto;min-height:0;position:relative;margin:0 12px 4px;border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;transition:margin-bottom .2s}
 .cart-list-wrap.tip-kbd{flex:0 0 0;min-height:0;margin-bottom:0;border-color:transparent}
 .cart-list-wrap::after{content:'';position:absolute;bottom:0;left:0;right:0;height:56px;background:linear-gradient(to bottom,transparent,var(--card));pointer-events:none}
@@ -382,19 +383,21 @@ img{display:block}
 <!-- ═══ CATALOG ═══ -->
 <div id="pg-catalog" class="page">
   <div style="position:sticky;top:0;z-index:40;background:rgba(7,7,14,.96);backdrop-filter:blur(20px)">
-    <!-- Single row: Address | Logo | Cart + Lang -->
+    <!-- Single row: Logo | Address (center) | Cart + Lang -->
     <div style="display:flex;align-items:center;padding:10px 14px;gap:6px">
-      <!-- Left: Address pill -->
-      <div class="addr-pill" onclick="openAddrModal()" id="addr-pill" style="align-items:flex-start;flex-shrink:1;min-width:0">
-        <span class="addr-pill-sub" id="addr-pill-label">АДРЕС</span>
-        <div class="addr-pill-row">
-          <span class="addr-pill-txt" id="addr-pill-txt">Добавьте адрес</span>
-          <span style="color:var(--gold);font-size:11px;flex-shrink:0">▾</span>
-        </div>
-      </div>
-      <!-- Center: Logo -->
-      <div style="flex:1;display:flex;justify-content:center;min-width:0">
+      <!-- Left: Logo -->
+      <div style="flex-shrink:0">
         <div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div></div>
+      </div>
+      <!-- Center: Address pill -->
+      <div style="flex:1;display:flex;justify-content:center;min-width:0">
+        <div class="addr-pill" onclick="openAddrModal()" id="addr-pill" style="align-items:center">
+          <span class="addr-pill-sub" id="addr-pill-label">ДОСТАВКА В</span>
+          <div class="addr-pill-row">
+            <span class="addr-pill-txt" id="addr-pill-txt">Добавьте адрес</span>
+            <span style="color:var(--gold);font-size:11px;flex-shrink:0">▾</span>
+          </div>
+        </div>
       </div>
       <!-- Right: Cart + Lang -->
       <div class="hdr-right" style="flex-shrink:0">
@@ -924,9 +927,27 @@ window.addEventListener('DOMContentLoaded',()=>{
   updateAddrPill();updateCartAddrBar();
   // Tip input keyboard handling
   const ti=el('tip-input'),clw=document.querySelector('.cart-list-wrap');
-  ti.addEventListener('focus',()=>{if(clw)clw.classList.add('tip-kbd');el('tip-done-btn').style.display='block';});
-  ti.addEventListener('blur',()=>{if(clw)clw.classList.remove('tip-kbd');setTimeout(()=>el('tip-done-btn').style.display='none',150);});
+  ti.addEventListener('focus',()=>{if(clw)clw.classList.add('tip-kbd');el('tip-done-btn').style.display='block';
+    el('pg-cart').classList.add('kbd-open');
+    // Scroll tip into view so user can see it
+    setTimeout(()=>ti.scrollIntoView({behavior:'smooth',block:'center'}),300);
+  });
+  ti.addEventListener('blur',()=>{if(clw)clw.classList.remove('tip-kbd');setTimeout(()=>el('tip-done-btn').style.display='none',150);
+    el('pg-cart').classList.remove('kbd-open');
+    // Scroll back to top so nothing is lost
+    setTimeout(()=>{el('pg-cart').scrollTop=0;},200);
+  });
   ti.addEventListener('keydown',e=>{if(e.key==='Enter'||e.keyCode===13)ti.blur();});
+  // Swipe down anywhere on cart page to dismiss keyboard
+  let _kbSwipeY=0;
+  el('pg-cart').addEventListener('touchstart',e=>{_kbSwipeY=e.touches[0].clientY;},{passive:true});
+  el('pg-cart').addEventListener('touchmove',e=>{
+    const ae=document.activeElement;
+    if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA')){
+      const dy=e.touches[0].clientY-_kbSwipeY;
+      if(dy>40){ae.blur();_kbSwipeY=9999;}
+    }
+  },{passive:true});
   // Address form keyboard handling
   const ac=el('addr-comment-in'),adb=el('addr-done-btn');
   ac.addEventListener('focus',()=>{adb.style.display='block';setTimeout(()=>ac.scrollIntoView({behavior:'smooth',block:'center'}),300);});
@@ -1862,14 +1883,14 @@ let _revealedWrap=null; // currently revealed swipe item
 function initCartSwipe(){
   document.querySelectorAll('.ci-swipe-wrap').forEach(wrap=>{
     const inner=wrap.querySelector('.ci-swipe-inner');
-    let startX=0,startY=0,dx=0,swiping=false,locked=false;
+    let startX=0,startY=0,dx=0,swiping=false,locked=false,wasRevealed=false;
 
     inner.addEventListener('touchstart',e=>{
-      // If another item is revealed, close it first
+      // If another item is revealed, close it smoothly
       if(_revealedWrap&&_revealedWrap!==wrap) closeRevealedSwipe();
+      wasRevealed=inner.classList.contains('revealed');
       const t=e.touches[0];startX=t.clientX;startY=t.clientY;dx=0;swiping=false;locked=false;
-      inner.classList.remove('revealed');
-      inner.classList.add('no-trans');
+      // Only disable transition once we start actually moving
     },{passive:true});
 
     inner.addEventListener('touchmove',e=>{
@@ -1877,15 +1898,27 @@ function initCartSwipe(){
       const t=e.touches[0];
       const diffX=t.clientX-startX, diffY=t.clientY-startY;
       if(!swiping&&Math.abs(diffY)>Math.abs(diffX)){locked=true;return;}
-      if(Math.abs(diffX)>6)swiping=true;
+      if(Math.abs(diffX)>6){
+        if(!swiping){swiping=true;inner.classList.remove('revealed');inner.classList.add('no-trans');}
+      }
       if(!swiping)return;
       e.preventDefault();
-      dx=Math.min(0,Math.max(-80,diffX)); // clamp to -80px
+      // If was revealed, offset from -80
+      const base=wasRevealed?-80:0;
+      dx=Math.min(0,Math.max(-80,base+diffX));
       inner.style.transform=`translateX(${dx}px)`;
     },{passive:false});
 
     inner.addEventListener('touchend',()=>{
       inner.classList.remove('no-trans');
+      if(!swiping){
+        // Just a tap — if it was revealed, snap back smoothly
+        if(wasRevealed){
+          inner.classList.remove('revealed');
+          if(_revealedWrap===wrap) _revealedWrap=null;
+        }
+        dx=0;swiping=false;return;
+      }
       if(dx<-40){
         // Snap open — reveal the red delete area
         inner.classList.add('revealed');
@@ -1893,7 +1926,7 @@ function initCartSwipe(){
         _revealedWrap=wrap;
         haptic.light();
       } else {
-        // Snap back
+        // Snap back smoothly
         inner.style.transform='';
         inner.classList.remove('revealed');
         if(_revealedWrap===wrap) _revealedWrap=null;
@@ -1904,15 +1937,15 @@ function initCartSwipe(){
 
   // Tap anywhere else to close the revealed item
   el('cart-list').addEventListener('click',e=>{
-    if(_revealedWrap&&!_revealedWrap.contains(e.target)){
+    if(_revealedWrap&&!_revealedWrap.querySelector('.ci-del-bg').contains(e.target)){
       closeRevealedSwipe();
     }
-  });
+  },{capture:true});
 }
 function closeRevealedSwipe(){
   if(!_revealedWrap)return;
   const inner=_revealedWrap.querySelector('.ci-swipe-inner');
-  if(inner){inner.classList.remove('revealed');inner.style.transform='';}
+  if(inner){inner.classList.remove('revealed','no-trans');inner.style.transform='';}
   _revealedWrap=null;
 }
 function confirmSwipeDel(cid){

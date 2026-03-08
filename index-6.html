@@ -6,6 +6,8 @@
 <title>AMBAR</title>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root{
   --gold:#C9A96E;--gold2:#E8C98A;--gold3:#F5E0B0;
@@ -408,8 +410,20 @@ img{display:block}
 .support-send:disabled{opacity:.4;cursor:not-allowed}
 .support-send svg{width:16px;height:16px;fill:#07070E}
 /* Support button on order cards */
+.support-attach{width:36px;height:36px;border-radius:50%;border:1px solid var(--border2);background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--sub);transition:.15s}
+.support-attach:active{transform:scale(.85)}
+.msg-bubble img.chat-photo{max-width:100%;border-radius:10px;margin-bottom:4px;cursor:pointer;display:block}
 .ocard-support-btn{flex:1;padding:10px;border-radius:var(--r3);border:1px solid rgba(201,169,110,.3);background:rgba(201,169,110,.08);color:var(--gold);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:.15s;font-family:'DM Sans',sans-serif}
 .ocard-support-btn:active{background:rgba(201,169,110,.2);transform:scale(.97)}
+/* Map picker */
+.map-container{width:100%;height:0;overflow:hidden;border-radius:var(--r2);border:1px solid var(--border2);margin:10px 0;transition:height .3s cubic-bezier(.34,1,.64,1)}
+.map-container.expanded{height:260px}
+.map-container .leaflet-container{height:100%;width:100%;background:var(--bg3)}
+.map-pin-btn{width:100%;padding:10px;border-radius:var(--r3);border:1px solid rgba(201,169,110,.3);background:rgba(201,169,110,.08);color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:.15s;font-family:'DM Sans',sans-serif;margin:8px 0}
+.map-pin-btn:active{background:rgba(201,169,110,.2);transform:scale(.97)}
+.leaflet-tile-pane{filter:brightness(.85) contrast(1.1)}
+.leaflet-control-attribution{font-size:8px!important;background:rgba(0,0,0,.5)!important;color:#888!important}
+.leaflet-control-attribution a{color:#aaa!important}
 </style>
 </head>
 <body>
@@ -538,6 +552,7 @@ img{display:block}
         <div class="mpanel show" id="mpanel-gps">
           <button class="gps-btn" onclick="grabGPS()" id="gps-btn"><span style="font-size:22px">📍</span><span id="gps-lbl">Поделиться геолокацией</span></button>
           <div class="gps-status" id="gps-status"></div>
+          <div class="map-container" id="map-gps-wrap"><div id="map-gps" style="height:100%"></div></div>
           <div id="gps-extra" style="display:none">
             <label class="flabel" id="lbl-type-gps">ТИП АДРЕСА</label>
             <div class="type-chips" id="tchips-gps"></div>
@@ -558,6 +573,8 @@ img{display:block}
               <input class="finput" id="man-building" type="text" enterkeyhint="next" placeholder="12B">
             </div>
           </div>
+          <button class="map-pin-btn" id="map-manual-btn" onclick="toggleManualMap()"><span>📍</span><span id="map-manual-btn-lbl">Выбрать на карте</span></button>
+          <div class="map-container" id="map-manual-wrap"><div id="map-manual" style="height:100%"></div></div>
           <label class="flabel" id="lbl-type-man">ТИП АДРЕСА</label>
           <div class="type-chips" id="tchips-man"></div>
         </div>
@@ -747,6 +764,10 @@ img{display:block}
     </div>
   </div>
   <div class="support-input-bar">
+    <label class="support-attach" for="support-file-input">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48"/></svg>
+      <input type="file" id="support-file-input" accept="image/*" style="display:none" onchange="onSupportFileSelect(this)">
+    </label>
     <textarea class="support-input" id="support-input" rows="1" placeholder="Введите сообщение..." maxlength="1000" enterkeyhint="send"></textarea>
     <button class="support-send" id="support-send-btn" onclick="sendSupportMsg()">
       <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
@@ -881,6 +902,7 @@ ru:{
   lcMsg:'Похоже, вы сейчас далеко от выбранного адреса. Всё равно оформить заказ туда?',
   lcYes:'Да, оформить',lcNo:'Отмена',
   supportBtn:'💬 Поддержка',supportTitle:'Поддержка',supportEmpty:'Задайте вопрос по заказу',supportPlaceholder:'Введите сообщение...',
+  mapPinBtn:'Выбрать на карте',mapHideBtn:'Скрыть карту',
 },
 en:{
   catalog:'Catalog',favs:'Favourites',cart:'Cart',addrPage:'Addresses',orders:'History',profile:'Profile',
@@ -915,6 +937,7 @@ en:{
   lcMsg:'It looks like you\'re not near the selected address. Order there anyway?',
   lcYes:'Yes, order',lcNo:'Cancel',
   supportBtn:'💬 Support',supportTitle:'Support',supportEmpty:'Ask us about your order',supportPlaceholder:'Type a message...',
+  mapPinBtn:'Pin on map',mapHideBtn:'Hide map',
 },
 };
 
@@ -1289,6 +1312,9 @@ function switchMethod(m){
     el('mtab-'+id)?.classList.toggle('on',id===m);
     el('mpanel-'+id)?.classList.toggle('show',id===m);
   });
+  // Collapse maps when switching
+  const gw=el('map-gps-wrap');if(gw)gw.classList.remove('expanded');
+  const mw=el('map-manual-wrap');if(mw)mw.classList.remove('expanded');
   if(m==='manual'){buildAreaChips();buildTypeChips('man');}
   if(m==='gps'){
     // GPS-only flow: do not show address type/street fields.
@@ -1366,11 +1392,71 @@ function grabGPS(){
         locInfo.street=(road+(num?' '+num:'')).trim();
       })
       .catch(()=>{});
+    // Show fine-tuning map
+    initMapGps(lat,lon);
   },()=>fail(),{timeout:10000,maximumAge:60000,enableHighAccuracy:true});
   function fail(){btn.style.opacity='1';set('gps-lbl',t('gpsBtn'));stat.className='gps-status fail';stat.textContent=t('gpsFail');}
 }
 
+// ── MAP PICKER (Leaflet) ────────────────────────────────────────────────────
+let _mapGps=null,_mapManual=null,_markerGps=null,_markerManual=null;
+const DUBAI_CENTER=[25.2048,55.2708];
 
+function _reverseGeo(lat,lon,cb){
+  fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`)
+    .then(r=>r.json())
+    .then(d=>{const a=d.address||{};const road=a.road||a.pedestrian||a.suburb||a.neighbourhood||'';const num=a.house_number||'';cb((road+(num?' '+num:'')).trim());})
+    .catch(()=>cb(''));
+}
+
+function initMapGps(lat,lon){
+  const wrap=el('map-gps-wrap');if(!wrap)return;
+  wrap.classList.add('expanded');
+  if(_mapGps){_mapGps.setView([lat,lon],16);_markerGps.setLatLng([lat,lon]);return;}
+  _mapGps=L.map('map-gps',{zoomControl:false,attributionControl:true}).setView([lat,lon],16);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(_mapGps);
+  _markerGps=L.marker([lat,lon],{draggable:true}).addTo(_mapGps);
+  _markerGps.on('dragend',function(){
+    const p=_markerGps.getLatLng();
+    const off=nearestOffice(p.lat,p.lng);
+    locInfo={lat:p.lat,lon:p.lng,office_id:off.id,office_name:off.name,street:''};
+    _reverseGeo(p.lat,p.lng,road=>{locInfo.street=road;});
+    haptic.select();
+  });
+  setTimeout(()=>_mapGps.invalidateSize(),350);
+}
+
+function toggleManualMap(){
+  const wrap=el('map-manual-wrap');if(!wrap)return;
+  const exp=wrap.classList.contains('expanded');
+  if(exp){wrap.classList.remove('expanded');el('map-manual-btn-lbl').textContent=t('mapPinBtn');return;}
+  wrap.classList.add('expanded');
+  el('map-manual-btn-lbl').textContent=t('mapHideBtn');
+  const sLat=locInfo?.lat||DUBAI_CENTER[0],sLon=locInfo?.lon||DUBAI_CENTER[1];
+  const zoom=locInfo?.lat?16:13;
+  if(_mapManual){_mapManual.setView([sLat,sLon],zoom);_markerManual.setLatLng([sLat,sLon]);setTimeout(()=>_mapManual.invalidateSize(),350);return;}
+  _mapManual=L.map('map-manual',{zoomControl:false,attributionControl:true}).setView([sLat,sLon],zoom);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(_mapManual);
+  _markerManual=L.marker([sLat,sLon],{draggable:true}).addTo(_mapManual);
+  _markerManual.on('dragend',function(){
+    const p=_markerManual.getLatLng();
+    const off=nearestOffice(p.lat,p.lng);
+    locInfo={lat:p.lat,lon:p.lng,office_id:off.id,office_name:off.name,street:''};
+    _reverseGeo(p.lat,p.lng,road=>{
+      locInfo.street=road;
+      const streetIn=el('man-street');if(streetIn&&road)streetIn.value=road;
+    });
+    haptic.select();
+  });
+  setTimeout(()=>_mapManual.invalidateSize(),350);
+}
+
+function _destroyMaps(){
+  if(_mapGps){_mapGps.remove();_mapGps=null;_markerGps=null;}
+  if(_mapManual){_mapManual.remove();_mapManual=null;_markerManual=null;}
+  const gw=el('map-gps-wrap');if(gw)gw.classList.remove('expanded');
+  const mw=el('map-manual-wrap');if(mw)mw.classList.remove('expanded');
+}
 
 // ── BUILD ADDRESS STRING ──────────────────────────────────────────────────────
 function buildAddrStr(p){
@@ -1437,10 +1523,10 @@ function saveNewAddress(){
     areaIdx:curMethod==='manual'?selArea:null,
     typeId:curMethod==='gps'?selTypeGps:selTypeMan,
     typeIcon:typeIcon,
-    lat:curMethod==='gps'?(locInfo?.lat||0):0,
-    lon:curMethod==='gps'?(locInfo?.lon||0):0,
-    office_id:curMethod==='gps'?(locInfo?.office_id||'office_central'):'office_central',
-    office_name:curMethod==='gps'?(locInfo?.office_name||OFFICES[0].name):OFFICES[0].name,
+    lat:locInfo?.lat||0,
+    lon:locInfo?.lon||0,
+    office_id:locInfo?.office_id||'office_central',
+    office_name:locInfo?.office_name||OFFICES[0].name,
     comment:comment,
   };
 
@@ -1491,6 +1577,7 @@ function saveNewAddress(){
 
 function resetAddrForm(){
   curMethod='gps';selTypeGps=null;selTypeMan=null;selArea=null;locInfo=null;editingAddrIdx=null;
+  _destroyMaps();
   set('save-addr-btn',t('saveAddrBtn'));set('add-form-title',t('addFormTitle'));
   el('gps-status').className='gps-status';
   el('gps-extra').style.display='none';
@@ -2827,7 +2914,12 @@ async function fetchSupportMsgs(){
       messages.forEach(m=>{
         const bubble=document.createElement('div');
         bubble.className='msg-bubble '+m.role;
-        bubble.innerHTML=`<div>${_escHtml(m.text)}</div><div class="msg-ts">${_fmtTime(m.ts)}</div>`;
+        if(m.type==='photo'){
+          const cap=m.caption?`<div>${_escHtml(m.caption)}</div>`:'';
+          bubble.innerHTML=`<img class="chat-photo" src="${AMBAR_API}${m.url}" alt="photo" onclick="window.open(this.src,'_blank')">${cap}<div class="msg-ts">${_fmtTime(m.ts)}</div>`;
+        }else{
+          bubble.innerHTML=`<div>${_escHtml(m.text)}</div><div class="msg-ts">${_fmtTime(m.ts)}</div>`;
+        }
         container.appendChild(bubble);
       });
       _supportLastTs=messages[messages.length-1].ts;
@@ -2880,6 +2972,41 @@ async function sendSupportMsg(){
     }
   }catch(e){showToast('Network error','err');bubble.style.opacity='.5';}
   btn.disabled=false;
+}
+
+async function onSupportFileSelect(input){
+  const file=input.files[0];if(!file)return;
+  input.value='';
+  const initData=tg?.initData;
+  if(!initData){showToast('No Telegram context','err');return;}
+
+  // Optimistic thumbnail bubble
+  const container=el('support-msgs');
+  const emptyEl=el('support-empty');if(emptyEl)emptyEl.remove();
+  const bubble=document.createElement('div');
+  bubble.className='msg-bubble user';
+  const thumbUrl=URL.createObjectURL(file);
+  bubble.innerHTML=`<img class="chat-photo" src="${thumbUrl}" alt="photo"><div class="msg-ts" style="opacity:.5">⏳</div>`;
+  container.appendChild(bubble);
+  container.scrollTop=container.scrollHeight;
+  haptic.light();
+
+  const fd=new FormData();
+  fd.append('initData',initData);
+  fd.append('order_id',_supportOrderId);
+  fd.append('image',file);
+
+  try{
+    const resp=await fetch(`${AMBAR_API}/api/support/send-image`,{method:'POST',body:fd});
+    const res=await resp.json();
+    if(!res.ok){showToast(res.error||'Upload failed','err');bubble.style.opacity='.5';}
+    else{
+      if(res.ts){_supportLastTs=res.ts;}
+      if(res.url){bubble.querySelector('.chat-photo').src=`${AMBAR_API}${res.url}`;}
+      const tsEl=bubble.querySelector('.msg-ts');
+      if(tsEl){tsEl.style.opacity='1';tsEl.textContent=_fmtTime(res.ts);}
+    }
+  }catch(e){showToast('Network error','err');bubble.style.opacity='.5';}
 }
 
 function _autoResizeSupport(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,100)+'px';}

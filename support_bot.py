@@ -1,6 +1,7 @@
-import json
+import os, json
 from pathlib import Path
 from datetime import datetime
+import aiohttp as _aiohttp
 
 from telegram import Update
 from telegram.ext import (
@@ -12,6 +13,9 @@ from telegram.ext import (
 )
 
 from config import BOT_TOKEN, ADMIN_IDS
+
+# Main customer bot token (for sending notifications to users)
+MAIN_BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 
 # map: forwarded_message_id -> user_id (in-memory, for direct bot users)
 MESSAGE_MAP = {}
@@ -28,6 +32,21 @@ def _load_json(path):
 
 def _save_json(path, data):
     path.write_text(json.dumps(data, ensure_ascii=False, indent=2))
+
+async def _notify_user(user_id: int, text: str):
+    """Send notification to user via main AMBAR bot."""
+    if not MAIN_BOT_TOKEN:
+        return
+    url = f"https://api.telegram.org/bot{MAIN_BOT_TOKEN}/sendMessage"
+    payload = {"chat_id": user_id, "text": text, "parse_mode": "Markdown"}
+    try:
+        async with _aiohttp.ClientSession() as session:
+            async with session.post(url, json=payload) as resp:
+                r = await resp.json()
+                if not r.get("ok"):
+                    print(f"⚠️ Notification failed: {r}")
+    except Exception as e:
+        print(f"⚠️ Notification error: {e}")
 
 def t(user, en, ru):
     """Return RU if user language is Russian, else EN"""
@@ -159,12 +178,41 @@ async def handle_admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE)
         msgs = _load_json(SUPPORT_MSGS_FILE)
         if conv_key not in msgs:
             msgs[conv_key] = []
-        msgs[conv_key].append({
-            "role": "operator",
-            "text": msg.text or msg.caption or "(media)",
-            "ts": datetime.now().isoformat(),
-        })
+
+        if msg.photo:
+            # Operator sent a photo — download and store
+            import uuid
+            photo = msg.photo[-1]  # highest resolution
+            file = await photo.get_file()
+            upload_dir = Path(__file__).parent / "uploads" / "support"
+            upload_dir.mkdir(parents=True, exist_ok=True)
+            fname = f"{uuid.uuid4().hex[:12]}.jpg"
+            fpath = upload_dir / fname
+            await file.download_to_drive(str(fpath))
+            msgs[conv_key].append({
+                "role": "operator", "type": "photo",
+                "url": f"/uploads/support/{fname}",
+                "caption": msg.caption or "",
+                "ts": datetime.now().isoformat(),
+            })
+        else:
+            msgs[conv_key].append({
+                "role": "operator", "type": "text",
+                "text": msg.text or msg.caption or "(media)",
+                "ts": datetime.now().isoformat(),
+            })
         _save_json(SUPPORT_MSGS_FILE, msgs)
+
+        # Notify user via main bot DM
+        order_id = conv_info.get("order_id", "")
+        preview = (msg.text or msg.caption or "📷 Фото")[:80]
+        notif = (
+            f"💬 *Ответ от поддержки*"
+            + (f" по заказу #{order_id}" if order_id else "")
+            + f"\n\n{preview}"
+            + ("…" if len(msg.text or msg.caption or "") > 80 else "")
+        )
+        await _notify_user(user_id, notif)
         return
 
     # Direct bot conversation — send reply to user DM

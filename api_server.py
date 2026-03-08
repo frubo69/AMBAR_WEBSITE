@@ -7,7 +7,7 @@ AMBAR API + Static file server
 - Validates Telegram WebApp initData via HMAC-SHA256
 """
 from __future__ import annotations
-import os, json, hmac, hashlib, urllib.parse, mimetypes, logging, time
+import os, json, hmac, hashlib, urllib.parse, mimetypes, logging, time, uuid
 from datetime import datetime
 from pathlib import Path
 import aiohttp as _aiohttp
@@ -24,6 +24,7 @@ SUPPORT_MSGS_FILE  = Path(__file__).parent / "support_messages.json"
 SUPPORT_MAP_FILE   = Path(__file__).parent / "support_map.json"
 PORT               = int(os.getenv("WEBAPP_PORT", "8080"))
 STATIC_DIR         = Path(__file__).parent
+UPLOAD_DIR         = STATIC_DIR / "uploads" / "support"
 
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -100,6 +101,18 @@ async def tg_send(token, chat_id, text, parse_mode="Markdown", reply_markup=None
     async with _aiohttp.ClientSession() as session:
         async with session.post(url, json=payload) as resp:
             return await resp.json()
+
+async def tg_send_photo(token, chat_id, photo_path, caption=""):
+    url = f"https://api.telegram.org/bot{token}/sendPhoto"
+    data = _aiohttp.FormData()
+    data.add_field("chat_id", str(chat_id))
+    if caption:
+        data.add_field("caption", caption[:1024])
+    with open(photo_path, "rb") as f:
+        data.add_field("photo", f, filename=Path(photo_path).name, content_type="image/jpeg")
+        async with _aiohttp.ClientSession() as session:
+            async with session.post(url, data=data) as resp:
+                return await resp.json()
 
 # ── API: POST /api/order — receive order from mini app ───────────────────────
 async def handle_create_order(request: web.Request) -> web.Response:
@@ -315,6 +328,88 @@ async def handle_support_send(request: web.Request) -> web.Response:
     log.info(f"[support] user={uid} order={order_id} msg='{text[:50]}'")
     return web.json_response({"ok": True, "ts": server_ts}, headers=CORS_HEADERS)
 
+# ── API: POST /api/support/send-image — user sends photo from mini app ─────
+async def handle_support_send_image(request: web.Request) -> web.Response:
+    if request.method == "OPTIONS":
+        return web.Response(status=200, headers=CORS_HEADERS)
+
+    reader = await request.multipart()
+    init_data = ""
+    order_id = ""
+    caption = ""
+    image_data = None
+    image_ext = ".jpg"
+
+    async for part in reader:
+        if part.name == "initData":
+            init_data = (await part.read()).decode()
+        elif part.name == "order_id":
+            order_id = (await part.read()).decode()
+        elif part.name == "caption":
+            caption = (await part.read()).decode()
+        elif part.name == "image":
+            image_data = await part.read()
+            fname = part.filename or "photo.jpg"
+            image_ext = Path(fname).suffix or ".jpg"
+
+    user = validate_init_data(init_data)
+    if not user:
+        return web.json_response({"error": "auth failed"}, status=401, headers=CORS_HEADERS)
+    if not image_data:
+        return web.json_response({"error": "no image"}, status=400, headers=CORS_HEADERS)
+    if len(image_data) > 5 * 1024 * 1024:  # 5MB limit
+        return web.json_response({"error": "file too large"}, status=400, headers=CORS_HEADERS)
+
+    uid       = user.get("id")
+    user_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
+    username  = user.get("username", "—")
+
+    # Save image
+    UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
+    fname = f"{uuid.uuid4().hex[:12]}{image_ext}"
+    fpath = UPLOAD_DIR / fname
+    fpath.write_bytes(image_data)
+    url_path = f"/uploads/support/{fname}"
+
+    conv_key = f"{uid}_{order_id}" if order_id else str(uid)
+    server_ts = datetime.now().isoformat()
+
+    msgs = load_support_msgs()
+    if conv_key not in msgs:
+        msgs[conv_key] = []
+    msgs[conv_key].append({
+        "role": "user", "type": "photo",
+        "url": url_path, "caption": caption,
+        "ts": server_ts,
+    })
+    save_support_msgs(msgs)
+
+    # Forward photo to operators
+    header_caption = (
+        f"📸 Mini App Photo\n"
+        f"📦 Order: #{order_id}\n"
+        f"👤 {user_name} (@{username}, ID: {uid})"
+        + (f"\n💬 {caption}" if caption else "")
+    )
+    smap = load_support_map()
+    token = SUPPORT_BOT_TOKEN or BOT_TOKEN
+    for op_id in OPERATOR_IDS:
+        try:
+            result = await tg_send_photo(token, op_id, str(fpath), header_caption)
+            fwd_id = result.get("result", {}).get("message_id")
+            if fwd_id:
+                smap[str(fwd_id)] = {
+                    "user_id": uid,
+                    "conv_key": conv_key,
+                    "order_id": order_id,
+                }
+        except Exception as e:
+            log.error(f"Support photo forward to {op_id}: {e}")
+    save_support_map(smap)
+
+    log.info(f"[support-img] user={uid} order={order_id} file={fname}")
+    return web.json_response({"ok": True, "ts": server_ts, "url": url_path}, headers=CORS_HEADERS)
+
 # ── API: GET /api/support/messages — fetch conversation for a conv_key ────────
 async def handle_support_messages(request: web.Request) -> web.Response:
     if request.method == "OPTIONS":
@@ -380,6 +475,8 @@ def main():
     app.router.add_post("/api/order", handle_create_order)
     app.router.add_route("OPTIONS", "/api/support/send", handle_support_send)
     app.router.add_post("/api/support/send", handle_support_send)
+    app.router.add_route("OPTIONS", "/api/support/send-image", handle_support_send_image)
+    app.router.add_post("/api/support/send-image", handle_support_send_image)
     app.router.add_route("OPTIONS", "/api/support/messages", handle_support_messages)
     app.router.add_get("/api/support/messages", handle_support_messages)
     app.router.add_get("/", handle_static)

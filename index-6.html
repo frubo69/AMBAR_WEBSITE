@@ -772,8 +772,7 @@ img{display:block}
     <div id="map-leaflet" style="width:100%;height:100%"></div>
     <div class="map-center-pin" id="map-center-pin">📍</div>
     <div class="map-layer-toggle" id="map-layer-toggle">
-      <button class="map-layer-btn on" data-layer="dark" onclick="switchMapLayer('dark')">2D</button>
-      <button class="map-layer-btn" data-layer="detail" onclick="switchMapLayer('detail')">3D</button>
+      <button class="map-layer-btn on" data-layer="dark" onclick="switchMapLayer('dark')">Map</button>
       <button class="map-layer-btn" data-layer="sat" onclick="switchMapLayer('sat')">Satellite</button>
     </div>
     <div class="map-bottom">
@@ -1444,12 +1443,10 @@ let _mapGeoTimer=null,_mapLastGeo='',_mapGeoResult=null;
 const DUBAI_CENTER=[25.2048,55.2708];
 const MAP_TILES={
   dark:'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-  detail:'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
   sat:'https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
 };
 const MAP_FILTERS={
-  dark:'invert(1) hue-rotate(180deg) brightness(.93) contrast(.9)',
-  detail:'invert(1) hue-rotate(180deg) brightness(.8) contrast(.85) saturate(.8)',
+  dark:'invert(1) hue-rotate(180deg) saturate(.18) brightness(.9)',
   sat:'brightness(.95) contrast(1.05)',
 };
 
@@ -1460,27 +1457,40 @@ function switchMapLayer(style){
   document.querySelectorAll('.map-layer-btn').forEach(b=>b.classList.toggle('on',b.dataset.layer===style));
   const pane=document.querySelector('#map-leaflet .leaflet-tile-pane');
   if(pane)pane.style.filter=MAP_FILTERS[style]||'none';
+  // Also invert the center pin so it stays normal on inverted map
+  const pin=el('map-center-pin');
+  if(pin)pin.style.filter=style==='dark'?'invert(1) hue-rotate(180deg) saturate(5)':'none';
   haptic.light();
 }
 
 function _reverseGeo(lat,lon,cb){
-  fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&namedetails=1&extratags=1&zoom=18`)
+  fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&namedetails=1&extratags=1&zoom=19`)
     .then(r=>r.json())
     .then(d=>{
       const a=d.address||{};
+      const dn=d.display_name||'';
+      const parts=dn.split(',').map(p=>p.trim()).filter(Boolean);
+
+      // Extract individual fields
       const road=a.road||a.pedestrian||a.hamlet||'';
       const num=a.house_number||'';
-      const suburb=a.suburb||a.city_district||a.neighbourhood||a.quarter||'';
       const bldg=a.building||a.amenity||a.shop||a.tourism||a.office||a.leisure||'';
-      const city=a.city||a.town||a.state||'';
-      const community=a.residential||a.commercial||'';
-      // Build full display: street + building number
-      const streetFull=(road+(num?' '+num:'')).trim();
-      // Build detail line: building name, community
-      const details=[bldg,community].filter(Boolean).join(', ');
-      cb({street:road,building:num,area:suburb,city,bldgName:bldg,community,details,full:streetFull});
+      const community=a.residential||a.commercial||a.industrial||'';
+      const suburb=a.suburb||a.city_district||a.neighbourhood||a.quarter||'';
+      const city=a.city||a.town||'';
+
+      // Line 1 — most specific: building name > street+num > first display_name part
+      const line1=bldg||(road+(num?' '+num:'')).trim()||parts[0]||'';
+      // Line 2 — if bldg found show street+num, else community, else display_name part
+      const line2=(bldg&&road?(road+(num?' '+num:'')).trim():'') || community || (parts.length>2&&parts[1]!==line1?parts[1]:'')||'';
+      // Line 3 — district + city
+      const line3=[suburb,city].filter(Boolean).join(', ')||(parts.length>3?parts.slice(2,4).join(', '):'');
+
+      cb({street:road,building:num,bldgName:bldg,area:suburb,city,community,
+          line1,line2,line3,full:(road+(num?' '+num:'')).trim(),displayName:dn});
     })
-    .catch(()=>cb({street:'',building:'',area:'',city:'',bldgName:'',community:'',details:'',full:''}));
+    .catch(()=>cb({street:'',building:'',bldgName:'',area:'',city:'',community:'',
+        line1:'',line2:'',line3:'',full:'',displayName:''}));
 }
 
 function openMapPicker(source,lat,lon){
@@ -1492,12 +1502,12 @@ function openMapPicker(source,lat,lon){
   set('map-addr-street','—');set('map-addr-building','');set('map-addr-area','');
   overlay.classList.add('show');
 
-  // Reset layer toggle to dark
+  // Reset layer toggle
   document.querySelectorAll('.map-layer-btn').forEach(b=>b.classList.toggle('on',b.dataset.layer==='dark'));
 
   const sLat=lat||locInfo?.lat||DUBAI_CENTER[0];
   const sLon=lon||locInfo?.lon||DUBAI_CENTER[1];
-  const zoom=(lat||locInfo?.lat)?17:13;
+  const zoom=(lat||locInfo?.lat)?18:14;
 
   if(_mapPicker){
     if(_currentMapStyle!=='dark')switchMapLayer('dark');
@@ -1507,12 +1517,14 @@ function openMapPicker(source,lat,lon){
     return;
   }
   _mapPicker=L.map('map-leaflet',{zoomControl:false,attributionControl:false}).setView([sLat,sLon],zoom);
-  _mapTileLayer=L.tileLayer(MAP_TILES.dark,{maxZoom:20,subdomains:'0123'}).addTo(_mapPicker);
+  _mapTileLayer=L.tileLayer(MAP_TILES.dark,{maxZoom:21,subdomains:'0123'}).addTo(_mapPicker);
   _currentMapStyle='dark';
-  // Apply dark filter
+  // Apply dark filter + invert pin
   setTimeout(()=>{
     const pane=document.querySelector('#map-leaflet .leaflet-tile-pane');
     if(pane)pane.style.filter=MAP_FILTERS.dark;
+    const pin=el('map-center-pin');
+    if(pin)pin.style.filter='invert(1) hue-rotate(180deg) saturate(5)';
   },50);
 
   const pin=el('map-center-pin');
@@ -1532,11 +1544,11 @@ function _onMapMove(){
   _mapGeoTimer=setTimeout(()=>{
     _reverseGeo(c.lat,c.lng,info=>{
       _mapGeoResult=info;
-      set('map-addr-street',info.full||`${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`);
-      set('map-addr-building',info.details);
-      set('map-addr-area',[info.area,info.city].filter(Boolean).join(', '));
+      set('map-addr-street',info.line1||`${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`);
+      set('map-addr-building',info.line2);
+      set('map-addr-area',info.line3);
     });
-  },400);
+  },350);
 }
 
 function confirmMapLocation(){
@@ -1544,11 +1556,12 @@ function confirmMapLocation(){
   const c=_mapPicker.getCenter();
   const off=nearestOffice(c.lat,c.lng);
   const geo=_mapGeoResult||{};
-  const streetFull=geo.full||(el('map-addr-street')?.textContent||'').trim();
-  locInfo={lat:c.lat,lon:c.lng,office_id:off.id,office_name:off.name,street:(streetFull==='...'||streetFull==='—')?'':streetFull};
+  const streetFull=geo.full||geo.line1||(el('map-addr-street')?.textContent||'').trim();
+  locInfo={lat:c.lat,lon:c.lng,office_id:off.id,office_name:off.name,
+    street:(streetFull==='...'||streetFull==='—')?'':streetFull};
 
   if(_mapPickerSource==='manual'){
-    const streetIn=el('man-street');if(streetIn)streetIn.value=geo.street||'';
+    const streetIn=el('man-street');if(streetIn)streetIn.value=geo.street||geo.line1||'';
     const buildIn=el('man-building');if(buildIn)buildIn.value=geo.building||'';
     // Try auto-select area chip
     if(geo.area){

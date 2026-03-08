@@ -438,8 +438,7 @@ img{display:block}
 .map-layer-btn+.map-layer-btn{border-left:1px solid rgba(255,255,255,.08)}
 .map-layer-btn:active{opacity:.7}
 .map-addr-building{font-size:13px;color:var(--text);margin-top:1px}
-.leaflet-control-attribution{font-size:8px!important;background:rgba(0,0,0,.5)!important;color:#888!important}
-.leaflet-control-attribution a{color:#aaa!important}
+.leaflet-control-attribution{display:none!important}
 .leaflet-control-zoom{display:none!important}
 </style>
 </head>
@@ -1439,49 +1438,49 @@ function grabGPS(){
   function fail(){btn.style.opacity='1';set('gps-lbl',t('gpsBtn'));stat.className='gps-status fail';stat.textContent=t('gpsFail');}
 }
 
-// ── MAP PICKER (Leaflet — full-screen overlay) ──────────────────────────────
+// ── MAP PICKER (Leaflet + Google tiles) ──────────────────────────────────────
 let _mapPicker=null,_mapPickerSource=null,_mapTileLayer=null,_currentMapStyle='dark';
 let _mapGeoTimer=null,_mapLastGeo='',_mapGeoResult=null;
 const DUBAI_CENTER=[25.2048,55.2708];
 const MAP_TILES={
-  dark:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
-  detail:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
-  sat:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+  dark:'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+  detail:'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+  sat:'https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
 };
-const MAP_ATTR={
-  dark:'&copy; <a href="https://carto.com/">CARTO</a>',
-  detail:'&copy; <a href="https://osm.org/">OSM</a>',
-  sat:'&copy; <a href="https://www.esri.com/">Esri</a>',
+const MAP_FILTERS={
+  dark:'invert(1) hue-rotate(180deg) brightness(.93) contrast(.9)',
+  detail:'invert(1) hue-rotate(180deg) brightness(.8) contrast(.85) saturate(.8)',
+  sat:'brightness(.95) contrast(1.05)',
 };
 
 function switchMapLayer(style){
   if(!_mapPicker||!_mapTileLayer)return;
   _currentMapStyle=style;
   _mapTileLayer.setUrl(MAP_TILES[style]);
-  _mapTileLayer.getAttribution=()=>MAP_ATTR[style];
   document.querySelectorAll('.map-layer-btn').forEach(b=>b.classList.toggle('on',b.dataset.layer===style));
   const pane=document.querySelector('#map-leaflet .leaflet-tile-pane');
-  if(pane){
-    if(style==='dark')pane.style.filter='none';
-    else if(style==='detail')pane.style.filter='brightness(.72) contrast(1.1) saturate(.7)';
-    else pane.style.filter='brightness(.9) contrast(1.05)';
-  }
+  if(pane)pane.style.filter=MAP_FILTERS[style]||'none';
   haptic.light();
 }
 
 function _reverseGeo(lat,lon,cb){
-  fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&zoom=18`)
+  fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&namedetails=1&extratags=1&zoom=18`)
     .then(r=>r.json())
     .then(d=>{
       const a=d.address||{};
-      const road=a.road||a.pedestrian||'';
+      const road=a.road||a.pedestrian||a.hamlet||'';
       const num=a.house_number||'';
-      const suburb=a.suburb||a.city_district||a.neighbourhood||'';
-      const bldg=a.building||'';
+      const suburb=a.suburb||a.city_district||a.neighbourhood||a.quarter||'';
+      const bldg=a.building||a.amenity||a.shop||a.tourism||a.office||a.leisure||'';
       const city=a.city||a.town||a.state||'';
-      cb({street:road,building:num,area:suburb,city,bldgName:bldg,full:(road+(num?' '+num:'')).trim()});
+      const community=a.residential||a.commercial||'';
+      // Build full display: street + building number
+      const streetFull=(road+(num?' '+num:'')).trim();
+      // Build detail line: building name, community
+      const details=[bldg,community].filter(Boolean).join(', ');
+      cb({street:road,building:num,area:suburb,city,bldgName:bldg,community,details,full:streetFull});
     })
-    .catch(()=>cb({street:'',building:'',area:'',city:'',bldgName:'',full:''}));
+    .catch(()=>cb({street:'',building:'',area:'',city:'',bldgName:'',community:'',details:'',full:''}));
 }
 
 function openMapPicker(source,lat,lon){
@@ -1498,7 +1497,7 @@ function openMapPicker(source,lat,lon){
 
   const sLat=lat||locInfo?.lat||DUBAI_CENTER[0];
   const sLon=lon||locInfo?.lon||DUBAI_CENTER[1];
-  const zoom=(lat||locInfo?.lat)?16:13;
+  const zoom=(lat||locInfo?.lat)?17:13;
 
   if(_mapPicker){
     if(_currentMapStyle!=='dark')switchMapLayer('dark');
@@ -1507,9 +1506,14 @@ function openMapPicker(source,lat,lon){
     _onMapMove();
     return;
   }
-  _mapPicker=L.map('map-leaflet',{zoomControl:false,attributionControl:true}).setView([sLat,sLon],zoom);
-  _mapTileLayer=L.tileLayer(MAP_TILES.dark,{maxZoom:19,attribution:MAP_ATTR.dark}).addTo(_mapPicker);
+  _mapPicker=L.map('map-leaflet',{zoomControl:false,attributionControl:false}).setView([sLat,sLon],zoom);
+  _mapTileLayer=L.tileLayer(MAP_TILES.dark,{maxZoom:20,subdomains:'0123'}).addTo(_mapPicker);
   _currentMapStyle='dark';
+  // Apply dark filter
+  setTimeout(()=>{
+    const pane=document.querySelector('#map-leaflet .leaflet-tile-pane');
+    if(pane)pane.style.filter=MAP_FILTERS.dark;
+  },50);
 
   const pin=el('map-center-pin');
   _mapPicker.on('movestart',()=>{pin.classList.add('dragging');});
@@ -1529,8 +1533,7 @@ function _onMapMove(){
     _reverseGeo(c.lat,c.lng,info=>{
       _mapGeoResult=info;
       set('map-addr-street',info.full||`${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`);
-      const bldgLine=[info.bldgName].filter(Boolean).join(' ');
-      set('map-addr-building',bldgLine);
+      set('map-addr-building',info.details);
       set('map-addr-area',[info.area,info.city].filter(Boolean).join(', '));
     });
   },400);

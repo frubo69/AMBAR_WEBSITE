@@ -203,14 +203,12 @@ async def handle_admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE)
             })
         _save_json(SUPPORT_MSGS_FILE, msgs)
 
-        # Notify user via main bot DM
+        # Notify user via main bot DM (no reply preview — let them check in the app)
         order_id = conv_info.get("order_id", "")
-        preview = (msg.text or msg.caption or "📷 Фото")[:80]
         notif = (
-            f"💬 *Ответ от поддержки*"
+            f"💬 *Новое сообщение от поддержки*"
             + (f" по заказу #{order_id}" if order_id else "")
-            + f"\n\n{preview}"
-            + ("…" if len(msg.text or msg.caption or "") > 80 else "")
+            + f"\n\nОткройте приложение, чтобы прочитать ответ."
         )
         await _notify_user(user_id, notif)
         return

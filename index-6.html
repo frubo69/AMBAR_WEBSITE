@@ -415,15 +415,27 @@ img{display:block}
 .msg-bubble img.chat-photo{max-width:100%;border-radius:10px;margin-bottom:4px;cursor:pointer;display:block}
 .ocard-support-btn{flex:1;padding:10px;border-radius:var(--r3);border:1px solid rgba(201,169,110,.3);background:rgba(201,169,110,.08);color:var(--gold);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:.15s;font-family:'DM Sans',sans-serif}
 .ocard-support-btn:active{background:rgba(201,169,110,.2);transform:scale(.97)}
-/* Map picker */
-.map-container{width:100%;height:0;overflow:hidden;border-radius:var(--r2);border:1px solid var(--border2);margin:10px 0;transition:height .3s cubic-bezier(.34,1,.64,1)}
-.map-container.expanded{height:260px}
-.map-container .leaflet-container{height:100%;width:100%;background:var(--bg3)}
+/* Map picker — full-screen overlay */
+.map-overlay{position:fixed;inset:0;z-index:310;background:var(--bg);display:flex;flex-direction:column;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1,.64,1)}
+.map-overlay.show{transform:translateY(0)}
+.map-overlay .leaflet-container{flex:1;width:100%;background:#1a1a2e}
+.map-center-pin{position:absolute;top:50%;left:50%;z-index:500;transform:translate(-50%,-100%);pointer-events:none;font-size:36px;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5));transition:transform .15s}
+.map-center-pin.dragging{transform:translate(-50%,-120%) scale(1.15)}
+.map-hdr{display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(7,7,14,.95);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);z-index:501;flex-shrink:0}
+.map-hdr-back{width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.08);border:none;color:var(--gold);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.map-hdr-title{font-family:'DM Sans',sans-serif;font-size:16px;font-weight:600;color:var(--gold2)}
+.map-bottom{position:absolute;bottom:0;left:0;right:0;z-index:501;padding:16px 16px calc(16px + var(--safe-bottom));background:linear-gradient(transparent,rgba(7,7,14,.92) 30%)}
+.map-addr-preview{background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);padding:12px 14px;margin-bottom:12px;font-family:'DM Sans',sans-serif}
+.map-addr-street{font-size:15px;font-weight:600;color:var(--gold2);margin-bottom:2px}
+.map-addr-area{font-size:12px;color:var(--sub)}
+.map-confirm-btn{width:100%;padding:14px;border-radius:var(--r3);border:none;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;font-size:14px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;letter-spacing:.3px;transition:.15s}
+.map-confirm-btn:active{opacity:.85;transform:scale(.97)}
 .map-pin-btn{width:100%;padding:10px;border-radius:var(--r3);border:1px solid rgba(201,169,110,.3);background:rgba(201,169,110,.08);color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:.15s;font-family:'DM Sans',sans-serif;margin:8px 0}
 .map-pin-btn:active{background:rgba(201,169,110,.2);transform:scale(.97)}
 .leaflet-tile-pane{filter:brightness(.85) contrast(1.1)}
 .leaflet-control-attribution{font-size:8px!important;background:rgba(0,0,0,.5)!important;color:#888!important}
 .leaflet-control-attribution a{color:#aaa!important}
+.leaflet-control-zoom{display:none!important}
 </style>
 </head>
 <body>
@@ -552,7 +564,6 @@ img{display:block}
         <div class="mpanel show" id="mpanel-gps">
           <button class="gps-btn" onclick="grabGPS()" id="gps-btn"><span style="font-size:22px">📍</span><span id="gps-lbl">Поделиться геолокацией</span></button>
           <div class="gps-status" id="gps-status"></div>
-          <div class="map-container" id="map-gps-wrap"><div id="map-gps" style="height:100%"></div></div>
           <div id="gps-extra" style="display:none">
             <label class="flabel" id="lbl-type-gps">ТИП АДРЕСА</label>
             <div class="type-chips" id="tchips-gps"></div>
@@ -573,8 +584,7 @@ img{display:block}
               <input class="finput" id="man-building" type="text" enterkeyhint="next" placeholder="12B">
             </div>
           </div>
-          <button class="map-pin-btn" id="map-manual-btn" onclick="toggleManualMap()"><span>📍</span><span id="map-manual-btn-lbl">Выбрать на карте</span></button>
-          <div class="map-container" id="map-manual-wrap"><div id="map-manual" style="height:100%"></div></div>
+          <button class="map-pin-btn" id="map-manual-btn" onclick="openMapPicker('manual')"><span>📍</span><span id="map-manual-btn-lbl">Выбрать на карте</span></button>
           <label class="flabel" id="lbl-type-man">ТИП АДРЕСА</label>
           <div class="type-chips" id="tchips-man"></div>
         </div>
@@ -746,6 +756,27 @@ img{display:block}
   </div>
 </div>
 
+<!-- Map Picker Overlay (full-screen, Uber/Yandex Go style) -->
+<div class="map-overlay" id="map-overlay">
+  <div class="map-hdr">
+    <button class="map-hdr-back" onclick="closeMapPicker()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <span class="map-hdr-title" id="map-hdr-title">Выбрать на карте</span>
+  </div>
+  <div style="position:relative;flex:1;min-height:0">
+    <div id="map-leaflet" style="width:100%;height:100%"></div>
+    <div class="map-center-pin" id="map-center-pin">📍</div>
+    <div class="map-bottom">
+      <div class="map-addr-preview" id="map-addr-preview">
+        <div class="map-addr-street" id="map-addr-street">—</div>
+        <div class="map-addr-area" id="map-addr-area"></div>
+      </div>
+      <button class="map-confirm-btn" id="map-confirm-btn" onclick="confirmMapLocation()">Подтвердить</button>
+    </div>
+  </div>
+</div>
+
 <!-- Support Chat Overlay -->
 <div class="support-overlay" id="support-overlay">
   <div class="support-hdr">
@@ -902,7 +933,7 @@ ru:{
   lcMsg:'Похоже, вы сейчас далеко от выбранного адреса. Всё равно оформить заказ туда?',
   lcYes:'Да, оформить',lcNo:'Отмена',
   supportBtn:'💬 Поддержка',supportTitle:'Поддержка',supportEmpty:'Задайте вопрос по заказу',supportPlaceholder:'Введите сообщение...',
-  mapPinBtn:'Выбрать на карте',mapHideBtn:'Скрыть карту',
+  mapPinBtn:'Выбрать на карте',mapHideBtn:'Скрыть карту',mapPickTitle:'Выбрать на карте',mapConfirm:'Подтвердить',
 },
 en:{
   catalog:'Catalog',favs:'Favourites',cart:'Cart',addrPage:'Addresses',orders:'History',profile:'Profile',
@@ -937,7 +968,7 @@ en:{
   lcMsg:'It looks like you\'re not near the selected address. Order there anyway?',
   lcYes:'Yes, order',lcNo:'Cancel',
   supportBtn:'💬 Support',supportTitle:'Support',supportEmpty:'Ask us about your order',supportPlaceholder:'Type a message...',
-  mapPinBtn:'Pin on map',mapHideBtn:'Hide map',
+  mapPinBtn:'Pin on map',mapHideBtn:'Hide map',mapPickTitle:'Pick on map',mapConfirm:'Confirm',
 },
 };
 
@@ -1312,9 +1343,8 @@ function switchMethod(m){
     el('mtab-'+id)?.classList.toggle('on',id===m);
     el('mpanel-'+id)?.classList.toggle('show',id===m);
   });
-  // Collapse maps when switching
-  const gw=el('map-gps-wrap');if(gw)gw.classList.remove('expanded');
-  const mw=el('map-manual-wrap');if(mw)mw.classList.remove('expanded');
+  // Close map overlay when switching tabs
+  closeMapPicker();
   if(m==='manual'){buildAreaChips();buildTypeChips('man');}
   if(m==='gps'){
     // GPS-only flow: do not show address type/street fields.
@@ -1392,70 +1422,100 @@ function grabGPS(){
         locInfo.street=(road+(num?' '+num:'')).trim();
       })
       .catch(()=>{});
-    // Show fine-tuning map
-    initMapGps(lat,lon);
+    // Open full-screen map for fine-tuning
+    openMapPicker('gps',lat,lon);
   },()=>fail(),{timeout:10000,maximumAge:60000,enableHighAccuracy:true});
   function fail(){btn.style.opacity='1';set('gps-lbl',t('gpsBtn'));stat.className='gps-status fail';stat.textContent=t('gpsFail');}
 }
 
-// ── MAP PICKER (Leaflet) ────────────────────────────────────────────────────
-let _mapGps=null,_mapManual=null,_markerGps=null,_markerManual=null;
+// ── MAP PICKER (Leaflet — full-screen overlay) ──────────────────────────────
+let _mapPicker=null,_mapPickerSource=null;
+let _mapGeoTimer=null,_mapLastGeo='';
 const DUBAI_CENTER=[25.2048,55.2708];
 
 function _reverseGeo(lat,lon,cb){
   fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`)
     .then(r=>r.json())
-    .then(d=>{const a=d.address||{};const road=a.road||a.pedestrian||a.suburb||a.neighbourhood||'';const num=a.house_number||'';cb((road+(num?' '+num:'')).trim());})
-    .catch(()=>cb(''));
+    .then(d=>{
+      const a=d.address||{};
+      const road=a.road||a.pedestrian||a.suburb||a.neighbourhood||'';
+      const num=a.house_number||'';
+      const area=a.suburb||a.city_district||a.neighbourhood||'';
+      cb({street:(road+(num?' '+num:'')).trim(), area});
+    })
+    .catch(()=>cb({street:'',area:''}));
 }
 
-function initMapGps(lat,lon){
-  const wrap=el('map-gps-wrap');if(!wrap)return;
-  wrap.classList.add('expanded');
-  if(_mapGps){_mapGps.setView([lat,lon],16);_markerGps.setLatLng([lat,lon]);return;}
-  _mapGps=L.map('map-gps',{zoomControl:false,attributionControl:true}).setView([lat,lon],16);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(_mapGps);
-  _markerGps=L.marker([lat,lon],{draggable:true}).addTo(_mapGps);
-  _markerGps.on('dragend',function(){
-    const p=_markerGps.getLatLng();
-    const off=nearestOffice(p.lat,p.lng);
-    locInfo={lat:p.lat,lon:p.lng,office_id:off.id,office_name:off.name,street:''};
-    _reverseGeo(p.lat,p.lng,road=>{locInfo.street=road;});
-    haptic.select();
-  });
-  setTimeout(()=>_mapGps.invalidateSize(),350);
+function openMapPicker(source,lat,lon){
+  _mapPickerSource=source;
+  const overlay=el('map-overlay');
+  set('map-hdr-title',t('mapPickTitle'));
+  set('map-confirm-btn',t('mapConfirm'));
+  set('map-addr-street','—');
+  set('map-addr-area','');
+  overlay.classList.add('show');
+
+  const sLat=lat||locInfo?.lat||DUBAI_CENTER[0];
+  const sLon=lon||locInfo?.lon||DUBAI_CENTER[1];
+  const zoom=(lat||locInfo?.lat)?16:13;
+
+  if(_mapPicker){
+    _mapPicker.setView([sLat,sLon],zoom);
+    setTimeout(()=>_mapPicker.invalidateSize(),200);
+    _onMapMove();
+    return;
+  }
+  _mapPicker=L.map('map-leaflet',{zoomControl:false,attributionControl:true}).setView([sLat,sLon],zoom);
+  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(_mapPicker);
+
+  const pin=el('map-center-pin');
+  _mapPicker.on('movestart',()=>{pin.classList.add('dragging');});
+  _mapPicker.on('moveend',()=>{pin.classList.remove('dragging');_onMapMove();});
+  setTimeout(()=>{_mapPicker.invalidateSize();_onMapMove();},350);
 }
 
-function toggleManualMap(){
-  const wrap=el('map-manual-wrap');if(!wrap)return;
-  const exp=wrap.classList.contains('expanded');
-  if(exp){wrap.classList.remove('expanded');el('map-manual-btn-lbl').textContent=t('mapPinBtn');return;}
-  wrap.classList.add('expanded');
-  el('map-manual-btn-lbl').textContent=t('mapHideBtn');
-  const sLat=locInfo?.lat||DUBAI_CENTER[0],sLon=locInfo?.lon||DUBAI_CENTER[1];
-  const zoom=locInfo?.lat?16:13;
-  if(_mapManual){_mapManual.setView([sLat,sLon],zoom);_markerManual.setLatLng([sLat,sLon]);setTimeout(()=>_mapManual.invalidateSize(),350);return;}
-  _mapManual=L.map('map-manual',{zoomControl:false,attributionControl:true}).setView([sLat,sLon],zoom);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(_mapManual);
-  _markerManual=L.marker([sLat,sLon],{draggable:true}).addTo(_mapManual);
-  _markerManual.on('dragend',function(){
-    const p=_markerManual.getLatLng();
-    const off=nearestOffice(p.lat,p.lng);
-    locInfo={lat:p.lat,lon:p.lng,office_id:off.id,office_name:off.name,street:''};
-    _reverseGeo(p.lat,p.lng,road=>{
-      locInfo.street=road;
-      const streetIn=el('man-street');if(streetIn&&road)streetIn.value=road;
+function _onMapMove(){
+  if(!_mapPicker)return;
+  const c=_mapPicker.getCenter();
+  const key=c.lat.toFixed(5)+','+c.lng.toFixed(5);
+  if(key===_mapLastGeo)return;
+  _mapLastGeo=key;
+  clearTimeout(_mapGeoTimer);
+  set('map-addr-street','...');set('map-addr-area','');
+  _mapGeoTimer=setTimeout(()=>{
+    _reverseGeo(c.lat,c.lng,info=>{
+      set('map-addr-street',info.street||`${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`);
+      set('map-addr-area',info.area||'');
     });
-    haptic.select();
-  });
-  setTimeout(()=>_mapManual.invalidateSize(),350);
+  },400);
 }
 
-function _destroyMaps(){
-  if(_mapGps){_mapGps.remove();_mapGps=null;_markerGps=null;}
-  if(_mapManual){_mapManual.remove();_mapManual=null;_markerManual=null;}
-  const gw=el('map-gps-wrap');if(gw)gw.classList.remove('expanded');
-  const mw=el('map-manual-wrap');if(mw)mw.classList.remove('expanded');
+function confirmMapLocation(){
+  if(!_mapPicker)return;
+  const c=_mapPicker.getCenter();
+  const off=nearestOffice(c.lat,c.lng);
+  const streetTxt=(el('map-addr-street')?.textContent||'').trim();
+  locInfo={lat:c.lat,lon:c.lng,office_id:off.id,office_name:off.name,street:(streetTxt==='...'||streetTxt==='—')?'':streetTxt};
+
+  if(_mapPickerSource==='manual'){
+    const streetIn=el('man-street');if(streetIn&&locInfo.street)streetIn.value=locInfo.street;
+  }
+  if(_mapPickerSource==='gps'){
+    const stat=el('gps-status');
+    stat.className='gps-status ok';stat.textContent=t('gpsOk');
+  }
+  haptic.success();
+  closeMapPicker();
+}
+
+function closeMapPicker(){
+  el('map-overlay').classList.remove('show');
+}
+
+function _destroyMapPicker(){
+  if(_mapPicker){_mapPicker.remove();_mapPicker=null;}
+  _mapLastGeo='';
+  closeMapPicker();
 }
 
 // ── BUILD ADDRESS STRING ──────────────────────────────────────────────────────
@@ -1577,7 +1637,7 @@ function saveNewAddress(){
 
 function resetAddrForm(){
   curMethod='gps';selTypeGps=null;selTypeMan=null;selArea=null;locInfo=null;editingAddrIdx=null;
-  _destroyMaps();
+  _destroyMapPicker();
   set('save-addr-btn',t('saveAddrBtn'));set('add-form-title',t('addFormTitle'));
   el('gps-status').className='gps-status';
   el('gps-extra').style.display='none';

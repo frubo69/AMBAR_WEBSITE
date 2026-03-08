@@ -432,7 +432,12 @@ img{display:block}
 .map-confirm-btn:active{opacity:.85;transform:scale(.97)}
 .map-pin-btn{width:100%;padding:10px;border-radius:var(--r3);border:1px solid rgba(201,169,110,.3);background:rgba(201,169,110,.08);color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:6px;transition:.15s;font-family:'DM Sans',sans-serif;margin:8px 0}
 .map-pin-btn:active{background:rgba(201,169,110,.2);transform:scale(.97)}
-.leaflet-tile-pane{filter:brightness(.85) contrast(1.1)}
+.map-layer-toggle{position:absolute;top:12px;right:12px;z-index:502;display:flex;border-radius:10px;overflow:hidden;background:rgba(0,0,0,.55);backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.1)}
+.map-layer-btn{padding:7px 12px;font-size:11px;font-weight:600;font-family:'DM Sans',sans-serif;border:none;background:transparent;color:rgba(255,255,255,.5);cursor:pointer;transition:.15s;white-space:nowrap}
+.map-layer-btn.on{background:rgba(201,169,110,.22);color:var(--gold2)}
+.map-layer-btn+.map-layer-btn{border-left:1px solid rgba(255,255,255,.08)}
+.map-layer-btn:active{opacity:.7}
+.map-addr-building{font-size:13px;color:var(--text);margin-top:1px}
 .leaflet-control-attribution{font-size:8px!important;background:rgba(0,0,0,.5)!important;color:#888!important}
 .leaflet-control-attribution a{color:#aaa!important}
 .leaflet-control-zoom{display:none!important}
@@ -767,9 +772,15 @@ img{display:block}
   <div style="position:relative;flex:1;min-height:0">
     <div id="map-leaflet" style="width:100%;height:100%"></div>
     <div class="map-center-pin" id="map-center-pin">📍</div>
+    <div class="map-layer-toggle" id="map-layer-toggle">
+      <button class="map-layer-btn on" data-layer="dark" onclick="switchMapLayer('dark')">2D</button>
+      <button class="map-layer-btn" data-layer="detail" onclick="switchMapLayer('detail')">3D</button>
+      <button class="map-layer-btn" data-layer="sat" onclick="switchMapLayer('sat')">Satellite</button>
+    </div>
     <div class="map-bottom">
       <div class="map-addr-preview" id="map-addr-preview">
         <div class="map-addr-street" id="map-addr-street">—</div>
+        <div class="map-addr-building" id="map-addr-building"></div>
         <div class="map-addr-area" id="map-addr-area"></div>
       </div>
       <button class="map-confirm-btn" id="map-confirm-btn" onclick="confirmMapLocation()">Подтвердить</button>
@@ -1429,44 +1440,76 @@ function grabGPS(){
 }
 
 // ── MAP PICKER (Leaflet — full-screen overlay) ──────────────────────────────
-let _mapPicker=null,_mapPickerSource=null;
-let _mapGeoTimer=null,_mapLastGeo='';
+let _mapPicker=null,_mapPickerSource=null,_mapTileLayer=null,_currentMapStyle='dark';
+let _mapGeoTimer=null,_mapLastGeo='',_mapGeoResult=null;
 const DUBAI_CENTER=[25.2048,55.2708];
+const MAP_TILES={
+  dark:'https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png',
+  detail:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+  sat:'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+};
+const MAP_ATTR={
+  dark:'&copy; <a href="https://carto.com/">CARTO</a>',
+  detail:'&copy; <a href="https://osm.org/">OSM</a>',
+  sat:'&copy; <a href="https://www.esri.com/">Esri</a>',
+};
+
+function switchMapLayer(style){
+  if(!_mapPicker||!_mapTileLayer)return;
+  _currentMapStyle=style;
+  _mapTileLayer.setUrl(MAP_TILES[style]);
+  _mapTileLayer.getAttribution=()=>MAP_ATTR[style];
+  document.querySelectorAll('.map-layer-btn').forEach(b=>b.classList.toggle('on',b.dataset.layer===style));
+  const pane=document.querySelector('#map-leaflet .leaflet-tile-pane');
+  if(pane){
+    if(style==='dark')pane.style.filter='none';
+    else if(style==='detail')pane.style.filter='brightness(.72) contrast(1.1) saturate(.7)';
+    else pane.style.filter='brightness(.9) contrast(1.05)';
+  }
+  haptic.light();
+}
 
 function _reverseGeo(lat,lon,cb){
-  fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`)
+  fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&zoom=18`)
     .then(r=>r.json())
     .then(d=>{
       const a=d.address||{};
-      const road=a.road||a.pedestrian||a.suburb||a.neighbourhood||'';
+      const road=a.road||a.pedestrian||'';
       const num=a.house_number||'';
-      const area=a.suburb||a.city_district||a.neighbourhood||'';
-      cb({street:(road+(num?' '+num:'')).trim(), area});
+      const suburb=a.suburb||a.city_district||a.neighbourhood||'';
+      const bldg=a.building||'';
+      const city=a.city||a.town||a.state||'';
+      cb({street:road,building:num,area:suburb,city,bldgName:bldg,full:(road+(num?' '+num:'')).trim()});
     })
-    .catch(()=>cb({street:'',area:''}));
+    .catch(()=>cb({street:'',building:'',area:'',city:'',bldgName:'',full:''}));
 }
 
 function openMapPicker(source,lat,lon){
   _mapPickerSource=source;
+  _mapGeoResult=null;
   const overlay=el('map-overlay');
   set('map-hdr-title',t('mapPickTitle'));
   set('map-confirm-btn',t('mapConfirm'));
-  set('map-addr-street','—');
-  set('map-addr-area','');
+  set('map-addr-street','—');set('map-addr-building','');set('map-addr-area','');
   overlay.classList.add('show');
+
+  // Reset layer toggle to dark
+  document.querySelectorAll('.map-layer-btn').forEach(b=>b.classList.toggle('on',b.dataset.layer==='dark'));
 
   const sLat=lat||locInfo?.lat||DUBAI_CENTER[0];
   const sLon=lon||locInfo?.lon||DUBAI_CENTER[1];
   const zoom=(lat||locInfo?.lat)?16:13;
 
   if(_mapPicker){
+    if(_currentMapStyle!=='dark')switchMapLayer('dark');
     _mapPicker.setView([sLat,sLon],zoom);
     setTimeout(()=>_mapPicker.invalidateSize(),200);
     _onMapMove();
     return;
   }
   _mapPicker=L.map('map-leaflet',{zoomControl:false,attributionControl:true}).setView([sLat,sLon],zoom);
-  L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19}).addTo(_mapPicker);
+  _mapTileLayer=L.tileLayer(MAP_TILES.dark,{maxZoom:19,attribution:MAP_ATTR.dark}).addTo(_mapPicker);
+  _currentMapStyle='dark';
 
   const pin=el('map-center-pin');
   _mapPicker.on('movestart',()=>{pin.classList.add('dragging');});
@@ -1481,11 +1524,14 @@ function _onMapMove(){
   if(key===_mapLastGeo)return;
   _mapLastGeo=key;
   clearTimeout(_mapGeoTimer);
-  set('map-addr-street','...');set('map-addr-area','');
+  set('map-addr-street','...');set('map-addr-building','');set('map-addr-area','');
   _mapGeoTimer=setTimeout(()=>{
     _reverseGeo(c.lat,c.lng,info=>{
-      set('map-addr-street',info.street||`${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`);
-      set('map-addr-area',info.area||'');
+      _mapGeoResult=info;
+      set('map-addr-street',info.full||`${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`);
+      const bldgLine=[info.bldgName].filter(Boolean).join(' ');
+      set('map-addr-building',bldgLine);
+      set('map-addr-area',[info.area,info.city].filter(Boolean).join(', '));
     });
   },400);
 }
@@ -1494,11 +1540,24 @@ function confirmMapLocation(){
   if(!_mapPicker)return;
   const c=_mapPicker.getCenter();
   const off=nearestOffice(c.lat,c.lng);
-  const streetTxt=(el('map-addr-street')?.textContent||'').trim();
-  locInfo={lat:c.lat,lon:c.lng,office_id:off.id,office_name:off.name,street:(streetTxt==='...'||streetTxt==='—')?'':streetTxt};
+  const geo=_mapGeoResult||{};
+  const streetFull=geo.full||(el('map-addr-street')?.textContent||'').trim();
+  locInfo={lat:c.lat,lon:c.lng,office_id:off.id,office_name:off.name,street:(streetFull==='...'||streetFull==='—')?'':streetFull};
 
   if(_mapPickerSource==='manual'){
-    const streetIn=el('man-street');if(streetIn&&locInfo.street)streetIn.value=locInfo.street;
+    const streetIn=el('man-street');if(streetIn)streetIn.value=geo.street||'';
+    const buildIn=el('man-building');if(buildIn)buildIn.value=geo.building||'';
+    // Try auto-select area chip
+    if(geo.area){
+      const areaLow=geo.area.toLowerCase();
+      const areas=AREAS[lang]||[];
+      let match=-1;
+      for(let i=0;i<areas.length;i++){
+        const parts=areas[i].lbl.toLowerCase().split(/[\/,]/);
+        if(parts.some(p=>areaLow.includes(p.trim())||p.trim().includes(areaLow))){match=i;break;}
+      }
+      if(match>=0){selArea=match;buildAreaChips();}
+    }
   }
   if(_mapPickerSource==='gps'){
     const stat=el('gps-status');
@@ -1513,8 +1572,8 @@ function closeMapPicker(){
 }
 
 function _destroyMapPicker(){
-  if(_mapPicker){_mapPicker.remove();_mapPicker=null;}
-  _mapLastGeo='';
+  if(_mapPicker){_mapPicker.remove();_mapPicker=null;_mapTileLayer=null;}
+  _mapLastGeo='';_mapGeoResult=null;_currentMapStyle='dark';
   closeMapPicker();
 }
 

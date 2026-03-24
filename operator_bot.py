@@ -532,7 +532,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             async with app2:
                 await app2.bot.set_chat_menu_button(
                     chat_id=int(uid_str),
-                    menu_button=MenuButtonWebApp(text="🛒 Заказать", web_app=WebAppInfo(url=WEBAPP_URL))
+                    menu_button=MenuButtonWebApp(text="🍾 Заказать", web_app=WebAppInfo(url=WEBAPP_URL))
                 )
         except: pass
         await q.edit_message_text(f"✅ Пользователь `{uid_str}` разблокирован.", parse_mode="Markdown")

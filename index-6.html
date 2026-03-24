@@ -1118,22 +1118,37 @@ function alignLogoSubs(){
 }
 
 // ── BAN WALL ──────────────────────────────────────────────────────────────────
+(function(){
+  // Inject a blocking overlay immediately — prevents any tap while ban check is in flight
+  const _bl=document.createElement('div');
+  _bl.id='ban-check-blocker';
+  _bl.style.cssText='position:fixed;inset:0;z-index:99999;background:#07070E;display:flex;align-items:center;justify-content:center;';
+  _bl.innerHTML='<div style="width:32px;height:32px;border:3px solid #333;border-top-color:#fff;border-radius:50%;animation:_bspin .7s linear infinite"></div><style>@keyframes _bspin{to{transform:rotate(360deg)}}</style>';
+  document.addEventListener('DOMContentLoaded',()=>document.body.appendChild(_bl));
+})();
+
+function _removeBanBlocker(){
+  const b=document.getElementById('ban-check-blocker');
+  if(b) b.remove();
+}
+
 function showBanWall(){
-  // Replace entire body content with ban screen, close Mini App after 3s
+  _removeBanBlocker();
   document.body.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;padding:32px;text-align:center;background:#07070E;color:#fff"><div style="font-size:72px;margin-bottom:24px">🚫</div><h2 style="margin:0 0 12px;font-size:22px">Аккаунт заблокирован</h2><p style="margin:0;color:#888;font-size:15px;line-height:1.5">Ваш аккаунт заблокирован.<br>Обратитесь в поддержку.</p></div>`;
   setTimeout(()=>tg&&tg.close&&tg.close(),3000);
 }
 
 async function checkBanStatus(){
   const initData=tg?.initData;
-  if(!initData) return; // dev mode — skip
+  if(!initData){_removeBanBlocker();return;} // dev mode — skip
   try{
     const resp=await fetch(`${AMBAR_API}/api/me`,{headers:{'Authorization':'tma '+initData}});
     if(resp.ok){
       const d=await resp.json();
-      if(d.banned) showBanWall();
+      if(d.banned){showBanWall();return;}
     }
   }catch(e){/* network error — allow through */}
+  _removeBanBlocker(); // unblock the UI
 }
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────

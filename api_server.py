@@ -412,10 +412,17 @@ async def handle_static(request: web.Request) -> web.Response:
     if not filepath.exists() or not filepath.is_file():
         return web.Response(status=404, text="Not found")
     mime, _ = mimetypes.guess_type(str(filepath))
-    return web.FileResponse(filepath, headers={
+    # For HTML files use no-store to prevent Telegram WebView from caching stale versions
+    is_html = str(filepath).endswith(".html")
+    cache_header = "no-store, no-cache, must-revalidate, max-age=0" if is_html else "public, max-age=86400"
+    headers = {
         "Content-Type": mime or "application/octet-stream",
-        "Cache-Control": "no-cache",
-    })
+        "Cache-Control": cache_header,
+    }
+    if is_html:
+        headers["Pragma"] = "no-cache"
+        headers["Expires"] = "0"
+    return web.FileResponse(filepath, headers=headers)
 
 
 # ── App setup ─────────────────────────────────────────────────────────────────

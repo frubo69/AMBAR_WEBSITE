@@ -67,26 +67,18 @@ def kb_review(cid, lang):
 
 # ── Handlers ──────────────────────────────────────────────────────────────────
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    uid = update.effective_user.id
-    if await db.is_banned(uid):
-        await update.message.reply_text(
-            "🚫 *Ваш аккаунт заблокирован.*\n\nОбратитесь в поддержку.", parse_mode="Markdown")
-        return
-
+    uid  = update.effective_user.id
     lang = ctx.user_data.get("lang", "ru")
     name = update.effective_user.first_name
 
-    # Upsert user profile
-    tg_user   = update.effective_user
-    full_name = f"{tg_user.first_name or ''} {tg_user.last_name or ''}".strip()
-    await db.upsert_user(
-        uid,
-        first_name=tg_user.first_name or "",
-        last_name=tg_user.last_name or "",
-        full_name=full_name,
-        name=full_name,
-        username=tg_user.username or "—",
-    )
+    # Ban check — silently skip if DB is unavailable
+    try:
+        if await db.is_banned(uid):
+            await update.message.reply_text(
+                "🚫 *Ваш аккаунт заблокирован.*\n\nОбратитесь в поддержку.", parse_mode="Markdown")
+            return
+    except Exception as e:
+        log.warning(f"ban check failed: {e}")
 
     if WEBAPP_URL:
         try:
@@ -117,7 +109,23 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"💎 Fair pricing — premium quality, no unnecessary markups\n\n"
         f"Tap *🍾 Order* to the left of the input field 👇"
     )
+    # Send welcome message first — DB write is best-effort
     await update.message.reply_text(text, parse_mode="Markdown", reply_markup=ReplyKeyboardRemove())
+
+    # Upsert user profile in background (doesn't affect UX if it fails)
+    try:
+        tg_user   = update.effective_user
+        full_name = f"{tg_user.first_name or ''} {tg_user.last_name or ''}".strip()
+        await db.upsert_user(
+            uid,
+            first_name=tg_user.first_name or "",
+            last_name=tg_user.last_name or "",
+            full_name=full_name,
+            name=full_name,
+            username=tg_user.username or "—",
+        )
+    except Exception as e:
+        log.warning(f"upsert_user failed: {e}")
 
 
 async def cb_review(update: Update, ctx: ContextTypes.DEFAULT_TYPE):

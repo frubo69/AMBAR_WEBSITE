@@ -1119,12 +1119,12 @@ function alignLogoSubs(){
 
 // ── BAN WALL ──────────────────────────────────────────────────────────────────
 (function(){
-  // Inject a full-screen blocker immediately on load — nothing is tappable until ban check returns
+  // Inject blocker immediately — script is at end of body so document.body exists
   const _bl=document.createElement('div');
   _bl.id='ban-check-blocker';
   _bl.style.cssText='position:fixed;inset:0;z-index:99999;background:#07070E;display:flex;align-items:center;justify-content:center;';
   _bl.innerHTML='<div style="width:36px;height:36px;border:3px solid #333;border-top-color:#fff;border-radius:50%;animation:_bspin .7s linear infinite"></div><style>@keyframes _bspin{to{transform:rotate(360deg)}}</style>';
-  document.addEventListener('DOMContentLoaded',()=>document.body.appendChild(_bl));
+  (document.body||document.documentElement).appendChild(_bl);
 })();
 
 function _removeBanBlocker(){

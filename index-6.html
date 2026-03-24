@@ -1153,16 +1153,16 @@ function _hideBanBlocker(){
 }
 
 async function checkBanStatus(){
-  const initData=tg?.initData;
-  if(!initData){_hideBanBlocker();return;} // dev/browser mode
+  const uid=tg?.initDataUnsafe?.user?.id;
+  if(!uid){_hideBanBlocker();return;} // no Telegram context = dev/browser mode
   try{
-    const resp=await fetch(`${AMBAR_API}/api/me`,{headers:{'Authorization':'tma '+initData}});
+    const resp=await fetch(`${AMBAR_API}/api/me?uid=${uid}`);
     if(resp.ok){
       const d=await resp.json();
       if(d.banned){_showBanWall();return;} // banned — keep overlay, show card
     }
   }catch(e){}
-  _hideBanBlocker(); // confirmed not banned — remove overlay
+  _hideBanBlocker(); // not banned or network error — show app
 }
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────

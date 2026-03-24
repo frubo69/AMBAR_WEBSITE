@@ -215,21 +215,19 @@ async def handle_create_order(request: web.Request) -> web.Response:
 
 # ── GET /api/me ───────────────────────────────────────────────────────────────
 async def handle_me(request: web.Request) -> web.Response:
-    """Returns ban status for the authenticated user. Called by Mini App on load."""
+    """Returns ban status. Accepts ?uid=<telegram_id> — no auth needed (info is not sensitive)."""
     if request.method == "OPTIONS":
         return web.Response(status=200, headers=CORS_HEADERS)
-    auth = request.headers.get("Authorization", "")
-    if not auth.startswith("tma "):
-        return web.json_response({"error": "missing auth"}, status=401, headers=CORS_HEADERS)
-    user = validate_init_data(auth[4:])
-    if not user:
-        return web.json_response({"error": "auth failed"}, status=401, headers=CORS_HEADERS)
-    uid = user.get("id")
+    uid_str = request.query.get("uid", "")
+    if not uid_str.lstrip("-").isdigit():
+        return web.json_response({"banned": False}, headers=CORS_HEADERS)
+    uid = int(uid_str)
     try:
         banned = await db.is_banned(uid)
     except Exception as e:
         log.warning(f"ban check /api/me failed: {e}")
         banned = False
+    log.info(f"[me] uid={uid} banned={banned}")
     return web.json_response({"banned": banned}, headers=CORS_HEADERS)
 
 

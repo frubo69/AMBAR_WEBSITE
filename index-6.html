@@ -383,6 +383,24 @@ img{display:block}
 .ptr-indicator.no-trans{transition:none}
 .ptr-indicator svg{color:var(--gold);opacity:.7}
 .ptr-indicator.refreshing svg{animation:spin .65s linear infinite}
+/* ── Home Screen Prompt ── */
+.hs-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:500;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .22s}
+.hs-overlay.show{opacity:1;pointer-events:all}
+.hs-sheet{width:100%;background:var(--bg2);border-radius:22px 22px 0 0;padding:0 20px calc(24px + var(--safe-bottom));transform:translateY(70px);transition:transform .28s cubic-bezier(.34,1,.64,1)}
+.hs-overlay.show .hs-sheet{transform:translateY(0)}
+.hs-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:14px auto 20px}
+.hs-icon-wrap{width:64px;height:64px;border-radius:18px;background:linear-gradient(135deg,rgba(201,169,110,.18),rgba(232,201,138,.10));border:1.5px solid rgba(201,169,110,.3);display:flex;align-items:center;justify-content:center;margin:0 auto 16px;font-size:30px}
+.hs-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:700;color:var(--gold2);text-align:center;margin-bottom:8px;letter-spacing:.3px}
+.hs-desc{font-size:13px;color:var(--sub);text-align:center;line-height:1.55;margin-bottom:24px;padding:0 4px}
+.hs-step{display:flex;align-items:flex-start;gap:14px;padding:13px 0;border-bottom:1px solid var(--border2)}
+.hs-step:last-child{border-bottom:none}
+.hs-step-num{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.hs-step-body{flex:1;min-width:0}
+.hs-step-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:3px}
+.hs-step-desc{font-size:12px;color:var(--sub);line-height:1.5}
+.hs-later{display:block;width:100%;background:none;border:none;color:var(--muted);font-size:13px;font-family:'DM Sans',sans-serif;padding:14px 0 0;cursor:pointer;text-align:center;letter-spacing:.2px}
+.hs-later:active{color:var(--sub)}
+.hs-guide-title{font-size:16px;font-weight:700;color:var(--gold2);margin-bottom:4px;text-align:center}
 /* ── Support Chat Overlay ── */
 .support-overlay{position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;flex-direction:column;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1,.64,1)}
 .support-overlay.show{transform:translateY(0)}
@@ -760,6 +778,50 @@ img{display:block}
   </div>
 </div>
 
+<!-- ═══ HOME SCREEN PROMPT ═══ -->
+<div class="hs-overlay" id="hs-overlay">
+  <div class="hs-sheet">
+    <div class="hs-handle"></div>
+    <!-- Prompt view -->
+    <div id="hs-prompt-view">
+      <div class="hs-icon-wrap">📌</div>
+      <div class="hs-title" id="hs-title-txt"></div>
+      <div class="hs-desc" id="hs-desc-txt"></div>
+      <button class="btn-main" id="hs-add-btn" onclick="doAddHomeScreen()"></button>
+      <button class="btn-outline" id="hs-guide-btn" onclick="showHsGuide()" style="margin-top:10px"></button>
+      <button class="hs-later" id="hs-later-btn" onclick="closeHsOverlay()"></button>
+    </div>
+    <!-- Guide view -->
+    <div id="hs-guide-view" style="display:none">
+      <div class="hs-guide-title" id="hs-guide-title-txt"></div>
+      <div style="margin-top:16px">
+        <div class="hs-step">
+          <div class="hs-step-num">1</div>
+          <div class="hs-step-body">
+            <div class="hs-step-title" id="hs-s1-title"></div>
+            <div class="hs-step-desc" id="hs-s1-desc"></div>
+          </div>
+        </div>
+        <div class="hs-step">
+          <div class="hs-step-num">2</div>
+          <div class="hs-step-body">
+            <div class="hs-step-title" id="hs-s2-title"></div>
+            <div class="hs-step-desc" id="hs-s2-desc"></div>
+          </div>
+        </div>
+        <div class="hs-step">
+          <div class="hs-step-num">3</div>
+          <div class="hs-step-body">
+            <div class="hs-step-title" id="hs-s3-title"></div>
+            <div class="hs-step-desc" id="hs-s3-desc"></div>
+          </div>
+        </div>
+      </div>
+      <button class="btn-main" id="hs-close-btn" onclick="closeHsOverlay()" style="margin-top:20px"></button>
+    </div>
+  </div>
+</div>
+
 <!-- Map Picker Overlay (full-screen, Uber/Yandex Go style) -->
 <div class="map-overlay" id="map-overlay">
   <div class="map-hdr">
@@ -978,8 +1040,29 @@ en:{
   lcYes:'Yes, order',lcNo:'Cancel',
   supportBtn:'💬 Support',supportTitle:'Support',supportEmpty:'Ask us about your order',supportPlaceholder:'Type a message...',
   mapPinBtn:'Pin on map',mapHideBtn:'Hide map',mapPickTitle:'Pick on map',mapConfirm:'Confirm',
+  hsTitle:'Add to Main Menu',hsDesc:'Open AMBAR in one tap right from your Telegram home screen.',
+  hsAdd:'Add to Home Screen',hsGuide:'Show me how',hsLater:'Maybe later',
+  hsGuideTitle:'How to add AMBAR',
+  hsStep1:'Tap the menu button',hsStep1d:'Find the ··· (three dots) or menu icon in the top-right corner of this screen.',
+  hsStep2:'Select "Add to Home Screen"',hsStep2d:'Tap "Add to Home Screen" or "Add Shortcut" from the menu options.',
+  hsStep3:'Confirm',hsStep3d:'Tap "Add" or confirm the prompt — done! AMBAR will appear in your Telegram home.',
+  hsClose:'Got it!',
 },
 };
+// ── HOME SCREEN TRANSLATIONS (inline, added to TX above) ──────────────────
+TX.ru.hsTitle='Добавить в главное меню';
+TX.ru.hsDesc='Открывайте AMBAR одним нажатием прямо с главного экрана Telegram.';
+TX.ru.hsAdd='Добавить в главное меню';
+TX.ru.hsGuide='Показать как';
+TX.ru.hsLater='Позже';
+TX.ru.hsGuideTitle='Как добавить AMBAR';
+TX.ru.hsStep1='Нажмите кнопку меню';
+TX.ru.hsStep1d='Найдите ··· (три точки) или иконку меню в правом верхнем углу экрана.';
+TX.ru.hsStep2='Выберите «Добавить на главный экран»';
+TX.ru.hsStep2d='Нажмите «Добавить на главный экран» или «Создать ярлык» в меню.';
+TX.ru.hsStep3='Подтвердите';
+TX.ru.hsStep3d='Нажмите «Добавить» — готово! AMBAR появится на главном экране Telegram.';
+TX.ru.hsClose='Понятно!';
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
 let lang='ru',cart={},beerPcs={},catF='all',tip=0; // beerPcs: {id: 12|24}
@@ -1042,7 +1125,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   if(saved!==null) activeAddrIdx=parseInt(saved);
   // Validate it still exists
   if(activeAddrIdx!==null&&!getSaved()[activeAddrIdx]) activeAddrIdx=null;
-  buildTips();syncOrders();applyLang();loadCatalog();updateFavBtn();updateSortBtn();initSupportInput();
+  buildTips();syncOrders();applyLang();loadCatalog();updateFavBtn();updateSortBtn();initSupportInput();checkFirstLaunchHomeScreen();
   alignLogoSubs();
   document.fonts?.ready?.then(alignLogoSubs);
   // Pre-fill saved phone
@@ -1141,6 +1224,54 @@ function applyLang(){
   el('tip-input').placeholder=lang==='ru'?'Введите сумму...':'Enter amount...';
   set('mtl-gps','GPS');set('mtl-manual',lang==='ru'?'Вручную':'Manual');
   set('lc-title',t('lcTitle'));set('lc-msg',t('lcMsg'));set('lc-yes',t('lcYes'));set('lc-no',t('lcNo'));
+}
+
+// ── HOME SCREEN PROMPT ────────────────────────────────────────────────────────
+function applyHsLang(){
+  set('hs-title-txt',t('hsTitle'));
+  set('hs-desc-txt',t('hsDesc'));
+  set('hs-add-btn',t('hsAdd'));
+  set('hs-guide-btn',t('hsGuide'));
+  set('hs-later-btn',t('hsLater'));
+  set('hs-guide-title-txt',t('hsGuideTitle'));
+  set('hs-s1-title',t('hsStep1'));set('hs-s1-desc',t('hsStep1d'));
+  set('hs-s2-title',t('hsStep2'));set('hs-s2-desc',t('hsStep2d'));
+  set('hs-s3-title',t('hsStep3'));set('hs-s3-desc',t('hsStep3d'));
+  set('hs-close-btn',t('hsClose'));
+}
+function checkFirstLaunchHomeScreen(){
+  if(!tg) return; // only inside Telegram
+  if(localStorage.getItem('ambar_hs_asked')) return;
+  const canNative=tg.isVersionAtLeast&&tg.isVersionAtLeast('8.0');
+  function _show(){
+    applyHsLang();
+    if(!canNative) el('hs-add-btn').style.display='none'; // hide auto btn if unsupported
+    setTimeout(()=>el('hs-overlay').classList.add('show'), 1800);
+  }
+  if(canNative){
+    tg.checkHomeScreenStatus(status=>{
+      if(status==='added'){ localStorage.setItem('ambar_hs_asked','1'); return; }
+      _show();
+    });
+  } else {
+    _show();
+  }
+}
+function closeHsOverlay(){
+  el('hs-overlay').classList.remove('show');
+  localStorage.setItem('ambar_hs_asked','1');
+}
+function doAddHomeScreen(){
+  if(tg&&tg.isVersionAtLeast&&tg.isVersionAtLeast('8.0')){
+    tg.addToHomeScreen();
+    closeHsOverlay();
+  } else {
+    showHsGuide();
+  }
+}
+function showHsGuide(){
+  el('hs-prompt-view').style.display='none';
+  el('hs-guide-view').style.display='block';
 }
 
 // ── PAGES ─────────────────────────────────────────────────────────────────────

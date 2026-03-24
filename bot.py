@@ -174,7 +174,7 @@ async def fallback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         except: pass
 
         if thanks_mid:
-            safe = comment.replace("_","\_").replace("*","\*").replace("`","\`").replace("[","\[")
+            safe = comment.replace("_","\\_").replace("*","\\*").replace("`","\\`").replace("[","\\[")
             if lang == "ru":
                 edited = f"🙏 *Спасибо за оценку {score}/5!*\n\n💬 *Ваш отзыв:* _{safe}_"
             else:

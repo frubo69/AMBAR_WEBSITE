@@ -7,6 +7,7 @@ from __future__ import annotations
 import os, logging
 from datetime import datetime, timezone
 import motor.motor_asyncio
+import certifi
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -28,8 +29,7 @@ async def connect():
     _client = motor.motor_asyncio.AsyncIOMotorClient(
         MONGO_URI,
         serverSelectionTimeoutMS=8000,
-        tls=True,
-        tlsAllowInvalidCertificates=True,   # fix for older OpenSSL on server
+        tlsCAFile=certifi.where(),   # use up-to-date CA bundle, fixes Atlas TLS on old servers
     )
     _db = _client.ambar
     try:

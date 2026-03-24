@@ -10,7 +10,7 @@ AMBAR Operator Bot — MongoDB edition
 import os, asyncio, logging
 from datetime import datetime
 from dotenv import load_dotenv
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove, MenuButtonCommands, MenuButtonWebApp, WebAppInfo
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 import db
 
@@ -492,9 +492,13 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         try:
             app2 = Application.builder().token(BOT_TOKEN).build()
             async with app2:
+                # Notify user
                 await app2.bot.send_message(
                     cid, "🚫 *Ваш аккаунт заблокирован.*\n\nОбратитесь в поддержку.",
                     parse_mode="Markdown")
+                # Remove the "Заказать" Mini App button so they can't open the app
+                await app2.bot.set_chat_menu_button(
+                    chat_id=cid, menu_button=MenuButtonCommands())
         except: pass
         await q.edit_message_text(
             f"🚫 *Пользователь заблокирован*\n\nID: `{cid}`\nЗаказ: `#{oid}`\nЗаблокировал: оператор `{op}`",
@@ -522,6 +526,15 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("unban_"):
         uid_str = data[6:]
         await db.unban_user(int(uid_str))
+        # Restore the "Заказать" Mini App button
+        try:
+            app2 = Application.builder().token(BOT_TOKEN).build()
+            async with app2:
+                await app2.bot.set_chat_menu_button(
+                    chat_id=int(uid_str),
+                    menu_button=MenuButtonWebApp(text="🛒 Заказать", web_app=WebAppInfo(url=WEBAPP_URL))
+                )
+        except: pass
         await q.edit_message_text(f"✅ Пользователь `{uid_str}` разблокирован.", parse_mode="Markdown")
 
 

@@ -462,6 +462,18 @@ img{display:block}
 </head>
 <body>
 
+<!-- ═══ BAN WALL — always in HTML, removed by JS if user is NOT banned ═══ -->
+<div id="ban-check-blocker" style="position:fixed;inset:0;z-index:99999;background:#07070E;display:flex;align-items:center;justify-content:center;">
+  <div id="ban-spinner" style="width:36px;height:36px;border:3px solid #333;border-top-color:#fff;border-radius:50%;animation:banspin .7s linear infinite;"></div>
+  <div id="ban-wall-card" style="display:none;flex-direction:column;align-items:center;text-align:center;padding:28px;max-width:300px;width:100%;">
+    <div style="font-size:64px;line-height:1;margin-bottom:20px;">🚫</div>
+    <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:12px;">Аккаунт заблокирован</div>
+    <div style="font-size:14px;color:#888;line-height:1.65;margin-bottom:28px;">Ваш аккаунт был заблокирован.<br>Свяжитесь с поддержкой для<br>решения вопроса.</div>
+    <button id="ban-support-btn" style="width:100%;padding:15px;background:linear-gradient(135deg,#5865f2,#7289da);border:none;border-radius:14px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;">💬 Написать в поддержку</button>
+  </div>
+  <style>@keyframes banspin{to{transform:rotate(360deg)}}</style>
+</div>
+
 <!-- ═══ CATALOG ═══ -->
 <div id="pg-catalog" class="page">
   <div style="position:sticky;top:0;z-index:40;background:rgba(7,7,14,.96);backdrop-filter:blur(20px)">
@@ -1118,52 +1130,39 @@ function alignLogoSubs(){
 }
 
 // ── BAN WALL ──────────────────────────────────────────────────────────────────
-(function(){
-  // Inject blocker immediately — script is at end of body so document.body exists
-  const _bl=document.createElement('div');
-  _bl.id='ban-check-blocker';
-  _bl.style.cssText='position:fixed;inset:0;z-index:99999;background:#07070E;display:flex;align-items:center;justify-content:center;';
-  _bl.innerHTML='<div style="width:36px;height:36px;border:3px solid #333;border-top-color:#fff;border-radius:50%;animation:_bspin .7s linear infinite"></div><style>@keyframes _bspin{to{transform:rotate(360deg)}}</style>';
-  (document.body||document.documentElement).appendChild(_bl);
-})();
+// The blocker div is already in the HTML — always visible on load.
+// We only REMOVE it if the user is confirmed not-banned.
 
-function _removeBanBlocker(){
-  const b=document.getElementById('ban-check-blocker');
-  if(b) b.remove();
-}
-
-function showBanWall(){
-  // Remove spinner, show permanent blurred overlay — cannot be dismissed
-  _removeBanBlocker();
-  const ov=document.createElement('div');
-  ov.id='ban-wall';
-  ov.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:28px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);background:rgba(7,7,14,0.80);';
-  ov.innerHTML=`
-    <div style="background:#16162a;border-radius:24px;padding:36px 28px;text-align:center;max-width:300px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,0.7);">
-      <div style="font-size:64px;line-height:1;margin-bottom:20px;">🚫</div>
-      <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:12px;">Аккаунт заблокирован</div>
-      <div style="font-size:14px;color:#888;line-height:1.65;margin-bottom:28px;">Ваш аккаунт был заблокирован.<br>Свяжитесь с поддержкой для<br>решения вопроса.</div>
-      <button id="ban-support-btn" style="width:100%;padding:15px;background:linear-gradient(135deg,#5865f2,#7289da);border:none;border-radius:14px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;letter-spacing:.3px;">💬 Написать в поддержку</button>
-    </div>`;
-  document.body.appendChild(ov);
-  document.body.style.overflow='hidden';
-  document.getElementById('ban-support-btn').addEventListener('click',()=>{
+function _showBanWall(){
+  // Switch spinner → ban card (stays forever, can't be dismissed)
+  const blocker=document.getElementById('ban-check-blocker');
+  const spinner=document.getElementById('ban-spinner');
+  const card   =document.getElementById('ban-wall-card');
+  if(spinner) spinner.style.display='none';
+  if(card)    {card.style.display='flex';}
+  if(blocker) {blocker.style.backdropFilter='blur(14px)';blocker.style.webkitBackdropFilter='blur(14px)';blocker.style.background='rgba(7,7,14,0.85)';}
+  document.getElementById('ban-support-btn')?.addEventListener('click',()=>{
     if(tg&&tg.openTelegramLink) tg.openTelegramLink('https://t.me/ambar_support_bot');
     else window.open('https://t.me/ambar_support_bot','_blank');
   });
 }
 
+function _hideBanBlocker(){
+  const b=document.getElementById('ban-check-blocker');
+  if(b) b.remove();
+}
+
 async function checkBanStatus(){
   const initData=tg?.initData;
-  if(!initData){_removeBanBlocker();return;} // dev mode — skip ban check
+  if(!initData){_hideBanBlocker();return;} // dev/browser mode
   try{
     const resp=await fetch(`${AMBAR_API}/api/me`,{headers:{'Authorization':'tma '+initData}});
     if(resp.ok){
       const d=await resp.json();
-      if(d.banned){showBanWall();return;}
+      if(d.banned){_showBanWall();return;} // banned — keep overlay, show card
     }
-  }catch(e){/* network error — allow through, API will enforce */}
-  _removeBanBlocker(); // not banned — unblock the UI
+  }catch(e){}
+  _hideBanBlocker(); // confirmed not banned — remove overlay
 }
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────

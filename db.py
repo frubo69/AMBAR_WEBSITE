@@ -128,7 +128,26 @@ async def get_user(telegram_id: int) -> dict | None:
 
 async def is_banned(telegram_id: int) -> bool:
     u = await get_user(telegram_id)
-    return bool(u and u.get("is_banned"))
+    if not u:
+        return False
+    # New schema: explicit is_banned field
+    if u.get("is_banned") is True:
+        return True
+    # Old schema fallback: documents migrated from JSON had ban_reason but no is_banned field.
+    # If is_banned is not explicitly False (i.e. was never set) and ban_reason exists → banned.
+    if u.get("is_banned") is None and u.get("ban_reason"):
+        # Backfill the field so future checks are fast
+        db = _db_or_none()
+        if db is not None:
+            try:
+                await db.users.update_one(
+                    {"telegram_id": telegram_id},
+                    {"$set": {"is_banned": True}}
+                )
+            except Exception:
+                pass
+        return True
+    return False
 
 
 async def ban_user(telegram_id: int, reason: str, by: int):

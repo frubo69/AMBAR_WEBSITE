@@ -492,13 +492,9 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         try:
             app2 = Application.builder().token(BOT_TOKEN).build()
             async with app2:
-                # Notify user
                 await app2.bot.send_message(
                     cid, "🚫 *Ваш аккаунт заблокирован.*\n\nОбратитесь в поддержку.",
                     parse_mode="Markdown")
-                # Remove the "Заказать" Mini App button so they can't open the app
-                await app2.bot.set_chat_menu_button(
-                    chat_id=cid, menu_button=MenuButtonCommands())
         except: pass
         await q.edit_message_text(
             f"🚫 *Пользователь заблокирован*\n\nID: `{cid}`\nЗаказ: `#{oid}`\nЗаблокировал: оператор `{op}`",

@@ -377,6 +377,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("dec_"):
         _, oid, cid = data.split("_", 2); cid = int(cid)
         await db.update_order(oid, status="declined", updated_at=datetime.now().isoformat())
+        await db._increment_user(cid, orders_declined=1)
         order = await db.get_order(oid)
         lang  = order.get("lang","ru") if order else "ru"
         tx    = {"ru": f"❌ *Заказ #{oid} отменён.*", "en": f"❌ *Order #{oid} cancelled.*"}
@@ -390,6 +391,8 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await db.update_order(oid, status="delivered", updated_at=datetime.now().isoformat())
         order = await db.get_order(oid)
         lang  = order.get("lang","ru") if order else "ru"
+        total = (order or {}).get("total", 0)
+        await db._increment_user(cid, orders_done=1, total_spent=total)
         await cleanup_and_deliver(cid, oid, lang)
         await q.edit_message_reply_markup(reply_markup=None)
         await q.message.reply_text(f"✅ #{oid} — доставлен. Клиент уведомлён.")

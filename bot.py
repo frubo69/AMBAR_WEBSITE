@@ -77,10 +77,14 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     name = update.effective_user.first_name
 
     # Upsert user profile
-    tg_user = update.effective_user
+    tg_user   = update.effective_user
+    full_name = f"{tg_user.first_name or ''} {tg_user.last_name or ''}".strip()
     await db.upsert_user(
         uid,
-        name=f"{tg_user.first_name or ''} {tg_user.last_name or ''}".strip(),
+        first_name=tg_user.first_name or "",
+        last_name=tg_user.last_name or "",
+        full_name=full_name,
+        name=full_name,
         username=tg_user.username or "—",
     )
 

@@ -129,8 +129,14 @@ async def handle_create_order(request: web.Request) -> web.Response:
         "status": "pending",    "timestamp": datetime.now(timezone.utc).isoformat(),
     }
     await db.save_order(oid, order_doc)
-    await db.upsert_user(uid, name=user_name, username=username,
-                         **({"phone": phone} if phone != "—" else {}))
+    # Upsert user and increment order counter
+    user_fields = dict(name=user_name, full_name=user_name, first_name=user.get("first_name",""),
+                       last_name=user.get("last_name",""), username=username,
+                       last_order_at=datetime.now(timezone.utc))
+    if phone != "—":
+        user_fields["phone"] = phone
+    await db.upsert_user(uid, **user_fields)
+    await db._increment_user(uid, orders_total=1)
 
     # ── Customer confirmation ─────────────────────────────────────────────────
     if lang == "ru":

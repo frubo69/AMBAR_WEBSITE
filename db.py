@@ -32,7 +32,7 @@ async def connect():
     try:
         await _db.orders.create_index("order_id", unique=True)
         await _db.orders.create_index("customer_id")
-        await _db.users.create_index("tg_id", unique=True)
+        await _db.users.create_index("telegram_id", unique=True)
         await _db.support_messages.create_index("conv_key", unique=True)
         await _db.support_map.create_index("fwd_msg_id", unique=True)
         log.info("✅ MongoDB connected — db: ambar")
@@ -89,44 +89,70 @@ async def get_user_orders(tg_id: int) -> list:
 
 # ── Users ─────────────────────────────────────────────────────────────────────
 
-async def upsert_user(tg_id: int, **fields):
+async def upsert_user(telegram_id: int, **fields):
+    """Upsert user doc. Matches existing schema field names."""
     db = _db_or_none()
     if db is None: return
     now = datetime.now(timezone.utc)
-    fields["updated_at"] = now
-    await db.users.update_one(
-        {"tg_id": tg_id},
-        {
-            "$set": fields,
-            "$setOnInsert": {"tg_id": tg_id, "is_banned": False, "created_at": now},
+    fields["last_seen"] = now
+    # Move phone → add to phones array if provided
+    phone = fields.pop("phone", None)
+    set_fields = fields
+    update = {
+        "$set": set_fields,
+        "$setOnInsert": {
+            "telegram_id": telegram_id,
+            "is_banned": False,
+            "first_seen": now,
+            "orders_total": 0,
+            "orders_done": 0,
+            "orders_declined": 0,
+            "total_spent": 0,
+            "support_tickets": 0,
+            "notes": "",
         },
+    }
+    if phone:
+        update["$addToSet"] = {"phones": phone}
+    await db.users.update_one({"telegram_id": telegram_id}, update, upsert=True)
+
+
+async def get_user(telegram_id: int) -> dict | None:
+    db = _db_or_none()
+    if db is None: return None
+    return await db.users.find_one({"telegram_id": telegram_id}, {"_id": 0})
+
+
+async def is_banned(telegram_id: int) -> bool:
+    u = await get_user(telegram_id)
+    return bool(u and u.get("is_banned"))
+
+
+async def ban_user(telegram_id: int, reason: str, by: int):
+    db = _db_or_none()
+    if db is None: return
+    await db.users.update_one(
+        {"telegram_id": telegram_id},
+        {"$set": {"is_banned": True, "ban_reason": reason, "banned_by": by,
+                  "banned_at": datetime.now(timezone.utc).isoformat()}},
         upsert=True,
     )
 
 
-async def get_user(tg_id: int) -> dict | None:
+async def unban_user(telegram_id: int):
     db = _db_or_none()
-    if db is None: return None
-    return await db.users.find_one({"tg_id": tg_id}, {"_id": 0})
-
-
-async def is_banned(tg_id: int) -> bool:
-    u = await get_user(tg_id)
-    return bool(u and u.get("is_banned"))
-
-
-async def ban_user(tg_id: int, reason: str, by: int):
-    await upsert_user(
-        tg_id,
-        is_banned=True,
-        ban_reason=reason,
-        banned_by=by,
-        banned_at=datetime.now(timezone.utc).isoformat(),
+    if db is None: return
+    await db.users.update_one(
+        {"telegram_id": telegram_id},
+        {"$set": {"is_banned": False, "ban_reason": None, "banned_by": None, "banned_at": None}},
     )
 
 
-async def unban_user(tg_id: int):
-    await upsert_user(tg_id, is_banned=False, ban_reason=None, banned_by=None, banned_at=None)
+async def _increment_user(telegram_id: int, **counters):
+    """Atomically increment numeric fields on a user doc."""
+    db = _db_or_none()
+    if db is None: return
+    await db.users.update_one({"telegram_id": telegram_id}, {"$inc": counters})
 
 
 async def get_all_banned() -> list:
@@ -138,31 +164,31 @@ async def get_all_banned() -> list:
 
 # ── Addresses ─────────────────────────────────────────────────────────────────
 
-async def save_address(tg_id: int, addr_entry: dict):
+async def save_address(telegram_id: int, addr_entry: dict):
     """Push address to front of list (max 5, no duplicate streets)."""
-    u     = await get_user(tg_id) or {}
-    lst   = u.get("addresses", [])
-    norm  = addr_entry.get("address", "").strip().lower()
-    lst   = [a for a in lst if a.get("address", "").strip().lower() != norm]
+    u    = await get_user(telegram_id) or {}
+    lst  = u.get("addresses", [])
+    norm = addr_entry.get("address", "").strip().lower()
+    lst  = [a for a in lst if a.get("address", "").strip().lower() != norm]
     lst.insert(0, addr_entry)
-    await upsert_user(tg_id, addresses=lst[:5])
+    await upsert_user(telegram_id, addresses=lst[:5])
 
 
 # ── User state ────────────────────────────────────────────────────────────────
 
-async def get_ustate(tg_id: int) -> dict:
-    u = await get_user(tg_id)
+async def get_ustate(telegram_id: int) -> dict:
+    u = await get_user(telegram_id)
     return (u or {}).get("state", {})
 
 
-async def set_ustate(tg_id: int, data: dict):
-    await upsert_user(tg_id, state=data)
+async def set_ustate(telegram_id: int, data: dict):
+    await upsert_user(telegram_id, state=data)
 
 
-async def upd_ustate(tg_id: int, **kw):
-    u     = await get_user(tg_id) or {}
+async def upd_ustate(telegram_id: int, **kw):
+    u     = await get_user(telegram_id) or {}
     state = {**u.get("state", {}), **kw}
-    await upsert_user(tg_id, state=state)
+    await upsert_user(telegram_id, state=state)
 
 
 # ── Support messages ──────────────────────────────────────────────────────────

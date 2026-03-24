@@ -156,9 +156,12 @@ async def cb_review(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 async def fallback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid  = update.effective_user.id
-    if await db.is_banned(uid):
-        await update.message.reply_text("🚫 Ваш аккаунт заблокирован.")
-        return
+    try:
+        if await db.is_banned(uid):
+            await update.message.reply_text("🚫 Ваш аккаунт заблокирован.")
+            return
+    except Exception as e:
+        log.warning(f"ban check failed: {e}")
 
     text   = update.message.text or ""
     ustate = await db.get_ustate(uid)

@@ -298,7 +298,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         lines = ["🚫 *Заблокированные пользователи:*\n"]
         rows  = []
         for u in banned[:15]:
-            uid_str = str(u["tg_id"])
+            uid_str = str(u.get("telegram_id", u.get("tg_id", "?")))
             ts      = (u.get("banned_at","") or "")[:10]
             lines.append(f"• ID `{uid_str}` — {u.get('ban_reason','—')} ({ts})")
             rows.append([InlineKeyboardButton(f"🔓 Разбанить {uid_str}", callback_data=f"unban_{uid_str}")])

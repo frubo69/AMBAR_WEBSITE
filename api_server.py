@@ -102,6 +102,14 @@ async def handle_create_order(request: web.Request) -> web.Response:
     user_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
     username  = user.get("username", "—")
     lang      = data.get("lang", "ru")
+
+    # Ban check — reject order if user is banned
+    try:
+        if await db.is_banned(uid):
+            log.warning(f"[order] banned user {uid} attempted to place order")
+            return web.json_response({"error": "banned"}, status=403, headers=CORS_HEADERS)
+    except Exception as e:
+        log.warning(f"ban check failed: {e}")
     oid       = data.get("order_id", f"AMB{int(time.time()) % 100000:05d}")
     items     = data.get("items", [])
     phone     = data.get("phone", "—")

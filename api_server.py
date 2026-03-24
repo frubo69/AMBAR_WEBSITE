@@ -213,6 +213,26 @@ async def handle_create_order(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "order_id": oid}, headers=CORS_HEADERS)
 
 
+# ── GET /api/me ───────────────────────────────────────────────────────────────
+async def handle_me(request: web.Request) -> web.Response:
+    """Returns ban status for the authenticated user. Called by Mini App on load."""
+    if request.method == "OPTIONS":
+        return web.Response(status=200, headers=CORS_HEADERS)
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("tma "):
+        return web.json_response({"error": "missing auth"}, status=401, headers=CORS_HEADERS)
+    user = validate_init_data(auth[4:])
+    if not user:
+        return web.json_response({"error": "auth failed"}, status=401, headers=CORS_HEADERS)
+    uid = user.get("id")
+    try:
+        banned = await db.is_banned(uid)
+    except Exception as e:
+        log.warning(f"ban check /api/me failed: {e}")
+        banned = False
+    return web.json_response({"banned": banned}, headers=CORS_HEADERS)
+
+
 # ── GET /api/orders ───────────────────────────────────────────────────────────
 async def handle_orders(request: web.Request) -> web.Response:
     if request.method == "OPTIONS":
@@ -252,6 +272,12 @@ async def handle_support_send(request: web.Request) -> web.Response:
     username  = user.get("username", "—")
     order_id  = data.get("order_id", "")
     text      = (data.get("text", "") or "").strip()
+
+    try:
+        if await db.is_banned(uid):
+            return web.json_response({"error": "banned"}, status=403, headers=CORS_HEADERS)
+    except Exception as e:
+        log.warning(f"ban check failed: {e}")
 
     if not text:
         return web.json_response({"error": "empty message"}, status=400, headers=CORS_HEADERS)
@@ -403,6 +429,8 @@ def main():
     app.on_startup.append(on_startup)
     app.on_cleanup.append(on_cleanup)
 
+    app.router.add_route("OPTIONS", "/api/me",                 handle_me)
+    app.router.add_get(            "/api/me",                  handle_me)
     app.router.add_route("OPTIONS", "/api/orders",             handle_orders)
     app.router.add_get(            "/api/orders",              handle_orders)
     app.router.add_route("OPTIONS", "/api/order",              handle_create_order)

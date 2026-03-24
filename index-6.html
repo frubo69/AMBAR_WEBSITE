@@ -1155,34 +1155,16 @@ function _hideBanBlocker(){
   if(b) b.remove();
 }
 
-function _dbg(msg){
-  // Temporary debug panel — shows on screen so we can see what's happening
-  let d=document.getElementById('_ban_dbg');
-  if(!d){
-    d=document.createElement('div');
-    d.id='_ban_dbg';
-    d.style.cssText='position:fixed;bottom:80px;left:10px;right:10px;z-index:999999;background:rgba(255,0,0,0.9);color:#fff;padding:10px 12px;font-size:11px;border-radius:10px;word-break:break-all;line-height:1.5;';
-    document.body.appendChild(d);
-    setTimeout(()=>d?.remove(), 15000);
-  }
-  d.textContent+=msg+'\n';
-}
-
 async function checkBanStatus(){
   const uid=tg?.initDataUnsafe?.user?.id;
-  _dbg(`uid=${uid} | tg=${!!window.Telegram} | initData=${!!(tg?.initData)}`);
-  if(!uid){_dbg('→ no uid, hiding blocker');_hideBanBlocker();return;}
+  if(!uid){_hideBanBlocker();return;}
   try{
-    _dbg(`→ fetching /api/me?uid=${uid}`);
     const resp=await fetch(`${AMBAR_API}/api/me?uid=${uid}`);
-    const txt=await resp.text();
-    _dbg(`→ status=${resp.status} body=${txt}`);
     if(resp.ok){
-      const d=JSON.parse(txt);
-      if(d.banned){_dbg('→ BANNED, showing wall');_showBanWall();return;}
-      _dbg('→ not banned, showing app');
+      const d=await resp.json();
+      if(d.banned){_showBanWall();return;}
     }
-  }catch(e){_dbg(`→ ERROR: ${e.message}`);}
+  }catch(e){}
   _hideBanBlocker();
 }
 

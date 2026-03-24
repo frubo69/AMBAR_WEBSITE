@@ -1119,11 +1119,11 @@ function alignLogoSubs(){
 
 // ── BAN WALL ──────────────────────────────────────────────────────────────────
 (function(){
-  // Inject a blocking overlay immediately — prevents any tap while ban check is in flight
+  // Inject a full-screen blocker immediately on load — nothing is tappable until ban check returns
   const _bl=document.createElement('div');
   _bl.id='ban-check-blocker';
   _bl.style.cssText='position:fixed;inset:0;z-index:99999;background:#07070E;display:flex;align-items:center;justify-content:center;';
-  _bl.innerHTML='<div style="width:32px;height:32px;border:3px solid #333;border-top-color:#fff;border-radius:50%;animation:_bspin .7s linear infinite"></div><style>@keyframes _bspin{to{transform:rotate(360deg)}}</style>';
+  _bl.innerHTML='<div style="width:36px;height:36px;border:3px solid #333;border-top-color:#fff;border-radius:50%;animation:_bspin .7s linear infinite"></div><style>@keyframes _bspin{to{transform:rotate(360deg)}}</style>';
   document.addEventListener('DOMContentLoaded',()=>document.body.appendChild(_bl));
 })();
 
@@ -1133,22 +1133,37 @@ function _removeBanBlocker(){
 }
 
 function showBanWall(){
+  // Remove spinner, show permanent blurred overlay — cannot be dismissed
   _removeBanBlocker();
-  document.body.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;padding:32px;text-align:center;background:#07070E;color:#fff"><div style="font-size:72px;margin-bottom:24px">🚫</div><h2 style="margin:0 0 12px;font-size:22px">Аккаунт заблокирован</h2><p style="margin:0;color:#888;font-size:15px;line-height:1.5">Ваш аккаунт заблокирован.<br>Обратитесь в поддержку.</p></div>`;
-  setTimeout(()=>tg&&tg.close&&tg.close(),3000);
+  const ov=document.createElement('div');
+  ov.id='ban-wall';
+  ov.style.cssText='position:fixed;inset:0;z-index:99999;display:flex;align-items:center;justify-content:center;padding:28px;backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);background:rgba(7,7,14,0.80);';
+  ov.innerHTML=`
+    <div style="background:#16162a;border-radius:24px;padding:36px 28px;text-align:center;max-width:300px;width:100%;box-shadow:0 24px 80px rgba(0,0,0,0.7);">
+      <div style="font-size:64px;line-height:1;margin-bottom:20px;">🚫</div>
+      <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:12px;">Аккаунт заблокирован</div>
+      <div style="font-size:14px;color:#888;line-height:1.65;margin-bottom:28px;">Ваш аккаунт был заблокирован.<br>Свяжитесь с поддержкой для<br>решения вопроса.</div>
+      <button id="ban-support-btn" style="width:100%;padding:15px;background:linear-gradient(135deg,#5865f2,#7289da);border:none;border-radius:14px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;letter-spacing:.3px;">💬 Написать в поддержку</button>
+    </div>`;
+  document.body.appendChild(ov);
+  document.body.style.overflow='hidden';
+  document.getElementById('ban-support-btn').addEventListener('click',()=>{
+    if(tg&&tg.openTelegramLink) tg.openTelegramLink('https://t.me/ambar_support_bot');
+    else window.open('https://t.me/ambar_support_bot','_blank');
+  });
 }
 
 async function checkBanStatus(){
   const initData=tg?.initData;
-  if(!initData){_removeBanBlocker();return;} // dev mode — skip
+  if(!initData){_removeBanBlocker();return;} // dev mode — skip ban check
   try{
     const resp=await fetch(`${AMBAR_API}/api/me`,{headers:{'Authorization':'tma '+initData}});
     if(resp.ok){
       const d=await resp.json();
       if(d.banned){showBanWall();return;}
     }
-  }catch(e){/* network error — allow through */}
-  _removeBanBlocker(); // unblock the UI
+  }catch(e){/* network error — allow through, API will enforce */}
+  _removeBanBlocker(); // not banned — unblock the UI
 }
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────

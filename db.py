@@ -26,7 +26,10 @@ async def connect():
         log.warning("⚠️  MONGO_URI not set — DB unavailable")
         return None
     _client = motor.motor_asyncio.AsyncIOMotorClient(
-        MONGO_URI, serverSelectionTimeoutMS=8000
+        MONGO_URI,
+        serverSelectionTimeoutMS=8000,
+        tls=True,
+        tlsAllowInvalidCertificates=True,   # fix for older OpenSSL on server
     )
     _db = _client.ambar
     try:

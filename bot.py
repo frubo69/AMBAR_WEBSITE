@@ -74,8 +74,11 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # Ban check — silently skip if DB is unavailable
     try:
         if await db.is_banned(uid):
-            await update.message.reply_text(
+            ban_msg = await update.message.reply_text(
                 "🚫 *Ваш аккаунт заблокирован.*\n\nОбратитесь в поддержку.", parse_mode="Markdown")
+            try:
+                await db.set_user_field(uid, last_ban_msg_id=ban_msg.message_id)
+            except: pass
             return
     except Exception as e:
         log.warning(f"ban check failed: {e}")

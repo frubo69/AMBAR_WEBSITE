@@ -521,13 +521,27 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # ── UNBAN ─────────────────────────────────────────────────────────────────
     elif data.startswith("unban_"):
         uid_str = data[6:]
-        await db.unban_user(int(uid_str))
-        # Restore the "Заказать" Mini App button
+        cid = int(uid_str)
+        user_doc = await db.get_user(cid)
+        ban_msg_id = user_doc.get("last_ban_msg_id") if user_doc else None
+        await db.unban_user(cid)
         try:
             app2 = Application.builder().token(BOT_TOKEN).build()
             async with app2:
+                # Delete the "you are banned" message
+                if ban_msg_id:
+                    try:
+                        await app2.bot.delete_message(chat_id=cid, message_id=ban_msg_id)
+                    except: pass
+                # Notify user they're unblocked
+                await app2.bot.send_message(
+                    chat_id=cid,
+                    text="✅ *Ваш аккаунт разблокирован!*\n\nТеперь вы снова можете делать заказы. Нажмите кнопку ниже 👇",
+                    parse_mode="Markdown"
+                )
+                # Restore the "Заказать" Mini App button
                 await app2.bot.set_chat_menu_button(
-                    chat_id=int(uid_str),
+                    chat_id=cid,
                     menu_button=MenuButtonWebApp(text="🍾 Заказать", web_app=WebAppInfo(url=WEBAPP_URL))
                 )
         except: pass

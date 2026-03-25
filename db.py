@@ -246,3 +246,10 @@ async def get_support_map_entry(fwd_id: str) -> dict | None:
     db = _db_or_none()
     if db is None: return None
     return await db.support_map.find_one({"fwd_msg_id": fwd_id}, {"_id": 0})
+
+
+async def set_user_field(telegram_id: int, **fields):
+    """Set arbitrary fields on a user document."""
+    db = _db_or_none()
+    if db is None: return
+    await db.users.update_one({"telegram_id": telegram_id}, {"$set": fields})

@@ -399,8 +399,8 @@ img{display:block}
 .aob-time{font-size:13px;font-weight:700;color:#d4af37;flex-shrink:0}
 .aob-track{position:relative;height:7px;background:rgba(255,255,255,.08);border-radius:4px}
 .aob-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#7c5510,#d4af37,#f5d060);transition:width .9s cubic-bezier(.34,1,.64,1);min-width:0}
-.aob-fill.pending{background:rgba(255,255,255,.12);animation:aob-shimmer 1.6s ease-in-out infinite}
-@keyframes aob-shimmer{0%,100%{opacity:.4}50%{opacity:.9}}
+.aob-fill.pending{background:linear-gradient(90deg,rgba(80,50,5,.25) 0%,rgba(212,175,55,.5) 38%,rgba(255,225,100,.9) 50%,rgba(212,175,55,.5) 62%,rgba(80,50,5,.25) 100%);background-size:250% 100%;animation:aob-shine 2s linear infinite}
+@keyframes aob-shine{0%{background-position:200% 0}100%{background-position:-100% 0}}
 .aob-moto{position:absolute;top:-9px;font-size:22px;line-height:1;transition:left .9s cubic-bezier(.34,1,.64,1);filter:drop-shadow(0 2px 5px rgba(0,0,0,.7));transform:translateX(-50%)}
 /* ── Active Order Detail ──────────────────────────────────────────────────── */
 .aod-ov{position:fixed;inset:0;z-index:700;background:rgba(0,0,0,.72);opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
@@ -416,7 +416,7 @@ img{display:block}
 .aod-prog{padding:20px 20px 4px}
 .aod-big-track{position:relative;height:10px;background:rgba(255,255,255,.07);border-radius:5px;margin:10px 0 20px;overflow:visible}
 .aod-big-fill{height:100%;border-radius:5px;background:linear-gradient(90deg,#7c5510,#d4af37,#f5d060);transition:width 1s ease}
-.aod-big-fill.pending{background:rgba(255,255,255,.1);animation:aob-shimmer 1.6s ease-in-out infinite}
+.aod-big-fill.pending{background:linear-gradient(90deg,rgba(80,50,5,.25) 0%,rgba(212,175,55,.5) 38%,rgba(255,225,100,.9) 50%,rgba(212,175,55,.5) 62%,rgba(80,50,5,.25) 100%);background-size:250% 100%;animation:aob-shine 2s linear infinite}
 .aod-big-moto{position:absolute;top:-13px;font-size:28px;line-height:1;transition:left 1s ease;filter:drop-shadow(0 3px 7px rgba(0,0,0,.7));transform:translateX(-50%)}
 .aod-stages{display:flex;justify-content:space-between;padding:0 4px}
 .aod-stage{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;font-weight:600;color:rgba(255,255,255,.3);flex:1;text-align:center;transition:color .4s}
@@ -3501,7 +3501,7 @@ function _renderAob(){
   if(status==='pending'){
     title.textContent=ru?'Ожидает подтверждения...':'Waiting for confirmation...';
     time.textContent='';
-    fill.className='aob-fill pending';fill.style.width='0%';
+    fill.className='aob-fill pending';fill.style.width='100%'; // full width so shimmer covers whole track
     moto.style.display='none';
   } else {
     const{pct,remaining}=_calcProgress(confirmed_at,eta);
@@ -3542,7 +3542,7 @@ function _renderAodDetail(){
   // Progress bar
   const bigFill=el('aod-big-fill'),bigMoto=el('aod-big-moto'),timeTxt=el('aod-time-txt');
   if(status==='pending'){
-    bigFill.className='aod-big-fill pending';bigFill.style.width='0%';
+    bigFill.className='aod-big-fill pending';bigFill.style.width='100%';
     bigMoto.style.display='none';
     timeTxt.textContent=ru?'Ожидаем подтверждения оператора...':'Waiting for operator confirmation...';
   } else if(confirmed_at&&eta){

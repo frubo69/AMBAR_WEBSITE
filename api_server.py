@@ -326,18 +326,20 @@ async def handle_active_order(request: web.Request) -> web.Response:
         return web.json_response({"active": False}, headers=CORS_HEADERS)
     if not uid:
         return web.json_response({"active": False}, headers=CORS_HEADERS)
-    order = await db.get_active_order(uid)
-    if not order:
-        return web.json_response({"active": False}, headers=CORS_HEADERS)
+    orders = await db.get_active_orders(uid)
+    if not orders:
+        return web.json_response({"active": False, "orders": []}, headers=CORS_HEADERS)
     return web.json_response({
-        "active":       True,
-        "order_id":     order.get("order_id"),
-        "status":       order.get("status"),
-        "confirmed_at": order.get("confirmed_at"),
-        "eta":          order.get("eta"),
-        "items":        order.get("items", []),
-        "total":        order.get("total", 0),
-        "address":      order.get("address", ""),
+        "active": True,
+        "orders": [{
+            "order_id":     o.get("order_id"),
+            "status":       o.get("status"),
+            "confirmed_at": o.get("confirmed_at"),
+            "eta":          o.get("eta"),
+            "items":        o.get("items", []),
+            "total":        o.get("total", 0),
+            "address":      o.get("address", ""),
+        } for o in orders],
     }, headers=CORS_HEADERS)
 
 

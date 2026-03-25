@@ -73,15 +73,16 @@ async def get_order(oid: str) -> dict | None:
     return await db.orders.find_one({"order_id": oid}, {"_id": 0})
 
 
-async def get_active_order(telegram_id: int) -> dict | None:
-    """Return the most recent pending/approved order for a user."""
+async def get_active_orders(telegram_id: int) -> list:
+    """Return all pending/approved orders for a user, newest first."""
     db = _db_or_none()
-    if db is None: return None
-    return await db.orders.find_one(
+    if db is None: return []
+    cursor = db.orders.find(
         {"customer_id": telegram_id, "status": {"$in": ["pending", "approved"]}},
         {"_id": 0},
         sort=[("timestamp", -1)]
     )
+    return await cursor.to_list(length=10)
 
 
 async def get_all_orders(office_id: str = None) -> dict:

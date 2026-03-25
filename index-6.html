@@ -432,6 +432,13 @@ img{display:block}
 .aod-total-row{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-top:1px solid rgba(255,255,255,.1);margin-top:6px}
 .aod-total-lbl{font-size:16px;font-weight:700;color:#fff}
 .aod-total-val{font-size:20px;font-weight:800;color:#d4af37}
+.aod-stage.current{color:#fff;transform:scale(1.1)}
+.aod-stage.current .aod-stage-ic{filter:drop-shadow(0 0 6px rgba(212,175,55,.8))}
+.aob-dots{display:flex;justify-content:center;gap:5px;margin-top:7px}
+.aob-dot-ind{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.2);transition:background .25s,transform .25s}
+.aob-dot-active{background:#d4af37!important;transform:scale(1.3)}
+.aod-support-btn{width:100%;padding:14px;background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.3);border-radius:14px;color:#d4af37;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s}
+.aod-support-btn:active{background:rgba(212,175,55,.22)}
 /* Refresh spin */
 @keyframes spin{to{transform:rotate(360deg)}}
 .spinning{animation:spin .65s linear infinite!important;opacity:.7}
@@ -966,6 +973,7 @@ img{display:block}
     <div class="aob-fill pending" id="aob-fill" style="width:0%"></div>
     <div class="aob-moto" id="aob-moto" style="left:0%;display:none">🏍️</div>
   </div>
+  <div class="aob-dots" id="aob-dots" style="display:none"></div>
 </div>
 
 <!-- ── Active Order Detail Modal ─────────────────────────────────────────── -->
@@ -1000,6 +1008,11 @@ img{display:block}
     <div class="aod-total-row">
       <span class="aod-total-lbl" id="aod-total-lbl">Итого</span>
       <span class="aod-total-val" id="aod-total-val">—</span>
+    </div>
+    <div style="padding:8px 20px 0">
+      <button class="aod-support-btn" onclick="closeAod();openSupportChat(_aobOrders[_aobIdx]?.order_id||'')">
+        💬 <span id="aod-support-lbl">Написать в поддержку</span>
+      </button>
     </div>
   </div>
 </div>
@@ -3091,6 +3104,7 @@ function openPDM(id){
   dismissToast();
   el('pdm-overlay').classList.add('show');
   document.body.style.overflow='hidden';
+  el('aob').classList.add('aob-hidden'); // hide order bar behind product card
   initPinchZoom();
   initPDMSwipe();
 }
@@ -3220,6 +3234,8 @@ function closePDMDirect(){
   const sh=el('pdm-sheet'),ov=el('pdm-overlay');
   if(sh){sh.style.transition='';sh.style.transform='';}
   if(ov){ov.style.transition='';ov.style.background='';}
+  // Restore order bar if there's an active order
+  if(_aobOrders.length>0) el('aob').classList.remove('aob-hidden');
   pdmId=null;
   _pdmPendingQty=1;
   _pdmImgZoomed=false;
@@ -3439,7 +3455,7 @@ async function onSupportFileSelect(input){
 function _autoResizeSupport(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,100)+'px';}
 
 // ── Active Order Bar & Detail ──────────────────────────────────────────────
-let _aobData=null,_aobPollTimer=null,_aobTickTimer=null;
+let _aobOrders=[],_aobIdx=0,_aobPollTimer=null,_aobTickTimer=null;
 
 async function checkActiveOrder(){
   const uid=tg?.initDataUnsafe?.user?.id;
@@ -3448,121 +3464,153 @@ async function checkActiveOrder(){
     const r=await fetch(`${AMBAR_API}/api/active-order?uid=${uid}`);
     if(!r.ok)return;
     const d=await r.json();
-    if(d.active){
-      _aobData=d;
+    const bar=el('aob');
+    if(d.active&&d.orders&&d.orders.length){
+      _aobOrders=d.orders;
+      if(_aobIdx>=_aobOrders.length)_aobIdx=0;
       _renderAob();
-      document.getElementById('aob').classList.remove('aob-hidden');
+      if(!el('pdm-overlay').classList.contains('show'))bar.classList.remove('aob-hidden');
     } else {
-      _aobData=null;
-      document.getElementById('aob').classList.add('aob-hidden');
+      _aobOrders=[];
+      bar.classList.add('aob-hidden');
     }
   }catch(e){}
 }
 
 function _calcProgress(confirmedAt,etaMins){
   if(!confirmedAt||!etaMins)return{pct:0,remaining:etaMins||0};
-  const elapsedMin=(Date.now()-new Date(confirmedAt).getTime())/60000;
-  const pct=Math.min(elapsedMin/etaMins,1);
-  return{pct,remaining:etaMins-elapsedMin};
+  const elapsed=(Date.now()-new Date(confirmedAt).getTime())/60000;
+  return{pct:Math.min(elapsed/etaMins,1),remaining:etaMins-elapsed};
 }
 
 function _renderAob(){
-  if(!_aobData)return;
-  const {status,order_id,eta,confirmed_at}=_aobData;
+  const o=_aobOrders[_aobIdx];
+  if(!o)return;
   const ru=lang==='ru';
-  const dot=document.getElementById('aob-dot');
-  const title=document.getElementById('aob-title');
-  const sub=document.getElementById('aob-sub');
-  const time=document.getElementById('aob-time');
-  const fill=document.getElementById('aob-fill');
-  const moto=document.getElementById('aob-moto');
-  sub.textContent=`#${order_id}`;
+  const{status,order_id,eta,confirmed_at}=o;
+  // Dots
+  const dotsEl=el('aob-dots');
+  if(_aobOrders.length>1){
+    dotsEl.style.display='flex';
+    dotsEl.innerHTML=_aobOrders.map((_,i)=>`<div class="aob-dot-ind${i===_aobIdx?' aob-dot-active':''}"></div>`).join('');
+  } else dotsEl.style.display='none';
+  // Status dot
+  el('aob-dot').className='aob-dot '+(status==='pending'?'pending':'active');
+  el('aob-sub').textContent=`#${order_id}`;
+  const fill=el('aob-fill'),moto=el('aob-moto'),time=el('aob-time'),title=el('aob-title');
   if(status==='pending'){
-    dot.className='aob-dot pending';
     title.textContent=ru?'Ожидает подтверждения...':'Waiting for confirmation...';
     time.textContent='';
-    fill.className='aob-fill pending';
-    fill.style.width='0%';
+    fill.className='aob-fill pending';fill.style.width='0%';
     moto.style.display='none';
-  } else if(status==='approved'){
-    dot.className='aob-dot active';
+  } else {
     const{pct,remaining}=_calcProgress(confirmed_at,eta);
-    fill.className='aob-fill';
-    fill.style.width=`${Math.round(pct*100)}%`;
-    moto.style.display='block';
-    moto.style.left=`${Math.min(Math.round(pct*100),94)}%`;
-    if(remaining<=0){
-      title.textContent=ru?'Уже почти...':'Almost there...';
-      time.textContent='';
-    } else if(remaining<=3){
-      title.textContent=ru?'🏍️ Курьер рядом!':'🏍️ Almost at your door!';
-      time.textContent='';
-    } else {
-      title.textContent=ru?'Заказ в пути':'Order on the way';
-      time.textContent=ru?`≈${Math.ceil(remaining)} мин`:`≈${Math.ceil(remaining)} min`;
-    }
+    const p=Math.round(pct*100);
+    fill.className='aob-fill';fill.style.width=p+'%';
+    moto.style.display='block';moto.style.left=Math.min(p,94)+'%';
+    if(remaining<=0){title.textContent=ru?'Уже почти...':'Almost there...';time.textContent='';}
+    else if(remaining<=3){title.textContent=ru?'🏍️ Курьер рядом!':'🏍️ Almost at your door!';time.textContent='';}
+    else{title.textContent=ru?'Заказ в пути':'Order on the way';time.textContent=ru?`≈${Math.ceil(remaining)} мин`:`≈${Math.ceil(remaining)} min`;}
   }
-  _renderAodDetail();
+  if(document.getElementById('aod-ov').classList.contains('open'))_renderAodDetail();
 }
 
 function _renderAodDetail(){
-  if(!_aobData)return;
-  const{status,order_id,eta,confirmed_at,items=[],total=0,address=''}=_aobData;
+  const o=_aobOrders[_aobIdx];
+  if(!o)return;
+  const{status,order_id,eta,confirmed_at,items=[],total=0,address=''}=o;
   const ru=lang==='ru';
-  // Header
-  document.getElementById('aod-oid').textContent=`#${order_id}`;
-  const badge=document.getElementById('aod-badge');
-  if(status==='pending'){badge.textContent=ru?'Ожидание':'Pending';badge.className='aod-badge pending';}
-  else{badge.textContent=ru?'В пути':'On the way';badge.className='aod-badge approved';}
-  // Stages
-  ['aod-s0','aod-s1','aod-s2','aod-s3'].forEach(id=>document.getElementById(id).classList.remove('done'));
-  document.getElementById('aod-s0').classList.add('done');
-  if(status==='approved'){document.getElementById('aod-s1').classList.add('done');document.getElementById('aod-s2').classList.add('done');}
-  // Stage labels i18n
-  if(ru){document.getElementById('aod-s0-lbl').textContent='Ожидание';document.getElementById('aod-s1-lbl').textContent='Принят';document.getElementById('aod-s2-lbl').textContent='В пути';document.getElementById('aod-s3-lbl').textContent='Доставлен';}
-  else{document.getElementById('aod-s0-lbl').textContent='Pending';document.getElementById('aod-s1-lbl').textContent='Confirmed';document.getElementById('aod-s2-lbl').textContent='On the way';document.getElementById('aod-s3-lbl').textContent='Delivered';}
-  // Big progress
-  const bigFill=document.getElementById('aod-big-fill');
-  const bigMoto=document.getElementById('aod-big-moto');
-  const timeTxt=document.getElementById('aod-time-txt');
+  el('aod-oid').textContent='#'+order_id;
+  // Badge = current stage only
+  const badge=el('aod-badge');
+  if(status==='pending'){badge.textContent=ru?'⏳ Ожидание':'⏳ Pending';badge.className='aod-badge pending';}
+  else{
+    const{remaining}=_calcProgress(confirmed_at,eta);
+    if(remaining<=0)badge.textContent=ru?'🎉 Уже скоро':'🎉 Almost there';
+    else if(remaining<=3)badge.textContent=ru?'🏍️ Рядом!':'🏍️ Nearby!';
+    else badge.textContent=ru?'🏍️ В пути':'🏍️ On the way';
+    badge.className='aod-badge approved';
+  }
+  // Stage timeline — highlight current only
+  ['aod-s0','aod-s1','aod-s2','aod-s3'].forEach(id=>el(id).classList.remove('done','current'));
+  if(status==='pending'){el('aod-s0').classList.add('current');}
+  else{el('aod-s0').classList.add('done');el('aod-s1').classList.add('done');el('aod-s2').classList.add('current');}
+  el('aod-s0-lbl').textContent=ru?'Ожидание':'Pending';
+  el('aod-s1-lbl').textContent=ru?'Принят':'Confirmed';
+  el('aod-s2-lbl').textContent=ru?'В пути':'On way';
+  el('aod-s3-lbl').textContent=ru?'Готово':'Done';
+  // Progress bar
+  const bigFill=el('aod-big-fill'),bigMoto=el('aod-big-moto'),timeTxt=el('aod-time-txt');
   if(status==='pending'){
     bigFill.className='aod-big-fill pending';bigFill.style.width='0%';
     bigMoto.style.display='none';
     timeTxt.textContent=ru?'Ожидаем подтверждения оператора...':'Waiting for operator confirmation...';
   } else if(confirmed_at&&eta){
     const{pct,remaining}=_calcProgress(confirmed_at,eta);
-    bigFill.className='aod-big-fill';
-    bigFill.style.width=`${Math.round(pct*100)}%`;
-    bigMoto.style.display='block';
-    bigMoto.style.left=`${Math.min(Math.round(pct*100),92)}%`;
-    if(remaining<=0)timeTxt.textContent=ru?'Курьер вот-вот будет у вас — звонок ожидается в любой момент 🎉':'Courier should arrive any minute now 🎉';
-    else if(remaining<=3)timeTxt.textContent=ru?'🏍️ Курьер совсем рядом! Приготовьтесь принять заказ 🎉':'🏍️ Courier is right around the corner — get ready!';
-    else timeTxt.textContent=ru?`Ориентировочно ещё ${Math.ceil(remaining)} мин`:`Approximately ${Math.ceil(remaining)} min remaining`;
+    const p=Math.round(pct*100);
+    bigFill.className='aod-big-fill';bigFill.style.width=p+'%';
+    bigMoto.style.display='block';bigMoto.style.left=Math.min(p,92)+'%';
+    if(remaining<=0)timeTxt.textContent=ru?'Курьер вот-вот будет у вас 🎉':'Courier arriving any minute 🎉';
+    else if(remaining<=3)timeTxt.textContent=ru?'🏍️ Курьер совсем рядом! Приготовьтесь 🎉':'🏍️ Right around the corner — get ready!';
+    else timeTxt.textContent=ru?`Примерно ${Math.ceil(remaining)} мин до доставки`:`About ${Math.ceil(remaining)} min until delivery`;
   }
-  // Items
-  document.getElementById('aod-items-lbl').textContent=ru?'Состав заказа':'Order items';
-  document.getElementById('aod-addr-lbl').textContent=ru?'Адрес':'Address';
-  document.getElementById('aod-total-lbl').textContent=ru?'Итого':'Total';
-  document.getElementById('aod-items').innerHTML=(items||[]).map(i=>`<div class="aod-row"><span class="aod-row-name">${i.name} ×${i.qty}</span><span class="aod-row-price">${i.line_total||(i.price*i.qty)} AED</span></div>`).join('');
-  document.getElementById('aod-addr').textContent=address||'—';
-  document.getElementById('aod-total-val').textContent=`${total} AED`;
+  // Items, address, total
+  el('aod-items-lbl').textContent=ru?'Состав заказа':'Items';
+  el('aod-addr-lbl').textContent=ru?'Адрес':'Address';
+  el('aod-total-lbl').textContent=ru?'Итого':'Total';
+  el('aod-items').innerHTML=(items||[]).map(i=>`<div class="aod-row"><span class="aod-row-name">${i.name} ×${i.qty}</span><span class="aod-row-price">${i.line_total||(i.price*i.qty)} AED</span></div>`).join('');
+  el('aod-addr').textContent=address||'—';
+  el('aod-total-val').textContent=total+' AED';
 }
 
 function openAod(){
-  if(!_aobData)return;
+  if(!_aobOrders.length)return;
   haptic.light();
   _renderAodDetail();
-  document.getElementById('aod-ov').classList.add('open');
+  el('aod-ov').classList.add('open');
 }
 function closeAod(){
-  document.getElementById('aod-ov').classList.remove('open');
+  const sheet=el('aod-ov').querySelector('.aod-sheet');
+  if(sheet)sheet.style.transform='';
+  el('aod-ov').classList.remove('open');
+}
+
+function _initAodSwipe(){
+  const sheet=document.querySelector('.aod-sheet');
+  if(!sheet)return;
+  let sy=0,dragging=false;
+  sheet.addEventListener('touchstart',e=>{sy=e.touches[0].clientY;dragging=true;},{passive:true});
+  sheet.addEventListener('touchmove',e=>{
+    if(!dragging)return;
+    const dy=e.touches[0].clientY-sy;
+    if(dy>0){sheet.style.transition='none';sheet.style.transform=`translateY(${dy}px)`;}
+  },{passive:true});
+  sheet.addEventListener('touchend',e=>{
+    dragging=false;
+    sheet.style.transition='';
+    const dy=e.changedTouches[0].clientY-sy;
+    if(dy>110){closeAod();}else{sheet.style.transform='';}
+  },{passive:true});
+}
+
+function _initAobSwipe(){
+  const bar=el('aob');
+  if(!bar)return;
+  let sx=0;
+  bar.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;},{passive:true});
+  bar.addEventListener('touchend',e=>{
+    if(!_aobOrders.length)return;
+    const dx=e.changedTouches[0].clientX-sx;
+    if(Math.abs(dx)<40)return; // tap, not swipe
+    if(dx<0&&_aobIdx<_aobOrders.length-1){_aobIdx++;haptic.select();_renderAob();}
+    else if(dx>0&&_aobIdx>0){_aobIdx--;haptic.select();_renderAob();}
+  },{passive:true});
 }
 
 function startOrderPolling(){
   checkActiveOrder();
-  // Re-render timer every 30s (updates countdown)
-  _aobTickTimer=setInterval(()=>{if(_aobData)_renderAob();},30000);
-  // Re-fetch from server every 25s (catches status changes)
+  setTimeout(()=>{_initAobSwipe();_initAodSwipe();},500);
+  _aobTickTimer=setInterval(()=>{if(_aobOrders.length)_renderAob();},30000);
   _aobPollTimer=setInterval(()=>checkActiveOrder(),25000);
 }
 

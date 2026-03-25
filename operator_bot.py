@@ -8,7 +8,7 @@ AMBAR Operator Bot — MongoDB edition
 - Stats
 """
 import os, asyncio, logging
-from datetime import datetime
+from datetime import datetime, timezone
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove, MenuButtonCommands, MenuButtonWebApp, WebAppInfo
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
@@ -366,7 +366,8 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         parts = data.split("_")
         eta, oid, cid = int(parts[1]), parts[2], int(parts[3])
         await db.update_order(oid, status="approved", eta=eta,
-                              operator_id=op, updated_at=datetime.now().isoformat())
+                              operator_id=op, updated_at=datetime.now().isoformat(),
+                              confirmed_at=datetime.now(timezone.utc).isoformat())
         order = await db.get_order(oid)
         lang  = order.get("lang","ru") if order else "ru"
         name  = order.get("customer_name","") if order else ""

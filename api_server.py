@@ -316,6 +316,31 @@ async def handle_support_send(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "ts": server_ts}, headers=CORS_HEADERS)
 
 
+# ── GET /api/active-order ─────────────────────────────────────────────────────
+async def handle_active_order(request: web.Request) -> web.Response:
+    if request.method == "OPTIONS":
+        return web.Response(status=200, headers=CORS_HEADERS)
+    try:
+        uid = int(request.rel_url.query.get("uid", 0))
+    except (ValueError, TypeError):
+        return web.json_response({"active": False}, headers=CORS_HEADERS)
+    if not uid:
+        return web.json_response({"active": False}, headers=CORS_HEADERS)
+    order = await db.get_active_order(uid)
+    if not order:
+        return web.json_response({"active": False}, headers=CORS_HEADERS)
+    return web.json_response({
+        "active":       True,
+        "order_id":     order.get("order_id"),
+        "status":       order.get("status"),
+        "confirmed_at": order.get("confirmed_at"),
+        "eta":          order.get("eta"),
+        "items":        order.get("items", []),
+        "total":        order.get("total", 0),
+        "address":      order.get("address", ""),
+    }, headers=CORS_HEADERS)
+
+
 # ── POST /api/support/send-image ──────────────────────────────────────────────
 async def handle_support_send_image(request: web.Request) -> web.Response:
     if request.method == "OPTIONS":
@@ -445,6 +470,8 @@ def main():
 
     app.router.add_route("OPTIONS", "/api/me",                 handle_me)
     app.router.add_get(            "/api/me",                  handle_me)
+    app.router.add_route("OPTIONS", "/api/active-order",       handle_active_order)
+    app.router.add_get(            "/api/active-order",        handle_active_order)
     app.router.add_route("OPTIONS", "/api/orders",             handle_orders)
     app.router.add_get(            "/api/orders",              handle_orders)
     app.router.add_route("OPTIONS", "/api/order",              handle_create_order)

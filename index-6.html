@@ -7,6 +7,12 @@
 <meta http-equiv="Pragma" content="no-cache">
 <meta http-equiv="Expires" content="0">
 <title>AMBAR</title>
+<link rel="manifest" href="/manifest.json">
+<link rel="apple-touch-icon" href="/icon.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AmBar">
+<meta name="theme-color" content="#07070E">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
@@ -378,6 +384,54 @@ img{display:block}
 .toast.pdm-mode.show{transform:translateY(0)}
 .toast-icon{font-size:16px;flex-shrink:0;line-height:1}
 .toast-msg{flex:1;min-width:0}
+/* ── Active Order Bar ─────────────────────────────────────────────────────── */
+.aob{position:fixed;bottom:calc(68px + var(--safe-bottom));left:10px;right:10px;z-index:200;background:linear-gradient(135deg,#140d1f 0%,#0d1520 100%);border:1px solid rgba(212,175,55,.35);border-radius:16px;padding:10px 14px 12px;cursor:pointer;box-shadow:0 4px 28px rgba(0,0,0,.6),0 0 0 1px rgba(212,175,55,.08);transition:transform .35s cubic-bezier(.34,1,.64,1),opacity .3s ease}
+.aob.aob-hidden{transform:translateY(calc(100% + 80px));opacity:0;pointer-events:none}
+.aob-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
+.aob-left{display:flex;align-items:center;gap:8px}
+.aob-left-text{display:flex;flex-direction:column;gap:1px}
+.aob-dot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.aob-dot.pending{background:#888;box-shadow:0 0 0 3px rgba(136,136,136,.2)}
+.aob-dot.active{background:#22c55e;box-shadow:0 0 0 3px rgba(34,197,94,.25);animation:aob-glow 1.8s ease-in-out infinite}
+@keyframes aob-glow{0%,100%{box-shadow:0 0 0 3px rgba(34,197,94,.25)}50%{box-shadow:0 0 0 6px rgba(34,197,94,.1)}}
+.aob-title{font-size:13px;font-weight:600;color:#fff;line-height:1.2}
+.aob-sub{font-size:11px;color:rgba(255,255,255,.4);margin-top:1px}
+.aob-time{font-size:13px;font-weight:700;color:#d4af37;flex-shrink:0}
+.aob-track{position:relative;height:7px;background:rgba(255,255,255,.08);border-radius:4px}
+.aob-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#7c5510,#d4af37,#f5d060);transition:width .9s cubic-bezier(.34,1,.64,1);min-width:0}
+.aob-fill.pending{background:rgba(255,255,255,.12);animation:aob-shimmer 1.6s ease-in-out infinite}
+@keyframes aob-shimmer{0%,100%{opacity:.4}50%{opacity:.9}}
+.aob-moto{position:absolute;top:-9px;font-size:22px;line-height:1;transition:left .9s cubic-bezier(.34,1,.64,1);filter:drop-shadow(0 2px 5px rgba(0,0,0,.7));transform:translateX(-50%)}
+/* ── Active Order Detail ──────────────────────────────────────────────────── */
+.aod-ov{position:fixed;inset:0;z-index:700;background:rgba(0,0,0,.72);opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+.aod-ov.open{opacity:1;pointer-events:all}
+.aod-sheet{position:absolute;bottom:0;left:0;right:0;background:#0d1117;border-radius:24px 24px 0 0;padding:0 0 calc(28px + var(--safe-bottom));max-height:90vh;overflow-y:auto;transform:translateY(100%);transition:transform .32s cubic-bezier(.34,1,.64,1)}
+.aod-ov.open .aod-sheet{transform:translateY(0)}
+.aod-handle{width:36px;height:4px;background:rgba(255,255,255,.18);border-radius:2px;margin:14px auto 0}
+.aod-hdr{padding:16px 20px 0;display:flex;align-items:center;justify-content:space-between}
+.aod-oid{font-size:22px;font-weight:800;color:#d4af37;letter-spacing:-.5px}
+.aod-badge{padding:5px 13px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:.3px}
+.aod-badge.pending{background:rgba(251,191,36,.15);color:#fbbf24;border:1px solid rgba(251,191,36,.3)}
+.aod-badge.approved{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3)}
+.aod-prog{padding:20px 20px 4px}
+.aod-big-track{position:relative;height:10px;background:rgba(255,255,255,.07);border-radius:5px;margin:10px 0 20px;overflow:visible}
+.aod-big-fill{height:100%;border-radius:5px;background:linear-gradient(90deg,#7c5510,#d4af37,#f5d060);transition:width 1s ease}
+.aod-big-fill.pending{background:rgba(255,255,255,.1);animation:aob-shimmer 1.6s ease-in-out infinite}
+.aod-big-moto{position:absolute;top:-13px;font-size:28px;line-height:1;transition:left 1s ease;filter:drop-shadow(0 3px 7px rgba(0,0,0,.7));transform:translateX(-50%)}
+.aod-stages{display:flex;justify-content:space-between;padding:0 4px}
+.aod-stage{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;font-weight:600;color:rgba(255,255,255,.3);flex:1;text-align:center;transition:color .4s}
+.aod-stage.done{color:#d4af37}
+.aod-stage-ic{font-size:18px;margin-bottom:2px}
+.aod-time-txt{text-align:center;margin:14px 20px 4px;font-size:14px;color:rgba(255,255,255,.75);line-height:1.5;min-height:20px}
+.aod-sec{padding:16px 20px 0}
+.aod-sec-lbl{font-size:10px;font-weight:700;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:10px}
+.aod-row{display:flex;justify-content:space-between;align-items:center;font-size:14px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.aod-row:last-child{border-bottom:none}
+.aod-row-name{color:rgba(255,255,255,.8)}
+.aod-row-price{color:#d4af37;font-weight:600}
+.aod-total-row{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-top:1px solid rgba(255,255,255,.1);margin-top:6px}
+.aod-total-lbl{font-size:16px;font-weight:700;color:#fff}
+.aod-total-val{font-size:20px;font-weight:800;color:#d4af37}
 /* Refresh spin */
 @keyframes spin{to{transform:rotate(360deg)}}
 .spinning{animation:spin .65s linear infinite!important;opacity:.7}
@@ -896,6 +950,60 @@ img{display:block}
 <div class="toast" id="toast0"></div>
 <div class="toast" id="toast1"></div>
 
+<!-- ── Active Order Bar ───────────────────────────────────────────────────── -->
+<div class="aob aob-hidden" id="aob" onclick="openAod()">
+  <div class="aob-top">
+    <div class="aob-left">
+      <div class="aob-dot pending" id="aob-dot"></div>
+      <div class="aob-left-text">
+        <div class="aob-title" id="aob-title">Ожидает подтверждения</div>
+        <div class="aob-sub" id="aob-sub"></div>
+      </div>
+    </div>
+    <span class="aob-time" id="aob-time"></span>
+  </div>
+  <div class="aob-track">
+    <div class="aob-fill pending" id="aob-fill" style="width:0%"></div>
+    <div class="aob-moto" id="aob-moto" style="left:0%;display:none">🏍️</div>
+  </div>
+</div>
+
+<!-- ── Active Order Detail Modal ─────────────────────────────────────────── -->
+<div class="aod-ov" id="aod-ov" onclick="if(event.target===this)closeAod()">
+  <div class="aod-sheet">
+    <div class="aod-handle"></div>
+    <div class="aod-hdr">
+      <span class="aod-oid" id="aod-oid">—</span>
+      <span class="aod-badge pending" id="aod-badge">—</span>
+    </div>
+    <div class="aod-prog">
+      <div class="aod-big-track">
+        <div class="aod-big-fill pending" id="aod-big-fill" style="width:0%"></div>
+        <div class="aod-big-moto" id="aod-big-moto" style="left:0%;display:none">🏍️</div>
+      </div>
+      <div class="aod-stages">
+        <div class="aod-stage done" id="aod-s0"><div class="aod-stage-ic">⏳</div><div id="aod-s0-lbl">Ожидание</div></div>
+        <div class="aod-stage"      id="aod-s1"><div class="aod-stage-ic">✅</div><div id="aod-s1-lbl">Принят</div></div>
+        <div class="aod-stage"      id="aod-s2"><div class="aod-stage-ic">🏍️</div><div id="aod-s2-lbl">В пути</div></div>
+        <div class="aod-stage"      id="aod-s3"><div class="aod-stage-ic">🎉</div><div id="aod-s3-lbl">Доставлен</div></div>
+      </div>
+    </div>
+    <div class="aod-time-txt" id="aod-time-txt"></div>
+    <div class="aod-sec">
+      <div class="aod-sec-lbl" id="aod-items-lbl">Состав заказа</div>
+      <div id="aod-items"></div>
+    </div>
+    <div class="aod-sec" style="padding-bottom:8px">
+      <div class="aod-sec-lbl" id="aod-addr-lbl">Адрес</div>
+      <div style="font-size:14px;color:rgba(255,255,255,.75)" id="aod-addr"></div>
+    </div>
+    <div class="aod-total-row">
+      <span class="aod-total-lbl" id="aod-total-lbl">Итого</span>
+      <span class="aod-total-val" id="aod-total-val">—</span>
+    </div>
+  </div>
+</div>
+
 <script>
 // ── OFFICES ───────────────────────────────────────────────────────────────────
 const OFFICES=[
@@ -1172,6 +1280,7 @@ async function checkBanStatus(){
 window.addEventListener('DOMContentLoaded',()=>{
   if(tg){tg.ready();tg.expand();tg.setHeaderColor&&tg.setHeaderColor('#07070E');tg.setBackgroundColor&&tg.setBackgroundColor('#07070E');tg.enableClosingConfirmation&&tg.enableClosingConfirmation();tg.disableVerticalSwipes&&tg.disableVerticalSwipes();}
   checkBanStatus(); // 🔒 Check ban first — halts UI if banned
+  startOrderPolling(); // 📦 Start active order bar polling
   // Restore active address index
   const saved=localStorage.getItem('ambar_active_addr');
   if(saved!==null) activeAddrIdx=parseInt(saved);
@@ -3328,6 +3437,134 @@ async function onSupportFileSelect(input){
 }
 
 function _autoResizeSupport(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,100)+'px';}
+
+// ── Active Order Bar & Detail ──────────────────────────────────────────────
+let _aobData=null,_aobPollTimer=null,_aobTickTimer=null;
+
+async function checkActiveOrder(){
+  const uid=tg?.initDataUnsafe?.user?.id;
+  if(!uid)return;
+  try{
+    const r=await fetch(`${AMBAR_API}/api/active-order?uid=${uid}`);
+    if(!r.ok)return;
+    const d=await r.json();
+    if(d.active){
+      _aobData=d;
+      _renderAob();
+      document.getElementById('aob').classList.remove('aob-hidden');
+    } else {
+      _aobData=null;
+      document.getElementById('aob').classList.add('aob-hidden');
+    }
+  }catch(e){}
+}
+
+function _calcProgress(confirmedAt,etaMins){
+  if(!confirmedAt||!etaMins)return{pct:0,remaining:etaMins||0};
+  const elapsedMin=(Date.now()-new Date(confirmedAt).getTime())/60000;
+  const pct=Math.min(elapsedMin/etaMins,1);
+  return{pct,remaining:etaMins-elapsedMin};
+}
+
+function _renderAob(){
+  if(!_aobData)return;
+  const {status,order_id,eta,confirmed_at}=_aobData;
+  const ru=lang==='ru';
+  const dot=document.getElementById('aob-dot');
+  const title=document.getElementById('aob-title');
+  const sub=document.getElementById('aob-sub');
+  const time=document.getElementById('aob-time');
+  const fill=document.getElementById('aob-fill');
+  const moto=document.getElementById('aob-moto');
+  sub.textContent=`#${order_id}`;
+  if(status==='pending'){
+    dot.className='aob-dot pending';
+    title.textContent=ru?'Ожидает подтверждения...':'Waiting for confirmation...';
+    time.textContent='';
+    fill.className='aob-fill pending';
+    fill.style.width='0%';
+    moto.style.display='none';
+  } else if(status==='approved'){
+    dot.className='aob-dot active';
+    const{pct,remaining}=_calcProgress(confirmed_at,eta);
+    fill.className='aob-fill';
+    fill.style.width=`${Math.round(pct*100)}%`;
+    moto.style.display='block';
+    moto.style.left=`${Math.min(Math.round(pct*100),94)}%`;
+    if(remaining<=0){
+      title.textContent=ru?'Уже почти...':'Almost there...';
+      time.textContent='';
+    } else if(remaining<=3){
+      title.textContent=ru?'🏍️ Курьер рядом!':'🏍️ Almost at your door!';
+      time.textContent='';
+    } else {
+      title.textContent=ru?'Заказ в пути':'Order on the way';
+      time.textContent=ru?`≈${Math.ceil(remaining)} мин`:`≈${Math.ceil(remaining)} min`;
+    }
+  }
+  _renderAodDetail();
+}
+
+function _renderAodDetail(){
+  if(!_aobData)return;
+  const{status,order_id,eta,confirmed_at,items=[],total=0,address=''}=_aobData;
+  const ru=lang==='ru';
+  // Header
+  document.getElementById('aod-oid').textContent=`#${order_id}`;
+  const badge=document.getElementById('aod-badge');
+  if(status==='pending'){badge.textContent=ru?'Ожидание':'Pending';badge.className='aod-badge pending';}
+  else{badge.textContent=ru?'В пути':'On the way';badge.className='aod-badge approved';}
+  // Stages
+  ['aod-s0','aod-s1','aod-s2','aod-s3'].forEach(id=>document.getElementById(id).classList.remove('done'));
+  document.getElementById('aod-s0').classList.add('done');
+  if(status==='approved'){document.getElementById('aod-s1').classList.add('done');document.getElementById('aod-s2').classList.add('done');}
+  // Stage labels i18n
+  if(ru){document.getElementById('aod-s0-lbl').textContent='Ожидание';document.getElementById('aod-s1-lbl').textContent='Принят';document.getElementById('aod-s2-lbl').textContent='В пути';document.getElementById('aod-s3-lbl').textContent='Доставлен';}
+  else{document.getElementById('aod-s0-lbl').textContent='Pending';document.getElementById('aod-s1-lbl').textContent='Confirmed';document.getElementById('aod-s2-lbl').textContent='On the way';document.getElementById('aod-s3-lbl').textContent='Delivered';}
+  // Big progress
+  const bigFill=document.getElementById('aod-big-fill');
+  const bigMoto=document.getElementById('aod-big-moto');
+  const timeTxt=document.getElementById('aod-time-txt');
+  if(status==='pending'){
+    bigFill.className='aod-big-fill pending';bigFill.style.width='0%';
+    bigMoto.style.display='none';
+    timeTxt.textContent=ru?'Ожидаем подтверждения оператора...':'Waiting for operator confirmation...';
+  } else if(confirmed_at&&eta){
+    const{pct,remaining}=_calcProgress(confirmed_at,eta);
+    bigFill.className='aod-big-fill';
+    bigFill.style.width=`${Math.round(pct*100)}%`;
+    bigMoto.style.display='block';
+    bigMoto.style.left=`${Math.min(Math.round(pct*100),92)}%`;
+    if(remaining<=0)timeTxt.textContent=ru?'Курьер вот-вот будет у вас — звонок ожидается в любой момент 🎉':'Courier should arrive any minute now 🎉';
+    else if(remaining<=3)timeTxt.textContent=ru?'🏍️ Курьер совсем рядом! Приготовьтесь принять заказ 🎉':'🏍️ Courier is right around the corner — get ready!';
+    else timeTxt.textContent=ru?`Ориентировочно ещё ${Math.ceil(remaining)} мин`:`Approximately ${Math.ceil(remaining)} min remaining`;
+  }
+  // Items
+  document.getElementById('aod-items-lbl').textContent=ru?'Состав заказа':'Order items';
+  document.getElementById('aod-addr-lbl').textContent=ru?'Адрес':'Address';
+  document.getElementById('aod-total-lbl').textContent=ru?'Итого':'Total';
+  document.getElementById('aod-items').innerHTML=(items||[]).map(i=>`<div class="aod-row"><span class="aod-row-name">${i.name} ×${i.qty}</span><span class="aod-row-price">${i.line_total||(i.price*i.qty)} AED</span></div>`).join('');
+  document.getElementById('aod-addr').textContent=address||'—';
+  document.getElementById('aod-total-val').textContent=`${total} AED`;
+}
+
+function openAod(){
+  if(!_aobData)return;
+  haptic.light();
+  _renderAodDetail();
+  document.getElementById('aod-ov').classList.add('open');
+}
+function closeAod(){
+  document.getElementById('aod-ov').classList.remove('open');
+}
+
+function startOrderPolling(){
+  checkActiveOrder();
+  // Re-render timer every 30s (updates countdown)
+  _aobTickTimer=setInterval(()=>{if(_aobData)_renderAob();},30000);
+  // Re-fetch from server every 25s (catches status changes)
+  _aobPollTimer=setInterval(()=>checkActiveOrder(),25000);
+}
 
 // Wire up support input events (called from DOMContentLoaded)
 function initSupportInput(){

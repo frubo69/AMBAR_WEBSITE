@@ -85,7 +85,7 @@ img{display:block}
 #modal-addr-list .saved-card{padding:10px 14px}
 #modal-addr-list .saved-card:last-child{border-bottom:1px solid var(--border2)}
 
-.bnav{position:fixed;bottom:0;left:0;right:0;z-index:40;display:flex;background:rgba(7,7,14,.97);border-top:1px solid var(--border);padding-bottom:var(--safe-bottom);padding-left:4px;padding-right:4px}
+.bnav{position:fixed;bottom:0;left:0;right:0;z-index:40;display:flex;background:rgba(7,7,14,.97);border-top:1px solid var(--border);padding-bottom:var(--safe-bottom);padding-left:10px;padding-right:10px}
 .bnav-pill{position:absolute;top:7px;left:0;border-radius:14px;background:rgba(201,169,110,.11);border:1px solid rgba(201,169,110,.38);pointer-events:none;z-index:0;will-change:transform;transition:transform .2s cubic-bezier(.4,0,.2,1)}
 .nb{flex:1;display:flex;flex-direction:column;align-items:center;padding:11px 4px 9px;gap:4px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:color .2s;position:relative;z-index:1}
 .nb.on{color:var(--gold)}
@@ -1476,15 +1476,14 @@ function _initPill(){
   movePill('catalog',true);
 
   const pillW=btn0.offsetWidth-_PM*2;
-  let _live=false,_fx=0,_raf=null;
+  let _live=false,_fx=0,_sx=0,_raf=null;
+  const DRAG_MIN=7;
 
-  // Get tab center X relative to nav
   function _tc(page){
     const b=el('nb-'+page),nr=nav.getBoundingClientRect();
     if(!b)return 0;const r=b.getBoundingClientRect();
     return r.left-nr.left+r.width/2;
   }
-  // Nearest page to a nav-relative X
   function _nearest(relX){
     let best=_NAV_PAGES[0],bd=Infinity;
     for(const p of _NAV_PAGES){const d=Math.abs(relX-_tc(p));if(d<bd){bd=d;best=p;}}
@@ -1494,44 +1493,45 @@ function _initPill(){
   function _frame(){
     if(!_live)return;
     const nr=nav.getBoundingClientRect();
-    const relX=_fx-nr.left; // finger relative to nav left
+    const relX=_fx-nr.left;
     const tabW=nr.width/_NAV_PAGES.length;
-
-    // Find nearest tab and distance to its center
     let nearPage=_NAV_PAGES[0],nearDist=Infinity,nearCX=0;
     for(const p of _NAV_PAGES){
       const cx=_tc(p);const d=Math.abs(relX-cx);
       if(d<nearDist){nearDist=d;nearPage=p;nearCX=cx;}
     }
-    // Magnetic pull strength: 0 far away → 1 when centred on tab
     const pull=Math.max(0,1-nearDist/(tabW*0.55));
-    const eased=pull*pull*(3-2*pull); // smoothstep
-    // Pill centre: blend finger ↔ nearest tab centre
+    const eased=pull*pull*(3-2*pull);
     const pillCX=relX+(nearCX-relX)*eased*0.65;
-    // translateX = pill left edge = pillCX - pillW/2, clamped inside nav
     const maxX=nr.width-pillW-_PM;
     const tx=Math.max(_PM,Math.min(maxX,pillCX-pillW/2));
     pill.style.transition='none';
     pill.style.transform='translateX('+tx+'px)';
-    // Highlight nearest tab
     _NAV_PAGES.forEach(p=>el('nb-'+p)?.classList.toggle('on',p===nearPage));
     _raf=requestAnimationFrame(_frame);
   }
 
   nav.addEventListener('touchstart',e=>{
-    _live=true;_fx=e.touches[0].clientX;
-    if(_raf)cancelAnimationFrame(_raf);
-    _raf=requestAnimationFrame(_frame);
+    _sx=_fx=e.touches[0].clientX;
+    _live=false; // wait for actual movement before drag mode
   },{passive:true});
   nav.addEventListener('touchmove',e=>{
     _fx=e.touches[0].clientX;
+    if(!_live&&Math.abs(_fx-_sx)>DRAG_MIN){
+      _live=true;
+      if(_raf)cancelAnimationFrame(_raf);
+      _raf=requestAnimationFrame(_frame);
+    }
   },{passive:true});
   nav.addEventListener('touchend',e=>{
-    if(!_live)return;_live=false;
-    if(_raf){cancelAnimationFrame(_raf);_raf=null;}
     const nr=nav.getBoundingClientRect();
     const page=_nearest(e.changedTouches[0].clientX-nr.left);
-    pill.style.transition=''; // snap with CSS transition
+    if(_live){
+      _live=false;
+      if(_raf){cancelAnimationFrame(_raf);_raf=null;}
+      pill.style.transition=''; // re-enable CSS transition for snap
+    }
+    // tap OR drag end: always smooth-slide to destination
     if(page!==curPg)go(page);else movePill(curPg);
   },{passive:true});
 }

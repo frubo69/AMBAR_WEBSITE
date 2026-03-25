@@ -27,6 +27,7 @@
   --red:#E05555;--green:#4CAF7D;
   --r:16px;--r2:12px;--r3:10px;
   --safe-bottom:env(safe-area-inset-bottom,0px);
+  --safe-top:var(--tg-content-safe-area-inset-top,0px);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
 html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;height:100%;overflow:hidden}
@@ -34,7 +35,7 @@ button,input{font-family:'DM Sans',sans-serif;outline:none}
 img{display:block}
 .page{position:fixed;top:0;left:0;right:0;height:calc(var(--tg-h,100vh) - 60px - var(--safe-bottom));overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;opacity:1;transition:opacity .2s,transform .2s}
 .page.hidden{opacity:0;pointer-events:none;transform:translateY(8px)}
-.hdr{position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;background:rgba(7,7,14,.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);flex-shrink:0}
+.hdr{position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;padding-top:calc(12px + var(--safe-top));background:rgba(7,7,14,.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);flex-shrink:0}
 .logo{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:700;letter-spacing:7px;background:linear-gradient(135deg,var(--gold),var(--gold2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .logo-sub{font-size:7px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);margin-top:-1px;font-family:'DM Sans',sans-serif;font-weight:400;text-align:center}
 .logo-grp{display:inline-flex;flex-direction:column;align-items:center;gap:2px}
@@ -468,7 +469,7 @@ img{display:block}
 /* ── Support Chat Overlay ── */
 .support-overlay{position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;flex-direction:column;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1,.64,1)}
 .support-overlay.show{transform:translateY(0)}
-.support-hdr{display:flex;align-items:center;gap:12px;padding:12px 16px;background:rgba(7,7,14,.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);flex-shrink:0}
+.support-hdr{display:flex;align-items:center;gap:12px;padding:12px 16px;padding-top:calc(12px + var(--safe-top));background:rgba(7,7,14,.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);flex-shrink:0}
 .support-back{width:32px;height:32px;border-radius:50%;border:1px solid var(--border2);background:var(--card2);display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--sub);flex-shrink:0;transition:.15s}
 .support-back:active{transform:scale(.85)}
 .support-hdr-info{flex:1;min-width:0}
@@ -542,7 +543,7 @@ img{display:block}
 <div id="pg-catalog" class="page">
   <div style="position:sticky;top:0;z-index:40;background:rgba(7,7,14,.96);backdrop-filter:blur(20px)">
     <!-- Single row: Logo | Address (center) | Cart + Lang -->
-    <div style="display:flex;align-items:center;padding:10px 14px;gap:6px">
+    <div style="display:flex;align-items:center;padding:10px 14px;padding-top:calc(10px + var(--safe-top));gap:6px">
       <!-- Left: Logo -->
       <div style="flex-shrink:0">
         <div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div></div>

@@ -1291,7 +1291,7 @@ async function checkBanStatus(){
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded',()=>{
-  if(tg){tg.ready();tg.expand();tg.setHeaderColor&&tg.setHeaderColor('#07070E');tg.setBackgroundColor&&tg.setBackgroundColor('#07070E');tg.enableClosingConfirmation&&tg.enableClosingConfirmation();tg.disableVerticalSwipes&&tg.disableVerticalSwipes();}
+  if(tg){tg.ready();tg.expand();if(tg.isVersionAtLeast&&tg.isVersionAtLeast('8.0')&&tg.requestFullscreen)tg.requestFullscreen();tg.setHeaderColor&&tg.setHeaderColor('#07070E');tg.setBackgroundColor&&tg.setBackgroundColor('#07070E');tg.enableClosingConfirmation&&tg.enableClosingConfirmation();tg.disableVerticalSwipes&&tg.disableVerticalSwipes();}
   checkBanStatus(); // 🔒 Check ban first — halts UI if banned
   startOrderPolling(); // 📦 Start active order bar polling
   // Restore active address index

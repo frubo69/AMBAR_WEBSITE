@@ -492,9 +492,15 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         try:
             app2 = Application.builder().token(BOT_TOKEN).build()
             async with app2:
-                await app2.bot.send_message(
-                    cid, "🚫 *Ваш аккаунт заблокирован.*\n\nОбратитесь в поддержку.",
-                    parse_mode="Markdown")
+                ban_msg = await app2.bot.send_message(
+                    cid,
+                    "🚫 *Ваш аккаунт заблокирован.*\n\nОбратитесь в поддержку — нажмите кнопку ниже.",
+                    parse_mode="Markdown",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("💬 Написать в поддержку", url="https://t.me/ambar_support_bot")
+                    ]])
+                )
+                await db.set_user_field(cid, last_ban_msg_id=ban_msg.message_id)
         except: pass
         await q.edit_message_text(
             f"🚫 *Пользователь заблокирован*\n\nID: `{cid}`\nЗаказ: `#{oid}`\nЗаблокировал: оператор `{op}`",

@@ -114,13 +114,29 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
               "📎 Получили файл! Скоро ответим здесь.")
         )
 
+    # Check ban status for this user
+    ban_notice = ""
+    try:
+        user_doc = await db.get_user(user.id)
+        if user_doc and user_doc.get("is_banned"):
+            banned_at = (user_doc.get("banned_at") or "")[:10]
+            ban_reason = user_doc.get("ban_reason") or "—"
+            ban_notice = (
+                f"\n\n🔴 *ПОЛЬЗОВАТЕЛЬ ЗАБЛОКИРОВАН*"
+                f"\nДата: {banned_at}"
+                f"\nПричина: {ban_reason}"
+            )
+    except Exception as e:
+        print(f"⚠️ Ban check failed: {e}")
+
     # Forward to admins with user info
     for admin_id in ADMIN_IDS:
         try:
-            # Send user info first
+            # Send user info first (with ban notice if applicable)
             info_msg = await context.bot.send_message(
                 chat_id=admin_id,
-                text=format_user_info(user)
+                text=format_user_info(user) + ban_notice,
+                parse_mode="Markdown"
             )
 
             # Forward actual user message

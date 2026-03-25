@@ -126,6 +126,13 @@ async def handle_create_order(request: web.Request) -> web.Response:
         for i in items
     )
 
+    # Check if this is the user's very first order (before incrementing)
+    try:
+        user_doc = await db.get_user(uid)
+        is_first_order = (user_doc is None or user_doc.get("orders_total", 0) == 0)
+    except Exception:
+        is_first_order = False
+
     # Save order + upsert user profile in parallel
     order_doc = {
         "order_id": oid,        "customer_id": uid,
@@ -180,7 +187,9 @@ async def handle_create_order(request: web.Request) -> web.Response:
         try: loc_str = f"\n📍 {float(lat):.5f}, {float(lon):.5f}"
         except (ValueError, TypeError): pass
 
+    first_order_banner = "🔴 *⚠️ ПЕРВЫЙ ЗАКАЗ — новый клиент!*\n\n" if is_first_order else ""
     op_text = (
+        f"{first_order_banner}"
         f"🆕 *НОВЫЙ ЗАКАЗ #{oid}*\n\n"
         f"🏢 Офис: *{office_nm}*\n\n"
         f"👤 *{user_name}*\n"

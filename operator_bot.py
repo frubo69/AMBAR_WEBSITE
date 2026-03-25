@@ -108,8 +108,8 @@ def kb_add_product(oid):
 
 def kb_ban_confirm(cid, oid):
     return InlineKeyboardMarkup([[
-        InlineKeyboardButton("⚠️ Да, заблокировать", callback_data=f"ban_confirm_{cid}_{oid}"),
-        InlineKeyboardButton("❌ Отмена",             callback_data=f"ban_cancel_{oid}"),
+        InlineKeyboardButton("⏭ Без причины", callback_data=f"ban_skip_{cid}_{oid}"),
+        InlineKeyboardButton("❌ Отмена",      callback_data=f"ban_cancel_{oid}"),
     ]])
 
 
@@ -244,6 +244,19 @@ async def run_countdown(cid, eta_min, lang, oid=None):
 async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_operator(update.effective_user.id):
         await update.message.reply_text("⛔ Нет доступа."); return
+
+    # ── Intercept ban reason input ─────────────────────────────────────────────
+    pending = ctx.user_data.get("pending_ban")
+    if pending:
+        ctx.user_data.pop("pending_ban")
+        op     = update.effective_user.id
+        reason = (update.message.text or "").strip()
+        await _do_ban(op, pending["cid"], pending["oid"], reason)
+        display = reason or "Заблокирован оператором"
+        await update.message.reply_text(
+            f"🚫 *Пользователь `{pending['cid']}` заблокирован*\n\n💬 Причина: _{display}_",
+            parse_mode="Markdown")
+        return
 
     text = update.message.text
     uid  = update.effective_user.id
@@ -486,22 +499,10 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         except: pass
 
     # ── BAN ───────────────────────────────────────────────────────────────────
-    elif data.startswith("ban_confirm_"):
+    elif data.startswith("ban_skip_"):
         parts = data.split("_"); cid = int(parts[2]); oid = parts[3]
-        await db.ban_user(cid, reason="Заблокирован оператором", by=op)
-        try:
-            app2 = Application.builder().token(BOT_TOKEN).build()
-            async with app2:
-                ban_msg = await app2.bot.send_message(
-                    cid,
-                    "🚫 *Ваш аккаунт заблокирован.*\n\nОбратитесь в поддержку — нажмите кнопку ниже.",
-                    parse_mode="Markdown",
-                    reply_markup=InlineKeyboardMarkup([[
-                        InlineKeyboardButton("💬 Написать в поддержку", url="https://t.me/ambar_support_bot")
-                    ]])
-                )
-                await db.set_user_field(cid, last_ban_msg_id=ban_msg.message_id)
-        except: pass
+        ctx.user_data.pop("pending_ban", None)
+        await _do_ban(op, cid, oid, "")
         await q.edit_message_text(
             f"🚫 *Пользователь заблокирован*\n\nID: `{cid}`\nЗаказ: `#{oid}`\nЗаблокировал: оператор `{op}`",
             parse_mode="Markdown")
@@ -520,8 +521,10 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     elif data.startswith("ban_"):
         parts = data.split("_"); oid = parts[1]; cid = int(parts[2])
+        ctx.user_data["pending_ban"] = {"cid": cid, "oid": oid}
         await q.message.reply_text(
-            f"⚠️ Заблокировать клиента `{cid}`?\n\nОн не сможет пользоваться ботом.",
+            f"⚠️ Блокировка клиента `{cid}`\n\n"
+            f"💬 *Введите причину* (для внутренних заметок) или нажмите «Без причины»:",
             parse_mode="Markdown", reply_markup=kb_ban_confirm(cid, oid))
 
     # ── UNBAN ─────────────────────────────────────────────────────────────────
@@ -552,6 +555,27 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 )
         except: pass
         await q.edit_message_text(f"✅ Пользователь `{uid_str}` разблокирован.", parse_mode="Markdown")
+
+
+# ── Ban helper ────────────────────────────────────────────────────────────────
+async def _do_ban(op: int, cid: int, oid: str, reason: str):
+    """Ban user, send ban message with support button, save msg_id."""
+    final_reason = reason.strip() or "Заблокирован оператором"
+    await db.ban_user(cid, reason=final_reason, by=op)
+    try:
+        app2 = Application.builder().token(BOT_TOKEN).build()
+        async with app2:
+            ban_msg = await app2.bot.send_message(
+                cid,
+                "🚫 *Ваш аккаунт заблокирован.*\n\nОбратитесь в поддержку — нажмите кнопку ниже.",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("💬 Написать в поддержку", url="https://t.me/ambar_support_bot")
+                ]])
+            )
+            await db.set_user_field(cid, last_ban_msg_id=ban_msg.message_id)
+    except: pass
+
 
 
 # ── Init ──────────────────────────────────────────────────────────────────────

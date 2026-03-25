@@ -85,7 +85,7 @@ img{display:block}
 #modal-addr-list .saved-card{padding:10px 14px}
 #modal-addr-list .saved-card:last-child{border-bottom:1px solid var(--border2)}
 
-.bnav{position:fixed;bottom:0;left:0;right:0;z-index:40;display:flex;background:rgba(7,7,14,.97);border-top:1px solid var(--border);padding-bottom:var(--safe-bottom)}
+.bnav{position:fixed;bottom:0;left:0;right:0;z-index:40;display:flex;background:rgba(7,7,14,.97);border-top:1px solid var(--border);padding-bottom:var(--safe-bottom);padding-left:4px;padding-right:4px}
 .bnav-pill{position:absolute;top:7px;left:0;border-radius:14px;background:rgba(201,169,110,.11);border:1px solid rgba(201,169,110,.38);pointer-events:none;z-index:0;will-change:transform;transition:transform .2s cubic-bezier(.4,0,.2,1)}
 .nb{flex:1;display:flex;flex-direction:column;align-items:center;padding:11px 4px 9px;gap:4px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:color .2s;position:relative;z-index:1}
 .nb.on{color:var(--gold)}
@@ -1455,59 +1455,84 @@ function showHsGuide(){
 // ── PAGES ─────────────────────────────────────────────────────────────────────
 const PAGES=['catalog','cart','address','orders','profile','checkout'];
 const _NAV_PAGES=['catalog','cart','address','orders','profile'];
-function _pillX(page){
-  const btn=el('nb-'+page),bnav=el('bnav');
-  if(!btn||!bnav)return 0;
-  return btn.getBoundingClientRect().left - bnav.getBoundingClientRect().left;
+const _PM=6; // pill margin inside each tab
+// returns the target translateX for a given page
+function _pillSnapX(page){
+  const btn=el('nb-'+page),nav=el('bnav');
+  if(!btn||!nav)return 0;
+  return btn.getBoundingClientRect().left - nav.getBoundingClientRect().left + _PM;
 }
 function movePill(page,instant){
-  const pill=el('bnav-pill');
-  if(!pill)return;
-  if(instant){pill.style.transition='none';requestAnimationFrame(()=>pill.style.transition='');}
-  pill.style.transform='translateX('+_pillX(page)+'px)';
+  const pill=el('bnav-pill');if(!pill)return;
+  if(instant){pill.style.transition='none';pill.style.transform='translateX('+_pillSnapX(page)+'px)';requestAnimationFrame(()=>pill.style.transition='');}
+  else pill.style.transform='translateX('+_pillSnapX(page)+'px)';
 }
 function _initPill(){
-  const pill=el('bnav-pill'),btn=el('nb-catalog');
-  if(!pill||!btn)return;
-  const m=5;
-  pill.style.width=(btn.offsetWidth-m*2)+'px';
-  pill.style.height=(btn.offsetHeight-14)+'px';
-  pill.style.left=m+'px';
+  const pill=el('bnav-pill'),btn0=el('nb-catalog'),nav=el('bnav');
+  if(!pill||!btn0||!nav)return;
+  pill.style.left='0';
+  pill.style.width=(btn0.offsetWidth-_PM*2)+'px';
+  pill.style.height=(btn0.offsetHeight-14)+'px';
   movePill('catalog',true);
-  // ── drag to switch tabs ──
-  const bnav=el('bnav');
-  let _dragging=false,_dragPage=null;
-  function _pageAtX(cx){
+
+  const pillW=btn0.offsetWidth-_PM*2;
+  let _live=false,_fx=0,_raf=null;
+
+  // Get tab center X relative to nav
+  function _tc(page){
+    const b=el('nb-'+page),nr=nav.getBoundingClientRect();
+    if(!b)return 0;const r=b.getBoundingClientRect();
+    return r.left-nr.left+r.width/2;
+  }
+  // Nearest page to a nav-relative X
+  function _nearest(relX){
+    let best=_NAV_PAGES[0],bd=Infinity;
+    for(const p of _NAV_PAGES){const d=Math.abs(relX-_tc(p));if(d<bd){bd=d;best=p;}}
+    return best;
+  }
+
+  function _frame(){
+    if(!_live)return;
+    const nr=nav.getBoundingClientRect();
+    const relX=_fx-nr.left; // finger relative to nav left
+    const tabW=nr.width/_NAV_PAGES.length;
+
+    // Find nearest tab and distance to its center
+    let nearPage=_NAV_PAGES[0],nearDist=Infinity,nearCX=0;
     for(const p of _NAV_PAGES){
-      const b=el('nb-'+p);if(!b)continue;
-      const r=b.getBoundingClientRect();
-      if(cx>=r.left&&cx<=r.right)return p;
+      const cx=_tc(p);const d=Math.abs(relX-cx);
+      if(d<nearDist){nearDist=d;nearPage=p;nearCX=cx;}
     }
-    return null;
-  }
-  function _dragSet(cx){
-    const p=_pageAtX(cx);
-    if(!p||p===_dragPage)return;
-    _dragPage=p;
+    // Magnetic pull strength: 0 far away → 1 when centred on tab
+    const pull=Math.max(0,1-nearDist/(tabW*0.55));
+    const eased=pull*pull*(3-2*pull); // smoothstep
+    // Pill centre: blend finger ↔ nearest tab centre
+    const pillCX=relX+(nearCX-relX)*eased*0.65;
+    // translateX = pill left edge = pillCX - pillW/2, clamped inside nav
+    const maxX=nr.width-pillW-_PM;
+    const tx=Math.max(_PM,Math.min(maxX,pillCX-pillW/2));
     pill.style.transition='none';
-    pill.style.transform='translateX('+(_pillX(p)-m)+'px)';
-    _NAV_PAGES.forEach(id=>el('nb-'+id)?.classList.toggle('on',id===p));
+    pill.style.transform='translateX('+tx+'px)';
+    // Highlight nearest tab
+    _NAV_PAGES.forEach(p=>el('nb-'+p)?.classList.toggle('on',p===nearPage));
+    _raf=requestAnimationFrame(_frame);
   }
-  bnav.addEventListener('touchstart',e=>{
-    _dragging=true;_dragPage=curPg;
-    _dragSet(e.touches[0].clientX);
+
+  nav.addEventListener('touchstart',e=>{
+    _live=true;_fx=e.touches[0].clientX;
+    if(_raf)cancelAnimationFrame(_raf);
+    _raf=requestAnimationFrame(_frame);
   },{passive:true});
-  bnav.addEventListener('touchmove',e=>{
-    if(!_dragging)return;
-    _dragSet(e.touches[0].clientX);
+  nav.addEventListener('touchmove',e=>{
+    _fx=e.touches[0].clientX;
   },{passive:true});
-  bnav.addEventListener('touchend',e=>{
-    if(!_dragging)return;
-    _dragging=false;
-    pill.style.transition='';
-    const p=_pageAtX(e.changedTouches[0].clientX)||curPg;
-    if(p!==curPg)go(p);
-    else movePill(curPg);
+  nav.addEventListener('touchend',e=>{
+    if(!_live)return;_live=false;
+    if(_raf){cancelAnimationFrame(_raf);_raf=null;}
+    const nr=nav.getBoundingClientRect();
+    const page=_nearest(e.changedTouches[0].clientX-nr.left);
+    pill.style.transition=''; // snap with CSS transition
+    if(page!==curPg)go(page);else movePill(curPg);
   },{passive:true});
 }
 function go(p){

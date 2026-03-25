@@ -1,6 +1,6 @@
-import os, json
+import os, uuid
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 import aiohttp as _aiohttp
 
 from telegram import Update
@@ -13,25 +13,13 @@ from telegram.ext import (
 )
 
 from config import BOT_TOKEN, ADMIN_IDS
+import db
 
 # Main customer bot token (for sending notifications to users)
 MAIN_BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 
 # map: forwarded_message_id -> user_id (in-memory, for direct bot users)
 MESSAGE_MAP = {}
-
-# Shared files for mini app support bridge
-SUPPORT_MSGS_FILE = Path(__file__).parent / "support_messages.json"
-SUPPORT_MAP_FILE  = Path(__file__).parent / "support_map.json"
-
-def _load_json(path):
-    try:
-        return json.loads(path.read_text())
-    except:
-        return {}
-
-def _save_json(path, data):
-    path.write_text(json.dumps(data, ensure_ascii=False, indent=2))
 
 async def _notify_user(user_id: int, text: str):
     """Send notification to user via main AMBAR bot."""
@@ -160,50 +148,49 @@ async def handle_admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE)
     replied_id = msg.reply_to_message.message_id
     user_id = MESSAGE_MAP.get(replied_id)
 
-    # Check shared file map for mini app conversations
+    # Check MongoDB for mini app conversations
     conv_info = None
     if not user_id:
-        smap = _load_json(SUPPORT_MAP_FILE)
-        info = smap.get(str(replied_id))
-        if info:
-            user_id = info["user_id"]
-            conv_info = info  # has conv_key, order_id
+        try:
+            conv_info = await db.get_support_map_entry(str(replied_id))
+            if conv_info:
+                user_id = conv_info["user_id"]
+        except Exception as e:
+            print(f"⚠️ DB lookup failed: {e}")
 
     if not user_id:
         return
 
-    # If this was a mini app conversation, save reply to shared file only (user sees it in the app)
+    # Mini app conversation — save reply to MongoDB so it appears in the app
     if conv_info:
         conv_key = conv_info["conv_key"]
-        msgs = _load_json(SUPPORT_MSGS_FILE)
-        if conv_key not in msgs:
-            msgs[conv_key] = []
+        ts = datetime.now(timezone.utc).isoformat()
 
-        if msg.photo:
-            # Operator sent a photo — download and store
-            import uuid
-            photo = msg.photo[-1]  # highest resolution
-            file = await photo.get_file()
-            upload_dir = Path(__file__).parent / "uploads" / "support"
-            upload_dir.mkdir(parents=True, exist_ok=True)
-            fname = f"{uuid.uuid4().hex[:12]}.jpg"
-            fpath = upload_dir / fname
-            await file.download_to_drive(str(fpath))
-            msgs[conv_key].append({
-                "role": "operator", "type": "photo",
-                "url": f"/uploads/support/{fname}",
-                "caption": msg.caption or "",
-                "ts": datetime.now().isoformat(),
-            })
-        else:
-            msgs[conv_key].append({
-                "role": "operator", "type": "text",
-                "text": msg.text or msg.caption or "(media)",
-                "ts": datetime.now().isoformat(),
-            })
-        _save_json(SUPPORT_MSGS_FILE, msgs)
+        try:
+            if msg.photo:
+                photo = msg.photo[-1]
+                file = await photo.get_file()
+                upload_dir = Path(__file__).parent / "uploads" / "support"
+                upload_dir.mkdir(parents=True, exist_ok=True)
+                fname = f"{uuid.uuid4().hex[:12]}.jpg"
+                fpath = upload_dir / fname
+                await file.download_to_drive(str(fpath))
+                await db.append_support_msg(conv_key, {
+                    "role": "operator", "type": "photo",
+                    "url": f"/uploads/support/{fname}",
+                    "caption": msg.caption or "",
+                    "ts": ts,
+                })
+            else:
+                await db.append_support_msg(conv_key, {
+                    "role": "operator", "type": "text",
+                    "text": msg.text or msg.caption or "(media)",
+                    "ts": ts,
+                })
+        except Exception as e:
+            print(f"⚠️ Failed to save operator reply to DB: {e}")
 
-        # Notify user via main bot DM (no reply preview — let them check in the app)
+        # Notify user via main bot
         order_id = conv_info.get("order_id", "")
         notif = (
             f"💬 *Новое сообщение от поддержки*"
@@ -220,8 +207,11 @@ async def handle_admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE)
         print(f"⚠️ Could not send reply to user {user_id}: {e}")
 
 
+async def post_init(app):
+    await db.connect()
+
 def main():
-    app = ApplicationBuilder().token(BOT_TOKEN).build()
+    app = ApplicationBuilder().token(BOT_TOKEN).post_init(post_init).build()
 
     app.add_handler(CommandHandler("start", start))
 

@@ -240,3 +240,9 @@ async def save_support_map_entry(fwd_id: str, entry: dict):
         {"$set": {**entry, "fwd_msg_id": fwd_id}},
         upsert=True,
     )
+
+
+async def get_support_map_entry(fwd_id: str) -> dict | None:
+    db = _db_or_none()
+    if db is None: return None
+    return await db.support_map.find_one({"fwd_msg_id": fwd_id}, {"_id": 0})

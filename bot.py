@@ -75,7 +75,12 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     try:
         if await db.is_banned(uid):
             ban_msg = await update.message.reply_text(
-                "🚫 *Ваш аккаунт заблокирован.*\n\nОбратитесь в поддержку.", parse_mode="Markdown")
+                "🚫 *Ваш аккаунт заблокирован.*\n\nОбратитесь в поддержку — нажмите кнопку ниже.",
+                parse_mode="Markdown",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("💬 Написать в поддержку", url="https://t.me/ambar_support_bot")
+                ]])
+            )
             try:
                 await db.set_user_field(uid, last_ban_msg_id=ban_msg.message_id)
             except: pass
@@ -161,7 +166,12 @@ async def fallback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid  = update.effective_user.id
     try:
         if await db.is_banned(uid):
-            await update.message.reply_text("🚫 Ваш аккаунт заблокирован.")
+            await update.message.reply_text(
+                "🚫 Ваш аккаунт заблокирован.",
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("💬 Написать в поддержку", url="https://t.me/ambar_support_bot")
+                ]])
+            )
             return
     except Exception as e:
         log.warning(f"ban check failed: {e}")

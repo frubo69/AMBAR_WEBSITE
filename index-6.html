@@ -65,6 +65,15 @@ img{display:block}
 .addr-pill-row{display:flex;align-items:center;gap:3px;min-width:0;max-width:100%}
 .addr-pill-txt{font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .addr-pill-dot{display:none}
+/* Header delivery button */
+.hdr-addr-btn{background:none;border:none;padding:0;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:1px;-webkit-tap-highlight-color:transparent;outline:none;flex-shrink:0;max-width:130px}
+.hdr-addr-btn:active{opacity:.6}
+.hdr-addr-sub{font-size:8px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;font-weight:500;white-space:nowrap}
+.hdr-addr-row{display:flex;align-items:center;gap:3px}
+.hdr-addr-txt{font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:118px}
+/* Header back button */
+.hdr-back{width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(255,255,255,.6);flex-shrink:0;transition:.15s;-webkit-tap-highlight-color:transparent;outline:none}
+.hdr-back:active{transform:scale(.85)}
 
 /* Address selector modal */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .2s}
@@ -552,24 +561,24 @@ img{display:block}
 <!-- ═══ CATALOG ═══ -->
 <div id="pg-catalog" class="page">
   <div style="position:sticky;top:0;z-index:40;background:rgba(7,7,14,.96);backdrop-filter:blur(20px)">
-    <!-- Single row: Logo | Address (center) | Cart + Lang -->
-    <div style="display:flex;align-items:center;padding:10px 14px;padding-top:calc(10px + var(--safe-top));gap:6px">
-      <!-- Left: Logo -->
-      <div style="flex-shrink:0">
+    <!-- Single row: Delivery (left) | AMBAR logo (center absolute) | Cart + Lang (right) -->
+    <div style="display:flex;align-items:center;padding:10px 14px;padding-top:calc(10px + var(--safe-top));position:relative">
+      <!-- Left: Delivery address -->
+      <div style="flex:1">
+        <button class="hdr-addr-btn" onclick="openAddrModal()">
+          <span class="hdr-addr-sub" id="addr-pill-label">ДОСТАВКА В</span>
+          <div class="hdr-addr-row">
+            <span class="hdr-addr-txt" id="addr-pill-txt">Добавьте адрес</span>
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.8"><polyline points="6 9 12 15 18 9"/></svg>
+          </div>
+        </button>
+      </div>
+      <!-- Center: Logo (absolute overlay, pointer-events:none) -->
+      <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
         <div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div></div>
       </div>
-      <!-- Center: Address pill -->
-      <div style="flex:1;display:flex;justify-content:center;min-width:0">
-        <div class="addr-pill" onclick="openAddrModal()" id="addr-pill" style="align-items:center">
-          <span class="addr-pill-sub" id="addr-pill-label">ДОСТАВКА В</span>
-          <div class="addr-pill-row">
-            <span class="addr-pill-txt" id="addr-pill-txt">Добавьте адрес</span>
-            <span style="color:var(--gold);font-size:11px;flex-shrink:0">▾</span>
-          </div>
-        </div>
-      </div>
       <!-- Right: Cart + Lang -->
-      <div class="hdr-right" style="flex-shrink:0">
+      <div class="hdr-right" style="flex:1;justify-content:flex-end">
         <div class="cart-pill" onclick="go('cart')">🛒 <span class="cart-txt" id="hdr-tot">0 AED</span><span class="cart-dot" id="hdr-dot">0</span></div>
         <button class="lang-btn" onclick="flipLang()" id="lbtn">🇷🇺</button>
       </div>
@@ -597,10 +606,10 @@ img{display:block}
 
 <!-- ═══ CART ═══ -->
 <div id="pg-cart" class="page hidden">
-  <div class="hdr">
+  <div class="hdr" style="position:relative">
+    <div style="flex:1"><button class="hdr-back" onclick="go('catalog')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-cart">ваша корзина</div></div></div>
     <div style="flex:1"></div>
-    <div style="flex:0 0 auto"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-cart">ваша корзина</div></div></div>
-    <div class="hdr-right" style="flex:1;justify-content:flex-end"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
   </div>
   <!-- Cart top bar -->
   <div class="cart-topbar">
@@ -644,10 +653,10 @@ img{display:block}
 
 <!-- ═══ ADDRESS PAGE ═══ -->
 <div id="pg-address" class="page hidden">
-  <div class="hdr">
+  <div class="hdr" style="position:relative">
+    <div style="flex:1"><button class="hdr-back" onclick="go('catalog')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-addr">ваши адреса</div></div></div>
     <div style="flex:1"></div>
-    <div style="flex:0 0 auto"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-addr">ваши адреса</div></div></div>
-    <div class="hdr-right" style="flex:1;justify-content:flex-end"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
   </div>
   <div class="addr-page-body">
     <!-- Saved addresses list -->
@@ -718,10 +727,10 @@ img{display:block}
 
 <!-- ═══ ORDERS ═══ -->
 <div id="pg-orders" class="page hidden" style="overflow:hidden">
-  <div class="hdr">
+  <div class="hdr" style="position:relative">
+    <div style="flex:1"><button class="hdr-back" onclick="go('catalog')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-ord">ваша история</div></div></div>
     <div style="flex:1"></div>
-    <div style="flex:0 0 auto"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-ord">ваша история</div></div></div>
-    <div class="hdr-right" style="flex:1;justify-content:flex-end"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
   </div>
   <div style="display:flex;align-items:center;padding:10px 14px 8px;gap:10px;flex-shrink:0">
     <span style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:var(--gold);letter-spacing:2.5px;text-transform:uppercase" id="sh-orders">История</span>
@@ -739,10 +748,10 @@ img{display:block}
 
 <!-- ═══ PROFILE ═══ -->
 <div id="pg-profile" class="page hidden">
-  <div class="hdr">
+  <div class="hdr" style="position:relative">
+    <div style="flex:1"><button class="hdr-back" onclick="go('catalog')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-prof">ваш профиль</div></div></div>
     <div style="flex:1"></div>
-    <div style="flex:0 0 auto"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-prof">ваш профиль</div></div></div>
-    <div class="hdr-right" style="flex:1;justify-content:flex-end"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
   </div>
   <div class="profile-card">
     <div class="profile-avatar" id="prof-av">A</div>
@@ -3744,9 +3753,27 @@ function _initAobSwipe(){
   },{passive:true});
 }
 
+function _initSortSwipe(){
+  const sheet=el('sort-overlay').querySelector('.modal-sheet');
+  if(!sheet)return;
+  let sy=0,dragging=false;
+  sheet.addEventListener('touchstart',e=>{sy=e.touches[0].clientY;dragging=true;},{passive:true});
+  sheet.addEventListener('touchmove',e=>{
+    if(!dragging)return;
+    const dy=e.touches[0].clientY-sy;
+    if(dy>0){sheet.style.transition='none';sheet.style.transform=`translateY(${dy}px)`;}
+  },{passive:true});
+  sheet.addEventListener('touchend',e=>{
+    dragging=false;sheet.style.transition='';
+    const dy=e.changedTouches[0].clientY-sy;
+    if(dy>80){el('sort-overlay').classList.remove('show');sheet.style.transform='';}
+    else{sheet.style.transform='';}
+  },{passive:true});
+}
+
 function startOrderPolling(){
   checkActiveOrder();
-  setTimeout(()=>{_initAobSwipe();_initAodSwipe();},500);
+  setTimeout(()=>{_initAobSwipe();_initAodSwipe();_initSortSwipe();},500);
   _aobTickTimer=setInterval(()=>{if(_aobOrders.length)_renderAob();},30000);
   _aobPollTimer=setInterval(()=>checkActiveOrder(),25000);
 }

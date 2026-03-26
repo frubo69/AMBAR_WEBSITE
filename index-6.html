@@ -2397,7 +2397,10 @@ function setCat(c,btn){
   const page=el('pg-catalog');
   if(!hdr||!page)return;
   const stickyH=page.querySelector('.hdr')?.offsetHeight||170;
-  page.scrollTop=hdr.offsetTop-stickyH+1;
+  // Use getBoundingClientRect for accurate scroll delta on iOS (offsetTop unreliable in sticky/fixed nesting)
+  const hdrRect=hdr.getBoundingClientRect();
+  const pageRect=page.getBoundingClientRect();
+  page.scrollTop=page.scrollTop+(hdrRect.top-pageRect.top)-stickyH;
 }
 function renderGrid(){
   let list=[...P];

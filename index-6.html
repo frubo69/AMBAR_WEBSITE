@@ -96,11 +96,17 @@ img{display:block}
 
 .chips{display:flex;gap:6px;padding:8px 10px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;position:relative}
 .chips::-webkit-scrollbar{display:none}
-.sort-opt{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--border2);cursor:pointer;transition:.15s;font-size:14px;color:var(--text)}
-.sort-opt:active{background:rgba(255,255,255,.03)}
-.sort-opt.on{color:var(--gold)}
-.sort-opt-check{font-size:18px;color:var(--gold);opacity:0;transition:.15s}
-.sort-opt.on .sort-opt-check{opacity:1}
+#sort-overlay .modal-sheet{border-radius:22px;margin:0 10px calc(var(--safe-bottom,0px) + 16px);width:auto;padding:0;background:var(--bg3)}
+.sort-ttl{font-size:13px;font-weight:600;color:rgba(255,255,255,.35);text-align:center;padding:16px 16px 14px;letter-spacing:.8px;text-transform:uppercase;font-family:'DM Sans',sans-serif}
+.sort-opts-wrap{display:flex;flex-direction:column;gap:5px;padding:0 10px 14px}
+.sort-opt{display:flex;align-items:center;gap:12px;padding:14px 14px;border-radius:14px;cursor:pointer;transition:.15s;font-size:14px;font-weight:500;color:rgba(255,255,255,.6);background:rgba(255,255,255,.04);border:1px solid transparent;outline:none;-webkit-tap-highlight-color:transparent;width:100%;text-align:left}
+.sort-opt:active{opacity:.6;transform:scale(.97)}
+.sort-opt.on{background:rgba(201,169,110,.1);border-color:rgba(201,169,110,.22);color:var(--gold)}
+.sort-opt-lbl{flex:1;font-family:'DM Sans',sans-serif}
+.sort-opt-radio{width:21px;height:21px;border-radius:50%;border:1.5px solid rgba(255,255,255,.18);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.2s}
+.sort-opt.on .sort-opt-radio{border-color:var(--gold);background:var(--gold)}
+.sort-opt-radio svg{opacity:0;transition:.12s;transform:scale(.7);transition:opacity .12s,transform .12s}
+.sort-opt.on .sort-opt-radio svg{opacity:1;transform:scale(1)}
 .sort-btn{width:32px;height:32px;border-radius:10px;border:none;outline:none;-webkit-tap-highlight-color:transparent;background:rgba(255,255,255,.08);color:rgba(255,255,255,.65)!important;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s}
 .sort-btn:active{transform:scale(.85)}
 .sort-btn.active{background:rgba(201,169,110,.18);color:var(--gold)}
@@ -855,8 +861,8 @@ img{display:block}
 <div class="modal-overlay" id="sort-overlay" onclick="closeSortSheet(event)">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="sort-sheet-title">Сортировка</div>
-    <div id="sort-options"></div>
+    <div class="sort-ttl" id="sort-sheet-title">Сортировка</div>
+    <div id="sort-options" class="sort-opts-wrap"></div>
   </div>
 </div>
 
@@ -2352,10 +2358,10 @@ const SORT_OPTIONS=[
 function openSortSheet(){
   el('sort-sheet-title').textContent=lang==='ru'?'Сортировка':'Sort by';
   el('sort-options').innerHTML=SORT_OPTIONS.map(o=>`
-    <div class="sort-opt${sortMode===o.key?' on':''}" onclick="applySort('${o.key}')">
-      <span>${lang==='ru'?o.ru:o.en}</span>
-      <svg class="sort-opt-check" viewBox="0 0 24 24" fill="none" stroke="#c9a96e" stroke-width="2.5" width="20" height="20"><polyline points="20 6 9 17 4 12"/></svg>
-    </div>`).join('');
+    <button class="sort-opt${sortMode===o.key?' on':''}" onclick="applySort('${o.key}')">
+      <span class="sort-opt-lbl">${lang==='ru'?o.ru:o.en}</span>
+      <span class="sort-opt-radio"><svg viewBox="0 0 24 24" fill="none" stroke="#07070E" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" width="11" height="11"><polyline points="20 6 9 17 4 12"/></svg></span>
+    </button>`).join('');
   el('sort-overlay').classList.add('show');
 }
 function closeSortSheet(e){

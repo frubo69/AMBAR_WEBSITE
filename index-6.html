@@ -94,7 +94,7 @@ img{display:block}
 .nb i{font-size:26px;line-height:1;transition:filter .25s}
 .nb span{font-size:10px;letter-spacing:.4px;font-weight:500}
 
-.chips{display:flex;gap:7px;padding:8px 14px 6px;overflow-x:auto;scrollbar-width:none;flex-shrink:0}
+.chips{display:flex;gap:7px;padding:8px 14px 6px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;position:relative}
 .chips::-webkit-scrollbar{display:none}
 .sort-opt{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--border2);cursor:pointer;transition:.15s;font-size:14px;color:var(--text)}
 .sort-opt:active{background:rgba(255,255,255,.03)}
@@ -1306,13 +1306,23 @@ window.addEventListener('DOMContentLoaded',()=>{
   // Validate it still exists
   if(activeAddrIdx!==null&&!getSaved()[activeAddrIdx]) activeAddrIdx=null;
   buildTips();syncOrders();applyLang();loadCatalog();updateFavBtn();updateSortBtn();initSupportInput();checkFirstLaunchHomeScreen();
-  // Fix iOS WebKit chip click offset (scrollLeft not accounted for in click events inside nested overflow)
+  // Fix iOS WebKit chip tap offset: elementFromPoint also ignores scrollLeft on iOS,
+  // so we compute hit manually using chip.offsetLeft (DOM layout, not visual) + cc.scrollLeft
   (function(){
     const cc=el('cat-chips');if(!cc)return;
     cc.addEventListener('touchend',function(e){
       const t=e.changedTouches[0];
-      const chip=(document.elementFromPoint(t.clientX,t.clientY)||e.target).closest('.chip');
-      if(chip&&cc.contains(chip)){e.preventDefault();setCat(chip.dataset.cat,chip);}
+      const ccRect=cc.getBoundingClientRect();
+      if(t.clientY<ccRect.top-4||t.clientY>ccRect.bottom+4)return;
+      // xInContent = touch position within cc's scrollable content area
+      const xInContent=t.clientX-ccRect.left+cc.scrollLeft;
+      const chips=cc.querySelectorAll('.chip');
+      let found=null;
+      for(const chip of chips){
+        // chip.offsetLeft is relative to cc (because cc has position:relative)
+        if(xInContent>=chip.offsetLeft&&xInContent<chip.offsetLeft+chip.offsetWidth){found=chip;break;}
+      }
+      if(found){e.preventDefault();setCat(found.dataset.cat,found);}
     },{passive:false});
     cc.addEventListener('click',function(e){
       const chip=e.target.closest('.chip');

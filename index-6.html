@@ -1563,7 +1563,11 @@ function _initPill(){
       if(_raf){cancelAnimationFrame(_raf);_raf=null;}
     }
     // tap OR drag end: always smooth-slide to destination
-    if(page!==curPg)go(page);else movePill(curPg);
+    if(page!==curPg){go(page);}else{
+      const pg=el('pg-'+page);
+      if(pg&&pg.scrollTop>0){pg.scrollTo({top:0,behavior:'smooth'});haptic.light();}
+      else movePill(curPg);
+    }
   },{passive:false});
 }
 function go(p){
@@ -2491,9 +2495,9 @@ function initScrollSpy(){
     page.onscroll=null;
     return;
   }
-  const stickyH=page.querySelector('.hdr')?.offsetHeight||170;
   let _lastSpyCat=null;
   page.onscroll=()=>{
+    const stickyH=page.querySelector('.hdr')?.offsetHeight||170;
     const headers=[...document.querySelectorAll('#p-grid .cat-section-hdr')];
     if(!headers.length)return;
     const scrollTop=page.scrollTop;

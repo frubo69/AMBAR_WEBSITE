@@ -56,7 +56,10 @@ img{display:block}
 .notif-panel.show{transform:scale(1);opacity:1;pointer-events:all}
 .notif-panel-hdr{display:flex;align-items:center;justify-content:space-between;padding:13px 14px 11px;border-bottom:1px solid rgba(255,255,255,.07);flex-shrink:0}
 .notif-panel-title{font-size:13px;font-weight:600;color:var(--gold2);letter-spacing:.3px}
-.notif-read-all{font-size:10px;color:var(--gold);background:none;border:none;cursor:pointer;padding:0;opacity:.8;-webkit-tap-highlight-color:transparent;outline:none}
+.notif-read-all{display:none}
+.notif-action-btn{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:500;color:rgba(255,255,255,.45);background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);border-radius:8px;padding:4px 8px;cursor:pointer;-webkit-tap-highlight-color:transparent;outline:none;transition:.15s;white-space:nowrap}
+.notif-action-btn:active{opacity:.6}
+.notif-clear-btn-el{color:rgba(224,85,85,.7);border-color:rgba(224,85,85,.2);background:rgba(224,85,85,.06)}
 .notif-close-btn{width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.08);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(255,255,255,.5);-webkit-tap-highlight-color:transparent;outline:none;transition:.15s}
 .notif-close-btn:active{transform:scale(.85)}
 .notif-panel-list{overflow-y:auto;flex:1;overscroll-behavior:contain;position:relative}
@@ -452,7 +455,7 @@ img{display:block}
 .aob-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,#7c5510,#d4af37,#f5d060);transition:width .9s cubic-bezier(.34,1,.64,1);min-width:0}
 .aob-fill.pending{background:linear-gradient(90deg,rgba(80,50,5,.25) 0%,rgba(212,175,55,.5) 38%,rgba(255,225,100,.9) 50%,rgba(212,175,55,.5) 62%,rgba(80,50,5,.25) 100%);background-size:250% 100%;animation:aob-shine 2s linear infinite}
 @keyframes aob-shine{0%{background-position:200% 0}100%{background-position:-100% 0}}
-.aob-moto{position:absolute;top:-9px;font-size:22px;line-height:1;transition:left .9s cubic-bezier(.34,1,.64,1);filter:drop-shadow(0 2px 5px rgba(0,0,0,.7));transform:translateX(-50%)}
+.aob-moto{position:absolute;top:-9px;font-size:22px;line-height:1;transition:left .9s cubic-bezier(.34,1,.64,1);filter:drop-shadow(0 2px 5px rgba(0,0,0,.7));transform:translateX(-50%) scaleX(-1)}
 /* ── Active Order Detail ──────────────────────────────────────────────────── */
 .aod-ov{position:fixed;inset:0;z-index:700;background:rgba(0,0,0,.72);opacity:0;pointer-events:none;transition:opacity .25s;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
 .aod-ov.open{opacity:1;pointer-events:all}
@@ -460,15 +463,17 @@ img{display:block}
 .aod-ov.open .aod-sheet{transform:translateY(0)}
 .aod-handle{width:36px;height:4px;background:rgba(255,255,255,.18);border-radius:2px;margin:14px auto 0}
 .aod-hdr{padding:16px 20px 0;display:flex;align-items:center;justify-content:space-between}
-.aod-oid{font-size:22px;font-weight:800;color:#d4af37;letter-spacing:-.5px}
-.aod-badge{padding:5px 13px;border-radius:20px;font-size:12px;font-weight:700;letter-spacing:.3px}
-.aod-badge.pending{background:rgba(251,191,36,.15);color:#fbbf24;border:1px solid rgba(251,191,36,.3)}
-.aod-badge.approved{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3)}
+.aod-oid{font-size:20px;font-weight:700;color:rgba(255,255,255,.9);letter-spacing:-.3px;font-family:'DM Sans',sans-serif}
+.aod-badge{padding:5px 13px;border-radius:20px;font-size:11px;font-weight:600;letter-spacing:.4px;text-transform:uppercase}
+.aod-badge.pending{background:rgba(255,255,255,.07);color:rgba(255,255,255,.5);border:1px solid rgba(255,255,255,.12)}
+.aod-badge.approved{background:rgba(34,197,94,.12);color:#5edc8a;border:1px solid rgba(34,197,94,.25)}
 .aod-prog{padding:20px 20px 4px}
-.aod-big-track{position:relative;height:6px;background:rgba(255,255,255,.07);border-radius:3px;margin:10px 0 28px;overflow:visible}
-.aod-big-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#7c5510,#d4af37,#f5d060);transition:width 1s ease}
-.aod-big-fill.pending{background:linear-gradient(90deg,rgba(80,50,5,.25) 0%,rgba(212,175,55,.5) 38%,rgba(255,225,100,.9) 50%,rgba(212,175,55,.5) 62%,rgba(80,50,5,.25) 100%);background-size:250% 100%;animation:aob-shine 2s linear infinite}
-.aod-big-moto{position:absolute;top:-14px;font-size:28px;line-height:1;transition:left 1s ease;filter:drop-shadow(0 3px 7px rgba(0,0,0,.7));transform:translateX(-50%)}
+.aod-big-track{position:relative;height:10px;border-radius:6px;margin:10px 0 28px;overflow:hidden;background:#1a1a28}
+.aod-road-dashes{position:absolute;inset:0;background:repeating-linear-gradient(90deg,transparent 0px,transparent 12px,rgba(255,255,255,.12) 12px,rgba(255,255,255,.12) 22px);animation:road-scroll 1s linear infinite}
+@keyframes road-scroll{from{background-position:0 0}to{background-position:34px 0}}
+.aod-big-fill{position:absolute;inset:0;right:auto;border-radius:6px 0 0 6px;background:linear-gradient(90deg,#5a3a05,#c49a2a,#f0cc60);transition:width 1s ease;z-index:1}
+.aod-big-fill.pending{width:100%!important;background:linear-gradient(90deg,rgba(80,50,5,.3) 0%,rgba(212,175,55,.6) 38%,rgba(255,225,100,.95) 50%,rgba(212,175,55,.6) 62%,rgba(80,50,5,.3) 100%);background-size:250% 100%;animation:aob-shine 2s linear infinite;border-radius:6px}
+.aod-big-moto{position:absolute;top:-14px;font-size:28px;line-height:1;transition:left 1s ease;filter:drop-shadow(0 3px 7px rgba(0,0,0,.7));transform:translateX(-50%) scaleX(-1)}
 /* Stepper */
 .aod-stages{display:flex;align-items:flex-start;padding:0 2px;position:relative}
 .aod-stage{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;position:relative;z-index:1}
@@ -482,16 +487,16 @@ img{display:block}
 .aod-stage.current .aod-stage-circle{border-color:#d4af37;background:rgba(212,175,55,.18);box-shadow:0 0 0 4px rgba(212,175,55,.12);animation:stage-pulse 2s ease-in-out infinite}
 .aod-stage.current .aod-stage-lbl{color:#fff;font-weight:700}
 @keyframes stage-pulse{0%,100%{box-shadow:0 0 0 4px rgba(212,175,55,.12)}50%{box-shadow:0 0 0 8px rgba(212,175,55,.05)}}
-.aod-time-txt{text-align:center;margin:14px 20px 4px;font-size:14px;color:rgba(255,255,255,.75);line-height:1.5;min-height:20px}
+.aod-time-txt{text-align:center;margin:14px 20px 4px;font-size:13px;color:rgba(255,255,255,.55);line-height:1.5;min-height:20px;font-family:'DM Sans',sans-serif}
 .aod-sec{padding:16px 20px 0}
-.aod-sec-lbl{font-size:10px;font-weight:700;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:10px}
-.aod-row{display:flex;justify-content:space-between;align-items:center;font-size:14px;padding:6px 0;border-bottom:1px solid rgba(255,255,255,.05)}
+.aod-sec-lbl{font-size:9px;font-weight:700;color:rgba(255,255,255,.3);text-transform:uppercase;letter-spacing:1.4px;margin-bottom:10px}
+.aod-row{display:flex;justify-content:space-between;align-items:center;font-size:13px;padding:7px 0;border-bottom:1px solid rgba(255,255,255,.04)}
 .aod-row:last-child{border-bottom:none}
-.aod-row-name{color:rgba(255,255,255,.8)}
-.aod-row-price{color:#d4af37;font-weight:600}
-.aod-total-row{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-top:1px solid rgba(255,255,255,.1);margin-top:6px}
-.aod-total-lbl{font-size:16px;font-weight:700;color:#fff}
-.aod-total-val{font-size:20px;font-weight:800;color:#d4af37}
+.aod-row-name{color:rgba(255,255,255,.75);font-family:'DM Sans',sans-serif}
+.aod-row-price{color:rgba(255,255,255,.9);font-weight:600;font-family:'DM Sans',sans-serif}
+.aod-total-row{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-top:1px solid rgba(255,255,255,.08);margin-top:6px}
+.aod-total-lbl{font-size:14px;font-weight:600;color:rgba(255,255,255,.6);font-family:'DM Sans',sans-serif;text-transform:uppercase;letter-spacing:.5px}
+.aod-total-val{font-size:20px;font-weight:800;color:#d4af37;font-family:'DM Sans',sans-serif}
 /* iOS-style push toast */
 .push-toast{position:fixed;top:calc(var(--safe-top,0px) + 12px);left:14px;right:14px;z-index:999;background:rgba(28,28,36,.92);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:11px;box-shadow:0 8px 32px rgba(0,0,0,.6);transform:translateY(calc(-100% - 80px));opacity:0;transition:transform .42s cubic-bezier(.34,1.2,.64,1),opacity .3s;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .push-toast.show{transform:translateY(0);opacity:1}
@@ -930,11 +935,25 @@ img{display:block}
 <div id="notif-panel" class="notif-panel">
   <div class="notif-panel-hdr">
     <span class="notif-panel-title">Уведомления</span>
-    <div style="display:flex;align-items:center;gap:8px">
-      <button onclick="markAllNotifRead()" id="notif-mark-all" class="notif-read-all" style="display:none">Прочитать все</button>
+    <div style="display:flex;align-items:center;gap:6px">
+      <button onclick="markAllNotifRead()" id="notif-mark-all" class="notif-action-btn" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="11" height="11"><polyline points="20 6 9 17 4 12"/></svg>
+        Прочитать все
+      </button>
+      <button onclick="confirmClearNotifs()" id="notif-clear-btn" class="notif-action-btn notif-clear-btn-el" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="11" height="11"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
+      </button>
       <button onclick="closeNotifSheet()" class="notif-close-btn">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="13" height="13"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
+    </div>
+  </div>
+  <!-- Clear confirmation strip -->
+  <div id="notif-clear-confirm" style="display:none;padding:10px 14px;background:rgba(224,85,85,.08);border-bottom:1px solid rgba(224,85,85,.15);display:none;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0">
+    <span style="font-size:11px;color:rgba(255,255,255,.6)">Удалить все уведомления?</span>
+    <div style="display:flex;gap:6px">
+      <button onclick="doClearNotifs()" style="padding:4px 10px;border-radius:8px;background:rgba(224,85,85,.2);border:1px solid rgba(224,85,85,.35);color:#e05555;font-size:11px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;outline:none">Да</button>
+      <button onclick="cancelClearNotifs()" style="padding:4px 10px;border-radius:8px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);font-size:11px;cursor:pointer;-webkit-tap-highlight-color:transparent;outline:none">Нет</button>
     </div>
   </div>
   <div class="notif-panel-wrap" id="notif-panel-wrap">
@@ -1075,6 +1094,7 @@ img{display:block}
     </div>
     <div class="aod-prog">
       <div class="aod-big-track">
+        <div class="aod-road-dashes"></div>
         <div class="aod-big-fill pending" id="aod-big-fill" style="width:0%"></div>
         <div class="aod-big-moto" id="aod-big-moto" style="left:0%;display:none">🏎️</div>
       </div>
@@ -2533,8 +2553,10 @@ function _fmtNotifTime(ts){
 function _renderNotifList(){
   const wrap=el('notif-list');if(!wrap)return;
   const markAll=el('notif-mark-all');
+  const clearBtn=el('notif-clear-btn');
   const unread=_notifs.filter(n=>!n.read).length;
-  if(markAll)markAll.style.display=unread>0?'block':'none';
+  if(markAll)markAll.style.display=unread>0?'flex':'none';
+  if(clearBtn)clearBtn.style.display=_notifs.length>0?'flex':'none';
   if(!_notifs.length){
     wrap.innerHTML=`<div class="notif-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><p>Нет уведомлений</p></div>`;
     return;
@@ -2557,6 +2579,7 @@ function _renderNotifList(){
 function _tapNotif(id){
   const n=_notifs.find(x=>x.id===id);
   if(!n)return;
+  haptic.select();
   if(!n.read){n.read=true;_saveNotifs();_renderNotifBadge();_renderNotifList();}
   closeNotifSheet();
   if(n.action==='support'&&n.order_id){openSupportChat(n.order_id);}
@@ -2564,6 +2587,7 @@ function _tapNotif(id){
   else if(n.action==='cart'){go('cart');}
 }
 function markAllNotifRead(){
+  haptic.light();
   _notifs.forEach(n=>n.read=true);_saveNotifs();_renderNotifBadge();_renderNotifList();
 }
 function _updateNotifThumb(){
@@ -2591,7 +2615,43 @@ function openNotifSheet(){
 function closeNotifSheet(){
   el('notif-panel').classList.remove('show');
   el('notif-backdrop').style.display='none';
+  cancelClearNotifs();
 }
+function confirmClearNotifs(){
+  haptic.light();
+  const c=el('notif-clear-confirm');
+  if(c){c.style.display='flex';}
+}
+function cancelClearNotifs(){
+  const c=el('notif-clear-confirm');
+  if(c)c.style.display='none';
+}
+function doClearNotifs(){
+  haptic.medium();
+  _notifs=[];_saveNotifs();_renderNotifBadge();_renderNotifList();
+  cancelClearNotifs();
+}
+// Toast swipe-to-dismiss
+(function(){
+  let _tsy=0,_tsx=0,_tdrag=false;
+  function _initToastSwipe(){
+    const t=el('push-toast');if(!t)return;
+    t.addEventListener('touchstart',e=>{_tsy=e.touches[0].clientY;_tsx=e.touches[0].clientX;_tdrag=true;},{passive:true});
+    t.addEventListener('touchmove',e=>{
+      if(!_tdrag)return;
+      const dy=e.touches[0].clientY-_tsy;
+      if(dy<-8){t.style.transform=`translateY(${dy}px)`;t.style.transition='none';}
+    },{passive:true});
+    t.addEventListener('touchend',e=>{
+      if(!_tdrag)return;_tdrag=false;
+      const dy=e.changedTouches[0].clientY-_tsy;
+      t.style.transition='';
+      if(dy<-30){t.style.transform='';t.classList.remove('show');if(_toastTimer){clearTimeout(_toastTimer);_toastTimer=null;}}
+      else{t.style.transform='';}
+    },{passive:true});
+  }
+  document.addEventListener('DOMContentLoaded',_initToastSwipe);
+})();
 _loadNotifs();_renderNotifBadge();
 function updateSortBtn(){
   const btn=el('sort-btn');

@@ -85,11 +85,13 @@ img{display:block}
 #modal-addr-list .saved-card{padding:10px 14px}
 #modal-addr-list .saved-card:last-child{border-bottom:1px solid var(--border2)}
 
-.bnav{position:fixed;bottom:calc(10px + var(--safe-bottom));left:50%;transform:translateX(-50%);width:calc(100% - 28px);max-width:520px;z-index:40;display:flex;background:rgba(10,10,20,.82);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);border:1px solid rgba(201,169,110,.18);border-radius:24px;padding:0 6px;box-shadow:0 8px 32px rgba(0,0,0,.45),0 0 0 1px rgba(255,255,255,.04)}
-.bnav-pill{position:absolute;top:7px;left:0;border-radius:16px;background:rgba(201,169,110,.13);border:1px solid rgba(201,169,110,.4);pointer-events:none;z-index:0;will-change:transform;transition:transform .25s cubic-bezier(.34,1.1,.64,1)}
-.nb{flex:1;display:flex;flex-direction:column;align-items:center;padding:11px 4px 10px;gap:4px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:color .25s;position:relative;z-index:1}
+.bnav{position:fixed;bottom:calc(14px + var(--safe-bottom));left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:520px;z-index:40;display:flex;background:rgba(8,8,16,.68);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid rgba(255,255,255,.1);border-top:1px solid rgba(255,255,255,.18);border-radius:28px;padding:0 6px;box-shadow:0 16px 48px rgba(0,0,0,.55),0 4px 16px rgba(0,0,0,.3),0 0 0 0.5px rgba(201,169,110,.12),inset 0 1px 0 rgba(255,255,255,.07)}
+.bnav-pill{position:absolute;top:7px;left:0;border-radius:18px;background:rgba(201,169,110,.15);border:1px solid rgba(201,169,110,.45);pointer-events:none;z-index:0;will-change:transform;transition:transform .3s cubic-bezier(.34,1.2,.64,1);box-shadow:0 2px 12px rgba(201,169,110,.15),inset 0 1px 0 rgba(255,255,255,.08)}
+.nb{flex:1;display:flex;flex-direction:column;align-items:center;padding:11px 4px 10px;gap:4px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:color .25s,transform .18s cubic-bezier(.34,1.4,.64,1);position:relative;z-index:1}
+.nb:active{transform:scale(.88)}
 .nb.on{color:var(--gold)}
-.nb i{font-size:26px;line-height:1}
+.nb.on i{filter:drop-shadow(0 0 6px rgba(201,169,110,.5))}
+.nb i{font-size:26px;line-height:1;transition:filter .25s}
 .nb span{font-size:10px;letter-spacing:.4px;font-weight:500}
 
 .chips{display:flex;gap:7px;padding:8px 14px 6px;overflow-x:auto;scrollbar-width:none;flex-shrink:0}

@@ -2391,7 +2391,7 @@ function setCat(c,btn){
   const hdr=document.querySelector(`#p-grid .cat-section-hdr[data-cat="${c}"]`);
   const page=el('pg-catalog');
   if(!hdr||!page)return;
-  const stickyH=page.querySelector('[style*="sticky"]')?.offsetHeight||160;
+  const stickyH=page.querySelector('.hdr')?.offsetHeight||170;
   page.scrollTop=hdr.offsetTop-stickyH+1;
 }
 function renderGrid(){
@@ -2490,11 +2490,11 @@ function initScrollSpy(){
     page.onscroll=null;
     return;
   }
+  const stickyH=page.querySelector('.hdr')?.offsetHeight||170;
   let _lastSpyCat=null;
   page.onscroll=()=>{
     const headers=[...document.querySelectorAll('#p-grid .cat-section-hdr')];
     if(!headers.length)return;
-    const stickyH=170;
     const scrollTop=page.scrollTop;
     let active=null;
     for(const h of headers){

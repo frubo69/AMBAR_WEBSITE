@@ -2439,10 +2439,15 @@ function _loadNotifs(){
   try{const s=localStorage.getItem('ambar_notifs');if(s)_notifs=JSON.parse(s);}catch(e){}
 }
 function _saveNotifs(){try{localStorage.setItem('ambar_notifs',JSON.stringify(_notifs));}catch(e){}}
-function addNotification(icon,title,msg,ts){
-  _notifs.unshift({id:Date.now()+'',icon,title,msg,ts:ts||Date.now(),read:false});
+function addNotification(icon,title,msg,opts={}){
+  const ts=opts.ts||Date.now();
+  // Deduplicate: skip if same title+order_id within last 60s
+  if(opts.dedup_key&&_notifs.find(n=>n.dedup_key===opts.dedup_key))return;
+  _notifs.unshift({id:Date.now()+'',icon,title,msg,ts,read:false,action:opts.action||null,order_id:opts.order_id||null,dedup_key:opts.dedup_key||null});
+  if(_notifs.length>50)_notifs=_notifs.slice(0,50);
   _saveNotifs();
   _renderNotifBadge();
+  haptic.light();
 }
 function _renderNotifBadge(){
   const unread=_notifs.filter(n=>!n.read).length;
@@ -2475,12 +2480,20 @@ function _renderNotifList(){
         <div class="notif-msg">${n.msg}</div>
         <div class="notif-time">${_fmtNotifTime(n.ts)}</div>
       </div>
-      ${n.read?'':'<div class="notif-unread-badge"></div>'}
+      <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
+        ${n.read?'':'<div class="notif-unread-badge"></div>'}
+        ${n.action?`<svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="2.5" stroke-linecap="round" width="10" height="10"><polyline points="9 18 15 12 9 6"/></svg>`:''}
+      </div>
     </div>`).join('');
 }
 function _tapNotif(id){
   const n=_notifs.find(x=>x.id===id);
-  if(n&&!n.read){n.read=true;_saveNotifs();_renderNotifBadge();_renderNotifList();}
+  if(!n)return;
+  if(!n.read){n.read=true;_saveNotifs();_renderNotifBadge();_renderNotifList();}
+  closeNotifSheet();
+  if(n.action==='support'&&n.order_id){openSupportChat(n.order_id);}
+  else if(n.action==='orders'){go('orders');}
+  else if(n.action==='cart'){go('cart');}
 }
 function markAllNotifRead(){
   _notifs.forEach(n=>n.read=true);_saveNotifs();_renderNotifBadge();_renderNotifList();
@@ -2937,6 +2950,8 @@ function placeOrder(){
 
   cart={};beerPcs={};tip=0;el('phone-err').classList.remove('on');el('phone-in').classList.remove('err');
   updHdr();buildTips();haptic.success();showToast(t('placed'),'ok');
+  const _ru=lang==='ru';
+  addNotification('🛒',_ru?'Заказ оформлен':'Order placed',(_ru?'Заказ ':'Order ')+'#'+oid+(_ru?' принят и ожидает подтверждения':' received, awaiting confirmation'),{action:'orders',dedup_key:'placed_'+oid});
   setTimeout(()=>{go('orders'); if(tg?.close) tg.close();},1400);
 }
 
@@ -3713,6 +3728,7 @@ function _autoResizeSupport(el){el.style.height='auto';el.style.height=Math.min(
 
 // ── Active Order Bar & Detail ──────────────────────────────────────────────
 let _aobOrders=[],_aobIdx=0,_aobPollTimer=null,_aobTickTimer=null;
+let _aobStatusCache={}; // order_id → last known status for change detection
 
 async function checkActiveOrder(){
   const uid=tg?.initDataUnsafe?.user?.id;
@@ -3727,6 +3743,22 @@ async function checkActiveOrder(){
       if(_aobIdx>=_aobOrders.length)_aobIdx=0;
       _renderAob();
       if(!el('pdm-overlay').classList.contains('show'))bar.classList.remove('aob-hidden');
+      // Detect status changes and fire notifications
+      const _ru=lang==='ru';
+      d.orders.forEach(o=>{
+        const prev=_aobStatusCache[o.order_id];
+        const cur=o.status;
+        if(prev&&prev!==cur){
+          if(cur==='confirmed'||cur==='approved'){
+            addNotification('✅',_ru?'Заказ подтверждён':'Order confirmed',(_ru?'Ваш заказ ':'Your order ')+'#'+o.order_id+(_ru?' принят! Курьер уже готовится':' is confirmed! Courier is preparing'),{action:'orders',dedup_key:'confirmed_'+o.order_id});
+          } else if(cur==='delivered'){
+            addNotification('🎉',_ru?'Заказ доставлен!':'Order delivered!',(_ru?'Заказ ':'Order ')+'#'+o.order_id+(_ru?' доставлен. Приятного!':' delivered. Enjoy!'),{action:'orders',dedup_key:'delivered_'+o.order_id});
+          } else if(cur==='declined'){
+            addNotification('❌',_ru?'Заказ отклонён':'Order declined',(_ru?'Заказ ':'Order ')+'#'+o.order_id+(_ru?' был отклонён. Свяжитесь с поддержкой':' was declined. Please contact support'),{action:'support',order_id:o.order_id,dedup_key:'declined_'+o.order_id});
+          }
+        }
+        _aobStatusCache[o.order_id]=cur;
+      });
     } else {
       _aobOrders=[];
       bar.classList.add('aob-hidden');
@@ -3882,11 +3914,44 @@ function _initSortSwipe(){
   },{passive:true});
 }
 
+/* Background support poll — checks for new operator messages when chat is closed */
+let _bgSupportCache={}; // conv_key → last ts seen
+async function _bgSupportPoll(){
+  if(_supportConvKey)return; // chat is open, foreground poll handles it
+  const uid=tg?.initDataUnsafe?.user?.id;
+  const initData=tg?.initData;
+  if(!uid||!initData)return;
+  // Find orders that have been active recently (pending or confirmed)
+  const activeIds=[...(new Set([..._aobOrders.map(o=>o.order_id),...orders.filter(o=>o.status==='pending'||o.status==='confirmed').slice(0,5).map(o=>o.order_id)]))];
+  if(!activeIds.length)return;
+  const _ru=lang==='ru';
+  for(const oid of activeIds){
+    try{
+      const convKey=uid+'_'+oid;
+      const lastTs=_bgSupportCache[convKey]||'';
+      let url=`${AMBAR_API}/api/support/messages?conv_key=${encodeURIComponent(convKey)}`;
+      if(lastTs)url+=`&after=${encodeURIComponent(lastTs)}`;
+      const resp=await fetch(url,{headers:{'Authorization':'tma '+initData}});
+      if(!resp.ok)continue;
+      const{messages=[]}=await resp.json();
+      const opMsgs=messages.filter(m=>m.role==='operator');
+      if(opMsgs.length&&lastTs){
+        // New operator messages while chat was closed
+        const preview=opMsgs[opMsgs.length-1];
+        const text=preview.type==='photo'?(_ru?'📷 Фото':'📷 Photo'):(preview.text||'').slice(0,80);
+        addNotification('💬',_ru?'Ответ от поддержки':'Support reply',text,{action:'support',order_id:oid,dedup_key:'support_'+oid+'_'+preview.ts});
+      }
+      if(messages.length)_bgSupportCache[convKey]=messages[messages.length-1].ts;
+    }catch(e){}
+  }
+}
+
 function startOrderPolling(){
   checkActiveOrder();
   setTimeout(()=>{_initAobSwipe();_initAodSwipe();_initSortSwipe();},500);
   _aobTickTimer=setInterval(()=>{if(_aobOrders.length)_renderAob();},30000);
   _aobPollTimer=setInterval(()=>checkActiveOrder(),25000);
+  setInterval(()=>_bgSupportPoll(),20000);
 }
 
 // Wire up support input events (called from DOMContentLoaded)

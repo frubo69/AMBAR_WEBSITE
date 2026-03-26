@@ -66,11 +66,11 @@ img{display:block}
 .addr-pill-txt{font-size:12px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .addr-pill-dot{display:none}
 /* Header delivery button */
-.hdr-addr-btn{background:none;border:none;padding:0;cursor:pointer;text-align:left;display:flex;flex-direction:column;gap:2px;-webkit-tap-highlight-color:transparent;outline:none;flex-shrink:0;min-width:0}
-.hdr-addr-btn:active{opacity:.6}
-.hdr-addr-sub{font-size:9px;letter-spacing:1.4px;color:var(--muted);text-transform:uppercase;font-weight:500;white-space:nowrap}
-.hdr-addr-row{display:flex;align-items:center;gap:4px}
-.hdr-addr-txt{font-size:15px;font-weight:700;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:150px}
+.hdr-addr-btn{display:flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--border);border-radius:50px;padding:0 11px;height:30px;cursor:pointer;transition:.15s;white-space:nowrap;-webkit-tap-highlight-color:transparent;outline:none;flex-shrink:1;min-width:0;max-width:160px}
+.hdr-addr-btn:active{transform:scale(.93);opacity:.8}
+.hdr-addr-sub{display:none}
+.hdr-addr-row{display:flex;align-items:center;gap:5px;min-width:0}
+.hdr-addr-txt{font-size:12px;font-weight:600;color:var(--gold2);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 /* Header back button */
 .hdr-back{width:32px;height:32px;border-radius:50%;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;cursor:pointer;color:rgba(255,255,255,.6);flex-shrink:0;transition:.15s;-webkit-tap-highlight-color:transparent;outline:none}
 .hdr-back:active{transform:scale(.85)}
@@ -566,11 +566,10 @@ img{display:block}
       <!-- Left: Delivery address -->
       <div style="flex:1">
         <button class="hdr-addr-btn" onclick="openAddrModal()">
-          <span class="hdr-addr-sub" id="addr-pill-label">ДОСТАВКА В</span>
-          <div class="hdr-addr-row">
-            <span class="hdr-addr-txt" id="addr-pill-txt">Добавьте адрес</span>
-            <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.8"><polyline points="6 9 12 15 18 9"/></svg>
-          </div>
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+          <span class="hdr-addr-txt" id="addr-pill-txt">Добавьте адрес</span>
+          <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.8" style="flex-shrink:0"><polyline points="6 9 12 15 18 9"/></svg>
+          <span id="addr-pill-label" style="display:none"></span>
         </button>
       </div>
       <!-- Center: Logo (absolute overlay, pointer-events:none) -->

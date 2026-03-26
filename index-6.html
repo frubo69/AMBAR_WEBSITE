@@ -1225,6 +1225,7 @@ const AMBAR_API=(()=>{
   return window.AMBAR_API_URL||window.location.origin;
 })();
 let curPg='catalog';
+let _catalogScroll=0;
 let pendingOrderConfirmed=false; // for location mismatch flow
 const tg=window.Telegram?.WebApp||null;
 
@@ -1305,6 +1306,19 @@ window.addEventListener('DOMContentLoaded',()=>{
   // Validate it still exists
   if(activeAddrIdx!==null&&!getSaved()[activeAddrIdx]) activeAddrIdx=null;
   buildTips();syncOrders();applyLang();loadCatalog();updateFavBtn();updateSortBtn();initSupportInput();checkFirstLaunchHomeScreen();
+  // Fix iOS WebKit chip click offset (scrollLeft not accounted for in click events inside nested overflow)
+  (function(){
+    const cc=el('cat-chips');if(!cc)return;
+    cc.addEventListener('touchend',function(e){
+      const t=e.changedTouches[0];
+      const chip=(document.elementFromPoint(t.clientX,t.clientY)||e.target).closest('.chip');
+      if(chip&&cc.contains(chip)){e.preventDefault();setCat(chip.dataset.cat,chip);}
+    },{passive:false});
+    cc.addEventListener('click',function(e){
+      const chip=e.target.closest('.chip');
+      if(chip)setCat(chip.dataset.cat,chip);
+    });
+  })();
   alignLogoSubs();
   document.fonts?.ready?.then(alignLogoSubs);
   setTimeout(()=>_initPill(),80);
@@ -1460,12 +1474,15 @@ const _NAV_PAGES=['catalog','cart','address','orders','profile'];
 const _PM=6; // pill margin inside each tab
 // returns the target translateX for a given page
 function _pillSnapX(page){
-  const btn=el('nb-'+page),nav=el('bnav');
-  if(!btn||!nav)return 0;
-  return btn.getBoundingClientRect().left - nav.getBoundingClientRect().left + _PM;
+  const btn=el('nb-'+page);
+  if(!btn)return 0;
+  // offsetLeft is relative to nav's padding box — more reliable than getBoundingClientRect on iOS
+  return btn.offsetLeft+_PM;
 }
 function movePill(page,instant){
   const pill=el('bnav-pill');if(!pill)return;
+  const btn=el('nb-'+page);
+  if(btn){pill.style.width=(btn.offsetWidth-_PM*2)+'px';pill.style.height=(btn.offsetHeight-14)+'px';}
   const x=_pillSnapX(page);
   if(instant){
     pill.style.transition='none';
@@ -1552,11 +1569,15 @@ function go(p){
     if(pg&&pg.scrollTop>0){pg.scrollTo({top:0,behavior:'smooth'});haptic.light();}
     return;
   }
+  // Save catalog scroll before hiding (iOS WebKit resets scrollTop on transform change)
+  if(curPg==='catalog'){const pg=el('pg-catalog');if(pg)_catalogScroll=pg.scrollTop;}
   haptic.select();
   PAGES.forEach(id=>{
     el('pg-'+id)?.classList.toggle('hidden',id!==p);
     el('nb-'+id)?.classList.toggle('on',id===p);
   });
+  // Restore catalog scroll position after it becomes visible again
+  if(p==='catalog'&&_catalogScroll>0){requestAnimationFrame(()=>{const pg=el('pg-catalog');if(pg)pg.scrollTop=_catalogScroll;});}
   movePill(p);
   curPg=p;
   if(p==='cart'){renderCart();updateCartAddrBar();}
@@ -2350,7 +2371,7 @@ function buildChips(){
   el('cat-chips').innerHTML=cats.map(c=>{
     const label=lang==='ru'?c:(P.find(p=>p.cat===c)?.catE||c);
     const isOn=catFilter===c;
-    return`<button class="chip${isOn?' on':''}" data-cat="${c}" onclick="setCat('${c}',this)">${label}</button>`;
+    return`<button class="chip${isOn?' on':''}" data-cat="${c}">${label}</button>`;
   }).join('');
 }
 function setCat(c,btn){

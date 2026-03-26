@@ -1306,27 +1306,31 @@ window.addEventListener('DOMContentLoaded',()=>{
   // Validate it still exists
   if(activeAddrIdx!==null&&!getSaved()[activeAddrIdx]) activeAddrIdx=null;
   buildTips();syncOrders();applyLang();loadCatalog();updateFavBtn();updateSortBtn();initSupportInput();checkFirstLaunchHomeScreen();
-  // Fix iOS WebKit chip tap offset: elementFromPoint also ignores scrollLeft on iOS,
-  // so we compute hit manually using chip.offsetLeft (DOM layout, not visual) + cc.scrollLeft
+  // Chip tap: capture target at touchstart (before any scroll movement), confirm at touchend
   (function(){
     const cc=el('cat-chips');if(!cc)return;
-    cc.addEventListener('touchend',function(e){
-      const t=e.changedTouches[0];
-      const ccRect=cc.getBoundingClientRect();
-      if(t.clientY<ccRect.top-4||t.clientY>ccRect.bottom+4)return;
-      // xInContent = touch position within cc's scrollable content area
-      const xInContent=t.clientX-ccRect.left+cc.scrollLeft;
-      const chips=cc.querySelectorAll('.chip');
-      let found=null;
-      for(const chip of chips){
-        // chip.offsetLeft is relative to cc (because cc has position:relative)
-        if(xInContent>=chip.offsetLeft&&xInContent<chip.offsetLeft+chip.offsetWidth){found=chip;break;}
+    let _pendingChip=null,_startX=0,_blocked=false;
+    cc.addEventListener('touchstart',function(e){
+      if(e.touches.length!==1){_pendingChip=null;return;}
+      const t=e.touches[0];
+      _startX=t.clientX;
+      // Read scrollLeft NOW before anything can change it
+      const xInContent=t.clientX-cc.getBoundingClientRect().left+cc.scrollLeft;
+      _pendingChip=null;
+      for(const chip of cc.querySelectorAll('.chip')){
+        if(xInContent>=chip.offsetLeft&&xInContent<chip.offsetLeft+chip.offsetWidth){_pendingChip=chip;break;}
       }
-      if(found){e.preventDefault();setCat(found.dataset.cat,found);}
+    },{passive:true});
+    cc.addEventListener('touchend',function(e){
+      const chip=_pendingChip;_pendingChip=null;
+      if(!chip||Math.abs(e.changedTouches[0].clientX-_startX)>10)return;
+      e.preventDefault();
+      _blocked=true;setTimeout(()=>{_blocked=false;},400);
+      setCat(chip.dataset.cat,chip);
     },{passive:false});
     cc.addEventListener('click',function(e){
-      const chip=e.target.closest('.chip');
-      if(chip)setCat(chip.dataset.cat,chip);
+      if(_blocked)return;
+      const chip=e.target.closest('.chip');if(chip)setCat(chip.dataset.cat,chip);
     });
   })();
   alignLogoSubs();
@@ -2496,6 +2500,7 @@ function initScrollSpy(){
     page.onscroll=null;
     return;
   }
+  let _lastSpyCat=null;
   page.onscroll=()=>{
     const headers=[...document.querySelectorAll('#p-grid .cat-section-hdr')];
     if(!headers.length)return;
@@ -2505,7 +2510,10 @@ function initScrollSpy(){
     for(const h of headers){
       if(h.offsetTop-stickyH<=scrollTop+1)active=h;
     }
-    highlightChip(active?active.dataset.cat:null);
+    const cat=active?active.dataset.cat:null;
+    if(cat===_lastSpyCat)return;
+    _lastSpyCat=cat;
+    highlightChip(cat);
   };
 }
 function highlightChip(cat){

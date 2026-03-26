@@ -1226,6 +1226,18 @@ const AMBAR_API=(()=>{
 })();
 let curPg='catalog';
 let _catalogScroll=0;
+// Chip touch handlers — touchstart target is always correct (no scrollLeft bug)
+let _cTS=null,_cTX=0,_cTBlocked=false;
+function _chipTS(e,b){if(e.touches.length!==1)return;_cTS=b;_cTX=e.touches[0].clientX;}
+function _chipTE(e,b){
+  if(_cTS!==b)return;
+  const dx=Math.abs(e.changedTouches[0].clientX-_cTX);
+  _cTS=null;
+  if(dx>10)return; // was a horizontal swipe, not a tap
+  e.preventDefault();
+  _cTBlocked=true;setTimeout(()=>{_cTBlocked=false;},400);
+  setCat(b.dataset.cat,b);
+}
 let pendingOrderConfirmed=false; // for location mismatch flow
 const tg=window.Telegram?.WebApp||null;
 
@@ -1306,33 +1318,11 @@ window.addEventListener('DOMContentLoaded',()=>{
   // Validate it still exists
   if(activeAddrIdx!==null&&!getSaved()[activeAddrIdx]) activeAddrIdx=null;
   buildTips();syncOrders();applyLang();loadCatalog();updateFavBtn();updateSortBtn();initSupportInput();checkFirstLaunchHomeScreen();
-  // Chip tap: capture target at touchstart (before any scroll movement), confirm at touchend
-  (function(){
-    const cc=el('cat-chips');if(!cc)return;
-    let _pendingChip=null,_startX=0,_blocked=false;
-    cc.addEventListener('touchstart',function(e){
-      if(e.touches.length!==1){_pendingChip=null;return;}
-      const t=e.touches[0];
-      _startX=t.clientX;
-      // Read scrollLeft NOW before anything can change it
-      const xInContent=t.clientX-cc.getBoundingClientRect().left+cc.scrollLeft;
-      _pendingChip=null;
-      for(const chip of cc.querySelectorAll('.chip')){
-        if(xInContent>=chip.offsetLeft&&xInContent<chip.offsetLeft+chip.offsetWidth){_pendingChip=chip;break;}
-      }
-    },{passive:true});
-    cc.addEventListener('touchend',function(e){
-      const chip=_pendingChip;_pendingChip=null;
-      if(!chip||Math.abs(e.changedTouches[0].clientX-_startX)>10)return;
-      e.preventDefault();
-      _blocked=true;setTimeout(()=>{_blocked=false;},400);
-      setCat(chip.dataset.cat,chip);
-    },{passive:false});
-    cc.addEventListener('click',function(e){
-      if(_blocked)return;
-      const chip=e.target.closest('.chip');if(chip)setCat(chip.dataset.cat,chip);
-    });
-  })();
+  // Click fallback for non-touch (desktop) — touch is handled via ontouchstart/ontouchend on each chip
+  el('cat-chips').addEventListener('click',function(e){
+    if(_cTBlocked)return;
+    const chip=e.target.closest('.chip');if(chip)setCat(chip.dataset.cat,chip);
+  });
   alignLogoSubs();
   document.fonts?.ready?.then(alignLogoSubs);
   setTimeout(()=>_initPill(),80);
@@ -2385,7 +2375,7 @@ function buildChips(){
   el('cat-chips').innerHTML=cats.map(c=>{
     const label=lang==='ru'?c:(P.find(p=>p.cat===c)?.catE||c);
     const isOn=catFilter===c;
-    return`<button class="chip${isOn?' on':''}" data-cat="${c}">${label}</button>`;
+    return`<button class="chip${isOn?' on':''}" data-cat="${c}" ontouchstart="_chipTS(event,this)" ontouchend="_chipTE(event,this)">${label}</button>`;
   }).join('');
 }
 function setCat(c,btn){

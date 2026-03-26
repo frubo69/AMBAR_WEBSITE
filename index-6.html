@@ -1555,6 +1555,7 @@ function _initPill(){
     }
   },{passive:true});
   nav.addEventListener('touchend',e=>{
+    e.preventDefault(); // prevent ghost onclick from firing go() a second time
     const nr=nav.getBoundingClientRect();
     const page=_nearest(e.changedTouches[0].clientX-nr.left);
     if(_live){
@@ -1563,7 +1564,7 @@ function _initPill(){
     }
     // tap OR drag end: always smooth-slide to destination
     if(page!==curPg)go(page);else movePill(curPg);
-  },{passive:true});
+  },{passive:false});
 }
 function go(p){
   dismissToast();

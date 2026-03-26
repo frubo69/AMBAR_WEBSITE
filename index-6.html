@@ -47,6 +47,23 @@ img{display:block}
 .cart-dot{position:absolute;top:-5px;right:-5px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;border-radius:50%;width:18px;height:18px;font-size:9px;font-weight:700;display:none;align-items:center;justify-content:center;border:2px solid var(--bg)}
 .lang-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--border2);background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;transition:.15s}
 .lang-btn:active{transform:scale(.85)}
+.notif-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--border2);background:var(--card2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;color:rgba(255,255,255,.65);position:relative;-webkit-tap-highlight-color:transparent;outline:none;flex-shrink:0}
+.notif-btn:active{transform:scale(.85)}
+.notif-btn.has-unread{color:var(--gold);border-color:rgba(201,169,110,.35)}
+.notif-dot{position:absolute;top:4px;right:4px;width:7px;height:7px;border-radius:50%;background:var(--gold);border:1.5px solid var(--bg)}
+/* Notifications sheet */
+.notif-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:40px 20px;gap:12px;color:var(--muted)}
+.notif-empty svg{opacity:.3}
+.notif-empty p{font-size:13px;letter-spacing:.3px}
+.notif-item{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-bottom:1px solid var(--border2);cursor:pointer;transition:.15s}
+.notif-item:active{background:rgba(255,255,255,.03)}
+.notif-item.unread{background:rgba(201,169,110,.04)}
+.notif-icon{width:36px;height:36px;border-radius:50%;background:rgba(201,169,110,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:16px}
+.notif-body{flex:1;min-width:0}
+.notif-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:3px}
+.notif-msg{font-size:12px;color:var(--muted);line-height:1.4;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.notif-time{font-size:10px;color:rgba(255,255,255,.25);margin-top:4px;letter-spacing:.2px}
+.notif-unread-badge{width:8px;height:8px;border-radius:50%;background:var(--gold);flex-shrink:0;margin-top:4px}
 .fav-btn{width:32px;height:32px;border-radius:10px;border:none;outline:none;-webkit-tap-highlight-color:transparent;background:rgba(255,255,255,.08);color:rgba(255,255,255,.65)!important;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;position:relative}
 .fav-btn:active{transform:scale(.85)}
 .fav-btn svg{width:16px;height:16px;transition:.15s}
@@ -580,6 +597,10 @@ img{display:block}
       <div class="hdr-right" style="flex:1;justify-content:flex-end">
         <div class="cart-pill" onclick="go('cart')">🛒 <span class="cart-txt" id="hdr-tot">0 AED</span><span class="cart-dot" id="hdr-dot">0</span></div>
         <button class="lang-btn" onclick="flipLang()" id="lbtn">🇷🇺</button>
+        <button class="notif-btn" onclick="openNotifSheet()" id="notif-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
+          <span class="notif-dot" id="notif-dot" style="display:none"></span>
+        </button>
       </div>
     </div>
     <!-- Row 2: Search bar -->
@@ -871,6 +892,18 @@ img{display:block}
     <div class="modal-handle"></div>
     <div class="sort-ttl" id="sort-sheet-title">Сортировка</div>
     <div id="sort-options" class="sort-opts-wrap"></div>
+  </div>
+</div>
+
+<!-- ═══ NOTIFICATIONS ═══ -->
+<div class="modal-overlay" id="notif-overlay" onclick="closeNotifSheet(event)">
+  <div class="modal-sheet" style="max-height:80vh">
+    <div class="modal-handle"></div>
+    <div class="modal-title" style="display:flex;align-items:center;justify-content:space-between">
+      <span id="notif-sheet-title">Уведомления</span>
+      <button onclick="markAllNotifRead()" id="notif-mark-all" style="font-size:11px;color:var(--gold);background:none;border:none;cursor:pointer;padding:0;display:none">Прочитать все</button>
+    </div>
+    <div id="notif-list"></div>
   </div>
 </div>
 
@@ -2384,6 +2417,69 @@ function applySort(key){
   el('pg-catalog').scrollTop=0;
 }
 function cycleSort(){openSortSheet();}
+
+/* ── Notifications ── */
+let _notifs=[];
+function _loadNotifs(){
+  try{const s=localStorage.getItem('ambar_notifs');if(s)_notifs=JSON.parse(s);}catch(e){}
+}
+function _saveNotifs(){try{localStorage.setItem('ambar_notifs',JSON.stringify(_notifs));}catch(e){}}
+function addNotification(icon,title,msg,ts){
+  _notifs.unshift({id:Date.now()+'',icon,title,msg,ts:ts||Date.now(),read:false});
+  _saveNotifs();
+  _renderNotifBadge();
+}
+function _renderNotifBadge(){
+  const unread=_notifs.filter(n=>!n.read).length;
+  const btn=el('notif-btn');const dot=el('notif-dot');
+  if(btn){btn.classList.toggle('has-unread',unread>0);}
+  if(dot){dot.style.display=unread>0?'block':'none';}
+}
+function _fmtNotifTime(ts){
+  const d=new Date(ts),now=new Date();
+  const diff=now-d;
+  if(diff<60000)return'только что';
+  if(diff<3600000)return Math.floor(diff/60000)+' мин назад';
+  if(diff<86400000)return Math.floor(diff/3600000)+' ч назад';
+  return d.toLocaleDateString('ru',{day:'numeric',month:'short'});
+}
+function _renderNotifList(){
+  const wrap=el('notif-list');if(!wrap)return;
+  const markAll=el('notif-mark-all');
+  const unread=_notifs.filter(n=>!n.read).length;
+  if(markAll)markAll.style.display=unread>0?'block':'none';
+  if(!_notifs.length){
+    wrap.innerHTML=`<div class="notif-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><p>Нет уведомлений</p></div>`;
+    return;
+  }
+  wrap.innerHTML=_notifs.map(n=>`
+    <div class="notif-item${n.read?'':' unread'}" onclick="_tapNotif('${n.id}')">
+      <div class="notif-icon">${n.icon||'🔔'}</div>
+      <div class="notif-body">
+        <div class="notif-title">${n.title}</div>
+        <div class="notif-msg">${n.msg}</div>
+        <div class="notif-time">${_fmtNotifTime(n.ts)}</div>
+      </div>
+      ${n.read?'':'<div class="notif-unread-badge"></div>'}
+    </div>`).join('');
+}
+function _tapNotif(id){
+  const n=_notifs.find(x=>x.id===id);
+  if(n&&!n.read){n.read=true;_saveNotifs();_renderNotifBadge();_renderNotifList();}
+}
+function markAllNotifRead(){
+  _notifs.forEach(n=>n.read=true);_saveNotifs();_renderNotifBadge();_renderNotifList();
+}
+function openNotifSheet(){
+  _loadNotifs();_renderNotifList();
+  el('notif-overlay').classList.add('show');
+  haptic.light();
+}
+function closeNotifSheet(e){
+  if(e&&e.target!==el('notif-overlay'))return;
+  el('notif-overlay').classList.remove('show');
+}
+_loadNotifs();_renderNotifBadge();
 function updateSortBtn(){
   const btn=el('sort-btn');
   if(!btn)return;

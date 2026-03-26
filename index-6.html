@@ -47,7 +47,7 @@ img{display:block}
 .cart-dot{position:absolute;top:-5px;right:-5px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;border-radius:50%;width:18px;height:18px;font-size:9px;font-weight:700;display:none;align-items:center;justify-content:center;border:2px solid var(--bg)}
 .lang-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--border2);background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;transition:.15s}
 .lang-btn:active{transform:scale(.85)}
-.fav-btn{width:34px;height:34px;border-radius:50%;border:1px solid var(--border2);background:var(--card2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;position:relative}
+.fav-btn{width:32px;height:32px;border-radius:10px;border:none;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;position:relative}
 .fav-btn:active{transform:scale(.85)}
 .fav-btn svg{width:16px;height:16px;transition:.15s}
 .fav-btn.has-favs svg{fill:none;stroke:#e05555}
@@ -94,24 +94,25 @@ img{display:block}
 .nb i{font-size:26px;line-height:1;transition:filter .25s}
 .nb span{font-size:10px;letter-spacing:.4px;font-weight:500}
 
-.chips{display:flex;gap:7px;padding:8px 14px 6px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;position:relative}
+.chips{display:flex;gap:6px;padding:8px 10px;overflow-x:auto;scrollbar-width:none;flex-shrink:0;position:relative}
 .chips::-webkit-scrollbar{display:none}
 .sort-opt{display:flex;align-items:center;justify-content:space-between;padding:15px 18px;border-bottom:1px solid var(--border2);cursor:pointer;transition:.15s;font-size:14px;color:var(--text)}
 .sort-opt:active{background:rgba(255,255,255,.03)}
 .sort-opt.on{color:var(--gold)}
 .sort-opt-check{font-size:18px;color:var(--gold);opacity:0;transition:.15s}
 .sort-opt.on .sort-opt-check{opacity:1}
-.sort-btn{width:34px;height:34px;border-radius:50%;border:1px solid var(--border2);background:var(--card2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s}
+.sort-btn{width:32px;height:32px;border-radius:10px;border:none;background:rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s}
 .sort-btn:active{transform:scale(.85)}
-.sort-btn.active{border-color:var(--gold);color:var(--gold)}
+.sort-btn.active{background:rgba(201,169,110,.18);color:var(--gold)}
 .search-wrap{display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border2);border-radius:50px;padding:0 14px;gap:8px;transition:.2s}
 .search-wrap:focus-within{border-color:rgba(201,169,110,.5)}
 .search-ico{width:15px;height:15px;color:var(--muted);flex-shrink:0}
 .search-inp{flex:1;background:transparent;border:none;outline:none;font-size:13px;color:var(--text);padding:9px 0;font-family:inherit}
 .search-inp::placeholder{color:var(--muted)}
 .search-clr{background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:0;line-height:1;flex-shrink:0}
-.chip{white-space:nowrap;padding:7px 14px;border-radius:50px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-size:11px;font-weight:500;cursor:pointer;transition:.15s}
-.chip.on{background:rgba(201,169,110,.1);border-color:var(--gold);color:var(--gold);font-weight:700}
+.chip{white-space:nowrap;padding:7px 13px;border-radius:20px;border:1px solid transparent;background:rgba(255,255,255,.07);color:rgba(255,255,255,.45);font-size:12px;font-weight:500;cursor:pointer;transition:.18s;letter-spacing:.1px}
+.chip:active{transform:scale(.93);opacity:.8}
+.chip.on{background:rgba(201,169,110,.15);border-color:rgba(201,169,110,.45);color:var(--gold);font-weight:700;box-shadow:0 0 14px rgba(201,169,110,.12)}
 .sec-h{padding:10px 14px 8px;font-family:'DM Sans',sans-serif;font-size:20px;display:flex;align-items:center;gap:10px;flex-shrink:0}
 .sec-h::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border2),transparent)}
 .cat-section-hdr{padding:16px 14px 8px;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:var(--gold);display:flex;align-items:center;gap:10px;letter-spacing:2.5px;text-transform:uppercase}
@@ -576,12 +577,11 @@ img{display:block}
       </div>
     </div>
     <!-- Row 3: Heart + Sort (fixed left) + category chips (scrollable) -->
-    <div style="display:flex;align-items:center;border-bottom:1px solid var(--border2)">
-      <button class="fav-btn" id="fav-hdr-btn" onclick="toggleFavFilter()" style="flex-shrink:0;margin-left:10px"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="fav-dot" id="fav-dot"></span></button>
-      <button class="sort-btn" id="sort-btn" onclick="cycleSort()" style="flex-shrink:0;margin-left:6px">
+    <div style="display:flex;align-items:center;padding:0 4px 0 10px;border-bottom:1px solid rgba(255,255,255,.05)">
+      <button class="fav-btn" id="fav-hdr-btn" onclick="toggleFavFilter()" style="flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="fav-dot" id="fav-dot"></span></button>
+      <button class="sort-btn" id="sort-btn" onclick="cycleSort()" style="flex-shrink:0;margin-left:5px">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
       </button>
-      <div style="width:1px;height:20px;background:var(--border2);flex-shrink:0;margin:0 6px"></div>
       <div class="chips" id="cat-chips" style="flex:1"></div>
     </div>
   </div>

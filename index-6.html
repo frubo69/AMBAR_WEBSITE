@@ -2396,7 +2396,8 @@ function setCat(c,btn){
   const hdr=document.querySelector(`#p-grid .cat-section-hdr[data-cat="${c}"]`);
   const page=el('pg-catalog');
   if(!hdr||!page)return;
-  const stickyH=page.querySelector('.hdr')?.offsetHeight||170;
+  const stickyH=page.querySelector('[style*="sticky"]')?.offsetHeight||170;
+  highlightChip(c);
   page.scrollTop=hdr.offsetTop-stickyH;
 }
 function renderGrid(){
@@ -2497,7 +2498,7 @@ function initScrollSpy(){
   }
   let _lastSpyCat=null;
   page.onscroll=()=>{
-    const stickyH=page.querySelector('.hdr')?.offsetHeight||170;
+    const stickyH=page.querySelector('[style*="sticky"]')?.offsetHeight||170;
     const headers=[...document.querySelectorAll('#p-grid .cat-section-hdr')];
     if(!headers.length)return;
     const scrollTop=page.scrollTop;

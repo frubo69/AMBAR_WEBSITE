@@ -465,14 +465,23 @@ img{display:block}
 .aod-badge.pending{background:rgba(251,191,36,.15);color:#fbbf24;border:1px solid rgba(251,191,36,.3)}
 .aod-badge.approved{background:rgba(34,197,94,.15);color:#22c55e;border:1px solid rgba(34,197,94,.3)}
 .aod-prog{padding:20px 20px 4px}
-.aod-big-track{position:relative;height:10px;background:rgba(255,255,255,.07);border-radius:5px;margin:10px 0 20px;overflow:visible}
-.aod-big-fill{height:100%;border-radius:5px;background:linear-gradient(90deg,#7c5510,#d4af37,#f5d060);transition:width 1s ease}
+.aod-big-track{position:relative;height:6px;background:rgba(255,255,255,.07);border-radius:3px;margin:10px 0 28px;overflow:visible}
+.aod-big-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,#7c5510,#d4af37,#f5d060);transition:width 1s ease}
 .aod-big-fill.pending{background:linear-gradient(90deg,rgba(80,50,5,.25) 0%,rgba(212,175,55,.5) 38%,rgba(255,225,100,.9) 50%,rgba(212,175,55,.5) 62%,rgba(80,50,5,.25) 100%);background-size:250% 100%;animation:aob-shine 2s linear infinite}
-.aod-big-moto{position:absolute;top:-13px;font-size:28px;line-height:1;transition:left 1s ease;filter:drop-shadow(0 3px 7px rgba(0,0,0,.7));transform:translateX(-50%)}
-.aod-stages{display:flex;justify-content:space-between;padding:0 4px}
-.aod-stage{display:flex;flex-direction:column;align-items:center;gap:3px;font-size:10px;font-weight:600;color:rgba(255,255,255,.3);flex:1;text-align:center;transition:color .4s}
-.aod-stage.done{color:#d4af37}
-.aod-stage-ic{font-size:18px;margin-bottom:2px}
+.aod-big-moto{position:absolute;top:-14px;font-size:28px;line-height:1;transition:left 1s ease;filter:drop-shadow(0 3px 7px rgba(0,0,0,.7));transform:translateX(-50%)}
+/* Stepper */
+.aod-stages{display:flex;align-items:flex-start;padding:0 2px;position:relative}
+.aod-stage{display:flex;flex-direction:column;align-items:center;gap:5px;flex:1;position:relative;z-index:1}
+.aod-stage-circle{width:36px;height:36px;border-radius:50%;border:2px solid rgba(255,255,255,.15);background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;transition:all .4s;flex-shrink:0}
+.aod-stage-lbl{font-size:9.5px;font-weight:600;color:rgba(255,255,255,.28);text-align:center;line-height:1.2;transition:color .4s;letter-spacing:.2px}
+.aod-stage-connector{position:absolute;top:18px;left:calc(50% + 18px);right:calc(-50% + 18px);height:2px;background:rgba(255,255,255,.1);z-index:0}
+.aod-stage:last-child .aod-stage-connector{display:none}
+.aod-stage.done .aod-stage-circle{border-color:#d4af37;background:rgba(212,175,55,.15)}
+.aod-stage.done .aod-stage-lbl{color:#d4af37}
+.aod-stage.done .aod-stage-connector{background:linear-gradient(90deg,#d4af37,rgba(212,175,55,.3))}
+.aod-stage.current .aod-stage-circle{border-color:#d4af37;background:rgba(212,175,55,.18);box-shadow:0 0 0 4px rgba(212,175,55,.12);animation:stage-pulse 2s ease-in-out infinite}
+.aod-stage.current .aod-stage-lbl{color:#fff;font-weight:700}
+@keyframes stage-pulse{0%,100%{box-shadow:0 0 0 4px rgba(212,175,55,.12)}50%{box-shadow:0 0 0 8px rgba(212,175,55,.05)}}
 .aod-time-txt{text-align:center;margin:14px 20px 4px;font-size:14px;color:rgba(255,255,255,.75);line-height:1.5;min-height:20px}
 .aod-sec{padding:16px 20px 0}
 .aod-sec-lbl{font-size:10px;font-weight:700;color:rgba(255,255,255,.35);text-transform:uppercase;letter-spacing:1.2px;margin-bottom:10px}
@@ -483,8 +492,13 @@ img{display:block}
 .aod-total-row{display:flex;justify-content:space-between;align-items:center;padding:14px 20px;border-top:1px solid rgba(255,255,255,.1);margin-top:6px}
 .aod-total-lbl{font-size:16px;font-weight:700;color:#fff}
 .aod-total-val{font-size:20px;font-weight:800;color:#d4af37}
-.aod-stage.current{color:#fff;transform:scale(1.1)}
-.aod-stage.current .aod-stage-ic{filter:drop-shadow(0 0 6px rgba(212,175,55,.8))}
+/* iOS-style push toast */
+.push-toast{position:fixed;top:calc(var(--safe-top,0px) + 12px);left:14px;right:14px;z-index:999;background:rgba(28,28,36,.92);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:11px;box-shadow:0 8px 32px rgba(0,0,0,.6);transform:translateY(calc(-100% - 80px));opacity:0;transition:transform .42s cubic-bezier(.34,1.2,.64,1),opacity .3s;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.push-toast.show{transform:translateY(0);opacity:1}
+.push-toast-icon{width:36px;height:36px;border-radius:10px;background:rgba(201,169,110,.15);border:1px solid rgba(201,169,110,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.push-toast-body{flex:1;min-width:0}
+.push-toast-title{font-size:13px;font-weight:700;color:#fff;margin-bottom:2px}
+.push-toast-msg{font-size:12px;color:rgba(255,255,255,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .aob-dots{display:flex;justify-content:center;gap:5px;margin-top:7px}
 .aob-dot-ind{width:5px;height:5px;border-radius:50%;background:rgba(255,255,255,.2);transition:background .25s,transform .25s}
 .aob-dot-active{background:#d4af37!important;transform:scale(1.3)}
@@ -1046,7 +1060,7 @@ img{display:block}
   </div>
   <div class="aob-track">
     <div class="aob-fill pending" id="aob-fill" style="width:0%"></div>
-    <div class="aob-moto" id="aob-moto" style="left:0%;display:none">🏍️</div>
+    <div class="aob-moto" id="aob-moto" style="left:0%;display:none">🏎️</div>
   </div>
   <div class="aob-dots" id="aob-dots" style="display:none"></div>
 </div>
@@ -1062,13 +1076,29 @@ img{display:block}
     <div class="aod-prog">
       <div class="aod-big-track">
         <div class="aod-big-fill pending" id="aod-big-fill" style="width:0%"></div>
-        <div class="aod-big-moto" id="aod-big-moto" style="left:0%;display:none">🏍️</div>
+        <div class="aod-big-moto" id="aod-big-moto" style="left:0%;display:none">🏎️</div>
       </div>
       <div class="aod-stages">
-        <div class="aod-stage done" id="aod-s0"><div class="aod-stage-ic">⏳</div><div id="aod-s0-lbl">Ожидание</div></div>
-        <div class="aod-stage"      id="aod-s1"><div class="aod-stage-ic">✅</div><div id="aod-s1-lbl">Принят</div></div>
-        <div class="aod-stage"      id="aod-s2"><div class="aod-stage-ic">🏍️</div><div id="aod-s2-lbl">В пути</div></div>
-        <div class="aod-stage"      id="aod-s3"><div class="aod-stage-ic">🎉</div><div id="aod-s3-lbl">Доставлен</div></div>
+        <div class="aod-stage" id="aod-s0">
+          <div class="aod-stage-connector"></div>
+          <div class="aod-stage-circle" id="aod-s0-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="16" height="16"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+          <div class="aod-stage-lbl" id="aod-s0-lbl">Ожидание</div>
+        </div>
+        <div class="aod-stage" id="aod-s1">
+          <div class="aod-stage-connector"></div>
+          <div class="aod-stage-circle" id="aod-s1-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="16" height="16"><polyline points="20 6 9 17 4 12"/></svg></div>
+          <div class="aod-stage-lbl" id="aod-s1-lbl">Принят</div>
+        </div>
+        <div class="aod-stage" id="aod-s2">
+          <div class="aod-stage-connector"></div>
+          <div class="aod-stage-circle" id="aod-s2-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="16" height="16"><path d="M5 17H3a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11a2 2 0 0 1 2 2v3"/><rect x="9" y="11" width="14" height="10" rx="2"/><circle cx="12" cy="21" r="1"/><circle cx="20" cy="21" r="1"/></svg></div>
+          <div class="aod-stage-lbl" id="aod-s2-lbl">В пути</div>
+        </div>
+        <div class="aod-stage" id="aod-s3">
+          <div class="aod-stage-connector"></div>
+          <div class="aod-stage-circle" id="aod-s3-circle"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="16" height="16"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+          <div class="aod-stage-lbl" id="aod-s3-lbl">Доставлен</div>
+        </div>
       </div>
     </div>
     <div class="aod-time-txt" id="aod-time-txt"></div>
@@ -1086,9 +1116,19 @@ img{display:block}
     </div>
     <div style="padding:8px 20px 0">
       <button class="aod-support-btn" onclick="closeAod();openSupportChat(_aobOrders[_aobIdx]?.order_id||'')">
-        💬 <span id="aod-support-lbl">Написать в поддержку</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="16" height="16" style="margin-right:8px;vertical-align:middle"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <span id="aod-support-lbl">Написать в поддержку</span>
       </button>
     </div>
+  </div>
+</div>
+
+<!-- iOS-style push toast -->
+<div id="push-toast" class="push-toast" onclick="openNotifSheet()">
+  <div class="push-toast-icon" id="push-toast-icon"></div>
+  <div class="push-toast-body">
+    <div class="push-toast-title" id="push-toast-title"></div>
+    <div class="push-toast-msg" id="push-toast-msg"></div>
   </div>
 </div>
 
@@ -2464,12 +2504,23 @@ function addNotification(icon,title,msg,opts={}){
   _saveNotifs();
   _renderNotifBadge();
   haptic.light();
+  _showPushToast(icon,title,msg);
 }
 function _renderNotifBadge(){
   const unread=_notifs.filter(n=>!n.read).length;
   const btn=el('notif-btn');const dot=el('notif-dot');
   if(btn){btn.classList.toggle('has-unread',unread>0);}
   if(dot){dot.style.display=unread>0?'block':'none';}
+}
+let _toastTimer=null;
+function _showPushToast(icon,title,msg){
+  const toast=el('push-toast');if(!toast)return;
+  el('push-toast-icon').innerHTML=_notifIconHtml(icon);
+  el('push-toast-title').textContent=title;
+  el('push-toast-msg').textContent=msg;
+  if(_toastTimer){clearTimeout(_toastTimer);toast.classList.remove('show');void toast.offsetWidth;}
+  toast.classList.add('show');
+  _toastTimer=setTimeout(()=>{toast.classList.remove('show');_toastTimer=null;},3200);
 }
 function _fmtNotifTime(ts){
   const d=new Date(ts),now=new Date();
@@ -3831,7 +3882,7 @@ function _renderAob(){
     fill.className='aob-fill';fill.style.width=p+'%';
     moto.style.display='block';moto.style.left=Math.min(p,94)+'%';
     if(remaining<=0){title.textContent=ru?'Уже почти...':'Almost there...';time.textContent='';}
-    else if(remaining<=3){title.textContent=ru?'🏍️ Курьер рядом!':'🏍️ Almost at your door!';time.textContent='';}
+    else if(remaining<=3){title.textContent=ru?'🏎️ Курьер рядом!':'🏎️ Almost at your door!';time.textContent='';}
     else{title.textContent=ru?'Заказ в пути':'Order on the way';time.textContent=ru?`≈${Math.ceil(remaining)} мин`:`≈${Math.ceil(remaining)} min`;}
   }
   if(document.getElementById('aod-ov').classList.contains('open'))_renderAodDetail();
@@ -3845,22 +3896,23 @@ function _renderAodDetail(){
   el('aod-oid').textContent='#'+order_id;
   // Badge = current stage only
   const badge=el('aod-badge');
-  if(status==='pending'){badge.textContent=ru?'⏳ Ожидание':'⏳ Pending';badge.className='aod-badge pending';}
+  if(status==='pending'){badge.textContent=ru?'Ожидание':'Pending';badge.className='aod-badge pending';}
   else{
     const{remaining}=_calcProgress(confirmed_at,eta);
-    if(remaining<=0)badge.textContent=ru?'🎉 Уже скоро':'🎉 Almost there';
-    else if(remaining<=3)badge.textContent=ru?'🏍️ Рядом!':'🏍️ Nearby!';
-    else badge.textContent=ru?'🏍️ В пути':'🏍️ On the way';
+    if(remaining<=0)badge.textContent=ru?'Уже скоро':'Almost there';
+    else if(remaining<=3)badge.textContent=ru?'🏎️ Рядом!':'🏎️ Nearby!';
+    else badge.textContent=ru?'🏎️ В пути':'🏎️ On the way';
     badge.className='aod-badge approved';
   }
-  // Stage timeline — highlight current only
+  // Stage stepper — highlight current only
   ['aod-s0','aod-s1','aod-s2','aod-s3'].forEach(id=>el(id).classList.remove('done','current'));
   if(status==='pending'){el('aod-s0').classList.add('current');}
+  else if(status==='delivered'){['aod-s0','aod-s1','aod-s2','aod-s3'].forEach(id=>el(id).classList.add('done'));}
   else{el('aod-s0').classList.add('done');el('aod-s1').classList.add('done');el('aod-s2').classList.add('current');}
   el('aod-s0-lbl').textContent=ru?'Ожидание':'Pending';
   el('aod-s1-lbl').textContent=ru?'Принят':'Confirmed';
   el('aod-s2-lbl').textContent=ru?'В пути':'On way';
-  el('aod-s3-lbl').textContent=ru?'Готово':'Done';
+  el('aod-s3-lbl').textContent=ru?'Доставлен':'Delivered';
   // Progress bar
   const bigFill=el('aod-big-fill'),bigMoto=el('aod-big-moto'),timeTxt=el('aod-time-txt');
   if(status==='pending'){
@@ -3873,7 +3925,7 @@ function _renderAodDetail(){
     bigFill.className='aod-big-fill';bigFill.style.width=p+'%';
     bigMoto.style.display='block';bigMoto.style.left=Math.min(p,92)+'%';
     if(remaining<=0)timeTxt.textContent=ru?'Курьер вот-вот будет у вас 🎉':'Courier arriving any minute 🎉';
-    else if(remaining<=3)timeTxt.textContent=ru?'🏍️ Курьер совсем рядом! Приготовьтесь 🎉':'🏍️ Right around the corner — get ready!';
+    else if(remaining<=3)timeTxt.textContent=ru?'🏎️ Курьер совсем рядом! Приготовьтесь':'🏎️ Right around the corner — get ready!';
     else timeTxt.textContent=ru?`Примерно ${Math.ceil(remaining)} мин до доставки`:`About ${Math.ceil(remaining)} min until delivery`;
   }
   // Items, address, total

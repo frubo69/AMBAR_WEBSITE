@@ -2618,7 +2618,7 @@ function closeNotifSheet(){
 function confirmClearNotifs(){
   haptic.light();
   const c=el('notif-clear-confirm');
-  if(c){c.style.display='flex';}
+  if(c){c.style.display=c.style.display==='flex'?'none':'flex';}
 }
 function cancelClearNotifs(){
   const c=el('notif-clear-confirm');
@@ -3301,10 +3301,13 @@ async function syncOrders(spin=false){
     });
 
     // Keep any local orders not yet visible in the API (just placed, in-flight)
+    // Also keep delivered/declined local orders the API may no longer return
     const apiIds=new Set(fresh.map(o=>o.order_id));
     const localOnly=orders.filter(o=>!apiIds.has(o.order_id)&&!cleared.has(o.order_id));
 
     orders=[...localOnly,...fresh];
+    // Ensure delivered/declined orders that were only local aren't lost between syncs
+    // (they stay in localOnly above as long as they're in localStorage)
     orders.sort((a,b)=>new Date(b.timestamp||0)-new Date(a.timestamp||0));
     localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
   }catch(e){
@@ -3902,10 +3905,33 @@ async function checkActiveOrder(){
         _aobStatusCache[o.order_id]=cur;
       });
     } else {
+      // Orders disappeared from active list — check if any were confirmed before (likely delivered/declined)
+      const prevConfirmed=Object.entries(_aobStatusCache)
+        .filter(([,s])=>s==='confirmed'||s==='approved'||s==='pending')
+        .map(([id])=>id);
+      if(prevConfirmed.length){
+        // Pull final statuses from orders history
+        _checkCompletedTransitions(prevConfirmed);
+      }
+      _aobStatusCache={};
       _aobOrders=[];
       bar.classList.add('aob-hidden');
     }
   }catch(e){}
+}
+
+async function _checkCompletedTransitions(orderIds){
+  await syncOrders();
+  const _ru=lang==='ru';
+  orderIds.forEach(id=>{
+    const o=orders.find(x=>x.order_id===id);
+    if(!o)return;
+    if(o.status==='delivered'&&!_notifs.find(n=>n.dedup_key==='delivered_'+id)){
+      addNotification('box',_ru?'Заказ доставлен!':'Order delivered!',(_ru?'Заказ ':'Order ')+'#'+id+(_ru?' доставлен. Приятного!':' delivered. Enjoy!'),{action:'orders',dedup_key:'delivered_'+id});
+    }else if(o.status==='declined'&&!_notifs.find(n=>n.dedup_key==='declined_'+id)){
+      addNotification('x',_ru?'Заказ отклонён':'Order declined',(_ru?'Заказ ':'Order ')+'#'+id+(_ru?' был отклонён. Свяжитесь с поддержкой':' was declined. Please contact support'),{action:'support',order_id:id,dedup_key:'declined_'+id});
+    }
+  });
 }
 
 function _calcProgress(confirmedAt,etaMins){

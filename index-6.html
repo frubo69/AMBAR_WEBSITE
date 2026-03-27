@@ -665,6 +665,8 @@ img{display:block}
 .addr-save-preview{background:rgba(201,169,110,.07);border:1px solid rgba(201,169,110,.2);border-radius:14px;padding:13px 14px;margin-bottom:22px;display:flex;align-items:flex-start;gap:10px}
 .addr-save-preview-icon{color:var(--gold);flex-shrink:0;margin-top:1px}
 .addr-save-preview-text{font-size:14px;font-weight:500;color:var(--gold2);flex:1;min-width:0;line-height:1.5}
+.addr-save-edit-map-btn{flex-shrink:0;width:30px;height:30px;border-radius:9px;background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.25);color:var(--gold);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;margin-top:-2px}
+.addr-save-edit-map-btn:active{transform:scale(.85);background:rgba(201,169,110,.2)}
 .addr-save-err{font-size:12px;color:var(--red);margin-top:8px;display:none}
 .addr-save-err.on{display:block}
 .addr-save-btn{width:100%;padding:16px;border-radius:16px;border:none;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:22px;transition:.15s;letter-spacing:.2px}
@@ -957,7 +959,8 @@ img{display:block}
     <div class="modal-title" id="modal-title">Адрес доставки</div>
     <div id="modal-addr-list"></div>
     <div class="modal-add-btn" onclick="closeAddrModal();go('address')">
-      <span style="font-size:20px">➕</span><span id="modal-add-lbl">Добавить новый адрес</span>
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16" style="flex-shrink:0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <span id="modal-add-lbl">Добавить новый адрес</span>
     </div>
   </div>
 </div>
@@ -965,7 +968,7 @@ img{display:block}
 <!-- Location mismatch confirm -->
 <div class="confirm-overlay" id="loc-confirm">
   <div class="confirm-box">
-    <div class="confirm-icon">📍</div>
+    <div class="confirm-icon"><svg viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.8" width="28" height="28"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
     <div class="confirm-title" id="lc-title">Вы там?</div>
     <div class="confirm-msg" id="lc-msg">Похоже, вы находитесь далеко от выбранного адреса. Оформить заказ туда?</div>
     <div class="confirm-btns">
@@ -1170,13 +1173,16 @@ img{display:block}
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
       </div>
       <div class="addr-save-preview-text" id="addr-save-preview">—</div>
+      <button class="addr-save-edit-map-btn" id="addr-save-edit-map-btn" onclick="editMapLocationFromSheet()" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+      </button>
     </div>
     <label class="flabel" id="addr-save-name-lbl">НАЗВАНИЕ АДРЕСА</label>
     <input class="finput" id="addr-name-in" type="text" enterkeyhint="next" placeholder="Дом / Офис / JVC...">
     <label class="flabel" style="margin-top:16px" id="addr-save-comment-lbl">КОММЕНТАРИЙ ДЛЯ КУРЬЕРА</label>
     <textarea class="finput" id="addr-comment-in" rows="3" enterkeyhint="done" style="resize:none;height:80px;padding-top:11px" placeholder="Необязательно"></textarea>
     <div class="addr-save-err" id="addr-form-err"></div>
-    <button class="addr-save-btn" id="addr-save-btn-el" onclick="saveNewAddress()">💾 Сохранить адрес</button>
+    <button class="addr-save-btn" id="addr-save-btn-el" onclick="saveNewAddress()">Сохранить адрес</button>
   </div>
 </div>
 
@@ -1402,7 +1408,7 @@ ru:{
   gpsBtn:'Поделиться геолокацией',gpsBtnLoading:'⏳ Определяем...',
   gpsOk:'✅ Геолокация получена — введите название адреса',gpsFail:'⚠️ Не удалось получить геолокацию',
   addrLabelReq:'❌ Введите название адреса',
-  lblAddrName:'НАЗВАНИЕ АДРЕСА',saveAddrBtn:'💾 Сохранить адрес',updateAddrBtn:'✏️ Обновить адрес',doneBtn:'Готово ✓',
+  lblAddrName:'НАЗВАНИЕ АДРЕСА',saveAddrBtn:'Сохранить адрес',updateAddrBtn:'Обновить адрес',doneBtn:'Готово ✓',
   addrSaved:'Адрес сохранён ✓',addrUpdated:'Адрес обновлён ✓',addrDeleted:'Адрес удалён',addrSelected:'Адрес выбран',
   nearOffice:'Ближайший офис',
   addrFormErr:'❌ Заполните обязательные поля',areaErr:'❌ Выберите район',
@@ -1450,7 +1456,7 @@ en:{
   gpsBtn:'Share my location',gpsBtnLoading:'⏳ Getting location...',
   gpsOk:'✅ Location received — enter address label',gpsFail:'⚠️ Could not get location',
   addrLabelReq:'❌ Enter address label',
-  lblAddrName:'ADDRESS LABEL',saveAddrBtn:'💾 Save address',updateAddrBtn:'✏️ Update address',doneBtn:'Done ✓',
+  lblAddrName:'ADDRESS LABEL',saveAddrBtn:'Save address',updateAddrBtn:'Update address',doneBtn:'Done ✓',
   addrSaved:'Address saved ✓',addrUpdated:'Address updated ✓',addrDeleted:'Address removed',addrSelected:'Address selected',
   nearOffice:'Nearest office',
   addrFormErr:'❌ Fill in required fields',areaErr:'❌ Select an area',
@@ -1743,7 +1749,7 @@ function applyLang(){
   set('addr-save-title-txt',t('saveSheetTitle'));
   set('addr-save-name-lbl',t('lblAddrName'));
   set('addr-save-comment-lbl',lang==='ru'?'КОММЕНТАРИЙ ДЛЯ КУРЬЕРА':'COMMENT FOR COURIER');
-  set('addr-save-btn-el',lang==='ru'?'💾 Сохранить адрес':'💾 Save address');
+  set('addr-save-btn-el',lang==='ru'?'Сохранить адрес':'Save address');
   set('map-done-btn',t('mapDone'));
   const ain=el('addr-name-in');if(ain)ain.placeholder=lang==='ru'?'Дом / Офис / JVC...':'Home / Office / JVC...';
   const acin=el('addr-comment-in');if(acin)acin.placeholder=lang==='ru'?'Необязательно':'Optional';
@@ -2033,14 +2039,16 @@ function deleteAddr(i){
 function editAddr(i){
   const a=getSaved()[i];if(!a)return;
   editingAddrIdx=i;
-  locInfo={lat:a.lat||0,lon:a.lon||0,office_id:a.office_id||'office_central',office_name:a.office_name||OFFICES[0].name,street:a.street||a.address||''};
+  locInfo={lat:a.lat||0,lon:a.lon||0,office_id:a.office_id||'office_central',office_name:a.office_name||OFFICES[0].name,street:a.street||a.address||'',isGps:a.isGps||false,gmap_link:a.gmap_link||''};
   _mapGeoResult=null;
   const nameIn=el('addr-name-in');if(nameIn)nameIn.value=a.label||'';
   const commentIn=el('addr-comment-in');if(commentIn)commentIn.value=a.comment||'';
   const previewEl=el('addr-save-preview');if(previewEl)previewEl.textContent=a.address||a.label||'';
+  const editMapBtn=el('addr-save-edit-map-btn');
+  if(editMapBtn)editMapBtn.style.display=(!a.isGps&&a.lat)?'flex':'none';
   const ae=el('addr-form-err');if(ae){ae.classList.remove('on');ae.textContent='';}
   const saveBtn=el('addr-save-btn-el');if(saveBtn)saveBtn.textContent=t('updateAddrBtn');
-  const saveTitle=el('addr-save-title-txt');if(saveTitle)saveTitle.textContent=lang==='ru'?'✏️ Редактировать адрес':'✏️ Edit address';
+  const saveTitle=el('addr-save-title-txt');if(saveTitle)saveTitle.textContent=lang==='ru'?'Редактировать адрес':'Edit address';
   el('addr-save-overlay').classList.add('show');
   setTimeout(()=>nameIn?.focus(),400);
 }
@@ -2060,14 +2068,17 @@ function renderModalAddrList(){
   if(!arr.length){
     list.innerHTML=`<div style="padding:20px 16px;font-size:13px;color:var(--muted)">${t('noSaved')}</div>`;return;
   }
+  const _mPinSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="15" height="15"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
+  const _mEditSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+  const _mTrashSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`;
+  const _mCommentSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="11" height="11" style="flex-shrink:0;opacity:.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
   list.innerHTML=arr.map((a,i)=>{
     const isActive=i===activeAddrIdx;
-    const typeIcon=a.typeIcon||'📍';
-    const commentHtml=a.comment?`<div class="sc-comment">💬 ${a.comment}</div>`:'';
+    const commentHtml=a.comment?`<div class="sc-comment">${_mCommentSvg}<span>${a.comment}</span></div>`:'';
     const addrShort=a.label&&a.label!==a.address?a.address:'';
     return`<div class="saved-card${isActive?' active-addr':''}" onclick="selectAddr(${i})">
       <div class="sc-radio"><div class="sc-radio-dot"></div></div>
-      <span class="sc-icon">${typeIcon}</span>
+      <div class="sc-pin-icon">${_mPinSvg}</div>
       <div class="sc-info">
         <div class="sc-row1">
           <span class="sc-label">${a.label||a.address}</span>
@@ -2076,8 +2087,8 @@ function renderModalAddrList(){
         ${commentHtml}
       </div>
       <div class="sc-actions">
-        <button class="sc-edit-btn" onclick="event.stopPropagation();modalEditAddr(${i})">✏️</button>
-        <button class="sc-del-btn" onclick="event.stopPropagation();modalDeleteAddr(${i})">🗑</button>
+        <button class="sc-edit-btn" onclick="event.stopPropagation();modalEditAddr(${i})">${_mEditSvg}</button>
+        <button class="sc-del-btn" onclick="event.stopPropagation();modalDeleteAddr(${i})">${_mTrashSvg}</button>
       </div>
     </div>`;
   }).join('');
@@ -2315,6 +2326,7 @@ function confirmMapLocation(){
     street:streetFull||'',isGps:_mapPickerSource==='gps'};
   haptic.success();
   closeMapPicker();
+  // _sheetFromMapEdit flag is already set if user came via editMapLocationFromSheet()
   showAddrSaveSheet();
 }
 
@@ -2424,7 +2436,7 @@ function resetAddrForm(){
   const nameIn=el('addr-name-in');if(nameIn)nameIn.value='';
   const commentIn=el('addr-comment-in');if(commentIn)commentIn.value='';
   const ae=el('addr-form-err');if(ae){ae.classList.remove('on');ae.textContent='';}
-  const saveBtn=el('addr-save-btn-el');if(saveBtn)saveBtn.textContent=lang==='ru'?'💾 Сохранить адрес':'💾 Save address';
+  const saveBtn=el('addr-save-btn-el');if(saveBtn)saveBtn.textContent=lang==='ru'?'Сохранить адрес':'Save address';
   const saveTitle=el('addr-save-title-txt');if(saveTitle)saveTitle.textContent=t('saveSheetTitle');
   const gpsBtn=el('btn-add-gps');
   if(gpsBtn){gpsBtn.classList.remove('loading','err');const sub=gpsBtn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=t('btnGpsSub');}
@@ -2472,19 +2484,43 @@ function startMapSearch(){
   }
 }
 
+let _savedSheetLabel='',_savedSheetComment='',_sheetFromMapEdit=false;
+
 function showAddrSaveSheet(){
   const geo=_mapGeoResult||{};
   const preview=locInfo?.isGps?'GPS':(locInfo?.street||geo.line1||(locInfo?.lat?`${locInfo.lat.toFixed(5)}, ${locInfo.lon.toFixed(5)}`:''));
   const previewEl=el('addr-save-preview');if(previewEl)previewEl.textContent=preview||'—';
-  if(editingAddrIdx===null){
+  // Show/hide map edit button — only for non-GPS map addresses
+  const editMapBtn=el('addr-save-edit-map-btn');
+  if(editMapBtn)editMapBtn.style.display=(!locInfo?.isGps&&locInfo?.lat)?'flex':'none';
+  if(_sheetFromMapEdit){
+    // Coming back from map edit — restore preserved label/comment
+    const nameIn=el('addr-name-in');const commentIn=el('addr-comment-in');
+    if(nameIn)nameIn.value=_savedSheetLabel;
+    if(commentIn)commentIn.value=_savedSheetComment;
+  } else if(editingAddrIdx===null){
     const nameIn=el('addr-name-in');if(nameIn)nameIn.value='';
     const commentIn=el('addr-comment-in');if(commentIn)commentIn.value='';
-    const saveBtn=el('addr-save-btn-el');if(saveBtn)saveBtn.textContent=lang==='ru'?'💾 Сохранить адрес':'💾 Save address';
+    const saveBtn=el('addr-save-btn-el');if(saveBtn)saveBtn.textContent=lang==='ru'?'Сохранить адрес':'Save address';
     const saveTitle=el('addr-save-title-txt');if(saveTitle)saveTitle.textContent=t('saveSheetTitle');
   }
+  _sheetFromMapEdit=false;
   const ae=el('addr-form-err');if(ae){ae.classList.remove('on');ae.textContent='';}
   el('addr-save-overlay').classList.add('show');
   setTimeout(()=>el('addr-name-in')?.focus(),400);
+}
+
+function editMapLocationFromSheet(){
+  // Save current label/comment so they're restored when Done is pressed
+  _savedSheetLabel=(el('addr-name-in')?.value||'').trim();
+  _savedSheetComment=(el('addr-comment-in')?.value||'').trim();
+  _sheetFromMapEdit=true;
+  closeAddrSaveSheet();
+  // Open map at current locInfo coords
+  const lat=locInfo?.lat||DUBAI_CENTER[0];
+  const lon=locInfo?.lon||DUBAI_CENTER[1];
+  openMapPicker('map_search',lat,lon);
+  haptic.light();
 }
 
 function closeAddrSaveSheet(){

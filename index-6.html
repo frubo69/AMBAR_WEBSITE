@@ -2400,11 +2400,11 @@ function startGPSAdd(){
     locInfo={lat,lon,office_id:off.id,office_name:off.name,street:'',isGps:true};
     if(btn){btn.classList.remove('loading','err');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=t('btnGpsSub');}
     haptic.success();
-    showToast(lang==='ru'?'📍 Геолокация получена':'📍 Location detected','ok');
+    showToast(lang==='ru'?'📍 Геолокация получена':'📍 Location detected','ok',true);
     showAddrSaveSheet();
   },()=>{
     haptic.error();
-    showToast(lang==='ru'?'⚠️ Не удалось получить геолокацию':'⚠️ Could not get location','err');
+    showToast(lang==='ru'?'⚠️ Не удалось получить геолокацию':'⚠️ Could not get location','err',true);
     if(btn){btn.classList.remove('loading');btn.classList.add('err');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=lang==='ru'?'Не удалось получить геолокацию':'Could not get location';}
     setTimeout(()=>{if(btn){btn.classList.remove('err');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=t('btnGpsSub');}},3000);
   },{timeout:10000,maximumAge:60000,enableHighAccuracy:true});
@@ -4334,7 +4334,7 @@ function dismissToast(){
   el('toast0')?.classList.remove('show');
   el('toast1')?.classList.remove('show');
 }
-function showToast(msg,type=''){
+function showToast(msg,type='',top=false){
   if(type==='err')haptic.error();
   clearTimeout(_tt);
   _ti=1-_ti;
@@ -4345,7 +4345,8 @@ function showToast(msg,type=''){
   const icon=type==='ok'?'✓':type==='err'?'✕':'·';
   const iconColor=type==='ok'?'var(--green)':type==='err'?'var(--red)':'var(--gold)';
   cur.innerHTML=`<span class="toast-icon" style="color:${iconColor}">${icon}</span><span class="toast-msg">${msg}</span>`;
-  setTimeout(()=>{cur.className='toast'+(type?' '+type:'')+' show';},16);
+  const cls='toast'+(type?' '+type:'')+(top?' pdm-mode':'')+' show';
+  setTimeout(()=>{cur.className=cls;},16);
   _tt=setTimeout(()=>cur.classList.remove('show'),2800);
 }
 

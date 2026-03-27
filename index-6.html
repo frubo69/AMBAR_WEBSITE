@@ -112,21 +112,22 @@ img{display:block}
 /* Address selector modal */
 .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .2s}
 .modal-overlay.show{opacity:1;pointer-events:all}
-.modal-sheet{width:100%;background:var(--bg2);border-radius:20px 20px 0 0;padding:0 0 calc(16px + var(--safe-bottom));max-height:70vh;overflow-y:auto;transform:translateY(60px);transition:transform .25s cubic-bezier(.34,1,.64,1)}
+.modal-sheet{width:100%;background:var(--bg2);border-radius:24px 24px 0 0;padding:0 0 calc(20px + var(--safe-bottom));max-height:75vh;overflow-y:auto;transform:translateY(60px);transition:transform .28s cubic-bezier(.34,1,.64,1)}
 .modal-overlay.show .modal-sheet{transform:translateY(0)}
-.modal-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:12px auto 16px}
-.modal-title{font-family:'DM Sans',sans-serif;font-size:18px;color:var(--gold2);padding:0 16px 12px;border-bottom:1px solid var(--border2)}
-.modal-addr-item{display:flex;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--border2);cursor:pointer;transition:.15s}
-.modal-addr-item:active{background:rgba(255,255,255,.03)}
-.modal-addr-item.active{background:rgba(201,169,110,.06)}
-.mai-icon{font-size:22px;flex-shrink:0}
-.mai-info{flex:1;min-width:0}
-.mai-label{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mai-addr{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.mai-check{color:var(--gold);font-size:18px;flex-shrink:0}
-.modal-add-btn{display:flex;align-items:center;gap:10px;padding:14px 16px;cursor:pointer;color:var(--gold);font-size:13px;font-weight:600}
-#modal-addr-list .saved-card{padding:10px 14px}
-#modal-addr-list .saved-card:last-child{border-bottom:1px solid var(--border2)}
+.modal-handle{width:36px;height:4px;background:rgba(255,255,255,.1);border-radius:2px;margin:10px auto 0}
+/* Addr modal header */
+.addr-modal-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px 14px}
+.addr-modal-hdr-left{display:flex;flex-direction:column;gap:1px}
+.addr-modal-sup{font-size:10px;letter-spacing:2px;color:var(--muted);font-weight:600;text-transform:uppercase}
+.addr-modal-ttl{font-size:18px;font-weight:700;color:var(--text);letter-spacing:-.3px;line-height:1.2}
+.addr-modal-close-btn{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.4);cursor:pointer;transition:.15s;flex-shrink:0}
+.addr-modal-close-btn:active{transform:scale(.82);background:rgba(255,255,255,.12)}
+/* Card list inside modal */
+#modal-addr-list{padding:0 12px;display:flex;flex-direction:column;gap:8px;overflow-y:auto}
+#modal-addr-list .saved-card{padding:11px 13px;border-bottom:none!important}
+/* Add button */
+.addr-modal-add-row{margin:10px 12px 0;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 16px;border-radius:16px;border:1.5px dashed rgba(201,169,110,.22);background:rgba(201,169,110,.03);cursor:pointer;color:var(--gold);font-size:13px;font-weight:600;transition:.15s;-webkit-tap-highlight-color:transparent}
+.addr-modal-add-row:active{background:rgba(201,169,110,.08);border-color:rgba(201,169,110,.4)}
 
 .bnav{position:fixed;bottom:calc(14px + var(--safe-bottom));left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:520px;z-index:40;display:flex;background:rgba(8,8,16,.68);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid rgba(255,255,255,.1);border-top:1px solid rgba(255,255,255,.18);border-radius:28px;padding:0 6px;box-shadow:0 16px 48px rgba(0,0,0,.55),0 4px 16px rgba(0,0,0,.3),0 0 0 0.5px rgba(201,169,110,.12),inset 0 1px 0 rgba(255,255,255,.07)}
 .bnav-pill{position:absolute;top:7px;left:0;border-radius:18px;background:rgba(201,169,110,.15);border:1px solid rgba(201,169,110,.45);pointer-events:none;z-index:0;will-change:transform;transition:transform .3s cubic-bezier(.34,1.2,.64,1);box-shadow:0 2px 12px rgba(201,169,110,.15),inset 0 1px 0 rgba(255,255,255,.08)}
@@ -956,11 +957,19 @@ img{display:block}
 <div class="modal-overlay" id="addr-modal" onclick="closeAddrModal(event)">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
-    <div class="modal-title" id="modal-title">Адрес доставки</div>
+    <div class="addr-modal-hdr">
+      <div class="addr-modal-hdr-left">
+        <div class="addr-modal-sup" id="modal-sup">ДОСТАВКА</div>
+        <div class="addr-modal-ttl" id="modal-title">Адрес доставки</div>
+      </div>
+      <button class="addr-modal-close-btn" onclick="el('addr-modal').classList.remove('show')">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
     <div id="modal-addr-list"></div>
-    <div class="modal-add-btn" onclick="closeAddrModal();go('address')">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="16" height="16" style="flex-shrink:0"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-      <span id="modal-add-lbl">Добавить новый адрес</span>
+    <div class="addr-modal-add-row" onclick="closeAddrModal();go('address')">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="15" height="15"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <span id="modal-add-lbl">Добавить адрес</span>
     </div>
   </div>
 </div>
@@ -1712,7 +1721,7 @@ function applyLang(){
   set('nbl-cat',t('catalog'));set('nbl-cart',t('cart'));set('nbl-addr',t('addrPage'));
   set('nbl-ord',t('orders'));set('nbl-prof',t('profile'));
   set('tot-lbl',t('total'));set('co-btn',t('coBtn'));set('clear-btn',t('clearCart'));set('back-catalog-btn',t('backCatalog'));
-  set('modal-title',t('modalTitle'));set('modal-add-lbl',t('modalAdd'));
+  set('modal-title',t('modalTitle'));set('modal-add-lbl',t('modalAdd'));set('modal-sup',lang==='ru'?'ДОСТАВКА':'DELIVERY');
   set('sh-saved-addr',t('shSaved'));set('add-form-title',t('addFormTitle'));
   set('lbl-area',t('lblArea'));set('lbl-street',t('lblStreet'));set('lbl-building',t('lblBuilding'));
   set('lbl-type-gps',t('lblTypeGps'));set('lbl-type-man',t('lblTypeMan'));

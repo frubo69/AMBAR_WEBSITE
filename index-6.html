@@ -297,34 +297,31 @@ img{display:block}
 
 /* Saved addr cards */
 .saved-cards-wrap{position:relative;margin-bottom:12px}
-.saved-cards-wrap::after{content:'';position:absolute;bottom:0;left:0;right:0;height:36px;background:linear-gradient(to bottom,transparent,var(--card));pointer-events:none;border-radius:0 0 var(--r2) var(--r2);z-index:1}
-.saved-cards-wrap::before{content:'';position:absolute;right:4px;top:8px;bottom:8px;width:3px;background:rgba(201,169,110,.18);border-radius:2px;z-index:3;pointer-events:none}
 #sc-thumb{position:absolute;right:4px;width:3px;background:rgba(201,169,110,.6);border-radius:2px;z-index:4;pointer-events:none;transition:top .08s,height .08s;display:none}
 .saved-cards-wrap.few::after{display:none}
 .saved-cards-wrap.few::before{display:none}
-#saved-cards{max-height:162px;overflow-y:scroll;scrollbar-width:none;background:var(--card);border:1.5px solid var(--border2);border-radius:var(--r2)}
+#saved-cards{max-height:220px;overflow-y:scroll;scrollbar-width:none;display:flex;flex-direction:column;gap:8px}
 #saved-cards::-webkit-scrollbar{display:none}
-.saved-card{padding:10px 12px;cursor:pointer;transition:background .15s;display:flex;align-items:center;gap:10px;border-bottom:1px solid var(--border2);border-left:3px solid transparent}
-.saved-card:last-child{border-bottom:none}
+.saved-card{padding:13px 14px;cursor:pointer;transition:background .15s,border-color .15s;display:flex;align-items:center;gap:12px;border-radius:14px;border:1.5px solid var(--border2);background:var(--card)}
 .saved-card:active{background:rgba(255,255,255,.03)}
-.saved-card.active-addr{border-left-color:var(--green);background:rgba(76,175,125,.05)}
-.sc-radio{width:16px;height:16px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:.2s}
+.saved-card.active-addr{border-color:rgba(76,175,125,.5);background:rgba(76,175,125,.04)}
+.sc-radio{width:18px;height:18px;border-radius:50%;border:2px solid var(--border);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:.2s}
 .saved-card.active-addr .sc-radio{border-color:var(--green);background:var(--green)}
-.sc-radio-dot{width:5px;height:5px;border-radius:50%;background:#fff;opacity:0;transform:scale(0);transition:.15s}
+.sc-radio-dot{width:6px;height:6px;border-radius:50%;background:#fff;opacity:0;transform:scale(0);transition:.15s}
 .saved-card.active-addr .sc-radio-dot{opacity:1;transform:scale(1)}
-.sc-icon{font-size:16px;flex-shrink:0}
+.sc-pin-icon{width:34px;height:34px;border-radius:10px;background:rgba(201,169,110,.08);border:1px solid rgba(201,169,110,.14);display:flex;align-items:center;justify-content:center;color:var(--gold);flex-shrink:0}
 .sc-info{flex:1;min-width:0}
 .sc-row1{display:flex;align-items:baseline;gap:5px;min-width:0}
-.sc-label{font-size:13px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;max-width:45%}
+.sc-label{font-size:13px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;max-width:50%}
 .sc-sep{font-size:10px;color:var(--muted);flex-shrink:0}
 .sc-addr{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
-.sc-comment{font-size:10px;color:var(--sub);font-style:italic;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:1px}
-.sc-actions{display:flex;gap:4px;flex-shrink:0}
-.sc-edit-btn,.sc-del-btn{width:28px;height:28px;border-radius:7px;border:1px solid var(--border2);background:transparent;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;font-size:12px;font-family:'DM Sans',sans-serif}
+.sc-comment{font-size:11px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-top:3px;display:flex;align-items:center;gap:4px}
+.sc-actions{display:flex;gap:6px;flex-shrink:0}
+.sc-edit-btn,.sc-del-btn{width:32px;height:32px;border-radius:9px;border:1px solid var(--border2);background:var(--card2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent}
 .sc-edit-btn{color:var(--gold)}
-.sc-del-btn{color:var(--red)}
-.sc-edit-btn:active{background:rgba(201,169,110,.15)}
-.sc-del-btn:active{background:rgba(224,85,85,.1)}
+.sc-del-btn{color:var(--sub)}
+.sc-edit-btn:active{background:rgba(201,169,110,.15);border-color:rgba(201,169,110,.3)}
+.sc-del-btn:active{background:rgba(224,85,85,.1);border-color:rgba(224,85,85,.25);color:var(--red)}
 
 /* Confirm modal */
 .confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .2s}
@@ -601,13 +598,13 @@ img{display:block}
 .addr-empty-title{font-size:17px;font-weight:700;color:var(--text);margin-bottom:6px}
 .addr-empty-sub{font-size:13px;color:var(--sub);line-height:1.5}
 .addr-add-label{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);font-weight:600;padding:20px 16px 10px}
-.addr-methods-row{display:flex;flex-direction:column;gap:10px;padding:0 16px 32px}
-.addr-method-card{background:var(--card);border:1.5px solid var(--border2);border-radius:18px;padding:16px 18px;cursor:pointer;display:flex;flex-direction:row;align-items:center;text-align:left;gap:16px;transition:.18s;-webkit-tap-highlight-color:transparent;outline:none;font-family:'DM Sans',sans-serif;width:100%}
-.addr-method-card:active{transform:scale(.97);background:rgba(201,169,110,.05);border-color:rgba(201,169,110,.4)}
-.addr-method-card-icon{width:50px;height:50px;border-radius:14px;background:rgba(201,169,110,.08);border:1px solid rgba(201,169,110,.18);display:flex;align-items:center;justify-content:center;color:var(--gold);flex-shrink:0;transition:.18s}
-.addr-method-card-text{flex:1;min-width:0}
-.addr-method-card-title{font-size:14px;font-weight:700;color:var(--text);line-height:1.3}
-.addr-method-card-sub{font-size:12px;color:var(--sub);line-height:1.4;margin-top:2px}
+.addr-methods-row{display:flex;flex-direction:row;gap:10px;padding:0 16px 32px}
+.addr-method-card{flex:1;background:var(--card);border:1.5px solid var(--border2);border-radius:18px;padding:20px 12px 18px;cursor:pointer;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;transition:.18s;-webkit-tap-highlight-color:transparent;outline:none;font-family:'DM Sans',sans-serif}
+.addr-method-card:active{transform:scale(.95);background:rgba(201,169,110,.05);border-color:rgba(201,169,110,.4)}
+.addr-method-card-icon{width:54px;height:54px;border-radius:15px;background:rgba(201,169,110,.08);border:1px solid rgba(201,169,110,.18);display:flex;align-items:center;justify-content:center;color:var(--gold);margin-bottom:6px;transition:.18s}
+.addr-method-card-text{display:contents}
+.addr-method-card-title{font-size:13px;font-weight:700;color:var(--text);line-height:1.3}
+.addr-method-card-sub{font-size:11px;color:var(--sub);line-height:1.4}
 .addr-method-card.loading .addr-method-card-icon{animation:addrPulse 1.2s ease-in-out infinite}
 .addr-method-card.loading .addr-method-card-title,.addr-method-card.loading .addr-method-card-sub{color:var(--muted)}
 .addr-method-card.err .addr-method-card-icon{background:rgba(224,85,85,.08);border-color:rgba(224,85,85,.25);color:var(--red)}
@@ -1977,14 +1974,17 @@ function renderSavedCards(){
   if(emptyState)emptyState.style.display=arr.length?'none':'';
   if(wrapOuter) wrapOuter.classList.toggle('few', arr.length<=3);
   if(!arr.length){wrap.innerHTML='';return;}
+  const pinSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="15" height="15"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
+  const editSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
+  const trashSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`;
+  const commentSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="11" height="11" style="flex-shrink:0;opacity:.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
   wrap.innerHTML=arr.map((a,i)=>{
     const isActive=i===activeAddrIdx;
-    const typeIcon=a.typeIcon||'📍';
-    const commentHtml=a.comment?`<div class="sc-comment">💬 ${a.comment}</div>`:'';
+    const commentHtml=a.comment?`<div class="sc-comment">${commentSvg}<span>${a.comment}</span></div>`:'';
     const addrShort=a.label&&a.label!==a.address?a.address:'';
     return`<div class="saved-card${isActive?' active-addr':''}" onclick="selectAddr(${i})">
       <div class="sc-radio"><div class="sc-radio-dot"></div></div>
-      <span class="sc-icon">${typeIcon}</span>
+      <div class="sc-pin-icon">${pinSvg}</div>
       <div class="sc-info">
         <div class="sc-row1">
           <span class="sc-label">${a.label||a.address}</span>
@@ -1993,8 +1993,8 @@ function renderSavedCards(){
         ${commentHtml}
       </div>
       <div class="sc-actions">
-        <button class="sc-edit-btn" onclick="event.stopPropagation();editAddr(${i})">✏️</button>
-        <button class="sc-del-btn" onclick="event.stopPropagation();deleteAddr(${i})">🗑</button>
+        <button class="sc-edit-btn" onclick="event.stopPropagation();editAddr(${i})">${editSvg}</button>
+        <button class="sc-del-btn" onclick="event.stopPropagation();deleteAddr(${i})">${trashSvg}</button>
       </div>
     </div>`;
   }).join('');

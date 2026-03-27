@@ -436,7 +436,7 @@ img{display:block}
 .toast.show{opacity:1;visibility:visible;transform:translateY(0)}
 .toast.ok{border-left-color:var(--green)}
 .toast.err{border-left-color:var(--red)}
-.toast.pdm-mode{bottom:auto;top:56px;transform:translateY(-14px)}
+.toast.pdm-mode{bottom:auto;top:calc(var(--safe-top,0px) + 56px);transform:translateY(-14px)}
 .toast.pdm-mode.show{transform:translateY(0)}
 .toast-icon{font-size:16px;flex-shrink:0;line-height:1}
 .toast-msg{flex:1;min-width:0}
@@ -2531,21 +2531,35 @@ function _onMapSearchInput(q){
 function _runMapSearch(q){
   const res=el('map-search-results');if(!res)return;
   res.innerHTML=`<div class="map-search-hint">${lang==='ru'?'Поиск...':'Searching...'}</div>`;
-  fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=8&addressdetails=1`)
+  // Build URL with location bias viewbox around user's current location
+  const cLat=locInfo?.lat||DUBAI_CENTER[0],cLon=locInfo?.lon||DUBAI_CENTER[1];
+  const d=0.5; // ~55km box
+  const vb=`${cLon-d},${cLat+d},${cLon+d},${cLat-d}`;
+  const url=`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=8&addressdetails=1&viewbox=${vb}&bounded=0&accept-language=${lang==='ru'?'ru,en':'en,ru'}`;
+  fetch(url)
     .then(r=>r.json())
     .then(data=>{
       if(!data.length){res.innerHTML=`<div class="map-search-hint">${lang==='ru'?'Ничего не найдено':'No results found'}</div>`;return;}
       res.innerHTML=data.map(item=>{
         const a=item.address||{};
-        const main=a.road||a.pedestrian||a.suburb||a.neighbourhood||item.display_name.split(',')[0];
-        const parts=[a.house_number?main+' '+a.house_number:null,a.city||a.town||a.village||a.county,a.country].filter(Boolean);
-        const sub=parts.slice(1).join(', ');
+        // Build readable name: prefer name of POI, then road+number
+        const poiName=item.name||'';
+        const road=a.road||a.pedestrian||a.footway||a.suburb||a.neighbourhood||'';
+        const num=a.house_number||'';
+        const streetFull=road+(num?' '+num:'');
+        const main=poiName||(streetFull||item.display_name.split(',')[0]);
+        // Sub: type + city/district
+        const typeStr=item.type&&item.type!=='yes'?item.type.replace(/_/g,' '):null;
+        const city=a.city||a.town||a.village||a.county||a.state||'';
+        const subParts=[typeStr&&poiName?streetFull||null:null,city].filter(Boolean);
+        const sub=typeStr&&poiName?[typeStr,streetFull,city].filter(Boolean).join(' · '):city;
         const safeLat=parseFloat(item.lat).toFixed(6),safeLon=parseFloat(item.lon).toFixed(6);
-        const safeName=(main||'').replace(/'/g,'&apos;').replace(/"/g,'&quot;');
+        const streetForSave=(poiName?(streetFull||poiName):streetFull)||main;
+        const safeName=streetForSave.replace(/'/g,'&apos;').replace(/"/g,'&quot;');
         return `<div class="map-search-result-item" onclick="selectMapSearchResult(${safeLat},${safeLon},'${safeName}')">
           <div class="map-search-ri-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></div>
           <div>
-            <div class="map-search-ri-main">${main||item.display_name.split(',')[0]}</div>
+            <div class="map-search-ri-main">${main}</div>
             ${sub?`<div class="map-search-ri-sub">${sub}</div>`:''}
           </div>
         </div>`;

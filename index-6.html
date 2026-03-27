@@ -643,8 +643,8 @@ img{display:block}
 .map-search-ri-main{font-size:15px;font-weight:500;color:#fff;font-family:'DM Sans',sans-serif}
 .map-search-ri-sub{font-size:13px;color:rgba(255,255,255,.4);margin-top:2px;font-family:'DM Sans',sans-serif}
 .map-search-hint{padding:32px 20px;text-align:center;color:rgba(255,255,255,.3);font-size:14px;font-family:'DM Sans',sans-serif}
-.map-pin-dot{position:absolute;top:50%;left:50%;z-index:500;transform:translate(-50%,-100%);pointer-events:none;width:42px;height:56px;transition:transform .15s,filter .15s}
-.map-pin-dot.dragging{transform:translate(-50%,-115%) scale(1.18);filter:drop-shadow(0 8px 16px rgba(0,0,0,.5))}
+.map-pin-dot{position:absolute;top:50%;left:50%;z-index:500;transform:translate(-50%,-60%);pointer-events:none;width:52px;height:52px;transition:transform .15s}
+.map-pin-dot.dragging{transform:translate(-50%,-70%) scale(1.18)}
 .map-pin-dot-inner{display:none}
 .map-pin-shadow{position:absolute;top:50%;left:50%;z-index:499;transform:translate(-50%,4px);pointer-events:none;width:18px;height:6px;border-radius:50%;background:rgba(0,0,0,.4);filter:blur(4px);transition:transform .15s,opacity .15s}
 .map-pin-shadow.dragging{transform:translate(-50%,20px) scale(.65);opacity:.3}
@@ -1112,24 +1112,7 @@ img{display:block}
   </div>
   <!-- Center pin -->
   <div class="map-pin-dot" id="map-center-pin">
-    <svg viewBox="0 0 42 56" width="42" height="56" xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <linearGradient id="pg" x1="20%" y1="0%" x2="80%" y2="100%">
-          <stop offset="0%" stop-color="#F7DC6F"/>
-          <stop offset="40%" stop-color="#C9A96E"/>
-          <stop offset="100%" stop-color="#8B6914"/>
-        </linearGradient>
-        <linearGradient id="pg2" x1="0%" y1="0%" x2="100%" y2="100%">
-          <stop offset="0%" stop-color="#F0C040"/>
-          <stop offset="100%" stop-color="#A07830"/>
-        </linearGradient>
-      </defs>
-      <path d="M21 2C12.16 2 5 9.16 5 18c0 12.42 16 34 16 34S37 30.42 37 18C37 9.16 29.84 2 21 2z" fill="url(#pg)" filter="drop-shadow(0 2px 6px rgba(0,0,0,.55))"/>
-      <path d="M21 4C13.27 4 7 10.27 7 18c0 11 14 31 14 31s14-20 14-31C35 10.27 28.73 4 21 4z" fill="url(#pg2)" opacity="0.5"/>
-      <circle cx="21" cy="18" r="7.5" fill="rgba(0,0,0,0.3)"/>
-      <circle cx="21" cy="18" r="6" fill="#0a0a12"/>
-      <circle cx="21" cy="18" r="2.5" fill="rgba(201,169,110,0.5)"/>
-    </svg>
+    <img src="pin.png" width="52" height="52" style="display:block;filter:drop-shadow(0 3px 8px rgba(0,0,0,.6))">
   </div>
   <div class="map-pin-shadow" id="map-pin-shadow"></div>
   <!-- Layer toggle -->

@@ -601,12 +601,13 @@ img{display:block}
 .addr-empty-title{font-size:17px;font-weight:700;color:var(--text);margin-bottom:6px}
 .addr-empty-sub{font-size:13px;color:var(--sub);line-height:1.5}
 .addr-add-label{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);font-weight:600;padding:20px 16px 10px}
-.addr-methods-row{display:flex;gap:10px;padding:0 16px 32px}
-.addr-method-card{flex:1;background:var(--card);border:1.5px solid var(--border2);border-radius:18px;padding:20px 12px 18px;cursor:pointer;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;transition:.18s;-webkit-tap-highlight-color:transparent;outline:none;font-family:'DM Sans',sans-serif}
-.addr-method-card:active{transform:scale(.95);background:rgba(201,169,110,.05);border-color:rgba(201,169,110,.4)}
-.addr-method-card-icon{width:54px;height:54px;border-radius:15px;background:rgba(201,169,110,.08);border:1px solid rgba(201,169,110,.18);display:flex;align-items:center;justify-content:center;color:var(--gold);margin-bottom:6px;transition:.18s}
-.addr-method-card-title{font-size:13px;font-weight:700;color:var(--text);line-height:1.3}
-.addr-method-card-sub{font-size:11px;color:var(--sub);line-height:1.4}
+.addr-methods-row{display:flex;flex-direction:column;gap:10px;padding:0 16px 32px}
+.addr-method-card{background:var(--card);border:1.5px solid var(--border2);border-radius:18px;padding:16px 18px;cursor:pointer;display:flex;flex-direction:row;align-items:center;text-align:left;gap:16px;transition:.18s;-webkit-tap-highlight-color:transparent;outline:none;font-family:'DM Sans',sans-serif;width:100%}
+.addr-method-card:active{transform:scale(.97);background:rgba(201,169,110,.05);border-color:rgba(201,169,110,.4)}
+.addr-method-card-icon{width:50px;height:50px;border-radius:14px;background:rgba(201,169,110,.08);border:1px solid rgba(201,169,110,.18);display:flex;align-items:center;justify-content:center;color:var(--gold);flex-shrink:0;transition:.18s}
+.addr-method-card-text{flex:1;min-width:0}
+.addr-method-card-title{font-size:14px;font-weight:700;color:var(--text);line-height:1.3}
+.addr-method-card-sub{font-size:12px;color:var(--sub);line-height:1.4;margin-top:2px}
 .addr-method-card.loading .addr-method-card-icon{animation:addrPulse 1.2s ease-in-out infinite}
 .addr-method-card.loading .addr-method-card-title,.addr-method-card.loading .addr-method-card-sub{color:var(--muted)}
 .addr-method-card.err .addr-method-card-icon{background:rgba(224,85,85,.08);border-color:rgba(224,85,85,.25);color:var(--red)}
@@ -642,11 +643,11 @@ img{display:block}
 .map-search-ri-main{font-size:15px;font-weight:500;color:#fff;font-family:'DM Sans',sans-serif}
 .map-search-ri-sub{font-size:13px;color:rgba(255,255,255,.4);margin-top:2px;font-family:'DM Sans',sans-serif}
 .map-search-hint{padding:32px 20px;text-align:center;color:rgba(255,255,255,.3);font-size:14px;font-family:'DM Sans',sans-serif}
-.map-pin-dot{position:absolute;top:50%;left:50%;z-index:500;transform:translate(-50%,-50%);pointer-events:none;width:26px;height:26px;border-radius:50%;background:#E8472A;border:3px solid #fff;box-shadow:0 2px 14px rgba(0,0,0,.45),0 0 0 6px rgba(232,71,42,.2);display:flex;align-items:center;justify-content:center;transition:transform .15s,box-shadow .15s}
-.map-pin-dot.dragging{transform:translate(-50%,-58%) scale(1.2);box-shadow:0 6px 22px rgba(0,0,0,.55),0 0 0 10px rgba(232,71,42,.12)}
-.map-pin-dot-inner{width:8px;height:8px;border-radius:50%;background:#fff;flex-shrink:0}
-.map-pin-shadow{position:absolute;top:50%;left:50%;z-index:499;transform:translate(-50%,6px);pointer-events:none;width:14px;height:5px;border-radius:50%;background:rgba(0,0,0,.35);filter:blur(3px);transition:transform .15s,opacity .15s}
-.map-pin-shadow.dragging{transform:translate(-50%,14px) scale(.7);opacity:.4}
+.map-pin-dot{position:absolute;top:50%;left:50%;z-index:500;transform:translate(-50%,-100%);pointer-events:none;width:42px;height:56px;transition:transform .15s,filter .15s}
+.map-pin-dot.dragging{transform:translate(-50%,-115%) scale(1.18);filter:drop-shadow(0 8px 16px rgba(0,0,0,.5))}
+.map-pin-dot-inner{display:none}
+.map-pin-shadow{position:absolute;top:50%;left:50%;z-index:499;transform:translate(-50%,4px);pointer-events:none;width:18px;height:6px;border-radius:50%;background:rgba(0,0,0,.4);filter:blur(4px);transition:transform .15s,opacity .15s}
+.map-pin-shadow.dragging{transform:translate(-50%,20px) scale(.65);opacity:.3}
 .map-zoom-controls{position:absolute;right:14px;top:50%;transform:translateY(-50%);z-index:501;display:flex;flex-direction:column;background:rgba(12,12,18,.75);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.12);border-radius:14px;overflow:hidden}
 .map-zoom-btn{width:42px;height:42px;background:transparent;border:none;color:#fff;font-size:22px;font-weight:300;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.12s;font-family:'DM Sans',sans-serif;-webkit-tap-highlight-color:transparent;line-height:1}
 .map-zoom-btn:active{background:rgba(255,255,255,.1)}
@@ -814,17 +815,21 @@ img{display:block}
     <div class="addr-methods-row">
       <button class="addr-method-card" id="btn-add-gps" onclick="startGPSAdd()">
         <div class="addr-method-card-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="26" height="26"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8" stroke-dasharray="3 2.5" stroke-width="1.5" opacity=".5"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8" stroke-dasharray="3 2.5" stroke-width="1.5" opacity=".5"/></svg>
         </div>
-        <div class="addr-method-card-title" id="btn-gps-title">Отправить геолокацию</div>
-        <div class="addr-method-card-sub" id="btn-gps-sub">Авто-определение и уточнение</div>
+        <div class="addr-method-card-text">
+          <div class="addr-method-card-title" id="btn-gps-title">Отправить геолокацию</div>
+          <div class="addr-method-card-sub" id="btn-gps-sub">Авто-определение и уточнение</div>
+        </div>
       </button>
       <button class="addr-method-card" id="btn-add-map" onclick="startMapSearch()">
         <div class="addr-method-card-icon">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="26" height="26"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="24" height="24"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
         </div>
-        <div class="addr-method-card-title" id="btn-map-title">Найти на карте</div>
-        <div class="addr-method-card-sub" id="btn-map-sub">Переместите пин на ваш адрес</div>
+        <div class="addr-method-card-text">
+          <div class="addr-method-card-title" id="btn-map-title">Найти на карте</div>
+          <div class="addr-method-card-sub" id="btn-map-sub">Переместите пин на ваш адрес</div>
+        </div>
       </button>
     </div>
 
@@ -1106,7 +1111,26 @@ img{display:block}
     </button>
   </div>
   <!-- Center pin -->
-  <div class="map-pin-dot" id="map-center-pin"><div class="map-pin-dot-inner"></div></div>
+  <div class="map-pin-dot" id="map-center-pin">
+    <svg viewBox="0 0 42 56" width="42" height="56" xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <linearGradient id="pg" x1="20%" y1="0%" x2="80%" y2="100%">
+          <stop offset="0%" stop-color="#F7DC6F"/>
+          <stop offset="40%" stop-color="#C9A96E"/>
+          <stop offset="100%" stop-color="#8B6914"/>
+        </linearGradient>
+        <linearGradient id="pg2" x1="0%" y1="0%" x2="100%" y2="100%">
+          <stop offset="0%" stop-color="#F0C040"/>
+          <stop offset="100%" stop-color="#A07830"/>
+        </linearGradient>
+      </defs>
+      <path d="M21 2C12.16 2 5 9.16 5 18c0 12.42 16 34 16 34S37 30.42 37 18C37 9.16 29.84 2 21 2z" fill="url(#pg)" filter="drop-shadow(0 2px 6px rgba(0,0,0,.55))"/>
+      <path d="M21 4C13.27 4 7 10.27 7 18c0 11 14 31 14 31s14-20 14-31C35 10.27 28.73 4 21 4z" fill="url(#pg2)" opacity="0.5"/>
+      <circle cx="21" cy="18" r="7.5" fill="rgba(0,0,0,0.3)"/>
+      <circle cx="21" cy="18" r="6" fill="#0a0a12"/>
+      <circle cx="21" cy="18" r="2.5" fill="rgba(201,169,110,0.5)"/>
+    </svg>
+  </div>
   <div class="map-pin-shadow" id="map-pin-shadow"></div>
   <!-- Layer toggle -->
   <div class="map-layer-toggle" id="map-layer-toggle">
@@ -2199,9 +2223,6 @@ function switchMapLayer(style){
   document.querySelectorAll('.map-layer-btn').forEach(b=>b.classList.toggle('on',b.dataset.layer===style));
   const pane=document.querySelector('#map-leaflet .leaflet-tile-pane');
   if(pane)pane.style.filter=MAP_FILTERS[style]||'none';
-  // Also invert the center pin so it stays normal on inverted map
-  const pin=el('map-center-pin');
-  if(pin)pin.style.filter=style==='dark'?'invert(1) hue-rotate(180deg) saturate(5)':'none';
   haptic.light();
 }
 
@@ -2451,9 +2472,21 @@ function startGPSAdd(){
 }
 
 function startMapSearch(){
-  const sLat=locInfo?.lat||DUBAI_CENTER[0];
-  const sLon=locInfo?.lon||DUBAI_CENTER[1];
-  openMapPicker('map_search',sLat,sLon);
+  const btn=el('btn-add-map');
+  const open=(lat,lon)=>{
+    if(btn){btn.classList.remove('loading');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=t('btnMapSub');}
+    openMapPicker('map_search',lat,lon);
+  };
+  if(navigator.geolocation){
+    if(btn){btn.classList.add('loading');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=lang==='ru'?'Определяем...':'Getting location...';}
+    navigator.geolocation.getCurrentPosition(
+      pos=>open(pos.coords.latitude,pos.coords.longitude),
+      ()=>open(locInfo?.lat||DUBAI_CENTER[0],locInfo?.lon||DUBAI_CENTER[1]),
+      {timeout:6000,maximumAge:60000,enableHighAccuracy:true}
+    );
+  } else {
+    open(locInfo?.lat||DUBAI_CENTER[0],locInfo?.lon||DUBAI_CENTER[1]);
+  }
 }
 
 function showAddrSaveSheet(){

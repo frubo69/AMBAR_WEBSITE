@@ -124,11 +124,13 @@ def order_card(o, full=True):
             f"👤 *{o.get('customer_name','—')}*",
             f"📞 Телефон: `{o.get('phone','—')}`",
             f"🔗 @{o.get('username','—')}  |  ID: `{o.get('customer_id','—')}`",
-            f"🏠 Адрес: {o.get('address','—')}",
-        ]
-        loc = o.get("location", {})
-        if loc.get("lat"):
-            lines.append(f"📍 GPS: {loc['lat']:.5f}, {loc['lon']:.5f}")
+            ]
+        gmap = o.get("gmap_link","")
+        addr = o.get("address","—")
+        if gmap:
+            lines.append(f"📍 GPS: {gmap}" if (o.get("is_gps") or addr == "GPS") else f"🏠 Адрес: {gmap}")
+        else:
+            lines.append(f"🏠 Адрес: {addr}")
         lines.append("")
     lines.append("🛒 *Позиции:*")
     for item in o.get("items", []):
@@ -419,9 +421,8 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         loc   = order.get("location", {})
         if loc.get("lat"):
             await q.message.reply_location(latitude=loc["lat"], longitude=loc["lon"])
-            await q.message.reply_text(f"📍 GPS клиента для заказа #{oid}\n🏠 Адрес: {order.get('address','—')}")
         else:
-            await q.message.reply_text(f"📍 GPS недоступен\n\n🏠 Адрес: {order.get('address','—')}")
+            await q.answer("📍 GPS недоступен для этого заказа", show_alert=True)
 
     # ── EDIT done ─────────────────────────────────────────────────────────────
     elif data.startswith("edit_done_"):

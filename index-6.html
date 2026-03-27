@@ -2268,7 +2268,7 @@ function confirmMapLocation(){
   const topText=(el('map-addr-top-text')?.textContent||'').trim();
   const streetFull=geo.full||geo.line1||(topText!=='...'&&topText!=='—'?topText:'');
   locInfo={lat:c.lat,lon:c.lng,office_id:off.id,office_name:off.name,
-    street:streetFull||''};
+    street:streetFull||'',isGps:_mapPickerSource==='gps'};
   haptic.success();
   closeMapPicker();
   showAddrSaveSheet();
@@ -2317,14 +2317,16 @@ function saveNewAddress(){
   const comment=(el('addr-comment-in')?.value||'').trim();
   const lat=Number(locInfo?.lat||0);
   const lon=Number(locInfo?.lon||0);
+  const isGps=locInfo?.isGps||false;
   const streetShort=locInfo?.street||'';
-  const addrStr=streetShort||(lat?`${lat.toFixed(5)}, ${lon.toFixed(5)}`:'');
+  const gmapLink=lat&&lon?`https://maps.google.com/maps?q=${lat},${lon}`:'';
+  const addrStr=isGps?'GPS':(streetShort||gmapLink);
 
   const newAddr={
-    label,address:addrStr,street:streetShort,
+    label,address:addrStr,street:isGps?'':streetShort,
     streetPart:'',buildingPart:'',areaIdx:null,
     typeId:null,typeIcon:'📍',
-    lat,lon,
+    lat,lon,isGps,gmap_link:gmapLink,
     office_id:locInfo?.office_id||'office_central',
     office_name:locInfo?.office_name||OFFICES[0].name,
     comment,
@@ -2415,7 +2417,7 @@ function startMapSearch(){
 
 function showAddrSaveSheet(){
   const geo=_mapGeoResult||{};
-  const preview=locInfo?.street||geo.line1||(locInfo?.lat?`${locInfo.lat.toFixed(5)}, ${locInfo.lon.toFixed(5)}`:'');
+  const preview=locInfo?.isGps?'GPS':(locInfo?.street||geo.line1||(locInfo?.lat?`${locInfo.lat.toFixed(5)}, ${locInfo.lon.toFixed(5)}`:''));
   const previewEl=el('addr-save-preview');if(previewEl)previewEl.textContent=preview||'—';
   if(editingAddrIdx===null){
     const nameIn=el('addr-name-in');if(nameIn)nameIn.value='';
@@ -3241,6 +3243,7 @@ function placeOrder(){
   const payload={
     action:'order',order_id:oid,items,subtotal:sub,tip,total,currency:'AED',
     phone:'+'+digits,address:addr.address,address_label:addr.label,comment:addr.comment||'',
+    gmap_link:addr.gmap_link||'',is_gps:addr.isGps||false,
     location:{lat:addr.lat||0,lon:addr.lon||0},
     office_id:addr.office_id||'office_central',
     office_name:addr.office_name||OFFICES[0].name,lang,

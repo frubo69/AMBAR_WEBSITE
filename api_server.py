@@ -114,6 +114,8 @@ async def handle_create_order(request: web.Request) -> web.Response:
     items     = data.get("items", [])
     phone     = data.get("phone", "—")
     address   = data.get("address", "—")
+    gmap_link = data.get("gmap_link", "")
+    is_gps    = data.get("is_gps", False)
     tip       = data.get("tip", 0)
     total     = data.get("total", 0)
     loc       = data.get("location", {})
@@ -138,6 +140,7 @@ async def handle_create_order(request: web.Request) -> web.Response:
         "order_id": oid,        "customer_id": uid,
         "customer_name": user_name, "username": username,
         "phone": phone,         "address": address,   "location": loc,
+        "gmap_link": gmap_link, "is_gps": is_gps,
         "items": items,         "item_lines": item_lines,
         "tip": tip,             "total": total,        "lang": lang,
         "office_id": office_id, "office_name": office_nm, "comment": comment,
@@ -182,10 +185,15 @@ async def handle_create_order(request: web.Request) -> web.Response:
 
     # ── Operator notification ─────────────────────────────────────────────────
     lat, lon = loc.get("lat", 0), loc.get("lon", 0)
-    loc_str  = ""
-    if lat and lon:
-        try: loc_str = f"\n📍 {float(lat):.5f}, {float(lon):.5f}"
+    # Build google maps link if not provided
+    if not gmap_link and lat and lon:
+        try: gmap_link = f"https://maps.google.com/maps?q={float(lat):.6f},{float(lon):.6f}"
         except (ValueError, TypeError): pass
+    # Single address line: GPS link or Maps link
+    if gmap_link:
+        addr_line = f"📍 GPS: {gmap_link}" if (is_gps or address == "GPS") else f"🏠 Адрес: {gmap_link}"
+    else:
+        addr_line = f"🏠 Адрес: {address}"
 
     first_order_banner = "🔴 *⚠️ ПЕРВЫЙ ЗАКАЗ — новый клиент!*\n\n" if is_first_order else ""
     op_text = (
@@ -195,7 +203,7 @@ async def handle_create_order(request: web.Request) -> web.Response:
         f"👤 *{user_name}*\n"
         f"📞 `{phone}`\n"
         f"🔗 @{username} | ID: `{uid}`\n"
-        f"🏠 Адрес: {address}{loc_str}\n\n"
+        f"{addr_line}\n\n"
         f"🛒 *Позиции:*\n{item_lines}\n\n"
         f"🎁 Чаевые: {tip} AED\n"
         f"💰 *Итого: {total} AED*"

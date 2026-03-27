@@ -2397,12 +2397,9 @@ function startGPSAdd(){
   navigator.geolocation.getCurrentPosition(pos=>{
     const{latitude:lat,longitude:lon}=pos.coords;
     const off=nearestOffice(lat,lon);
-    locInfo={lat,lon,office_id:off.id,office_name:off.name,street:''};
+    locInfo={lat,lon,office_id:off.id,office_name:off.name,street:'',isGps:true};
     if(btn){btn.classList.remove('loading','err');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=t('btnGpsSub');}
-    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`)
-      .then(r=>r.json()).then(d=>{const a=d.address||{};const road=a.road||a.pedestrian||a.suburb||'';const num=a.house_number||'';locInfo.street=(road+(num?' '+num:'')).trim();})
-      .catch(()=>{});
-    openMapPicker('gps',lat,lon);
+    showAddrSaveSheet();
   },()=>{
     if(btn){btn.classList.remove('loading');btn.classList.add('err');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=lang==='ru'?'Не удалось получить геолокацию':'Could not get location';}
     setTimeout(()=>{if(btn){btn.classList.remove('err');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=t('btnGpsSub');}},3000);

@@ -436,7 +436,7 @@ img{display:block}
 .toast.show{opacity:1;visibility:visible;transform:translateY(0)}
 .toast.ok{border-left-color:var(--green)}
 .toast.err{border-left-color:var(--red)}
-.toast.pdm-mode{bottom:auto;top:20px;transform:translateY(-14px)}
+.toast.pdm-mode{bottom:auto;top:56px;transform:translateY(-14px)}
 .toast.pdm-mode.show{transform:translateY(0)}
 .toast-icon{font-size:16px;flex-shrink:0;line-height:1}
 .toast-msg{flex:1;min-width:0}
@@ -622,6 +622,26 @@ img{display:block}
 .map-top-addr-wrap{flex:1;min-width:0}
 .map-top-addr-text{font-size:18px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 10px rgba(0,0,0,.7);transition:opacity .25s}
 .map-top-addr-text.updating{opacity:.45}
+/* Map search overlay */
+.map-search-overlay{position:fixed;inset:0;background:#0d0d14;z-index:1100;display:flex;flex-direction:column;transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1)}
+.map-search-overlay.show{transform:translateX(0)}
+.map-search-hdr{display:flex;align-items:center;gap:10px;padding:14px 14px;padding-top:calc(14px + var(--safe-top,0px));border-bottom:1px solid rgba(255,255,255,.08);flex-shrink:0}
+.map-search-back-btn{width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.1);background:rgba(255,255,255,.06);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;color:#fff;-webkit-tap-highlight-color:transparent}
+.map-search-back-btn:active{opacity:.6}
+.map-search-input-wrap{flex:1;position:relative;display:flex;align-items:center}
+.map-search-input{width:100%;height:42px;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.12);border-radius:12px;color:#fff;font-size:15px;font-family:'DM Sans',sans-serif;padding:0 38px 0 14px;outline:none;-webkit-appearance:none}
+.map-search-input::placeholder{color:rgba(255,255,255,.35)}
+.map-search-input:focus{border-color:rgba(201,169,110,.5);background:rgba(255,255,255,.09)}
+.map-search-clear-btn{position:absolute;right:10px;width:22px;height:22px;border-radius:50%;background:rgba(255,255,255,.18);border:none;color:#fff;font-size:14px;display:flex;align-items:center;justify-content:center;cursor:pointer;opacity:0;transition:opacity .15s;pointer-events:none}
+.map-search-clear-btn.show{opacity:1;pointer-events:all}
+.map-search-results{flex:1;overflow-y:auto;scrollbar-width:none}
+.map-search-results::-webkit-scrollbar{display:none}
+.map-search-result-item{display:flex;align-items:flex-start;gap:12px;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.05);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:background .12s}
+.map-search-result-item:active{background:rgba(255,255,255,.04)}
+.map-search-ri-icon{flex-shrink:0;color:rgba(255,255,255,.35);margin-top:2px}
+.map-search-ri-main{font-size:15px;font-weight:500;color:#fff;font-family:'DM Sans',sans-serif}
+.map-search-ri-sub{font-size:13px;color:rgba(255,255,255,.4);margin-top:2px;font-family:'DM Sans',sans-serif}
+.map-search-hint{padding:32px 20px;text-align:center;color:rgba(255,255,255,.3);font-size:14px;font-family:'DM Sans',sans-serif}
 .map-pin-dot{position:absolute;top:50%;left:50%;z-index:500;transform:translate(-50%,-50%);pointer-events:none;width:26px;height:26px;border-radius:50%;background:#E8472A;border:3px solid #fff;box-shadow:0 2px 14px rgba(0,0,0,.45),0 0 0 6px rgba(232,71,42,.2);display:flex;align-items:center;justify-content:center;transition:transform .15s,box-shadow .15s}
 .map-pin-dot.dragging{transform:translate(-50%,-58%) scale(1.2);box-shadow:0 6px 22px rgba(0,0,0,.55),0 0 0 10px rgba(232,71,42,.12)}
 .map-pin-dot-inner{width:8px;height:8px;border-radius:50%;background:#fff;flex-shrink:0}
@@ -1081,6 +1101,9 @@ img{display:block}
     <div class="map-top-addr-wrap">
       <div class="map-top-addr-text" id="map-addr-top-text">—</div>
     </div>
+    <button class="map-top-icon-btn" onclick="openMapSearchPanel()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    </button>
   </div>
   <!-- Center pin -->
   <div class="map-pin-dot" id="map-center-pin"><div class="map-pin-dot-inner"></div></div>
@@ -1113,6 +1136,23 @@ img{display:block}
     <span id="map-hdr-title"></span>
   </div>
 </div>
+
+<!-- Map Search Overlay -->
+<div class="map-search-overlay" id="map-search-overlay">
+  <div class="map-search-hdr">
+    <button class="map-search-back-btn" onclick="closeMapSearchPanel()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div class="map-search-input-wrap">
+      <input class="map-search-input" id="map-search-input" type="text" enterkeyhint="search" autocomplete="off" oninput="_onMapSearchInput(this.value)" placeholder="Search address...">
+      <button class="map-search-clear-btn" id="map-search-clear-btn" onclick="_clearMapSearch()">×</button>
+    </div>
+  </div>
+  <div class="map-search-results" id="map-search-results">
+    <div class="map-search-hint" id="map-search-hint">Type to search an address</div>
+  </div>
+</div>
+
 <!-- Address Save Sheet -->
 <div class="addr-save-overlay" id="addr-save-overlay">
   <div class="addr-save-backdrop" onclick="closeAddrSaveSheet()"></div>
@@ -2443,6 +2483,84 @@ function _mapGoToUserLocation(){
     _mapPicker.setView([pos.coords.latitude,pos.coords.longitude],17,{animate:true});
   },()=>{showToast(lang==='ru'?'Не удалось получить геолокацию':'Could not get location','err');},
   {timeout:8000,maximumAge:30000,enableHighAccuracy:true});
+}
+
+// ── MAP SEARCH PANEL ──────────────────────────────────────────────────────────
+let _mapSearchTimer=null;
+
+function openMapSearchPanel(){
+  const panel=el('map-search-overlay'),input=el('map-search-input');
+  if(!panel||!input)return;
+  // Pre-fill with currently detected address
+  const cur=(el('map-addr-top-text')?.textContent||'').trim();
+  if(cur&&cur!=='—'&&cur!=='...'){
+    input.value=cur;
+    el('map-search-clear-btn')?.classList.add('show');
+    _runMapSearch(cur);
+  } else {
+    input.value='';
+    el('map-search-results').innerHTML=`<div class="map-search-hint">${lang==='ru'?'Введите адрес для поиска':'Type to search an address'}</div>`;
+  }
+  panel.classList.add('show');
+  setTimeout(()=>{input.focus();input.select();},200);
+}
+
+function closeMapSearchPanel(){
+  el('map-search-overlay')?.classList.remove('show');
+}
+
+function _clearMapSearch(){
+  const input=el('map-search-input');
+  if(input)input.value='';
+  el('map-search-clear-btn')?.classList.remove('show');
+  el('map-search-results').innerHTML=`<div class="map-search-hint">${lang==='ru'?'Введите адрес для поиска':'Type to search an address'}</div>`;
+  el('map-search-input')?.focus();
+}
+
+function _onMapSearchInput(q){
+  const clearBtn=el('map-search-clear-btn');
+  if(clearBtn)clearBtn.classList.toggle('show',q.length>0);
+  clearTimeout(_mapSearchTimer);
+  if(!q.trim()){
+    el('map-search-results').innerHTML=`<div class="map-search-hint">${lang==='ru'?'Введите адрес для поиска':'Type to search an address'}</div>`;
+    return;
+  }
+  _mapSearchTimer=setTimeout(()=>_runMapSearch(q),400);
+}
+
+function _runMapSearch(q){
+  const res=el('map-search-results');if(!res)return;
+  res.innerHTML=`<div class="map-search-hint">${lang==='ru'?'Поиск...':'Searching...'}</div>`;
+  fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=8&addressdetails=1`)
+    .then(r=>r.json())
+    .then(data=>{
+      if(!data.length){res.innerHTML=`<div class="map-search-hint">${lang==='ru'?'Ничего не найдено':'No results found'}</div>`;return;}
+      res.innerHTML=data.map(item=>{
+        const a=item.address||{};
+        const main=a.road||a.pedestrian||a.suburb||a.neighbourhood||item.display_name.split(',')[0];
+        const parts=[a.house_number?main+' '+a.house_number:null,a.city||a.town||a.village||a.county,a.country].filter(Boolean);
+        const sub=parts.slice(1).join(', ');
+        const safeLat=parseFloat(item.lat).toFixed(6),safeLon=parseFloat(item.lon).toFixed(6);
+        const safeName=(main||'').replace(/'/g,'&apos;').replace(/"/g,'&quot;');
+        return `<div class="map-search-result-item" onclick="selectMapSearchResult(${safeLat},${safeLon},'${safeName}')">
+          <div class="map-search-ri-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></div>
+          <div>
+            <div class="map-search-ri-main">${main||item.display_name.split(',')[0]}</div>
+            ${sub?`<div class="map-search-ri-sub">${sub}</div>`:''}
+          </div>
+        </div>`;
+      }).join('');
+    })
+    .catch(()=>{res.innerHTML=`<div class="map-search-hint" style="color:var(--red)">${lang==='ru'?'Ошибка поиска':'Search failed'}</div>`;});
+}
+
+function selectMapSearchResult(lat,lon,displayName){
+  const off=nearestOffice(lat,lon);
+  locInfo={lat,lon,office_id:off.id,office_name:off.name,street:displayName,isGps:false};
+  closeMapSearchPanel();
+  closeMapPicker();
+  haptic.success();
+  showAddrSaveSheet();
 }
 
 // ── CATALOG CHIPS & GRID ──────────────────────────────────────────────────────

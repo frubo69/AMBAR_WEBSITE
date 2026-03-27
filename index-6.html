@@ -593,6 +593,64 @@ img{display:block}
 .map-addr-building{font-size:13px;color:var(--text);margin-top:1px}
 .leaflet-control-attribution{display:none!important}
 .leaflet-control-zoom{display:none!important}
+/* ── NEW ADDRESS PAGE ──────────────────────────────────────────────────────── */
+.addr-page-body{padding:0!important}
+#addr-list-wrap{padding:14px 16px 0}
+.addr-empty-state{display:flex;flex-direction:column;align-items:center;justify-content:center;padding:44px 24px 4px;text-align:center}
+.addr-empty-icon{color:rgba(201,169,110,.35);margin-bottom:12px}
+.addr-empty-title{font-size:17px;font-weight:700;color:var(--text);margin-bottom:6px}
+.addr-empty-sub{font-size:13px;color:var(--sub);line-height:1.5}
+.addr-add-label{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);font-weight:600;padding:20px 16px 10px}
+.addr-methods-row{display:flex;gap:10px;padding:0 16px 32px}
+.addr-method-card{flex:1;background:var(--card);border:1.5px solid var(--border2);border-radius:18px;padding:20px 12px 18px;cursor:pointer;display:flex;flex-direction:column;align-items:center;text-align:center;gap:6px;transition:.18s;-webkit-tap-highlight-color:transparent;outline:none;font-family:'DM Sans',sans-serif}
+.addr-method-card:active{transform:scale(.95);background:rgba(201,169,110,.05);border-color:rgba(201,169,110,.4)}
+.addr-method-card-icon{width:54px;height:54px;border-radius:15px;background:rgba(201,169,110,.08);border:1px solid rgba(201,169,110,.18);display:flex;align-items:center;justify-content:center;color:var(--gold);margin-bottom:6px;transition:.18s}
+.addr-method-card-title{font-size:13px;font-weight:700;color:var(--text);line-height:1.3}
+.addr-method-card-sub{font-size:11px;color:var(--sub);line-height:1.4}
+.addr-method-card.loading .addr-method-card-icon{animation:addrPulse 1.2s ease-in-out infinite}
+.addr-method-card.loading .addr-method-card-title,.addr-method-card.loading .addr-method-card-sub{color:var(--muted)}
+.addr-method-card.err .addr-method-card-icon{background:rgba(224,85,85,.08);border-color:rgba(224,85,85,.25);color:var(--red)}
+@keyframes addrPulse{0%,100%{opacity:1}50%{opacity:.45}}
+/* ── NEW MAP OVERLAY ───────────────────────────────────────────────────────── */
+.map-overlay{position:fixed;inset:0;z-index:310;background:#111;display:block;transform:translateY(100%);transition:transform .35s cubic-bezier(.34,1,.64,1)}
+.map-overlay.show{transform:translateY(0)}
+#map-leaflet{position:absolute;inset:0;width:100%;height:100%}
+.map-top-bar{position:absolute;top:0;left:0;right:0;z-index:502;padding:calc(14px + var(--safe-top,0px)) 14px 18px;display:flex;align-items:center;gap:10px;background:linear-gradient(to bottom,rgba(7,7,14,.8) 0%,transparent 100%);pointer-events:none}
+.map-top-bar>*{pointer-events:all}
+.map-top-icon-btn{width:38px;height:38px;border-radius:50%;background:rgba(15,15,22,.7);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.12);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:.15s;-webkit-tap-highlight-color:transparent;outline:none}
+.map-top-icon-btn:active{opacity:.65;transform:scale(.9)}
+.map-top-addr-wrap{flex:1;min-width:0}
+.map-top-addr-text{font-size:18px;font-weight:700;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-shadow:0 1px 10px rgba(0,0,0,.7);transition:opacity .25s}
+.map-top-addr-text.updating{opacity:.45}
+.map-pin-dot{position:absolute;top:50%;left:50%;z-index:500;transform:translate(-50%,-50%);pointer-events:none;width:26px;height:26px;border-radius:50%;background:#E8472A;border:3px solid #fff;box-shadow:0 2px 14px rgba(0,0,0,.45),0 0 0 6px rgba(232,71,42,.2);display:flex;align-items:center;justify-content:center;transition:transform .15s,box-shadow .15s}
+.map-pin-dot.dragging{transform:translate(-50%,-58%) scale(1.2);box-shadow:0 6px 22px rgba(0,0,0,.55),0 0 0 10px rgba(232,71,42,.12)}
+.map-pin-dot-inner{width:8px;height:8px;border-radius:50%;background:#fff;flex-shrink:0}
+.map-pin-shadow{position:absolute;top:50%;left:50%;z-index:499;transform:translate(-50%,6px);pointer-events:none;width:14px;height:5px;border-radius:50%;background:rgba(0,0,0,.35);filter:blur(3px);transition:transform .15s,opacity .15s}
+.map-pin-shadow.dragging{transform:translate(-50%,14px) scale(.7);opacity:.4}
+.map-zoom-controls{position:absolute;right:14px;top:50%;transform:translateY(-50%);z-index:501;display:flex;flex-direction:column;background:rgba(12,12,18,.75);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.12);border-radius:14px;overflow:hidden}
+.map-zoom-btn{width:42px;height:42px;background:transparent;border:none;color:#fff;font-size:22px;font-weight:300;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.12s;font-family:'DM Sans',sans-serif;-webkit-tap-highlight-color:transparent;line-height:1}
+.map-zoom-btn:active{background:rgba(255,255,255,.1)}
+.map-zoom-divider{height:1px;background:rgba(255,255,255,.12);margin:0 8px}
+.map-locate-btn{position:absolute;right:14px;bottom:calc(96px + var(--safe-bottom,0px));z-index:501;width:42px;height:42px;border-radius:50%;background:rgba(12,12,18,.75);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.12);color:var(--gold);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent;outline:none}
+.map-locate-btn:active{background:rgba(201,169,110,.18);transform:scale(.9)}
+.map-done-bar{position:absolute;bottom:0;left:0;right:0;z-index:502;padding:10px 16px calc(18px + var(--safe-bottom,0px));background:linear-gradient(transparent,rgba(7,7,14,.9) 35%)}
+.map-done-btn{width:100%;padding:16px;border-radius:16px;border:none;background:linear-gradient(135deg,#C9A96E,#E8C97A);color:#07070E;font-size:16px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;letter-spacing:.3px;transition:.15s;box-shadow:0 4px 22px rgba(201,169,110,.28)}
+.map-done-btn:active{opacity:.85;transform:scale(.97)}
+/* ── ADDRESS SAVE SHEET ────────────────────────────────────────────────────── */
+.addr-save-overlay{position:fixed;inset:0;z-index:320;display:flex;flex-direction:column;justify-content:flex-end;opacity:0;pointer-events:none;transition:opacity .25s}
+.addr-save-overlay.show{opacity:1;pointer-events:all}
+.addr-save-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.addr-save-sheet{position:relative;background:var(--card);border-radius:24px 24px 0 0;padding:10px 20px calc(28px + var(--safe-bottom,0px));transform:translateY(100%);transition:transform .38s cubic-bezier(.34,1,.64,1);max-height:88vh;overflow-y:auto}
+.addr-save-overlay.show .addr-save-sheet{transform:translateY(0)}
+.addr-save-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;padding-top:4px}
+.addr-save-title{font-size:17px;font-weight:700;color:var(--text)}
+.addr-save-preview{background:rgba(201,169,110,.07);border:1px solid rgba(201,169,110,.2);border-radius:14px;padding:13px 14px;margin-bottom:22px;display:flex;align-items:flex-start;gap:10px}
+.addr-save-preview-icon{color:var(--gold);flex-shrink:0;margin-top:1px}
+.addr-save-preview-text{font-size:14px;font-weight:500;color:var(--gold2);flex:1;min-width:0;line-height:1.5}
+.addr-save-err{font-size:12px;color:var(--red);margin-top:8px;display:none}
+.addr-save-err.on{display:block}
+.addr-save-btn{width:100%;padding:16px;border-radius:16px;border:none;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:22px;transition:.15s;letter-spacing:.2px}
+.addr-save-btn:active{opacity:.85;transform:scale(.98)}
 </style>
 </head>
 <body>
@@ -713,68 +771,57 @@ img{display:block}
     <div style="flex:1"></div>
   </div>
   <div class="addr-page-body">
-    <!-- Saved addresses list -->
-    <div class="sec-h" id="sh-saved-addr">Сохранённые адреса</div>
-    <div class="saved-cards-wrap" id="saved-cards-wrap">
-      <div id="saved-cards"></div>
-      <div id="sc-thumb"></div>
+    <!-- Saved addresses list (hidden when empty) -->
+    <div id="addr-list-wrap" style="display:none">
+      <div class="sec-h" id="sh-saved-addr">Сохранённые адреса</div>
+      <div class="saved-cards-wrap" id="saved-cards-wrap">
+        <div id="saved-cards"></div>
+        <div id="sc-thumb"></div>
+      </div>
     </div>
 
-    <!-- Add new address form -->
-    <div class="addr-form-card" id="addr-form-card">
-      <div class="addr-form-head">
-        <span class="addr-form-title" id="add-form-title">➕ Добавить адрес</span>
+    <!-- Empty state -->
+    <div class="addr-empty-state" id="addr-empty-state">
+      <div class="addr-empty-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" width="52" height="52"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
       </div>
-      <div class="addr-form-body">
-        <!-- Method tabs -->
-        <div class="mtabs">
-          <button class="mtab on" id="mtab-gps" onclick="switchMethod('gps')"><i>📍</i><span id="mtl-gps">GPS</span></button>
-          <button class="mtab" id="mtab-manual" onclick="switchMethod('manual')"><i>✏️</i><span id="mtl-manual">Вручную</span></button>
+      <div class="addr-empty-title" id="addr-empty-title-txt">Нет сохранённых адресов</div>
+      <div class="addr-empty-sub" id="addr-empty-sub-txt">Добавьте первый адрес доставки</div>
+    </div>
+
+    <!-- Add address methods -->
+    <div class="addr-add-label" id="addr-add-label-txt">Добавить адрес</div>
+    <div class="addr-methods-row">
+      <button class="addr-method-card" id="btn-add-gps" onclick="startGPSAdd()">
+        <div class="addr-method-card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="26" height="26"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="8" stroke-dasharray="3 2.5" stroke-width="1.5" opacity=".5"/></svg>
         </div>
-
-        <!-- GPS panel -->
-        <div class="mpanel show" id="mpanel-gps">
-          <button class="gps-btn" onclick="grabGPS()" id="gps-btn"><span style="font-size:22px">📍</span><span id="gps-lbl">Поделиться геолокацией</span></button>
-          <div class="gps-status" id="gps-status"></div>
-          <div id="gps-extra" style="display:none">
-            <label class="flabel" id="lbl-type-gps">ТИП АДРЕСА</label>
-            <div class="type-chips" id="tchips-gps"></div>
-          </div>
+        <div class="addr-method-card-title" id="btn-gps-title">Отправить геолокацию</div>
+        <div class="addr-method-card-sub" id="btn-gps-sub">Авто-определение и уточнение</div>
+      </button>
+      <button class="addr-method-card" id="btn-add-map" onclick="startMapSearch()">
+        <div class="addr-method-card-icon">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="26" height="26"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
         </div>
+        <div class="addr-method-card-title" id="btn-map-title">Найти на карте</div>
+        <div class="addr-method-card-sub" id="btn-map-sub">Переместите пин на ваш адрес</div>
+      </button>
+    </div>
 
-        <!-- Manual panel -->
-        <div class="mpanel" id="mpanel-manual">
-          <label class="flabel" id="lbl-area">РАЙОН / ЗОНА</label>
-          <div class="type-chips" id="area-chips" style="margin-bottom:12px"></div>
-          <div style="display:flex;gap:8px;margin-bottom:12px">
-            <div style="flex:2;min-width:0">
-              <label class="flabel" id="lbl-street">УЛИЦА</label>
-              <input class="finput" id="man-street" type="text" enterkeyhint="next" placeholder="Jumeirah St">
-            </div>
-            <div style="flex:1;min-width:0">
-              <label class="flabel" id="lbl-building">ДОМ / №</label>
-              <input class="finput" id="man-building" type="text" enterkeyhint="next" placeholder="12B">
-            </div>
-          </div>
-          <button class="map-pin-btn" id="map-manual-btn" onclick="openMapPicker('manual')"><span>📍</span><span id="map-manual-btn-lbl">Выбрать на карте</span></button>
-          <label class="flabel" id="lbl-type-man">ТИП АДРЕСА</label>
-          <div class="type-chips" id="tchips-man"></div>
-        </div>
-
-
-        <div class="ferr" id="addr-form-err"></div>
-
-        <!-- Name label -->
-        <label class="flabel" style="margin-top:14px" id="lbl-addr-name">НАЗВАНИЕ АДРЕСА</label>
-        <input class="finput" id="addr-name-in" type="text" enterkeyhint="next" placeholder="Дом / Офис / JVC...">
-        <button class="tip-done-btn" id="addr-name-done-btn" style="display:none" onpointerdown="event.preventDefault()" onclick="el('addr-name-in').blur()">Готово ✓</button>
-
-        <label class="flabel" style="margin-top:14px" id="lbl-addr-comment">КОММЕНТАРИЙ ДЛЯ КУРЬЕРА</label>
-        <textarea class="finput" id="addr-comment-in" rows="3" placeholder="" enterkeyhint="done" style="resize:none;height:76px;padding-top:10px"></textarea>
-        <button class="tip-done-btn" id="addr-done-btn" style="display:none" onpointerdown="event.preventDefault()" onclick="el('addr-comment-in').blur()">Готово ✓</button>
-
-        <button class="btn-main" style="margin-top:14px" onclick="saveNewAddress()" id="save-addr-btn">💾 Сохранить адрес</button>
-      </div>
+    <!-- Hidden legacy elements required by JS -->
+    <div style="display:none" aria-hidden="true">
+      <div class="gps-status" id="gps-status"></div>
+      <div id="gps-extra"><div class="type-chips" id="tchips-gps"></div></div>
+      <div class="type-chips" id="tchips-man"></div>
+      <div class="type-chips" id="area-chips"></div>
+      <input id="man-street" type="text"><input id="man-building" type="text">
+      <button id="mtab-gps"></button><button id="mtab-manual"></button>
+      <div id="mpanel-gps"></div><div id="mpanel-manual"></div>
+      <span id="gps-lbl"></span><span id="mtl-gps"></span><span id="mtl-manual"></span>
+      <span id="add-form-title"></span><button id="save-addr-btn"></button>
+      <span id="lbl-area"></span><span id="lbl-street"></span><span id="lbl-building"></span>
+      <span id="lbl-type-gps"></span><span id="lbl-type-man"></span><span id="lbl-addr-name"></span>
+      <button id="addr-name-done-btn"></button><button id="addr-done-btn"></button>
     </div>
   </div>
 </div>
@@ -1022,29 +1069,70 @@ img{display:block}
   </div>
 </div>
 
-<!-- Map Picker Overlay (full-screen, Uber/Yandex Go style) -->
+<!-- Map Picker Overlay -->
 <div class="map-overlay" id="map-overlay">
-  <div class="map-hdr">
-    <button class="map-hdr-back" onclick="closeMapPicker()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+  <!-- Map tiles -->
+  <div id="map-leaflet"></div>
+  <!-- Top bar: close button + detected address -->
+  <div class="map-top-bar">
+    <button class="map-top-icon-btn" onclick="closeMapPicker()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
-    <span class="map-hdr-title" id="map-hdr-title">Выбрать на карте</span>
+    <div class="map-top-addr-wrap">
+      <div class="map-top-addr-text" id="map-addr-top-text">—</div>
+    </div>
   </div>
-  <div style="position:relative;flex:1;min-height:0">
-    <div id="map-leaflet" style="width:100%;height:100%"></div>
-    <div class="map-center-pin" id="map-center-pin">📍</div>
-    <div class="map-layer-toggle" id="map-layer-toggle">
-      <button class="map-layer-btn on" data-layer="dark" onclick="switchMapLayer('dark')">Map</button>
-      <button class="map-layer-btn" data-layer="sat" onclick="switchMapLayer('sat')">Satellite</button>
+  <!-- Center pin -->
+  <div class="map-pin-dot" id="map-center-pin"><div class="map-pin-dot-inner"></div></div>
+  <div class="map-pin-shadow" id="map-pin-shadow"></div>
+  <!-- Layer toggle -->
+  <div class="map-layer-toggle" id="map-layer-toggle">
+    <button class="map-layer-btn on" data-layer="dark" onclick="switchMapLayer('dark')">Map</button>
+    <button class="map-layer-btn" data-layer="sat" onclick="switchMapLayer('sat')">Satellite</button>
+  </div>
+  <!-- Zoom controls -->
+  <div class="map-zoom-controls">
+    <button class="map-zoom-btn" onclick="_mapPicker&&_mapPicker.zoomIn()">+</button>
+    <div class="map-zoom-divider"></div>
+    <button class="map-zoom-btn" onclick="_mapPicker&&_mapPicker.zoomOut()">−</button>
+  </div>
+  <!-- Re-center on user location -->
+  <button class="map-locate-btn" onclick="_mapGoToUserLocation()">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+  </button>
+  <!-- Done button -->
+  <div class="map-done-bar">
+    <button class="map-done-btn" id="map-done-btn" onclick="confirmMapLocation()">Готово</button>
+  </div>
+  <!-- Hidden legacy elements -->
+  <div style="display:none" aria-hidden="true">
+    <div id="map-addr-street"></div>
+    <div id="map-addr-building"></div>
+    <div id="map-addr-area"></div>
+    <button id="map-confirm-btn"></button>
+    <span id="map-hdr-title"></span>
+  </div>
+</div>
+<!-- Address Save Sheet -->
+<div class="addr-save-overlay" id="addr-save-overlay">
+  <div class="addr-save-backdrop" onclick="closeAddrSaveSheet()"></div>
+  <div class="addr-save-sheet">
+    <div class="modal-handle"></div>
+    <div class="addr-save-header">
+      <div class="addr-save-title" id="addr-save-title-txt">Сохранить адрес</div>
     </div>
-    <div class="map-bottom">
-      <div class="map-addr-preview" id="map-addr-preview">
-        <div class="map-addr-street" id="map-addr-street">—</div>
-        <div class="map-addr-building" id="map-addr-building"></div>
-        <div class="map-addr-area" id="map-addr-area"></div>
+    <div class="addr-save-preview">
+      <div class="addr-save-preview-icon">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18" height="18"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
       </div>
-      <button class="map-confirm-btn" id="map-confirm-btn" onclick="confirmMapLocation()">Подтвердить</button>
+      <div class="addr-save-preview-text" id="addr-save-preview">—</div>
     </div>
+    <label class="flabel" id="addr-save-name-lbl">НАЗВАНИЕ АДРЕСА</label>
+    <input class="finput" id="addr-name-in" type="text" enterkeyhint="next" placeholder="Дом / Офис / JVC...">
+    <label class="flabel" style="margin-top:16px" id="addr-save-comment-lbl">КОММЕНТАРИЙ ДЛЯ КУРЬЕРА</label>
+    <textarea class="finput" id="addr-comment-in" rows="3" enterkeyhint="done" style="resize:none;height:80px;padding-top:11px" placeholder="Необязательно"></textarea>
+    <div class="addr-save-err" id="addr-form-err"></div>
+    <button class="addr-save-btn" id="addr-save-btn-el" onclick="saveNewAddress()">💾 Сохранить адрес</button>
   </div>
 </div>
 
@@ -1300,6 +1388,10 @@ ru:{
   nfDeliveredT:'Заказ доставлен!',nfDeliveredM:'доставлен. Приятного!',
   nfDeclinedT:'Заказ отклонён',nfDeclinedM:'был отклонён. Свяжитесь с поддержкой',
   nfSupportT:'Ответ от поддержки',
+  btnGpsTitle:'Отправить геолокацию',btnGpsSub:'Авто-определение и уточнение',
+  btnMapTitle:'Найти на карте',btnMapSub:'Переместите пин на ваш адрес',
+  addAddrLabel:'Добавить адрес',emptyAddrTitle:'Нет сохранённых адресов',emptyAddrSub:'Добавьте первый адрес доставки',
+  saveSheetTitle:'Сохранить адрес',mapDone:'Готово',addrNoLoc:'Сначала выберите адрес на карте',
 },
 en:{
   catalog:'Catalog',favs:'Favourites',cart:'Cart',addrPage:'Addresses',orders:'History',profile:'Profile',
@@ -1344,6 +1436,10 @@ en:{
   nfDeliveredT:'Order delivered!',nfDeliveredM:'delivered. Enjoy!',
   nfDeclinedT:'Order declined',nfDeclinedM:'was declined. Please contact support',
   nfSupportT:'Support reply',
+  btnGpsTitle:'Share my location',btnGpsSub:'Auto-detect & fine-tune',
+  btnMapTitle:'Search on map',btnMapSub:'Drag the pin to your address',
+  addAddrLabel:'Add address',emptyAddrTitle:'No saved addresses',emptyAddrSub:'Add your first delivery address',
+  saveSheetTitle:'Save address',mapDone:'Done',addrNoLoc:'Please select your address on the map first',
   hsTitle:'Add to Main Menu',hsDesc:'Open AMBAR in one tap right from your Telegram home screen.',
   hsAdd:'Add to Home Screen',hsGuide:'Show me how',hsLater:'Maybe later',
   hsGuideTitle:'How to add AMBAR',
@@ -1592,6 +1688,21 @@ function applyLang(){
   set('notif-clear-confirm-txt',t('nfClearConfirm'));
   set('notif-yes-btn',t('nfYes'));
   set('notif-no-btn',t('nfNo'));
+  // Address page new elements
+  set('addr-empty-title-txt',t('emptyAddrTitle'));
+  set('addr-empty-sub-txt',t('emptyAddrSub'));
+  set('addr-add-label-txt',t('addAddrLabel'));
+  set('btn-gps-title',t('btnGpsTitle'));
+  set('btn-gps-sub',t('btnGpsSub'));
+  set('btn-map-title',t('btnMapTitle'));
+  set('btn-map-sub',t('btnMapSub'));
+  set('addr-save-title-txt',t('saveSheetTitle'));
+  set('addr-save-name-lbl',t('lblAddrName'));
+  set('addr-save-comment-lbl',lang==='ru'?'КОММЕНТАРИЙ ДЛЯ КУРЬЕРА':'COMMENT FOR COURIER');
+  set('addr-save-btn-el',lang==='ru'?'💾 Сохранить адрес':'💾 Save address');
+  set('map-done-btn',t('mapDone'));
+  const ain=el('addr-name-in');if(ain)ain.placeholder=lang==='ru'?'Дом / Офис / JVC...':'Home / Office / JVC...';
+  const acin=el('addr-comment-in');if(acin)acin.placeholder=lang==='ru'?'Необязательно':'Optional';
 }
 
 // ── HOME SCREEN PROMPT ────────────────────────────────────────────────────────
@@ -1813,11 +1924,12 @@ function renderSavedCards(){
   const arr=getSaved();
   const wrap=el('saved-cards');if(!wrap)return;
   const wrapOuter=el('saved-cards-wrap');
+  const listWrap=el('addr-list-wrap');
+  const emptyState=el('addr-empty-state');
+  if(listWrap)listWrap.style.display=arr.length?'block':'none';
+  if(emptyState)emptyState.style.display=arr.length?'none':'';
   if(wrapOuter) wrapOuter.classList.toggle('few', arr.length<=3);
-  if(!arr.length){
-    wrap.innerHTML=`<div class="empty" style="padding:24px 0"><div class="empty-icon">📍</div><div>${t('noSaved')}</div></div>`;
-    return;
-  }
+  if(!arr.length){wrap.innerHTML='';return;}
   wrap.innerHTML=arr.map((a,i)=>{
     const isActive=i===activeAddrIdx;
     const typeIcon=a.typeIcon||'📍';
@@ -1873,27 +1985,17 @@ function deleteAddr(i){
 }
 function editAddr(i){
   const a=getSaved()[i];if(!a)return;
-  resetAddrForm();
   editingAddrIdx=i;
-  set('add-form-title',lang==='ru'?'✏️ Редактировать адрес':'✏️ Edit address');
-  set('save-addr-btn',t('updateAddrBtn'));
-  el('addr-name-in').value=a.label||'';
-  el('addr-comment-in').value=a.comment||'';
-  const isGps=!!(a.lat&&a.lon);
-  if(isGps){
-    switchMethod('gps');
-    locInfo={lat:a.lat,lon:a.lon,office_id:a.office_id||'office_central',office_name:a.office_name||OFFICES[0].name,street:a.street||''};
-    const stat=el('gps-status');stat.className='gps-status ok';stat.textContent=t('gpsOk');
-    el('gps-extra').style.display='block';
-    if(a.typeId){selTypeGps=a.typeId;buildTypeChips('gps');}
-  } else {
-    switchMethod('manual');
-    if(a.areaIdx!==null&&a.areaIdx!==undefined)pickArea(a.areaIdx);
-    el('man-street').value=a.streetPart||a.street||'';
-    el('man-building').value=a.buildingPart||'';
-    if(a.typeId){selTypeMan=a.typeId;buildTypeChips('man');}
-  }
-  setTimeout(()=>el('addr-form-card')?.scrollIntoView({behavior:'smooth',block:'start'}),100);
+  locInfo={lat:a.lat||0,lon:a.lon||0,office_id:a.office_id||'office_central',office_name:a.office_name||OFFICES[0].name,street:a.street||a.address||''};
+  _mapGeoResult=null;
+  const nameIn=el('addr-name-in');if(nameIn)nameIn.value=a.label||'';
+  const commentIn=el('addr-comment-in');if(commentIn)commentIn.value=a.comment||'';
+  const previewEl=el('addr-save-preview');if(previewEl)previewEl.textContent=a.address||a.label||'';
+  const ae=el('addr-form-err');if(ae){ae.classList.remove('on');ae.textContent='';}
+  const saveBtn=el('addr-save-btn-el');if(saveBtn)saveBtn.textContent=t('updateAddrBtn');
+  const saveTitle=el('addr-save-title-txt');if(saveTitle)saveTitle.textContent=lang==='ru'?'✏️ Редактировать адрес':'✏️ Edit address';
+  el('addr-save-overlay').classList.add('show');
+  setTimeout(()=>nameIn?.focus(),400);
 }
 
 // ── ADDRESS MODAL ─────────────────────────────────────────────────────────────
@@ -2097,12 +2199,11 @@ function openMapPicker(source,lat,lon){
   _mapPickerSource=source;
   _mapGeoResult=null;
   const overlay=el('map-overlay');
-  set('map-hdr-title',t('mapPickTitle'));
-  set('map-confirm-btn',t('mapConfirm'));
-  set('map-addr-street','—');set('map-addr-building','');set('map-addr-area','');
+  set('map-done-btn',t('mapDone'));
+  const topText=el('map-addr-top-text');if(topText)topText.textContent='—';
   overlay.classList.add('show');
 
-  // Reset layer toggle
+  // Reset layer toggle to dark
   document.querySelectorAll('.map-layer-btn').forEach(b=>b.classList.toggle('on',b.dataset.layer==='dark'));
 
   const sLat=lat||locInfo?.lat||DUBAI_CENTER[0];
@@ -2119,17 +2220,21 @@ function openMapPicker(source,lat,lon){
   _mapPicker=L.map('map-leaflet',{zoomControl:false,attributionControl:false}).setView([sLat,sLon],zoom);
   _mapTileLayer=L.tileLayer(MAP_TILES.dark,{maxZoom:21,subdomains:'0123'}).addTo(_mapPicker);
   _currentMapStyle='dark';
-  // Apply dark filter + invert pin
+  // Apply dark filter to tiles (no filter needed on CSS pin)
   setTimeout(()=>{
     const pane=document.querySelector('#map-leaflet .leaflet-tile-pane');
     if(pane)pane.style.filter=MAP_FILTERS.dark;
-    const pin=el('map-center-pin');
-    if(pin)pin.style.filter='invert(1) hue-rotate(180deg) saturate(5)';
   },50);
 
-  const pin=el('map-center-pin');
-  _mapPicker.on('movestart',()=>{pin.classList.add('dragging');});
-  _mapPicker.on('moveend',()=>{pin.classList.remove('dragging');_onMapMove();});
+  _mapPicker.on('movestart',()=>{
+    el('map-center-pin')?.classList.add('dragging');
+    el('map-pin-shadow')?.classList.add('dragging');
+  });
+  _mapPicker.on('moveend',()=>{
+    el('map-center-pin')?.classList.remove('dragging');
+    el('map-pin-shadow')?.classList.remove('dragging');
+    _onMapMove();
+  });
   setTimeout(()=>{_mapPicker.invalidateSize();_onMapMove();},350);
 }
 
@@ -2140,11 +2245,15 @@ function _onMapMove(){
   if(key===_mapLastGeo)return;
   _mapLastGeo=key;
   clearTimeout(_mapGeoTimer);
-  set('map-addr-street','...');set('map-addr-building','');set('map-addr-area','');
+  const topText=el('map-addr-top-text');
+  if(topText){topText.textContent='...';topText.classList.add('updating');}
   _mapGeoTimer=setTimeout(()=>{
     _reverseGeo(c.lat,c.lng,info=>{
       _mapGeoResult=info;
-      set('map-addr-street',info.line1||`${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`);
+      const line1=info.line1||`${c.lat.toFixed(5)}, ${c.lng.toFixed(5)}`;
+      const line2=info.line2;
+      if(topText){topText.textContent=line1+(line2?' · '+line2:'');topText.classList.remove('updating');}
+      set('map-addr-street',line1);
       set('map-addr-building',info.line2);
       set('map-addr-area',info.line3);
     });
@@ -2156,31 +2265,13 @@ function confirmMapLocation(){
   const c=_mapPicker.getCenter();
   const off=nearestOffice(c.lat,c.lng);
   const geo=_mapGeoResult||{};
-  const streetFull=geo.full||geo.line1||(el('map-addr-street')?.textContent||'').trim();
+  const topText=(el('map-addr-top-text')?.textContent||'').trim();
+  const streetFull=geo.full||geo.line1||(topText!=='...'&&topText!=='—'?topText:'');
   locInfo={lat:c.lat,lon:c.lng,office_id:off.id,office_name:off.name,
-    street:(streetFull==='...'||streetFull==='—')?'':streetFull};
-
-  if(_mapPickerSource==='manual'){
-    const streetIn=el('man-street');if(streetIn)streetIn.value=geo.street||geo.line1||'';
-    const buildIn=el('man-building');if(buildIn)buildIn.value=geo.building||'';
-    // Try auto-select area chip
-    if(geo.area){
-      const areaLow=geo.area.toLowerCase();
-      const areas=AREAS[lang]||[];
-      let match=-1;
-      for(let i=0;i<areas.length;i++){
-        const parts=areas[i].lbl.toLowerCase().split(/[\/,]/);
-        if(parts.some(p=>areaLow.includes(p.trim())||p.trim().includes(areaLow))){match=i;break;}
-      }
-      if(match>=0){selArea=match;buildAreaChips();}
-    }
-  }
-  if(_mapPickerSource==='gps'){
-    const stat=el('gps-status');
-    stat.className='gps-status ok';stat.textContent=t('gpsOk');
-  }
+    street:streetFull||''};
   haptic.success();
   closeMapPicker();
+  showAddrSaveSheet();
 }
 
 function closeMapPicker(){
@@ -2216,63 +2307,35 @@ function buildAddrStr(p){
 function saveNewAddress(){
   const ae=el('addr-form-err');ae.classList.remove('on');ae.textContent='';
 
-  // Validate method
-  if(curMethod==='manual'&&selArea===null){
-    ae.textContent=t('areaErr');ae.classList.add('on');return;
-  }
-  if(curMethod==='gps'&&!locInfo){
-    ae.textContent=t('gpsFail');ae.classList.add('on');return;
+  if(!locInfo){
+    ae.textContent=t('addrNoLoc');ae.classList.add('on');return;
   }
 
   const label=(el('addr-name-in')?.value||'').trim();
-  if(!label){ae.textContent=t('addrLabelReq');ae.classList.add('on');return;}
+  if(!label){ae.textContent=t('addrLabelReq');ae.classList.add('on');el('addr-name-in')?.focus();return;}
 
   const comment=(el('addr-comment-in')?.value||'').trim();
-
-  // Build address string
-  let addrStr='';
-  let typeIcon='📍';
-  let streetShort='';
-  if(curMethod==='gps'){
-    const lat=Number(locInfo?.lat||0);
-    const lon=Number(locInfo?.lon||0);
-    streetShort=locInfo?.street||'';
-    addrStr=streetShort||`${lat.toFixed(5)}, ${lon.toFixed(5)}`;
-  } else {
-    const street=(el('man-street')?.value||'').trim();
-    const building=(el('man-building')?.value||'').trim();
-    if(!street&&!building){ae.textContent=t('addrFormErr');ae.classList.add('on');return;}
-    const tp=TYPES[lang].find(x=>x.id===selTypeMan);
-    typeIcon=tp?.icon||'📍';
-    const areaPart=selArea!==null?(AREAS[lang][selArea]?.lbl||''):'';
-    streetShort=[street,building].filter(Boolean).join(' ');
-    addrStr=[areaPart,street,building].filter(Boolean).join(', ');
-  }
+  const lat=Number(locInfo?.lat||0);
+  const lon=Number(locInfo?.lon||0);
+  const streetShort=locInfo?.street||'';
+  const addrStr=streetShort||(lat?`${lat.toFixed(5)}, ${lon.toFixed(5)}`:'');
 
   const newAddr={
-    label:label,
-    address:addrStr,
-    street:streetShort,
-    streetPart:curMethod==='manual'?(el('man-street')?.value||'').trim():'',
-    buildingPart:curMethod==='manual'?(el('man-building')?.value||'').trim():'',
-    areaIdx:curMethod==='manual'?selArea:null,
-    typeId:curMethod==='gps'?selTypeGps:selTypeMan,
-    typeIcon:typeIcon,
-    lat:locInfo?.lat||0,
-    lon:locInfo?.lon||0,
+    label,address:addrStr,street:streetShort,
+    streetPart:'',buildingPart:'',areaIdx:null,
+    typeId:null,typeIcon:'📍',
+    lat,lon,
     office_id:locInfo?.office_id||'office_central',
     office_name:locInfo?.office_name||OFFICES[0].name,
-    comment:comment,
+    comment,
   };
 
   const arr=getSaved();
   if(editingAddrIdx!==null){
     const idx=editingAddrIdx;
-    arr[idx]=newAddr;
-    setSaved(arr);
+    arr[idx]=newAddr;setSaved(arr);
     if(activeAddrIdx===idx){updateCartAddrBar();updateAddrPill();}
-    resetAddrForm();
-    renderSavedCards();
+    closeAddrSaveSheet();resetAddrForm();renderSavedCards();
     if(fromCart){fromCart=false;setTimeout(()=>{const msg=lang==='ru'?'Вернуться в корзину и оформить заказ?':'Go back to cart and place order?';const yes=lang==='ru'?'В корзину →':'To cart →';const no=lang==='ru'?'Остаться':'Stay';showBackToCartPrompt(msg,yes,no,'cart');},400);}
     else if(_fromCatalogModal){_fromCatalogModal=false;setTimeout(()=>{const msg=lang==='ru'?'Адрес обновлён! Вернуться в каталог?':'Address updated! Go back to catalog?';const yes=lang==='ru'?'В каталог →':'To catalog →';const no=lang==='ru'?'Остаться':'Stay';showBackToCartPrompt(msg,yes,no,'catalog');},400);}
     else showToast(t('addrUpdated'),'ok');
@@ -2280,15 +2343,11 @@ function saveNewAddress(){
   }
   arr.unshift(newAddr);
   setSaved(arr);
-
-  // Auto-select the newly added one
   setActiveAddr(0);
-
-  // Reset form
+  closeAddrSaveSheet();
   resetAddrForm();
   renderSavedCards();
 
-  // If redirected from cart, show back-to-cart prompt instead of toast
   if(fromCart){
     fromCart=false;
     setTimeout(()=>{
@@ -2312,16 +2371,75 @@ function saveNewAddress(){
 
 function resetAddrForm(){
   curMethod='gps';selTypeGps=null;selTypeMan=null;selArea=null;locInfo=null;editingAddrIdx=null;
+  _mapGeoResult=null;
   _destroyMapPicker();
-  set('save-addr-btn',t('saveAddrBtn'));set('add-form-title',t('addFormTitle'));
-  el('gps-status').className='gps-status';
-  el('gps-extra').style.display='none';
+  closeAddrSaveSheet();
+  const gpsStatus=el('gps-status');if(gpsStatus)gpsStatus.className='gps-status';
+  const nameIn=el('addr-name-in');if(nameIn)nameIn.value='';
+  const commentIn=el('addr-comment-in');if(commentIn)commentIn.value='';
+  const ae=el('addr-form-err');if(ae){ae.classList.remove('on');ae.textContent='';}
+  const saveBtn=el('addr-save-btn-el');if(saveBtn)saveBtn.textContent=lang==='ru'?'💾 Сохранить адрес':'💾 Save address';
+  const saveTitle=el('addr-save-title-txt');if(saveTitle)saveTitle.textContent=t('saveSheetTitle');
+  const gpsBtn=el('btn-add-gps');
+  if(gpsBtn){gpsBtn.classList.remove('loading','err');const sub=gpsBtn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=t('btnGpsSub');}
+}
 
-  el('addr-name-in').value='';el('addr-comment-in').value='';
-  el('man-street').value='';el('man-building').value='';
-  el('addr-form-err').classList.remove('on');el('addr-form-err').textContent='';
-  set('gps-lbl',t('gpsBtn'));
-  switchMethod('gps');buildTypeChips('gps');buildAreaChips();buildTypeChips('man');
+// ── NEW ADDRESS FLOW ──────────────────────────────────────────────────────────
+function startGPSAdd(){
+  const btn=el('btn-add-gps');
+  if(btn){btn.classList.add('loading');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=lang==='ru'?'Определяем...':'Getting location...';}
+  if(!navigator.geolocation){
+    if(btn){btn.classList.remove('loading');btn.classList.add('err');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=lang==='ru'?'GPS недоступен':'GPS unavailable';}
+    return;
+  }
+  navigator.geolocation.getCurrentPosition(pos=>{
+    const{latitude:lat,longitude:lon}=pos.coords;
+    const off=nearestOffice(lat,lon);
+    locInfo={lat,lon,office_id:off.id,office_name:off.name,street:''};
+    if(btn){btn.classList.remove('loading','err');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=t('btnGpsSub');}
+    fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1`)
+      .then(r=>r.json()).then(d=>{const a=d.address||{};const road=a.road||a.pedestrian||a.suburb||'';const num=a.house_number||'';locInfo.street=(road+(num?' '+num:'')).trim();})
+      .catch(()=>{});
+    openMapPicker('gps',lat,lon);
+  },()=>{
+    if(btn){btn.classList.remove('loading');btn.classList.add('err');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=lang==='ru'?'Не удалось получить геолокацию':'Could not get location';}
+    setTimeout(()=>{if(btn){btn.classList.remove('err');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=t('btnGpsSub');}},3000);
+  },{timeout:10000,maximumAge:60000,enableHighAccuracy:true});
+}
+
+function startMapSearch(){
+  const sLat=locInfo?.lat||DUBAI_CENTER[0];
+  const sLon=locInfo?.lon||DUBAI_CENTER[1];
+  openMapPicker('map_search',sLat,sLon);
+}
+
+function showAddrSaveSheet(){
+  const geo=_mapGeoResult||{};
+  const preview=locInfo?.street||geo.line1||(locInfo?.lat?`${locInfo.lat.toFixed(5)}, ${locInfo.lon.toFixed(5)}`:'');
+  const previewEl=el('addr-save-preview');if(previewEl)previewEl.textContent=preview||'—';
+  if(editingAddrIdx===null){
+    const nameIn=el('addr-name-in');if(nameIn)nameIn.value='';
+    const commentIn=el('addr-comment-in');if(commentIn)commentIn.value='';
+    const saveBtn=el('addr-save-btn-el');if(saveBtn)saveBtn.textContent=lang==='ru'?'💾 Сохранить адрес':'💾 Save address';
+    const saveTitle=el('addr-save-title-txt');if(saveTitle)saveTitle.textContent=t('saveSheetTitle');
+  }
+  const ae=el('addr-form-err');if(ae){ae.classList.remove('on');ae.textContent='';}
+  el('addr-save-overlay').classList.add('show');
+  setTimeout(()=>el('addr-name-in')?.focus(),400);
+}
+
+function closeAddrSaveSheet(){
+  el('addr-save-overlay')?.classList.remove('show');
+}
+
+function _mapGoToUserLocation(){
+  if(!_mapPicker)return;
+  haptic.light();
+  if(!navigator.geolocation){showToast(lang==='ru'?'GPS недоступен':'GPS unavailable','err');return;}
+  navigator.geolocation.getCurrentPosition(pos=>{
+    _mapPicker.setView([pos.coords.latitude,pos.coords.longitude],17,{animate:true});
+  },()=>{showToast(lang==='ru'?'Не удалось получить геолокацию':'Could not get location','err');},
+  {timeout:8000,maximumAge:30000,enableHighAccuracy:true});
 }
 
 // ── CATALOG CHIPS & GRID ──────────────────────────────────────────────────────

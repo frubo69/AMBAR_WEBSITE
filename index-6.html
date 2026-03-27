@@ -126,7 +126,7 @@ img{display:block}
 #modal-addr-list{padding:0 12px 4px;display:flex;flex-direction:column;gap:8px;overflow-y:auto}
 #modal-addr-list .saved-card{padding:11px 13px;border-bottom:none!important}
 /* Add button */
-.addr-modal-add-row{margin:10px 12px 0;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 16px;border-radius:16px;border:1.5px dashed rgba(201,169,110,.22);background:rgba(201,169,110,.03);cursor:pointer;color:var(--gold);font-size:13px;font-weight:600;transition:.15s;-webkit-tap-highlight-color:transparent}
+.addr-modal-add-row{margin:14px 12px 0;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 16px;border-radius:16px;border:1.5px dashed rgba(201,169,110,.22);background:rgba(201,169,110,.03);cursor:pointer;color:var(--gold);font-size:13px;font-weight:600;transition:.15s;-webkit-tap-highlight-color:transparent}
 .addr-modal-add-row:active{background:rgba(201,169,110,.08);border-color:rgba(201,169,110,.4)}
 
 .bnav{position:fixed;bottom:calc(14px + var(--safe-bottom));left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:520px;z-index:40;display:flex;background:rgba(8,8,16,.68);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid rgba(255,255,255,.1);border-top:1px solid rgba(255,255,255,.18);border-radius:28px;padding:0 6px;box-shadow:0 16px 48px rgba(0,0,0,.55),0 4px 16px rgba(0,0,0,.3),0 0 0 0.5px rgba(201,169,110,.12),inset 0 1px 0 rgba(255,255,255,.07)}
@@ -2067,10 +2067,42 @@ function editAddr(i){
 function openAddrModal(){
   renderModalAddrList();
   el('addr-modal').classList.add('show');
+  haptic.light();
+  _initAddrModalSwipe();
 }
 function closeAddrModal(e){
   if(e&&e.target!==el('addr-modal'))return;
   el('addr-modal').classList.remove('show');
+}
+function _initAddrModalSwipe(){
+  const sheet=el('addr-modal')?.querySelector('.modal-sheet');
+  if(!sheet||sheet._swipeInited)return;
+  sheet._swipeInited=true;
+  let sy=0,cy=0,active=false;
+  sheet.addEventListener('touchstart',e=>{
+    const sheetTop=sheet.getBoundingClientRect().top;
+    if(e.touches[0].clientY-sheetTop>72){active=false;return;}
+    sy=e.touches[0].clientY;cy=sy;active=true;
+    sheet.style.transition='none';
+  },{passive:true});
+  sheet.addEventListener('touchmove',e=>{
+    if(!active)return;
+    cy=e.touches[0].clientY;
+    const dy=Math.max(0,cy-sy);
+    sheet.style.transform=`translateY(${dy}px)`;
+  },{passive:true});
+  sheet.addEventListener('touchend',()=>{
+    if(!active)return;
+    active=false;
+    sheet.style.transition='';
+    if(cy-sy>80){
+      haptic.light();
+      sheet.style.transform='';
+      el('addr-modal').classList.remove('show');
+    } else {
+      sheet.style.transform='';
+    }
+  },{passive:true});
 }
 function renderModalAddrList(){
   const arr=getSaved();
@@ -2454,6 +2486,7 @@ function resetAddrForm(){
 
 // ── NEW ADDRESS FLOW ──────────────────────────────────────────────────────────
 function startGPSAdd(){
+  editingAddrIdx=null;
   const btn=el('btn-add-gps');
   if(btn){btn.classList.add('loading');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=lang==='ru'?'Определяем...':'Getting location...';}
   if(!navigator.geolocation){
@@ -2477,6 +2510,7 @@ function startGPSAdd(){
 }
 
 function startMapSearch(){
+  editingAddrIdx=null;
   const btn=el('btn-add-map');
   const open=(lat,lon)=>{
     if(btn){btn.classList.remove('loading');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=t('btnMapSub');}
@@ -2631,6 +2665,7 @@ function _runMapSearch(q){
 }
 
 function selectMapSearchResult(lat,lon,displayName){
+  editingAddrIdx=null;
   const off=nearestOffice(lat,lon);
   locInfo={lat,lon,office_id:off.id,office_name:off.name,street:displayName,isGps:false};
   closeMapSearchPanel();

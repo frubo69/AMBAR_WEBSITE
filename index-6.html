@@ -1162,7 +1162,7 @@ img{display:block}
     </button>
     <div class="map-search-input-wrap">
       <input class="map-search-input" id="map-search-input" type="text" enterkeyhint="search" autocomplete="off" oninput="_onMapSearchInput(this.value)" placeholder="Search address...">
-      <button class="map-search-clear-btn" id="map-search-clear-btn" onclick="_clearMapSearch()">×</button>
+      <button class="map-search-clear-btn" id="map-search-clear-btn" ontouchstart="event.preventDefault();event.stopPropagation();_clearMapSearch()" onclick="_clearMapSearch()">×</button>
     </div>
   </div>
   <div class="map-search-results" id="map-search-results">
@@ -2607,10 +2607,10 @@ function closeMapSearchPanel(){
 
 function _clearMapSearch(){
   const input=el('map-search-input');
-  if(input)input.value='';
+  if(input){input.blur();input.value='';}
   el('map-search-clear-btn')?.classList.remove('show');
   el('map-search-results').innerHTML=`<div class="map-search-hint">${lang==='ru'?'Введите адрес для поиска':'Type to search an address'}</div>`;
-  el('map-search-input')?.focus();
+  setTimeout(()=>el('map-search-input')?.focus(),50);
 }
 
 function _onMapSearchInput(q){

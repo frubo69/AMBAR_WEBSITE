@@ -950,11 +950,11 @@ img{display:block}
 <!-- Notif floating panel -->
 <div id="notif-panel" class="notif-panel">
   <div class="notif-panel-hdr">
-    <span class="notif-panel-title">Уведомления</span>
+    <span class="notif-panel-title" id="notif-panel-title">Уведомления</span>
     <div style="display:flex;align-items:center;gap:6px">
       <button onclick="markAllNotifRead()" id="notif-mark-all" class="notif-action-btn" style="display:none">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="11" height="11"><polyline points="20 6 9 17 4 12"/></svg>
-        Прочитать все
+        <span id="notif-mark-all-txt">Прочитать все</span>
       </button>
       <button onclick="confirmClearNotifs()" id="notif-clear-btn" class="notif-action-btn notif-clear-btn-el" style="display:none">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="11" height="11"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
@@ -966,10 +966,10 @@ img{display:block}
   </div>
   <!-- Clear confirmation strip -->
   <div id="notif-clear-confirm" style="display:none;padding:10px 14px;background:rgba(224,85,85,.08);border-bottom:1px solid rgba(224,85,85,.15);display:none;align-items:center;justify-content:space-between;gap:8px;flex-shrink:0">
-    <span style="font-size:11px;color:rgba(255,255,255,.6)">Удалить все уведомления?</span>
+    <span id="notif-clear-confirm-txt" style="font-size:11px;color:rgba(255,255,255,.6)">Удалить все уведомления?</span>
     <div style="display:flex;gap:6px">
-      <button onclick="doClearNotifs()" style="padding:4px 10px;border-radius:8px;background:rgba(224,85,85,.2);border:1px solid rgba(224,85,85,.35);color:#e05555;font-size:11px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;outline:none">Да</button>
-      <button onclick="cancelClearNotifs()" style="padding:4px 10px;border-radius:8px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);font-size:11px;cursor:pointer;-webkit-tap-highlight-color:transparent;outline:none">Нет</button>
+      <button id="notif-yes-btn" onclick="doClearNotifs()" style="padding:4px 10px;border-radius:8px;background:rgba(224,85,85,.2);border:1px solid rgba(224,85,85,.35);color:#e05555;font-size:11px;font-weight:600;cursor:pointer;-webkit-tap-highlight-color:transparent;outline:none">Да</button>
+      <button id="notif-no-btn" onclick="cancelClearNotifs()" style="padding:4px 10px;border-radius:8px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);font-size:11px;cursor:pointer;-webkit-tap-highlight-color:transparent;outline:none">Нет</button>
     </div>
   </div>
   <div class="notif-panel-wrap" id="notif-panel-wrap">
@@ -1291,6 +1291,15 @@ ru:{
   lcYes:'Да, оформить',lcNo:'Отмена',
   supportBtn:'💬 Поддержка',supportTitle:'Поддержка',supportEmpty:'Задайте вопрос по заказу',supportPlaceholder:'Введите сообщение...',
   mapPinBtn:'Выбрать на карте',mapHideBtn:'Скрыть карту',mapPickTitle:'Выбрать на карте',mapConfirm:'Подтвердить',
+  nfTitle:'Уведомления',nfMarkAll:'Прочитать все',nfEmpty:'Нет уведомлений',
+  nfJustNow:'только что',nfMinAgo:'мин назад',nfHrAgo:'ч назад',
+  nfClearConfirm:'Удалить все уведомления?',nfYes:'Да',nfNo:'Нет',
+  nfPhoto:'📷 Фото',
+  nfPlacedT:'Заказ оформлен',nfPlacedM:'принят и ожидает подтверждения',
+  nfConfirmedT:'Заказ подтверждён',nfConfirmedM:'принят! Курьер уже готовится',
+  nfDeliveredT:'Заказ доставлен!',nfDeliveredM:'доставлен. Приятного!',
+  nfDeclinedT:'Заказ отклонён',nfDeclinedM:'был отклонён. Свяжитесь с поддержкой',
+  nfSupportT:'Ответ от поддержки',
 },
 en:{
   catalog:'Catalog',favs:'Favourites',cart:'Cart',addrPage:'Addresses',orders:'History',profile:'Profile',
@@ -1326,6 +1335,15 @@ en:{
   lcYes:'Yes, order',lcNo:'Cancel',
   supportBtn:'💬 Support',supportTitle:'Support',supportEmpty:'Ask us about your order',supportPlaceholder:'Type a message...',
   mapPinBtn:'Pin on map',mapHideBtn:'Hide map',mapPickTitle:'Pick on map',mapConfirm:'Confirm',
+  nfTitle:'Notifications',nfMarkAll:'Mark all read',nfEmpty:'No notifications',
+  nfJustNow:'just now',nfMinAgo:'min ago',nfHrAgo:'hr ago',
+  nfClearConfirm:'Clear all notifications?',nfYes:'Yes',nfNo:'No',
+  nfPhoto:'📷 Photo',
+  nfPlacedT:'Order placed',nfPlacedM:'received, awaiting confirmation',
+  nfConfirmedT:'Order confirmed',nfConfirmedM:'is confirmed! Courier is preparing',
+  nfDeliveredT:'Order delivered!',nfDeliveredM:'delivered. Enjoy!',
+  nfDeclinedT:'Order declined',nfDeclinedM:'was declined. Please contact support',
+  nfSupportT:'Support reply',
   hsTitle:'Add to Main Menu',hsDesc:'Open AMBAR in one tap right from your Telegram home screen.',
   hsAdd:'Add to Home Screen',hsGuide:'Show me how',hsLater:'Maybe later',
   hsGuideTitle:'How to add AMBAR',
@@ -1351,7 +1369,7 @@ TX.ru.hsStep3d='Нажмите «Добавить» — готово! AMBAR по
 TX.ru.hsClose='Понятно!';
 
 // ── STATE ─────────────────────────────────────────────────────────────────────
-let lang='ru',cart={},beerPcs={},catF='all',tip=0; // beerPcs: {id: 12|24}
+let lang=localStorage.getItem('ambar_lang')||'ru',cart={},beerPcs={},catF='all',tip=0; // beerPcs: {id: 12|24}
 let sortMode='none';
 let catFilter=null; // null = all, string = selected category
 let favs=new Set(JSON.parse(localStorage.getItem('ambar_favs')||'[]'));
@@ -1533,8 +1551,10 @@ function set(id,v){const e=el(id);if(e)e.textContent=v;}
 // ── LANGUAGE ──────────────────────────────────────────────────────────────────
 function flipLang(){
   lang=lang==='ru'?'en':'ru';
+  localStorage.setItem('ambar_lang',lang);
   applyLang();buildChips();renderGrid();buildTips();renderOrders();renderCart();buildSummary();buildProfile();updateSortBtn();
   buildTypeChips('gps');buildTypeChips('man');buildAreaChips();renderSavedCards();updateAddrPill();updateCartAddrBar();
+  _renderNotifList();
 }
 function applyLang(){
   const f=lang==='ru'?'🇷🇺':'🇬🇧';
@@ -1567,6 +1587,11 @@ function applyLang(){
   el('tip-input').placeholder=lang==='ru'?'Введите сумму...':'Enter amount...';
   set('mtl-gps','GPS');set('mtl-manual',lang==='ru'?'Вручную':'Manual');
   set('lc-title',t('lcTitle'));set('lc-msg',t('lcMsg'));set('lc-yes',t('lcYes'));set('lc-no',t('lcNo'));
+  set('notif-panel-title',t('nfTitle'));
+  set('notif-mark-all-txt',t('nfMarkAll'));
+  set('notif-clear-confirm-txt',t('nfClearConfirm'));
+  set('notif-yes-btn',t('nfYes'));
+  set('notif-no-btn',t('nfNo'));
 }
 
 // ── HOME SCREEN PROMPT ────────────────────────────────────────────────────────
@@ -2534,7 +2559,7 @@ function addNotification(icon,title,msg,opts={}){
   const ts=opts.ts||Date.now();
   // Deduplicate: skip if same title+order_id within last 60s
   if(opts.dedup_key&&_notifs.find(n=>n.dedup_key===opts.dedup_key))return;
-  _notifs.unshift({id:Date.now()+'',icon,title,msg,ts,read:false,action:opts.action||null,order_id:opts.order_id||null,dedup_key:opts.dedup_key||null});
+  _notifs.unshift({id:Date.now()+'',icon,title,msg,ts,read:false,action:opts.action||null,order_id:opts.order_id||null,dedup_key:opts.dedup_key||null,notif_type:opts.notif_type||null,notif_oid:opts.notif_oid||null});
   if(_notifs.length>50)_notifs=_notifs.slice(0,50);
   _saveNotifs();
   _renderNotifBadge();
@@ -2560,10 +2585,23 @@ function _showPushToast(icon,title,msg){
 function _fmtNotifTime(ts){
   const d=new Date(ts),now=new Date();
   const diff=now-d;
-  if(diff<60000)return'только что';
-  if(diff<3600000)return Math.floor(diff/60000)+' мин назад';
-  if(diff<86400000)return Math.floor(diff/3600000)+' ч назад';
-  return d.toLocaleDateString('ru',{day:'numeric',month:'short'});
+  if(diff<60000)return t('nfJustNow');
+  if(diff<3600000)return Math.floor(diff/60000)+' '+t('nfMinAgo');
+  if(diff<86400000)return Math.floor(diff/3600000)+' '+t('nfHrAgo');
+  return d.toLocaleDateString(lang==='ru'?'ru':'en',{day:'numeric',month:'short'});
+}
+function _getNotifTexts(n){
+  if(!n.notif_type)return{title:n.title,msg:n.msg};
+  const oid=n.notif_oid||n.order_id||'';
+  const ru=lang==='ru';
+  switch(n.notif_type){
+    case'placed':return{title:t('nfPlacedT'),msg:(ru?'Заказ ':'Order ')+'#'+oid+' '+t('nfPlacedM')};
+    case'confirmed':return{title:t('nfConfirmedT'),msg:(ru?'Ваш заказ ':'Your order ')+'#'+oid+' '+t('nfConfirmedM')};
+    case'delivered':return{title:t('nfDeliveredT'),msg:(ru?'Заказ ':'Order ')+'#'+oid+' '+t('nfDeliveredM')};
+    case'declined':return{title:t('nfDeclinedT'),msg:(ru?'Заказ ':'Order ')+'#'+oid+' '+t('nfDeclinedM')};
+    case'support_reply':return{title:t('nfSupportT'),msg:n.msg==='__photo__'?t('nfPhoto'):n.msg};
+    default:return{title:n.title,msg:n.msg};
+  }
 }
 function _renderNotifList(){
   const wrap=el('notif-list');if(!wrap)return;
@@ -2573,22 +2611,22 @@ function _renderNotifList(){
   if(markAll)markAll.style.display=unread>0?'flex':'none';
   if(clearBtn)clearBtn.style.display=_notifs.length>0?'flex':'none';
   if(!_notifs.length){
-    wrap.innerHTML=`<div class="notif-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><p>Нет уведомлений</p></div>`;
+    wrap.innerHTML=`<div class="notif-empty"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="48" height="48"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg><p>${t('nfEmpty')}</p></div>`;
     return;
   }
-  wrap.innerHTML=_notifs.map(n=>`
+  wrap.innerHTML=_notifs.map(n=>{const{title,msg}=_getNotifTexts(n);return`
     <div class="notif-item${n.read?'':' unread'}" onclick="_tapNotif('${n.id}')">
       <div class="notif-icon">${_notifIconHtml(n.icon)}</div>
       <div class="notif-body">
-        <div class="notif-title">${n.title}</div>
-        <div class="notif-msg">${n.msg}</div>
+        <div class="notif-title">${title}</div>
+        <div class="notif-msg">${msg}</div>
         <div class="notif-time">${_fmtNotifTime(n.ts)}</div>
       </div>
       <div style="display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0">
         ${n.read?'':'<div class="notif-unread-badge"></div>'}
         ${n.action?`<svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="2.5" stroke-linecap="round" width="10" height="10"><polyline points="9 18 15 12 9 6"/></svg>`:''}
       </div>
-    </div>`).join('');
+    </div>`;}).join('');
   setTimeout(_updateNotifThumb,0);
 }
 function _tapNotif(id){
@@ -3110,7 +3148,7 @@ function placeOrder(){
   cart={};beerPcs={};tip=0;el('phone-err').classList.remove('on');el('phone-in').classList.remove('err');
   updHdr();buildTips();haptic.success();showToast(t('placed'),'ok');
   const _ru=lang==='ru';
-  addNotification('cart',_ru?'Заказ оформлен':'Order placed',(_ru?'Заказ ':'Order ')+'#'+oid+(_ru?' принят и ожидает подтверждения':' received, awaiting confirmation'),{action:'orders',dedup_key:'placed_'+oid});
+  addNotification('cart',_ru?'Заказ оформлен':'Order placed',(_ru?'Заказ ':'Order ')+'#'+oid+(_ru?' принят и ожидает подтверждения':' received, awaiting confirmation'),{action:'orders',dedup_key:'placed_'+oid,notif_type:'placed',notif_oid:oid});
   setTimeout(()=>{go('orders'); if(tg?.close) tg.close();},1400);
 }
 
@@ -3912,11 +3950,11 @@ async function checkActiveOrder(){
         const cur=o.status;
         if(prev&&prev!==cur){
           if(cur==='confirmed'||cur==='approved'){
-            addNotification('check',_ru?'Заказ подтверждён':'Order confirmed',(_ru?'Ваш заказ ':'Your order ')+'#'+o.order_id+(_ru?' принят! Курьер уже готовится':' is confirmed! Courier is preparing'),{action:'orders',dedup_key:'confirmed_'+o.order_id});
+            addNotification('check',_ru?'Заказ подтверждён':'Order confirmed',(_ru?'Ваш заказ ':'Your order ')+'#'+o.order_id+(_ru?' принят! Курьер уже готовится':' is confirmed! Courier is preparing'),{action:'orders',dedup_key:'confirmed_'+o.order_id,notif_type:'confirmed',notif_oid:o.order_id});
           } else if(cur==='delivered'){
-            addNotification('box',_ru?'Заказ доставлен!':'Order delivered!',(_ru?'Заказ ':'Order ')+'#'+o.order_id+(_ru?' доставлен. Приятного!':' delivered. Enjoy!'),{action:'orders',dedup_key:'delivered_'+o.order_id});
+            addNotification('box',_ru?'Заказ доставлен!':'Order delivered!',(_ru?'Заказ ':'Order ')+'#'+o.order_id+(_ru?' доставлен. Приятного!':' delivered. Enjoy!'),{action:'orders',dedup_key:'delivered_'+o.order_id,notif_type:'delivered',notif_oid:o.order_id});
           } else if(cur==='declined'){
-            addNotification('x',_ru?'Заказ отклонён':'Order declined',(_ru?'Заказ ':'Order ')+'#'+o.order_id+(_ru?' был отклонён. Свяжитесь с поддержкой':' was declined. Please contact support'),{action:'support',order_id:o.order_id,dedup_key:'declined_'+o.order_id});
+            addNotification('x',_ru?'Заказ отклонён':'Order declined',(_ru?'Заказ ':'Order ')+'#'+o.order_id+(_ru?' был отклонён. Свяжитесь с поддержкой':' was declined. Please contact support'),{action:'support',order_id:o.order_id,dedup_key:'declined_'+o.order_id,notif_type:'declined',notif_oid:o.order_id});
           }
         }
         _aobStatusCache[o.order_id]=cur;
@@ -3944,9 +3982,9 @@ async function _checkCompletedTransitions(orderIds){
     const o=orders.find(x=>x.order_id===id);
     if(!o)return;
     if(o.status==='delivered'&&!_notifs.find(n=>n.dedup_key==='delivered_'+id)){
-      addNotification('box',_ru?'Заказ доставлен!':'Order delivered!',(_ru?'Заказ ':'Order ')+'#'+id+(_ru?' доставлен. Приятного!':' delivered. Enjoy!'),{action:'orders',dedup_key:'delivered_'+id});
+      addNotification('box',_ru?'Заказ доставлен!':'Order delivered!',(_ru?'Заказ ':'Order ')+'#'+id+(_ru?' доставлен. Приятного!':' delivered. Enjoy!'),{action:'orders',dedup_key:'delivered_'+id,notif_type:'delivered',notif_oid:id});
     }else if(o.status==='declined'&&!_notifs.find(n=>n.dedup_key==='declined_'+id)){
-      addNotification('x',_ru?'Заказ отклонён':'Order declined',(_ru?'Заказ ':'Order ')+'#'+id+(_ru?' был отклонён. Свяжитесь с поддержкой':' was declined. Please contact support'),{action:'support',order_id:id,dedup_key:'declined_'+id});
+      addNotification('x',_ru?'Заказ отклонён':'Order declined',(_ru?'Заказ ':'Order ')+'#'+id+(_ru?' был отклонён. Свяжитесь с поддержкой':' was declined. Please contact support'),{action:'support',order_id:id,dedup_key:'declined_'+id,notif_type:'declined',notif_oid:id});
     }
   });
 }
@@ -4124,8 +4162,8 @@ async function _bgSupportPoll(){
       if(opMsgs.length&&lastTs){
         // New operator messages while chat was closed
         const preview=opMsgs[opMsgs.length-1];
-        const text=preview.type==='photo'?(_ru?'📷 Фото':'📷 Photo'):(preview.text||'').slice(0,80);
-        addNotification('chat',_ru?'Ответ от поддержки':'Support reply',text,{action:'support',order_id:oid,dedup_key:'support_'+oid+'_'+preview.ts});
+        const text=preview.type==='photo'?'__photo__':(preview.text||'').slice(0,80);
+        addNotification('chat',_ru?'Ответ от поддержки':'Support reply',text,{action:'support',order_id:oid,dedup_key:'support_'+oid+'_'+preview.ts,notif_type:'support_reply',notif_oid:oid});
       }
       if(messages.length)_bgSupportCache[convKey]=messages[messages.length-1].ts;
     }catch(e){}

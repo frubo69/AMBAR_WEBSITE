@@ -4625,6 +4625,35 @@ function _initSortSwipe(){
   },{passive:true});
 }
 
+function _initSaveSheetSwipe(){
+  const sheet=document.querySelector('.addr-save-sheet');
+  if(!sheet)return;
+  let sy=0,dragging=false;
+  sheet.addEventListener('touchstart',e=>{
+    // Ignore touches inside the mini-map
+    if(e.target.closest('#gps-mini-map-el'))return;
+    // Only start swipe if sheet is not scrolled
+    if(sheet.scrollTop>4){dragging=false;return;}
+    sy=e.touches[0].clientY;dragging=true;
+    sheet.style.transition='none';
+  },{passive:true});
+  sheet.addEventListener('touchmove',e=>{
+    if(!dragging)return;
+    if(sheet.scrollTop>4){dragging=false;sheet.style.transition='';sheet.style.transform='';return;}
+    const dy=Math.max(0,e.touches[0].clientY-sy);
+    sheet.style.transform=`translateY(${dy}px)`;
+  },{passive:true});
+  sheet.addEventListener('touchend',e=>{
+    if(!dragging)return;
+    dragging=false;
+    sheet.style.transition='';
+    const dy=e.changedTouches[0].clientY-sy;
+    if(dy>90){haptic.light();closeAddrSaveSheet();}
+    sheet.style.transform='';
+  },{passive:true});
+}
+document.addEventListener('DOMContentLoaded',_initSaveSheetSwipe);
+
 /* Background support poll — checks for new operator messages when chat is closed */
 let _bgSupportCache={}; // conv_key → last ts seen
 async function _bgSupportPoll(){

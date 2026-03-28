@@ -669,6 +669,21 @@ img{display:block}
 .addr-save-preview-text{font-size:14px;font-weight:500;color:var(--gold2);flex:1;min-width:0;line-height:1.5}
 .addr-save-edit-map-btn{flex-shrink:0;width:30px;height:30px;border-radius:9px;background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.25);color:var(--gold);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;margin-top:-2px}
 .addr-save-edit-map-btn:active{transform:scale(.85);background:rgba(201,169,110,.2)}
+.addr-gps-expand-btn{flex-shrink:0;width:26px;height:26px;border-radius:8px;background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.2);color:var(--gold);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:transform .25s;margin-top:-1px}
+.addr-gps-expand-btn.open{transform:rotate(180deg)}
+.addr-gps-expand-btn:active{opacity:.7}
+.gps-mini-panel{overflow:hidden;max-height:0;transition:max-height .38s cubic-bezier(.4,0,.2,1),margin-bottom .38s ease;margin-bottom:0}
+.gps-mini-panel.open{max-height:280px;margin-bottom:18px}
+.gps-mini-map-wrap{position:relative;border-radius:14px;overflow:hidden;height:180px}
+.gps-mini-map-el{width:100%;height:100%}
+.gps-mini-pin{position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);pointer-events:none;z-index:500;transition:transform .15s}
+.gps-mini-pin.editing{transform:translate(-50%,-70%) scale(1.1)}
+.gps-mini-close-btn{position:absolute;top:8px;right:8px;width:30px;height:30px;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font-size:18px;line-height:1;display:flex;align-items:center;justify-content:center;z-index:600;border:none;cursor:pointer;backdrop-filter:blur(4px)}
+.gps-mini-actions{display:flex;gap:8px;margin-top:10px}
+.gps-mini-edit-btn{flex:1;padding:10px;border-radius:12px;background:rgba(201,169,110,.12);border:1px solid rgba(201,169,110,.25);color:var(--gold);font-size:13px;font-weight:600;cursor:pointer;transition:.15s}
+.gps-mini-edit-btn:active{opacity:.7}
+.gps-mini-done-btn{flex:1;padding:10px;border-radius:12px;background:var(--gold);border:none;color:#1a1a18;font-size:13px;font-weight:700;cursor:pointer;transition:.15s;display:none}
+.gps-mini-done-btn:active{opacity:.8}
 .addr-save-err{font-size:12px;color:var(--red);margin-top:8px;display:none}
 .addr-save-err.on{display:block}
 .addr-save-btn{width:100%;padding:16px;border-radius:16px;border:none;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:22px;transition:.15s;letter-spacing:.2px}
@@ -1186,6 +1201,22 @@ img{display:block}
       <button class="addr-save-edit-map-btn" id="addr-save-edit-map-btn" onclick="editMapLocationFromSheet()" style="display:none">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
       </button>
+      <button class="addr-gps-expand-btn" id="addr-gps-expand-btn" onclick="toggleGpsMiniPanel()" style="display:none">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="13" height="13"><polyline points="6 9 12 15 18 9"/></svg>
+      </button>
+    </div>
+    <div class="gps-mini-panel" id="gps-mini-panel">
+      <div class="gps-mini-map-wrap">
+        <div id="gps-mini-map-el" class="gps-mini-map-el"></div>
+        <div class="gps-mini-pin" id="gps-mini-pin">
+          <img src="pin.png" width="36" height="36" style="display:block;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5))">
+        </div>
+        <button class="gps-mini-close-btn" ontouchstart="event.preventDefault();closeGpsMiniPanel()" onclick="closeGpsMiniPanel()">×</button>
+      </div>
+      <div class="gps-mini-actions">
+        <button class="gps-mini-edit-btn" id="gps-mini-edit-btn" onclick="startGpsMiniEdit()">Изменить точку</button>
+        <button class="gps-mini-done-btn" id="gps-mini-done-btn" onclick="confirmGpsMiniEdit()">Готово</button>
+      </div>
     </div>
     <label class="flabel" id="addr-save-name-lbl">НАЗВАНИЕ АДРЕСА</label>
     <input class="finput" id="addr-name-in" type="text" enterkeyhint="next" placeholder="Дом / Офис / JVC...">
@@ -1756,6 +1787,8 @@ function applyLang(){
   set('btn-gps-sub',t('btnGpsSub'));
   set('btn-map-title',t('btnMapTitle'));
   set('btn-map-sub',t('btnMapSub'));
+  set('gps-mini-edit-btn',lang==='ru'?'Изменить точку':'Edit location');
+  set('gps-mini-done-btn',lang==='ru'?'Готово':'Done');
   set('addr-save-title-txt',t('saveSheetTitle'));
   set('addr-save-name-lbl',t('lblAddrName'));
   set('addr-save-comment-lbl',lang==='ru'?'КОММЕНТАРИЙ ДЛЯ КУРЬЕРА':'COMMENT FOR COURIER');
@@ -2534,9 +2567,17 @@ function showAddrSaveSheet(){
   const geo=_mapGeoResult||{};
   const preview=locInfo?.isGps?'GPS':(locInfo?.street||geo.line1||(locInfo?.lat?`${locInfo.lat.toFixed(5)}, ${locInfo.lon.toFixed(5)}`:''));
   const previewEl=el('addr-save-preview');if(previewEl)previewEl.textContent=preview||'—';
-  // Show/hide map edit button — only for non-GPS map addresses
+  // Show/hide map edit button (non-GPS) or GPS expand button
   const editMapBtn=el('addr-save-edit-map-btn');
   if(editMapBtn)editMapBtn.style.display=(!locInfo?.isGps&&locInfo?.lat)?'flex':'none';
+  const expandBtn=el('addr-gps-expand-btn');
+  if(expandBtn)expandBtn.style.display=(locInfo?.isGps&&locInfo?.lat)?'flex':'none';
+  // Reset mini panel state on fresh open
+  _destroyGpsMiniMap();
+  el('gps-mini-panel')?.classList.remove('open');
+  expandBtn?.classList.remove('open');
+  el('gps-mini-done-btn') && (el('gps-mini-done-btn').style.display='none');
+  el('gps-mini-edit-btn') && (el('gps-mini-edit-btn').style.display='flex');
   if(_sheetFromMapEdit){
     // Coming back from map edit — restore preserved label/comment
     const nameIn=el('addr-name-in');const commentIn=el('addr-comment-in');
@@ -2569,6 +2610,78 @@ function editMapLocationFromSheet(){
 
 function closeAddrSaveSheet(){
   el('addr-save-overlay')?.classList.remove('show');
+  _destroyGpsMiniMap();
+}
+
+// ── GPS MINI-MAP PANEL ────────────────────────────────────────────────────────
+let _miniMap=null,_miniEditing=false,_miniMapOpen=false;
+
+function toggleGpsMiniPanel(){
+  _miniMapOpen?closeGpsMiniPanel():openGpsMiniPanel();
+}
+
+function openGpsMiniPanel(){
+  const panel=el('gps-mini-panel'),btn=el('addr-gps-expand-btn');
+  if(!panel||!locInfo?.lat)return;
+  panel.classList.add('open');
+  if(btn)btn.classList.add('open');
+  _miniMapOpen=true;
+  haptic.light();
+  setTimeout(()=>{
+    if(!_miniMap){
+      _miniMap=L.map('gps-mini-map-el',{
+        dragging:false,zoomControl:false,scrollWheelZoom:false,
+        doubleClickZoom:false,touchZoom:false,tap:false,attributionControl:false
+      });
+      L.tileLayer('https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+        {subdomains:['mt0','mt1','mt2','mt3'],maxZoom:19}).addTo(_miniMap);
+    }
+    _miniMap.setView([locInfo.lat,locInfo.lon],17);
+    _miniMap.invalidateSize();
+  },60);
+}
+
+function closeGpsMiniPanel(){
+  const panel=el('gps-mini-panel'),btn=el('addr-gps-expand-btn');
+  if(panel)panel.classList.remove('open');
+  if(btn)btn.classList.remove('open');
+  _miniMapOpen=false;
+  _miniEditing=false;
+  _destroyGpsMiniMap();
+  const doneBtn=el('gps-mini-done-btn');if(doneBtn)doneBtn.style.display='none';
+  const editBtn=el('gps-mini-edit-btn');if(editBtn)editBtn.style.display='flex';
+}
+
+function _destroyGpsMiniMap(){
+  if(_miniMap){try{_miniMap.remove();}catch(e){}  _miniMap=null;}
+  _miniMapOpen=false;_miniEditing=false;
+}
+
+function startGpsMiniEdit(){
+  if(!_miniMap)return;
+  _miniEditing=true;
+  _miniMap.dragging.enable();
+  _miniMap.touchZoom.enable();
+  _miniMap.doubleClickZoom.enable();
+  el('gps-mini-pin')?.classList.add('editing');
+  const doneBtn=el('gps-mini-done-btn');if(doneBtn)doneBtn.style.display='flex';
+  const editBtn=el('gps-mini-edit-btn');if(editBtn)editBtn.style.display='none';
+  haptic.light();
+}
+
+function confirmGpsMiniEdit(){
+  if(!_miniMap)return;
+  const c=_miniMap.getCenter();
+  locInfo={...locInfo,lat:c.lat,lon:c.lng};
+  _miniEditing=false;
+  _miniMap.dragging.disable();
+  _miniMap.touchZoom.disable();
+  _miniMap.doubleClickZoom.disable();
+  el('gps-mini-pin')?.classList.remove('editing');
+  const doneBtn=el('gps-mini-done-btn');if(doneBtn)doneBtn.style.display='none';
+  const editBtn=el('gps-mini-edit-btn');if(editBtn)editBtn.style.display='flex';
+  haptic.success();
+  showToast(lang==='ru'?'📍 Координаты обновлены':'📍 Location updated','ok',true);
 }
 
 function _mapGoToUserLocation(){

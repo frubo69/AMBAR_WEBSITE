@@ -686,10 +686,6 @@ img{display:block}
 .gps-edit-pill.editing .gps-edit-pill-text{opacity:1;transition:opacity .18s .14s}
 .addr-save-err{font-size:12px;color:var(--red);margin-top:8px;display:none}
 .addr-save-err.on{display:block}
-/* Keyboard done bar */
-.kbd-done-bar{position:fixed;left:0;right:0;bottom:0;z-index:9100;background:rgba(24,24,32,.96);border-top:1px solid rgba(255,255,255,.07);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:flex-end;padding:7px 16px 7px;transform:translateY(100%);transition:transform .2s cubic-bezier(.4,0,.2,1);pointer-events:none}
-.kbd-done-bar.show{transform:translateY(0);pointer-events:all}
-.kbd-done-btn{color:var(--gold);font-size:15px;font-weight:700;background:none;border:none;padding:5px 10px;cursor:pointer;font-family:'DM Sans',sans-serif;letter-spacing:.2px}
 .addr-save-btn{width:100%;padding:16px;border-radius:16px;border:none;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:22px;transition:.15s;letter-spacing:.2px}
 .addr-save-btn:active{opacity:.85;transform:scale(.98)}
 </style>
@@ -1801,7 +1797,6 @@ function applyLang(){
   set('map-done-btn',t('mapDone'));
   const ain=el('addr-name-in');if(ain)ain.placeholder=lang==='ru'?'Дом / Офис / JVC...':'Home / Office / JVC...';
   const acin=el('addr-comment-in');if(acin)acin.placeholder=lang==='ru'?'Необязательно':'Optional';
-  window._updateKbdDoneBtn?.();
 }
 
 // ── HOME SCREEN PROMPT ────────────────────────────────────────────────────────
@@ -4749,77 +4744,16 @@ function showToast(msg,type='',top=false){
   _tt=setTimeout(()=>cur.classList.remove('show'),2800);
 }
 
-// ── KEYBOARD DONE BAR ─────────────────────────────────────────────────────────
-(function(){
-  let _blurTimer=null;
-
-  function _showKbdBar(){
-    clearTimeout(_blurTimer);
-    const bar=el('kbd-done-bar');
-    if(!bar)return;
-    bar.classList.add('show');
-    _positionKbdBar();
-  }
-  function _hideKbdBar(){
-    // Small delay — prevents flicker when tapping Done (which also triggers blur)
-    _blurTimer=setTimeout(()=>{
-      const bar=el('kbd-done-bar');
-      if(bar){bar.classList.remove('show');bar.style.bottom='';}
-    },80);
-  }
-  function _positionKbdBar(){
-    if(!window.visualViewport)return;
-    const bar=el('kbd-done-bar');if(!bar)return;
-    const offset=window.innerHeight-window.visualViewport.height-window.visualViewport.offsetTop;
-    bar.style.bottom=Math.max(0,offset)+'px';
-  }
-
-  function _onFocus(e){
-    const overlay=el('addr-save-overlay');
-    if(!overlay||!overlay.contains(e.target))return;
-    if(!e.target.matches('input,textarea'))return;
-    _showKbdBar();
-  }
-  function _onBlur(e){
-    if(!e.target.matches('input,textarea'))return;
-    _hideKbdBar();
-  }
-
-  document.addEventListener('DOMContentLoaded',()=>{
-    // Create the bar
-    const bar=document.createElement('div');
-    bar.className='kbd-done-bar';bar.id='kbd-done-bar';
-    bar.innerHTML=`<button class="kbd-done-btn" id="kbd-done-btn" ontouchstart="event.preventDefault();document.activeElement?.blur()" onclick="document.activeElement?.blur()">Готово</button>`;
-    document.body.appendChild(bar);
-
-    // Focus / blur detection
-    document.addEventListener('focusin',_onFocus,true);
-    document.addEventListener('focusout',_onBlur,true);
-
-    // Reposition as viewport changes (keyboard slides up/down)
-    if(window.visualViewport){
-      window.visualViewport.addEventListener('resize',_positionKbdBar);
-      window.visualViewport.addEventListener('scroll',_positionKbdBar);
-    }
-  });
-
-  // Option 2: tap on non-interactive areas of save sheet blurs active input
-  document.addEventListener('DOMContentLoaded',()=>{
-    const sheet=document.querySelector('.addr-save-sheet');
-    if(!sheet)return;
-    sheet.addEventListener('touchend',e=>{
-      if(e.target.matches('input,textarea,button,.addr-save-btn,#gps-mini-map-el *'))return;
-      const ae=document.activeElement;
-      if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))ae.blur();
-    },{passive:true});
-  });
-
-  // Update Done btn text on lang change
-  window._updateKbdDoneBtn=function(){
-    const btn=el('kbd-done-btn');
-    if(btn)btn.textContent=typeof lang!=='undefined'&&lang==='ru'?'Готово':'Done';
-  };
-})();
+// ── TAP OUTSIDE TO DISMISS KEYBOARD ──────────────────────────────────────────
+document.addEventListener('DOMContentLoaded',()=>{
+  const sheet=document.querySelector('.addr-save-sheet');
+  if(!sheet)return;
+  sheet.addEventListener('touchend',e=>{
+    if(e.target.matches('input,textarea,button,#gps-mini-map-el *'))return;
+    const ae=document.activeElement;
+    if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))ae.blur();
+  },{passive:true});
+});
 </script>
 </body>
 </html>

@@ -2665,6 +2665,15 @@ function closeGpsMiniPanel(){
 function _destroyGpsMiniMap(){
   if(_miniMap){try{_miniMap.remove();}catch(e){}  _miniMap=null;}
   _miniMapOpen=false;_miniEditing=false;
+  // Reset panel instantly — disable transition so there's no collapse animation on next open
+  const panel=el('gps-mini-panel');
+  if(panel){
+    panel.style.transition='none';
+    panel.classList.remove('open');
+    requestAnimationFrame(()=>{panel.style.transition='';});
+  }
+  el('addr-gps-expand-btn')?.classList.remove('open');
+  el('gps-edit-pill')?.classList.remove('editing');
 }
 
 function _onGpsEditPillTap(){

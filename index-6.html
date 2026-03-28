@@ -678,11 +678,12 @@ img{display:block}
 .gps-mini-map-el{width:100%;height:100%}
 .gps-mini-pin{position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);pointer-events:none;z-index:500;transition:transform .15s}
 .gps-mini-pin.editing{transform:translate(-50%,-70%) scale(1.1)}
-.gps-mini-actions{display:flex;align-items:center;justify-content:center;margin-top:10px;height:44px}
-.gps-mini-edit-circle{width:44px;height:44px;border-radius:50%;background:rgba(201,169,110,.12);border:1.5px solid rgba(201,169,110,.3);color:var(--gold);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.18s;flex-shrink:0}
-.gps-mini-edit-circle:active{transform:scale(.85);opacity:.8}
-.gps-mini-done-btn{width:100%;padding:12px;border-radius:14px;background:var(--gold);border:none;color:#1a1a18;font-size:14px;font-weight:700;cursor:pointer;transition:.18s;display:none}
-.gps-mini-done-btn:active{opacity:.8}
+.gps-edit-pill{position:absolute;bottom:10px;right:10px;z-index:600;display:flex;align-items:center;background:rgba(18,18,24,.72);border:1.5px solid rgba(201,169,110,.35);border-radius:50px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);overflow:hidden;width:36px;transition:width .28s cubic-bezier(.4,0,.2,1);cursor:pointer}
+.gps-edit-pill:active{opacity:.75}
+.gps-edit-pill.editing{width:108px}
+.gps-edit-pill-text{color:var(--gold);font-size:13px;font-weight:600;white-space:nowrap;padding-left:12px;opacity:0;transition:opacity .15s;pointer-events:none}
+.gps-edit-pill.editing .gps-edit-pill-text{opacity:1;transition:opacity .2s .12s}
+.gps-edit-pill-icon{width:36px;height:36px;display:flex;align-items:center;justify-content:center;color:var(--gold);flex-shrink:0}
 .addr-save-err{font-size:12px;color:var(--red);margin-top:8px;display:none}
 .addr-save-err.on{display:block}
 .addr-save-btn{width:100%;padding:16px;border-radius:16px;border:none;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:22px;transition:.15s;letter-spacing:.2px}
@@ -1210,12 +1211,13 @@ img{display:block}
         <div class="gps-mini-pin" id="gps-mini-pin">
           <img src="pin.png" width="36" height="36" style="display:block;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5))">
         </div>
-      </div>
-      <div class="gps-mini-actions">
-        <button class="gps-mini-edit-circle" id="gps-mini-edit-btn" onclick="startGpsMiniEdit()">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-        </button>
-        <button class="gps-mini-done-btn" id="gps-mini-done-btn" onclick="confirmGpsMiniEdit()">Готово</button>
+        <!-- edit pill inside the map, bottom-right -->
+        <div class="gps-edit-pill" id="gps-edit-pill" onclick="_onGpsEditPillTap()">
+          <span class="gps-edit-pill-text" id="gps-edit-pill-text">Готово</span>
+          <div class="gps-edit-pill-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          </div>
+        </div>
       </div>
     </div>
     <label class="flabel" id="addr-save-name-lbl">НАЗВАНИЕ АДРЕСА</label>
@@ -1787,8 +1789,7 @@ function applyLang(){
   set('btn-gps-sub',t('btnGpsSub'));
   set('btn-map-title',t('btnMapTitle'));
   set('btn-map-sub',t('btnMapSub'));
-  set('gps-mini-edit-btn',lang==='ru'?'Изменить точку':'Edit location');
-  set('gps-mini-done-btn',lang==='ru'?'Готово':'Done');
+  const _pt=el('gps-edit-pill-text');if(_pt)_pt.textContent=lang==='ru'?'Готово':'Done';
   set('addr-save-title-txt',t('saveSheetTitle'));
   set('addr-save-name-lbl',t('lblAddrName'));
   set('addr-save-comment-lbl',lang==='ru'?'КОММЕНТАРИЙ ДЛЯ КУРЬЕРА':'COMMENT FOR COURIER');
@@ -2576,8 +2577,7 @@ function showAddrSaveSheet(){
   _destroyGpsMiniMap();
   el('gps-mini-panel')?.classList.remove('open');
   expandBtn?.classList.remove('open');
-  const _d=el('gps-mini-done-btn');if(_d)_d.style.display='none';
-  const _e=el('gps-mini-edit-btn');if(_e)_e.style.display='flex';
+  el('gps-edit-pill')?.classList.remove('editing');
   if(_sheetFromMapEdit){
     // Coming back from map edit — restore preserved label/comment
     const nameIn=el('addr-name-in');const commentIn=el('addr-comment-in');
@@ -2647,13 +2647,16 @@ function closeGpsMiniPanel(){
   if(btn)btn.classList.remove('open');
   _miniMapOpen=false;_miniEditing=false;
   _destroyGpsMiniMap();
-  const d=el('gps-mini-done-btn');if(d)d.style.display='none';
-  const e=el('gps-mini-edit-btn');if(e)e.style.display='flex';
+  el('gps-edit-pill')?.classList.remove('editing');
 }
 
 function _destroyGpsMiniMap(){
   if(_miniMap){try{_miniMap.remove();}catch(e){}  _miniMap=null;}
   _miniMapOpen=false;_miniEditing=false;
+}
+
+function _onGpsEditPillTap(){
+  if(!_miniEditing)startGpsMiniEdit();else confirmGpsMiniEdit();
 }
 
 function startGpsMiniEdit(){
@@ -2663,8 +2666,9 @@ function startGpsMiniEdit(){
   _miniMap.touchZoom.enable();
   _miniMap.doubleClickZoom.enable();
   el('gps-mini-pin')?.classList.add('editing');
-  el('gps-mini-done-btn').style.display='block';
-  el('gps-mini-edit-btn').style.display='none';
+  el('gps-edit-pill')?.classList.add('editing');
+  // update text for current lang
+  const t=el('gps-edit-pill-text');if(t)t.textContent=lang==='ru'?'Готово':'Done';
   haptic.light();
 }
 
@@ -2677,8 +2681,7 @@ function confirmGpsMiniEdit(){
   _miniMap.touchZoom.disable();
   _miniMap.doubleClickZoom.disable();
   el('gps-mini-pin')?.classList.remove('editing');
-  el('gps-mini-done-btn').style.display='none';
-  el('gps-mini-edit-btn').style.display='flex';
+  el('gps-edit-pill')?.classList.remove('editing');
   haptic.success();
   showToast(lang==='ru'?'📍 Координаты обновлены':'📍 Location updated','ok',true);
 }

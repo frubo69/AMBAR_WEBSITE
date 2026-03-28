@@ -686,9 +686,6 @@ img{display:block}
 .gps-edit-pill.editing .gps-edit-pill-text{opacity:1;transition:opacity .18s .14s}
 .addr-save-err{font-size:12px;color:var(--red);margin-top:8px;display:none}
 .addr-save-err.on{display:block}
-.kbd-done-bar{position:fixed;left:0;right:0;bottom:0;z-index:9100;background:rgba(22,22,30,.97);border-top:1px solid rgba(255,255,255,.07);display:flex;justify-content:flex-end;align-items:center;padding:6px 16px;transform:translateY(100%);transition:transform .18s ease;pointer-events:none}
-.kbd-done-bar.show{transform:translateY(0);pointer-events:all}
-.kbd-done-btn{color:var(--gold);font-size:15px;font-weight:700;background:none;border:none;padding:6px 10px;cursor:pointer;font-family:'DM Sans',sans-serif}
 .addr-save-btn{width:100%;padding:16px;border-radius:16px;border:none;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;margin-top:22px;transition:.15s;letter-spacing:.2px}
 .addr-save-btn:active{opacity:.85;transform:scale(.98)}
 </style>
@@ -1800,7 +1797,6 @@ function applyLang(){
   set('map-done-btn',t('mapDone'));
   const ain=el('addr-name-in');if(ain)ain.placeholder=lang==='ru'?'Дом / Офис / JVC...':'Home / Office / JVC...';
   const acin=el('addr-comment-in');if(acin)acin.placeholder=lang==='ru'?'Необязательно':'Optional';
-  window._updateKbdDoneBtn?.();
 }
 
 // ── HOME SCREEN PROMPT ────────────────────────────────────────────────────────
@@ -4748,69 +4744,15 @@ function showToast(msg,type='',top=false){
   _tt=setTimeout(()=>cur.classList.remove('show'),2800);
 }
 
-// ── KEYBOARD DISMISS ──────────────────────────────────────────────────────────
-(function(){
-  // Floating "Done" bar above keyboard
-  let _kbdVisible=false,_blurTimer=null;
-
-  function _positionBar(bar){
-    if(!window.visualViewport)return;
-    const off=window.innerHeight-window.visualViewport.height-window.visualViewport.offsetTop;
-    bar.style.bottom=Math.max(0,Math.round(off))+'px';
-  }
-  function _showBar(){
-    clearTimeout(_blurTimer);
-    const bar=el('kbd-done-bar');if(!bar)return;
-    _kbdVisible=true;
-    _positionBar(bar);
-    bar.classList.add('show');
-  }
-  function _hideBar(){
-    _blurTimer=setTimeout(()=>{
-      const bar=el('kbd-done-bar');if(!bar)return;
-      _kbdVisible=false;
-      bar.classList.remove('show');
-      bar.style.bottom='';
-    },100);
-  }
-
-  document.addEventListener('DOMContentLoaded',()=>{
-    // Inject bar
-    const bar=document.createElement('div');
-    bar.id='kbd-done-bar';bar.className='kbd-done-bar';
-    bar.innerHTML=`<button class="kbd-done-btn" ontouchstart="event.preventDefault();document.activeElement?.blur()" onclick="document.activeElement?.blur()">Готово</button>`;
-    document.body.appendChild(bar);
-    window._kbdDoneBar=bar;
-
-    // Show/hide on focus inside save sheet
-    document.addEventListener('focusin',e=>{
-      const ov=el('addr-save-overlay');
-      if(ov&&ov.contains(e.target)&&e.target.matches('input,textarea'))_showBar();
-    },true);
-    document.addEventListener('focusout',e=>{
-      if(e.target.matches('input,textarea'))_hideBar();
-    },true);
-
-    // Reposition as keyboard animates
-    if(window.visualViewport){
-      window.visualViewport.addEventListener('resize',()=>{if(_kbdVisible)_positionBar(bar);});
-      window.visualViewport.addEventListener('scroll',()=>{if(_kbdVisible)_positionBar(bar);});
-    }
-
-    // Tap outside inputs on sheet → dismiss keyboard
-    const sheet=document.querySelector('.addr-save-sheet');
-    if(sheet)sheet.addEventListener('touchend',e=>{
-      if(e.target.matches('input,textarea,button,#gps-mini-map-el *'))return;
-      document.activeElement?.blur();
-    },{passive:true});
-  });
-
-  // Update lang
-  window._updateKbdDoneBtn=function(){
-    const btn=document.querySelector('.kbd-done-btn');
-    if(btn)btn.textContent=typeof lang!=='undefined'&&lang==='ru'?'Готово':'Done';
-  };
-})();
+// Tap outside inputs on sheet → dismiss keyboard
+document.addEventListener('DOMContentLoaded',()=>{
+  const sheet=document.querySelector('.addr-save-sheet');
+  if(!sheet)return;
+  sheet.addEventListener('touchend',e=>{
+    if(e.target.matches('input,textarea,button,#gps-mini-map-el *'))return;
+    document.activeElement?.blur();
+  },{passive:true});
+});
 </script>
 </body>
 </html>

@@ -4744,15 +4744,12 @@ function showToast(msg,type='',top=false){
   _tt=setTimeout(()=>cur.classList.remove('show'),2800);
 }
 
-// Tap outside inputs on sheet → dismiss keyboard
-document.addEventListener('DOMContentLoaded',()=>{
-  const sheet=document.querySelector('.addr-save-sheet');
-  if(!sheet)return;
-  sheet.addEventListener('touchend',e=>{
-    if(e.target.matches('input,textarea,button,#gps-mini-map-el *'))return;
-    document.activeElement?.blur();
-  },{passive:true});
-});
+// Tap anywhere outside input/textarea → dismiss keyboard
+document.addEventListener('touchend',e=>{
+  if(e.target.matches('input,textarea'))return;
+  const ae=document.activeElement;
+  if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))ae.blur();
+},{passive:true});
 </script>
 </body>
 </html>

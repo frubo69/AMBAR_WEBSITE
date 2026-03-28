@@ -676,7 +676,6 @@ img{display:block}
 .gps-mini-panel.open{max-height:280px;margin-bottom:18px}
 .gps-mini-map-wrap{position:relative;border-radius:14px;overflow:hidden;height:180px}
 .gps-mini-map-el{width:100%;height:100%}
-.gps-mini-map-el .leaflet-layer,.gps-mini-map-el .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) brightness(0.92) contrast(0.88) saturate(0.7)}
 .gps-mini-pin{position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);pointer-events:none;z-index:500;transition:transform .15s}
 .gps-mini-pin.editing{transform:translate(-50%,-70%) scale(1.1)}
 .gps-edit-pill{position:absolute;bottom:10px;right:10px;z-index:600;display:flex;align-items:center;background:rgba(18,18,24,.78);border:1.5px solid rgba(201,169,110,.4);border-radius:50px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);overflow:hidden;width:36px;height:36px;transition:width .3s cubic-bezier(.4,0,.2,1);cursor:pointer}
@@ -2091,6 +2090,13 @@ function editAddr(i){
   const previewEl=el('addr-save-preview');if(previewEl)previewEl.textContent=a.address||a.label||'';
   const editMapBtn=el('addr-save-edit-map-btn');
   if(editMapBtn)editMapBtn.style.display=(!a.isGps&&a.lat)?'flex':'none';
+  // GPS expand button — only for GPS addresses
+  const expandBtn=el('addr-gps-expand-btn');
+  if(expandBtn)expandBtn.style.display=(a.isGps&&a.lat)?'flex':'none';
+  _destroyGpsMiniMap();
+  el('gps-mini-panel')?.classList.remove('open');
+  expandBtn?.classList.remove('open');
+  el('gps-edit-pill')?.classList.remove('editing');
   const ae=el('addr-form-err');if(ae){ae.classList.remove('on');ae.textContent='';}
   const saveBtn=el('addr-save-btn-el');if(saveBtn)saveBtn.textContent=t('updateAddrBtn');
   const saveTitle=el('addr-save-title-txt');if(saveTitle)saveTitle.textContent=lang==='ru'?'Редактировать адрес':'Edit address';
@@ -2636,6 +2642,11 @@ function openGpsMiniPanel(){
       });
       L.tileLayer('https://{s}.google.com/vt/lyrs=r&x={x}&y={y}&z={z}',
         {subdomains:['mt0','mt1','mt2','mt3'],maxZoom:19}).addTo(_miniMap);
+      // Apply dark filter to tile pane only (pin stays normal)
+      setTimeout(()=>{
+        const tp=document.querySelector('#gps-mini-map-el .leaflet-tile-pane');
+        if(tp)tp.style.filter='invert(1) hue-rotate(180deg) brightness(.9) contrast(.85) saturate(.65)';
+      },200);
     }
     _miniMap.setView([locInfo.lat,locInfo.lon],17);
     _miniMap.invalidateSize();

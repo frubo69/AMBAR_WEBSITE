@@ -4009,37 +4009,12 @@ function buildProfile(){
   if(!active.length){el('active-list').innerHTML=`<div class="empty" style="padding:20px 0"><div>${t('noActive')}</div></div>`;return;}
   const months2=lang==='ru'?['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек']:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   function fmtDate2(ts){if(!ts)return'';const d=new Date(ts);return`${d.getDate()} ${months2[d.getMonth()]} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
-  // Show "clear all" if multiple stuck pending orders (older than 30 min)
-  const now=Date.now();
-  const stuckOld=active.filter(o=>o.status==='pending'&&(now-new Date(o.timestamp||0).getTime())>1800000);
-  const clearAllHtml=stuckOld.length>1?`<button class="ocard-clear-all-btn" onclick="clearAllStuckOrders()">${lang==='ru'?'Очистить застрявшие заказы':'Clear stuck orders'} (${stuckOld.length})</button>`:'';
-  el('active-list').innerHTML=clearAllHtml+active.map(o=>{
-    const idx=orders.indexOf(o);
+  el('active-list').innerHTML=active.map(o=>{
     const st=o.status==='confirmed'?'sc2':'sp';
     const lbl=o.status==='confirmed'?(lang==='ru'?'Принят':'Confirmed'):(lang==='ru'?'Ожидает':'Pending');
     const rows=o.items.map(i=>`<div class="o-row"><span class="o-row-name">${i.name}</span><span class="o-row-qty">${i.qty} ${lang==='ru'?'шт':'pcs'}</span></div>`).join('');
-    const dismissBtn=`<button class="ocard-dismiss-btn" onclick="event.stopPropagation();dismissActiveOrder(${idx})" title="${lang==='ru'?'Убрать':'Dismiss'}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="14" height="14"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>`;
-    return`<div class="ocard ${st}"><div class="ocard-inner"><div class="ocard-meta"><span class="o-id">#${o.order_id}</span><span class="o-date">${fmtDate2(o.timestamp)}</span>${dismissBtn}</div><div class="o-rows">${rows}</div><div class="ocard-foot"><span class="o-status"><span class="o-status-dot"></span>${lbl}</span><div class="o-total"><span class="o-total-num">${o.total}</span><span class="o-total-cur">AED</span></div></div></div><div class="ocard-actions"><button class="ocard-support-btn" onclick="event.stopPropagation();openSupportChat('${o.order_id}')">${t('supportBtn')}</button></div></div>`;
+    return`<div class="ocard ${st}"><div class="ocard-inner"><div class="ocard-meta"><span class="o-id">#${o.order_id}</span><span class="o-date">${fmtDate2(o.timestamp)}</span></div><div class="o-rows">${rows}</div><div class="ocard-foot"><span class="o-status"><span class="o-status-dot"></span>${lbl}</span><div class="o-total"><span class="o-total-num">${o.total}</span><span class="o-total-cur">AED</span></div></div></div><div class="ocard-actions"><button class="ocard-support-btn" onclick="event.stopPropagation();openSupportChat('${o.order_id}')">${t('supportBtn')}</button></div></div>`;
   }).join('');
-}
-
-function dismissActiveOrder(idx){
-  haptic.light();
-  deleteOrder(idx);
-}
-
-function clearAllStuckOrders(){
-  const now=Date.now();
-  const stuck=orders.filter(o=>o.status==='pending'&&(now-new Date(o.timestamp||0).getTime())>1800000);
-  if(!stuck.length)return;
-  const prevCleared=JSON.parse(localStorage.getItem('ambar_cleared_ids')||'[]');
-  stuck.forEach(o=>prevCleared.push(o.order_id));
-  localStorage.setItem('ambar_cleared_ids',JSON.stringify([...new Set(prevCleared)]));
-  orders=orders.filter(o=>!stuck.includes(o));
-  localStorage.setItem('ambar_orders',JSON.stringify(orders));
-  haptic.success();
-  renderOrders();buildProfile();
-  showToast(lang==='ru'?`Убрано ${stuck.length} заказов`:`${stuck.length} orders cleared`,'ok');
 }
 
 function orderTheUsual(){

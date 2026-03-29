@@ -3875,7 +3875,9 @@ function placeOrder(){
     }
   }).catch(err=>console.error('Order fetch error:', err));
 
+  const _placedIds=Object.keys(cart);
   cart={};beerPcs={};tip=0;el('phone-err').classList.remove('on');el('phone-in').classList.remove('err');
+  _placedIds.forEach(id=>syncCtrl(id));
   updHdr();buildTips();haptic.success();showToast(t('placed'),'ok');
   const _ru=lang==='ru';
   addNotification('cart',_ru?'Заказ оформлен':'Order placed',(_ru?'Заказ ':'Order ')+'#'+oid+(_ru?' принят и ожидает подтверждения':' received, awaiting confirmation'),{action:'orders',dedup_key:'placed_'+oid,notif_type:'placed',notif_oid:oid});

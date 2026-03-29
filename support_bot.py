@@ -20,6 +20,8 @@ MAIN_BOT_TOKEN = os.getenv("BOT_TOKEN", "")
 
 # map: forwarded_message_id -> user_id (in-memory, for direct bot users)
 MESSAGE_MAP = {}
+# dedup: set of already-processed update_ids
+_SEEN_UPDATES: set = set()
 
 async def _notify_user(user_id: int, text: str):
     """Send notification to user via main AMBAR bot."""
@@ -99,6 +101,13 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Ignore admins here
     if is_admin(user.id):
         return
+
+    # Dedup — skip if we've already processed this update
+    if update.update_id in _SEEN_UPDATES:
+        return
+    _SEEN_UPDATES.add(update.update_id)
+    if len(_SEEN_UPDATES) > 10000:
+        _SEEN_UPDATES.clear()
 
     # Friendly confirmation
     if msg.text:
@@ -242,7 +251,7 @@ def main():
     )
 
     print("🤖 Support bot is running...")
-    app.run_polling()
+    app.run_polling(drop_pending_updates=True, allowed_updates=Update.ALL_TYPES)
 
 
 if __name__ == "__main__":

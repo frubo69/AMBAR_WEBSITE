@@ -3877,7 +3877,7 @@ function placeOrder(){
   updHdr();buildTips();haptic.success();showToast(t('placed'),'ok');
   const _ru=lang==='ru';
   addNotification('cart',_ru?'Заказ оформлен':'Order placed',(_ru?'Заказ ':'Order ')+'#'+oid+(_ru?' принят и ожидает подтверждения':' received, awaiting confirmation'),{action:'orders',dedup_key:'placed_'+oid,notif_type:'placed',notif_oid:oid});
-  setTimeout(()=>{go('orders');},1400);
+  setTimeout(()=>{go('orders');checkActiveOrder();},1400);
 }
 
 // ── ORDERS ────────────────────────────────────────────────────────────────────
@@ -3885,7 +3885,7 @@ function confirmClearHistory(){
   const msg=lang==='ru'?'Удалить завершённые заказы?':'Remove completed orders?';
   if(!confirm(msg))return;
   // Persist delivered total so the profile stat survives the wipe
-  const removable=orders.filter(o=>o.status==='delivered'||o.status==='declined');
+  const removable=orders.filter(o=>o.status==='delivered'||o.status==='declined'||o.status==='cancelled');
   const spent=removable.filter(o=>o.status==='delivered').reduce((s,o)=>s+o.total,0);
   const prev=parseInt(localStorage.getItem('ambar_spent_total')||'0');
   localStorage.setItem('ambar_spent_total',prev+spent);
@@ -4023,17 +4023,17 @@ function renderOrders(){
     return;
   }
   if(ordHdr)ordHdr.style.display='';
-  const hasClearable=orders.some(o=>o.status==='delivered'||o.status==='declined');
+  const hasClearable=orders.some(o=>o.status==='delivered'||o.status==='declined'||o.status==='cancelled');
   if(clearWrap)clearWrap.style.display=hasClearable?'block':'none';
-  const cls={pending:'sp',confirmed:'sc2',delivered:'sd',declined:'sx'};
-  const lbl={pending:()=>t('stP'),confirmed:()=>t('stC'),delivered:()=>t('stD'),declined:()=>t('stX')};
-  const lbl2={pending:()=>lang==='ru'?'Ожидает':'Pending',confirmed:()=>lang==='ru'?'Принят':'Confirmed',delivered:()=>lang==='ru'?'Доставлен':'Delivered',declined:()=>lang==='ru'?'Отменён':'Cancelled'};
+  const cls={pending:'sp',confirmed:'sc2',delivered:'sd',declined:'sx',cancelled:'sx'};
+  const lbl={pending:()=>t('stP'),confirmed:()=>t('stC'),delivered:()=>t('stD'),declined:()=>t('stX'),cancelled:()=>t('stX')};
+  const lbl2={pending:()=>lang==='ru'?'Ожидает':'Pending',confirmed:()=>lang==='ru'?'Принят':'Confirmed',delivered:()=>lang==='ru'?'Доставлен':'Delivered',declined:()=>lang==='ru'?'Отменён':'Cancelled',cancelled:()=>lang==='ru'?'Отменён вами':'Cancelled by you'};
   const months=lang==='ru'?['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек']:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   function fmtDate(ts){if(!ts)return'';const d=new Date(ts);return`${d.getDate()} ${months[d.getMonth()]} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
   el('orders-list').innerHTML=orders.map((o,idx)=>{
     const st=cls[o.status]||'sp';
     const rows=o.items.map(i=>`<div class="o-row"><span class="o-row-name">${i.name}</span><span class="o-row-qty">${i.qty} ${lang==='ru'?'шт':'pcs'}</span></div>`).join('');
-    const isFinished=o.status==='delivered'||o.status==='declined';
+    const isFinished=o.status==='delivered'||o.status==='declined'||o.status==='cancelled';
     const isActive=o.status==='pending'||o.status==='confirmed';
     const actionsHtml=isFinished
       ?`<div class="ocard-actions"><button class="ocard-repeat-btn" onclick="event.stopPropagation();repeatOrder(${idx})">🔁 ${lang==='ru'?'Повторить':'Repeat'}</button></div>`
@@ -4959,10 +4959,17 @@ async function confirmCancelOrder(){
     if(resp.ok&&d.ok){
       closeCancelSheet();
       haptic.medium();
+      // Immediately remove cancelled order from local cache and hide the bar
+      _aobOrders=_aobOrders.filter(ord=>ord.order_id!==o.order_id);
+      if(_aobOrders.length===0){
+        el('aob').classList.add('aob-hidden');
+        document.body.classList.remove('aob-on');
+      }
       addNotification('x',ru?'Заказ отменён':'Order Cancelled',
         (ru?'Заказ ':'Order ')+'#'+o.order_id+(ru?' успешно отменён':' successfully cancelled'),
         {dedup_key:'cancel_'+o.order_id});
       showToast(ru?'Заказ отменён':'Order cancelled','ok');
+      syncOrders();
     } else if(d.error==='not_cancellable'){
       closeCancelSheet();
       showToast(ru?'Заказ уже подтверждён — напишите в поддержку':'Order confirmed — contact support','err');

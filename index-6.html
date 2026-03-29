@@ -534,8 +534,8 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .aod-cancel-btn{width:100%;padding:13px;background:rgba(224,85,85,.07);border:1px solid rgba(224,85,85,.22);border-radius:14px;color:var(--red);font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.15s;display:flex;align-items:center;justify-content:center;gap:7px}
 .aod-cancel-btn:active{background:rgba(224,85,85,.16)}
 /* ── Cancel sheet ── */
-.cancel-ov{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:800;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .22s;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
-.cancel-ov.open{opacity:1;pointer-events:all}
+.cancel-ov{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:800;display:none;align-items:flex-end;opacity:0;transition:opacity .22s}
+.cancel-ov.open{display:flex;opacity:1}
 .cancel-sheet{width:100%;background:var(--bg2);border-radius:24px 24px 0 0;padding:0 20px calc(32px + var(--safe-bottom));transform:translateY(60px);transition:transform .28s cubic-bezier(.34,1,.64,1);max-height:88vh;overflow-y:auto}
 .cancel-ov.open .cancel-sheet{transform:translateY(0)}
 .cancel-handle{width:36px;height:4px;background:rgba(255,255,255,.1);border-radius:2px;margin:14px auto 20px}
@@ -4924,11 +4924,16 @@ function openCancelSheet(){
   el('cancel-do-txt').textContent=ru?'Подтвердить отмену':'Confirm Cancellation';
   el('cancel-back-txt').textContent=ru?'Назад':'Back';
   closeAod();
-  el('cancel-ov').classList.add('open');
+  const ov=el('cancel-ov');
+  ov.style.display='flex';
+  ov.offsetHeight; // force reflow so transition fires
+  ov.classList.add('open');
 }
 
 function closeCancelSheet(){
-  el('cancel-ov').classList.remove('open');
+  const ov=el('cancel-ov');
+  ov.classList.remove('open');
+  setTimeout(()=>{if(!ov.classList.contains('open'))ov.style.display='none';},240);
 }
 
 function selectCancelReason(btn){

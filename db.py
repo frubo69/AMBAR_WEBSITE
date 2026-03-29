@@ -98,7 +98,11 @@ async def get_all_orders(office_id: str = None) -> dict:
 async def get_user_orders(tg_id: int) -> list:
     db = _db_or_none()
     if db is None: return []
-    cursor = db.orders.find({"customer_id": tg_id}, {"_id": 0}).sort("timestamp", -1)
+    # Match both int and string customer_id (handles DB migration type mismatches)
+    cursor = db.orders.find(
+        {"customer_id": {"$in": [tg_id, str(tg_id)]}},
+        {"_id": 0}
+    ).sort("timestamp", -1)
     return await cursor.to_list(length=200)
 
 

@@ -3829,7 +3829,7 @@ function placeOrder(){
   updHdr();buildTips();haptic.success();showToast(t('placed'),'ok');
   const _ru=lang==='ru';
   addNotification('cart',_ru?'Заказ оформлен':'Order placed',(_ru?'Заказ ':'Order ')+'#'+oid+(_ru?' принят и ожидает подтверждения':' received, awaiting confirmation'),{action:'orders',dedup_key:'placed_'+oid,notif_type:'placed',notif_oid:oid});
-  setTimeout(()=>{go('orders'); if(tg?.close) tg.close();},1400);
+  setTimeout(()=>{go('orders');},1400);
 }
 
 // ── ORDERS ────────────────────────────────────────────────────────────────────

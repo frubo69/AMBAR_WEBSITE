@@ -115,7 +115,7 @@ def kb_ban_confirm(cid, oid):
 
 # ── Order card formatter ──────────────────────────────────────────────────────
 def order_card(o, full=True):
-    st_map = {"pending":"🟡 Ожидает","approved":"🟢 Принят","delivered":"✅ Доставлен","declined":"🔴 Отклонён"}
+    st_map = {"pending":"🟡 Ожидает","approved":"🟢 Принят","delivered":"✅ Доставлен","declined":"🔴 Отклонён","cancelled":"🚫 Отменён клиентом"}
     ts     = o.get("timestamp","")[:16].replace("T"," ")
     st     = st_map.get(o.get("status",""), o.get("status",""))
     lines  = [f"📦 *Заказ #{o['order_id']}*  |  {st}", f"🕐 {ts}  |  🏢 {o.get('office_name','—')}", ""]
@@ -226,7 +226,7 @@ async def run_countdown(cid, eta_min, lang, oid=None):
             if rem <= 0: break
             if oid:
                 o = await db.get_order(oid)
-                if (o or {}).get("status") == "delivered":
+                if (o or {}).get("status") in ("delivered", "cancelled"):
                     return
             try:
                 await app.bot.edit_message_text(
@@ -236,7 +236,7 @@ async def run_countdown(cid, eta_min, lang, oid=None):
 
     if oid:
         order = await db.get_order(oid)
-        if not order or order.get("status") == "delivered":
+        if not order or order.get("status") in ("delivered", "cancelled"):
             return
         await db.update_order(oid, status="delivered", updated_at=datetime.now().isoformat())
     await cleanup_and_deliver(cid, oid, lang)
@@ -284,7 +284,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text(order_card(o), parse_mode="Markdown", reply_markup=kb_order_actions(o))
 
     elif "Завершённые" in text:
-        items = sorted([o for o in all_orders.values() if o.get("status") in ("delivered","declined")],
+        items = sorted([o for o in all_orders.values() if o.get("status") in ("delivered","declined","cancelled")],
                        key=lambda x: x.get("timestamp",""), reverse=True)
         if not items:
             await update.message.reply_text("Нет завершённых.", reply_markup=kb_main()); return
@@ -361,6 +361,12 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # ── ACCEPT → show ETA ────────────────────────────────────────────────────
     if data.startswith("acc_"):
         _, oid, cid = data.split("_", 2)
+        order = await db.get_order(oid)
+        if order and order.get("status") == "cancelled":
+            await q.answer("🚫 Заказ отменён клиентом", show_alert=True)
+            try: await q.edit_message_reply_markup(reply_markup=None)
+            except: pass
+            return
         await q.edit_message_reply_markup(reply_markup=kb_eta(oid, cid))
 
     # ── ETA selected ─────────────────────────────────────────────────────────
@@ -392,6 +398,12 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # ── DECLINE ───────────────────────────────────────────────────────────────
     elif data.startswith("dec_"):
         _, oid, cid = data.split("_", 2); cid = int(cid)
+        order_chk = await db.get_order(oid)
+        if order_chk and order_chk.get("status") == "cancelled":
+            await q.answer("🚫 Заказ уже отменён клиентом", show_alert=True)
+            try: await q.edit_message_reply_markup(reply_markup=None)
+            except: pass
+            return
         await db.update_order(oid, status="declined", updated_at=datetime.now().isoformat())
         await db._increment_user(cid, orders_declined=1)
         order = await db.get_order(oid)

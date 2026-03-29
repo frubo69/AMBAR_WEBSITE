@@ -531,6 +531,29 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .aob-dot-active{background:#d4af37!important;transform:scale(1.3)}
 .aod-support-btn{width:100%;padding:14px;background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.3);border-radius:14px;color:#d4af37;font-size:15px;font-weight:600;cursor:pointer;transition:background .2s}
 .aod-support-btn:active{background:rgba(212,175,55,.22)}
+.aod-cancel-btn{width:100%;padding:13px;background:rgba(224,85,85,.07);border:1px solid rgba(224,85,85,.22);border-radius:14px;color:var(--red);font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.15s;display:flex;align-items:center;justify-content:center;gap:7px}
+.aod-cancel-btn:active{background:rgba(224,85,85,.16)}
+/* ── Cancel sheet ── */
+.cancel-ov{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:800;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .22s;backdrop-filter:blur(5px);-webkit-backdrop-filter:blur(5px)}
+.cancel-ov.open{opacity:1;pointer-events:all}
+.cancel-sheet{width:100%;background:var(--bg2);border-radius:24px 24px 0 0;padding:0 20px calc(32px + var(--safe-bottom));transform:translateY(60px);transition:transform .28s cubic-bezier(.34,1,.64,1);max-height:88vh;overflow-y:auto}
+.cancel-ov.open .cancel-sheet{transform:translateY(0)}
+.cancel-handle{width:36px;height:4px;background:rgba(255,255,255,.1);border-radius:2px;margin:14px auto 20px}
+.cancel-ttl{font-size:18px;font-weight:700;color:var(--text);margin-bottom:4px}
+.cancel-sub{font-size:13px;color:var(--sub);margin-bottom:18px}
+.cancel-reasons{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
+.cancel-reason{width:100%;padding:13px 16px;background:var(--card);border:1.5px solid var(--border2);border-radius:12px;color:var(--text);font-size:14px;font-weight:500;text-align:left;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.15s;-webkit-tap-highlight-color:transparent}
+.cancel-reason.selected{border-color:rgba(224,85,85,.7);background:rgba(224,85,85,.08);color:var(--red)}
+.cancel-reason:active{opacity:.75}
+.cancel-comment-lbl{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:8px}
+.cancel-comment-inp{width:100%;background:var(--card);border:1.5px solid var(--border2);border-radius:12px;padding:12px 14px;color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;resize:none;min-height:76px;margin-bottom:18px;transition:.15s;outline:none;display:block}
+.cancel-comment-inp:focus{border-color:rgba(224,85,85,.35)}
+.cancel-comment-inp::placeholder{color:var(--muted)}
+.cancel-do-btn{width:100%;padding:15px;background:linear-gradient(135deg,#b82e2e,#E05555);border:none;border-radius:14px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.15s;margin-bottom:10px;opacity:.4;pointer-events:none}
+.cancel-do-btn.ready{opacity:1;pointer-events:all}
+.cancel-do-btn.ready:active{opacity:.85;transform:scale(.98)}
+.cancel-back-btn{width:100%;padding:13px;background:transparent;border:1.5px solid var(--border2);border-radius:14px;color:var(--sub);font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.15s}
+.cancel-back-btn:active{background:var(--card)}
 /* Refresh spin */
 @keyframes spin{to{transform:rotate(360deg)}}
 .spinning{animation:spin .65s linear infinite!important;opacity:.7}
@@ -1524,6 +1547,26 @@ body.aob-on #pg-cart{overflow-y:auto!important}
         <span id="aod-support-lbl">Написать в поддержку</span>
       </button>
     </div>
+    <div style="padding:6px 20px 12px" id="aod-cancel-wrap">
+      <button class="aod-cancel-btn" onclick="openCancelSheet()">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="15" height="15"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        <span id="aod-cancel-lbl">Отменить заказ</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Cancel order sheet ── -->
+<div class="cancel-ov" id="cancel-ov" onclick="if(event.target===this)closeCancelSheet()">
+  <div class="cancel-sheet">
+    <div class="cancel-handle"></div>
+    <div class="cancel-ttl" id="cancel-ttl">Отменить заказ</div>
+    <div class="cancel-sub" id="cancel-sub">Выберите причину отмены</div>
+    <div class="cancel-reasons" id="cancel-reasons"></div>
+    <div class="cancel-comment-lbl" id="cancel-comment-lbl">КОММЕНТАРИЙ</div>
+    <textarea class="cancel-comment-inp" id="cancel-comment" rows="3"></textarea>
+    <button class="cancel-do-btn" id="cancel-do-btn" onclick="confirmCancelOrder()"><span id="cancel-do-txt">Подтвердить отмену</span></button>
+    <button class="cancel-back-btn" onclick="closeCancelSheet()"><span id="cancel-back-txt">Назад</span></button>
   </div>
 </div>
 
@@ -4844,6 +4887,11 @@ function _renderAodDetail(){
   el('aod-items').innerHTML=(items||[]).map(i=>`<div class="aod-row"><span class="aod-row-name">${i.name} ×${i.qty}</span><span class="aod-row-price">${i.line_total||(i.price*i.qty)} AED</span></div>`).join('');
   el('aod-addr').textContent=address||'—';
   el('aod-total-val').textContent=total+' AED';
+  // Cancel button — only when still pending (operator hasn't accepted yet)
+  const cw=el('aod-cancel-wrap');
+  if(cw)cw.style.display=status==='pending'?'':'none';
+  el('aod-cancel-lbl').textContent=ru?'Отменить заказ':'Cancel Order';
+  el('aod-support-lbl').textContent=ru?'Написать в поддержку':'Contact Support';
 }
 
 function openAod(){
@@ -4851,6 +4899,81 @@ function openAod(){
   haptic.light();
   _renderAodDetail();
   el('aod-ov').classList.add('open');
+}
+
+// ── Cancel order ──────────────────────────────────────────────────────────────
+let _cancelReason='';
+const _cancelReasons={
+  ru:['🤔 Изменил(а) мнение','✍️ Заказал(а) ошибочно','⏱ Слишком долго ждать','📍 Неверный адрес','💬 Другое'],
+  en:['🤔 Changed my mind','✍️ Ordered by mistake','⏱ Taking too long','📍 Wrong address','💬 Other']
+};
+
+function openCancelSheet(){
+  const ru=lang==='ru';
+  _cancelReason='';
+  const reasons=_cancelReasons[ru?'ru':'en'];
+  el('cancel-reasons').innerHTML=reasons.map((r,i)=>
+    `<button class="cancel-reason" data-idx="${i}" onclick="selectCancelReason(this)">${r}</button>`
+  ).join('');
+  el('cancel-comment').value='';
+  el('cancel-comment').placeholder=ru?'Комментарий (необязательно)':'Comment (optional)';
+  el('cancel-do-btn').classList.remove('ready');
+  el('cancel-ttl').textContent=ru?'Отменить заказ':'Cancel Order';
+  el('cancel-sub').textContent=ru?'Выберите причину отмены':'Select a cancellation reason';
+  el('cancel-comment-lbl').textContent=ru?'КОММЕНТАРИЙ':'COMMENT';
+  el('cancel-do-txt').textContent=ru?'Подтвердить отмену':'Confirm Cancellation';
+  el('cancel-back-txt').textContent=ru?'Назад':'Back';
+  closeAod();
+  el('cancel-ov').classList.add('open');
+}
+
+function closeCancelSheet(){
+  el('cancel-ov').classList.remove('open');
+}
+
+function selectCancelReason(btn){
+  const ru=lang==='ru';
+  const idx=parseInt(btn.dataset.idx);
+  _cancelReason=_cancelReasons[ru?'ru':'en'][idx];
+  document.querySelectorAll('.cancel-reason').forEach(b=>b.classList.remove('selected'));
+  btn.classList.add('selected');
+  el('cancel-do-btn').classList.add('ready');
+  haptic.light();
+}
+
+async function confirmCancelOrder(){
+  if(!_cancelReason)return;
+  const o=_aobOrders[_aobIdx];
+  if(!o)return;
+  const ru=lang==='ru';
+  const btn=el('cancel-do-btn');
+  btn.disabled=true;btn.style.opacity='0.55';
+  const comment=(el('cancel-comment').value||'').trim();
+  try{
+    const resp=await fetch(`${AMBAR_API}/api/cancel-order`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({initData:tg?.initData||'',order_id:o.order_id,reason:_cancelReason,comment})
+    });
+    const d=await resp.json();
+    if(resp.ok&&d.ok){
+      closeCancelSheet();
+      haptic.medium();
+      addNotification('x',ru?'Заказ отменён':'Order Cancelled',
+        (ru?'Заказ ':'Order ')+'#'+o.order_id+(ru?' успешно отменён':' successfully cancelled'),
+        {dedup_key:'cancel_'+o.order_id});
+      showToast(ru?'Заказ отменён':'Order cancelled','ok');
+    } else if(d.error==='not_cancellable'){
+      closeCancelSheet();
+      showToast(ru?'Заказ уже подтверждён — напишите в поддержку':'Order confirmed — contact support','err');
+    } else {
+      throw new Error(d.error||'unknown');
+    }
+  }catch(e){
+    showToast(lang==='ru'?'Ошибка — попробуйте ещё раз':'Error — try again','err');
+  }finally{
+    btn.disabled=false;btn.style.opacity='';
+  }
 }
 function closeAod(){
   const sheet=el('aod-ov').querySelector('.aod-sheet');

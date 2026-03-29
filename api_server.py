@@ -230,6 +230,65 @@ async def handle_create_order(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "order_id": oid}, headers=CORS_HEADERS)
 
 
+# ── POST /api/cancel-order ────────────────────────────────────────────────────
+async def handle_cancel_order(request: web.Request) -> web.Response:
+    if request.method == "OPTIONS":
+        return web.Response(status=200, headers=CORS_HEADERS)
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid json"}, status=400, headers=CORS_HEADERS)
+
+    user = validate_init_data(data.get("initData", ""))
+    if not user:
+        return web.json_response({"error": "auth failed"}, status=401, headers=CORS_HEADERS)
+
+    uid      = user.get("id")
+    order_id = data.get("order_id", "").strip()
+    reason   = data.get("reason", "").strip()
+    comment  = data.get("comment", "").strip()
+
+    if not order_id:
+        return web.json_response({"error": "missing order_id"}, status=400, headers=CORS_HEADERS)
+
+    order = await db.get_order(order_id)
+    if not order:
+        return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
+
+    # Ownership check (handle int vs str customer_id)
+    if str(order.get("customer_id")) != str(uid):
+        return web.json_response({"error": "forbidden"}, status=403, headers=CORS_HEADERS)
+
+    status = order.get("status", "")
+    if status != "pending":
+        return web.json_response({"error": "not_cancellable", "status": status}, status=409, headers=CORS_HEADERS)
+
+    await db.update_order(order_id,
+        status="cancelled",
+        cancel_reason=reason,
+        cancel_comment=comment,
+        cancelled_at=datetime.now(timezone.utc).isoformat(),
+    )
+
+    # Notify operators
+    user_name = order.get("customer_name", "—")
+    username  = order.get("username", "—")
+    op_text = (
+        f"🚫 *ЗАКАЗ #{order_id} ОТМЕНЁН КЛИЕНТОМ*\n\n"
+        f"👤 *{user_name}* (@{username}, ID: `{uid}`)\n\n"
+        f"📋 *Причина:* {reason or '—'}"
+        + (f"\n💬 *Комментарий:* {comment}" if comment else "")
+    )
+    for op_id in OPERATOR_IDS:
+        try:
+            await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text)
+        except Exception as e:
+            log.error(f"Operator cancel notify {op_id}: {e}")
+
+    log.info(f"[cancel-order] #{order_id} user={uid} reason={reason!r}")
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+
 # ── GET /api/me ───────────────────────────────────────────────────────────────
 async def handle_me(request: web.Request) -> web.Response:
     """Returns ban status. Accepts ?uid=<telegram_id> — no auth needed (info is not sensitive)."""
@@ -486,6 +545,8 @@ def main():
     app.router.add_get(            "/api/orders",              handle_orders)
     app.router.add_route("OPTIONS", "/api/order",              handle_create_order)
     app.router.add_post(           "/api/order",               handle_create_order)
+    app.router.add_route("OPTIONS", "/api/cancel-order",       handle_cancel_order)
+    app.router.add_post(           "/api/cancel-order",        handle_cancel_order)
     app.router.add_route("OPTIONS", "/api/support/send",       handle_support_send)
     app.router.add_post(           "/api/support/send",        handle_support_send)
     app.router.add_route("OPTIONS", "/api/support/send-image", handle_support_send_image)

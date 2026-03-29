@@ -3875,7 +3875,15 @@ async function syncOrders(spin=false){
     // Keep any local orders not yet visible in the API (just placed, in-flight)
     // Also keep delivered/declined local orders the API may no longer return
     const apiIds=new Set(fresh.map(o=>o.order_id));
-    const localOnly=orders.filter(o=>!apiIds.has(o.order_id)&&!cleared.has(o.order_id));
+    const now4h=Date.now()-4*3600*1000;
+    const localOnly=orders.filter(o=>{
+      if(apiIds.has(o.order_id)||cleared.has(o.order_id))return false;
+      // Drop stale pending/confirmed orders the server no longer knows about
+      // (covers deleted+re-registered users, DB migration orphans, etc.)
+      const isActive=o.status==='pending'||o.status==='confirmed';
+      if(isActive&&new Date(o.timestamp||0).getTime()<now4h)return false;
+      return true;
+    });
 
     orders=[...localOnly,...fresh];
     // Ensure delivered/declined orders that were only local aren't lost between syncs

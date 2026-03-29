@@ -110,7 +110,7 @@ img{display:block}
 .hdr-back:active{transform:scale(.85)}
 
 /* Address selector modal */
-.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:200;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .2s}
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:400;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .2s}
 .modal-overlay.show{opacity:1;pointer-events:all}
 .modal-sheet{width:100%;background:var(--bg2);border-radius:24px 24px 0 0;padding:0 0 calc(20px + var(--safe-bottom));max-height:75vh;overflow-y:auto;transform:translateY(60px);transition:transform .28s cubic-bezier(.34,1,.64,1)}
 .modal-overlay.show .modal-sheet{transform:translateY(0)}
@@ -459,6 +459,9 @@ img{display:block}
 /* ── Active Order Bar ─────────────────────────────────────────────────────── */
 .aob{position:fixed;bottom:calc(92px + var(--safe-bottom));left:10px;right:10px;z-index:200;background:linear-gradient(135deg,#140d1f 0%,#0d1520 100%);border:1px solid rgba(212,175,55,.35);border-radius:16px;padding:10px 14px 12px;cursor:pointer;box-shadow:0 4px 28px rgba(0,0,0,.6),0 0 0 1px rgba(212,175,55,.08);transition:transform .35s cubic-bezier(.34,1,.64,1),opacity .3s ease}
 .aob.aob-hidden{transform:translateY(calc(100% + 80px));opacity:0;pointer-events:none}
+/* When active order bar is visible, push scrollable page content up so nothing hides behind it */
+body.aob-on .page{padding-bottom:90px}
+body.aob-on .grid{padding-bottom:8px} /* grid is inside .page, .page padding covers it */
 .aob-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
 .aob-left{display:flex;align-items:center;gap:8px}
 .aob-left-text{display:flex;flex-direction:column;gap:1px}
@@ -4341,7 +4344,7 @@ function openPDM(id){
   dismissToast();
   el('pdm-overlay').classList.add('show');
   document.body.style.overflow='hidden';
-  el('aob').classList.add('aob-hidden'); // hide order bar behind product card
+  el('aob').classList.add('aob-hidden');document.body.classList.remove('aob-on'); // hide order bar behind product card
   initPinchZoom();
   initPDMSwipe();
 }
@@ -4472,7 +4475,7 @@ function closePDMDirect(){
   if(sh){sh.style.transition='';sh.style.transform='';}
   if(ov){ov.style.transition='';ov.style.background='';}
   // Restore order bar if there's an active order
-  if(_aobOrders.length>0) el('aob').classList.remove('aob-hidden');
+  if(_aobOrders.length>0){el('aob').classList.remove('aob-hidden');document.body.classList.add('aob-on');}
   pdmId=null;
   _pdmPendingQty=1;
   _pdmImgZoomed=false;
@@ -4707,7 +4710,7 @@ async function checkActiveOrder(){
       _aobOrders=d.orders;
       if(_aobIdx>=_aobOrders.length)_aobIdx=0;
       _renderAob();
-      if(!el('pdm-overlay').classList.contains('show'))bar.classList.remove('aob-hidden');
+      if(!el('pdm-overlay').classList.contains('show')){bar.classList.remove('aob-hidden');document.body.classList.add('aob-on');}
       // Detect status changes and fire notifications
       const _ru=lang==='ru';
       d.orders.forEach(o=>{
@@ -4735,7 +4738,7 @@ async function checkActiveOrder(){
       }
       _aobStatusCache={};
       _aobOrders=[];
-      bar.classList.add('aob-hidden');
+      bar.classList.add('aob-hidden');document.body.classList.remove('aob-on');
     }
   }catch(e){}
 }

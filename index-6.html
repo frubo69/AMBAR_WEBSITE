@@ -709,16 +709,115 @@ img{display:block}
 </head>
 <body>
 
-<!-- ═══ BAN WALL — always in HTML, removed by JS if user is NOT banned ═══ -->
-<div id="ban-check-blocker" style="position:fixed;inset:0;z-index:99999;background:#07070E;display:flex;align-items:center;justify-content:center;">
-  <div id="ban-spinner" style="width:36px;height:36px;border:3px solid #333;border-top-color:#fff;border-radius:50%;animation:banspin .7s linear infinite;"></div>
+<!-- ═══ SPLASH / BAN WALL ═══ -->
+<div id="ban-check-blocker" style="position:fixed;inset:0;z-index:99999;background:#07070E;display:flex;align-items:center;justify-content:center;flex-direction:column;overflow:hidden;">
+
+  <!-- ── Animated intro ── -->
+  <div id="splash-anim" style="display:flex;flex-direction:column;align-items:center;justify-content:center;">
+    <!-- Pin + ripple rings + shadow -->
+    <div style="position:relative;width:220px;height:220px;display:flex;align-items:flex-end;justify-content:center;flex-shrink:0;">
+      <div class="sp-ring" style="animation-delay:.52s"></div>
+      <div class="sp-ring" style="animation-delay:.76s"></div>
+      <div class="sp-ring" style="animation-delay:1.00s"></div>
+      <div id="sp-shadow"></div>
+      <img id="sp-pin" src="pin.png" alt="">
+    </div>
+    <!-- Branding -->
+    <div id="sp-logo">AMBAR</div>
+    <div id="sp-sub">premium spirits</div>
+  </div>
+
+  <!-- ── Ban wall (hidden until ban confirmed) ── -->
   <div id="ban-wall-card" style="display:none;flex-direction:column;align-items:center;text-align:center;padding:28px;max-width:300px;width:100%;">
     <div style="font-size:64px;line-height:1;margin-bottom:20px;">🚫</div>
     <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:12px;">Аккаунт заблокирован</div>
     <div style="font-size:14px;color:#888;line-height:1.65;margin-bottom:28px;">Ваш аккаунт был заблокирован.<br>Свяжитесь с поддержкой для<br>решения вопроса.</div>
     <button id="ban-support-btn" style="width:100%;padding:15px;background:linear-gradient(135deg,#5865f2,#7289da);border:none;border-radius:14px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;">💬 Написать в поддержку</button>
   </div>
-  <style>@keyframes banspin{to{transform:rotate(360deg)}}</style>
+
+  <style>
+    /* ── Pin drop with cartoon squash-and-stretch ── */
+    #sp-pin{
+      width:116px;height:auto;
+      position:relative;z-index:2;
+      transform-origin:bottom center;
+      opacity:0;
+      animation:spPinDrop .95s ease forwards;
+    }
+    @keyframes spPinDrop{
+      0%  {opacity:0;transform:translateY(-240px) rotate(-14deg) scale(.65);}
+      6%  {opacity:1;}
+      52% {transform:translateY(22px) rotate(5deg) scale(1.02);}
+      62% {transform:translateY(0) scaleX(1.14) scaleY(.82) rotate(0deg);}  /* squash on impact */
+      72% {transform:translateY(-18px) scaleX(.93) scaleY(1.08);}           /* stretch up */
+      81% {transform:translateY(7px) scaleX(1.05) scaleY(.96);}             /* small squash */
+      89% {transform:translateY(-4px) scaleX(.99) scaleY(1.02);}            /* tiny bounce */
+      95% {transform:translateY(1px) scale(1.003);}
+      100%{transform:translateY(0) scale(1) rotate(0deg);}
+    }
+
+    /* ── Elliptical ground shadow ── */
+    #sp-shadow{
+      position:absolute;bottom:2px;left:50%;
+      width:72px;height:16px;border-radius:50%;
+      background:radial-gradient(ellipse,rgba(201,169,110,.38) 0%,transparent 70%);
+      transform:translateX(-50%) scaleX(0);opacity:0;
+      animation:spShadow .95s ease forwards;
+    }
+    @keyframes spShadow{
+      0%  {transform:translateX(-50%) scaleX(0);opacity:0;}
+      52% {transform:translateX(-50%) scaleX(.55);opacity:.55;}
+      62% {transform:translateX(-50%) scaleX(1.35);opacity:.8;}
+      100%{transform:translateX(-50%) scaleX(1);opacity:1;}
+    }
+
+    /* ── Gold ripple rings ── */
+    .sp-ring{
+      position:absolute;bottom:9px;left:50%;
+      width:64px;height:64px;border-radius:50%;
+      border:1.5px solid #C9A96E;
+      transform:translate(-50%,50%) scale(0);opacity:0;
+      animation:spRing 1.15s ease-out forwards;
+    }
+    @keyframes spRing{
+      0%  {transform:translate(-50%,50%) scale(.15);opacity:.95;}
+      100%{transform:translate(-50%,50%) scale(4.2);opacity:0;}
+    }
+
+    /* ── AMBAR logo ── */
+    #sp-logo{
+      font-family:'Cormorant Garamond',serif;
+      font-size:40px;font-weight:700;letter-spacing:11px;
+      background:linear-gradient(110deg,#C9A96E 0%,#F5E0B0 40%,#E8C98A 60%,#C9A96E 100%);
+      background-size:220% auto;
+      -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+      margin-top:22px;
+      opacity:0;transform:translateY(14px);
+      animation:spSlideUp .55s ease forwards 1.1s, spShimmer 2.8s linear infinite 1.7s;
+    }
+    @keyframes spSlideUp{to{opacity:1;transform:translateY(0);}}
+    @keyframes spShimmer{to{background-position:220% center;}}
+
+    /* ── Subtitle ── */
+    #sp-sub{
+      font-size:9px;letter-spacing:4.5px;text-transform:uppercase;
+      color:#54526A;margin-top:5px;
+      opacity:0;
+      animation:spSlideUp .45s ease forwards 1.42s;
+    }
+
+    /* ── Exit animation ── */
+    @keyframes spExit{
+      0%  {opacity:1;transform:scale(1);}
+      100%{opacity:0;transform:scale(1.07);}
+    }
+    #ban-check-blocker.sp-exiting{
+      animation:spExit .6s cubic-bezier(.4,0,1,1) forwards;
+      pointer-events:none;
+    }
+
+    @keyframes banspin{to{transform:rotate(360deg)}}
+  </style>
 </div>
 
 <!-- ═══ CATALOG ═══ -->
@@ -1658,22 +1757,31 @@ function alignLogoSubs(){
 // We only REMOVE it if the user is confirmed not-banned.
 
 function _showBanWall(){
-  // Switch spinner → ban card (stays forever, can't be dismissed)
+  // Switch splash anim → ban card (stays forever, can't be dismissed)
   const blocker=document.getElementById('ban-check-blocker');
-  const spinner=document.getElementById('ban-spinner');
+  const anim   =document.getElementById('splash-anim');
   const card   =document.getElementById('ban-wall-card');
-  if(spinner) spinner.style.display='none';
+  if(anim)    anim.style.display='none';
   if(card)    {card.style.display='flex';}
-  if(blocker) {blocker.style.backdropFilter='blur(14px)';blocker.style.webkitBackdropFilter='blur(14px)';blocker.style.background='rgba(7,7,14,0.85)';}
+  if(blocker) {blocker.style.backdropFilter='blur(14px)';blocker.style.webkitBackdropFilter='blur(14px)';blocker.style.background='rgba(7,7,14,0.97)';}
   document.getElementById('ban-support-btn')?.addEventListener('click',()=>{
     if(tg&&tg.openTelegramLink) tg.openTelegramLink('https://t.me/ambar_support_bot');
     else window.open('https://t.me/ambar_support_bot','_blank');
   });
 }
 
+// Splash minimum-time gate: both the ban check AND the 2.8s timer must complete before exit
+let _splashBanOK=false,_splashTimeOK=false;
 function _hideBanBlocker(){
+  _splashBanOK=true;
+  _trySplashExit();
+}
+function _trySplashExit(){
+  if(!_splashBanOK||!_splashTimeOK)return;
   const b=document.getElementById('ban-check-blocker');
-  if(b) b.remove();
+  if(!b)return;
+  b.classList.add('sp-exiting');
+  setTimeout(()=>b.remove(),650);
 }
 
 async function checkBanStatus(){
@@ -1693,6 +1801,7 @@ async function checkBanStatus(){
 window.addEventListener('DOMContentLoaded',()=>{
   if(tg){tg.ready();tg.expand();if(tg.isVersionAtLeast&&tg.isVersionAtLeast('8.0')&&tg.requestFullscreen)tg.requestFullscreen();tg.setHeaderColor&&tg.setHeaderColor('#07070E');tg.setBackgroundColor&&tg.setBackgroundColor('#07070E');tg.enableClosingConfirmation&&tg.enableClosingConfirmation();tg.disableVerticalSwipes&&tg.disableVerticalSwipes();}
   checkBanStatus(); // 🔒 Check ban first — halts UI if banned
+  setTimeout(()=>{_splashTimeOK=true;_trySplashExit();},2800); // ⏱ Minimum splash display time
   startOrderPolling(); // 📦 Start active order bar polling
   // Restore active address index
   const saved=localStorage.getItem('ambar_active_addr');

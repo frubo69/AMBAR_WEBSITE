@@ -461,7 +461,9 @@ img{display:block}
 .aob.aob-hidden{transform:translateY(calc(100% + 80px));opacity:0;pointer-events:none}
 /* When active order bar is visible, push scrollable page content up so nothing hides behind it */
 body.aob-on .page{padding-bottom:90px}
-body.aob-on .grid{padding-bottom:8px} /* grid is inside .page, .page padding covers it */
+/* Cart: shrink item list to ~2 items and let the whole page scroll */
+body.aob-on #cart-list{max-height:150px}
+body.aob-on #pg-cart{overflow-y:auto!important}
 .aob-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
 .aob-left{display:flex;align-items:center;gap:8px}
 .aob-left-text{display:flex;flex-direction:column;gap:1px}

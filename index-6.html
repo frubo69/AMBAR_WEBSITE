@@ -1166,12 +1166,27 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     </div>
   </div>
 
-  <!-- HUB GROUP 3 — Insights -->
+  <!-- HUB GROUP 3 — Perks & Quick Actions -->
   <div class="prof-hub-section">
-    <div class="prof-hub-row" onclick="openStatsSheet()">
-      <div class="phub-icon"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
-      <div class="phub-text"><div class="phub-title" id="phub-t-stats">My Stats</div><div class="phub-sub" id="phub-s-stats">Spending & insights</div></div>
+    <div class="prof-hub-row" onclick="openVipSheet()">
+      <div class="phub-icon" id="phub-vip-icon"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+      <div class="phub-text"><div class="phub-title" id="phub-t-vip">VIP Status</div><div class="phub-sub" id="phub-s-vip">Bronze member</div></div>
+      <div class="phub-right"><span class="phub-badge" id="phub-v-vip">BRONZE</span><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+    <div class="prof-hub-row" onclick="quickReorder()">
+      <div class="phub-icon"><svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg></div>
+      <div class="phub-text"><div class="phub-title" id="phub-t-reorder">Quick Reorder</div><div class="phub-sub" id="phub-s-reorder">Repeat your last order</div></div>
       <div class="phub-right"><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+    <div class="prof-hub-row" onclick="openDeliveryNoteSheet()">
+      <div class="phub-icon"><svg viewBox="0 0 24 24"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div>
+      <div class="phub-text"><div class="phub-title" id="phub-t-dnote">Delivery Note</div><div class="phub-sub" id="phub-s-dnote">Gate code, instructions…</div></div>
+      <div class="phub-right"><span class="phub-val" id="phub-v-dnote" style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px"></span><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+    <div class="prof-hub-row" onclick="openBudgetSheet()">
+      <div class="phub-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
+      <div class="phub-text"><div class="phub-title" id="phub-t-budget">Monthly Budget</div><div class="phub-sub" id="phub-s-budget">Track your spending limit</div></div>
+      <div class="phub-right"><span class="phub-val" id="phub-v-budget">—</span><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
     </div>
     <div class="prof-hub-row" onclick="shareInvite()">
       <div class="phub-icon"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></div>
@@ -1218,16 +1233,42 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div id="active-list" style="display:none"></div>
 </div>
 
-<!-- STATS SHEET -->
-<div class="cancel-ov" id="stats-ov" onclick="if(event.target===this)closeStatsSheet()" style="z-index:900">
-  <div class="cancel-sheet" style="max-height:85vh;overflow-y:auto">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)">MY STATS</div>
-      <button onclick="closeStatsSheet()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);color:var(--muted);display:flex;align-items:center;justify-content:center">
+<!-- VIP SHEET -->
+<div class="cancel-ov" id="vip-ov" onclick="if(event.target===this)closeVipSheet()" style="z-index:900">
+  <div class="cancel-sheet">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)" id="vip-sheet-title">VIP STATUS</div>
+      <button onclick="closeVipSheet()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);color:var(--muted);display:flex;align-items:center;justify-content:center">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
-    <div id="stats-content"></div>
+    <div id="vip-content"></div>
+  </div>
+</div>
+
+<!-- DELIVERY NOTE SHEET -->
+<div class="cancel-ov" id="dnote-ov" onclick="if(event.target===this)closeDeliveryNoteSheet()" style="z-index:900">
+  <div class="cancel-sheet">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)" id="dnote-title">DELIVERY NOTE</div>
+      <button onclick="closeDeliveryNoteSheet()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);color:var(--muted);display:flex;align-items:center;justify-content:center">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="dnote-content"></div>
+  </div>
+</div>
+
+<!-- BUDGET SHEET -->
+<div class="cancel-ov" id="budget-ov" onclick="if(event.target===this)closeBudgetSheet()" style="z-index:900">
+  <div class="cancel-sheet">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)" id="budget-title">MONTHLY BUDGET</div>
+      <button onclick="closeBudgetSheet()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);color:var(--muted);display:flex;align-items:center;justify-content:center">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="budget-content"></div>
   </div>
 </div>
 
@@ -1310,7 +1351,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
     <span id="nbl-ord">История</span>
   </button>
-  <button class="nb" id="nb-profile" onclick="go('profile');buildProfile()">
+  <button class="nb" id="nb-profile" onclick="go('profile')">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
     <span id="nbl-prof">Профиль</span>
   </button>
@@ -3993,7 +4034,8 @@ function placeOrder(){
   const sub=cartSub(),total=sub+tip,oid='AMB'+Date.now().toString().slice(-7);
   const payload={
     action:'order',order_id:oid,items,subtotal:sub,tip,total,currency:'AED',
-    phone:'+'+digits,address:addr.address,address_label:addr.label,comment:addr.comment||'',
+    phone:'+'+digits,address:addr.address,address_label:addr.label,
+    comment:[addr.comment,localStorage.getItem('ambar_delivery_note')].filter(Boolean).join(' | ')||'',
     gmap_link:addr.gmap_link||'',is_gps:addr.isGps||false,
     location:{lat:addr.lat||0,lon:addr.lon||0},
     office_id:addr.office_id||'office_central',
@@ -4337,8 +4379,34 @@ function buildProfile(){
   if(wishCount){wishBadge.textContent=wishCount;wishBadge.style.display='';}else{wishBadge.style.display='none';}
   set('phub-t-usual',ru?'Как обычно':'The Usual');
   set('phub-s-usual',ru?'Топ ваших заказов':'Your top ordered items');
-  set('phub-t-stats',ru?'Моя статистика':'My Stats');
-  set('phub-s-stats',ru?'Траты и аналитика':'Spending & insights');
+  // VIP
+  const spentVal=orders.filter(o=>o.status==='delivered').reduce((s,o)=>s+o.total,0)+parseInt(localStorage.getItem('ambar_spent_total')||'0');
+  const vip=_getVipTier(spentVal);
+  set('phub-t-vip',ru?'VIP Статус':'VIP Status');
+  set('phub-s-vip',ru?`${ru?vip.labelRu:vip.label} · ${spentVal} AED потрачено`:`${vip.label} · ${spentVal} AED spent`);
+  const vipBadge=el('phub-v-vip');if(vipBadge){vipBadge.textContent=ru?vip.labelRu:vip.label;vipBadge.style.color=vip.color;vipBadge.style.background=vip.color+'22';}
+  const vipIcon=el('phub-vip-icon');if(vipIcon)vipIcon.style.background=vip.color+'22';
+  // Quick reorder
+  set('phub-t-reorder',ru?'Быстрый повтор':'Quick Reorder');
+  set('phub-s-reorder',ru?'Повторить последний заказ':'Repeat your last order');
+  // Delivery note
+  set('phub-t-dnote',ru?'Записка курьеру':'Delivery Note');
+  set('phub-s-dnote',ru?'Код ворот, инструкции…':'Gate code, instructions…');
+  const dnote=localStorage.getItem('ambar_delivery_note')||'';
+  set('phub-v-dnote',dnote||(ru?'Не задана':'Not set'));
+  // Budget
+  set('phub-t-budget',ru?'Мой бюджет':'Monthly Budget');
+  const bud=parseInt(localStorage.getItem('ambar_monthly_budget')||'0');
+  if(bud){
+    const nowB=new Date();
+    const spentM=orders.filter(o=>{const d=new Date(o.timestamp);return d.getMonth()===nowB.getMonth()&&d.getFullYear()===nowB.getFullYear()&&o.status!=='cancelled'&&o.status!=='declined';}).reduce((s,o)=>s+o.total,0);
+    const over=spentM>bud;
+    set('phub-s-budget',over?(ru?`⚠️ Превышен на ${spentM-bud} AED`:`⚠️ Over by ${spentM-bud} AED`):(ru?`${spentM} / ${bud} AED`:`${spentM} / ${bud} AED`));
+    set('phub-v-budget',bud+' AED');
+  } else {
+    set('phub-s-budget',ru?'Контролируйте траты':'Track your spending limit');
+    set('phub-v-budget','—');
+  }
   set('phub-t-invite',ru?'Пригласить друга':'Invite a Friend');
   set('phub-s-invite',ru?'Поделиться AMBAR':'Share AMBAR');
   set('phub-t-notif',ru?'Уведомления':'Notifications');
@@ -4432,36 +4500,134 @@ function addWishlistToCart(){
 function _openSheet(id){const ov=el(id);ov.style.display='flex';ov.offsetHeight;ov.classList.add('open');}
 function _closeSheet(id){const ov=el(id);ov.classList.remove('open');setTimeout(()=>{if(!ov.classList.contains('open'))ov.style.display='none';},240);}
 
-function openStatsSheet(){
+// VIP tiers: Bronze 0-999 · Silver 1000-4999 · Gold 5000-14999 · Platinum 15000+
+const _vipTiers=[
+  {key:'bronze', min:0,   max:999,   next:1000,  color:'#cd7f32', label:'BRONZE',   labelRu:'БРОНЗА'},
+  {key:'silver', min:1000,max:4999,  next:5000,  color:'#c0c0c0', label:'SILVER',   labelRu:'СЕРЕБРО'},
+  {key:'gold',   min:5000,max:14999, next:15000, color:'#c9a96e', label:'GOLD',     labelRu:'ЗОЛОТО'},
+  {key:'plat',   min:15000,max:Infinity,next:null,color:'#e5e4e2',label:'PLATINUM', labelRu:'ПЛАТИНА'},
+];
+function _getVipTier(spent){return _vipTiers.find(t=>spent>=t.min&&spent<=t.max)||_vipTiers[0];}
+
+function openVipSheet(){
   const ru=lang==='ru';
-  const delivered=orders.filter(o=>o.status==='delivered');
-  const total=delivered.reduce((s,o)=>s+o.total,0)+parseInt(localStorage.getItem('ambar_spent_total')||'0');
-  const avg=delivered.length?Math.round(total/delivered.length):0;
-  const now=new Date();const m=now.getMonth(),y=now.getFullYear();
-  const thisMonth=orders.filter(o=>{const d=new Date(o.timestamp);return d.getMonth()===m&&d.getFullYear()===y;}).length;
-  // favorite category
-  const catCounts={};
-  orders.forEach(o=>(o.items||[]).forEach(i=>{
-    const p=P.find(x=>x.id===i.id);if(!p)return;
-    const c=p.cat||'Other';catCounts[c]=(catCounts[c]||0)+i.qty;
-  }));
-  const topCat=Object.entries(catCounts).sort((a,b)=>b[1]-a[1])[0];
-  const statRow=(icon,label,value)=>`
-    <div style="display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid rgba(255,255,255,.055)">
-      <div class="phub-icon">${icon}</div>
-      <div style="flex:1;font-size:13px;color:var(--muted)">${label}</div>
-      <div style="font-size:16px;font-weight:700;color:var(--gold2)">${value}</div>
-    </div>`;
-  el('stats-content').innerHTML=`
-    ${statRow(`<svg viewBox="0 0 24 24" fill="none" stroke="var(--gold2)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`,ru?'Всего заказов':'Total orders',orders.length)}
-    ${statRow(`<svg viewBox="0 0 24 24" fill="none" stroke="var(--gold2)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,ru?'Потрачено всего':'Total spent',total+' AED')}
-    ${statRow(`<svg viewBox="0 0 24 24" fill="none" stroke="var(--gold2)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,ru?'Средний заказ':'Avg order',avg+' AED')}
-    ${statRow(`<svg viewBox="0 0 24 24" fill="none" stroke="var(--gold2)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,ru?'В этом месяце':'This month',thisMonth)}
-    ${topCat?statRow(`<svg viewBox="0 0 24 24" fill="none" stroke="var(--gold2)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,ru?'Любимая категория':'Fav category',topCat[0]):''}
+  const spent=orders.filter(o=>o.status==='delivered').reduce((s,o)=>s+o.total,0)+parseInt(localStorage.getItem('ambar_spent_total')||'0');
+  const tier=_getVipTier(spent);
+  const nextTier=_vipTiers[_vipTiers.indexOf(tier)+1];
+  const progress=tier.next?Math.min(100,Math.round(((spent-tier.min)/(tier.next-tier.min))*100)):100;
+  const perks={
+    bronze:ru?['Доступ к каталогу','Поддержка 24/7']:['Access to full catalogue','24/7 support'],
+    silver:ru?['Всё из Bronze','Приоритетная поддержка','Ранний доступ к новинкам']:['Everything in Bronze','Priority support','Early access to new arrivals'],
+    gold:ru?['Всё из Silver','Персональный менеджер','Бесплатная экспресс-доставка']:['Everything in Silver','Dedicated manager','Free express delivery'],
+    plat:ru?['Всё из Gold','Консьерж-сервис','Эксклюзивные предложения','VIP мероприятия']:['Everything in Gold','Concierge service','Exclusive offers','VIP events'],
+  };
+  el('vip-content').innerHTML=`
+    <div style="text-align:center;padding:8px 0 22px">
+      <div style="font-size:48px;line-height:1;margin-bottom:10px">
+        ${tier.key==='plat'?'💎':tier.key==='gold'?'🏆':tier.key==='silver'?'🥈':'🥉'}
+      </div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;color:${tier.color};letter-spacing:3px">${ru?tier.labelRu:tier.label}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:4px">${spent} AED ${ru?'потрачено':'spent'}</div>
+    </div>
+    ${tier.next?`
+    <div style="margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:8px">
+        <span>${ru?`До ${nextTier?ru?nextTier.labelRu:nextTier.label:''}`:`To ${nextTier?nextTier.label:''}`}</span>
+        <span>${tier.next-spent} AED ${ru?'осталось':'to go'}</span>
+      </div>
+      <div style="height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${progress}%;background:${tier.color};border-radius:3px;transition:width .6s cubic-bezier(.4,0,.2,1)"></div>
+      </div>
+    </div>`:'<div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:20px">'+(ru?'Вы на максимальном уровне':'You\'ve reached the top tier')+'</div>'}
+    <div style="border-top:1px solid rgba(255,255,255,.07);padding-top:16px">
+      <div style="font-size:10px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:12px">${ru?'Ваши привилегии':'Your perks'}</div>
+      ${(perks[tier.key]||[]).map(p=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;font-size:13px;color:var(--text)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${tier.color}" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>${p}</div>`).join('')}
+    </div>
     <div style="height:8px"></div>`;
-  _openSheet('stats-ov');
+  _openSheet('vip-ov');
 }
-function closeStatsSheet(){_closeSheet('stats-ov');}
+function closeVipSheet(){_closeSheet('vip-ov');}
+
+function quickReorder(){
+  const last=orders.filter(o=>o.items?.length).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp))[0];
+  if(!last){haptic.error();showToast(lang==='ru'?'Нет прошлых заказов':'No past orders','err');return;}
+  let added=0;
+  (last.items||[]).forEach(i=>{const p=P.find(x=>x.id===i.id);if(p&&p.stock){cart[p.id]=(cart[p.id]||0)+i.qty;added++;}});
+  if(!added){haptic.error();showToast(lang==='ru'?'Товары недоступны':'Items unavailable','err');return;}
+  saveCart();updateCartUI();haptic.success();
+  showToast(lang==='ru'?`Заказ #${last.order_id} добавлен в корзину`:`Order #${last.order_id} added to cart`,'ok');
+  setTimeout(()=>go('cart'),600);
+}
+
+function openDeliveryNoteSheet(){
+  const ru=lang==='ru';
+  const saved=localStorage.getItem('ambar_delivery_note')||'';
+  el('dnote-title').textContent=ru?'ЗАПИСКА КУРЬЕРУ':'DELIVERY NOTE';
+  el('dnote-content').innerHTML=`
+    <div style="font-size:13px;color:var(--muted);margin-bottom:12px">${ru?'Эта заметка будет автоматически прикреплена к каждому заказу.':'This note is automatically attached to every order.'}</div>
+    <textarea id="dnote-input" rows="4" placeholder="${ru?'Например: код ворот 1234, позвоните когда будете рядом…':'E.g. gate code 1234, call when nearby…'}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:12px 14px;font-size:14px;color:var(--text);font-family:inherit;resize:none;line-height:1.5;box-sizing:border-box">${saved}</textarea>
+    <button onclick="_saveDnote()" style="width:100%;margin-top:12px;padding:14px;background:linear-gradient(135deg,var(--gold),var(--gold2));border-radius:14px;font-size:14px;font-weight:700;color:#07070E;font-family:'DM Sans',sans-serif;letter-spacing:.3px;transition:.15s" onpointerdown="this.style.opacity='.8'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">${ru?'Сохранить':'Save'}</button>
+    <div style="height:8px"></div>`;
+  _openSheet('dnote-ov');
+  setTimeout(()=>el('dnote-input')?.focus(),300);
+}
+function _saveDnote(){
+  const val=(el('dnote-input')?.value||'').trim();
+  localStorage.setItem('ambar_delivery_note',val);
+  closeDeliveryNoteSheet();
+  haptic.success();
+  showToast(lang==='ru'?'Сохранено':'Saved','ok');
+  buildProfile();
+}
+function closeDeliveryNoteSheet(){_closeSheet('dnote-ov');}
+
+function openBudgetSheet(){
+  const ru=lang==='ru';
+  const budget=parseInt(localStorage.getItem('ambar_monthly_budget')||'0');
+  const now=new Date();
+  const spent=orders.filter(o=>{const d=new Date(o.timestamp);return d.getMonth()===now.getMonth()&&d.getFullYear()===now.getFullYear()&&o.status!=='cancelled'&&o.status!=='declined';}).reduce((s,o)=>s+o.total,0);
+  const pct=budget?Math.min(100,Math.round((spent/budget)*100)):0;
+  const over=budget&&spent>budget;
+  el('budget-title').textContent=ru?'МОЙ БЮДЖЕТ':'MONTHLY BUDGET';
+  el('budget-content').innerHTML=`
+    ${budget?`
+    <div style="text-align:center;padding:8px 0 20px">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:6px">${ru?'Потрачено в этом месяце':'Spent this month'}</div>
+      <div style="font-size:36px;font-weight:700;color:${over?'#ff6b6b':'var(--gold2)'};">${spent} <span style="font-size:18px;font-weight:400">AED</span></div>
+      <div style="font-size:13px;color:var(--muted);margin-top:2px">${ru?'из':'of'} ${budget} AED</div>
+      <div style="height:8px;background:rgba(255,255,255,.08);border-radius:4px;overflow:hidden;margin:14px 0 6px">
+        <div style="height:100%;width:${pct}%;background:${over?'#ff5050':'var(--gold)'};border-radius:4px;transition:width .6s ease"></div>
+      </div>
+      <div style="font-size:12px;color:${over?'#ff6b6b':'var(--muted)'}">
+        ${over?(ru?`⚠️ Лимит превышен на ${spent-budget} AED`:`⚠️ Over budget by ${spent-budget} AED`):(ru?`Осталось ${budget-spent} AED`:`${budget-spent} AED remaining`)}
+      </div>
+    </div>`:''}
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px">${ru?'Установить месячный лимит расходов:':'Set your monthly spending limit:'}</div>
+    <div style="display:flex;gap:8px;margin-bottom:12px">
+      ${[500,1000,2000,5000].map(v=>`<button onclick="el('budget-input').value=${v}" style="flex:1;padding:10px 0;background:var(--bg3);border:1px solid var(--border2);border-radius:10px;font-size:12px;font-weight:600;color:var(--muted);transition:.15s" onpointerdown="this.style.opacity='.6'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">${v}</button>`).join('')}
+    </div>
+    <input id="budget-input" type="number" inputmode="numeric" placeholder="${ru?'Сумма в AED':'Amount in AED'}" value="${budget||''}" style="width:100%;background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:12px 14px;font-size:15px;color:var(--text);font-family:inherit;box-sizing:border-box;margin-bottom:12px">
+    <div style="display:flex;gap:8px">
+      ${budget?`<button onclick="_clearBudget()" style="flex:1;padding:13px;background:rgba(255,80,80,.08);border:1px solid rgba(255,80,80,.2);border-radius:14px;font-size:13px;font-weight:600;color:#ff6b6b;font-family:'DM Sans',sans-serif;transition:.15s" onpointerdown="this.style.opacity='.6'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">${ru?'Убрать':'Remove'}</button>`:''}
+      <button onclick="_saveBudget()" style="flex:2;padding:13px;background:linear-gradient(135deg,var(--gold),var(--gold2));border-radius:14px;font-size:14px;font-weight:700;color:#07070E;font-family:'DM Sans',sans-serif;letter-spacing:.3px;transition:.15s" onpointerdown="this.style.opacity='.8'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">${ru?'Сохранить':'Save'}</button>
+    </div>
+    <div style="height:8px"></div>`;
+  _openSheet('budget-ov');
+}
+function _saveBudget(){
+  const v=parseInt(el('budget-input')?.value||'0');
+  if(!v||v<1){haptic.error();showToast(lang==='ru'?'Введите сумму':'Enter an amount','err');return;}
+  localStorage.setItem('ambar_monthly_budget',v);
+  closeBudgetSheet();haptic.success();
+  showToast(lang==='ru'?'Бюджет установлен':'Budget set','ok');
+  buildProfile();
+}
+function _clearBudget(){
+  localStorage.removeItem('ambar_monthly_budget');
+  closeBudgetSheet();haptic.light();
+  buildProfile();
+}
+function closeBudgetSheet(){_closeSheet('budget-ov');}
 
 function openNotifsSheet(){
   const ru=lang==='ru';

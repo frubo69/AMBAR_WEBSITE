@@ -1209,7 +1209,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     </div>
   </div>
 
-  <!-- HUB GROUP 4 — Preferences -->
+  <!-- HUB GROUP 4 — Preferences & Support -->
   <div class="prof-hub-section">
     <div class="prof-hub-row" onclick="openNotifsSheet()">
       <div class="phub-icon"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
@@ -1221,15 +1221,15 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       <div class="phub-text"><div class="phub-title" id="phub-t-lang">Language</div><div class="phub-sub" id="phub-s-lang">App language</div></div>
       <div class="phub-right"><span class="phub-val" id="phub-v-lang">RU</span><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
     </div>
-  </div>
-
-  <!-- HUB GROUP 5 — Support & Info -->
-  <div class="prof-hub-section" style="margin-bottom:32px">
-    <div class="prof-hub-row" onclick="openSupportChat('')">
+    <div class="prof-hub-row" onclick="openSupportOptions()">
       <div class="phub-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
-      <div class="phub-text"><div class="phub-title" id="phub-t-support">Contact Support</div><div class="phub-sub" id="phub-s-support">We reply fast</div></div>
+      <div class="phub-text"><div class="phub-title" id="phub-t-support">Support</div><div class="phub-sub" id="phub-s-support">Call or message us</div></div>
       <div class="phub-right"><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
     </div>
+  </div>
+
+  <!-- HUB GROUP 5 — Info -->
+  <div class="prof-hub-section" style="margin-bottom:32px">
     <div class="prof-hub-row" onclick="openAboutSheet()">
       <div class="phub-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
       <div class="phub-text"><div class="phub-title" id="phub-t-about">About AMBAR</div><div class="phub-sub" id="phub-s-about">Version & info</div></div>
@@ -1245,6 +1245,42 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     <div class="prof-hscroll" id="wishlist-scroll-hidden"></div>
   </div>
   <div id="active-list" style="display:none"></div>
+</div>
+
+<!-- SUPPORT OPTIONS SHEET -->
+<div class="cancel-ov" id="support-options-ov" onclick="if(event.target===this)closeSupportOptions()" style="z-index:900">
+  <div class="cancel-sheet">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)" id="supp-opt-title">SUPPORT</div>
+      <button onclick="closeSupportOptions()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);color:var(--muted);display:flex;align-items:center;justify-content:center">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div style="display:flex;flex-direction:column;gap:10px;padding-bottom:8px">
+      <button onclick="closeSupportOptions();setTimeout(()=>{if(tg)tg.openLink('tel:+971501234567');else window.location.href='tel:+971501234567';},200)"
+        style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 18px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:16px;text-align:left;transition:.15s"
+        onpointerdown="this.style.background='rgba(255,255,255,.09)'" onpointerup="this.style.background='rgba(255,255,255,.05)'" onpointercancel="this.style.background='rgba(255,255,255,.05)'">
+        <div style="width:42px;height:42px;border-radius:12px;background:rgba(52,199,89,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#34c759" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.63 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.78a16 16 0 0 0 6 6l.94-1.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 15z"/></svg>
+        </div>
+        <div>
+          <div style="font-size:15px;font-weight:600;color:var(--text)" id="supp-call-lbl">Call</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px" id="supp-call-sub">+971 50 123 4567</div>
+        </div>
+      </button>
+      <button onclick="closeSupportOptions();setTimeout(()=>openSupportChat(''),200)"
+        style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 18px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:16px;text-align:left;transition:.15s"
+        onpointerdown="this.style.background='rgba(255,255,255,.09)'" onpointerup="this.style.background='rgba(255,255,255,.05)'" onpointercancel="this.style.background='rgba(255,255,255,.05)'">
+        <div style="width:42px;height:42px;border-radius:12px;background:rgba(201,169,110,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--gold2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        </div>
+        <div>
+          <div style="font-size:15px;font-weight:600;color:var(--text)" id="supp-msg-lbl">Send message</div>
+          <div style="font-size:12px;color:var(--muted);margin-top:2px" id="supp-msg-sub">Telegram chat</div>
+        </div>
+      </button>
+    </div>
+  </div>
 </div>
 
 <!-- VIP SHEET -->
@@ -4483,8 +4519,8 @@ function buildProfile(){
   set('phub-t-lang',ru?'Язык':'Language');
   set('phub-s-lang',ru?'Язык приложения':'App language');
   set('phub-v-lang',ru?'RU':'EN');
-  set('phub-t-support',ru?'Поддержка':'Contact Support');
-  set('phub-s-support',ru?'Отвечаем быстро':'We reply fast');
+  set('phub-t-support',ru?'Поддержка':'Support');
+  set('phub-s-support',ru?'Позвонить или написать':'Call or message us');
   set('phub-t-about',ru?'О AMBAR':'About AMBAR');
   set('phub-s-about',ru?'Версия и инфо':'Version & info');
 
@@ -4679,6 +4715,21 @@ function openVipSheet(){
   _openSheet('vip-ov');
 }
 function closeVipSheet(){_closeSheet('vip-ov');}
+
+// ── SUPPORT PHONE — change this number ───────────────────────────────────────
+const SUPPORT_PHONE='+971501234567';
+const SUPPORT_PHONE_DISPLAY='+971 50 123 4567';
+
+function openSupportOptions(){
+  const ru=lang==='ru';
+  set('supp-opt-title',ru?'ПОДДЕРЖКА':'SUPPORT');
+  set('supp-call-lbl',ru?'Позвонить':'Call');
+  set('supp-call-sub',SUPPORT_PHONE_DISPLAY);
+  set('supp-msg-lbl',ru?'Написать сообщение':'Send message');
+  set('supp-msg-sub','Telegram');
+  _openSheet('support-options-ov');
+}
+function closeSupportOptions(){_closeSheet('support-options-ov');}
 
 function quickReorder(){
   const last=orders.filter(o=>o.items?.length).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp))[0];

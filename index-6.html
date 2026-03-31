@@ -1726,6 +1726,16 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       <span class="aod-total-lbl" id="aod-total-lbl">Итого</span>
       <span class="aod-total-val" id="aod-total-val">—</span>
     </div>
+    <div id="aod-game-wrap" style="display:none;padding:0 20px 4px">
+      <button onclick="openGame()" style="width:100%;padding:14px;border-radius:14px;background:linear-gradient(135deg,rgba(212,175,55,.12),rgba(212,175,55,.06));border:1px solid rgba(212,175,55,.3);display:flex;align-items:center;gap:12px;cursor:pointer;transition:.15s" onpointerdown="this.style.opacity='.7'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">
+        <div style="width:36px;height:36px;border-radius:10px;background:rgba(212,175,55,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px">🏍️</div>
+        <div style="text-align:left">
+          <div style="font-size:13px;font-weight:700;color:#d4af37" id="aod-game-title">Играй пока ждёшь</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:1px" id="aod-game-sub">Рекорд: <span id="aod-game-best">0</span> AED</div>
+        </div>
+        <svg style="margin-left:auto;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="rgba(212,175,55,.5)" stroke-width="2.5" stroke-linecap="round" width="16" height="16"><polyline points="9 18 15 12 9 6"/></svg>
+      </button>
+    </div>
     <div style="padding:8px 20px 0">
       <button class="aod-support-btn" onclick="closeAod();openSupportChat(_aobOrders[_aobIdx]?.order_id||'')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" width="16" height="16" style="margin-right:8px;vertical-align:middle"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
@@ -1753,6 +1763,45 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     <button class="cancel-do-btn" id="cancel-do-btn" onclick="confirmCancelOrder()"><span id="cancel-do-txt">Подтвердить отмену</span></button>
     <button class="cancel-back-btn" onclick="closeCancelSheet()"><span id="cancel-back-txt">Назад</span></button>
   </div>
+</div>
+
+<!-- ── AMBAR Delivery Run game ── -->
+<div id="game-ov" style="position:fixed;inset:0;z-index:9500;background:#07070E;display:none;flex-direction:column;overflow:hidden">
+  <div style="display:flex;align-items:center;gap:10px;padding:max(18px,env(safe-area-inset-top)) 16px 8px">
+    <button onclick="closeGame()" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.08);border:none;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div style="flex:1;text-align:center">
+      <div style="font-family:'DM Sans',sans-serif;font-size:13px;letter-spacing:4px;color:#d4af37;font-weight:700">AMBAR</div>
+      <div style="font-size:9px;letter-spacing:2.5px;color:rgba(255,255,255,.3);text-transform:uppercase;margin-top:1px">delivery run</div>
+    </div>
+    <div style="width:36px"></div>
+  </div>
+  <div style="display:flex;justify-content:space-between;padding:4px 24px 10px">
+    <div>
+      <div id="game-score" style="font-size:24px;font-weight:700;color:#d4af37;font-family:'DM Sans',sans-serif;line-height:1">0</div>
+      <div style="font-size:9px;letter-spacing:1.5px;color:rgba(255,255,255,.3);margin-top:2px">AED EARNED</div>
+    </div>
+    <div style="text-align:right">
+      <div id="game-best-disp" style="font-size:24px;font-weight:700;color:rgba(212,175,55,.45);font-family:'DM Sans',sans-serif;line-height:1">0</div>
+      <div style="font-size:9px;letter-spacing:1.5px;color:rgba(255,255,255,.3);margin-top:2px">РЕКОРД</div>
+    </div>
+  </div>
+  <div style="position:relative;flex:1;overflow:hidden">
+    <canvas id="game-canvas" style="width:100%;height:100%;display:block;touch-action:none"></canvas>
+    <div id="game-start-screen" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;pointer-events:none">
+      <div style="font-size:56px;line-height:1;filter:drop-shadow(0 0 20px rgba(212,175,55,.4))">🏍️</div>
+      <div style="font-size:11px;letter-spacing:3px;color:rgba(255,255,255,.5)">DELIVERY RUN</div>
+      <div style="font-size:13px;color:rgba(255,255,255,.35);margin-top:4px" id="game-tap-hint">Нажмите, чтобы начать</div>
+    </div>
+    <div id="game-over-screen" style="position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(7,7,14,.85)">
+      <div style="font-size:10px;letter-spacing:3px;color:rgba(255,255,255,.35);text-transform:uppercase">доставка прервана</div>
+      <div id="game-final-aed" style="font-size:42px;font-weight:700;color:#d4af37;font-family:'DM Sans',sans-serif;line-height:1.1">0 AED</div>
+      <div id="game-new-best" style="font-size:11px;color:#d4af37;letter-spacing:2px;display:none">🏆 НОВЫЙ РЕКОРД</div>
+      <button onclick="startGame()" style="margin-top:12px;padding:13px 32px;background:linear-gradient(135deg,#c9a96e,#d4af37);color:#07070E;border:none;border-radius:14px;font-size:14px;font-weight:700;letter-spacing:.5px;cursor:pointer">Ещё раз</button>
+    </div>
+  </div>
+  <div style="height:max(16px,env(safe-area-inset-bottom))"></div>
 </div>
 
 <!-- iOS-style push toast -->
@@ -5463,6 +5512,17 @@ function _renderAodDetail(){
   if(cw)cw.style.display=status==='pending'?'':'none';
   el('aod-cancel-lbl').textContent=ru?'Отменить заказ':'Cancel Order';
   el('aod-support-lbl').textContent=ru?'Написать в поддержку':'Contact Support';
+  // Game button — only when confirmed (order is on the way)
+  const gw=el('aod-game-wrap');
+  if(gw){
+    const isConfirmed=(status==='confirmed'||status==='approved');
+    gw.style.display=isConfirmed?'':'none';
+    if(isConfirmed){
+      el('aod-game-title').textContent=ru?'Играй пока ждёшь':'Play while you wait';
+      const best=parseInt(localStorage.getItem('ambar_game_best')||'0');
+      el('aod-game-best').textContent=best;
+    }
+  }
 }
 
 function openAod(){
@@ -5569,6 +5629,197 @@ function closeAod(){
   const sheet=el('aod-ov').querySelector('.aod-sheet');
   if(sheet)sheet.style.transform='';
   el('aod-ov').classList.remove('open');
+}
+
+// ── AMBAR Delivery Run ────────────────────────────────────────────────────────
+const _G={state:'idle',raf:0,frame:0,score:0,speed:0,W:0,H:0,gY:0,
+  player:null,obstacles:[],coins:[],ctx:null};
+
+function openGame(){
+  closeAod();
+  const ov=el('game-ov');
+  ov.style.display='flex';
+  const best=parseInt(localStorage.getItem('ambar_game_best')||'0');
+  el('game-best-disp').textContent=best;
+  el('game-score').textContent='0';
+  _G.state='idle';
+  cancelAnimationFrame(_G.raf);
+  requestAnimationFrame(_gameInit);
+}
+
+function closeGame(){
+  cancelAnimationFrame(_G.raf);
+  _G.state='idle';
+  el('game-ov').style.display='none';
+}
+
+function _gameInit(){
+  const canvas=el('game-canvas');
+  const dpr=window.devicePixelRatio||1;
+  const W=canvas.offsetWidth,H=canvas.offsetHeight;
+  canvas.width=W*dpr;canvas.height=H*dpr;
+  _G.ctx=canvas.getContext('2d');
+  _G.ctx.scale(dpr,dpr);
+  _G.W=W;_G.H=H;_G.gY=H*0.70;
+  canvas.ontouchstart=_gameTouch;
+  canvas.onmousedown=_gameTouch;
+  const ru=lang==='ru';
+  el('game-tap-hint').textContent=ru?'Нажмите, чтобы начать':'Tap to start';
+  el('game-start-screen').style.display='flex';
+  el('game-over-screen').style.display='none';
+  _gameDrawIdle();
+}
+
+function _gameTouch(e){
+  e.preventDefault();
+  if(_G.state==='idle'){startGame();return;}
+  if(_G.state==='dead'){startGame();return;}
+  if(_G.state==='playing'){
+    const p=_G.player;
+    if(p.jumps<2){p.vy=-15;p.jumps++;haptic.light();}
+  }
+}
+
+function startGame(){
+  cancelAnimationFrame(_G.raf);
+  _G.score=0;_G.frame=0;_G.speed=5;
+  _G.obstacles=[];_G.coins=[];_G.state='playing';
+  _G.player={x:80,y:_G.gY,vy:0,w:42,h:30,jumps:0};
+  el('game-start-screen').style.display='none';
+  el('game-over-screen').style.display='none';
+  _G.raf=requestAnimationFrame(_gameLoop);
+}
+
+function _gameLoop(){
+  if(_G.state!=='playing')return;
+  const G=_G,p=G.player;
+  G.frame++;G.score++;
+  G.speed=5+Math.floor(G.score/500)*0.6;
+  el('game-score').textContent=Math.floor(G.score/10);
+  // Physics
+  p.vy+=0.75;p.y+=p.vy;
+  if(p.y>=G.gY){p.y=G.gY;p.vy=0;p.jumps=0;}
+  // Spawn obstacles
+  const si=Math.max(65,125-Math.floor(G.score/300)*6);
+  if(G.frame%si===0){
+    const h=24+Math.random()*26;
+    G.obstacles.push({x:G.W+20,w:16,h,y:G.gY});
+  }
+  // Spawn coins (arcs of 3)
+  if(G.frame%70===0&&Math.random()>.35){
+    for(let k=0;k<3;k++)G.coins.push({x:G.W+10+k*30,y:G.gY-40-Math.sin(k*1.2)*35,r:7,col:false});
+  }
+  // Move
+  G.obstacles.forEach(o=>o.x-=G.speed);
+  G.coins.forEach(c=>c.x-=G.speed);
+  G.obstacles=G.obstacles.filter(o=>o.x>-40);
+  G.coins=G.coins.filter(c=>c.x>-20);
+  // Collision — obstacles (hitbox slightly smaller)
+  const hx=p.x+8,hy=p.y-p.h+4,hw=p.w-16,hh=p.h-6;
+  for(const o of G.obstacles){
+    if(hx<o.x+o.w&&hx+hw>o.x&&hy<o.y&&hy+hh>o.y-o.h){_gameDead();return;}
+  }
+  // Coins
+  G.coins.forEach(c=>{
+    if(!c.col&&Math.abs(p.x+p.w/2-c.x)<c.r+16&&Math.abs(p.y-p.h/2-c.y)<c.r+16){
+      c.col=true;G.score+=80;haptic.light();
+    }
+  });
+  _gameDraw();
+  G.raf=requestAnimationFrame(_gameLoop);
+}
+
+function _gameDead(){
+  _G.state='dead';
+  const finalAed=Math.floor(_G.score/10);
+  const prev=parseInt(localStorage.getItem('ambar_game_best')||'0');
+  const isNew=finalAed>prev;
+  if(isNew){localStorage.setItem('ambar_game_best',String(finalAed));el('game-best-disp').textContent=finalAed;}
+  el('aod-game-best').textContent=Math.max(finalAed,prev);
+  el('game-final-aed').textContent=finalAed+' AED';
+  el('game-new-best').style.display=isNew?'block':'none';
+  el('game-over-screen').style.display='flex';
+  haptic.error();
+  _gameDraw();
+}
+
+function _gameDraw(){
+  const G=_G,ctx=G.ctx,W=G.W,H=G.H,gY=G.gY;
+  ctx.clearRect(0,0,W,H);
+  // Sky
+  const sky=ctx.createLinearGradient(0,0,0,gY);
+  sky.addColorStop(0,'#07070E');sky.addColorStop(1,'#0d111a');
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+  // Stars
+  for(let i=0;i<50;i++){
+    const sx=(i*137.508)%W,sy=(i*89.313)%(gY-10);
+    const br=i%7===0?.9:.35+((i%3)*.15);
+    ctx.fillStyle=`rgba(255,255,255,${br})`;
+    ctx.beginPath();ctx.arc(sx,sy,i%5===0?1.2:.6,0,Math.PI*2);ctx.fill();
+  }
+  // Ground glow
+  const gl=ctx.createLinearGradient(0,gY,0,H);
+  gl.addColorStop(0,'rgba(212,175,55,.12)');gl.addColorStop(1,'rgba(212,175,55,0)');
+  ctx.fillStyle=gl;ctx.fillRect(0,gY+2,W,H-gY);
+  // Ground line
+  ctx.strokeStyle='rgba(212,175,55,.45)';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(0,gY+2);ctx.lineTo(W,gY+2);ctx.stroke();
+  // Road dashes
+  ctx.strokeStyle='rgba(212,175,55,.1)';ctx.lineWidth=1.5;
+  const off=(G.frame*G.speed)%70;
+  for(let x=-off;x<W;x+=70){ctx.beginPath();ctx.moveTo(x,gY+18);ctx.lineTo(x+36,gY+18);ctx.stroke();}
+  // Coins
+  G.coins.forEach(c=>{
+    if(c.col)return;
+    ctx.save();
+    ctx.shadowColor='rgba(212,175,55,.6)';ctx.shadowBlur=8;
+    ctx.fillStyle='#d4af37';ctx.beginPath();ctx.arc(c.x,c.y,c.r,0,Math.PI*2);ctx.fill();
+    ctx.restore();
+    ctx.fillStyle='#07070E';ctx.font='bold 7px sans-serif';
+    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('$',c.x,c.y);
+  });
+  // Obstacles (barriers)
+  G.obstacles.forEach(o=>{
+    const ox=o.x,oy=o.y-o.h;
+    ctx.fillStyle='rgba(180,20,20,.85)';
+    ctx.beginPath();if(ctx.roundRect)ctx.roundRect(ox,oy,o.w,o.h,3);else ctx.rect(ox,oy,o.w,o.h);ctx.fill();
+    ctx.strokeStyle='rgba(255,80,80,.7)';ctx.lineWidth=1;
+    ctx.strokeRect(ox+.5,oy+.5,o.w-1,o.h-1);
+    // stripes
+    ctx.strokeStyle='rgba(255,220,0,.5)';ctx.lineWidth=1.5;
+    for(let s=4;s<o.h-2;s+=7){ctx.beginPath();ctx.moveTo(ox+2,oy+s);ctx.lineTo(Math.min(ox+o.w-2,ox+s+8),oy+2);ctx.stroke();}
+  });
+  // Player — motorcycle
+  const p=G.player;if(!p)return;
+  const px=p.x,py=p.y,pw=p.w,ph=p.h;
+  const wr=9,fwx=px+pw-4,bwx=px+8,wy=py;
+  // wheels
+  ctx.strokeStyle='#d4af37';ctx.lineWidth=2;
+  ctx.fillStyle='rgba(212,175,55,.18)';
+  [bwx,fwx].forEach(wx=>{ctx.beginPath();ctx.arc(wx,wy,wr,0,Math.PI*2);ctx.fill();ctx.stroke();});
+  // frame
+  ctx.strokeStyle='rgba(212,175,55,.8)';ctx.lineWidth=2;
+  ctx.beginPath();ctx.moveTo(bwx,wy-wr);ctx.lineTo(px+pw*.5,py-ph);ctx.lineTo(fwx,wy-wr);ctx.stroke();
+  // seat/body
+  ctx.fillStyle='rgba(212,175,55,.55)';
+  ctx.beginPath();ctx.ellipse(px+pw*.45,py-ph*.3,pw*.22,ph*.22,-.3,0,Math.PI*2);ctx.fill();
+  // rider silhouette
+  ctx.fillStyle='rgba(212,175,55,.7)';
+  ctx.beginPath();if(ctx.roundRect)ctx.roundRect(px+pw*.3,py-ph*.95,pw*.25,ph*.6,3);else ctx.rect(px+pw*.3,py-ph*.95,pw*.25,ph*.6);ctx.fill();
+  ctx.beginPath();ctx.arc(px+pw*.42,py-ph-4,5,0,Math.PI*2);ctx.fill();
+}
+
+function _gameDrawIdle(){
+  if(_G.state!=='idle')return;
+  const G=_G,ctx=G.ctx,W=G.W,H=G.H,gY=G.gY;
+  if(!ctx)return;
+  ctx.clearRect(0,0,W,H);
+  const sky=ctx.createLinearGradient(0,0,0,gY);
+  sky.addColorStop(0,'#07070E');sky.addColorStop(1,'#0d111a');
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+  for(let i=0;i<50;i++){const sx=(i*137.508)%W,sy=(i*89.313)%(gY-10);ctx.fillStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.arc(sx,sy,.8,0,Math.PI*2);ctx.fill();}
+  ctx.fillStyle='rgba(212,175,55,.08)';ctx.fillRect(0,gY,W,H-gY);
+  ctx.strokeStyle='rgba(212,175,55,.4)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(0,gY+2);ctx.lineTo(W,gY+2);ctx.stroke();
 }
 
 function _initAodSwipe(){

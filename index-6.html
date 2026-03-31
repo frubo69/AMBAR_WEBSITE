@@ -400,15 +400,27 @@ img{display:block}
 .ps-n{font-size:20px;font-weight:700;color:var(--gold2)}
 .ps-l{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:2px}
 /* Profile feature sections */
-.prof-hscroll{display:flex;gap:10px;overflow-x:auto;padding-bottom:12px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+/* Wishlist 2-col grid */
+.wish-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:4px 0 2px}
+.wish-card{background:var(--card2);border:1px solid var(--border2);border-radius:14px;overflow:hidden;cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent}
+.wish-card:active{transform:scale(.96);opacity:.82}
+.wish-card-img{width:100%;aspect-ratio:1/1;object-fit:contain;background:var(--card);padding:14px;box-sizing:border-box}
+.wish-card-info{padding:9px 11px 11px}
+.wish-card-name{font-size:12px;font-weight:600;color:var(--text);line-height:1.3;margin-bottom:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.wish-card-price{font-size:13px;color:var(--gold2);font-weight:700}
+/* The Usual horizontal scroll */
+.usual-hscroll{display:flex;gap:10px;overflow-x:auto;padding:4px 0 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.usual-hscroll::-webkit-scrollbar{display:none}
+.usual-card{flex-shrink:0;width:120px;background:var(--card2);border:1px solid var(--border2);border-radius:14px;overflow:hidden;cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent}
+.usual-card:active{transform:scale(.95);opacity:.82}
+.usual-card-img{width:100%;height:96px;object-fit:contain;background:var(--card);padding:10px;box-sizing:border-box}
+.usual-card-info{padding:8px 10px 10px}
+.usual-card-name{font-size:11px;font-weight:600;color:var(--text);line-height:1.3;margin-bottom:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.usual-card-sub{font-size:10px;color:var(--muted);margin-bottom:3px}
+.usual-card-price{font-size:12px;color:var(--gold2);font-weight:700}
+/* legacy — kept for any stray references */
+.prof-hscroll{display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .prof-hscroll::-webkit-scrollbar{display:none}
-.prof-mini-card{flex-shrink:0;width:108px;background:var(--card);border:1px solid var(--border2);border-radius:16px;overflow:hidden;cursor:pointer;transition:.15s}
-.prof-mini-card:active{transform:scale(.95);opacity:.85}
-.prof-mini-img{width:100%;height:88px;object-fit:contain;background:var(--card2);padding:10px;box-sizing:border-box}
-.prof-mini-info{padding:8px 9px 10px}
-.prof-mini-name{font-size:11.5px;font-weight:600;color:var(--fg);line-height:1.25;margin-bottom:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.prof-mini-sub{font-size:10px;color:var(--muted);margin-bottom:4px}
-.prof-mini-price{font-size:12px;color:var(--gold2);font-weight:700}
 .prof-action-btn{width:100%;padding:15px;background:var(--card);border:1.5px dashed rgba(201,169,110,.35);border-radius:var(--r);font-size:14px;font-weight:700;color:var(--gold2);margin-bottom:4px;transition:.15s;letter-spacing:.3px}
 .prof-action-btn:active{opacity:.75;transform:scale(.98)}
 .prof-empty-hint{font-size:13px;color:var(--muted);text-align:center;padding:18px 0 12px}
@@ -1157,7 +1169,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       <div class="phub-right"><span class="phub-badge" id="phub-v-wish" style="display:none">0</span><svg class="phub-chevron" id="phub-ch-wish" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
     </div>
     <div id="wishlist-section" style="display:none;padding:0 14px 14px">
-      <div class="prof-hscroll" id="wishlist-scroll"></div>
+      <div class="wish-grid" id="wishlist-scroll"></div>
       <button class="prof-action-btn" id="wishlist-cart-btn" onclick="addWishlistToCart()">Add all to cart</button>
     </div>
     <div class="prof-hub-row" onclick="_toggleProfSection('usual-section')">
@@ -1166,7 +1178,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       <div class="phub-right"><svg class="phub-chevron" id="phub-ch-usual" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
     </div>
     <div id="usual-section" style="display:none;padding:0 14px 14px">
-      <div class="prof-hscroll" id="usual-scroll"></div>
+      <div class="usual-hscroll" id="usual-scroll"></div>
       <button class="prof-action-btn" id="usual-order-btn" onclick="orderTheUsual()">Order The Usual</button>
     </div>
   </div>
@@ -4522,37 +4534,42 @@ function _toggleProfSection(id){
   const isOpen=sec.style.display!=='none';
   if(!isOpen){
     // Always re-render fresh so race-condition with catalog load doesn't matter
+    const oErr=`this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><rect width=%2280%22 height=%2280%22 rx=%228%22 fill=%22%2316151f%22/><text y=%2256%22 x=%2240%22 text-anchor=%22middle%22 font-size=%2244%22>🍾</text></svg>'`;
     if(id==='wishlist-section'){
-      const oErr=`this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><text y=%2268%22 font-size=%2264%22>🍾</text></svg>'`;
       const wishProds=[...favs].map(fid=>P.find(x=>x.id===fid)).filter(Boolean);
-      el('wishlist-scroll').innerHTML=wishProds.map(p=>{
-        const pname=lang==='ru'?p.name:p.nameE;
-        return`<div class="prof-mini-card" onclick="openPDM('${p.id}')">
-          <img class="prof-mini-img" src="${p.img}" alt="${pname}" onerror="${oErr}">
-          <div class="prof-mini-info">
-            <div class="prof-mini-name">${pname}</div>
-            <div class="prof-mini-price">${p.price} AED</div>
-          </div>
-        </div>`;
-      }).join('') || `<div class="prof-empty-hint">${lang==='ru'?'Список пуст':'Nothing saved yet'}</div>`;
+      el('wishlist-scroll').innerHTML=wishProds.length
+        ? wishProds.map(p=>{
+            const pname=lang==='ru'?p.name:p.nameE;
+            return`<div class="wish-card" onclick="openPDM('${p.id}')">
+              <img class="wish-card-img" src="${p.img}" alt="${pname}" onerror="${oErr}">
+              <div class="wish-card-info">
+                <div class="wish-card-name">${pname}</div>
+                <div class="wish-card-price">${p.price} AED</div>
+              </div>
+            </div>`;
+          }).join('')
+        : `<div class="prof-empty-hint" style="grid-column:1/-1">${lang==='ru'?'Список пуст':'Nothing saved yet'}</div>`;
+      el('wishlist-cart-btn').textContent=lang==='ru'?'Добавить всё в корзину':'Add all to cart';
     }
     if(id==='usual-section'){
-      const oErr=`this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2020/svg%22 viewBox=%220 0 80 80%22><text y=%2268%22 font-size=%2264%22>🍾</text></svg>'`;
       const itemCounts={};
       orders.forEach(o=>(o.items||[]).forEach(i=>{if(!i.id)return;if(!itemCounts[i.id])itemCounts[i.id]={id:i.id,count:0};itemCounts[i.id].count+=i.qty;}));
       const topItems=Object.values(itemCounts).sort((a,b)=>b.count-a.count).slice(0,6);
-      el('usual-scroll').innerHTML=topItems.map(item=>{
-        const p=P.find(x=>x.id===item.id);if(!p)return'';
-        const pname=lang==='ru'?p.name:p.nameE;
-        return`<div class="prof-mini-card" onclick="openPDM('${p.id}')">
-          <img class="prof-mini-img" src="${p.img}" alt="${pname}" onerror="${oErr}">
-          <div class="prof-mini-info">
-            <div class="prof-mini-name">${pname}</div>
-            <div class="prof-mini-sub">${lang==='ru'?'заказано':'ordered'} ×${item.count}</div>
-            <div class="prof-mini-price">${p.price} AED</div>
-          </div>
-        </div>`;
-      }).join('') || `<div class="prof-empty-hint">${lang==='ru'?'Нет истории заказов':'No order history yet'}</div>`;
+      el('usual-scroll').innerHTML=topItems.length
+        ? topItems.map(item=>{
+            const p=P.find(x=>x.id===item.id);if(!p)return'';
+            const pname=lang==='ru'?p.name:p.nameE;
+            return`<div class="usual-card" onclick="openPDM('${p.id}')">
+              <img class="usual-card-img" src="${p.img}" alt="${pname}" onerror="${oErr}">
+              <div class="usual-card-info">
+                <div class="usual-card-name">${pname}</div>
+                <div class="usual-card-sub">×${item.count} ${lang==='ru'?'заказов':'orders'}</div>
+                <div class="usual-card-price">${p.price} AED</div>
+              </div>
+            </div>`;
+          }).join('')
+        : `<div class="prof-empty-hint">${lang==='ru'?'Нет истории заказов':'No order history yet'}</div>`;
+      el('usual-order-btn').textContent=lang==='ru'?'Заказать как обычно':'Order The Usual';
     }
   }
   sec.style.display=isOpen?'none':'block';
@@ -4762,43 +4779,32 @@ function shareInvite(){
 
 function openAboutSheet(){
   const ru=lang==='ru';
-  const steps=ru?[
-    ['🗺️','Каталог','Листайте категории — Водка, Виски, Пиво и другие. Нажмите на карточку, чтобы увидеть детали и добавить в корзину.'],
-    ['📍','Адрес','Сохраните адрес доставки один раз — и он подставится автоматически при следующем заказе.'],
-    ['🛒','Корзина','Проверьте состав заказа, выберите чаевые и подтвердите. Заказ мгновенно уйдёт оператору.'],
-    ['📦','Трекинг','Следите за статусом в баре снизу — от «Ожидает» до «В пути». Нажмите, чтобы открыть детали.'],
-    ['❤️','Избранное','Сохраняйте любимые позиции в Wishlist и заказывайте одним нажатием через «Как обычно».'],
-    ['💬','Поддержка','Есть вопросы? Пишите через раздел Поддержка — операторы отвечают быстро.'],
+  const facts=ru?[
+    ['Что такое AMBAR','AMBAR — сервис доставки премиальных спиртных напитков по всем Эмиратам. Мы работаем официально и доставляем только сертифицированную продукцию.'],
+    ['Доставка','Работаем 7 дней в неделю. Среднее время доставки — 30–60 минут в зависимости от вашей зоны и загруженности курьеров.'],
+    ['Ассортимент','Водка, виски, джин, ром, текила, вермут, пиво и многое другое — от масс-маркета до редких коллекционных позиций.'],
+    ['Оплата','Оплата наличными или картой при получении. Чаевые курьеру — по желанию, прямо при оформлении заказа.'],
+    ['Поддержка','Операторы на связи каждый день. Если возникли вопросы по заказу — пишите через раздел Поддержка, мы отвечаем быстро.'],
   ]:[
-    ['🗺️','Catalogue','Browse categories — Vodka, Whisky, Beer and more. Tap any card to see details and add to cart.'],
-    ['📍','Address','Save your delivery address once — it auto-fills on your next order.'],
-    ['🛒','Cart','Review your order, set a tip and confirm. It goes to our operator instantly.'],
-    ['📦','Tracking','Watch your order status in the bar at the bottom — from Pending to On the Way. Tap for details.'],
-    ['❤️','Wishlist','Save your favourites and reorder them in one tap via The Usual.'],
-    ['💬','Support','Questions? Message us via the Support section — we reply fast.'],
+    ['What is AMBAR','AMBAR is a premium spirits delivery service operating across the UAE. We are fully licensed and deliver only certified products.'],
+    ['Delivery','We operate 7 days a week. Average delivery time is 30–60 minutes depending on your area and courier availability.'],
+    ['Selection','Vodka, whisky, gin, rum, tequila, vermouth, beer and more — from everyday favourites to rare collector bottles.'],
+    ['Payment','Cash or card on delivery. Tip your courier optionally — you can set it directly at checkout.'],
+    ['Support','Our team is available every day. Any issues with your order? Message us via the Support section — we reply fast.'],
   ];
   el('about-content').innerHTML=`
-    <div style="text-align:center;padding:6px 0 20px">
+    <div style="text-align:center;padding:6px 0 22px">
       <div style="font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;letter-spacing:4px;color:var(--gold)">AMBAR</div>
-      <div style="font-size:10px;letter-spacing:2.5px;color:var(--muted);text-transform:uppercase;margin-top:4px">Premium Spirits · UAE</div>
-      <div style="font-size:13px;color:var(--sub);line-height:1.6;margin-top:14px;padding:0 4px">
-        ${ru
-          ? 'AMBAR — сервис доставки премиальных спиртных напитков по ОАЭ. Заказ за несколько касаний, доставка в кратчайшие сроки.'
-          : 'AMBAR is a premium spirits delivery service across the UAE. Order in a few taps, delivered to your door fast.'}
-      </div>
+      <div style="font-size:10px;letter-spacing:2.5px;color:var(--muted);text-transform:uppercase;margin-top:5px">Premium Spirits · UAE</div>
     </div>
-    <div style="border-top:1px solid rgba(255,255,255,.07);padding-top:16px;margin-bottom:4px">
-      <div style="font-size:10px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:14px">${ru?'Как пользоваться':'How it works'}</div>
-      ${steps.map(([icon,title,desc])=>`
-        <div style="display:flex;gap:13px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)">
-          <div style="font-size:20px;line-height:1;flex-shrink:0;padding-top:1px">${icon}</div>
-          <div>
-            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px">${title}</div>
-            <div style="font-size:12px;color:var(--muted);line-height:1.55">${desc}</div>
-          </div>
+    <div style="border-top:1px solid rgba(255,255,255,.07)">
+      ${facts.map(([title,body],i)=>`
+        <div style="padding:14px 0;${i<facts.length-1?'border-bottom:1px solid rgba(255,255,255,.05)':''}">
+          <div style="font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--gold2);margin-bottom:6px">${title}</div>
+          <div style="font-size:13px;color:var(--muted);line-height:1.6">${body}</div>
         </div>`).join('')}
     </div>
-    <div style="text-align:center;padding:16px 0 6px;font-size:11px;color:rgba(255,255,255,.15);letter-spacing:.5px">v1.7.0 · AMBAR © 2025</div>`;
+    <div style="text-align:center;padding:18px 0 6px;font-size:11px;color:rgba(255,255,255,.15);letter-spacing:.5px">v1.7.0 · AMBAR © 2025</div>`;
   _openSheet('about-ov');
 }
 function closeAboutSheet(){_closeSheet('about-ov');}

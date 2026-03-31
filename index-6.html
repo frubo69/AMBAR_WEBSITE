@@ -4588,6 +4588,7 @@ function initPDMSwipe(){
 
 // ── SUPPORT CHAT ─────────────────────────────────────────────────────────────
 let _supportConvKey='',_supportOrderId='',_supportPollTimer=null,_supportLastTs='';
+let _supportRenderedTs=new Set(); // dedup: ts values already in the DOM
 
 function openSupportChat(orderId){
   const uid=tg?.initDataUnsafe?.user?.id;
@@ -4595,6 +4596,10 @@ function openSupportChat(orderId){
   _supportOrderId=orderId;
   _supportConvKey=uid+'_'+orderId;
   _supportLastTs='';
+  _supportRenderedTs=new Set();
+
+  // Kill any existing poll before starting a new one
+  if(_supportPollTimer){clearInterval(_supportPollTimer);_supportPollTimer=null;}
 
   el('support-hdr-title').textContent=t('supportTitle');
   el('support-hdr-sub').textContent='#'+orderId;
@@ -4644,6 +4649,8 @@ async function fetchSupportMsgs(){
       }
       const container=el('support-msgs');
       messages.forEach(m=>{
+        if(_supportRenderedTs.has(m.ts))return; // already in DOM
+        _supportRenderedTs.add(m.ts);
         const bubble=document.createElement('div');
         bubble.className='msg-bubble '+m.role;
         if(m.type==='photo'){
@@ -4698,6 +4705,7 @@ async function sendSupportMsg(){
     if(!res.ok){showToast('Send failed','err');bubble.style.opacity='.5';}
     else if(res.ts){
       _supportLastTs=res.ts;
+      _supportRenderedTs.add(res.ts);
       // Update bubble timestamp to server time
       const tsEl=bubble.querySelector('.msg-ts');
       if(tsEl)tsEl.textContent=_fmtTime(res.ts);
@@ -4733,7 +4741,7 @@ async function onSupportFileSelect(input){
     const res=await resp.json();
     if(!res.ok){showToast(res.error||'Upload failed','err');bubble.style.opacity='.5';}
     else{
-      if(res.ts){_supportLastTs=res.ts;}
+      if(res.ts){_supportLastTs=res.ts;_supportRenderedTs.add(res.ts);}
       if(res.url){bubble.querySelector('.chat-photo').src=`${AMBAR_API}${res.url}`;}
       const tsEl=bubble.querySelector('.msg-ts');
       if(tsEl){tsEl.style.opacity='1';tsEl.textContent=_fmtTime(res.ts);}

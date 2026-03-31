@@ -612,6 +612,11 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .support-attach{width:36px;height:36px;border-radius:50%;border:1px solid var(--border2);background:rgba(255,255,255,.05);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--sub);transition:.15s}
 .support-attach:active{transform:scale(.85)}
 .msg-bubble img.chat-photo{max-width:100%;border-radius:10px;margin-bottom:4px;cursor:pointer;display:block}
+.msg-photo-wrap{position:relative;display:inline-block;max-width:100%}
+.msg-photo-wrap img.chat-photo{margin-bottom:0}
+.msg-fail-btn{position:absolute;bottom:6px;right:6px;width:24px;height:24px;border-radius:50%;background:#e53935;border:none;cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 6px rgba(0,0,0,.5);transition:transform .15s}
+.msg-fail-btn:active{transform:scale(.85)}
+.msg-fail-btn svg{width:12px;height:12px;stroke:#fff;fill:none;stroke-width:2.5;stroke-linecap:round}
 .ocard-support-btn{flex:1;padding:10px;border-radius:var(--r3);border:1px solid rgba(201,169,110,.3);background:rgba(201,169,110,.08);color:var(--gold);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:.15s;font-family:'DM Sans',sans-serif}
 .ocard-support-btn:active{background:rgba(201,169,110,.2);transform:scale(.97)}
 /* Map picker — full-screen overlay */
@@ -4727,34 +4732,70 @@ async function onSupportFileSelect(input){
   input.value='';
   const initData=tg?.initData;
   if(!initData){showToast('No Telegram context','err');return;}
+  const thumbUrl=URL.createObjectURL(file);
+  _uploadSupportPhoto(file,thumbUrl,initData);
+}
 
-  // Optimistic thumbnail bubble
+async function _uploadSupportPhoto(file,thumbUrl,initData){
   const container=el('support-msgs');
   const emptyEl=el('support-empty');if(emptyEl)emptyEl.remove();
+
   const bubble=document.createElement('div');
   bubble.className='msg-bubble user';
-  const thumbUrl=URL.createObjectURL(file);
-  bubble.innerHTML=`<img class="chat-photo" src="${thumbUrl}" alt="photo" onclick="openPhotoViewer(this.src)"><div class="msg-ts" style="opacity:.5">⏳</div>`;
+  bubble.innerHTML=`<div class="msg-photo-wrap"><img class="chat-photo" src="${thumbUrl}" alt="photo" onclick="openPhotoViewer(this.src)"></div><div class="msg-ts" style="opacity:.5">⏳</div>`;
   container.appendChild(bubble);
   container.scrollTop=container.scrollHeight;
   haptic.light();
 
   const fd=new FormData();
-  fd.append('initData',initData);
+  fd.append('initData',initData||tg?.initData||'');
   fd.append('order_id',_supportOrderId);
   fd.append('image',file);
+
+  const _markFailed=()=>{
+    const wrap=bubble.querySelector('.msg-photo-wrap');
+    if(!wrap||wrap.querySelector('.msg-fail-btn'))return;
+    const btn=document.createElement('button');
+    btn.className='msg-fail-btn';
+    btn.title='Failed';
+    btn.innerHTML=`<svg viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>`;
+    btn.onclick=(e)=>{
+      e.stopPropagation();
+      haptic.light&&haptic.light();
+      const _ru=lang==='ru';
+      const sheet=document.createElement('div');
+      sheet.style.cssText='position:fixed;inset:0;z-index:9100;display:flex;align-items:flex-end;background:rgba(0,0,0,.6)';
+      sheet.innerHTML=`<div style="width:100%;background:var(--card);border-radius:20px 20px 0 0;padding:16px 16px calc(16px + var(--safe-bottom));display:flex;flex-direction:column;gap:10px">
+        <div style="font-size:13px;color:var(--muted);text-align:center;margin-bottom:4px">${_ru?'Не удалось отправить фото':'Photo failed to send'}</div>
+        <button onclick="this.closest('[style*=fixed]')._resend()" style="width:100%;padding:14px;border-radius:14px;background:rgba(201,169,110,.12);border:1px solid rgba(201,169,110,.3);color:var(--gold);font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">${_ru?'Повторить':'Resend'}</button>
+        <button onclick="this.closest('[style*=fixed]')._del()" style="width:100%;padding:14px;border-radius:14px;background:rgba(229,57,53,.1);border:1px solid rgba(229,57,53,.3);color:#e53935;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif">${_ru?'Удалить':'Delete'}</button>
+      </div>`;
+      sheet._resend=()=>{
+        sheet.remove();
+        btn.remove();
+        bubble.querySelector('.msg-ts').style.opacity='.5';
+        bubble.querySelector('.msg-ts').textContent='⏳';
+        _uploadSupportPhoto(file,thumbUrl,null);
+        bubble.remove(); // old bubble replaced by new one in _uploadSupportPhoto
+      };
+      sheet._del=()=>{sheet.remove();bubble.remove();};
+      sheet.addEventListener('click',ev=>{if(ev.target===sheet)sheet.remove();});
+      document.body.appendChild(sheet);
+    };
+    wrap.appendChild(btn);
+  };
 
   try{
     const resp=await fetch(`${AMBAR_API}/api/support/send-image`,{method:'POST',body:fd});
     const res=await resp.json();
-    if(!res.ok){showToast(res.error||'Upload failed','err');bubble.style.opacity='.5';}
+    if(!res.ok){_markFailed();}
     else{
       if(res.ts){_supportLastTs=res.ts;_supportRenderedTs.add(res.ts);}
       if(res.url){bubble.querySelector('.chat-photo').src=`${AMBAR_API}${res.url}`;}
       const tsEl=bubble.querySelector('.msg-ts');
       if(tsEl){tsEl.style.opacity='1';tsEl.textContent=_fmtTime(res.ts);}
     }
-  }catch(e){showToast('Network error','err');bubble.style.opacity='.5';}
+  }catch(e){_markFailed();}
 }
 
 function _autoResizeSupport(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,100)+'px';}

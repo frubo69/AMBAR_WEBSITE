@@ -1125,15 +1125,13 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div class="profile-card">
     <div class="profile-avatar" id="prof-av">A</div>
     <div class="profile-name" id="prof-name">—</div>
-    <div id="prof-tier-wrap" style="display:flex;align-items:center;justify-content:center;gap:7px;margin:7px 0 2px">
-      <div id="prof-tier-dot" style="width:6px;height:6px;border-radius:50%;background:#c9a96e;flex-shrink:0"></div>
-      <div id="prof-tier-label" style="font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:700;letter-spacing:2.5px;color:#c9a96e;text-transform:uppercase">INITIATE</div>
-      <div id="prof-tier-dot2" style="width:6px;height:6px;border-radius:50%;background:#c9a96e;flex-shrink:0"></div>
-    </div>
     <div class="profile-stat">
       <div class="ps"><div class="ps-n" id="stat-total">0</div><div class="ps-l" id="stat-lbl1">ЗАКАЗОВ</div></div>
       <div class="ps"><div class="ps-n" id="stat-active">0</div><div class="ps-l" id="stat-lbl2">АКТИВНЫХ</div></div>
-      <div class="ps"><div class="ps-n" id="stat-spent">0</div><div class="ps-l" id="stat-lbl3">AED</div></div>
+      <div class="ps" onclick="openVipSheet()" style="cursor:pointer">
+        <div class="ps-n" id="prof-tier-label" style="font-size:14px;letter-spacing:1px">SILVER</div>
+        <div class="ps-l" id="stat-lbl3">STATUS</div>
+      </div>
     </div>
   </div>
 
@@ -1175,6 +1173,11 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 
   <!-- HUB GROUP 3 — Perks & Quick Actions -->
   <div class="prof-hub-section">
+    <div class="prof-hub-row" onclick="openVipSheet()">
+      <div class="phub-icon" id="phub-vip-icon"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg></div>
+      <div class="phub-text"><div class="phub-title" id="phub-t-vip">Status</div><div class="phub-sub" id="phub-s-vip">Silver member</div></div>
+      <div class="phub-right"><span class="phub-badge" id="phub-v-vip">SILVER</span><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
     <div class="prof-hub-row" onclick="quickReorder()">
       <div class="phub-icon"><svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg></div>
       <div class="phub-text"><div class="phub-title" id="phub-t-reorder">Quick Reorder</div><div class="phub-sub" id="phub-s-reorder">Repeat your last order</div></div>
@@ -4430,14 +4433,19 @@ function buildProfile(){
   if(wishCount){wishBadge.textContent=wishCount;wishBadge.style.display='';}else{wishBadge.style.display='none';}
   set('phub-t-usual',ru?'Как обычно':'The Usual');
   set('phub-s-usual',ru?'Топ ваших заказов':'Your top ordered items');
-  // Tier badge in profile card (order-count based)
+  // Tier — order-count based, English only
   const tier=_getVipTier(orders.length);
+  // Profile card stat slot
   const tierLabel=el('prof-tier-label');
-  const tierDot=el('prof-tier-dot');
-  const tierDot2=el('prof-tier-dot2');
-  if(tierLabel){tierLabel.textContent=ru?tier.labelRu:tier.label;tierLabel.style.color=tier.color;}
-  if(tierDot){tierDot.style.background=tier.color;}
-  if(tierDot2){tierDot2.style.background=tier.color;}
+  if(tierLabel){tierLabel.textContent=tier.label;tierLabel.style.color=tier.color;}
+  set('stat-lbl3','STATUS');
+  // Hub row
+  set('phub-t-vip','Status');
+  set('phub-s-vip',tier.label+' · '+orders.length+' '+(ru?'заказов':'orders'));
+  const vipBadge=el('phub-v-vip');
+  if(vipBadge){vipBadge.textContent=tier.label;vipBadge.style.color=tier.color;vipBadge.style.background=tier.color+'22';}
+  const vipIcon=el('phub-vip-icon');
+  if(vipIcon){vipIcon.style.background=tier.color+'22';const s=vipIcon.querySelector('svg');if(s)s.style.stroke=tier.color;}
   // Quick reorder
   set('phub-t-reorder',ru?'Быстрый повтор':'Quick Reorder');
   set('phub-s-reorder',ru?'Повторить последний заказ':'Repeat your last order');
@@ -4554,14 +4562,50 @@ function _closeSheet(id){const ov=el(id);ov.classList.remove('open');setTimeout(
 
 // VIP tiers: Bronze 0-999 · Silver 1000-4999 · Gold 5000-14999 · Platinum 15000+
 const _vipTiers=[
-  {key:'initiate',  min:1,  max:4,  next:5,  color:'#9b8ea0', label:'INITIATE',    labelRu:'НОВИЧОК'},
-  {key:'regular',   min:5,  max:9,  next:10, color:'#7ab8c7', label:'REGULAR',     labelRu:'ЗАВСЕГДАТАЙ'},
-  {key:'connois',   min:10, max:19, next:20, color:'#c9a96e', label:'CONNOISSEUR', labelRu:'ЦЕНИТЕЛЬ'},
-  {key:'patron',    min:20, max:49, next:50, color:'#e8d5a3', label:'PATRON',      labelRu:'ПАТРОН'},
-  {key:'legend',    min:50, max:Infinity,next:null,color:'#fff7e0',label:'LEGEND', labelRu:'ЛЕГЕНДА'},
+  {key:'silver',   min:1,  max:4,          next:5,  color:'#a8b8c8', label:'SILVER'},
+  {key:'gold',     min:5,  max:9,          next:10, color:'#c9a96e', label:'GOLD'},
+  {key:'platinum', min:10, max:19,         next:20, color:'#d4d4e8', label:'PLATINUM'},
+  {key:'diamond',  min:20, max:49,         next:50, color:'#7ecfea', label:'DIAMOND'},
+  {key:'obsidian', min:50, max:Infinity,   next:null,color:'#c8b8e8',label:'OBSIDIAN'},
 ];
-function _getVipTier(count){return _vipTiers.find(t=>count>=t.min&&count<=t.max)||{key:'initiate',min:0,max:4,next:5,color:'#9b8ea0',label:'INITIATE',labelRu:'НОВИЧОК'};}
+function _getVipTier(count){return _vipTiers.find(t=>count>=t.min&&count<=t.max)||_vipTiers[0];}
 
+function openVipSheet(){
+  const ru=lang==='ru';
+  const count=orders.length;
+  const tier=_getVipTier(count);
+  const idx=_vipTiers.indexOf(tier);
+  const nextTier=_vipTiers[idx+1];
+  const progress=tier.next?Math.min(100,Math.round(((count-tier.min)/(tier.next-tier.min))*100)):100;
+  const perks={
+    silver: ['Access to full catalogue','24/7 support'],
+    gold:   ['Everything in Silver','Priority support','Early access to new arrivals'],
+    platinum:['Everything in Gold','Dedicated manager','Free express delivery'],
+    diamond: ['Everything in Platinum','Concierge service','Exclusive offers'],
+    obsidian:['Everything in Diamond','VIP events','Personal account manager','Secret drops'],
+  };
+  el('vip-content').innerHTML=`
+    <div style="text-align:center;padding:8px 0 22px">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:700;color:${tier.color};letter-spacing:4px">${tier.label}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:6px">${count} ${ru?'заказов':'orders'}</div>
+    </div>
+    ${tier.next?`
+    <div style="margin-bottom:20px">
+      <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:8px">
+        <span>${ru?'До':'To'} ${nextTier?nextTier.label:''}</span>
+        <span>${tier.next-count} ${ru?'заказов':'orders'} ${ru?'осталось':'to go'}</span>
+      </div>
+      <div style="height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden">
+        <div style="height:100%;width:${progress}%;background:${tier.color};border-radius:3px;transition:width .6s cubic-bezier(.4,0,.2,1)"></div>
+      </div>
+    </div>`:`<div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:20px">${ru?'Вы на максимальном уровне':'You\'ve reached the top tier'}</div>`}
+    <div style="border-top:1px solid rgba(255,255,255,.07);padding-top:16px">
+      <div style="font-size:10px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:12px">${ru?'Ваши привилегии':'Your perks'}</div>
+      ${(perks[tier.key]||[]).map(p=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;font-size:13px;color:var(--text)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${tier.color}" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>${p}</div>`).join('')}
+    </div>
+    <div style="height:8px"></div>`;
+  _openSheet('vip-ov');
+}
 function closeVipSheet(){_closeSheet('vip-ov');}
 
 function quickReorder(){

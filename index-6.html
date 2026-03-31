@@ -400,14 +400,15 @@ img{display:block}
 .ps-n{font-size:20px;font-weight:700;color:var(--gold2)}
 .ps-l{font-size:9px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-top:2px}
 /* Profile feature sections */
-/* Wishlist 2-col grid */
-.wish-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:4px 0 2px}
-.wish-card{background:var(--card2);border:1px solid var(--border2);border-radius:14px;overflow:hidden;cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent}
-.wish-card:active{transform:scale(.96);opacity:.82}
-.wish-card-img{width:100%;aspect-ratio:1/1;object-fit:contain;background:var(--card);padding:14px;box-sizing:border-box}
-.wish-card-info{padding:9px 11px 11px}
-.wish-card-name{font-size:12px;font-weight:600;color:var(--text);line-height:1.3;margin-bottom:5px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.wish-card-price{font-size:13px;color:var(--gold2);font-weight:700}
+/* Wishlist horizontal scroll mini-cards */
+.wish-grid{display:flex;gap:10px;overflow-x:auto;padding:4px 0 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
+.wish-grid::-webkit-scrollbar{display:none}
+.wish-card{flex-shrink:0;width:110px;background:var(--card2);border:1px solid var(--border2);border-radius:14px;overflow:hidden;cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent}
+.wish-card:active{transform:scale(.95);opacity:.82}
+.wish-card-img{width:100%;height:90px;object-fit:contain;background:var(--card);padding:10px;box-sizing:border-box;display:block}
+.wish-card-info{padding:8px 10px 10px}
+.wish-card-name{font-size:11.5px;font-weight:600;color:var(--text);line-height:1.3;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.wish-card-price{font-size:12px;color:var(--gold2);font-weight:700}
 /* The Usual horizontal scroll */
 .usual-hscroll{display:flex;gap:10px;overflow-x:auto;padding:4px 0 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .usual-hscroll::-webkit-scrollbar{display:none}
@@ -4420,7 +4421,7 @@ function buildProfile(){
   const spentCurrent=orders.filter(o=>o.status==='delivered').reduce((s,o)=>s+o.total,0);
   const spentPersisted=parseInt(localStorage.getItem('ambar_spent_total')||'0');
   const spent=spentCurrent+spentPersisted;
-  el('stat-total').textContent=orders.length;el('stat-active').textContent=active.length;el('stat-spent').textContent=spent;
+  el('stat-total').textContent=orders.length;el('stat-active').textContent=active.length;
   set('stat-lbl1',t('statOrders'));set('stat-lbl2',t('statActive'));set('stat-lbl3','STATUS');
 
   const ru=lang==='ru';
@@ -4780,17 +4781,19 @@ function shareInvite(){
 function openAboutSheet(){
   const ru=lang==='ru';
   const facts=ru?[
-    ['Что такое AMBAR','AMBAR — сервис доставки премиальных спиртных напитков по всем Эмиратам. Мы работаем официально и доставляем только сертифицированную продукцию.'],
-    ['Доставка','Работаем 7 дней в неделю. Среднее время доставки — 30–60 минут в зависимости от вашей зоны и загруженности курьеров.'],
-    ['Ассортимент','Водка, виски, джин, ром, текила, вермут, пиво и многое другое — от масс-маркета до редких коллекционных позиций.'],
-    ['Оплата','Оплата наличными или картой при получении. Чаевые курьеру — по желанию, прямо при оформлении заказа.'],
-    ['Поддержка','Операторы на связи каждый день. Если возникли вопросы по заказу — пишите через раздел Поддержка, мы отвечаем быстро.'],
+    ['Что такое AMBAR','AMBAR — сервис экспресс-доставки премиальных спиртных напитков. Работаем официально, доставляем только сертифицированную продукцию.'],
+    ['Зона доставки','Доставляем только по Дубаю. Другие эмираты пока недоступны.'],
+    ['Время работы','Принимаем заказы с 12:00 до 06:00. Заказы вне этого времени не обрабатываются.'],
+    ['Ассортимент','Водка, виски, джин, ром, текила, вермут, пиво и многое другое — от популярных марок до редких коллекционных позиций.'],
+    ['Оплата','Принимаем только наличные при получении. Оплата картой недоступна. Чаевые курьеру — по желанию, задаются при оформлении.'],
+    ['Поддержка','Операторы на связи ежедневно в часы работы. Вопросы по заказу — через раздел Поддержка, отвечаем быстро.'],
   ]:[
-    ['What is AMBAR','AMBAR is a premium spirits delivery service operating across the UAE. We are fully licensed and deliver only certified products.'],
-    ['Delivery','We operate 7 days a week. Average delivery time is 30–60 minutes depending on your area and courier availability.'],
+    ['What is AMBAR','AMBAR is an express premium spirits delivery service. Fully licensed, certified products only.'],
+    ['Delivery Zone','We deliver within Dubai only. Other Emirates are not available yet.'],
+    ['Working Hours','We accept orders from 12:00 PM to 6:00 AM. Orders outside these hours are not processed.'],
     ['Selection','Vodka, whisky, gin, rum, tequila, vermouth, beer and more — from everyday favourites to rare collector bottles.'],
-    ['Payment','Cash or card on delivery. Tip your courier optionally — you can set it directly at checkout.'],
-    ['Support','Our team is available every day. Any issues with your order? Message us via the Support section — we reply fast.'],
+    ['Payment','Cash on delivery only. Card payments are not accepted. Optional tip for your courier at checkout.'],
+    ['Support','Our team is available daily during working hours. Any questions — message us via the Support section.'],
   ];
   el('about-content').innerHTML=`
     <div style="text-align:center;padding:6px 0 22px">

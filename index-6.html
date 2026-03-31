@@ -1781,7 +1781,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
         <div style="width:36px;height:36px;border-radius:10px;background:rgba(212,175,55,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:20px">🏍️</div>
         <div style="text-align:left">
           <div style="font-size:13px;font-weight:700;color:#d4af37" id="aod-game-title">Играй пока ждёшь</div>
-          <div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:1px" id="aod-game-sub">Рекорд: <span id="aod-game-best">0</span> AED</div>
+          <div style="font-size:11px;color:rgba(255,255,255,.35);margin-top:1px" id="aod-game-sub">Рекорд: <span id="aod-game-best">0</span> pts</div>
         </div>
         <svg style="margin-left:auto;flex-shrink:0" viewBox="0 0 24 24" fill="none" stroke="rgba(212,175,55,.5)" stroke-width="2.5" stroke-linecap="round" width="16" height="16"><polyline points="9 18 15 12 9 6"/></svg>
       </button>
@@ -1816,42 +1816,41 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 </div>
 
 <!-- ── AMBAR Delivery Run game ── -->
-<div id="game-ov" style="position:fixed;inset:0;z-index:9500;background:#07070E;display:none;flex-direction:column;overflow:hidden">
-  <div style="display:flex;align-items:center;gap:10px;padding:max(18px,env(safe-area-inset-top)) 16px 8px">
-    <button onclick="closeGame()" style="width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.08);border:none;display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
-    </button>
-    <div style="flex:1;text-align:center">
-      <div style="font-family:'DM Sans',sans-serif;font-size:13px;letter-spacing:4px;color:#d4af37;font-weight:700">AMBAR</div>
-      <div style="font-size:9px;letter-spacing:2.5px;color:rgba(255,255,255,.3);text-transform:uppercase;margin-top:1px">delivery run</div>
-    </div>
-    <div style="width:36px"></div>
-  </div>
-  <div style="display:flex;justify-content:space-between;padding:4px 24px 10px">
-    <div>
-      <div id="game-score" style="font-size:24px;font-weight:700;color:#d4af37;font-family:'DM Sans',sans-serif;line-height:1">0</div>
-      <div style="font-size:9px;letter-spacing:1.5px;color:rgba(255,255,255,.3);margin-top:2px">AED EARNED</div>
-    </div>
-    <div style="text-align:right">
-      <div id="game-best-disp" style="font-size:24px;font-weight:700;color:rgba(212,175,55,.45);font-family:'DM Sans',sans-serif;line-height:1">0</div>
-      <div style="font-size:9px;letter-spacing:1.5px;color:rgba(255,255,255,.3);margin-top:2px">РЕКОРД</div>
+<div id="game-ov" style="position:fixed;inset:0;z-index:9500;background:#07070E;display:none">
+  <canvas id="game-canvas" style="position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none"></canvas>
+  <!-- HUD -->
+  <div style="position:absolute;top:0;left:0;right:0;pointer-events:none;padding:max(54px,calc(env(safe-area-inset-top) + 36px)) 22px 0">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start">
+      <div>
+        <div id="game-score" style="font-size:34px;font-weight:700;color:#fff;font-family:'DM Sans',sans-serif;line-height:1;text-shadow:0 2px 16px rgba(0,0,0,.9)">0</div>
+        <div style="font-size:9px;letter-spacing:2px;color:rgba(255,255,255,.38);margin-top:3px">SCORE</div>
+      </div>
+      <div style="text-align:right">
+        <div id="game-best-disp" style="font-size:34px;font-weight:700;color:rgba(212,175,55,.5);font-family:'DM Sans',sans-serif;line-height:1;text-shadow:0 2px 16px rgba(0,0,0,.9)">0</div>
+        <div style="font-size:9px;letter-spacing:2px;color:rgba(255,255,255,.38);margin-top:3px" id="game-best-lbl">BEST</div>
+      </div>
     </div>
   </div>
-  <div style="position:relative;flex:1;overflow:hidden">
-    <canvas id="game-canvas" style="width:100%;height:100%;display:block;touch-action:none"></canvas>
-    <div id="game-start-screen" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;pointer-events:none">
-      <div style="font-size:56px;line-height:1;filter:drop-shadow(0 0 20px rgba(212,175,55,.4))">🏍️</div>
-      <div style="font-size:11px;letter-spacing:3px;color:rgba(255,255,255,.5)">DELIVERY RUN</div>
-      <div style="font-size:13px;color:rgba(255,255,255,.35);margin-top:4px" id="game-tap-hint">Нажмите, чтобы начать</div>
-    </div>
-    <div id="game-over-screen" style="position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:10px;background:rgba(7,7,14,.85)">
-      <div style="font-size:10px;letter-spacing:3px;color:rgba(255,255,255,.35);text-transform:uppercase">доставка прервана</div>
-      <div id="game-final-aed" style="font-size:42px;font-weight:700;color:#d4af37;font-family:'DM Sans',sans-serif;line-height:1.1">0 AED</div>
-      <div id="game-new-best" style="font-size:11px;color:#d4af37;letter-spacing:2px;display:none">🏆 НОВЫЙ РЕКОРД</div>
-      <button onclick="startGame()" style="margin-top:12px;padding:13px 32px;background:linear-gradient(135deg,#c9a96e,#d4af37);color:#07070E;border:none;border-radius:14px;font-size:14px;font-weight:700;letter-spacing:.5px;cursor:pointer">Ещё раз</button>
+  <!-- Close -->
+  <button onclick="closeGame()" style="position:absolute;top:max(14px,env(safe-area-inset-top));left:16px;width:34px;height:34px;border-radius:50%;background:rgba(0,0,0,.45);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2">
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.65)" stroke-width="2.8" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  </button>
+  <!-- Start screen -->
+  <div id="game-start-screen" style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;pointer-events:none">
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:11px;letter-spacing:5px;color:rgba(212,175,55,.6);margin-bottom:4px">AMBAR</div>
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;letter-spacing:2px;color:#fff;text-shadow:0 0 40px rgba(212,175,55,.3)">DELIVERY RUN</div>
+    <div style="margin-top:18px;padding:11px 26px;border:1px solid rgba(212,175,55,.25);border-radius:24px;background:rgba(212,175,55,.07);backdrop-filter:blur(8px)">
+      <div id="game-tap-hint" style="font-size:13px;color:rgba(255,255,255,.55);letter-spacing:.3px">Tap to start</div>
     </div>
   </div>
-  <div style="height:max(16px,env(safe-area-inset-bottom))"></div>
+  <!-- Game over -->
+  <div id="game-over-screen" style="position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center;gap:6px;background:rgba(7,7,14,.82);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)">
+    <div id="game-over-lbl" style="font-size:10px;letter-spacing:4px;color:rgba(255,255,255,.28)">GAME OVER</div>
+    <div id="game-final-aed" style="font-size:62px;font-weight:700;color:#fff;font-family:'DM Sans',sans-serif;line-height:1;margin-top:6px">0</div>
+    <div id="game-pts-lbl" style="font-size:11px;color:rgba(255,255,255,.32);letter-spacing:2px">POINTS</div>
+    <div id="game-new-best" style="margin-top:6px;padding:5px 16px;background:rgba(212,175,55,.12);border:1px solid rgba(212,175,55,.35);border-radius:20px;font-size:10px;color:#d4af37;letter-spacing:2.5px;display:none">NEW BEST</div>
+    <button id="game-retry-btn" onclick="startGame()" style="margin-top:20px;padding:15px 40px;background:linear-gradient(135deg,#c9a96e,#d4af37);color:#07070E;border:none;border-radius:16px;font-size:14px;font-weight:700;letter-spacing:.5px;cursor:pointer;font-family:'DM Sans',sans-serif">Play again</button>
+  </div>
 </div>
 
 <!-- iOS-style push toast -->
@@ -5791,10 +5790,12 @@ const _G={state:'idle',raf:0,frame:0,score:0,speed:0,W:0,H:0,gY:0,
 function openGame(){
   closeAod();
   const ov=el('game-ov');
-  ov.style.display='flex';
+  ov.style.display='block';
+  const ru=lang==='ru';
   const best=parseInt(localStorage.getItem('ambar_game_best')||'0');
   el('game-best-disp').textContent=best;
   el('game-score').textContent='0';
+  el('game-best-lbl').textContent=ru?'РЕКОРД':'BEST';
   _G.state='idle';
   cancelAnimationFrame(_G.raf);
   requestAnimationFrame(_gameInit);
@@ -5813,11 +5814,24 @@ function _gameInit(){
   canvas.width=W*dpr;canvas.height=H*dpr;
   _G.ctx=canvas.getContext('2d');
   _G.ctx.scale(dpr,dpr);
-  _G.W=W;_G.H=H;_G.gY=H*0.70;
+  _G.W=W;_G.H=H;_G.gY=H*0.72;
+  _G.bgOff=0;
+  // Generate city skyline once
+  _G.buildings=[];
+  const bCount=18;
+  for(let i=0;i<bCount;i++){
+    const bw=18+Math.random()*34,bh=28+Math.random()*(_G.gY*0.55),lit=Math.random()>.45;
+    const wins=[];
+    if(lit){for(let dy=6;dy<bh-6;dy+=10)for(let dx=4;dx<bw-4;dx+=8)if(Math.random()>.5)wins.push({dx,dy});}
+    _G.buildings.push({x:(W/bCount)*i*1.1+Math.random()*20,w:bw,h:bh,lit,wins});
+  }
   canvas.ontouchstart=_gameTouch;
   canvas.onmousedown=_gameTouch;
   const ru=lang==='ru';
   el('game-tap-hint').textContent=ru?'Нажмите, чтобы начать':'Tap to start';
+  el('game-over-lbl').textContent=ru?'ИГРА ОКОНЧЕНА':'GAME OVER';
+  el('game-pts-lbl').textContent=ru?'ОЧКОВ':'POINTS';
+  el('game-retry-btn').textContent=ru?'Ещё раз':'Play again';
   el('game-start-screen').style.display='flex';
   el('game-over-screen').style.display='none';
   _gameDrawIdle();
@@ -5835,9 +5849,9 @@ function _gameTouch(e){
 
 function startGame(){
   cancelAnimationFrame(_G.raf);
-  _G.score=0;_G.frame=0;_G.speed=5;
+  _G.score=0;_G.frame=0;_G.speed=5;_G.bgOff=_G.bgOff||0;
   _G.obstacles=[];_G.coins=[];_G.state='playing';
-  _G.player={x:80,y:_G.gY,vy:0,w:42,h:30,jumps:0};
+  _G.player={x:80,y:_G.gY,vy:0,w:44,h:32,jumps:0};
   el('game-start-screen').style.display='none';
   el('game-over-screen').style.display='none';
   _G.raf=requestAnimationFrame(_gameLoop);
@@ -5847,34 +5861,33 @@ function _gameLoop(){
   if(_G.state!=='playing')return;
   const G=_G,p=G.player;
   G.frame++;G.score++;
-  G.speed=5+Math.floor(G.score/500)*0.6;
+  G.speed=5+Math.floor(G.score/500)*0.5;
+  G.bgOff=(G.bgOff+G.speed*0.18)%(G.W*1.2);
   el('game-score').textContent=Math.floor(G.score/10);
   // Physics
   p.vy+=0.75;p.y+=p.vy;
   if(p.y>=G.gY){p.y=G.gY;p.vy=0;p.jumps=0;}
   // Spawn obstacles
-  const si=Math.max(65,125-Math.floor(G.score/300)*6);
+  const si=Math.max(60,120-Math.floor(G.score/300)*5);
   if(G.frame%si===0){
-    const h=24+Math.random()*26;
-    G.obstacles.push({x:G.W+20,w:16,h,y:G.gY});
+    const h=26+Math.random()*28;
+    G.obstacles.push({x:G.W+20,w:14,h,y:G.gY});
   }
-  // Spawn coins (arcs of 3)
-  if(G.frame%70===0&&Math.random()>.35){
-    for(let k=0;k<3;k++)G.coins.push({x:G.W+10+k*30,y:G.gY-40-Math.sin(k*1.2)*35,r:7,col:false});
+  // Spawn coins
+  if(G.frame%72===0&&Math.random()>.3){
+    for(let k=0;k<3;k++)G.coins.push({x:G.W+12+k*32,y:G.gY-44-Math.sin(k*1.1)*38,r:7,col:false});
   }
-  // Move
   G.obstacles.forEach(o=>o.x-=G.speed);
   G.coins.forEach(c=>c.x-=G.speed);
   G.obstacles=G.obstacles.filter(o=>o.x>-40);
   G.coins=G.coins.filter(c=>c.x>-20);
-  // Collision — obstacles (hitbox slightly smaller)
-  const hx=p.x+8,hy=p.y-p.h+4,hw=p.w-16,hh=p.h-6;
+  // Collision
+  const hx=p.x+9,hy=p.y-p.h+5,hw=p.w-18,hh=p.h-7;
   for(const o of G.obstacles){
     if(hx<o.x+o.w&&hx+hw>o.x&&hy<o.y&&hy+hh>o.y-o.h){_gameDead();return;}
   }
-  // Coins
   G.coins.forEach(c=>{
-    if(!c.col&&Math.abs(p.x+p.w/2-c.x)<c.r+16&&Math.abs(p.y-p.h/2-c.y)<c.r+16){
+    if(!c.col&&Math.abs(p.x+p.w/2-c.x)<c.r+14&&Math.abs(p.y-p.h/2-c.y)<c.r+14){
       c.col=true;G.score+=80;haptic.light();
     }
   });
@@ -5884,82 +5897,160 @@ function _gameLoop(){
 
 function _gameDead(){
   _G.state='dead';
-  const finalAed=Math.floor(_G.score/10);
+  const pts=Math.floor(_G.score/10);
   const prev=parseInt(localStorage.getItem('ambar_game_best')||'0');
-  const isNew=finalAed>prev;
-  if(isNew){localStorage.setItem('ambar_game_best',String(finalAed));el('game-best-disp').textContent=finalAed;}
-  el('aod-game-best').textContent=Math.max(finalAed,prev);
-  el('game-final-aed').textContent=finalAed+' AED';
+  const isNew=pts>prev;
+  if(isNew){localStorage.setItem('ambar_game_best',String(pts));el('game-best-disp').textContent=pts;}
+  el('aod-game-best').textContent=Math.max(pts,prev);
+  el('game-final-aed').textContent=pts;
   el('game-new-best').style.display=isNew?'block':'none';
   el('game-over-screen').style.display='flex';
   haptic.error();
   _gameDraw();
 }
 
+function _gameDrawScene(G,ctx,W,H,gY){
+  // Sky gradient
+  const sky=ctx.createLinearGradient(0,0,0,gY);
+  sky.addColorStop(0,'#060810');sky.addColorStop(0.6,'#0a0d1a');sky.addColorStop(1,'#0f1422');
+  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
+  // Moon
+  ctx.save();
+  ctx.shadowColor='rgba(220,220,180,.35)';ctx.shadowBlur=18;
+  ctx.fillStyle='rgba(240,235,200,.92)';
+  ctx.beginPath();ctx.arc(W*0.82,gY*0.18,11,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+  // Stars
+  for(let i=0;i<70;i++){
+    const sx=(i*137.508+13)%W,sy=(i*89.313+7)%(gY*0.85);
+    const size=i%9===0?1.4:i%4===0?1.0:.55;
+    const alpha=i%9===0?.95:i%4===0?.6:.3;
+    ctx.fillStyle=`rgba(255,255,255,${alpha})`;
+    ctx.beginPath();ctx.arc(sx,sy,size,0,Math.PI*2);ctx.fill();
+  }
+  // City silhouette (parallax)
+  if(G.buildings&&G.buildings.length){
+    ctx.fillStyle='rgba(12,14,26,.9)';
+    G.buildings.forEach(b=>{
+      const bx=((b.x-G.bgOff*0.22)%( W+60)+W+60)%(W+60)-30;
+      const by=gY-b.h;
+      ctx.fillRect(bx,by,b.w,b.h);
+      // windows (pre-baked per building)
+      if(b.lit&&b.wins){
+        ctx.fillStyle='rgba(212,175,55,.22)';
+        b.wins.forEach(w=>ctx.fillRect(bx+w.dx,by+w.dy,3,4));
+        ctx.fillStyle='rgba(12,14,26,.9)';
+      }
+    });
+  }
+  // Road base
+  const roadGrad=ctx.createLinearGradient(0,gY,0,H);
+  roadGrad.addColorStop(0,'#141820');roadGrad.addColorStop(1,'#0e1118');
+  ctx.fillStyle=roadGrad;ctx.fillRect(0,gY,W,H-gY);
+  // Ground glow
+  const gl=ctx.createLinearGradient(0,gY,0,gY+50);
+  gl.addColorStop(0,'rgba(212,175,55,.09)');gl.addColorStop(1,'rgba(212,175,55,0)');
+  ctx.fillStyle=gl;ctx.fillRect(0,gY,W,50);
+  // Ground line
+  ctx.strokeStyle='rgba(212,175,55,.5)';ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(0,gY+1);ctx.lineTo(W,gY+1);ctx.stroke();
+  // Road dashes
+  ctx.strokeStyle='rgba(255,255,255,.07)';ctx.lineWidth=2;
+  const off=(G.frame*G.speed)%80;
+  for(let x=-off;x<W;x+=80){ctx.beginPath();ctx.moveTo(x,gY+20);ctx.lineTo(x+44,gY+20);ctx.stroke();}
+  // Curb dots
+  ctx.fillStyle='rgba(212,175,55,.2)';
+  const coff=(G.frame*G.speed)%40;
+  for(let x=-coff;x<W;x+=40){ctx.beginPath();ctx.arc(x,gY+3,2,0,Math.PI*2);ctx.fill();}
+}
+
 function _gameDraw(){
   const G=_G,ctx=G.ctx,W=G.W,H=G.H,gY=G.gY;
   ctx.clearRect(0,0,W,H);
-  // Sky
-  const sky=ctx.createLinearGradient(0,0,0,gY);
-  sky.addColorStop(0,'#07070E');sky.addColorStop(1,'#0d111a');
-  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
-  // Stars
-  for(let i=0;i<50;i++){
-    const sx=(i*137.508)%W,sy=(i*89.313)%(gY-10);
-    const br=i%7===0?.9:.35+((i%3)*.15);
-    ctx.fillStyle=`rgba(255,255,255,${br})`;
-    ctx.beginPath();ctx.arc(sx,sy,i%5===0?1.2:.6,0,Math.PI*2);ctx.fill();
-  }
-  // Ground glow
-  const gl=ctx.createLinearGradient(0,gY,0,H);
-  gl.addColorStop(0,'rgba(212,175,55,.12)');gl.addColorStop(1,'rgba(212,175,55,0)');
-  ctx.fillStyle=gl;ctx.fillRect(0,gY+2,W,H-gY);
-  // Ground line
-  ctx.strokeStyle='rgba(212,175,55,.45)';ctx.lineWidth=1.5;
-  ctx.beginPath();ctx.moveTo(0,gY+2);ctx.lineTo(W,gY+2);ctx.stroke();
-  // Road dashes
-  ctx.strokeStyle='rgba(212,175,55,.1)';ctx.lineWidth=1.5;
-  const off=(G.frame*G.speed)%70;
-  for(let x=-off;x<W;x+=70){ctx.beginPath();ctx.moveTo(x,gY+18);ctx.lineTo(x+36,gY+18);ctx.stroke();}
-  // Coins
+  _gameDrawScene(G,ctx,W,H,gY);
+  // Coins — glowing orbs
   G.coins.forEach(c=>{
     if(c.col)return;
     ctx.save();
-    ctx.shadowColor='rgba(212,175,55,.6)';ctx.shadowBlur=8;
-    ctx.fillStyle='#d4af37';ctx.beginPath();ctx.arc(c.x,c.y,c.r,0,Math.PI*2);ctx.fill();
+    // outer glow
+    const cg=ctx.createRadialGradient(c.x,c.y,1,c.x,c.y,c.r*2.2);
+    cg.addColorStop(0,'rgba(212,175,55,.5)');cg.addColorStop(1,'rgba(212,175,55,0)');
+    ctx.fillStyle=cg;ctx.beginPath();ctx.arc(c.x,c.y,c.r*2.2,0,Math.PI*2);ctx.fill();
+    // coin body
+    ctx.shadowColor='rgba(212,175,55,.8)';ctx.shadowBlur=10;
+    const cinner=ctx.createRadialGradient(c.x-2,c.y-2,0,c.x,c.y,c.r);
+    cinner.addColorStop(0,'#f0d060');cinner.addColorStop(1,'#b8860b');
+    ctx.fillStyle=cinner;ctx.beginPath();ctx.arc(c.x,c.y,c.r,0,Math.PI*2);ctx.fill();
     ctx.restore();
-    ctx.fillStyle='#07070E';ctx.font='bold 7px sans-serif';
-    ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('$',c.x,c.y);
   });
-  // Obstacles (barriers)
+  // Obstacles — road barriers
   G.obstacles.forEach(o=>{
-    const ox=o.x,oy=o.y-o.h;
-    ctx.fillStyle='rgba(180,20,20,.85)';
-    ctx.beginPath();if(ctx.roundRect)ctx.roundRect(ox,oy,o.w,o.h,3);else ctx.rect(ox,oy,o.w,o.h);ctx.fill();
-    ctx.strokeStyle='rgba(255,80,80,.7)';ctx.lineWidth=1;
-    ctx.strokeRect(ox+.5,oy+.5,o.w-1,o.h-1);
-    // stripes
-    ctx.strokeStyle='rgba(255,220,0,.5)';ctx.lineWidth=1.5;
-    for(let s=4;s<o.h-2;s+=7){ctx.beginPath();ctx.moveTo(ox+2,oy+s);ctx.lineTo(Math.min(ox+o.w-2,ox+s+8),oy+2);ctx.stroke();}
+    const ox=o.x,oy=o.y-o.h,ow=o.w,oh=o.h;
+    // Post
+    const bg=ctx.createLinearGradient(ox,oy,ox+ow,oy);
+    bg.addColorStop(0,'#c0392b');bg.addColorStop(0.5,'#e74c3c');bg.addColorStop(1,'#c0392b');
+    ctx.fillStyle=bg;
+    ctx.beginPath();if(ctx.roundRect)ctx.roundRect(ox,oy,ow,oh,2);else ctx.rect(ox,oy,ow,oh);ctx.fill();
+    // Warning stripes
+    ctx.save();
+    ctx.beginPath();if(ctx.roundRect)ctx.roundRect(ox,oy,ow,oh,2);else ctx.rect(ox,oy,ow,oh);ctx.clip();
+    ctx.strokeStyle='rgba(255,220,30,.75)';ctx.lineWidth=3;
+    for(let s=-oh;s<oh+ow;s+=10){
+      ctx.beginPath();ctx.moveTo(ox+s,oy);ctx.lineTo(ox+s+oh,oy+oh);ctx.stroke();
+    }
+    ctx.restore();
+    // Reflection dot on top
+    ctx.fillStyle='rgba(255,100,100,.9)';
+    ctx.beginPath();ctx.arc(ox+ow/2,oy+3,2.5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,200,200,.6)';
+    ctx.beginPath();ctx.arc(ox+ow/2,oy+3,1.2,0,Math.PI*2);ctx.fill();
   });
-  // Player — motorcycle
+  // Player — clean cyclist
   const p=G.player;if(!p)return;
+  _drawPlayer(ctx,p);
+}
+
+function _drawPlayer(ctx,p){
   const px=p.x,py=p.y,pw=p.w,ph=p.h;
-  const wr=9,fwx=px+pw-4,bwx=px+8,wy=py;
-  // wheels
-  ctx.strokeStyle='#d4af37';ctx.lineWidth=2;
-  ctx.fillStyle='rgba(212,175,55,.18)';
-  [bwx,fwx].forEach(wx=>{ctx.beginPath();ctx.arc(wx,wy,wr,0,Math.PI*2);ctx.fill();ctx.stroke();});
-  // frame
+  const wr=10,fwx=px+pw-5,bwx=px+9,wy=py;
+  const lean=p.vy<0?-0.12:0.04; // lean on jump
+  ctx.save();ctx.translate(px+pw/2,py);ctx.rotate(lean);ctx.translate(-(px+pw/2),-py);
+  // Wheel shadows
+  ctx.fillStyle='rgba(0,0,0,.25)';
+  [bwx,fwx].forEach(wx=>{ctx.beginPath();ctx.ellipse(wx,wy+2,wr,3,0,0,Math.PI*2);ctx.fill();});
+  // Wheels
+  [bwx,fwx].forEach(wx=>{
+    const wg=ctx.createRadialGradient(wx,wy,2,wx,wy,wr);
+    wg.addColorStop(0,'rgba(212,175,55,.25)');wg.addColorStop(0.7,'rgba(30,30,30,.9)');wg.addColorStop(1,'#d4af37');
+    ctx.fillStyle=wg;ctx.beginPath();ctx.arc(wx,wy,wr,0,Math.PI*2);ctx.fill();
+    ctx.strokeStyle='#d4af37';ctx.lineWidth=1.8;ctx.beginPath();ctx.arc(wx,wy,wr,0,Math.PI*2);ctx.stroke();
+    // Spokes
+    ctx.strokeStyle='rgba(212,175,55,.4)';ctx.lineWidth=1;
+    for(let a=0;a<Math.PI*2;a+=Math.PI/3){
+      ctx.beginPath();ctx.moveTo(wx,wy);ctx.lineTo(wx+Math.cos(a)*wr*0.85,wy+Math.sin(a)*wr*0.85);ctx.stroke();
+    }
+  });
+  // Frame
+  ctx.strokeStyle='rgba(212,175,55,.75)';ctx.lineWidth=2.2;ctx.lineCap='round';
+  ctx.beginPath();ctx.moveTo(bwx,wy-wr+2);ctx.lineTo(px+pw*.48,py-ph*.85);ctx.lineTo(fwx,wy-wr+2);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(px+pw*.48,py-ph*.85);ctx.lineTo(px+pw*.55,py-ph*.4);ctx.lineTo(bwx+4,wy-wr+2);ctx.stroke();
+  // Handlebars
   ctx.strokeStyle='rgba(212,175,55,.8)';ctx.lineWidth=2;
-  ctx.beginPath();ctx.moveTo(bwx,wy-wr);ctx.lineTo(px+pw*.5,py-ph);ctx.lineTo(fwx,wy-wr);ctx.stroke();
-  // seat/body
-  ctx.fillStyle='rgba(212,175,55,.55)';
-  ctx.beginPath();ctx.ellipse(px+pw*.45,py-ph*.3,pw*.22,ph*.22,-.3,0,Math.PI*2);ctx.fill();
-  // rider silhouette
-  ctx.fillStyle='rgba(212,175,55,.7)';
-  ctx.beginPath();if(ctx.roundRect)ctx.roundRect(px+pw*.3,py-ph*.95,pw*.25,ph*.6,3);else ctx.rect(px+pw*.3,py-ph*.95,pw*.25,ph*.6);ctx.fill();
-  ctx.beginPath();ctx.arc(px+pw*.42,py-ph-4,5,0,Math.PI*2);ctx.fill();
+  ctx.beginPath();ctx.moveTo(fwx-2,wy-wr+2);ctx.lineTo(fwx-4,wy-wr-8);ctx.lineTo(fwx+2,wy-wr-8);ctx.stroke();
+  // Seat
+  ctx.fillStyle='rgba(180,140,40,.7)';
+  ctx.beginPath();if(ctx.roundRect)ctx.roundRect(px+pw*.3,py-ph*.45,pw*.24,5,2);else ctx.rect(px+pw*.3,py-ph*.45,pw*.24,5);ctx.fill();
+  // Rider body
+  const riderGrad=ctx.createLinearGradient(0,py-ph,0,py-ph*.3);
+  riderGrad.addColorStop(0,'rgba(200,165,55,.85)');riderGrad.addColorStop(1,'rgba(160,120,30,.7)');
+  ctx.fillStyle=riderGrad;
+  ctx.beginPath();if(ctx.roundRect)ctx.roundRect(px+pw*.28,py-ph,pw*.28,ph*.6,4);else ctx.rect(px+pw*.28,py-ph,pw*.28,ph*.6);ctx.fill();
+  // Head with helmet
+  ctx.fillStyle='rgba(212,175,55,.85)';
+  ctx.beginPath();ctx.arc(px+pw*.38,py-ph-7,6,0,Math.PI*2);ctx.fill();
+  ctx.fillStyle='rgba(160,120,30,.9)';
+  ctx.beginPath();ctx.arc(px+pw*.38,py-ph-9,5,Math.PI,.0);ctx.fill();
+  ctx.restore();
 }
 
 function _gameDrawIdle(){
@@ -5967,12 +6058,10 @@ function _gameDrawIdle(){
   const G=_G,ctx=G.ctx,W=G.W,H=G.H,gY=G.gY;
   if(!ctx)return;
   ctx.clearRect(0,0,W,H);
-  const sky=ctx.createLinearGradient(0,0,0,gY);
-  sky.addColorStop(0,'#07070E');sky.addColorStop(1,'#0d111a');
-  ctx.fillStyle=sky;ctx.fillRect(0,0,W,H);
-  for(let i=0;i<50;i++){const sx=(i*137.508)%W,sy=(i*89.313)%(gY-10);ctx.fillStyle='rgba(255,255,255,.35)';ctx.beginPath();ctx.arc(sx,sy,.8,0,Math.PI*2);ctx.fill();}
-  ctx.fillStyle='rgba(212,175,55,.08)';ctx.fillRect(0,gY,W,H-gY);
-  ctx.strokeStyle='rgba(212,175,55,.4)';ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(0,gY+2);ctx.lineTo(W,gY+2);ctx.stroke();
+  _gameDrawScene(G,ctx,W,H,gY);
+  // Idle player centered
+  const idleP={x:W/2-22,y:gY,vy:0,w:44,h:32,jumps:0};
+  _drawPlayer(ctx,idleP);
 }
 
 function _initAodSwipe(){

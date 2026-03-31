@@ -4606,7 +4606,41 @@ function addWishlistToCart(){
 }
 
 // ── PROFILE HUB SHEETS ────────────────────────────────────────────────────────
-function _openSheet(id){const ov=el(id);ov.style.display='flex';ov.offsetHeight;ov.classList.add('open');}
+function _openSheet(id){
+  const ov=el(id);
+  ov.style.display='flex';
+  ov.offsetHeight;
+  ov.classList.add('open');
+  // attach swipe-to-close on the inner sheet element
+  const sheet=ov.querySelector('.cancel-sheet');
+  if(sheet&&!sheet._swipeInit){
+    sheet._swipeInit=true;
+    let startY=0,startScroll=0,dragging=false;
+    sheet.addEventListener('touchstart',e=>{
+      if(e.touches.length!==1)return;
+      startY=e.touches[0].clientY;
+      startScroll=sheet.scrollTop;
+      dragging=true;
+      sheet.style.transition='none';
+    },{passive:true});
+    sheet.addEventListener('touchmove',e=>{
+      if(!dragging)return;
+      const dy=e.touches[0].clientY-startY;
+      // only drag down when scrolled to top
+      if(dy>0&&sheet.scrollTop<=0){
+        sheet.style.transform=`translateY(${dy}px)`;
+      }
+    },{passive:true});
+    sheet.addEventListener('touchend',e=>{
+      if(!dragging)return;
+      dragging=false;
+      const dy=e.changedTouches[0].clientY-startY;
+      sheet.style.transition='';
+      sheet.style.transform='';
+      if(dy>80) _closeSheet(id);
+    },{passive:true});
+  }
+}
 function _closeSheet(id){const ov=el(id);ov.classList.remove('open');setTimeout(()=>{if(!ov.classList.contains('open'))ov.style.display='none';},240);}
 
 // VIP tiers: Bronze 0-999 · Silver 1000-4999 · Gold 5000-14999 · Platinum 15000+
@@ -4626,32 +4660,21 @@ function openVipSheet(){
   const idx=_vipTiers.indexOf(tier);
   const nextTier=_vipTiers[idx+1];
   const progress=tier.next?Math.min(100,Math.round(((count-tier.min)/(tier.next-tier.min))*100)):100;
-  const perks={
-    silver: ['Access to full catalogue','24/7 support'],
-    gold:   ['Everything in Silver','Priority support','Early access to new arrivals'],
-    platinum:['Everything in Gold','Dedicated manager','Free express delivery'],
-    diamond: ['Everything in Platinum','Concierge service','Exclusive offers'],
-    obsidian:['Everything in Diamond','VIP events','Personal account manager','Secret drops'],
-  };
   el('vip-content').innerHTML=`
-    <div style="text-align:center;padding:8px 0 22px">
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:700;color:${tier.color};letter-spacing:4px">${tier.label}</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:6px">${count} ${ru?'заказов':'orders'}</div>
+    <div style="text-align:center;padding:8px 0 28px">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:36px;font-weight:700;color:${tier.color};letter-spacing:5px">${tier.label}</div>
+      <div style="font-size:12px;color:var(--muted);margin-top:8px">${count} ${ru?'заказов':'orders'}</div>
     </div>
     ${tier.next?`
-    <div style="margin-bottom:20px">
+    <div style="margin-bottom:12px">
       <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:8px">
         <span>${ru?'До':'To'} ${nextTier?nextTier.label:''}</span>
-        <span>${tier.next-count} ${ru?'заказов':'orders'} ${ru?'осталось':'to go'}</span>
+        <span>${tier.next-count} ${ru?'заказов осталось':'orders to go'}</span>
       </div>
       <div style="height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden">
         <div style="height:100%;width:${progress}%;background:${tier.color};border-radius:3px;transition:width .6s cubic-bezier(.4,0,.2,1)"></div>
       </div>
-    </div>`:`<div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:20px">${ru?'Вы на максимальном уровне':'You\'ve reached the top tier'}</div>`}
-    <div style="border-top:1px solid rgba(255,255,255,.07);padding-top:16px">
-      <div style="font-size:10px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:12px">${ru?'Ваши привилегии':'Your perks'}</div>
-      ${(perks[tier.key]||[]).map(p=>`<div style="display:flex;align-items:center;gap:10px;padding:7px 0;font-size:13px;color:var(--text)"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${tier.color}" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>${p}</div>`).join('')}
-    </div>
+    </div>`:`<div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:12px">${ru?'Вы на максимальном уровне 🏆':'You\'ve reached the top tier 🏆'}</div>`}
     <div style="height:8px"></div>`;
   _openSheet('vip-ov');
 }

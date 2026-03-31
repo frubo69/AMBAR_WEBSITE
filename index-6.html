@@ -1188,11 +1188,6 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       <div class="phub-text"><div class="phub-title" id="phub-t-dnote">Delivery Note</div><div class="phub-sub" id="phub-s-dnote">Gate code, instructions…</div></div>
       <div class="phub-right"><span class="phub-val" id="phub-v-dnote" style="max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px"></span><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
     </div>
-    <div class="prof-hub-row" onclick="openBudgetSheet()">
-      <div class="phub-icon"><svg viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg></div>
-      <div class="phub-text"><div class="phub-title" id="phub-t-budget">Monthly Budget</div><div class="phub-sub" id="phub-s-budget">Track your spending limit</div></div>
-      <div class="phub-right"><span class="phub-val" id="phub-v-budget">—</span><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
-    </div>
     <div class="prof-hub-row" onclick="shareInvite()">
       <div class="phub-icon"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></div>
       <div class="phub-text"><div class="phub-title" id="phub-t-invite">Invite a Friend</div><div class="phub-sub" id="phub-s-invite">Share AMBAR</div></div>
@@ -4525,6 +4520,41 @@ function buildProfile(){
 function _toggleProfSection(id){
   const sec=el(id);
   const isOpen=sec.style.display!=='none';
+  if(!isOpen){
+    // Always re-render fresh so race-condition with catalog load doesn't matter
+    if(id==='wishlist-section'){
+      const oErr=`this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><text y=%2268%22 font-size=%2264%22>🍾</text></svg>'`;
+      const wishProds=[...favs].map(fid=>P.find(x=>x.id===fid)).filter(Boolean);
+      el('wishlist-scroll').innerHTML=wishProds.map(p=>{
+        const pname=lang==='ru'?p.name:p.nameE;
+        return`<div class="prof-mini-card" onclick="openPDM('${p.id}')">
+          <img class="prof-mini-img" src="${p.img}" alt="${pname}" onerror="${oErr}">
+          <div class="prof-mini-info">
+            <div class="prof-mini-name">${pname}</div>
+            <div class="prof-mini-price">${p.price} AED</div>
+          </div>
+        </div>`;
+      }).join('') || `<div class="prof-empty-hint">${lang==='ru'?'Список пуст':'Nothing saved yet'}</div>`;
+    }
+    if(id==='usual-section'){
+      const oErr=`this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2020/svg%22 viewBox=%220 0 80 80%22><text y=%2268%22 font-size=%2264%22>🍾</text></svg>'`;
+      const itemCounts={};
+      orders.forEach(o=>(o.items||[]).forEach(i=>{if(!i.id)return;if(!itemCounts[i.id])itemCounts[i.id]={id:i.id,count:0};itemCounts[i.id].count+=i.qty;}));
+      const topItems=Object.values(itemCounts).sort((a,b)=>b.count-a.count).slice(0,6);
+      el('usual-scroll').innerHTML=topItems.map(item=>{
+        const p=P.find(x=>x.id===item.id);if(!p)return'';
+        const pname=lang==='ru'?p.name:p.nameE;
+        return`<div class="prof-mini-card" onclick="openPDM('${p.id}')">
+          <img class="prof-mini-img" src="${p.img}" alt="${pname}" onerror="${oErr}">
+          <div class="prof-mini-info">
+            <div class="prof-mini-name">${pname}</div>
+            <div class="prof-mini-sub">${lang==='ru'?'заказано':'ordered'} ×${item.count}</div>
+            <div class="prof-mini-price">${p.price} AED</div>
+          </div>
+        </div>`;
+      }).join('') || `<div class="prof-empty-hint">${lang==='ru'?'Нет истории заказов':'No order history yet'}</div>`;
+    }
+  }
   sec.style.display=isOpen?'none':'block';
   const chevId=id==='wishlist-section'?'phub-ch-wish':'phub-ch-usual';
   const ch=el(chevId);
@@ -4732,16 +4762,43 @@ function shareInvite(){
 
 function openAboutSheet(){
   const ru=lang==='ru';
+  const steps=ru?[
+    ['🗺️','Каталог','Листайте категории — Водка, Виски, Пиво и другие. Нажмите на карточку, чтобы увидеть детали и добавить в корзину.'],
+    ['📍','Адрес','Сохраните адрес доставки один раз — и он подставится автоматически при следующем заказе.'],
+    ['🛒','Корзина','Проверьте состав заказа, выберите чаевые и подтвердите. Заказ мгновенно уйдёт оператору.'],
+    ['📦','Трекинг','Следите за статусом в баре снизу — от «Ожидает» до «В пути». Нажмите, чтобы открыть детали.'],
+    ['❤️','Избранное','Сохраняйте любимые позиции в Wishlist и заказывайте одним нажатием через «Как обычно».'],
+    ['💬','Поддержка','Есть вопросы? Пишите через раздел Поддержка — операторы отвечают быстро.'],
+  ]:[
+    ['🗺️','Catalogue','Browse categories — Vodka, Whisky, Beer and more. Tap any card to see details and add to cart.'],
+    ['📍','Address','Save your delivery address once — it auto-fills on your next order.'],
+    ['🛒','Cart','Review your order, set a tip and confirm. It goes to our operator instantly.'],
+    ['📦','Tracking','Watch your order status in the bar at the bottom — from Pending to On the Way. Tap for details.'],
+    ['❤️','Wishlist','Save your favourites and reorder them in one tap via The Usual.'],
+    ['💬','Support','Questions? Message us via the Support section — we reply fast.'],
+  ];
   el('about-content').innerHTML=`
-    <div style="text-align:center;padding:10px 0 24px">
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:700;letter-spacing:4px;color:var(--gold);margin-bottom:4px">AMBAR</div>
-      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase">Premium Spirits · UAE</div>
-      <div style="font-size:12px;color:rgba(255,255,255,.2);margin-top:18px">v1.6.0</div>
+    <div style="text-align:center;padding:6px 0 20px">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;letter-spacing:4px;color:var(--gold)">AMBAR</div>
+      <div style="font-size:10px;letter-spacing:2.5px;color:var(--muted);text-transform:uppercase;margin-top:4px">Premium Spirits · UAE</div>
+      <div style="font-size:13px;color:var(--sub);line-height:1.6;margin-top:14px;padding:0 4px">
+        ${ru
+          ? 'AMBAR — сервис доставки премиальных спиртных напитков по ОАЭ. Заказ за несколько касаний, доставка в кратчайшие сроки.'
+          : 'AMBAR is a premium spirits delivery service across the UAE. Order in a few taps, delivered to your door fast.'}
+      </div>
     </div>
-    <div style="border-top:1px solid rgba(255,255,255,.07);padding-top:16px;display:flex;flex-direction:column;gap:10px">
-      <button onclick="openSupportChat('')" style="width:100%;padding:14px;background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.25);border-radius:14px;color:var(--gold2);font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;letter-spacing:.3px;transition:.15s" onpointerdown="this.style.opacity='.6'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">${ru?'Написать в поддержку':'Contact Support'}</button>
+    <div style="border-top:1px solid rgba(255,255,255,.07);padding-top:16px;margin-bottom:4px">
+      <div style="font-size:10px;letter-spacing:1.5px;color:var(--muted);text-transform:uppercase;margin-bottom:14px">${ru?'Как пользоваться':'How it works'}</div>
+      ${steps.map(([icon,title,desc])=>`
+        <div style="display:flex;gap:13px;padding:10px 0;border-bottom:1px solid rgba(255,255,255,.05)">
+          <div style="font-size:20px;line-height:1;flex-shrink:0;padding-top:1px">${icon}</div>
+          <div>
+            <div style="font-size:13px;font-weight:700;color:var(--text);margin-bottom:3px">${title}</div>
+            <div style="font-size:12px;color:var(--muted);line-height:1.55">${desc}</div>
+          </div>
+        </div>`).join('')}
     </div>
-    <div style="height:8px"></div>`;
+    <div style="text-align:center;padding:16px 0 6px;font-size:11px;color:rgba(255,255,255,.15);letter-spacing:.5px">v1.7.0 · AMBAR © 2025</div>`;
   _openSheet('about-ov');
 }
 function closeAboutSheet(){_closeSheet('about-ov');}

@@ -4421,7 +4421,7 @@ function buildProfile(){
   const spentPersisted=parseInt(localStorage.getItem('ambar_spent_total')||'0');
   const spent=spentCurrent+spentPersisted;
   el('stat-total').textContent=orders.length;el('stat-active').textContent=active.length;el('stat-spent').textContent=spent;
-  set('stat-lbl1',t('statOrders'));set('stat-lbl2',t('statActive'));set('stat-lbl3',t('statSpent'));
+  set('stat-lbl1',t('statOrders'));set('stat-lbl2',t('statActive'));set('stat-lbl3','STATUS');
 
   const ru=lang==='ru';
 
@@ -4447,7 +4447,7 @@ function buildProfile(){
   if(tierLabel){tierLabel.textContent=tier.label;tierLabel.style.color=tier.color;}
   set('stat-lbl3','STATUS');
   // Hub row
-  set('phub-t-vip','Status');
+  set('phub-t-vip',ru?'Статус':'Status');
   set('phub-s-vip',tier.label+' · '+orders.length+' '+(ru?'заказов':'orders'));
   const vipBadge=el('phub-v-vip');
   if(vipBadge){vipBadge.textContent=tier.label;vipBadge.style.color=tier.color;vipBadge.style.background=tier.color+'22';}

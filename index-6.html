@@ -1257,7 +1257,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       </button>
     </div>
     <div style="display:flex;flex-direction:column;gap:10px;padding-bottom:8px">
-      <button onclick="closeSupportOptions();setTimeout(()=>{if(tg)tg.openLink('tel:+971501234567');else window.location.href='tel:+971501234567';},200)"
+      <button onclick="closeSupportOptions();setTimeout(()=>{window.location.href='tel:'+SUPPORT_PHONE;},200)"
         style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 18px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:16px;text-align:left;transition:.15s"
         onpointerdown="this.style.background='rgba(255,255,255,.09)'" onpointerup="this.style.background='rgba(255,255,255,.05)'" onpointercancel="this.style.background='rgba(255,255,255,.05)'">
         <div style="width:42px;height:42px;border-radius:12px;background:rgba(52,199,89,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
@@ -1268,7 +1268,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
           <div style="font-size:12px;color:var(--muted);margin-top:2px" id="supp-call-sub">+971 50 123 4567</div>
         </div>
       </button>
-      <button onclick="closeSupportOptions();setTimeout(()=>openSupportChat(''),200)"
+      <button onclick="closeSupportOptions();setTimeout(()=>{if(tg&&tg.openTelegramLink)tg.openTelegramLink('https://t.me/ambar_support_bot');else window.open('https://t.me/ambar_support_bot','_blank');},200)"
         style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 18px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:16px;text-align:left;transition:.15s"
         onpointerdown="this.style.background='rgba(255,255,255,.09)'" onpointerup="this.style.background='rgba(255,255,255,.05)'" onpointercancel="this.style.background='rgba(255,255,255,.05)'">
         <div style="width:42px;height:42px;border-radius:12px;background:rgba(201,169,110,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">

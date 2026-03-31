@@ -1257,7 +1257,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       </button>
     </div>
     <div style="display:flex;flex-direction:column;gap:10px;padding-bottom:8px">
-      <button onclick="navigator.clipboard.writeText(SUPPORT_PHONE).then(()=>{if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred('success');showToast(lang==='ru'?'Номер скопирован':'Number copied','ok',true);})"
+      <button onclick="navigator.clipboard.writeText(SUPPORT_PHONE).then(()=>{if(tg&&tg.HapticFeedback)tg.HapticFeedback.notificationOccurred('success');const s=el('supp-call-sub');const prev=s.textContent;s.textContent=lang==='ru'?'Скопировано':'Copied';s.style.color='var(--green)';setTimeout(()=>{s.textContent=prev;s.style.color='';},2000);})"
         style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 18px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:16px;text-align:left;transition:.15s;box-sizing:border-box"
         onpointerdown="this.style.background='rgba(255,255,255,.09)'" onpointerup="this.style.background='rgba(255,255,255,.05)'" onpointercancel="this.style.background='rgba(255,255,255,.05)'">
         <div style="width:42px;height:42px;border-radius:12px;background:rgba(52,199,89,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">

@@ -1471,6 +1471,14 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   </div>
 </div>
 
+<!-- Photo Viewer Overlay -->
+<div id="photo-viewer" style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.95);display:none;align-items:center;justify-content:center;opacity:0;transition:opacity .2s;touch-action:none;">
+  <button onclick="closePhotoViewer()" style="position:absolute;top:calc(16px + var(--safe-top));right:16px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.12);border:none;color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1;">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  </button>
+  <img id="photo-viewer-img" src="" alt="" style="max-width:100%;max-height:100%;object-fit:contain;transform-origin:center;will-change:transform;user-select:none;-webkit-user-drag:none;">
+</div>
+
 <!-- Toasts (two elements to avoid stuck animation) -->
 <div class="toast" id="toast0"></div>
 <div class="toast" id="toast1"></div>
@@ -4655,7 +4663,7 @@ async function fetchSupportMsgs(){
         bubble.className='msg-bubble '+m.role;
         if(m.type==='photo'){
           const cap=m.caption?`<div>${_escHtml(m.caption)}</div>`:'';
-          bubble.innerHTML=`<img class="chat-photo" src="${AMBAR_API}${m.url}" alt="photo" onclick="window.open(this.src,'_blank')">${cap}<div class="msg-ts">${_fmtTime(m.ts)}</div>`;
+          bubble.innerHTML=`<img class="chat-photo" src="${AMBAR_API}${m.url}" alt="photo" onclick="openPhotoViewer(this.src)">${cap}<div class="msg-ts">${_fmtTime(m.ts)}</div>`;
         }else{
           bubble.innerHTML=`<div>${_escHtml(m.text)}</div><div class="msg-ts">${_fmtTime(m.ts)}</div>`;
         }
@@ -4726,7 +4734,7 @@ async function onSupportFileSelect(input){
   const bubble=document.createElement('div');
   bubble.className='msg-bubble user';
   const thumbUrl=URL.createObjectURL(file);
-  bubble.innerHTML=`<img class="chat-photo" src="${thumbUrl}" alt="photo"><div class="msg-ts" style="opacity:.5">⏳</div>`;
+  bubble.innerHTML=`<img class="chat-photo" src="${thumbUrl}" alt="photo" onclick="openPhotoViewer(this.src)"><div class="msg-ts" style="opacity:.5">⏳</div>`;
   container.appendChild(bubble);
   container.scrollTop=container.scrollHeight;
   haptic.light();
@@ -4750,6 +4758,108 @@ async function onSupportFileSelect(input){
 }
 
 function _autoResizeSupport(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,100)+'px';}
+
+// ── Photo Viewer ─────────────────────────────────────────────────────────────
+(function(){
+  let _scale=1,_tx=0,_ty=0;
+  let _pinchStartDist=0,_pinchStartScale=1;
+  let _panStart={x:0,y:0},_isPanning=false;
+  let _lastTap=0;
+
+  function _applyTransform(){
+    const img=document.getElementById('photo-viewer-img');
+    if(img)img.style.transform=`translate(${_tx}px,${_ty}px) scale(${_scale})`;
+  }
+  function _clampPan(){
+    // Allow panning only when zoomed in
+    if(_scale<=1){_tx=0;_ty=0;return;}
+    const img=document.getElementById('photo-viewer-img');
+    if(!img)return;
+    const r=img.getBoundingClientRect();
+    const vw=window.innerWidth,vh=window.innerHeight;
+    const maxX=Math.max(0,(r.width-vw)/2);
+    const maxY=Math.max(0,(r.height-vh)/2);
+    _tx=Math.max(-maxX,Math.min(maxX,_tx));
+    _ty=Math.max(-maxY,Math.min(maxY,_ty));
+  }
+
+  window.openPhotoViewer=function(src){
+    const v=document.getElementById('photo-viewer');
+    const img=document.getElementById('photo-viewer-img');
+    _scale=1;_tx=0;_ty=0;
+    img.style.transform='';
+    img.src=src;
+    v.style.display='flex';
+    v.offsetHeight;
+    v.style.opacity='1';
+    haptic.light&&haptic.light();
+  };
+  window.closePhotoViewer=function(){
+    const v=document.getElementById('photo-viewer');
+    v.style.opacity='0';
+    setTimeout(()=>{v.style.display='none';document.getElementById('photo-viewer-img').src='';},220);
+  };
+
+  // Tap to close (when not zoomed), double-tap to zoom
+  document.addEventListener('DOMContentLoaded',()=>{
+    const v=document.getElementById('photo-viewer');
+    const img=document.getElementById('photo-viewer-img');
+
+    // Double-tap to zoom in/out
+    img.addEventListener('click',e=>{
+      const now=Date.now();
+      if(now-_lastTap<280){
+        if(_scale>1){_scale=1;_tx=0;_ty=0;}
+        else{_scale=2.5;}
+        _applyTransform();
+      } else if(_scale<=1){
+        // single tap on background (not zoomed) → close
+      }
+      _lastTap=now;
+    });
+    v.addEventListener('click',e=>{
+      if(e.target===v)closePhotoViewer();
+    });
+
+    // Pinch to zoom
+    v.addEventListener('touchstart',e=>{
+      if(e.touches.length===2){
+        _pinchStartDist=Math.hypot(
+          e.touches[0].clientX-e.touches[1].clientX,
+          e.touches[0].clientY-e.touches[1].clientY);
+        _pinchStartScale=_scale;
+        e.preventDefault();
+      } else if(e.touches.length===1&&_scale>1){
+        _isPanning=true;
+        _panStart={x:e.touches[0].clientX-_tx,y:e.touches[0].clientY-_ty};
+        e.preventDefault();
+      }
+    },{passive:false});
+
+    v.addEventListener('touchmove',e=>{
+      if(e.touches.length===2){
+        const dist=Math.hypot(
+          e.touches[0].clientX-e.touches[1].clientX,
+          e.touches[0].clientY-e.touches[1].clientY);
+        _scale=Math.max(1,Math.min(5,_pinchStartScale*(dist/_pinchStartDist)));
+        _clampPan();
+        _applyTransform();
+        e.preventDefault();
+      } else if(e.touches.length===1&&_isPanning){
+        _tx=e.touches[0].clientX-_panStart.x;
+        _ty=e.touches[0].clientY-_panStart.y;
+        _clampPan();
+        _applyTransform();
+        e.preventDefault();
+      }
+    },{passive:false});
+
+    v.addEventListener('touchend',e=>{
+      if(e.touches.length<2)_isPanning=false;
+      if(_scale<1.05){_scale=1;_tx=0;_ty=0;_applyTransform();}
+    });
+  });
+})();
 
 // ── Active Order Bar & Detail ──────────────────────────────────────────────
 let _aobOrders=[],_aobIdx=0,_aobPollTimer=null,_aobTickTimer=null;

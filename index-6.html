@@ -412,6 +412,24 @@ img{display:block}
 .prof-action-btn{width:100%;padding:15px;background:var(--card);border:1.5px dashed rgba(201,169,110,.35);border-radius:var(--r);font-size:14px;font-weight:700;color:var(--gold2);margin-bottom:4px;transition:.15s;letter-spacing:.3px}
 .prof-action-btn:active{opacity:.75;transform:scale(.98)}
 .prof-empty-hint{font-size:13px;color:var(--muted);text-align:center;padding:18px 0 12px}
+/* ── Profile Hub ── */
+.prof-hub-section{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);margin:0 14px 12px;overflow:hidden}
+.prof-hub-row{display:flex;align-items:center;gap:14px;padding:14px 16px;border-bottom:1px solid rgba(255,255,255,.055);cursor:pointer;transition:background .15s;-webkit-tap-highlight-color:transparent}
+.prof-hub-row:last-child{border-bottom:none}
+.prof-hub-row:active{background:rgba(255,255,255,.05)}
+.phub-icon{width:36px;height:36px;border-radius:10px;background:rgba(201,169,110,.12);display:flex;align-items:center;justify-content:center;flex-shrink:0}
+.phub-icon svg{width:17px;height:17px;stroke:var(--gold2);fill:none;stroke-width:1.75;stroke-linecap:round;stroke-linejoin:round}
+.phub-text{flex:1;min-width:0}
+.phub-title{font-size:14px;font-weight:600;color:var(--text)}
+.phub-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.phub-right{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.phub-val{font-size:13px;color:var(--muted)}
+.phub-badge{background:rgba(201,169,110,.18);color:var(--gold2);font-size:10px;font-weight:700;border-radius:6px;padding:2px 7px;letter-spacing:.3px}
+.phub-chevron{width:14px;height:14px;stroke:rgba(255,255,255,.25);fill:none;stroke-width:2;stroke-linecap:round}
+.phub-toggle{width:42px;height:24px;border-radius:12px;background:rgba(255,255,255,.12);position:relative;transition:.2s;flex-shrink:0}
+.phub-toggle.on{background:var(--gold)}
+.phub-toggle::after{content:'';position:absolute;top:3px;left:3px;width:18px;height:18px;border-radius:50%;background:#fff;transition:.2s}
+.phub-toggle.on::after{left:21px}
 .ocard-dismiss-btn{margin-left:auto;width:24px;height:24px;border-radius:7px;background:rgba(255,255,255,.06);color:var(--muted);display:flex;align-items:center;justify-content:center;flex-shrink:0;transition:.15s}
 .ocard-dismiss-btn:active{background:rgba(255,80,80,.18);color:#ff5050}
 .ocard-clear-all-btn{width:100%;padding:11px;background:rgba(255,80,80,.08);border:1px solid rgba(255,80,80,.2);border-radius:12px;color:#ff6b6b;font-size:13px;font-weight:600;margin-bottom:10px;transition:.15s}
@@ -1094,12 +1112,14 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 </div>
 
 <!-- ═══ PROFILE ═══ -->
-<div id="pg-profile" class="page hidden">
+<div id="pg-profile" class="page hidden" style="overflow-y:auto;overscroll-behavior:contain">
   <div class="hdr" style="position:relative">
     <div style="flex:1"><button class="hdr-back" onclick="go('catalog')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
     <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-prof">ваш профиль</div></div></div>
     <div style="flex:1"></div>
   </div>
+
+  <!-- PROFILE CARD -->
   <div class="profile-card">
     <div class="profile-avatar" id="prof-av">A</div>
     <div class="profile-name" id="prof-name">—</div>
@@ -1109,22 +1129,131 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       <div class="ps"><div class="ps-n" id="stat-spent">0</div><div class="ps-l" id="stat-lbl3">AED</div></div>
     </div>
   </div>
-  <!-- THE USUAL -->
-  <div id="the-usual-wrap" style="padding:0 14px 0">
-    <div class="cat-section-hdr" id="sh-usual" style="padding:0 0 10px">THE USUAL</div>
-    <div class="prof-hscroll" id="usual-scroll"></div>
-    <button class="prof-action-btn" id="usual-order-btn" onclick="orderTheUsual()">Order The Usual</button>
+
+  <!-- HUB GROUP 1 — My Orders & Addresses -->
+  <div class="prof-hub-section">
+    <div class="prof-hub-row" onclick="go('orders')">
+      <div class="phub-icon"><svg viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+      <div class="phub-text"><div class="phub-title" id="phub-t-history">Order History</div><div class="phub-sub" id="phub-s-history">All your past orders</div></div>
+      <div class="phub-right"><span class="phub-val" id="phub-v-history">0</span><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+    <div class="prof-hub-row" onclick="fromCart=false;_fromCatalogModal=false;go('address')">
+      <div class="phub-icon"><svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
+      <div class="phub-text"><div class="phub-title" id="phub-t-addr">My Addresses</div><div class="phub-sub" id="phub-s-addr">Saved delivery spots</div></div>
+      <div class="phub-right"><span class="phub-val" id="phub-v-addr">—</span><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
   </div>
-  <!-- WISHLIST -->
-  <div id="wishlist-wrap" style="padding:0 14px 0">
-    <div class="cat-section-hdr" id="sh-wishlist" style="padding:0 0 10px">WISHLIST</div>
-    <div class="prof-hscroll" id="wishlist-scroll"></div>
-    <button class="prof-action-btn" id="wishlist-cart-btn" onclick="addWishlistToCart()">Add all to cart</button>
+
+  <!-- HUB GROUP 2 — Wishlist & The Usual -->
+  <div class="prof-hub-section">
+    <div class="prof-hub-row" onclick="_toggleProfSection('wishlist-section')">
+      <div class="phub-icon"><svg viewBox="0 0 24 24"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></div>
+      <div class="phub-text"><div class="phub-title" id="phub-t-wish">Wishlist</div><div class="phub-sub" id="phub-s-wish">Saved for later</div></div>
+      <div class="phub-right"><span class="phub-badge" id="phub-v-wish" style="display:none">0</span><svg class="phub-chevron" id="phub-ch-wish" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+    <div id="wishlist-section" style="display:none;padding:0 14px 14px">
+      <div class="prof-hscroll" id="wishlist-scroll"></div>
+      <button class="prof-action-btn" id="wishlist-cart-btn" onclick="addWishlistToCart()">Add all to cart</button>
+    </div>
+    <div class="prof-hub-row" onclick="_toggleProfSection('usual-section')">
+      <div class="phub-icon"><svg viewBox="0 0 24 24"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg></div>
+      <div class="phub-text"><div class="phub-title" id="phub-t-usual">The Usual</div><div class="phub-sub" id="phub-s-usual">Your top ordered items</div></div>
+      <div class="phub-right"><svg class="phub-chevron" id="phub-ch-usual" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+    <div id="usual-section" style="display:none;padding:0 14px 14px">
+      <div class="prof-hscroll" id="usual-scroll"></div>
+      <button class="prof-action-btn" id="usual-order-btn" onclick="orderTheUsual()">Order The Usual</button>
+    </div>
   </div>
-  <!-- ACTIVE ORDERS -->
-  <div style="padding:0 14px 14px">
-    <div class="cat-section-hdr" id="sh-active" style="padding:14px 0 10px">Активные заказы</div>
-    <div id="active-list"></div>
+
+  <!-- HUB GROUP 3 — Insights -->
+  <div class="prof-hub-section">
+    <div class="prof-hub-row" onclick="openStatsSheet()">
+      <div class="phub-icon"><svg viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></div>
+      <div class="phub-text"><div class="phub-title" id="phub-t-stats">My Stats</div><div class="phub-sub" id="phub-s-stats">Spending & insights</div></div>
+      <div class="phub-right"><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+    <div class="prof-hub-row" onclick="shareInvite()">
+      <div class="phub-icon"><svg viewBox="0 0 24 24"><circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/></svg></div>
+      <div class="phub-text"><div class="phub-title" id="phub-t-invite">Invite a Friend</div><div class="phub-sub" id="phub-s-invite">Share AMBAR</div></div>
+      <div class="phub-right"><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+  </div>
+
+  <!-- HUB GROUP 4 — Preferences -->
+  <div class="prof-hub-section">
+    <div class="prof-hub-row" onclick="openNotifsSheet()">
+      <div class="phub-icon"><svg viewBox="0 0 24 24"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg></div>
+      <div class="phub-text"><div class="phub-title" id="phub-t-notif">Notifications</div><div class="phub-sub" id="phub-s-notif">Order updates & alerts</div></div>
+      <div class="phub-right"><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+    <div class="prof-hub-row" onclick="flipLang();buildProfile()">
+      <div class="phub-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
+      <div class="phub-text"><div class="phub-title" id="phub-t-lang">Language</div><div class="phub-sub" id="phub-s-lang">App language</div></div>
+      <div class="phub-right"><span class="phub-val" id="phub-v-lang">RU</span><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+  </div>
+
+  <!-- HUB GROUP 5 — Support & Info -->
+  <div class="prof-hub-section" style="margin-bottom:32px">
+    <div class="prof-hub-row" onclick="openSupportChat('')">
+      <div class="phub-icon"><svg viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg></div>
+      <div class="phub-text"><div class="phub-title" id="phub-t-support">Contact Support</div><div class="phub-sub" id="phub-s-support">We reply fast</div></div>
+      <div class="phub-right"><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+    <div class="prof-hub-row" onclick="openAboutSheet()">
+      <div class="phub-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></div>
+      <div class="phub-text"><div class="phub-title" id="phub-t-about">About AMBAR</div><div class="phub-sub" id="phub-s-about">Version & info</div></div>
+      <div class="phub-right"><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
+  </div>
+
+  <!-- hidden scrolls needed by buildProfile() -->
+  <div id="the-usual-wrap" style="display:none">
+    <div class="prof-hscroll" id="usual-scroll-hidden"></div>
+  </div>
+  <div id="wishlist-wrap" style="display:none">
+    <div class="prof-hscroll" id="wishlist-scroll-hidden"></div>
+  </div>
+  <div id="active-list" style="display:none"></div>
+</div>
+
+<!-- STATS SHEET -->
+<div class="cancel-ov" id="stats-ov" onclick="if(event.target===this)closeStatsSheet()" style="z-index:900">
+  <div class="cancel-sheet" style="max-height:85vh;overflow-y:auto">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)">MY STATS</div>
+      <button onclick="closeStatsSheet()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);color:var(--muted);display:flex;align-items:center;justify-content:center">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="stats-content"></div>
+  </div>
+</div>
+
+<!-- NOTIFS SHEET -->
+<div class="cancel-ov" id="notifs-ov" onclick="if(event.target===this)closeNotifsSheet()" style="z-index:900">
+  <div class="cancel-sheet">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)" id="notifs-title">NOTIFICATIONS</div>
+      <button onclick="closeNotifsSheet()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);color:var(--muted);display:flex;align-items:center;justify-content:center">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="notifs-content"></div>
+  </div>
+</div>
+
+<!-- ABOUT SHEET -->
+<div class="cancel-ov" id="about-ov" onclick="if(event.target===this)closeAboutSheet()" style="z-index:900">
+  <div class="cancel-sheet">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)">ABOUT AMBAR</div>
+      <button onclick="closeAboutSheet()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);color:var(--muted);display:flex;align-items:center;justify-content:center">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div id="about-content"></div>
   </div>
 </div>
 
@@ -2223,7 +2352,7 @@ function go(p){
   if(p==='cart'){renderCart();updateCartAddrBar();}
   if(p==='orders'){syncOrders();initPullToRefresh();}  // fetch latest from API, fall back to localStorage
   if(p==='address'){renderSavedCards();buildAreaChips();buildTypeChips('man'); /* GPS uses label+comment only */}
-  if(p==='profile'){syncOrders();}
+  if(p==='profile'){buildProfile();syncOrders();}
   if(p==='checkout')buildSummary();
 }
 
@@ -4191,6 +4320,37 @@ function buildProfile(){
   el('stat-total').textContent=orders.length;el('stat-active').textContent=active.length;el('stat-spent').textContent=spent;
   set('stat-lbl1',t('statOrders'));set('stat-lbl2',t('statActive'));set('stat-lbl3',t('statSpent'));
 
+  const ru=lang==='ru';
+
+  // ── HUB labels ──
+  set('phub-t-history',ru?'История заказов':'Order History');
+  set('phub-s-history',ru?'Все ваши заказы':'All your past orders');
+  set('phub-v-history',orders.length||'0');
+  set('phub-t-addr',ru?'Мои адреса':'My Addresses');
+  set('phub-s-addr',ru?'Сохранённые места':'Saved delivery spots');
+  const savedAddrs=JSON.parse(localStorage.getItem('ambar_addresses')||'[]');
+  set('phub-v-addr',savedAddrs.length?savedAddrs.length:'—');
+  set('phub-t-wish',ru?'Список желаний':'Wishlist');
+  set('phub-s-wish',ru?'Отложено на потом':'Saved for later');
+  const wishCount=favs.size;
+  const wishBadge=el('phub-v-wish');
+  if(wishCount){wishBadge.textContent=wishCount;wishBadge.style.display='';}else{wishBadge.style.display='none';}
+  set('phub-t-usual',ru?'Как обычно':'The Usual');
+  set('phub-s-usual',ru?'Топ ваших заказов':'Your top ordered items');
+  set('phub-t-stats',ru?'Моя статистика':'My Stats');
+  set('phub-s-stats',ru?'Траты и аналитика':'Spending & insights');
+  set('phub-t-invite',ru?'Пригласить друга':'Invite a Friend');
+  set('phub-s-invite',ru?'Поделиться AMBAR':'Share AMBAR');
+  set('phub-t-notif',ru?'Уведомления':'Notifications');
+  set('phub-s-notif',ru?'Обновления заказов':'Order updates & alerts');
+  set('phub-t-lang',ru?'Язык':'Language');
+  set('phub-s-lang',ru?'Язык приложения':'App language');
+  set('phub-v-lang',ru?'RU':'EN');
+  set('phub-t-support',ru?'Поддержка':'Contact Support');
+  set('phub-s-support',ru?'Отвечаем быстро':'We reply fast');
+  set('phub-t-about',ru?'О AMBAR':'About AMBAR');
+  set('phub-s-about',ru?'Версия и инфо':'Version & info');
+
   // ── THE USUAL ──
   const itemCounts={};
   orders.forEach(o=>(o.items||[]).forEach(i=>{
@@ -4199,7 +4359,6 @@ function buildProfile(){
     itemCounts[i.id].count+=i.qty;
   }));
   const topItems=Object.values(itemCounts).sort((a,b)=>b.count-a.count).slice(0,6);
-  const usualWrap=el('the-usual-wrap');
   if(topItems.length){
     const oErr=`this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><text y=%2268%22 font-size=%2264%22>🍾</text></svg>'`;
     el('usual-scroll').innerHTML=topItems.map(item=>{
@@ -4215,14 +4374,10 @@ function buildProfile(){
       </div>`;
     }).join('');
     el('usual-order-btn').textContent=lang==='ru'?'Заказать как обычно':'Order The Usual';
-    usualWrap.style.display='';
-  } else {
-    usualWrap.style.display='none';
   }
 
   // ── WISHLIST ──
   const wishProds=[...favs].map(id=>P.find(x=>x.id===id)).filter(Boolean);
-  const wishWrap=el('wishlist-wrap');
   if(wishProds.length){
     const oErr=`this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><text y=%2268%22 font-size=%2264%22>🍾</text></svg>'`;
     el('wishlist-scroll').innerHTML=wishProds.map(p=>{
@@ -4236,21 +4391,16 @@ function buildProfile(){
       </div>`;
     }).join('');
     el('wishlist-cart-btn').textContent=lang==='ru'?'Добавить всё в корзину':'Add all to cart';
-    wishWrap.style.display='';
-  } else {
-    wishWrap.style.display='none';
   }
+}
 
-  // ── ACTIVE ORDERS ──
-  if(!active.length){el('active-list').innerHTML=`<div class="empty" style="padding:20px 0"><div>${t('noActive')}</div></div>`;return;}
-  const months2=lang==='ru'?['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек']:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-  function fmtDate2(ts){if(!ts)return'';const d=new Date(ts);return`${d.getDate()} ${months2[d.getMonth()]} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
-  el('active-list').innerHTML=active.map(o=>{
-    const st=o.status==='confirmed'?'sc2':'sp';
-    const lbl=o.status==='confirmed'?(lang==='ru'?'Принят':'Confirmed'):(lang==='ru'?'Ожидает':'Pending');
-    const rows=o.items.map(i=>`<div class="o-row"><span class="o-row-name">${i.name}</span><span class="o-row-qty">${i.qty} ${lang==='ru'?'шт':'pcs'}</span></div>`).join('');
-    return`<div class="ocard ${st}"><div class="ocard-inner"><div class="ocard-meta"><span class="o-id">#${o.order_id}</span><span class="o-date">${fmtDate2(o.timestamp)}</span></div><div class="o-rows">${rows}</div><div class="ocard-foot"><span class="o-status"><span class="o-status-dot"></span>${lbl}</span><div class="o-total"><span class="o-total-num">${o.total}</span><span class="o-total-cur">AED</span></div></div></div><div class="ocard-actions"><button class="ocard-support-btn" onclick="event.stopPropagation();openSupportChat('${o.order_id}')">${t('supportBtn')}</button></div></div>`;
-  }).join('');
+function _toggleProfSection(id){
+  const sec=el(id);
+  const isOpen=sec.style.display!=='none';
+  sec.style.display=isOpen?'none':'block';
+  const chevId=id==='wishlist-section'?'phub-ch-wish':'phub-ch-usual';
+  const ch=el(chevId);
+  if(ch)ch.style.transform=isOpen?'':'rotate(90deg)';
 }
 
 function orderTheUsual(){
@@ -4277,6 +4427,98 @@ function addWishlistToCart(){
   showToast(lang==='ru'?'Список желаний добавлен в корзину':'Wishlist added to cart','ok');
   setTimeout(()=>go('cart'),600);
 }
+
+// ── PROFILE HUB SHEETS ────────────────────────────────────────────────────────
+function _openSheet(id){const ov=el(id);ov.style.display='flex';ov.offsetHeight;ov.classList.add('open');}
+function _closeSheet(id){const ov=el(id);ov.classList.remove('open');setTimeout(()=>{if(!ov.classList.contains('open'))ov.style.display='none';},240);}
+
+function openStatsSheet(){
+  const ru=lang==='ru';
+  const delivered=orders.filter(o=>o.status==='delivered');
+  const total=delivered.reduce((s,o)=>s+o.total,0)+parseInt(localStorage.getItem('ambar_spent_total')||'0');
+  const avg=delivered.length?Math.round(total/delivered.length):0;
+  const now=new Date();const m=now.getMonth(),y=now.getFullYear();
+  const thisMonth=orders.filter(o=>{const d=new Date(o.timestamp);return d.getMonth()===m&&d.getFullYear()===y;}).length;
+  // favorite category
+  const catCounts={};
+  orders.forEach(o=>(o.items||[]).forEach(i=>{
+    const p=P.find(x=>x.id===i.id);if(!p)return;
+    const c=p.cat||'Other';catCounts[c]=(catCounts[c]||0)+i.qty;
+  }));
+  const topCat=Object.entries(catCounts).sort((a,b)=>b[1]-a[1])[0];
+  const statRow=(icon,label,value)=>`
+    <div style="display:flex;align-items:center;gap:14px;padding:13px 0;border-bottom:1px solid rgba(255,255,255,.055)">
+      <div class="phub-icon">${icon}</div>
+      <div style="flex:1;font-size:13px;color:var(--muted)">${label}</div>
+      <div style="font-size:16px;font-weight:700;color:var(--gold2)">${value}</div>
+    </div>`;
+  el('stats-content').innerHTML=`
+    ${statRow(`<svg viewBox="0 0 24 24" fill="none" stroke="var(--gold2)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>`,ru?'Всего заказов':'Total orders',orders.length)}
+    ${statRow(`<svg viewBox="0 0 24 24" fill="none" stroke="var(--gold2)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>`,ru?'Потрачено всего':'Total spent',total+' AED')}
+    ${statRow(`<svg viewBox="0 0 24 24" fill="none" stroke="var(--gold2)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>`,ru?'Средний заказ':'Avg order',avg+' AED')}
+    ${statRow(`<svg viewBox="0 0 24 24" fill="none" stroke="var(--gold2)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>`,ru?'В этом месяце':'This month',thisMonth)}
+    ${topCat?statRow(`<svg viewBox="0 0 24 24" fill="none" stroke="var(--gold2)" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" width="17" height="17"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>`,ru?'Любимая категория':'Fav category',topCat[0]):''}
+    <div style="height:8px"></div>`;
+  _openSheet('stats-ov');
+}
+function closeStatsSheet(){_closeSheet('stats-ov');}
+
+function openNotifsSheet(){
+  const ru=lang==='ru';
+  const prefs=JSON.parse(localStorage.getItem('ambar_notif_prefs')||'{"order_updates":true,"promos":false}');
+  const row=(key,title,sub)=>`
+    <div style="display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid rgba(255,255,255,.055)" onclick="_toggleNotif('${key}')">
+      <div style="flex:1">
+        <div style="font-size:14px;font-weight:600;color:var(--text)">${title}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">${sub}</div>
+      </div>
+      <div class="phub-toggle ${prefs[key]?'on':''}" id="ntog-${key}"></div>
+    </div>`;
+  el('notifs-content').innerHTML=
+    row('order_updates',ru?'Обновления заказа':'Order updates',ru?'Подтверждение, доставка, отмена':'Confirmation, delivery, cancellation')+
+    row('promos',ru?'Акции и предложения':'Promos & offers',ru?'Скидки и новые позиции':'Discounts and new arrivals')+
+    `<div style="height:8px"></div>`;
+  set('notifs-title',ru?'УВЕДОМЛЕНИЯ':'NOTIFICATIONS');
+  _openSheet('notifs-ov');
+}
+function _toggleNotif(key){
+  const prefs=JSON.parse(localStorage.getItem('ambar_notif_prefs')||'{"order_updates":true,"promos":false}');
+  prefs[key]=!prefs[key];
+  localStorage.setItem('ambar_notif_prefs',JSON.stringify(prefs));
+  const tog=el('ntog-'+key);if(tog)tog.classList.toggle('on',prefs[key]);
+  haptic.light();
+}
+function closeNotifsSheet(){_closeSheet('notifs-ov');}
+
+function shareInvite(){
+  const uid=tg?.initDataUnsafe?.user?.id||'';
+  const botUsername=(tg?.initDataUnsafe?.user?.username)||'';
+  const text=lang==='ru'
+    ?'Заказывай премиальный алкоголь с доставкой в ОАЭ через AMBAR 🥃'
+    :'Order premium spirits delivered in UAE via AMBAR 🥃';
+  try{
+    tg.openTelegramLink(`https://t.me/share/url?url=https://t.me/AmbarDeliveryBot${uid?'?start=ref_'+uid:''}&text=${encodeURIComponent(text)}`);
+  }catch(e){
+    if(navigator.share){navigator.share({text,url:'https://t.me/AmbarDeliveryBot'});}
+    else{navigator.clipboard?.writeText('https://t.me/AmbarDeliveryBot');showToast(lang==='ru'?'Ссылка скопирована':'Link copied','ok');}
+  }
+}
+
+function openAboutSheet(){
+  const ru=lang==='ru';
+  el('about-content').innerHTML=`
+    <div style="text-align:center;padding:10px 0 24px">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:700;letter-spacing:4px;color:var(--gold);margin-bottom:4px">AMBAR</div>
+      <div style="font-size:11px;letter-spacing:2px;color:var(--muted);text-transform:uppercase">Premium Spirits · UAE</div>
+      <div style="font-size:12px;color:rgba(255,255,255,.2);margin-top:18px">v1.6.0</div>
+    </div>
+    <div style="border-top:1px solid rgba(255,255,255,.07);padding-top:16px;display:flex;flex-direction:column;gap:10px">
+      <button onclick="openSupportChat('')" style="width:100%;padding:14px;background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.25);border-radius:14px;color:var(--gold2);font-size:14px;font-weight:600;font-family:'DM Sans',sans-serif;letter-spacing:.3px;transition:.15s" onpointerdown="this.style.opacity='.6'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">${ru?'Написать в поддержку':'Contact Support'}</button>
+    </div>
+    <div style="height:8px"></div>`;
+  _openSheet('about-ov');
+}
+function closeAboutSheet(){_closeSheet('about-ov');}
 
 // ── BEER PICKER ───────────────────────────────────────────────────────────────
 // Any product with cat === 'Пиво' gets a 12/24 pcs picker.

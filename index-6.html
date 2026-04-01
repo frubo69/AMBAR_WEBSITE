@@ -653,8 +653,8 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .support-hdr-title{font-size:14px;font-weight:600;color:var(--gold2)}
 .support-hdr-sub{font-size:11px;color:var(--muted);margin-top:1px}
 .support-msgs{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:8px;overscroll-behavior:contain}
-.support-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;color:var(--muted);font-size:13px;text-align:center}
-.support-empty-icon{font-size:36px;opacity:.5}
+.support-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--muted);font-size:13px;text-align:center;letter-spacing:.2px}
+.support-empty-icon{opacity:.7;line-height:0}
 .msg-bubble{max-width:80%;padding:10px 14px;font-size:13px;line-height:1.45;word-break:break-word}
 .msg-bubble.user{align-self:flex-end;background:rgba(201,169,110,.12);border:1px solid rgba(201,169,110,.2);border-radius:16px 16px 4px 16px;color:var(--text)}
 .msg-bubble.operator{align-self:flex-start;background:var(--card);border:1px solid var(--border2);border-radius:16px 16px 16px 4px;color:var(--text)}
@@ -1291,7 +1291,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
           <div style="font-size:12px;color:var(--muted);margin-top:2px" id="supp-call-sub">+971 50 123 4567</div>
         </div>
       </button>
-      <button onclick="closeSupportOptions();setTimeout(()=>{if(tg&&tg.openTelegramLink)tg.openTelegramLink('https://t.me/ambar_support_bot');else window.open('https://t.me/ambar_support_bot','_blank');},200)"
+      <button onclick="closeSupportOptions();setTimeout(()=>{openSupportChat('general');},250)"
         style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 18px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:16px;text-align:left;transition:.15s"
         onpointerdown="this.style.background='rgba(255,255,255,.09)'" onpointerup="this.style.background='rgba(255,255,255,.05)'" onpointercancel="this.style.background='rgba(255,255,255,.05)'">
         <div style="width:42px;height:42px;border-radius:12px;background:rgba(201,169,110,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
@@ -1719,7 +1719,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   </div>
   <div class="support-msgs" id="support-msgs">
     <div class="support-empty" id="support-empty">
-      <div class="support-empty-icon">💬</div>
+      <div class="support-empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(201,169,110,.45)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a8 8 0 0 0-8 8v5a3 3 0 0 0 3 3h1a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1H7v-2a5 5 0 0 1 10 0v2h-1a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h1a3 3 0 0 0 3-3v-5a8 8 0 0 0-8-8z"/><path d="M18 18v1a2 2 0 0 1-2 2h-2" stroke="rgba(201,169,110,.35)"/></svg></div>
       <div id="support-empty-txt">Задайте вопрос по заказу</div>
     </div>
   </div>
@@ -4764,7 +4764,7 @@ function openSupportOptions(){
   set('supp-call-sub',SUPPORT_PHONE_DISPLAY);
   el('supp-call-btn').dataset.copied=ru?'Скопировано':'Copied';
   set('supp-msg-lbl',ru?'Написать сообщение':'Send message');
-  set('supp-msg-sub','Telegram');
+  set('supp-msg-sub',ru?'Чат в приложении':'In-app chat');
   _openSheet('support-options-ov');
 }
 function closeSupportOptions(){_closeSheet('support-options-ov');}
@@ -5282,12 +5282,13 @@ function openSupportChat(orderId){
   if(_supportPollTimer){clearInterval(_supportPollTimer);_supportPollTimer=null;}
 
   el('support-hdr-title').textContent=t('supportTitle');
-  el('support-hdr-sub').textContent='#'+orderId;
+  el('support-hdr-sub').textContent=orderId==='general'?(lang==='ru'?'Общий вопрос':'General inquiry'):'#'+orderId;
   el('support-input').placeholder=t('supportPlaceholder');
   el('support-input').value='';
 
-  // Reset messages area to empty state (includes support-empty-txt)
-  el('support-msgs').innerHTML=`<div class="support-empty" id="support-empty"><div class="support-empty-icon">💬</div><div id="support-empty-txt">${t('supportEmpty')}</div></div>`;
+  // Reset messages area to empty state
+  const _suppSvg='<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(201,169,110,.45)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a8 8 0 0 0-8 8v5a3 3 0 0 0 3 3h1a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1H7v-2a5 5 0 0 1 10 0v2h-1a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h1a3 3 0 0 0 3-3v-5a8 8 0 0 0-8-8z"/><path d="M18 18v1a2 2 0 0 1-2 2h-2" stroke="rgba(201,169,110,.35)"/></svg>';
+  el('support-msgs').innerHTML=`<div class="support-empty" id="support-empty"><div class="support-empty-icon">${_suppSvg}</div><div id="support-empty-txt">${t('supportEmpty')}</div></div>`;
 
   el('support-overlay').classList.add('show');
   haptic.select();

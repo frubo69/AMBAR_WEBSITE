@@ -5930,7 +5930,7 @@ function startGame(){
   cancelAnimationFrame(_G.raf);
   _G.score=0;_G.frame=0;_G.speed=5;_G.bgOff=_G.bgOff||0;_G.nextObs=90;
   _G.obstacles=[];_G.coins=[];_G.state='playing';
-  _G.player={x:75,y:_G.gY,vy:0,w:60,h:50,jumps:0};
+  _G.player={x:65,y:_G.gY,vy:0,w:76,h:62,jumps:0};
   el('game-start-screen').style.display='none';
   el('game-over-screen').style.display='none';
   _G.raf=requestAnimationFrame(_gameLoop);
@@ -5940,10 +5940,10 @@ function _spawnObstacle(G){
   const type=Math.floor(Math.random()*2);
   if(type===0){
     // obstacle 1
-    G.obstacles.push({x:G.W+20,w:36,h:36,y:G.gY,t:0});
+    G.obstacles.push({x:G.W+20,w:50,h:48,y:G.gY,t:0});
   }else{
     // obstacle 2
-    G.obstacles.push({x:G.W+20,w:38,h:34,y:G.gY,t:1});
+    G.obstacles.push({x:G.W+20,w:52,h:46,y:G.gY,t:1});
   }
 }
 
@@ -5952,16 +5952,16 @@ function _spawnCoins(G){
   const pat=Math.floor(Math.random()*4);
   if(pat===0){
     // ground level coin
-    G.coins.push({x:G.W+40+Math.random()*60,y:base-32,r:16,col:false});
+    G.coins.push({x:G.W+40+Math.random()*60,y:base-36,r:22,col:false});
   }else if(pat===1){
     // mid-height coin (reachable with small jump)
-    G.coins.push({x:G.W+30+Math.random()*80,y:base-62-Math.random()*20,r:16,col:false});
+    G.coins.push({x:G.W+30+Math.random()*80,y:base-68-Math.random()*20,r:22,col:false});
   }else if(pat===2){
     // high coin (needs good jump)
-    G.coins.push({x:G.W+50+Math.random()*40,y:base-95-Math.random()*15,r:16,col:false});
+    G.coins.push({x:G.W+50+Math.random()*40,y:base-100-Math.random()*15,r:22,col:false});
   }else{
     // slightly off-ground
-    G.coins.push({x:G.W+35+Math.random()*70,y:base-44-Math.random()*16,r:16,col:false});
+    G.coins.push({x:G.W+35+Math.random()*70,y:base-50-Math.random()*16,r:22,col:false});
   }
 }
 
@@ -5984,7 +5984,7 @@ function _gameLoop(){
   G.coins.forEach(c=>c.x-=G.speed);
   G.obstacles=G.obstacles.filter(o=>o.x>-60);
   G.coins=G.coins.filter(c=>c.x>-20);
-  const hx=p.x+10,hy=p.y-p.h+6,hw=p.w-20,hh=p.h-10;
+  const hx=p.x+14,hy=p.y-p.h+8,hw=p.w-28,hh=p.h-14;
   for(const o of G.obstacles){
     if(hx<o.x+o.w&&hx+hw>o.x&&hy<o.y&&hy+hh>o.y-o.h){_gameDead();return;}
   }
@@ -6093,19 +6093,19 @@ function _drawCoin(ctx,c){
   if(c.col)return;
   // ambient glow
   const og=ctx.createRadialGradient(c.x,c.y,0,c.x,c.y,c.r*2.2);
-  og.addColorStop(0,'rgba(201,169,64,0.25)');og.addColorStop(1,'rgba(201,169,64,0)');
+  og.addColorStop(0,'rgba(201,169,64,0.28)');og.addColorStop(1,'rgba(201,169,64,0)');
   ctx.fillStyle=og;ctx.beginPath();ctx.arc(c.x,c.y,c.r*2.2,0,Math.PI*2);ctx.fill();
   // image or fallback
   const img=_G.imgs&&_G.imgs.coin;
   const sz=c.r*2;
-  if(img){ctx.drawImage(img,c.x-c.r,c.y-c.r,sz,sz);}
-  else{ctx.save();ctx.shadowColor='rgba(212,175,55,.8)';ctx.shadowBlur=12;ctx.fillStyle='#d4af37';ctx.beginPath();ctx.arc(c.x,c.y,c.r,0,Math.PI*2);ctx.fill();ctx.restore();}
+  if(img&&img.complete&&img.naturalWidth>0){ctx.drawImage(img,c.x-c.r,c.y-c.r,sz,sz);}
+  else{ctx.save();ctx.shadowColor='rgba(212,175,55,.8)';ctx.shadowBlur=12;ctx.fillStyle='#d4af37';ctx.beginPath();ctx.arc(c.x,c.y,c.r,0,Math.PI*2);ctx.fill();ctx.fillStyle='rgba(255,245,180,0.4)';ctx.font='bold '+Math.round(c.r)+'px sans-serif';ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText('$',c.x,c.y+1);ctx.restore();}
 }
 
 function _drawObstacle(ctx,o){
   const key=o.t===0?'obs0':'obs1';
   const img=_G.imgs&&_G.imgs[key];
-  if(img){
+  if(img&&img.complete&&img.naturalWidth>0){
     ctx.drawImage(img,o.x,o.y-o.h,o.w,o.h);
   }else{
     ctx.fillStyle=o.t===0?'#c92020':'#3c2d19';
@@ -6115,7 +6115,7 @@ function _drawObstacle(ctx,o){
 
 function _drawPlayer(ctx,p,frame){
   const img=_G.imgs&&_G.imgs.player;
-  const iW=80,iH=64;
+  const iW=130,iH=100;
   if(img){
     const lean=p.vy<-4?-0.09:p.vy>3?0.03:0;
     ctx.save();
@@ -6123,7 +6123,7 @@ function _drawPlayer(ctx,p,frame){
       const cx2=p.x+iW/2,cy2=p.y-iH/2;
       ctx.translate(cx2,cy2);ctx.rotate(lean);ctx.translate(-cx2,-cy2);
     }
-    ctx.drawImage(img,p.x-6,p.y-iH,iW,iH);
+    ctx.drawImage(img,p.x-16,p.y-iH+8,iW,iH);
     ctx.restore();
   }else{
     ctx.fillStyle='#d4af37';ctx.fillRect(p.x,p.y-p.h,p.w,p.h);
@@ -6146,7 +6146,7 @@ function _gameDrawIdle(){
   if(!ctx)return;
   ctx.clearRect(0,0,W,H);
   _gameDrawScene(G,ctx,W,H,gY);
-  const idleP={x:W/2-30,y:gY,vy:0,w:60,h:50,jumps:0};
+  const idleP={x:W/2-38,y:gY,vy:0,w:76,h:62,jumps:0};
   _drawPlayer(ctx,idleP,0);
 }
 

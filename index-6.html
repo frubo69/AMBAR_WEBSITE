@@ -979,14 +979,15 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div style="position:sticky;top:0;z-index:40;background:rgba(7,7,14,.96);backdrop-filter:blur(20px)">
     <!-- Single row: Delivery (left) | AMBAR logo (center absolute) | Cart + Lang (right) -->
     <div style="display:flex;align-items:center;padding:10px 14px;padding-top:calc(10px + var(--safe-top));position:relative">
-      <!-- Left: Delivery address -->
-      <div style="flex:1">
+      <!-- Left: Delivery address + Lang -->
+      <div style="flex:1;display:flex;align-items:center;gap:6px">
         <button class="hdr-addr-btn" onclick="openAddrModal()">
           <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
           <span class="hdr-addr-txt" id="addr-pill-txt">Добавьте адрес</span>
           <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.8" style="flex-shrink:0"><polyline points="6 9 12 15 18 9"/></svg>
           <span id="addr-pill-label" style="display:none"></span>
         </button>
+        <button class="lang-btn" onclick="flipLang()" id="lbtn">🇷🇺</button>
       </div>
       <!-- Center: Logo (absolute overlay, pointer-events:none) -->
       <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
@@ -995,7 +996,9 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       <!-- Right: Cart + Lang -->
       <div class="hdr-right" style="flex:1;justify-content:flex-end">
         <div class="cart-pill" onclick="go('cart')">🛒 <span class="cart-txt" id="hdr-tot">0 AED</span><span class="cart-dot" id="hdr-dot">0</span></div>
-        <button class="lang-btn" onclick="flipLang()" id="lbtn">🇷🇺</button>
+        <button class="notif-btn" onclick="openSupportOptions()" id="hdr-support-btn" aria-label="Support">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M12 2a8 8 0 0 0-8 8v5a3 3 0 0 0 3 3h1a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1H7v-2a5 5 0 0 1 10 0v2h-1a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h1a3 3 0 0 0 3-3v-5a8 8 0 0 0-8-8z"/><path d="M18 18v1a2 2 0 0 1-2 2h-2"/></svg>
+        </button>
         <button class="notif-btn" onclick="openNotifSheet()" id="notif-btn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <span class="notif-dot" id="notif-dot" style="display:none"></span>

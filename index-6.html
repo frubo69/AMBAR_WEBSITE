@@ -1870,6 +1870,8 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       </div>
     </div>
   </div>
+  <!-- Mute — bottom left -->
+  <button id="game-mute-btn" onclick="_gameToggleMute()" style="position:absolute;bottom:calc(var(--safe-bottom,24px) + 16px);left:20px;width:42px;height:42px;border-radius:50%;background:rgba(0,0,0,.45);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.55);font-size:18px;cursor:pointer;z-index:2;display:flex;align-items:center;justify-content:center">&#x1f50a;</button>
   <!-- Close — bottom right, out of way of HUD and game action -->
   <button onclick="closeGame()" style="position:absolute;bottom:calc(var(--safe-bottom,24px) + 16px);right:20px;padding:9px 18px;border-radius:20px;background:rgba(0,0,0,.45);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.55);font-size:12px;font-family:'DM Sans',sans-serif;letter-spacing:.5px;cursor:pointer;z-index:2">
     Закрыть
@@ -5845,6 +5847,31 @@ function closeAod(){
 const _G={state:'idle',raf:0,frame:0,score:0,speed:0,W:0,H:0,gY:0,
   player:null,obstacles:[],coins:[],ctx:null,imgs:null};
 
+let _gameAudio=null;
+let _gameMuted=localStorage.getItem('ambar_game_muted')==='1';
+
+function _gameInitAudio(){
+  if(!_gameAudio){
+    _gameAudio=new Audio('buckshot_roulette_02. General Release.mp3');
+    _gameAudio.loop=true;
+    _gameAudio.volume=0.4;
+  }
+}
+function _gamePlayMusic(){
+  _gameInitAudio();
+  if(!_gameMuted){_gameAudio.play().catch(()=>{});}
+}
+function _gameStopMusic(){
+  if(_gameAudio){_gameAudio.pause();_gameAudio.currentTime=0;}
+}
+function _gameToggleMute(){
+  _gameMuted=!_gameMuted;
+  localStorage.setItem('ambar_game_muted',_gameMuted?'1':'0');
+  el('game-mute-btn').textContent=_gameMuted?'\u{1f507}':'\u{1f50a}';
+  if(_gameMuted&&_gameAudio){_gameAudio.pause();}
+  else if(!_gameMuted&&_G.state==='playing'){_gamePlayMusic();}
+}
+
 const _PNG_ASSETS={
   player:'bike.png',
   obs0:'obstacle_1.png',
@@ -5889,6 +5916,7 @@ function openGame(){
 function closeGame(){
   cancelAnimationFrame(_G.raf);
   _G.state='idle';
+  _gameStopMusic();
   el('game-ov').style.display='none';
 }
 
@@ -5938,6 +5966,8 @@ function startGame(){
   _G.player={x:55,y:_G.gY,vy:0,w:82,h:70,jumps:0,flipAngle:0,flipping:false,flipSpeed:0};
   el('game-start-screen').style.display='none';
   el('game-over-screen').style.display='none';
+  el('game-mute-btn').textContent=_gameMuted?'\u{1f507}':'\u{1f50a}';
+  _gamePlayMusic();
   _G.raf=requestAnimationFrame(_gameLoop);
 }
 
@@ -6013,6 +6043,7 @@ function _gameDead(){
   el('game-final-aed').textContent=pts;
   el('game-new-best').style.display=isNew?'block':'none';
   el('game-over-screen').style.display='flex';
+  _gameStopMusic();
   haptic.error();_gameDraw();
 }
 

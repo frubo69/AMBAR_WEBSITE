@@ -601,18 +601,14 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .lcard-front{background:linear-gradient(145deg,#0e0e0e 0%,#181818 50%,#0e0e0e 100%);border:1px solid rgba(201,169,110,.2);box-shadow:0 8px 32px rgba(0,0,0,.5),inset 0 1px 0 rgba(201,169,110,.08)}
 .lcard-back{background:linear-gradient(145deg,#0e0e0e 0%,#181818 50%,#0e0e0e 100%);border:1px solid rgba(201,169,110,.2);box-shadow:0 8px 32px rgba(0,0,0,.5);transform:rotateY(180deg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px}
 .lcard-noise{position:absolute;inset:0;opacity:.04;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");pointer-events:none}
-.lcard-corner{position:absolute;width:50px;height:50px;pointer-events:none;opacity:.7}
-.lcard-corner svg{width:100%;height:100%}
-.lcard-corner.tl{top:-1px;left:-1px}
-.lcard-corner.tr{top:-1px;right:-1px;transform:scaleX(-1)}
-.lcard-corner.br{bottom:-1px;right:-1px;transform:rotate(180deg)}
-.lcard-corner.bl{bottom:-1px;left:-1px;transform:scaleY(-1)}
+.lcard-deco{position:absolute;pointer-events:none;overflow:hidden}
+.lcard-deco svg{width:100%;height:100%}
 .lcard-tier-label{font-family:'Cormorant Garamond',serif;font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;opacity:.7}
 .lcard-tier-name{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:700;letter-spacing:2px;line-height:1}
 .lcard-tier-sub{font-family:'Cormorant Garamond',serif;font-size:18px;font-style:italic;font-weight:400;opacity:.85;margin-top:-2px}
 .lcard-username{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;letter-spacing:2px;text-transform:uppercase}
-.lcard-qr{width:64px;height:64px;border-radius:8px;background:#fff;padding:4px;display:flex;align-items:center;justify-content:center}
-.lcard-qr canvas{width:100%!important;height:100%!important}
+.lcard-qr{width:88px;height:88px;border-radius:12px;background:#0e0e0e;padding:0;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
+.lcard-qr canvas{width:100%!important;height:100%!important;border-radius:8px}
 .lcard-points-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);letter-spacing:.5px}
 .lcard-points-dot{width:5px;height:5px;border-radius:50%;background:var(--gold);opacity:.6}
 .lcard-tap-hint{text-align:center;font-size:11px;color:var(--muted);margin-top:-8px;margin-bottom:16px;opacity:.5}
@@ -4757,26 +4753,71 @@ const _vipTiers=[
   {key:'gold',     min:10, max:24,         next:25, color:'#c9a96e', label:'GOLD'},
   {key:'platinum', min:25, max:49,         next:50, color:'#d4d4e8', label:'PLATINUM'},
   {key:'diamond',  min:50, max:99,         next:100,color:'#7ecfea', label:'DIAMOND'},
-  {key:'obsidian', min:100,max:Infinity,   next:null,color:'#c8b8e8',label:'OBSIDIAN'},
+  {key:'brilliant',min:100,max:Infinity,   next:null,color:'#c8b8e8',label:'BRILLIANT'},
 ];
 function _getVipTier(count){return _vipTiers.find(t=>count>=t.min&&count<=t.max)||_vipTiers[0];}
 
 function _genQR(text,size){
-  // Minimal QR code generator — renders to canvas
-  // Uses a simple approach: generate via an SVG-based API-free method
   const canvas=document.createElement('canvas');
   canvas.width=size;canvas.height=size;
   const ctx=canvas.getContext('2d');
-  // Use a lightweight QR encoding
   const modules=_qrEncode(text);
   const n=modules.length;
   const cellSize=size/n;
-  ctx.fillStyle='#fff';
+  const r=cellSize*0.38; // dot radius for rounded look
+
+  // Dark background
+  ctx.fillStyle='#0e0e0e';
   ctx.fillRect(0,0,size,size);
-  ctx.fillStyle='#111';
-  for(let r=0;r<n;r++)for(let c=0;c<n;c++){
-    if(modules[r][c])ctx.fillRect(c*cellSize,r*cellSize,cellSize+.5,cellSize+.5);
+
+  // Draw QR modules as rounded dots in gold
+  const grad=ctx.createLinearGradient(0,0,size,size);
+  grad.addColorStop(0,'#E8C98A');grad.addColorStop(0.5,'#C9A96E');grad.addColorStop(1,'#E8C98A');
+  ctx.fillStyle=grad;
+
+  // Center logo exclusion zone (clear a circle in the middle)
+  const centerX=size/2,centerY=size/2,logoR=size*0.16;
+
+  for(let row=0;row<n;row++)for(let col=0;col<n;col++){
+    if(!modules[row][col])continue;
+    const cx=col*cellSize+cellSize/2;
+    const cy=row*cellSize+cellSize/2;
+    // Skip modules in center logo area
+    if(Math.hypot(cx-centerX,cy-centerY)<logoR+cellSize*0.3)continue;
+    // Check if part of finder pattern (top-left, top-right, bottom-left 7x7)
+    const isFinder=(row<7&&col<7)||(row<7&&col>=n-7)||(row>=n-7&&col<7);
+    if(isFinder){
+      // Draw finder pattern modules as squares for scannability
+      ctx.fillRect(col*cellSize,row*cellSize,cellSize+0.5,cellSize+0.5);
+    }else{
+      // Rounded dots for data modules
+      ctx.beginPath();
+      ctx.arc(cx,cy,r,0,Math.PI*2);
+      ctx.fill();
+    }
   }
+
+  // Draw AMBAR logo pin in center
+  const lx=centerX,ly=centerY;
+  const pinH=logoR*1.6,pinW=logoR*1.1;
+  // Pin body
+  ctx.save();
+  const pinGrad=ctx.createLinearGradient(lx,ly-pinH*0.5,lx,ly+pinH*0.5);
+  pinGrad.addColorStop(0,'#F5E0B0');pinGrad.addColorStop(0.5,'#C9A96E');pinGrad.addColorStop(1,'#967B4B');
+  ctx.fillStyle=pinGrad;
+  ctx.beginPath();
+  ctx.arc(lx,ly-pinH*0.15,pinW*0.5,Math.PI,0);
+  ctx.lineTo(lx,ly+pinH*0.4);
+  ctx.closePath();
+  ctx.fill();
+  // Cutout hole (bottle opener shape simplified as circle)
+  ctx.globalCompositeOperation='destination-out';
+  ctx.beginPath();
+  ctx.arc(lx,ly-pinH*0.15,pinW*0.22,0,Math.PI*2);
+  ctx.fill();
+  ctx.globalCompositeOperation='source-over';
+  ctx.restore();
+
   return canvas;
 }
 
@@ -4932,8 +4973,10 @@ function openVipSheet(){
   const uid=user?.id||'';
   const refLink='https://t.me/AmBarDelivery_bot?start=ref_'+uid;
 
-  // Golden corner SVG
-  const cornerSvg='<svg viewBox="0 0 70 70" fill="none"><path d="M0 0C0 0 15 0 30 8C45 16 55 35 60 50C62 56 65 65 70 70L70 0Z" fill="url(#gc)"/><defs><linearGradient id="gc" x1="0" y1="0" x2="70" y2="70"><stop stop-color="#E8C98A"/><stop offset="0.5" stop-color="#C9A96E"/><stop offset="1" stop-color="#967B4B"/></linearGradient></defs></svg>';
+  // Golden flowing wave decoration — top-right corner (3 curved stripes like reference)
+  const wavesTR='<svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="gw1" x1="50" y1="0" x2="120" y2="80"><stop stop-color="#E8C98A"/><stop offset="1" stop-color="#967B4B"/></linearGradient><linearGradient id="gw2" x1="60" y1="0" x2="120" y2="70"><stop stop-color="#F5E0B0"/><stop offset="1" stop-color="#C9A96E"/></linearGradient><linearGradient id="gw3" x1="70" y1="0" x2="120" y2="60"><stop stop-color="#E8C98A"/><stop offset="1" stop-color="#8B6914"/></linearGradient></defs><path d="M120 0C120 0 110 45 85 72C60 99 30 108 0 110L0 120L120 120Z" fill="url(#gw1)" opacity=".9"/><path d="M120 0C120 0 112 35 95 55C78 75 50 85 25 88L25 95L120 95Z" fill="url(#gw2)" opacity=".85"/><path d="M120 0C120 0 115 25 103 40C91 55 70 65 50 68L50 73L120 73Z" fill="url(#gw3)" opacity=".8"/></svg>';
+  // Bottom-left corner (mirrored)
+  const wavesBL='<svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="gw4" x1="70" y1="120" x2="0" y2="40"><stop stop-color="#E8C98A"/><stop offset="1" stop-color="#967B4B"/></linearGradient><linearGradient id="gw5" x1="60" y1="120" x2="0" y2="50"><stop stop-color="#F5E0B0"/><stop offset="1" stop-color="#C9A96E"/></linearGradient><linearGradient id="gw6" x1="50" y1="120" x2="0" y2="60"><stop stop-color="#E8C98A"/><stop offset="1" stop-color="#8B6914"/></linearGradient></defs><path d="M0 120C0 120 10 75 35 48C60 21 90 12 120 10L120 0L0 0Z" fill="url(#gw4)" opacity=".9"/><path d="M0 120C0 120 8 85 25 65C42 45 70 35 95 32L95 25L0 25Z" fill="url(#gw5)" opacity=".85"/><path d="M0 120C0 120 5 95 17 80C29 65 50 55 70 52L70 47L0 47Z" fill="url(#gw6)" opacity=".8"/></svg>';
 
   const vipTitle=el('vip-sheet-title');
   if(vipTitle)vipTitle.textContent=ru?'ЛОЯЛЬНОСТЬ':'LOYALTY';
@@ -4943,8 +4986,8 @@ function openVipSheet(){
       <div class="lcard-inner">
         <div class="lcard-front">
           <div class="lcard-noise"></div>
-          <div class="lcard-corner tr">${cornerSvg}</div>
-          <div class="lcard-corner bl">${cornerSvg}</div>
+          <div class="lcard-deco" style="top:-1px;right:-1px;width:100px;height:100px">${wavesTR}</div>
+          <div class="lcard-deco" style="bottom:-1px;left:-1px;width:100px;height:100px">${wavesBL}</div>
           <div style="position:absolute;inset:0;border-radius:16px;background:radial-gradient(ellipse at 80% 20%,rgba(201,169,110,.04) 0%,transparent 60%);pointer-events:none"></div>
           <div style="position:relative;z-index:1;padding:22px 20px;display:flex;flex-direction:column;height:100%;box-sizing:border-box">
             <div style="display:flex;justify-content:space-between;align-items:flex-start">
@@ -4967,10 +5010,8 @@ function openVipSheet(){
         </div>
         <div class="lcard-back">
           <div class="lcard-noise"></div>
-          <div class="lcard-corner tl">${cornerSvg}</div>
-          <div class="lcard-corner tr">${cornerSvg}</div>
-          <div class="lcard-corner bl">${cornerSvg}</div>
-          <div class="lcard-corner br">${cornerSvg}</div>
+          <div class="lcard-deco" style="top:-1px;right:-1px;width:100px;height:100px">${wavesTR}</div>
+          <div class="lcard-deco" style="bottom:-1px;left:-1px;width:100px;height:100px">${wavesBL}</div>
           <div style="position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(201,169,110,.06) 0%,transparent 70%);pointer-events:none"></div>
           <div style="position:relative;z-index:1;text-align:center">
             <div style="width:48px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:0 auto 16px;opacity:.4"></div>
@@ -5007,7 +5048,7 @@ function openVipSheet(){
       </div>
       <div class="lcard-step">
         <div class="lcard-step-num">3</div>
-        <div class="lcard-step-txt">${ru?'Набирайте очки и повышайте статус: <b>Silver → Gold → Platinum → Diamond → Obsidian</b>':'Earn points and level up: <b>Silver → Gold → Platinum → Diamond → Obsidian</b>'}</div>
+        <div class="lcard-step-txt">${ru?'Набирайте очки и повышайте статус: <b>Silver → Gold → Platinum → Diamond → Brilliant</b>':'Earn points and level up: <b>Silver → Gold → Platinum → Diamond → Brilliant</b>'}</div>
       </div>
       <div class="lcard-step">
         <div class="lcard-step-num">4</div>

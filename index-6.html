@@ -5923,14 +5923,14 @@ function _gameTouch(e){
   e.preventDefault();
   if(_G.state==='idle'){startGame();return;}
   if(_G.state==='dead'){startGame();return;}
-  if(_G.state==='playing'){const p=_G.player;if(p.jumps<2){p.vy=-16;p.jumps++;haptic.light();}}
+  if(_G.state==='playing'){const p=_G.player;if(p.jumps<2){p.vy=-16;p.jumps++;if(p.jumps===2){p.flipAngle=0;p.flipping=true;}haptic.light();}}
 }
 
 function startGame(){
   cancelAnimationFrame(_G.raf);
   _G.score=0;_G.frame=0;_G.speed=5;_G.bgOff=_G.bgOff||0;_G.nextObs=90;
   _G.obstacles=[];_G.coins=[];_G.state='playing';
-  _G.player={x:55,y:_G.gY,vy:0,w:82,h:70,jumps:0};
+  _G.player={x:55,y:_G.gY,vy:0,w:82,h:70,jumps:0,flipAngle:0,flipping:false};
   el('game-start-screen').style.display='none';
   el('game-over-screen').style.display='none';
   _G.raf=requestAnimationFrame(_gameLoop);
@@ -5940,10 +5940,10 @@ function _spawnObstacle(G){
   const type=Math.floor(Math.random()*2);
   if(type===0){
     // obstacle 1
-    G.obstacles.push({x:G.W+20,w:66,h:72,y:G.gY,t:0});
+    G.obstacles.push({x:G.W+20,w:74,h:82,y:G.gY,t:0});
   }else{
     // obstacle 2
-    G.obstacles.push({x:G.W+20,w:66,h:72,y:G.gY,t:1});
+    G.obstacles.push({x:G.W+20,w:74,h:82,y:G.gY,t:1});
   }
 }
 
@@ -5973,7 +5973,8 @@ function _gameLoop(){
   G.bgOff=(G.bgOff+G.speed*0.16)%(G.W*1.3);
   el('game-score').textContent=Math.floor(G.score/10);
   p.vy+=0.78;p.y+=p.vy;
-  if(p.y>=G.gY){p.y=G.gY;p.vy=0;p.jumps=0;}
+  if(p.flipping){p.flipAngle+=0.18;}
+  if(p.y>=G.gY){p.y=G.gY;p.vy=0;p.jumps=0;p.flipping=false;p.flipAngle=0;}
   G.nextObs--;
   if(G.nextObs<=0){
     _spawnObstacle(G);
@@ -6151,13 +6152,18 @@ function _drawPlayer(ctx,p,frame){
     const iW=targetH*aspect,iH=targetH;
     // Shift down by bottom transparent padding so wheels touch ground
     const groundShift=img._trimB*iH;
-    const lean=p.vy<-4?-0.09:p.vy>3?0.03:0;
+    const drawX=p.x-iW*0.12,drawY=p.y-iH+groundShift;
+    const cx2=drawX+iW/2,cy2=drawY+iH/2;
     ctx.save();
-    if(lean!==0){
-      const cx2=p.x+iW/2,cy2=p.y-iH/2+groundShift;
-      ctx.translate(cx2,cy2);ctx.rotate(lean);ctx.translate(-cx2,-cy2);
+    ctx.translate(cx2,cy2);
+    if(p.flipping){
+      ctx.rotate(p.flipAngle);
+    }else{
+      const lean=p.vy<-4?-0.09:p.vy>3?0.03:0;
+      if(lean!==0)ctx.rotate(lean);
     }
-    ctx.drawImage(img,p.x-iW*0.12,p.y-iH+groundShift,iW,iH);
+    ctx.translate(-cx2,-cy2);
+    ctx.drawImage(img,drawX,drawY,iW,iH);
     ctx.restore();
   }else{
     ctx.fillStyle='#d4af37';ctx.fillRect(p.x,p.y-p.h,p.w,p.h);

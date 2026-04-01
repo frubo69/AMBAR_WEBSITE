@@ -431,7 +431,7 @@ img{display:block}
 .wish-card-img{width:100%;height:90px;object-fit:contain;background:var(--card);padding:10px;box-sizing:border-box;display:block}
 .wish-card-info{padding:8px 10px 10px}
 .wish-card-name{font-size:11.5px;font-weight:600;color:var(--text);line-height:1.3;margin-bottom:4px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.wish-card-price{font-size:12px;color:var(--gold2);font-weight:700}
+.wish-card-price{font-size:12px;color:var(--gold2);font-weight:700;margin-bottom:6px;text-align:center}
 /* The Usual horizontal scroll */
 .usual-hscroll{display:flex;gap:10px;overflow-x:auto;padding:4px 0 10px;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .usual-hscroll::-webkit-scrollbar{display:none}
@@ -441,7 +441,11 @@ img{display:block}
 .usual-card-info{padding:8px 10px 10px}
 .usual-card-name{font-size:11px;font-weight:600;color:var(--text);line-height:1.3;margin-bottom:3px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .usual-card-sub{font-size:10px;color:var(--muted);margin-bottom:3px}
-.usual-card-price{font-size:12px;color:var(--gold2);font-weight:700}
+.usual-card-price{font-size:12px;color:var(--gold2);font-weight:700;margin-bottom:6px;text-align:center}
+.prof-mini-price{font-size:12px;color:var(--gold2);font-weight:700;margin-bottom:6px;text-align:center}
+.prof-ctrl-wrap{display:flex;justify-content:center}
+.prof-ctrl-wrap .add-btn{width:100%;height:28px;border-radius:8px;font-size:12px;font-weight:700}
+.prof-ctrl-wrap .qctrl{width:100%;justify-content:center}
 /* legacy — kept for any stray references */
 .prof-hscroll{display:flex;gap:10px;overflow-x:auto;-webkit-overflow-scrolling:touch;scrollbar-width:none}
 .prof-hscroll::-webkit-scrollbar{display:none}
@@ -3860,7 +3864,7 @@ function renderCard(p){
       <div class="pcat">${catVal}</div>
       <div class="pname">${lang==='ru'?p.name:p.nameE}</div>
       <div class="pdesc">${desc}</div>
-      <div class="pfoot"><div class="pprice">${p.price}<small> AED</small></div><div id="ctrl-${p.id}" onclick="event.stopPropagation()">${ctrlHTML(p,qty)}</div></div>
+      <div class="pfoot"><div class="pprice">${p.price}<small> AED</small></div><div id="ctrl-${p.id}" data-ctrl="${p.id}" onclick="event.stopPropagation()">${ctrlHTML(p,qty)}</div></div>
     </div>
   </div>`;
 }
@@ -3915,6 +3919,10 @@ function ctrlHTML(p,qty){
   if(qty===0)return`<button class="add-btn"${!p.stock?' disabled':''} onclick="addItem('${p.id}')">+</button>`;
   return`<div class="qctrl"><button class="qb" onclick="chgQty('${p.id}',-1)">−</button><span class="qn">${qty}</span><button class="qb" onclick="chgQty('${p.id}',1)">+</button></div>`;
 }
+function profCtrlHTML(p,qty){
+  if(qty===0)return`<button class="add-btn"${!p.stock?' disabled':''} onclick="addItem('${p.id}')">Add +</button>`;
+  return`<div class="qctrl"><button class="qb" onclick="chgQty('${p.id}',-1)">−</button><span class="qn">${qty}</span><button class="qb" onclick="chgQty('${p.id}',1)">+</button></div>`;
+}
 function addItem(id){
   const p=P.find(x=>x.id===id);if(!p||!p.stock)return;
   if(isBeer(p)){openPDM(id);return;}
@@ -3928,7 +3936,7 @@ function chgQty(id,d){
   if(nq<=0)delete cart[id];else cart[id]=nq;
   haptic.light();syncCtrl(id);updHdr();if(curPg==='cart')renderCart();
 }
-function syncCtrl(id){const e=el('ctrl-'+id);if(!e)return;const p=P.find(x=>x.id===id);e.innerHTML=ctrlHTML(p,cart[id]||0);}
+function syncCtrl(id){const p=P.find(x=>x.id===id);document.querySelectorAll('[data-ctrl="'+id+'"]').forEach(e=>{e.innerHTML=(e.dataset.ctrlStyle==='prof'?profCtrlHTML:ctrlHTML)(p,cart[id]||0);});}
 function cartSub(){return Object.entries(cart).reduce((s,[id,qty])=>{const p=P.find(x=>x.id===id);if(!p)return s;const pcs=isBeer(p)?beerPcs[id]:null;const unitPrice=pcs===24?Math.round(p.price*1.8):p.price;return s+unitPrice*qty;},0);}
 function updHdr(){
   const cnt=Object.values(cart).reduce((a,b)=>a+b,0);
@@ -4606,6 +4614,7 @@ function buildProfile(){
           <div class="prof-mini-name">${pname}</div>
           <div class="prof-mini-sub">${lang==='ru'?'заказано':'ordered'} ×${item.count}</div>
           <div class="prof-mini-price">${p.price} AED</div>
+          <div class="prof-ctrl-wrap" data-ctrl="${p.id}" data-ctrl-style="prof" onclick="event.stopPropagation()">${profCtrlHTML(p,cart[p.id]||0)}</div>
         </div>
       </div>`;
     }).join('');
@@ -4623,6 +4632,7 @@ function buildProfile(){
         <div class="prof-mini-info">
           <div class="prof-mini-name">${pname}</div>
           <div class="prof-mini-price">${p.price} AED</div>
+          <div class="prof-ctrl-wrap" data-ctrl="${p.id}" data-ctrl-style="prof" onclick="event.stopPropagation()">${profCtrlHTML(p,cart[p.id]||0)}</div>
         </div>
       </div>`;
     }).join('');
@@ -4646,6 +4656,7 @@ function _toggleProfSection(id){
               <div class="wish-card-info">
                 <div class="wish-card-name">${pname}</div>
                 <div class="wish-card-price">${p.price} AED</div>
+                <div class="prof-ctrl-wrap" data-ctrl="${p.id}" data-ctrl-style="prof" onclick="event.stopPropagation()">${profCtrlHTML(p,cart[p.id]||0)}</div>
               </div>
             </div>`;
           }).join('')
@@ -4666,6 +4677,7 @@ function _toggleProfSection(id){
                 <div class="usual-card-name">${pname}</div>
                 <div class="usual-card-sub">×${item.count} ${lang==='ru'?'заказов':'orders'}</div>
                 <div class="usual-card-price">${p.price} AED</div>
+                <div class="prof-ctrl-wrap" data-ctrl="${p.id}" data-ctrl-style="prof" onclick="event.stopPropagation()">${profCtrlHTML(p,cart[p.id]||0)}</div>
               </div>
             </div>`;
           }).join('')

@@ -71,6 +71,16 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     lang = ctx.user_data.get("lang", "ru")
     name = update.effective_user.first_name
 
+    # Handle referral deep link: /start ref_123456
+    referrer_id = None
+    if ctx.args and ctx.args[0].startswith("ref_"):
+        try:
+            referrer_id = int(ctx.args[0][4:])
+            if referrer_id == uid:
+                referrer_id = None  # can't refer yourself
+        except (ValueError, IndexError):
+            referrer_id = None
+
     # Ban check — silently skip if DB is unavailable
     try:
         if await db.is_banned(uid):
@@ -124,14 +134,20 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     try:
         tg_user   = update.effective_user
         full_name = f"{tg_user.first_name or ''} {tg_user.last_name or ''}".strip()
-        await db.upsert_user(
-            uid,
+        user_fields = dict(
             first_name=tg_user.first_name or "",
             last_name=tg_user.last_name or "",
             full_name=full_name,
             name=full_name,
             username=tg_user.username or "—",
         )
+        # Only set referred_by on first visit (new user)
+        if referrer_id:
+            existing = await db.get_user(uid)
+            if existing is None or not existing.get("referred_by"):
+                user_fields["referred_by"] = referrer_id
+                log.info(f"[referral] user {uid} referred by {referrer_id}")
+        await db.upsert_user(uid, **user_fields)
     except Exception as e:
         log.warning(f"upsert_user failed: {e}")
 

@@ -269,3 +269,17 @@ async def set_user_field(telegram_id: int, **fields):
     db = _db_or_none()
     if db is None: return
     await db.users.update_one({"telegram_id": telegram_id}, {"$set": fields})
+
+
+async def award_referral_points(referrer_id: int, referred_id: int, points: int):
+    """Award referral points to the referrer and log the referral."""
+    db = _db_or_none()
+    if db is None: return
+    await db.users.update_one(
+        {"telegram_id": referrer_id},
+        {
+            "$inc": {"referral_points": points},
+            "$push": {"referrals": {"user_id": referred_id, "points": points,
+                                     "at": datetime.now(timezone.utc)}},
+        },
+    )

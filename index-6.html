@@ -593,6 +593,34 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .aod-support-btn:active{background:rgba(212,175,55,.22)}
 .aod-cancel-btn{width:100%;padding:13px;background:rgba(224,85,85,.07);border:1px solid rgba(224,85,85,.22);border-radius:14px;color:var(--red);font-size:14px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.15s;display:flex;align-items:center;justify-content:center;gap:7px}
 .aod-cancel-btn:active{background:rgba(224,85,85,.16)}
+/* ── Loyalty Card ── */
+.lcard-wrap{perspective:800px;width:100%;margin:0 auto 20px}
+.lcard-inner{position:relative;width:100%;aspect-ratio:1.6/1;transition:transform .6s cubic-bezier(.4,0,.2,1);transform-style:preserve-3d;cursor:pointer}
+.lcard-wrap.flipped .lcard-inner{transform:rotateY(180deg)}
+.lcard-front,.lcard-back{position:absolute;inset:0;border-radius:16px;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden}
+.lcard-front{background:linear-gradient(145deg,#111 0%,#1a1a1a 50%,#111 100%);border:1px solid rgba(201,169,110,.25);box-shadow:0 8px 32px rgba(0,0,0,.5),inset 0 1px 0 rgba(201,169,110,.1)}
+.lcard-back{background:linear-gradient(145deg,#111 0%,#1a1a1a 50%,#111 100%);border:1px solid rgba(201,169,110,.25);box-shadow:0 8px 32px rgba(0,0,0,.5);transform:rotateY(180deg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px}
+.lcard-noise{position:absolute;inset:0;opacity:.03;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");pointer-events:none}
+.lcard-corner{position:absolute;width:70px;height:70px;pointer-events:none}
+.lcard-corner svg{width:100%;height:100%}
+.lcard-corner.tl{top:0;left:0}
+.lcard-corner.tr{top:0;right:0;transform:scaleX(-1)}
+.lcard-corner.br{bottom:0;right:0;transform:rotate(180deg)}
+.lcard-corner.bl{bottom:0;left:0;transform:scaleY(-1)}
+.lcard-tier-label{font-family:'Cormorant Garamond',serif;font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;opacity:.7}
+.lcard-tier-name{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:700;letter-spacing:2px;line-height:1}
+.lcard-tier-sub{font-family:'Cormorant Garamond',serif;font-size:18px;font-style:italic;font-weight:400;opacity:.85;margin-top:-2px}
+.lcard-username{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;letter-spacing:2px;text-transform:uppercase}
+.lcard-qr{width:64px;height:64px;border-radius:8px;background:#fff;padding:4px;display:flex;align-items:center;justify-content:center}
+.lcard-qr canvas{width:100%!important;height:100%!important}
+.lcard-points-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);letter-spacing:.5px}
+.lcard-points-dot{width:5px;height:5px;border-radius:50%;background:var(--gold);opacity:.6}
+.lcard-tap-hint{text-align:center;font-size:11px;color:var(--muted);margin-top:-8px;margin-bottom:16px;opacity:.5}
+.lcard-how{display:flex;flex-direction:column;gap:12px;margin-top:4px}
+.lcard-step{display:flex;gap:12px;align-items:flex-start}
+.lcard-step-num{width:26px;height:26px;border-radius:50%;background:rgba(201,169,110,.12);border:1px solid rgba(201,169,110,.2);color:var(--gold);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Space Grotesk',sans-serif}
+.lcard-step-txt{font-size:12px;color:var(--sub);line-height:1.5}
+.lcard-step-txt b{color:var(--gold2);font-weight:600}
 /* ── Cancel sheet ── */
 .cancel-ov{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:800;display:none;align-items:flex-end;opacity:0;transition:opacity .22s}
 .cancel-ov.open{display:flex;opacity:1}
@@ -1328,8 +1356,8 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <!-- VIP SHEET -->
 <div class="cancel-ov" id="vip-ov" onclick="if(event.target===this)closeVipSheet()" style="z-index:900">
   <div class="cancel-sheet">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:20px">
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)" id="vip-sheet-title">VIP STATUS</div>
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)" id="vip-sheet-title">LOYALTY</div>
       <button onclick="closeVipSheet()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);color:var(--muted);display:flex;align-items:center;justify-content:center">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
@@ -2221,6 +2249,7 @@ async function checkBanStatus(){
     if(resp.ok){
       const d=await resp.json();
       if(d.banned){_showBanWall();return;}
+      if(d.referral_points!=null)localStorage.setItem('ambar_ref_points',String(d.referral_points));
     }
   }catch(e){}
   _hideBanBlocker();
@@ -4557,16 +4586,18 @@ function buildProfile(){
   if(wishCount){wishBadge.textContent=wishCount;wishBadge.style.display='';}else{wishBadge.style.display='none';}
   set('phub-t-usual',ru?'Как обычно':'The Usual');
   set('phub-s-usual',ru?'Топ ваших заказов':'Your top ordered items');
-  // Tier — count only successfully delivered orders
+  // Tier — points = delivered orders + referral bonus
   const _deliveredCount=orders.filter(o=>o.status==='delivered').length;
-  const tier=_getVipTier(_deliveredCount);
+  const _refPoints=parseInt(localStorage.getItem('ambar_ref_points')||'0');
+  const _totalPts=_deliveredCount+_refPoints;
+  const tier=_getVipTier(_totalPts);
   // Profile card stat slot
   const tierLabel=el('prof-tier-label');
   if(tierLabel){tierLabel.textContent=tier.label;tierLabel.style.color=tier.color;}
   set('stat-lbl3','STATUS');
   // Hub row
   set('phub-t-vip',ru?'Статус':'Status');
-  set('phub-s-vip',tier.label+' · '+_deliveredCount+' '+(ru?'заказов':'orders'));
+  set('phub-s-vip',tier.label+' · '+_totalPts+' '+(ru?'очков':'pts'));
   const vipBadge=el('phub-v-vip');
   if(vipBadge){vipBadge.textContent=tier.label;vipBadge.style.color=tier.color;vipBadge.style.background=tier.color+'22';}
   const vipIcon=el('phub-vip-icon');
@@ -4722,37 +4753,272 @@ function _closeSheet(id){const ov=el(id);ov.classList.remove('open');setTimeout(
 
 // VIP tiers: Bronze 0-999 · Silver 1000-4999 · Gold 5000-14999 · Platinum 15000+
 const _vipTiers=[
-  {key:'silver',   min:1,  max:4,          next:5,  color:'#a8b8c8', label:'SILVER'},
-  {key:'gold',     min:5,  max:9,          next:10, color:'#c9a96e', label:'GOLD'},
-  {key:'platinum', min:10, max:19,         next:20, color:'#d4d4e8', label:'PLATINUM'},
-  {key:'diamond',  min:20, max:49,         next:50, color:'#7ecfea', label:'DIAMOND'},
-  {key:'obsidian', min:50, max:Infinity,   next:null,color:'#c8b8e8',label:'OBSIDIAN'},
+  {key:'silver',   min:1,  max:9,          next:10, color:'#a8b8c8', label:'SILVER'},
+  {key:'gold',     min:10, max:24,         next:25, color:'#c9a96e', label:'GOLD'},
+  {key:'platinum', min:25, max:49,         next:50, color:'#d4d4e8', label:'PLATINUM'},
+  {key:'diamond',  min:50, max:99,         next:100,color:'#7ecfea', label:'DIAMOND'},
+  {key:'obsidian', min:100,max:Infinity,   next:null,color:'#c8b8e8',label:'OBSIDIAN'},
 ];
 function _getVipTier(count){return _vipTiers.find(t=>count>=t.min&&count<=t.max)||_vipTiers[0];}
+
+function _genQR(text,size){
+  // Minimal QR code generator — renders to canvas
+  // Uses a simple approach: generate via an SVG-based API-free method
+  const canvas=document.createElement('canvas');
+  canvas.width=size;canvas.height=size;
+  const ctx=canvas.getContext('2d');
+  // Use a lightweight QR encoding
+  const modules=_qrEncode(text);
+  const n=modules.length;
+  const cellSize=size/n;
+  ctx.fillStyle='#fff';
+  ctx.fillRect(0,0,size,size);
+  ctx.fillStyle='#111';
+  for(let r=0;r<n;r++)for(let c=0;c<n;c++){
+    if(modules[r][c])ctx.fillRect(c*cellSize,r*cellSize,cellSize+.5,cellSize+.5);
+  }
+  return canvas;
+}
+
+// Minimal QR Code encoder (Mode Byte, ECC L, versions 1-6)
+function _qrEncode(text){
+  const data=[];for(let i=0;i<text.length;i++)data.push(text.charCodeAt(i));
+  const ver=data.length<=17?1:data.length<=32?2:data.length<=53?3:data.length<=78?4:data.length<=106?5:6;
+  const size=17+ver*4;
+  const grid=Array.from({length:size},()=>Array(size).fill(null));
+  const reserved=Array.from({length:size},()=>Array(size).fill(false));
+
+  function setMod(r,c,v,res){if(r>=0&&r<size&&c>=0&&c<size){grid[r][c]=v?1:0;if(res)reserved[r][c]=true;}}
+
+  // Finder patterns
+  function finderPattern(row,col){
+    for(let r=-1;r<=7;r++)for(let c=-1;c<=7;c++){
+      const inOuter=(r===0||r===6)&&c>=0&&c<=6||(c===0||c===6)&&r>=0&&r<=6;
+      const inInner=r>=2&&r<=4&&c>=2&&c<=4;
+      const inBorder=r===-1||r===7||c===-1||c===7;
+      if(row+r>=0&&row+r<size&&col+c>=0&&col+c<size){
+        setMod(row+r,col+c,inOuter||inInner?1:inBorder?0:0,true);
+      }
+    }
+  }
+  finderPattern(0,0);finderPattern(0,size-7);finderPattern(size-7,0);
+
+  // Timing patterns
+  for(let i=8;i<size-8;i++){setMod(6,i,i%2===0,true);setMod(i,6,i%2===0,true);}
+
+  // Alignment pattern for ver>=2
+  if(ver>=2){
+    const pos=[6,ver===2?18:ver===3?22:ver===4?26:ver===5?30:34];
+    for(const r of pos)for(const c of pos){
+      if(reserved[r]&&reserved[r][c])continue;
+      for(let dr=-2;dr<=2;dr++)for(let dc=-2;dc<=2;dc++){
+        const v=Math.abs(dr)===2||Math.abs(dc)===2||(dr===0&&dc===0);
+        setMod(r+dr,c+dc,v,true);
+      }
+    }
+  }
+
+  // Dark module & reserved format areas
+  setMod(size-8,8,1,true);
+  for(let i=0;i<8;i++){setMod(8,i,0,true);setMod(8,size-1-i,0,true);setMod(i,8,0,true);setMod(size-1-i,8,0,true);}
+  setMod(8,8,0,true);
+
+  // Encode data
+  const totalBits=_qrDataBits(ver);
+  const bits=[];
+  // Mode indicator (0100 = byte) + character count
+  bits.push(0,1,0,0);
+  const ccBits=ver<=9?8:16;
+  for(let i=ccBits-1;i>=0;i--)bits.push((data.length>>i)&1);
+  // Data
+  for(const b of data)for(let i=7;i>=0;i--)bits.push((b>>i)&1);
+  // Terminator
+  for(let i=0;i<4&&bits.length<totalBits;i++)bits.push(0);
+  // Pad to byte boundary
+  while(bits.length%8!==0&&bits.length<totalBits)bits.push(0);
+  // Pad codewords
+  const pads=[0xEC,0x11];let pi=0;
+  while(bits.length<totalBits){for(let i=7;i>=0;i--)bits.push((pads[pi]>>i)&1);pi^=1;}
+
+  // Convert to bytes
+  const codewords=[];
+  for(let i=0;i<bits.length;i+=8){
+    let b=0;for(let j=0;j<8;j++)b=(b<<1)|(bits[i+j]||0);
+    codewords.push(b);
+  }
+
+  // ECC (simplified Reed-Solomon for ECC L)
+  const eccCount=[7,10,15,20,26,36][ver-1];
+  const eccBytes=_rsEncode(codewords,eccCount);
+  const allBytes=[...codewords,...eccBytes];
+
+  // Place data bits
+  const allBits=[];
+  for(const b of allBytes)for(let i=7;i>=0;i--)allBits.push((b>>i)&1);
+
+  let bitIdx=0;
+  for(let col=size-1;col>=1;col-=2){
+    if(col===6)col=5;
+    const upward=((size-1-col)>>1)%2===0;
+    for(let row=0;row<size;row++){
+      const r=upward?size-1-row:row;
+      for(const dc of [0,-1]){
+        const c=col+dc;
+        if(!reserved[r][c]&&grid[r][c]===null){
+          grid[r][c]=bitIdx<allBits.length?allBits[bitIdx]:0;
+          bitIdx++;
+        }
+      }
+    }
+  }
+
+  // Apply mask 0 (checkerboard)
+  for(let r=0;r<size;r++)for(let c=0;c<size;c++){
+    if(!reserved[r][c])grid[r][c]^=((r+c)%2===0)?1:0;
+  }
+
+  // Format info for mask 0, ECC L
+  const fmtBits=[1,1,1,0,1,1,1,1,1,0,0,0,1,0,0];
+  const fmtPos=[[8,0],[8,1],[8,2],[8,3],[8,4],[8,5],[8,7],[8,8],[7,8],[5,8],[4,8],[3,8],[2,8],[1,8],[0,8]];
+  const fmtPos2=[[size-1,8],[size-2,8],[size-3,8],[size-4,8],[size-5,8],[size-6,8],[size-7,8],[8,size-8],[8,size-7],[8,size-6],[8,size-5],[8,size-4],[8,size-3],[8,size-2],[8,size-1]];
+  for(let i=0;i<15;i++){
+    grid[fmtPos[i][0]][fmtPos[i][1]]=fmtBits[i];
+    grid[fmtPos2[i][0]][fmtPos2[i][1]]=fmtBits[i];
+  }
+
+  return grid;
+}
+
+function _qrDataBits(ver){return[152,272,440,640,864,1088][ver-1]||152;}
+
+function _rsEncode(data,eccCount){
+  // GF(256) with poly 0x11d
+  const gfExp=new Uint8Array(512),gfLog=new Uint8Array(256);
+  let v=1;for(let i=0;i<255;i++){gfExp[i]=v;gfLog[v]=i;v<<=1;if(v>=256)v^=0x11d;}
+  for(let i=255;i<512;i++)gfExp[i]=gfExp[i-255];
+  function gfMul(a,b){return a===0||b===0?0:gfExp[gfLog[a]+gfLog[b]];}
+
+  // Generator polynomial
+  let gen=[1];
+  for(let i=0;i<eccCount;i++){
+    const ng=new Array(gen.length+1).fill(0);
+    for(let j=0;j<gen.length;j++){
+      ng[j]^=gen[j];
+      ng[j+1]^=gfMul(gen[j],gfExp[i]);
+    }
+    gen=ng;
+  }
+
+  const msg=new Uint8Array(data.length+eccCount);
+  for(let i=0;i<data.length;i++)msg[i]=data[i];
+  for(let i=0;i<data.length;i++){
+    const coef=msg[i];
+    if(coef!==0)for(let j=0;j<gen.length;j++)msg[i+j]^=gfMul(gen[j],coef);
+  }
+  return Array.from(msg.slice(data.length));
+}
 
 function openVipSheet(){
   const ru=lang==='ru';
   const count=orders.filter(o=>o.status==='delivered').length;
-  const tier=_getVipTier(count);
+  const refPoints=parseInt(localStorage.getItem('ambar_ref_points')||'0');
+  const totalPoints=count+refPoints;
+  const tier=_getVipTier(totalPoints);
   const idx=_vipTiers.indexOf(tier);
   const nextTier=_vipTiers[idx+1];
-  const progress=tier.next?Math.min(100,Math.round(((count-tier.min)/(tier.next-tier.min))*100)):100;
+  const progress=tier.next?Math.min(100,Math.round(((totalPoints-tier.min)/(tier.next-tier.min))*100)):100;
+  const user=tg?.initDataUnsafe?.user;
+  const username=localStorage.getItem('ambar_custom_name')||user?.first_name||'MEMBER';
+  const uid=user?.id||'';
+  const refLink='https://t.me/AmbarDeliveryBot?start=ref_'+uid;
+
+  // Golden corner SVG
+  const cornerSvg='<svg viewBox="0 0 70 70" fill="none"><path d="M0 0C0 0 15 0 30 8C45 16 55 35 60 50C62 56 65 65 70 70L70 0Z" fill="url(#gc)"/><defs><linearGradient id="gc" x1="0" y1="0" x2="70" y2="70"><stop stop-color="#E8C98A"/><stop offset="0.5" stop-color="#C9A96E"/><stop offset="1" stop-color="#967B4B"/></linearGradient></defs></svg>';
+
+  const vipTitle=el('vip-sheet-title');
+  if(vipTitle)vipTitle.textContent=ru?'ЛОЯЛЬНОСТЬ':'LOYALTY';
+
   el('vip-content').innerHTML=`
-    <div style="text-align:center;padding:8px 0 28px">
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:36px;font-weight:700;color:${tier.color};letter-spacing:5px">${tier.label}</div>
-      <div style="font-size:12px;color:var(--muted);margin-top:8px">${count} ${ru?'заказов':'orders'}</div>
+    <div class="lcard-wrap" id="lcard-wrap" onclick="this.classList.toggle('flipped')">
+      <div class="lcard-inner">
+        <div class="lcard-front">
+          <div class="lcard-noise"></div>
+          <div class="lcard-corner tl">${cornerSvg}</div>
+          <div class="lcard-corner br">${cornerSvg}</div>
+          <div style="position:relative;z-index:1;padding:20px;display:flex;flex-direction:column;height:100%;box-sizing:border-box">
+            <div style="display:flex;justify-content:space-between;align-items:flex-start">
+              <div>
+                <div class="lcard-tier-label" style="color:${tier.color}">${ru?'УРОВЕНЬ':'TIER'}</div>
+                <div class="lcard-tier-name" style="color:${tier.color}">${tier.label}</div>
+                <div class="lcard-tier-sub" style="color:${tier.color}">Card</div>
+              </div>
+              <div class="lcard-qr" id="lcard-qr"></div>
+            </div>
+            <div style="flex:1"></div>
+            <div style="display:flex;justify-content:space-between;align-items:flex-end">
+              <div class="lcard-username" style="color:${tier.color}">${username.toUpperCase()}</div>
+              <div class="lcard-points-row">
+                <div class="lcard-points-dot" style="background:${tier.color}"></div>
+                <span style="color:${tier.color}">${totalPoints} ${ru?'очков':'pts'}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="lcard-back">
+          <div class="lcard-noise"></div>
+          <div class="lcard-corner tl">${cornerSvg}</div>
+          <div class="lcard-corner br">${cornerSvg}</div>
+          <div style="position:relative;z-index:1;text-align:center">
+            <div style="font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:700;letter-spacing:8px;background:linear-gradient(135deg,var(--gold),var(--gold2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">AMBAR</div>
+            <div style="font-family:'Cormorant Garamond',serif;font-size:10px;letter-spacing:4px;color:var(--gold);opacity:.6;margin-top:2px">PREMIUM SPIRITS</div>
+          </div>
+        </div>
+      </div>
     </div>
+    <div class="lcard-tap-hint">${ru?'нажмите на карту, чтобы перевернуть':'tap the card to flip'}</div>
+
     ${tier.next?`
-    <div style="margin-bottom:12px">
+    <div style="margin-bottom:18px">
       <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:8px">
         <span>${ru?'До':'To'} ${nextTier?nextTier.label:''}</span>
-        <span>${tier.next-count} ${ru?'заказов осталось':'orders to go'}</span>
+        <span>${tier.next-totalPoints} ${ru?'очков осталось':'pts to go'}</span>
       </div>
       <div style="height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden">
-        <div style="height:100%;width:${progress}%;background:${tier.color};border-radius:3px;transition:width .6s cubic-bezier(.4,0,.2,1)"></div>
+        <div style="height:100%;width:${progress}%;background:linear-gradient(90deg,${tier.color},${tier.color}cc);border-radius:3px;transition:width .6s cubic-bezier(.4,0,.2,1)"></div>
       </div>
-    </div>`:`<div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:12px">${ru?'Вы на максимальном уровне 🏆':'You\'ve reached the top tier 🏆'}</div>`}
-    <div style="height:8px"></div>`;
+    </div>`:`<div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:16px">${ru?'Максимальный уровень достигнут':'Top tier reached'}</div>`}
+
+    <div style="font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;letter-spacing:1.5px;color:var(--gold);margin-bottom:12px">${ru?'КАК ЭТО РАБОТАЕТ':'HOW IT WORKS'}</div>
+    <div class="lcard-how">
+      <div class="lcard-step">
+        <div class="lcard-step-num">1</div>
+        <div class="lcard-step-txt">${ru?'Каждый <b>доставленный заказ</b> = 1 очко':'Each <b>delivered order</b> = 1 point'}</div>
+      </div>
+      <div class="lcard-step">
+        <div class="lcard-step-num">2</div>
+        <div class="lcard-step-txt">${ru?'<b>Пригласите друга</b> по QR-коду — когда он сделает первый заказ, вы получите <b>+5 очков</b>':'<b>Invite a friend</b> via QR code — when they make their first order, you get <b>+5 points</b>'}</div>
+      </div>
+      <div class="lcard-step">
+        <div class="lcard-step-num">3</div>
+        <div class="lcard-step-txt">${ru?'Набирайте очки и повышайте статус: <b>Silver → Gold → Platinum → Diamond → Obsidian</b>':'Earn points and level up: <b>Silver → Gold → Platinum → Diamond → Obsidian</b>'}</div>
+      </div>
+      <div class="lcard-step">
+        <div class="lcard-step-num">4</div>
+        <div class="lcard-step-txt">${ru?'Ваш <b>QR-код</b> — персональная реферальная ссылка. Друг сканирует → попадает в бот → делает заказ → вы получаете очки':'Your <b>QR code</b> is your personal referral link. Friend scans → enters bot → places order → you earn points'}</div>
+      </div>
+    </div>
+    <div style="height:12px"></div>`;
+
+  // Generate QR code
+  setTimeout(()=>{
+    const qrContainer=el('lcard-qr');
+    if(qrContainer){
+      const canvas=_genQR(refLink,256);
+      canvas.style.width='100%';canvas.style.height='100%';
+      qrContainer.appendChild(canvas);
+    }
+  },50);
+
   _openSheet('vip-ov');
 }
 function closeVipSheet(){_closeSheet('vip-ov');}

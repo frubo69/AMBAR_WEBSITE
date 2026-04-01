@@ -129,9 +129,13 @@ async def handle_create_order(request: web.Request) -> web.Response:
     )
 
     # Check if this is the user's very first order (before incrementing)
+    referred_by = None
+    referrer_username = None
     try:
         user_doc = await db.get_user(uid)
         is_first_order = (user_doc is None or user_doc.get("orders_total", 0) == 0)
+        if is_first_order and user_doc and user_doc.get("referred_by"):
+            referred_by = user_doc["referred_by"]
     except Exception:
         is_first_order = False
 
@@ -195,7 +199,18 @@ async def handle_create_order(request: web.Request) -> web.Response:
     else:
         addr_line = f"🏠 Адрес: {address}"
 
-    first_order_banner = "🔴 *⚠️ ПЕРВЫЙ ЗАКАЗ — новый клиент!*\n\n" if is_first_order else ""
+    # Build first order banner — with referral info if applicable
+    if is_first_order and referred_by:
+        try:
+            referrer_doc = await db.get_user(referred_by)
+            referrer_username = referrer_doc.get("username", "—") if referrer_doc else "—"
+        except Exception:
+            referrer_username = "—"
+        first_order_banner = f"🔴 *⚠️ НОВЫЙ КЛИЕНТ РЕФЕРАЛ*\n👥 Пригласил — @{referrer_username}\n\n"
+    elif is_first_order:
+        first_order_banner = "🔴 *⚠️ ПЕРВЫЙ ЗАКАЗ — новый клиент!*\n\n"
+    else:
+        first_order_banner = ""
     op_text = (
         f"{first_order_banner}"
         f"🆕 *НОВЫЙ ЗАКАЗ #{oid}*\n\n"
@@ -225,6 +240,21 @@ async def handle_create_order(request: web.Request) -> web.Response:
             await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text, reply_markup=op_kb)
         except Exception as e:
             log.error(f"Operator notify {op_id}: {e}")
+
+    # Award referral points (+5) to the referrer on first order
+    if is_first_order and referred_by:
+        try:
+            await db.award_referral_points(referred_by, uid, 5)
+            # Notify referrer about the bonus
+            ref_msg = (
+                f"🎉 *Реферальный бонус!*\n\n"
+                f"Ваш друг сделал первый заказ.\n"
+                f"Вам начислено *+5 очков* лояльности!"
+            )
+            await tg_send(BOT_TOKEN, referred_by, ref_msg)
+            log.info(f"[referral] awarded 5 pts to {referred_by} for {uid}'s first order")
+        except Exception as e:
+            log.error(f"Referral award failed: {e}")
 
     log.info(f"[order] #{oid} user={uid} items={len(items)} total={total} AED")
     return web.json_response({"ok": True, "order_id": oid}, headers=CORS_HEADERS)
@@ -299,12 +329,15 @@ async def handle_me(request: web.Request) -> web.Response:
         return web.json_response({"banned": False}, headers=CORS_HEADERS)
     uid = int(uid_str)
     try:
-        banned = await db.is_banned(uid)
+        user_doc = await db.get_user(uid)
+        banned = user_doc.get("is_banned", False) if user_doc else False
+        ref_points = user_doc.get("referral_points", 0) if user_doc else 0
     except Exception as e:
         log.warning(f"ban check /api/me failed: {e}")
         banned = False
+        ref_points = 0
     log.info(f"[me] uid={uid} banned={banned}")
-    return web.json_response({"banned": banned}, headers=CORS_HEADERS)
+    return web.json_response({"banned": banned, "referral_points": ref_points}, headers=CORS_HEADERS)
 
 
 # ── GET /api/orders ───────────────────────────────────────────────────────────

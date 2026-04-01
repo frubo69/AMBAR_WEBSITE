@@ -238,8 +238,8 @@ async def run_countdown(cid, eta_min, lang, oid=None):
         order = await db.get_order(oid)
         if not order or order.get("status") in ("delivered", "cancelled"):
             return
-        await db.update_order(oid, status="delivered", updated_at=datetime.now().isoformat())
-    await cleanup_and_deliver(cid, oid, lang)
+        # Timer expired — operator must press the Delivered button manually
+        log.info(f"ETA expired for order {oid}, awaiting manual delivery confirmation")
 
 
 # ── Menu handler ──────────────────────────────────────────────────────────────

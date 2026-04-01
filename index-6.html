@@ -4595,14 +4595,15 @@ function buildProfile(){
   const _refPoints=parseInt(localStorage.getItem('ambar_ref_points')||'0');
   const _totalPts=_deliveredCount+_refPoints;
   const _isFounder=(tg?.initDataUnsafe?.user?.id===956633762);
-  const tier=_isFounder?{key:'founder',min:0,max:Infinity,next:null,color:'#E8C98A',label:'ÉLITE'}:_getVipTier(_totalPts);
+  const _isPremiumProfile=[686932322].includes(tg?.initDataUnsafe?.user?.id);
+  const tier=(_isFounder||_isPremiumProfile)?{key:'founder',min:0,max:Infinity,next:null,color:'#E8C98A',label:'ÉLITE'}:_getVipTier(_totalPts);
   // Profile card stat slot
   const tierLabel=el('prof-tier-label');
   if(tierLabel){tierLabel.textContent=tier.label;tierLabel.style.color=tier.color;}
   set('stat-lbl3','STATUS');
   // Hub row
   set('phub-t-vip',ru?'Статус':'Status');
-  set('phub-s-vip',_isFounder?'ÉLITE':(tier.label+' · '+_totalPts+' '+(ru?'очков':'pts')));
+  set('phub-s-vip',(_isFounder||_isPremiumProfile)?'ÉLITE':(tier.label+' · '+_totalPts+' '+(ru?'очков':'pts')));
   const vipBadge=el('phub-v-vip');
   if(vipBadge){vipBadge.textContent=tier.label;vipBadge.style.color=tier.color;vipBadge.style.background=tier.color+'22';}
   const vipIcon=el('phub-vip-icon');
@@ -4939,122 +4940,104 @@ function openVipSheet(){
   const count=orders.filter(o=>o.status==='delivered').length;
   const refPoints=parseInt(localStorage.getItem('ambar_ref_points')||'0');
   const totalPoints=count+refPoints;
-  const tier=_getVipTier(totalPoints);
+  let tier=_getVipTier(totalPoints);
   const idx=_vipTiers.indexOf(tier);
   const nextTier=_vipTiers[idx+1];
   const progress=tier.next?Math.min(100,Math.round(((totalPoints-tier.min)/(tier.next-tier.min))*100)):100;
-  const user=tg?.initDataUnsafe?.user;
-  const displayName=user?.username?'@'+user.username:(localStorage.getItem('ambar_custom_name')||user?.first_name||'MEMBER');
-  const uid=user?.id||'';
-  const isFounder=(uid===956633762);
-  const refLink='https://t.me/AmBarDelivery_bot?start=ref_'+uid;
 
-  // Golden flowing wave decoration — top-right corner (3 curved stripes like reference)
-  const wavesTR='<svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="gw1" x1="50" y1="0" x2="120" y2="80"><stop stop-color="#E8C98A"/><stop offset="1" stop-color="#967B4B"/></linearGradient><linearGradient id="gw2" x1="60" y1="0" x2="120" y2="70"><stop stop-color="#F5E0B0"/><stop offset="1" stop-color="#C9A96E"/></linearGradient><linearGradient id="gw3" x1="70" y1="0" x2="120" y2="60"><stop stop-color="#E8C98A"/><stop offset="1" stop-color="#8B6914"/></linearGradient></defs><path d="M120 0C120 0 110 45 85 72C60 99 30 108 0 110L0 120L120 120Z" fill="url(#gw1)" opacity=".9"/><path d="M120 0C120 0 112 35 95 55C78 75 50 85 25 88L25 95L120 95Z" fill="url(#gw2)" opacity=".85"/><path d="M120 0C120 0 115 25 103 40C91 55 70 65 50 68L50 73L120 73Z" fill="url(#gw3)" opacity=".8"/></svg>';
-  // Bottom-left corner (mirrored)
-  const wavesBL='<svg viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="gw4" x1="70" y1="120" x2="0" y2="40"><stop stop-color="#E8C98A"/><stop offset="1" stop-color="#967B4B"/></linearGradient><linearGradient id="gw5" x1="60" y1="120" x2="0" y2="50"><stop stop-color="#F5E0B0"/><stop offset="1" stop-color="#C9A96E"/></linearGradient><linearGradient id="gw6" x1="50" y1="120" x2="0" y2="60"><stop stop-color="#E8C98A"/><stop offset="1" stop-color="#8B6914"/></linearGradient></defs><path d="M0 120C0 120 10 75 35 48C60 21 90 12 120 10L120 0L0 0Z" fill="url(#gw4)" opacity=".9"/><path d="M0 120C0 120 8 85 25 65C42 45 70 35 95 32L95 25L0 25Z" fill="url(#gw5)" opacity=".85"/><path d="M0 120C0 120 5 95 17 80C29 65 50 55 70 52L70 47L0 47Z" fill="url(#gw6)" opacity=".8"/></svg>';
+  // Premium customer IDs (manually added, numbered 01-10 max)
+  const _premiumIDs=[686932322];
 
   const vipTitle=el('vip-sheet-title');
   if(vipTitle)vipTitle.textContent=ru?'ЛОЯЛЬНОСТЬ':'LOYALTY';
 
-  // ── Founder exclusive card (1/1) ──────────────────────────────────────────
-  if(isFounder){
-    el('vip-content').innerHTML=`
-    <div class="lcard-wrap" id="lcard-wrap" onclick="this.classList.toggle('flipped')">
-      <div class="lcard-inner">
-        <div class="lcard-front founder">
-          <div class="lcard-noise"></div>
-          <div class="lcard-shimmer"></div>
-          <div class="lcard-founder-glow"></div>
-          <div class="lcard-deco" style="top:-1px;right:-1px;width:110px;height:110px">${wavesTR}</div>
-          <div class="lcard-deco" style="bottom:-1px;left:-1px;width:110px;height:110px">${wavesBL}</div>
-          <div class="lcard-deco" style="top:-1px;left:-1px;width:70px;height:70px;opacity:.3;transform:rotate(90deg)">${wavesTR}</div>
-          <div class="lcard-deco" style="bottom:-1px;right:-1px;width:70px;height:70px;opacity:.3;transform:rotate(90deg)">${wavesBL}</div>
-          <div style="position:relative;z-index:2;padding:22px 20px;display:flex;flex-direction:column;height:100%;box-sizing:border-box">
-            <div style="display:flex;justify-content:space-between;align-items:flex-start">
-              <div>
-                <div style="font-family:'Cormorant Garamond',serif;font-size:10px;font-weight:600;letter-spacing:4px;color:rgba(232,201,138,.6)">EXCLUSIVE</div>
-                <div style="font-family:'Cormorant Garamond',serif;font-size:36px;font-weight:700;letter-spacing:3px;line-height:1;background:linear-gradient(135deg,#F5E0B0,#E8C98A,#C9A96E,#E8C98A,#F5E0B0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">ÉLITE</div>
-                <div style="font-family:'Cormorant Garamond',serif;font-size:18px;font-style:italic;font-weight:400;color:rgba(232,201,138,.7);margin-top:-2px">Card</div>
-              </div>
-              <div class="lcard-qr" id="lcard-qr"></div>
-            </div>
-            <div style="flex:1"></div>
-            <div class="lcard-founder-line" style="bottom:52px"></div>
-            <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:8px">
-              <div class="lcard-username" style="color:#E8C98A;font-size:15px">${displayName.toUpperCase()}</div>
-              <div class="lcard-founder-serial">N° 001 / 001</div>
-            </div>
-          </div>
-        </div>
-        <div class="lcard-back founder">
-          <div class="lcard-noise"></div>
-          <div class="lcard-shimmer"></div>
-          <div class="lcard-founder-glow"></div>
-          <div class="lcard-deco" style="top:-1px;right:-1px;width:110px;height:110px">${wavesTR}</div>
-          <div class="lcard-deco" style="bottom:-1px;left:-1px;width:110px;height:110px">${wavesBL}</div>
-          <div class="lcard-deco" style="top:-1px;left:-1px;width:70px;height:70px;opacity:.3;transform:rotate(90deg)">${wavesTR}</div>
-          <div class="lcard-deco" style="bottom:-1px;right:-1px;width:70px;height:70px;opacity:.3;transform:rotate(90deg)">${wavesBL}</div>
-          <div style="position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(232,201,138,.06) 0%,transparent 60%);pointer-events:none"></div>
-          <div style="position:relative;z-index:2;text-align:center">
-            <div style="width:60px;height:1px;background:linear-gradient(90deg,transparent,#E8C98A,transparent);margin:0 auto 14px;opacity:.5"></div>
-            <div style="font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:700;letter-spacing:12px;background:linear-gradient(135deg,#F5E0B0,#E8C98A,#C9A96E,#E8C98A,#F5E0B0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">AMBAR</div>
-            <div style="font-family:'Cormorant Garamond',serif;font-size:9px;letter-spacing:5px;color:#E8C98A;opacity:.45;margin-top:6px">PREMIUM SPIRITS</div>
-            <div style="width:60px;height:1px;background:linear-gradient(90deg,transparent,#E8C98A,transparent);margin:14px auto 0;opacity:.5"></div>
-          </div>
-          <div style="position:relative;z-index:2;font-family:'Space Grotesk',sans-serif;font-size:9px;letter-spacing:3px;color:rgba(232,201,138,.3);margin-top:10px">EXCLUSIVE MEMBER</div>
-        </div>
-      </div>
-    </div>
-    <div class="lcard-tap-hint">${ru?'нажмите на карту, чтобы перевернуть':'tap the card to flip'}</div>
-    <div style="text-align:center;font-size:12px;color:rgba(232,201,138,.5);margin-bottom:16px;font-style:italic;font-family:'Cormorant Garamond',serif;letter-spacing:1px">${ru?'Эксклюзивная карта — единственная в мире':'Exclusive card — one of a kind'}</div>`;
-  } else {
-  // ── Standard loyalty card ─────────────────────────────────────────────────
+  const user=tg?.initDataUnsafe?.user;
+  const displayName=user?.username?'@'+user.username:(localStorage.getItem('ambar_custom_name')||user?.first_name||'MEMBER');
+  const uid=user?.id||'';
+  const isFounder=(uid===956633762);
+  const premiumIdx=_premiumIDs.indexOf(uid);
+  const isPremium=premiumIdx!==-1;
+  const refLink='https://t.me/AmBarDelivery_bot?start=ref_'+uid;
+
+  // Determine card type & tier override
+  let cardType='standard'; // standard | premium | founder
+  if(isFounder){cardType='founder';tier={key:'founder',min:0,max:Infinity,next:null,color:'#E8C98A',label:'ÉLITE'};}
+  else if(isPremium){cardType='premium';tier={key:'premium',min:0,max:Infinity,next:null,color:'#E8C98A',label:'ÉLITE'};}
+
+  // Luxury escalation for standard cards: shimmer from Gold+, glow from Platinum+, stronger border from Diamond+
+  const hasShimmer=cardType!=='standard'||['gold','platinum','diamond','brilliant'].includes(tier.key);
+  const hasGlow=cardType!=='standard'||['platinum','diamond','brilliant'].includes(tier.key);
+  const isUltra=cardType!=='standard'||['diamond','brilliant'].includes(tier.key);
+
+  // Card border/shadow escalation
+  const cardBorder=isUltra?`1.5px solid ${tier.color}44`:`1px solid rgba(201,169,110,.2)`;
+  const cardShadow=isUltra?`0 8px 40px ${tier.color}15,inset 0 1px 0 ${tier.color}18`:'0 8px 32px rgba(0,0,0,.5),inset 0 1px 0 rgba(201,169,110,.08)';
+  const glowHtml=hasGlow?`<div style="position:absolute;inset:0;border-radius:16px;background:radial-gradient(ellipse at 30% 40%,${tier.color}0d 0%,transparent 50%),radial-gradient(ellipse at 70% 80%,${tier.color}08 0%,transparent 50%);pointer-events:none"></div>`:'';
+  const shimmerHtml=hasShimmer?'<div class="lcard-shimmer"></div>':'';
+  const lineHtml=(cardType!=='standard')?`<div class="lcard-founder-line" style="bottom:52px"></div>`:'';
+
+  // ── Build card front content ──────────────────────────────────────────────
+  let frontLabel,frontTitle,frontSub,serialHtml,bottomRight,tagline;
+  if(cardType==='founder'){
+    frontLabel='EXCLUSIVE';frontTitle='ÉLITE';frontSub='Card';
+    serialHtml=`<div class="lcard-founder-serial">N° 001 / 001</div>`;
+    tagline=ru?'Эксклюзивная карта — единственная в мире':'Exclusive card — one of a kind';
+  }else if(cardType==='premium'){
+    const pNum=String(premiumIdx+1).padStart(2,'0');
+    frontLabel='PREMIUM CUSTOMER';frontTitle='ÉLITE';frontSub='Card';
+    serialHtml=`<div class="lcard-founder-serial">N° ${pNum} / 10</div>`;
+    tagline=ru?'Премиальная карта — ограниченный выпуск':'Premium card — limited edition';
+  }else{
+    frontLabel=ru?'УРОВЕНЬ':'TIER';frontTitle=tier.label;frontSub='Card';
+    serialHtml=`<div class="lcard-points-row"><div class="lcard-points-dot" style="background:${tier.color}"></div><span style="color:${tier.color}">${totalPoints} ${ru?'очков':'pts'}</span></div>`;
+    tagline='';
+  }
+
+  const backMemberLabel=cardType==='founder'?'EXCLUSIVE MEMBER':cardType==='premium'?'PREMIUM MEMBER':'LOYALTY MEMBER';
+
+  const cardFrontClass=cardType!=='standard'?'lcard-front founder':'lcard-front';
+  const cardBackClass=cardType!=='standard'?'lcard-back founder':'lcard-back';
+
   el('vip-content').innerHTML=`
     <div class="lcard-wrap" id="lcard-wrap" onclick="this.classList.toggle('flipped')">
       <div class="lcard-inner">
-        <div class="lcard-front">
+        <div class="${cardFrontClass}" style="border:${cardBorder};box-shadow:${cardShadow}">
           <div class="lcard-noise"></div>
-          <div class="lcard-deco" style="top:-1px;right:-1px;width:100px;height:100px">${wavesTR}</div>
-          <div class="lcard-deco" style="bottom:-1px;left:-1px;width:100px;height:100px">${wavesBL}</div>
-          <div style="position:absolute;inset:0;border-radius:16px;background:radial-gradient(ellipse at 80% 20%,rgba(201,169,110,.04) 0%,transparent 60%);pointer-events:none"></div>
-          <div style="position:relative;z-index:1;padding:22px 20px;display:flex;flex-direction:column;height:100%;box-sizing:border-box">
+          ${shimmerHtml}${glowHtml}
+          <div style="position:relative;z-index:2;padding:22px 20px;display:flex;flex-direction:column;height:100%;box-sizing:border-box">
             <div style="display:flex;justify-content:space-between;align-items:flex-start">
               <div>
-                <div class="lcard-tier-label" style="color:${tier.color}">${ru?'УРОВЕНЬ':'TIER'}</div>
-                <div class="lcard-tier-name" style="color:${tier.color}">${tier.label}</div>
-                <div class="lcard-tier-sub" style="color:${tier.color}">Card</div>
+                <div class="lcard-tier-label" style="color:${tier.color}">${frontLabel}</div>
+                <div class="lcard-tier-name" style="color:${tier.color};${cardType!=='standard'?'background:linear-gradient(135deg,#F5E0B0,#E8C98A,#C9A96E,#E8C98A,#F5E0B0);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text':''}">${frontTitle}</div>
+                <div class="lcard-tier-sub" style="color:${tier.color}">${frontSub}</div>
               </div>
               <div class="lcard-qr" id="lcard-qr"></div>
             </div>
             <div style="flex:1"></div>
-            <div style="display:flex;justify-content:space-between;align-items:flex-end">
-              <div class="lcard-username" style="color:${tier.color}">${displayName.toUpperCase()}</div>
-              <div class="lcard-points-row">
-                <div class="lcard-points-dot" style="background:${tier.color}"></div>
-                <span style="color:${tier.color}">${totalPoints} ${ru?'очков':'pts'}</span>
-              </div>
+            ${lineHtml}
+            <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-top:8px">
+              <div class="lcard-username" style="color:${tier.color};${cardType!=='standard'?'font-size:15px':''}">${displayName.toUpperCase()}</div>
+              ${serialHtml}
             </div>
           </div>
         </div>
-        <div class="lcard-back">
+        <div class="${cardBackClass}" style="border:${cardBorder};box-shadow:${cardShadow}">
           <div class="lcard-noise"></div>
-          <div class="lcard-deco" style="top:-1px;right:-1px;width:100px;height:100px">${wavesTR}</div>
-          <div class="lcard-deco" style="bottom:-1px;left:-1px;width:100px;height:100px">${wavesBL}</div>
-          <div style="position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(201,169,110,.06) 0%,transparent 70%);pointer-events:none"></div>
-          <div style="position:relative;z-index:1;text-align:center">
-            <div style="width:48px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:0 auto 16px;opacity:.4"></div>
-            <div style="font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:700;letter-spacing:10px;background:linear-gradient(135deg,#E8C98A,#C9A96E,#E8C98A);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">AMBAR</div>
-            <div style="font-family:'Cormorant Garamond',serif;font-size:9px;letter-spacing:5px;color:var(--gold);opacity:.5;margin-top:6px">PREMIUM SPIRITS</div>
-            <div style="width:48px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:16px auto 0;opacity:.4"></div>
+          ${shimmerHtml}${glowHtml}
+          <div style="position:relative;z-index:2;text-align:center">
+            <div style="width:${cardType!=='standard'?60:48}px;height:1px;background:linear-gradient(90deg,transparent,${tier.color},transparent);margin:0 auto 14px;opacity:.4"></div>
+            <div style="font-family:'Cormorant Garamond',serif;font-size:${cardType!=='standard'?34:32}px;font-weight:700;letter-spacing:${cardType!=='standard'?12:10}px;background:linear-gradient(135deg,#E8C98A,#C9A96E,#E8C98A);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">AMBAR</div>
+            <div style="font-family:'Cormorant Garamond',serif;font-size:9px;letter-spacing:5px;color:${tier.color};opacity:.45;margin-top:6px">PREMIUM SPIRITS</div>
+            <div style="width:${cardType!=='standard'?60:48}px;height:1px;background:linear-gradient(90deg,transparent,${tier.color},transparent);margin:14px auto 0;opacity:.4"></div>
           </div>
-          <div style="position:relative;z-index:1;font-family:'Space Grotesk',sans-serif;font-size:9px;letter-spacing:2px;color:rgba(201,169,110,.3);margin-top:8px">LOYALTY MEMBER</div>
+          <div style="position:relative;z-index:2;font-family:'Space Grotesk',sans-serif;font-size:9px;letter-spacing:${cardType!=='standard'?3:2}px;color:${tier.color}4d;margin-top:10px">${backMemberLabel}</div>
         </div>
       </div>
     </div>
     <div class="lcard-tap-hint">${ru?'нажмите на карту, чтобы перевернуть':'tap the card to flip'}</div>
+    ${tagline?`<div style="text-align:center;font-size:12px;color:${tier.color}80;margin-bottom:16px;font-style:italic;font-family:'Cormorant Garamond',serif;letter-spacing:1px">${tagline}</div>`:''}
 
-    ${tier.next?`
+    ${cardType==='standard'?(tier.next?`
     <div style="margin-bottom:18px">
       <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:8px">
         <span>${ru?'До':'To'} ${nextTier?nextTier.label:''}</span>
@@ -5063,29 +5046,17 @@ function openVipSheet(){
       <div style="height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden">
         <div style="height:100%;width:${progress}%;background:linear-gradient(90deg,${tier.color},${tier.color}cc);border-radius:3px;transition:width .6s cubic-bezier(.4,0,.2,1)"></div>
       </div>
-    </div>`:`<div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:16px">${ru?'Максимальный уровень достигнут':'Top tier reached'}</div>`}
+    </div>`:`<div style="text-align:center;font-size:12px;color:var(--muted);margin-bottom:16px">${ru?'Максимальный уровень достигнут':'Top tier reached'}</div>`):''}
 
+    ${cardType==='standard'?`
     <div style="font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;letter-spacing:1.5px;color:var(--gold);margin-bottom:12px">${ru?'КАК ЭТО РАБОТАЕТ':'HOW IT WORKS'}</div>
     <div class="lcard-how">
-      <div class="lcard-step">
-        <div class="lcard-step-num">1</div>
-        <div class="lcard-step-txt">${ru?'Каждый <b>доставленный заказ</b> = 1 очко':'Each <b>delivered order</b> = 1 point'}</div>
-      </div>
-      <div class="lcard-step">
-        <div class="lcard-step-num">2</div>
-        <div class="lcard-step-txt">${ru?'<b>Пригласите друга</b> по QR-коду — когда он сделает первый заказ, вы получите <b>+5 очков</b>':'<b>Invite a friend</b> via QR code — when they make their first order, you get <b>+5 points</b>'}</div>
-      </div>
-      <div class="lcard-step">
-        <div class="lcard-step-num">3</div>
-        <div class="lcard-step-txt">${ru?'Набирайте очки и повышайте статус: <b>Silver → Gold → Platinum → Diamond → Brilliant</b>':'Earn points and level up: <b>Silver → Gold → Platinum → Diamond → Brilliant</b>'}</div>
-      </div>
-      <div class="lcard-step">
-        <div class="lcard-step-num">4</div>
-        <div class="lcard-step-txt">${ru?'Ваш <b>QR-код</b> — персональная реферальная ссылка. Друг сканирует → попадает в бот → делает заказ → вы получаете очки':'Your <b>QR code</b> is your personal referral link. Friend scans → enters bot → places order → you earn points'}</div>
-      </div>
+      <div class="lcard-step"><div class="lcard-step-num">1</div><div class="lcard-step-txt">${ru?'Каждый <b>доставленный заказ</b> = 1 очко':'Each <b>delivered order</b> = 1 point'}</div></div>
+      <div class="lcard-step"><div class="lcard-step-num">2</div><div class="lcard-step-txt">${ru?'<b>Пригласите друга</b> по QR-коду — когда он сделает первый заказ, вы получите <b>+5 очков</b>':'<b>Invite a friend</b> via QR code — when they make their first order, you get <b>+5 points</b>'}</div></div>
+      <div class="lcard-step"><div class="lcard-step-num">3</div><div class="lcard-step-txt">${ru?'Набирайте очки и повышайте статус: <b>Silver → Gold → Platinum → Diamond → Brilliant</b>':'Earn points and level up: <b>Silver → Gold → Platinum → Diamond → Brilliant</b>'}</div></div>
+      <div class="lcard-step"><div class="lcard-step-num">4</div><div class="lcard-step-txt">${ru?'Ваш <b>QR-код</b> — персональная реферальная ссылка. Друг сканирует → попадает в бот → делает заказ → вы получаете очки':'Your <b>QR code</b> is your personal referral link. Friend scans → enters bot → places order → you earn points'}</div></div>
     </div>
-    <div style="height:12px"></div>`;
-  }
+    <div style="height:12px"></div>`:''}`;
 
   // Generate QR code
   setTimeout(()=>{

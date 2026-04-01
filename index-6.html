@@ -5845,26 +5845,23 @@ function closeAod(){
 const _G={state:'idle',raf:0,frame:0,score:0,speed:0,W:0,H:0,gY:0,
   player:null,obstacles:[],coins:[],ctx:null,imgs:null};
 
-const _SVGS={
-player:`<svg xmlns="http://www.w3.org/2000/svg" width="110" height="70" viewBox="0 0 110 70"><ellipse cx="55" cy="69" rx="46" ry="2" fill="rgba(0,0,0,0.18)"/><circle cx="17" cy="56" r="12" fill="#F0ECD8"/><circle cx="17" cy="56" r="5" fill="#07070e"/><circle cx="17" cy="56" r="2" fill="#F0ECD8"/><circle cx="93" cy="56" r="12" fill="#F0ECD8"/><circle cx="93" cy="56" r="5" fill="#07070e"/><circle cx="93" cy="56" r="2" fill="#F0ECD8"/><path d="M20 50 L28 36 L50 32 L68 34 L84 42 L90 52 L86 56 L76 56 L74 48 L30 46 L20 56 Z" fill="#F0ECD8"/><line x1="84" y1="42" x2="93" y2="56" stroke="#F0ECD8" stroke-width="3.5" stroke-linecap="round"/><rect x="24" y="15" width="24" height="19" rx="2" fill="#F0ECD8"/><line x1="24" y1="24" x2="48" y2="24" stroke="#07070e" stroke-width="1.3"/><line x1="36" y1="15" x2="36" y2="34" stroke="#07070e" stroke-width="1.3"/><line x1="24" y1="34" x2="28" y2="38" stroke="#F0ECD8" stroke-width="1.8" stroke-linecap="round"/><line x1="48" y1="34" x2="48" y2="38" stroke="#F0ECD8" stroke-width="1.8" stroke-linecap="round"/><circle cx="64" cy="17" r="10" fill="#F0ECD8"/><path d="M56 20 Q64 25 72 20" stroke="#07070e" stroke-width="1.5" fill="none" stroke-linecap="round"/><path d="M57 26 L60 38 L72 36 L70 24 Z" fill="#F0ECD8"/><path d="M68 30 L80 27 L84 30" stroke="#F0ECD8" stroke-width="3" stroke-linecap="round" fill="none"/><line x1="2" y1="44" x2="12" y2="44" stroke="#F0ECD8" stroke-width="1.5" stroke-linecap="round" opacity="0.4"/><line x1="4" y1="49" x2="9" y2="49" stroke="#F0ECD8" stroke-width="1" stroke-linecap="round" opacity="0.3"/></svg>`,
-obs0:`<svg xmlns="http://www.w3.org/2000/svg" width="42" height="42" viewBox="0 0 42 42"><ellipse cx="21" cy="41" rx="18" ry="1.8" fill="rgba(0,0,0,0.18)"/><rect x="2" y="22" width="30" height="18" rx="2" fill="#F0ECD8"/><line x1="2" y1="31" x2="32" y2="31" stroke="#07070e" stroke-width="1.2"/><line x1="17" y1="22" x2="17" y2="40" stroke="#07070e" stroke-width="1.2"/><rect x="14" y="6" width="26" height="18" rx="2" fill="#F0ECD8"/><line x1="14" y1="15" x2="40" y2="15" stroke="#07070e" stroke-width="1.2"/><line x1="27" y1="6" x2="27" y2="24" stroke="#07070e" stroke-width="1.2"/><rect x="0" y="10" width="16" height="14" rx="2" fill="#F0ECD8"/><line x1="0" y1="17" x2="16" y2="17" stroke="#07070e" stroke-width="1.2"/><line x1="8" y1="10" x2="8" y2="24" stroke="#07070e" stroke-width="1.2"/></svg>`,
-obs1:`<svg xmlns="http://www.w3.org/2000/svg" width="18" height="58" viewBox="0 0 18 58"><ellipse cx="9" cy="57" rx="7" ry="1.5" fill="rgba(0,0,0,0.18)"/><path d="M2 30 Q1 40 2 52 Q2 56 9 56 Q16 56 16 52 Q17 40 16 30 Z" fill="#F0ECD8"/><path d="M5 18 Q2 24 2 30 L16 30 Q16 24 13 18 Z" fill="#F0ECD8"/><rect x="6" y="6" width="6" height="14" rx="2" fill="#F0ECD8"/><rect x="5" y="2" width="8" height="6" rx="1.5" fill="#F0ECD8"/><rect x="3" y="36" width="12" height="10" rx="1" fill="rgba(7,7,14,0.22)" stroke="#F0ECD8" stroke-width="0.5"/></svg>`,
-obs2:`<svg xmlns="http://www.w3.org/2000/svg" width="38" height="32" viewBox="0 0 38 32"><ellipse cx="19" cy="31" rx="15" ry="1.8" fill="rgba(0,0,0,0.18)"/><path d="M4 7 Q1 16 4 25 L34 25 Q37 16 34 7 Z" fill="#F0ECD8"/><ellipse cx="19" cy="7" rx="15" ry="4.5" fill="#F0ECD8"/><ellipse cx="19" cy="25" rx="15" ry="4.5" fill="#F0ECD8"/><path d="M5 11 Q19 9 33 11" stroke="#07070e" stroke-width="1.8" fill="none"/><path d="M4 16 Q19 18 34 16" stroke="#07070e" stroke-width="1.8" fill="none"/><path d="M5 21 Q19 23 33 21" stroke="#07070e" stroke-width="1.8" fill="none"/><line x1="14" y1="4" x2="14" y2="28" stroke="#07070e" stroke-width="0.7" opacity="0.3"/><line x1="19" y1="3" x2="19" y2="29" stroke="#07070e" stroke-width="0.7" opacity="0.3"/><line x1="24" y1="4" x2="24" y2="28" stroke="#07070e" stroke-width="0.7" opacity="0.3"/></svg>`,
-obs3:`<svg xmlns="http://www.w3.org/2000/svg" width="40" height="52" viewBox="0 0 40 52"><defs><clipPath id="cc3"><polygon points="20,3 1,48 39,48"/></clipPath></defs><ellipse cx="20" cy="51" rx="18" ry="2" fill="rgba(0,0,0,0.2)"/><rect x="0" y="44" width="40" height="6" rx="3" fill="#F0ECD8"/><polygon points="20,3 1,48 39,48" fill="#F0ECD8"/><rect x="0" y="28" width="40" height="11" fill="#07070e" clip-path="url(#cc3)"/><rect x="0" y="30" width="40" height="6" fill="#F0ECD8" clip-path="url(#cc3)"/></svg>`,
-obs4:`<svg xmlns="http://www.w3.org/2000/svg" width="62" height="28" viewBox="0 0 62 28"><defs><clipPath id="bc4"><rect x="1" y="5" width="60" height="14" rx="3"/></clipPath></defs><ellipse cx="31" cy="27" rx="27" ry="1.5" fill="rgba(0,0,0,0.18)"/><path d="M10 19 L5 27 L15 27 Z" fill="#F0ECD8"/><path d="M52 19 L47 27 L57 27 Z" fill="#F0ECD8"/><rect x="1" y="5" width="60" height="14" rx="3" fill="#F0ECD8"/><g clip-path="url(#bc4)"><line x1="6" y1="5" x2="-3" y2="19" stroke="#07070e" stroke-width="7"/><line x1="16" y1="5" x2="7" y2="19" stroke="#07070e" stroke-width="7"/><line x1="26" y1="5" x2="17" y2="19" stroke="#07070e" stroke-width="7"/><line x1="36" y1="5" x2="27" y2="19" stroke="#07070e" stroke-width="7"/><line x1="46" y1="5" x2="37" y2="19" stroke="#07070e" stroke-width="7"/><line x1="56" y1="5" x2="47" y2="19" stroke="#07070e" stroke-width="7"/><line x1="66" y1="5" x2="57" y2="19" stroke="#07070e" stroke-width="7"/></g></svg>`,
-coin:`<svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 22 22"><defs><radialGradient id="cng" cx="35%" cy="30%"><stop offset="0%" stop-color="#ffe566"/><stop offset="55%" stop-color="#d4a820"/><stop offset="100%" stop-color="#8b6010"/></radialGradient></defs><circle cx="11" cy="11" r="11" fill="rgba(201,169,64,0.12)"/><circle cx="11" cy="11" r="9" fill="url(#cng)"/><circle cx="11" cy="11" r="6.5" fill="none" stroke="rgba(139,96,16,0.45)" stroke-width="0.8"/><ellipse cx="8.5" cy="8" rx="3" ry="1.8" fill="rgba(255,245,180,0.5)" transform="rotate(-20,8.5,8)"/></svg>`,
+const _PNG_ASSETS={
+  player:'bike.png',
+  obs0:'obstacle_1.png',
+  obs1:'obstacle_2.png',
+  coin:'coin.png',
 };
 
 function _gameLoadAssets(cb){
   if(_G.imgs&&_G.imgs._ready){cb();return;}
   _G.imgs={_ready:false};
-  const keys=Object.keys(_SVGS);
+  const keys=Object.keys(_PNG_ASSETS);
   let pending=keys.length;
   keys.forEach(k=>{
     const img=new Image();
     img.onload=()=>{_G.imgs[k]=img;if(--pending===0){_G.imgs._ready=true;cb();}};
     img.onerror=()=>{if(--pending===0){_G.imgs._ready=true;cb();}};
-    img.src='data:image/svg+xml,'+encodeURIComponent(_SVGS[k]);
+    img.src=_PNG_ASSETS[k];
   });
 }
 
@@ -5928,64 +5925,38 @@ function startGame(){
   cancelAnimationFrame(_G.raf);
   _G.score=0;_G.frame=0;_G.speed=5;_G.bgOff=_G.bgOff||0;_G.nextObs=90;
   _G.obstacles=[];_G.coins=[];_G.state='playing';
-  _G.player={x:75,y:_G.gY,vy:0,w:50,h:42,jumps:0};
+  _G.player={x:75,y:_G.gY,vy:0,w:60,h:50,jumps:0};
   el('game-start-screen').style.display='none';
   el('game-over-screen').style.display='none';
   _G.raf=requestAnimationFrame(_gameLoop);
 }
 
 function _spawnObstacle(G){
-  const type=Math.floor(Math.random()*5);
+  const type=Math.floor(Math.random()*2);
   if(type===0){
-    // stacked boxes
-    G.obstacles.push({x:G.W+20,w:42,h:40,y:G.gY,t:0});
-  }else if(type===1){
-    // wine bottle
-    G.obstacles.push({x:G.W+20,w:16,h:52+(Math.random()*6|0),y:G.gY,t:1});
-  }else if(type===2){
-    // wooden barrel
-    G.obstacles.push({x:G.W+20,w:38,h:28+(Math.random()*4|0),y:G.gY,t:2});
-  }else if(type===3){
-    // two traffic cones
-    const h=44+(Math.random()*8|0);
-    G.obstacles.push({x:G.W+20,w:36,h,y:G.gY,t:3});
-    G.obstacles.push({x:G.W+74,w:36,h:h-6,y:G.gY,t:3});
+    // obstacle 1
+    G.obstacles.push({x:G.W+20,w:36,h:36,y:G.gY,t:0});
   }else{
-    // road barrier
-    G.obstacles.push({x:G.W+20,w:62,h:26,y:G.gY,t:4});
+    // obstacle 2
+    G.obstacles.push({x:G.W+20,w:38,h:34,y:G.gY,t:1});
   }
 }
 
 function _spawnCoins(G){
   const base=G.gY;
-  const pat=Math.floor(Math.random()*8);
+  const pat=Math.floor(Math.random()*4);
   if(pat===0){
-    // arc (3-5 coins)
-    const n=3+Math.floor(Math.random()*3);
-    for(let k=0;k<n;k++){const t=k/Math.max(n-1,1);G.coins.push({x:G.W+18+k*(24+Math.random()*10),y:base-34-Math.sin(t*Math.PI)*58,r:8,col:false});}
+    // ground level coin
+    G.coins.push({x:G.W+40+Math.random()*60,y:base-32,r:16,col:false});
   }else if(pat===1){
-    // single high bonus
-    G.coins.push({x:G.W+38+Math.random()*30,y:base-82-Math.random()*18,r:10,col:false});
+    // mid-height coin (reachable with small jump)
+    G.coins.push({x:G.W+30+Math.random()*80,y:base-62-Math.random()*20,r:16,col:false});
   }else if(pat===2){
-    // wave (5 coins)
-    for(let k=0;k<5;k++)G.coins.push({x:G.W+12+k*(22+Math.random()*8),y:base-44-Math.sin(k*0.85)*34,r:8,col:false});
-  }else if(pat===3){
-    // staggered two heights
-    for(let k=0;k<4;k++)G.coins.push({x:G.W+10+k*(28+Math.random()*8),y:base-36-(k%2===0?0:32),r:8,col:false});
-  }else if(pat===4){
-    // rising diagonal
-    for(let k=0;k<4;k++)G.coins.push({x:G.W+12+k*(25+Math.random()*8),y:base-28-k*18,r:8,col:false});
-  }else if(pat===5){
-    // falling diagonal
-    for(let k=0;k<4;k++)G.coins.push({x:G.W+12+k*(25+Math.random()*8),y:base-84+k*16,r:8,col:false});
-  }else if(pat===6){
-    // sparse scatter (2-3 coins, wide gaps)
-    const n=2+Math.floor(Math.random()*2);
-    for(let k=0;k<n;k++)G.coins.push({x:G.W+16+k*(46+Math.random()*22),y:base-32-Math.random()*54,r:8,col:false});
+    // high coin (needs good jump)
+    G.coins.push({x:G.W+50+Math.random()*40,y:base-95-Math.random()*15,r:16,col:false});
   }else{
-    // tight cluster then gap
-    for(let k=0;k<3;k++)G.coins.push({x:G.W+10+k*18,y:base-46-Math.random()*16,r:8,col:false});
-    G.coins.push({x:G.W+110+Math.random()*20,y:base-38-Math.random()*30,r:8,col:false});
+    // slightly off-ground
+    G.coins.push({x:G.W+35+Math.random()*70,y:base-44-Math.random()*16,r:16,col:false});
   }
 }
 
@@ -6003,7 +5974,7 @@ function _gameLoop(){
     _spawnObstacle(G);
     G.nextObs=Math.max(55,110-Math.floor(G.score/400)*4)+(Math.random()*30|0);
   }
-  if(G.frame%68===0&&Math.random()>.25)_spawnCoins(G);
+  if(G.frame%52===0&&Math.random()>.2)_spawnCoins(G);
   G.obstacles.forEach(o=>o.x-=G.speed);
   G.coins.forEach(c=>c.x-=G.speed);
   G.obstacles=G.obstacles.filter(o=>o.x>-60);
@@ -6013,8 +5984,8 @@ function _gameLoop(){
     if(hx<o.x+o.w&&hx+hw>o.x&&hy<o.y&&hy+hh>o.y-o.h){_gameDead();return;}
   }
   G.coins.forEach(c=>{
-    if(!c.col&&Math.abs(p.x+p.w/2-c.x)<c.r+13&&Math.abs(p.y-p.h/2-c.y)<c.r+16){
-      c.col=true;G.score+=80;haptic.light();
+    if(!c.col&&Math.abs(p.x+p.w/2-c.x)<c.r+14&&Math.abs(p.y-p.h/2-c.y)<c.r+18){
+      c.col=true;G.score+=150;haptic.light();
     }
   });
   _gameDraw();
@@ -6116,34 +6087,30 @@ function _drawBurjKhalifa(ctx,W,gY,bgOff){
 function _drawCoin(ctx,c){
   if(c.col)return;
   // ambient glow
-  const og=ctx.createRadialGradient(c.x,c.y,0,c.x,c.y,c.r*2.4);
-  og.addColorStop(0,'rgba(201,169,64,0.22)');og.addColorStop(1,'rgba(201,169,64,0)');
-  ctx.fillStyle=og;ctx.beginPath();ctx.arc(c.x,c.y,c.r*2.4,0,Math.PI*2);ctx.fill();
+  const og=ctx.createRadialGradient(c.x,c.y,0,c.x,c.y,c.r*2.2);
+  og.addColorStop(0,'rgba(201,169,64,0.25)');og.addColorStop(1,'rgba(201,169,64,0)');
+  ctx.fillStyle=og;ctx.beginPath();ctx.arc(c.x,c.y,c.r*2.2,0,Math.PI*2);ctx.fill();
   // image or fallback
   const img=_G.imgs&&_G.imgs.coin;
-  if(img){ctx.drawImage(img,c.x-c.r,c.y-c.r,c.r*2,c.r*2);}
-  else{ctx.save();ctx.shadowColor='rgba(212,175,55,.8)';ctx.shadowBlur=10;ctx.fillStyle='#d4af37';ctx.beginPath();ctx.arc(c.x,c.y,c.r,0,Math.PI*2);ctx.fill();ctx.restore();}
+  const sz=c.r*2;
+  if(img){ctx.drawImage(img,c.x-c.r,c.y-c.r,sz,sz);}
+  else{ctx.save();ctx.shadowColor='rgba(212,175,55,.8)';ctx.shadowBlur=12;ctx.fillStyle='#d4af37';ctx.beginPath();ctx.arc(c.x,c.y,c.r,0,Math.PI*2);ctx.fill();ctx.restore();}
 }
 
 function _drawObstacle(ctx,o){
-  const key=['obs0','obs1','obs2','obs3','obs4'][o.t]||'obs0';
+  const key=o.t===0?'obs0':'obs1';
   const img=_G.imgs&&_G.imgs[key];
   if(img){
     ctx.drawImage(img,o.x,o.y-o.h,o.w,o.h);
   }else{
-    // fallback shapes
-    if(o.t===1){ctx.fillStyle='#3c2d19';}
-    else if(o.t===2){ctx.fillStyle='#cc3300';}
-    else if(o.t===3){ctx.fillStyle='#28283e';}
-    else if(o.t===4){ctx.fillStyle='#183312';}
-    else{ctx.fillStyle='#c92020';}
+    ctx.fillStyle=o.t===0?'#c92020':'#3c2d19';
     ctx.fillRect(o.x,o.y-o.h,o.w,o.h);
   }
 }
 
 function _drawPlayer(ctx,p,frame){
   const img=_G.imgs&&_G.imgs.player;
-  const iW=110,iH=70;
+  const iW=80,iH=64;
   if(img){
     const lean=p.vy<-4?-0.09:p.vy>3?0.03:0;
     ctx.save();
@@ -6151,10 +6118,9 @@ function _drawPlayer(ctx,p,frame){
       const cx2=p.x+iW/2,cy2=p.y-iH/2;
       ctx.translate(cx2,cy2);ctx.rotate(lean);ctx.translate(-cx2,-cy2);
     }
-    ctx.drawImage(img,p.x-8,p.y-iH,iW,iH);
+    ctx.drawImage(img,p.x-6,p.y-iH,iW,iH);
     ctx.restore();
   }else{
-    // fallback
     ctx.fillStyle='#d4af37';ctx.fillRect(p.x,p.y-p.h,p.w,p.h);
   }
 }
@@ -6175,7 +6141,7 @@ function _gameDrawIdle(){
   if(!ctx)return;
   ctx.clearRect(0,0,W,H);
   _gameDrawScene(G,ctx,W,H,gY);
-  const idleP={x:W/2-25,y:gY,vy:0,w:50,h:42,jumps:0};
+  const idleP={x:W/2-30,y:gY,vy:0,w:60,h:50,jumps:0};
   _drawPlayer(ctx,idleP,0);
 }
 

@@ -6047,8 +6047,7 @@ function _gameDrawScene(G,ctx,W,H,gY){
       }
     });
   }
-  // Burj Khalifa silhouette (far background, very slow parallax)
-  _drawBurjKhalifa(ctx,W,gY,G.bgOff);
+  // Burj Khalifa removed
   const roadGrad=ctx.createLinearGradient(0,gY,0,H);
   roadGrad.addColorStop(0,'#131620');roadGrad.addColorStop(1,'#0c0e16');
   ctx.fillStyle=roadGrad;ctx.fillRect(0,gY,W,H-gY);
@@ -6147,7 +6146,7 @@ function _drawPlayer(ctx,p,frame){
       img._trimT=top/tc.height;img._trimB=(tc.height-1-bot)/tc.height;
       img._trimL=lft/tc.width;img._trimR=(tc.width-1-rgt)/tc.width;
     }
-    const targetH=120;
+    const targetH=140;
     const aspect=img.naturalWidth/img.naturalHeight;
     const iW=targetH*aspect,iH=targetH;
     // Shift down by bottom transparent padding so wheels touch ground

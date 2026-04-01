@@ -1226,11 +1226,6 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 
   <!-- HUB GROUP 3 — Quick Actions & Preferences -->
   <div class="prof-hub-section">
-    <div class="prof-hub-row" onclick="quickReorder()">
-      <div class="phub-icon"><svg viewBox="0 0 24 24"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg></div>
-      <div class="phub-text"><div class="phub-title" id="phub-t-reorder">Quick Reorder</div><div class="phub-sub" id="phub-s-reorder">Repeat your last order</div></div>
-      <div class="phub-right"><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
-    </div>
     <div class="prof-hub-row" onclick="flipLang();buildProfile()">
       <div class="phub-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg></div>
       <div class="phub-text"><div class="phub-title" id="phub-t-lang">Language</div><div class="phub-sub" id="phub-s-lang">App language</div></div>
@@ -4562,9 +4557,6 @@ function buildProfile(){
   if(vipBadge){vipBadge.textContent=tier.label;vipBadge.style.color=tier.color;vipBadge.style.background=tier.color+'22';}
   const vipIcon=el('phub-vip-icon');
   if(vipIcon){vipIcon.style.background=tier.color+'22';const s=vipIcon.querySelector('svg');if(s)s.style.stroke=tier.color;}
-  // Quick reorder
-  set('phub-t-reorder',ru?'Быстрый повтор':'Quick Reorder');
-  set('phub-s-reorder',ru?'Повторить последний заказ':'Repeat your last order');
   // Delivery note
   set('phub-t-dnote',ru?'Записка курьеру':'Delivery Note');
   set('phub-s-dnote',ru?'Код ворот, инструкции…':'Gate code, instructions…');
@@ -5694,10 +5686,10 @@ function _renderAob(){
     moto.style.display='none';
   } else {
     const{pct,remaining}=_calcProgress(confirmed_at,eta);
-    const p=Math.round(pct*100);
+    const p=Math.min(Math.round(pct*100),95);
     fill.className='aob-fill';fill.style.width=p+'%';
-    moto.style.display='block';moto.style.left=Math.min(p,94)+'%';
-    if(remaining<=0){title.textContent=ru?'Уже почти...':'Almost there...';time.textContent='';}
+    moto.style.display='block';moto.style.left=Math.min(p,88)+'%';
+    if(remaining<=0){title.textContent=ru?'🏎️ Курьер рядом!':'🏎️ Driver nearby!';time.textContent='';}
     else if(remaining<=3){title.textContent=ru?'🏎️ Курьер рядом!':'🏎️ Almost at your door!';time.textContent='';}
     else{title.textContent=ru?'Заказ в пути':'Order on the way';time.textContent=ru?`≈${Math.ceil(remaining)} мин`:`≈${Math.ceil(remaining)} min`;}
   }
@@ -5715,8 +5707,7 @@ function _renderAodDetail(){
   if(status==='pending'){badge.textContent=ru?'Ожидание':'Pending';badge.className='aod-badge pending';}
   else{
     const{remaining}=_calcProgress(confirmed_at,eta);
-    if(remaining<=0)badge.textContent=ru?'Уже скоро':'Almost there';
-    else if(remaining<=3)badge.textContent=ru?'🏎️ Рядом!':'🏎️ Nearby!';
+    if(remaining<=3)badge.textContent=ru?'🏎️ Рядом!':'🏎️ Nearby!';
     else badge.textContent=ru?'🏎️ В пути':'🏎️ On the way';
     badge.className='aod-badge approved';
   }
@@ -5737,10 +5728,13 @@ function _renderAodDetail(){
     timeTxt.textContent=ru?'Ожидаем подтверждения оператора...':'Waiting for operator confirmation...';
   } else if(confirmed_at&&eta){
     const{pct,remaining}=_calcProgress(confirmed_at,eta);
-    const p=Math.round(pct*100);
+    const p=Math.min(Math.round(pct*100),95);
+    bigFill.style.transition='none';
     bigFill.className='aod-big-fill';bigFill.style.width=p+'%';
-    bigMoto.style.display='block';bigMoto.style.left=Math.min(p,92)+'%';
-    if(remaining<=0)timeTxt.textContent=ru?'Курьер вот-вот будет у вас 🎉':'Courier arriving any minute 🎉';
+    bigMoto.style.display='block';bigMoto.style.left=Math.min(p,88)+'%';
+    void bigFill.offsetWidth;
+    bigFill.style.transition='';
+    if(remaining<=0)timeTxt.textContent=ru?'🏎️ Курьер рядом! Ожидайте':'🏎️ Driver is nearby — hang tight!';
     else if(remaining<=3)timeTxt.textContent=ru?'🏎️ Курьер совсем рядом! Приготовьтесь':'🏎️ Right around the corner — get ready!';
     else timeTxt.textContent=ru?`Примерно ${Math.ceil(remaining)} мин до доставки`:`About ${Math.ceil(remaining)} min until delivery`;
   }

@@ -4557,15 +4557,16 @@ function buildProfile(){
   if(wishCount){wishBadge.textContent=wishCount;wishBadge.style.display='';}else{wishBadge.style.display='none';}
   set('phub-t-usual',ru?'Как обычно':'The Usual');
   set('phub-s-usual',ru?'Топ ваших заказов':'Your top ordered items');
-  // Tier — order-count based, English only
-  const tier=_getVipTier(orders.length);
+  // Tier — count only successfully delivered orders
+  const _deliveredCount=orders.filter(o=>o.status==='delivered').length;
+  const tier=_getVipTier(_deliveredCount);
   // Profile card stat slot
   const tierLabel=el('prof-tier-label');
   if(tierLabel){tierLabel.textContent=tier.label;tierLabel.style.color=tier.color;}
   set('stat-lbl3','STATUS');
   // Hub row
   set('phub-t-vip',ru?'Статус':'Status');
-  set('phub-s-vip',tier.label+' · '+orders.length+' '+(ru?'заказов':'orders'));
+  set('phub-s-vip',tier.label+' · '+_deliveredCount+' '+(ru?'заказов':'orders'));
   const vipBadge=el('phub-v-vip');
   if(vipBadge){vipBadge.textContent=tier.label;vipBadge.style.color=tier.color;vipBadge.style.background=tier.color+'22';}
   const vipIcon=el('phub-vip-icon');
@@ -4731,7 +4732,7 @@ function _getVipTier(count){return _vipTiers.find(t=>count>=t.min&&count<=t.max)
 
 function openVipSheet(){
   const ru=lang==='ru';
-  const count=orders.length;
+  const count=orders.filter(o=>o.status==='delivered').length;
   const tier=_getVipTier(count);
   const idx=_vipTiers.indexOf(tier);
   const nextTier=_vipTiers[idx+1];

@@ -391,6 +391,29 @@ img{display:block}
 .ocard-actions{display:flex;gap:8px;padding:8px 14px 10px;border-top:1px solid var(--border2)}
 .ocard-repeat-btn{flex:1;padding:10px;border-radius:var(--r3);border:none;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;font-size:12px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:5px;transition:.15s;font-family:'DM Sans',sans-serif;letter-spacing:.3px}
 .ocard-repeat-btn:active{opacity:.85;transform:scale(.97)}
+/* ── Order filter chips ── */
+#ord-filter-bar{display:flex;gap:7px;padding:2px 14px 10px;overflow-x:auto;scrollbar-width:none;flex-shrink:0}
+#ord-filter-bar::-webkit-scrollbar{display:none}
+.ord-chip{flex-shrink:0;display:inline-flex;align-items:center;gap:5px;padding:6px 13px;border-radius:20px;border:1px solid var(--border2);background:transparent;color:var(--muted);font-size:12px;font-weight:600;font-family:'DM Sans',sans-serif;cursor:pointer;transition:all .18s;letter-spacing:.2px;white-space:nowrap;-webkit-tap-highlight-color:transparent}
+.ord-chip.active{background:linear-gradient(135deg,var(--gold),var(--gold2));border-color:transparent;color:#07070E}
+.ord-chip:not(.active):active{background:var(--card2);opacity:.8}
+.ofc-n{font-size:10px;font-weight:700;min-width:14px;height:14px;line-height:14px;text-align:center;border-radius:7px;background:rgba(255,255,255,.13);padding:0 4px;display:none}
+.ord-chip.active .ofc-n{background:rgba(0,0,0,.18)}
+.ofc-n:not(:empty){display:inline-block}
+/* ── Improved order card layout ── */
+.ocard-meta{display:flex;justify-content:space-between;align-items:flex-start;padding:11px 14px;border-bottom:1px solid var(--border2)}
+.o-meta-left{display:flex;flex-direction:column;gap:3px}
+.o-status-badge{display:inline-flex;align-items:center;gap:5px;padding:4px 10px;border-radius:20px;font-size:10.5px;font-weight:600;letter-spacing:.2px;margin-top:1px;flex-shrink:0}
+.o-sbg-sp{background:rgba(201,169,110,.13);color:var(--gold)}
+.o-sbg-sp .o-status-dot{background:var(--gold);box-shadow:0 0 5px rgba(201,169,110,.7)}
+.o-sbg-sc2{background:rgba(76,175,125,.11);color:var(--green)}
+.o-sbg-sc2 .o-status-dot{background:var(--green);box-shadow:0 0 5px rgba(76,175,125,.7)}
+.o-sbg-sd{background:rgba(100,160,220,.11);color:#64a0dc}
+.o-sbg-sd .o-status-dot{background:#64a0dc;box-shadow:0 0 5px rgba(100,160,220,.6)}
+.o-sbg-sx{background:rgba(224,85,85,.1);color:var(--red)}
+.o-sbg-sx .o-status-dot{background:var(--red);box-shadow:0 0 5px rgba(224,85,85,.6)}
+.ocard-foot{display:flex;justify-content:flex-end;align-items:center;padding:9px 14px;border-top:1px solid var(--border2)}
+.o-total-num{font-size:20px;font-weight:700;color:var(--gold2);font-family:'DM Sans',sans-serif;line-height:1}
 .profile-card{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:20px;margin:14px}
 .profile-avatar{width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));display:flex;align-items:center;justify-content:center;font-size:28px;margin:0 auto 12px;font-family:'DM Sans',sans-serif;color:#07070E;font-weight:700}
 .profile-name{text-align:center;font-family:'DM Sans',sans-serif;font-size:20px;color:var(--gold2)}
@@ -1119,6 +1142,13 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     <button id="refresh-btn" onclick="syncOrders(true)" title="Обновить" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--border2);background:var(--card2);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:opacity .15s" onpointerdown="this.style.opacity='.5'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">
       <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg>
     </button>
+  </div>
+  <div id="ord-filter-bar">
+    <button class="ord-chip active" id="ofc-all" onclick="setOrderFilter('all')"><span id="ofc-all-lbl">Все</span><span class="ofc-n" id="ofc-all-n"></span></button>
+    <button class="ord-chip" id="ofc-pending" onclick="setOrderFilter('pending')"><span id="ofc-pending-lbl">Ожидает</span><span class="ofc-n" id="ofc-pending-n"></span></button>
+    <button class="ord-chip" id="ofc-confirmed" onclick="setOrderFilter('confirmed')"><span id="ofc-confirmed-lbl">Принят</span><span class="ofc-n" id="ofc-confirmed-n"></span></button>
+    <button class="ord-chip" id="ofc-delivered" onclick="setOrderFilter('delivered')"><span id="ofc-delivered-lbl">Доставлен</span><span class="ofc-n" id="ofc-delivered-n"></span></button>
+    <button class="ord-chip" id="ofc-cancelled" onclick="setOrderFilter('cancelled')"><span id="ofc-cancelled-lbl">Отменён</span><span class="ofc-n" id="ofc-cancelled-n"></span></button>
   </div>
   <div class="ptr-indicator" id="ptr-indicator"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 .49-4.5"/></svg></div>
   <div id="orders-list" style="flex:1;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none"></div>
@@ -4293,9 +4323,35 @@ function closeRevealedOrder(){
   _revealedOrderWrap=null;
 }
 
+let _orderFilter='all';
+const _ordStatusMap={pending:['pending'],confirmed:['confirmed'],delivered:['delivered'],cancelled:['declined','cancelled']};
+
+function setOrderFilter(f){
+  _orderFilter=f;
+  document.querySelectorAll('.ord-chip').forEach(c=>c.classList.remove('active'));
+  const chip=el('ofc-'+f);
+  if(chip)chip.classList.add('active');
+  renderOrders();
+}
+
+function _updateOrdChips(){
+  const chipLabels={all:{ru:'Все',en:'All'},pending:{ru:'Ожидает',en:'Pending'},confirmed:{ru:'Принят',en:'Confirmed'},delivered:{ru:'Доставлен',en:'Delivered'},cancelled:{ru:'Отменён',en:'Cancelled'}};
+  ['all','pending','confirmed','delivered','cancelled'].forEach(f=>{
+    const chip=el('ofc-'+f);
+    if(!chip)return;
+    const n=f==='all'?orders.length:orders.filter(o=>(_ordStatusMap[f]||[]).includes(o.status)).length;
+    const nEl=el('ofc-'+f+'-n');
+    if(nEl)nEl.textContent=n>0?String(n):'';
+    chip.style.display=(f!=='all'&&n===0)?'none':'';
+    const lEl=el('ofc-'+f+'-lbl');
+    if(lEl)lEl.textContent=lang==='ru'?chipLabels[f].ru:chipLabels[f].en;
+  });
+}
+
 function renderOrders(){
   const ordHdr=el('sh-orders');
   const clearWrap=el('clear-history-wrap');
+  _updateOrdChips();
   if(!orders.length){
     if(ordHdr)ordHdr.style.display='none';
     if(clearWrap)clearWrap.style.display='none';
@@ -4312,11 +4368,16 @@ function renderOrders(){
   const hasClearable=orders.some(o=>o.status==='delivered'||o.status==='declined'||o.status==='cancelled');
   if(clearWrap)clearWrap.style.display=hasClearable?'block':'none';
   const cls={pending:'sp',confirmed:'sc2',delivered:'sd',declined:'sx',cancelled:'sx'};
-  const lbl={pending:()=>t('stP'),confirmed:()=>t('stC'),delivered:()=>t('stD'),declined:()=>t('stX'),cancelled:()=>t('stX')};
   const lbl2={pending:()=>lang==='ru'?'Ожидает':'Pending',confirmed:()=>lang==='ru'?'Принят':'Confirmed',delivered:()=>lang==='ru'?'Доставлен':'Delivered',declined:()=>lang==='ru'?'Отменён':'Cancelled',cancelled:()=>lang==='ru'?'Отменён вами':'Cancelled by you'};
   const months=lang==='ru'?['янв','фев','мар','апр','май','июн','июл','авг','сен','окт','ноя','дек']:['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
   function fmtDate(ts){if(!ts)return'';const d=new Date(ts);return`${d.getDate()} ${months[d.getMonth()]} · ${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;}
-  el('orders-list').innerHTML=orders.map((o,idx)=>{
+  const filtered=_orderFilter==='all'?orders:orders.filter(o=>(_ordStatusMap[_orderFilter]||[]).includes(o.status));
+  if(!filtered.length){
+    el('orders-list').innerHTML=`<div style="padding:50px 20px;text-align:center;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:13px;font-weight:500">${lang==='ru'?'Нет заказов в этой категории':'No orders in this category'}</div>`;
+    return;
+  }
+  el('orders-list').innerHTML=filtered.map((o)=>{
+    const idx=orders.indexOf(o);
     const st=cls[o.status]||'sp';
     const rows=o.items.map(i=>`<div class="o-row"><span class="o-row-name">${i.name}</span><span class="o-row-qty">${i.qty} ${lang==='ru'?'шт':'pcs'}</span></div>`).join('');
     const isFinished=o.status==='delivered'||o.status==='declined'||o.status==='cancelled';
@@ -4326,7 +4387,8 @@ function renderOrders(){
       :isActive
         ?`<div class="ocard-actions"><button class="ocard-support-btn" onclick="event.stopPropagation();openSupportChat('${o.order_id}')">${t('supportBtn')}</button></div>`
         :'';
-    const cardHtml=`<div class="ocard ${st}"><div class="ocard-inner"><div class="ocard-meta"><span class="o-id">#${o.order_id}</span><span class="o-date">${fmtDate(o.timestamp)}</span></div><div class="o-rows">${rows}</div><div class="ocard-foot"><span class="o-status"><span class="o-status-dot"></span>${(lbl2[o.status]||lbl2.pending)()}</span><div class="o-total"><span class="o-total-num">${o.total}</span><span class="o-total-cur">AED</span></div></div></div>${actionsHtml}</div>`;
+    const statusBadge=`<span class="o-status-badge o-sbg-${st}"><span class="o-status-dot"></span>${(lbl2[o.status]||lbl2.pending)()}</span>`;
+    const cardHtml=`<div class="ocard ${st}"><div class="ocard-inner"><div class="ocard-meta"><div class="o-meta-left"><span class="o-id">#${o.order_id}</span><span class="o-date">${fmtDate(o.timestamp)}</span></div>${statusBadge}</div><div class="o-rows">${rows}</div><div class="ocard-foot"><div class="o-total"><span class="o-total-num">${o.total}</span><span class="o-total-cur">AED</span></div></div></div>${actionsHtml}</div>`;
     if(isFinished){
       return`<div class="ocard-swipe-wrap" data-oidx="${idx}"><div class="ocard-swipe-del" onclick="confirmOrderDel(${idx})"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></div><div class="ocard-swipe-body">${cardHtml}</div></div>`;
     }

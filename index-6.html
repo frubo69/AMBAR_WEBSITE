@@ -607,8 +607,8 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .lcard-tier-name{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:700;letter-spacing:2px;line-height:1}
 .lcard-tier-sub{font-family:'Cormorant Garamond',serif;font-size:18px;font-style:italic;font-weight:400;opacity:.85;margin-top:-2px}
 .lcard-username{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;letter-spacing:2px;text-transform:uppercase}
-.lcard-qr{width:88px;height:88px;border-radius:12px;background:#0e0e0e;padding:0;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden}
-.lcard-qr canvas{width:100%!important;height:100%!important;border-radius:8px}
+.lcard-qr{width:88px;height:88px;border-radius:10px;background:#fff;padding:5px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;box-sizing:border-box}
+.lcard-qr canvas{width:100%!important;height:100%!important;border-radius:4px}
 .lcard-points-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);letter-spacing:.5px}
 .lcard-points-dot{width:5px;height:5px;border-radius:50%;background:var(--gold);opacity:.6}
 .lcard-tap-hint{text-align:center;font-size:11px;color:var(--muted);margin-top:-8px;margin-bottom:16px;opacity:.5}
@@ -4764,60 +4764,26 @@ function _genQR(text,size){
   const modules=_qrEncode(text);
   const n=modules.length;
   const cellSize=size/n;
-  const r=cellSize*0.38; // dot radius for rounded look
+  const dotR=cellSize*0.42;
 
-  // Dark background
-  ctx.fillStyle='#0e0e0e';
+  // White background for max contrast / scannability
+  ctx.fillStyle='#fff';
   ctx.fillRect(0,0,size,size);
 
-  // Draw QR modules as rounded dots in gold
-  const grad=ctx.createLinearGradient(0,0,size,size);
-  grad.addColorStop(0,'#E8C98A');grad.addColorStop(0.5,'#C9A96E');grad.addColorStop(1,'#E8C98A');
-  ctx.fillStyle=grad;
-
-  // Center logo exclusion zone (clear a circle in the middle)
-  const centerX=size/2,centerY=size/2,logoR=size*0.16;
+  // Dark modules
+  ctx.fillStyle='#1a1a1a';
 
   for(let row=0;row<n;row++)for(let col=0;col<n;col++){
     if(!modules[row][col])continue;
-    const cx=col*cellSize+cellSize/2;
-    const cy=row*cellSize+cellSize/2;
-    // Skip modules in center logo area
-    if(Math.hypot(cx-centerX,cy-centerY)<logoR+cellSize*0.3)continue;
-    // Check if part of finder pattern (top-left, top-right, bottom-left 7x7)
     const isFinder=(row<7&&col<7)||(row<7&&col>=n-7)||(row>=n-7&&col<7);
     if(isFinder){
-      // Draw finder pattern modules as squares for scannability
       ctx.fillRect(col*cellSize,row*cellSize,cellSize+0.5,cellSize+0.5);
     }else{
-      // Rounded dots for data modules
       ctx.beginPath();
-      ctx.arc(cx,cy,r,0,Math.PI*2);
+      ctx.arc(col*cellSize+cellSize/2,row*cellSize+cellSize/2,dotR,0,Math.PI*2);
       ctx.fill();
     }
   }
-
-  // Draw AMBAR logo pin in center
-  const lx=centerX,ly=centerY;
-  const pinH=logoR*1.6,pinW=logoR*1.1;
-  // Pin body
-  ctx.save();
-  const pinGrad=ctx.createLinearGradient(lx,ly-pinH*0.5,lx,ly+pinH*0.5);
-  pinGrad.addColorStop(0,'#F5E0B0');pinGrad.addColorStop(0.5,'#C9A96E');pinGrad.addColorStop(1,'#967B4B');
-  ctx.fillStyle=pinGrad;
-  ctx.beginPath();
-  ctx.arc(lx,ly-pinH*0.15,pinW*0.5,Math.PI,0);
-  ctx.lineTo(lx,ly+pinH*0.4);
-  ctx.closePath();
-  ctx.fill();
-  // Cutout hole (bottle opener shape simplified as circle)
-  ctx.globalCompositeOperation='destination-out';
-  ctx.beginPath();
-  ctx.arc(lx,ly-pinH*0.15,pinW*0.22,0,Math.PI*2);
-  ctx.fill();
-  ctx.globalCompositeOperation='source-over';
-  ctx.restore();
-
   return canvas;
 }
 

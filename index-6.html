@@ -5857,12 +5857,17 @@ function _gameLoadAssets(cb){
   _G.imgs={_ready:false};
   const keys=Object.keys(_PNG_ASSETS);
   let pending=keys.length;
+  // Call cb immediately so game init doesn't wait for large PNGs
+  let cbCalled=false;
+  const tryCall=()=>{if(!cbCalled){cbCalled=true;cb();}};
   keys.forEach(k=>{
     const img=new Image();
-    img.onload=()=>{_G.imgs[k]=img;if(--pending===0){_G.imgs._ready=true;cb();}};
-    img.onerror=()=>{if(--pending===0){_G.imgs._ready=true;cb();}};
+    img.onload=()=>{_G.imgs[k]=img;if(--pending===0){_G.imgs._ready=true;}tryCall();};
+    img.onerror=()=>{console.warn('Game asset failed:',_PNG_ASSETS[k]);if(--pending===0){_G.imgs._ready=true;}tryCall();};
     img.src=_PNG_ASSETS[k];
   });
+  // Failsafe: init game after 300ms even if no image event fired yet
+  setTimeout(tryCall,300);
 }
 
 function openGame(){

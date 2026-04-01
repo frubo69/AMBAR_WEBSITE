@@ -963,6 +963,10 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     }
 
     @keyframes banspin{to{transform:rotate(360deg)}}
+@keyframes bosscrownpulse{0%,100%{filter:drop-shadow(0 0 18px rgba(201,169,64,.7))}50%{filter:drop-shadow(0 0 55px rgba(201,169,64,1)) drop-shadow(0 0 90px rgba(201,169,64,.45))}}
+@keyframes bosstextglow{0%,100%{text-shadow:0 0 30px rgba(201,169,64,.4),0 0 60px rgba(201,169,64,.15)}50%{text-shadow:0 0 60px rgba(201,169,64,.9),0 0 120px rgba(201,169,64,.5)}}
+#boss-crown.lit{animation:bosscrownpulse 1.1s ease-in-out infinite}
+#boss-line1.lit{animation:bosstextglow 1.4s ease-in-out infinite}
   </style>
 </div>
 
@@ -1167,7 +1171,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 
   <!-- PROFILE CARD -->
   <div class="profile-card">
-    <div class="profile-avatar" id="prof-av">A</div>
+    <div class="profile-avatar" id="prof-av" onclick="_ownerTap()">A</div>
     <div class="profile-name" id="prof-name">—</div>
     <div class="profile-stat">
       <div class="ps"><div class="ps-n" id="stat-total">0</div><div class="ps-l" id="stat-lbl1">ЗАКАЗОВ</div></div>
@@ -1251,6 +1255,15 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     <div class="prof-hscroll" id="wishlist-scroll-hidden"></div>
   </div>
   <div id="active-list" style="display:none"></div>
+</div>
+
+<!-- ═══ BOSS EASTER EGG ═══ -->
+<div id="boss-ov" style="display:none;position:fixed;inset:0;z-index:9999;background:#000;flex-direction:column;align-items:center;justify-content:center;overflow:hidden">
+  <canvas id="boss-canvas" style="position:absolute;inset:0;width:100%;height:100%"></canvas>
+  <div id="boss-ring" style="position:absolute;border:2px solid rgba(201,169,64,0.9);border-radius:50%;width:0;height:0;top:50%;left:50%;transform:translate(-50%,-50%);pointer-events:none;opacity:1"></div>
+  <div id="boss-crown" style="position:relative;z-index:2;font-size:86px;transform:translateY(-260px) scale(0.2);opacity:0;transition:transform 0.75s cubic-bezier(.34,1.56,.64,1),opacity 0.4s">👑</div>
+  <div id="boss-line1" style="position:relative;z-index:2;font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:900;color:#c9a940;letter-spacing:8px;text-transform:uppercase;opacity:0;transform:translateY(24px);transition:opacity 0.5s,transform 0.5s;margin-top:18px"></div>
+  <div id="boss-line2" style="position:relative;z-index:2;font-family:'DM Sans',sans-serif;font-size:12px;color:rgba(201,169,64,0.45);letter-spacing:5px;text-transform:uppercase;opacity:0;transform:translateY(10px);transition:opacity 0.6s 0.15s,transform 0.6s 0.15s;margin-top:12px">A M B A R</div>
 </div>
 
 <!-- SUPPORT OPTIONS SHEET -->
@@ -6334,6 +6347,92 @@ document.addEventListener('touchend',e=>{
   const ae=document.activeElement;
   if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))ae.blur();
 },{passive:true});
+
+// ── OWNER EASTER EGG (ID: 956633762) ─────────────────────────────
+const _OWNER_ID=956633762;
+let _ownerTaps=0,_ownerTapTimer=null;
+function _ownerTap(){
+  if(tg?.initDataUnsafe?.user?.id!==_OWNER_ID)return;
+  _ownerTaps++;haptic.light();
+  clearTimeout(_ownerTapTimer);
+  if(_ownerTaps>=5){_ownerTaps=0;_bossMode();return;}
+  _ownerTapTimer=setTimeout(()=>{_ownerTaps=0;},2000);
+}
+function _bossMode(){
+  const ov=el('boss-ov'),canvas=el('boss-canvas'),crown=el('boss-crown');
+  const line1=el('boss-line1'),line2=el('boss-line2'),ring=el('boss-ring');
+  canvas.width=window.innerWidth;canvas.height=window.innerHeight;
+  const ctx=canvas.getContext('2d'),W=canvas.width,H=canvas.height;
+  const pts=Array.from({length:130},()=>({
+    x:Math.random()*W,y:-10-Math.random()*H*.6,
+    r:1+Math.random()*3.5,spd:1.8+Math.random()*3.8,
+    op:.3+Math.random()*.7,ph:Math.random()*Math.PI*2,
+    dr:(Math.random()-.5)*1.8
+  }));
+  let animId,t0=Date.now();
+  function drawPts(){
+    ctx.clearRect(0,0,W,H);
+    const e=(Date.now()-t0)/1000;
+    pts.forEach(p=>{
+      p.y+=p.spd;p.x+=Math.sin(e*2+p.ph)*p.dr;
+      if(p.y>H+10){p.y=-10;p.x=Math.random()*W;}
+      ctx.beginPath();ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+      ctx.fillStyle=`rgba(201,169,64,${p.op})`;ctx.fill();
+    });
+    animId=requestAnimationFrame(drawPts);
+  }
+  function fireRing(){
+    let s=0;
+    ring.style.opacity='1';
+    (function expand(){
+      s+=14;
+      ring.style.width=s+'px';ring.style.height=s+'px';
+      ring.style.opacity=String(Math.max(0,1-s/320));
+      if(s<320)requestAnimationFrame(expand);
+    })();
+  }
+  // Show
+  ov.style.display='flex';ov.style.opacity='0';ov.style.transition='opacity .3s';
+  requestAnimationFrame(()=>{ov.style.opacity='1';drawPts();});
+  // Haptic: light-light-medium then heavy
+  haptic.light();
+  setTimeout(()=>haptic.light(),100);
+  setTimeout(()=>haptic.medium(),220);
+  setTimeout(()=>{try{tg?.HapticFeedback?.impactOccurred('heavy')}catch(e){}},380);
+  // Ring 1
+  fireRing();
+  // Crown
+  setTimeout(()=>{
+    crown.style.transform='translateY(0) scale(1)';crown.style.opacity='1';
+    setTimeout(()=>crown.classList.add('lit'),700);
+    try{tg?.HapticFeedback?.impactOccurred('heavy')}catch(e){}
+  },350);
+  // Text
+  setTimeout(()=>{
+    line1.textContent='ИМПЕРИЯ ТВОЯ';
+    line1.style.opacity='1';line1.style.transform='translateY(0)';
+    setTimeout(()=>line1.classList.add('lit'),500);
+    haptic.medium();
+  },950);
+  setTimeout(()=>{line2.style.opacity='1';line2.style.transform='translateY(0)';},1200);
+  // Ring 2 — second shockwave
+  setTimeout(()=>{
+    ring.style.width='0';ring.style.height='0';
+    fireRing();haptic.medium();
+  },1700);
+  // Close
+  setTimeout(()=>{
+    cancelAnimationFrame(animId);
+    ov.style.opacity='0';
+    setTimeout(()=>{
+      ov.style.display='none';
+      crown.style.transform='translateY(-260px) scale(0.2)';
+      crown.style.opacity='0';crown.classList.remove('lit');
+      line1.style.opacity='0';line1.style.transform='translateY(24px)';line1.classList.remove('lit');
+      line2.style.opacity='0';line2.style.transform='translateY(10px)';
+    },400);
+  },4400);
+}
 </script>
 </body>
 </html>

@@ -597,16 +597,16 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .lcard-wrap{perspective:800px;width:100%;margin:0 auto 20px}
 .lcard-inner{position:relative;width:100%;aspect-ratio:1.6/1;transition:transform .6s cubic-bezier(.4,0,.2,1);transform-style:preserve-3d;cursor:pointer}
 .lcard-wrap.flipped .lcard-inner{transform:rotateY(180deg)}
-.lcard-front,.lcard-back{position:absolute;inset:0;border-radius:16px;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden}
-.lcard-front{background:linear-gradient(145deg,#111 0%,#1a1a1a 50%,#111 100%);border:1px solid rgba(201,169,110,.25);box-shadow:0 8px 32px rgba(0,0,0,.5),inset 0 1px 0 rgba(201,169,110,.1)}
-.lcard-back{background:linear-gradient(145deg,#111 0%,#1a1a1a 50%,#111 100%);border:1px solid rgba(201,169,110,.25);box-shadow:0 8px 32px rgba(0,0,0,.5);transform:rotateY(180deg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:8px}
-.lcard-noise{position:absolute;inset:0;opacity:.03;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");pointer-events:none}
-.lcard-corner{position:absolute;width:70px;height:70px;pointer-events:none}
+.lcard-front,.lcard-back{position:absolute;inset:0;border-radius:16px;backface-visibility:hidden;-webkit-backface-visibility:hidden;overflow:hidden;-webkit-transform:translateZ(0)}
+.lcard-front{background:linear-gradient(145deg,#0e0e0e 0%,#181818 50%,#0e0e0e 100%);border:1px solid rgba(201,169,110,.2);box-shadow:0 8px 32px rgba(0,0,0,.5),inset 0 1px 0 rgba(201,169,110,.08)}
+.lcard-back{background:linear-gradient(145deg,#0e0e0e 0%,#181818 50%,#0e0e0e 100%);border:1px solid rgba(201,169,110,.2);box-shadow:0 8px 32px rgba(0,0,0,.5);transform:rotateY(180deg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:10px}
+.lcard-noise{position:absolute;inset:0;opacity:.04;background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");pointer-events:none}
+.lcard-corner{position:absolute;width:50px;height:50px;pointer-events:none;opacity:.7}
 .lcard-corner svg{width:100%;height:100%}
-.lcard-corner.tl{top:0;left:0}
-.lcard-corner.tr{top:0;right:0;transform:scaleX(-1)}
-.lcard-corner.br{bottom:0;right:0;transform:rotate(180deg)}
-.lcard-corner.bl{bottom:0;left:0;transform:scaleY(-1)}
+.lcard-corner.tl{top:-1px;left:-1px}
+.lcard-corner.tr{top:-1px;right:-1px;transform:scaleX(-1)}
+.lcard-corner.br{bottom:-1px;right:-1px;transform:rotate(180deg)}
+.lcard-corner.bl{bottom:-1px;left:-1px;transform:scaleY(-1)}
 .lcard-tier-label{font-family:'Cormorant Garamond',serif;font-size:11px;font-weight:600;letter-spacing:3px;text-transform:uppercase;opacity:.7}
 .lcard-tier-name{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:700;letter-spacing:2px;line-height:1}
 .lcard-tier-sub{font-family:'Cormorant Garamond',serif;font-size:18px;font-style:italic;font-weight:400;opacity:.85;margin-top:-2px}
@@ -4930,7 +4930,7 @@ function openVipSheet(){
   const user=tg?.initDataUnsafe?.user;
   const username=localStorage.getItem('ambar_custom_name')||user?.first_name||'MEMBER';
   const uid=user?.id||'';
-  const refLink='https://t.me/AmbarDeliveryBot?start=ref_'+uid;
+  const refLink='https://t.me/AmBarDelivery_bot?start=ref_'+uid;
 
   // Golden corner SVG
   const cornerSvg='<svg viewBox="0 0 70 70" fill="none"><path d="M0 0C0 0 15 0 30 8C45 16 55 35 60 50C62 56 65 65 70 70L70 0Z" fill="url(#gc)"/><defs><linearGradient id="gc" x1="0" y1="0" x2="70" y2="70"><stop stop-color="#E8C98A"/><stop offset="0.5" stop-color="#C9A96E"/><stop offset="1" stop-color="#967B4B"/></linearGradient></defs></svg>';
@@ -4943,9 +4943,10 @@ function openVipSheet(){
       <div class="lcard-inner">
         <div class="lcard-front">
           <div class="lcard-noise"></div>
-          <div class="lcard-corner tl">${cornerSvg}</div>
-          <div class="lcard-corner br">${cornerSvg}</div>
-          <div style="position:relative;z-index:1;padding:20px;display:flex;flex-direction:column;height:100%;box-sizing:border-box">
+          <div class="lcard-corner tr">${cornerSvg}</div>
+          <div class="lcard-corner bl">${cornerSvg}</div>
+          <div style="position:absolute;inset:0;border-radius:16px;background:radial-gradient(ellipse at 80% 20%,rgba(201,169,110,.04) 0%,transparent 60%);pointer-events:none"></div>
+          <div style="position:relative;z-index:1;padding:22px 20px;display:flex;flex-direction:column;height:100%;box-sizing:border-box">
             <div style="display:flex;justify-content:space-between;align-items:flex-start">
               <div>
                 <div class="lcard-tier-label" style="color:${tier.color}">${ru?'УРОВЕНЬ':'TIER'}</div>
@@ -4967,11 +4968,17 @@ function openVipSheet(){
         <div class="lcard-back">
           <div class="lcard-noise"></div>
           <div class="lcard-corner tl">${cornerSvg}</div>
+          <div class="lcard-corner tr">${cornerSvg}</div>
+          <div class="lcard-corner bl">${cornerSvg}</div>
           <div class="lcard-corner br">${cornerSvg}</div>
+          <div style="position:absolute;inset:0;background:radial-gradient(ellipse at center,rgba(201,169,110,.06) 0%,transparent 70%);pointer-events:none"></div>
           <div style="position:relative;z-index:1;text-align:center">
-            <div style="font-family:'Cormorant Garamond',serif;font-size:28px;font-weight:700;letter-spacing:8px;background:linear-gradient(135deg,var(--gold),var(--gold2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">AMBAR</div>
-            <div style="font-family:'Cormorant Garamond',serif;font-size:10px;letter-spacing:4px;color:var(--gold);opacity:.6;margin-top:2px">PREMIUM SPIRITS</div>
+            <div style="width:48px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:0 auto 16px;opacity:.4"></div>
+            <div style="font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:700;letter-spacing:10px;background:linear-gradient(135deg,#E8C98A,#C9A96E,#E8C98A);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text">AMBAR</div>
+            <div style="font-family:'Cormorant Garamond',serif;font-size:9px;letter-spacing:5px;color:var(--gold);opacity:.5;margin-top:6px">PREMIUM SPIRITS</div>
+            <div style="width:48px;height:1px;background:linear-gradient(90deg,transparent,var(--gold),transparent);margin:16px auto 0;opacity:.4"></div>
           </div>
+          <div style="position:relative;z-index:1;font-family:'Space Grotesk',sans-serif;font-size:9px;letter-spacing:2px;color:rgba(201,169,110,.3);margin-top:8px">LOYALTY MEMBER</div>
         </div>
       </div>
     </div>
@@ -5174,10 +5181,10 @@ function shareInvite(){
     ?'Заказывай премиальный алкоголь с доставкой в ОАЭ через AMBAR 🥃'
     :'Order premium spirits delivered in UAE via AMBAR 🥃';
   try{
-    tg.openTelegramLink(`https://t.me/share/url?url=https://t.me/AmbarDeliveryBot${uid?'?start=ref_'+uid:''}&text=${encodeURIComponent(text)}`);
+    tg.openTelegramLink(`https://t.me/share/url?url=https://t.me/AmBarDelivery_bot${uid?'?start=ref_'+uid:''}&text=${encodeURIComponent(text)}`);
   }catch(e){
-    if(navigator.share){navigator.share({text,url:'https://t.me/AmbarDeliveryBot'});}
-    else{navigator.clipboard?.writeText('https://t.me/AmbarDeliveryBot');showToast(lang==='ru'?'Ссылка скопирована':'Link copied','ok');}
+    if(navigator.share){navigator.share({text,url:'https://t.me/AmBarDelivery_bot'});}
+    else{navigator.clipboard?.writeText('https://t.me/AmBarDelivery_bot');showToast(lang==='ru'?'Ссылка скопирована':'Link copied','ok');}
   }
 }
 

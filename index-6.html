@@ -5930,7 +5930,7 @@ function startGame(){
   cancelAnimationFrame(_G.raf);
   _G.score=0;_G.frame=0;_G.speed=5;_G.bgOff=_G.bgOff||0;_G.nextObs=90;
   _G.obstacles=[];_G.coins=[];_G.state='playing';
-  _G.player={x:65,y:_G.gY,vy:0,w:76,h:62,jumps:0};
+  _G.player={x:55,y:_G.gY,vy:0,w:82,h:70,jumps:0};
   el('game-start-screen').style.display='none';
   el('game-over-screen').style.display='none';
   _G.raf=requestAnimationFrame(_gameLoop);
@@ -5940,10 +5940,10 @@ function _spawnObstacle(G){
   const type=Math.floor(Math.random()*2);
   if(type===0){
     // obstacle 1
-    G.obstacles.push({x:G.W+20,w:56,h:56,y:G.gY,t:0});
+    G.obstacles.push({x:G.W+20,w:66,h:72,y:G.gY,t:0});
   }else{
     // obstacle 2
-    G.obstacles.push({x:G.W+20,w:56,h:56,y:G.gY,t:1});
+    G.obstacles.push({x:G.W+20,w:66,h:72,y:G.gY,t:1});
   }
 }
 
@@ -6109,10 +6109,22 @@ function _drawObstacle(ctx,o){
   const key=o.t===0?'obs0':'obs1';
   const img=_G.imgs&&_G.imgs[key];
   if(img&&img.complete&&img.naturalWidth>0){
+    if(!img._trimB){
+      const tc=document.createElement('canvas');
+      tc.width=img.naturalWidth;tc.height=img.naturalHeight;
+      const tx=tc.getContext('2d');tx.drawImage(img,0,0);
+      const td=tx.getImageData(0,0,tc.width,tc.height).data;
+      let bot=0;
+      for(let y=0;y<tc.height;y++)for(let x=0;x<tc.width;x++){
+        if(td[(y*tc.width+x)*4+3]>20&&y>bot)bot=y;
+      }
+      img._trimB=(tc.height-1-bot)/tc.height;
+    }
     const targetH=o.h;
     const aspect=img.naturalWidth/img.naturalHeight;
     const dW=targetH*aspect,dH=targetH;
-    ctx.drawImage(img,o.x+(o.w-dW)/2,o.y-dH,dW,dH);
+    const groundShift=img._trimB*dH;
+    ctx.drawImage(img,o.x+(o.w-dW)/2,o.y-dH+groundShift,dW,dH);
   }else{
     ctx.fillStyle=o.t===0?'#c92020':'#3c2d19';
     ctx.fillRect(o.x,o.y-o.h,o.w,o.h);
@@ -6122,16 +6134,31 @@ function _drawObstacle(ctx,o){
 function _drawPlayer(ctx,p,frame){
   const img=_G.imgs&&_G.imgs.player;
   if(img&&img.complete&&img.naturalWidth>0){
-    const targetH=90;
+    // Detect actual opaque bounds on first draw, then cache
+    if(!img._trimB){
+      const tc=document.createElement('canvas');
+      tc.width=img.naturalWidth;tc.height=img.naturalHeight;
+      const tx=tc.getContext('2d');tx.drawImage(img,0,0);
+      const td=tx.getImageData(0,0,tc.width,tc.height).data;
+      let top=tc.height,bot=0,lft=tc.width,rgt=0;
+      for(let y=0;y<tc.height;y++)for(let x=0;x<tc.width;x++){
+        if(td[(y*tc.width+x)*4+3]>20){if(y<top)top=y;if(y>bot)bot=y;if(x<lft)lft=x;if(x>rgt)rgt=x;}
+      }
+      img._trimT=top/tc.height;img._trimB=(tc.height-1-bot)/tc.height;
+      img._trimL=lft/tc.width;img._trimR=(tc.width-1-rgt)/tc.width;
+    }
+    const targetH=120;
     const aspect=img.naturalWidth/img.naturalHeight;
     const iW=targetH*aspect,iH=targetH;
+    // Shift down by bottom transparent padding so wheels touch ground
+    const groundShift=img._trimB*iH;
     const lean=p.vy<-4?-0.09:p.vy>3?0.03:0;
     ctx.save();
     if(lean!==0){
-      const cx2=p.x+iW/2,cy2=p.y-iH/2;
+      const cx2=p.x+iW/2,cy2=p.y-iH/2+groundShift;
       ctx.translate(cx2,cy2);ctx.rotate(lean);ctx.translate(-cx2,-cy2);
     }
-    ctx.drawImage(img,p.x-iW*0.15,p.y-iH,iW,iH);
+    ctx.drawImage(img,p.x-iW*0.12,p.y-iH+groundShift,iW,iH);
     ctx.restore();
   }else{
     ctx.fillStyle='#d4af37';ctx.fillRect(p.x,p.y-p.h,p.w,p.h);
@@ -6154,7 +6181,7 @@ function _gameDrawIdle(){
   if(!ctx)return;
   ctx.clearRect(0,0,W,H);
   _gameDrawScene(G,ctx,W,H,gY);
-  const idleP={x:W/2-38,y:gY,vy:0,w:76,h:62,jumps:0};
+  const idleP={x:W/2-41,y:gY,vy:0,w:82,h:70,jumps:0};
   _drawPlayer(ctx,idleP,0);
 }
 

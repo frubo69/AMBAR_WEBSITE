@@ -4487,25 +4487,22 @@ async function syncOrders(spin=false){
     // IDs the user deliberately cleared locally (delivered/declined)
     const cleared=new Set(JSON.parse(localStorage.getItem('ambar_cleared_ids')||'[]'));
 
-    // Keep API orders, but skip ones the user cleared (unless they're active again)
+    // API is the single source of truth — discard ALL local orders
+    // Only exception: orders placed in the last 90 seconds that haven't reached the API yet
+    const apiIds=new Set(apiOrders.map(o=>o.order_id));
+    const now90s=Date.now()-90*1000;
+    const justPlaced=orders.filter(o=>
+      !apiIds.has(o.order_id)&&!cleared.has(o.order_id)&&
+      o.status==='pending'&&new Date(o.timestamp||0).getTime()>now90s
+    );
+
+    // Filter out user-cleared orders from API results
     const fresh=apiOrders.filter(o=>{
       if(!cleared.has(o.order_id))return true;
-      return o.status==='pending'||o.status==='confirmed'; // re-activate if status changed
+      return o.status==='pending'||o.status==='confirmed';
     });
 
-    // API is the source of truth — only keep local orders the API doesn't know about yet
-    // (e.g. just placed, still in-flight to the server)
-    const apiIds=new Set(fresh.map(o=>o.order_id));
-    const now2m=Date.now()-2*60*1000;
-    const localOnly=orders.filter(o=>{
-      if(apiIds.has(o.order_id)||cleared.has(o.order_id))return false;
-      // Only keep very recent local orders (< 2 min) not yet in API — likely just placed
-      if(new Date(o.timestamp||0).getTime()<now2m)return false;
-      return true;
-    });
-
-    // API data always wins — fresh orders override any local duplicates
-    orders=[...localOnly,...fresh];
+    orders=[...justPlaced,...fresh];
     orders.sort((a,b)=>new Date(b.timestamp||0)-new Date(a.timestamp||0));
     localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
   }catch(e){

@@ -2254,6 +2254,8 @@ async function checkBanStatus(){
       const d=await resp.json();
       if(d.banned){_showBanWall();return;}
       if(d.referral_points!=null)localStorage.setItem('ambar_ref_points',String(d.referral_points));
+      if(d.card_type)localStorage.setItem('ambar_card_type',d.card_type);
+      if(d.premium_index!=null)localStorage.setItem('ambar_premium_idx',String(d.premium_index));
     }
   }catch(e){}
   _hideBanBlocker();
@@ -4594,8 +4596,9 @@ function buildProfile(){
   const _deliveredCount=orders.filter(o=>o.status==='delivered').length;
   const _refPoints=parseInt(localStorage.getItem('ambar_ref_points')||'0');
   const _totalPts=_deliveredCount+_refPoints;
-  const _isFounder=(tg?.initDataUnsafe?.user?.id===956633762);
-  const _isPremiumProfile=[686932322].includes(tg?.initDataUnsafe?.user?.id);
+  const _cardType=localStorage.getItem('ambar_card_type')||'standard';
+  const _isFounder=(_cardType==='founder');
+  const _isPremiumProfile=(_cardType==='premium');
   const tier=(_isFounder||_isPremiumProfile)?{key:'founder',min:0,max:Infinity,next:null,color:'#E8C98A',label:'ÉLITE'}:_getVipTier(_totalPts);
   // Profile card stat slot
   const tierLabel=el('prof-tier-label');
@@ -4945,18 +4948,16 @@ function openVipSheet(){
   const nextTier=_vipTiers[idx+1];
   const progress=tier.next?Math.min(100,Math.round(((totalPoints-tier.min)/(tier.next-tier.min))*100)):100;
 
-  // Premium customer IDs (manually added, numbered 01-10 max)
-  const _premiumIDs=[686932322];
-
   const vipTitle=el('vip-sheet-title');
   if(vipTitle)vipTitle.textContent=ru?'ЛОЯЛЬНОСТЬ':'LOYALTY';
 
   const user=tg?.initDataUnsafe?.user;
   const displayName=user?.username?'@'+user.username:(localStorage.getItem('ambar_custom_name')||user?.first_name||'MEMBER');
   const uid=user?.id||'';
-  const isFounder=(uid===956633762);
-  const premiumIdx=_premiumIDs.indexOf(uid);
-  const isPremium=premiumIdx!==-1;
+  const _srvCardType=localStorage.getItem('ambar_card_type')||'standard';
+  const isFounder=(_srvCardType==='founder');
+  const premiumIdx=_srvCardType==='premium'?parseInt(localStorage.getItem('ambar_premium_idx')||'0'):-1;
+  const isPremium=(_srvCardType==='premium');
   const refLink='https://t.me/AmBarDelivery_bot?start=ref_'+uid;
 
   // Determine card type & tier override
@@ -6722,11 +6723,10 @@ document.addEventListener('touchend',e=>{
   if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))ae.blur();
 },{passive:true});
 
-// ── OWNER EASTER EGG (ID: 956633762) ─────────────────────────────
-const _OWNER_ID=956633762;
+// ── OWNER EASTER EGG ─────────────────────────────────────────────
 let _ownerTaps=0,_ownerTapTimer=null;
 function _ownerTap(){
-  if(tg?.initDataUnsafe?.user?.id!==_OWNER_ID)return;
+  if(localStorage.getItem('ambar_card_type')!=='founder')return;
   _ownerTaps++;haptic.light();
   clearTimeout(_ownerTapTimer);
   if(_ownerTaps>=5){_ownerTaps=0;_bossMode();return;}

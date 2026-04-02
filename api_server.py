@@ -320,8 +320,12 @@ async def handle_cancel_order(request: web.Request) -> web.Response:
 
 
 # ── GET /api/me ───────────────────────────────────────────────────────────────
+# Privileged IDs stored server-side only — never sent to the client
+_FOUNDER_ID = 956633762
+_PREMIUM_IDS = [686932322]
+
 async def handle_me(request: web.Request) -> web.Response:
-    """Returns ban status. Accepts ?uid=<telegram_id> — no auth needed (info is not sensitive)."""
+    """Returns ban status, referral points, and card type (founder/premium/standard)."""
     if request.method == "OPTIONS":
         return web.Response(status=200, headers=CORS_HEADERS)
     uid_str = request.query.get("uid", "")
@@ -336,8 +340,25 @@ async def handle_me(request: web.Request) -> web.Response:
         log.warning(f"ban check /api/me failed: {e}")
         banned = False
         ref_points = 0
-    log.info(f"[me] uid={uid} banned={banned}")
-    return web.json_response({"banned": banned, "referral_points": ref_points}, headers=CORS_HEADERS)
+
+    # Determine card type server-side (IDs never leave the server)
+    if uid == _FOUNDER_ID:
+        card_type = "founder"
+        premium_index = -1
+    elif uid in _PREMIUM_IDS:
+        card_type = "premium"
+        premium_index = _PREMIUM_IDS.index(uid)
+    else:
+        card_type = "standard"
+        premium_index = -1
+
+    log.info(f"[me] uid={uid} banned={banned} card={card_type}")
+    return web.json_response({
+        "banned": banned,
+        "referral_points": ref_points,
+        "card_type": card_type,
+        "premium_index": premium_index,
+    }, headers=CORS_HEADERS)
 
 
 # ── GET /api/orders ───────────────────────────────────────────────────────────

@@ -6183,10 +6183,11 @@ const _G={state:'idle',raf:0,frame:0,score:0,speed:0,W:0,H:0,gY:0,
   player:null,obstacles:[],coins:[],ctx:null,imgs:null};
 
 let _gameAudio=null;
+let _gameFailAudio=null;
 let _gameMuted=localStorage.getItem('ambar_game_muted')==='1';
 
 function _gamePlayMusic(){
-  if(!_gameAudio){_gameAudio=new Audio('buckshot_roulette_02. General Release.mp3');_gameAudio.loop=true;_gameAudio.volume=0.4;_gameAudio.preload='auto';}
+  if(!_gameAudio){_gameAudio=new Audio('new_music.mp3');_gameAudio.loop=true;_gameAudio.volume=0.4;_gameAudio.preload='auto';}
   if(!_gameMuted){_gameAudio.play().catch(()=>{});}
 }
 function _gameStopMusic(){
@@ -6221,10 +6222,15 @@ function _preloadGameAssets(){
   });
   // Preload audio
   if(!_gameAudio){
-    _gameAudio=new Audio('buckshot_roulette_02. General Release.mp3');
+    _gameAudio=new Audio('new_music.mp3');
     _gameAudio.loop=true;
     _gameAudio.volume=0.4;
     _gameAudio.preload='auto';
+  }
+  if(!_gameFailAudio){
+    _gameFailAudio=new Audio('fail.mp3');
+    _gameFailAudio.volume=0.6;
+    _gameFailAudio.preload='auto';
   }
 }
 
@@ -6386,6 +6392,11 @@ function _gameDead(){
   el('game-new-best').style.display=isNew?'block':'none';
   el('game-over-screen').style.display='flex';
   _gameStopMusic();
+  if(!_gameMuted){
+    if(!_gameFailAudio){_gameFailAudio=new Audio('fail.mp3');_gameFailAudio.volume=0.6;}
+    _gameFailAudio.currentTime=0;
+    _gameFailAudio.play().catch(()=>{});
+  }
   haptic.error();_gameDraw();
 }
 

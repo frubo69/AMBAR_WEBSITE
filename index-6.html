@@ -1572,10 +1572,11 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       <div class="hs-icon-wrap"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
       <div class="hs-title" id="hs-title-txt"></div>
       <div class="hs-desc" id="hs-desc-txt"></div>
-      <button class="btn-main" id="hs-add-btn" onclick="doAddHomeScreen()"></button>
+      <button class="btn-main" id="hs-add-btn" onclick="doAddHomeScreen()" style="font-family:'DM Sans',sans-serif"></button>
+      <button class="btn-outline" id="hs-guide-btn" onclick="showHsGuide()" style="margin-top:10px;width:100%"></button>
       <div style="display:flex;gap:10px;margin-top:10px">
-        <button class="btn-outline" id="hs-guide-btn" onclick="showHsGuide()" style="flex:1"></button>
-        <button class="btn-outline" id="hs-never-btn" onclick="neverShowHs()" style="flex:1;color:rgba(255,255,255,.35)"></button>
+        <button class="btn-outline" style="flex:1;color:rgba(255,255,255,.4);border-color:rgba(255,255,255,.08)" onclick="closeHsOverlay()" id="hs-later-btn"></button>
+        <button class="btn-outline" style="flex:1;color:rgba(255,255,255,.25);border-color:rgba(255,255,255,.08)" id="hs-never-btn" onclick="neverShowHs()"></button>
       </div>
     </div>
     <!-- Guide view -->
@@ -2100,7 +2101,7 @@ en:{
   addAddrLabel:'Add address',emptyAddrTitle:'No saved addresses',emptyAddrSub:'Add your first delivery address',
   saveSheetTitle:'Save address',mapDone:'Done',addrNoLoc:'Please select your address on the map first',
   hsTitle:'Add to Home Screen',hsDesc:'Open AMBAR directly from your device\'s home screen — one tap away.',
-  hsAdd:'Add to Home Screen',hsGuide:'Show me how',hsNever:'Not now',
+  hsAdd:'Add to Home Screen',hsGuide:'Show me how',hsLater:'Not now',hsNever:'Never show again',
   hsGuideTitle:'How to add AMBAR',
   hsStep1:'Tap the menu button',hsStep1d:'Find the ··· (three dots) or menu icon in the top-right corner of this screen.',
   hsStep2:'Select "Add to Home Screen"',hsStep2d:'Tap "Add to Home Screen" or "Add Shortcut" from the menu options.',
@@ -2113,7 +2114,8 @@ TX.ru.hsTitle='Добавить на главный экран';
 TX.ru.hsDesc='Открывайте наше приложение AMBAR прямо с главного экрана вашего устройства.';
 TX.ru.hsAdd='Добавить на главный экран';
 TX.ru.hsGuide='Как это сделать';
-TX.ru.hsNever='Не сейчас';
+TX.ru.hsLater='Не сейчас';
+TX.ru.hsNever='Больше не показывать';
 TX.ru.hsGuideTitle='Как добавить AMBAR';
 TX.ru.hsStep1='Нажмите кнопку меню';
 TX.ru.hsStep1d='Найдите ··· (три точки) или иконку меню в правом верхнем углу экрана.';
@@ -2401,6 +2403,7 @@ function applyHsLang(){
   set('hs-desc-txt',t('hsDesc'));
   set('hs-add-btn',t('hsAdd'));
   set('hs-guide-btn',t('hsGuide'));
+  set('hs-later-btn',t('hsLater'));
   set('hs-never-btn',t('hsNever'));
   set('hs-guide-title-txt',t('hsGuideTitle'));
   set('hs-s1-title',t('hsStep1'));set('hs-s1-desc',t('hsStep1d'));

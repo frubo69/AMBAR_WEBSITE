@@ -127,16 +127,8 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"💎 Fair pricing — premium quality, no unnecessary markups\n\n"
         f"Tap *🍾 Order* to the left of the input field 👇"
     )
-    # Send welcome message with inline webapp button as fallback
-    open_kb = None
-    if WEBAPP_URL:
-        open_kb = InlineKeyboardMarkup([[
-            InlineKeyboardButton(
-                "🍾 Заказать" if lang == "ru" else "🍾 Order",
-                web_app=WebAppInfo(url=WEBAPP_URL),
-            )
-        ]])
-    await update.message.reply_text(text, parse_mode="Markdown", reply_markup=open_kb or ReplyKeyboardRemove())
+    # Send welcome message
+    await update.message.reply_text(text, parse_mode="Markdown", reply_markup=ReplyKeyboardRemove())
 
     # Upsert user profile in background (doesn't affect UX if it fails)
     try:

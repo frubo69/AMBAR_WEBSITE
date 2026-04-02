@@ -290,7 +290,7 @@ async def handle_cancel_order(request: web.Request) -> web.Response:
         return web.json_response({"error": "forbidden"}, status=403, headers=CORS_HEADERS)
 
     status = order.get("status", "")
-    if status not in ("pending", "confirmed"):
+    if status not in ("pending", "confirmed", "approved"):
         return web.json_response({"error": "not_cancellable", "status": status}, status=409, headers=CORS_HEADERS)
 
     await db.update_order(order_id,

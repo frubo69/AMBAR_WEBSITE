@@ -672,10 +672,6 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .hs-step-body{flex:1;min-width:0}
 .hs-step-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:3px}
 .hs-step-desc{font-size:12px;color:var(--sub);line-height:1.5}
-.hs-later{display:block;width:100%;background:none;border:none;color:var(--muted);font-size:13px;font-family:'DM Sans',sans-serif;padding:14px 0 4px;cursor:pointer;text-align:center;letter-spacing:.2px}
-.hs-later:active{color:var(--sub)}
-.hs-never{display:block;width:100%;background:none;border:none;color:rgba(255,255,255,.2);font-size:11px;font-family:'DM Sans',sans-serif;padding:8px 0 0;cursor:pointer;text-align:center;letter-spacing:.2px}
-.hs-never:active{color:rgba(255,255,255,.35)}
 .hs-guide-title{font-size:16px;font-weight:700;color:var(--gold2);margin-bottom:4px;text-align:center}
 /* ── Support Chat Overlay ── */
 .support-overlay{position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;flex-direction:column;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1,.64,1)}
@@ -1577,9 +1573,10 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       <div class="hs-title" id="hs-title-txt"></div>
       <div class="hs-desc" id="hs-desc-txt"></div>
       <button class="btn-main" id="hs-add-btn" onclick="doAddHomeScreen()"></button>
-      <button class="btn-outline" id="hs-guide-btn" onclick="showHsGuide()" style="margin-top:10px"></button>
-      <button class="hs-later" id="hs-later-btn" onclick="closeHsOverlay()"></button>
-      <button class="hs-never" id="hs-never-btn" onclick="neverShowHs()"></button>
+      <div style="display:flex;gap:10px;margin-top:10px">
+        <button class="btn-outline" id="hs-guide-btn" onclick="showHsGuide()" style="flex:1"></button>
+        <button class="btn-outline" id="hs-never-btn" onclick="neverShowHs()" style="flex:1;color:rgba(255,255,255,.35)"></button>
+      </div>
     </div>
     <!-- Guide view -->
     <div id="hs-guide-view" style="display:none">
@@ -2103,7 +2100,7 @@ en:{
   addAddrLabel:'Add address',emptyAddrTitle:'No saved addresses',emptyAddrSub:'Add your first delivery address',
   saveSheetTitle:'Save address',mapDone:'Done',addrNoLoc:'Please select your address on the map first',
   hsTitle:'Add to Home Screen',hsDesc:'Open AMBAR directly from your device\'s home screen — one tap away.',
-  hsAdd:'Add to Home Screen',hsGuide:'Show me how',hsLater:'Later',hsNever:'Don\'t show again',
+  hsAdd:'Add to Home Screen',hsGuide:'Show me how',hsNever:'Not now',
   hsGuideTitle:'How to add AMBAR',
   hsStep1:'Tap the menu button',hsStep1d:'Find the ··· (three dots) or menu icon in the top-right corner of this screen.',
   hsStep2:'Select "Add to Home Screen"',hsStep2d:'Tap "Add to Home Screen" or "Add Shortcut" from the menu options.',
@@ -2115,9 +2112,8 @@ en:{
 TX.ru.hsTitle='Добавить на главный экран';
 TX.ru.hsDesc='Открывайте наше приложение AMBAR прямо с главного экрана вашего устройства.';
 TX.ru.hsAdd='Добавить на главный экран';
-TX.ru.hsGuide='Показать как';
-TX.ru.hsLater='Позже';
-TX.ru.hsNever='Больше не показывать';
+TX.ru.hsGuide='Как это сделать';
+TX.ru.hsNever='Не сейчас';
 TX.ru.hsGuideTitle='Как добавить AMBAR';
 TX.ru.hsStep1='Нажмите кнопку меню';
 TX.ru.hsStep1d='Найдите ··· (три точки) или иконку меню в правом верхнем углу экрана.';
@@ -2405,7 +2401,6 @@ function applyHsLang(){
   set('hs-desc-txt',t('hsDesc'));
   set('hs-add-btn',t('hsAdd'));
   set('hs-guide-btn',t('hsGuide'));
-  set('hs-later-btn',t('hsLater'));
   set('hs-never-btn',t('hsNever'));
   set('hs-guide-title-txt',t('hsGuideTitle'));
   set('hs-s1-title',t('hsStep1'));set('hs-s1-desc',t('hsStep1d'));
@@ -2424,7 +2419,7 @@ function checkFirstLaunchHomeScreen(){
   }
   if(canNative){
     tg.checkHomeScreenStatus(status=>{
-      if(status==='added'){ localStorage.setItem('ambar_hs_never','1'); return; }
+      if(status==='added'){ return; } // already on home screen — don't bother
       _show();
     });
   } else {

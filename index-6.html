@@ -4493,22 +4493,19 @@ async function syncOrders(spin=false){
       return o.status==='pending'||o.status==='confirmed'; // re-activate if status changed
     });
 
-    // Keep any local orders not yet visible in the API (just placed, in-flight)
-    // Also keep delivered/declined local orders the API may no longer return
+    // API is the source of truth — only keep local orders the API doesn't know about yet
+    // (e.g. just placed, still in-flight to the server)
     const apiIds=new Set(fresh.map(o=>o.order_id));
-    const now4h=Date.now()-4*3600*1000;
+    const now2m=Date.now()-2*60*1000;
     const localOnly=orders.filter(o=>{
       if(apiIds.has(o.order_id)||cleared.has(o.order_id))return false;
-      // Drop stale pending/confirmed orders the server no longer knows about
-      // (covers deleted+re-registered users, DB migration orphans, etc.)
-      const isActive=o.status==='pending'||o.status==='confirmed';
-      if(isActive&&new Date(o.timestamp||0).getTime()<now4h)return false;
+      // Only keep very recent local orders (< 2 min) not yet in API — likely just placed
+      if(new Date(o.timestamp||0).getTime()<now2m)return false;
       return true;
     });
 
+    // API data always wins — fresh orders override any local duplicates
     orders=[...localOnly,...fresh];
-    // Ensure delivered/declined orders that were only local aren't lost between syncs
-    // (they stay in localOnly above as long as they're in localStorage)
     orders.sort((a,b)=>new Date(b.timestamp||0)-new Date(a.timestamp||0));
     localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
   }catch(e){

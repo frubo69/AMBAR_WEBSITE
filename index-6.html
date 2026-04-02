@@ -4478,7 +4478,7 @@ async function syncOrders(spin=false){
     const resp=await fetch(`${AMBAR_API}/api/orders`,{
       headers:{'Authorization':'tma '+initData},
     });
-    if(!resp.ok) throw new Error(resp.status);
+    if(!resp.ok) throw new Error('status '+resp.status);
     const {orders:apiOrders=[]}=await resp.json();
 
     // Backend uses "approved", mini app uses "confirmed" — normalise
@@ -4487,8 +4487,8 @@ async function syncOrders(spin=false){
     // IDs the user deliberately cleared locally (delivered/declined)
     const cleared=new Set(JSON.parse(localStorage.getItem('ambar_cleared_ids')||'[]'));
 
-    // API is the single source of truth — discard ALL local orders
-    // Only exception: orders placed in the last 90 seconds that haven't reached the API yet
+    // API is the single source of truth — completely replace local orders
+    // Only keep orders placed in the last 90s that the API doesn't know about yet
     const apiIds=new Set(apiOrders.map(o=>o.order_id));
     const now90s=Date.now()-90*1000;
     const justPlaced=orders.filter(o=>
@@ -4505,9 +4505,16 @@ async function syncOrders(spin=false){
     orders=[...justPlaced,...fresh];
     orders.sort((a,b)=>new Date(b.timestamp||0)-new Date(a.timestamp||0));
     localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
+    console.log('[AMBAR] sync OK: '+apiOrders.length+' from API, final orders: '+orders.length);
+    // TEMP DEBUG: enable with localStorage.setItem('ambar_sync_debug','1')
+    if(localStorage.getItem('ambar_sync_debug')==='1'){
+      showToast('API: '+apiOrders.length+' orders, statuses: '+apiOrders.slice(0,3).map(o=>o.status).join(','),'ok');
+    }
   }catch(e){
-    // Network error or no API — silently use cached data
-    console.log('[AMBAR] sync failed:',e.message);
+    // Network error or API failure — use cached data but log the error
+    console.log('[AMBAR] sync FAILED:',e.message);
+    // TEMP DEBUG: show toast so we can see if API is failing
+    if(window._syncDebug)showToast('SYNC ERR: '+e.message,'err');
   }
 
   if(spin&&btn) btn.querySelector('svg').classList.remove('spinning');

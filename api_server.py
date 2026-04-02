@@ -380,6 +380,11 @@ async def handle_orders(request: web.Request) -> web.Response:
 
     uid        = user.get("id")
     user_orders = await db.get_user_orders(uid)
+    # Sanitise any raw datetime objects that would break JSON serialisation
+    for o in user_orders:
+        for k, v in o.items():
+            if isinstance(v, datetime):
+                o[k] = v.isoformat()
     log.info(f"[orders] user={uid} count={len(user_orders)}")
     return web.json_response({"orders": user_orders}, headers=CORS_HEADERS)
 

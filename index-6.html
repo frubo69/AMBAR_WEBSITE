@@ -2415,7 +2415,7 @@ function applyHsLang(){
 }
 function checkFirstLaunchHomeScreen(){
   if(!tg) return; // only inside Telegram
-  if(localStorage.getItem('ambar_hs_asked')) return;
+  if(localStorage.getItem('ambar_hs_never')) return;
   const canNative=tg.isVersionAtLeast&&tg.isVersionAtLeast('8.0');
   function _show(){
     applyHsLang();
@@ -2424,7 +2424,7 @@ function checkFirstLaunchHomeScreen(){
   }
   if(canNative){
     tg.checkHomeScreenStatus(status=>{
-      if(status==='added'){ localStorage.setItem('ambar_hs_asked','1'); return; }
+      if(status==='added'){ localStorage.setItem('ambar_hs_never','1'); return; }
       _show();
     });
   } else {
@@ -2437,12 +2437,12 @@ function closeHsOverlay(){
 }
 function neverShowHs(){
   el('hs-overlay').classList.remove('show');
-  localStorage.setItem('ambar_hs_asked','1');
+  localStorage.setItem('ambar_hs_never','1');
 }
 function doAddHomeScreen(){
   if(tg&&tg.isVersionAtLeast&&tg.isVersionAtLeast('8.0')){
     tg.addToHomeScreen();
-    localStorage.setItem('ambar_hs_asked','1');
+    localStorage.setItem('ambar_hs_never','1');
     el('hs-overlay').classList.remove('show');
   } else {
     showHsGuide();

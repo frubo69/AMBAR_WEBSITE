@@ -352,12 +352,15 @@ async def handle_me(request: web.Request) -> web.Response:
         card_type = "standard"
         premium_index = -1
 
-    log.info(f"[me] uid={uid} banned={banned} card={card_type}")
+    demo = user_doc.get("demo", False) if user_doc else False
+
+    log.info(f"[me] uid={uid} banned={banned} card={card_type} demo={demo}")
     return web.json_response({
         "banned": banned,
         "referral_points": ref_points,
         "card_type": card_type,
         "premium_index": premium_index,
+        "demo": demo,
     }, headers=CORS_HEADERS)
 
 

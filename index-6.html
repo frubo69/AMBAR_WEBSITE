@@ -2253,6 +2253,13 @@ async function checkBanStatus(){
     if(resp.ok){
       const d=await resp.json();
       if(d.banned){_showBanWall();return;}
+      // Demo mode: wipe localStorage so app acts like first-ever launch
+      if(d.demo){
+        const keys=[];
+        for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i);if(k&&k.startsWith('ambar_'))keys.push(k);}
+        keys.forEach(k=>localStorage.removeItem(k));
+        orders=[];
+      }
       if(d.referral_points!=null)localStorage.setItem('ambar_ref_points',String(d.referral_points));
       if(d.card_type)localStorage.setItem('ambar_card_type',d.card_type);
       if(d.premium_index!=null)localStorage.setItem('ambar_premium_idx',String(d.premium_index));

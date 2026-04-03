@@ -349,7 +349,11 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         except: pass
         if new_name:
             await db.upsert_user(cid, name=new_name, full_name=new_name, custom_name=new_name)
-            await db.update_order(oid, customer_name=new_name)
+            # Update name on ALL orders from this customer
+            all_orders = await db.get_all_orders()
+            for o in all_orders.values():
+                if o.get("customer_id") == cid:
+                    await db.update_order(o["order_id"], customer_name=new_name)
             if pending_rename.get("msg_id"):
                 order = await db.get_order(oid)
                 if order:
@@ -463,6 +467,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         parts = data.split("_", 2)  # osel, list_type, oid
         lt  = parts[1]
         oid = parts[2]
+        ctx.user_data["lt"] = lt  # persist list context for sub-views
         order = await db.get_order(oid)
         if order:
             await q.edit_message_text(
@@ -513,9 +518,10 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 await db.update_order(oid, customer_msg_ids=ids)
         order = await db.get_order(oid)
         if order:
+            lt = ctx.user_data.get("lt")
             await q.edit_message_text(
                 order_card(order) + f"\n\n✅ *Принят* | ⏱ {eta} мин",
-                parse_mode="Markdown", reply_markup=kb_order_actions(order))
+                parse_mode="Markdown", reply_markup=kb_order_actions(order, list_type=lt))
         asyncio.create_task(run_countdown(cid, eta, lang, oid))
 
     # ── DECLINE ───────────────────────────────────────────────────────────────
@@ -557,7 +563,8 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         oid = data[len("back_order_"):]
         order = await db.get_order(oid)
         if order:
-            await q.edit_message_text(order_card(order), parse_mode="Markdown", reply_markup=kb_order_actions(order))
+            lt = ctx.user_data.get("lt")
+            await q.edit_message_text(order_card(order), parse_mode="Markdown", reply_markup=kb_order_actions(order, list_type=lt))
 
     # ── LOCATION ──────────────────────────────────────────────────────────────
     elif data.startswith("loc_"):
@@ -584,8 +591,9 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         oid   = data[len("edit_done_"):]
         order = await db.get_order(oid)
         if not order: return
+        lt = ctx.user_data.get("lt")
         await q.edit_message_text(order_card(order), parse_mode="Markdown",
-                                  reply_markup=kb_order_actions(order))
+                                  reply_markup=kb_order_actions(order, list_type=lt))
 
     elif data.startswith("edit_"):
         oid   = data[5:]
@@ -690,7 +698,8 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         oid = data[len("client_back_"):]
         order = await db.get_order(oid)
         if order:
-            await q.edit_message_text(order_card(order), parse_mode="Markdown", reply_markup=kb_order_actions(order))
+            lt = ctx.user_data.get("lt")
+            await q.edit_message_text(order_card(order), parse_mode="Markdown", reply_markup=kb_order_actions(order, list_type=lt))
 
     elif data.startswith("client_"):
         _, oid, cid_str = data.split("_", 2)

@@ -349,7 +349,7 @@ img{display:block}
 .sum-line{display:flex;justify-content:space-between;font-size:12px;color:var(--sub);margin-bottom:5px}
 .sum-div{height:1px;background:var(--border2);margin:8px 0}
 .sum-total{display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:var(--gold2)}
-.co-foot{padding:0 16px 16px}
+.co-foot{padding:0 16px calc(16px + 92px + var(--safe-bottom))}
 /* Order card swipe-to-delete */
 .ocard-swipe-wrap{position:relative;overflow:hidden;border-radius:var(--r);margin:0 14px 10px}
 .ocard-swipe-del{position:absolute;top:0;right:0;bottom:0;width:80px;background:var(--red);display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:0 var(--r) var(--r) 0}
@@ -1429,7 +1429,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     <div class="sum-line" id="sum-tip-row" style="display:none"><span id="sum-tip-lbl">Чаевые</span><span id="sum-tip-val">0 AED</span></div>
     <div class="sum-total"><span id="sum-tot-lbl">Итого</span><span id="sum-tot-val">0 AED</span></div>
   </div>
-  <div class="co-foot"><button class="btn-main" id="place-btn" onclick="placeOrder()">✅ Подтвердить заказ</button></div>
+  <div class="co-foot"><button class="btn-main" id="place-btn" onclick="placeOrder()">Подтвердить заказ</button></div>
 </div>
 
 <!-- NAV -->
@@ -2019,7 +2019,7 @@ ru:{
   shSaved:'Сохранённые адреса',addFormTitle:'➕ Добавить адрес',
   lblArea:'РАЙОН / ЗОНА',lblStreet:'УЛИЦА',lblBuilding:'ДОМ / №',lblTypeGps:'ТИП АДРЕСА',lblTypeMan:'ТИП АДРЕСА',
   gpsBtn:'Поделиться геолокацией',gpsBtnLoading:'⏳ Определяем...',
-  gpsOk:'✅ Геолокация получена — введите название адреса',gpsFail:'⚠️ Не удалось получить геолокацию',
+  gpsOk:'Геолокация получена — введите название адреса',gpsFail:'Не удалось получить геолокацию',
   addrLabelReq:'❌ Введите название адреса',
   lblAddrName:'НАЗВАНИЕ АДРЕСА',saveAddrBtn:'Сохранить адрес',updateAddrBtn:'Обновить адрес',doneBtn:'Готово ✓',
   addrSaved:'Адрес сохранён ✓',addrUpdated:'Адрес обновлён ✓',addrDeleted:'Адрес удалён',addrSelected:'Адрес выбран',
@@ -2028,12 +2028,12 @@ ru:{
   noSaved:'Нет сохранённых адресов — добавьте первый!',
   activeAddrLabel:'АКТИВНЫЙ',
   ct2:'Номер телефона',phoneLbl:'ТОЛЬКО ЦИФРЫ, 10–15 ЗНАКОВ',phoneErr:'❌ Введите корректный номер (10–15 цифр)',
-  sumTitle:'Ваш заказ',tipLbl:'Чаевые',totLbl:'Итого',placeBtn:'✅ Подтвердить заказ',
+  sumTitle:'Ваш заказ',tipLbl:'Чаевые',totLbl:'Итого',placeBtn:'Подтвердить заказ',
   coAddrTitle:'Адрес доставки',
   noOrders:'Заказов пока нет',noActive:'Нет активных заказов',
   stP:'🟡 Ожидает',stC:'🟢 Принят',stD:'✅ Доставлен',stX:'❌ Отменён',
   added:'Добавлено',emptyCart:'Корзина пуста',
-  placed:'✅ Заказ оформлен! Ожидайте звонка.',
+  placed:'Заказ оформлен! Ожидайте звонка.',
   activeOrders:'Активные заказы',oos:'НЕТ',oosLabel:'Нет в наличии',
   statOrders:'ЗАКАЗОВ',statActive:'АКТИВНЫХ',statSpent:'ПОТРАЧЕНО',
   noAddrWarning:'Сначала добавьте адрес доставки',
@@ -2067,7 +2067,7 @@ en:{
   shSaved:'Saved addresses',addFormTitle:'➕ Add address',
   lblArea:'AREA / ZONE',lblStreet:'STREET',lblBuilding:'BUILDING / №',lblTypeGps:'ADDRESS TYPE',lblTypeMan:'ADDRESS TYPE',
   gpsBtn:'Share my location',gpsBtnLoading:'⏳ Getting location...',
-  gpsOk:'✅ Location received — enter address label',gpsFail:'⚠️ Could not get location',
+  gpsOk:'Location received — enter address label',gpsFail:'Could not get location',
   addrLabelReq:'❌ Enter address label',
   lblAddrName:'ADDRESS LABEL',saveAddrBtn:'Save address',updateAddrBtn:'Update address',doneBtn:'Done ✓',
   addrSaved:'Address saved ✓',addrUpdated:'Address updated ✓',addrDeleted:'Address removed',addrSelected:'Address selected',
@@ -2076,12 +2076,12 @@ en:{
   noSaved:'No saved addresses — add your first one!',
   activeAddrLabel:'ACTIVE',
   ct2:'Phone Number',phoneLbl:'DIGITS ONLY, 10–15 DIGITS',phoneErr:'❌ Enter a valid phone (10–15 digits)',
-  sumTitle:'Your order',tipLbl:'Tip',totLbl:'Total',placeBtn:'✅ Confirm order',
+  sumTitle:'Your order',tipLbl:'Tip',totLbl:'Total',placeBtn:'Confirm order',
   coAddrTitle:'Delivery address',
   noOrders:'No orders yet',noActive:'No active orders',
   stP:'🟡 Pending',stC:'🟢 Confirmed',stD:'✅ Delivered',stX:'❌ Cancelled',
   added:'Added',emptyCart:'Cart is empty',
-  placed:'✅ Order placed! We\'ll call you.',
+  placed:'Order placed! We\'ll call you.',
   activeOrders:'Active orders',oos:'N/A',oosLabel:'Out of stock',
   statOrders:'ORDERS',statActive:'ACTIVE',statSpent:'SPENT AED',
   noAddrWarning:'Please add a delivery address first',
@@ -4191,7 +4191,7 @@ function proceedToCheckout(){
   pendingOrderConfirmed=false;
   // Show address preview in checkout
   const addr=getSaved()[activeAddrIdx];
-  el('co-addr-preview').innerHTML=`<strong>${addr.label||''}</strong>${addr.label?'<br>':''}${addr.address}<br><span style="color:var(--gold);font-size:11px">🏢 ${addr.office_name}</span>`;
+  el('co-addr-preview').innerHTML=`<strong>${addr.label||''}</strong>${addr.label?'<br>':''}${addr.address}`;
   buildSummary();
   go('checkout');
 }

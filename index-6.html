@@ -6184,20 +6184,6 @@ const _G={state:'idle',raf:0,frame:0,score:0,speed:0,W:0,H:0,gY:0,
 
 let _gameAudio=null;
 let _gameFailAudio=null;
-// Coin sound pool — avoids lag from resetting a single Audio element
-const _coinPool=[];
-let _coinPoolIdx=0;
-function _initCoinPool(){
-  if(_coinPool.length)return;
-  for(let i=0;i<4;i++){const a=new Audio('coin.mp3');a.volume=0.3;a.preload='auto';_coinPool.push(a);}
-}
-function _playCoinSfx(){
-  if(_gameMuted||!_coinPool.length)return;
-  const a=_coinPool[_coinPoolIdx];
-  _coinPoolIdx=(_coinPoolIdx+1)%_coinPool.length;
-  a.currentTime=0;
-  a.play().catch(()=>{});
-}
 let _gameMuted=localStorage.getItem('ambar_game_muted')==='1';
 
 function _gamePlayMusic(){
@@ -6246,7 +6232,6 @@ function _preloadGameAssets(){
     _gameFailAudio.volume=0.35;
     _gameFailAudio.preload='auto';
   }
-  _initCoinPool();
 }
 
 function _gameLoadAssets(cb){
@@ -6390,7 +6375,6 @@ function _gameLoop(){
   G.coins.forEach(c=>{
     if(!c.col&&Math.abs(p.x+p.w/2-c.x)<c.r+14&&Math.abs(p.y-p.h/2-c.y)<c.r+18){
       c.col=true;G.score+=150;haptic.light();
-      _playCoinSfx();
     }
   });
   _gameDraw();

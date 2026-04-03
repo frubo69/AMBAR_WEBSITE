@@ -78,8 +78,17 @@ def kb_order_actions(order):
         InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{oid}"),
         InlineKeyboardButton("📍 Геолокация",    callback_data=f"loc_{oid}"),
     ])
-    rows.append([InlineKeyboardButton("🚫 Забанить клиента", callback_data=f"ban_{oid}_{cid}")])
+    rows.append([InlineKeyboardButton("👤 Клиент", callback_data=f"client_{oid}_{cid}")])
     return InlineKeyboardMarkup(rows)
+
+
+def kb_client_actions(oid, cid):
+    """Keyboard shown on client info view."""
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("🚫 Забанить клиента",      callback_data=f"ban_{oid}_{cid}")],
+        [InlineKeyboardButton("✏️ Переименовать клиента", callback_data=f"rename_{oid}_{cid}")],
+        [InlineKeyboardButton("← Назад",                  callback_data=f"client_back_{oid}")],
+    ])
 
 def kb_eta(oid, cid):
     r1 = [InlineKeyboardButton(f"⏱ {t} мин", callback_data=f"eta_{t}_{oid}_{cid}") for t in [20, 30, 45]]
@@ -116,19 +125,16 @@ def kb_ban_confirm(cid, oid):
 # ── Order card formatter ──────────────────────────────────────────────────────
 def order_card(o, full=True):
     st_map = {"pending":"🟡 Ожидает","approved":"🟢 Принят","delivered":"✅ Доставлен","declined":"🔴 Отклонён","cancelled":"🚫 Отменён клиентом"}
-    ts     = o.get("timestamp","")[:16].replace("T"," ")
     st     = st_map.get(o.get("status",""), o.get("status",""))
-    lines  = [f"📦 *Заказ #{o['order_id']}*  |  {st}", f"🕐 {ts}  |  🏢 {o.get('office_name','—')}", ""]
+    lines  = [f"🏢 Офис: *{o.get('office_name','—')}*", ""]
+    lines.append(f"🆕 *НОВЫЙ ЗАКАЗ #{o['order_id']}*")
+    lines.append("")
     if full:
-        lines += [
-            f"👤 *{o.get('customer_name','—')}*",
-            f"📞 Телефон: `{o.get('phone','—')}`",
-            f"🔗 @{o.get('username','—')}  |  ID: `{o.get('customer_id','—')}`",
-            ]
         gmap = o.get("gmap_link","")
         addr = o.get("address","—")
         if gmap:
-            lines.append(f"📍 GPS: {gmap}" if (o.get("is_gps") or addr == "GPS") else f"🏠 Адрес: {gmap}")
+            lines.append(f"🏠 Адрес: {addr}" if addr and addr != "GPS" and addr != "—" else "🏠 Адрес: GPS")
+            lines.append(f"Google Maps: {gmap}")
         else:
             lines.append(f"🏠 Адрес: {addr}")
         lines.append("")
@@ -139,6 +145,20 @@ def order_card(o, full=True):
     lines.append("")
     if o.get("tip"): lines.append(f"🎁 Чаевые: {o['tip']} AED")
     lines.append(f"💰 *Итого: {o.get('total',0)} AED*")
+    comment = o.get("comment", "").strip()
+    if comment:
+        lines.append("")
+        lines.append(f"💬 Комментарий: {comment}")
+    return "\n".join(lines)
+
+
+def customer_card(o):
+    """Customer info card — shown when operator clicks 'Клиент'."""
+    lines = [
+        f"👤 *{o.get('customer_name','—')}*",
+        f"📞 `{o.get('phone','—')}`",
+        f"🔗 @{o.get('username','—')}  |  ID: `{o.get('customer_id','—')}`",
+    ]
     return "\n".join(lines)
 
 
@@ -258,6 +278,23 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text(
             f"🚫 *Пользователь `{pending['cid']}` заблокирован*\n\n💬 Причина: _{display}_",
             parse_mode="Markdown")
+        return
+
+    # ── Intercept rename input ──────────────────────────────────────────────────
+    pending_rename = ctx.user_data.get("pending_rename")
+    if pending_rename:
+        ctx.user_data.pop("pending_rename")
+        new_name = (update.message.text or "").strip()
+        if new_name:
+            cid = pending_rename["cid"]
+            oid = pending_rename["oid"]
+            # Update user's name in DB
+            await db.upsert_user(cid, name=new_name, full_name=new_name, custom_name=new_name)
+            await update.message.reply_text(
+                f"✅ Клиент `{cid}` переименован в *{new_name}*\n\nНовое имя будет отображаться в следующих заказах.",
+                parse_mode="Markdown")
+        else:
+            await update.message.reply_text("❌ Переименование отменено — пустое имя.")
         return
 
     text = update.message.text
@@ -533,6 +570,28 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 await q.edit_message_text("❌ Блокировка отменена.", parse_mode="Markdown")
         except: pass
 
+    # ── CLIENT INFO VIEW ───────────────────────────────────────────────────────
+    elif data.startswith("client_back_"):
+        oid = data[len("client_back_"):]
+        order = await db.get_order(oid)
+        if order:
+            await q.edit_message_text(order_card(order), parse_mode="Markdown", reply_markup=kb_order_actions(order))
+
+    elif data.startswith("client_"):
+        _, oid, cid_str = data.split("_", 2)
+        order = await db.get_order(oid)
+        if order:
+            await q.edit_message_text(customer_card(order), parse_mode="Markdown", reply_markup=kb_client_actions(oid, int(cid_str)))
+
+    # ── RENAME CLIENT ────────────────────────────────────────────────────────
+    elif data.startswith("rename_"):
+        parts = data.split("_"); oid = parts[1]; cid = int(parts[2])
+        ctx.user_data["pending_rename"] = {"cid": cid, "oid": oid}
+        await q.message.reply_text(
+            f"✏️ *Переименовать клиента*\n\nВведите новое имя для клиента `{cid}`:",
+            parse_mode="Markdown")
+
+    # ── BAN ──────────────────────────────────────────────────────────────────
     elif data.startswith("ban_"):
         parts = data.split("_"); oid = parts[1]; cid = int(parts[2])
         ctx.user_data["pending_ban"] = {"cid": cid, "oid": oid}

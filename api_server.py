@@ -103,6 +103,14 @@ async def handle_create_order(request: web.Request) -> web.Response:
     username  = user.get("username", "—")
     lang      = data.get("lang", "ru")
 
+    # Use custom name from operator rename if set
+    try:
+        user_doc = await db.get_user(uid)
+        if user_doc and user_doc.get("custom_name"):
+            user_name = user_doc["custom_name"]
+    except Exception:
+        pass
+
     # Ban check — reject order if user is banned
     try:
         if await db.is_banned(uid):

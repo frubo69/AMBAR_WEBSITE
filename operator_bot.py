@@ -55,17 +55,29 @@ def get_operator_office(uid):
     return None
 
 
+DUBAI_TZ = timezone(offset=__import__('datetime').timedelta(hours=4))
+
 def order_summary_label(o):
     """Compact one-line label for order list buttons."""
     items = o.get("items", [])
-    if items:
-        first = items[0]["name"]
-        if len(first) > 18:
-            first = first[:16] + ".."
-        extra = f" +{len(items)-1}" if len(items) > 1 else ""
-    else:
-        first, extra = "—", ""
-    return f"#{o['order_id']} · {first}{extra} · {o.get('total',0)} AED"
+    n_items = sum(i.get("qty", 1) for i in items)
+    # Show confirmed_at time (Dubai) if available, else order timestamp
+    time_str = ""
+    for key in ("confirmed_at", "timestamp"):
+        raw = o.get(key, "")
+        if raw:
+            try:
+                dt = datetime.fromisoformat(raw.replace("Z", "+00:00"))
+                dt_dubai = dt.astimezone(DUBAI_TZ)
+                time_str = dt_dubai.strftime("%H:%M")
+            except: pass
+            break
+    parts = [f"#{o['order_id']}"]
+    if time_str:
+        parts.append(time_str)
+    parts.append(f"{n_items} поз.")
+    parts.append(f"{o.get('total',0)} AED")
+    return " · ".join(parts)
 
 
 # ── Keyboards ─────────────────────────────────────────────────────────────────

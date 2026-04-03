@@ -116,10 +116,11 @@ def kb_add_product(oid):
     return InlineKeyboardMarkup(rows)
 
 def kb_ban_confirm(cid, oid):
-    return InlineKeyboardMarkup([[
-        InlineKeyboardButton("⏭ Без причины", callback_data=f"ban_skip_{cid}_{oid}"),
-        InlineKeyboardButton("❌ Отмена",      callback_data=f"ban_cancel_{oid}"),
-    ]])
+    return InlineKeyboardMarkup([
+        [InlineKeyboardButton("⏭ Без причины",     callback_data=f"ban_skip_{cid}_{oid}")],
+        [InlineKeyboardButton("✏️ Ввести причину", callback_data=f"ban_input_{cid}_{oid}")],
+        [InlineKeyboardButton("← Отмена",           callback_data=f"ban_cancel_{oid}_{cid}")],
+    ])
 
 
 # ── Order card formatter ──────────────────────────────────────────────────────
@@ -275,9 +276,19 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         reason = (update.message.text or "").strip()
         await _do_ban(op, pending["cid"], pending["oid"], reason)
         display = reason or "Заблокирован оператором"
-        await update.message.reply_text(
-            f"🚫 *Пользователь `{pending['cid']}` заблокирован*\n\n💬 Причина: _{display}_",
-            parse_mode="Markdown")
+        try: await update.message.delete()
+        except: pass
+        if pending.get("msg_id"):
+            try:
+                await ctx.bot.edit_message_text(
+                    f"🚫 *Клиент заблокирован*\n\nID: `{pending['cid']}`\n💬 Причина: _{display}_",
+                    chat_id=update.effective_chat.id,
+                    message_id=pending["msg_id"],
+                    parse_mode="Markdown",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("← К заказу", callback_data=f"back_order_{pending['oid']}")
+                    ]]))
+            except: pass
         return
 
     # ── Intercept rename input ──────────────────────────────────────────────────
@@ -285,16 +296,24 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if pending_rename:
         ctx.user_data.pop("pending_rename")
         new_name = (update.message.text or "").strip()
+        cid = pending_rename["cid"]
+        oid = pending_rename["oid"]
+        try: await update.message.delete()
+        except: pass
         if new_name:
-            cid = pending_rename["cid"]
-            oid = pending_rename["oid"]
-            # Update user's name in DB
             await db.upsert_user(cid, name=new_name, full_name=new_name, custom_name=new_name)
-            await update.message.reply_text(
-                f"✅ Клиент `{cid}` переименован в *{new_name}*\n\nНовое имя будет отображаться в следующих заказах.",
-                parse_mode="Markdown")
-        else:
-            await update.message.reply_text("❌ Переименование отменено — пустое имя.")
+            await db.update_order(oid, customer_name=new_name)
+            if pending_rename.get("msg_id"):
+                order = await db.get_order(oid)
+                if order:
+                    try:
+                        await ctx.bot.edit_message_text(
+                            customer_card(order),
+                            chat_id=update.effective_chat.id,
+                            message_id=pending_rename["msg_id"],
+                            parse_mode="Markdown",
+                            reply_markup=kb_client_actions(oid, cid))
+                    except: pass
         return
 
     text = update.message.text
@@ -415,7 +434,6 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                               confirmed_at=datetime.now(timezone.utc).isoformat())
         order = await db.get_order(oid)
         lang  = order.get("lang","ru") if order else "ru"
-        name  = order.get("customer_name","") if order else ""
         tx    = {"ru": f"✅ *Заказ #{oid} принят!*\n\n🕐 Доставка через *{eta} минут*",
                  "en": f"✅ *Order #{oid} confirmed!*\n\n🕐 Delivery in *{eta} minutes*"}
         acc_msg = await notify(cid, tx.get(lang, tx["ru"]))
@@ -424,12 +442,12 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             if o:
                 ids = o.get("customer_msg_ids", []) + [acc_msg.message_id]
                 await db.update_order(oid, customer_msg_ids=ids)
-        await q.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton(f"🚚 Доставлено #{oid}", callback_data=f"done_{oid}_{cid}")
-        ]]))
-        await q.message.reply_text(
-            f"✅ *#{oid}* принят | 👤 {name} | ⏱ {eta} мин\n\nНажмите «Доставлено» после вручения:",
-            parse_mode="Markdown")
+        # Update the same message — show order card with approved status
+        order = await db.get_order(oid)
+        if order:
+            await q.edit_message_text(
+                order_card(order) + f"\n\n✅ *Принят* | ⏱ {eta} мин",
+                parse_mode="Markdown", reply_markup=kb_order_actions(order))
         asyncio.create_task(run_countdown(cid, eta, lang, oid))
 
     # ── DECLINE ───────────────────────────────────────────────────────────────
@@ -447,8 +465,10 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         lang  = order.get("lang","ru") if order else "ru"
         tx    = {"ru": f"❌ *Заказ #{oid} отменён.*", "en": f"❌ *Order #{oid} cancelled.*"}
         await notify(cid, tx.get(lang, tx["ru"]))
-        await q.edit_message_reply_markup(reply_markup=None)
-        await q.message.reply_text(f"❌ #{oid} — отклонён. Клиент уведомлён.")
+        if order:
+            await q.edit_message_text(
+                order_card(order) + "\n\n❌ *Отклонён*",
+                parse_mode="Markdown", reply_markup=None)
 
     # ── DELIVERED ─────────────────────────────────────────────────────────────
     elif data.startswith("done_"):
@@ -459,8 +479,17 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         total = (order or {}).get("total", 0)
         await db._increment_user(cid, orders_done=1, total_spent=total)
         await cleanup_and_deliver(cid, oid, lang)
-        await q.edit_message_reply_markup(reply_markup=None)
-        await q.message.reply_text(f"✅ #{oid} — доставлен. Клиент уведомлён.")
+        if order:
+            await q.edit_message_text(
+                order_card(order) + "\n\n✅ *Доставлен*",
+                parse_mode="Markdown", reply_markup=None)
+
+    # ── BACK TO ORDER (from ban/rename result screens) ────────────────────────
+    elif data.startswith("back_order_"):
+        oid = data[len("back_order_"):]
+        order = await db.get_order(oid)
+        if order:
+            await q.edit_message_text(order_card(order), parse_mode="Markdown", reply_markup=kb_order_actions(order))
 
     # ── LOCATION ──────────────────────────────────────────────────────────────
     elif data.startswith("loc_"):
@@ -549,26 +578,35 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         try: await q.edit_message_reply_markup(reply_markup=kb_edit(order))
         except: pass
 
-    # ── BAN ───────────────────────────────────────────────────────────────────
+    # ── BAN — specific prefixes first ─────────────────────────────────────────
     elif data.startswith("ban_skip_"):
         parts = data.split("_"); cid = int(parts[2]); oid = parts[3]
         ctx.user_data.pop("pending_ban", None)
         await _do_ban(op, cid, oid, "")
         await q.edit_message_text(
-            f"🚫 *Пользователь заблокирован*\n\nID: `{cid}`\nЗаказ: `#{oid}`\nЗаблокировал: оператор `{op}`",
-            parse_mode="Markdown")
+            f"🚫 *Клиент заблокирован*\n\nID: `{cid}`\nЗаказ: `#{oid}`",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("← К заказу", callback_data=f"back_order_{oid}")
+            ]]))
+
+    elif data.startswith("ban_input_"):
+        parts = data.split("_")  # ban_input_CID_OID
+        cid = int(parts[2]); oid = parts[3]
+        ctx.user_data["pending_ban"] = {"cid": cid, "oid": oid, "msg_id": q.message.message_id}
+        await q.edit_message_text(
+            f"✏️ *Введите причину блокировки*\n\nКлиент: `{cid}`\n\n_Отправьте текст сообщением_",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("← Отмена", callback_data=f"client_{oid}_{cid}")
+            ]]))
 
     elif data.startswith("ban_cancel_"):
-        oid   = data[len("ban_cancel_"):]
+        parts = data.split("_")  # ban_cancel_OID_CID
+        oid = parts[2]; cid = int(parts[3])
         order = await db.get_order(oid)
-        try:
-            if order:
-                await q.edit_message_text(
-                    f"❌ *Блокировка отменена*\n\nПользователь НЕ заблокирован. Заказ `#{oid}` без изменений.",
-                    parse_mode="Markdown", reply_markup=kb_order_actions(order))
-            else:
-                await q.edit_message_text("❌ Блокировка отменена.", parse_mode="Markdown")
-        except: pass
+        if order:
+            await q.edit_message_text(customer_card(order), parse_mode="Markdown", reply_markup=kb_client_actions(oid, cid))
 
     # ── CLIENT INFO VIEW ───────────────────────────────────────────────────────
     elif data.startswith("client_back_"):
@@ -586,18 +624,19 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # ── RENAME CLIENT ────────────────────────────────────────────────────────
     elif data.startswith("rename_"):
         parts = data.split("_"); oid = parts[1]; cid = int(parts[2])
-        ctx.user_data["pending_rename"] = {"cid": cid, "oid": oid}
-        await q.message.reply_text(
-            f"✏️ *Переименовать клиента*\n\nВведите новое имя для клиента `{cid}`:",
-            parse_mode="Markdown")
+        ctx.user_data["pending_rename"] = {"cid": cid, "oid": oid, "msg_id": q.message.message_id}
+        await q.edit_message_text(
+            f"✏️ *Переименовать клиента*\n\nID: `{cid}`\n\n_Отправьте новое имя сообщением_",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("← Отмена", callback_data=f"client_{oid}_{cid}")
+            ]]))
 
-    # ── BAN ──────────────────────────────────────────────────────────────────
+    # ── BAN (generic — show confirmation) ─────────────────────────────────────
     elif data.startswith("ban_"):
         parts = data.split("_"); oid = parts[1]; cid = int(parts[2])
-        ctx.user_data["pending_ban"] = {"cid": cid, "oid": oid}
-        await q.message.reply_text(
-            f"⚠️ Блокировка клиента `{cid}`\n\n"
-            f"💬 *Введите причину* (для внутренних заметок) или нажмите «Без причины»:",
+        await q.edit_message_text(
+            f"⚠️ *Блокировка клиента* `{cid}`\n\nВыберите действие:",
             parse_mode="Markdown", reply_markup=kb_ban_confirm(cid, oid))
 
     # ── UNBAN ─────────────────────────────────────────────────────────────────

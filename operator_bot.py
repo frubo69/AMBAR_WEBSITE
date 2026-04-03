@@ -558,9 +558,10 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         tx    = {"ru": f"❌ *Заказ #{oid} отменён.*", "en": f"❌ *Order #{oid} cancelled.*"}
         await notify(cid, tx.get(lang, tx["ru"]))
         if order:
+            _done_kb = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
             await q.edit_message_text(
                 order_card(order) + "\n\n❌ *Отклонён*",
-                parse_mode="Markdown", reply_markup=None)
+                parse_mode="Markdown", reply_markup=_done_kb)
 
     # ── DELIVERED ─────────────────────────────────────────────────────────────
     elif data.startswith("done_"):
@@ -572,9 +573,10 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await db._increment_user(cid, orders_done=1, total_spent=total)
         await cleanup_and_deliver(cid, oid, lang)
         if order:
+            _done_kb = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
             await q.edit_message_text(
                 order_card(order) + "\n\n✅ *Доставлен*",
-                parse_mode="Markdown", reply_markup=None)
+                parse_mode="Markdown", reply_markup=_done_kb)
 
     # ── BACK TO ORDER (from sub-views) ────────────────────────────────────────
     elif data.startswith("back_order_"):

@@ -383,31 +383,34 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     uid  = update.effective_user.id
 
+    # Delete the operator's menu tap to keep chat clean
+    try: await update.message.delete()
+    except: pass
+
+    cid = update.effective_chat.id
+    send = ctx.bot.send_message  # shortcut — original message is deleted
     _dismiss = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
 
     if "Новые" in text:
         header, empty, items = await _build_order_list("n", uid)
         if not items:
-            await update.message.reply_text(empty, reply_markup=_dismiss); return
-        await update.message.reply_text(
-            header + "\n\nНажмите на заказ для просмотра:",
-            parse_mode="Markdown", reply_markup=kb_order_list(items, "n"))
+            await send(cid, empty, reply_markup=_dismiss); return
+        await send(cid, header + "\n\nНажмите на заказ для просмотра:",
+                   parse_mode="Markdown", reply_markup=kb_order_list(items, "n"))
 
     elif "Активные" in text:
         header, empty, items = await _build_order_list("a", uid)
         if not items:
-            await update.message.reply_text(empty, reply_markup=_dismiss); return
-        await update.message.reply_text(
-            header + "\n\nНажмите на заказ для просмотра:",
-            parse_mode="Markdown", reply_markup=kb_order_list(items, "a"))
+            await send(cid, empty, reply_markup=_dismiss); return
+        await send(cid, header + "\n\nНажмите на заказ для просмотра:",
+                   parse_mode="Markdown", reply_markup=kb_order_list(items, "a"))
 
     elif "Завершённые" in text:
         header, empty, items = await _build_order_list("d", uid)
         if not items:
-            await update.message.reply_text("Нет завершённых.", reply_markup=_dismiss); return
-        await update.message.reply_text(
-            header + "\n\nНажмите на заказ для просмотра:",
-            parse_mode="Markdown", reply_markup=kb_order_list(items, "d"))
+            await send(cid, "Нет завершённых.", reply_markup=_dismiss); return
+        await send(cid, header + "\n\nНажмите на заказ для просмотра:",
+                   parse_mode="Markdown", reply_markup=kb_order_list(items, "d"))
 
     elif "Статистика" in text:
         off = get_operator_office(uid)
@@ -415,7 +418,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         today = datetime.now().strftime("%Y-%m-%d")
         tod   = [o for o in all_orders.values() if o.get("timestamp","").startswith(today)]
         rev   = sum(o.get("total",0) for o in tod if o.get("status")=="delivered")
-        await update.message.reply_text(
+        await send(cid,
             f"📊 *Статистика сегодня — {today}*\n\n"
             f"🆕 Новых: *{len([o for o in tod if o.get('status')=='pending'])}*\n"
             f"🟢 Принято: *{len([o for o in tod if o.get('status')=='approved'])}*\n"
@@ -423,12 +426,12 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             f"🔴 Отклонено: *{len([o for o in tod if o.get('status')=='declined'])}*\n"
             f"📦 Всего: *{len(tod)}*\n\n"
             f"💰 *Выручка: {int(rev)} AED*",
-            parse_mode="Markdown", reply_markup=kb_main())
+            parse_mode="Markdown", reply_markup=_dismiss)
 
     elif "Забаненные" in text:
         banned = await db.get_all_banned()
         if not banned:
-            await update.message.reply_text("✅ Забаненных нет.", reply_markup=kb_main()); return
+            await send(cid, "✅ Забаненных нет.", reply_markup=_dismiss); return
         lines = ["🚫 *Заблокированные пользователи:*\n"]
         rows  = []
         for u in banned[:15]:
@@ -436,12 +439,12 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             ts      = (u.get("banned_at","") or "")[:10]
             lines.append(f"• ID `{uid_str}` — {u.get('ban_reason','—')} ({ts})")
             rows.append([InlineKeyboardButton(f"🔓 Разбанить {uid_str}", callback_data=f"unban_{uid_str}")])
-        await update.message.reply_text(
-            "\n".join(lines), parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup(rows) if rows else None)
+        rows.append([InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")])
+        await send(cid, "\n".join(lines), parse_mode="Markdown",
+                   reply_markup=InlineKeyboardMarkup(rows) if rows else None)
 
     elif "Помощь" in text:
-        await update.message.reply_text(
+        await send(cid,
             "ℹ️ *AMBAR — Оператор*\n\n"
             "🆕 *Новые* — входящие заказы\n"
             "🟢 *Активные* — принятые, в доставке\n"
@@ -453,10 +456,10 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             "✏️ Редактировать → добавить/убрать позиции\n"
             "📍 Геолокация → увидеть точку клиента\n"
             "🚫 Забанить → заблокировать клиента",
-            parse_mode="Markdown", reply_markup=kb_main())
+            parse_mode="Markdown", reply_markup=_dismiss)
 
     else:
-        await update.message.reply_text("Используйте кнопки меню 👇", reply_markup=kb_main())
+        await send(cid, "Используйте кнопки меню 👇", reply_markup=_dismiss)
 
 
 # ── Start ─────────────────────────────────────────────────────────────────────

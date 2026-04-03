@@ -5988,7 +5988,7 @@ function _renderAob(){
     const{pct,remaining}=_calcProgress(confirmed_at,eta);
     const p=Math.min(Math.round(pct*100),95);
     fill.className='aob-fill';fill.style.width=p+'%';
-    moto.style.display='block';moto.style.left=Math.min(p,88)+'%';
+    moto.style.display='block';moto.style.left=p+'%';
     if(remaining<=0){title.textContent=ru?'Курьер рядом!':'Driver nearby!';time.textContent='';}
     else if(remaining<=3){title.textContent=ru?'Курьер рядом!':'Almost at your door!';time.textContent='';}
     else{title.textContent=ru?'Заказ в пути':'Order on the way';time.textContent=ru?`≈${Math.ceil(remaining)} мин`:`≈${Math.ceil(remaining)} min`;}

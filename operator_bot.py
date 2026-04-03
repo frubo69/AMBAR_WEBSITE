@@ -559,30 +559,25 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if order:
             await q.edit_message_text(order_card(order), parse_mode="Markdown", reply_markup=kb_order_actions(order))
 
-    # ── LOCATION (in-place) ──────────────────────────────────────────────────
+    # ── LOCATION ──────────────────────────────────────────────────────────────
     elif data.startswith("loc_"):
         oid   = data[4:]
         order = await db.get_order(oid)
         if not order: await q.answer("❌ Заказ не найден", show_alert=True); return
         loc   = order.get("location", {})
-        lines = [f"📍 *Геолокация #{oid}*", ""]
-        addr  = order.get("address", "—")
-        lines.append(f"🏠 {addr}")
-        gmap  = order.get("gmap_link", "")
         if loc.get("lat"):
-            lines.append(f"📌 `{loc['lat']}, {loc['lon']}`")
-            if not gmap:
-                gmap = f"https://www.google.com/maps?q={loc['lat']},{loc['lon']}"
-        if gmap:
-            lines.append(f"\n[🗺 Открыть в Google Maps]({gmap})")
+            loc_msg = await q.message.reply_location(
+                latitude=loc["lat"], longitude=loc["lon"],
+                reply_markup=InlineKeyboardMarkup([[
+                    InlineKeyboardButton("✅ Просмотрел", callback_data=f"delloc_{loc['lat']}_{loc['lon']}")
+                ]]))
         else:
-            lines.append("\n_GPS недоступен для этого заказа_")
-        await q.edit_message_text(
-            "\n".join(lines), parse_mode="Markdown",
-            disable_web_page_preview=True,
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("← К заказу", callback_data=f"back_order_{oid}")
-            ]]))
+            await q.answer("📍 GPS недоступен для этого заказа", show_alert=True)
+
+    # ── DELETE LOCATION message ──────────────────────────────────────────────
+    elif data.startswith("delloc_"):
+        try: await q.message.delete()
+        except: pass
 
     # ── EDIT done ─────────────────────────────────────────────────────────────
     elif data.startswith("edit_done_"):

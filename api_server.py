@@ -221,11 +221,8 @@ async def handle_create_order(request: web.Request) -> web.Response:
         first_order_banner = ""
     op_text = (
         f"{first_order_banner}"
-        f"🆕 *НОВЫЙ ЗАКАЗ #{oid}*\n\n"
         f"🏢 Офис: *{office_nm}*\n\n"
-        f"👤 *{user_name}*\n"
-        f"📞 `{phone}`\n"
-        f"🔗 @{username} | ID: `{uid}`\n"
+        f"🆕 *НОВЫЙ ЗАКАЗ #{oid}*\n\n"
         f"{addr_line}\n\n"
         f"🛒 *Позиции:*\n{item_lines}\n\n"
         f"🎁 Чаевые: {tip} AED\n"
@@ -241,7 +238,7 @@ async def handle_create_order(request: web.Request) -> web.Response:
             {"text": "✏️ Редактировать", "callback_data": f"edit_{oid}"},
             {"text": "📍 Геолокация",    "callback_data": f"loc_{oid}"},
         ],
-        [{"text": "🚫 Забанить клиента", "callback_data": f"ban_{oid}_{uid}"}],
+        [{"text": "👤 Клиент", "callback_data": f"client_{oid}_{uid}"}],
     ]}
     for op_id in OPERATOR_IDS:
         try:

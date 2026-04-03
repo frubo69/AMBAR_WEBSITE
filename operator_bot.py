@@ -96,6 +96,7 @@ def kb_order_list(items, list_type, limit=15):
             order_summary_label(o),
             callback_data=f"osel_{list_type}_{o['order_id']}"
         )])
+    rows.append([InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")])
     return InlineKeyboardMarkup(rows)
 
 def kb_order_actions(order, list_type=None):
@@ -382,10 +383,12 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     text = update.message.text
     uid  = update.effective_user.id
 
+    _dismiss = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
+
     if "Новые" in text:
         header, empty, items = await _build_order_list("n", uid)
         if not items:
-            await update.message.reply_text(empty, reply_markup=kb_main()); return
+            await update.message.reply_text(empty, reply_markup=_dismiss); return
         await update.message.reply_text(
             header + "\n\nНажмите на заказ для просмотра:",
             parse_mode="Markdown", reply_markup=kb_order_list(items, "n"))
@@ -393,7 +396,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     elif "Активные" in text:
         header, empty, items = await _build_order_list("a", uid)
         if not items:
-            await update.message.reply_text(empty, reply_markup=kb_main()); return
+            await update.message.reply_text(empty, reply_markup=_dismiss); return
         await update.message.reply_text(
             header + "\n\nНажмите на заказ для просмотра:",
             parse_mode="Markdown", reply_markup=kb_order_list(items, "a"))
@@ -401,7 +404,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     elif "Завершённые" in text:
         header, empty, items = await _build_order_list("d", uid)
         if not items:
-            await update.message.reply_text(empty, reply_markup=kb_main()); return
+            await update.message.reply_text("Нет завершённых.", reply_markup=_dismiss); return
         await update.message.reply_text(
             header + "\n\nНажмите на заказ для просмотра:",
             parse_mode="Markdown", reply_markup=kb_order_list(items, "d"))
@@ -593,8 +596,8 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         else:
             await q.answer("📍 GPS недоступен для этого заказа", show_alert=True)
 
-    # ── DELETE LOCATION message ──────────────────────────────────────────────
-    elif data.startswith("delloc_"):
+    # ── DELETE message (location / list / empty) ────────────────────────────
+    elif data in ("delmsg",) or data.startswith("delloc_"):
         try: await q.message.delete()
         except: pass
 

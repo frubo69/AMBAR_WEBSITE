@@ -55,6 +55,19 @@ def get_operator_office(uid):
     return None
 
 
+def order_summary_label(o):
+    """Compact one-line label for order list buttons."""
+    items = o.get("items", [])
+    if items:
+        first = items[0]["name"]
+        if len(first) > 18:
+            first = first[:16] + ".."
+        extra = f" +{len(items)-1}" if len(items) > 1 else ""
+    else:
+        first, extra = "—", ""
+    return f"#{o['order_id']} · {first}{extra} · {o.get('total',0)} AED"
+
+
 # ── Keyboards ─────────────────────────────────────────────────────────────────
 def kb_main():
     return ReplyKeyboardMarkup([
@@ -63,7 +76,17 @@ def kb_main():
         ["🚫 Забаненные",     "ℹ️ Помощь"],
     ], resize_keyboard=True)
 
-def kb_order_actions(order):
+def kb_order_list(items, list_type, limit=15):
+    """Compact list of orders as inline buttons."""
+    rows = []
+    for o in items[:limit]:
+        rows.append([InlineKeyboardButton(
+            order_summary_label(o),
+            callback_data=f"osel_{list_type}_{o['order_id']}"
+        )])
+    return InlineKeyboardMarkup(rows)
+
+def kb_order_actions(order, list_type=None):
     oid, cid = order["order_id"], order["customer_id"]
     st       = order.get("status", "")
     rows     = []
@@ -79,6 +102,8 @@ def kb_order_actions(order):
         InlineKeyboardButton("📍 Геолокация",    callback_data=f"loc_{oid}"),
     ])
     rows.append([InlineKeyboardButton("👤 Клиент", callback_data=f"client_{oid}_{cid}")])
+    if list_type:
+        rows.append([InlineKeyboardButton("← К списку", callback_data=f"olist_{list_type}")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -259,8 +284,30 @@ async def run_countdown(cid, eta_min, lang, oid=None):
         order = await db.get_order(oid)
         if not order or order.get("status") in ("delivered", "cancelled"):
             return
-        # Timer expired — operator must press the Delivered button manually
         log.info(f"ETA expired for order {oid}, awaiting manual delivery confirmation")
+
+
+# ── Helper: fetch & build order list ─────────────────────────────────────────
+async def _build_order_list(list_type, operator_uid):
+    """Fetch orders and return (header_text, sorted_items, list_type)."""
+    off = get_operator_office(operator_uid)
+    all_orders = await db.get_all_orders(off)
+    if list_type == "n":
+        items = sorted([o for o in all_orders.values() if o.get("status") == "pending"],
+                       key=lambda x: x.get("timestamp",""), reverse=True)
+        header = f"🆕 *Новых заказов: {len(items)}*"
+        empty  = "✅ Новых заказов нет."
+    elif list_type == "a":
+        items = sorted([o for o in all_orders.values() if o.get("status") == "approved"],
+                       key=lambda x: x.get("timestamp",""), reverse=True)
+        header = f"🟢 *Активных: {len(items)}*"
+        empty  = "✅ Активных нет."
+    else:
+        items = sorted([o for o in all_orders.values() if o.get("status") in ("delivered","declined","cancelled")],
+                       key=lambda x: x.get("timestamp",""), reverse=True)
+        header = f"✅ *Завершённых: {len(items)}*"
+        empty  = "Нет завершённых."
+    return header, empty, items
 
 
 # ── Menu handler ──────────────────────────────────────────────────────────────
@@ -318,37 +365,34 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     text = update.message.text
     uid  = update.effective_user.id
-    off  = get_operator_office(uid)
-    all_orders = await db.get_all_orders(off)
 
     if "Новые" in text:
-        items = sorted([o for o in all_orders.values() if o.get("status") == "pending"],
-                       key=lambda x: x.get("timestamp",""), reverse=True)
+        header, empty, items = await _build_order_list("n", uid)
         if not items:
-            await update.message.reply_text("✅ Новых заказов нет.", reply_markup=kb_main()); return
-        await update.message.reply_text(f"🆕 *Новых заказов: {len(items)}*", parse_mode="Markdown", reply_markup=kb_main())
-        for o in items[:10]:
-            await update.message.reply_text(order_card(o), parse_mode="Markdown", reply_markup=kb_order_actions(o))
+            await update.message.reply_text(empty, reply_markup=kb_main()); return
+        await update.message.reply_text(
+            header + "\n\nНажмите на заказ для просмотра:",
+            parse_mode="Markdown", reply_markup=kb_order_list(items, "n"))
 
     elif "Активные" in text:
-        items = sorted([o for o in all_orders.values() if o.get("status") == "approved"],
-                       key=lambda x: x.get("timestamp",""), reverse=True)
+        header, empty, items = await _build_order_list("a", uid)
         if not items:
-            await update.message.reply_text("✅ Активных нет.", reply_markup=kb_main()); return
-        await update.message.reply_text(f"🟢 *Активных: {len(items)}*", parse_mode="Markdown", reply_markup=kb_main())
-        for o in items[:10]:
-            await update.message.reply_text(order_card(o), parse_mode="Markdown", reply_markup=kb_order_actions(o))
+            await update.message.reply_text(empty, reply_markup=kb_main()); return
+        await update.message.reply_text(
+            header + "\n\nНажмите на заказ для просмотра:",
+            parse_mode="Markdown", reply_markup=kb_order_list(items, "a"))
 
     elif "Завершённые" in text:
-        items = sorted([o for o in all_orders.values() if o.get("status") in ("delivered","declined","cancelled")],
-                       key=lambda x: x.get("timestamp",""), reverse=True)
+        header, empty, items = await _build_order_list("d", uid)
         if not items:
-            await update.message.reply_text("Нет завершённых.", reply_markup=kb_main()); return
-        await update.message.reply_text(f"✅ *Завершённых: {len(items)}*", parse_mode="Markdown", reply_markup=kb_main())
-        for o in items[:15]:
-            await update.message.reply_text(order_card(o, full=False), parse_mode="Markdown")
+            await update.message.reply_text(empty, reply_markup=kb_main()); return
+        await update.message.reply_text(
+            header + "\n\nНажмите на заказ для просмотра:",
+            parse_mode="Markdown", reply_markup=kb_order_list(items, "d"))
 
     elif "Статистика" in text:
+        off = get_operator_office(uid)
+        all_orders = await db.get_all_orders(off)
         today = datetime.now().strftime("%Y-%m-%d")
         tod   = [o for o in all_orders.values() if o.get("timestamp","").startswith(today)]
         rev   = sum(o.get("total",0) for o in tod if o.get("status")=="delivered")
@@ -414,8 +458,33 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if data == "noop": return
 
+    # ── ORDER LIST: select order ─────────────────────────────────────────────
+    if data.startswith("osel_"):
+        parts = data.split("_", 2)  # osel, list_type, oid
+        lt  = parts[1]
+        oid = parts[2]
+        order = await db.get_order(oid)
+        if order:
+            await q.edit_message_text(
+                order_card(order), parse_mode="Markdown",
+                reply_markup=kb_order_actions(order, list_type=lt))
+        else:
+            await q.answer("❌ Заказ не найден", show_alert=True)
+
+    # ── ORDER LIST: back to list ─────────────────────────────────────────────
+    elif data.startswith("olist_"):
+        lt = data[6:]
+        header, empty, items = await _build_order_list(lt, op)
+        if not items:
+            await q.edit_message_text(empty)
+            return
+        await q.edit_message_text(
+            header + "\n\nНажмите на заказ для просмотра:",
+            parse_mode="Markdown",
+            reply_markup=kb_order_list(items, lt))
+
     # ── ACCEPT → show ETA ────────────────────────────────────────────────────
-    if data.startswith("acc_"):
+    elif data.startswith("acc_"):
         _, oid, cid = data.split("_", 2)
         order = await db.get_order(oid)
         if order and order.get("status") == "cancelled":
@@ -442,7 +511,6 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             if o:
                 ids = o.get("customer_msg_ids", []) + [acc_msg.message_id]
                 await db.update_order(oid, customer_msg_ids=ids)
-        # Update the same message — show order card with approved status
         order = await db.get_order(oid)
         if order:
             await q.edit_message_text(
@@ -484,23 +552,37 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 order_card(order) + "\n\n✅ *Доставлен*",
                 parse_mode="Markdown", reply_markup=None)
 
-    # ── BACK TO ORDER (from ban/rename result screens) ────────────────────────
+    # ── BACK TO ORDER (from sub-views) ────────────────────────────────────────
     elif data.startswith("back_order_"):
         oid = data[len("back_order_"):]
         order = await db.get_order(oid)
         if order:
             await q.edit_message_text(order_card(order), parse_mode="Markdown", reply_markup=kb_order_actions(order))
 
-    # ── LOCATION ──────────────────────────────────────────────────────────────
+    # ── LOCATION (in-place) ──────────────────────────────────────────────────
     elif data.startswith("loc_"):
         oid   = data[4:]
         order = await db.get_order(oid)
         if not order: await q.answer("❌ Заказ не найден", show_alert=True); return
         loc   = order.get("location", {})
+        lines = [f"📍 *Геолокация #{oid}*", ""]
+        addr  = order.get("address", "—")
+        lines.append(f"🏠 {addr}")
+        gmap  = order.get("gmap_link", "")
         if loc.get("lat"):
-            await q.message.reply_location(latitude=loc["lat"], longitude=loc["lon"])
+            lines.append(f"📌 `{loc['lat']}, {loc['lon']}`")
+            if not gmap:
+                gmap = f"https://www.google.com/maps?q={loc['lat']},{loc['lon']}"
+        if gmap:
+            lines.append(f"\n[🗺 Открыть в Google Maps]({gmap})")
         else:
-            await q.answer("📍 GPS недоступен для этого заказа", show_alert=True)
+            lines.append("\n_GPS недоступен для этого заказа_")
+        await q.edit_message_text(
+            "\n".join(lines), parse_mode="Markdown",
+            disable_web_page_preview=True,
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("← К заказу", callback_data=f"back_order_{oid}")
+            ]]))
 
     # ── EDIT done ─────────────────────────────────────────────────────────────
     elif data.startswith("edit_done_"):
@@ -591,7 +673,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             ]]))
 
     elif data.startswith("ban_input_"):
-        parts = data.split("_")  # ban_input_CID_OID
+        parts = data.split("_")
         cid = int(parts[2]); oid = parts[3]
         ctx.user_data["pending_ban"] = {"cid": cid, "oid": oid, "msg_id": q.message.message_id}
         await q.edit_message_text(
@@ -602,7 +684,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             ]]))
 
     elif data.startswith("ban_cancel_"):
-        parts = data.split("_")  # ban_cancel_OID_CID
+        parts = data.split("_")
         oid = parts[2]; cid = int(parts[3])
         order = await db.get_order(oid)
         if order:
@@ -649,18 +731,15 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         try:
             app2 = Application.builder().token(BOT_TOKEN).build()
             async with app2:
-                # Delete the "you are banned" message
                 if ban_msg_id:
                     try:
                         await app2.bot.delete_message(chat_id=cid, message_id=ban_msg_id)
                     except: pass
-                # Notify user they're unblocked
                 await app2.bot.send_message(
                     chat_id=cid,
                     text="✅ *Ваш аккаунт разблокирован!*\n\nТеперь вы снова можете делать заказы. Нажмите кнопку ниже 👇",
                     parse_mode="Markdown"
                 )
-                # Restore the "Заказать" Mini App button
                 await app2.bot.set_chat_menu_button(
                     chat_id=cid,
                     menu_button=MenuButtonWebApp(text="🍾 Заказать", web_app=WebAppInfo(url=WEBAPP_URL))

@@ -1831,16 +1831,19 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     </div>
     <div style="padding:10px 20px 0;display:flex;gap:10px" id="aod-actions-row">
       <div id="aod-game-wrap" style="display:none;flex:1">
-        <button onclick="openGame()" style="width:100%;height:100%;padding:14px 0;border-radius:12px;background:rgba(212,175,55,.04);border:1px solid rgba(212,175,55,.12);display:flex;flex-direction:column;align-items:center;gap:6px;cursor:pointer;transition:.15s" onpointerdown="this.style.opacity='.7'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">
-          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(212,175,55,.45)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="20" height="20"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><circle cx="17" cy="10" r="1" fill="rgba(212,175,55,.45)"/><circle cx="15" cy="13" r="1" fill="rgba(212,175,55,.45)"/></svg>
-          <div style="font-size:10px;font-weight:600;color:rgba(212,175,55,.5);letter-spacing:.2px" id="aod-game-title">Играй пока ждёшь</div>
-          <div style="font-size:9px;color:rgba(212,175,55,.3)" id="aod-game-sub"><span id="aod-game-best">0</span> pts</div>
+        <button onclick="openGame()" style="width:100%;height:100%;padding:14px 12px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:10px;cursor:pointer;transition:.15s" onpointerdown="this.style.opacity='.7'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.55)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><circle cx="17" cy="10" r="1" fill="rgba(255,255,255,.55)"/><circle cx="15" cy="13" r="1" fill="rgba(255,255,255,.55)"/></svg>
+          <div style="text-align:left">
+            <div style="font-size:12px;font-weight:600;color:rgba(255,255,255,.75);letter-spacing:.2px" id="aod-game-title">Играй пока ждёшь</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px" id="aod-game-sub">Рекорд: <span id="aod-game-best">0</span> pts</div>
+          </div>
+          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.3)" stroke-width="2" stroke-linecap="round" width="16" height="16" style="margin-left:auto;flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
       </div>
       <div style="flex:1">
-        <button class="aod-support-btn" onclick="closeAod();openSupportChat(_aobOrders[_aobIdx]?.order_id||'')" style="height:100%;flex-direction:column;gap:6px;padding:14px 0">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" width="20" height="20"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-          <span style="font-size:11px;font-weight:600;letter-spacing:.3px" id="aod-support-lbl">ПОДДЕРЖКА</span>
+        <button onclick="closeAod();openSupportChat(_aobOrders[_aobIdx]?.order_id||'')" style="width:100%;height:100%;padding:14px 0;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;transition:.15s;font-family:'DM Sans',sans-serif" onpointerdown="this.style.opacity='.7'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.5" stroke-linecap="round" width="20" height="20"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span style="font-size:11px;font-weight:600;letter-spacing:.3px;color:rgba(255,255,255,.4)" id="aod-support-lbl">ПОДДЕРЖКА</span>
         </button>
       </div>
     </div>
@@ -6028,7 +6031,7 @@ function _renderAodDetail(){
     const p=Math.min(Math.round(pct*100),95);
     bigFill.style.transition='none';
     bigFill.className='aod-big-fill';bigFill.style.width=p+'%';
-    bigMoto.style.display='block';bigMoto.style.left=Math.min(p,88)+'%';
+    bigMoto.style.display='block';bigMoto.style.left=p+'%';
     void bigFill.offsetWidth;
     bigFill.style.transition='';
     if(remaining<=0)timeTxt.textContent=ru?'Курьер рядом — ожидайте':'Driver is nearby — hang tight';

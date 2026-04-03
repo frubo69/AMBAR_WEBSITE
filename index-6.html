@@ -6184,10 +6184,11 @@ const _G={state:'idle',raf:0,frame:0,score:0,speed:0,W:0,H:0,gY:0,
 
 let _gameAudio=null;
 let _gameFailAudio=null;
+let _gameCoinAudio=null;
 let _gameMuted=localStorage.getItem('ambar_game_muted')==='1';
 
 function _gamePlayMusic(){
-  if(!_gameAudio){_gameAudio=new Audio('new_music.mp3');_gameAudio.loop=true;_gameAudio.volume=0.4;_gameAudio.preload='auto';}
+  if(!_gameAudio){_gameAudio=new Audio('new_music.mp3');_gameAudio.loop=true;_gameAudio.volume=0.25;_gameAudio.preload='auto';}
   if(!_gameMuted){_gameAudio.play().catch(()=>{});}
 }
 function _gameStopMusic(){
@@ -6224,13 +6225,18 @@ function _preloadGameAssets(){
   if(!_gameAudio){
     _gameAudio=new Audio('new_music.mp3');
     _gameAudio.loop=true;
-    _gameAudio.volume=0.4;
+    _gameAudio.volume=0.25;
     _gameAudio.preload='auto';
   }
   if(!_gameFailAudio){
-    _gameFailAudio=new Audio('fail.mp3');
-    _gameFailAudio.volume=0.6;
+    _gameFailAudio=new Audio('new_fail.mp3');
+    _gameFailAudio.volume=0.35;
     _gameFailAudio.preload='auto';
+  }
+  if(!_gameCoinAudio){
+    _gameCoinAudio=new Audio('coin.mp3');
+    _gameCoinAudio.volume=0.3;
+    _gameCoinAudio.preload='auto';
   }
 }
 
@@ -6375,6 +6381,7 @@ function _gameLoop(){
   G.coins.forEach(c=>{
     if(!c.col&&Math.abs(p.x+p.w/2-c.x)<c.r+14&&Math.abs(p.y-p.h/2-c.y)<c.r+18){
       c.col=true;G.score+=150;haptic.light();
+      if(!_gameMuted){if(!_gameCoinAudio){_gameCoinAudio=new Audio('coin.mp3');_gameCoinAudio.volume=0.3;}_gameCoinAudio.currentTime=0;_gameCoinAudio.play().catch(()=>{});}
     }
   });
   _gameDraw();
@@ -6393,7 +6400,7 @@ function _gameDead(){
   el('game-over-screen').style.display='flex';
   _gameStopMusic();
   if(!_gameMuted){
-    if(!_gameFailAudio){_gameFailAudio=new Audio('fail.mp3');_gameFailAudio.volume=0.6;}
+    if(!_gameFailAudio){_gameFailAudio=new Audio('new_fail.mp3');_gameFailAudio.volume=0.35;}
     _gameFailAudio.currentTime=0;
     _gameFailAudio.play().catch(()=>{});
   }

@@ -117,6 +117,8 @@ def kb_order_actions(order, list_type=None):
     rows.append([InlineKeyboardButton("👤 Клиент", callback_data=f"client_{oid}_{cid}")])
     if list_type:
         rows.append([InlineKeyboardButton("← К списку", callback_data=f"olist_{list_type}")])
+    if st in ("delivered", "declined", "cancelled"):
+        rows.append([InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")])
     return InlineKeyboardMarkup(rows)
 
 
@@ -124,7 +126,7 @@ def kb_client_actions(oid, cid):
     """Keyboard shown on client info view."""
     return InlineKeyboardMarkup([
         [InlineKeyboardButton("🚫 Забанить клиента",      callback_data=f"ban_{oid}_{cid}")],
-        [InlineKeyboardButton("✏️ Переименовать клиента", callback_data=f"rename_{oid}_{cid}")],
+        [InlineKeyboardButton("✏️ Заметка к имени", callback_data=f"rename_{oid}_{cid}")],
         [InlineKeyboardButton("← Назад",                  callback_data=f"client_back_{oid}")],
     ])
 
@@ -191,10 +193,21 @@ def order_card(o, full=True):
     return "\n".join(lines)
 
 
-def customer_card(o):
+async def customer_card(o):
     """Customer info card — shown when operator clicks 'Клиент'."""
+    cid = o.get("customer_id")
+    original = o.get("customer_name", "—")
+    nickname = ""
+    if cid:
+        user_doc = await db.get_user(int(cid)) if cid else None
+        if user_doc:
+            original = user_doc.get("full_name") or user_doc.get("name") or original
+            nickname = user_doc.get("custom_name", "")
+    name_line = f"👤 *{original}*"
+    if nickname:
+        name_line += f"  _({nickname})_"
     lines = [
-        f"👤 *{o.get('customer_name','—')}*",
+        name_line,
         f"📞 `{o.get('phone','—')}`",
         f"🔗 @{o.get('username','—')}  |  ID: `{o.get('customer_id','—')}`",
     ]
@@ -361,18 +374,22 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         try: await update.message.delete()
         except: pass
         if new_name:
-            await db.upsert_user(cid, name=new_name, full_name=new_name, custom_name=new_name)
-            # Update name on ALL orders from this customer
+            # Only set the nickname (custom_name), keep original name untouched
+            await db.upsert_user(cid, custom_name=new_name)
+            # Build combined display name for orders: "Original (nickname)"
+            user_doc = await db.get_user(cid)
+            original = (user_doc or {}).get("full_name") or (user_doc or {}).get("name") or "—"
+            display_name = f"{original} ({new_name})"
             all_orders = await db.get_all_orders()
             for o in all_orders.values():
                 if o.get("customer_id") == cid:
-                    await db.update_order(o["order_id"], customer_name=new_name)
+                    await db.update_order(o["order_id"], customer_name=display_name)
             if pending_rename.get("msg_id"):
                 order = await db.get_order(oid)
                 if order:
                     try:
                         await ctx.bot.edit_message_text(
-                            customer_card(order),
+                            await customer_card(order),
                             chat_id=update.effective_chat.id,
                             message_id=pending_rename["msg_id"],
                             parse_mode="Markdown",
@@ -711,7 +728,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         oid = parts[2]; cid = int(parts[3])
         order = await db.get_order(oid)
         if order:
-            await q.edit_message_text(customer_card(order), parse_mode="Markdown", reply_markup=kb_client_actions(oid, cid))
+            await q.edit_message_text(await customer_card(order), parse_mode="Markdown", reply_markup=kb_client_actions(oid, cid))
 
     # ── CLIENT INFO VIEW ───────────────────────────────────────────────────────
     elif data.startswith("client_back_"):
@@ -725,18 +742,39 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         _, oid, cid_str = data.split("_", 2)
         order = await db.get_order(oid)
         if order:
-            await q.edit_message_text(customer_card(order), parse_mode="Markdown", reply_markup=kb_client_actions(oid, int(cid_str)))
+            await q.edit_message_text(await customer_card(order), parse_mode="Markdown", reply_markup=kb_client_actions(oid, int(cid_str)))
 
     # ── RENAME CLIENT ────────────────────────────────────────────────────────
     elif data.startswith("rename_"):
         parts = data.split("_"); oid = parts[1]; cid = int(parts[2])
         ctx.user_data["pending_rename"] = {"cid": cid, "oid": oid, "msg_id": q.message.message_id}
+        # Show current nickname if any
+        user_doc = await db.get_user(cid)
+        current_nick = (user_doc or {}).get("custom_name", "")
+        nick_line = f"\nТекущая заметка: _{current_nick}_" if current_nick else ""
+        buttons = []
+        if current_nick:
+            buttons.append([InlineKeyboardButton("🗑 Убрать заметку", callback_data=f"clearnick_{oid}_{cid}")])
+        buttons.append([InlineKeyboardButton("← Отмена", callback_data=f"client_{oid}_{cid}")])
         await q.edit_message_text(
-            f"✏️ *Переименовать клиента*\n\nID: `{cid}`\n\n_Отправьте новое имя сообщением_",
+            f"✏️ *Заметка к клиенту*\n\nID: `{cid}`{nick_line}\n\n_Отправьте заметку/никнейм сообщением_",
             parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton("← Отмена", callback_data=f"client_{oid}_{cid}")
-            ]]))
+            reply_markup=InlineKeyboardMarkup(buttons))
+
+    # ── CLEAR NICKNAME ────────────────────────────────────────────────────────
+    elif data.startswith("clearnick_"):
+        parts = data.split("_"); oid = parts[1]; cid = int(parts[2])
+        await db.upsert_user(cid, custom_name="")
+        # Restore original name on all orders
+        user_doc = await db.get_user(cid)
+        original = (user_doc or {}).get("full_name") or (user_doc or {}).get("name") or "—"
+        all_orders = await db.get_all_orders()
+        for o in all_orders.values():
+            if o.get("customer_id") == cid:
+                await db.update_order(o["order_id"], customer_name=original)
+        order = await db.get_order(oid)
+        if order:
+            await q.edit_message_text(await customer_card(order), parse_mode="Markdown", reply_markup=kb_client_actions(oid, cid))
 
     # ── BAN (generic — show confirmation) ─────────────────────────────────────
     elif data.startswith("ban_"):

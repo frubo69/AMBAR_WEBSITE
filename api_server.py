@@ -99,15 +99,16 @@ async def handle_create_order(request: web.Request) -> web.Response:
         return web.json_response({"error": "auth failed"}, status=401, headers=CORS_HEADERS)
 
     uid       = user.get("id")
-    user_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
+    original_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
+    user_name = original_name
     username  = user.get("username", "—")
     lang      = data.get("lang", "ru")
 
-    # Use custom name from operator rename if set
+    # Append operator nickname if set (original name stays, nickname in parentheses)
     try:
         user_doc = await db.get_user(uid)
         if user_doc and user_doc.get("custom_name"):
-            user_name = user_doc["custom_name"]
+            user_name = f"{original_name} ({user_doc['custom_name']})"
     except Exception:
         pass
 
@@ -160,7 +161,7 @@ async def handle_create_order(request: web.Request) -> web.Response:
     }
     await db.save_order(oid, order_doc)
     # Upsert user and increment order counter
-    user_fields = dict(name=user_name, full_name=user_name, first_name=user.get("first_name",""),
+    user_fields = dict(name=original_name, full_name=original_name, first_name=user.get("first_name",""),
                        last_name=user.get("last_name",""), username=username,
                        last_order_at=datetime.now(timezone.utc))
     if phone != "—":

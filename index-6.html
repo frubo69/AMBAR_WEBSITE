@@ -1045,7 +1045,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div class="cart-topbar">
     <button class="cart-back-btn" id="back-catalog-btn" onclick="go('catalog')">← В каталог</button>
     <div class="cart-addr-bar" onclick="openAddrModal()" id="cab">
-      <span class="cab-icon">📍</span>
+      <span class="cab-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></span>
       <div class="cab-info">
         <div class="cab-label" id="cab-label">АДРЕС ДОСТАВКИ</div>
         <div class="cab-addr" id="cab-addr">Не выбран — нажмите чтобы добавить</div>
@@ -1076,7 +1076,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     <div class="cart-foot">
       <div class="total-row"><span class="total-lbl" id="tot-lbl">ИТОГО</span><span class="total-val"><span id="tot-n">0</span> AED</span></div>
       <button class="btn-main" id="co-btn" onclick="tryOrder()">Оформить заказ →</button>
-      <button class="btn-outline" id="clear-btn" onclick="clearCart()">🗑 Очистить корзину</button>
+      <button class="btn-outline" id="clear-btn" onclick="clearCart()">Очистить корзину</button>
     </div>
   </div>
 </div>
@@ -2011,8 +2011,8 @@ const TX={
 ru:{
   catalog:'Каталог',favs:'Избранное',cart:'Корзина',addrPage:'Адреса',orders:'История',profile:'Профиль',
   cartSub:'ваша корзина',addrSub:'ваши адреса',ordersSub:'ваша история',profileSub:'ваш профиль',
-  all:'Все',total:'ИТОГО',tip:'ЧАЕВЫЕ',noTip:'Без чаевых',customTip:'✏️ Своя',
-  coBtn:'Оформить заказ →',clearCart:'🗑 Очистить корзину',backCatalog:'← В каталог',
+  all:'Все',total:'ИТОГО',tip:'ЧАЕВЫЕ',noTip:'Без чаевых',customTip:'Своя',
+  coBtn:'Оформить заказ →',clearCart:'Очистить корзину',backCatalog:'← В каталог',
   addrPill:'Добавьте адрес',addrPillChange:'Изменить',
   modalTitle:'Адрес доставки',modalAdd:'Добавить новый адрес',
   cabLabel:'АДРЕС ДОСТАВКИ',cabNoAddr:'Не выбран — нажмите чтобы добавить',cabChange:'Изменить',
@@ -2059,8 +2059,8 @@ ru:{
 en:{
   catalog:'Catalog',favs:'Favourites',cart:'Cart',addrPage:'Addresses',orders:'History',profile:'Profile',
   cartSub:'your cart',addrSub:'your addresses',ordersSub:'your history',profileSub:'your profile',
-  all:'All',total:'TOTAL',tip:'TIP',noTip:'No tip',customTip:'✏️ Custom',
-  coBtn:'Checkout →',clearCart:'🗑 Clear cart',backCatalog:'← Back to catalog',
+  all:'All',total:'TOTAL',tip:'TIP',noTip:'No tip',customTip:'Custom',
+  coBtn:'Checkout →',clearCart:'Clear cart',backCatalog:'← Back to catalog',
   addrPill:'Add address',addrPillChange:'Change',
   modalTitle:'Delivery address',modalAdd:'Add new address',
   cabLabel:'DELIVERY ADDRESS',cabNoAddr:'Not set — tap to add',cabChange:'Change',
@@ -3147,7 +3147,7 @@ function startGPSAdd(){
     locInfo={lat,lon,office_id:off.id,office_name:off.name,street:'',isGps:true};
     if(btn){btn.classList.remove('loading','err');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=t('btnGpsSub');}
     haptic.success();
-    showToast(lang==='ru'?'📍 Геолокация получена':'📍 Location detected','ok',true);
+    showToast(lang==='ru'?'Геолокация получена':'Location detected','ok',true);
     showAddrSaveSheet();
   },()=>{
     haptic.error();
@@ -3311,7 +3311,7 @@ function confirmGpsMiniEdit(){
   el('gps-mini-pin')?.classList.remove('editing');
   el('gps-edit-pill')?.classList.remove('editing');
   haptic.success();
-  showToast(lang==='ru'?'📍 Координаты обновлены':'📍 Location updated','ok',true);
+  showToast(lang==='ru'?'Координаты обновлены':'Location updated','ok',true);
 }
 
 function _mapGoToUserLocation(){

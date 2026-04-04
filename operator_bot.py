@@ -371,6 +371,12 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_operator(update.effective_user.id):
         await update.message.reply_text("⛔ Нет доступа."); return
 
+    # If operator tapped a menu button, cancel any pending input flow
+    _menu_keywords = ("Новые", "Активные", "Завершённые", "Забаненные", "Статистика")
+    if any(kw in (update.message.text or "") for kw in _menu_keywords):
+        ctx.user_data.pop("pending_ban", None)
+        ctx.user_data.pop("pending_rename", None)
+
     # ── Intercept ban reason input ─────────────────────────────────────────────
     pending = ctx.user_data.get("pending_ban")
     if pending:
@@ -526,6 +532,11 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     op   = update.effective_user.id
 
     if data == "noop": return
+
+    # Clear pending input flows when operator navigates away
+    if not data.startswith("rename_") and not data.startswith("ban_input_"):
+        ctx.user_data.pop("pending_ban", None)
+        ctx.user_data.pop("pending_rename", None)
 
     # ── ORDER LIST: select order ─────────────────────────────────────────────
     if data.startswith("osel_"):

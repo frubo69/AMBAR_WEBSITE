@@ -493,6 +493,25 @@ async def handle_review(request: web.Request) -> web.Response:
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 
+# ── POST /api/review-skip ───────────────────────────────────────────────────
+async def handle_review_skip(request: web.Request) -> web.Response:
+    if request.method == "OPTIONS":
+        return web.Response(status=200, headers=CORS_HEADERS)
+    data = await request.json()
+    user = validate_init_data(data.get("initData", ""))
+    if not user:
+        return web.json_response({"error": "auth failed"}, status=401, headers=CORS_HEADERS)
+    uid = user.get("id")
+    order_id = data.get("order_id", "")
+    if not order_id:
+        return web.json_response({"error": "missing order_id"}, status=400, headers=CORS_HEADERS)
+    order = await db.get_order(order_id)
+    if not order or order.get("customer_id") != uid:
+        return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
+    await db.update_order(order_id, review_skipped=True)
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+
 # ── GET /api/active-order ─────────────────────────────────────────────────────
 async def handle_active_order(request: web.Request) -> web.Response:
     if request.method == "OPTIONS":
@@ -652,6 +671,8 @@ def main():
     app.router.add_get(            "/api/me",                  handle_me)
     app.router.add_route("OPTIONS", "/api/review",              handle_review)
     app.router.add_post(           "/api/review",              handle_review)
+    app.router.add_route("OPTIONS", "/api/review-skip",        handle_review_skip)
+    app.router.add_post(           "/api/review-skip",         handle_review_skip)
     app.router.add_route("OPTIONS", "/api/active-order",       handle_active_order)
     app.router.add_get(            "/api/active-order",        handle_active_order)
     app.router.add_route("OPTIONS", "/api/orders",             handle_orders)

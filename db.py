@@ -83,7 +83,7 @@ async def get_active_orders(telegram_id: int) -> list:
         {"customer_id": telegram_id, "status": {"$in": ["pending", "approved", "delivered"]},
          "$or": [
              {"status": {"$in": ["pending", "approved"]}},
-             {"status": "delivered", "review_score": {"$exists": False}},
+             {"status": "delivered", "review_score": {"$exists": False}, "review_skipped": {"$ne": True}},
          ]},
         {"_id": 0},
         sort=[("timestamp", -1)]

@@ -6196,7 +6196,12 @@ function _tapTag(t){
 function _skipReview(){
   haptic.light();
   const o=_aobOrders[_aobIdx];
-  if(o)o.review_score=-1; // mark as skipped locally
+  if(o){
+    fetch(`${AMBAR_API}/api/review-skip`,{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({initData:tg?.initData||'',order_id:o.order_id})
+    }).catch(()=>{});
+  }
   _aobOrders.splice(_aobIdx,1);
   if(_aobIdx>=_aobOrders.length)_aobIdx=Math.max(0,_aobOrders.length-1);
   closeAod();

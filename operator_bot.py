@@ -193,11 +193,23 @@ def order_card(o, full=True):
     return "\n".join(lines)
 
 
+_FOUNDER_ID = 956633762
+_PREMIUM_IDS = [686932322, 1459370603]
+
+def _card_tier(uid):
+    """Return display label for customer card tier."""
+    if uid == _FOUNDER_ID:
+        return "💎 Founder"
+    elif uid in _PREMIUM_IDS:
+        return "⭐ Premium"
+    return "🪪 Standard"
+
 async def customer_card(o):
     """Customer info card — shown when operator clicks 'Клиент'."""
     cid = o.get("customer_id")
     original = o.get("customer_name", "—")
     nickname = ""
+    user_doc = None
     if cid:
         user_doc = await db.get_user(int(cid)) if cid else None
         if user_doc:
@@ -210,7 +222,25 @@ async def customer_card(o):
         name_line,
         f"📞 `{o.get('phone','—')}`",
         f"🔗 @{o.get('username','—')}  |  ID: `{o.get('customer_id','—')}`",
+        "",
     ]
+    # Card tier
+    uid = int(cid) if cid else None
+    lines.append(f"🏷 Карта: *{_card_tier(uid)}*" if uid else "🏷 Карта: —")
+    # Order stats
+    if user_doc:
+        total = user_doc.get("orders_total", 0)
+        done = user_doc.get("orders_done", 0)
+        declined = user_doc.get("orders_declined", 0)
+        spent = user_doc.get("total_spent", 0)
+        lines.append(f"📦 Заказов: *{total}*  (✅ {done} / ❌ {declined})")
+        lines.append(f"💰 Потрачено: *{spent:,.0f} AED*")
+    # First seen
+    if user_doc and user_doc.get("first_seen"):
+        fs = user_doc["first_seen"]
+        if isinstance(fs, str):
+            fs = datetime.fromisoformat(fs)
+        lines.append(f"📅 Клиент с: *{fs.strftime('%d.%m.%Y')}*")
     return "\n".join(lines)
 
 

@@ -1904,6 +1904,9 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       </div>
       <textarea class="aod-review-comment" id="aod-review-comment" rows="2"></textarea>
       <button class="aod-review-submit" id="aod-review-submit" disabled onclick="_submitReview()"></button>
+      <div style="text-align:center;margin-top:10px">
+        <span class="aod-review-skip" id="aod-review-skip" onclick="_skipReview()" style="font-size:12px;color:rgba(255,255,255,.25);cursor:pointer;-webkit-tap-highlight-color:transparent"></span>
+      </div>
     </div>
     <div style="padding:10px 20px 12px" id="aod-cancel-wrap">
       <button class="aod-cancel-btn" onclick="openCancelSheet()">
@@ -6157,6 +6160,7 @@ function _renderAodDetail(){
     el('aod-tag-courier').textContent=ru?'Вежливый курьер':'Polite courier';
     el('aod-tag-packaging').textContent=ru?'Аккуратная упаковка':'Neat packaging';
     el('aod-tag-quality').textContent=ru?'Качество товара':'Product quality';
+    el('aod-review-skip').textContent=ru?'Пропустить':'Skip';
   }else{
     revWrap.style.display='none';
   }
@@ -6188,6 +6192,16 @@ function _tapTag(t){
   const tag=t.dataset.tag;
   if(t.classList.contains('active')){if(!_reviewTags.includes(tag))_reviewTags.push(tag);}
   else{_reviewTags=_reviewTags.filter(x=>x!==tag);}
+}
+function _skipReview(){
+  haptic.light();
+  const o=_aobOrders[_aobIdx];
+  if(o)o.review_score=-1; // mark as skipped locally
+  _aobOrders.splice(_aobIdx,1);
+  if(_aobIdx>=_aobOrders.length)_aobIdx=Math.max(0,_aobOrders.length-1);
+  closeAod();
+  if(!_aobOrders.length){el('aob').classList.add('aob-hidden');document.body.classList.remove('aob-on');}
+  else{_renderAob();}
 }
 async function _submitReview(){
   const btn=el('aod-review-submit');

@@ -57,55 +57,23 @@ PRODUCTS = [
     {"id":"p24", "name":"Chivas Regal 25Y 0.7 ltr",   "price":1300, "cat":"Виски"},
     {"id":"p21", "name":"Blue Label 1 ltr",            "price":1400, "cat":"Виски"},
     {"id":"p30", "name":"Macallan 18Y 0.75 ltr",      "price":2000, "cat":"Виски"},
-    # ── Пиво / Beer ───────────────────────────────────────────────────────────
-    {"id":"p31",    "name":"Heineken 0.33 can",           "price":100, "cat":"Пиво"},
-    {"id":"p31_12", "name":"Heineken 0.33 can ×12",       "price":100, "cat":"Пиво"},
-    {"id":"p31_24", "name":"Heineken 0.33 can ×24",       "price":200, "cat":"Пиво"},
-    {"id":"p33",    "name":"Budweiser 0.33 can",          "price":100, "cat":"Пиво"},
-    {"id":"p33_12", "name":"Budweiser 0.33 can ×12",      "price":100, "cat":"Пиво"},
-    {"id":"p33_24", "name":"Budweiser 0.33 can ×24",      "price":200, "cat":"Пиво"},
-    {"id":"p35",    "name":"Stella Artois 0.33 can",      "price":100, "cat":"Пиво"},
-    {"id":"p35_12", "name":"Stella Artois 0.33 can ×12",  "price":100, "cat":"Пиво"},
-    {"id":"p35_24", "name":"Stella Artois 0.33 can ×24",  "price":200, "cat":"Пиво"},
-    {"id":"p37",    "name":"Red Horse 0.5 can",           "price":100, "cat":"Пиво"},
-    {"id":"p37_12", "name":"Red Horse 0.5 can ×12",       "price":100, "cat":"Пиво"},
-    {"id":"p37_24", "name":"Red Horse 0.5 can ×24",       "price":200, "cat":"Пиво"},
-    {"id":"p38",    "name":"Amstel Light 0.33 can",       "price":100, "cat":"Пиво"},
-    {"id":"p38_12", "name":"Amstel Light 0.33 can ×12",   "price":100, "cat":"Пиво"},
-    {"id":"p38_24", "name":"Amstel Light 0.33 can ×24",   "price":200, "cat":"Пиво"},
-    {"id":"p40",    "name":"XXL Vodka 0.25 can",          "price":100, "cat":"Пиво"},
-    {"id":"p40_12", "name":"XXL Vodka 0.25 can ×12",      "price":100, "cat":"Пиво"},
-    {"id":"p40_24", "name":"XXL Vodka 0.25 can ×24",      "price":200, "cat":"Пиво"},
-    {"id":"p32",    "name":"Heineken 0.33 bottle",        "price":150, "cat":"Пиво"},
-    {"id":"p32_12", "name":"Heineken 0.33 bottle ×12",    "price":150, "cat":"Пиво"},
-    {"id":"p32_24", "name":"Heineken 0.33 bottle ×24",    "price":300, "cat":"Пиво"},
-    {"id":"p34",    "name":"Budweiser 0.33 bottle",       "price":150, "cat":"Пиво"},
-    {"id":"p34_12", "name":"Budweiser 0.33 bottle ×12",   "price":150, "cat":"Пиво"},
-    {"id":"p34_24", "name":"Budweiser 0.33 bottle ×24",   "price":300, "cat":"Пиво"},
-    {"id":"p36",    "name":"Stella Artois 0.33 bottle",   "price":150, "cat":"Пиво"},
-    {"id":"p36_12", "name":"Stella Artois 0.33 bottle ×12","price":150,"cat":"Пиво"},
-    {"id":"p36_24", "name":"Stella Artois 0.33 bottle ×24","price":300,"cat":"Пиво"},
-    {"id":"p41",    "name":"Asahi Super Dry 0.33 bottle", "price":150, "cat":"Пиво"},
-    {"id":"p41_12", "name":"Asahi Super Dry 0.33 btl ×12","price":150, "cat":"Пиво"},
-    {"id":"p41_24", "name":"Asahi Super Dry 0.33 btl ×24","price":300, "cat":"Пиво"},
-    {"id":"p42",    "name":"Hoegaarden 0.33 bottle",      "price":150, "cat":"Пиво"},
-    {"id":"p42_12", "name":"Hoegaarden 0.33 bottle ×12",  "price":150, "cat":"Пиво"},
-    {"id":"p42_24", "name":"Hoegaarden 0.33 bottle ×24",  "price":300, "cat":"Пиво"},
-    {"id":"p43",    "name":"Corona Extra 0.355 bottle",   "price":150, "cat":"Пиво"},
-    {"id":"p43_12", "name":"Corona Extra 0.355 btl ×12",  "price":150, "cat":"Пиво"},
-    {"id":"p43_24", "name":"Corona Extra 0.355 btl ×24",  "price":300, "cat":"Пиво"},
-    {"id":"p44",    "name":"Peroni Nastro 0.33 bottle",   "price":150, "cat":"Пиво"},
-    {"id":"p44_12", "name":"Peroni Nastro 0.33 btl ×12",  "price":150, "cat":"Пиво"},
-    {"id":"p44_24", "name":"Peroni Nastro 0.33 btl ×24",  "price":300, "cat":"Пиво"},
-    {"id":"p45",    "name":"Smirnoff Ice 0.275 bottle",   "price":150, "cat":"Пиво"},
-    {"id":"p45_12", "name":"Smirnoff Ice 0.275 btl ×12",  "price":150, "cat":"Пиво"},
-    {"id":"p45_24", "name":"Smirnoff Ice 0.275 btl ×24",  "price":300, "cat":"Пиво"},
-    {"id":"p46",    "name":"Bacardi Breezer 0.275 bottle","price":150, "cat":"Пиво"},
-    {"id":"p46_12", "name":"Bacardi Breezer 0.275 btl ×12","price":150,"cat":"Пиво"},
-    {"id":"p46_24", "name":"Bacardi Breezer 0.275 btl ×24","price":300,"cat":"Пиво"},
-    {"id":"p39",    "name":"Guinness 0.44 can",           "price":200, "cat":"Пиво"},
-    {"id":"p39_12", "name":"Guinness 0.44 can ×12",       "price":200, "cat":"Пиво"},
-    {"id":"p39_24", "name":"Guinness 0.44 can ×24",       "price":400, "cat":"Пиво"},
+    # ── Пиво / Beer (pack-only: 12 & 24) ─────────────────────────────────────
+    {"id":"p31", "name":"Heineken 0.33 can",           "cat":"Пиво", "p12":100, "p24":200},
+    {"id":"p33", "name":"Budweiser 0.33 can",          "cat":"Пиво", "p12":100, "p24":200},
+    {"id":"p35", "name":"Stella Artois 0.33 can",      "cat":"Пиво", "p12":100, "p24":200},
+    {"id":"p37", "name":"Red Horse 0.5 can",           "cat":"Пиво", "p12":100, "p24":200},
+    {"id":"p38", "name":"Amstel Light 0.33 can",       "cat":"Пиво", "p12":100, "p24":200},
+    {"id":"p40", "name":"XXL Vodka 0.25 can",          "cat":"Пиво", "p12":100, "p24":200},
+    {"id":"p32", "name":"Heineken 0.33 bottle",        "cat":"Пиво", "p12":150, "p24":300},
+    {"id":"p34", "name":"Budweiser 0.33 bottle",       "cat":"Пиво", "p12":150, "p24":300},
+    {"id":"p36", "name":"Stella Artois 0.33 bottle",   "cat":"Пиво", "p12":150, "p24":300},
+    {"id":"p41", "name":"Asahi Super Dry 0.33 bottle", "cat":"Пиво", "p12":150, "p24":300},
+    {"id":"p42", "name":"Hoegaarden 0.33 bottle",      "cat":"Пиво", "p12":150, "p24":300},
+    {"id":"p43", "name":"Corona Extra 0.355 bottle",   "cat":"Пиво", "p12":150, "p24":300},
+    {"id":"p44", "name":"Peroni Nastro 0.33 bottle",   "cat":"Пиво", "p12":150, "p24":300},
+    {"id":"p45", "name":"Smirnoff Ice 0.275 bottle",   "cat":"Пиво", "p12":150, "p24":300},
+    {"id":"p46", "name":"Bacardi Breezer 0.275 bottle","cat":"Пиво", "p12":150, "p24":300},
+    {"id":"p39", "name":"Guinness 0.44 can",           "cat":"Пиво", "p12":200, "p24":400},
     # ── Ром / Rum ─────────────────────────────────────────────────────────────
     {"id":"p47", "name":"Bacardi White 1 ltr",         "price":100, "cat":"Ром"},
     {"id":"p48", "name":"Bacardi Black 1 ltr",         "price":100, "cat":"Ром"},
@@ -332,9 +300,27 @@ def kb_add_categories(oid):
 def kb_add_product(oid, cat=None):
     """Product list filtered by category, sorted by price."""
     items = [p for p in PRODUCTS if p["cat"] == cat] if cat else PRODUCTS
-    items = sorted(items, key=lambda p: p["price"])
-    rows = [[InlineKeyboardButton(f"{p['name']}  {p['price']} AED", callback_data=f"ei_addp_{oid}_{p['id']}")] for p in items]
+    if cat == "Пиво":
+        # Beer: show brand names only, operator picks pack size next
+        items = sorted(items, key=lambda p: p["p12"])
+        rows = [[InlineKeyboardButton(f"{p['name']}", callback_data=f"ei_beer_{oid}_{p['id']}")] for p in items]
+    else:
+        items = sorted(items, key=lambda p: p["price"])
+        rows = [[InlineKeyboardButton(f"{p['name']}  {p['price']} AED", callback_data=f"ei_addp_{oid}_{p['id']}")] for p in items]
     rows.append([InlineKeyboardButton("← Назад", callback_data=f"ei_add_{oid}")])
+    return InlineKeyboardMarkup(rows)
+
+def kb_beer_pack(oid, pid):
+    """Pack size picker for a specific beer."""
+    pmap = {p["id"]: p for p in PRODUCTS}
+    p = pmap.get(pid)
+    if not p:
+        return InlineKeyboardMarkup([[InlineKeyboardButton("← Назад", callback_data=f"ei_cat_{oid}_Пиво")]])
+    rows = [
+        [InlineKeyboardButton(f"📦 ×12  —  {p['p12']} AED", callback_data=f"ei_addp_{oid}_{pid}_12")],
+        [InlineKeyboardButton(f"📦 ×24  —  {p['p24']} AED", callback_data=f"ei_addp_{oid}_{pid}_24")],
+        [InlineKeyboardButton("← Назад", callback_data=f"ei_cat_{oid}_Пиво")],
+    ]
     return InlineKeyboardMarkup(rows)
 
 def kb_ban_confirm(cid, oid):
@@ -441,7 +427,8 @@ def recalc_order(order):
     items = order.get("items", [])
     for item in items:
         p = pmap.get(item["id"])
-        if p: item["line_total"] = p["price"] * item["qty"]
+        price = p["price"] if p and "price" in p else item.get("price", 0)
+        item["line_total"] = price * item["qty"]
     sub            = sum(i.get("line_total", 0) for i in items)
     order["subtotal"] = sub
     order["total"]    = sub + order.get("tip", 0)
@@ -919,18 +906,34 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         oid = data[7:]
         await q.edit_message_reply_markup(reply_markup=kb_add_categories(oid))
 
+    elif data.startswith("ei_beer_"):
+        # ei_beer_{oid}_{pid} — show pack size picker
+        parts = data.split("_"); oid = parts[2]; pid = parts[3]
+        await q.edit_message_reply_markup(reply_markup=kb_beer_pack(oid, pid))
+
     elif data.startswith("ei_addp_"):
-        parts = data.split("_"); oid, pid = parts[2], parts[3]
+        parts = data.split("_")
+        oid, pid = parts[2], parts[3]
+        pack = parts[4] if len(parts) > 4 else None  # "12" or "24" for beer
         order = await db.get_order(oid)
         if not order: return
         pmap  = {p["id"]: p for p in PRODUCTS}
         p     = pmap.get(pid)
         if not p: return
+        # Determine name and price
+        if pack and p.get("p12"):
+            price = p["p12"] if pack == "12" else p["p24"]
+            item_name = f"{p['name']} ×{pack}"
+            item_id = f"{pid}_{pack}"
+        else:
+            price = p["price"]
+            item_name = p["name"]
+            item_id = pid
         items = order.get("items", [])
         for item in items:
-            if item["id"] == pid: item["qty"] += 1; break
+            if item["id"] == item_id: item["qty"] += 1; break
         else:
-            items.append({"id": pid, "name": p["name"], "price": p["price"], "qty": 1, "line_total": p["price"]})
+            items.append({"id": item_id, "name": item_name, "price": price, "qty": 1, "line_total": price})
         order["items"] = items
         order = recalc_order(order)
         await db.update_order(oid, items=order["items"], subtotal=order["subtotal"], total=order["total"])

@@ -595,22 +595,30 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .aod-cancel-btn:active{background:rgba(200,60,60,.12);color:rgba(220,90,90,.8)}
 /* ── Review UI (inside delivered order detail) ── */
 .aod-review{padding:20px 20px 0;text-align:center}
-.aod-review-title{font-size:15px;font-weight:700;color:rgba(255,255,255,.9);margin-bottom:4px}
-.aod-review-sub{font-size:12px;color:rgba(255,255,255,.4);margin-bottom:16px}
-.aod-stars{display:flex;justify-content:center;gap:8px;margin-bottom:18px}
-.aod-star{width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent}
-.aod-star svg{width:22px;height:22px;fill:none;stroke:rgba(255,255,255,.2);stroke-width:1.5;transition:all .2s}
-.aod-star.active{border-color:#d4af37;background:rgba(212,175,55,.15);transform:scale(1.1)}
-.aod-star.active svg{fill:#d4af37;stroke:#d4af37}
-.aod-review-comment{width:100%;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.85);font-size:13px;font-family:'DM Sans',sans-serif;resize:none;outline:none;transition:border-color .2s;min-height:60px;box-sizing:border-box}
-.aod-review-comment::placeholder{color:rgba(255,255,255,.25)}
+.aod-review-label{font-size:22px;font-weight:800;color:rgba(255,255,255,.85);margin-bottom:18px;min-height:28px;transition:opacity .15s;font-family:'DM Sans',sans-serif}
+.aod-stars{display:flex;justify-content:center;gap:6px;margin-bottom:22px}
+.aod-star{width:42px;height:42px;cursor:pointer;transition:transform .15s;-webkit-tap-highlight-color:transparent}
+.aod-star svg{width:42px;height:42px;transition:all .2s}
+.aod-star svg .star-fill{fill:rgba(255,255,255,.08);transition:fill .2s}
+.aod-star svg .star-stroke{fill:rgba(255,255,255,.12);transition:fill .2s}
+.aod-star.active{transform:scale(1.15)}
+.aod-star.active svg .star-fill{fill:#d4af37}
+.aod-star.active svg .star-stroke{fill:#b8942e}
+.aod-review-tags-title{font-size:13px;font-weight:600;color:rgba(255,255,255,.4);margin-bottom:12px}
+.aod-review-tags{display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-bottom:18px;padding:0 4px}
+.aod-tag{display:flex;flex-direction:column;align-items:center;gap:6px;width:72px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.aod-tag-icon{width:48px;height:48px;border-radius:50%;background:rgba(255,255,255,.04);border:1.5px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;transition:all .2s}
+.aod-tag-icon svg{width:22px;height:22px;stroke:rgba(255,255,255,.25);fill:none;stroke-width:1.5;stroke-linecap:round;stroke-linejoin:round;transition:all .2s}
+.aod-tag-lbl{font-size:10px;color:rgba(255,255,255,.3);text-align:center;line-height:1.2;transition:color .2s;font-weight:500}
+.aod-tag.active .aod-tag-icon{border-color:rgba(212,175,55,.4);background:rgba(212,175,55,.1)}
+.aod-tag.active .aod-tag-icon svg{stroke:#d4af37}
+.aod-tag.active .aod-tag-lbl{color:#d4af37}
+.aod-review-comment{width:100%;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.85);font-size:13px;font-family:'DM Sans',sans-serif;resize:none;outline:none;transition:border-color .2s;min-height:54px;box-sizing:border-box}
+.aod-review-comment::placeholder{color:rgba(255,255,255,.2)}
 .aod-review-comment:focus{border-color:rgba(212,175,55,.3)}
 .aod-review-submit{width:100%;padding:14px;border-radius:12px;background:linear-gradient(135deg,#b8942e,#d4af37);border:none;color:#0d1117;font-size:14px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;margin-top:12px;transition:opacity .2s;letter-spacing:.3px}
 .aod-review-submit:disabled{opacity:.35;cursor:default}
 .aod-review-submit:not(:disabled):active{opacity:.8}
-.aod-review-done{padding:20px 20px 0;text-align:center}
-.aod-review-done-stars{font-size:28px;margin-bottom:6px;letter-spacing:4px}
-.aod-review-done-txt{font-size:14px;color:rgba(255,255,255,.5)}
 /* ── Loyalty Card ── */
 .lcard-wrap{perspective:800px;width:100%;margin:0 auto 20px}
 .lcard-inner{position:relative;width:100%;aspect-ratio:1.6/1;transition:transform .6s cubic-bezier(.4,0,.2,1);transform-style:preserve-3d;cursor:pointer}
@@ -1867,22 +1875,35 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     </div>
     <!-- Review UI (shown when delivered) -->
     <div class="aod-review" id="aod-review" style="display:none">
-      <div class="aod-review-title" id="aod-review-title">Оцените доставку</div>
-      <div class="aod-review-sub" id="aod-review-sub">Ваш отзыв помогает нам стать лучше</div>
+      <div class="aod-review-label" id="aod-review-label"></div>
       <div class="aod-stars" id="aod-stars">
-        <div class="aod-star" data-score="1" onclick="_tapStar(1)"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg></div>
-        <div class="aod-star" data-score="2" onclick="_tapStar(2)"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg></div>
-        <div class="aod-star" data-score="3" onclick="_tapStar(3)"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg></div>
-        <div class="aod-star" data-score="4" onclick="_tapStar(4)"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg></div>
-        <div class="aod-star" data-score="5" onclick="_tapStar(5)"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg></div>
+        <div class="aod-star" data-score="1" onclick="_tapStar(1)"><svg viewBox="0 0 50 50"><polygon class="star-stroke" points="25 3 31.5 16.2 46 18.3 35.5 28.5 38 43 25 36 12 43 14.5 28.5 4 18.3 18.5 16.2"/><polygon class="star-fill" points="25 5.5 30.5 17 43.5 18.8 34.2 27.9 36.5 41 25 34.8 13.5 41 15.8 27.9 6.5 18.8 19.5 17"/></svg></div>
+        <div class="aod-star" data-score="2" onclick="_tapStar(2)"><svg viewBox="0 0 50 50"><polygon class="star-stroke" points="25 3 31.5 16.2 46 18.3 35.5 28.5 38 43 25 36 12 43 14.5 28.5 4 18.3 18.5 16.2"/><polygon class="star-fill" points="25 5.5 30.5 17 43.5 18.8 34.2 27.9 36.5 41 25 34.8 13.5 41 15.8 27.9 6.5 18.8 19.5 17"/></svg></div>
+        <div class="aod-star" data-score="3" onclick="_tapStar(3)"><svg viewBox="0 0 50 50"><polygon class="star-stroke" points="25 3 31.5 16.2 46 18.3 35.5 28.5 38 43 25 36 12 43 14.5 28.5 4 18.3 18.5 16.2"/><polygon class="star-fill" points="25 5.5 30.5 17 43.5 18.8 34.2 27.9 36.5 41 25 34.8 13.5 41 15.8 27.9 6.5 18.8 19.5 17"/></svg></div>
+        <div class="aod-star" data-score="4" onclick="_tapStar(4)"><svg viewBox="0 0 50 50"><polygon class="star-stroke" points="25 3 31.5 16.2 46 18.3 35.5 28.5 38 43 25 36 12 43 14.5 28.5 4 18.3 18.5 16.2"/><polygon class="star-fill" points="25 5.5 30.5 17 43.5 18.8 34.2 27.9 36.5 41 25 34.8 13.5 41 15.8 27.9 6.5 18.8 19.5 17"/></svg></div>
+        <div class="aod-star" data-score="5" onclick="_tapStar(5)"><svg viewBox="0 0 50 50"><polygon class="star-stroke" points="25 3 31.5 16.2 46 18.3 35.5 28.5 38 43 25 36 12 43 14.5 28.5 4 18.3 18.5 16.2"/><polygon class="star-fill" points="25 5.5 30.5 17 43.5 18.8 34.2 27.9 36.5 41 25 34.8 13.5 41 15.8 27.9 6.5 18.8 19.5 17"/></svg></div>
       </div>
-      <textarea class="aod-review-comment" id="aod-review-comment" placeholder="Комментарий (необязательно)" rows="2"></textarea>
-      <button class="aod-review-submit" id="aod-review-submit" disabled onclick="_submitReview()">Отправить</button>
-    </div>
-    <!-- Already reviewed -->
-    <div class="aod-review-done" id="aod-review-done" style="display:none">
-      <div class="aod-review-done-stars" id="aod-review-done-stars"></div>
-      <div class="aod-review-done-txt" id="aod-review-done-txt">Спасибо за отзыв!</div>
+      <div class="aod-review-tags-title" id="aod-tags-title" style="display:none">Что понравилось?</div>
+      <div class="aod-review-tags" id="aod-tags" style="display:none">
+        <div class="aod-tag" data-tag="speed" onclick="_tapTag(this)">
+          <div class="aod-tag-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+          <div class="aod-tag-lbl" id="aod-tag-speed">Быстрая доставка</div>
+        </div>
+        <div class="aod-tag" data-tag="courier" onclick="_tapTag(this)">
+          <div class="aod-tag-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 0 0-16 0"/></svg></div>
+          <div class="aod-tag-lbl" id="aod-tag-courier">Вежливый курьер</div>
+        </div>
+        <div class="aod-tag" data-tag="packaging" onclick="_tapTag(this)">
+          <div class="aod-tag-icon"><svg viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg></div>
+          <div class="aod-tag-lbl" id="aod-tag-packaging">Аккуратная упаковка</div>
+        </div>
+        <div class="aod-tag" data-tag="quality" onclick="_tapTag(this)">
+          <div class="aod-tag-icon"><svg viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg></div>
+          <div class="aod-tag-lbl" id="aod-tag-quality">Качество товара</div>
+        </div>
+      </div>
+      <textarea class="aod-review-comment" id="aod-review-comment" rows="2"></textarea>
+      <button class="aod-review-submit" id="aod-review-submit" disabled onclick="_submitReview()"></button>
     </div>
     <div style="padding:10px 20px 12px" id="aod-cancel-wrap">
       <button class="aod-cancel-btn" onclick="openCancelSheet()">
@@ -6112,46 +6133,61 @@ function _renderAodDetail(){
   if(isDelivered){
     bigFill.className='aod-big-fill';bigFill.style.width='100%';
     bigMoto.style.display='block';bigMoto.style.left='100%';
-    timeTxt.textContent=ru?'Заказ доставлен ✅':'Order delivered ✅';
+    timeTxt.textContent=ru?'Заказ доставлен':'Order delivered';
     badge.textContent=ru?'ДОСТАВЛЕН':'DELIVERED';
     badge.className='aod-badge approved';
   }
   // Review section
-  const revWrap=el('aod-review'),revDone=el('aod-review-done');
-  if(isDelivered){
-    const alreadyReviewed=o.review_score;
-    if(alreadyReviewed){
-      revWrap.style.display='none';
-      revDone.style.display='';
-      el('aod-review-done-stars').textContent='⭐'.repeat(alreadyReviewed);
-      el('aod-review-done-txt').textContent=ru?'Спасибо за отзыв!':'Thanks for your review!';
-    }else{
-      revWrap.style.display='';
-      revDone.style.display='none';
-      _reviewScore=0;
-      document.querySelectorAll('.aod-star').forEach(s=>s.classList.remove('active'));
-      el('aod-review-comment').value='';
-      el('aod-review-submit').disabled=true;
-      el('aod-review-title').textContent=ru?'Оцените доставку':'Rate your delivery';
-      el('aod-review-sub').textContent=ru?'Ваш отзыв помогает нам стать лучше':'Your feedback helps us improve';
-      el('aod-review-comment').placeholder=ru?'Комментарий (необязательно)':'Comment (optional)';
-      el('aod-review-submit').textContent=ru?'Отправить':'Submit';
-    }
+  const revWrap=el('aod-review');
+  if(isDelivered&&!o.review_score){
+    revWrap.style.display='';
+    _reviewScore=0;
+    _reviewTags=[];
+    document.querySelectorAll('.aod-star').forEach(s=>s.classList.remove('active'));
+    document.querySelectorAll('.aod-tag').forEach(t=>t.classList.remove('active'));
+    el('aod-review-label').textContent='';
+    el('aod-review-comment').value='';
+    el('aod-review-submit').disabled=true;
+    el('aod-review-comment').placeholder=ru?'Ваш комментарий...':'Your comment...';
+    el('aod-review-submit').textContent=ru?'Готово':'Done';
+    el('aod-tags-title').style.display='none';
+    el('aod-tags').style.display='none';
+    el('aod-tags-title').textContent=ru?'Что понравилось?':'What did you like?';
+    el('aod-tag-speed').textContent=ru?'Быстрая доставка':'Fast delivery';
+    el('aod-tag-courier').textContent=ru?'Вежливый курьер':'Polite courier';
+    el('aod-tag-packaging').textContent=ru?'Аккуратная упаковка':'Neat packaging';
+    el('aod-tag-quality').textContent=ru?'Качество товара':'Product quality';
   }else{
     revWrap.style.display='none';
-    revDone.style.display='none';
   }
 }
 
 let _reviewScore=0;
+let _reviewTags=[];
+const _starLabels={
+  ru:{0:'',1:'Ужасно',2:'Плохо',3:'Нормально',4:'Хорошо',5:'Отлично'},
+  en:{0:'',1:'Terrible',2:'Bad',3:'Okay',4:'Good',5:'Excellent'}
+};
 function _tapStar(n){
   haptic.light();
   _reviewScore=n;
   document.querySelectorAll('.aod-star').forEach(s=>{
-    const v=parseInt(s.dataset.score);
-    s.classList.toggle('active',v<=n);
+    s.classList.toggle('active',parseInt(s.dataset.score)<=n);
   });
+  el('aod-review-label').textContent=(_starLabels[lang]||_starLabels.ru)[n];
   el('aod-review-submit').disabled=false;
+  // Show tags section when 4+ stars
+  const show=n>=4;
+  el('aod-tags-title').style.display=show?'':'none';
+  el('aod-tags').style.display=show?'flex':'none';
+  if(!show){_reviewTags=[];document.querySelectorAll('.aod-tag').forEach(t=>t.classList.remove('active'));}
+}
+function _tapTag(t){
+  haptic.light();
+  t.classList.toggle('active');
+  const tag=t.dataset.tag;
+  if(t.classList.contains('active')){if(!_reviewTags.includes(tag))_reviewTags.push(tag);}
+  else{_reviewTags=_reviewTags.filter(x=>x!==tag);}
 }
 async function _submitReview(){
   const btn=el('aod-review-submit');
@@ -6159,8 +6195,10 @@ async function _submitReview(){
   const o=_aobOrders[_aobIdx];
   if(!o)return;
   btn.disabled=true;
-  btn.textContent=lang==='ru'?'Отправка...':'Sending...';
+  const ru=lang==='ru';
+  btn.textContent=ru?'Отправка...':'Sending...';
   try{
+    const comment=(el('aod-review-comment').value||'').trim();
     const r=await fetch(`${AMBAR_API}/api/review`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
@@ -6168,23 +6206,27 @@ async function _submitReview(){
         initData:tg?.initData||'',
         order_id:o.order_id,
         score:_reviewScore,
-        comment:(el('aod-review-comment').value||'').trim()
+        comment:comment,
+        tags:_reviewTags
       })
     });
     if(r.ok){
       haptic.success();
-      o.review_score=_reviewScore;
-      el('aod-review').style.display='none';
-      el('aod-review-done').style.display='';
-      el('aod-review-done-stars').textContent='⭐'.repeat(_reviewScore);
-      el('aod-review-done-txt').textContent=lang==='ru'?'Спасибо за отзыв!':'Thanks for your review!';
+      // Remove from active list and close
+      _aobOrders.splice(_aobIdx,1);
+      if(_aobIdx>=_aobOrders.length)_aobIdx=Math.max(0,_aobOrders.length-1);
+      closeAod();
+      if(!_aobOrders.length){
+        el('aob').classList.add('aob-hidden');
+        document.body.classList.remove('aob-on');
+      }else{_renderAob();}
     }else{
       btn.disabled=false;
-      btn.textContent=lang==='ru'?'Отправить':'Submit';
+      btn.textContent=ru?'Готово':'Done';
     }
   }catch(e){
     btn.disabled=false;
-    btn.textContent=lang==='ru'?'Отправить':'Submit';
+    btn.textContent=lang==='ru'?'Готово':'Done';
   }
 }
 

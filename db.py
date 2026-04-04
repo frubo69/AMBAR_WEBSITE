@@ -75,11 +75,16 @@ async def get_order(oid: str) -> dict | None:
 
 async def get_active_orders(telegram_id: int) -> list:
     """Return all pending/approved/delivered orders for a user, newest first.
-    Delivered orders are included so the in-app review UI can be shown."""
+    Delivered orders are included so the in-app review UI can be shown,
+    but excluded once the user has already submitted a review."""
     db = _db_or_none()
     if db is None: return []
     cursor = db.orders.find(
-        {"customer_id": telegram_id, "status": {"$in": ["pending", "approved", "delivered"]}},
+        {"customer_id": telegram_id, "status": {"$in": ["pending", "approved", "delivered"]},
+         "$or": [
+             {"status": {"$in": ["pending", "approved"]}},
+             {"status": "delivered", "review_score": {"$exists": False}},
+         ]},
         {"_id": 0},
         sort=[("timestamp", -1)]
     )

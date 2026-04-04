@@ -470,14 +470,18 @@ async def handle_review(request: web.Request) -> web.Response:
     order = await db.get_order(order_id)
     if not order or order.get("customer_id") != uid:
         return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
+    tags = data.get("tags", [])
     await db.update_order(order_id, review_score=int(score), review_comment=comment,
-                          reviewed_at=datetime.now(timezone.utc).isoformat())
+                          review_tags=tags, reviewed_at=datetime.now(timezone.utc).isoformat())
     # Notify operators about the review
     user_name = order.get("customer_name", "—")
+    tag_labels = {"speed":"Быстрая доставка","courier":"Вежливый курьер","packaging":"Аккуратная упаковка","quality":"Качество товара"}
     stars = "⭐" * int(score)
+    tags_line = ", ".join(tag_labels.get(t, t) for t in tags) if tags else ""
     op_text = (f"📝 *Отзыв на заказ #{order_id}*\n\n"
                f"👤 {user_name}\n"
                f"🏅 {stars} ({score}/5)"
+               + (f"\n👍 {tags_line}" if tags_line else "")
                + (f"\n💬 _{comment}_" if comment else ""))
     dismiss_kb = {"inline_keyboard": [[{"text": "✅ Просмотрено", "callback_data": "delmsg"}]]}
     for op_id in OPERATOR_IDS:

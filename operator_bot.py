@@ -196,13 +196,20 @@ def order_card(o, full=True):
 _FOUNDER_ID = 956633762
 _PREMIUM_IDS = [686932322, 1459370603]
 
-def _card_tier(uid):
-    """Return display label for customer card tier."""
+def _card_tier(uid, orders_done=0, total_spent=0):
+    """Return display label for customer card/loyalty tier."""
     if uid == _FOUNDER_ID:
         return "💎 Founder"
-    elif uid in _PREMIUM_IDS:
+    if uid in _PREMIUM_IDS:
         return "⭐ Premium"
-    return "🪪 Standard"
+    # Loyalty tiers based on completed orders & spend
+    if orders_done >= 30 or total_spent >= 15000:
+        return "💠 Diamond"
+    if orders_done >= 15 or total_spent >= 7000:
+        return "🥇 Gold"
+    if orders_done >= 5 or total_spent >= 2000:
+        return "🥈 Silver"
+    return "🪪 New"
 
 async def customer_card(o):
     """Customer info card — shown when operator clicks 'Клиент'."""
@@ -224,15 +231,18 @@ async def customer_card(o):
         f"🔗 @{o.get('username','—')}  |  ID: `{o.get('customer_id','—')}`",
         "",
     ]
-    # Card tier
-    uid = int(cid) if cid else None
-    lines.append(f"🏷 Карта: *{_card_tier(uid)}*" if uid else "🏷 Карта: —")
     # Order stats
+    total = done = declined = 0
+    spent = 0
     if user_doc:
         total = user_doc.get("orders_total", 0)
         done = user_doc.get("orders_done", 0)
         declined = user_doc.get("orders_declined", 0)
         spent = user_doc.get("total_spent", 0)
+    # Card / loyalty tier
+    uid = int(cid) if cid else None
+    lines.append(f"🏷 *{_card_tier(uid, done, spent)}*" if uid else "🏷 —")
+    if user_doc:
         lines.append(f"📦 Заказов: *{total}*  (✅ {done} / ❌ {declined})")
         lines.append(f"💰 Потрачено: *{spent:,.0f} AED*")
     # First seen

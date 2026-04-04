@@ -593,6 +593,24 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .aod-support-btn:active{background:rgba(212,175,55,.1)}
 .aod-cancel-btn{width:100%;padding:12px;background:rgba(200,60,60,.06);border:1px solid rgba(200,60,60,.15);border-radius:12px;color:rgba(220,90,90,.55);font-size:13px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.15s;display:flex;align-items:center;justify-content:center;gap:6px}
 .aod-cancel-btn:active{background:rgba(200,60,60,.12);color:rgba(220,90,90,.8)}
+/* ── Review UI (inside delivered order detail) ── */
+.aod-review{padding:20px 20px 0;text-align:center}
+.aod-review-title{font-size:15px;font-weight:700;color:rgba(255,255,255,.9);margin-bottom:4px}
+.aod-review-sub{font-size:12px;color:rgba(255,255,255,.4);margin-bottom:16px}
+.aod-stars{display:flex;justify-content:center;gap:8px;margin-bottom:18px}
+.aod-star{width:44px;height:44px;border-radius:50%;border:2px solid rgba(255,255,255,.1);background:rgba(255,255,255,.03);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:all .2s;-webkit-tap-highlight-color:transparent}
+.aod-star svg{width:22px;height:22px;fill:none;stroke:rgba(255,255,255,.2);stroke-width:1.5;transition:all .2s}
+.aod-star.active{border-color:#d4af37;background:rgba(212,175,55,.15);transform:scale(1.1)}
+.aod-star.active svg{fill:#d4af37;stroke:#d4af37}
+.aod-review-comment{width:100%;padding:12px 14px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.85);font-size:13px;font-family:'DM Sans',sans-serif;resize:none;outline:none;transition:border-color .2s;min-height:60px;box-sizing:border-box}
+.aod-review-comment::placeholder{color:rgba(255,255,255,.25)}
+.aod-review-comment:focus{border-color:rgba(212,175,55,.3)}
+.aod-review-submit{width:100%;padding:14px;border-radius:12px;background:linear-gradient(135deg,#b8942e,#d4af37);border:none;color:#0d1117;font-size:14px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;margin-top:12px;transition:opacity .2s;letter-spacing:.3px}
+.aod-review-submit:disabled{opacity:.35;cursor:default}
+.aod-review-submit:not(:disabled):active{opacity:.8}
+.aod-review-done{padding:20px 20px 0;text-align:center}
+.aod-review-done-stars{font-size:28px;margin-bottom:6px;letter-spacing:4px}
+.aod-review-done-txt{font-size:14px;color:rgba(255,255,255,.5)}
 /* ── Loyalty Card ── */
 .lcard-wrap{perspective:800px;width:100%;margin:0 auto 20px}
 .lcard-inner{position:relative;width:100%;aspect-ratio:1.6/1;transition:transform .6s cubic-bezier(.4,0,.2,1);transform-style:preserve-3d;cursor:pointer}
@@ -1846,6 +1864,25 @@ body.aob-on #pg-cart{overflow-y:auto!important}
           <span style="font-size:11px;font-weight:600;letter-spacing:.3px;color:rgba(255,255,255,.4)" id="aod-support-lbl">ПОДДЕРЖКА</span>
         </button>
       </div>
+    </div>
+    <!-- Review UI (shown when delivered) -->
+    <div class="aod-review" id="aod-review" style="display:none">
+      <div class="aod-review-title" id="aod-review-title">Оцените доставку</div>
+      <div class="aod-review-sub" id="aod-review-sub">Ваш отзыв помогает нам стать лучше</div>
+      <div class="aod-stars" id="aod-stars">
+        <div class="aod-star" data-score="1" onclick="_tapStar(1)"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg></div>
+        <div class="aod-star" data-score="2" onclick="_tapStar(2)"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg></div>
+        <div class="aod-star" data-score="3" onclick="_tapStar(3)"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg></div>
+        <div class="aod-star" data-score="4" onclick="_tapStar(4)"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg></div>
+        <div class="aod-star" data-score="5" onclick="_tapStar(5)"><svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26"/></svg></div>
+      </div>
+      <textarea class="aod-review-comment" id="aod-review-comment" placeholder="Комментарий (необязательно)" rows="2"></textarea>
+      <button class="aod-review-submit" id="aod-review-submit" disabled onclick="_submitReview()">Отправить</button>
+    </div>
+    <!-- Already reviewed -->
+    <div class="aod-review-done" id="aod-review-done" style="display:none">
+      <div class="aod-review-done-stars" id="aod-review-done-stars"></div>
+      <div class="aod-review-done-txt" id="aod-review-done-txt">Спасибо за отзыв!</div>
     </div>
     <div style="padding:10px 20px 12px" id="aod-cancel-wrap">
       <button class="aod-cancel-btn" onclick="openCancelSheet()">
@@ -5979,10 +6016,16 @@ function _renderAob(){
   el('aob-dot').className='aob-dot '+(status==='pending'?'pending':'active');
   el('aob-sub').textContent=`#${order_id}`;
   const fill=el('aob-fill'),moto=el('aob-moto'),time=el('aob-time'),title=el('aob-title');
-  if(status==='pending'){
+  if(status==='delivered'){
+    title.textContent=ru?'Доставлен — оцените!':'Delivered — rate us!';
+    time.textContent='';
+    fill.className='aob-fill';fill.style.width='100%';
+    moto.style.display='none';
+    el('aob-dot').className='aob-dot active';
+  } else if(status==='pending'){
     title.textContent=ru?'Ожидает подтверждения...':'Waiting for confirmation...';
     time.textContent='';
-    fill.className='aob-fill pending';fill.style.width='100%'; // full width so shimmer covers whole track
+    fill.className='aob-fill pending';fill.style.width='100%';
     moto.style.display='none';
   } else {
     const{pct,remaining}=_calcProgress(confirmed_at,eta);
@@ -6045,9 +6088,10 @@ function _renderAodDetail(){
   el('aod-items').innerHTML=(items||[]).map(i=>`<div class="aod-row"><span class="aod-row-name">${i.name} ×${i.qty}</span><span class="aod-row-price">${i.line_total||(i.price*i.qty)} AED</span></div>`).join('');
   el('aod-addr').textContent=address||'—';
   el('aod-total-val').textContent=total+' AED';
-  // Cancel button — always available
+  const isDelivered=status==='delivered';
+  // Cancel button — hide when delivered
   const cw=el('aod-cancel-wrap');
-  if(cw)cw.style.display='';
+  if(cw)cw.style.display=isDelivered?'none':'';
   el('aod-cancel-lbl').textContent=ru?'Отменить заказ':'Cancel Order';
   el('aod-support-lbl').textContent=ru?'ПОДДЕРЖКА':'SUPPORT';
   // Game button — only when confirmed (order is on the way)
@@ -6060,6 +6104,87 @@ function _renderAodDetail(){
       const best=parseInt(localStorage.getItem('ambar_game_best')||'0');
       el('aod-game-best').textContent=best;
     }
+  }
+  // Actions row — hide when delivered
+  const ar=el('aod-actions-row');
+  if(ar)ar.style.display=isDelivered?'none':'';
+  // Delivered state: progress bar full, badge, review UI
+  if(isDelivered){
+    bigFill.className='aod-big-fill';bigFill.style.width='100%';
+    bigMoto.style.display='block';bigMoto.style.left='100%';
+    timeTxt.textContent=ru?'Заказ доставлен ✅':'Order delivered ✅';
+    badge.textContent=ru?'ДОСТАВЛЕН':'DELIVERED';
+    badge.className='aod-badge approved';
+  }
+  // Review section
+  const revWrap=el('aod-review'),revDone=el('aod-review-done');
+  if(isDelivered){
+    const alreadyReviewed=o.review_score;
+    if(alreadyReviewed){
+      revWrap.style.display='none';
+      revDone.style.display='';
+      el('aod-review-done-stars').textContent='⭐'.repeat(alreadyReviewed);
+      el('aod-review-done-txt').textContent=ru?'Спасибо за отзыв!':'Thanks for your review!';
+    }else{
+      revWrap.style.display='';
+      revDone.style.display='none';
+      _reviewScore=0;
+      document.querySelectorAll('.aod-star').forEach(s=>s.classList.remove('active'));
+      el('aod-review-comment').value='';
+      el('aod-review-submit').disabled=true;
+      el('aod-review-title').textContent=ru?'Оцените доставку':'Rate your delivery';
+      el('aod-review-sub').textContent=ru?'Ваш отзыв помогает нам стать лучше':'Your feedback helps us improve';
+      el('aod-review-comment').placeholder=ru?'Комментарий (необязательно)':'Comment (optional)';
+      el('aod-review-submit').textContent=ru?'Отправить':'Submit';
+    }
+  }else{
+    revWrap.style.display='none';
+    revDone.style.display='none';
+  }
+}
+
+let _reviewScore=0;
+function _tapStar(n){
+  haptic.light();
+  _reviewScore=n;
+  document.querySelectorAll('.aod-star').forEach(s=>{
+    const v=parseInt(s.dataset.score);
+    s.classList.toggle('active',v<=n);
+  });
+  el('aod-review-submit').disabled=false;
+}
+async function _submitReview(){
+  const btn=el('aod-review-submit');
+  if(!_reviewScore||btn.disabled)return;
+  const o=_aobOrders[_aobIdx];
+  if(!o)return;
+  btn.disabled=true;
+  btn.textContent=lang==='ru'?'Отправка...':'Sending...';
+  try{
+    const r=await fetch(`${AMBAR_API}/api/review`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        initData:tg?.initData||'',
+        order_id:o.order_id,
+        score:_reviewScore,
+        comment:(el('aod-review-comment').value||'').trim()
+      })
+    });
+    if(r.ok){
+      haptic.success();
+      o.review_score=_reviewScore;
+      el('aod-review').style.display='none';
+      el('aod-review-done').style.display='';
+      el('aod-review-done-stars').textContent='⭐'.repeat(_reviewScore);
+      el('aod-review-done-txt').textContent=lang==='ru'?'Спасибо за отзыв!':'Thanks for your review!';
+    }else{
+      btn.disabled=false;
+      btn.textContent=lang==='ru'?'Отправить':'Submit';
+    }
+  }catch(e){
+    btn.disabled=false;
+    btn.textContent=lang==='ru'?'Отправить':'Submit';
   }
 }
 

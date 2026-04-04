@@ -455,17 +455,12 @@ async def cleanup_and_deliver(cid: int, oid: str, lang: str):
     total      = order.get("total", 0)
     msg_ids    = order.get("customer_msg_ids", [])
     item_lines = "\n".join(f"  • {i['name']} ×{i['qty']}" for i in items)
-    review_kb  = InlineKeyboardMarkup([[
-        InlineKeyboardButton(str(i), callback_data=f"rev_{i}_{cid}_{lang}_{oid}") for i in range(1, 6)
-    ]])
     if lang == "ru":
-        summary = f"✅ *Заказ #{oid} доставлен!*\n\n🛒 *Позиции:*\n{item_lines}\n\n💰 *Итого: {total} AED*"
-        thanks  = ("Спасибо 🥂\n\nОцените сервис:\n\n"
-                   "_После оценки можете написать нам — просто отправьте сообщение в этот чат._")
+        summary = (f"✅ *Заказ #{oid} доставлен!*\n\n🛒 *Позиции:*\n{item_lines}\n\n💰 *Итого: {total} AED*\n\n"
+                   f"_Оцените доставку в приложении 🥂_")
     else:
-        summary = f"✅ *Order #{oid} delivered!*\n\n🛒 *Items:*\n{item_lines}\n\n💰 *Total: {total} AED*"
-        thanks  = ("Thank you 🥂\n\nRate our service:\n\n"
-                   "_After rating you can leave a comment — just send a message here._")
+        summary = (f"✅ *Order #{oid} delivered!*\n\n🛒 *Items:*\n{item_lines}\n\n💰 *Total: {total} AED*\n\n"
+                   f"_Rate your delivery in the app 🥂_")
 
     tmp = Application.builder().token(BOT_TOKEN).build()
     async with tmp:
@@ -475,10 +470,6 @@ async def cleanup_and_deliver(cid: int, oid: str, lang: str):
         try: await tmp.bot.send_message(cid, summary, parse_mode="Markdown",
                                          reply_markup=ReplyKeyboardRemove())
         except Exception as e: log.error(f"delivery summary {cid}: {e}")
-        try:
-            rate_msg = await tmp.bot.send_message(cid, thanks, parse_mode="Markdown", reply_markup=review_kb)
-            await db.set_ustate(cid, {"to_delete_on_order": [rate_msg.message_id], "awaiting_comment": False})
-        except Exception as e: log.error(f"review msg {cid}: {e}")
 
 
 # ── Countdown timer ───────────────────────────────────────────────────────────

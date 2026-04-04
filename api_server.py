@@ -452,6 +452,43 @@ async def handle_support_send(request: web.Request) -> web.Response:
     return web.json_response({"ok": True, "ts": server_ts}, headers=CORS_HEADERS)
 
 
+# ── POST /api/review ──────────────────────────────────────────────────────────
+async def handle_review(request: web.Request) -> web.Response:
+    if request.method == "OPTIONS":
+        return web.Response(status=200, headers=CORS_HEADERS)
+    data = await request.json()
+    init_data = data.get("initData", "")
+    user = validate_init_data(init_data)
+    if not user:
+        return web.json_response({"error": "auth failed"}, status=401, headers=CORS_HEADERS)
+    uid      = user.get("id")
+    order_id = data.get("order_id", "")
+    score    = data.get("score", 0)
+    comment  = data.get("comment", "").strip()
+    if not order_id or not score:
+        return web.json_response({"error": "missing fields"}, status=400, headers=CORS_HEADERS)
+    order = await db.get_order(order_id)
+    if not order or order.get("customer_id") != uid:
+        return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
+    await db.update_order(order_id, review_score=int(score), review_comment=comment,
+                          reviewed_at=datetime.now(timezone.utc).isoformat())
+    # Notify operators about the review
+    user_name = order.get("customer_name", "—")
+    stars = "⭐" * int(score)
+    op_text = (f"📝 *Отзыв на заказ #{order_id}*\n\n"
+               f"👤 {user_name}\n"
+               f"🏅 {stars} ({score}/5)"
+               + (f"\n💬 _{comment}_" if comment else ""))
+    dismiss_kb = {"inline_keyboard": [[{"text": "✅ Просмотрено", "callback_data": "delmsg"}]]}
+    for op_id in OPERATOR_IDS:
+        try:
+            await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text, reply_markup=dismiss_kb)
+        except Exception as e:
+            log.error(f"Review notify {op_id}: {e}")
+    log.info(f"[review] #{order_id} uid={uid} score={score}")
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+
 # ── GET /api/active-order ─────────────────────────────────────────────────────
 async def handle_active_order(request: web.Request) -> web.Response:
     if request.method == "OPTIONS":
@@ -475,6 +512,7 @@ async def handle_active_order(request: web.Request) -> web.Response:
             "items":        o.get("items", []),
             "total":        o.get("total", 0),
             "address":      o.get("address", ""),
+            "review_score": o.get("review_score"),
         } for o in orders],
     }, headers=CORS_HEADERS)
 
@@ -608,6 +646,8 @@ def main():
 
     app.router.add_route("OPTIONS", "/api/me",                 handle_me)
     app.router.add_get(            "/api/me",                  handle_me)
+    app.router.add_route("OPTIONS", "/api/review",              handle_review)
+    app.router.add_post(           "/api/review",              handle_review)
     app.router.add_route("OPTIONS", "/api/active-order",       handle_active_order)
     app.router.add_get(            "/api/active-order",        handle_active_order)
     app.router.add_route("OPTIONS", "/api/orders",             handle_orders)

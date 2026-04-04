@@ -650,7 +650,8 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         rows = []
         for day, orders in dates.items():
             cnt = len(orders)
-            rows.append([InlineKeyboardButton(f"📅 {day}  ({cnt})", callback_data=f"dday_{day}")])
+            day_total = sum(o.get("total", 0) for o in orders)
+            rows.append([InlineKeyboardButton(f"📅 {day}  ({cnt})  {day_total:,.0f} AED", callback_data=f"dday_{day}")])
         rows.append([InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")])
         await send(cid, f"✅ *Завершённых: {len(done)}*\n\nВыберите дату:",
                    parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(rows))
@@ -810,7 +811,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                     day = dt.strftime("%d.%m.%Y")
                 except: day = "—"
                 dates.setdefault(day, []).append(o)
-            rows = [[InlineKeyboardButton(f"📅 {d}  ({len(ords)})", callback_data=f"dday_{d}")] for d, ords in dates.items()]
+            rows = [[InlineKeyboardButton(f"📅 {d}  ({len(ords)})  {sum(o.get('total',0) for o in ords):,.0f} AED", callback_data=f"dday_{d}")] for d, ords in dates.items()]
             rows.append([InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")])
             await q.edit_message_text(f"✅ *Завершённых: {len(done)}*\n\nВыберите дату:",
                 parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(rows))

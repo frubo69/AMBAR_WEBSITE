@@ -837,7 +837,8 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                     menu_button=MenuButtonWebApp(text="🍾 Заказать", web_app=WebAppInfo(url=WEBAPP_URL))
                 )
         except: pass
-        await q.edit_message_text(f"✅ Пользователь `{uid_str}` разблокирован.", parse_mode="Markdown")
+        await q.edit_message_text(f"✅ Пользователь `{uid_str}` разблокирован.", parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]]))
 
 
 # ── Ban helper ────────────────────────────────────────────────────────────────

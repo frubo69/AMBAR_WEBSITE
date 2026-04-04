@@ -315,9 +315,10 @@ async def handle_cancel_order(request: web.Request) -> web.Response:
         f"📋 *Причина:* {reason or '—'}"
         + (f"\n💬 *Комментарий:* {comment}" if comment else "")
     )
+    dismiss_kb = {"inline_keyboard": [[{"text": "✅ Просмотрено", "callback_data": "delmsg"}]]}
     for op_id in OPERATOR_IDS:
         try:
-            await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text)
+            await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text, reply_markup=dismiss_kb)
         except Exception as e:
             log.error(f"Operator cancel notify {op_id}: {e}")
 

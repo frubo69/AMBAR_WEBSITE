@@ -142,7 +142,8 @@ async def handle_create_order(request: web.Request) -> web.Response:
     referrer_username = None
     try:
         user_doc = await db.get_user(uid)
-        is_first_order = (user_doc is None or user_doc.get("orders_total", 0) == 0)
+        _TEST_ALWAYS_FIRST = {8251195567}  # DEBUG: always treat as first order
+        is_first_order = (uid in _TEST_ALWAYS_FIRST) or (user_doc is None or user_doc.get("orders_total", 0) == 0)
         if is_first_order and user_doc and user_doc.get("referred_by"):
             referred_by = user_doc["referred_by"]
     except Exception:
@@ -230,7 +231,7 @@ async def handle_create_order(request: web.Request) -> web.Response:
         f"💰 *Итого: {total} AED*"
         + (f"\n\n💬 *Комментарий:* {comment}" if comment else "")
     )
-    op_kb = {"inline_keyboard": [
+    op_buttons = [
         [
             {"text": "✅ Принять",   "callback_data": f"acc_{oid}_{uid}"},
             {"text": "❌ Отклонить", "callback_data": f"dec_{oid}_{uid}"},
@@ -240,7 +241,11 @@ async def handle_create_order(request: web.Request) -> web.Response:
             {"text": "📍 Геолокация",    "callback_data": f"loc_{oid}"},
         ],
         [{"text": "👤 Клиент", "callback_data": f"client_{oid}_{uid}"}],
-    ]}
+    ]
+    # Add verify button for first orders of non-referral customers
+    if is_first_order and not referred_by:
+        op_buttons.append([{"text": "🔐 Верифицировать клиента", "callback_data": f"verify_{uid}"}])
+    op_kb = {"inline_keyboard": op_buttons}
     for op_id in OPERATOR_IDS:
         try:
             await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text, reply_markup=op_kb)
@@ -361,14 +366,68 @@ async def handle_me(request: web.Request) -> web.Response:
 
     demo = user_doc.get("demo", False) if user_doc else False
 
-    log.info(f"[me] uid={uid} banned={banned} card={card_type} demo={demo}")
+    # Verification status
+    is_referral = bool(user_doc.get("referred_by")) if user_doc else False
+    verified = True if is_referral else (user_doc.get("verified", False) if user_doc else False)
+    verify_requested = user_doc.get("verify_requested", False) if user_doc else False
+
+    log.info(f"[me] uid={uid} banned={banned} card={card_type} demo={demo} verified={verified}")
     return web.json_response({
         "banned": banned,
         "referral_points": ref_points,
         "card_type": card_type,
         "premium_index": premium_index,
         "demo": demo,
+        "verified": verified,
+        "verify_requested": verify_requested,
     }, headers=CORS_HEADERS)
+
+
+# ── POST /api/verify-request ──────────────────────────────────────────────────
+async def handle_verify_request(request: web.Request) -> web.Response:
+    if request.method == "OPTIONS":
+        return web.Response(status=200, headers=CORS_HEADERS)
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid json"}, status=400, headers=CORS_HEADERS)
+
+    user = validate_init_data(data.get("initData", ""))
+    if not user:
+        return web.json_response({"error": "auth failed"}, status=401, headers=CORS_HEADERS)
+
+    uid = user.get("id")
+    user_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
+    username = user.get("username", "—")
+    recommender_name = (data.get("recommender_name", "") or "").strip()
+    recommender_phone = (data.get("recommender_phone", "") or "").strip()
+    user_phone = (data.get("user_phone", "") or "").strip()
+
+    if not recommender_name or not recommender_phone:
+        return web.json_response({"error": "missing fields"}, status=400, headers=CORS_HEADERS)
+
+    await db.submit_verify_request(uid, recommender_name, recommender_phone)
+
+    # Notify operators
+    op_text = (
+        f"🔐 *ЗАПРОС НА ВЕРИФИКАЦИЮ*\n\n"
+        f"👤 *Клиент:* {user_name} (@{username}, ID: `{uid}`)\n"
+        f"📞 *Тел клиента:* {user_phone or '—'}\n\n"
+        f"👥 *Рекомендатель:* {recommender_name}\n"
+        f"📞 *Тел рекомендателя:* {recommender_phone}"
+    )
+    op_kb = {"inline_keyboard": [
+        [{"text": "✅ Верифицировать", "callback_data": f"verify_{uid}"}],
+        [{"text": "✅ Просмотрено", "callback_data": "delmsg"}],
+    ]}
+    for op_id in OPERATOR_IDS:
+        try:
+            await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text, reply_markup=op_kb)
+        except Exception as e:
+            log.error(f"Verify request notify {op_id}: {e}")
+
+    log.info(f"[verify-request] uid={uid} recommender={recommender_name}")
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 
 # ── GET /api/orders ───────────────────────────────────────────────────────────
@@ -675,6 +734,8 @@ def main():
     app.router.add_post(           "/api/review-skip",         handle_review_skip)
     app.router.add_route("OPTIONS", "/api/active-order",       handle_active_order)
     app.router.add_get(            "/api/active-order",        handle_active_order)
+    app.router.add_route("OPTIONS", "/api/verify-request",     handle_verify_request)
+    app.router.add_post(           "/api/verify-request",     handle_verify_request)
     app.router.add_route("OPTIONS", "/api/orders",             handle_orders)
     app.router.add_get(            "/api/orders",              handle_orders)
     app.router.add_route("OPTIONS", "/api/order",              handle_create_order)

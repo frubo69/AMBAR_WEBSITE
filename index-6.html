@@ -1008,6 +1008,38 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   </style>
 </div>
 
+<!-- ═══ VERIFICATION WALL ═══ -->
+<div id="verify-wall" style="display:none;position:fixed;inset:0;z-index:99998;background:rgba(7,7,14,0.97);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);align-items:center;justify-content:center;flex-direction:column;overflow:hidden;">
+
+  <!-- Step 1: Recommender name -->
+  <div id="verify-step1" style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:28px;max-width:340px;width:100%;">
+    <div style="font-size:48px;line-height:1;margin-bottom:20px;">🔐</div>
+    <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px;" id="verify-title1">Верификация</div>
+    <div style="font-size:13px;color:#888;line-height:1.6;margin-bottom:24px;" id="verify-desc1">Откуда вы узнали о нас?<br>Укажите имя / фамилию / отчество / ник / погоняло человека, который вас порекомендовал</div>
+    <input id="verify-name-in" type="text" placeholder="Имя рекомендателя" style="width:100%;padding:14px 16px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:15px;font-family:'DM Sans',sans-serif;outline:none;box-sizing:border-box;margin-bottom:16px;" />
+    <button id="verify-next-btn" style="width:100%;padding:15px;background:linear-gradient(135deg,rgba(255,255,255,.1),rgba(255,255,255,.06));border:1px solid rgba(255,255,255,.15);border-radius:14px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;" onclick="verifyStep2()">Далее</button>
+  </div>
+
+  <!-- Step 2: Recommender phone -->
+  <div id="verify-step2" style="display:none;flex-direction:column;align-items:center;text-align:center;padding:28px;max-width:340px;width:100%;">
+    <div style="font-size:48px;line-height:1;margin-bottom:20px;">📞</div>
+    <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px;" id="verify-title2">Номер рекомендателя</div>
+    <div style="font-size:13px;color:#888;line-height:1.6;margin-bottom:24px;" id="verify-desc2">Укажите номер телефона человека, который вас порекомендовал</div>
+    <input id="verify-phone-in" type="tel" placeholder="+971..." style="width:100%;padding:14px 16px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:15px;font-family:'DM Sans',sans-serif;outline:none;box-sizing:border-box;margin-bottom:16px;" />
+    <button id="verify-submit-btn" style="width:100%;padding:15px;background:linear-gradient(135deg,rgba(255,255,255,.1),rgba(255,255,255,.06));border:1px solid rgba(255,255,255,.15);border-radius:14px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;" onclick="verifySubmit()">Отправить</button>
+    <button style="margin-top:10px;background:none;border:none;color:rgba(255,255,255,.35);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;" onclick="verifyBack()">← Назад</button>
+  </div>
+
+  <!-- Step 3: Waiting for operator -->
+  <div id="verify-wait" style="display:none;flex-direction:column;align-items:center;text-align:center;padding:28px;max-width:340px;width:100%;">
+    <div style="font-size:48px;line-height:1;margin-bottom:20px;">⏳</div>
+    <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:12px;" id="verify-wait-title">Ожидайте подтверждения</div>
+    <div style="font-size:14px;color:#888;line-height:1.65;margin-bottom:20px;" id="verify-wait-desc">Возможно поступит звонок на телефон для уточнения деталей.</div>
+    <div style="font-size:12px;color:rgba(255,255,255,.3);line-height:1.6;padding:12px 16px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);" id="verify-wait-note">Верификация проходится только один раз. После подтверждения вы сможете пользоваться ботом как обычно.</div>
+  </div>
+
+</div>
+
 <!-- ═══ CATALOG ═══ -->
 <div id="pg-catalog" class="page">
   <div style="position:sticky;top:0;z-index:40;background:rgba(7,7,14,.96);backdrop-filter:blur(20px)">
@@ -1857,17 +1889,16 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     </div>
     <div style="padding:10px 20px 0;display:flex;gap:10px" id="aod-actions-row">
       <div id="aod-game-wrap" style="display:none;flex:1 1 0;min-width:0">
-        <button onclick="openGame()" style="width:100%;height:100%;padding:14px 14px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;gap:12px;cursor:pointer;transition:.15s" onpointerdown="this.style.opacity='.7'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">
-          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="24" height="24" style="flex-shrink:0"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><circle cx="17" cy="10" r="1" fill="rgba(255,255,255,.5)"/><circle cx="15" cy="13" r="1" fill="rgba(255,255,255,.5)"/></svg>
-          <div style="flex:1;text-align:left;min-width:0">
-            <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.8);letter-spacing:.1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis" id="aod-game-title">Играй пока ждёшь</div>
-            <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:1px" id="aod-game-sub">Рекорд: <span id="aod-game-best">0</span> pts</div>
+        <button onclick="openGame()" style="width:100%;height:100%;padding:20px 14px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:.15s" onpointerdown="this.style.opacity='.7'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.5)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="24" height="24"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><circle cx="17" cy="10" r="1" fill="rgba(255,255,255,.5)"/><circle cx="15" cy="13" r="1" fill="rgba(255,255,255,.5)"/></svg>
+          <div style="text-align:center">
+            <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.8);letter-spacing:.1px" id="aod-game-title">Играй пока ждёшь</div>
+            <div style="font-size:10px;color:rgba(255,255,255,.35);margin-top:2px" id="aod-game-sub"><span id="aod-game-best">0</span> pts</div>
           </div>
-          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.25)" stroke-width="2" stroke-linecap="round" width="14" height="14" style="flex-shrink:0"><polyline points="9 18 15 12 9 6"/></svg>
         </button>
       </div>
       <div style="flex:1 1 0;min-width:0">
-        <button onclick="closeAod();openSupportChat(_aobOrders[_aobIdx]?.order_id||'')" style="width:100%;height:100%;padding:14px 0;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;cursor:pointer;transition:.15s;font-family:'DM Sans',sans-serif" onpointerdown="this.style.opacity='.7'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">
+        <button onclick="closeAod();openSupportChat(_aobOrders[_aobIdx]?.order_id||'')" style="width:100%;height:100%;padding:20px 14px;border-radius:12px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.1);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:.15s;font-family:'DM Sans',sans-serif" onpointerdown="this.style.opacity='.7'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">
           <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.5" stroke-linecap="round" width="20" height="20"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
           <span style="font-size:11px;font-weight:600;letter-spacing:.3px;color:rgba(255,255,255,.4)" id="aod-support-lbl">ПОДДЕРЖКА</span>
         </button>
@@ -2313,9 +2344,123 @@ async function checkBanStatus(){
       if(d.referral_points!=null)localStorage.setItem('ambar_ref_points',String(d.referral_points));
       if(d.card_type)localStorage.setItem('ambar_card_type',d.card_type);
       if(d.premium_index!=null)localStorage.setItem('ambar_premium_idx',String(d.premium_index));
+      // Verification status
+      if(d.verified)localStorage.setItem('ambar_verified','1');
+      else localStorage.removeItem('ambar_verified');
+      if(d.verify_requested)localStorage.setItem('ambar_verify_requested','1');
+      else localStorage.removeItem('ambar_verify_requested');
     }
   }catch(e){}
   _hideBanBlocker();
+  // Show verification wall on boot if user has pending verification
+  if(!_isVerified()&&localStorage.getItem('ambar_verify_requested')==='1'){
+    setTimeout(()=>showVerifyWall(),800);
+  }
+}
+
+// ── VERIFICATION WALL ─────────────────────────────────────────────────────────
+let _verifyPollTimer=null;
+
+function _isVerified(){
+  return localStorage.getItem('ambar_verified')==='1';
+}
+
+function showVerifyWall(){
+  const wall=document.getElementById('verify-wall');
+  if(!wall)return;
+  const requested=localStorage.getItem('ambar_verify_requested')==='1';
+  // Apply language
+  const ru=lang==='ru';
+  el('verify-title1').textContent=ru?'Верификация':'Verification';
+  el('verify-desc1').textContent=ru?'Откуда вы узнали о нас?\nУкажите имя / фамилию / ник человека, который вас порекомендовал':'How did you hear about us?\nEnter the name / nickname of the person who recommended us';
+  el('verify-name-in').placeholder=ru?'Имя рекомендателя':'Recommender name';
+  el('verify-next-btn').textContent=ru?'Далее':'Next';
+  el('verify-title2').textContent=ru?'Номер рекомендателя':'Recommender phone';
+  el('verify-desc2').textContent=ru?'Укажите номер телефона человека, который вас порекомендовал':'Enter the phone number of the person who recommended us';
+  el('verify-phone-in').placeholder='+971...';
+  el('verify-submit-btn').textContent=ru?'Отправить':'Submit';
+  el('verify-wait-title').textContent=ru?'Ожидайте подтверждения':'Awaiting confirmation';
+  el('verify-wait-desc').textContent=ru?'Возможно поступит звонок на телефон для уточнения деталей.':'You may receive a call to clarify details.';
+  el('verify-wait-note').textContent=ru?'Верификация проходится только один раз. После подтверждения вы сможете пользоваться ботом как обычно.':'Verification is a one-time process. Once confirmed, you can use the bot as usual.';
+
+  wall.style.display='flex';
+  if(requested){
+    // Already submitted — go straight to waiting screen
+    el('verify-step1').style.display='none';
+    el('verify-step2').style.display='none';
+    el('verify-wait').style.display='flex';
+    _startVerifyPoll();
+  } else {
+    el('verify-step1').style.display='flex';
+    el('verify-step2').style.display='none';
+    el('verify-wait').style.display='none';
+  }
+}
+
+function hideVerifyWall(){
+  const wall=document.getElementById('verify-wall');
+  if(wall)wall.style.display='none';
+  if(_verifyPollTimer){clearInterval(_verifyPollTimer);_verifyPollTimer=null;}
+}
+
+function verifyStep2(){
+  const name=el('verify-name-in').value.trim();
+  if(!name){el('verify-name-in').style.borderColor='rgba(255,80,80,.5)';return;}
+  el('verify-name-in').style.borderColor='rgba(255,255,255,.12)';
+  el('verify-step1').style.display='none';
+  el('verify-step2').style.display='flex';
+}
+
+function verifyBack(){
+  el('verify-step2').style.display='none';
+  el('verify-step1').style.display='flex';
+}
+
+async function verifySubmit(){
+  const name=el('verify-name-in').value.trim();
+  const phone=el('verify-phone-in').value.trim();
+  if(!phone){el('verify-phone-in').style.borderColor='rgba(255,80,80,.5)';return;}
+  el('verify-phone-in').style.borderColor='rgba(255,255,255,.12)';
+  // Get user's own phone from checkout if available
+  const userPhone=el('phone-in')?.value?.trim()||'';
+  el('verify-submit-btn').textContent='...';
+  el('verify-submit-btn').disabled=true;
+  try{
+    await fetch(`${AMBAR_API}/api/verify-request`,{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        initData:tg?.initData||'',
+        recommender_name:name,
+        recommender_phone:phone,
+        user_phone:userPhone,
+      })
+    });
+  }catch(e){console.error('verify-request error:',e);}
+  localStorage.setItem('ambar_verify_requested','1');
+  el('verify-step2').style.display='none';
+  el('verify-wait').style.display='flex';
+  _startVerifyPoll();
+}
+
+function _startVerifyPoll(){
+  if(_verifyPollTimer)return;
+  _verifyPollTimer=setInterval(async()=>{
+    const uid=tg?.initDataUnsafe?.user?.id;
+    if(!uid)return;
+    try{
+      const resp=await fetch(`${AMBAR_API}/api/me?uid=${uid}`);
+      if(resp.ok){
+        const d=await resp.json();
+        if(d.verified){
+          localStorage.setItem('ambar_verified','1');
+          localStorage.removeItem('ambar_verify_requested');
+          hideVerifyWall();
+          showToast(lang==='ru'?'Верификация пройдена ✓':'Verified ✓','ok');
+        }
+      }
+    }catch(e){}
+  },5000); // poll every 5s
 }
 
 // ── BOOT ──────────────────────────────────────────────────────────────────────
@@ -2741,6 +2886,8 @@ function selectAddr(i){
 }
 
 function deleteAddr(i){
+  const msg=lang==='ru'?'Удалить этот адрес?':'Delete this address?';
+  if(!confirm(msg))return;
   const arr=getSaved();arr.splice(i,1);setSaved(arr);
   // Adjust active index
   if(activeAddrIdx===i) setActiveAddr(arr.length?0:null);
@@ -4311,7 +4458,11 @@ function placeOrder(){
   updHdr();buildTips();haptic.success();showToast(t('placed'),'ok');
   const _ru=lang==='ru';
   addNotification('cart',_ru?'Заказ оформлен':'Order placed',(_ru?'Заказ ':'Order ')+'#'+oid+(_ru?' принят и ожидает подтверждения':' received, awaiting confirmation'),{action:'orders',dedup_key:'placed_'+oid,notif_type:'placed',notif_oid:oid});
-  setTimeout(()=>{go('catalog');checkActiveOrder();},1400);
+  setTimeout(()=>{
+    go('catalog');checkActiveOrder();
+    // Show verification wall for unverified non-referral users after placing order
+    if(!_isVerified()){showVerifyWall();}
+  },1400);
 }
 
 // ── ORDERS ────────────────────────────────────────────────────────────────────

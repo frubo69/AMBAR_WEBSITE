@@ -1106,6 +1106,15 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             f"⚠️ *Блокировка клиента* `{cid}`\n\nВыберите действие:",
             parse_mode="Markdown", reply_markup=kb_ban_confirm(cid, oid))
 
+    # ── VERIFY ────────────────────────────────────────────────────────────────
+    elif data.startswith("verify_"):
+        cid = int(data[7:])
+        await db.verify_user(cid)
+        await q.edit_message_text(
+            f"✅ Пользователь `{cid}` верифицирован.",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]]))
+
     # ── UNBAN ─────────────────────────────────────────────────────────────────
     elif data.startswith("unban_"):
         uid_str = data[6:]

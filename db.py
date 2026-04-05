@@ -135,6 +135,8 @@ async def upsert_user(telegram_id: int, **fields):
             "total_spent": 0,
             "support_tickets": 0,
             "notes": "",
+            "verified": False,
+            "verify_requested": False,
         },
     }
     if phone:
@@ -275,6 +277,31 @@ async def set_user_field(telegram_id: int, **fields):
     db = _db_or_none()
     if db is None: return
     await db.users.update_one({"telegram_id": telegram_id}, {"$set": fields})
+
+
+async def verify_user(telegram_id: int):
+    """Mark user as verified (operator-approved)."""
+    db = _db_or_none()
+    if db is None: return
+    await db.users.update_one(
+        {"telegram_id": telegram_id},
+        {"$set": {"verified": True, "verified_at": datetime.now(timezone.utc).isoformat()}},
+    )
+
+
+async def submit_verify_request(telegram_id: int, recommender_name: str, recommender_phone: str):
+    """Store verification request info and mark as pending."""
+    db = _db_or_none()
+    if db is None: return
+    await db.users.update_one(
+        {"telegram_id": telegram_id},
+        {"$set": {
+            "verify_requested": True,
+            "verify_recommender_name": recommender_name,
+            "verify_recommender_phone": recommender_phone,
+            "verify_requested_at": datetime.now(timezone.utc).isoformat(),
+        }},
+    )
 
 
 async def award_referral_points(referrer_id: int, referred_id: int, points: int):

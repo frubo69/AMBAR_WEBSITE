@@ -270,13 +270,21 @@ async def kb_order_actions(order, list_type=None):
     return InlineKeyboardMarkup(rows)
 
 
-def kb_client_actions(oid, cid):
+async def kb_client_actions(oid, cid):
     """Keyboard shown on client info view."""
-    return InlineKeyboardMarkup([
-        [InlineKeyboardButton("🚫 Забанить клиента",      callback_data=f"ban_{oid}_{cid}")],
-        [InlineKeyboardButton("✏️ Заметка к имени", callback_data=f"rename_{oid}_{cid}")],
-        [InlineKeyboardButton("← Назад",                  callback_data=f"client_back_{oid}")],
-    ])
+    rows = []
+    # Call button — get phone from order
+    try:
+        order = await db.get_order(oid)
+        phone = order.get("phone", "") if order else ""
+        if phone and phone != "—":
+            rows.append([InlineKeyboardButton(f"📞 Позвонить {phone}", url=f"tel:{phone}")])
+    except Exception:
+        pass
+    rows.append([InlineKeyboardButton("🚫 Забанить клиента", callback_data=f"ban_{oid}_{cid}")])
+    rows.append([InlineKeyboardButton("✏️ Заметка к имени", callback_data=f"rename_{oid}_{cid}")])
+    rows.append([InlineKeyboardButton("← Назад", callback_data=f"client_back_{oid}")])
+    return InlineKeyboardMarkup(rows)
 
 def kb_eta(oid, cid):
     r1 = [InlineKeyboardButton(f"⏱ {t} мин", callback_data=f"eta_{t}_{oid}_{cid}") for t in [20, 30, 45]]
@@ -625,7 +633,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                             chat_id=update.effective_chat.id,
                             message_id=pending_rename["msg_id"],
                             parse_mode="Markdown",
-                            reply_markup=kb_client_actions(oid, cid))
+                            reply_markup=await kb_client_actions(oid, cid))
                     except: pass
         return
 
@@ -1074,7 +1082,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         oid = parts[2]; cid = int(parts[3])
         order = await db.get_order(oid)
         if order:
-            await q.edit_message_text(await customer_card(order), parse_mode="Markdown", reply_markup=kb_client_actions(oid, cid))
+            await q.edit_message_text(await customer_card(order), parse_mode="Markdown", reply_markup=await kb_client_actions(oid, cid))
 
     # ── CLIENT INFO VIEW ───────────────────────────────────────────────────────
     elif data.startswith("client_back_"):
@@ -1088,7 +1096,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         _, oid, cid_str = data.split("_", 2)
         order = await db.get_order(oid)
         if order:
-            await q.edit_message_text(await customer_card(order), parse_mode="Markdown", reply_markup=kb_client_actions(oid, int(cid_str)))
+            await q.edit_message_text(await customer_card(order), parse_mode="Markdown", reply_markup=await kb_client_actions(oid, int(cid_str)))
 
     # ── RENAME CLIENT ────────────────────────────────────────────────────────
     elif data.startswith("rename_"):
@@ -1120,7 +1128,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 await db.update_order(o["order_id"], customer_name=original)
         order = await db.get_order(oid)
         if order:
-            await q.edit_message_text(await customer_card(order), parse_mode="Markdown", reply_markup=kb_client_actions(oid, cid))
+            await q.edit_message_text(await customer_card(order), parse_mode="Markdown", reply_markup=await kb_client_actions(oid, cid))
 
     # ── BAN (generic — show confirmation) ─────────────────────────────────────
     elif data.startswith("ban_"):

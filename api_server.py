@@ -216,9 +216,9 @@ async def handle_create_order(request: web.Request) -> web.Response:
             referrer_username = referrer_doc.get("username", "—") if referrer_doc else "—"
         except Exception:
             referrer_username = "—"
-        first_order_banner = f"🔴 *⚠️ НОВЫЙ КЛИЕНТ РЕФЕРАЛ*\n👥 Пригласил — @{referrer_username}\n\n"
+        first_order_banner = f"🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ РЕФЕРАЛ* 🚨🚨🚨\n👥 Пригласил — @{referrer_username}\n\n"
     elif is_first_order:
-        first_order_banner = "🔴 *⚠️ ПЕРВЫЙ ЗАКАЗ — новый клиент!*\n\n"
+        first_order_banner = "🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨\n\n"
     else:
         first_order_banner = ""
     op_text = (
@@ -231,26 +231,30 @@ async def handle_create_order(request: web.Request) -> web.Response:
         f"💰 *Итого: {total} AED*"
         + (f"\n\n💬 *Комментарий:* {comment}" if comment else "")
     )
-    op_buttons = [
-        [
-            {"text": "✅ Принять",   "callback_data": f"acc_{oid}_{uid}"},
-            {"text": "❌ Отклонить", "callback_data": f"dec_{oid}_{uid}"},
-        ],
-        [
-            {"text": "✏️ Редактировать", "callback_data": f"edit_{oid}"},
-            {"text": "📍 Геолокация",    "callback_data": f"loc_{oid}"},
-        ],
-        [{"text": "👤 Клиент", "callback_data": f"client_{oid}_{uid}"}],
-    ]
-    # Add verify button for first orders of non-referral customers
-    if is_first_order and not referred_by:
-        op_buttons.append([{"text": "🔐 Верифицировать клиента", "callback_data": f"verify_{uid}"}])
-    op_kb = {"inline_keyboard": op_buttons}
-    for op_id in OPERATOR_IDS:
-        try:
-            await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text, reply_markup=op_kb)
-        except Exception as e:
-            log.error(f"Operator notify {op_id}: {e}")
+    # For first-time non-referral users, delay operator notification until
+    # verification data is submitted. Save order details for later.
+    _needs_verification = is_first_order and not referred_by
+    if _needs_verification:
+        await db.update_order(oid, pending_verification=True, op_text=op_text)
+        log.info(f"[order] #{oid} held for verification — operator notification delayed")
+    else:
+        op_buttons = [
+            [
+                {"text": "✅ Принять",   "callback_data": f"acc_{oid}_{uid}"},
+                {"text": "❌ Отклонить", "callback_data": f"dec_{oid}_{uid}"},
+            ],
+            [
+                {"text": "✏️ Редактировать", "callback_data": f"edit_{oid}"},
+                {"text": "📍 Геолокация",    "callback_data": f"loc_{oid}"},
+            ],
+            [{"text": "👤 Клиент", "callback_data": f"client_{oid}_{uid}"}],
+        ]
+        op_kb = {"inline_keyboard": op_buttons}
+        for op_id in OPERATOR_IDS:
+            try:
+                await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text, reply_markup=op_kb)
+            except Exception as e:
+                log.error(f"Operator notify {op_id}: {e}")
 
     # Award referral points (+5) to the referrer on first order
     if is_first_order and referred_by:
@@ -367,9 +371,14 @@ async def handle_me(request: web.Request) -> web.Response:
     demo = user_doc.get("demo", False) if user_doc else False
 
     # Verification status
+    _TEST_ALWAYS_FIRST = {8251195567}  # DEBUG: always unverified for testing
     is_referral = bool(user_doc.get("referred_by")) if user_doc else False
-    verified = True if is_referral else (user_doc.get("verified", False) if user_doc else False)
-    verify_requested = user_doc.get("verify_requested", False) if user_doc else False
+    if uid in _TEST_ALWAYS_FIRST:
+        verified = False
+        verify_requested = False
+    else:
+        verified = True if is_referral else (user_doc.get("verified", False) if user_doc else False)
+        verify_requested = user_doc.get("verify_requested", False) if user_doc else False
 
     log.info(f"[me] uid={uid} banned={banned} card={card_type} demo={demo} verified={verified}")
     return web.json_response({
@@ -397,34 +406,54 @@ async def handle_verify_request(request: web.Request) -> web.Response:
         return web.json_response({"error": "auth failed"}, status=401, headers=CORS_HEADERS)
 
     uid = user.get("id")
-    user_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
-    username = user.get("username", "—")
     recommender_name = (data.get("recommender_name", "") or "").strip()
     recommender_phone = (data.get("recommender_phone", "") or "").strip()
-    user_phone = (data.get("user_phone", "") or "").strip()
 
     if not recommender_name or not recommender_phone:
         return web.json_response({"error": "missing fields"}, status=400, headers=CORS_HEADERS)
 
     await db.submit_verify_request(uid, recommender_name, recommender_phone)
 
-    # Notify operators
-    op_text = (
-        f"🔐 *ЗАПРОС НА ВЕРИФИКАЦИЮ*\n\n"
-        f"👤 *Клиент:* {user_name} (@{username}, ID: `{uid}`)\n"
-        f"📞 *Тел клиента:* {user_phone or '—'}\n\n"
-        f"👥 *Рекомендатель:* {recommender_name}\n"
-        f"📞 *Тел рекомендателя:* {recommender_phone}"
-    )
-    op_kb = {"inline_keyboard": [
-        [{"text": "✅ Верифицировать", "callback_data": f"verify_{uid}"}],
-        [{"text": "✅ Просмотрено", "callback_data": "delmsg"}],
-    ]}
-    for op_id in OPERATOR_IDS:
-        try:
-            await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text, reply_markup=op_kb)
-        except Exception as e:
-            log.error(f"Verify request notify {op_id}: {e}")
+    # Find the pending-verification order and send combined notification
+    user_orders = await db.get_user_orders(uid)
+    pending = [o for o in user_orders if o.get("pending_verification")]
+    for order in pending:
+        oid = order["order_id"]
+        saved_op_text = order.get("op_text", "")
+        # Strip any existing first-order banner from saved text, replace with louder one
+        if saved_op_text:
+            for prefix in ["🔴 *⚠️ ПЕРВЫЙ ЗАКАЗ — новый клиент!*\n\n",
+                           "🔴 *⚠️ НОВЫЙ КЛИЕНТ РЕФЕРАЛ*\n",
+                           "🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨\n\n",
+                           "🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ РЕФЕРАЛ* 🚨🚨🚨\n"]:
+                saved_op_text = saved_op_text.replace(prefix, "")
+            combined = (
+                f"🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨\n\n"
+                + saved_op_text.strip()
+            )
+        else:
+            combined = f"🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨\n\n🆕 *ЗАКАЗ #{oid}*"
+
+        op_buttons = [
+            [
+                {"text": "✅ Принять",   "callback_data": f"acc_{oid}_{uid}"},
+                {"text": "❌ Отклонить", "callback_data": f"dec_{oid}_{uid}"},
+            ],
+            [
+                {"text": "✏️ Редактировать", "callback_data": f"edit_{oid}"},
+                {"text": "📍 Геолокация",    "callback_data": f"loc_{oid}"},
+            ],
+            [{"text": "👤 Клиент", "callback_data": f"client_{oid}_{uid}"}],
+            [{"text": "🔐 Верифицировать клиента", "callback_data": f"verify_{uid}"}],
+        ]
+        op_kb = {"inline_keyboard": op_buttons}
+        for op_id in OPERATOR_IDS:
+            try:
+                await tg_send(OPERATOR_BOT_TOKEN, op_id, combined, reply_markup=op_kb)
+            except Exception as e:
+                log.error(f"Verify+order notify {op_id}: {e}")
+        # Clear the pending flag
+        await db.update_order(oid, pending_verification=False)
 
     log.info(f"[verify-request] uid={uid} recommender={recommender_name}")
     return web.json_response({"ok": True}, headers=CORS_HEADERS)

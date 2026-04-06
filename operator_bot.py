@@ -422,6 +422,22 @@ async def customer_card(o):
         if isinstance(fs, str):
             fs = datetime.fromisoformat(fs)
         lines.append(f"📅 Клиент с: *{fs.strftime('%d.%m.%Y')}*")
+    # Verification info
+    if user_doc:
+        verified = user_doc.get("verified", False)
+        rec_name = user_doc.get("verify_recommender_name", "")
+        rec_phone = user_doc.get("verify_recommender_phone", "")
+        lines.append("")
+        if verified:
+            lines.append("🔐 *Верифицирован* ✅")
+        elif rec_name:
+            lines.append("🔐 *Ожидает верификации* ⏳")
+        else:
+            lines.append("🔐 *Не верифицирован*")
+        if rec_name:
+            lines.append(f"👥 Рекомендатель: *{rec_name}*")
+        if rec_phone:
+            lines.append(f"📞 Тел рекомендателя: `{rec_phone}`")
     return "\n".join(lines)
 
 
@@ -1110,10 +1126,15 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("verify_"):
         cid = int(data[7:])
         await db.verify_user(cid)
-        await q.edit_message_text(
-            f"✅ Пользователь `{cid}` верифицирован.",
-            parse_mode="Markdown",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]]))
+        # Remove the verify button but keep all other buttons
+        old_kb = q.message.reply_markup
+        if old_kb:
+            new_rows = [row for row in old_kb.inline_keyboard
+                        if not any(b.callback_data and b.callback_data.startswith("verify_") for b in row)]
+            # Add a "verified" indicator row
+            new_rows.append([InlineKeyboardButton("🔐 Верифицирован ✅", callback_data="noop")])
+            await q.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(new_rows))
+        await q.answer("✅ Клиент верифицирован")
 
     # ── UNBAN ─────────────────────────────────────────────────────────────────
     elif data.startswith("unban_"):

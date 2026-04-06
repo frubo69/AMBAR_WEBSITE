@@ -253,13 +253,11 @@ async def kb_order_actions(order, list_type=None):
         InlineKeyboardButton("📍 Геолокация",    callback_data=f"loc_{oid}"),
     ])
     rows.append([InlineKeyboardButton("👤 Клиент", callback_data=f"client_{oid}_{cid}")])
-    # Show verify button if customer is not yet verified
+    # Show verify button if customer is not yet verified (and not a referral)
     try:
         user_doc = await db.get_user(int(cid))
         if user_doc and not user_doc.get("verified", False) and not user_doc.get("referred_by"):
             rows.append([InlineKeyboardButton("🔐 Верифицировать клиента", callback_data=f"verify_{cid}")])
-        elif user_doc and user_doc.get("verified", False):
-            rows.append([InlineKeyboardButton("🔐 Верифицирован ✅", callback_data="noop")])
     except Exception:
         pass
     if list_type:
@@ -1135,15 +1133,19 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("verify_"):
         cid = int(data[7:])
         await db.verify_user(cid)
-        # Remove the verify button but keep all other buttons
+        # Replace verify button with "verified" label on this message
         old_kb = q.message.reply_markup
         if old_kb:
             new_rows = [row for row in old_kb.inline_keyboard
                         if not any(b.callback_data and b.callback_data.startswith("verify_") for b in row)]
-            # Add a "verified" indicator row
             new_rows.append([InlineKeyboardButton("🔐 Верифицирован ✅", callback_data="noop")])
             await q.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(new_rows))
         await q.answer("✅ Клиент верифицирован")
+        # Send separate confirmation message
+        _dismiss = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
+        await q.message.reply_text(
+            f"✅ Клиент `{cid}` верифицирован.",
+            parse_mode="Markdown", reply_markup=_dismiss)
 
     # ── UNBAN ─────────────────────────────────────────────────────────────────
     elif data.startswith("unban_"):

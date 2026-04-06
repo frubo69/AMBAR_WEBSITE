@@ -144,6 +144,9 @@ async def handle_create_order(request: web.Request) -> web.Response:
         user_doc = await db.get_user(uid)
         _TEST_ALWAYS_FIRST = {8251195567}  # DEBUG: always treat as first order
         is_first_order = (uid in _TEST_ALWAYS_FIRST) or (user_doc is None or user_doc.get("orders_total", 0) == 0)
+        # Reset verification for test accounts so each order triggers full flow
+        if uid in _TEST_ALWAYS_FIRST:
+            await db.set_user_field(uid, verified=False, verify_requested=False)
         if is_first_order and user_doc and user_doc.get("referred_by"):
             referred_by = user_doc["referred_by"]
     except Exception:
@@ -371,14 +374,9 @@ async def handle_me(request: web.Request) -> web.Response:
     demo = user_doc.get("demo", False) if user_doc else False
 
     # Verification status
-    _TEST_ALWAYS_FIRST = {8251195567}  # DEBUG: always unverified for testing
     is_referral = bool(user_doc.get("referred_by")) if user_doc else False
-    if uid in _TEST_ALWAYS_FIRST:
-        verified = False
-        verify_requested = False
-    else:
-        verified = True if is_referral else (user_doc.get("verified", False) if user_doc else False)
-        verify_requested = user_doc.get("verify_requested", False) if user_doc else False
+    verified = True if is_referral else (user_doc.get("verified", False) if user_doc else False)
+    verify_requested = user_doc.get("verify_requested", False) if user_doc else False
 
     log.info(f"[me] uid={uid} banned={banned} card={card_type} demo={demo} verified={verified}")
     return web.json_response({

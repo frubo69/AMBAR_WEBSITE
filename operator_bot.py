@@ -237,7 +237,7 @@ def kb_order_list(items, list_type, limit=15):
     rows.append([InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")])
     return InlineKeyboardMarkup(rows)
 
-def kb_order_actions(order, list_type=None):
+async def kb_order_actions(order, list_type=None):
     oid, cid = order["order_id"], order["customer_id"]
     st       = order.get("status", "")
     rows     = []
@@ -253,6 +253,15 @@ def kb_order_actions(order, list_type=None):
         InlineKeyboardButton("📍 Геолокация",    callback_data=f"loc_{oid}"),
     ])
     rows.append([InlineKeyboardButton("👤 Клиент", callback_data=f"client_{oid}_{cid}")])
+    # Show verify button if customer is not yet verified
+    try:
+        user_doc = await db.get_user(int(cid))
+        if user_doc and not user_doc.get("verified", False) and not user_doc.get("referred_by"):
+            rows.append([InlineKeyboardButton("🔐 Верифицировать клиента", callback_data=f"verify_{cid}")])
+        elif user_doc and user_doc.get("verified", False):
+            rows.append([InlineKeyboardButton("🔐 Верифицирован ✅", callback_data="noop")])
+    except Exception:
+        pass
     if list_type:
         rows.append([InlineKeyboardButton("← К списку", callback_data=f"olist_{list_type}")])
     if order.get("review_score"):
@@ -755,7 +764,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if order:
             await q.edit_message_text(
                 order_card(order), parse_mode="Markdown",
-                reply_markup=kb_order_actions(order, list_type=lt))
+                reply_markup=await kb_order_actions(order, list_type=lt))
         else:
             await q.answer("❌ Заказ не найден", show_alert=True)
 
@@ -874,7 +883,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             lt = ctx.user_data.get("lt")
             await q.edit_message_text(
                 order_card(order) + f"\n\n✅ *Принят* | ⏱ {eta} мин",
-                parse_mode="Markdown", reply_markup=kb_order_actions(order, list_type=lt))
+                parse_mode="Markdown", reply_markup=await kb_order_actions(order, list_type=lt))
         asyncio.create_task(run_countdown(cid, eta, lang, oid))
 
     # ── DECLINE ───────────────────────────────────────────────────────────────
@@ -919,7 +928,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         order = await db.get_order(oid)
         if order:
             lt = ctx.user_data.get("lt")
-            await q.edit_message_text(order_card(order), parse_mode="Markdown", reply_markup=kb_order_actions(order, list_type=lt))
+            await q.edit_message_text(order_card(order), parse_mode="Markdown", reply_markup=await kb_order_actions(order, list_type=lt))
 
     # ── LOCATION ──────────────────────────────────────────────────────────────
     elif data.startswith("loc_"):
@@ -948,7 +957,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if not order: return
         lt = ctx.user_data.get("lt")
         await q.edit_message_text(order_card(order), parse_mode="Markdown",
-                                  reply_markup=kb_order_actions(order, list_type=lt))
+                                  reply_markup=await kb_order_actions(order, list_type=lt))
 
     elif data.startswith("edit_"):
         oid   = data[5:]
@@ -1075,7 +1084,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         order = await db.get_order(oid)
         if order:
             lt = ctx.user_data.get("lt")
-            await q.edit_message_text(order_card(order), parse_mode="Markdown", reply_markup=kb_order_actions(order, list_type=lt))
+            await q.edit_message_text(order_card(order), parse_mode="Markdown", reply_markup=await kb_order_actions(order, list_type=lt))
 
     elif data.startswith("client_"):
         _, oid, cid_str = data.split("_", 2)

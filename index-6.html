@@ -652,19 +652,19 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 @keyframes lcardShimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
 .lcard-shimmer{position:absolute;inset:0;background:linear-gradient(105deg,transparent 40%,rgba(232,201,138,.06) 45%,rgba(232,201,138,.12) 50%,rgba(232,201,138,.06) 55%,transparent 60%);background-size:200% 100%;animation:lcardShimmer 4s linear infinite;pointer-events:none;border-radius:16px}
 /* ── Custom confirm dialog ── */
-.confirm-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9990;display:none;align-items:center;justify-content:center;opacity:0;transition:opacity .18s;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.confirm-ov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9990;display:none;align-items:center;justify-content:center;opacity:0;transition:opacity .2s;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
 .confirm-ov.open{display:flex;opacity:1}
-.confirm-box{width:270px;border-radius:20px;background:rgba(44,44,46,.92);-webkit-backdrop-filter:saturate(180%) blur(40px);backdrop-filter:saturate(180%) blur(40px);overflow:hidden;transform:scale(.85);transition:transform .22s cubic-bezier(.34,1.2,.64,1);box-shadow:0 8px 40px rgba(0,0,0,.45)}
-.confirm-ov.open .confirm-box{transform:scale(1)}
-.confirm-body{padding:22px 20px 18px;text-align:center}
-.confirm-title{font-size:17px;font-weight:600;color:#fff;letter-spacing:-.2px;line-height:1.3}
-.confirm-sub{font-size:13px;color:rgba(255,255,255,.55);margin-top:6px;line-height:1.35}
-.confirm-btns{display:flex;border-top:1px solid rgba(255,255,255,.12)}
-.confirm-btn{flex:1;padding:12px 8px;font-size:17px;font-weight:400;border:none;background:transparent;cursor:pointer;transition:background .1s;font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans-serif}
-.confirm-btn:active{background:rgba(255,255,255,.08)}
-.confirm-btn+.confirm-btn{border-left:1px solid rgba(255,255,255,.12)}
-.confirm-btn-cancel{color:rgba(255,255,255,.85);font-weight:400}
-.confirm-btn-ok{color:#007aff;font-weight:600}
+.confirm-box{width:min(300px,82vw);border-radius:28px;background:linear-gradient(145deg,rgba(58,58,62,.88),rgba(42,42,46,.92));-webkit-backdrop-filter:saturate(200%) blur(50px);backdrop-filter:saturate(200%) blur(50px);overflow:hidden;transform:scale(.65);opacity:0;transition:transform .35s cubic-bezier(.175,.885,.32,1.275),opacity .2s;box-shadow:0 12px 60px rgba(0,0,0,.5),0 0 0 .5px rgba(255,255,255,.08) inset}
+.confirm-ov.open .confirm-box{transform:scale(1);opacity:1}
+.confirm-body{padding:28px 24px 24px;text-align:center}
+.confirm-title{font-size:17px;font-weight:600;color:#fff;letter-spacing:-.15px;line-height:1.35;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Helvetica Neue',sans-serif}
+.confirm-sub{font-size:13px;color:rgba(255,255,255,.5);margin-top:8px;line-height:1.4;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',sans-serif}
+.confirm-btns{display:flex;gap:10px;padding:0 18px 20px}
+.confirm-btn{flex:1;padding:14px 8px;font-size:17px;border:none;cursor:pointer;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Helvetica Neue',sans-serif;border-radius:14px;transition:transform .1s,opacity .1s}
+.confirm-btn:active{transform:scale(.96);opacity:.8}
+.confirm-btn-cancel{color:#fff;font-weight:500;background:rgba(255,255,255,.12)}
+.confirm-btn-ok{color:#fff;font-weight:600;background:#007aff}
+.confirm-btn-ok.destructive{background:#ff453a}
 
 /* ── Cancel sheet ── */
 .cancel-ov{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:800;display:none;align-items:flex-end;opacity:0;transition:opacity .22s}
@@ -5347,7 +5347,8 @@ function showConfirm(title,opts={}){
     if(opts.sub){sub.textContent=opts.sub;sub.style.display='';}else{sub.style.display='none';}
     el('confirm-cancel-btn').textContent=opts.cancel||(lang==='ru'?'Отмена':'Cancel');
     el('confirm-ok-btn').textContent=opts.ok||'OK';
-    if(opts.destructive){el('confirm-ok-btn').style.color='#ff453a';}else{el('confirm-ok-btn').style.color='#007aff';}
+    const okBtn=el('confirm-ok-btn');
+    if(opts.destructive){okBtn.classList.add('destructive');}else{okBtn.classList.remove('destructive');}
     const ov=el('confirm-ov');
     ov.style.display='flex';
     requestAnimationFrame(()=>requestAnimationFrame(()=>ov.classList.add('open')));

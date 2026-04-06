@@ -1101,11 +1101,12 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         total = (order or {}).get("total", 0)
         await db._increment_user(cid, orders_done=1, total_spent=total)
         await cleanup_and_deliver(cid, oid, lang)
+        order = await db.get_order(oid)
         if order:
-            _done_kb = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
+            lt = ctx.user_data.get("lt")
             await q.edit_message_text(
                 (await order_card(order)) + "\n\n✅ *Доставлен*",
-                parse_mode="Markdown", reply_markup=_done_kb)
+                parse_mode="Markdown", reply_markup=await kb_order_actions(order, list_type=lt))
 
     # ── UNDO DELIVERED → back to approved ────────────────────────────────────
     elif data.startswith("undone_"):

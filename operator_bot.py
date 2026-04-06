@@ -248,6 +248,8 @@ async def kb_order_actions(order, list_type=None):
         ])
     if st == "approved":
         rows.append([InlineKeyboardButton(f"🚚 Доставлено #{oid}", callback_data=f"done_{oid}_{cid}")])
+    if st == "delivered":
+        rows.append([InlineKeyboardButton("🔄 Вернуть в доставку", callback_data=f"undone_{oid}_{cid}")])
     rows.append([
         InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{oid}"),
         InlineKeyboardButton("📍 Геолокация",    callback_data=f"loc_{oid}"),
@@ -1104,6 +1106,21 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await q.edit_message_text(
                 (await order_card(order)) + "\n\n✅ *Доставлен*",
                 parse_mode="Markdown", reply_markup=_done_kb)
+
+    # ── UNDO DELIVERED → back to approved ────────────────────────────────────
+    elif data.startswith("undone_"):
+        parts = data.split("_"); oid, cid = parts[1], int(parts[2])
+        order = await db.get_order(oid)
+        if order and order.get("status") == "delivered":
+            total = order.get("total", 0)
+            await db._increment_user(cid, orders_done=-1, total_spent=-total)
+            await db.update_order(oid, status="approved", updated_at=datetime.now().isoformat())
+        order = await db.get_order(oid)
+        if order:
+            lt = ctx.user_data.get("lt")
+            await q.edit_message_text(
+                (await order_card(order)) + "\n\n🔄 *Возвращён в доставку*",
+                parse_mode="Markdown", reply_markup=await kb_order_actions(order, list_type=lt))
 
     # ── BACK TO ORDER (from sub-views) ────────────────────────────────────────
     elif data.startswith("back_order_"):

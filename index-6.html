@@ -867,6 +867,11 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .gps-mini-map-el{width:100%;height:100%}
 .gps-mini-pin{position:absolute;top:50%;left:50%;transform:translate(-50%,-60%);pointer-events:none;z-index:500;transition:transform .15s}
 .gps-mini-pin.editing{transform:translate(-50%,-70%) scale(1.1)}
+.gps-locate-pill{position:absolute;bottom:10px;left:10px;z-index:600;display:flex;align-items:center;background:rgba(18,18,24,.78);border:1.5px solid var(--border2);border-radius:50px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);overflow:hidden;height:36px;cursor:pointer;opacity:0;pointer-events:none;transition:opacity .2s,width .3s cubic-bezier(.4,0,.2,1);width:36px}
+.gps-mini-pin.editing~.gps-locate-pill,.gps-mini-map-wrap .gps-locate-pill.visible{opacity:1;pointer-events:auto;width:110px}
+.gps-locate-pill:active{opacity:.7}
+.gps-locate-pill-icon{width:36px;height:36px;flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--sub)}
+.gps-locate-pill-text{color:var(--text);font-size:12px;font-weight:600;white-space:nowrap;padding-right:12px}
 .gps-edit-pill{position:absolute;bottom:10px;right:10px;z-index:600;display:flex;align-items:center;background:rgba(18,18,24,.78);border:1.5px solid rgba(201,169,110,.4);border-radius:50px;backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);overflow:hidden;width:36px;height:36px;transition:width .3s cubic-bezier(.4,0,.2,1);cursor:pointer}
 .gps-edit-pill:active{opacity:.7}
 .gps-edit-pill.editing{width:104px}
@@ -1791,6 +1796,13 @@ body.aob-on #pg-cart{overflow-y:auto!important}
         <div id="gps-mini-map-el" class="gps-mini-map-el"></div>
         <div class="gps-mini-pin" id="gps-mini-pin">
           <img src="pin.png" width="36" height="36" style="display:block;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5))">
+        </div>
+        <!-- locate pill inside the map, bottom-left (only in edit mode) -->
+        <div class="gps-locate-pill" id="gps-locate-pill" onclick="_gpsMiniLocateMe()">
+          <div class="gps-locate-pill-icon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><circle cx="12" cy="12" r="3"/><path d="M12 2v4m0 12v4m10-10h-4M6 12H2"/><circle cx="12" cy="12" r="9"/></svg>
+          </div>
+          <span class="gps-locate-pill-text" id="gps-locate-pill-text">Где я?</span>
         </div>
         <!-- edit pill inside the map, bottom-right -->
         <div class="gps-edit-pill" id="gps-edit-pill" onclick="_onGpsEditPillTap()">
@@ -3436,6 +3448,10 @@ function showAddrSaveSheet(){
   el('gps-mini-panel')?.classList.remove('open');
   expandBtn?.classList.remove('open');
   el('gps-edit-pill')?.classList.remove('editing');
+  // Auto-expand mini map for GPS addresses
+  if(locInfo?.isGps&&locInfo?.lat){
+    setTimeout(()=>openGpsMiniPanel(),120);
+  }
   if(_sheetFromMapEdit){
     // Coming back from map edit — restore preserved label/comment
     const nameIn=el('addr-name-in');const commentIn=el('addr-comment-in');
@@ -3539,6 +3555,8 @@ function startGpsMiniEdit(){
   _miniMap.doubleClickZoom.enable();
   el('gps-mini-pin')?.classList.add('editing');
   el('gps-edit-pill')?.classList.add('editing');
+  el('gps-locate-pill')?.classList.add('visible');
+  const lt=el('gps-locate-pill-text');if(lt)lt.textContent=lang==='ru'?'Где я?':'Where am I?';
   // update text for current lang
   const t=el('gps-edit-pill-text');if(t)t.textContent=lang==='ru'?'Готово':'Done';
   haptic.light();
@@ -3554,8 +3572,21 @@ function confirmGpsMiniEdit(){
   _miniMap.doubleClickZoom.disable();
   el('gps-mini-pin')?.classList.remove('editing');
   el('gps-edit-pill')?.classList.remove('editing');
+  el('gps-locate-pill')?.classList.remove('visible');
   haptic.success();
   showToast(lang==='ru'?'Координаты обновлены':'Location updated','ok',true);
+}
+
+function _gpsMiniLocateMe(){
+  if(!_miniMap||!_miniEditing)return;
+  haptic.light();
+  if(!navigator.geolocation){showToast(lang==='ru'?'GPS недоступен':'GPS unavailable','err');return;}
+  navigator.geolocation.getCurrentPosition(pos=>{
+    _miniMap.setView([pos.coords.latitude,pos.coords.longitude],17,{animate:true});
+    haptic.success();
+  },()=>{
+    showToast(lang==='ru'?'Не удалось определить':'Could not get location','err');
+  },{timeout:8000,maximumAge:30000,enableHighAccuracy:true});
 }
 
 function _mapGoToUserLocation(){

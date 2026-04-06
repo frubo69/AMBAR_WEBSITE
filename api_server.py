@@ -228,6 +228,7 @@ async def handle_create_order(request: web.Request) -> web.Response:
         f"{first_order_banner}"
         f"🏢 Офис: *{office_nm}*\n\n"
         f"🆕 *НОВЫЙ ЗАКАЗ #{oid}*\n\n"
+        f"📞 Тел: {phone}\n"
         f"{addr_line}\n\n"
         f"🛒 *Позиции:*\n{item_lines}\n\n"
         f"🎁 Чаевые: {tip} AED\n"
@@ -432,8 +433,6 @@ async def handle_verify_request(request: web.Request) -> web.Response:
         else:
             combined = f"🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨\n\n🆕 *ЗАКАЗ #{oid}*"
 
-        # Get customer phone from the order
-        customer_phone = order.get("phone", "")
         op_buttons = [
             [
                 {"text": "✅ Принять",   "callback_data": f"acc_{oid}_{uid}"},
@@ -444,7 +443,6 @@ async def handle_verify_request(request: web.Request) -> web.Response:
                 {"text": "📍 Геолокация",    "callback_data": f"loc_{oid}"},
             ],
             [{"text": "👤 Клиент", "callback_data": f"client_{oid}_{uid}"}],
-            [{"text": f"📞 Позвонить {customer_phone}", "url": f"tel:{customer_phone}"}],
             [{"text": "🔐 Верифицировать клиента", "callback_data": f"verify_{uid}"}],
         ]
         op_kb = {"inline_keyboard": op_buttons}

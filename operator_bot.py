@@ -273,14 +273,6 @@ async def kb_order_actions(order, list_type=None):
 async def kb_client_actions(oid, cid):
     """Keyboard shown on client info view."""
     rows = []
-    # Call button — get phone from order
-    try:
-        order = await db.get_order(oid)
-        phone = order.get("phone", "") if order else ""
-        if phone and phone != "—":
-            rows.append([InlineKeyboardButton(f"📞 Позвонить {phone}", url=f"tel:{phone}")])
-    except Exception:
-        pass
     rows.append([InlineKeyboardButton("🚫 Забанить клиента", callback_data=f"ban_{oid}_{cid}")])
     rows.append([InlineKeyboardButton("✏️ Заметка к имени", callback_data=f"rename_{oid}_{cid}")])
     rows.append([InlineKeyboardButton("← Назад", callback_data=f"client_back_{oid}")])

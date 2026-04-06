@@ -364,6 +364,28 @@ async def get_orders_in_range(start_iso: str, end_iso: str, office_id: str = Non
     return await cursor.to_list(length=500)
 
 
+async def get_unverified_users_with_orders() -> list:
+    """Return users who are not verified and have placed at least one order."""
+    db = _db_or_none()
+    if db is None: return []
+    # Get distinct customer_ids from orders
+    order_cids = await db.orders.distinct("customer_id")
+    # Normalize to int (handles possible string ids)
+    int_cids = set()
+    for c in order_cids:
+        try:
+            int_cids.add(int(c))
+        except (ValueError, TypeError):
+            pass
+    if not int_cids:
+        return []
+    cursor = db.users.find(
+        {"telegram_id": {"$in": list(int_cids)}, "$or": [{"verified": False}, {"verified": {"$exists": False}}]},
+        {"_id": 0}
+    )
+    return await cursor.to_list(length=200)
+
+
 async def award_referral_points(referrer_id: int, referred_id: int, points: int):
     """Award referral points to the referrer and log the referral."""
     db = _db_or_none()

@@ -223,7 +223,7 @@ def kb_main():
     return ReplyKeyboardMarkup([
         ["🆕 Новые заказы",   "🟢 Активные"],
         ["✅ Завершённые",    "📊 Статистика"],
-        ["🚫 Забаненные",     "🔄 Смена"],
+        ["🚫 Бан / Нет верификации", "🔄 Смена"],
     ], resize_keyboard=True)
 
 def kb_order_list(items, list_type, limit=15):
@@ -579,7 +579,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Нет доступа."); return
 
     # If operator tapped a menu button, cancel any pending input flow
-    _menu_keywords = ("Новые", "Активные", "Завершённые", "Забаненные", "Статистика", "Смена")
+    _menu_keywords = ("Новые", "Активные", "Завершённые", "Бан", "Статистика", "Смена")
     if any(kw in (update.message.text or "") for kw in _menu_keywords):
         ctx.user_data.pop("pending_ban", None)
         ctx.user_data.pop("pending_rename", None)
@@ -718,20 +718,14 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             f"💰 *Выручка: {int(rev)} AED*",
             parse_mode="Markdown", reply_markup=_dismiss)
 
-    elif "Забаненные" in text:
-        banned = await db.get_all_banned()
-        if not banned:
-            await send(cid, "✅ Забаненных нет.", reply_markup=_dismiss); return
-        lines = ["🚫 *Заблокированные пользователи:*\n"]
-        rows  = []
-        for u in banned[:15]:
-            uid_str = str(u.get("telegram_id", u.get("tg_id", "?")))
-            ts      = (u.get("banned_at","") or "")[:10]
-            lines.append(f"• ID `{uid_str}` — {u.get('ban_reason','—')} ({ts})")
-            rows.append([InlineKeyboardButton(f"🔓 Разбанить {uid_str}", callback_data=f"unban_{uid_str}")])
-        rows.append([InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")])
-        await send(cid, "\n".join(lines), parse_mode="Markdown",
-                   reply_markup=InlineKeyboardMarkup(rows) if rows else None)
+    elif "Бан" in text:
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("🚫 Забаненные", callback_data="list_banned")],
+            [InlineKeyboardButton("🔐 Без верификации", callback_data="list_unverified")],
+            [InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")],
+        ])
+        await send(cid, "🚫 *Бан / Верификация*\n\nВыберите категорию:",
+                   parse_mode="Markdown", reply_markup=kb)
 
     elif "Смена" in text:
         shift = await db.get_active_shift(uid)
@@ -886,6 +880,54 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not data.startswith("rename_") and not data.startswith("ban_input_"):
         ctx.user_data.pop("pending_ban", None)
         ctx.user_data.pop("pending_rename", None)
+
+    # ── LIST BANNED ───────────────────────────────────────────────────────────
+    if data == "list_banned":
+        banned = await db.get_all_banned()
+        if not banned:
+            await q.edit_message_text("✅ Нет заблокированных пользователей.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]]))
+            return
+        lines = []
+        buttons = []
+        for u in banned[:20]:
+            tid = u.get("telegram_id")
+            name = u.get("first_name", "") or ""
+            lname = u.get("last_name", "") or ""
+            full = f"{name} {lname}".strip() or str(tid)
+            reason = u.get("ban_reason", "—")
+            lines.append(f"• `{tid}` — {full}\n  Причина: _{reason}_")
+            buttons.append([InlineKeyboardButton(f"🔓 Разбанить {full}", callback_data=f"unban_{tid}")])
+        buttons.append([InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")])
+        await q.edit_message_text(
+            "🚫 *Заблокированные пользователи:*\n\n" + "\n".join(lines),
+            parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
+        return
+
+    # ── LIST UNVERIFIED ───────────────────────────────────────────────────────
+    if data == "list_unverified":
+        users = await db.get_unverified_users_with_orders()
+        if not users:
+            await q.edit_message_text("✅ Все пользователи с заказами верифицированы.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]]))
+            return
+        lines = []
+        buttons = []
+        for u in users[:20]:
+            tid = u.get("telegram_id")
+            name = u.get("first_name", "") or ""
+            lname = u.get("last_name", "") or ""
+            full = f"{name} {lname}".strip() or str(tid)
+            rec_name = u.get("verify_recommender_name", "")
+            rec_phone = u.get("verify_recommender_phone", "")
+            rec_info = f"  Рекомендатель: _{rec_name}_ {rec_phone}" if rec_name else ""
+            lines.append(f"• `{tid}` — {full}{rec_info}")
+            buttons.append([InlineKeyboardButton(f"✅ Верифицировать {full}", callback_data=f"verify_{tid}")])
+        buttons.append([InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")])
+        await q.edit_message_text(
+            "🔐 *Без верификации (есть заказы):*\n\n" + "\n".join(lines),
+            parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
+        return
 
     # ── ORDER LIST: select order ─────────────────────────────────────────────
     if data.startswith("osel_"):

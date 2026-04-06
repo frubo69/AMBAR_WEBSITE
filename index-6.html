@@ -1360,7 +1360,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
           <div style="font-size:12px;color:var(--muted);margin-top:2px" id="supp-call-sub">+971 50 123 4567</div>
         </div>
       </button>
-      <button onclick="closeSupportOptions();setTimeout(()=>{openSupportChat('general');},250)"
+      <button id="supp-msg-btn" onclick="closeSupportOptions();setTimeout(()=>{openSupportChat('general');},250)"
         style="display:flex;align-items:center;gap:14px;width:100%;padding:16px 18px;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.08);border-radius:16px;text-align:left;transition:.15s"
         onpointerdown="this.style.background='rgba(255,255,255,.09)'" onpointerup="this.style.background='rgba(255,255,255,.05)'" onpointercancel="this.style.background='rgba(255,255,255,.05)'">
         <div style="width:42px;height:42px;border-radius:12px;background:rgba(201,169,110,.15);display:flex;align-items:center;justify-content:center;flex-shrink:0">
@@ -1788,7 +1788,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       <div class="support-hdr-title" id="support-hdr-title">Поддержка</div>
       <div class="support-hdr-sub" id="support-hdr-sub"></div>
     </div>
-    <button class="support-back" onclick="openSupportOptions()" style="border-color:rgba(52,199,89,.3);background:rgba(52,199,89,.08)">
+    <button class="support-back" onclick="openSupportOptions(true)" style="border-color:rgba(52,199,89,.3);background:rgba(52,199,89,.08)">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#34c759" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.63 3.4 2 2 0 0 1 3.6 1.22h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.78a16 16 0 0 0 6 6l.94-1.94a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 21.73 15z"/></svg>
     </button>
   </div>
@@ -5304,7 +5304,7 @@ function closeVipSheet(){_closeSheet('vip-ov');}
 const SUPPORT_PHONE='+971501234567';
 const SUPPORT_PHONE_DISPLAY='+971 50 123 4567';
 
-function openSupportOptions(){
+function openSupportOptions(hideMsg){
   const ru=lang==='ru';
   set('supp-opt-title',ru?'ПОДДЕРЖКА':'SUPPORT');
   set('supp-call-lbl',ru?'Позвонить':'Call');
@@ -5312,6 +5312,7 @@ function openSupportOptions(){
   el('supp-call-btn').dataset.copied=ru?'Скопировано':'Copied';
   set('supp-msg-lbl',ru?'Написать сообщение':'Send message');
   set('supp-msg-sub',ru?'Чат в приложении':'In-app chat');
+  el('supp-msg-btn').style.display=hideMsg?'none':'flex';
   _openSheet('support-options-ov');
 }
 function closeSupportOptions(){_closeSheet('support-options-ov');}

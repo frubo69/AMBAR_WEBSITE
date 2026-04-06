@@ -38,6 +38,7 @@ async def connect():
         await _db.users.create_index("telegram_id", unique=True)
         await _db.support_messages.create_index("conv_key", unique=True)
         await _db.support_map.create_index("fwd_msg_id", unique=True)
+        await _db.shifts.create_index([("operator_id", 1), ("status", 1)])
         log.info("✅ MongoDB connected — db: ambar")
     except Exception as e:
         log.error(f"MongoDB index error: {e}")
@@ -302,6 +303,65 @@ async def submit_verify_request(telegram_id: int, recommender_name: str, recomme
             "verify_requested_at": datetime.now(timezone.utc).isoformat(),
         }},
     )
+
+
+# ── Shifts ────────────────────────────────────────────────────────────────────
+
+async def open_shift(operator_id: int, office_id: str = None):
+    """Open a new shift for an operator. Close any existing open shift first."""
+    db = _db_or_none()
+    if db is None: return
+    # Close any existing open shift
+    await db.shifts.update_many(
+        {"operator_id": operator_id, "status": "open"},
+        {"$set": {"status": "closed", "closed_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    await db.shifts.insert_one({
+        "operator_id": operator_id,
+        "office_id": office_id,
+        "status": "open",
+        "opened_at": datetime.now(timezone.utc).isoformat(),
+        "closed_at": None,
+    })
+
+
+async def close_shift(operator_id: int) -> dict | None:
+    """Close the active shift and return the shift doc."""
+    db = _db_or_none()
+    if db is None: return None
+    now = datetime.now(timezone.utc).isoformat()
+    shift = await db.shifts.find_one(
+        {"operator_id": operator_id, "status": "open"}, {"_id": 0}
+    )
+    if not shift:
+        return None
+    await db.shifts.update_one(
+        {"operator_id": operator_id, "status": "open"},
+        {"$set": {"status": "closed", "closed_at": now}},
+    )
+    shift["closed_at"] = now
+    shift["status"] = "closed"
+    return shift
+
+
+async def get_active_shift(operator_id: int) -> dict | None:
+    """Return the currently open shift for an operator, or None."""
+    db = _db_or_none()
+    if db is None: return None
+    return await db.shifts.find_one(
+        {"operator_id": operator_id, "status": "open"}, {"_id": 0}
+    )
+
+
+async def get_orders_in_range(start_iso: str, end_iso: str, office_id: str = None) -> list:
+    """Return all orders with timestamp between start and end."""
+    db = _db_or_none()
+    if db is None: return []
+    filt = {"timestamp": {"$gte": start_iso, "$lte": end_iso}}
+    if office_id:
+        filt["office_id"] = office_id
+    cursor = db.orders.find(filt, {"_id": 0}).sort("timestamp", -1)
+    return await cursor.to_list(length=500)
 
 
 async def award_referral_points(referrer_id: int, referred_id: int, points: int):

@@ -223,7 +223,7 @@ def kb_main():
     return ReplyKeyboardMarkup([
         ["🆕 Новые заказы",   "🟢 Активные"],
         ["✅ Завершённые",    "📊 Статистика"],
-        ["🚫 Забаненные",     "ℹ️ Помощь"],
+        ["🚫 Забаненные",     "🔄 Смена"],
     ], resize_keyboard=True)
 
 def kb_order_list(items, list_type, limit=15):
@@ -579,7 +579,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Нет доступа."); return
 
     # If operator tapped a menu button, cancel any pending input flow
-    _menu_keywords = ("Новые", "Активные", "Завершённые", "Забаненные", "Статистика")
+    _menu_keywords = ("Новые", "Активные", "Завершённые", "Забаненные", "Статистика", "Смена")
     if any(kw in (update.message.text or "") for kw in _menu_keywords):
         ctx.user_data.pop("pending_ban", None)
         ctx.user_data.pop("pending_rename", None)
@@ -651,6 +651,18 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     send = ctx.bot.send_message  # shortcut — original message is deleted
     _dismiss = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
 
+    # Block all actions except "Смена" when shift is closed
+    if "Смена" not in text:
+        shift = await db.get_active_shift(uid)
+        if not shift:
+            kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🟢 Открыть смену", callback_data="shift_open")],
+            ])
+            await send(cid,
+                "⚠️ *Смена не открыта*\n\nОткройте смену чтобы начать работу.",
+                parse_mode="Markdown", reply_markup=kb)
+            return
+
     if "Новые" in text:
         header, empty, items = await _build_order_list("n", uid)
         if not items:
@@ -721,20 +733,31 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await send(cid, "\n".join(lines), parse_mode="Markdown",
                    reply_markup=InlineKeyboardMarkup(rows) if rows else None)
 
-    elif "Помощь" in text:
-        await send(cid,
-            "ℹ️ *AMBAR — Оператор*\n\n"
-            "🆕 *Новые* — входящие заказы\n"
-            "🟢 *Активные* — принятые, в доставке\n"
-            "✅ *Завершённые* — история\n"
-            "📊 *Статистика* — сводка за сегодня\n"
-            "🚫 *Забаненные* — заблокированные клиенты\n\n"
-            "На каждом заказе есть кнопки:\n"
-            "✅ Принять → выбрать время → таймер запускается\n"
-            "✏️ Редактировать → добавить/убрать позиции\n"
-            "📍 Геолокация → увидеть точку клиента\n"
-            "🚫 Забанить → заблокировать клиента",
-            parse_mode="Markdown", reply_markup=_dismiss)
+    elif "Смена" in text:
+        shift = await db.get_active_shift(uid)
+        if shift:
+            opened = shift.get("opened_at", "")
+            try:
+                dt = datetime.fromisoformat(opened.replace("Z", "+00:00")).astimezone(DUBAI_TZ)
+                opened_str = dt.strftime("%H:%M %d.%m.%Y")
+            except:
+                opened_str = opened[:16]
+            kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🔴 Закрыть смену", callback_data="shift_close")],
+                [InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")],
+            ])
+            await send(cid,
+                f"🔄 *Смена активна*\n\n"
+                f"🕐 Открыта: *{opened_str}*",
+                parse_mode="Markdown", reply_markup=kb)
+        else:
+            kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🟢 Открыть смену", callback_data="shift_open")],
+                [InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")],
+            ])
+            await send(cid,
+                "🔄 *Смена не активна*\n\nОткройте смену чтобы начать работу.",
+                parse_mode="Markdown", reply_markup=kb)
 
     else:
         await send(cid, "Используйте кнопки меню 👇", reply_markup=_dismiss)
@@ -757,6 +780,107 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     op   = update.effective_user.id
 
     if data == "noop": return
+
+    # ── SHIFT OPEN / CLOSE ───────────────────────────────────────────────────
+    if data == "shift_open":
+        off = get_operator_office(op)
+        await db.open_shift(op, off)
+        now = datetime.now(DUBAI_TZ).strftime("%H:%M %d.%m.%Y")
+        await q.edit_message_text(
+            f"🟢 *Смена открыта!*\n\n🕐 Начало: *{now}*\n\nУдачной работы! 💪",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]]))
+        return
+
+    if data == "shift_close":
+        shift = await db.close_shift(op)
+        if not shift:
+            await q.edit_message_text("⚠️ Нет активной смены.", reply_markup=InlineKeyboardMarkup(
+                [[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])); return
+        # Build shift stats
+        opened_at = shift.get("opened_at", "")
+        closed_at = shift.get("closed_at", "")
+        off = shift.get("office_id")
+        # Time calculations
+        try:
+            dt_open = datetime.fromisoformat(opened_at.replace("Z", "+00:00")).astimezone(DUBAI_TZ)
+            dt_close = datetime.fromisoformat(closed_at.replace("Z", "+00:00")).astimezone(DUBAI_TZ)
+            duration = dt_close - dt_open
+            hours = int(duration.total_seconds() // 3600)
+            mins = int((duration.total_seconds() % 3600) // 60)
+            dur_str = f"{hours}ч {mins}мин" if hours else f"{mins}мин"
+            open_str = dt_open.strftime("%H:%M")
+            close_str = dt_close.strftime("%H:%M")
+            date_str = dt_open.strftime("%d.%m.%Y")
+        except:
+            dur_str = "—"
+            open_str = opened_at[:16]
+            close_str = closed_at[:16]
+            date_str = ""
+        # Get orders during shift
+        orders = await db.get_orders_in_range(opened_at, closed_at, off)
+        delivered = [o for o in orders if o.get("status") == "delivered"]
+        approved = [o for o in orders if o.get("status") == "approved"]
+        pending = [o for o in orders if o.get("status") == "pending"]
+        declined = [o for o in orders if o.get("status") == "declined"]
+        cancelled = [o for o in orders if o.get("status") == "cancelled"]
+        revenue = sum(o.get("total", 0) for o in delivered)
+        tips = sum(o.get("tip", 0) for o in delivered)
+        avg_check = int(revenue / len(delivered)) if delivered else 0
+        # Build order list
+        order_lines = []
+        for o in orders[:30]:
+            st_emoji = {"delivered": "✅", "approved": "🟢", "pending": "🟡", "declined": "🔴", "cancelled": "🚫"}.get(o.get("status"), "❓")
+            total = o.get("total", 0)
+            oid = o.get("order_id", "?")
+            name = o.get("customer_name", "—")
+            order_lines.append(f"  {st_emoji} `#{oid}` — {total} AED — {name}")
+        orders_text = "\n".join(order_lines) if order_lines else "  Нет заказов"
+        # Top products
+        product_counts = {}
+        for o in delivered:
+            for item in o.get("items", []):
+                pname = item.get("name", "?")
+                qty = item.get("qty", 1)
+                product_counts[pname] = product_counts.get(pname, 0) + qty
+        top_products = sorted(product_counts.items(), key=lambda x: -x[1])[:5]
+        top_lines = "\n".join(f"  • {name} ×{cnt}" for name, cnt in top_products) if top_products else "  —"
+
+        stats = (
+            f"🔴 *Смена закрыта*\n\n"
+            f"📅 *{date_str}*\n"
+            f"🕐 {open_str} → {close_str}  (*{dur_str}*)\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"📦 *Заказов за смену: {len(orders)}*\n\n"
+            f"  ✅ Доставлено: *{len(delivered)}*\n"
+            f"  🟢 В работе: *{len(approved)}*\n"
+            f"  🟡 Ожидают: *{len(pending)}*\n"
+            f"  🔴 Отклонено: *{len(declined)}*\n"
+            f"  🚫 Отменено: *{len(cancelled)}*\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"💰 *Выручка: {int(revenue):,} AED*\n"
+            f"🎁 Чаевые: *{int(tips):,} AED*\n"
+            f"🧾 Средний чек: *{avg_check:,} AED*\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"🏆 *Топ товаров:*\n{top_lines}\n\n"
+            f"━━━━━━━━━━━━━━━━━━━\n"
+            f"📋 *Все заказы:*\n{orders_text}"
+        )
+        await q.edit_message_text(stats, parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]]))
+        return
+
+    # Block callbacks (except shift/delmsg) when shift is not open
+    if data != "delmsg":
+        shift = await db.get_active_shift(op)
+        if not shift:
+            kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton("🟢 Открыть смену", callback_data="shift_open")],
+            ])
+            await q.edit_message_text(
+                "⚠️ *Смена не открыта*\n\nОткройте смену чтобы начать работу.",
+                parse_mode="Markdown", reply_markup=kb)
+            return
 
     # Clear pending input flows when operator navigates away
     if not data.startswith("rename_") and not data.startswith("ban_input_"):

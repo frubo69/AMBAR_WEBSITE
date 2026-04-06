@@ -651,6 +651,21 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .lcard-founder-serial{font-family:'Space Grotesk',sans-serif;font-size:9px;letter-spacing:3px;color:rgba(232,201,138,.25)}
 @keyframes lcardShimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
 .lcard-shimmer{position:absolute;inset:0;background:linear-gradient(105deg,transparent 40%,rgba(232,201,138,.06) 45%,rgba(232,201,138,.12) 50%,rgba(232,201,138,.06) 55%,transparent 60%);background-size:200% 100%;animation:lcardShimmer 4s linear infinite;pointer-events:none;border-radius:16px}
+/* ── Custom confirm dialog ── */
+.confirm-ov{position:fixed;inset:0;background:rgba(0,0,0,.55);z-index:9990;display:none;align-items:center;justify-content:center;opacity:0;transition:opacity .18s;-webkit-backdrop-filter:blur(12px);backdrop-filter:blur(12px)}
+.confirm-ov.open{display:flex;opacity:1}
+.confirm-box{width:270px;border-radius:20px;background:rgba(44,44,46,.92);-webkit-backdrop-filter:saturate(180%) blur(40px);backdrop-filter:saturate(180%) blur(40px);overflow:hidden;transform:scale(.85);transition:transform .22s cubic-bezier(.34,1.2,.64,1);box-shadow:0 8px 40px rgba(0,0,0,.45)}
+.confirm-ov.open .confirm-box{transform:scale(1)}
+.confirm-body{padding:22px 20px 18px;text-align:center}
+.confirm-title{font-size:17px;font-weight:600;color:#fff;letter-spacing:-.2px;line-height:1.3}
+.confirm-sub{font-size:13px;color:rgba(255,255,255,.55);margin-top:6px;line-height:1.35}
+.confirm-btns{display:flex;border-top:1px solid rgba(255,255,255,.12)}
+.confirm-btn{flex:1;padding:12px 8px;font-size:17px;font-weight:400;border:none;background:transparent;cursor:pointer;transition:background .1s;font-family:-apple-system,BlinkMacSystemFont,'SF Pro','Helvetica Neue',sans-serif}
+.confirm-btn:active{background:rgba(255,255,255,.08)}
+.confirm-btn+.confirm-btn{border-left:1px solid rgba(255,255,255,.12)}
+.confirm-btn-cancel{color:rgba(255,255,255,.85);font-weight:400}
+.confirm-btn-ok{color:#007aff;font-weight:600}
+
 /* ── Cancel sheet ── */
 .cancel-ov{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:800;display:none;align-items:flex-end;opacity:0;transition:opacity .22s}
 .cancel-ov.open{display:flex;opacity:1}
@@ -1337,6 +1352,20 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div id="boss-crown" style="position:relative;z-index:2;font-size:86px;transform:translateY(-260px) scale(0.2);opacity:0;transition:transform 0.75s cubic-bezier(.34,1.56,.64,1),opacity 0.4s">👑</div>
   <div id="boss-line1" style="position:relative;z-index:2;font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:900;color:#c9a940;letter-spacing:8px;text-transform:uppercase;opacity:0;transform:translateY(24px);transition:opacity 0.5s,transform 0.5s;margin-top:18px"></div>
   <div id="boss-line2" style="position:relative;z-index:2;font-family:'DM Sans',sans-serif;font-size:12px;color:rgba(201,169,64,0.45);letter-spacing:5px;text-transform:uppercase;opacity:0;transform:translateY(10px);transition:opacity 0.6s 0.15s,transform 0.6s 0.15s;margin-top:12px">A M B A R</div>
+</div>
+
+<!-- CUSTOM CONFIRM DIALOG -->
+<div class="confirm-ov" id="confirm-ov" onclick="if(event.target===this)_confirmResolve&&_confirmResolve(false)">
+  <div class="confirm-box">
+    <div class="confirm-body">
+      <div class="confirm-title" id="confirm-title"></div>
+      <div class="confirm-sub" id="confirm-sub" style="display:none"></div>
+    </div>
+    <div class="confirm-btns">
+      <button class="confirm-btn confirm-btn-cancel" id="confirm-cancel-btn" onclick="_confirmResolve&&_confirmResolve(false)">Cancel</button>
+      <button class="confirm-btn confirm-btn-ok" id="confirm-ok-btn" onclick="_confirmResolve&&_confirmResolve(true)">OK</button>
+    </div>
+  </div>
 </div>
 
 <!-- SUPPORT OPTIONS SHEET -->
@@ -2888,9 +2917,10 @@ function selectAddr(i){
   showToast(t('addrSelected')+': '+(getSaved()[i]?.label||''),'ok');
 }
 
-function deleteAddr(i){
+async function deleteAddr(i){
   const msg=lang==='ru'?'Удалить этот адрес?':'Delete this address?';
-  if(!confirm(msg))return;
+  const ok=await showConfirm(msg,{ok:lang==='ru'?'Удалить':'Delete',cancel:lang==='ru'?'Отмена':'Cancel',destructive:true});
+  if(!ok)return;
   const arr=getSaved();arr.splice(i,1);setSaved(arr);
   // Adjust active index
   if(activeAddrIdx===i) setActiveAddr(arr.length?0:null);
@@ -5299,6 +5329,30 @@ function openVipSheet(){
   _openSheet('vip-ov');
 }
 function closeVipSheet(){_closeSheet('vip-ov');}
+
+// ── Custom confirm dialog ────────────────────────────────────────────────────
+let _confirmResolve=null;
+function showConfirm(title,opts={}){
+  return new Promise(resolve=>{
+    _confirmResolve=(v)=>{
+      _confirmResolve=null;
+      const ov=el('confirm-ov');
+      ov.classList.remove('open');
+      setTimeout(()=>{ov.style.display='none';},200);
+      if(tg&&tg.HapticFeedback)tg.HapticFeedback.impactOccurred('light');
+      resolve(v);
+    };
+    el('confirm-title').textContent=title;
+    const sub=el('confirm-sub');
+    if(opts.sub){sub.textContent=opts.sub;sub.style.display='';}else{sub.style.display='none';}
+    el('confirm-cancel-btn').textContent=opts.cancel||(lang==='ru'?'Отмена':'Cancel');
+    el('confirm-ok-btn').textContent=opts.ok||'OK';
+    if(opts.destructive){el('confirm-ok-btn').style.color='#ff453a';}else{el('confirm-ok-btn').style.color='#007aff';}
+    const ov=el('confirm-ov');
+    ov.style.display='flex';
+    requestAnimationFrame(()=>requestAnimationFrame(()=>ov.classList.add('open')));
+  });
+}
 
 // ── SUPPORT PHONE — change this number ───────────────────────────────────────
 const SUPPORT_PHONE='+971501234567';

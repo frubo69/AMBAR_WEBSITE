@@ -870,6 +870,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if not shift:
             kb = InlineKeyboardMarkup([
                 [InlineKeyboardButton("🟢 Открыть смену", callback_data="shift_open")],
+                [InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")],
             ])
             await q.edit_message_text(
                 "⚠️ *Смена не открыта*\n\nОткройте смену чтобы начать работу.",

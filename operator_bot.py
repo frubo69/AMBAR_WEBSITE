@@ -379,6 +379,9 @@ async def order_card(o, full=True):
     if comment:
         lines.append("")
         lines.append(f"💬 Комментарий: {comment}")
+    if o.get("status") == "approved" and o.get("deliver_by"):
+        lines.append("")
+        lines.append(f"🏁 Доставить до: *{o['deliver_by']}*")
     return "\n".join(lines)
 
 
@@ -1041,9 +1044,13 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("eta_"):
         parts = data.split("_")
         eta, oid, cid = int(parts[1]), parts[2], int(parts[3])
+        now_dubai = datetime.now(DUBAI_TZ)
+        deliver_by = now_dubai + __import__('datetime').timedelta(minutes=eta)
+        deliver_by_str = deliver_by.strftime("%H:%M")
         await db.update_order(oid, status="approved", eta=eta,
                               operator_id=op, updated_at=datetime.now().isoformat(),
-                              confirmed_at=datetime.now(timezone.utc).isoformat())
+                              confirmed_at=datetime.now(timezone.utc).isoformat(),
+                              deliver_by=deliver_by_str)
         order = await db.get_order(oid)
         lang  = order.get("lang","ru") if order else "ru"
         tx    = {"ru": f"✅ *Заказ #{oid} принят!*\n\n🕐 Доставка через *{eta} минут*",
@@ -1058,7 +1065,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if order:
             lt = ctx.user_data.get("lt")
             await q.edit_message_text(
-                (await order_card(order)) + f"\n\n✅ *Принят* | ⏱ {eta} мин",
+                (await order_card(order)) + f"\n\n✅ *Принят* | ⏱ {eta} мин | 🏁 До *{deliver_by_str}*",
                 parse_mode="Markdown", reply_markup=await kb_order_actions(order, list_type=lt))
         asyncio.create_task(run_countdown(cid, eta, lang, oid))
 

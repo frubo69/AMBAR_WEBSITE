@@ -272,7 +272,7 @@ async def handle_create_order(request: web.Request) -> web.Response:
             log.error(f"Referral award failed: {e}")
 
     log.info(f"[order] #{oid} user={uid} items={len(items)} total={total} AED")
-    return web.json_response({"ok": True, "order_id": oid}, headers=CORS_HEADERS)
+    return web.json_response({"ok": True, "order_id": oid, "needs_verification": _needs_verification}, headers=CORS_HEADERS)
 
 
 # ── POST /api/cancel-order ────────────────────────────────────────────────────

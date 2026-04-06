@@ -4440,17 +4440,23 @@ function placeOrder(){
 
   // Send order via API (works from both menu button and reply keyboard)
   const body={...payload, initData: tg?.initData||''};
-  fetch(`${AMBAR_API}/api/order`,{
+  const _orderPromise=fetch(`${AMBAR_API}/api/order`,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify(body)
   }).then(r=>r.json()).then(res=>{
     if(res.ok){
       console.log('Order sent via API:', res.order_id);
+      if(res.needs_verification){
+        localStorage.removeItem('ambar_verified');
+        localStorage.removeItem('ambar_verify_requested');
+        return true; // needs verification
+      }
     } else {
       console.error('Order API error:', res.error);
     }
-  }).catch(err=>console.error('Order fetch error:', err));
+    return false;
+  }).catch(err=>{console.error('Order fetch error:', err);return false;});
 
   const _placedIds=Object.keys(cart);
   cart={};beerPcs={};tip=0;el('phone-err').classList.remove('on');el('phone-in').classList.remove('err');
@@ -4458,10 +4464,11 @@ function placeOrder(){
   updHdr();buildTips();haptic.success();showToast(t('placed'),'ok');
   const _ru=lang==='ru';
   addNotification('cart',_ru?'Заказ оформлен':'Order placed',(_ru?'Заказ ':'Order ')+'#'+oid+(_ru?' принят и ожидает подтверждения':' received, awaiting confirmation'),{action:'orders',dedup_key:'placed_'+oid,notif_type:'placed',notif_oid:oid});
-  setTimeout(()=>{
+  setTimeout(async()=>{
     go('catalog');checkActiveOrder();
-    // Show verification wall for unverified non-referral users after placing order
-    if(!_isVerified()){showVerifyWall();}
+    // Wait for order API response, then show verification wall if needed
+    const needsVerify=await _orderPromise;
+    if(needsVerify){showVerifyWall();}
   },1400);
 }
 

@@ -1055,7 +1055,8 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div id="verify-step0" style="display:flex;flex-direction:column;align-items:center;text-align:center;padding:28px;max-width:360px;width:100%;">
     <div style="font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:700;letter-spacing:6px;background:linear-gradient(135deg,var(--gold),var(--gold2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:6px;">AMBAR</div>
     <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:6px;" id="verify-title0">Верификация</div>
-    <div style="font-size:13px;color:#888;line-height:1.6;margin-bottom:24px;" id="verify-desc0">Как вы узнали о нас?</div>
+    <div style="font-size:13px;color:#888;line-height:1.6;margin-bottom:6px;" id="verify-desc0">Как вы узнали о нас?</div>
+    <div style="font-size:11px;color:rgba(255,255,255,.25);line-height:1.5;margin-bottom:24px;" id="verify-note0">Верификация проходится один раз и не может быть пропущена</div>
     <div id="verify-sources" style="width:100%;display:flex;flex-direction:column;gap:10px;">
       <button class="v-src-btn" onclick="pickVerifySource('friend')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span id="vs-friend">Рекомендация знакомого</span></button>
       <button class="v-src-btn" onclick="pickVerifySource('operator')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg><span id="vs-operator">Оператор AMBAR</span></button>
@@ -2486,6 +2487,7 @@ function showVerifyWall(){
   // Step 0 labels
   el('verify-title0').textContent=ru?'Верификация':'Verification';
   el('verify-desc0').textContent=ru?'Как вы узнали о нас?':'How did you find out about us?';
+  el('verify-note0').textContent=ru?'Верификация проходится один раз и не может быть пропущена':'Verification is a one-time process and cannot be skipped';
   el('vs-friend').textContent=ru?'Рекомендация знакомого':'Friend recommendation';
   el('vs-operator').textContent=ru?'Оператор AMBAR':'AMBAR operator';
   el('vs-other').textContent=ru?'Другое':'Other';

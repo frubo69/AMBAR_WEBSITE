@@ -1054,12 +1054,12 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <!-- Step 0: How did you find us? -->
   <div id="verify-step0" style="display:flex;flex-direction:column;align-items:center;width:100%;height:100%;padding:0 28px;">
     <!-- Top: logo + title -->
-    <div style="padding-top:calc(4vh + var(--safe-top));text-align:center;flex-shrink:0;">
+    <div style="padding-top:calc(var(--safe-top));text-align:center;flex-shrink:0;">
       <div style="font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:700;letter-spacing:8px;background:linear-gradient(135deg,var(--gold),var(--gold2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:10px;">AMBAR</div>
       <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);font-weight:500;" id="verify-title0">Верификация</div>
     </div>
     <!-- Middle: question + buttons -->
-    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;max-width:340px;">
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;max-width:340px;margin-top:-18vh;">
       <div style="font-size:15px;color:var(--sub);margin-bottom:24px;letter-spacing:.2px;" id="verify-desc0">Как вы узнали о нас?</div>
       <div id="verify-sources" style="width:100%;display:flex;flex-direction:column;gap:10px;">
         <button class="v-src-btn" onclick="pickVerifySource('friend')"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg><span id="vs-friend">Рекомендация знакомого</span></button>
@@ -1108,11 +1108,17 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   </div>
 
   <!-- Waiting for operator -->
-  <div id="verify-wait" style="display:none;flex-direction:column;align-items:center;text-align:center;padding:28px;max-width:340px;width:100%;">
-    <div style="font-size:48px;line-height:1;margin-bottom:20px;">⏳</div>
-    <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:12px;" id="verify-wait-title">Ожидайте подтверждения</div>
-    <div style="font-size:14px;color:#888;line-height:1.65;margin-bottom:20px;" id="verify-wait-desc">Возможно поступит звонок на телефон для уточнения деталей.</div>
-    <div style="font-size:12px;color:rgba(255,255,255,.3);line-height:1.6;padding:12px 16px;border-radius:10px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06);" id="verify-wait-note">Верификация проходится только один раз. После подтверждения вы сможете пользоваться ботом как обычно.</div>
+  <div id="verify-wait" style="display:none;flex-direction:column;align-items:center;width:100%;height:100%;padding:0 28px;">
+    <div style="padding-top:calc(var(--safe-top));text-align:center;flex-shrink:0;">
+      <div style="font-family:'Cormorant Garamond',serif;font-size:34px;font-weight:700;letter-spacing:8px;background:linear-gradient(135deg,var(--gold),var(--gold2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:10px;">AMBAR</div>
+      <div style="font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--muted);font-weight:500;" id="verify-wait-sub">ВЕРИФИКАЦИЯ</div>
+    </div>
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;max-width:300px;margin-top:-18vh;">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.5;margin-bottom:20px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:10px;" id="verify-wait-title">Ожидайте подтверждения</div>
+      <div style="font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:24px;" id="verify-wait-desc">Возможно поступит звонок для уточнения деталей</div>
+      <div style="font-size:11px;color:rgba(255,255,255,.2);letter-spacing:.3px;" id="verify-wait-note">Проходится только один раз</div>
+    </div>
   </div>
 
 </div>
@@ -2511,9 +2517,10 @@ function showVerifyWall(){
   el('verify-submit-btn').textContent=ru?'Отправить':'Submit';
 
   // Wait labels
+  el('verify-wait-sub').textContent=ru?'ВЕРИФИКАЦИЯ':'VERIFICATION';
   el('verify-wait-title').textContent=ru?'Ожидайте подтверждения':'Awaiting confirmation';
-  el('verify-wait-desc').textContent=ru?'Возможно поступит звонок на телефон для уточнения деталей.':'You may receive a call to clarify details.';
-  el('verify-wait-note').textContent=ru?'Верификация проходится только один раз. После подтверждения вы сможете пользоваться ботом как обычно.':'Verification is a one-time process. Once confirmed, you can use the bot as usual.';
+  el('verify-wait-desc').textContent=ru?'Возможно поступит звонок для уточнения деталей':'You may receive a call to clarify details';
+  el('verify-wait-note').textContent=ru?'Проходится только один раз':'One-time process only';
 
   wall.style.display='flex';
   _hideAllVerifySteps();

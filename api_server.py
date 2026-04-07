@@ -10,7 +10,7 @@ AMBAR API + Static file server — MongoDB edition
 All user/order data is stored in MongoDB Atlas (db: ambar).
 """
 from __future__ import annotations
-import os, json, hmac, hashlib, urllib.parse, mimetypes, logging, time, uuid
+import os, json, hmac, hashlib, html as _html_mod, urllib.parse, mimetypes, logging, time, uuid
 from datetime import datetime, timezone
 from pathlib import Path
 import aiohttp as _aiohttp
@@ -224,21 +224,22 @@ async def handle_create_order(request: web.Request) -> web.Response:
             referrer_username = referrer_doc.get("username", "—") if referrer_doc else "—"
         except Exception:
             referrer_username = "—"
-        first_order_banner = f"🔴🔴🔴 *НОВЫЙ КЛИЕНТ — РЕФЕРАЛ* 🔴🔴🔴\n👥 Пригласил — @{referrer_username}\n\n"
+        first_order_banner = f"<blockquote>🔴🔴🔴 <b>НОВЫЙ КЛИЕНТ — РЕФЕРАЛ</b> 🔴🔴🔴\n👥 Пригласил — @{referrer_username}</blockquote>\n\n"
     elif is_first_order:
-        first_order_banner = "🔴🔴🔴 *НОВЫЙ КЛИЕНТ!* 🔴🔴🔴\n\n"
+        first_order_banner = "<blockquote>🔴🔴🔴 <b>НОВЫЙ КЛИЕНТ!</b> 🔴🔴🔴</blockquote>\n\n"
     else:
         first_order_banner = ""
     tip_line = f"\n🎁 Чаевые: {tip} AED" if tip else ""
+    _comment_esc = _html_mod.escape(comment) if comment else ""
     op_text = (
         f"{first_order_banner}"
-        f"🏢 Офис: *{office_nm}*\n\n"
-        f"🆕 *НОВЫЙ ЗАКАЗ #{oid}*\n\n"
+        f"🏢 Офис: <b>{_html_mod.escape(office_nm)}</b>\n\n"
+        f"🆕 <b>НОВЫЙ ЗАКАЗ #{oid}</b>\n\n"
         f"{addr_line}\n\n"
-        f"🛒 *Позиции:*\n{item_lines}\n"
+        f"🛒 <b>Позиции:</b>\n{item_lines}\n"
         f"{tip_line}"
-        f"\n💰 *Итого: {total} AED*"
-        + (f"\n\n💬 *Комментарий:* {comment}" if comment else "")
+        f"\n💰 <b>Итого: {total} AED</b>"
+        + (f"\n\n💬 <b>Комментарий:</b> {_comment_esc}" if comment else "")
     )
     # For first-time non-referral users, delay operator notification until
     # verification data is submitted. Save order details for later.
@@ -261,7 +262,7 @@ async def handle_create_order(request: web.Request) -> web.Response:
         op_kb = {"inline_keyboard": op_buttons}
         for op_id in OPERATOR_IDS:
             try:
-                await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text, reply_markup=op_kb)
+                await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text, parse_mode="HTML", reply_markup=op_kb)
             except Exception as e:
                 log.error(f"Operator notify {op_id}: {e}")
 
@@ -441,23 +442,20 @@ async def handle_verify_request(request: web.Request) -> web.Response:
         elif source_detail:
             src_extra = f"\n💬 {source_detail}"
 
+        bq_alert = f"<blockquote>🔴🔴🔴 <b>НОВЫЙ КЛИЕНТ!</b> 🔴🔴🔴\n📋 Источник: <b>{src_line}</b>{src_extra}</blockquote>"
+
         if saved_op_text:
+            # Strip old banners (both Markdown and HTML variants)
+            import re as _re
+            saved_op_text = _re.sub(r'<blockquote>.*?</blockquote>\s*', '', saved_op_text, flags=_re.DOTALL)
             for prefix in ["🔴 *⚠️ ПЕРВЫЙ ЗАКАЗ — новый клиент!*\n\n",
                            "🔴 *⚠️ НОВЫЙ КЛИЕНТ РЕФЕРАЛ*\n",
                            "🔴🔴🔴 *НОВЫЙ КЛИЕНТ!* 🔴🔴🔴\n\n",
                            "🔴🔴🔴 *НОВЫЙ КЛИЕНТ — РЕФЕРАЛ* 🔴🔴🔴\n"]:
                 saved_op_text = saved_op_text.replace(prefix, "")
-            combined = (
-                f"🔴🔴🔴 *НОВЫЙ КЛИЕНТ!* 🔴🔴🔴\n"
-                f"📋 Источник: *{src_line}*{src_extra}\n\n"
-                + saved_op_text.strip()
-            )
+            combined = bq_alert + "\n\n" + saved_op_text.strip()
         else:
-            combined = (
-                f"🔴🔴🔴 *НОВЫЙ КЛИЕНТ!* 🔴🔴🔴\n"
-                f"📋 Источник: *{src_line}*{src_extra}\n\n"
-                f"🆕 *ЗАКАЗ #{oid}*"
-            )
+            combined = bq_alert + f"\n\n🆕 <b>ЗАКАЗ #{oid}</b>"
 
         op_buttons = [
             [
@@ -474,7 +472,7 @@ async def handle_verify_request(request: web.Request) -> web.Response:
         op_kb = {"inline_keyboard": op_buttons}
         for op_id in OPERATOR_IDS:
             try:
-                await tg_send(OPERATOR_BOT_TOKEN, op_id, combined, reply_markup=op_kb)
+                await tg_send(OPERATOR_BOT_TOKEN, op_id, combined, parse_mode="HTML", reply_markup=op_kb)
             except Exception as e:
                 log.error(f"Verify+order notify {op_id}: {e}")
         # Clear the pending flag

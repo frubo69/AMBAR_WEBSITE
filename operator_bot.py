@@ -354,48 +354,53 @@ async def order_card(o, full=True):
         if cid:
             user_doc = await db.get_user(int(cid))
             if user_doc and not user_doc.get("verified", False) and not user_doc.get("referred_by"):
-                lines.append("🔴🔴🔴 *НОВЫЙ КЛИЕНТ!* 🔴🔴🔴")
+                bq = ["🔴🔴🔴 <b>НОВЫЙ КЛИЕНТ!</b> 🔴🔴🔴"]
                 src = user_doc.get("verify_source", "")
                 if src:
                     src_labels = {"friend":"👥 Знакомый","operator":"📞 Оператор","social":"📱 Соцсети","search":"🔍 Интернет","other":"💬 Другое"}
                     src_detail = user_doc.get("verify_source_detail", "")
                     rec_name = user_doc.get("verify_recommender_name", "")
                     rec_phone = user_doc.get("verify_recommender_phone", "")
-                    lines.append(f"📋 Источник: *{src_labels.get(src, src)}*")
+                    bq.append(f"📋 Источник: <b>{src_labels.get(src, src)}</b>")
                     if src == "friend" and rec_name:
-                        lines.append(f"👤 {rec_name}" + (f" — {rec_phone}" if rec_phone else ""))
+                        bq.append(f"👤 {rec_name}" + (f" — {rec_phone}" if rec_phone else ""))
                     elif src_detail:
-                        lines.append(f"💬 {src_detail}")
+                        bq.append(f"💬 {src_detail}")
+                lines.append("<blockquote>" + "\n".join(bq) + "</blockquote>")
                 lines.append("")
     except Exception:
         pass
-    lines.extend([f"🏢 Офис: *{o.get('office_name','—')}*", ""])
-    lines.append(f"🆕 *НОВЫЙ ЗАКАЗ #{o['order_id']}*")
+    lines.extend([f"🏢 Офис: <b>{_esc(o.get('office_name','—'))}</b>", ""])
+    lines.append(f"🆕 <b>НОВЫЙ ЗАКАЗ #{o['order_id']}</b>")
     lines.append("")
     if full:
         gmap = o.get("gmap_link","")
         addr = o.get("address","—")
         if gmap:
-            lines.append(f"🏠 Адрес: {addr}" if addr and addr != "GPS" and addr != "—" else "🏠 Адрес: GPS")
+            lines.append(f"🏠 Адрес: {_esc(addr)}" if addr and addr != "GPS" and addr != "—" else "🏠 Адрес: GPS")
             lines.append(f"Google Maps: {gmap}")
         else:
-            lines.append(f"🏠 Адрес: {addr}")
+            lines.append(f"🏠 Адрес: {_esc(addr)}")
         lines.append("")
-    lines.append("🛒 *Позиции:*")
+    lines.append("🛒 <b>Позиции:</b>")
     for item in o.get("items", []):
         lt = item.get("line_total", item["price"] * item["qty"])
-        lines.append(f"  • {item['name']} ×{item['qty']} = {lt} AED")
+        lines.append(f"  • {_esc(item['name'])} ×{item['qty']} = {lt} AED")
     lines.append("")
     if o.get("tip"): lines.append(f"🎁 Чаевые: {o['tip']} AED")
-    lines.append(f"💰 *Итого: {o.get('total',0)} AED*")
+    lines.append(f"💰 <b>Итого: {o.get('total',0)} AED</b>")
     comment = o.get("comment", "").strip()
     if comment:
         lines.append("")
-        lines.append(f"💬 Комментарий: {comment}")
+        lines.append(f"💬 Комментарий: {_esc(comment)}")
     if o.get("status") == "approved" and o.get("deliver_by"):
         lines.append("")
-        lines.append(f"🏁 Доставить до: *{o['deliver_by']}*")
+        lines.append(f"🏁 Доставить до: <b>{o['deliver_by']}</b>")
     return "\n".join(lines)
+
+def _esc(t):
+    """Escape HTML special chars."""
+    return str(t).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
 
 
 _FOUNDER_ID = 956633762
@@ -880,7 +885,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         order = await db.get_order(oid)
         if order:
             await q.edit_message_text(
-                await order_card(order), parse_mode="Markdown",
+                await order_card(order), parse_mode="HTML",
                 reply_markup=await kb_order_actions(order, list_type=lt))
         else:
             await q.answer("❌ Заказ не найден", show_alert=True)
@@ -1003,8 +1008,8 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if order:
             lt = ctx.user_data.get("lt")
             await q.edit_message_text(
-                (await order_card(order)) + f"\n\n✅ *Принят* | ⏱ {eta} мин | 🏁 До *{deliver_by_str}*",
-                parse_mode="Markdown", reply_markup=await kb_order_actions(order, list_type=lt))
+                (await order_card(order)) + f"\n\n✅ <b>Принят</b> | ⏱ {eta} мин | 🏁 До <b>{deliver_by_str}</b>",
+                parse_mode="HTML", reply_markup=await kb_order_actions(order, list_type=lt))
         asyncio.create_task(run_countdown(cid, eta, lang, oid))
 
     # ── DECLINE ───────────────────────────────────────────────────────────────
@@ -1025,8 +1030,8 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if order:
             _done_kb = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
             await q.edit_message_text(
-                (await order_card(order)) + "\n\n❌ *Отклонён*",
-                parse_mode="Markdown", reply_markup=_done_kb)
+                (await order_card(order)) + "\n\n❌ <b>Отклонён</b>",
+                parse_mode="HTML", reply_markup=_done_kb)
 
     # ── DELIVERED ─────────────────────────────────────────────────────────────
     elif data.startswith("done_"):
@@ -1041,8 +1046,8 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if order:
             lt = ctx.user_data.get("lt")
             await q.edit_message_text(
-                (await order_card(order)) + "\n\n✅ *Доставлен*",
-                parse_mode="Markdown", reply_markup=await kb_order_actions(order, list_type=lt))
+                (await order_card(order)) + "\n\n✅ <b>Доставлен</b>",
+                parse_mode="HTML", reply_markup=await kb_order_actions(order, list_type=lt))
 
     # ── UNDO DELIVERED → back to approved ────────────────────────────────────
     elif data.startswith("undone_"):
@@ -1056,8 +1061,8 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if order:
             lt = ctx.user_data.get("lt")
             await q.edit_message_text(
-                (await order_card(order)) + "\n\n🔄 *Возвращён в доставку*",
-                parse_mode="Markdown", reply_markup=await kb_order_actions(order, list_type=lt))
+                (await order_card(order)) + "\n\n🔄 <b>Возвращён в доставку</b>",
+                parse_mode="HTML", reply_markup=await kb_order_actions(order, list_type=lt))
 
     # ── BACK TO ORDER (from sub-views) ────────────────────────────────────────
     elif data.startswith("back_order_"):
@@ -1065,7 +1070,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         order = await db.get_order(oid)
         if order:
             lt = ctx.user_data.get("lt")
-            await q.edit_message_text(await order_card(order), parse_mode="Markdown", reply_markup=await kb_order_actions(order, list_type=lt))
+            await q.edit_message_text(await order_card(order), parse_mode="HTML", reply_markup=await kb_order_actions(order, list_type=lt))
 
     # ── LOCATION ──────────────────────────────────────────────────────────────
     elif data.startswith("loc_"):
@@ -1093,7 +1098,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         order = await db.get_order(oid)
         if not order: return
         lt = ctx.user_data.get("lt")
-        await q.edit_message_text(await order_card(order), parse_mode="Markdown",
+        await q.edit_message_text(await order_card(order), parse_mode="HTML",
                                   reply_markup=await kb_order_actions(order, list_type=lt))
 
     elif data.startswith("edit_"):
@@ -1221,7 +1226,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         order = await db.get_order(oid)
         if order:
             lt = ctx.user_data.get("lt")
-            await q.edit_message_text(await order_card(order), parse_mode="Markdown", reply_markup=await kb_order_actions(order, list_type=lt))
+            await q.edit_message_text(await order_card(order), parse_mode="HTML", reply_markup=await kb_order_actions(order, list_type=lt))
 
     elif data.startswith("client_"):
         _, oid, cid_str = data.split("_", 2)

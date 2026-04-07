@@ -224,9 +224,9 @@ async def handle_create_order(request: web.Request) -> web.Response:
             referrer_username = referrer_doc.get("username", "—") if referrer_doc else "—"
         except Exception:
             referrer_username = "—"
-        first_order_banner = f"🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ РЕФЕРАЛ* 🚨🚨🚨\n👥 Пригласил — @{referrer_username}\n\n"
+        first_order_banner = f"🔴🔴🔴 *НОВЫЙ КЛИЕНТ — РЕФЕРАЛ* 🔴🔴🔴\n👥 Пригласил — @{referrer_username}\n\n"
     elif is_first_order:
-        first_order_banner = "🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨\n\n"
+        first_order_banner = "🔴🔴🔴 *НОВЫЙ КЛИЕНТ!* 🔴🔴🔴\n\n"
     else:
         first_order_banner = ""
     tip_line = f"\n🎁 Чаевые: {tip} AED" if tip else ""
@@ -444,17 +444,17 @@ async def handle_verify_request(request: web.Request) -> web.Response:
         if saved_op_text:
             for prefix in ["🔴 *⚠️ ПЕРВЫЙ ЗАКАЗ — новый клиент!*\n\n",
                            "🔴 *⚠️ НОВЫЙ КЛИЕНТ РЕФЕРАЛ*\n",
-                           "🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨\n\n",
-                           "🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ РЕФЕРАЛ* 🚨🚨🚨\n"]:
+                           "🔴🔴🔴 *НОВЫЙ КЛИЕНТ!* 🔴🔴🔴\n\n",
+                           "🔴🔴🔴 *НОВЫЙ КЛИЕНТ — РЕФЕРАЛ* 🔴🔴🔴\n"]:
                 saved_op_text = saved_op_text.replace(prefix, "")
             combined = (
-                f"🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨\n"
+                f"🔴🔴🔴 *НОВЫЙ КЛИЕНТ!* 🔴🔴🔴\n"
                 f"📋 Источник: *{src_line}*{src_extra}\n\n"
                 + saved_op_text.strip()
             )
         else:
             combined = (
-                f"🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨\n"
+                f"🔴🔴🔴 *НОВЫЙ КЛИЕНТ!* 🔴🔴🔴\n"
                 f"📋 Источник: *{src_line}*{src_extra}\n\n"
                 f"🆕 *ЗАКАЗ #{oid}*"
             )

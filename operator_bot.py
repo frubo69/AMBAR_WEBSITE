@@ -354,7 +354,7 @@ async def order_card(o, full=True):
         if cid:
             user_doc = await db.get_user(int(cid))
             if user_doc and not user_doc.get("verified", False) and not user_doc.get("referred_by"):
-                lines.append("🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨")
+                lines.append("🔴🔴🔴 *НОВЫЙ КЛИЕНТ!* 🔴🔴🔴")
                 src = user_doc.get("verify_source", "")
                 if src:
                     src_labels = {"friend":"👥 Знакомый","operator":"📞 Оператор","social":"📱 Соцсети","search":"🔍 Интернет","other":"💬 Другое"}

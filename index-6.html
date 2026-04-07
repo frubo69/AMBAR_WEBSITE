@@ -817,12 +817,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .addr-method-card.loading .addr-method-card-title,.addr-method-card.loading .addr-method-card-sub{color:var(--muted)}
 .addr-method-card.err .addr-method-card-icon{background:rgba(224,85,85,.08);border-color:rgba(224,85,85,.25);color:var(--red)}
 @keyframes addrPulse{0%,100%{opacity:1}50%{opacity:.45}}
-/* ── Address tips ── */
-.addr-tips{padding:28px 16px 16px}
-.addr-tips-title{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:14px}
-.addr-tip{display:flex;align-items:center;gap:14px;padding:13px 16px;background:var(--card);border:1px solid var(--border2);border-radius:14px;margin-bottom:8px}
-.addr-tip-icon{flex-shrink:0;width:34px;height:34px;border-radius:10px;background:rgba(201,169,110,.08);border:1px solid rgba(201,169,110,.15);display:flex;align-items:center;justify-content:center;color:var(--gold)}
-.addr-tip-text{font-size:13px;color:var(--sub);line-height:1.45}
+
 /* ── NEW MAP OVERLAY ───────────────────────────────────────────────────────── */
 .map-overlay{position:fixed;inset:0;z-index:310;background:#111;display:block;transform:translateY(100%);transition:transform .35s cubic-bezier(.34,1,.64,1)}
 .map-overlay.show{transform:translateY(0)}
@@ -1267,23 +1262,6 @@ body.aob-on #pg-cart{overflow-y:auto!important}
           <div class="addr-method-card-sub" id="btn-map-sub">Переместите пин на ваш адрес</div>
         </div>
       </button>
-    </div>
-
-    <!-- Address tips -->
-    <div class="addr-tips">
-      <div class="addr-tips-title" id="addr-tips-title">Советы для быстрой доставки</div>
-      <div class="addr-tip">
-        <div class="addr-tip-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
-        <div class="addr-tip-text" id="addr-tip-1">Добавьте ориентир — кафе, магазин или отель рядом</div>
-      </div>
-      <div class="addr-tip">
-        <div class="addr-tip-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg></div>
-        <div class="addr-tip-text" id="addr-tip-2">Оставьте комментарий — курьер увидит его при доставке</div>
-      </div>
-      <div class="addr-tip">
-        <div class="addr-tip-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg></div>
-        <div class="addr-tip-text" id="addr-tip-3">Назовите адрес понятно — так проще выбрать при заказе</div>
-      </div>
     </div>
 
     <!-- Hidden legacy elements required by JS -->
@@ -2279,7 +2257,7 @@ ru:{
   btnGpsTitle:'Отправить геолокацию',btnGpsSub:'Авто-определение и уточнение',
   btnMapTitle:'Найти на карте',btnMapSub:'Найти на карте или ввести вручную',
   addAddrLabel:'Добавить адрес',emptyAddrTitle:'Нет сохранённых адресов',emptyAddrSub:'Добавьте первый адрес доставки',
-  addrTipsTitle:'Советы для быстрой доставки',addrTip1:'Добавьте ориентир — кафе, магазин или отель рядом',addrTip2:'Оставьте комментарий — курьер увидит его при доставке',addrTip3:'Назовите адрес понятно — так проще выбрать при заказе',
+
   saveSheetTitle:'Сохранить адрес',mapDone:'Готово',addrNoLoc:'Сначала выберите адрес на карте',
 },
 en:{
@@ -2328,7 +2306,7 @@ en:{
   btnGpsTitle:'Share my location',btnGpsSub:'Auto-detect & fine-tune',
   btnMapTitle:'Search on map',btnMapSub:'Find on map or enter manually',
   addAddrLabel:'Add address',emptyAddrTitle:'No saved addresses',emptyAddrSub:'Add your first delivery address',
-  addrTipsTitle:'Tips for faster delivery',addrTip1:'Add a landmark — café, shop or hotel nearby',addrTip2:'Leave a comment — courier sees it on delivery',addrTip3:'Name your address clearly — easier to pick when ordering',
+
   saveSheetTitle:'Save address',mapDone:'Done',addrNoLoc:'Please select your address on the map first',
   hsTitle:'Add to Home Screen',hsDesc:'Open AMBAR directly from your device\'s home screen — one tap away.',
   hsAdd:'Add to Home Screen',hsGuide:'Show me how',hsLater:'Not now',hsNever:'Never show again',
@@ -2832,10 +2810,7 @@ function applyLang(){
   set('btn-gps-sub',t('btnGpsSub'));
   set('btn-map-title',t('btnMapTitle'));
   set('btn-map-sub',t('btnMapSub'));
-  set('addr-tips-title',t('addrTipsTitle'));
-  set('addr-tip-1',t('addrTip1'));
-  set('addr-tip-2',t('addrTip2'));
-  set('addr-tip-3',t('addrTip3'));
+
   const _pt=el('gps-edit-pill-text');if(_pt)_pt.textContent=lang==='ru'?'Готово':'Done';
   set('addr-save-title-txt',t('saveSheetTitle'));
   set('addr-save-name-lbl',t('lblAddrName'));

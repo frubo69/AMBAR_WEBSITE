@@ -727,12 +727,23 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .support-msgs{flex:1;overflow-y:auto;padding:16px 14px;display:flex;flex-direction:column;gap:8px;overscroll-behavior:contain}
 .support-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--muted);font-size:13px;text-align:center;letter-spacing:.2px}
 .support-empty-icon{opacity:.7;line-height:0}
-.msg-bubble{max-width:80%;padding:10px 14px;font-size:13px;line-height:1.45;word-break:break-word}
+.msg-bubble{max-width:80%;padding:10px 14px;font-size:13px;line-height:1.45;word-break:break-word;position:relative;touch-action:pan-y;transition:transform .15s ease-out}
 .msg-bubble.user{align-self:flex-end;background:rgba(201,169,110,.12);border:1px solid rgba(201,169,110,.2);border-radius:16px 16px 4px 16px;color:var(--text)}
 .msg-bubble.operator{align-self:flex-start;background:var(--card);border:1px solid var(--border2);border-radius:16px 16px 16px 4px;color:var(--text)}
 .msg-ts{font-size:10px;color:var(--muted);margin-top:3px}
 .msg-bubble.user .msg-ts{text-align:right}
 .msg-bubble.operator .msg-ts{text-align:left}
+.msg-quote{padding:6px 10px;margin-bottom:6px;border-left:2px solid var(--gold);border-radius:4px;background:rgba(201,169,110,.06);font-size:11px;color:var(--sub);line-height:1.35;max-height:40px;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.msg-quote-name{font-size:10px;font-weight:600;color:var(--gold2);margin-bottom:2px}
+.support-reply-bar{display:none;align-items:center;gap:10px;padding:8px 14px;background:rgba(7,7,14,.96);border-top:1px solid var(--border);border-bottom:none}
+.support-reply-bar.show{display:flex}
+.support-reply-preview{flex:1;min-width:0;padding:6px 10px;border-left:2px solid var(--gold);border-radius:4px;background:rgba(201,169,110,.06)}
+.support-reply-name{font-size:10px;font-weight:600;color:var(--gold2)}
+.support-reply-text{font-size:12px;color:var(--sub);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.support-reply-close{width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;color:var(--muted)}
+.support-reply-close:active{opacity:.6}
+.msg-reply-icon{position:absolute;right:calc(100% + 8px);top:50%;transform:translateY(-50%);opacity:0;transition:opacity .15s;pointer-events:none;color:var(--muted)}
+.msg-bubble.operator .msg-reply-icon{left:calc(100% + 8px);right:auto}
 .support-input-bar{display:flex;align-items:flex-end;gap:8px;padding:10px 14px calc(10px + var(--safe-bottom));background:rgba(7,7,14,.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);flex-shrink:0}
 .support-input{flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:20px;padding:10px 16px;font-size:13px;color:var(--text);font-family:inherit;resize:none;max-height:100px;line-height:1.4;overflow-y:auto}
 .support-input::placeholder{color:var(--muted)}
@@ -1841,6 +1852,15 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       <div class="support-empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(201,169,110,.45)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a8 8 0 0 0-8 8v5a3 3 0 0 0 3 3h1a1 1 0 0 0 1-1v-4a1 1 0 0 0-1-1H7v-2a5 5 0 0 1 10 0v2h-1a1 1 0 0 0-1 1v4a1 1 0 0 0 1 1h1a3 3 0 0 0 3-3v-5a8 8 0 0 0-8-8z"/><path d="M18 18v1a2 2 0 0 1-2 2h-2" stroke="rgba(201,169,110,.35)"/></svg></div>
       <div id="support-empty-txt">Задайте вопрос по заказу</div>
     </div>
+  </div>
+  <div class="support-reply-bar" id="support-reply-bar">
+    <div class="support-reply-preview">
+      <div class="support-reply-name" id="support-reply-name"></div>
+      <div class="support-reply-text" id="support-reply-text"></div>
+    </div>
+    <button class="support-reply-close" onclick="cancelReply()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    </button>
   </div>
   <div class="support-input-bar">
     <label class="support-attach" for="support-file-input">
@@ -5944,12 +5964,72 @@ function closeSupportChat(){
   clearInterval(_supportPollTimer);
   _supportPollTimer=null;
   _supportConvKey='';_supportOrderId='';
-  // Blur input to dismiss keyboard
+  cancelReply();
   el('support-input').blur();
 }
 
 function _escHtml(s){const d=document.createElement('div');d.textContent=s;return d.innerHTML;}
 function _fmtTime(ts){const d=new Date(ts);return String(d.getHours()).padStart(2,'0')+':'+String(d.getMinutes()).padStart(2,'0');}
+
+// ── Reply state ──
+let _replyTo=null; // {text, role, ts}
+
+function _initSwipeReply(bubble,msgData){
+  let startX=0,dx=0,swiping=false;
+  const isUser=bubble.classList.contains('user');
+  const dir=isUser?-1:1; // swipe left for user, right for operator
+  bubble.addEventListener('touchstart',e=>{
+    startX=e.touches[0].clientX;dx=0;swiping=true;
+    bubble.style.transition='none';
+  },{passive:true});
+  bubble.addEventListener('touchmove',e=>{
+    if(!swiping)return;
+    const raw=(e.touches[0].clientX-startX)*dir;
+    dx=Math.max(0,Math.min(raw,80));
+    bubble.style.transform=`translateX(${dx*dir}px)`;
+    // Show reply icon at threshold
+    const icon=bubble.querySelector('.msg-reply-icon');
+    if(icon)icon.style.opacity=dx>30?'1':'0';
+  },{passive:true});
+  bubble.addEventListener('touchend',()=>{
+    if(!swiping)return;
+    swiping=false;
+    bubble.style.transition='transform .15s ease-out';
+    bubble.style.transform='';
+    const icon=bubble.querySelector('.msg-reply-icon');
+    if(icon)setTimeout(()=>{icon.style.opacity='0';},150);
+    if(dx>=40){
+      setReply(msgData);
+      haptic.light();
+    }
+    dx=0;
+  },{passive:true});
+}
+
+function setReply(msgData){
+  _replyTo=msgData;
+  const bar=el('support-reply-bar');
+  const nameEl=el('support-reply-name');
+  const textEl=el('support-reply-text');
+  const isOp=msgData.role==='operator';
+  nameEl.textContent=isOp?(lang==='ru'?'Оператор':'Operator'):(lang==='ru'?'Вы':'You');
+  textEl.textContent=msgData.text||'';
+  bar.classList.add('show');
+  el('support-input')?.focus();
+}
+
+function cancelReply(){
+  _replyTo=null;
+  el('support-reply-bar').classList.remove('show');
+}
+
+function _getMsgText(bubble){
+  // Extract plain text from bubble, ignoring timestamp and quote
+  const clone=bubble.cloneNode(true);
+  clone.querySelectorAll('.msg-ts,.msg-quote,.msg-reply-icon').forEach(e=>e.remove());
+  const img=clone.querySelector('img.chat-photo');
+  return img?'[photo]':(clone.textContent||'').trim();
+}
 
 async function fetchSupportMsgs(){
   if(!_supportConvKey)return;
@@ -5972,12 +6052,19 @@ async function fetchSupportMsgs(){
         _supportRenderedTs.add(m.ts);
         const bubble=document.createElement('div');
         bubble.className='msg-bubble '+m.role;
+        let quoteHtml='';
+        if(m.reply_to_text){
+          const qName=m.reply_to_role==='operator'?(lang==='ru'?'Оператор':'Operator'):(lang==='ru'?'Вы':'You');
+          quoteHtml=`<div class="msg-quote"><div class="msg-quote-name">${_escHtml(qName)}</div>${_escHtml(m.reply_to_text)}</div>`;
+        }
+        const replyIcon=`<div class="msg-reply-icon"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/></svg></div>`;
         if(m.type==='photo'){
           const cap=m.caption?`<div>${_escHtml(m.caption)}</div>`:'';
-          bubble.innerHTML=`<img class="chat-photo" src="${AMBAR_API}${m.url}" alt="photo" onclick="openPhotoViewer(this.src)">${cap}<div class="msg-ts">${_fmtTime(m.ts)}</div>`;
+          bubble.innerHTML=`${replyIcon}${quoteHtml}<img class="chat-photo" src="${AMBAR_API}${m.url}" alt="photo" onclick="openPhotoViewer(this.src)">${cap}<div class="msg-ts">${_fmtTime(m.ts)}</div>`;
         }else{
-          bubble.innerHTML=`<div>${_escHtml(m.text)}</div><div class="msg-ts">${_fmtTime(m.ts)}</div>`;
+          bubble.innerHTML=`${replyIcon}${quoteHtml}<div>${_escHtml(m.text)}</div><div class="msg-ts">${_fmtTime(m.ts)}</div>`;
         }
+        _initSwipeReply(bubble,{text:m.text||m.caption||'',role:m.role,ts:m.ts});
         container.appendChild(bubble);
       });
       _supportLastTs=messages[messages.length-1].ts;
@@ -6001,12 +6088,21 @@ async function sendSupportMsg(){
   // Remove empty state if present
   const emptyEl=el('support-empty');if(emptyEl)emptyEl.remove();
 
+  // Capture reply state before clearing
+  const replyData=_replyTo?{..._replyTo}:null;
+  cancelReply();
+
   // Optimistically add bubble
   const container=el('support-msgs');
   const bubble=document.createElement('div');
   bubble.className='msg-bubble user';
   const now=new Date();
-  bubble.innerHTML=`<div>${_escHtml(text)}</div><div class="msg-ts">${_fmtTime(now.toISOString())}</div>`;
+  let quoteHtml='';
+  if(replyData){
+    const qName=replyData.role==='operator'?(lang==='ru'?'Оператор':'Operator'):(lang==='ru'?'Вы':'You');
+    quoteHtml=`<div class="msg-quote"><div class="msg-quote-name">${_escHtml(qName)}</div>${_escHtml(replyData.text)}</div>`;
+  }
+  bubble.innerHTML=`${quoteHtml}<div>${_escHtml(text)}</div><div class="msg-ts">${_fmtTime(now.toISOString())}</div>`;
   container.appendChild(bubble);
   container.scrollTop=container.scrollHeight;
 
@@ -6014,11 +6110,18 @@ async function sendSupportMsg(){
   _autoResizeSupport(inp);
   haptic.light();
 
+  // Build payload
+  const payload={initData,order_id:_supportOrderId,text};
+  if(replyData){
+    payload.reply_to_text=replyData.text;
+    payload.reply_to_role=replyData.role;
+  }
+
   try{
     const resp=await fetch(`${AMBAR_API}/api/support/send`,{
       method:'POST',
       headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({initData,order_id:_supportOrderId,text})
+      body:JSON.stringify(payload)
     });
     const res=await resp.json();
     if(!res.ok){showToast('Send failed','err');bubble.style.opacity='.5';}

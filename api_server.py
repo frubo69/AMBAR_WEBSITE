@@ -502,6 +502,8 @@ async def handle_support_send(request: web.Request) -> web.Response:
     username  = user.get("username", "—")
     order_id  = data.get("order_id", "")
     text      = (data.get("text", "") or "").strip()
+    reply_to_text = (data.get("reply_to_text", "") or "").strip()
+    reply_to_role = data.get("reply_to_role", "")
 
     try:
         if await db.is_banned(uid):
@@ -515,12 +517,24 @@ async def handle_support_send(request: web.Request) -> web.Response:
     conv_key  = f"{uid}_{order_id}" if order_id else str(uid)
     server_ts = datetime.now(timezone.utc).isoformat()
 
-    await db.append_support_msg(conv_key, {"role": "user", "text": text, "ts": server_ts})
+    msg_doc = {"role": "user", "text": text, "ts": server_ts}
+    if reply_to_text:
+        msg_doc["reply_to_text"] = reply_to_text
+        msg_doc["reply_to_role"] = reply_to_role
+    await db.append_support_msg(conv_key, msg_doc)
+
+    # Build quote block for operator
+    quote_block = ""
+    if reply_to_text:
+        quote_label = "Оператор" if reply_to_role == "operator" else user_name
+        short_quote = reply_to_text[:120] + ("…" if len(reply_to_text) > 120 else "")
+        quote_block = f"\n┃ _{quote_label}_\n┃ {short_quote}\n"
 
     header = (
         f"💬 *Чат поддержки (Mini App)*\n\n"
         f"📦 Заказ: `#{order_id}`\n"
-        f"👤 {user_name} (@{username}, ID: `{uid}`)\n\n"
+        f"👤 {user_name} (@{username}, ID: `{uid}`)\n"
+        f"{quote_block}\n"
         f"💬 {text}"
     )
     token = SUPPORT_BOT_TOKEN or BOT_TOKEN

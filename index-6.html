@@ -233,7 +233,8 @@ img{display:block}
 .btn-main{width:100%;background:linear-gradient(135deg,var(--gold),var(--gold2),var(--gold3));color:#07070E;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.3px;transition:.15s}
 .btn-main:active{transform:scale(.98);opacity:.9}
 .btn-main:disabled{opacity:.3;cursor:not-allowed}
-.work-hours-hint{text-align:center;font-size:10px;color:var(--muted);margin-top:6px;letter-spacing:.3px;font-family:'DM Sans',sans-serif}
+.btn-main{display:flex;flex-direction:column;align-items:center;gap:2px}
+.btn-hours{font-size:9px;font-weight:500;opacity:.55;letter-spacing:.2px}
 .btn-outline{width:100%;background:transparent;border:1.5px solid var(--border);color:var(--sub);border-radius:14px;padding:13px;font-size:14px;font-weight:500;cursor:pointer;margin-top:8px;transition:.15s}
 .btn-outline:active{border-color:var(--gold);color:var(--gold)}
 
@@ -1168,8 +1169,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div id="cart-foot" style="display:none">
     <div class="cart-foot">
       <div class="total-row"><span class="total-lbl" id="tot-lbl">ИТОГО</span><span class="total-val"><span id="tot-n">0</span> AED</span></div>
-      <button class="btn-main" id="co-btn" onclick="tryOrder()">Оформить заказ →</button>
-      <div class="work-hours-hint" id="co-hours-hint">12:00 – 06:00 (12PM – 6AM)</div>
+      <button class="btn-main" id="co-btn" onclick="tryOrder()"><span id="co-btn-text">Оформить заказ →</span><span class="btn-hours" id="co-btn-hours">Принимаем заказы с 12:00 до 06:00</span></button>
       <button class="btn-outline" id="clear-btn" onclick="clearCart()">Очистить корзину</button>
     </div>
   </div>
@@ -1538,8 +1538,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     <div class="sum-total"><span id="sum-tot-lbl">Итого</span><span id="sum-tot-val">0 AED</span></div>
   </div>
   <div class="co-foot">
-    <button class="btn-main" id="place-btn" onclick="placeOrder()">Подтвердить заказ</button>
-    <div class="work-hours-hint" id="place-hours-hint">12:00 – 06:00 (12PM – 6AM)</div>
+    <button class="btn-main" id="place-btn" onclick="placeOrder()"><span id="place-btn-text">Подтвердить заказ</span><span class="btn-hours" id="place-btn-hours">Принимаем заказы с 12:00 до 06:00</span></button>
   </div>
 </div>
 
@@ -2633,7 +2632,9 @@ function applyLang(){
   set('sh-orders',t('orders'));set('sh-active',t('activeOrders'));
   set('nbl-cat',t('catalog'));set('nbl-cart',t('cart'));set('nbl-addr',t('addrPage'));
   set('nbl-ord',t('orders'));set('nbl-prof',t('profile'));
-  set('tot-lbl',t('total'));set('co-btn',t('coBtn'));set('clear-btn',t('clearCart'));set('back-catalog-btn',t('backCatalog'));
+  set('tot-lbl',t('total'));set('co-btn-text',t('coBtn'));set('clear-btn',t('clearCart'));set('back-catalog-btn',t('backCatalog'));
+  const _hrs=lang==='ru'?'Принимаем заказы с 12:00 до 06:00':'Working hours 12PM – 6AM';
+  set('co-btn-hours',_hrs);set('place-btn-hours',_hrs);
   set('modal-title',t('modalTitle'));set('modal-add-lbl',t('modalAdd'));set('modal-sup',lang==='ru'?'ДОСТАВКА':'DELIVERY');
   set('sh-saved-addr',t('shSaved'));set('add-form-title',t('addFormTitle'));
   set('lbl-area',t('lblArea'));set('lbl-street',t('lblStreet'));set('lbl-building',t('lblBuilding'));
@@ -2651,7 +2652,7 @@ function applyLang(){
   set('lbl-addr-comment',lang==='ru'?'КОММЕНТАРИЙ ДЛЯ КУРЬЕРА':'COMMENT FOR COURIER');
   el('addr-comment-in').placeholder = lang==='ru' ? 'Например: проедьте чуть дальше шлагбаума, я встречу вас там...' : 'For example: drive a bit past the barrier, I will meet you there...';
   set('sum-title',t('sumTitle'));set('sum-tip-lbl',t('tipLbl'));set('sum-tot-lbl',t('totLbl'));
-  set('place-btn',t('placeBtn'));set('tip-lbl',t('tip'));set('co-addr-title',t('coAddrTitle'));
+  set('place-btn-text',t('placeBtn'));set('tip-lbl',t('tip'));set('co-addr-title',t('coAddrTitle'));
   el('tip-input').placeholder=lang==='ru'?'Введите сумму...':'Enter amount...';
   set('mtl-gps','GPS');set('mtl-manual',lang==='ru'?'Вручную':'Manual');
   set('lc-title',t('lcTitle'));set('lc-msg',t('lcMsg'));set('lc-yes',t('lcYes'));set('lc-no',t('lcNo'));

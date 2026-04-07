@@ -595,7 +595,19 @@ async def _build_order_list(list_type, operator_uid):
     if list_type == "n":
         items = sorted([o for o in all_orders.values() if o.get("status") == "pending"],
                        key=lambda x: x.get("timestamp",""), reverse=True)
+        # Count unverified
+        unverified_count = 0
+        for o in items:
+            try:
+                cid = o.get("customer_id")
+                if cid:
+                    u = await db.get_user(int(cid))
+                    if u and not u.get("verified", False) and not u.get("referred_by"):
+                        unverified_count += 1
+            except: pass
         header = f"🆕 *Новых заказов: {len(items)}*"
+        if unverified_count:
+            header += f"\n🔴 Без верификации: *{unverified_count}*"
         empty  = "✅ Новых заказов нет."
     elif list_type == "a":
         items = sorted([o for o in all_orders.values() if o.get("status") == "approved"],

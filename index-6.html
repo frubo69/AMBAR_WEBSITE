@@ -233,6 +233,7 @@ img{display:block}
 .btn-main{width:100%;background:linear-gradient(135deg,var(--gold),var(--gold2),var(--gold3));color:#07070E;border:none;border-radius:14px;padding:15px;font-size:15px;font-weight:700;cursor:pointer;letter-spacing:.3px;transition:.15s}
 .btn-main:active{transform:scale(.98);opacity:.9}
 .btn-main:disabled{opacity:.3;cursor:not-allowed}
+.work-hours-hint{text-align:center;font-size:10px;color:var(--muted);margin-top:6px;letter-spacing:.3px;font-family:'DM Sans',sans-serif}
 .btn-outline{width:100%;background:transparent;border:1.5px solid var(--border);color:var(--sub);border-radius:14px;padding:13px;font-size:14px;font-weight:500;cursor:pointer;margin-top:8px;transition:.15s}
 .btn-outline:active{border-color:var(--gold);color:var(--gold)}
 
@@ -1149,7 +1150,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     <div class="ce-line"></div>
     <div class="ce-brand-bg">AMBAR</div>
     <div class="ce-line"></div>
-    <button class="ce-btn" id="ce-btn" onclick="go('catalog')">каталог →</button>
+    <button class="ce-btn" id="ce-btn" onclick="go('catalog')">← в каталог</button>
     <div id="ce-title" style="display:none"></div>
   </div>
   <div class="cart-list-wrap">
@@ -1168,6 +1169,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     <div class="cart-foot">
       <div class="total-row"><span class="total-lbl" id="tot-lbl">ИТОГО</span><span class="total-val"><span id="tot-n">0</span> AED</span></div>
       <button class="btn-main" id="co-btn" onclick="tryOrder()">Оформить заказ →</button>
+      <div class="work-hours-hint" id="co-hours-hint">12:00 – 06:00 (12PM – 6AM)</div>
       <button class="btn-outline" id="clear-btn" onclick="clearCart()">Очистить корзину</button>
     </div>
   </div>
@@ -1535,7 +1537,10 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     <div class="sum-line" id="sum-tip-row" style="display:none"><span id="sum-tip-lbl">Чаевые</span><span id="sum-tip-val">0 AED</span></div>
     <div class="sum-total"><span id="sum-tot-lbl">Итого</span><span id="sum-tot-val">0 AED</span></div>
   </div>
-  <div class="co-foot"><button class="btn-main" id="place-btn" onclick="placeOrder()">Подтвердить заказ</button></div>
+  <div class="co-foot">
+    <button class="btn-main" id="place-btn" onclick="placeOrder()">Подтвердить заказ</button>
+    <div class="work-hours-hint" id="place-hours-hint">12:00 – 06:00 (12PM – 6AM)</div>
+  </div>
 </div>
 
 <!-- NAV -->
@@ -4293,7 +4298,7 @@ function renderCart(){
     document.querySelector('.cart-list-wrap').style.display='none';
     if(topbar)topbar.style.display='none';
     el('ce-title').textContent=lang==='ru'?'пусто':'empty';
-    el('ce-btn').textContent=lang==='ru'?'каталог →':'catalog →';
+    el('ce-btn').textContent=lang==='ru'?'← в каталог':'← to catalog';
     foot.style.display='none';tipSec.style.display='none';return;
   }
   el('cart-empty').style.display='none';

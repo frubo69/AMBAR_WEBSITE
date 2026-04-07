@@ -348,13 +348,24 @@ async def order_card(o, full=True):
     st_map = {"pending":"🟡 Ожидает","approved":"🟢 Принят","delivered":"✅ Доставлен","declined":"🔴 Отклонён","cancelled":"🚫 Отменён клиентом"}
     st     = st_map.get(o.get("status",""), o.get("status",""))
     lines  = []
-    # Preserve first order banner for unverified non-referral customers
+    # Preserve first order banner + source info for unverified non-referral customers
     try:
         cid = o.get("customer_id")
         if cid:
             user_doc = await db.get_user(int(cid))
             if user_doc and not user_doc.get("verified", False) and not user_doc.get("referred_by"):
                 lines.append("🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨")
+                src = user_doc.get("verify_source", "")
+                if src:
+                    src_labels = {"friend":"👥 Знакомый","operator":"📞 Оператор","social":"📱 Соцсети","search":"🔍 Интернет","other":"💬 Другое"}
+                    src_detail = user_doc.get("verify_source_detail", "")
+                    rec_name = user_doc.get("verify_recommender_name", "")
+                    rec_phone = user_doc.get("verify_recommender_phone", "")
+                    lines.append(f"📋 Источник: *{src_labels.get(src, src)}*")
+                    if src == "friend" and rec_name:
+                        lines.append(f"👤 {rec_name}" + (f" — {rec_phone}" if rec_phone else ""))
+                    elif src_detail:
+                        lines.append(f"💬 {src_detail}")
                 lines.append("")
     except Exception:
         pass

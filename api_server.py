@@ -229,15 +229,15 @@ async def handle_create_order(request: web.Request) -> web.Response:
         first_order_banner = "🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨\n\n"
     else:
         first_order_banner = ""
+    tip_line = f"\n🎁 Чаевые: {tip} AED" if tip else ""
     op_text = (
         f"{first_order_banner}"
         f"🏢 Офис: *{office_nm}*\n\n"
         f"🆕 *НОВЫЙ ЗАКАЗ #{oid}*\n\n"
-        f"📞 Тел: {phone}\n"
         f"{addr_line}\n\n"
-        f"🛒 *Позиции:*\n{item_lines}\n\n"
-        f"🎁 Чаевые: {tip} AED\n"
-        f"💰 *Итого: {total} AED*"
+        f"🛒 *Позиции:*\n{item_lines}\n"
+        f"{tip_line}"
+        f"\n💰 *Итого: {total} AED*"
         + (f"\n\n💬 *Комментарий:* {comment}" if comment else "")
     )
     # For first-time non-referral users, delay operator notification until
@@ -428,22 +428,18 @@ async def handle_verify_request(request: web.Request) -> web.Response:
         oid = order["order_id"]
         saved_op_text = order.get("op_text", "")
         # Strip any existing first-order banner from saved text, replace with louder one
-        # Build source info block
+        # Build source info line
         source_labels = {
-            "friend": "👥 Рекомендация знакомого",
-            "operator": "📞 Оператор AMBAR",
-            "social": "📱 Социальные сети",
-            "search": "🔍 Поиск в интернете",
+            "friend": "👥 Знакомый",
+            "operator": "📞 Оператор",
             "other": "💬 Другое",
         }
-        source_line = source_labels.get(source, source)
-        verify_info = f"\n\n📋 *Источник:* {source_line}"
+        src_line = source_labels.get(source, source)
+        src_extra = ""
         if source == "friend" and recommender_name:
-            verify_info += f"\n👤 *Имя:* {recommender_name}"
-            if recommender_phone:
-                verify_info += f"\n📞 *Телефон:* {recommender_phone}"
+            src_extra = f"\n👤 {recommender_name}" + (f" — {recommender_phone}" if recommender_phone else "")
         elif source_detail:
-            verify_info += f"\n💬 *Детали:* {source_detail}"
+            src_extra = f"\n💬 {source_detail}"
 
         if saved_op_text:
             for prefix in ["🔴 *⚠️ ПЕРВЫЙ ЗАКАЗ — новый клиент!*\n\n",
@@ -452,12 +448,16 @@ async def handle_verify_request(request: web.Request) -> web.Response:
                            "🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ РЕФЕРАЛ* 🚨🚨🚨\n"]:
                 saved_op_text = saved_op_text.replace(prefix, "")
             combined = (
-                f"🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨"
-                + verify_info + "\n\n"
+                f"🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨\n"
+                f"📋 Источник: *{src_line}*{src_extra}\n\n"
                 + saved_op_text.strip()
             )
         else:
-            combined = f"🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨" + verify_info + f"\n\n🆕 *ЗАКАЗ #{oid}*"
+            combined = (
+                f"🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨\n"
+                f"📋 Источник: *{src_line}*{src_extra}\n\n"
+                f"🆕 *ЗАКАЗ #{oid}*"
+            )
 
         op_buttons = [
             [

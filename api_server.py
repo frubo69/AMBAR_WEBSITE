@@ -213,7 +213,7 @@ async def handle_create_order(request: web.Request) -> web.Response:
         except (ValueError, TypeError): pass
     # Single address line: GPS link or Maps link
     if gmap_link:
-        addr_line = f"📍 GPS: {gmap_link}" if (is_gps or address == "GPS") else f"🏠 Адрес: {gmap_link}"
+        addr_line = f"📍 Адрес: {address}\nGoogle Maps: {gmap_link}" if (is_gps and address and address != "GPS") else (f"📍 GPS: {gmap_link}" if (is_gps or address == "GPS") else f"🏠 Адрес: {gmap_link}")
     else:
         addr_line = f"🏠 Адрес: {address}"
 

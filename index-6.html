@@ -3495,7 +3495,7 @@ function saveNewAddress(){
   const isGps=locInfo?.isGps||false;
   const streetShort=locInfo?.street||'';
   const gmapLink=lat&&lon?`https://maps.google.com/maps?q=${lat},${lon}`:'';
-  const addrStr=isGps?'GPS':(streetShort||gmapLink);
+  const addrStr=isGps?(streetShort||'GPS'):(streetShort||gmapLink);
 
   const newAddr={
     label,address:addrStr,street:isGps?'':streetShort,
@@ -3577,6 +3577,7 @@ function startGPSAdd(){
     if(btn){btn.classList.remove('loading','err');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=t('btnGpsSub');}
     haptic.success();
     showToast(lang==='ru'?'Геолокация получена':'Location detected','ok',true);
+    _reverseGeo(lat,lon,info=>{if(locInfo&&locInfo.isGps)locInfo.street=info.full||info.line1||'';});
     showAddrSaveSheet();
   },()=>{
     haptic.error();

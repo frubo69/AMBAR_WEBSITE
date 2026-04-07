@@ -1081,7 +1081,17 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     <button style="margin-top:10px;background:none;border:none;color:rgba(255,255,255,.35);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;" onclick="verifyBack()">← Назад</button>
   </div>
 
-  <!-- Step detail: single detail field (for operator/social/search/other) -->
+  <!-- Step operator: phone + when -->
+  <div id="verify-op" style="display:none;flex-direction:column;align-items:center;text-align:center;padding:28px;max-width:340px;width:100%;">
+    <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px;" id="verify-op-title">Оператор</div>
+    <div style="font-size:13px;color:#888;line-height:1.6;margin-bottom:24px;" id="verify-op-desc">Укажите номер телефона оператора и примерную дату получения ссылки</div>
+    <input id="verify-op-phone" type="tel" placeholder="+971..." style="width:100%;padding:14px 16px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:15px;font-family:'DM Sans',sans-serif;outline:none;box-sizing:border-box;margin-bottom:12px;" />
+    <input id="verify-op-when" type="text" placeholder="Примерная дата" style="width:100%;padding:14px 16px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:15px;font-family:'DM Sans',sans-serif;outline:none;box-sizing:border-box;margin-bottom:16px;" />
+    <button id="verify-op-submit" style="width:100%;padding:15px;background:linear-gradient(135deg,rgba(255,255,255,.1),rgba(255,255,255,.06));border:1px solid rgba(255,255,255,.15);border-radius:14px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;" onclick="verifyOpSubmit()">Отправить</button>
+    <button style="margin-top:10px;background:none;border:none;color:rgba(255,255,255,.35);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;" onclick="verifyBackTo0()">← Назад</button>
+  </div>
+
+  <!-- Step detail: single detail field (for other) -->
   <div id="verify-detail" style="display:none;flex-direction:column;align-items:center;text-align:center;padding:28px;max-width:340px;width:100%;">
     <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px;" id="verify-detail-title">Детали</div>
     <div style="font-size:13px;color:#888;line-height:1.6;margin-bottom:24px;" id="verify-detail-desc">Уточните</div>
@@ -2462,7 +2472,7 @@ function _isVerified(){
 }
 
 function _hideAllVerifySteps(){
-  ['verify-step0','verify-step1','verify-step2','verify-detail','verify-wait'].forEach(id=>{
+  ['verify-step0','verify-step1','verify-step2','verify-op','verify-detail','verify-wait'].forEach(id=>{
     const e=el(id);if(e)e.style.display='none';
   });
 }
@@ -2522,13 +2532,14 @@ function pickVerifySource(src){
     // Friend recommendation → name → phone
     el('verify-step1').style.display='flex';
   } else if(src==='operator'){
-    el('verify-detail-title').textContent=ru?'Оператор':'Operator';
-    el('verify-detail-desc').textContent=ru?'Укажите имя или ник оператора':'Enter the operator\'s name or nickname';
-    el('verify-detail-in').placeholder=ru?'Имя оператора':'Operator name';
-    el('verify-detail-in').type='text';
-    el('verify-detail-in').value='';
-    el('verify-detail-submit').textContent=ru?'Отправить':'Submit';
-    el('verify-detail').style.display='flex';
+    el('verify-op-title').textContent=ru?'Оператор AMBAR':'AMBAR Operator';
+    el('verify-op-desc').textContent=ru?'Укажите номер телефона оператора и когда примерно вы получили ссылку':'Enter the operator\'s phone number and approximate date you received the link';
+    el('verify-op-phone').placeholder=ru?'Номер телефона оператора':'Operator phone number';
+    el('verify-op-when').placeholder=ru?'Когда получили ссылку (примерно)':'When did you get the link (approx.)';
+    el('verify-op-phone').value='';
+    el('verify-op-when').value='';
+    el('verify-op-submit').textContent=ru?'Отправить':'Submit';
+    el('verify-op').style.display='flex';
   } else {
     // Other — free text
     el('verify-detail-title').textContent=ru?'Другое':'Other';
@@ -2557,6 +2568,21 @@ function verifyStep2(){
 function verifyBack(){
   _hideAllVerifySteps();
   el('verify-step1').style.display='flex';
+}
+
+async function verifyOpSubmit(){
+  const phone=el('verify-op-phone').value.trim();
+  const when=el('verify-op-when').value.trim();
+  if(!phone){el('verify-op-phone').style.borderColor='rgba(255,80,80,.5)';return;}
+  el('verify-op-phone').style.borderColor='rgba(255,255,255,.12)';
+  if(!when){el('verify-op-when').style.borderColor='rgba(255,80,80,.5)';return;}
+  el('verify-op-when').style.borderColor='rgba(255,255,255,.12)';
+  el('verify-op-submit').textContent='...';
+  el('verify-op-submit').disabled=true;
+  await _verifySubmitGeneric(phone+' | '+when);
+  el('verify-op-submit').disabled=false;
+  const ru=lang==='ru';
+  el('verify-op-submit').textContent=ru?'Отправить':'Submit';
 }
 
 async function verifyDetailSubmit(){

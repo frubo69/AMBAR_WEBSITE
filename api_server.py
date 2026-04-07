@@ -62,11 +62,16 @@ def validate_init_data(init_data: str) -> dict | None:
 
 
 # ── Telegram Bot API helpers ───────────────────────────────────────────────────
-async def tg_send(token, chat_id, text, parse_mode="Markdown", reply_markup=None):
+async def tg_send(token, chat_id, text, parse_mode="Markdown", reply_markup=None, reply_to_message_id=None):
     url     = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
     if reply_markup:
         payload["reply_markup"] = json.dumps(reply_markup)
+    if reply_to_message_id:
+        payload["reply_parameters"] = json.dumps({
+            "message_id": reply_to_message_id,
+            "allow_sending_without_reply": True
+        })
     async with _aiohttp.ClientSession() as session:
         async with session.post(url, json=payload) as resp:
             return await resp.json()
@@ -504,6 +509,7 @@ async def handle_support_send(request: web.Request) -> web.Response:
     text      = (data.get("text", "") or "").strip()
     reply_to_text = (data.get("reply_to_text", "") or "").strip()
     reply_to_role = data.get("reply_to_role", "")
+    reply_to_ts   = data.get("reply_to_ts", "")
 
     try:
         if await db.is_banned(uid):
@@ -523,29 +529,28 @@ async def handle_support_send(request: web.Request) -> web.Response:
         msg_doc["reply_to_role"] = reply_to_role
     await db.append_support_msg(conv_key, msg_doc)
 
-    # Build quote block for operator
-    quote_block = ""
-    if reply_to_text:
-        quote_label = "Оператор" if reply_to_role == "operator" else user_name
-        short_quote = reply_to_text[:120] + ("…" if len(reply_to_text) > 120 else "")
-        quote_block = f"\n┃ _{quote_label}_\n┃ {short_quote}\n"
-
     header = (
         f"💬 *Чат поддержки (Mini App)*\n\n"
         f"📦 Заказ: `#{order_id}`\n"
-        f"👤 {user_name} (@{username}, ID: `{uid}`)\n"
-        f"{quote_block}\n"
+        f"👤 {user_name} (@{username}, ID: `{uid}`)\n\n"
         f"💬 {text}"
     )
     token = SUPPORT_BOT_TOKEN or BOT_TOKEN
     for op_id in OPERATOR_IDS:
         try:
-            result = await tg_send(token, op_id, header)
+            # Look up fwd_msg_id of the message being replied to (for native Telegram reply)
+            reply_msg_id = None
+            if reply_to_ts:
+                reply_msg_id = await db.get_support_fwd_id(conv_key, reply_to_ts, op_id)
+
+            result = await tg_send(token, op_id, header, reply_to_message_id=reply_msg_id)
             fwd_id = result.get("result", {}).get("message_id")
             if fwd_id:
                 await db.save_support_map_entry(str(fwd_id), {
                     "user_id": uid, "conv_key": conv_key, "order_id": order_id
                 })
+                # Save mapping: this message's ts → fwd_id for this operator
+                await db.save_support_fwd_id(conv_key, server_ts, op_id, fwd_id)
         except Exception as e:
             log.error(f"Support forward {op_id}: {e}")
 

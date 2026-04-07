@@ -267,6 +267,27 @@ async def save_support_map_entry(fwd_id: str, entry: dict):
     )
 
 
+async def save_support_fwd_id(conv_key: str, ts: str, op_id: int, fwd_msg_id: int):
+    """Map a message timestamp to its forwarded Telegram message ID per operator."""
+    db = _db_or_none()
+    if db is None: return
+    await db.support_fwd_ids.update_one(
+        {"conv_key": conv_key, "ts": ts, "op_id": op_id},
+        {"$set": {"fwd_msg_id": fwd_msg_id}},
+        upsert=True,
+    )
+
+
+async def get_support_fwd_id(conv_key: str, ts: str, op_id: int) -> int | None:
+    """Look up the forwarded Telegram message ID for a given message."""
+    db = _db_or_none()
+    if db is None: return None
+    doc = await db.support_fwd_ids.find_one(
+        {"conv_key": conv_key, "ts": ts, "op_id": op_id}
+    )
+    return doc.get("fwd_msg_id") if doc else None
+
+
 async def get_support_map_entry(fwd_id: str) -> dict | None:
     db = _db_or_none()
     if db is None: return None

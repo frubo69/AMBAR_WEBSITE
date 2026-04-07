@@ -212,6 +212,10 @@ async def handle_admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE)
                     "text": msg.text or msg.caption or "(media)",
                     "ts": ts,
                 })
+            # Save fwd_id mapping so users can reply to operator messages
+            op_id = msg.from_user.id if msg.from_user else 0
+            if op_id:
+                await db.save_support_fwd_id(conv_key, ts, op_id, msg.message_id)
         except Exception as e:
             print(f"⚠️ Failed to save operator reply to DB: {e}")
 

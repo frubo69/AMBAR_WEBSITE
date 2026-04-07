@@ -403,8 +403,24 @@ async def order_card(o, full=True):
         lines.append("")
         lines.append(f"💬 Комментарий: {_esc(comment)}")
     if o.get("status") == "approved" and o.get("deliver_by"):
+        confirmed_at = o.get("confirmed_at", "")
+        confirmed_time = ""
+        if confirmed_at:
+            try:
+                from datetime import datetime as _dt
+                ct = _dt.fromisoformat(confirmed_at.replace("Z", "+00:00")).astimezone(DUBAI_TZ)
+                confirmed_time = ct.strftime("%H:%M")
+            except Exception:
+                pass
+        eta_val = o.get("eta", "")
+        parts_line = []
+        if confirmed_time:
+            parts_line.append(f"Принят в <b>{confirmed_time}</b>")
+        if eta_val:
+            parts_line.append(f"Время доставки не более <b>{eta_val} мин</b>")
+        parts_line.append(f"Доставить до <b>{o['deliver_by']}</b>")
         lines.append("")
-        lines.append(f"🏁 Доставить до: <b>{o['deliver_by']}</b>")
+        lines.append("🏁 " + " | ".join(parts_line))
     return "\n".join(lines)
 
 def _esc(t):
@@ -1029,7 +1045,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if order:
             lt = ctx.user_data.get("lt")
             await q.edit_message_text(
-                (await order_card(order)) + f"\n\n✅ <b>Принят</b> | ⏱ {eta} мин | 🏁 До <b>{deliver_by_str}</b>",
+                (await order_card(order)) + f"\n\n✅ <b>Принят в {now_dubai.strftime('%H:%M')}</b> | ⏱ Не более <b>{eta} мин</b> | 🏁 До <b>{deliver_by_str}</b>",
                 parse_mode="HTML", reply_markup=await kb_order_actions(order, list_type=lt))
         asyncio.create_task(run_countdown(cid, eta, lang, oid))
 

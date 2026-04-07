@@ -410,13 +410,16 @@ async def handle_verify_request(request: web.Request) -> web.Response:
         return web.json_response({"error": "auth failed"}, status=401, headers=CORS_HEADERS)
 
     uid = user.get("id")
+    source = (data.get("source", "") or "").strip()
+    source_detail = (data.get("source_detail", "") or "").strip()
     recommender_name = (data.get("recommender_name", "") or "").strip()
     recommender_phone = (data.get("recommender_phone", "") or "").strip()
 
-    if not recommender_name or not recommender_phone:
-        return web.json_response({"error": "missing fields"}, status=400, headers=CORS_HEADERS)
+    if not source:
+        return web.json_response({"error": "missing source"}, status=400, headers=CORS_HEADERS)
 
-    await db.submit_verify_request(uid, recommender_name, recommender_phone)
+    await db.submit_verify_request(uid, recommender_name, recommender_phone,
+                                    source=source, source_detail=source_detail)
 
     # Find the pending-verification order and send combined notification
     user_orders = await db.get_user_orders(uid)
@@ -425,6 +428,23 @@ async def handle_verify_request(request: web.Request) -> web.Response:
         oid = order["order_id"]
         saved_op_text = order.get("op_text", "")
         # Strip any existing first-order banner from saved text, replace with louder one
+        # Build source info block
+        source_labels = {
+            "friend": "👥 Рекомендация знакомого",
+            "operator": "📞 Оператор AMBAR",
+            "social": "📱 Социальные сети",
+            "search": "🔍 Поиск в интернете",
+            "other": "💬 Другое",
+        }
+        source_line = source_labels.get(source, source)
+        verify_info = f"\n\n📋 *Источник:* {source_line}"
+        if source == "friend" and recommender_name:
+            verify_info += f"\n👤 *Имя:* {recommender_name}"
+            if recommender_phone:
+                verify_info += f"\n📞 *Телефон:* {recommender_phone}"
+        elif source_detail:
+            verify_info += f"\n💬 *Детали:* {source_detail}"
+
         if saved_op_text:
             for prefix in ["🔴 *⚠️ ПЕРВЫЙ ЗАКАЗ — новый клиент!*\n\n",
                            "🔴 *⚠️ НОВЫЙ КЛИЕНТ РЕФЕРАЛ*\n",
@@ -432,11 +452,12 @@ async def handle_verify_request(request: web.Request) -> web.Response:
                            "🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ РЕФЕРАЛ* 🚨🚨🚨\n"]:
                 saved_op_text = saved_op_text.replace(prefix, "")
             combined = (
-                f"🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨\n\n"
+                f"🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨"
+                + verify_info + "\n\n"
                 + saved_op_text.strip()
             )
         else:
-            combined = f"🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨\n\n🆕 *ЗАКАЗ #{oid}*"
+            combined = f"🚨🚨🚨 *ПЕРВЫЙ ЗАКАЗ — НОВЫЙ КЛИЕНТ!* 🚨🚨🚨" + verify_info + f"\n\n🆕 *ЗАКАЗ #{oid}*"
 
         op_buttons = [
             [
@@ -459,7 +480,7 @@ async def handle_verify_request(request: web.Request) -> web.Response:
         # Clear the pending flag
         await db.update_order(oid, pending_verification=False)
 
-    log.info(f"[verify-request] uid={uid} recommender={recommender_name}")
+    log.info(f"[verify-request] uid={uid} source={source} detail={source_detail or recommender_name}")
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 

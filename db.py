@@ -311,18 +311,22 @@ async def verify_user(telegram_id: int):
     )
 
 
-async def submit_verify_request(telegram_id: int, recommender_name: str, recommender_phone: str):
+async def submit_verify_request(telegram_id: int, recommender_name: str, recommender_phone: str,
+                                 source: str = "", source_detail: str = ""):
     """Store verification request info and mark as pending."""
     db = _db_or_none()
     if db is None: return
+    fields = {
+        "verify_requested": True,
+        "verify_source": source,
+        "verify_source_detail": source_detail,
+        "verify_recommender_name": recommender_name,
+        "verify_recommender_phone": recommender_phone,
+        "verify_requested_at": datetime.now(timezone.utc).isoformat(),
+    }
     await db.users.update_one(
         {"telegram_id": telegram_id},
-        {"$set": {
-            "verify_requested": True,
-            "verify_recommender_name": recommender_name,
-            "verify_recommender_phone": recommender_phone,
-            "verify_requested_at": datetime.now(timezone.utc).isoformat(),
-        }},
+        {"$set": fields},
     )
 
 

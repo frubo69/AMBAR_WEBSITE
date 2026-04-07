@@ -448,19 +448,26 @@ async def customer_card(o):
     # Verification info
     if user_doc:
         verified = user_doc.get("verified", False)
+        src = user_doc.get("verify_source", "")
+        src_detail = user_doc.get("verify_source_detail", "")
         rec_name = user_doc.get("verify_recommender_name", "")
         rec_phone = user_doc.get("verify_recommender_phone", "")
         lines.append("")
         if verified:
             lines.append("🔐 *Верифицирован* ✅")
-        elif rec_name:
+        elif src:
             lines.append("🔐 *Ожидает верификации* ⏳")
         else:
             lines.append("🔐 *Не верифицирован*")
-        if rec_name:
-            lines.append(f"👥 Рекомендатель: *{rec_name}*")
-        if rec_phone:
-            lines.append(f"📞 Тел рекомендателя: `{rec_phone}`")
+        if src:
+            src_labels = {"friend": "👥 Знакомый", "operator": "📞 Оператор", "social": "📱 Соцсети", "search": "🔍 Интернет", "other": "💬 Другое"}
+            lines.append(f"📋 Источник: *{src_labels.get(src, src)}*")
+        if src == "friend" and rec_name:
+            lines.append(f"👤 Рекомендатель: *{rec_name}*")
+            if rec_phone:
+                lines.append(f"📞 Тел рекомендателя: `{rec_phone}`")
+        elif src_detail:
+            lines.append(f"💬 Детали: *{src_detail}*")
     return "\n".join(lines)
 
 
@@ -834,9 +841,17 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             name = u.get("first_name", "") or ""
             lname = u.get("last_name", "") or ""
             full = f"{name} {lname}".strip() or str(tid)
+            src = u.get("verify_source", "")
+            src_detail = u.get("verify_source_detail", "")
             rec_name = u.get("verify_recommender_name", "")
             rec_phone = u.get("verify_recommender_phone", "")
-            rec_info = f"  Рекомендатель: _{rec_name}_ {rec_phone}" if rec_name else ""
+            src_labels = {"friend":"👥 Знакомый","operator":"📞 Оператор","social":"📱 Соцсети","search":"🔍 Интернет","other":"💬 Другое"}
+            src_line = src_labels.get(src, "")
+            if src == "friend" and rec_name:
+                src_line += f": _{rec_name}_ {rec_phone}"
+            elif src_detail:
+                src_line += f": _{src_detail}_"
+            rec_info = f"  {src_line}" if src_line else ""
             lines.append(f"• `{tid}` — {full}{rec_info}")
             buttons.append([InlineKeyboardButton(f"✅ Верифицировать {full}", callback_data=f"verify_{tid}")])
         buttons.append([InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")])

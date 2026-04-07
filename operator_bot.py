@@ -195,7 +195,7 @@ def get_operator_office(uid):
 
 DUBAI_TZ = timezone(offset=__import__('datetime').timedelta(hours=4))
 
-def order_summary_label(o):
+async def order_summary_label(o):
     """Compact one-line label for order list buttons."""
     items = o.get("items", [])
     n_items = sum(i.get("qty", 1) for i in items)
@@ -215,7 +215,16 @@ def order_summary_label(o):
         parts.append(time_str)
     parts.append(f"{n_items} поз.")
     parts.append(f"{o.get('total',0)} AED")
-    return " · ".join(parts)
+    label = " · ".join(parts)
+    # Check verification status
+    try:
+        cid = o.get("customer_id")
+        if cid:
+            user_doc = await db.get_user(int(cid))
+            if user_doc and not user_doc.get("verified", False) and not user_doc.get("referred_by"):
+                label = "🔴 " + label + " 🔴"
+    except: pass
+    return label
 
 
 # ── Keyboards ─────────────────────────────────────────────────────────────────
@@ -226,12 +235,12 @@ def kb_main():
         ["🚫 Бан / Нет верификации", "❓ Помощь"],
     ], resize_keyboard=True)
 
-def kb_order_list(items, list_type, limit=15):
+async def kb_order_list(items, list_type, limit=15):
     """Compact list of orders as inline buttons."""
     rows = []
     for o in items[:limit]:
         rows.append([InlineKeyboardButton(
-            order_summary_label(o),
+            await order_summary_label(o),
             callback_data=f"osel_{list_type}_{o['order_id']}"
         )])
     rows.append([InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")])
@@ -685,14 +694,14 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if not items:
             await send(cid, empty, reply_markup=_dismiss); return
         await send(cid, header + "\n\nНажмите на заказ для просмотра:",
-                   parse_mode="Markdown", reply_markup=kb_order_list(items, "n"))
+                   parse_mode="Markdown", reply_markup=await kb_order_list(items, "n"))
 
     elif "Активные" in text:
         header, empty, items = await _build_order_list("a", uid)
         if not items:
             await send(cid, empty, reply_markup=_dismiss); return
         await send(cid, header + "\n\nНажмите на заказ для просмотра:",
-                   parse_mode="Markdown", reply_markup=kb_order_list(items, "a"))
+                   parse_mode="Markdown", reply_markup=await kb_order_list(items, "a"))
 
     elif "Завершённые" in text:
         off = get_operator_office(uid)
@@ -910,7 +919,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         rows = []
         for o in done[:30]:
             rows.append([InlineKeyboardButton(
-                order_summary_label(o), callback_data=f"osel_d_{o['order_id']}")])
+                await order_summary_label(o), callback_data=f"osel_d_{o['order_id']}")])
         rows.append([InlineKeyboardButton("← К датам", callback_data="olist_d")])
         await q.edit_message_text(
             f"📅 *{day}*  —  {len(done)} заказов\n\nНажмите на заказ:",
@@ -970,7 +979,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await q.edit_message_text(
             header + "\n\nНажмите на заказ для просмотра:",
             parse_mode="Markdown",
-            reply_markup=kb_order_list(items, lt))
+            reply_markup=await kb_order_list(items, lt))
 
     # ── ACCEPT → show ETA ────────────────────────────────────────────────────
     elif data.startswith("acc_"):

@@ -2009,22 +2009,20 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       <span class="aod-total-lbl" id="aod-total-lbl">Итого</span>
       <span class="aod-total-val" id="aod-total-val">—</span>
     </div>
-    <div style="padding:10px 20px 0;display:flex;flex-direction:column;gap:8px" id="aod-actions-row">
-      <div id="aod-game-wrap" style="display:none">
-        <button onclick="openGame()" style="width:100%;padding:14px 16px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--border2);display:flex;align-items:center;gap:14px;cursor:pointer;transition:.15s;font-family:'DM Sans',sans-serif" onpointerdown="this.style.opacity='.7'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">
-          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.45)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" width="22" height="22"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><circle cx="17" cy="10" r="1" fill="rgba(255,255,255,.45)"/><circle cx="15" cy="13" r="1" fill="rgba(255,255,255,.45)"/></svg>
-          <div style="text-align:left;flex:1">
-            <div style="font-size:13px;font-weight:600;color:rgba(255,255,255,.8)" id="aod-game-title">Играй пока ждёшь</div>
-            <div style="font-size:10px;color:rgba(255,255,255,.3);margin-top:1px" id="aod-game-sub"><span id="aod-game-best">0</span> pts</div>
-          </div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="2.5" stroke-linecap="round"><polyline points="9 6 15 12 9 18"/></svg>
+    <div style="padding:12px 20px 0;display:flex;gap:8px" id="aod-actions-row">
+      <div id="aod-game-wrap" style="display:none;flex:1">
+        <button onclick="openGame()" style="width:100%;padding:10px 0;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:.15s;font-family:'DM Sans',sans-serif" onpointerdown="this.style.opacity='.6'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.5" width="16" height="16"><rect x="2" y="6" width="20" height="12" rx="2"/><line x1="6" y1="12" x2="10" y2="12"/><line x1="8" y1="10" x2="8" y2="14"/><circle cx="17" cy="10" r="1" fill="rgba(255,255,255,.4)"/><circle cx="15" cy="13" r="1" fill="rgba(255,255,255,.4)"/></svg>
+          <span style="font-size:12px;font-weight:600;color:rgba(255,255,255,.5)" id="aod-game-title">Мини-игра</span>
+          <span style="font-size:10px;color:rgba(255,255,255,.25)" id="aod-game-sub"><span id="aod-game-best">0</span> pts</span>
         </button>
       </div>
-      <button onclick="closeAod();openSupportChat(_aobOrders[_aobIdx]?.order_id||'')" style="width:100%;padding:14px 16px;border-radius:12px;background:rgba(255,255,255,.04);border:1px solid var(--border2);display:flex;align-items:center;gap:14px;cursor:pointer;transition:.15s;font-family:'DM Sans',sans-serif" onpointerdown="this.style.opacity='.7'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">
-        <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1.5" stroke-linecap="round" width="20" height="20"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-        <span style="font-size:13px;font-weight:600;color:rgba(255,255,255,.45)" id="aod-support-lbl">Поддержка</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.2)" stroke-width="2.5" stroke-linecap="round" style="margin-left:auto"><polyline points="9 6 15 12 9 18"/></svg>
-      </button>
+      <div style="flex:1">
+        <button onclick="closeAod();openSupportChat(_aobOrders[_aobIdx]?.order_id||'')" style="width:100%;padding:10px 0;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;transition:.15s;font-family:'DM Sans',sans-serif" onpointerdown="this.style.opacity='.6'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">
+          <svg viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,.35)" stroke-width="1.5" width="16" height="16"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+          <span style="font-size:12px;font-weight:600;color:rgba(255,255,255,.4)" id="aod-support-lbl">Поддержка</span>
+        </button>
+      </div>
     </div>
     <!-- Review UI (shown when delivered) -->
     <div class="aod-review" id="aod-review" style="display:none">

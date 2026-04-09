@@ -1501,9 +1501,13 @@ async def _do_decline_verification(bot, chat_id: int, cid: int, oid: str, commen
             declined_oids.append(po_oid)
     # Notify customer (never show reason)
     lang_u = pending[0].get("lang", "ru") if pending else "ru"
-    tx = {"ru": "❌ Ваша верификация отклонена. Свяжитесь с поддержкой для уточнения.",
-          "en": "❌ Your verification was declined. Contact support for details."}
-    await notify(cid, tx.get(lang_u, tx["ru"]))
+    tx = {"ru": "❌ Ваша верификация отклонена.",
+          "en": "❌ Your verification was declined."}
+    support_kb = InlineKeyboardMarkup([[
+        InlineKeyboardButton("💬 Написать в поддержку" if lang_u == "ru" else "💬 Contact support",
+                             url=f"https://t.me/{SUPPORT_BOT_USERNAME}")
+    ]])
+    await notify(cid, tx.get(lang_u, tx["ru"]), reply_markup=support_kb)
     # Report
     declined_info = f"\n📦 Отклонено заказов: {len(declined_oids)}" if declined_oids else ""
     comment_info = f"\n💬 Комментарий: {comment}" if comment else ""

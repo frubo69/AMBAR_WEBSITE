@@ -76,6 +76,15 @@ async def tg_send(token, chat_id, text, parse_mode="Markdown", reply_markup=None
         async with session.post(url, json=payload) as resp:
             return await resp.json()
 
+async def tg_edit(token, chat_id, message_id, text, parse_mode="HTML", reply_markup=None):
+    url = f"https://api.telegram.org/bot{token}/editMessageText"
+    payload = {"chat_id": chat_id, "message_id": message_id, "text": text, "parse_mode": parse_mode}
+    if reply_markup:
+        payload["reply_markup"] = json.dumps(reply_markup)
+    async with _aiohttp.ClientSession() as session:
+        async with session.post(url, json=payload) as resp:
+            return await resp.json()
+
 async def tg_send_photo(token, chat_id, photo_path, caption=""):
     url  = f"https://api.telegram.org/bot{token}/sendPhoto"
     data = _aiohttp.FormData()
@@ -264,11 +273,16 @@ async def handle_create_order(request: web.Request) -> web.Response:
             [{"text": "👤 Клиент", "callback_data": f"client_{oid}_{uid}"}],
         ]
         op_kb = {"inline_keyboard": op_buttons}
+        op_msg_ids = {}
         for op_id in OPERATOR_IDS:
             try:
-                await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text, parse_mode="HTML", reply_markup=op_kb)
+                resp = await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text, parse_mode="HTML", reply_markup=op_kb)
+                if resp and resp.get("ok") and resp.get("result"):
+                    op_msg_ids[str(op_id)] = resp["result"]["message_id"]
             except Exception as e:
                 log.error(f"Operator notify {op_id}: {e}")
+        if op_msg_ids:
+            await db.update_order(oid, op_msg_ids=op_msg_ids)
 
     # Award referral points (+5) to the referrer on first order
     if is_first_order and referred_by:
@@ -329,21 +343,59 @@ async def handle_cancel_order(request: web.Request) -> web.Response:
         cancelled_at=datetime.now(timezone.utc).isoformat(),
     )
 
-    # Notify operators
+    # Update original order messages with cancelled status
+    op_msg_ids = order.get("op_msg_ids", {})
     user_name = order.get("customer_name", "—")
     username  = order.get("username", "—")
-    op_text = (
-        f"🚫 *ЗАКАЗ #{order_id} ОТМЕНЁН КЛИЕНТОМ*\n\n"
-        f"👤 *{user_name}* (@{username}, ID: `{uid}`)\n\n"
-        f"📋 *Причина:* {reason or '—'}"
-        + (f"\n💬 *Комментарий:* {comment}" if comment else "")
-    )
     dismiss_kb = {"inline_keyboard": [[{"text": "✅ Просмотрено", "callback_data": "delmsg"}]]}
-    for op_id in OPERATOR_IDS:
-        try:
-            await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text, reply_markup=dismiss_kb)
-        except Exception as e:
-            log.error(f"Operator cancel notify {op_id}: {e}")
+    if op_msg_ids:
+        # Build cancelled order card
+        def _esc(t):
+            return str(t).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
+        cancel_lines = [
+            f"🚫 <b>ЗАКАЗ #{order_id} — ОТМЕНЁН КЛИЕНТОМ</b>",
+            "",
+            f"🏢 Офис: <b>{_esc(order.get('office_name', '—'))}</b>",
+            "",
+        ]
+        gmap = order.get("gmap_link", "")
+        addr = order.get("address", "—")
+        if gmap:
+            cancel_lines.append(f"🏠 Адрес: {_esc(addr)}" if addr and addr != "GPS" and addr != "—" else "🏠 Адрес: GPS")
+            cancel_lines.append(f"Google Maps: {gmap}")
+        else:
+            cancel_lines.append(f"🏠 Адрес: {_esc(addr)}")
+        cancel_lines.append("")
+        cancel_lines.append("🛒 <b>Позиции:</b>")
+        for item in order.get("items", []):
+            lt = item.get("line_total", item["price"] * item["qty"])
+            cancel_lines.append(f"  • {_esc(item['name'])} ×{item['qty']} = {lt} AED")
+        cancel_lines.append("")
+        cancel_lines.append(f"💰 <b>Итого: {order.get('total', 0)} AED</b>")
+        cancel_lines.append("")
+        cancel_lines.append(f"👤 {_esc(user_name)} (@{_esc(username)}, ID: <code>{uid}</code>)")
+        cancel_lines.append(f"📋 Причина: {_esc(reason or '—')}")
+        if comment:
+            cancel_lines.append(f"💬 Комментарий: {_esc(comment)}")
+        cancel_card = "\n".join(cancel_lines)
+        for op_id_str, msg_id in op_msg_ids.items():
+            try:
+                await tg_edit(OPERATOR_BOT_TOKEN, int(op_id_str), msg_id, cancel_card, reply_markup=dismiss_kb)
+            except Exception as e:
+                log.error(f"Edit cancel card {op_id_str}: {e}")
+    else:
+        # Fallback: send separate cancel notification if no stored message IDs
+        op_text = (
+            f"🚫 *ЗАКАЗ #{order_id} ОТМЕНЁН КЛИЕНТОМ*\n\n"
+            f"👤 *{user_name}* (@{username}, ID: `{uid}`)\n\n"
+            f"📋 *Причина:* {reason or '—'}"
+            + (f"\n💬 *Комментарий:* {comment}" if comment else "")
+        )
+        for op_id in OPERATOR_IDS:
+            try:
+                await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text, reply_markup=dismiss_kb)
+            except Exception as e:
+                log.error(f"Operator cancel notify {op_id}: {e}")
 
     log.info(f"[cancel-order] #{order_id} user={uid} reason={reason!r}")
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
@@ -471,11 +523,16 @@ async def handle_verify_request(request: web.Request) -> web.Response:
             [{"text": "👤 Клиент", "callback_data": f"client_{oid}_{uid}"}],
         ]
         op_kb = {"inline_keyboard": op_buttons}
+        op_msg_ids = {}
         for op_id in OPERATOR_IDS:
             try:
-                await tg_send(OPERATOR_BOT_TOKEN, op_id, combined, parse_mode="HTML", reply_markup=op_kb)
+                resp = await tg_send(OPERATOR_BOT_TOKEN, op_id, combined, parse_mode="HTML", reply_markup=op_kb)
+                if resp and resp.get("ok") and resp.get("result"):
+                    op_msg_ids[str(op_id)] = resp["result"]["message_id"]
             except Exception as e:
                 log.error(f"Verify+order notify {op_id}: {e}")
+        if op_msg_ids:
+            await db.update_order(oid, op_msg_ids=op_msg_ids)
         # Clear the pending flag
         await db.update_order(oid, pending_verification=False)
 

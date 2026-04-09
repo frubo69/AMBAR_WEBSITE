@@ -1090,7 +1090,11 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         order = await db.get_order(oid)
         if order and order.get("status") == "cancelled":
             await q.answer("🚫 Заказ отменён клиентом", show_alert=True)
-            try: await q.edit_message_reply_markup(reply_markup=None)
+            _done_kb = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
+            try:
+                await q.edit_message_text(
+                    (await order_card(order)) + "\n\n🚫 <b>Отменён клиентом</b>",
+                    parse_mode="HTML", reply_markup=_done_kb)
             except: pass
             return
         # Block acceptance for unverified users
@@ -1135,7 +1139,11 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         order_chk = await db.get_order(oid)
         if order_chk and order_chk.get("status") == "cancelled":
             await q.answer("🚫 Заказ уже отменён клиентом", show_alert=True)
-            try: await q.edit_message_reply_markup(reply_markup=None)
+            _done_kb = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
+            try:
+                await q.edit_message_text(
+                    (await order_card(order_chk)) + "\n\n🚫 <b>Отменён клиентом</b>",
+                    parse_mode="HTML", reply_markup=_done_kb)
             except: pass
             return
         await db.update_order(oid, status="declined", updated_at=datetime.now().isoformat())

@@ -301,7 +301,7 @@ async def kb_client_actions(oid, cid):
 def kb_eta(oid, cid):
     r1 = [InlineKeyboardButton(f"⏱ {t} мин", callback_data=f"eta_{t}_{oid}_{cid}") for t in [20, 30, 45]]
     r2 = [InlineKeyboardButton(f"⏱ {t} мин", callback_data=f"eta_{t}_{oid}_{cid}") for t in [60, 90, 120]]
-    return InlineKeyboardMarkup([r1, r2])
+    return InlineKeyboardMarkup([r1, r2, [InlineKeyboardButton("← Назад", callback_data=f"eta_back_{oid}_{cid}")]])
 
 def kb_edit(order):
     oid  = order["order_id"]
@@ -1074,6 +1074,15 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             header + "\n\nНажмите на заказ для просмотра:",
             parse_mode="Markdown",
             reply_markup=await kb_order_list(items, lt))
+
+    # ── ETA back → restore order actions ────────────────────────────────────
+    elif data.startswith("eta_back_"):
+        parts = data.split("_")
+        oid, cid = parts[2], int(parts[3])
+        order = await db.get_order(oid)
+        if order:
+            lt = ctx.user_data.get("lt")
+            await q.edit_message_reply_markup(reply_markup=await kb_order_actions(order, list_type=lt))
 
     # ── ACCEPT → show ETA ────────────────────────────────────────────────────
     elif data.startswith("acc_"):

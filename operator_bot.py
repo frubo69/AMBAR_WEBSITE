@@ -426,7 +426,7 @@ async def order_card(o, full=True):
         if confirmed_time:
             parts_line.append(f"Принят в <b>{confirmed_time}</b>")
         if eta_val:
-            parts_line.append(f"Время доставки не более <b>{eta_val} мин</b>")
+            parts_line.append(f"Время доставки <b>{eta_val} мин</b>")
         parts_line.append(f"Доставить до <b>{o['deliver_by']}</b>")
         lines.append("")
         lines.append("🏁 " + " | ".join(parts_line))
@@ -1125,7 +1125,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if order:
             lt = ctx.user_data.get("lt")
             await q.edit_message_text(
-                (await order_card(order)) + f"\n\n✅ <b>Принят в {now_dubai.strftime('%H:%M')}</b> | ⏱ Не более <b>{eta} мин</b> | 🏁 До <b>{deliver_by_str}</b>",
+                await order_card(order),
                 parse_mode="HTML", reply_markup=await kb_order_actions(order, list_type=lt))
         asyncio.create_task(run_countdown(cid, eta, lang, oid))
 

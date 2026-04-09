@@ -1366,15 +1366,28 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         cid = int(data[7:])
         await db.verify_user(cid)
         await db.undecline_verification(cid)
-        # Replace verify/decline buttons with "verified" label on this message
-        old_kb = q.message.reply_markup
-        if old_kb:
-            new_rows = [row for row in old_kb.inline_keyboard
-                        if not any(b.callback_data and (b.callback_data.startswith("verify_") or b.callback_data.startswith("decverify_")) for b in row)]
-            new_rows.append([InlineKeyboardButton("🔐 Верифицирован ✅", callback_data="noop")])
-            await q.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(new_rows))
         await q.answer("✅ Клиент верифицирован")
-        # Send separate confirmation message
+        # Find order_id from message text to refresh with full buttons
+        import re as _re
+        oid_match = _re.search(r'#(AMB\d+)', q.message.text or "")
+        if oid_match:
+            oid = oid_match.group(1)
+            order = await db.get_order(oid)
+            if order:
+                lt = ctx.user_data.get("lt")
+                await q.edit_message_text(
+                    await order_card(order),
+                    parse_mode="HTML",
+                    reply_markup=await kb_order_actions(order, list_type=lt))
+        else:
+            # Fallback: just replace buttons
+            old_kb = q.message.reply_markup
+            if old_kb:
+                new_rows = [row for row in old_kb.inline_keyboard
+                            if not any(b.callback_data and (b.callback_data.startswith("verify_") or b.callback_data.startswith("decverify_")) for b in row)]
+                new_rows.append([InlineKeyboardButton("🔐 Верифицирован ✅", callback_data="noop")])
+                await q.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(new_rows))
+        # Send confirmation
         _dismiss = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
         await q.message.reply_text(
             f"✅ Клиент `{cid}` верифицирован.",

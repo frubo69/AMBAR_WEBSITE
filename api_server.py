@@ -463,15 +463,10 @@ async def handle_verify_request(request: web.Request) -> web.Response:
 
         op_buttons = [
             [
-                {"text": "✅ Принять",   "callback_data": f"acc_{oid}_{uid}"},
-                {"text": "❌ Отклонить", "callback_data": f"dec_{oid}_{uid}"},
-            ],
-            [
-                {"text": "✏️ Редактировать", "callback_data": f"edit_{oid}"},
-                {"text": "📍 Геолокация",    "callback_data": f"loc_{oid}"},
+                {"text": "✅ Верифицировать", "callback_data": f"verify_{uid}"},
+                {"text": "❌ Не верифицировать", "callback_data": f"decverify_{oid}_{uid}"},
             ],
             [{"text": "👤 Клиент", "callback_data": f"client_{oid}_{uid}"}],
-            [{"text": "🔐 Верифицировать клиента", "callback_data": f"verify_{uid}"}],
         ]
         op_kb = {"inline_keyboard": op_buttons}
         for op_id in OPERATOR_IDS:

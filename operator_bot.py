@@ -250,30 +250,36 @@ async def kb_order_actions(order, list_type=None):
     oid, cid = order["order_id"], order["customer_id"]
     st       = order.get("status", "")
     rows     = []
-    if st == "pending":
-        rows.append([
-            InlineKeyboardButton("✅ Принять",   callback_data=f"acc_{oid}_{cid}"),
-            InlineKeyboardButton("❌ Отклонить", callback_data=f"dec_{oid}_{cid}"),
-        ])
-    if st == "approved":
-        rows.append([InlineKeyboardButton(f"🚚 Доставлено #{oid}", callback_data=f"done_{oid}_{cid}")])
-    if st == "delivered":
-        rows.append([InlineKeyboardButton("🔄 Вернуть в доставку", callback_data=f"undone_{oid}_{cid}")])
-    rows.append([
-        InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{oid}"),
-        InlineKeyboardButton("📍 Геолокация",    callback_data=f"loc_{oid}"),
-    ])
-    rows.append([InlineKeyboardButton("👤 Клиент", callback_data=f"client_{oid}_{cid}")])
-    # Show verify button if customer is not yet verified (and not a referral)
+    # Check verification status
+    is_unverified = False
     try:
         user_doc = await db.get_user(int(cid))
         if user_doc and not user_doc.get("verified", False) and not user_doc.get("referred_by"):
-            rows.append([
-                InlineKeyboardButton("✅ Верифицировать", callback_data=f"verify_{cid}"),
-                InlineKeyboardButton("❌ Отклонить", callback_data=f"decverify_{oid}_{cid}"),
-            ])
+            is_unverified = True
     except Exception:
         pass
+    if is_unverified:
+        # Only show verify/decline + client for unverified users
+        rows.append([
+            InlineKeyboardButton("✅ Верифицировать", callback_data=f"verify_{cid}"),
+            InlineKeyboardButton("❌ Не верифицировать", callback_data=f"decverify_{oid}_{cid}"),
+        ])
+        rows.append([InlineKeyboardButton("👤 Клиент", callback_data=f"client_{oid}_{cid}")])
+    else:
+        if st == "pending":
+            rows.append([
+                InlineKeyboardButton("✅ Принять",   callback_data=f"acc_{oid}_{cid}"),
+                InlineKeyboardButton("❌ Отклонить", callback_data=f"dec_{oid}_{cid}"),
+            ])
+        if st == "approved":
+            rows.append([InlineKeyboardButton(f"🚚 Доставлено #{oid}", callback_data=f"done_{oid}_{cid}")])
+        if st == "delivered":
+            rows.append([InlineKeyboardButton("🔄 Вернуть в доставку", callback_data=f"undone_{oid}_{cid}")])
+        rows.append([
+            InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{oid}"),
+            InlineKeyboardButton("📍 Геолокация",    callback_data=f"loc_{oid}"),
+        ])
+        rows.append([InlineKeyboardButton("👤 Клиент", callback_data=f"client_{oid}_{cid}")])
     if list_type:
         rows.append([InlineKeyboardButton("← К списку", callback_data=f"olist_{list_type}")])
     if order.get("review_score"):

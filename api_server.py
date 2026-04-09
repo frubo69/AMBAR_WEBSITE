@@ -211,9 +211,13 @@ async def handle_create_order(request: web.Request) -> web.Response:
     if not gmap_link and lat and lon:
         try: gmap_link = f"https://maps.google.com/maps?q={float(lat):.6f},{float(lon):.6f}"
         except (ValueError, TypeError): pass
-    # Single address line: GPS link or Maps link
-    if gmap_link:
-        addr_line = f"📍 Адрес: {address}\nGoogle Maps: {gmap_link}" if (is_gps and address and address != "GPS") else (f"📍 GPS: {gmap_link}" if (is_gps or address == "GPS") else f"🏠 Адрес: {gmap_link}")
+    # Address line: text name first, then link
+    if address and address != "GPS" and address != "—":
+        addr_line = f"🏠 Адрес: {address}"
+        if gmap_link:
+            addr_line += f"\nGoogle Maps: {gmap_link}"
+    elif gmap_link:
+        addr_line = f"📍 GPS: {gmap_link}"
     else:
         addr_line = f"🏠 Адрес: {address}"
 

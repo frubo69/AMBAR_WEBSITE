@@ -2541,6 +2541,7 @@ function showVerifyWall(){
   _hideAllVerifySteps();
   if(declined){
     el('verify-declined').style.display='flex';
+    _startVerifyPoll();
   } else if(requested){
     el('verify-wait').style.display='flex';
     _startVerifyPoll();
@@ -2689,8 +2690,17 @@ function _startVerifyPoll(){
         if(d.verified){
           localStorage.setItem('ambar_verified','1');
           localStorage.removeItem('ambar_verify_requested');
+          localStorage.removeItem('ambar_verify_declined');
           hideVerifyWall();
           showToast(lang==='ru'?'Верификация пройдена ✓':'Verified ✓','ok');
+        } else if(d.verify_declined&&localStorage.getItem('ambar_verify_declined')!=='1'){
+          localStorage.setItem('ambar_verify_declined','1');
+          _hideAllVerifySteps();
+          const ru=lang==='ru';
+          el('verify-declined-title').textContent=ru?'Верификация отклонена':'Verification declined';
+          el('verify-declined-desc').textContent=ru?'Свяжитесь с поддержкой для уточнения деталей':'Contact support for details';
+          el('verify-declined-btn-text').textContent=ru?'Написать в поддержку':'Contact support';
+          el('verify-declined').style.display='flex';
         }
       }
     }catch(e){}

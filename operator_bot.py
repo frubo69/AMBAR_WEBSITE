@@ -729,8 +729,9 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if prompt_msg:
             try: await ctx.bot.delete_message(update.effective_chat.id, prompt_msg)
             except: pass
+        order_msg = ctx.user_data.pop("decv_order_msg", None)
         if cid_dv:
-            await _do_decline_verification(ctx.bot, update.effective_chat.id, cid_dv, oid_dv, comment)
+            await _do_decline_verification(ctx.bot, update.effective_chat.id, cid_dv, oid_dv, comment, edit_msg_id=order_msg)
         return
 
     text = update.message.text
@@ -1417,6 +1418,8 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         parts = data.split("_", 2)
         oid = parts[1]
         cid = int(parts[2])
+        # Save the order message ID so we can update it after decline
+        ctx.user_data["decv_order_msg"] = q.message.message_id
         # Show confirmation with optional comment
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("❌ Отклонить без комментария", callback_data=f"decvconf_{oid}_{cid}")],
@@ -1454,9 +1457,10 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         parts = data.split("_", 2)
         oid = parts[1]
         cid = int(parts[2])
+        order_msg = ctx.user_data.pop("decv_order_msg", None)
         try: await q.message.delete()
         except: pass
-        await _do_decline_verification(ctx.bot, q.message.chat_id, cid, oid, "")
+        await _do_decline_verification(ctx.bot, q.message.chat_id, cid, oid, "", edit_msg_id=order_msg)
 
     # ── UNBAN ─────────────────────────────────────────────────────────────────
     elif data.startswith("unban_"):
@@ -1487,7 +1491,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 # ── Decline verification helper ──────────────────────────────────────────────
-async def _do_decline_verification(bot, chat_id: int, cid: int, oid: str, comment: str):
+async def _do_decline_verification(bot, chat_id: int, cid: int, oid: str, comment: str, edit_msg_id: int = None):
     """Decline verification, auto-decline pending orders, notify customer."""
     await db.decline_verification(cid)
     if comment:
@@ -1510,6 +1514,17 @@ async def _do_decline_verification(bot, chat_id: int, cid: int, oid: str, commen
                              url=f"https://t.me/{SUPPORT_BOT_USERNAME}")
     ]])
     await notify(cid, tx.get(lang_u, tx["ru"]), reply_markup=support_kb)
+    # Update the original order message if we have it
+    if edit_msg_id and oid and oid != "0":
+        order = await db.get_order(oid)
+        if order:
+            _done_kb = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
+            try:
+                await bot.edit_message_text(
+                    (await order_card(order)) + "\n\n🔴 <b>Верификация отклонена</b>",
+                    chat_id=chat_id, message_id=edit_msg_id,
+                    parse_mode="HTML", reply_markup=_done_kb)
+            except: pass
     # Report
     declined_info = f"\n📦 Отклонено заказов: {len(declined_oids)}" if declined_oids else ""
     comment_info = f"\n💬 Комментарий: {comment}" if comment else ""

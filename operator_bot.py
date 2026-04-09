@@ -657,6 +657,9 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if any(kw in (update.message.text or "") for kw in _menu_keywords):
         ctx.user_data.pop("pending_ban", None)
         ctx.user_data.pop("pending_rename", None)
+        ctx.user_data.pop("awaiting_decv_comment", None)
+        ctx.user_data.pop("decv_oid", None)
+        ctx.user_data.pop("decv_cid", None)
 
     # ── Intercept ban reason input ─────────────────────────────────────────────
     pending = ctx.user_data.get("pending_ban")
@@ -712,6 +715,18 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                             parse_mode="Markdown",
                             reply_markup=await kb_client_actions(oid, cid))
                     except: pass
+        return
+
+    # ── Intercept decline verification comment ───────────────────────────────
+    if ctx.user_data.get("awaiting_decv_comment"):
+        ctx.user_data.pop("awaiting_decv_comment")
+        comment = (update.message.text or "").strip()
+        cid_dv = ctx.user_data.pop("decv_cid", 0)
+        oid_dv = ctx.user_data.pop("decv_oid", "0")
+        try: await update.message.delete()
+        except: pass
+        if cid_dv:
+            await _do_decline_verification(ctx.bot, update.effective_chat.id, cid_dv, oid_dv, comment)
         return
 
     text = update.message.text
@@ -1396,40 +1411,45 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # ── DECLINE VERIFICATION ─────────────────────────────────────────────────
     elif data.startswith("decverify_"):
         parts = data.split("_", 2)
-        oid = parts[1]  # "0" if from unverified list
+        oid = parts[1]
         cid = int(parts[2])
-        await db.decline_verification(cid)
-        # Auto-decline all pending orders for this user
-        pending = await db.get_pending_orders_for_user(cid)
-        declined_oids = []
-        for po in pending:
-            po_oid = po.get("order_id")
-            if po_oid:
-                await db.update_order(po_oid, status="declined", updated_at=datetime.now().isoformat())
-                await db._increment_user(cid, orders_declined=1)
-                declined_oids.append(po_oid)
-        # Notify customer
-        user_doc = await db.get_user(cid)
-        lang_u = "ru"
-        if pending:
-            lang_u = pending[0].get("lang", "ru")
-        tx = {"ru": "❌ Ваша верификация отклонена. Свяжитесь с поддержкой для уточнения.",
-              "en": "❌ Your verification was declined. Contact support for details."}
-        await notify(cid, tx.get(lang_u, tx["ru"]))
-        # Update button on this message
-        old_kb = q.message.reply_markup
-        if old_kb:
-            new_rows = [row for row in old_kb.inline_keyboard
-                        if not any(b.callback_data and (b.callback_data.startswith("verify_") or b.callback_data.startswith("decverify_")) for b in row)]
-            new_rows.append([InlineKeyboardButton("🔴 Верификация отклонена", callback_data="noop")])
-            new_rows.append([InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")])
-            await q.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(new_rows))
-        declined_info = f"\n📦 Отклонено заказов: {len(declined_oids)}" if declined_oids else ""
-        await q.answer("❌ Верификация отклонена", show_alert=True)
-        _dismiss = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
+        # Show confirmation with optional comment
+        kb = InlineKeyboardMarkup([
+            [InlineKeyboardButton("❌ Отклонить без комментария", callback_data=f"decvconf_{oid}_{cid}")],
+            [InlineKeyboardButton("✏️ Добавить комментарий", callback_data=f"decvcomm_{oid}_{cid}")],
+            [InlineKeyboardButton("← Отмена", callback_data="delmsg")],
+        ])
         await q.message.reply_text(
-            f"🔴 Верификация клиента `{cid}` отклонена.{declined_info}",
-            parse_mode="Markdown", reply_markup=_dismiss)
+            f"🔴 *Отклонение верификации* `{cid}`\n\nДобавить комментарий?",
+            parse_mode="Markdown", reply_markup=kb)
+
+    # ── DECLINE VERIFY: with comment prompt ──────────────────────────────────
+    elif data.startswith("decvcomm_"):
+        parts = data.split("_", 2)
+        oid = parts[1]
+        cid = int(parts[2])
+        ctx.user_data["decv_oid"] = oid
+        ctx.user_data["decv_cid"] = cid
+        ctx.user_data["awaiting_decv_comment"] = True
+        await q.edit_message_text(
+            f"✏️ Напишите причину отклонения для клиента `{cid}`:",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("← Отмена", callback_data="cancel_decv")]]))
+
+    # ── DECLINE VERIFY: cancel comment ───────────────────────────────────────
+    elif data == "cancel_decv":
+        ctx.user_data.pop("awaiting_decv_comment", None)
+        ctx.user_data.pop("decv_oid", None)
+        ctx.user_data.pop("decv_cid", None)
+        await q.edit_message_text("❌ Отклонение отменено.",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]]))
+
+    # ── DECLINE VERIFY: confirm without comment ──────────────────────────────
+    elif data.startswith("decvconf_"):
+        parts = data.split("_", 2)
+        oid = parts[1]
+        cid = int(parts[2])
+        await _do_decline_verification(ctx.bot, q.message.chat_id, cid, oid, "")
 
     # ── UNBAN ─────────────────────────────────────────────────────────────────
     elif data.startswith("unban_"):
@@ -1457,6 +1477,39 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         except: pass
         await q.edit_message_text(f"✅ Пользователь `{uid_str}` разблокирован.", parse_mode="Markdown",
             reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]]))
+
+
+# ── Decline verification helper ──────────────────────────────────────────────
+async def _do_decline_verification(bot, chat_id: int, cid: int, oid: str, comment: str):
+    """Decline verification, auto-decline pending orders, notify customer."""
+    await db.decline_verification(cid)
+    if comment:
+        await db.upsert_user(cid, verify_decline_reason=comment)
+    # Auto-decline all pending orders
+    pending = await db.get_pending_orders_for_user(cid)
+    declined_oids = []
+    for po in pending:
+        po_oid = po.get("order_id")
+        if po_oid:
+            await db.update_order(po_oid, status="declined", updated_at=datetime.now().isoformat())
+            await db._increment_user(cid, orders_declined=1)
+            declined_oids.append(po_oid)
+    # Notify customer
+    lang_u = pending[0].get("lang", "ru") if pending else "ru"
+    if comment:
+        tx = {"ru": f"❌ Ваша верификация отклонена.\n\n💬 Причина: {comment}",
+              "en": f"❌ Your verification was declined.\n\n💬 Reason: {comment}"}
+    else:
+        tx = {"ru": "❌ Ваша верификация отклонена. Свяжитесь с поддержкой для уточнения.",
+              "en": "❌ Your verification was declined. Contact support for details."}
+    await notify(cid, tx.get(lang_u, tx["ru"]))
+    # Report
+    declined_info = f"\n📦 Отклонено заказов: {len(declined_oids)}" if declined_oids else ""
+    comment_info = f"\n💬 Комментарий: {comment}" if comment else ""
+    _dismiss = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
+    await bot.send_message(chat_id,
+        f"🔴 Верификация клиента `{cid}` отклонена.{comment_info}{declined_info}",
+        parse_mode="Markdown", reply_markup=_dismiss)
 
 
 # ── Ban helper ────────────────────────────────────────────────────────────────

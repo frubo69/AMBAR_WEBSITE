@@ -723,8 +723,12 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         comment = (update.message.text or "").strip()
         cid_dv = ctx.user_data.pop("decv_cid", 0)
         oid_dv = ctx.user_data.pop("decv_oid", "0")
+        prompt_msg = ctx.user_data.pop("decv_prompt_msg", None)
         try: await update.message.delete()
         except: pass
+        if prompt_msg:
+            try: await ctx.bot.delete_message(update.effective_chat.id, prompt_msg)
+            except: pass
         if cid_dv:
             await _do_decline_verification(ctx.bot, update.effective_chat.id, cid_dv, oid_dv, comment)
         return
@@ -1431,6 +1435,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         ctx.user_data["decv_oid"] = oid
         ctx.user_data["decv_cid"] = cid
         ctx.user_data["awaiting_decv_comment"] = True
+        ctx.user_data["decv_prompt_msg"] = q.message.message_id
         await q.edit_message_text(
             f"✏️ Напишите причину отклонения для клиента `{cid}`:",
             parse_mode="Markdown",

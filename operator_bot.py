@@ -1494,14 +1494,10 @@ async def _do_decline_verification(bot, chat_id: int, cid: int, oid: str, commen
             await db.update_order(po_oid, status="declined", updated_at=datetime.now().isoformat())
             await db._increment_user(cid, orders_declined=1)
             declined_oids.append(po_oid)
-    # Notify customer
+    # Notify customer (never show reason)
     lang_u = pending[0].get("lang", "ru") if pending else "ru"
-    if comment:
-        tx = {"ru": f"❌ Ваша верификация отклонена.\n\n💬 Причина: {comment}",
-              "en": f"❌ Your verification was declined.\n\n💬 Reason: {comment}"}
-    else:
-        tx = {"ru": "❌ Ваша верификация отклонена. Свяжитесь с поддержкой для уточнения.",
-              "en": "❌ Your verification was declined. Contact support for details."}
+    tx = {"ru": "❌ Ваша верификация отклонена. Свяжитесь с поддержкой для уточнения.",
+          "en": "❌ Your verification was declined. Contact support for details."}
     await notify(cid, tx.get(lang_u, tx["ru"]))
     # Report
     declined_info = f"\n📦 Отклонено заказов: {len(declined_oids)}" if declined_oids else ""

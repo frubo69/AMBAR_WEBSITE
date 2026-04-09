@@ -1422,6 +1422,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             new_rows = [row for row in old_kb.inline_keyboard
                         if not any(b.callback_data and (b.callback_data.startswith("verify_") or b.callback_data.startswith("decverify_")) for b in row)]
             new_rows.append([InlineKeyboardButton("🔴 Верификация отклонена", callback_data="noop")])
+            new_rows.append([InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")])
             await q.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(new_rows))
         declined_info = f"\n📦 Отклонено заказов: {len(declined_oids)}" if declined_oids else ""
         await q.answer("❌ Верификация отклонена", show_alert=True)

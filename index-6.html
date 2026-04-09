@@ -1081,7 +1081,8 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div id="verify-step2" style="display:none;flex-direction:column;align-items:center;text-align:center;padding:28px;max-width:340px;width:100%;">
     <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:8px;" id="verify-title2">Номер рекомендателя</div>
     <div style="font-size:13px;color:#888;line-height:1.6;margin-bottom:24px;" id="verify-desc2">Укажите номер телефона человека, который вас порекомендовал</div>
-    <input id="verify-phone-in" type="tel" placeholder="+971..." style="width:100%;padding:14px 16px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:15px;font-family:'DM Sans',sans-serif;outline:none;box-sizing:border-box;margin-bottom:16px;" />
+    <input id="verify-phone-in" type="tel" placeholder="+971..." style="width:100%;padding:14px 16px;border-radius:12px;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);color:#fff;font-size:15px;font-family:'DM Sans',sans-serif;outline:none;box-sizing:border-box;margin-bottom:6px;" />
+    <div id="verify-phone-skip" style="font-size:12px;color:rgba(255,255,255,.3);margin-bottom:14px;">Необязательно — можно пропустить</div>
     <button id="verify-submit-btn" style="width:100%;padding:15px;background:linear-gradient(135deg,rgba(255,255,255,.1),rgba(255,255,255,.06));border:1px solid rgba(255,255,255,.15);border-radius:14px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;" onclick="verifySubmit()">Отправить</button>
     <button style="margin-top:10px;background:none;border:none;color:rgba(255,255,255,.35);font-size:13px;cursor:pointer;font-family:'DM Sans',sans-serif;" onclick="verifyBack()">← Назад</button>
   </div>
@@ -2396,7 +2397,7 @@ function alignLogoSubs(){
     if(!logo)return;
     const lw=logo.offsetWidth;
     if(!lw)return;
-    g.querySelectorAll('.logo-line').forEach(l=>l.style.width=lw+'px');
+    g.querySelectorAll('.logo-line').forEach(l=>l.style.width=Math.round(lw*1.15)+'px');
     if(!sub)return;
     sub.style.letterSpacing='0px';
     const sw=sub.scrollWidth;
@@ -2508,6 +2509,7 @@ function showVerifyWall(){
   // Step 2 labels (friend flow)
   el('verify-title2').textContent=ru?'Номер рекомендателя':'Recommender phone';
   el('verify-desc2').textContent=ru?'Укажите номер телефона человека, который вас порекомендовал':'Enter the phone number of the person who recommended us';
+  el('verify-phone-skip').textContent=ru?'Необязательно — можно пропустить':'Optional — you can skip this';
   el('verify-phone-in').placeholder='+971...';
   el('verify-submit-btn').textContent=ru?'Отправить':'Submit';
 
@@ -2606,8 +2608,6 @@ async function verifyDetailSubmit(){
 async function verifySubmit(){
   const name=el('verify-name-in').value.trim();
   const phone=el('verify-phone-in').value.trim();
-  if(!phone){el('verify-phone-in').style.borderColor='rgba(255,80,80,.5)';return;}
-  el('verify-phone-in').style.borderColor='rgba(255,255,255,.12)';
   el('verify-submit-btn').textContent='...';
   el('verify-submit-btn').disabled=true;
   const userPhone=el('phone-in')?.value?.trim()||'';

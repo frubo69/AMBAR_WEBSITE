@@ -268,7 +268,10 @@ async def kb_order_actions(order, list_type=None):
     try:
         user_doc = await db.get_user(int(cid))
         if user_doc and not user_doc.get("verified", False) and not user_doc.get("referred_by"):
-            rows.append([InlineKeyboardButton("🔐 Верифицировать клиента", callback_data=f"verify_{cid}")])
+            rows.append([
+                InlineKeyboardButton("✅ Верифицировать", callback_data=f"verify_{cid}"),
+                InlineKeyboardButton("❌ Отклонить", callback_data=f"decverify_{oid}_{cid}"),
+            ])
     except Exception:
         pass
     if list_type:
@@ -825,6 +828,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         kb = InlineKeyboardMarkup([
             [InlineKeyboardButton("🚫 Забаненные", callback_data="list_banned")],
             [InlineKeyboardButton("🔐 Без верификации", callback_data="list_unverified")],
+            [InlineKeyboardButton("🔴 Отклонённые", callback_data="list_declined_verify")],
             [InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")],
         ])
         await send(cid, "🚫 *Бан / Верификация*\n\nВыберите категорию:",
@@ -906,10 +910,46 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 src_line += f": _{src_detail}_"
             rec_info = f"  {src_line}" if src_line else ""
             lines.append(f"• `{tid}` — {full}{rec_info}")
-            buttons.append([InlineKeyboardButton(f"✅ Верифицировать {full}", callback_data=f"verify_{tid}")])
+            buttons.append([
+                InlineKeyboardButton(f"✅ {full}", callback_data=f"verify_{tid}"),
+                InlineKeyboardButton(f"❌ {full}", callback_data=f"decverify_0_{tid}"),
+            ])
         buttons.append([InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")])
         await q.edit_message_text(
             "🔐 *Без верификации (есть заказы):*\n\n" + "\n".join(lines),
+            parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
+        return
+
+    # ── LIST DECLINED VERIFICATIONS ──────────────────────────────────────────
+    if data == "list_declined_verify":
+        users = await db.get_declined_verification_users()
+        if not users:
+            await q.edit_message_text("✅ Нет отклонённых верификаций.",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]]))
+            return
+        lines = []
+        buttons = []
+        for u in users[:20]:
+            tid = u.get("telegram_id")
+            name = u.get("first_name", "") or ""
+            lname = u.get("last_name", "") or ""
+            full = f"{name} {lname}".strip() or str(tid)
+            src = u.get("verify_source", "")
+            src_detail = u.get("verify_source_detail", "")
+            rec_name = u.get("verify_recommender_name", "")
+            rec_phone = u.get("verify_recommender_phone", "")
+            src_labels = {"friend":"👥 Знакомый","operator":"📞 Оператор","social":"📱 Соцсети","search":"🔍 Интернет","other":"💬 Другое"}
+            src_line = src_labels.get(src, "")
+            if src == "friend" and rec_name:
+                src_line += f": _{rec_name}_ {rec_phone}"
+            elif src_detail:
+                src_line += f": _{src_detail}_"
+            rec_info = f"  {src_line}" if src_line else ""
+            lines.append(f"• `{tid}` — {full}{rec_info}")
+            buttons.append([InlineKeyboardButton(f"✅ Верифицировать {full}", callback_data=f"verify_{tid}")])
+        buttons.append([InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")])
+        await q.edit_message_text(
+            "🔴 *Отклонённые верификации:*\n\n" + "\n".join(lines),
             parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(buttons))
         return
 
@@ -1017,6 +1057,11 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await q.answer("🚫 Заказ отменён клиентом", show_alert=True)
             try: await q.edit_message_reply_markup(reply_markup=None)
             except: pass
+            return
+        # Block acceptance for unverified users
+        user_doc = await db.get_user(int(cid))
+        if user_doc and not user_doc.get("verified", False) and not user_doc.get("referred_by"):
+            await q.answer("🔴 Клиент не верифицирован! Сначала верифицируйте или отклоните.", show_alert=True)
             return
         await q.edit_message_reply_markup(reply_markup=kb_eta(oid, cid))
 
@@ -1314,11 +1359,12 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     elif data.startswith("verify_"):
         cid = int(data[7:])
         await db.verify_user(cid)
-        # Replace verify button with "verified" label on this message
+        await db.undecline_verification(cid)
+        # Replace verify/decline buttons with "verified" label on this message
         old_kb = q.message.reply_markup
         if old_kb:
             new_rows = [row for row in old_kb.inline_keyboard
-                        if not any(b.callback_data and b.callback_data.startswith("verify_") for b in row)]
+                        if not any(b.callback_data and (b.callback_data.startswith("verify_") or b.callback_data.startswith("decverify_")) for b in row)]
             new_rows.append([InlineKeyboardButton("🔐 Верифицирован ✅", callback_data="noop")])
             await q.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(new_rows))
         await q.answer("✅ Клиент верифицирован")
@@ -1326,6 +1372,43 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         _dismiss = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
         await q.message.reply_text(
             f"✅ Клиент `{cid}` верифицирован.",
+            parse_mode="Markdown", reply_markup=_dismiss)
+
+    # ── DECLINE VERIFICATION ─────────────────────────────────────────────────
+    elif data.startswith("decverify_"):
+        parts = data.split("_", 2)
+        oid = parts[1]  # "0" if from unverified list
+        cid = int(parts[2])
+        await db.decline_verification(cid)
+        # Auto-decline all pending orders for this user
+        pending = await db.get_pending_orders_for_user(cid)
+        declined_oids = []
+        for po in pending:
+            po_oid = po.get("order_id")
+            if po_oid:
+                await db.update_order(po_oid, status="declined", updated_at=datetime.now().isoformat())
+                await db._increment_user(cid, orders_declined=1)
+                declined_oids.append(po_oid)
+        # Notify customer
+        user_doc = await db.get_user(cid)
+        lang_u = "ru"
+        if pending:
+            lang_u = pending[0].get("lang", "ru")
+        tx = {"ru": "❌ Ваша верификация отклонена. Свяжитесь с поддержкой для уточнения.",
+              "en": "❌ Your verification was declined. Contact support for details."}
+        await notify(cid, tx.get(lang_u, tx["ru"]))
+        # Update button on this message
+        old_kb = q.message.reply_markup
+        if old_kb:
+            new_rows = [row for row in old_kb.inline_keyboard
+                        if not any(b.callback_data and (b.callback_data.startswith("verify_") or b.callback_data.startswith("decverify_")) for b in row)]
+            new_rows.append([InlineKeyboardButton("🔴 Верификация отклонена", callback_data="noop")])
+            await q.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(new_rows))
+        declined_info = f"\n📦 Отклонено заказов: {len(declined_oids)}" if declined_oids else ""
+        await q.answer("❌ Верификация отклонена", show_alert=True)
+        _dismiss = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
+        await q.message.reply_text(
+            f"🔴 Верификация клиента `{cid}` отклонена.{declined_info}",
             parse_mode="Markdown", reply_markup=_dismiss)
 
     # ── UNBAN ─────────────────────────────────────────────────────────────────

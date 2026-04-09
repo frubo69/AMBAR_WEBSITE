@@ -311,6 +311,48 @@ async def verify_user(telegram_id: int):
     )
 
 
+async def decline_verification(telegram_id: int):
+    """Mark user's verification as declined."""
+    db = _db_or_none()
+    if db is None: return
+    await db.users.update_one(
+        {"telegram_id": telegram_id},
+        {"$set": {"verify_declined": True, "verify_declined_at": datetime.now(timezone.utc).isoformat()}},
+    )
+
+
+async def undecline_verification(telegram_id: int):
+    """Remove verification decline flag (for re-verification)."""
+    db = _db_or_none()
+    if db is None: return
+    await db.users.update_one(
+        {"telegram_id": telegram_id},
+        {"$set": {"verify_declined": False, "verify_declined_at": None}},
+    )
+
+
+async def get_declined_verification_users() -> list:
+    """Return users whose verification was declined."""
+    db = _db_or_none()
+    if db is None: return []
+    cursor = db.users.find(
+        {"verify_declined": True, "$or": [{"verified": False}, {"verified": {"$exists": False}}]},
+        {"_id": 0}
+    )
+    return await cursor.to_list(length=200)
+
+
+async def get_pending_orders_for_user(customer_id: int) -> list:
+    """Return pending orders for a given customer."""
+    db = _db_or_none()
+    if db is None: return []
+    cursor = db.orders.find(
+        {"customer_id": customer_id, "status": "pending"},
+        {"_id": 0}
+    )
+    return await cursor.to_list(length=50)
+
+
 async def submit_verify_request(telegram_id: int, recommender_name: str, recommender_phone: str,
                                  source: str = "", source_detail: str = ""):
     """Store verification request info and mark as pending."""

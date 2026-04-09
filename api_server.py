@@ -388,6 +388,7 @@ async def handle_me(request: web.Request) -> web.Response:
     is_referral = bool(user_doc.get("referred_by")) if user_doc else False
     verified = True if is_referral else (user_doc.get("verified", False) if user_doc else False)
     verify_requested = user_doc.get("verify_requested", False) if user_doc else False
+    verify_declined = user_doc.get("verify_declined", False) if user_doc else False
 
     log.info(f"[me] uid={uid} banned={banned} card={card_type} demo={demo} verified={verified}")
     return web.json_response({
@@ -398,6 +399,7 @@ async def handle_me(request: web.Request) -> web.Response:
         "demo": demo,
         "verified": verified,
         "verify_requested": verify_requested,
+        "verify_declined": verify_declined,
     }, headers=CORS_HEADERS)
 
 

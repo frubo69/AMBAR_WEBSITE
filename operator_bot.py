@@ -1454,6 +1454,8 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         parts = data.split("_", 2)
         oid = parts[1]
         cid = int(parts[2])
+        try: await q.message.delete()
+        except: pass
         await _do_decline_verification(ctx.bot, q.message.chat_id, cid, oid, "")
 
     # ── UNBAN ─────────────────────────────────────────────────────────────────

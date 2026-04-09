@@ -1115,6 +1115,16 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     </div>
   </div>
 
+  <!-- Verification declined -->
+  <div id="verify-declined" style="display:none;flex-direction:column;align-items:center;width:100%;height:100%;padding:0 28px;">
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;max-width:300px;margin-top:-6vh;">
+      <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#e05555" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:18px;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+      <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:10px;" id="verify-declined-title">Верификация отклонена</div>
+      <div style="font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:28px;" id="verify-declined-desc">Свяжитесь с поддержкой для уточнения деталей</div>
+      <a id="verify-declined-btn" href="https://t.me/ambar_support_bot" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;background:linear-gradient(135deg,rgba(255,255,255,.1),rgba(255,255,255,.06));border:1px solid rgba(255,255,255,.15);border-radius:14px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;text-decoration:none;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span id="verify-declined-btn-text">Написать в поддержку</span></a>
+    </div>
+  </div>
+
 </div>
 
 <!-- ═══ CATALOG ═══ -->
@@ -2397,14 +2407,15 @@ function alignLogoSubs(){
     if(!logo)return;
     const lw=logo.offsetWidth;
     if(!lw)return;
-    g.querySelectorAll('.logo-line').forEach(l=>l.style.width=Math.round(lw*1.15)+'px');
-    if(!sub)return;
+    if(!sub){g.querySelectorAll('.logo-line').forEach(l=>l.style.width=Math.round(lw*1.45)+'px');return;}
     sub.style.letterSpacing='0px';
     const sw=sub.scrollWidth;
     if(!sw)return;
     const n=sub.textContent.trim().length;
     if(n<1)return;
     sub.style.letterSpacing=((lw-sw-10)/n)+'px';
+    const lineW=Math.max(Math.round(lw*1.45), sub.scrollWidth+10);
+    g.querySelectorAll('.logo-line').forEach(l=>l.style.width=lineW+'px');
   });
 }
 
@@ -2463,11 +2474,13 @@ async function checkBanStatus(){
       else localStorage.removeItem('ambar_verified');
       if(d.verify_requested)localStorage.setItem('ambar_verify_requested','1');
       else localStorage.removeItem('ambar_verify_requested');
+      if(d.verify_declined)localStorage.setItem('ambar_verify_declined','1');
+      else localStorage.removeItem('ambar_verify_declined');
     }
   }catch(e){}
   _hideBanBlocker();
   // Show verification wall on boot if user has pending verification
-  if(!_isVerified()&&localStorage.getItem('ambar_verify_requested')==='1'){
+  if(!_isVerified()&&(localStorage.getItem('ambar_verify_requested')==='1'||localStorage.getItem('ambar_verify_declined')==='1')){
     setTimeout(()=>showVerifyWall(),800);
   }
 }
@@ -2481,7 +2494,7 @@ function _isVerified(){
 }
 
 function _hideAllVerifySteps(){
-  ['verify-step0','verify-step1','verify-step2','verify-op','verify-detail','verify-wait'].forEach(id=>{
+  ['verify-step0','verify-step1','verify-step2','verify-op','verify-detail','verify-wait','verify-declined'].forEach(id=>{
     const e=el(id);if(e)e.style.display='none';
   });
 }
@@ -2517,9 +2530,18 @@ function showVerifyWall(){
   el('verify-wait-title').textContent=ru?'Ожидайте подтверждения':'Awaiting confirmation';
   el('verify-wait-desc').textContent=ru?'Возможно поступит звонок для уточнения деталей':'You may receive a call to clarify details';
 
+  // Declined labels
+  el('verify-declined-title').textContent=ru?'Верификация отклонена':'Verification declined';
+  el('verify-declined-desc').textContent=ru?'Свяжитесь с поддержкой для уточнения деталей':'Contact support for details';
+  el('verify-declined-btn-text').textContent=ru?'Написать в поддержку':'Contact support';
+
+  const declined=localStorage.getItem('ambar_verify_declined')==='1';
+
   wall.style.display='flex';
   _hideAllVerifySteps();
-  if(requested){
+  if(declined){
+    el('verify-declined').style.display='flex';
+  } else if(requested){
     el('verify-wait').style.display='flex';
     _startVerifyPoll();
   } else {
@@ -4714,9 +4736,10 @@ function placeOrder(){
 }
 
 // ── ORDERS ────────────────────────────────────────────────────────────────────
-function confirmClearHistory(){
+async function confirmClearHistory(){
   const msg=lang==='ru'?'Удалить завершённые заказы?':'Remove completed orders?';
-  if(!confirm(msg))return;
+  const ok=await showConfirm(msg,{ok:lang==='ru'?'Удалить':'Delete',cancel:lang==='ru'?'Отмена':'Cancel',destructive:true});
+  if(!ok)return;
   // Persist delivered total so the profile stat survives the wipe
   const removable=orders.filter(o=>o.status==='delivered'||o.status==='declined'||o.status==='cancelled');
   const spent=removable.filter(o=>o.status==='delivered').reduce((s,o)=>s+o.total,0);

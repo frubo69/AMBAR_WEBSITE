@@ -606,10 +606,29 @@ async def handle_support_send(request: web.Request) -> web.Response:
         msg_doc["reply_to_role"] = reply_to_role
     await db.append_support_msg(conv_key, msg_doc)
 
+    # Build context line
+    if order_id and order_id != "general":
+        context_line = f"📦 Заказ: `#{order_id}`"
+    else:
+        context_line = "📋 Общий вопрос"
+    # Check user status
+    status_tags = []
+    try:
+        user_doc = await db.get_user(uid)
+        if user_doc:
+            if user_doc.get("is_banned"):
+                status_tags.append("🚫 Забанен")
+            if user_doc.get("verify_declined"):
+                status_tags.append("❌ Верификация отклонена")
+            elif not user_doc.get("verified") and not user_doc.get("referred_by"):
+                status_tags.append("🔴 Не верифицирован")
+    except Exception:
+        pass
+    status_line = (" | ".join(status_tags) + "\n") if status_tags else ""
     header = (
-        f"💬 *Чат поддержки (Mini App)*\n\n"
-        f"📦 Заказ: `#{order_id}`\n"
-        f"👤 {user_name} (@{username}, ID: `{uid}`)\n\n"
+        f"{context_line}\n"
+        f"👤 {user_name} (@{username}, ID: `{uid}`)\n"
+        f"{status_line}\n"
         f"💬 {text}"
     )
     token = SUPPORT_BOT_TOKEN or BOT_TOKEN
@@ -767,9 +786,13 @@ async def handle_support_send_image(request: web.Request) -> web.Response:
         "caption": caption, "ts": server_ts
     })
 
+    if order_id and order_id != "general":
+        ctx_line = f"📦 Заказ: #{order_id}"
+    else:
+        ctx_line = "📋 Общий вопрос"
     header_caption = (
-        f"📸 Mini App Photo\n"
-        f"📦 Order: #{order_id}\n"
+        f"📸 Фото\n"
+        f"{ctx_line}\n"
         f"👤 {user_name} (@{username}, ID: {uid})"
         + (f"\n💬 {caption}" if caption else "")
     )

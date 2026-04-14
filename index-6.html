@@ -121,8 +121,8 @@ img{display:block}
 .addr-modal-hdr-left{display:flex;flex-direction:column;gap:1px}
 .addr-modal-sup{font-size:10px;letter-spacing:2px;color:var(--muted);font-weight:600;text-transform:uppercase}
 .addr-modal-ttl{font-size:18px;font-weight:700;color:var(--text);letter-spacing:-.3px;line-height:1.2}
-.addr-modal-close-btn{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.4);cursor:pointer;transition:.15s;flex-shrink:0}
-.addr-modal-close-btn:active{transform:scale(.82);background:rgba(255,255,255,.12)}
+.addr-modal-close-btn,.sheet-close-btn{width:30px;height:30px;border-radius:50%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.4);cursor:pointer;transition:.15s;flex-shrink:0}
+.addr-modal-close-btn:active,.sheet-close-btn:active{transform:scale(.82);background:rgba(255,255,255,.12)}
 /* Card list inside modal */
 #modal-addr-list{padding:0 12px 12px;display:flex;flex-direction:column;gap:8px}
 #modal-addr-list .saved-card{padding:11px 13px;border-bottom:none!important}
@@ -235,7 +235,7 @@ img{display:block}
 .btn-main:active{transform:scale(.98);opacity:.9}
 .btn-main:disabled{opacity:.3;cursor:not-allowed}
 .btn-main{display:flex;flex-direction:column;align-items:center;gap:2px}
-.btn-hours{font-size:9px;font-weight:500;opacity:.55;letter-spacing:.2px}
+.btn-hours{font-size:10px;font-weight:600;opacity:.7;letter-spacing:.3px}
 .btn-outline{width:100%;background:transparent;border:1.5px solid var(--border);color:var(--sub);border-radius:14px;padding:13px;font-size:14px;font-weight:500;cursor:pointer;margin-top:8px;transition:.15s}
 .btn-outline:active{border-color:var(--gold);color:var(--gold)}
 
@@ -706,11 +706,11 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .ptr-indicator svg{color:var(--gold);opacity:.7}
 .ptr-indicator.refreshing svg{animation:spin .65s linear infinite}
 /* ── Home Screen Prompt ── */
-.hs-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:500;display:flex;align-items:flex-end;opacity:0;pointer-events:none;transition:opacity .22s}
+.hs-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:500;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .22s;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
 .hs-overlay.show{opacity:1;pointer-events:all}
-.hs-sheet{width:100%;background:var(--bg2);border-radius:22px 22px 0 0;padding:0 20px calc(24px + var(--safe-bottom));transform:translateY(70px);transition:transform .28s cubic-bezier(.34,1,.64,1)}
-.hs-overlay.show .hs-sheet{transform:translateY(0)}
-.hs-handle{width:36px;height:4px;background:var(--border);border-radius:2px;margin:14px auto 20px}
+.hs-sheet{width:100%;max-width:360px;background:var(--bg2);border-radius:22px;padding:28px 20px 24px;transform:scale(.92);opacity:0;transition:transform .25s cubic-bezier(.34,1,.64,1),opacity .2s}
+.hs-overlay.show .hs-sheet{transform:scale(1);opacity:1}
+.hs-handle{display:none}
 .hs-icon-wrap{width:56px;height:56px;border-radius:16px;background:rgba(201,169,110,.06);border:1px solid rgba(201,169,110,.15);display:flex;align-items:center;justify-content:center;margin:0 auto 18px}
 .hs-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:700;color:var(--gold2);text-align:center;margin-bottom:8px;letter-spacing:.3px}
 .hs-desc{font-size:13px;color:var(--sub);text-align:center;line-height:1.55;margin-bottom:24px;padding:0 4px}
@@ -923,7 +923,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 
     <!-- AMBAR wordmark — letter by letter -->
     <div id="sp-wordmark">
-      <span style="animation-delay:.4s">A</span><span style="animation-delay:.52s">M</span><span style="animation-delay:.64s">B</span><span style="animation-delay:.76s">A</span><span style="animation-delay:.88s">R</span>
+      <span style="animation-delay:.4s;position:relative">A<i style="position:absolute;top:18%;left:.60em;width:1.5px;height:60%;background:linear-gradient(180deg,#C9A96E,#F5E0B0,#C9A96E);transform:skewX(27deg);pointer-events:none;font-style:normal"></i></span><span style="animation-delay:.52s">M</span><span style="animation-delay:.64s">B</span><span style="animation-delay:.76s">A</span><span style="animation-delay:.88s">R</span>
     </div>
 
     <!-- Gold rule line -->
@@ -1131,7 +1131,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <div id="pg-catalog" class="page">
   <div style="position:sticky;top:0;z-index:40;background:rgba(7,7,14,.96);backdrop-filter:blur(20px)">
     <!-- Single row: Delivery (left) | AMBAR logo (center absolute) | Cart + Lang (right) -->
-    <div style="display:flex;align-items:center;padding:10px 14px;padding-top:calc(10px + var(--safe-top));position:relative">
+    <div style="display:flex;align-items:center;padding:12px 16px;padding-top:calc(18px + var(--safe-top));position:relative">
       <!-- Left: Delivery address + Lang -->
       <div style="flex:1;display:flex;align-items:center;gap:6px">
         <button class="hdr-addr-btn" onclick="openAddrModal()">
@@ -1144,7 +1144,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       </div>
       <!-- Center: Logo (absolute overlay, pointer-events:none) -->
       <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
-        <div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub">premium spirits</div></div>
+        <div class="logo-grp"><div class="logo-line"></div><div class="logo" style="position:relative">A<i style="position:absolute;top:18%;left:.60em;width:1px;height:60%;background:linear-gradient(180deg,var(--gold),var(--gold2),var(--gold));transform:skewX(27deg);pointer-events:none;font-style:normal"></i>MBAR</div><div class="logo-line"></div><div class="logo-sub">premium spirits</div></div>
       </div>
       <!-- Right: Cart + Lang -->
       <div class="hdr-right" style="flex:1;justify-content:flex-end">
@@ -1183,7 +1183,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <div id="pg-cart" class="page hidden">
   <div class="hdr" style="position:relative">
     <div style="flex:1"><button class="hdr-back" onclick="go('catalog')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
-    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-cart">ваша корзина</div></div></div>
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div class="logo-grp"><div class="logo-line"></div><div class="logo" style="position:relative">A<i style="position:absolute;top:18%;left:.60em;width:1px;height:60%;background:linear-gradient(180deg,var(--gold),var(--gold2),var(--gold));transform:skewX(27deg);pointer-events:none;font-style:normal"></i>MBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-cart">ваша корзина</div></div></div>
     <div style="flex:1"></div>
   </div>
   <!-- Cart top bar -->
@@ -1230,7 +1230,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <div id="pg-address" class="page hidden">
   <div class="hdr" style="position:relative">
     <div style="flex:1"><button class="hdr-back" onclick="go('catalog')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
-    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-addr">ваши адреса</div></div></div>
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div class="logo-grp"><div class="logo-line"></div><div class="logo" style="position:relative">A<i style="position:absolute;top:18%;left:.60em;width:1px;height:60%;background:linear-gradient(180deg,var(--gold),var(--gold2),var(--gold));transform:skewX(27deg);pointer-events:none;font-style:normal"></i>MBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-addr">ваши адреса</div></div></div>
     <div style="flex:1"></div>
   </div>
   <div class="addr-page-body">
@@ -1297,7 +1297,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <div id="pg-orders" class="page hidden" style="overflow:hidden">
   <div class="hdr" style="position:relative">
     <div style="flex:1"><button class="hdr-back" onclick="go('catalog')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
-    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-ord">ваша история</div></div></div>
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div class="logo-grp"><div class="logo-line"></div><div class="logo" style="position:relative">A<i style="position:absolute;top:18%;left:.60em;width:1px;height:60%;background:linear-gradient(180deg,var(--gold),var(--gold2),var(--gold));transform:skewX(27deg);pointer-events:none;font-style:normal"></i>MBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-ord">ваша история</div></div></div>
     <div style="flex:1"></div>
   </div>
   <div style="display:flex;align-items:center;padding:10px 14px 8px;gap:10px;flex-shrink:0">
@@ -1325,7 +1325,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <div id="pg-profile" class="page hidden" style="overflow-y:auto;overscroll-behavior:contain">
   <div class="hdr" style="position:relative">
     <div style="flex:1"><button class="hdr-back" onclick="go('catalog')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
-    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-prof">ваш профиль</div></div></div>
+    <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div class="logo-grp"><div class="logo-line"></div><div class="logo" style="position:relative">A<i style="position:absolute;top:18%;left:.60em;width:1px;height:60%;background:linear-gradient(180deg,var(--gold),var(--gold2),var(--gold));transform:skewX(27deg);pointer-events:none;font-style:normal"></i>MBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-prof">ваш профиль</div></div></div>
     <div style="flex:1"></div>
   </div>
 
@@ -1445,8 +1445,8 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div class="cancel-sheet">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
       <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)" id="supp-opt-title">SUPPORT</div>
-      <button onclick="closeSupportOptions()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);color:var(--muted);display:flex;align-items:center;justify-content:center">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      <button class="sheet-close-btn" onclick="closeSupportOptions()">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
     <div style="display:flex;flex-direction:column;gap:10px;padding-bottom:8px">
@@ -1481,7 +1481,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div class="cancel-sheet">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
       <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)" id="rename-title">YOUR NAME</div>
-      <button onclick="closeRenameSheet()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);color:var(--muted);display:flex;align-items:center;justify-content:center">
+      <button class="sheet-close-btn" onclick="closeRenameSheet()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -1497,7 +1497,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div class="cancel-sheet">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
       <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)" id="vip-sheet-title">LOYALTY</div>
-      <button onclick="closeVipSheet()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);color:var(--muted);display:flex;align-items:center;justify-content:center">
+      <button onclick="closeVipSheet()" class="sheet-close-btn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -1510,7 +1510,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div class="cancel-sheet">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
       <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)" id="dnote-title">DELIVERY NOTE</div>
-      <button onclick="closeDeliveryNoteSheet()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);color:var(--muted);display:flex;align-items:center;justify-content:center">
+      <button onclick="closeDeliveryNoteSheet()" class="sheet-close-btn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -1523,7 +1523,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div class="cancel-sheet">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
       <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)" id="budget-title">MONTHLY BUDGET</div>
-      <button onclick="closeBudgetSheet()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);color:var(--muted);display:flex;align-items:center;justify-content:center">
+      <button onclick="closeBudgetSheet()" class="sheet-close-btn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -1536,7 +1536,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div class="cancel-sheet">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
       <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)" id="notifs-title">NOTIFICATIONS</div>
-      <button onclick="closeNotifsSheet()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);color:var(--muted);display:flex;align-items:center;justify-content:center">
+      <button onclick="closeNotifsSheet()" class="sheet-close-btn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -1549,7 +1549,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div class="cancel-sheet">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
       <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)">ABOUT AMBAR</div>
-      <button onclick="closeAboutSheet()" style="width:28px;height:28px;border-radius:50%;background:rgba(255,255,255,.07);color:var(--muted);display:flex;align-items:center;justify-content:center">
+      <button onclick="closeAboutSheet()" class="sheet-close-btn">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -1561,7 +1561,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <div id="pg-checkout" class="page hidden">
   <div class="hdr">
     <div style="flex:1;display:flex;align-items:center"><button onclick="go('cart')" style="background:none;border:1px solid var(--border2);border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--sub);transition:.15s" ontouchstart="this.style.transform='scale(.85)'" ontouchend="this.style.transform=''"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
-    <div style="flex:0 0 auto"><div class="logo-grp"><div class="logo-line"></div><div class="logo">AMBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-co">Оформление</div></div></div>
+    <div style="flex:0 0 auto"><div class="logo-grp"><div class="logo-line"></div><div class="logo" style="position:relative">A<i style="position:absolute;top:18%;left:.60em;width:1px;height:60%;background:linear-gradient(180deg,var(--gold),var(--gold2),var(--gold));transform:skewX(27deg);pointer-events:none;font-style:normal"></i>MBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-co">Оформление</div></div></div>
     <div class="hdr-right" style="flex:1;justify-content:flex-end"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
   </div>
   <div class="co-body">
@@ -1705,8 +1705,8 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       <button onclick="confirmClearNotifs()" id="notif-clear-btn" class="notif-action-btn notif-clear-btn-el" style="display:none">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="11" height="11"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/></svg>
       </button>
-      <button onclick="closeNotifSheet()" class="notif-close-btn">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="13" height="13"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      <button onclick="closeNotifSheet()" class="sheet-close-btn">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" width="12" height="12"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
   </div>
@@ -1777,8 +1777,8 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div id="map-leaflet"></div>
   <!-- Top bar: close button + detected address -->
   <div class="map-top-bar">
-    <button class="map-top-icon-btn" onclick="closeMapPicker()">
-      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+    <button class="sheet-close-btn" onclick="closeMapPicker()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
     </button>
     <div class="map-top-addr-wrap">
       <div class="map-top-addr-text" id="map-addr-top-text">—</div>
@@ -1931,8 +1931,8 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 
 <!-- Photo Viewer Overlay -->
 <div id="photo-viewer" style="position:fixed;inset:0;z-index:9000;background:rgba(0,0,0,.95);display:none;align-items:center;justify-content:center;opacity:0;transition:opacity .2s;touch-action:none;">
-  <button onclick="closePhotoViewer()" style="position:absolute;top:calc(16px + var(--safe-top));right:16px;width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.12);border:none;color:#fff;font-size:20px;cursor:pointer;display:flex;align-items:center;justify-content:center;z-index:1;">
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+  <button onclick="closePhotoViewer()" class="sheet-close-btn" style="position:absolute;top:calc(16px + var(--safe-top));right:16px;z-index:1;">
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
   </button>
   <img id="photo-viewer-img" src="" alt="" style="max-width:100%;max-height:100%;object-fit:contain;transform-origin:center;will-change:transform;user-select:none;-webkit-user-drag:none;">
 </div>
@@ -2048,8 +2048,8 @@ body.aob-on #pg-cart{overflow-y:auto!important}
         <span class="aod-review-skip" id="aod-review-skip" onclick="_skipReview()" style="font-size:12px;color:rgba(255,255,255,.25);cursor:pointer;-webkit-tap-highlight-color:transparent"></span>
       </div>
     </div>
-    <div style="padding:8px 20px 12px" id="aod-cancel-wrap">
-      <button onclick="openCancelSheet()" style="width:100%;padding:11px 0;border-radius:10px;background:rgba(220,90,90,.08);border:1px solid rgba(220,90,90,.25);color:rgba(220,90,90,.7);font-size:12px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;-webkit-tap-highlight-color:transparent" onpointerdown="this.style.opacity='.6'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'" id="aod-cancel-lbl">Отменить заказ</button>
+    <div style="padding:0 28px 12px" id="aod-cancel-wrap">
+      <button onclick="openCancelSheet()" style="width:100%;padding:10px 0;border-radius:10px;background:rgba(220,90,90,.06);border:1px solid rgba(220,90,90,.18);color:rgba(220,90,90,.5);font-size:11px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;-webkit-tap-highlight-color:transparent" onpointerdown="this.style.opacity='.6'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'" id="aod-cancel-lbl">Отменить заказ</button>
     </div>
   </div>
 </div>
@@ -5744,10 +5744,10 @@ function shareInvite(){
 function openAboutSheet(){
   const ru=lang==='ru';
   const facts=ru?[
-    ['Что такое AMBAR','AMBAR — сервис экспресс-доставки премиальных спиртных напитков в Дубае.'],
+    ['Что такое AMBAR','AMBAR — Сервис экспресс-доставки алкогольных напитков в Дубае.'],
     ['Зона доставки','Доставляем только по Дубаю. Другие эмираты пока недоступны.'],
     ['Время работы','Принимаем заказы с 12:00 до 06:00. Заказы вне этого времени не обрабатываются.'],
-    ['Ассортимент','Водка, виски, джин, ром, текила, вермут, пиво и многое другое — от популярных марок до редких коллекционных позиций.'],
+    ['Ассортимент','Водка, виски, джин, ром, текила, вермут, пиво и многое другое — от простых до премиальных напитков в Дубае.'],
     ['Оплата','Принимаем наличные при получении. Онлайн переводы по запросу. Чаевые курьеру — по желанию, задаются при оформлении.'],
     ['Поддержка','Операторы на связи ежедневно в часы работы. Вопросы по заказу — через раздел Поддержка, отвечаем быстро.'],
   ]:[
@@ -5770,7 +5770,7 @@ function openAboutSheet(){
           <div style="font-size:13px;color:var(--muted);line-height:1.6">${body}</div>
         </div>`).join('')}
     </div>
-    <div style="text-align:center;padding:18px 0 6px;font-size:11px;color:rgba(255,255,255,.15);letter-spacing:.5px">v1.7.0 · AMBAR © 2025</div>`;
+    <div style="text-align:center;padding:18px 0 2px;font-size:11px;color:rgba(255,255,255,.15);letter-spacing:.5px">AMBAR © 1917</div><div style="text-align:center;padding:0 0 6px;font-size:9px;color:rgba(255,255,255,.08);letter-spacing:.5px">v1.7.0</div>`;
   _openSheet('about-ov');
 }
 function closeAboutSheet(){_closeSheet('about-ov');}

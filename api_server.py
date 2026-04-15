@@ -200,13 +200,17 @@ async def handle_create_order(request: web.Request) -> web.Response:
     await db._increment_user(uid, orders_total=1)
 
     # ── Customer confirmation (single live status msg, edited through lifecycle) ─
-    # Delete the live msgs from any previous orders so the chat stays clean —
-    # the new order's card becomes the only visible one.
+    # Purge the live msgs from previous *finished* orders so the chat stays clean.
+    # Active orders (pending/confirmed/approved) keep their cards — the customer
+    # still needs visibility into in-flight work while placing a new order.
+    _TERMINAL_STATUSES = {"delivered", "cancelled", "rejected"}
     try:
         prev_orders = await db.get_user_orders(uid)
         for po in prev_orders:
             if po.get("order_id") == oid:
                 continue  # skip the order we just created
+            if po.get("status") not in _TERMINAL_STATUSES:
+                continue  # preserve live cards for still-active orders
             prev_mid = po.get("customer_msg_id") or (po.get("customer_msg_ids") or [None])[0]
             if prev_mid:
                 await tg_delete(BOT_TOKEN, uid, prev_mid)

@@ -5494,18 +5494,19 @@ function orderTheUsual(){
   }));
   const top=Object.values(itemCounts).sort((a,b)=>b.count-a.count).slice(0,5);
   let added=0;
-  top.forEach(item=>{const p=P.find(x=>x.id===item.id);if(p&&p.stock){cart[p.id]=(cart[p.id]||0)+1;added++;}});
-  if(!added){haptic.error();showToast(lang==='ru'?'Нет доступных товаров':'No items available','err');return;}
-  saveCart();updateCartUI();haptic.success();
+  const addedIds=[];
+  top.forEach(item=>{const p=P.find(x=>x.id===item.id);if(p&&p.stock){cart[p.id]=(cart[p.id]||0)+1;addedIds.push(p.id);}});
+  if(!addedIds.length){haptic.error();showToast(lang==='ru'?'Нет доступных товаров':'No items available','err');return;}
+  addedIds.forEach(id=>syncCtrl(id));updHdr();haptic.success();
   showToast(lang==='ru'?'Добавлено в корзину':'Added to cart','ok');
-  setTimeout(()=>go('cart'),600);
+  go('cart');
 }
 
 function addWishlistToCart(){
-  let added=0;
-  [...favs].forEach(id=>{const p=P.find(x=>x.id===id);if(p&&p.stock){cart[p.id]=(cart[p.id]||0)+1;added++;}});
-  if(!added){haptic.error();showToast(lang==='ru'?'Нет доступных товаров':'No items available','err');return;}
-  saveCart();updateCartUI();haptic.success();
+  const addedIds=[];
+  [...favs].forEach(id=>{const p=P.find(x=>x.id===id);if(p&&p.stock){cart[p.id]=(cart[p.id]||0)+1;addedIds.push(p.id);}});
+  if(!addedIds.length){haptic.error();showToast(lang==='ru'?'Нет доступных товаров':'No items available','err');return;}
+  addedIds.forEach(id=>syncCtrl(id));updHdr();haptic.success();
   showToast(lang==='ru'?'Список желаний добавлен в корзину':'Wishlist added to cart','ok');
   // Jump to the cart immediately — the toast can render over it
   go('cart');
@@ -5959,12 +5960,12 @@ function closeSupportOptions(){_closeSheet('support-options-ov');}
 function quickReorder(){
   const last=orders.filter(o=>o.items?.length).sort((a,b)=>new Date(b.timestamp)-new Date(a.timestamp))[0];
   if(!last){haptic.error();showToast(lang==='ru'?'Нет прошлых заказов':'No past orders','err');return;}
-  let added=0;
-  (last.items||[]).forEach(i=>{const p=P.find(x=>x.id===i.id);if(p&&p.stock){cart[p.id]=(cart[p.id]||0)+i.qty;added++;}});
-  if(!added){haptic.error();showToast(lang==='ru'?'Товары недоступны':'Items unavailable','err');return;}
-  saveCart();updateCartUI();haptic.success();
+  const addedIds=[];
+  (last.items||[]).forEach(i=>{const p=P.find(x=>x.id===i.id);if(p&&p.stock){cart[p.id]=(cart[p.id]||0)+i.qty;addedIds.push(p.id);}});
+  if(!addedIds.length){haptic.error();showToast(lang==='ru'?'Товары недоступны':'Items unavailable','err');return;}
+  addedIds.forEach(id=>syncCtrl(id));updHdr();haptic.success();
   showToast(lang==='ru'?`Заказ #${last.order_id} добавлен в корзину`:`Order #${last.order_id} added to cart`,'ok');
-  setTimeout(()=>go('cart'),600);
+  go('cart');
 }
 
 function openRenameSheet(){

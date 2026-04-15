@@ -17,6 +17,7 @@ import aiohttp as _aiohttp
 from aiohttp import web
 from dotenv import load_dotenv
 import db
+from customer_card import render_customer_card
 
 load_dotenv()
 BOT_TOKEN          = os.getenv("BOT_TOKEN", "")
@@ -187,30 +188,13 @@ async def handle_create_order(request: web.Request) -> web.Response:
     await db.upsert_user(uid, **user_fields)
     await db._increment_user(uid, orders_total=1)
 
-    # ── Customer confirmation ─────────────────────────────────────────────────
-    if lang == "ru":
-        confirm = (
-            f"✅ *Заказ #{oid} оформлен!*\n\n"
-            f"🏠 {address}\n📞 {phone}\n\n"
-            f"🛒 *Позиции:*\n{item_lines}\n\n"
-            f"🎁 Чаевые: {tip} AED\n"
-            f"💰 *Итого: {total} AED*\n\n"
-            f"⏳ Оператор позвонит вам для подтверждения."
-        )
-    else:
-        confirm = (
-            f"✅ *Order #{oid} placed!*\n\n"
-            f"🏠 {address}\n📞 {phone}\n\n"
-            f"🛒 *Items:*\n{item_lines}\n\n"
-            f"🎁 Tip: {tip} AED\n"
-            f"💰 *Total: {total} AED*\n\n"
-            f"⏳ Our operator will call you to confirm."
-        )
+    # ── Customer confirmation (single live status msg, edited through lifecycle) ─
     try:
+        confirm = render_customer_card(order_doc, lang)
         conf_result = await tg_send(BOT_TOKEN, uid, confirm)
         conf_msg_id = conf_result.get("result", {}).get("message_id")
         if conf_msg_id:
-            await db.update_order(oid, customer_msg_ids=[conf_msg_id])
+            await db.update_order(oid, customer_msg_id=conf_msg_id)
     except Exception as e:
         log.error(f"Customer confirm: {e}")
 
@@ -396,6 +380,17 @@ async def handle_cancel_order(request: web.Request) -> web.Response:
                 await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text, reply_markup=dismiss_kb)
             except Exception as e:
                 log.error(f"Operator cancel notify {op_id}: {e}")
+
+    # Update the customer's live status msg → "cancelled"
+    cust_msg_id = order.get("customer_msg_id") or (order.get("customer_msg_ids") or [None])[0]
+    if cust_msg_id:
+        try:
+            updated = await db.get_order(order_id)
+            await tg_edit(BOT_TOKEN, uid, cust_msg_id,
+                          render_customer_card(updated, updated.get("lang", "ru")),
+                          parse_mode="Markdown")
+        except Exception as e:
+            log.error(f"Customer cancel edit: {e}")
 
     log.info(f"[cancel-order] #{order_id} user={uid} reason={reason!r}")
     return web.json_response({"ok": True}, headers=CORS_HEADERS)

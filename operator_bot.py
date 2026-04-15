@@ -13,6 +13,7 @@ from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove, MenuButtonCommands, MenuButtonWebApp, WebAppInfo
 from telegram.ext import Application, CommandHandler, CallbackQueryHandler, ContextTypes, MessageHandler, filters
 import db
+from customer_card import render_customer_card
 
 load_dotenv()
 OPERATOR_BOT_TOKEN   = os.getenv("OPERATOR_BOT_TOKEN", "")
@@ -534,82 +535,42 @@ def recalc_order(order):
     return order
 
 
-# ── Customer notification via main bot ────────────────────────────────────────
-async def notify(cid, text, reply_markup=None):
-    try:
-        app = Application.builder().token(BOT_TOKEN).build()
-        async with app:
-            return await app.bot.send_message(cid, text, parse_mode="Markdown", reply_markup=reply_markup)
-    except Exception as e:
-        log.error(f"notify {cid}: {e}")
-        return None
+# ── Customer status card — one live message per order, edited in place ──────
+def _order_msg_id(order: dict):
+    """Backwards-compatible read of the live customer msg id."""
+    return order.get("customer_msg_id") or (order.get("customer_msg_ids") or [None])[0]
 
 
-# ── Cleanup + deliver ─────────────────────────────────────────────────────────
-async def cleanup_and_deliver(cid: int, oid: str, lang: str):
+async def update_customer_card(oid: str, reply_markup=None):
+    """Render the customer card for `oid` and edit the live msg in place.
+    Falls back to sending a new msg if the old one can't be edited."""
     order = await db.get_order(oid)
-    if not order: return
+    if not order: return None
+    cid = order.get("customer_id")
+    if not cid: return None
+    lang   = order.get("lang", "ru")
+    msg_id = _order_msg_id(order)
+    text   = render_customer_card(order, lang)
 
-    items      = order.get("items", [])
-    total      = order.get("total", 0)
-    msg_ids    = order.get("customer_msg_ids", [])
-    item_lines = "\n".join(f"  • {i['name']} ×{i['qty']}" for i in items)
-    if lang == "ru":
-        summary = (f"✅ *Заказ #{oid} доставлен!*\n\n🛒 *Позиции:*\n{item_lines}\n\n💰 *Итого: {total} AED*\n\n"
-                   f"_Оцените доставку в приложении 🥂_")
-    else:
-        summary = (f"✅ *Order #{oid} delivered!*\n\n🛒 *Items:*\n{item_lines}\n\n💰 *Total: {total} AED*\n\n"
-                   f"_Rate your delivery in the app 🥂_")
-
-    tmp = Application.builder().token(BOT_TOKEN).build()
-    async with tmp:
-        for mid in msg_ids:
-            try: await tmp.bot.delete_message(cid, mid)
-            except Exception as e: log.debug(f"del msg {mid}: {e}")
-        try: await tmp.bot.send_message(cid, summary, parse_mode="Markdown",
-                                         reply_markup=ReplyKeyboardRemove())
-        except Exception as e: log.error(f"delivery summary {cid}: {e}")
-
-
-# ── Countdown timer ───────────────────────────────────────────────────────────
-async def run_countdown(cid, eta_min, lang, oid=None):
-    import time as tm
-    T = {
-        "ru": {"s": f"⏱ *Курьер в пути!*\n\nОсталось: *{eta_min} мин*",
-               "t": "🚚 *Доставка в пути*\n\nОсталось: *{m} мин {s} сек*"},
-        "en": {"s": f"⏱ *Courier is on the way!*\n\nTime left: *{eta_min} min*",
-               "t": "🚚 *Delivery in progress*\n\nTime left: *{m} min {s} sec*"},
-    }
-    tx  = T.get(lang, T["ru"])
     app = Application.builder().token(BOT_TOKEN).build()
     async with app:
-        try: msg = await app.bot.send_message(cid, tx["s"], parse_mode="Markdown")
-        except: return
-        if oid:
-            order = await db.get_order(oid)
-            if order:
-                ids = order.get("customer_msg_ids", []) + [msg.message_id]
-                await db.update_order(oid, customer_msg_ids=ids)
-        end = tm.time() + eta_min * 60
-        while True:
-            await asyncio.sleep(30)
-            rem = int(end - tm.time())
-            if rem <= 0: break
-            if oid:
-                o = await db.get_order(oid)
-                if (o or {}).get("status") in ("delivered", "cancelled"):
-                    return
+        if msg_id:
             try:
                 await app.bot.edit_message_text(
-                    tx["t"].format(m=rem//60, s=rem%60),
-                    chat_id=cid, message_id=msg.message_id, parse_mode="Markdown")
-            except: break
+                    text, chat_id=cid, message_id=msg_id,
+                    parse_mode="Markdown", reply_markup=reply_markup)
+                return msg_id
+            except Exception as e:
+                log.debug(f"customer edit {cid}/{msg_id} failed ({e}); sending new")
+        try:
+            sent = await app.bot.send_message(
+                cid, text, parse_mode="Markdown", reply_markup=reply_markup)
+        except Exception as e:
+            log.error(f"customer send {cid}: {e}")
+            return None
 
-    if oid:
-        order = await db.get_order(oid)
-        if not order or order.get("status") in ("delivered", "cancelled"):
-            return
-        log.info(f"ETA expired for order {oid}, awaiting manual delivery confirmation")
+    await db.update_order(oid, customer_msg_id=sent.message_id)
+    return sent.message_id
 
 
 # ── Helper: fetch & build order list ─────────────────────────────────────────
@@ -1115,23 +1076,14 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                               operator_id=op, updated_at=datetime.now().isoformat(),
                               confirmed_at=datetime.now(timezone.utc).isoformat(),
                               deliver_by=deliver_by_str)
-        order = await db.get_order(oid)
-        lang  = order.get("lang","ru") if order else "ru"
-        tx    = {"ru": f"✅ *Заказ #{oid} принят!*\n\n🕐 Доставка через *{eta} минут*",
-                 "en": f"✅ *Order #{oid} confirmed!*\n\n🕐 Delivery in *{eta} minutes*"}
-        acc_msg = await notify(cid, tx.get(lang, tx["ru"]))
-        if acc_msg:
-            o = await db.get_order(oid)
-            if o:
-                ids = o.get("customer_msg_ids", []) + [acc_msg.message_id]
-                await db.update_order(oid, customer_msg_ids=ids)
+        # Edit the single live customer status msg in place (no new send, no countdown)
+        await update_customer_card(oid)
         order = await db.get_order(oid)
         if order:
             lt = ctx.user_data.get("lt")
             await q.edit_message_text(
                 await order_card(order),
                 parse_mode="HTML", reply_markup=await kb_order_actions(order, list_type=lt))
-        asyncio.create_task(run_countdown(cid, eta, lang, oid))
 
     # ── DECLINE ───────────────────────────────────────────────────────────────
     elif data.startswith("dec_"):
@@ -1148,10 +1100,9 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             return
         await db.update_order(oid, status="declined", updated_at=datetime.now().isoformat())
         await db._increment_user(cid, orders_declined=1)
+        # Edit the live customer msg in place (no new notification)
+        await update_customer_card(oid)
         order = await db.get_order(oid)
-        lang  = order.get("lang","ru") if order else "ru"
-        tx    = {"ru": f"❌ *Заказ #{oid} отменён.*", "en": f"❌ *Order #{oid} cancelled.*"}
-        await notify(cid, tx.get(lang, tx["ru"]))
         if order:
             _done_kb = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
             await q.edit_message_text(
@@ -1163,10 +1114,10 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         parts = data.split("_"); oid, cid = parts[1], int(parts[2])
         await db.update_order(oid, status="delivered", updated_at=datetime.now().isoformat())
         order = await db.get_order(oid)
-        lang  = order.get("lang","ru") if order else "ru"
         total = (order or {}).get("total", 0)
         await db._increment_user(cid, orders_done=1, total_spent=total)
-        await cleanup_and_deliver(cid, oid, lang)
+        # Edit the live customer msg in place → "delivered"
+        await update_customer_card(oid)
         order = await db.get_order(oid)
         if order:
             lt = ctx.user_data.get("lt")
@@ -1182,6 +1133,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             total = order.get("total", 0)
             await db._increment_user(cid, orders_done=-1, total_spent=-total)
             await db.update_order(oid, status="approved", updated_at=datetime.now().isoformat())
+            await update_customer_card(oid)
         order = await db.get_order(oid)
         if order:
             lt = ctx.user_data.get("lt")
@@ -1488,16 +1440,20 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await db.unban_user(cid)
         try:
             app2 = Application.builder().token(BOT_TOKEN).build()
+            unban_text = ("✅ *Ваш аккаунт разблокирован!*\n\n"
+                          "Теперь вы снова можете делать заказы. Нажмите кнопку ниже 👇")
             async with app2:
+                # Edit the ban msg in place if we still have it; otherwise send new.
+                edited = False
                 if ban_msg_id:
                     try:
-                        await app2.bot.delete_message(chat_id=cid, message_id=ban_msg_id)
+                        await app2.bot.edit_message_text(
+                            unban_text, chat_id=cid, message_id=ban_msg_id,
+                            parse_mode="Markdown")
+                        edited = True
                     except: pass
-                await app2.bot.send_message(
-                    chat_id=cid,
-                    text="✅ *Ваш аккаунт разблокирован!*\n\nТеперь вы снова можете делать заказы. Нажмите кнопку ниже 👇",
-                    parse_mode="Markdown"
-                )
+                if not edited:
+                    await app2.bot.send_message(cid, unban_text, parse_mode="Markdown")
                 await app2.bot.set_chat_menu_button(
                     chat_id=cid,
                     menu_button=MenuButtonWebApp(text="🍾 Заказать", web_app=WebAppInfo(url=WEBAPP_URL))
@@ -1522,15 +1478,15 @@ async def _do_decline_verification(bot, chat_id: int, cid: int, oid: str, commen
             await db.update_order(po_oid, status="declined", updated_at=datetime.now().isoformat())
             await db._increment_user(cid, orders_declined=1)
             declined_oids.append(po_oid)
-    # Notify customer (never show reason)
+    # Edit each pending order's live msg → "declined" (with support button).
+    # No separate "verification declined" notification — reduces noise.
     lang_u = pending[0].get("lang", "ru") if pending else "ru"
-    tx = {"ru": "❌ Ваша верификация отклонена.",
-          "en": "❌ Your verification was declined."}
     support_kb = InlineKeyboardMarkup([[
         InlineKeyboardButton("💬 Написать в поддержку" if lang_u == "ru" else "💬 Contact support",
                              url=f"https://t.me/{SUPPORT_BOT_USERNAME}")
     ]])
-    await notify(cid, tx.get(lang_u, tx["ru"]), reply_markup=support_kb)
+    for po_oid in declined_oids:
+        await update_customer_card(po_oid, reply_markup=support_kb)
     # Update the original order message if we have it
     if edit_msg_id and oid and oid != "0":
         order = await db.get_order(oid)

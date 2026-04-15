@@ -6002,6 +6002,10 @@ function isBeer(p){ return p && p.cat==='Пиво'; }
 
 function renderBeerPDM(p){
   const row=el('pdm-add-row');if(!row)return;
+  if(!p.stock){
+    row.innerHTML=`<div style="text-align:center;padding:14px 0;color:var(--muted);font-size:13px;letter-spacing:1.5px;text-transform:uppercase">${t('oosLabel')}</div>`;
+    return;
+  }
   const inCart=(cart[p.id]||0)>0;
   const chosen=inCart?(beerPcs[p.id]||_beerPcsChoice):_beerPcsChoice;
   const price12=p.price_12||p.price||0;
@@ -6076,6 +6080,7 @@ function beerPendingChg(d){
 
 function beerAddPending(){
   const p=_beerProduct; if(!p||!_beerPcsChoice) return;
+  if(!p.stock){showToast(t('oosLabel'),'err');return;}
   cart[p.id]=_beerPendingQty;
   beerPcs[p.id]=_beerPcsChoice;
   syncCtrl(p.id); updHdr();

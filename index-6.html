@@ -750,7 +750,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .support-reply-close:active{opacity:.6}
 .msg-reply-icon{position:absolute;right:calc(100% + 8px);top:50%;transform:translateY(-50%);opacity:0;transition:opacity .15s;pointer-events:none;color:var(--muted)}
 .msg-bubble.operator .msg-reply-icon{left:calc(100% + 8px);right:auto}
-.support-input-bar{display:flex;align-items:flex-end;gap:8px;padding:10px 14px calc(10px + var(--safe-bottom));background:rgba(7,7,14,.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);flex-shrink:0}
+.support-input-bar{display:flex;align-items:flex-end;gap:8px;padding:10px 14px calc(24px + var(--safe-bottom));background:rgba(7,7,14,.96);backdrop-filter:blur(20px);border-top:1px solid var(--border);flex-shrink:0}
 .support-input{flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:20px;padding:10px 16px;font-size:13px;color:var(--text);font-family:inherit;resize:none;max-height:100px;line-height:1.4;overflow-y:auto}
 .support-input::placeholder{color:var(--muted)}
 .support-input:focus{border-color:rgba(201,169,110,.5)}
@@ -6221,6 +6221,21 @@ async function fetchSupportMsgs(){
       const container=el('support-msgs');
       messages.forEach(m=>{
         if(_supportRenderedTs.has(m.ts))return; // already in DOM
+        // Adopt an optimistic pending user bubble (prevents duplicate when poll arrives before send response)
+        if(m.role==='user'){
+          const wantText=m.type==='photo'?(m.caption||''):(m.text||'');
+          const pending=Array.from(container.querySelectorAll('.msg-bubble.user[data-pending="1"]'))
+            .find(b=>(b.dataset.pendingText||'')===wantText&&(b.dataset.pendingType||'text')===(m.type==='photo'?'photo':'text'));
+          if(pending){
+            delete pending.dataset.pending;
+            delete pending.dataset.pendingText;
+            delete pending.dataset.pendingType;
+            _supportRenderedTs.add(m.ts);
+            const tsEl=pending.querySelector('.msg-ts');
+            if(tsEl)tsEl.textContent=_fmtTime(m.ts);
+            return;
+          }
+        }
         _supportRenderedTs.add(m.ts);
         const bubble=document.createElement('div');
         bubble.className='msg-bubble '+m.role;
@@ -6268,6 +6283,9 @@ async function sendSupportMsg(){
   const container=el('support-msgs');
   const bubble=document.createElement('div');
   bubble.className='msg-bubble user';
+  bubble.dataset.pending='1';
+  bubble.dataset.pendingText=text;
+  bubble.dataset.pendingType='text';
   const now=new Date();
   let quoteHtml='';
   if(replyData){
@@ -6297,15 +6315,19 @@ async function sendSupportMsg(){
       body:JSON.stringify(payload)
     });
     const res=await resp.json();
-    if(!res.ok){showToast('Send failed','err');bubble.style.opacity='.5';}
+    if(!res.ok){showToast('Send failed','err');bubble.style.opacity='.5';delete bubble.dataset.pending;delete bubble.dataset.pendingText;delete bubble.dataset.pendingType;}
     else if(res.ts){
       _supportLastTs=res.ts;
       _supportRenderedTs.add(res.ts);
+      // Clear pending flags (poll may have already adopted the bubble)
+      delete bubble.dataset.pending;
+      delete bubble.dataset.pendingText;
+      delete bubble.dataset.pendingType;
       // Update bubble timestamp to server time
       const tsEl=bubble.querySelector('.msg-ts');
       if(tsEl)tsEl.textContent=_fmtTime(res.ts);
     }
-  }catch(e){showToast('Network error','err');bubble.style.opacity='.5';}
+  }catch(e){showToast('Network error','err');bubble.style.opacity='.5';delete bubble.dataset.pending;delete bubble.dataset.pendingText;delete bubble.dataset.pendingType;}
   btn.disabled=false;
 }
 
@@ -6324,6 +6346,9 @@ async function _uploadSupportPhoto(file,thumbUrl,initData){
 
   const bubble=document.createElement('div');
   bubble.className='msg-bubble user';
+  bubble.dataset.pending='1';
+  bubble.dataset.pendingText='';
+  bubble.dataset.pendingType='photo';
   bubble.innerHTML=`<div class="msg-photo-wrap"><img class="chat-photo" src="${thumbUrl}" alt="photo" onclick="openPhotoViewer(this.src)"></div><div class="msg-ts" style="opacity:.5">⏳</div>`;
   container.appendChild(bubble);
   container.scrollTop=container.scrollHeight;
@@ -6370,14 +6395,17 @@ async function _uploadSupportPhoto(file,thumbUrl,initData){
   try{
     const resp=await fetch(`${AMBAR_API}/api/support/send-image`,{method:'POST',body:fd});
     const res=await resp.json();
-    if(!res.ok){_markFailed();}
+    if(!res.ok){_markFailed();delete bubble.dataset.pending;delete bubble.dataset.pendingText;delete bubble.dataset.pendingType;}
     else{
       if(res.ts){_supportLastTs=res.ts;_supportRenderedTs.add(res.ts);}
       if(res.url){bubble.querySelector('.chat-photo').src=`${AMBAR_API}${res.url}`;}
+      delete bubble.dataset.pending;
+      delete bubble.dataset.pendingText;
+      delete bubble.dataset.pendingType;
       const tsEl=bubble.querySelector('.msg-ts');
       if(tsEl){tsEl.style.opacity='1';tsEl.textContent=_fmtTime(res.ts);}
     }
-  }catch(e){_markFailed();}
+  }catch(e){_markFailed();delete bubble.dataset.pending;delete bubble.dataset.pendingText;delete bubble.dataset.pendingType;}
 }
 
 function _autoResizeSupport(el){el.style.height='auto';el.style.height=Math.min(el.scrollHeight,100)+'px';}

@@ -5489,7 +5489,8 @@ function addWishlistToCart(){
   if(!added){haptic.error();showToast(lang==='ru'?'Нет доступных товаров':'No items available','err');return;}
   saveCart();updateCartUI();haptic.success();
   showToast(lang==='ru'?'Список желаний добавлен в корзину':'Wishlist added to cart','ok');
-  setTimeout(()=>go('cart'),600);
+  // Jump to the cart immediately — the toast can render over it
+  go('cart');
 }
 
 // ── PROFILE HUB SHEETS ────────────────────────────────────────────────────────

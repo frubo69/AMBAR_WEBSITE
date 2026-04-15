@@ -637,8 +637,32 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .lcard-tier-name{font-family:'Cormorant Garamond',serif;font-size:32px;font-weight:700;letter-spacing:2px;line-height:1}
 .lcard-tier-sub{font-family:'Cormorant Garamond',serif;font-size:18px;font-style:italic;font-weight:400;opacity:.85;margin-top:-2px}
 .lcard-username{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;letter-spacing:2px;text-transform:uppercase}
-.lcard-qr{width:88px;height:88px;border-radius:10px;background:#fff;padding:5px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;box-sizing:border-box}
+.lcard-qr{width:88px;height:88px;border-radius:10px;background:#fff;padding:5px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;box-sizing:border-box;cursor:pointer;transition:transform .15s ease}
 .lcard-qr canvas{width:100%!important;height:100%!important;border-radius:4px}
+.lcard-qr:active{transform:scale(.94)}
+
+/* ── QR Expand Modal ─────────────────────────────────────────────── */
+.qr-ov{position:fixed;inset:0;z-index:9200;background:radial-gradient(ellipse at center,rgba(15,12,8,.82) 0%,rgba(0,0,0,.94) 80%);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);display:flex;align-items:center;justify-content:center;padding:28px;opacity:0;pointer-events:none;transition:opacity .32s cubic-bezier(.4,0,.2,1)}
+.qr-ov.show{opacity:1;pointer-events:auto}
+.qr-ov-box{position:relative;width:min(84vw,340px);display:flex;flex-direction:column;align-items:center;gap:14px;transform:translateY(18px) scale(.88);opacity:0;transition:transform .55s cubic-bezier(.16,1.18,.3,1),opacity .32s ease}
+.qr-ov.show .qr-ov-box{transform:translateY(0) scale(1);opacity:1}
+.qr-ov-title{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:700;letter-spacing:6px;text-transform:uppercase;background:linear-gradient(135deg,#C9A96E 0%,#F5E0B0 50%,#C9A96E 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;text-align:center;line-height:1;opacity:0;transform:translateY(-6px);animation:qrFadeInDown .5s cubic-bezier(.4,0,.2,1) forwards .18s}
+.qr-ov-sub{font-family:'DM Sans',sans-serif;font-size:9px;letter-spacing:3.5px;text-transform:uppercase;color:rgba(201,169,110,.45);margin-top:-6px;opacity:0;animation:qrFadeIn .5s ease forwards .26s}
+.qr-ov-frame{position:relative;width:100%;aspect-ratio:1/1;background:linear-gradient(135deg,#fefcf7 0%,#f4eddc 100%);border-radius:24px;padding:22px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;box-shadow:0 30px 70px rgba(0,0,0,.65),0 0 0 1px rgba(201,169,110,.25),0 0 0 5px rgba(12,10,6,.9),0 0 0 6px rgba(201,169,110,.5),0 0 80px rgba(201,169,110,.18)}
+.qr-ov-frame canvas{width:100%!important;height:100%!important;border-radius:6px;display:block}
+.qr-ov-frame::before,.qr-ov-frame::after{content:'';position:absolute;width:18px;height:18px;border:1.5px solid rgba(201,169,110,.75);pointer-events:none;border-radius:3px 0 0 0}
+.qr-ov-frame::before{top:8px;left:8px;border-right:none;border-bottom:none}
+.qr-ov-frame::after{bottom:8px;right:8px;border-left:none;border-top:none;border-radius:0 0 3px 0}
+.qr-ov-corner-tr,.qr-ov-corner-bl{position:absolute;width:18px;height:18px;border:1.5px solid rgba(201,169,110,.75);pointer-events:none}
+.qr-ov-corner-tr{top:8px;right:8px;border-left:none;border-bottom:none;border-radius:0 3px 0 0}
+.qr-ov-corner-bl{bottom:8px;left:8px;border-right:none;border-top:none;border-radius:0 0 0 3px}
+.qr-ov-hint{font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:1.5px;color:rgba(255,255,255,.32);margin-top:6px;opacity:0;animation:qrFadeIn .45s ease forwards .42s}
+.qr-ov-close{position:absolute;top:-46px;right:0;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.55);cursor:pointer;transition:.15s;opacity:0;animation:qrFadeIn .4s ease forwards .32s}
+.qr-ov-close:active{transform:scale(.88);background:rgba(255,255,255,.12);color:rgba(255,255,255,.9)}
+.qr-ov-scan{position:absolute;left:22px;right:22px;height:2px;background:linear-gradient(90deg,transparent,rgba(201,169,110,.9),transparent);border-radius:2px;top:22px;pointer-events:none;opacity:0;animation:qrScan 2.2s cubic-bezier(.45,0,.55,1) .55s infinite;box-shadow:0 0 12px rgba(201,169,110,.6)}
+@keyframes qrFadeIn{to{opacity:1}}
+@keyframes qrFadeInDown{to{opacity:1;transform:translateY(0)}}
+@keyframes qrScan{0%{opacity:0;top:22px}10%{opacity:.9}90%{opacity:.9}100%{opacity:0;top:calc(100% - 24px)}}
 .lcard-points-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);letter-spacing:.5px}
 .lcard-points-dot{width:5px;height:5px;border-radius:50%;background:var(--gold);opacity:.6}
 .lcard-tap-hint{text-align:center;font-size:11px;color:var(--muted);margin-top:-8px;margin-bottom:16px;opacity:.5}
@@ -5564,27 +5588,43 @@ function openQRModal(refLink){
   // Avoid duplicates
   let ov=document.getElementById('qr-expand-ov');
   if(ov)ov.remove();
+  const ru=lang==='ru';
   ov=document.createElement('div');
   ov.id='qr-expand-ov';
-  ov.style.cssText='position:fixed;inset:0;z-index:9200;background:rgba(0,0,0,.82);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;transition:opacity .22s';
-  const box=document.createElement('div');
-  box.style.cssText='width:min(82vw,380px);aspect-ratio:1/1;background:#fff;border-radius:22px;padding:16px;box-sizing:border-box;display:flex;align-items:center;justify-content:center;transform:scale(.92);transition:transform .25s cubic-bezier(.34,1,.64,1);box-shadow:0 20px 60px rgba(0,0,0,.6)';
-  const canvas=_genQR(refLink,512);
-  canvas.style.width='100%';canvas.style.height='100%';
-  box.appendChild(canvas);
-  ov.appendChild(box);
+  ov.className='qr-ov';
+  ov.innerHTML=`
+    <div class="qr-ov-box" role="dialog" aria-modal="true">
+      <button class="qr-ov-close" type="button" aria-label="Close">
+        <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M2 2l10 10M12 2L2 12"/></svg>
+      </button>
+      <div class="qr-ov-title">${ru?'Сканируйте':'Scan Me'}</div>
+      <div class="qr-ov-sub">${ru?'персональный код':'personal code'}</div>
+      <div class="qr-ov-frame" id="qr-ov-frame">
+        <div class="qr-ov-corner-tr"></div>
+        <div class="qr-ov-corner-bl"></div>
+        <div class="qr-ov-scan"></div>
+      </div>
+      <div class="qr-ov-hint">${ru?'нажмите вне окна, чтобы закрыть':'tap outside to close'}</div>
+    </div>`;
+  const frame=ov.querySelector('#qr-ov-frame');
+  const canvas=_genQR(refLink,640);
+  frame.insertBefore(canvas,frame.querySelector('.qr-ov-scan'));
+  const box=ov.querySelector('.qr-ov-box');
   ov.addEventListener('click',()=>closeQRModal());
   box.addEventListener('click',(e)=>e.stopPropagation());
+  ov.querySelector('.qr-ov-close').addEventListener('click',(e)=>{e.stopPropagation();closeQRModal();});
   document.body.appendChild(ov);
-  requestAnimationFrame(()=>{ov.style.opacity='1';box.style.transform='scale(1)';});
-  haptic.light&&haptic.light();
+  // Force reflow then animate in
+  void ov.offsetWidth;
+  requestAnimationFrame(()=>ov.classList.add('show'));
+  try{haptic.light&&haptic.light()}catch(e){}
 }
 function closeQRModal(){
   const ov=document.getElementById('qr-expand-ov');
   if(!ov)return;
-  ov.style.opacity='0';
-  const box=ov.firstChild;if(box)box.style.transform='scale(.92)';
-  setTimeout(()=>ov.remove(),230);
+  ov.classList.remove('show');
+  try{haptic.light&&haptic.light()}catch(e){}
+  setTimeout(()=>{if(ov&&ov.parentNode)ov.remove();},340);
 }
 
 // ── Custom confirm dialog ────────────────────────────────────────────────────

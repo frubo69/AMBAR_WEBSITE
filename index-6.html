@@ -206,9 +206,13 @@ img{display:block}
 .fav-grid-oos .pcard{background:rgba(15,13,10,.6)}
 /* Per-category horizontal carousel in the favourites view.
    Shows exactly 2 cards in view (matches the normal grid width) with the
-   next card peeking — scrolls on overflow, snaps to each card. */
-.fav-cat-row{display:flex;gap:12px;overflow-x:auto;padding:0 12px 8px;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-padding-inline-start:12px}
-.fav-cat-row::-webkit-scrollbar{display:none}
+   next card peeking — scrolls on overflow, snaps to each card. Thin gold
+   scrollbar at the bottom hints at scrollability without being loud. */
+.fav-cat-row{display:flex;gap:12px;overflow-x:auto;padding:0 12px 10px;scroll-snap-type:x mandatory;-webkit-overflow-scrolling:touch;scroll-padding-inline-start:12px;scrollbar-width:thin;scrollbar-color:rgba(201,169,110,.35) transparent}
+.fav-cat-row::-webkit-scrollbar{height:3px}
+.fav-cat-row::-webkit-scrollbar-track{background:transparent;margin:0 12px}
+.fav-cat-row::-webkit-scrollbar-thumb{background:rgba(201,169,110,.35);border-radius:2px;transition:background .2s}
+.fav-cat-row::-webkit-scrollbar-thumb:hover{background:rgba(201,169,110,.55)}
 .fav-cat-row>.pcard{flex:0 0 calc(50% - 6px);scroll-snap-align:start}
 .fav-notify-btn{grid-column:1/-1;margin:4px 0 0;padding:11px 14px;background:linear-gradient(135deg,rgba(201,169,110,.08),rgba(201,169,110,.02));border:1px dashed rgba(201,169,110,.25);border-radius:12px;color:rgba(245,224,176,.75);font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;-webkit-tap-highlight-color:transparent;transition:transform .15s ease,background .2s ease}
 .fav-notify-btn:active{transform:scale(.98);background:linear-gradient(135deg,rgba(201,169,110,.14),rgba(201,169,110,.06))}

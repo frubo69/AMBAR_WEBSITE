@@ -866,21 +866,35 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .ptr-indicator svg{color:var(--gold);opacity:.7}
 .ptr-indicator.refreshing svg{animation:spin .65s linear infinite}
 /* ── Home Screen Prompt ── */
-.hs-overlay{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:500;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .22s;-webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px)}
+.hs-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .22s;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
 .hs-overlay.show{opacity:1;pointer-events:all}
-.hs-sheet{width:100%;max-width:360px;background:var(--bg2);border-radius:22px;padding:28px 20px 24px;transform:scale(.92);opacity:0;transition:transform .25s cubic-bezier(.34,1,.64,1),opacity .2s}
+.hs-sheet{width:100%;max-width:340px;background:linear-gradient(180deg,rgba(22,18,12,.96),rgba(14,12,8,.96));border:1px solid rgba(201,169,110,.16);border-radius:24px;padding:32px 24px 20px;transform:scale(.94);opacity:0;transition:transform .28s cubic-bezier(.34,1,.64,1),opacity .2s;box-shadow:0 24px 60px rgba(0,0,0,.6),inset 0 1px 0 rgba(245,224,176,.08)}
 .hs-overlay.show .hs-sheet{transform:scale(1);opacity:1}
 .hs-handle{display:none}
-.hs-icon-wrap{width:56px;height:56px;border-radius:16px;background:rgba(201,169,110,.06);border:1px solid rgba(201,169,110,.15);display:flex;align-items:center;justify-content:center;margin:0 auto 18px}
-.hs-title{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:700;color:var(--gold2);text-align:center;margin-bottom:8px;letter-spacing:.3px}
-.hs-desc{font-size:13px;color:var(--sub);text-align:center;line-height:1.55;margin-bottom:24px;padding:0 4px}
+/* Icon — soft gold glow instead of boxed chrome */
+.hs-icon-wrap{width:52px;height:52px;border-radius:16px;background:linear-gradient(180deg,rgba(201,169,110,.18),rgba(201,169,110,.05));border:1px solid rgba(201,169,110,.22);display:flex;align-items:center;justify-content:center;margin:0 auto 22px;box-shadow:0 8px 28px rgba(201,169,110,.18),inset 0 1px 0 rgba(245,224,176,.12)}
+/* Title — geometric sans, tight tracking, modern scale */
+.hs-title{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:600;color:var(--text);text-align:center;margin-bottom:8px;letter-spacing:-.3px;line-height:1.2}
+.hs-desc{font-family:'DM Sans',sans-serif;font-size:13px;color:rgba(255,255,255,.55);text-align:center;line-height:1.5;margin-bottom:26px;padding:0 6px;letter-spacing:.1px}
+/* Secondary CTA — gold ghost button, serves as primary when native add-btn is hidden */
+.hs-cta{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border-radius:14px;border:1px solid rgba(201,169,110,.35);background:linear-gradient(180deg,rgba(201,169,110,.08),rgba(201,169,110,.02));color:var(--gold2);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;letter-spacing:.2px;cursor:pointer;transition:.18s;-webkit-tap-highlight-color:transparent}
+.hs-cta:active{transform:scale(.98);background:linear-gradient(180deg,rgba(201,169,110,.14),rgba(201,169,110,.05));border-color:rgba(201,169,110,.5)}
+.hs-cta svg{transition:transform .18s}
+.hs-cta:active svg{transform:translateX(2px)}
+/* Dismiss row — plain text links, low visual weight, clear differentiation by colour */
+.hs-links{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:18px;padding-top:2px}
+.hs-link-btn{background:none;border:none;padding:8px 12px;font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:500;color:rgba(255,255,255,.45);letter-spacing:.1px;cursor:pointer;transition:color .15s;-webkit-tap-highlight-color:transparent;border-radius:8px}
+.hs-link-btn:active{color:rgba(255,255,255,.85);background:rgba(255,255,255,.04)}
+.hs-link-btn.muted{color:rgba(255,255,255,.28)}
+.hs-link-btn.muted:active{color:rgba(224,85,85,.85)}
+.hs-link-sep{color:rgba(255,255,255,.14);font-size:11px;user-select:none}
 .hs-step{display:flex;align-items:flex-start;gap:14px;padding:13px 0;border-bottom:1px solid var(--border2)}
 .hs-step:last-child{border-bottom:none}
-.hs-step-num{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
+.hs-step-num{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
 .hs-step-body{flex:1;min-width:0}
-.hs-step-title{font-size:14px;font-weight:600;color:var(--text);margin-bottom:3px}
-.hs-step-desc{font-size:12px;color:var(--sub);line-height:1.5}
-.hs-guide-title{font-size:16px;font-weight:700;color:var(--gold2);margin-bottom:4px;text-align:center}
+.hs-step-title{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--text);margin-bottom:3px;letter-spacing:-.1px}
+.hs-step-desc{font-family:'DM Sans',sans-serif;font-size:12px;color:var(--sub);line-height:1.5}
+.hs-guide-title{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;color:var(--text);margin-bottom:4px;text-align:center;letter-spacing:-.2px}
 /* ── Support Chat Overlay ── */
 .support-overlay{position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;flex-direction:column;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1,.64,1)}
 .support-overlay.show{transform:translateY(0)}
@@ -1895,14 +1909,18 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     <div class="hs-handle"></div>
     <!-- Prompt view -->
     <div id="hs-prompt-view">
-      <div class="hs-icon-wrap"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+      <div class="hs-icon-wrap"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
       <div class="hs-title" id="hs-title-txt"></div>
       <div class="hs-desc" id="hs-desc-txt"></div>
-      <button class="btn-main" id="hs-add-btn" onclick="doAddHomeScreen()" style="font-family:'DM Sans',sans-serif"></button>
-      <button class="btn-outline" id="hs-guide-btn" onclick="showHsGuide()" style="margin-top:10px;width:100%"></button>
-      <div style="display:flex;gap:10px;margin-top:10px">
-        <button class="btn-outline" style="flex:1;color:rgba(255,255,255,.4);border-color:rgba(255,255,255,.08)" onclick="closeHsOverlay()" id="hs-later-btn"></button>
-        <button class="btn-outline" style="flex:1;color:rgba(255,255,255,.25);border-color:rgba(255,255,255,.08)" id="hs-never-btn" onclick="neverShowHs()"></button>
+      <button class="btn-main" id="hs-add-btn" onclick="doAddHomeScreen()" style="font-family:'Space Grotesk',sans-serif;margin-bottom:10px"></button>
+      <button class="hs-cta" id="hs-guide-btn" onclick="showHsGuide()">
+        <span id="hs-guide-txt"></span>
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+      </button>
+      <div class="hs-links">
+        <button class="hs-link-btn" onclick="closeHsOverlay()" id="hs-later-btn"></button>
+        <span class="hs-link-sep">·</span>
+        <button class="hs-link-btn muted" id="hs-never-btn" onclick="neverShowHs()"></button>
       </div>
     </div>
     <!-- Guide view -->
@@ -3047,7 +3065,7 @@ function applyHsLang(){
   set('hs-title-txt',t('hsTitle'));
   set('hs-desc-txt',t('hsDesc'));
   set('hs-add-btn',t('hsAdd'));
-  set('hs-guide-btn',t('hsGuide'));
+  set('hs-guide-txt',t('hsGuide'));
   set('hs-later-btn',t('hsLater'));
   set('hs-never-btn',t('hsNever'));
   set('hs-guide-title-txt',t('hsGuideTitle'));

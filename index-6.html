@@ -671,6 +671,10 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .lcard-points-row{display:flex;align-items:center;gap:6px;font-size:11px;color:var(--muted);letter-spacing:.5px}
 .lcard-points-dot{width:5px;height:5px;border-radius:50%;background:var(--gold);opacity:.6}
 .lcard-tap-hint{text-align:center;font-size:11px;color:var(--muted);margin-top:-8px;margin-bottom:16px;opacity:.5}
+.lcard-qr-note{position:relative;margin:0 0 18px;padding:14px 16px 14px 44px;background:linear-gradient(135deg,rgba(201,169,110,.08) 0%,rgba(201,169,110,.03) 100%);border:1px solid rgba(201,169,110,.18);border-radius:14px;font-family:'DM Sans',sans-serif;font-size:12px;line-height:1.55;color:var(--sub)}
+.lcard-qr-note::before{content:'';position:absolute;left:0;top:14px;bottom:14px;width:2px;background:linear-gradient(180deg,transparent,var(--gold),transparent);border-radius:2px}
+.lcard-qr-note .lcard-qr-note-ic{position:absolute;left:14px;top:14px;width:20px;height:20px;display:flex;align-items:center;justify-content:center;color:var(--gold);opacity:.85}
+.lcard-qr-note b{color:var(--gold2);font-weight:600}
 .lcard-how{display:flex;flex-direction:column;gap:12px;margin-top:4px}
 .lcard-step{display:flex;gap:12px;align-items:flex-start}
 .lcard-step-num{width:26px;height:26px;border-radius:50%;background:rgba(201,169,110,.12);border:1px solid rgba(201,169,110,.2);color:var(--gold);font-size:12px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-family:'Space Grotesk',sans-serif}
@@ -5556,6 +5560,12 @@ function openVipSheet(){
     <div class="lcard-tap-hint">${ru?'нажмите на карту, чтобы перевернуть':'tap the card to flip'}</div>
     ${tagline?`<div style="text-align:center;font-size:12px;color:${tier.color}80;margin-bottom:16px;font-style:italic;font-family:'Cormorant Garamond',serif;letter-spacing:1px">${tagline}</div>`:''}
 
+    ${cardType==='standard'?`
+    <div class="lcard-qr-note">
+      <span class="lcard-qr-note-ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg></span>
+      ${ru?'Ваш <b>QR-код</b> — персональная реферальная ссылка. Друг сканирует → попадает в бот → делает заказ → вы получаете очки':'Your <b>QR code</b> is your personal referral link. Friend scans → enters bot → places order → you earn points'}
+    </div>`:''}
+
     ${cardType==='standard'?(tier.next?`
     <div style="margin-bottom:18px">
       <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:8px">
@@ -5570,10 +5580,9 @@ function openVipSheet(){
     ${cardType==='standard'?`
     <div style="font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;letter-spacing:1.5px;color:var(--gold);margin-bottom:12px">${ru?'КАК ЭТО РАБОТАЕТ':'HOW IT WORKS'}</div>
     <div class="lcard-how">
-      <div class="lcard-step"><div class="lcard-step-num">1</div><div class="lcard-step-txt">${ru?'Ваш <b>QR-код</b> — персональная реферальная ссылка. Друг сканирует → попадает в бот → делает заказ → вы получаете очки':'Your <b>QR code</b> is your personal referral link. Friend scans → enters bot → places order → you earn points'}</div></div>
-      <div class="lcard-step"><div class="lcard-step-num">2</div><div class="lcard-step-txt">${ru?'Каждый <b>доставленный заказ</b> = 1 очко':'Each <b>delivered order</b> = 1 point'}</div></div>
-      <div class="lcard-step"><div class="lcard-step-num">3</div><div class="lcard-step-txt">${ru?'<b>Пригласите друга</b> по QR-коду — когда он сделает первый заказ, вы получите <b>+5 очков</b>':'<b>Invite a friend</b> via QR code — when they make their first order, you get <b>+5 points</b>'}</div></div>
-      <div class="lcard-step"><div class="lcard-step-num">4</div><div class="lcard-step-txt">${ru?'Набирайте очки и повышайте статус: <b>Silver → Gold → Platinum → Diamond → Brilliant</b>':'Earn points and level up: <b>Silver → Gold → Platinum → Diamond → Brilliant</b>'}</div></div>
+      <div class="lcard-step"><div class="lcard-step-num">1</div><div class="lcard-step-txt">${ru?'Каждый <b>доставленный заказ</b> = 1 очко':'Each <b>delivered order</b> = 1 point'}</div></div>
+      <div class="lcard-step"><div class="lcard-step-num">2</div><div class="lcard-step-txt">${ru?'<b>Пригласите друга</b> по QR-коду — когда он сделает первый заказ, вы получите <b>+5 очков</b>':'<b>Invite a friend</b> via QR code — when they make their first order, you get <b>+5 points</b>'}</div></div>
+      <div class="lcard-step"><div class="lcard-step-num">3</div><div class="lcard-step-txt">${ru?'Набирайте очки и повышайте статус: <b>Silver → Gold → Platinum → Diamond → Brilliant</b>':'Earn points and level up: <b>Silver → Gold → Platinum → Diamond → Brilliant</b>'}</div></div>
     </div>
     <div style="height:12px"></div>`:''}`;
 

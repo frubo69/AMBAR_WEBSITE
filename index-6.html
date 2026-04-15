@@ -204,6 +204,12 @@ img{display:block}
 .fav-section-sub svg{width:11px;height:11px;opacity:.5;flex-shrink:0}
 .fav-grid-oos{opacity:.62;filter:saturate(.65)}
 .fav-grid-oos .pcard{background:rgba(15,13,10,.6)}
+/* Per-category horizontal carousel in the favourites view.
+   Shows exactly 2 cards in view (matches the normal grid width) with the
+   next card peeking — scrolls on overflow, snaps to each card. */
+.fav-cat-row{display:flex;gap:12px;overflow-x:auto;padding:0 12px 8px;scroll-snap-type:x mandatory;scrollbar-width:none;-webkit-overflow-scrolling:touch;scroll-padding-inline-start:12px}
+.fav-cat-row::-webkit-scrollbar{display:none}
+.fav-cat-row>.pcard{flex:0 0 calc(50% - 6px);scroll-snap-align:start}
 .fav-notify-btn{grid-column:1/-1;margin:4px 0 0;padding:11px 14px;background:linear-gradient(135deg,rgba(201,169,110,.08),rgba(201,169,110,.02));border:1px dashed rgba(201,169,110,.25);border-radius:12px;color:rgba(245,224,176,.75);font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;-webkit-tap-highlight-color:transparent;transition:transform .15s ease,background .2s ease}
 .fav-notify-btn:active{transform:scale(.98);background:linear-gradient(135deg,rgba(201,169,110,.14),rgba(201,169,110,.06))}
 .fav-notify-btn svg{width:13px;height:13px;opacity:.7;flex-shrink:0}
@@ -4567,13 +4573,24 @@ function renderGrid(){
       </button>`:''}
     </div>`;
 
-    // Available section
+    // Available section — grouped by category.
+    // Categories with > 2 items become a horizontal scrollable row; smaller
+    // ones stay in the regular 2-column grid so nothing looks stranded.
     if(inStock.length){
-      html+=`<div class="fav-section-hdr">
-        <span class="fav-section-ttl">${ru?'Ваша коллекция':'Your selection'}</span>
-        <span class="fav-section-count">${inStock.length}</span>
-      </div>`;
-      html+='<div class="grid-group">'+inStock.map(renderCard).join('')+'</div>';
+      const groups=new Map();
+      inStock.forEach(p=>{
+        if(!groups.has(p.cat))groups.set(p.cat,[]);
+        groups.get(p.cat).push(p);
+      });
+      groups.forEach((items)=>{
+        const catLabel=ru?items[0].cat:(items[0].catE||items[0].cat);
+        html+=`<div class="fav-section-hdr">
+          <span class="fav-section-ttl">${catLabel}</span>
+          <span class="fav-section-count">${items.length}</span>
+        </div>`;
+        const cls=items.length>2?'fav-cat-row':'grid-group';
+        html+=`<div class="${cls}">${items.map(renderCard).join('')}</div>`;
+      });
     }
 
     // Currently unavailable section

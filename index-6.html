@@ -204,8 +204,13 @@ img{display:block}
 .ce-brand-bg{font-size:80px;font-weight:700;font-family:'Cormorant Garamond',serif;letter-spacing:16px;color:rgba(201,169,110,.08);pointer-events:none;user-select:none;white-space:nowrap;line-height:1;padding:1px 0;margin:-2px 0;position:relative}
 .ce-brand-bg i{position:absolute;top:18%;left:.60em;width:2px;height:60%;background:linear-gradient(180deg,rgba(201,169,110,.08),rgba(232,201,138,.1),rgba(201,169,110,.08));transform:skewX(27deg);pointer-events:none;font-style:normal}
 .ce-title{display:none}
-.ce-btn{background:rgba(201,169,110,.07);border:1px solid rgba(201,169,110,.2);color:rgba(201,169,110,.7);font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;padding:0 18px;height:34px;border-radius:8px;display:flex;align-items:center;gap:6px;letter-spacing:.5px;margin-top:22px;transition:.15s}
-.ce-btn:active{opacity:.5;transform:scale(.96)}
+.ce-btn{position:relative;background:linear-gradient(135deg,rgba(201,169,110,.11) 0%,rgba(201,169,110,.04) 100%);border:1px solid rgba(201,169,110,.28);color:rgba(245,224,176,.9);font-size:10.5px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;padding:0 26px;height:44px;border-radius:12px;display:inline-flex;align-items:center;justify-content:center;gap:10px;letter-spacing:2.2px;text-transform:uppercase;margin-top:26px;transition:background .25s ease,border-color .25s ease,transform .15s ease,color .2s ease,box-shadow .25s ease;box-shadow:0 4px 18px rgba(201,169,110,.08),inset 0 1px 0 rgba(255,255,255,.04);-webkit-tap-highlight-color:transparent;overflow:hidden}
+.ce-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent 0%,rgba(245,224,176,.14) 50%,transparent 100%);transform:translateX(-100%);transition:transform .75s ease;pointer-events:none}
+.ce-btn:active::before{transform:translateX(100%);transition:transform .45s ease}
+.ce-btn:active{transform:scale(.97);background:linear-gradient(135deg,rgba(201,169,110,.18) 0%,rgba(201,169,110,.08) 100%);border-color:rgba(201,169,110,.42);color:#F5E0B0;box-shadow:0 6px 22px rgba(201,169,110,.18),inset 0 1px 0 rgba(255,255,255,.06)}
+.ce-btn svg{width:13px;height:13px;position:relative;z-index:1;transition:transform .2s cubic-bezier(.4,0,.2,1)}
+.ce-btn:active svg{transform:translateX(-4px)}
+.ce-btn span{position:relative;z-index:1}
 /* Swipe-to-delete cart items */
 .ci-swipe-wrap{position:relative;overflow:hidden;border-bottom:1px solid var(--border2)}
 .ci-swipe-wrap:last-child{border-bottom:none}
@@ -1259,7 +1264,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     <div class="ce-line"></div>
     <div class="ce-brand-bg">A<i></i>MBAR</div>
     <div class="ce-line"></div>
-    <button class="ce-btn" id="ce-btn" onclick="go('catalog')">← в каталог</button>
+    <button class="ce-btn" id="ce-btn" onclick="go('catalog')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg><span id="ce-btn-lbl">в каталог</span></button>
     <div id="ce-title" style="display:none"></div>
   </div>
   <div class="cart-list-wrap">
@@ -4551,7 +4556,7 @@ function renderCart(){
     document.querySelector('.cart-list-wrap').style.display='none';
     if(topbar)topbar.style.display='none';
     el('ce-title').textContent=lang==='ru'?'пусто':'empty';
-    el('ce-btn').textContent=lang==='ru'?'← в каталог':'← to catalog';
+    el('ce-btn-lbl').textContent=lang==='ru'?'в каталог':'to catalog';
     foot.style.display='none';tipSec.style.display='none';return;
   }
   el('cart-empty').style.display='none';

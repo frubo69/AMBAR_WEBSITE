@@ -1337,7 +1337,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div class="logo-grp"><div class="logo-line"></div><div class="logo" style="position:relative">A<i style="position:absolute;top:18%;left:.60em;width:1px;height:60%;background:linear-gradient(180deg,var(--gold),var(--gold2),var(--gold));transform:skewX(27deg);pointer-events:none;font-style:normal"></i>MBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-ord">ваша история</div></div></div>
     <div style="flex:1"></div>
   </div>
-  <div style="display:flex;align-items:center;padding:10px 14px 8px;gap:10px;flex-shrink:0">
+  <div id="ord-hdr-row" style="display:flex;align-items:center;padding:10px 14px 8px;gap:10px;flex-shrink:0">
     <span style="font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;color:var(--gold);letter-spacing:2.5px;text-transform:uppercase" id="sh-orders">История</span>
     <div style="flex:1;height:1px;background:linear-gradient(90deg,rgba(201,169,110,.3),transparent)"></div>
     <button id="refresh-btn" onclick="syncOrders(true)" title="Обновить" style="width:28px;height:28px;border-radius:50%;border:1px solid var(--border2);background:var(--card2);color:var(--muted);display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;transition:opacity .15s" onpointerdown="this.style.opacity='.5'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">
@@ -4927,12 +4927,16 @@ function _updateOrdChips(){
 
 function renderOrders(){
   const ordHdr=el('sh-orders');
+  const ordHdrRow=el('ord-hdr-row');
+  const ordFilterBar=el('ord-filter-bar');
   const clearWrap=el('clear-history-wrap');
   _updateOrdChips();
   if(!orders.length){
     if(ordHdr)ordHdr.style.display='none';
+    if(ordHdrRow)ordHdrRow.style.display='none';
+    if(ordFilterBar)ordFilterBar.style.display='none';
     if(clearWrap)clearWrap.style.display='none';
-    el('orders-list').innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(var(--tg-h,100vh) - 120px);overflow:hidden">
+    el('orders-list').innerHTML=`<div style="height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;padding:0 20px;box-sizing:border-box">
       <div class="ce-line"></div>
       <div class="ce-brand-bg">A<i></i>MBAR</div>
       <div class="ce-line"></div>
@@ -4942,6 +4946,8 @@ function renderOrders(){
     return;
   }
   if(ordHdr)ordHdr.style.display='';
+  if(ordHdrRow)ordHdrRow.style.display='';
+  if(ordFilterBar)ordFilterBar.style.display='';
   const hasClearable=orders.some(o=>o.status==='delivered'||o.status==='declined'||o.status==='cancelled');
   if(clearWrap)clearWrap.style.display=hasClearable?'block':'none';
   const clrTxt=el('clear-history-text');if(clrTxt)clrTxt.textContent=lang==='ru'?'Очистить историю':'Clear history';

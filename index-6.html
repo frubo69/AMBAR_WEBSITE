@@ -719,29 +719,41 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .confirm-btn-ok.destructive{background:linear-gradient(135deg,#c0392b,#e74c3c)}
 
 /* ── Cancel sheet ── */
-.cancel-ov{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:800;display:none;align-items:flex-end;opacity:0;transition:opacity .22s}
+.cancel-ov{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:800;display:none;align-items:flex-end;opacity:0;transition:opacity .22s;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
 .cancel-ov.open{display:flex;opacity:1}
-.cancel-sheet{width:100%;background:var(--bg2);border-radius:24px 24px 0 0;padding:0 20px calc(36px + var(--safe-bottom));transform:translateY(60px);transition:transform .28s cubic-bezier(.34,1,.64,1);max-height:80vh;overflow-y:auto}
-.cancel-sheet::before{content:'';display:block;width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.15);margin:14px auto 18px}
+.cancel-sheet{width:100%;background:var(--bg2);border-radius:24px 24px 0 0;padding:0 22px calc(28px + var(--safe-bottom));transform:translateY(60px);transition:transform .32s cubic-bezier(.34,1.1,.64,1);max-height:88vh;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}
+.cancel-sheet::-webkit-scrollbar{display:none}
+.cancel-sheet::before{content:'';display:block;width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.15);margin:12px auto 6px}
 .cancel-ov.open .cancel-sheet{transform:translateY(0)}
-.cancel-handle{width:36px;height:4px;background:rgba(255,255,255,.1);border-radius:2px;margin:14px auto 20px}
-.cancel-ttl{font-size:18px;font-weight:700;color:var(--text);margin-bottom:4px}
-.cancel-sub{font-size:13px;color:var(--sub);margin-bottom:18px}
-.cancel-reasons{display:flex;flex-direction:column;gap:8px;margin-bottom:14px}
-.cancel-reason{width:100%;padding:13px 16px;background:var(--card);border:1.5px solid var(--border2);border-radius:12px;color:var(--text);font-size:14px;font-weight:500;text-align:left;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.15s;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;gap:13px}
-.cancel-reason svg{flex-shrink:0;opacity:.5;transition:.15s}
-.cancel-reason.selected{border-color:rgba(224,85,85,.7);background:rgba(224,85,85,.08);color:var(--red)}
-.cancel-reason.selected svg{opacity:1}
-.cancel-reason:active{opacity:.75}
-.cancel-comment-lbl{font-size:10px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:8px}
-.cancel-comment-inp{width:100%;background:var(--card);border:1.5px solid var(--border2);border-radius:12px;padding:12px 14px;color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;resize:none;min-height:76px;margin-bottom:18px;transition:.15s;outline:none;display:block}
-.cancel-comment-inp:focus{border-color:rgba(224,85,85,.35)}
-.cancel-comment-inp::placeholder{color:var(--muted)}
-.cancel-do-btn{width:100%;padding:15px;background:linear-gradient(135deg,#b82e2e,#E05555);border:none;border-radius:14px;color:#fff;font-size:15px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.15s;margin-bottom:10px;opacity:.4;pointer-events:none}
-.cancel-do-btn.ready{opacity:1;pointer-events:all}
-.cancel-do-btn.ready:active{opacity:.85;transform:scale(.98)}
-.cancel-back-btn{width:100%;padding:13px;background:transparent;border:1.5px solid var(--border2);border-radius:14px;color:var(--sub);font-size:14px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.15s}
-.cancel-back-btn:active{background:var(--card)}
+.cancel-handle{display:none}
+.cancel-hero{display:flex;gap:14px;align-items:flex-start;padding:18px 2px 18px;border-bottom:1px solid var(--border2);margin-bottom:18px}
+.cancel-hero-ic{width:42px;height:42px;border-radius:12px;background:radial-gradient(circle at 30% 30%,rgba(224,85,85,.22),rgba(224,85,85,.06));border:1px solid rgba(224,85,85,.28);display:flex;align-items:center;justify-content:center;color:rgba(255,140,140,.95);flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.03)}
+.cancel-hero-txt{flex:1;min-width:0}
+.cancel-ttl{font-family:'Cormorant Garamond',serif;font-size:24px;font-weight:700;color:var(--text);letter-spacing:.3px;line-height:1.15;margin-bottom:4px}
+.cancel-sub{font-family:'DM Sans',sans-serif;font-size:13px;color:var(--sub);line-height:1.45}
+.cancel-reasons{display:flex;flex-direction:column;gap:6px;margin-bottom:22px}
+.cancel-reason{width:100%;padding:11px 14px;background:rgba(255,255,255,.025);border:1px solid var(--border2);border-radius:13px;color:rgba(255,255,255,.88);font-size:14px;font-weight:500;text-align:left;cursor:pointer;font-family:'DM Sans',sans-serif;transition:background .2s,border-color .2s,color .2s,transform .1s;-webkit-tap-highlight-color:transparent;display:flex;align-items:center;gap:12px;position:relative}
+.cancel-reason-ic{width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.04);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.5);transition:.2s;flex-shrink:0}
+.cancel-reason-ic svg{width:15px;height:15px}
+.cancel-reason-lbl{flex:1;line-height:1.3}
+.cancel-reason-check{width:18px;height:18px;border-radius:50%;border:1.5px solid rgba(255,255,255,.15);flex-shrink:0;display:flex;align-items:center;justify-content:center;transition:.2s}
+.cancel-reason-check svg{width:11px;height:11px;opacity:0;color:#fff;transition:.15s}
+.cancel-reason.selected{border-color:rgba(224,85,85,.5);background:rgba(224,85,85,.06);color:#fff}
+.cancel-reason.selected .cancel-reason-ic{background:rgba(224,85,85,.14);border-color:rgba(224,85,85,.32);color:rgba(255,170,170,1)}
+.cancel-reason.selected .cancel-reason-check{background:linear-gradient(135deg,#b82e2e,#E05555);border-color:transparent;box-shadow:0 2px 6px rgba(224,85,85,.4)}
+.cancel-reason.selected .cancel-reason-check svg{opacity:1}
+.cancel-reason:active{transform:scale(.99)}
+.cancel-comment-group{position:relative;background:rgba(255,255,255,.025);border:1px solid var(--border2);border-radius:13px;padding:11px 14px 10px;margin-bottom:20px;transition:border-color .2s}
+.cancel-comment-group:focus-within{border-color:rgba(224,85,85,.35);background:rgba(255,255,255,.035)}
+.cancel-comment-lbl{display:block;font-family:'Space Grotesk',sans-serif;font-size:9.5px;letter-spacing:1.8px;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:4px}
+.cancel-comment-inp{width:100%;background:transparent;border:none;padding:0;color:var(--text);font-size:14px;font-family:'DM Sans',sans-serif;resize:none;min-height:42px;outline:none;display:block;line-height:1.45}
+.cancel-comment-inp::placeholder{color:rgba(255,255,255,.22)}
+.cancel-do-btn{width:100%;padding:15px;background:linear-gradient(135deg,#9a2525,#b82e2e 50%,#E05555);border:none;border-radius:14px;color:#fff;font-size:12.5px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;font-family:'DM Sans',sans-serif;transition:opacity .2s,transform .1s,box-shadow .25s;margin-bottom:4px;opacity:.3;pointer-events:none;box-shadow:0 6px 18px rgba(184,46,46,0);display:inline-flex;align-items:center;justify-content:center;gap:8px}
+.cancel-do-btn.ready{opacity:1;pointer-events:all;box-shadow:0 8px 22px rgba(184,46,46,.35)}
+.cancel-do-btn.ready:active{opacity:.92;transform:scale(.985)}
+.cancel-do-btn svg{width:14px;height:14px;opacity:.9}
+.cancel-back-btn{width:100%;padding:12px;background:transparent;border:none;color:var(--muted);font-size:13px;font-weight:500;letter-spacing:.3px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:color .15s;-webkit-tap-highlight-color:transparent}
+.cancel-back-btn:active{color:var(--sub)}
 /* Refresh spin */
 @keyframes spin{to{transform:rotate(360deg)}}
 .spinning{animation:spin .65s linear infinite!important;opacity:.7}
@@ -2121,13 +2133,24 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <!-- ── Cancel order sheet ── -->
 <div class="cancel-ov" id="cancel-ov" onclick="if(event.target===this)closeCancelSheet()">
   <div class="cancel-sheet">
-    <div class="cancel-handle"></div>
-    <div class="cancel-ttl" id="cancel-ttl">Отменить заказ</div>
-    <div class="cancel-sub" id="cancel-sub">Выберите причину отмены</div>
+    <div class="cancel-hero">
+      <div class="cancel-hero-ic">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      </div>
+      <div class="cancel-hero-txt">
+        <div class="cancel-ttl" id="cancel-ttl">Отменить заказ</div>
+        <div class="cancel-sub" id="cancel-sub">Выберите причину отмены</div>
+      </div>
+    </div>
     <div class="cancel-reasons" id="cancel-reasons"></div>
-    <div class="cancel-comment-lbl" id="cancel-comment-lbl">КОММЕНТАРИЙ</div>
-    <textarea class="cancel-comment-inp" id="cancel-comment" rows="3"></textarea>
-    <button class="cancel-do-btn" id="cancel-do-btn" onclick="confirmCancelOrder()"><span id="cancel-do-txt">Подтвердить отмену</span></button>
+    <div class="cancel-comment-group">
+      <label class="cancel-comment-lbl" id="cancel-comment-lbl" for="cancel-comment">КОММЕНТАРИЙ</label>
+      <textarea class="cancel-comment-inp" id="cancel-comment" rows="2"></textarea>
+    </div>
+    <button class="cancel-do-btn" id="cancel-do-btn" onclick="confirmCancelOrder()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      <span id="cancel-do-txt">Подтвердить отмену</span>
+    </button>
     <button class="cancel-back-btn" onclick="closeCancelSheet()"><span id="cancel-back-txt">Назад</span></button>
   </div>
 </div>
@@ -6966,7 +6989,11 @@ function openCancelSheet(){
   _cancelReason='';
   const reasons=_cancelReasons[ru?'ru':'en'];
   el('cancel-reasons').innerHTML=reasons.map((r,i)=>
-    `<button class="cancel-reason" data-idx="${i}" onclick="selectCancelReason(this)">${_cancelIcons[i]}<span>${r}</span></button>`
+    `<button class="cancel-reason" data-idx="${i}" onclick="selectCancelReason(this)">
+      <span class="cancel-reason-ic">${_cancelIcons[i]}</span>
+      <span class="cancel-reason-lbl">${r}</span>
+      <span class="cancel-reason-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></span>
+    </button>`
   ).join('');
   el('cancel-comment').value='';
   el('cancel-comment').placeholder=ru?'Комментарий (необязательно)':'Comment (optional)';

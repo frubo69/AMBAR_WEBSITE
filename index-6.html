@@ -174,6 +174,39 @@ img{display:block}
 .grid-group{display:grid;grid-template-columns:1fr 1fr;gap:12px;padding:0 12px 4px}
 .grid{padding:2px 0 16px}
 @media(min-width:460px){.grid{grid-template-columns:repeat(3,1fr)}}
+/* ── Favorites view: summary + sectioned grid ── */
+.fav-summary{margin:4px 12px 18px;padding:18px 18px 16px;position:relative;background:linear-gradient(180deg,rgba(24,20,12,.55) 0%,rgba(14,12,8,.35) 100%);border:1px solid rgba(201,169,110,.2);border-radius:16px;overflow:hidden;box-shadow:0 8px 26px rgba(0,0,0,.35),inset 0 1px 0 rgba(245,224,176,.06)}
+.fav-summary::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent 10%,rgba(245,224,176,.4) 50%,transparent 90%)}
+.fav-summary-head{display:flex;align-items:stretch;gap:18px}
+.fav-summary-stat{flex:1;display:flex;flex-direction:column;align-items:flex-start;gap:3px;min-width:0}
+.fav-summary-val{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;color:#fff;line-height:1;letter-spacing:-.5px;font-variant-numeric:tabular-nums;background:linear-gradient(180deg,#fff 0%,rgba(245,224,176,.88) 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;display:inline-flex;align-items:baseline;gap:4px}
+.fav-summary-val small{font-size:11px;font-weight:600;letter-spacing:1.2px;color:rgba(201,169,110,.55);-webkit-text-fill-color:rgba(201,169,110,.55)}
+.fav-summary-lbl{font-family:'Space Grotesk',sans-serif;font-size:8.5px;font-weight:600;letter-spacing:2.4px;color:rgba(201,169,110,.65);text-transform:uppercase}
+.fav-summary-divider{width:1px;background:linear-gradient(180deg,transparent,rgba(201,169,110,.22) 30%,rgba(201,169,110,.22) 70%,transparent)}
+.fav-summary-meta{display:flex;align-items:center;gap:7px;margin-top:14px;font-family:'DM Sans',sans-serif;font-size:11px;color:rgba(255,255,255,.55);letter-spacing:.2px;flex-wrap:wrap}
+.fav-summary-sep{color:rgba(255,255,255,.2);margin:0 2px}
+.fav-dot{display:inline-block;width:6px;height:6px;border-radius:50%;flex-shrink:0}
+.fav-dot-ok{background:#6fd89a;box-shadow:0 0 6px rgba(111,216,154,.55)}
+.fav-dot-oos{background:rgba(220,90,90,.7);box-shadow:0 0 6px rgba(220,90,90,.4)}
+.fav-add-all-btn{position:relative;margin-top:14px;width:100%;height:44px;border-radius:12px;background:linear-gradient(135deg,rgba(245,224,176,.16) 0%,rgba(201,169,110,.05) 100%);border:1px solid rgba(201,169,110,.35);color:rgba(245,224,176,.92);font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:2.2px;text-transform:uppercase;cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:9px;overflow:hidden;box-shadow:inset 0 1px 0 rgba(245,224,176,.06);-webkit-tap-highlight-color:transparent;transition:transform .15s ease}
+.fav-add-all-btn::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent 0%,rgba(245,224,176,.18) 50%,transparent 100%);transform:translateX(-100%);transition:transform .8s ease;pointer-events:none}
+.fav-add-all-btn:active{transform:scale(.98)}
+.fav-add-all-btn:active::before{transform:translateX(100%);transition:transform .5s ease}
+.fav-add-all-btn svg{width:14px;height:14px;opacity:.75;flex-shrink:0}
+.fav-section-hdr{padding:18px 14px 6px;font-family:'Space Grotesk',sans-serif;font-size:10.5px;font-weight:700;color:var(--gold);letter-spacing:2.5px;text-transform:uppercase;display:flex;align-items:center;gap:10px}
+.fav-section-hdr::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,rgba(201,169,110,.28),transparent)}
+.fav-section-ttl{white-space:nowrap}
+.fav-section-count{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:18px;padding:0 6px;border-radius:9px;background:rgba(201,169,110,.12);border:1px solid rgba(201,169,110,.2);font-size:9px;font-weight:700;color:rgba(245,224,176,.85);letter-spacing:.2px}
+.fav-section-oos-hdr{color:rgba(255,255,255,.4)}
+.fav-section-oos-hdr::after{background:linear-gradient(90deg,rgba(255,255,255,.15),transparent)}
+.fav-section-oos-hdr .fav-section-count{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.12);color:rgba(255,255,255,.55)}
+.fav-section-sub{padding:0 14px 8px;font-family:'DM Sans',sans-serif;font-size:10.5px;color:rgba(255,255,255,.35);letter-spacing:.1px;display:flex;align-items:center;gap:6px}
+.fav-section-sub svg{width:11px;height:11px;opacity:.5;flex-shrink:0}
+.fav-grid-oos{opacity:.62;filter:saturate(.65)}
+.fav-grid-oos .pcard{background:rgba(15,13,10,.6)}
+.fav-notify-btn{grid-column:1/-1;margin:4px 0 0;padding:11px 14px;background:linear-gradient(135deg,rgba(201,169,110,.08),rgba(201,169,110,.02));border:1px dashed rgba(201,169,110,.25);border-radius:12px;color:rgba(245,224,176,.75);font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:8px;-webkit-tap-highlight-color:transparent;transition:transform .15s ease,background .2s ease}
+.fav-notify-btn:active{transform:scale(.98);background:linear-gradient(135deg,rgba(201,169,110,.14),rgba(201,169,110,.06))}
+.fav-notify-btn svg{width:13px;height:13px;opacity:.7;flex-shrink:0}
 .pcard{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;transition:.15s}
 .pcard:active{transform:scale(.97)}
 .pimg-box{height:148px;background:linear-gradient(155deg,#0E0E1E,#090916);display:flex;align-items:center;justify-content:center;padding:10px;position:relative;overflow:hidden}
@@ -4228,6 +4261,16 @@ function toggleFavFilter(){
   el('fav-hdr-btn').style.borderColor=showFavOnly?'#e05555':'';
   renderGrid();
 }
+function favNotifyAll(){
+  const oosIds=[...favs].filter(id=>{const p=P.find(x=>x.id===id);return p&&!p.stock;});
+  if(!oosIds.length){haptic.error();return;}
+  const existing=JSON.parse(localStorage.getItem('ambar_restock_notify')||'[]');
+  const merged=[...new Set([...existing,...oosIds])];
+  localStorage.setItem('ambar_restock_notify',JSON.stringify(merged));
+  haptic.success();
+  const ru=lang==='ru';
+  showToast(ru?`Уведомим вас о ${oosIds.length} ${oosIds.length===1?'товаре':'товарах'}`:`You'll be notified about ${oosIds.length} item${oosIds.length===1?'':'s'}`,'ok');
+}
 
 const SORT_OPTIONS=[
   {key:'none',   ru:'По умолчанию',      en:'Default'},
@@ -4498,7 +4541,68 @@ function renderGrid(){
     return;
   }
 
-  // Build HTML with category section headers when showing all
+  // Favorites view: summary header + split sections (available / unavailable)
+  if(showFavOnly){
+    const ru=lang==='ru';
+    const inStock=list.filter(p=>p.stock);
+    const oosList=list.filter(p=>!p.stock);
+    const totalValue=inStock.reduce((s,p)=>s+(p.price||0),0);
+    let html='';
+
+    // Summary card
+    html+=`<div class="fav-summary">
+      <div class="fav-summary-head">
+        <div class="fav-summary-stat">
+          <div class="fav-summary-val">${list.length}</div>
+          <div class="fav-summary-lbl">${ru?'Сохранено':'Saved'}</div>
+        </div>
+        <div class="fav-summary-divider"></div>
+        <div class="fav-summary-stat" style="align-items:flex-end;text-align:right">
+          <div class="fav-summary-val">${totalValue.toLocaleString('en-US')}<small>AED</small></div>
+          <div class="fav-summary-lbl">${ru?'Общая стоимость':'Total value'}</div>
+        </div>
+      </div>
+      <div class="fav-summary-meta">
+        <span class="fav-dot fav-dot-ok"></span><span>${inStock.length} ${ru?'в наличии':'in stock'}</span>
+        ${oosList.length?`<span class="fav-summary-sep">·</span><span class="fav-dot fav-dot-oos"></span><span>${oosList.length} ${ru?'нет в наличии':'unavailable'}</span>`:''}
+      </div>
+      ${inStock.length?`<button class="fav-add-all-btn" onclick="addWishlistToCart()">
+        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 3h2l1.6 6.4a1 1 0 0 0 1 .8h4.8a1 1 0 0 0 1-.75l.9-3.45H5.2"/><circle cx="6.5" cy="12" r="1"/><circle cx="11" cy="12" r="1"/></svg>
+        <span>${ru?'Добавить всё в корзину':'Add all in stock to cart'}</span>
+      </button>`:''}
+    </div>`;
+
+    // Available section
+    if(inStock.length){
+      html+=`<div class="fav-section-hdr">
+        <span class="fav-section-ttl">${ru?'Ваша коллекция':'Your selection'}</span>
+        <span class="fav-section-count">${inStock.length}</span>
+      </div>`;
+      html+='<div class="grid-group">'+inStock.map(renderCard).join('')+'</div>';
+    }
+
+    // Currently unavailable section
+    if(oosList.length){
+      html+=`<div class="fav-section-hdr fav-section-oos-hdr">
+        <span class="fav-section-ttl">${ru?'Нет в наличии':'Currently unavailable'}</span>
+        <span class="fav-section-count">${oosList.length}</span>
+      </div>
+      <div class="fav-section-sub">
+        <svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 1.5a3 3 0 0 0-3 3v2l-1 1.5h8l-1-1.5v-2a3 3 0 0 0-3-3zM4.5 9.5a1.5 1.5 0 0 0 3 0"/></svg>
+        <span>${ru?'Сообщим, как только снова появятся':"We'll let you know when they're back"}</span>
+      </div>`;
+      html+='<div class="grid-group fav-grid-oos">'+oosList.map(renderCard).join('')+'</div>';
+      html+=`<div style="padding:0 12px 4px"><button class="fav-notify-btn" onclick="favNotifyAll()">
+        <svg viewBox="0 0 13 13" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 1.5a3 3 0 0 0-3 3v2.2L2.3 8.5h8.4L9.5 6.7V4.5a3 3 0 0 0-3-3zM5 10.3a1.5 1.5 0 0 0 3 0"/></svg>
+        <span>${ru?'Уведомить о всех':'Notify me for all'}</span>
+      </button></div>`;
+    }
+
+    el('p-grid').innerHTML=html;
+    initScrollSpy();return;
+  }
+
+  // Default grid — category section headers when showing all
   let html='';
   if(!catFilter&&!searchQ&&sortMode==='none'){
     let lastCat=null;

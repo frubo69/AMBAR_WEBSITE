@@ -3208,9 +3208,9 @@ function go(p){
   }
   curPg=p;
   if(p==='cart'){renderCart();updateCartAddrBar();}
-  if(p==='orders'){syncOrders();initPullToRefresh();}  // fetch latest from API, fall back to localStorage
+  if(p==='orders'){syncOrders();checkActiveOrder();initPullToRefresh();}  // fetch latest + refresh status bar
   if(p==='address'){renderSavedCards();buildAreaChips();buildTypeChips('man'); /* GPS uses label+comment only */}
-  if(p==='profile'){buildProfile();syncOrders();}
+  if(p==='profile'){buildProfile();syncOrders();checkActiveOrder();}
   if(p==='checkout')buildSummary();
 }
 
@@ -7779,7 +7779,14 @@ function startOrderPolling(){
   checkActiveOrder();
   setTimeout(()=>{_initAobSwipe();_initAodSwipe();_initSortSwipe();},500);
   _aobTickTimer=setInterval(()=>{if(_aobOrders.length)_renderAob();},30000);
-  _aobPollTimer=setInterval(()=>checkActiveOrder(),25000);
+  // Poll the active-order bar every 7s — lightweight endpoint, keeps the
+  // status pill in sync with operator actions (accept / deliver / decline).
+  _aobPollTimer=setInterval(()=>checkActiveOrder(),7000);
+  // Refresh immediately when the app becomes visible again (user came back
+  // from a different tab / multitasking).
+  document.addEventListener('visibilitychange',()=>{
+    if(!document.hidden)checkActiveOrder();
+  });
   setInterval(()=>_bgSupportPoll(),20000);
 }
 

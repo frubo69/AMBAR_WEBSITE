@@ -816,7 +816,9 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 /* ── Custom confirm dialog ── */
 .confirm-ov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9990;display:none;align-items:center;justify-content:center;opacity:0;transition:opacity .2s;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
 .confirm-ov.open{display:flex;opacity:1}
-.confirm-box{width:min(300px,82vw);border-radius:28px;background:linear-gradient(145deg,rgba(30,28,24,.92),rgba(18,16,14,.95));-webkit-backdrop-filter:saturate(200%) blur(50px);backdrop-filter:saturate(200%) blur(50px);overflow:hidden;transform:scale(.65);opacity:0;transition:transform .35s cubic-bezier(.175,.885,.32,1.275),opacity .2s;box-shadow:0 12px 60px rgba(0,0,0,.5),0 0 0 .5px rgba(201,169,110,.12) inset}
+/* Scoped to .confirm-ov so it doesn't clobber the older .confirm-overlay
+   variant (#loc-confirm), which has its own base rule up top. */
+.confirm-ov .confirm-box{width:min(300px,82vw);border-radius:28px;background:linear-gradient(145deg,rgba(30,28,24,.92),rgba(18,16,14,.95));-webkit-backdrop-filter:saturate(200%) blur(50px);backdrop-filter:saturate(200%) blur(50px);overflow:hidden;transform:scale(.65);opacity:0;transition:transform .35s cubic-bezier(.175,.885,.32,1.275),opacity .2s;box-shadow:0 12px 60px rgba(0,0,0,.5),0 0 0 .5px rgba(201,169,110,.12) inset}
 .confirm-ov.open .confirm-box{transform:scale(1);opacity:1}
 .confirm-body{padding:28px 24px 24px;text-align:center}
 .confirm-title{font-size:17px;font-weight:600;color:var(--gold2);letter-spacing:-.15px;line-height:1.35;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,sans-serif}

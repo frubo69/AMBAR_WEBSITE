@@ -86,6 +86,17 @@ async def tg_edit(token, chat_id, message_id, text, parse_mode="HTML", reply_mar
         async with session.post(url, json=payload) as resp:
             return await resp.json()
 
+async def tg_delete(token, chat_id, message_id):
+    """Silently delete a message. Telegram only allows this within 48h; errors are swallowed."""
+    url = f"https://api.telegram.org/bot{token}/deleteMessage"
+    try:
+        async with _aiohttp.ClientSession() as session:
+            async with session.post(url, json={"chat_id": chat_id, "message_id": message_id}) as resp:
+                return await resp.json()
+    except Exception as e:
+        log.debug(f"tg_delete {chat_id}/{message_id}: {e}")
+        return None
+
 async def tg_send_photo(token, chat_id, photo_path, caption=""):
     url  = f"https://api.telegram.org/bot{token}/sendPhoto"
     data = _aiohttp.FormData()
@@ -189,6 +200,19 @@ async def handle_create_order(request: web.Request) -> web.Response:
     await db._increment_user(uid, orders_total=1)
 
     # ── Customer confirmation (single live status msg, edited through lifecycle) ─
+    # Delete the live msgs from any previous orders so the chat stays clean —
+    # the new order's card becomes the only visible one.
+    try:
+        prev_orders = await db.get_user_orders(uid)
+        for po in prev_orders:
+            if po.get("order_id") == oid:
+                continue  # skip the order we just created
+            prev_mid = po.get("customer_msg_id") or (po.get("customer_msg_ids") or [None])[0]
+            if prev_mid:
+                await tg_delete(BOT_TOKEN, uid, prev_mid)
+                await db.update_order(po["order_id"], customer_msg_id=None)
+    except Exception as e:
+        log.debug(f"prev msg cleanup: {e}")
     try:
         confirm = render_customer_card(order_doc, lang)
         conf_result = await tg_send(BOT_TOKEN, uid, confirm)

@@ -650,11 +650,15 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .game-newbest.is-show{display:inline-flex}
 .game-newbest svg{width:12px;height:12px;flex-shrink:0}
 .game-newbest-txt{font-family:'Space Grotesk',sans-serif;font-size:9.5px;font-weight:700;letter-spacing:2.8px;color:#F5E0B0;text-transform:uppercase}
-.game-retry{margin-top:28px;position:relative;padding:0 32px;height:48px;background:linear-gradient(135deg,rgba(201,169,110,.14) 0%,rgba(201,169,110,.05) 100%);border:1px solid rgba(201,169,110,.32);border-radius:14px;color:rgba(245,224,176,.92);font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;letter-spacing:2.4px;text-transform:uppercase;cursor:pointer;display:inline-flex;align-items:center;gap:10px;overflow:hidden;box-shadow:0 6px 22px rgba(201,169,110,.1),inset 0 1px 0 rgba(245,224,176,.06);-webkit-tap-highlight-color:transparent;transition:transform .15s ease;animation:gameFadeIn .5s ease .7s both}
+.game-over-actions{display:flex;flex-direction:column;align-items:center;gap:12px;margin-top:28px}
+.game-retry{position:relative;padding:0 32px;height:48px;background:linear-gradient(135deg,rgba(201,169,110,.14) 0%,rgba(201,169,110,.05) 100%);border:1px solid rgba(201,169,110,.32);border-radius:14px;color:rgba(245,224,176,.92);font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;letter-spacing:2.4px;text-transform:uppercase;cursor:pointer;display:inline-flex;align-items:center;gap:10px;overflow:hidden;box-shadow:0 6px 22px rgba(201,169,110,.1),inset 0 1px 0 rgba(245,224,176,.06);-webkit-tap-highlight-color:transparent;transition:transform .15s ease;animation:gameFadeIn .5s ease .7s both}
 .game-retry::before{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent 0%,rgba(245,224,176,.18) 50%,transparent 100%);transform:translateX(-100%);transition:transform .8s ease;pointer-events:none}
 .game-retry:active{transform:scale(.97)}
 .game-retry:active::before{transform:translateX(100%);transition:transform .5s ease}
 .game-retry svg{width:14px;height:14px;opacity:.75;flex-shrink:0}
+.game-quit{padding:0 22px;height:38px;background:transparent;border:none;color:rgba(255,255,255,.42);font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;letter-spacing:2.6px;text-transform:uppercase;cursor:pointer;display:inline-flex;align-items:center;gap:8px;-webkit-tap-highlight-color:transparent;transition:color .15s ease,transform .15s ease;animation:gameFadeIn .5s ease .82s both}
+.game-quit:active{color:rgba(255,255,255,.75);transform:scale(.97)}
+.game-quit svg{width:11px;height:11px;opacity:.6;flex-shrink:0}
 @keyframes gameFadeIn{from{opacity:0}to{opacity:1}}
 @keyframes gameTitleIn{from{opacity:0;transform:translateY(18px) scale(.94);letter-spacing:2px}to{opacity:1;transform:translateY(0) scale(1)}}
 @keyframes gameStartBtnIn{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:translateY(0)}}
@@ -2251,10 +2255,16 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       <svg viewBox="0 0 12 12" fill="none" stroke="#F5E0B0" stroke-width="1.4" stroke-linejoin="round"><path d="M6 1.2l1.35 3.05L10.5 4.7 8.25 7l.5 3.3L6 8.75 3.25 10.3l.5-3.3L1.5 4.7l3.15-.45z" fill="rgba(245,224,176,.25)"/></svg>
       <span class="game-newbest-txt" id="game-newbest-txt">NEW BEST</span>
     </div>
-    <button id="game-retry-btn" class="game-retry" onclick="startGame()">
-      <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5a5 5 0 11-1.5-3.5M12 1.2V5h-3.8"/></svg>
-      <span id="game-retry-lbl">Play again</span>
-    </button>
+    <div class="game-over-actions">
+      <button id="game-retry-btn" class="game-retry" onclick="startGame()">
+        <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.5a5 5 0 11-1.5-3.5M12 1.2V5h-3.8"/></svg>
+        <span id="game-retry-lbl">Play again</span>
+      </button>
+      <button id="game-quit-btn" class="game-quit" onclick="closeGame()">
+        <svg viewBox="0 0 11 11" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round"><path d="M3 3l5 5M8 3l-5 5"/></svg>
+        <span id="game-quit-lbl">Quit</span>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -7215,6 +7225,7 @@ function openGame(){
   el('game-score-lbl').textContent=ru?'ОЧКИ':'SCORE';
   el('game-best-lbl').textContent=ru?'РЕКОРД':'BEST';
   el('game-retry-lbl').textContent=ru?'Ещё раз':'Play again';
+  el('game-quit-lbl').textContent=ru?'Выйти':'Quit';
   el('game-close-lbl').textContent=ru?'Закрыть':'Close';
   el('game-newbest-txt').textContent=ru?'НОВЫЙ РЕКОРД':'NEW BEST';
   el('game-start-sub').textContent=ru?'нажмите, чтобы прыгнуть':'tap anywhere to jump';

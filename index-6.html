@@ -656,7 +656,10 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .qr-ov-corner-tr,.qr-ov-corner-bl{position:absolute;width:18px;height:18px;border:1.5px solid rgba(201,169,110,.75);pointer-events:none}
 .qr-ov-corner-tr{top:8px;right:8px;border-left:none;border-bottom:none;border-radius:0 3px 0 0}
 .qr-ov-corner-bl{bottom:8px;left:8px;border-right:none;border-top:none;border-radius:0 0 0 3px}
-.qr-ov-hint{font-family:'DM Sans',sans-serif;font-size:11px;letter-spacing:1.5px;color:rgba(255,255,255,.32);margin-top:6px;opacity:0;animation:qrFadeIn .45s ease forwards .42s}
+.qr-ov-explain{font-family:'DM Sans',sans-serif;font-size:12.5px;line-height:1.55;letter-spacing:.2px;color:rgba(255,255,255,.72);text-align:center;margin-top:4px;max-width:300px;opacity:0;animation:qrFadeIn .5s ease forwards .42s}
+.qr-ov-explain b{color:#F5E0B0;font-weight:600}
+.qr-ov-explain .qr-ov-flow{display:block;margin-top:6px;font-size:10.5px;letter-spacing:1.8px;text-transform:uppercase;color:rgba(201,169,110,.75)}
+.qr-ov-hint{font-family:'DM Sans',sans-serif;font-size:10.5px;letter-spacing:1.5px;color:rgba(255,255,255,.28);margin-top:2px;opacity:0;animation:qrFadeIn .45s ease forwards .55s}
 .qr-ov-close{position:absolute;top:-46px;right:0;width:34px;height:34px;border-radius:50%;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.1);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.55);cursor:pointer;transition:.15s;opacity:0;animation:qrFadeIn .4s ease forwards .32s}
 .qr-ov-close:active{transform:scale(.88);background:rgba(255,255,255,.12);color:rgba(255,255,255,.9)}
 .qr-ov-scan{position:absolute;left:22px;right:22px;height:2px;background:linear-gradient(90deg,transparent,rgba(201,169,110,.9),transparent);border-radius:2px;top:22px;pointer-events:none;opacity:0;animation:qrScan 2.2s cubic-bezier(.45,0,.55,1) .55s infinite;box-shadow:0 0 12px rgba(201,169,110,.6)}
@@ -5560,10 +5563,10 @@ function openVipSheet(){
     ${cardType==='standard'?`
     <div style="font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;letter-spacing:1.5px;color:var(--gold);margin-bottom:12px">${ru?'КАК ЭТО РАБОТАЕТ':'HOW IT WORKS'}</div>
     <div class="lcard-how">
-      <div class="lcard-step"><div class="lcard-step-num">1</div><div class="lcard-step-txt">${ru?'Каждый <b>доставленный заказ</b> = 1 очко':'Each <b>delivered order</b> = 1 point'}</div></div>
-      <div class="lcard-step"><div class="lcard-step-num">2</div><div class="lcard-step-txt">${ru?'<b>Пригласите друга</b> по QR-коду — когда он сделает первый заказ, вы получите <b>+5 очков</b>':'<b>Invite a friend</b> via QR code — when they make their first order, you get <b>+5 points</b>'}</div></div>
-      <div class="lcard-step"><div class="lcard-step-num">3</div><div class="lcard-step-txt">${ru?'Набирайте очки и повышайте статус: <b>Silver → Gold → Platinum → Diamond → Brilliant</b>':'Earn points and level up: <b>Silver → Gold → Platinum → Diamond → Brilliant</b>'}</div></div>
-      <div class="lcard-step"><div class="lcard-step-num">4</div><div class="lcard-step-txt">${ru?'Ваш <b>QR-код</b> — персональная реферальная ссылка. Друг сканирует → попадает в бот → делает заказ → вы получаете очки':'Your <b>QR code</b> is your personal referral link. Friend scans → enters bot → places order → you earn points'}</div></div>
+      <div class="lcard-step"><div class="lcard-step-num">1</div><div class="lcard-step-txt">${ru?'Ваш <b>QR-код</b> — персональная реферальная ссылка. Друг сканирует → попадает в бот → делает заказ → вы получаете очки':'Your <b>QR code</b> is your personal referral link. Friend scans → enters bot → places order → you earn points'}</div></div>
+      <div class="lcard-step"><div class="lcard-step-num">2</div><div class="lcard-step-txt">${ru?'Каждый <b>доставленный заказ</b> = 1 очко':'Each <b>delivered order</b> = 1 point'}</div></div>
+      <div class="lcard-step"><div class="lcard-step-num">3</div><div class="lcard-step-txt">${ru?'<b>Пригласите друга</b> по QR-коду — когда он сделает первый заказ, вы получите <b>+5 очков</b>':'<b>Invite a friend</b> via QR code — when they make their first order, you get <b>+5 points</b>'}</div></div>
+      <div class="lcard-step"><div class="lcard-step-num">4</div><div class="lcard-step-txt">${ru?'Набирайте очки и повышайте статус: <b>Silver → Gold → Platinum → Diamond → Brilliant</b>':'Earn points and level up: <b>Silver → Gold → Platinum → Diamond → Brilliant</b>'}</div></div>
     </div>
     <div style="height:12px"></div>`:''}`;
 
@@ -5603,6 +5606,10 @@ function openQRModal(refLink){
         <div class="qr-ov-corner-tr"></div>
         <div class="qr-ov-corner-bl"></div>
         <div class="qr-ov-scan"></div>
+      </div>
+      <div class="qr-ov-explain">
+        ${ru?'Ваш <b>QR-код</b> — персональная реферальная ссылка.':'Your <b>QR code</b> is your personal referral link.'}
+        <span class="qr-ov-flow">${ru?'сканирует → бот → заказ → ваши очки':'scans → bot → order → your points'}</span>
       </div>
       <div class="qr-ov-hint">${ru?'нажмите вне окна, чтобы закрыть':'tap outside to close'}</div>
     </div>`;

@@ -16,12 +16,12 @@ def render_customer_card(order: dict, lang: str = "ru") -> str:
         if status == "pending":
             return (f"⏳ *Заказ #{oid} оформлен*\n"
                     f"_Ожидает подтверждения оператора_\n\n"
-                    f"🍾 Подробности — в приложении")
+                    f"🍾 Вы можете отслеживать статус Вашего заказа в приложении")
         if status == "approved":
             eta_line = f"доставка через ~{eta} мин" if eta else "скоро выедем"
             return (f"✅ *Заказ #{oid} подтверждён*\n"
                     f"_{eta_line}_\n\n"
-                    f"🍾 Подробности — в приложении")
+                    f"🍾 Вы можете отслеживать статус Вашего заказа в приложении")
         if status == "delivered":
             return (f"✅ *Заказ #{oid} доставлен!*\n"
                     f"_Спасибо! Оцените нас в приложении_ 🥂")
@@ -35,12 +35,12 @@ def render_customer_card(order: dict, lang: str = "ru") -> str:
     if status == "pending":
         return (f"⏳ *Order #{oid} placed*\n"
                 f"_Awaiting operator confirmation_\n\n"
-                f"🍾 Details — in the app")
+                f"🍾 You can track your order status in the app")
     if status == "approved":
         eta_line = f"delivery in ~{eta} min" if eta else "on the way soon"
         return (f"✅ *Order #{oid} confirmed*\n"
                 f"_{eta_line}_\n\n"
-                f"🍾 Details — in the app")
+                f"🍾 You can track your order status in the app")
     if status == "delivered":
         return (f"✅ *Order #{oid} delivered!*\n"
                 f"_Thank you! Rate us in the app_ 🥂")

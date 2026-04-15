@@ -201,7 +201,8 @@ img{display:block}
 .empty-icon{font-size:54px;margin-bottom:14px;opacity:.3}
 #cart-empty{flex:1;display:none;flex-direction:column;align-items:center;justify-content:center;overflow:hidden;gap:0}
 .ce-line{width:270px;height:1px;background:linear-gradient(90deg,transparent 0%,rgba(201,169,110,.5) 50%,transparent 100%)}
-.ce-brand-bg{font-size:80px;font-weight:700;font-family:'Cormorant Garamond',serif;letter-spacing:16px;color:rgba(201,169,110,.08);pointer-events:none;user-select:none;white-space:nowrap;line-height:1;padding:1px 0;margin:-2px 0}
+.ce-brand-bg{font-size:80px;font-weight:700;font-family:'Cormorant Garamond',serif;letter-spacing:16px;color:rgba(201,169,110,.08);pointer-events:none;user-select:none;white-space:nowrap;line-height:1;padding:1px 0;margin:-2px 0;position:relative}
+.ce-brand-bg i{position:absolute;top:18%;left:.60em;width:2px;height:60%;background:linear-gradient(180deg,rgba(201,169,110,.08),rgba(232,201,138,.1),rgba(201,169,110,.08));transform:skewX(27deg);pointer-events:none;font-style:normal}
 .ce-title{display:none}
 .ce-btn{background:rgba(201,169,110,.07);border:1px solid rgba(201,169,110,.2);color:rgba(201,169,110,.7);font-size:12px;font-weight:500;cursor:pointer;font-family:'DM Sans',sans-serif;padding:0 18px;height:34px;border-radius:8px;display:flex;align-items:center;gap:6px;letter-spacing:.5px;margin-top:22px;transition:.15s}
 .ce-btn:active{opacity:.5;transform:scale(.96)}
@@ -1236,7 +1237,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   </div>
   <div id="cart-empty">
     <div class="ce-line"></div>
-    <div class="ce-brand-bg">AMBAR</div>
+    <div class="ce-brand-bg">A<i></i>MBAR</div>
     <div class="ce-line"></div>
     <button class="ce-btn" id="ce-btn" onclick="go('catalog')">← в каталог</button>
     <div id="ce-title" style="display:none"></div>
@@ -4355,7 +4356,7 @@ function renderGrid(){
     if(isFav){
       el('p-grid').innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(var(--tg-h,100vh) - 210px);overflow:hidden;text-align:center">
         <div class="ce-line"></div>
-        <div class="ce-brand-bg">AMBAR</div>
+        <div class="ce-brand-bg">A<i></i>MBAR</div>
         <div class="ce-line"></div>
         <div style="margin-top:20px;font-size:14px;font-weight:500;color:var(--sub);font-family:'Space Grotesk',sans-serif;letter-spacing:-.1px">${lang==='ru'?'Oops, избранное пусто':'Oops, no favourites yet'}</div>
         <div style="margin-top:6px;font-size:11px;font-weight:400;color:var(--muted);font-family:'DM Sans',sans-serif;letter-spacing:.4px;display:flex;align-items:center;justify-content:center;gap:4px">${lang==='ru'?'Нажмите':'Tap'} <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:.7"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> ${lang==='ru'?'на товаре, чтобы сохранить':'on any product to save it here'}</div>
@@ -4933,7 +4934,7 @@ function renderOrders(){
     if(clearWrap)clearWrap.style.display='none';
     el('orders-list').innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(var(--tg-h,100vh) - 120px);overflow:hidden">
       <div class="ce-line"></div>
-      <div class="ce-brand-bg">AMBAR</div>
+      <div class="ce-brand-bg">A<i></i>MBAR</div>
       <div class="ce-line"></div>
       <div style="margin-top:20px;font-size:14px;font-weight:500;color:var(--sub);font-family:'Space Grotesk',sans-serif;letter-spacing:-.1px">${lang==='ru'?'Oops, заказов пока нет':'Oops, no orders yet'}</div>
       <div style="margin-top:6px;font-size:11px;font-weight:400;color:var(--muted);font-family:'DM Sans',sans-serif;letter-spacing:.4px">${lang==='ru'?'Ваши заказы появятся здесь':'Your orders will appear here'}</div>

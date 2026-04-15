@@ -640,6 +640,10 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .lcard-qr{width:88px;height:88px;border-radius:10px;background:#fff;padding:5px;display:flex;align-items:center;justify-content:center;position:relative;overflow:hidden;box-sizing:border-box;cursor:pointer;transition:transform .15s ease}
 .lcard-qr canvas{width:100%!important;height:100%!important;border-radius:4px}
 .lcard-qr:active{transform:scale(.94)}
+.lcard-qr-hint{position:absolute;right:6px;bottom:6px;width:18px;height:18px;border-radius:5px;background:rgba(0,0,0,.72);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;color:#fff;pointer-events:none;box-shadow:0 1px 3px rgba(0,0,0,.25);animation:lcardQrPulse 2.6s ease-in-out infinite;transition:opacity .25s ease,transform .25s ease}
+.lcard-qr-hint svg{width:10px;height:10px;display:block}
+.lcard-qr.seen .lcard-qr-hint{opacity:0;transform:scale(.6)}
+@keyframes lcardQrPulse{0%,100%{opacity:.35}50%{opacity:.72}}
 
 /* ── QR Expand Modal ─────────────────────────────────────────────── */
 .qr-ov{position:fixed;inset:0;z-index:9200;background:radial-gradient(ellipse at center,rgba(15,12,8,.82) 0%,rgba(0,0,0,.94) 80%);backdrop-filter:blur(22px);-webkit-backdrop-filter:blur(22px);display:flex;align-items:center;justify-content:center;padding:28px;opacity:0;pointer-events:none;transition:opacity .32s cubic-bezier(.4,0,.2,1)}
@@ -5577,8 +5581,13 @@ function openVipSheet(){
       const canvas=_genQR(refLink,256);
       canvas.style.width='100%';canvas.style.height='100%';
       qrContainer.appendChild(canvas);
+      // Subtle pulsing expand hint — hides on first tap
+      const hint=document.createElement('div');
+      hint.className='lcard-qr-hint';
+      hint.innerHTML='<svg viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 2h3v3M5 10H2V7M10 2L7 5M2 10l3-3"/></svg>';
+      qrContainer.appendChild(hint);
       qrContainer.style.cursor='pointer';
-      qrContainer.onclick=(ev)=>{ev.stopPropagation();openQRModal(refLink);};
+      qrContainer.onclick=(ev)=>{ev.stopPropagation();qrContainer.classList.add('seen');openQRModal(refLink);};
     }
   },50);
 

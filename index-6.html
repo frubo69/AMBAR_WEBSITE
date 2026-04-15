@@ -614,24 +614,29 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .game-ov.is-open{display:block}
 .game-canvas{position:absolute;inset:0;width:100%;height:100%;display:block;touch-action:none}
 .game-hud{position:absolute;top:0;left:0;right:0;pointer-events:none;padding:calc(var(--safe-top,44px) + 14px) 18px 0;display:flex;justify-content:space-between;align-items:flex-start;gap:10px;z-index:2}
-.game-hud-pill{position:relative;min-width:88px;padding:9px 14px 8px;background:linear-gradient(180deg,rgba(14,14,22,.68) 0%,rgba(7,7,14,.55) 100%);backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);border:1px solid rgba(255,255,255,.07);border-radius:14px;box-shadow:0 6px 22px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.04);overflow:hidden}
+.game-hud-pill{position:relative;min-width:96px;padding:9px 16px 8px;background:linear-gradient(180deg,rgba(14,14,22,.68) 0%,rgba(7,7,14,.55) 100%);backdrop-filter:blur(18px) saturate(1.2);-webkit-backdrop-filter:blur(18px) saturate(1.2);border:1px solid rgba(255,255,255,.07);border-radius:14px;box-shadow:0 6px 22px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.04);overflow:hidden;text-align:center;display:flex;flex-direction:column;align-items:center}
 .game-hud-pill::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(255,255,255,.12),transparent)}
 .game-hud-pill.is-best::after{content:'';position:absolute;top:0;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent 15%,rgba(245,224,176,.55) 50%,transparent 85%);opacity:.7}
 .game-hud-pill.is-best{border-color:rgba(201,169,110,.2)}
-.game-hud-val{font-size:24px;font-weight:700;color:#fff;font-family:'DM Sans',sans-serif;line-height:1;letter-spacing:-.3px;font-variant-numeric:tabular-nums}
+.game-hud-val{font-size:24px;font-weight:700;color:#fff;font-family:'Space Grotesk',sans-serif;line-height:1;letter-spacing:-.3px;font-variant-numeric:tabular-nums;text-align:center}
 .game-hud-pill.is-best .game-hud-val{background:linear-gradient(135deg,#F5E0B0 0%,#C9A96E 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
-.game-hud-lbl{font-size:8.5px;letter-spacing:2.4px;color:rgba(255,255,255,.4);margin-top:3px;font-family:'Space Grotesk',sans-serif;font-weight:600;text-transform:uppercase}
+.game-hud-lbl{font-size:8.5px;letter-spacing:2.4px;color:rgba(255,255,255,.4);margin-top:3px;font-family:'Space Grotesk',sans-serif;font-weight:600;text-transform:uppercase;text-align:center}
 .game-hud-pill.is-best .game-hud-lbl{color:rgba(201,169,110,.65)}
-.game-hud-pill.align-right{text-align:right}
-.game-mute{position:absolute;bottom:calc(var(--safe-bottom,24px) + 18px);left:18px;width:44px;height:44px;border-radius:50%;background:linear-gradient(180deg,rgba(14,14,22,.7),rgba(7,7,14,.55));backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.62);font-size:18px;line-height:1;cursor:pointer;z-index:3;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 6px 22px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.04);transition:transform .15s ease,opacity .15s ease;-webkit-tap-highlight-color:transparent}
+.game-mute{position:absolute;bottom:calc(var(--safe-bottom,24px) + 18px);left:18px;width:44px;height:44px;border-radius:50%;background:linear-gradient(180deg,rgba(14,14,22,.7),rgba(7,7,14,.55));backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.62);cursor:pointer;z-index:3;display:flex;align-items:center;justify-content:center;padding:0;box-shadow:0 6px 22px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.04);transition:transform .15s ease,opacity .15s ease;-webkit-tap-highlight-color:transparent}
 .game-mute:active{transform:scale(.92);opacity:.75}
+.game-mute svg{width:16px;height:16px}
+.game-mute .ic-mute-off{display:block}
+.game-mute .ic-mute-on{display:none}
+.game-mute.is-muted .ic-mute-off{display:none}
+.game-mute.is-muted .ic-mute-on{display:block}
+.game-mute.is-muted{color:rgba(255,255,255,.4)}
 .game-close{position:absolute;bottom:calc(var(--safe-bottom,24px) + 18px);right:18px;height:44px;padding:0 20px;border-radius:22px;background:linear-gradient(180deg,rgba(14,14,22,.7),rgba(7,7,14,.55));backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);border:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.62);font-size:10.5px;font-family:'DM Sans',sans-serif;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;cursor:pointer;z-index:3;display:inline-flex;align-items:center;gap:8px;box-shadow:0 6px 22px rgba(0,0,0,.42),inset 0 1px 0 rgba(255,255,255,.04);transition:transform .15s ease,opacity .15s ease;-webkit-tap-highlight-color:transparent}
 .game-close:active{transform:scale(.97);opacity:.75}
 .game-close svg{width:12px;height:12px;opacity:.7}
 .game-start{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;pointer-events:none;padding:0 36px}
 .game-start-brand{font-family:'Space Grotesk',sans-serif;font-size:10px;letter-spacing:6px;color:rgba(201,169,110,.55);margin-bottom:14px;font-weight:600;animation:gameFadeIn .6s ease .1s both}
 .game-start-brand::before,.game-start-brand::after{content:'';display:inline-block;width:24px;height:1px;background:linear-gradient(90deg,transparent,rgba(201,169,110,.4),transparent);vertical-align:middle;margin:0 12px}
-.game-start-title{font-family:'Cormorant Garamond',serif;font-size:42px;font-weight:500;letter-spacing:6px;color:#fff;text-shadow:0 0 60px rgba(201,169,110,.3);line-height:1;animation:gameTitleIn .8s cubic-bezier(.16,1.1,.3,1) .15s both;background:linear-gradient(180deg,#fff 0%,rgba(245,224,176,.88) 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;font-style:italic}
+.game-start-title{font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:700;letter-spacing:4px;color:#fff;text-shadow:0 0 60px rgba(201,169,110,.3);line-height:1;text-transform:uppercase;animation:gameTitleIn .8s cubic-bezier(.16,1.1,.3,1) .15s both;background:linear-gradient(180deg,#fff 0%,rgba(245,224,176,.88) 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}
 .game-start-sub{font-family:'Space Grotesk',sans-serif;font-size:9.5px;letter-spacing:4px;color:rgba(255,255,255,.32);margin-top:18px;font-weight:500;text-transform:uppercase;animation:gameFadeIn .6s ease .35s both}
 .game-start-btn{margin-top:32px;padding:13px 30px;border:1px solid rgba(201,169,110,.28);border-radius:30px;background:linear-gradient(180deg,rgba(20,16,10,.65),rgba(12,10,6,.45));backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);box-shadow:0 8px 32px rgba(0,0,0,.5),inset 0 1px 0 rgba(245,224,176,.06);animation:gameStartBtnIn .7s cubic-bezier(.16,1.1,.3,1) .5s both,gameStartPulse 2.4s ease-in-out 1.3s infinite}
 .game-start-btn-txt{font-family:'DM Sans',sans-serif;font-size:11px;color:rgba(245,224,176,.82);letter-spacing:3px;font-weight:600;text-transform:uppercase}
@@ -639,7 +644,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .game-over.is-open{display:flex;animation:gameFadeIn .45s ease}
 .game-over-lbl{font-family:'Space Grotesk',sans-serif;font-size:9.5px;letter-spacing:5px;color:rgba(255,255,255,.32);font-weight:600;text-transform:uppercase;animation:gameFadeIn .5s ease .1s both}
 .game-over-divider{width:54px;height:1px;background:linear-gradient(90deg,transparent,rgba(201,169,110,.55),transparent);margin:14px 0 18px;animation:gameFadeIn .5s ease .2s both}
-.game-over-final{font-family:'Cormorant Garamond',serif;font-size:78px;font-weight:500;color:#fff;line-height:1;letter-spacing:-1px;font-variant-numeric:tabular-nums;background:linear-gradient(180deg,#fff 0%,rgba(245,224,176,.88) 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:gameTitleIn .7s cubic-bezier(.16,1.1,.3,1) .25s both}
+.game-over-final{font-family:'Space Grotesk',sans-serif;font-size:72px;font-weight:700;color:#fff;line-height:1;letter-spacing:-1.5px;font-variant-numeric:tabular-nums;background:linear-gradient(180deg,#fff 0%,rgba(245,224,176,.88) 100%);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;animation:gameTitleIn .7s cubic-bezier(.16,1.1,.3,1) .25s both}
 .game-over-pts{font-family:'Space Grotesk',sans-serif;font-size:9.5px;letter-spacing:3.5px;color:rgba(255,255,255,.3);margin-top:6px;font-weight:600;text-transform:uppercase;animation:gameFadeIn .5s ease .4s both}
 .game-newbest{margin-top:14px;padding:7px 14px 7px 10px;background:linear-gradient(135deg,rgba(245,224,176,.12) 0%,rgba(201,169,110,.06) 100%);border:1px solid rgba(201,169,110,.35);border-radius:20px;display:none;align-items:center;gap:6px;animation:gameFadeIn .5s ease .55s both,gameStartPulse 2.2s ease-in-out 1.8s infinite}
 .game-newbest.is-show{display:inline-flex}
@@ -2214,13 +2219,16 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       <div class="game-hud-val" id="game-score">0</div>
       <div class="game-hud-lbl" id="game-score-lbl">SCORE</div>
     </div>
-    <div class="game-hud-pill is-best align-right">
+    <div class="game-hud-pill is-best">
       <div class="game-hud-val" id="game-best-disp">0</div>
       <div class="game-hud-lbl" id="game-best-lbl">BEST</div>
     </div>
   </div>
   <!-- Mute — bottom left -->
-  <button id="game-mute-btn" class="game-mute" onclick="_gameToggleMute()" aria-label="Mute">&#x1f50a;</button>
+  <button id="game-mute-btn" class="game-mute" onclick="_gameToggleMute()" aria-label="Mute">
+    <svg class="ic-mute-off" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5L4 6H2v4h2l3 2.5v-9z" fill="currentColor" fill-opacity=".35"/><path d="M11 5.5a3.2 3.2 0 010 5M13 3.5a5.8 5.8 0 010 9"/></svg>
+    <svg class="ic-mute-on" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.5L4 6H2v4h2l3 2.5v-9z" fill="currentColor" fill-opacity=".35"/><path d="M10.5 6.5l4 4M14.5 6.5l-4 4"/></svg>
+  </button>
   <!-- Close — bottom right -->
   <button class="game-close" onclick="closeGame()" aria-label="Close game">
     <svg viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M3 3l8 8M11 3l-8 8"/></svg>
@@ -7148,7 +7156,7 @@ function _gameStopMusic(){
 function _gameToggleMute(){
   _gameMuted=!_gameMuted;
   localStorage.setItem('ambar_game_muted',_gameMuted?'1':'0');
-  el('game-mute-btn').textContent=_gameMuted?'\u{1f507}':'\u{1f50a}';
+  el('game-mute-btn').classList.toggle('is-muted',_gameMuted);
   if(_gameMuted&&_gameAudio){_gameAudio.pause();}
   else if(!_gameMuted&&_G.state==='playing'){_gamePlayMusic();}
 }
@@ -7210,6 +7218,7 @@ function openGame(){
   el('game-close-lbl').textContent=ru?'Закрыть':'Close';
   el('game-newbest-txt').textContent=ru?'НОВЫЙ РЕКОРД':'NEW BEST';
   el('game-start-sub').textContent=ru?'нажмите, чтобы прыгнуть':'tap anywhere to jump';
+  el('game-mute-btn').classList.toggle('is-muted',_gameMuted);
   _G.state='idle';
   cancelAnimationFrame(_G.raf);
   if(_G.imgs&&_G.imgs._ready){requestAnimationFrame(_gameInit);}
@@ -7269,7 +7278,7 @@ function startGame(){
   _G.player={x:55,y:_G.gY,vy:0,w:82,h:70,jumps:0,flipAngle:0,flipping:false,flipSpeed:0};
   el('game-start-screen').style.display='none';
   el('game-over-screen').classList.remove('is-open');
-  el('game-mute-btn').textContent=_gameMuted?'\u{1f507}':'\u{1f50a}';
+  el('game-mute-btn').classList.toggle('is-muted',_gameMuted);
   _gamePlayMusic();
   _G.raf=requestAnimationFrame(_gameLoop);
 }

@@ -9,7 +9,7 @@ DEFAULT_OPERATORS = [int(x.strip()) for x in os.getenv("OPERATOR_IDS","").split(
 
 # Map office_id → list of operator Telegram IDs
 OFFICE_OPERATORS = {
-    "office_central": [686932322, 1567466073],   # Ambar — Центр
-    "office_north":   [686932322, 1567466073],   # Ambar — Север
-    "office_south":   [686932322, 1567466073],   # Ambar — Юг (same as central, change if needed)
+    "office_central": [686932322, 1567466073, 625010022],   # Ambar — Центр
+    "office_north":   [686932322, 1567466073, 625010022],   # Ambar — Север
+    "office_south":   [686932322, 1567466073, 625010022],   # Ambar — Юг (same as central, change if needed)
 }

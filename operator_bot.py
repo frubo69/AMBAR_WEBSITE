@@ -1177,6 +1177,8 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         lt = ctx.user_data.get("lt")
         await q.edit_message_text(await order_card(order), parse_mode="HTML",
                                   reply_markup=await kb_order_actions(order, list_type=lt))
+        # Push the updated items/total to the customer's live msg
+        await update_customer_card(oid)
 
     elif data.startswith("edit_"):
         oid   = data[5:]

@@ -4574,6 +4574,9 @@ function renderGrid(){
     const sc=new Map();
     list.forEach(p=>sc.set(p.id,searchScore(p,searchQ)));
     list=list.filter(p=>sc.get(p.id)>0);
+    // If any strong match exists (alias/substring ≥100), drop weak trigram-only hits
+    const hasStrong=list.some(p=>sc.get(p.id)>=100);
+    if(hasStrong)list=list.filter(p=>sc.get(p.id)>=100);
     list.sort((a,b)=>sc.get(b.id)-sc.get(a.id));
   }
   if(sortMode==='asc')list=[...list].sort((a,b)=>a.price-b.price);

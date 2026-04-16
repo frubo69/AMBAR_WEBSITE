@@ -4291,6 +4291,7 @@ function toggleFav(id){
   const btn=el('pfav-'+id);
   if(btn)btn.classList.toggle('on',favs.has(id));
   updateFavBtn();
+  if(showFavOnly)renderGrid();
 }
 function updateFavBtn(){
   const btn=el('fav-hdr-btn'),dot=el('fav-dot');
@@ -5067,7 +5068,7 @@ async function confirmClearFavs(){
   favs=new Set();
   saveFavs();
   updateFavBtn();
-  renderProducts();
+  renderGrid();
 }
 
 // ── ORDERS ────────────────────────────────────────────────────────────────────
@@ -6130,7 +6131,7 @@ function shareInvite(){
   const uid=tg?.initDataUnsafe?.user?.id||'';
   const botUsername=(tg?.initDataUnsafe?.user?.username)||'';
   const text=lang==='ru'
-    ?'Заказывай премиальный алкоголь с доставкой в ОАЭ через AMBAR 🥃'
+    ?'Заказывай экспресс-доставку алкогольных напитков в Дубае через AMBAR🥃'
     :'Order premium spirits delivered in UAE via AMBAR 🥃';
   try{
     tg.openTelegramLink(`https://t.me/share/url?url=https://t.me/AmBarDelivery_bot${uid?'?start=ref_'+uid:''}&text=${encodeURIComponent(text)}`);

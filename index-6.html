@@ -4256,18 +4256,40 @@ const ALIASES={
   'дростди хоф':['p137','p138'],'drostdy hof':['p137','p138'],
 };
 
-function matchSearch(p,q){
-  if(!q)return true;
-  // 1. Direct alias match
+function _phoneNorm(s){return s.replace(/j/g,'y').replace(/ph/g,'f').replace(/ck/g,'k').replace(/w/g,'v');}
+function _trigrams(s){
+  const t=new Set();
+  for(let i=0;i<=s.length-3;i++)t.add(s.slice(i,i+3));
+  return t;
+}
+function searchScore(p,q){
+  if(!q)return 1;
+  const raw=(p.name+' '+(p.nameE||'')+' '+(p.cat||'')+' '+(p.catE||'')+' '+(p.desc||'')+' '+(p.descE||'')).toLowerCase();
+  const hayNorm=_phoneNorm(raw);
+  const variants=translit(q);
+  let score=0;
+  // 1. Alias match — strongest signal
   for(const[alias,ids]of Object.entries(ALIASES)){
     if(q.includes(alias)||alias.includes(q)){
-      if(ids.includes(p.id))return true;
+      if(ids.includes(p.id)){score+=200;break;}
     }
   }
-  // 2. Plain text match across all fields + transliteration
-  const haystack=(p.name+' '+(p.nameE||'')+' '+(p.cat||'')+' '+(p.catE||'')+' '+(p.desc||'')+' '+(p.descE||'')).toLowerCase();
-  const variants=translit(q);
-  return variants.some(v=>v&&haystack.includes(v));
+  // 2. Direct substring match (both raw + phonetic-normalized)
+  if(variants.some(v=>v&&(raw.includes(v)||hayNorm.includes(_phoneNorm(v)))))score+=100;
+  // 3. Trigram scoring — best-of-variants, require ≥50% ratio
+  if(q.length>=3){
+    const hTri=_trigrams(hayNorm);
+    let best=0;
+    for(const v of variants){
+      if(!v||v.length<3)continue;
+      const qTri=_trigrams(_phoneNorm(v));
+      let m=0;
+      for(const t of qTri)if(hTri.has(t))m++;
+      if(m/qTri.size>=0.5&&m>best)best=m;
+    }
+    score+=best;
+  }
+  return score;
 }
 
 function onSearch(val){
@@ -4548,7 +4570,12 @@ function renderGrid(){
   let list=[...P];
   if(catFilter)list=list.filter(p=>p.cat===catFilter);
   if(showFavOnly)list=list.filter(p=>favs.has(p.id));
-  if(searchQ)list=list.filter(p=>matchSearch(p,searchQ));
+  if(searchQ){
+    const sc=new Map();
+    list.forEach(p=>sc.set(p.id,searchScore(p,searchQ)));
+    list=list.filter(p=>sc.get(p.id)>0);
+    list.sort((a,b)=>sc.get(b.id)-sc.get(a.id));
+  }
   if(sortMode==='asc')list=[...list].sort((a,b)=>a.price-b.price);
   else if(sortMode==='desc')list=[...list].sort((a,b)=>b.price-a.price);
   else if(sortMode==='name')list=[...list].sort((a,b)=>(lang==='ru'?a.name:a.nameE).localeCompare(lang==='ru'?b.name:b.nameE));
@@ -4569,7 +4596,7 @@ function renderGrid(){
   if(list.length===0){
     const isSearch=!!searchQ;
     const isFav=showFavOnly;
-    let emoji,title,sub;
+    let icon,title,sub;
     if(isFav){
       el('p-grid').innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(var(--tg-h,100vh) - 210px);overflow:hidden;text-align:center">
         <div class="ce-line"></div>
@@ -4579,16 +4606,16 @@ function renderGrid(){
       </div>`;
       initScrollSpy();return;
     } else if(isSearch){
-      emoji='🔍';
+      icon='<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>';
       title=lang==='ru'?'Ничего не найдено':'Nothing found';
       sub=lang==='ru'?'Попробуйте другой запрос':'Try a different search';
     } else {
-      emoji='📦';
+      icon='<svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>';
       title=lang==='ru'?'Нет товаров':'No products';
       sub='';
     }
     el('p-grid').innerHTML=`<div style="text-align:center;padding:60px 24px;color:var(--muted)">
-      <div style="font-size:48px;margin-bottom:16px">${emoji}</div>
+      <div style="margin-bottom:16px">${icon}</div>
       <div style="font-family:'DM Sans',sans-serif;font-size:20px;color:var(--text);margin-bottom:8px">${title}</div>
       <div style="font-size:13px">${sub}</div>
     </div>`;

@@ -573,6 +573,7 @@ img{display:block}
 .toast.err{border-left-color:var(--red)}
 /* Lift above the active-order bar when it's visible so they never overlap */
 body.aob-on .toast{bottom:calc(186px + var(--safe-bottom))}
+body.aob-on #clear-favs-wrap{bottom:calc(190px + var(--safe-bottom))}
 .toast.pdm-mode{bottom:auto;top:calc(var(--safe-top,0px) + 56px);transform:translateY(-14px)}
 .toast.pdm-mode.show{transform:translateY(0)}
 body.aob-on .toast.pdm-mode{bottom:auto}
@@ -1347,7 +1348,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     </div>
     <!-- Row 3: Heart + Sort (fixed left) + category chips (scrollable) -->
     <div style="display:flex;align-items:center;padding:0 4px 0 10px;border-bottom:1px solid rgba(255,255,255,.05)">
-      <button class="fav-btn" id="fav-hdr-btn" onclick="toggleFavFilter()" style="flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg><span class="fav-dot" id="fav-dot"></span></button>
+      <button class="fav-btn" id="fav-hdr-btn" onclick="toggleFavFilter()" style="flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
       <button class="sort-btn" id="sort-btn" onclick="cycleSort()" style="flex-shrink:0;margin-left:5px">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M8 18V6m0 0L4 10m4-4 4 4"/><path d="M16 6v12m0 0 4-4m-4 4-4-4"/></svg>
       </button>
@@ -1356,6 +1357,12 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     </div>
   </div>
   <div class="grid" id="p-grid"></div>
+  <div id="clear-favs-wrap" style="display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + var(--safe-bottom));width:calc(100% - 32px);max-width:520px;z-index:35;pointer-events:none">
+    <button onclick="confirmClearFavs()" style="pointer-events:auto;width:100%;background:rgba(8,8,16,.72);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--border2);color:var(--text);font-size:13px;font-weight:600;padding:14px;border-radius:14px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.15s;display:flex;align-items:center;justify-content:center;gap:7px;box-shadow:0 8px 24px rgba(0,0,0,.45)" onpointerdown="this.style.opacity='.6'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--sub)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg>
+      <span id="clear-favs-text">Clear favourites</span>
+    </button>
+  </div>
 </div>
 
 <!-- ═══ CART ═══ -->
@@ -2476,6 +2483,7 @@ ru:{
   nfConfirmedT:'Заказ подтверждён',nfConfirmedM:'принят! Курьер уже готовится',
   nfDeliveredT:'Заказ доставлен!',nfDeliveredM:'доставлен. Приятного!',
   nfDeclinedT:'Заказ отклонён',nfDeclinedM:'был отклонён. Свяжитесь с поддержкой',
+  nfEditedT:'Заказ изменён',nfEditedM:'обновлён оператором',
   nfSupportT:'Ответ от поддержки',
   btnGpsTitle:'Отправить геолокацию',btnGpsSub:'Авто-определение и уточнение',
   btnMapTitle:'Найти на карте',btnMapSub:'Найти на карте или ввести вручную',
@@ -2525,6 +2533,7 @@ en:{
   nfConfirmedT:'Order confirmed',nfConfirmedM:'is confirmed! Courier is preparing',
   nfDeliveredT:'Order delivered!',nfDeliveredM:'delivered. Enjoy!',
   nfDeclinedT:'Order declined',nfDeclinedM:'was declined. Please contact support',
+  nfEditedT:'Order updated',nfEditedM:'has been updated by the operator',
   nfSupportT:'Support reply',
   btnGpsTitle:'Share my location',btnGpsSub:'Auto-detect & fine-tune',
   btnMapTitle:'Search on map',btnMapSub:'Find on map or enter manually',
@@ -4395,6 +4404,7 @@ function _getNotifTexts(n){
     case'confirmed':return{title:t('nfConfirmedT'),msg:(ru?'Ваш заказ ':'Your order ')+'#'+oid+' '+t('nfConfirmedM')};
     case'delivered':return{title:t('nfDeliveredT'),msg:(ru?'Заказ ':'Order ')+'#'+oid+' '+t('nfDeliveredM')};
     case'declined':return{title:t('nfDeclinedT'),msg:(ru?'Заказ ':'Order ')+'#'+oid+' '+t('nfDeclinedM')};
+    case'edited':return{title:t('nfEditedT'),msg:(ru?'Заказ ':'Order ')+'#'+oid+' '+t('nfEditedM')};
     case'support_reply':return{title:t('nfSupportT'),msg:n.msg==='__photo__'?t('nfPhoto'):n.msg};
     default:return{title:n.title,msg:n.msg};
   }
@@ -4543,6 +4553,17 @@ function renderGrid(){
   else if(sortMode==='name')list=[...list].sort((a,b)=>(lang==='ru'?a.name:a.nameE).localeCompare(lang==='ru'?b.name:b.nameE));
   else if(sortMode==='stock')list=[...list].sort((a,b)=>(b.stock?1:0)-(a.stock?1:0));
 
+  // Fixed "Clear favourites" footer — only in fav-only view with items present.
+  const cfw=el('clear-favs-wrap');
+  const pGrid=el('p-grid');
+  if(cfw){
+    const show=showFavOnly&&list.length>0;
+    cfw.style.display=show?'':'none';
+    const lbl=el('clear-favs-text');
+    if(lbl)lbl.textContent=lang==='ru'?'Очистить избранное':'Clear favourites';
+    if(pGrid)pGrid.style.paddingBottom=show?'84px':'';
+  }
+
   // Empty state
   if(list.length===0){
     const isSearch=!!searchQ;
@@ -4553,8 +4574,7 @@ function renderGrid(){
         <div class="ce-line"></div>
         <div class="ce-brand-bg">A<i></i>MBAR</div>
         <div class="ce-line"></div>
-        <div style="margin-top:20px;font-size:14px;font-weight:500;color:var(--sub);font-family:'Space Grotesk',sans-serif;letter-spacing:-.1px">${lang==='ru'?'Oops, избранное пусто':'Oops, no favourites yet'}</div>
-        <div style="margin-top:6px;font-size:11px;font-weight:400;color:var(--muted);font-family:'DM Sans',sans-serif;letter-spacing:.4px;display:flex;align-items:center;justify-content:center;gap:4px">${lang==='ru'?'Нажмите':'Tap'} <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="flex-shrink:0;opacity:.7"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg> ${lang==='ru'?'на товаре, чтобы сохранить':'on any product to save it here'}</div>
+        <button class="ce-btn" onclick="toggleFavFilter()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg><span>${lang==='ru'?'в каталог':'to catalog'}</span></button>
       </div>`;
       initScrollSpy();return;
     } else if(isSearch){
@@ -5040,6 +5060,16 @@ function placeOrder(){
   },1400);
 }
 
+async function confirmClearFavs(){
+  const msg=lang==='ru'?'Удалить всё из избранного?':'Remove all favourites?';
+  const ok=await showConfirm(msg,{ok:lang==='ru'?'Удалить':'Delete',cancel:lang==='ru'?'Отмена':'Cancel',destructive:true});
+  if(!ok)return;
+  favs=new Set();
+  saveFavs();
+  updateFavBtn();
+  renderProducts();
+}
+
 // ── ORDERS ────────────────────────────────────────────────────────────────────
 async function confirmClearHistory(){
   const msg=lang==='ru'?'Удалить завершённые заказы?':'Remove completed orders?';
@@ -5208,8 +5238,7 @@ function renderOrders(){
       <div class="ce-line"></div>
       <div class="ce-brand-bg">A<i></i>MBAR</div>
       <div class="ce-line"></div>
-      <div style="margin-top:20px;font-size:14px;font-weight:500;color:var(--sub);font-family:'Space Grotesk',sans-serif;letter-spacing:-.1px">${lang==='ru'?'Oops, заказов пока нет':'Oops, no orders yet'}</div>
-      <div style="margin-top:6px;font-size:11px;font-weight:400;color:var(--muted);font-family:'DM Sans',sans-serif;letter-spacing:.4px">${lang==='ru'?'Ваши заказы появятся здесь':'Your orders will appear here'}</div>
+      <button class="ce-btn" onclick="go('catalog')"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg><span>${lang==='ru'?'в каталог':'to catalog'}</span></button>
     </div>`;
     return;
   }
@@ -6130,8 +6159,12 @@ function openAboutSheet(){
   ];
   el('about-content').innerHTML=`
     <div style="text-align:center;padding:6px 0 22px">
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;letter-spacing:4px;color:var(--gold)">AMBAR</div>
-      <div style="font-size:10px;letter-spacing:2.5px;color:var(--muted);text-transform:uppercase;margin-top:5px">Premium Spirits · UAE</div>
+      <div class="logo-grp" style="align-items:stretch">
+        <div class="logo-line"></div>
+        <div class="logo" style="position:relative;font-size:40px;letter-spacing:12px;margin:3px 0">A<i style="position:absolute;top:18%;left:.60em;width:1.5px;height:60%;background:linear-gradient(180deg,var(--gold),var(--gold2),var(--gold));transform:skewX(27deg);pointer-events:none;font-style:normal"></i>MBAR</div>
+        <div class="logo-line"></div>
+      </div>
+      <div style="font-size:10px;letter-spacing:2.5px;color:var(--muted);text-transform:uppercase;margin-top:10px">Premium Spirits · UAE</div>
     </div>
     <div style="border-top:1px solid rgba(255,255,255,.07)">
       ${facts.map(([title,body],i)=>`
@@ -6889,7 +6922,15 @@ function _autoResizeSupport(el){el.style.height='auto';el.style.height=Math.min(
 
 // ── Active Order Bar & Detail ──────────────────────────────────────────────
 let _aobOrders=[],_aobIdx=0,_aobPollTimer=null,_aobTickTimer=null;
-let _aobStatusCache={}; // order_id → last known status for change detection
+let _aobStatusCache={}; // order_id → {status, sig} for change detection
+
+// Compute a stable signature of an order's items+total so edits by the
+// operator (qty change, item added/removed, total shift) can be detected
+// across polls even when status stays the same.
+function _orderSig(o){
+  const items=(o.items||[]).map(i=>`${i.id||i.name||''}:${i.qty||1}`).sort().join('|');
+  return items+'|'+(o.total||0);
+}
 
 async function checkActiveOrder(){
   const uid=tg?.initDataUnsafe?.user?.id;
@@ -6907,8 +6948,11 @@ async function checkActiveOrder(){
       // Detect status changes and fire notifications
       const _ru=lang==='ru';
       d.orders.forEach(o=>{
-        const prev=_aobStatusCache[o.order_id];
+        const cached=_aobStatusCache[o.order_id]||{};
+        const prev=cached.status;
+        const prevSig=cached.sig;
         const cur=o.status;
+        const curSig=_orderSig(o);
         if(prev&&prev!==cur){
           if(cur==='confirmed'||cur==='approved'){
             addNotification('check',_ru?'Заказ подтверждён':'Order confirmed',(_ru?'Ваш заказ ':'Your order ')+'#'+o.order_id+(_ru?' принят! Курьер уже готовится':' is confirmed! Courier is preparing'),{action:'orders',dedup_key:'confirmed_'+o.order_id,notif_type:'confirmed',notif_oid:o.order_id});
@@ -6917,13 +6961,16 @@ async function checkActiveOrder(){
           } else if(cur==='declined'){
             addNotification('x',_ru?'Заказ отклонён':'Order declined',(_ru?'Заказ ':'Order ')+'#'+o.order_id+(_ru?' был отклонён. Свяжитесь с поддержкой':' was declined. Please contact support'),{action:'support',order_id:o.order_id,dedup_key:'declined_'+o.order_id,notif_type:'declined',notif_oid:o.order_id});
           }
+        } else if(prev&&prev===cur&&prevSig&&prevSig!==curSig&&(cur==='pending'||cur==='confirmed'||cur==='approved')){
+          // Operator edited an active order — items/total changed, status the same.
+          addNotification('cart',_ru?'Заказ изменён':'Order updated',(_ru?'Заказ ':'Order ')+'#'+o.order_id+' '+(_ru?'обновлён оператором':'has been updated by the operator'),{action:'orders',dedup_key:'edited_'+o.order_id+'_'+curSig,notif_type:'edited',notif_oid:o.order_id});
         }
-        _aobStatusCache[o.order_id]=cur;
+        _aobStatusCache[o.order_id]={status:cur,sig:curSig};
       });
     } else {
       // Orders disappeared from active list — check if any were confirmed before (likely delivered/declined)
       const prevConfirmed=Object.entries(_aobStatusCache)
-        .filter(([,s])=>s==='confirmed'||s==='approved'||s==='pending')
+        .filter(([,v])=>v&&(v.status==='confirmed'||v.status==='approved'||v.status==='pending'))
         .map(([id])=>id);
       if(prevConfirmed.length){
         // Pull final statuses from orders history

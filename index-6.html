@@ -4567,6 +4567,9 @@ function setCat(c,btn){
   page.scrollTop=hdr.offsetTop-stickyH;
 }
 function renderGrid(){
+  // Reset p-grid layout (fav-empty state sets flex fill; reset every render)
+  const _pg=el('p-grid');
+  if(_pg){_pg.style.flex='';_pg.style.display='';_pg.style.alignItems='';_pg.style.justifyContent='';_pg.style.minHeight='';}
   let list=[...P];
   if(catFilter)list=list.filter(p=>p.cat===catFilter);
   if(showFavOnly)list=list.filter(p=>favs.has(p.id));
@@ -4601,7 +4604,12 @@ function renderGrid(){
     const isFav=showFavOnly;
     let icon,title,sub;
     if(isFav){
-      el('p-grid').innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:calc(var(--tg-h,100vh) - 210px);overflow:hidden;text-align:center">
+      const pg=el('p-grid');
+      pg.style.flex='1';
+      pg.style.display='flex';
+      pg.style.alignItems='center';
+      pg.style.justifyContent='center';
+      pg.innerHTML=`<div style="display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;overflow:hidden;text-align:center">
         <div class="ce-line"></div>
         <div class="ce-brand-bg">A<i></i>MBAR</div>
         <div class="ce-line"></div>
@@ -5964,7 +5972,7 @@ function openQRModal(refLink){
         <div class="qr-ov-scan"></div>
       </div>
       <div class="qr-ov-explain">${ru?'Ваш <b>QR-код</b> — персональная реферальная ссылка.':'Your <b>QR code</b> is your personal referral link.'}</div>
-      <div class="qr-ov-hint">${ru?'нажмите вне окна, чтобы закрыть':'tap outside to close'}</div>
+      <div class="qr-ov-hint" id="qr-ov-hint">${ru?'нажмите на QR, чтобы скопировать ссылку':'tap QR to copy link'}</div>
     </div>`;
   const frame=ov.querySelector('#qr-ov-frame');
   const canvas=_genQR(refLink,640);
@@ -5973,6 +5981,15 @@ function openQRModal(refLink){
   ov.addEventListener('click',()=>closeQRModal());
   box.addEventListener('click',(e)=>e.stopPropagation());
   ov.querySelector('.qr-ov-close').addEventListener('click',(e)=>{e.stopPropagation();closeQRModal();});
+  frame.style.cursor='pointer';
+  frame.addEventListener('click',(e)=>{
+    e.stopPropagation();
+    try{navigator.clipboard?.writeText(refLink);}catch(_){}
+    try{haptic.success&&haptic.success();}catch(_){}
+    showToast(ru?'Ссылка скопирована':'Link copied','ok');
+    const hint=ov.querySelector('#qr-ov-hint');
+    if(hint)hint.textContent=ru?'✓ ссылка скопирована':'✓ link copied';
+  });
   document.body.appendChild(ov);
   // Force reflow then animate in
   void ov.offsetWidth;

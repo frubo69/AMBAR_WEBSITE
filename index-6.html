@@ -860,8 +860,10 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .v-src-btn:active{transform:scale(.97);background:rgba(201,169,110,.1);border-color:rgba(201,169,110,.35)}
 .v-src-btn svg{flex-shrink:0;color:var(--gold);opacity:.7}
 .confirm-btn-cancel{color:rgba(255,255,255,.7);font-weight:500;background:rgba(201,169,110,.08);border:1px solid rgba(201,169,110,.12)}
-.confirm-btn-ok{color:#fff;font-weight:600;background:linear-gradient(135deg,var(--gold),var(--gold2))}
-.confirm-btn-ok.destructive{background:linear-gradient(135deg,#c0392b,#e74c3c)}
+/* Dark text on gold matches every other primary CTA in the app (.btn-main,
+   .map-confirm-btn) and clears WCAG AA contrast — white text was ~2:1.    */
+.confirm-btn-ok{color:#07070E;font-weight:700;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.confirm-btn-ok.destructive{color:#fff;background:linear-gradient(135deg,#c0392b,#e74c3c)}
 
 /* ── Cancel sheet ── */
 .cancel-ov{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:800;display:none;align-items:flex-end;opacity:0;transition:opacity .22s;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}

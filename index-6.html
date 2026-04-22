@@ -19,13 +19,32 @@
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 :root{
+  /* ── Brand colour ─────────────────────────────────────────────────── */
   --gold:#C9A96E;--gold2:#E8C98A;--gold3:#F5E0B0;
+  /* Surface scale: bg → bg2 (modals) → bg3 (inputs) → card → card2 (raised) */
   --bg:#07070E;--bg2:#0C0C18;--bg3:#111120;
   --card:#121224;--card2:#161628;
   --border:rgba(201,169,110,.16);--border2:rgba(255,255,255,.06);
+  /* Text scale: text (primary) → sub (secondary) → muted (tertiary) */
   --text:#EDE9E0;--sub:#9896AA;--muted:#54526A;
-  --red:#E05555;--green:#4CAF7D;
+  /* Semantic state colours — single source of truth, no inline hex */
+  --red:#E05555;--green:#4CAF7D;--blue:#64a0dc;
+  /* ── Radius scale (6 steps, 4-base) ───────────────────────────────── */
+  --r-xs:6px;--r-sm:10px;--r-md:12px;--r-lg:16px;--r-xl:20px;--r-2xl:24px;--r-pill:999px;
+  /* Legacy aliases, retained so existing rules keep rendering */
   --r:16px;--r2:12px;--r3:10px;
+  /* ── Motion tokens ────────────────────────────────────────────────── */
+  --dur-fast:.15s;--dur-base:.22s;--dur-slow:.32s;
+  --ease-standard:cubic-bezier(.34,1,.64,1);
+  --ease-emphatic:cubic-bezier(.34,1.2,.64,1);
+  /* ── Press feedback (4 tiers) ─────────────────────────────────────── */
+  --press-card:.97;       /* whole cards / large surfaces */
+  --press-btn:.94;        /* primary CTAs and named buttons */
+  --press-icon:.88;       /* small icon buttons (≤32px) */
+  --press-chip:.92;       /* chips and pills */
+  /* ── Z-index scale ────────────────────────────────────────────────── */
+  --z-bnav:40;--z-aob:200;--z-notif:300;--z-modal:400;--z-toast:999;--z-game:9500;--z-confirm:9990;
+  /* ── Safe areas ───────────────────────────────────────────────────── */
   --safe-bottom:env(safe-area-inset-bottom,0px);
   --safe-top:calc(var(--tg-safe-area-inset-top,0px) + var(--tg-content-safe-area-inset-top,0px));
 }
@@ -46,7 +65,7 @@ img{display:block}
 .cart-pill:active{transform:scale(.93)}
 .cart-txt{font-size:12px;font-weight:600;color:var(--gold2);white-space:nowrap}
 .cart-dot{position:absolute;top:-5px;right:-5px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;border-radius:50%;width:18px;height:18px;font-size:9px;font-weight:700;display:none;align-items:center;justify-content:center;border:2px solid var(--bg)}
-.lang-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--border2);background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:14px;cursor:pointer;transition:.15s}
+.lang-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--border2);background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--gold2);font-family:'Space Grotesk',sans-serif;cursor:pointer;transition:.15s}
 .lang-btn:active{transform:scale(.85)}
 .notif-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--border2);background:var(--card2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;color:rgba(255,255,255,.65);position:relative;-webkit-tap-highlight-color:transparent;outline:none;flex-shrink:0}
 .notif-btn:active{transform:scale(.85)}
@@ -85,9 +104,10 @@ img{display:block}
 .fav-btn{width:32px;height:32px;border-radius:10px;border:none;outline:none;-webkit-tap-highlight-color:transparent;background:rgba(255,255,255,.08);color:rgba(255,255,255,.65)!important;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;position:relative}
 .fav-btn:active{transform:scale(.85)}
 .fav-btn svg{width:16px;height:16px;transition:.15s}
-.fav-btn.has-favs svg{fill:none;stroke:#e05555}
-.fav-dot{position:absolute;top:-4px;right:-4px;background:#e05555;color:#fff;border-radius:50%;width:16px;height:16px;font-size:8px;font-weight:700;display:none;align-items:center;justify-content:center;border:2px solid var(--bg)}
-.fav-dot.on{display:flex}
+.fav-btn.has-favs svg{fill:none;stroke:var(--red)}
+/* (header `.fav-dot` badge declaration removed — dead code, no markup used it.
+    The .fav-dot rule at line ~207 is the only definition now and powers the
+    in-stock / OOS dots in the favourites summary card.)                     */
 .pfav{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.5);border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;z-index:2}
 .pfav:active{transform:scale(.8)}
 .pfav svg{width:14px;height:14px;transition:.15s}
@@ -234,11 +254,11 @@ img{display:block}
 .pprice{font-size:16px;font-weight:700;color:var(--gold2)}
 .pprice small{font-size:9px;color:var(--muted);font-weight:400}
 .add-btn{width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none;color:#07070E;font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.13s}
-.add-btn:active{transform:scale(.75)}
+.add-btn:active{transform:scale(var(--press-icon))}
 .add-btn:disabled{background:var(--card2);color:var(--muted);cursor:not-allowed}
 .qctrl{display:flex;align-items:center;gap:5px}
 .qb{width:28px;height:28px;border-radius:8px;border:1px solid var(--border);background:var(--bg3);color:var(--gold);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.12s}
-.qb:active{transform:scale(.75)}
+.qb:active{transform:scale(var(--press-icon))}
 .qn{font-size:13px;font-weight:700;min-width:20px;text-align:center;color:var(--gold2)}
 .empty{text-align:center;padding:60px 20px;color:var(--muted)}
 .empty-icon{font-size:54px;margin-bottom:14px;opacity:.3}
@@ -377,17 +397,7 @@ img{display:block}
 .sc-edit-btn:active{background:rgba(201,169,110,.15);border-color:rgba(201,169,110,.3)}
 .sc-del-btn:active{background:rgba(224,85,85,.1);border-color:rgba(224,85,85,.25);color:var(--red)}
 
-/* Confirm modal */
-.confirm-overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:300;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .2s}
-.confirm-overlay.show{opacity:1;pointer-events:all}
-.confirm-box{background:var(--card2);border:1px solid var(--border);border-radius:var(--r);padding:24px;width:100%;max-width:320px}
-.confirm-icon{font-size:36px;text-align:center;margin-bottom:12px}
-.confirm-title{font-family:'DM Sans',sans-serif;font-size:18px;color:var(--gold2);text-align:center;margin-bottom:8px}
-.confirm-msg{font-size:13px;color:var(--sub);text-align:center;line-height:1.5;margin-bottom:20px}
-.confirm-btns{display:flex;gap:10px}
-.confirm-btns button{flex:1;padding:12px;border-radius:var(--r3);border:none;font-size:13px;font-weight:700;cursor:pointer;transition:.15s}
-.confirm-yes{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E}
-.confirm-no{background:var(--bg3);border:1px solid var(--border)!important;color:var(--sub)}
+/* (legacy .confirm-overlay removed — see .confirm-ov below for the active confirm system) */
 
 /* Orders */
 .co-body{padding:14px 16px}
@@ -561,7 +571,7 @@ img{display:block}
 .pdm-qctrl-full{display:flex;align-items:center;justify-content:center;gap:20px;height:52px;width:100%}
 .pdm-qctrl{display:flex;align-items:center;gap:8px}
 .pdm-qb{width:40px;height:40px;border-radius:11px;border:1px solid var(--border);background:var(--bg3);color:var(--gold);font-size:22px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.12s}
-.pdm-qb:active{transform:scale(.75)}
+.pdm-qb:active{transform:scale(var(--press-icon))}
 .pdm-qn{font-size:18px;font-weight:700;min-width:28px;text-align:center;color:var(--gold2)}
 .pdm-oos{height:44px;padding:0 20px;border-radius:12px;background:var(--card2);border:1px solid var(--border2);color:var(--muted);font-size:13px;font-weight:600;display:flex;align-items:center;cursor:not-allowed}
 
@@ -603,6 +613,14 @@ body.aob-on .toast-bottom.is-flipped{bottom:auto}
 @media (prefers-reduced-motion:reduce){
   .toast{transition:opacity .15s,visibility .15s!important;transform:none!important}
   .toast.show{transform:none!important}
+  /* Calm the rest of the app's motion language. We keep transitions but kill
+     long durations, slides, scale-from-tiny effects, and ambient animations.
+     Press feedback (small scale on :active) is preserved because it conveys
+     real interaction, not decoration.                                       */
+  *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
+  .modal-sheet,.pdm-sheet,.aod-sheet,.cancel-sheet,.notif-panel,.aob,.bnav-pill{transition-duration:.15s!important}
+  .notif-panel{transform:none!important}
+  .notif-panel:not(.show){opacity:0!important;pointer-events:none}
 }
 /* ── Active Order Bar ─────────────────────────────────────────────────────── */
 .aob{position:fixed;bottom:calc(92px + var(--safe-bottom));left:10px;right:10px;z-index:200;background:linear-gradient(135deg,#140d1f 0%,#0d1520 100%);border:1px solid rgba(212,175,55,.35);border-radius:16px;padding:10px 14px 12px;cursor:pointer;box-shadow:0 4px 28px rgba(0,0,0,.6),0 0 0 1px rgba(212,175,55,.08);transition:transform .35s cubic-bezier(.34,1,.64,1),opacity .3s ease}
@@ -829,8 +847,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 /* ── Custom confirm dialog ── */
 .confirm-ov{position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:9990;display:none;align-items:center;justify-content:center;opacity:0;transition:opacity .2s;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
 .confirm-ov.open{display:flex;opacity:1}
-/* Scoped to .confirm-ov so it doesn't clobber the older .confirm-overlay
-   variant (#loc-confirm), which has its own base rule up top. */
+/* Confirm dialog — the only confirm system in the app, accessed via showConfirm(). */
 .confirm-ov .confirm-box{width:min(300px,82vw);border-radius:28px;background:linear-gradient(145deg,rgba(30,28,24,.92),rgba(18,16,14,.95));-webkit-backdrop-filter:saturate(200%) blur(50px);backdrop-filter:saturate(200%) blur(50px);overflow:hidden;transform:scale(.65);opacity:0;transition:transform .35s cubic-bezier(.175,.885,.32,1.275),opacity .2s;box-shadow:0 12px 60px rgba(0,0,0,.5),0 0 0 .5px rgba(201,169,110,.12) inset}
 .confirm-ov.open .confirm-box{transform:scale(1);opacity:1}
 .confirm-body{padding:28px 24px 24px;text-align:center}
@@ -854,6 +871,10 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .cancel-sheet::before{content:'';display:block;width:36px;height:4px;border-radius:2px;background:rgba(255,255,255,.15);margin:12px auto 6px}
 .cancel-ov.open .cancel-sheet{transform:translateY(0)}
 .cancel-handle{display:none}
+/* Shared sheet header (extracted from 6 duplicate inline-styled headers in
+   support / rename / vip / dnote / budget / notifs / about sheets).        */
+.sheet-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
+.sheet-hdr-ttl{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)}
 .cancel-hero{display:flex;gap:14px;align-items:flex-start;padding:18px 2px 18px;border-bottom:1px solid var(--border2);margin-bottom:18px}
 .cancel-hero-ic{width:42px;height:42px;border-radius:12px;background:radial-gradient(circle at 30% 30%,rgba(224,85,85,.22),rgba(224,85,85,.06));border:1px solid rgba(224,85,85,.28);display:flex;align-items:center;justify-content:center;color:rgba(255,140,140,.95);flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.03)}
 .cancel-hero-txt{flex:1;min-width:0}
@@ -1339,7 +1360,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
           <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="2.8" style="flex-shrink:0"><polyline points="6 9 12 15 18 9"/></svg>
           <span id="addr-pill-label" style="display:none"></span>
         </button>
-        <button class="lang-btn" onclick="flipLang()" id="lbtn">🇷🇺</button>
+        <button class="lang-btn" aria-label="Toggle language" onclick="flipLang()" id="lbtn"><span id="lbtn-glyph" aria-hidden="true">RU</span></button>
       </div>
       <!-- Center: Logo (absolute overlay, pointer-events:none) -->
       <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none">
@@ -1351,7 +1372,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
         <button class="notif-btn" onclick="openSupportOptions()" id="hdr-support-btn" aria-label="Support" style="color:var(--gold)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1" fill="currentColor" stroke="none"/></svg>
         </button>
-        <button class="notif-btn" onclick="openNotifSheet()" id="notif-btn">
+        <button class="notif-btn" aria-label="Notifications" onclick="openNotifSheet()" id="notif-btn">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="15" height="15"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
           <span class="notif-dot" id="notif-dot" style="display:none"></span>
         </button>
@@ -1367,8 +1388,8 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     </div>
     <!-- Row 3: Heart + Sort (fixed left) + category chips (scrollable) -->
     <div style="display:flex;align-items:center;padding:0 4px 0 10px;border-bottom:1px solid rgba(255,255,255,.05)">
-      <button class="fav-btn" id="fav-hdr-btn" onclick="toggleFavFilter()" style="flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
-      <button class="sort-btn" id="sort-btn" onclick="cycleSort()" style="flex-shrink:0;margin-left:5px">
+      <button class="fav-btn" id="fav-hdr-btn" aria-label="Toggle favourites filter" onclick="toggleFavFilter()" style="flex-shrink:0"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
+      <button class="sort-btn" id="sort-btn" aria-label="Change sort order" onclick="cycleSort()" style="flex-shrink:0;margin-left:5px">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="17" height="17"><path d="M8 18V6m0 0L4 10m4-4 4 4"/><path d="M16 6v12m0 0 4-4m-4 4-4-4"/></svg>
       </button>
       <div style="width:1px;height:22px;background:rgba(255,255,255,.1);flex-shrink:0;margin:0 2px 0 7px"></div>
@@ -1387,7 +1408,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <!-- ═══ CART ═══ -->
 <div id="pg-cart" class="page hidden">
   <div class="hdr" style="position:relative">
-    <div style="flex:1"><button class="hdr-back" onclick="go('catalog')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
+    <div style="flex:1"><button class="hdr-back" aria-label="Back" onclick="go('catalog')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
     <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div class="logo-grp"><div class="logo-line"></div><div class="logo" style="position:relative">A<i style="position:absolute;top:18%;left:.60em;width:1px;height:60%;background:linear-gradient(180deg,var(--gold),var(--gold2),var(--gold));transform:skewX(27deg);pointer-events:none;font-style:normal"></i>MBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-cart">ваша корзина</div></div></div>
     <div style="flex:1"></div>
   </div>
@@ -1434,7 +1455,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <!-- ═══ ADDRESS PAGE ═══ -->
 <div id="pg-address" class="page hidden">
   <div class="hdr" style="position:relative">
-    <div style="flex:1"><button class="hdr-back" onclick="go('catalog')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
+    <div style="flex:1"><button class="hdr-back" aria-label="Back" onclick="go('catalog')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
     <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div class="logo-grp"><div class="logo-line"></div><div class="logo" style="position:relative">A<i style="position:absolute;top:18%;left:.60em;width:1px;height:60%;background:linear-gradient(180deg,var(--gold),var(--gold2),var(--gold));transform:skewX(27deg);pointer-events:none;font-style:normal"></i>MBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-addr">ваши адреса</div></div></div>
     <div style="flex:1"></div>
   </div>
@@ -1501,7 +1522,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <!-- ═══ ORDERS ═══ -->
 <div id="pg-orders" class="page hidden" style="overflow:hidden">
   <div class="hdr" style="position:relative">
-    <div style="flex:1"><button class="hdr-back" onclick="go('catalog')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
+    <div style="flex:1"><button class="hdr-back" aria-label="Back" onclick="go('catalog')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
     <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div class="logo-grp"><div class="logo-line"></div><div class="logo" style="position:relative">A<i style="position:absolute;top:18%;left:.60em;width:1px;height:60%;background:linear-gradient(180deg,var(--gold),var(--gold2),var(--gold));transform:skewX(27deg);pointer-events:none;font-style:normal"></i>MBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-ord">ваша история</div></div></div>
     <div style="flex:1"></div>
   </div>
@@ -1529,7 +1550,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <!-- ═══ PROFILE ═══ -->
 <div id="pg-profile" class="page hidden" style="overflow:hidden">
   <div class="hdr" style="position:relative">
-    <div style="flex:1"><button class="hdr-back" onclick="go('catalog')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
+    <div style="flex:1"><button class="hdr-back" aria-label="Back" onclick="go('catalog')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
     <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;pointer-events:none"><div class="logo-grp"><div class="logo-line"></div><div class="logo" style="position:relative">A<i style="position:absolute;top:18%;left:.60em;width:1px;height:60%;background:linear-gradient(180deg,var(--gold),var(--gold2),var(--gold));transform:skewX(27deg);pointer-events:none;font-style:normal"></i>MBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-prof">ваш профиль</div></div></div>
     <div style="flex:1"></div>
   </div>
@@ -1653,9 +1674,9 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <!-- SUPPORT OPTIONS SHEET -->
 <div class="cancel-ov" id="support-options-ov" onclick="if(event.target===this)closeSupportOptions()" style="z-index:900">
   <div class="cancel-sheet">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:22px">
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)" id="supp-opt-title">SUPPORT</div>
-      <button class="sheet-close-btn" onclick="closeSupportOptions()">
+    <div class="sheet-hdr" style="margin-bottom:22px">
+      <div class="sheet-hdr-ttl" id="supp-opt-title">SUPPORT</div>
+      <button class="sheet-close-btn" aria-label="Close" onclick="closeSupportOptions()">
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -1689,9 +1710,9 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <!-- RENAME SHEET -->
 <div class="cancel-ov" id="rename-ov" onclick="if(event.target===this)closeRenameSheet()" style="z-index:900">
   <div class="cancel-sheet">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)" id="rename-title">YOUR NAME</div>
-      <button class="sheet-close-btn" onclick="closeRenameSheet()">
+    <div class="sheet-hdr">
+      <div class="sheet-hdr-ttl" id="rename-title">YOUR NAME</div>
+      <button class="sheet-close-btn" aria-label="Close" onclick="closeRenameSheet()">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -1705,9 +1726,9 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <!-- VIP SHEET -->
 <div class="cancel-ov" id="vip-ov" onclick="if(event.target===this)closeVipSheet()" style="z-index:900">
   <div class="cancel-sheet">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px">
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)" id="vip-sheet-title">LOYALTY</div>
-      <button onclick="closeVipSheet()" class="sheet-close-btn">
+    <div class="sheet-hdr" style="margin-bottom:16px">
+      <div class="sheet-hdr-ttl" id="vip-sheet-title">LOYALTY</div>
+      <button onclick="closeVipSheet()" class="sheet-close-btn" aria-label="Close">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -1718,9 +1739,9 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <!-- DELIVERY NOTE SHEET -->
 <div class="cancel-ov" id="dnote-ov" onclick="if(event.target===this)closeDeliveryNoteSheet()" style="z-index:900">
   <div class="cancel-sheet">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)" id="dnote-title">DELIVERY NOTE</div>
-      <button onclick="closeDeliveryNoteSheet()" class="sheet-close-btn">
+    <div class="sheet-hdr">
+      <div class="sheet-hdr-ttl" id="dnote-title">DELIVERY NOTE</div>
+      <button onclick="closeDeliveryNoteSheet()" class="sheet-close-btn" aria-label="Close">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -1731,9 +1752,9 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <!-- BUDGET SHEET -->
 <div class="cancel-ov" id="budget-ov" onclick="if(event.target===this)closeBudgetSheet()" style="z-index:900">
   <div class="cancel-sheet">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)" id="budget-title">MONTHLY BUDGET</div>
-      <button onclick="closeBudgetSheet()" class="sheet-close-btn">
+    <div class="sheet-hdr">
+      <div class="sheet-hdr-ttl" id="budget-title">MONTHLY BUDGET</div>
+      <button onclick="closeBudgetSheet()" class="sheet-close-btn" aria-label="Close">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -1744,9 +1765,9 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <!-- NOTIFS SHEET -->
 <div class="cancel-ov" id="notifs-ov" onclick="if(event.target===this)closeNotifsSheet()" style="z-index:900">
   <div class="cancel-sheet">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)" id="notifs-title">NOTIFICATIONS</div>
-      <button onclick="closeNotifsSheet()" class="sheet-close-btn">
+    <div class="sheet-hdr">
+      <div class="sheet-hdr-ttl" id="notifs-title">NOTIFICATIONS</div>
+      <button onclick="closeNotifsSheet()" class="sheet-close-btn" aria-label="Close">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -1757,9 +1778,9 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <!-- ABOUT SHEET -->
 <div class="cancel-ov" id="about-ov" onclick="if(event.target===this)closeAboutSheet()" style="z-index:900">
   <div class="cancel-sheet">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px">
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)">ABOUT AMBAR</div>
-      <button onclick="closeAboutSheet()" class="sheet-close-btn">
+    <div class="sheet-hdr">
+      <div class="sheet-hdr-ttl">ABOUT AMBAR</div>
+      <button onclick="closeAboutSheet()" class="sheet-close-btn" aria-label="Close">
         <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -1772,7 +1793,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div class="hdr">
     <div style="flex:1;display:flex;align-items:center"><button onclick="go('cart')" style="background:none;border:1px solid var(--border2);border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--sub);transition:.15s" ontouchstart="this.style.transform='scale(.85)'" ontouchend="this.style.transform=''"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
     <div style="flex:0 0 auto"><div class="logo-grp"><div class="logo-line"></div><div class="logo" style="position:relative">A<i style="position:absolute;top:18%;left:.60em;width:1px;height:60%;background:linear-gradient(180deg,var(--gold),var(--gold2),var(--gold));transform:skewX(27deg);pointer-events:none;font-style:normal"></i>MBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-co">Оформление</div></div></div>
-    <div class="hdr-right" style="flex:1;justify-content:flex-end"><button class="lang-btn" onclick="flipLang()">🇷🇺</button></div>
+    <div class="hdr-right" style="flex:1;justify-content:flex-end"><button class="lang-btn" aria-label="Toggle language" onclick="flipLang()"><span aria-hidden="true">RU</span></button></div>
   </div>
   <div class="co-body">
     <div class="co-card">
@@ -1837,7 +1858,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
         <div class="addr-modal-sup" id="modal-sup">ДОСТАВКА</div>
         <div class="addr-modal-ttl" id="modal-title">Адрес доставки</div>
       </div>
-      <button class="addr-modal-close-btn" onclick="el('addr-modal').classList.remove('show')">
+      <button class="addr-modal-close-btn" aria-label="Close" onclick="el('addr-modal').classList.remove('show')">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="12" height="12"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
       </button>
     </div>
@@ -1850,17 +1871,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 </div>
 
 <!-- Location mismatch confirm -->
-<div class="confirm-overlay" id="loc-confirm">
-  <div class="confirm-box">
-    <div class="confirm-icon"><svg viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.8" width="28" height="28"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg></div>
-    <div class="confirm-title" id="lc-title">Вы там?</div>
-    <div class="confirm-msg" id="lc-msg">Похоже, вы находитесь далеко от выбранного адреса. Оформить заказ туда?</div>
-    <div class="confirm-btns">
-      <button class="confirm-yes" onclick="confirmLocYes()" id="lc-yes">Да, заказать</button>
-      <button class="confirm-no" onclick="confirmLocNo()" id="lc-no">Отмена</button>
-    </div>
-  </div>
-</div>
+<!-- (legacy #loc-confirm dialog removed — showLocConfirm() now uses the unified showConfirm() Promise API) -->
 
 <!-- Product Detail Modal -->
 <div class="pdm-overlay" id="pdm-overlay" onclick="closePDM(event)">
@@ -2183,9 +2194,9 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       <span class="aod-badge pending" id="aod-badge">—</span>
     </div>
     <div class="aod-prog">
-      <div class="aod-big-track">
+      <div class="aod-big-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Order progress" id="aod-big-track">
         <div class="aod-big-fill pending" id="aod-big-fill" style="width:0%"></div>
-        <div class="aod-big-moto" id="aod-big-moto" style="left:0%;display:none"><img src="pin.png" width="28" height="28" style="display:block"></div>
+        <div class="aod-big-moto" id="aod-big-moto" style="left:0%;display:none"><img src="pin.png" width="28" height="28" alt="" style="display:block"></div>
       </div>
       <div class="aod-stages">
         <div class="aod-stage" id="aod-s0">
@@ -3037,8 +3048,13 @@ function flipLang(){
   _renderNotifList();
 }
 function applyLang(){
-  const f=lang==='ru'?'🇷🇺':'🇬🇧';
-  document.querySelectorAll('.lang-btn').forEach(b=>b.textContent=f);
+  // Show the *current* language as a 2-letter glyph; aria-label on the button
+  // tells assistive tech what tapping it will do (toggle the language).
+  const glyph=lang==='ru'?'RU':'EN';
+  document.querySelectorAll('.lang-btn').forEach(b=>{
+    const span=b.querySelector('span[aria-hidden]');
+    if(span)span.textContent=glyph;else b.textContent=glyph;
+  });
   set('catalog-page-title',showFavOnly?t('favs'):t('catalog'));set('ls-cart',t('cartSub'));set('ls-addr',t('addrSub'));
   set('ls-ord',t('ordersSub'));set('ls-prof',t('profileSub'));
   alignLogoSubs();
@@ -4754,8 +4770,8 @@ function renderCard(p){
     <div class="pimg-box${!p.stock?' oos':''}">
       ${!p.stock?`<div class="oos-overlay">${t('oosLabel')}</div>`:''}
       ${p.isNew?`<span class="pbadge isnew">NEW</span>`:''}
-      <button class="pfav${favs.has(p.id)?' on':''}" id="pfav-${p.id}" onclick="event.stopPropagation();toggleFav('${p.id}')" style="z-index:3"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
-      <img class="pimg" src="${p.img}" alt="${p.name}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><text y=%2268%22 font-size=%2264%22>🍾</text></svg>'">
+      <button class="pfav${favs.has(p.id)?' on':''}" id="pfav-${p.id}" aria-label="${favs.has(p.id)?(lang==='ru'?'Убрать из избранного':'Remove from favourites'):(lang==='ru'?'Добавить в избранное':'Add to favourites')}" aria-pressed="${favs.has(p.id)?'true':'false'}" onclick="event.stopPropagation();toggleFav('${p.id}')" style="z-index:3"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
+      <img class="pimg" src="${p.img}" alt="${p.name}" loading="lazy" decoding="async" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><text y=%2268%22 font-size=%2264%22>🍾</text></svg>'">
     </div>
     <div class="pinfo">
       <div class="pcat">${catVal}</div>
@@ -5028,16 +5044,14 @@ function tryOrder(){
   }
 }
 
-function showLocConfirm(){
-  el('loc-confirm').classList.add('show');
-}
-function confirmLocYes(){
-  el('loc-confirm').classList.remove('show');
-  pendingOrderConfirmed=true;
-  proceedToCheckout();
-}
-function confirmLocNo(){
-  el('loc-confirm').classList.remove('show');
+async function showLocConfirm(){
+  const ru=lang==='ru';
+  const ok=await showConfirm(
+    ru?'Вы там?':'Are you there?',
+    {sub:ru?'Похоже, вы находитесь далеко от выбранного адреса. Оформить заказ туда?':'You seem far from the selected address. Place the order there anyway?',
+     ok:ru?'Да, заказать':'Yes, order',cancel:ru?'Отмена':'Cancel'}
+  );
+  if(ok){pendingOrderConfirmed=true;proceedToCheckout();}
 }
 
 function proceedToCheckout(){
@@ -5541,7 +5555,7 @@ function _renderProfSection(id){
       ? wishProds.map(p=>{
           const pname=lang==='ru'?p.name:p.nameE;
           return`<div class="wish-card" onclick="openPDM('${p.id}')">
-            <img class="wish-card-img" src="${p.img}" alt="${pname}" onerror="${oErr}">
+            <img class="wish-card-img" src="${p.img}" alt="${pname}" loading="lazy" decoding="async" onerror="${oErr}">
             <div class="wish-card-info">
               <div class="wish-card-name">${pname}</div>
               <div class="wish-card-price">${p.price} AED</div>
@@ -5561,7 +5575,7 @@ function _renderProfSection(id){
           const p=P.find(x=>x.id===item.id);if(!p)return'';
           const pname=lang==='ru'?p.name:p.nameE;
           return`<div class="usual-card" onclick="openPDM('${p.id}')">
-            <img class="usual-card-img" src="${p.img}" alt="${pname}" onerror="${oErr}">
+            <img class="usual-card-img" src="${p.img}" alt="${pname}" loading="lazy" decoding="async" onerror="${oErr}">
             <div class="usual-card-info">
               <div class="usual-card-name">${pname}</div>
               <div class="usual-card-sub">×${item.count} ${lang==='ru'?'заказов':'orders'}</div>
@@ -7133,10 +7147,11 @@ function _renderAodDetail(){
   el('aod-s2-lbl').textContent=ru?'В пути':'On way';
   el('aod-s3-lbl').textContent=ru?'Доставлен':'Delivered';
   // Progress bar
-  const bigFill=el('aod-big-fill'),bigMoto=el('aod-big-moto'),timeTxt=el('aod-time-txt');
+  const bigFill=el('aod-big-fill'),bigMoto=el('aod-big-moto'),timeTxt=el('aod-time-txt'),bigTrack=el('aod-big-track');
   if(status==='pending'){
     bigFill.className='aod-big-fill pending';bigFill.style.width='100%';
     bigMoto.style.display='none';
+    if(bigTrack)bigTrack.setAttribute('aria-valuenow','0');
     timeTxt.textContent=ru?'Ожидаем подтверждения оператора...':'Waiting for operator confirmation...';
   } else if(confirmed_at&&eta){
     const{pct,remaining}=_calcProgress(confirmed_at,eta);
@@ -7144,6 +7159,7 @@ function _renderAodDetail(){
     bigFill.style.transition='none';
     bigFill.className='aod-big-fill';bigFill.style.width=p+'%';
     bigMoto.style.display='block';bigMoto.style.left=p+'%';
+    if(bigTrack)bigTrack.setAttribute('aria-valuenow',String(p));
     void bigFill.offsetWidth;
     bigFill.style.transition='';
     if(remaining<=0)timeTxt.textContent=ru?'Курьер рядом — ожидайте':'Driver is nearby — hang tight';

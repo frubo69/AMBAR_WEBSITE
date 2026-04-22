@@ -565,20 +565,45 @@ img{display:block}
 .pdm-qn{font-size:18px;font-weight:700;min-width:28px;text-align:center;color:var(--gold2)}
 .pdm-oos{height:44px;padding:0 20px;border-radius:12px;background:var(--card2);border:1px solid var(--border2);color:var(--muted);font-size:13px;font-weight:600;display:flex;align-items:center;cursor:not-allowed}
 
-/* Toast — original look; behaviour-only upgrades (duplicate removal + auto-flip
-   when bottom-anchored sheets are open) live in showToast() in the JS. */
-.toast{position:fixed;bottom:calc(86px + var(--safe-bottom));left:16px;right:16px;transform:translateY(14px);background:var(--card2);border:1px solid var(--border2);border-left:3px solid var(--border2);color:var(--text);padding:13px 16px;border-radius:var(--r2);font-size:13px;font-weight:500;z-index:600;pointer-events:none;box-shadow:0 10px 36px rgba(0,0,0,.75);opacity:0;visibility:hidden;transition:opacity .2s,transform .28s cubic-bezier(.34,1,.64,1),visibility .2s,bottom .25s ease;display:flex;align-items:center;gap:10px}
-.toast.show{opacity:1;visibility:visible;transform:translateY(0)}
-.toast.ok{border-left-color:var(--green)}
-.toast.err{border-left-color:var(--red)}
-/* Lift above the active-order bar when it's visible so they never overlap */
-body.aob-on .toast{bottom:calc(186px + var(--safe-bottom))}
+/* ── Unified toast system ──────────────────────────────────────────────────
+   Shared visual language for both the bottom snackbar (.toast-bottom) and the
+   top iOS-style push notification (.toast-top). Variants .ok/.err/.info colour
+   the icon block + are announced via the SVG glyph (no color-only meaning).
+   Position-flip on bottom: when a fullscreen sheet is open, the snackbar
+   lifts to the top so it stays visible above the sheet (.is-flipped).      */
+.toast{position:fixed;z-index:999;color:var(--text);display:flex;align-items:center;gap:11px;pointer-events:none;opacity:0;visibility:hidden;background:rgba(28,28,36,.92);-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);border:1px solid rgba(255,255,255,.1);border-radius:16px;box-shadow:0 10px 36px rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.3);transition:transform .32s cubic-bezier(.34,1.2,.64,1),opacity .22s,visibility .22s,bottom .25s ease}
+.toast.show{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0)}
+/* Bottom snackbar — single-line "icon + msg" for ephemeral feedback */
+.toast-bottom{bottom:calc(86px + var(--safe-bottom));left:14px;right:14px;padding:12px 14px;font-size:13px;font-weight:500;transform:translateY(14px)}
+body.aob-on .toast-bottom{bottom:calc(186px + var(--safe-bottom))}
 body.aob-on #clear-favs-wrap{bottom:calc(190px + var(--safe-bottom))}
-.toast.pdm-mode{bottom:auto;top:calc(var(--safe-top,0px) + 56px);transform:translateY(-14px)}
-.toast.pdm-mode.show{transform:translateY(0)}
-body.aob-on .toast.pdm-mode{bottom:auto}
-.toast-icon{font-size:16px;flex-shrink:0;line-height:1}
+/* Lift to top when a fullscreen sheet covers the bottom area */
+.toast-bottom.is-flipped{bottom:auto;top:calc(var(--safe-top,0px) + 12px);transform:translateY(-14px)}
+body.aob-on .toast-bottom.is-flipped{bottom:auto}
+/* Top notification — richer "icon + title + msg", swipe-up to dismiss */
+.toast-top{top:calc(var(--safe-top,0px) + 12px);left:14px;right:14px;padding:12px 14px;cursor:pointer;-webkit-tap-highlight-color:transparent;transform:translateY(calc(-100% - 80px))}
+/* Shared icon block — colour driven by variant */
+.toast-icon{flex-shrink:0;display:flex;align-items:center;justify-content:center;color:var(--gold2)}
+.toast-icon svg{width:16px;height:16px;display:block}
+.toast.ok .toast-icon{color:var(--green)}
+.toast.err .toast-icon{color:var(--red)}
+/* Bottom snackbar uses a smaller, borderless glyph */
+.toast-bottom .toast-icon{width:22px;height:22px;border-radius:7px}
+.toast-bottom .toast-icon svg{width:14px;height:14px}
+/* Top notification gets the framed icon tile */
+.toast-top .toast-icon{width:36px;height:36px;border-radius:10px;background:rgba(201,169,110,.15);border:1px solid rgba(201,169,110,.2)}
+.toast-top.ok .toast-icon{background:rgba(76,175,125,.16);border-color:rgba(76,175,125,.3)}
+.toast-top.err .toast-icon{background:rgba(224,85,85,.14);border-color:rgba(224,85,85,.3)}
+/* Body content */
+.toast-body{flex:1;min-width:0}
+.toast-title{font-size:13px;font-weight:700;color:#fff;margin-bottom:2px}
 .toast-msg{flex:1;min-width:0}
+.toast-top .toast-msg{font-size:12px;color:rgba(255,255,255,.55);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* Honour reduced-motion: cross-fade only, no slide */
+@media (prefers-reduced-motion:reduce){
+  .toast{transition:opacity .15s,visibility .15s!important;transform:none!important}
+  .toast.show{transform:none!important}
+}
 /* ── Active Order Bar ─────────────────────────────────────────────────────── */
 .aob{position:fixed;bottom:calc(92px + var(--safe-bottom));left:10px;right:10px;z-index:200;background:linear-gradient(135deg,#140d1f 0%,#0d1520 100%);border:1px solid rgba(212,175,55,.35);border-radius:16px;padding:10px 14px 12px;cursor:pointer;box-shadow:0 4px 28px rgba(0,0,0,.6),0 0 0 1px rgba(212,175,55,.08);transition:transform .35s cubic-bezier(.34,1,.64,1),opacity .3s ease}
 .aob.aob-hidden{transform:translateY(calc(100% + 80px));opacity:0;pointer-events:none}
@@ -650,13 +675,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .aod-act.is-danger svg{opacity:.55}
 .aod-act-wrap{position:relative}
 .aod-best-pill{position:absolute;top:-7px;right:-5px;min-width:22px;height:18px;padding:0 6px;border-radius:9px;background:linear-gradient(135deg,#F5E0B0,#C9A96E);color:#1a140a;font-size:9.5px;font-weight:800;letter-spacing:.3px;font-family:'Space Grotesk',sans-serif;display:inline-flex;align-items:center;justify-content:center;box-shadow:0 3px 8px rgba(0,0,0,.45),0 0 0 2px rgba(12,10,6,.95);z-index:2;pointer-events:none}
-/* iOS-style push toast */
-.push-toast{position:fixed;top:calc(var(--safe-top,0px) + 12px);left:14px;right:14px;z-index:999;background:rgba(28,28,36,.92);backdrop-filter:blur(30px);-webkit-backdrop-filter:blur(30px);border:1px solid rgba(255,255,255,.1);border-radius:18px;padding:12px 14px;display:flex;align-items:center;gap:11px;box-shadow:0 8px 32px rgba(0,0,0,.6);transform:translateY(calc(-100% - 80px));opacity:0;transition:transform .42s cubic-bezier(.34,1.2,.64,1),opacity .3s;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.push-toast.show{transform:translateY(0);opacity:1}
-.push-toast-icon{width:36px;height:36px;border-radius:10px;background:rgba(201,169,110,.15);border:1px solid rgba(201,169,110,.2);display:flex;align-items:center;justify-content:center;flex-shrink:0}
-.push-toast-body{flex:1;min-width:0}
-.push-toast-title{font-size:13px;font-weight:700;color:#fff;margin-bottom:2px}
-.push-toast-msg{font-size:12px;color:rgba(255,255,255,.5);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* (legacy .push-toast styles replaced by unified .toast.toast-top above) */
 /* ── Delivery Run game overlay ── */
 .game-ov{position:fixed;inset:0;z-index:9500;background:#07070E;display:none}
 .game-ov.is-open{display:block}
@@ -2132,9 +2151,9 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <img id="photo-viewer-img" src="" alt="" style="max-width:100%;max-height:100%;object-fit:contain;transform-origin:center;will-change:transform;user-select:none;-webkit-user-drag:none;">
 </div>
 
-<!-- Toasts (two elements to avoid stuck animation) -->
-<div class="toast" id="toast0"></div>
-<div class="toast" id="toast1"></div>
+<!-- Toasts (two slots ping-pong to avoid stuck animation when fired in quick succession) -->
+<div class="toast toast-bottom" id="toast0"></div>
+<div class="toast toast-bottom" id="toast1"></div>
 
 <!-- ── Active Order Bar ───────────────────────────────────────────────────── -->
 <div class="aob aob-hidden" id="aob" onclick="openAod()">
@@ -2342,12 +2361,12 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   </div>
 </div>
 
-<!-- iOS-style push toast -->
-<div id="push-toast" class="push-toast" onclick="openNotifSheet()">
-  <div class="push-toast-icon" id="push-toast-icon"></div>
-  <div class="push-toast-body">
-    <div class="push-toast-title" id="push-toast-title"></div>
-    <div class="push-toast-msg" id="push-toast-msg"></div>
+<!-- Top push notification (uses the unified .toast system) -->
+<div id="push-toast" class="toast toast-top" onclick="openNotifSheet()">
+  <div class="toast-icon" id="push-toast-icon"></div>
+  <div class="toast-body">
+    <div class="toast-title" id="push-toast-title"></div>
+    <div class="toast-msg" id="push-toast-msg"></div>
   </div>
 </div>
 
@@ -7974,20 +7993,27 @@ const _TOP_WHEN_OPEN='#addr-modal.show,#addr-save-overlay.show,#map-overlay.show
 function _toastShouldFlipTop(){
   try{return !!document.querySelector(_TOP_WHEN_OPEN);}catch(e){return false;}
 }
+const _TOAST_ICONS={
+  ok:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="4 10.5 8 14.5 16 6"/></svg>',
+  err:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="5" x2="15" y2="15"/><line x1="15" y1="5" x2="5" y2="15"/></svg>',
+  info:'<svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="8"/><line x1="10" y1="9" x2="10" y2="14"/><circle cx="10" cy="6.4" r=".6" fill="currentColor"/></svg>'
+};
 function showToast(msg,type='',top=false){
   if(type==='err')haptic.error();
   clearTimeout(_tt);
   _ti=1-_ti;
   const cur=el('toast'+_ti),other=el('toast'+(1-_ti));
-  if(other)other.className='toast';
+  if(other)other.className='toast toast-bottom';
   if(!cur)return;
-  cur.className='toast';
-  const icon=type==='ok'?'✓':type==='err'?'✕':'·';
-  const iconColor=type==='ok'?'var(--green)':type==='err'?'var(--red)':'var(--gold)';
-  cur.innerHTML=`<span class="toast-icon" style="color:${iconColor}">${icon}</span><span class="toast-msg">${msg}</span>`;
+  const iconSvg=_TOAST_ICONS[type]||_TOAST_ICONS.info;
+  cur.innerHTML=`<span class="toast-icon">${iconSvg}</span><span class="toast-msg"></span>`;
+  // Use textContent to avoid HTML injection from i18n strings
+  cur.querySelector('.toast-msg').textContent=msg;
   const useTop=top||_toastShouldFlipTop();
-  const cls='toast'+(type?' '+type:'')+(useTop?' pdm-mode':'')+' show';
-  setTimeout(()=>{cur.className=cls;},16);
+  cur.className='toast toast-bottom'+(type?' '+type:'')+(useTop?' is-flipped':'');
+  // Force reflow before adding .show so the transition fires
+  void cur.offsetWidth;
+  cur.classList.add('show');
   _tt=setTimeout(()=>cur.classList.remove('show'),2800);
 }
 

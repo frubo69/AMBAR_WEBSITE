@@ -2723,17 +2723,32 @@ async function checkBanStatus(){
       if(d.card_type)localStorage.setItem('ambar_card_type',d.card_type);
       if(d.premium_index!=null)localStorage.setItem('ambar_premium_idx',String(d.premium_index));
       // Verification status
-      if(d.verified)localStorage.setItem('ambar_verified','1');
-      else localStorage.removeItem('ambar_verified');
-      if(d.verify_requested)localStorage.setItem('ambar_verify_requested','1');
-      else localStorage.removeItem('ambar_verify_requested');
-      if(d.verify_declined)localStorage.setItem('ambar_verify_declined','1');
-      else localStorage.removeItem('ambar_verify_declined');
+      if(d.verified){
+        localStorage.setItem('ambar_verified','1');
+        // User is verified — clear any stale pending flag
+        localStorage.removeItem('ambar_verify_pending');
+      } else localStorage.removeItem('ambar_verified');
+      if(d.verify_requested){
+        localStorage.setItem('ambar_verify_requested','1');
+        // Form was already submitted — pending flag no longer needed
+        localStorage.removeItem('ambar_verify_pending');
+      } else localStorage.removeItem('ambar_verify_requested');
+      if(d.verify_declined){
+        localStorage.setItem('ambar_verify_declined','1');
+        localStorage.removeItem('ambar_verify_pending');
+      } else localStorage.removeItem('ambar_verify_declined');
+      // Backend may also explicitly flag a pending verification
+      if(d.verify_pending||d.needs_verification)localStorage.setItem('ambar_verify_pending','1');
     }
   }catch(e){}
   _hideBanBlocker();
-  // Show verification wall on boot if user has pending verification
-  if(!_isVerified()&&(localStorage.getItem('ambar_verify_requested')==='1'||localStorage.getItem('ambar_verify_declined')==='1')){
+  // Show verification wall on boot if user has pending verification —
+  // including the case where the wall was shown after an order but the user
+  // closed the app before submitting (verify_pending flag).
+  if(!_isVerified()&&(
+      localStorage.getItem('ambar_verify_pending')==='1'||
+      localStorage.getItem('ambar_verify_requested')==='1'||
+      localStorage.getItem('ambar_verify_declined')==='1')){
     setTimeout(()=>showVerifyWall(),800);
   }
 }
@@ -2901,6 +2916,7 @@ async function verifySubmit(){
     });
   }catch(e){console.error('verify-request error:',e);}
   localStorage.setItem('ambar_verify_requested','1');
+  localStorage.removeItem('ambar_verify_pending');
   _hideAllVerifySteps();
   el('verify-wait').style.display='flex';
   _startVerifyPoll();
@@ -2926,6 +2942,7 @@ async function _verifySubmitGeneric(detail){
     });
   }catch(e){console.error('verify-request error:',e);}
   localStorage.setItem('ambar_verify_requested','1');
+  localStorage.removeItem('ambar_verify_pending');
   _hideAllVerifySteps();
   el('verify-wait').style.display='flex';
   _startVerifyPoll();
@@ -2944,6 +2961,7 @@ function _startVerifyPoll(){
           localStorage.setItem('ambar_verified','1');
           localStorage.removeItem('ambar_verify_requested');
           localStorage.removeItem('ambar_verify_declined');
+          localStorage.removeItem('ambar_verify_pending');
           hideVerifyWall();
           showToast(lang==='ru'?'Верификация пройдена':'Verified','ok');
         } else if(d.verify_declined&&localStorage.getItem('ambar_verify_declined')!=='1'){
@@ -5111,6 +5129,9 @@ function placeOrder(){
       if(res.needs_verification){
         localStorage.removeItem('ambar_verified');
         localStorage.removeItem('ambar_verify_requested');
+        // Persist across app restarts — wall must reappear until the user
+        // actually completes the verification flow, not just dismisses the app.
+        localStorage.setItem('ambar_verify_pending','1');
         return true; // needs verification
       }
     } else {

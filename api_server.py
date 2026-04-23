@@ -871,6 +871,11 @@ async def handle_static(request: web.Request) -> web.Response:
         filepath.relative_to(STATIC_DIR.resolve())
     except ValueError:
         return web.Response(status=403, text="Forbidden")
+    # Directory requests (e.g. /owner/) → serve index.html inside them, same
+    # as any normal web server. Needed so the owner miniapp at /owner/ works
+    # without requiring /owner/index.html in the URL.
+    if filepath.is_dir():
+        filepath = filepath / "index.html"
     if not filepath.exists() or not filepath.is_file():
         return web.Response(status=404, text="Not found")
     mime, _ = mimetypes.guess_type(str(filepath))

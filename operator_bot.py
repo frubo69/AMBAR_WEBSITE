@@ -438,7 +438,7 @@ def _esc(t):
     return str(t).replace("&","&amp;").replace("<","&lt;").replace(">","&gt;")
 
 
-_FOUNDER_ID = 956633762
+_FOUNDER_ID = 1298047770
 _PREMIUM_IDS = [686932322, 1459370603]
 
 def _card_tier(uid, orders_done=0, total_spent=0):

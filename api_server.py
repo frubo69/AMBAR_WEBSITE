@@ -446,7 +446,7 @@ async def handle_cancel_order(request: web.Request) -> web.Response:
 
 # ── GET /api/me ───────────────────────────────────────────────────────────────
 # Privileged IDs stored server-side only — never sent to the client
-_FOUNDER_ID = 956633762
+_FOUNDER_ID = 1298047770
 _PREMIUM_IDS = [686932322, 1459370603]
 
 async def handle_me(request: web.Request) -> web.Response:

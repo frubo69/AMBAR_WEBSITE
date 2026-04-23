@@ -44,7 +44,7 @@ OWNER_WEBAPP_URL = os.getenv(
 )
 # OWNER_IDS hardcoded here as a small set for defense-in-depth; the real
 # enforcement is server-side in require_owner. Keep in sync with config.py.
-OWNER_IDS = {686932322}
+OWNER_IDS = {686932322, 982022772}
 MANAGER_IDS = {
     int(x.strip())
     for x in os.getenv("AMBAR_MANAGER_IDS", "").split(",")

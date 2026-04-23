@@ -9,7 +9,7 @@ ADMIN_IDS = {686932322, 982022772}
 # Telegram IDs allowed to access the owner dashboard (/api/owner/*).
 # Keep in sync with the mini-app deployment. Separate from ADMIN_IDS — admins
 # may have support/mod powers without owning the business.
-OWNER_IDS = {686932322}
+OWNER_IDS = {686932322, 982022772}
 
 # Managers get the same /api/owner/* access as owners but are easier to
 # rotate — read from env (comma-separated TG user IDs) so adding/removing

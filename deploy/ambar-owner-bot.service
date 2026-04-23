@@ -1,0 +1,29 @@
+# Systemd unit for the AMBAR owner/manager bot (@ambar_manage_bot).
+#
+# Install on VPS:
+#   sudo cp /opt/ambar/deploy/ambar-owner-bot.service /etc/systemd/system/
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now ambar-owner-bot
+#
+# Restart together with the rest of the stack:
+#   sudo systemctl restart ambar-api ambar-bot ambar-operator ambar-support ambar-owner-bot
+
+[Unit]
+Description=AMBAR Owner/Manager Bot (launcher for the owner dashboard miniapp)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/opt/ambar
+EnvironmentFile=/opt/ambar/.env
+ExecStart=/opt/ambar/venv/bin/python /opt/ambar/owner_bot.py
+Restart=always
+RestartSec=3
+# Crash loop fuse: if the bot dies 5 times in 60s, give up so we notice.
+StartLimitIntervalSec=60
+StartLimitBurst=5
+
+[Install]
+WantedBy=multi-user.target

@@ -14,7 +14,7 @@ Design notes
 from functools import wraps
 from aiohttp import web
 
-from config import OWNER_IDS
+from config import OWNER_IDS, MANAGER_IDS
 
 CORS_HEADERS = {
     "Access-Control-Allow-Origin":  "*",
@@ -33,7 +33,10 @@ def install_validator(fn):
 
 
 def require_owner(handler):
-    """Decorator: only allow requests whose Telegram user is in OWNER_IDS."""
+    """Decorator: only allow requests whose Telegram user is in OWNER_IDS
+    or MANAGER_IDS. Managers have the same access as owners here — the
+    distinction is only meaningful if we later add owner-only mutations
+    (e.g. firing a manager). Until then both roles share one gate."""
     @wraps(handler)
     async def wrapped(request):
         # Preflight: answer OPTIONS without auth.
@@ -61,13 +64,14 @@ def require_owner(handler):
             )
 
         uid = user.get("id")
-        if uid not in OWNER_IDS:
+        if uid not in OWNER_IDS and uid not in MANAGER_IDS:
             return web.json_response(
                 {"error": "forbidden"},
                 status=403, headers=CORS_HEADERS,
             )
 
-        request["owner_id"] = uid
+        request["owner_id"]   = uid
         request["owner_user"] = user
+        request["is_owner"]   = uid in OWNER_IDS
         return await handler(request)
     return wrapped

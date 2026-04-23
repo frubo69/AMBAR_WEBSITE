@@ -23,6 +23,9 @@ load_dotenv()
 BOT_TOKEN          = os.getenv("BOT_TOKEN", "")
 OPERATOR_BOT_TOKEN = os.getenv("OPERATOR_BOT_TOKEN", "")
 SUPPORT_BOT_TOKEN  = os.getenv("SUPPORT_BOT_TOKEN", "")
+# Owner bot token — separate Telegram bot (@ambar_manage_bot) whose initData
+# signs requests to /api/owner/*. Kept in .env, never in code.
+OWNER_BOT_TOKEN    = os.getenv("AMBAR_OWNER_BOT_TOKEN", "")
 OPERATOR_IDS       = [int(x.strip()) for x in os.getenv("OPERATOR_IDS", "").split(",") if x.strip().isdigit()]
 PORT               = int(os.getenv("WEBAPP_PORT", "8080"))
 STATIC_DIR         = Path(__file__).parent
@@ -47,12 +50,18 @@ async def on_cleanup(app):
 
 
 # ── Telegram initData validation ──────────────────────────────────────────────
-def validate_init_data(init_data: str) -> dict | None:
+# initData is HMAC-SHA256 signed with the bot's token. Every Telegram bot
+# has its own token, so a miniapp launched from @ambar_bot and one launched
+# from @ambar_manage_bot produce initData signed differently — we validate
+# each against the right secret and never mix them.
+def _validate_init_data_with_token(init_data: str, token: str) -> dict | None:
+    if not token:
+        return None
     try:
         params    = dict(urllib.parse.parse_qsl(init_data, keep_blank_values=True))
         hash_val  = params.pop("hash", "")
         data_check = "\n".join(f"{k}={v}" for k, v in sorted(params.items()))
-        secret_key = hmac.new(b"WebAppData", BOT_TOKEN.encode(), hashlib.sha256).digest()
+        secret_key = hmac.new(b"WebAppData", token.encode(), hashlib.sha256).digest()
         calc_hash  = hmac.new(secret_key, data_check.encode(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(calc_hash, hash_val):
             return None
@@ -60,6 +69,17 @@ def validate_init_data(init_data: str) -> dict | None:
     except Exception as e:
         log.debug(f"initData parse error: {e}")
         return None
+
+
+def validate_init_data(init_data: str) -> dict | None:
+    """Validate initData from the customer bot (@ambar_bot)."""
+    return _validate_init_data_with_token(init_data, BOT_TOKEN)
+
+
+def validate_owner_init_data(init_data: str) -> dict | None:
+    """Validate initData from the owner bot (@ambar_manage_bot). Used by
+    /api/owner/* endpoints — a customer-bot initData will not pass here."""
+    return _validate_init_data_with_token(init_data, OWNER_BOT_TOKEN)
 
 
 # ── Telegram Bot API helpers ───────────────────────────────────────────────────
@@ -927,7 +947,12 @@ def main():
     # surface is easy to find and extend without touching customer routes.
     from owner_auth import install_validator
     from owner_routes import setup as setup_owner_routes
-    install_validator(validate_init_data)
+    # Owner miniapp runs under @ambar_manage_bot → validate initData with its
+    # token, NOT the customer BOT_TOKEN. A miniapp launched from the customer
+    # bot cannot reach /api/owner/* even if the user id is in OWNER_IDS.
+    if not OWNER_BOT_TOKEN:
+        log.warning("⚠️  AMBAR_OWNER_BOT_TOKEN not set — /api/owner/* will 401 on every request!")
+    install_validator(validate_owner_init_data)
     setup_owner_routes(app)
 
     app.router.add_get("/",          handle_static)

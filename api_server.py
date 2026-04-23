@@ -918,6 +918,13 @@ def main():
     app.router.add_post(           "/api/support/send-image",  handle_support_send_image)
     app.router.add_route("OPTIONS", "/api/support/messages",   handle_support_messages)
     app.router.add_get(            "/api/support/messages",    handle_support_messages)
+    # Owner dashboard routes (/api/owner/*). Kept in a separate module so the
+    # surface is easy to find and extend without touching customer routes.
+    from owner_auth import install_validator
+    from owner_routes import setup as setup_owner_routes
+    install_validator(validate_init_data)
+    setup_owner_routes(app)
+
     app.router.add_get("/",          handle_static)
     app.router.add_get("/{path:.+}", handle_static)
 

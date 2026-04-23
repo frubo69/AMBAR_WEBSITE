@@ -2737,8 +2737,17 @@ async function checkBanStatus(){
         localStorage.setItem('ambar_verify_declined','1');
         localStorage.removeItem('ambar_verify_pending');
       } else localStorage.removeItem('ambar_verify_declined');
-      // Backend may also explicitly flag a pending verification
-      if(d.verify_pending||d.needs_verification)localStorage.setItem('ambar_verify_pending','1');
+      // Backend is authoritative for pending verification — a user with an
+      // order still marked pending_verification must see the wall no matter
+      // what localStorage says (Telegram desktop sometimes wipes it).
+      if(d.verify_pending||d.needs_verification){
+        localStorage.setItem('ambar_verify_pending','1');
+      } else if(!d.verified&&!d.verify_requested&&!d.verify_declined){
+        // Server says no pending verification and none of the other states —
+        // clear any stale local flag so the wall doesn't re-appear for users
+        // who shouldn't see it (e.g., if admin manually cleared DB state).
+        localStorage.removeItem('ambar_verify_pending');
+      }
     }
   }catch(e){}
   _hideBanBlocker();

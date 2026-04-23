@@ -485,7 +485,20 @@ async def handle_me(request: web.Request) -> web.Response:
     verify_requested = user_doc.get("verify_requested", False) if user_doc else False
     verify_declined = user_doc.get("verify_declined", False) if user_doc else False
 
-    log.info(f"[me] uid={uid} banned={banned} card={card_type} demo={demo} verified={verified}")
+    # Server-authoritative "wall must be shown" flag: any order still marked
+    # pending_verification means the user placed an order but hasn't submitted
+    # the verification form yet. Survives across app restarts regardless of
+    # whether the client's localStorage was cleared (Telegram desktop sometimes
+    # wipes it between sessions).
+    verify_pending = False
+    if not verified and not verify_requested and not verify_declined:
+        try:
+            _user_orders = await db.get_user_orders(uid)
+            verify_pending = any(o.get("pending_verification") for o in _user_orders)
+        except Exception as e:
+            log.warning(f"verify_pending check failed for uid={uid}: {e}")
+
+    log.info(f"[me] uid={uid} banned={banned} card={card_type} demo={demo} verified={verified} pending={verify_pending}")
     return web.json_response({
         "banned": banned,
         "referral_points": ref_points,
@@ -495,6 +508,7 @@ async def handle_me(request: web.Request) -> web.Response:
         "verified": verified,
         "verify_requested": verify_requested,
         "verify_declined": verify_declined,
+        "verify_pending": verify_pending,
     }, headers=CORS_HEADERS)
 
 

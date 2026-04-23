@@ -73,15 +73,16 @@ def launcher_keyboard() -> InlineKeyboardMarkup:
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Everyone gets the launcher button. Access control happens inside
+    the miniapp itself (full-screen block overlay) and server-side in
+    require_owner — so even if someone accidentally gets pointed at this
+    bot, they can't do anything. Letting them tap the button is fine."""
     uid = update.effective_user.id
-    if not is_allowed(uid):
-        log.info(f"denied /start from uid={uid} (@{update.effective_user.username})")
-        await update.message.reply_text(
-            "⛔ Доступ ограничен.\n\n"
-            "Эта панель только для владельцев и менеджеров AMBAR."
-        )
-        return
-    log.info(f"/start from uid={uid} (@{update.effective_user.username})")
+    allowed = is_allowed(uid)
+    log.info(
+        "/start uid=%s @%s allowed=%s",
+        uid, update.effective_user.username, allowed,
+    )
     await update.message.reply_text(
         "Панель владельца AMBAR",
         reply_markup=launcher_keyboard(),
@@ -89,12 +90,10 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def on_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Any non-command message → re-send the launcher for allowed users,
-    silent ignore for everyone else. Keeps the bot discoverable but quiet."""
+    """Any non-command message → re-send the launcher. Same reasoning as
+    cmd_start: the miniapp and /api/owner/* both gate access, so the bot
+    can be uniformly welcoming."""
     if not update.effective_user:
-        return
-    uid = update.effective_user.id
-    if not is_allowed(uid):
         return
     await update.message.reply_text(
         "Панель владельца AMBAR",

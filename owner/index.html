@@ -336,9 +336,40 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 
 /* Scrollbar hide */
 ::-webkit-scrollbar{display:none}
+
+/* ===== Access-denied overlay =====
+   Shown when /api/owner/ping returns 401/403. Covers everything, has no
+   close affordance, captures all pointer events. Same pattern as the
+   customer miniapp's hard-block for banned/unknown users. */
+.deny-overlay{
+  position:fixed; inset:0; z-index:2147483647;
+  display:none; align-items:center; justify-content:center;
+  text-align:center; padding:40px 28px;
+  background:rgba(8,4,6,.96);
+  -webkit-backdrop-filter:blur(24px); backdrop-filter:blur(24px);
+  color:#fff; user-select:none; -webkit-user-select:none;
+  touch-action:none; overscroll-behavior:contain;
+}
+.deny-overlay.show{display:flex}
+.deny-card{max-width:340px; display:flex; flex-direction:column; align-items:center; gap:14px}
+.deny-emoji{font-size:56px; line-height:1; filter:drop-shadow(0 4px 18px rgba(224,85,85,.35))}
+.deny-title{font-size:26px; font-weight:800; color:var(--dn); letter-spacing:.3px; text-transform:uppercase}
+.deny-sub{font-size:14px; color:rgba(255,255,255,.62); line-height:1.5; max-width:300px}
+.deny-meta{margin-top:6px; font-size:10px; color:rgba(255,255,255,.3); font-family:ui-monospace,SFMono-Regular,Menlo,monospace; letter-spacing:.5px}
 </style>
 </head>
 <body>
+
+<!-- Hard access-denied overlay. Populated + shown by the boot ping when
+     /api/owner/ping returns 401/403. No dismiss affordance by design. -->
+<div class="deny-overlay" id="denyOverlay" aria-hidden="true" role="alertdialog" aria-labelledby="denyTitle">
+  <div class="deny-card">
+    <div class="deny-emoji">🚫</div>
+    <div class="deny-title" id="denyTitle">Иди нахуй</div>
+    <div class="deny-sub">Эта панель только для владельцев и менеджеров AMBAR. Если ты здесь по ошибке — закрой окно.</div>
+    <div class="deny-meta" id="denyMeta"></div>
+  </div>
+</div>
 
 <!-- ============ HEADER ============ -->
 <header class="hdr">
@@ -1914,23 +1945,46 @@ try{ if(window.Telegram && Telegram.WebApp){ Telegram.WebApp.ready(); Telegram.W
 
 // ===== API liveness / auth probe =====
 // Hits /api/owner/ping on load and every 30s, drives the header #liveDot pill.
-// 200 → green "Online"; 401/403 → yellow "Auth"; network/5xx → red "Offline".
+// 200 → green "Online"; 401/403 → yellow "Auth" pill AND hard-block overlay;
+// network/5xx → red "Offline" (no overlay — that's infra, not an access issue).
 (function(){
-  const dot = document.getElementById('liveDot');
+  const dot   = document.getElementById('liveDot');
+  const deny  = document.getElementById('denyOverlay');
+  const meta  = document.getElementById('denyMeta');
   if(!dot || !window.ownerApi) return;
+
   function setState(cls, label, title){
     dot.classList.remove('warn','dn');
     if(cls) dot.classList.add(cls);
     dot.textContent = label;
     if(title) dot.title = title; else dot.removeAttribute('title');
   }
+  // Once triggered, the overlay never comes down — re-ping success would
+  // otherwise let a briefly-valid session slip through if the gate flaps.
+  let denied = false;
+  function blockAccess(reason){
+    if(denied) return;
+    denied = true;
+    if(meta)  meta.textContent  = reason ? 'code: ' + reason : '';
+    if(deny){
+      deny.classList.add('show');
+      deny.setAttribute('aria-hidden','false');
+    }
+    // Prevent underlying scroll / interaction.
+    try{ document.body.style.overflow = 'hidden'; }catch(e){}
+    // Haptic "nope" feedback inside Telegram.
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('error'); }catch(e){}
+  }
+
   async function probe(){
+    if(denied) return;  // stop polling once we've locked the door
     try{
       const r = await window.ownerApi.ownerFetch('/api/owner/ping');
       setState(null, 'Online', 'owner_id=' + r.owner_id);
     }catch(e){
       if(e && (e.status === 401 || e.status === 403)){
         setState('warn', 'Auth', (e.payload && e.payload.error) || 'unauthorized');
+        blockAccess((e.payload && e.payload.error) || ('http ' + e.status));
       } else {
         setState('dn', 'Offline', (e && e.message) || 'network error');
       }

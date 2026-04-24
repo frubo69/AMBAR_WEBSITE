@@ -45,6 +45,45 @@ CORS_HEADERS = {
 # ── DB lifecycle ──────────────────────────────────────────────────────────────
 async def on_startup(app):
     await db.connect()
+    # Send Worldwide PREMIUM welcome to any newly-issued card holders.
+    # Runs once at startup (i.e. right after `git pull` + restart).
+    try:
+        await _announce_new_worldwide_cards()
+    except Exception as e:
+        log.warning(f"[worldwide] startup announce failed: {e}")
+
+
+async def _announce_new_worldwide_cards():
+    if not _WORLDWIDE_IDS:
+        return
+    for idx, uid in enumerate(_WORLDWIDE_IDS):
+        try:
+            user_doc = await db.get_user(uid)
+        except Exception:
+            user_doc = None
+        if (user_doc or {}).get("worldwide_card_announced"):
+            continue
+        card_number = f"{idx + 1:03d}"
+        welcome_text = (
+            "🎉 *Добро пожаловать в клуб PREMIUM*\n\n"
+            f"Вы стали обладателем эксклюзивной карты *PREMIUM* №{card_number} — одной из 100 по всему миру.\n\n"
+            "✨ *Ваши привилегии:*\n\n"
+            "• ⚡️ *Premium Express* — приоритетная обработка и ускоренная доставка\n"
+            "• 👑 Персональный оператор на связи\n"
+            "• 🥃 Эксклюзивные позиции и пробники редких напитков\n"
+            "• 💎 Закрытые предложения только для держателей карты\n\n"
+            "Откройте приложение, чтобы увидеть ваш PREMIUM-статус.\n\n"
+            "_Добро пожаловать._ 🥂"
+        )
+        try:
+            resp = await tg_send(BOT_TOKEN, uid, welcome_text, parse_mode="Markdown")
+            if resp and resp.get("ok"):
+                await db.set_user_field(uid, worldwide_card_announced=True)
+                log.info(f"[worldwide] welcome sent to {uid} (card #{card_number})")
+            else:
+                log.warning(f"[worldwide] welcome failed for {uid}: {resp}")
+        except Exception as e:
+            log.warning(f"[worldwide] welcome send failed for {uid}: {e}")
 
 async def on_cleanup(app):
     db.close()
@@ -522,28 +561,6 @@ async def handle_me(request: web.Request) -> web.Response:
         card_type = "standard"
         premium_index = -1
 
-    # First time we see this user holding the Worldwide PREMIUM card — send
-    # a welcome message. Idempotent: the `worldwide_card_announced` flag on
-    # the user doc blocks repeats on subsequent /api/me calls.
-    if card_type == "worldwide" and not (user_doc or {}).get("worldwide_card_announced"):
-        card_number = f"{premium_index + 1:03d}"
-        welcome_text = (
-            "🎉 *Добро пожаловать в клуб PREMIUM*\n\n"
-            f"Вы стали обладателем эксклюзивной карты *PREMIUM* №{card_number} — одной из 100 по всему миру.\n\n"
-            "✨ *Ваши привилегии:*\n\n"
-            "• ⚡️ *Premium Express* — приоритетная обработка и ускоренная доставка\n"
-            "• 👑 Персональный оператор на связи\n"
-            "• 🥃 Эксклюзивные позиции и пробники редких напитков\n"
-            "• 💎 Закрытые предложения только для держателей карты\n\n"
-            "Откройте приложение, чтобы увидеть ваш PREMIUM-статус.\n\n"
-            "_Добро пожаловать._ 🥂"
-        )
-        try:
-            await tg_send(BOT_TOKEN, uid, welcome_text, parse_mode="Markdown")
-            await db.set_user_field(uid, worldwide_card_announced=True)
-            log.info(f"[worldwide] welcome sent to {uid} (card #{card_number})")
-        except Exception as e:
-            log.warning(f"[worldwide] welcome send failed for {uid}: {e}")
 
     demo = user_doc.get("demo", False) if user_doc else False
 

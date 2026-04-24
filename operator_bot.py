@@ -234,7 +234,7 @@ def kb_main():
         ["🆕 Новые заказы (ожидают ответа)",   "🟢 Активные"],
         ["✅ Завершённые",    "📊 Статистика"],
         ["🚫 Бан / Нет верификации", "❓ Помощь"],
-        ["👤 Профиль"],
+        # ["👤 Профиль"],  # hidden — handler + helpers kept in handle_menu() below
     ], resize_keyboard=True)
 
 async def kb_order_list(items, list_type, limit=15):

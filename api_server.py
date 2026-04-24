@@ -239,7 +239,7 @@ async def handle_create_order(request: web.Request) -> web.Response:
     # Purge the live msgs from previous *finished* orders so the chat stays clean.
     # Active orders (pending/confirmed/approved) keep their cards — the customer
     # still needs visibility into in-flight work while placing a new order.
-    _TERMINAL_STATUSES = {"delivered", "cancelled", "rejected"}
+    _TERMINAL_STATUSES = {"delivered", "cancelled", "declined", "rejected"}
     try:
         prev_orders = await db.get_user_orders(uid)
         for po in prev_orders:

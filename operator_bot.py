@@ -222,7 +222,7 @@ async def order_summary_label(o):
         cid = o.get("customer_id")
         if cid:
             user_doc = await db.get_user(int(cid))
-            if user_doc and not user_doc.get("verified", False) and not user_doc.get("referred_by"):
+            if user_doc and not user_doc.get("verified", False):
                 label = "🔴 " + label + " 🔴"
     except: pass
     return label
@@ -255,7 +255,7 @@ async def kb_order_actions(order, list_type=None):
     is_unverified = False
     try:
         user_doc = await db.get_user(int(cid))
-        if user_doc and not user_doc.get("verified", False) and not user_doc.get("referred_by"):
+        if user_doc and not user_doc.get("verified", False):
             is_unverified = True
     except Exception:
         pass
@@ -372,7 +372,7 @@ async def order_card(o, full=True):
         cid = o.get("customer_id")
         if cid:
             user_doc = await db.get_user(int(cid))
-            if user_doc and not user_doc.get("verified", False) and not user_doc.get("referred_by"):
+            if user_doc and not user_doc.get("verified", False):
                 bq = ["🔴🔴🔴 <b>НОВЫЙ КЛИЕНТ!</b> 🔴🔴🔴"]
                 src = user_doc.get("verify_source", "")
                 if src:
@@ -588,7 +588,7 @@ async def _build_order_list(list_type, operator_uid):
                 cid = o.get("customer_id")
                 if cid:
                     u = await db.get_user(int(cid))
-                    if u and not u.get("verified", False) and not u.get("referred_by"):
+                    if u and not u.get("verified", False):
                         unverified_count += 1
             except: pass
         header = f"🆕 *Новых заказов: {len(items)}*"
@@ -1060,7 +1060,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             return
         # Block acceptance for unverified users
         user_doc = await db.get_user(int(cid))
-        if user_doc and not user_doc.get("verified", False) and not user_doc.get("referred_by"):
+        if user_doc and not user_doc.get("verified", False):
             await q.answer("🔴 Клиент не верифицирован! Сначала верифицируйте или отклоните.", show_alert=True)
             return
         await q.edit_message_reply_markup(reply_markup=kb_eta(oid, cid))

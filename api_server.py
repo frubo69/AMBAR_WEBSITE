@@ -286,12 +286,15 @@ async def handle_create_order(request: web.Request) -> web.Response:
         f"\n💰 <b>Итого: {total} AED</b>"
         + (f"\n\n💬 <b>Комментарий:</b> {_comment_esc}" if comment else "")
     )
-    # For first-time non-referral users, delay operator notification until
-    # verification data is submitted. Save order details for later.
-    _needs_verification = is_first_order and not referred_by
+    # For every first-order user (including referrals) delay operator
+    # notification until verification data is submitted. Referral users still
+    # need to go through the flow — the referrer info just shows up as a hint
+    # when the operator receives the combined notification.
+    _needs_verification = is_first_order
     if _needs_verification:
-        await db.update_order(oid, pending_verification=True, op_text=op_text)
-        log.info(f"[order] #{oid} held for verification — operator notification delayed")
+        await db.update_order(oid, pending_verification=True, op_text=op_text,
+                              referred_by=referred_by, referrer_username=referrer_username)
+        log.info(f"[order] #{oid} held for verification — operator notification delayed (ref={referrer_username})")
     else:
         op_buttons = [
             [
@@ -479,9 +482,10 @@ async def handle_me(request: web.Request) -> web.Response:
 
     demo = user_doc.get("demo", False) if user_doc else False
 
-    # Verification status
-    is_referral = bool(user_doc.get("referred_by")) if user_doc else False
-    verified = True if is_referral else (user_doc.get("verified", False) if user_doc else False)
+    # Verification status — referrals no longer skip the flow; they must
+    # submit the form just like any other first-time user. The referrer info
+    # is passed along to the operator as a hint when the form is submitted.
+    verified = user_doc.get("verified", False) if user_doc else False
     verify_requested = user_doc.get("verify_requested", False) if user_doc else False
     verify_declined = user_doc.get("verify_declined", False) if user_doc else False
 
@@ -557,7 +561,16 @@ async def handle_verify_request(request: web.Request) -> web.Response:
         elif source_detail:
             src_extra = f"\n💬 {source_detail}"
 
-        bq_alert = f"<blockquote>🔴🔴🔴 <b>НОВЫЙ КЛИЕНТ!</b> 🔴🔴🔴\n📋 Источник: <b>{src_line}</b>{src_extra}</blockquote>"
+        # Referral hint — if the user came in via a referral link, show the
+        # referrer's @username to the operator as an extra cross-check on top
+        # of whatever the user submitted in the verification form.
+        ref_hint = ""
+        order_ref_username = order.get("referrer_username")
+        if order.get("referred_by") and order_ref_username:
+            ref_hint = f"\n🔗 Приглашён — @{order_ref_username}"
+
+        banner_title = "<b>НОВЫЙ КЛИЕНТ — РЕФЕРАЛ</b>" if order.get("referred_by") else "<b>НОВЫЙ КЛИЕНТ!</b>"
+        bq_alert = f"<blockquote>🔴🔴🔴 {banner_title} 🔴🔴🔴{ref_hint}\n📋 Источник: <b>{src_line}</b>{src_extra}</blockquote>"
 
         if saved_op_text:
             # Strip old banners (both Markdown and HTML variants)
@@ -677,7 +690,7 @@ async def handle_support_send(request: web.Request) -> web.Response:
                 status_tags.append("🚫 Забанен")
             if user_doc.get("verify_declined"):
                 status_tags.append("❌ Верификация отклонена")
-            elif not user_doc.get("verified") and not user_doc.get("referred_by"):
+            elif not user_doc.get("verified"):
                 status_tags.append("🔴 Не верифицирован")
     except Exception:
         pass

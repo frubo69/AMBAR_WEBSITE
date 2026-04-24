@@ -7253,11 +7253,19 @@ function _renderAob(){
   } else {
     const{pct,remaining}=_calcProgress(confirmed_at,eta);
     const p=Math.min(Math.round(pct*100),95);
+    // Snap fill + moto without animation when transitioning from pending
+    // or from a previously delivered state of this or another order;
+    // otherwise let the CSS transition animate forward progress smoothly.
+    const wasPending=fill.classList.contains('pending');
+    const orderChanged=_lastMotoOid!==order_id;
+    const motoSnap=(moto.style.display==='none')||orderChanged||wasPending;
+    const fillSnap=wasPending||orderChanged;
+    if(fillSnap)fill.style.transition='none';
     fill.className='aob-fill';fill.style.width=p+'%';
-    const snap=(moto.style.display==='none')||(_lastMotoOid!==order_id);
-    if(snap)moto.style.transition='none';
+    if(fillSnap){void fill.offsetWidth;fill.style.transition='';}
+    if(motoSnap)moto.style.transition='none';
     moto.style.display='block';moto.style.left=p+'%';
-    if(snap){void moto.offsetWidth;moto.style.transition='';}
+    if(motoSnap){void moto.offsetWidth;moto.style.transition='';}
     _lastMotoOid=order_id;
     if(remaining<=0){title.textContent=ru?'Курьер рядом!':'Driver nearby!';time.textContent='';}
     else if(remaining<=3){title.textContent=ru?'Курьер рядом!':'Almost at your door!';time.textContent='';}

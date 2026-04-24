@@ -84,6 +84,21 @@ def validate_owner_init_data(init_data: str) -> dict | None:
 
 
 # ── Telegram Bot API helpers ───────────────────────────────────────────────────
+_op_bot_username = None
+async def _resolve_op_bot_username():
+    """Fetch and cache @username of OPERATOR_BOT for t.me/<bot>?start=... deep links."""
+    global _op_bot_username
+    if _op_bot_username or not OPERATOR_BOT_TOKEN:
+        return _op_bot_username
+    try:
+        async with _aiohttp.ClientSession() as session:
+            async with session.get(f"https://api.telegram.org/bot{OPERATOR_BOT_TOKEN}/getMe") as resp:
+                d = await resp.json()
+                _op_bot_username = d.get("result", {}).get("username")
+    except Exception as e:
+        log.warning(f"getMe(OPERATOR_BOT) failed: {e}")
+    return _op_bot_username
+
 async def tg_send(token, chat_id, text, parse_mode="Markdown", reply_markup=None, reply_to_message_id=None):
     url     = f"https://api.telegram.org/bot{token}/sendMessage"
     payload = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
@@ -728,6 +743,16 @@ async def handle_support_send(request: web.Request) -> web.Response:
         f"💬 {text}"
     )
     token = SUPPORT_BOT_TOKEN or BOT_TOKEN
+    # If the support message references an order, add a URL button that
+    # deep-links the operator bot straight into that order's card.
+    op_kb = None
+    if order_id and order_id != "general":
+        op_bot_name = await _resolve_op_bot_username()
+        if op_bot_name:
+            op_kb = {"inline_keyboard": [[{
+                "text": f"👁 Открыть заказ #{order_id}",
+                "url": f"https://t.me/{op_bot_name}?start=order_{order_id}",
+            }]]}
     for op_id in OPERATOR_IDS:
         try:
             # Look up fwd_msg_id of the message being replied to (for native Telegram reply)
@@ -735,7 +760,7 @@ async def handle_support_send(request: web.Request) -> web.Response:
             if reply_to_ts:
                 reply_msg_id = await db.get_support_fwd_id(conv_key, reply_to_ts, op_id)
 
-            result = await tg_send(token, op_id, header, reply_to_message_id=reply_msg_id)
+            result = await tg_send(token, op_id, header, reply_markup=op_kb, reply_to_message_id=reply_msg_id)
             fwd_id = result.get("result", {}).get("message_id")
             if fwd_id:
                 await db.save_support_map_entry(str(fwd_id), {

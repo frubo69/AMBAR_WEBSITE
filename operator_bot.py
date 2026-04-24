@@ -937,6 +937,17 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if not is_operator(update.effective_user.id):
         await update.effective_message.reply_text("⛔ Нет доступа."); return
+    # Deep link: /start order_<oid> — jump straight to an order card
+    if ctx.args and ctx.args[0].startswith("order_"):
+        oid = ctx.args[0][6:]
+        order = await db.get_order(oid)
+        if order:
+            await update.effective_message.reply_text(
+                await order_card(order), parse_mode="HTML",
+                reply_markup=await kb_order_actions(order))
+        else:
+            await update.effective_message.reply_text(f"❌ Заказ #{oid} не найден.")
+        return
     await update.effective_message.reply_text(
         "🛠 *AMBAR — Панель оператора*\n\nВыберите действие:",
         parse_mode="Markdown", reply_markup=kb_main())

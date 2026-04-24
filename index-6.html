@@ -5240,7 +5240,7 @@ function placeOrder(){
 
   // Send order via API (works from both menu button and reply keyboard)
   const body={...payload, initData: tg?.initData||''};
-  const _orderPromise=fetch(`${AMBAR_API}/api/order`,{
+  fetch(`${AMBAR_API}/api/order`,{
     method:'POST',
     headers:{'Content-Type':'application/json'},
     body:JSON.stringify(body)
@@ -5253,13 +5253,14 @@ function placeOrder(){
         // Persist across app restarts — wall must reappear until the user
         // actually completes the verification flow, not just dismisses the app.
         localStorage.setItem('ambar_verify_pending','1');
-        return true; // needs verification
+        // Show the wall immediately when the server confirms first-order
+        // verification is needed — no artificial delay, no polling.
+        showVerifyWall();
       }
     } else {
       console.error('Order API error:', res.error);
     }
-    return false;
-  }).catch(err=>{console.error('Order fetch error:', err);return false;});
+  }).catch(err=>{console.error('Order fetch error:', err);});
 
   const _placedIds=Object.keys(cart);
   cart={};beerPcs={};tip=0;el('phone-err').classList.remove('on');el('phone-in').classList.remove('err');
@@ -5268,11 +5269,8 @@ function placeOrder(){
   // No bottom toast here — addNotification() fires the rich top push-toast
   const _ru=lang==='ru';
   addNotification('cart',_ru?'Заказ оформлен':'Order placed',(_ru?'Заказ ':'Order ')+'#'+oid+(_ru?' принят и ожидает подтверждения':' received, awaiting confirmation'),{action:'orders',dedup_key:'placed_'+oid,notif_type:'placed',notif_oid:oid});
-  setTimeout(async()=>{
+  setTimeout(()=>{
     go('catalog');checkActiveOrder();
-    // Wait for order API response, then show verification wall if needed
-    const needsVerify=await _orderPromise;
-    if(needsVerify){showVerifyWall();}
   },1400);
 }
 

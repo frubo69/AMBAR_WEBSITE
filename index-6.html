@@ -3717,10 +3717,10 @@ function _parseNominatimReverse(d){
     line1,line2,line3,full:(road+(num?' '+num:'')).trim(),displayName:dn};
 }
 function _reverseGeo(lat,lon,cb){
-  // Photon only supports default/de/en/fr — omit lang for Russian (returns local names)
-  const photonLang=lang==='en'?'&lang=en':'';
-  const photonUrl=`https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}${photonLang}`;
-  const nominatimUrl=`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&namedetails=1&extratags=1&zoom=19&email=${encodeURIComponent(GEOCODE_EMAIL)}&accept-language=${lang==='ru'?'ru,en':'en,ru'}`;
+  // Always request English names — Photon only supports default/de/en/fr,
+  // and default returns local language (Arabic in UAE) which is unusable.
+  const photonUrl=`https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}&lang=en`;
+  const nominatimUrl=`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&namedetails=1&extratags=1&zoom=19&email=${encodeURIComponent(GEOCODE_EMAIL)}&accept-language=${lang==='ru'?'en,ru':'en'}`;
   const empty={street:'',building:'',bldgName:'',area:'',city:'',community:'',
     line1:'',line2:'',line3:'',full:'',displayName:''};
   _fetchJSON(photonUrl,6000)
@@ -4221,9 +4221,11 @@ function _runMapSearch(q){
   const cLat=locInfo?.lat||DUBAI_CENTER[0],cLon=locInfo?.lon||DUBAI_CENTER[1];
   const d=0.5;
   const vb=`${cLon-d},${cLat+d},${cLon+d},${cLat-d}`;
-  const photonLang=lang==='en'?'&lang=en':'';
-  const photonUrl=`https://photon.komoot.io/api?q=${encodeURIComponent(q)}&limit=8${photonLang}&lat=${cLat}&lon=${cLon}&location_bias_scale=0.3`;
-  const nominatimUrl=`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=8&addressdetails=1&viewbox=${vb}&bounded=0&accept-language=${lang==='ru'?'ru,en':'en,ru'}&email=${encodeURIComponent(GEOCODE_EMAIL)}`;
+  // Always request English names (Photon only supports default/de/en/fr);
+  // location_bias_scale=1 (max) pulls results near the user to the top so
+  // "Burj Khalifa" resolves to Dubai's landmark, not some distant duplicate.
+  const photonUrl=`https://photon.komoot.io/api?q=${encodeURIComponent(q)}&limit=10&lang=en&lat=${cLat}&lon=${cLon}&location_bias_scale=1`;
+  const nominatimUrl=`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=10&addressdetails=1&viewbox=${vb}&bounded=0&accept-language=${lang==='ru'?'en,ru':'en'}&email=${encodeURIComponent(GEOCODE_EMAIL)}`;
   const pinSvg=`<div class="map-search-ri-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></div>`;
   const renderPhoton=items=>items.map(f=>{
     const p=f.properties||{};

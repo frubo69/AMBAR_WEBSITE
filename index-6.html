@@ -3658,34 +3658,64 @@ function switchMapLayer(style){
   haptic.light();
 }
 
+// Photon (photon.komoot.io) is primary — lenient limits. Nominatim is fallback
+// with email= identifier per their usage policy. Timeout prevents slow-hang.
+const GEOCODE_EMAIL='support@ambar-delivery.com';
+function _fetchJSON(url,timeoutMs){
+  const ctrl=('AbortController' in window)?new AbortController():null;
+  const tid=ctrl?setTimeout(()=>ctrl.abort(),timeoutMs||6000):null;
+  return fetch(url,ctrl?{signal:ctrl.signal}:{}).then(r=>{
+    if(tid)clearTimeout(tid);
+    if(!r.ok)throw new Error('HTTP '+r.status);
+    return r.json();
+  },e=>{if(tid)clearTimeout(tid);throw e;});
+}
+function _parsePhotonReverse(d){
+  const f=d&&d.features&&d.features[0];if(!f)return null;
+  const p=f.properties||{};
+  const key=p.osm_key||'';
+  const isPOI=['amenity','shop','tourism','leisure','building','office','craft','historic'].includes(key);
+  const road=p.street||(key==='highway'?p.name:'')||'';
+  const num=p.housenumber||'';
+  const bldg=isPOI&&p.name?p.name:'';
+  const community=p.district||'';
+  const suburb=p.suburb||p.neighbourhood||p.district||'';
+  const city=p.city||p.town||p.village||p.county||'';
+  const line1=bldg||(road+(num?' '+num:'')).trim()||p.name||'';
+  const line2=(bldg&&road?(road+(num?' '+num:'')).trim():'')||community||'';
+  const line3=[suburb,city].filter(s=>s&&s!==line2&&s!==line1).join(', ')||city;
+  const displayName=[bldg,(road+(num?' '+num:'')).trim(),suburb,city].filter(Boolean).join(', ');
+  return{street:road,building:num,bldgName:bldg,area:suburb,city,community,
+    line1,line2,line3,full:(road+(num?' '+num:'')).trim(),displayName};
+}
+function _parseNominatimReverse(d){
+  const a=d.address||{};
+  const dn=d.display_name||'';
+  const parts=dn.split(',').map(p=>p.trim()).filter(Boolean);
+  const road=a.road||a.pedestrian||a.hamlet||'';
+  const num=a.house_number||'';
+  const bldg=a.building||a.amenity||a.shop||a.tourism||a.office||a.leisure||'';
+  const community=a.residential||a.commercial||a.industrial||'';
+  const suburb=a.suburb||a.city_district||a.neighbourhood||a.quarter||'';
+  const city=a.city||a.town||'';
+  const line1=bldg||(road+(num?' '+num:'')).trim()||parts[0]||'';
+  const line2=(bldg&&road?(road+(num?' '+num:'')).trim():'') || community || (parts.length>2&&parts[1]!==line1?parts[1]:'')||'';
+  const line3=[suburb,city].filter(Boolean).join(', ')||(parts.length>3?parts.slice(2,4).join(', '):'');
+  return{street:road,building:num,bldgName:bldg,area:suburb,city,community,
+    line1,line2,line3,full:(road+(num?' '+num:'')).trim(),displayName:dn};
+}
 function _reverseGeo(lat,lon,cb){
-  fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&namedetails=1&extratags=1&zoom=19`)
-    .then(r=>r.json())
-    .then(d=>{
-      const a=d.address||{};
-      const dn=d.display_name||'';
-      const parts=dn.split(',').map(p=>p.trim()).filter(Boolean);
-
-      // Extract individual fields
-      const road=a.road||a.pedestrian||a.hamlet||'';
-      const num=a.house_number||'';
-      const bldg=a.building||a.amenity||a.shop||a.tourism||a.office||a.leisure||'';
-      const community=a.residential||a.commercial||a.industrial||'';
-      const suburb=a.suburb||a.city_district||a.neighbourhood||a.quarter||'';
-      const city=a.city||a.town||'';
-
-      // Line 1 — most specific: building name > street+num > first display_name part
-      const line1=bldg||(road+(num?' '+num:'')).trim()||parts[0]||'';
-      // Line 2 — if bldg found show street+num, else community, else display_name part
-      const line2=(bldg&&road?(road+(num?' '+num:'')).trim():'') || community || (parts.length>2&&parts[1]!==line1?parts[1]:'')||'';
-      // Line 3 — district + city
-      const line3=[suburb,city].filter(Boolean).join(', ')||(parts.length>3?parts.slice(2,4).join(', '):'');
-
-      cb({street:road,building:num,bldgName:bldg,area:suburb,city,community,
-          line1,line2,line3,full:(road+(num?' '+num:'')).trim(),displayName:dn});
-    })
-    .catch(()=>cb({street:'',building:'',bldgName:'',area:'',city:'',community:'',
-        line1:'',line2:'',line3:'',full:'',displayName:''}));
+  // Photon only supports default/de/en/fr — omit lang for Russian (returns local names)
+  const photonLang=lang==='en'?'&lang=en':'';
+  const photonUrl=`https://photon.komoot.io/reverse?lat=${lat}&lon=${lon}${photonLang}`;
+  const nominatimUrl=`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lon}&format=json&addressdetails=1&namedetails=1&extratags=1&zoom=19&email=${encodeURIComponent(GEOCODE_EMAIL)}&accept-language=${lang==='ru'?'ru,en':'en,ru'}`;
+  const empty={street:'',building:'',bldgName:'',area:'',city:'',community:'',
+    line1:'',line2:'',line3:'',full:'',displayName:''};
+  _fetchJSON(photonUrl,6000)
+    .then(d=>{const r=_parsePhotonReverse(d);if(!r)throw new Error('photon-empty');cb(r);})
+    .catch(()=>_fetchJSON(nominatimUrl,6000)
+      .then(d=>cb(_parseNominatimReverse(d)))
+      .catch(()=>cb(empty)));
 }
 
 function openMapPicker(source,lat,lon){
@@ -3896,8 +3926,12 @@ function startGPSAdd(){
     if(btn){btn.classList.remove('loading','err');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=t('btnGpsSub');}
     haptic.success();
     showToast(lang==='ru'?'Геолокация получена':'Location detected','ok',true);
-    _reverseGeo(lat,lon,info=>{if(locInfo&&locInfo.isGps)locInfo.street=info.full||info.line1||'';});
     showAddrSaveSheet();
+    _reverseGeo(lat,lon,info=>{
+      if(!locInfo||!locInfo.isGps)return;
+      locInfo.street=info.line1||info.full||'';
+      _updateAddrPreview();
+    });
   },()=>{
     haptic.error();
     showToast(lang==='ru'?'⚠️ Не удалось получить геолокацию':'⚠️ Could not get location','err',true);
@@ -3928,9 +3962,14 @@ function startMapSearch(){
 let _savedSheetLabel='',_savedSheetComment='',_sheetFromMapEdit=false;
 
 function showAddrSaveSheet(){
-  const geo=_mapGeoResult||{};
-  const preview=locInfo?.isGps?'GPS':(locInfo?.street||geo.line1||(locInfo?.lat?`${locInfo.lat.toFixed(5)}, ${locInfo.lon.toFixed(5)}`:''));
-  const previewEl=el('addr-save-preview');if(previewEl)previewEl.textContent=preview||'—';
+  const previewEl=el('addr-save-preview');
+  if(previewEl){
+    if(locInfo?.isGps&&!locInfo.street){
+      previewEl.textContent=lang==='ru'?'Определяем адрес...':'Detecting address...';
+    } else {
+      _updateAddrPreview();
+    }
+  }
   // Show/hide map edit button (non-GPS) or GPS expand button
   const editMapBtn=el('addr-save-edit-map-btn');
   if(editMapBtn)editMapBtn.style.display=(!locInfo?.isGps&&locInfo?.lat)?'flex':'none';
@@ -3981,7 +4020,20 @@ function closeAddrSaveSheet(){
 }
 
 // ── GPS MINI-MAP PANEL ────────────────────────────────────────────────────────
-let _miniMap=null,_miniEditing=false,_miniMapOpen=false;
+let _miniMap=null,_miniEditing=false,_miniMapOpen=false,_miniGeoTimer=null;
+
+function _updateAddrPreview(){
+  const previewEl=el('addr-save-preview');if(!previewEl)return;
+  const geo=_mapGeoResult||{};
+  const street=locInfo?.street||geo.line1||'';
+  if(street){
+    previewEl.textContent=street;
+  } else if(locInfo?.lat){
+    previewEl.textContent=`${locInfo.lat.toFixed(5)}, ${locInfo.lon.toFixed(5)}`;
+  } else {
+    previewEl.textContent='—';
+  }
+}
 
 function toggleGpsMiniPanel(){
   _miniMapOpen?closeGpsMiniPanel():openGpsMiniPanel();
@@ -4007,6 +4059,21 @@ function openGpsMiniPanel(){
         const tp=document.querySelector('#gps-mini-map-el .leaflet-tile-pane');
         if(tp)tp.style.filter='invert(1) hue-rotate(180deg) brightness(.9) contrast(.85) saturate(.65)';
       },200);
+      _miniMap.on('moveend',()=>{
+        if(!_miniEditing||!locInfo)return;
+        const c=_miniMap.getCenter();
+        locInfo.lat=c.lat;locInfo.lon=c.lng;
+        const previewEl=el('addr-save-preview');
+        if(previewEl)previewEl.textContent=lang==='ru'?'Определяем адрес...':'Detecting address...';
+        clearTimeout(_miniGeoTimer);
+        _miniGeoTimer=setTimeout(()=>{
+          _reverseGeo(c.lat,c.lng,info=>{
+            if(!locInfo)return;
+            locInfo.street=info.line1||info.full||'';
+            _updateAddrPreview();
+          });
+        },350);
+      });
     }
     _miniMap.setView([locInfo.lat,locInfo.lon],17);
     _miniMap.invalidateSize();
@@ -4068,6 +4135,7 @@ function confirmGpsMiniEdit(){
   el('gps-locate-pill')?.classList.remove('visible');
   haptic.success();
   showToast(lang==='ru'?'Координаты обновлены':'Location updated','ok',true);
+  _updateAddrPreview();
 }
 
 function _gpsMiniLocateMe(){
@@ -4138,41 +4206,71 @@ function _onMapSearchInput(q){
 function _runMapSearch(q){
   const res=el('map-search-results');if(!res)return;
   res.innerHTML=`<div class="map-search-hint">${lang==='ru'?'Поиск...':'Searching...'}</div>`;
-  // Build URL with location bias viewbox around user's current location
   const cLat=locInfo?.lat||DUBAI_CENTER[0],cLon=locInfo?.lon||DUBAI_CENTER[1];
-  const d=0.5; // ~55km box
+  const d=0.5;
   const vb=`${cLon-d},${cLat+d},${cLon+d},${cLat-d}`;
-  const url=`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=8&addressdetails=1&viewbox=${vb}&bounded=0&accept-language=${lang==='ru'?'ru,en':'en,ru'}`;
-  fetch(url)
-    .then(r=>r.json())
-    .then(data=>{
-      if(!data.length){res.innerHTML=`<div class="map-search-hint">${lang==='ru'?'Ничего не найдено':'No results found'}</div>`;return;}
-      res.innerHTML=data.map(item=>{
-        const a=item.address||{};
-        // Build readable name: prefer name of POI, then road+number
-        const poiName=item.name||'';
-        const road=a.road||a.pedestrian||a.footway||a.suburb||a.neighbourhood||'';
-        const num=a.house_number||'';
-        const streetFull=road+(num?' '+num:'');
-        const main=poiName||(streetFull||item.display_name.split(',')[0]);
-        // Sub: type + city/district
-        const typeStr=item.type&&item.type!=='yes'?item.type.replace(/_/g,' '):null;
-        const city=a.city||a.town||a.village||a.county||a.state||'';
-        const subParts=[typeStr&&poiName?streetFull||null:null,city].filter(Boolean);
-        const sub=typeStr&&poiName?[typeStr,streetFull,city].filter(Boolean).join(' · '):city;
-        const safeLat=parseFloat(item.lat).toFixed(6),safeLon=parseFloat(item.lon).toFixed(6);
-        const streetForSave=(poiName?(streetFull||poiName):streetFull)||main;
-        const safeName=streetForSave.replace(/'/g,'&apos;').replace(/"/g,'&quot;');
-        return `<div class="map-search-result-item" onclick="selectMapSearchResult(${safeLat},${safeLon},'${safeName}')">
-          <div class="map-search-ri-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></div>
-          <div>
-            <div class="map-search-ri-main">${main}</div>
-            ${sub?`<div class="map-search-ri-sub">${sub}</div>`:''}
-          </div>
-        </div>`;
-      }).join('');
+  const photonLang=lang==='en'?'&lang=en':'';
+  const photonUrl=`https://photon.komoot.io/api?q=${encodeURIComponent(q)}&limit=8${photonLang}&lat=${cLat}&lon=${cLon}&location_bias_scale=0.3`;
+  const nominatimUrl=`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&limit=8&addressdetails=1&viewbox=${vb}&bounded=0&accept-language=${lang==='ru'?'ru,en':'en,ru'}&email=${encodeURIComponent(GEOCODE_EMAIL)}`;
+  const pinSvg=`<div class="map-search-ri-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" width="18" height="18"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7z"/><circle cx="12" cy="9" r="2.5"/></svg></div>`;
+  const renderPhoton=items=>items.map(f=>{
+    const p=f.properties||{};
+    const g=f.geometry&&f.geometry.coordinates||[0,0];
+    const lon=g[0],lat=g[1];
+    const key=p.osm_key||'';
+    const isPOI=['amenity','shop','tourism','leisure','building','office','craft','historic','railway','aeroway'].includes(key);
+    const poiName=isPOI&&p.name?p.name:'';
+    const road=p.street||(key==='highway'?p.name:'')||'';
+    const num=p.housenumber||'';
+    const streetFull=(road+(num?' '+num:'')).trim();
+    const main=poiName||streetFull||p.name||'—';
+    const typeStr=p.osm_value&&p.osm_value!=='yes'?String(p.osm_value).replace(/_/g,' '):null;
+    const city=p.city||p.town||p.village||p.county||p.state||'';
+    const sub=typeStr&&poiName?[typeStr,streetFull,city].filter(Boolean).join(' · '):[streetFull&&poiName?streetFull:'',city].filter(Boolean).join(' · ');
+    const safeLat=parseFloat(lat).toFixed(6),safeLon=parseFloat(lon).toFixed(6);
+    const streetForSave=(poiName?(streetFull||poiName):streetFull)||main;
+    const safeName=streetForSave.replace(/'/g,'&apos;').replace(/"/g,'&quot;');
+    return `<div class="map-search-result-item" onclick="selectMapSearchResult(${safeLat},${safeLon},'${safeName}')">
+      ${pinSvg}
+      <div>
+        <div class="map-search-ri-main">${main}</div>
+        ${sub?`<div class="map-search-ri-sub">${sub}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  const renderNominatim=data=>data.map(item=>{
+    const a=item.address||{};
+    const poiName=item.name||'';
+    const road=a.road||a.pedestrian||a.footway||a.suburb||a.neighbourhood||'';
+    const num=a.house_number||'';
+    const streetFull=road+(num?' '+num:'');
+    const main=poiName||(streetFull||item.display_name.split(',')[0]);
+    const typeStr=item.type&&item.type!=='yes'?item.type.replace(/_/g,' '):null;
+    const city=a.city||a.town||a.village||a.county||a.state||'';
+    const sub=typeStr&&poiName?[typeStr,streetFull,city].filter(Boolean).join(' · '):city;
+    const safeLat=parseFloat(item.lat).toFixed(6),safeLon=parseFloat(item.lon).toFixed(6);
+    const streetForSave=(poiName?(streetFull||poiName):streetFull)||main;
+    const safeName=streetForSave.replace(/'/g,'&apos;').replace(/"/g,'&quot;');
+    return `<div class="map-search-result-item" onclick="selectMapSearchResult(${safeLat},${safeLon},'${safeName}')">
+      ${pinSvg}
+      <div>
+        <div class="map-search-ri-main">${main}</div>
+        ${sub?`<div class="map-search-ri-sub">${sub}</div>`:''}
+      </div>
+    </div>`;
+  }).join('');
+  _fetchJSON(photonUrl,6000)
+    .then(d=>{
+      const items=d&&d.features||[];
+      if(!items.length)throw new Error('photon-empty');
+      res.innerHTML=renderPhoton(items);
     })
-    .catch(()=>{res.innerHTML=`<div class="map-search-hint" style="color:var(--red)">${lang==='ru'?'Ошибка поиска':'Search failed'}</div>`;});
+    .catch(()=>_fetchJSON(nominatimUrl,6000)
+      .then(data=>{
+        if(!data.length){res.innerHTML=`<div class="map-search-hint">${lang==='ru'?'Ничего не найдено':'No results found'}</div>`;return;}
+        res.innerHTML=renderNominatim(data);
+      })
+      .catch(()=>{res.innerHTML=`<div class="map-search-hint" style="color:var(--red)">${lang==='ru'?'Ошибка поиска':'Search failed'}</div>`;}));
 }
 
 function selectMapSearchResult(lat,lon,displayName){

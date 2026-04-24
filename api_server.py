@@ -11,7 +11,8 @@ All user/order data is stored in MongoDB Atlas (db: ambar).
 """
 from __future__ import annotations
 import os, json, hmac, hashlib, html as _html_mod, urllib.parse, mimetypes, logging, time, uuid
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
+DUBAI_TZ = timezone(timedelta(hours=4))
 from pathlib import Path
 import aiohttp as _aiohttp
 from aiohttp import web
@@ -544,10 +545,20 @@ async def handle_verify_request(request: web.Request) -> web.Response:
     # Find the pending-verification order and send combined notification
     user_orders = await db.get_user_orders(uid)
     pending = [o for o in user_orders if o.get("pending_verification")]
+    user_doc = await db.get_user(uid) or {}
+    inv_op = user_doc.get("invited_by_operator")
+    inv_at = user_doc.get("invited_at")
+    def _fmt_inv_at(t):
+        if not t: return ""
+        try:
+            dt = datetime.fromisoformat(str(t).replace("Z","+00:00")) if isinstance(t, str) else t
+            return dt.astimezone(DUBAI_TZ).strftime('%d.%m.%Y %H:%M')
+        except Exception:
+            return ""
+    joined_str = _fmt_inv_at(inv_at)
     for order in pending:
         oid = order["order_id"]
         saved_op_text = order.get("op_text", "")
-        # Strip any existing first-order banner from saved text, replace with louder one
         # Build source info line
         source_labels = {
             "friend": "👥 Знакомый",
@@ -561,16 +572,31 @@ async def handle_verify_request(request: web.Request) -> web.Response:
         elif source_detail:
             src_extra = f"\n💬 {source_detail}"
 
-        # Referral hint — if the user came in via a referral link, show the
-        # referrer's @username to the operator as an extra cross-check on top
-        # of whatever the user submitted in the verification form.
-        ref_hint = ""
+        # Attribution hints (multiple can apply — show whichever are set)
+        hints = []
         order_ref_username = order.get("referrer_username")
         if order.get("referred_by") and order_ref_username:
-            ref_hint = f"\n🔗 Приглашён — @{order_ref_username}"
+            hints.append(f"👥 Пригласил клиент — @{order_ref_username}")
+        if inv_op is not None and inv_op > 0:
+            h = f"🔗 По ссылке оператора <code>{inv_op}</code>"
+            if joined_str: h += f" · вступил {joined_str}"
+            hints.append(h)
+        elif inv_op == 0:
+            h = "🔗 По общей ссылке операторов"
+            if joined_str: h += f" · вступил {joined_str}"
+            hints.append(h)
 
-        banner_title = "<b>НОВЫЙ КЛИЕНТ — РЕФЕРАЛ</b>" if order.get("referred_by") else "<b>НОВЫЙ КЛИЕНТ!</b>"
-        bq_alert = f"<blockquote>🔴🔴🔴 {banner_title} 🔴🔴🔴{ref_hint}\n📋 Источник: <b>{src_line}</b>{src_extra}</blockquote>"
+        # Banner title — most specific wins
+        if order.get("referred_by"):
+            banner_title = "<b>НОВЫЙ КЛИЕНТ — РЕФЕРАЛ</b>"
+        elif inv_op is not None and inv_op > 0:
+            banner_title = "<b>НОВЫЙ КЛИЕНТ — ССЫЛКА ОПЕРАТОРА</b>"
+        elif inv_op == 0:
+            banner_title = "<b>НОВЫЙ КЛИЕНТ — ОБЩАЯ ССЫЛКА</b>"
+        else:
+            banner_title = "<b>НОВЫЙ КЛИЕНТ!</b>"
+        hints_str = ("\n" + "\n".join(hints)) if hints else ""
+        bq_alert = f"<blockquote>🔴🔴🔴 {banner_title} 🔴🔴🔴{hints_str}\n📋 Источник: <b>{src_line}</b>{src_extra}</blockquote>"
 
         if saved_op_text:
             # Strip old banners (both Markdown and HTML variants)

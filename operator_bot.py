@@ -234,6 +234,7 @@ def kb_main():
         ["🆕 Новые заказы (ожидают ответа)",   "🟢 Активные"],
         ["✅ Завершённые",    "📊 Статистика"],
         ["🚫 Бан / Нет верификации", "❓ Помощь"],
+        ["👤 Профиль"],
     ], resize_keyboard=True)
 
 async def kb_order_list(items, list_type, limit=15):
@@ -367,13 +368,38 @@ async def order_card(o, full=True):
     st_map = {"pending":"🟡 Ожидает","approved":"🟢 Принят","delivered":"✅ Доставлен","declined":"🔴 Отклонён","cancelled":"🚫 Отменён клиентом"}
     st     = st_map.get(o.get("status",""), o.get("status",""))
     lines  = []
-    # Preserve first order banner + source info for unverified non-referral customers
+    # Preserve first order banner + source info for unverified customers
     try:
         cid = o.get("customer_id")
         if cid:
             user_doc = await db.get_user(int(cid))
             if user_doc and not user_doc.get("verified", False):
-                bq = ["🔴🔴🔴 <b>НОВЫЙ КЛИЕНТ!</b> 🔴🔴🔴"]
+                inv_op = user_doc.get("invited_by_operator")
+                inv_at = user_doc.get("invited_at")
+                joined_str = ""
+                if inv_at:
+                    try:
+                        dt = datetime.fromisoformat(str(inv_at).replace("Z","+00:00")) if isinstance(inv_at, str) else inv_at
+                        joined_str = dt.astimezone(DUBAI_TZ).strftime('%d.%m.%Y %H:%M')
+                    except Exception:
+                        joined_str = ""
+                if user_doc.get("referred_by"):
+                    title = "<b>НОВЫЙ КЛИЕНТ — РЕФЕРАЛ</b>"
+                elif inv_op is not None and inv_op > 0:
+                    title = "<b>НОВЫЙ КЛИЕНТ — ССЫЛКА ОПЕРАТОРА</b>"
+                elif inv_op == 0:
+                    title = "<b>НОВЫЙ КЛИЕНТ — ОБЩАЯ ССЫЛКА</b>"
+                else:
+                    title = "<b>НОВЫЙ КЛИЕНТ!</b>"
+                bq = [f"🔴🔴🔴 {title} 🔴🔴🔴"]
+                if inv_op is not None and inv_op > 0:
+                    h = f"🔗 По ссылке оператора <code>{inv_op}</code>"
+                    if joined_str: h += f" · вступил {joined_str}"
+                    bq.append(h)
+                elif inv_op == 0:
+                    h = "🔗 По общей ссылке операторов"
+                    if joined_str: h += f" · вступил {joined_str}"
+                    bq.append(h)
                 src = user_doc.get("verify_source", "")
                 if src:
                     src_labels = {"friend":"👥 Знакомый","operator":"📞 Оператор","social":"📱 Соцсети","search":"🔍 Интернет","other":"💬 Другое"}
@@ -496,6 +522,20 @@ async def customer_card(o):
         if isinstance(fs, str):
             fs = datetime.fromisoformat(fs)
         lines.append(f"📅 Клиент с: *{fs.strftime('%d.%m.%Y')}*")
+    # Invite attribution (always shown if set)
+    if user_doc:
+        inv_op = user_doc.get("invited_by_operator")
+        inv_at = user_doc.get("invited_at")
+        joined_str = ""
+        if inv_at:
+            try:
+                dt = datetime.fromisoformat(str(inv_at).replace("Z","+00:00")) if isinstance(inv_at, str) else inv_at
+                joined_str = dt.astimezone(DUBAI_TZ).strftime('%d.%m.%Y %H:%M')
+            except Exception: pass
+        if inv_op is not None and inv_op > 0:
+            lines.append(f"🔗 По ссылке оператора: `{inv_op}`" + (f"  _({joined_str})_" if joined_str else ""))
+        elif inv_op == 0:
+            lines.append("🔗 По общей ссылке операторов" + (f"  _({joined_str})_" if joined_str else ""))
     # Verification info
     if user_doc:
         verified = user_doc.get("verified", False)
@@ -614,7 +654,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update.message.reply_text("⛔ Нет доступа."); return
 
     # If operator tapped a menu button, cancel any pending input flow
-    _menu_keywords = ("Новые", "Активные", "Завершённые", "Бан", "Статистика", "Помощь")
+    _menu_keywords = ("Новые", "Активные", "Завершённые", "Бан", "Статистика", "Помощь", "Профиль")
     if any(kw in (update.message.text or "") for kw in _menu_keywords):
         ctx.user_data.pop("pending_ban", None)
         ctx.user_data.pop("pending_rename", None)
@@ -820,6 +860,74 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         ])
         await send(cid, "🚫 *Бан / Верификация*\n\nВыберите категорию:",
                    parse_mode="Markdown", reply_markup=kb)
+
+    elif "Профиль" in text:
+        mine    = await db.get_customers_invited_by(uid)
+        common  = await db.get_common_invite_customers()
+        personal_link = f"https://t.me/AmBarDelivery_bot?start=op_{uid}"
+        common_link   = f"https://t.me/AmBarDelivery_bot?start=op"
+        src_labels = {"friend":"👥 Знакомый","operator":"📞 Оператор","social":"📱 Соцсети","search":"🔍 Интернет","other":"💬 Другое"}
+        def _fmt_join(ts):
+            if not ts: return "—"
+            try:
+                dt = datetime.fromisoformat(ts.replace("Z","+00:00")) if isinstance(ts, str) else ts
+                return dt.astimezone(DUBAI_TZ).strftime("%d.%m.%Y %H:%M")
+            except: return "—"
+        def _render_user(u):
+            tid = u.get("telegram_id")
+            name = ((u.get("first_name","") or "") + " " + (u.get("last_name","") or "")).strip() or "—"
+            uname = u.get("username", "")
+            at = _fmt_join(u.get("invited_at"))
+            phones = u.get("phones") or []
+            phone = phones[0] if phones else ""
+            src = u.get("verify_source", "")
+            src_line = src_labels.get(src, "")
+            rec_name = u.get("verify_recommender_name", "")
+            rec_phone = u.get("verify_recommender_phone", "")
+            src_detail = u.get("verify_source_detail", "")
+            orders = u.get("orders_total", 0) or 0
+            spent  = u.get("total_spent", 0) or 0
+            out = []
+            out.append(f"• *{name}*" + (f"  @{uname}" if uname and uname != "—" else ""))
+            out.append(f"  🆔 `{tid}`")
+            out.append(f"  📅 Вступил: {at}")
+            if phone: out.append(f"  📞 `{phone}`")
+            if src_line:
+                out.append(f"  🔐 Источник: {src_line}")
+                if src == "friend" and rec_name:
+                    out.append(f"  👤 Рекомендовал: _{rec_name}_" + (f" — `{rec_phone}`" if rec_phone else ""))
+                elif src_detail:
+                    out.append(f"  💬 _{src_detail}_")
+            if orders:
+                out.append(f"  📦 Заказов: {orders}  •  💰 {int(spent)} AED")
+            out.append("")
+            return out
+        def _section(bucket, title, link, empty_hint):
+            verified    = [u for u in bucket if u.get("verified")]
+            pending     = [u for u in bucket if not u.get("verified") and (u.get("orders_total") or 0) > 0]
+            not_ordered = [u for u in bucket if (u.get("orders_total") or 0) == 0]
+            out = ["━━━━━━━━━━━━━━━━━━━", f"*{title}*", f"`{link}`", ""]
+            out.append(f"👥 Перешли: *{len(bucket)}*  •  ✅ Верифицированы: *{len(verified)}*")
+            out.append(f"⏳ Ожидают: *{len(pending)}*  •  ⚪ Без заказа: *{len(not_ordered)}*")
+            out.append("")
+            if verified:
+                out.append("*✅ Верифицированные клиенты:*")
+                out.append("")
+                for u in verified[:10]:
+                    out.extend(_render_user(u))
+                if len(verified) > 10:
+                    out.append(f"_…и ещё {len(verified)-10}_")
+            else:
+                out.append(f"_{empty_hint}_")
+            return out
+        lines = ["👤 *Ваш профиль оператора*", ""]
+        lines.extend(_section(mine, "🔗 Ваша персональная ссылка", personal_link,
+                              "Пока нет верифицированных клиентов по вашей ссылке."))
+        lines.append("")
+        lines.extend(_section(common, "🌐 Общая ссылка операторов", common_link,
+                              "Пока нет верифицированных клиентов по общей ссылке."))
+        await send(cid, "\n".join(lines), parse_mode="Markdown", reply_markup=_dismiss,
+                   disable_web_page_preview=True)
 
     else:
         await send(cid, "Используйте кнопки меню 👇", reply_markup=_dismiss)

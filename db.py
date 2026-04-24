@@ -453,6 +453,28 @@ async def get_unverified_users_with_orders() -> list:
     return await cursor.to_list(length=200)
 
 
+async def get_customers_invited_by(operator_id: int) -> list:
+    """Return customers who joined via this operator's /start op_<id> link."""
+    db = _db_or_none()
+    if db is None: return []
+    cursor = db.users.find(
+        {"invited_by_operator": operator_id},
+        {"_id": 0}
+    ).sort("invited_at", -1)
+    return await cursor.to_list(length=500)
+
+
+async def get_common_invite_customers() -> list:
+    """Return customers who joined via the common /start op link (invited_by_operator=0)."""
+    db = _db_or_none()
+    if db is None: return []
+    cursor = db.users.find(
+        {"invited_by_operator": 0},
+        {"_id": 0}
+    ).sort("invited_at", -1)
+    return await cursor.to_list(length=500)
+
+
 async def award_referral_points(referrer_id: int, referred_id: int, points: int):
     """Award referral points to the referrer and log the referral."""
     db = _db_or_none()

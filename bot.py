@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """AMBAR Customer Bot — opens mini app, receives orders, ban check"""
 import os, json, logging
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, WebAppInfo, MenuButtonWebApp
@@ -71,15 +71,30 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     lang = ctx.user_data.get("lang", "ru")
     name = update.effective_user.first_name
 
-    # Handle referral deep link: /start ref_123456
+    # Deep links:
+    #   /start ref_<id>   — customer-to-customer referral
+    #   /start op_<id>    — specific-operator invite
+    #   /start op         — common (shared) operator invite; stored as invited_by_operator=0
     referrer_id = None
-    if ctx.args and ctx.args[0].startswith("ref_"):
-        try:
-            referrer_id = int(ctx.args[0][4:])
-            if referrer_id == uid:
-                referrer_id = None  # can't refer yourself
-        except (ValueError, IndexError):
-            referrer_id = None
+    invited_by_operator = None
+    if ctx.args and ctx.args[0]:
+        arg = ctx.args[0]
+        if arg.startswith("ref_"):
+            try:
+                referrer_id = int(arg[4:])
+                if referrer_id == uid:
+                    referrer_id = None
+            except (ValueError, IndexError):
+                referrer_id = None
+        elif arg == "op":
+            invited_by_operator = 0
+        elif arg.startswith("op_"):
+            try:
+                invited_by_operator = int(arg[3:])
+                if invited_by_operator == uid:
+                    invited_by_operator = None
+            except (ValueError, IndexError):
+                invited_by_operator = None
 
     # Ban check — silently skip if DB is unavailable
     try:
@@ -141,12 +156,18 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             name=full_name,
             username=tg_user.username or "—",
         )
-        # Only set referred_by on first visit (new user)
-        if referrer_id:
+        # First-touch attribution for referral and operator invite (don't overwrite).
+        # 0 is a valid invited_by_operator value (common link), so compare to None.
+        existing = None
+        if referrer_id or invited_by_operator is not None:
             existing = await db.get_user(uid)
-            if existing is None or not existing.get("referred_by"):
-                user_fields["referred_by"] = referrer_id
-                log.info(f"[referral] user {uid} referred by {referrer_id}")
+        if referrer_id and (existing is None or not existing.get("referred_by")):
+            user_fields["referred_by"] = referrer_id
+            log.info(f"[referral] user {uid} referred by {referrer_id}")
+        if invited_by_operator is not None and (existing is None or existing.get("invited_by_operator") is None):
+            user_fields["invited_by_operator"] = invited_by_operator
+            user_fields["invited_at"] = datetime.now(timezone.utc)
+            log.info(f"[op-invite] user {uid} invited_by_operator={invited_by_operator}")
         await db.upsert_user(uid, **user_fields)
     except Exception as e:
         log.warning(f"upsert_user failed: {e}")

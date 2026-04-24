@@ -45,45 +45,66 @@ CORS_HEADERS = {
 # ── DB lifecycle ──────────────────────────────────────────────────────────────
 async def on_startup(app):
     await db.connect()
-    # Send Worldwide PREMIUM welcome to any newly-issued card holders.
+    # Send welcome messages to any newly-issued premium card holders.
     # Runs once at startup (i.e. right after `git pull` + restart).
+    try:
+        await _announce_new_elite_cards()
+    except Exception as e:
+        log.warning(f"[elite] startup announce failed: {e}")
     try:
         await _announce_new_worldwide_cards()
     except Exception as e:
         log.warning(f"[worldwide] startup announce failed: {e}")
 
 
-async def _announce_new_worldwide_cards():
-    if not _WORLDWIDE_IDS:
+async def _send_card_welcome(ids, flag_field, total, pad, title_ru, tag):
+    """Send welcome to any ids[] holder whose flag_field isn't set on user doc.
+
+    ids:         ordered list — index+1 is the card number
+    flag_field:  user doc boolean marking "already announced"
+    total:       total cards in the tier (10, 100, ...)
+    pad:         zero-pad width for card number string (2, 3, ...)
+    title_ru:    the display word shown in bold in the message
+    tag:         short key for log lines
+    """
+    if not ids:
         return
-    for idx, uid in enumerate(_WORLDWIDE_IDS):
+    for idx, uid in enumerate(ids):
         try:
             user_doc = await db.get_user(uid)
         except Exception:
             user_doc = None
-        if (user_doc or {}).get("worldwide_card_announced"):
+        if (user_doc or {}).get(flag_field):
             continue
-        card_number = f"{idx + 1:03d}"
+        card_number = f"{idx + 1:0{pad}d}"
         welcome_text = (
-            "🎉 *Добро пожаловать в клуб PREMIUM*\n\n"
-            f"Вы стали обладателем эксклюзивной карты *PREMIUM* №{card_number} — одной из 100 по всему миру.\n\n"
+            f"🎉 *Добро пожаловать в клуб {title_ru}*\n\n"
+            f"Вы стали обладателем эксклюзивной карты *{title_ru}* №{card_number} — одной из {total} по всему миру.\n\n"
             "✨ *Ваши привилегии:*\n\n"
             "• ⚡️ *Premium Express* — приоритетная обработка и ускоренная доставка\n"
             "• 👑 Персональный оператор на связи\n"
             "• 🥃 Эксклюзивные позиции и пробники редких напитков\n"
-            "• 💎 Закрытые предложения только для держателей карты\n\n"
-            "Откройте приложение, чтобы увидеть ваш PREMIUM-статус.\n\n"
+            f"• 💎 Закрытые предложения только для держателей карты {title_ru}\n\n"
+            f"Откройте приложение, чтобы увидеть ваш {title_ru}-статус.\n\n"
             "_Добро пожаловать._ 🥂"
         )
         try:
             resp = await tg_send(BOT_TOKEN, uid, welcome_text, parse_mode="Markdown")
             if resp and resp.get("ok"):
-                await db.set_user_field(uid, worldwide_card_announced=True)
-                log.info(f"[worldwide] welcome sent to {uid} (card #{card_number})")
+                await db.set_user_field(uid, **{flag_field: True})
+                log.info(f"[{tag}] welcome sent to {uid} (card #{card_number})")
             else:
-                log.warning(f"[worldwide] welcome failed for {uid}: {resp}")
+                log.warning(f"[{tag}] welcome failed for {uid}: {resp}")
         except Exception as e:
-            log.warning(f"[worldwide] welcome send failed for {uid}: {e}")
+            log.warning(f"[{tag}] welcome send failed for {uid}: {e}")
+
+
+async def _announce_new_worldwide_cards():
+    await _send_card_welcome(_WORLDWIDE_IDS, "worldwide_card_announced", 100, 3, "PREMIUM", "worldwide")
+
+
+async def _announce_new_elite_cards():
+    await _send_card_welcome(_PREMIUM_IDS, "elite_card_announced", 10, 2, "ÉLITE", "elite")
 
 async def on_cleanup(app):
     db.close()
@@ -526,7 +547,10 @@ async def handle_cancel_order(request: web.Request) -> web.Response:
 # ── GET /api/me ───────────────────────────────────────────────────────────────
 # Privileged IDs stored server-side only — never sent to the client
 _FOUNDER_ID = 7865205960
+# ÉLITE premium tier: up to 10 cards, serial "N° XX / 10".
+# Order matters — list index + 1 is the card number.
 _PREMIUM_IDS = [686932322, 1459370603]
+assert len(_PREMIUM_IDS) <= 10, "ÉLITE premium is capped at 10 cards"
 # Worldwide Premium tier: up to 100 cards, serial "N° XXX / 100".
 # Order matters — list index + 1 is the card number. Append new holders to
 # the end so their cards get the next sequential number (003, 004, ...).

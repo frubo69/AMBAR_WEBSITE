@@ -261,6 +261,24 @@ async def handle_create_order(request: web.Request) -> web.Response:
             await db.update_order(oid, customer_msg_id=conf_msg_id)
     except Exception as e:
         log.error(f"Customer confirm: {e}")
+    # First-order customers must verify before their order is visible to operators
+    if is_first_order:
+        if lang == "ru":
+            warn_text = (
+                "🚨 <b>ВЕРИФИКАЦИЯ ОБЯЗАТЕЛЬНА</b>\n\n"
+                "Ваш заказ <b>не передан оператору</b>, пока вы не пройдёте верификацию в приложении.\n\n"
+                "Откройте AMBAR и заполните короткую форму — займёт минуту."
+            )
+        else:
+            warn_text = (
+                "🚨 <b>VERIFICATION REQUIRED</b>\n\n"
+                "Your order <b>has not been sent to an operator</b> until you complete verification in the app.\n\n"
+                "Open AMBAR and fill out a short form — it takes a minute."
+            )
+        try:
+            await tg_send(BOT_TOKEN, uid, warn_text, parse_mode="HTML")
+        except Exception as e:
+            log.warning(f"Verification-warning send failed: {e}")
 
     # ── Operator notification ─────────────────────────────────────────────────
     lat, lon = loc.get("lat", 0), loc.get("lon", 0)

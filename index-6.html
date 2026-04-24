@@ -7142,6 +7142,7 @@ function _autoResizeSupport(el){el.style.height='auto';el.style.height=Math.min(
 
 // ── Active Order Bar & Detail ──────────────────────────────────────────────
 let _aobOrders=[],_aobIdx=0,_aobPollTimer=null,_aobTickTimer=null;
+let _lastMotoOid=null,_lastBigMotoOid=null,_reviewInitOid=null;
 let _aobStatusCache={}; // order_id → {status, sig} for change detection
 
 // Compute a stable signature of an order's items+total so edits by the
@@ -7253,7 +7254,11 @@ function _renderAob(){
     const{pct,remaining}=_calcProgress(confirmed_at,eta);
     const p=Math.min(Math.round(pct*100),95);
     fill.className='aob-fill';fill.style.width=p+'%';
+    const snap=(moto.style.display==='none')||(_lastMotoOid!==order_id);
+    if(snap)moto.style.transition='none';
     moto.style.display='block';moto.style.left=p+'%';
+    if(snap){void moto.offsetWidth;moto.style.transition='';}
+    _lastMotoOid=order_id;
     if(remaining<=0){title.textContent=ru?'Курьер рядом!':'Driver nearby!';time.textContent='';}
     else if(remaining<=3){title.textContent=ru?'Курьер рядом!':'Almost at your door!';time.textContent='';}
     else{title.textContent=ru?'Заказ в пути':'Order on the way';time.textContent=ru?`≈${Math.ceil(remaining)} мин`:`≈${Math.ceil(remaining)} min`;}
@@ -7287,17 +7292,22 @@ function _renderAodDetail(){
   el('aod-s3-lbl').textContent=ru?'Доставлен':'Delivered';
   // Progress bar
   const bigFill=el('aod-big-fill'),bigMoto=el('aod-big-moto'),timeTxt=el('aod-time-txt'),bigTrack=el('aod-big-track');
+  const isDelivered=status==='delivered';
   if(status==='pending'){
     bigFill.className='aod-big-fill pending';bigFill.style.width='100%';
     bigMoto.style.display='none';
     if(bigTrack)bigTrack.setAttribute('aria-valuenow','0');
     timeTxt.textContent=ru?'Ожидаем подтверждения оператора...':'Waiting for operator confirmation...';
-  } else if(confirmed_at&&eta){
+  } else if(!isDelivered&&confirmed_at&&eta){
     const{pct,remaining}=_calcProgress(confirmed_at,eta);
     const p=Math.min(Math.round(pct*100),95);
     bigFill.style.transition='none';
     bigFill.className='aod-big-fill';bigFill.style.width=p+'%';
+    const snap=(bigMoto.style.display==='none')||(_lastBigMotoOid!==order_id);
+    if(snap)bigMoto.style.transition='none';
     bigMoto.style.display='block';bigMoto.style.left=p+'%';
+    if(snap){void bigMoto.offsetWidth;bigMoto.style.transition='';}
+    _lastBigMotoOid=order_id;
     if(bigTrack)bigTrack.setAttribute('aria-valuenow',String(p));
     void bigFill.offsetWidth;
     bigFill.style.transition='';
@@ -7312,7 +7322,6 @@ function _renderAodDetail(){
   el('aod-items').innerHTML=(items||[]).map(i=>`<div class="aod-row"><span class="aod-row-name">${i.name} ×${i.qty}</span><span class="aod-row-price">${i.line_total||(i.price*i.qty)} AED</span></div>`).join('');
   el('aod-addr').textContent=address||'—';
   el('aod-total-val').textContent=total+' AED';
-  const isDelivered=status==='delivered';
   // Cancel button — hide when delivered
   const cw=el('aod-cancel-wrap');
   if(cw)cw.style.display=isDelivered?'none':'';
@@ -7338,34 +7347,42 @@ function _renderAodDetail(){
   // Delivered state: progress bar full, badge, review UI
   if(isDelivered){
     bigFill.className='aod-big-fill';bigFill.style.width='100%';
+    const snap=(bigMoto.style.display==='none')||(_lastBigMotoOid!==order_id);
+    if(snap)bigMoto.style.transition='none';
     bigMoto.style.display='block';bigMoto.style.left='100%';
+    if(snap){void bigMoto.offsetWidth;bigMoto.style.transition='';}
+    _lastBigMotoOid=order_id;
     timeTxt.textContent=ru?'Заказ доставлен':'Order delivered';
     badge.textContent=ru?'ДОСТАВЛЕН':'DELIVERED';
     badge.className='aod-badge approved';
   }
-  // Review section
+  // Review section — only initialize fields once per order to avoid wiping user's selection on poll
   const revWrap=el('aod-review');
   if(isDelivered&&!o.review_score){
     revWrap.style.display='';
-    _reviewScore=0;
-    _reviewTags=[];
-    document.querySelectorAll('.aod-star').forEach(s=>s.classList.remove('active'));
-    document.querySelectorAll('.aod-tag').forEach(t=>t.classList.remove('active'));
-    el('aod-review-label').textContent='';
-    el('aod-review-comment').value='';
-    el('aod-review-submit').disabled=true;
-    el('aod-review-comment').placeholder=ru?'Ваш комментарий...':'Your comment...';
-    el('aod-review-submit').textContent=ru?'Готово':'Done';
-    el('aod-tags-title').style.display='none';
-    el('aod-tags').style.display='none';
-    el('aod-tags-title').textContent=ru?'Что понравилось?':'What did you like?';
-    el('aod-tag-speed').textContent=ru?'Быстрая доставка':'Fast delivery';
-    el('aod-tag-courier').textContent=ru?'Вежливый курьер':'Polite courier';
-    el('aod-tag-packaging').textContent=ru?'Аккуратная упаковка':'Neat packaging';
-    el('aod-tag-quality').textContent=ru?'Качество товара':'Product quality';
-    el('aod-review-skip').textContent=ru?'Пропустить':'Skip';
+    if(_reviewInitOid!==order_id){
+      _reviewInitOid=order_id;
+      _reviewScore=0;
+      _reviewTags=[];
+      document.querySelectorAll('.aod-star').forEach(s=>s.classList.remove('active'));
+      document.querySelectorAll('.aod-tag').forEach(t=>t.classList.remove('active'));
+      el('aod-review-label').textContent='';
+      el('aod-review-comment').value='';
+      el('aod-review-submit').disabled=true;
+      el('aod-review-comment').placeholder=ru?'Ваш комментарий...':'Your comment...';
+      el('aod-review-submit').textContent=ru?'Готово':'Done';
+      el('aod-tags-title').style.display='none';
+      el('aod-tags').style.display='none';
+      el('aod-tags-title').textContent=ru?'Что понравилось?':'What did you like?';
+      el('aod-tag-speed').textContent=ru?'Быстрая доставка':'Fast delivery';
+      el('aod-tag-courier').textContent=ru?'Вежливый курьер':'Polite courier';
+      el('aod-tag-packaging').textContent=ru?'Аккуратная упаковка':'Neat packaging';
+      el('aod-tag-quality').textContent=ru?'Качество товара':'Product quality';
+      el('aod-review-skip').textContent=ru?'Пропустить':'Skip';
+    }
   }else{
     revWrap.style.display='none';
+    if(!isDelivered)_reviewInitOid=null;
   }
 }
 
@@ -7415,7 +7432,7 @@ async function _submitReview(){
   const btn=el('aod-review-submit');
   if(!_reviewScore||btn.disabled)return;
   const o=_aobOrders[_aobIdx];
-  if(!o)return;
+  if(!o||o.review_score)return;  // already reviewed — don't resubmit
   btn.disabled=true;
   const ru=lang==='ru';
   btn.textContent=ru?'Отправка...':'Sending...';

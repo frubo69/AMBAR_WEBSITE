@@ -793,6 +793,8 @@ async def handle_review(request: web.Request) -> web.Response:
     order = await db.get_order(order_id)
     if not order or order.get("customer_id") != uid:
         return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
+    if order.get("review_score"):
+        return web.json_response({"error": "already reviewed"}, status=409, headers=CORS_HEADERS)
     tags = data.get("tags", [])
     await db.update_order(order_id, review_score=int(score), review_comment=comment,
                           review_tags=tags, reviewed_at=datetime.now(timezone.utc).isoformat())

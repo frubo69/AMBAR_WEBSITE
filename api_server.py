@@ -488,6 +488,8 @@ async def handle_cancel_order(request: web.Request) -> web.Response:
 # Privileged IDs stored server-side only — never sent to the client
 _FOUNDER_ID = 7865205960
 _PREMIUM_IDS = [686932322, 1459370603]
+# Worldwide Premium tier: up to 100 cards, serial "N° XXX / 100"
+_WORLDWIDE_IDS = []  # add Telegram user IDs as the cards are handed out
 
 async def handle_me(request: web.Request) -> web.Response:
     """Returns ban status, referral points, and card type (founder/premium/standard)."""
@@ -513,6 +515,9 @@ async def handle_me(request: web.Request) -> web.Response:
     elif uid in _PREMIUM_IDS:
         card_type = "premium"
         premium_index = _PREMIUM_IDS.index(uid)
+    elif uid in _WORLDWIDE_IDS:
+        card_type = "worldwide"
+        premium_index = _WORLDWIDE_IDS.index(uid)
     else:
         card_type = "standard"
         premium_index = -1

@@ -489,7 +489,7 @@ async def handle_cancel_order(request: web.Request) -> web.Response:
 _FOUNDER_ID = 7865205960
 _PREMIUM_IDS = [686932322, 1459370603]
 # Worldwide Premium tier: up to 100 cards, serial "N° XXX / 100"
-_WORLDWIDE_IDS = []  # add Telegram user IDs as the cards are handed out
+_WORLDWIDE_IDS = [7236406959]  # add Telegram user IDs as the cards are handed out
 
 async def handle_me(request: web.Request) -> web.Response:
     """Returns ban status, referral points, and card type (founder/premium/standard)."""

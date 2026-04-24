@@ -276,7 +276,10 @@ async def handle_create_order(request: web.Request) -> web.Response:
                 "Open AMBAR and fill out a short form — it takes a minute."
             )
         try:
-            await tg_send(BOT_TOKEN, uid, warn_text, parse_mode="HTML")
+            resp = await tg_send(BOT_TOKEN, uid, warn_text, parse_mode="HTML")
+            warn_mid = (resp or {}).get("result", {}).get("message_id")
+            if warn_mid:
+                await db.set_user_field(uid, verify_warn_msg_id=warn_mid)
         except Exception as e:
             log.warning(f"Verification-warning send failed: {e}")
 

@@ -1489,9 +1489,21 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # ── VERIFY ────────────────────────────────────────────────────────────────
     elif data.startswith("verify_"):
         cid = int(data[7:])
+        user_doc_before = await db.get_user(cid)
         await db.verify_user(cid)
         await db.undecline_verification(cid)
         await q.answer("✅ Клиент верифицирован")
+        # Remove the "ПРОЙДИТЕ ВЕРИФИКАЦИЮ" warning message from the customer bot
+        warn_mid = (user_doc_before or {}).get("verify_warn_msg_id")
+        if warn_mid:
+            try:
+                app2 = Application.builder().token(BOT_TOKEN).build()
+                async with app2:
+                    try: await app2.bot.delete_message(chat_id=cid, message_id=warn_mid)
+                    except Exception: pass
+                await db.set_user_field(cid, verify_warn_msg_id=None)
+            except Exception as e:
+                log.debug(f"delete verify-warning for {cid} failed: {e}")
         # Find order_id from message text to refresh with full buttons
         import re as _re
         oid_match = _re.search(r'#(AMB\d+)', q.message.text or "")

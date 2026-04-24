@@ -4,7 +4,7 @@ All three processes (api_server, bot, operator_bot) import this module.
 Each process maintains its own Motor client pointing at the same Atlas cluster.
 """
 from __future__ import annotations
-import os, logging
+import os, logging, re
 from datetime import datetime, timezone
 import motor.motor_asyncio
 import certifi
@@ -141,7 +141,11 @@ async def upsert_user(telegram_id: int, **fields):
         },
     }
     if phone:
-        update["$addToSet"] = {"phones": phone}
+        # Normalize to digits only so "+971 50 123 4567" and "971501234567"
+        # don't both get stored as separate entries in the phones array.
+        digits = re.sub(r"\D", "", str(phone))
+        if digits:
+            update["$addToSet"] = {"phones": digits}
     await db.users.update_one({"telegram_id": telegram_id}, update, upsert=True)
 
 

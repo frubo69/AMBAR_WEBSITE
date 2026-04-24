@@ -5642,7 +5642,7 @@ function buildProfile(){
   set('stat-lbl3','STATUS');
   // Hub row
   set('phub-t-vip',ru?'Статус & Ваш QR':'Status & Your QR');
-  set('phub-s-vip',(_isFounder||_isPremiumProfile)?'ÉLITE':(tier.label+' · '+_totalPts+' '+(ru?'очков':'pts')));
+  set('phub-s-vip',(_isFounder||_isPremiumProfile)?'ÉLITE':(tier.label+' · '+_totalPts+' '+(ru?'баллов':'pts')));
   const vipBadge=el('phub-v-vip');
   if(vipBadge){vipBadge.textContent=tier.label;vipBadge.style.color=tier.color;vipBadge.style.background=tier.color+'22';}
   const vipIcon=el('phub-vip-icon');
@@ -6028,7 +6028,7 @@ function openVipSheet(){
     tagline=ru?'Премиальная карта — ограниченный выпуск':'Premium card — limited edition';
   }else{
     frontLabel=ru?'УРОВЕНЬ':'TIER';frontTitle=tier.label;frontSub='Card';
-    serialHtml=`<div class="lcard-points-row"><div class="lcard-points-dot" style="background:${tier.color}"></div><span style="color:${tier.color}">${totalPoints} ${ru?'очков':'pts'}</span></div>`;
+    serialHtml=`<div class="lcard-points-row"><div class="lcard-points-dot" style="background:${tier.color}"></div><span style="color:${tier.color}">${totalPoints} ${ru?'баллов':'pts'}</span></div>`;
     tagline='';
   }
 
@@ -6083,14 +6083,14 @@ function openVipSheet(){
     ${cardType==='standard'?`
     <div class="lcard-qr-note">
       <span class="lcard-qr-note-ic"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><path d="M14 14h3v3h-3zM18 18h3v3h-3z"/></svg></span>
-      ${ru?'Ваш <b>QR-код</b> — персональная реферальная ссылка. Друг сканирует → попадает в бот → делает заказ → вы получаете очки':'Your <b>QR code</b> is your personal referral link. Friend scans → enters bot → places order → you earn points'}
+      ${ru?'Ваш <b>QR-код</b> — персональная реферальная ссылка. Друг сканирует → попадает в бот → делает заказ → вы получаете баллы':'Your <b>QR code</b> is your personal referral link. Friend scans → enters bot → places order → you earn points'}
     </div>`:''}
 
     ${cardType==='standard'?(tier.next?`
     <div style="margin-bottom:18px">
       <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);margin-bottom:8px">
         <span>${ru?'До':'To'} ${nextTier?nextTier.label:''}</span>
-        <span>${tier.next-totalPoints} ${ru?'очков осталось':'pts to go'}</span>
+        <span>${tier.next-totalPoints} ${ru?'баллов осталось':'pts to go'}</span>
       </div>
       <div style="height:6px;background:rgba(255,255,255,.08);border-radius:3px;overflow:hidden">
         <div style="height:100%;width:${progress}%;background:linear-gradient(90deg,${tier.color},${tier.color}cc);border-radius:3px;transition:width .6s cubic-bezier(.4,0,.2,1)"></div>
@@ -6100,9 +6100,9 @@ function openVipSheet(){
     ${cardType==='standard'?`
     <div style="font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:600;letter-spacing:1.5px;color:var(--gold);margin-bottom:12px">${ru?'КАК ЭТО РАБОТАЕТ':'HOW IT WORKS'}</div>
     <div class="lcard-how">
-      <div class="lcard-step"><div class="lcard-step-num">1</div><div class="lcard-step-txt">${ru?'Каждый <b>доставленный заказ</b> = 1 очко':'Each <b>delivered order</b> = 1 point'}</div></div>
-      <div class="lcard-step"><div class="lcard-step-num">2</div><div class="lcard-step-txt">${ru?'<b>Пригласите друга</b> по QR-коду — когда он сделает первый заказ, вы получите <b>+5 очков</b>':'<b>Invite a friend</b> via QR code — when they make their first order, you get <b>+5 points</b>'}</div></div>
-      <div class="lcard-step"><div class="lcard-step-num">3</div><div class="lcard-step-txt">${ru?'Набирайте очки и повышайте статус: <b>Silver → Gold → Platinum → Diamond → Brilliant</b>':'Earn points and level up: <b>Silver → Gold → Platinum → Diamond → Brilliant</b>'}</div></div>
+      <div class="lcard-step"><div class="lcard-step-num">1</div><div class="lcard-step-txt">${ru?'Каждый <b>доставленный заказ</b> = 1 балл':'Each <b>delivered order</b> = 1 point'}</div></div>
+      <div class="lcard-step"><div class="lcard-step-num">2</div><div class="lcard-step-txt">${ru?'<b>Пригласите друга</b> по QR-коду — когда он сделает первый заказ, вы получите <b>+5 баллов</b>':'<b>Invite a friend</b> via QR code — when they make their first order, you get <b>+5 points</b>'}</div></div>
+      <div class="lcard-step"><div class="lcard-step-num">3</div><div class="lcard-step-txt">${ru?'Набирайте баллы и повышайте статус: <b>Silver → Gold → Platinum → Diamond → Brilliant</b>':'Earn points and level up: <b>Silver → Gold → Platinum → Diamond → Brilliant</b>'}</div></div>
     </div>
     <div style="height:12px"></div>`:''}`;
 

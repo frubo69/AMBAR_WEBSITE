@@ -940,13 +940,28 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # Deep link: /start order_<oid> — jump straight to an order card
     if ctx.args and ctx.args[0].startswith("order_"):
         oid = ctx.args[0][6:]
+        op_id = update.effective_user.id
         order = await db.get_order(oid)
-        if order:
-            await update.effective_message.reply_text(
-                await order_card(order), parse_mode="HTML",
-                reply_markup=await kb_order_actions(order))
-        else:
-            await update.effective_message.reply_text(f"❌ Заказ #{oid} не найден.")
+        # Always wipe the /start command for a clean chat
+        try: await update.message.delete()
+        except Exception: pass
+        if not order:
+            await ctx.bot.send_message(op_id, f"❌ Заказ #{oid} не найден.")
+            return
+        # Remove any previous copy of this order for this operator so we don't duplicate
+        old_mid = (order.get("op_msg_ids") or {}).get(str(op_id))
+        if old_mid:
+            try: await ctx.bot.delete_message(chat_id=op_id, message_id=old_mid)
+            except Exception: pass
+        sent = await ctx.bot.send_message(
+            op_id, await order_card(order), parse_mode="HTML",
+            reply_markup=await kb_order_actions(order))
+        try:
+            new_ids = dict(order.get("op_msg_ids") or {})
+            new_ids[str(op_id)] = sent.message_id
+            await db.update_order(oid, op_msg_ids=new_ids)
+        except Exception as e:
+            log.debug(f"update op_msg_ids failed: {e}")
         return
     await update.effective_message.reply_text(
         "🛠 *AMBAR — Панель оператора*\n\nВыберите действие:",

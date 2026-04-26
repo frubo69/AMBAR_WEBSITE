@@ -4,7 +4,7 @@ load_dotenv()
 
 BOT_TOKEN = os.getenv("SUPPORT_BOT_TOKEN", "")
 
-ADMIN_IDS = {686932322, 982022772}
+ADMIN_IDS = {686932322, 982022772, 1567466073}
 
 # Telegram IDs allowed to access the owner dashboard (/api/owner/*).
 # Keep in sync with the mini-app deployment. Separate from ADMIN_IDS — admins

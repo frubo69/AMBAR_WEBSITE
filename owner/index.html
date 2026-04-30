@@ -28,7 +28,7 @@
   --r:18px; --r2:14px; --r3:10px; --r4:8px;
   /* Motion */
   --e1: cubic-bezier(.25,.8,.25,1);
-  --safe-top:env(safe-area-inset-top,0px);
+  --safe-top:calc(var(--tg-safe-area-inset-top,0px) + var(--tg-content-safe-area-inset-top,0px));
   --safe-bottom:env(safe-area-inset-bottom,0px);
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
@@ -1941,7 +1941,18 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 
 <script>
 // Telegram WebApp integration
-try{ if(window.Telegram && Telegram.WebApp){ Telegram.WebApp.ready(); Telegram.WebApp.expand(); Telegram.WebApp.setHeaderColor('#000006'); Telegram.WebApp.setBackgroundColor('#000006'); } }catch(e){}
+try{ if(window.Telegram && Telegram.WebApp){
+  var tg=Telegram.WebApp;
+  tg.ready(); tg.expand();
+  if(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0') && tg.requestFullscreen) tg.requestFullscreen();
+  tg.setHeaderColor && tg.setHeaderColor('#000006');
+  tg.setBackgroundColor && tg.setBackgroundColor('#000006');
+  tg.enableClosingConfirmation && tg.enableClosingConfirmation();
+  tg.disableVerticalSwipes && tg.disableVerticalSwipes();
+  function updVph(){document.documentElement.style.setProperty('--tg-h',(tg.viewportHeight||window.innerHeight)+'px');}
+  updVph(); window.addEventListener('resize',updVph);
+  tg.onEvent('viewportChanged',updVph);
+} }catch(e){}
 
 // ===== API liveness / auth probe =====
 // Hits /api/owner/ping on load and every 30s, drives the header #liveDot pill.

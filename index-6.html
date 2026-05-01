@@ -1275,7 +1275,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 </div>
 
 <!-- ═══ VERIFICATION WALL ═══ -->
-<div id="verify-wall" style="display:none;position:fixed;inset:0;z-index:99998;background:rgba(7,7,14,0.97);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);align-items:center;justify-content:center;flex-direction:column;overflow:hidden;overflow-y:auto;">
+<div id="verify-wall" style="display:none;position:fixed;inset:0;z-index:99998;background:rgba(7,7,14,0.97);align-items:center;justify-content:center;flex-direction:column;overflow:hidden;overflow-y:auto;">
 
   <!-- Step 0: How did you find us? -->
   <div id="verify-step0" style="display:flex;flex-direction:column;align-items:center;width:100%;height:100%;padding:0 28px;">
@@ -2770,7 +2770,7 @@ async function checkBanStatus(){
       localStorage.getItem('ambar_verify_pending')==='1'||
       localStorage.getItem('ambar_verify_requested')==='1'||
       localStorage.getItem('ambar_verify_declined')==='1')){
-    setTimeout(()=>showVerifyWall(),800);
+    showVerifyWall();
   }
 }
 

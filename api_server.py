@@ -820,6 +820,7 @@ async def handle_support_send(request: web.Request) -> web.Response:
         context_line = "📋 Общий вопрос"
     # Check user status
     status_tags = []
+    highlight = False
     try:
         user_doc = await db.get_user(uid)
         if user_doc:
@@ -827,11 +828,19 @@ async def handle_support_send(request: web.Request) -> web.Response:
                 status_tags.append("🚫 Забанен")
             if user_doc.get("verify_declined"):
                 status_tags.append("❌ Верификация отклонена")
+                highlight = True
+            elif user_doc.get("verify_requested") and not user_doc.get("verified"):
+                status_tags.append("⏳ Ожидает верификации")
+                highlight = True
             elif not user_doc.get("verified"):
                 status_tags.append("🔴 Не верифицирован")
     except Exception:
         pass
-    status_line = (" | ".join(status_tags) + "\n") if status_tags else ""
+    if status_tags:
+        joined = " | ".join(status_tags)
+        status_line = (f"⚠️ *{joined}*\n" if highlight else f"{joined}\n")
+    else:
+        status_line = ""
     header = (
         f"{context_line}\n"
         f"👤 {user_name} (@{username}, ID: `{uid}`)\n"
@@ -1009,10 +1018,34 @@ async def handle_support_send_image(request: web.Request) -> web.Response:
         ctx_line = f"📦 Заказ: #{order_id}"
     else:
         ctx_line = "📋 Общий вопрос"
+    # Check user status
+    status_tags = []
+    highlight = False
+    try:
+        user_doc = await db.get_user(uid)
+        if user_doc:
+            if user_doc.get("is_banned"):
+                status_tags.append("🚫 Забанен")
+            if user_doc.get("verify_declined"):
+                status_tags.append("❌ Верификация отклонена")
+                highlight = True
+            elif user_doc.get("verify_requested") and not user_doc.get("verified"):
+                status_tags.append("⏳ Ожидает верификации")
+                highlight = True
+            elif not user_doc.get("verified"):
+                status_tags.append("🔴 Не верифицирован")
+    except Exception:
+        pass
+    if status_tags:
+        joined = " | ".join(status_tags)
+        status_line = ("\n⚠️ " + joined) if highlight else ("\n" + joined)
+    else:
+        status_line = ""
     header_caption = (
         f"📸 Фото\n"
         f"{ctx_line}\n"
         f"👤 {user_name} (@{username}, ID: {uid})"
+        + status_line
         + (f"\n💬 {caption}" if caption else "")
     )
     token = SUPPORT_BOT_TOKEN or BOT_TOKEN

@@ -1090,6 +1090,70 @@ async def handle_support_messages(request: web.Request) -> web.Response:
     return web.json_response({"messages": conversation}, headers=CORS_HEADERS)
 
 
+# ── GET /api/points-history ───────────────────────────────────────────────────
+async def handle_points_history(request: web.Request) -> web.Response:
+    """Returns the user's combined points history: +1 per delivered order
+    and +N per referral, sorted newest-first. Names of referred friends are
+    resolved server-side so the client never sees other users' Telegram IDs.
+    """
+    if request.method == "OPTIONS":
+        return web.Response(status=200, headers=CORS_HEADERS)
+
+    auth = request.headers.get("Authorization", "")
+    if not auth.startswith("tma "):
+        return web.json_response({"error": "missing auth"}, status=401, headers=CORS_HEADERS)
+    user = validate_init_data(auth[4:])
+    if not user:
+        return web.json_response({"items": []}, headers=CORS_HEADERS)
+    uid = user.get("id")
+
+    items = []
+    try:
+        user_doc = await db.get_user(uid) or {}
+        # Referral entries — each {user_id, points, at}
+        for r in user_doc.get("referrals", []) or []:
+            ref_uid = r.get("user_id")
+            ref_name = ""
+            ref_username = ""
+            if ref_uid:
+                try:
+                    ref_doc = await db.get_user(ref_uid) or {}
+                    ref_name = (ref_doc.get("first_name") or ref_doc.get("name") or "").strip()
+                    ref_username = (ref_doc.get("username") or "").strip()
+                except Exception:
+                    pass
+            at = r.get("at")
+            ts = at.isoformat() if hasattr(at, "isoformat") else str(at or "")
+            items.append({
+                "type": "referral",
+                "amount": int(r.get("points") or 0),
+                "name": ref_name,
+                "username": ref_username,
+                "ts": ts,
+            })
+        # Delivered orders — implicit +1 each
+        try:
+            orders = await db.get_user_orders(uid)
+        except Exception:
+            orders = []
+        for o in orders:
+            if o.get("status") != "delivered":
+                continue
+            ts_raw = o.get("delivered_at") or o.get("timestamp") or ""
+            ts = ts_raw.isoformat() if hasattr(ts_raw, "isoformat") else str(ts_raw)
+            items.append({
+                "type": "order",
+                "amount": 1,
+                "order_id": o.get("order_id", ""),
+                "ts": ts,
+            })
+    except Exception as e:
+        log.warning(f"points-history failed for uid={uid}: {e}")
+
+    items.sort(key=lambda x: x.get("ts") or "", reverse=True)
+    return web.json_response({"items": items}, headers=CORS_HEADERS)
+
+
 # ── Static file handler ───────────────────────────────────────────────────────
 async def handle_static(request: web.Request) -> web.Response:
     path = request.match_info.get("path", "") or "index-6.html"
@@ -1152,6 +1216,8 @@ def main():
     app.router.add_post(           "/api/support/send-image",  handle_support_send_image)
     app.router.add_route("OPTIONS", "/api/support/messages",   handle_support_messages)
     app.router.add_get(            "/api/support/messages",    handle_support_messages)
+    app.router.add_route("OPTIONS", "/api/points-history",     handle_points_history)
+    app.router.add_get(            "/api/points-history",      handle_points_history)
     # Owner dashboard routes (/api/owner/*). Kept in a separate module so the
     # surface is easy to find and extend without touching customer routes.
     from owner_auth import install_validator

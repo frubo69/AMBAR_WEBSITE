@@ -943,6 +943,22 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .hs-step-title{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--text);margin-bottom:3px;letter-spacing:-.1px}
 .hs-step-desc{font-family:'DM Sans',sans-serif;font-size:12px;color:var(--sub);line-height:1.5}
 .hs-guide-title{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;color:var(--text);margin-bottom:4px;text-align:center;letter-spacing:-.2px}
+/* ── Points History Overlay ── */
+.pts-overlay{position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;flex-direction:column;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1,.64,1)}
+.pts-overlay.show{transform:translateY(0)}
+.pts-hdr{display:flex;align-items:center;gap:12px;padding:12px 16px;padding-top:calc(18px + var(--safe-top));background:rgba(7,7,14,.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);flex-shrink:0}
+.pts-hdr-info{flex:1;min-width:0}
+.pts-hdr-title{font-size:14px;font-weight:600;color:var(--gold2)}
+.pts-hdr-sub{font-size:11px;color:var(--muted);margin-top:1px}
+.pts-list{flex:1;overflow-y:auto;padding:14px;display:flex;flex-direction:column;gap:8px;overscroll-behavior:contain}
+.pts-empty{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:14px;color:var(--muted);font-size:13px;text-align:center;padding:40px 30px;letter-spacing:.2px}
+.pts-empty-icon{opacity:.6;line-height:0}
+.pts-row{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--card);border:1px solid var(--border2);border-radius:14px}
+.pts-row-icon{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;background:rgba(201,169,110,.1);color:var(--gold2)}
+.pts-row-body{flex:1;min-width:0}
+.pts-row-title{font-size:13px;font-weight:600;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pts-row-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.pts-row-amount{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;color:var(--gold2);flex-shrink:0}
 /* ── Support Chat Overlay ── */
 .support-overlay{position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;flex-direction:column;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1,.64,1)}
 .support-overlay.show{transform:translateY(0)}
@@ -1602,6 +1618,11 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       <div class="phub-text"><div class="phub-title" id="phub-t-invite">Invite a Friend</div><div class="phub-sub" id="phub-s-invite">Share AMBAR</div></div>
       <div class="phub-right"><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
     </div>
+    <div class="prof-hub-row" onclick="openPointsHistory()">
+      <div class="phub-icon"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+      <div class="phub-text"><div class="phub-title" id="phub-t-pts">Points history</div><div class="phub-sub" id="phub-s-pts">Where your points came from</div></div>
+      <div class="phub-right"><svg class="phub-chevron" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg></div>
+    </div>
   </div>
 
   <!-- HUB GROUP 2 — Wishlist & The Usual -->
@@ -2129,6 +2150,25 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 </div>
 
 <!-- Support Chat Overlay -->
+<!-- ═══ POINTS HISTORY ═══ -->
+<div class="pts-overlay" id="pts-overlay">
+  <div class="pts-hdr">
+    <button class="support-back" onclick="closePointsHistory()">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="15 18 9 12 15 6"/></svg>
+    </button>
+    <div class="pts-hdr-info">
+      <div class="pts-hdr-title" id="pts-hdr-title">История баллов</div>
+      <div class="pts-hdr-sub" id="pts-hdr-sub">Откуда пришли ваши баллы</div>
+    </div>
+  </div>
+  <div class="pts-list" id="pts-list">
+    <div class="pts-empty" id="pts-empty">
+      <div class="pts-empty-icon"><svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="rgba(201,169,110,.45)" stroke-width="1.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
+      <div id="pts-empty-txt">Здесь появятся ваши баллы за заказы и приглашения друзей</div>
+    </div>
+  </div>
+</div>
+
 <div class="support-overlay" id="support-overlay">
   <div class="support-hdr">
     <button class="support-back" onclick="closeSupportChat()">
@@ -5687,6 +5727,8 @@ function buildProfile(){
   }
   set('phub-t-invite',ru?'Пригласить друга':'Invite a Friend');
   set('phub-s-invite',ru?'Поделиться AMBAR':'Share AMBAR');
+  set('phub-t-pts',ru?'История баллов':'Points history');
+  set('phub-s-pts',ru?'Откуда пришли ваши баллы':'Where your points came from');
   set('phub-t-notif',ru?'Уведомления':'Notifications');
   set('phub-s-notif',ru?'Обновления заказов':'Order updates & alerts');
   set('phub-t-lang',ru?'Язык':'Language');
@@ -6751,6 +6793,72 @@ function initPDMSwipe(){
     }
     isDragging=false;
   },{passive:true});
+}
+
+// ── POINTS HISTORY ───────────────────────────────────────────────────────────
+function openPointsHistory(){
+  const ru=lang==='ru';
+  el('pts-hdr-title').textContent=ru?'История баллов':'Points history';
+  el('pts-hdr-sub').textContent=ru?'Откуда пришли ваши баллы':'Where your points came from';
+  el('pts-empty-txt').textContent=ru?'Здесь появятся ваши баллы за заказы и приглашения друзей':'Points from your orders and invited friends will appear here';
+  el('pts-overlay').classList.add('show');
+  loadPointsHistory();
+}
+function closePointsHistory(){
+  el('pts-overlay').classList.remove('show');
+}
+async function loadPointsHistory(){
+  const list=el('pts-list'),empty=el('pts-empty'),ru=lang==='ru';
+  // Reset to a "loading" state — keep empty placeholder visible while fetching.
+  list.querySelectorAll('.pts-row').forEach(n=>n.remove());
+  empty.style.display='flex';
+  const initData=tg?.initData;
+  if(!initData){return;}
+  let items=[];
+  try{
+    const r=await fetch(`${AMBAR_API}/api/points-history`,{headers:{'Authorization':'tma '+initData}});
+    const j=await r.json();
+    items=j.items||[];
+  }catch(e){console.error('points-history fetch:',e);}
+  if(!items.length){
+    el('pts-empty-txt').textContent=ru?'Здесь появятся ваши баллы за заказы и приглашения друзей':'Points from your orders and invited friends will appear here';
+    return;
+  }
+  empty.style.display='none';
+  const giftSvg='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7z"/></svg>';
+  const bagSvg='<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2L3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>';
+  items.forEach(it=>{
+    const row=document.createElement('div');
+    row.className='pts-row';
+    let title='',sub='';
+    if(it.type==='referral'){
+      const who=it.username?('@'+it.username):(it.name||(ru?'Друг':'Friend'));
+      title=ru?('Приглашён: '+who):('Invited: '+who);
+      sub=ru?'Реферальный бонус':'Referral bonus';
+    }else{
+      title=ru?('Заказ #'+(it.order_id||'')):('Order #'+(it.order_id||''));
+      sub=ru?'Балл за доставленный заказ':'Point for delivered order';
+    }
+    let dateStr='';
+    if(it.ts){
+      try{
+        const d=new Date(it.ts);
+        if(!isNaN(d.getTime())){
+          dateStr=d.toLocaleDateString(ru?'ru-RU':'en-US',{day:'2-digit',month:'short',year:'numeric'});
+        }
+      }catch(e){}
+    }
+    row.innerHTML=
+      '<div class="pts-row-icon">'+(it.type==='referral'?giftSvg:bagSvg)+'</div>'+
+      '<div class="pts-row-body">'+
+        '<div class="pts-row-title"></div>'+
+        '<div class="pts-row-sub"></div>'+
+      '</div>'+
+      '<div class="pts-row-amount">+'+(it.amount||0)+'</div>';
+    row.querySelector('.pts-row-title').textContent=title;
+    row.querySelector('.pts-row-sub').textContent=dateStr?(sub+' · '+dateStr):sub;
+    list.appendChild(row);
+  });
 }
 
 // ── SUPPORT CHAT ─────────────────────────────────────────────────────────────
@@ -8198,7 +8306,7 @@ function dismissToast(){
 // Bottom-anchored sheets/modals that would eat a bottom toast — flip it up.
 // NB: #pdm-overlay is intentionally NOT in this list — users want the toast
 // at the bottom when they add from the full-screen product card.
-const _TOP_WHEN_OPEN='#addr-modal.show,#addr-save-overlay.show,#map-overlay.show,#map-search-overlay.show,#support-overlay.show,#hs-overlay.show,#notifs-ov.show,#cancel-ov.show,#rename-ov.show,#budget-ov.show,#sort-overlay.show,#support-options-ov.show,#back-cart-overlay.show,#confirm-ov.show,#dnote-ov.show,#vip-ov.show,#about-ov.show,#boss-ov.show,#aod-ov.show,#verify-wall.show,#verify-declined.show';
+const _TOP_WHEN_OPEN='#addr-modal.show,#addr-save-overlay.show,#map-overlay.show,#map-search-overlay.show,#support-overlay.show,#pts-overlay.show,#hs-overlay.show,#notifs-ov.show,#cancel-ov.show,#rename-ov.show,#budget-ov.show,#sort-overlay.show,#support-options-ov.show,#back-cart-overlay.show,#confirm-ov.show,#dnote-ov.show,#vip-ov.show,#about-ov.show,#boss-ov.show,#aod-ov.show,#verify-wall.show,#verify-declined.show';
 function _toastShouldFlipTop(){
   try{return !!document.querySelector(_TOP_WHEN_OPEN);}catch(e){return false;}
 }

@@ -444,41 +444,41 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   <div class="bento">
     <div class="card" data-detail="kpi:orders">
       <div class="card-lbl"><span>Заказы</span></div>
-      <div class="card-val mono"><span id="kOrders">47</span><span class="u">шт</span></div>
+      <div class="card-val mono"><span id="kOrders">—</span><span class="u">шт</span></div>
       <div class="card-row">
-        <span class="delta up" id="kOrdersDelta">▲ 8</span>
-        <span class="card-hint">средний чек <span id="kOrdersAvg">392</span></span>
+        <span class="delta" id="kOrdersDelta">…</span>
+        <span class="card-hint">средний чек <span id="kOrdersAvg">—</span></span>
       </div>
     </div>
     <div class="card glow-up" data-detail="kpi:done">
       <div class="card-lbl"><span>Доставлено</span></div>
-      <div class="card-val mono"><span id="kDone">42</span><span class="u">/<span id="kDoneTotal">47</span></span></div>
+      <div class="card-val mono"><span id="kDone">—</span><span class="u">/<span id="kDoneTotal">—</span></span></div>
       <div class="card-row">
-        <span class="delta up" id="kDonePct">89.4%</span>
-        <span class="card-hint" id="kInRoute">3 в пути</span>
+        <span class="delta up" id="kDonePct">…</span>
+        <span class="card-hint" id="kInRoute">…</span>
       </div>
     </div>
     <div class="card" data-detail="kpi:avg">
       <div class="card-lbl"><span>Среднее время</span></div>
-      <div class="card-val mono"><span id="kAvg">38</span><span class="u">мин</span></div>
+      <div class="card-val mono"><span id="kAvg">—</span><span class="u">мин</span></div>
       <div class="card-row">
-        <span class="delta up" id="kAvgDelta">▼ 4 мин</span>
-        <span class="card-hint" id="kAvgSub">vs вчера</span>
+        <span class="delta" id="kAvgDelta"></span>
+        <span class="card-hint" id="kAvgSub">нет данных</span>
       </div>
     </div>
     <div class="card glow-warn" data-detail="kpi:late">
       <div class="card-lbl"><span>Опоздания</span></div>
-      <div class="card-val mono"><span id="kLate">6</span><span class="u">%</span></div>
+      <div class="card-val mono"><span id="kLate">—</span><span class="u">%</span></div>
       <div class="card-row">
-        <span class="delta dn" id="kLateCount" style="background:var(--warn-soft);color:var(--warn);border-color:rgba(243,180,74,.22)">3 заказа</span>
+        <span class="delta" id="kLateCount" style="background:var(--warn-soft);color:var(--warn);border-color:rgba(243,180,74,.22)">—</span>
         <span class="card-hint">&gt; 45 мин</span>
       </div>
     </div>
     <div class="card wide" data-detail="kpi:rating">
-      <div class="card-lbl"><span id="kRatingLbl">Рейтинг · сегодня</span></div>
+      <div class="card-lbl"><span id="kRatingLbl">Рейтинг</span></div>
       <div style="display:flex;align-items:flex-end;gap:14px;margin-top:2px">
         <div>
-          <span class="star-num" id="kRating">4.82</span>
+          <span class="star-num" id="kRating">—</span>
           <span class="stars">
             <svg viewBox="0 0 24 24"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z"/></svg>
             <svg viewBox="0 0 24 24"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z"/></svg>
@@ -2131,11 +2131,11 @@ const FINANCE_CACHE = {};
 
 function applyPeriod(p){
   const d = PERIOD_DATA[p]; if(!d) return;
-  // Header label
+  // Header label (only thing pulled from PERIOD_DATA — everything else is API-driven)
   const heroLbl = document.getElementById('heroLbl'); if(heroLbl) heroLbl.textContent = 'Выручка · ' + d.lbl;
   _setText('heroPrevLbl', d.prev);
   // If we have cached live data for this period, render instantly; otherwise
-  // show "loading" placeholders so stale mock values don't flash.
+  // show placeholders so stale mock values don't flash.
   if(FINANCE_CACHE[p]){
     renderFinance(p, FINANCE_CACHE[p]);
   } else {
@@ -2150,23 +2150,12 @@ function applyPeriod(p){
     ['offCentralBar','offNorthBar','offSouthBar'].forEach(id=>{
       const b = document.getElementById(id); if(b) b.style.width = '0%';
     });
+    // KPI placeholders (real values come from /api/owner/finance kpi block)
+    ['kOrders','kOrdersAvg','kDone','kDoneTotal','kDonePct','kInRoute','kAvg','kLate','kLateCount','kRating'].forEach(id=>_setText(id,'—'));
+    _setText('kOrdersDelta', '…');
+    _setText('kRatingLbl', 'Рейтинг');
+    _setText('kAvgSub', 'нет данных');
   }
-  // Bento KPIs (no live API yet — keep mock for now)
-  _setText('kOrders', d.orders);
-  _setText('kOrdersDelta', d.ordersDelta);
-  _setText('kOrdersAvg', d.orderAvg);
-  _setText('kDone', d.done);
-  _setText('kDoneTotal', d.total);
-  _setText('kDonePct', d.donePct);
-  _setText('kInRoute', d.inRoute);
-  _setText('kAvg', d.avg);
-  _setText('kAvgDelta', d.avgDelta);
-  _setText('kAvgSub', d.avgSub);
-  _setText('kLate', d.late);
-  _setText('kLateCount', d.lateCount);
-  _setText('kRating', d.rating);
-  _setText('kRatingLbl', d.ratingLbl);
-  // Re-render currency-aware values
   applyCurrency();
   // Fetch live data and overlay
   applyFinanceLive(p);
@@ -2225,8 +2214,38 @@ function renderFinance(p, f){
   }
   // Money tab 7-day bars
   renderBars7d(f.bars_7d);
+  // Bento KPIs (real values)
+  renderKpis(f.kpi);
   // Re-render with currency formatting
   applyCurrency();
+}
+
+function renderKpis(k){
+  if(!k) return;
+  // Orders
+  _setText('kOrders', k.orders);
+  const od = document.getElementById('kOrdersDelta');
+  if(od){
+    const sign = k.orders_delta > 0 ? '▲ ' : k.orders_delta < 0 ? '▼ ' : '';
+    od.textContent = sign + Math.abs(k.orders_delta);
+    od.classList.toggle('up', k.orders_delta >  0);
+    od.classList.toggle('dn', k.orders_delta <  0);
+  }
+  _setText('kOrdersAvg', k.avg_check);
+  // Done
+  _setText('kDone',      k.done);
+  _setText('kDoneTotal', k.done_total);
+  _setText('kDonePct',   (k.done_pct ?? 0) + '%');
+  _setText('kInRoute',   (k.in_route ?? 0) + ' в пути');
+  // Rating
+  _setText('kRating',    k.rating ? k.rating.toFixed(2) : '—');
+  _setText('kRatingLbl', 'Рейтинг · ' + (k.rating_period || ''));
+  // Avg time + late: no live data yet — show "—" rather than mock numbers
+  _setText('kAvg', '—');
+  _setText('kAvgDelta', '');
+  _setText('kAvgSub', 'нет данных');
+  _setText('kLate', '—');
+  _setText('kLateCount', '—');
 }
 
 function renderBars7d(b){

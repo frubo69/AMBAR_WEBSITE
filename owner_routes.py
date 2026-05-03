@@ -98,6 +98,19 @@ def _orders_in_window(all_orders: dict, start_dt: datetime, end_dt: datetime):
     return out
 
 
+def _all_orders_in_window(all_orders: dict, start_dt: datetime, end_dt: datetime):
+    """Like _orders_in_window but doesn't filter by status — every order
+    placed during the window, regardless of outcome."""
+    out = []
+    for o in all_orders.values():
+        dt = _parse_ts(o.get("timestamp"))
+        if dt is None:
+            continue
+        if start_dt <= dt < end_dt:
+            out.append((dt, o))
+    return out
+
+
 def _sum_field(orders, field: str) -> int:
     return sum(int(o.get(field, 0) or 0) for _, o in orders)
 
@@ -212,8 +225,10 @@ async def handle_finance(request):
     all_orders = await db.get_all_orders()
 
     start, end, prev_start, prev_end = _period_window(period)
-    curr_orders = _orders_in_window(all_orders, start, end)
+    curr_orders = _orders_in_window(all_orders, start, end)        # delivered only
     prev_orders = _orders_in_window(all_orders, prev_start, prev_end)
+    curr_all    = _all_orders_in_window(all_orders, start, end)    # any status
+    prev_all    = _all_orders_in_window(all_orders, prev_start, prev_end)
 
     rev_curr = _sum_field(curr_orders, "total")
     rev_prev = _sum_field(prev_orders, "total")
@@ -221,6 +236,22 @@ async def handle_finance(request):
 
     bars = _last_7_days(all_orders)
     bars_total = sum(bars)
+
+    # ── KPI section ───────────────────────────────────────────────────
+    orders_count_curr = len(curr_all)
+    orders_count_prev = len(prev_all)
+    orders_delta_count = orders_count_curr - orders_count_prev
+    delivered_count   = len(curr_orders)
+    declined_count    = sum(1 for _, o in curr_all if o.get("status") in ("declined", "cancelled"))
+    in_route_count    = sum(1 for o in all_orders.values() if o.get("status") == "approved")
+    avg_check         = (rev_curr // delivered_count) if delivered_count else 0
+    done_pct          = round(delivered_count / orders_count_curr * 100, 1) if orders_count_curr else 0
+    # Reviews: collect non-null review_score from delivered orders in window
+    reviews = [int(o.get("review_score")) for _, o in curr_orders if o.get("review_score")]
+    rating_avg   = round(sum(reviews) / len(reviews), 2) if reviews else 0
+    rating_count = len(reviews)
+
+    period_lbl_for_rating = {"today":"сегодня","week":"неделя","month":"месяц","year":"год"}[period]
 
     return web.json_response({
         "period": period,
@@ -243,6 +274,19 @@ async def handle_finance(request):
             "values":  bars,
             "total":   bars_total,
             "average": bars_total // 7 if bars_total else 0,
+        },
+        "kpi": {
+            "orders":         orders_count_curr,
+            "orders_delta":   orders_delta_count,
+            "avg_check":      avg_check,
+            "done":           delivered_count,
+            "done_total":     orders_count_curr,
+            "done_pct":       done_pct,
+            "in_route":       in_route_count,
+            "declined":       declined_count,
+            "rating":         rating_avg,
+            "rating_count":   rating_count,
+            "rating_period":  period_lbl_for_rating,
         },
     }, headers=CORS_HEADERS)
 

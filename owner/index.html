@@ -2312,7 +2312,14 @@ async function loadCustomers(){
 
 function renderCustomerSections(customers){
   const top10 = customers.slice(0, 10);
-  const vips = customers.filter(c=>c.is_vip);
+  // VIPs grouped by card class: FOUNDER → ÉLITE → WORLDWIDE, then by card number.
+  const CARD_RANK = {founder:0, premium:1, worldwide:2};
+  const vips = customers.filter(c=>c.is_vip).sort((a,b)=>{
+    const ra = CARD_RANK[a.card_type] ?? 9;
+    const rb = CARD_RANK[b.card_type] ?? 9;
+    if(ra !== rb) return ra - rb;
+    return (a.card_number||0) - (b.card_number||0);
+  });
 
   // Top-10 cards
   const scrollEl = document.querySelector('#peopleCustomers .cust-scroll');

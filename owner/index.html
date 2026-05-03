@@ -1435,7 +1435,14 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .dt-bar-v{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;min-width:50px;text-align:right;font-variant-numeric:lining-nums tabular-nums}
 
 /* Clickable state */
-[data-detail]{cursor:pointer;transition:.15s var(--e1)}
+[data-detail]{
+  cursor:pointer;
+  transition:.15s var(--e1);
+  /* Skip the browser's 300ms tap delay + double-tap-zoom; both make taps feel laggy/unreliable */
+  touch-action:manipulation;
+  /* Subtle tap highlight so the user gets feedback the tap registered */
+  -webkit-tap-highlight-color:rgba(201,169,110,.08);
+}
 [data-detail]:active{transform:scale(.985);opacity:.88}
 </style>
 

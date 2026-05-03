@@ -243,13 +243,37 @@ async def handle_finance(request):
     orders_delta_count = orders_count_curr - orders_count_prev
     delivered_count   = len(curr_orders)
     declined_count    = sum(1 for _, o in curr_all if o.get("status") in ("declined", "cancelled"))
+    pending_count     = sum(1 for o in all_orders.values() if o.get("status") == "pending")
     in_route_count    = sum(1 for o in all_orders.values() if o.get("status") == "approved")
     avg_check         = (rev_curr // delivered_count) if delivered_count else 0
     done_pct          = round(delivered_count / orders_count_curr * 100, 1) if orders_count_curr else 0
+    # Order counts per office (any status, in window)
+    orders_by_office = {oid: 0 for oid in OFFICE_IDS}
+    for _, o in curr_all:
+        oid = o.get("office_id")
+        if oid in orders_by_office:
+            orders_by_office[oid] += 1
     # Reviews: collect non-null review_score from delivered orders in window
     reviews = [int(o.get("review_score")) for _, o in curr_orders if o.get("review_score")]
     rating_avg   = round(sum(reviews) / len(reviews), 2) if reviews else 0
     rating_count = len(reviews)
+    # Star distribution for rating detail
+    rating_dist = {1:0, 2:0, 3:0, 4:0, 5:0}
+    for r in reviews:
+        if 1 <= r <= 5:
+            rating_dist[r] += 1
+
+    # Last 7 days order count (any status) — for orders detail trend
+    today_start = _now_dubai().replace(hour=0, minute=0, second=0, microsecond=0)
+    week_end = today_start + timedelta(days=1)
+    week_start = week_end - timedelta(days=7)
+    orders_7d = [0] * 7
+    for _, o in _all_orders_in_window(all_orders, week_start, week_end):
+        dt = _parse_ts(o.get("timestamp"))
+        if dt is None: continue
+        idx = (dt.date() - week_start.date()).days
+        if 0 <= idx < 7:
+            orders_7d[idx] += 1
 
     period_lbl_for_rating = {"today":"сегодня","week":"неделя","month":"месяц","year":"год"}[period]
 
@@ -276,17 +300,21 @@ async def handle_finance(request):
             "average": bars_total // 7 if bars_total else 0,
         },
         "kpi": {
-            "orders":         orders_count_curr,
-            "orders_delta":   orders_delta_count,
-            "avg_check":      avg_check,
-            "done":           delivered_count,
-            "done_total":     orders_count_curr,
-            "done_pct":       done_pct,
-            "in_route":       in_route_count,
-            "declined":       declined_count,
-            "rating":         rating_avg,
-            "rating_count":   rating_count,
-            "rating_period":  period_lbl_for_rating,
+            "orders":           orders_count_curr,
+            "orders_delta":     orders_delta_count,
+            "avg_check":        avg_check,
+            "done":             delivered_count,
+            "done_total":       orders_count_curr,
+            "done_pct":         done_pct,
+            "in_route":         in_route_count,
+            "pending":          pending_count,
+            "declined":         declined_count,
+            "rating":           rating_avg,
+            "rating_count":     rating_count,
+            "rating_period":    period_lbl_for_rating,
+            "rating_dist":      rating_dist,
+            "orders_by_office": orders_by_office,
+            "orders_7d":        orders_7d,
         },
     }, headers=CORS_HEADERS)
 

@@ -3684,193 +3684,121 @@ const DETAIL = {
   },
 
   kpi: id=>{
-    // Helper: build line chart SVG from an array of 7 values
+    // Active period from periodPicker (today | week | month | year)
+    const period = document.querySelector('#periodPicker button.on')?.dataset?.p || 'today';
+    const f = FINANCE_CACHE[period];
+    const periodLbl = {today:'сегодня', week:'неделя', month:'месяц', year:'год'}[period] || period;
+
+    // Helpers
     const line7 = (arr, stroke='#C9A96E', yFmt=v=>v)=>{
+      if(!arr || !arr.length) return '<div style="color:var(--muted);font-size:12px;text-align:center;padding:24px">нет данных</div>';
       const min=Math.min(...arr), max=Math.max(...arr), rng=Math.max(1,max-min);
       const pts = arr.map((v,i)=>{
-        const x = i*(320/6);
+        const x = i*(320/Math.max(1,arr.length-1));
         const y = 90 - ((v-min)/rng)*70;
         return [x.toFixed(1),y.toFixed(1)];
       });
       const path = pts.map((p,i)=> (i===0?'M':'L')+p[0]+' '+p[1]).join(' ');
-      const dots = pts.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="${i===6?3.2:2.2}" fill="${i===6?'#F5E0B0':stroke}"/>`).join('');
+      const last = arr.length - 1;
+      const dots = pts.map((p,i)=>`<circle cx="${p[0]}" cy="${p[1]}" r="${i===last?3.2:2.2}" fill="${i===last?'#F5E0B0':stroke}"/>`).join('');
       const labels = ['ПН','ВТ','СР','ЧТ','ПТ','СБ','СЕГ'];
-      const xlab = labels.map((l,i)=>`<text x="${i*(320/6)}" y="108" text-anchor="middle" font-family="DM Sans" font-size="9" fill="${i===6?'#E8C98A':'#54526A'}" ${i===6?'font-weight="600"':''}>${l}</text>`).join('');
-      const vlab = pts.map((p,i)=>i===6||i===0?`<text x="${p[0]}" y="${Math.max(12,p[1]-8)}" text-anchor="middle" font-family="DM Sans" font-size="10" font-weight="700" fill="${i===6?'#F5E0B0':'#9896AA'}">${yFmt(arr[i])}</text>`:'').join('');
+      const xlab = labels.slice(0,arr.length).map((l,i)=>`<text x="${i*(320/Math.max(1,arr.length-1))}" y="108" text-anchor="middle" font-family="DM Sans" font-size="9" fill="${i===last?'#E8C98A':'#54526A'}" ${i===last?'font-weight="600"':''}>${l}</text>`).join('');
+      const vlab = pts.map((p,i)=>i===last||i===0?`<text x="${p[0]}" y="${Math.max(12,p[1]-8)}" text-anchor="middle" font-family="DM Sans" font-size="10" font-weight="700" fill="${i===last?'#F5E0B0':'#9896AA'}">${yFmt(arr[i])}</text>`:'').join('');
       return `<svg viewBox="0 0 320 118" width="100%" height="118" preserveAspectRatio="none"><path d="${path}" fill="none" stroke="${stroke}" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>${dots}${vlab}${xlab}</svg>`;
     };
-    // Star SVG
     const stars = (n,max=5,size=12)=>{ let s=''; for(let i=0;i<max;i++) s+=`<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align:-2px"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z" fill="${i<n?'#E8C98A':'#3a394d'}"/></svg>`; return s; };
-
-    const tpls = {
-      revenue:()=>{
-        const trend=[13200,11400,14800,13900,16100,16380,18420];
-        const sub = '▲ 12.4% vs вчера · прибыль ~ 6 480 AED';
-        return {
-          hero:`<div class="dt-stat-val gold" style="font-size:48px;line-height:1">18 420<span class="u" style="font-size:16px;margin-left:8px">AED</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${sub}</div>`,
-          body:`
-            <div class="dt-sect">Выручка по офисам</div>
-            <div class="dt-card">
-              <div class="dt-bar"><div class="dt-bar-l">Central</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:100%"></div></div><div class="dt-bar-v gold">8 420</div></div>
-              <div class="dt-bar"><div class="dt-bar-l">North</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:74%"></div></div><div class="dt-bar-v">6 240</div></div>
-              <div class="dt-bar"><div class="dt-bar-l">South</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:45%"></div></div><div class="dt-bar-v">3 760</div></div>
-            </div>
-            <div class="dt-sect">Выручка · 7 дней (AED)</div>
-            <div class="dt-card" style="padding:14px">${line7(trend,'#C9A96E', v=>fmt(v))}</div>
-            <div class="dt-sect">Способ оплаты</div>
-            <div class="dt-card">
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Наличные</div><div class="dt-row-s">68% · кэш-операции</div></div><div class="dt-row-r gold">12 526</div></div>
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Перевод</div><div class="dt-row-s">25% · на счёт</div></div><div class="dt-row-r">4 605</div></div>
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Другое</div><div class="dt-row-s">7% · чаевые, доп.</div></div><div class="dt-row-r">1 289</div></div>
-            </div>`
-        };
-      },
-
-      orders:()=>{
-        const trend=[38,32,41,39,44,46,47];
-        return {
-          hero:`<div class="dt-stat-val" style="font-size:48px;line-height:1;color:var(--text)">47<span class="u" style="font-size:16px;margin-left:8px">ШТ</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">▲ 8 заказов · средний чек 392 AED</div>`,
-          body:`
-            <div class="dt-sect">Заказы по офисам</div>
-            <div class="dt-card">
-              <div class="dt-bar"><div class="dt-bar-l">Central</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:100%"></div></div><div class="dt-bar-v">19 шт</div></div>
-              <div class="dt-bar"><div class="dt-bar-l">North</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:84%"></div></div><div class="dt-bar-v">16 шт</div></div>
-              <div class="dt-bar"><div class="dt-bar-l">South</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:63%"></div></div><div class="dt-bar-v">12 шт</div></div>
-            </div>
-            <div class="dt-sect">Заказы · 7 дней (шт)</div>
-            <div class="dt-card" style="padding:14px">${line7(trend,'#C9A96E')}</div>
-            <div class="dt-sect">Статусы сегодня</div>
-            <div class="dt-card">
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Доставлено</div><div class="dt-row-s">89% от всех</div></div><div class="dt-row-r up">42</div></div>
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">В пути</div><div class="dt-row-s">оператор на доставке</div></div><div class="dt-row-r">3</div></div>
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Отменены клиентом</div><div class="dt-row-s">с причиной</div></div><div class="dt-row-r dn">1</div></div>
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Отклонены оператором</div><div class="dt-row-s">вне зоны, пьяный и т.п.</div></div><div class="dt-row-r dn">1</div></div>
-            </div>`
-        };
-      },
-
-      done:()=>{
-        const trend=[86,88,84,89,91,90,89];
-        return {
-          hero:`<div class="dt-stat-val up" style="font-size:48px;line-height:1">42<span class="u" style="font-size:16px;margin-left:8px">/47</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">89.4% доставлено · 3 в пути · 2 отменены</div>`,
-          body:`
-            <div class="dt-sect">Доставлено по офисам</div>
-            <div class="dt-card">
-              <div class="dt-bar"><div class="dt-bar-l">Central</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:100%;background:linear-gradient(90deg,var(--up),#6BC894)"></div></div><div class="dt-bar-v up">19/19</div></div>
-              <div class="dt-bar"><div class="dt-bar-l">North</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:88%;background:linear-gradient(90deg,var(--up),#6BC894)"></div></div><div class="dt-bar-v up">14/16</div></div>
-              <div class="dt-bar"><div class="dt-bar-l">South</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:75%;background:linear-gradient(90deg,var(--warn),#F3C878)"></div></div><div class="dt-bar-v warn">9/12</div></div>
-            </div>
-            <div class="dt-sect">% доставки · 7 дней</div>
-            <div class="dt-card" style="padding:14px">${line7(trend,'#4CAF7D', v=>v+'%')}</div>
-            <div class="dt-sect">Сейчас в пути · 3</div>
-            <div class="dt-card">
-              <div class="dt-row" data-detail="order:AMB7601682"><div class="dt-row-l"><div class="dt-row-t">#AMB7601 682 <span class="dt-row-tiny" style="color:var(--info)">в пути</span></div><div class="dt-row-s">North · Рашид Н. · 8 мин с выезда</div></div><div class="dt-row-r">18 мин ETA</div></div>
-              <div class="dt-row" data-detail="order:AMB7601681"><div class="dt-row-l"><div class="dt-row-t">#AMB7601 681 <span class="dt-row-tiny" style="color:var(--info)">в пути</span></div><div class="dt-row-s">Central · Ахмад К. · 5 мин</div></div><div class="dt-row-r">22 мин ETA</div></div>
-              <div class="dt-row" data-detail="order:AMB7601679"><div class="dt-row-l"><div class="dt-row-t">#AMB7601 679 <span class="dt-row-tiny" style="color:var(--warn)">задержка</span></div><div class="dt-row-s">South · Дима М. · 14 мин</div></div><div class="dt-row-r warn">3 мин ETA</div></div>
-            </div>`
-        };
-      },
-
-      avg:()=>{
-        const trend=[42,41,43,39,40,41,38];
-        return {
-          hero:`<div class="dt-stat-val up" style="font-size:48px;line-height:1">38<span class="u" style="font-size:16px;margin-left:8px">МИН</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">▼ 4 мин vs вчера · норматив 40 мин</div>`,
-          body:`
-            <div class="dt-sect">Ср. время по офисам</div>
-            <div class="dt-card">
-              <div class="dt-bar"><div class="dt-bar-l">Central</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:58%;background:linear-gradient(90deg,var(--up),#6BC894)"></div></div><div class="dt-bar-v up">35 мин</div></div>
-              <div class="dt-bar"><div class="dt-bar-l">North</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:78%"></div></div><div class="dt-bar-v">41 мин</div></div>
-              <div class="dt-bar"><div class="dt-bar-l">South</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:85%;background:linear-gradient(90deg,var(--warn),#F3C878)"></div></div><div class="dt-bar-v warn">43 мин</div></div>
-            </div>
-            <div class="dt-sect">Ср. время · 7 дней (мин)</div>
-            <div class="dt-card" style="padding:14px">${line7(trend,'#4CAF7D', v=>v+'м')}</div>
-            <div class="dt-sect">Разбивка времени заказа</div>
-            <div class="dt-card">
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Реакция оператора</div><div class="dt-row-s">приход в бот → accept</div></div><div class="dt-row-r up">&lt; 1 мин</div></div>
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Доставка</div><div class="dt-row-s">accept → получено клиентом</div></div><div class="dt-row-r">37 мин</div></div>
-            </div>`
-        };
-      },
-
-      late:()=>{
-        const trend=[4,5,3,4,2,3,3];
-        return {
-          hero:`<div class="dt-stat-val warn" style="font-size:48px;line-height:1">6<span class="u" style="font-size:16px;margin-left:8px">%</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">3 заказа сегодня опоздали &gt; 45 мин</div>`,
-          body:`
-            <div class="dt-sect">Опоздания по офисам</div>
-            <div class="dt-card">
-              <div class="dt-bar"><div class="dt-bar-l">Central</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:0%"></div></div><div class="dt-bar-v up">0</div></div>
-              <div class="dt-bar"><div class="dt-bar-l">North</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:33%;background:linear-gradient(90deg,var(--warn),#F3C878)"></div></div><div class="dt-bar-v warn">1</div></div>
-              <div class="dt-bar"><div class="dt-bar-l">South</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:66%;background:linear-gradient(90deg,var(--dn),#E87575)"></div></div><div class="dt-bar-v dn">2</div></div>
-            </div>
-            <div class="dt-sect">Опоздания · 7 дней (шт)</div>
-            <div class="dt-card" style="padding:14px">${line7(trend,'#E05555')}</div>
-            <div class="dt-sect">Опоздавшие заказы сегодня</div>
-            <div class="dt-card">
-              <div class="dt-row" data-detail="order:AMB7601674"><div class="dt-row-l"><div class="dt-row-t">#AMB7601 674 <span class="dt-row-tiny" style="color:var(--dn)">+13 мин</span></div><div class="dt-row-s">South · Дима М. · причина: пробка</div></div><div class="dt-row-r warn">58 мин</div></div>
-              <div class="dt-row" data-detail="order:AMB7601658"><div class="dt-row-l"><div class="dt-row-t">#AMB7601 658 <span class="dt-row-tiny" style="color:var(--dn)">+8 мин</span></div><div class="dt-row-s">South · Дима М. · не нашёл адрес</div></div><div class="dt-row-r warn">53 мин</div></div>
-              <div class="dt-row" data-detail="order:AMB7601642"><div class="dt-row-l"><div class="dt-row-t">#AMB7601 642 <span class="dt-row-tiny" style="color:var(--dn)">+3 мин</span></div><div class="dt-row-s">North · Рашид Н. · клиент не брал трубку</div></div><div class="dt-row-r warn">48 мин</div></div>
-            </div>
-            <div class="dt-sect">Причины опозданий · месяц</div>
-            <div class="dt-card">
-              <div class="dt-bar"><div class="dt-bar-l">Пробки</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:45%;background:linear-gradient(90deg,var(--warn),#F3C878)"></div></div><div class="dt-bar-v">42%</div></div>
-              <div class="dt-bar"><div class="dt-bar-l">Клиент</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:30%;background:linear-gradient(90deg,var(--warn),#F3C878)"></div></div><div class="dt-bar-v">28%</div></div>
-              <div class="dt-bar"><div class="dt-bar-l">Адрес</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:20%;background:linear-gradient(90deg,var(--warn),#F3C878)"></div></div><div class="dt-bar-v">18%</div></div>
-              <div class="dt-bar"><div class="dt-bar-l">Оператор</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:12%;background:linear-gradient(90deg,var(--dn),#E87575)"></div></div><div class="dt-bar-v">12%</div></div>
-            </div>`
-        };
-      },
-
-      rating:()=>{
-        const trend=[4.71,4.78,4.75,4.80,4.77,4.81,4.82];
-        return {
-          hero:`<div class="dt-stat-val gold" style="font-size:48px;line-height:1">4.82<span class="u" style="font-size:16px;margin-left:8px">★</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">34 оценки сегодня · ▲ 0.05 vs вчера</div>`,
-          body:`
-            <div class="dt-sect">★ Рейтинг по офисам</div>
-            <div class="dt-card">
-              <div class="dt-bar"><div class="dt-bar-l">Central</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:98%;background:linear-gradient(90deg,var(--gold),var(--gold2))"></div></div><div class="dt-bar-v gold">4.9 ★</div></div>
-              <div class="dt-bar"><div class="dt-bar-l">North</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:94%;background:linear-gradient(90deg,var(--gold),var(--gold2))"></div></div><div class="dt-bar-v gold">4.7 ★</div></div>
-              <div class="dt-bar"><div class="dt-bar-l">South</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:96%;background:linear-gradient(90deg,var(--gold),var(--gold2))"></div></div><div class="dt-bar-v gold">4.8 ★</div></div>
-            </div>
-            <div class="dt-sect">Распределение оценок · сегодня</div>
-            <div class="dt-card">
-              <div class="dt-bar"><div class="dt-bar-l" style="min-width:46px">${stars(5)}</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:78%"></div></div><div class="dt-bar-v gold">24</div></div>
-              <div class="dt-bar"><div class="dt-bar-l" style="min-width:46px">${stars(4)}</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:45%"></div></div><div class="dt-bar-v">8</div></div>
-              <div class="dt-bar"><div class="dt-bar-l" style="min-width:46px">${stars(3)}</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:12%"></div></div><div class="dt-bar-v">2</div></div>
-              <div class="dt-bar"><div class="dt-bar-l" style="min-width:46px">${stars(2)}</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:0%"></div></div><div class="dt-bar-v" style="color:var(--muted)">0</div></div>
-              <div class="dt-bar"><div class="dt-bar-l" style="min-width:46px">${stars(1)}</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:0%"></div></div><div class="dt-bar-v" style="color:var(--muted)">0</div></div>
-            </div>
-            <div class="dt-sect">Динамика · 7 дней (ср. ★)</div>
-            <div class="dt-card" style="padding:14px">${line7(trend,'#C9A96E', v=>v.toFixed(2))}</div>
-            <div class="dt-sect">По тегам отзывов</div>
-            <div class="dt-card">
-              <div class="dt-bar"><div class="dt-bar-l">Скорость</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:88%;background:linear-gradient(90deg,var(--up),#6BC894)"></div></div><div class="dt-bar-v up">4.88</div></div>
-              <div class="dt-bar"><div class="dt-bar-l">Оператор</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:94%;background:linear-gradient(90deg,var(--up),#6BC894)"></div></div><div class="dt-bar-v up">4.93</div></div>
-              <div class="dt-bar"><div class="dt-bar-l">Упаковка</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:76%"></div></div><div class="dt-bar-v">4.65</div></div>
-              <div class="dt-bar"><div class="dt-bar-l">Товар</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:80%"></div></div><div class="dt-bar-v">4.72</div></div>
-            </div>
-            <div class="dt-sect">Последние отзывы</div>
-            <div class="dt-card">
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t up">★ 5 · «Быстрая доставка»</div><div class="dt-row-s">@nikita_k · Central · 17 мин назад</div></div></div>
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t up">★ 5 · без комментария</div><div class="dt-row-s">@roma_m · Central · 2 ч назад</div></div></div>
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t warn">★ 3 · «Долго ждал»</div><div class="dt-row-s">@anon_user · South · вчера</div></div></div>
-            </div>`
-        };
-      }
+    // Build a horizontal bars block from {label: value} pairs
+    const officeBars = (vals, fmtFn=v=>v, color='')=>{
+      const max = Math.max(1, ...Object.values(vals));
+      const labels = {office_central:'Central', office_north:'North', office_south:'South'};
+      return Object.entries(vals).map(([k,v])=>{
+        const pct = Math.round((v/max)*100);
+        const fill = color ? `background:${color}` : '';
+        return `<div class="dt-bar"><div class="dt-bar-l">${labels[k]||k}</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:${pct}%${fill?';'+fill:''}"></div></div><div class="dt-bar-v">${fmtFn(v)}</div></div>`;
+      }).join('');
     };
-    const t = tpls[id]?.();
-    if(!t) return { title:'', body:'', foot:'' };
-    const titleT = {revenue:'Выручка · сегодня',orders:'Заказы · сегодня',done:'Доставлено · сегодня',avg:'Среднее время доставки',late:'Опоздания · сегодня',rating:'Рейтинг · сегодня'}[id];
-    const titleSub = {revenue:'Офисы · 7 дней · оплата',orders:'Офисы · статусы · динамика',done:'Выполнение SLA · в пути',avg:'Реакция оператора + доставка',late:'Кто · почему · сколько',rating:'Звёзды · теги · отзывы'}[id];
-    const titleIco = {revenue:'$',orders:'📦',done:'✓',avg:'⏱',late:'⚠',rating:'★'}[id];
-    const titleBg = {revenue:'var(--up-soft);color:var(--up)',orders:'rgba(201,169,110,.14);color:var(--gold2)',done:'var(--up-soft);color:var(--up)',avg:'var(--info-soft);color:var(--info)',late:'var(--warn-soft);color:var(--warn)',rating:'rgba(201,169,110,.14);color:var(--gold2)'}[id];
+    const noData = '<div style="padding:24px 16px;text-align:center;color:var(--muted);font-size:13px">Нет данных</div>';
+    const noDataYet = '<div style="padding:24px 16px;text-align:center;color:var(--muted);font-size:13px">Этот показатель пока не считается — операторский бот не сохраняет время доставки.</div>';
+
+    let hero='', body='';
+
+    if(!f){
+      hero = `<div class="dt-stat-val" style="font-size:32px;line-height:1;color:var(--muted)">…</div><div style="font-size:12px;color:var(--muted);margin-top:10px">Загрузка…</div>`;
+    } else if(id === 'revenue'){
+      const k = f.kpi || {};
+      hero = `<div class="dt-stat-val gold" style="font-size:48px;line-height:1"><span data-aed="${f.revenue.current}">${fmt(f.revenue.current)}</span><span class="u" style="font-size:16px;margin-left:8px">AED</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${f.revenue.delta_label} vs прошлого · прибыль ~ <span data-aed="${f.profit.current}">${fmt(f.profit.current)}</span> AED</div>`;
+      body = `
+        <div class="dt-sect">Выручка по офисам</div>
+        <div class="dt-card">${officeBars(f.by_office, v=>`<span data-aed="${v}">${fmt(v)}</span>`)}</div>
+        <div class="dt-sect">Выручка · 7 дней (AED)</div>
+        <div class="dt-card" style="padding:14px">${line7(f.bars_7d?.values||[], '#C9A96E', v=>fmt(v))}</div>
+        <div class="dt-sect">Сводка</div>
+        <div class="dt-card">
+          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Доставлено заказов</div></div><div class="dt-row-r">${k.done||0}</div></div>
+          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Чаевые</div></div><div class="dt-row-r"><span data-aed="${f.tips||0}">${fmt(f.tips||0)}</span> AED</div></div>
+          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Средний чек</div></div><div class="dt-row-r gold"><span data-aed="${k.avg_check||0}">${fmt(k.avg_check||0)}</span> AED</div></div>
+        </div>`;
+    } else if(id === 'orders'){
+      const k = f.kpi || {};
+      const sign = (k.orders_delta||0) > 0 ? '▲ ' : (k.orders_delta||0) < 0 ? '▼ ' : '';
+      hero = `<div class="dt-stat-val" style="font-size:48px;line-height:1;color:var(--text)">${k.orders||0}<span class="u" style="font-size:16px;margin-left:8px">ШТ</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${sign}${Math.abs(k.orders_delta||0)} vs прошлого · средний чек <span data-aed="${k.avg_check||0}">${fmt(k.avg_check||0)}</span> AED</div>`;
+      body = `
+        <div class="dt-sect">Заказы по офисам</div>
+        <div class="dt-card">${officeBars(k.orders_by_office||{}, v=>`${v} шт`)}</div>
+        <div class="dt-sect">Заказы · 7 дней (шт)</div>
+        <div class="dt-card" style="padding:14px">${line7(k.orders_7d||[], '#C9A96E')}</div>
+        <div class="dt-sect">Статусы за период</div>
+        <div class="dt-card">
+          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Доставлено</div><div class="dt-row-s">${k.done_pct||0}% от всех</div></div><div class="dt-row-r up">${k.done||0}</div></div>
+          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">В пути</div><div class="dt-row-s">оператор на доставке</div></div><div class="dt-row-r">${k.in_route||0}</div></div>
+          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Ожидают</div><div class="dt-row-s">не принят оператором</div></div><div class="dt-row-r">${k.pending||0}</div></div>
+          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Отменены / отклонены</div><div class="dt-row-s">клиентом или оператором</div></div><div class="dt-row-r dn">${k.declined||0}</div></div>
+        </div>`;
+    } else if(id === 'done'){
+      const k = f.kpi || {};
+      hero = `<div class="dt-stat-val up" style="font-size:48px;line-height:1">${k.done||0}<span class="u" style="font-size:16px;margin-left:8px">/${k.done_total||0}</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${k.done_pct||0}% доставлено · ${k.in_route||0} в пути · ${k.declined||0} отменены</div>`;
+      body = `
+        <div class="dt-sect">Сейчас в работе</div>
+        <div class="dt-card">
+          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Ожидают принятия</div><div class="dt-row-s">оператор ещё не нажал accept</div></div><div class="dt-row-r ${k.pending>0?'warn':''}">${k.pending||0}</div></div>
+          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">В пути</div><div class="dt-row-s">принят, едет к клиенту</div></div><div class="dt-row-r">${k.in_route||0}</div></div>
+        </div>
+        <div class="dt-sect">Заказы · 7 дней (шт)</div>
+        <div class="dt-card" style="padding:14px">${line7(k.orders_7d||[], '#4CAF7D')}</div>`;
+    } else if(id === 'avg'){
+      hero = `<div class="dt-stat-val" style="font-size:32px;line-height:1;color:var(--muted)">—</div><div style="font-size:12px;color:var(--muted);margin-top:10px">показатель не считается</div>`;
+      body = `<div class="dt-sect">Среднее время доставки</div><div class="dt-card">${noDataYet}</div>`;
+    } else if(id === 'late'){
+      hero = `<div class="dt-stat-val" style="font-size:32px;line-height:1;color:var(--muted)">—</div><div style="font-size:12px;color:var(--muted);margin-top:10px">показатель не считается</div>`;
+      body = `<div class="dt-sect">Опоздания</div><div class="dt-card">${noDataYet}</div>`;
+    } else if(id === 'rating'){
+      const k = f.kpi || {};
+      const dist = k.rating_dist || {1:0,2:0,3:0,4:0,5:0};
+      const distMax = Math.max(1, ...Object.values(dist));
+      const ratingNum = k.rating ? k.rating.toFixed(2) : '—';
+      hero = `<div class="dt-stat-val gold" style="font-size:48px;line-height:1">${ratingNum}<span class="u" style="font-size:16px;margin-left:8px">★</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${k.rating_count||0} оценок · ${periodLbl}</div>`;
+      const distBars = [5,4,3,2,1].map(n=>{
+        const v = dist[n] || 0;
+        const pct = Math.round((v/distMax)*100);
+        return `<div class="dt-bar"><div class="dt-bar-l" style="min-width:46px">${stars(n)}</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:${pct}%"></div></div><div class="dt-bar-v ${v>0?(n>=4?'gold':n===3?'warn':'dn'):''}" style="${v===0?'color:var(--muted)':''}">${v}</div></div>`;
+      }).join('');
+      body = `
+        <div class="dt-sect">Распределение оценок</div>
+        <div class="dt-card">${k.rating_count ? distBars : noData}</div>`;
+    }
+
+    const titleT = {revenue:'Выручка · '+periodLbl, orders:'Заказы · '+periodLbl, done:'Доставлено · '+periodLbl, avg:'Среднее время доставки', late:'Опоздания', rating:'Рейтинг · '+periodLbl}[id] || id;
+    const titleSub = {revenue:'Офисы · 7 дней · сводка', orders:'Офисы · статусы · 7 дней', done:'Сейчас в работе · динамика', avg:'нет данных', late:'нет данных', rating:'★ распределение'}[id] || '';
+    const titleIco = {revenue:'$', orders:'📦', done:'✓', avg:'⏱', late:'⚠', rating:'★'}[id] || '•';
+    const titleBg = {revenue:'var(--up-soft);color:var(--up)', orders:'rgba(201,169,110,.14);color:var(--gold2)', done:'var(--up-soft);color:var(--up)', avg:'var(--info-soft);color:var(--info)', late:'var(--warn-soft);color:var(--warn)', rating:'rgba(201,169,110,.14);color:var(--gold2)'}[id] || '';
+
     return {
-      title:`<div class="dt-tit-av plain" style="background:${titleBg.split(';')[0]};color:${titleBg.split(';')[1].replace('color:','')};font-size:16px">${titleIco}</div><div><div class="dt-tit-name">${titleT}</div><div class="dt-sub">${titleSub}</div></div>`,
+      title:`<div class="dt-tit-av plain" style="background:${titleBg.split(';')[0]};color:${titleBg.split(';')[1]?.replace('color:','')||'var(--text)'};font-size:16px">${titleIco}</div><div><div class="dt-tit-name">${titleT}</div><div class="dt-sub">${titleSub}</div></div>`,
       body:`
-        <div style="padding:20px 16px;text-align:center;background:var(--card);border:1px solid var(--border2);border-radius:14px;margin-bottom:6px">${t.hero}</div>
-        ${t.body}
+        <div style="padding:20px 16px;text-align:center;background:var(--card);border:1px solid var(--border2);border-radius:14px;margin-bottom:6px">${hero}</div>
+        ${body}
       `,
-      foot:`<button class="dt-btn">Поделиться</button><button class="dt-btn pri">Отчёт CSV</button>`
+      foot:''
     };
   }
 };

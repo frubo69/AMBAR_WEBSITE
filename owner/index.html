@@ -1376,9 +1376,10 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Detail overlay sits ABOVE all other overlays so it can be opened from inside any modal
    (All Clients list, Settings, Notifications, etc.) without being hidden behind them. */
 #dtOverlay{z-index:500}
-.dt-sheet{max-width:520px;max-height:calc(100vh - 40px);margin-top:40px;display:flex;flex-direction:column}
-@media (max-width:520px),(pointer:coarse){.dt-sheet{max-height:calc(100vh - 16px);margin-top:16px;border-radius:20px 20px 0 0;align-self:flex-end}}
-.dt-hdr{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border2)}
+.dt-sheet{max-width:520px;max-height:calc(100vh - var(--safe-top) - 40px);margin-top:40px;display:flex;flex-direction:column}
+@media (max-width:520px),(pointer:coarse){.dt-sheet{max-height:calc(100vh - var(--safe-top) - 16px);margin-top:16px;border-radius:20px 20px 0 0;align-self:flex-end}}
+/* Pad the header so the close button clears the Telegram status-bar / native header */
+.dt-hdr{display:flex;align-items:center;gap:10px;padding:calc(14px + var(--safe-top)) 16px 14px;border-bottom:1px solid var(--border2)}
 .dt-back{width:32px;height:32px;border-radius:10px;background:var(--card);border:1px solid var(--border2);color:var(--sub);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;transition:.15s var(--e1)}
 .dt-back:active{transform:scale(.92);color:var(--gold2);border-color:rgba(201,169,110,.35)}
 .dt-title{flex:1;display:flex;align-items:center;gap:12px;min-width:0;font-family:'Space Grotesk',sans-serif}
@@ -1555,8 +1556,8 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 </div>
 
 <style>
-.ac-sheet{max-width:520px;height:calc(100vh - 40px);max-height:calc(100vh - 40px);margin-top:40px;display:flex;flex-direction:column}
-@media (max-width:520px),(pointer:coarse){.ac-sheet{height:calc(100vh - 16px);max-height:calc(100vh - 16px);margin-top:16px;border-radius:20px 20px 0 0;align-self:flex-end}}
+.ac-sheet{max-width:520px;height:calc(100vh - var(--safe-top) - 40px);max-height:calc(100vh - var(--safe-top) - 40px);margin-top:40px;display:flex;flex-direction:column}
+@media (max-width:520px),(pointer:coarse){.ac-sheet{height:calc(100vh - var(--safe-top) - 16px);max-height:calc(100vh - var(--safe-top) - 16px);margin-top:16px;border-radius:20px 20px 0 0;align-self:flex-end}}
 .ac-search-wrap{padding:12px 14px 0}
 .ac-search-wrap .cust-search{margin:0}
 .ac-body-wrap{flex:1;display:flex;min-height:0;position:relative}
@@ -1662,6 +1663,9 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .tp-sheet{max-width:340px;margin-top:20vh}
 @media (max-width:520px),(pointer:coarse){.tp-sheet{margin-top:30vh}}
 .tp-hdr{display:flex;align-items:center;justify-content:space-between;padding:14px 16px;border-bottom:1px solid var(--border2)}
+/* Sheets pinned to viewport bottom on mobile (ac-sheet) need their own safe-top padding,
+   since align-self:flex-end bypasses the overlay's safe-top padding. */
+.ac-sheet .tp-hdr{padding-top:calc(14px + var(--safe-top))}
 .tp-body{padding:18px 18px 20px;position:relative}
 .tp-wheels{display:flex;align-items:flex-end;justify-content:center;gap:10px;position:relative;z-index:2}
 .tp-col{flex:1;text-align:center;position:relative;padding-top:26px}

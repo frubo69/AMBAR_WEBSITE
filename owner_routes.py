@@ -17,7 +17,7 @@ from aiohttp import web
 from owner_auth import require_owner, CORS_HEADERS
 import db
 # Premium card lists live in api_server (single source of truth).
-from api_server import _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS
+from api_server import _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS, tg_send, BOT_TOKEN
 
 
 # ─── constants ──────────────────────────────────────────────────────────
@@ -369,6 +369,57 @@ async def handle_customer_detail(request):
     )
 
 
+@require_owner
+async def handle_customer_ban(request):
+    """Ban or unban a customer. POST body: {"reason": "..."} for ban (optional)."""
+    raw = request.match_info["telegram_id"]
+    try:
+        tg_id = int(raw)
+    except (ValueError, TypeError):
+        return web.json_response({"error": "invalid telegram_id"}, status=400, headers=CORS_HEADERS)
+
+    user = await db.get_user(tg_id)
+    if not user:
+        return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
+
+    action = request.match_info.get("action", "ban")
+    owner_id = request["owner_id"]
+
+    if action == "ban":
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        reason = (body.get("reason") or "").strip() or "Заблокирован владельцем"
+        await db.ban_user(tg_id, reason=reason, by=owner_id)
+        # Notify the user via the customer bot. Best-effort — don't fail if Telegram is down.
+        if BOT_TOKEN:
+            try:
+                await tg_send(
+                    BOT_TOKEN, tg_id,
+                    "🚫 *Ваш аккаунт заблокирован.*\n\nОбратитесь в поддержку для разъяснений.",
+                    parse_mode="Markdown",
+                )
+            except Exception:
+                pass
+        return web.json_response({"ok": True, "banned": True, "reason": reason}, headers=CORS_HEADERS)
+
+    if action == "unban":
+        await db.unban_user(tg_id)
+        if BOT_TOKEN:
+            try:
+                await tg_send(
+                    BOT_TOKEN, tg_id,
+                    "✅ *Ваш аккаунт разблокирован.*\n\nДобро пожаловать обратно!",
+                    parse_mode="Markdown",
+                )
+            except Exception:
+                pass
+        return web.json_response({"ok": True, "banned": False}, headers=CORS_HEADERS)
+
+    return web.json_response({"error": "unknown action"}, status=400, headers=CORS_HEADERS)
+
+
 def setup(app):
     """Wire owner routes into the aiohttp app. Called from api_server.main()."""
     app.router.add_route("OPTIONS", "/api/owner/ping",    handle_ping)
@@ -379,3 +430,5 @@ def setup(app):
     app.router.add_get(             "/api/owner/customers",              handle_customers)
     app.router.add_route("OPTIONS", "/api/owner/customers/{telegram_id}", handle_customer_detail)
     app.router.add_get(             "/api/owner/customers/{telegram_id}", handle_customer_detail)
+    app.router.add_route("OPTIONS", "/api/owner/customers/{telegram_id}/{action:ban|unban}", handle_customer_ban)
+    app.router.add_post(            "/api/owner/customers/{telegram_id}/{action:ban|unban}", handle_customer_ban)

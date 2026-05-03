@@ -2299,6 +2299,48 @@ function _joinedDate(iso){
   return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit',year:'numeric'});
 }
 
+// Re-render the currently open detail sheet without touching the back-stack.
+// Used after in-sheet actions (ban/unban) that need to refresh the view.
+function _refreshOpenDetail(){
+  if(!_dtCurrent) return;
+  const [type, id] = _dtCurrent.split(':');
+  const tpl = DETAIL[type]?.(id);
+  if(!tpl) return;
+  document.getElementById('dtTitle').innerHTML = tpl.title;
+  document.getElementById('dtBody').innerHTML  = tpl.body;
+  document.getElementById('dtFoot').innerHTML  = tpl.foot || '';
+  applyCurrency();
+}
+
+async function ownerBanCustomer(tgId){
+  const reason = prompt('Причина блокировки (необязательно):', '');
+  if(reason === null) return; // user pressed cancel
+  if(!window.ownerApi) return;
+  try{
+    await ownerApi.ownerFetch('/api/owner/customers/'+tgId+'/ban', {method:'POST', body:{reason}});
+    const c = (_customersCache||[]).find(u=>String(u.telegram_id)===String(tgId));
+    if(c) c.is_banned = true;
+    _refreshOpenDetail();
+    try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(e){}
+  }catch(e){
+    alert('Ошибка блокировки: '+(e.message||'unknown'));
+  }
+}
+
+async function ownerUnbanCustomer(tgId){
+  if(!confirm('Разблокировать клиента?')) return;
+  if(!window.ownerApi) return;
+  try{
+    await ownerApi.ownerFetch('/api/owner/customers/'+tgId+'/unban', {method:'POST'});
+    const c = (_customersCache||[]).find(u=>String(u.telegram_id)===String(tgId));
+    if(c) c.is_banned = false;
+    _refreshOpenDetail();
+    try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(e){}
+  }catch(e){
+    alert('Ошибка разблокировки: '+(e.message||'unknown'));
+  }
+}
+
 async function loadCustomers(){
   if(_customersCache) return _customersCache;
   if(!window.ownerApi) return [];
@@ -3447,7 +3489,9 @@ const DETAIL = {
           <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">Загрузка…</div></div></div>
         </div>
       `,
-      foot:`<button class="dt-btn" onclick="window.open('https://t.me/${c.username||''}','_blank')">Написать</button><button class="dt-btn dn">Забанить</button>`
+      foot: c.is_banned
+        ? `<button class="dt-btn" onclick="window.open('https://t.me/${c.username||''}','_blank')">Написать</button><button class="dt-btn pri" onclick="ownerUnbanCustomer(${c.telegram_id})">Разбанить</button>`
+        : `<button class="dt-btn" onclick="window.open('https://t.me/${c.username||''}','_blank')">Написать</button><button class="dt-btn dn" onclick="ownerBanCustomer(${c.telegram_id})">Забанить</button>`
     };
   },
 

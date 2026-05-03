@@ -850,9 +850,9 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     <div style="padding:20px;color:var(--muted);font-size:13px;text-align:center;width:100%">Загрузка…</div>
   </div>
 
-  <!-- PREMIUM / tiered cardholders -->
+  <!-- VIP cardholders (FOUNDER / ÉLITE / WORLDWIDE) -->
   <div class="cust-sect">
-    <div><div class="cust-sect-t">VIP · клиенты с тиром</div><div class="cust-sect-s">по количеству заказов</div></div>
+    <div><div class="cust-sect-t">VIP · держатели карт</div><div class="cust-sect-s">FOUNDER · ÉLITE · WORLDWIDE</div></div>
     <div class="cust-sect-meta"><span style="color:var(--text)">—</span> активных</div>
   </div>
   <div class="cust-scroll">
@@ -2266,12 +2266,13 @@ function _fmtPhone(digits){
   if(digits.length===12) return '+'+digits.slice(0,3)+' '+digits.slice(3,5)+' '+digits.slice(5,8)+'-'+digits.slice(8,10)+'-'+digits.slice(10);
   return '+'+digits;
 }
-function _tierClass(t){ return {BRILLIANT:'tag-diamond',DIAMOND:'tag-diamond',PLATINUM:'tag-gold',GOLD:'tag-gold',SILVER:'tag-silver'}[t]||''; }
-function _tierAvStyle(t){
-  if(t==='BRILLIANT') return 'background:linear-gradient(135deg,#c8b8e8,#a090d0);color:#0a0a14';
-  if(t==='DIAMOND') return 'background:linear-gradient(135deg,#a8c5e8,#7ba7f5);color:#0a0a14';
-  if(t==='PLATINUM') return 'background:linear-gradient(135deg,#d4d4e8,#b8b8d0);color:#0a0a14';
-  if(t==='GOLD')    return 'background:linear-gradient(135deg,#c9a96e,#e8c98a);color:#0a0a14';
+// Map premium card type → CSS class / avatar gradient.
+// VIP designation is card-based, not order-count based. See api_server._FOUNDER_ID etc.
+function _cardClass(ct){ return {founder:'tag-diamond',premium:'tag-gold',worldwide:'tag-silver'}[ct]||''; }
+function _cardAvStyle(ct){
+  if(ct==='founder')   return 'background:linear-gradient(135deg,#c8b8e8,#a090d0);color:#0a0a14';
+  if(ct==='premium')   return 'background:linear-gradient(135deg,#c9a96e,#e8c98a);color:#0a0a14';
+  if(ct==='worldwide') return 'background:linear-gradient(135deg,#a8c5e8,#7ba7f5);color:#0a0a14';
   return '';
 }
 function _pluralOrders(n){
@@ -2312,18 +2313,19 @@ async function loadCustomers(){
 
 function renderCustomerSections(customers){
   const top10 = customers.slice(0, 10);
-  const premium = customers.filter(c=>c.tier && c.tier!=='');
+  const vips = customers.filter(c=>c.is_vip);
 
   // Top-10 cards
   const scrollEl = document.querySelector('#peopleCustomers .cust-scroll');
   if(scrollEl){
     scrollEl.innerHTML = top10.map((c,i)=>{
-      const avSt = _tierAvStyle(c.tier);
+      const avSt = _cardAvStyle(c.card_type);
+      const cardBadge = c.card_label ? `<div class="cc-tier ${_cardClass(c.card_type)}">${c.card_label}</div>` : '<div class="cc-tier" style="color:var(--muted)">—</div>';
       return `<div class="cust-card top" data-detail="customer:${c.telegram_id}">
         <div class="cc-rank">№${i+1}</div>
         <div class="cc-av"${avSt?' style="'+avSt+'"':''}>${c.initials}</div>
         <div class="cc-name">${c.full_name}</div>
-        <div class="cc-tier ${_tierClass(c.tier)}">${c.tier||'—'}</div>
+        ${cardBadge}
         <div class="cc-value"><span data-aed="${c.total_spent}">${fmt(c.total_spent)}</span> <span class="cur-unit" style="font-size:10px;color:var(--muted);font-weight:600;margin-left:3px;letter-spacing:.4px;text-transform:uppercase">AED</span></div>
         <div class="cc-sub">${_pluralOrders(c.orders_total)} · ${c.username?'@'+c.username:'ID '+c.telegram_id}</div>
       </div>`;
@@ -2337,30 +2339,31 @@ function renderCustomerSections(customers){
     sectMeta.innerHTML = `<span data-aed="${totalSpent}">${fmt(totalSpent)}</span> <span class="cur-unit">AED</span>`;
   }
 
-  // Premium section
+  // VIP section — premium cardholders only
   const premScroll = document.querySelectorAll('#peopleCustomers .cust-scroll')[1];
   if(premScroll){
-    if(premium.length){
-      premScroll.innerHTML = premium.map(c=>{
-        const avSt = _tierAvStyle(c.tier);
-        return `<div class="cust-card prem" data-tier="${c.tier.toLowerCase()}" data-detail="customer:${c.telegram_id}">
+    if(vips.length){
+      premScroll.innerHTML = vips.map(c=>{
+        const avSt = _cardAvStyle(c.card_type);
+        const num = c.card_total ? `№ ${String(c.card_number).padStart(3,'0')} / ${c.card_total}` : '';
+        return `<div class="cust-card prem" data-tier="${c.card_type}" data-detail="customer:${c.telegram_id}">
           <div class="cc-crown">◆</div>
           <div class="cc-av"${avSt?' style="'+avSt+'"':''}>${c.initials}</div>
           <div class="cc-name">${c.full_name}</div>
-          <div class="cc-tier ${_tierClass(c.tier)}">${c.tier}</div>
-          <div class="cc-value">${_pluralOrders(c.orders_total)}</div>
+          <div class="cc-tier ${_cardClass(c.card_type)}">${c.card_label}</div>
+          <div class="cc-value">${num}</div>
           <div class="cc-sub">с ${_joinedDate(c.first_seen)}</div>
         </div>`;
       }).join('');
     } else {
-      premScroll.innerHTML = '<div style="padding:16px;color:var(--muted);font-size:13px;text-align:center">Нет клиентов с картами</div>';
+      premScroll.innerHTML = '<div style="padding:16px;color:var(--muted);font-size:13px;text-align:center;width:100%">Нет держателей карт</div>';
     }
   }
-  // Premium meta
+  // VIP meta
   const premSect = document.querySelectorAll('#peopleCustomers .cust-sect')[1];
   if(premSect){
     const pm = premSect.querySelector('.cust-sect-meta');
-    if(pm) pm.innerHTML = `<span style="color:var(--text)">${premium.length}</span> активных`;
+    if(pm) pm.innerHTML = `<span style="color:var(--text)">${vips.length}</span> активных`;
   }
 
   // All clients button count
@@ -2386,8 +2389,8 @@ function renderAllClientsList(customers){
       lastLetter = letter;
       html += `<div class="az-hdr">${letter}</div>`;
     }
-    const avSt = _tierAvStyle(c.tier);
-    const tag = c.tier ? ` <span class="lrow-tag ${_tierClass(c.tier)}">${c.tier}</span>` : '';
+    const avSt = _cardAvStyle(c.card_type);
+    const tag = c.card_label ? ` <span class="lrow-tag ${_cardClass(c.card_type)}">${c.card_label}</span>` : '';
     const uname = c.username ? '@'+c.username : 'ID '+c.telegram_id;
     html += `<div class="lrow" data-detail="customer:${c.telegram_id}"><div class="lrow-av"${avSt?' style="'+avSt+'"':''}>${c.initials}</div><div class="lrow-body"><div class="lrow-name">${name}${tag}</div><div class="lrow-sub">${uname} · ${_pluralOrders(c.orders_total)}</div></div><div class="lrow-amt mono" data-aed="${c.total_spent}">${fmt(c.total_spent)}</div></div>`;
   });
@@ -3375,8 +3378,9 @@ const DETAIL = {
   customer: id=>{
     const c = (_customersCache||[]).find(u=>String(u.telegram_id)===String(id));
     if(!c) return {title:'<div class="dt-tit-av plain">?</div><div><div class="dt-tit-name">Загрузка…</div></div>', body:'<div style="text-align:center;padding:40px;color:var(--muted)">Нет данных</div>', foot:''};
-    const tier = c.tier;
-    const tierCl = _tierClass(tier);
+    const cardLabel = c.card_label;
+    const cardCl = _cardClass(c.card_type);
+    const cardAv = _cardAvStyle(c.card_type);
     const ph = _fmtPhone(c.phone);
     const uname = c.username ? '@'+c.username : 'ID '+c.telegram_id;
     const joined = _joinedDate(c.first_seen);
@@ -3419,7 +3423,7 @@ const DETAIL = {
     }
 
     return {
-      title:`<div class="dt-tit-av plain"${_tierAvStyle(tier)?' style="'+_tierAvStyle(tier)+'"':''}>${c.initials}</div><div><div class="dt-tit-name">${c.full_name} ${tier?`<span class="lrow-tag ${tierCl}" style="font-size:9px;padding:2px 6px;border-radius:4px;letter-spacing:.8px;font-weight:700">${tier}</span>`:''}${banBadge}${verBadge}</div><div class="dt-sub">${uname} · ${ph||'нет телефона'} · <span style="color:var(--gold2)">в боте с ${joined}</span></div></div>`,
+      title:`<div class="dt-tit-av plain"${cardAv?' style="'+cardAv+'"':''}>${c.initials}</div><div><div class="dt-tit-name">${c.full_name} ${cardLabel?`<span class="lrow-tag ${cardCl}" style="font-size:9px;padding:2px 6px;border-radius:4px;letter-spacing:.8px;font-weight:700">${cardLabel}${c.card_total?` №${String(c.card_number).padStart(3,'0')}/${c.card_total}`:''}</span>`:''}${banBadge}${verBadge}</div><div class="dt-sub">${uname} · ${ph||'нет телефона'} · <span style="color:var(--gold2)">в боте с ${joined}</span></div></div>`,
       body:`
         <div class="dt-stats">
           <div class="dt-stat"><div class="dt-stat-lbl">Потрачено</div><div class="dt-stat-val gold"><span data-aed="${c.total_spent}">${fmt(c.total_spent)}</span><span class="u">AED</span></div><div class="dt-stat-sub">всего</div></div>

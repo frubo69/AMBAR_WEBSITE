@@ -16,6 +16,8 @@ from aiohttp import web
 
 from owner_auth import require_owner, CORS_HEADERS
 import db
+# Premium card lists live in api_server (single source of truth).
+from api_server import _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS
 
 
 # ─── constants ──────────────────────────────────────────────────────────
@@ -247,22 +249,18 @@ async def handle_finance(request):
 
 # ─── customers ─────────────────────────────────────────────────────────
 
-def _tier_for_user(user: dict) -> str:
-    """Derive loyalty tier from orders_done (matches customer app _vipTiers)."""
-    count = int(user.get("orders_done", 0) or 0)
-    if count >= 100:
-        return "BRILLIANT"
-    if count >= 50:
-        return "DIAMOND"
-    if count >= 25:
-        return "PLATINUM"
-    if count >= 10:
-        return "GOLD"
-    if count >= 1:
-        return "SILVER"
-    return ""
-
-TIER_RANK = {"BRILLIANT": 0, "DIAMOND": 1, "PLATINUM": 2, "GOLD": 3, "SILVER": 4, "": 5}
+def _card_for_user(user: dict) -> dict:
+    """Premium card status. VIP = anyone with a card other than 'standard'.
+    Mirrors api_server.handle_me logic so owner sees the same designation
+    the customer sees in their loyalty card."""
+    uid = int(user.get("telegram_id") or 0)
+    if uid == _FOUNDER_ID:
+        return {"type": "founder", "label": "FOUNDER", "number": 1, "total": 1}
+    if uid in _PREMIUM_IDS:
+        return {"type": "premium", "label": "ÉLITE", "number": _PREMIUM_IDS.index(uid) + 1, "total": 10}
+    if uid in _WORLDWIDE_IDS:
+        return {"type": "worldwide", "label": "WORLDWIDE", "number": _WORLDWIDE_IDS.index(uid) + 1, "total": 100}
+    return {"type": "standard", "label": "", "number": 0, "total": 0}
 
 def _initials(user: dict) -> str:
     fn = (user.get("first_name") or "")[:1].upper()
@@ -272,7 +270,7 @@ def _initials(user: dict) -> str:
 
 def _serialize_user(u: dict, orders: list | None = None) -> dict:
     """Convert a user doc into a JSON-safe dict for the owner dashboard."""
-    tier = _tier_for_user(u)
+    card = _card_for_user(u)
     total_spent = int(u.get("total_spent", 0) or 0)
     orders_total = int(u.get("orders_total", 0) or 0)
     avg_check = total_spent // orders_total if orders_total else 0
@@ -287,7 +285,11 @@ def _serialize_user(u: dict, orders: list | None = None) -> dict:
         "username":      u.get("username", ""),
         "phone":         phone,
         "initials":      _initials(u),
-        "tier":          tier,
+        "card_type":     card["type"],          # founder | premium | worldwide | standard
+        "card_label":    card["label"],         # FOUNDER | ÉLITE | WORLDWIDE | ""
+        "card_number":   card["number"],
+        "card_total":    card["total"],
+        "is_vip":        card["type"] != "standard",
         "verified":      bool(u.get("verified")),
         "is_banned":     bool(u.get("is_banned")),
         "total_spent":   total_spent,

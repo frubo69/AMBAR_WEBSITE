@@ -1437,13 +1437,16 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Clickable state */
 [data-detail]{
   cursor:pointer;
-  transition:.15s var(--e1);
+  transition:opacity .15s var(--e1), background-color .15s var(--e1);
   /* Skip the browser's 300ms tap delay + double-tap-zoom; both make taps feel laggy/unreliable */
   touch-action:manipulation;
   /* Subtle tap highlight so the user gets feedback the tap registered */
   -webkit-tap-highlight-color:rgba(201,169,110,.08);
 }
-[data-detail]:active{transform:scale(.985);opacity:.88}
+/* Opacity-only feedback — using transform:scale here would shrink the element
+   during :active, which on iOS can move the corner out from under the user's
+   finger and cancel the click. */
+[data-detail]:active{opacity:.7}
 </style>
 
 <!-- ============ CATALOG MODAL ============ -->

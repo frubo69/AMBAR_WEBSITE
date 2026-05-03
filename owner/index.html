@@ -3843,15 +3843,58 @@ function backDetail(){
   try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
 }
 
-// Global click delegation for detail triggers
-document.addEventListener('click',e=>{
-  const el = e.target.closest('[data-detail]');
-  if(!el) return;
-  // don't hijack toggles/buttons
-  if(e.target.closest('label,button,input,.chip,.tg,.preset,.cmd-close,.nfoot-btn,.dt-btn')) return;
-  e.preventDefault();
-  openDetail(el.dataset.detail);
-});
+// Detail-trigger handler.
+// Uses pointerdown/pointerup so taps fire immediately and reliably on touch
+// (the click event on iOS Safari can be cancelled by sub-pixel movement,
+// scale transforms, or :active state changes — all of which made corner
+// taps on bento KPI cards intermittently miss).
+(function(){
+  let _ptrStartX = 0, _ptrStartY = 0, _ptrTarget = null;
+  const EXCLUDE = 'label,button,input,.chip,.tg,.preset,.cmd-close,.nfoot-btn,.dt-btn';
+
+  function isExcluded(target){
+    return target && target.closest && target.closest(EXCLUDE);
+  }
+
+  document.addEventListener('pointerdown', e=>{
+    const el = e.target.closest && e.target.closest('[data-detail]');
+    if(!el) { _ptrTarget = null; return; }
+    if(isExcluded(e.target)) { _ptrTarget = null; return; }
+    _ptrTarget = el;
+    _ptrStartX = e.clientX;
+    _ptrStartY = e.clientY;
+  }, {passive:true});
+
+  document.addEventListener('pointerup', e=>{
+    if(!_ptrTarget) return;
+    // Tolerate ~12px finger drift before treating it as a scroll
+    const dx = Math.abs(e.clientX - _ptrStartX);
+    const dy = Math.abs(e.clientY - _ptrStartY);
+    if(dx > 12 || dy > 12) { _ptrTarget = null; return; }
+    // The pointerup target might be a child or even outside the original
+    // card if the finger drifted slightly. Use the saved start target.
+    const el = _ptrTarget;
+    _ptrTarget = null;
+    if(isExcluded(e.target)) return;
+    e.preventDefault();
+    openDetail(el.dataset.detail);
+  });
+
+  // Drop the saved target if the gesture is cancelled (e.g. browser
+  // takes the pointer for a system gesture mid-tap).
+  document.addEventListener('pointercancel', ()=>{ _ptrTarget = null; });
+
+  // Click fallback for environments where pointer events don't fire
+  // (older browsers, some embedded webviews). Won't double-fire because
+  // pointerup uses preventDefault on success.
+  document.addEventListener('click', e=>{
+    const el = e.target.closest && e.target.closest('[data-detail]');
+    if(!el) return;
+    if(isExcluded(e.target)) return;
+    e.preventDefault();
+    openDetail(el.dataset.detail);
+  });
+})();
 
 // Load custom snapshot (persists independently of current preset)
 try{

@@ -479,6 +479,14 @@ async def get_common_invite_customers() -> list:
     return await cursor.to_list(length=500)
 
 
+async def get_all_customers() -> list:
+    """Return all user documents, newest-first."""
+    db = _db_or_none()
+    if db is None: return []
+    cursor = db.users.find({}, {"_id": 0}).sort("first_seen", -1)
+    return await cursor.to_list(length=2000)
+
+
 async def award_referral_points(referrer_id: int, referred_id: int, points: int):
     """Award referral points to the referrer and log the referral."""
     db = _db_or_none()

@@ -245,9 +245,135 @@ async def handle_finance(request):
     }, headers=CORS_HEADERS)
 
 
+# ─── customers ─────────────────────────────────────────────────────────
+
+def _tier_for_user(user: dict) -> str:
+    """Derive loyalty tier from orders_done (matches customer app _vipTiers)."""
+    count = int(user.get("orders_done", 0) or 0)
+    if count >= 100:
+        return "BRILLIANT"
+    if count >= 50:
+        return "DIAMOND"
+    if count >= 25:
+        return "PLATINUM"
+    if count >= 10:
+        return "GOLD"
+    if count >= 1:
+        return "SILVER"
+    return ""
+
+TIER_RANK = {"BRILLIANT": 0, "DIAMOND": 1, "PLATINUM": 2, "GOLD": 3, "SILVER": 4, "": 5}
+
+def _initials(user: dict) -> str:
+    fn = (user.get("first_name") or "")[:1].upper()
+    ln = (user.get("last_name") or "")[:1].upper()
+    return (fn + ln) or "?"
+
+
+def _serialize_user(u: dict, orders: list | None = None) -> dict:
+    """Convert a user doc into a JSON-safe dict for the owner dashboard."""
+    tier = _tier_for_user(u)
+    total_spent = int(u.get("total_spent", 0) or 0)
+    orders_total = int(u.get("orders_total", 0) or 0)
+    avg_check = total_spent // orders_total if orders_total else 0
+    phones = u.get("phones", [])
+    phone = phones[0] if phones else (u.get("phone") or "")
+
+    out = {
+        "telegram_id":   u.get("telegram_id"),
+        "first_name":    u.get("first_name", ""),
+        "last_name":     u.get("last_name", ""),
+        "full_name":     u.get("full_name") or f'{u.get("first_name", "")} {u.get("last_name", "")}'.strip(),
+        "username":      u.get("username", ""),
+        "phone":         phone,
+        "initials":      _initials(u),
+        "tier":          tier,
+        "verified":      bool(u.get("verified")),
+        "is_banned":     bool(u.get("is_banned")),
+        "total_spent":   total_spent,
+        "orders_total":  orders_total,
+        "orders_done":   int(u.get("orders_done", 0) or 0),
+        "orders_declined": int(u.get("orders_declined", 0) or 0),
+        "avg_check":     avg_check,
+        "referral_points": int(u.get("referral_points", 0) or 0),
+        "referrals_count": len(u.get("referrals", [])),
+        "first_seen":    u.get("first_seen", ""),
+        "last_seen":     u.get("last_seen", ""),
+        "addresses":     u.get("addresses", []),
+        "verify_source": u.get("verify_source", ""),
+        "verify_recommender_name":  u.get("verify_recommender_name", ""),
+        "verify_recommender_phone": u.get("verify_recommender_phone", ""),
+    }
+    if orders is not None:
+        out["recent_orders"] = orders[:20]
+    return out
+
+
+def _json_default(obj):
+    """Handle datetime serialization for json_response."""
+    from datetime import datetime as _dt
+    if isinstance(obj, _dt):
+        return obj.isoformat()
+    raise TypeError(f"Object of type {type(obj)} is not JSON serializable")
+
+
+@require_owner
+async def handle_customers(request):
+    """Return all customers with stats, sorted by total_spent desc."""
+    users = await db.get_all_customers()
+    result = []
+    for u in users:
+        result.append(_serialize_user(u))
+    result.sort(key=lambda c: c["total_spent"], reverse=True)
+    return web.json_response(
+        {"customers": result, "total": len(result)},
+        headers=CORS_HEADERS,
+        dumps=lambda o: __import__("json").dumps(o, default=_json_default),
+    )
+
+
+@require_owner
+async def handle_customer_detail(request):
+    """Return single customer profile + recent orders."""
+    raw = request.match_info["telegram_id"]
+    try:
+        tg_id = int(raw)
+    except (ValueError, TypeError):
+        return web.json_response({"error": "invalid telegram_id"}, status=400, headers=CORS_HEADERS)
+
+    user = await db.get_user(tg_id)
+    if not user:
+        return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
+
+    orders = await db.get_user_orders(tg_id)
+    safe_orders = []
+    for o in orders[:20]:
+        safe_orders.append({
+            "order_id":  o.get("order_id", ""),
+            "status":    o.get("status", ""),
+            "total":     int(o.get("total", 0) or 0),
+            "tip":       int(o.get("tip", 0) or 0),
+            "items":     o.get("items", []),
+            "timestamp": o.get("timestamp", ""),
+            "office_id": o.get("office_id", ""),
+            "review_score": o.get("review_score"),
+            "review_text":  o.get("review_text", ""),
+        })
+
+    return web.json_response(
+        _serialize_user(user, safe_orders),
+        headers=CORS_HEADERS,
+        dumps=lambda o: __import__("json").dumps(o, default=_json_default),
+    )
+
+
 def setup(app):
     """Wire owner routes into the aiohttp app. Called from api_server.main()."""
     app.router.add_route("OPTIONS", "/api/owner/ping",    handle_ping)
     app.router.add_get(             "/api/owner/ping",    handle_ping)
     app.router.add_route("OPTIONS", "/api/owner/finance", handle_finance)
     app.router.add_get(             "/api/owner/finance", handle_finance)
+    app.router.add_route("OPTIONS", "/api/owner/customers",              handle_customers)
+    app.router.add_get(             "/api/owner/customers",              handle_customers)
+    app.router.add_route("OPTIONS", "/api/owner/customers/{telegram_id}", handle_customer_detail)
+    app.router.add_get(             "/api/owner/customers/{telegram_id}", handle_customer_detail)

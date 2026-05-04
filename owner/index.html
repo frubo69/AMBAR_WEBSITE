@@ -1362,11 +1362,13 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Detail overlay sits ABOVE all other overlays so it can be opened from inside any modal
    (All Clients list, Settings, Notifications, etc.) without being hidden behind them. */
 #dtOverlay{z-index:500}
-/* max-height is shrunk by var(--safe-top) so the sheet (which uses
-   align-self:flex-end on mobile and bypasses .cmd-overlay's safe-top padding)
-   can't extend behind the Telegram native header / iOS status bar. */
-.dt-sheet{max-width:520px;max-height:calc(100vh - var(--safe-top) - 40px);margin-top:40px;display:flex;flex-direction:column}
-@media (max-width:520px),(pointer:coarse){.dt-sheet{max-height:calc(100vh - var(--safe-top) - 16px);margin-top:16px;border-radius:20px 20px 0 0;align-self:flex-end}}
+/* Lock the sheet to a fixed height so it doesn't shrink for short
+   profiles (e.g. customer with one order) — the window stays consistent
+   between users. height is shrunk by var(--safe-top) so the sheet (which
+   uses align-self:flex-end on mobile and bypasses .cmd-overlay's safe-top
+   padding) can't extend behind the Telegram native header / iOS status bar. */
+.dt-sheet{max-width:520px;height:calc(100vh - var(--safe-top) - 40px);max-height:calc(100vh - var(--safe-top) - 40px);margin-top:40px;display:flex;flex-direction:column}
+@media (max-width:520px),(pointer:coarse){.dt-sheet{height:calc(100vh - var(--safe-top) - 16px);max-height:calc(100vh - var(--safe-top) - 16px);margin-top:16px;border-radius:20px 20px 0 0;align-self:flex-end}}
 .dt-hdr{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border2)}
 .dt-back{width:32px;height:32px;border-radius:10px;background:var(--card);border:1px solid var(--border2);color:var(--sub);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;transition:.15s var(--e1)}
 .dt-back:active{transform:scale(.92);color:var(--gold2);border-color:rgba(201,169,110,.35)}

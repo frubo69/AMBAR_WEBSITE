@@ -1004,7 +1004,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
         </button>
         <div class="set-group-row"><span>Активно</span><span><b id="setActiveLbl" style="color:var(--text)">12 из 21</b> <span style="color:var(--muted)">типов</span></span></div>
         <div class="set-group-row"><span>Тихий режим</span><b id="setQuietLbl" style="color:var(--gold2);font-weight:600">22:00 → 08:00</b></div>
-        <div class="set-group-row"><span>Telegram-бот · @ambar_owner_bot</span><span style="color:var(--up);font-weight:600;font-size:12px">подключён</span></div>
+        <div class="set-group-row"><span>Telegram-бот · @ambar_manage_bot</span><span style="color:var(--up);font-weight:600;font-size:12px">подключён</span></div>
       </div>
 
       <div class="cmd-grp-t" style="padding:14px 12px 6px">Отображение</div>
@@ -1104,7 +1104,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     <div class="notif-hdr">
       <div class="notif-hdr-l">
         <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;line-height:1.1">Уведомления</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:6px"><span class="live-dot" style="padding:2px 8px;font-size:9px">Bot</span><span>от @ambar_owner_bot</span></div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px;display:flex;align-items:center;gap:6px"><span class="live-dot" style="padding:2px 8px;font-size:9px">Bot</span><span>от @ambar_manage_bot</span></div>
       </div>
       <button class="cmd-close" onclick="closeNotif()" aria-label="Закрыть"><span class="txt">ESC</span><span class="x">✕</span></button>
     </div>
@@ -1327,7 +1327,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
       <!-- Delivery -->
       <div class="sect"><div class="sect-t">Как доставлять</div></div>
       <div class="card" style="padding:0;overflow:hidden">
-        <div class="nrow"><div class="nrow-body"><div class="nrow-t">Telegram-бот <span class="pill up">основной</span></div><div class="nrow-s">@ambar_owner_bot</div></div><span style="color:var(--up);font-weight:600;font-size:12px">подключён</span></div>
+        <div class="nrow"><div class="nrow-body"><div class="nrow-t">Telegram-бот <span class="pill up">основной</span></div><div class="nrow-s">@ambar_manage_bot</div></div><span style="color:var(--up);font-weight:600;font-size:12px">подключён</span></div>
         <div class="nrow"><div class="nrow-body"><div class="nrow-t">Группировать в дайджесты</div><div class="nrow-s">Не более 1 сообщения в 5 мин</div></div><label class="tg"><input type="checkbox" data-p="delivery.group"><i></i></label></div>
         <div class="nrow"><div class="nrow-body"><div class="nrow-t">Email-дубликат</div><div class="nrow-s">Для архива</div></div><label class="tg"><input type="checkbox" data-p="delivery.email"><i></i></label></div>
         <div class="nrow" style="border:none"><div class="nrow-body"><div class="nrow-t">Push через браузер</div><div class="nrow-s">Когда miniapp открыт</div></div><label class="tg"><input type="checkbox" data-p="delivery.browser" checked><i></i></label></div>
@@ -3055,15 +3055,30 @@ document.addEventListener('change',e=>{
 });
 function closeNotif(){ notifOv.classList.remove('show'); }
 function toggleCat(h){ const c = h.closest('.ncat'); c.classList.toggle('open'); try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){} }
-function testNotif(){
+async function testNotif(){
   const btn = (window.event && window.event.target && window.event.target.closest('.nfoot-btn')) || document.querySelector('.nfoot-btn.sec');
   const prev = btn.textContent;
-  btn.textContent = '✓ Отправлено в Telegram';
-  btn.style.color='var(--up)';
-  btn.style.borderColor='rgba(76,175,125,.35)';
-  btn.style.background='var(--up-soft)';
-  try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(e){}
-  setTimeout(()=>{ btn.textContent=prev; btn.style.color=''; btn.style.borderColor=''; btn.style.background=''; },2200);
+  btn.disabled = true;
+  btn.textContent = '⏳ Отправка…';
+  let ok = false;
+  try{
+    if(!window.ownerApi) throw new Error('api not ready');
+    await ownerApi.ownerFetch('/api/owner/notif-test', {method:'POST'});
+    ok = true;
+  }catch(e){
+    console.warn('[notif-test] failed', e);
+  }
+  btn.disabled = false;
+  if(ok){
+    btn.textContent = '✓ Отправлено в @ambar_manage_bot';
+    btn.style.color='var(--up)'; btn.style.borderColor='rgba(76,175,125,.35)'; btn.style.background='var(--up-soft)';
+    try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(e){}
+  } else {
+    btn.textContent = '✕ Не удалось отправить';
+    btn.style.color='var(--dn)'; btn.style.borderColor='rgba(224,85,85,.35)'; btn.style.background='var(--dn-soft)';
+    try{Telegram.WebApp.HapticFeedback.notificationOccurred('error')}catch(e){}
+  }
+  setTimeout(()=>{ btn.textContent=prev; btn.style.color=''; btn.style.borderColor=''; btn.style.background=''; },2400);
 }
 notifOv.addEventListener('click',e=>{ if(e.target===notifOv) closeNotif(); });
 
@@ -3300,7 +3315,12 @@ function autosaveNotif(){
     const master = notifOv.querySelector('#master').checked;
     const payload = { master, preset: activePreset, quiet, prefs };
     try{ localStorage.setItem('ambar_owner_notif', JSON.stringify(payload)); }catch(e){}
-    // TODO backend: fetch('/api/owner/notif_prefs', {method:'POST', body: JSON.stringify(payload)})
+    // Persist to MongoDB so the backend can read prefs when an event fires.
+    if(window.ownerApi){
+      ownerApi.ownerFetch('/api/owner/notif-prefs', {method:'POST', body: payload}).catch(e=>{
+        console.warn('[notif-prefs] save failed', e);
+      });
+    }
     syncQuietLbl();
     syncActiveCount();
   }, 200);
@@ -4041,6 +4061,32 @@ applyFinanceLive('today');
 loadCustomers().then(customers=>{
   if(customers.length) renderCustomerSections(customers);
 });
+
+// Pull notification preferences from MongoDB so they're consistent across
+// devices. Falls back to localStorage (already loaded above) if the API call
+// fails or returns nothing.
+if(window.ownerApi){
+  ownerApi.ownerFetch('/api/owner/notif-prefs').then(saved=>{
+    if(!saved || !Object.keys(saved).length) return;
+    if(typeof saved.master === 'boolean'){ const m=document.getElementById('master'); if(m) m.checked=saved.master; }
+    if(saved.quiet){
+      const q = notifOv.querySelector('.notif-quiet input[type=checkbox]'); if(q) q.checked = !!saved.quiet.enabled;
+      if(saved.quiet.from) document.getElementById('qtFrom').textContent = saved.quiet.from;
+      if(saved.quiet.to)   document.getElementById('qtTo').textContent   = saved.quiet.to;
+    }
+    if(saved.prefs){
+      Object.entries(saved.prefs).forEach(([k,v])=>{
+        const el = notifOv.querySelector(`input[data-p="${k}"]`);
+        if(el) el.checked = !!v;
+      });
+    }
+    if(saved.preset){
+      document.querySelectorAll('.preset').forEach(p=>p.classList.toggle('on', p.dataset.preset===saved.preset));
+    }
+    if(typeof syncQuietLbl==='function') syncQuietLbl();
+    if(typeof syncActiveCount==='function') syncActiveCount();
+  }).catch(()=>{ /* fall back to localStorage state already applied */ });
+}
 
 // Heatmap mock data
 (()=>{

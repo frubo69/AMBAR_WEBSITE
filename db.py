@@ -5,7 +5,7 @@ Each process maintains its own Motor client pointing at the same Atlas cluster.
 """
 from __future__ import annotations
 import os, logging, re
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 import motor.motor_asyncio
 import certifi
 from dotenv import load_dotenv
@@ -477,6 +477,59 @@ async def get_common_invite_customers() -> list:
         {"_id": 0}
     ).sort("invited_at", -1)
     return await cursor.to_list(length=500)
+
+
+async def get_owner_prefs(owner_id: int) -> dict:
+    """Notification preferences for one owner — what events they want pushed
+    via @ambar_manage_bot. Returns {} if none saved (treat as 'use defaults')."""
+    db = _db_or_none()
+    if db is None: return {}
+    doc = await db.owner_prefs.find_one({"owner_id": owner_id}, {"_id": 0})
+    return doc or {}
+
+
+async def set_owner_prefs(owner_id: int, prefs: dict) -> None:
+    """Upsert the full notif-pref doc. Caller sends the whole settings blob
+    on every change — small payload, no merge logic needed server-side."""
+    db = _db_or_none()
+    if db is None: return
+    await db.owner_prefs.update_one(
+        {"owner_id": owner_id},
+        {"$set": {**prefs, "owner_id": owner_id, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True,
+    )
+
+
+async def get_owners_subscribed_to(event_key: str) -> list:
+    """Return owner_ids whose prefs[event_key] is truthy AND master is on AND
+    we're not in their quiet hours. Quiet-hour check is done server-side
+    against the saved 'from'/'to' times in their prefs.quiet."""
+    db = _db_or_none()
+    if db is None: return []
+    cursor = db.owner_prefs.find(
+        {"$and": [
+            {f"prefs.{event_key}": True},
+            {"$or": [{"master": {"$exists": False}}, {"master": True}]},
+        ]},
+        {"_id": 0, "owner_id": 1, "quiet": 1},
+    )
+    rows = await cursor.to_list(length=100)
+    out = []
+    now_h = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=4))).hour
+    for r in rows:
+        q = r.get("quiet") or {}
+        if q.get("enabled"):
+            try:
+                from_h = int(str(q.get("from","22:00")).split(":")[0])
+                to_h   = int(str(q.get("to","08:00")).split(":")[0])
+                # Quiet window crosses midnight if from >= to (e.g. 22 → 08)
+                in_quiet = (now_h >= from_h or now_h < to_h) if from_h >= to_h else (from_h <= now_h < to_h)
+                if in_quiet:
+                    continue
+            except Exception:
+                pass
+        out.append(r["owner_id"])
+    return out
 
 
 async def get_all_customers() -> list:

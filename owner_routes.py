@@ -16,8 +16,13 @@ from aiohttp import web
 
 from owner_auth import require_owner, CORS_HEADERS
 import db
+import os, logging
 # Premium card lists live in api_server (single source of truth).
 from api_server import _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS, tg_send, BOT_TOKEN
+
+log = logging.getLogger(__name__)
+# Owner-bot token used to push notifications to the owner via @ambar_manage_bot.
+OWNER_BOT_TOKEN = os.getenv("AMBAR_OWNER_BOT_TOKEN", "")
 
 
 # ─── constants ──────────────────────────────────────────────────────────
@@ -441,6 +446,64 @@ async def handle_customer_detail(request):
     )
 
 
+# ─── notification preferences ────────────────────────────────────────
+
+@require_owner
+async def handle_notif_prefs_get(request):
+    """Return the saved notif prefs for the authenticated owner."""
+    prefs = await db.get_owner_prefs(request["owner_id"])
+    return web.json_response(prefs, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_notif_prefs_set(request):
+    """Replace notif prefs for the authenticated owner. Body shape:
+       {"master": bool, "preset": str, "quiet": {enabled,from,to},
+        "prefs": {"orders.new": bool, ...}}"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid json"}, status=400, headers=CORS_HEADERS)
+    if not isinstance(body, dict):
+        return web.json_response({"error": "expected object"}, status=400, headers=CORS_HEADERS)
+    await db.set_owner_prefs(request["owner_id"], body)
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_notif_test(request):
+    """Send a single test message to the requesting owner via @ambar_manage_bot."""
+    if not OWNER_BOT_TOKEN:
+        return web.json_response({"error": "owner bot not configured"}, status=503, headers=CORS_HEADERS)
+    try:
+        await tg_send(
+            OWNER_BOT_TOKEN, request["owner_id"],
+            "🔔 *Тест уведомлений*\n\nЕсли вы видите это сообщение — связь с @ambar\\_manage\\_bot работает.",
+            parse_mode="Markdown",
+        )
+        return web.json_response({"ok": True}, headers=CORS_HEADERS)
+    except Exception as e:
+        log.error(f"[owner-notif] test send failed: {e}")
+        return web.json_response({"error": str(e)}, status=500, headers=CORS_HEADERS)
+
+
+# Public helper used by api_server (and operator_bot in future) to push an
+# event to all owners subscribed to it. Best-effort; logs failures.
+async def notify_owners(event_key: str, text: str, parse_mode: str = "Markdown") -> None:
+    if not OWNER_BOT_TOKEN:
+        return
+    try:
+        owner_ids = await db.get_owners_subscribed_to(event_key)
+    except Exception as e:
+        log.error(f"[owner-notif] subscriber lookup failed for {event_key}: {e}")
+        return
+    for oid in owner_ids:
+        try:
+            await tg_send(OWNER_BOT_TOKEN, oid, text, parse_mode=parse_mode)
+        except Exception as e:
+            log.error(f"[owner-notif] send {event_key} → {oid} failed: {e}")
+
+
 @require_owner
 async def handle_customer_ban(request):
     """Ban or unban a customer. POST body: {"reason": "..."} for ban (optional)."""
@@ -504,3 +567,8 @@ def setup(app):
     app.router.add_get(             "/api/owner/customers/{telegram_id}", handle_customer_detail)
     app.router.add_route("OPTIONS", "/api/owner/customers/{telegram_id}/{action:ban|unban}", handle_customer_ban)
     app.router.add_post(            "/api/owner/customers/{telegram_id}/{action:ban|unban}", handle_customer_ban)
+    app.router.add_route("OPTIONS", "/api/owner/notif-prefs", handle_notif_prefs_get)
+    app.router.add_get(             "/api/owner/notif-prefs", handle_notif_prefs_get)
+    app.router.add_post(            "/api/owner/notif-prefs", handle_notif_prefs_set)
+    app.router.add_route("OPTIONS", "/api/owner/notif-test",  handle_notif_test)
+    app.router.add_post(            "/api/owner/notif-test",  handle_notif_test)

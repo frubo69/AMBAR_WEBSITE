@@ -432,6 +432,27 @@ async def handle_create_order(request: web.Request) -> web.Response:
             log.error(f"Referral award failed: {e}")
 
     log.info(f"[order] #{oid} user={uid} items={len(items)} total={total} AED")
+
+    # Owner notifications via @ambar_manage_bot — fan out to every event the
+    # order matches (new, ≥500, ≥1000). owner_routes.notify_owners filters by
+    # subscriber prefs + master toggle + quiet hours.
+    try:
+        from owner_routes import notify_owners
+        owner_text = (
+            f"🆕 *Новый заказ #{oid}*\n"
+            f"Сумма: *{total} AED*\n"
+            f"Клиент: {user_name} ({phone})\n"
+            f"Адрес: {address}\n"
+            f"Офис: {office_nm or office_id}"
+        )
+        await notify_owners("orders.new", owner_text)
+        if total >= 1000:
+            await notify_owners("orders.new1000", "💎 *Очень крупный заказ!*\n\n" + owner_text)
+        elif total >= 500:
+            await notify_owners("orders.new500", "💰 *Крупный заказ*\n\n" + owner_text)
+    except Exception as e:
+        log.error(f"[owner-notif] orders.new failed: {e}")
+
     return web.json_response({"ok": True, "order_id": oid, "needs_verification": _needs_verification}, headers=CORS_HEADERS)
 
 
@@ -541,6 +562,20 @@ async def handle_cancel_order(request: web.Request) -> web.Response:
             log.error(f"Customer cancel edit: {e}")
 
     log.info(f"[cancel-order] #{order_id} user={uid} reason={reason!r}")
+
+    # Owner notification — orders.cancelled
+    try:
+        from owner_routes import notify_owners
+        await notify_owners(
+            "orders.cancelled",
+            f"🚫 *Клиент отменил заказ #{order_id}*\n"
+            f"Клиент: {user_name}\n"
+            f"Причина: {reason or '—'}"
+            + (f"\nКомментарий: {comment}" if comment else "")
+        )
+    except Exception as e:
+        log.error(f"[owner-notif] orders.cancelled failed: {e}")
+
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 
@@ -744,6 +779,23 @@ async def handle_verify_request(request: web.Request) -> web.Response:
         await db.update_order(oid, pending_verification=False)
 
     log.info(f"[verify-request] uid={uid} source={source} detail={source_detail or recommender_name}")
+
+    # Owner notification — customers.verify
+    try:
+        from owner_routes import notify_owners
+        src_lbl = {"friend":"от друга","operator":"от оператора"}.get(source, source or "—")
+        await notify_owners(
+            "customers.verify",
+            f"📝 *Запрос верификации*\n"
+            f"Клиент: {user.get('first_name','')} {user.get('last_name','')}\n"
+            f"@{user.get('username','—')}\n"
+            f"ID: `{uid}`\n"
+            f"Источник: {src_lbl}"
+            + (f"\nРекомендатель: {recommender_name} ({recommender_phone})" if recommender_name else "")
+        )
+    except Exception as e:
+        log.error(f"[owner-notif] customers.verify failed: {e}")
+
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 
@@ -920,6 +972,41 @@ async def handle_review(request: web.Request) -> web.Response:
         except Exception as e:
             log.error(f"Review notify {op_id}: {e}")
     log.info(f"[review] #{order_id} uid={uid} score={score}")
+
+    # Owner notifications — review event(s) based on score
+    try:
+        from owner_routes import notify_owners
+        await notify_owners(
+            "reviews.any",
+            f"📝 *Отзыв на заказ #{order_id}*\n"
+            f"Клиент: {user_name}\n"
+            f"Оценка: {stars} ({score}/5)"
+            + (f"\nКомментарий: _{comment}_" if comment else "")
+        )
+        if int(score) <= 3:
+            await notify_owners(
+                "reviews.bad3",
+                f"⚠️ *Плохой отзыв ({score}★)*\n"
+                f"Заказ #{order_id} · {user_name}"
+                + (f"\n_{comment}_" if comment else "")
+            )
+        if int(score) == 5:
+            await notify_owners(
+                "reviews.good5",
+                f"⭐ *Отличный отзыв (5★)*\n"
+                f"Заказ #{order_id} · {user_name}"
+                + (f"\n_{comment}_" if comment else "")
+            )
+        if comment:
+            await notify_owners(
+                "reviews.comment",
+                f"💬 *Отзыв с комментарием*\n"
+                f"Заказ #{order_id} · {user_name} · {stars}\n"
+                f"_{comment}_"
+            )
+    except Exception as e:
+        log.error(f"[owner-notif] reviews.* failed: {e}")
+
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 

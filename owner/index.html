@@ -604,37 +604,23 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     </div>
   </div>
 
-  <!-- 7-day bars -->
-  <div class="sect"><div class="sect-t">Последние 7 дней</div></div>
-  <div class="card">
-    <svg viewBox="0 0 320 140" width="100%" height="140" preserveAspectRatio="none">
+  <!-- Period bars (dynamic — re-rendered per period) -->
+  <div class="sect"><div class="sect-t" id="periodBarsTitle">Последние 7 дней</div></div>
+  <div class="card" style="position:relative">
+    <svg id="periodBarsSvg" viewBox="0 0 320 140" width="100%" height="140" preserveAspectRatio="none">
       <defs>
         <linearGradient id="bg1" x1="0" x2="0" y1="0" y2="1">
           <stop offset="0%" stop-color="#E8C98A"/>
           <stop offset="100%" stop-color="#C9A96E" stop-opacity=".5"/>
         </linearGradient>
       </defs>
-      <!-- grid -->
-      <line x1="0" y1="35" x2="320" y2="35" stroke="rgba(255,255,255,.04)"/>
-      <line x1="0" y1="70" x2="320" y2="70" stroke="rgba(255,255,255,.04)"/>
+      <line x1="0" y1="35"  x2="320" y2="35"  stroke="rgba(255,255,255,.04)"/>
+      <line x1="0" y1="70"  x2="320" y2="70"  stroke="rgba(255,255,255,.04)"/>
       <line x1="0" y1="105" x2="320" y2="105" stroke="rgba(255,255,255,.04)"/>
-      <!-- bars (heights/y set dynamically by renderMoney) -->
-      <g id="bars7d">
-        <rect x="10"  y="130" width="30" height="0" rx="4" fill="url(#bg1)" opacity=".7"/>
-        <rect x="52"  y="130" width="30" height="0" rx="4" fill="url(#bg1)" opacity=".7"/>
-        <rect x="94"  y="130" width="30" height="0" rx="4" fill="url(#bg1)" opacity=".7"/>
-        <rect x="136" y="130" width="30" height="0" rx="4" fill="url(#bg1)" opacity=".7"/>
-        <rect x="178" y="130" width="30" height="0" rx="4" fill="url(#bg1)" opacity=".7"/>
-        <rect x="220" y="130" width="30" height="0" rx="4" fill="url(#bg1)" opacity=".7"/>
-        <rect x="262" y="130" width="30" height="0" rx="4" fill="url(#bg1)"/>
-      </g>
-      <!-- day labels -->
-      <g font-family="DM Sans" font-size="9" fill="#54526A" text-anchor="middle">
-        <text x="25" y="138">ПН</text><text x="67" y="138">ВТ</text><text x="109" y="138">СР</text>
-        <text x="151" y="138">ЧТ</text><text x="193" y="138">ПТ</text><text x="235" y="138">СБ</text>
-        <text x="277" y="138" fill="#E8C98A" font-weight="600">СЕГ</text>
-      </g>
+      <g id="periodBarsGroup"></g>
+      <g id="periodBarsLabels" font-family="DM Sans" font-size="9" fill="#54526A" text-anchor="middle"></g>
     </svg>
+    <div id="periodBarTooltip" style="position:absolute;display:none;background:var(--card2);border:1px solid var(--gold2);border-radius:8px;padding:6px 10px;font-size:12px;font-weight:600;color:var(--gold2);pointer-events:none;white-space:nowrap;z-index:5;font-family:'DM Sans',sans-serif;box-shadow:0 4px 14px rgba(201,169,110,.25);transform:translate(-50%,-100%)"></div>
     <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);padding:4px 10px 0;border-top:1px solid var(--border2);margin-top:8px;padding-top:10px">
       <span>В среднем: <b id="bars7dAvg" data-aed="" style="color:var(--text)">—</b> <span class="cur-unit">AED</span></span>
       <span>Всего: <b id="bars7dTotal" data-aed="" style="color:var(--gold2)">—</b> <span class="cur-unit" style="color:var(--gold2)">AED</span></span>
@@ -2168,6 +2154,10 @@ function applyPeriod(p){
     ['offCentralBar','offNorthBar','offSouthBar'].forEach(id=>{
       const b = document.getElementById(id); if(b) b.style.width = '0%';
     });
+    // Clear period bars + title to avoid showing previous period's bars
+    const pbg = document.getElementById('periodBarsGroup'); if(pbg) pbg.innerHTML = '';
+    const pbl = document.getElementById('periodBarsLabels'); if(pbl) pbl.innerHTML = '';
+    const pbt = document.getElementById('periodBarsTitle'); if(pbt) pbt.textContent = _periodBarsTitle(p);
     // KPI placeholders (real values come from /api/owner/finance kpi block)
     ['kOrders','kOrdersAvg','kDone','kDoneTotal','kDonePct','kInRoute','kAvg','kLate','kLateCount','kRating'].forEach(id=>_setText(id,'—'));
     _setText('kOrdersDelta', '…');
@@ -2230,8 +2220,8 @@ function renderFinance(p, f){
     md.classList.toggle('up',   f.revenue.delta_pct >  0);
     md.classList.toggle('down', f.revenue.delta_pct <  0);
   }
-  // Money tab 7-day bars
-  renderBars7d(f.bars_7d);
+  // Money tab dynamic bars (period-aware)
+  renderPeriodBars(p, f.trend || []);
   // Bento KPIs (real values)
   renderKpis(f.kpi);
   // Re-render with currency formatting
@@ -2266,24 +2256,114 @@ function renderKpis(k){
   _setText('kLateCount', '—');
 }
 
-function renderBars7d(b){
-  if(!b || !Array.isArray(b.values)) return;
-  const g = document.getElementById('bars7d');
-  if(!g) return;
-  const rects = g.querySelectorAll('rect');
-  const max = Math.max(1, ...b.values);
-  const TOP = 20, BOT = 130; // viewBox y range for bars
-  rects.forEach((r,i)=>{
-    const v = b.values[i] || 0;
-    const h = Math.round((v / max) * (BOT - TOP));
-    r.setAttribute('height', h);
-    r.setAttribute('y', BOT - h);
-    // Highlight today's bar (last index)
-    r.setAttribute('opacity', i === rects.length - 1 ? '1' : '0.7');
-  });
-  _setAed('bars7dAvg',   b.average || 0);
-  _setAed('bars7dTotal', b.total   || 0);
+function _periodBarLabels(period, n){
+  if(period === 'today'){
+    // Hourly buckets — label every 4 hours
+    return Array.from({length:n}, (_,i)=> i % 4 === 0 ? i + 'ч' : '');
+  }
+  if(period === 'week'){
+    const base = ['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'];
+    // Last bucket = today (highlight). Trim/extend for safety.
+    const arr = base.slice(0, Math.min(n, 7));
+    if(arr.length) arr[arr.length - 1] = 'СЕГ';
+    return arr;
+  }
+  if(period === 'month'){
+    // 30 daily buckets — label day-of-month every 5 days + last
+    return Array.from({length:n}, (_,i)=> ((i+1) % 5 === 0 || i === n-1) ? String(i+1) : '');
+  }
+  if(period === 'year'){
+    // Months — Я,Ф,М,А,М,И,И,А,С,О,Н,Д
+    const base = ['Я','Ф','М','А','М','И','И','А','С','О','Н','Д'];
+    return base.slice(0, Math.min(n, 12));
+  }
+  return [];
 }
+
+function _periodBarsTitle(period){
+  return {today:'Сегодня · по часам', week:'Последние 7 дней', month:'Последние 30 дней', year:'12 месяцев'}[period] || 'Динамика';
+}
+
+function renderPeriodBars(period, values){
+  if(!Array.isArray(values) || !values.length) return;
+  const group  = document.getElementById('periodBarsGroup');
+  const labelG = document.getElementById('periodBarsLabels');
+  const title  = document.getElementById('periodBarsTitle');
+  if(!group || !labelG) return;
+
+  if(title) title.textContent = _periodBarsTitle(period);
+
+  const W = 320, PAD = 10, TOP = 20, BOT = 130;
+  const n = values.length;
+  const gap = n > 14 ? 1 : n > 10 ? 2 : 4;
+  const barW = (W - 2*PAD - gap*(n-1)) / n;
+  const max  = Math.max(1, ...values);
+  const labels = _periodBarLabels(period, n);
+
+  // Bars
+  let bars = '';
+  values.forEach((v, i)=>{
+    const h = Math.round((v / max) * (BOT - TOP));
+    const x = PAD + i * (barW + gap);
+    const y = BOT - h;
+    const opacity = i === n - 1 ? 1 : 0.7;
+    const radius  = Math.min(4, Math.max(1, barW/4));
+    bars += `<rect x="${x.toFixed(1)}" y="${y}" width="${barW.toFixed(1)}" height="${h}" rx="${radius.toFixed(1)}" fill="url(#bg1)" opacity="${opacity}" data-amt="${v}" data-lbl="${labels[i]||(i+1)}" class="period-bar" style="cursor:pointer"/>`;
+  });
+  group.innerHTML = bars;
+
+  // Labels — only emit non-empty ones to keep it readable
+  let lbl = '';
+  labels.forEach((l, i)=>{
+    if(!l) return;
+    const cx = PAD + i * (barW + gap) + barW/2;
+    const fill = i === n - 1 ? '#E8C98A' : '#54526A';
+    const weight = i === n - 1 ? 'font-weight="600"' : '';
+    lbl += `<text x="${cx.toFixed(1)}" y="138" fill="${fill}" ${weight}>${l}</text>`;
+  });
+  labelG.innerHTML = lbl;
+
+  // Aggregate stats
+  const total = values.reduce((s,v)=>s+v, 0);
+  _setAed('bars7dAvg',   n ? Math.round(total / n) : 0);
+  _setAed('bars7dTotal', total);
+}
+
+// Tap on a bar → tooltip with the amount; tap elsewhere to dismiss.
+(function initPeriodBarTaps(){
+  const svg = document.getElementById('periodBarsSvg');
+  const tip = document.getElementById('periodBarTooltip');
+  if(!svg || !tip) return;
+  let hideTimer = null;
+  function showFor(rect){
+    const amt = parseFloat(rect.getAttribute('data-amt')) || 0;
+    const lbl = rect.getAttribute('data-lbl') || '';
+    tip.textContent = (lbl ? lbl + ': ' : '') + fmt(amt) + ' ' + curCur;
+    // Position above the bar's top, in card-relative coords
+    const svgBox  = svg.getBoundingClientRect();
+    const rectBox = rect.getBoundingClientRect();
+    const cardBox = svg.parentElement.getBoundingClientRect();
+    const cx = (rectBox.left + rectBox.width/2) - cardBox.left;
+    const cy = rectBox.top - cardBox.top - 4;
+    tip.style.left = cx + 'px';
+    tip.style.top  = cy + 'px';
+    tip.style.display = 'block';
+    clearTimeout(hideTimer);
+    hideTimer = setTimeout(()=>{ tip.style.display = 'none'; }, 2200);
+  }
+  svg.addEventListener('pointerdown', e=>{
+    const r = e.target.closest && e.target.closest('rect.period-bar');
+    if(!r) return;
+    e.stopPropagation();
+    showFor(r);
+    try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(_){}
+  });
+  document.addEventListener('pointerdown', e=>{
+    if(tip.style.display === 'none') return;
+    if(svg.contains(e.target)) return;
+    tip.style.display = 'none';
+  });
+})();
 
 function applyPeopleTab(tab){
   const op = document.getElementById('peopleOperators');

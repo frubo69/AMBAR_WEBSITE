@@ -881,6 +881,11 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     <div class="lrow"><div class="card-ico">⭐</div><div class="lrow-body"><div class="lrow-name">Отзывы и жалобы</div><div class="lrow-sub">с фильтром по офису / курьеру</div></div><span style="color:var(--muted)">›</span></div>
   </div>
 
+  <div class="sect"><div class="sect-t">Каталог</div></div>
+  <div class="list">
+    <div class="lrow" onclick="openCatalog()" style="cursor:pointer"><div class="card-ico">🍾</div><div class="lrow-body"><div class="lrow-name">Все позиции</div><div class="lrow-sub" id="catLrowSub">остатки · продажи · выручка</div></div><span style="color:var(--muted)">›</span></div>
+  </div>
+
   <div class="sect"><div class="sect-t">Алерты</div></div>
   <div class="card glow-warn" style="display:flex;gap:12px;align-items:center;padding:14px">
     <div style="width:36px;height:36px;border-radius:10px;background:var(--warn-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0">⚠️</div>
@@ -1667,7 +1672,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .dp-dow span{text-align:center;font-size:9px;font-weight:700;color:var(--muted);letter-spacing:1px;padding:4px 0}
 .dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
 .dp-cell{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:var(--text);cursor:pointer;border-radius:8px;transition:background .15s var(--e1),color .15s var(--e1);font-variant-numeric:lining-nums tabular-nums;position:relative;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
-.dp-cell:active{transform:scale(.88);background:rgba(201,169,110,.12)}
+.dp-cell:active{transform:scale(.88)}
 .dp-cell.off{color:var(--dim);cursor:default;pointer-events:none}
 .dp-cell.today{color:var(--gold2);font-weight:700}
 .dp-cell.in-range{background:rgba(201,169,110,.12);border-radius:0}
@@ -2678,45 +2683,103 @@ function filterCustomers(q){
   });
 })();
 
-// ==== Catalog modal (products) ====
-const PRODUCTS = [
-  {id:'absolut', name:'Absolut', vol:'1L',     cat:'strong', i:'А', price:280, stock:{c:4,n:12,s:8},   sold:18, rev:5040},
-  {id:'jack',    name:"Jack Daniel's", vol:'0.7L', cat:'strong', i:'J', price:340, stock:{c:14,n:8,s:6},  sold:9,  rev:3060},
-  {id:'heineken',name:'Heineken', vol:'6-pack', cat:'beer',  i:'H', price:90,  stock:{c:42,n:28,s:34}, sold:14, rev:1260},
-  {id:'chivas',  name:'Chivas', vol:'0.7L',    cat:'strong', i:'C', price:380, stock:{c:8,n:4,s:6},   sold:3,  rev:1140},
-  {id:'corona',  name:'Corona', vol:'6-pack',  cat:'beer',   i:'C', price:95,  stock:{c:38,n:22,s:28}, sold:11, rev:1045},
-  {id:'greygoose',name:'Grey Goose', vol:'1L', cat:'strong', i:'G', price:420, stock:{c:3,n:2,s:4},   sold:2,  rev:840},
-  {id:'jameson', name:'Jameson', vol:'0.7L',   cat:'strong', i:'J', price:310, stock:{c:6,n:5,s:3},   sold:4,  rev:1240},
-  {id:'budweiser',name:'Budweiser', vol:'6-pack', cat:'beer', i:'B', price:85,  stock:{c:28,n:18,s:24}, sold:8,  rev:680},
-  {id:'johnnie', name:'Johnnie Walker', vol:'1L', cat:'strong', i:'J', price:460, stock:{c:5,n:3,s:4}, sold:3,  rev:1380},
-  {id:'stella',  name:'Stella Artois', vol:'6-pack', cat:'beer', i:'S', price:88, stock:{c:20,n:14,s:16}, sold:6, rev:528},
-  {id:'guinness',name:'Guinness', vol:'6-pack', cat:'beer',  i:'G', price:95,  stock:{c:12,n:8,s:10}, sold:5,  rev:475},
-  {id:'moet',    name:'Moët Chandon', vol:'0.75L', cat:'champ', i:'M', price:580, stock:{c:4,n:2,s:3}, sold:2, rev:1160},
-  {id:'prosecco',name:'Prosecco', vol:'0.75L', cat:'champ',  i:'P', price:180, stock:{c:10,n:7,s:8},  sold:3,  rev:540},
-  {id:'merlot',  name:'Merlot', vol:'0.75L',   cat:'wine',   i:'M', price:160, stock:{c:8,n:6,s:5},   sold:4,  rev:640},
-  {id:'chardonnay',name:'Chardonnay', vol:'0.75L', cat:'wine', i:'C', price:150, stock:{c:6,n:4,s:6}, sold:3,  rev:450},
-  {id:'coke',    name:'Coca-Cola', vol:'1L',   cat:'mixer',  i:'C', price:10,  stock:{c:120,n:80,s:100}, sold:38, rev:380},
-  {id:'tonic',   name:'Schweppes Tonic', vol:'0.5L', cat:'mixer', i:'S', price:15, stock:{c:60,n:40,s:50}, sold:16, rev:240},
-  {id:'redbull', name:'Red Bull', vol:'0.25L', cat:'mixer',  i:'R', price:18,  stock:{c:45,n:30,s:35}, sold:12, rev:216},
-  {id:'patron',  name:'Patrón Silver', vol:'0.7L', cat:'strong', i:'P', price:520, stock:{c:3,n:2,s:2}, sold:1, rev:520},
-  {id:'somersby',name:'Somersby Apple', vol:'6-pack', cat:'light', i:'S', price:75, stock:{c:18,n:12,s:14}, sold:4, rev:300}
-];
+// ==== Catalog modal (products) — backed by /catalog.json ====
+let PRODUCTS = [];
+let catLoaded = false;
+let catLoading = null;
+const CAT_ICO = {'Водка':'🍸','Виски':'🥃','Ром':'🥃','Коньяк':'🥃','Текила':'🌵','Джин':'🍸','Арак':'🥃','Пиво':'🍺','Вино':'🍷','Вермут':'🍷','Шампанское':'🥂','Просекко':'🥂','Ликёр':'🍶'};
 
-const CAT_NAMES = { strong:'Крепкий', beer:'Пиво', wine:'Вино', champ:'Игристое', light:'Слабый', mixer:'Миксеры' };
+function _hashSeed(s){let h=2166136261;for(let i=0;i<(s||'').length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return Math.abs(h|0)}
+
+function _splitVol(name){
+  const m = (name||'').match(/^(.+?)\s+(\d+(?:[.,]\d+)?\s*(?:ltr|ml|cl|cans?|pack)s?)\s*$/i);
+  if(!m) return {n:(name||'').trim(), v:''};
+  return {n: m[1].trim(), v: m[2].trim().replace(/ltr/i,'L').replace(/\s+/g,'')};
+}
+
+async function loadCatalog(){
+  if(catLoaded) return;
+  if(catLoading) return catLoading;
+  catLoading = (async()=>{
+    try{
+      const r = await fetch('../catalog.json?t='+Date.now(), {cache:'no-store'});
+      const raw = await r.json();
+      PRODUCTS = raw.map(p=>{
+        const seed = _hashSeed(p.id||p.name);
+        const inStock = p.stock !== false;
+        const c = inStock ? 4 + (seed % 60) : 0;
+        const n = inStock ? 2 + ((seed>>4) % 30) : 0;
+        const s = inStock ? 3 + ((seed>>7) % 40) : 0;
+        const sold = inStock ? ((seed>>11) % 22) + 1 : 0;
+        const rev = sold * (p.price||0);
+        const sp = _splitVol(p.name);
+        const first = (sp.n[0]||'?').toUpperCase();
+        return {id:p.id, name:sp.n, vol:sp.v, cat:p.cat||'—', i:first, price:p.price||0, stock:{c,n,s}, sold, rev, img:p.img, desc:p.desc};
+      });
+      catLoaded = true;
+      rebuildCatFilters();
+      _refreshCatLrowSub();
+    }catch(e){
+      console.warn('catalog load failed', e);
+      PRODUCTS = [];
+    }finally{
+      catLoading = null;
+    }
+  })();
+  return catLoading;
+}
+
+function _refreshCatLrowSub(){
+  const el = document.getElementById('catLrowSub');
+  if(!el) return;
+  const n = PRODUCTS.length;
+  el.textContent = n ? `${n} ${pluralize(n,'позиция','позиции','позиций')} · остатки · продажи` : 'остатки · продажи · выручка';
+}
+
+function rebuildCatFilters(){
+  const wrap = document.getElementById('catFilters');
+  if(!wrap) return;
+  const counts = {};
+  PRODUCTS.forEach(p=>{ counts[p.cat] = (counts[p.cat]||0)+1; });
+  const cats = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
+  let html = `<button class="cat-f${catFilter==='all'?' on':''}" data-c="all">Все</button>`;
+  cats.forEach(c=>{
+    const ico = CAT_ICO[c] || '';
+    const on = c===catFilter ? ' on' : '';
+    html += `<button class="cat-f${on}" data-c="${c}">${ico?`<span>${ico}</span>`:''}${c}</button>`;
+  });
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('.cat-f').forEach(b=>{
+    b.addEventListener('click',()=>{
+      catFilter = b.dataset.c;
+      wrap.querySelectorAll('.cat-f').forEach(x=>x.classList.toggle('on', x===b));
+      renderCatalog();
+      try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
+    });
+  });
+}
 
 const catOv = document.getElementById('catalogOverlay');
 let catFilter = 'all';
 let catSort = 'rev';
 let catQuery = '';
 
+// Preload catalog so the lrow sub-line shows real count
+loadCatalog();
+
 function openCatalog(){
   if(!catOv) return;
   catQuery = '';
   const inp = document.getElementById('catSearch'); if(inp) inp.value = '';
   const xBtn = document.getElementById('catSearchClear'); if(xBtn) xBtn.classList.remove('on');
-  renderCatalog();
   catOv.classList.add('show');
   const body = document.getElementById('catBody'); if(body) body.scrollTop = 0;
+  if(!catLoaded){
+    if(body) body.innerHTML = '<div class="cat-empty">Загрузка…</div>';
+    loadCatalog().then(()=>renderCatalog());
+  } else {
+    renderCatalog();
+  }
   try{Telegram.WebApp.HapticFeedback.impactOccurred('light')}catch(e){}
 }
 function closeCatalog(){ if(catOv) catOv.classList.remove('show'); }
@@ -2732,7 +2795,7 @@ function renderCatalog(){
   let list = PRODUCTS.filter(p=>{
     if(catFilter !== 'all' && p.cat !== catFilter) return false;
     if(!needle) return true;
-    const hay = clean(p.name + ' ' + p.vol + ' ' + (CAT_NAMES[p.cat]||''));
+    const hay = clean(p.name + ' ' + p.vol + ' ' + (p.cat||''));
     return hay.includes(needle);
   });
   // Sort
@@ -2742,7 +2805,7 @@ function renderCatalog(){
   else if(catSort === 'name') list.sort((a,b)=>a.name.localeCompare(b.name));
 
   const meta = document.getElementById('catalogMeta');
-  if(meta) meta.textContent = `${list.length} ${pluralize(list.length,'позиция','позиции','позиций')}${catFilter!=='all'?' · '+CAT_NAMES[catFilter]:''}`;
+  if(meta) meta.textContent = `${list.length} ${pluralize(list.length,'позиция','позиции','позиций')}${catFilter!=='all'?' · '+catFilter:''}`;
 
   if(!list.length){ body.innerHTML = '<div class="cat-empty">🔍 Ничего не найдено</div>'; return; }
 
@@ -2761,8 +2824,8 @@ function renderCatalog(){
     return `<div class="cat-row" data-detail="product:${p.id}">
       <div class="lrow-av">${p.i}</div>
       <div class="cat-row-body">
-        <div class="cat-row-n">${p.name} <span style="color:var(--muted);font-weight:500">· ${p.vol}</span></div>
-        <div class="cat-row-sub">${CAT_NAMES[p.cat]||''} · ${p.sold} шт/мес · ост. ${st}${low?'<span style="color:var(--warn);margin-left:4px">· низкий</span>':''}</div>
+        <div class="cat-row-n">${p.name}${p.vol?` <span style="color:var(--muted);font-weight:500">· ${p.vol}</span>`:''}</div>
+        <div class="cat-row-sub">${p.cat||''} · ${p.sold} шт/мес · ост. ${st}${low?'<span style="color:var(--warn);margin-left:4px">· низкий</span>':''}</div>
       </div>
       <div class="cat-row-r">
         <div class="cat-row-v ${valClass}">${valText}</div>
@@ -2780,15 +2843,7 @@ function pluralize(n, one, few, many){
   return many;
 }
 
-// Filter + sort chip wiring
-document.querySelectorAll('#catFilters .cat-f').forEach(b=>{
-  b.addEventListener('click',()=>{
-    catFilter = b.dataset.c;
-    document.querySelectorAll('#catFilters .cat-f').forEach(x=>x.classList.toggle('on', x===b));
-    renderCatalog();
-    try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
-  });
-});
+// Filter chips are wired by rebuildCatFilters() once data loads
 // Sort dropdown: trigger + menu
 function toggleCatSortMenu(e){
   if(e){ e.stopPropagation(); }

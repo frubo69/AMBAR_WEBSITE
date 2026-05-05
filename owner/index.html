@@ -885,13 +885,13 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     </div>
     <div class="cat-block-kpis">
       <div class="cat-kpi"><div class="cat-kpi-v" id="catKpiRev">—</div><div class="cat-kpi-l">Выручка / мес</div></div>
-      <div class="cat-kpi"><div class="cat-kpi-v" id="catKpiLow">—</div><div class="cat-kpi-l">Низкий ост.</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v" id="catKpiLow">—</div><div class="cat-kpi-l" id="catKpiLowLbl">Нет в наличии</div></div>
       <div class="cat-kpi"><div class="cat-kpi-v" id="catKpiCats">—</div><div class="cat-kpi-l">Категории</div></div>
     </div>
     <div class="cat-block-expand">
       <div class="cat-block-sect-t">Топ продаж</div>
       <div id="catBlockTop"></div>
-      <div class="cat-block-sect-t">Низкий остаток</div>
+      <div class="cat-block-sect-t">Нет в наличии</div>
       <div id="catBlockLow"></div>
       <button class="cat-block-open" onclick="event.stopPropagation();openCatalog()">Открыть полный каталог →</button>
     </div>
@@ -1574,7 +1574,41 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .cat-row-v{font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;color:var(--gold2);letter-spacing:-.2px;font-variant-numeric:lining-nums tabular-nums}
 .cat-row-vu{font-size:9px;color:var(--muted);margin-top:2px;letter-spacing:.5px;text-transform:uppercase;font-weight:600}
 .cat-stock-low{color:var(--warn)!important}
+.cat-row-out{opacity:.65}
+.cat-row-out .lrow-av{background:linear-gradient(135deg,#2a1818,#1a0f0f);color:var(--warn);border-color:rgba(243,109,109,.2)}
 .cat-empty{padding:30px 14px;text-align:center;color:var(--muted);font-size:13px}
+
+/* Catalog item editor sheet */
+.ce-row{display:flex;align-items:center;gap:12px;padding:14px 0;border-bottom:1px solid var(--border2)}
+.ce-row:last-of-type{border-bottom:none}
+.ce-row-l{flex:1;min-width:0}
+.ce-row-t{font-size:13px;font-weight:600;color:var(--text)}
+.ce-row-s{font-size:11px;color:var(--muted);margin-top:2px}
+.ce-toggle{flex-shrink:0;position:relative;width:48px;height:28px;background:var(--card3);border:1px solid var(--border3);border-radius:999px;cursor:pointer;transition:.2s var(--e1);padding:0;-webkit-tap-highlight-color:transparent}
+.ce-toggle .ce-knob{position:absolute;top:2px;left:2px;width:22px;height:22px;border-radius:50%;background:#888;transition:.25s var(--e1)}
+.ce-toggle.on{background:linear-gradient(135deg,rgba(120,200,140,.32),rgba(120,200,140,.12));border-color:rgba(120,200,140,.5)}
+.ce-toggle.on .ce-knob{left:24px;background:linear-gradient(135deg,#a8e6b8,#7ed29b);box-shadow:0 2px 6px rgba(120,200,140,.35)}
+.ce-toggle:active{transform:scale(.96)}
+.ce-price{flex-shrink:0;display:flex;align-items:center;gap:8px;background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:0 12px;height:40px;transition:.15s var(--e1)}
+.ce-price:focus-within{border-color:rgba(201,169,110,.5);background:var(--card3)}
+.ce-price input{width:90px;background:none;border:none;outline:none;color:var(--gold2);font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;text-align:right;font-variant-numeric:lining-nums tabular-nums;padding:0;-moz-appearance:textfield}
+.ce-price input::-webkit-outer-spin-button,.ce-price input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.ce-price-cur{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:.5px}
+.ce-stats{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:14px}
+.ce-stat{padding:10px 8px;background:var(--card2);border:1px solid var(--border2);border-radius:10px;text-align:center}
+.ce-stat-v{font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;color:var(--gold2);font-variant-numeric:lining-nums tabular-nums}
+.ce-stat-l{font-size:9px;color:var(--muted);margin-top:3px;letter-spacing:.5px;text-transform:uppercase;font-weight:600}
+.ce-msg{margin-top:10px;font-size:11px;text-align:center;min-height:14px}
+.ce-msg.ok{color:var(--up)}
+.ce-msg.err{color:var(--warn)}
+.ce-btn-1,.ce-btn-2{flex:1;padding:12px;font-size:13px;font-weight:600;border-radius:10px;cursor:pointer;font-family:inherit;letter-spacing:.2px;transition:.15s var(--e1);-webkit-tap-highlight-color:transparent}
+.ce-btn-1{background:linear-gradient(135deg,rgba(201,169,110,.22),rgba(201,169,110,.08));border:1px solid rgba(201,169,110,.4);color:var(--gold2)}
+.ce-btn-1:hover{border-color:rgba(201,169,110,.6);background:linear-gradient(135deg,rgba(201,169,110,.32),rgba(201,169,110,.12))}
+.ce-btn-1:active{transform:scale(.98)}
+.ce-btn-1[disabled]{opacity:.5;cursor:wait}
+.ce-btn-2{background:var(--card2);border:1px solid var(--border2);color:var(--sub)}
+.ce-btn-2:hover{color:var(--text)}
+.ce-btn-2:active{transform:scale(.98)}
 
 /* Catalog block on Ещё page — expandable card with KPIs + drill-down */
 .cat-block{background:var(--card);border:1px solid var(--border2);border-radius:14px;overflow:hidden;margin-bottom:8px;transition:.2s var(--e1)}
@@ -2736,10 +2770,14 @@ function filterCustomers(q){
   });
 })();
 
-// ==== Catalog modal (products) — backed by /catalog.json ====
+// ==== Catalog modal (products) — backed by /api/owner/catalog (real-time) ====
+// Stock is a boolean (in/out of stock). Sold + revenue are aggregated from
+// delivered orders server-side. Falls back to static catalog.json (with
+// deterministic placeholder stats) when the owner API is unreachable.
 let PRODUCTS = [];
 let catLoaded = false;
 let catLoading = null;
+let catEditable = false;
 const CAT_ICO = {'Водка':'🍸','Виски':'🥃','Ром':'🥃','Коньяк':'🥃','Текила':'🌵','Джин':'🍸','Арак':'🥃','Пиво':'🍺','Вино':'🍷','Вермут':'🍷','Шампанское':'🥂','Просекко':'🥂','Ликёр':'🍶'};
 
 function _hashSeed(s){let h=2166136261;for(let i=0;i<(s||'').length;i++){h^=s.charCodeAt(i);h=Math.imul(h,16777619)}return Math.abs(h|0)}
@@ -2750,25 +2788,43 @@ function _splitVol(name){
   return {n: m[1].trim(), v: m[2].trim().replace(/ltr/i,'L').replace(/\s+/g,'')};
 }
 
+function _shapeProduct(p, withRealStats){
+  const sp = _splitVol(p.name);
+  const first = (sp.n[0]||'?').toUpperCase();
+  let sold, rev;
+  if(withRealStats){
+    sold = +p.sold || 0;
+    rev  = +p.rev  || 0;
+  } else {
+    const seed = _hashSeed(p.id||p.name);
+    sold = p.stock !== false ? ((seed>>11) % 22) + 1 : 0;
+    rev  = sold * (p.price||0);
+  }
+  return {id:p.id, name:sp.n, vol:sp.v, cat:p.cat||'—', i:first, price:+p.price||0, stock: p.stock !== false, sold, rev, img:p.img, desc:p.desc};
+}
+
 async function loadCatalog(){
   if(catLoaded) return;
   if(catLoading) return catLoading;
   catLoading = (async()=>{
     try{
-      const r = await fetch('../catalog.json?t='+Date.now(), {cache:'no-store'});
-      const raw = await r.json();
-      PRODUCTS = raw.map(p=>{
-        const seed = _hashSeed(p.id||p.name);
-        const inStock = p.stock !== false;
-        const c = inStock ? 4 + (seed % 60) : 0;
-        const n = inStock ? 2 + ((seed>>4) % 30) : 0;
-        const s = inStock ? 3 + ((seed>>7) % 40) : 0;
-        const sold = inStock ? ((seed>>11) % 22) + 1 : 0;
-        const rev = sold * (p.price||0);
-        const sp = _splitVol(p.name);
-        const first = (sp.n[0]||'?').toUpperCase();
-        return {id:p.id, name:sp.n, vol:sp.v, cat:p.cat||'—', i:first, price:p.price||0, stock:{c,n,s}, sold, rev, img:p.img, desc:p.desc};
-      });
+      // Try owner API first — gets real stock toggle + real sold/rev.
+      if(window.ownerApi){
+        try{
+          const data = await window.ownerApi.ownerFetch('/api/owner/catalog', {params:{period:'month'}});
+          PRODUCTS = (data.items||[]).map(p=>_shapeProduct(p, true));
+          catEditable = true;
+        }catch(apiErr){
+          console.warn('owner API catalog failed, falling back to static', apiErr);
+        }
+      }
+      // Fallback to static catalog.json (no stats, no editing).
+      if(!PRODUCTS.length){
+        const r = await fetch('../catalog.json?t='+Date.now(), {cache:'no-store'});
+        const raw = await r.json();
+        PRODUCTS = raw.map(p=>_shapeProduct(p, false));
+        catEditable = false;
+      }
       catLoaded = true;
       rebuildCatFilters();
       _renderCatBlock();
@@ -2788,53 +2844,58 @@ function _renderCatBlock(){
   if(!PRODUCTS.length){ sub.textContent = 'Не удалось загрузить каталог'; return; }
   const n = PRODUCTS.length;
   const totalRev = PRODUCTS.reduce((s,p)=>s+(p.rev||0),0);
-  const lowItems = PRODUCTS.filter(p=>stockTotal(p)<20);
+  const outItems = PRODUCTS.filter(p=>!p.stock);
   const cats = new Set(PRODUCTS.map(p=>p.cat));
   sub.textContent = `${n} ${pluralize(n,'позиция','позиции','позиций')} · ${cats.size} ${pluralize(cats.size,'категория','категории','категорий')}`;
 
   const revEl = document.getElementById('catKpiRev');
   if(revEl){
-    const k = totalRev/1000;
-    revEl.innerHTML = `${fmt(Math.round(k))}<span class="u">k</span>`;
+    if(totalRev >= 1000){
+      revEl.innerHTML = `${fmt(Math.round(totalRev/1000))}<span class="u">k</span>`;
+    } else {
+      revEl.innerHTML = `${fmt(totalRev)}`;
+    }
   }
   const lowEl = document.getElementById('catKpiLow');
   if(lowEl){
-    lowEl.textContent = lowItems.length;
-    lowEl.style.color = lowItems.length>0 ? 'var(--warn)' : 'var(--up)';
+    lowEl.textContent = outItems.length;
+    lowEl.style.color = outItems.length>0 ? 'var(--warn)' : 'var(--up)';
   }
+  const lowLblEl = document.getElementById('catKpiLowLbl');
+  if(lowLblEl) lowLblEl.textContent = 'Нет в наличии';
   const catsEl = document.getElementById('catKpiCats');
   if(catsEl) catsEl.textContent = cats.size;
 
   const topWrap = document.getElementById('catBlockTop');
   if(topWrap){
     const top = [...PRODUCTS].sort((a,b)=>b.rev-a.rev).slice(0,3);
-    topWrap.innerHTML = top.map(p=>`<div class="cat-mini-row">
-      <div class="cat-mini-av">${p.i}</div>
-      <div class="cat-mini-body">
-        <div class="cat-mini-n">${p.name}${p.vol?` <span style="color:var(--muted);font-weight:500">· ${p.vol}</span>`:''}</div>
-        <div class="cat-mini-sub">${p.cat} · ${p.sold} шт/мес</div>
-      </div>
-      <div class="cat-mini-r">${fmt(p.rev)}<span class="u">${curCur}</span></div>
-    </div>`).join('');
+    if(top.every(p=>p.rev===0)){
+      topWrap.innerHTML = '<div class="cat-block-empty">Пока нет продаж</div>';
+    } else {
+      topWrap.innerHTML = top.map(p=>`<div class="cat-mini-row">
+        <div class="cat-mini-av">${p.i}</div>
+        <div class="cat-mini-body">
+          <div class="cat-mini-n">${p.name}${p.vol?` <span style="color:var(--muted);font-weight:500">· ${p.vol}</span>`:''}</div>
+          <div class="cat-mini-sub">${p.cat} · ${p.sold} шт/мес</div>
+        </div>
+        <div class="cat-mini-r">${fmt(p.rev)}<span class="u">${curCur}</span></div>
+      </div>`).join('');
+    }
   }
 
-  const lowWrap = document.getElementById('catBlockLow');
-  if(lowWrap){
-    const low = [...lowItems].sort((a,b)=>stockTotal(a)-stockTotal(b)).slice(0,3);
-    if(!low.length){
-      lowWrap.innerHTML = '<div class="cat-block-empty">Все позиции в норме ✓</div>';
+  const outWrap = document.getElementById('catBlockLow');
+  if(outWrap){
+    if(!outItems.length){
+      outWrap.innerHTML = '<div class="cat-block-empty">Все позиции в наличии ✓</div>';
     } else {
-      lowWrap.innerHTML = low.map(p=>{
-        const st = stockTotal(p);
-        return `<div class="cat-mini-row">
-          <div class="cat-mini-av">${p.i}</div>
-          <div class="cat-mini-body">
-            <div class="cat-mini-n">${p.name}${p.vol?` <span style="color:var(--muted);font-weight:500">· ${p.vol}</span>`:''}</div>
-            <div class="cat-mini-sub">${p.cat}</div>
-          </div>
-          <div class="cat-mini-r" style="color:var(--warn)">${st}<span class="u">ост.</span></div>
-        </div>`;
-      }).join('');
+      outWrap.innerHTML = outItems.slice(0,5).map(p=>`<div class="cat-mini-row">
+        <div class="cat-mini-av">${p.i}</div>
+        <div class="cat-mini-body">
+          <div class="cat-mini-n">${p.name}${p.vol?` <span style="color:var(--muted);font-weight:500">· ${p.vol}</span>`:''}</div>
+          <div class="cat-mini-sub">${p.cat}</div>
+        </div>
+        <div class="cat-mini-r" style="color:var(--warn)">нет<span class="u">в нал.</span></div>
+      </div>`).join('') + (outItems.length>5 ? `<div class="cat-block-empty" style="padding-top:6px">…и ещё ${outItems.length-5}</div>` : '');
     }
   }
 }
@@ -2899,6 +2960,67 @@ function closeCatalog(){ if(catOv) catOv.classList.remove('show'); }
 if(catOv) catOv.addEventListener('click',e=>{ if(e.target===catOv) closeCatalog(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && catOv && catOv.classList.contains('show')) closeCatalog(); });
 
+// ── Inline product edit (lives inside the rich product detail view) ────
+window._toggleProdStock = function(){
+  const tog = document.getElementById('dtStockToggle');
+  if(!tog) return;
+  const on = !tog.classList.contains('on');
+  tog.classList.toggle('on', on);
+  tog.setAttribute('aria-checked', on ? 'true' : 'false');
+  const sub = document.getElementById('dtStockSub');
+  if(sub) sub.textContent = on ? 'позиция доступна для заказа' : 'позиция скрыта от клиентов';
+  try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
+};
+
+window.saveProductEdits = async function(id){
+  const tog = document.getElementById('dtStockToggle');
+  const inp = document.getElementById('dtPriceInput');
+  const msg = document.getElementById('dtSaveMsg');
+  const btn = document.getElementById('dtSaveBtn');
+  if(!window.ownerApi){
+    if(msg){ msg.textContent = 'API недоступен'; msg.className = 'ce-msg err'; }
+    return;
+  }
+  const p = PRODUCTS.find(x=>x.id===id);
+  if(!p) return;
+  const newStock = tog ? tog.classList.contains('on') : !!p.stock;
+  const newPrice = inp ? parseInt(inp.value, 10) : +p.price;
+  if(isNaN(newPrice) || newPrice < 0 || newPrice > 100000){
+    if(msg){ msg.textContent = 'Введите корректную цену (0–100 000)'; msg.className = 'ce-msg err'; }
+    return;
+  }
+  const patch = {};
+  if(newStock !== !!p.stock) patch.stock = newStock;
+  if(newPrice !== +p.price)  patch.price = newPrice;
+  if(!Object.keys(patch).length){
+    if(msg){ msg.textContent = 'Нет изменений'; msg.className = 'ce-msg'; }
+    return;
+  }
+  if(btn) btn.disabled = true;
+  if(msg){ msg.textContent = 'Сохранение…'; msg.className = 'ce-msg'; }
+  try{
+    const res = await window.ownerApi.ownerFetch('/api/owner/catalog/'+encodeURIComponent(id), {method:'POST', body:patch});
+    if('stock' in res) p.stock = !!res.stock;
+    if('price' in res){ p.price = +res.price || 0; p.rev = p.sold * p.price; }
+    try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(e){}
+    renderCatalog();
+    _renderCatBlock();
+    // Re-render the detail view in place so KPI tiles + sub-line reflect new values.
+    // Avoid openDetail() since that would push the current key onto the back stack.
+    const fresh = DETAIL.product(id);
+    document.getElementById('dtTitle').innerHTML = fresh.title;
+    document.getElementById('dtBody').innerHTML = fresh.body;
+    document.getElementById('dtFoot').innerHTML = fresh.foot || '';
+    applyCurrency();
+    const newMsg = document.getElementById('dtSaveMsg');
+    if(newMsg){ newMsg.textContent = 'Сохранено ✓'; newMsg.className = 'ce-msg ok'; }
+  }catch(e){
+    if(msg){ msg.textContent = 'Ошибка: ' + (e.payload?.error || e.message || 'не удалось сохранить'); msg.className = 'ce-msg err'; }
+    if(btn) btn.disabled = false;
+    try{Telegram.WebApp.HapticFeedback.notificationOccurred('error')}catch(_e){}
+  }
+};
+
 function renderCatalog(){
   const body = document.getElementById('catBody');
   if(!body) return;
@@ -2911,10 +3033,10 @@ function renderCatalog(){
     const hay = clean(p.name + ' ' + p.vol + ' ' + (p.cat||''));
     return hay.includes(needle);
   });
-  // Sort
+  // Sort. Stock is boolean — sort puts out-of-stock first (needs attention).
   if(catSort === 'rev') list.sort((a,b)=>b.rev - a.rev);
   else if(catSort === 'sold') list.sort((a,b)=>b.sold - a.sold);
-  else if(catSort === 'stock') list.sort((a,b)=>stockTotal(a) - stockTotal(b));
+  else if(catSort === 'stock') list.sort((a,b)=>(a.stock?1:0) - (b.stock?1:0) || b.rev - a.rev);
   else if(catSort === 'name') list.sort((a,b)=>a.name.localeCompare(b.name));
 
   const meta = document.getElementById('catalogMeta');
@@ -2923,22 +3045,22 @@ function renderCatalog(){
   if(!list.length){ body.innerHTML = '<div class="cat-empty">🔍 Ничего не найдено</div>'; return; }
 
   body.innerHTML = list.map(p=>{
-    const st = stockTotal(p);
-    const low = st < 20;
-    const valText = catSort==='sold' ? `${p.sold}` :
-                    catSort==='stock' ? `${st}` :
-                    catSort==='name' ? `${fmt(p.price)}` :
-                    `${fmt(p.rev)}`;
-    const valUnit = catSort==='sold' ? 'продано' :
-                    catSort==='stock' ? 'остаток' :
-                    catSort==='name' ? `${curCur}/ед` :
-                    `${curCur}`;
-    const valClass = catSort==='stock' && low ? 'cat-stock-low' : '';
-    return `<div class="cat-row" data-detail="product:${p.id}">
+    const out = !p.stock;
+    const stockTxt = out ? '<span style="color:var(--warn)">нет в наличии</span>' : 'в наличии';
+    const valText = catSort==='sold'  ? `${p.sold}` :
+                    catSort==='stock' ? (out ? '—' : '✓') :
+                    catSort==='name'  ? `${fmt(p.price)}` :
+                                        `${fmt(p.rev)}`;
+    const valUnit = catSort==='sold'  ? 'продано' :
+                    catSort==='stock' ? (out ? 'нет' : 'есть') :
+                    catSort==='name'  ? `${curCur}/ед` :
+                                        `${curCur}`;
+    const valClass = catSort==='stock' && out ? 'cat-stock-low' : '';
+    return `<div class="cat-row${out?' cat-row-out':''}" data-detail="product:${p.id}">
       <div class="lrow-av">${p.i}</div>
       <div class="cat-row-body">
         <div class="cat-row-n">${p.name}${p.vol?` <span style="color:var(--muted);font-weight:500">· ${p.vol}</span>`:''}</div>
-        <div class="cat-row-sub">${p.cat||''} · ${p.sold} шт/мес · ост. ${st}${low?'<span style="color:var(--warn);margin-left:4px">· низкий</span>':''}</div>
+        <div class="cat-row-sub">${p.cat||''} · ${stockTxt} · ${fmt(p.price)} ${curCur}</div>
       </div>
       <div class="cat-row-r">
         <div class="cat-row-v ${valClass}">${valText}</div>
@@ -2947,8 +3069,6 @@ function renderCatalog(){
     </div>`;
   }).join('');
 }
-
-function stockTotal(p){ return p.stock.c + p.stock.n + p.stock.s; }
 function pluralize(n, one, few, many){
   const m10 = n%10, m100 = n%100;
   if(m10===1 && m100!==11) return one;
@@ -3921,43 +4041,81 @@ const DETAIL = {
   },
 
   product: id=>{
-    // Fixed rich data for top products; fall back to PRODUCTS catalog for the rest
+    // Prefer live catalog data; fall back to fixed placeholders for legacy ids in hardcoded HTML
+    const live = (typeof PRODUCTS !== 'undefined') ? PRODUCTS.find(x=>x.id===id) : null;
     const fixed = {
       absolut:{name:'Absolut · 1L', i:'А', sold:18, rev:5040, price:280, stock:{central:4,north:12,south:8}, trend:[12,15,11,18,22,16,18]},
       jack:   {name:"Jack Daniel's · 0.7L", i:'J', sold:9, rev:3060, price:340, stock:{central:14,north:8,south:6}, trend:[6,8,5,10,12,7,9]},
       heineken:{name:'Heineken · 6-pack', i:'H', sold:14, rev:1260, price:90, stock:{central:42,north:28,south:34}, trend:[10,12,11,14,18,12,14]},
       chivas: {name:'Chivas · 0.7L', i:'C', sold:3, rev:1140, price:380, stock:{central:8,north:4,south:6}, trend:[2,4,3,5,3,2,3]}
     };
-    let d = fixed[id];
-    if(!d){
-      const p = (typeof PRODUCTS !== 'undefined') ? PRODUCTS.find(x=>x.id===id) : null;
-      if(p){
-        // Generate a plausible 7-day trend scaled around weekly average
-        const avg = Math.max(1, Math.round(p.sold/7));
-        const trend = [0,-1,1,-1,2,0,1].map((o,i)=> Math.max(0, avg+o));
-        trend[6] = Math.max(1, p.sold - trend.slice(0,6).reduce((a,b)=>a+b,0)); // today closes the week to p.sold
-        d = {
-          name: `${p.name} · ${p.vol}`,
-          i: p.i,
-          sold: p.sold,
-          rev: p.rev,
-          price: p.price,
-          stock: { central:p.stock.c, north:p.stock.n, south:p.stock.s },
-          trend
-        };
-      } else d = {};
+    let d;
+    let liveStock = null; // boolean when product is in live PRODUCTS, null otherwise
+    if(live){
+      liveStock = !!live.stock;
+      // Synthesize a plausible per-office distribution from a deterministic seed.
+      // catalog.json only stores a single boolean stock flag; office breakdown stays illustrative.
+      const seed = _hashSeed(live.id);
+      const total = liveStock ? Math.max(8, Math.round((live.sold||10) * 0.8)) : 0;
+      const cShare = 0.36 + ((seed % 25)/100);     // 0.36 – 0.60
+      const nShare = 0.28 + (((seed>>5) % 22)/100); // 0.28 – 0.49
+      const central = Math.round(total * cShare);
+      const north   = Math.round(total * nShare);
+      const south   = Math.max(0, total - central - north);
+      const avg = Math.max(1, Math.round((live.sold||7)/7));
+      const trend = [0,-1,1,-1,2,0,1].map(o=>Math.max(0, avg+o));
+      trend[6] = Math.max(0, (live.sold||0) - trend.slice(0,6).reduce((a,b)=>a+b,0));
+      d = {
+        name: live.name + (live.vol?' · '+live.vol:''),
+        i: live.i,
+        sold: live.sold || 0,
+        rev:  live.rev  || 0,
+        price: live.price || 0,
+        stock: {central, north, south},
+        trend
+      };
+    } else if(fixed[id]){
+      d = fixed[id];
+    } else {
+      d = {name:'—', i:'?', sold:0, rev:0, price:0, stock:{central:0,north:0,south:0}, trend:[0,0,0,0,0,0,0]};
     }
+    const cur = (typeof curCur === 'string' && curCur) ? curCur : 'AED';
     const totalStock = Object.values(d.stock).reduce((a,b)=>a+b,0);
     const low = totalStock < 20;
-    const max = Math.max(...d.trend);
+    const max = Math.max(1, ...d.trend);
     const days = ['ПН','ВТ','СР','ЧТ','ПТ','СБ','СЕГ'];
+    const editable = !!(catEditable && live);
+    const subStock = liveStock===false ? '<span style="color:var(--warn)">нет в наличии</span>' : `${totalStock} на складах${low?' <span style="color:var(--warn)">· низкий</span>':''}`;
+    const editSection = editable ? `
+        <div class="dt-sect">Управление</div>
+        <div class="dt-card">
+          <div class="dt-row" style="border-bottom:1px solid var(--border2)">
+            <div class="dt-row-l">
+              <div class="dt-row-t">В наличии</div>
+              <div class="dt-row-s" id="dtStockSub">${liveStock ? 'позиция доступна для заказа' : 'позиция скрыта от клиентов'}</div>
+            </div>
+            <button class="ce-toggle${liveStock?' on':''}" id="dtStockToggle" role="switch" aria-checked="${liveStock?'true':'false'}" onclick="_toggleProdStock()"><span class="ce-knob"></span></button>
+          </div>
+          <div class="dt-row">
+            <div class="dt-row-l">
+              <div class="dt-row-t">Цена</div>
+              <div class="dt-row-s">за единицу</div>
+            </div>
+            <div class="ce-price">
+              <input type="number" id="dtPriceInput" inputmode="numeric" pattern="[0-9]*" min="0" max="100000" step="1" value="${d.price}"/>
+              <span class="ce-price-cur">${cur}</span>
+            </div>
+          </div>
+        </div>
+        <div id="dtSaveMsg" class="ce-msg" style="margin:0 0 4px"></div>
+    ` : '';
     return {
-      title:`<div class="dt-tit-av plain" style="background:linear-gradient(135deg,#2a2040,#1a1428);color:var(--gold)">${d.i}</div><div><div class="dt-tit-name">${d.name}</div><div class="dt-sub">${fmt(d.price)} AED за ед. · ${totalStock} на складах${low?' <span style="color:var(--warn)">· низкий</span>':''}</div></div>`,
+      title:`<div class="dt-tit-av plain" style="background:linear-gradient(135deg,#2a2040,#1a1428);color:var(--gold)">${d.i}</div><div><div class="dt-tit-name">${d.name}</div><div class="dt-sub">${fmt(d.price)} ${cur} за ед. · ${subStock}</div></div>`,
       body:`
         <div class="dt-stats">
           <div class="dt-stat"><div class="dt-stat-lbl">Продано</div><div class="dt-stat-val">${d.sold}</div><div class="dt-stat-sub">сегодня</div></div>
-          <div class="dt-stat"><div class="dt-stat-lbl">Выручка</div><div class="dt-stat-val gold">${fmt(d.rev)}<span class="u">AED</span></div></div>
-          <div class="dt-stat"><div class="dt-stat-lbl">Цена</div><div class="dt-stat-val">${d.price}<span class="u">AED</span></div></div>
+          <div class="dt-stat"><div class="dt-stat-lbl">Выручка</div><div class="dt-stat-val gold">${fmt(d.rev)}<span class="u">${cur}</span></div></div>
+          <div class="dt-stat"><div class="dt-stat-lbl">Цена</div><div class="dt-stat-val">${d.price}<span class="u">${cur}</span></div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">Остаток</div><div class="dt-stat-val ${low?'warn':''}">${totalStock}</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">За неделю</div><div class="dt-stat-val">${d.trend.reduce((a,b)=>a+b,0)}</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">За месяц</div><div class="dt-stat-val">~${d.sold*22}</div></div>
@@ -3970,8 +4128,11 @@ const DETAIL = {
           <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Ambar North</div><div class="dt-row-s">норма · норматив 12</div></div><div class="dt-row-r">${d.stock.north}</div></div>
           <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Ambar South</div><div class="dt-row-s">норма · норматив 12</div></div><div class="dt-row-r">${d.stock.south}</div></div>
         </div>
+        ${editSection}
       `,
-      foot:`<button class="dt-btn">Изменить цену</button><button class="dt-btn pri">Заказать поставку</button>`
+      foot: editable
+        ? `<button class="dt-btn">Заказать поставку</button><button class="dt-btn pri" id="dtSaveBtn" onclick="saveProductEdits('${id}')">Сохранить</button>`
+        : `<button class="dt-btn">Изменить цену</button><button class="dt-btn pri">Заказать поставку</button>`
     };
   },
 

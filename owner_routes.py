@@ -9,8 +9,9 @@ Register with:
     from owner_routes import setup as setup_owner_routes
     setup_owner_routes(app)
 """
-import time
+import time, json, asyncio
 from datetime import datetime, timedelta, timezone
+from pathlib import Path
 
 from aiohttp import web
 
@@ -555,6 +556,130 @@ async def handle_customer_ban(request):
     return web.json_response({"error": "unknown action"}, status=400, headers=CORS_HEADERS)
 
 
+# ─── Catalog (stock toggle + price edit) ────────────────────────────────
+# catalog.json holds the canonical product list, including `stock` (bool) and
+# `price` (int). It's served statically to the customer mini-app, so any
+# update here is visible to customers on their next page load.
+
+CATALOG_FILE = Path(__file__).parent / "catalog.json"
+_catalog_lock = asyncio.Lock()
+
+
+def _read_catalog() -> list:
+    try:
+        return json.loads(CATALOG_FILE.read_text())
+    except Exception as e:
+        log.error(f"[catalog] read failed: {e}")
+        return []
+
+
+def _write_catalog(catalog: list) -> None:
+    CATALOG_FILE.write_text(json.dumps(catalog, ensure_ascii=False, indent=2))
+
+
+async def _aggregate_sales(period: str = "month") -> dict:
+    """Return {product_id: {sold, rev}} aggregated over the given period."""
+    start, end, _, _ = _period_window(period)
+    orders = await db.get_orders_in_range(
+        start.astimezone(timezone.utc).isoformat().replace("+00:00", ""),
+        end.astimezone(timezone.utc).isoformat().replace("+00:00", ""),
+    )
+    agg = {}
+    for o in orders:
+        if o.get("status") not in REVENUE_STATUSES:
+            continue
+        for it in (o.get("items") or []):
+            pid = it.get("id")
+            if not pid:
+                continue
+            row = agg.setdefault(pid, {"sold": 0, "rev": 0})
+            qty = int(it.get("qty") or 0)
+            line = it.get("line_total") or (it.get("price", 0) * qty)
+            row["sold"] += qty
+            row["rev"] += int(line or 0)
+    return agg
+
+
+@require_owner
+async def handle_catalog_list(request):
+    """Return full catalog joined with sold/rev aggregated from delivered orders.
+
+    Query: period = today | week | month | year (default: month)
+    """
+    period = request.query.get("period", "month")
+    if period not in VALID_PERIODS:
+        period = "month"
+
+    catalog = await asyncio.to_thread(_read_catalog)
+    sales = await _aggregate_sales(period)
+
+    items = []
+    for p in catalog:
+        pid = p.get("id")
+        s = sales.get(pid, {"sold": 0, "rev": 0})
+        items.append({
+            "id":     pid,
+            "cat":    p.get("cat") or "—",
+            "name":   p.get("name") or "",
+            "price":  int(p.get("price") or 0),
+            "stock":  bool(p.get("stock", True)),
+            "img":    p.get("img") or "",
+            "desc":   p.get("desc") or "",
+            "sold":   s["sold"],
+            "rev":    s["rev"],
+        })
+    return web.json_response({"period": period, "items": items}, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_catalog_update(request):
+    """Update stock (bool) and/or price (int) for a single product.
+
+    Body: {"stock": bool?, "price": int?}
+    Returns the updated product row.
+    """
+    pid = request.match_info["product_id"]
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid json"}, status=400, headers=CORS_HEADERS)
+    if not isinstance(body, dict):
+        return web.json_response({"error": "expected object"}, status=400, headers=CORS_HEADERS)
+
+    new_stock = body.get("stock", None)
+    new_price = body.get("price", None)
+    if new_stock is None and new_price is None:
+        return web.json_response({"error": "no fields to update"}, status=400, headers=CORS_HEADERS)
+    if new_stock is not None and not isinstance(new_stock, bool):
+        return web.json_response({"error": "stock must be bool"}, status=400, headers=CORS_HEADERS)
+    if new_price is not None:
+        try:
+            new_price = int(new_price)
+        except (ValueError, TypeError):
+            return web.json_response({"error": "price must be integer"}, status=400, headers=CORS_HEADERS)
+        if new_price < 0 or new_price > 100000:
+            return web.json_response({"error": "price out of range"}, status=400, headers=CORS_HEADERS)
+
+    async with _catalog_lock:
+        catalog = await asyncio.to_thread(_read_catalog)
+        target = next((p for p in catalog if p.get("id") == pid), None)
+        if target is None:
+            return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
+        if new_stock is not None:
+            target["stock"] = new_stock
+        if new_price is not None:
+            target["price"] = new_price
+        await asyncio.to_thread(_write_catalog, catalog)
+
+    log.info(f"[catalog] {request['owner_id']} updated {pid}: stock={new_stock} price={new_price}")
+    return web.json_response({
+        "ok": True,
+        "id": pid,
+        "stock": bool(target.get("stock", True)),
+        "price": int(target.get("price") or 0),
+    }, headers=CORS_HEADERS)
+
+
 def setup(app):
     """Wire owner routes into the aiohttp app. Called from api_server.main()."""
     app.router.add_route("OPTIONS", "/api/owner/ping",    handle_ping)
@@ -572,3 +697,7 @@ def setup(app):
     app.router.add_post(            "/api/owner/notif-prefs", handle_notif_prefs_set)
     app.router.add_route("OPTIONS", "/api/owner/notif-test",  handle_notif_test)
     app.router.add_post(            "/api/owner/notif-test",  handle_notif_test)
+    app.router.add_route("OPTIONS", "/api/owner/catalog",                handle_catalog_list)
+    app.router.add_get(             "/api/owner/catalog",                handle_catalog_list)
+    app.router.add_route("OPTIONS", "/api/owner/catalog/{product_id}",   handle_catalog_update)
+    app.router.add_post(            "/api/owner/catalog/{product_id}",   handle_catalog_update)

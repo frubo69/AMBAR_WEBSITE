@@ -27,6 +27,7 @@ SUPPORT_BOT_TOKEN  = os.getenv("SUPPORT_BOT_TOKEN", "")
 # Owner bot token — separate Telegram bot (@ambar_manage_bot) whose initData
 # signs requests to /api/owner/*. Kept in .env, never in code.
 OWNER_BOT_TOKEN    = os.getenv("AMBAR_OWNER_BOT_TOKEN", "")
+WEBAPP_URL         = os.getenv("WEBAPP_URL", "https://ambar-delivery.com/")
 OPERATOR_IDS       = [int(x.strip()) for x in os.getenv("OPERATOR_IDS", "").split(",") if x.strip().isdigit()]
 PORT               = int(os.getenv("WEBAPP_PORT", "8080"))
 STATIC_DIR         = Path(__file__).parent
@@ -88,8 +89,12 @@ async def _send_card_welcome(ids, flag_field, total, pad, title_ru, tag):
             f"Откройте приложение, чтобы увидеть ваш {title_ru}-статус.\n\n"
             "_Добро пожаловать._ 🥂"
         )
+        kb = {"inline_keyboard": [[{
+            "text": "👑 Открыть PREMIUM-статус",
+            "web_app": {"url": f"{WEBAPP_URL.rstrip('/')}#profile"}
+        }]]}
         try:
-            resp = await tg_send(BOT_TOKEN, uid, welcome_text, parse_mode="Markdown")
+            resp = await tg_send(BOT_TOKEN, uid, welcome_text, parse_mode="Markdown", reply_markup=kb)
             if resp and resp.get("ok"):
                 await db.set_user_field(uid, **{flag_field: True})
                 log.info(f"[{tag}] welcome sent to {uid} (card #{card_number})")
@@ -590,8 +595,9 @@ assert len(_PREMIUM_IDS) <= 10, "ÉLITE premium is capped at 10 cards"
 # Order matters — list index + 1 is the card number. Append new holders to
 # the end so their cards get the next sequential number (003, 004, ...).
 _WORLDWIDE_IDS = [
-    323390062,   # card #001
-    7236406959,  # card #002
+    323390062,    # card #001
+    7236406959,   # card #002
+    1154453658,   # card #003
 ]
 assert len(_WORLDWIDE_IDS) <= 100, "Worldwide PREMIUM is capped at 100 cards"
 

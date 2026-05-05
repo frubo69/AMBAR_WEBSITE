@@ -3054,6 +3054,8 @@ window.addEventListener('DOMContentLoaded',()=>{
   // Validate it still exists
   if(activeAddrIdx!==null&&!getSaved()[activeAddrIdx]) activeAddrIdx=null;
   buildTips();syncOrders();applyLang();loadCatalog();updateFavBtn();updateSortBtn();initSupportInput();checkFirstLaunchHomeScreen();
+  // Deep-link: #profile (from premium card welcome button) → auto-navigate to profile
+  if(window.location.hash==='#profile'){try{history.replaceState(null,'',window.location.pathname);}catch(e){}setTimeout(()=>goPage('profile'),400);}
   // Preload game assets (images + audio) early so game opens instantly
   _preloadGameAssets();
   // Click fallback for non-touch (desktop) — touch is handled via ontouchstart/ontouchend on each chip

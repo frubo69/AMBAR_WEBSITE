@@ -184,14 +184,21 @@ CATEGORY_ORDER = [
 def is_operator(uid):
     return not OPERATOR_IDS or uid in OPERATOR_IDS
 
-def get_operator_office(uid):
+def get_operator_offices(uid):
+    """Return ALL offices an operator belongs to.
+
+    Operators are commonly listed in multiple offices (central+north+south),
+    and they need to see orders from all of them. The previous version only
+    returned the FIRST matching office, which silently hid every order from
+    other offices the same operator was supposed to handle.
+
+    Returns [] if the operator isn't in any office (will be treated by
+    db.get_all_orders as 'no filter' → returns nothing for non-operators)."""
     try:
         from config_offices import OFFICE_OPERATORS
-        for oid, ops in OFFICE_OPERATORS.items():
-            if uid in ops:
-                return oid
-    except: pass
-    return None
+        return [oid for oid, ops in OFFICE_OPERATORS.items() if uid in ops]
+    except Exception:
+        return []
 
 
 DUBAI_TZ = timezone(offset=__import__('datetime').timedelta(hours=4))
@@ -630,7 +637,7 @@ async def update_customer_card(oid: str, reply_markup=None):
 # ── Helper: fetch & build order list ─────────────────────────────────────────
 async def _build_order_list(list_type, operator_uid):
     """Fetch orders and return (header_text, sorted_items, list_type)."""
-    off = get_operator_office(operator_uid)
+    off = get_operator_offices(operator_uid)
     all_orders = await db.get_all_orders(off)
     if list_type == "n":
         items = sorted([o for o in all_orders.values() if o.get("status") == "pending"],
@@ -776,7 +783,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                    parse_mode="Markdown", reply_markup=await kb_order_list(items, "a"))
 
     elif "Завершённые" in text:
-        off = get_operator_office(uid)
+        off = get_operator_offices(uid)
         all_orders = await db.get_all_orders(off)
         done = [o for o in all_orders.values() if o.get("status") in ("delivered","declined","cancelled")]
         if not done:
@@ -803,7 +810,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     elif "Отклонённые" in text:
         # Declined-only date picker — same UX as Завершённые but filtered.
         # Drill-in chain: Отклонённые → xday_<day> → osel_x_<oid> → olist_x → back to date picker.
-        off = get_operator_office(uid)
+        off = get_operator_offices(uid)
         all_orders = await db.get_all_orders(off)
         declined = [o for o in all_orders.values() if o.get("status") == "declined"]
         if not declined:
@@ -827,7 +834,7 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                    parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(rows))
 
     elif "Статистика" in text:
-        off = get_operator_office(uid)
+        off = get_operator_offices(uid)
         all_orders = await db.get_all_orders(off)
         today = datetime.now().strftime("%Y-%m-%d")
         tod   = [o for o in all_orders.values() if o.get("timestamp","").startswith(today)]
@@ -1132,7 +1139,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # ── COMPLETED: date picker ──────────────────────────────────────────────
     elif data.startswith("dday_"):
         day = data[5:]  # dd.mm.yyyy
-        off = get_operator_office(op)
+        off = get_operator_offices(op)
         all_orders = await db.get_all_orders(off)
         done = []
         for o in all_orders.values():
@@ -1159,7 +1166,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # ── DECLINED-ONLY: date picker drill-in ──────────────────────────────────
     elif data.startswith("xday_"):
         day = data[5:]
-        off = get_operator_office(op)
+        off = get_operator_offices(op)
         all_orders = await db.get_all_orders(off)
         declined = []
         for o in all_orders.values():
@@ -1211,7 +1218,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         lt = data[6:]
         if lt == "d":
             # Completed: show date picker instead of flat list
-            off = get_operator_office(op)
+            off = get_operator_offices(op)
             all_orders = await db.get_all_orders(off)
             done = [o for o in all_orders.values() if o.get("status") in ("delivered","declined","cancelled")]
             if not done:
@@ -1232,7 +1239,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             return
         if lt == "x":
             # Declined-only: show date picker
-            off = get_operator_office(op)
+            off = get_operator_offices(op)
             all_orders = await db.get_all_orders(off)
             declined = [o for o in all_orders.values() if o.get("status") == "declined"]
             if not declined:

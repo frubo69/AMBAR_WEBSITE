@@ -92,11 +92,26 @@ async def get_active_orders(telegram_id: int) -> list:
     return await cursor.to_list(length=10)
 
 
-async def get_all_orders(office_id: str = None) -> dict:
-    """Returns {order_id: order_doc, ...}"""
+async def get_all_orders(office_id=None) -> dict:
+    """Returns {order_id: order_doc, ...}.
+
+    office_id can be:
+      • None  → no office filter (returns all orders)
+      • str   → orders from that single office
+      • list  → orders from any office in the list (used by operators who
+                handle multiple offices — central+north+south, etc.)
+    Empty list is treated as 'no orders for this operator' to avoid
+    accidentally returning everyone's orders to a non-operator."""
     db = _db_or_none()
     if db is None: return {}
-    filt = {"office_id": office_id} if office_id else {}
+    if office_id is None:
+        filt = {}
+    elif isinstance(office_id, (list, tuple, set)):
+        if not office_id:
+            return {}
+        filt = {"office_id": {"$in": list(office_id)}}
+    else:
+        filt = {"office_id": office_id}
     cursor = db.orders.find(filt, {"_id": 0})
     docs = await cursor.to_list(length=2000)
     return {o["order_id"]: o for o in docs}

@@ -873,17 +873,36 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 <div class="page" id="pg-more">
   <div style="padding:10px 4px 4px"><div style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600">Ещё</div><div style="font-size:12px;color:var(--muted);margin-top:2px">Отчёты · склад · настройки</div></div>
 
+  <div class="sect"><div class="sect-t">Каталог</div></div>
+  <div class="cat-block" id="catBlock">
+    <div class="cat-block-hdr" id="catBlockHdr">
+      <div class="card-ico">🍾</div>
+      <div class="cat-block-title">
+        <div class="cat-block-n">Все позиции</div>
+        <div class="cat-block-sub" id="catBlockSub">Загрузка…</div>
+      </div>
+      <svg class="cat-block-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="cat-block-kpis">
+      <div class="cat-kpi"><div class="cat-kpi-v" id="catKpiRev">—</div><div class="cat-kpi-l">Выручка / мес</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v" id="catKpiLow">—</div><div class="cat-kpi-l">Низкий ост.</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v" id="catKpiCats">—</div><div class="cat-kpi-l">Категории</div></div>
+    </div>
+    <div class="cat-block-expand">
+      <div class="cat-block-sect-t">Топ продаж</div>
+      <div id="catBlockTop"></div>
+      <div class="cat-block-sect-t">Низкий остаток</div>
+      <div id="catBlockLow"></div>
+      <button class="cat-block-open" onclick="event.stopPropagation();openCatalog()">Открыть полный каталог →</button>
+    </div>
+  </div>
+
   <div class="sect"><div class="sect-t">Отчёты</div></div>
   <div class="list">
     <div class="lrow"><div class="card-ico">📊</div><div class="lrow-body"><div class="lrow-name">Финансовый отчёт</div><div class="lrow-sub">P&L · налоги · комиссии</div></div><span style="color:var(--muted)">›</span></div>
     <div class="lrow"><div class="card-ico">📦</div><div class="lrow-body"><div class="lrow-name">Товарный отчёт</div><div class="lrow-sub">остатки · движение · списания</div></div><span style="color:var(--muted)">›</span></div>
     <div class="lrow"><div class="card-ico">👥</div><div class="lrow-body"><div class="lrow-name">Персонал</div><div class="lrow-sub">нагрузка · зарплаты · KPI</div></div><span style="color:var(--muted)">›</span></div>
     <div class="lrow"><div class="card-ico">⭐</div><div class="lrow-body"><div class="lrow-name">Отзывы и жалобы</div><div class="lrow-sub">с фильтром по офису / курьеру</div></div><span style="color:var(--muted)">›</span></div>
-  </div>
-
-  <div class="sect"><div class="sect-t">Каталог</div></div>
-  <div class="list">
-    <div class="lrow" onclick="openCatalog()" style="cursor:pointer"><div class="card-ico">🍾</div><div class="lrow-body"><div class="lrow-name">Все позиции</div><div class="lrow-sub" id="catLrowSub">остатки · продажи · выручка</div></div><span style="color:var(--muted)">›</span></div>
   </div>
 
   <div class="sect"><div class="sect-t">Алерты</div></div>
@@ -1556,6 +1575,40 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .cat-row-vu{font-size:9px;color:var(--muted);margin-top:2px;letter-spacing:.5px;text-transform:uppercase;font-weight:600}
 .cat-stock-low{color:var(--warn)!important}
 .cat-empty{padding:30px 14px;text-align:center;color:var(--muted);font-size:13px}
+
+/* Catalog block on Ещё page — expandable card with KPIs + drill-down */
+.cat-block{background:var(--card);border:1px solid var(--border2);border-radius:14px;overflow:hidden;margin-bottom:8px;transition:.2s var(--e1)}
+.cat-block:hover{border-color:rgba(201,169,110,.22)}
+.cat-block.open{border-color:rgba(201,169,110,.32)}
+.cat-block-hdr{display:flex;align-items:center;gap:12px;padding:14px;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.cat-block-hdr .card-ico{flex-shrink:0}
+.cat-block-hdr:active{background:rgba(255,255,255,.02)}
+.cat-block-title{flex:1;min-width:0}
+.cat-block-n{font-size:14px;font-weight:600;color:var(--text);font-family:'Space Grotesk',sans-serif}
+.cat-block-sub{font-size:11px;color:var(--muted);margin-top:3px}
+.cat-block-chev{width:16px;height:16px;color:var(--muted);transition:transform .25s var(--e1);flex-shrink:0;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+.cat-block.open .cat-block-chev{transform:rotate(180deg);color:var(--gold2)}
+.cat-block-kpis{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;padding:0 14px 14px}
+.cat-kpi{padding:10px 6px;background:var(--card2);border:1px solid var(--border2);border-radius:10px;text-align:center;min-width:0}
+.cat-kpi-v{font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;color:var(--gold2);letter-spacing:-.2px;font-variant-numeric:lining-nums tabular-nums;line-height:1.1}
+.cat-kpi-v .u{font-size:10px;font-weight:600;color:var(--muted);margin-left:1px}
+.cat-kpi-l{font-size:9px;color:var(--muted);margin-top:4px;letter-spacing:.4px;text-transform:uppercase;font-weight:600;line-height:1.2}
+.cat-block-expand{max-height:0;opacity:0;overflow:hidden;transition:max-height .35s var(--e1), opacity .2s var(--e1), padding .25s var(--e1);padding:0 14px}
+.cat-block.open .cat-block-expand{max-height:800px;opacity:1;padding:0 14px 14px}
+.cat-block-sect-t{font-size:9px;color:var(--muted);letter-spacing:.7px;text-transform:uppercase;font-weight:700;margin:6px 0 4px;padding-top:10px;border-top:1px solid var(--border2)}
+.cat-block-sect-t:first-child{margin-top:2px;padding-top:0;border-top:none}
+.cat-mini-row{display:flex;align-items:center;gap:10px;padding:7px 0}
+.cat-mini-row + .cat-mini-row{border-top:1px solid var(--border2)}
+.cat-mini-av{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:11px;background:linear-gradient(135deg,#2a2040,#1a1428);color:var(--gold);border:1px solid var(--border2);flex-shrink:0}
+.cat-mini-body{flex:1;min-width:0}
+.cat-mini-n{font-size:12px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cat-mini-sub{font-size:10px;color:var(--muted);margin-top:1px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cat-mini-r{font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;color:var(--gold2);font-variant-numeric:lining-nums tabular-nums;flex-shrink:0;text-align:right}
+.cat-mini-r .u{font-size:9px;color:var(--muted);font-weight:600;margin-left:2px}
+.cat-block-empty{font-size:11px;color:var(--muted);padding:6px 0}
+.cat-block-open{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:12px;padding:11px;background:linear-gradient(135deg,rgba(201,169,110,.16),rgba(201,169,110,.05));border:1px solid rgba(201,169,110,.3);border-radius:10px;color:var(--gold2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;letter-spacing:.2px;transition:.15s var(--e1);-webkit-tap-highlight-color:transparent}
+.cat-block-open:hover{border-color:rgba(201,169,110,.5);background:linear-gradient(135deg,rgba(201,169,110,.22),rgba(201,169,110,.08))}
+.cat-block-open:active{transform:scale(.98)}
 </style>
 
 <!-- ============ ALL CLIENTS (A-Z) MODAL ============ -->
@@ -2718,7 +2771,7 @@ async function loadCatalog(){
       });
       catLoaded = true;
       rebuildCatFilters();
-      _refreshCatLrowSub();
+      _renderCatBlock();
     }catch(e){
       console.warn('catalog load failed', e);
       PRODUCTS = [];
@@ -2729,12 +2782,72 @@ async function loadCatalog(){
   return catLoading;
 }
 
-function _refreshCatLrowSub(){
-  const el = document.getElementById('catLrowSub');
-  if(!el) return;
+function _renderCatBlock(){
+  const sub = document.getElementById('catBlockSub');
+  if(!sub) return;
+  if(!PRODUCTS.length){ sub.textContent = 'Не удалось загрузить каталог'; return; }
   const n = PRODUCTS.length;
-  el.textContent = n ? `${n} ${pluralize(n,'позиция','позиции','позиций')} · остатки · продажи` : 'остатки · продажи · выручка';
+  const totalRev = PRODUCTS.reduce((s,p)=>s+(p.rev||0),0);
+  const lowItems = PRODUCTS.filter(p=>stockTotal(p)<20);
+  const cats = new Set(PRODUCTS.map(p=>p.cat));
+  sub.textContent = `${n} ${pluralize(n,'позиция','позиции','позиций')} · ${cats.size} ${pluralize(cats.size,'категория','категории','категорий')}`;
+
+  const revEl = document.getElementById('catKpiRev');
+  if(revEl){
+    const k = totalRev/1000;
+    revEl.innerHTML = `${fmt(Math.round(k))}<span class="u">k</span>`;
+  }
+  const lowEl = document.getElementById('catKpiLow');
+  if(lowEl){
+    lowEl.textContent = lowItems.length;
+    lowEl.style.color = lowItems.length>0 ? 'var(--warn)' : 'var(--up)';
+  }
+  const catsEl = document.getElementById('catKpiCats');
+  if(catsEl) catsEl.textContent = cats.size;
+
+  const topWrap = document.getElementById('catBlockTop');
+  if(topWrap){
+    const top = [...PRODUCTS].sort((a,b)=>b.rev-a.rev).slice(0,3);
+    topWrap.innerHTML = top.map(p=>`<div class="cat-mini-row">
+      <div class="cat-mini-av">${p.i}</div>
+      <div class="cat-mini-body">
+        <div class="cat-mini-n">${p.name}${p.vol?` <span style="color:var(--muted);font-weight:500">· ${p.vol}</span>`:''}</div>
+        <div class="cat-mini-sub">${p.cat} · ${p.sold} шт/мес</div>
+      </div>
+      <div class="cat-mini-r">${fmt(p.rev)}<span class="u">${curCur}</span></div>
+    </div>`).join('');
+  }
+
+  const lowWrap = document.getElementById('catBlockLow');
+  if(lowWrap){
+    const low = [...lowItems].sort((a,b)=>stockTotal(a)-stockTotal(b)).slice(0,3);
+    if(!low.length){
+      lowWrap.innerHTML = '<div class="cat-block-empty">Все позиции в норме ✓</div>';
+    } else {
+      lowWrap.innerHTML = low.map(p=>{
+        const st = stockTotal(p);
+        return `<div class="cat-mini-row">
+          <div class="cat-mini-av">${p.i}</div>
+          <div class="cat-mini-body">
+            <div class="cat-mini-n">${p.name}${p.vol?` <span style="color:var(--muted);font-weight:500">· ${p.vol}</span>`:''}</div>
+            <div class="cat-mini-sub">${p.cat}</div>
+          </div>
+          <div class="cat-mini-r" style="color:var(--warn)">${st}<span class="u">ост.</span></div>
+        </div>`;
+      }).join('');
+    }
+  }
 }
+
+(function initCatBlock(){
+  const block = document.getElementById('catBlock');
+  const hdr = document.getElementById('catBlockHdr');
+  if(!block || !hdr) return;
+  hdr.addEventListener('click',()=>{
+    block.classList.toggle('open');
+    try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
+  });
+})();
 
 function rebuildCatFilters(){
   const wrap = document.getElementById('catFilters');

@@ -226,12 +226,20 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 
 /* Operator sort/filter chip row (People → Операторы)
    Width-aligned with the period-bar above (no negative margins). */
-.op-filters{display:flex;gap:6px;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch;margin:10px 0 0;padding:4px 0}
-.op-filters::-webkit-scrollbar{display:none}
 .op-f{flex:0 0 auto;padding:0 13px;height:32px;display:inline-flex;align-items:center;background:var(--card);border:1px solid var(--border2);border-radius:999px;color:var(--sub);font-size:12px;font-weight:600;letter-spacing:.2px;cursor:pointer;transition:.15s var(--e1);white-space:nowrap;font-family:inherit;line-height:1}
 .op-f:active{transform:scale(.94)}
 .op-f:hover{color:var(--gold2)}
 .op-f.on{background:linear-gradient(135deg,rgba(201,169,110,.18),rgba(201,169,110,.06));border-color:rgba(201,169,110,.4);color:var(--gold2)}
+.op-ctrl-row{margin-top:4px}
+.op-ctrl-btn{width:100%;display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--card);border:1px solid var(--border2);border-radius:11px;color:var(--sub);font-size:12px;font-weight:600;letter-spacing:.2px;cursor:pointer;transition:.15s var(--e1);font-family:inherit;text-align:left}
+.op-ctrl-btn:active{transform:scale(.98)}
+.op-ctrl-btn.on{border-color:rgba(201,169,110,.35);color:var(--gold2)}
+.op-ctrl-btn #opCtrlLbl{flex:1;color:var(--text)}
+.op-ctrl-panel{overflow:hidden;max-height:0;opacity:0;transition:max-height .25s var(--e1),opacity .2s var(--e1),padding .25s var(--e1);padding:0}
+.op-ctrl-panel.open{max-height:220px;opacity:1;padding:12px 0 4px}
+.op-ctrl-sect-lbl{font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.8px;text-transform:uppercase;margin-bottom:7px}
+.op-ctrl-chips{display:flex;gap:6px;align-items:center;overflow-x:auto;overflow-y:hidden;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.op-ctrl-chips::-webkit-scrollbar{display:none}
 
 /* A-Z list letter headers */
 .az-list{gap:0}
@@ -751,25 +759,36 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
 
   <div id="peopleOperators">
-  <div class="period-bar" style="margin-top:4px">
-    <div class="periods" id="opPeriod">
-      <div class="period-pill"></div>
-      <button class="on" data-op-p="today">Сегодня</button>
-      <button data-op-p="week">Неделя</button>
-      <button data-op-p="month">Месяц</button>
-    </div>
-    <button class="cal-btn" onclick="openDate('opPeriod')" aria-label="Свой период">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+  <div class="op-ctrl-row">
+    <button class="op-ctrl-btn" id="opCtrlBtn">
+      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:.7"><path d="M3 6h18M7 12h10M11 18h2"/></svg>
+      <span id="opCtrlLbl">Сегодня · Общий</span>
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-left:auto;opacity:.5" id="opCtrlChevron"><path d="M6 9l6 6 6-6"/></svg>
     </button>
   </div>
   <div class="range-chip" id="rangeChip-opPeriod" style="display:none"><span class="rc-icon">📅</span><span class="rc-text"></span><button class="rc-x" onclick="clearRange('opPeriod')">✕</button></div>
-  <div class="op-filters" id="opFilters">
-    <button class="op-f on" data-f="overall">Общий</button>
-    <button class="op-f" data-f="fast">⚡ Реакция</button>
-    <button class="op-f" data-f="rating">★ Рейтинг</button>
-    <button class="op-f" data-f="orders">Заказы</button>
-    <button class="op-f" data-f="handle">⏱ Обработка</button>
-    <button class="op-f" data-f="late">⚠ Опоздания</button>
+  <div class="op-ctrl-panel" id="opCtrlPanel">
+    <div class="op-ctrl-sect-lbl">Период</div>
+    <div class="period-bar" style="margin:0">
+      <div class="periods" id="opPeriod" style="margin:0">
+        <div class="period-pill"></div>
+        <button class="on" data-op-p="today">Сегодня</button>
+        <button data-op-p="week">Неделя</button>
+        <button data-op-p="month">Месяц</button>
+      </div>
+      <button class="cal-btn" onclick="openDate('opPeriod')" aria-label="Свой период">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+      </button>
+    </div>
+    <div class="op-ctrl-sect-lbl" style="margin-top:12px">Показатель</div>
+    <div class="op-ctrl-chips" id="opFilters">
+      <button class="op-f on" data-f="overall">Общий</button>
+      <button class="op-f" data-f="fast">⚡ Реакция</button>
+      <button class="op-f" data-f="rating">★ Рейтинг</button>
+      <button class="op-f" data-f="orders">Заказы</button>
+      <button class="op-f" data-f="handle">⏱ Обработка</button>
+      <button class="op-f" data-f="late">⚠ Опоздания</button>
+    </div>
   </div>
   <div class="sect"><div class="sect-t">Рейтинг операторов · <span id="opPeriodLbl">сегодня</span></div><div class="sect-a" style="font-size:10px;color:var(--muted)" id="opSortLbl">по общему</div></div>
   <div class="list" id="opList">
@@ -1540,15 +1559,25 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     <div class="tp-hdr">
       <div style="flex:1">
         <div style="font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:600">Все клиенты</div>
-        <div style="font-size:11px;color:var(--muted);margin-top:3px">20 человек · А → Я</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px" id="acSubtitle">20 человек · А → Я</div>
       </div>
       <button class="cmd-close" onclick="closeAllClients()" aria-label="Закрыть"><span class="txt">ESC</span><span class="x">✕</span></button>
     </div>
     <div class="ac-search-wrap">
-      <div class="cust-search">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
-        <input type="text" id="acSearch" placeholder="Имя · @username · телефон" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="search"/>
-        <button class="cust-x" id="acSearchClear" aria-label="Очистить">✕</button>
+      <div class="ac-search-row">
+        <div class="cust-search">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+          <input type="text" id="acSearch" placeholder="Имя · @username · телефон" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" inputmode="search"/>
+          <button class="cust-x" id="acSearchClear" aria-label="Очистить">✕</button>
+        </div>
+        <button class="ac-filter-btn" id="acFilterBtn" aria-label="Фильтр">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+          <span class="ac-filter-dot" id="acFilterDot"></span>
+        </button>
+      </div>
+      <div class="ac-filter-panel" id="acFilterPanel">
+        <button class="ac-chip" data-filter="hasOrders">С заказами</button>
+        <button class="ac-chip" data-filter="vip">VIP</button>
       </div>
     </div>
     <div class="ac-body-wrap">
@@ -1574,6 +1603,18 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .az-index span{font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;color:var(--muted);letter-spacing:.2px;padding:1px 3px;line-height:1;cursor:pointer;transition:.12s var(--e1);user-select:none;-webkit-user-select:none;border-radius:3px;min-width:14px;text-align:center}
 .az-index span:active{color:var(--gold2);transform:scale(1.35);background:rgba(201,169,110,.15)}
 .az-index span.disabled{color:var(--dim);pointer-events:none;opacity:.4}
+.ac-search-row{display:flex;gap:8px;align-items:center}
+.ac-search-row .cust-search{flex:1;margin:0}
+.ac-filter-btn{position:relative;flex-shrink:0;width:44px;align-self:stretch;background:var(--card);border:1px solid var(--border2);border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s var(--e1);color:var(--sub)}
+.ac-filter-btn:active{transform:scale(.93)}
+.ac-filter-btn.on{background:linear-gradient(135deg,rgba(201,169,110,.15),rgba(201,169,110,.04));border-color:rgba(201,169,110,.35);color:var(--gold2)}
+.ac-filter-dot{position:absolute;top:7px;right:7px;width:6px;height:6px;border-radius:50%;background:var(--gold2);display:none}
+.ac-filter-dot.show{display:block}
+.ac-filter-panel{display:flex;gap:6px;flex-wrap:wrap;overflow:hidden;max-height:0;opacity:0;transition:max-height .22s var(--e1),opacity .18s var(--e1),padding .22s var(--e1);padding:0}
+.ac-filter-panel.open{max-height:80px;opacity:1;padding-top:10px}
+.ac-chip{padding:5px 14px;background:var(--card);border:1px solid var(--border2);border-radius:20px;color:var(--sub);font-size:11px;font-weight:600;cursor:pointer;transition:.15s var(--e1);letter-spacing:.2px;white-space:nowrap}
+.ac-chip:active{transform:scale(.95)}
+.ac-chip.on{background:linear-gradient(135deg,rgba(201,169,110,.15),rgba(201,169,110,.04));border-color:rgba(201,169,110,.35);color:var(--gold2)}
 </style>
 
 <!-- ============ DATE RANGE PICKER ============ -->
@@ -1625,8 +1666,8 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .dp-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding:0 2px 6px}
 .dp-dow span{text-align:center;font-size:9px;font-weight:700;color:var(--muted);letter-spacing:1px;padding:4px 0}
 .dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
-.dp-cell{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:var(--text);cursor:pointer;border-radius:8px;transition:background .15s var(--e1),color .15s var(--e1);font-variant-numeric:lining-nums tabular-nums;position:relative;user-select:none;-webkit-user-select:none}
-.dp-cell:active{transform:scale(.9)}
+.dp-cell{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:var(--text);cursor:pointer;border-radius:8px;transition:background .15s var(--e1),color .15s var(--e1);font-variant-numeric:lining-nums tabular-nums;position:relative;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+.dp-cell:active{transform:scale(.88);background:rgba(201,169,110,.12)}
 .dp-cell.off{color:var(--dim);cursor:default;pointer-events:none}
 .dp-cell.today{color:var(--gold2);font-weight:700}
 .dp-cell.in-range{background:rgba(201,169,110,.12);border-radius:0}
@@ -2567,7 +2608,7 @@ function renderAllClientsList(customers){
     const avSt = _cardAvStyle(c.card_type);
     const tag = c.card_label ? ` <span class="lrow-tag ${_cardClass(c.card_type)}">${c.card_label}</span>` : '';
     const uname = c.username ? '@'+c.username : 'ID '+c.telegram_id;
-    html += `<div class="lrow" data-detail="customer:${c.telegram_id}"><div class="lrow-av"${avSt?' style="'+avSt+'"':''}>${c.initials}</div><div class="lrow-body"><div class="lrow-name">${name}${tag}</div><div class="lrow-sub">${uname} · ${_pluralOrders(c.orders_total)}</div></div><div class="lrow-amt mono" data-aed="${c.total_spent}">${fmt(c.total_spent)}</div></div>`;
+    html += `<div class="lrow" data-detail="customer:${c.telegram_id}" data-orders="${c.orders_total||0}" data-vip="${c.is_vip?1:0}"><div class="lrow-av"${avSt?' style="'+avSt+'"':''}>${c.initials}</div><div class="lrow-body"><div class="lrow-name">${name}${tag}</div><div class="lrow-sub">${uname} · ${_pluralOrders(c.orders_total)}</div></div><div class="lrow-amt mono" data-aed="${c.total_spent}">${fmt(c.total_spent)}</div></div>`;
   });
   html += '</div>';
   body.innerHTML = html;
@@ -2847,17 +2888,25 @@ function closeAllClients(){ if(acOv) acOv.classList.remove('show'); }
 if(acOv) acOv.addEventListener('click',e=>{ if(e.target===acOv) closeAllClients(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && acOv && acOv.classList.contains('show')) closeAllClients(); });
 
+let _acActiveFilter = null;
 function filterAllClients(q){
   const wrap = document.getElementById('acBody');
   if(!wrap) return;
   const rows = wrap.querySelectorAll('.lrow');
   const clean = s => (s||'').toLowerCase().replace(/[\s\-\(\)\+]/g,'');
   const needle = clean(q);
+  let visCount = 0;
   rows.forEach(row=>{
-    if(!needle){ row.style.display = ''; return; }
-    const phone = clean(CUST_PHONES[row.dataset.detail] || '');
-    const hay = clean(row.textContent) + ' ' + phone;
-    row.style.display = hay.includes(needle) ? '' : 'none';
+    let show = true;
+    if(needle){
+      const phone = clean(CUST_PHONES[row.dataset.detail] || '');
+      const hay = clean(row.textContent) + ' ' + phone;
+      if(!hay.includes(needle)) show = false;
+    }
+    if(show && _acActiveFilter === 'hasOrders' && Number(row.dataset.orders) === 0) show = false;
+    if(show && _acActiveFilter === 'vip' && row.dataset.vip !== '1') show = false;
+    row.style.display = show ? '' : 'none';
+    if(show) visCount++;
   });
   // Hide empty az-hdr groups
   const list = wrap.querySelector('.az-list');
@@ -2876,6 +2925,13 @@ function filterAllClients(q){
   }
   const x = document.getElementById('acSearchClear');
   if(x) x.classList.toggle('on', !!needle);
+  const sub = document.getElementById('acSubtitle');
+  if(sub){
+    const total = rows.length;
+    if(_acActiveFilter || needle) sub.textContent = `${visCount} из ${total} · А → Я`;
+    else sub.textContent = `${total} человек · А → Я`;
+  }
+  initAzIndex();
 }
 (function initAcSearch(){
   const inp = document.getElementById('acSearch');
@@ -2887,6 +2943,32 @@ function filterAllClients(q){
     filterAllClients('');
     inp.focus();
     try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
+  });
+})();
+(function initAcFilters(){
+  const filterBtn = document.getElementById('acFilterBtn');
+  const panel = document.getElementById('acFilterPanel');
+  const dot = document.getElementById('acFilterDot');
+  if(filterBtn && panel){
+    filterBtn.addEventListener('click', ()=>{
+      const open = panel.classList.toggle('open');
+      filterBtn.classList.toggle('on', open);
+      try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
+    });
+  }
+  document.querySelectorAll('#acFilterPanel .ac-chip').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      const f = btn.dataset.filter;
+      if(_acActiveFilter === f){ _acActiveFilter = null; btn.classList.remove('on'); }
+      else{
+        document.querySelectorAll('#acFilterPanel .ac-chip').forEach(b=>b.classList.remove('on'));
+        _acActiveFilter = f; btn.classList.add('on');
+      }
+      if(dot) dot.classList.toggle('show', !!_acActiveFilter);
+      const inp = document.getElementById('acSearch');
+      filterAllClients(inp ? inp.value : '');
+      try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
+    });
   });
 })();
 
@@ -2976,14 +3058,41 @@ function renderOperators(){
   });
 }
 
-function applyOpPeriod(p){ opPeriodCur = p; renderOperators(); }
+function applyOpPeriod(p){ opPeriodCur = p; renderOperators(); _syncOpCtrl(); }
 function applyOpFilter(f){
   opFilterCur = f;
   document.querySelectorAll('#opFilters .op-f').forEach(b=>b.classList.toggle('on', b.dataset.f===f));
-  renderOperators();
+  renderOperators(); _syncOpCtrl();
 }
+const _opFilterLabels = {overall:'Общий',fast:'⚡ Реакция',rating:'★ Рейтинг',orders:'Заказы',handle:'⏱ Обработка',late:'⚠ Опоздания'};
+const _opPeriodLabels = {today:'Сегодня',week:'Неделя',month:'Месяц'};
+function _opCtrlLabel(){
+  const pKey = opPeriodCur||'today';
+  const fKey = opFilterCur||'overall';
+  const fLbl = (_opFilterLabels[fKey]||'Общий').replace(/[⚡★⏱⚠]\s?/g,'');
+  return (_opPeriodLabels[pKey]||'Сегодня')+' · '+fLbl;
+}
+function _syncOpCtrl(){
+  const lbl = document.getElementById('opCtrlLbl');
+  if(lbl) lbl.textContent = _opCtrlLabel();
+}
+// Ctrl button toggle
+(function(){
+  const btn = document.getElementById('opCtrlBtn');
+  const panel = document.getElementById('opCtrlPanel');
+  const chev = document.getElementById('opCtrlChevron');
+  if(!btn||!panel) return;
+  btn.addEventListener('click',()=>{
+    const open = panel.classList.toggle('open');
+    btn.classList.toggle('on',open);
+    if(chev) chev.style.transform = open ? 'rotate(180deg)' : '';
+    if(open){ const g=document.getElementById('opPeriod'); if(g) requestAnimationFrame(()=>movePill(g)); }
+    try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
+  });
+})();
+// Metric chips
 document.querySelectorAll('#opFilters .op-f').forEach(b=>{
-  b.addEventListener('click', ()=>{
+  b.addEventListener('click',()=>{
     applyOpFilter(b.dataset.f);
     try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
   });

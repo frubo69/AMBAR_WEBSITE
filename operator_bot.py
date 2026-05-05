@@ -483,7 +483,10 @@ def _card_tier(uid, orders_done=0, total_spent=0):
     return "🪪 New"
 
 async def customer_card(o):
-    """Customer info card — shown when operator clicks 'Клиент'."""
+    """Customer info card — shown when operator clicks 'Клиент'.
+    Renders as HTML so user-provided fields (username/name/etc.) can contain
+    Markdown special chars without breaking message parsing — _esc() escapes
+    <, >, & which are the only HTML chars that need handling."""
     cid = o.get("customer_id")
     original = o.get("customer_name", "—")
     nickname = ""
@@ -493,13 +496,13 @@ async def customer_card(o):
         if user_doc:
             original = user_doc.get("full_name") or user_doc.get("name") or original
             nickname = user_doc.get("custom_name", "")
-    name_line = f"👤 *{original}*"
+    name_line = f"👤 <b>{_esc(original)}</b>"
     if nickname:
-        name_line += f"  _({nickname})_"
+        name_line += f"  <i>({_esc(nickname)})</i>"
     lines = [
         name_line,
-        f"📞 `{o.get('phone','—')}`",
-        f"🔗 @{o.get('username','—')}  |  ID: `{o.get('customer_id','—')}`",
+        f"📞 <code>{_esc(o.get('phone','—'))}</code>",
+        f"🔗 @{_esc(o.get('username','—'))}  |  ID: <code>{_esc(o.get('customer_id','—'))}</code>",
         "",
     ]
     # Order stats
@@ -512,16 +515,16 @@ async def customer_card(o):
         spent = user_doc.get("total_spent", 0)
     # Card / loyalty tier
     uid = int(cid) if cid else None
-    lines.append(f"🏷 *{_card_tier(uid, done, spent)}*" if uid else "🏷 —")
+    lines.append(f"🏷 <b>{_esc(_card_tier(uid, done, spent))}</b>" if uid else "🏷 —")
     if user_doc:
-        lines.append(f"📦 Заказов: *{total}*  (✅ {done} / ❌ {declined})")
-        lines.append(f"💰 Потрачено: *{spent:,.0f} AED*")
+        lines.append(f"📦 Заказов: <b>{total}</b>  (✅ {done} / ❌ {declined})")
+        lines.append(f"💰 Потрачено: <b>{spent:,.0f} AED</b>")
     # First seen
     if user_doc and user_doc.get("first_seen"):
         fs = user_doc["first_seen"]
         if isinstance(fs, str):
             fs = datetime.fromisoformat(fs)
-        lines.append(f"📅 Клиент с: *{fs.strftime('%d.%m.%Y')}*")
+        lines.append(f"📅 Клиент с: <b>{fs.strftime('%d.%m.%Y')}</b>")
     # Invite attribution (always shown if set)
     if user_doc:
         inv_op = user_doc.get("invited_by_operator")
@@ -533,9 +536,9 @@ async def customer_card(o):
                 joined_str = dt.astimezone(DUBAI_TZ).strftime('%d.%m.%Y %H:%M')
             except Exception: pass
         if inv_op is not None and inv_op > 0:
-            lines.append(f"🔗 По ссылке оператора: `{inv_op}`" + (f"  _({joined_str})_" if joined_str else ""))
+            lines.append(f"🔗 По ссылке оператора: <code>{inv_op}</code>" + (f"  <i>({joined_str})</i>" if joined_str else ""))
         elif inv_op == 0:
-            lines.append("🔗 По общей ссылке операторов" + (f"  _({joined_str})_" if joined_str else ""))
+            lines.append("🔗 По общей ссылке операторов" + (f"  <i>({joined_str})</i>" if joined_str else ""))
     # Verification info
     if user_doc:
         verified = user_doc.get("verified", False)
@@ -545,20 +548,20 @@ async def customer_card(o):
         rec_phone = user_doc.get("verify_recommender_phone", "")
         lines.append("")
         if verified:
-            lines.append("🔐 *Верифицирован* ✅")
+            lines.append("🔐 <b>Верифицирован</b> ✅")
         elif src:
-            lines.append("🔐 *Ожидает верификации* ⏳")
+            lines.append("🔐 <b>Ожидает верификации</b> ⏳")
         else:
-            lines.append("🔐 *Не верифицирован*")
+            lines.append("🔐 <b>Не верифицирован</b>")
         if src:
             src_labels = {"friend": "👥 Знакомый", "operator": "📞 Оператор", "social": "📱 Соцсети", "search": "🔍 Интернет", "other": "💬 Другое"}
-            lines.append(f"📋 Источник: *{src_labels.get(src, src)}*")
+            lines.append(f"📋 Источник: <b>{_esc(src_labels.get(src, src))}</b>")
         if src == "friend" and rec_name:
-            lines.append(f"👤 Рекомендатель: *{rec_name}*")
+            lines.append(f"👤 Рекомендатель: <b>{_esc(rec_name)}</b>")
             if rec_phone:
-                lines.append(f"📞 Тел рекомендателя: `{rec_phone}`")
+                lines.append(f"📞 Тел рекомендателя: <code>{_esc(rec_phone)}</code>")
         elif src_detail:
-            lines.append(f"💬 Детали: *{src_detail}*")
+            lines.append(f"💬 Детали: <b>{_esc(src_detail)}</b>")
     return "\n".join(lines)
 
 
@@ -1442,10 +1445,21 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await q.edit_message_text(await order_card(order), parse_mode="HTML", reply_markup=await kb_order_actions(order, list_type=lt))
 
     elif data.startswith("client_"):
-        _, oid, cid_str = data.split("_", 2)
-        order = await db.get_order(oid)
-        if order:
-            await q.edit_message_text(await customer_card(order), parse_mode="Markdown", reply_markup=await kb_client_actions(oid, int(cid_str)))
+        try:
+            _, oid, cid_str = data.split("_", 2)
+            order = await db.get_order(oid)
+            if not order:
+                await q.answer(f"❌ Заказ #{oid} не найден", show_alert=True)
+                return
+            await q.edit_message_text(
+                await customer_card(order),
+                parse_mode="HTML",
+                reply_markup=await kb_client_actions(oid, int(cid_str)),
+            )
+        except Exception as e:
+            log.exception(f"client_ callback failed for data={data!r}")
+            try: await q.answer(f"⚠️ Ошибка: {type(e).__name__}", show_alert=True)
+            except Exception: pass
 
     # ── RENAME CLIENT ────────────────────────────────────────────────────────
     elif data.startswith("rename_"):
@@ -1687,8 +1701,23 @@ def main():
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu))
     app.add_handler(CallbackQueryHandler(cb))
+    app.add_error_handler(on_error)
     log.info("🛠 AMBAR Operator Bot started!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
+
+
+async def on_error(update, ctx):
+    """Last-resort handler: surface any unhandled exception to the operator
+    as an alert popup instead of letting it die silently. Without this,
+    a BadRequest from a malformed Markdown/HTML message looks identical to
+    'button does nothing' from the operator's side."""
+    log.exception("Unhandled error in operator bot handler", exc_info=ctx.error)
+    try:
+        if update and getattr(update, "callback_query", None):
+            err_name = type(ctx.error).__name__ if ctx.error else "Error"
+            await update.callback_query.answer(f"⚠️ {err_name}", show_alert=True)
+    except Exception:
+        pass
 
 
 if __name__ == "__main__":

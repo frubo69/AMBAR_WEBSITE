@@ -334,7 +334,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   background:rgba(0,0,6,.88);backdrop-filter:blur(24px);-webkit-backdrop-filter:blur(24px);
   border-top:1px solid var(--border2);
   display:flex;justify-content:space-around;gap:4px}
-.tb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 4px;color:var(--muted);font-size:9px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;transition:.2s var(--e1);border-radius:10px;min-width:0}
+.tb{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:6px 4px;color:var(--muted);font-size:9px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;transition:.2s var(--e1);border-radius:10px;min-width:0}
 .tb svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.8;transition:.2s var(--e1)}
 .tb.on{color:var(--gold2)}
 .tb.on svg{stroke:var(--gold2);filter:drop-shadow(0 0 8px rgba(201,169,110,.35))}
@@ -873,6 +873,13 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 <div class="page" id="pg-more">
   <div style="padding:10px 4px 4px"><div style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600">Ещё</div><div style="font-size:12px;color:var(--muted);margin-top:2px">Отчёты · склад · настройки</div></div>
 
+  <!-- Dynamic alerts -->
+  <div class="sect"><div class="sect-t">Алерты <span id="alertsBadge" class="alert-badge" style="display:none">0</span></div><a class="sect-a" id="alertsAll" style="cursor:pointer;display:none" onclick="qaShowAllAlerts()">все →</a></div>
+  <div class="alert-list" id="alertList">
+    <div class="alert-empty"><span class="ae-ico">✓</span>Все системы в норме</div>
+  </div>
+
+  <!-- Catalog (kept as-is — reference card) -->
   <div class="sect"><div class="sect-t">Каталог</div></div>
   <div class="cat-block" id="catBlock">
     <div class="cat-block-hdr" id="catBlockHdr">
@@ -897,31 +904,18 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     </div>
   </div>
 
-  <div class="sect"><div class="sect-t">Отчёты</div></div>
-  <div class="list">
-    <div class="lrow"><div class="card-ico">📊</div><div class="lrow-body"><div class="lrow-name">Финансовый отчёт</div><div class="lrow-sub">P&L · налоги · комиссии</div></div><span style="color:var(--muted)">›</span></div>
-    <div class="lrow"><div class="card-ico">📦</div><div class="lrow-body"><div class="lrow-name">Товарный отчёт</div><div class="lrow-sub">остатки · движение · списания</div></div><span style="color:var(--muted)">›</span></div>
-    <div class="lrow"><div class="card-ico">👥</div><div class="lrow-body"><div class="lrow-name">Персонал</div><div class="lrow-sub">нагрузка · зарплаты · KPI</div></div><span style="color:var(--muted)">›</span></div>
-    <div class="lrow"><div class="card-ico">⭐</div><div class="lrow-body"><div class="lrow-name">Отзывы и жалобы</div><div class="lrow-sub">с фильтром по офису / курьеру</div></div><span style="color:var(--muted)">›</span></div>
-  </div>
-
-  <div class="sect"><div class="sect-t">Алерты</div></div>
-  <div class="card glow-warn" style="display:flex;gap:12px;align-items:center;padding:14px">
-    <div style="width:36px;height:36px;border-radius:10px;background:var(--warn-soft);display:flex;align-items:center;justify-content:center;flex-shrink:0">⚠️</div>
-    <div style="flex:1">
-      <div style="font-size:13px;font-weight:600">Absolut 1L · низкий остаток</div>
-      <div style="font-size:11px;color:var(--muted);margin-top:2px">Central: 4 бут · норматив 12</div>
-    </div>
-  </div>
-
+  <!-- Settings — functional -->
   <div class="sect"><div class="sect-t">Настройки</div></div>
   <div class="list">
-    <div class="lrow"><div class="lrow-body"><div class="lrow-name">Телеграм-оповещения</div><div class="lrow-sub">заказы &gt; 1000 AED · опоздания</div></div><span style="color:var(--up)">вкл</span></div>
-    <div class="lrow"><div class="lrow-body"><div class="lrow-name">Доступ для менеджеров</div><div class="lrow-sub">2 пользователя</div></div><span style="color:var(--muted)">›</span></div>
-    <div class="lrow"><div class="lrow-body"><div class="lrow-name">Экспорт CSV / XLSX</div></div><span style="color:var(--muted)">›</span></div>
+    <div class="lrow lrow-tog" data-tog="notif"><div class="card-ico">🔔</div><div class="lrow-body"><div class="lrow-name">Telegram-оповещения</div><div class="lrow-sub">заказы &gt; 1000 AED · опоздания</div></div><span class="tog on" id="togNotif"></span></div>
+    <div class="lrow lrow-tog" data-tog="sound"><div class="card-ico">🔊</div><div class="lrow-body"><div class="lrow-name">Звук уведомлений</div><div class="lrow-sub">только важные события</div></div><span class="tog on" id="togSound"></span></div>
+    <div class="lrow lrow-tog" data-tog="quiet"><div class="card-ico">🌙</div><div class="lrow-body"><div class="lrow-name">Тихие часы</div><div class="lrow-sub">23:00 → 09:00 · только критичные</div></div><span class="tog" id="togQuiet"></span></div>
+    <div class="lrow" onclick="openMgr()"><div class="card-ico">👤</div><div class="lrow-body"><div class="lrow-name">Доступ для менеджеров</div><div class="lrow-sub" id="mgrLrowSub">владельцы и менеджеры</div></div><span style="color:var(--muted)">›</span></div>
+    <div class="lrow" onclick="qaExport()"><div class="card-ico">📤</div><div class="lrow-body"><div class="lrow-name">Экспорт CSV / XLSX</div><div class="lrow-sub">данные за выбранный период</div></div><span style="color:var(--muted)">›</span></div>
+    <div class="lrow" onclick="openNotif()"><div class="card-ico">⚙️</div><div class="lrow-body"><div class="lrow-name">Тонкая настройка алертов</div><div class="lrow-sub">пресеты · пороги · каналы</div></div><span style="color:var(--muted)">›</span></div>
   </div>
 
-  <div class="foot">AMBAR Owner · build 2026.04</div>
+  <div class="foot">AMBAR Owner · build 2026.05</div>
 </div>
 
 <!-- ============ COMMAND PALETTE ============ -->
@@ -1530,6 +1524,106 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
 </div>
 
+<!-- ============ MANAGERS ACCESS MODAL ============ -->
+<div class="cmd-overlay" id="mgrOverlay">
+  <div class="cmd-sheet" style="max-width:480px;display:flex;flex-direction:column">
+    <div class="cmd-hdr" style="padding:16px 18px 14px">
+      <div style="flex:1">
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:var(--text)">Доступ к боту</div>
+        <div style="font-size:11px;color:var(--muted);letter-spacing:.3px;margin-top:2px" id="mgrSubtitle">Загрузка…</div>
+      </div>
+      <button class="cmd-close" onclick="closeMgr()" aria-label="Закрыть"><span class="txt">ESC</span><span class="x">✕</span></button>
+    </div>
+    <div class="mgr-body" id="mgrBody">
+      <div style="padding:30px 20px;color:var(--muted);font-size:13px;text-align:center">Загрузка…</div>
+    </div>
+    <!-- Add manager footer (owner only) -->
+    <div class="mgr-add-bar" id="mgrAddBar" style="display:none">
+      <button class="mgr-add-btn" onclick="openMgrAdd()">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M19 8v6M16 11h6"/></svg>
+        <span>Добавить менеджера</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Add manager mini-form (slides in over mgrBody) -->
+<div class="cmd-overlay" id="mgrAddOverlay">
+  <div class="cmd-sheet" style="max-width:420px">
+    <div class="cmd-hdr" style="padding:16px 18px 14px">
+      <div style="flex:1">
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:600">Новый менеджер</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px">Доступ к боту через @ambar_manage_bot</div>
+      </div>
+      <button class="cmd-close" onclick="closeMgrAdd()" aria-label="Закрыть"><span class="txt">ESC</span><span class="x">✕</span></button>
+    </div>
+    <div style="padding:14px 18px 18px;display:flex;flex-direction:column;gap:12px">
+      <label class="mgr-fld">
+        <span class="mgr-fld-l">Telegram ID <span style="color:var(--warn)">*</span></span>
+        <input type="text" id="mgrAddId" inputmode="numeric" placeholder="напр. 123456789" autocomplete="off"/>
+        <span class="mgr-fld-h">узнать через @userinfobot или /id в @ambar_manage_bot</span>
+      </label>
+      <label class="mgr-fld">
+        <span class="mgr-fld-l">Имя</span>
+        <input type="text" id="mgrAddName" placeholder="напр. Алексей К." autocomplete="off" maxlength="60"/>
+      </label>
+      <label class="mgr-fld">
+        <span class="mgr-fld-l">Username</span>
+        <input type="text" id="mgrAddUser" placeholder="@username" autocomplete="off" maxlength="40"/>
+      </label>
+      <div class="mgr-msg" id="mgrAddMsg"></div>
+      <div style="display:flex;gap:8px;margin-top:4px">
+        <button class="ce-btn-2" onclick="closeMgrAdd()">Отмена</button>
+        <button class="ce-btn-1" id="mgrAddSubmit" onclick="submitMgrAdd()">Добавить</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<style>
+.mgr-body{flex:1;overflow-y:auto;padding:8px 10px 14px;max-height:calc(100vh - 220px)}
+.mgr-body::-webkit-scrollbar{display:none}
+.mgr-grp{margin-top:6px}
+.mgr-grp:first-child{margin-top:0}
+.mgr-grp-t{font-size:9px;color:var(--muted);letter-spacing:.7px;text-transform:uppercase;font-weight:700;padding:10px 12px 6px;display:flex;align-items:center;gap:6px}
+.mgr-grp-cnt{font-family:'DM Sans',sans-serif;color:var(--gold2);font-weight:700;font-size:11px}
+.mgr-grp-hint{font-size:10px;color:var(--dim);font-weight:500;text-transform:none;letter-spacing:0;margin-left:auto}
+.mgr-row{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:11px;transition:.15s var(--e1)}
+.mgr-row + .mgr-row{margin-top:4px}
+.mgr-row:hover{background:rgba(255,255,255,.02)}
+.mgr-row.is-self{background:linear-gradient(135deg,rgba(201,169,110,.08),transparent);border:1px solid rgba(201,169,110,.18)}
+.mgr-av{width:36px;height:36px;border-radius:50%;background:linear-gradient(135deg,#2a2040,#1a1428);color:var(--gold);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;font-family:'Space Grotesk',sans-serif;flex-shrink:0;overflow:hidden}
+.mgr-av.owner{background:linear-gradient(135deg,#c9a96e,#e8c98a);color:#0a0a14}
+.mgr-body-info{flex:1;min-width:0}
+.mgr-name{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mgr-name .mgr-tag{display:inline-flex;align-items:center;padding:1px 6px;border-radius:6px;font-size:9px;font-weight:700;letter-spacing:.4px;margin-left:6px;vertical-align:middle;text-transform:uppercase;font-family:'DM Sans',sans-serif}
+.mgr-name .mgr-tag.owner{background:linear-gradient(135deg,rgba(201,169,110,.28),rgba(201,169,110,.12));color:var(--gold2);border:1px solid rgba(201,169,110,.4)}
+.mgr-name .mgr-tag.you{background:rgba(91,141,239,.18);color:var(--info);border:1px solid rgba(91,141,239,.35)}
+.mgr-name .mgr-tag.env{background:var(--card3);color:var(--sub);border:1px solid var(--border2)}
+.mgr-sub{font-size:11px;color:var(--muted);margin-top:2px;font-family:'DM Sans',sans-serif;font-variant-numeric:lining-nums tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mgr-actions{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.mgr-rm{background:transparent;border:1px solid var(--border2);color:var(--muted);width:32px;height:32px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s var(--e1);-webkit-tap-highlight-color:transparent}
+.mgr-rm:hover{border-color:rgba(224,85,85,.5);color:var(--dn);background:rgba(224,85,85,.06)}
+.mgr-rm:active{transform:scale(.92)}
+.mgr-rm[disabled]{opacity:.35;cursor:not-allowed;pointer-events:none}
+.mgr-rm svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.mgr-empty{padding:18px 14px;text-align:center;font-size:11px;color:var(--muted);background:var(--card2);border:1px dashed var(--border2);border-radius:10px;margin:6px 12px}
+.mgr-banner{margin:8px 12px;padding:10px 12px;background:linear-gradient(135deg,rgba(91,141,239,.1),rgba(91,141,239,.03));border:1px solid rgba(91,141,239,.25);border-radius:10px;font-size:11px;color:var(--sub);line-height:1.5}
+.mgr-banner b{color:var(--info)}
+.mgr-add-bar{padding:12px 14px calc(12px + var(--safe-bottom));border-top:1px solid var(--border2);background:var(--bg3)}
+.mgr-add-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0a0a14;font-family:inherit;font-size:13px;font-weight:700;letter-spacing:.3px;border:none;border-radius:12px;cursor:pointer;transition:.15s var(--e1);-webkit-tap-highlight-color:transparent;box-shadow:0 6px 20px rgba(201,169,110,.25)}
+.mgr-add-btn:hover{box-shadow:0 8px 24px rgba(201,169,110,.35)}
+.mgr-add-btn:active{transform:scale(.98)}
+.mgr-fld{display:flex;flex-direction:column;gap:4px}
+.mgr-fld-l{font-size:10px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700}
+.mgr-fld input{background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:11px 12px;font-family:inherit;font-size:14px;color:var(--text);outline:none;transition:.15s var(--e1);-webkit-appearance:none}
+.mgr-fld input:focus{border-color:rgba(201,169,110,.5);background:var(--card3)}
+.mgr-fld-h{font-size:10px;color:var(--dim);margin-top:2px}
+.mgr-msg{min-height:14px;font-size:11px;text-align:center}
+.mgr-msg.ok{color:var(--up)}
+.mgr-msg.err{color:var(--dn)}
+</style>
+
 <style>
 /* Catalog search row — search input + sort trigger side-by-side */
 .cat-search-row{position:relative;display:flex;align-items:center;gap:8px}
@@ -1643,6 +1737,37 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .cat-block-open{display:flex;align-items:center;justify-content:center;gap:6px;width:100%;margin-top:12px;padding:11px;background:linear-gradient(135deg,rgba(201,169,110,.16),rgba(201,169,110,.05));border:1px solid rgba(201,169,110,.3);border-radius:10px;color:var(--gold2);font-size:12px;font-weight:600;cursor:pointer;font-family:inherit;letter-spacing:.2px;transition:.15s var(--e1);-webkit-tap-highlight-color:transparent}
 .cat-block-open:hover{border-color:rgba(201,169,110,.5);background:linear-gradient(135deg,rgba(201,169,110,.22),rgba(201,169,110,.08))}
 .cat-block-open:active{transform:scale(.98)}
+
+/* ===== Dynamic alerts list ===== */
+.alert-list{display:flex;flex-direction:column;gap:6px}
+.alert-row{display:flex;gap:12px;align-items:center;padding:12px 14px;background:var(--card);border:1px solid var(--border2);border-radius:12px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:.15s var(--e1)}
+.alert-row:active{transform:scale(.99)}
+.alert-row.warn{border-color:rgba(243,180,74,.28);background:linear-gradient(135deg,rgba(243,180,74,.06),transparent)}
+.alert-row.dn{border-color:rgba(224,85,85,.32);background:linear-gradient(135deg,rgba(224,85,85,.07),transparent)}
+.alert-row.info{border-color:rgba(91,141,239,.26);background:linear-gradient(135deg,rgba(91,141,239,.06),transparent)}
+.alert-ico{width:34px;height:34px;border-radius:10px;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:15px}
+.alert-row.warn .alert-ico{background:var(--warn-soft);color:var(--warn)}
+.alert-row.dn .alert-ico{background:rgba(224,85,85,.14);color:var(--dn)}
+.alert-row.info .alert-ico{background:rgba(91,141,239,.14);color:var(--info)}
+.alert-body{flex:1;min-width:0}
+.alert-t{font-size:13px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.alert-s{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.alert-x{flex-shrink:0;width:24px;height:24px;border-radius:8px;background:transparent;border:none;color:var(--muted);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.12s var(--e1);-webkit-tap-highlight-color:transparent}
+.alert-x:hover{background:var(--card2);color:var(--text)}
+.alert-x:active{transform:scale(.9)}
+.alert-empty{padding:18px 14px;text-align:center;font-size:12px;color:var(--muted);background:var(--card);border:1px dashed var(--border2);border-radius:12px}
+.alert-empty .ae-ico{font-size:22px;display:block;margin-bottom:6px;opacity:.7}
+
+/* ===== Toggle switch (Settings) ===== */
+.tog{position:relative;display:inline-flex;width:36px;height:20px;background:var(--card2);border:1px solid var(--border2);border-radius:11px;cursor:pointer;transition:.18s var(--e1);flex-shrink:0;-webkit-tap-highlight-color:transparent}
+.tog::after{content:"";position:absolute;top:1px;left:1px;width:16px;height:16px;border-radius:50%;background:var(--sub);transition:.2s var(--e1);box-shadow:0 1px 3px rgba(0,0,0,.4)}
+.tog.on{background:linear-gradient(135deg,rgba(201,169,110,.35),rgba(201,169,110,.18));border-color:rgba(201,169,110,.55)}
+.tog.on::after{left:17px;background:var(--gold2);box-shadow:0 1px 4px rgba(201,169,110,.5)}
+.tog:active{transform:scale(.96)}
+.lrow.lrow-tog{cursor:pointer}
+.alert-badge{display:inline-flex;align-items:center;justify-content:center;min-width:18px;height:18px;padding:0 5px;border-radius:9px;background:var(--warn);color:#0a0a14;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:800;margin-left:6px;vertical-align:middle}
+.alert-badge.dn{background:var(--dn);color:#fff}
+.tab-badge{position:absolute;top:6px;right:calc(50% - 18px);min-width:14px;height:14px;padding:0 3px;border-radius:7px;background:var(--dn);color:#fff;font-family:'DM Sans',sans-serif;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;line-height:1;border:1.5px solid var(--bg);pointer-events:none}
 </style>
 
 <!-- ============ ALL CLIENTS (A-Z) MODAL ============ -->
@@ -1923,6 +2048,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   <button class="tb" data-pg="more">
     <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
     Ещё
+    <span class="tab-badge" id="moreTabBadge" style="display:none">0</span>
   </button>
 </nav>
 
@@ -2828,6 +2954,7 @@ async function loadCatalog(){
       catLoaded = true;
       rebuildCatFilters();
       _renderCatBlock();
+      try{ _renderAlerts(); }catch(e){}
     }catch(e){
       console.warn('catalog load failed', e);
       PRODUCTS = [];
@@ -2909,6 +3036,370 @@ function _renderCatBlock(){
     try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
   });
 })();
+
+// ==== Dynamic alerts (Ещё page) ====
+// Generates alerts from live data (mostly PRODUCTS stock + a few computed
+// signals from PERIOD_DATA / OP_PERIOD). Severities: dn / warn / info.
+const _DISMISSED_ALERTS = new Set();
+function _buildAlerts(){
+  const out = [];
+  // Out-of-stock products → critical
+  const outItems = PRODUCTS.filter(p=>!p.stock);
+  outItems.slice(0,3).forEach(p=>{
+    out.push({
+      id:'oos:'+p.id, sev:'dn', ico:'⚠',
+      t:`${p.name}${p.vol?' · '+p.vol:''} · нет в наличии`,
+      s:`${p.cat} · возобновить поставку`,
+      onClick:()=>openCatalog()
+    });
+  });
+  if(outItems.length>3){
+    out.push({
+      id:'oos:more', sev:'warn', ico:'📦',
+      t:`Ещё ${outItems.length-3} ${pluralize(outItems.length-3,'позиция','позиции','позиций')} нет в наличии`,
+      s:'открыть каталог для проверки',
+      onClick:()=>openCatalog()
+    });
+  }
+  // Slow-moving (real or fallback stats — show only top one to avoid noise)
+  const slowest = PRODUCTS.filter(p=>p.stock && (p.sold||0)===0);
+  if(slowest.length){
+    out.push({
+      id:'slow:top', sev:'info', ico:'💤',
+      t:`${slowest.length} ${pluralize(slowest.length,'позиция','позиции','позиций')} без продаж за месяц`,
+      s:'возможно стоит снизить цену или убрать',
+      onClick:()=>openCatalog()
+    });
+  }
+  // Late operator (from OP_PERIOD today)
+  try{
+    const td = OP_PERIOD.today;
+    Object.keys(td).filter(k=>k!=='lbl').forEach(k=>{
+      const op = td[k];
+      if(op.respSec > 60){
+        out.push({
+          id:'op:slow:'+k, sev:'warn', ico:'⏱',
+          t:`Медленная реакция · ${k.charAt(0).toUpperCase()+k.slice(1)}`,
+          s:`${fmtSec(op.respSec).v} ${fmtSec(op.respSec).u} · норма ≤ 60 сек`,
+          onClick:()=>switchPage('people')
+        });
+      }
+      if(op.late >= 2){
+        out.push({
+          id:'op:late:'+k, sev:'dn', ico:'🚨',
+          t:`${op.late} ${pluralize(op.late,'опоздание','опоздания','опозданий')} · ${k.charAt(0).toUpperCase()+k.slice(1)}`,
+          s:'требует внимания',
+          onClick:()=>switchPage('people')
+        });
+      }
+    });
+  }catch(e){}
+  // Late % from period data
+  try{
+    const d = PERIOD_DATA.today;
+    if(d && d.late >= 8){
+      out.push({
+        id:'kpi:late', sev:'warn', ico:'📈',
+        t:`Опозданий ${d.late}% — выше нормы`,
+        s:`${d.lateCount} · цель ≤ 5%`,
+        onClick:()=>switchPage('overview')
+      });
+    }
+  }catch(e){}
+  return out.filter(a=>!_DISMISSED_ALERTS.has(a.id));
+}
+
+function _renderAlerts(){
+  const list = document.getElementById('alertList');
+  if(!list) return;
+  const alerts = _buildAlerts();
+  const badge = document.getElementById('alertsBadge');
+  const tbBadge = document.getElementById('moreTabBadge');
+  const allLink = document.getElementById('alertsAll');
+  const critical = alerts.filter(a=>a.sev==='dn').length;
+  if(alerts.length){
+    if(badge){
+      badge.textContent = alerts.length;
+      badge.style.display = 'inline-flex';
+      badge.classList.toggle('dn', critical>0);
+    }
+    if(tbBadge){
+      tbBadge.textContent = alerts.length;
+      tbBadge.style.display = 'flex';
+    }
+  } else {
+    if(badge) badge.style.display = 'none';
+    if(tbBadge) tbBadge.style.display = 'none';
+  }
+  if(allLink) allLink.style.display = alerts.length>4 ? '' : 'none';
+
+  if(!alerts.length){
+    list.innerHTML = '<div class="alert-empty"><span class="ae-ico">✓</span>Все системы в норме</div>';
+    return;
+  }
+  const shown = alerts.slice(0,4);
+  list.innerHTML = shown.map((a,i)=>`
+    <div class="alert-row ${a.sev}" data-alert-id="${a.id}" data-alert-idx="${i}">
+      <div class="alert-ico">${a.ico}</div>
+      <div class="alert-body">
+        <div class="alert-t">${a.t}</div>
+        <div class="alert-s">${a.s}</div>
+      </div>
+      <button class="alert-x" data-dismiss="${a.id}" aria-label="Скрыть">✕</button>
+    </div>
+  `).join('');
+  // Wire row clicks
+  list.querySelectorAll('.alert-row').forEach((row,i)=>{
+    row.addEventListener('click',(e)=>{
+      if(e.target.closest('.alert-x')) return;
+      const a = shown[i];
+      if(a && a.onClick){ try{a.onClick()}catch(_){}}
+      try{Telegram.WebApp.HapticFeedback.impactOccurred('light')}catch(_){}
+    });
+  });
+  list.querySelectorAll('.alert-x').forEach(btn=>{
+    btn.addEventListener('click',(e)=>{
+      e.stopPropagation();
+      _DISMISSED_ALERTS.add(btn.dataset.dismiss);
+      try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(_){}
+      _renderAlerts();
+    });
+  });
+}
+
+// ==== Helper to switch tabs programmatically ====
+function switchPage(pg){
+  const tab = document.querySelector(`.tb[data-pg="${pg}"]`);
+  if(tab){ tab.click(); }
+}
+
+function qaShowAllAlerts(){ openNotif && openNotif(); }
+function qaExport(){
+  try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(_){}
+  alert('Экспорт CSV/XLSX скоро будет доступен');
+}
+
+// ==== Settings toggles ====
+(function initSettingsToggles(){
+  const KEY = 'ambar.settings';
+  let st = {};
+  try{ st = JSON.parse(localStorage.getItem(KEY)||'{}'); }catch(_){}
+  document.querySelectorAll('.lrow-tog[data-tog]').forEach(row=>{
+    const k = row.dataset.tog;
+    const tog = row.querySelector('.tog');
+    if(!tog) return;
+    if(typeof st[k] === 'boolean') tog.classList.toggle('on', st[k]);
+    row.addEventListener('click',(e)=>{
+      e.stopPropagation();
+      tog.classList.toggle('on');
+      st[k] = tog.classList.contains('on');
+      try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(_){}
+      try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(_){}
+    });
+  });
+})();
+
+// ==== Managers (access control) modal ====
+const mgrOv    = document.getElementById('mgrOverlay');
+const mgrAddOv = document.getElementById('mgrAddOverlay');
+let _mgrCache  = null;  // {owners, managers, current_user}
+let _mgrLoading = false;
+
+function _initials(name, tgId){
+  const s = (name||'').trim();
+  if(!s) return String(tgId||'?').slice(-2);
+  const parts = s.split(/\s+/);
+  return ((parts[0][0]||'') + (parts[1]?parts[1][0]:'')).toUpperCase();
+}
+
+function _fmtMgrSub(m, isMe){
+  const bits = [];
+  if(m.username) bits.push('@' + m.username);
+  bits.push('ID ' + m.telegram_id);
+  if(m.source === 'env') bits.push('из .env');
+  return bits.join(' · ');
+}
+
+async function openMgr(){
+  if(!mgrOv) return;
+  mgrOv.classList.add('show');
+  try{Telegram.WebApp.HapticFeedback.impactOccurred('light')}catch(_){}
+  await loadMgr();
+}
+function closeMgr(){ if(mgrOv) mgrOv.classList.remove('show'); }
+
+async function loadMgr(){
+  const body = document.getElementById('mgrBody');
+  const sub  = document.getElementById('mgrSubtitle');
+  if(_mgrLoading) return;
+  _mgrLoading = true;
+  if(body && !_mgrCache){
+    body.innerHTML = '<div style="padding:30px 20px;color:var(--muted);font-size:13px;text-align:center">Загрузка…</div>';
+  }
+  try{
+    const data = await window.ownerApi.ownerFetch('/api/owner/managers');
+    _mgrCache = data;
+    _renderMgr();
+  }catch(e){
+    if(body){
+      const msg = (e && e.status === 403) ? 'Нет доступа' : (e && e.message) || 'Ошибка загрузки';
+      body.innerHTML = `<div class="mgr-empty" style="border-color:rgba(224,85,85,.4);color:var(--dn)">${msg}</div>`;
+    }
+    if(sub) sub.textContent = 'Ошибка';
+  }finally{
+    _mgrLoading = false;
+  }
+}
+
+function _renderMgr(){
+  if(!_mgrCache) return;
+  const body = document.getElementById('mgrBody');
+  const sub  = document.getElementById('mgrSubtitle');
+  const addBar = document.getElementById('mgrAddBar');
+  const lrowSub = document.getElementById('mgrLrowSub');
+  if(!body) return;
+  const me = _mgrCache.current_user;
+  const owners   = _mgrCache.owners   || [];
+  const managers = _mgrCache.managers || [];
+  const isOwnerMe = owners.some(o => o.telegram_id === me);
+
+  if(sub){
+    sub.textContent = `${owners.length} ${pluralize(owners.length,'владелец','владельца','владельцев')} · ${managers.length} ${pluralize(managers.length,'менеджер','менеджера','менеджеров')}`;
+  }
+  if(lrowSub){
+    lrowSub.textContent = `${owners.length+managers.length} ${pluralize(owners.length+managers.length,'пользователь','пользователя','пользователей')}`;
+  }
+  if(addBar) addBar.style.display = isOwnerMe ? '' : 'none';
+
+  let html = '';
+
+  // Owners group
+  html += '<div class="mgr-grp">';
+  html += `<div class="mgr-grp-t"><span>Владельцы</span><span class="mgr-grp-cnt">${owners.length}</span><span class="mgr-grp-hint">read-only</span></div>`;
+  owners.forEach(o => {
+    const isMe = o.telegram_id === me;
+    const initials = _initials(o.name, o.telegram_id);
+    html += `<div class="mgr-row${isMe?' is-self':''}">
+      <div class="mgr-av owner">${initials}</div>
+      <div class="mgr-body-info">
+        <div class="mgr-name">${o.name || ('User '+o.telegram_id)}<span class="mgr-tag owner">owner</span>${isMe?'<span class="mgr-tag you">вы</span>':''}</div>
+        <div class="mgr-sub">${_fmtMgrSub(o, isMe)}</div>
+      </div>
+    </div>`;
+  });
+  html += '</div>';
+
+  // Managers group
+  html += '<div class="mgr-grp">';
+  html += `<div class="mgr-grp-t"><span>Менеджеры</span><span class="mgr-grp-cnt">${managers.length}</span></div>`;
+  if(!managers.length){
+    html += '<div class="mgr-empty">Менеджеров пока нет — добавьте первого через кнопку ниже</div>';
+  } else {
+    managers.forEach(m => {
+      const isMe = m.telegram_id === me;
+      const isEnv = m.source === 'env';
+      const initials = _initials(m.name, m.telegram_id);
+      const tags = [];
+      if(isMe) tags.push('<span class="mgr-tag you">вы</span>');
+      if(isEnv) tags.push('<span class="mgr-tag env">.env</span>');
+      const rmBtn = (isOwnerMe && !isEnv) ? `
+        <button class="mgr-rm" data-rm="${m.telegram_id}" data-name="${(m.name||'').replace(/"/g,'&quot;')}" aria-label="Удалить">
+          <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+        </button>` : '';
+      html += `<div class="mgr-row${isMe?' is-self':''}">
+        <div class="mgr-av">${initials}</div>
+        <div class="mgr-body-info">
+          <div class="mgr-name">${m.name || ('User '+m.telegram_id)}${tags.join('')}</div>
+          <div class="mgr-sub">${_fmtMgrSub(m, isMe)}</div>
+        </div>
+        <div class="mgr-actions">${rmBtn}</div>
+      </div>`;
+    });
+  }
+  html += '</div>';
+
+  // Hint banner about env managers (only show if any env managers exist)
+  if(managers.some(m => m.source === 'env')){
+    html += `<div class="mgr-banner">
+      <b>Менеджеры из .env</b> загружаются при старте сервиса (<code>AMBAR_MANAGER_IDS</code>) и не удаляются из интерфейса. Чтобы их убрать — отредактируйте .env и перезапустите.
+    </div>`;
+  }
+
+  body.innerHTML = html;
+
+  // Wire delete buttons
+  body.querySelectorAll('.mgr-rm[data-rm]').forEach(btn => {
+    btn.addEventListener('click', async (e) => {
+      e.stopPropagation();
+      const tgId = btn.dataset.rm;
+      const name = btn.dataset.name || ('ID ' + tgId);
+      if(!confirm(`Удалить менеджера ${name}?\n\nДоступ к Owner-боту будет немедленно закрыт.`)) return;
+      btn.setAttribute('disabled', '');
+      try{
+        await window.ownerApi.ownerFetch('/api/owner/managers/' + encodeURIComponent(tgId), {method:'DELETE'});
+        try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(_){}
+        _mgrCache = null;
+        await loadMgr();
+      }catch(err){
+        btn.removeAttribute('disabled');
+        const hint = (err.payload && err.payload.hint) ? `\n\n${err.payload.hint}` : '';
+        alert('Не удалось удалить: ' + ((err.payload && err.payload.error) || err.message) + hint);
+      }
+    });
+  });
+}
+
+function openMgrAdd(){
+  if(!mgrAddOv) return;
+  mgrAddOv.classList.add('show');
+  setTimeout(()=>{ const el = document.getElementById('mgrAddId'); if(el) el.focus(); }, 140);
+  const msg = document.getElementById('mgrAddMsg'); if(msg){ msg.textContent=''; msg.className='mgr-msg'; }
+  ['mgrAddId','mgrAddName','mgrAddUser'].forEach(id => { const el=document.getElementById(id); if(el) el.value=''; });
+}
+function closeMgrAdd(){ if(mgrAddOv) mgrAddOv.classList.remove('show'); }
+
+async function submitMgrAdd(){
+  const idEl   = document.getElementById('mgrAddId');
+  const nameEl = document.getElementById('mgrAddName');
+  const userEl = document.getElementById('mgrAddUser');
+  const msg    = document.getElementById('mgrAddMsg');
+  const btn    = document.getElementById('mgrAddSubmit');
+  const raw    = (idEl.value||'').trim();
+  const tgId   = parseInt(raw, 10);
+  if(!raw || !Number.isFinite(tgId) || tgId <= 0){
+    msg.textContent = 'Введите корректный Telegram ID (число)';
+    msg.className = 'mgr-msg err';
+    idEl.focus();
+    return;
+  }
+  btn.setAttribute('disabled', '');
+  msg.textContent = 'Добавление…';
+  msg.className = 'mgr-msg';
+  try{
+    await window.ownerApi.ownerFetch('/api/owner/managers', {
+      method: 'POST',
+      body: { telegram_id: tgId, name: nameEl.value, username: userEl.value },
+    });
+    try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(_){}
+    msg.textContent = 'Добавлен ✓';
+    msg.className = 'mgr-msg ok';
+    _mgrCache = null;
+    await loadMgr();
+    setTimeout(closeMgrAdd, 600);
+  }catch(err){
+    btn.removeAttribute('disabled');
+    const m = (err.payload && err.payload.error) || err.message || 'Ошибка';
+    msg.textContent = m;
+    msg.className = 'mgr-msg err';
+  }
+}
+
+// ESC to close
+document.addEventListener('keydown', (e)=>{
+  if(e.key !== 'Escape') return;
+  if(mgrAddOv && mgrAddOv.classList.contains('show')){ closeMgrAdd(); return; }
+  if(mgrOv && mgrOv.classList.contains('show')){ closeMgr(); return; }
+});
 
 function rebuildCatFilters(){
   const wrap = document.getElementById('catFilters');

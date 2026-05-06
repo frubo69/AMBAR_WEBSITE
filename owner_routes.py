@@ -16,6 +16,7 @@ from pathlib import Path
 from aiohttp import web
 
 from owner_auth import require_owner, CORS_HEADERS
+from config import OWNER_IDS, MANAGER_IDS
 import db
 import os, logging
 # Premium card lists live in api_server (single source of truth).
@@ -680,6 +681,94 @@ async def handle_catalog_update(request):
     }, headers=CORS_HEADERS)
 
 
+@require_owner
+async def handle_managers_list(request):
+    """Return owners (env, read-only) + managers (env + DB, mutable) with metadata.
+    Shape: {"owners": [...], "managers": [...], "current_user": int}.
+    Each entry: {telegram_id, name, username, source: 'env'|'db'|'owner', added_at?}."""
+    db_managers = await db.get_managers()
+    db_ids = {int(m["telegram_id"]) for m in db_managers}
+
+    owners = [
+        {"telegram_id": int(oid), "name": "", "username": "", "source": "owner"}
+        for oid in sorted(OWNER_IDS)
+    ]
+    managers = []
+    # env managers come first (read-only — to remove, edit .env + restart)
+    for mid in sorted(MANAGER_IDS):
+        if int(mid) in db_ids:
+            continue  # promoted to DB entry below
+        managers.append({"telegram_id": int(mid), "name": "", "username": "", "source": "env"})
+    # DB managers (mutable)
+    for m in db_managers:
+        managers.append({
+            "telegram_id": int(m["telegram_id"]),
+            "name":     m.get("name", ""),
+            "username": m.get("username", ""),
+            "added_at": m.get("added_at", ""),
+            "added_by": m.get("added_by", 0),
+            "source":   "db",
+        })
+
+    return web.json_response({
+        "owners":       owners,
+        "managers":     managers,
+        "current_user": request["owner_id"],
+    }, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_manager_add(request):
+    """Add a DB-stored manager. Owner-only (no manager-promotes-manager).
+    Body: {"telegram_id": int, "name": str?, "username": str?}."""
+    if request["owner_id"] not in OWNER_IDS:
+        return web.json_response({"error": "owner only"}, status=403, headers=CORS_HEADERS)
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid json"}, status=400, headers=CORS_HEADERS)
+    try:
+        tg_id = int(body.get("telegram_id"))
+    except (TypeError, ValueError):
+        return web.json_response({"error": "telegram_id must be a number"}, status=400, headers=CORS_HEADERS)
+    if tg_id <= 0:
+        return web.json_response({"error": "invalid telegram_id"}, status=400, headers=CORS_HEADERS)
+    if tg_id in OWNER_IDS:
+        return web.json_response({"error": "already an owner"}, status=409, headers=CORS_HEADERS)
+
+    doc = await db.add_manager(
+        telegram_id = tg_id,
+        name        = (body.get("name") or "").strip(),
+        username    = (body.get("username") or "").strip(),
+        added_by    = request["owner_id"],
+    )
+    log.info(f"[owner] {request['owner_id']} added manager {tg_id} ({doc.get('name','')})")
+    return web.json_response({"ok": True, "manager": doc}, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_manager_remove(request):
+    """Remove a DB-stored manager. Owner-only. Env-managers can't be removed
+    here — they're sourced from AMBAR_MANAGER_IDS which is loaded at startup."""
+    if request["owner_id"] not in OWNER_IDS:
+        return web.json_response({"error": "owner only"}, status=403, headers=CORS_HEADERS)
+    raw = request.match_info["telegram_id"]
+    try:
+        tg_id = int(raw)
+    except (ValueError, TypeError):
+        return web.json_response({"error": "invalid telegram_id"}, status=400, headers=CORS_HEADERS)
+    if tg_id in MANAGER_IDS:
+        return web.json_response(
+            {"error": "env-managed", "hint": "remove from AMBAR_MANAGER_IDS env var and restart service"},
+            status=409, headers=CORS_HEADERS,
+        )
+    removed = await db.remove_manager(tg_id)
+    if not removed:
+        return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
+    log.info(f"[owner] {request['owner_id']} removed manager {tg_id}")
+    return web.json_response({"ok": True, "removed": tg_id}, headers=CORS_HEADERS)
+
+
 def setup(app):
     """Wire owner routes into the aiohttp app. Called from api_server.main()."""
     app.router.add_route("OPTIONS", "/api/owner/ping",    handle_ping)
@@ -701,3 +790,8 @@ def setup(app):
     app.router.add_get(             "/api/owner/catalog",                handle_catalog_list)
     app.router.add_route("OPTIONS", "/api/owner/catalog/{product_id}",   handle_catalog_update)
     app.router.add_post(            "/api/owner/catalog/{product_id}",   handle_catalog_update)
+    app.router.add_route("OPTIONS", "/api/owner/managers",                handle_managers_list)
+    app.router.add_get(             "/api/owner/managers",                handle_managers_list)
+    app.router.add_post(            "/api/owner/managers",                handle_manager_add)
+    app.router.add_route("OPTIONS", "/api/owner/managers/{telegram_id}",  handle_manager_remove)
+    app.router.add_delete(          "/api/owner/managers/{telegram_id}",  handle_manager_remove)

@@ -15,6 +15,7 @@ from functools import wraps
 from aiohttp import web
 
 from config import OWNER_IDS, MANAGER_IDS
+import db
 
 CORS_HEADERS = {
     "Access-Control-Allow-Origin":  "*",
@@ -64,11 +65,15 @@ def require_owner(handler):
             )
 
         uid = user.get("id")
+        is_db_manager = False
         if uid not in OWNER_IDS and uid not in MANAGER_IDS:
-            return web.json_response(
-                {"error": "forbidden"},
-                status=403, headers=CORS_HEADERS,
-            )
+            # Fall through to DB-stored managers (added via the Owner UI).
+            is_db_manager = await db.is_manager(uid)
+            if not is_db_manager:
+                return web.json_response(
+                    {"error": "forbidden"},
+                    status=403, headers=CORS_HEADERS,
+                )
 
         request["owner_id"]   = uid
         request["owner_user"] = user

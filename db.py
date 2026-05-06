@@ -39,6 +39,7 @@ async def connect():
         await _db.support_messages.create_index("conv_key", unique=True)
         await _db.support_map.create_index("fwd_msg_id", unique=True)
         await _db.shifts.create_index([("operator_id", 1), ("status", 1)])
+        await _db.owner_managers.create_index("telegram_id", unique=True)
         log.info("✅ MongoDB connected — db: ambar")
     except Exception as e:
         log.error(f"MongoDB index error: {e}")
@@ -545,6 +546,50 @@ async def get_owners_subscribed_to(event_key: str) -> list:
                 pass
         out.append(r["owner_id"])
     return out
+
+
+async def get_managers() -> list:
+    """Return all DB-stored managers as plain dicts. Sorted newest-first."""
+    db = _db_or_none()
+    if db is None: return []
+    cursor = db.owner_managers.find({}, {"_id": 0}).sort("added_at", -1)
+    return await cursor.to_list(length=200)
+
+
+async def add_manager(telegram_id: int, name: str = "", username: str = "", added_by: int = 0) -> dict:
+    """Upsert a manager. Returns the saved document. No-op if telegram_id is 0."""
+    db = _db_or_none()
+    if db is None or not telegram_id:
+        return {}
+    doc = {
+        "telegram_id": int(telegram_id),
+        "name": (name or "").strip(),
+        "username": (username or "").lstrip("@").strip(),
+        "added_by": int(added_by) if added_by else 0,
+        "added_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.owner_managers.update_one(
+        {"telegram_id": int(telegram_id)},
+        {"$set": doc},
+        upsert=True,
+    )
+    return doc
+
+
+async def remove_manager(telegram_id: int) -> bool:
+    """Delete a manager by telegram_id. Returns True if a row was removed."""
+    db = _db_or_none()
+    if db is None: return False
+    res = await db.owner_managers.delete_one({"telegram_id": int(telegram_id)})
+    return res.deleted_count > 0
+
+
+async def is_manager(telegram_id: int) -> bool:
+    """Check if a Telegram user is a DB-stored manager."""
+    db = _db_or_none()
+    if db is None: return False
+    doc = await db.owner_managers.find_one({"telegram_id": int(telegram_id)}, {"_id": 1})
+    return doc is not None
 
 
 async def get_all_customers() -> list:

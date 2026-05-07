@@ -180,8 +180,9 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .bento .wide{grid-column:1/-1}
 .card{position:relative;padding:14px 14px 14px;border-radius:var(--r2);background:var(--card);border:1px solid var(--border2);overflow:hidden}
 .bento .card{height:120px}             /* HARD-LOCKED — never grows or shrinks */
-.bento .card.wide{height:140px}        /* rating card is taller (5★ row + bars) */
+.bento .card.wide{height:180px}        /* rating card needs room for label + 5★ row + 3-bar distribution */
 .hero-row,.card-row{height:24px}       /* delta pill row, fixed regardless of pill state */
+.card-hint{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .card-lbl{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:1.4px;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px}
 .card-val{font-family:'DM Sans',sans-serif;font-size:24px;font-weight:700;line-height:1;color:var(--text);letter-spacing:-.4px;font-variant-numeric:lining-nums tabular-nums}
 .card-val .u{font-family:'DM Sans',sans-serif;font-size:11px;color:var(--muted);font-weight:600;margin-left:4px;letter-spacing:.8px;text-transform:uppercase}
@@ -2705,7 +2706,7 @@ function renderKpis(k){
     od.classList.toggle('up', k.orders_delta >  0);
     od.classList.toggle('dn', k.orders_delta <  0);
   }
-  _setText('kOrdersAvg', k.avg_check);
+  _setText('kOrdersAvg', fmtCompact(k.avg_check));
   // Done
   _setText('kDone',      k.done);
   _setText('kDoneTotal', k.done_total);
@@ -4917,6 +4918,14 @@ const CUR_RATE = 3.67;
 let curCur = localStorage.getItem('ambar_owner_cur') || 'AED';
 function conv(aed){ return curCur === 'USD' ? Math.round(aed/CUR_RATE) : aed; }
 function fmt(aed){ return conv(aed).toLocaleString('ru-RU').replace(/,/g,' '); }
+// Compact formatter for tight cells (e.g. card-hint «средний чек») where a
+// 7-digit number would wrap and break the fixed-height card layout.
+function fmtCompact(n){
+  n = Math.round(+n || 0);
+  if(n >= 1e6) return (n/1e6).toFixed(1).replace(/\.0$/,'') + 'M';
+  if(n >= 1e4) return (n/1e3).toFixed(1).replace(/\.0$/,'') + 'k';
+  return n.toLocaleString('ru-RU').replace(/,/g,' ');
+}
 
 function applyCurrency(){
   document.querySelectorAll('[data-aed]').forEach(el=>{

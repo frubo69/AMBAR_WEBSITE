@@ -78,15 +78,22 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 
 /* ===== Loading skeleton ===== */
 /* Toggled on placeholder spans while /api/owner/finance is in-flight.
-   Hides the «—» / «…» glyph and replaces it with a shimmering pill. */
+   Hides the «—» / «…» glyph and replaces it with a shimmering pill.
+   The !important overrides matter for .hero-amt — that element uses
+   background-clip:text with a gold gradient, which would otherwise clip
+   the shimmer to the «—» glyph instead of the full pill. */
 .is-skel{
   display:inline-block;
   min-width:42px;
   height:.95em;
   border-radius:6px;
   color:transparent !important;
-  background:linear-gradient(90deg, var(--card2) 0%, rgba(201,169,110,.22) 50%, var(--card2) 100%);
-  background-size:200% 100%;
+  text-shadow:none !important;
+  background:linear-gradient(90deg, var(--card2) 0%, rgba(201,169,110,.22) 50%, var(--card2) 100%) !important;
+  background-size:200% 100% !important;
+  background-clip:border-box !important;
+  -webkit-background-clip:border-box !important;
+  -webkit-text-fill-color:transparent !important;
   animation:skelShimmer 1.3s ease-in-out infinite;
   vertical-align:middle;
 }

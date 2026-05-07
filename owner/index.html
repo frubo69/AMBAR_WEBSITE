@@ -64,9 +64,17 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 @keyframes pulse-dn{0%{box-shadow:0 0 0 0 rgba(224,85,85,.6)}70%{box-shadow:0 0 0 8px rgba(224,85,85,0)}100%{box-shadow:0 0 0 0 rgba(224,85,85,0)}}
 @keyframes pulse{0%{box-shadow:0 0 0 0 rgba(76,175,125,.6)}70%{box-shadow:0 0 0 8px rgba(76,175,125,0)}100%{box-shadow:0 0 0 0 rgba(76,175,125,0)}}
 .hdr-r{display:flex;gap:8px}
-.icon-btn{width:38px;height:38px;border-radius:11px;background:var(--card);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;color:var(--sub);transition:.15s var(--e1);flex-shrink:0}
+.icon-btn{width:38px;height:38px;border-radius:11px;background:var(--card);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;color:var(--sub);transition:.15s var(--e1);flex-shrink:0;position:relative;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .icon-btn:active{transform:scale(.92);background:var(--card2)}
-.icon-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2}
+.icon-btn svg{width:17px;height:17px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}
+/* Alerts button — color reflects state. Default warn (yellow); flips to crit
+   (red, pulsing) when an alert matching an enabled notif-pref is unseen. */
+.alerts-btn.warn{background:var(--warn-soft);border-color:rgba(243,180,74,.32);color:var(--warn)}
+.alerts-btn.crit{background:var(--dn-soft);border-color:rgba(224,85,85,.42);color:var(--dn);animation:alertsPulse 1.8s infinite}
+.alerts-btn.calm{color:var(--sub)}
+.alerts-btn-badge{position:absolute;top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:9px;background:var(--warn);color:#0a0a14;font-family:'DM Sans',sans-serif;font-size:9px;font-weight:800;display:flex;align-items:center;justify-content:center;border:2px solid var(--bg);line-height:1}
+.alerts-btn.crit .alerts-btn-badge{background:var(--dn);color:#fff}
+@keyframes alertsPulse{0%,100%{box-shadow:0 0 0 0 rgba(224,85,85,.5)}50%{box-shadow:0 0 0 6px rgba(224,85,85,0)}}
 
 /* Page */
 .page{padding:6px 14px 20px;display:none;animation:fadeIn .3s var(--e1)}
@@ -399,6 +407,10 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     <div class="live-dot" id="liveDot" title="API status">Online</div>
   </div>
   <div class="hdr-r">
+    <button class="icon-btn alerts-btn" id="alertsBtn" aria-label="Уведомления" onclick="openAlerts()">
+      <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
+      <span class="alerts-btn-badge" id="alertsBtnBadge" style="display:none">0</span>
+    </button>
     <button class="icon-btn" aria-label="Search" onclick="openCmd()">
       <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
     </button>
@@ -883,11 +895,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 <div class="page" id="pg-more">
   <div style="padding:10px 4px 4px"><div style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600">Ещё</div><div style="font-size:12px;color:var(--muted);margin-top:2px">Отчёты · склад · настройки</div></div>
 
-  <!-- Dynamic alerts -->
-  <div class="sect"><div class="sect-t">Алерты <span id="alertsBadge" class="alert-badge" style="display:none">0</span></div><a class="sect-a" id="alertsAll" style="cursor:pointer;display:none" onclick="qaShowAllAlerts()">все →</a></div>
-  <div class="alert-list" id="alertList">
-    <div class="alert-empty"><span class="ae-ico">✓</span>Все системы в норме</div>
-  </div>
+  <!-- Alerts moved to header bell button. See #alertsOverlay below. -->
 
   <!-- Catalog (kept as-is — reference card) -->
   <div class="sect"><div class="sect-t">Каталог</div></div>
@@ -1167,6 +1175,28 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .tg input:checked + i{background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .tg input:checked + i::after{left:calc(100% - 17px)}
 </style>
+
+<!-- ============ ALERTS LIST ============ -->
+<div class="cmd-overlay" id="alertsOverlay">
+  <div class="cmd-sheet" style="max-width:520px">
+    <div class="notif-hdr" style="border-bottom:1px solid var(--border2)">
+      <div class="notif-hdr-l">
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;line-height:1.1">Алерты</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px" id="alertsOvSub">Все события системы</div>
+      </div>
+      <button class="cmd-close" onclick="closeAlerts()" aria-label="Закрыть"><span class="txt">ESC</span><span class="x">✕</span></button>
+    </div>
+    <div class="notif-body" id="alertsOvBody" style="padding:14px 16px">
+      <div class="alert-list" id="alertList">
+        <div class="alert-empty"><span class="ae-ico">✓</span>Все системы в норме</div>
+      </div>
+    </div>
+    <div class="notif-foot" id="alertsOvFoot" style="padding:12px 16px;border-top:1px solid var(--border2);display:flex;gap:10px;align-items:center;justify-content:space-between">
+      <div style="font-size:11px;color:var(--muted)" id="alertsOvHint">Тонкая настройка — в разделе Уведомления</div>
+      <button id="alertsSeenBtn" onclick="markAlertsSeen()" style="display:none;padding:8px 14px;border-radius:10px;background:linear-gradient(135deg,rgba(76,175,125,.16),rgba(76,175,125,.05));border:1px solid rgba(76,175,125,.32);color:var(--up);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent">✓ Отметить прочитанным</button>
+    </div>
+  </div>
+</div>
 
 <!-- ============ NOTIFICATIONS DETAILED ============ -->
 <div class="cmd-overlay" id="notifOverlay">
@@ -3304,38 +3334,58 @@ function _renderAccessBlock(){
   }
 })();
 
-// ==== Dynamic alerts (Ещё page) ====
-// Generates alerts from live data (mostly PRODUCTS stock + a few computed
-// signals from PERIOD_DATA / OP_PERIOD). Severities: dn / warn / info.
+// ==== Dynamic alerts (header bell button + overlay) ====
+// Each alert carries a `pref` key matching a notif-prefs toggle. An alert
+// is "important" when its pref toggle is currently ON — only important
+// + unseen alerts flip the header bell to red. The yellow→red transition
+// sticks until the user clicks "Отметить прочитанным".
 const _DISMISSED_ALERTS = new Set();
+const _SEEN_IMPORTANT = new Set();
+try{
+  JSON.parse(localStorage.getItem('ambar_seen_alerts')||'[]').forEach(x => _SEEN_IMPORTANT.add(x));
+}catch(_){}
+function _persistSeen(){
+  try{ localStorage.setItem('ambar_seen_alerts', JSON.stringify([..._SEEN_IMPORTANT])); }catch(_){}
+}
+function _getNotifPrefs(){
+  try{
+    const raw = JSON.parse(localStorage.getItem('ambar_owner_notif')||'{}');
+    if(raw.master === false) return {};   // master kill-switch suppresses red
+    return raw.prefs || {};
+  }catch(_){ return {}; }
+}
+function _isAlertImportant(a){
+  if(!a || !a.pref) return false;
+  return _getNotifPrefs()[a.pref] === true;
+}
 function _buildAlerts(){
   const out = [];
-  // Out-of-stock products → critical
+  // Out-of-stock products → stock.out toggle
   const outItems = PRODUCTS.filter(p=>!p.stock);
   outItems.slice(0,3).forEach(p=>{
     out.push({
-      id:'oos:'+p.id, sev:'dn', ico:'⚠',
+      id:'oos:'+p.id, sev:'dn', ico:'⚠', pref:'stock.out',
       t:`${p.name}${p.vol?' · '+p.vol:''} · нет в наличии`,
       s:`${p.cat} · возобновить поставку`,
-      onClick:()=>openCatalog()
+      onClick:()=>{ closeAlerts(); openCatalog(); }
     });
   });
   if(outItems.length>3){
     out.push({
-      id:'oos:more', sev:'warn', ico:'📦',
+      id:'oos:more', sev:'warn', ico:'📦', pref:'stock.out',
       t:`Ещё ${outItems.length-3} ${pluralize(outItems.length-3,'позиция','позиции','позиций')} нет в наличии`,
       s:'открыть каталог для проверки',
-      onClick:()=>openCatalog()
+      onClick:()=>{ closeAlerts(); openCatalog(); }
     });
   }
-  // Slow-moving (real or fallback stats — show only top one to avoid noise)
+  // Slow-moving → stock.low toggle
   const slowest = PRODUCTS.filter(p=>p.stock && (p.sold||0)===0);
   if(slowest.length){
     out.push({
-      id:'slow:top', sev:'info', ico:'💤',
+      id:'slow:top', sev:'info', ico:'💤', pref:'stock.low',
       t:`${slowest.length} ${pluralize(slowest.length,'позиция','позиции','позиций')} без продаж за месяц`,
       s:'возможно стоит снизить цену или убрать',
-      onClick:()=>openCatalog()
+      onClick:()=>{ closeAlerts(); openCatalog(); }
     });
   }
   // Late operator (from OP_PERIOD today)
@@ -3345,18 +3395,18 @@ function _buildAlerts(){
       const op = td[k];
       if(op.respSec > 60){
         out.push({
-          id:'op:slow:'+k, sev:'warn', ico:'⏱',
+          id:'op:slow:'+k, sev:'warn', ico:'⏱', pref:'timing.notAccepted5',
           t:`Медленная реакция · ${k.charAt(0).toUpperCase()+k.slice(1)}`,
           s:`${fmtSec(op.respSec).v} ${fmtSec(op.respSec).u} · норма ≤ 60 сек`,
-          onClick:()=>switchPage('people')
+          onClick:()=>{ closeAlerts(); switchPage('people'); }
         });
       }
       if(op.late >= 2){
         out.push({
-          id:'op:late:'+k, sev:'dn', ico:'🚨',
+          id:'op:late:'+k, sev:'dn', ico:'🚨', pref:'timing.late45',
           t:`${op.late} ${pluralize(op.late,'опоздание','опоздания','опозданий')} · ${k.charAt(0).toUpperCase()+k.slice(1)}`,
           s:'требует внимания',
-          onClick:()=>switchPage('people')
+          onClick:()=>{ closeAlerts(); switchPage('people'); }
         });
       }
     });
@@ -3366,60 +3416,102 @@ function _buildAlerts(){
     const d = PERIOD_DATA.today;
     if(d && d.late >= 8){
       out.push({
-        id:'kpi:late', sev:'warn', ico:'📈',
+        id:'kpi:late', sev:'warn', ico:'📈', pref:'timing.late45',
         t:`Опозданий ${d.late}% — выше нормы`,
         s:`${d.lateCount} · цель ≤ 5%`,
-        onClick:()=>switchPage('overview')
+        onClick:()=>{ closeAlerts(); switchPage('overview'); }
       });
     }
   }catch(e){}
   return out.filter(a=>!_DISMISSED_ALERTS.has(a.id));
 }
 
+function _renderAlertBtn(){
+  const btn = document.getElementById('alertsBtn');
+  const badge = document.getElementById('alertsBtnBadge');
+  if(!btn) return;
+  const alerts = _buildAlerts();
+  const importantUnseen = alerts.filter(a => _isAlertImportant(a) && !_SEEN_IMPORTANT.has(a.id));
+  btn.classList.remove('warn','crit','calm');
+  if(importantUnseen.length){
+    btn.classList.add('crit');
+  } else if(alerts.length){
+    btn.classList.add('warn');
+  } else {
+    btn.classList.add('calm');
+  }
+  if(badge){
+    if(alerts.length){
+      badge.textContent = alerts.length;
+      badge.style.display = '';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+  // Mirror the "important unseen" indicator on the bottom-tab «Ещё» badge
+  // for visibility while on other pages.
+  const tbBadge = document.getElementById('moreTabBadge');
+  if(tbBadge){
+    if(importantUnseen.length){
+      tbBadge.textContent = importantUnseen.length;
+      tbBadge.style.display = 'flex';
+    } else {
+      tbBadge.style.display = 'none';
+    }
+  }
+}
+
 function _renderAlerts(){
   const list = document.getElementById('alertList');
+  const seenBtn = document.getElementById('alertsSeenBtn');
+  const sub  = document.getElementById('alertsOvSub');
+  const hint = document.getElementById('alertsOvHint');
+  _renderAlertBtn();
   if(!list) return;
   const alerts = _buildAlerts();
-  const badge = document.getElementById('alertsBadge');
-  const tbBadge = document.getElementById('moreTabBadge');
-  const allLink = document.getElementById('alertsAll');
-  const critical = alerts.filter(a=>a.sev==='dn').length;
-  if(alerts.length){
-    if(badge){
-      badge.textContent = alerts.length;
-      badge.style.display = 'inline-flex';
-      badge.classList.toggle('dn', critical>0);
-    }
-    if(tbBadge){
-      tbBadge.textContent = alerts.length;
-      tbBadge.style.display = 'flex';
-    }
-  } else {
-    if(badge) badge.style.display = 'none';
-    if(tbBadge) tbBadge.style.display = 'none';
+  const importantUnseen = alerts.filter(a => _isAlertImportant(a) && !_SEEN_IMPORTANT.has(a.id));
+  if(sub){
+    if(!alerts.length) sub.textContent = 'Все системы в норме';
+    else sub.innerHTML = `${alerts.length} ${pluralize(alerts.length,'событие','события','событий')}` +
+      (importantUnseen.length ? ` · <span style="color:var(--dn);font-weight:600">${importantUnseen.length} важных</span>` : '');
   }
-  if(allLink) allLink.style.display = alerts.length>4 ? '' : 'none';
-
+  if(seenBtn) seenBtn.style.display = importantUnseen.length ? '' : 'none';
+  if(hint){
+    hint.textContent = importantUnseen.length
+      ? 'Нажми «Отметить прочитанным» чтобы погасить красный индикатор'
+      : 'Тонкая настройка — в разделе Уведомления';
+  }
   if(!alerts.length){
     list.innerHTML = '<div class="alert-empty"><span class="ae-ico">✓</span>Все системы в норме</div>';
     return;
   }
-  const shown = alerts.slice(0,4);
-  list.innerHTML = shown.map((a,i)=>`
-    <div class="alert-row ${a.sev}" data-alert-id="${a.id}" data-alert-idx="${i}">
+  // Sort: unseen-important first, then dn > warn > info
+  const sevRank = {dn:0, warn:1, info:2};
+  const sorted = [...alerts].sort((a,b)=>{
+    const ai = _isAlertImportant(a) && !_SEEN_IMPORTANT.has(a.id) ? 0 : 1;
+    const bi = _isAlertImportant(b) && !_SEEN_IMPORTANT.has(b.id) ? 0 : 1;
+    if(ai !== bi) return ai - bi;
+    return (sevRank[a.sev]||9) - (sevRank[b.sev]||9);
+  });
+  list.innerHTML = sorted.map((a)=>{
+    const isImp = _isAlertImportant(a);
+    const unseen = isImp && !_SEEN_IMPORTANT.has(a.id);
+    const tag = unseen
+      ? '<span style="margin-left:6px;font-size:9px;color:var(--dn);background:rgba(224,85,85,.14);padding:2px 6px;border-radius:5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;vertical-align:middle">важно</span>'
+      : (isImp ? '<span style="margin-left:6px;font-size:9px;color:var(--up);background:rgba(76,175,125,.14);padding:2px 6px;border-radius:5px;font-weight:700;letter-spacing:.3px;text-transform:uppercase;vertical-align:middle">прочитано</span>' : '');
+    return `<div class="alert-row ${a.sev}" data-alert-id="${a.id}">
       <div class="alert-ico">${a.ico}</div>
       <div class="alert-body">
-        <div class="alert-t">${a.t}</div>
+        <div class="alert-t">${a.t}${tag}</div>
         <div class="alert-s">${a.s}</div>
       </div>
       <button class="alert-x" data-dismiss="${a.id}" aria-label="Скрыть">✕</button>
-    </div>
-  `).join('');
-  // Wire row clicks
-  list.querySelectorAll('.alert-row').forEach((row,i)=>{
+    </div>`;
+  }).join('');
+  list.querySelectorAll('.alert-row').forEach((row)=>{
     row.addEventListener('click',(e)=>{
       if(e.target.closest('.alert-x')) return;
-      const a = shown[i];
+      const a = sorted.find(x => x.id === row.dataset.alertId);
       if(a && a.onClick){ try{a.onClick()}catch(_){}}
       try{Telegram.WebApp.HapticFeedback.impactOccurred('light')}catch(_){}
     });
@@ -3434,13 +3526,32 @@ function _renderAlerts(){
   });
 }
 
+const alertsOv = document.getElementById('alertsOverlay');
+function openAlerts(){
+  if(!alertsOv) return;
+  _renderAlerts();
+  alertsOv.classList.add('show');
+  try{Telegram.WebApp.HapticFeedback.impactOccurred('light')}catch(_){}
+}
+function closeAlerts(){ if(alertsOv) alertsOv.classList.remove('show'); }
+if(alertsOv){
+  alertsOv.addEventListener('click', e => { if(e.target === alertsOv) closeAlerts(); });
+}
+function markAlertsSeen(){
+  const alerts = _buildAlerts();
+  alerts.forEach(a => { if(_isAlertImportant(a)) _SEEN_IMPORTANT.add(a.id); });
+  _persistSeen();
+  try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(_){}
+  _renderAlerts();
+}
+
 // ==== Helper to switch tabs programmatically ====
 function switchPage(pg){
   const tab = document.querySelector(`.tb[data-pg="${pg}"]`);
   if(tab){ tab.click(); }
 }
 
-function qaShowAllAlerts(){ openNotif && openNotif(); }
+function qaShowAllAlerts(){ openAlerts && openAlerts(); }
 function qaExport(){
   try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(_){}
   alert('Экспорт CSV/XLSX скоро будет доступен');
@@ -3853,6 +3964,9 @@ let catQuery = '';
 
 // Preload catalog so the lrow sub-line shows real count
 loadCatalog();
+// Initial header-bell state. Re-fires after catalog finishes loading
+// (loadCatalog → _renderAlerts → _renderAlertBtn) once PRODUCTS arrives.
+try{ _renderAlertBtn(); }catch(_){}
 
 function openCatalog(){
   if(!catOv) return;
@@ -4633,6 +4747,9 @@ function autosaveNotif(){
     }
     syncQuietLbl();
     syncActiveCount();
+    // Re-evaluate header bell — flipping a toggle can promote existing
+    // alerts from "non-important" to "important" (and vice versa).
+    try{ _renderAlertBtn(); }catch(_){}
   }, 200);
 }
 
@@ -5470,6 +5587,9 @@ if(window.ownerApi){
     }
     if(typeof syncQuietLbl==='function') syncQuietLbl();
     if(typeof syncActiveCount==='function') syncActiveCount();
+    // Server prefs may differ from localStorage — refresh the bell color
+    // now that the toggles reflect the source of truth.
+    try{ _renderAlertBtn(); }catch(_){}
   }).catch(()=>{ /* fall back to localStorage state already applied */ });
 }
 

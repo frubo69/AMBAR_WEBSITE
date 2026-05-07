@@ -2715,14 +2715,15 @@ function renderKpis(k){
   _setText('kRatingLbl', 'Рейтинг · ' + (k.rating_period || ''));
   // Avg delivery time (in minutes). avg_min === 0 with sample 0 means we
   // have no delivered orders in the window yet, so keep the placeholder.
+  const ad = document.getElementById('kAvgDelta');
   if(k.avg_min_sample > 0){
     _setText('kAvg', k.avg_min);
-    const ad = document.getElementById('kAvgDelta');
     if(ad){
       const d = k.avg_min_delta || 0;
       const sign = d > 0 ? '▲ ' : d < 0 ? '▼ ' : '';
       ad.textContent = d ? (sign + Math.abs(d) + ' мин') : '0 мин';
       ad.classList.remove('up','dn');
+      ad.style.visibility = '';
       // Faster delivery is GOOD, so a negative delta is "up" (green).
       if(d < 0) ad.classList.add('up');
       if(d > 0) ad.classList.add('dn');
@@ -2730,20 +2731,30 @@ function renderKpis(k){
     _setText('kAvgSub', `по ${k.avg_min_sample} ${pluralize(k.avg_min_sample,'заказу','заказам','заказам')}`);
   } else {
     _setText('kAvg', '—');
-    _setText('kAvgDelta', '');
+    if(ad){
+      ad.textContent = '';
+      ad.classList.remove('up','dn');
+      // Hide the pill so an empty colored badge isn't shown — but keep
+      // its slot in the row so the card-row height stays consistent.
+      ad.style.visibility = 'hidden';
+    }
     _setText('kAvgSub', 'нет данных');
   }
   // Late % + raw count. Threshold is server-driven so the sub-label stays in sync.
   if(k.late_threshold) _setText('kLateHint', `> ${k.late_threshold} мин`);
+  const lc = document.getElementById('kLateCount');
   if(k.avg_min_sample > 0){
     _setText('kLate', k.late_pct);
-    const lc = document.getElementById('kLateCount');
     if(lc){
       lc.textContent = k.late_count + ' ' + pluralize(k.late_count, 'заказ', 'заказа', 'заказов');
+      lc.style.visibility = '';
     }
   } else {
     _setText('kLate', '—');
-    _setText('kLateCount', '—');
+    if(lc){
+      lc.textContent = '';
+      lc.style.visibility = 'hidden';
+    }
   }
 }
 

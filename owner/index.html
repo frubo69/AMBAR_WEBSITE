@@ -101,6 +101,9 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 }
 .hero-amt.is-skel{min-width:200px;height:1em;border-radius:10px}
 .star-num.is-skel{min-width:48px}
+/* .delta is a padded pill (~22px loaded). Without this override the
+   1em skeleton would collapse it to ~12px, dropping the row by ~10px. */
+.delta.is-skel{height:auto;min-height:22px;min-width:60px;padding:4px 10px;border-radius:999px;line-height:14px}
 /* Hero sparkline: keep the .hero-spark container's 56px box; the SVG
    inside is hidden and a shimmer overlay is painted on top, so the
    block's height never changes between loading and loaded. */
@@ -153,6 +156,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 
 /* Hero KPI — the main money number */
 .hero{position:relative;padding:22px 20px 24px;border-radius:var(--r);margin-bottom:14px;
+  min-height:218px;  /* locks loaded height so skeleton→data swap can't reflow */
   background:
     radial-gradient(ellipse 90% 60% at 15% 0%, rgba(201,169,110,.18), transparent 60%),
     linear-gradient(180deg,#161629 0%, #0F0F20 100%);
@@ -174,7 +178,9 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Bento grid */
 .bento{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
 .bento .wide{grid-column:1/-1}
-.card{position:relative;padding:14px 14px 14px;border-radius:var(--r2);background:var(--card);border:1px solid var(--border2);overflow:hidden}
+.card{position:relative;padding:14px 14px 14px;border-radius:var(--r2);background:var(--card);border:1px solid var(--border2);overflow:hidden;min-height:106px}
+.bento .card.wide{min-height:130px}
+.hero-row,.card-row{min-height:24px}  /* delta pill is ~22px loaded */
 .card-lbl{font-size:10px;font-weight:600;color:var(--muted);letter-spacing:1.4px;text-transform:uppercase;margin-bottom:8px;display:flex;align-items:center;gap:6px}
 .card-val{font-family:'DM Sans',sans-serif;font-size:24px;font-weight:700;line-height:1;color:var(--text);letter-spacing:-.4px;font-variant-numeric:lining-nums tabular-nums}
 .card-val .u{font-family:'DM Sans',sans-serif;font-size:11px;color:var(--muted);font-weight:600;margin-left:4px;letter-spacing:.8px;text-transform:uppercase}

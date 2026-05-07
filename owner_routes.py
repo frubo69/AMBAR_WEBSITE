@@ -767,10 +767,11 @@ async def handle_managers_list(request):
     managers = []
     # env managers come first. They CAN now be blocked — the block lives in
     # access_log instead of owner_managers since these IDs are sourced from
-    # the .env file at startup.
+    # the .env file at startup. Skip IDs that are also owners or already
+    # have a DB row, so each user only appears once.
     for mid in sorted(MANAGER_IDS):
-        if int(mid) in db_ids:
-            continue  # promoted to DB entry below
+        if int(mid) in db_ids or int(mid) in OWNER_IDS:
+            continue
         managers.append({
             "telegram_id": int(mid),
             "name": "", "username": "",
@@ -792,9 +793,13 @@ async def handle_managers_list(request):
         })
 
     return web.json_response({
-        "owners":       owners,
-        "managers":     managers,
-        "current_user": request["owner_id"],
+        "owners":           owners,
+        "managers":         managers,
+        "current_user":     request["owner_id"],
+        # Capability flag for the UI — true for OWNER_IDS and the legacy
+        # access set (currently 686932322). Lets the frontend show block
+        # buttons even when the user isn't strictly in OWNER_IDS.
+        "can_manage_users": _can_manage_users(request["owner_id"]),
     }, headers=CORS_HEADERS)
 
 
@@ -1023,8 +1028,52 @@ async def handle_manager_remove(request):
     return web.json_response({"ok": True, "removed": tg_id}, headers=CORS_HEADERS)
 
 
+_backfill_done = False
+
+async def _backfill_delivery_times():
+    """One-time migration: set updated_at on old delivered orders that lack it.
+
+    Uses confirmed_at + eta as the best estimate; falls back to
+    timestamp + 35 min when neither exists.  Runs once per process."""
+    global _backfill_done
+    if _backfill_done:
+        return
+    _backfill_done = True
+    all_orders = await db.get_all_orders()
+    patched = 0
+    for oid, o in all_orders.items():
+        if o.get("status") != "delivered":
+            continue
+        if o.get("updated_at"):
+            continue
+        placed = o.get("timestamp")
+        if not placed:
+            continue
+        confirmed = o.get("confirmed_at")
+        eta = int(o.get("eta") or 0)
+        if confirmed and eta:
+            try:
+                t = datetime.fromisoformat(confirmed)
+                est = t + timedelta(minutes=eta)
+            except (ValueError, TypeError):
+                est = None
+        else:
+            est = None
+        if est is None:
+            try:
+                t0 = datetime.fromisoformat(placed)
+                est = t0 + timedelta(minutes=max(eta, 35))
+            except (ValueError, TypeError):
+                continue
+        await db.update_order(oid, updated_at=est.isoformat())
+        patched += 1
+    if patched:
+        log.info(f"[owner] backfilled updated_at on {patched} delivered orders")
+
+
 def setup(app):
     """Wire owner routes into the aiohttp app. Called from api_server.main()."""
+    app.on_startup.append(lambda _: _backfill_delivery_times())
     app.router.add_route("OPTIONS", "/api/owner/ping",    handle_ping)
     app.router.add_get(             "/api/owner/ping",    handle_ping)
     app.router.add_route("OPTIONS", "/api/owner/finance", handle_finance)

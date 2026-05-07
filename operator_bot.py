@@ -1304,7 +1304,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         deliver_by = now_dubai + __import__('datetime').timedelta(minutes=eta)
         deliver_by_str = deliver_by.strftime("%H:%M")
         await db.update_order(oid, status="approved", eta=eta,
-                              operator_id=op, updated_at=datetime.now().isoformat(),
+                              operator_id=op, updated_at=datetime.now(timezone.utc).isoformat(),
                               confirmed_at=datetime.now(timezone.utc).isoformat(),
                               deliver_by=deliver_by_str)
         # Edit the single live customer status msg in place (no new send, no countdown)
@@ -1329,7 +1329,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                     parse_mode="HTML", reply_markup=_done_kb)
             except: pass
             return
-        await db.update_order(oid, status="declined", updated_at=datetime.now().isoformat())
+        await db.update_order(oid, status="declined", updated_at=datetime.now(timezone.utc).isoformat())
         await db._increment_user(cid, orders_declined=1)
         # Edit the live customer msg in place (no new notification)
         await update_customer_card(oid)
@@ -1343,7 +1343,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # ── DELIVERED ─────────────────────────────────────────────────────────────
     elif data.startswith("done_"):
         parts = data.split("_"); oid, cid = parts[1], int(parts[2])
-        await db.update_order(oid, status="delivered", updated_at=datetime.now().isoformat())
+        await db.update_order(oid, status="delivered", updated_at=datetime.now(timezone.utc).isoformat())
         order = await db.get_order(oid)
         total = (order or {}).get("total", 0)
         await db._increment_user(cid, orders_done=1, total_spent=total)
@@ -1731,7 +1731,7 @@ async def _do_decline_verification(bot, chat_id: int, cid: int, oid: str, commen
     for po in pending:
         po_oid = po.get("order_id")
         if po_oid:
-            await db.update_order(po_oid, status="declined", updated_at=datetime.now().isoformat())
+            await db.update_order(po_oid, status="declined", updated_at=datetime.now(timezone.utc).isoformat())
             await db._increment_user(cid, orders_declined=1)
             declined_oids.append(po_oid)
     # Edit each pending order's live msg → "declined" (with support button).

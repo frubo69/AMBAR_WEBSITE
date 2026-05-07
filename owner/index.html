@@ -3393,7 +3393,12 @@ function _renderMgr(){
   const me = _mgrCache.current_user;
   const owners   = _mgrCache.owners   || [];
   const allMgrs  = _mgrCache.managers || [];
-  const isOwnerMe = owners.some(o => o.telegram_id === me);
+  // Backend tells us directly via `can_manage_users` whether this user can
+  // mutate (OWNER_IDS plus the legacy access set). Fall back to OWNER_IDS
+  // membership for older server responses that don't carry the flag.
+  const canManage = (typeof _mgrCache.can_manage_users === 'boolean')
+    ? _mgrCache.can_manage_users
+    : owners.some(o => o.telegram_id === me);
 
   // Split managers into active vs blocked.
   const activeMgrs  = allMgrs.filter(m => !m.blocked);
@@ -3420,13 +3425,13 @@ function _renderMgr(){
     if(pendingReqs.length) s += ` · ${pendingReqs.length} запрос${pendingReqs.length===1?'':'ов'}`;
     lrowSub.textContent = s;
   }
-  if(addBar) addBar.style.display = isOwnerMe ? '' : 'none';
+  if(addBar) addBar.style.display = canManage ? '' : 'none';
 
   let html = '';
 
   // ── Pending access requests (outsiders who tried to open the bot) ──
   // Owner-only; managers don't see who else tried to get in.
-  if(isOwnerMe && pendingReqs.length){
+  if(canManage && pendingReqs.length){
     const open = _mgrSectionOpen.pending;
     html += `<div class="mgr-grp collapsible${open?' open':''}" data-sect="pending">
       <div class="mgr-grp-t">
@@ -3486,7 +3491,7 @@ function _renderMgr(){
       if(isEnv) tags.push('<span class="mgr-tag env">.env</span>');
       // Block any non-owner, non-self user — including .env-sourced managers
       // (their block is recorded in access_log so it survives a restart).
-      const blockBtn = (isOwnerMe && !isMe) ? `
+      const blockBtn = (canManage && !isMe) ? `
         <button class="mgr-block" data-mgr-block="${m.telegram_id}" data-name="${(m.name||'').replace(/"/g,'&quot;')}" aria-label="Заблокировать">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M5 5l14 14"/></svg>
           <span>Блок</span>
@@ -3504,7 +3509,7 @@ function _renderMgr(){
   html += '</div></div>';
 
   // ── Blocked (managers + outsiders combined) ──
-  if(isOwnerMe && totalBlocked){
+  if(canManage && totalBlocked){
     const open = _mgrSectionOpen.blocked;
     html += `<div class="mgr-grp collapsible${open?' open':''}" data-sect="blocked">
       <div class="mgr-grp-t">
@@ -5073,11 +5078,45 @@ const DETAIL = {
         <div class="dt-sect">Заказы · 7 дней (шт)</div>
         <div class="dt-card" style="padding:14px">${line7(k.orders_7d||[], '#4CAF7D')}</div>`;
     } else if(id === 'avg'){
-      hero = `<div class="dt-stat-val" style="font-size:32px;line-height:1;color:var(--muted)">—</div><div style="font-size:12px;color:var(--muted);margin-top:10px">показатель не считается</div>`;
-      body = `<div class="dt-sect">Среднее время доставки</div><div class="dt-card">${noDataYet}</div>`;
+      const k = f.kpi || {};
+      if(k.avg_min_sample > 0){
+        const d = k.avg_min_delta || 0;
+        const sign = d > 0 ? '▲ ' : d < 0 ? '▼ ' : '';
+        const dClr = d < 0 ? 'var(--up)' : d > 0 ? 'var(--dn)' : 'var(--muted)';
+        hero = `<div class="dt-stat-val" style="font-size:48px;line-height:1;color:var(--text)">${k.avg_min}<span class="u" style="font-size:16px;margin-left:8px">мин</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${sign}<span style="color:${dClr}">${Math.abs(d)} мин</span> vs прошлого · по ${k.avg_min_sample} ${pluralize(k.avg_min_sample,'заказу','заказам','заказам')}</div>`;
+        const bucketLabel = k.avg_min <= 30 ? 'Быстро (< 30 мин)' : k.avg_min <= 45 ? 'Нормально (30–45 мин)' : 'Долго (> 45 мин)';
+        const bucketClr = k.avg_min <= 30 ? 'var(--up)' : k.avg_min <= 45 ? 'var(--gold2)' : 'var(--dn)';
+        body = `
+          <div class="dt-sect">Среднее время доставки</div>
+          <div class="dt-card">
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Среднее</div><div class="dt-row-s">от оформления до доставки</div></div><div class="dt-row-r">${k.avg_min} мин</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Оценка</div></div><div class="dt-row-r" style="color:${bucketClr}">${bucketLabel}</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Выборка</div><div class="dt-row-s">доставленных за период</div></div><div class="dt-row-r">${k.avg_min_sample}</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Порог опоздания</div></div><div class="dt-row-r">> ${k.late_threshold||45} мин</div></div>
+          </div>`;
+      } else {
+        hero = `<div class="dt-stat-val" style="font-size:32px;line-height:1;color:var(--muted)">—</div><div style="font-size:12px;color:var(--muted);margin-top:10px">нет доставленных заказов за период</div>`;
+        body = `<div class="dt-sect">Среднее время доставки</div><div class="dt-card">${noData}</div>`;
+      }
     } else if(id === 'late'){
-      hero = `<div class="dt-stat-val" style="font-size:32px;line-height:1;color:var(--muted)">—</div><div style="font-size:12px;color:var(--muted);margin-top:10px">показатель не считается</div>`;
-      body = `<div class="dt-sect">Опоздания</div><div class="dt-card">${noDataYet}</div>`;
+      const k = f.kpi || {};
+      if(k.avg_min_sample > 0){
+        const lateClr = k.late_pct > 20 ? 'var(--dn)' : k.late_pct > 0 ? 'var(--warn)' : 'var(--up)';
+        hero = `<div class="dt-stat-val" style="font-size:48px;line-height:1;color:${lateClr}">${k.late_pct}<span class="u" style="font-size:16px;margin-left:8px">%</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${k.late_count} ${pluralize(k.late_count,'заказ','заказа','заказов')} > ${k.late_threshold||45} мин · из ${k.avg_min_sample}</div>`;
+        const onTime = k.avg_min_sample - k.late_count;
+        const onTimePct = Math.round(onTime / k.avg_min_sample * 100);
+        body = `
+          <div class="dt-sect">Опоздания · > ${k.late_threshold||45} мин</div>
+          <div class="dt-card">
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Опоздавших</div><div class="dt-row-s">доставка дольше ${k.late_threshold||45} мин</div></div><div class="dt-row-r dn">${k.late_count}</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Вовремя</div><div class="dt-row-s">доставка ≤ ${k.late_threshold||45} мин</div></div><div class="dt-row-r up">${onTime} (${onTimePct}%)</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Всего доставлено</div></div><div class="dt-row-r">${k.avg_min_sample}</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Среднее время</div></div><div class="dt-row-r">${k.avg_min} мин</div></div>
+          </div>`;
+      } else {
+        hero = `<div class="dt-stat-val" style="font-size:32px;line-height:1;color:var(--muted)">—</div><div style="font-size:12px;color:var(--muted);margin-top:10px">нет доставленных заказов за период</div>`;
+        body = `<div class="dt-sect">Опоздания</div><div class="dt-card">${noData}</div>`;
+      }
     } else if(id === 'rating'){
       const k = f.kpi || {};
       const dist = k.rating_dist || {1:0,2:0,3:0,4:0,5:0};
@@ -5095,7 +5134,7 @@ const DETAIL = {
     }
 
     const titleT = {revenue:'Выручка · '+periodLbl, orders:'Заказы · '+periodLbl, done:'Доставлено · '+periodLbl, avg:'Среднее время доставки', late:'Опоздания', rating:'Рейтинг · '+periodLbl}[id] || id;
-    const titleSub = {revenue:'Офисы · 7 дней · сводка', orders:'Офисы · статусы · 7 дней', done:'Сейчас в работе · динамика', avg:'нет данных', late:'нет данных', rating:'★ распределение'}[id] || '';
+    const titleSub = {revenue:'Офисы · 7 дней · сводка', orders:'Офисы · статусы · 7 дней', done:'Сейчас в работе · динамика', avg:'время от заказа до доставки', late:'заказы дольше порога', rating:'★ распределение'}[id] || '';
     const titleIco = {revenue:'$', orders:'📦', done:'✓', avg:'⏱', late:'⚠', rating:'★'}[id] || '•';
     const titleBg = {revenue:'var(--up-soft);color:var(--up)', orders:'rgba(201,169,110,.14);color:var(--gold2)', done:'var(--up-soft);color:var(--up)', avg:'var(--info-soft);color:var(--info)', late:'var(--warn-soft);color:var(--warn)', rating:'rgba(201,169,110,.14);color:var(--gold2)'}[id] || '';
 

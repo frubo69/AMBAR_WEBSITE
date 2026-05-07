@@ -76,6 +76,33 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .alerts-btn.crit .alerts-btn-badge{background:var(--dn);color:#fff}
 @keyframes alertsPulse{0%,100%{box-shadow:0 0 0 0 rgba(224,85,85,.5)}50%{box-shadow:0 0 0 6px rgba(224,85,85,0)}}
 
+/* ===== Loading skeleton ===== */
+/* Toggled on placeholder spans while /api/owner/finance is in-flight.
+   Hides the «—» / «…» glyph and replaces it with a shimmering pill. */
+.is-skel{
+  display:inline-block;
+  min-width:42px;
+  height:.95em;
+  border-radius:6px;
+  color:transparent !important;
+  background:linear-gradient(90deg, var(--card2) 0%, rgba(201,169,110,.22) 50%, var(--card2) 100%);
+  background-size:200% 100%;
+  animation:skelShimmer 1.3s ease-in-out infinite;
+  vertical-align:middle;
+}
+.is-skel.wide{min-width:120px}
+.is-skel.xl{min-width:180px;height:1em}
+.hero-amt.is-skel{min-width:200px;height:38px;border-radius:10px}
+.star-num.is-skel{min-width:48px;height:.95em}
+.is-skel + .u, .is-skel + .hero-unit{opacity:.35}
+.hero-spark.is-skel-bar{position:relative;overflow:hidden;border-radius:10px;background:var(--card2)}
+.hero-spark.is-skel-bar svg{opacity:0}
+.hero-spark.is-skel-bar::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg, transparent 0%, rgba(201,169,110,.18) 50%, transparent 100%);background-size:200% 100%;animation:skelShimmer 1.3s ease-in-out infinite}
+@keyframes skelShimmer{
+  0%{background-position:200% 0}
+  100%{background-position:-200% 0}
+}
+
 /* Page */
 .page{padding:6px 14px 20px;display:none;animation:fadeIn .3s var(--e1)}
 .page.active{display:block}
@@ -2495,6 +2522,25 @@ const PERIOD_DATA = {
 function _setAed(id, val){ const el = document.getElementById(id); if(el){ el.dataset.aed = String(val); } }
 function _setText(id, txt){ const el = document.getElementById(id); if(el) el.textContent = txt; }
 
+// IDs of finance/KPI placeholders that render skeleton shimmers while the
+// /api/owner/finance request is in flight. Mapped to size hints via CSS.
+const _SKEL_IDS = [
+  'heroRev','heroPrev','heroDelta','moneyHero','moneyProfit','moneyDelta',
+  'offCentralRev','offNorthRev','offSouthRev','bars7dAvg','bars7dTotal',
+  'kOrders','kOrdersAvg','kOrdersDelta','kDone','kDoneTotal','kDonePct',
+  'kInRoute','kAvg','kAvgSub','kLate','kLateCount','kRating'
+];
+function setFinanceSkel(on){
+  _SKEL_IDS.forEach(id => {
+    const el = document.getElementById(id);
+    if(!el) return;
+    el.classList.toggle('is-skel', !!on);
+  });
+  // Hero sparkline: cover the SVG with a shimmering bar while loading.
+  const hs = document.querySelector('.hero-spark');
+  if(hs) hs.classList.toggle('is-skel-bar', !!on);
+}
+
 // Sparkline trend per period (values are cumulative-ish for visual feel)
 const PERIOD_TREND = {
   today: [6200,5800,6400,6100,7200,7900,8800,9400,10200,11100,12400,13100,14200,15800,16900,18420],  // 16 hourly points
@@ -2564,6 +2610,7 @@ function applyPeriod(p){
     _setText('kOrdersDelta', '…');
     _setText('kRatingLbl', 'Рейтинг');
     _setText('kAvgSub', 'нет данных');
+    setFinanceSkel(true);
   }
   applyCurrency();
   // Fetch live data and overlay
@@ -2575,17 +2622,19 @@ function applyPeriod(p){
 // sparkline, Money tab hero/profit, and 7-day bars with real numbers.
 // Falls back silently to mock data on failure (UI stays functional).
 async function applyFinanceLive(p){
-  if(!window.ownerApi) return;
+  if(!window.ownerApi){ setFinanceSkel(false); return; }
   let data = FINANCE_CACHE[p];
   if(!data){
     try { data = await ownerApi.ownerFetch('/api/owner/finance', {params:{period:p}}); }
-    catch(e){ console.warn('[finance] fetch failed', e); return; }
+    catch(e){ console.warn('[finance] fetch failed', e); setFinanceSkel(false); return; }
     FINANCE_CACHE[p] = data;
   }
   renderFinance(p, data);
 }
 
 function renderFinance(p, f){
+  // Data has arrived — clear loading shimmers before painting real values.
+  setFinanceSkel(false);
   // Overview hero
   _setAed('heroRev',  f.revenue.current);
   _setAed('heroPrev', f.revenue.previous);
@@ -5556,7 +5605,10 @@ applyCurrency();
 syncActiveCount();
 updateSparkline('today');
 
-// Load real finance data immediately (default period = today)
+// Load real finance data immediately (default period = today).
+// Show skeleton shimmers until /api/owner/finance returns; renderFinance
+// will clear them when it paints the first real values.
+setFinanceSkel(true);
 applyFinanceLive('today');
 
 // Load real customer data from API

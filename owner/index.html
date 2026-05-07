@@ -3405,9 +3405,13 @@ function _renderMgr(){
   const blockedMgrs = allMgrs.filter(m =>  m.blocked);
 
   // Split access log into pending requests vs explicitly blocked outsiders.
+  // Hide log rows whose telegram_id already appears in the managers list — env
+  // managers blocked through the UI are mirrored into access_log, so without
+  // this dedupe they'd render twice (once as blockedMgrs, once as blockedOuts).
   const logItems = (_mgrLogCache && _mgrLogCache.items) || [];
-  const pendingReqs = logItems.filter(a => a.status === 'pending');
-  const blockedOuts = logItems.filter(a => a.status === 'blocked');
+  const mgrIds = new Set(allMgrs.map(m => m.telegram_id));
+  const pendingReqs = logItems.filter(a => a.status === 'pending' && !mgrIds.has(a.telegram_id));
+  const blockedOuts = logItems.filter(a => a.status === 'blocked' && !mgrIds.has(a.telegram_id));
   const totalBlocked = blockedMgrs.length + blockedOuts.length;
 
   if(sub){

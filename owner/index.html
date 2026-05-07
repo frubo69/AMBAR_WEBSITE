@@ -914,13 +914,36 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     </div>
   </div>
 
+  <!-- Доступ к боту (owner-only — display toggled in initAccessBlock) -->
+  <div class="cat-block" id="accBlock" style="display:none">
+    <div class="cat-block-hdr" id="accBlockHdr">
+      <div class="card-ico">👤</div>
+      <div class="cat-block-title">
+        <div class="cat-block-n">Доступ к боту</div>
+        <div class="cat-block-sub" id="accBlockSub">Загрузка…</div>
+      </div>
+      <svg class="cat-block-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="cat-block-kpis">
+      <div class="cat-kpi"><div class="cat-kpi-v" id="accKpiOwn">—</div><div class="cat-kpi-l">Владельцы</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v" id="accKpiMgr">—</div><div class="cat-kpi-l">Менеджеры</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v" id="accKpiBlk">—</div><div class="cat-kpi-l" id="accKpiBlkLbl">Заблокировано</div></div>
+    </div>
+    <div class="cat-block-expand">
+      <div class="cat-block-sect-t">Владельцы и менеджеры</div>
+      <div id="accBlockUsers"></div>
+      <div class="cat-block-sect-t" id="accBlockExtraT" style="display:none">Запросы на доступ</div>
+      <div id="accBlockExtra"></div>
+      <button class="cat-block-open" onclick="event.stopPropagation();openMgr()">Управлять доступом →</button>
+    </div>
+  </div>
+
   <!-- Settings — functional -->
   <div class="sect"><div class="sect-t">Настройки</div></div>
   <div class="list">
     <div class="lrow lrow-tog" data-tog="notif"><div class="card-ico">🔔</div><div class="lrow-body"><div class="lrow-name">Telegram-оповещения</div><div class="lrow-sub">заказы &gt; 1000 AED · опоздания</div></div><span class="tog on" id="togNotif"></span></div>
     <div class="lrow lrow-tog" data-tog="sound"><div class="card-ico">🔊</div><div class="lrow-body"><div class="lrow-name">Звук уведомлений</div><div class="lrow-sub">только важные события</div></div><span class="tog on" id="togSound"></span></div>
     <div class="lrow lrow-tog" data-tog="quiet"><div class="card-ico">🌙</div><div class="lrow-body"><div class="lrow-name">Тихие часы</div><div class="lrow-sub">23:00 → 09:00 · только критичные</div></div><span class="tog" id="togQuiet"></span></div>
-    <div class="lrow" id="mgrLrow" onclick="openMgr()" style="display:none"><div class="card-ico">👤</div><div class="lrow-body"><div class="lrow-name">Доступ для менеджеров</div><div class="lrow-sub" id="mgrLrowSub">владельцы и менеджеры</div></div><span style="color:var(--muted)">›</span></div>
     <div class="lrow" onclick="qaExport()"><div class="card-ico">📤</div><div class="lrow-body"><div class="lrow-name">Экспорт CSV / XLSX</div><div class="lrow-sub">данные за выбранный период</div></div><span style="color:var(--muted)">›</span></div>
     <div class="lrow" onclick="openNotif()"><div class="card-ico">⚙️</div><div class="lrow-body"><div class="lrow-name">Тонкая настройка алертов</div><div class="lrow-sub">пресеты · пороги · каналы</div></div><span style="color:var(--muted)">›</span></div>
   </div>
@@ -2183,8 +2206,6 @@ try{ if(window.Telegram && Telegram.WebApp){
         is_owner: !!r.is_owner,
         can_manage_users: !!r.can_manage_users,
       };
-      const mgrLrow = document.getElementById('mgrLrow');
-      if(mgrLrow) mgrLrow.style.display = r.can_manage_users ? '' : 'none';
     }catch(e){
       if(e && (e.status === 401 || e.status === 403)){
         const reason = (e.payload && e.payload.error) || 'unauthorized';
@@ -3144,6 +3165,145 @@ function _renderCatBlock(){
   });
 })();
 
+// ==== Доступ к боту block (Ещё page) ====
+// Mirrors the catalog-block layout: header → 3 KPI tiles → expand panel
+// with preview rows + an "open full modal" button. Data comes from the
+// same _mgrCache / _mgrLogCache that openMgr() populates, so opening this
+// block warms the modal cache too.
+function _renderAccessBlock(){
+  const block = document.getElementById('accBlock');
+  if(!block || !_mgrCache) return;
+  const owners   = _mgrCache.owners   || [];
+  const allMgrs  = _mgrCache.managers || [];
+  const activeMgrs  = allMgrs.filter(m => !m.blocked);
+  const blockedMgrs = allMgrs.filter(m =>  m.blocked);
+  const logItems = (_mgrLogCache && _mgrLogCache.items) || [];
+  const mgrIds = new Set(allMgrs.map(m => m.telegram_id));
+  const pendingReqs = logItems.filter(a => a.status === 'pending' && !mgrIds.has(a.telegram_id));
+  const blockedOuts = logItems.filter(a => a.status === 'blocked' && !mgrIds.has(a.telegram_id));
+  const totalBlocked = blockedMgrs.length + blockedOuts.length;
+
+  const sub = document.getElementById('accBlockSub');
+  if(sub){
+    const totalUsers = owners.length + activeMgrs.length;
+    let s = `${totalUsers} ${pluralize(totalUsers,'пользователь','пользователя','пользователей')} · доступ к панели`;
+    if(pendingReqs.length) s += ` · ${pendingReqs.length} запрос${pendingReqs.length===1?'':'ов'}`;
+    sub.textContent = s;
+  }
+
+  const ownEl = document.getElementById('accKpiOwn');
+  if(ownEl) ownEl.textContent = owners.length;
+  const mgrEl = document.getElementById('accKpiMgr');
+  if(mgrEl) mgrEl.textContent = activeMgrs.length;
+  const blkEl = document.getElementById('accKpiBlk');
+  const blkLbl = document.getElementById('accKpiBlkLbl');
+  if(blkEl){
+    if(pendingReqs.length){
+      blkEl.textContent = pendingReqs.length;
+      blkEl.style.color = 'var(--info)';
+      if(blkLbl) blkLbl.textContent = 'Запросов';
+    } else {
+      blkEl.textContent = totalBlocked;
+      blkEl.style.color = totalBlocked>0 ? 'var(--warn)' : 'var(--up)';
+      if(blkLbl) blkLbl.textContent = 'Заблокировано';
+    }
+  }
+
+  const usersWrap = document.getElementById('accBlockUsers');
+  if(usersWrap){
+    const me = _mgrCache.current_user;
+    const rows = [];
+    owners.forEach(o => rows.push({tg:o.telegram_id, name:o.name, tag:'owner', isMe:o.telegram_id===me, src:''}));
+    activeMgrs.slice(0, 4).forEach(m => rows.push({
+      tg:m.telegram_id, name:m.name, tag:'мен.',
+      isMe:m.telegram_id===me, src:m.source==='env'?'.env':''
+    }));
+    if(!rows.length){
+      usersWrap.innerHTML = '<div class="cat-block-empty">Нет менеджеров</div>';
+    } else {
+      usersWrap.innerHTML = rows.map(r => {
+        const init = _initials(r.name, r.tg);
+        const display = r.name || ('User '+r.tg);
+        const tagHtml = r.tag === 'owner'
+          ? '<span style="font-size:9px;color:var(--gold2);background:rgba(201,169,110,.14);padding:2px 6px;border-radius:6px;margin-left:6px;font-weight:700;letter-spacing:.3px;text-transform:uppercase">owner</span>'
+          : (r.isMe ? '<span style="font-size:9px;color:var(--info);background:rgba(91,141,239,.14);padding:2px 6px;border-radius:6px;margin-left:6px;font-weight:700;letter-spacing:.3px;text-transform:uppercase">вы</span>' : '');
+        return `<div class="cat-mini-row">
+          <div class="cat-mini-av">${init}</div>
+          <div class="cat-mini-body">
+            <div class="cat-mini-n">${display}${tagHtml}</div>
+            <div class="cat-mini-sub">ID ${r.tg}${r.src?' · '+r.src:''}</div>
+          </div>
+        </div>`;
+      }).join('') + (activeMgrs.length>4 ? `<div class="cat-block-empty" style="padding-top:6px">…и ещё ${activeMgrs.length-4}</div>` : '');
+    }
+  }
+
+  const extraT = document.getElementById('accBlockExtraT');
+  const extraWrap = document.getElementById('accBlockExtra');
+  if(extraT && extraWrap){
+    if(pendingReqs.length){
+      extraT.style.display = '';
+      extraT.textContent = 'Запросы на доступ';
+      extraWrap.innerHTML = pendingReqs.slice(0,3).map(a => {
+        const fullName = ((a.first_name||'')+' '+(a.last_name||'')).trim() || ('User '+a.telegram_id);
+        return `<div class="cat-mini-row">
+          <div class="cat-mini-av">${_initials(fullName, a.telegram_id)}</div>
+          <div class="cat-mini-body">
+            <div class="cat-mini-n">${fullName}</div>
+            <div class="cat-mini-sub">ID ${a.telegram_id} · ждёт решения</div>
+          </div>
+          <div class="cat-mini-r" style="color:var(--info)">●<span class="u">new</span></div>
+        </div>`;
+      }).join('') + (pendingReqs.length>3 ? `<div class="cat-block-empty" style="padding-top:6px">…и ещё ${pendingReqs.length-3}</div>` : '');
+    } else if(totalBlocked){
+      extraT.style.display = '';
+      extraT.textContent = 'Заблокированные';
+      const blocked = [
+        ...blockedMgrs.map(m => ({tg:m.telegram_id, name:m.name})),
+        ...blockedOuts.map(a => ({tg:a.telegram_id, name:((a.first_name||'')+' '+(a.last_name||'')).trim()})),
+      ];
+      extraWrap.innerHTML = blocked.slice(0,3).map(b => {
+        const display = b.name || ('User '+b.tg);
+        return `<div class="cat-mini-row">
+          <div class="cat-mini-av" style="opacity:.55">${_initials(b.name, b.tg)}</div>
+          <div class="cat-mini-body">
+            <div class="cat-mini-n" style="color:var(--muted)">${display}</div>
+            <div class="cat-mini-sub">ID ${b.tg} · доступ закрыт</div>
+          </div>
+          <div class="cat-mini-r" style="color:var(--warn)">блок</div>
+        </div>`;
+      }).join('') + (totalBlocked>3 ? `<div class="cat-block-empty" style="padding-top:6px">…и ещё ${totalBlocked-3}</div>` : '');
+    } else {
+      extraT.style.display = 'none';
+      extraWrap.innerHTML = '';
+    }
+  }
+}
+
+(function initAccessBlock(){
+  const block = document.getElementById('accBlock');
+  const hdr = document.getElementById('accBlockHdr');
+  if(!block || !hdr) return;
+  hdr.addEventListener('click',()=>{
+    block.classList.toggle('open');
+    try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
+  });
+  // Reveal block + warm the cache once auth has resolved. window._ambarCaps
+  // is populated by the ping handshake — wait for it before we know whether
+  // this user can manage users (owner / legacy access set).
+  const reveal = () => {
+    if(!window._ambarCaps) return false;
+    if(!window._ambarCaps.can_manage_users) return true;  // hide, but stop polling
+    block.style.display = '';
+    if(typeof loadMgr === 'function'){ loadMgr(); }
+    return true;
+  };
+  if(!reveal()){
+    const iv = setInterval(()=>{ if(reveal()) clearInterval(iv); }, 400);
+    setTimeout(()=>clearInterval(iv), 15000);
+  }
+})();
+
 // ==== Dynamic alerts (Ещё page) ====
 // Generates alerts from live data (mostly PRODUCTS stock + a few computed
 // signals from PERIOD_DATA / OP_PERIOD). Severities: dn / warn / info.
@@ -3372,6 +3532,7 @@ async function loadMgr(){
     _mgrCache = mgrs;
     _mgrLogCache = log;
     _renderMgr();
+    try{ _renderAccessBlock(); }catch(_){}
   }catch(e){
     if(body){
       const msg = (e && e.status === 403) ? 'Нет доступа' : (e && e.message) || 'Ошибка загрузки';
@@ -3388,7 +3549,6 @@ function _renderMgr(){
   const body = document.getElementById('mgrBody');
   const sub  = document.getElementById('mgrSubtitle');
   const addBar = document.getElementById('mgrAddBar');
-  const lrowSub = document.getElementById('mgrLrowSub');
   if(!body) return;
   const me = _mgrCache.current_user;
   const owners   = _mgrCache.owners   || [];
@@ -3422,12 +3582,6 @@ function _renderMgr(){
     if(pendingReqs.length) pieces.push(`<span style="color:var(--info)">${pendingReqs.length} запрос${pendingReqs.length===1?'':'ов'}</span>`);
     if(totalBlocked)       pieces.push(`<span style="color:var(--warn)">${totalBlocked} заблокировано</span>`);
     sub.innerHTML = pieces.join(' · ');
-  }
-  if(lrowSub){
-    const totalUsers = owners.length + activeMgrs.length;
-    let s = `${totalUsers} ${pluralize(totalUsers,'пользователь','пользователя','пользователей')}`;
-    if(pendingReqs.length) s += ` · ${pendingReqs.length} запрос${pendingReqs.length===1?'':'ов'}`;
-    lrowSub.textContent = s;
   }
   if(addBar) addBar.style.display = canManage ? '' : 'none';
 

@@ -40,6 +40,8 @@ async def connect():
         await _db.support_map.create_index("fwd_msg_id", unique=True)
         await _db.shifts.create_index([("operator_id", 1), ("status", 1)])
         await _db.owner_managers.create_index("telegram_id", unique=True)
+        await _db.owner_access_log.create_index("telegram_id", unique=True)
+        await _db.owner_access_log.create_index([("status", 1), ("last_attempt_at", -1)])
         log.info("✅ MongoDB connected — db: ambar")
     except Exception as e:
         log.error(f"MongoDB index error: {e}")
@@ -585,11 +587,193 @@ async def remove_manager(telegram_id: int) -> bool:
 
 
 async def is_manager(telegram_id: int) -> bool:
-    """Check if a Telegram user is a DB-stored manager."""
+    """Check if a Telegram user is a DB-stored manager AND not blocked."""
     db = _db_or_none()
     if db is None: return False
-    doc = await db.owner_managers.find_one({"telegram_id": int(telegram_id)}, {"_id": 1})
+    doc = await db.owner_managers.find_one({"telegram_id": int(telegram_id)}, {"_id": 1, "blocked": 1})
+    return bool(doc) and not doc.get("blocked", False)
+
+
+async def is_manager_blocked(telegram_id: int) -> bool:
+    """True if user has a blocked record in owner_managers."""
+    db = _db_or_none()
+    if db is None: return False
+    doc = await db.owner_managers.find_one({"telegram_id": int(telegram_id)}, {"_id": 1, "blocked": 1})
+    return bool(doc) and bool(doc.get("blocked", False))
+
+
+async def set_manager_blocked(telegram_id: int, blocked: bool, by: int = 0) -> bool:
+    """Toggle the blocked flag on a manager. Returns True if a row was updated."""
+    db = _db_or_none()
+    if db is None: return False
+    upd = {"blocked": bool(blocked)}
+    if blocked:
+        upd["blocked_at"] = datetime.now(timezone.utc).isoformat()
+        upd["blocked_by"] = int(by) if by else 0
+    else:
+        upd["blocked_at"] = ""
+        upd["blocked_by"] = 0
+    res = await db.owner_managers.update_one(
+        {"telegram_id": int(telegram_id)},
+        {"$set": upd},
+    )
+    return res.matched_count > 0
+
+
+# ── Owner access log: track unauthorized attempts + explicit blocks ──────────
+# Rows are keyed by telegram_id and have a status:
+#   'pending'  — unauthorized user tried to open the bot, awaiting decision
+#   'blocked'  — explicitly denied by owner (sees "blocked" deny screen)
+#   'approved' — a record exists but the user is allowed (rare; usually means
+#                they were promoted to manager and we kept the log row for history)
+async def log_access_attempt(user: dict, request_path: str = "", ip: str = "", ua: str = "") -> dict:
+    """Upsert an access-log entry from a Telegram user dict. Returns
+    {is_first_in_window: bool, doc: dict} so the caller can decide whether
+    to fire a Telegram alert (we throttle to once per 24h per user)."""
+    db = _db_or_none()
+    if db is None or not user:
+        return {"is_first_in_window": False, "doc": {}}
+    tg_id = int(user.get("id") or 0)
+    if not tg_id:
+        return {"is_first_in_window": False, "doc": {}}
+    now = datetime.now(timezone.utc)
+    existing = await db.owner_access_log.find_one({"telegram_id": tg_id}, {"_id": 0})
+    is_first = True
+    if existing:
+        try:
+            last = datetime.fromisoformat(existing.get("last_attempt_at", ""))
+            if (now - last).total_seconds() < 24 * 3600:
+                is_first = False
+        except Exception:
+            pass
+    update = {
+        "telegram_id":      tg_id,
+        "username":         user.get("username", ""),
+        "first_name":       user.get("first_name", ""),
+        "last_name":        user.get("last_name", ""),
+        "language_code":    user.get("language_code", ""),
+        "is_premium":       bool(user.get("is_premium", False)),
+        "allows_pm":        bool(user.get("allows_write_to_pm", False)),
+        "photo_url":        user.get("photo_url", ""),
+        "last_attempt_at":  now.isoformat(),
+        "last_path":        request_path,
+        "last_ip":          ip,
+        "last_user_agent":  ua,
+    }
+    inc = {"attempts": 1}
+    set_on_insert = {
+        "first_attempt_at": now.isoformat(),
+        "status":           "pending",
+        "blocked_at":       "",
+        "blocked_by":       0,
+    }
+    await db.owner_access_log.update_one(
+        {"telegram_id": tg_id},
+        {"$set": update, "$inc": inc, "$setOnInsert": set_on_insert},
+        upsert=True,
+    )
+    doc = await db.owner_access_log.find_one({"telegram_id": tg_id}, {"_id": 0})
+    return {"is_first_in_window": is_first, "doc": doc or {}}
+
+
+async def get_access_log(status: str = "") -> list:
+    """Return access-log entries, newest first. Filter by status if given."""
+    db = _db_or_none()
+    if db is None: return []
+    q = {"status": status} if status else {}
+    cursor = db.owner_access_log.find(q, {"_id": 0}).sort("last_attempt_at", -1)
+    return await cursor.to_list(length=500)
+
+
+async def get_access_entry(telegram_id: int) -> dict:
+    db = _db_or_none()
+    if db is None: return {}
+    doc = await db.owner_access_log.find_one({"telegram_id": int(telegram_id)}, {"_id": 0})
+    return doc or {}
+
+
+async def set_access_status(telegram_id: int, status: str, by: int = 0) -> bool:
+    """Update status of an access-log entry. Status: pending|blocked|approved."""
+    db = _db_or_none()
+    if db is None: return False
+    if status not in ("pending", "blocked", "approved"):
+        return False
+    upd = {"status": status}
+    if status == "blocked":
+        upd["blocked_at"] = datetime.now(timezone.utc).isoformat()
+        upd["blocked_by"] = int(by) if by else 0
+    else:
+        upd["blocked_at"] = ""
+        upd["blocked_by"] = 0
+    res = await db.owner_access_log.update_one(
+        {"telegram_id": int(telegram_id)},
+        {"$set": upd},
+    )
+    return res.matched_count > 0
+
+
+async def is_access_blocked(telegram_id: int) -> bool:
+    """True if user has an access-log row with status='blocked'."""
+    db = _db_or_none()
+    if db is None: return False
+    doc = await db.owner_access_log.find_one(
+        {"telegram_id": int(telegram_id), "status": "blocked"},
+        {"_id": 1},
+    )
     return doc is not None
+
+
+async def get_blocked_access_ids() -> set:
+    """Return the set of telegram_ids with status='blocked' in access_log.
+    Used to mark env-managers as blocked in the managers list UI without
+    requiring them to have a DB row in owner_managers."""
+    db = _db_or_none()
+    if db is None: return set()
+    cursor = db.owner_access_log.find({"status": "blocked"}, {"_id": 0, "telegram_id": 1})
+    rows = await cursor.to_list(length=500)
+    return {int(r["telegram_id"]) for r in rows if r.get("telegram_id")}
+
+
+async def upsert_access_block(telegram_id: int, by: int = 0, hint: dict = None) -> dict:
+    """Upsert an access-log row in 'blocked' status — used to revoke
+    env-managers who don't have an owner_managers row. The optional `hint`
+    can pre-fill name/username so the UI shows something nicer than just
+    the bare ID."""
+    db = _db_or_none()
+    if db is None or not telegram_id:
+        return {}
+    now = datetime.now(timezone.utc).isoformat()
+    set_doc = {
+        "telegram_id": int(telegram_id),
+        "status":      "blocked",
+        "blocked_at":  now,
+        "blocked_by":  int(by) if by else 0,
+        "last_attempt_at": now,
+    }
+    if hint:
+        if hint.get("name"):     set_doc["first_name"] = hint["name"]
+        if hint.get("username"): set_doc["username"]   = hint["username"].lstrip("@")
+    set_on_insert = {
+        "first_attempt_at": now,
+        "attempts":         0,
+        "first_name":       hint.get("name", "")     if hint else "",
+        "last_name":        "",
+        "username":         (hint.get("username", "") if hint else "").lstrip("@"),
+        "language_code":    "",
+        "is_premium":       False,
+        "allows_pm":        False,
+        "photo_url":        "",
+        "last_path":        "",
+        "last_ip":          "",
+        "last_user_agent":  "",
+    }
+    await db.owner_access_log.update_one(
+        {"telegram_id": int(telegram_id)},
+        {"$set": set_doc, "$setOnInsert": set_on_insert},
+        upsert=True,
+    )
+    doc = await db.owner_access_log.find_one({"telegram_id": int(telegram_id)}, {"_id": 0})
+    return doc or {}
 
 
 async def get_all_customers() -> list:

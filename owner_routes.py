@@ -15,7 +15,7 @@ from pathlib import Path
 
 from aiohttp import web
 
-from owner_auth import require_owner, CORS_HEADERS
+from owner_auth import require_owner, CORS_HEADERS, install_alerter
 from config import OWNER_IDS, MANAGER_IDS
 import db
 import os, logging
@@ -29,6 +29,15 @@ OWNER_BOT_TOKEN = os.getenv("AMBAR_OWNER_BOT_TOKEN", "")
 
 # ─── constants ──────────────────────────────────────────────────────────
 DUBAI_TZ = timezone(timedelta(hours=4))
+
+# Who is allowed to see/operate the "Доступ для менеджеров" section.
+# Currently single owner (7865205960) plus legacy access for 686932322
+# during the transition. Remove 686932322 once new owner is fully onboarded.
+LEGACY_MGR_UI_ACCESS = {686932322}
+
+
+def _can_manage_users(uid: int) -> bool:
+    return uid in OWNER_IDS or uid in LEGACY_MGR_UI_ACCESS
 
 # Estimated profit margin until per-item cost-of-goods is tracked.
 # Mock data assumed ~35% (6480/18420). Revisit once catalog has cost field.
@@ -179,6 +188,46 @@ def _last_7_days(all_orders: dict) -> list:
     return buckets
 
 
+# Anything over this is a "late" delivery for the Опоздания KPI tile.
+# Matches the UI hint "> 45 мин" on the bento card.
+LATE_THRESHOLD_MIN = 45
+
+
+def _delivery_stats(orders) -> dict:
+    """Compute average delivery time + late count from delivered orders.
+
+    `orders` is a list of (dt, order) pairs (output of _orders_in_window).
+    Delivery duration = updated_at − timestamp, both ISO strings on the
+    order document. Orders without a parseable updated_at are skipped —
+    they shouldn't exist for delivered status, but defensively handled."""
+    durations = []  # in whole minutes
+    for _, o in orders:
+        placed_ts = o.get("timestamp")
+        delivered_ts = o.get("updated_at") or o.get("delivered_at")
+        if not placed_ts or not delivered_ts:
+            continue
+        try:
+            t0 = datetime.fromisoformat(placed_ts).replace(tzinfo=timezone.utc)
+            t1 = datetime.fromisoformat(delivered_ts).replace(tzinfo=timezone.utc)
+        except (ValueError, TypeError):
+            continue
+        diff_min = (t1 - t0).total_seconds() / 60
+        # Drop nonsense values (negative = clock skew, > 24h = stuck order)
+        if 0 < diff_min < 24 * 60:
+            durations.append(diff_min)
+    if not durations:
+        return {"avg_min": 0, "late_count": 0, "late_pct": 0, "sample": 0}
+    avg_min = round(sum(durations) / len(durations))
+    late_count = sum(1 for d in durations if d > LATE_THRESHOLD_MIN)
+    late_pct = round(late_count / len(durations) * 100, 1)
+    return {
+        "avg_min":    avg_min,
+        "late_count": late_count,
+        "late_pct":   late_pct,
+        "sample":     len(durations),
+    }
+
+
 def _delta_pct(curr: int, prev: int) -> float:
     if prev == 0:
         return 100.0 if curr > 0 else 0.0
@@ -196,12 +245,16 @@ def _delta_label(pct: float) -> str:
 # ─── handlers ───────────────────────────────────────────────────────────
 @require_owner
 async def handle_ping(request):
-    """Cheap health + identity check. Returns the authenticated owner's id."""
+    """Cheap health + identity check. Returns the authenticated owner's id
+    plus capability flags so the UI can hide/show owner-only sections."""
+    uid = request["owner_id"]
     return web.json_response(
         {
             "ok": True,
-            "owner_id": request["owner_id"],
-            "server_time": int(time.time()),
+            "owner_id":         uid,
+            "is_owner":         uid in OWNER_IDS,
+            "can_manage_users": _can_manage_users(uid),
+            "server_time":      int(time.time()),
         },
         headers=CORS_HEADERS,
     )
@@ -270,6 +323,11 @@ async def handle_finance(request):
         if 1 <= r <= 5:
             rating_dist[r] += 1
 
+    # Delivery time + late-rate KPIs (current vs previous for delta).
+    deliv_curr = _delivery_stats(curr_orders)
+    deliv_prev = _delivery_stats(prev_orders)
+    avg_delta_min = deliv_curr["avg_min"] - deliv_prev["avg_min"] if deliv_prev["sample"] else 0
+
     # Last 7 days order count (any status) — for orders detail trend
     today_start = _now_dubai().replace(hour=0, minute=0, second=0, microsecond=0)
     week_end = today_start + timedelta(days=1)
@@ -322,6 +380,14 @@ async def handle_finance(request):
             "rating_dist":      rating_dist,
             "orders_by_office": orders_by_office,
             "orders_7d":        orders_7d,
+            # Delivery-time + late KPIs (computed from updated_at − timestamp
+            # on delivered orders). avg_min = 0 means we have no samples yet.
+            "avg_min":          deliv_curr["avg_min"],
+            "avg_min_delta":    avg_delta_min,
+            "avg_min_sample":   deliv_curr["sample"],
+            "late_count":       deliv_curr["late_count"],
+            "late_pct":         deliv_curr["late_pct"],
+            "late_threshold":   LATE_THRESHOLD_MIN,
         },
     }, headers=CORS_HEADERS)
 
@@ -684,22 +750,35 @@ async def handle_catalog_update(request):
 @require_owner
 async def handle_managers_list(request):
     """Return owners (env, read-only) + managers (env + DB, mutable) with metadata.
-    Shape: {"owners": [...], "managers": [...], "current_user": int}.
-    Each entry: {telegram_id, name, username, source: 'env'|'db'|'owner', added_at?}."""
+    Owner-only (plus LEGACY_MGR_UI_ACCESS) — managers can't see this list."""
+    if not _can_manage_users(request["owner_id"]):
+        return web.json_response({"error": "forbidden"}, status=403, headers=CORS_HEADERS)
+
     db_managers = await db.get_managers()
     db_ids = {int(m["telegram_id"]) for m in db_managers}
+    # access_log "blocked" rows let us mark env-managers as blocked too,
+    # since they don't have an owner_managers row to flip.
+    blocked_in_log = await db.get_blocked_access_ids()
 
     owners = [
-        {"telegram_id": int(oid), "name": "", "username": "", "source": "owner"}
+        {"telegram_id": int(oid), "name": "", "username": "", "source": "owner", "blocked": False}
         for oid in sorted(OWNER_IDS)
     ]
     managers = []
-    # env managers come first (read-only — to remove, edit .env + restart)
+    # env managers come first. They CAN now be blocked — the block lives in
+    # access_log instead of owner_managers since these IDs are sourced from
+    # the .env file at startup.
     for mid in sorted(MANAGER_IDS):
         if int(mid) in db_ids:
             continue  # promoted to DB entry below
-        managers.append({"telegram_id": int(mid), "name": "", "username": "", "source": "env"})
-    # DB managers (mutable)
+        managers.append({
+            "telegram_id": int(mid),
+            "name": "", "username": "",
+            "source": "env",
+            "blocked": int(mid) in blocked_in_log,
+        })
+    # DB managers (mutable) — surface the blocked flag so the UI can split
+    # them into "active" vs "blocked" sections.
     for m in db_managers:
         managers.append({
             "telegram_id": int(m["telegram_id"]),
@@ -707,6 +786,8 @@ async def handle_managers_list(request):
             "username": m.get("username", ""),
             "added_at": m.get("added_at", ""),
             "added_by": m.get("added_by", 0),
+            "blocked":  bool(m.get("blocked", False)) or int(m["telegram_id"]) in blocked_in_log,
+            "blocked_at": m.get("blocked_at", ""),
             "source":   "db",
         })
 
@@ -721,8 +802,8 @@ async def handle_managers_list(request):
 async def handle_manager_add(request):
     """Add a DB-stored manager. Owner-only (no manager-promotes-manager).
     Body: {"telegram_id": int, "name": str?, "username": str?}."""
-    if request["owner_id"] not in OWNER_IDS:
-        return web.json_response({"error": "owner only"}, status=403, headers=CORS_HEADERS)
+    if not _can_manage_users(request["owner_id"]):
+        return web.json_response({"error": "forbidden"}, status=403, headers=CORS_HEADERS)
     try:
         body = await request.json()
     except Exception:
@@ -746,12 +827,185 @@ async def handle_manager_add(request):
     return web.json_response({"ok": True, "manager": doc}, headers=CORS_HEADERS)
 
 
+def _ru_bool(v) -> str:
+    return "да" if v else "нет"
+
+
+def _md_escape(s: str) -> str:
+    """Escape Markdown v1 special chars so usernames/names with _ * ` [ don't break parsing."""
+    return (s or "").replace("_", "\\_").replace("*", "\\*").replace("`", "\\`").replace("[", "\\[")
+
+
+def _format_unauthorized_alert(user: dict, meta: dict, log_doc: dict) -> str:
+    """Russian Telegram alert for owners. Includes everything we can scrape
+    out of Telegram's initData user object + the request that hit us."""
+    fn = (user.get("first_name") or "").strip()
+    ln = (user.get("last_name") or "").strip()
+    full_name = (fn + " " + ln).strip() or "—"
+    uname = user.get("username") or ""
+    uname_link = f"@{_md_escape(uname)}" if uname else "—"
+    tg_id = user.get("id") or "—"
+    lang = user.get("language_code") or "—"
+    is_premium = user.get("is_premium")
+    allows_pm = user.get("allows_write_to_pm")
+    photo_url = user.get("photo_url") or ""
+    attempts = log_doc.get("attempts") or 1
+    first_at = log_doc.get("first_attempt_at") or ""
+    # Render first_attempt time in Dubai TZ (UTC+4)
+    first_at_lbl = "—"
+    try:
+        if first_at:
+            dt = datetime.fromisoformat(first_at).astimezone(DUBAI_TZ)
+            first_at_lbl = dt.strftime("%d.%m.%Y · %H:%M")
+    except Exception:
+        first_at_lbl = first_at or "—"
+
+    lines = [
+        "🚨 *ПОПЫТКА НЕСАНКЦИОНИРОВАННОГО ДОСТУПА*",
+        "",
+        "Кто-то открыл owner-бота, но его нет в списке доступа.",
+        "",
+        "👤 *Пользователь*",
+        f"• Имя: *{_md_escape(full_name)}*",
+        f"• Username: {uname_link}",
+        f"• Telegram ID: `{tg_id}`",
+        f"• Язык: `{lang}`",
+        f"• Premium: {_ru_bool(is_premium)}",
+        f"• Разрешил писать в ЛС: {_ru_bool(allows_pm)}",
+    ]
+    if photo_url:
+        lines.append(f"• Фото: [открыть]({photo_url})")
+    lines += [
+        "",
+        "🌐 *Запрос*",
+        f"• Endpoint: `{_md_escape(meta.get('path',''))}`",
+        f"• Метод: `{meta.get('method','')}`",
+        f"• IP: `{_md_escape(meta.get('ip','—') or '—')}`",
+        f"• User-Agent: `{_md_escape((meta.get('user_agent','') or '—')[:120])}`",
+        "",
+        "📊 *История*",
+        f"• Попыток всего: *{attempts}*",
+        f"• Первая попытка: {first_at_lbl}",
+        "",
+        "_Открой панель → Доступ для менеджеров → Запросы на доступ, чтобы решить судьбу._",
+    ]
+    return "\n".join(lines)
+
+
+async def _alert_owners_unauthorized(user: dict, meta: dict, log_doc: dict) -> None:
+    """Push a security alert to every OWNER_IDS via @ambar_manage_bot.
+    Called from owner_auth.require_owner — best-effort, swallows errors."""
+    if not OWNER_BOT_TOKEN:
+        log.warning("[owner-auth] OWNER_BOT_TOKEN not set — can't send security alert")
+        return
+    text = _format_unauthorized_alert(user, meta, log_doc)
+    for oid in OWNER_IDS:
+        try:
+            await tg_send(OWNER_BOT_TOKEN, oid, text, parse_mode="Markdown")
+        except Exception as e:
+            log.error(f"[owner-auth] alert send to {oid} failed: {e}")
+
+
+# Wire the alerter into the auth layer at import time.
+install_alerter(_alert_owners_unauthorized)
+
+
+@require_owner
+async def handle_manager_block(request):
+    """Block or unblock any manager. Owner-only.
+    URL: POST /api/owner/managers/{tg_id}/{action:block|unblock}.
+
+    For DB-managed users the block is stored as `blocked` on their
+    owner_managers row. For env-managers (sourced from .env) we can't flip
+    a row that doesn't exist, so we upsert a `blocked` entry into access_log
+    instead — `require_owner` already checks `is_access_blocked()` before
+    the env allow-list, so the next request from that user is denied.
+
+    Owners are never blockable through this endpoint."""
+    if not _can_manage_users(request["owner_id"]):
+        return web.json_response({"error": "forbidden"}, status=403, headers=CORS_HEADERS)
+    try:
+        tg_id = int(request.match_info["telegram_id"])
+    except (ValueError, TypeError):
+        return web.json_response({"error": "invalid telegram_id"}, status=400, headers=CORS_HEADERS)
+    action = request.match_info.get("action", "")
+    if action not in ("block", "unblock"):
+        return web.json_response({"error": "invalid action"}, status=400, headers=CORS_HEADERS)
+    if tg_id in OWNER_IDS:
+        return web.json_response({"error": "cannot block an owner"}, status=409, headers=CORS_HEADERS)
+
+    by = request["owner_id"]
+    blocked_target = action == "block"
+    is_env  = tg_id in MANAGER_IDS
+    is_db   = await db.is_manager(tg_id) or await db.is_manager_blocked(tg_id)
+
+    if blocked_target:
+        # On block: flip DB row if it exists, AND mirror into access_log so
+        # env-managers (no DB row) are also denied. Both checks run in
+        # require_owner so either path is sufficient — we set both for
+        # consistency in the UI.
+        if is_db:
+            await db.set_manager_blocked(tg_id, True, by=by)
+        await db.upsert_access_block(tg_id, by=by)
+    else:
+        # On unblock: clear both DB row + access_log status.
+        if is_db:
+            await db.set_manager_blocked(tg_id, False, by=by)
+        # If there's an access_log row, flip it back to 'pending' so it
+        # doesn't block but stays in history. set_access_status is a no-op
+        # for users who don't have a row, so calling it is safe.
+        await db.set_access_status(tg_id, "pending", by=by)
+
+    if not is_env and not is_db:
+        return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
+
+    log.info(f"[owner] {by} {action}ed user {tg_id} (env={is_env}, db={is_db})")
+    return web.json_response({"ok": True, "telegram_id": tg_id, "blocked": blocked_target}, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_access_log_list(request):
+    """Return the access log. Optional ?status= filter (pending|blocked|approved).
+    Owner-only — managers can't see who else tried to get in."""
+    if not _can_manage_users(request["owner_id"]):
+        return web.json_response({"error": "forbidden"}, status=403, headers=CORS_HEADERS)
+    status = request.query.get("status", "").strip()
+    rows = await db.get_access_log(status=status if status else "")
+    # Don't leak photo_url, ip, ua to anyone except owners — but since this
+    # is owner-only already, we pass them through as-is.
+    return web.json_response({"items": rows, "count": len(rows)}, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_access_log_action(request):
+    """Block/unblock/approve a logged user. Owner-only.
+    URL: POST /api/owner/access-log/{tg_id}/{action:block|unblock|approve}."""
+    if not _can_manage_users(request["owner_id"]):
+        return web.json_response({"error": "forbidden"}, status=403, headers=CORS_HEADERS)
+    try:
+        tg_id = int(request.match_info["telegram_id"])
+    except (ValueError, TypeError):
+        return web.json_response({"error": "invalid telegram_id"}, status=400, headers=CORS_HEADERS)
+    action = request.match_info.get("action", "")
+    status_map = {"block": "blocked", "unblock": "pending", "approve": "approved"}
+    new_status = status_map.get(action)
+    if not new_status:
+        return web.json_response({"error": "invalid action"}, status=400, headers=CORS_HEADERS)
+    if tg_id in OWNER_IDS:
+        return web.json_response({"error": "cannot block an owner"}, status=409, headers=CORS_HEADERS)
+    ok = await db.set_access_status(tg_id, new_status, by=request["owner_id"])
+    if not ok:
+        return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
+    log.info(f"[owner] {request['owner_id']} set access {tg_id} → {new_status}")
+    return web.json_response({"ok": True, "telegram_id": tg_id, "status": new_status}, headers=CORS_HEADERS)
+
+
 @require_owner
 async def handle_manager_remove(request):
     """Remove a DB-stored manager. Owner-only. Env-managers can't be removed
     here — they're sourced from AMBAR_MANAGER_IDS which is loaded at startup."""
-    if request["owner_id"] not in OWNER_IDS:
-        return web.json_response({"error": "owner only"}, status=403, headers=CORS_HEADERS)
+    if not _can_manage_users(request["owner_id"]):
+        return web.json_response({"error": "forbidden"}, status=403, headers=CORS_HEADERS)
     raw = request.match_info["telegram_id"]
     try:
         tg_id = int(raw)
@@ -795,3 +1049,9 @@ def setup(app):
     app.router.add_post(            "/api/owner/managers",                handle_manager_add)
     app.router.add_route("OPTIONS", "/api/owner/managers/{telegram_id}",  handle_manager_remove)
     app.router.add_delete(          "/api/owner/managers/{telegram_id}",  handle_manager_remove)
+    app.router.add_route("OPTIONS", "/api/owner/managers/{telegram_id}/{action:block|unblock}", handle_manager_block)
+    app.router.add_post(            "/api/owner/managers/{telegram_id}/{action:block|unblock}", handle_manager_block)
+    app.router.add_route("OPTIONS", "/api/owner/access-log",                                    handle_access_log_list)
+    app.router.add_get(             "/api/owner/access-log",                                    handle_access_log_list)
+    app.router.add_route("OPTIONS", "/api/owner/access-log/{telegram_id}/{action:block|unblock|approve}", handle_access_log_action)
+    app.router.add_post(            "/api/owner/access-log/{telegram_id}/{action:block|unblock|approve}", handle_access_log_action)

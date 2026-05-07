@@ -376,12 +376,15 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 <body>
 
 <!-- Hard access-denied overlay. Populated + shown by the boot ping when
-     /api/owner/ping returns 401/403. No dismiss affordance by design. -->
+     /api/owner/ping returns 401/403. No dismiss affordance by design.
+     Two copy variants depending on the server-side error key:
+       'blocked'      → user was explicitly denied by an owner
+       'not_approved' → unknown user; owners have been notified -->
 <div class="deny-overlay" id="denyOverlay" aria-hidden="true" role="alertdialog" aria-labelledby="denyTitle">
   <div class="deny-card">
-    <div class="deny-emoji">🚫</div>
+    <div class="deny-emoji" id="denyEmoji">🚫</div>
     <div class="deny-title" id="denyTitle">Иди нахуй</div>
-    <div class="deny-sub">Эта панель только для владельцев и менеджеров AMBAR. Если ты здесь по ошибке — закрой окно.</div>
+    <div class="deny-sub" id="denySub">Эта панель только для владельцев и менеджеров AMBAR. Если ты здесь по ошибке — закрой окно.</div>
     <div class="deny-meta" id="denyMeta"></div>
   </div>
 </div>
@@ -486,7 +489,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
       <div class="card-val mono"><span id="kLate">—</span><span class="u">%</span></div>
       <div class="card-row">
         <span class="delta" id="kLateCount" style="background:var(--warn-soft);color:var(--warn);border-color:rgba(243,180,74,.22)">—</span>
-        <span class="card-hint">&gt; 45 мин</span>
+        <span class="card-hint" id="kLateHint">&gt; 45 мин</span>
       </div>
     </div>
     <div class="card wide" data-detail="kpi:rating">
@@ -917,7 +920,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     <div class="lrow lrow-tog" data-tog="notif"><div class="card-ico">🔔</div><div class="lrow-body"><div class="lrow-name">Telegram-оповещения</div><div class="lrow-sub">заказы &gt; 1000 AED · опоздания</div></div><span class="tog on" id="togNotif"></span></div>
     <div class="lrow lrow-tog" data-tog="sound"><div class="card-ico">🔊</div><div class="lrow-body"><div class="lrow-name">Звук уведомлений</div><div class="lrow-sub">только важные события</div></div><span class="tog on" id="togSound"></span></div>
     <div class="lrow lrow-tog" data-tog="quiet"><div class="card-ico">🌙</div><div class="lrow-body"><div class="lrow-name">Тихие часы</div><div class="lrow-sub">23:00 → 09:00 · только критичные</div></div><span class="tog" id="togQuiet"></span></div>
-    <div class="lrow" onclick="openMgr()"><div class="card-ico">👤</div><div class="lrow-body"><div class="lrow-name">Доступ для менеджеров</div><div class="lrow-sub" id="mgrLrowSub">владельцы и менеджеры</div></div><span style="color:var(--muted)">›</span></div>
+    <div class="lrow" id="mgrLrow" onclick="openMgr()" style="display:none"><div class="card-ico">👤</div><div class="lrow-body"><div class="lrow-name">Доступ для менеджеров</div><div class="lrow-sub" id="mgrLrowSub">владельцы и менеджеры</div></div><span style="color:var(--muted)">›</span></div>
     <div class="lrow" onclick="qaExport()"><div class="card-ico">📤</div><div class="lrow-body"><div class="lrow-name">Экспорт CSV / XLSX</div><div class="lrow-sub">данные за выбранный период</div></div><span style="color:var(--muted)">›</span></div>
     <div class="lrow" onclick="openNotif()"><div class="card-ico">⚙️</div><div class="lrow-body"><div class="lrow-name">Тонкая настройка алертов</div><div class="lrow-sub">пресеты · пороги · каналы</div></div><span style="color:var(--muted)">›</span></div>
   </div>
@@ -1544,11 +1547,13 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     <div class="mgr-body" id="mgrBody">
       <div style="padding:30px 20px;color:var(--muted);font-size:13px;text-align:center">Загрузка…</div>
     </div>
-    <!-- Add manager footer (owner only) -->
+    <!-- Add manager footer (owner only). Frozen while we finalize the
+         invite flow — kept visible so owners know it's coming. -->
     <div class="mgr-add-bar" id="mgrAddBar" style="display:none">
-      <button class="mgr-add-btn" onclick="openMgrAdd()">
+      <button class="mgr-add-btn frozen" onclick="qaFrozenMgr()" disabled>
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><path d="M19 8v6M16 11h6"/></svg>
         <span>Добавить менеджера</span>
+        <span class="mgr-add-soon">скоро</span>
       </button>
     </div>
   </div>
@@ -1621,6 +1626,37 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .mgr-add-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:13px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0a0a14;font-family:inherit;font-size:13px;font-weight:700;letter-spacing:.3px;border:none;border-radius:12px;cursor:pointer;transition:.15s var(--e1);-webkit-tap-highlight-color:transparent;box-shadow:0 6px 20px rgba(201,169,110,.25)}
 .mgr-add-btn:hover{box-shadow:0 8px 24px rgba(201,169,110,.35)}
 .mgr-add-btn:active{transform:scale(.98)}
+.mgr-add-btn.frozen{background:var(--card2);color:var(--muted);box-shadow:none;border:1px solid var(--border2);cursor:not-allowed;opacity:.85}
+.mgr-add-btn.frozen:hover{box-shadow:none}
+.mgr-add-btn.frozen:active{transform:none}
+.mgr-add-soon{font-size:9px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;padding:2px 6px;border-radius:5px;background:var(--card3);color:var(--gold2);border:1px solid var(--border2);margin-left:4px}
+/* Per-row block button (and unblock variant for blocked rows). */
+.mgr-block{background:transparent;border:1px solid var(--border2);color:var(--muted);height:32px;padding:0 10px;border-radius:8px;cursor:pointer;display:flex;align-items:center;gap:5px;font-family:inherit;font-size:11px;font-weight:600;transition:.15s var(--e1);-webkit-tap-highlight-color:transparent}
+.mgr-block:hover{border-color:rgba(243,180,74,.5);color:var(--warn);background:rgba(243,180,74,.06)}
+.mgr-block:active{transform:scale(.94)}
+.mgr-block[disabled]{opacity:.35;cursor:not-allowed;pointer-events:none}
+.mgr-block svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.mgr-block.unblock{border-color:rgba(91,141,239,.4);color:var(--info);background:rgba(91,141,239,.06)}
+.mgr-block.unblock:hover{border-color:rgba(91,141,239,.7);background:rgba(91,141,239,.12)}
+.mgr-block.approve{border-color:rgba(76,175,125,.4);color:var(--up);background:rgba(76,175,125,.06)}
+.mgr-block.approve:hover{border-color:rgba(76,175,125,.7);background:rgba(76,175,125,.12)}
+.mgr-block.danger{border-color:rgba(224,85,85,.4);color:var(--dn);background:rgba(224,85,85,.06)}
+.mgr-block.danger:hover{border-color:rgba(224,85,85,.7);background:rgba(224,85,85,.12)}
+/* Visual treatment for blocked rows + the new request rows */
+.mgr-row.is-blocked{opacity:.7;background:rgba(243,180,74,.04);border:1px dashed rgba(243,180,74,.25)}
+.mgr-row.is-blocked .mgr-av{filter:grayscale(.5)}
+.mgr-row.is-pending{background:linear-gradient(135deg,rgba(91,141,239,.08),transparent);border:1px solid rgba(91,141,239,.18)}
+.mgr-name .mgr-tag.blocked{background:rgba(243,180,74,.18);color:var(--warn);border:1px solid rgba(243,180,74,.4)}
+.mgr-name .mgr-tag.pending{background:rgba(91,141,239,.18);color:var(--info);border:1px solid rgba(91,141,239,.4)}
+.mgr-name .mgr-tag.attempt{background:rgba(224,85,85,.16);color:var(--dn);border:1px solid rgba(224,85,85,.35)}
+/* Section toggle (collapsible) */
+.mgr-grp.collapsible .mgr-grp-t{cursor:pointer;-webkit-tap-highlight-color:transparent;user-select:none}
+.mgr-grp.collapsible .mgr-grp-t:hover{color:var(--text)}
+.mgr-grp .mgr-grp-chev{width:11px;height:11px;color:var(--muted);transition:transform .25s var(--e1);stroke:currentColor;fill:none;stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round;margin-right:4px;flex-shrink:0}
+.mgr-grp.open .mgr-grp-chev{transform:rotate(90deg);color:var(--gold2)}
+.mgr-grp .mgr-grp-rows{max-height:0;overflow:hidden;transition:max-height .3s var(--e1)}
+.mgr-grp.open .mgr-grp-rows{max-height:1500px}
+.mgr-grp:not(.collapsible) .mgr-grp-rows{max-height:none}
 .mgr-fld{display:flex;flex-direction:column;gap:4px}
 .mgr-fld-l{font-size:10px;color:var(--muted);letter-spacing:.5px;text-transform:uppercase;font-weight:700}
 .mgr-fld input{background:var(--card2);border:1px solid var(--border2);border-radius:10px;padding:11px 12px;font-family:inherit;font-size:14px;color:var(--text);outline:none;transition:.15s var(--e1);-webkit-appearance:none}
@@ -2080,9 +2116,12 @@ try{ if(window.Telegram && Telegram.WebApp){
 // 200 → green "Online"; 401/403 → yellow "Auth" pill AND hard-block overlay;
 // network/5xx → red "Offline" (no overlay — that's infra, not an access issue).
 (function(){
-  const dot   = document.getElementById('liveDot');
-  const deny  = document.getElementById('denyOverlay');
-  const meta  = document.getElementById('denyMeta');
+  const dot     = document.getElementById('liveDot');
+  const deny    = document.getElementById('denyOverlay');
+  const meta    = document.getElementById('denyMeta');
+  const emoji   = document.getElementById('denyEmoji');
+  const title   = document.getElementById('denyTitle');
+  const sub     = document.getElementById('denySub');
   if(!dot || !window.ownerApi) return;
 
   function setState(cls, label, title){
@@ -2091,32 +2130,66 @@ try{ if(window.Telegram && Telegram.WebApp){
     dot.textContent = label;
     if(title) dot.title = title; else dot.removeAttribute('title');
   }
+  // Two distinct deny states the server can return:
+  //   'blocked'      → owner explicitly revoked access
+  //   'not_approved' → unknown user; owners have been alerted
+  // Anything else is treated as generic forbidden.
+  const DENY_COPY = {
+    blocked: {
+      emoji: '⛔',
+      title: 'Доступ закрыт',
+      sub:   'Ваш доступ к панели был отозван. Свяжитесь с владельцем, если считаете это ошибкой.',
+    },
+    not_approved: {
+      emoji: '🔒',
+      title: 'Доступ ещё не одобрен',
+      sub:   'Владелец получил уведомление о вашей попытке входа. Дождитесь одобрения или свяжитесь с ним напрямую.',
+    },
+    _default: {
+      emoji: '🚫',
+      title: 'Иди нахуй',
+      sub:   'Эта панель только для владельцев и менеджеров AMBAR. Если ты здесь по ошибке — закрой окно.',
+    },
+  };
+
   // Once triggered, the overlay never comes down — re-ping success would
   // otherwise let a briefly-valid session slip through if the gate flaps.
   let denied = false;
   function blockAccess(reason){
     if(denied) return;
     denied = true;
+    const copy = DENY_COPY[reason] || DENY_COPY._default;
+    if(emoji) emoji.textContent = copy.emoji;
+    if(title) title.textContent = copy.title;
+    if(sub)   sub.textContent   = copy.sub;
     if(meta)  meta.textContent  = reason ? 'code: ' + reason : '';
     if(deny){
       deny.classList.add('show');
       deny.setAttribute('aria-hidden','false');
     }
-    // Prevent underlying scroll / interaction.
     try{ document.body.style.overflow = 'hidden'; }catch(e){}
-    // Haptic "nope" feedback inside Telegram.
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('error'); }catch(e){}
   }
 
   async function probe(){
-    if(denied) return;  // stop polling once we've locked the door
+    if(denied) return;
     try{
       const r = await window.ownerApi.ownerFetch('/api/owner/ping');
       setState(null, 'Online', 'owner_id=' + r.owner_id);
+      // Stash capabilities so other modules (managers modal entrypoint, etc.)
+      // can hide owner-only UI without doing their own probe.
+      window._ambarCaps = {
+        owner_id: r.owner_id,
+        is_owner: !!r.is_owner,
+        can_manage_users: !!r.can_manage_users,
+      };
+      const mgrLrow = document.getElementById('mgrLrow');
+      if(mgrLrow) mgrLrow.style.display = r.can_manage_users ? '' : 'none';
     }catch(e){
       if(e && (e.status === 401 || e.status === 403)){
-        setState('warn', 'Auth', (e.payload && e.payload.error) || 'unauthorized');
-        blockAccess((e.payload && e.payload.error) || ('http ' + e.status));
+        const reason = (e.payload && e.payload.error) || 'unauthorized';
+        setState('warn', 'Auth', reason);
+        blockAccess(reason);
       } else {
         setState('dn', 'Offline', (e && e.message) || 'network error');
       }
@@ -2525,12 +2598,38 @@ function renderKpis(k){
   // Rating
   _setText('kRating',    k.rating ? k.rating.toFixed(2) : '—');
   _setText('kRatingLbl', 'Рейтинг · ' + (k.rating_period || ''));
-  // Avg time + late: no live data yet — show "—" rather than mock numbers
-  _setText('kAvg', '—');
-  _setText('kAvgDelta', '');
-  _setText('kAvgSub', 'нет данных');
-  _setText('kLate', '—');
-  _setText('kLateCount', '—');
+  // Avg delivery time (in minutes). avg_min === 0 with sample 0 means we
+  // have no delivered orders in the window yet, so keep the placeholder.
+  if(k.avg_min_sample > 0){
+    _setText('kAvg', k.avg_min);
+    const ad = document.getElementById('kAvgDelta');
+    if(ad){
+      const d = k.avg_min_delta || 0;
+      const sign = d > 0 ? '▲ ' : d < 0 ? '▼ ' : '';
+      ad.textContent = d ? (sign + Math.abs(d) + ' мин') : '0 мин';
+      ad.classList.remove('up','dn');
+      // Faster delivery is GOOD, so a negative delta is "up" (green).
+      if(d < 0) ad.classList.add('up');
+      if(d > 0) ad.classList.add('dn');
+    }
+    _setText('kAvgSub', `по ${k.avg_min_sample} ${pluralize(k.avg_min_sample,'заказу','заказам','заказам')}`);
+  } else {
+    _setText('kAvg', '—');
+    _setText('kAvgDelta', '');
+    _setText('kAvgSub', 'нет данных');
+  }
+  // Late % + raw count. Threshold is server-driven so the sub-label stays in sync.
+  if(k.late_threshold) _setText('kLateHint', `> ${k.late_threshold} мин`);
+  if(k.avg_min_sample > 0){
+    _setText('kLate', k.late_pct);
+    const lc = document.getElementById('kLateCount');
+    if(lc){
+      lc.textContent = k.late_count + ' ' + pluralize(k.late_count, 'заказ', 'заказа', 'заказов');
+    }
+  } else {
+    _setText('kLate', '—');
+    _setText('kLateCount', '—');
+  }
 }
 
 function _periodBarLabels(period, n){
@@ -3211,7 +3310,11 @@ function qaExport(){
 const mgrOv    = document.getElementById('mgrOverlay');
 const mgrAddOv = document.getElementById('mgrAddOverlay');
 let _mgrCache  = null;  // {owners, managers, current_user}
+let _mgrLogCache = null; // access-log items
 let _mgrLoading = false;
+// Tracks which collapsible sections are open. Defaults are sensible:
+// pending requests open by default (action needed), blocked closed.
+let _mgrSectionOpen = {pending:true, blocked:false};
 
 function _initials(name, tgId){
   const s = (name||'').trim();
@@ -3228,8 +3331,24 @@ function _fmtMgrSub(m, isMe){
   return bits.join(' · ');
 }
 
+function _fmtAccessSub(a){
+  const bits = [];
+  if(a.username) bits.push('@' + a.username);
+  bits.push('ID ' + a.telegram_id);
+  if(a.attempts) bits.push(`${a.attempts} ${pluralize(a.attempts,'попытка','попытки','попыток')}`);
+  if(a.language_code) bits.push(a.language_code.toUpperCase());
+  return bits.join(' · ');
+}
+
 async function openMgr(){
   if(!mgrOv) return;
+  // Defense in depth — backend also enforces this (403). The UI gate via
+  // window._ambarCaps just keeps non-authorized users from seeing the
+  // empty-modal flash before the request fails.
+  if(window._ambarCaps && !window._ambarCaps.can_manage_users){
+    alert('Доступ к этой секции есть только у владельца.');
+    return;
+  }
   mgrOv.classList.add('show');
   try{Telegram.WebApp.HapticFeedback.impactOccurred('light')}catch(_){}
   await loadMgr();
@@ -3245,8 +3364,13 @@ async function loadMgr(){
     body.innerHTML = '<div style="padding:30px 20px;color:var(--muted);font-size:13px;text-align:center">Загрузка…</div>';
   }
   try{
-    const data = await window.ownerApi.ownerFetch('/api/owner/managers');
-    _mgrCache = data;
+    // Always fetch managers; access-log is owner-only — graceful degrade if 403.
+    const [mgrs, log] = await Promise.all([
+      window.ownerApi.ownerFetch('/api/owner/managers'),
+      window.ownerApi.ownerFetch('/api/owner/access-log').catch(()=>({items:[]})),
+    ]);
+    _mgrCache = mgrs;
+    _mgrLogCache = log;
     _renderMgr();
   }catch(e){
     if(body){
@@ -3268,22 +3392,72 @@ function _renderMgr(){
   if(!body) return;
   const me = _mgrCache.current_user;
   const owners   = _mgrCache.owners   || [];
-  const managers = _mgrCache.managers || [];
+  const allMgrs  = _mgrCache.managers || [];
   const isOwnerMe = owners.some(o => o.telegram_id === me);
 
+  // Split managers into active vs blocked.
+  const activeMgrs  = allMgrs.filter(m => !m.blocked);
+  const blockedMgrs = allMgrs.filter(m =>  m.blocked);
+
+  // Split access log into pending requests vs explicitly blocked outsiders.
+  const logItems = (_mgrLogCache && _mgrLogCache.items) || [];
+  const pendingReqs = logItems.filter(a => a.status === 'pending');
+  const blockedOuts = logItems.filter(a => a.status === 'blocked');
+  const totalBlocked = blockedMgrs.length + blockedOuts.length;
+
   if(sub){
-    sub.textContent = `${owners.length} ${pluralize(owners.length,'владелец','владельца','владельцев')} · ${managers.length} ${pluralize(managers.length,'менеджер','менеджера','менеджеров')}`;
+    const pieces = [
+      `${owners.length} ${pluralize(owners.length,'владелец','владельца','владельцев')}`,
+      `${activeMgrs.length} ${pluralize(activeMgrs.length,'менеджер','менеджера','менеджеров')}`,
+    ];
+    if(pendingReqs.length) pieces.push(`<span style="color:var(--info)">${pendingReqs.length} запрос${pendingReqs.length===1?'':'ов'}</span>`);
+    if(totalBlocked)       pieces.push(`<span style="color:var(--warn)">${totalBlocked} заблокировано</span>`);
+    sub.innerHTML = pieces.join(' · ');
   }
   if(lrowSub){
-    lrowSub.textContent = `${owners.length+managers.length} ${pluralize(owners.length+managers.length,'пользователь','пользователя','пользователей')}`;
+    const totalUsers = owners.length + activeMgrs.length;
+    let s = `${totalUsers} ${pluralize(totalUsers,'пользователь','пользователя','пользователей')}`;
+    if(pendingReqs.length) s += ` · ${pendingReqs.length} запрос${pendingReqs.length===1?'':'ов'}`;
+    lrowSub.textContent = s;
   }
   if(addBar) addBar.style.display = isOwnerMe ? '' : 'none';
 
   let html = '';
 
-  // Owners group
-  html += '<div class="mgr-grp">';
-  html += `<div class="mgr-grp-t"><span>Владельцы</span><span class="mgr-grp-cnt">${owners.length}</span><span class="mgr-grp-hint">read-only</span></div>`;
+  // ── Pending access requests (outsiders who tried to open the bot) ──
+  // Owner-only; managers don't see who else tried to get in.
+  if(isOwnerMe && pendingReqs.length){
+    const open = _mgrSectionOpen.pending;
+    html += `<div class="mgr-grp collapsible${open?' open':''}" data-sect="pending">
+      <div class="mgr-grp-t">
+        <svg class="mgr-grp-chev" viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
+        <span>Запросы на доступ</span>
+        <span class="mgr-grp-cnt">${pendingReqs.length}</span>
+        <span class="mgr-grp-hint">требуют решения</span>
+      </div>
+      <div class="mgr-grp-rows">`;
+    pendingReqs.forEach(a => {
+      const fullName = ((a.first_name||'')+' '+(a.last_name||'')).trim() || ('User '+a.telegram_id);
+      html += `<div class="mgr-row is-pending">
+        <div class="mgr-av">${_initials(fullName, a.telegram_id)}</div>
+        <div class="mgr-body-info">
+          <div class="mgr-name">${fullName}<span class="mgr-tag attempt">попытка</span>${a.is_premium?'<span class="mgr-tag pending">★ premium</span>':''}</div>
+          <div class="mgr-sub">${_fmtAccessSub(a)}</div>
+        </div>
+        <div class="mgr-actions" style="flex-direction:column;gap:4px">
+          <button class="mgr-block danger" data-access-block="${a.telegram_id}" aria-label="Заблокировать">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M5 5l14 14"/></svg>
+            <span>Блок</span>
+          </button>
+        </div>
+      </div>`;
+    });
+    html += '</div></div>';
+  }
+
+  // ── Owners ──
+  html += '<div class="mgr-grp"><div class="mgr-grp-rows">';
+  html += `<div class="mgr-grp-t" style="padding-left:0;padding-top:10px"><span>Владельцы</span><span class="mgr-grp-cnt">${owners.length}</span><span class="mgr-grp-hint">read-only</span></div>`;
   owners.forEach(o => {
     const isMe = o.telegram_id === me;
     const initials = _initials(o.name, o.telegram_id);
@@ -3295,24 +3469,27 @@ function _renderMgr(){
       </div>
     </div>`;
   });
-  html += '</div>';
+  html += '</div></div>';
 
-  // Managers group
-  html += '<div class="mgr-grp">';
-  html += `<div class="mgr-grp-t"><span>Менеджеры</span><span class="mgr-grp-cnt">${managers.length}</span></div>`;
-  if(!managers.length){
-    html += '<div class="mgr-empty">Менеджеров пока нет — добавьте первого через кнопку ниже</div>';
+  // ── Active managers ──
+  html += '<div class="mgr-grp"><div class="mgr-grp-rows">';
+  html += `<div class="mgr-grp-t" style="padding-left:0;padding-top:10px"><span>Менеджеры</span><span class="mgr-grp-cnt">${activeMgrs.length}</span></div>`;
+  if(!activeMgrs.length){
+    html += '<div class="mgr-empty">Активных менеджеров пока нет</div>';
   } else {
-    managers.forEach(m => {
+    activeMgrs.forEach(m => {
       const isMe = m.telegram_id === me;
       const isEnv = m.source === 'env';
       const initials = _initials(m.name, m.telegram_id);
       const tags = [];
       if(isMe) tags.push('<span class="mgr-tag you">вы</span>');
       if(isEnv) tags.push('<span class="mgr-tag env">.env</span>');
-      const rmBtn = (isOwnerMe && !isEnv) ? `
-        <button class="mgr-rm" data-rm="${m.telegram_id}" data-name="${(m.name||'').replace(/"/g,'&quot;')}" aria-label="Удалить">
-          <svg viewBox="0 0 24 24"><path d="M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/></svg>
+      // Block any non-owner, non-self user — including .env-sourced managers
+      // (their block is recorded in access_log so it survives a restart).
+      const blockBtn = (isOwnerMe && !isMe) ? `
+        <button class="mgr-block" data-mgr-block="${m.telegram_id}" data-name="${(m.name||'').replace(/"/g,'&quot;')}" aria-label="Заблокировать">
+          <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M5 5l14 14"/></svg>
+          <span>Блок</span>
         </button>` : '';
       html += `<div class="mgr-row${isMe?' is-self':''}">
         <div class="mgr-av">${initials}</div>
@@ -3320,41 +3497,115 @@ function _renderMgr(){
           <div class="mgr-name">${m.name || ('User '+m.telegram_id)}${tags.join('')}</div>
           <div class="mgr-sub">${_fmtMgrSub(m, isMe)}</div>
         </div>
-        <div class="mgr-actions">${rmBtn}</div>
+        <div class="mgr-actions">${blockBtn}</div>
       </div>`;
     });
   }
-  html += '</div>';
+  html += '</div></div>';
 
-  // Hint banner about env managers (only show if any env managers exist)
-  if(managers.some(m => m.source === 'env')){
+  // ── Blocked (managers + outsiders combined) ──
+  if(isOwnerMe && totalBlocked){
+    const open = _mgrSectionOpen.blocked;
+    html += `<div class="mgr-grp collapsible${open?' open':''}" data-sect="blocked">
+      <div class="mgr-grp-t">
+        <svg class="mgr-grp-chev" viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
+        <span>Заблокированные</span>
+        <span class="mgr-grp-cnt">${totalBlocked}</span>
+        <span class="mgr-grp-hint">доступ закрыт</span>
+      </div>
+      <div class="mgr-grp-rows">`;
+    blockedMgrs.forEach(m => {
+      const initials = _initials(m.name, m.telegram_id);
+      html += `<div class="mgr-row is-blocked">
+        <div class="mgr-av">${initials}</div>
+        <div class="mgr-body-info">
+          <div class="mgr-name">${m.name || ('User '+m.telegram_id)}<span class="mgr-tag blocked">заблокирован</span></div>
+          <div class="mgr-sub">${_fmtMgrSub(m, false)}</div>
+        </div>
+        <div class="mgr-actions">
+          <button class="mgr-block unblock" data-mgr-unblock="${m.telegram_id}" aria-label="Разблокировать">
+            <svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg>
+            <span>Снять</span>
+          </button>
+        </div>
+      </div>`;
+    });
+    blockedOuts.forEach(a => {
+      const fullName = ((a.first_name||'')+' '+(a.last_name||'')).trim() || ('User '+a.telegram_id);
+      html += `<div class="mgr-row is-blocked">
+        <div class="mgr-av">${_initials(fullName, a.telegram_id)}</div>
+        <div class="mgr-body-info">
+          <div class="mgr-name">${fullName}<span class="mgr-tag blocked">заблокирован</span></div>
+          <div class="mgr-sub">${_fmtAccessSub(a)}</div>
+        </div>
+        <div class="mgr-actions">
+          <button class="mgr-block unblock" data-access-unblock="${a.telegram_id}" aria-label="Разблокировать">
+            <svg viewBox="0 0 24 24"><path d="M5 12l5 5L20 7"/></svg>
+            <span>Снять</span>
+          </button>
+        </div>
+      </div>`;
+    });
+    html += '</div></div>';
+  }
+
+  // Hint banner about env managers
+  if(allMgrs.some(m => m.source === 'env')){
     html += `<div class="mgr-banner">
-      <b>Менеджеры из .env</b> загружаются при старте сервиса (<code>AMBAR_MANAGER_IDS</code>) и не удаляются из интерфейса. Чтобы их убрать — отредактируйте .env и перезапустите.
+      <b>Менеджеры из .env</b> загружаются при старте сервиса из <code>AMBAR_MANAGER_IDS</code>. Их можно <b>заблокировать здесь</b> (запись попадёт в журнал доступа), но окончательно убрать — только правкой .env и рестартом.
     </div>`;
   }
 
   body.innerHTML = html;
 
-  // Wire delete buttons
-  body.querySelectorAll('.mgr-rm[data-rm]').forEach(btn => {
-    btn.addEventListener('click', async (e) => {
-      e.stopPropagation();
-      const tgId = btn.dataset.rm;
-      const name = btn.dataset.name || ('ID ' + tgId);
-      if(!confirm(`Удалить менеджера ${name}?\n\nДоступ к Owner-боту будет немедленно закрыт.`)) return;
-      btn.setAttribute('disabled', '');
-      try{
-        await window.ownerApi.ownerFetch('/api/owner/managers/' + encodeURIComponent(tgId), {method:'DELETE'});
-        try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(_){}
-        _mgrCache = null;
-        await loadMgr();
-      }catch(err){
-        btn.removeAttribute('disabled');
-        const hint = (err.payload && err.payload.hint) ? `\n\n${err.payload.hint}` : '';
-        alert('Не удалось удалить: ' + ((err.payload && err.payload.error) || err.message) + hint);
-      }
+  // Wire collapsible sections
+  body.querySelectorAll('.mgr-grp.collapsible > .mgr-grp-t').forEach(hdr => {
+    hdr.addEventListener('click', () => {
+      const grp = hdr.parentElement;
+      const key = grp.dataset.sect;
+      grp.classList.toggle('open');
+      _mgrSectionOpen[key] = grp.classList.contains('open');
+      try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(_){}
     });
   });
+  // Manager block / unblock
+  body.querySelectorAll('[data-mgr-block]').forEach(btn => {
+    btn.addEventListener('click', (e) => _mgrAction(e, btn, 'managers', btn.dataset.mgrBlock, 'block', btn.dataset.name));
+  });
+  body.querySelectorAll('[data-mgr-unblock]').forEach(btn => {
+    btn.addEventListener('click', (e) => _mgrAction(e, btn, 'managers', btn.dataset.mgrUnblock, 'unblock'));
+  });
+  // Access-log block / unblock
+  body.querySelectorAll('[data-access-block]').forEach(btn => {
+    btn.addEventListener('click', (e) => _mgrAction(e, btn, 'access-log', btn.dataset.accessBlock, 'block'));
+  });
+  body.querySelectorAll('[data-access-unblock]').forEach(btn => {
+    btn.addEventListener('click', (e) => _mgrAction(e, btn, 'access-log', btn.dataset.accessUnblock, 'unblock'));
+  });
+}
+
+async function _mgrAction(e, btn, kind, tgId, action, name){
+  e.stopPropagation();
+  if(action === 'block'){
+    const who = name ? `менеджера ${name}` : `пользователя ID ${tgId}`;
+    if(!confirm(`Заблокировать ${who}?\n\nОн увидит экран «Доступ закрыт» при следующей попытке входа.`)) return;
+  }
+  btn.setAttribute('disabled','');
+  try{
+    await window.ownerApi.ownerFetch(`/api/owner/${kind}/${encodeURIComponent(tgId)}/${action}`, {method:'POST'});
+    try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(_){}
+    _mgrCache = null; _mgrLogCache = null;
+    await loadMgr();
+  }catch(err){
+    btn.removeAttribute('disabled');
+    const hint = (err.payload && err.payload.hint) ? `\n\n${err.payload.hint}` : '';
+    alert('Не удалось: ' + ((err.payload && err.payload.error) || err.message) + hint);
+  }
+}
+
+function qaFrozenMgr(){
+  try{Telegram.WebApp.HapticFeedback.notificationOccurred('warning')}catch(_){}
+  alert('Добавление менеджеров временно отключено.\n\nВ ближайшем обновлении появится приглашение по ссылке + подтверждение через @ambar_manage_bot.');
 }
 
 function openMgrAdd(){

@@ -1136,7 +1136,9 @@ async def _monitor_pending_orders():
 def setup(app):
     """Wire owner routes into the aiohttp app. Called from api_server.main()."""
     app.on_startup.append(lambda _: _backfill_delivery_times())
-    app.on_startup.append(lambda _: asyncio.ensure_future(_monitor_pending_orders()))
+    async def _start_monitor(_):
+        asyncio.ensure_future(_monitor_pending_orders())
+    app.on_startup.append(_start_monitor)
     app.router.add_route("OPTIONS", "/api/owner/ping",    handle_ping)
     app.router.add_get(             "/api/owner/ping",    handle_ping)
     app.router.add_route("OPTIONS", "/api/owner/finance", handle_finance)

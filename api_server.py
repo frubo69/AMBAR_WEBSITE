@@ -840,6 +840,7 @@ async def handle_orders(request: web.Request) -> web.Response:
 # Complaint keywords — if a customer message contains any of these, fire
 # support.complaint notification.  Stems are used so "верните"/"возврат" both match.
 _COMPLAINT_KEYWORDS = [
+    # ═══ RUSSIAN ═══
     # General dissatisfaction
     "плохо", "плохой", "плохая", "плохое",
     "ужас", "кошмар", "отвратительн",
@@ -877,6 +878,41 @@ _COMPLAINT_KEYWORDS = [
     "хам", "грубо", "грубый", "нагл", "хамство",
     "обман", "мошен", "развод",
     "игнор", "не отвечает", "не перезвон",
+    # ═══ ENGLISH ═══
+    # General dissatisfaction
+    "terrible", "horrible", "awful", "disgusting",
+    "worst", "unacceptable", "disappointed", "disappointing",
+    "ridiculous", "pathetic", "outrageous",
+    "complaint", "complain",
+    # Returns / refunds
+    "refund", "money back", "compensat", "reimburse",
+    "return it", "give me back", "want my money",
+    # Delivery issues
+    "too long", "waited too long", "still waiting",
+    "late", "delayed", "never arrived", "not delivered",
+    "forgot", "lost my order", "missing",
+    "wrong order", "wrong bottle", "wrong item", "not what i ordered",
+    "mixed up", "someone else",
+    # Damaged / broken
+    "broken", "smashed", "shattered", "cracked",
+    "leaking", "leaked", "spilled",
+    "damaged", "dented", "crushed",
+    # Packaging / tampering
+    "opened", "tampered", "unsealed",
+    "packaging", "label",
+    "half empty", "not full", "short pour",
+    # Counterfeit / quality
+    "fake", "counterfeit", "knockoff",
+    "cloudy", "sediment",
+    "flat", "gone off", "stale",
+    "sour", "vinegar",
+    "expired", "expiry", "out of date",
+    # Temperature
+    "warm", "not cold", "not chilled", "room temperature",
+    # Rudeness / service
+    "rude", "disrespectful", "unprofessional", "attitude",
+    "scam", "fraud", "liar", "lying",
+    "ignored", "no response", "no reply", "never called back",
 ]
 
 # ── POST /api/support/send ────────────────────────────────────────────────────

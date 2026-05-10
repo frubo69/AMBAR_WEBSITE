@@ -522,27 +522,28 @@ async def set_owner_prefs(owner_id: int, prefs: dict) -> None:
 
 async def get_owners_subscribed_to(event_key: str) -> list:
     """Return owner_ids whose prefs[event_key] is truthy AND master is on AND
-    we're not in their quiet hours. Quiet-hour check is done server-side
-    against the saved 'from'/'to' times in their prefs.quiet."""
+    we're not in their quiet hours.
+
+    Prefs keys contain literal dots (e.g. "orders.new") which MongoDB dot
+    notation can't query directly, so we fetch all master-on docs and filter
+    in Python. The collection has at most a handful of rows."""
     db = _db_or_none()
     if db is None: return []
     cursor = db.owner_prefs.find(
-        {"$and": [
-            {f"prefs.{event_key}": True},
-            {"$or": [{"master": {"$exists": False}}, {"master": True}]},
-        ]},
-        {"_id": 0, "owner_id": 1, "quiet": 1},
+        {"$or": [{"master": {"$exists": False}}, {"master": True}]},
+        {"_id": 0, "owner_id": 1, "quiet": 1, "prefs": 1},
     )
     rows = await cursor.to_list(length=100)
     out = []
     now_h = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=4))).hour
     for r in rows:
+        if not (r.get("prefs") or {}).get(event_key):
+            continue
         q = r.get("quiet") or {}
         if q.get("enabled"):
             try:
                 from_h = int(str(q.get("from","22:00")).split(":")[0])
                 to_h   = int(str(q.get("to","08:00")).split(":")[0])
-                # Quiet window crosses midnight if from >= to (e.g. 22 → 08)
                 in_quiet = (now_h >= from_h or now_h < to_h) if from_h >= to_h else (from_h <= now_h < to_h)
                 if in_quiet:
                     continue

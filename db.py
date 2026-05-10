@@ -553,6 +553,15 @@ async def get_owners_subscribed_to(event_key: str) -> list:
     return out
 
 
+async def get_configured_owner_ids() -> list:
+    """Return owner_ids that have ANY doc in owner_prefs (regardless of master)."""
+    db = _db_or_none()
+    if db is None: return []
+    cursor = db.owner_prefs.find({}, {"_id": 0, "owner_id": 1})
+    docs = await cursor.to_list(length=200)
+    return [d["owner_id"] for d in docs if "owner_id" in d]
+
+
 async def get_managers() -> list:
     """Return all DB-stored managers as plain dicts. Sorted newest-first."""
     db = _db_or_none()

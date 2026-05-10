@@ -244,7 +244,7 @@ async def order_summary_label(o):
 def kb_main():
     return ReplyKeyboardMarkup([
         ["🆕 Новые заказы (ожидают ответа)",   "🟢 Активные"],
-        ["✅ Завершённые",    "🔴 Отклонённые"],
+        ["✅ Завершённые"],
         ["📊 Статистика", "🚫 Бан / Нет верификации"],
         ["❓ Помощь"],
         # ["👤 Профиль"],  # hidden — handler + helpers kept in handle_menu() below
@@ -293,7 +293,10 @@ async def kb_order_actions(order, list_type=None):
                 InlineKeyboardButton("❌ Отклонить", callback_data=f"dec_{oid}_{cid}"),
             ])
         if st == "approved":
-            rows.append([InlineKeyboardButton(f"🚚 Доставлено #{oid}", callback_data=f"done_{oid}_{cid}")])
+            rows.append([
+                InlineKeyboardButton(f"🚚 Доставлено #{oid}", callback_data=f"done_{oid}_{cid}"),
+                InlineKeyboardButton("🚫 Отменить", callback_data=f"opcancel_{oid}_{cid}"),
+            ])
         if st == "delivered":
             rows.append([InlineKeyboardButton("🔄 Вернуть в доставку", callback_data=f"undone_{oid}_{cid}")])
         rows.append([
@@ -792,52 +795,16 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     elif "Завершённые" in text:
         off = get_operator_offices(uid)
         all_orders = await db.get_all_orders(off)
-        done = [o for o in all_orders.values() if o.get("status") in ("delivered","declined","cancelled")]
-        if not done:
-            await send(cid, "Нет завершённых.", reply_markup=_dismiss); return
-        # Group by date
-        from collections import OrderedDict
-        dates = OrderedDict()
-        for o in sorted(done, key=lambda x: x.get("timestamp",""), reverse=True):
-            ts = o.get("timestamp","")
-            try:
-                dt = datetime.fromisoformat(ts.replace("Z","+00:00")).astimezone(DUBAI_TZ)
-                day = dt.strftime("%d.%m.%Y")
-            except: day = "—"
-            dates.setdefault(day, []).append(o)
-        rows = []
-        for day, orders in dates.items():
-            cnt = len(orders)
-            day_total = sum(o.get("total", 0) for o in orders)
-            rows.append([InlineKeyboardButton(f"📅 {day}  ({cnt})  {day_total:,.0f} AED", callback_data=f"dday_{day}")])
-        rows.append([InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")])
-        await send(cid, f"✅ *Завершённых: {len(done)}*\n\nВыберите дату:",
-                   parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(rows))
-
-    elif "Отклонённые" in text:
-        # Declined-only date picker — same UX as Завершённые but filtered.
-        # Drill-in chain: Отклонённые → xday_<day> → osel_x_<oid> → olist_x → back to date picker.
-        off = get_operator_offices(uid)
-        all_orders = await db.get_all_orders(off)
-        declined = [o for o in all_orders.values() if o.get("status") == "declined"]
-        if not declined:
-            await send(cid, "🔴 Нет отклонённых заказов.", reply_markup=_dismiss); return
-        from collections import OrderedDict
-        dates = OrderedDict()
-        for o in sorted(declined, key=lambda x: x.get("timestamp",""), reverse=True):
-            ts = o.get("timestamp","")
-            try:
-                dt = datetime.fromisoformat(ts.replace("Z","+00:00")).astimezone(DUBAI_TZ)
-                day = dt.strftime("%d.%m.%Y")
-            except: day = "—"
-            dates.setdefault(day, []).append(o)
-        rows = []
-        for day, orders in dates.items():
-            cnt = len(orders)
-            day_total = sum(o.get("total", 0) for o in orders)
-            rows.append([InlineKeyboardButton(f"📅 {day}  ({cnt})  {day_total:,.0f} AED", callback_data=f"xday_{day}")])
-        rows.append([InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")])
-        await send(cid, f"🔴 *Отклонённых: {len(declined)}*\n\nВыберите дату:",
+        n_delivered = sum(1 for o in all_orders.values() if o.get("status") == "delivered")
+        n_declined = sum(1 for o in all_orders.values() if o.get("status") == "declined")
+        n_cancelled = sum(1 for o in all_orders.values() if o.get("status") == "cancelled")
+        rows = [
+            [InlineKeyboardButton(f"✅ Доставленные ({n_delivered})", callback_data="cmenu_delivered")],
+            [InlineKeyboardButton(f"🔴 Отклонённые ({n_declined})", callback_data="cmenu_declined")],
+            [InlineKeyboardButton(f"🚫 Отменённые ({n_cancelled})", callback_data="cmenu_cancelled")],
+            [InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")],
+        ]
+        await send(cid, "✅ *Завершённые заказы*\n\nВыберите категорию:",
                    parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(rows))
 
     elif "Статистика" in text:
@@ -1142,15 +1109,60 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         else:
             await q.answer("❌ Заказ не найден", show_alert=True)
 
+    # ── COMPLETED SUBMENU ──────────────────────────────────────────────────
+    elif data.startswith("cmenu_"):
+        category = data[6:]  # delivered / declined / cancelled
+        off = get_operator_offices(op)
+        all_orders = await db.get_all_orders(off)
+        filtered = [o for o in all_orders.values() if o.get("status") == category]
+        label_map = {"delivered": "✅ Доставленные", "declined": "🔴 Отклонённые", "cancelled": "🚫 Отменённые"}
+        label = label_map.get(category, category)
+        if not filtered:
+            await q.edit_message_text(f"{label}: нет заказов."); return
+        from collections import OrderedDict
+        dates = OrderedDict()
+        for o in sorted(filtered, key=lambda x: x.get("timestamp",""), reverse=True):
+            ts = o.get("timestamp","")
+            try:
+                dt = datetime.fromisoformat(ts.replace("Z","+00:00")).astimezone(DUBAI_TZ)
+                day = dt.strftime("%d.%m.%Y")
+            except: day = "—"
+            dates.setdefault(day, []).append(o)
+        prefix_map = {"delivered": "dday", "declined": "xday", "cancelled": "cday"}
+        pfx = prefix_map[category]
+        rows = []
+        for day, orders in dates.items():
+            cnt = len(orders)
+            day_total = sum(o.get("total", 0) for o in orders)
+            rows.append([InlineKeyboardButton(f"📅 {day}  ({cnt})  {day_total:,.0f} AED", callback_data=f"{pfx}_{day}")])
+        rows.append([InlineKeyboardButton("← Назад", callback_data="cmenu_back")])
+        await q.edit_message_text(f"{label}: *{len(filtered)}*\n\nВыберите дату:",
+            parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(rows))
+
+    elif data == "cmenu_back":
+        off = get_operator_offices(op)
+        all_orders = await db.get_all_orders(off)
+        n_delivered = sum(1 for o in all_orders.values() if o.get("status") == "delivered")
+        n_declined = sum(1 for o in all_orders.values() if o.get("status") == "declined")
+        n_cancelled = sum(1 for o in all_orders.values() if o.get("status") == "cancelled")
+        rows = [
+            [InlineKeyboardButton(f"✅ Доставленные ({n_delivered})", callback_data="cmenu_delivered")],
+            [InlineKeyboardButton(f"🔴 Отклонённые ({n_declined})", callback_data="cmenu_declined")],
+            [InlineKeyboardButton(f"🚫 Отменённые ({n_cancelled})", callback_data="cmenu_cancelled")],
+            [InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")],
+        ]
+        await q.edit_message_text("✅ *Завершённые заказы*\n\nВыберите категорию:",
+            parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(rows))
+
     # ── ORDER LIST: back to list ─────────────────────────────────────────────
     # ── COMPLETED: date picker ──────────────────────────────────────────────
     elif data.startswith("dday_"):
-        day = data[5:]  # dd.mm.yyyy
+        day = data[5:]
         off = get_operator_offices(op)
         all_orders = await db.get_all_orders(off)
         done = []
         for o in all_orders.values():
-            if o.get("status") not in ("delivered","declined","cancelled"): continue
+            if o.get("status") != "delivered": continue
             ts = o.get("timestamp","")
             try:
                 dt = datetime.fromisoformat(ts.replace("Z","+00:00")).astimezone(DUBAI_TZ)
@@ -1165,7 +1177,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 await order_summary_label(o), callback_data=f"osel_d_{o['order_id']}")])
         if len(done) > 100:
             rows.append([InlineKeyboardButton(f"⚠️ Ещё {len(done)-100} скрыто", callback_data="noop")])
-        rows.append([InlineKeyboardButton("← К датам", callback_data="olist_d")])
+        rows.append([InlineKeyboardButton("← К датам", callback_data="cmenu_delivered")])
         await q.edit_message_text(
             f"📅 *{day}*  —  {len(done)} заказов\n\nНажмите на заказ:",
             parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(rows))
@@ -1192,9 +1204,36 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 await order_summary_label(o), callback_data=f"osel_x_{o['order_id']}")])
         if len(declined) > 100:
             rows.append([InlineKeyboardButton(f"⚠️ Ещё {len(declined)-100} скрыто", callback_data="noop")])
-        rows.append([InlineKeyboardButton("← К датам", callback_data="olist_x")])
+        rows.append([InlineKeyboardButton("← К датам", callback_data="cmenu_declined")])
         await q.edit_message_text(
             f"🔴 *{day}*  —  {len(declined)} отклонённых\n\nНажмите на заказ:",
+            parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(rows))
+
+    # ── CANCELLED: date drill-in ─────────────────────────────────────────────
+    elif data.startswith("cday_"):
+        day = data[5:]
+        off = get_operator_offices(op)
+        all_orders = await db.get_all_orders(off)
+        cancelled = []
+        for o in all_orders.values():
+            if o.get("status") != "cancelled": continue
+            ts = o.get("timestamp","")
+            try:
+                dt = datetime.fromisoformat(ts.replace("Z","+00:00")).astimezone(DUBAI_TZ)
+                if dt.strftime("%d.%m.%Y") == day: cancelled.append(o)
+            except: pass
+        cancelled.sort(key=lambda x: x.get("timestamp",""), reverse=True)
+        if not cancelled:
+            await q.edit_message_text("🚫 Нет отменённых за эту дату."); return
+        rows = []
+        for o in cancelled[:100]:
+            rows.append([InlineKeyboardButton(
+                await order_summary_label(o), callback_data=f"osel_c_{o['order_id']}")])
+        if len(cancelled) > 100:
+            rows.append([InlineKeyboardButton(f"⚠️ Ещё {len(cancelled)-100} скрыто", callback_data="noop")])
+        rows.append([InlineKeyboardButton("← К датам", callback_data="cmenu_cancelled")])
+        await q.edit_message_text(
+            f"🚫 *{day}*  —  {len(cancelled)} отменённых\n\nНажмите на заказ:",
             parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(rows))
 
     # ── VIEW REVIEW ──────────────────────────────────────────────────────────
@@ -1223,46 +1262,32 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     elif data.startswith("olist_"):
         lt = data[6:]
-        if lt == "d":
-            # Completed: show date picker instead of flat list
+        _olist_redir = {"d": "cmenu_delivered", "x": "cmenu_declined", "c": "cmenu_cancelled"}
+        if lt in _olist_redir:
+            data = _olist_redir[lt]
+            # fall through handled above — re-dispatch
             off = get_operator_offices(op)
             all_orders = await db.get_all_orders(off)
-            done = [o for o in all_orders.values() if o.get("status") in ("delivered","declined","cancelled")]
-            if not done:
-                await q.edit_message_text("Нет завершённых."); return
+            category = {"d":"delivered","x":"declined","c":"cancelled"}[lt]
+            filtered = [o for o in all_orders.values() if o.get("status") == category]
+            label_map = {"delivered": "✅ Доставленные", "declined": "🔴 Отклонённые", "cancelled": "🚫 Отменённые"}
+            label = label_map[category]
+            if not filtered:
+                await q.edit_message_text(f"{label}: нет заказов."); return
             from collections import OrderedDict
             dates = OrderedDict()
-            for o in sorted(done, key=lambda x: x.get("timestamp",""), reverse=True):
+            for o in sorted(filtered, key=lambda x: x.get("timestamp",""), reverse=True):
                 ts = o.get("timestamp","")
                 try:
                     dt = datetime.fromisoformat(ts.replace("Z","+00:00")).astimezone(DUBAI_TZ)
                     day = dt.strftime("%d.%m.%Y")
                 except: day = "—"
                 dates.setdefault(day, []).append(o)
-            rows = [[InlineKeyboardButton(f"📅 {d}  ({len(ords)})  {sum(o.get('total',0) for o in ords):,.0f} AED", callback_data=f"dday_{d}")] for d, ords in dates.items()]
-            rows.append([InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")])
-            await q.edit_message_text(f"✅ *Завершённых: {len(done)}*\n\nВыберите дату:",
-                parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(rows))
-            return
-        if lt == "x":
-            # Declined-only: show date picker
-            off = get_operator_offices(op)
-            all_orders = await db.get_all_orders(off)
-            declined = [o for o in all_orders.values() if o.get("status") == "declined"]
-            if not declined:
-                await q.edit_message_text("🔴 Нет отклонённых заказов."); return
-            from collections import OrderedDict
-            dates = OrderedDict()
-            for o in sorted(declined, key=lambda x: x.get("timestamp",""), reverse=True):
-                ts = o.get("timestamp","")
-                try:
-                    dt = datetime.fromisoformat(ts.replace("Z","+00:00")).astimezone(DUBAI_TZ)
-                    day = dt.strftime("%d.%m.%Y")
-                except: day = "—"
-                dates.setdefault(day, []).append(o)
-            rows = [[InlineKeyboardButton(f"📅 {d}  ({len(ords)})  {sum(o.get('total',0) for o in ords):,.0f} AED", callback_data=f"xday_{d}")] for d, ords in dates.items()]
-            rows.append([InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")])
-            await q.edit_message_text(f"🔴 *Отклонённых: {len(declined)}*\n\nВыберите дату:",
+            prefix_map = {"delivered": "dday", "declined": "xday", "cancelled": "cday"}
+            pfx = prefix_map[category]
+            rows = [[InlineKeyboardButton(f"📅 {d}  ({len(ords)})  {sum(o.get('total',0) for o in ords):,.0f} AED", callback_data=f"{pfx}_{d}")] for d, ords in dates.items()]
+            rows.append([InlineKeyboardButton("← Назад", callback_data=f"cmenu_{category}")])
+            await q.edit_message_text(f"{label}: *{len(filtered)}*\n\nВыберите дату:",
                 parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(rows))
             return
         header, empty, items = await _build_order_list(lt, op)
@@ -1345,6 +1370,21 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             _done_kb = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
             await q.edit_message_text(
                 (await order_card(order)) + "\n\n❌ <b>Отклонён</b>",
+                parse_mode="HTML", reply_markup=_done_kb)
+
+    # ── OPERATOR CANCEL (approved → cancelled) ─────────────────────────────
+    elif data.startswith("opcancel_"):
+        _, oid, cid = data.split("_", 2); cid = int(cid)
+        order = await db.get_order(oid)
+        if not order or order.get("status") != "approved":
+            await q.answer("Заказ уже не в статусе «Принят»", show_alert=True); return
+        await db.update_order(oid, status="cancelled", updated_at=datetime.now(timezone.utc).isoformat())
+        await update_customer_card(oid)
+        order = await db.get_order(oid)
+        if order:
+            _done_kb = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
+            await q.edit_message_text(
+                (await order_card(order)) + "\n\n🚫 <b>Отменён оператором</b>",
                 parse_mode="HTML", reply_markup=_done_kb)
 
     # ── DELIVERED ─────────────────────────────────────────────────────────────

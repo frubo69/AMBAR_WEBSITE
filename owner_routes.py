@@ -20,7 +20,7 @@ from config import OWNER_IDS, MANAGER_IDS
 import db
 import os, logging
 # Premium card lists live in api_server (single source of truth).
-from api_server import _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS, tg_send, BOT_TOKEN
+from api_server import _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS, tg_send, tg_delete, BOT_TOKEN
 
 log = logging.getLogger(__name__)
 # Owner-bot token used to push notifications to the owner via @ambar_manage_bot.
@@ -534,7 +534,39 @@ async def handle_notif_prefs_set(request):
         return web.json_response({"error": "invalid json"}, status=400, headers=CORS_HEADERS)
     if not isinstance(body, dict):
         return web.json_response({"error": "expected object"}, status=400, headers=CORS_HEADERS)
-    await db.set_owner_prefs(request["owner_id"], body)
+
+    owner_id = request["owner_id"]
+    # Check previous quiet state before saving
+    old_prefs = await db.get_owner_prefs(owner_id)
+    old_quiet = (old_prefs.get("quiet") or {}).get("enabled", False)
+
+    await db.set_owner_prefs(owner_id, body)
+
+    # Quiet mode toggle → send/delete message in @ambar_manage_bot
+    new_quiet = (body.get("quiet") or {}).get("enabled", False)
+    if OWNER_BOT_TOKEN:
+        try:
+            if new_quiet and not old_quiet:
+                # Turned ON — send pinned message
+                q = body.get("quiet", {})
+                from_t = q.get("from", "22:00")
+                to_t = q.get("to", "08:00")
+                result = await tg_send(OWNER_BOT_TOKEN, owner_id,
+                    f"🔇 *Тихий режим включён*\n"
+                    f"Уведомления отключены с {from_t} до {to_t}",
+                    parse_mode="Markdown")
+                if result and result.get("ok"):
+                    msg_id = result["result"]["message_id"]
+                    await db.set_quiet_msg_id(owner_id, msg_id)
+            elif not new_quiet and old_quiet:
+                # Turned OFF — delete the quiet message
+                msg_id = await db.get_quiet_msg_id(owner_id)
+                if msg_id:
+                    await tg_delete(OWNER_BOT_TOKEN, owner_id, msg_id)
+                    await db.set_quiet_msg_id(owner_id, None)
+        except Exception as e:
+            log.error(f"[owner-prefs] quiet mode msg failed for {owner_id}: {e}")
+
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 

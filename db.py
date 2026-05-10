@@ -593,6 +593,27 @@ async def set_owner_prefs(owner_id: int, body: dict) -> None:
     log.info(f"[owner-prefs] saved for {owner_id}: master={doc['master']}")
 
 
+async def set_quiet_msg_id(owner_id: int, msg_id: int | None) -> None:
+    """Store the Telegram message_id of the quiet-mode indicator message."""
+    db = _db_or_none()
+    if db is None: return
+    if msg_id is None:
+        await db.owner_prefs.update_one(
+            {"owner_id": owner_id}, {"$unset": {"_quiet_msg_id": ""}})
+    else:
+        await db.owner_prefs.update_one(
+            {"owner_id": owner_id}, {"$set": {"_quiet_msg_id": msg_id}})
+
+
+async def get_quiet_msg_id(owner_id: int) -> int | None:
+    """Get the stored quiet-mode Telegram message_id."""
+    db = _db_or_none()
+    if db is None: return None
+    doc = await db.owner_prefs.find_one(
+        {"owner_id": owner_id}, {"_id": 0, "_quiet_msg_id": 1})
+    return (doc or {}).get("_quiet_msg_id")
+
+
 _DEFAULT_PREFS = {
     "orders.new": True, "orders.new500": False, "orders.new1000": True,
     "orders.delivered": False, "orders.cancelled": True, "orders.declined": True,

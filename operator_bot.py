@@ -245,8 +245,7 @@ def kb_main():
     return ReplyKeyboardMarkup([
         ["🆕 Новые заказы (ожидают ответа)",   "🟢 Активные"],
         ["✅ Завершённые",    "📊 Статистика"],
-        ["🚫 Бан / Нет верификации"],
-        ["❓ Помощь"],
+        ["🚫 Бан / Нет верификации", "❓ Помощь"],
         # ["👤 Профиль"],  # hidden — handler + helpers kept in handle_menu() below
     ], resize_keyboard=True)
 

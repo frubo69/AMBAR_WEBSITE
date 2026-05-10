@@ -172,7 +172,7 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 highlighted = msg.text[:200]
                 for kw in matched:
                     highlighted = _re.sub(
-                        r'\b(' + _re.escape(kw) + r')',
+                        r'\b(' + _re.escape(kw) + r'\w*)',
                         r"⟨ *\1* ⟩",
                         highlighted,
                         flags=_re.IGNORECASE,

@@ -1003,7 +1003,7 @@ async def handle_support_send(request: web.Request) -> web.Response:
             highlighted = text[:200]
             for kw in matched:
                 highlighted = _re.sub(
-                    r'\b(' + _re.escape(kw) + r')',
+                    r'\b(' + _re.escape(kw) + r'\w*)',
                     r"⟨ *\1* ⟩",
                     highlighted,
                     flags=_re.IGNORECASE,

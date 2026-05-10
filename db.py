@@ -9,6 +9,7 @@ from datetime import datetime, timezone, timedelta
 import motor.motor_asyncio
 import certifi
 from dotenv import load_dotenv
+from config import OWNER_IDS, MANAGER_IDS
 
 load_dotenv()
 log        = logging.getLogger(__name__)
@@ -44,14 +45,19 @@ async def connect():
         await _db.owner_access_log.create_index([("status", 1), ("last_attempt_at", -1)])
         await _db.owner_notifications.create_index([("created_at", -1)])
         await _db.owner_notifications.create_index("event_key")
-        # Clean up duplicate owner_prefs docs before adding unique index.
+        # Clean up duplicate owner_prefs docs (keep newest by updated_at).
         try:
-            pipeline = [{"$group": {"_id": "$owner_id", "count": {"$sum": 1}, "ids": {"$push": "$_id"}}},
+            pipeline = [{"$group": {"_id": "$owner_id", "count": {"$sum": 1}}},
                         {"$match": {"count": {"$gt": 1}}}]
             async for group in _db.owner_prefs.aggregate(pipeline):
-                keep = group["ids"][-1]
-                await _db.owner_prefs.delete_many({"_id": {"$in": [i for i in group["ids"] if i != keep]}})
-                log.info(f"[owner-prefs] cleaned {group['count']-1} dupes for owner_id={group['_id']}")
+                oid = group["_id"]
+                docs = await _db.owner_prefs.find(
+                    {"owner_id": oid}, {"_id": 1, "updated_at": 1}
+                ).sort("updated_at", -1).to_list(length=50)
+                if len(docs) > 1:
+                    dup_ids = [d["_id"] for d in docs[1:]]
+                    await _db.owner_prefs.delete_many({"_id": {"$in": dup_ids}})
+                    log.info(f"[owner-prefs] cleaned {len(dup_ids)} dupes for owner_id={oid}")
         except Exception as e:
             log.warning(f"[owner-prefs] dupe cleanup: {e}")
         try:
@@ -515,12 +521,18 @@ async def get_common_invite_customers() -> list:
 
 async def get_owner_prefs(owner_id: int) -> dict:
     """Notification preferences for one owner — what events they want pushed
-    via @ambar_manage_bot. Returns {} if none saved (treat as 'use defaults')."""
+    via @ambar_manage_bot.  Returns sensible defaults if nothing saved yet."""
     db = _db_or_none()
     if db is None: return {}
     doc = await db.owner_prefs.find_one({"owner_id": owner_id}, {"_id": 0})
     if not doc:
-        return {}
+        return {
+            "owner_id": owner_id,
+            "master": True,
+            "preset": "important",
+            "quiet": {"enabled": False, "from": "22:00", "to": "08:00"},
+            "prefs": dict(_DEFAULT_PREFS),
+        }
     if "prefs_json" in doc:
         try:
             doc["prefs"] = json.loads(doc.pop("prefs_json"))
@@ -609,17 +621,25 @@ async def ensure_owner_prefs(owner_id: int) -> None:
 
 async def get_owners_subscribed_to(event_key: str) -> list:
     """Return owner_ids whose prefs have event_key enabled, master is on,
-    and we're not in their quiet hours."""
+    and we're not in their quiet hours.
+
+    Managers who have never opened the dashboard (no prefs doc) get
+    _DEFAULT_PREFS applied — so they receive important notifications
+    out of the box.  Once they save any prefs, only those are used."""
     db = _db_or_none()
     if db is None: return []
+
+    # 1. Fetch ALL prefs docs (including master=False) so we know who has
+    #    explicitly configured their prefs.
     cursor = db.owner_prefs.find(
-        {"$or": [{"master": {"$exists": False}}, {"master": True}]},
-        {"_id": 0, "owner_id": 1, "quiet": 1, "prefs_json": 1, "prefs": 1, "updated_at": 1},
+        {},
+        {"_id": 0, "owner_id": 1, "master": 1, "quiet": 1,
+         "prefs_json": 1, "prefs": 1, "updated_at": 1},
     )
     rows = await cursor.to_list(length=200)
 
     # Deduplicate: if multiple docs exist for one owner_id, use the newest.
-    best = {}
+    best: dict[int, dict] = {}
     for r in rows:
         oid = r.get("owner_id")
         if oid is None:
@@ -627,11 +647,34 @@ async def get_owners_subscribed_to(event_key: str) -> list:
         prev = best.get(oid)
         if prev is None or (r.get("updated_at", "") > prev.get("updated_at", "")):
             best[oid] = r
-    rows = list(best.values())
 
+    configured_ids = set(best.keys())
+
+    # 2. Collect every manager ID (env owners + env managers + DB managers).
+    all_manager_ids = set(OWNER_IDS) | set(MANAGER_IDS)
+    try:
+        db_managers = await get_managers()
+        for m in db_managers:
+            if not m.get("blocked"):
+                all_manager_ids.add(m["telegram_id"])
+    except Exception:
+        pass
+
+    # 3. Managers without a prefs doc get _DEFAULT_PREFS.
+    for mid in all_manager_ids:
+        if mid not in configured_ids:
+            best[mid] = {
+                "owner_id": mid,
+                "master": True,
+                "prefs_json": json.dumps(_DEFAULT_PREFS),
+            }
+
+    # 4. Filter by master, event_key, and quiet hours.
     out = []
     now_h = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=4))).hour
-    for r in rows:
+    for r in best.values():
+        if r.get("master") is False:
+            continue
         if "prefs_json" in r:
             try:
                 p = json.loads(r["prefs_json"])

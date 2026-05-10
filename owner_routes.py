@@ -536,36 +536,18 @@ async def handle_notif_prefs_set(request):
         return web.json_response({"error": "expected object"}, status=400, headers=CORS_HEADERS)
 
     owner_id = request["owner_id"]
-    # Check previous quiet state before saving
-    old_prefs = await db.get_owner_prefs(owner_id)
-    old_quiet = (old_prefs.get("quiet") or {}).get("enabled", False)
-
     await db.set_owner_prefs(owner_id, body)
 
-    # Quiet mode toggle → send/delete message in @ambar_manage_bot
+    # If user turned OFF quiet mode — delete the quiet message if it exists
     new_quiet = (body.get("quiet") or {}).get("enabled", False)
-    if OWNER_BOT_TOKEN:
+    if not new_quiet and OWNER_BOT_TOKEN:
         try:
-            if new_quiet and not old_quiet:
-                # Turned ON — send pinned message
-                q = body.get("quiet", {})
-                from_t = q.get("from", "22:00")
-                to_t = q.get("to", "08:00")
-                result = await tg_send(OWNER_BOT_TOKEN, owner_id,
-                    f"🔇 *Тихий режим включён*\n"
-                    f"Уведомления отключены с {from_t} до {to_t}",
-                    parse_mode="Markdown")
-                if result and result.get("ok"):
-                    msg_id = result["result"]["message_id"]
-                    await db.set_quiet_msg_id(owner_id, msg_id)
-            elif not new_quiet and old_quiet:
-                # Turned OFF — delete the quiet message
-                msg_id = await db.get_quiet_msg_id(owner_id)
-                if msg_id:
-                    await tg_delete(OWNER_BOT_TOKEN, owner_id, msg_id)
-                    await db.set_quiet_msg_id(owner_id, None)
+            msg_id = await db.get_quiet_msg_id(owner_id)
+            if msg_id:
+                await tg_delete(OWNER_BOT_TOKEN, owner_id, msg_id)
+                await db.set_quiet_msg_id(owner_id, None)
         except Exception as e:
-            log.error(f"[owner-prefs] quiet mode msg failed for {owner_id}: {e}")
+            log.error(f"[owner-prefs] quiet msg delete failed for {owner_id}: {e}")
 
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
@@ -1206,6 +1188,59 @@ async def _backfill_delivery_times():
         log.info(f"[owner] backfilled updated_at on {patched} delivered orders")
 
 
+async def _monitor_quiet_hours():
+    """Background loop: send/delete quiet-mode messages based on actual time.
+    Runs every 60s. When a user enters their quiet window → send message.
+    When they leave it → delete the message."""
+    while True:
+        await asyncio.sleep(60)
+        if not OWNER_BOT_TOKEN:
+            continue
+        try:
+            _db = db._db_or_none()
+            if not _db:
+                continue
+            now_h = datetime.now(timezone.utc).astimezone(DUBAI_TZ).hour
+            cursor = _db.owner_prefs.find(
+                {"quiet.enabled": True},
+                {"_id": 0, "owner_id": 1, "quiet": 1, "_quiet_msg_id": 1})
+            docs = await cursor.to_list(length=200)
+            for doc in docs:
+                oid = doc.get("owner_id")
+                q = doc.get("quiet", {})
+                msg_id = doc.get("_quiet_msg_id")
+                try:
+                    from_h = int(str(q.get("from", "22:00")).split(":")[0])
+                    to_h = int(str(q.get("to", "08:00")).split(":")[0])
+                except (ValueError, TypeError):
+                    continue
+                if from_h >= to_h:
+                    in_quiet = (now_h >= from_h or now_h < to_h)
+                else:
+                    in_quiet = (from_h <= now_h < to_h)
+
+                if in_quiet and not msg_id:
+                    # Entering quiet hours — send message
+                    try:
+                        result = await tg_send(OWNER_BOT_TOKEN, oid,
+                            f"🔇 *Тихий режим*\n"
+                            f"Уведомления отключены до {q.get('to', '08:00')}",
+                            parse_mode="Markdown")
+                        if result and result.get("ok"):
+                            await db.set_quiet_msg_id(oid, result["result"]["message_id"])
+                    except Exception as e:
+                        log.error(f"[quiet-monitor] send to {oid} failed: {e}")
+                elif not in_quiet and msg_id:
+                    # Leaving quiet hours — delete message
+                    try:
+                        await tg_delete(OWNER_BOT_TOKEN, oid, msg_id)
+                        await db.set_quiet_msg_id(oid, None)
+                    except Exception as e:
+                        log.error(f"[quiet-monitor] delete for {oid} failed: {e}")
+        except Exception as e:
+            log.error(f"[quiet-monitor] check failed: {e}")
+
+
 async def _monitor_pending_orders():
     """Background loop: fire timing.notAccepted5 for orders pending > 5 min."""
     _alerted = set()
@@ -1240,9 +1275,10 @@ async def _monitor_pending_orders():
 def setup(app):
     """Wire owner routes into the aiohttp app. Called from api_server.main()."""
     app.on_startup.append(lambda _: _backfill_delivery_times())
-    async def _start_monitor(_):
+    async def _start_monitors(_):
         asyncio.ensure_future(_monitor_pending_orders())
-    app.on_startup.append(_start_monitor)
+        asyncio.ensure_future(_monitor_quiet_hours())
+    app.on_startup.append(_start_monitors)
     app.router.add_route("OPTIONS", "/api/owner/ping",    handle_ping)
     app.router.add_get(             "/api/owner/ping",    handle_ping)
     app.router.add_route("OPTIONS", "/api/owner/finance", handle_finance)

@@ -986,20 +986,22 @@ async def handle_support_send(request: web.Request) -> web.Response:
     log.info(f"[support] user={uid} order={order_id}")
 
     try:
-        from owner_routes import notify_owners
-        ctx_lbl = f"заказ #{order_id}" if order_id and order_id != "general" else "общий вопрос"
-        await notify_owners("support.new",
-            f"💬 *Новое обращение в поддержку*\n"
-            f"Клиент: {user_name} (@{username})\n"
-            f"Контекст: {ctx_lbl}\n"
-            f"_{text[:100]}_")
-        # Complaint keyword detection (word-boundary at start to avoid
-        # matching inside other words, e.g. "не доставил" inside "мне доставили")
+        from owner_routes import notify_owners, OWNER_BOT_TOKEN
         import re as _re
+        ctx_lbl = f"заказ #{order_id}" if order_id and order_id != "general" else "общий вопрос"
+
+        # Check for complaint keywords first
         text_lower = text.lower()
         matched = [kw for kw in _COMPLAINT_KEYWORDS
                    if _re.search(r'\b' + _re.escape(kw), text_lower)]
+
+        text_new = (f"💬 *Новое обращение в поддержку*\n"
+                    f"Клиент: {user_name} (@{username})\n"
+                    f"Контекст: {ctx_lbl}\n"
+                    f"_{text[:100]}_")
+
         if matched:
+            # Build complaint message with highlighted keywords
             highlighted = text[:200]
             for kw in matched:
                 highlighted = _re.sub(
@@ -1008,14 +1010,43 @@ async def handle_support_send(request: web.Request) -> web.Response:
                     highlighted,
                     flags=_re.IGNORECASE,
                 )
-            await notify_owners("support.complaint",
-                f"⚠️ *Жалоба — ключевые слова*\n"
-                f"Клиент: {user_name} (@{username})\n"
-                f"Контекст: {ctx_lbl}\n\n"
-                f"\"{highlighted}\"",
-                parse_mode="Markdown")
+            text_complaint = (f"⚠️ *Жалоба — ключевые слова*\n"
+                              f"Клиент: {user_name} (@{username})\n"
+                              f"Контекст: {ctx_lbl}\n\n"
+                              f"\"{highlighted}\"")
+
+            # Dedup: users with both support.new + support.complaint ON
+            # get only the complaint version (higher priority)
+            complaint_subs = await db.get_owners_subscribed_to("support.complaint")
+            new_subs = await db.get_owners_subscribed_to("support.new")
+            complaint_set = set(complaint_subs)
+
+            # Send complaint to complaint subscribers
+            await db.insert_notification("support.complaint", text_complaint)
+            for oid in complaint_subs:
+                try:
+                    result = await tg_send(OWNER_BOT_TOKEN, oid, text_complaint, parse_mode="Markdown")
+                    if not result or not result.get("ok"):
+                        log.error(f"[owner-notif] support.complaint → {oid} TG error: {result}")
+                except Exception as e:
+                    log.error(f"[owner-notif] support.complaint → {oid} failed: {e}")
+
+            # Send regular support.new only to those NOT getting complaint
+            await db.insert_notification("support.new", text_new)
+            for oid in new_subs:
+                if oid in complaint_set:
+                    continue  # already got the complaint version
+                try:
+                    result = await tg_send(OWNER_BOT_TOKEN, oid, text_new, parse_mode="Markdown")
+                    if not result or not result.get("ok"):
+                        log.error(f"[owner-notif] support.new → {oid} TG error: {result}")
+                except Exception as e:
+                    log.error(f"[owner-notif] support.new → {oid} failed: {e}")
+        else:
+            # No trigger words — just send support.new normally
+            await notify_owners("support.new", text_new)
     except Exception as e:
-        log.error(f"[owner-notif] support.new failed: {e}")
+        log.error(f"[owner-notif] support notification failed: {e}")
 
     return web.json_response({"ok": True, "ts": server_ts}, headers=CORS_HEADERS)
 

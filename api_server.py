@@ -395,7 +395,7 @@ async def handle_create_order(request: web.Request) -> web.Response:
     # notification until verification data is submitted. Referral users still
     # need to go through the flow — the referrer info just shows up as a hint
     # when the operator receives the combined notification.
-    _needs_verification = is_first_order
+    _needs_verification = is_first_order and uid not in _TEST_ACCOUNTS
     if _needs_verification:
         await db.update_order(oid, pending_verification=True, op_text=op_text,
                               referred_by=referred_by, referrer_username=referrer_username)

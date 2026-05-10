@@ -837,6 +837,27 @@ async def handle_orders(request: web.Request) -> web.Response:
     return web.json_response({"orders": user_orders}, headers=CORS_HEADERS)
 
 
+# Complaint keywords — if a customer message contains any of these, fire
+# support.complaint notification.  Stems are used so "верните"/"возврат" both match.
+_COMPLAINT_KEYWORDS = [
+    "плохо", "плохой", "плохая", "плохое",
+    "верните", "возврат", "вернуть",
+    "просрочен", "просрочк", "истёк", "истек",
+    "ужас", "кошмар", "отвратительн",
+    "жалоба", "жалуюсь",
+    "некачествен", "брак",
+    "испорчен", "тухл", "гнил", "воняет", "запах",
+    "невкусн", "несвеж",
+    "холодн",
+    "долго ждал", "долго жд", "слишком долго",
+    "опоздал", "опоздани", "задержк",
+    "не привез", "не доставил", "забыли",
+    "обман", "мошен", "развод",
+    "хам", "грубо", "грубый", "нагл", "хамство",
+    "не то привез", "перепутал", "не тот заказ", "чужой заказ",
+    "разочарован",
+]
+
 # ── POST /api/support/send ────────────────────────────────────────────────────
 async def handle_support_send(request: web.Request) -> web.Response:
     if request.method == "OPTIONS":
@@ -951,6 +972,16 @@ async def handle_support_send(request: web.Request) -> web.Response:
             f"Клиент: {user_name} (@{username})\n"
             f"Контекст: {ctx_lbl}\n"
             f"_{text[:100]}_")
+        # Complaint keyword detection
+        text_lower = text.lower()
+        matched = [kw for kw in _COMPLAINT_KEYWORDS if kw in text_lower]
+        if matched:
+            await notify_owners("support.complaint",
+                f"⚠️ *Жалоба — ключевые слова*\n"
+                f"Клиент: {user_name} (@{username})\n"
+                f"Контекст: {ctx_lbl}\n"
+                f"Триггеры: {', '.join(matched)}\n"
+                f"_{text[:150]}_")
     except Exception as e:
         log.error(f"[owner-notif] support.new failed: {e}")
 

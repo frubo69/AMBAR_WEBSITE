@@ -157,6 +157,25 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         except Exception as e:
             print(f"⚠️ Could not forward to admin {admin_id}: {e}")
 
+    # Complaint keyword detection
+    if msg.text:
+        try:
+            from api_server import _COMPLAINT_KEYWORDS
+            from owner_routes import notify_owners
+            text_lower = msg.text.lower()
+            matched = [kw for kw in _COMPLAINT_KEYWORDS if kw in text_lower]
+            if matched:
+                uname = user.username or "—"
+                full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+                await notify_owners("support.complaint",
+                    f"⚠️ *Жалоба — ключевые слова*\n"
+                    f"Клиент: {full_name} (@{uname})\n"
+                    f"Канал: Telegram бот\n"
+                    f"Триггеры: {', '.join(matched)}\n"
+                    f"_{msg.text[:150]}_")
+        except Exception as e:
+            print(f"⚠️ Complaint detection failed: {e}")
+
 
 # -------------------------
 # ADMIN → USER (reply)

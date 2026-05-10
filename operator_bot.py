@@ -403,7 +403,7 @@ async def order_card(o, full=True):
                     except Exception:
                         joined_str = ""
                 if int(cid) in _TEST_ACCOUNTS:
-                    bq = ["🟢🟢🟢 <b>TEST(NOT REAL ORDER)</b> 🟢🟢🟢"]
+                    bq = ["🟢🟢🟢 <b>ТЕСТ (НЕ НАСТОЯЩИЙ ЗАКАЗ)</b> 🟢🟢🟢"]
                 elif user_doc.get("referred_by"):
                     title = "<b>НОВЫЙ КЛИЕНТ — РЕФЕРАЛ</b>"
                     bq = [f"🔴🔴🔴 {title} 🔴🔴🔴"]
@@ -1362,21 +1362,6 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await q.edit_message_text(
                 (await order_card(order)) + "\n\n✅ <b>Доставлен</b>",
                 parse_mode="HTML", reply_markup=await kb_order_actions(order, list_type=lt))
-            try:
-                from owner_routes import notify_owners
-                placed_ts = order.get("timestamp")
-                if placed_ts:
-                    t0 = datetime.fromisoformat(placed_ts).replace(tzinfo=timezone.utc)
-                    diff_min = (datetime.now(timezone.utc) - t0).total_seconds() / 60
-                    if diff_min > 45:
-                        await notify_owners("timing.late45",
-                            f"🕐 *Опоздание доставки*\n"
-                            f"Заказ #{oid} · {int(diff_min)} мин\nПорог: 45 мин")
-                await notify_owners("orders.delivered",
-                    f"✅ *Заказ доставлен #{oid}*\n"
-                    f"Сумма: {total} AED")
-            except Exception as e:
-                log.error(f"[owner-notif] delivered notify failed: {e}")
 
     # ── UNDO DELIVERED → back to approved ────────────────────────────────────
     elif data.startswith("undone_"):

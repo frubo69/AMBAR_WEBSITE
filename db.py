@@ -64,6 +64,36 @@ async def connect():
             await _db.owner_prefs.create_index("owner_id", unique=True)
         except Exception:
             pass
+        # Migrate old prefs dict → prefs_json for any docs still in old format.
+        try:
+            cursor = _db.owner_prefs.find({"prefs_json": {"$exists": False}})
+            async for doc in cursor:
+                prefs = doc.get("prefs")
+                if isinstance(prefs, dict):
+                    # Handle both flat {"orders.new": true} and nested
+                    # {orders: {new: true}} (MongoDB dot-key corruption).
+                    flat = {}
+                    for k, v in prefs.items():
+                        if isinstance(v, dict):
+                            for k2, v2 in v.items():
+                                flat[f"{k}.{k2}"] = v2
+                        else:
+                            flat[k] = v
+                    await _db.owner_prefs.update_one(
+                        {"_id": doc["_id"]},
+                        {"$set": {"prefs_json": json.dumps(flat)},
+                         "$unset": {"prefs": ""}},
+                    )
+                    log.info(f"[owner-prefs] migrated prefs→prefs_json for owner_id={doc.get('owner_id')}")
+                else:
+                    # No prefs at all — set defaults.
+                    await _db.owner_prefs.update_one(
+                        {"_id": doc["_id"]},
+                        {"$set": {"prefs_json": json.dumps(_DEFAULT_PREFS)}},
+                    )
+                    log.info(f"[owner-prefs] set default prefs_json for owner_id={doc.get('owner_id')}")
+        except Exception as e:
+            log.warning(f"[owner-prefs] migration: {e}")
         log.info("✅ MongoDB connected — db: ambar")
     except Exception as e:
         log.error(f"MongoDB index error: {e}")

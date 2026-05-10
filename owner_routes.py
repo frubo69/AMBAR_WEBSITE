@@ -600,6 +600,8 @@ async def notify_owners(event_key: str, text: str, parse_mode: str = "Markdown")
             result = await tg_send(OWNER_BOT_TOKEN, oid, text, parse_mode=parse_mode)
             if result and result.get("ok"):
                 sent.append({"chat_id": oid, "message_id": result["result"]["message_id"]})
+            else:
+                log.error(f"[owner-notif] send {event_key} → {oid} TG error: {result}")
         except Exception as e:
             log.error(f"[owner-notif] send {event_key} → {oid} failed: {e}")
     return sent
@@ -653,7 +655,9 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
     tier_text = {ek: txt for ek, txt in tiers}
     for uid_sub, event_key in all_subs.items():
         try:
-            await tg_send(OWNER_BOT_TOKEN, uid_sub, tier_text[event_key], parse_mode="Markdown")
+            result = await tg_send(OWNER_BOT_TOKEN, uid_sub, tier_text[event_key], parse_mode="Markdown")
+            if not result or not result.get("ok"):
+                log.error(f"[owner-notif] new-order {event_key} → {uid_sub} TG error: {result}")
         except Exception as e:
             log.error(f"[owner-notif] new-order {event_key} → {uid_sub} failed: {e}")
 

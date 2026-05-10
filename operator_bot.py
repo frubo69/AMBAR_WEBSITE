@@ -1110,9 +1110,22 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     # ── COMPLETED SUBMENU ──────────────────────────────────────────────────
     elif data.startswith("cmenu_"):
-        category = data[6:]  # delivered / declined / cancelled
+        category = data[6:]  # delivered / declined / cancelled / back
         off = get_operator_offices(op)
         all_orders = await db.get_all_orders(off)
+        if category == "back":
+            n_delivered = sum(1 for o in all_orders.values() if o.get("status") == "delivered")
+            n_declined = sum(1 for o in all_orders.values() if o.get("status") == "declined")
+            n_cancelled = sum(1 for o in all_orders.values() if o.get("status") == "cancelled")
+            rows = [
+                [InlineKeyboardButton(f"✅ Доставленные ({n_delivered})", callback_data="cmenu_delivered")],
+                [InlineKeyboardButton(f"🔴 Отклонённые ({n_declined})", callback_data="cmenu_declined")],
+                [InlineKeyboardButton(f"🚫 Отменённые ({n_cancelled})", callback_data="cmenu_cancelled")],
+                [InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")],
+            ]
+            await q.edit_message_text("✅ *Завершённые заказы*\n\nВыберите категорию:",
+                parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(rows))
+            return
         filtered = [o for o in all_orders.values() if o.get("status") == category]
         label_map = {"delivered": "✅ Доставленные", "declined": "🔴 Отклонённые", "cancelled": "🚫 Отменённые"}
         label = label_map.get(category, category)
@@ -1136,21 +1149,6 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             rows.append([InlineKeyboardButton(f"📅 {day}  ({cnt})  {day_total:,.0f} AED", callback_data=f"{pfx}_{day}")])
         rows.append([InlineKeyboardButton("← Назад", callback_data="cmenu_back")])
         await q.edit_message_text(f"{label}: *{len(filtered)}*\n\nВыберите дату:",
-            parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(rows))
-
-    elif data == "cmenu_back":
-        off = get_operator_offices(op)
-        all_orders = await db.get_all_orders(off)
-        n_delivered = sum(1 for o in all_orders.values() if o.get("status") == "delivered")
-        n_declined = sum(1 for o in all_orders.values() if o.get("status") == "declined")
-        n_cancelled = sum(1 for o in all_orders.values() if o.get("status") == "cancelled")
-        rows = [
-            [InlineKeyboardButton(f"✅ Доставленные ({n_delivered})", callback_data="cmenu_delivered")],
-            [InlineKeyboardButton(f"🔴 Отклонённые ({n_declined})", callback_data="cmenu_declined")],
-            [InlineKeyboardButton(f"🚫 Отменённые ({n_cancelled})", callback_data="cmenu_cancelled")],
-            [InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")],
-        ]
-        await q.edit_message_text("✅ *Завершённые заказы*\n\nВыберите категорию:",
             parse_mode="Markdown", reply_markup=InlineKeyboardMarkup(rows))
 
     # ── ORDER LIST: back to list ─────────────────────────────────────────────

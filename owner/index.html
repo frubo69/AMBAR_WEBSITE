@@ -1433,7 +1433,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
           <span class="ncat-caret">⌵</span>
         </div>
         <div class="ncat-body">
-          <div class="nrow"><div class="nrow-body"><div class="nrow-t">Выручка ниже плана <span class="pill warn">&lt; 10 000 AED</span></div><div class="nrow-s">Проверка в 18:00</div></div><label class="tg"><input type="checkbox" data-p="finance.revenueLow" checked><i></i></label></div>
+          <div class="nrow"><div class="nrow-body"><div class="nrow-t">Выручка ниже плана <button class="pill warn" type="button" onclick="openRevPicker()" id="revPill">&lt; 10 000 AED</button></div><div class="nrow-s">Проверка в 18:00</div></div><label class="tg"><input type="checkbox" data-p="finance.revenueLow" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Ср. чек упал <span class="pill dn">&gt; 20%</span></div><div class="nrow-s">Относительно недели</div></div><label class="tg"><input type="checkbox" data-p="finance.avgDrop" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Всплеск отмен <span class="pill dn">≥ 5/час</span></div><div class="nrow-s">Что-то идёт не так</div></div><label class="tg"><input type="checkbox" data-p="finance.cancelSpike" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Рекорд дня 🏆</div><div class="nrow-s">Лучший день за месяц</div></div><label class="tg"><input type="checkbox" data-p="finance.record" checked><i></i></label></div>
@@ -2063,6 +2063,39 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
 </div>
 
+<div class="cmd-overlay" id="revOverlay">
+  <div class="cmd-sheet tp-sheet">
+    <div class="tp-hdr">
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:600">Порог выручки</div>
+      <button class="cmd-close" onclick="closeRevPicker()" aria-label="Закрыть"><span class="txt">ESC</span><span class="x">✕</span></button>
+    </div>
+    <div class="tp-body">
+      <div class="tp-wheels">
+        <div class="tp-col">
+          <div class="tp-col-lbl">ТЫСЯЧИ</div>
+          <div class="tp-wheel" id="rpThou"></div>
+        </div>
+        <div class="tp-sep rev-sep">000</div>
+        <div class="tp-col" style="flex:.4">
+          <div class="tp-col-lbl"></div>
+          <div style="height:180px;display:flex;align-items:center;justify-content:center">
+            <span style="font-family:'DM Sans',sans-serif;font-size:22px;font-weight:700;color:var(--gold)">AED</span>
+          </div>
+        </div>
+      </div>
+      <div class="tp-mask"></div>
+    </div>
+    <div class="notif-foot">
+      <button class="nfoot-btn sec" onclick="closeRevPicker()">Отмена</button>
+      <button class="nfoot-btn pri" onclick="confirmRevPicker()">Готово</button>
+    </div>
+  </div>
+</div>
+
+<style>
+.rev-sep{font-size:24px!important;letter-spacing:1px;padding-bottom:66px}
+</style>
+
 <style>
 .tp-sheet{max-width:340px;margin-top:20vh}
 @media (max-width:520px),(pointer:coarse){.tp-sheet{margin-top:30vh}}
@@ -2151,7 +2184,9 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .nrow-body{flex:1;min-width:0}
 .nrow-t{font-size:13px;font-weight:500;color:var(--text);display:flex;align-items:center;flex-wrap:wrap;gap:6px}
 .nrow-s{font-size:11px;color:var(--muted);margin-top:2px}
-.pill{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;background:rgba(255,255,255,.06);color:var(--sub);letter-spacing:.3px;font-family:'JetBrains Mono',monospace;font-variant-numeric:lining-nums tabular-nums}
+.pill{display:inline-flex;align-items:center;font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;background:rgba(255,255,255,.06);color:var(--sub);letter-spacing:.3px;font-family:'JetBrains Mono',monospace;font-variant-numeric:lining-nums tabular-nums;border:none}
+button.pill{cursor:pointer;-webkit-tap-highlight-color:transparent;transition:opacity .15s}
+button.pill:active{opacity:.6}
 .pill.gold{background:rgba(201,169,110,.18);color:var(--gold2)}
 .pill.warn{background:var(--warn-soft);color:var(--warn)}
 .pill.dn{background:var(--dn-soft);color:var(--dn)}
@@ -4806,6 +4841,7 @@ timeOv.addEventListener('click',e=>{ if(e.target===timeOv) closeTime(); });
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'){
     if(timeOv.classList.contains('show')) closeTime();
+    else if(revOv && revOv.classList.contains('show')) closeRevPicker();
     else if(notifOv.classList.contains('show')) closeNotif();
   }
 });
@@ -4862,6 +4898,57 @@ function syncQuietLbl(){
   if(lbl) lbl.textContent = `${from} → ${to}`;
 }
 
+// ======= REVENUE THRESHOLD PICKER =======
+let _revThreshold = 10000;
+const revOv = document.getElementById('revOverlay');
+function openRevPicker(){
+  const thou = Math.round(_revThreshold / 1000);
+  // Build wheel: 1..50 (1000..50000 AED)
+  const el = document.getElementById('rpThou');
+  el.innerHTML = '';
+  const padTop = document.createElement('div'); padTop.className='tp-pad'; el.appendChild(padTop);
+  for(let i=1;i<=50;i++){
+    const d = document.createElement('div');
+    d.className='tp-item'; d.dataset.v = i;
+    d.textContent = String(i);
+    if(i===thou) d.classList.add('sel');
+    el.appendChild(d);
+  }
+  const padBot = document.createElement('div'); padBot.className='tp-pad'; el.appendChild(padBot);
+  requestAnimationFrame(()=>{
+    const target = el.querySelector('.tp-item.sel');
+    if(target) el.scrollTop = target.offsetTop - 72;
+  });
+  let rAF;
+  el.addEventListener('scroll',()=>{
+    if(rAF) cancelAnimationFrame(rAF);
+    rAF = requestAnimationFrame(()=>{
+      const items = el.querySelectorAll('.tp-item');
+      const mid = el.scrollTop + 90;
+      let best = null, bestD = 1e9;
+      items.forEach(it=>{
+        const c = it.offsetTop + 18;
+        const d = Math.abs(c - mid);
+        if(d<bestD){ bestD=d; best=it; }
+      });
+      items.forEach(it=>it.classList.toggle('sel', it===best));
+    });
+  });
+  revOv.classList.add('show');
+  try{Telegram.WebApp.HapticFeedback.impactOccurred('light')}catch(e){}
+}
+function closeRevPicker(){ revOv.classList.remove('show'); }
+revOv.addEventListener('click',e=>{ if(e.target===revOv) closeRevPicker(); });
+function confirmRevPicker(){
+  const v = document.querySelector('#rpThou .tp-item.sel')?.dataset.v || '10';
+  _revThreshold = parseInt(v) * 1000;
+  const formatted = _revThreshold.toLocaleString('ru-RU').replace(/ /g,' ');
+  document.getElementById('revPill').innerHTML = `&lt; ${formatted} AED`;
+  autosaveNotif();
+  try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(e){}
+  closeRevPicker();
+}
+
 // Silent autosave — runs on every change. Debounced by 200ms to batch rapid toggles.
 let _autosaveTimer = null;
 function autosaveNotif(){
@@ -4877,7 +4964,7 @@ function autosaveNotif(){
       to:   document.getElementById('qtTo').textContent.trim()
     };
     const master = notifOv.querySelector('#master').checked;
-    const payload = { master, preset: activePreset, quiet, prefs };
+    const payload = { master, preset: activePreset, quiet, prefs, revThreshold: _revThreshold };
     try{ localStorage.setItem('ambar_owner_notif', JSON.stringify(payload)); }catch(e){}
     // Persist to MongoDB so the backend can read prefs when an event fires.
     if(window.ownerApi){
@@ -5695,6 +5782,12 @@ try{
     if(saved.preset){
       document.querySelectorAll('.preset').forEach(p=>p.classList.toggle('on', p.dataset.preset===saved.preset));
     }
+    if(saved.revThreshold){
+      _revThreshold = saved.revThreshold;
+      const fmt = _revThreshold.toLocaleString('ru-RU').replace(/ /g,' ');
+      const pill = document.getElementById('revPill');
+      if(pill) pill.innerHTML = `&lt; ${fmt} AED`;
+    }
     syncQuietLbl();
   }
 }catch(e){}
@@ -5735,6 +5828,12 @@ if(window.ownerApi){
     }
     if(saved.preset){
       document.querySelectorAll('.preset').forEach(p=>p.classList.toggle('on', p.dataset.preset===saved.preset));
+    }
+    if(saved.revThreshold){
+      _revThreshold = saved.revThreshold;
+      const fmt = _revThreshold.toLocaleString('ru-RU').replace(/ /g,' ');
+      const pill = document.getElementById('revPill');
+      if(pill) pill.innerHTML = `&lt; ${fmt} AED`;
     }
     if(typeof syncQuietLbl==='function') syncQuietLbl();
     if(typeof syncActiveCount==='function') syncActiveCount();

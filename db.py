@@ -583,6 +583,7 @@ async def set_owner_prefs(owner_id: int, body: dict) -> None:
         "preset": body.get("preset", "custom"),
         "quiet": body.get("quiet", {}),
         "prefs_json": json.dumps(body.get("prefs", {})),
+        "revThreshold": body.get("revThreshold", 10000),
         "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.owner_prefs.update_one(

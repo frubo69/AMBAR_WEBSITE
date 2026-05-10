@@ -458,6 +458,19 @@ async def handle_create_order(request: web.Request) -> web.Response:
     except Exception as e:
         log.error(f"[owner-notif] orders.new failed: {e}")
 
+    if is_first_order:
+        try:
+            from owner_routes import notify_owners
+            await notify_owners(
+                "customers.new",
+                f"👤 *Новый клиент · первый заказ*\n"
+                f"Имя: {user_name}\n"
+                f"@{username or '—'}\n"
+                f"Заказ #{oid} · {total} AED"
+            )
+        except Exception as e:
+            log.error(f"[owner-notif] customers.new failed: {e}")
+
     return web.json_response({"ok": True, "order_id": oid, "needs_verification": _needs_verification}, headers=CORS_HEADERS)
 
 

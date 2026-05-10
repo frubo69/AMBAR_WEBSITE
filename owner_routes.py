@@ -539,6 +539,26 @@ async def handle_notif_prefs_set(request):
 
 
 @require_owner
+async def handle_notifications(request):
+    """Return recent notification events for the authenticated owner."""
+    owner_id = request["owner_id"]
+    since = request.query.get("since", "").strip()
+    try:
+        limit = min(int(request.query.get("limit", "30")), 100)
+    except (ValueError, TypeError):
+        limit = 30
+    if since:
+        items = await db.get_notifications_since(since, owner_id=owner_id, limit=limit)
+    else:
+        items = await db.get_recent_notifications(owner_id=owner_id, limit=limit)
+    return web.json_response(
+        {"items": items, "count": len(items),
+         "server_time": datetime.now(timezone.utc).isoformat()},
+        headers=CORS_HEADERS,
+    )
+
+
+@require_owner
 async def handle_notif_test(request):
     """Send a single test message to the requesting owner via @ambar_manage_bot."""
     if not OWNER_BOT_TOKEN:
@@ -558,6 +578,11 @@ async def handle_notif_test(request):
 # Public helper used by api_server (and operator_bot in future) to push an
 # event to all owners subscribed to it. Best-effort; logs failures.
 async def notify_owners(event_key: str, text: str, parse_mode: str = "Markdown") -> None:
+    try:
+        await db.insert_notification(event_key, text)
+    except Exception as e:
+        log.error(f"[owner-notif] persist failed for {event_key}: {e}")
+
     if not OWNER_BOT_TOKEN:
         return
     try:
@@ -739,6 +764,12 @@ async def handle_catalog_update(request):
         await asyncio.to_thread(_write_catalog, catalog)
 
     log.info(f"[catalog] {request['owner_id']} updated {pid}: stock={new_stock} price={new_price}")
+    if new_stock is False:
+        try:
+            await notify_owners("stock.out",
+                f"⚠️ *Товар закончился*\n{target.get('name', pid)}")
+        except Exception as e:
+            log.error(f"[owner-notif] stock.out failed: {e}")
     return web.json_response({
         "ok": True,
         "id": pid,
@@ -1084,6 +1115,8 @@ def setup(app):
     app.router.add_get(             "/api/owner/customers/{telegram_id}", handle_customer_detail)
     app.router.add_route("OPTIONS", "/api/owner/customers/{telegram_id}/{action:ban|unban}", handle_customer_ban)
     app.router.add_post(            "/api/owner/customers/{telegram_id}/{action:ban|unban}", handle_customer_ban)
+    app.router.add_route("OPTIONS", "/api/owner/notifications", handle_notifications)
+    app.router.add_get(             "/api/owner/notifications", handle_notifications)
     app.router.add_route("OPTIONS", "/api/owner/notif-prefs", handle_notif_prefs_get)
     app.router.add_get(             "/api/owner/notif-prefs", handle_notif_prefs_get)
     app.router.add_post(            "/api/owner/notif-prefs", handle_notif_prefs_set)

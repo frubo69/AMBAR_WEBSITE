@@ -42,6 +42,8 @@ async def connect():
         await _db.owner_managers.create_index("telegram_id", unique=True)
         await _db.owner_access_log.create_index("telegram_id", unique=True)
         await _db.owner_access_log.create_index([("status", 1), ("last_attempt_at", -1)])
+        await _db.owner_notifications.create_index([("created_at", -1)])
+        await _db.owner_notifications.create_index("event_key")
         log.info("✅ MongoDB connected — db: ambar")
     except Exception as e:
         log.error(f"MongoDB index error: {e}")
@@ -796,3 +798,38 @@ async def award_referral_points(referrer_id: int, referred_id: int, points: int)
                                      "at": datetime.now(timezone.utc)}},
         },
     )
+
+
+# ── Owner notifications ──────────────────────────────────────────────────────
+
+async def insert_notification(event_key: str, text: str, owner_id: int = 0) -> None:
+    """Persist a notification event. owner_id=0 means broadcast."""
+    db = _db_or_none()
+    if db is None: return
+    await db.owner_notifications.insert_one({
+        "event_key": event_key,
+        "text": text,
+        "owner_id": owner_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+
+
+async def get_notifications_since(since_iso: str, owner_id: int = 0, limit: int = 50) -> list:
+    """Return notifications created after `since_iso`."""
+    db = _db_or_none()
+    if db is None: return []
+    filt = {
+        "created_at": {"$gt": since_iso},
+        "$or": [{"owner_id": 0}, {"owner_id": owner_id}],
+    }
+    cursor = db.owner_notifications.find(filt, {"_id": 0}).sort("created_at", -1).limit(limit)
+    return await cursor.to_list(length=limit)
+
+
+async def get_recent_notifications(owner_id: int = 0, limit: int = 30) -> list:
+    """Return the most recent N notifications."""
+    db = _db_or_none()
+    if db is None: return []
+    filt = {"$or": [{"owner_id": 0}, {"owner_id": owner_id}]}
+    cursor = db.owner_notifications.find(filt, {"_id": 0}).sort("created_at", -1).limit(limit)
+    return await cursor.to_list(length=limit)

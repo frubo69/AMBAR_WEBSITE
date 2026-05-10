@@ -4,7 +4,7 @@ All three processes (api_server, bot, operator_bot) import this module.
 Each process maintains its own Motor client pointing at the same Atlas cluster.
 """
 from __future__ import annotations
-import os, logging, re
+import os, logging, re, json
 from datetime import datetime, timezone, timedelta
 import motor.motor_asyncio
 import certifi
@@ -505,19 +505,36 @@ async def get_owner_prefs(owner_id: int) -> dict:
     db = _db_or_none()
     if db is None: return {}
     doc = await db.owner_prefs.find_one({"owner_id": owner_id}, {"_id": 0})
-    return doc or {}
+    if not doc:
+        return {}
+    if "prefs_json" in doc:
+        try:
+            doc["prefs"] = json.loads(doc.pop("prefs_json"))
+        except Exception:
+            doc["prefs"] = {}
+    return doc
 
 
-async def set_owner_prefs(owner_id: int, prefs: dict) -> None:
-    """Upsert the full notif-pref doc. Caller sends the whole settings blob
-    on every change — small payload, no merge logic needed server-side."""
+async def set_owner_prefs(owner_id: int, body: dict) -> None:
+    """Upsert the full notif-pref doc. The prefs dict (which has dotted keys
+    like 'orders.new') is stored as a JSON string to avoid MongoDB dot-notation
+    issues."""
     db = _db_or_none()
     if db is None: return
+    doc = {
+        "owner_id": owner_id,
+        "master": body.get("master", True),
+        "preset": body.get("preset", "custom"),
+        "quiet": body.get("quiet", {}),
+        "prefs_json": json.dumps(body.get("prefs", {})),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
     await db.owner_prefs.update_one(
         {"owner_id": owner_id},
-        {"$set": {**prefs, "owner_id": owner_id, "updated_at": datetime.now(timezone.utc).isoformat()}},
+        {"$set": doc},
         upsert=True,
     )
+    log.info(f"[owner-prefs] saved for {owner_id}: master={doc['master']}")
 
 
 _DEFAULT_PREFS = {
@@ -539,41 +556,49 @@ _DEFAULT_PREFS = {
 
 
 async def ensure_owner_prefs(owner_id: int) -> None:
-    """Create a default prefs doc if this owner/manager has none yet."""
+    """Create a default prefs doc if none exists. Also migrates old docs that
+    stored prefs as a dict (dotted keys) to the new prefs_json format."""
     db = _db_or_none()
     if db is None or not owner_id: return
-    await db.owner_prefs.update_one(
-        {"owner_id": owner_id},
-        {"$setOnInsert": {
+    doc = await db.owner_prefs.find_one({"owner_id": owner_id})
+    if doc is None:
+        await db.owner_prefs.insert_one({
             "owner_id": owner_id,
             "master": True,
             "preset": "important",
             "quiet": {"enabled": False, "from": "22:00", "to": "08:00"},
-            "prefs": _DEFAULT_PREFS,
+            "prefs_json": json.dumps(_DEFAULT_PREFS),
             "updated_at": datetime.now(timezone.utc).isoformat(),
-        }},
-        upsert=True,
-    )
+        })
+        return
+    if "prefs_json" not in doc and isinstance(doc.get("prefs"), dict):
+        await db.owner_prefs.update_one(
+            {"owner_id": owner_id},
+            {"$set": {"prefs_json": json.dumps(doc["prefs"])}, "$unset": {"prefs": ""}},
+        )
 
 
 async def get_owners_subscribed_to(event_key: str) -> list:
-    """Return owner_ids whose prefs[event_key] is truthy AND master is on AND
-    we're not in their quiet hours.
-
-    Prefs keys contain literal dots (e.g. "orders.new") which MongoDB dot
-    notation can't query directly, so we fetch all master-on docs and filter
-    in Python. The collection has at most a handful of rows."""
+    """Return owner_ids whose prefs have event_key enabled, master is on,
+    and we're not in their quiet hours."""
     db = _db_or_none()
     if db is None: return []
     cursor = db.owner_prefs.find(
         {"$or": [{"master": {"$exists": False}}, {"master": True}]},
-        {"_id": 0, "owner_id": 1, "quiet": 1, "prefs": 1},
+        {"_id": 0, "owner_id": 1, "quiet": 1, "prefs_json": 1, "prefs": 1},
     )
     rows = await cursor.to_list(length=100)
     out = []
     now_h = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=4))).hour
     for r in rows:
-        if not (r.get("prefs") or {}).get(event_key):
+        if "prefs_json" in r:
+            try:
+                p = json.loads(r["prefs_json"])
+            except Exception:
+                p = {}
+        else:
+            p = r.get("prefs") or {}
+        if not p.get(event_key):
             continue
         q = r.get("quiet") or {}
         if q.get("enabled"):

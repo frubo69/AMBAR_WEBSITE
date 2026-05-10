@@ -367,7 +367,7 @@ async def handle_create_order(request: web.Request) -> web.Response:
 
     # Build first order banner — with referral info if applicable
     if is_first_order and uid in _TEST_ACCOUNTS:
-        first_order_banner = "<blockquote>🟢🟢🟢 <b>TEST(NOT REAL ORDER)</b> 🟢🟢🟢</blockquote>\n\n"
+        first_order_banner = "<blockquote>🟢🟢🟢 <b>ТЕСТ (НЕ НАСТОЯЩИЙ ЗАКАЗ)</b> 🟢🟢🟢</blockquote>\n\n"
     elif is_first_order and referred_by:
         try:
             referrer_doc = await db.get_user(referred_by)
@@ -743,7 +743,7 @@ async def handle_verify_request(request: web.Request) -> web.Response:
 
         # Banner title — test accounts get green TEST banner
         if uid in _TEST_ACCOUNTS:
-            bq_alert = "<blockquote>🟢🟢🟢 <b>TEST(NOT REAL ORDER)</b> 🟢🟢🟢</blockquote>"
+            bq_alert = "<blockquote>🟢🟢🟢 <b>ТЕСТ (НЕ НАСТОЯЩИЙ ЗАКАЗ)</b> 🟢🟢🟢</blockquote>"
         else:
             if order.get("referred_by"):
                 banner_title = "<b>НОВЫЙ КЛИЕНТ — РЕФЕРАЛ</b>"

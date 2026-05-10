@@ -403,7 +403,7 @@ async def order_card(o, full=True):
                     except Exception:
                         joined_str = ""
                 if int(cid) in _TEST_ACCOUNTS:
-                    bq = ["🟢🟢🟢 <b>TEST(NOT REAL ORDER)</b> 🟢🟢🟢"]
+                    bq = ["🟢🟢🟢 <b>ТЕСТ (НЕ НАСТОЯЩИЙ ЗАКАЗ)</b> 🟢🟢🟢"]
                 elif user_doc.get("referred_by"):
                     title = "<b>НОВЫЙ КЛИЕНТ — РЕФЕРАЛ</b>"
                     bq = [f"🔴🔴🔴 {title} 🔴🔴🔴"]

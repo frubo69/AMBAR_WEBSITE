@@ -160,6 +160,7 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Complaint keyword detection
     if msg.text:
         try:
+            import re as _re
             from api_server import _COMPLAINT_KEYWORDS
             from owner_routes import notify_owners
             text_lower = msg.text.lower()
@@ -167,12 +168,20 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             if matched:
                 uname = user.username or "—"
                 full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
+                highlighted = msg.text[:200]
+                for kw in matched:
+                    highlighted = _re.sub(
+                        f"({_re.escape(kw)})",
+                        r"*\1*",
+                        highlighted,
+                        flags=_re.IGNORECASE,
+                    )
                 await notify_owners("support.complaint",
                     f"⚠️ *Жалоба — ключевые слова*\n"
                     f"Клиент: {full_name} (@{uname})\n"
-                    f"Канал: Telegram бот\n"
-                    f"Триггеры: {', '.join(matched)}\n"
-                    f"_{msg.text[:150]}_")
+                    f"Канал: Telegram бот\n\n"
+                    f"「{highlighted}」",
+                    parse_mode="Markdown")
         except Exception as e:
             print(f"⚠️ Complaint detection failed: {e}")
 

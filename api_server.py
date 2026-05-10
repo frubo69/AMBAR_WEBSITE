@@ -997,12 +997,22 @@ async def handle_support_send(request: web.Request) -> web.Response:
         text_lower = text.lower()
         matched = [kw for kw in _COMPLAINT_KEYWORDS if kw in text_lower]
         if matched:
+            # Highlight trigger words in the message with bold
+            highlighted = text[:200]
+            for kw in matched:
+                import re as _re
+                highlighted = _re.sub(
+                    f"({_re.escape(kw)})",
+                    r"*\1*",
+                    highlighted,
+                    flags=_re.IGNORECASE,
+                )
             await notify_owners("support.complaint",
                 f"⚠️ *Жалоба — ключевые слова*\n"
                 f"Клиент: {user_name} (@{username})\n"
-                f"Контекст: {ctx_lbl}\n"
-                f"Триггеры: {', '.join(matched)}\n"
-                f"_{text[:150]}_")
+                f"Контекст: {ctx_lbl}\n\n"
+                f"「{highlighted}」",
+                parse_mode="Markdown")
     except Exception as e:
         log.error(f"[owner-notif] support.new failed: {e}")
 

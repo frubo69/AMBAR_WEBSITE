@@ -585,37 +585,13 @@ async def notify_owners(event_key: str, text: str, parse_mode: str = "Markdown")
 
     if not OWNER_BOT_TOKEN:
         return
-
-    # --- build the full recipient set ---
-    # 1. Explicit subscribers (have prefs doc, master on, event enabled)
     try:
-        subscribed = set(await db.get_owners_subscribed_to(event_key))
+        owner_ids = await db.get_owners_subscribed_to(event_key)
     except Exception as e:
         log.error(f"[owner-notif] subscriber lookup failed for {event_key}: {e}")
-        subscribed = set()
-
-    # 2. All owner/manager IDs (config + DB)
-    all_ids = set(OWNER_IDS) | set(MANAGER_IDS)
-    try:
-        db_mgrs = await db.get_managers()
-        all_ids |= {m["telegram_id"] for m in db_mgrs if not m.get("blocked")}
-    except Exception:
-        pass
-
-    # 3. Who already has a prefs doc? They made an explicit choice.
-    try:
-        configured = set(await db.get_configured_owner_ids())
-    except Exception:
-        configured = set()
-
-    # Unconfigured owners/managers default to receiving everything.
-    unconfigured = all_ids - configured
-    send_to = subscribed | unconfigured
-
-    log.info(f"[owner-notif] {event_key} → {len(send_to)} recipients "
-             f"(subscribed={len(subscribed)}, unconfigured={len(unconfigured)})")
-
-    for oid in send_to:
+        return
+    log.info(f"[owner-notif] {event_key} → {owner_ids}")
+    for oid in owner_ids:
         try:
             await tg_send(OWNER_BOT_TOKEN, oid, text, parse_mode=parse_mode)
         except Exception as e:

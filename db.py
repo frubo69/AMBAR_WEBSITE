@@ -520,6 +520,42 @@ async def set_owner_prefs(owner_id: int, prefs: dict) -> None:
     )
 
 
+_DEFAULT_PREFS = {
+    "orders.new": True, "orders.new500": False, "orders.new1000": True,
+    "orders.delivered": False, "orders.cancelled": True, "orders.declined": True,
+    "timing.late45": True, "timing.notAccepted5": True, "timing.enroute30": False,
+    "reviews.bad3": True, "reviews.good5": False, "reviews.comment": True, "reviews.any": False,
+    "digest.morning": True, "digest.evening": True, "digest.weekly": False, "digest.monthly": False,
+    "stock.low": True, "stock.out": True,
+    "customers.new": False, "customers.verify": True, "customers.vip": False,
+    "customers.vipReturn": False, "customers.vipChurn": False,
+    "ops.officeEmpty": True,
+    "finance.revenueLow": True, "finance.avgDrop": True,
+    "finance.cancelSpike": True, "finance.record": False, "finance.tipHigh": False,
+    "support.new": False, "support.noreply": True, "support.complaint": True, "support.escalation": False,
+    "system.botDown": True, "system.apiErrors": True, "system.dbDown": True, "system.deploy": False,
+    "delivery.browser": True,
+}
+
+
+async def ensure_owner_prefs(owner_id: int) -> None:
+    """Create a default prefs doc if this owner/manager has none yet."""
+    db = _db_or_none()
+    if db is None or not owner_id: return
+    await db.owner_prefs.update_one(
+        {"owner_id": owner_id},
+        {"$setOnInsert": {
+            "owner_id": owner_id,
+            "master": True,
+            "preset": "important",
+            "quiet": {"enabled": False, "from": "22:00", "to": "08:00"},
+            "prefs": _DEFAULT_PREFS,
+            "updated_at": datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True,
+    )
+
+
 async def get_owners_subscribed_to(event_key: str) -> list:
     """Return owner_ids whose prefs[event_key] is truthy AND master is on AND
     we're not in their quiet hours.

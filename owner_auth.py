@@ -112,6 +112,7 @@ def require_owner(handler):
             request["owner_id"]   = uid
             request["owner_user"] = user
             request["is_owner"]   = uid in OWNER_IDS
+            await db.ensure_owner_prefs(uid)
             return await handler(request)
 
         # Unknown user: log the attempt and alert owners (throttled).

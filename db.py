@@ -44,6 +44,20 @@ async def connect():
         await _db.owner_access_log.create_index([("status", 1), ("last_attempt_at", -1)])
         await _db.owner_notifications.create_index([("created_at", -1)])
         await _db.owner_notifications.create_index("event_key")
+        # Clean up duplicate owner_prefs docs before adding unique index.
+        try:
+            pipeline = [{"$group": {"_id": "$owner_id", "count": {"$sum": 1}, "ids": {"$push": "$_id"}}},
+                        {"$match": {"count": {"$gt": 1}}}]
+            async for group in _db.owner_prefs.aggregate(pipeline):
+                keep = group["ids"][-1]
+                await _db.owner_prefs.delete_many({"_id": {"$in": [i for i in group["ids"] if i != keep]}})
+                log.info(f"[owner-prefs] cleaned {group['count']-1} dupes for owner_id={group['_id']}")
+        except Exception as e:
+            log.warning(f"[owner-prefs] dupe cleanup: {e}")
+        try:
+            await _db.owner_prefs.create_index("owner_id", unique=True)
+        except Exception:
+            pass
         log.info("✅ MongoDB connected — db: ambar")
     except Exception as e:
         log.error(f"MongoDB index error: {e}")
@@ -556,24 +570,39 @@ _DEFAULT_PREFS = {
 
 
 async def ensure_owner_prefs(owner_id: int) -> None:
-    """Create a default prefs doc if none exists. Also migrates old docs that
-    stored prefs as a dict (dotted keys) to the new prefs_json format."""
+    """Atomic: create a default prefs doc only if none exists.
+    Also cleans up duplicate docs and migrates old prefs→prefs_json."""
     db = _db_or_none()
     if db is None or not owner_id: return
-    doc = await db.owner_prefs.find_one({"owner_id": owner_id})
-    if doc is None:
-        await db.owner_prefs.insert_one({
+
+    # 1. Delete ALL duplicate docs for this owner, keeping only the newest.
+    cursor = db.owner_prefs.find({"owner_id": owner_id}, {"_id": 1, "updated_at": 1})
+    docs = await cursor.to_list(length=50)
+    if len(docs) > 1:
+        docs.sort(key=lambda d: d.get("updated_at", ""), reverse=True)
+        dup_ids = [d["_id"] for d in docs[1:]]
+        await db.owner_prefs.delete_many({"_id": {"$in": dup_ids}})
+        log.info(f"[owner-prefs] cleaned {len(dup_ids)} duplicate docs for {owner_id}")
+
+    # 2. Atomic upsert: insert defaults only if no doc exists.
+    await db.owner_prefs.update_one(
+        {"owner_id": owner_id},
+        {"$setOnInsert": {
             "owner_id": owner_id,
             "master": True,
             "preset": "important",
             "quiet": {"enabled": False, "from": "22:00", "to": "08:00"},
             "prefs_json": json.dumps(_DEFAULT_PREFS),
             "updated_at": datetime.now(timezone.utc).isoformat(),
-        })
-        return
-    if "prefs_json" not in doc and isinstance(doc.get("prefs"), dict):
+        }},
+        upsert=True,
+    )
+
+    # 3. Migrate old format (prefs dict → prefs_json string).
+    doc = await db.owner_prefs.find_one({"owner_id": owner_id})
+    if doc and "prefs_json" not in doc and isinstance(doc.get("prefs"), dict):
         await db.owner_prefs.update_one(
-            {"owner_id": owner_id},
+            {"_id": doc["_id"]},
             {"$set": {"prefs_json": json.dumps(doc["prefs"])}, "$unset": {"prefs": ""}},
         )
 
@@ -585,9 +614,21 @@ async def get_owners_subscribed_to(event_key: str) -> list:
     if db is None: return []
     cursor = db.owner_prefs.find(
         {"$or": [{"master": {"$exists": False}}, {"master": True}]},
-        {"_id": 0, "owner_id": 1, "quiet": 1, "prefs_json": 1, "prefs": 1},
+        {"_id": 0, "owner_id": 1, "quiet": 1, "prefs_json": 1, "prefs": 1, "updated_at": 1},
     )
-    rows = await cursor.to_list(length=100)
+    rows = await cursor.to_list(length=200)
+
+    # Deduplicate: if multiple docs exist for one owner_id, use the newest.
+    best = {}
+    for r in rows:
+        oid = r.get("owner_id")
+        if oid is None:
+            continue
+        prev = best.get(oid)
+        if prev is None or (r.get("updated_at", "") > prev.get("updated_at", "")):
+            best[oid] = r
+    rows = list(best.values())
+
     out = []
     now_h = datetime.now(timezone.utc).astimezone(timezone(timedelta(hours=4))).hour
     for r in rows:

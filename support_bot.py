@@ -172,7 +172,7 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                 for kw in matched:
                     highlighted = _re.sub(
                         f"({_re.escape(kw)})",
-                        r"*\1*",
+                        r"⟨ *\1* ⟩",
                         highlighted,
                         flags=_re.IGNORECASE,
                     )
@@ -180,7 +180,7 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                     f"⚠️ *Жалоба — ключевые слова*\n"
                     f"Клиент: {full_name} (@{uname})\n"
                     f"Канал: Telegram бот\n\n"
-                    f"「{highlighted}」",
+                    f"\"{highlighted}\"",
                     parse_mode="Markdown")
         except Exception as e:
             print(f"⚠️ Complaint detection failed: {e}")

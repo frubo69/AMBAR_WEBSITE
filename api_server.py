@@ -993,15 +993,17 @@ async def handle_support_send(request: web.Request) -> web.Response:
             f"Клиент: {user_name} (@{username})\n"
             f"Контекст: {ctx_lbl}\n"
             f"_{text[:100]}_")
-        # Complaint keyword detection
+        # Complaint keyword detection (word-boundary at start to avoid
+        # matching inside other words, e.g. "не доставил" inside "мне доставили")
+        import re as _re
         text_lower = text.lower()
-        matched = [kw for kw in _COMPLAINT_KEYWORDS if kw in text_lower]
+        matched = [kw for kw in _COMPLAINT_KEYWORDS
+                   if _re.search(r'\b' + _re.escape(kw), text_lower)]
         if matched:
-            import re as _re
             highlighted = text[:200]
             for kw in matched:
                 highlighted = _re.sub(
-                    f"({_re.escape(kw)})",
+                    r'\b(' + _re.escape(kw) + r')',
                     r"⟨ *\1* ⟩",
                     highlighted,
                     flags=_re.IGNORECASE,

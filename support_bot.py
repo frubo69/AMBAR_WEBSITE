@@ -164,14 +164,15 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             from api_server import _COMPLAINT_KEYWORDS
             from owner_routes import notify_owners
             text_lower = msg.text.lower()
-            matched = [kw for kw in _COMPLAINT_KEYWORDS if kw in text_lower]
+            matched = [kw for kw in _COMPLAINT_KEYWORDS
+                       if _re.search(r'\b' + _re.escape(kw), text_lower)]
             if matched:
                 uname = user.username or "—"
                 full_name = f"{user.first_name or ''} {user.last_name or ''}".strip()
                 highlighted = msg.text[:200]
                 for kw in matched:
                     highlighted = _re.sub(
-                        f"({_re.escape(kw)})",
+                        r'\b(' + _re.escape(kw) + r')',
                         r"⟨ *\1* ⟩",
                         highlighted,
                         flags=_re.IGNORECASE,

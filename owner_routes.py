@@ -631,6 +631,7 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
             pass
 
     if not OWNER_BOT_TOKEN:
+        log.warning("[owner-notif] OWNER_BOT_TOKEN empty — skipping new-order notify")
         return
 
     # Build per-user: pick the highest tier they're subscribed to.
@@ -638,11 +639,15 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
     for event_key, _ in tiers:
         try:
             ids = await db.get_owners_subscribed_to(event_key)
-        except Exception:
+            log.info(f"[owner-notif] {event_key} subscribers: {ids}")
+        except Exception as e:
+            log.error(f"[owner-notif] subscriber lookup {event_key} failed: {e}")
             ids = []
         for uid_sub in ids:
             if uid_sub not in all_subs:
                 all_subs[uid_sub] = event_key
+
+    log.info(f"[owner-notif] new-order #{oid} total={total} → {len(all_subs)} recipients: {all_subs}")
 
     # Send one message per user.
     tier_text = {ek: txt for ek, txt in tiers}

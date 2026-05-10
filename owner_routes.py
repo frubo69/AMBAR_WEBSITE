@@ -577,25 +577,32 @@ async def handle_notif_test(request):
 
 # Public helper used by api_server (and operator_bot in future) to push an
 # event to all owners subscribed to it. Best-effort; logs failures.
-async def notify_owners(event_key: str, text: str, parse_mode: str = "Markdown") -> None:
+async def notify_owners(event_key: str, text: str, parse_mode: str = "Markdown") -> list:
+    """Send notification to subscribed owners/managers. Returns list of
+    {"chat_id": int, "message_id": int} for each successfully sent message
+    so callers can delete them later if needed."""
     try:
         await db.insert_notification(event_key, text)
     except Exception as e:
         log.error(f"[owner-notif] persist failed for {event_key}: {e}")
 
+    sent = []
     if not OWNER_BOT_TOKEN:
-        return
+        return sent
     try:
         owner_ids = await db.get_owners_subscribed_to(event_key)
     except Exception as e:
         log.error(f"[owner-notif] subscriber lookup failed for {event_key}: {e}")
-        return
+        return sent
     log.info(f"[owner-notif] {event_key} → {owner_ids}")
     for oid in owner_ids:
         try:
-            await tg_send(OWNER_BOT_TOKEN, oid, text, parse_mode=parse_mode)
+            result = await tg_send(OWNER_BOT_TOKEN, oid, text, parse_mode=parse_mode)
+            if result and result.get("ok"):
+                sent.append({"chat_id": oid, "message_id": result["result"]["message_id"]})
         except Exception as e:
             log.error(f"[owner-notif] send {event_key} → {oid} failed: {e}")
+    return sent
 
 
 @require_owner

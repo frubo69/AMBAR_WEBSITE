@@ -1407,6 +1407,16 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await q.edit_message_text(
                 (await order_card(order)) + "\n\n✅ <b>Доставлен</b>",
                 parse_mode="HTML", reply_markup=await kb_order_actions(order, list_type=lt))
+            try:
+                from owner_routes import notify_owners
+                sent = await notify_owners("orders.delivered",
+                    f"✅ *Заказ доставлен #{oid}*\n"
+                    f"Клиент: {order.get('customer_name','—')}\n"
+                    f"Сумма: {order.get('total',0)} AED")
+                if sent:
+                    await db.update_order(oid, _delivered_notif_msgs=sent)
+            except Exception as e:
+                log.error(f"[owner-notif] orders.delivered failed: {e}")
 
     # ── UNDO DELIVERED → back to approved ────────────────────────────────────
     elif data.startswith("undone_"):
@@ -1415,7 +1425,15 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if order and order.get("status") == "delivered":
             total = order.get("total", 0)
             await db._increment_user(cid, orders_done=-1, total_spent=-total)
-            await db.update_order(oid, status="approved", updated_at=datetime.now().isoformat())
+            # Delete the "delivered" notification messages from @ambar_manage_bot
+            try:
+                from api_server import tg_delete
+                from owner_routes import OWNER_BOT_TOKEN
+                for m in order.get("_delivered_notif_msgs", []):
+                    await tg_delete(OWNER_BOT_TOKEN, m["chat_id"], m["message_id"])
+            except Exception as e:
+                log.error(f"[owner-notif] delete delivered msgs failed: {e}")
+            await db.update_order(oid, status="approved", _delivered_notif_msgs=[], updated_at=datetime.now().isoformat())
             await update_customer_card(oid)
         order = await db.get_order(oid)
         if order:

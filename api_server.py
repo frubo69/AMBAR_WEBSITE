@@ -913,6 +913,24 @@ _COMPLAINT_KEYWORDS = [
     "rude", "disrespectful", "unprofessional", "attitude",
     "scam", "fraud", "liar", "lying",
     "ignored", "no response", "no reply", "never called back",
+    # ═══ SWEAR WORDS / AGGRESSIVE LANGUAGE ═══
+    # Russian
+    "блять", "блядь", "бляд", "сука", "сучк", "пизд", "пиздец",
+    "хуй", "хуё", "хуе", "нахуй", "нахуя", "охуе",
+    "ебан", "ебат", "ёбан", "заеб", "уёб", "уеб", "ёб твою",
+    "мудак", "мудач", "дебил", "идиот", "кретин", "долбоёб", "долбоеб",
+    "пошёл нах", "пошел нах", "иди нах",
+    "говно", "дерьмо", "срань", "засранц",
+    "урод", "тварь", "скотин", "падл",
+    # English
+    "fuck", "fucked", "fucking", "wtf",
+    "shit", "shitty", "bullshit",
+    "ass", "asshole",
+    "bitch", "bastard",
+    "crap", "crappy",
+    "damn", "dammit",
+    "piss", "pissed",
+    "idiot", "moron", "stupid",
 ]
 
 # ── POST /api/support/send ────────────────────────────────────────────────────

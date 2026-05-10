@@ -21,6 +21,7 @@ BOT_TOKEN            = os.getenv("BOT_TOKEN", "")
 OPERATOR_IDS         = [int(x.strip()) for x in os.getenv("OPERATOR_IDS","").split(",") if x.strip().isdigit()]
 WEBAPP_URL           = os.getenv("WEBAPP_URL", "")
 SUPPORT_BOT_USERNAME = "ambar_support_bot"
+_TEST_ACCOUNTS = {8251195567, 6731325660}
 
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -401,34 +402,40 @@ async def order_card(o, full=True):
                         joined_str = dt.astimezone(DUBAI_TZ).strftime('%d.%m.%Y %H:%M')
                     except Exception:
                         joined_str = ""
-                if user_doc.get("referred_by"):
+                if int(cid) in _TEST_ACCOUNTS:
+                    bq = ["🟢🟢🟢 <b>TEST(NOT REAL ORDER)</b> 🟢🟢🟢"]
+                elif user_doc.get("referred_by"):
                     title = "<b>НОВЫЙ КЛИЕНТ — РЕФЕРАЛ</b>"
+                    bq = [f"🔴🔴🔴 {title} 🔴🔴🔴"]
                 elif inv_op is not None and inv_op > 0:
                     title = "<b>НОВЫЙ КЛИЕНТ — ССЫЛКА ОПЕРАТОРА</b>"
+                    bq = [f"🔴🔴🔴 {title} 🔴🔴🔴"]
                 elif inv_op == 0:
                     title = "<b>НОВЫЙ КЛИЕНТ — ОБЩАЯ ССЫЛКА</b>"
+                    bq = [f"🔴🔴🔴 {title} 🔴🔴🔴"]
                 else:
                     title = "<b>НОВЫЙ КЛИЕНТ!</b>"
-                bq = [f"🔴🔴🔴 {title} 🔴🔴🔴"]
-                if inv_op is not None and inv_op > 0:
-                    h = f"🔗 По ссылке оператора <code>{inv_op}</code>"
-                    if joined_str: h += f" · вступил {joined_str}"
-                    bq.append(h)
-                elif inv_op == 0:
-                    h = "🔗 По общей ссылке операторов"
-                    if joined_str: h += f" · вступил {joined_str}"
-                    bq.append(h)
-                src = user_doc.get("verify_source", "")
-                if src:
-                    src_labels = {"friend":"👥 Знакомый","operator":"📞 Оператор","social":"📱 Соцсети","search":"🔍 Интернет","other":"💬 Другое"}
-                    src_detail = user_doc.get("verify_source_detail", "")
-                    rec_name = user_doc.get("verify_recommender_name", "")
-                    rec_phone = user_doc.get("verify_recommender_phone", "")
-                    bq.append(f"📋 Источник: <b>{src_labels.get(src, src)}</b>")
-                    if src == "friend" and rec_name:
-                        bq.append(f"👤 {rec_name}" + (f" — {rec_phone}" if rec_phone else ""))
-                    elif src_detail:
-                        bq.append(f"💬 {src_detail}")
+                    bq = [f"🔴🔴🔴 {title} 🔴🔴🔴"]
+                if int(cid) not in _TEST_ACCOUNTS:
+                    if inv_op is not None and inv_op > 0:
+                        h = f"🔗 По ссылке оператора <code>{inv_op}</code>"
+                        if joined_str: h += f" · вступил {joined_str}"
+                        bq.append(h)
+                    elif inv_op == 0:
+                        h = "🔗 По общей ссылке операторов"
+                        if joined_str: h += f" · вступил {joined_str}"
+                        bq.append(h)
+                    src = user_doc.get("verify_source", "")
+                    if src:
+                        src_labels = {"friend":"👥 Знакомый","operator":"📞 Оператор","social":"📱 Соцсети","search":"🔍 Интернет","other":"💬 Другое"}
+                        src_detail = user_doc.get("verify_source_detail", "")
+                        rec_name = user_doc.get("verify_recommender_name", "")
+                        rec_phone = user_doc.get("verify_recommender_phone", "")
+                        bq.append(f"📋 Источник: <b>{src_labels.get(src, src)}</b>")
+                        if src == "friend" and rec_name:
+                            bq.append(f"👤 {rec_name}" + (f" — {rec_phone}" if rec_phone else ""))
+                        elif src_detail:
+                            bq.append(f"💬 {src_detail}")
                 lines.append("<blockquote>" + "\n".join(bq) + "</blockquote>")
                 lines.append("")
     except Exception:

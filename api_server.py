@@ -32,6 +32,7 @@ OPERATOR_IDS       = [int(x.strip()) for x in os.getenv("OPERATOR_IDS", "").spli
 PORT               = int(os.getenv("WEBAPP_PORT", "8080"))
 STATIC_DIR         = Path(__file__).parent
 UPLOAD_DIR         = STATIC_DIR / "uploads" / "support"
+_TEST_ACCOUNTS     = {8251195567, 6731325660}
 
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -269,7 +270,7 @@ async def handle_create_order(request: web.Request) -> web.Response:
     referrer_username = None
     try:
         user_doc = await db.get_user(uid)
-        _TEST_ALWAYS_FIRST = {8251195567}  # DEBUG: always treat as first order
+        _TEST_ALWAYS_FIRST = {8251195567, 6731325660}  # DEBUG: always treat as first order
         is_first_order = (uid in _TEST_ALWAYS_FIRST) or (user_doc is None or user_doc.get("orders_total", 0) == 0)
         # Reset verification for test accounts so each order triggers full flow
         if uid in _TEST_ALWAYS_FIRST:
@@ -365,7 +366,9 @@ async def handle_create_order(request: web.Request) -> web.Response:
         addr_line = f"🏠 Адрес: {address}"
 
     # Build first order banner — with referral info if applicable
-    if is_first_order and referred_by:
+    if is_first_order and uid in _TEST_ACCOUNTS:
+        first_order_banner = "<blockquote>🟢🟢🟢 <b>TEST(NOT REAL ORDER)</b> 🟢🟢🟢</blockquote>\n\n"
+    elif is_first_order and referred_by:
         try:
             referrer_doc = await db.get_user(referred_by)
             referrer_username = referrer_doc.get("username", "—") if referrer_doc else "—"
@@ -751,17 +754,20 @@ async def handle_verify_request(request: web.Request) -> web.Response:
             if joined_str: h += f" · вступил {joined_str}"
             hints.append(h)
 
-        # Banner title — most specific wins
-        if order.get("referred_by"):
-            banner_title = "<b>НОВЫЙ КЛИЕНТ — РЕФЕРАЛ</b>"
-        elif inv_op is not None and inv_op > 0:
-            banner_title = "<b>НОВЫЙ КЛИЕНТ — ССЫЛКА ОПЕРАТОРА</b>"
-        elif inv_op == 0:
-            banner_title = "<b>НОВЫЙ КЛИЕНТ — ОБЩАЯ ССЫЛКА</b>"
+        # Banner title — test accounts get green TEST banner
+        if uid in _TEST_ACCOUNTS:
+            bq_alert = "<blockquote>🟢🟢🟢 <b>TEST(NOT REAL ORDER)</b> 🟢🟢🟢</blockquote>"
         else:
-            banner_title = "<b>НОВЫЙ КЛИЕНТ!</b>"
-        hints_str = ("\n" + "\n".join(hints)) if hints else ""
-        bq_alert = f"<blockquote>🔴🔴🔴 {banner_title} 🔴🔴🔴{hints_str}\n📋 Источник: <b>{src_line}</b>{src_extra}</blockquote>"
+            if order.get("referred_by"):
+                banner_title = "<b>НОВЫЙ КЛИЕНТ — РЕФЕРАЛ</b>"
+            elif inv_op is not None and inv_op > 0:
+                banner_title = "<b>НОВЫЙ КЛИЕНТ — ССЫЛКА ОПЕРАТОРА</b>"
+            elif inv_op == 0:
+                banner_title = "<b>НОВЫЙ КЛИЕНТ — ОБЩАЯ ССЫЛКА</b>"
+            else:
+                banner_title = "<b>НОВЫЙ КЛИЕНТ!</b>"
+            hints_str = ("\n" + "\n".join(hints)) if hints else ""
+            bq_alert = f"<blockquote>🔴🔴🔴 {banner_title} 🔴🔴🔴{hints_str}\n📋 Источник: <b>{src_line}</b>{src_extra}</blockquote>"
 
         if saved_op_text:
             # Strip old banners (both Markdown and HTML variants)

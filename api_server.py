@@ -441,28 +441,11 @@ async def handle_create_order(request: web.Request) -> web.Response:
 
     log.info(f"[order] #{oid} user={uid} items={len(items)} total={total} AED")
 
-    # Owner notifications via @ambar_manage_bot — fan out to every event the
-    # order matches (new, ≥500, ≥1000). owner_routes.notify_owners filters by
-    # subscriber prefs + master toggle + quiet hours.
+    # Owner notifications — one message per user, highest matching tier only.
     try:
-        from owner_routes import notify_owners
-        owner_text = (
-            f"🆕 *Новый заказ #{oid}*\n"
-            f"Сумма: *{total} AED*\n"
-            f"Клиент: {user_name} ({phone})\n"
-            f"Адрес: {address}\n"
-            f"Офис: {office_nm or office_id}"
-        )
-        await notify_owners("orders.new", owner_text)
-        if total >= 1000:
-            await notify_owners("orders.new1000", "💎 *Очень крупный заказ!*\n\n" + owner_text)
-        elif total >= 500:
-            await notify_owners("orders.new500", "💰 *Крупный заказ*\n\n" + owner_text)
-        if uid == _FOUNDER_ID or uid in _PREMIUM_IDS or uid in _WORLDWIDE_IDS:
-            tier = "FOUNDER" if uid == _FOUNDER_ID else ("ÉLITE" if uid in _PREMIUM_IDS else "PREMIUM")
-            await notify_owners("customers.vip",
-                f"💎 *VIP-клиент сделал заказ*\n"
-                f"Карта: {tier}\n" + owner_text)
+        from owner_routes import notify_new_order
+        await notify_new_order(oid, total, user_name, phone, address, office_nm or office_id,
+                               uid, _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS)
     except Exception as e:
         log.error(f"[owner-notif] orders.new failed: {e}")
 

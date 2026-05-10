@@ -605,6 +605,61 @@ async def notify_owners(event_key: str, text: str, parse_mode: str = "Markdown")
     return sent
 
 
+async def notify_new_order(oid, total, user_name, phone, address, office,
+                           uid, founder_id, premium_ids, worldwide_ids):
+    """Send exactly one new-order message per user at their highest matching tier.
+    Tiers (highest first): orders.new1000 → orders.new500 → orders.new.
+    VIP notification is independent (separate event key, never duplicates)."""
+    base = (f"Сумма: *{total} AED*\n"
+            f"Клиент: {user_name} ({phone})\n"
+            f"Адрес: {address}\n"
+            f"Офис: {office}")
+
+    tiers = []
+    if total >= 1000:
+        tiers.append(("orders.new1000", f"💎 *Очень крупный заказ #{oid}!*\n\n{base}"))
+        tiers.append(("orders.new500",  f"💰 *Крупный заказ #{oid}*\n\n{base}"))
+    elif total >= 500:
+        tiers.append(("orders.new500",  f"💰 *Крупный заказ #{oid}*\n\n{base}"))
+    tiers.append(("orders.new", f"🆕 *Новый заказ #{oid}*\n{base}"))
+
+    # Persist all matching events for the dashboard alerts.
+    for event_key, text in tiers:
+        try:
+            await db.insert_notification(event_key, text)
+        except Exception:
+            pass
+
+    if not OWNER_BOT_TOKEN:
+        return
+
+    # Build per-user: pick the highest tier they're subscribed to.
+    all_subs = {}
+    for event_key, _ in tiers:
+        try:
+            ids = await db.get_owners_subscribed_to(event_key)
+        except Exception:
+            ids = []
+        for uid_sub in ids:
+            if uid_sub not in all_subs:
+                all_subs[uid_sub] = event_key
+
+    # Send one message per user.
+    tier_text = {ek: txt for ek, txt in tiers}
+    for uid_sub, event_key in all_subs.items():
+        try:
+            await tg_send(OWNER_BOT_TOKEN, uid_sub, tier_text[event_key], parse_mode="Markdown")
+        except Exception as e:
+            log.error(f"[owner-notif] new-order {event_key} → {uid_sub} failed: {e}")
+
+    # VIP is independent — not an order-tier, never duplicates with the above.
+    if uid == founder_id or uid in premium_ids or uid in worldwide_ids:
+        tier = "FOUNDER" if uid == founder_id else ("ÉLITE" if uid in premium_ids else "PREMIUM")
+        await notify_owners("customers.vip",
+            f"💎 *VIP-клиент сделал заказ*\n"
+            f"Карта: {tier}\n{base}")
+
+
 @require_owner
 async def handle_customer_ban(request):
     """Ban or unban a customer. POST body: {"reason": "..."} for ban (optional)."""

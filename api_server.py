@@ -458,8 +458,26 @@ async def handle_create_order(request: web.Request) -> web.Response:
             await notify_owners("orders.new1000", "💎 *Очень крупный заказ!*\n\n" + owner_text)
         elif total >= 500:
             await notify_owners("orders.new500", "💰 *Крупный заказ*\n\n" + owner_text)
+        if uid == _FOUNDER_ID or uid in _PREMIUM_IDS or uid in _WORLDWIDE_IDS:
+            tier = "FOUNDER" if uid == _FOUNDER_ID else ("ÉLITE" if uid in _PREMIUM_IDS else "PREMIUM")
+            await notify_owners("customers.vip",
+                f"💎 *VIP-клиент сделал заказ*\n"
+                f"Карта: {tier}\n" + owner_text)
     except Exception as e:
         log.error(f"[owner-notif] orders.new failed: {e}")
+
+    if is_first_order:
+        try:
+            from owner_routes import notify_owners
+            await notify_owners(
+                "customers.new",
+                f"👤 *Новый клиент · первый заказ*\n"
+                f"Имя: {user_name}\n"
+                f"@{username or '—'}\n"
+                f"Заказ #{oid} · {total} AED"
+            )
+        except Exception as e:
+            log.error(f"[owner-notif] customers.new failed: {e}")
 
     return web.json_response({"ok": True, "order_id": oid, "needs_verification": _needs_verification}, headers=CORS_HEADERS)
 
@@ -941,6 +959,18 @@ async def handle_support_send(request: web.Request) -> web.Response:
             log.error(f"Support forward {op_id}: {e}")
 
     log.info(f"[support] user={uid} order={order_id}")
+
+    try:
+        from owner_routes import notify_owners
+        ctx_lbl = f"заказ #{order_id}" if order_id and order_id != "general" else "общий вопрос"
+        await notify_owners("support.new",
+            f"💬 *Новое обращение в поддержку*\n"
+            f"Клиент: {user_name} (@{username})\n"
+            f"Контекст: {ctx_lbl}\n"
+            f"_{text[:100]}_")
+    except Exception as e:
+        log.error(f"[owner-notif] support.new failed: {e}")
+
     return web.json_response({"ok": True, "ts": server_ts}, headers=CORS_HEADERS)
 
 

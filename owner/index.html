@@ -3532,18 +3532,22 @@ function _buildAlerts(){
     const sevMap = {
       'orders.cancelled':'warn','orders.declined':'dn','orders.delivered':'info',
       'orders.new':'info','orders.new500':'info','orders.new1000':'info',
-      'timing.late45':'dn','timing.notAccepted5':'warn',
+      'timing.late45':'dn','timing.notAccepted5':'warn','timing.enroute30':'warn',
       'reviews.bad3':'dn','reviews.good5':'info','reviews.comment':'info','reviews.any':'info',
       'stock.out':'warn','stock.low':'info',
       'customers.new':'info','customers.verify':'warn','customers.vip':'info',
+      'support.new':'warn','support.escalation':'dn','support.unresolved':'warn',
+      'operations.shiftStart':'info','operations.shiftEnd':'info',
     };
     const icoMap = {
       'orders.new':'🆕','orders.new500':'💰','orders.new1000':'💎',
       'orders.cancelled':'🚫','orders.declined':'❌','orders.delivered':'✅',
-      'timing.late45':'🕐','timing.notAccepted5':'⏱',
+      'timing.late45':'🕐','timing.notAccepted5':'⏱','timing.enroute30':'🚗',
       'reviews.bad3':'⚠','reviews.good5':'⭐','reviews.comment':'💬','reviews.any':'📝',
       'stock.out':'📦','stock.low':'💤',
       'customers.new':'👤','customers.verify':'📝','customers.vip':'💎',
+      'support.new':'💬','support.escalation':'🚨','support.unresolved':'📩',
+      'operations.shiftStart':'🟢','operations.shiftEnd':'🔴',
     };
     (window._serverNotifs||[]).forEach(n=>{
       const id = 'srv:'+n.event_key+':'+n.created_at;

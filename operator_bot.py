@@ -1368,6 +1368,14 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             await q.edit_message_text(
                 (await order_card(order)) + "\n\n❌ <b>Отклонён</b>",
                 parse_mode="HTML", reply_markup=_done_kb)
+            try:
+                from owner_routes import notify_owners
+                await notify_owners("orders.declined",
+                    f"❌ *Заказ отклонён #{oid}*\n"
+                    f"Клиент: {order.get('customer_name','—')}\n"
+                    f"Сумма: {order.get('total',0)} AED")
+            except Exception as e:
+                log.error(f"[owner-notif] orders.declined failed: {e}")
 
     # ── OPERATOR CANCEL (approved → cancelled) ─────────────────────────────
     elif data.startswith("opcancel_"):

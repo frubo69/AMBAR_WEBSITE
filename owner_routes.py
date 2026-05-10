@@ -1102,9 +1102,41 @@ async def _backfill_delivery_times():
         log.info(f"[owner] backfilled updated_at on {patched} delivered orders")
 
 
+async def _monitor_pending_orders():
+    """Background loop: fire timing.notAccepted5 for orders pending > 5 min."""
+    _alerted = set()
+    while True:
+        await asyncio.sleep(60)
+        try:
+            all_orders = await db.get_all_orders()
+            now = datetime.now(timezone.utc)
+            for oid, o in all_orders.items():
+                if o.get("status") != "pending" or oid in _alerted:
+                    continue
+                ts = o.get("timestamp")
+                if not ts:
+                    continue
+                try:
+                    placed = datetime.fromisoformat(ts).replace(tzinfo=timezone.utc)
+                except (ValueError, TypeError):
+                    continue
+                wait_min = (now - placed).total_seconds() / 60
+                if wait_min >= 5:
+                    _alerted.add(oid)
+                    await notify_owners("timing.notAccepted5",
+                        f"⏱ *Заказ не принят {int(wait_min)} мин*\n"
+                        f"Заказ #{oid}\n"
+                        f"Клиент: {o.get('customer_name','—')}\n"
+                        f"Сумма: {o.get('total',0)} AED")
+            _alerted -= {oid for oid in _alerted if all_orders.get(oid, {}).get("status") != "pending"}
+        except Exception as e:
+            log.error(f"[monitor] pending check failed: {e}")
+
+
 def setup(app):
     """Wire owner routes into the aiohttp app. Called from api_server.main()."""
     app.on_startup.append(lambda _: _backfill_delivery_times())
+    app.on_startup.append(lambda _: asyncio.ensure_future(_monitor_pending_orders()))
     app.router.add_route("OPTIONS", "/api/owner/ping",    handle_ping)
     app.router.add_get(             "/api/owner/ping",    handle_ping)
     app.router.add_route("OPTIONS", "/api/owner/finance", handle_finance)

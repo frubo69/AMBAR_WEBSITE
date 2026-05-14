@@ -5726,15 +5726,12 @@ function backDetail(){
 
   document.addEventListener('pointerup', e=>{
     if(!_ptrTarget) return;
-    // Tolerate ~12px finger drift before treating it as a scroll
     const dx = Math.abs(e.clientX - _ptrStartX);
     const dy = Math.abs(e.clientY - _ptrStartY);
-    if(dx > 12 || dy > 12) { _ptrTarget = null; return; }
-    // The pointerup target might be a child or even outside the original
-    // card if the finger drifted slightly. Use the saved start target.
+    if(dx > 20 || dy > 20) { _ptrTarget = null; return; }
     const el = _ptrTarget;
     _ptrTarget = null;
-    if(isExcluded(e.target)) return;
+    if(el.contains(e.target) && isExcluded(e.target)) return;
     e.preventDefault();
     openDetail(el.dataset.detail);
   });

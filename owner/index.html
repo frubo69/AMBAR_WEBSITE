@@ -45,7 +45,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .display{font-family:'Space Grotesk',sans-serif;letter-spacing:-.3px}
 
 /* Header */
-.hdr{position:sticky;top:0;z-index:40;padding:calc(14px + var(--safe-top)) 18px 14px;
+.hdr{position:fixed;top:0;left:0;right:0;z-index:40;padding:calc(14px + var(--safe-top)) 18px 14px;
   background:var(--bg);
   backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
   display:flex;align-items:center;justify-content:space-between}
@@ -116,12 +116,12 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 }
 
 /* Page */
-.page{padding:6px 14px 20px;display:none;animation:fadeIn .3s var(--e1)}
+.page{padding:calc(122px + var(--safe-top)) 14px 20px;display:none;animation:fadeIn .3s var(--e1)}
 .page.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
 /* Period bar — pill group + calendar button */
-.period-bar{display:flex;gap:8px;margin:0 0 16px;align-items:stretch;position:sticky;top:calc(66px + var(--safe-top));z-index:35;background:var(--bg);padding-top:4px;padding-bottom:4px}
+.period-bar{display:flex;gap:8px;margin:0;align-items:stretch;position:fixed;top:calc(66px + var(--safe-top));left:0;right:0;z-index:35;background:var(--bg);padding:4px 14px 10px}
 .period-bar .periods{flex:1;margin:0}
 .cal-btn{width:40px;height:auto;padding:0;border-radius:11px;background:var(--card);border:1px solid var(--border2);color:var(--sub);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s var(--e1);flex-shrink:0}
 .cal-btn:active{transform:scale(.92);color:var(--gold2);border-color:rgba(201,169,110,.35)}

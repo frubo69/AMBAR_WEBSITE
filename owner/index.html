@@ -526,12 +526,12 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
         <span class="card-hint">средний чек <span id="kOrdersAvg">—</span></span>
       </div>
     </div>
-    <div class="card" data-detail="kpi:rejected">
+    <div class="card" data-detail="kpi:pending">
       <div class="card-lbl"><span>Не принято</span></div>
-      <div class="card-val mono"><span id="kRejected">—</span><span class="u">шт</span></div>
+      <div class="card-val mono"><span id="kPending">—</span><span class="u">шт</span></div>
       <div class="card-row">
-        <span class="delta" id="kRejectedDelta">…</span>
-        <span class="card-hint" id="kRejectedHint">отклонено + отменено</span>
+        <span class="delta" id="kPendingDelta" style="visibility:hidden">…</span>
+        <span class="card-hint" id="kPendingHint">ожидают ответа</span>
       </div>
     </div>
     <div class="card" data-detail="kpi:inroute">
@@ -2627,8 +2627,8 @@ function _setText(id, txt){ const el = document.getElementById(id); if(el) el.te
 const _SKEL_IDS = [
   'heroRev','heroPrev','heroDelta','moneyHero','moneyProfit','moneyDelta',
   'offCentralRev','offNorthRev','offSouthRev','bars7dAvg','bars7dTotal',
-  'kOrders','kOrdersAvg','kOrdersDelta','kDone','kDoneTotal','kDonePct',
-  'kInRoute','kAvg','kAvgSub','kLate','kLateCount','kRating'
+  'kOrders','kOrdersAvg','kOrdersDelta','kPending','kDone','kDoneTotal','kDonePct',
+  'kInRoute','kInRouteVal','kAvg','kAvgSub','kLate','kLateCount','kRating'
 ];
 function setFinanceSkel(on){
   _SKEL_IDS.forEach(id => {
@@ -2706,7 +2706,7 @@ function applyPeriod(p){
     const pbl = document.getElementById('periodBarsLabels'); if(pbl) pbl.innerHTML = '';
     const pbt = document.getElementById('periodBarsTitle'); if(pbt) pbt.textContent = _periodBarsTitle(p);
     // KPI placeholders (real values come from /api/owner/finance kpi block)
-    ['kOrders','kOrdersAvg','kDone','kDoneTotal','kDonePct','kInRoute','kAvg','kLate','kLateCount','kRating'].forEach(id=>_setText(id,'—'));
+    ['kOrders','kOrdersAvg','kPending','kInRouteVal','kDone','kDoneTotal','kDonePct','kInRoute','kAvg','kLate','kLateCount','kRating'].forEach(id=>_setText(id,'—'));
     _setText('kOrdersDelta', '…');
     _setText('kRatingLbl', 'Рейтинг');
     _setText('kAvgSub', 'нет данных');
@@ -2790,6 +2790,10 @@ function renderKpis(k){
     od.classList.toggle('dn', k.orders_delta <  0);
   }
   _setText('kOrdersAvg', fmtCompact(k.avg_check));
+  // Pending (не принято)
+  _setText('kPending', k.pending ?? 0);
+  // In route (в пути)
+  _setText('kInRouteVal', k.in_route ?? 0);
   // Done
   _setText('kDone',      k.done);
   _setText('kDoneTotal', k.done_total);

@@ -1336,10 +1336,14 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         deliver_by = now_dubai + __import__('datetime').timedelta(minutes=eta)
         deliver_by_str = deliver_by.strftime("%H:%M")
         if int(cid) in _TEST_ACCOUNTS:
+            _kb = InlineKeyboardMarkup([
+                [InlineKeyboardButton(f"🚚 Доставлено #{oid}", callback_data=f"done_{oid}_{cid}"),
+                 InlineKeyboardButton("🚫 Отменить", callback_data=f"opcancel_{oid}_{cid}")],
+                [InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")],
+            ])
             await q.edit_message_text(
-                f"🟢 <b>ТЕСТ</b> — Принят, ETA {eta} мин (до {deliver_by_str})\n\n✅ Просмотрено",
-                parse_mode="HTML",
-                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]]))
+                f"🟢 <b>ТЕСТ</b> — #{oid} Принят, ETA {eta} мин (до {deliver_by_str})",
+                parse_mode="HTML", reply_markup=_kb)
         else:
             await db.update_order(oid, status="approved", eta=eta,
                                   operator_id=op, updated_at=datetime.now(timezone.utc).isoformat(),

@@ -922,7 +922,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 .promo-sheet{position:relative;width:100%;max-width:320px;border-radius:18px;overflow:visible;transform:scale(.92);opacity:0;transition:transform .35s cubic-bezier(.34,1,.64,1),opacity .25s;box-shadow:0 24px 80px rgba(0,0,0,.7)}
 .promo-overlay.show .promo-sheet{transform:scale(1);opacity:1}
 .promo-img{width:100%;display:block;border-radius:18px}
-.promo-close{position:absolute;top:-14px;right:-14px;width:34px;height:34px;border-radius:50%;border:none;background:var(--bg2);color:var(--muted);font-size:16px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 16px rgba(0,0,0,.5);z-index:2;transition:.15s}
+.promo-close{position:absolute;top:-16px;right:-16px;width:40px;height:40px;border-radius:50%;border:2px solid rgba(255,255,255,.25);background:rgba(30,30,30,.95);color:#fff;font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;box-shadow:0 4px 20px rgba(0,0,0,.7);z-index:2;transition:.15s}
 .promo-close:active{transform:scale(.9);background:var(--bg3)}
 .hs-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .22s;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
 .hs-overlay.show{opacity:1;pointer-events:all}
@@ -1995,7 +1995,7 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <div class="promo-overlay" id="promo-overlay" onclick="closePromo(event)">
   <div class="promo-sheet">
     <button class="promo-close" onclick="closePromo()">✕</button>
-    <img class="promo-img" src="promo_svoi.png" alt="ЦЕНЫ ДЛЯ СВОИХ" onerror="this.parentElement.parentElement.remove()">
+    <img class="promo-img" id="promo-img" alt="ЦЕНЫ ДЛЯ СВОИХ" onerror="this.parentElement.parentElement.remove()">
   </div>
 </div>
 <div class="hs-overlay" id="hs-overlay">
@@ -3233,22 +3233,21 @@ function _tryShowPromo(){
 }
 function showPromoThenHS(){
   const promoEl=el('promo-overlay');
-  if(!promoEl||localStorage.getItem('ambar_promo_svoi_seen')){checkFirstLaunchHomeScreen();return;}
+  if(!promoEl){checkFirstLaunchHomeScreen();return;}
   _promoBootReady=true;
   if(_promoImgReady)_tryShowPromo();
   else setTimeout(()=>{if(!_promoImgReady){promoEl.remove();checkFirstLaunchHomeScreen();}},5000);
 }
 (function _preloadPromo(){
-  if(localStorage.getItem('ambar_promo_svoi_seen'))return;
+  const promoSrc=lang==='ru'?'promo_svoi_rus.png':'promo_svoi_eng.png';
   const img=new Image();
-  img.onload=()=>{_promoImgReady=true;_tryShowPromo();};
+  img.onload=()=>{const pi=document.getElementById('promo-img');if(pi)pi.src=promoSrc;_promoImgReady=true;_tryShowPromo();};
   img.onerror=()=>{const p=document.getElementById('promo-overlay');if(p)p.remove();_promoImgReady=false;};
-  img.src='promo_svoi.png';
+  img.src=promoSrc;
 })();
 function closePromo(e){
   if(e&&e.target&&e.target.classList&&!e.target.classList.contains('promo-overlay')&&!e.target.classList.contains('promo-close'))return;
   const ov=el('promo-overlay');if(ov)ov.classList.remove('show');
-  localStorage.setItem('ambar_promo_svoi_seen','1');
   setTimeout(checkFirstLaunchHomeScreen,400);
 }
 function checkFirstLaunchHomeScreen(){

@@ -340,6 +340,30 @@ async def handle_finance(request):
         if 0 <= idx < 7:
             orders_7d[idx] += 1
 
+    def _order_summary(o):
+        return {
+            "id": o.get("order_id",""),
+            "name": o.get("customer_name","—"),
+            "total": o.get("total", 0),
+            "status": o.get("status",""),
+            "ts": o.get("timestamp",""),
+            "eta": o.get("eta",""),
+            "office": o.get("office_name",""),
+            "items_short": ", ".join(f"{it.get('name','')} ×{it.get('qty',1)}" for it in (o.get("items") or [])[:3]),
+        }
+    pending_orders = sorted(
+        [o for o in all_orders.values() if o.get("status") == "pending"],
+        key=lambda x: x.get("timestamp",""), reverse=True)[:20]
+    inroute_orders = sorted(
+        [o for o in all_orders.values() if o.get("status") == "approved"],
+        key=lambda x: x.get("timestamp",""), reverse=True)[:20]
+    delivered_orders_list = sorted(
+        [o for _, o in curr_orders],
+        key=lambda x: x.get("timestamp",""), reverse=True)[:20]
+    declined_orders_list = sorted(
+        [o for _, o in curr_all if o.get("status") in ("declined","cancelled")],
+        key=lambda x: x.get("timestamp",""), reverse=True)[:20]
+
     period_lbl_for_rating = {"today":"сегодня","week":"неделя","month":"месяц","year":"год"}[period]
 
     return web.json_response({
@@ -388,6 +412,10 @@ async def handle_finance(request):
             "late_count":       deliv_curr["late_count"],
             "late_pct":         deliv_curr["late_pct"],
             "late_threshold":   LATE_THRESHOLD_MIN,
+            "pending_orders":   [_order_summary(o) for o in pending_orders],
+            "inroute_orders":   [_order_summary(o) for o in inroute_orders],
+            "delivered_orders": [_order_summary(o) for o in delivered_orders_list],
+            "declined_orders":  [_order_summary(o) for o in declined_orders_list],
         },
     }, headers=CORS_HEADERS)
 

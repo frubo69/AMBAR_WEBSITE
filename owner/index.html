@@ -5442,7 +5442,42 @@ const DETAIL = {
       AMB7601682:{t:'18:38', dur:null, late:0, status:'in_progress', sum:380, tip:0, office:'north',   op:'north',   client:'anon', clientName:'Анон', clientTier:'', items:[['Chivas · 0.7L',1,380]], deliverBy:'19:15', accept:3, created:0, pickup:3},
       AMB7601679:{t:'18:10', dur:null, late:14, status:'in_progress', sum:280, tip:0, office:'south', op:'south', client:'anon', clientName:'Анон', clientTier:'', items:[['Absolut · 1L',1,280]], deliverBy:'18:35', accept:8, created:0, pickup:8}
     };
-    const d = ORDERS[id] || {t:'—', dur:null, late:0, sum:0, tip:0, office:'central', op:'central', client:'anon', clientName:'Неизвестно', clientTier:'', items:[], review:null, accept:0, created:0, pickup:0, deliverBy:'--:--'};
+    let d = ORDERS[id];
+    if(!d){
+      const period = document.querySelector('#periodPicker button.on')?.dataset?.p || 'today';
+      const fc = FINANCE_CACHE[period];
+      const k = fc?.kpi || {};
+      const allLists = [...(k.pending_orders||[]),...(k.inroute_orders||[]),...(k.delivered_orders||[]),...(k.declined_orders||[])];
+      const real = allLists.find(o=>o.id===id);
+      if(real){
+        const t = real.ts ? new Date(real.ts+'Z') : null;
+        const time = t ? `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}` : '—';
+        const stMap = {delivered:'доставлен',approved:'в пути',pending:'ожидает',declined:'отклонён',cancelled:'отменён'};
+        const stClr = {delivered:'var(--up)',approved:'var(--info)',pending:'var(--warn)',declined:'var(--dn)',cancelled:'var(--dn)'};
+        return {
+          title:`<div class="dt-tit-av plain" style="background:rgba(201,169,110,.14);color:var(--gold2);font-family:'JetBrains Mono',monospace;font-size:10px;letter-spacing:0">#${id.slice(-4)}</div><div><div class="dt-tit-name">Заказ ${id}</div><div class="dt-sub">${time} · <span style="color:${stClr[real.status]||'var(--muted)'}">${stMap[real.status]||real.status}</span> · ${real.office||''}</div></div>`,
+          body:`
+            <div style="padding:20px 16px;text-align:center;background:var(--card);border:1px solid var(--border2);border-radius:14px;margin-bottom:6px">
+              <div class="dt-stat-val gold" style="font-size:48px;line-height:1">${real.total}<span class="u" style="font-size:16px;margin-left:8px">AED</span></div>
+              <div style="font-size:12px;color:var(--muted);margin-top:10px">${real.name}${real.eta ? ' · ETA '+real.eta+' мин' : ''}</div>
+            </div>
+            <div class="dt-sect">Позиции</div>
+            <div class="dt-card">
+              ${real.items_short ? real.items_short.split(', ').map(it=>`<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${it}</div></div></div>`).join('') : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">нет данных</div></div></div>'}
+            </div>
+            <div class="dt-sect">Информация</div>
+            <div class="dt-card">
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Клиент</div></div><div class="dt-row-r">${real.name}</div></div>
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Офис</div></div><div class="dt-row-r">${real.office||'—'}</div></div>
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Статус</div></div><div class="dt-row-r" style="color:${stClr[real.status]||'var(--muted)'}">${stMap[real.status]||real.status}</div></div>
+              ${real.eta ? `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">ETA</div></div><div class="dt-row-r">${real.eta} мин</div></div>` : ''}
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Время</div></div><div class="dt-row-r">${time}</div></div>
+            </div>`,
+          foot:''
+        };
+      }
+      d = {t:'—', dur:null, late:0, sum:0, tip:0, office:'central', op:'central', client:'anon', clientName:'Неизвестно', clientTier:'', items:[], review:null, accept:0, created:0, pickup:0, deliverBy:'--:--'};
+    }
 
     // Header status line
     let statusLine = '';
@@ -5564,6 +5599,18 @@ const DETAIL = {
         return `<div class="dt-bar"><div class="dt-bar-l">${labels[k]||k}</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:${pct}%${fill?';'+fill:''}"></div></div><div class="dt-bar-v">${fmtFn(v)}</div></div>`;
       }).join('');
     };
+    const stColor = {delivered:'var(--up)',approved:'var(--info)',pending:'var(--warn)',declined:'var(--dn)',cancelled:'var(--dn)'};
+    const stLabel = {delivered:'доставлен',approved:'в пути',pending:'ожидает',declined:'отклонён',cancelled:'отменён'};
+    const orderRows = (list)=>{
+      if(!list||!list.length) return '<div style="padding:20px 16px;text-align:center;color:var(--muted);font-size:13px">Нет заказов</div>';
+      return list.map(o=>{
+        const t = o.ts ? new Date(o.ts+'Z') : null;
+        const time = t ? `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}` : '';
+        const st = stLabel[o.status]||o.status;
+        const sc = stColor[o.status]||'var(--muted)';
+        return `<div class="dt-row" data-detail="order:${o.id}"><div class="dt-row-l"><div class="dt-row-t">#${o.id} <span class="dt-row-tiny" style="color:${sc}">${st}</span></div><div class="dt-row-s">${time}${o.items_short?' · '+o.items_short:''}${o.eta?' · ETA '+o.eta+' мин':''}</div></div><div class="dt-row-r gold">${o.total}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:2px">›</div></div>`;
+      }).join('');
+    };
     const noData = '<div style="padding:24px 16px;text-align:center;color:var(--muted);font-size:13px">Нет данных</div>';
     const noDataYet = '<div style="padding:24px 16px;text-align:center;color:var(--muted);font-size:13px">Этот показатель пока не считается — операторский бот не сохраняет время доставки.</div>';
 
@@ -5599,19 +5646,21 @@ const DETAIL = {
         <div class="dt-card" style="padding:14px">${line7(k.orders_7d||[], '#C9A96E')}</div>
         <div class="dt-sect">Статусы за период</div>
         <div class="dt-card">
-          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Доставлено</div><div class="dt-row-s">${k.done_pct||0}% от всех</div></div><div class="dt-row-r up">${k.done||0}</div></div>
-          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">В пути</div><div class="dt-row-s">оператор на доставке</div></div><div class="dt-row-r">${k.in_route||0}</div></div>
-          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Ожидают</div><div class="dt-row-s">не принят оператором</div></div><div class="dt-row-r">${k.pending||0}</div></div>
+          <div class="dt-row" data-detail="kpi:done"><div class="dt-row-l"><div class="dt-row-t">Доставлено</div><div class="dt-row-s">${k.done_pct||0}% от всех</div></div><div class="dt-row-r up">${k.done||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
+          <div class="dt-row" data-detail="kpi:inroute"><div class="dt-row-l"><div class="dt-row-t">В пути</div><div class="dt-row-s">оператор на доставке</div></div><div class="dt-row-r">${k.in_route||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
+          <div class="dt-row" data-detail="kpi:pending"><div class="dt-row-l"><div class="dt-row-t">Ожидают</div><div class="dt-row-s">не принят оператором</div></div><div class="dt-row-r ${(k.pending||0)>0?'warn':''}">${k.pending||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
           <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Отменены / отклонены</div><div class="dt-row-s">клиентом или оператором</div></div><div class="dt-row-r dn">${k.declined||0}</div></div>
         </div>`;
     } else if(id === 'done'){
       const k = f.kpi || {};
       hero = `<div class="dt-stat-val up" style="font-size:48px;line-height:1">${k.done||0}<span class="u" style="font-size:16px;margin-left:8px">/${k.done_total||0}</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${k.done_pct||0}% доставлено · ${k.in_route||0} в пути · ${k.declined||0} отменены</div>`;
       body = `
+        <div class="dt-sect">Доставленные заказы · ${k.done||0}</div>
+        <div class="dt-card">${orderRows(k.delivered_orders)}</div>
         <div class="dt-sect">Сейчас в работе</div>
         <div class="dt-card">
-          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Ожидают принятия</div><div class="dt-row-s">оператор ещё не нажал accept</div></div><div class="dt-row-r ${k.pending>0?'warn':''}">${k.pending||0}</div></div>
-          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">В пути</div><div class="dt-row-s">принят, едет к клиенту</div></div><div class="dt-row-r">${k.in_route||0}</div></div>
+          <div class="dt-row" data-detail="kpi:pending"><div class="dt-row-l"><div class="dt-row-t">Ожидают принятия</div><div class="dt-row-s">оператор ещё не нажал accept</div></div><div class="dt-row-r ${k.pending>0?'warn':''}">${k.pending||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
+          <div class="dt-row" data-detail="kpi:inroute"><div class="dt-row-l"><div class="dt-row-t">В пути</div><div class="dt-row-s">принят, едет к клиенту</div></div><div class="dt-row-r">${k.in_route||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
         </div>
         <div class="dt-sect">Заказы · 7 дней (шт)</div>
         <div class="dt-card" style="padding:14px">${line7(k.orders_7d||[], '#4CAF7D')}</div>`;
@@ -5662,19 +5711,12 @@ const DETAIL = {
       hero = `<div class="dt-stat-val" style="font-size:48px;line-height:1;color:${clr}">${pendingN}<span class="u" style="font-size:16px;margin-left:8px">ШТ</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${pendingN === 0 ? 'все заказы обработаны' : 'ожидают ответа оператора'}</div>`;
       if(pendingN > 0){
         body = `
-          <div class="dt-sect">Ожидающие заказы</div>
-          <div class="dt-card">
-            <div style="padding:20px 16px;text-align:center">
-              <div style="font-size:36px;margin-bottom:8px">${pendingN > 3 ? '🔴' : '🟡'}</div>
-              <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">${pendingN} ${pluralize(pendingN,'заказ','заказа','заказов')} без ответа</div>
-              <div style="font-size:12px;color:var(--muted)">Операторы ещё не приняли и не отклонили</div>
-            </div>
-          </div>
+          <div class="dt-sect">Ожидающие заказы · ${pendingN}</div>
+          <div class="dt-card">${orderRows(k.pending_orders)}</div>
           <div class="dt-sect">Статусы за период</div>
           <div class="dt-card">
-            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Ожидают</div><div class="dt-row-s">не обработаны оператором</div></div><div class="dt-row-r ${pendingN>0?'warn':''}">${pendingN}</div></div>
-            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">В пути</div><div class="dt-row-s">приняты, едут к клиенту</div></div><div class="dt-row-r">${k.in_route||0}</div></div>
-            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Доставлено</div></div><div class="dt-row-r up">${k.done||0}</div></div>
+            <div class="dt-row" data-detail="kpi:inroute"><div class="dt-row-l"><div class="dt-row-t">В пути</div><div class="dt-row-s">приняты, едут к клиенту</div></div><div class="dt-row-r">${k.in_route||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
+            <div class="dt-row" data-detail="kpi:done"><div class="dt-row-l"><div class="dt-row-t">Доставлено</div></div><div class="dt-row-r up">${k.done||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
             <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Отклонено / отменено</div></div><div class="dt-row-r dn">${k.declined||0}</div></div>
           </div>`;
       } else {
@@ -5689,8 +5731,8 @@ const DETAIL = {
           </div>
           <div class="dt-sect">Статусы за период</div>
           <div class="dt-card">
-            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">В пути</div><div class="dt-row-s">приняты, едут к клиенту</div></div><div class="dt-row-r">${k.in_route||0}</div></div>
-            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Доставлено</div></div><div class="dt-row-r up">${k.done||0}</div></div>
+            <div class="dt-row" data-detail="kpi:inroute"><div class="dt-row-l"><div class="dt-row-t">В пути</div><div class="dt-row-s">приняты, едут к клиенту</div></div><div class="dt-row-r">${k.in_route||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
+            <div class="dt-row" data-detail="kpi:done"><div class="dt-row-l"><div class="dt-row-t">Доставлено</div></div><div class="dt-row-r up">${k.done||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
             <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Отклонено / отменено</div></div><div class="dt-row-r dn">${k.declined||0}</div></div>
           </div>`;
       }
@@ -5700,19 +5742,12 @@ const DETAIL = {
       hero = `<div class="dt-stat-val" style="font-size:48px;line-height:1;color:var(--text)">${inRouteN}<span class="u" style="font-size:16px;margin-left:8px">ШТ</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${inRouteN === 0 ? 'нет активных доставок' : 'сейчас в доставке'}</div>`;
       if(inRouteN > 0){
         body = `
-          <div class="dt-sect">Активные доставки</div>
-          <div class="dt-card">
-            <div style="padding:20px 16px;text-align:center">
-              <div style="font-size:36px;margin-bottom:8px">🚚</div>
-              <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">${inRouteN} ${pluralize(inRouteN,'заказ','заказа','заказов')} в пути</div>
-              <div style="font-size:12px;color:var(--muted)">Приняты оператором, едут к клиенту</div>
-            </div>
-          </div>
+          <div class="dt-sect">Сейчас в доставке · ${inRouteN}</div>
+          <div class="dt-card">${orderRows(k.inroute_orders)}</div>
           <div class="dt-sect">Обзор</div>
           <div class="dt-card">
-            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">В пути</div><div class="dt-row-s">приняты, на доставке</div></div><div class="dt-row-r">${inRouteN}</div></div>
-            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Ожидают</div><div class="dt-row-s">не обработаны</div></div><div class="dt-row-r ${(k.pending||0)>0?'warn':''}">${k.pending||0}</div></div>
-            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Доставлено</div></div><div class="dt-row-r up">${k.done||0}</div></div>
+            <div class="dt-row" data-detail="kpi:pending"><div class="dt-row-l"><div class="dt-row-t">Ожидают</div><div class="dt-row-s">не обработаны</div></div><div class="dt-row-r ${(k.pending||0)>0?'warn':''}">${k.pending||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
+            <div class="dt-row" data-detail="kpi:done"><div class="dt-row-l"><div class="dt-row-t">Доставлено</div></div><div class="dt-row-r up">${k.done||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
           </div>`;
       } else {
         body = `
@@ -5726,8 +5761,8 @@ const DETAIL = {
           </div>
           <div class="dt-sect">Обзор</div>
           <div class="dt-card">
-            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Ожидают</div><div class="dt-row-s">не обработаны</div></div><div class="dt-row-r ${(k.pending||0)>0?'warn':''}">${k.pending||0}</div></div>
-            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Доставлено</div></div><div class="dt-row-r up">${k.done||0}</div></div>
+            <div class="dt-row" data-detail="kpi:pending"><div class="dt-row-l"><div class="dt-row-t">Ожидают</div><div class="dt-row-s">не обработаны</div></div><div class="dt-row-r ${(k.pending||0)>0?'warn':''}">${k.pending||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
+            <div class="dt-row" data-detail="kpi:done"><div class="dt-row-l"><div class="dt-row-t">Доставлено</div></div><div class="dt-row-r up">${k.done||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
           </div>`;
       }
     } else if(id === 'rating'){

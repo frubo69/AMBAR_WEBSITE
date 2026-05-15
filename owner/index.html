@@ -5468,21 +5468,16 @@ const DETAIL = {
             <div class="dt-card">
               ${real.items_short ? real.items_short.split(', ').map(it=>`<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${it}</div></div></div>`).join('') : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">нет данных</div></div></div>'}
             </div>
-            <div class="dt-sect">Клиент</div>
-            <div class="dt-card">
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Имя</div></div><div class="dt-row-r">${real.name}</div></div>
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Username</div></div><div class="dt-row-r" style="font-family:'JetBrains Mono',monospace;font-size:12px">${real.username && real.username!=='—' ? '@'+real.username : '—'}</div></div>
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">ID</div></div><div class="dt-row-r" style="font-family:'JetBrains Mono',monospace;font-size:12px">${real.customer_id||'—'}</div></div>
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Телефон</div></div><div class="dt-row-r" style="font-family:'JetBrains Mono',monospace;font-size:12px">${real.phone||'—'}</div></div>
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Адрес</div></div><div class="dt-row-r" style="font-size:12px;max-width:60%;text-align:right">${real.gmap_link ? '<a href="'+real.gmap_link+'" target="_blank" style="color:var(--gold2)">'+( real.address && real.address!=='—' && real.address!=='GPS' ? real.address : '📍 Карта')+'</a>' : (real.address||'—')}</div></div>
-            </div>
             <div class="dt-sect">Информация</div>
             <div class="dt-card">
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Клиент</div><div class="dt-row-s">${real.username && real.username!=='—' ? '@'+real.username : ''}</div></div><div class="dt-row-r">${real.name}</div></div>
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Адрес</div></div><div class="dt-row-r" style="font-size:12px;max-width:60%;text-align:right">${real.gmap_link ? '<a href="'+real.gmap_link+'" target="_blank" style="color:var(--gold2)">'+( real.address && real.address!=='—' && real.address!=='GPS' ? real.address : '📍 Карта')+'</a>' : (real.address||'—')}</div></div>
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Офис</div></div><div class="dt-row-r">${real.office||'—'}</div></div>
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Статус</div></div><div class="dt-row-r" style="color:${stClr[real.status]||'var(--muted)'}">${stMap[real.status]||real.status}</div></div>
               ${real.eta ? `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">ETA</div></div><div class="dt-row-r">${real.eta} мин</div></div>` : ''}
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Время</div></div><div class="dt-row-r">${time}</div></div>
             </div>`,
+          foot: real.customer_id ? `<button class="dt-btn pri" onclick="openDetail('customer:${real.customer_id}')">👤 Клиент</button>` : ''
           foot:''
         };
       }

@@ -298,6 +298,8 @@ async def kb_order_actions(order, list_type=None):
             ])
         if st == "delivered":
             rows.append([InlineKeyboardButton("🔄 Вернуть в доставку", callback_data=f"undone_{oid}_{cid}")])
+        if st == "cancelled":
+            rows.append([InlineKeyboardButton("🔄 Вернуть в доставку", callback_data=f"undocancel_{oid}_{cid}")])
         rows.append([
             InlineKeyboardButton("✏️ Редактировать", callback_data=f"edit_{oid}"),
             InlineKeyboardButton("📍 Геолокация",    callback_data=f"loc_{oid}"),
@@ -322,8 +324,8 @@ async def kb_client_actions(oid, cid):
     return InlineKeyboardMarkup(rows)
 
 def kb_eta(oid, cid):
-    r1 = [InlineKeyboardButton(f"⏱ {t} мин", callback_data=f"eta_{t}_{oid}_{cid}") for t in [20, 30, 45]]
-    r2 = [InlineKeyboardButton(f"⏱ {t} мин", callback_data=f"eta_{t}_{oid}_{cid}") for t in [60, 90, 120]]
+    r1 = [InlineKeyboardButton(f"⏱ {t} мин", callback_data=f"eta_{t}_{oid}_{cid}") for t in [20, 25, 30]]
+    r2 = [InlineKeyboardButton(f"⏱ {t} мин", callback_data=f"eta_{t}_{oid}_{cid}") for t in [40, 45, 60]]
     return InlineKeyboardMarkup([r1, r2, [InlineKeyboardButton("← Назад", callback_data=f"eta_back_{oid}_{cid}")]])
 
 def kb_edit(order):
@@ -1387,10 +1389,10 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await update_customer_card(oid)
         order = await db.get_order(oid)
         if order:
-            _done_kb = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
+            lt = ctx.user_data.get("lt")
             await q.edit_message_text(
                 (await order_card(order)) + "\n\n🚫 <b>Отменён оператором</b>",
-                parse_mode="HTML", reply_markup=_done_kb)
+                parse_mode="HTML", reply_markup=await kb_order_actions(order, list_type=lt))
 
     # ── DELIVERED ─────────────────────────────────────────────────────────────
     elif data.startswith("done_"):
@@ -1434,6 +1436,20 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             except Exception as e:
                 log.error(f"[owner-notif] delete delivered msgs failed: {e}")
             await db.update_order(oid, status="approved", _delivered_notif_msgs=[], updated_at=datetime.now().isoformat())
+            await update_customer_card(oid)
+        order = await db.get_order(oid)
+        if order:
+            lt = ctx.user_data.get("lt")
+            await q.edit_message_text(
+                (await order_card(order)) + "\n\n🔄 <b>Возвращён в доставку</b>",
+                parse_mode="HTML", reply_markup=await kb_order_actions(order, list_type=lt))
+
+    # ── UNDO CANCELLED → back to approved ───────────────────────────────────
+    elif data.startswith("undocancel_"):
+        parts = data.split("_"); oid, cid = parts[1], int(parts[2])
+        order = await db.get_order(oid)
+        if order and order.get("status") == "cancelled":
+            await db.update_order(oid, status="approved", updated_at=datetime.now().isoformat())
             await update_customer_card(oid)
         order = await db.get_order(oid)
         if order:

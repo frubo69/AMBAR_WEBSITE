@@ -5581,9 +5581,12 @@ const DETAIL = {
         <div class="dt-card" style="padding:14px">${line7(f.bars_7d?.values||[], '#C9A96E', v=>fmt(v))}</div>
         <div class="dt-sect">Сводка</div>
         <div class="dt-card">
-          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Доставлено заказов</div></div><div class="dt-row-r">${k.done||0}</div></div>
+          <div class="dt-row" data-detail="kpi:done"><div class="dt-row-l"><div class="dt-row-t">Доставлено заказов</div><div class="dt-row-s">${k.done_pct||0}% от всех · ${k.in_route||0} в пути</div></div><div class="dt-row-r">${k.done||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
+          <div class="dt-row" data-detail="kpi:pending"><div class="dt-row-l"><div class="dt-row-t">Не принято</div><div class="dt-row-s">ожидают ответа оператора</div></div><div class="dt-row-r ${(k.pending||0)>0?'warn':''}">${k.pending||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
+          <div class="dt-row" data-detail="kpi:orders"><div class="dt-row-l"><div class="dt-row-t">Всего заказов</div><div class="dt-row-s">средний чек <span data-aed="${k.avg_check||0}">${fmt(k.avg_check||0)}</span> AED</div></div><div class="dt-row-r">${k.orders||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
           <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Чаевые</div></div><div class="dt-row-r"><span data-aed="${f.tips||0}">${fmt(f.tips||0)}</span> AED</div></div>
-          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Средний чек</div></div><div class="dt-row-r gold"><span data-aed="${k.avg_check||0}">${fmt(k.avg_check||0)}</span> AED</div></div>
+          <div class="dt-row" data-detail="kpi:late"><div class="dt-row-l"><div class="dt-row-t">Опоздания</div><div class="dt-row-s">> ${k.late_threshold||45} мин</div></div><div class="dt-row-r ${(k.late_count||0)>0?'warn':''}">${k.late_count||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
+          <div class="dt-row" data-detail="kpi:avg"><div class="dt-row-l"><div class="dt-row-t">Среднее время</div><div class="dt-row-s">от заказа до доставки</div></div><div class="dt-row-r">${k.avg_min_sample>0 ? k.avg_min+' мин' : '—'}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
         </div>`;
     } else if(id === 'orders'){
       const k = f.kpi || {};

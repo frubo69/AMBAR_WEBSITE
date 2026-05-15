@@ -1310,21 +1310,22 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # ── ACCEPT → show ETA ────────────────────────────────────────────────────
     elif data.startswith("acc_"):
         _, oid, cid = data.split("_", 2)
-        order = await db.get_order(oid)
-        if order and order.get("status") == "cancelled":
-            await q.answer("🚫 Заказ отменён клиентом", show_alert=True)
-            _done_kb = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
-            try:
-                await q.edit_message_text(
-                    (await order_card(order)) + "\n\n🚫 <b>Отменён клиентом</b>",
-                    parse_mode="HTML", reply_markup=_done_kb)
-            except: pass
-            return
-        # Block acceptance for unverified users
-        user_doc = await db.get_user(int(cid))
-        if user_doc and not user_doc.get("verified", False):
-            await q.answer("🔴 Клиент не верифицирован! Сначала верифицируйте или отклоните.", show_alert=True)
-            return
+        if int(cid) not in _TEST_ACCOUNTS:
+            order = await db.get_order(oid)
+            if order and order.get("status") == "cancelled":
+                await q.answer("🚫 Заказ отменён клиентом", show_alert=True)
+                _done_kb = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
+                try:
+                    await q.edit_message_text(
+                        (await order_card(order)) + "\n\n🚫 <b>Отменён клиентом</b>",
+                        parse_mode="HTML", reply_markup=_done_kb)
+                except: pass
+                return
+            # Block acceptance for unverified users
+            user_doc = await db.get_user(int(cid))
+            if user_doc and not user_doc.get("verified", False):
+                await q.answer("🔴 Клиент не верифицирован! Сначала верифицируйте или отклоните.", show_alert=True)
+                return
         await q.edit_message_reply_markup(reply_markup=kb_eta(oid, cid))
 
     # ── ETA selected ─────────────────────────────────────────────────────────
@@ -1334,91 +1335,110 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         now_dubai = datetime.now(DUBAI_TZ)
         deliver_by = now_dubai + __import__('datetime').timedelta(minutes=eta)
         deliver_by_str = deliver_by.strftime("%H:%M")
-        await db.update_order(oid, status="approved", eta=eta,
-                              operator_id=op, updated_at=datetime.now(timezone.utc).isoformat(),
-                              confirmed_at=datetime.now(timezone.utc).isoformat(),
-                              deliver_by=deliver_by_str)
-        # Edit the single live customer status msg in place (no new send, no countdown)
-        await update_customer_card(oid)
-        order = await db.get_order(oid)
-        if order:
-            lt = ctx.user_data.get("lt")
+        if int(cid) in _TEST_ACCOUNTS:
             await q.edit_message_text(
-                await order_card(order),
-                parse_mode="HTML", reply_markup=await kb_order_actions(order, list_type=lt))
+                f"🟢 <b>ТЕСТ</b> — Принят, ETA {eta} мин (до {deliver_by_str})\n\n✅ Просмотрено",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]]))
+        else:
+            await db.update_order(oid, status="approved", eta=eta,
+                                  operator_id=op, updated_at=datetime.now(timezone.utc).isoformat(),
+                                  confirmed_at=datetime.now(timezone.utc).isoformat(),
+                                  deliver_by=deliver_by_str)
+            await update_customer_card(oid)
+            order = await db.get_order(oid)
+            if order:
+                lt = ctx.user_data.get("lt")
+                await q.edit_message_text(
+                    await order_card(order),
+                    parse_mode="HTML", reply_markup=await kb_order_actions(order, list_type=lt))
 
     # ── DECLINE ───────────────────────────────────────────────────────────────
     elif data.startswith("dec_"):
         _, oid, cid = data.split("_", 2); cid = int(cid)
-        order_chk = await db.get_order(oid)
-        if order_chk and order_chk.get("status") == "cancelled":
-            await q.answer("🚫 Заказ уже отменён клиентом", show_alert=True)
-            _done_kb = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
-            try:
-                await q.edit_message_text(
-                    (await order_card(order_chk)) + "\n\n🚫 <b>Отменён клиентом</b>",
-                    parse_mode="HTML", reply_markup=_done_kb)
-            except: pass
-            return
-        await db.update_order(oid, status="declined", updated_at=datetime.now(timezone.utc).isoformat())
-        await db._increment_user(cid, orders_declined=1)
-        # Edit the live customer msg in place (no new notification)
-        await update_customer_card(oid)
-        order = await db.get_order(oid)
-        if order:
-            _done_kb = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
+        _done_kb = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
+        if int(cid) in _TEST_ACCOUNTS:
             await q.edit_message_text(
-                (await order_card(order)) + "\n\n❌ <b>Отклонён</b>",
+                f"🟢 <b>ТЕСТ</b> — #{oid} Отклонён\n\n✅ Просмотрено",
                 parse_mode="HTML", reply_markup=_done_kb)
-            try:
-                from owner_routes import notify_owners
-                await notify_owners("orders.declined",
-                    f"❌ *Заказ отклонён #{oid}*\n"
-                    f"Клиент: {order.get('customer_name','—')}\n"
-                    f"Сумма: {order.get('total',0)} AED")
-            except Exception as e:
-                log.error(f"[owner-notif] orders.declined failed: {e}")
+        else:
+            order_chk = await db.get_order(oid)
+            if order_chk and order_chk.get("status") == "cancelled":
+                await q.answer("🚫 Заказ уже отменён клиентом", show_alert=True)
+                try:
+                    await q.edit_message_text(
+                        (await order_card(order_chk)) + "\n\n🚫 <b>Отменён клиентом</b>",
+                        parse_mode="HTML", reply_markup=_done_kb)
+                except: pass
+                return
+            await db.update_order(oid, status="declined", updated_at=datetime.now(timezone.utc).isoformat())
+            await db._increment_user(cid, orders_declined=1)
+            await update_customer_card(oid)
+            order = await db.get_order(oid)
+            if order:
+                await q.edit_message_text(
+                    (await order_card(order)) + "\n\n❌ <b>Отклонён</b>",
+                    parse_mode="HTML", reply_markup=_done_kb)
+                try:
+                    from owner_routes import notify_owners
+                    await notify_owners("orders.declined",
+                        f"❌ *Заказ отклонён #{oid}*\n"
+                        f"Клиент: {order.get('customer_name','—')}\n"
+                        f"Сумма: {order.get('total',0)} AED")
+                except Exception as e:
+                    log.error(f"[owner-notif] orders.declined failed: {e}")
 
     # ── OPERATOR CANCEL (approved → cancelled) ─────────────────────────────
     elif data.startswith("opcancel_"):
         _, oid, cid = data.split("_", 2); cid = int(cid)
-        order = await db.get_order(oid)
-        if not order or order.get("status") != "approved":
-            await q.answer("Заказ уже не в статусе «Принят»", show_alert=True); return
-        await db.update_order(oid, status="cancelled", updated_at=datetime.now(timezone.utc).isoformat())
-        await update_customer_card(oid)
-        order = await db.get_order(oid)
-        if order:
-            lt = ctx.user_data.get("lt")
+        if int(cid) in _TEST_ACCOUNTS:
             await q.edit_message_text(
-                (await order_card(order)) + "\n\n🚫 <b>Отменён оператором</b>",
-                parse_mode="HTML", reply_markup=await kb_order_actions(order, list_type=lt))
+                f"🟢 <b>ТЕСТ</b> — #{oid} Отменён оператором\n\n✅ Просмотрено",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]]))
+        else:
+            order = await db.get_order(oid)
+            if not order or order.get("status") != "approved":
+                await q.answer("Заказ уже не в статусе «Принят»", show_alert=True); return
+            await db.update_order(oid, status="cancelled", updated_at=datetime.now(timezone.utc).isoformat())
+            await update_customer_card(oid)
+            order = await db.get_order(oid)
+            if order:
+                lt = ctx.user_data.get("lt")
+                await q.edit_message_text(
+                    (await order_card(order)) + "\n\n🚫 <b>Отменён оператором</b>",
+                    parse_mode="HTML", reply_markup=await kb_order_actions(order, list_type=lt))
 
     # ── DELIVERED ─────────────────────────────────────────────────────────────
     elif data.startswith("done_"):
         parts = data.split("_"); oid, cid = parts[1], int(parts[2])
-        await db.update_order(oid, status="delivered", updated_at=datetime.now(timezone.utc).isoformat())
-        order = await db.get_order(oid)
-        total = (order or {}).get("total", 0)
-        await db._increment_user(cid, orders_done=1, total_spent=total)
-        # Edit the live customer msg in place → "delivered"
-        await update_customer_card(oid)
-        order = await db.get_order(oid)
-        if order:
-            lt = ctx.user_data.get("lt")
+        if cid in _TEST_ACCOUNTS:
             await q.edit_message_text(
-                (await order_card(order)) + "\n\n✅ <b>Доставлен</b>",
-                parse_mode="HTML", reply_markup=await kb_order_actions(order, list_type=lt))
-            try:
-                from owner_routes import notify_owners
-                sent = await notify_owners("orders.delivered",
-                    f"✅ *Заказ доставлен #{oid}*\n"
-                    f"Клиент: {order.get('customer_name','—')}\n"
-                    f"Сумма: {order.get('total',0)} AED")
-                if sent:
-                    await db.update_order(oid, _delivered_notif_msgs=sent)
-            except Exception as e:
-                log.error(f"[owner-notif] orders.delivered failed: {e}")
+                f"🟢 <b>ТЕСТ</b> — #{oid} Доставлен\n\n✅ Просмотрено",
+                parse_mode="HTML",
+                reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]]))
+        else:
+            await db.update_order(oid, status="delivered", updated_at=datetime.now(timezone.utc).isoformat())
+            order = await db.get_order(oid)
+            total = (order or {}).get("total", 0)
+            await db._increment_user(cid, orders_done=1, total_spent=total)
+            await update_customer_card(oid)
+            order = await db.get_order(oid)
+            if order:
+                lt = ctx.user_data.get("lt")
+                await q.edit_message_text(
+                    (await order_card(order)) + "\n\n✅ <b>Доставлен</b>",
+                    parse_mode="HTML", reply_markup=await kb_order_actions(order, list_type=lt))
+                try:
+                    from owner_routes import notify_owners
+                    sent = await notify_owners("orders.delivered",
+                        f"✅ *Заказ доставлен #{oid}*\n"
+                        f"Клиент: {order.get('customer_name','—')}\n"
+                        f"Сумма: {order.get('total',0)} AED")
+                    if sent:
+                        await db.update_order(oid, _delivered_notif_msgs=sent)
+                except Exception as e:
+                    log.error(f"[owner-notif] orders.delivered failed: {e}")
 
     # ── UNDO DELIVERED → back to approved ────────────────────────────────────
     elif data.startswith("undone_"):

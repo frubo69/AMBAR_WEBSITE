@@ -352,6 +352,8 @@ async def handle_finance(request):
             "ts": o.get("timestamp",""),
             "eta": o.get("eta",""),
             "office": o.get("office_name",""),
+            "address": o.get("address","—"),
+            "gmap_link": o.get("gmap_link",""),
             "items_short": ", ".join(f"{it.get('name','')} ×{it.get('qty',1)}" for it in (o.get("items") or [])[:3]),
         }
     pending_orders = sorted(

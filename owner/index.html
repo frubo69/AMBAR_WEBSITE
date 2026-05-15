@@ -5613,7 +5613,8 @@ const DETAIL = {
     const stLabel = {delivered:'доставлен',approved:'в пути',pending:'ожидает',declined:'отклонён',cancelled:'отменён'};
     const orderRows = (list)=>{
       if(!list||!list.length) return '<div style="padding:20px 16px;text-align:center;color:var(--muted);font-size:13px">Нет заказов</div>';
-      return list.map(o=>{
+      const wrap = list.length > 3;
+      const inner = list.map(o=>{
         let time = '';
         if(o.ts){
           const t = new Date(/Z$|[+-]\d{2}/.test(o.ts) ? o.ts : o.ts+'Z');
@@ -5623,6 +5624,8 @@ const DETAIL = {
         const sc = stColor[o.status]||'var(--muted)';
         return `<div class="dt-row" data-detail="order:${o.id}"><div class="dt-row-l"><div class="dt-row-t">#${o.id} <span class="dt-row-tiny" style="color:${sc}">${st}</span></div><div class="dt-row-s">${time}${o.items_short?' · '+o.items_short:''}${o.eta?' · ETA '+o.eta+' мин':''}</div></div><div class="dt-row-r gold">${o.total}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:2px">›</div></div>`;
       }).join('');
+      if(wrap) return `<div style="max-height:220px;overflow-y:auto;-webkit-overflow-scrolling:touch">${inner}</div>`;
+      return inner;
     };
     const noData = '<div style="padding:24px 16px;text-align:center;color:var(--muted);font-size:13px">Нет данных</div>';
     const noDataYet = '<div style="padding:24px 16px;text-align:center;color:var(--muted);font-size:13px">Этот показатель пока не считается — операторский бот не сохраняет время доставки.</div>';

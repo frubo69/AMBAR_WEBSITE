@@ -5450,8 +5450,11 @@ const DETAIL = {
       const allLists = [...(k.pending_orders||[]),...(k.inroute_orders||[]),...(k.delivered_orders||[]),...(k.declined_orders||[])];
       const real = allLists.find(o=>o.id===id);
       if(real){
-        const t = real.ts ? new Date(real.ts+'Z') : null;
-        const time = t ? `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}` : '—';
+        let time = '—';
+        if(real.ts){
+          const t = new Date(/Z$|[+-]\d{2}/.test(real.ts) ? real.ts : real.ts+'Z');
+          if(!isNaN(t.getTime())) time = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+        }
         const stMap = {delivered:'доставлен',approved:'в пути',pending:'ожидает',declined:'отклонён',cancelled:'отменён'};
         const stClr = {delivered:'var(--up)',approved:'var(--info)',pending:'var(--warn)',declined:'var(--dn)',cancelled:'var(--dn)'};
         return {
@@ -5465,9 +5468,15 @@ const DETAIL = {
             <div class="dt-card">
               ${real.items_short ? real.items_short.split(', ').map(it=>`<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${it}</div></div></div>`).join('') : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">нет данных</div></div></div>'}
             </div>
+            <div class="dt-sect">Клиент</div>
+            <div class="dt-card">
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Имя</div></div><div class="dt-row-r">${real.name}</div></div>
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Username</div></div><div class="dt-row-r" style="font-family:'JetBrains Mono',monospace;font-size:12px">${real.username && real.username!=='—' ? '@'+real.username : '—'}</div></div>
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">ID</div></div><div class="dt-row-r" style="font-family:'JetBrains Mono',monospace;font-size:12px">${real.customer_id||'—'}</div></div>
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Телефон</div></div><div class="dt-row-r" style="font-family:'JetBrains Mono',monospace;font-size:12px">${real.phone||'—'}</div></div>
+            </div>
             <div class="dt-sect">Информация</div>
             <div class="dt-card">
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Клиент</div></div><div class="dt-row-r">${real.name}</div></div>
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Офис</div></div><div class="dt-row-r">${real.office||'—'}</div></div>
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Статус</div></div><div class="dt-row-r" style="color:${stClr[real.status]||'var(--muted)'}">${stMap[real.status]||real.status}</div></div>
               ${real.eta ? `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">ETA</div></div><div class="dt-row-r">${real.eta} мин</div></div>` : ''}
@@ -5604,8 +5613,11 @@ const DETAIL = {
     const orderRows = (list)=>{
       if(!list||!list.length) return '<div style="padding:20px 16px;text-align:center;color:var(--muted);font-size:13px">Нет заказов</div>';
       return list.map(o=>{
-        const t = o.ts ? new Date(o.ts+'Z') : null;
-        const time = t ? `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}` : '';
+        let time = '';
+        if(o.ts){
+          const t = new Date(/Z$|[+-]\d{2}/.test(o.ts) ? o.ts : o.ts+'Z');
+          if(!isNaN(t.getTime())) time = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
+        }
         const st = stLabel[o.status]||o.status;
         const sc = stColor[o.status]||'var(--muted)';
         return `<div class="dt-row" data-detail="order:${o.id}"><div class="dt-row-l"><div class="dt-row-t">#${o.id} <span class="dt-row-tiny" style="color:${sc}">${st}</span></div><div class="dt-row-s">${time}${o.items_short?' · '+o.items_short:''}${o.eta?' · ETA '+o.eta+' мин':''}</div></div><div class="dt-row-r gold">${o.total}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:2px">›</div></div>`;

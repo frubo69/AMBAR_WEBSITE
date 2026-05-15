@@ -344,6 +344,9 @@ async def handle_finance(request):
         return {
             "id": o.get("order_id",""),
             "name": o.get("customer_name","—"),
+            "username": o.get("username","—"),
+            "customer_id": o.get("customer_id",""),
+            "phone": o.get("phone","—"),
             "total": o.get("total", 0),
             "status": o.get("status",""),
             "ts": o.get("timestamp",""),

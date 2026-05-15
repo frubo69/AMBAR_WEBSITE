@@ -5652,6 +5652,81 @@ const DETAIL = {
         hero = `<div class="dt-stat-val" style="font-size:32px;line-height:1;color:var(--muted)">—</div><div style="font-size:12px;color:var(--muted);margin-top:10px">нет доставленных заказов за период</div>`;
         body = `<div class="dt-sect">Опоздания</div><div class="dt-card">${noData}</div>`;
       }
+    } else if(id === 'pending'){
+      const k = f.kpi || {};
+      const pendingN = k.pending || 0;
+      const clr = pendingN > 3 ? 'var(--dn)' : pendingN > 0 ? 'var(--warn)' : 'var(--up)';
+      hero = `<div class="dt-stat-val" style="font-size:48px;line-height:1;color:${clr}">${pendingN}<span class="u" style="font-size:16px;margin-left:8px">ШТ</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${pendingN === 0 ? 'все заказы обработаны' : 'ожидают ответа оператора'}</div>`;
+      if(pendingN > 0){
+        body = `
+          <div class="dt-sect">Ожидающие заказы</div>
+          <div class="dt-card">
+            <div style="padding:20px 16px;text-align:center">
+              <div style="font-size:36px;margin-bottom:8px">${pendingN > 3 ? '🔴' : '🟡'}</div>
+              <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">${pendingN} ${pluralize(pendingN,'заказ','заказа','заказов')} без ответа</div>
+              <div style="font-size:12px;color:var(--muted)">Операторы ещё не приняли и не отклонили</div>
+            </div>
+          </div>
+          <div class="dt-sect">Статусы за период</div>
+          <div class="dt-card">
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Ожидают</div><div class="dt-row-s">не обработаны оператором</div></div><div class="dt-row-r ${pendingN>0?'warn':''}">${pendingN}</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">В пути</div><div class="dt-row-s">приняты, едут к клиенту</div></div><div class="dt-row-r">${k.in_route||0}</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Доставлено</div></div><div class="dt-row-r up">${k.done||0}</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Отклонено / отменено</div></div><div class="dt-row-r dn">${k.declined||0}</div></div>
+          </div>`;
+      } else {
+        body = `
+          <div class="dt-sect">Статус</div>
+          <div class="dt-card">
+            <div style="padding:24px 16px;text-align:center">
+              <div style="font-size:36px;margin-bottom:8px">✅</div>
+              <div style="font-size:14px;font-weight:600;color:var(--up);margin-bottom:4px">Все заказы обработаны</div>
+              <div style="font-size:12px;color:var(--muted)">Нет ожидающих ответа</div>
+            </div>
+          </div>
+          <div class="dt-sect">Статусы за период</div>
+          <div class="dt-card">
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">В пути</div><div class="dt-row-s">приняты, едут к клиенту</div></div><div class="dt-row-r">${k.in_route||0}</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Доставлено</div></div><div class="dt-row-r up">${k.done||0}</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Отклонено / отменено</div></div><div class="dt-row-r dn">${k.declined||0}</div></div>
+          </div>`;
+      }
+    } else if(id === 'inroute'){
+      const k = f.kpi || {};
+      const inRouteN = k.in_route || 0;
+      hero = `<div class="dt-stat-val" style="font-size:48px;line-height:1;color:var(--text)">${inRouteN}<span class="u" style="font-size:16px;margin-left:8px">ШТ</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${inRouteN === 0 ? 'нет активных доставок' : 'сейчас в доставке'}</div>`;
+      if(inRouteN > 0){
+        body = `
+          <div class="dt-sect">Активные доставки</div>
+          <div class="dt-card">
+            <div style="padding:20px 16px;text-align:center">
+              <div style="font-size:36px;margin-bottom:8px">🚚</div>
+              <div style="font-size:14px;font-weight:600;color:var(--text);margin-bottom:4px">${inRouteN} ${pluralize(inRouteN,'заказ','заказа','заказов')} в пути</div>
+              <div style="font-size:12px;color:var(--muted)">Приняты оператором, едут к клиенту</div>
+            </div>
+          </div>
+          <div class="dt-sect">Обзор</div>
+          <div class="dt-card">
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">В пути</div><div class="dt-row-s">приняты, на доставке</div></div><div class="dt-row-r">${inRouteN}</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Ожидают</div><div class="dt-row-s">не обработаны</div></div><div class="dt-row-r ${(k.pending||0)>0?'warn':''}">${k.pending||0}</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Доставлено</div></div><div class="dt-row-r up">${k.done||0}</div></div>
+          </div>`;
+      } else {
+        body = `
+          <div class="dt-sect">Статус</div>
+          <div class="dt-card">
+            <div style="padding:24px 16px;text-align:center">
+              <div style="font-size:36px;margin-bottom:8px">📭</div>
+              <div style="font-size:14px;font-weight:600;color:var(--muted);margin-bottom:4px">Нет активных доставок</div>
+              <div style="font-size:12px;color:var(--muted)">Все заказы доставлены или ожидают</div>
+            </div>
+          </div>
+          <div class="dt-sect">Обзор</div>
+          <div class="dt-card">
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Ожидают</div><div class="dt-row-s">не обработаны</div></div><div class="dt-row-r ${(k.pending||0)>0?'warn':''}">${k.pending||0}</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Доставлено</div></div><div class="dt-row-r up">${k.done||0}</div></div>
+          </div>`;
+      }
     } else if(id === 'rating'){
       const k = f.kpi || {};
       const dist = k.rating_dist || {1:0,2:0,3:0,4:0,5:0};
@@ -5668,10 +5743,10 @@ const DETAIL = {
         <div class="dt-card">${k.rating_count ? distBars : noData}</div>`;
     }
 
-    const titleT = {revenue:'Выручка · '+periodLbl, orders:'Заказы · '+periodLbl, done:'Доставлено · '+periodLbl, avg:'Среднее время доставки', late:'Опоздания', rating:'Рейтинг · '+periodLbl}[id] || id;
-    const titleSub = {revenue:'Офисы · 7 дней · сводка', orders:'Офисы · статусы · 7 дней', done:'Сейчас в работе · динамика', avg:'время от заказа до доставки', late:'заказы дольше порога', rating:'★ распределение'}[id] || '';
-    const titleIco = {revenue:'$', orders:'📦', done:'✓', avg:'⏱', late:'⚠', rating:'★'}[id] || '•';
-    const titleBg = {revenue:'var(--up-soft);color:var(--up)', orders:'rgba(201,169,110,.14);color:var(--gold2)', done:'var(--up-soft);color:var(--up)', avg:'var(--info-soft);color:var(--info)', late:'var(--warn-soft);color:var(--warn)', rating:'rgba(201,169,110,.14);color:var(--gold2)'}[id] || '';
+    const titleT = {revenue:'Выручка · '+periodLbl, orders:'Заказы · '+periodLbl, pending:'Не принято', inroute:'В пути', done:'Доставлено · '+periodLbl, avg:'Среднее время доставки', late:'Опоздания', rating:'Рейтинг · '+periodLbl}[id] || id;
+    const titleSub = {revenue:'Офисы · 7 дней · сводка', orders:'Офисы · статусы · 7 дней', pending:'ожидают ответа оператора', inroute:'приняты · на доставке', done:'Сейчас в работе · динамика', avg:'время от заказа до доставки', late:'заказы дольше порога', rating:'★ распределение'}[id] || '';
+    const titleIco = {revenue:'$', orders:'📦', pending:'⏳', inroute:'🚚', done:'✓', avg:'⏱', late:'⚠', rating:'★'}[id] || '•';
+    const titleBg = {revenue:'var(--up-soft);color:var(--up)', orders:'rgba(201,169,110,.14);color:var(--gold2)', pending:'var(--warn-soft);color:var(--warn)', inroute:'var(--info-soft);color:var(--info)', done:'var(--up-soft);color:var(--up)', avg:'var(--info-soft);color:var(--info)', late:'var(--warn-soft);color:var(--warn)', rating:'rgba(201,169,110,.14);color:var(--gold2)'}[id] || '';
 
     return {
       title:`<div class="dt-tit-av plain" style="background:${titleBg.split(';')[0]};color:${titleBg.split(';')[1]?.replace('color:','')||'var(--text)'};font-size:16px">${titleIco}</div><div><div class="dt-tit-name">${titleT}</div><div class="dt-sub">${titleSub}</div></div>`,

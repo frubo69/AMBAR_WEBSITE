@@ -291,15 +291,15 @@ async def handle_create_order(request: web.Request) -> web.Response:
         "office_id": office_id, "office_name": office_nm, "comment": comment,
         "status": "pending",    "timestamp": datetime.now(timezone.utc).isoformat(),
     }
-    await db.save_order(oid, order_doc)
-    # Upsert user and increment order counter
-    user_fields = dict(name=original_name, full_name=original_name, first_name=user.get("first_name",""),
-                       last_name=user.get("last_name",""), username=username,
-                       last_order_at=datetime.now(timezone.utc))
-    if phone != "—":
-        user_fields["phone"] = phone
-    await db.upsert_user(uid, **user_fields)
-    await db._increment_user(uid, orders_total=1)
+    if uid not in _TEST_ACCOUNTS:
+        await db.save_order(oid, order_doc)
+        user_fields = dict(name=original_name, full_name=original_name, first_name=user.get("first_name",""),
+                           last_name=user.get("last_name",""), username=username,
+                           last_order_at=datetime.now(timezone.utc))
+        if phone != "—":
+            user_fields["phone"] = phone
+        await db.upsert_user(uid, **user_fields)
+        await db._increment_user(uid, orders_total=1)
 
     # ── Customer confirmation (single live status msg, edited through lifecycle) ─
     # Purge the live msgs from previous *finished* orders so the chat stays clean.
@@ -323,7 +323,7 @@ async def handle_create_order(request: web.Request) -> web.Response:
         confirm = render_customer_card(order_doc, lang)
         conf_result = await tg_send(BOT_TOKEN, uid, confirm)
         conf_msg_id = conf_result.get("result", {}).get("message_id")
-        if conf_msg_id:
+        if conf_msg_id and uid not in _TEST_ACCOUNTS:
             await db.update_order(oid, customer_msg_id=conf_msg_id)
     except Exception as e:
         log.error(f"Customer confirm: {e}")

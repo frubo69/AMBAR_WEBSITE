@@ -1150,6 +1150,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Command palette + settings modal */
 .cmd-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,6,.7);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:flex;align-items:flex-start;justify-content:center;padding:calc(60px + var(--safe-top)) 12px 12px;opacity:0;pointer-events:none;transition:opacity .18s var(--e1)}
 .cmd-overlay.show{opacity:1;pointer-events:all}
+.cmd-overlay:not(.show) *{pointer-events:none!important}
 .cmd-sheet{width:100%;max-width:560px;max-height:calc(100vh - 120px);background:var(--bg2);border:1px solid var(--border);border-radius:18px;box-shadow:0 24px 72px rgba(0,0,0,.65),0 0 0 1px rgba(201,169,110,.06);display:flex;flex-direction:column;overflow:hidden;transform:translateY(-12px) scale(.98);transition:transform .22s var(--e1)}
 .cmd-overlay.show .cmd-sheet{transform:none}
 .cmd-hdr{display:flex;align-items:center;gap:10px;padding:14px 16px;border-bottom:1px solid var(--border2)}
@@ -5703,12 +5704,12 @@ function backDetail(){
 }
 
 // Detail-trigger handler.
-// Uses pointerdown/pointerup so taps fire immediately and reliably on touch
-// (the click event on iOS Safari can be cancelled by sub-pixel movement,
-// scale transforms, or :active state changes — all of which made corner
-// taps on bento KPI cards intermittently miss).
+// Uses pointerdown/pointerup so taps fire immediately and reliably on touch.
+// A per-tap flag prevents double-fire (iOS WKWebView doesn't always
+// suppress the click event after pointerup).
 (function(){
   let _ptrStartX = 0, _ptrStartY = 0, _ptrTarget = null;
+  let _ptrHandled = false;
   const EXCLUDE = 'label,button,input,.chip,.tg,.preset,.cmd-close,.nfoot-btn,.dt-btn';
 
   function isExcluded(target){
@@ -5732,22 +5733,19 @@ function backDetail(){
     const el = _ptrTarget;
     _ptrTarget = null;
     if(el.contains(e.target) && isExcluded(e.target)) return;
-    e.preventDefault();
+    _ptrHandled = true;
+    setTimeout(()=>{ _ptrHandled = false; }, 800);
     openDetail(el.dataset.detail);
   });
 
-  // Drop the saved target if the gesture is cancelled (e.g. browser
-  // takes the pointer for a system gesture mid-tap).
   document.addEventListener('pointercancel', ()=>{ _ptrTarget = null; });
 
-  // Click fallback for environments where pointer events don't fire
-  // (older browsers, some embedded webviews). Won't double-fire because
-  // pointerup uses preventDefault on success.
+  // Click fallback — only fires when pointerup didn't handle this tap.
   document.addEventListener('click', e=>{
+    if(_ptrHandled){ _ptrHandled = false; return; }
     const el = e.target.closest && e.target.closest('[data-detail]');
     if(!el) return;
     if(isExcluded(e.target)) return;
-    e.preventDefault();
     openDetail(el.dataset.detail);
   });
 })();

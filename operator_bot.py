@@ -76,7 +76,7 @@ PRODUCTS = [
     {"id":"p45", "name":"Smirnoff Ice 0.275 bottle",   "cat":"Пиво", "p12":150, "p24":300},
     {"id":"p46", "name":"Bacardi Breezer 0.275 bottle","cat":"Пиво", "p12":150, "p24":300},
     {"id":"p39", "name":"Guinness 0.44 can",           "cat":"Пиво", "p12":200, "p24":400},
-    {"id":"p47", "name":"Carlsberg 0.5 can",          "cat":"Пиво", "p12":100, "p24":200},
+    {"id":"p47", "name":"Carlsberg 0.5 can",          "cat":"Пиво", "p12":100, "p24":180},
     # ── Ром / Rum ─────────────────────────────────────────────────────────────
     {"id":"p48", "name":"Bacardi White 1 ltr",         "price":100, "cat":"Ром"},
     {"id":"p49", "name":"Bacardi Black 1 ltr",         "price":100, "cat":"Ром"},

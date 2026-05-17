@@ -215,7 +215,7 @@ def _delivery_stats(orders) -> dict:
         if 0 < diff_min < 24 * 60:
             durations.append(diff_min)
             eta = int(o.get("eta") or 0) or LATE_THRESHOLD_FALLBACK
-            if diff_min > eta + LATE_GRACE_MIN:
+            if int(diff_min) > eta + LATE_GRACE_MIN:
                 late_count += 1
     if not durations:
         return {"avg_min": 0, "late_count": 0, "late_pct": 0, "sample": 0}

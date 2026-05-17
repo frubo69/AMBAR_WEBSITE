@@ -34,7 +34,7 @@ async def main():
                 pass
 
         eta_val = int(eta or 0) or 25
-        is_late = dur is not None and dur > eta_val + 5
+        is_late = dur is not None and int(dur) > eta_val + 5
 
         print(f"{oid}: eta={eta!r} (using {eta_val}), placed={ts}, confirmed={confirmed}, delivered={delivered}, duration={dur} min, late={is_late}")
 

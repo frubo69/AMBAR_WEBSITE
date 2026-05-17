@@ -3150,6 +3150,8 @@ function renderCustomerSections(customers){
 function renderAllClientsList(customers){
   const body = document.getElementById('acBody');
   if(!body) return;
+  const sub = document.getElementById('acSubtitle');
+  if(sub) sub.textContent = `${customers.length} человек · А → Я`;
   const sorted = [...customers].sort((a,b)=>(a.full_name||'').localeCompare(b.full_name||'','ru'));
   let html = '<div class="az-list">';
   let lastLetter = '';

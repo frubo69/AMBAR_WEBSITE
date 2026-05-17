@@ -1040,7 +1040,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
         </button>
         <button class="cmd-item" data-act="quick:late" data-kw="опоздания задержки late delay">
           <span class="cmd-ico" style="background:var(--warn-soft);color:var(--warn)">⚠</span>
-          <span class="cmd-lbl"><b>Показать опоздания</b><span class="cmd-sub">3 заказа сегодня &gt; 25 мин</span></span>
+          <span class="cmd-lbl"><b>Показать опоздания</b><span class="cmd-sub">3 заказа сегодня · дольше ETA</span></span>
         </button>
         <button class="cmd-item" data-act="quick:reviews" data-kw="отзывы рейтинги reviews ratings">
           <span class="cmd-ico" style="background:rgba(201,169,110,.14);color:var(--gold2)">★</span>
@@ -1337,7 +1337,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
           <span class="ncat-caret">⌵</span>
         </div>
         <div class="ncat-body">
-          <div class="nrow"><div class="nrow-body"><div class="nrow-t">Заказ опоздал <span class="pill warn">&gt; 25 мин</span></div><div class="nrow-s">От подтверждения до доставки</div></div><label class="tg"><input type="checkbox" data-p="timing.late25" checked><i></i></label></div>
+          <div class="nrow"><div class="nrow-body"><div class="nrow-t">Заказ опоздал <span class="pill warn">дольше ETA</span></div><div class="nrow-s">Факт превысил ETA оператора + 3 мин</div></div><label class="tg"><input type="checkbox" data-p="timing.late25" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Оператор не принял <span class="pill warn">&gt; 5 мин</span></div><div class="nrow-s">Заказ висит непринятым</div></div><label class="tg"><input type="checkbox" data-p="timing.notAccepted5" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Заказ в пути <span class="pill warn">&gt; 30 мин</span></div><div class="nrow-s">Оператор не завершает доставку</div></div><label class="tg"><input type="checkbox" data-p="timing.enroute30" checked><i></i></label></div>
           <div class="nrow nrow-filter">
@@ -2813,7 +2813,7 @@ function renderKpis(k){
     _setText('kAvgSub', 'нет данных');
   }
   // Late % + raw count. Threshold is server-driven so the sub-label stays in sync.
-  if(k.late_threshold) _setText('kLateHint', `> ${k.late_threshold} мин`);
+  _setText('kLateHint', '> ETA + 3 мин');
   const lc = document.getElementById('kLateCount');
   if(k.avg_min_sample > 0){
     _setText('kLate', k.late_pct);
@@ -5211,7 +5211,7 @@ const DETAIL = {
           <div class="dt-stat"><div class="dt-stat-lbl">Заказы</div><div class="dt-stat-val">${d.ord}</div><div class="dt-stat-sub">доставлено ${d.ord-d.late}</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">Ср. время</div><div class="dt-stat-val ${d.avg>40?'warn':'up'}">${d.avg}<span class="u">мин</span></div><div class="dt-stat-sub">норматив 40</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">★ Рейтинг</div><div class="dt-stat-val up">${d.rate}</div><div class="dt-stat-sub">34 оценки</div></div>
-          <div class="dt-stat"><div class="dt-stat-lbl">Опоздания</div><div class="dt-stat-val ${d.late>1?'warn':''}">${d.late}</div><div class="dt-stat-sub">&gt; 25 мин</div></div>
+          <div class="dt-stat"><div class="dt-stat-lbl">Опоздания</div><div class="dt-stat-val ${d.late>1?'warn':''}">${d.late}</div><div class="dt-stat-sub">дольше ETA</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">Ср. чек</div><div class="dt-stat-val">${d.chk}<span class="u">AED</span></div><div class="dt-stat-sub">vs нед. +3%</div></div>
         </div>
         <div class="dt-sect">Выручка · 7 дней</div>
@@ -5695,7 +5695,7 @@ const DETAIL = {
           <div class="dt-row" data-detail="kpi:pending"><div class="dt-row-l"><div class="dt-row-t">Не принято</div><div class="dt-row-s">ожидают ответа оператора</div></div><div class="dt-row-r ${(k.pending||0)>0?'warn':''}">${k.pending||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
           <div class="dt-row" data-detail="kpi:orders"><div class="dt-row-l"><div class="dt-row-t">Всего заказов</div><div class="dt-row-s">средний чек <span data-aed="${k.avg_check||0}">${fmt(k.avg_check||0)}</span> AED</div></div><div class="dt-row-r">${k.orders||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
           <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Чаевые</div></div><div class="dt-row-r"><span data-aed="${f.tips||0}">${fmt(f.tips||0)}</span> AED</div></div>
-          <div class="dt-row" data-detail="kpi:late"><div class="dt-row-l"><div class="dt-row-t">Опоздания</div><div class="dt-row-s">> ${k.late_threshold||25} мин</div></div><div class="dt-row-r ${(k.late_count||0)>0?'warn':''}">${k.late_count||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
+          <div class="dt-row" data-detail="kpi:late"><div class="dt-row-l"><div class="dt-row-t">Опоздания</div><div class="dt-row-s">дольше ETA + 3 мин</div></div><div class="dt-row-r ${(k.late_count||0)>0?'warn':''}">${k.late_count||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
           <div class="dt-row" data-detail="kpi:avg"><div class="dt-row-l"><div class="dt-row-t">Среднее время</div><div class="dt-row-s">от заказа до доставки</div></div><div class="dt-row-r">${k.avg_min_sample>0 ? k.avg_min+' мин' : '—'}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
         </div>`;
     } else if(id === 'orders'){
@@ -5742,7 +5742,7 @@ const DETAIL = {
             <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Среднее</div><div class="dt-row-s">от оформления до доставки</div></div><div class="dt-row-r">${k.avg_min} мин</div></div>
             <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Оценка</div></div><div class="dt-row-r" style="color:${bucketClr}">${bucketLabel}</div></div>
             <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Выборка</div><div class="dt-row-s">доставленных за период</div></div><div class="dt-row-r">${k.avg_min_sample}</div></div>
-            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Порог опоздания</div></div><div class="dt-row-r">> ${k.late_threshold||25} мин</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Порог опоздания</div></div><div class="dt-row-r">ETA + 3 мин</div></div>
           </div>`;
       } else {
         hero = `<div class="dt-stat-val" style="font-size:32px;line-height:1;color:var(--muted)">—</div><div style="font-size:12px;color:var(--muted);margin-top:10px">нет доставленных заказов за период</div>`;
@@ -5752,14 +5752,14 @@ const DETAIL = {
       const k = f.kpi || {};
       if(k.avg_min_sample > 0){
         const lateClr = k.late_pct > 20 ? 'var(--dn)' : k.late_pct > 0 ? 'var(--warn)' : 'var(--up)';
-        hero = `<div class="dt-stat-val" style="font-size:48px;line-height:1;color:${lateClr}">${k.late_pct}<span class="u" style="font-size:16px;margin-left:8px">%</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${k.late_count} ${pluralize(k.late_count,'заказ','заказа','заказов')} > ${k.late_threshold||25} мин · из ${k.avg_min_sample}</div>`;
+        hero = `<div class="dt-stat-val" style="font-size:48px;line-height:1;color:${lateClr}">${k.late_pct}<span class="u" style="font-size:16px;margin-left:8px">%</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${k.late_count} ${pluralize(k.late_count,'заказ','заказа','заказов')} дольше ETA · из ${k.avg_min_sample}</div>`;
         const onTime = k.avg_min_sample - k.late_count;
         const onTimePct = Math.round(onTime / k.avg_min_sample * 100);
         body = `
-          <div class="dt-sect">Опоздания · > ${k.late_threshold||25} мин</div>
+          <div class="dt-sect">Опоздания · дольше ETA</div>
           <div class="dt-card">
-            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Опоздавших</div><div class="dt-row-s">доставка дольше ${k.late_threshold||25} мин</div></div><div class="dt-row-r dn">${k.late_count}</div></div>
-            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Вовремя</div><div class="dt-row-s">доставка ≤ ${k.late_threshold||25} мин</div></div><div class="dt-row-r up">${onTime} (${onTimePct}%)</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Опоздавших</div><div class="dt-row-s">факт превысил ETA + 3 мин</div></div><div class="dt-row-r dn">${k.late_count}</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Вовремя</div><div class="dt-row-s">уложился в ETA + 3 мин</div></div><div class="dt-row-r up">${onTime} (${onTimePct}%)</div></div>
             <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Всего доставлено</div></div><div class="dt-row-r">${k.avg_min_sample}</div></div>
             <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Среднее время</div></div><div class="dt-row-r">${k.avg_min} мин</div></div>
           </div>`;

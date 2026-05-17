@@ -5499,7 +5499,14 @@ const DETAIL = {
             <div class="dt-sect">Позиции</div>
             <div class="dt-card">
               ${real.items_short ? real.items_short.split(', ').map(it=>`<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${it}</div></div></div>`).join('') : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">нет данных</div></div></div>'}
-            </div>
+            </div>${real.customer_id ? `
+            <div class="dt-card" style="margin-top:8px;cursor:pointer;border-color:rgba(201,169,110,.15)" onclick="openDetail('customer:${real.customer_id}')">
+              <div class="dt-row" style="justify-content:center;gap:8px;padding:10px 14px">
+                <span style="font-size:12px;color:var(--sub)">👤</span>
+                <span style="font-size:12px;color:var(--sub);font-weight:500">${real.name}</span>
+                <span style="font-size:11px;color:var(--muted)">›</span>
+              </div>
+            </div>` : ''}
             <div class="dt-sect">Информация</div>
             <div class="dt-card">
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Клиент</div><div class="dt-row-s">${real.username && real.username!=='—' ? '@'+real.username : ''}</div></div><div class="dt-row-r">${real.name}</div></div>
@@ -5509,7 +5516,7 @@ const DETAIL = {
               ${real.eta ? `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">ETA</div></div><div class="dt-row-r">${real.eta} мин</div></div>` : ''}
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Время</div></div><div class="dt-row-r">${time}</div></div>
             </div>`,
-          foot: real.customer_id ? `<button class="dt-btn pri" onclick="openDetail('customer:${real.customer_id}')">👤 Клиент</button>` : ''
+          foot: ''
         };
       }
       d = {t:'—', dur:null, late:0, sum:0, tip:0, office:'central', op:'central', client:'anon', clientName:'Неизвестно', clientTier:'', items:[], review:null, accept:0, created:0, pickup:0, deliverBy:'--:--'};

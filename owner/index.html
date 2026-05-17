@@ -1249,7 +1249,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
       </div>
       <button class="cmd-close" onclick="closeAlerts()" aria-label="Закрыть"><span class="txt">ESC</span><span class="x">✕</span></button>
     </div>
-    <div class="notif-body" id="alertsOvBody" style="padding:14px 16px">
+    <div class="notif-body" id="alertsOvBody" style="padding:14px 16px;overflow-y:auto;flex:1;min-height:0">
       <div class="alert-list" id="alertList">
         <div class="alert-empty"><span class="ae-ico">✓</span>Все системы в норме</div>
       </div>
@@ -3507,9 +3507,13 @@ const _DISMISSED_ALERTS = new Set();
 const _SEEN_IMPORTANT = new Set();
 try{
   JSON.parse(localStorage.getItem('ambar_seen_alerts')||'[]').forEach(x => _SEEN_IMPORTANT.add(x));
+  JSON.parse(localStorage.getItem('ambar_dismissed_alerts')||'[]').forEach(x => _DISMISSED_ALERTS.add(x));
 }catch(_){}
 function _persistSeen(){
   try{ localStorage.setItem('ambar_seen_alerts', JSON.stringify([..._SEEN_IMPORTANT])); }catch(_){}
+}
+function _persistDismissed(){
+  try{ localStorage.setItem('ambar_dismissed_alerts', JSON.stringify([..._DISMISSED_ALERTS])); }catch(_){}
 }
 function _getNotifPrefs(){
   try{
@@ -3720,6 +3724,7 @@ function _renderAlerts(){
     btn.addEventListener('click',(e)=>{
       e.stopPropagation();
       _DISMISSED_ALERTS.add(btn.dataset.dismiss);
+      _persistDismissed();
       try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(_){}
       _renderAlerts();
     });

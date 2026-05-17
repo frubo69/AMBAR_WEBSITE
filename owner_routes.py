@@ -341,6 +341,18 @@ async def handle_finance(request):
             orders_7d[idx] += 1
 
     def _order_summary(o):
+        placed = o.get("timestamp","")
+        confirmed = o.get("confirmed_at","")
+        delivered = o.get("updated_at","") if o.get("status") == "delivered" else ""
+        actual_min = None
+        if placed and delivered:
+            try:
+                from datetime import datetime as _dt
+                p = _dt.fromisoformat(placed.replace("Z","+00:00"))
+                d = _dt.fromisoformat(delivered.replace("Z","+00:00"))
+                actual_min = max(0, int((d - p).total_seconds() / 60))
+            except Exception:
+                pass
         return {
             "id": o.get("order_id",""),
             "name": o.get("customer_name","—"),
@@ -349,8 +361,11 @@ async def handle_finance(request):
             "phone": o.get("phone","—"),
             "total": o.get("total", 0),
             "status": o.get("status",""),
-            "ts": o.get("timestamp",""),
+            "ts": placed,
             "eta": o.get("eta",""),
+            "confirmed_at": confirmed,
+            "delivered_at": delivered,
+            "actual_min": actual_min,
             "office": o.get("office_name",""),
             "address": o.get("address","—"),
             "gmap_link": o.get("gmap_link",""),

@@ -5500,21 +5500,36 @@ const DETAIL = {
             <div class="dt-card">
               ${real.items_short ? real.items_short.split(', ').map(it=>`<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${it}</div></div></div>`).join('') : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">нет данных</div></div></div>'}
             </div>
-            <div class="dt-sect">Информация</div>
-            <div class="dt-card">
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Адрес</div></div><div class="dt-row-r" style="font-size:12px;max-width:60%;text-align:right">${real.gmap_link ? '<a href="'+real.gmap_link+'" target="_blank" style="color:var(--gold2)">'+( real.address && real.address!=='—' && real.address!=='GPS' ? real.address : '📍 Карта')+'</a>' : (real.address||'—')}</div></div>
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Офис</div></div><div class="dt-row-r">${real.office||'—'}</div></div>
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Статус</div></div><div class="dt-row-r" style="color:${stClr[real.status]||'var(--muted)'}">${stMap[real.status]||real.status}</div></div>
-              ${real.eta ? `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">ETA</div></div><div class="dt-row-r">${real.eta} мин</div></div>` : ''}
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Время</div></div><div class="dt-row-r">${time}</div></div>
-            </div>${real.customer_id ? `
-            <div class="dt-card" style="margin-top:12px;cursor:pointer;border-color:rgba(201,169,110,.25);background:rgba(201,169,110,.06)" onclick="openDetail('customer:${real.customer_id}')">
+            ${real.customer_id ? `
+            <div class="dt-card" style="margin-top:12px;margin-bottom:4px;cursor:pointer;border-color:rgba(201,169,110,.25);background:rgba(201,169,110,.06)" onclick="openDetail('customer:${real.customer_id}')">
               <div class="dt-row" style="justify-content:center;gap:10px;padding:14px 16px">
                 <span style="font-size:16px">👤</span>
                 <span style="font-size:14px;color:var(--text);font-weight:600">${real.name}</span>
                 <span style="font-size:13px;color:var(--muted)">›</span>
               </div>
-            </div>` : ''}`,
+            </div>` : ''}
+            <div class="dt-sect">Информация</div>
+            <div class="dt-card">
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Адрес</div></div><div class="dt-row-r" style="font-size:12px;max-width:60%;text-align:right">${real.gmap_link ? '<a href="'+real.gmap_link+'" target="_blank" style="color:var(--gold2)">'+( real.address && real.address!=='—' && real.address!=='GPS' ? real.address : '📍 Карта')+'</a>' : (real.address||'—')}</div></div>
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Офис</div></div><div class="dt-row-r">${real.office||'—'}</div></div>
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Статус</div></div><div class="dt-row-r" style="color:${stClr[real.status]||'var(--muted)'}">${stMap[real.status]||real.status}</div></div>
+            </div>
+            <div class="dt-sect">Время</div>
+            <div class="dt-card">
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Оформлен</div></div><div class="dt-row-r">${time||'—'}</div></div>
+              ${(()=>{
+                if(!real.confirmed_at) return '';
+                const ca = new Date(/Z$|[+-]\\d{2}/.test(real.confirmed_at) ? real.confirmed_at : real.confirmed_at+'Z');
+                return isNaN(ca.getTime()) ? '' : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Принят</div></div><div class="dt-row-r">'+String(ca.getHours()).padStart(2,'0')+':'+String(ca.getMinutes()).padStart(2,'0')+'</div></div>';
+              })()}
+              ${(()=>{
+                if(!real.delivered_at) return '';
+                const da = new Date(/Z$|[+-]\\d{2}/.test(real.delivered_at) ? real.delivered_at : real.delivered_at+'Z');
+                return isNaN(da.getTime()) ? '' : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Доставлен</div></div><div class="dt-row-r">'+String(da.getHours()).padStart(2,'0')+':'+String(da.getMinutes()).padStart(2,'0')+'</div></div>';
+              })()}
+              ${real.eta ? '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">ETA</div></div><div class="dt-row-r">'+real.eta+' мин</div></div>' : ''}
+              ${real.actual_min != null ? '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Факт</div></div><div class="dt-row-r" style="color:'+(real.actual_min>(parseInt(real.eta)||25)?'var(--warn)':'var(--up)')+'"><b>'+real.actual_min+'</b> мин</div></div>' : ''}
+            </div>`,
           foot: ''
         };
       }

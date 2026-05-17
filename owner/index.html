@@ -1894,8 +1894,10 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .alert-x{flex-shrink:0;width:24px;height:24px;border-radius:8px;background:transparent;border:none;color:var(--muted);font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.12s var(--e1);-webkit-tap-highlight-color:transparent}
 .alert-x:hover{background:var(--card2);color:var(--text)}
 .alert-x:active{transform:scale(.9)}
-.alert-empty{padding:18px 14px;text-align:center;font-size:12px;color:var(--muted);background:var(--card);border:1px dashed var(--border2);border-radius:12px}
-.alert-empty .ae-ico{font-size:22px;display:block;margin-bottom:6px;opacity:.7}
+.alert-list.empty{flex:1;display:flex;align-items:center;justify-content:center;min-height:220px}
+.alert-empty{padding:28px 20px;text-align:center;font-size:13px;color:var(--muted);width:100%}
+.alert-empty .ae-ico{font-size:32px;display:block;margin-bottom:10px;opacity:.6}
+.alert-row.seen{opacity:.55}
 
 /* ===== Toggle switch (Settings) ===== */
 .tog{position:relative;display:inline-flex;width:36px;height:20px;background:var(--card2);border:1px solid var(--border2);border-radius:11px;cursor:pointer;transition:.18s var(--e1);flex-shrink:0;-webkit-tap-highlight-color:transparent}
@@ -3688,9 +3690,11 @@ function _renderAlerts(){
   if(seenBtn) seenBtn.style.display = alerts.length ? 'block' : 'none';
   if(clearBtn) clearBtn.style.display = alerts.length ? 'block' : 'none';
   if(!alerts.length){
+    list.classList.add('empty');
     list.innerHTML = '<div class="alert-empty"><span class="ae-ico">✓</span>Все системы в норме</div>';
     return;
   }
+  list.classList.remove('empty');
   // Sort: unseen-important first, then dn > warn > info
   const sevRank = {dn:0, warn:1, info:2};
   const sorted = [...alerts].sort((a,b)=>{
@@ -3757,8 +3761,12 @@ function markAlertsSeen(){
   const alerts = _buildAlerts();
   alerts.forEach(a => { if(_isAlertImportant(a)) _SEEN_IMPORTANT.add(a.id); });
   _persistSeen();
+  document.querySelectorAll('.alert-row').forEach(r=>r.classList.add('seen'));
+  document.querySelectorAll('.alert-row [style*="важно"],.alert-row span').forEach(s=>{
+    if(s.textContent==='важно'){s.textContent='прочитано';s.style.color='var(--up)';s.style.background='rgba(76,175,125,.14)';}
+  });
   try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(_){}
-  _renderAlerts();
+  setTimeout(()=>_renderAlerts(),300);
 }
 function clearAllAlerts(){
   const alerts = _buildAlerts();

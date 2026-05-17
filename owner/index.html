@@ -1262,10 +1262,13 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 </div>
 
 <style>
-#alertsOverlay{padding-bottom:48px}
+#alertsOverlay{padding-bottom:48px;overflow:hidden;touch-action:none}
 .alerts-sheet{max-height:calc(100vh - var(--safe-top) - 80px);align-self:flex-end;border-radius:18px}
 @media (max-width:520px),(pointer:coarse){.alerts-sheet{max-height:calc(100vh - var(--safe-top) - 48px)}}
-#alertsOvBody{-webkit-overflow-scrolling:touch}
+#alertsOvBody{-webkit-overflow-scrolling:touch;overscroll-behavior:contain;touch-action:pan-y;min-height:0}
+#alertsOvBody::-webkit-scrollbar{display:none}
+.alert-row{touch-action:pan-y}
+.alert-x{touch-action:manipulation}
 .alerts-foot{display:flex;gap:10px;padding:10px 16px;border-top:1px solid var(--border2);background:var(--bg3);flex-shrink:0;justify-content:center}
 .abtn{padding:10px 18px;border-radius:10px;font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:.15s var(--e1);border:1px solid;text-align:center}
 .abtn:active{transform:scale(.97);opacity:.8}
@@ -3745,11 +3748,19 @@ function openAlerts(){
   _renderAlerts();
   var b=document.getElementById('alertsOvBody'); if(b) b.scrollTop=0;
   alertsOv.classList.add('show');
+  document.body.style.overflow='hidden';
   try{Telegram.WebApp.HapticFeedback.impactOccurred('light')}catch(_){}
 }
-function closeAlerts(){ if(alertsOv) alertsOv.classList.remove('show'); }
+function closeAlerts(){
+  if(alertsOv) alertsOv.classList.remove('show');
+  document.body.style.overflow='';
+}
 if(alertsOv){
   alertsOv.addEventListener('click', e => { if(e.target === alertsOv) closeAlerts(); });
+  alertsOv.addEventListener('touchmove', function(e){
+    var body = document.getElementById('alertsOvBody');
+    if(!body || !body.contains(e.target)) e.preventDefault();
+  }, {passive:false});
 }
 function markAlertsSeen(){
   const alerts = _buildAlerts();

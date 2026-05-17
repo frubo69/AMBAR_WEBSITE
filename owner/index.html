@@ -3743,6 +3743,7 @@ const alertsOv = document.getElementById('alertsOverlay');
 function openAlerts(){
   if(!alertsOv) return;
   _renderAlerts();
+  var b=document.getElementById('alertsOvBody'); if(b) b.scrollTop=0;
   alertsOv.classList.add('show');
   try{Telegram.WebApp.HapticFeedback.impactOccurred('light')}catch(_){}
 }

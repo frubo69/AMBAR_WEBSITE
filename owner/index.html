@@ -5807,22 +5807,14 @@ function openDetail(key){
   const [type, id] = key.split(':');
   const tpl = DETAIL[type]?.(id);
   if(!tpl){ console.warn('No template for', key); return; }
-  // If overlay already open, push current onto stack so Back returns here.
-  // But if navigating between siblings (same type), replace instead of push
-  // to avoid circular stacks (e.g. kpi:pending → kpi:inroute → kpi:pending…)
   if(dtOv.classList.contains('show') && _dtCurrent){
-    const curType = _dtCurrent.split(':')[0];
-    if(curType === type){
-      // sibling navigation — don't push, just replace
-    } else {
-      _dtStack.push(_dtCurrent);
-    }
+    _dtStack.push(_dtCurrent);
   }
   _dtCurrent = key;
   document.getElementById('dtTitle').innerHTML = tpl.title;
   document.getElementById('dtBody').innerHTML = tpl.body;
   document.getElementById('dtFoot').innerHTML = tpl.foot || '';
-  document.getElementById('dtBack').style.display = 'flex';
+  document.getElementById('dtBack').style.display = _dtStack.length ? 'flex' : 'none';
   dtOv.classList.add('show');
   document.getElementById('dtBody').scrollTop = 0;
   applyCurrency();
@@ -5840,7 +5832,7 @@ function backDetail(){
   document.getElementById('dtTitle').innerHTML = tpl.title;
   document.getElementById('dtBody').innerHTML = tpl.body;
   document.getElementById('dtFoot').innerHTML = tpl.foot || '';
-  document.getElementById('dtBack').style.display = 'flex';
+  document.getElementById('dtBack').style.display = _dtStack.length ? 'flex' : 'none';
   document.getElementById('dtBody').scrollTop = 0;
   applyCurrency();
   try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}

@@ -588,45 +588,10 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     </div>
   </div>
 
-  <!-- Top products -->
+  <!-- Top products (populated from /api/owner/catalog) -->
   <div class="sect"><div class="sect-t">Топ позиций</div><a class="sect-a" onclick="openCatalog()" style="cursor:pointer">каталог →</a></div>
-  <div class="list">
-    <div class="lrow" data-detail="product:absolut">
-      <div class="lrow-idx">1</div>
-      <div class="lrow-av" style="background:linear-gradient(135deg,#2a2040,#1a1428);color:var(--gold)">А</div>
-      <div class="lrow-body">
-        <div class="lrow-name">Absolut · 1L</div>
-        <div class="lrow-sub">18 шт · 280 AED за бут.</div>
-      </div>
-      <div class="lrow-amt mono" data-aed="5040">5 040</div>
-    </div>
-    <div class="lrow" data-detail="product:jack">
-      <div class="lrow-idx">2</div>
-      <div class="lrow-av" style="background:linear-gradient(135deg,#2a2040,#1a1428);color:var(--gold)">J</div>
-      <div class="lrow-body">
-        <div class="lrow-name">Jack Daniel's · 0.7L</div>
-        <div class="lrow-sub">9 шт · 340 AED за бут.</div>
-      </div>
-      <div class="lrow-amt mono" data-aed="3060">3 060</div>
-    </div>
-    <div class="lrow" data-detail="product:heineken">
-      <div class="lrow-idx">3</div>
-      <div class="lrow-av" style="background:linear-gradient(135deg,#2a2040,#1a1428);color:var(--gold)">H</div>
-      <div class="lrow-body">
-        <div class="lrow-name">Heineken · 6-pack</div>
-        <div class="lrow-sub">14 шт · 90 AED</div>
-      </div>
-      <div class="lrow-amt mono" data-aed="1260">1 260</div>
-    </div>
-    <div class="lrow" data-detail="product:chivas">
-      <div class="lrow-idx">4</div>
-      <div class="lrow-av" style="background:linear-gradient(135deg,#2a2040,#1a1428);color:var(--gold)">C</div>
-      <div class="lrow-body">
-        <div class="lrow-name">Chivas · 0.7L</div>
-        <div class="lrow-sub">3 шт · 380 AED</div>
-      </div>
-      <div class="lrow-amt mono" data-aed="1140">1 140</div>
-    </div>
+  <div class="list" id="topProductsList">
+    <div style="padding:18px;text-align:center;color:var(--muted);font-size:13px">Загрузка…</div>
   </div>
 
   <!-- Live feed -->
@@ -3310,7 +3275,25 @@ async function loadCatalog(){
   return catLoading;
 }
 
+function _renderTopProducts(){
+  const wrap = document.getElementById('topProductsList');
+  if(!wrap) return;
+  if(!PRODUCTS.length){ wrap.innerHTML = '<div style="padding:18px;text-align:center;color:var(--muted);font-size:13px">Нет данных</div>'; return; }
+  const top = [...PRODUCTS].sort((a,b)=>b.rev-a.rev).slice(0,4).filter(p=>p.rev>0);
+  if(!top.length){ wrap.innerHTML = '<div style="padding:18px;text-align:center;color:var(--muted);font-size:13px">Пока нет продаж</div>'; return; }
+  wrap.innerHTML = top.map((p,i)=>`<div class="lrow">
+    <div class="lrow-idx">${i+1}</div>
+    <div class="lrow-av" style="background:linear-gradient(135deg,#2a2040,#1a1428);color:var(--gold)">${p.i}</div>
+    <div class="lrow-body">
+      <div class="lrow-name">${p.name}${p.vol?' · '+p.vol:''}</div>
+      <div class="lrow-sub">${p.sold} шт · ${fmt(p.price)} ${curCur} за бут.</div>
+    </div>
+    <div class="lrow-amt mono">${fmt(p.rev)}</div>
+  </div>`).join('');
+}
+
 function _renderCatBlock(){
+  _renderTopProducts();
   const sub = document.getElementById('catBlockSub');
   if(!sub) return;
   if(!PRODUCTS.length){ sub.textContent = 'Не удалось загрузить каталог'; return; }

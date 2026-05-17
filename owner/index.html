@@ -5783,27 +5783,25 @@ const DETAIL = {
           const timeStr = o.ts ? new Date(/Z$|[+-]\d{2}/.test(o.ts)?o.ts:o.ts+'Z').toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}) : '';
           return `<div class="dt-row" data-detail="order:${o.id}"><div class="dt-row-l"><div class="dt-row-t">#${(o.id||'').slice(0,6)} ${(o.id||'').slice(6)} ${isLate?'<span class="dt-row-tiny" style="color:var(--warn)">+'+over+' мин</span>':'<span class="dt-row-tiny" style="color:var(--up)">OK</span>'}</div><div class="dt-row-s">${timeStr} · ETA ${o._eta} мин</div></div><div class="dt-row-r ${isLate?'warn':'up'}">${o._dur} мин</div></div>`;
         };
-        window._lateOrderRows = lateOrders.map(o=>orderRow(o,true)).join('');
-        window._onTimeOrderRows = onTimeOrders.map(o=>orderRow(o,false)).join('');
+        const allDelRows = allDel.filter(o=>o._dur!=null).map(o=>{
+          const isL = o._dur > o._eta + 5;
+          return orderRow(o, isL);
+        }).join('');
+        const lateRows = lateOrders.map(o=>orderRow(o,true)).join('');
         body = `
           <div class="dt-sect">Опоздания · дольше ETA</div>
           <div class="dt-card">
-            <div class="dt-row" ${lateOrders.length?'data-detail="kpi:late:orders"':''}><div class="dt-row-l"><div class="dt-row-t">Опоздавших</div><div class="dt-row-s">факт превысил ETA + 5 мин</div></div><div class="dt-row-r dn">${k.late_count}</div>${lateOrders.length?'<div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div>':''}</div>
-            <div class="dt-row" ${onTimeOrders.length?'data-detail="kpi:late:ontime"':''}><div class="dt-row-l"><div class="dt-row-t">Вовремя</div><div class="dt-row-s">уложился в ETA + 5 мин</div></div><div class="dt-row-r up">${onTime} (${onTimePct}%)</div>${onTimeOrders.length?'<div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div>':''}</div>
-            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Всего доставлено</div></div><div class="dt-row-r">${k.avg_min_sample}</div></div>
+            <div class="dt-row" ${lateOrders.length?'style="cursor:pointer" onclick="var el=document.getElementById(\'_expandLate\');el.style.display=el.style.display===\'none\'?\'block\':\'none\'"':''}><div class="dt-row-l"><div class="dt-row-t">Опоздавших</div><div class="dt-row-s">факт превысил ETA + 5 мин</div></div><div class="dt-row-r dn">${k.late_count}</div>${lateOrders.length?'<div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">⌵</div>':''}</div>
+            <div id="_expandLate" style="display:none">${lateRows}</div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Вовремя</div><div class="dt-row-s">уложился в ETA + 5 мин</div></div><div class="dt-row-r up">${onTime} (${onTimePct}%)</div></div>
+            <div class="dt-row" style="cursor:pointer" onclick="var el=document.getElementById('_expandAll');el.style.display=el.style.display==='none'?'block':'none'"><div class="dt-row-l"><div class="dt-row-t">Всего доставлено</div></div><div class="dt-row-r">${k.avg_min_sample}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">⌵</div></div>
+            <div id="_expandAll" style="display:none">${allDelRows}</div>
             <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Среднее время</div></div><div class="dt-row-r">${k.avg_min} мин</div></div>
-          </div>
-          ${lateOrders.length ? `<div class="dt-sect">Последние опоздания</div><div class="dt-card">${lateOrders.slice(0,3).map(o=>orderRow(o,true)).join('')}</div>` : ''}`;
+          </div>`;
       } else {
         hero = `<div class="dt-stat-val" style="font-size:32px;line-height:1;color:var(--muted)">—</div><div style="font-size:12px;color:var(--muted);margin-top:10px">нет доставленных заказов за период</div>`;
         body = `<div class="dt-sect">Опоздания</div><div class="dt-card">${noData}</div>`;
       }
-    } else if(id === 'late:orders'){
-      hero = `<div class="dt-stat-val dn" style="font-size:48px;line-height:1">${(window._lateOrderRows||'').split('dt-row').length-1}</div><div style="font-size:12px;color:var(--muted);margin-top:10px">заказов дольше ETA + 5 мин</div>`;
-      body = `<div class="dt-sect">Опоздавшие заказы</div><div class="dt-card">${window._lateOrderRows||noData}</div>`;
-    } else if(id === 'late:ontime'){
-      hero = `<div class="dt-stat-val up" style="font-size:48px;line-height:1">${(window._onTimeOrderRows||'').split('dt-row').length-1}</div><div style="font-size:12px;color:var(--muted);margin-top:10px">заказов вовремя</div>`;
-      body = `<div class="dt-sect">Вовремя</div><div class="dt-card">${window._onTimeOrderRows||noData}</div>`;
     } else if(id === 'pending'){
       const k = f.kpi || {};
       const pendingN = k.pending || 0;

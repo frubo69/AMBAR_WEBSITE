@@ -188,19 +188,19 @@ def _last_7_days(all_orders: dict) -> list:
     return buckets
 
 
-# Anything over this is a "late" delivery for the Опоздания KPI tile.
-# Matches the UI hint "> 25 мин" on the bento card.
-LATE_THRESHOLD_MIN = 25
+# Fallback when an order has no ETA set by the operator.
+LATE_THRESHOLD_FALLBACK = 25
+# Grace period: delivery up to this many minutes over ETA is still OK.
+LATE_GRACE_MIN = 3
 
 
 def _delivery_stats(orders) -> dict:
     """Compute average delivery time + late count from delivered orders.
 
-    `orders` is a list of (dt, order) pairs (output of _orders_in_window).
-    Delivery duration = updated_at − timestamp, both ISO strings on the
-    order document. Orders without a parseable updated_at are skipped —
-    they shouldn't exist for delivered status, but defensively handled."""
-    durations = []  # in whole minutes
+    Late = actual duration > order's ETA + grace (3 min).
+    If the order has no ETA, falls back to 25 min."""
+    durations = []
+    late_count = 0
     for _, o in orders:
         placed_ts = o.get("timestamp")
         delivered_ts = o.get("updated_at") or o.get("delivered_at")
@@ -212,13 +212,14 @@ def _delivery_stats(orders) -> dict:
         except (ValueError, TypeError):
             continue
         diff_min = (t1 - t0).total_seconds() / 60
-        # Drop nonsense values (negative = clock skew, > 24h = stuck order)
         if 0 < diff_min < 24 * 60:
             durations.append(diff_min)
+            eta = int(o.get("eta") or 0) or LATE_THRESHOLD_FALLBACK
+            if diff_min > eta + LATE_GRACE_MIN:
+                late_count += 1
     if not durations:
         return {"avg_min": 0, "late_count": 0, "late_pct": 0, "sample": 0}
     avg_min = round(sum(durations) / len(durations))
-    late_count = sum(1 for d in durations if d > LATE_THRESHOLD_MIN)
     late_pct = round(late_count / len(durations) * 100, 1)
     return {
         "avg_min":    avg_min,
@@ -431,7 +432,7 @@ async def handle_finance(request):
             "avg_min_sample":   deliv_curr["sample"],
             "late_count":       deliv_curr["late_count"],
             "late_pct":         deliv_curr["late_pct"],
-            "late_threshold":   LATE_THRESHOLD_MIN,
+            "late_threshold":   LATE_THRESHOLD_FALLBACK,
             "pending_orders":   [_order_summary(o) for o in pending_orders],
             "inroute_orders":   [_order_summary(o) for o in inroute_orders],
             "delivered_orders": [_order_summary(o) for o in delivered_orders_list],

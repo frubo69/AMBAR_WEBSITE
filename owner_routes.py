@@ -191,7 +191,7 @@ def _last_7_days(all_orders: dict) -> list:
 # Fallback when an order has no ETA set by the operator.
 LATE_THRESHOLD_FALLBACK = 25
 # Grace period: delivery up to this many minutes over ETA is still OK.
-LATE_GRACE_MIN = 3
+LATE_GRACE_MIN = 5
 
 
 def _delivery_stats(orders) -> dict:

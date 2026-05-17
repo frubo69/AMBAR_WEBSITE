@@ -2977,6 +2977,12 @@ function applyPeopleTab(tab){
   if(!op || !cu) return;
   op.style.display = tab==='operators' ? '' : 'none';
   cu.style.display = tab==='customers' ? '' : 'none';
+  if(tab==='customers') refreshCustomers();
+}
+async function refreshCustomers(){
+  _customersCache = null;
+  const customers = await loadCustomers();
+  if(customers.length) renderCustomerSections(customers);
 }
 
 // ===== Customer data (loaded from API) =====

@@ -29,7 +29,7 @@
   /* Motion */
   --e1: cubic-bezier(.25,.8,.25,1);
   --safe-top:calc(var(--tg-safe-area-inset-top,0px) + var(--tg-content-safe-area-inset-top,0px));
-  --safe-bottom:env(safe-area-inset-bottom,0px);
+  --safe-bottom:calc(var(--tg-safe-area-inset-bottom,0px) + env(safe-area-inset-bottom,0px));
 }
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
 html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100%;overflow-x:clip;font-size:14px;line-height:1.4;font-variant-numeric:lining-nums tabular-nums}
@@ -1262,8 +1262,9 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 </div>
 
 <style>
-.alerts-sheet{max-height:calc(100vh - var(--safe-top) - 80px);align-self:flex-end;border-radius:16px 16px 0 0}
-@media (max-width:520px),(pointer:coarse){.alerts-sheet{max-height:calc(100vh - var(--safe-top) - 24px)}}
+#alertsOverlay{padding-bottom:calc(60px + var(--safe-bottom))}
+.alerts-sheet{max-height:calc(100vh - var(--safe-top) - var(--safe-bottom) - 140px);align-self:flex-end;border-radius:16px 16px 0 0}
+@media (max-width:520px),(pointer:coarse){.alerts-sheet{max-height:calc(100vh - var(--safe-top) - var(--safe-bottom) - 100px)}}
 #alertsOvBody{display:flex;flex-direction:column}
 #alertList{margin:auto 0}
 </style>

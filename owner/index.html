@@ -5793,8 +5793,7 @@ const DETAIL = {
             <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Всего доставлено</div></div><div class="dt-row-r">${k.avg_min_sample}</div></div>
             <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Среднее время</div></div><div class="dt-row-r">${k.avg_min} мин</div></div>
           </div>
-          ${lateOrders.length ? `<div class="dt-sect">Последние опоздания</div><div class="dt-card">${lateOrders.slice(0,3).map(o=>orderRow(o,true)).join('')}</div>` : ''}
-          ${onTimeOrders.length ? `<div class="dt-sect">Последние вовремя</div><div class="dt-card">${onTimeOrders.slice(0,3).map(o=>orderRow(o,false)).join('')}</div>` : ''}`;
+          ${lateOrders.length ? `<div class="dt-sect">Последние опоздания</div><div class="dt-card">${lateOrders.slice(0,3).map(o=>orderRow(o,true)).join('')}</div>` : ''}`;
       } else {
         hero = `<div class="dt-stat-val" style="font-size:32px;line-height:1;color:var(--muted)">—</div><div style="font-size:12px;color:var(--muted);margin-top:10px">нет доставленных заказов за период</div>`;
         body = `<div class="dt-sect">Опоздания</div><div class="dt-card">${noData}</div>`;

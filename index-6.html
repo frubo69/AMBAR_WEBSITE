@@ -240,7 +240,9 @@ img{display:block}
 .pcard{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;transition:.15s}
 .pcard:active{transform:scale(.97)}
 .pimg-box{height:148px;background:linear-gradient(155deg,#0E0E1E,#090916);display:flex;align-items:center;justify-content:center;padding:10px;position:relative;overflow:hidden}
-.pimg{max-height:128px;max-width:90%;object-fit:contain;filter:drop-shadow(0 6px 20px rgba(0,0,0,.7))}
+.pimg-box::after{content:'';position:absolute;width:24px;height:24px;border:2px solid rgba(201,169,110,.15);border-top-color:rgba(201,169,110,.5);border-radius:50%;animation:spin .7s linear infinite;z-index:0;pointer-events:none}
+.pimg-box.loaded::after{display:none}
+.pimg{max-height:128px;max-width:90%;object-fit:contain;filter:drop-shadow(0 6px 20px rgba(0,0,0,.7));position:relative;z-index:1}
 .pbadge{position:absolute;font-size:8px;letter-spacing:1px;text-transform:uppercase;padding:3px 7px;border-radius:6px;font-weight:700;z-index:2}
 .pbadge.oos{left:8px;top:8px;background:rgba(0,0,0,.7);border:1px solid var(--border2);color:var(--muted)}
 .pimg-box.oos .pimg{filter:grayscale(1) opacity(.55) drop-shadow(0 6px 20px rgba(0,0,0,.7))}
@@ -553,7 +555,9 @@ img{display:block}
 .pdm-close{position:absolute;top:14px;right:16px;width:32px;height:32px;border-radius:50%;background:rgba(0,0,0,.5);border:1px solid var(--border2);color:var(--sub);font-size:18px;display:flex;align-items:center;justify-content:center;cursor:pointer;z-index:2}
 .pdm-close:active{transform:scale(.85)}
 .pdm-img-box{height:300px;background:linear-gradient(155deg,#0E0E1E,#090916);display:flex;align-items:center;justify-content:center;padding:10px;position:relative;overflow:hidden;touch-action:none}
-.pdm-img{max-height:260px;max-width:85%;object-fit:contain;filter:drop-shadow(0 12px 32px rgba(0,0,0,.8));transform-origin:center center;will-change:transform;user-select:none;pointer-events:none}
+.pdm-img-box::after{content:'';position:absolute;width:28px;height:28px;border:2px solid rgba(201,169,110,.15);border-top-color:rgba(201,169,110,.5);border-radius:50%;animation:spin .7s linear infinite;z-index:0;pointer-events:none}
+.pdm-img-box.loaded::after{display:none}
+.pdm-img{max-height:260px;max-width:85%;object-fit:contain;filter:drop-shadow(0 12px 32px rgba(0,0,0,.8));transform-origin:center center;will-change:transform;user-select:none;pointer-events:none;position:relative;z-index:1}
 .pdm-zoom-hint{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:rgba(255,255,255,.3);pointer-events:none;white-space:nowrap}
 .pdm-body{padding:20px 18px 0}
 .pdm-cat{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--gold);font-weight:700;margin-bottom:6px}
@@ -4958,7 +4962,7 @@ function renderCard(p){
       ${!p.stock?`<div class="oos-overlay">${t('oosLabel')}</div>`:''}
       ${p.isNew?`<span class="pbadge isnew">NEW</span>`:''}
       <button class="pfav${favs.has(p.id)?' on':''}" id="pfav-${p.id}" aria-label="${favs.has(p.id)?(lang==='ru'?'Убрать из избранного':'Remove from favourites'):(lang==='ru'?'Добавить в избранное':'Add to favourites')}" aria-pressed="${favs.has(p.id)?'true':'false'}" onclick="event.stopPropagation();toggleFav('${p.id}')" style="z-index:3"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
-      <img class="pimg" src="${p.img}" alt="${p.name}" loading="lazy" decoding="async" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><text y=%2268%22 font-size=%2264%22>🍾</text></svg>'">
+      <img class="pimg" src="${p.img}" alt="${p.name}" loading="lazy" decoding="async" onload="this.parentElement.classList.add('loaded')" onerror="this.parentElement.classList.add('loaded');this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><text y=%2268%22 font-size=%2264%22>🍾</text></svg>'">
     </div>
     <div class="pinfo">
       <div class="pcat">${catVal}</div>
@@ -6594,8 +6598,10 @@ function openPDM(id){
   _pdmPendingQty=(cart[p.id]>0)?cart[p.id]:1;
   pdmId=id;
   const img=el('pdm-img');
+  const imgBox=el('pdm-img-box');imgBox.classList.remove('loaded');
+  img.onload=function(){imgBox.classList.add('loaded');};
   img.src=p.img||'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><text y="68" font-size="64">🍾</text></svg>';
-  img.onerror=function(){this.src='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><text y="68" font-size="64">🍾</text></svg>';};
+  img.onerror=function(){imgBox.classList.add('loaded');this.src='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><text y="68" font-size="64">🍾</text></svg>';};
   img.style.transform='translate(0px,0px) scale(1)';img.style.transition='';
   el('pdm-cat').textContent=lang==='ru'?p.cat:p.catE;
   // For beer pairs show the base name without "– 12 pcs" suffix

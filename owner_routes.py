@@ -189,8 +189,8 @@ def _last_7_days(all_orders: dict) -> list:
 
 
 # Anything over this is a "late" delivery for the Опоздания KPI tile.
-# Matches the UI hint "> 45 мин" on the bento card.
-LATE_THRESHOLD_MIN = 45
+# Matches the UI hint "> 25 мин" on the bento card.
+LATE_THRESHOLD_MIN = 25
 
 
 def _delivery_stats(orders) -> dict:

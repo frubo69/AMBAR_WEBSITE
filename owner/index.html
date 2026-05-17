@@ -563,7 +563,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
       <div class="card-val mono"><span id="kLate">—</span><span class="u">%</span></div>
       <div class="card-row">
         <span class="delta" id="kLateCount" style="background:var(--warn-soft);color:var(--warn);border-color:rgba(243,180,74,.22)">—</span>
-        <span class="card-hint" id="kLateHint">&gt; 45 мин</span>
+        <span class="card-hint" id="kLateHint">&gt; 25 мин</span>
       </div>
     </div>
     <div class="card wide" data-detail="kpi:rating">
@@ -1040,7 +1040,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
         </button>
         <button class="cmd-item" data-act="quick:late" data-kw="опоздания задержки late delay">
           <span class="cmd-ico" style="background:var(--warn-soft);color:var(--warn)">⚠</span>
-          <span class="cmd-lbl"><b>Показать опоздания</b><span class="cmd-sub">3 заказа сегодня &gt; 45 мин</span></span>
+          <span class="cmd-lbl"><b>Показать опоздания</b><span class="cmd-sub">3 заказа сегодня &gt; 25 мин</span></span>
         </button>
         <button class="cmd-item" data-act="quick:reviews" data-kw="отзывы рейтинги reviews ratings">
           <span class="cmd-ico" style="background:rgba(201,169,110,.14);color:var(--gold2)">★</span>
@@ -1337,12 +1337,12 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
           <span class="ncat-caret">⌵</span>
         </div>
         <div class="ncat-body">
-          <div class="nrow"><div class="nrow-body"><div class="nrow-t">Заказ опоздал <span class="pill warn">&gt; 45 мин</span></div><div class="nrow-s">От подтверждения до доставки</div></div><label class="tg"><input type="checkbox" data-p="timing.late45" checked><i></i></label></div>
+          <div class="nrow"><div class="nrow-body"><div class="nrow-t">Заказ опоздал <span class="pill warn">&gt; 25 мин</span></div><div class="nrow-s">От подтверждения до доставки</div></div><label class="tg"><input type="checkbox" data-p="timing.late25" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Оператор не принял <span class="pill warn">&gt; 5 мин</span></div><div class="nrow-s">Заказ висит непринятым</div></div><label class="tg"><input type="checkbox" data-p="timing.notAccepted5" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Заказ в пути <span class="pill warn">&gt; 30 мин</span></div><div class="nrow-s">Оператор не завершает доставку</div></div><label class="tg"><input type="checkbox" data-p="timing.enroute30" checked><i></i></label></div>
           <div class="nrow nrow-filter">
             <div class="nrow-body"><div class="nrow-t">Порог опоздания</div></div>
-            <div class="chip-row"><button class="chip">30м</button><button class="chip on">45м</button><button class="chip">60м</button></div>
+            <div class="chip-row"><button class="chip">15м</button><button class="chip on">25м</button><button class="chip">35м</button></div>
           </div>
         </div>
       </div>
@@ -3579,7 +3579,7 @@ function _buildAlerts(){
       }
       if(op.late >= 2){
         out.push({
-          id:'op:late:'+k, sev:'dn', ico:'🚨', pref:'timing.late45',
+          id:'op:late:'+k, sev:'dn', ico:'🚨', pref:'timing.late25',
           t:`${op.late} ${pluralize(op.late,'опоздание','опоздания','опозданий')} · ${k.charAt(0).toUpperCase()+k.slice(1)}`,
           s:'требует внимания',
           onClick:()=>{ closeAlerts(); switchPage('people'); }
@@ -3592,7 +3592,7 @@ function _buildAlerts(){
     const d = PERIOD_DATA.today;
     if(d && d.late >= 8){
       out.push({
-        id:'kpi:late', sev:'warn', ico:'📈', pref:'timing.late45',
+        id:'kpi:late', sev:'warn', ico:'📈', pref:'timing.late25',
         t:`Опозданий ${d.late}% — выше нормы`,
         s:`${d.lateCount} · цель ≤ 5%`,
         onClick:()=>{ closeAlerts(); switchPage('overview'); }
@@ -3604,7 +3604,7 @@ function _buildAlerts(){
     const sevMap = {
       'orders.cancelled':'warn','orders.declined':'dn','orders.delivered':'info',
       'orders.new':'info','orders.new500':'info','orders.new1000':'info',
-      'timing.late45':'dn','timing.notAccepted5':'warn','timing.enroute30':'warn',
+      'timing.late25':'dn','timing.notAccepted5':'warn','timing.enroute30':'warn',
       'reviews.bad3':'dn','reviews.good5':'info','reviews.comment':'info','reviews.any':'info',
       'stock.out':'warn','stock.low':'info',
       'customers.new':'info','customers.verify':'warn','customers.vip':'info',
@@ -3614,7 +3614,7 @@ function _buildAlerts(){
     const icoMap = {
       'orders.new':'🆕','orders.new500':'💰','orders.new1000':'💎',
       'orders.cancelled':'🚫','orders.declined':'❌','orders.delivered':'✅',
-      'timing.late45':'🕐','timing.notAccepted5':'⏱','timing.enroute30':'🚗',
+      'timing.late25':'🕐','timing.notAccepted5':'⏱','timing.enroute30':'🚗',
       'reviews.bad3':'⚠','reviews.good5':'⭐','reviews.comment':'💬','reviews.any':'📝',
       'stock.out':'📦','stock.low':'💤',
       'customers.new':'👤','customers.verify':'📝','customers.vip':'💎',
@@ -4741,7 +4741,7 @@ notifOv.addEventListener('click',e=>{ if(e.target===notifOv) closeNotif(); });
 // ======= PRESETS =======
 // 'important' mirrors default checked attrs from HTML
 const PRESET_IMPORTANT = new Set(['orders.new','orders.new1000','orders.cancelled','orders.declined',
-  'timing.late45','timing.notAccepted5','timing.enroute30',
+  'timing.late25','timing.notAccepted5','timing.enroute30',
   'reviews.bad3','reviews.comment',
   'digest.morning','digest.evening',
   'stock.low','stock.out',
@@ -4752,9 +4752,9 @@ const PRESET_IMPORTANT = new Set(['orders.new','orders.new1000','orders.cancelle
   'system.botDown','system.apiErrors','system.dbDown',
   'delivery.browser']);
 const PRESET_QUIET = new Set(['system.botDown','system.dbDown','system.apiErrors',
-  'timing.late45','ops.officeEmpty','finance.cancelSpike','delivery.browser']);
+  'timing.late25','ops.officeEmpty','finance.cancelSpike','delivery.browser']);
 // Chip defaults per preset (office filter + review tags + threshold)
-const CHIP_IMPORTANT = { office:['Central','North','South'], tag:['Скорость','Курьер','Упаковка','Товар'], threshold:'45м' };
+const CHIP_IMPORTANT = { office:['Central','North','South'], tag:['Скорость','Курьер','Упаковка','Товар'], threshold:'25м' };
 const CHIP_QUIET     = { office:['Central','North','South'], tag:[], threshold:'60м' };
 const CHIP_ALL       = { office:['Central','North','South'], tag:['Скорость','Курьер','Упаковка','Товар'], threshold:'30м' };
 
@@ -4815,7 +4815,7 @@ function applyChips(cfg){
       c.classList.toggle('on', cfg.tag.includes(c.textContent.trim()));
     });
   }
-  // threshold chips (30м/45м/60м)
+  // threshold chips (15м/25м/35м)
   const thRow = [...notifOv.querySelectorAll('.nrow-filter')].find(r=>[...r.querySelectorAll('.chip')].every(c=>/м$/.test(c.textContent.trim())));
   if(thRow){
     thRow.querySelectorAll('.chip').forEach(c=>{
@@ -5210,7 +5210,7 @@ const DETAIL = {
           <div class="dt-stat"><div class="dt-stat-lbl">Заказы</div><div class="dt-stat-val">${d.ord}</div><div class="dt-stat-sub">доставлено ${d.ord-d.late}</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">Ср. время</div><div class="dt-stat-val ${d.avg>40?'warn':'up'}">${d.avg}<span class="u">мин</span></div><div class="dt-stat-sub">норматив 40</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">★ Рейтинг</div><div class="dt-stat-val up">${d.rate}</div><div class="dt-stat-sub">34 оценки</div></div>
-          <div class="dt-stat"><div class="dt-stat-lbl">Опоздания</div><div class="dt-stat-val ${d.late>1?'warn':''}">${d.late}</div><div class="dt-stat-sub">&gt; 45 мин</div></div>
+          <div class="dt-stat"><div class="dt-stat-lbl">Опоздания</div><div class="dt-stat-val ${d.late>1?'warn':''}">${d.late}</div><div class="dt-stat-sub">&gt; 25 мин</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">Ср. чек</div><div class="dt-stat-val">${d.chk}<span class="u">AED</span></div><div class="dt-stat-sub">vs нед. +3%</div></div>
         </div>
         <div class="dt-sect">Выручка · 7 дней</div>
@@ -5254,7 +5254,7 @@ const DETAIL = {
         ${d.late>0 ? `
         <div class="dt-sect">Опоздания · сегодня</div>
         <div class="dt-card">
-          ${d.lateList.map(l=>`<div class="dt-row" data-detail="order:${l.id}"><div class="dt-row-l"><div class="dt-row-t">#${l.id.slice(0,6)} ${l.id.slice(6)} <span class="dt-row-tiny" style="color:var(--warn)">+${l.by} мин</span></div><div class="dt-row-s">причина: <b style="color:var(--text)">${l.reason}</b></div></div><div class="dt-row-r warn">${45+l.by} мин</div></div>`).join('')}
+          ${d.lateList.map(l=>`<div class="dt-row" data-detail="order:${l.id}"><div class="dt-row-l"><div class="dt-row-t">#${l.id.slice(0,6)} ${l.id.slice(6)} <span class="dt-row-tiny" style="color:var(--warn)">+${l.by} мин</span></div><div class="dt-row-s">причина: <b style="color:var(--text)">${l.reason}</b></div></div><div class="dt-row-r warn">${25+l.by} мин</div></div>`).join('')}
         </div>
         <div style="font-size:11px;color:var(--muted);padding:8px 4px 0;line-height:1.5">Причина ставится оператором в operator_bot сразу после «Доставлено», если фактическое время превысило <span style="color:var(--text)">deliver_by</span>. Варианты: Пробка · Клиент не отвечал · Адрес не нашёл · Погода · Другое (свободный текст).</div>
         ` : `
@@ -5499,23 +5499,22 @@ const DETAIL = {
             <div class="dt-sect">Позиции</div>
             <div class="dt-card">
               ${real.items_short ? real.items_short.split(', ').map(it=>`<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${it}</div></div></div>`).join('') : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">нет данных</div></div></div>'}
-            </div>${real.customer_id ? `
-            <div class="dt-card" style="margin-top:8px;cursor:pointer;border-color:rgba(201,169,110,.15)" onclick="openDetail('customer:${real.customer_id}')">
-              <div class="dt-row" style="justify-content:center;gap:8px;padding:10px 14px">
-                <span style="font-size:12px;color:var(--sub)">👤</span>
-                <span style="font-size:12px;color:var(--sub);font-weight:500">${real.name}</span>
-                <span style="font-size:11px;color:var(--muted)">›</span>
-              </div>
-            </div>` : ''}
+            </div>
             <div class="dt-sect">Информация</div>
             <div class="dt-card">
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Клиент</div><div class="dt-row-s">${real.username && real.username!=='—' ? '@'+real.username : ''}</div></div><div class="dt-row-r">${real.name}</div></div>
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Адрес</div></div><div class="dt-row-r" style="font-size:12px;max-width:60%;text-align:right">${real.gmap_link ? '<a href="'+real.gmap_link+'" target="_blank" style="color:var(--gold2)">'+( real.address && real.address!=='—' && real.address!=='GPS' ? real.address : '📍 Карта')+'</a>' : (real.address||'—')}</div></div>
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Офис</div></div><div class="dt-row-r">${real.office||'—'}</div></div>
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Статус</div></div><div class="dt-row-r" style="color:${stClr[real.status]||'var(--muted)'}">${stMap[real.status]||real.status}</div></div>
               ${real.eta ? `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">ETA</div></div><div class="dt-row-r">${real.eta} мин</div></div>` : ''}
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Время</div></div><div class="dt-row-r">${time}</div></div>
-            </div>`,
+            </div>${real.customer_id ? `
+            <div class="dt-card" style="margin-top:12px;cursor:pointer;border-color:rgba(201,169,110,.25);background:rgba(201,169,110,.06)" onclick="openDetail('customer:${real.customer_id}')">
+              <div class="dt-row" style="justify-content:center;gap:10px;padding:14px 16px">
+                <span style="font-size:16px">👤</span>
+                <span style="font-size:14px;color:var(--text);font-weight:600">${real.name}</span>
+                <span style="font-size:13px;color:var(--muted)">›</span>
+              </div>
+            </div>` : ''}`,
           foot: ''
         };
       }
@@ -5681,7 +5680,7 @@ const DETAIL = {
           <div class="dt-row" data-detail="kpi:pending"><div class="dt-row-l"><div class="dt-row-t">Не принято</div><div class="dt-row-s">ожидают ответа оператора</div></div><div class="dt-row-r ${(k.pending||0)>0?'warn':''}">${k.pending||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
           <div class="dt-row" data-detail="kpi:orders"><div class="dt-row-l"><div class="dt-row-t">Всего заказов</div><div class="dt-row-s">средний чек <span data-aed="${k.avg_check||0}">${fmt(k.avg_check||0)}</span> AED</div></div><div class="dt-row-r">${k.orders||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
           <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Чаевые</div></div><div class="dt-row-r"><span data-aed="${f.tips||0}">${fmt(f.tips||0)}</span> AED</div></div>
-          <div class="dt-row" data-detail="kpi:late"><div class="dt-row-l"><div class="dt-row-t">Опоздания</div><div class="dt-row-s">> ${k.late_threshold||45} мин</div></div><div class="dt-row-r ${(k.late_count||0)>0?'warn':''}">${k.late_count||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
+          <div class="dt-row" data-detail="kpi:late"><div class="dt-row-l"><div class="dt-row-t">Опоздания</div><div class="dt-row-s">> ${k.late_threshold||25} мин</div></div><div class="dt-row-r ${(k.late_count||0)>0?'warn':''}">${k.late_count||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
           <div class="dt-row" data-detail="kpi:avg"><div class="dt-row-l"><div class="dt-row-t">Среднее время</div><div class="dt-row-s">от заказа до доставки</div></div><div class="dt-row-r">${k.avg_min_sample>0 ? k.avg_min+' мин' : '—'}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
         </div>`;
     } else if(id === 'orders'){
@@ -5720,15 +5719,15 @@ const DETAIL = {
         const sign = d > 0 ? '▲ ' : d < 0 ? '▼ ' : '';
         const dClr = d < 0 ? 'var(--up)' : d > 0 ? 'var(--dn)' : 'var(--muted)';
         hero = `<div class="dt-stat-val" style="font-size:48px;line-height:1;color:var(--text)">${k.avg_min}<span class="u" style="font-size:16px;margin-left:8px">мин</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${sign}<span style="color:${dClr}">${Math.abs(d)} мин</span> vs прошлого · по ${k.avg_min_sample} ${pluralize(k.avg_min_sample,'заказу','заказам','заказам')}</div>`;
-        const bucketLabel = k.avg_min <= 30 ? 'Быстро (< 30 мин)' : k.avg_min <= 45 ? 'Нормально (30–45 мин)' : 'Долго (> 45 мин)';
-        const bucketClr = k.avg_min <= 30 ? 'var(--up)' : k.avg_min <= 45 ? 'var(--gold2)' : 'var(--dn)';
+        const bucketLabel = k.avg_min <= 15 ? 'Быстро (< 15 мин)' : k.avg_min <= 25 ? 'Нормально (15–25 мин)' : 'Долго (> 25 мин)';
+        const bucketClr = k.avg_min <= 15 ? 'var(--up)' : k.avg_min <= 25 ? 'var(--gold2)' : 'var(--dn)';
         body = `
           <div class="dt-sect">Среднее время доставки</div>
           <div class="dt-card">
             <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Среднее</div><div class="dt-row-s">от оформления до доставки</div></div><div class="dt-row-r">${k.avg_min} мин</div></div>
             <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Оценка</div></div><div class="dt-row-r" style="color:${bucketClr}">${bucketLabel}</div></div>
             <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Выборка</div><div class="dt-row-s">доставленных за период</div></div><div class="dt-row-r">${k.avg_min_sample}</div></div>
-            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Порог опоздания</div></div><div class="dt-row-r">> ${k.late_threshold||45} мин</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Порог опоздания</div></div><div class="dt-row-r">> ${k.late_threshold||25} мин</div></div>
           </div>`;
       } else {
         hero = `<div class="dt-stat-val" style="font-size:32px;line-height:1;color:var(--muted)">—</div><div style="font-size:12px;color:var(--muted);margin-top:10px">нет доставленных заказов за период</div>`;
@@ -5738,14 +5737,14 @@ const DETAIL = {
       const k = f.kpi || {};
       if(k.avg_min_sample > 0){
         const lateClr = k.late_pct > 20 ? 'var(--dn)' : k.late_pct > 0 ? 'var(--warn)' : 'var(--up)';
-        hero = `<div class="dt-stat-val" style="font-size:48px;line-height:1;color:${lateClr}">${k.late_pct}<span class="u" style="font-size:16px;margin-left:8px">%</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${k.late_count} ${pluralize(k.late_count,'заказ','заказа','заказов')} > ${k.late_threshold||45} мин · из ${k.avg_min_sample}</div>`;
+        hero = `<div class="dt-stat-val" style="font-size:48px;line-height:1;color:${lateClr}">${k.late_pct}<span class="u" style="font-size:16px;margin-left:8px">%</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${k.late_count} ${pluralize(k.late_count,'заказ','заказа','заказов')} > ${k.late_threshold||25} мин · из ${k.avg_min_sample}</div>`;
         const onTime = k.avg_min_sample - k.late_count;
         const onTimePct = Math.round(onTime / k.avg_min_sample * 100);
         body = `
-          <div class="dt-sect">Опоздания · > ${k.late_threshold||45} мин</div>
+          <div class="dt-sect">Опоздания · > ${k.late_threshold||25} мин</div>
           <div class="dt-card">
-            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Опоздавших</div><div class="dt-row-s">доставка дольше ${k.late_threshold||45} мин</div></div><div class="dt-row-r dn">${k.late_count}</div></div>
-            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Вовремя</div><div class="dt-row-s">доставка ≤ ${k.late_threshold||45} мин</div></div><div class="dt-row-r up">${onTime} (${onTimePct}%)</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Опоздавших</div><div class="dt-row-s">доставка дольше ${k.late_threshold||25} мин</div></div><div class="dt-row-r dn">${k.late_count}</div></div>
+            <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Вовремя</div><div class="dt-row-s">доставка ≤ ${k.late_threshold||25} мин</div></div><div class="dt-row-r up">${onTime} (${onTimePct}%)</div></div>
             <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Всего доставлено</div></div><div class="dt-row-r">${k.avg_min_sample}</div></div>
             <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Среднее время</div></div><div class="dt-row-r">${k.avg_min} мин</div></div>
           </div>`;

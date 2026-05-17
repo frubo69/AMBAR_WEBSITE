@@ -326,7 +326,7 @@ async def kb_client_actions(oid, cid):
 
 def kb_eta(oid, cid):
     r1 = [InlineKeyboardButton(f"⏱ {t} мин", callback_data=f"eta_{t}_{oid}_{cid}") for t in [20, 25, 30]]
-    r2 = [InlineKeyboardButton(f"⏱ {t} мин", callback_data=f"eta_{t}_{oid}_{cid}") for t in [40, 45, 60]]
+    r2 = [InlineKeyboardButton(f"⏱ {t} мин", callback_data=f"eta_{t}_{oid}_{cid}") for t in [35, 40, 50]]
     return InlineKeyboardMarkup([r1, r2, [InlineKeyboardButton("← Назад", callback_data=f"eta_back_{oid}_{cid}")]])
 
 def kb_edit(order):

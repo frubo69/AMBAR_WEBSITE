@@ -523,7 +523,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
       <div class="card-val mono"><span id="kOrders">—</span><span class="u">шт</span></div>
       <div class="card-row">
         <span class="delta" id="kOrdersDelta">…</span>
-        <span class="card-hint">средний чек <span id="kOrdersAvg">—</span></span>
+        <span class="card-hint">из них отмены <span id="kDeclined">0</span></span>
       </div>
     </div>
     <div class="card" data-detail="kpi:pending">
@@ -2609,7 +2609,7 @@ function _setText(id, txt){ const el = document.getElementById(id); if(el) el.te
 const _SKEL_IDS = [
   'heroRev','heroPrev','heroDelta','moneyHero','moneyProfit','moneyDelta',
   'offCentralRev','offNorthRev','offSouthRev','bars7dAvg','bars7dTotal',
-  'kOrders','kOrdersAvg','kOrdersDelta','kPending','kDone','kDoneTotal','kDonePct',
+  'kOrders','kOrdersAvg','kOrdersDelta','kDeclined','kPending','kDone','kDoneTotal','kDonePct',
   'kInRoute','kInRouteVal','kAvg','kAvgSub','kLate','kLateCount','kRating'
 ];
 function setFinanceSkel(on){
@@ -2688,7 +2688,7 @@ function applyPeriod(p){
     const pbl = document.getElementById('periodBarsLabels'); if(pbl) pbl.innerHTML = '';
     const pbt = document.getElementById('periodBarsTitle'); if(pbt) pbt.textContent = _periodBarsTitle(p);
     // KPI placeholders (real values come from /api/owner/finance kpi block)
-    ['kOrders','kOrdersAvg','kPending','kInRouteVal','kDone','kDoneTotal','kDonePct','kInRoute','kAvg','kLate','kLateCount','kRating'].forEach(id=>_setText(id,'—'));
+    ['kOrders','kOrdersAvg','kDeclined','kPending','kInRouteVal','kDone','kDoneTotal','kDonePct','kInRoute','kAvg','kLate','kLateCount','kRating'].forEach(id=>_setText(id,'—'));
     _setText('kOrdersDelta', '…');
     _setText('kRatingLbl', 'Рейтинг');
     _setText('kAvgSub', 'нет данных');
@@ -2772,6 +2772,7 @@ function renderKpis(k){
     od.classList.toggle('dn', k.orders_delta <  0);
   }
   _setText('kOrdersAvg', fmtCompact(k.avg_check));
+  _setText('kDeclined', k.declined || 0);
   // Pending (не принято)
   _setText('kPending', k.pending ?? 0);
   // In route (в пути)
@@ -5500,20 +5501,19 @@ const DETAIL = {
             <div class="dt-card">
               ${real.items_short ? real.items_short.split(', ').map(it=>`<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${it}</div></div></div>`).join('') : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">нет данных</div></div></div>'}
             </div>
-            ${real.customer_id ? `
-            <div class="dt-card" style="margin-top:12px;margin-bottom:4px;cursor:pointer;border-color:rgba(201,169,110,.25);background:rgba(201,169,110,.06)" onclick="openDetail('customer:${real.customer_id}')">
+            <div class="dt-sect">Информация</div>
+            <div class="dt-card">
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Адрес</div></div><div class="dt-row-r" style="font-size:12px;max-width:60%;text-align:right">${real.gmap_link ? '<a href="'+real.gmap_link+'" target="_blank" style="color:var(--gold2)">'+( real.address && real.address!=='—' && real.address!=='GPS' ? real.address : '📍 Карта')+'</a>' : (real.address||'—')}</div></div>
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Офис</div></div><div class="dt-row-r">${real.office||'—'}</div></div>
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Статус</div></div><div class="dt-row-r" style="color:${stClr[real.status]||'var(--muted)'}">${stMap[real.status]||real.status}</div></div>
+            </div>${real.customer_id ? `
+            <div class="dt-card" style="margin-top:12px;cursor:pointer;border-color:rgba(201,169,110,.25);background:rgba(201,169,110,.06)" onclick="openDetail('customer:${real.customer_id}')">
               <div class="dt-row" style="justify-content:center;gap:10px;padding:14px 16px">
                 <span style="font-size:16px">👤</span>
                 <span style="font-size:14px;color:var(--text);font-weight:600">${real.name}</span>
                 <span style="font-size:13px;color:var(--muted)">›</span>
               </div>
             </div>` : ''}
-            <div class="dt-sect">Информация</div>
-            <div class="dt-card">
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Адрес</div></div><div class="dt-row-r" style="font-size:12px;max-width:60%;text-align:right">${real.gmap_link ? '<a href="'+real.gmap_link+'" target="_blank" style="color:var(--gold2)">'+( real.address && real.address!=='—' && real.address!=='GPS' ? real.address : '📍 Карта')+'</a>' : (real.address||'—')}</div></div>
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Офис</div></div><div class="dt-row-r">${real.office||'—'}</div></div>
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Статус</div></div><div class="dt-row-r" style="color:${stClr[real.status]||'var(--muted)'}">${stMap[real.status]||real.status}</div></div>
-            </div>
             <div class="dt-sect">Время</div>
             <div class="dt-card">
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Оформлен</div></div><div class="dt-row-r">${time||'—'}</div></div>

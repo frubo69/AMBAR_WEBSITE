@@ -5755,6 +5755,34 @@ const DETAIL = {
         hero = `<div class="dt-stat-val" style="font-size:48px;line-height:1;color:${lateClr}">${k.late_pct}<span class="u" style="font-size:16px;margin-left:8px">%</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${k.late_count} ${pluralize(k.late_count,'заказ','заказа','заказов')} дольше ETA · из ${k.avg_min_sample}</div>`;
         const onTime = k.avg_min_sample - k.late_count;
         const onTimePct = Math.round(onTime / k.avg_min_sample * 100);
+        const allDel = k.delivered_orders || [];
+        const lateOrders = allDel.filter(o=>{
+          if(!o.ts || !o.delivered_at) return false;
+          const t0 = new Date(/Z$|[+-]\d{2}/.test(o.ts)?o.ts:o.ts+'Z');
+          const t1 = new Date(/Z$|[+-]\d{2}/.test(o.delivered_at)?o.delivered_at:o.delivered_at+'Z');
+          if(isNaN(t0)||isNaN(t1)) return false;
+          const dur = Math.floor((t1-t0)/60000);
+          const eta = parseInt(o.eta)||25;
+          o._dur = dur;
+          o._eta = eta;
+          return dur > eta + 5;
+        });
+        const onTimeOrders = allDel.filter(o=>{
+          if(!o.ts || !o.delivered_at) return false;
+          const t0 = new Date(/Z$|[+-]\d{2}/.test(o.ts)?o.ts:o.ts+'Z');
+          const t1 = new Date(/Z$|[+-]\d{2}/.test(o.delivered_at)?o.delivered_at:o.delivered_at+'Z');
+          if(isNaN(t0)||isNaN(t1)) return false;
+          const dur = Math.floor((t1-t0)/60000);
+          const eta = parseInt(o.eta)||25;
+          o._dur = dur;
+          o._eta = eta;
+          return dur <= eta + 5;
+        });
+        const orderRow = (o, isLate) => {
+          const over = o._dur - o._eta;
+          const timeStr = o.ts ? new Date(/Z$|[+-]\d{2}/.test(o.ts)?o.ts:o.ts+'Z').toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}) : '';
+          return `<div class="dt-row" data-detail="order:${o.id}"><div class="dt-row-l"><div class="dt-row-t">#${(o.id||'').slice(0,6)} ${(o.id||'').slice(6)} ${isLate?'<span class="dt-row-tiny" style="color:var(--warn)">+'+over+' мин</span>':'<span class="dt-row-tiny" style="color:var(--up)">OK</span>'}</div><div class="dt-row-s">${timeStr} · ETA ${o._eta} мин</div></div><div class="dt-row-r ${isLate?'warn':'up'}">${o._dur} мин</div></div>`;
+        };
         body = `
           <div class="dt-sect">Опоздания · дольше ETA</div>
           <div class="dt-card">
@@ -5762,7 +5790,9 @@ const DETAIL = {
             <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Вовремя</div><div class="dt-row-s">уложился в ETA + 5 мин</div></div><div class="dt-row-r up">${onTime} (${onTimePct}%)</div></div>
             <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Всего доставлено</div></div><div class="dt-row-r">${k.avg_min_sample}</div></div>
             <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Среднее время</div></div><div class="dt-row-r">${k.avg_min} мин</div></div>
-          </div>`;
+          </div>
+          ${lateOrders.length ? `<div class="dt-sect">Опоздавшие заказы · ${lateOrders.length}</div><div class="dt-card">${lateOrders.map(o=>orderRow(o,true)).join('')}</div>` : ''}
+          ${onTimeOrders.length ? `<div class="dt-sect">Вовремя · ${onTimeOrders.length}</div><div class="dt-card">${onTimeOrders.map(o=>orderRow(o,false)).join('')}</div>` : ''}`;
       } else {
         hero = `<div class="dt-stat-val" style="font-size:32px;line-height:1;color:var(--muted)">—</div><div style="font-size:12px;color:var(--muted);margin-top:10px">нет доставленных заказов за период</div>`;
         body = `<div class="dt-sect">Опоздания</div><div class="dt-card">${noData}</div>`;

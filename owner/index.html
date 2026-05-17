@@ -1241,7 +1241,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 
 <!-- ============ ALERTS LIST ============ -->
 <div class="cmd-overlay" id="alertsOverlay">
-  <div class="cmd-sheet" style="max-width:520px">
+  <div class="cmd-sheet alerts-sheet" style="max-width:520px">
     <div class="notif-hdr" style="border-bottom:1px solid var(--border2)">
       <div class="notif-hdr-l">
         <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;line-height:1.1">Алерты</div>
@@ -1254,12 +1254,19 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
         <div class="alert-empty"><span class="ae-ico">✓</span>Все системы в норме</div>
       </div>
     </div>
-    <div class="notif-foot" id="alertsOvFoot" style="padding:12px 16px;border-top:1px solid var(--border2);display:flex;gap:10px;align-items:center;justify-content:space-between">
-      <div style="font-size:11px;color:var(--muted)" id="alertsOvHint">Тонкая настройка — в разделе Уведомления</div>
+    <div class="notif-foot" id="alertsOvFoot" style="padding:12px 16px calc(12px + var(--safe-bottom));border-top:1px solid var(--border2);display:flex;gap:10px;align-items:center;justify-content:space-between">
+      <button id="alertsClearBtn" onclick="clearAllAlerts()" style="display:none;padding:8px 14px;border-radius:10px;background:linear-gradient(135deg,rgba(239,83,80,.16),rgba(239,83,80,.05));border:1px solid rgba(239,83,80,.32);color:var(--dn);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent">✕ Удалить все</button>
       <button id="alertsSeenBtn" onclick="markAlertsSeen()" style="display:none;padding:8px 14px;border-radius:10px;background:linear-gradient(135deg,rgba(76,175,125,.16),rgba(76,175,125,.05));border:1px solid rgba(76,175,125,.32);color:var(--up);font-size:12px;font-weight:600;font-family:inherit;cursor:pointer;-webkit-tap-highlight-color:transparent">✓ Отметить прочитанным</button>
     </div>
   </div>
 </div>
+
+<style>
+.alerts-sheet{max-height:calc(100vh - var(--safe-top) - 80px);align-self:flex-end;border-radius:16px 16px 0 0}
+@media (max-width:520px),(pointer:coarse){.alerts-sheet{max-height:calc(100vh - var(--safe-top) - 24px)}}
+#alertsOvBody{display:flex;flex-direction:column}
+#alertList{margin:auto 0}
+</style>
 
 <!-- ============ NOTIFICATIONS DETAILED ============ -->
 <div class="cmd-overlay" id="notifOverlay">
@@ -3668,8 +3675,8 @@ function _renderAlertBtn(){
 function _renderAlerts(){
   const list = document.getElementById('alertList');
   const seenBtn = document.getElementById('alertsSeenBtn');
+  const clearBtn = document.getElementById('alertsClearBtn');
   const sub  = document.getElementById('alertsOvSub');
-  const hint = document.getElementById('alertsOvHint');
   _renderAlertBtn();
   if(!list) return;
   const alerts = _buildAlerts();
@@ -3680,11 +3687,7 @@ function _renderAlerts(){
       (importantUnseen.length ? ` · <span style="color:var(--dn);font-weight:600">${importantUnseen.length} важных</span>` : '');
   }
   if(seenBtn) seenBtn.style.display = importantUnseen.length ? '' : 'none';
-  if(hint){
-    hint.textContent = importantUnseen.length
-      ? 'Нажми «Отметить прочитанным» чтобы погасить красный индикатор'
-      : 'Тонкая настройка — в разделе Уведомления';
-  }
+  if(clearBtn) clearBtn.style.display = alerts.length ? '' : 'none';
   if(!alerts.length){
     list.innerHTML = '<div class="alert-empty"><span class="ae-ico">✓</span>Все системы в норме</div>';
     return;
@@ -3745,6 +3748,14 @@ if(alertsOv){
 function markAlertsSeen(){
   const alerts = _buildAlerts();
   alerts.forEach(a => { if(_isAlertImportant(a)) _SEEN_IMPORTANT.add(a.id); });
+  _persistSeen();
+  try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(_){}
+  _renderAlerts();
+}
+function clearAllAlerts(){
+  const alerts = _buildAlerts();
+  alerts.forEach(a => { _DISMISSED_ALERTS.add(a.id); if(_isAlertImportant(a)) _SEEN_IMPORTANT.add(a.id); });
+  _persistDismissed();
   _persistSeen();
   try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(_){}
   _renderAlerts();

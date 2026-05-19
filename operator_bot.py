@@ -142,11 +142,11 @@ PRODUCTS = [
     {"id":"p106", "name":"Le Grand Noir Merlot 0.75",     "price":100, "cat":"Вино"},
     {"id":"p115", "name":"Mateus Rose 0.75",               "price":100, "cat":"Вино"},
     {"id":"p117", "name":"Chateau Ksara Rose 0.75",        "price":100, "cat":"Вино"},
-    {"id":"p100",  "name":"Calvet Sancerre 0.75",          "price":150, "cat":"Вино"},
+    {"id":"p99",  "name":"Calvet Sancerre 0.75",          "price":150, "cat":"Вино"},
     {"id":"p109", "name":"Chateau Saint Leon 0.75",        "price":150, "cat":"Вино"},
     {"id":"p112", "name":"La Celia Malbec 0.75",           "price":150, "cat":"Вино"},
     {"id":"p120", "name":"MiP Collection Rose 0.75",       "price":150, "cat":"Вино"},
-    {"id":"p99",  "name":"Rimapere SB 0.75",              "price":200, "cat":"Вино"},
+    {"id":"p100",  "name":"Rimapere SB 0.75",              "price":200, "cat":"Вино"},
     {"id":"p104", "name":"Oyster Bay SB 0.75",             "price":200, "cat":"Вино"},
     {"id":"p107", "name":"Castel Barreyres 0.75",          "price":200, "cat":"Вино"},
     {"id":"p108", "name":"Chateau Perron 0.75",            "price":200, "cat":"Вино"},
@@ -326,7 +326,7 @@ async def kb_client_actions(oid, cid):
 
 def kb_eta(oid, cid):
     r1 = [InlineKeyboardButton(f"⏱ {t} мин", callback_data=f"eta_{t}_{oid}_{cid}") for t in [20, 25, 30]]
-    r2 = [InlineKeyboardButton(f"⏱ {t} мин", callback_data=f"eta_{t}_{oid}_{cid}") for t in [40, 45, 60]]
+    r2 = [InlineKeyboardButton(f"⏱ {t} мин", callback_data=f"eta_{t}_{oid}_{cid}") for t in [35, 40, 50]]
     return InlineKeyboardMarkup([r1, r2, [InlineKeyboardButton("← Назад", callback_data=f"eta_back_{oid}_{cid}")]])
 
 def kb_edit(order):

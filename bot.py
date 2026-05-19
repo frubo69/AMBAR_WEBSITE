@@ -155,6 +155,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             full_name=full_name,
             name=full_name,
             username=tg_user.username or "—",
+            language_code=tg_user.language_code or "",
         )
         # First-touch attribution for referral and operator invite (don't overwrite).
         # 0 is a valid invited_by_operator value (common link), so compare to None.

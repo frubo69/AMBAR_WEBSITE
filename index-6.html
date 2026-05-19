@@ -2774,7 +2774,8 @@ async function checkBanStatus(){
   const uid=tg?.initDataUnsafe?.user?.id;
   if(!uid){_hideBanBlocker();return;}
   try{
-    const resp=await fetch(`${AMBAR_API}/api/me?uid=${uid}`);
+    const _lc=tg?.initDataUnsafe?.user?.language_code||'';
+    const resp=await fetch(`${AMBAR_API}/api/me?uid=${uid}&lc=${encodeURIComponent(_lc)}`);
     if(resp.ok){
       const d=await resp.json();
       if(d.banned){_showBanWall();return;}

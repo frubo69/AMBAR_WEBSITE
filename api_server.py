@@ -295,6 +295,7 @@ async def handle_create_order(request: web.Request) -> web.Response:
         await db.save_order(oid, order_doc)
         user_fields = dict(name=original_name, full_name=original_name, first_name=user.get("first_name",""),
                            last_name=user.get("last_name",""), username=username,
+                           language_code=user.get("language_code", ""),
                            last_order_at=datetime.now(timezone.utc))
         if phone != "—":
             user_fields["phone"] = phone
@@ -613,6 +614,12 @@ async def handle_me(request: web.Request) -> web.Response:
     if not uid_str.lstrip("-").isdigit():
         return web.json_response({"banned": False}, headers=CORS_HEADERS)
     uid = int(uid_str)
+    lc = request.query.get("lc", "").strip()
+    if lc:
+        try:
+            await db.set_user_field(uid, language_code=lc)
+        except Exception:
+            pass
     try:
         user_doc = await db.get_user(uid)
         banned = user_doc.get("is_banned", False) if user_doc else False

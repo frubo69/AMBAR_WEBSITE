@@ -593,6 +593,27 @@ img{display:block}
    the icon block + are announced via the SVG glyph (no color-only meaning).
    Position-flip on bottom: when a fullscreen sheet is open, the snackbar
    lifts to the top so it stays visible above the sheet (.is-flipped).      */
+/* ── Promo Hero Banner (above catalog grid) ──────────────────────────────── */
+.promo-hero{position:relative;margin:10px 12px 10px;border-radius:18px;overflow:hidden;cursor:pointer;border:1px solid rgba(201,169,110,.18);transition:opacity .3s,transform .3s,max-height .4s ease-in-out,margin .4s ease-in-out,border-color .3s;flex-shrink:0;max-height:600px}
+.promo-hero-img{width:100%;display:block;border-radius:18px}
+.promo-hero-close{position:absolute;top:10px;right:10px;z-index:3;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;line-height:1}
+.promo-hero-close:active{transform:scale(.85);background:rgba(255,255,255,.15)}
+/* Promo hero with background image */
+
+/* ── Promo Popup Modal ───────────────────────────────────────────────────── */
+.promo-modal-ov{position:fixed;inset:0;background:rgba(0,0,0,0);z-index:500;display:flex;align-items:center;justify-content:center;pointer-events:none;transition:background .3s}
+.promo-modal-ov.show{background:rgba(0,0,0,.82);pointer-events:all}
+.promo-modal-card{position:relative;width:calc(100% - 48px);max-width:340px;border-radius:24px;overflow:hidden;border:1px solid rgba(201,169,110,.2);box-shadow:0 24px 80px rgba(0,0,0,.7),0 0 0 0.5px rgba(201,169,110,.08);transform:scale(.5);opacity:0;transition:transform .35s cubic-bezier(.34,1.2,.64,1),opacity .25s;background:#07070E}
+.promo-modal-ov.show .promo-modal-card{transform:scale(1);opacity:1}
+.promo-modal-close{position:absolute;top:12px;right:12px;z-index:3;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.12);color:rgba(255,255,255,.5);font-size:13px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;line-height:1}
+.promo-modal-close:active{transform:scale(.85)}
+.promo-modal-card{display:flex;flex-direction:column}
+.promo-modal-img{width:100%;display:block}
+.promo-modal-bottom{position:absolute;bottom:0;left:0;right:0;padding:20px 24px 24px;z-index:2}
+.promo-modal-cta{width:100%;padding:14px;border:none;border-radius:14px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;font-size:14px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;transition:.15s;letter-spacing:.3px}
+.promo-modal-cta:active{transform:scale(.96);opacity:.85}
+/* Modal with background image */
+
 .toast{position:fixed;z-index:999;color:var(--text);display:flex;align-items:center;gap:11px;pointer-events:none;opacity:0;visibility:hidden;background:rgba(28,28,36,.92);-webkit-backdrop-filter:blur(30px) saturate(180%);backdrop-filter:blur(30px) saturate(180%);border:1px solid rgba(255,255,255,.1);border-radius:16px;box-shadow:0 10px 36px rgba(0,0,0,.55),0 2px 8px rgba(0,0,0,.3);transition:transform .32s cubic-bezier(.34,1.2,.64,1),opacity .22s,visibility .22s,bottom .25s ease}
 .toast.show{opacity:1;visibility:visible;pointer-events:auto;transform:translateY(0)}
 /* Bottom snackbar — single-line "icon + msg" for ephemeral feedback */
@@ -1437,6 +1458,11 @@ body.aob-on #pg-cart{overflow-y:auto!important}
       <div class="chips" id="cat-chips" style="flex:1"></div>
     </div>
   </div>
+  <!-- ═══ PROMO HERO BANNER ═══ -->
+  <div id="promo-hero" class="promo-hero has-img" style="display:none" onclick="dismissPromoHero()">
+    <button class="promo-hero-close" onclick="event.stopPropagation();dismissPromoHero()" aria-label="Close">✕</button>
+    <img id="promo-hero-img" class="promo-hero-img" src="" alt="promo">
+  </div>
   <div class="grid" id="p-grid"></div>
   <div id="clear-favs-wrap" style="display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + var(--safe-bottom));width:calc(100% - 32px);max-width:520px;z-index:35;pointer-events:none">
     <button onclick="confirmClearFavs()" style="pointer-events:auto;width:100%;background:rgba(8,8,16,.72);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid var(--border2);color:var(--text);font-size:13px;font-weight:600;padding:14px;border-radius:14px;cursor:pointer;font-family:'DM Sans',sans-serif;transition:.15s;display:flex;align-items:center;justify-content:center;gap:7px;box-shadow:0 8px 24px rgba(0,0,0,.45)" onpointerdown="this.style.opacity='.6'" onpointerup="this.style.opacity='1'" onpointercancel="this.style.opacity='1'">
@@ -2228,6 +2254,17 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
   </button>
   <img id="photo-viewer-img" src="" alt="" style="max-width:100%;max-height:100%;object-fit:contain;transform-origin:center;will-change:transform;user-select:none;-webkit-user-drag:none;">
+</div>
+
+<!-- ═══ PROMO POPUP MODAL ═══ -->
+<div class="promo-modal-ov" id="promo-modal" onclick="if(event.target===this)dismissPromoModal()">
+  <div class="promo-modal-card">
+    <button class="promo-modal-close" onclick="dismissPromoModal()" aria-label="Close">✕</button>
+    <img id="promo-modal-img" class="promo-modal-img" src="" alt="promo">
+    <div class="promo-modal-bottom">
+      <button class="promo-modal-cta" onclick="dismissPromoModal();go('catalog')"><span id="promo-modal-cta-txt">Открыть каталог</span></button>
+    </div>
+  </div>
 </div>
 
 <!-- Toasts (two slots ping-pong to avoid stuck animation when fired in quick succession) -->
@@ -3067,7 +3104,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   if(saved!==null) activeAddrIdx=parseInt(saved);
   // Validate it still exists
   if(activeAddrIdx!==null&&!getSaved()[activeAddrIdx]) activeAddrIdx=null;
-  buildTips();syncOrders();applyLang();loadCatalog();updateFavBtn();updateSortBtn();initSupportInput();checkFirstLaunchHomeScreen();
+  buildTips();syncOrders();applyLang();loadCatalog();updateFavBtn();updateSortBtn();initSupportInput();checkFirstLaunchHomeScreen();initPromo();
   // Deep-link: #profile (from premium card welcome button) → auto-navigate to profile
   if(window.location.hash==='#profile'){try{history.replaceState(null,'',window.location.pathname);}catch(e){}setTimeout(()=>goPage('profile'),400);}
   // Preload game assets (images + audio) early so game opens instantly
@@ -3207,6 +3244,40 @@ function applyLang(){
   set('map-done-btn',t('mapDone'));
   const ain=el('addr-name-in');if(ain)ain.placeholder=lang==='ru'?'Дом / Офис / JVC...':'Home / Office / JVC...';
   const acin=el('addr-comment-in');if(acin)acin.placeholder=lang==='ru'?'Необязательно':'Optional';
+  // Promo images + CTA
+  _setPromoImgs();
+  set('promo-modal-cta-txt',lang==='ru'?'Открыть каталог':'Open catalog');
+}
+
+// ── PROMO BANNER & MODAL ──────────────────────────────────────────────────────
+const _PROMO_KEY='ambar_promo5_seen';
+const _PROMO_HERO_KEY='ambar_promo5_hero_dismissed';
+const _PROMO_12H=12*60*60*1000;
+function _promoImgs(){const r=lang==='ru';return{hero:r?'promo_hero_ru.png':'promo_hero_en.png',modal:r?'promo_modal_ru.png':'promo_modal_en.png'};}
+function _setPromoImgs(){const imgs=_promoImgs();const hi=el('promo-hero-img');if(hi)hi.src=imgs.hero;const mi=el('promo-modal-img');if(mi)mi.src=imgs.modal;}
+function _promoExpired(key){const ts=localStorage.getItem(key);if(!ts)return true;return(Date.now()-Number(ts))>=_PROMO_12H;}
+function initPromo(){
+  _setPromoImgs();
+  // Modal — always show on every open
+  setTimeout(()=>{const m=el('promo-modal');if(m)m.classList.add('show');},800);
+  // Hero banner — show always, re-show 12h after last dismiss
+  if(_promoExpired(_PROMO_HERO_KEY)){
+    localStorage.removeItem(_PROMO_HERO_KEY);
+    const h=el('promo-hero');if(h){h.style.display='';h.style.opacity='';h.style.transform='';h.style.maxHeight='';h.style.margin='';h.style.borderColor='';}
+  }
+}
+function dismissPromoHero(){
+  localStorage.setItem(_PROMO_HERO_KEY,String(Date.now()));
+  const h=el('promo-hero');
+  if(!h)return;
+  h.style.opacity='0';h.style.transform='scale(.97)';
+  setTimeout(()=>{h.style.maxHeight='0';h.style.margin='0 12px';h.style.borderColor='transparent';},150);
+  setTimeout(()=>{h.style.display='none';},550);
+}
+function dismissPromoModal(){
+  localStorage.setItem(_PROMO_KEY,'1');
+  const m=el('promo-modal');
+  if(m){m.classList.remove('show');setTimeout(()=>m.style.display='none',350);}
 }
 
 // ── HOME SCREEN PROMPT ────────────────────────────────────────────────────────

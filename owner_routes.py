@@ -819,6 +819,9 @@ async def _aggregate_sales(period: str = "month") -> dict:
             pid = it.get("id")
             if not pid:
                 continue
+            # Aggregate all custom items under one "СВОБОДНАЯ ПОЗИЦИЯ" row
+            if it.get("is_custom") or str(pid).startswith("custom_"):
+                pid = "_custom"
             row = agg.setdefault(pid, {"sold": 0, "rev": 0})
             qty = int(it.get("qty") or 0)
             line = it.get("line_total") or (it.get("price", 0) * qty)
@@ -854,6 +857,20 @@ async def handle_catalog_list(request):
             "desc":   p.get("desc") or "",
             "sold":   s["sold"],
             "rev":    s["rev"],
+        })
+    # Append aggregated custom items row if any were sold
+    custom_s = sales.get("_custom")
+    if custom_s and custom_s["sold"] > 0:
+        items.append({
+            "id":    "_custom",
+            "cat":   "Другое",
+            "name":  "СВОБОДНАЯ ПОЗИЦИЯ",
+            "price": 0,
+            "stock": True,
+            "img":   "",
+            "desc":  "Товары вне каталога, добавленные оператором",
+            "sold":  custom_s["sold"],
+            "rev":   custom_s["rev"],
         })
     return web.json_response({"period": period, "items": items}, headers=CORS_HEADERS)
 

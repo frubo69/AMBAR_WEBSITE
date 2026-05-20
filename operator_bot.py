@@ -341,6 +341,7 @@ def kb_edit(order):
             InlineKeyboardButton("🗑",  callback_data=f"ei_del_{oid}_{pid}"),
         ])
     rows.append([InlineKeyboardButton("➕ Добавить товар", callback_data=f"ei_add_{oid}")])
+    rows.append([InlineKeyboardButton("📝 Свободная позиция", callback_data=f"ei_free_{oid}")])
     rows.append([InlineKeyboardButton("✅ Готово",         callback_data=f"edit_done_{oid}")])
     return InlineKeyboardMarkup(rows)
 
@@ -599,8 +600,12 @@ def recalc_order(order):
     pmap  = {p["id"]: p for p in PRODUCTS}
     items = order.get("items", [])
     for item in items:
-        p = pmap.get(item["id"])
-        price = p["price"] if p and "price" in p else item.get("price", 0)
+        if item.get("is_custom"):
+            # Custom items keep their own price
+            price = item.get("price", 0)
+        else:
+            p = pmap.get(item["id"])
+            price = p["price"] if p and "price" in p else item.get("price", 0)
         item["line_total"] = price * item["qty"]
     sub            = sum(i.get("line_total", 0) for i in items)
     order["subtotal"] = sub
@@ -694,6 +699,8 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         ctx.user_data.pop("awaiting_decv_comment", None)
         ctx.user_data.pop("decv_oid", None)
         ctx.user_data.pop("decv_cid", None)
+        ctx.user_data.pop("pending_free_name", None)
+        ctx.user_data.pop("pending_free_price", None)
 
     # ── Intercept ban reason input ─────────────────────────────────────────────
     pending = ctx.user_data.get("pending_ban")
@@ -749,6 +756,85 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                             parse_mode="Markdown",
                             reply_markup=await kb_client_actions(oid, cid))
                     except: pass
+        return
+
+    # ── Intercept free position: price input ─────────────────────────────────
+    pending_free_price = ctx.user_data.get("pending_free_price")
+    if pending_free_price:
+        ctx.user_data.pop("pending_free_price")
+        raw = (update.message.text or "").strip().replace(",", ".")
+        try: await update.message.delete()
+        except: pass
+        try:
+            price = int(float(raw))
+        except ValueError:
+            if pending_free_price.get("msg_id"):
+                try:
+                    await ctx.bot.edit_message_text(
+                        "❌ Неверная цена. Введите число (AED):",
+                        chat_id=update.effective_chat.id,
+                        message_id=pending_free_price["msg_id"],
+                        reply_markup=InlineKeyboardMarkup([[
+                            InlineKeyboardButton("← Отмена", callback_data=f"edit_{pending_free_price['oid']}")
+                        ]]))
+                except: pass
+            ctx.user_data["pending_free_price"] = pending_free_price
+            return
+        if price <= 0:
+            ctx.user_data["pending_free_price"] = pending_free_price
+            return
+        oid = pending_free_price["oid"]
+        item_name = pending_free_price["name"]
+        import time as _time
+        item_id = f"custom_{int(_time.time())}_{oid[-3:]}"
+        order = await db.get_order(oid)
+        if order:
+            items = order.get("items", [])
+            items.append({"id": item_id, "name": item_name, "price": price, "qty": 1,
+                          "line_total": price, "is_custom": True})
+            order["items"] = items
+            order = recalc_order(order)
+            await db.update_order(oid, items=order["items"], subtotal=order["subtotal"], total=order["total"])
+            order = await db.get_order(oid)
+            if pending_free_price.get("msg_id"):
+                try:
+                    await ctx.bot.edit_message_text(
+                        f"✏️ *Редактирование #{oid}*\n\n"
+                        + "\n".join(f"  • {i['name']} ×{i['qty']}" for i in order.get("items", [])),
+                        chat_id=update.effective_chat.id,
+                        message_id=pending_free_price["msg_id"],
+                        parse_mode="Markdown",
+                        reply_markup=kb_edit(order))
+                except: pass
+        return
+
+    # ── Intercept free position: name input ───────────────────────────────────
+    pending_free_name = ctx.user_data.get("pending_free_name")
+    if pending_free_name:
+        ctx.user_data.pop("pending_free_name")
+        name = (update.message.text or "").strip()
+        try: await update.message.delete()
+        except: pass
+        if not name:
+            return
+        ctx.user_data["pending_free_price"] = {
+            "oid": pending_free_name["oid"],
+            "name": name,
+            "msg_id": pending_free_name.get("msg_id"),
+        }
+        if pending_free_name.get("msg_id"):
+            try:
+                await ctx.bot.edit_message_text(
+                    f"📝 *Свободная позиция*\n\n"
+                    f"Название: _{name}_\n\n"
+                    f"💰 Введите цену (AED):",
+                    chat_id=update.effective_chat.id,
+                    message_id=pending_free_name["msg_id"],
+                    parse_mode="Markdown",
+                    reply_markup=InlineKeyboardMarkup([[
+                        InlineKeyboardButton("← Отмена", callback_data=f"edit_{pending_free_name['oid']}")
+                    ]]))
+            except: pass
         return
 
     # ── Intercept decline verification comment ───────────────────────────────
@@ -1610,6 +1696,17 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         order = await db.get_order(oid)
         try: await q.edit_message_reply_markup(reply_markup=kb_edit(order))
         except: pass
+
+    # ── FREE POSITION — operator types name + price ─────────────────────────
+    elif data.startswith("ei_free_"):
+        oid = data[8:]
+        ctx.user_data["pending_free_name"] = {"oid": oid, "msg_id": q.message.message_id}
+        await q.edit_message_text(
+            f"📝 *Свободная позиция*\n\nЗаказ: `#{oid}`\n\n✏️ Введите название товара:",
+            parse_mode="Markdown",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton("← Отмена", callback_data=f"edit_{oid}")
+            ]]))
 
     # ── BAN — specific prefixes first ─────────────────────────────────────────
     elif data.startswith("ban_skip_"):

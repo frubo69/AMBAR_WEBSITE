@@ -15,7 +15,7 @@ OWNER_IDS = {7865205960}
 # managers list themselves (owner-only). Hardcoded defaults below; env var
 # AMBAR_MANAGER_IDS (comma-separated) is merged in on top so a deploy can
 # add managers without a code change.
-_DEFAULT_MANAGER_IDS = {982022772, 1298047770, 686932322, 7236406959}
+_DEFAULT_MANAGER_IDS = {982022772, 1298047770, 686932322, 7236406959, 8927037895}
 MANAGER_IDS = _DEFAULT_MANAGER_IDS | {
     int(x.strip())
     for x in os.getenv("AMBAR_MANAGER_IDS", "").split(",")

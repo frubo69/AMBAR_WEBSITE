@@ -4665,16 +4665,39 @@ function filterAllClients(q){
     try{Telegram.WebApp.HapticFeedback.impactOccurred('medium');}catch(_){}
   }
 
+  function doSwap(ref, mode){
+    _swapLock = true;
+    const flip = flipSnap();
+    if(mode==='before') ref.before(_dragEl);
+    else ref.after(_dragEl);
+    flip();
+    try{Telegram.WebApp.HapticFeedback.selectionChanged();}catch(_){}
+    setTimeout(()=>{_swapLock=false;_lastSwap=null;},280);
+  }
+
   function moveDrag(cx, cy){
     if(!_floatEl) return;
     _floatEl.style.left = (cx - _ox) + 'px';
     _floatEl.style.top  = (cy - _oy) + 'px';
-
-    // Cooldown — prevent rapid-fire swaps that cause jitter
     if(_swapLock) return;
 
-    // Only swap when drag center is INSIDE a chip's rect (not just "nearby")
     const chips=[...panel.querySelectorAll('.ac-chip')].filter(c=>c!==_dragEl);
+    if(!chips.length) return;
+
+    // Edge zones: drag to start (before first chip) or end (after last chip)
+    const fR = chips[0].getBoundingClientRect();
+    const lR = chips[chips.length-1].getBoundingClientRect();
+
+    if((cy <= fR.bottom && cx < fR.left) || cy < fR.top){
+      if(_lastSwap!=='_first'){_lastSwap='_first'; doSwap(chips[0],'before');}
+      return;
+    }
+    if((cy >= lR.top && cx > lR.right) || cy > lR.bottom){
+      if(_lastSwap!=='_last'){_lastSwap='_last'; doSwap(chips[chips.length-1],'after');}
+      return;
+    }
+
+    // Inside a chip's rect → swap
     let target = null;
     for(const c of chips){
       const r = c.getBoundingClientRect();
@@ -4682,32 +4705,35 @@ function filterAllClients(q){
         target = c; break;
       }
     }
-
     if(target && target !== _lastSwap){
       _lastSwap = target;
-      _swapLock = true;
-      const flip = flipSnap();
       const all=[...panel.querySelectorAll('.ac-chip')];
       const di=all.indexOf(_dragEl), bi=all.indexOf(target);
-      if(di<bi) target.after(_dragEl); else target.before(_dragEl);
-      flip();
-      try{Telegram.WebApp.HapticFeedback.selectionChanged();}catch(_){}
-      // Lock swaps for 280ms so animations finish before next swap
-      setTimeout(()=>{ _swapLock=false; _lastSwap=null; }, 280);
+      doSwap(target, di<bi?'after':'before');
     }
   }
 
   function endDrag(){
-    if(_floatEl){
+    if(_floatEl && _dragEl){
       const fr = _dragEl.getBoundingClientRect();
-      _floatEl.style.transition='all .22s cubic-bezier(.34,1.56,.64,1)';
-      _floatEl.style.left = fr.left+'px';
-      _floatEl.style.top = fr.top+'px';
-      _floatEl.style.transform = 'scale(1)';
-      _floatEl.style.boxShadow = 'none';
-      setTimeout(()=>{_floatEl?.remove();_floatEl=null;},240);
+      const fl = _floatEl;
+      const gh = _dragEl;
+      _floatEl = null;
+      _dragEl = null;
+      // Animate float to final position, keep ghost hidden until done
+      fl.style.transition='all .18s cubic-bezier(.34,1.56,.64,1)';
+      fl.style.left = fr.left+'px';
+      fl.style.top = fr.top+'px';
+      fl.style.transform = 'scale(1)';
+      fl.style.boxShadow = 'none';
+      setTimeout(()=>{
+        fl.remove();
+        gh.classList.remove('drag-ghost');
+      }, 200);
+    } else {
+      if(_floatEl){_floatEl.remove();_floatEl=null;}
+      if(_dragEl){_dragEl.classList.remove('drag-ghost');_dragEl=null;}
     }
-    if(_dragEl){_dragEl.classList.remove('drag-ghost');_dragEl=null;}
     _lastSwap = null;
     _swapLock = false;
     saveOrder();

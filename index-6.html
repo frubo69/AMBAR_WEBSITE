@@ -151,7 +151,7 @@ img{display:block}
 .addr-modal-add-row:active{background:rgba(201,169,110,.08);border-color:rgba(201,169,110,.4)}
 
 .bnav{position:fixed;bottom:calc(14px + var(--safe-bottom));left:50%;transform:translateX(-50%) translateZ(0);width:calc(100% - 32px);max-width:520px;z-index:40;display:flex;background:rgba(8,8,16,.82);backdrop-filter:blur(20px) saturate(150%);-webkit-backdrop-filter:blur(20px) saturate(150%);border:1px solid rgba(255,255,255,.1);border-top:1px solid rgba(255,255,255,.18);border-radius:28px;padding:0 6px;box-shadow:0 16px 48px rgba(0,0,0,.55),0 4px 16px rgba(0,0,0,.3),0 0 0 0.5px rgba(201,169,110,.12),inset 0 1px 0 rgba(255,255,255,.07);contain:layout style}
-.bnav-pill{position:absolute;top:7px;left:0;border-radius:18px;background:rgba(201,169,110,.15);border:1px solid rgba(201,169,110,.45);pointer-events:none;z-index:0;will-change:transform,width;transition:transform .3s cubic-bezier(.34,1.2,.64,1),width .3s cubic-bezier(.34,1.2,.64,1);box-shadow:0 2px 12px rgba(201,169,110,.15),inset 0 1px 0 rgba(255,255,255,.08);contain:layout style}
+.bnav-pill{position:absolute;top:7px;left:0;border-radius:18px;background:rgba(201,169,110,.15);border:1px solid rgba(201,169,110,.45);pointer-events:none;z-index:0;will-change:transform;transition:transform .28s cubic-bezier(.34,1.2,.64,1);box-shadow:0 2px 12px rgba(201,169,110,.15),inset 0 1px 0 rgba(255,255,255,.08);contain:layout style}
 .nb{flex:1;display:flex;flex-direction:column;align-items:center;padding:11px 4px 10px;gap:4px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:color .25s,transform .18s cubic-bezier(.34,1.4,.64,1);position:relative;z-index:1}
 .nb:active{transform:scale(.88)}
 .nb.on{color:var(--gold)}
@@ -3338,72 +3338,66 @@ function showHsGuide(){
 // ── PAGES ─────────────────────────────────────────────────────────────────────
 const PAGES=['catalog','cart','address','orders','profile','checkout'];
 const _NAV_PAGES=['catalog','cart','address','orders','profile'];
-const _PM=6; // pill margin inside each tab
-// returns the target translateX for a given page
-function _pillSnapX(page){
-  const btn=el('nb-'+page);
-  if(!btn)return 0;
-  // offsetLeft is relative to nav's padding box — more reliable than getBoundingClientRect on iOS
-  return btn.offsetLeft+_PM;
+const _PM=6;
+// Cached pill geometry — computed once at init, zero layout reads on tap
+let _pillCache=null;
+function _buildPillCache(){
+  const nav=el('bnav');if(!nav)return;
+  const c={positions:{},w:0,h:0,tabW:0,navLeft:0};
+  const btn0=el('nb-'+_NAV_PAGES[0]);
+  if(btn0){c.w=btn0.offsetWidth-_PM*2;c.h=btn0.offsetHeight-14;}
+  _NAV_PAGES.forEach(p=>{const b=el('nb-'+p);if(b)c.positions[p]=b.offsetLeft+_PM;});
+  const nr=nav.getBoundingClientRect();
+  c.navLeft=nr.left;c.tabW=nr.width/_NAV_PAGES.length;
+  // Pre-calc tab center offsets relative to nav
+  c.centers={};_NAV_PAGES.forEach(p=>{const b=el('nb-'+p);if(b){const r=b.getBoundingClientRect();c.centers[p]=r.left-nr.left+r.width/2;}});
+  _pillCache=c;
 }
 function movePill(page,instant){
-  const pill=el('bnav-pill');if(!pill)return;
-  const btn=el('nb-'+page);
-  // Batch all layout reads first
-  const w=btn?(btn.offsetWidth-_PM*2):0;
-  const h=btn?(btn.offsetHeight-14):0;
-  const x=_pillSnapX(page);
-  // Then batch all writes
+  const pill=el('bnav-pill');if(!pill||!_pillCache)return;
+  const x=_pillCache.positions[page]||0;
   if(instant){
     pill.style.transition='none';
-    if(btn){pill.style.width=w+'px';pill.style.height=h+'px';}
     pill.style.transform='translateX('+x+'px)';
     requestAnimationFrame(()=>pill.style.transition='');
   } else {
-    pill.style.transition='';
-    requestAnimationFrame(()=>{
-      if(btn){pill.style.width=w+'px';pill.style.height=h+'px';}
-      pill.style.transform='translateX('+x+'px)';
-    });
+    pill.style.transform='translateX('+x+'px)';
   }
 }
 function _initPill(){
-  const pill=el('bnav-pill'),btn0=el('nb-catalog'),nav=el('bnav');
-  if(!pill||!btn0||!nav)return;
+  const pill=el('bnav-pill'),nav=el('bnav');
+  if(!pill||!nav)return;
+  _buildPillCache();
+  if(!_pillCache)return;
   pill.style.left='0';
-  pill.style.width=(btn0.offsetWidth-_PM*2)+'px';
-  pill.style.height=(btn0.offsetHeight-14)+'px';
+  pill.style.width=_pillCache.w+'px';
+  pill.style.height=_pillCache.h+'px';
   movePill('catalog',true);
 
-  const pillW=btn0.offsetWidth-_PM*2;
+  const pillW=_pillCache.w;
   let _live=false,_fx=0,_sx=0,_raf=null;
   const DRAG_MIN=7;
 
-  function _tc(page){
-    const b=el('nb-'+page),nr=nav.getBoundingClientRect();
-    if(!b)return 0;const r=b.getBoundingClientRect();
-    return r.left-nr.left+r.width/2;
-  }
   function _nearest(relX){
     let best=_NAV_PAGES[0],bd=Infinity;
-    for(const p of _NAV_PAGES){const d=Math.abs(relX-_tc(p));if(d<bd){bd=d;best=p;}}
+    for(const p of _NAV_PAGES){const d=Math.abs(relX-(_pillCache.centers[p]||0));if(d<bd){bd=d;best=p;}}
     return best;
   }
 
   function _frame(){
     if(!_live)return;
-    const nr=nav.getBoundingClientRect();
-    const relX=_fx-nr.left;
-    const tabW=nr.width/_NAV_PAGES.length;
+    const navLeft=_pillCache.navLeft;
+    const relX=_fx-navLeft;
+    const tabW=_pillCache.tabW;
     let nearPage=_NAV_PAGES[0],nearDist=Infinity,nearCX=0;
     for(const p of _NAV_PAGES){
-      const cx=_tc(p);const d=Math.abs(relX-cx);
+      const cx=_pillCache.centers[p]||0;const d=Math.abs(relX-cx);
       if(d<nearDist){nearDist=d;nearPage=p;nearCX=cx;}
     }
     const pull=Math.max(0,1-nearDist/(tabW*0.55));
     const eased=pull*pull*(3-2*pull);
     const pillCX=relX+(nearCX-relX)*eased*0.65;
-    const maxX=nr.width-pillW-_PM;
+    const maxX=_pillCache.tabW*_NAV_PAGES.length-pillW-_PM;
     const tx=Math.max(_PM,Math.min(maxX,pillCX-pillW/2));
     pill.style.transition='none';
     pill.style.transform='translateX('+tx+'px)';
@@ -3413,7 +3407,7 @@ function _initPill(){
 
   nav.addEventListener('touchstart',e=>{
     _sx=_fx=e.touches[0].clientX;
-    _live=false; // wait for actual movement before drag mode
+    _live=false;
   },{passive:true});
   nav.addEventListener('touchmove',e=>{
     _fx=e.touches[0].clientX;
@@ -3424,14 +3418,12 @@ function _initPill(){
     }
   },{passive:true});
   nav.addEventListener('touchend',e=>{
-    e.preventDefault(); // prevent ghost onclick from firing go() a second time
-    const nr=nav.getBoundingClientRect();
-    const page=_nearest(e.changedTouches[0].clientX-nr.left);
+    e.preventDefault();
+    const page=_nearest(e.changedTouches[0].clientX-_pillCache.navLeft);
     if(_live){
       _live=false;
       if(_raf){cancelAnimationFrame(_raf);_raf=null;}
     }
-    // tap OR drag end: always smooth-slide to destination
     if(page!==curPg){go(page);}else{
       const pg=el('pg-'+page);
       if(pg&&pg.scrollTop>0){pg.scrollTo({top:0,behavior:'smooth'});haptic.light();}
@@ -3441,37 +3433,35 @@ function _initPill(){
 }
 function go(p){
   dismissToast();
-  // If already on this page, scroll to top smoothly
   if(p===curPg){
     const pg=el('pg-'+p);
     if(pg&&pg.scrollTop>0){pg.scrollTo({top:0,behavior:'smooth'});haptic.light();}
     return;
   }
-  // Save catalog scroll before hiding (iOS WebKit resets scrollTop on transform change)
   if(curPg==='catalog'){const pg=el('pg-catalog');if(pg)_catalogScroll=pg.scrollTop;}
   haptic.select();
-  // 1) Move pill FIRST — before any page toggles cause layout thrash
+  // 1) Move pill — zero layout reads, pure transform from cache
   const bnav=el('bnav');
   if(bnav){
     if(p==='checkout'){bnav.style.display='none';}
     else{bnav.style.display='';movePill(p);}
   }
-  // 2) Toggle nav button active states (lightweight — just classes on small elements)
   _NAV_PAGES.forEach(id=>el('nb-'+id)?.classList.toggle('on',id===p));
-  curPg=p;
-  // 3) Defer page visibility toggle + heavy renders to next frame so pill animates cleanly
-  requestAnimationFrame(()=>{
-    PAGES.forEach(id=>el('pg-'+id)?.classList.toggle('hidden',id!==p));
-    if(p==='catalog'&&_catalogScroll>0){const pg=el('pg-catalog');if(pg)pg.scrollTop=_catalogScroll;}
-    // Heavy renders on next idle tick
-    setTimeout(()=>{
-      if(p==='cart'){renderCart();updateCartAddrBar();}
-      if(p==='orders'){syncOrders();checkActiveOrder();initPullToRefresh();}
-      if(p==='address'){renderSavedCards();buildAreaChips();buildTypeChips('man');}
-      if(p==='profile'){buildProfile();syncOrders();checkActiveOrder();}
-      if(p==='checkout')buildSummary();
-    },0);
-  });
+  const prev=curPg;curPg=p;
+  // 2) Immediately hide old page, show new page (no transition on old — user can't see it anyway)
+  const oldPg=el('pg-'+prev);if(oldPg){oldPg.style.transition='none';oldPg.classList.add('hidden');void oldPg.offsetHeight;oldPg.style.transition='';}
+  const newPg=el('pg-'+p);if(newPg)newPg.classList.remove('hidden');
+  // Mark other pages hidden (no transition needed — already invisible)
+  PAGES.forEach(id=>{if(id!==p&&id!==prev)el('pg-'+id)?.classList.add('hidden');});
+  if(p==='catalog'&&_catalogScroll>0){requestAnimationFrame(()=>{const pg=el('pg-catalog');if(pg)pg.scrollTop=_catalogScroll;});}
+  // 3) Heavy renders — deferred so pill animates on GPU undisturbed
+  requestAnimationFrame(()=>setTimeout(()=>{
+    if(p==='cart'){renderCart();updateCartAddrBar();}
+    if(p==='orders'){syncOrders();checkActiveOrder();initPullToRefresh();}
+    if(p==='address'){renderSavedCards();buildAreaChips();buildTypeChips('man');}
+    if(p==='profile'){buildProfile();syncOrders();checkActiveOrder();}
+    if(p==='checkout')buildSummary();
+  },0));
 }
 
 // ── SAVED ADDRESSES ───────────────────────────────────────────────────────────

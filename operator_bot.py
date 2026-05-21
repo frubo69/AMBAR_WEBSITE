@@ -1840,9 +1840,18 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                             if not any(b.callback_data and (b.callback_data.startswith("verify_") or b.callback_data.startswith("decverify_")) for b in row)]
                 new_rows.append([InlineKeyboardButton("🔐 Верифицирован ✅", callback_data="noop")])
                 await q.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(new_rows))
-        # Owner notification — customers.verified
+        # Owner notification — delete old "Запрос" msg, send "Пройдена"
         try:
-            from owner_routes import notify_owners
+            from owner_routes import notify_owners, OWNER_BOT_TOKEN
+            from api_server import tg_delete
+            # Delete old "Запрос верификации" messages
+            old_msgs = (user_doc_before or {}).get("verify_owner_msg_ids", [])
+            for m in old_msgs:
+                try:
+                    await tg_delete(OWNER_BOT_TOKEN, m["chat_id"], m["message_id"])
+                except Exception:
+                    pass
+            await db.set_user_field(cid, verify_owner_msg_ids=[])
             v_user = await db.get_user(cid)
             v_name = f"{(v_user or {}).get('first_name','')} {(v_user or {}).get('last_name','')}".strip() or str(cid)
             v_uname = (v_user or {}).get("username", "")
@@ -1978,6 +1987,30 @@ async def _do_decline_verification(bot, chat_id: int, cid: int, oid: str, commen
                     chat_id=chat_id, message_id=edit_msg_id,
                     parse_mode="HTML", reply_markup=_done_kb)
             except: pass
+    # Owner notification — delete old "Запрос" msg, send "Отклонена"
+    try:
+        from owner_routes import notify_owners, OWNER_BOT_TOKEN
+        from api_server import tg_delete
+        user_doc = await db.get_user(cid)
+        old_msgs = (user_doc or {}).get("verify_owner_msg_ids", [])
+        for m in old_msgs:
+            try:
+                await tg_delete(OWNER_BOT_TOKEN, m["chat_id"], m["message_id"])
+            except Exception:
+                pass
+        await db.set_user_field(cid, verify_owner_msg_ids=[])
+        v_name = f"{(user_doc or {}).get('first_name','')} {(user_doc or {}).get('last_name','')}".strip() or str(cid)
+        v_uname = (user_doc or {}).get("username", "")
+        comment_ln = f"\nПричина: {comment}" if comment else ""
+        await notify_owners(
+            "customers.verified",
+            f"🔴 *Верификация отклонена*\n"
+            f"Клиент: {v_name}\n"
+            + (f"@{v_uname}\n" if v_uname else "")
+            + f"ID: `{cid}`{comment_ln}"
+        )
+    except Exception as e:
+        log.error(f"[owner-notif] customers.verified decline failed: {e}")
     # Report
     declined_info = f"\n📦 Отклонено заказов: {len(declined_oids)}" if declined_oids else ""
     comment_info = f"\n💬 Комментарий: {comment}" if comment else ""

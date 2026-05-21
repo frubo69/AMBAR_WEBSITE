@@ -800,6 +800,24 @@ async def handle_verify_request(request: web.Request) -> web.Response:
 
     log.info(f"[verify-request] uid={uid} source={source} detail={source_detail or recommender_name}")
 
+    # Owner notification — customers.verify (will be replaced on approve/decline)
+    try:
+        from owner_routes import notify_owners
+        src_lbl = {"friend":"от друга","operator":"от оператора"}.get(source, source or "—")
+        owner_msg_ids = await notify_owners(
+            "customers.verify",
+            f"📝 *Запрос верификации*\n"
+            f"Клиент: {user.get('first_name','')} {user.get('last_name','')}\n"
+            f"@{user.get('username','—')}\n"
+            f"ID: `{uid}`\n"
+            f"Источник: {src_lbl}"
+            + (f"\nРекомендатель: {recommender_name} ({recommender_phone})" if recommender_name else "")
+        )
+        if owner_msg_ids:
+            await db.set_user_field(uid, verify_owner_msg_ids=owner_msg_ids)
+    except Exception as e:
+        log.error(f"[owner-notif] customers.verify failed: {e}")
+
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 

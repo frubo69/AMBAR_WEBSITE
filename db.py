@@ -622,7 +622,7 @@ _DEFAULT_PREFS = {
     "reviews.bad3": True, "reviews.good5": False, "reviews.comment": True, "reviews.any": False,
     "digest.morning": True, "digest.evening": True, "digest.weekly": False, "digest.monthly": False,
     "stock.low": True, "stock.out": True,
-    "customers.new": False, "customers.verified": True, "customers.vip": False,
+    "customers.new": False, "customers.verify": True, "customers.verified": True, "customers.vip": False,
     "customers.vipReturn": False, "customers.vipChurn": False,
     "ops.officeEmpty": True,
     "finance.revenueLow": True, "finance.avgDrop": True,

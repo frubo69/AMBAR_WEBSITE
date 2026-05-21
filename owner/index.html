@@ -937,8 +937,8 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     </div>
     <div class="cat-block-kpis">
       <div class="cat-kpi"><div class="cat-kpi-v" id="catKpiRev">—</div><div class="cat-kpi-l">Выручка / мес</div></div>
-      <div class="cat-kpi"><div class="cat-kpi-v" id="catKpiLow">—</div><div class="cat-kpi-l" id="catKpiLowLbl">Нет в наличии</div></div>
       <div class="cat-kpi"><div class="cat-kpi-v" id="catKpiCats">—</div><div class="cat-kpi-l">Категории</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v" id="catKpiItems">—</div><div class="cat-kpi-l">Позиции</div></div>
     </div>
     <div class="cat-block-expand">
       <div class="cat-block-sect-t">Топ продаж</div>
@@ -3316,22 +3316,11 @@ function _renderCatBlock(){
   sub.textContent = `${n} ${pluralize(n,'позиция','позиции','позиций')} · ${cats.size} ${pluralize(cats.size,'категория','категории','категорий')}`;
 
   const revEl = document.getElementById('catKpiRev');
-  if(revEl){
-    if(totalRev >= 1000){
-      revEl.innerHTML = `${fmt(Math.round(totalRev/1000))}<span class="u">k</span>`;
-    } else {
-      revEl.innerHTML = `${fmt(totalRev)}`;
-    }
-  }
-  const lowEl = document.getElementById('catKpiLow');
-  if(lowEl){
-    lowEl.textContent = outItems.length;
-    lowEl.style.color = outItems.length>0 ? 'var(--warn)' : 'var(--up)';
-  }
-  const lowLblEl = document.getElementById('catKpiLowLbl');
-  if(lowLblEl) lowLblEl.textContent = 'Нет в наличии';
+  if(revEl) revEl.innerHTML = `<span data-aed="${totalRev}">${fmt(totalRev)}</span>`;
   const catsEl = document.getElementById('catKpiCats');
   if(catsEl) catsEl.textContent = cats.size;
+  const itemsEl = document.getElementById('catKpiItems');
+  if(itemsEl) itemsEl.textContent = n;
 
   const topWrap = document.getElementById('catBlockTop');
   if(topWrap){

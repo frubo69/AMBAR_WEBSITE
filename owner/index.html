@@ -1935,7 +1935,14 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
       </div>
       <div class="ac-filter-panel" id="acFilterPanel">
         <button class="ac-chip" data-filter="hasOrders">С заказами</button>
+        <button class="ac-chip" data-filter="returning">Повторные</button>
         <button class="ac-chip" data-filter="vip">VIP</button>
+        <button class="ac-chip" data-filter="banned">Забаненные</button>
+        <button class="ac-chip" data-filter="hasReferrals">С рефералами</button>
+        <button class="ac-chip" data-filter="hasPhone">С номером</button>
+        <button class="ac-chip" data-filter="new7d">Новые (7д)</button>
+        <button class="ac-chip" data-filter="inactive">Неактивные</button>
+        <button class="ac-chip" data-filter="topSpent">Топ по тратам</button>
       </div>
     </div>
     <div class="ac-body-wrap">
@@ -1970,7 +1977,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .ac-filter-dot{position:absolute;top:7px;right:7px;width:6px;height:6px;border-radius:50%;background:var(--gold2);display:none}
 .ac-filter-dot.show{display:block}
 .ac-filter-panel{display:flex;gap:6px;flex-wrap:wrap;overflow:hidden;max-height:0;opacity:0;transition:max-height .22s var(--e1),opacity .18s var(--e1),padding .22s var(--e1);padding:0}
-.ac-filter-panel.open{max-height:80px;opacity:1;padding-top:10px}
+.ac-filter-panel.open{max-height:120px;opacity:1;padding-top:10px}
 .ac-chip{padding:5px 14px;background:var(--card);border:1px solid var(--border2);border-radius:20px;color:var(--sub);font-size:11px;font-weight:600;cursor:pointer;transition:.15s var(--e1);letter-spacing:.2px;white-space:nowrap}
 .ac-chip:active{transform:scale(.95)}
 .ac-chip.on{background:linear-gradient(135deg,rgba(201,169,110,.15),rgba(201,169,110,.04));border-color:rgba(201,169,110,.35);color:var(--gold2)}
@@ -3139,7 +3146,9 @@ function renderAllClientsList(customers){
     const avSt = _cardAvStyle(c.card_type);
     const tag = c.card_label ? ` <span class="lrow-tag ${_cardClass(c.card_type)}">${c.card_label}</span>` : '';
     const uname = c.username ? '@'+c.username : 'ID '+c.telegram_id;
-    html += `<div class="lrow" data-detail="customer:${c.telegram_id}" data-orders="${c.orders_total||0}" data-vip="${c.is_vip?1:0}"><div class="lrow-av"${avSt?' style="'+avSt+'"':''}>${c.initials}</div><div class="lrow-body"><div class="lrow-name">${name}${tag}</div><div class="lrow-sub">${uname} · ${_pluralOrders(c.orders_total)}</div></div><div class="lrow-amt mono" data-aed="${c.total_spent}">${fmt(c.total_spent)}</div></div>`;
+    const _fs=c.first_seen?new Date(c.first_seen).getTime():0;
+    const _ls=c.last_seen?new Date(c.last_seen).getTime():0;
+    html += `<div class="lrow" data-detail="customer:${c.telegram_id}" data-orders="${c.orders_total||0}" data-vip="${c.is_vip?1:0}" data-banned="${c.is_banned?1:0}" data-refs="${c.referrals_count||0}" data-phone="${c.phone?1:0}" data-firstseen="${_fs}" data-lastseen="${_ls}" data-spent="${c.total_spent||0}"><div class="lrow-av"${avSt?' style="'+avSt+'"':''}>${c.initials}</div><div class="lrow-body"><div class="lrow-name">${name}${tag}${c.is_banned?' <span class="lrow-tag" style="background:rgba(224,85,85,.15);color:#e05555">БАН</span>':''}</div><div class="lrow-sub">${uname} · ${_pluralOrders(c.orders_total)}</div></div><div class="lrow-amt mono" data-aed="${c.total_spent}">${fmt(c.total_spent)}</div></div>`;
   });
   html += '</div>';
   body.innerHTML = html;
@@ -4437,12 +4446,25 @@ if(acOv) acOv.addEventListener('click',e=>{ if(e.target===acOv) closeAllClients(
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && acOv && acOv.classList.contains('show')) closeAllClients(); });
 
 let _acActiveFilter = null;
+const _7D = 7*24*60*60*1000;
+const _30D = 30*24*60*60*1000;
 function filterAllClients(q){
   const wrap = document.getElementById('acBody');
   if(!wrap) return;
-  const rows = wrap.querySelectorAll('.lrow');
+  const rows = [...wrap.querySelectorAll('.lrow')];
   const clean = s => (s||'').toLowerCase().replace(/[\s\-\(\)\+]/g,'');
   const needle = clean(q);
+  const now = Date.now();
+  // For "topSpent" sort rows by spent desc then re-append
+  if(_acActiveFilter === 'topSpent'){
+    const list = wrap.querySelector('.az-list');
+    if(list){
+      const sorted = [...rows].sort((a,b)=>Number(b.dataset.spent)-Number(a.dataset.spent));
+      // Remove az-hdr elements for this view
+      list.querySelectorAll('.az-hdr').forEach(h=>h.style.display='none');
+      sorted.forEach(r=>list.appendChild(r));
+    }
+  }
   let visCount = 0;
   rows.forEach(row=>{
     let show = true;
@@ -4452,7 +4474,14 @@ function filterAllClients(q){
       if(!hay.includes(needle)) show = false;
     }
     if(show && _acActiveFilter === 'hasOrders' && Number(row.dataset.orders) === 0) show = false;
+    if(show && _acActiveFilter === 'returning' && Number(row.dataset.orders) < 2) show = false;
     if(show && _acActiveFilter === 'vip' && row.dataset.vip !== '1') show = false;
+    if(show && _acActiveFilter === 'banned' && row.dataset.banned !== '1') show = false;
+    if(show && _acActiveFilter === 'hasReferrals' && Number(row.dataset.refs) === 0) show = false;
+    if(show && _acActiveFilter === 'hasPhone' && row.dataset.phone !== '1') show = false;
+    if(show && _acActiveFilter === 'new7d'){const fs=Number(row.dataset.firstseen);if(!fs||now-fs>_7D) show=false;}
+    if(show && _acActiveFilter === 'inactive'){const ls=Number(row.dataset.lastseen);const ord=Number(row.dataset.orders);if(ord===0||(ls&&now-ls<_30D)) show=false;}
+    if(show && _acActiveFilter === 'topSpent' && Number(row.dataset.orders) === 0) show = false;
     row.style.display = show ? '' : 'none';
     if(show) visCount++;
   });
@@ -4476,7 +4505,9 @@ function filterAllClients(q){
   const sub = document.getElementById('acSubtitle');
   if(sub){
     const total = rows.length;
-    if(_acActiveFilter || needle) sub.textContent = `${visCount} из ${total} · А → Я`;
+    const _fNames={hasOrders:'с заказами',returning:'повторные',vip:'VIP',banned:'забаненные',hasReferrals:'с рефералами',hasPhone:'с номером',new7d:'новые 7д',inactive:'неактивные',topSpent:'по тратам ↓'};
+    const fLabel = _fNames[_acActiveFilter]||'';
+    if(_acActiveFilter || needle) sub.textContent = `${visCount} из ${total}${fLabel?' · '+fLabel:''}`;
     else sub.textContent = `${total} человек · А → Я`;
   }
   initAzIndex();
@@ -4507,12 +4538,17 @@ function filterAllClients(q){
   document.querySelectorAll('#acFilterPanel .ac-chip').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       const f = btn.dataset.filter;
+      const wasTopSpent = _acActiveFilter === 'topSpent';
       if(_acActiveFilter === f){ _acActiveFilter = null; btn.classList.remove('on'); }
       else{
         document.querySelectorAll('#acFilterPanel .ac-chip').forEach(b=>b.classList.remove('on'));
         _acActiveFilter = f; btn.classList.add('on');
       }
       if(dot) dot.classList.toggle('show', !!_acActiveFilter);
+      // Re-render list if switching away from topSpent to restore alphabetical order
+      if(wasTopSpent && _acActiveFilter !== 'topSpent' && _customersCache){
+        renderAllClientsList(_customersCache);
+      }
       const inp = document.getElementById('acSearch');
       filterAllClients(inp ? inp.value : '');
       try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}

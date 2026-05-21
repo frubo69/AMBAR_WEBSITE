@@ -150,8 +150,8 @@ img{display:block}
 .addr-modal-add-row{margin:14px 12px 0;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 16px;border-radius:16px;border:1.5px dashed rgba(201,169,110,.22);background:rgba(201,169,110,.03);cursor:pointer;color:var(--gold);font-size:13px;font-weight:600;transition:.15s;-webkit-tap-highlight-color:transparent}
 .addr-modal-add-row:active{background:rgba(201,169,110,.08);border-color:rgba(201,169,110,.4)}
 
-.bnav{position:fixed;bottom:calc(14px + var(--safe-bottom));left:50%;transform:translateX(-50%);width:calc(100% - 32px);max-width:520px;z-index:40;display:flex;background:rgba(8,8,16,.68);backdrop-filter:blur(40px) saturate(180%);-webkit-backdrop-filter:blur(40px) saturate(180%);border:1px solid rgba(255,255,255,.1);border-top:1px solid rgba(255,255,255,.18);border-radius:28px;padding:0 6px;box-shadow:0 16px 48px rgba(0,0,0,.55),0 4px 16px rgba(0,0,0,.3),0 0 0 0.5px rgba(201,169,110,.12),inset 0 1px 0 rgba(255,255,255,.07)}
-.bnav-pill{position:absolute;top:7px;left:0;border-radius:18px;background:rgba(201,169,110,.15);border:1px solid rgba(201,169,110,.45);pointer-events:none;z-index:0;will-change:transform;transition:transform .3s cubic-bezier(.34,1.2,.64,1);box-shadow:0 2px 12px rgba(201,169,110,.15),inset 0 1px 0 rgba(255,255,255,.08)}
+.bnav{position:fixed;bottom:calc(14px + var(--safe-bottom));left:50%;transform:translateX(-50%) translateZ(0);width:calc(100% - 32px);max-width:520px;z-index:40;display:flex;background:rgba(8,8,16,.82);backdrop-filter:blur(20px) saturate(150%);-webkit-backdrop-filter:blur(20px) saturate(150%);border:1px solid rgba(255,255,255,.1);border-top:1px solid rgba(255,255,255,.18);border-radius:28px;padding:0 6px;box-shadow:0 16px 48px rgba(0,0,0,.55),0 4px 16px rgba(0,0,0,.3),0 0 0 0.5px rgba(201,169,110,.12),inset 0 1px 0 rgba(255,255,255,.07);contain:layout style}
+.bnav-pill{position:absolute;top:7px;left:0;border-radius:18px;background:rgba(201,169,110,.15);border:1px solid rgba(201,169,110,.45);pointer-events:none;z-index:0;will-change:transform,width;transition:transform .3s cubic-bezier(.34,1.2,.64,1),width .3s cubic-bezier(.34,1.2,.64,1);box-shadow:0 2px 12px rgba(201,169,110,.15),inset 0 1px 0 rgba(255,255,255,.08);contain:layout style}
 .nb{flex:1;display:flex;flex-direction:column;align-items:center;padding:11px 4px 10px;gap:4px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:color .25s,transform .18s cubic-bezier(.34,1.4,.64,1);position:relative;z-index:1}
 .nb:active{transform:scale(.88)}
 .nb.on{color:var(--gold)}
@@ -3349,16 +3349,22 @@ function _pillSnapX(page){
 function movePill(page,instant){
   const pill=el('bnav-pill');if(!pill)return;
   const btn=el('nb-'+page);
-  if(btn){pill.style.width=(btn.offsetWidth-_PM*2)+'px';pill.style.height=(btn.offsetHeight-14)+'px';}
+  // Batch all layout reads first
+  const w=btn?(btn.offsetWidth-_PM*2):0;
+  const h=btn?(btn.offsetHeight-14):0;
   const x=_pillSnapX(page);
+  // Then batch all writes
   if(instant){
     pill.style.transition='none';
+    if(btn){pill.style.width=w+'px';pill.style.height=h+'px';}
     pill.style.transform='translateX('+x+'px)';
     requestAnimationFrame(()=>pill.style.transition='');
   } else {
-    // Force browser to flush any pending transition changes before animating
     pill.style.transition='';
-    requestAnimationFrame(()=>pill.style.transform='translateX('+x+'px)');
+    requestAnimationFrame(()=>{
+      if(btn){pill.style.width=w+'px';pill.style.height=h+'px';}
+      pill.style.transform='translateX('+x+'px)';
+    });
   }
 }
 function _initPill(){
@@ -3457,11 +3463,14 @@ function go(p){
     else{bnav.style.display='';movePill(p);}
   }
   curPg=p;
-  if(p==='cart'){renderCart();updateCartAddrBar();}
-  if(p==='orders'){syncOrders();checkActiveOrder();initPullToRefresh();}  // fetch latest + refresh status bar
-  if(p==='address'){renderSavedCards();buildAreaChips();buildTypeChips('man'); /* GPS uses label+comment only */}
-  if(p==='profile'){buildProfile();syncOrders();checkActiveOrder();}
-  if(p==='checkout')buildSummary();
+  // Defer heavy page renders so pill animation gets a clean frame
+  requestAnimationFrame(()=>setTimeout(()=>{
+    if(p==='cart'){renderCart();updateCartAddrBar();}
+    if(p==='orders'){syncOrders();checkActiveOrder();initPullToRefresh();}
+    if(p==='address'){renderSavedCards();buildAreaChips();buildTypeChips('man');}
+    if(p==='profile'){buildProfile();syncOrders();checkActiveOrder();}
+    if(p==='checkout')buildSummary();
+  },16));
 }
 
 // ── SAVED ADDRESSES ───────────────────────────────────────────────────────────

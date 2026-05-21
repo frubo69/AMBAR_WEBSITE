@@ -544,9 +544,8 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     </div>
     <div class="card glow-up" data-detail="kpi:done">
       <div class="card-lbl"><span>Доставлено</span></div>
-      <div class="card-val mono"><span id="kDone">—</span><span class="u">/<span id="kDoneTotal">—</span></span></div>
+      <div class="card-val mono"><span id="kDone">—</span></div>
       <div class="card-row">
-        <span class="delta up" id="kDonePct">…</span>
         <span class="card-hint" id="kInRoute">…</span>
       </div>
     </div>
@@ -2617,7 +2616,7 @@ function _setText(id, txt){ const el = document.getElementById(id); if(el) el.te
 const _SKEL_IDS = [
   'heroRev','heroPrev','heroDelta','moneyHero','moneyProfit','moneyDelta',
   'offCentralRev','offNorthRev','offSouthRev','bars7dAvg','bars7dTotal',
-  'kOrders','kOrdersAvg','kOrdersDelta','kDeclined','kPending','kDone','kDoneTotal','kDonePct',
+  'kOrders','kOrdersAvg','kOrdersDelta','kDeclined','kPending','kDone',
   'kInRoute','kInRouteVal','kAvg','kAvgSub','kLate','kLateCount','kRating'
 ];
 function setFinanceSkel(on){
@@ -2696,7 +2695,7 @@ function applyPeriod(p){
     const pbl = document.getElementById('periodBarsLabels'); if(pbl) pbl.innerHTML = '';
     const pbt = document.getElementById('periodBarsTitle'); if(pbt) pbt.textContent = _periodBarsTitle(p);
     // KPI placeholders (real values come from /api/owner/finance kpi block)
-    ['kOrders','kOrdersAvg','kDeclined','kPending','kInRouteVal','kDone','kDoneTotal','kDonePct','kInRoute','kAvg','kLate','kLateCount','kRating'].forEach(id=>_setText(id,'—'));
+    ['kOrders','kOrdersAvg','kDeclined','kPending','kInRouteVal','kDone','kInRoute','kAvg','kLate','kLateCount','kRating'].forEach(id=>_setText(id,'—'));
     _setText('kOrdersDelta', '…');
     _setText('kRatingLbl', 'Рейтинг');
     _setText('kAvgSub', 'нет данных');
@@ -2787,8 +2786,6 @@ function renderKpis(k){
   _setText('kInRouteVal', k.in_route ?? 0);
   // Done
   _setText('kDone',      k.done);
-  _setText('kDoneTotal', k.done_total);
-  _setText('kDonePct',   (k.done_pct ?? 0) + '%');
   _setText('kInRoute',   (k.in_route ?? 0) + ' в пути');
   // Rating
   _setText('kRating',    k.rating ? k.rating.toFixed(2) : '—');

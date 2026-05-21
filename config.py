@@ -4,19 +4,25 @@ load_dotenv()
 
 BOT_TOKEN = os.getenv("SUPPORT_BOT_TOKEN", "")
 
-ADMIN_IDS = {686932322, 982022772, 1567466073, 1553700382}
+ADMIN_IDS = {
+    int(x.strip())
+    for x in os.getenv("AMBAR_ADMIN_IDS", "").split(",")
+    if x.strip().isdigit()
+}
 
 # Telegram IDs allowed to access the owner dashboard (/api/owner/*).
-# Keep in sync with the mini-app deployment. Separate from ADMIN_IDS — admins
-# may have support/mod powers without owning the business.
-OWNER_IDS = {7865205960}
+# Separate from ADMIN_IDS — admins may have support/mod powers without
+# owning the business.
+OWNER_IDS = {
+    int(x.strip())
+    for x in os.getenv("AMBAR_OWNER_IDS", "").split(",")
+    if x.strip().isdigit()
+}
 
 # Managers get the same /api/owner/* access as owners but cannot mutate the
-# managers list themselves (owner-only). Hardcoded defaults below; env var
-# AMBAR_MANAGER_IDS (comma-separated) is merged in on top so a deploy can
-# add managers without a code change.
-_DEFAULT_MANAGER_IDS = {982022772, 1298047770, 686932322, 7236406959, 8927037895}
-MANAGER_IDS = _DEFAULT_MANAGER_IDS | {
+# managers list themselves (owner-only). All IDs come from env var
+# AMBAR_MANAGER_IDS (comma-separated).
+MANAGER_IDS = {
     int(x.strip())
     for x in os.getenv("AMBAR_MANAGER_IDS", "").split(",")
     if x.strip().isdigit()

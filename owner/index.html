@@ -1983,18 +1983,22 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .ac-chip.on{background:linear-gradient(135deg,rgba(201,169,110,.15),rgba(201,169,110,.04));border-color:rgba(201,169,110,.35);color:var(--gold2)}
 /* ---- Apple-style jiggle reorder ---- */
 @keyframes _chipJig{
-  0%,100%{transform:rotate(-1.8deg) scale(1)}
-  50%{transform:rotate(1.8deg) scale(1)}
+  0%{transform:rotate(-0.9deg) translate(0,0)}
+  20%{transform:rotate(1deg) translate(0.4px,-0.3px)}
+  40%{transform:rotate(-0.7deg) translate(-0.3px,0.2px)}
+  60%{transform:rotate(1.1deg) translate(0.3px,-0.2px)}
+  80%{transform:rotate(-0.8deg) translate(-0.2px,0.3px)}
+  100%{transform:rotate(-0.9deg) translate(0,0)}
 }
-.ac-filter-panel.jig .ac-chip{animation:_chipJig .14s ease-in-out infinite;cursor:grab}
-.ac-filter-panel.jig .ac-chip:nth-child(2){animation-duration:.17s;animation-delay:.03s}
-.ac-filter-panel.jig .ac-chip:nth-child(3){animation-duration:.13s;animation-delay:.06s}
-.ac-filter-panel.jig .ac-chip:nth-child(4){animation-duration:.19s;animation-delay:.01s}
-.ac-filter-panel.jig .ac-chip:nth-child(5){animation-duration:.15s;animation-delay:.05s}
-.ac-filter-panel.jig .ac-chip:nth-child(6){animation-duration:.16s;animation-delay:.04s}
-.ac-filter-panel.jig .ac-chip:nth-child(7){animation-duration:.2s;animation-delay:.02s}
-.ac-filter-panel.jig .ac-chip:nth-child(8){animation-duration:.13s;animation-delay:.07s}
-.ac-filter-panel.jig .ac-chip:nth-child(9){animation-duration:.18s;animation-delay:.03s}
+.ac-filter-panel.jig .ac-chip{animation:_chipJig .32s ease-in-out infinite;cursor:grab}
+.ac-filter-panel.jig .ac-chip:nth-child(2){animation-duration:.36s;animation-delay:.04s}
+.ac-filter-panel.jig .ac-chip:nth-child(3){animation-duration:.3s;animation-delay:.08s}
+.ac-filter-panel.jig .ac-chip:nth-child(4){animation-duration:.38s;animation-delay:.02s}
+.ac-filter-panel.jig .ac-chip:nth-child(5){animation-duration:.33s;animation-delay:.07s}
+.ac-filter-panel.jig .ac-chip:nth-child(6){animation-duration:.35s;animation-delay:.05s}
+.ac-filter-panel.jig .ac-chip:nth-child(7){animation-duration:.4s;animation-delay:.03s}
+.ac-filter-panel.jig .ac-chip:nth-child(8){animation-duration:.29s;animation-delay:.09s}
+.ac-filter-panel.jig .ac-chip:nth-child(9){animation-duration:.37s;animation-delay:.04s}
 .ac-filter-panel.jig .ac-chip:active{transform:none}
 .ac-chip.drag-ghost{opacity:.22;animation:none !important;transform:scale(.85) !important;transition:opacity .15s,transform .15s !important}
 .ac-chip.drag-float{position:fixed;z-index:10000;transform:scale(1.12);box-shadow:0 12px 44px rgba(0,0,0,.55),0 0 0 1px rgba(201,169,110,.25);animation:none !important;pointer-events:none;will-change:left,top;transition:none}
@@ -4574,6 +4578,7 @@ function filterAllClients(q){
   let _floatEl = null;  // floating clone
   let _ox = 0, _oy = 0;
   let _lastSwap = null;
+  let _swapLock = false;
 
   // ---- Persist order ----
   function saveOrder(){
@@ -4658,22 +4663,30 @@ function filterAllClients(q){
     _floatEl.style.left = (cx - _ox) + 'px';
     _floatEl.style.top  = (cy - _oy) + 'px';
 
-    const chips=[...panel.querySelectorAll('.ac-chip')].filter(c=>c!==_dragEl);
-    let best=null, bestD=55;
-    chips.forEach(c=>{
-      const r=c.getBoundingClientRect();
-      const d=Math.hypot(cx-(r.left+r.width/2), cy-(r.top+r.height/2));
-      if(d<bestD){bestD=d; best=c;}
-    });
+    // Cooldown — prevent rapid-fire swaps that cause jitter
+    if(_swapLock) return;
 
-    if(best && best!==_lastSwap){
-      _lastSwap = best;
+    // Only swap when drag center is INSIDE a chip's rect (not just "nearby")
+    const chips=[...panel.querySelectorAll('.ac-chip')].filter(c=>c!==_dragEl);
+    let target = null;
+    for(const c of chips){
+      const r = c.getBoundingClientRect();
+      if(cx >= r.left && cx <= r.right && cy >= r.top && cy <= r.bottom){
+        target = c; break;
+      }
+    }
+
+    if(target && target !== _lastSwap){
+      _lastSwap = target;
+      _swapLock = true;
       const flip = flipSnap();
       const all=[...panel.querySelectorAll('.ac-chip')];
-      const di=all.indexOf(_dragEl), bi=all.indexOf(best);
-      if(di<bi) best.after(_dragEl); else best.before(_dragEl);
+      const di=all.indexOf(_dragEl), bi=all.indexOf(target);
+      if(di<bi) target.after(_dragEl); else target.before(_dragEl);
       flip();
       try{Telegram.WebApp.HapticFeedback.selectionChanged();}catch(_){}
+      // Lock swaps for 280ms so animations finish before next swap
+      setTimeout(()=>{ _swapLock=false; _lastSwap=null; }, 280);
     }
   }
 
@@ -4689,6 +4702,7 @@ function filterAllClients(q){
     }
     if(_dragEl){_dragEl.classList.remove('drag-ghost');_dragEl=null;}
     _lastSwap = null;
+    _swapLock = false;
     saveOrder();
     try{Telegram.WebApp.HapticFeedback.impactOccurred('light');}catch(_){}
   }

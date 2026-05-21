@@ -1840,6 +1840,22 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                             if not any(b.callback_data and (b.callback_data.startswith("verify_") or b.callback_data.startswith("decverify_")) for b in row)]
                 new_rows.append([InlineKeyboardButton("🔐 Верифицирован ✅", callback_data="noop")])
                 await q.edit_message_reply_markup(reply_markup=InlineKeyboardMarkup(new_rows))
+        # Owner notification — customers.verified
+        try:
+            from owner_routes import notify_owners
+            v_user = await db.get_user(cid)
+            v_name = f"{(v_user or {}).get('first_name','')} {(v_user or {}).get('last_name','')}".strip() or str(cid)
+            v_uname = (v_user or {}).get("username", "")
+            await notify_owners(
+                "customers.verified",
+                f"✅ *Верификация пройдена*\n"
+                f"Клиент: {v_name}\n"
+                + (f"@{v_uname}\n" if v_uname else "")
+                + f"ID: `{cid}`\n"
+                f"Оператор: {q.from_user.first_name or q.from_user.id}"
+            )
+        except Exception as e:
+            log.error(f"[owner-notif] customers.verified failed: {e}")
         # Send confirmation
         _dismiss = InlineKeyboardMarkup([[InlineKeyboardButton("✅ Просмотрено", callback_data="delmsg")]])
         await q.message.reply_text(

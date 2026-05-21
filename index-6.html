@@ -2709,7 +2709,7 @@ let lang=(()=>{
   const auto=tgLang.startsWith('ru')?'ru':'en';
   localStorage.setItem('ambar_lang',auto);
   return auto;
-})(),cart={},beerPcs={},catF='all',tip=0; // beerPcs: {id: 12|24}
+})(),cart=(()=>{try{return JSON.parse(localStorage.getItem('ambar_cart'))||{};}catch(e){return{};}})(),beerPcs=(()=>{try{return JSON.parse(localStorage.getItem('ambar_beerPcs'))||{};}catch(e){return{};}})(),catF='all',tip=0;
 let sortMode='none';
 let catFilter=null; // null = all, string = selected category
 let favs=new Set(JSON.parse(localStorage.getItem('ambar_favs')||'[]'));
@@ -5123,7 +5123,9 @@ function chgQty(id,d){
 }
 function syncCtrl(id){const p=P.find(x=>x.id===id);document.querySelectorAll('[data-ctrl="'+id+'"]').forEach(e=>{e.innerHTML=(e.dataset.ctrlStyle==='prof'?profCtrlHTML:ctrlHTML)(p,cart[id]||0);});}
 function cartSub(){return Object.entries(cart).reduce((s,[id,qty])=>{const p=P.find(x=>x.id===id);if(!p)return s;const pcs=isBeer(p)?beerPcs[id]:null;const unitPrice=pcs===24?(p.price_24||Math.round(p.price*1.8)):(pcs===12?(p.price_12||p.price):p.price);return s+unitPrice*qty;},0);}
+function saveCart(){try{localStorage.setItem('ambar_cart',JSON.stringify(cart));localStorage.setItem('ambar_beerPcs',JSON.stringify(beerPcs));}catch(e){}}
 function updHdr(){
+  saveCart();
   const cnt=Object.values(cart).reduce((a,b)=>a+b,0);
   el('hdr-tot').textContent=cartSub()+' AED';
   const dot=el('hdr-dot');dot.textContent=cnt;dot.style.display=cnt>0?'flex':'none';
@@ -5401,7 +5403,7 @@ function placeOrder(){
   }).catch(err=>{console.error('Order fetch error:', err);});
 
   const _placedIds=Object.keys(cart);
-  cart={};beerPcs={};tip=0;el('phone-err').classList.remove('on');el('phone-in').classList.remove('err');
+  cart={};beerPcs={};tip=0;saveCart();el('phone-err').classList.remove('on');el('phone-in').classList.remove('err');
   _placedIds.forEach(id=>syncCtrl(id));
   updHdr();buildTips();haptic.success();
   // No bottom toast here — addNotification() fires the rich top push-toast

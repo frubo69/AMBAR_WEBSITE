@@ -52,8 +52,8 @@
 html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;height:100%;overflow:hidden}
 button,input{font-family:'DM Sans',sans-serif;outline:none}
 img{display:block}
-.page{position:fixed;top:0;left:0;right:0;height:calc(var(--tg-h,100vh) - 90px - var(--safe-bottom));overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;opacity:1;transition:opacity .2s,transform .2s;overscroll-behavior-y:none}
-.page.hidden{opacity:0;pointer-events:none;transform:translateY(8px)}
+.page{position:fixed;top:0;left:0;right:0;height:calc(var(--tg-h,100vh) - 90px - var(--safe-bottom));overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;opacity:1;transition:opacity .15s,transform .15s;overscroll-behavior-y:none;contain:content}
+.page.hidden{opacity:0;pointer-events:none;transform:translateY(8px);visibility:hidden;transition:opacity .15s,transform .15s,visibility 0s .15s}
 #pg-checkout{height:calc(var(--tg-h,100vh) - var(--safe-bottom))}
 .hdr{position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;padding-top:calc(18px + var(--safe-top));background:rgba(7,7,14,.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);flex-shrink:0}
 .logo{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:700;letter-spacing:7px;background:linear-gradient(135deg,var(--gold),var(--gold2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
@@ -3450,27 +3450,28 @@ function go(p){
   // Save catalog scroll before hiding (iOS WebKit resets scrollTop on transform change)
   if(curPg==='catalog'){const pg=el('pg-catalog');if(pg)_catalogScroll=pg.scrollTop;}
   haptic.select();
-  PAGES.forEach(id=>{
-    el('pg-'+id)?.classList.toggle('hidden',id!==p);
-    el('nb-'+id)?.classList.toggle('on',id===p);
-  });
-  // Restore catalog scroll position after it becomes visible again
-  if(p==='catalog'&&_catalogScroll>0){requestAnimationFrame(()=>{const pg=el('pg-catalog');if(pg)pg.scrollTop=_catalogScroll;});}
-  // Hide nav bar on checkout, show on other pages
+  // 1) Move pill FIRST — before any page toggles cause layout thrash
   const bnav=el('bnav');
   if(bnav){
     if(p==='checkout'){bnav.style.display='none';}
     else{bnav.style.display='';movePill(p);}
   }
+  // 2) Toggle nav button active states (lightweight — just classes on small elements)
+  _NAV_PAGES.forEach(id=>el('nb-'+id)?.classList.toggle('on',id===p));
   curPg=p;
-  // Defer heavy page renders so pill animation gets a clean frame
-  requestAnimationFrame(()=>setTimeout(()=>{
-    if(p==='cart'){renderCart();updateCartAddrBar();}
-    if(p==='orders'){syncOrders();checkActiveOrder();initPullToRefresh();}
-    if(p==='address'){renderSavedCards();buildAreaChips();buildTypeChips('man');}
-    if(p==='profile'){buildProfile();syncOrders();checkActiveOrder();}
-    if(p==='checkout')buildSummary();
-  },16));
+  // 3) Defer page visibility toggle + heavy renders to next frame so pill animates cleanly
+  requestAnimationFrame(()=>{
+    PAGES.forEach(id=>el('pg-'+id)?.classList.toggle('hidden',id!==p));
+    if(p==='catalog'&&_catalogScroll>0){const pg=el('pg-catalog');if(pg)pg.scrollTop=_catalogScroll;}
+    // Heavy renders on next idle tick
+    setTimeout(()=>{
+      if(p==='cart'){renderCart();updateCartAddrBar();}
+      if(p==='orders'){syncOrders();checkActiveOrder();initPullToRefresh();}
+      if(p==='address'){renderSavedCards();buildAreaChips();buildTypeChips('man');}
+      if(p==='profile'){buildProfile();syncOrders();checkActiveOrder();}
+      if(p==='checkout')buildSummary();
+    },0);
+  });
 }
 
 // ── SAVED ADDRESSES ───────────────────────────────────────────────────────────

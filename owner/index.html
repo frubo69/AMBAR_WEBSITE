@@ -1978,9 +1978,26 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .ac-filter-dot.show{display:block}
 .ac-filter-panel{display:flex;gap:6px;flex-wrap:wrap;overflow:hidden;max-height:0;opacity:0;transition:max-height .22s var(--e1),opacity .18s var(--e1),padding .22s var(--e1);padding:0}
 .ac-filter-panel.open{max-height:120px;opacity:1;padding-top:10px}
-.ac-chip{padding:5px 14px;background:var(--card);border:1px solid var(--border2);border-radius:20px;color:var(--sub);font-size:11px;font-weight:600;cursor:pointer;transition:.15s var(--e1);letter-spacing:.2px;white-space:nowrap}
+.ac-chip{padding:5px 14px;background:var(--card);border:1px solid var(--border2);border-radius:20px;color:var(--sub);font-size:11px;font-weight:600;cursor:pointer;transition:.15s var(--e1);letter-spacing:.2px;white-space:nowrap;-webkit-user-select:none;user-select:none;touch-action:manipulation}
 .ac-chip:active{transform:scale(.95)}
 .ac-chip.on{background:linear-gradient(135deg,rgba(201,169,110,.15),rgba(201,169,110,.04));border-color:rgba(201,169,110,.35);color:var(--gold2)}
+/* ---- Apple-style jiggle reorder ---- */
+@keyframes _chipJig{
+  0%,100%{transform:rotate(-1.8deg) scale(1)}
+  50%{transform:rotate(1.8deg) scale(1)}
+}
+.ac-filter-panel.jig .ac-chip{animation:_chipJig .14s ease-in-out infinite;cursor:grab}
+.ac-filter-panel.jig .ac-chip:nth-child(2){animation-duration:.17s;animation-delay:.03s}
+.ac-filter-panel.jig .ac-chip:nth-child(3){animation-duration:.13s;animation-delay:.06s}
+.ac-filter-panel.jig .ac-chip:nth-child(4){animation-duration:.19s;animation-delay:.01s}
+.ac-filter-panel.jig .ac-chip:nth-child(5){animation-duration:.15s;animation-delay:.05s}
+.ac-filter-panel.jig .ac-chip:nth-child(6){animation-duration:.16s;animation-delay:.04s}
+.ac-filter-panel.jig .ac-chip:nth-child(7){animation-duration:.2s;animation-delay:.02s}
+.ac-filter-panel.jig .ac-chip:nth-child(8){animation-duration:.13s;animation-delay:.07s}
+.ac-filter-panel.jig .ac-chip:nth-child(9){animation-duration:.18s;animation-delay:.03s}
+.ac-filter-panel.jig .ac-chip:active{transform:none}
+.ac-chip.drag-ghost{opacity:.22;animation:none !important;transform:scale(.85) !important;transition:opacity .15s,transform .15s !important}
+.ac-chip.drag-float{position:fixed;z-index:10000;transform:scale(1.12);box-shadow:0 12px 44px rgba(0,0,0,.55),0 0 0 1px rgba(201,169,110,.25);animation:none !important;pointer-events:none;will-change:left,top;transition:none}
 </style>
 
 <!-- ============ DATE RANGE PICKER ============ -->
@@ -4541,6 +4558,181 @@ function filterAllClients(q){
       try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
     });
   });
+})();
+
+// ===== Apple-style long-press → jiggle → drag-to-reorder filter chips =====
+(function initChipReorder(){
+  const panel = document.getElementById('acFilterPanel');
+  if(!panel) return;
+
+  const HOLD_MS = 420;
+  const LS_KEY = 'ambar_chip_order';
+  let _jig = false;
+  let _holdT = null;
+  let _sx = 0, _sy = 0;
+  let _dragEl = null;   // original chip (ghost)
+  let _floatEl = null;  // floating clone
+  let _ox = 0, _oy = 0;
+  let _lastSwap = null;
+
+  // ---- Persist order ----
+  function saveOrder(){
+    const ord=[...panel.querySelectorAll('.ac-chip')].map(c=>c.dataset.filter);
+    try{localStorage.setItem(LS_KEY,JSON.stringify(ord));}catch(_){}
+  }
+  function restoreOrder(){
+    try{
+      const ord=JSON.parse(localStorage.getItem(LS_KEY));
+      if(!ord||!Array.isArray(ord)) return;
+      const map={};
+      panel.querySelectorAll('.ac-chip').forEach(c=>{map[c.dataset.filter]=c;});
+      ord.forEach(f=>{if(map[f]){panel.appendChild(map[f]);delete map[f];}});
+      Object.values(map).forEach(c=>panel.appendChild(c));
+    }catch(_){}
+  }
+
+  // ---- Jiggle mode ----
+  function enterJig(){
+    if(_jig) return;
+    _jig = true;
+    panel.classList.add('jig');
+    try{Telegram.WebApp.HapticFeedback.impactOccurred('heavy');}catch(_){}
+  }
+  function exitJig(){
+    if(!_jig) return;
+    _jig = false;
+    panel.classList.remove('jig');
+    try{Telegram.WebApp.HapticFeedback.selectionChanged();}catch(_){}
+  }
+
+  // Block chip filter clicks while jiggling (capture phase)
+  panel.addEventListener('click', e=>{
+    if(_jig){e.stopPropagation();e.preventDefault();}
+  }, true);
+
+  // Exit jiggle when panel collapses
+  new MutationObserver(()=>{
+    if(_jig && !panel.classList.contains('open')) exitJig();
+  }).observe(panel, {attributes:true, attributeFilter:['class']});
+
+  // ---- FLIP helper (smooth reposition animation) ----
+  function flipSnap(){
+    const chips=[...panel.querySelectorAll('.ac-chip')];
+    const old=new Map();
+    chips.forEach(c=>old.set(c, c.getBoundingClientRect()));
+    return function play(){
+      chips.forEach(c=>{
+        if(c===_dragEl) return;
+        const o=old.get(c); if(!o) return;
+        const n=c.getBoundingClientRect();
+        const dx=o.left-n.left, dy=o.top-n.top;
+        if(Math.abs(dx)<1&&Math.abs(dy)<1) return;
+        c.style.transition='none';
+        c.style.transform=`translate(${dx}px,${dy}px)`;
+        void c.offsetHeight;
+        c.style.transition='transform .3s cubic-bezier(.34,1.56,.64,1)';
+        c.style.transform='';
+      });
+    };
+  }
+
+  // ---- Drag lifecycle ----
+  function startDrag(chip, cx, cy){
+    _dragEl = chip;
+    const r = chip.getBoundingClientRect();
+    _ox = cx - r.left;
+    _oy = cy - r.top;
+    _floatEl = chip.cloneNode(true);
+    _floatEl.className = 'ac-chip drag-float';
+    if(chip.classList.contains('on')) _floatEl.classList.add('on');
+    _floatEl.style.left = r.left + 'px';
+    _floatEl.style.top = r.top + 'px';
+    _floatEl.style.width = r.width + 'px';
+    document.body.appendChild(_floatEl);
+    chip.classList.add('drag-ghost');
+    try{Telegram.WebApp.HapticFeedback.impactOccurred('medium');}catch(_){}
+  }
+
+  function moveDrag(cx, cy){
+    if(!_floatEl) return;
+    _floatEl.style.left = (cx - _ox) + 'px';
+    _floatEl.style.top  = (cy - _oy) + 'px';
+
+    const chips=[...panel.querySelectorAll('.ac-chip')].filter(c=>c!==_dragEl);
+    let best=null, bestD=55;
+    chips.forEach(c=>{
+      const r=c.getBoundingClientRect();
+      const d=Math.hypot(cx-(r.left+r.width/2), cy-(r.top+r.height/2));
+      if(d<bestD){bestD=d; best=c;}
+    });
+
+    if(best && best!==_lastSwap){
+      _lastSwap = best;
+      const flip = flipSnap();
+      const all=[...panel.querySelectorAll('.ac-chip')];
+      const di=all.indexOf(_dragEl), bi=all.indexOf(best);
+      if(di<bi) best.after(_dragEl); else best.before(_dragEl);
+      flip();
+      try{Telegram.WebApp.HapticFeedback.selectionChanged();}catch(_){}
+    }
+  }
+
+  function endDrag(){
+    if(_floatEl){
+      const fr = _dragEl.getBoundingClientRect();
+      _floatEl.style.transition='all .22s cubic-bezier(.34,1.56,.64,1)';
+      _floatEl.style.left = fr.left+'px';
+      _floatEl.style.top = fr.top+'px';
+      _floatEl.style.transform = 'scale(1)';
+      _floatEl.style.boxShadow = 'none';
+      setTimeout(()=>{_floatEl?.remove();_floatEl=null;},240);
+    }
+    if(_dragEl){_dragEl.classList.remove('drag-ghost');_dragEl=null;}
+    _lastSwap = null;
+    saveOrder();
+    try{Telegram.WebApp.HapticFeedback.impactOccurred('light');}catch(_){}
+  }
+
+  // ---- Pointer / touch events ----
+  panel.addEventListener('pointerdown', e=>{
+    const chip=e.target.closest('.ac-chip');
+    if(!chip) return;
+    _sx=e.clientX; _sy=e.clientY;
+
+    if(_jig){
+      e.preventDefault();
+      startDrag(chip, e.clientX, e.clientY);
+      return;
+    }
+    _holdT = setTimeout(()=>{
+      _holdT=null;
+      enterJig();
+      startDrag(chip, e.clientX, e.clientY);
+    }, HOLD_MS);
+  });
+
+  panel.addEventListener('pointermove', e=>{
+    const cx=e.clientX, cy=e.clientY;
+    if(_holdT && Math.hypot(cx-_sx,cy-_sy)>8){clearTimeout(_holdT);_holdT=null;}
+    if(_floatEl) moveDrag(cx, cy);
+  });
+
+  const up = ()=>{
+    if(_holdT){clearTimeout(_holdT);_holdT=null;}
+    if(_floatEl) endDrag();
+  };
+  panel.addEventListener('pointerup', up);
+  panel.addEventListener('pointercancel', up);
+
+  // Prevent scroll while dragging
+  panel.addEventListener('touchmove', e=>{if(_floatEl)e.preventDefault();},{passive:false});
+
+  // Tap outside panel → exit jiggle
+  document.addEventListener('pointerdown', e=>{
+    if(_jig && !e.target.closest('.ac-filter-panel') && !_floatEl) exitJig();
+  });
+
+  restoreOrder();
 })();
 
 // ==== Operator period (inside People > Операторы) ====

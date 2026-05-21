@@ -2570,7 +2570,9 @@ async function loadCatalog(){
     console.warn('Catalog fetch failed, using embedded fallback');
     P=CATALOG_FALLBACK;
   }
-  buildChips();renderGrid();
+  buildChips();renderGrid();updHdr();
+  // Sync catalog card controls with restored cart
+  Object.keys(cart).forEach(id=>syncCtrl(id));
 }
 const TIP_OPTS=[0,50,100,200,500];
 
@@ -3104,7 +3106,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   if(saved!==null) activeAddrIdx=parseInt(saved);
   // Validate it still exists
   if(activeAddrIdx!==null&&!getSaved()[activeAddrIdx]) activeAddrIdx=null;
-  buildTips();syncOrders();applyLang();loadCatalog();updateFavBtn();updateSortBtn();initSupportInput();checkFirstLaunchHomeScreen();initPromo();updHdr();
+  buildTips();syncOrders();applyLang();loadCatalog();updateFavBtn();updateSortBtn();initSupportInput();checkFirstLaunchHomeScreen();initPromo();
   // Deep-link: #profile (from premium card welcome button) → auto-navigate to profile
   if(window.location.hash==='#profile'){try{history.replaceState(null,'',window.location.pathname);}catch(e){}setTimeout(()=>goPage('profile'),400);}
   // Preload game assets (images + audio) early so game opens instantly

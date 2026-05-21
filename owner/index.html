@@ -4603,8 +4603,15 @@ function filterAllClients(q){
     panel.classList.add('jig');
     try{Telegram.WebApp.HapticFeedback.impactOccurred('heavy');}catch(_){}
   }
+  function killDrag(){
+    if(_floatEl){_floatEl.remove();_floatEl=null;}
+    if(_dragEl){_dragEl.classList.remove('drag-ghost');_dragEl=null;}
+    if(_holdT){clearTimeout(_holdT);_holdT=null;}
+    _lastSwap=null;_swapLock=false;
+  }
   function exitJig(){
     if(!_jig) return;
+    killDrag();
     _jig = false;
     panel.classList.remove('jig');
     try{Telegram.WebApp.HapticFeedback.selectionChanged();}catch(_){}
@@ -4735,16 +4742,20 @@ function filterAllClients(q){
     if(_holdT){clearTimeout(_holdT);_holdT=null;}
     if(_floatEl) endDrag();
   };
-  panel.addEventListener('pointerup', up);
-  panel.addEventListener('pointercancel', up);
+  // Listen on document — pointer may leave the panel during drag
+  document.addEventListener('pointerup', up);
+  document.addEventListener('pointercancel', up);
 
   // Prevent scroll while dragging
-  panel.addEventListener('touchmove', e=>{if(_floatEl)e.preventDefault();},{passive:false});
+  document.addEventListener('touchmove', e=>{if(_floatEl)e.preventDefault();},{passive:false});
 
   // Tap outside panel → exit jiggle
   document.addEventListener('pointerdown', e=>{
     if(_jig && !e.target.closest('.ac-filter-panel') && !_floatEl) exitJig();
   });
+
+  // Safety: clean up if app goes to background mid-drag
+  document.addEventListener('visibilitychange', ()=>{if(document.hidden) killDrag();});
 
   restoreOrder();
 })();

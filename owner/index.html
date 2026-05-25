@@ -5775,6 +5775,7 @@ const DETAIL = {
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Адрес</div></div><div class="dt-row-r" style="font-size:12px;max-width:60%;text-align:right">${real.gmap_link ? '<a href="'+real.gmap_link+'" target="_blank" style="color:var(--gold2)">'+( real.address && real.address!=='—' && real.address!=='GPS' ? real.address : '📍 Карта')+'</a>' : (real.address||'—')}</div></div>
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Офис</div></div><div class="dt-row-r">${real.office||'—'}</div></div>
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Статус</div></div><div class="dt-row-r" style="color:${stClr[real.status]||'var(--muted)'}">${stMap[real.status]||real.status}</div></div>
+              ${real.status==='cancelled'||real.status==='declined'?`<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${real.status==='declined'?'Отклонён':'Отменён'}</div><div class="dt-row-s">${real.cancelled_by==='operator'||real.status==='declined'?'оператором':'клиентом'}${real.cancel_reason?' · '+real.cancel_reason:real.decline_reason?' · '+real.decline_reason:''}</div></div></div>`:''}
             </div>
             <div class="dt-sect">Позиции</div>
             <div class="dt-card">

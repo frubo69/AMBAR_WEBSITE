@@ -345,11 +345,15 @@ async def handle_finance(request):
         placed = o.get("timestamp","")
         confirmed = o.get("confirmed_at","")
         delivered = o.get("updated_at","") if o.get("status") == "delivered" else ""
+        cancelled_at = o.get("cancelled_at","") or o.get("declined_at","")
+        cancelled_by = o.get("cancelled_by","")
+        cancel_reason = o.get("cancel_reason","") or o.get("decline_reason","") or o.get("declineReason","")
         actual_min = None
-        if placed and delivered:
+        base = confirmed or placed
+        if base and delivered:
             try:
                 from datetime import datetime as _dt
-                p = _dt.fromisoformat(placed.replace("Z","+00:00"))
+                p = _dt.fromisoformat(base.replace("Z","+00:00"))
                 d = _dt.fromisoformat(delivered.replace("Z","+00:00"))
                 actual_min = max(0, int((d - p).total_seconds() / 60))
             except Exception:
@@ -366,6 +370,9 @@ async def handle_finance(request):
             "eta": o.get("eta",""),
             "confirmed_at": confirmed,
             "delivered_at": delivered,
+            "cancelled_at": cancelled_at,
+            "cancelled_by": cancelled_by,
+            "cancel_reason": cancel_reason,
             "actual_min": actual_min,
             "office": o.get("office_name",""),
             "address": o.get("address","—"),

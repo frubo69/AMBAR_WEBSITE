@@ -5785,13 +5785,22 @@ const DETAIL = {
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Оформлен</div></div><div class="dt-row-r">${time||'—'}</div></div>
               ${(()=>{
                 if(!real.confirmed_at) return '';
-                const ca = new Date(/Z$|[+-]\\d{2}/.test(real.confirmed_at) ? real.confirmed_at : real.confirmed_at+'Z');
+                const ca = new Date(/Z$|[+-]\d{2}/.test(real.confirmed_at) ? real.confirmed_at : real.confirmed_at+'Z');
                 return isNaN(ca.getTime()) ? '' : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Принят</div></div><div class="dt-row-r">'+String(ca.getHours()).padStart(2,'0')+':'+String(ca.getMinutes()).padStart(2,'0')+'</div></div>';
               })()}
               ${(()=>{
                 if(!real.delivered_at) return '';
-                const da = new Date(/Z$|[+-]\\d{2}/.test(real.delivered_at) ? real.delivered_at : real.delivered_at+'Z');
+                const da = new Date(/Z$|[+-]\d{2}/.test(real.delivered_at) ? real.delivered_at : real.delivered_at+'Z');
                 return isNaN(da.getTime()) ? '' : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Доставлен</div></div><div class="dt-row-r">'+String(da.getHours()).padStart(2,'0')+':'+String(da.getMinutes()).padStart(2,'0')+'</div></div>';
+              })()}
+              ${(()=>{
+                if(real.status!=='cancelled'&&real.status!=='declined') return '';
+                if(!real.cancelled_at&&!real.declined_at) return '';
+                const raw = real.cancelled_at||real.declined_at;
+                const dt = new Date(/Z$|[+-]\d{2}/.test(raw) ? raw : raw+'Z');
+                if(isNaN(dt.getTime())) return '';
+                const label = real.status==='declined'?'Отклонён':'Отменён';
+                return '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--dn)">'+label+'</div></div><div class="dt-row-r" style="color:var(--dn)">'+String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0')+'</div></div>';
               })()}
               ${real.eta ? '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">ETA</div></div><div class="dt-row-r">'+real.eta+' мин</div></div>' : ''}
               ${(()=>{

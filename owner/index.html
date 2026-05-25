@@ -5774,8 +5774,7 @@ const DETAIL = {
             <div class="dt-card">
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Адрес</div></div><div class="dt-row-r" style="font-size:12px;max-width:60%;text-align:right">${real.gmap_link ? '<a href="'+real.gmap_link+'" target="_blank" style="color:var(--gold2)">'+( real.address && real.address!=='—' && real.address!=='GPS' ? real.address : '📍 Карта')+'</a>' : (real.address||'—')}</div></div>
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Офис</div></div><div class="dt-row-r">${real.office||'—'}</div></div>
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Статус</div></div><div class="dt-row-r" style="color:${stClr[real.status]||'var(--muted)'}">${stMap[real.status]||real.status}</div></div>
-              ${real.status==='cancelled'||real.status==='declined'?`<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${real.status==='declined'?'Отклонён':'Отменён'}</div><div class="dt-row-s">${real.cancelled_by==='operator'||real.status==='declined'?'оператором':'клиентом'}${real.cancel_reason?' · '+real.cancel_reason:real.decline_reason?' · '+real.decline_reason:''}</div></div></div>`:''}
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Статус</div></div><div class="dt-row-r" style="color:${stClr[real.status]||'var(--muted)'}">${real.status==='cancelled'?(real.cancelled_by==='operator'?'отменён оператором':'отменён клиентом'):real.status==='declined'?'отклонён оператором':(stMap[real.status]||real.status)}</div></div>
             </div>
             <div class="dt-sect">Позиции</div>
             <div class="dt-card">
@@ -5795,7 +5794,16 @@ const DETAIL = {
                 return isNaN(da.getTime()) ? '' : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Доставлен</div></div><div class="dt-row-r">'+String(da.getHours()).padStart(2,'0')+':'+String(da.getMinutes()).padStart(2,'0')+'</div></div>';
               })()}
               ${real.eta ? '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">ETA</div></div><div class="dt-row-r">'+real.eta+' мин</div></div>' : ''}
-              ${real.actual_min != null ? '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Факт</div></div><div class="dt-row-r" style="color:'+(real.actual_min>((parseInt(real.eta)||25)+5)?'var(--warn)':'var(--up)')+'"><b>'+real.actual_min+'</b> мин</div></div>' : ''}
+              ${(()=>{
+                if(!real.confirmed_at || !real.delivered_at) return real.actual_min != null ? '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Факт. время</div></div><div class="dt-row-r"><b>'+real.actual_min+'</b> мин</div></div>' : '';
+                const ca = new Date(/Z$|[+-]\d{2}/.test(real.confirmed_at) ? real.confirmed_at : real.confirmed_at+'Z');
+                const da = new Date(/Z$|[+-]\d{2}/.test(real.delivered_at) ? real.delivered_at : real.delivered_at+'Z');
+                if(isNaN(ca.getTime())||isNaN(da.getTime())) return '';
+                const factMin = Math.round((da - ca) / 60000);
+                const etaNum = parseInt(real.eta) || 0;
+                const isLate = etaNum > 0 && factMin > etaNum;
+                return '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Факт. время</div>'+(isLate?'<div class="dt-row-s" style="color:var(--warn)">опоздание +'+(factMin - etaNum)+' мин</div>':'')+'</div><div class="dt-row-r" style="color:'+(isLate?'var(--warn)':'var(--up)')+'"><b>'+factMin+'</b> мин</div></div>';
+              })()}
             </div>`,
           foot: ''
         };

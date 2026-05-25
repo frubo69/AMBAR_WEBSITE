@@ -5382,6 +5382,7 @@ function closeDetail(){
   dtOv.classList.remove('show');
   _dtStack = [];
   _dtCurrent = null;
+  _dtExpandState = {};
   const bk = document.getElementById('dtBack'); if(bk) bk.style.display = 'none';
 }
 dtOv.addEventListener('click',e=>{ if(e.target===dtOv) closeDetail(); });
@@ -5992,8 +5993,8 @@ const DETAIL = {
           <div class="dt-row" data-detail="kpi:done"><div class="dt-row-l"><div class="dt-row-t">Доставлено</div><div class="dt-row-s">${k.done_pct||0}% от всех</div></div><div class="dt-row-r up">${k.done||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
           <div class="dt-row" data-detail="kpi:inroute"><div class="dt-row-l"><div class="dt-row-t">В пути</div><div class="dt-row-s">оператор на доставке</div></div><div class="dt-row-r">${k.in_route||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
           <div class="dt-row" data-detail="kpi:pending"><div class="dt-row-l"><div class="dt-row-t">Ожидают</div><div class="dt-row-s">не принят оператором</div></div><div class="dt-row-r ${(k.pending||0)>0?'warn':''}">${k.pending||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
-          <div class="dt-row" style="cursor:pointer" onclick="var el=document.getElementById('_expandDeclined'),a=this.querySelector('[data-arr]'),o=el.style.display==='none';el.style.display=o?'block':'none';if(a)a.textContent=o?'⌃':'⌵'"><div class="dt-row-l"><div class="dt-row-t">Отменены / отклонены</div><div class="dt-row-s">клиентом или оператором</div></div><div class="dt-row-r dn">${k.declined||0}</div><div class="dt-row-r" data-arr style="color:var(--muted);font-size:16px;margin-left:4px">⌵</div></div>
-          <div id="_expandDeclined" style="display:none;margin:0 -14px;padding:4px 8px 4px 14px;background:rgba(0,0,0,.2);border-left:2px solid var(--dn)">${orderRows(k.declined_orders)}</div>
+          <div class="dt-row" style="cursor:pointer" onclick="var el=document.getElementById('_expandDeclined'),a=this.querySelector('[data-arr]'),o=el.style.display==='none';el.style.display=o?'block':'none';_dtExpandState._declined=o;if(a)a.textContent=o?'⌃':'⌵'"><div class="dt-row-l"><div class="dt-row-t">Отменены / отклонены</div><div class="dt-row-s">клиентом или оператором</div></div><div class="dt-row-r dn">${k.declined||0}</div><div class="dt-row-r" data-arr style="color:var(--muted);font-size:16px;margin-left:4px">${_dtExpandState._declined?'⌃':'⌵'}</div></div>
+          <div id="_expandDeclined" style="display:${_dtExpandState._declined?'block':'none'};margin:0 -14px;padding:4px 8px 4px 14px;background:rgba(0,0,0,.2);border-left:2px solid var(--dn)">${orderRows(k.declined_orders)}</div>
         </div>
         <div class="dt-sect">Заказы по офисам</div>
         <div class="dt-card">${officeBars(k.orders_by_office||{}, v=>`${v} шт`)}</div>
@@ -6177,6 +6178,7 @@ const DETAIL = {
 // Detail navigation stack — back arrow walks you through previous detail views
 let _dtStack = [];
 let _dtCurrent = null;
+let _dtExpandState = {};
 
 function openDetail(key){
   const [type, id] = key.split(':');

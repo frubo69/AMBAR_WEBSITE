@@ -5598,7 +5598,7 @@ const DETAIL = {
           const items = (o.items||[]).map(it=>it.name||(it.title_ru||it.title||'')).filter(Boolean).join(', ');
           const ts = _relDate(o.timestamp);
           const rev = o.review_score ? ' · ★ '+o.review_score : '';
-          return `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">#${o.order_id} <span class="dt-row-tiny" style="color:${st[1]}">${st[0]}</span></div><div class="dt-row-s">${ts}${items?' · '+items:''}${rev}</div></div><div class="dt-row-r gold">${o.total}</div></div>`;
+          return `<div class="dt-row" data-detail="order:${o.order_id}"><div class="dt-row-l"><div class="dt-row-t">#${o.order_id} <span class="dt-row-tiny" style="color:${st[1]}">${st[0]}</span></div><div class="dt-row-s">${ts}${items?' · '+items:''}${rev}</div></div><div class="dt-row-r gold">${o.total}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>`;
         }).join('') : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">Нет заказов</div></div></div>';
         applyCurrency();
       }).catch(()=>{});
@@ -5951,10 +5951,6 @@ const DETAIL = {
       const k = f.kpi || {};
       hero = `<div class="dt-stat-val gold" style="font-size:48px;line-height:1"><span data-aed="${f.revenue.current}">${fmt(f.revenue.current)}</span><span class="u" style="font-size:16px;margin-left:8px">AED</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${f.revenue.delta_label} vs прошлого · прибыль ~ <span data-aed="${f.profit.current}">${fmt(f.profit.current)}</span> AED</div>`;
       body = `
-        <div class="dt-sect">Выручка по офисам</div>
-        <div class="dt-card">${officeBars(f.by_office, v=>`<span data-aed="${v}">${fmt(v)}</span>`)}</div>
-        <div class="dt-sect">Выручка · 7 дней (AED)</div>
-        <div class="dt-card" style="padding:14px">${line7(f.bars_7d?.values||[], '#C9A96E', v=>fmt(v))}</div>
         <div class="dt-sect">Сводка</div>
         <div class="dt-card">
           <div class="dt-row" data-detail="kpi:done"><div class="dt-row-l"><div class="dt-row-t">Доставлено заказов</div><div class="dt-row-s">${k.done_pct||0}% от всех · ${k.in_route||0} в пути</div></div><div class="dt-row-r">${k.done||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
@@ -5963,16 +5959,16 @@ const DETAIL = {
           <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Чаевые</div></div><div class="dt-row-r"><span data-aed="${f.tips||0}">${fmt(f.tips||0)}</span> AED</div></div>
           <div class="dt-row" data-detail="kpi:late"><div class="dt-row-l"><div class="dt-row-t">Опоздания</div><div class="dt-row-s">дольше ETA + 5 мин</div></div><div class="dt-row-r ${(k.late_count||0)>0?'warn':''}">${k.late_count||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
           <div class="dt-row" data-detail="kpi:avg"><div class="dt-row-l"><div class="dt-row-t">Среднее время</div><div class="dt-row-s">от заказа до доставки</div></div><div class="dt-row-r">${k.avg_min_sample>0 ? k.avg_min+' мин' : '—'}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
-        </div>`;
+        </div>
+        <div class="dt-sect">Выручка по офисам</div>
+        <div class="dt-card">${officeBars(f.by_office, v=>`<span data-aed="${v}">${fmt(v)}</span>`)}</div>
+        <div class="dt-sect">Выручка · 7 дней (AED)</div>
+        <div class="dt-card" style="padding:14px">${line7(f.bars_7d?.values||[], '#C9A96E', v=>fmt(v))}</div>`;
     } else if(id === 'orders'){
       const k = f.kpi || {};
       const sign = (k.orders_delta||0) > 0 ? '▲ ' : (k.orders_delta||0) < 0 ? '▼ ' : '';
       hero = `<div class="dt-stat-val" style="font-size:48px;line-height:1;color:var(--text)">${k.orders||0}<span class="u" style="font-size:16px;margin-left:8px">ШТ</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${sign}${Math.abs(k.orders_delta||0)} vs прошлого · средний чек <span data-aed="${k.avg_check||0}">${fmt(k.avg_check||0)}</span> AED</div>`;
       body = `
-        <div class="dt-sect">Заказы по офисам</div>
-        <div class="dt-card">${officeBars(k.orders_by_office||{}, v=>`${v} шт`)}</div>
-        <div class="dt-sect">Заказы · 7 дней (шт)</div>
-        <div class="dt-card" style="padding:14px">${line7(k.orders_7d||[], '#C9A96E')}</div>
         <div class="dt-sect">Статусы за период</div>
         <div class="dt-card">
           <div class="dt-row" data-detail="kpi:done"><div class="dt-row-l"><div class="dt-row-t">Доставлено</div><div class="dt-row-s">${k.done_pct||0}% от всех</div></div><div class="dt-row-r up">${k.done||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
@@ -5980,7 +5976,11 @@ const DETAIL = {
           <div class="dt-row" data-detail="kpi:pending"><div class="dt-row-l"><div class="dt-row-t">Ожидают</div><div class="dt-row-s">не принят оператором</div></div><div class="dt-row-r ${(k.pending||0)>0?'warn':''}">${k.pending||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
           <div class="dt-row" style="cursor:pointer" onclick="var el=document.getElementById('_expandDeclined'),a=this.querySelector('[data-arr]'),o=el.style.display==='none';el.style.display=o?'block':'none';if(a)a.textContent=o?'⌃':'⌵'"><div class="dt-row-l"><div class="dt-row-t">Отменены / отклонены</div><div class="dt-row-s">клиентом или оператором</div></div><div class="dt-row-r dn">${k.declined||0}</div><div class="dt-row-r" data-arr style="color:var(--muted);font-size:16px;margin-left:4px">⌵</div></div>
           <div id="_expandDeclined" style="display:none;margin:0 -14px;padding:4px 8px 4px 14px;background:rgba(0,0,0,.2);border-left:2px solid var(--dn)">${orderRows(k.declined_orders)}</div>
-        </div>`;
+        </div>
+        <div class="dt-sect">Заказы по офисам</div>
+        <div class="dt-card">${officeBars(k.orders_by_office||{}, v=>`${v} шт`)}</div>
+        <div class="dt-sect">Заказы · 7 дней (шт)</div>
+        <div class="dt-card" style="padding:14px">${line7(k.orders_7d||[], '#C9A96E')}</div>`;
     } else if(id === 'done'){
       const k = f.kpi || {};
       hero = `<div class="dt-stat-val up" style="font-size:48px;line-height:1">${k.done||0}<span class="u" style="font-size:16px;margin-left:8px">/${k.done_total||0}</span></div><div style="font-size:12px;color:var(--muted);margin-top:10px">${k.done_pct||0}% доставлено · ${k.in_route||0} в пути · ${k.declined||0} отменены</div>`;

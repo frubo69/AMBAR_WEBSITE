@@ -8,6 +8,7 @@ import os, logging, re, json
 from datetime import datetime, timezone, timedelta
 import motor.motor_asyncio
 import certifi
+from pymongo.errors import DuplicateKeyError
 from dotenv import load_dotenv
 from config import OWNER_IDS, MANAGER_IDS
 
@@ -45,6 +46,23 @@ async def connect():
         await _db.owner_access_log.create_index([("status", 1), ("last_attempt_at", -1)])
         await _db.owner_notifications.create_index([("created_at", -1)])
         await _db.owner_notifications.create_index("event_key")
+        # Crypto invoices: one per order; a txid binds to exactly one invoice so
+        # a transfer can never credit two orders. Partial (string-only) index so
+        # the many invoices with txid=None/unset don't collide on the null value.
+        await _db.crypto_invoices.create_index("order_id", unique=True)
+        await _db.crypto_invoices.create_index(
+            "txid", unique=True,
+            partialFilterExpression={"txid": {"$type": "string"}},
+        )
+        # No two WAITING invoices may share a USDT amount — the amount is how an
+        # incoming transfer is matched to exactly one order. Partial so confirmed/
+        # expired invoices (which keep their amount) don't collide.
+        await _db.crypto_invoices.create_index(
+            "amount_usdt", unique=True,
+            partialFilterExpression={"status": "waiting"},
+        )
+        await _db.crypto_invoices.create_index([("status", 1), ("expires_at_ms", 1)])
+        await _db.crypto_invoices.create_index("customer_id")
         # Clean up duplicate owner_prefs docs (keep newest by updated_at).
         try:
             pipeline = [{"$group": {"_id": "$owner_id", "count": {"$sum": 1}}},
@@ -1039,4 +1057,167 @@ async def get_recent_notifications(owner_id: int = 0, limit: int = 30) -> list:
     if db is None: return []
     filt = {"$or": [{"owner_id": 0}, {"owner_id": owner_id}]}
     cursor = db.owner_notifications.find(filt, {"_id": 0}).sort("created_at", -1).limit(limit)
+    return await cursor.to_list(length=limit)
+
+
+# ── Crypto invoices (USDT TRC-20, watch-only) ────────────────────────────────
+# An invoice lifecycle: waiting → confirmed (terminal) or expired. We credit only
+# on irreversible (solidified) transfers, so there is no intermediate "detected"
+# state server-side — "open" means strictly "waiting". The order payload is stored
+# on the invoice so the confirmed payment can be promoted into a real order
+# without ever trusting a client "paid" claim.
+_CRYPTO_OPEN = ["waiting"]
+
+
+def _dup_key_field(e: DuplicateKeyError) -> str:
+    """Which unique index a DuplicateKeyError tripped: 'amount_usdt', 'order_id',
+    'txid', or '' if undeterminable. Reads keyPattern (4.2+), falls back to text."""
+    try:
+        kp = (e.details or {}).get("keyPattern") or {}
+        for f in ("amount_usdt", "order_id", "txid"):
+            if f in kp:
+                return f
+    except Exception:
+        pass
+    msg = str(e)
+    for f in ("amount_usdt", "order_id", "txid"):
+        if f in msg:
+            return f
+    return ""
+
+
+async def create_crypto_invoice(doc: dict) -> str:
+    """Insert a new invoice. Returns 'ok', or which unique constraint blocked it:
+    'dup_amount' (another waiting invoice holds this amount — caller should pick a
+    new one and retry), 'dup_order' (order_id exists), or 'error'."""
+    db = _db_or_none()
+    if db is None: return "error"
+    try:
+        await db.crypto_invoices.insert_one(doc)
+        return "ok"
+    except DuplicateKeyError as e:
+        field = _dup_key_field(e)
+        if field == "amount_usdt": return "dup_amount"
+        if field == "order_id":    return "dup_order"
+        log.warning(f"[crypto] create invoice dup (oid={doc.get('order_id')}): {e}")
+        return "error"
+    except Exception as e:
+        log.warning(f"[crypto] create invoice failed (oid={doc.get('order_id')}): {e}")
+        return "error"
+
+
+async def reissue_crypto_invoice(oid: str, fields: dict) -> str:
+    """Re-quote an existing (expired) invoice in place. Returns 'ok', 'dup_amount'
+    (the new amount collides with another waiting invoice — pick a new one and
+    retry), or 'error'. Used instead of update_crypto_invoice when `fields` sets a
+    new amount_usdt that must stay unique among waiting invoices."""
+    db = _db_or_none()
+    if db is None: return "error"
+    try:
+        await db.crypto_invoices.update_one({"order_id": oid}, {"$set": fields})
+        return "ok"
+    except DuplicateKeyError as e:
+        if _dup_key_field(e) == "amount_usdt": return "dup_amount"
+        log.warning(f"[crypto] reissue dup (oid={oid}): {e}")
+        return "error"
+    except Exception as e:
+        log.warning(f"[crypto] reissue failed (oid={oid}): {e}")
+        return "error"
+
+
+async def get_crypto_invoice(oid: str) -> dict | None:
+    db = _db_or_none()
+    if db is None: return None
+    return await db.crypto_invoices.find_one({"order_id": oid}, {"_id": 0})
+
+
+async def update_crypto_invoice(oid: str, **kw):
+    db = _db_or_none()
+    if db is None: return
+    await db.crypto_invoices.update_one({"order_id": oid}, {"$set": kw})
+
+
+async def list_open_crypto_invoices(limit: int = 200) -> list:
+    """Invoices still awaiting payment / confirmation (non-terminal)."""
+    db = _db_or_none()
+    if db is None: return []
+    cursor = db.crypto_invoices.find({"status": {"$in": _CRYPTO_OPEN}}, {"_id": 0}).limit(limit)
+    return await cursor.to_list(length=limit)
+
+
+async def reserved_crypto_amounts() -> set:
+    """USDT amounts currently reserved by open invoices. The invoice endpoint
+    picks an amount NOT in this set so an incoming transfer maps to exactly one
+    order (amount is the matching key alongside the unique-txid guard)."""
+    db = _db_or_none()
+    if db is None: return set()
+    cursor = db.crypto_invoices.find({"status": {"$in": _CRYPTO_OPEN}},
+                                     {"_id": 0, "amount_usdt": 1})
+    docs = await cursor.to_list(length=1000)
+    return {round(float(d.get("amount_usdt", 0)), 6) for d in docs}
+
+
+async def claim_crypto_txid(oid: str, txid: str) -> bool:
+    """Atomically bind `txid` to invoice `oid` exactly once (idempotency).
+
+    Returns True only if THIS call performed the binding, or the invoice already
+    carries this exact txid (idempotent re-call). Returns False if the invoice
+    already has a different txid, or the txid is bound to another invoice (the
+    unique-sparse index raises, which we catch) — the caller must NOT credit."""
+    db = _db_or_none()
+    if db is None: return False
+    try:
+        res = await db.crypto_invoices.update_one(
+            {"order_id": oid, "$or": [{"txid": None}, {"txid": {"$exists": False}}]},
+            {"$set": {"txid": txid}},
+        )
+        if res.modified_count == 1:
+            return True
+        cur = await db.crypto_invoices.find_one({"order_id": oid}, {"_id": 0, "txid": 1})
+        return bool(cur and cur.get("txid") == txid)
+    except Exception as e:
+        log.warning(f"[crypto] claim_txid conflict (oid={oid} txid={txid}): {e}")
+        return False
+
+
+async def mark_crypto_confirmed(oid: str, confirmations: int) -> bool:
+    """Atomically flip a not-yet-confirmed invoice to 'confirmed'. Returns True
+    only if THIS call performed the flip — so confirmation is logged once even if
+    the watcher sees the same transfer on several polls."""
+    db = _db_or_none()
+    if db is None: return False
+    now = datetime.now(timezone.utc)
+    res = await db.crypto_invoices.update_one(
+        {"order_id": oid, "status": {"$ne": "confirmed"}},
+        {"$set": {"status": "confirmed", "confirmations": confirmations,
+                  "confirmed_at_ms": int(now.timestamp() * 1000),
+                  "confirmed_at": now.isoformat()}},
+    )
+    return res.modified_count == 1
+
+
+async def claim_crypto_promotion(oid: str) -> bool:
+    """Exactly-once gate for promoting a confirmed invoice into a real order.
+
+    Atomically stamps `promoted_at_ms` only if it is absent, returning True only
+    to the caller that won. Promotion is fail-closed: we stamp BEFORE building the
+    order, so a crash mid-promotion never double-creates / double-notifies — at
+    worst an order isn't auto-created and is recoverable from the stored payload+txid."""
+    db = _db_or_none()
+    if db is None: return False
+    res = await db.crypto_invoices.update_one(
+        {"order_id": oid, "promoted_at_ms": {"$exists": False}},
+        {"$set": {"promoted_at_ms": int(datetime.now(timezone.utc).timestamp() * 1000)}},
+    )
+    return res.modified_count == 1
+
+
+async def list_confirmed_unpromoted_crypto_invoices(limit: int = 50) -> list:
+    """Confirmed invoices whose promotion hasn't completed (e.g. a restart landed
+    between confirm and promote). The watcher retries these each tick."""
+    db = _db_or_none()
+    if db is None: return []
+    cursor = db.crypto_invoices.find(
+        {"status": "confirmed", "promoted_at_ms": {"$exists": False}}, {"_id": 0}
+    ).limit(limit)
     return await cursor.to_list(length=limit)

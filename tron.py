@@ -1,0 +1,86 @@
+"""
+AMBAR — read-only TRON / TRC-20 watcher.
+
+The server NEVER holds keys or signs anything. It only READS confirmed USDT
+(TRC-20) transfers that land on the merchant receive address, so it can credit
+the matching order. Funds stay in the merchant's own wallet — there is nothing
+to sweep and no hot wallet to compromise.
+
+Docs: https://developers.tron.network  (TronGrid HTTP API)
+"""
+from __future__ import annotations
+import logging, time
+import aiohttp
+from config import TRONGRID_BASE_URL, TRONGRID_API_KEY, USDT_TRC20_CONTRACT
+
+log = logging.getLogger(__name__)
+
+# USDT TRC-20 uses 6 decimals; on-chain values are integers in these base units.
+USDT_DECIMALS = 6
+_USDT_UNIT = 10 ** USDT_DECIMALS
+# Approx TRON block time, only used to *estimate* a confirmations count for the
+# UI. Crediting never relies on this number — it relies on only_confirmed below.
+_BLOCK_SEC = 3
+
+
+async def get_incoming_usdt(address: str, since_ms: int,
+                            only_confirmed: bool = True) -> list[dict]:
+    """Confirmed incoming USDT TRC-20 transfers to `address` at/after `since_ms`.
+
+    `since_ms` is epoch milliseconds (match the invoice creation time).
+    With only_confirmed=True, TronGrid returns transfers from the solidified
+    (irreversible) chain — that is the safe signal to credit on.
+
+    Returns a list of dicts (newest first):
+        {amount: float USDT, txid: str, ts: int ms, confirmations: int, from: str}
+    Read-only and defensive: returns [] on any error, so the caller simply
+    treats "no data" as "not paid yet" and retries on the next poll.
+    """
+    if not address or not TRONGRID_API_KEY:
+        return []
+    headers = {"TRON-PRO-API-KEY": TRONGRID_API_KEY, "Accept": "application/json"}
+    url = f"{TRONGRID_BASE_URL}/v1/accounts/{address}/transactions/trc20"
+    params = {
+        "only_to": "true",
+        "only_confirmed": "true" if only_confirmed else "false",
+        "contract_address": USDT_TRC20_CONTRACT,
+        "min_timestamp": str(int(since_ms)),
+        "limit": "50",
+        "order_by": "block_timestamp,desc",
+    }
+    out: list[dict] = []
+    try:
+        async with aiohttp.ClientSession(headers=headers) as session:
+            async with session.get(url, params=params,
+                                   timeout=aiohttp.ClientTimeout(total=15)) as r:
+                if r.status != 200:
+                    log.warning(f"[tron] trc20 list HTTP {r.status} for {address}")
+                    return []
+                data = await r.json()
+    except Exception as e:
+        log.warning(f"[tron] get_incoming_usdt failed for {address}: {e}")
+        return []
+
+    now_ms = time.time() * 1000
+    for it in (data or {}).get("data", []):
+        try:
+            # Defence in depth: the query is scoped, but re-check to/contract.
+            if (it.get("to") or "").strip() != address.strip():
+                continue
+            if ((it.get("token_info") or {}).get("address") or "") != USDT_TRC20_CONTRACT:
+                continue
+            raw = int(it.get("value", "0"))
+            ts = int(it.get("block_timestamp", 0))
+            # Estimate confirmations from age; cosmetic only (see _BLOCK_SEC).
+            conf = max(0, int((now_ms - ts) / 1000 / _BLOCK_SEC)) if ts else 0
+            out.append({
+                "amount": round(raw / _USDT_UNIT, USDT_DECIMALS),
+                "txid": it.get("transaction_id") or it.get("txID") or "",
+                "ts": ts,
+                "confirmations": conf,
+                "from": it.get("from") or "",
+            })
+        except Exception as e:
+            log.debug(f"[tron] parse item skipped: {e}")
+            continue
+    return out

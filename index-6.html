@@ -17,6 +17,7 @@
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="qrcode.min.js"></script>
 <style>
 :root{
   /* ── Brand colour ─────────────────────────────────────────────────── */
@@ -418,6 +419,87 @@ img{display:block}
 .sum-div{height:1px;background:var(--border2);margin:8px 0}
 .sum-total{display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:var(--gold2)}
 .co-foot{padding:0 16px calc(16px + var(--safe-bottom))}
+/* ── Crypto payments: checkout method toggle ────────────────────────────── */
+.pm-seg{display:flex;gap:10px}
+.pm-opt{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:14px 8px;min-height:84px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r2);cursor:pointer;color:var(--sub);outline:none;-webkit-tap-highlight-color:transparent;transition:transform var(--dur-fast) var(--ease-standard),border-color var(--dur-base),background var(--dur-base),color var(--dur-base)}
+.pm-opt:active{transform:scale(var(--press-card))}
+.pm-opt .pm-ico{width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:var(--sub);transition:color var(--dur-base)}
+.pm-opt .pm-ico svg{width:24px;height:24px}
+.pm-opt .pm-lbl{font-size:12.5px;font-weight:600;letter-spacing:.2px}
+.pm-opt.on{background:linear-gradient(160deg,rgba(201,169,110,.14),rgba(201,169,110,.05));border-color:var(--gold);color:var(--gold2);box-shadow:0 0 0 1px var(--gold) inset,0 6px 20px rgba(201,169,110,.12)}
+.pm-opt.on .pm-ico{color:var(--gold2)}
+.pm-opt.disabled{opacity:.5;cursor:not-allowed;filter:grayscale(.55)}
+.pm-opt.disabled:active{transform:none}
+.pm-soon{position:absolute;top:6px;right:6px;font-size:8.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);background:rgba(255,255,255,.06);border:1px solid var(--border2);border-radius:var(--r-pill);padding:2px 7px}
+.pm-hint{font-size:11px;color:var(--muted);line-height:1.5;margin-top:10px;min-height:16px}
+.pm-hint b{color:var(--gold2);font-weight:600}
+/* ── Crypto payments: invoice page ──────────────────────────────────────── */
+#pg-pay{height:calc(var(--tg-h,100vh) - var(--safe-bottom))}
+.cp-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:12px 18px calc(124px + var(--safe-bottom));overscroll-behavior-y:none}
+/* asset pill — single source of coin + network */
+.cp-asset{display:flex;align-items:center;gap:9px;width:fit-content;margin:2px auto 18px;padding:6px 15px 6px 6px;background:var(--card);border:1px solid var(--border);border-radius:var(--r-pill)}
+.cp-asset-ico{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#26A17B,#1a7a5a);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;color:#fff;font-family:'Space Grotesk',sans-serif;font-size:14px;box-shadow:0 2px 8px rgba(38,161,123,.35)}
+.cp-asset-txt{font-size:12.5px;font-weight:600;color:var(--text);letter-spacing:.2px}
+.cp-asset-txt span{color:var(--sub);font-weight:500}
+/* amount hero — borderless, tap to copy */
+.cp-amount{text-align:center;margin-bottom:14px}
+.cp-amount-lbl{font-size:10px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);margin-bottom:11px}
+.cp-amount-val{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:40px;font-weight:700;color:var(--gold2);line-height:1;letter-spacing:.5px;transition:transform .12s,opacity .12s;-webkit-tap-highlight-color:transparent}
+.cp-amount-val:active{transform:scale(.97);opacity:.75}
+.cp-amount-val .cur{font-size:16px;color:var(--sub);font-weight:600}
+.cp-amount-val .cp-cpy{width:15px;height:15px;color:var(--muted);flex-shrink:0;stroke:currentColor;fill:none}
+.cp-amount-fiat{font-size:11.5px;color:var(--muted);margin-top:10px}
+/* QR */
+.cp-qr-wrap{display:flex;justify-content:center;margin-bottom:11px}
+.cp-qr{position:relative;width:min(56vw,196px);background:linear-gradient(135deg,#fefcf7,#f4eddc);border-radius:18px;padding:14px;box-shadow:0 18px 44px rgba(0,0,0,.5),0 0 0 1px rgba(201,169,110,.25),0 0 0 4px rgba(12,10,6,.85),0 0 0 5px rgba(201,169,110,.45)}
+.cp-qr canvas,.cp-qr img{display:block;width:100%!important;height:auto!important;aspect-ratio:1/1;border-radius:5px;margin:0 auto}
+/* address pill — middle-truncated, whole row taps to copy */
+.cp-addr{display:flex;align-items:center;gap:8px;max-width:330px;margin:0 auto 12px;background:var(--card);border:1px solid var(--border2);border-radius:var(--r-pill);padding:7px 7px 7px 16px;cursor:pointer;transition:.15s}
+.cp-addr:active{transform:scale(.99);border-color:var(--border)}
+.cp-addr-val{flex:1;min-width:0;font-family:'Space Grotesk',monospace;font-size:12.5px;letter-spacing:.3px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cp-addr-copy{flex-shrink:0;width:32px;height:32px;border-radius:50%;background:rgba(201,169,110,.12);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--gold2);transition:.15s}
+.cp-addr:active .cp-addr-copy{transform:scale(.9)}
+.cp-addr-copy svg{width:15px;height:15px}
+/* safety — one subtle line, no heavy box */
+.cp-warn{display:flex;align-items:flex-start;justify-content:center;gap:7px;max-width:330px;margin:0 auto 12px;font-size:11px;line-height:1.5;color:#d98a8a;text-align:left}
+.cp-warn svg{width:14px;height:14px;flex-shrink:0;margin-top:1px;stroke:#E05555;fill:none}
+/* status strip — timer folded in behind a hairline divider */
+.cp-status{display:flex;align-items:flex-start;gap:12px;background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:13px 15px;transition:.25s}
+.cp-status-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:3px;position:relative}
+.cp-status-body{flex:1;min-width:0}
+.cp-status-txt{font-size:13px;font-weight:600;color:var(--text)}
+.cp-status-sub{font-size:11px;color:var(--sub);font-weight:400;margin-top:2px}
+.cp-timer-wrap{flex-shrink:0;display:flex;flex-direction:column;justify-content:center;text-align:right;padding-left:12px;border-left:1px solid var(--border2);align-self:stretch}
+.cp-timer-lbl{font-size:8.5px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.cp-timer{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:var(--text);line-height:1;font-variant-numeric:tabular-nums}
+/* demo banner — minimal, top of page; only shown in test/sim mode */
+.cp-demo{display:flex;align-items:center;justify-content:center;gap:7px;font-size:9.5px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);opacity:.6;margin:0 0 14px}
+.cp-demo::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--gold)}
+.cp-status[data-st="waiting"] .cp-status-dot{background:var(--gold)}
+.cp-status[data-st="waiting"] .cp-status-dot::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:2px solid var(--gold);animation:cpPulse 1.6s ease-out infinite}
+@keyframes cpPulse{0%{transform:scale(.55);opacity:.9}100%{transform:scale(1.9);opacity:0}}
+.cp-status[data-st="detected"]{border-color:rgba(100,160,220,.4)}
+.cp-status[data-st="detected"] .cp-status-dot{background:var(--blue)}
+.cp-status[data-st="confirmed"]{border-color:rgba(76,175,125,.5);background:rgba(76,175,125,.07)}
+.cp-status[data-st="confirmed"] .cp-status-dot{background:var(--green)}
+.cp-status[data-st="expired"]{border-color:rgba(224,85,85,.4)}
+.cp-status[data-st="expired"] .cp-status-dot{background:var(--red)}
+.cp-conf{height:4px;border-radius:2px;background:var(--bg3);overflow:hidden;margin-top:9px}
+.cp-conf-bar{height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--green));border-radius:2px;transition:width .4s ease}
+.cp-explorer{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--blue);margin-top:9px;text-decoration:none}
+.cp-explorer svg{width:12px;height:12px}
+.cp-foot{position:absolute;left:0;right:0;bottom:0;padding:12px 16px calc(14px + var(--safe-bottom));background:linear-gradient(180deg,transparent,var(--bg) 28%);display:flex;flex-direction:column;gap:9px}
+.cp-btn-ghost{width:100%;background:var(--card2);color:var(--text);border:1px solid var(--border2);border-radius:14px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;gap:7px}
+.cp-btn-ghost:active{transform:scale(.98);opacity:.85}
+.cp-btn-ghost svg{width:16px;height:16px}
+.cp-ton{background:linear-gradient(135deg,#3AAEF6,#0098EA)!important;color:#fff!important;border:none!important}
+.cp-success{position:fixed;inset:0;z-index:9300;background:radial-gradient(ellipse at center,rgba(15,12,8,.9),rgba(0,0,0,.97));backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:32px;text-align:center;opacity:0;pointer-events:none;transition:opacity .35s}
+.cp-success.show{opacity:1;pointer-events:auto}
+.cp-success-check{width:96px;height:96px;border-radius:50%;background:rgba(76,175,125,.12);border:2px solid var(--green);display:flex;align-items:center;justify-content:center;transform:scale(.5);transition:transform .5s cubic-bezier(.2,1.3,.5,1)}
+.cp-success.show .cp-success-check{transform:scale(1)}
+.cp-success-check svg{width:48px;height:48px;stroke:var(--green);stroke-width:3;fill:none}
+.cp-success-ttl{font-family:'Cormorant Garamond',serif;font-size:27px;font-weight:700;letter-spacing:1px;color:var(--gold2)}
+.cp-success-sub{font-size:13px;color:var(--sub);line-height:1.6;max-width:280px}
 /* Order card swipe-to-delete */
 .ocard-swipe-wrap{position:relative;overflow:hidden;border-radius:var(--r);margin:0 14px 10px}
 .ocard-swipe-del{position:absolute;top:0;right:0;bottom:0;width:80px;background:var(--red);display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:0 var(--r) var(--r) 0}
@@ -1885,6 +1967,23 @@ body.aob-on #pg-cart{overflow-y:auto!important}
         <div class="ferr" id="phone-err"></div>
       </div>
     </div>
+    <div class="co-card">
+      <div class="co-head"><div class="co-num">3</div><div class="co-title" id="co-pay-title">Способ оплаты</div></div>
+      <div class="co-inner">
+        <div class="pm-seg">
+          <button type="button" class="pm-opt on" id="pm-cash" onclick="selectPayMethod('cash')">
+            <span class="pm-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg></span>
+            <span class="pm-lbl" id="pm-cash-lbl">Наличными</span>
+          </button>
+          <button type="button" class="pm-opt disabled" id="pm-crypto" onclick="selectPayMethod('crypto')">
+            <span class="pm-soon" id="pm-soon">Скоро</span>
+            <span class="pm-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 9.4c0-1 1.35-1.5 3-1.5s3 .6 3 1.6-1.35 1.5-3 1.5-3 .5-3 1.5 1.35 1.6 3 1.6 3-.5 3-1.5"/><path d="M12 6.2v11.6"/></svg></span>
+            <span class="pm-lbl" id="pm-crypto-lbl">Криптой</span>
+          </button>
+        </div>
+        <div class="pm-hint" id="pm-hint"></div>
+      </div>
+    </div>
   </div>
   <div class="sum-card">
     <div class="sum-title" id="sum-title">Ваш заказ</div>
@@ -1896,6 +1995,61 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div class="co-foot">
     <button class="btn-main" id="place-btn" onclick="placeOrder()"><span id="place-btn-text">Подтвердить заказ</span><span class="btn-hours" id="place-btn-hours">Принимаем заказы с 12:00 до 06:00</span></button>
   </div>
+</div>
+
+<!-- CRYPTO PAYMENT (hidden, opened by the crypto checkout flow) -->
+<div id="pg-pay" class="page hidden">
+  <div class="hdr">
+    <div style="flex:1;display:flex;align-items:center"><button onclick="cryptoBack()" style="background:none;border:1px solid var(--border2);border-radius:50%;width:30px;height:30px;display:flex;align-items:center;justify-content:center;cursor:pointer;color:var(--sub);transition:.15s" ontouchstart="this.style.transform='scale(.85)'" ontouchend="this.style.transform=''"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="15 18 9 12 15 6"/></svg></button></div>
+    <div style="flex:0 0 auto"><div class="logo-grp"><div class="logo-line"></div><div class="logo" style="position:relative">A<i style="position:absolute;top:18%;left:.60em;width:1px;height:60%;background:linear-gradient(180deg,var(--gold),var(--gold2),var(--gold));transform:skewX(27deg);pointer-events:none;font-style:normal"></i>MBAR</div><div class="logo-line"></div><div class="logo-sub" id="ls-pay">Оплата</div></div></div>
+    <div class="hdr-right" style="flex:1;justify-content:flex-end"><button class="lang-btn" aria-label="Toggle language" onclick="flipLang()"><span aria-hidden="true">RU</span></button></div>
+  </div>
+  <div class="cp-body">
+    <div class="cp-demo" id="cp-demo" style="display:none"><span id="cp-demo-txt">Демо · детект оплаты подключим на бэкенде</span></div>
+    <div class="cp-asset">
+      <div class="cp-asset-ico">₮</div>
+      <div class="cp-asset-txt"><b id="cp-net-ttl">USDT</b> · <span id="cp-net-sub">Tron · TRC-20</span></div>
+    </div>
+    <div class="cp-amount">
+      <div class="cp-amount-lbl" id="cp-amount-lbl">Сумма к оплате</div>
+      <div class="cp-amount-val" onclick="cryptoCopy('amount')" role="button" aria-label="Copy amount"><span id="cp-amount-num">0.00</span><span class="cur">USDT</span><svg class="cp-cpy" viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></div>
+      <div class="cp-amount-fiat" id="cp-amount-fiat">≈ 0 AED · комиссия сети сверху</div>
+    </div>
+    <div class="cp-qr-wrap"><div class="cp-qr" id="cp-qr"></div></div>
+    <div class="cp-addr" onclick="cryptoCopy('addr')" role="button" aria-label="Copy address">
+      <div class="cp-addr-val" id="cp-addr-val">—</div>
+      <div class="cp-addr-copy"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></div>
+    </div>
+    <div class="cp-warn">
+      <svg viewBox="0 0 24 24" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+      <span id="cp-warn-txt">Отправляйте <b>только USDT в сети Tron (TRC-20)</b>. Другая монета или сеть — средства не зачислятся.</span>
+    </div>
+    <div class="cp-status" id="cp-status" data-st="waiting">
+      <div class="cp-status-dot"></div>
+      <div class="cp-status-body">
+        <div class="cp-status-txt" id="cp-status-txt">Ожидаем оплату…</div>
+        <div class="cp-status-sub" id="cp-status-sub">Отправьте перевод — мы поймаем его автоматически</div>
+        <div class="cp-conf" id="cp-conf" style="display:none"><div class="cp-conf-bar" id="cp-conf-bar"></div></div>
+        <a class="cp-explorer" id="cp-explorer" href="#" target="_blank" rel="noopener" style="display:none"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg><span id="cp-explorer-txt">Посмотреть транзакцию</span></a>
+      </div>
+      <div class="cp-timer-wrap" id="cp-timer-wrap">
+        <div class="cp-timer-lbl" id="cp-timer-lbl">Истекает</div>
+        <div class="cp-timer" id="cp-timer">15:00</div>
+      </div>
+    </div>
+  </div>
+  <div class="cp-foot">
+    <button class="btn-main" id="cp-wallet-btn" onclick="cryptoOpenWallet()"><span id="cp-wallet-txt">Открыть кошелёк</span></button>
+    <button class="cp-btn-ghost" id="cp-recheck-btn" onclick="cryptoRecheck()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg><span id="cp-recheck-txt">Я оплатил — проверить</span></button>
+  </div>
+</div>
+
+<!-- crypto success overlay -->
+<div class="cp-success" id="cp-success">
+  <div class="cp-success-check"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+  <div class="cp-success-ttl" id="cp-success-ttl">Оплата подтверждена</div>
+  <div class="cp-success-sub" id="cp-success-sub">Заказ передан оператору. Мы пришлём уведомление о статусе доставки.</div>
+  <button class="btn-main" style="max-width:240px" onclick="cryptoSuccessDone()"><span id="cp-success-btn">Готово</span></button>
 </div>
 
 <!-- NAV -->
@@ -2745,6 +2899,18 @@ function _chipTE(e,b){
 }
 let pendingOrderConfirmed=false; // for location mismatch flow
 const tg=window.Telegram?.WebApp||null;
+// ── Crypto payments (staged rollout) ──────────────────────────────────────────
+// CRYPTO_ENABLED is a per-user display gate delivered by /api/me. Non-admins see
+// the crypto option greyed with a "Soon" badge until CRYPTO_PAYMENTS_FOR_ALL is
+// switched on server-side. CRYPTO_SIM keeps the flow demoable while the on-chain
+// detector is being built — flip to false once /api/crypto/* is live.
+let CRYPTO_ENABLED = localStorage.getItem('ambar_crypto_enabled')==='1';
+const CRYPTO_SIM = true;
+const USDT_PER_AED = 1/3.6725;          // AED→USD peg; USDT≈USD. Backend will lock the real rate.
+let CRYPTO_FEE_PCT = 10;                 // surcharge on crypto orders (network+conversion). Real mode overrides from invoice.fee_pct.
+let payMethod = localStorage.getItem('ambar_pay_method')||'cash';
+let cryptoInvoice = null;               // active invoice object (see cryptoCreateInvoice)
+let _cpTimer=null,_cpPoll=null,_cpSim=null,_cpClimb=null;
 
 // ── HAPTIC FEEDBACK (Taptic Engine) ──────────────────────────────────────────
 const haptic={
@@ -2828,6 +2994,12 @@ async function checkBanStatus(){
       if(d.referral_points!=null)localStorage.setItem('ambar_ref_points',String(d.referral_points));
       if(d.card_type)localStorage.setItem('ambar_card_type',d.card_type);
       if(d.premium_index!=null)localStorage.setItem('ambar_premium_idx',String(d.premium_index));
+      // Crypto-payment display gate (staged rollout). Server is authoritative;
+      // non-allowlisted users get the greyed "Soon" button. This is a DISPLAY
+      // gate only — real on-chain endpoints must re-validate via signed initData.
+      if(d.crypto_enabled){localStorage.setItem('ambar_crypto_enabled','1');CRYPTO_ENABLED=true;}
+      else{localStorage.removeItem('ambar_crypto_enabled');CRYPTO_ENABLED=false;}
+      if(typeof refreshPayMethodUI==='function')refreshPayMethodUI();
       // Verification status
       if(d.verified){
         localStorage.setItem('ambar_verified','1');
@@ -3221,6 +3393,11 @@ function applyLang(){
   el('addr-comment-in').placeholder = lang==='ru' ? 'Например: проедьте чуть дальше шлагбаума, я встречу вас там...' : 'For example: drive a bit past the barrier, I will meet you there...';
   set('sum-title',t('sumTitle'));set('sum-tip-lbl',t('tipLbl'));set('sum-tot-lbl',t('totLbl'));
   set('place-btn-text',t('placeBtn'));set('tip-lbl',t('tip'));set('co-addr-title',t('coAddrTitle'));
+  // Payment method step
+  set('co-pay-title',lang==='ru'?'Способ оплаты':'Payment method');
+  set('pm-cash-lbl',lang==='ru'?'Наличными':'Cash');
+  set('pm-crypto-lbl',lang==='ru'?'Криптой':'Crypto');
+  set('pm-soon',lang==='ru'?'Скоро':'Soon');
   el('tip-input').placeholder=lang==='ru'?'Введите сумму...':'Enter amount...';
   set('mtl-gps','GPS');set('mtl-manual',lang==='ru'?'Вручную':'Manual');
   set('lc-title',t('lcTitle'));set('lc-msg',t('lcMsg'));set('lc-yes',t('lcYes'));set('lc-no',t('lcNo'));
@@ -3249,6 +3426,11 @@ function applyLang(){
   // Promo images + CTA
   _setPromoImgs();
   set('promo-modal-cta-txt',lang==='ru'?'Открыть каталог':'Open catalog');
+  // Payment method visuals (hint + CTA label depend on payMethod & gate state).
+  // Re-apply after the generic set() calls above so the crypto CTA label sticks.
+  if(typeof refreshPayMethodUI==='function')refreshPayMethodUI();
+  // Live-translate the open invoice screen if the user flips language there.
+  if(curPg==='pay'&&cryptoInvoice&&typeof renderInvoice==='function')renderInvoice();
 }
 
 // ── PROMO BANNER & MODAL ──────────────────────────────────────────────────────
@@ -3338,7 +3520,7 @@ function showHsGuide(){
 }
 
 // ── PAGES ─────────────────────────────────────────────────────────────────────
-const PAGES=['catalog','cart','address','orders','profile','checkout'];
+const PAGES=['catalog','cart','address','orders','profile','checkout','pay'];
 const _NAV_PAGES=['catalog','cart','address','orders','profile'];
 const _PM=6;
 // Cached pill geometry — computed once at init, zero layout reads on tap
@@ -3445,7 +3627,7 @@ function go(p){
   // 1) Move pill — zero layout reads, pure transform from cache
   const bnav=el('bnav');
   if(bnav){
-    if(p==='checkout'){bnav.style.display='none';}
+    if(p==='checkout'||p==='pay'){bnav.style.display='none';}
     else{bnav.style.display='';movePill(p);}
   }
   _NAV_PAGES.forEach(id=>el('nb-'+id)?.classList.toggle('on',id===p));
@@ -3462,7 +3644,7 @@ function go(p){
     if(p==='orders'){syncOrders();checkActiveOrder();initPullToRefresh();}
     if(p==='address'){renderSavedCards();buildAreaChips();buildTypeChips('man');}
     if(p==='profile'){buildProfile();syncOrders();checkActiveOrder();}
-    if(p==='checkout')buildSummary();
+    if(p==='checkout'){buildSummary();refreshPayMethodUI();}
   },0));
 }
 
@@ -5370,6 +5552,16 @@ function placeOrder(){
     office_name:addr.office_name||OFFICES[0].name,lang,
   };
 
+  // Crypto prepay: branch off into the on-chain invoice flow. The order is
+  // created locally in AWAITING_PAYMENT and is NOT sent to the operator until
+  // payment confirms (see _cpOnConfirmed). Gated to enabled accounts only.
+  if(payMethod==='crypto' && CRYPTO_ENABLED){
+    payload.payment_method='crypto';
+    startCryptoPayment({payload,oid,items,sub,total,addr});
+    return;
+  }
+  payload.payment_method='cash';
+
   orders.unshift({order_id:oid,items,total,address:addr.label||addr.address,status:'pending',timestamp:new Date().toISOString()});
   localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
 
@@ -5414,6 +5606,428 @@ function placeOrder(){
   setTimeout(()=>{
     go('catalog');checkActiveOrder();
   },1400);
+}
+
+// ── CRYPTO PAYMENT FLOW ─────────────────────────────────────────────────────
+// Optional USDT (TRC-20) prepay. While CRYPTO_SIM is true the on-chain detection
+// is simulated client-side so admins can exercise the whole flow before the
+// backend exists. SECURITY: confirmation/credit is authoritative ON THE SERVER
+// in real mode — the client never self-reports "paid" except in sim. Money
+// endpoints (future /api/crypto/*) must re-derive identity from signed initData.
+
+function selectPayMethod(m){
+  if(m==='crypto' && !CRYPTO_ENABLED){
+    haptic.light();
+    showToast(lang==='ru'?'Оплата криптой скоро будет доступна':'Crypto payment is coming soon','err');
+    return;
+  }
+  payMethod=m;
+  localStorage.setItem('ambar_pay_method',m);
+  haptic.select();
+  _applyPayMethodVisuals();
+}
+
+function refreshPayMethodUI(){
+  const cryptoBtn=el('pm-crypto'), soon=el('pm-soon');
+  if(CRYPTO_ENABLED){
+    cryptoBtn&&cryptoBtn.classList.remove('disabled');
+    if(soon)soon.style.display='none';
+  }else{
+    cryptoBtn&&cryptoBtn.classList.add('disabled');
+    if(soon)soon.style.display='';
+    if(payMethod==='crypto'){payMethod='cash';localStorage.setItem('ambar_pay_method','cash');}
+  }
+  _applyPayMethodVisuals();
+}
+
+function _applyPayMethodVisuals(){
+  const ru=lang==='ru';
+  const cashOn=payMethod!=='crypto';
+  el('pm-cash')&&el('pm-cash').classList.toggle('on',cashOn);
+  el('pm-crypto')&&el('pm-crypto').classList.toggle('on',!cashOn&&CRYPTO_ENABLED);
+  const hint=el('pm-hint');
+  if(hint){
+    hint.innerHTML = !cashOn
+      ? (ru?'Оплата <b>USDT (TRC-20)</b> заранее. Как только сеть подтвердит перевод — заказ уйдёт оператору.'
+           :'Pay <b>USDT (TRC-20)</b> upfront. As soon as the network confirms, your order goes to the operator.')
+      : (ru?'Оплата <b>наличными</b> курьеру при получении.'
+           :'Pay the courier <b>in cash</b> on delivery.');
+  }
+  const cta=el('place-btn-text');
+  if(cta){
+    cta.textContent = !cashOn
+      ? (ru?'Перейти к оплате →':'Continue to payment →')
+      : t('placeBtn');
+  }
+}
+
+function cryptoCreateInvoice(oid,totalAed){
+  // Customer pays the goods total + CRYPTO_FEE_PCT% (network/conversion fee).
+  // amountAed stays the goods value; the surcharge lives only in the USDT amount.
+  const usdt=Math.max(0.01,Math.round(totalAed*(1+CRYPTO_FEE_PCT/100)*USDT_PER_AED*100)/100);
+  const now=Date.now();
+  return {
+    oid,
+    address: CRYPTO_SIM ? 'TXk9aBcD3mNpQrStUvWxYz1234demoNILE' : '',
+    asset:'USDT', chain:'TRON', network:'TRC-20', netLabel:'Tron · TRC-20',
+    amountUsdt:usdt, amountAed:totalAed, feePct:CRYPTO_FEE_PCT,
+    reqConf:20, conf:0, txid:null,
+    status:'waiting',                 // waiting | detected | confirmed | expired
+    createdAt:now, expiresAt:now+15*60*1000,
+    sim:CRYPTO_SIM,
+  };
+}
+
+async function startCryptoPayment(ctx){
+  // SIM builds the invoice client-side; real mode asks the backend for the
+  // receive address + a server-computed unique amount (never trust client price).
+  let inv;
+  if(CRYPTO_SIM){
+    inv=cryptoCreateInvoice(ctx.oid,ctx.total);
+  }else{
+    inv=await cryptoCreateInvoiceRemote(ctx);
+    if(!inv){ showToast(lang==='ru'?'Не удалось создать счёт. Попробуйте ещё раз.':'Could not create invoice. Try again.','err'); haptic.error(); return; }
+  }
+  const o={
+    order_id:inv.oid, items:ctx.items, total:ctx.total,
+    address:ctx.addr.label||ctx.addr.address,
+    status:'awaiting_payment', payment_method:'crypto',
+    timestamp:new Date().toISOString(),
+    crypto:inv, _payload:ctx.payload,
+  };
+  orders.unshift(o);
+  localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
+  // The order now exists (resumable) — safe to clear the cart.
+  const ids=Object.keys(cart);
+  cart={};beerPcs={};tip=0;saveCart();
+  el('phone-err')&&el('phone-err').classList.remove('on');
+  el('phone-in')&&el('phone-in').classList.remove('err');
+  ids.forEach(id=>syncCtrl(id));updHdr();buildTips();
+  cryptoInvoice=inv;
+  go('pay');
+  renderInvoice();
+  cryptoStartWatch();
+  haptic.success();
+}
+
+// Real-mode invoice creation: POST the order to the backend, which assigns the
+// merchant receive address + a unique USDT amount and persists a WAITING invoice
+// (no operator notification until on-chain confirmation). Returns an invoice
+// object shaped exactly like cryptoCreateInvoice() so renderInvoice() is reused.
+async function cryptoCreateInvoiceRemote(ctx){
+  try{
+    // order_id + total are set explicitly (after the spread) so they win even
+    // when ctx.payload is partial — e.g. on a re-quote of an expired invoice.
+    const body={...ctx.payload, order_id:ctx.oid, total:ctx.total, payment_method:'crypto', initData: tg?.initData||''};
+    const r=await fetch(`${AMBAR_API}/api/crypto/invoice`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)});
+    if(!r.ok){ console.error('crypto invoice HTTP',r.status); return null; }
+    const d=await r.json();
+    if(!d||!d.ok||!d.address){ console.error('crypto invoice error',d&&d.error); return null; }
+    const now=Date.now();
+    return {
+      oid: d.order_id||ctx.oid,
+      address: d.address,
+      asset: d.asset||'USDT', chain:'TRON', network: d.network||'TRC-20', netLabel:'Tron · TRC-20',
+      amountUsdt: Number(d.amount_usdt),
+      amountAed: (d.amount_aed!=null)?Number(d.amount_aed):ctx.total,
+      feePct: (d.fee_pct!=null)?Number(d.fee_pct):CRYPTO_FEE_PCT,
+      reqConf: d.required_confirmations||20, conf:0, txid:null,
+      status:'waiting',
+      createdAt: now,
+      expiresAt: d.expires_at ? Number(d.expires_at) : now+15*60*1000,
+      sim:false,
+    };
+  }catch(e){ console.error('crypto invoice fetch error',e); return null; }
+}
+
+function renderInvoice(){
+  const inv=cryptoInvoice; if(!inv)return;
+  const ru=lang==='ru';
+  set('ls-pay',ru?'Оплата':'Payment');
+  const demo=el('cp-demo'); if(demo)demo.style.display=inv.sim?'flex':'none';
+  set('cp-demo-txt',ru?'Демо · детект оплаты подключим на бэкенде':'Demo · payment detection wired on the backend');
+  set('cp-net-ttl',inv.asset);
+  set('cp-net-sub',inv.netLabel);
+  set('cp-amount-lbl',ru?'Сумма к оплате':'Amount to pay');
+  set('cp-amount-num',inv.amountUsdt.toFixed(2));
+  const _feePct=inv.feePct||0, _goodsAed=Math.round(inv.amountAed);
+  set('cp-amount-fiat', _feePct>0
+    ? '≈ '+_goodsAed+' + '+_feePct+'% '+(ru?'комиссия':'fee')+' = '+Math.round(inv.amountAed*(1+_feePct/100))+' AED'
+    : '≈ '+_goodsAed+' AED');
+  const w=el('cp-warn-txt'); if(w)w.innerHTML=ru
+    ? 'Отправляйте <b>только USDT в сети Tron (TRC-20)</b>. Другая монета или сеть — средства не зачислятся.'
+    : 'Send <b>only USDT on Tron (TRC-20)</b>. A different coin or network means the funds are lost.';
+  const av=el('cp-addr-val'); if(av){av.textContent=inv.address?_cpShortAddr(inv.address):'—';av.title=inv.address||'';}
+  set('cp-timer-lbl',ru?'Истекает':'Expires');
+  set('cp-recheck-txt',ru?'Я оплатил — проверить':'I\'ve paid — check');
+  cryptoRenderQR(inv);
+  cryptoSetStatus(inv.status);
+  cryptoTickTimer();
+}
+
+function cryptoRenderQR(inv){
+  const box=el('cp-qr'); if(!box)return;
+  box.innerHTML='';
+  if(!inv.address)return;
+  try{
+    new QRCode(box,{text:inv.address,width:200,height:200,colorDark:'#0b0b14',colorLight:'#ffffff',correctLevel:QRCode.CorrectLevel.M});
+  }catch(e){ box.textContent=inv.address; }
+}
+
+function cryptoTickTimer(){
+  if(_cpTimer){clearInterval(_cpTimer);_cpTimer=null;}
+  const run=()=>{
+    const inv=cryptoInvoice;
+    if(!inv||inv.status==='confirmed'){clearInterval(_cpTimer);_cpTimer=null;return;}
+    if(inv.status==='expired'){ const e=el('cp-timer'); if(e){e.textContent='00:00';e.style.color='var(--red)';} clearInterval(_cpTimer);_cpTimer=null;return; }
+    const ms=inv.expiresAt-Date.now();
+    const e=el('cp-timer');
+    if(ms<=0){ if(e){e.textContent='00:00';} clearInterval(_cpTimer);_cpTimer=null; cryptoExpire(); return; }
+    const s=Math.floor(ms/1000), mm=String(Math.floor(s/60)).padStart(2,'0'), ss=String(s%60).padStart(2,'0');
+    if(e){ e.textContent=mm+':'+ss; e.style.color = ms<120000 ? 'var(--red)' : ''; }
+  };
+  run();
+  if(cryptoInvoice && cryptoInvoice.status!=='confirmed' && cryptoInvoice.status!=='expired'){
+    _cpTimer=setInterval(run,1000);
+  }
+}
+
+function cryptoSetStatus(st){
+  const inv=cryptoInvoice, ru=lang==='ru';
+  const box=el('cp-status'); if(box)box.setAttribute('data-st',st);
+  if(inv)inv.status=st;
+  const tw=el('cp-timer-wrap'); if(tw)tw.style.display=(st==='detected'||st==='confirmed')?'none':'';
+  const map={
+    waiting:{t:ru?'Ожидаем оплату…':'Waiting for payment…', s:ru?'Поймаем перевод автоматически':'We\'ll detect it automatically'},
+    detected:{t:ru?'Платёж обнаружен':'Payment detected', s:ru?'Ждём подтверждений сети':'Waiting for network confirmations'},
+    confirmed:{t:ru?'Оплата подтверждена':'Payment confirmed', s:ru?'Передаём заказ оператору…':'Sending your order to the operator…'},
+    expired:{t:ru?'Время оплаты истекло':'Payment window expired', s:ru?'Запросите новый счёт, чтобы продолжить':'Request a new invoice to continue'},
+  };
+  const m=map[st]||map.waiting;
+  set('cp-status-txt',m.t); set('cp-status-sub',m.s);
+  const conf=el('cp-conf'), bar=el('cp-conf-bar');
+  if(st==='detected'&&inv){
+    if(conf)conf.style.display='';
+    if(bar)bar.style.width=Math.min(100,Math.round((inv.conf/inv.reqConf)*100))+'%';
+    set('cp-status-sub',(ru?'Подтверждений: ':'Confirmations: ')+inv.conf+'/'+inv.reqConf);
+  }else if(conf){conf.style.display='none';}
+  const exp=el('cp-explorer');
+  if(exp){
+    if(inv&&inv.txid){ exp.style.display=''; exp.href='https://tronscan.org/#/transaction/'+inv.txid; set('cp-explorer-txt',ru?'Посмотреть транзакцию':'View transaction'); }
+    else exp.style.display='none';
+  }
+  const wbtn=el('cp-wallet-btn'), rbtn=el('cp-recheck-btn');
+  if(st==='confirmed'){
+    if(wbtn)wbtn.style.display='none'; if(rbtn)rbtn.style.display='none';
+    if(_cpTimer){clearInterval(_cpTimer);_cpTimer=null;}
+  }else if(st==='expired'){
+    if(wbtn){wbtn.style.display='';set('cp-wallet-txt',ru?'Запросить новый счёт':'Request new invoice');}
+    if(rbtn)rbtn.style.display='none';
+    if(_cpTimer){clearInterval(_cpTimer);_cpTimer=null;}
+    const tmr=el('cp-timer'); if(tmr){tmr.textContent='00:00';tmr.style.color='var(--red)';}
+  }else{
+    if(wbtn){wbtn.style.display='';set('cp-wallet-txt',ru?'Открыть кошелёк':'Open wallet');}
+    if(rbtn)rbtn.style.display='';
+  }
+  _cpPersist();
+}
+
+function cryptoStartWatch(){
+  cryptoStopWatch();
+  if(CRYPTO_SIM){ _cpSimRun(); }
+  else{ _cpPoll=setInterval(cryptoPollStatus,5000); cryptoPollStatus(); }
+}
+function cryptoStopWatch(){
+  if(_cpPoll){clearInterval(_cpPoll);_cpPoll=null;}
+  if(_cpSim){clearTimeout(_cpSim);_cpSim=null;}
+  if(_cpClimb){clearInterval(_cpClimb);_cpClimb=null;}
+}
+
+function _cpSimRun(){
+  const inv=cryptoInvoice; if(!inv)return;
+  _cpSim=setTimeout(()=>{
+    const inv=cryptoInvoice; if(!inv||inv.status!=='waiting')return;
+    inv.txid='SIM'+Math.random().toString(16).slice(2,10).toUpperCase();
+    inv.conf=1;
+    cryptoSetStatus('detected');
+    haptic.light();
+    _cpResumeClimb();
+  },6000);
+}
+
+function _cpResumeClimb(){
+  if(_cpClimb){clearInterval(_cpClimb);_cpClimb=null;}
+  _cpClimb=setInterval(()=>{
+    const inv=cryptoInvoice;
+    if(!inv){clearInterval(_cpClimb);_cpClimb=null;return;}
+    inv.conf++;
+    if(inv.conf>=inv.reqConf){
+      inv.conf=inv.reqConf; clearInterval(_cpClimb);_cpClimb=null;
+      cryptoSetStatus('confirmed'); _cpOnConfirmed(inv);
+    }else{
+      const bar=el('cp-conf-bar'); if(bar)bar.style.width=Math.round((inv.conf/inv.reqConf)*100)+'%';
+      set('cp-status-sub',(lang==='ru'?'Подтверждений: ':'Confirmations: ')+inv.conf+'/'+inv.reqConf);
+    }
+  },350);
+}
+
+function _cpOnConfirmed(inv){
+  cryptoStopWatch();
+  if(_cpTimer){clearInterval(_cpTimer);_cpTimer=null;}
+  const o=orders.find(x=>x.order_id===inv.oid);
+  if(o){
+    o.status='pending'; o.paid=true; if(o.crypto)o.crypto.status='confirmed';
+    localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
+    // In sim the client submits the now-paid order to the operator. In real
+    // mode the backend already created/credited it on-chain — just refresh.
+    if(inv.sim){ _cpSubmitPaidOrder(o); } else { syncOrders(); }
+  }
+  const ru=lang==='ru';
+  addNotification('cart',ru?'Оплата получена':'Payment received',(ru?'Заказ ':'Order ')+'#'+inv.oid+(ru?' оплачен и передан оператору':' paid and sent to the operator'),{action:'orders',dedup_key:'paid_'+inv.oid,notif_type:'placed',notif_oid:inv.oid});
+  cryptoInvoice=null;
+  cryptoShowSuccess();
+}
+
+function _cpSubmitPaidOrder(o){
+  const payload=o._payload||{};
+  const body={...payload, payment_method:'crypto', paid:true,
+    crypto:{asset:o.crypto&&o.crypto.asset,chain:o.crypto&&o.crypto.chain,amount:o.crypto&&o.crypto.amountUsdt,txid:o.crypto&&o.crypto.txid},
+    initData: tg?.initData||''};
+  fetch(`${AMBAR_API}/api/order`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(body)})
+    .then(r=>r.json()).then(res=>{ if(res&&res.ok)console.log('Crypto order submitted:',res.order_id); else console.error('Crypto order API error:',res&&res.error); })
+    .catch(err=>console.error('Crypto order fetch error:',err));
+  delete o._payload;
+  localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
+}
+
+function cryptoShowSuccess(){
+  const ru=lang==='ru';
+  set('cp-success-ttl',ru?'Оплата подтверждена':'Payment confirmed');
+  set('cp-success-sub',ru?'Заказ передан оператору. Мы пришлём уведомление о статусе доставки.':'Your order is with the operator. We\'ll notify you about delivery.');
+  set('cp-success-btn',ru?'Готово':'Done');
+  const ov=el('cp-success'); if(ov)ov.classList.add('show');
+  haptic.success();
+}
+function cryptoSuccessDone(){
+  const ov=el('cp-success'); if(ov)ov.classList.remove('show');
+  go('orders');
+}
+
+function cryptoExpire(){
+  const inv=cryptoInvoice; if(!inv)return;
+  cryptoStopWatch();
+  inv.status='expired';
+  cryptoSetStatus('expired');
+  haptic.error();
+}
+
+function cryptoOpenWallet(){
+  const inv=cryptoInvoice; if(!inv)return;
+  if(inv.status==='expired'){ cryptoRequote(); return; }
+  const ru=lang==='ru';
+  _cpCopy(inv.address);
+  showToast(ru?'Адрес скопирован — вставьте в кошелёк':'Address copied — paste it in your wallet','ok');
+  haptic.light();
+  const uri='tron:'+inv.address+'?amount='+inv.amountUsdt;
+  try{ if(tg&&tg.openLink){tg.openLink(uri);} else { window.open(uri,'_blank'); } }catch(e){}
+}
+
+async function cryptoRequote(){
+  const inv=cryptoInvoice; if(!inv)return;
+  const o=orders.find(x=>x.order_id===inv.oid);
+  const total=o?o.total:inv.amountAed;
+  // SIM rebuilds locally; real mode re-hits the backend, which re-issues the
+  // expired invoice in place (fresh unique amount + window, same address).
+  let fresh;
+  if(CRYPTO_SIM){
+    fresh=cryptoCreateInvoice(inv.oid,total);
+  }else{
+    fresh=await cryptoCreateInvoiceRemote({oid:inv.oid, total, payload:(o&&o._payload)||{}});
+    if(!fresh){ showToast(lang==='ru'?'Не удалось обновить счёт. Попробуйте ещё раз.':'Could not refresh invoice. Try again.','err'); haptic.error(); return; }
+  }
+  cryptoInvoice=fresh;
+  if(o){ o.crypto=fresh; o.status='awaiting_payment'; localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50))); }
+  renderInvoice();
+  cryptoStartWatch();
+  haptic.light();
+}
+
+function cryptoRecheck(){
+  const inv=cryptoInvoice; if(!inv)return;
+  const ru=lang==='ru';
+  if(inv.status==='expired'){ cryptoRequote(); return; }
+  haptic.light();
+  if(CRYPTO_SIM){
+    if(inv.status==='waiting'){
+      cryptoStopWatch();
+      inv.txid=inv.txid||('SIM'+Math.random().toString(16).slice(2,10).toUpperCase());
+      inv.conf=Math.max(inv.conf,1);
+      cryptoSetStatus('detected');
+      _cpResumeClimb();
+      showToast(ru?'Платёж найден — ждём подтверждений':'Payment found — confirming','ok');
+    }else{
+      showToast(ru?'Уже обрабатывается…':'Already processing…','ok');
+    }
+  }else{
+    showToast(ru?'Проверяем…':'Checking…','ok');
+    cryptoPollStatus();
+  }
+}
+
+async function cryptoPollStatus(){
+  const inv=cryptoInvoice; if(!inv||inv.sim)return;
+  try{
+    const r=await fetch(`${AMBAR_API}/api/crypto/invoice/${encodeURIComponent(inv.oid)}`,{headers:{'Authorization':'tma '+(tg?.initData||'')}});
+    if(!r.ok)return;
+    const d=await r.json();
+    if(d.txid)inv.txid=d.txid;
+    if(typeof d.confirmations==='number')inv.conf=d.confirmations;
+    if(typeof d.required_confirmations==='number')inv.reqConf=d.required_confirmations;
+    if(d.status==='confirmed'||d.status==='paid'){ cryptoSetStatus('confirmed'); _cpOnConfirmed(inv); }
+    else if(d.status==='detected'||d.status==='pending'){ cryptoSetStatus('detected'); }
+    else if(d.status==='expired'){ cryptoExpire(); }
+  }catch(e){}
+}
+
+function cryptoBack(){
+  cryptoStopWatch();
+  if(_cpTimer){clearInterval(_cpTimer);_cpTimer=null;}
+  cryptoInvoice=null;
+  go('orders');
+}
+
+function resumeCryptoPayment(oid){
+  const o=orders.find(x=>x.order_id===oid);
+  if(!o||!o.crypto){ showToast(lang==='ru'?'Счёт не найден':'Invoice not found','err'); return; }
+  cryptoInvoice=o.crypto;
+  if(Date.now()>=cryptoInvoice.expiresAt && cryptoInvoice.status!=='confirmed'){ cryptoInvoice.status='expired'; }
+  go('pay');
+  renderInvoice();
+  if(cryptoInvoice.status==='expired'){ cryptoSetStatus('expired'); }
+  else if(cryptoInvoice.status==='detected'){ cryptoSetStatus('detected'); if(CRYPTO_SIM)_cpResumeClimb(); else cryptoStartWatch(); }
+  else{ cryptoStartWatch(); }
+}
+
+function cryptoCopy(which){
+  const inv=cryptoInvoice; if(!inv)return;
+  const ru=lang==='ru';
+  const text = which==='amount' ? inv.amountUsdt.toFixed(2) : inv.address;
+  _cpCopy(text);
+  showToast(which==='amount'?(ru?'Сумма скопирована':'Amount copied'):(ru?'Адрес скопирован':'Address copied'),'ok');
+  haptic.light();
+}
+function _cpShortAddr(a){ return (a&&a.length>24) ? a.slice(0,12)+'…'+a.slice(-8) : a; }
+function _cpCopy(text){
+  try{ if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(text);return;} }catch(e){}
+  try{
+    const ta=document.createElement('textarea');ta.value=text;ta.style.position='fixed';ta.style.opacity='0';
+    document.body.appendChild(ta);ta.select();document.execCommand('copy');document.body.removeChild(ta);
+  }catch(e){}
+}
+function _cpPersist(){
+  const inv=cryptoInvoice; if(!inv)return;
+  const o=orders.find(x=>x.order_id===inv.oid);
+  if(o){ o.crypto=inv; localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50))); }
 }
 
 async function confirmClearFavs(){
@@ -5555,7 +6169,7 @@ function closeRevealedOrder(){
 }
 
 let _orderFilter='all';
-const _ordStatusMap={pending:['pending'],confirmed:['confirmed'],delivered:['delivered'],cancelled:['declined','cancelled']};
+const _ordStatusMap={pending:['pending','awaiting_payment'],confirmed:['confirmed'],delivered:['delivered'],cancelled:['declined','cancelled']};
 
 function setOrderFilter(f){
   _orderFilter=f;
@@ -5617,6 +6231,21 @@ function renderOrders(){
     const idx=orders.indexOf(o);
     const st=cls[o.status]||'sp';
     const rows=o.items.map(i=>`<div class="o-row"><span class="o-row-name">${i.name}</span><span class="o-row-qty">${i.qty} ${lang==='ru'?'шт':'pcs'}</span></div>`).join('');
+    // Crypto order awaiting on-chain payment — distinct card with a resume CTA.
+    if(o.status==='awaiting_payment'){
+      const ru=lang==='ru';
+      const ms=((o.crypto&&o.crypto.expiresAt)||0)-Date.now();
+      const expired=ms<=0;
+      const mins=Math.max(0,Math.ceil(ms/60000));
+      const amt=o.crypto?o.crypto.amountUsdt.toFixed(2):'';
+      const badge=`<span class="o-status-badge o-sbg-sp"><span class="o-status-dot"></span>${expired?(ru?'Оплата истекла':'Payment expired'):(ru?'Ожидает оплаты':'Awaiting payment')}</span>`;
+      const subTxt=expired
+        ? (ru?'Счёт истёк — обновите, чтобы оплатить':'Invoice expired — refresh to pay')
+        : (ru?('Осталось ≈ '+mins+' мин · '+amt+' USDT'):('≈ '+mins+' min left · '+amt+' USDT'));
+      const btnTxt=expired?(ru?'Обновить счёт':'Refresh invoice'):(ru?'Оплатить':'Pay');
+      const card=`<div class="ocard sp"><div class="ocard-inner"><div class="ocard-meta"><div class="o-meta-left"><span class="o-id">#${o.order_id}</span><span class="o-date">${fmtDate(o.timestamp)}</span></div>${badge}</div><div class="o-rows">${rows}</div><div style="font-size:11.5px;font-weight:600;margin:8px 14px 0;font-family:'DM Sans',sans-serif;color:${expired?'var(--red)':'var(--gold2)'}">${subTxt}</div><div class="ocard-foot" style="justify-content:space-between"><div class="o-total"><span class="o-total-num">${o.total}</span><span class="o-total-cur">AED</span></div><button onclick="event.stopPropagation();resumeCryptoPayment('${o.order_id}')" style="display:inline-flex;align-items:center;gap:6px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1206;border:none;border-radius:var(--r-pill);padding:9px 17px;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;cursor:pointer;-webkit-tap-highlight-color:transparent" ontouchstart="this.style.transform='scale(.95)'" ontouchend="this.style.transform=''">${btnTxt} <span style="font-size:15px">→</span></button></div></div></div>`;
+      return `<div style="margin:0 14px 10px">${card}</div>`;
+    }
     const isFinished=o.status==='delivered'||o.status==='declined'||o.status==='cancelled';
     const isActive=o.status==='pending'||o.status==='confirmed';
     const actionsHtml=isFinished
@@ -5671,13 +6300,20 @@ async function syncOrders(spin=false){
       o.status==='pending'&&new Date(o.timestamp||0).getTime()>now90s
     );
 
+    // Crypto orders awaiting on-chain payment live only client-side until paid —
+    // the server never sees them, so preserve them across syncs (their own timer
+    // handles expiry; once confirmed they're POSTed and arrive via the API).
+    const awaitingCrypto=orders.filter(o=>
+      o.status==='awaiting_payment'&&!apiIds.has(o.order_id)&&!cleared.has(o.order_id)
+    );
+
     // Filter out user-cleared orders from API results
     const fresh=apiOrders.filter(o=>{
       if(!cleared.has(o.order_id))return true;
       return o.status==='pending'||o.status==='confirmed';
     });
 
-    orders=[...justPlaced,...fresh];
+    orders=[...awaitingCrypto,...justPlaced,...fresh];
     orders.sort((a,b)=>new Date(b.timestamp||0)-new Date(a.timestamp||0));
     localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
     console.log('[AMBAR] sync OK: '+apiOrders.length+' from API, final orders: '+orders.length);

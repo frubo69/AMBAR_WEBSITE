@@ -10,7 +10,7 @@ AMBAR API + Static file server — MongoDB edition
 All user/order data is stored in MongoDB Atlas (db: ambar).
 """
 from __future__ import annotations
-import os, json, hmac, hashlib, html as _html_mod, urllib.parse, mimetypes, logging, time, uuid
+import os, json, hmac, hashlib, html as _html_mod, urllib.parse, mimetypes, logging, time, uuid, math, asyncio
 from datetime import datetime, timezone, timedelta
 DUBAI_TZ = timezone(timedelta(hours=4))
 from pathlib import Path
@@ -19,6 +19,12 @@ from aiohttp import web
 from dotenv import load_dotenv
 import db
 from customer_card import render_customer_card
+from config import (
+    CRYPTO_REAL_MODE, CRYPTO_USDT_PER_AED, CRYPTO_REQUIRED_CONF,
+    CRYPTO_TTL_MIN, CRYPTO_AMOUNT_STEP, TRON_RECEIVE_ADDRESS,
+    CRYPTO_WATCH_INTERVAL_SEC, CRYPTO_WATCH_DRYRUN, CRYPTO_FEE_PCT,
+)
+from tron import get_incoming_usdt
 
 load_dotenv()
 BOT_TOKEN          = os.getenv("BOT_TOKEN", "")
@@ -33,6 +39,32 @@ PORT               = int(os.getenv("WEBAPP_PORT", "8080"))
 STATIC_DIR         = Path(__file__).parent
 UPLOAD_DIR         = STATIC_DIR / "uploads" / "support"
 _TEST_ACCOUNTS     = {8251195567, 6731325660}
+
+# ── Crypto payments: staged rollout gate ──────────────────────────────────────
+# While CRYPTO_PAYMENTS_FOR_ALL is off, only "admin" accounts see a working
+# crypto-pay flow; everyone else sees the button greyed out with a "Soon" label.
+# This is a DISPLAY gate (it rides on /api/me, which trusts the uid query param).
+# The money-handling endpoints we add later MUST re-derive identity from the
+# signed Telegram initData — never from this flag.
+def _parse_id_set(env_name: str) -> set[int]:
+    return {int(x.strip()) for x in os.getenv(env_name, "").split(",")
+            if x.strip().lstrip("-").isdigit()}
+
+CRYPTO_PAYMENTS_FOR_ALL = os.getenv("CRYPTO_PAYMENTS_FOR_ALL", "").strip().lower() in ("1", "true", "yes", "on")
+# Admins who get the live flow during rollout: explicit allowlist + every staff
+# role we already know about (operators/managers/admins/owners) + the founder.
+_CRYPTO_ALLOWLIST = (
+    _parse_id_set("AMBAR_CRYPTO_TEST_IDS")
+    | _parse_id_set("AMBAR_ADMIN_IDS")
+    | _parse_id_set("AMBAR_OWNER_IDS")
+    | _parse_id_set("AMBAR_MANAGER_IDS")
+    | set(OPERATOR_IDS)
+)
+
+def _crypto_enabled_for(uid: int) -> bool:
+    if CRYPTO_PAYMENTS_FOR_ALL:
+        return True
+    return uid in _CRYPTO_ALLOWLIST or uid == _FOUNDER_ID
 
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -57,6 +89,9 @@ async def on_startup(app):
         await _announce_new_worldwide_cards()
     except Exception as e:
         log.warning(f"[worldwide] startup announce failed: {e}")
+    # Read-only crypto watcher: polls TronGrid for confirmed USDT transfers and
+    # promotes matching invoices to real orders. Inert unless CRYPTO_REAL_MODE.
+    app["crypto_watcher"] = asyncio.create_task(_crypto_watch_loop(app))
 
 
 async def _send_card_welcome(ids, flag_field, total, pad, title_ru, tag):
@@ -113,6 +148,13 @@ async def _announce_new_elite_cards():
     await _send_card_welcome(_PREMIUM_IDS, "elite_card_announced", 10, 2, "ÉLITE", "elite")
 
 async def on_cleanup(app):
+    watcher = app.get("crypto_watcher")
+    if watcher:
+        watcher.cancel()
+        try:
+            await watcher
+        except asyncio.CancelledError:
+            pass
     db.close()
 
 
@@ -226,11 +268,41 @@ async def handle_create_order(request: web.Request) -> web.Response:
     if not user:
         return web.json_response({"error": "auth failed"}, status=401, headers=CORS_HEADERS)
 
+    uid = user.get("id")
+    # Ban check — reject order if user is banned
+    try:
+        if await db.is_banned(uid):
+            log.warning(f"[order] banned user {uid} attempted to place order")
+            return web.json_response({"error": "banned"}, status=403, headers=CORS_HEADERS)
+    except Exception as e:
+        log.warning(f"ban check failed: {e}")
+
+    oid = data.get("order_id", f"AMB{int(time.time()) % 100000:05d}")
+    result = await _finalize_accepted_order(data, user, oid)
+    return web.json_response(
+        {"ok": True, "order_id": oid, "needs_verification": result["needs_verification"]},
+        headers=CORS_HEADERS,
+    )
+
+
+async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
+                                   prepaid: dict | None = None) -> dict:
+    """Persist an accepted order and run the full notification fan-out: customer
+    card, first-order verification gate, operator + owner notifications, and
+    referral points. Shared by the live POST /api/order path and the crypto
+    watcher's promotion of a confirmed prepaid invoice.
+
+    `src` carries the order fields (the request body, or an invoice's stored
+    order_payload). `user` is the Telegram identity (from signed initData, or
+    reconstructed from the invoice). `prepaid`, when set, is a dict
+    {"method","txid","amount_usdt"} marking the order as already paid online.
+    Returns {"needs_verification": bool, "is_first_order": bool}.
+    """
     uid       = user.get("id")
     original_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
     user_name = original_name
     username  = user.get("username", "—")
-    lang      = data.get("lang", "ru")
+    lang      = src.get("lang", "ru")
 
     # Append operator nickname if set (original name stays, nickname in parentheses)
     try:
@@ -240,25 +312,17 @@ async def handle_create_order(request: web.Request) -> web.Response:
     except Exception:
         pass
 
-    # Ban check — reject order if user is banned
-    try:
-        if await db.is_banned(uid):
-            log.warning(f"[order] banned user {uid} attempted to place order")
-            return web.json_response({"error": "banned"}, status=403, headers=CORS_HEADERS)
-    except Exception as e:
-        log.warning(f"ban check failed: {e}")
-    oid       = data.get("order_id", f"AMB{int(time.time()) % 100000:05d}")
-    items     = data.get("items", [])
-    phone     = data.get("phone", "—")
-    address   = data.get("address", "—")
-    gmap_link = data.get("gmap_link", "")
-    is_gps    = data.get("is_gps", False)
-    tip       = data.get("tip", 0)
-    total     = data.get("total", 0)
-    loc       = data.get("location", {})
-    office_id = data.get("office_id", "office_central")
-    office_nm = data.get("office_name", "Ambar")
-    comment   = data.get("comment", "")
+    items     = src.get("items", [])
+    phone     = src.get("phone", "—")
+    address   = src.get("address", "—")
+    gmap_link = src.get("gmap_link", "")
+    is_gps    = src.get("is_gps", False)
+    tip       = src.get("tip", 0)
+    total     = src.get("total", 0)
+    loc       = src.get("location", {})
+    office_id = src.get("office_id", "office_central")
+    office_nm = src.get("office_name", "Ambar")
+    comment   = src.get("comment", "")
 
     item_lines = "\n".join(
         f"  • {i['name']} ×{i['qty']} = {i.get('line_total', i['price'] * i['qty'])} AED"
@@ -291,6 +355,11 @@ async def handle_create_order(request: web.Request) -> web.Response:
         "office_id": office_id, "office_name": office_nm, "comment": comment,
         "status": "pending",    "timestamp": datetime.now(timezone.utc).isoformat(),
     }
+    if prepaid:
+        order_doc["payment_method"]     = "crypto"
+        order_doc["paid"]               = True
+        order_doc["crypto_txid"]        = prepaid.get("txid")
+        order_doc["crypto_amount_usdt"] = prepaid.get("amount_usdt")
     if uid not in _TEST_ACCOUNTS:
         await db.save_order(oid, order_doc)
         user_fields = dict(name=original_name, full_name=original_name, first_name=user.get("first_name",""),
@@ -380,10 +449,20 @@ async def handle_create_order(request: web.Request) -> web.Response:
         first_order_banner = "<blockquote>🔴🔴🔴 <b>НОВЫЙ КЛИЕНТ!</b> 🔴🔴🔴</blockquote>\n\n"
     else:
         first_order_banner = ""
+    # Prepaid (crypto) orders are already settled — flag it so the operator does
+    # NOT collect cash on delivery.
+    if prepaid:
+        paid_banner = (
+            f"<blockquote>💳 <b>ОПЛАЧЕНО ОНЛАЙН · {_html_mod.escape(str(prepaid.get('method', 'USDT')))}</b>\n"
+            f"Сумма: {prepaid.get('amount_usdt')} USDT</blockquote>\n\n"
+        )
+    else:
+        paid_banner = ""
     tip_line = f"\n🎁 Чаевые: {tip} AED" if tip else ""
     _comment_esc = _html_mod.escape(comment) if comment else ""
     op_text = (
         f"{first_order_banner}"
+        f"{paid_banner}"
         f"🏢 Офис: <b>{_html_mod.escape(office_nm)}</b>\n\n"
         f"🆕 <b>НОВЫЙ ЗАКАЗ #{oid}</b>\n\n"
         f"{addr_line}\n\n"
@@ -463,7 +542,410 @@ async def handle_create_order(request: web.Request) -> web.Response:
         except Exception as e:
             log.error(f"[owner-notif] customers.new failed: {e}")
 
-    return web.json_response({"ok": True, "order_id": oid, "needs_verification": _needs_verification}, headers=CORS_HEADERS)
+    return {"needs_verification": _needs_verification, "is_first_order": is_first_order}
+
+
+# ── Crypto payments: invoice create + status (USDT TRC-20, watch-only) ─────────
+# POST /api/crypto/invoice      → reserve a unique amount, persist a WAITING
+#                                 invoice. NO operator notification until the
+#                                 on-chain watcher confirms payment (CP3).
+# GET  /api/crypto/invoice/{oid} → poll status for the owning user.
+# Identity is ALWAYS re-derived from signed initData here — never the uid display
+# gate. The amount is computed server-side; the client's price is never trusted.
+
+def _pick_unique_crypto_amount(base_usdt: float, reserved: set) -> float:
+    """Round the base amount UP to the nearest step (never undercharge), then
+    bump by one step until it isn't already reserved by another open invoice —
+    so an incoming transfer amount maps to exactly one order."""
+    step = CRYPTO_AMOUNT_STEP if CRYPTO_AMOUNT_STEP > 0 else 0.01
+    amt = round(math.ceil(base_usdt / step) * step, 6)
+    guard = 0
+    while round(amt, 6) in reserved and guard < 10000:
+        amt = round(amt + step, 6)
+        guard += 1
+    return round(amt, 6)
+
+
+def _crypto_order_payload(data: dict, uid: int, user: dict, oid: str, total_aed: float) -> dict:
+    """Server-trusted snapshot of the order, stored on the invoice so a confirmed
+    payment can be promoted to a real order (CP3) without trusting a client
+    "paid" claim. Identity comes from initData; the rest mirrors /api/order."""
+    return {
+        "order_id": oid,
+        "items": data.get("items", []),
+        "phone": data.get("phone", "—"),
+        "address": data.get("address", "—"),
+        "address_label": data.get("address_label", ""),
+        "gmap_link": data.get("gmap_link", ""),
+        "is_gps": data.get("is_gps", False),
+        "location": data.get("location", {}),
+        "tip": data.get("tip", 0),
+        "total": total_aed,
+        "office_id": data.get("office_id", "office_central"),
+        "office_name": data.get("office_name", "Ambar"),
+        "comment": data.get("comment", ""),
+        "lang": data.get("lang", "ru"),
+        "customer_id": uid,
+        "first_name": user.get("first_name", ""),
+        "last_name": user.get("last_name", ""),
+        "username": user.get("username", "—"),
+        "language_code": user.get("language_code", ""),
+    }
+
+
+def _crypto_invoice_response(doc: dict) -> web.Response:
+    return web.json_response({
+        "ok": True,
+        "order_id": doc.get("order_id"),
+        "address": doc.get("address"),
+        "asset": doc.get("asset", "USDT"),
+        "network": doc.get("network", "TRC-20"),
+        "amount_usdt": doc.get("amount_usdt"),
+        "amount_aed": doc.get("amount_aed"),
+        "fee_pct": doc.get("fee_pct", CRYPTO_FEE_PCT),
+        "required_confirmations": doc.get("required_confirmations", CRYPTO_REQUIRED_CONF),
+        "expires_at": doc.get("expires_at_ms"),
+        "status": doc.get("status", "waiting"),
+    }, headers=CORS_HEADERS)
+
+
+# ── Server-authoritative catalog pricing (F4) ─────────────────────────────────
+# Prices live in catalog.json (owner-editable at runtime). We recompute each
+# crypto order's goods total here from item id + qty so the customer pays exactly
+# what the order is worth at current prices — the client's claimed prices/total
+# are never trusted for the amount we credit on-chain.
+_CATALOG_FILE = STATIC_DIR / "catalog.json"
+_catalog_cache: dict = {"mtime": 0.0, "by_id": {}}
+
+def _load_catalog_by_id() -> dict:
+    """{id: product} from catalog.json, re-read only when the file mtime changes
+    (so owner price edits take effect without a restart)."""
+    try:
+        mtime = _CATALOG_FILE.stat().st_mtime
+    except OSError:
+        return _catalog_cache["by_id"]
+    if mtime != _catalog_cache["mtime"]:
+        try:
+            data = json.loads(_CATALOG_FILE.read_text(encoding="utf-8"))
+            _catalog_cache["by_id"] = {
+                p["id"]: p for p in data if isinstance(p, dict) and "id" in p
+            }
+            _catalog_cache["mtime"] = mtime
+        except Exception as e:
+            log.warning(f"[crypto] catalog load failed: {e}")
+    return _catalog_cache["by_id"]
+
+def _catalog_unit_price(p: dict, pcs) -> float:
+    """Unit price mirroring the frontend (index-6.html placeOrder): a 24-pack uses
+    price_24 (or round(price×1.8)), a 12-pack uses price_12 (or price), else price."""
+    base = float(p.get("price", 0) or 0)
+    try:
+        pcs = int(pcs)
+    except (TypeError, ValueError):
+        pcs = 0
+    if pcs == 24:
+        return float(p.get("price_24") or round(base * 1.8))
+    if pcs == 12:
+        return float(p.get("price_12") or base)
+    return base
+
+async def _recompute_order_total_aed(items: list, tip: float) -> float:
+    """Authoritative order total (AED) = Σ catalog_unit_price×qty + tip. Unknown
+    ids fall back to the client's line_total so a valid order is never rejected;
+    known ids are always priced from the catalog (tamper-proof)."""
+    catalog = await asyncio.to_thread(_load_catalog_by_id)
+    subtotal = 0.0
+    for it in (items or []):
+        try:
+            qty = int(it.get("qty", 0) or 0)
+        except (TypeError, ValueError):
+            qty = 0
+        if qty <= 0:
+            continue
+        p = catalog.get(it.get("id"))
+        if p:
+            subtotal += _catalog_unit_price(p, it.get("pcs")) * qty
+        else:
+            try:
+                subtotal += float(it.get("line_total", 0) or 0)
+            except (TypeError, ValueError):
+                pass
+    try:
+        tip = float(tip or 0)
+    except (TypeError, ValueError):
+        tip = 0.0
+    return round(subtotal + tip, 2)
+
+
+async def handle_crypto_invoice_create(request: web.Request) -> web.Response:
+    if request.method == "OPTIONS":
+        return web.Response(status=200, headers=CORS_HEADERS)
+    if not CRYPTO_REAL_MODE:
+        return web.json_response({"ok": False, "error": "crypto_unavailable"}, status=503, headers=CORS_HEADERS)
+    try:
+        data = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid json"}, status=400, headers=CORS_HEADERS)
+
+    user = validate_init_data(data.get("initData", ""))
+    if not user:
+        return web.json_response({"error": "auth failed"}, status=401, headers=CORS_HEADERS)
+    uid = user.get("id")
+
+    # Re-enforce the rollout gate server-side (the /api/me flag is display-only).
+    if not _crypto_enabled_for(uid):
+        return web.json_response({"error": "crypto_not_enabled"}, status=403, headers=CORS_HEADERS)
+    try:
+        if await db.is_banned(uid):
+            return web.json_response({"error": "banned"}, status=403, headers=CORS_HEADERS)
+    except Exception as e:
+        log.warning(f"[crypto] ban check failed: {e}")
+
+    oid = data.get("order_id") or f"AMB{int(time.time()) % 10000000:07d}"
+    # F4: never trust the client's `total`. Recompute the goods total from each
+    # item's id + qty against the server-authoritative catalog (catalog.json).
+    total_aed = await _recompute_order_total_aed(data.get("items", []), data.get("tip", 0))
+    if total_aed <= 0:
+        return web.json_response({"error": "bad_total"}, status=400, headers=CORS_HEADERS)
+
+    now_ms = int(time.time() * 1000)
+    existing = await db.get_crypto_invoice(oid)
+    if existing:
+        # Never reveal or mutate another customer's invoice for this order id.
+        if existing.get("customer_id") != uid:
+            return web.json_response({"error": "order_conflict"}, status=409, headers=CORS_HEADERS)
+        est = existing.get("status", "waiting")
+        # Once confirmed/paid the invoice is locked: return it unchanged so the
+        # amount keeps matching the transfer that paid it.
+        if est in ("confirmed", "paid"):
+            return _crypto_invoice_response(existing)
+        # Still genuinely open within its window → idempotent: same invoice.
+        if est == "waiting" and existing.get("expires_at_ms", 0) > now_ms:
+            return _crypto_invoice_response(existing)
+        # Otherwise expired / past TTL → fall through and re-issue in place.
+
+    expires_ms = now_ms + CRYPTO_TTL_MIN * 60 * 1000
+    # Customer pays the goods total + CRYPTO_FEE_PCT% (network/conversion fee),
+    # converted at the server-authoritative USDT/AED rate. amount_aed stays the
+    # goods value; the surcharge lives only in the USDT amount we credit on-chain.
+    base_usdt = total_aed * (1.0 + CRYPTO_FEE_PCT / 100.0) * CRYPTO_USDT_PER_AED
+    payload = _crypto_order_payload(data, uid, user, oid, total_aed)
+    reserved = await db.reserved_crypto_amounts()
+
+    # The USDT amount must be unique across open invoices — that is how an
+    # incoming transfer maps to exactly one order. A partial-unique index on
+    # amount_usdt enforces it; if two requests race onto the same amount the
+    # loser gets "dup_amount", so we reserve it locally and bump to the next.
+    for _attempt in range(50):
+        amount = _pick_unique_crypto_amount(base_usdt, reserved)
+        if existing:
+            fields = {
+                "status": "waiting",
+                "amount_usdt": amount,
+                "amount_aed": total_aed,
+                "fee_pct": CRYPTO_FEE_PCT,
+                "required_confirmations": CRYPTO_REQUIRED_CONF,
+                "confirmations": 0,
+                "txid": None,
+                "created_at_ms": now_ms,
+                "expires_at_ms": expires_ms,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "order_payload": payload,
+            }
+            res = await db.reissue_crypto_invoice(oid, fields)
+            if res == "ok":
+                log.info(f"[crypto] invoice #{oid} re-issued uid={uid} amount={amount} USDT (≈{total_aed} AED +{CRYPTO_FEE_PCT:g}%)")
+                return _crypto_invoice_response({**existing, **fields})
+        else:
+            doc = {
+                "order_id": oid,
+                "customer_id": uid,
+                "status": "waiting",
+                "asset": "USDT", "chain": "TRON", "network": "TRC-20",
+                "address": TRON_RECEIVE_ADDRESS,
+                "amount_usdt": amount,
+                "amount_aed": total_aed,
+                "fee_pct": CRYPTO_FEE_PCT,
+                "required_confirmations": CRYPTO_REQUIRED_CONF,
+                "confirmations": 0,
+                "txid": None,
+                "created_at_ms": now_ms,
+                "expires_at_ms": expires_ms,
+                "created_at": datetime.now(timezone.utc).isoformat(),
+                "order_payload": payload,
+            }
+            res = await db.create_crypto_invoice(doc)
+            if res == "ok":
+                log.info(f"[crypto] invoice #{oid} uid={uid} amount={amount} USDT (≈{total_aed} AED +{CRYPTO_FEE_PCT:g}%)")
+                return _crypto_invoice_response(doc)
+            if res == "dup_order":
+                # Another request created this order's invoice first — return it
+                # if it's ours, else it's a genuine cross-customer id clash.
+                other = await db.get_crypto_invoice(oid)
+                if other and other.get("customer_id") == uid:
+                    return _crypto_invoice_response(other)
+                return web.json_response({"error": "order_conflict"}, status=409, headers=CORS_HEADERS)
+        if res == "dup_amount":
+            reserved.add(round(amount, 6))
+            continue
+        return web.json_response({"error": "create_failed"}, status=500, headers=CORS_HEADERS)
+
+    # Exhausted the retry budget without finding a free amount (extremely rare).
+    return web.json_response({"error": "amount_unavailable"}, status=503, headers=CORS_HEADERS)
+
+
+async def handle_crypto_invoice_get(request: web.Request) -> web.Response:
+    if request.method == "OPTIONS":
+        return web.Response(status=200, headers=CORS_HEADERS)
+    auth = request.headers.get("Authorization", "")
+    init = auth[4:] if auth.startswith("tma ") else ""
+    user = validate_init_data(init)
+    if not user:
+        return web.json_response({"error": "auth failed"}, status=401, headers=CORS_HEADERS)
+    uid = user.get("id")
+    oid = request.match_info.get("oid", "")
+    inv = await db.get_crypto_invoice(oid)
+    if not inv:
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    if inv.get("customer_id") != uid:
+        return web.json_response({"error": "forbidden"}, status=403, headers=CORS_HEADERS)
+
+    status = inv.get("status", "waiting")
+    # Lazy expiry so the client sees `expired` even before the watcher sweeps it.
+    if status == "waiting" and inv.get("expires_at_ms") and int(time.time() * 1000) > inv["expires_at_ms"]:
+        await db.update_crypto_invoice(oid, status="expired")
+        status = "expired"
+    return web.json_response({
+        "status": status,
+        "txid": inv.get("txid"),
+        "confirmations": inv.get("confirmations", 0),
+        "required_confirmations": inv.get("required_confirmations", CRYPTO_REQUIRED_CONF),
+    }, headers=CORS_HEADERS)
+
+
+# ── Crypto watcher: confirm on-chain payments + promote to real orders ─────────
+# Background task (started in on_startup). Read-only against the chain via
+# tron.py — it never holds keys. Crediting happens ONLY on confirmed
+# (irreversible) transfers, matched to an open invoice by its unique USDT amount,
+# and is idempotent: a txid binds to exactly one invoice and each invoice is
+# promoted to a real order at most once.
+
+async def _crypto_promote_invoice(inv: dict, txid: str, amount) -> None:
+    """Promote a confirmed invoice to a real order via _finalize_accepted_order,
+    using the identity + order snapshot captured when the invoice was created."""
+    p = inv.get("order_payload") or {}
+    uid = inv.get("customer_id") or p.get("customer_id")
+    user = {
+        "id": uid,
+        "first_name": p.get("first_name", ""),
+        "last_name": p.get("last_name", ""),
+        "username": p.get("username", "—"),
+        "language_code": p.get("language_code", ""),
+    }
+    await _finalize_accepted_order(
+        p, user, inv["order_id"],
+        prepaid={"method": "USDT · TRC-20", "txid": txid,
+                 "amount_usdt": amount if amount is not None else inv.get("amount_usdt")},
+    )
+
+
+async def _crypto_try_confirm(inv: dict, transfer: dict) -> None:
+    """Credit one confirmed transfer to its matching invoice, exactly once."""
+    oid  = inv["order_id"]
+    txid = (transfer.get("txid") or "").strip()
+    amt  = transfer.get("amount")
+    if not txid:
+        return
+    if CRYPTO_WATCH_DRYRUN:
+        log.info(f"[crypto-watch][DRYRUN] would credit #{oid} ← {amt} USDT txid={txid} "
+                 f"(no status change, no order, no messages)")
+        return
+    # 1) Bind txid → this invoice, exactly once. A txid already bound elsewhere,
+    #    or a different txid already on this invoice, means do NOT credit.
+    if not await db.claim_crypto_txid(oid, txid):
+        log.warning(f"[crypto-watch] txid {txid} will not bind to #{oid} — skip "
+                    f"(possible double-spend / mismatch)")
+        return
+    # 2) Flip to confirmed (logged once).
+    conf = inv.get("required_confirmations", CRYPTO_REQUIRED_CONF)
+    if await db.mark_crypto_confirmed(oid, conf):
+        log.info(f"[crypto-watch] #{oid} CONFIRMED ← {amt} USDT txid={txid}")
+    # 3) Promote to a real order, exactly once. Fail-closed: the promotion gate is
+    #    stamped BEFORE building the order, so a crash never double-creates.
+    if await db.claim_crypto_promotion(oid):
+        try:
+            await _crypto_promote_invoice(inv, txid, amt)
+            log.info(f"[crypto-watch] #{oid} promoted to order")
+        except Exception as e:
+            log.error(f"[crypto-watch] #{oid} promotion FAILED after confirm "
+                      f"(manual recovery; payload+txid stored on invoice): {e}")
+
+
+async def _crypto_watch_tick() -> None:
+    """One polling cycle: retry stuck promotions, expire stale invoices, then
+    match newly confirmed transfers to open invoices by exact amount."""
+    now_ms = int(time.time() * 1000)
+
+    # (a) Retry any invoice confirmed but not yet promoted (e.g. a restart landed
+    #     in the confirm→promote window). Self-healing.
+    for inv in await db.list_confirmed_unpromoted_crypto_invoices():
+        if CRYPTO_WATCH_DRYRUN:
+            log.info(f"[crypto-watch][DRYRUN] would re-promote confirmed #{inv['order_id']}")
+            continue
+        if await db.claim_crypto_promotion(inv["order_id"]):
+            try:
+                await _crypto_promote_invoice(inv, inv.get("txid") or "", inv.get("amount_usdt"))
+                log.info(f"[crypto-watch] #{inv['order_id']} promoted (recovery)")
+            except Exception as e:
+                log.error(f"[crypto-watch] #{inv['order_id']} recovery promotion failed: {e}")
+
+    # (b) Expire stale WAITING invoices so their reserved amount frees up. A
+    #     'detected' invoice is locked to an on-chain tx and left to confirm.
+    live = []
+    for inv in await db.list_open_crypto_invoices():
+        exp = inv.get("expires_at_ms", 0)
+        if inv.get("status") == "waiting" and exp and now_ms > exp:
+            await db.update_crypto_invoice(inv["order_id"], status="expired")
+            log.info(f"[crypto-watch] #{inv['order_id']} expired (unpaid)")
+        else:
+            live.append(inv)
+    if not live:
+        return
+
+    # (c) Fetch confirmed incoming USDT since the oldest live invoice, then match
+    #     by exact amount. only_confirmed=True ⇒ irreversible transfers only.
+    since_ms = min(int(i.get("created_at_ms", now_ms)) for i in live)
+    transfers = await get_incoming_usdt(TRON_RECEIVE_ADDRESS, since_ms, only_confirmed=True)
+    if not transfers:
+        return
+    by_amount = {round(float(i.get("amount_usdt", 0)), 6): i for i in live}
+    for tr in transfers:
+        try:
+            amt = round(float(tr.get("amount", 0)), 6)
+        except (TypeError, ValueError):
+            continue
+        inv = by_amount.get(amt)
+        if inv:
+            await _crypto_try_confirm(inv, tr)
+
+
+async def _crypto_watch_loop(app) -> None:
+    """Long-running poller; cancelled on shutdown."""
+    if not CRYPTO_REAL_MODE:
+        log.info("[crypto-watch] disabled (CRYPTO_REAL_MODE off — no receive address / API key)")
+        return
+    log.info(f"[crypto-watch] started · interval={CRYPTO_WATCH_INTERVAL_SEC}s · "
+             f"dryrun={CRYPTO_WATCH_DRYRUN} · addr={TRON_RECEIVE_ADDRESS[:6]}…")
+    await asyncio.sleep(3)  # let DB + indexes settle after startup
+    while True:
+        try:
+            await _crypto_watch_tick()
+        except asyncio.CancelledError:
+            log.info("[crypto-watch] stopped")
+            raise
+        except Exception as e:
+            log.warning(f"[crypto-watch] tick error: {e}")
+        await asyncio.sleep(CRYPTO_WATCH_INTERVAL_SEC)
 
 
 # ── POST /api/cancel-order ────────────────────────────────────────────────────
@@ -677,6 +1159,8 @@ async def handle_me(request: web.Request) -> web.Response:
         "verify_requested": verify_requested,
         "verify_declined": verify_declined,
         "verify_pending": verify_pending,
+        # Staged-rollout display gate for crypto payments (see _crypto_enabled_for).
+        "crypto_enabled": _crypto_enabled_for(uid),
     }, headers=CORS_HEADERS)
 
 
@@ -764,6 +1248,16 @@ async def handle_verify_request(request: web.Request) -> web.Response:
             hints_str = ("\n" + "\n".join(hints)) if hints else ""
             bq_alert = f"<blockquote>🔴🔴🔴 {banner_title} 🔴🔴🔴{hints_str}\n📋 Источник: <b>{src_line}</b>{src_extra}</blockquote>"
 
+        # Prepaid (crypto) orders carry a "ОПЛАЧЕНО ОНЛАЙН" blockquote in op_text;
+        # the strip below removes ALL blockquotes, so re-inject it — the operator
+        # must still see the order is settled and NOT collect cash on delivery.
+        paid_banner = ""
+        if order.get("payment_method") == "crypto" and order.get("paid"):
+            paid_banner = (
+                f"<blockquote>💳 <b>ОПЛАЧЕНО ОНЛАЙН · USDT · TRC-20</b>\n"
+                f"Сумма: {order.get('crypto_amount_usdt')} USDT</blockquote>\n\n"
+            )
+
         if saved_op_text:
             # Strip old banners (both Markdown and HTML variants)
             import re as _re
@@ -773,9 +1267,9 @@ async def handle_verify_request(request: web.Request) -> web.Response:
                            "🔴🔴🔴 *НОВЫЙ КЛИЕНТ!* 🔴🔴🔴\n\n",
                            "🔴🔴🔴 *НОВЫЙ КЛИЕНТ — РЕФЕРАЛ* 🔴🔴🔴\n"]:
                 saved_op_text = saved_op_text.replace(prefix, "")
-            combined = bq_alert + "\n\n" + saved_op_text.strip()
+            combined = bq_alert + "\n\n" + paid_banner + saved_op_text.strip()
         else:
-            combined = bq_alert + f"\n\n🆕 <b>ЗАКАЗ #{oid}</b>"
+            combined = bq_alert + "\n\n" + paid_banner + f"🆕 <b>ЗАКАЗ #{oid}</b>"
 
         op_buttons = [
             [
@@ -1481,6 +1975,10 @@ def main():
     app.router.add_get(            "/api/orders",              handle_orders)
     app.router.add_route("OPTIONS", "/api/order",              handle_create_order)
     app.router.add_post(           "/api/order",               handle_create_order)
+    app.router.add_route("OPTIONS", "/api/crypto/invoice",       handle_crypto_invoice_create)
+    app.router.add_post(           "/api/crypto/invoice",        handle_crypto_invoice_create)
+    app.router.add_route("OPTIONS", "/api/crypto/invoice/{oid}", handle_crypto_invoice_get)
+    app.router.add_get(            "/api/crypto/invoice/{oid}",  handle_crypto_invoice_get)
     app.router.add_route("OPTIONS", "/api/cancel-order",       handle_cancel_order)
     app.router.add_post(           "/api/cancel-order",        handle_cancel_order)
     app.router.add_route("OPTIONS", "/api/support/send",       handle_support_send)

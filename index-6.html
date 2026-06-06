@@ -435,36 +435,37 @@ img{display:block}
 .pm-hint b{color:var(--gold2);font-weight:600}
 /* ── Crypto payments: invoice page ──────────────────────────────────────── */
 #pg-pay{height:calc(var(--tg-h,100vh) - var(--safe-bottom))}
-.cp-body{flex:1;overflow-y:auto;overflow-x:hidden;padding:12px 18px calc(124px + var(--safe-bottom));overscroll-behavior-y:none}
+#pg-pay::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:150%;height:340px;background:radial-gradient(58% 100% at 50% 0,rgba(201,169,110,.11),rgba(201,169,110,.04) 45%,transparent 72%);pointer-events:none;z-index:0}
+.cp-body{position:relative;z-index:1;flex:1;min-height:0;overflow-y:auto;overflow-x:hidden;padding:10px 18px 12px;overscroll-behavior-y:none}
 /* asset pill — single source of coin + network */
-.cp-asset{display:flex;align-items:center;gap:9px;width:fit-content;margin:2px auto 18px;padding:6px 15px 6px 6px;background:var(--card);border:1px solid var(--border);border-radius:var(--r-pill)}
+.cp-asset{display:flex;align-items:center;gap:9px;width:fit-content;margin:2px auto 12px;padding:6px 15px 6px 6px;background:var(--card);border:1px solid var(--border);border-radius:var(--r-pill);box-shadow:inset 0 1px 0 rgba(255,255,255,.05),0 4px 14px rgba(0,0,0,.25)}
 .cp-asset-ico{width:26px;height:26px;border-radius:50%;background:linear-gradient(135deg,#26A17B,#1a7a5a);display:flex;align-items:center;justify-content:center;flex-shrink:0;font-weight:800;color:#fff;font-family:'Space Grotesk',sans-serif;font-size:14px;box-shadow:0 2px 8px rgba(38,161,123,.35)}
 .cp-asset-txt{font-size:12.5px;font-weight:600;color:var(--text);letter-spacing:.2px}
 .cp-asset-txt span{color:var(--sub);font-weight:500}
 /* amount hero — borderless, tap to copy */
-.cp-amount{text-align:center;margin-bottom:14px}
-.cp-amount-lbl{font-size:10px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);margin-bottom:11px}
-.cp-amount-val{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:40px;font-weight:700;color:var(--gold2);line-height:1;letter-spacing:.5px;transition:transform .12s,opacity .12s;-webkit-tap-highlight-color:transparent}
+.cp-amount{text-align:center;margin-bottom:10px}
+.cp-amount-lbl{font-size:10px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);margin-bottom:8px}
+.cp-amount-val{display:inline-flex;align-items:center;gap:7px;cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:40px;font-weight:700;color:var(--gold2);line-height:1;letter-spacing:.5px;font-variant-numeric:tabular-nums;text-shadow:0 0 26px rgba(232,201,138,.22);transition:transform .14s var(--ease-standard),opacity .14s;-webkit-tap-highlight-color:transparent}
 .cp-amount-val:active{transform:scale(.97);opacity:.75}
 .cp-amount-val .cur{font-size:16px;color:var(--sub);font-weight:600}
 .cp-amount-val .cp-cpy{width:15px;height:15px;color:var(--muted);flex-shrink:0;stroke:currentColor;fill:none}
-.cp-amount-fiat{font-size:11.5px;color:var(--muted);margin-top:10px}
+.cp-amount-fiat{font-size:11.5px;color:var(--muted);margin-top:8px;font-variant-numeric:tabular-nums}
 /* QR */
-.cp-qr-wrap{display:flex;justify-content:center;margin-bottom:11px}
-.cp-qr{position:relative;width:min(56vw,196px);background:linear-gradient(135deg,#fefcf7,#f4eddc);border-radius:18px;padding:14px;box-shadow:0 18px 44px rgba(0,0,0,.5),0 0 0 1px rgba(201,169,110,.25),0 0 0 4px rgba(12,10,6,.85),0 0 0 5px rgba(201,169,110,.45)}
+.cp-qr-wrap{display:flex;justify-content:center;margin-bottom:10px}
+.cp-qr{position:relative;width:min(50vw,158px);background:linear-gradient(135deg,#fefcf7,#f4eddc);border-radius:18px;padding:12px;box-shadow:0 18px 44px rgba(0,0,0,.5),0 0 0 1px rgba(201,169,110,.25),0 0 0 4px rgba(12,10,6,.85),0 0 0 5px rgba(201,169,110,.45)}
 .cp-qr canvas,.cp-qr img{display:block;width:100%!important;height:auto!important;aspect-ratio:1/1;border-radius:5px;margin:0 auto}
 /* address pill — middle-truncated, whole row taps to copy */
-.cp-addr{display:flex;align-items:center;gap:8px;max-width:330px;margin:0 auto 12px;background:var(--card);border:1px solid var(--border2);border-radius:var(--r-pill);padding:7px 7px 7px 16px;cursor:pointer;transition:.15s}
+.cp-addr{display:flex;align-items:center;gap:8px;max-width:330px;margin:0 auto 10px;background:var(--card);border:1px solid var(--border2);border-radius:var(--r-pill);padding:7px 7px 7px 16px;cursor:pointer;transition:.15s;box-shadow:inset 0 1px 0 rgba(255,255,255,.04)}
 .cp-addr:active{transform:scale(.99);border-color:var(--border)}
 .cp-addr-val{flex:1;min-width:0;font-family:'Space Grotesk',monospace;font-size:12.5px;letter-spacing:.3px;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .cp-addr-copy{flex-shrink:0;width:32px;height:32px;border-radius:50%;background:rgba(201,169,110,.12);border:1px solid var(--border);display:flex;align-items:center;justify-content:center;color:var(--gold2);transition:.15s}
 .cp-addr:active .cp-addr-copy{transform:scale(.9)}
 .cp-addr-copy svg{width:15px;height:15px}
 /* safety — one subtle line, no heavy box */
-.cp-warn{display:flex;align-items:flex-start;justify-content:center;gap:7px;max-width:330px;margin:0 auto 12px;font-size:11px;line-height:1.5;color:#d98a8a;text-align:left}
+.cp-warn{display:flex;align-items:flex-start;justify-content:center;gap:7px;max-width:330px;margin:0 auto 10px;font-size:11px;line-height:1.5;color:#d98a8a;text-align:left}
 .cp-warn svg{width:14px;height:14px;flex-shrink:0;margin-top:1px;stroke:#E05555;fill:none}
 /* status strip — timer folded in behind a hairline divider */
-.cp-status{display:flex;align-items:flex-start;gap:12px;background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:13px 15px;transition:.25s}
+.cp-status{display:flex;align-items:flex-start;gap:12px;background:var(--card);border:1px solid var(--border2);border-radius:var(--r);padding:12px 14px;box-shadow:inset 0 1px 0 rgba(255,255,255,.04),0 6px 18px rgba(0,0,0,.28);transition:.25s}
 .cp-status-dot{width:10px;height:10px;border-radius:50%;flex-shrink:0;margin-top:3px;position:relative}
 .cp-status-body{flex:1;min-width:0}
 .cp-status-txt{font-size:13px;font-weight:600;color:var(--text)}
@@ -472,9 +473,6 @@ img{display:block}
 .cp-timer-wrap{flex-shrink:0;display:flex;flex-direction:column;justify-content:center;text-align:right;padding-left:12px;border-left:1px solid var(--border2);align-self:stretch}
 .cp-timer-lbl{font-size:8.5px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:3px}
 .cp-timer{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;color:var(--text);line-height:1;font-variant-numeric:tabular-nums}
-/* demo banner — minimal, top of page; only shown in test/sim mode */
-.cp-demo{display:flex;align-items:center;justify-content:center;gap:7px;font-size:9.5px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);opacity:.6;margin:0 0 14px}
-.cp-demo::before{content:'';width:5px;height:5px;border-radius:50%;background:var(--gold)}
 .cp-status[data-st="waiting"] .cp-status-dot{background:var(--gold)}
 .cp-status[data-st="waiting"] .cp-status-dot::after{content:'';position:absolute;inset:-4px;border-radius:50%;border:2px solid var(--gold);animation:cpPulse 1.6s ease-out infinite}
 @keyframes cpPulse{0%{transform:scale(.55);opacity:.9}100%{transform:scale(1.9);opacity:0}}
@@ -488,18 +486,55 @@ img{display:block}
 .cp-conf-bar{height:100%;width:0;background:linear-gradient(90deg,var(--blue),var(--green));border-radius:2px;transition:width .4s ease}
 .cp-explorer{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--blue);margin-top:9px;text-decoration:none}
 .cp-explorer svg{width:12px;height:12px}
-.cp-foot{position:absolute;left:0;right:0;bottom:0;padding:12px 16px calc(14px + var(--safe-bottom));background:linear-gradient(180deg,transparent,var(--bg) 28%);display:flex;flex-direction:column;gap:9px}
+.cp-foot{position:relative;z-index:2;flex:0 0 auto;padding:14px 16px calc(14px + var(--safe-bottom));background:var(--bg);border-top:1px solid var(--border2);box-shadow:0 -12px 26px -10px rgba(7,7,14,.9);display:flex;flex-direction:column;gap:9px}
 .cp-btn-ghost{width:100%;background:var(--card2);color:var(--text);border:1px solid var(--border2);border-radius:14px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;gap:7px}
 .cp-btn-ghost:active{transform:scale(.98);opacity:.85}
 .cp-btn-ghost svg{width:16px;height:16px}
 .cp-ton{background:linear-gradient(135deg,#3AAEF6,#0098EA)!important;color:#fff!important;border:none!important}
-.cp-success{position:fixed;inset:0;z-index:9300;background:radial-gradient(ellipse at center,rgba(15,12,8,.9),rgba(0,0,0,.97));backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:32px;text-align:center;opacity:0;pointer-events:none;transition:opacity .35s}
+.cp-success{position:fixed;inset:0;z-index:9300;background:radial-gradient(ellipse 70% 50% at center 38%,rgba(76,175,125,.12),transparent 60%),radial-gradient(ellipse at center,rgba(15,12,8,.9),rgba(0,0,0,.97));backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:18px;padding:32px;text-align:center;opacity:0;pointer-events:none;transition:opacity .35s}
 .cp-success.show{opacity:1;pointer-events:auto}
-.cp-success-check{width:96px;height:96px;border-radius:50%;background:rgba(76,175,125,.12);border:2px solid var(--green);display:flex;align-items:center;justify-content:center;transform:scale(.5);transition:transform .5s cubic-bezier(.2,1.3,.5,1)}
+.cp-success-check{position:relative;width:96px;height:96px;border-radius:50%;background:rgba(76,175,125,.12);border:2px solid var(--green);display:flex;align-items:center;justify-content:center;transform:scale(.5);box-shadow:0 14px 44px rgba(76,175,125,.28);transition:transform .5s cubic-bezier(.2,1.3,.5,1)}
 .cp-success.show .cp-success-check{transform:scale(1)}
+.cp-success-check::after{content:'';position:absolute;inset:-6px;border-radius:50%;border:2px solid rgba(76,175,125,.5);opacity:0;transform:scale(.85);pointer-events:none}
+.cp-success.show .cp-success-check::after{animation:cpSuccRing 1.4s ease-out .3s}
+@keyframes cpSuccRing{0%{opacity:.7;transform:scale(.85)}100%{opacity:0;transform:scale(1.5)}}
 .cp-success-check svg{width:48px;height:48px;stroke:var(--green);stroke-width:3;fill:none}
-.cp-success-ttl{font-family:'Cormorant Garamond',serif;font-size:27px;font-weight:700;letter-spacing:1px;color:var(--gold2)}
-.cp-success-sub{font-size:13px;color:var(--sub);line-height:1.6;max-width:280px}
+.cp-success-check svg polyline{stroke-dasharray:24;stroke-dashoffset:24;transition:stroke-dashoffset .5s var(--ease-standard) .38s}
+.cp-success.show .cp-success-check svg polyline{stroke-dashoffset:0}
+.cp-success-ttl{font-family:'Cormorant Garamond',serif;font-size:27px;font-weight:700;letter-spacing:1px;color:var(--gold2);text-shadow:0 0 28px rgba(232,201,138,.25);opacity:0;transform:translateY(10px);transition:opacity .45s ease .16s,transform .55s var(--ease-standard) .16s}
+.cp-success.show .cp-success-ttl{opacity:1;transform:none}
+.cp-success-sub{font-size:13px;color:var(--sub);line-height:1.6;max-width:280px;opacity:0;transform:translateY(10px);transition:opacity .45s ease .24s,transform .55s var(--ease-standard) .24s}
+.cp-success.show .cp-success-sub{opacity:1;transform:none}
+/* crypto wallet picker sheet — horizontal carousel of real, app-icon-style marks */
+.cpw-hint{font-size:12.5px;color:var(--sub);line-height:1.55;margin:-2px 0 18px;opacity:.92}
+.cpw-list{display:flex;flex-direction:row;gap:8px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;padding:16px 2px 22px;margin:0 -4px;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent)}
+.cpw-list::-webkit-scrollbar{display:none}
+.cpw-row{display:flex;align-items:center;gap:13px;min-height:60px;padding:10px 12px;border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.07);cursor:pointer;transition:transform var(--dur-fast) var(--ease-standard),background var(--dur-fast),border-color var(--dur-fast);-webkit-tap-highlight-color:transparent}
+.cpw-row:active{transform:scale(.975);background:rgba(255,255,255,.10);border-color:var(--border)}
+.cpw-ic{position:relative;width:44px;height:44px;border-radius:13px;display:flex;align-items:center;justify-content:center;flex-shrink:0;box-shadow:0 4px 11px rgba(0,0,0,.3)}
+.cpw-ic::after{content:'';position:absolute;inset:0;border-radius:inherit;pointer-events:none}
+.cpw-ic-dk::after{box-shadow:inset 0 0 0 1px rgba(255,255,255,.14),inset 0 1px 1px rgba(255,255,255,.18)}
+.cpw-ic-lt::after{box-shadow:inset 0 0 0 1px rgba(0,0,0,.1),inset 0 1px 1px rgba(255,255,255,.6)}
+.cpw-ic svg{width:26px;height:26px;display:block}
+.cpw-ic-alt{background:var(--card2);color:var(--sub);box-shadow:none}
+.cpw-ic-alt::after{box-shadow:inset 0 0 0 1px var(--border2)}
+.cpw-ic-alt svg{width:20px;height:20px}
+.cpw-row-alt{background:transparent;border:none;margin-top:0;padding:8px 8px}
+.cpw-row-alt:active{background:rgba(255,255,255,.05)}
+.cpw-tx{flex:1;min-width:0}
+.cpw-nm{font-size:15px;font-weight:600;color:var(--text);line-height:1.2;letter-spacing:.1px}
+.cpw-sub{font-size:11.5px;color:var(--muted);font-weight:500;margin-top:3px}
+.cpw-chev{color:var(--muted);flex-shrink:0;opacity:.5}
+/* horizontal wallet cards */
+.cpw-card{flex:0 0 auto;width:78px;scroll-snap-align:start;display:flex;flex-direction:column;align-items:center;gap:10px;padding:2px 0;cursor:pointer;transition:transform var(--dur-fast) var(--ease-standard);-webkit-tap-highlight-color:transparent}
+.cpw-card:active{transform:scale(.9)}
+.cpw-card .cpw-ic{width:60px;height:60px;border-radius:17px;box-shadow:0 6px 16px rgba(0,0,0,.34)}
+.cpw-card .cpw-ic svg{width:34px;height:34px}
+.cpw-cnm{font-size:11.5px;font-weight:600;color:var(--text);text-align:center;line-height:1.3;letter-spacing:.1px;min-height:30px}
+.cpw-extra{margin-top:18px;padding-top:16px;border-top:1px solid var(--border2)}
+/* lift the wallet sheet a touch higher off the bottom edge */
+#cpw-ov .cancel-sheet{padding-bottom:calc(34px + var(--safe-bottom))}
+#cpw-ov .sheet-hdr{margin-bottom:22px}
 /* Order card swipe-to-delete */
 .ocard-swipe-wrap{position:relative;overflow:hidden;border-radius:var(--r);margin:0 14px 10px}
 .ocard-swipe-del{position:absolute;top:0;right:0;bottom:0;width:80px;background:var(--red);display:flex;align-items:center;justify-content:center;cursor:pointer;border-radius:0 var(--r) var(--r) 0}
@@ -2005,7 +2040,6 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     <div class="hdr-right" style="flex:1;justify-content:flex-end"><button class="lang-btn" aria-label="Toggle language" onclick="flipLang()"><span aria-hidden="true">RU</span></button></div>
   </div>
   <div class="cp-body">
-    <div class="cp-demo" id="cp-demo" style="display:none"><span id="cp-demo-txt">Демо · детект оплаты подключим на бэкенде</span></div>
     <div class="cp-asset">
       <div class="cp-asset-ico">₮</div>
       <div class="cp-asset-txt"><b id="cp-net-ttl">USDT</b> · <span id="cp-net-sub">Tron · TRC-20</span></div>
@@ -2050,6 +2084,21 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div class="cp-success-ttl" id="cp-success-ttl">Оплата подтверждена</div>
   <div class="cp-success-sub" id="cp-success-sub">Заказ передан оператору. Мы пришлём уведомление о статусе доставки.</div>
   <button class="btn-main" style="max-width:240px" onclick="cryptoSuccessDone()"><span id="cp-success-btn">Готово</span></button>
+</div>
+
+<!-- CRYPTO WALLET PICKER SHEET -->
+<div class="cancel-ov" id="cpw-ov" onclick="if(event.target===this)closeCryptoWalletSheet()" style="z-index:9200">
+  <div class="cancel-sheet">
+    <div class="sheet-hdr">
+      <div class="sheet-hdr-ttl" id="cpw-title">ВЫБЕРИТЕ КОШЕЛЁК</div>
+      <button class="sheet-close-btn" aria-label="Close" onclick="closeCryptoWalletSheet()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+      </button>
+    </div>
+    <div class="cpw-hint" id="cpw-hint">Скопируйте сумму и адрес и вставьте их в выбранном кошельке.</div>
+    <div class="cpw-list" id="cpw-list"></div>
+    <div class="cpw-extra" id="cpw-extra"></div>
+  </div>
 </div>
 
 <!-- NAV -->
@@ -2908,6 +2957,25 @@ let CRYPTO_ENABLED = localStorage.getItem('ambar_crypto_enabled')==='1';
 const CRYPTO_SIM = true;
 const USDT_PER_AED = 1/3.6725;          // AED→USD peg; USDT≈USD. Backend will lock the real rate.
 let CRYPTO_FEE_PCT = 10;                 // surcharge on crypto orders (network+conversion). Real mode overrides from invoice.fee_pct.
+// Wallet picker for the invoice "Open wallet" button. Each tap copies the
+// address and opens that app (tg=open inside Telegram; url=universal link →
+// opens the app if installed, else its site). No pre-fill / no installed-app
+// detection is possible from a webview — the user pastes amount+address himself.
+// Each wallet carries its REAL official brand mark (inline SVG, sourced from
+// Simple Icons / web3icons) shown app-icon-style on a tile tuned to that logo
+// (tile:'lt' = light bg for dark/coloured logos, 'dk' = dark bg for light/gold
+// logos). All eight genuinely support USDT on TRON (TRC-20). cat = wallet kind
+// for the localized sub-line. tg=open inside Telegram, url=universal app link.
+const CRYPTO_WALLETS = [
+  {name:'Telegram Wallet', hint:'@wallet', tg:'https://t.me/wallet', bg:'#2AABEE', tile:'dk', svg:'<svg viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="tg__a" x1="50%" x2="50%" y1="0%" y2="100%"><stop offset="0%" stop-color="#2AABEE"/><stop offset="100%" stop-color="#229ED9"/></linearGradient></defs><path fill="url(#tg__a)" d="M128 0C94.06 0 61.48 13.494 37.5 37.49A128.038 128.038 0 0 0 0 128c0 33.934 13.5 66.514 37.5 90.51C61.48 242.506 94.06 256 128 256s66.52-13.494 90.5-37.49c24-23.996 37.5-56.576 37.5-90.51 0-33.934-13.5-66.514-37.5-90.51C194.52 13.494 161.94 0 128 0Z"/><path fill="#FFF" d="M57.94 126.648c37.32-16.256 62.2-26.974 74.64-32.152 35.56-14.786 42.94-17.354 47.76-17.441 1.06-.017 3.42.245 4.96 1.49 1.28 1.05 1.64 2.47 1.82 3.467.16.996.38 3.266.2 5.038-1.92 20.24-10.26 69.356-14.5 92.026-1.78 9.592-5.32 12.808-8.74 13.122-7.44.684-13.08-4.912-20.28-9.63-11.26-7.386-17.62-11.982-28.56-19.188-12.64-8.328-4.44-12.906 2.76-20.386 1.88-1.958 34.64-31.748 35.26-34.45.08-.338.16-1.598-.6-2.262-.74-.666-1.84-.438-2.64-.258-1.14.256-19.12 12.152-54 35.686-5.1 3.508-9.72 5.218-13.88 5.128-4.56-.098-13.36-2.584-19.9-4.708-8-2.606-14.38-3.984-13.82-8.41.28-2.304 3.46-4.662 9.52-7.072Z"/></svg>'},
+  {name:'Trust Wallet', cat:'wallet', url:'https://link.trustwallet.com', bg:'#FFFFFF', tile:'lt', svg:'<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><path fill="#0500FF" d="M3.9 5.6 12 3v18c-5.786-2.4-8.1-7-8.1-9.6z"/><path fill="url(#trust__a)" d="M20.1 5.6 12 3v18c5.786-2.4 8.1-7 8.1-9.6z"/><defs><linearGradient id="trust__a" x1="17.948" x2="11.967" y1="1.74" y2="20.797" gradientUnits="userSpaceOnUse"><stop offset=".02" stop-color="#00F"/><stop offset=".08" stop-color="#0094FF"/><stop offset=".16" stop-color="#48FF91"/><stop offset=".42" stop-color="#0094FF"/><stop offset=".68" stop-color="#0038FF"/><stop offset=".9" stop-color="#0500FF"/></linearGradient></defs></svg>'},
+  {name:'Binance', cat:'cex', url:'https://app.binance.com', bg:'#0B0E11', tile:'dk', svg:'<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><path fill="#F0B90B" d="m7.068 12-2.03 2.03L3.003 12l2.03-2.03zm4.935-4.935 3.482 3.483 2.03-2.03L12.003 3 6.485 8.518l2.03 2.03zm6.964 2.905L16.937 12l2.03 2.03 2.03-2.03zm-6.964 6.965L8.52 13.452l-2.03 2.03L12.003 21l5.512-5.518-2.03-2.03zm0-2.905 2.03-2.03-2.03-2.03L9.967 12z"/></svg>'},
+  {name:'Bybit', cat:'cex', url:'https://www.bybit.com', bg:'#0B0B0F', tile:'dk', svg:'<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><path fill="#F6A500" d="M15.829 13.626V9h.93v4.626z"/><path fill="#fff" d="M4.993 15H3v-4.626h1.913c.93 0 1.471.507 1.471 1.3 0 .513-.348.845-.588.955.287.13.655.423.655 1.04 0 .863-.609 1.33-1.458 1.33m-.154-3.82h-.91v1.065h.91c.395 0 .615-.214.615-.533 0-.317-.22-.532-.615-.532m.06 1.877h-.97v1.137h.97c.42 0 .622-.259.622-.571s-.201-.565-.622-.565zm4.388.046V15h-.923v-1.898l-1.431-2.728h1.01l.889 1.864.877-1.864h1.01zM13.355 15h-1.993v-4.626h1.913c.93 0 1.47.507 1.47 1.3 0 .513-.347.845-.588.955.287.13.655.423.655 1.04 0 .863-.608 1.33-1.457 1.33m-.155-3.82h-.91v1.065h.91c.395 0 .616-.214.616-.533 0-.317-.22-.532-.616-.532m.06 1.877h-.97v1.137h.97c.422 0 .622-.259.622-.571s-.2-.565-.622-.565zm6.495-1.876V15h-.929v-3.82h-1.245v-.806H21v.806z"/></svg>'},
+  {name:'OKX', cat:'both', url:'https://www.okx.com', bg:'#FFFFFF', tile:'lt', svg:'<svg fill="#000000" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path d="M 7.15 8.685 C 7.18 8.705 7.2 8.745 7.2 8.785 L 7.2 15.225 C 7.2 15.265 7.18 15.305 7.15 15.325 C 7.121 15.355 7.082 15.372 7.04 15.375 L 0.16 15.375 C 0.118 15.372 0.079 15.355 0.05 15.325 C 0.02 15.3 0.002 15.264 0 15.225 L 0 8.785 C 0 8.745 0.02 8.705 0.05 8.685 C 0.079 8.655 0.118 8.638 0.16 8.635 L 7.04 8.635 C 7.08 8.635 7.12 8.655 7.15 8.685 Z M 4.8 11.035 C 4.798 10.996 4.78 10.96 4.75 10.935 C 4.721 10.905 4.682 10.887 4.64 10.885 L 2.56 10.885 C 2.52 10.885 2.481 10.899 2.45 10.925 C 2.42 10.95 2.402 10.986 2.4 11.025 L 2.4 12.975 C 2.4 13.015 2.42 13.055 2.45 13.075 C 2.48 13.115 2.52 13.125 2.56 13.125 L 4.64 13.125 C 4.68 13.125 4.72 13.115 4.75 13.085 C 4.78 13.06 4.798 13.024 4.8 12.985 L 4.8 11.035 Z M 21.6 11.035 L 21.6 12.975 C 21.6 13.065 21.53 13.125 21.44 13.125 L 19.36 13.125 C 19.27 13.125 19.2 13.065 19.2 12.975 L 19.2 11.035 C 19.2 10.955 19.27 10.885 19.36 10.885 L 21.44 10.885 C 21.53 10.885 21.6 10.945 21.6 11.035 Z M 19.2 8.785 L 19.2 10.735 C 19.2 10.815 19.13 10.885 19.04 10.885 L 16.96 10.885 C 16.87 10.885 16.8 10.815 16.8 10.735 L 16.8 8.785 C 16.8 8.705 16.87 8.635 16.96 8.635 L 19.04 8.635 C 19.13 8.635 19.2 8.705 19.2 8.785 Z M 24 8.785 L 24 10.735 C 24 10.815 23.93 10.885 23.84 10.885 L 21.76 10.885 C 21.67 10.885 21.6 10.815 21.6 10.735 L 21.6 8.785 C 21.6 8.705 21.67 8.635 21.76 8.635 L 23.84 8.635 C 23.93 8.635 24 8.705 24 8.785 Z M 19.2 13.285 L 19.2 15.225 C 19.2 15.305 19.13 15.375 19.04 15.375 L 16.96 15.375 C 16.87 15.375 16.8 15.305 16.8 15.225 L 16.8 13.275 C 16.8 13.195 16.87 13.125 16.96 13.125 L 19.04 13.125 C 19.13 13.125 19.2 13.195 19.2 13.275 L 19.2 13.285 Z M 24 13.285 L 24 15.225 C 24 15.305 23.93 15.375 23.84 15.375 L 21.76 15.375 C 21.67 15.375 21.6 15.305 21.6 15.225 L 21.6 13.275 C 21.6 13.195 21.67 13.125 21.76 13.125 L 23.84 13.125 C 23.93 13.125 24 13.195 24 13.275 L 24 13.285 Z M 15.6 8.785 L 15.6 10.735 C 15.6 10.815 15.53 10.885 15.44 10.885 L 13.36 10.885 C 13.27 10.885 13.2 10.815 13.2 10.735 L 13.2 8.785 C 13.2 8.705 13.27 8.635 13.36 8.635 L 15.44 8.635 C 15.53 8.635 15.6 8.705 15.6 8.785 Z M 15.6 13.285 L 15.6 15.225 C 15.6 15.305 15.53 15.375 15.44 15.375 L 13.36 15.375 C 13.27 15.375 13.2 15.305 13.2 15.225 L 13.2 13.275 C 13.2 13.195 13.27 13.125 13.36 13.125 L 15.44 13.125 C 15.53 13.125 15.6 13.195 15.6 13.275 L 15.6 13.285 Z M 13.2 12.985 C 13.195 13.069 13.125 13.135 13.04 13.135 L 10.8 13.135 L 10.8 15.215 C 10.8 15.255 10.78 15.295 10.75 15.325 C 10.719 15.351 10.68 15.365 10.64 15.365 L 8.56 15.365 C 8.516 15.368 8.473 15.353 8.44 15.325 C 8.414 15.298 8.399 15.262 8.4 15.225 L 8.4 8.775 C 8.4 8.735 8.41 8.695 8.44 8.675 C 8.472 8.643 8.515 8.625 8.56 8.625 L 10.64 8.625 C 10.68 8.625 10.72 8.645 10.75 8.675 C 10.78 8.695 10.8 8.735 10.8 8.775 L 10.8 10.875 L 13.04 10.875 C 13.08 10.875 13.12 10.885 13.15 10.915 C 13.18 10.945 13.2 10.985 13.2 11.015 L 13.2 12.965 L 13.2 12.985 Z"/></svg>'},
+  {name:'Bitget', cat:'both', url:'https://www.bitget.com', bg:'#0C1013', tile:'dk', svg:'<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><path fill="#00F0FF" d="M11.121 9.46h4.283l4.381 4.555a.785.785 0 0 1 .003 1.076L14.17 21H9.757l1.334-1.357 4.898-5.092-4.836-5.092"/><path fill="#00F0FF" d="M12.879 14.54H8.596L4.215 9.986a.785.785 0 0 1-.003-1.076L9.83 3h4.412l-1.334 1.357L8.01 9.449l4.836 5.092"/></svg>'},
+  {name:'TokenPocket', cat:'wallet', url:'https://www.tokenpocket.pro', bg:'#FFFFFF', tile:'lt', svg:'<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><path fill="url(#token-pocket__a)" d="M15.35 10.793v4.527a4.6 4.6 0 0 0 .936.117h.032v-3.6a1.04 1.04 0 0 1-.968-1.044"/><path fill="#2980FE" d="M15.348 10.794H11.78v6.485c0 .307.246.555.55.555h2.467c.304 0 .55-.248.55-.555zm-5.29-4.644H3.55a.55.55 0 0 0-.55.554v2.25c0 .307.246.555.55.555h2.095v7.787c0 .306.246.554.55.554H8.54c.304 0 .55-.248.55-.554V9.509h.959c.92 0 1.667-.754 1.667-1.68a1.66 1.66 0 0 0-1.658-1.679"/><path fill="#2980FE" d="M16.39 6.15c-2.545 0-4.61 2.08-4.61 4.644a4.64 4.64 0 0 0 3.57 4.526v-4.526c0-.578.467-1.047 1.04-1.047s1.04.47 1.04 1.047a1.04 1.04 0 0 1-1.04 1.046v3.597q.135 0 .265-.006C19.077 15.29 21 13.269 21 10.794c.003-2.564-2.062-4.644-4.61-4.644"/><path fill="#2980FE" d="M16.39 15.437V11.84q-.037 0-.075-.003v3.6z"/><defs><linearGradient id="token-pocket__a" x1="16.391" x2="15.351" y1="13.116" y2="13.116" gradientUnits="userSpaceOnUse"><stop stop-color="#2980FE"/><stop offset=".967" stop-color="#6CA8FF"/><stop offset="1" stop-color="#2980FE"/></linearGradient></defs></svg>'},
+  {name:'imToken', cat:'wallet', url:'https://token.im', bg:'#FFFFFF', tile:'lt', svg:'<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><path fill="url(#imtoken__a)" d="M20.953 6.132c.594 7.966-4.574 11.731-9.207 12.133-4.308.373-8.362-2.25-8.718-6.279C2.735 8.657 4.811 7.24 6.442 7.1c1.678-.146 3.088 1 3.21 2.389.119 1.335-.722 1.942-1.307 1.993-.462.04-1.043-.238-1.096-.835-.045-.513.152-.583.104-1.128-.086-.97-.94-1.084-1.407-1.043-.566.049-1.593.703-1.449 2.333.145 1.644 1.736 2.943 3.821 2.762 2.25-.195 3.818-1.931 3.936-4.366a.9.9 0 0 1 .08-.374v-.003q.037-.076.085-.147.071-.106.19-.236 0-.003.002-.002.087-.097.206-.21c.983-.919 4.524-3.086 7.872-2.4a.34.34 0 0 1 .264.3"/><defs><linearGradient id="imtoken__a" x1="19.143" x2="5.727" y1="8.706" y2="16.386" gradientUnits="userSpaceOnUse"><stop stop-color="#0CC5FF"/><stop offset="1" stop-color="#007FFF"/></linearGradient></defs></svg>'},
+];
 let payMethod = localStorage.getItem('ambar_pay_method')||'cash';
 let cryptoInvoice = null;               // active invoice object (see cryptoCreateInvoice)
 let _cpTimer=null,_cpPoll=null,_cpSim=null,_cpClimb=null;
@@ -5614,6 +5682,25 @@ function placeOrder(){
 // backend exists. SECURITY: confirmation/credit is authoritative ON THE SERVER
 // in real mode — the client never self-reports "paid" except in sim. Money
 // endpoints (future /api/crypto/*) must re-derive identity from signed initData.
+//
+// ┌─ DEMO vs REAL — READ THIS BEFORE TOUCHING THE WATCH/SUBMIT LOGIC ──────────┐
+// DEMO (CRYPTO_SIM=true, no real wallet/watcher — the state we ship today):
+//   • There is NO auto-detection. cryptoStartWatch() intentionally does nothing
+//     in SIM, so the order is NOT sent to the operator until the user taps
+//     "Я оплатил — проверить" (cryptoRecheck → climb → _cpOnConfirmed → submit).
+//   • The backend tags these as "TEST CRYPTO ORDER" (api_server.py only honours a
+//     client-side `paid:true` claim while CRYPTO_REAL_MODE is off).
+//
+// FUTURE / TODO (when the real receive address + TronGrid watcher are wired,
+// i.e. CRYPTO_REAL_MODE=true on the server):
+//   • DROP the manual gate — payment should auto-detect on-chain. The server
+//     watcher confirms the transfer and promotes the order itself; the frontend
+//     just polls cryptoPollStatus() (already implemented in the !CRYPTO_SIM
+//     branch of cryptoStartWatch) and "Я оплатил — проверить" becomes an
+//     OPTIONAL "check now", not the thing that creates the order.
+//   • Flip CRYPTO_SIM=false here; the non-sim branches already do the right
+//     thing. Never submit a paid order from the client in real mode.
+// └────────────────────────────────────────────────────────────────────────────┘
 
 function selectPayMethod(m){
   if(m==='crypto' && !CRYPTO_ENABLED){
@@ -5744,8 +5831,6 @@ function renderInvoice(){
   const inv=cryptoInvoice; if(!inv)return;
   const ru=lang==='ru';
   set('ls-pay',ru?'Оплата':'Payment');
-  const demo=el('cp-demo'); if(demo)demo.style.display=inv.sim?'flex':'none';
-  set('cp-demo-txt',ru?'Демо · детект оплаты подключим на бэкенде':'Demo · payment detection wired on the backend');
   set('cp-net-ttl',inv.asset);
   set('cp-net-sub',inv.netLabel);
   set('cp-amount-lbl',ru?'Сумма к оплате':'Amount to pay');
@@ -5798,7 +5883,7 @@ function cryptoSetStatus(st){
   if(inv)inv.status=st;
   const tw=el('cp-timer-wrap'); if(tw)tw.style.display=(st==='detected'||st==='confirmed')?'none':'';
   const map={
-    waiting:{t:ru?'Ожидаем оплату…':'Waiting for payment…', s:ru?'Поймаем перевод автоматически':'We\'ll detect it automatically'},
+    waiting:{t:ru?'Ожидаем оплату…':'Waiting for payment…', s: CRYPTO_SIM ? (ru?'После перевода нажмите «Я оплатил — проверить»':'After paying, tap “I’ve paid — check”') : (ru?'Поймаем перевод автоматически':'We\'ll detect it automatically')},
     detected:{t:ru?'Платёж обнаружен':'Payment detected', s:ru?'Ждём подтверждений сети':'Waiting for network confirmations'},
     confirmed:{t:ru?'Оплата подтверждена':'Payment confirmed', s:ru?'Передаём заказ оператору…':'Sending your order to the operator…'},
     expired:{t:ru?'Время оплаты истекло':'Payment window expired', s:ru?'Запросите новый счёт, чтобы продолжить':'Request a new invoice to continue'},
@@ -5834,8 +5919,12 @@ function cryptoSetStatus(st){
 
 function cryptoStartWatch(){
   cryptoStopWatch();
-  if(CRYPTO_SIM){ _cpSimRun(); }
-  else{ _cpPoll=setInterval(cryptoPollStatus,5000); cryptoPollStatus(); }
+  // DEMO (CRYPTO_SIM): no auto-detect — nothing reaches the operator until the
+  // user taps "Я оплатил — проверить" (cryptoRecheck). See the FUTURE note in the
+  // CRYPTO PAYMENT FLOW header: in real mode the on-chain watcher auto-detects and
+  // the button becomes an optional "check now".
+  if(CRYPTO_SIM){ /* manual: wait for cryptoRecheck() */ return; }
+  _cpPoll=setInterval(cryptoPollStatus,5000); cryptoPollStatus();
 }
 function cryptoStopWatch(){
   if(_cpPoll){clearInterval(_cpPoll);_cpPoll=null;}
@@ -5843,17 +5932,10 @@ function cryptoStopWatch(){
   if(_cpClimb){clearInterval(_cpClimb);_cpClimb=null;}
 }
 
-function _cpSimRun(){
-  const inv=cryptoInvoice; if(!inv)return;
-  _cpSim=setTimeout(()=>{
-    const inv=cryptoInvoice; if(!inv||inv.status!=='waiting')return;
-    inv.txid='SIM'+Math.random().toString(16).slice(2,10).toUpperCase();
-    inv.conf=1;
-    cryptoSetStatus('detected');
-    haptic.light();
-    _cpResumeClimb();
-  },6000);
-}
+// _cpSimRun() (the old "auto-detect after 6s" timer) was REMOVED on purpose: in
+// demo the order must not progress until the user taps "Я оплатил — проверить".
+// cryptoRecheck() is now the only trigger that detects → climbs confirmations →
+// submits the order to the operator.
 
 function _cpResumeClimb(){
   if(_cpClimb){clearInterval(_cpClimb);_cpClimb=null;}
@@ -5924,12 +6006,56 @@ function cryptoExpire(){
 function cryptoOpenWallet(){
   const inv=cryptoInvoice; if(!inv)return;
   if(inv.status==='expired'){ cryptoRequote(); return; }
+  openCryptoWalletSheet();
+}
+
+// Scrollable wallet picker. A tap copies the address (convenience) and opens
+// that wallet app so the user can paste the amount + address himself.
+function openCryptoWalletSheet(){
+  const inv=cryptoInvoice; if(!inv)return;
   const ru=lang==='ru';
-  _cpCopy(inv.address);
-  showToast(ru?'Адрес скопирован — вставьте в кошелёк':'Address copied — paste it in your wallet','ok');
+  set('cpw-title',ru?'ВЫБЕРИТЕ КОШЕЛЁК':'CHOOSE A WALLET');
+  set('cpw-hint',ru?'Скопируйте сумму и адрес и вставьте их в выбранном кошельке.':'Copy the amount and address, then paste them in your wallet.');
+  const list=el('cpw-list'); if(!list)return;
+  const chev='<svg class="cpw-chev" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><polyline points="9 18 15 12 9 6"/></svg>';
+  list.innerHTML='';
+  CRYPTO_WALLETS.forEach(w=>{
+    const card=document.createElement('div');
+    card.className='cpw-card';
+    card.setAttribute('role','button');
+    card.setAttribute('aria-label',w.name);
+    card.onclick=()=>_cpOpenWalletApp(w);
+    card.innerHTML=
+      '<div class="cpw-ic cpw-ic-'+(w.tile||'dk')+'" style="background:'+w.bg+'">'+w.svg+'</div>'+
+      '<div class="cpw-cnm">'+w.name+'</div>';
+    list.appendChild(card);
+  });
+  // Catch-all (full-width row beneath the carousel): just copy the address.
+  const extra=el('cpw-extra'); if(extra) extra.innerHTML='';
+  const copyRow=document.createElement('div');
+  copyRow.className='cpw-row cpw-row-alt';
+  copyRow.setAttribute('role','button');
+  copyRow.setAttribute('aria-label',ru?'Скопировать адрес':'Copy address');
+  copyRow.onclick=()=>{ if(inv.address){_cpCopy(inv.address);} showToast(ru?'Адрес скопирован':'Address copied','ok'); haptic.light(); closeCryptoWalletSheet(); };
+  copyRow.innerHTML=
+    '<div class="cpw-ic cpw-ic-alt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg></div>'+
+    '<div class="cpw-tx"><div class="cpw-nm">'+(ru?'Другой кошелёк':'Other wallet')+'</div><div class="cpw-sub">'+(ru?'Скопировать адрес вручную':'Copy address manually')+'</div></div>'+chev;
+  (extra||list).appendChild(copyRow);
+  _openSheet('cpw-ov');
   haptic.light();
-  const uri='tron:'+inv.address+'?amount='+inv.amountUsdt;
-  try{ if(tg&&tg.openLink){tg.openLink(uri);} else { window.open(uri,'_blank'); } }catch(e){}
+}
+function closeCryptoWalletSheet(){ _closeSheet('cpw-ov'); }
+function _cpOpenWalletApp(w){
+  const inv=cryptoInvoice; const ru=lang==='ru';
+  if(inv&&inv.address){ _cpCopy(inv.address); showToast((ru?'Адрес скопирован — вставьте в ':'Address copied — paste it in ')+w.name,'ok'); }
+  haptic.light();
+  const link=w.tg||w.url;
+  try{
+    if(w.tg&&tg&&tg.openTelegramLink){ tg.openTelegramLink(w.tg); }
+    else if(tg&&tg.openLink){ tg.openLink(link); }
+    else { window.open(link,'_blank'); }
+  }catch(e){ try{ window.open(link,'_blank'); }catch(_){} }
+  closeCryptoWalletSheet();
 }
 
 async function cryptoRequote(){

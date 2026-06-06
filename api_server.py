@@ -278,7 +278,26 @@ async def handle_create_order(request: web.Request) -> web.Response:
         log.warning(f"ban check failed: {e}")
 
     oid = data.get("order_id", f"AMB{int(time.time()) % 100000:05d}")
-    result = await _finalize_accepted_order(data, user, oid)
+
+    # Crypto orders. The client may submit payment_method="crypto" / paid=true.
+    #   • DEMO (CRYPTO_REAL_MODE off — today's state, no real wallet/watcher yet):
+    #     accept it as a *test* prepaid order so the operator gets a loud
+    #     "TEST CRYPTO ORDER" banner (see _finalize_accepted_order).
+    #   • REAL mode: NEVER trust a client-side "paid" claim. Genuine crypto orders
+    #     are promoted only by the on-chain watcher (_promote_invoice_to_order),
+    #     so reject the client-submitted paid order outright.
+    prepaid = None
+    if data.get("payment_method") == "crypto" and data.get("paid"):
+        if CRYPTO_REAL_MODE:
+            log.warning(f"[order] rejected client crypto 'paid' claim for {oid} "
+                        f"(uid={uid}) — real mode credits via on-chain watcher only")
+            return web.json_response({"error": "crypto_paid_unverified"},
+                                     status=403, headers=CORS_HEADERS)
+        _c = data.get("crypto") or {}
+        prepaid = {"method": _c.get("asset", "USDT"), "txid": _c.get("txid"),
+                   "amount_usdt": _c.get("amount"), "test": True}
+
+    result = await _finalize_accepted_order(data, user, oid, prepaid=prepaid)
     return web.json_response(
         {"ok": True, "order_id": oid, "needs_verification": result["needs_verification"]},
         headers=CORS_HEADERS,
@@ -360,6 +379,8 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         order_doc["paid"]               = True
         order_doc["crypto_txid"]        = prepaid.get("txid")
         order_doc["crypto_amount_usdt"] = prepaid.get("amount_usdt")
+        if prepaid.get("test"):
+            order_doc["crypto_test"]    = True   # demo order — not a real payment
     if uid not in _TEST_ACCOUNTS:
         await db.save_order(oid, order_doc)
         user_fields = dict(name=original_name, full_name=original_name, first_name=user.get("first_name",""),
@@ -451,7 +472,18 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         first_order_banner = ""
     # Prepaid (crypto) orders are already settled — flag it so the operator does
     # NOT collect cash on delivery.
-    if prepaid:
+    if prepaid and prepaid.get("test"):
+        # DEMO crypto order: real wallet/watcher not connected yet, so the
+        # "payment" is simulated. Loud caption so the operator never mistakes it
+        # for a settled order. This whole branch disappears once CRYPTO_REAL_MODE
+        # is on (client paid-claims are rejected upstream in handle_create_order).
+        paid_banner = (
+            "<blockquote>🧪🧪🧪 <b>TEST CRYPTO ORDER</b> 🧪🧪🧪\n"
+            "<b>НЕ НАСТОЯЩАЯ ОПЛАТА</b> — демо крипто-оплаты, реальный кошелёк ещё "
+            "не подключён. Не выдавайте заказ как оплаченный.\n"
+            f"Заявленная сумма: {_html_mod.escape(str(prepaid.get('amount_usdt')))} USDT</blockquote>\n\n"
+        )
+    elif prepaid:
         paid_banner = (
             f"<blockquote>💳 <b>ОПЛАЧЕНО ОНЛАЙН · {_html_mod.escape(str(prepaid.get('method', 'USDT')))}</b>\n"
             f"Сумма: {prepaid.get('amount_usdt')} USDT</blockquote>\n\n"

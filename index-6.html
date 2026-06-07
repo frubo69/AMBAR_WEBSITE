@@ -420,19 +420,25 @@ img{display:block}
 .sum-total{display:flex;justify-content:space-between;font-size:15px;font-weight:700;color:var(--gold2)}
 .co-foot{padding:0 16px calc(16px + var(--safe-bottom))}
 /* ── Crypto payments: checkout method toggle ────────────────────────────── */
-.pm-seg{display:flex;gap:10px}
-.pm-opt{position:relative;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:14px 8px;min-height:84px;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r2);cursor:pointer;color:var(--sub);outline:none;-webkit-tap-highlight-color:transparent;transition:transform var(--dur-fast) var(--ease-standard),border-color var(--dur-base),background var(--dur-base),color var(--dur-base)}
+/* payment method — animated segmented control with a sliding gold thumb */
+.pm-seg{position:relative;display:flex;gap:0;padding:5px;background:var(--bg3);border:1px solid var(--border2);border-radius:calc(var(--r2) + 4px)}
+.pm-thumb{position:absolute;top:5px;left:5px;width:calc(50% - 5px);height:calc(100% - 10px);border-radius:var(--r2);background:linear-gradient(160deg,rgba(201,169,110,.16),rgba(201,169,110,.05));border:1px solid var(--gold);box-shadow:0 0 0 1px var(--gold) inset,0 8px 22px rgba(201,169,110,.16);transform:translateX(0);transition:transform var(--dur-slow) cubic-bezier(.34,1.28,.5,1),opacity var(--dur-base);pointer-events:none;z-index:0}
+.pm-seg[data-sel="crypto"] .pm-thumb{transform:translateX(100%)}
+.pm-opt{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:13px 8px;min-height:80px;background:transparent;border:none;border-radius:var(--r2);cursor:pointer;color:var(--sub);outline:none;-webkit-tap-highlight-color:transparent;transition:color var(--dur-base),transform var(--dur-fast) var(--ease-standard)}
 .pm-opt:active{transform:scale(var(--press-card))}
-.pm-opt .pm-ico{width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:var(--sub);transition:color var(--dur-base)}
+.pm-opt:focus-visible{box-shadow:0 0 0 2px var(--bg3),0 0 0 4px rgba(201,169,110,.7)}
+.pm-opt .pm-ico{width:30px;height:30px;display:flex;align-items:center;justify-content:center;color:var(--sub);transition:color var(--dur-base),transform var(--dur-base) cubic-bezier(.34,1.4,.5,1)}
 .pm-opt .pm-ico svg{width:24px;height:24px}
 .pm-opt .pm-lbl{font-size:12.5px;font-weight:600;letter-spacing:.2px}
-.pm-opt.on{background:linear-gradient(160deg,rgba(201,169,110,.14),rgba(201,169,110,.05));border-color:var(--gold);color:var(--gold2);box-shadow:0 0 0 1px var(--gold) inset,0 6px 20px rgba(201,169,110,.12)}
-.pm-opt.on .pm-ico{color:var(--gold2)}
+.pm-opt.on{color:var(--gold2)}
+.pm-opt.on .pm-ico{color:var(--gold2);transform:scale(1.08)}
 .pm-opt.disabled{opacity:.5;cursor:not-allowed;filter:grayscale(.55)}
 .pm-opt.disabled:active{transform:none}
 .pm-soon{position:absolute;top:6px;right:6px;font-size:8.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);background:rgba(255,255,255,.06);border:1px solid var(--border2);border-radius:var(--r-pill);padding:2px 7px}
-.pm-hint{font-size:11px;color:var(--muted);line-height:1.5;margin-top:10px;min-height:16px}
+.pm-hint{font-size:11.5px;color:var(--sub);line-height:1.55;margin-top:12px;min-height:34px}
 .pm-hint b{color:var(--gold2);font-weight:600}
+@keyframes pmHintIn{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:none}}
+.pm-hint.pm-anim{animation:pmHintIn var(--dur-base) var(--ease-standard)}
 /* ── Crypto payments: invoice page ──────────────────────────────────────── */
 #pg-pay{height:calc(var(--tg-h,100vh) - var(--safe-bottom))}
 #pg-pay::before{content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);width:150%;height:340px;background:radial-gradient(58% 100% at 50% 0,rgba(201,169,110,.11),rgba(201,169,110,.04) 45%,transparent 72%);pointer-events:none;z-index:0}
@@ -507,7 +513,7 @@ img{display:block}
 .cp-success.show .cp-success-sub{opacity:1;transform:none}
 /* crypto wallet picker sheet — horizontal carousel of real, app-icon-style marks */
 .cpw-hint{font-size:12.5px;color:var(--sub);line-height:1.55;margin:-2px 0 18px;opacity:.92}
-.cpw-list{display:flex;flex-direction:row;gap:8px;overflow-x:auto;overflow-y:hidden;overscroll-behavior-x:contain;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;padding:16px 2px 22px;margin:0 -4px;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent)}
+.cpw-list{display:flex;flex-direction:row;gap:8px;overflow-x:auto;overflow-y:hidden;overscroll-behavior:contain;touch-action:pan-x;-webkit-overflow-scrolling:touch;scroll-snap-type:x proximity;padding:16px 2px 22px;margin:0 -4px;scrollbar-width:none;-webkit-mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent);mask-image:linear-gradient(90deg,#000 calc(100% - 26px),transparent)}
 .cpw-list::-webkit-scrollbar{display:none}
 .cpw-row{display:flex;align-items:center;gap:13px;min-height:60px;padding:10px 12px;border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.03));border:1px solid rgba(255,255,255,.07);cursor:pointer;transition:transform var(--dur-fast) var(--ease-standard),background var(--dur-fast),border-color var(--dur-fast);-webkit-tap-highlight-color:transparent}
 .cpw-row:active{transform:scale(.975);background:rgba(255,255,255,.10);border-color:var(--border)}
@@ -771,6 +777,7 @@ body.aob-on .toast-bottom.is-flipped{bottom:auto}
   .modal-sheet,.pdm-sheet,.aod-sheet,.cancel-sheet,.notif-panel,.aob,.bnav-pill{transition-duration:.15s!important}
   .notif-panel{transform:none!important}
   .notif-panel:not(.show){opacity:0!important;pointer-events:none}
+  .pm-thumb,.pm-opt .pm-ico{transition-duration:.01ms!important}
 }
 /* ── Active Order Bar ─────────────────────────────────────────────────────── */
 .aob{position:fixed;bottom:calc(92px + var(--safe-bottom));left:10px;right:10px;z-index:200;background:linear-gradient(135deg,#140d1f 0%,#0d1520 100%);border:1px solid rgba(212,175,55,.35);border-radius:16px;padding:10px 14px 12px;cursor:pointer;box-shadow:0 4px 28px rgba(0,0,0,.6),0 0 0 1px rgba(212,175,55,.08);transition:transform .35s cubic-bezier(.34,1,.64,1),opacity .3s ease}
@@ -2005,14 +2012,15 @@ body.aob-on #pg-cart{overflow-y:auto!important}
     <div class="co-card">
       <div class="co-head"><div class="co-num">3</div><div class="co-title" id="co-pay-title">Способ оплаты</div></div>
       <div class="co-inner">
-        <div class="pm-seg">
-          <button type="button" class="pm-opt on" id="pm-cash" onclick="selectPayMethod('cash')">
+        <div class="pm-seg" id="pm-seg" data-sel="cash">
+          <div class="pm-thumb" id="pm-thumb" aria-hidden="true"></div>
+          <button type="button" class="pm-opt on" id="pm-cash" aria-pressed="true" onclick="selectPayMethod('cash')">
             <span class="pm-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg></span>
             <span class="pm-lbl" id="pm-cash-lbl">Наличными</span>
           </button>
-          <button type="button" class="pm-opt disabled" id="pm-crypto" onclick="selectPayMethod('crypto')">
+          <button type="button" class="pm-opt disabled" id="pm-crypto" aria-pressed="false" onclick="selectPayMethod('crypto')">
             <span class="pm-soon" id="pm-soon">Скоро</span>
-            <span class="pm-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M9 9.4c0-1 1.35-1.5 3-1.5s3 .6 3 1.6-1.35 1.5-3 1.5-3 .5-3 1.5 1.35 1.6 3 1.6 3-.5 3-1.5"/><path d="M12 6.2v11.6"/></svg></span>
+            <span class="pm-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M7.7 8.9h8.6"/><path d="M12 8.9v7.3"/><path d="M9.4 11.3h5.2"/></svg></span>
             <span class="pm-lbl" id="pm-crypto-lbl">Криптой</span>
           </button>
         </div>
@@ -3359,6 +3367,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   alignLogoSubs();
   document.fonts?.ready?.then(alignLogoSubs);
   setTimeout(()=>_initPill(),80);
+  setTimeout(()=>_rebuildPill(),600);   // re-measure once fullscreen/expand has settled
   // Pre-fill saved phone
   const savedPhone=localStorage.getItem('ambar_phone');
   if(savedPhone)el('phone-in').value=savedPhone;
@@ -3398,11 +3407,14 @@ window.addEventListener('DOMContentLoaded',()=>{
     if(e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA')
       setTimeout(()=>e.target.scrollIntoView({behavior:'smooth',block:'center'}),300);
   });
+  let _pillRebuildT=null;
+  function _schedulePillRebuild(){clearTimeout(_pillRebuildT);_pillRebuildT=setTimeout(_rebuildPill,160);}
   function updVph(){document.documentElement.style.setProperty('--tg-h',(tg?tg.viewportHeight:window.innerHeight)+'px');}
   updVph();
-  window.addEventListener('resize',updVph);
+  window.addEventListener('resize',()=>{updVph();_schedulePillRebuild();});
   if(tg) tg.onEvent('viewportChanged',()=>{
     updVph();
+    _schedulePillRebuild();   // fullscreen settle / rotation changed the layout — refresh pill geometry
     const ae=document.activeElement;
     if(ae&&(ae.tagName==='INPUT'||ae.tagName==='TEXTAREA'))
       setTimeout(()=>ae.scrollIntoView({behavior:'smooth',block:'center'}),120);
@@ -3613,8 +3625,25 @@ function movePill(page,instant){
     pill.style.transform='translateX('+x+'px)';
     requestAnimationFrame(()=>pill.style.transition='');
   } else {
+    // clear any leftover inline transition:none from a drag so the slide animates
+    if(pill.style.transition)pill.style.transition='';
     pill.style.transform='translateX('+x+'px)';
   }
+}
+// Rebuild cached pill geometry after layout shifts (fullscreen settle, rotation,
+// viewport resize). Without this the init-time cache goes stale and the pill
+// jumps to the wrong tab / animates erratically. Skips while the nav is hidden
+// (checkout/pay) since geometry would read as 0.
+function _rebuildPill(){
+  const pill=el('bnav-pill'),nav=el('bnav');
+  // skip while the nav is hidden (checkout/pay) — offsetWidth is 0 then, and
+  // .bnav is position:fixed so offsetParent is always null (can't test that).
+  if(!pill||!nav||nav.style.display==='none'||!nav.offsetWidth)return;
+  _buildPillCache();
+  if(!_pillCache)return;
+  pill.style.width=_pillCache.w+'px';
+  pill.style.height=_pillCache.h+'px';
+  movePill(_pillCache.positions[curPg]!==undefined?curPg:'catalog',true);
 }
 function _initPill(){
   const pill=el('bnav-pill'),nav=el('bnav');
@@ -3675,6 +3704,7 @@ function _initPill(){
     if(_live){
       _live=false;
       if(_raf){cancelAnimationFrame(_raf);_raf=null;}
+      pill.style.transition='';   // restore the smooth slide killed during drag
     }
     if(page!==curPg){go(page);}else{
       const pg=el('pg-'+page);
@@ -5730,8 +5760,14 @@ function refreshPayMethodUI(){
 function _applyPayMethodVisuals(){
   const ru=lang==='ru';
   const cashOn=payMethod!=='crypto';
-  el('pm-cash')&&el('pm-cash').classList.toggle('on',cashOn);
-  el('pm-crypto')&&el('pm-crypto').classList.toggle('on',!cashOn&&CRYPTO_ENABLED);
+  const cryptoSel=!cashOn&&CRYPTO_ENABLED;
+  const cashBtn=el('pm-cash'), cryptoBtn=el('pm-crypto'), seg=el('pm-seg');
+  cashBtn&&cashBtn.classList.toggle('on',cashOn);
+  cryptoBtn&&cryptoBtn.classList.toggle('on',cryptoSel);
+  cashBtn&&cashBtn.setAttribute('aria-pressed',cashOn?'true':'false');
+  cryptoBtn&&cryptoBtn.setAttribute('aria-pressed',cryptoSel?'true':'false');
+  // slide the gold thumb to the active option
+  seg&&seg.setAttribute('data-sel',cryptoSel?'crypto':'cash');
   const hint=el('pm-hint');
   if(hint){
     hint.innerHTML = !cashOn
@@ -5739,6 +5775,8 @@ function _applyPayMethodVisuals(){
            :'Pay <b>USDT (TRC-20)</b> upfront. As soon as the network confirms, your order goes to the operator.')
       : (ru?'Оплата <b>наличными</b> курьеру при получении.'
            :'Pay the courier <b>in cash</b> on delivery.');
+    // re-trigger the crossfade-in each time the hint text swaps
+    hint.classList.remove('pm-anim'); void hint.offsetWidth; hint.classList.add('pm-anim');
   }
   const cta=el('place-btn-text');
   if(cta){

@@ -493,6 +493,12 @@ img{display:block}
 .cp-explorer{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--blue);margin-top:9px;text-decoration:none}
 .cp-explorer svg{width:12px;height:12px}
 .cp-foot{position:relative;z-index:2;flex:0 0 auto;padding:14px 16px calc(14px + var(--safe-bottom));background:var(--bg);border-top:1px solid var(--border2);box-shadow:0 -12px 26px -10px rgba(7,7,14,.9);display:flex;flex-direction:column;gap:9px}
+/* secondary actions on the invoice screen: switch to cash / cancel */
+.cp-alt{display:flex;align-items:center;justify-content:center;gap:10px;margin-top:1px}
+.cp-alt-link{background:none;border:none;padding:6px 4px;font-size:12.5px;font-weight:600;color:var(--sub);cursor:pointer;-webkit-tap-highlight-color:transparent;transition:color .15s,transform .12s var(--ease-standard)}
+.cp-alt-link:active{transform:scale(.95)}
+.cp-alt-danger{color:var(--red);opacity:.85}
+.cp-alt-sep{color:var(--muted);font-size:12px;user-select:none}
 .cp-btn-ghost{width:100%;background:var(--card2);color:var(--text);border:1px solid var(--border2);border-radius:14px;padding:13px;font-size:14px;font-weight:600;cursor:pointer;transition:.15s;display:flex;align-items:center;justify-content:center;gap:7px}
 .cp-btn-ghost:active{transform:scale(.98);opacity:.85}
 .cp-btn-ghost svg{width:16px;height:16px}
@@ -774,7 +780,7 @@ body.aob-on .toast-bottom.is-flipped{bottom:auto}
      Press feedback (small scale on :active) is preserved because it conveys
      real interaction, not decoration.                                       */
   *,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important}
-  .modal-sheet,.pdm-sheet,.aod-sheet,.cancel-sheet,.notif-panel,.aob,.bnav-pill{transition-duration:.15s!important}
+  .modal-sheet,.pdm-sheet,.aod-sheet,.cancel-sheet,.notif-panel,.aob,.cpb,.bnav-pill{transition-duration:.15s!important}
   .notif-panel{transform:none!important}
   .notif-panel:not(.show){opacity:0!important;pointer-events:none}
   .pm-thumb,.pm-opt .pm-ico{transition-duration:.01ms!important}
@@ -787,6 +793,22 @@ body.aob-on .page{padding-bottom:90px}
 /* Cart: shrink item list to ~2 items and let the whole page scroll */
 body.aob-on #cart-list{max-height:150px}
 body.aob-on #pg-cart{overflow-y:auto!important}
+/* ── Crypto pay mini-bar — persistent awaiting-payment reminder + live timer ── */
+.cpb{position:fixed;bottom:calc(92px + var(--safe-bottom));left:10px;right:10px;z-index:201;display:flex;align-items:center;gap:11px;background:linear-gradient(135deg,#1a1407 0%,#0d0c14 100%);border:1px solid rgba(201,169,110,.4);border-radius:16px;padding:10px 13px;cursor:pointer;box-shadow:0 4px 28px rgba(0,0,0,.6),0 0 0 1px rgba(201,169,110,.1);transition:transform .35s cubic-bezier(.34,1,.64,1),opacity .3s ease;-webkit-tap-highlight-color:transparent}
+.cpb:active{transform:scale(.985)}
+.cpb.cpb-hidden{transform:translateY(calc(100% + 90px));opacity:0;pointer-events:none}
+.cpb[data-st="expired"]{border-color:rgba(224,85,85,.45)}
+body.aob-on .cpb{bottom:calc(92px + var(--safe-bottom) + 70px)} /* stack above the active-order bar */
+.cpb-ic{width:34px;height:34px;border-radius:10px;flex-shrink:0;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,#26A17B,#1a7a5a);color:#fff;box-shadow:0 2px 8px rgba(38,161,123,.35)}
+.cpb-ic svg{width:20px;height:20px}
+.cpb-body{flex:1;min-width:0}
+.cpb-title{font-size:13px;font-weight:700;color:var(--gold2);line-height:1.2;letter-spacing:.2px}
+.cpb-sub{font-size:11px;color:var(--sub);margin-top:2px;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cpb-timer-wrap{flex-shrink:0;text-align:right;padding-left:11px;border-left:1px solid var(--border2);min-width:54px}
+.cpb-timer-lbl{font-size:8px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
+.cpb-timer{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:var(--text);line-height:1;font-variant-numeric:tabular-nums}
+body.cpb-on .page{padding-bottom:90px}
+body.aob-on.cpb-on .page{padding-bottom:162px}
 .aob-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
 .aob-left{display:flex;align-items:center;gap:8px}
 .aob-left-text{display:flex;flex-direction:column;gap:1px}
@@ -2083,6 +2105,11 @@ body.aob-on #pg-cart{overflow-y:auto!important}
   <div class="cp-foot">
     <button class="btn-main" id="cp-wallet-btn" onclick="cryptoOpenWallet()"><span id="cp-wallet-txt">Открыть кошелёк</span></button>
     <button class="cp-btn-ghost" id="cp-recheck-btn" onclick="cryptoRecheck()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 4v6h-6M1 20v-6h6"/><path d="M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15"/></svg><span id="cp-recheck-txt">Я оплатил — проверить</span></button>
+    <div class="cp-alt" id="cp-alt">
+      <button type="button" class="cp-alt-link" id="cp-tocash-btn" onclick="cryptoSwitchToCash()">Оплатить наличными</button>
+      <span class="cp-alt-sep" aria-hidden="true">·</span>
+      <button type="button" class="cp-alt-link cp-alt-danger" id="cp-cancel-btn" onclick="cryptoCancelPayment()">Отменить</button>
+    </div>
   </div>
 </div>
 
@@ -2483,6 +2510,17 @@ body.aob-on #pg-cart{overflow-y:auto!important}
 <div class="toast toast-bottom" id="toast1"></div>
 
 <!-- ── Active Order Bar ───────────────────────────────────────────────────── -->
+<div class="cpb cpb-hidden" id="cpb" data-st="waiting" role="button" tabindex="0" aria-label="Resume crypto payment" onclick="cpbResume()">
+  <div class="cpb-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M7.7 8.9h8.6"/><path d="M12 8.9v7.3"/><path d="M9.4 11.3h5.2"/></svg></div>
+  <div class="cpb-body">
+    <div class="cpb-title" id="cpb-title">Awaiting payment</div>
+    <div class="cpb-sub" id="cpb-sub">—</div>
+  </div>
+  <div class="cpb-timer-wrap">
+    <div class="cpb-timer-lbl" id="cpb-timer-lbl">Expires</div>
+    <div class="cpb-timer" id="cpb-timer">15:00</div>
+  </div>
+</div>
 <div class="aob aob-hidden" id="aob" onclick="openAod()">
   <div class="aob-top">
     <div class="aob-left">
@@ -2986,7 +3024,7 @@ const CRYPTO_WALLETS = [
 ];
 let payMethod = localStorage.getItem('ambar_pay_method')||'cash';
 let cryptoInvoice = null;               // active invoice object (see cryptoCreateInvoice)
-let _cpTimer=null,_cpPoll=null,_cpSim=null,_cpClimb=null;
+let _cpTimer=null,_cpPoll=null,_cpSim=null,_cpClimb=null,_cpbTick=null;
 
 // ── HAPTIC FEEDBACK (Taptic Engine) ──────────────────────────────────────────
 const haptic={
@@ -3372,6 +3410,7 @@ window.addEventListener('DOMContentLoaded',()=>{
   const savedPhone=localStorage.getItem('ambar_phone');
   if(savedPhone)el('phone-in').value=savedPhone;
   updateAddrPill();updateCartAddrBar();
+  _cpbStart(); // resurface a still-pending crypto payment from a previous session
   // Tip input keyboard handling
   const ti=el('tip-input'),clw=document.querySelector('.cart-list-wrap');
   ti.addEventListener('focus',()=>{if(clw)clw.classList.add('tip-kbd');el('tip-done-btn').style.display='block';
@@ -3735,6 +3774,7 @@ function go(p){
   const newPg=el('pg-'+p);if(newPg)newPg.classList.remove('hidden');
   // Mark other pages hidden (no transition needed — already invisible)
   PAGES.forEach(id=>{if(id!==p&&id!==prev)el('pg-'+id)?.classList.add('hidden');});
+  cpbUpdate(); // show/hide the crypto pay reminder bar for this page
   if(p==='catalog'&&_catalogScroll>0){requestAnimationFrame(()=>{const pg=el('pg-catalog');if(pg)pg.scrollTop=_catalogScroll;});}
   // 3) Heavy renders — deferred so pill animates on GPU undisturbed
   requestAnimationFrame(()=>setTimeout(()=>{
@@ -5832,6 +5872,7 @@ async function startCryptoPayment(ctx){
   go('pay');
   renderInvoice();
   cryptoStartWatch();
+  _cpbStart(); // arm the persistent pay-reminder bar for when the user navigates away
   haptic.success();
 }
 
@@ -5883,6 +5924,8 @@ function renderInvoice(){
   const av=el('cp-addr-val'); if(av){av.textContent=inv.address?_cpShortAddr(inv.address):'—';av.title=inv.address||'';}
   set('cp-timer-lbl',ru?'Истекает':'Expires');
   set('cp-recheck-txt',ru?'Я оплатил — проверить':'I\'ve paid — check');
+  set('cp-tocash-btn',ru?'Оплатить наличными':'Pay with cash instead');
+  set('cp-cancel-btn',ru?'Отменить оплату':'Cancel');
   cryptoRenderQR(inv);
   cryptoSetStatus(inv.status);
   cryptoTickTimer();
@@ -5952,6 +5995,8 @@ function cryptoSetStatus(st){
     if(wbtn){wbtn.style.display='';set('cp-wallet-txt',ru?'Открыть кошелёк':'Open wallet');}
     if(rbtn)rbtn.style.display='';
   }
+  // switch-to-cash / cancel only make sense before the transfer is in flight
+  const alt=el('cp-alt'); if(alt)alt.style.display=(st==='waiting'||st==='expired')?'':'none';
   _cpPersist();
 }
 
@@ -6005,6 +6050,7 @@ function _cpOnConfirmed(inv){
   const ru=lang==='ru';
   addNotification('cart',ru?'Оплата получена':'Payment received',(ru?'Заказ ':'Order ')+'#'+inv.oid+(ru?' оплачен и передан оператору':' paid and sent to the operator'),{action:'orders',dedup_key:'paid_'+inv.oid,notif_type:'placed',notif_oid:inv.oid});
   cryptoInvoice=null;
+  cpbUpdate(); // order is now 'pending' — drop the awaiting-payment bar
   cryptoShowSuccess();
 }
 
@@ -6167,6 +6213,7 @@ function resumeCryptoPayment(oid){
   if(Date.now()>=cryptoInvoice.expiresAt && cryptoInvoice.status!=='confirmed'){ cryptoInvoice.status='expired'; }
   go('pay');
   renderInvoice();
+  _cpbStart();
   if(cryptoInvoice.status==='expired'){ cryptoSetStatus('expired'); }
   else if(cryptoInvoice.status==='detected'){ cryptoSetStatus('detected'); if(CRYPTO_SIM)_cpResumeClimb(); else cryptoStartWatch(); }
   else{ cryptoStartWatch(); }
@@ -6193,6 +6240,106 @@ function _cpPersist(){
   const o=orders.find(x=>x.order_id===inv.oid);
   if(o){ o.crypto=inv; localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50))); }
 }
+
+// ── Crypto payment: switch-to-cash / cancel ─────────────────────────────────
+// The pending crypto order lives in orders[] as 'awaiting_payment' (resumable).
+// Per UX: both actions RESTORE the cart from that order and drop the unpaid
+// order; they differ only in where the user lands (checkout vs cart) and whether
+// cash is pre-selected. In SIM there is no server-side invoice yet, so dropping
+// the local order is enough.
+// TODO(real mode): when CRYPTO_REAL_MODE is wired, also POST a "void invoice"
+// to the backend in BOTH paths so the on-chain watcher can't later credit an
+// order the user already abandoned/converted.
+function _cryptoRestoreCart(o){
+  if(!o)return;
+  cart={};beerPcs={};
+  (o.items||[]).forEach(it=>{
+    const p=P.find(x=>x.id===it.id);
+    if(p){ cart[it.id]=it.qty; if(it.pcs)beerPcs[it.id]=it.pcs; }
+  });
+  tip=(o._payload&&typeof o._payload.tip==='number')?o._payload.tip:0;
+  saveCart();
+  Object.keys(cart).forEach(id=>syncCtrl(id));
+  updHdr(); buildTips();
+}
+function _cryptoDropOrder(oid){
+  const i=orders.findIndex(x=>x.order_id===oid);
+  if(i>=0)orders.splice(i,1);
+  localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
+}
+function _cryptoTeardown(){
+  cryptoStopWatch();
+  if(_cpTimer){clearInterval(_cpTimer);_cpTimer=null;}
+  cryptoInvoice=null;
+}
+function cryptoSwitchToCash(){
+  const inv=cryptoInvoice; if(!inv)return;
+  const ru=lang==='ru';
+  const o=orders.find(x=>x.order_id===inv.oid);
+  _cryptoTeardown();
+  if(o){ _cryptoRestoreCart(o); _cryptoDropOrder(o.order_id); }
+  payMethod='cash'; localStorage.setItem('ambar_pay_method','cash');
+  cpbUpdate();
+  // keep the checkout address preview correct, then return to checkout with cash
+  const a=getSaved()[activeAddrIdx];
+  if(a){ const pv=el('co-addr-preview'); if(pv)pv.innerHTML=`<strong>${a.label||''}</strong>${a.label?'<br>':''}${a.address}`; }
+  go('checkout'); // go() runs buildSummary()+refreshPayMethodUI() with cash now selected
+  haptic.light();
+  showToast(ru?'Оплата криптой отменена — оформите наличными':'Crypto cancelled — check out with cash','ok');
+}
+async function cryptoCancelPayment(){
+  const inv=cryptoInvoice; if(!inv)return;
+  const ru=lang==='ru';
+  const ok=await showConfirm(ru?'Отменить оплату?':'Cancel payment?',{
+    sub:ru?'Счёт будет отменён, а товары вернутся в корзину.':'The invoice will be cancelled and your items returned to the cart.',
+    ok:ru?'Отменить':'Cancel payment', cancel:ru?'Продолжить':'Keep paying', destructive:true
+  });
+  if(!ok)return;
+  const o=orders.find(x=>x.order_id===inv.oid);
+  _cryptoTeardown();
+  if(o){ _cryptoRestoreCart(o); _cryptoDropOrder(o.order_id); }
+  cpbUpdate();
+  go('cart');
+  haptic.light();
+  showToast(ru?'Оплата отменена — товары в корзине':'Payment cancelled — items back in cart','ok');
+}
+
+// ── Crypto pay mini-bar ─────────────────────────────────────────────────────
+// Persistent reminder shown off the pay screen while an invoice is still
+// awaiting payment, with a live countdown. Client-driven (demo orders aren't on
+// the backend yet) — reads straight from orders[]. Tap → resume the pay screen.
+// (_cpbTick is declared up top with the other crypto-flow globals.)
+function _cpbPending(){ return orders.find(o=>o&&o.status==='awaiting_payment'&&o.crypto); }
+function cpbUpdate(){
+  const bar=el('cpb'); if(!bar)return;
+  const o=_cpbPending();
+  if(!o || curPg==='pay'){
+    bar.classList.add('cpb-hidden'); document.body.classList.remove('cpb-on');
+    if(!o&&_cpbTick){clearInterval(_cpbTick);_cpbTick=null;}
+    return;
+  }
+  const inv=o.crypto, ru=lang==='ru';
+  // expire in place (idempotent — only transitions once)
+  if(inv.status!=='confirmed'&&inv.status!=='expired'&&Date.now()>=inv.expiresAt){
+    inv.status='expired'; localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
+  }
+  bar.setAttribute('data-st',inv.status||'waiting');
+  set('cpb-title', inv.status==='expired' ? (ru?'Счёт истёк':'Invoice expired')
+    : inv.status==='detected' ? (ru?'Подтверждаем оплату…':'Confirming payment…')
+    : (ru?'Ожидает оплаты':'Awaiting payment'));
+  set('cpb-sub','#'+o.order_id+' · '+Number(inv.amountUsdt).toFixed(2)+' USDT');
+  const tEl=el('cpb-timer'), lbl=el('cpb-timer-lbl');
+  if(inv.status==='expired'){ if(lbl)lbl.textContent=ru?'Истёк':'Expired'; if(tEl){tEl.textContent=ru?'Обновить':'Renew';tEl.style.color='var(--gold2)';} }
+  else if(inv.status==='detected'){ if(lbl)lbl.textContent=ru?'Статус':'Status'; if(tEl){tEl.textContent='•••';tEl.style.color='';} }
+  else{
+    const ms=inv.expiresAt-Date.now(), s=Math.max(0,Math.floor(ms/1000));
+    if(lbl)lbl.textContent=ru?'Истекает':'Expires';
+    if(tEl){tEl.textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); tEl.style.color=ms<120000?'var(--red)':'';}
+  }
+  bar.classList.remove('cpb-hidden'); document.body.classList.add('cpb-on');
+}
+function cpbResume(){ const o=_cpbPending(); if(o)resumeCryptoPayment(o.order_id); }
+function _cpbStart(){ if(!_cpbTick)_cpbTick=setInterval(cpbUpdate,1000); cpbUpdate(); }
 
 async function confirmClearFavs(){
   const msg=lang==='ru'?'Удалить всё из избранного?':'Remove all favourites?';

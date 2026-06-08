@@ -1095,15 +1095,15 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
 .ptr-indicator svg{color:var(--gold);opacity:.7}
 .ptr-indicator.refreshing svg{animation:spin .65s linear infinite}
 /* ── Home Screen Prompt ── */
-/* full-screen hero overlay — uses HOME_SCREEN_BG.png as a full-bleed background */
+/* full-screen hero overlay — uses HOME_SCREEN_BG.webp as a full-bleed background */
 .hs-overlay{position:fixed;inset:0;z-index:500;background:#07070E;opacity:0;pointer-events:none;transition:opacity var(--dur-base) var(--ease-standard)}
 .hs-overlay.show{opacity:1;pointer-events:auto}
-.hs-hero-bg{position:absolute;inset:0;background:#07070E url('HOME_SCREEN_BG.png') center top/cover no-repeat;transform:scale(1.04);transition:transform .5s var(--ease-standard)}
+.hs-hero-bg{position:absolute;inset:0;background:#07070E url('HOME_SCREEN_BG.webp') center top/cover no-repeat;transform:scale(1.04);transition:transform .5s var(--ease-standard)}
 .hs-overlay.show .hs-hero-bg{transform:scale(1)}
 /* scrim — darken the lower third so the headline/buttons stay legible over any crop */
 .hs-scrim{position:absolute;inset:0;pointer-events:none;background:linear-gradient(to bottom,transparent 36%,rgba(7,7,14,.45) 56%,rgba(7,7,14,.9) 78%,#07070E 100%)}
 /* prompt — pinned to the bottom, rises in on open */
-.hs-content{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:0 24px calc(22px + var(--safe-bottom));opacity:0;transform:translateY(18px);transition:opacity var(--dur-slow) var(--ease-standard) .08s,transform var(--dur-slow) var(--ease-standard) .08s}
+.hs-content{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:center;text-align:center;padding:0 24px calc(54px + var(--safe-bottom));opacity:0;transform:translateY(18px);transition:opacity var(--dur-slow) var(--ease-standard) .08s,transform var(--dur-slow) var(--ease-standard) .08s}
 .hs-overlay.show .hs-content{opacity:1;transform:none}
 .hs-inner{width:100%;max-width:430px}
 .hs-title{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,system-ui,sans-serif;font-size:28px;font-weight:700;line-height:1.13;letter-spacing:-.5px;color:var(--text);margin-bottom:20px}
@@ -1111,7 +1111,7 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
 .hs-add-pill{width:100%;border:none;border-radius:var(--r-pill);padding:16px 20px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,system-ui,sans-serif;font-size:16px;font-weight:600;letter-spacing:-.2px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 10px 30px rgba(201,169,110,.28);transition:transform var(--dur-fast) var(--ease-standard),opacity var(--dur-fast)}
 .hs-add-pill:active{transform:scale(.98);opacity:.95}
 .hs-add-pill:focus-visible{outline:none;box-shadow:0 0 0 2px #07070E,0 0 0 4px var(--gold2)}
-.hs-links{display:flex;align-items:center;justify-content:flex-start;gap:6px;margin-top:13px;margin-left:-12px}
+.hs-links{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:13px}
 .hs-link-btn{background:none;border:none;padding:9px 12px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,system-ui,sans-serif;font-size:14px;font-weight:500;color:var(--sub);letter-spacing:-.1px;cursor:pointer;border-radius:10px;-webkit-tap-highlight-color:transparent;transition:color .15s}
 .hs-link-btn:active{color:var(--text)}
 .hs-link-btn:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(201,169,110,.6)}
@@ -3544,6 +3544,25 @@ const _PROMO_12H=12*60*60*1000;
 let _hsPending=false, _hsCanNative=true, _promoModalShown=false;
 function _showPromoModal(){const m=el('promo-modal');if(m)m.classList.add('show');}
 function _maybeShowPromo(){if(_promoModalShown)return;_promoModalShown=true;setTimeout(_showPromoModal,500);}
+// Preload the hero image so the overlay only appears once it's actually painted —
+// the user never stares at a bare dark screen with just the button. The wait is
+// inherently connection-adaptive (resolves on the image's load event); a 5s cap
+// keeps a slow/broken link from stranding the flow.
+let _hsHeroReady=false, _hsHeroPromise=null;
+function _preloadHsHero(){
+  if(_hsHeroPromise) return _hsHeroPromise;
+  _hsHeroPromise=new Promise(resolve=>{
+    const img=new Image();
+    let done=false;
+    const finish=ok=>{ if(done)return; done=true; _hsHeroReady=ok; resolve(ok); };
+    img.onload=()=>finish(true);
+    img.onerror=()=>finish(false);
+    img.src='HOME_SCREEN_BG.webp';
+    if(img.complete && img.naturalWidth) finish(true); // already in cache
+    setTimeout(()=>finish(false), 5000);               // hard cap — don't wait forever
+  });
+  return _hsHeroPromise;
+}
 function _promoImgs(){const r=lang==='ru';return{hero:r?'promo_hero_ru.png':'promo_hero_en.png',modal:r?'promo_modal_ru.png':'promo_modal_en.png'};}
 function _setPromoImgs(){const imgs=_promoImgs();const hi=el('promo-hero-img');if(hi)hi.src=imgs.hero;const mi=el('promo-modal-img');if(mi)mi.src=imgs.modal;}
 function _promoExpired(key){const ts=localStorage.getItem(key);if(!ts)return true;return(Date.now()-Number(ts))>=_PROMO_12H;}
@@ -3592,9 +3611,15 @@ function checkFirstLaunchHomeScreen(){
   if(localStorage.getItem('ambar_hs_never')){ _hsPending=false; return; }
   _hsCanNative = !!(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0'));
   _hsPending = true;  // we intend to show it first; the promo modal waits its turn
+  _preloadHsHero();   // start fetching the hero now so it's painted before we reveal
   function _show(){
     applyHsLang();
-    setTimeout(()=>el('hs-overlay').classList.add('show'), 600);
+    // reveal only once the hero image is loaded — no flash of a bare dark screen.
+    // If it can't load in time, skip the overlay this launch and go to the promo.
+    _preloadHsHero().then(ok=>{
+      if(!ok){ _hsPending=false; _maybeShowPromo(); return; }
+      setTimeout(()=>el('hs-overlay').classList.add('show'), 180);
+    });
   }
   if(_hsCanNative){
     let _resolved=false;

@@ -785,7 +785,7 @@ body.aob-on .toast-bottom.is-flipped{bottom:auto}
   .notif-panel:not(.show){opacity:0!important;pointer-events:none}
   .pm-thumb,.pm-opt .pm-ico{transition-duration:.01ms!important}
   .hs-hero-bg,.hs-content{transition-duration:.01ms!important}
-  .hs-hero-bg{transform:none!important}
+  .hs-hero-bg{transform:scale(1.12) translateX(1.5%)!important}
 }
 /* ── Active Order Bar ─────────────────────────────────────────────────────── */
 .aob{position:fixed;bottom:calc(92px + var(--safe-bottom));left:10px;right:10px;z-index:200;background:linear-gradient(135deg,#140d1f 0%,#0d1520 100%);border:1px solid rgba(212,175,55,.35);border-radius:16px;padding:10px 14px 12px;cursor:pointer;box-shadow:0 4px 28px rgba(0,0,0,.6),0 0 0 1px rgba(212,175,55,.08);transition:transform .35s cubic-bezier(.34,1,.64,1),opacity .3s ease}
@@ -1098,18 +1098,22 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
 /* full-screen hero overlay — uses HOME_SCREEN_BG.webp as a full-bleed background */
 .hs-overlay{position:fixed;inset:0;z-index:500;background:#07070E;opacity:0;pointer-events:none;transition:opacity var(--dur-base) var(--ease-standard)}
 .hs-overlay.show{opacity:1;pointer-events:auto}
-.hs-hero-bg{position:absolute;inset:0;background:#07070E url('HOME_SCREEN_BG.webp?v=2') center top/cover no-repeat;transform:scale(1.04);transition:transform .5s var(--ease-standard)}
-.hs-overlay.show .hs-hero-bg{transform:scale(1)}
+.hs-hero-bg{position:absolute;inset:0;background:#07070E url('HOME_SCREEN_BG.webp?v=2') center top/cover no-repeat;transform:scale(1.16) translateX(1.5%);transition:transform .5s var(--ease-standard)}
+.hs-overlay.show .hs-hero-bg{transform:scale(1.12) translateX(1.5%)}
 /* scrim — darken the lower third so the headline/buttons stay legible over any crop */
 .hs-scrim{position:absolute;inset:0;pointer-events:none;background:linear-gradient(to bottom,transparent 36%,rgba(7,7,14,.45) 56%,rgba(7,7,14,.9) 78%,#07070E 100%)}
 /* prompt — pinned to the bottom, rises in on open */
 .hs-content{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:stretch;padding:0 26px calc(26px + var(--safe-bottom));opacity:0;transform:translateY(18px);transition:opacity var(--dur-slow) var(--ease-standard) .08s,transform var(--dur-slow) var(--ease-standard) .08s}
 .hs-overlay.show .hs-content{opacity:1;transform:none}
-/* text block — left-aligned, sits just under the phone */
-.hs-text{width:100%;max-width:440px;text-align:left}
+/* downward "add it" cue — floats in the gap under the phone, guides the eye to the CTA */
+.hs-cue{align-self:center;margin-bottom:22px;color:var(--gold2);animation:hsCueFloat 1.8s ease-in-out infinite}
+.hs-cue svg{width:32px;height:32px;display:block;filter:drop-shadow(0 0 10px rgba(201,169,110,.45))}
+@keyframes hsCueFloat{0%,100%{transform:translateY(0);opacity:.55}50%{transform:translateY(7px);opacity:1}}
+/* text block — centered headline, sits just under the phone */
+.hs-text{width:100%;max-width:440px;align-self:center;text-align:center}
 /* action block — centered, anchored to the bottom */
 .hs-actions{width:100%;max-width:440px;align-self:center;margin-top:24px;display:flex;flex-direction:column;align-items:center}
-.hs-title{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,system-ui,sans-serif;font-size:29px;font-weight:700;line-height:1.12;letter-spacing:-.5px;color:var(--text);margin:0 0 9px;text-wrap:pretty}
+.hs-title{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,system-ui,sans-serif;font-size:29px;font-weight:700;line-height:1.12;letter-spacing:-.5px;color:var(--text);margin:0;text-wrap:balance}
 .hs-desc{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,system-ui,sans-serif;font-size:14.5px;font-weight:400;line-height:1.45;color:var(--sub);margin:0;max-width:360px}
 .hs-add-pill{width:100%;border:none;border-radius:var(--r-pill);padding:16px 20px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,system-ui,sans-serif;font-size:16px;font-weight:600;letter-spacing:-.2px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 10px 30px rgba(201,169,110,.28);transition:transform var(--dur-fast) var(--ease-standard),opacity var(--dur-fast)}
 .hs-add-pill:active{transform:scale(.98);opacity:.95}
@@ -2273,9 +2277,9 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
   <div class="hs-scrim" aria-hidden="true"></div>
   <!-- Prompt view (pinned to the bottom over the hero image) -->
   <div class="hs-content" id="hs-prompt-view">
+    <div class="hs-cue" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg></div>
     <div class="hs-text">
       <div class="hs-title" id="hs-title-txt"></div>
-      <div class="hs-desc" id="hs-desc-txt"></div>
     </div>
     <div class="hs-actions">
       <button class="hs-add-pill" id="hs-add-btn" onclick="doAddHomeScreen()"></button>
@@ -3601,7 +3605,6 @@ function dismissPromoModal(){
 // ── HOME SCREEN PROMPT ────────────────────────────────────────────────────────
 function applyHsLang(){
   set('hs-title-txt',t('hsTitle'));
-  set('hs-desc-txt',t('hsDesc'));
   // primary pill: native clients add directly; older clients open the manual guide
   set('hs-add-btn', _hsCanNative ? t('hsAdd') : t('hsGuide'));
   set('hs-later-btn',t('hsLater'));

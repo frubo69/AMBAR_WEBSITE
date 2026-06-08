@@ -6901,6 +6901,9 @@ function _openSheet(id){
     let startY=0,startScroll=0,dragging=false;
     sheet.addEventListener('touchstart',e=>{
       if(e.touches.length!==1)return;
+      // don't hijack the horizontal wallet carousel — let it scroll; the sheet
+      // still swipes to close from anywhere above or below the row
+      if(e.target.closest('.cpw-list')){dragging=false;return;}
       startY=e.touches[0].clientY;
       startScroll=sheet.scrollTop;
       dragging=true;

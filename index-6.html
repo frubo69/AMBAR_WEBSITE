@@ -3608,9 +3608,9 @@ function applyHsLang(){
 
 function checkFirstLaunchHomeScreen(){
   if(!tg){ _hsPending=false; return; }                     // only inside Telegram
-  if(localStorage.getItem('ambar_hs_never')){ _hsPending=false; return; }
+  if(localStorage.getItem('ambar_hs_never')){ _hsPending=false; return; } // user tapped "Add" or "Never show again"
   _hsCanNative = !!(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0'));
-  _hsPending = true;  // we intend to show it first; the promo modal waits its turn
+  _hsPending = true;  // shows first; the promo modal waits its turn
   _preloadHsHero();   // start fetching the hero now so it's painted before we reveal
   function _show(){
     applyHsLang();
@@ -3621,18 +3621,10 @@ function checkFirstLaunchHomeScreen(){
       setTimeout(()=>el('hs-overlay').classList.add('show'), 180);
     });
   }
-  if(_hsCanNative){
-    let _resolved=false;
-    tg.checkHomeScreenStatus(status=>{
-      _resolved=true;
-      if(status==='added'){ _hsPending=false; _maybeShowPromo(); return; } // already added — skip to promo
-      _show();
-    });
-    // safety: if the status check never calls back, don't strand the promo modal
-    setTimeout(()=>{ if(!_resolved && !el('hs-overlay').classList.contains('show')){ _hsPending=false; _maybeShowPromo(); } }, 3000);
-  } else {
-    _show();
-  }
+  // Show on EVERY launch regardless of whether AMBAR is already on the home
+  // screen — only "Add to Home Screen" or "Never show again" stops it for good
+  // (both set ambar_hs_never, checked above). No checkHomeScreenStatus gate.
+  _show();
 }
 function closeHsOverlay(){
   el('hs-overlay').classList.remove('show');

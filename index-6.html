@@ -1098,7 +1098,7 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
 /* full-screen hero overlay — uses HOME_SCREEN_BG.webp as a full-bleed background */
 .hs-overlay{position:fixed;inset:0;z-index:500;background:#07070E;opacity:0;pointer-events:none;transition:opacity var(--dur-base) var(--ease-standard)}
 .hs-overlay.show{opacity:1;pointer-events:auto}
-.hs-hero-bg{position:absolute;inset:0;background:#07070E url('HOME_SCREEN_BG.webp') center top/cover no-repeat;transform:scale(1.04);transition:transform .5s var(--ease-standard)}
+.hs-hero-bg{position:absolute;inset:0;background:#07070E url('HOME_SCREEN_BG.webp?v=2') center top/cover no-repeat;transform:scale(1.04);transition:transform .5s var(--ease-standard)}
 .hs-overlay.show .hs-hero-bg{transform:scale(1)}
 /* scrim — darken the lower third so the headline/buttons stay legible over any crop */
 .hs-scrim{position:absolute;inset:0;pointer-events:none;background:linear-gradient(to bottom,transparent 36%,rgba(7,7,14,.45) 56%,rgba(7,7,14,.9) 78%,#07070E 100%)}
@@ -3557,7 +3557,7 @@ function _preloadHsHero(){
     const finish=ok=>{ if(done)return; done=true; _hsHeroReady=ok; resolve(ok); };
     img.onload=()=>finish(true);
     img.onerror=()=>finish(false);
-    img.src='HOME_SCREEN_BG.webp';
+    img.src='HOME_SCREEN_BG.webp?v=2';
     if(img.complete && img.naturalWidth) finish(true); // already in cache
     setTimeout(()=>finish(false), 5000);               // hard cap — don't wait forever
   });

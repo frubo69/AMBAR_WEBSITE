@@ -784,6 +784,8 @@ body.aob-on .toast-bottom.is-flipped{bottom:auto}
   .notif-panel{transform:none!important}
   .notif-panel:not(.show){opacity:0!important;pointer-events:none}
   .pm-thumb,.pm-opt .pm-ico{transition-duration:.01ms!important}
+  .hs-hero-bg,.hs-content{transition-duration:.01ms!important}
+  .hs-hero-bg{transform:none!important}
 }
 /* ── Active Order Bar ─────────────────────────────────────────────────────── */
 .aob{position:fixed;bottom:calc(92px + var(--safe-bottom));left:10px;right:10px;z-index:200;background:linear-gradient(135deg,#140d1f 0%,#0d1520 100%);border:1px solid rgba(212,175,55,.35);border-radius:16px;padding:10px 14px 12px;cursor:pointer;box-shadow:0 4px 28px rgba(0,0,0,.6),0 0 0 1px rgba(212,175,55,.08);transition:transform .35s cubic-bezier(.34,1,.64,1),opacity .3s ease}
@@ -1093,35 +1095,39 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
 .ptr-indicator svg{color:var(--gold);opacity:.7}
 .ptr-indicator.refreshing svg{animation:spin .65s linear infinite}
 /* ── Home Screen Prompt ── */
-.hs-overlay{position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:500;display:flex;align-items:center;justify-content:center;padding:24px;opacity:0;pointer-events:none;transition:opacity .22s;-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px)}
-.hs-overlay.show{opacity:1;pointer-events:all}
-.hs-sheet{width:100%;max-width:340px;background:var(--bg2);border:1px solid rgba(255,255,255,.06);border-radius:24px;padding:32px 24px 20px;transform:scale(.94);opacity:0;transition:transform .28s cubic-bezier(.34,1,.64,1),opacity .2s;box-shadow:0 24px 60px rgba(0,0,0,.6)}
-.hs-overlay.show .hs-sheet{transform:scale(1);opacity:1}
-.hs-handle{display:none}
-/* Icon — soft gold glow instead of boxed chrome */
-.hs-icon-wrap{width:52px;height:52px;border-radius:16px;background:linear-gradient(180deg,rgba(201,169,110,.18),rgba(201,169,110,.05));border:1px solid rgba(201,169,110,.22);display:flex;align-items:center;justify-content:center;margin:0 auto 22px;box-shadow:0 8px 28px rgba(201,169,110,.18),inset 0 1px 0 rgba(245,224,176,.12)}
-/* Title — geometric sans, tight tracking, modern scale */
-.hs-title{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:600;color:var(--text);text-align:center;margin-bottom:8px;letter-spacing:-.3px;line-height:1.2}
-.hs-desc{font-family:'DM Sans',sans-serif;font-size:13px;color:rgba(255,255,255,.55);text-align:center;line-height:1.5;margin-bottom:26px;padding:0 6px;letter-spacing:.1px}
-/* Secondary CTA — gold ghost button, serves as primary when native add-btn is hidden */
-.hs-cta{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px;border-radius:14px;border:1px solid rgba(201,169,110,.35);background:linear-gradient(180deg,rgba(201,169,110,.08),rgba(201,169,110,.02));color:var(--gold2);font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;letter-spacing:.2px;cursor:pointer;transition:.18s;-webkit-tap-highlight-color:transparent}
-.hs-cta:active{transform:scale(.98);background:linear-gradient(180deg,rgba(201,169,110,.14),rgba(201,169,110,.05));border-color:rgba(201,169,110,.5)}
-.hs-cta svg{transition:transform .18s}
-.hs-cta:active svg{transform:translateX(2px)}
-/* Dismiss row — plain text links, low visual weight, clear differentiation by colour */
-.hs-links{display:flex;align-items:center;justify-content:center;gap:4px;margin-top:18px;padding-top:2px}
-.hs-link-btn{background:none;border:none;padding:8px 12px;font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:500;color:rgba(255,255,255,.45);letter-spacing:.1px;cursor:pointer;transition:color .15s;-webkit-tap-highlight-color:transparent;border-radius:8px}
-.hs-link-btn:active{color:rgba(255,255,255,.85);background:rgba(255,255,255,.04)}
-.hs-link-btn.muted{color:rgba(255,255,255,.28)}
-.hs-link-btn.muted:active{color:rgba(224,85,85,.85)}
-.hs-link-sep{color:rgba(255,255,255,.14);font-size:11px;user-select:none}
+/* full-screen hero overlay — uses HOME_SCREEN_BG.png as a full-bleed background */
+.hs-overlay{position:fixed;inset:0;z-index:500;background:#07070E;opacity:0;pointer-events:none;transition:opacity var(--dur-base) var(--ease-standard)}
+.hs-overlay.show{opacity:1;pointer-events:auto}
+.hs-hero-bg{position:absolute;inset:0;background:#07070E url('HOME_SCREEN_BG.png') center top/cover no-repeat;transform:scale(1.04);transition:transform .5s var(--ease-standard)}
+.hs-overlay.show .hs-hero-bg{transform:scale(1)}
+/* scrim — darken the lower third so the headline/buttons stay legible over any crop */
+.hs-scrim{position:absolute;inset:0;pointer-events:none;background:linear-gradient(to bottom,transparent 36%,rgba(7,7,14,.45) 56%,rgba(7,7,14,.9) 78%,#07070E 100%)}
+/* prompt — pinned to the bottom, rises in on open */
+.hs-content{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:flex-start;text-align:left;padding:0 24px calc(22px + var(--safe-bottom));opacity:0;transform:translateY(18px);transition:opacity var(--dur-slow) var(--ease-standard) .08s,transform var(--dur-slow) var(--ease-standard) .08s}
+.hs-overlay.show .hs-content{opacity:1;transform:none}
+.hs-inner{width:100%;max-width:430px}
+.hs-title{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Display','Segoe UI',Roboto,system-ui,sans-serif;font-size:28px;font-weight:700;line-height:1.13;letter-spacing:-.5px;color:var(--text);margin-bottom:20px}
+.hs-desc{font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,system-ui,sans-serif;font-size:14.5px;font-weight:400;line-height:1.45;color:var(--sub);margin:0 auto 22px;max-width:340px}
+.hs-add-pill{width:100%;border:none;border-radius:var(--r-pill);padding:16px 20px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,system-ui,sans-serif;font-size:16px;font-weight:600;letter-spacing:-.2px;cursor:pointer;-webkit-tap-highlight-color:transparent;box-shadow:0 10px 30px rgba(201,169,110,.28);transition:transform var(--dur-fast) var(--ease-standard),opacity var(--dur-fast)}
+.hs-add-pill:active{transform:scale(.98);opacity:.95}
+.hs-add-pill:focus-visible{outline:none;box-shadow:0 0 0 2px #07070E,0 0 0 4px var(--gold2)}
+.hs-links{display:flex;align-items:center;justify-content:flex-start;gap:6px;margin-top:13px;margin-left:-12px}
+.hs-link-btn{background:none;border:none;padding:9px 12px;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text','Segoe UI',Roboto,system-ui,sans-serif;font-size:14px;font-weight:500;color:var(--sub);letter-spacing:-.1px;cursor:pointer;border-radius:10px;-webkit-tap-highlight-color:transparent;transition:color .15s}
+.hs-link-btn:active{color:var(--text)}
+.hs-link-btn:focus-visible{outline:none;box-shadow:0 0 0 2px rgba(201,169,110,.6)}
+.hs-link-btn.muted{color:var(--muted)}
+.hs-link-btn.muted:active{color:var(--red)}
+.hs-link-sep{color:rgba(255,255,255,.2);font-size:11px;user-select:none}
+/* guide view — manual-steps fallback for older Telegram clients (centered card) */
+#hs-guide-view{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);width:min(360px,88vw);max-height:84vh;overflow-y:auto;background:var(--bg2);border:1px solid var(--border2);border-radius:24px;padding:26px 22px 20px;box-shadow:0 24px 60px rgba(0,0,0,.6);scrollbar-width:none}
+#hs-guide-view::-webkit-scrollbar{display:none}
+.hs-guide-title{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;color:var(--text);margin-bottom:4px;text-align:center;letter-spacing:-.2px}
 .hs-step{display:flex;align-items:flex-start;gap:14px;padding:13px 0;border-bottom:1px solid var(--border2)}
 .hs-step:last-child{border-bottom:none}
 .hs-step-num{width:30px;height:30px;border-radius:50%;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;margin-top:1px}
 .hs-step-body{flex:1;min-width:0}
 .hs-step-title{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:600;color:var(--text);margin-bottom:3px;letter-spacing:-.1px}
 .hs-step-desc{font-family:'DM Sans',sans-serif;font-size:12px;color:var(--sub);line-height:1.5}
-.hs-guide-title{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:600;color:var(--text);margin-bottom:4px;text-align:center;letter-spacing:-.2px}
 /* ── Points History Overlay ── */
 .pts-overlay{position:fixed;inset:0;z-index:300;background:var(--bg);display:flex;flex-direction:column;transform:translateY(100%);transition:transform .3s cubic-bezier(.34,1,.64,1)}
 .pts-overlay.show{transform:translateY(0)}
@@ -2260,52 +2266,29 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
 
 <!-- ═══ HOME SCREEN PROMPT ═══ -->
 <div class="hs-overlay" id="hs-overlay">
-  <div class="hs-sheet">
-    <div class="hs-handle"></div>
-    <!-- Prompt view -->
-    <div id="hs-prompt-view">
-      <div class="hs-icon-wrap"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 15v4a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg></div>
+  <div class="hs-hero-bg" aria-hidden="true"></div>
+  <div class="hs-scrim" aria-hidden="true"></div>
+  <!-- Prompt view (pinned to the bottom over the hero image) -->
+  <div class="hs-content" id="hs-prompt-view">
+    <div class="hs-inner">
       <div class="hs-title" id="hs-title-txt"></div>
-      <div class="hs-desc" id="hs-desc-txt"></div>
-      <button class="btn-main" id="hs-add-btn" onclick="doAddHomeScreen()" style="font-family:'Space Grotesk',sans-serif;margin-bottom:10px"></button>
-      <button class="hs-cta" id="hs-guide-btn" onclick="showHsGuide()">
-        <span id="hs-guide-txt"></span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
-      </button>
+      <button class="hs-add-pill" id="hs-add-btn" onclick="doAddHomeScreen()"></button>
       <div class="hs-links">
-        <button class="hs-link-btn" onclick="closeHsOverlay()" id="hs-later-btn"></button>
+        <button class="hs-link-btn" id="hs-later-btn" onclick="closeHsOverlay()"></button>
         <span class="hs-link-sep">·</span>
         <button class="hs-link-btn muted" id="hs-never-btn" onclick="neverShowHs()"></button>
       </div>
     </div>
-    <!-- Guide view -->
-    <div id="hs-guide-view" style="display:none">
-      <div class="hs-guide-title" id="hs-guide-title-txt"></div>
-      <div style="margin-top:16px">
-        <div class="hs-step">
-          <div class="hs-step-num">1</div>
-          <div class="hs-step-body">
-            <div class="hs-step-title" id="hs-s1-title"></div>
-            <div class="hs-step-desc" id="hs-s1-desc"></div>
-          </div>
-        </div>
-        <div class="hs-step">
-          <div class="hs-step-num">2</div>
-          <div class="hs-step-body">
-            <div class="hs-step-title" id="hs-s2-title"></div>
-            <div class="hs-step-desc" id="hs-s2-desc"></div>
-          </div>
-        </div>
-        <div class="hs-step">
-          <div class="hs-step-num">3</div>
-          <div class="hs-step-body">
-            <div class="hs-step-title" id="hs-s3-title"></div>
-            <div class="hs-step-desc" id="hs-s3-desc"></div>
-          </div>
-        </div>
-      </div>
-      <button class="btn-main" id="hs-close-btn" onclick="closeHsOverlay()" style="margin-top:20px"></button>
+  </div>
+  <!-- Guide view — manual steps fallback for older Telegram clients -->
+  <div id="hs-guide-view" style="display:none">
+    <div class="hs-guide-title" id="hs-guide-title-txt"></div>
+    <div style="margin-top:16px">
+      <div class="hs-step"><div class="hs-step-num">1</div><div class="hs-step-body"><div class="hs-step-title" id="hs-s1-title"></div><div class="hs-step-desc" id="hs-s1-desc"></div></div></div>
+      <div class="hs-step"><div class="hs-step-num">2</div><div class="hs-step-body"><div class="hs-step-title" id="hs-s2-title"></div><div class="hs-step-desc" id="hs-s2-desc"></div></div></div>
+      <div class="hs-step"><div class="hs-step-num">3</div><div class="hs-step-body"><div class="hs-step-title" id="hs-s3-title"></div><div class="hs-step-desc" id="hs-s3-desc"></div></div></div>
     </div>
+    <button class="btn-main" id="hs-close-btn" onclick="closeHsOverlay()" style="margin-top:20px"></button>
   </div>
 </div>
 
@@ -2926,7 +2909,7 @@ en:{
   addAddrLabel:'Add address',emptyAddrTitle:'No saved addresses',emptyAddrSub:'Add your first delivery address',
 
   saveSheetTitle:'Save address',mapDone:'Done',addrNoLoc:'Please select your address on the map first',
-  hsTitle:'Add to Home Screen',hsDesc:'Open AMBAR directly from your device\'s home screen — one tap away.',
+  hsTitle:'Open AMBAR in one tap',hsDesc:'Add AMBAR to your Home Screen for quick access.',
   hsAdd:'Add to Home Screen',hsGuide:'Show me how',hsLater:'Not now',hsNever:'Never show again',
   hsGuideTitle:'How to add AMBAR',
   hsStep1:'Tap the menu button',hsStep1d:'Find the ··· (three dots) or menu icon in the top-right corner of this screen.',
@@ -2936,9 +2919,9 @@ en:{
 },
 };
 // ── HOME SCREEN TRANSLATIONS (inline, added to TX above) ──────────────────
-TX.ru.hsTitle='Добавить на главный экран';
-TX.ru.hsDesc='Открывайте наше приложение AMBAR прямо с главного экрана вашего устройства.';
-TX.ru.hsAdd='Добавить на главный экран';
+TX.ru.hsTitle='Открывайте AMBAR в одно касание';
+TX.ru.hsDesc='Добавьте AMBAR на экран «Домой» для быстрого доступа.';
+TX.ru.hsAdd='Добавить на экран «Домой»';
 TX.ru.hsGuide='Как это сделать';
 TX.ru.hsLater='Не сейчас';
 TX.ru.hsNever='Больше не показывать';
@@ -3556,18 +3539,25 @@ function applyLang(){
 const _PROMO_KEY='ambar_promo5_seen';
 const _PROMO_HERO_KEY='ambar_promo5_hero_dismissed';
 const _PROMO_12H=12*60*60*1000;
+// Launch order: the Add-to-Home-Screen overlay shows FIRST; the promo modal is
+// held back until that overlay is dismissed (or skipped entirely if it won't show).
+let _hsPending=false, _hsCanNative=true, _promoModalShown=false;
+function _showPromoModal(){const m=el('promo-modal');if(m)m.classList.add('show');}
+function _maybeShowPromo(){if(_promoModalShown)return;_promoModalShown=true;setTimeout(_showPromoModal,500);}
 function _promoImgs(){const r=lang==='ru';return{hero:r?'promo_hero_ru.png':'promo_hero_en.png',modal:r?'promo_modal_ru.png':'promo_modal_en.png'};}
 function _setPromoImgs(){const imgs=_promoImgs();const hi=el('promo-hero-img');if(hi)hi.src=imgs.hero;const mi=el('promo-modal-img');if(mi)mi.src=imgs.modal;}
 function _promoExpired(key){const ts=localStorage.getItem(key);if(!ts)return true;return(Date.now()-Number(ts))>=_PROMO_12H;}
 function initPromo(){
   _setPromoImgs();
-  // Modal — always show on every open
-  setTimeout(()=>{const m=el('promo-modal');if(m)m.classList.add('show');},800);
   // Hero banner — show always, re-show 12h after last dismiss
   if(_promoExpired(_PROMO_HERO_KEY)){
     localStorage.removeItem(_PROMO_HERO_KEY);
     const h=el('promo-hero');if(h){h.style.display='';h.style.opacity='';h.style.transform='';h.style.maxHeight='';h.style.margin='';h.style.borderColor='';}
   }
+  // Modal — shows on every open, but AFTER the Add-to-Home-Screen overlay. If that
+  // overlay is going to show first, it fires the promo itself once dismissed.
+  if(_hsPending) return;
+  _maybeShowPromo();
 }
 function dismissPromoHero(){
   localStorage.setItem(_PROMO_HERO_KEY,String(Date.now()));
@@ -3586,9 +3576,8 @@ function dismissPromoModal(){
 // ── HOME SCREEN PROMPT ────────────────────────────────────────────────────────
 function applyHsLang(){
   set('hs-title-txt',t('hsTitle'));
-  set('hs-desc-txt',t('hsDesc'));
-  set('hs-add-btn',t('hsAdd'));
-  set('hs-guide-txt',t('hsGuide'));
+  // primary pill: native clients add directly; older clients open the manual guide
+  set('hs-add-btn', _hsCanNative ? t('hsAdd') : t('hsGuide'));
   set('hs-later-btn',t('hsLater'));
   set('hs-never-btn',t('hsNever'));
   set('hs-guide-title-txt',t('hsGuideTitle'));
@@ -3599,36 +3588,43 @@ function applyHsLang(){
 }
 
 function checkFirstLaunchHomeScreen(){
-  if(!tg) return; // only inside Telegram
-  if(localStorage.getItem('ambar_hs_never')) return;
-  const canNative=tg.isVersionAtLeast&&tg.isVersionAtLeast('8.0');
+  if(!tg){ _hsPending=false; return; }                     // only inside Telegram
+  if(localStorage.getItem('ambar_hs_never')){ _hsPending=false; return; }
+  _hsCanNative = !!(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0'));
+  _hsPending = true;  // we intend to show it first; the promo modal waits its turn
   function _show(){
     applyHsLang();
-    if(!canNative) el('hs-add-btn').style.display='none'; // hide auto btn if unsupported
-    setTimeout(()=>el('hs-overlay').classList.add('show'), 1800);
+    setTimeout(()=>el('hs-overlay').classList.add('show'), 600);
   }
-  if(canNative){
+  if(_hsCanNative){
+    let _resolved=false;
     tg.checkHomeScreenStatus(status=>{
-      if(status==='added'){ return; } // already on home screen — don't bother
+      _resolved=true;
+      if(status==='added'){ _hsPending=false; _maybeShowPromo(); return; } // already added — skip to promo
       _show();
     });
+    // safety: if the status check never calls back, don't strand the promo modal
+    setTimeout(()=>{ if(!_resolved && !el('hs-overlay').classList.contains('show')){ _hsPending=false; _maybeShowPromo(); } }, 3000);
   } else {
     _show();
   }
 }
 function closeHsOverlay(){
   el('hs-overlay').classList.remove('show');
-  // Don't set flag — will show again next launch until user taps "never show again"
+  // Don't set never flag — will show again next launch until user taps "never show again"
+  _hsPending=false; _maybeShowPromo();
 }
 function neverShowHs(){
   el('hs-overlay').classList.remove('show');
   localStorage.setItem('ambar_hs_never','1');
+  _hsPending=false; _maybeShowPromo();
 }
 function doAddHomeScreen(){
   if(tg&&tg.isVersionAtLeast&&tg.isVersionAtLeast('8.0')){
     tg.addToHomeScreen();
     localStorage.setItem('ambar_hs_never','1');
     el('hs-overlay').classList.remove('show');
+    _hsPending=false; _maybeShowPromo();
   } else {
     showHsGuide();
   }

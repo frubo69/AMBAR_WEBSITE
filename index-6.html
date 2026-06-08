@@ -1102,6 +1102,9 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
 .hs-overlay.show .hs-hero-bg{transform:scale(1.06) translateX(1.5%)}
 /* scrim — darken the lower third so the headline/buttons stay legible over any crop */
 .hs-scrim{position:absolute;inset:0;pointer-events:none;background:linear-gradient(to bottom,transparent 36%,rgba(7,7,14,.45) 56%,rgba(7,7,14,.9) 78%,#07070E 100%)}
+/* dark-blue gradient + blur over the top — fills the top, fades smoothly into the
+   phone; the Telegram Close/⋯ controls sit on this clean dark area */
+.hs-topfade{position:absolute;top:0;left:0;right:0;height:22%;pointer-events:none;background:linear-gradient(to bottom,#070811 0%,rgba(9,11,24,.85) 42%,transparent 100%);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);-webkit-mask-image:linear-gradient(to bottom,#000 0%,#000 48%,transparent 100%);mask-image:linear-gradient(to bottom,#000 0%,#000 48%,transparent 100%)}
 /* prompt — pinned to the bottom, rises in on open */
 .hs-content{position:absolute;left:0;right:0;bottom:0;display:flex;flex-direction:column;align-items:stretch;padding:0 26px calc(26px + var(--safe-bottom));opacity:0;transform:translateY(18px);transition:opacity var(--dur-slow) var(--ease-standard) .08s,transform var(--dur-slow) var(--ease-standard) .08s}
 .hs-overlay.show .hs-content{opacity:1;transform:none}
@@ -2275,6 +2278,7 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
 <div class="hs-overlay" id="hs-overlay">
   <div class="hs-hero-bg" aria-hidden="true"></div>
   <div class="hs-scrim" aria-hidden="true"></div>
+  <div class="hs-topfade" aria-hidden="true"></div>
   <!-- Prompt view (pinned to the bottom over the hero image) -->
   <div class="hs-content" id="hs-prompt-view">
     <div class="hs-text">

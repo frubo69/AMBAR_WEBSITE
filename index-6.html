@@ -3618,7 +3618,7 @@ function applyHsLang(){
 
 function checkFirstLaunchHomeScreen(){
   if(!tg){ _hsPending=false; return; }                     // only inside Telegram
-  if(localStorage.getItem('ambar_hs_never')){ _hsPending=false; return; } // user tapped "Add" or "Never show again"
+  if(localStorage.getItem('ambar_hs_never2')){ _hsPending=false; return; } // user tapped "Add" or "Never show again"
   _hsCanNative = !!(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0'));
   _hsPending = true;  // shows first; the promo modal waits its turn
   _preloadHsHero();   // start fetching the hero now so it's painted before we reveal
@@ -3643,13 +3643,13 @@ function closeHsOverlay(){
 }
 function neverShowHs(){
   el('hs-overlay').classList.remove('show');
-  localStorage.setItem('ambar_hs_never','1');
+  localStorage.setItem('ambar_hs_never2','1');
   _hsPending=false; _maybeShowPromo();
 }
 function doAddHomeScreen(){
   if(tg&&tg.isVersionAtLeast&&tg.isVersionAtLeast('8.0')){
     tg.addToHomeScreen();
-    localStorage.setItem('ambar_hs_never','1');
+    localStorage.setItem('ambar_hs_never2','1');
     el('hs-overlay').classList.remove('show');
     _hsPending=false; _maybeShowPromo();
   } else {

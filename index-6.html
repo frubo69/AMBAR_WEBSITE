@@ -6500,10 +6500,13 @@ function _reserveForBars(){
       return b && getComputedStyle(b).display!=='none' && !b.classList.contains('cpb-hidden') && !b.classList.contains('aob-hidden');
     });
     document.querySelectorAll('.prof-scroll,#orders-list').forEach(function(ps){
-      if(ps.offsetParent===null){ ps.style.paddingBottom=''; return; }
-      var psBottom=ps.getBoundingClientRect().bottom, need=0;
-      bars.forEach(function(b){ var ov=psBottom-b.getBoundingClientRect().top; if(ov>need)need=ov; });
-      ps.style.paddingBottom = need>4 ? Math.round(need+18)+'px' : '';
+      ps.style.maxHeight=''; ps.style.paddingBottom=''; // reset to natural flex height
+      if(ps.offsetParent===null || !bars.length) return;
+      var r=ps.getBoundingClientRect(), psTop=r.top, natural=r.height, barTop=Infinity;
+      bars.forEach(function(b){ var t=b.getBoundingClientRect().top; if(t<barTop)barTop=t; });
+      // cap the scroller so it ends just above the topmost bar (don't add padding)
+      var cap=Math.round(barTop-14-psTop);
+      if(cap>80 && cap<natural-1){ ps.style.maxHeight=cap+'px'; }
     });
   }catch(e){}
 }

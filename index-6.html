@@ -3023,7 +3023,10 @@ const tg=window.Telegram?.WebApp||null;
 // switched on server-side. CRYPTO_SIM keeps the flow demoable while the on-chain
 // detector is being built — flip to false once /api/crypto/* is live.
 let CRYPTO_ENABLED = localStorage.getItem('ambar_crypto_enabled')==='1';
-const CRYPTO_SIM = true;
+// Client-side demo flow. Auto-disabled by /api/me (crypto_real_mode) once the
+// server has a real receive wallet + on-chain watcher — see initMe(). Defaults
+// to demo so nothing can half-activate before the backend is truly live.
+let CRYPTO_SIM = true;
 const USDT_PER_AED = 1/3.6725;          // AED→USD peg; USDT≈USD. Backend will lock the real rate.
 let CRYPTO_FEE_PCT = 10;                 // surcharge on crypto orders (network+conversion). Real mode overrides from invoice.fee_pct.
 // Wallet picker for the invoice "Open wallet" button. Each tap copies the
@@ -3136,6 +3139,9 @@ async function checkBanStatus(){
       // gate only — real on-chain endpoints must re-validate via signed initData.
       if(d.crypto_enabled){localStorage.setItem('ambar_crypto_enabled','1');CRYPTO_ENABLED=true;}
       else{localStorage.removeItem('ambar_crypto_enabled');CRYPTO_ENABLED=false;}
+      // Real on-chain flow once the server has a wallet+watcher; demo otherwise.
+      // (undefined on an older backend ⇒ stays demo — safe default.)
+      CRYPTO_SIM = !d.crypto_real_mode;
       if(typeof refreshPayMethodUI==='function')refreshPayMethodUI();
       // Verification status
       if(d.verified){

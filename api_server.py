@@ -1193,6 +1193,10 @@ async def handle_me(request: web.Request) -> web.Response:
         "verify_pending": verify_pending,
         # Staged-rollout display gate for crypto payments (see _crypto_enabled_for).
         "crypto_enabled": _crypto_enabled_for(uid),
+        # Whether the server has a real receive wallet + watcher (address+key set).
+        # The frontend uses this to switch off its client-side demo automatically,
+        # so there is no way to half-activate (demo stays on until real mode is on).
+        "crypto_real_mode": CRYPTO_REAL_MODE,
     }, headers=CORS_HEADERS)
 
 

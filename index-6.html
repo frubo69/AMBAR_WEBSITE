@@ -182,6 +182,21 @@ img{display:block}
 .search-wrap:focus-within{border-color:rgba(201,169,110,.5)}
 .search-ico{width:15px;height:15px;color:var(--muted);flex-shrink:0}
 .search-inp{flex:1;background:transparent;border:none;outline:none;font-size:13px;color:var(--text);padding:9px 0;font-family:inherit}
+/* search suggestions dropdown (recent + popular) */
+.search-suggest{position:fixed;z-index:1200;background:var(--bg2);border:1px solid var(--border);border-radius:14px;box-shadow:0 14px 34px rgba(0,0,0,.55);padding:12px 14px;opacity:0;transform:translateY(-6px);pointer-events:none;transition:opacity .16s,transform .16s}
+.search-suggest.show{opacity:1;transform:translateY(0);pointer-events:auto}
+.ss-label{font-size:10px;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted);margin-bottom:9px;display:flex;align-items:center;justify-content:space-between}
+.ss-clear{font-size:10px;color:var(--gold2);cursor:pointer;letter-spacing:.5px}
+.ss-chips{display:flex;flex-wrap:wrap;gap:7px}
+.ss-chip{display:inline-flex;align-items:center;gap:6px;background:var(--bg3);border:1px solid var(--border2);border-radius:999px;padding:7px 12px;font-size:12.5px;color:var(--text);cursor:pointer;transition:transform .12s;font-family:inherit}
+.ss-chip:active{transform:scale(.94)}
+.ss-chip svg{width:12px;height:12px;color:var(--muted);flex-shrink:0}
+/* undo snackbar (cart item removal) */
+.undo-bar{position:fixed;left:16px;right:16px;bottom:calc(var(--safe-bottom) + 100px);max-width:440px;margin:0 auto;z-index:1100;display:flex;align-items:center;gap:12px;padding:12px 12px 12px 16px;background:rgba(28,28,36,.96);-webkit-backdrop-filter:blur(20px);backdrop-filter:blur(20px);border:1px solid rgba(255,255,255,.1);border-radius:14px;box-shadow:0 12px 30px rgba(0,0,0,.5);transform:translateY(24px);opacity:0;pointer-events:none;transition:transform .26s var(--ease-standard),opacity .26s}
+.undo-bar.show{transform:translateY(0);opacity:1;pointer-events:auto}
+.undo-bar-msg{font-size:13px;color:var(--text);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.undo-bar-btn{flex-shrink:0;background:none;border:none;color:var(--gold2);font-size:13px;font-weight:700;letter-spacing:.3px;padding:7px 12px;cursor:pointer;border-radius:9px;font-family:inherit}
+.undo-bar-btn:active{background:rgba(201,169,110,.14)}
 .search-inp::placeholder{color:var(--muted)}
 .search-clr{background:none;border:none;color:var(--muted);font-size:14px;cursor:pointer;padding:0;line-height:1;flex-shrink:0}
 .chip{white-space:nowrap;padding:7px 13px;border-radius:20px;border:none;outline:none;-webkit-tap-highlight-color:transparent;background:rgba(255,255,255,.07);color:rgba(255,255,255,.45);font-size:12px;font-weight:500;cursor:pointer;transition:.18s;letter-spacing:.1px}
@@ -241,8 +256,12 @@ img{display:block}
 .pcard{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;transition:.15s}
 .pcard:active{transform:scale(.97)}
 .pimg-box{height:148px;background:linear-gradient(155deg,#0E0E1E,#090916);display:flex;align-items:center;justify-content:center;padding:10px;position:relative;overflow:hidden}
-.pimg-box::after{content:'';position:absolute;width:24px;height:24px;border:2px solid rgba(201,169,110,.15);border-top-color:rgba(201,169,110,.5);border-radius:50%;animation:spin .7s linear infinite;z-index:0;pointer-events:none}
+.pimg-box::after{content:'';position:absolute;inset:0;background:linear-gradient(100deg,transparent 38%,rgba(201,169,110,.10) 50%,transparent 62%);background-size:220% 100%;animation:skShimmer 1.25s linear infinite;z-index:0;pointer-events:none}
 .pimg-box.loaded::after{display:none}
+@keyframes skShimmer{0%{background-position:-220% 0}100%{background-position:220% 0}}
+/* generic skeleton shimmer block (used for points-history loading rows) */
+.sk-block{background:linear-gradient(100deg,rgba(255,255,255,.045) 30%,rgba(201,169,110,.11) 50%,rgba(255,255,255,.045) 70%);background-size:220% 100%;animation:skShimmer 1.25s linear infinite;border-radius:7px}
+.pts-row.sk{pointer-events:none}
 .pimg{max-height:128px;max-width:90%;object-fit:contain;filter:drop-shadow(0 6px 20px rgba(0,0,0,.7));position:relative;z-index:1}
 .pbadge{position:absolute;font-size:8px;letter-spacing:1px;text-transform:uppercase;padding:3px 7px;border-radius:6px;font-weight:700;z-index:2}
 .pbadge.oos{left:8px;top:8px;background:rgba(0,0,0,.7);border:1px solid var(--border2);color:var(--muted)}
@@ -654,7 +673,10 @@ img{display:block}
 .prof-hscroll::-webkit-scrollbar{display:none}
 .prof-action-btn{width:100%;padding:15px;background:var(--card);border:1.5px dashed rgba(201,169,110,.35);border-radius:var(--r);font-size:14px;font-weight:700;color:var(--gold2);margin-bottom:4px;transition:.15s;letter-spacing:.3px}
 .prof-action-btn:active{opacity:.75;transform:scale(.98)}
-.prof-empty-hint{font-size:13px;color:var(--muted);text-align:center;padding:18px 0 12px}
+.prof-empty-hint{display:flex;flex-direction:column;align-items:center;gap:7px;font-size:13px;color:var(--muted);text-align:center;padding:26px 14px 18px;width:100%}
+.prof-empty-hint svg{width:30px;height:30px;color:var(--gold2);opacity:.5}
+.prof-empty-hint b{color:var(--sub);font-weight:600;font-size:13.5px}
+.prof-empty-sub{font-size:11.5px;color:var(--muted);line-height:1.45;max-width:230px}
 /* ── Profile Hub ── */
 .prof-hub-section{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);margin:0 14px 12px}
 .prof-hub-row{display:flex;align-items:center;gap:14px;padding:15px 16px;border-bottom:1px solid rgba(255,255,255,.055);cursor:pointer;transition:background .15s;-webkit-tap-highlight-color:transparent}
@@ -1372,10 +1394,10 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
 
   <!-- ── Ban wall (hidden until ban confirmed) ── -->
   <div id="ban-wall-card" style="display:none;flex-direction:column;align-items:center;text-align:center;padding:28px;max-width:300px;width:100%;">
-    <div style="font-size:64px;line-height:1;margin-bottom:20px;">🚫</div>
+    <div style="margin-bottom:20px;color:var(--red,#e05555)"><svg width="60" height="60" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="5.6" y1="5.6" x2="18.4" y2="18.4"/></svg></div>
     <div style="font-size:20px;font-weight:700;color:#fff;margin-bottom:12px;">Аккаунт заблокирован</div>
     <div style="font-size:14px;color:#888;line-height:1.65;margin-bottom:28px;">Ваш аккаунт был заблокирован.<br>Свяжитесь с поддержкой для<br>решения вопроса.</div>
-    <button id="ban-support-btn" style="width:100%;padding:15px;background:linear-gradient(135deg,#5865f2,#7289da);border:none;border-radius:14px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;">💬 Написать в поддержку</button>
+    <button id="ban-support-btn" style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;padding:15px;background:linear-gradient(135deg,#5865f2,#7289da);border:none;border-radius:14px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>Написать в поддержку</button>
   </div>
 
   <style>
@@ -1592,7 +1614,7 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
       </div>
       <!-- Right: Cart + Lang -->
       <div class="hdr-right" style="flex:1;justify-content:flex-end">
-        <div class="cart-pill" onclick="go('cart')">🛒 <span class="cart-txt" id="hdr-tot">0 AED</span><span class="cart-dot" id="hdr-dot">0</span></div>
+        <div class="cart-pill" onclick="go('cart')"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--gold2)" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg><span class="cart-txt" id="hdr-tot">0 AED</span><span class="cart-dot" id="hdr-dot">0</span></div>
         <button class="notif-btn" onclick="openSupportOptions()" id="hdr-support-btn" aria-label="Support" style="color:var(--gold)">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" width="16" height="16"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/><circle cx="9" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="12" cy="10" r="1" fill="currentColor" stroke="none"/><circle cx="15" cy="10" r="1" fill="currentColor" stroke="none"/></svg>
         </button>
@@ -1606,7 +1628,7 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
     <div style="padding:0 14px 8px">
       <div class="search-wrap">
         <svg class="search-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
-        <input class="search-inp" id="search-inp" type="text" placeholder="Поиск..." oninput="onSearch(this.value)">
+        <input class="search-inp" id="search-inp" type="text" placeholder="Поиск..." oninput="onSearch(this.value)" onfocus="onSearchFocus()" onblur="onSearchBlur()">
         <button class="search-clr" id="search-clr" onclick="clearSearch()" style="display:none">✕</button>
       </div>
     </div>
@@ -2224,7 +2246,7 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
 <div class="modal-overlay" id="back-cart-overlay" onclick="closeBackToCart(event)">
   <div class="modal-sheet" style="padding:20px 16px calc(20px + var(--safe-bottom))">
     <div class="modal-handle"></div>
-    <div style="font-size:22px;text-align:center;margin:8px 0 10px">🛒</div>
+    <div id="back-cart-icon" style="display:flex;justify-content:center;margin:8px 0 12px;color:var(--gold2)"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg></div>
     <div id="back-cart-msg" style="font-family:'DM Sans',sans-serif;font-size:20px;color:var(--gold2);text-align:center;margin-bottom:20px"></div>
     <button class="btn-main" id="back-cart-yes" onclick="go(_backPromptTarget||'cart');closeBackToCartDirect()"></button>
     <button class="btn-outline" id="back-cart-no" onclick="closeBackToCartDirect()" style="margin-top:10px"></button>
@@ -2505,6 +2527,8 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
 <!-- Toasts (two slots ping-pong to avoid stuck animation when fired in quick succession) -->
 <div class="toast toast-bottom" id="toast0"></div>
 <div class="toast toast-bottom" id="toast1"></div>
+<div class="undo-bar" id="undo-bar"><span class="undo-bar-msg" id="undo-bar-msg"></span><button class="undo-bar-btn" id="undo-bar-btn" onclick="_doUndo()">Отменить</button></div>
+<div class="search-suggest" id="search-suggest"></div>
 
 <!-- ── Active Order Bar ───────────────────────────────────────────────────── -->
 <div class="cpb cpb-hidden" id="cpb" data-st="waiting" role="button" tabindex="0" aria-label="Resume crypto payment" onclick="cpbResume()">
@@ -2834,7 +2858,7 @@ ru:{
   cabLabel:'АДРЕС ДОСТАВКИ',cabNoAddr:'Не выбран — нажмите чтобы добавить',cabChange:'Изменить',
   shSaved:'Сохранённые адреса',addFormTitle:'➕ Добавить адрес',
   lblArea:'РАЙОН / ЗОНА',lblStreet:'УЛИЦА',lblBuilding:'ДОМ / №',lblTypeGps:'ТИП АДРЕСА',lblTypeMan:'ТИП АДРЕСА',
-  gpsBtn:'Поделиться геолокацией',gpsBtnLoading:'⏳ Определяем...',
+  gpsBtn:'Поделиться геолокацией',gpsBtnLoading:'Определяем...',
   gpsOk:'Геолокация получена — введите название адреса',gpsFail:'Не удалось получить геолокацию',
   addrLabelReq:'❌ Введите название адреса',
   lblAddrName:'НАЗВАНИЕ АДРЕСА',saveAddrBtn:'Сохранить адрес',updateAddrBtn:'Обновить адрес',doneBtn:'Готово ✓',
@@ -2884,7 +2908,7 @@ en:{
   cabLabel:'DELIVERY ADDRESS',cabNoAddr:'Not set — tap to add',cabChange:'Change',
   shSaved:'Saved addresses',addFormTitle:'➕ Add address',
   lblArea:'AREA / ZONE',lblStreet:'STREET',lblBuilding:'BUILDING / №',lblTypeGps:'ADDRESS TYPE',lblTypeMan:'ADDRESS TYPE',
-  gpsBtn:'Share my location',gpsBtnLoading:'⏳ Getting location...',
+  gpsBtn:'Share my location',gpsBtnLoading:'Getting location...',
   gpsOk:'Location received — enter address label',gpsFail:'Could not get location',
   addrLabelReq:'❌ Enter address label',
   lblAddrName:'ADDRESS LABEL',saveAddrBtn:'Save address',updateAddrBtn:'Update address',doneBtn:'Done ✓',
@@ -3653,6 +3677,7 @@ function neverShowHs(){
 function doAddHomeScreen(){
   if(tg&&tg.isVersionAtLeast&&tg.isVersionAtLeast('8.0')){
     tg.addToHomeScreen();
+    haptic.success();
     localStorage.setItem('ambar_hs_never2','1');
     el('hs-overlay').classList.remove('show');
     _hsPending=false; _maybeShowPromo();
@@ -4951,6 +4976,7 @@ function searchScore(p,q){
 function onSearch(val){
   searchQ=val.trim().toLowerCase();
   el('search-clr').style.display=searchQ?'block':'none';
+  if(searchQ)hideSearchSuggest();else if(document.activeElement===el('search-inp'))showSearchSuggest();
   renderGrid();
 }
 function clearSearch(){
@@ -4958,6 +4984,76 @@ function clearSearch(){
   searchQ='';
   el('search-clr').style.display='none';
   renderGrid();
+  if(document.activeElement===el('search-inp'))showSearchSuggest();else hideSearchSuggest();
+}
+function onSearchFocus(){if(!searchQ)showSearchSuggest();}
+function onSearchBlur(){
+  const raw=el('search-inp').value.trim();
+  if(raw)_addRecentSearch(raw);
+  setTimeout(hideSearchSuggest,180); // delay so a chip tap registers first
+}
+function _recentSearches(){try{return JSON.parse(localStorage.getItem('ambar_recent_q')||'[]');}catch(e){return [];}}
+function _addRecentSearch(q){
+  q=(q||'').trim();if(q.length<2)return;
+  let arr=_recentSearches().filter(x=>x.toLowerCase()!==q.toLowerCase());
+  arr.unshift(q);arr=arr.slice(0,6);
+  try{localStorage.setItem('ambar_recent_q',JSON.stringify(arr));}catch(e){}
+}
+function clearRecentSearches(){try{localStorage.removeItem('ambar_recent_q');}catch(e){}renderSearchSuggest();}
+function _popularSearchTerms(){
+  const counts={};
+  (typeof orders!=='undefined'?orders:[]).forEach(o=>(o.items||[]).forEach(i=>{if(i.id)counts[i.id]=(counts[i.id]||0)+(i.qty||1);}));
+  let prods=Object.keys(counts).sort((a,b)=>counts[b]-counts[a]).map(id=>P.find(p=>p.id===id)).filter(Boolean);
+  if(prods.length<3){P.filter(p=>p.stock).forEach(p=>{if(prods.length<5&&prods.indexOf(p)<0)prods.push(p);});}
+  return prods.slice(0,5).map(p=>lang==='ru'?p.name:p.nameE);
+}
+function renderSearchSuggest(){
+  const panel=el('search-suggest');if(!panel)return;
+  panel.innerHTML='';
+  const ru=lang==='ru',rec=_recentSearches();
+  const mkChips=(items,clock)=>{
+    const wrap=document.createElement('div');wrap.className='ss-chips';
+    items.forEach(q=>{
+      const b=document.createElement('button');b.className='ss-chip';b.type='button';
+      if(clock)b.innerHTML='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
+      b.appendChild(document.createTextNode(q));
+      b.addEventListener('mousedown',e=>e.preventDefault());
+      b.addEventListener('click',()=>pickSearch(q));
+      wrap.appendChild(b);
+    });
+    return wrap;
+  };
+  if(rec.length){
+    const lab=document.createElement('div');lab.className='ss-label';
+    lab.appendChild(document.createTextNode(ru?'Недавнее':'Recent'));
+    const clr=document.createElement('span');clr.className='ss-clear';clr.textContent=ru?'Очистить':'Clear';
+    clr.addEventListener('mousedown',e=>e.preventDefault());
+    clr.addEventListener('click',e=>{e.stopPropagation();clearRecentSearches();});
+    lab.appendChild(clr);panel.appendChild(lab);panel.appendChild(mkChips(rec,true));
+  }
+  const pop=_popularSearchTerms();
+  if(pop.length){
+    const lab=document.createElement('div');lab.className='ss-label';if(rec.length)lab.style.marginTop='14px';
+    lab.textContent=ru?'Популярное':'Popular';panel.appendChild(lab);panel.appendChild(mkChips(pop,false));
+  }
+}
+function showSearchSuggest(){
+  renderSearchSuggest();
+  const panel=el('search-suggest'),inp=el('search-inp');if(!panel||!inp)return;
+  if(!panel.firstChild){hideSearchSuggest();return;}
+  const r=inp.getBoundingClientRect();
+  panel.style.left=Math.round(Math.max(8,r.left-4))+'px';
+  panel.style.right=Math.round(Math.max(8,window.innerWidth-r.right-4))+'px';
+  panel.style.top=Math.round(r.bottom+8)+'px';
+  panel.classList.add('show');
+}
+function hideSearchSuggest(){const p=el('search-suggest');if(p)p.classList.remove('show');}
+function pickSearch(q){
+  const inp=el('search-inp');inp.value=q;
+  _addRecentSearch(q);
+  onSearch(q);
+  hideSearchSuggest();inp.blur();
+  haptic.select();
 }
 
 // ── FAVOURITES ────────────────────────────────────────────────────────────────
@@ -4978,6 +5074,7 @@ function updateFavBtn(){
   if(dot){dot.textContent=favs.size;dot.classList.toggle('on',favs.size>0);}
 }
 function toggleFavFilter(){
+  haptic.select();
   showFavOnly=!showFavOnly;
   el('fav-hdr-btn').style.background=showFavOnly?'rgba(224,85,85,.2)':'';
   el('fav-hdr-btn').style.borderColor=showFavOnly?'#e05555':'';
@@ -5010,6 +5107,7 @@ function openSortSheet(){
       <svg class="sort-opt-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" width="18" height="18"><polyline points="20 6 9 17 4 12"/></svg>
     </button>`).join('')+'</div>';
   el('sort-overlay').classList.add('show');
+  haptic.light();
 }
 function closeSortSheet(e){
   if(e&&e.target!==el('sort-overlay'))return;
@@ -5599,6 +5697,8 @@ function closeRevealedSwipe(){
   _revealedWrap=null;
 }
 function confirmSwipeDel(cid){
+  const p=P.find(x=>x.id===cid);
+  const prevQty=cart[cid],prevPcs=beerPcs[cid];
   delete cart[cid];delete beerPcs[cid];
   haptic.medium();
   _revealedWrap=null;
@@ -5606,7 +5706,24 @@ function confirmSwipeDel(cid){
   // Sync catalog card controls so it shows "+" instead of "-qty+"
   syncCtrl(cid);
   renderCart();
+  const nm=p?(lang==='ru'?p.name:p.nameE):'';
+  showUndoBar((lang==='ru'?'Удалено: ':'Removed: ')+nm,()=>{
+    cart[cid]=prevQty;if(prevPcs!==undefined)beerPcs[cid]=prevPcs;
+    updHdr();syncCtrl(cid);renderCart();
+    showToast((lang==='ru'?'Возвращено: ':'Restored: ')+nm,'ok');
+  });
 }
+let _undoFn=null,_undoTimer=null;
+function showUndoBar(msg,undoFn){
+  _undoFn=undoFn;
+  el('undo-bar-msg').textContent=msg;
+  el('undo-bar-btn').textContent=lang==='ru'?'Отменить':'Undo';
+  el('undo-bar').classList.add('show');
+  clearTimeout(_undoTimer);
+  _undoTimer=setTimeout(hideUndoBar,4500);
+}
+function hideUndoBar(){el('undo-bar').classList.remove('show');_undoFn=null;}
+function _doUndo(){const f=_undoFn;clearTimeout(_undoTimer);hideUndoBar();if(f){haptic.light();f();}}
 
 // ── TIPS ──────────────────────────────────────────────────────────────────────
 function buildTips(){
@@ -6153,7 +6270,6 @@ function openCryptoWalletSheet(){
     '<div class="cpw-tx"><div class="cpw-nm">'+(ru?'Другой кошелёк':'Other wallet')+'</div><div class="cpw-sub">'+(ru?'Скопировать адрес вручную':'Copy address manually')+'</div></div>'+chev;
   (extra||list).appendChild(copyRow);
   _openSheet('cpw-ov');
-  haptic.light();
 }
 function closeCryptoWalletSheet(){ _closeSheet('cpw-ov'); }
 function _cpOpenWalletApp(w){
@@ -6510,6 +6626,7 @@ let _orderFilter='all';
 const _ordStatusMap={pending:['pending','awaiting_payment'],confirmed:['confirmed'],delivered:['delivered'],cancelled:['declined','cancelled']};
 
 function setOrderFilter(f){
+  haptic.select();
   _orderFilter=f;
   document.querySelectorAll('.ord-chip').forEach(c=>c.classList.remove('active'));
   const chip=el('ofc-'+f);
@@ -6826,7 +6943,7 @@ function _renderProfSection(id){
             </div>
           </div>`;
         }).join('')
-      : `<div class="prof-empty-hint" style="grid-column:1/-1">${lang==='ru'?'Список пуст':'Nothing saved yet'}</div>`;
+      : `<div class="prof-empty-hint" style="grid-column:1/-1"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 1 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/></svg><b>${lang==='ru'?'Список пуст':'Nothing saved yet'}</b><div class="prof-empty-sub">${lang==='ru'?'Отмечайте товары сердечком, чтобы сохранить их сюда':'Tap the heart on a product to save it here'}</div></div>`;
     el('wishlist-cart-btn').textContent=lang==='ru'?'Добавить всё в корзину':'Add all to cart';
   }
   if(id==='usual-section'){
@@ -6847,7 +6964,7 @@ function _renderProfSection(id){
             </div>
           </div>`;
         }).join('')
-      : `<div class="prof-empty-hint">${lang==='ru'?'Нет истории заказов':'No order history yet'}</div>`;
+      : `<div class="prof-empty-hint"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l3.5 2"/></svg><b>${lang==='ru'?'Нет истории заказов':'No order history yet'}</b><div class="prof-empty-sub">${lang==='ru'?'Ваши частые товары появятся здесь после заказов':'Your go-to items will appear here after you order'}</div></div>`;
     el('usual-order-btn').textContent=lang==='ru'?'Заказать как обычно':'Order The Usual';
   }
 }
@@ -6894,6 +7011,7 @@ function _openSheet(id){
   ov.style.display='flex';
   ov.offsetHeight;
   ov.classList.add('open');
+  haptic.light();
   // attach swipe-to-close on the inner sheet element
   const sheet=ov.querySelector('.cancel-sheet');
   if(sheet&&!sheet._swipeInit){
@@ -7879,19 +7997,25 @@ function openPointsHistory(){
 function closePointsHistory(){
   el('pts-overlay').classList.remove('show');
 }
+function _ptsSkeleton(){
+  return ['62%','48%','70%','54%'].map(w=>'<div class="pts-row sk"><div class="sk-block" style="width:36px;height:36px;border-radius:50%;flex-shrink:0"></div><div class="pts-row-body"><div class="sk-block" style="height:12px;width:'+w+'"></div><div class="sk-block" style="height:9px;width:38%;margin-top:8px"></div></div><div class="sk-block" style="width:32px;height:14px;flex-shrink:0"></div></div>').join('');
+}
 async function loadPointsHistory(){
   const list=el('pts-list'),empty=el('pts-empty'),ru=lang==='ru';
-  // Reset to a "loading" state — keep empty placeholder visible while fetching.
+  // Show shimmer skeleton rows while fetching (real network call).
   list.querySelectorAll('.pts-row').forEach(n=>n.remove());
-  empty.style.display='flex';
+  empty.style.display='none';
+  list.insertAdjacentHTML('afterbegin',_ptsSkeleton());
+  const _rmSk=()=>list.querySelectorAll('.pts-row.sk').forEach(n=>n.remove());
   const initData=tg?.initData;
-  if(!initData){return;}
+  if(!initData){ _rmSk(); empty.style.display='flex'; return; }
   let items=[];
   try{
     const r=await fetch(`${AMBAR_API}/api/points-history`,{headers:{'Authorization':'tma '+initData}});
     const j=await r.json();
     items=j.items||[];
   }catch(e){console.error('points-history fetch:',e);}
+  _rmSk();
   if(!items.length){
     el('pts-empty-txt').textContent=ru?'Здесь появятся ваши баллы за заказы и приглашения друзей':'Points from your orders and invited friends will appear here';
     return;
@@ -8186,7 +8310,7 @@ async function _uploadSupportPhoto(file,thumbUrl,initData){
   bubble.dataset.pending='1';
   bubble.dataset.pendingText='';
   bubble.dataset.pendingType='photo';
-  bubble.innerHTML=`<div class="msg-photo-wrap"><img class="chat-photo" src="${thumbUrl}" alt="photo" onclick="openPhotoViewer(this.src)"></div><div class="msg-ts" style="opacity:.5">⏳</div>`;
+  bubble.innerHTML=`<div class="msg-photo-wrap"><img class="chat-photo" src="${thumbUrl}" alt="photo" onclick="openPhotoViewer(this.src)"></div><div class="msg-ts" style="opacity:.5"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></div>`;
   container.appendChild(bubble);
   container.scrollTop=container.scrollHeight;
   haptic.light();
@@ -8218,7 +8342,7 @@ async function _uploadSupportPhoto(file,thumbUrl,initData){
         sheet.remove();
         btn.remove();
         bubble.querySelector('.msg-ts').style.opacity='.5';
-        bubble.querySelector('.msg-ts').textContent='⏳';
+        bubble.querySelector('.msg-ts').innerHTML='<svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-1px"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>';
         _uploadSupportPhoto(file,thumbUrl,null);
         bubble.remove(); // old bubble replaced by new one in _uploadSupportPhoto
       };
@@ -9356,9 +9480,11 @@ function showBackToCartPrompt(msg,yes,no,target){
   el('back-cart-msg').textContent=msg;
   el('back-cart-yes').textContent=yes;
   el('back-cart-no').textContent=no;
-  // Update icon: 🛒 for cart, 📋 for catalog
-  const iconEl=document.querySelector('#back-cart-overlay .modal-sheet div[style*="font-size:22px"]');
-  if(iconEl) iconEl.textContent=_backPromptTarget==='catalog'?'📋':'🛒';
+  // Update icon: shopping bag for cart, list for catalog
+  const iconEl=el('back-cart-icon');
+  if(iconEl) iconEl.innerHTML=_backPromptTarget==='catalog'
+    ? '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h13"/><path d="M8 12h13"/><path d="M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg>'
+    : '<svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>';
   el('back-cart-overlay').classList.add('show');
 }
 function closeBackToCart(e){

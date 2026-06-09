@@ -833,8 +833,8 @@ body.aob-on .cpb{bottom:calc(92px + var(--safe-bottom) + 70px)} /* stack above t
 .cpb-timer-wrap{flex-shrink:0;text-align:right;padding-left:11px;border-left:1px solid var(--border2);min-width:54px}
 .cpb-timer-lbl{font-size:8px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
 .cpb-timer{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:var(--text);line-height:1;font-variant-numeric:tabular-nums}
-body.cpb-on .page{padding-bottom:calc(98px + var(--safe-bottom))}
-body.aob-on.cpb-on .page{padding-bottom:calc(170px + var(--safe-bottom))}
+body.cpb-on .page{padding-bottom:90px}
+body.aob-on.cpb-on .page{padding-bottom:162px}
 .aob-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
 .aob-left{display:flex;align-items:center;gap:8px}
 .aob-left-text{display:flex;flex-direction:column;gap:1px}
@@ -3829,6 +3829,7 @@ function go(p){
   // Mark other pages hidden (no transition needed — already invisible)
   PAGES.forEach(id=>{if(id!==p&&id!==prev)el('pg-'+id)?.classList.add('hidden');});
   cpbUpdate(); // show/hide the crypto pay reminder bar for this page
+  requestAnimationFrame(_reserveForBars); setTimeout(_reserveForBars,260); // pad inner scrollers (profile/orders) to clear the floating bars
   if(p==='catalog'&&_catalogScroll>0){requestAnimationFrame(()=>{const pg=el('pg-catalog');if(pg)pg.scrollTop=_catalogScroll;});}
   // 3) Heavy renders — deferred so pill animates on GPU undisturbed
   requestAnimationFrame(()=>setTimeout(()=>{
@@ -6463,6 +6464,7 @@ function cpbUpdate(){
   if(!o || curPg==='pay'){
     bar.classList.add('cpb-hidden'); document.body.classList.remove('cpb-on');
     if(!o&&_cpbTick){clearInterval(_cpbTick);_cpbTick=null;}
+    _reserveForBars();
     return;
   }
   const inv=o.crypto, ru=lang==='ru';
@@ -6484,9 +6486,31 @@ function cpbUpdate(){
     if(tEl){tEl.textContent=String(Math.floor(s/60)).padStart(2,'0')+':'+String(s%60).padStart(2,'0'); tEl.style.color=ms<120000?'var(--red)':'';}
   }
   bar.classList.remove('cpb-hidden'); document.body.classList.add('cpb-on');
+  _reserveForBars();
 }
 function cpbResume(){ const o=_cpbPending(); if(o)resumeCryptoPayment(o.order_id); }
 function _cpbStart(){ if(!_cpbTick)_cpbTick=setInterval(cpbUpdate,1000); cpbUpdate(); }
+// Page-level scrolls (catalog) get bottom padding from body.cpb-on/.aob-on, but
+// inner scrollers (profile .prof-scroll, orders #orders-list) don't — so the
+// floating bars overlap their last rows. Measure the real overlap (bars are
+// viewport-anchored) and pad the scroller exactly enough to clear them.
+function _reserveForBars(){
+  try{
+    var bars=['cpb','aob'].map(function(id){return el(id);}).filter(function(b){
+      return b && getComputedStyle(b).display!=='none' && !b.classList.contains('cpb-hidden') && !b.classList.contains('aob-hidden');
+    });
+    document.querySelectorAll('.prof-scroll,#orders-list').forEach(function(ps){
+      if(ps.offsetParent===null){ ps.style.paddingBottom=''; return; }
+      var psBottom=ps.getBoundingClientRect().bottom, need=0;
+      bars.forEach(function(b){ var ov=psBottom-b.getBoundingClientRect().top; if(ov>need)need=ov; });
+      ps.style.paddingBottom = need>4 ? Math.round(need+18)+'px' : '';
+    });
+  }catch(e){}
+}
+try{
+  new MutationObserver(function(){requestAnimationFrame(_reserveForBars);}).observe(document.body,{attributes:true,attributeFilter:['class']});
+  window.addEventListener('resize',function(){_reserveForBars();},{passive:true});
+}catch(e){}
 
 async function confirmClearFavs(){
   const msg=lang==='ru'?'Удалить всё из избранного?':'Remove all favourites?';

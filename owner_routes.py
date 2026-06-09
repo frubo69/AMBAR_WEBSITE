@@ -378,6 +378,11 @@ async def handle_finance(request):
             "address": o.get("address","—"),
             "gmap_link": o.get("gmap_link",""),
             "items_short": ", ".join(f"{it.get('name','')} ×{it.get('qty',1)}" for it in (o.get("items") or [])[:3]),
+            "items": [
+                {"id": it.get("id",""), "name": it.get("name",""), "qty": it.get("qty",1)}
+                for it in (o.get("items") or [])
+            ],
+            "cancel_comment": o.get("cancel_comment","") or o.get("comment",""),
         }
     pending_orders = sorted(
         [o for o in all_orders.values() if o.get("status") == "pending"],

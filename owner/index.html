@@ -3552,6 +3552,23 @@ function _isAlertImportant(a){
   if(!a || !a.pref) return false;
   return _getNotifPrefs()[a.pref] === true;
 }
+// Stash for the generic alert-detail fallback. Keyed by a colon-free token
+// because openDetail() splits its key on ':' (so the key itself must have none).
+window._alertDetailMap = window._alertDetailMap || {};
+// Decide where tapping a server-pushed alert should lead:
+//   1) an order page   if the text carries an #AMB… order number,
+//   2) a customer page  if it carries an `ID: 123…` (e.g. verification requests),
+//   3) otherwise a generic detail card showing the full (untruncated) event text.
+function _alertClickTarget(n, fullText, ts, ico){
+  const txt = (n && n.text) || '';
+  const om = txt.match(/#(AMB\d+)/i);
+  if(om){ const oid = om[1]; return ()=>{ closeAlerts(); openDetail('order:'+oid); }; }
+  const cm = txt.match(/ID:\s*`?(\d{4,})`?/);
+  if(cm){ const cid = cm[1]; return ()=>{ closeAlerts(); openDetail('customer:'+cid); }; }
+  const dkey = ('a_'+((n&&n.event_key)||'x')+'_'+((n&&n.created_at)||'')).replace(/[^A-Za-z0-9]/g,'_');
+  window._alertDetailMap[dkey] = {ev:(n&&n.event_key)||'', ico:ico||'🔔', text:fullText||'', ts:ts||''};
+  return ()=>{ closeAlerts(); openDetail('alert:'+dkey); };
+}
 function _buildAlerts(){
   const out = [];
   // Out-of-stock products → stock.out toggle
@@ -3644,12 +3661,14 @@ function _buildAlerts(){
       const clean = (n.text||'').replace(/\*/g,'').replace(/\\_/g,'_');
       const lines = clean.split('\n').filter(Boolean);
       const ts = n.created_at ? new Date(n.created_at+'Z').toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}) : '';
+      const ico = icoMap[n.event_key]||'🔔';
       out.push({
         id, sev: sevMap[n.event_key]||'info',
-        ico: icoMap[n.event_key]||'🔔',
+        ico,
         pref: n.event_key,
         t: lines[0]||n.event_key,
         s: (lines.slice(1).join(' · ').slice(0,80)||'') + (ts ? (lines.length>1?' · ':'')+ts : ''),
+        onClick: _alertClickTarget(n, clean, ts, ico),
       });
     });
   }catch(e){}
@@ -5776,10 +5795,16 @@ const DETAIL = {
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Адрес</div></div><div class="dt-row-r" style="font-size:12px;max-width:60%;text-align:right">${real.gmap_link ? '<a href="'+real.gmap_link+'" target="_blank" style="color:var(--gold2)">'+( real.address && real.address!=='—' && real.address!=='GPS' ? real.address : '📍 Карта')+'</a>' : (real.address||'—')}</div></div>
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Офис</div></div><div class="dt-row-r">${real.office||'—'}</div></div>
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Статус</div></div><div class="dt-row-r" style="color:${stClr[real.status]||'var(--muted)'}">${real.status==='cancelled'?(real.cancelled_by==='operator'?'отменён оператором':'отменён клиентом'):real.status==='declined'?'отклонён оператором':(stMap[real.status]||real.status)}</div></div>
+              ${(real.status==='cancelled'||real.status==='declined') && (real.cancel_reason||real.cancel_comment) ? `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Причина ${real.status==='cancelled'&&real.cancelled_by!=='operator'?'отмены':'отклонения'}</div></div><div class="dt-row-r" style="color:var(--dn);max-width:62%;text-align:right">${[real.cancel_reason, real.cancel_comment].filter(Boolean).join(' · ')}</div></div>` : ''}
             </div>
             <div class="dt-sect">Позиции</div>
             <div class="dt-card">
-              ${real.items_short ? real.items_short.split(', ').map(it=>`<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${it}</div></div></div>`).join('') : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">нет данных</div></div></div>'}
+              ${(real.items && real.items.length)
+                ? real.items.map(it=>it.id
+                    ? `<div class="dt-row" data-detail="product:${it.id}"><div class="dt-row-l"><div class="dt-row-t">${it.name||''}</div></div><div class="dt-row-r" style="color:var(--muted)">×${it.qty||1}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>`
+                    : `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${it.name||''}</div></div><div class="dt-row-r" style="color:var(--muted)">×${it.qty||1}</div></div>`
+                  ).join('')
+                : (real.items_short ? real.items_short.split(', ').map(it=>`<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${it}</div></div></div>`).join('') : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">нет данных</div></div></div>')}
             </div>
             <div class="dt-sect">Время</div>
             <div class="dt-card">
@@ -6002,7 +6027,7 @@ const DETAIL = {
         <div class="dt-card" style="padding:14px">${line7(k.orders_7d||[], '#C9A96E')}</div>`;
     } else if(id === 'done'){
       const k = f.kpi || {};
-      hero = `<div class="dt-stat-val up" style="font-size:48px;line-height:1">${k.done||0}</div>`;
+      hero = `<div class="dt-stat-val up" style="font-size:48px;line-height:1">${k.done||0}<span class="u" style="font-size:18px;margin-left:6px">шт</span></div>`;
       body = `
         <div class="dt-sect">Доставленные заказы · ${k.done||0}</div>
         <div class="dt-card">${orderRows(k.delivered_orders)}</div>
@@ -6170,6 +6195,39 @@ const DETAIL = {
         <div style="padding:20px 16px;text-align:center;background:var(--card);border:1px solid var(--border2);border-radius:14px;margin-bottom:6px">${hero}</div>
         ${body}
       `,
+      foot:''
+    };
+  },
+
+  // Generic fallback view for a server-pushed alert that has no order/customer
+  // to deep-link into (e.g. support tickets, shift events). Shows the full,
+  // untruncated event text — the alert row itself only shows the first 80 chars.
+  alert: dkey=>{
+    const a = (window._alertDetailMap||{})[dkey] || {ev:'', ico:'🔔', text:'', ts:''};
+    const EVN = {
+      'support.new':'Новое обращение в поддержку','support.escalation':'Эскалация · поддержка','support.unresolved':'Обращение без ответа',
+      'operations.shiftStart':'Начало смены','operations.shiftEnd':'Конец смены',
+      'reviews.any':'Новый отзыв','reviews.comment':'Отзыв с комментарием','reviews.good5':'Отличный отзыв','reviews.bad3':'Плохой отзыв',
+      'stock.out':'Нет в наличии','stock.low':'Мало на складе',
+      'customers.new':'Новый клиент','customers.vip':'VIP-клиент','customers.verified':'Клиент верифицирован',
+      'orders.delivered':'Заказ доставлен'
+    };
+    const lines = (a.text||'').split('\n').filter(Boolean);
+    const name = EVN[a.ev] || (lines[0]||'Событие').replace(/^[^0-9A-Za-zА-Яа-яёЁ]+/,'').trim() || 'Событие';
+    const detail = lines.length>1 ? lines.slice(1) : lines;
+    const rows = detail.length
+      ? detail.map(ln=>{
+          ln = ln.replace(/^_([\s\S]+)_$/,'$1').trim(); // drop Telegram italic wrapping (_text_)
+          const ci = ln.indexOf(': ');
+          if(ci>0 && ci<24){
+            return `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${ln.slice(0,ci)}</div></div><div class="dt-row-r" style="max-width:62%;text-align:right;color:var(--text)">${ln.slice(ci+2)}</div></div>`;
+          }
+          return `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="font-weight:500;white-space:normal">${ln}</div></div></div>`;
+        }).join('')
+      : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">Нет деталей</div></div></div>';
+    return {
+      title:`<div class="dt-tit-av plain" style="background:var(--warn-soft);color:var(--warn);font-size:18px">${a.ico||'🔔'}</div><div><div class="dt-tit-name">${name}</div><div class="dt-sub">${a.ts?('сегодня · '+a.ts):'уведомление'}</div></div>`,
+      body:`<div class="dt-sect">Детали события</div><div class="dt-card">${rows}</div>`,
       foot:''
     };
   }

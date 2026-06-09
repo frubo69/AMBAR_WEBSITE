@@ -256,11 +256,13 @@ img{display:block}
 .pcard{background:var(--card);border:1px solid var(--border2);border-radius:var(--r);overflow:hidden;display:flex;flex-direction:column;transition:.15s}
 .pcard:active{transform:scale(.97)}
 .pimg-box{height:148px;background:linear-gradient(155deg,#0E0E1E,#090916);display:flex;align-items:center;justify-content:center;padding:10px;position:relative;overflow:hidden}
-.pimg-box::after{content:'';position:absolute;inset:0;background:linear-gradient(100deg,transparent 38%,rgba(201,169,110,.10) 50%,transparent 62%);background-size:220% 100%;animation:skShimmer 1.25s linear infinite;z-index:0;pointer-events:none}
+.pimg-box::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(201,169,110,.11),transparent);transform:translateX(-100%);animation:skSweep 2s linear infinite;z-index:0;pointer-events:none}
 .pimg-box.loaded::after{display:none}
-@keyframes skShimmer{0%{background-position:-220% 0}100%{background-position:220% 0}}
+/* seamless sweep: the band is fully off-screen at both ends, so the loop never snaps */
+@keyframes skSweep{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
 /* generic skeleton shimmer block (used for points-history loading rows) */
-.sk-block{background:linear-gradient(100deg,rgba(255,255,255,.045) 30%,rgba(201,169,110,.11) 50%,rgba(255,255,255,.045) 70%);background-size:220% 100%;animation:skShimmer 1.25s linear infinite;border-radius:7px}
+.sk-block{position:relative;overflow:hidden;background:rgba(255,255,255,.05);border-radius:7px}
+.sk-block::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(201,169,110,.14),transparent);transform:translateX(-100%);animation:skSweep 2s linear infinite}
 .pts-row.sk{pointer-events:none}
 .pimg{max-height:128px;max-width:90%;object-fit:contain;filter:drop-shadow(0 6px 20px rgba(0,0,0,.7));position:relative;z-index:1}
 .pbadge{position:absolute;font-size:8px;letter-spacing:1px;text-transform:uppercase;padding:3px 7px;border-radius:6px;font-weight:700;z-index:2}

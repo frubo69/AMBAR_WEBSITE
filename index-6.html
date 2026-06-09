@@ -5041,12 +5041,14 @@ function renderSearchSuggest(){
 }
 function showSearchSuggest(){
   renderSearchSuggest();
-  const panel=el('search-suggest'),inp=el('search-inp');if(!panel||!inp)return;
+  const panel=el('search-suggest');
+  const anchor=document.querySelector('.search-wrap')||el('search-inp'); // align to the visual search bar, not the inner input
+  if(!panel||!anchor)return;
   if(!panel.firstChild){hideSearchSuggest();return;}
-  const r=inp.getBoundingClientRect();
-  panel.style.left=Math.round(Math.max(8,r.left-4))+'px';
-  panel.style.right=Math.round(Math.max(8,window.innerWidth-r.right-4))+'px';
-  panel.style.top=Math.round(r.bottom+8)+'px';
+  const r=anchor.getBoundingClientRect();
+  panel.style.left=Math.round(r.left)+'px';
+  panel.style.right=Math.round(window.innerWidth-r.right)+'px';
+  panel.style.top=Math.round(r.bottom+6)+'px';
   panel.classList.add('show');
 }
 function hideSearchSuggest(){const p=el('search-suggest');if(p)p.classList.remove('show');}

@@ -1082,6 +1082,12 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
    support / rename / vip / dnote / budget / notifs / about sheets).        */
 .sheet-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:18px}
 .sheet-hdr-ttl{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)}
+/* promo detail sheet (tap the promo hero card → its story) */
+.pinfo-badge{font-family:'DM Sans',sans-serif;font-size:54px;font-weight:800;line-height:1;letter-spacing:-1.5px;text-align:center;margin:2px 0 14px;background:linear-gradient(135deg,var(--gold),var(--gold2),var(--gold));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+.pinfo-lead{font-size:14px;line-height:1.6;color:var(--sub);text-align:center;margin:0 2px 20px}
+.pinfo-list{display:flex;flex-direction:column;gap:12px;margin-bottom:22px}
+.pinfo-item{display:flex;align-items:flex-start;gap:11px;font-size:13.5px;line-height:1.4;color:var(--text)}
+.pinfo-item svg{width:18px;height:18px;color:var(--gold2);flex-shrink:0;margin-top:1px}
 .cancel-hero{display:flex;gap:14px;align-items:flex-start;padding:18px 2px 18px;border-bottom:1px solid var(--border2);margin-bottom:18px}
 .cancel-hero-ic{width:42px;height:42px;border-radius:12px;background:radial-gradient(circle at 30% 30%,rgba(224,85,85,.22),rgba(224,85,85,.06));border:1px solid rgba(224,85,85,.28);display:flex;align-items:center;justify-content:center;color:rgba(255,140,140,.95);flex-shrink:0;box-shadow:inset 0 0 0 1px rgba(255,255,255,.03)}
 .cancel-hero-txt{flex:1;min-width:0}
@@ -1645,7 +1651,7 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
     </div>
   </div>
   <!-- ═══ PROMO HERO BANNER ═══ -->
-  <div id="promo-hero" class="promo-hero has-img" style="display:none" onclick="dismissPromoHero()">
+  <div id="promo-hero" class="promo-hero has-img" style="display:none" onclick="showPromoInfo()">
     <button class="promo-hero-close" onclick="event.stopPropagation();dismissPromoHero()" aria-label="Close">✕</button>
     <img id="promo-hero-img" class="promo-hero-img" src="" alt="promo">
   </div>
@@ -2162,6 +2168,18 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
 </div>
 
 <!-- CRYPTO WALLET PICKER SHEET -->
+<div class="cancel-ov" id="promo-info-ov" onclick="if(event.target===this)_closeSheet('promo-info-ov')" style="z-index:9300">
+  <div class="cancel-sheet">
+    <div class="sheet-hdr">
+      <div class="sheet-hdr-ttl" id="pinfo-title">ЦЕНЫ ДЛЯ СВОИХ</div>
+    </div>
+    <div class="pinfo-badge">−5%</div>
+    <div class="pinfo-lead" id="pinfo-lead"></div>
+    <div class="pinfo-list" id="pinfo-list"></div>
+    <button class="btn-main" id="pinfo-cta" onclick="_closeSheet('promo-info-ov')">Понятно</button>
+  </div>
+</div>
+
 <div class="cancel-ov" id="cpw-ov" onclick="if(event.target===this)closeCryptoWalletSheet()" style="z-index:9200">
   <div class="cancel-sheet">
     <div class="sheet-hdr">
@@ -3626,6 +3644,21 @@ function initPromo(){
   // overlay is going to show first, it fires the promo itself once dismissed.
   if(_hsPending) return;
   _maybeShowPromo();
+}
+// Tapping the promo hero card opens its story (the ✕ still dismisses the card).
+function showPromoInfo(){
+  const ru=lang==='ru';
+  set('pinfo-title', ru?'ЦЕНЫ ДЛЯ СВОИХ':'INSIDER PRICING');
+  set('pinfo-lead', ru
+    ? '−5% на весь каталог — всегда. Это не разовая акция, а постоянная привилегия для всех, кто заказывает через приложение AMBAR.'
+    : '−5% on the whole catalog — always. Not a one-off sale, but a standing privilege for everyone who orders through the AMBAR app.');
+  const items = ru
+    ? ['На все товары каталога','Применяется автоматически — без промокодов','Только в приложении, всегда']
+    : ['On every product in the catalog','Applied automatically — no promo codes','In the app, always'];
+  const check='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="8.5 12 11 14.5 15.5 9.5"/></svg>';
+  const list=el('pinfo-list'); if(list)list.innerHTML=items.map(t=>'<div class="pinfo-item">'+check+'<span>'+t+'</span></div>').join('');
+  set('pinfo-cta', ru?'Понятно':'Got it');
+  _openSheet('promo-info-ov');
 }
 function dismissPromoHero(){
   localStorage.setItem(_PROMO_HERO_KEY,String(Date.now()));

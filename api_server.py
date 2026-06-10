@@ -864,6 +864,71 @@ async def handle_crypto_invoice_get(request: web.Request) -> web.Response:
     }, headers=CORS_HEADERS)
 
 
+# ── Crypto receipt: branded PDF built from our own verified on-chain record ─────
+# POST /api/crypto/receipt        → owner-authed; returns a short-lived signed
+#                                   {exp, sig} the client turns into a GET URL.
+# GET  /api/crypto/receipt/{oid}  → validates the signature → renders the PDF.
+# No private data in the URL — the sig is a capability token (HMAC, 10-min TTL).
+_RECEIPT_SECRET = (os.getenv("AMBAR_RECEIPT_SECRET") or BOT_TOKEN or "ambar-receipt").encode()
+
+
+def _receipt_sig(oid: str, exp: int) -> str:
+    return hmac.new(_RECEIPT_SECRET, f"{oid}:{exp}".encode(), hashlib.sha256).hexdigest()[:40]
+
+
+async def handle_crypto_receipt_create(request: web.Request) -> web.Response:
+    if request.method == "OPTIONS":
+        return web.Response(status=200, headers=CORS_HEADERS)
+    auth = request.headers.get("Authorization", "")
+    user = validate_init_data(auth[4:] if auth.startswith("tma ") else "")
+    if not user:
+        return web.json_response({"error": "auth failed"}, status=401, headers=CORS_HEADERS)
+    uid = user.get("id")
+    try:
+        data = await request.json()
+    except Exception:
+        data = {}
+    oid = (data.get("order_id") or "").strip()
+    order = await db.get_order(oid)
+    if not order or order.get("customer_id") not in (uid, str(uid)):
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    if order.get("payment_method") != "crypto" or not order.get("paid"):
+        return web.json_response({"error": "not_crypto"}, status=400, headers=CORS_HEADERS)
+    exp = int(time.time()) + 600  # 10-minute capability token
+    return web.json_response({"order_id": oid, "exp": exp, "sig": _receipt_sig(oid, exp)},
+                             headers=CORS_HEADERS)
+
+
+async def handle_crypto_receipt_pdf(request: web.Request) -> web.Response:
+    if request.method == "OPTIONS":
+        return web.Response(status=200, headers=CORS_HEADERS)
+    oid = request.match_info.get("oid", "")
+    try:
+        exp = int(request.query.get("exp", "0"))
+    except ValueError:
+        exp = 0
+    sig = request.query.get("sig", "")
+    if not oid or exp < int(time.time()) or not hmac.compare_digest(sig, _receipt_sig(oid, exp)):
+        return web.Response(status=403, text="link expired", headers=CORS_HEADERS)
+    order = await db.get_order(oid)
+    if not order:
+        return web.Response(status=404, text="not found", headers=CORS_HEADERS)
+    try:
+        from crypto_receipt import build_receipt
+        pdf = build_receipt(order, to_address=TRON_RECEIVE_ADDRESS,
+                            from_address=order.get("crypto_from") or "")
+    except ImportError:
+        log.warning("[receipt] fpdf2 not installed on this host — run: pip install fpdf2")
+        return web.json_response({"error": "pdf_unavailable"}, status=503, headers=CORS_HEADERS)
+    except Exception as e:
+        log.error(f"[receipt] build failed for {oid}: {e}")
+        return web.json_response({"error": "build_failed"}, status=500, headers=CORS_HEADERS)
+    headers = dict(CORS_HEADERS)
+    headers["Content-Type"] = "application/pdf"
+    headers["Content-Disposition"] = f'inline; filename="AMBAR-{oid}.pdf"'
+    return web.Response(body=pdf, headers=headers)
+
+
 # ── Crypto watcher: confirm on-chain payments + promote to real orders ─────────
 # Background task (started in on_startup). Read-only against the chain via
 # tron.py — it never holds keys. Crediting happens ONLY on confirmed
@@ -2024,6 +2089,10 @@ def main():
     app.router.add_post(           "/api/crypto/invoice",        handle_crypto_invoice_create)
     app.router.add_route("OPTIONS", "/api/crypto/invoice/{oid}", handle_crypto_invoice_get)
     app.router.add_get(            "/api/crypto/invoice/{oid}",  handle_crypto_invoice_get)
+    app.router.add_route("OPTIONS", "/api/crypto/receipt",       handle_crypto_receipt_create)
+    app.router.add_post(           "/api/crypto/receipt",        handle_crypto_receipt_create)
+    app.router.add_route("OPTIONS", "/api/crypto/receipt/{oid}", handle_crypto_receipt_pdf)
+    app.router.add_get(            "/api/crypto/receipt/{oid}",  handle_crypto_receipt_pdf)
     app.router.add_route("OPTIONS", "/api/cancel-order",       handle_cancel_order)
     app.router.add_post(           "/api/cancel-order",        handle_cancel_order)
     app.router.add_route("OPTIONS", "/api/support/send",       handle_support_send)

@@ -53,8 +53,9 @@ def _parse_id_set(env_name: str) -> set[int]:
 CRYPTO_PAYMENTS_FOR_ALL = os.getenv("CRYPTO_PAYMENTS_FOR_ALL", "").strip().lower() in ("1", "true", "yes", "on")
 # Admins who get the live flow during rollout: explicit allowlist + every staff
 # role we already know about (operators/managers/admins/owners) + the founder.
+_CRYPTO_TEST_IDS = _parse_id_set("AMBAR_CRYPTO_TEST_IDS")  # exact ids for the test-price override
 _CRYPTO_ALLOWLIST = (
-    _parse_id_set("AMBAR_CRYPTO_TEST_IDS")
+    _CRYPTO_TEST_IDS
     | _parse_id_set("AMBAR_ADMIN_IDS")
     | _parse_id_set("AMBAR_OWNER_IDS")
     | _parse_id_set("AMBAR_MANAGER_IDS")
@@ -761,9 +762,10 @@ async def handle_crypto_invoice_create(request: web.Request) -> web.Response:
     # converted at the server-authoritative USDT/AED rate. amount_aed stays the
     # goods value; the surcharge lives only in the USDT amount we credit on-chain.
     base_usdt = total_aed * (1.0 + CRYPTO_FEE_PCT / 100.0) * CRYPTO_USDT_PER_AED
-    # Admin/owner TEST override: a tiny fixed USDT so the whole on-chain flow can
-    # be tested for cents. Allowlist-gated — real customers are never affected.
-    if CRYPTO_TEST_USDT > 0 and (uid in _CRYPTO_ALLOWLIST or uid == _FOUNDER_ID):
+    # TEST override: a tiny fixed USDT so the whole on-chain flow can be tested for
+    # cents. Restricted to AMBAR_CRYPTO_TEST_IDS — applies ONLY to those exact
+    # accounts; everyone else (admins included) pays the real amount.
+    if CRYPTO_TEST_USDT > 0 and uid in _CRYPTO_TEST_IDS:
         base_usdt = CRYPTO_TEST_USDT
         log.info(f"[crypto] TEST amount uid={uid}: {base_usdt} USDT (order {oid}; real total {total_aed} AED)")
     payload = _crypto_order_payload(data, uid, user, oid, total_aed)

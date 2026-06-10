@@ -474,20 +474,21 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
     # Prepaid (crypto) orders are already settled — flag it so the operator does
     # NOT collect cash on delivery.
     if prepaid and prepaid.get("test"):
-        # DEMO crypto order: real wallet/watcher not connected yet, so the
-        # "payment" is simulated. Loud caption so the operator never mistakes it
-        # for a settled order. This whole branch disappears once CRYPTO_REAL_MODE
-        # is on (client paid-claims are rejected upstream in handle_create_order).
+        # DEMO crypto order (real wallet/watcher not connected). Loud warning so the
+        # operator never mistakes it for a settled order. Inert once CRYPTO_REAL_MODE.
         paid_banner = (
-            "<blockquote>🧪🧪🧪 <b>TEST CRYPTO ORDER</b> 🧪🧪🧪\n"
+            "\n\n<blockquote>🧪🧪🧪 <b>TEST CRYPTO ORDER</b> 🧪🧪🧪\n"
             "<b>НЕ НАСТОЯЩАЯ ОПЛАТА</b> — демо крипто-оплаты, реальный кошелёк ещё "
             "не подключён. Не выдавайте заказ как оплаченный.\n"
-            f"Заявленная сумма: {_html_mod.escape(str(prepaid.get('amount_usdt')))} USDT</blockquote>\n\n"
+            f"Заявленная сумма: {_html_mod.escape(str(prepaid.get('amount_usdt')))} USDT</blockquote>"
         )
     elif prepaid:
+        # Settled online (crypto). Sits right after the total + highlighted, so the
+        # operator clearly sees it's already paid and must NOT collect cash.
         paid_banner = (
-            f"<blockquote>💳 <b>ОПЛАЧЕНО ОНЛАЙН · {_html_mod.escape(str(prepaid.get('method', 'USDT')))}</b>\n"
-            f"Сумма: {prepaid.get('amount_usdt')} USDT</blockquote>\n\n"
+            "\n\n<blockquote>✅💎 <b>ОПЛАЧЕНО ОНЛАЙН — КРИПТА</b>\n"
+            f"💵 USDT · TRC-20 · <b>{prepaid.get('amount_usdt')} USDT</b>\n"
+            "☑️ Уже зачислено — <b>наличные НЕ брать</b></blockquote>"
         )
     else:
         paid_banner = ""
@@ -495,13 +496,13 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
     _comment_esc = _html_mod.escape(comment) if comment else ""
     op_text = (
         f"{first_order_banner}"
-        f"{paid_banner}"
         f"🏢 Офис: <b>{_html_mod.escape(office_nm)}</b>\n\n"
         f"🆕 <b>НОВЫЙ ЗАКАЗ #{oid}</b>\n\n"
         f"{addr_line}\n\n"
         f"🛒 <b>Позиции:</b>\n{item_lines}\n"
         f"{tip_line}"
         f"\n💰 <b>Итого: {total} AED</b>"
+        f"{paid_banner}"
         + (f"\n\n💬 <b>Комментарий:</b> {_comment_esc}" if comment else "")
     )
     # For every first-order user (including referrals) delay operator

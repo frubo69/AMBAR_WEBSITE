@@ -6119,7 +6119,7 @@ function cryptoSetStatus(st){
   if(inv)inv.status=st;
   const tw=el('cp-timer-wrap'); if(tw)tw.style.display=(st==='detected'||st==='confirmed')?'none':'';
   const map={
-    waiting:{t:ru?'Ожидаем оплату…':'Waiting for payment…', s: CRYPTO_SIM ? (ru?'После перевода нажмите «Я оплатил — проверить»':'After paying, tap “I’ve paid — check”') : (ru?'Поймаем перевод автоматически':'We\'ll detect it automatically')},
+    waiting:{t:ru?'Ожидаем оплату…':'Waiting for payment…', s: CRYPTO_SIM ? (ru?'После перевода нажмите «Я оплатил — проверить»':'After paying, tap “I’ve paid — check”') : (ru?'Проверяем сеть — поймаем перевод автоматически':'Checking the network — we\'ll catch it automatically')},
     detected:{t:ru?'Платёж обнаружен':'Payment detected', s:ru?'Ждём подтверждений сети':'Waiting for network confirmations'},
     confirmed:{t:ru?'Оплата подтверждена':'Payment confirmed', s:ru?'Передаём заказ оператору…':'Sending your order to the operator…'},
     expired:{t:ru?'Время оплаты истекло':'Payment window expired', s:ru?'Запросите новый счёт, чтобы продолжить':'Request a new invoice to continue'},
@@ -6347,7 +6347,18 @@ async function cryptoPollStatus(){
     if(d.txid)inv.txid=d.txid;
     if(typeof d.confirmations==='number')inv.conf=d.confirmations;
     if(typeof d.required_confirmations==='number')inv.reqConf=d.required_confirmations;
-    if(d.status==='confirmed'||d.status==='paid'){ cryptoSetStatus('confirmed'); _cpOnConfirmed(inv); }
+    if(d.status==='confirmed'||d.status==='paid'){
+      // Server confirmed on-chain. Play a short verification climb (detected →
+      // confirmations 1..N) before success, so the user sees it being checked
+      // instead of an instant jump. Runs once.
+      if(!inv._verifying){
+        inv._verifying=true;
+        cryptoStopWatch();            // stop polling; the climb finishes the flow
+        inv.conf=0;
+        cryptoSetStatus('detected');
+        _cpResumeClimb();             // climbs conf→reqConf, then confirmed + success
+      }
+    }
     else if(d.status==='detected'||d.status==='pending'){ cryptoSetStatus('detected'); }
     else if(d.status==='expired'){ cryptoExpire(); }
   }catch(e){}

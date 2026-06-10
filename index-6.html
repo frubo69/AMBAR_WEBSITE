@@ -593,6 +593,11 @@ img{display:block}
 .o-row-qty{font-size:12px;font-weight:600;color:var(--sub);flex-shrink:0;background:var(--bg3);border-radius:6px;padding:2px 7px}
 /* bottom bar: status left, total right */
 .ocard-foot{display:flex;justify-content:space-between;align-items:center;padding:9px 14px;border-top:1px solid var(--border2)}
+/* crypto-paid order: minimalist gold marker + tronscan link */
+.o-crypto-tag{display:inline-flex;align-items:center;gap:3px;font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--gold2);background:rgba(201,169,110,.13);border:1px solid rgba(201,169,110,.3);border-radius:999px;padding:2px 7px;margin-left:8px;vertical-align:middle}
+.ocard-crypto{box-shadow:0 0 0 1px rgba(201,169,110,.16),0 3px 16px rgba(201,169,110,.06)}
+.o-tx-link{font-size:11px;font-weight:600;color:var(--gold2);text-decoration:none;font-family:'DM Sans',sans-serif;display:inline-flex;align-items:center;gap:3px;-webkit-tap-highlight-color:transparent}
+.o-tx-link:active{opacity:.6}
 .o-status{font-size:11px;font-weight:600;display:flex;align-items:center;gap:6px;letter-spacing:.2px}
 .o-status-dot{width:6px;height:6px;border-radius:50%;flex-shrink:0}
 .sp .o-status{color:var(--gold)}
@@ -2366,7 +2371,7 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
   </div>
   <!-- Center pin -->
   <div class="map-pin-dot" id="map-center-pin">
-    <img src="pin.png" width="52" height="52" style="display:block;filter:drop-shadow(0 3px 8px rgba(0,0,0,.6))">
+    <img src="TEXTURES/pin.png" width="52" height="52" style="display:block;filter:drop-shadow(0 3px 8px rgba(0,0,0,.6))">
   </div>
   <div class="map-pin-shadow" id="map-pin-shadow"></div>
   <!-- Layer toggle -->
@@ -2438,7 +2443,7 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
       <div class="gps-mini-map-wrap">
         <div id="gps-mini-map-el" class="gps-mini-map-el"></div>
         <div class="gps-mini-pin" id="gps-mini-pin">
-          <img src="pin.png" width="36" height="36" style="display:block;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5))">
+          <img src="TEXTURES/pin.png" width="36" height="36" style="display:block;filter:drop-shadow(0 2px 6px rgba(0,0,0,.5))">
         </div>
         <!-- locate pill inside the map, bottom-left (only in edit mode) -->
         <div class="gps-locate-pill" id="gps-locate-pill" onclick="_gpsMiniLocateMe()">
@@ -2575,7 +2580,7 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
   </div>
   <div class="aob-track">
     <div class="aob-fill pending" id="aob-fill" style="width:0%"></div>
-    <div class="aob-moto" id="aob-moto" style="left:0%;display:none"><img src="pin.png" width="22" height="22" style="display:block"></div>
+    <div class="aob-moto" id="aob-moto" style="left:0%;display:none"><img src="TEXTURES/pin.png" width="22" height="22" style="display:block"></div>
   </div>
   <div class="aob-dots" id="aob-dots" style="display:none"></div>
 </div>
@@ -2591,7 +2596,7 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
     <div class="aod-prog">
       <div class="aod-big-track" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Order progress" id="aod-big-track">
         <div class="aod-big-fill pending" id="aod-big-fill" style="width:0%"></div>
-        <div class="aod-big-moto" id="aod-big-moto" style="left:0%;display:none"><img src="pin.png" width="28" height="28" alt="" style="display:block"></div>
+        <div class="aod-big-moto" id="aod-big-moto" style="left:0%;display:none"><img src="TEXTURES/pin.png" width="28" height="28" alt="" style="display:block"></div>
       </div>
       <div class="aod-stages">
         <div class="aod-stage" id="aod-s0">
@@ -3871,6 +3876,8 @@ function go(p){
   // Mark other pages hidden (no transition needed — already invisible)
   PAGES.forEach(id=>{if(id!==p&&id!==prev)el('pg-'+id)?.classList.add('hidden');});
   cpbUpdate(); // show/hide the crypto pay reminder bar for this page
+  // Hide the active-order bar immediately on the pay screen (the next poll keeps it hidden).
+  if(p==='pay'){const _aob=el('aob');if(_aob)_aob.classList.add('aob-hidden');document.body.classList.remove('aob-on');}
   requestAnimationFrame(_reserveForBars); setTimeout(_reserveForBars,260); // pad inner scrollers (profile/orders) to clear the floating bars
   if(p==='catalog'&&_catalogScroll>0){requestAnimationFrame(()=>{const pg=el('pg-catalog');if(pg)pg.scrollTop=_catalogScroll;});}
   // 3) Heavy renders — deferred so pill animates on GPU undisturbed
@@ -6792,8 +6799,11 @@ function renderOrders(){
       :isActive
         ?`<div class="ocard-actions"><button class="ocard-support-btn" onclick="event.stopPropagation();openSupportChat('${o.order_id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>${t('supportBtn')}</button><button class="ocard-cancel-btn" onclick="event.stopPropagation();openCancelSheetFor('${o.order_id}')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>${lang==='ru'?'Отменить':'Cancel'}</button></div>`
         :'';
+    const ru=lang==='ru';
+    const isCrypto=o.payment_method==='crypto'||!!o.crypto_txid||!!(o.crypto&&o.crypto.txid);
+    const cTx=o.crypto_txid||(o.crypto&&o.crypto.txid)||'';
     const statusBadge=`<span class="o-status-badge o-sbg-${st}"><span class="o-status-dot"></span>${(lbl2[o.status]||lbl2.pending)()}</span>`;
-    const cardHtml=`<div class="ocard ${st}"><div class="ocard-inner"><div class="ocard-meta"><div class="o-meta-left"><span class="o-id">#${o.order_id}</span><span class="o-date">${fmtDate(o.timestamp)}</span></div>${statusBadge}</div><div class="o-rows">${rows}</div><div class="ocard-foot"><div class="o-total"><span class="o-total-num">${o.total}</span><span class="o-total-cur">AED</span></div></div></div>${actionsHtml}</div>`;
+    const cardHtml=`<div class="ocard ${st}${isCrypto?' ocard-crypto':''}"><div class="ocard-inner"><div class="ocard-meta"><div class="o-meta-left"><span class="o-id">#${o.order_id}</span><span class="o-date">${fmtDate(o.timestamp)}</span>${isCrypto?'<span class="o-crypto-tag">USDT</span>':''}</div>${statusBadge}</div><div class="o-rows">${rows}</div><div class="ocard-foot"${isCrypto&&cTx?' style="justify-content:space-between"':''}><div class="o-total"><span class="o-total-num">${o.total}</span><span class="o-total-cur">AED</span></div>${isCrypto&&cTx?`<a href="https://tronscan.org/#/transaction/${cTx}" target="_blank" rel="noopener" class="o-tx-link" onclick="event.stopPropagation()">${ru?'Транзакция':'Transaction'} ↗</a>`:''}</div></div>${actionsHtml}</div>`;
     if(isFinished){
       return`<div class="ocard-swipe-wrap" data-oidx="${idx}"><div class="ocard-swipe-del" onclick="confirmOrderDel(${idx})"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></div><div class="ocard-swipe-body">${cardHtml}</div></div>`;
     }
@@ -8582,7 +8592,10 @@ async function checkActiveOrder(){
       _aobOrders=d.orders;
       if(_aobIdx>=_aobOrders.length)_aobIdx=0;
       _renderAob();
-      if(!el('pdm-overlay').classList.contains('show')){bar.classList.remove('aob-hidden');document.body.classList.add('aob-on');}
+      // Don't surface the active-order bar while the user is on the crypto pay
+      // screen — the pay screen shows its own status; the bar reads as messy there.
+      if(!el('pdm-overlay').classList.contains('show')&&curPg!=='pay'){bar.classList.remove('aob-hidden');document.body.classList.add('aob-on');}
+      else if(curPg==='pay'){bar.classList.add('aob-hidden');document.body.classList.remove('aob-on');}
       // Detect status changes and fire notifications
       const _ru=lang==='ru';
       d.orders.forEach(o=>{
@@ -9025,7 +9038,7 @@ let _gameFailAudio=null;
 let _gameMuted=localStorage.getItem('ambar_game_muted')==='1';
 
 function _gamePlayMusic(){
-  if(!_gameAudio){_gameAudio=new Audio('new_music.mp3');_gameAudio.loop=true;_gameAudio.volume=0.02;_gameAudio.preload='auto';}
+  if(!_gameAudio){_gameAudio=new Audio('TEXTURES/GAME/MUSIC/new_music.mp3');_gameAudio.loop=true;_gameAudio.volume=0.02;_gameAudio.preload='auto';}
   if(!_gameMuted){_gameAudio.play().catch(()=>{});}
 }
 function _gameStopMusic(){
@@ -9040,10 +9053,10 @@ function _gameToggleMute(){
 }
 
 const _PNG_ASSETS={
-  player:'bike.png',
-  obs0:'obstacle_1.png',
-  obs1:'obstacle_2.png',
-  coin:'coin.png',
+  player:'TEXTURES/GAME/bike.png',
+  obs0:'TEXTURES/GAME/obstacle_1.png',
+  obs1:'TEXTURES/GAME/obstacle_2.png',
+  coin:'TEXTURES/GAME/coin.png',
 };
 
 function _preloadGameAssets(){
@@ -9060,13 +9073,13 @@ function _preloadGameAssets(){
   });
   // Preload audio
   if(!_gameAudio){
-    _gameAudio=new Audio('new_music.mp3');
+    _gameAudio=new Audio('TEXTURES/GAME/MUSIC/new_music.mp3');
     _gameAudio.loop=true;
     _gameAudio.volume=0.02;
     _gameAudio.preload='auto';
   }
   if(!_gameFailAudio){
-    _gameFailAudio=new Audio('new_fail.mp3');
+    _gameFailAudio=new Audio('TEXTURES/GAME/MUSIC/new_fail.mp3');
     _gameFailAudio.volume=0.35;
     _gameFailAudio.preload='auto';
   }
@@ -9237,7 +9250,7 @@ function _gameDead(){
   el('game-over-screen').classList.add('is-open');
   _gameStopMusic();
   if(!_gameMuted){
-    if(!_gameFailAudio){_gameFailAudio=new Audio('new_fail.mp3');_gameFailAudio.volume=0.35;}
+    if(!_gameFailAudio){_gameFailAudio=new Audio('TEXTURES/GAME/MUSIC/new_fail.mp3');_gameFailAudio.volume=0.35;}
     _gameFailAudio.currentTime=0;
     _gameFailAudio.play().catch(()=>{});
   }

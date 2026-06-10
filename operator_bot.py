@@ -465,6 +465,13 @@ async def order_card(o, full=True):
     lines.append("")
     if o.get("tip"): lines.append(f"🎁 Чаевые: {o['tip']} AED")
     lines.append(f"💰 <b>Итого: {o.get('total',0)} AED</b>")
+    # Crypto-paid orders: keep the "already paid" banner on the card through every
+    # lifecycle state (accepted/delivered) so the operator never collects cash.
+    if o.get("payment_method") == "crypto" and o.get("paid"):
+        amt = o.get("crypto_amount_usdt", "?")
+        lines.append("")
+        lines.append("<blockquote>✅💎 <b>ОПЛАЧЕНО КРИПТОЙ</b>\n"
+                     f"{amt} USDT · TRC-20 — наличные НЕ брать</blockquote>")
     comment = o.get("comment", "").strip()
     if comment:
         lines.append("")

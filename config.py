@@ -71,6 +71,11 @@ CRYPTO_USDT_PER_AED  = _getenv_float("AMBAR_CRYPTO_USDT_PER_AED", 1.0 / 3.6725)
 # goods_total × (1 + CRYPTO_FEE_PCT/100), converted to USDT. The order's AED total
 # stays the goods value — this is purely the payment-method fee.
 CRYPTO_FEE_PCT       = _getenv_float("AMBAR_CRYPTO_FEE_PCT", 10.0)
+# Admin/owner TEST override (USDT). When > 0, accounts in the admin/owner/founder
+# set are charged this tiny fixed amount instead of the real order total — so the
+# whole on-chain pay → detect → confirm flow can be tested for cents. Real
+# customers are NEVER affected (allowlist-gated). Leave unset (0) in production.
+CRYPTO_TEST_USDT     = _getenv_float("AMBAR_CRYPTO_TEST_USDT", 0.0)
 # Required confirmations before crediting. TronGrid's only_confirmed already
 # returns irreversible (solidified) transfers; this is a display/extra guard.
 CRYPTO_REQUIRED_CONF = _getenv_int("AMBAR_CRYPTO_REQUIRED_CONF", 19)

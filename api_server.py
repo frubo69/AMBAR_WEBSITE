@@ -22,7 +22,7 @@ from customer_card import render_customer_card
 from config import (
     CRYPTO_REAL_MODE, CRYPTO_USDT_PER_AED, CRYPTO_REQUIRED_CONF,
     CRYPTO_TTL_MIN, CRYPTO_AMOUNT_STEP, TRON_RECEIVE_ADDRESS,
-    CRYPTO_WATCH_INTERVAL_SEC, CRYPTO_WATCH_DRYRUN, CRYPTO_FEE_PCT,
+    CRYPTO_WATCH_INTERVAL_SEC, CRYPTO_WATCH_DRYRUN, CRYPTO_FEE_PCT, CRYPTO_TEST_USDT,
 )
 from tron import get_incoming_usdt
 
@@ -761,6 +761,11 @@ async def handle_crypto_invoice_create(request: web.Request) -> web.Response:
     # converted at the server-authoritative USDT/AED rate. amount_aed stays the
     # goods value; the surcharge lives only in the USDT amount we credit on-chain.
     base_usdt = total_aed * (1.0 + CRYPTO_FEE_PCT / 100.0) * CRYPTO_USDT_PER_AED
+    # Admin/owner TEST override: a tiny fixed USDT so the whole on-chain flow can
+    # be tested for cents. Allowlist-gated — real customers are never affected.
+    if CRYPTO_TEST_USDT > 0 and (uid in _CRYPTO_ALLOWLIST or uid == _FOUNDER_ID):
+        base_usdt = CRYPTO_TEST_USDT
+        log.info(f"[crypto] TEST amount uid={uid}: {base_usdt} USDT (order {oid}; real total {total_aed} AED)")
     payload = _crypto_order_payload(data, uid, user, oid, total_aed)
     reserved = await db.reserved_crypto_amounts()
 

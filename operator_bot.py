@@ -447,6 +447,12 @@ async def order_card(o, full=True):
     except Exception:
         pass
     lines.extend([f"🏢 Офис: <b>{_esc(o.get('office_name','—'))}</b>", ""])
+    # Crypto-paid: loud banner right at the top so the operator sees "already paid —
+    # don't collect cash" first. Persists through every lifecycle state.
+    if o.get("payment_method") == "crypto" and o.get("paid"):
+        lines.append("<blockquote>✅💎 <b>ОПЛАЧЕНО КРИПТОЙ</b>\n"
+                     f"{o.get('crypto_amount_usdt', '?')} USDT · TRC-20 — наличные НЕ брать</blockquote>")
+        lines.append("")
     lines.append(f"🆕 <b>НОВЫЙ ЗАКАЗ #{o['order_id']}</b>")
     lines.append("")
     if full:
@@ -465,13 +471,6 @@ async def order_card(o, full=True):
     lines.append("")
     if o.get("tip"): lines.append(f"🎁 Чаевые: {o['tip']} AED")
     lines.append(f"💰 <b>Итого: {o.get('total',0)} AED</b>")
-    # Crypto-paid orders: keep the "already paid" banner on the card through every
-    # lifecycle state (accepted/delivered) so the operator never collects cash.
-    if o.get("payment_method") == "crypto" and o.get("paid"):
-        amt = o.get("crypto_amount_usdt", "?")
-        lines.append("")
-        lines.append("<blockquote>✅💎 <b>ОПЛАЧЕНО КРИПТОЙ</b>\n"
-                     f"{amt} USDT · TRC-20 — наличные НЕ брать</blockquote>")
     comment = o.get("comment", "").strip()
     if comment:
         lines.append("")

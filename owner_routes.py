@@ -682,15 +682,46 @@ async def notify_owners(event_key: str, text: str, parse_mode: str = "Markdown")
     return sent
 
 
+async def notify_owners_force(event_key: str, text: str, parse_mode: str = "Markdown") -> None:
+    """Send to EVERY owner/manager, bypassing prefs + quiet hours — for critical
+    alerts (crypto-paid orders, order edits) that must always be seen."""
+    try:
+        await db.insert_notification(event_key, text)
+    except Exception as e:
+        log.error(f"[owner-notif] persist {event_key} failed: {e}")
+    if not OWNER_BOT_TOKEN:
+        return
+    try:
+        ids = await db.get_all_manager_ids()
+    except Exception as e:
+        log.error(f"[owner-notif] force lookup failed: {e}")
+        return
+    log.info(f"[owner-notif] FORCE {event_key} → {len(ids)} owners: {ids}")
+    for oid in ids:
+        try:
+            await tg_send(OWNER_BOT_TOKEN, oid, text, parse_mode=parse_mode)
+        except Exception as e:
+            log.error(f"[owner-notif] force {event_key} → {oid} failed: {e}")
+
+
 async def notify_new_order(oid, total, user_name, phone, address, office,
-                           uid, founder_id, premium_ids, worldwide_ids):
-    """Send exactly one new-order message per user at their highest matching tier.
-    Tiers (highest first): orders.new1000 → orders.new500 → orders.new.
-    VIP notification is independent (separate event key, never duplicates)."""
+                           uid, founder_id, premium_ids, worldwide_ids,
+                           items=None, prepaid=None):
+    """Send exactly one new-order message per user at their highest matching tier
+    (orders.new1000 → orders.new500 → orders.new). VIP notification is independent.
+    Crypto-paid orders (prepaid set) ALWAYS reach every owner, bypassing the tier
+    filters AND quiet hours."""
+    items_txt = "\n".join(
+        f"• {it.get('name','')} ×{it.get('qty',1)}" for it in (items or [])
+    ) or "—"
     base = (f"Сумма: *{total} AED*\n"
             f"Клиент: {user_name} ({phone})\n"
             f"Адрес: {address}\n"
-            f"Офис: {office}")
+            f"Офис: {office}\n"
+            f"🛒 Позиции:\n{items_txt}")
+    if prepaid:
+        base += (f"\n\n✅💎 *ОПЛАЧЕНО КРИПТОЙ*\n"
+                 f"{prepaid.get('amount_usdt')} USDT · TRC-20 — наличные НЕ брать")
 
     tiers = []
     if total >= 1000:
@@ -711,30 +742,43 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
         log.warning("[owner-notif] OWNER_BOT_TOKEN empty — skipping new-order notify")
         return
 
-    # Build per-user: pick the highest tier they're subscribed to.
-    all_subs = {}
-    for event_key, _ in tiers:
+    if prepaid:
+        # CRYPTO-PAID → notify EVERY owner/manager, ignoring tier filters + quiet.
+        head = ("💎 Очень крупный заказ" if total >= 1000
+                else ("💰 Крупный заказ" if total >= 500 else "🆕 Новый заказ"))
+        crypto_text = f"*{head} #{oid}* · 💳 КРИПТА\n\n{base}"
         try:
-            ids = await db.get_owners_subscribed_to(event_key)
-            log.info(f"[owner-notif] {event_key} subscribers: {ids}")
+            recipients = set(await db.get_all_manager_ids())
         except Exception as e:
-            log.error(f"[owner-notif] subscriber lookup {event_key} failed: {e}")
-            ids = []
-        for uid_sub in ids:
-            if uid_sub not in all_subs:
-                all_subs[uid_sub] = event_key
-
-    log.info(f"[owner-notif] new-order #{oid} total={total} → {len(all_subs)} recipients: {all_subs}")
-
-    # Send one message per user.
-    tier_text = {ek: txt for ek, txt in tiers}
-    for uid_sub, event_key in all_subs.items():
-        try:
-            result = await tg_send(OWNER_BOT_TOKEN, uid_sub, tier_text[event_key], parse_mode="Markdown")
-            if not result or not result.get("ok"):
-                log.error(f"[owner-notif] new-order {event_key} → {uid_sub} TG error: {result}")
-        except Exception as e:
-            log.error(f"[owner-notif] new-order {event_key} → {uid_sub} failed: {e}")
+            log.error(f"[owner-notif] all-manager lookup failed: {e}")
+            recipients = set()
+        if founder_id:
+            recipients.add(founder_id)
+        log.info(f"[owner-notif] CRYPTO order #{oid} → force {len(recipients)} owners: {recipients}")
+        for uid_sub in recipients:
+            try:
+                await tg_send(OWNER_BOT_TOKEN, uid_sub, crypto_text, parse_mode="Markdown")
+            except Exception as e:
+                log.error(f"[owner-notif] crypto new-order → {uid_sub} failed: {e}")
+    else:
+        # Normal: one message per user at their highest subscribed tier.
+        all_subs = {}
+        for event_key, _ in tiers:
+            try:
+                ids = await db.get_owners_subscribed_to(event_key)
+            except Exception as e:
+                log.error(f"[owner-notif] subscriber lookup {event_key} failed: {e}")
+                ids = []
+            for uid_sub in ids:
+                if uid_sub not in all_subs:
+                    all_subs[uid_sub] = event_key
+        log.info(f"[owner-notif] new-order #{oid} total={total} → {len(all_subs)} recipients: {all_subs}")
+        tier_text = {ek: txt for ek, txt in tiers}
+        for uid_sub, event_key in all_subs.items():
+            try:
+                await tg_send(OWNER_BOT_TOKEN, uid_sub, tier_text[event_key], parse_mode="Markdown")
+            except Exception as e:
+                log.error(f"[owner-notif] new-order {event_key} → {uid_sub} failed: {e}")
 
     # VIP is independent — not an order-tier, never duplicates with the above.
     if uid == founder_id or uid in premium_ids or uid in worldwide_ids:

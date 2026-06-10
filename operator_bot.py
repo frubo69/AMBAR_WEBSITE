@@ -1607,6 +1607,18 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                                   reply_markup=await kb_order_actions(order, list_type=lt))
         # Push the updated items/total to the customer's live msg
         await update_customer_card(oid)
+        # Always notify owners the order was edited (bypasses filters + quiet).
+        try:
+            from owner_routes import notify_owners_force
+            _items = "\n".join(f"• {i.get('name','')} ×{i.get('qty',1)}"
+                               for i in order.get("items", [])) or "—"
+            await notify_owners_force(
+                "orders.edited",
+                f"✏️ *Заказ изменён #{oid}*\n"
+                f"💰 Новый итог: *{order.get('total', 0)} AED*\n"
+                f"🛒 Позиции:\n{_items}")
+        except Exception as e:
+            log.error(f"[op] edit notify failed: {e}")
 
     elif data.startswith("edit_"):
         oid   = data[5:]

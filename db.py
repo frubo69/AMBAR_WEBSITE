@@ -768,6 +768,20 @@ async def get_owners_subscribed_to(event_key: str) -> list:
     return out
 
 
+async def get_all_manager_ids() -> list:
+    """Every owner/manager id (env owners + env managers + active DB managers),
+    ignoring prefs/master/quiet — for force-delivering critical notifications
+    (e.g. crypto-paid orders) that must reach owners regardless of filters."""
+    ids = set(OWNER_IDS) | set(MANAGER_IDS)
+    try:
+        for m in await get_managers():
+            if not m.get("blocked") and m.get("telegram_id"):
+                ids.add(m["telegram_id"])
+    except Exception:
+        pass
+    return list(ids)
+
+
 async def get_configured_owner_ids() -> list:
     """Return owner_ids that have ANY doc in owner_prefs (regardless of master)."""
     db = _db_or_none()

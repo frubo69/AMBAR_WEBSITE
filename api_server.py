@@ -559,7 +559,8 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
     try:
         from owner_routes import notify_new_order
         await notify_new_order(oid, total, user_name, phone, address, office_nm or office_id,
-                               uid, _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS)
+                               uid, _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS,
+                               items=items, prepaid=prepaid)
     except Exception as e:
         log.error(f"[owner-notif] orders.new failed: {e}")
 

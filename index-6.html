@@ -3588,7 +3588,10 @@ const _PROMO_12H=12*60*60*1000;
 // Launch order: the Add-to-Home-Screen overlay shows FIRST; the promo modal is
 // held back until that overlay is dismissed (or skipped entirely if it won't show).
 let _hsPending=false, _hsCanNative=true, _promoModalShown=false;
-function _showPromoModal(){const m=el('promo-modal');if(m)m.classList.add('show');}
+// Launch promo banner ("Цены для своих −5%") — OFF for now. Flip to true to bring
+// it back; all the modal markup + logic below is kept intact, just not shown.
+const PROMO_MODAL_ENABLED = false;
+function _showPromoModal(){if(!PROMO_MODAL_ENABLED)return;const m=el('promo-modal');if(m)m.classList.add('show');}
 function _maybeShowPromo(){if(_promoModalShown)return;_promoModalShown=true;setTimeout(_showPromoModal,500);}
 // Preload the hero image so the overlay only appears once it's actually painted —
 // the user never stares at a bare dark screen with just the button. The wait is

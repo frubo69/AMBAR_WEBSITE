@@ -3654,6 +3654,10 @@ function applyLang(){
 // ── PROMO BANNER & MODAL ──────────────────────────────────────────────────────
 const _PROMO_KEY='ambar_promo5_seen';
 const _PROMO_HERO_KEY='ambar_promo5_hero_dismissed';
+// Promo hero banner: false → the ✕ close button is hidden so the banner can't be
+// dismissed (it just stays — effectively permanent). All dismiss logic below is
+// kept intact; flip to true to bring the ✕ back.
+const PROMO_HERO_DISMISSIBLE=false;
 const _PROMO_12H=12*60*60*1000;
 // Launch order: the Add-to-Home-Screen overlay shows FIRST; the promo modal is
 // held back until that overlay is dismissed (or skipped entirely if it won't show).
@@ -3687,8 +3691,12 @@ function _setPromoImgs(){const imgs=_promoImgs();const hi=el('promo-hero-img');i
 function _promoExpired(key){const ts=localStorage.getItem(key);if(!ts)return true;return(Date.now()-Number(ts))>=_PROMO_12H;}
 function initPromo(){
   _setPromoImgs();
-  // Hero banner — show always, re-show 12h after last dismiss
-  if(_promoExpired(_PROMO_HERO_KEY)){
+  // ✕ close on the hero banner is OFF for now (PROMO_HERO_DISMISSIBLE) — hide the
+  // button so the banner can't be dismissed; the dismiss logic stays available.
+  if(!PROMO_HERO_DISMISSIBLE){const _hx=document.querySelector('.promo-hero-close');if(_hx)_hx.style.display='none';}
+  // Hero banner — while non-dismissible, ALWAYS show (ignore any past dismissal);
+  // when dismissible, show + re-show 12h after the last dismiss.
+  if(!PROMO_HERO_DISMISSIBLE || _promoExpired(_PROMO_HERO_KEY)){
     localStorage.removeItem(_PROMO_HERO_KEY);
     const h=el('promo-hero');if(h){h.style.display='';h.style.opacity='';h.style.transform='';h.style.maxHeight='';h.style.margin='';h.style.borderColor='';}
   }
@@ -3923,8 +3931,13 @@ function go(p){
   // Mark other pages hidden (no transition needed — already invisible)
   PAGES.forEach(id=>{if(id!==p&&id!==prev)el('pg-'+id)?.classList.add('hidden');});
   cpbUpdate(); // show/hide the crypto pay reminder bar for this page
-  // Hide the active-order bar immediately on the pay screen (the next poll keeps it hidden).
-  if(p==='pay'){const _aob=el('aob');if(_aob)_aob.classList.add('aob-hidden');document.body.classList.remove('aob-on');}
+  // Ambient bars (crypto-pay + active-order) live ONLY on the catalog so they can
+  // never overlap a task page's content/CTAs. cpbUpdate() above already hid the
+  // pay bar off-catalog; here we hide the active-order bar off-catalog and restore
+  // it on the catalog.
+  const _aob=el('aob');
+  if(p!=='catalog'){ if(_aob)_aob.classList.add('aob-hidden'); document.body.classList.remove('aob-on'); }
+  else if(_aob && _aobOrders && _aobOrders.length && !el('pdm-overlay').classList.contains('show')){ _aob.classList.remove('aob-hidden'); document.body.classList.add('aob-on'); }
   requestAnimationFrame(_reserveForBars); setTimeout(_reserveForBars,260); // pad inner scrollers (profile/orders) to clear the floating bars
   if(p==='catalog'&&_catalogScroll>0){requestAnimationFrame(()=>{const pg=el('pg-catalog');if(pg)pg.scrollTop=_catalogScroll;});}
   // 3) Heavy renders — deferred so pill animates on GPU undisturbed
@@ -4104,14 +4117,7 @@ function _initAddrModalSwipe(){
   sheet.addEventListener('touchend',()=>{
     if(!active)return;
     active=false;
-    sheet.style.transition='';
-    if(cy-sy>80){
-      haptic.light();
-      sheet.style.transform='';
-      el('addr-modal').classList.remove('show');
-    } else {
-      sheet.style.transform='';
-    }
+    _sheetRelease(sheet, cy-sy, 80, ()=>{haptic.light();el('addr-modal').classList.remove('show');});
   },{passive:true});
 }
 function renderModalAddrList(){
@@ -6568,7 +6574,8 @@ function _cpbPending(){ return orders.find(o=>o&&o.status==='awaiting_payment'&&
 function cpbUpdate(){
   const bar=el('cpb'); if(!bar)return;
   const o=_cpbPending();
-  if(!o || curPg==='pay'){
+  // Ambient bar — only on the catalog (browse) surface; never over a task page.
+  if(!o || curPg!=='catalog'){
     bar.classList.add('cpb-hidden'); document.body.classList.remove('cpb-on');
     if(!o&&_cpbTick){clearInterval(_cpbTick);_cpbTick=null;}
     _reserveForBars();
@@ -7207,24 +7214,40 @@ function addWishlistToCart(){
 }
 
 // ── PROFILE HUB SHEETS ────────────────────────────────────────────────────────
+// Bottom-sheet swipe release, done right: past `th` px keep sliding DOWN and
+// close (no "jump up then close" glitch); otherwise snap back to the open spot.
+function _sheetRelease(sheet, dy, th, closeFn){
+  if(!sheet) return;
+  if(dy>th){
+    sheet.style.transition='transform .26s cubic-bezier(.34,1,.64,1)';
+    sheet.style.transform='translateY(100%)';
+    try{ closeFn(); }catch(e){}
+    setTimeout(()=>{ sheet.style.transition=''; sheet.style.transform=''; }, 320);
+  }else{
+    sheet.style.transition='';
+    sheet.style.transform='';
+  }
+}
 function _openSheet(id){
   const ov=el(id);
+  const _sh=ov.querySelector('.cancel-sheet');
+  if(_sh){ _sh.style.transition='none'; _sh.style.transform=''; }   // drop any leftover close transform
   ov.style.display='flex';
   ov.offsetHeight;
+  if(_sh) _sh.style.transition='';                                  // restore CSS transition for the open
   ov.classList.add('open');
   haptic.light();
   // attach swipe-to-close on the inner sheet element
   const sheet=ov.querySelector('.cancel-sheet');
   if(sheet&&!sheet._swipeInit){
     sheet._swipeInit=true;
-    let startY=0,startScroll=0,dragging=false;
+    let startY=0,dragging=false;
     sheet.addEventListener('touchstart',e=>{
       if(e.touches.length!==1)return;
       // don't hijack the horizontal wallet carousel — let it scroll; the sheet
       // still swipes to close from anywhere above or below the row
       if(e.target.closest('.cpw-list')){dragging=false;return;}
       startY=e.touches[0].clientY;
-      startScroll=sheet.scrollTop;
       dragging=true;
       sheet.style.transition='none';
     },{passive:true});
@@ -7239,10 +7262,7 @@ function _openSheet(id){
     sheet.addEventListener('touchend',e=>{
       if(!dragging)return;
       dragging=false;
-      const dy=e.changedTouches[0].clientY-startY;
-      sheet.style.transition='';
-      sheet.style.transform='';
-      if(dy>80) _closeSheet(id);
+      _sheetRelease(sheet, e.changedTouches[0].clientY-startY, 80, ()=>_closeSheet(id));
     },{passive:true});
   }
 }
@@ -8123,8 +8143,8 @@ function closePDMDirect(){
   const sh=el('pdm-sheet'),ov=el('pdm-overlay');
   if(sh){sh.style.transition='';sh.style.transform='';}
   if(ov){ov.style.transition='';ov.style.background='';}
-  // Restore order bar if there's an active order
-  if(_aobOrders.length>0){el('aob').classList.remove('aob-hidden');document.body.classList.add('aob-on');}
+  // Restore order bar if there's an active order — only on the catalog surface
+  if(_aobOrders.length>0&&curPg==='catalog'){el('aob').classList.remove('aob-hidden');document.body.classList.add('aob-on');}
   pdmId=null;
   _pdmPendingQty=1;
   _pdmImgZoomed=false;
@@ -8701,8 +8721,8 @@ async function checkActiveOrder(){
       _renderAob();
       // Don't surface the active-order bar while the user is on the crypto pay
       // screen — the pay screen shows its own status; the bar reads as messy there.
-      if(!el('pdm-overlay').classList.contains('show')&&curPg!=='pay'){bar.classList.remove('aob-hidden');document.body.classList.add('aob-on');}
-      else if(curPg==='pay'){bar.classList.add('aob-hidden');document.body.classList.remove('aob-on');}
+      if(!el('pdm-overlay').classList.contains('show')&&curPg==='catalog'){bar.classList.remove('aob-hidden');document.body.classList.add('aob-on');}
+      else{bar.classList.add('aob-hidden');document.body.classList.remove('aob-on');}
       // Detect status changes and fire notifications
       const _ru=lang==='ru';
       d.orders.forEach(o=>{
@@ -9555,9 +9575,7 @@ function _initAodSwipe(){
   },{passive:true});
   sheet.addEventListener('touchend',e=>{
     dragging=false;
-    sheet.style.transition='';
-    const dy=e.changedTouches[0].clientY-sy;
-    if(dy>110){closeAod();}else{sheet.style.transform='';}
+    _sheetRelease(sheet, e.changedTouches[0].clientY-sy, 110, closeAod);
   },{passive:true});
 }
 
@@ -9586,10 +9604,8 @@ function _initSortSwipe(){
     if(dy>0){sheet.style.transition='none';sheet.style.transform=`translateY(${dy}px)`;}
   },{passive:true});
   sheet.addEventListener('touchend',e=>{
-    dragging=false;sheet.style.transition='';
-    const dy=e.changedTouches[0].clientY-sy;
-    if(dy>80){el('sort-overlay').classList.remove('show');sheet.style.transform='';}
-    else{sheet.style.transform='';}
+    dragging=false;
+    _sheetRelease(sheet, e.changedTouches[0].clientY-sy, 80, ()=>el('sort-overlay').classList.remove('show'));
   },{passive:true});
 }
 
@@ -9614,10 +9630,7 @@ function _initSaveSheetSwipe(){
   sheet.addEventListener('touchend',e=>{
     if(!dragging)return;
     dragging=false;
-    sheet.style.transition='';
-    const dy=e.changedTouches[0].clientY-sy;
-    if(dy>90){haptic.light();closeAddrSaveSheet();}
-    sheet.style.transform='';
+    _sheetRelease(sheet, e.changedTouches[0].clientY-sy, 90, ()=>{haptic.light();closeAddrSaveSheet();});
   },{passive:true});
 }
 document.addEventListener('DOMContentLoaded',_initSaveSheetSwipe);

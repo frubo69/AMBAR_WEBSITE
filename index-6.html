@@ -1093,6 +1093,27 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
 .rcpt-scroll{flex:1;overflow:auto;display:flex;justify-content:center;padding:4px 14px calc(24px + var(--safe-bottom,0px));-webkit-overflow-scrolling:touch}
 .rcpt-canvas{max-width:100%;height:auto;border-radius:12px;box-shadow:0 16px 50px rgba(0,0,0,.6);align-self:flex-start}
 .rcpt-load{margin:auto;color:var(--sub);font-size:13px;font-family:'DM Sans',sans-serif}
+/* receipt loading — content-aware skeleton that mirrors the PDF, gold shimmer sweep */
+.rcpt-sk{width:100%;max-width:460px;aspect-ratio:148/210;align-self:flex-start;margin-top:2px;background:#0d1117;border:1px solid rgba(201,169,110,.1);border-radius:12px;box-shadow:0 16px 50px rgba(0,0,0,.5);padding:26px 28px;box-sizing:border-box;position:relative;overflow:hidden;display:flex;flex-direction:column}
+.rcpt-sk i{display:block;background:rgba(255,255,255,.055);border-radius:5px;flex-shrink:0}
+.rcpt-sk .sk-w{height:22px;width:46%;align-self:center;background:rgba(201,169,110,.16);border-radius:6px}
+.rcpt-sk .sk-sub{height:7px;width:28%;align-self:center;margin-top:11px}
+.rcpt-sk .sk-div{height:3px;width:25%;align-self:center;margin:22px 0;background:rgba(201,169,110,.22)}
+.rcpt-sk .sk-ttl{height:15px;width:40%;align-self:center;margin-bottom:30px}
+.rcpt-sk .sk-row{display:flex;justify-content:space-between;margin-bottom:18px;flex-shrink:0}
+.rcpt-sk .sk-row i{height:13px}
+.rcpt-sk .sk-row .a{width:34%;background:rgba(201,169,110,.15)}
+.rcpt-sk .sk-row .b{width:26%}
+.rcpt-sk .sk-panel{background:rgba(255,255,255,.03);border-radius:8px;padding:16px;margin-bottom:22px;flex-shrink:0}
+.rcpt-sk .sk-li{display:flex;justify-content:space-between;margin-bottom:14px}
+.rcpt-sk .sk-li:last-child{margin-bottom:0}
+.rcpt-sk .sk-li i{height:11px}
+.rcpt-sk .sk-li .a{width:48%}
+.rcpt-sk .sk-li .b{width:20%}
+.rcpt-sk .sk-pay{height:86px;border:1px solid rgba(201,169,110,.22);background:rgba(201,169,110,.05);border-radius:8px;margin-bottom:26px;flex-shrink:0}
+.rcpt-sk .sk-l{height:9px;margin-bottom:13px}
+.rcpt-sk::after{content:'';position:absolute;top:0;left:0;width:100%;height:100%;background:linear-gradient(100deg,transparent 28%,rgba(255,255,255,.07) 50%,transparent 72%);transform:translateX(-100%);animation:rcptSweep 1.5s ease-in-out infinite;pointer-events:none}
+@keyframes rcptSweep{100%{transform:translateX(100%)}}
 .cancel-ov.open{display:flex;opacity:1}
 .cancel-sheet{width:100%;background:var(--bg2);border-radius:24px 24px 0 0;padding:0 22px calc(28px + var(--safe-bottom));transform:translateY(60px);transition:transform .32s cubic-bezier(.34,1.1,.64,1);max-height:88vh;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}
 .cancel-sheet::-webkit-scrollbar{display:none}
@@ -6792,7 +6813,7 @@ async function openReceipt(oid){
   _rcptUrl=url; _rcptOid=oid;
   const ov=el('rcpt-ov'), scroll=el('rcpt-scroll');
   set('rcpt-ttl','#'+oid); set('rcpt-save-txt',ru?'Сохранить':'Save');
-  scroll.innerHTML='<div class="rcpt-load">'+(ru?'Загрузка чека…':'Loading receipt…')+'</div>';
+  scroll.innerHTML='<div class="rcpt-sk" role="img" aria-label="'+(ru?'Загрузка чека':'Loading receipt')+'"><i class="sk-w"></i><i class="sk-sub"></i><i class="sk-div"></i><i class="sk-ttl"></i><div class="sk-row"><i class="a"></i><i class="b"></i></div><div class="sk-panel"><div class="sk-li"><i class="a"></i><i class="b"></i></div><div class="sk-li"><i class="a"></i><i class="b"></i></div><div class="sk-li"><i class="a"></i><i class="b"></i></div></div><i class="sk-pay"></i><i class="sk-l" style="width:38%"></i><i class="sk-l" style="width:86%"></i><i class="sk-l" style="width:30%"></i><i class="sk-l" style="width:58%"></i></div>';
   ov.classList.add('show');
   try{
     await _loadPdfJs();

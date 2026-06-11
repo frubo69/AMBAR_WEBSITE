@@ -63,20 +63,21 @@ def build_receipt(order: dict, to_address: str = "", from_address: str = "") -> 
     def line(x1, y1, x2, color=LINE, w=0.2):
         pdf.set_draw_color(*color); pdf.set_line_width(w); pdf.line(x1, y1, x2, y1)
 
-    # ── header ───────────────────────────────────────────────────────────────
-    y = 17
-    pdf.set_font("D", "B", 27); pdf.set_text_color(*GOLDL); pdf.set_char_spacing(3.2)
-    pdf.set_xy(ML, y); pdf.cell(cw, 12, "AMBAR", align="C")
-    pdf.set_char_spacing(0)
-    pdf.set_font("D", "", 7); pdf.set_text_color(*GOLD); pdf.set_char_spacing(4.5)
-    pdf.set_xy(ML, y + 13); pdf.cell(cw, 4, "PREMIUM SPIRITS", align="C")
-    pdf.set_char_spacing(0)
-    line(ML + 32, y + 23, W - MR - 32, color=GOLD, w=0.4)
-
-    pdf.set_font("D", "B", 14); pdf.set_text_color(*TEXT)
-    pdf.set_xy(ML, y + 28); pdf.cell(cw, 7, "Чек оплаты", align="C")
-    pdf.set_font("D", "", 8); pdf.set_text_color(*SUB)
-    pdf.set_xy(ML, y + 35); pdf.cell(cw, 5, "Payment receipt", align="C")
+    # ── header: brand logo (pin + AMBAR + PREMIUM SPIRITS) ─────────────────────
+    _logo = _HERE / "LOGOS" / "ambar_logo.png"
+    if _logo.exists():
+        lw = 42.0
+        hy = 9 + lw * 994.0 / 1093.0             # logo bottom (height auto-scales)
+        pdf.image(str(_logo), x=(W - lw) / 2.0, y=9, w=lw)
+    else:                                         # fallback: text wordmark
+        pdf.set_font("D", "B", 27); pdf.set_text_color(*GOLDL); pdf.set_char_spacing(3.2)
+        pdf.set_xy(ML, 14); pdf.cell(cw, 12, "AMBAR", align="C"); pdf.set_char_spacing(0)
+        pdf.set_font("D", "", 7); pdf.set_text_color(*GOLD); pdf.set_char_spacing(4.5)
+        pdf.set_xy(ML, 27); pdf.cell(cw, 4, "PREMIUM SPIRITS", align="C"); pdf.set_char_spacing(0)
+        hy = 38.0
+    line(ML + 38, hy + 3, W - MR - 38, color=GOLD, w=0.4)
+    pdf.set_font("D", "B", 13); pdf.set_text_color(*TEXT)
+    pdf.set_xy(ML, hy + 6); pdf.cell(cw, 7, "Чек оплаты", align="C")
 
     # ── order + date ───────────────────────────────────────────────────────────
     y = 63

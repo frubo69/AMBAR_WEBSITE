@@ -23,6 +23,7 @@ from config import (
     CRYPTO_REAL_MODE, CRYPTO_USDT_PER_AED, CRYPTO_REQUIRED_CONF,
     CRYPTO_TTL_MIN, CRYPTO_AMOUNT_STEP, TRON_RECEIVE_ADDRESS,
     CRYPTO_WATCH_INTERVAL_SEC, CRYPTO_WATCH_DRYRUN, CRYPTO_FEE_PCT, CRYPTO_TEST_USDT,
+    CRYPTO_AED_PER_USDT,
 )
 from tron import get_incoming_usdt
 
@@ -760,10 +761,11 @@ async def handle_crypto_invoice_create(request: web.Request) -> web.Response:
         # Otherwise expired / past TTL → fall through and re-issue in place.
 
     expires_ms = now_ms + CRYPTO_TTL_MIN * 60 * 1000
-    # Customer pays the goods total + CRYPTO_FEE_PCT% (network/conversion fee),
-    # converted at the server-authoritative USDT/AED rate. amount_aed stays the
-    # goods value; the surcharge lives only in the USDT amount we credit on-chain.
-    base_usdt = total_aed * (1.0 + CRYPTO_FEE_PCT / 100.0) * CRYPTO_USDT_PER_AED
+    # Customer pays the goods total converted to USDT at a fixed merchant rate
+    # (CRYPTO_AED_PER_USDT AED per 1 USDT). That rate already bakes in the
+    # network/conversion margin — there is NO separate % fee. amount_aed stays the
+    # goods value; the margin lives only in the USDT amount we credit on-chain.
+    base_usdt = total_aed / CRYPTO_AED_PER_USDT if CRYPTO_AED_PER_USDT > 0 else 0.0
     # TEST override: a tiny fixed USDT so the whole on-chain flow can be tested for
     # cents. Restricted to AMBAR_CRYPTO_TEST_IDS — applies ONLY to those exact
     # accounts; everyone else (admins included) pays the real amount.
@@ -784,7 +786,7 @@ async def handle_crypto_invoice_create(request: web.Request) -> web.Response:
                 "status": "waiting",
                 "amount_usdt": amount,
                 "amount_aed": total_aed,
-                "fee_pct": CRYPTO_FEE_PCT,
+                "fee_pct": 0,
                 "required_confirmations": CRYPTO_REQUIRED_CONF,
                 "confirmations": 0,
                 "txid": None,
@@ -795,7 +797,7 @@ async def handle_crypto_invoice_create(request: web.Request) -> web.Response:
             }
             res = await db.reissue_crypto_invoice(oid, fields)
             if res == "ok":
-                log.info(f"[crypto] invoice #{oid} re-issued uid={uid} amount={amount} USDT (≈{total_aed} AED +{CRYPTO_FEE_PCT:g}%)")
+                log.info(f"[crypto] invoice #{oid} re-issued uid={uid} amount={amount} USDT (≈{total_aed} AED @ {CRYPTO_AED_PER_USDT:g} AED/USDT)")
                 return _crypto_invoice_response({**existing, **fields})
         else:
             doc = {
@@ -806,7 +808,7 @@ async def handle_crypto_invoice_create(request: web.Request) -> web.Response:
                 "address": TRON_RECEIVE_ADDRESS,
                 "amount_usdt": amount,
                 "amount_aed": total_aed,
-                "fee_pct": CRYPTO_FEE_PCT,
+                "fee_pct": 0,
                 "required_confirmations": CRYPTO_REQUIRED_CONF,
                 "confirmations": 0,
                 "txid": None,
@@ -817,7 +819,7 @@ async def handle_crypto_invoice_create(request: web.Request) -> web.Response:
             }
             res = await db.create_crypto_invoice(doc)
             if res == "ok":
-                log.info(f"[crypto] invoice #{oid} uid={uid} amount={amount} USDT (≈{total_aed} AED +{CRYPTO_FEE_PCT:g}%)")
+                log.info(f"[crypto] invoice #{oid} uid={uid} amount={amount} USDT (≈{total_aed} AED @ {CRYPTO_AED_PER_USDT:g} AED/USDT)")
                 return _crypto_invoice_response(doc)
             if res == "dup_order":
                 # Another request created this order's invoice first — return it

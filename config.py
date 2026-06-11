@@ -70,7 +70,11 @@ CRYPTO_USDT_PER_AED  = _getenv_float("AMBAR_CRYPTO_USDT_PER_AED", 1.0 / 3.6725)
 # Surcharge on crypto orders to cover network + conversion fees. The customer pays
 # goods_total × (1 + CRYPTO_FEE_PCT/100), converted to USDT. The order's AED total
 # stays the goods value — this is purely the payment-method fee.
-CRYPTO_FEE_PCT       = _getenv_float("AMBAR_CRYPTO_FEE_PCT", 10.0)
+CRYPTO_FEE_PCT       = _getenv_float("AMBAR_CRYPTO_FEE_PCT", 10.0)  # legacy; superseded by the fixed rate below
+# Fixed merchant rate: AED per 1 USDT. The crypto total = goods_AED ÷ this rate.
+# The rate already bakes in the network/conversion margin, so there is NO separate
+# % fee. 3.50 vs the ~3.6725 USD peg ≈ a 4.9% margin. Single formula for every tx.
+CRYPTO_AED_PER_USDT  = _getenv_float("AMBAR_CRYPTO_AED_PER_USDT", 3.50)
 # Admin/owner TEST override (USDT). When > 0, accounts in the admin/owner/founder
 # set are charged this tiny fixed amount instead of the real order total — so the
 # whole on-chain pay → detect → confirm flow can be tested for cents. Real

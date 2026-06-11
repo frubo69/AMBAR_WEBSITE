@@ -1080,6 +1080,19 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
 
 /* ── Cancel sheet ── */
 .cancel-ov{position:fixed;inset:0;background:rgba(0,0,0,.72);z-index:800;display:none;align-items:flex-end;opacity:0;transition:opacity .22s;backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+/* in-app PDF receipt viewer (renders the receipt without leaving the Mini App) */
+.rcpt-ov{position:fixed;inset:0;z-index:9400;background:rgba(6,6,12,.94);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);display:none;flex-direction:column;opacity:0;transition:opacity .25s}
+.rcpt-ov.show{display:flex;opacity:1}
+.rcpt-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:calc(12px + var(--safe-top,0px)) 16px 12px}
+.rcpt-ttl{font-size:14px;font-weight:700;color:var(--gold2);letter-spacing:.5px;font-family:'DM Sans',sans-serif}
+.rcpt-btn{display:inline-flex;align-items:center;gap:7px;padding:9px 15px;border-radius:var(--r-pill);font-size:13px;font-weight:700;font-family:'DM Sans',sans-serif;cursor:pointer;border:1px solid rgba(255,255,255,.12);background:rgba(255,255,255,.06);color:#fff;-webkit-tap-highlight-color:transparent}
+.rcpt-btn svg{width:15px;height:15px}
+.rcpt-btn:active{transform:scale(.94)}
+.rcpt-btn.icon{padding:9px;border-radius:50%}
+.rcpt-btn.gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1206;border:none}
+.rcpt-scroll{flex:1;overflow:auto;display:flex;justify-content:center;padding:4px 14px calc(24px + var(--safe-bottom,0px));-webkit-overflow-scrolling:touch}
+.rcpt-canvas{max-width:100%;height:auto;border-radius:12px;box-shadow:0 16px 50px rgba(0,0,0,.6);align-self:flex-start}
+.rcpt-load{margin:auto;color:var(--sub);font-size:13px;font-family:'DM Sans',sans-serif}
 .cancel-ov.open{display:flex;opacity:1}
 .cancel-sheet{width:100%;background:var(--bg2);border-radius:24px 24px 0 0;padding:0 22px calc(28px + var(--safe-bottom));transform:translateY(60px);transition:transform .32s cubic-bezier(.34,1.1,.64,1);max-height:88vh;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none}
 .cancel-sheet::-webkit-scrollbar{display:none}
@@ -2176,6 +2189,15 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
 </div>
 
 <!-- CRYPTO WALLET PICKER SHEET -->
+<div class="rcpt-ov" id="rcpt-ov">
+  <div class="rcpt-bar">
+    <button class="rcpt-btn icon" onclick="closeReceipt()" aria-label="Close"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+    <div class="rcpt-ttl" id="rcpt-ttl">ЧЕК</div>
+    <button class="rcpt-btn gold" id="rcpt-save" onclick="saveReceipt()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg><span id="rcpt-save-txt">Сохранить</span></button>
+  </div>
+  <div class="rcpt-scroll" id="rcpt-scroll"></div>
+</div>
+
 <div class="cancel-ov" id="promo-info-ov" onclick="if(event.target===this)_closeSheet('promo-info-ov')" style="z-index:9300">
   <div class="cancel-sheet">
     <div class="sheet-hdr">
@@ -6743,23 +6765,60 @@ function _updateOrdChips(){
   });
 }
 
-// Crypto receipt: ask the backend for a short-lived signed URL, then open the
-// branded PDF in a viewer. Falls back to Tronscan if the service is unavailable
-// (e.g. fpdf2 not yet installed), so the button never dead-ends.
+// Crypto receipt: get a short-lived signed URL, render the PDF INSIDE the Mini
+// App (PDF.js) and let the user save it natively (tg.downloadFile) — no exit to a
+// browser. Falls back to Tronscan only if the receipt can't be loaded at all.
+let _rcptUrl='', _rcptOid='', _pdfjsP=null;
+function _loadPdfJs(){
+  if(window.pdfjsLib) return Promise.resolve();
+  if(_pdfjsP) return _pdfjsP;
+  _pdfjsP=new Promise((res,rej)=>{
+    const s=document.createElement('script');
+    s.src='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js';
+    s.onload=()=>{try{pdfjsLib.GlobalWorkerOptions.workerSrc='https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';}catch(e){} res();};
+    s.onerror=()=>rej(new Error('pdfjs'));
+    document.head.appendChild(s);
+  });
+  return _pdfjsP;
+}
 async function openReceipt(oid){
   const ru=lang==='ru'; try{haptic.light();}catch(e){}
+  let url='';
   try{
     const r=await fetch(`${AMBAR_API}/api/crypto/receipt`,{method:'POST',headers:{'Content-Type':'application/json','Authorization':'tma '+(tg?.initData||'')},body:JSON.stringify({order_id:oid})});
-    if(r.ok){
-      const d=await r.json();
-      if(d&&d.sig){
-        const url=`${AMBAR_API}/api/crypto/receipt/${encodeURIComponent(oid)}?exp=${d.exp}&sig=${encodeURIComponent(d.sig)}`;
-        if(tg&&tg.openLink){tg.openLink(url);}else{window.open(url,'_blank');}
-        return;
-      }
-    }
+    if(r.ok){const d=await r.json(); if(d&&d.sig) url=`${AMBAR_API}/api/crypto/receipt/${encodeURIComponent(oid)}?exp=${d.exp}&sig=${encodeURIComponent(d.sig)}`;}
   }catch(e){}
-  const o=orders.find(x=>x.order_id===oid);
+  if(!url) return _receiptFallback(oid);
+  _rcptUrl=url; _rcptOid=oid;
+  const ov=el('rcpt-ov'), scroll=el('rcpt-scroll');
+  set('rcpt-ttl','#'+oid); set('rcpt-save-txt',ru?'Сохранить':'Save');
+  scroll.innerHTML='<div class="rcpt-load">'+(ru?'Загрузка чека…':'Loading receipt…')+'</div>';
+  ov.classList.add('show');
+  try{
+    await _loadPdfJs();
+    const buf=await (await fetch(url)).arrayBuffer();
+    const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+    const page=await pdf.getPage(1);
+    const dpr=Math.min(3,window.devicePixelRatio||2);
+    const base=page.getViewport({scale:1});
+    const targetW=Math.min((scroll.clientWidth||360)-28,460);
+    const vp=page.getViewport({scale:(targetW/base.width)*dpr});
+    const canvas=document.createElement('canvas'); canvas.className='rcpt-canvas';
+    canvas.width=vp.width; canvas.height=vp.height; canvas.style.width=(vp.width/dpr)+'px';
+    await page.render({canvasContext:canvas.getContext('2d'),viewport:vp}).promise;
+    if(el('rcpt-ov').classList.contains('show')){ scroll.innerHTML=''; scroll.appendChild(canvas); }
+  }catch(e){ closeReceipt(); _receiptFallback(oid); }
+}
+function closeReceipt(){ const ov=el('rcpt-ov'); if(ov)ov.classList.remove('show'); }
+function saveReceipt(){
+  if(!_rcptUrl) return; try{haptic.light();}catch(e){}
+  const fn='AMBAR-'+_rcptOid+'.pdf';
+  try{ if(tg&&tg.downloadFile){ tg.downloadFile({url:_rcptUrl,file_name:fn}); return; } }catch(e){}
+  // older Telegram (no downloadFile): open the URL so the OS viewer can save it
+  if(tg&&tg.openLink){tg.openLink(_rcptUrl);}else{window.open(_rcptUrl,'_blank');}
+}
+function _receiptFallback(oid){
+  const ru=lang==='ru'; const o=orders.find(x=>x.order_id===oid);
   const tx=o&&(o.crypto_txid||(o.crypto&&o.crypto.txid));
   if(tx){const u='https://tronscan.org/#/transaction/'+tx; if(tg&&tg.openLink)tg.openLink(u);else window.open(u,'_blank');}
   else showToast(ru?'Чек недоступен':'Receipt unavailable','err');

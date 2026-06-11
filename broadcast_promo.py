@@ -13,6 +13,8 @@ Run ON THE VPS (BOT_TOKEN, the user DB and WEBAPP_URL live there):
     python broadcast_promo.py --send                     # blast everyone, each in their language
 
 Nothing is sent unless you pass --test or --send. Always --stats, then --test yourself.
+--send is SAFE TO RE-RUN: every chat is logged so nobody is messaged twice — an
+interrupted blast just resumes. Delete .broadcast_sent_crypto.txt to re-broadcast.
 Drop the two images next to this file:  crypto_ru.png  and  crypto_en.png
 (or override with PROMO_PHOTO_RU / PROMO_PHOTO_EN in the env).
 """
@@ -31,6 +33,22 @@ HERE = Path(__file__).resolve().parent
 PHOTO_RU = Path(os.getenv("PROMO_PHOTO_RU", HERE / "CRYPTO_PROMO_AMBAR_RU.png"))
 PHOTO_EN = Path(os.getenv("PROMO_PHOTO_EN", HERE / "CRYPTO_PROMO_AMBAR_EN.png"))
 
+# Idempotency log: every chat we've messaged (or that's permanently unreachable)
+# is appended here, so re-running --send NEVER messages anyone twice — it just
+# resumes where it left off. Delete this file to start a brand-new campaign.
+SENT_LOG = Path(os.getenv("PROMO_SENT_LOG", HERE / ".broadcast_sent_crypto.txt"))
+
+
+def _load_sent() -> set:
+    if SENT_LOG.exists():
+        return {int(x) for x in SENT_LOG.read_text().split() if x.strip().lstrip("-").isdigit()}
+    return set()
+
+
+def _mark_sent(tid: int):
+    with open(SENT_LOG, "a") as f:
+        f.write(f"{tid}\n")
+
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
 log = logging.getLogger(__name__)
 
@@ -38,21 +56,21 @@ log = logging.getLogger(__name__)
 CAPTION_RU = (
     "Крипта? Принимаем. 🪙\n"
     "Вопросы? Не задаём. 🤫\n"
-    "USDT TRC-20 — уже в AMBAR ⚡️"
+    "Уже в AMBAR ⚡️"
 )
 CAPTION_EN = (
     "Crypto? Accepted. 🪙\n"
     "Questions? Not asked. 🤫\n"
-    "USDT TRC-20 — live in AMBAR ⚡️"
+    "Live in AMBAR ⚡️"
 )
 CAPTION_BOTH = (
     "Крипта? Принимаем. 🪙\n"
     "Вопросы? Не задаём. 🤫\n"
-    "USDT TRC-20 — уже в AMBAR ⚡️\n"
+    "Уже в AMBAR ⚡️\n"
     "—\n"
     "Crypto? Accepted. 🪙\n"
     "Questions? Not asked. 🤫\n"
-    "USDT TRC-20 — live in AMBAR ⚡️"
+    "Live in AMBAR ⚡️"
 )
 
 # bucket → (caption, image path, button label). 'both' = universal text + EN picture.
@@ -127,14 +145,20 @@ async def main():
         if not img.exists():
             print(f"❌ image missing for bucket '{k}': {img}  — drop the file and retry."); return
 
-    file_ids = {}   # bucket → reused file_id (upload each image just once)
-    sent = skipped_ban = failed = 0
+    done = _load_sent()             # chats already messaged in a previous run → never twice
+    file_ids = {}                   # bucket → reused file_id (upload each image just once)
+    sent = skipped_ban = already = failed = 0
     by = {"ru": 0, "en": 0, "both": 0}
     total = len(users)
+    if done:
+        log.info(f"Resuming — {len(done)} chats already handled previously; they'll be skipped.")
     log.info(f"Broadcasting to {total} customers, language-aware...")
     for u in users:
         tid = u.get("telegram_id")
         if not tid:
+            continue
+        if tid in done:             # already messaged (or unreachable) before → skip, no repeat
+            already += 1
             continue
         if u.get("is_banned"):
             skipped_ban += 1
@@ -151,19 +175,21 @@ async def main():
                 with open(img, "rb") as f:
                     file_ids[k] = await _send_one(bot, tid, f, cap, kb)
             sent += 1; by[k] += 1
+            _mark_sent(tid); done.add(tid)          # record immediately — survives a crash
             if sent % 25 == 0:
                 log.info(f"  sent {sent}/{total}  (ru={by['ru']} en={by['en']} both={by['both']})...")
             await asyncio.sleep(0.05)  # ~20/s, under Telegram's broadcast limit
         except Exception as e:
             err = str(e).lower()
-            if any(x in err for x in ("blocked", "deactivated", "chat not found")):
+            if any(x in err for x in ("blocked", "deactivated", "chat not found", "user is deactivated")):
+                _mark_sent(tid); done.add(tid)      # permanently unreachable — don't retry next run
                 log.debug(f"  {tid} unreachable")
             else:
-                log.warning(f"  failed {tid}: {e}")
+                log.warning(f"  failed {tid} (will retry on re-run): {e}")
             failed += 1
 
     log.info(f"✅ Done. Sent: {sent} (ru={by['ru']} en={by['en']} both={by['both']}), "
-             f"Banned: {skipped_ban}, Failed: {failed}, Total: {total}")
+             f"AlreadyDone(skipped): {already}, Banned: {skipped_ban}, Failed(retryable): {failed}, Total: {total}")
 
 
 if __name__ == "__main__":

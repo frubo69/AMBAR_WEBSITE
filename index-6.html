@@ -3253,6 +3253,7 @@ async function checkBanStatus(){
 // ── VERIFICATION WALL ─────────────────────────────────────────────────────────
 let _verifyPollTimer=null;
 let _verifySource=''; // friend | operator | social | search | other
+let _cryptoVerifyCtx=null; // pending crypto checkout awaiting the pre-payment source form
 
 function _isVerified(){
   return localStorage.getItem('ambar_verified')==='1';
@@ -3264,7 +3265,7 @@ function _hideAllVerifySteps(){
   });
 }
 
-function showVerifyWall(){
+function showVerifyWall(forCrypto){
   const wall=document.getElementById('verify-wall');
   if(!wall)return;
   const requested=localStorage.getItem('ambar_verify_requested')==='1';
@@ -3272,9 +3273,9 @@ function showVerifyWall(){
 
   // Step 0 labels
   el('verify-title0').textContent=ru?'ВЕРИФИКАЦИЯ':'VERIFICATION';
-  el('verify-alert-title').textContent=ru?'ПРОЙДИТЕ ВЕРИФИКАЦИЮ':'COMPLETE VERIFICATION';
-  el('verify-alert-desc').textContent=ru?'Оператор не увидит ваш заказ, пока вы не пройдёте верификацию ниже.':'The operator will not see your order until you complete verification below.';
-  el('verify-note0').textContent=ru?'Пропустить нельзя, но это только один раз':'Can\'t be skipped, but it\'s only once';
+  el('verify-alert-title').textContent=forCrypto?(ru?'ОДИН МОМЕНТ ПЕРЕД ОПЛАТОЙ':'ONE MOMENT BEFORE PAYMENT'):(ru?'ПРОЙДИТЕ ВЕРИФИКАЦИЮ':'COMPLETE VERIFICATION');
+  el('verify-alert-desc').textContent=forCrypto?(ru?'Расскажите, откуда вы о нас узнали — и переходите к оплате.':'Tell us how you heard about us, then continue to payment.'):(ru?'Оператор не увидит ваш заказ, пока вы не пройдёте верификацию ниже.':'The operator will not see your order until you complete verification below.');
+  el('verify-note0').textContent=forCrypto?(ru?'Нужно только один раз':'Just once'):(ru?'Пропустить нельзя, но это только один раз':'Can\'t be skipped, but it\'s only once');
   el('verify-desc0').textContent=ru?'Как вы узнали о нас?':'How did you find out about us?';
   el('vs-friend').textContent=ru?'Рекомендация знакомого':'Friend recommendation';
   el('vs-operator').textContent=ru?'Оператор AMBAR':'AMBAR operator';
@@ -3306,7 +3307,15 @@ function showVerifyWall(){
 
   wall.style.display='flex';
   _hideAllVerifySteps();
-  if(declined){
+  if(forCrypto){
+    // Crypto pre-payment: always the source form — never the operator-wait/declined
+    // screens (those belong to the cash flow). The payment itself verifies them.
+    // If they filled it before but abandoned payment, jump to their answered step
+    // with the fields pre-pasted so they can proceed as-is or edit.
+    const _d=_loadVerifyDraft();
+    if(_d&&_d.source){ pickVerifySource(_d.source); _applyVerifyDraft(_d); }
+    else { el('verify-step0').style.display='flex'; }
+  } else if(declined){
     el('verify-declined').style.display='flex';
     _startVerifyPoll();
   } else if(requested){
@@ -3395,9 +3404,52 @@ async function verifyDetailSubmit(){
   el('verify-detail-submit').disabled=false;
 }
 
+// Remember the source answers locally so a customer who abandons payment and has to
+// fill the form again finds it pre-pasted (proceed as-is or edit). Crypto-only — the
+// cash flow never reads or writes this draft.
+function _loadVerifyDraft(){
+  try{ const r=localStorage.getItem('ambar_verify_draft'); return r?JSON.parse(r):null; }catch(e){ return null; }
+}
+function _saveVerifyDraft(){
+  try{
+    localStorage.setItem('ambar_verify_draft',JSON.stringify({
+      source:_verifySource,
+      name:(el('verify-name-in')||{}).value||'',
+      phone:(el('verify-phone-in')||{}).value||'',
+      op_phone:(el('verify-op-phone')||{}).value||'',
+      op_when:(el('verify-op-when')||{}).value||'',
+      detail:(el('verify-detail-in')||{}).value||'',
+    }));
+  }catch(e){}
+}
+function _applyVerifyDraft(d){
+  if(!d)return;
+  const sv=(id,v)=>{const e=el(id);if(e)e.value=v||'';};
+  sv('verify-name-in',d.name); sv('verify-phone-in',d.phone);
+  sv('verify-op-phone',d.op_phone); sv('verify-op-when',d.op_when);
+  sv('verify-detail-in',d.detail);
+}
+
+// Crypto pre-payment info: stash the source answers onto the order payload (they ride
+// into the invoice snapshot → reach the operator), then go STRAIGHT to the pay screen.
+// No operator-wait/poll — the confirmed on-chain payment auto-verifies (backend). The
+// cash submit handlers fall through to their original code when this ctx is unset.
+function _submitCryptoInfoAndPay(info){
+  const ctx=_cryptoVerifyCtx; _cryptoVerifyCtx=null;
+  _saveVerifyDraft();             // remember answers in case payment is abandoned
+  hideVerifyWall();
+  if(!ctx)return;
+  ctx.payload.verify_source=info.source||'';
+  ctx.payload.verify_source_detail=info.source_detail||'';
+  ctx.payload.verify_recommender_name=info.recommender_name||'';
+  ctx.payload.verify_recommender_phone=info.recommender_phone||'';
+  startCryptoPayment(ctx);
+}
+
 async function verifySubmit(){
   const name=el('verify-name-in').value.trim();
   const phone=el('verify-phone-in').value.trim();
+  if(_cryptoVerifyCtx){ _submitCryptoInfoAndPay({source:_verifySource,recommender_name:name,recommender_phone:phone}); return; }
   el('verify-submit-btn').textContent='...';
   el('verify-submit-btn').disabled=true;
   const userPhone=el('phone-in')?.value?.trim()||'';
@@ -3425,6 +3477,7 @@ async function verifySubmit(){
 }
 
 async function _verifySubmitGeneric(detail){
+  if(_cryptoVerifyCtx){ _submitCryptoInfoAndPay({source:_verifySource,source_detail:detail}); return; }
   const userPhone=el('phone-in')?.value?.trim()||'';
   try{
     await fetch(`${AMBAR_API}/api/verify-request`,{
@@ -5943,7 +5996,13 @@ function placeOrder(){
   // payment confirms (see _cpOnConfirmed). Gated to enabled accounts only.
   if(payMethod==='crypto' && CRYPTO_ENABLED){
     payload.payment_method='crypto';
-    startCryptoPayment({payload,oid,items,sub,total,addr});
+    const _ctx={payload,oid,items,sub,total,addr};
+    // First-time (unverified) crypto buyers leave the same "how did you hear about us"
+    // info BEFORE paying — it's attached to the order, and the confirmed payment itself
+    // auto-verifies them (no operator approval). Already-verified customers go straight
+    // to the invoice.
+    if(!_isVerified()){ _cryptoVerifyCtx=_ctx; showVerifyWall(true); return; }
+    startCryptoPayment(_ctx);
     return;
   }
   payload.payment_method='cash';
@@ -6295,6 +6354,12 @@ function _cpOnConfirmed(inv){
     // mode the backend already created/credited it on-chain — just refresh.
     if(inv.sim){ _cpSubmitPaidOrder(o); } else { syncOrders(); }
   }
+  // The confirmed payment IS the verification — reflect it locally so the source form
+  // never shows again (the backend auto-verified this uid on promotion; the next
+  // /api/me confirms it server-side).
+  localStorage.setItem('ambar_verified','1');
+  localStorage.removeItem('ambar_verify_pending');
+  localStorage.removeItem('ambar_verify_draft'); // verified now — saved answers no longer needed
   const ru=lang==='ru';
   addNotification('cart',ru?'Оплата получена':'Payment received',(ru?'Заказ ':'Order ')+'#'+inv.oid+(ru?' оплачен и передан оператору':' paid and sent to the operator'),{action:'orders',dedup_key:'paid_'+inv.oid,notif_type:'placed',notif_oid:inv.oid});
   cryptoInvoice=null;

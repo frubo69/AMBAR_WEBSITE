@@ -365,6 +365,16 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
     except Exception:
         is_first_order = False
 
+    # A confirmed crypto payment IS the verification — paying real USDT on-chain is a
+    # stronger trust signal than the self-reported source form, so the payer is
+    # auto-verified here (no operator approval) and the prepaid order is never held
+    # below. Cash orders are untouched and still go through the manual gate.
+    if prepaid and uid not in _TEST_ACCOUNTS:
+        try:
+            await db.verify_user(uid)
+        except Exception as e:
+            log.warning(f"[crypto] auto-verify on prepaid failed for uid={uid}: {e}")
+
     # Save order + upsert user profile in parallel
     order_doc = {
         "order_id": oid,        "customer_id": uid,
@@ -420,8 +430,9 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
             await db.update_order(oid, customer_msg_id=conf_msg_id)
     except Exception as e:
         log.error(f"Customer confirm: {e}")
-    # First-order customers must verify before their order is visible to operators
-    if is_first_order:
+    # First-order customers must verify before their order is visible to operators —
+    # EXCEPT prepaid crypto orders, which the confirmed payment already auto-verified.
+    if is_first_order and not prepaid:
         if lang == "ru":
             warn_text = (
                 "🚨 <b>ВЕРИФИКАЦИЯ ОБЯЗАТЕЛЬНА</b>\n\n"
@@ -458,6 +469,23 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
     else:
         addr_line = f"🏠 Адрес: {address}"
 
+    # Source info collected pre-payment (crypto auto-verify path). Shown on the paid
+    # order's banner so the operator still sees where the customer came from — the same
+    # data the cash flow surfaces via the verify-request message.
+    _src_info = ""
+    if prepaid and is_first_order:
+        _vs = (src.get("verify_source") or "").strip()
+        if _vs:
+            _src_labels = {"friend": "👥 Знакомый", "operator": "📞 Оператор", "other": "💬 Другое"}
+            _src_info = f"\n📋 Источник: <b>{_src_labels.get(_vs, _html_mod.escape(_vs))}</b>"
+            _rn = (src.get("verify_recommender_name") or "").strip()
+            _rp = (src.get("verify_recommender_phone") or "").strip()
+            _sd = (src.get("verify_source_detail") or "").strip()
+            if _vs == "friend" and _rn:
+                _src_info += f"\n👤 {_html_mod.escape(_rn)}" + (f" — {_html_mod.escape(_rp)}" if _rp else "")
+            elif _sd:
+                _src_info += f"\n💬 {_html_mod.escape(_sd)}"
+
     # Build first order banner — with referral info if applicable
     if is_first_order and uid in _TEST_ACCOUNTS:
         first_order_banner = "<blockquote>🟢🟢🟢 <b>ТЕСТ (НЕ НАСТОЯЩИЙ ЗАКАЗ)</b> 🟢🟢🟢</blockquote>\n\n"
@@ -467,9 +495,9 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
             referrer_username = referrer_doc.get("username", "—") if referrer_doc else "—"
         except Exception:
             referrer_username = "—"
-        first_order_banner = f"<blockquote>🔴🔴🔴 <b>НОВЫЙ КЛИЕНТ — РЕФЕРАЛ</b> 🔴🔴🔴\n👥 Пригласил — @{referrer_username}</blockquote>\n\n"
+        first_order_banner = f"<blockquote>🔴🔴🔴 <b>НОВЫЙ КЛИЕНТ — РЕФЕРАЛ</b> 🔴🔴🔴\n👥 Пригласил — @{referrer_username}{_src_info}</blockquote>\n\n"
     elif is_first_order:
-        first_order_banner = "<blockquote>🔴🔴🔴 <b>НОВЫЙ КЛИЕНТ!</b> 🔴🔴🔴</blockquote>\n\n"
+        first_order_banner = f"<blockquote>🔴🔴🔴 <b>НОВЫЙ КЛИЕНТ!</b> 🔴🔴🔴{_src_info}</blockquote>\n\n"
     else:
         first_order_banner = ""
     # Prepaid (crypto) orders are already settled — flag it so the operator does
@@ -510,7 +538,7 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
     # notification until verification data is submitted. Referral users still
     # need to go through the flow — the referrer info just shows up as a hint
     # when the operator receives the combined notification.
-    _needs_verification = is_first_order and uid not in _TEST_ACCOUNTS
+    _needs_verification = is_first_order and uid not in _TEST_ACCOUNTS and not prepaid
     if _needs_verification:
         await db.update_order(oid, pending_verification=True, op_text=op_text,
                               referred_by=referred_by, referrer_username=referrer_username)
@@ -626,6 +654,13 @@ def _crypto_order_payload(data: dict, uid: int, user: dict, oid: str, total_aed:
         "last_name": user.get("last_name", ""),
         "username": user.get("username", "—"),
         "language_code": user.get("language_code", ""),
+        # Referral/source info collected pre-payment (crypto auto-verify path) — rides
+        # along on the invoice snapshot so the operator still sees where the customer
+        # came from on the confirmed, auto-verified order.
+        "verify_source": data.get("verify_source", ""),
+        "verify_source_detail": data.get("verify_source_detail", ""),
+        "verify_recommender_name": data.get("verify_recommender_name", ""),
+        "verify_recommender_phone": data.get("verify_recommender_phone", ""),
     }
 
 

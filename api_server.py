@@ -597,26 +597,30 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
     log.info(f"[order] #{oid} user={uid} items={len(items)} total={total} AED")
 
     # Owner notifications — one message per user, highest matching tier only.
-    try:
-        from owner_routes import notify_new_order
-        await notify_new_order(oid, total, user_name, phone, address, office_nm or office_id,
-                               uid, _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS,
-                               items=items, prepaid=prepaid)
-    except Exception as e:
-        log.error(f"[owner-notif] orders.new failed: {e}")
-
-    if is_first_order:
+    # Held (unverified) orders stay silent here too: the owner is pinged only once the
+    # customer submits verification (see handle_verify_request), exactly like the
+    # operator. Prepaid crypto is auto-verified, so it notifies immediately.
+    if not _needs_verification:
         try:
-            from owner_routes import notify_owners
-            await notify_owners(
-                "customers.new",
-                f"👤 *Новый клиент · первый заказ*\n"
-                f"Имя: {user_name}\n"
-                f"@{username or '—'}\n"
-                f"Заказ #{oid} · {total} AED"
-            )
+            from owner_routes import notify_new_order
+            await notify_new_order(oid, total, user_name, phone, address, office_nm or office_id,
+                                   uid, _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS,
+                                   items=items, prepaid=prepaid)
         except Exception as e:
-            log.error(f"[owner-notif] customers.new failed: {e}")
+            log.error(f"[owner-notif] orders.new failed: {e}")
+
+        if is_first_order:
+            try:
+                from owner_routes import notify_owners
+                await notify_owners(
+                    "customers.new",
+                    f"👤 *Новый клиент · первый заказ*\n"
+                    f"Имя: {user_name}\n"
+                    f"@{username or '—'}\n"
+                    f"Заказ #{oid} · {total} AED"
+                )
+            except Exception as e:
+                log.error(f"[owner-notif] customers.new failed: {e}")
 
     return {"needs_verification": _needs_verification, "is_first_order": is_first_order}
 
@@ -1450,6 +1454,20 @@ async def handle_verify_request(request: web.Request) -> web.Response:
             await db.update_order(oid, op_msg_ids=op_msg_ids)
         # Clear the pending flag
         await db.update_order(oid, pending_verification=False)
+
+        # The owner "new order" ping was held back with the operator's — fire it now
+        # that the order is released (held orders are always cash, so prepaid=None).
+        try:
+            from owner_routes import notify_new_order
+            await notify_new_order(
+                oid, order.get("total", 0), order.get("customer_name", "—"),
+                order.get("phone", "—"), order.get("address", "—"),
+                order.get("office_name") or order.get("office_id") or "Ambar",
+                uid, _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS,
+                items=order.get("items", []), prepaid=None,
+            )
+        except Exception as e:
+            log.error(f"[owner-notif] deferred orders.new failed: {e}")
 
     log.info(f"[verify-request] uid={uid} source={source} detail={source_detail or recommender_name}")
 

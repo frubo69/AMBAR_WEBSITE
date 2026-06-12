@@ -353,13 +353,20 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
     # Check if this is the user's very first order (before incrementing)
     referred_by = None
     referrer_username = None
+    _user_verified = False
     try:
         user_doc = await db.get_user(uid)
         _TEST_ALWAYS_FIRST = {8251195567, 6731325660}  # DEBUG: always treat as first order
         is_first_order = (uid in _TEST_ALWAYS_FIRST) or (user_doc is None or user_doc.get("orders_total", 0) == 0)
+        # Whether the customer is already vetted. The operator hold below keys off
+        # THIS, not "first order", so it stays in lock-step with the app's wall — an
+        # unverified customer is held until they submit the form no matter how many
+        # orders they've started (closes the place-a-second-order bypass).
+        _user_verified = bool(user_doc and user_doc.get("verified"))
         # Reset verification for test accounts so each order triggers full flow
         if uid in _TEST_ALWAYS_FIRST:
             await db.set_user_field(uid, verified=False, verify_requested=False)
+            _user_verified = False
         if is_first_order and user_doc and user_doc.get("referred_by"):
             referred_by = user_doc["referred_by"]
     except Exception:
@@ -374,6 +381,14 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
             await db.verify_user(uid)
         except Exception as e:
             log.warning(f"[crypto] auto-verify on prepaid failed for uid={uid}: {e}")
+
+    # Hold this order back from the operator until an UNVERIFIED customer submits their
+    # verification. Keyed off verified status (not "first order") so it stays in
+    # lock-step with the app's wall — it can never ship an order while the wall is still
+    # up, and it closes the place-a-second-order bypass. Prepaid crypto is auto-verified
+    # just above, so it passes straight through. One condition, reused for the customer
+    # warning and the operator hold so the two never disagree.
+    _needs_verification = (not _user_verified) and uid not in _TEST_ACCOUNTS and not prepaid
 
     # Save order + upsert user profile in parallel
     order_doc = {
@@ -430,9 +445,9 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
             await db.update_order(oid, customer_msg_id=conf_msg_id)
     except Exception as e:
         log.error(f"Customer confirm: {e}")
-    # First-order customers must verify before their order is visible to operators —
-    # EXCEPT prepaid crypto orders, which the confirmed payment already auto-verified.
-    if is_first_order and not prepaid:
+    # Warn the customer their order is held — same condition as the operator hold, so a
+    # verified customer placing a first order never gets a false "held" warning.
+    if _needs_verification:
         if lang == "ru":
             warn_text = (
                 "🚨 <b>ВЕРИФИКАЦИЯ ОБЯЗАТЕЛЬНА</b>\n\n"
@@ -534,11 +549,8 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         f"{paid_banner}"
         + (f"\n\n💬 <b>Комментарий:</b> {_comment_esc}" if comment else "")
     )
-    # For every first-order user (including referrals) delay operator
-    # notification until verification data is submitted. Referral users still
-    # need to go through the flow — the referrer info just shows up as a hint
-    # when the operator receives the combined notification.
-    _needs_verification = is_first_order and uid not in _TEST_ACCOUNTS and not prepaid
+    # Held back here (condition computed above) until the customer verifies — keeps the
+    # order invisible to the operator while the app still shows the wall.
     if _needs_verification:
         await db.update_order(oid, pending_verification=True, op_text=op_text,
                               referred_by=referred_by, referrer_username=referrer_username)

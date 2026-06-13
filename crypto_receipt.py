@@ -139,13 +139,45 @@ def build_receipt(order: dict, to_address: str = "", from_address: str = "") -> 
         kv("Отправитель", from_address)
     kv("Получатель", to_address or "—")
 
-    # ── footer ─────────────────────────────────────────────────────────────────
-    fy = 192
-    line(ML, fy, W - MR)
-    pdf.set_font("D", "", 7); pdf.set_text_color(*SUB)
-    pdf.set_xy(ML, fy + 3); pdf.cell(cw, 4, "Проверить в блокчейне на tronscan.org", align="C")
-    pdf.set_font("D", "B", 8.5); pdf.set_text_color(*GOLD)
-    pdf.set_xy(ML, fy + 9.5); pdf.cell(cw, 4, "AMBAR · Спасибо за заказ", align="C")
+    # ── verify-on-chain QR + footer ──────────────────────────────────────────────
+    # A QR the customer can SCAN or TAP to open this exact transaction on tronscan.
+    # Falls back to the plain text line if segno isn't installed or there's no txid.
+    _txid = str(order.get("crypto_txid") or "").strip()
+    _tron_url = (f"https://tronscan.org/#/transaction/{_txid}" if _txid and _txid != "—"
+                 else (f"https://tronscan.org/#/address/{to_address}" if to_address else ""))
+    _qr_buf = None
+    if _tron_url:
+        try:
+            import io as _io, segno as _segno
+            _qr_buf = _io.BytesIO()
+            _segno.make(_tron_url, error="m").save(
+                _qr_buf, kind="png", scale=12, border=2, dark="#0B0B14", light="#FFFFFF")
+            _qr_buf.seek(0)
+        except Exception:
+            _qr_buf = None
+
+    if _qr_buf is not None:
+        qy = max(y + 3, 173)
+        line(ML, qy, W - MR)
+        iy = qy + 5
+        qsz = 20.0
+        pdf.image(_qr_buf, x=ML, y=iy, w=qsz, h=qsz, link=_tron_url)   # scan OR tap → tronscan
+        pdf.set_draw_color(*GOLD); pdf.set_line_width(0.3); pdf.rect(ML, iy, qsz, qsz)
+        tx0 = ML + qsz + 7; tw = cw - qsz - 7
+        pdf.set_font("D", "B", 9); pdf.set_text_color(*GOLD)
+        pdf.set_xy(tx0, iy + 2); pdf.cell(tw, 5, "Проверить в блокчейне")
+        pdf.set_font("D", "", 7.5); pdf.set_text_color(*SUB)
+        pdf.set_xy(tx0, iy + 8); pdf.multi_cell(tw, 4, "Сканируйте код или нажмите — транзакция откроется на tronscan.org")
+        pdf.link(tx0, iy, tw, qsz, _tron_url)                          # caption tappable too
+        pdf.set_font("D", "B", 8.5); pdf.set_text_color(*GOLD)
+        pdf.set_xy(ML, iy + qsz + 3); pdf.cell(cw, 4, "AMBAR · Спасибо за заказ", align="C")
+    else:
+        fy = 192
+        line(ML, fy, W - MR)
+        pdf.set_font("D", "", 7); pdf.set_text_color(*SUB)
+        pdf.set_xy(ML, fy + 3); pdf.cell(cw, 4, "Проверить в блокчейне на tronscan.org", align="C")
+        pdf.set_font("D", "B", 8.5); pdf.set_text_color(*GOLD)
+        pdf.set_xy(ML, fy + 9.5); pdf.cell(cw, 4, "AMBAR · Спасибо за заказ", align="C")
 
     return bytes(pdf.output())
 

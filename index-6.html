@@ -755,8 +755,16 @@ img{display:block}
    Position-flip on bottom: when a fullscreen sheet is open, the snackbar
    lifts to the top so it stays visible above the sheet (.is-flipped).      */
 /* ── Promo Hero Banner (above catalog grid) ──────────────────────────────── */
-.promo-hero{position:relative;margin:10px 12px 10px;border-radius:18px;overflow:hidden;cursor:pointer;border:1px solid rgba(201,169,110,.18);transition:opacity .3s,transform .3s,max-height .4s ease-in-out,margin .4s ease-in-out,border-color .3s;flex-shrink:0;max-height:600px}
+.promo-hero{position:relative;margin:10px 12px 10px;border-radius:18px;overflow:hidden;cursor:pointer;border:1px solid rgba(201,169,110,.18);transition:opacity .3s,transform .3s,max-height .4s ease-in-out,margin .4s ease-in-out,border-color .3s;flex-shrink:0;max-height:600px;aspect-ratio:1774/887}
 .promo-hero-img{width:100%;display:block;border-radius:18px}
+/* promo carousel — flex track translateX-es between full-width slides (like SWAPLY) */
+.promo-track{display:flex;height:100%;transition:transform .7s cubic-bezier(.7,.05,.2,1);will-change:transform}
+.promo-slide{flex:0 0 100%;height:100%}
+.promo-slide img{width:100%;height:100%;object-fit:cover;display:block}
+.promo-dots{position:absolute;left:0;right:0;bottom:9px;z-index:3;display:flex;align-items:center;justify-content:center;gap:5px;pointer-events:none}
+.promo-dot{position:relative;flex:0 0 auto;width:18px;height:3px;padding:0;border:none;border-radius:2px;background:rgba(255,255,255,.26);overflow:hidden;cursor:pointer;pointer-events:auto;transition:width .35s cubic-bezier(.4,0,.2,1)}
+.promo-dot.active{width:38px}
+.promo-dot-fill{position:absolute;inset:0 auto 0 0;width:0;background:var(--gold);border-radius:2px}
 .promo-hero-close{position:absolute;top:10px;right:10px;z-index:3;width:24px;height:24px;border-radius:50%;background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.1);color:rgba(255,255,255,.5);font-size:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;line-height:1}
 .promo-hero-close:active{transform:scale(.85);background:rgba(255,255,255,.15)}
 /* Promo hero with background image */
@@ -1695,7 +1703,8 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
   <!-- ═══ PROMO HERO BANNER ═══ -->
   <div id="promo-hero" class="promo-hero has-img" style="display:none" onclick="showPromoInfo()">
     <button class="promo-hero-close" onclick="event.stopPropagation();dismissPromoHero()" aria-label="Close">✕</button>
-    <img id="promo-hero-img" class="promo-hero-img" src="" alt="promo">
+    <div class="promo-track" id="promo-track"></div>
+    <div class="promo-dots" id="promo-dots"></div>
   </div>
   <div class="grid" id="p-grid"></div>
   <div id="clear-favs-wrap" style="display:none;position:fixed;left:50%;transform:translateX(-50%);bottom:calc(90px + var(--safe-bottom));width:calc(100% - 32px);max-width:520px;z-index:35;pointer-events:none">
@@ -3736,8 +3745,63 @@ function _preloadHsHero(){
   });
   return _hsHeroPromise;
 }
+// Promo banner slides — drop your images in here (per language). Add as many as you
+// like; with 2+ the banner auto-scrolls through them with line indicators (like the
+// SWAPLY hero). They render in a fixed 2:1 frame (object-fit:cover), so keep them ~2:1.
+const PROMO_SLIDES = {
+  ru: ['promo_hero_ru.png', 'promo_banner_ru.png'],
+  en: ['promo_hero_en.png', 'promo_banner_en.png'],
+};
+let _promoIdx=0,_promoRAF=null,_promoT0=0;
+const _PROMO_AUTO_MS=4500;   // dwell per slide — also how long each line takes to fill
+function _promoList(){ return PROMO_SLIDES[lang==='ru'?'ru':'en'] || PROMO_SLIDES.en || []; }
+function _buildPromoCarousel(){
+  const track=el('promo-track'), dotsEl=el('promo-dots'); if(!track)return;
+  const imgs=_promoList();
+  track.innerHTML=''; if(dotsEl)dotsEl.innerHTML='';
+  imgs.forEach((src,i)=>{
+    const sl=document.createElement('div'); sl.className='promo-slide';
+    const im=document.createElement('img'); im.src=src; im.alt='promo'; im.draggable=false; im.loading='lazy';
+    sl.appendChild(im); track.appendChild(sl);
+    if(dotsEl){
+      const d=document.createElement('button'); d.type='button'; d.className='promo-dot'; d.setAttribute('aria-label','Слайд '+(i+1));
+      const f=document.createElement('span'); f.className='promo-dot-fill'; d.appendChild(f);
+      d.onclick=(e)=>{e.stopPropagation();_promoGo(i);};
+      dotsEl.appendChild(d);
+    }
+  });
+  if(dotsEl) dotsEl.style.display = imgs.length>1 ? '' : 'none';
+  _promoIdx=0; _promoSet();
+  if(imgs.length>1) _promoStartAuto(); else _promoStopAuto();
+}
+// Position the track + set each line's fill: passed = full, current(reset) + upcoming = empty.
+function _promoSet(){
+  const track=el('promo-track'); if(track)track.style.transform='translateX(-'+(_promoIdx*100)+'%)';
+  const dotsEl=el('promo-dots'); if(!dotsEl)return;
+  [...dotsEl.children].forEach((d,i)=>{
+    d.classList.toggle('active',i===_promoIdx);   // current line is wider / highlighted
+    const f=d.firstElementChild;
+    if(f) f.style.width = i<_promoIdx ? '100%' : '0%';   // current resets to 0 — the rAF loop fills it
+  });
+}
+// ONE rAF loop drives BOTH the current line's fill (from real elapsed time) AND the
+// advance, so they can't drift apart or stick on a half-restarted transition. rAF also
+// auto-pauses while the page is hidden and resumes cleanly (advances once on return).
+function _promoFrame(now){
+  const len=_promoList().length;
+  if(len<=1){ _promoRAF=null; return; }
+  if(!_promoT0) _promoT0=now;
+  let frac=(now-_promoT0)/_PROMO_AUTO_MS;
+  if(frac>=1){ _promoIdx=(_promoIdx+1)%len; _promoT0=now; _promoSet(); frac=0; }
+  const dotsEl=el('promo-dots'), d=dotsEl&&dotsEl.children[_promoIdx], f=d&&d.firstElementChild;
+  if(f) f.style.width=(frac*100)+'%';
+  _promoRAF=requestAnimationFrame(_promoFrame);
+}
+function _promoStartAuto(){ _promoStopAuto(); _promoT0=0; _promoRAF=requestAnimationFrame(_promoFrame); }
+function _promoStopAuto(){ if(_promoRAF){cancelAnimationFrame(_promoRAF);_promoRAF=null;} }
+function _promoGo(n){ const len=_promoList().length; if(len<=1)return; _promoIdx=(n+len)%len; _promoSet(); _promoStartAuto(); }
 function _promoImgs(){const r=lang==='ru';return{hero:r?'promo_hero_ru.png':'promo_hero_en.png',modal:r?'promo_modal_ru.png':'promo_modal_en.png'};}
-function _setPromoImgs(){const imgs=_promoImgs();const hi=el('promo-hero-img');if(hi)hi.src=imgs.hero;const mi=el('promo-modal-img');if(mi)mi.src=imgs.modal;}
+function _setPromoImgs(){ _buildPromoCarousel(); const mi=el('promo-modal-img'); if(mi)mi.src=_promoImgs().modal; }
 function _promoExpired(key){const ts=localStorage.getItem(key);if(!ts)return true;return(Date.now()-Number(ts))>=_PROMO_12H;}
 function initPromo(){
   _setPromoImgs();

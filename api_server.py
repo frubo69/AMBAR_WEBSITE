@@ -219,7 +219,11 @@ async def tg_send(token, chat_id, text, parse_mode="Markdown", reply_markup=None
             "message_id": reply_to_message_id,
             "allow_sending_without_reply": True
         })
-    async with _aiohttp.ClientSession() as session:
+    # Hard timeout: without it a stalled Telegram call hangs the awaiting request
+    # forever (try/except can't catch an infinite await) — that can silently freeze
+    # notification flows like handle_verify_request mid-send.
+    _to = _aiohttp.ClientTimeout(total=20)
+    async with _aiohttp.ClientSession(timeout=_to) as session:
         async with session.post(url, json=payload) as resp:
             return await resp.json()
 
@@ -596,31 +600,31 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
 
     log.info(f"[order] #{oid} user={uid} items={len(items)} total={total} AED")
 
-    # Owner notifications — one message per user, highest matching tier only.
-    # Held (unverified) orders stay silent here too: the owner is pinged only once the
-    # customer submits verification (see handle_verify_request), exactly like the
-    # operator. Prepaid crypto is auto-verified, so it notifies immediately.
-    if not _needs_verification:
-        try:
-            from owner_routes import notify_new_order
-            await notify_new_order(oid, total, user_name, phone, address, office_nm or office_id,
-                                   uid, _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS,
-                                   items=items, prepaid=prepaid)
-        except Exception as e:
-            log.error(f"[owner-notif] orders.new failed: {e}")
+    # Owner notification — fires for EVERY order at placement, INCLUDING held ones, so the
+    # owner is never blind to an order even if the customer abandons the verification form.
+    # Held orders are flagged "⏳ ОЖИДАЕТ ВЕРИФИКАЦИИ". Only the OPERATOR stays gated on
+    # verification (handle_verify_request); the owner always gets this heads-up. (Two real
+    # orders were silently stranded when this was deferred — #AMB1713977 and one before it.)
+    try:
+        from owner_routes import notify_new_order
+        await notify_new_order(oid, total, user_name, phone, address, office_nm or office_id,
+                               uid, _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS,
+                               items=items, prepaid=prepaid, held=_needs_verification)
+    except Exception as e:
+        log.error(f"[owner-notif] orders.new failed: {e}")
 
-        if is_first_order:
-            try:
-                from owner_routes import notify_owners
-                await notify_owners(
-                    "customers.new",
-                    f"👤 *Новый клиент · первый заказ*\n"
-                    f"Имя: {user_name}\n"
-                    f"@{username or '—'}\n"
-                    f"Заказ #{oid} · {total} AED"
-                )
-            except Exception as e:
-                log.error(f"[owner-notif] customers.new failed: {e}")
+    if is_first_order:
+        try:
+            from owner_routes import notify_owners
+            await notify_owners(
+                "customers.new",
+                f"👤 *Новый клиент · первый заказ*\n"
+                f"Имя: {user_name}\n"
+                f"@{username or '—'}\n"
+                f"Заказ #{oid} · {total} AED"
+            )
+        except Exception as e:
+            log.error(f"[owner-notif] customers.new failed: {e}")
 
     return {"needs_verification": _needs_verification, "is_first_order": is_first_order}
 
@@ -1349,13 +1353,29 @@ async def handle_verify_request(request: web.Request) -> web.Response:
     if not source:
         return web.json_response({"error": "missing source"}, status=400, headers=CORS_HEADERS)
 
-    await db.submit_verify_request(uid, recommender_name, recommender_phone,
-                                    source=source, source_detail=source_detail)
+    try:
+        await db.submit_verify_request(uid, recommender_name, recommender_phone,
+                                        source=source, source_detail=source_detail)
+    except Exception as e:
+        log.error(f"[verify-request] submit_verify_request failed uid={uid}: {e}")
 
-    # Find the pending-verification order and send combined notification
-    user_orders = await db.get_user_orders(uid)
+    # Find the pending-verification order and send combined notification. Every DB read
+    # below is wrapped: a held order is INVISIBLE to the operator until this handler
+    # fires, so nothing here may abort the function before the sends.
+    try:
+        user_orders = await db.get_user_orders(uid)
+    except Exception as e:
+        log.error(f"[verify-request] get_user_orders failed uid={uid}: {e}")
+        user_orders = []
     pending = [o for o in user_orders if o.get("pending_verification")]
-    user_doc = await db.get_user(uid) or {}
+    if not pending:
+        log.warning(f"[verify-request] uid={uid} submitted verification but NO held order found "
+                    f"(total orders={len(user_orders)}) — operator gets no order message this call")
+    try:
+        user_doc = await db.get_user(uid) or {}
+    except Exception as e:
+        log.error(f"[verify-request] get_user failed uid={uid}: {e}")
+        user_doc = {}
     inv_op = user_doc.get("invited_by_operator")
     inv_at = user_doc.get("invited_at")
     def _fmt_inv_at(t):
@@ -1367,81 +1387,88 @@ async def handle_verify_request(request: web.Request) -> web.Response:
             return ""
     joined_str = _fmt_inv_at(inv_at)
     for order in pending:
-        oid = order["order_id"]
+        oid = order.get("order_id", "?")
         saved_op_text = order.get("op_text", "")
-        # Build source info line
-        source_labels = {
-            "friend": "👥 Знакомый",
-            "operator": "📞 Оператор",
-            "other": "💬 Другое",
-        }
-        src_line = source_labels.get(source, source)
-        src_extra = ""
-        if source == "friend" and recommender_name:
-            src_extra = f"\n👤 {recommender_name}" + (f" — {recommender_phone}" if recommender_phone else "")
-        elif source_detail:
-            src_extra = f"\n💬 {source_detail}"
-
-        # Attribution hints (multiple can apply — show whichever are set)
-        hints = []
-        order_ref_username = order.get("referrer_username")
-        if order.get("referred_by") and order_ref_username:
-            hints.append(f"👥 Пригласил клиент — @{order_ref_username}")
-        if inv_op is not None and inv_op > 0:
-            h = f"🔗 По ссылке оператора <code>{inv_op}</code>"
-            if joined_str: h += f" · вступил {joined_str}"
-            hints.append(h)
-        elif inv_op == 0:
-            h = "🔗 По общей ссылке операторов"
-            if joined_str: h += f" · вступил {joined_str}"
-            hints.append(h)
-
-        # Banner title — test accounts get green TEST banner
-        if uid in _TEST_ACCOUNTS:
-            bq_alert = "<blockquote>🟢🟢🟢 <b>ТЕСТ (НЕ НАСТОЯЩИЙ ЗАКАЗ)</b> 🟢🟢🟢</blockquote>"
-        else:
-            if order.get("referred_by"):
-                banner_title = "<b>НОВЫЙ КЛИЕНТ — РЕФЕРАЛ</b>"
-            elif inv_op is not None and inv_op > 0:
-                banner_title = "<b>НОВЫЙ КЛИЕНТ — ССЫЛКА ОПЕРАТОРА</b>"
-            elif inv_op == 0:
-                banner_title = "<b>НОВЫЙ КЛИЕНТ — ОБЩАЯ ССЫЛКА</b>"
-            else:
-                banner_title = "<b>НОВЫЙ КЛИЕНТ!</b>"
-            hints_str = ("\n" + "\n".join(hints)) if hints else ""
-            bq_alert = f"<blockquote>🔴🔴🔴 {banner_title} 🔴🔴🔴{hints_str}\n📋 Источник: <b>{src_line}</b>{src_extra}</blockquote>"
-
-        # Prepaid (crypto) orders carry a "ОПЛАЧЕНО ОНЛАЙН" blockquote in op_text;
-        # the strip below removes ALL blockquotes, so re-inject it — the operator
-        # must still see the order is settled and NOT collect cash on delivery.
-        paid_banner = ""
-        if order.get("payment_method") == "crypto" and order.get("paid"):
-            paid_banner = (
-                f"<blockquote>💳 <b>ОПЛАЧЕНО ОНЛАЙН · USDT · TRC-20</b>\n"
-                f"Сумма: {order.get('crypto_amount_usdt')} USDT</blockquote>\n\n"
-            )
-
-        if saved_op_text:
-            # Strip old banners (both Markdown and HTML variants)
-            import re as _re
-            saved_op_text = _re.sub(r'<blockquote>.*?</blockquote>\s*', '', saved_op_text, flags=_re.DOTALL)
-            for prefix in ["🔴 *⚠️ ПЕРВЫЙ ЗАКАЗ — новый клиент!*\n\n",
-                           "🔴 *⚠️ НОВЫЙ КЛИЕНТ РЕФЕРАЛ*\n",
-                           "🔴🔴🔴 *НОВЫЙ КЛИЕНТ!* 🔴🔴🔴\n\n",
-                           "🔴🔴🔴 *НОВЫЙ КЛИЕНТ — РЕФЕРАЛ* 🔴🔴🔴\n"]:
-                saved_op_text = saved_op_text.replace(prefix, "")
-            combined = bq_alert + "\n\n" + paid_banner + saved_op_text.strip()
-        else:
-            combined = bq_alert + "\n\n" + paid_banner + f"🆕 <b>ЗАКАЗ #{oid}</b>"
-
-        op_buttons = [
+        # Bulletproof defaults — a held order is INVISIBLE to the operator until this
+        # send fires, so even if the rich build below throws, a usable notification
+        # (order id, source, verify buttons) still goes out.
+        op_kb = {"inline_keyboard": [
             [
                 {"text": "✅ Верифицировать", "callback_data": f"verify_{uid}"},
                 {"text": "❌ Не верифицировать", "callback_data": f"decverify_{oid}_{uid}"},
             ],
             [{"text": "👤 Клиент", "callback_data": f"client_{oid}_{uid}"}],
-        ]
-        op_kb = {"inline_keyboard": op_buttons}
+        ]}
+        _src_fb = {"friend": "Знакомый", "operator": "Оператор", "other": "Другое"}.get(source, source or "—")
+        combined = (f"🔴🔴🔴 <b>НОВЫЙ КЛИЕНТ!</b> 🔴🔴🔴\n📋 Источник: <b>{_src_fb}</b>\n\n"
+                    f"🆕 <b>ЗАКАЗ #{oid}</b>")
+        try:
+            # Build source info line
+            source_labels = {
+                "friend": "👥 Знакомый",
+                "operator": "📞 Оператор",
+                "other": "💬 Другое",
+            }
+            src_line = source_labels.get(source, source)
+            src_extra = ""
+            if source == "friend" and recommender_name:
+                src_extra = f"\n👤 {recommender_name}" + (f" — {recommender_phone}" if recommender_phone else "")
+            elif source_detail:
+                src_extra = f"\n💬 {source_detail}"
+
+            # Attribution hints (multiple can apply — show whichever are set)
+            hints = []
+            order_ref_username = order.get("referrer_username")
+            if order.get("referred_by") and order_ref_username:
+                hints.append(f"👥 Пригласил клиент — @{order_ref_username}")
+            if inv_op is not None and inv_op > 0:
+                h = f"🔗 По ссылке оператора <code>{inv_op}</code>"
+                if joined_str: h += f" · вступил {joined_str}"
+                hints.append(h)
+            elif inv_op == 0:
+                h = "🔗 По общей ссылке операторов"
+                if joined_str: h += f" · вступил {joined_str}"
+                hints.append(h)
+
+            # Banner title — test accounts get green TEST banner
+            if uid in _TEST_ACCOUNTS:
+                bq_alert = "<blockquote>🟢🟢🟢 <b>ТЕСТ (НЕ НАСТОЯЩИЙ ЗАКАЗ)</b> 🟢🟢🟢</blockquote>"
+            else:
+                if order.get("referred_by"):
+                    banner_title = "<b>НОВЫЙ КЛИЕНТ — РЕФЕРАЛ</b>"
+                elif inv_op is not None and inv_op > 0:
+                    banner_title = "<b>НОВЫЙ КЛИЕНТ — ССЫЛКА ОПЕРАТОРА</b>"
+                elif inv_op == 0:
+                    banner_title = "<b>НОВЫЙ КЛИЕНТ — ОБЩАЯ ССЫЛКА</b>"
+                else:
+                    banner_title = "<b>НОВЫЙ КЛИЕНТ!</b>"
+                hints_str = ("\n" + "\n".join(hints)) if hints else ""
+                bq_alert = f"<blockquote>🔴🔴🔴 {banner_title} 🔴🔴🔴{hints_str}\n📋 Источник: <b>{src_line}</b>{src_extra}</blockquote>"
+
+            # Prepaid (crypto) orders carry a "ОПЛАЧЕНО ОНЛАЙН" blockquote in op_text;
+            # the strip below removes ALL blockquotes, so re-inject it — the operator
+            # must still see the order is settled and NOT collect cash on delivery.
+            paid_banner = ""
+            if order.get("payment_method") == "crypto" and order.get("paid"):
+                paid_banner = (
+                    f"<blockquote>💳 <b>ОПЛАЧЕНО ОНЛАЙН · USDT · TRC-20</b>\n"
+                    f"Сумма: {order.get('crypto_amount_usdt')} USDT</blockquote>\n\n"
+                )
+
+            if saved_op_text:
+                # Strip old banners (both Markdown and HTML variants)
+                import re as _re
+                saved_op_text = _re.sub(r'<blockquote>.*?</blockquote>\s*', '', saved_op_text, flags=_re.DOTALL)
+                for prefix in ["🔴 *⚠️ ПЕРВЫЙ ЗАКАЗ — новый клиент!*\n\n",
+                               "🔴 *⚠️ НОВЫЙ КЛИЕНТ РЕФЕРАЛ*\n",
+                               "🔴🔴🔴 *НОВЫЙ КЛИЕНТ!* 🔴🔴🔴\n\n",
+                               "🔴🔴🔴 *НОВЫЙ КЛИЕНТ — РЕФЕРАЛ* 🔴🔴🔴\n"]:
+                    saved_op_text = saved_op_text.replace(prefix, "")
+                combined = bq_alert + "\n\n" + paid_banner + saved_op_text.strip()
+            else:
+                combined = bq_alert + "\n\n" + paid_banner + f"🆕 <b>ЗАКАЗ #{oid}</b>"
+        except Exception as e:
+            log.error(f"[verify-request] message build failed for #{oid} — sending fallback: {e}")
         op_msg_ids = {}
         for op_id in OPERATOR_IDS:
             try:
@@ -1454,20 +1481,8 @@ async def handle_verify_request(request: web.Request) -> web.Response:
             await db.update_order(oid, op_msg_ids=op_msg_ids)
         # Clear the pending flag
         await db.update_order(oid, pending_verification=False)
-
-        # The owner "new order" ping was held back with the operator's — fire it now
-        # that the order is released (held orders are always cash, so prepaid=None).
-        try:
-            from owner_routes import notify_new_order
-            await notify_new_order(
-                oid, order.get("total", 0), order.get("customer_name", "—"),
-                order.get("phone", "—"), order.get("address", "—"),
-                order.get("office_name") or order.get("office_id") or "Ambar",
-                uid, _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS,
-                items=order.get("items", []), prepaid=None,
-            )
-        except Exception as e:
-            log.error(f"[owner-notif] deferred orders.new failed: {e}")
+        # (The owner "new order" ping already fired at placement — see
+        #  _finalize_accepted_order. No deferred re-send here, or the owner gets it twice.)
 
     log.info(f"[verify-request] uid={uid} source={source} detail={source_detail or recommender_name}")
 

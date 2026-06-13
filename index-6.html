@@ -3277,6 +3277,11 @@ function _hideAllVerifySteps(){
 function showVerifyWall(forCrypto){
   const wall=document.getElementById('verify-wall');
   if(!wall)return;
+  // CRITICAL: a cash wall must never carry a crypto-checkout context left over from an
+  // abandoned crypto attempt. If it does, verifySubmit/_verifySubmitGeneric route into the
+  // crypto path and NEVER POST /api/verify-request — the order stays held & invisible to
+  // operator + owner forever (this stranded real order #AMB1713977).
+  if(!forCrypto) _cryptoVerifyCtx=null;
   const requested=localStorage.getItem('ambar_verify_requested')==='1';
   const ru=lang==='ru';
 

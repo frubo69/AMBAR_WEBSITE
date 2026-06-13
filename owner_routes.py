@@ -706,7 +706,7 @@ async def notify_owners_force(event_key: str, text: str, parse_mode: str = "Mark
 
 async def notify_new_order(oid, total, user_name, phone, address, office,
                            uid, founder_id, premium_ids, worldwide_ids,
-                           items=None, prepaid=None):
+                           items=None, prepaid=None, held=False):
     """Send exactly one new-order message per user at their highest matching tier
     (orders.new1000 → orders.new500 → orders.new). VIP notification is independent.
     Crypto-paid orders (prepaid set) ALWAYS reach every owner, bypassing the tier
@@ -722,6 +722,9 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
     if prepaid:
         base += (f"\n\n✅💎 *ОПЛАЧЕНО КРИПТОЙ*\n"
                  f"{prepaid.get('amount_usdt')} USDT · TRC-20 — наличные НЕ брать")
+    if held:
+        base = ("⏳ *ОЖИДАЕТ ВЕРИФИКАЦИИ* — клиент ещё не подтверждён.\n"
+                "Оператор получит заказ после заполнения формы.\n\n") + base
 
     tiers = []
     if total >= 1000:
@@ -1320,7 +1323,7 @@ async def _monitor_quiet_hours():
             continue
         try:
             _db = db._db_or_none()
-            if not _db:
+            if _db is None:   # Motor DB objects raise on bool() — must compare to None
                 continue
             now_h = datetime.now(timezone.utc).astimezone(DUBAI_TZ).hour
             cursor = _db.owner_prefs.find(

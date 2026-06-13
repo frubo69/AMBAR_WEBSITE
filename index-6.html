@@ -3957,6 +3957,15 @@ function _initPill(){
       else movePill(curPg);
     }
   },{passive:false});
+
+  // Keep the cached geometry honest: ANY change to the nav's size — fullscreen
+  // settle, rotation, safe-area inset, a viewport resize — rebuilds the cache. This
+  // is what stops the pill drifting to a stale slot and "going crazy" after a layout
+  // shift that never fired a window 'resize'/'viewportChanged' event.
+  if(window.ResizeObserver){
+    let _roT=null;
+    try{ new ResizeObserver(()=>{ clearTimeout(_roT); _roT=setTimeout(_rebuildPill,100); }).observe(nav); }catch(e){}
+  }
 }
 function go(p){
   dismissToast();

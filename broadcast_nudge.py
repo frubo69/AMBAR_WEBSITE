@@ -34,8 +34,8 @@ logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=lo
 log = logging.getLogger(__name__)
 
 # Each message ≤ 4096 chars (Telegram text-message limit).
-TEXT_RU = "Мы не говорим, что тебе нужно выпить. Мы просто очень удачно оказались рядом. С доставкой."
-TEXT_EN = "We're not saying you need a drink. We just happen to be conveniently nearby. With delivery."
+TEXT_RU = "Мы не говорим, что тебе нужно выпить. Мы просто очень удачно оказались рядом. С доставкой. 🤭"
+TEXT_EN = "We're not saying you need a drink. We just happen to be conveniently nearby. With delivery. 🤭"
 
 # bucket → (text, button label). NO 'both'/universal bucket — those users are skipped.
 BUCKETS = {

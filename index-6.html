@@ -58,6 +58,10 @@ img{display:block}
 /* Floating-island nav: boxed pages (fixed header + inner scroll) extend their inner
    scroll UNDER the nav so content shows through the glass — like the catalog. Pinned
    action buttons (clear-history) keep clearance above the nav. */
+/* Checkout + crypto-pay are nav-LESS sub-flows (not in _NAV_PAGES) — they must NOT get
+   the nav-clearance padding, which pushed their sticky/flex footers up 90px + left a
+   black strip. Their footers clear the safe-area themselves. */
+#pg-checkout,#pg-pay{padding-bottom:0}
 #pg-profile{padding-bottom:0}
 .prof-scroll{padding-bottom:calc(96px + var(--safe-bottom))}
 #pg-orders{padding-bottom:0}

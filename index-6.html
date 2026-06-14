@@ -55,6 +55,18 @@ button,input{font-family:'DM Sans',sans-serif;outline:none}
 img{display:block}
 .page{position:fixed;top:0;left:0;right:0;height:var(--tg-h,100vh);overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;opacity:1;transition:opacity .15s,transform .15s;overscroll-behavior-y:none;contain:content;padding-bottom:calc(90px + var(--safe-bottom))}
 .page.hidden{opacity:0;pointer-events:none;transform:translateY(8px);visibility:hidden;transition:opacity .15s,transform .15s,visibility 0s .15s}
+/* Floating-island nav: boxed pages (fixed header + inner scroll) extend their inner
+   scroll UNDER the nav so content shows through the glass — like the catalog. Pinned
+   action buttons (clear-history) keep clearance above the nav. */
+#pg-profile{padding-bottom:0}
+.prof-scroll{padding-bottom:calc(96px + var(--safe-bottom))}
+#pg-orders{padding-bottom:0}
+#orders-list{padding-bottom:calc(96px + var(--safe-bottom))}
+#clear-history-wrap{margin-bottom:calc(90px + var(--safe-bottom))}
+/* Cart keeps its pinned checkout footer; extend its bar background under the nav so the
+   island floats over the footer instead of a black gap (normal view only — not aob/cpb). */
+#cart-foot{position:relative}
+body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;left:0;right:0;top:100%;height:calc(140px + var(--safe-bottom));background:var(--bg2);pointer-events:none}
 #pg-checkout{height:calc(var(--tg-h,100vh) - var(--safe-bottom))}
 .hdr{position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;padding-top:calc(18px + var(--safe-top));background:rgba(7,7,14,.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);flex-shrink:0}
 .logo{font-family:'Cormorant Garamond',serif;font-size:22px;font-weight:700;letter-spacing:7px;background:linear-gradient(135deg,var(--gold),var(--gold2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}

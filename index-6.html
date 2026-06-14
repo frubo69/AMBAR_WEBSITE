@@ -1390,15 +1390,18 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
 .map-zoom-btn{width:42px;height:42px;background:transparent;border:none;color:#fff;font-size:22px;font-weight:300;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.12s;font-family:'DM Sans',sans-serif;-webkit-tap-highlight-color:transparent;line-height:1}
 .map-zoom-btn:active{background:rgba(255,255,255,.1)}
 .map-zoom-divider{height:1px;background:rgba(255,255,255,.12);margin:0 8px}
-.map-locate-btn{position:absolute;right:14px;bottom:calc(96px + var(--safe-bottom,0px));z-index:501;width:52px;height:52px;border-radius:50%;background:#fff;border:none;color:#1f1f24;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent;outline:none;box-shadow:0 3px 14px rgba(0,0,0,.35)}
-.map-locate-btn:active{transform:scale(.9)}
-.map-pano-btn{position:absolute;left:14px;bottom:calc(96px + var(--safe-bottom,0px));z-index:501;width:118px;height:74px;border-radius:14px;overflow:hidden;border:2px solid #fff;box-shadow:0 3px 14px rgba(0,0,0,.45);padding:0;background:#0a0a0e;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.map-locate-btn{position:absolute;right:14px;bottom:calc(96px + var(--safe-bottom,0px));z-index:501;width:46px;height:46px;border-radius:50%;background:rgba(12,12,18,.78);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);border:1px solid rgba(255,255,255,.12);color:var(--gold);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;-webkit-tap-highlight-color:transparent;outline:none;box-shadow:0 3px 14px rgba(0,0,0,.35)}
+.map-locate-btn:active{background:rgba(201,169,110,.18);transform:scale(.9)}
+.map-pano-btn{position:absolute;left:14px;bottom:calc(96px + var(--safe-bottom,0px));z-index:501;width:118px;height:74px;border-radius:14px;overflow:hidden;border:1.5px solid rgba(201,169,110,.65);box-shadow:0 3px 14px rgba(0,0,0,.45);padding:0;background:#0a0a0e;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .map-pano-btn img{width:100%;height:100%;object-fit:cover;display:block}
 .map-pano-btn:active{transform:scale(.96)}
 .map-pano-peg{position:absolute;left:6px;bottom:6px;width:30px;height:30px;border-radius:9px;background:rgba(255,255,255,.95);display:flex;align-items:center;justify-content:center;color:#1a1a1a}
-.pano-ov{position:fixed;inset:0;z-index:9600;background:#000;display:none}
-.pano-ov.show{display:block}
+.pano-ov{position:fixed;inset:0;z-index:9600;background:#000;transform:translateY(100%);transition:transform .4s cubic-bezier(.34,1.04,.5,1);will-change:transform}
+.pano-ov.show{transform:translateY(0)}
 .pano-frame{position:absolute;inset:0;width:100%;height:100%;border:0;background:#0a0a0e}
+.pano-loading{position:absolute;inset:0;z-index:2;display:flex;align-items:center;justify-content:center;background:#0a0a0e;transition:opacity .45s ease;pointer-events:none}
+.pano-spin{width:38px;height:38px;border-radius:50%;border:3px solid rgba(201,169,110,.22);border-top-color:var(--gold);animation:panospin .8s linear infinite}
+@keyframes panospin{to{transform:rotate(360deg)}}
 .pano-close{position:absolute;top:calc(14px + var(--safe-top,0px));left:14px;z-index:3;width:40px;height:40px;border-radius:50%;background:rgba(10,10,20,.85);border:1px solid rgba(255,255,255,.18);color:#fff;display:flex;align-items:center;justify-content:center;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .map-done-bar{position:absolute;bottom:0;left:0;right:0;z-index:502;padding:10px 16px calc(18px + var(--safe-bottom,0px));background:linear-gradient(transparent,rgba(7,7,14,.9) 35%)}
 .map-done-btn{width:100%;padding:16px;border-radius:16px;border:none;background:linear-gradient(135deg,#C9A96E,#E8C97A);color:#07070E;font-size:16px;font-weight:700;cursor:pointer;font-family:'DM Sans',sans-serif;letter-spacing:.3px;transition:.15s;box-shadow:0 4px 22px rgba(201,169,110,.28)}
@@ -2468,7 +2471,7 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
   </button>
   <!-- Re-center on user location -->
   <button class="map-locate-btn" onclick="_mapGoToUserLocation()">
-    <svg viewBox="0 0 24 24" fill="currentColor" width="22" height="22"><path d="M3 11l18-8-8 18-2-7-8-3z"/></svg>
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" width="19" height="19"><circle cx="12" cy="12" r="3.2"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg>
   </button>
   <!-- Done button -->
   <div class="map-done-bar">
@@ -2487,6 +2490,7 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
 <!-- Street View panorama viewer (Google Maps Embed API — iframe) -->
 <div class="pano-ov" id="pano-ov">
   <button class="pano-close" onclick="closePano()" aria-label="Close"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg></button>
+  <div class="pano-loading" id="pano-loading"><div class="pano-spin"></div></div>
   <iframe id="pano-frame" class="pano-frame" allowfullscreen loading="lazy"></iframe>
 </div>
 
@@ -4459,11 +4463,17 @@ function _mapOpenPano(){
   if(!_mapPicker)return;
   try{haptic.light();}catch(e){}
   const c=_mapPicker.getCenter();
-  const f=el('pano-frame');
-  if(f) f.src='https://www.google.com/maps/embed/v1/streetview?key='+GOOGLE_SV_KEY+'&location='+c.lat.toFixed(6)+','+c.lng.toFixed(6)+'&fov=90';
-  const ov=el('pano-ov'); if(ov)ov.classList.add('show');
+  const f=el('pano-frame'), load=el('pano-loading');
+  if(load) load.style.opacity='1';                       // show spinner while it loads
+  if(f){ f.onload=function(){ if(load) load.style.opacity='0'; };
+         f.src='https://www.google.com/maps/embed/v1/streetview?key='+GOOGLE_SV_KEY+'&location='+c.lat.toFixed(6)+','+c.lng.toFixed(6)+'&fov=90'; }
+  const ov=el('pano-ov'); if(ov)ov.classList.add('show'); // slides up (CSS transform)
 }
-function closePano(){ const ov=el('pano-ov'); if(ov)ov.classList.remove('show'); const f=el('pano-frame'); if(f)f.src='about:blank'; }
+function closePano(){
+  const ov=el('pano-ov'); if(ov)ov.classList.remove('show');   // slides down
+  const f=el('pano-frame'); if(f)setTimeout(()=>{f.src='about:blank';},420);  // clear after the slide
+  const load=el('pano-loading'); if(load)load.style.opacity='1';
+}
 // Refresh the panorama preview thumbnail for the current pin. Loading the Static SV
 // image IS the availability check: return_error_code=true makes Google 404 when there's
 // no panorama → onerror hides the button; onload shows it with the live street preview.

@@ -53,7 +53,7 @@
 html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;height:100%;overflow:hidden}
 button,input{font-family:'DM Sans',sans-serif;outline:none}
 img{display:block}
-.page{position:fixed;top:0;left:0;right:0;height:calc(var(--tg-h,100vh) - 90px - var(--safe-bottom));overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;opacity:1;transition:opacity .15s,transform .15s;overscroll-behavior-y:none;contain:content}
+.page{position:fixed;top:0;left:0;right:0;height:var(--tg-h,100vh);overflow-y:auto;overflow-x:hidden;display:flex;flex-direction:column;opacity:1;transition:opacity .15s,transform .15s;overscroll-behavior-y:none;contain:content;padding-bottom:calc(90px + var(--safe-bottom))}
 .page.hidden{opacity:0;pointer-events:none;transform:translateY(8px);visibility:hidden;transition:opacity .15s,transform .15s,visibility 0s .15s}
 #pg-checkout{height:calc(var(--tg-h,100vh) - var(--safe-bottom))}
 .hdr{position:sticky;top:0;z-index:40;display:flex;align-items:center;justify-content:space-between;padding:12px 16px;padding-top:calc(18px + var(--safe-top));background:rgba(7,7,14,.96);backdrop-filter:blur(20px);border-bottom:1px solid var(--border);flex-shrink:0}
@@ -831,7 +831,7 @@ body.aob-on .toast-bottom.is-flipped{bottom:auto}
 .aob{position:fixed;bottom:calc(92px + var(--safe-bottom));left:10px;right:10px;z-index:200;background:linear-gradient(135deg,#140d1f 0%,#0d1520 100%);border:1px solid rgba(212,175,55,.35);border-radius:16px;padding:10px 14px 12px;cursor:pointer;box-shadow:0 4px 28px rgba(0,0,0,.6),0 0 0 1px rgba(212,175,55,.08);transition:transform .35s cubic-bezier(.34,1,.64,1),opacity .3s ease}
 .aob.aob-hidden{transform:translateY(calc(100% + 80px));opacity:0;pointer-events:none}
 /* When active order bar is visible, push scrollable page content up so nothing hides behind it */
-body.aob-on .page{padding-bottom:90px}
+body.aob-on .page{padding-bottom:calc(180px + var(--safe-bottom))}
 /* Cart: shrink item list to ~2 items and let the whole page scroll */
 body.aob-on #cart-list{max-height:150px}
 body.aob-on #pg-cart{overflow-y:auto!important}
@@ -849,8 +849,8 @@ body.aob-on .cpb{bottom:calc(92px + var(--safe-bottom) + 70px)} /* stack above t
 .cpb-timer-wrap{flex-shrink:0;text-align:right;padding-left:11px;border-left:1px solid var(--border2);min-width:54px}
 .cpb-timer-lbl{font-size:8px;letter-spacing:1px;text-transform:uppercase;color:var(--muted);margin-bottom:2px}
 .cpb-timer{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;color:var(--text);line-height:1;font-variant-numeric:tabular-nums}
-body.cpb-on .page{padding-bottom:90px}
-body.aob-on.cpb-on .page{padding-bottom:162px}
+body.cpb-on .page{padding-bottom:calc(180px + var(--safe-bottom))}
+body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
 .aob-top{display:flex;align-items:center;justify-content:space-between;margin-bottom:9px}
 .aob-left{display:flex;align-items:center;gap:8px}
 .aob-left-text{display:flex;flex-direction:column;gap:1px}

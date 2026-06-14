@@ -2233,7 +2233,7 @@ body.aob-on.cpb-on .page{padding-bottom:162px}
     <div class="sheet-hdr">
       <div class="sheet-hdr-ttl" id="pinfo-title">ЦЕНЫ ДЛЯ СВОИХ</div>
     </div>
-    <div class="pinfo-badge">−5%</div>
+    <div class="pinfo-badge" id="pinfo-badge">−5%</div>
     <div class="pinfo-lead" id="pinfo-lead"></div>
     <div class="pinfo-list" id="pinfo-list"></div>
     <button class="btn-main" id="pinfo-cta" onclick="_closeSheet('promo-info-ov')">Понятно</button>
@@ -3754,9 +3754,31 @@ function _preloadHsHero(){
 // like; with 2+ the banner auto-scrolls through them with line indicators (like the
 // SWAPLY hero). They render in a fixed 2:1 frame (object-fit:cover), so keep them ~2:1.
 const PROMO_SLIDES = {
-  ru: ['promo_hero_ru.png', 'promo_banner_ru.png'],
-  en: ['promo_hero_en.png', 'promo_banner_en.png'],
+  ru: ['promo_hero_ru.png', 'promo_banner_ru.png', 'promo_addhome_ru.png'],
+  en: ['promo_hero_en.png', 'promo_banner_en.png', 'promo_addhome_en.png'],
 };
+// Tap-through info per slide, keyed by the slide's base filename (promo_hero → discount,
+// promo_banner → crypto). showPromoInfo() picks by the CURRENTLY shown slide; unknown
+// slides fall back to the discount card.
+const PROMO_INFO = {
+  promo_hero: {
+    badge: '−5%',
+    title: {ru:'ЦЕНЫ ДЛЯ СВОИХ', en:'INSIDER PRICING'},
+    lead:  {ru:'−5% на весь каталог — всегда. Это не разовая акция, а постоянная привилегия для всех, кто заказывает через приложение AMBAR.',
+            en:'−5% on the whole catalog — always. Not a one-off sale, but a standing privilege for everyone who orders through the AMBAR app.'},
+    items: {ru:['На все товары каталога','Применяется автоматически — без промокодов','Только в приложении, всегда'],
+            en:['On every product in the catalog','Applied automatically — no promo codes','In the app, always']},
+  },
+  promo_banner: {
+    badge: 'USDT',
+    title: {ru:'ТЕПЕРЬ И КРИПТОЙ', en:'NOW IN CRYPTO'},
+    lead:  {ru:'Принимаем USDT в сети TRON (TRC-20): оплата подтверждается прямо на блокчейне, автоматически.',
+            en:'We accept USDT on TRON (TRC-20): payment confirms right on-chain, automatically.'},
+    items: {ru:['USDT · сеть TRON (TRC-20)','Подтверждается на блокчейне — без лишних вопросов','Чек с QR сразу после оплаты'],
+            en:['USDT · TRON network (TRC-20)','Confirmed on-chain — no extra questions','Receipt with QR right after payment']},
+  },
+};
+function _promoInfoKey(){ return (_promoList()[_promoIdx]||'').replace(/.*\//,'').replace(/_(ru|en)\.png$/i,''); }
 let _promoIdx=0,_promoRAF=null,_promoT0=0;
 const _PROMO_AUTO_MS=6000;   // dwell per slide — also how long each line takes to fill
 function _promoList(){ return PROMO_SLIDES[lang==='ru'?'ru':'en'] || PROMO_SLIDES.en || []; }
@@ -3826,14 +3848,15 @@ function initPromo(){
 }
 // Tapping the promo hero card opens its story (the ✕ still dismisses the card).
 function showPromoInfo(){
-  const ru=lang==='ru';
-  set('pinfo-title', ru?'ЦЕНЫ ДЛЯ СВОИХ':'INSIDER PRICING');
-  set('pinfo-lead', ru
-    ? '−5% на весь каталог — всегда. Это не разовая акция, а постоянная привилегия для всех, кто заказывает через приложение AMBAR.'
-    : '−5% on the whole catalog — always. Not a one-off sale, but a standing privilege for everyone who orders through the AMBAR app.');
-  const items = ru
-    ? ['На все товары каталога','Применяется автоматически — без промокодов','Только в приложении, всегда']
-    : ['On every product in the catalog','Applied automatically — no promo codes','In the app, always'];
+  const key=_promoInfoKey();
+  // The "Add to Home Screen" slide opens the install guide instead of an info sheet.
+  if(key==='promo_addhome'){ try{applyHsLang();}catch(e){} const o=el('hs-overlay'); if(o)o.classList.add('show'); try{haptic.light();}catch(e){} return; }
+  const ru=lang==='ru', L=ru?'ru':'en';
+  const info=PROMO_INFO[key]||PROMO_INFO.promo_hero;   // content for the slide on screen
+  set('pinfo-title', info.title[L]);
+  const badge=el('pinfo-badge'); if(badge)badge.textContent=info.badge;
+  set('pinfo-lead', info.lead[L]);
+  const items=info.items[L]||[];
   const check='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="8.5 12 11 14.5 15.5 9.5"/></svg>';
   const list=el('pinfo-list'); if(list)list.innerHTML=items.map(t=>'<div class="pinfo-item">'+check+'<span>'+t+'</span></div>').join('');
   set('pinfo-cta', ru?'Понятно':'Got it');

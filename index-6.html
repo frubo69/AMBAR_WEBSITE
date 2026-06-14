@@ -3849,8 +3849,16 @@ function initPromo(){
 // Tapping the promo hero card opens its story (the ✕ still dismisses the card).
 function showPromoInfo(){
   const key=_promoInfoKey();
-  // The "Add to Home Screen" slide opens the install guide instead of an info sheet.
-  if(key==='promo_addhome'){ try{applyHsLang();}catch(e){} const o=el('hs-overlay'); if(o)o.classList.add('show'); try{haptic.light();}catch(e){} return; }
+  // The "Add to Home Screen" slide does EXACTLY what the install button does:
+  // native tg.addToHomeScreen() on Telegram 8.0+, the manual guide otherwise. For the
+  // guide fallback the overlay must be visible first (doAddHomeScreen→showHsGuide only
+  // swaps views inside #hs-overlay).
+  if(key==='promo_addhome'){
+    try{haptic.light();}catch(e){}
+    if(!(tg&&tg.isVersionAtLeast&&tg.isVersionAtLeast('8.0'))){ try{applyHsLang();}catch(e){} const o=el('hs-overlay'); if(o)o.classList.add('show'); }
+    try{doAddHomeScreen();}catch(e){}
+    return;
+  }
   const ru=lang==='ru', L=ru?'ru':'en';
   const info=PROMO_INFO[key]||PROMO_INFO.promo_hero;   // content for the slide on screen
   set('pinfo-title', info.title[L]);

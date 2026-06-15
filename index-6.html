@@ -5415,11 +5415,17 @@ function updateFavBtn(){
 function toggleFavFilter(){
   haptic.select();
   showFavOnly=!showFavOnly;
+  // The category filter only applies INSIDE the fav/search/sort context. Reset it on
+  // every fav toggle — otherwise exiting favourites leaves the catalog filtered to a
+  // category but in scroll-to-section mode (flat list, no headers), where the chips can
+  // no longer switch or unfilter it. (Bug: category stuck after leaving favourites.)
+  catFilter=null;
   el('fav-hdr-btn').style.background=showFavOnly?'rgba(224,85,85,.2)':'';
   el('fav-hdr-btn').style.borderColor=showFavOnly?'#e05555':'';
   // the promo banner is for browsing — hide it (and pause its auto-scroll) in favourites
   const _ph=el('promo-hero');
   if(_ph){ _ph.style.display = showFavOnly ? 'none' : ''; if(showFavOnly)_promoStopAuto(); else _promoStartAuto(); }
+  buildChips();   // clear the active category chip highlight
   renderGrid();
 }
 function favNotifyAll(){
@@ -5653,8 +5659,9 @@ function setCat(c,btn){
     renderGrid();
     return;
   }
-  // default mode: scroll to section
-  catFilter=null;
+  // default mode: scroll to section. If a stale catFilter left a flat (header-less) grid,
+  // rebuild the sectioned grid first so the target header exists to scroll to.
+  if(catFilter){ catFilter=null; buildChips(); renderGrid(); }
   const hdr=document.querySelector(`#p-grid .cat-section-hdr[data-cat="${c}"]`);
   const page=el('pg-catalog');
   if(!hdr||!page)return;

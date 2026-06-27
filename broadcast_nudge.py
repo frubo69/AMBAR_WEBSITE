@@ -28,14 +28,16 @@ WEBAPP_URL = os.getenv("WEBAPP_URL", "")
 
 HERE = Path(__file__).resolve().parent
 # Own idempotency log so it never clashes with the crypto-promo campaign.
-SENT_LOG = Path(os.getenv("NUDGE_SENT_LOG", HERE / ".broadcast_sent_nudge.txt"))
+# Bump CAMPAIGN for each new blast → a fresh send-log, so nobody from a prior nudge is skipped.
+CAMPAIGN = "nudge2"
+SENT_LOG = Path(os.getenv("NUDGE_SENT_LOG", HERE / (".broadcast_sent_" + CAMPAIGN + ".txt")))
 
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
 log = logging.getLogger(__name__)
 
 # Each message ≤ 4096 chars (Telegram text-message limit).
-TEXT_RU = "Мы не говорим, что тебе нужно выпить. Мы просто очень удачно оказались рядом. С доставкой. 🤭"
-TEXT_EN = "We're not saying you need a drink. We just happen to be conveniently nearby. With delivery. 🤭"
+TEXT_RU = "Мы бы написали что-то умное. Но ты уже понял, зачем мы тут🤫"
+TEXT_EN = "We'd write something clever. But you already know what we're here for 🤫"
 
 # bucket → (text, button label). NO 'both'/universal bucket — those users are skipped.
 BUCKETS = {

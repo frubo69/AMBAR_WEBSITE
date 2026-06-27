@@ -1,10 +1,9 @@
 #!/usr/bin/env python3
 """AMBAR casual nudge — TEXT-ONLY, language-segmented broadcast (RU + EN only).
 
-Sends each customer a short message in THEIR language:
+Sends each customer a short message:
   • language_code ru*  → Russian text
-  • language_code en*  → English text
-  • anything else / no language set → SKIPPED (no universal version)
+  • EVERYONE else (en*, other languages, AND no language set) → English text
 
 Run ON THE VPS (BOT_TOKEN, the user DB and WEBAPP_URL live there):
     python broadcast_nudge.py --stats              # language split, sends NOTHING
@@ -50,9 +49,7 @@ def bucket_for(language_code):
     lc = (language_code or "").strip().lower()
     if lc.startswith("ru"):
         return "ru"
-    if lc.startswith("en"):
-        return "en"
-    return None   # no language set / other language → skip (no universal version)
+    return "en"   # English for EVERYONE else — en*, other languages, AND no language set
 
 
 def _load_sent():
@@ -87,9 +84,8 @@ async def main():
     if mode == "--stats":
         c = Counter(bucket_for(u.get("language_code")) for u in users if u.get("telegram_id"))
         print(f"\n  Customers with a chat id: {sum(c.values())}")
-        print(f"   • RU  (ru*)   → Russian text : {c['ru']}")
-        print(f"   • EN  (en*)   → English text : {c['en']}")
-        print(f"   • Other/none  → SKIPPED      : {c[None]}\n")
+        print(f"   • RU (ru*)        → Russian text : {c['ru']}")
+        print(f"   • Everyone else   → English text : {c['en']}  (en*, other langs, no-lang)\n")
         return
 
     bot = Bot(token=BOT_TOKEN)

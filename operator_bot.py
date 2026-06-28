@@ -1554,6 +1554,18 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                 log.error(f"[owner-notif] delete delivered msgs failed: {e}")
             await db.update_order(oid, status="approved", _delivered_notif_msgs=[], updated_at=datetime.now().isoformat())
             await update_customer_card(oid)
+            # Owner alert: order un-delivered (e.g. operator hit "Delivered" by mistake).
+            try:
+                from owner_routes import notify_owners_force
+                _op = q.from_user
+                _opn = ('@'+_op.username) if _op.username else (_op.first_name or str(_op.id))
+                await notify_owners_force(
+                    "orders.reverted",
+                    f"🔄 *Заказ возвращён в доставку #{oid}*\n"
+                    f"Был «доставлен» — оператор {_opn} вернул его в активные.\n"
+                    f"💰 {total} AED · {order.get('customer_name','—')}")
+            except Exception as e:
+                log.error(f"[owner-notif] reverted notify failed: {e}")
         order = await db.get_order(oid)
         if order:
             lt = ctx.user_data.get("lt")
@@ -1618,9 +1630,11 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             from owner_routes import notify_owners_force
             _items = "\n".join(f"• {i.get('name','')} ×{i.get('qty',1)}"
                                for i in order.get("items", [])) or "—"
+            _op = q.from_user   # only operators can edit (the app has no client edit) — name them
+            _opn = ('@'+_op.username) if _op.username else (_op.first_name or str(_op.id))
             await notify_owners_force(
                 "orders.edited",
-                f"✏️ *Заказ изменён #{oid}*\n"
+                f"✏️ *Заказ изменён #{oid}* — оператором {_opn}\n"
                 f"💰 Новый итог: *{order.get('total', 0)} AED*\n"
                 f"🛒 Позиции:\n{_items}")
         except Exception as e:

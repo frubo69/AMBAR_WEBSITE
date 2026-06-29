@@ -7,7 +7,7 @@ AMBAR Operator Bot — MongoDB edition
 - Ban / unban customers
 - Stats
 """
-import os, asyncio, logging
+import os, asyncio, logging, math
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove, MenuButtonCommands, MenuButtonWebApp, WebAppInfo
@@ -367,6 +367,14 @@ def kb_add_product(oid, cat=None):
     rows.append([InlineKeyboardButton("← Назад", callback_data=f"ei_add_{oid}")])
     return InlineKeyboardMarkup(rows)
 
+def beer_pack_price(p, pack):
+    """12-pack = the listed 12-price; 24-pack = double minus a flat 5, snapped up to a clean
+    0/5 in our favour (95→185, 140→275). Mirrors the customer app's beerPrice."""
+    twelve = p.get("p12") or p.get("price") or 0
+    if str(pack) == "12" or not twelve:
+        return twelve
+    return math.ceil((twelve * 2 - 5) / 5) * 5
+
 def kb_beer_pack(oid, pid):
     """Pack size picker for a specific beer."""
     pmap = {p["id"]: p for p in PRODUCTS}
@@ -374,8 +382,8 @@ def kb_beer_pack(oid, pid):
     if not p:
         return InlineKeyboardMarkup([[InlineKeyboardButton("← Назад", callback_data=f"ei_cat_{oid}_Пиво")]])
     rows = [
-        [InlineKeyboardButton(f"📦 ×12  —  {p['p12']} AED", callback_data=f"ei_addp_{oid}_{pid}_12")],
-        [InlineKeyboardButton(f"📦 ×24  —  {p['p24']} AED", callback_data=f"ei_addp_{oid}_{pid}_24")],
+        [InlineKeyboardButton(f"📦 ×12  —  {beer_pack_price(p,'12')} AED", callback_data=f"ei_addp_{oid}_{pid}_12")],
+        [InlineKeyboardButton(f"📦 ×24  —  {beer_pack_price(p,'24')} AED", callback_data=f"ei_addp_{oid}_{pid}_24")],
         [InlineKeyboardButton("← Назад", callback_data=f"ei_cat_{oid}_Пиво")],
     ]
     return InlineKeyboardMarkup(rows)
@@ -1710,7 +1718,7 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if not p: return
         # Determine name and price
         if pack and p.get("p12"):
-            price = p["p12"] if pack == "12" else p["p24"]
+            price = beer_pack_price(p, pack)
             item_name = f"{p['name']} ×{pack}"
             item_id = f"{pid}_{pack}"
         else:

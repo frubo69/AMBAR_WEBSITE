@@ -727,17 +727,16 @@ def _load_catalog_by_id() -> dict:
     return _catalog_cache["by_id"]
 
 def _catalog_unit_price(p: dict, pcs) -> float:
-    """Unit price mirroring the frontend (index-6.html placeOrder): a 24-pack uses
-    price_24 (or round(price×1.8)), a 12-pack uses price_12 (or price), else price."""
+    """Unit price mirroring the frontend (index-6.html beerPrice): a 24-pack = double the
+    12-pack minus a flat 5, snapped up to a clean 0/5 in our favour (95→185, 140→275); a
+    12-pack = price. Derived from price — the stale price_12/price_24 fields are ignored."""
     base = float(p.get("price", 0) or 0)
     try:
         pcs = int(pcs)
     except (TypeError, ValueError):
         pcs = 0
-    if pcs == 24:
-        return float(p.get("price_24") or round(base * 1.8))
-    if pcs == 12:
-        return float(p.get("price_12") or base)
+    if pcs == 24 and base:
+        return float(math.ceil((base * 2 - 5) / 5) * 5)
     return base
 
 async def _recompute_order_total_aed(items: list, tip: float) -> float:

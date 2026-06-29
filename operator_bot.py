@@ -375,6 +375,14 @@ def beer_pack_price(p, pack):
         return twelve
     return math.ceil((twelve * 2 - 5) / 5) * 5
 
+def _items_sig(order):
+    """Storage-stable signature of an order's line items — used to tell a real edit from a
+    no-op (operator opened «Редактировать» then «Готово» without changing anything)."""
+    return "|".join(
+        f"{i.get('id')}:{int(i.get('qty', 0) or 0)}:{float(i.get('price', 0) or 0)}"
+        for i in sorted(order.get("items") or [], key=lambda x: str(x.get("id")))
+    )
+
 def kb_beer_pack(oid, pid):
     """Pack size picker for a specific beer."""
     pmap = {p["id"]: p for p in PRODUCTS}
@@ -1633,25 +1641,29 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                                   reply_markup=await kb_order_actions(order, list_type=lt))
         # Push the updated items/total to the customer's live msg
         await update_customer_card(oid)
-        # Always notify owners the order was edited (bypasses filters + quiet).
-        try:
-            from owner_routes import notify_owners_force
-            _items = "\n".join(f"• {i.get('name','')} ×{i.get('qty',1)}"
-                               for i in order.get("items", [])) or "—"
-            _op = q.from_user   # only operators can edit (the app has no client edit) — name them
-            _opn = ('@'+_op.username) if _op.username else (_op.first_name or str(_op.id))
-            await notify_owners_force(
-                "orders.edited",
-                f"✏️ *Заказ изменён #{oid}* — оператором {_opn}\n"
-                f"💰 Новый итог: *{order.get('total', 0)} AED*\n"
-                f"🛒 Позиции:\n{_items}")
-        except Exception as e:
-            log.error(f"[op] edit notify failed: {e}")
+        # Notify owners ONLY if the items actually changed. Opening «Редактировать» and
+        # hitting «Готово» without touching anything (or a net-zero +/−) must stay silent.
+        _base = ctx.user_data.pop(f"edit_sig_{oid}", None)
+        if _base is None or _base != _items_sig(order):
+            try:
+                from owner_routes import notify_owners_force
+                _items = "\n".join(f"• {i.get('name','')} ×{i.get('qty',1)}"
+                                   for i in order.get("items", [])) or "—"
+                _op = q.from_user   # only operators can edit (the app has no client edit) — name them
+                _opn = ('@'+_op.username) if _op.username else (_op.first_name or str(_op.id))
+                await notify_owners_force(
+                    "orders.edited",
+                    f"✏️ *Заказ изменён #{oid}* — оператором {_opn}\n"
+                    f"💰 Новый итог: *{order.get('total', 0)} AED*\n"
+                    f"🛒 Позиции:\n{_items}")
+            except Exception as e:
+                log.error(f"[op] edit notify failed: {e}")
 
     elif data.startswith("edit_"):
         oid   = data[5:]
         order = await db.get_order(oid)
         if not order: return
+        ctx.user_data[f"edit_sig_{oid}"] = _items_sig(order)   # baseline → detect real edits at «Готово»
         await q.edit_message_text(
             f"✏️ *Редактирование #{oid}*\n\n"
             + "\n".join(f"  • {i['name']} ×{i['qty']}" for i in order.get("items",[])),

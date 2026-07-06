@@ -167,15 +167,26 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 .addr-modal-add-row{margin:14px 12px 0;display:flex;align-items:center;justify-content:center;gap:8px;padding:14px 16px;border-radius:16px;border:1.5px dashed rgba(201,169,110,.22);background:rgba(201,169,110,.03);cursor:pointer;color:var(--gold);font-size:13px;font-weight:600;transition:.15s;-webkit-tap-highlight-color:transparent}
 .addr-modal-add-row:active{background:rgba(201,169,110,.08);border-color:rgba(201,169,110,.4)}
 
-.bnav{position:fixed;bottom:calc(20px + var(--safe-bottom));left:50%;transform:translateX(-50%) translateZ(0);width:calc(100% - 36px);max-width:480px;z-index:40;display:flex;background:rgba(22,22,32,.6);backdrop-filter:blur(30px) saturate(180%);-webkit-backdrop-filter:blur(30px) saturate(180%);border:1px solid rgba(255,255,255,.08);border-radius:32px;padding:0 6px;box-shadow:0 8px 28px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.08);contain:layout style}
-.bnav-pill{position:absolute;top:7px;left:0;border-radius:19px;pointer-events:none;z-index:0;will-change:transform;transition:transform .42s cubic-bezier(.34,1.3,.5,1);contain:layout style}
-/* Liquid-glass droplet: a gold-tinted lens that rides behind the active tab and stretches
-   like liquid while it travels (navSquish). Sits a touch larger than the pill slot so it
-   reads as a raised droplet — refracting the bar + page behind it, not the icon on top. */
-.bnav-glass{position:absolute;inset:-4px -3px;border-radius:21px;pointer-events:none;transform-origin:center;will-change:transform;background:linear-gradient(150deg,rgba(232,203,156,.32),rgba(201,169,110,.13) 52%,rgba(201,169,110,.22));-webkit-backdrop-filter:blur(3px) saturate(1.7) brightness(1.12);backdrop-filter:blur(3px) saturate(1.7) brightness(1.12);border:1px solid rgba(211,180,124,.6);box-shadow:inset 0 1.5px 1px rgba(255,246,228,.6),inset 0 -3px 7px rgba(201,169,110,.3),inset 0 0 13px rgba(255,240,214,.14),0 7px 20px -6px rgba(0,0,0,.55),0 0 24px -7px rgba(201,169,110,.6)}
-.bnav-glass::before{content:'';position:absolute;left:14%;right:14%;top:3px;height:40%;border-radius:16px;background:linear-gradient(180deg,rgba(255,249,238,.55),rgba(255,249,238,0));filter:blur(1px)}
-.bnav-glass.squish{animation:navSquish .42s cubic-bezier(.34,1.3,.5,1)}
-@keyframes navSquish{0%{transform:scaleX(1) scaleY(1)}32%{transform:scaleX(1.24) scaleY(.82)}100%{transform:scaleX(1) scaleY(1)}}
+.bnav{position:fixed;bottom:calc(20px + var(--safe-bottom));left:50%;transform:translateX(-50%) translateZ(0);width:calc(100% - 36px);max-width:480px;z-index:40;display:flex;background:rgba(20,20,30,.44);backdrop-filter:blur(36px) saturate(200%);-webkit-backdrop-filter:blur(36px) saturate(200%);border:1px solid rgba(255,255,255,.1);border-radius:32px;padding:0 6px;box-shadow:0 8px 28px rgba(0,0,0,.38),inset 0 1px 0 rgba(255,255,255,.12);contain:layout style}
+.bnav-pill{position:absolute;top:7px;left:0;border-radius:19px;pointer-events:none;z-index:0;will-change:transform;transition:transform .45s cubic-bezier(.3,1.35,.45,1);contain:layout style}
+/* iOS 26 Liquid Glass — straight port, no brand tint. A light-grey glass capsule exactly like
+   Apple's dark-mode tab selection: a visible milky face over a hard backdrop brighten, a masked
+   rim ring with a much heavier blur playing the thick lens edge (light bends at the rim, the
+   centre stays clear), white specular hairlines, faint chromatic dispersion hugging the side
+   rims, and a soft drop shadow. Inflates on touch (.lift), stretches + leans into the direction
+   of travel (squish-l/r), and while the finger drags it JS stretches it live with velocity.  */
+.bnav-glass{position:absolute;inset:-6px -5px;border-radius:25px;pointer-events:none;transform-origin:center;will-change:transform;transition:transform .32s cubic-bezier(.3,1.4,.5,1);background:linear-gradient(180deg,rgba(255,255,255,.21),rgba(255,255,255,.09) 42%,rgba(255,255,255,.14));-webkit-backdrop-filter:blur(2px) saturate(1.8) brightness(1.42);backdrop-filter:blur(2px) saturate(1.8) brightness(1.42);box-shadow:inset 0 1px 0 rgba(255,255,255,.52),inset 0 -1px 0 rgba(255,255,255,.22),inset 3px 6px 10px -6px rgba(255,255,255,.5),inset -3px -6px 10px -6px rgba(255,255,255,.32),0 8px 20px -8px rgba(0,0,0,.65),0 2px 5px rgba(0,0,0,.32)}
+.bnav-glass.lift{transform:scale(1.07,1.1)}
+/* thick lens edge — a rim-only ring bending light much harder than the face */
+.bnav-glass::before{content:'';position:absolute;inset:0;border-radius:inherit;padding:5px;-webkit-backdrop-filter:blur(9px) saturate(1.9) brightness(1.5);backdrop-filter:blur(9px) saturate(1.9) brightness(1.5);-webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);mask-composite:exclude}
+/* top glint + bottom counter-light + chromatic dispersion on the side rims */
+.bnav-glass::after{content:'';position:absolute;inset:0;border-radius:inherit;background:radial-gradient(60% 46% at 50% 0%,rgba(255,255,255,.34),rgba(255,255,255,0) 70%),radial-gradient(34% 62% at 0% 56%,rgba(150,210,255,.12),rgba(150,210,255,0) 60%),radial-gradient(34% 62% at 100% 56%,rgba(255,195,175,.12),rgba(255,195,175,0) 60%),radial-gradient(70% 36% at 50% 104%,rgba(255,255,255,.12),rgba(255,255,255,0) 70%)}
+.bnav-glass.squish{animation:navSquish .5s cubic-bezier(.33,1.3,.5,1)}
+.bnav-glass.squish-r{animation:navSquishR .5s cubic-bezier(.33,1.3,.5,1)}
+.bnav-glass.squish-l{animation:navSquishL .5s cubic-bezier(.33,1.3,.5,1)}
+@keyframes navSquish{0%{transform:scale(1,1)}30%{transform:scale(1.3,.78)}60%{transform:scale(.94,1.06)}82%{transform:scale(1.02,.99)}100%{transform:scale(1,1)}}
+@keyframes navSquishR{0%{transform:scale(1,1)}30%{transform:scale(1.34,.76) skewX(-7deg)}60%{transform:scale(.94,1.06) skewX(2.5deg)}82%{transform:scale(1.02,.99)}100%{transform:scale(1,1)}}
+@keyframes navSquishL{0%{transform:scale(1,1)}30%{transform:scale(1.34,.76) skewX(7deg)}60%{transform:scale(.94,1.06) skewX(-2.5deg)}82%{transform:scale(1.02,.99)}100%{transform:scale(1,1)}}
 .nb{flex:1;display:flex;flex-direction:column;align-items:center;padding:11px 4px 10px;gap:4px;border:none;background:transparent;color:var(--muted);cursor:pointer;transition:color .25s,transform .18s cubic-bezier(.34,1.4,.64,1);position:relative;z-index:1}
 .nb:active{transform:scale(.88)}
 .nb.on{color:var(--gold)}
@@ -4008,6 +4019,7 @@ function _buildPillCache(){
   c.centers={};_NAV_PAGES.forEach(p=>{const b=el('nb-'+p);if(b){const r=b.getBoundingClientRect();c.centers[p]=r.left-nr.left+r.width/2;}});
   _pillCache=c;
 }
+let _pillX=null;
 function movePill(page,instant){
   const pill=el('bnav-pill');if(!pill||!_pillCache)return;
   const x=_pillCache.positions[page]||0;
@@ -4019,11 +4031,13 @@ function movePill(page,instant){
     // clear any leftover inline transition:none from a drag so the slide animates
     if(pill.style.transition)pill.style.transition='';
     pill.style.transform='translateX('+x+'px)';
-    _navSquish();   // liquid stretch on the glass droplet as it travels
+    _navSquish(_pillX===null?0:x-_pillX);   // liquid stretch, leaning into the travel direction
   }
+  _pillX=x;
 }
 // Re-trigger the stretch keyframe on the glass droplet (restart it if already mid-flight).
-function _navSquish(){const g=el('bnav-glass');if(!g)return;g.classList.remove('squish');void g.offsetWidth;g.classList.add('squish');}
+// dir>0 → travelling right, dir<0 → left, 0 → symmetric pulse.
+function _navSquish(dir){const g=el('bnav-glass');if(!g)return;g.classList.remove('squish','squish-l','squish-r');void g.offsetWidth;g.classList.add(dir>0?'squish-r':dir<0?'squish-l':'squish');}
 // Rebuild cached pill geometry after layout shifts (fullscreen settle, rotation,
 // viewport resize). Without this the init-time cache goes stale and the pill
 // jumps to the wrong tab / animates erratically. Skips while the nav is hidden
@@ -4050,7 +4064,8 @@ function _initPill(){
   movePill('catalog',true);
 
   const pillW=_pillCache.w;
-  let _live=false,_fx=0,_sx=0,_raf=null;
+  const glass=el('bnav-glass');
+  let _live=false,_fx=0,_sx=0,_raf=null,_ltx=null;
   const DRAG_MIN=7;
 
   function _nearest(relX){
@@ -4076,6 +4091,8 @@ function _initPill(){
     const tx=Math.max(_PM,Math.min(maxX,pillCX-pillW/2));
     pill.style.transition='none';
     pill.style.transform='translateX('+tx+'px)';
+    // live liquid: stretch the glass with drag velocity, like iOS under the finger
+    if(glass){const v=_ltx===null?0:tx-_ltx;_ltx=tx;const s=Math.min(.22,Math.abs(v)*.012);glass.style.transform=s>.005?'scale('+(1+s).toFixed(3)+','+(1-s*.55).toFixed(3)+')':'';}
     _NAV_PAGES.forEach(p=>el('nb-'+p)?.classList.toggle('on',p===nearPage));
     _raf=requestAnimationFrame(_frame);
   }
@@ -4083,6 +4100,7 @@ function _initPill(){
   nav.addEventListener('touchstart',e=>{
     _sx=_fx=e.touches[0].clientX;
     _live=false;
+    el('bnav-glass')?.classList.add('lift');   // glass inflates under the finger, iOS-style
   },{passive:true});
   nav.addEventListener('touchmove',e=>{
     _fx=e.touches[0].clientX;
@@ -4094,11 +4112,14 @@ function _initPill(){
   },{passive:true});
   nav.addEventListener('touchend',e=>{
     e.preventDefault();
+    el('bnav-glass')?.classList.remove('lift');
     const page=_nearest(e.changedTouches[0].clientX-_pillCache.navLeft);
     if(_live){
       _live=false;
       if(_raf){cancelAnimationFrame(_raf);_raf=null;}
       pill.style.transition='';   // restore the smooth slide killed during drag
+      if(glass)glass.style.transform='';
+      _ltx=null;
     }
     if(page!==curPg){go(page);}else{
       const pg=el('pg-'+page);
@@ -4106,6 +4127,12 @@ function _initPill(){
       else movePill(curPg);
     }
   },{passive:false});
+  nav.addEventListener('touchcancel',()=>{
+    el('bnav-glass')?.classList.remove('lift');
+    if(_live){_live=false;if(_raf){cancelAnimationFrame(_raf);_raf=null;}pill.style.transition='';}
+    if(glass)glass.style.transform='';
+    _ltx=null;
+  },{passive:true});
 
   // Keep the cached geometry honest: ANY change to the nav's size — fullscreen
   // settle, rotation, safe-area inset, a viewport resize — rebuilds the cache. This

@@ -365,6 +365,8 @@ async def handle_finance(request):
             "customer_id": o.get("customer_id",""),
             "phone": o.get("phone","—"),
             "total": o.get("total", 0),
+            "crypto": bool(o.get("payment_method") == "crypto" and o.get("paid")),
+            "crypto_usdt": o.get("crypto_amount_usdt") or 0,
             "status": o.get("status",""),
             "ts": placed,
             "eta": o.get("eta",""),
@@ -399,6 +401,24 @@ async def handle_finance(request):
 
     period_lbl_for_rating = {"today":"сегодня","week":"неделя","month":"месяц","year":"год"}[period]
 
+    # ── Crypto vs cash split ─────────────────────────────────────────
+    # Crypto lands on the wallet at PAYMENT time (order placement), cash arrives
+    # with the courier at delivery — the owner needs to instantly see which part
+    # of the income is already on the wallet and which is physical cash.
+    def _is_crypto(o):
+        return o.get("payment_method") == "crypto" and o.get("paid")
+    def _usdt(o):
+        try:
+            return float(o.get("crypto_amount_usdt") or 0)
+        except (TypeError, ValueError):
+            return 0.0
+    crypto_delivered = [o for _, o in curr_orders if _is_crypto(o)]
+    crypto_aed  = sum(o.get("total", 0) for o in crypto_delivered)
+    crypto_usdt = round(sum(_usdt(o) for o in crypto_delivered), 2)
+    # Paid on-chain but still in flight — the money is ALREADY on the wallet.
+    inflight = [o for _, o in curr_all
+                if _is_crypto(o) and o.get("status") in ("pending", "approved")]
+
     return web.json_response({
         "period": period,
         "currency": "AED",
@@ -414,6 +434,15 @@ async def handle_finance(request):
             "estimated":  True,
         },
         "tips":      _sum_field(curr_orders, "tip"),
+        "by_method": {
+            "crypto": {"aed": crypto_aed, "usdt": crypto_usdt, "count": len(crypto_delivered)},
+            "cash":   {"aed": rev_curr - crypto_aed, "count": delivered_count - len(crypto_delivered)},
+            "crypto_inflight": {
+                "aed":   sum(o.get("total", 0) for o in inflight),
+                "usdt":  round(sum(_usdt(o) for o in inflight), 2),
+                "count": len(inflight),
+            },
+        },
         "by_office": _by_office(curr_orders),
         "trend":     _bucket_trend(curr_orders, start, period),
         "bars_7d": {

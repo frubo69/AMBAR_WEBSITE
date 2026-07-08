@@ -691,26 +691,25 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     <div class="bar-row" style="margin:0"><span class="bar-lbl">South</span><div class="bar-track"><div class="bar-fill up" id="offSouthBar" style="width:0%"></div></div><span class="bar-val" id="offSouthRev" data-aed="">—</span></div>
   </div>
 
-  <!-- Payment donut -->
+  <!-- Payment split: crypto (already on the wallet) vs cash (courier collects) -->
   <div class="sect"><div class="sect-t">Способ оплаты</div></div>
   <div class="card">
     <div class="donut-wrap">
       <div class="donut">
         <svg viewBox="0 0 36 36" width="92" height="92">
           <circle cx="18" cy="18" r="15.9" fill="none" stroke="#14142A" stroke-width="3.5"/>
-          <circle cx="18" cy="18" r="15.9" fill="none" stroke="#C9A96E" stroke-width="3.5"
-            stroke-dasharray="68 100" stroke-dashoffset="25" transform="rotate(-90 18 18)" stroke-linecap="round"/>
-          <circle cx="18" cy="18" r="15.9" fill="none" stroke="#5B8DEF" stroke-width="3.5"
-            stroke-dasharray="25 100" stroke-dashoffset="-43" transform="rotate(-90 18 18)" stroke-linecap="round"/>
-          <circle cx="18" cy="18" r="15.9" fill="none" stroke="#4CAF7D" stroke-width="3.5"
-            stroke-dasharray="7 100" stroke-dashoffset="-68" transform="rotate(-90 18 18)" stroke-linecap="round"/>
+          <circle id="payCashArc" cx="18" cy="18" r="15.9" fill="none" stroke="#C9A96E" stroke-width="3.5"
+            stroke-dasharray="0 100" stroke-dashoffset="25" transform="rotate(-90 18 18)" stroke-linecap="round"/>
+          <circle id="payCryptoArc" cx="18" cy="18" r="15.9" fill="none" stroke="#26A17B" stroke-width="3.5"
+            stroke-dasharray="0 100" stroke-dashoffset="25" transform="rotate(-90 18 18)" stroke-linecap="round"/>
         </svg>
-        <div class="donut-c"><div class="donut-val mono">100%</div><div class="donut-lbl">оплат</div></div>
+        <div class="donut-c"><div class="donut-val mono" id="payCryptoPct">—</div><div class="donut-lbl">крипта</div></div>
       </div>
       <div class="donut-leg">
-        <div class="dleg"><span class="dleg-dot" style="background:#C9A96E"></span><span class="dleg-name">Наличные</span><span class="dleg-val">68%</span></div>
-        <div class="dleg"><span class="dleg-dot" style="background:#5B8DEF"></span><span class="dleg-name">Перевод</span><span class="dleg-val">25%</span></div>
-        <div class="dleg"><span class="dleg-dot" style="background:#4CAF7D"></span><span class="dleg-name">Другое</span><span class="dleg-val">7%</span></div>
+        <div class="dleg"><span class="dleg-dot" style="background:#26A17B"></span><span class="dleg-name">💎 Крипта · на кошельке</span><span class="dleg-val" id="payCryptoVal" data-aed="">—</span></div>
+        <div class="dleg"><span class="dleg-name" style="color:var(--muted);font-size:10px;padding-left:16px" id="payCryptoUsdt"></span></div>
+        <div class="dleg"><span class="dleg-dot" style="background:#C9A96E"></span><span class="dleg-name">💵 Наличные</span><span class="dleg-val" id="payCashVal" data-aed="">—</span></div>
+        <div class="dleg" id="payInflightRow" style="display:none"><span class="dleg-name" style="color:#26A17B;font-size:10px" id="payInflight"></span></div>
       </div>
     </div>
   </div>
@@ -2782,10 +2781,34 @@ function renderFinance(p, f){
   }
   // Money tab dynamic bars (period-aware)
   renderPeriodBars(p, f.trend || []);
+  // Payment split: crypto (already on the wallet) vs cash (courier collects)
+  renderPaySplit(f.by_method);
   // Bento KPIs (real values)
   renderKpis(f.kpi);
   // Re-render with currency formatting
   applyCurrency();
+}
+
+function renderPaySplit(bm){
+  bm = bm || {};
+  const c = bm.crypto || {}, k = bm.cash || {}, i = bm.crypto_inflight || {};
+  const cAed = c.aed || 0, kAed = k.aed || 0, tot = cAed + kAed;
+  const cLen = tot ? Math.max(0, Math.min(100, cAed / tot * 100)) : 0;
+  const kLen = tot ? 100 - cLen : 0;
+  const arcK = document.getElementById('payCashArc'), arcC = document.getElementById('payCryptoArc');
+  if(arcK){ arcK.setAttribute('stroke-dasharray', kLen.toFixed(1)+' 100'); arcK.setAttribute('stroke-dashoffset','25'); }
+  if(arcC){ arcC.setAttribute('stroke-dasharray', cLen.toFixed(1)+' 100'); arcC.setAttribute('stroke-dashoffset', String(25 - kLen)); }
+  _setText('payCryptoPct', (tot ? Math.round(cAed/tot*100) : 0) + '%');
+  _setAed('payCryptoVal', cAed);
+  _setAed('payCashVal',   kAed);
+  const cu = document.getElementById('payCryptoUsdt');
+  if(cu) cu.textContent = c.count ? `≈ ${c.usdt} USDT · заказов: ${c.count}` : 'заказов: 0';
+  // Paid on-chain but still in delivery — the money is ALREADY on the wallet.
+  const infRow = document.getElementById('payInflightRow'), inf = document.getElementById('payInflight');
+  if(infRow && inf){
+    if(i.count){ infRow.style.display=''; inf.textContent = `⏳ в доставке, уже оплачено: ${i.aed} AED (≈ ${i.usdt} USDT · ${i.count} зак.)`; }
+    else infRow.style.display='none';
+  }
 }
 
 function renderKpis(k){
@@ -5782,6 +5805,7 @@ const DETAIL = {
             <div style="padding:20px 16px;text-align:center;background:var(--card);border:1px solid var(--border2);border-radius:14px;margin-bottom:6px">
               <div class="dt-stat-val gold" style="font-size:48px;line-height:1">${real.total}<span class="u" style="font-size:16px;margin-left:8px">AED</span></div>
               <div style="font-size:12px;color:var(--muted);margin-top:10px">${real.name}${real.eta ? ' · ETA '+real.eta+' мин' : ''}</div>
+              ${real.crypto ? '<div style="font-size:11px;color:#26A17B;font-weight:700;margin-top:8px">💎 ОПЛАЧЕНО КРИПТОЙ — деньги уже на кошельке</div>' : ''}
             </div>
             <div class="dt-sect">Информация</div>${real.customer_id ? `
             <div class="dt-card" style="margin-bottom:6px;cursor:pointer;border-color:rgba(201,169,110,.25);background:rgba(201,169,110,.06)" onclick="openDetail('customer:${real.customer_id}')">
@@ -5795,6 +5819,7 @@ const DETAIL = {
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Адрес</div></div><div class="dt-row-r" style="font-size:12px;max-width:60%;text-align:right">${real.gmap_link ? '<a href="'+real.gmap_link+'" target="_blank" style="color:var(--gold2)">'+( real.address && real.address!=='—' && real.address!=='GPS' ? real.address : '📍 Карта')+'</a>' : (real.address||'—')}</div></div>
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Офис</div></div><div class="dt-row-r">${real.office||'—'}</div></div>
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Статус</div></div><div class="dt-row-r" style="color:${stClr[real.status]||'var(--muted)'}">${real.status==='cancelled'?(real.cancelled_by==='operator'?'отменён оператором':'отменён клиентом'):real.status==='declined'?'отклонён оператором':(stMap[real.status]||real.status)}</div></div>
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Оплата</div></div><div class="dt-row-r" style="${real.crypto?'color:#26A17B;font-weight:600':'color:var(--muted)'}">${real.crypto?('💎 Крипта · '+(real.crypto_usdt||'—')+' USDT · на кошельке'):'💵 Наличные'}</div></div>
               ${(real.status==='cancelled'||real.status==='declined') && (real.cancel_reason||real.cancel_comment) ? `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Причина ${real.status==='cancelled'&&real.cancelled_by!=='operator'?'отмены':'отклонения'}</div></div><div class="dt-row-r" style="color:var(--dn);max-width:62%;text-align:right">${[real.cancel_reason, real.cancel_comment].filter(Boolean).join(' · ')}</div></div>` : ''}
             </div>
             <div class="dt-sect">Позиции</div>
@@ -5979,7 +6004,7 @@ const DETAIL = {
         }
         const st = stLabel[o.status]||o.status;
         const sc = stColor[o.status]||'var(--muted)';
-        return `<div class="dt-row" data-detail="order:${o.id}"><div class="dt-row-l"><div class="dt-row-t">#${o.id} <span class="dt-row-tiny" style="color:${sc}">${st}</span></div><div class="dt-row-s">${time}${o.items_short?' · '+o.items_short:''}${o.eta?' · ETA '+o.eta+' мин':''}</div></div><div class="dt-row-r gold">${o.total}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:2px">›</div></div>`;
+        return `<div class="dt-row" data-detail="order:${o.id}"><div class="dt-row-l"><div class="dt-row-t">#${o.id}${o.crypto?' <span title="оплачено криптой" style="font-size:10px">💎</span>':''} <span class="dt-row-tiny" style="color:${sc}">${st}</span></div><div class="dt-row-s">${time}${o.items_short?' · '+o.items_short:''}${o.eta?' · ETA '+o.eta+' мин':''}</div></div><div class="dt-row-r ${o.crypto?'':'gold'}" ${o.crypto?'style="color:#26A17B"':''}>${o.total}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:2px">›</div></div>`;
       }).join('');
       if(wrap) return `<div style="max-height:220px;overflow-y:auto;-webkit-overflow-scrolling:touch">${inner}</div>`;
       return inner;

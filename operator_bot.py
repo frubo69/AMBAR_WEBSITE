@@ -922,15 +922,22 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         all_orders = await db.get_all_orders(off)
         today = datetime.now().strftime("%Y-%m-%d")
         tod   = [o for o in all_orders.values() if o.get("timestamp","").startswith(today)]
-        rev   = sum(o.get("total",0) for o in tod if o.get("status")=="delivered")
+        deliv = [o for o in tod if o.get("status")=="delivered"]
+        rev   = sum(o.get("total",0) for o in deliv)
+        # Crypto was paid on-chain at placement — that money is already on the wallet,
+        # the courier must NOT have collected cash for it.
+        crypto_rev = sum(o.get("total",0) for o in deliv
+                         if o.get("payment_method")=="crypto" and o.get("paid"))
         await send(cid,
             f"📊 *Статистика сегодня — {today}*\n\n"
             f"🆕 Новых: *{len([o for o in tod if o.get('status')=='pending'])}*\n"
             f"🟢 Принято: *{len([o for o in tod if o.get('status')=='approved'])}*\n"
-            f"✅ Доставлено: *{len([o for o in tod if o.get('status')=='delivered'])}*\n"
+            f"✅ Доставлено: *{len(deliv)}*\n"
             f"🔴 Отклонено: *{len([o for o in tod if o.get('status')=='declined'])}*\n"
             f"📦 Всего: *{len(tod)}*\n\n"
-            f"💰 *Выручка: {int(rev)} AED*",
+            f"💰 *Выручка: {int(rev)} AED*\n"
+            f"  💎 Крипта (уже на кошельке): *{int(crypto_rev)} AED*\n"
+            f"  💵 Наличные: *{int(rev-crypto_rev)} AED*",
             parse_mode="Markdown", reply_markup=_dismiss)
 
     elif "Помощь" in text:

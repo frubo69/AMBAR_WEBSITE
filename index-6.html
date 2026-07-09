@@ -84,6 +84,11 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 .cart-dot{position:absolute;top:-5px;right:-5px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E;border-radius:50%;width:18px;height:18px;font-size:9px;font-weight:700;display:none;align-items:center;justify-content:center;border:2px solid var(--bg)}
 .lang-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--border2);background:var(--card2);display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;letter-spacing:.5px;color:var(--gold2);font-family:'Space Grotesk',sans-serif;cursor:pointer;transition:.15s}
 .lang-btn:active{transform:scale(.85)}
+/* Flag disc inside the language button — CSS-drawn (no emoji), muted tones to sit in the
+   AMBAR palette. Shows the flag of the language you'd SWITCH TO, not the current one. */
+.lang-flag{width:18px;height:18px;border-radius:50%;display:block;box-shadow:inset 0 0 0 1px rgba(255,255,255,.16),0 1px 4px rgba(0,0,0,.35)}
+.lang-flag.ru{background:linear-gradient(180deg,#EDEDF2 0 34%,#3D5A9E 34% 67%,#B8434E 67% 100%)}
+.lang-flag.en{background:linear-gradient(90deg,transparent 42%,#B8434E 42% 58%,transparent 58%),linear-gradient(0deg,transparent 42%,#B8434E 42% 58%,transparent 58%),linear-gradient(90deg,transparent 33%,#EDEDF2 33% 67%,transparent 67%),linear-gradient(0deg,transparent 33%,#EDEDF2 33% 67%,transparent 67%),#2E4380}
 .notif-btn{width:30px;height:30px;border-radius:50%;border:1px solid var(--border2);background:var(--card2);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s;color:rgba(255,255,255,.65);position:relative;-webkit-tap-highlight-color:transparent;outline:none;flex-shrink:0}
 .notif-btn:active{transform:scale(.85)}
 .notif-btn.has-unread{color:var(--gold);border-color:rgba(201,169,110,.35)}
@@ -3680,12 +3685,13 @@ function flipLang(){
   _renderNotifList();
 }
 function applyLang(){
-  // Show the *current* language as a 2-letter glyph; aria-label on the button
-  // tells assistive tech what tapping it will do (toggle the language).
-  const glyph=lang==='ru'?'RU':'EN';
+  // The button shows the flag of the language you'd SWITCH TO (tap target), not the
+  // current one — Russian set → English flag, English set → Russian flag. CSS-drawn disc.
+  const target=lang==='ru'?'en':'ru';
   document.querySelectorAll('.lang-btn').forEach(b=>{
     const span=b.querySelector('span[aria-hidden]');
-    if(span)span.textContent=glyph;else b.textContent=glyph;
+    if(span){span.textContent='';span.className='lang-flag '+target;}
+    b.setAttribute('aria-label',lang==='ru'?'Switch to English':'Переключить на русский');
   });
   set('catalog-page-title',showFavOnly?t('favs'):t('catalog'));set('ls-cart',t('cartSub'));set('ls-addr',t('addrSub'));
   set('ls-ord',t('ordersSub'));set('ls-prof',t('profileSub'));

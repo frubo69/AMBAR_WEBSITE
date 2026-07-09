@@ -3678,6 +3678,7 @@ function set(id,v){const e=el(id);if(e)e.textContent=v;}
 
 // ── LANGUAGE ──────────────────────────────────────────────────────────────────
 function flipLang(){
+  haptic.select();   // tactile tick on language toggle, like the other header buttons
   lang=lang==='ru'?'en':'ru';
   localStorage.setItem('ambar_lang',lang);
   applyLang();buildChips();renderGrid();buildTips();renderOrders();renderCart();buildSummary();buildProfile();updateSortBtn();

@@ -1447,6 +1447,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
         </div>
         <div class="ncat-body">
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Новое обращение</div><div class="nrow-s">Клиент написал в поддержку</div></div><label class="tg"><input type="checkbox" data-p="support.new"><i></i></label></div>
+          <div class="nrow"><div class="nrow-body"><div class="nrow-t">Ответ оператора</div><div class="nrow-s">Оператор ответил клиенту — с текстом ответа</div></div><label class="tg"><input type="checkbox" data-p="support.replied" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Без ответа <span class="pill warn">&gt; 15 мин</span></div><div class="nrow-s">Оператор не отреагировал</div></div><label class="tg"><input type="checkbox" data-p="support.noreply" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Жалоба · ключевые слова</div><div class="nrow-s">«плохо», «верните», «просрочено»…</div></div><label class="tg"><input type="checkbox" data-p="support.complaint" checked><i></i></label></div>
         </div>
@@ -2630,6 +2631,15 @@ const PERIOD_DATA = {
 
 function _setAed(id, val){ const el = document.getElementById(id); if(el){ el.dataset.aed = String(val); } }
 function _setText(id, txt){ const el = document.getElementById(id); if(el) el.textContent = txt; }
+// ── Date helpers ──────────────────────────────────────────────────────────
+// Server timestamps are UTC ISO — some carry an offset (+00:00), some don't.
+// Naive `new Date(ts+'Z')` on an offset-carrying string yields Invalid Date.
+function _dtParse(iso){ if(!iso) return null; const d=new Date(/Z$|[+-]\d{2}:?\d{2}$/.test(iso)?iso:iso+'Z'); return isNaN(d.getTime())?null:d; }
+function fmtDMY(iso){ const d=(iso instanceof Date)?iso:_dtParse(iso); if(!d) return ''; const p=n=>String(n).padStart(2,'0'); return p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear(); }
+function fmtHM(iso){ const d=_dtParse(iso); if(!d) return ''; const p=n=>String(n).padStart(2,'0'); return p(d.getHours())+':'+p(d.getMinutes()); }
+// Time for today's events, full dd/mm/yyyy hh:mm for anything older.
+function fmtWhen(iso){ const d=_dtParse(iso); if(!d) return ''; const t=fmtHM(iso); return fmtDMY(d)===fmtDMY(new Date())?t:fmtDMY(d)+' '+t; }
+function escS(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
 
 // IDs of finance/KPI placeholders that render skeleton shimmers while the
 // /api/owner/finance request is in flight. Mapped to size hints via CSS.
@@ -3584,6 +3594,17 @@ window._alertDetailMap = window._alertDetailMap || {};
 //   3) otherwise a generic detail card showing the full (untruncated) event text.
 function _alertClickTarget(n, fullText, ts, ico){
   const txt = (n && n.text) || '';
+  // Support events ALWAYS open the conversation window — never the bare order card.
+  // New alerts carry meta.conv_key; older ones fall back to the order id in the
+  // text, and with no hint at all we open the threads list.
+  const ek = (n && n.event_key) || '';
+  if(ek.indexOf('support.') === 0){
+    const meta = (n && n.meta) || {};
+    if(meta.conv_key) return ()=>{ closeAlerts(); openDetail('support:'+meta.conv_key); };
+    const som = txt.match(/#(AMB\d+)/i);
+    if(som) return ()=>{ closeAlerts(); openDetail('support:order-'+som[1]); };
+    return ()=>{ closeAlerts(); openDetail('support:list'); };
+  }
   const om = txt.match(/#(AMB\d+)/i);
   if(om){ const oid = om[1]; return ()=>{ closeAlerts(); openDetail('order:'+oid); }; }
   const cm = txt.match(/ID:\s*`?(\d{4,})`?/);
@@ -3667,6 +3688,7 @@ function _buildAlerts(){
       'stock.out':'warn','stock.low':'info',
       'customers.new':'info','customers.verify':'warn','customers.verified':'info','customers.vip':'info',
       'support.new':'warn','support.escalation':'dn','support.unresolved':'warn',
+      'support.complaint':'dn','support.replied':'info',
       'operations.shiftStart':'info','operations.shiftEnd':'info',
     };
     const icoMap = {
@@ -3677,13 +3699,14 @@ function _buildAlerts(){
       'stock.out':'📦','stock.low':'💤',
       'customers.new':'👤','customers.verify':'📝','customers.vip':'💎',
       'support.new':'💬','support.escalation':'🚨','support.unresolved':'📩',
+      'support.complaint':'⚠️','support.replied':'🎧',
       'operations.shiftStart':'🟢','operations.shiftEnd':'🔴',
     };
     (window._serverNotifs||[]).forEach(n=>{
       const id = 'srv:'+n.event_key+':'+n.created_at;
       const clean = (n.text||'').replace(/\*/g,'').replace(/\\_/g,'_');
       const lines = clean.split('\n').filter(Boolean);
-      const ts = n.created_at ? new Date(n.created_at+'Z').toLocaleTimeString('ru',{hour:'2-digit',minute:'2-digit'}) : '';
+      const ts = fmtWhen(n.created_at);   // time today, dd/mm/yyyy hh:mm for older
       const ico = icoMap[n.event_key]||'🔔';
       out.push({
         id, sev: sevMap[n.event_key]||'info',
@@ -5792,11 +5815,7 @@ const DETAIL = {
       const allLists = [...(k.pending_orders||[]),...(k.inroute_orders||[]),...(k.delivered_orders||[]),...(k.declined_orders||[])];
       const real = allLists.find(o=>o.id===id);
       if(real){
-        let time = '—';
-        if(real.ts){
-          const t = new Date(/Z$|[+-]\d{2}/.test(real.ts) ? real.ts : real.ts+'Z');
-          if(!isNaN(t.getTime())) time = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
-        }
+        const time = real.ts ? (fmtDMY(real.ts)+' '+fmtHM(real.ts)).trim() : '—';   // full date, always
         const stMap = {delivered:'доставлен',approved:'в пути',pending:'ожидает',declined:'отклонён',cancelled:'отменён'};
         const stClr = {delivered:'var(--up)',approved:'var(--info)',pending:'var(--warn)',declined:'var(--dn)',cancelled:'var(--dn)'};
         return {
@@ -5835,23 +5854,20 @@ const DETAIL = {
             <div class="dt-card">
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Оформлен</div></div><div class="dt-row-r">${time||'—'}</div></div>
               ${(()=>{
-                if(!real.confirmed_at) return '';
-                const ca = new Date(/Z$|[+-]\d{2}/.test(real.confirmed_at) ? real.confirmed_at : real.confirmed_at+'Z');
-                return isNaN(ca.getTime()) ? '' : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Принят</div></div><div class="dt-row-r">'+String(ca.getHours()).padStart(2,'0')+':'+String(ca.getMinutes()).padStart(2,'0')+'</div></div>';
+                const v = real.confirmed_at && fmtHM(real.confirmed_at);
+                return v ? '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Принят</div></div><div class="dt-row-r">'+fmtDMY(real.confirmed_at)+' '+v+'</div></div>' : '';
               })()}
               ${(()=>{
-                if(!real.delivered_at) return '';
-                const da = new Date(/Z$|[+-]\d{2}/.test(real.delivered_at) ? real.delivered_at : real.delivered_at+'Z');
-                return isNaN(da.getTime()) ? '' : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Доставлен</div></div><div class="dt-row-r">'+String(da.getHours()).padStart(2,'0')+':'+String(da.getMinutes()).padStart(2,'0')+'</div></div>';
+                const v = real.delivered_at && fmtHM(real.delivered_at);
+                return v ? '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Доставлен</div></div><div class="dt-row-r">'+fmtDMY(real.delivered_at)+' '+v+'</div></div>' : '';
               })()}
               ${(()=>{
                 if(real.status!=='cancelled'&&real.status!=='declined') return '';
-                if(!real.cancelled_at&&!real.declined_at) return '';
                 const raw = real.cancelled_at||real.declined_at;
-                const dt = new Date(/Z$|[+-]\d{2}/.test(raw) ? raw : raw+'Z');
-                if(isNaN(dt.getTime())) return '';
+                const v = raw && fmtHM(raw);
+                if(!v) return '';
                 const label = real.status==='declined'?'Отклонён':'Отменён';
-                return '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--dn)">'+label+'</div></div><div class="dt-row-r" style="color:var(--dn)">'+String(dt.getHours()).padStart(2,'0')+':'+String(dt.getMinutes()).padStart(2,'0')+'</div></div>';
+                return '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--dn)">'+label+'</div></div><div class="dt-row-r" style="color:var(--dn)">'+fmtDMY(raw)+' '+v+'</div></div>';
               })()}
               ${real.eta ? '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">ETA</div></div><div class="dt-row-r">'+real.eta+' мин</div></div>' : ''}
               ${(()=>{
@@ -5997,11 +6013,7 @@ const DETAIL = {
       if(!list||!list.length) return '<div style="padding:20px 16px;text-align:center;color:var(--muted);font-size:13px">Нет заказов</div>';
       const wrap = list.length > 3;
       const inner = list.map(o=>{
-        let time = '';
-        if(o.ts){
-          const t = new Date(/Z$|[+-]\d{2}/.test(o.ts) ? o.ts : o.ts+'Z');
-          if(!isNaN(t.getTime())) time = `${String(t.getHours()).padStart(2,'0')}:${String(t.getMinutes()).padStart(2,'0')}`;
-        }
+        const time = fmtWhen(o.ts);   // today → HH:MM, older → dd/mm/yyyy HH:MM
         const st = stLabel[o.status]||o.status;
         const sc = stColor[o.status]||'var(--muted)';
         return `<div class="dt-row" data-detail="order:${o.id}"><div class="dt-row-l"><div class="dt-row-t">#${o.id}${o.crypto?' <span title="оплачено криптой" style="font-size:10px">💎</span>':''} <span class="dt-row-tiny" style="color:${sc}">${st}</span></div><div class="dt-row-s">${time}${o.items_short?' · '+o.items_short:''}${o.eta?' · ETA '+o.eta+' мин':''}</div></div><div class="dt-row-r ${o.crypto?'':'gold'}" ${o.crypto?'style="color:#26A17B"':''}>${o.total}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:2px">›</div></div>`;
@@ -6227,10 +6239,22 @@ const DETAIL = {
   // Generic fallback view for a server-pushed alert that has no order/customer
   // to deep-link into (e.g. support tickets, shift events). Shows the full,
   // untruncated event text — the alert row itself only shows the first 80 chars.
+  // Support conversation window. id: 'list' | <conv_key> | 'order-AMB…'.
+  // openDetail is sync → render a skeleton now, _supportLoad() fills it in.
+  support: id=>{
+    _supportLoad(id);
+    const isList = id==='list';
+    return {
+      title:`<div class="dt-tit-av plain" style="background:var(--warn-soft);color:var(--warn);font-size:18px">💬</div><div><div class="dt-tit-name">${isList?'Поддержка · обращения':'Поддержка · переписка'}</div><div class="dt-sub" id="supThreadSub">загрузка…</div></div>`,
+      body:`<div class="dt-sect">${isList?'Последние диалоги':'Сообщения'}</div><div id="supThreadBody"><div class="dt-card"><div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">Загрузка…</div></div></div></div></div>`,
+      foot:''
+    };
+  },
   alert: dkey=>{
     const a = (window._alertDetailMap||{})[dkey] || {ev:'', ico:'🔔', text:'', ts:''};
     const EVN = {
       'support.new':'Новое обращение в поддержку','support.escalation':'Эскалация · поддержка','support.unresolved':'Обращение без ответа',
+      'support.complaint':'Жалоба · поддержка','support.replied':'Ответ оператора · поддержка',
       'operations.shiftStart':'Начало смены','operations.shiftEnd':'Конец смены',
       'reviews.any':'Новый отзыв','reviews.comment':'Отзыв с комментарием','reviews.good5':'Отличный отзыв','reviews.bad3':'Плохой отзыв',
       'stock.out':'Нет в наличии','stock.low':'Мало на складе',
@@ -6251,7 +6275,7 @@ const DETAIL = {
         }).join('')
       : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">Нет деталей</div></div></div>';
     return {
-      title:`<div class="dt-tit-av plain" style="background:var(--warn-soft);color:var(--warn);font-size:18px">${a.ico||'🔔'}</div><div><div class="dt-tit-name">${name}</div><div class="dt-sub">${a.ts?('сегодня · '+a.ts):'уведомление'}</div></div>`,
+      title:`<div class="dt-tit-av plain" style="background:var(--warn-soft);color:var(--warn);font-size:18px">${a.ico||'🔔'}</div><div><div class="dt-tit-name">${name}</div><div class="dt-sub">${a.ts?(a.ts.includes('/')?a.ts.replace(' ',' · '):('сегодня · '+a.ts)):'уведомление'}</div></div>`,
       body:`<div class="dt-sect">Детали события</div><div class="dt-card">${rows}</div>`,
       foot:''
     };
@@ -6279,6 +6303,53 @@ function openDetail(key){
   document.getElementById('dtBody').scrollTop = 0;
   applyCurrency();
   try{Telegram.WebApp.HapticFeedback.impactOccurred('light')}catch(e){}
+}
+
+// Fills the support window opened by DETAIL.support once the API answers.
+// Bails out silently if the user has already navigated elsewhere (_dtCurrent moved).
+async function _supportLoad(id){
+  const key='support:'+id;
+  const bodyEl=()=>document.getElementById('supThreadBody');
+  const subEl=()=>document.getElementById('supThreadSub');
+  try{
+    if(id==='list'){
+      const r=await ownerApi.ownerFetch('/api/owner/support-threads');
+      if(_dtCurrent!==key||!bodyEl())return;
+      const th=r.threads||[];
+      if(subEl())subEl().textContent=th.length?('диалогов: '+th.length):'нет обращений';
+      bodyEl().innerHTML='<div class="dt-card">'+(th.length?th.map(t=>{
+        const who=`${escS(t.name||'—')}${t.username?' <span style="color:var(--muted)">@'+escS(t.username)+'</span>':''}`;
+        const ctx=t.order_id?('заказ #'+escS(t.order_id)):'общий вопрос';
+        const prev=(t.last_role==='operator'?'🎧 ':'👤 ')+escS(t.last_text||'');
+        return `<div class="dt-row" data-detail="support:${escS(t.key)}"><div class="dt-row-l"><div class="dt-row-t">${who} <span class="dt-row-tiny" style="color:var(--muted)">${ctx}</span></div><div class="dt-row-s">${fmtWhen(t.last_ts)} · ${prev}</div></div><div class="dt-row-r" style="color:var(--muted)">${t.count}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:2px">›</div></div>`;
+      }).join(''):'<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">Обращений пока нет</div></div></div>')+'</div>';
+      return;
+    }
+    const params = id.indexOf('order-')===0 ? {order:id.slice(6)} : {key:id};
+    const r=await ownerApi.ownerFetch('/api/owner/support-thread',{params});
+    if(_dtCurrent!==key||!bodyEl())return;
+    const c=r.client||{};
+    if(subEl())subEl().textContent=`${c.name||'—'}${c.username?' @'+c.username:''}${r.order_id?' · заказ #'+r.order_id:' · общий вопрос'}`;
+    const msgs=r.messages||[];
+    const base=(window.ownerApi&&ownerApi.AMBAR_API)||'';
+    const rows=msgs.map(m=>{
+      const op=m.role==='operator';
+      const when=(fmtDMY(m.ts)+' '+fmtHM(m.ts)).trim();
+      const body=m.type==='photo'
+        ? `<img src="${base+escS(m.url||'')}" style="max-width:180px;border-radius:10px;display:block" loading="lazy"/>${m.caption?`<div style="margin-top:4px">${escS(m.caption)}</div>`:''}`
+        : escS(m.text||'');
+      return `<div style="display:flex;justify-content:${op?'flex-end':'flex-start'};margin:6px 0">
+        <div style="max-width:82%;padding:9px 12px;border-radius:${op?'14px 14px 4px 14px':'14px 14px 14px 4px'};background:${op?'rgba(201,169,110,.12)':'var(--card2)'};border:1px solid ${op?'rgba(201,169,110,.3)':'var(--border2)'}">
+          <div style="font-size:10px;color:${op?'var(--gold2)':'var(--muted)'};margin-bottom:3px">${op?'🎧 Оператор':'👤 Клиент'} · ${when}</div>
+          <div style="font-size:13px;line-height:1.45;white-space:pre-wrap;word-break:break-word">${body}</div>
+        </div></div>`;
+    }).join('');
+    const orderCard=r.order_id?`<div class="dt-card" style="margin-bottom:8px"><div class="dt-row" data-detail="order:${escS(r.order_id)}"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--gold2)">Открыть заказ #${escS(r.order_id)}</div></div><div class="dt-row-r" style="color:var(--muted);font-size:16px">›</div></div></div>`:'';
+    bodyEl().innerHTML=orderCard+`<div style="padding:2px 2px 12px">${rows||'<div style="color:var(--muted);font-size:13px;padding:12px">Сообщений нет</div>'}</div>`;
+  }catch(e){
+    if(_dtCurrent===key&&bodyEl())
+      bodyEl().innerHTML=`<div class="dt-card"><div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--dn)">Не удалось загрузить переписку${e&&e.status?' ('+e.status+')':''}</div></div></div></div>`;
+  }
 }
 
 function backDetail(){

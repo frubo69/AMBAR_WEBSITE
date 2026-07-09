@@ -679,14 +679,90 @@ async def handle_notif_test(request):
         return web.json_response({"error": str(e)}, status=500, headers=CORS_HEADERS)
 
 
+# ── Support conversations (owner app "переписка" window) ────────────────────
+def _conv_parts(conv_key: str):
+    """conv_key is '{uid}' or '{uid}_{order_id}' (order_id may be 'general')."""
+    head, _, tail = (conv_key or "").partition("_")
+    uid = int(head) if head.isdigit() else 0
+    order_id = "" if tail in ("", "general") else tail
+    return uid, order_id
+
+
+async def _conv_client(uid: int) -> dict:
+    u = (await db.get_user(uid)) or {} if uid else {}
+    return {
+        "id": uid,
+        "name": u.get("first_name") or u.get("name") or (str(uid) if uid else "—"),
+        "username": u.get("username") or "",
+    }
+
+
+def _msg_preview(m: dict) -> str:
+    return (m.get("text") or m.get("caption")
+            or ("📷 фото" if m.get("type") == "photo" else ""))[:80]
+
+
+@require_owner
+async def handle_support_threads(request):
+    """GET /api/owner/support-threads — recent conversations for the list window."""
+    docs = await db.get_recent_support_convs(50)
+    out = []
+    for d in docs:
+        key = d.get("conv_key", "")
+        msgs = d.get("messages") or []
+        if not key or not msgs:
+            continue
+        uid, order_id = _conv_parts(key)
+        client = await _conv_client(uid)
+        last = msgs[-1]
+        out.append({
+            "key": key,
+            "order_id": order_id,
+            "name": client["name"],
+            "username": client["username"],
+            "count": len(msgs),
+            "last_ts": last.get("ts", ""),
+            "last_role": last.get("role", ""),
+            "last_text": _msg_preview(last),
+        })
+    return web.json_response({"threads": out}, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_support_thread(request):
+    """GET /api/owner/support-thread?key=<conv_key> | ?order=<AMB…> —
+    the FULL conversation (client + operator messages) for the owner app."""
+    key = request.query.get("key", "").strip()
+    order = request.query.get("order", "").strip().lstrip("#")
+    if not key and order:
+        docs = await db.get_recent_support_convs(500)
+        for d in docs:
+            if d.get("conv_key", "").endswith("_" + order):
+                key = d["conv_key"]
+                break
+    if not key:
+        return web.json_response({"error": "thread not found"}, status=404, headers=CORS_HEADERS)
+    msgs = await db.get_support_conv(key)
+    uid, order_id = _conv_parts(key)
+    client = await _conv_client(uid)
+    return web.json_response({
+        "key": key,
+        "order_id": order_id,
+        "client": client,
+        "messages": msgs,
+    }, headers=CORS_HEADERS)
+
+
 # Public helper used by api_server (and operator_bot in future) to push an
 # event to all owners subscribed to it. Best-effort; logs failures.
-async def notify_owners(event_key: str, text: str, parse_mode: str = "Markdown") -> list:
+async def notify_owners(event_key: str, text: str, parse_mode: str = "Markdown",
+                        meta: dict | None = None) -> list:
     """Send notification to subscribed owners/managers. Returns list of
     {"chat_id": int, "message_id": int} for each successfully sent message
-    so callers can delete them later if needed."""
+    so callers can delete them later if needed. `meta` is persisted with the
+    notification for the owner app (e.g. support conv_key routing)."""
     try:
-        await db.insert_notification(event_key, text)
+        await db.insert_notification(event_key, text, meta=meta)
     except Exception as e:
         log.error(f"[owner-notif] persist failed for {event_key}: {e}")
 
@@ -1445,6 +1521,10 @@ def setup(app):
     app.router.add_post(            "/api/owner/customers/{telegram_id}/{action:ban|unban}", handle_customer_ban)
     app.router.add_route("OPTIONS", "/api/owner/notifications", handle_notifications)
     app.router.add_get(             "/api/owner/notifications", handle_notifications)
+    app.router.add_route("OPTIONS", "/api/owner/support-threads", handle_support_threads)
+    app.router.add_get(             "/api/owner/support-threads", handle_support_threads)
+    app.router.add_route("OPTIONS", "/api/owner/support-thread",  handle_support_thread)
+    app.router.add_get(             "/api/owner/support-thread",  handle_support_thread)
     app.router.add_route("OPTIONS", "/api/owner/notif-prefs", handle_notif_prefs_get)
     app.router.add_get(             "/api/owner/notif-prefs", handle_notif_prefs_get)
     app.router.add_post(            "/api/owner/notif-prefs", handle_notif_prefs_set)

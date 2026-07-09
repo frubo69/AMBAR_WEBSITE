@@ -1741,6 +1741,9 @@ async def handle_support_send(request: web.Request) -> web.Response:
         from owner_routes import notify_owners, OWNER_BOT_TOKEN
         import re as _re
         ctx_lbl = f"заказ #{order_id}" if order_id and order_id != "general" else "общий вопрос"
+        # Routing hint for the owner app: tapping the alert opens THIS conversation.
+        _meta = {"conv_key": conv_key,
+                 "order_id": order_id if order_id and order_id != "general" else ""}
 
         # Check for complaint keywords first
         text_lower = text.lower()
@@ -1774,7 +1777,7 @@ async def handle_support_send(request: web.Request) -> web.Response:
             complaint_set = set(complaint_subs)
 
             # Send complaint to complaint subscribers
-            await db.insert_notification("support.complaint", text_complaint)
+            await db.insert_notification("support.complaint", text_complaint, meta=_meta)
             for oid in complaint_subs:
                 try:
                     result = await tg_send(OWNER_BOT_TOKEN, oid, text_complaint, parse_mode="Markdown")
@@ -1784,7 +1787,7 @@ async def handle_support_send(request: web.Request) -> web.Response:
                     log.error(f"[owner-notif] support.complaint → {oid} failed: {e}")
 
             # Send regular support.new only to those NOT getting complaint
-            await db.insert_notification("support.new", text_new)
+            await db.insert_notification("support.new", text_new, meta=_meta)
             for oid in new_subs:
                 if oid in complaint_set:
                     continue  # already got the complaint version
@@ -1796,7 +1799,7 @@ async def handle_support_send(request: web.Request) -> web.Response:
                     log.error(f"[owner-notif] support.new → {oid} failed: {e}")
         else:
             # No trigger words — just send support.new normally
-            await notify_owners("support.new", text_new)
+            await notify_owners("support.new", text_new, meta=_meta)
     except Exception as e:
         log.error(f"[owner-notif] support notification failed: {e}")
 

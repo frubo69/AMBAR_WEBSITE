@@ -256,6 +256,7 @@ async def handle_admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE)
             + f"\n\nОткройте приложение, чтобы прочитать ответ."
         )
         await _notify_user(user_id, notif)
+        await _notify_owners_replied(msg, user_id, order_id, conv_key=conv_key)
         return
 
     # Direct bot conversation — send reply to user DM
@@ -263,6 +264,35 @@ async def handle_admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE)
         await msg.copy(chat_id=user_id)
     except Exception as e:
         print(f"⚠️ Could not send reply to user {user_id}: {e}")
+        return
+    await _notify_owners_replied(msg, user_id, "", conv_key=None)
+
+
+async def _notify_owners_replied(msg, user_id: int, order_id: str, conv_key: str | None):
+    """Owner alert (support.replied toggle): an operator answered a client —
+    include WHO replied and the reply text so ambar star sees what was said."""
+    try:
+        from owner_routes import notify_owners
+        u = (await db.get_user(user_id)) or {}
+        cname = u.get("first_name") or u.get("name") or str(user_id)
+        cuser = u.get("username") or "—"
+        op = msg.from_user
+        opn = ("@" + op.username) if (op and op.username) else ((op.first_name if op else "") or "оператор")
+        reply_txt = (msg.text or msg.caption or ("📷 фото" if msg.photo else "(медиа)"))[:150]
+        ctx = f"заказ #{order_id}" if order_id and order_id != "general" else (
+            "общий вопрос" if conv_key else "Telegram бот")
+        meta = {"conv_key": conv_key,
+                "order_id": order_id if order_id and order_id != "general" else ""} if conv_key else None
+        await notify_owners(
+            "support.replied",
+            f"🎧 *Оператор ответил в поддержке*\n"
+            f"Клиент: {cname} (@{cuser})\n"
+            f"Контекст: {ctx}\n"
+            f"Оператор: {opn}\n"
+            f"_«{reply_txt}»_",
+            meta=meta)
+    except Exception as e:
+        print(f"⚠️ support.replied notify failed: {e}")
 
 
 async def post_init(app):

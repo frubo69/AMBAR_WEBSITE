@@ -339,6 +339,15 @@ async def get_support_conv(conv_key: str) -> list:
     return doc.get("messages", []) if doc else []
 
 
+async def get_recent_support_convs(limit: int = 50) -> list:
+    """Recent support conversations, newest-last-message first (owner app list)."""
+    db = _db_or_none()
+    if db is None: return []
+    docs = await db.support_messages.find({}, {"_id": 0}).to_list(length=500)
+    docs.sort(key=lambda d: (d.get("messages") or [{}])[-1].get("ts", ""), reverse=True)
+    return docs[:limit]
+
+
 async def append_support_msg(conv_key: str, msg: dict):
     db = _db_or_none()
     if db is None: return
@@ -646,6 +655,7 @@ _DEFAULT_PREFS = {
     "finance.revenueLow": True, "finance.avgDrop": True,
     "finance.cancelSpike": True, "finance.record": False, "finance.tipHigh": False,
     "support.new": False, "support.noreply": True, "support.complaint": True, "support.escalation": False,
+    "support.replied": True,
     "system.botDown": True, "system.apiErrors": True, "system.dbDown": True, "system.deploy": False,
     "delivery.browser": True,
 }
@@ -1041,16 +1051,21 @@ async def award_referral_points(referrer_id: int, referred_id: int, points: int)
 
 # ── Owner notifications ──────────────────────────────────────────────────────
 
-async def insert_notification(event_key: str, text: str, owner_id: int = 0) -> None:
-    """Persist a notification event. owner_id=0 means broadcast."""
+async def insert_notification(event_key: str, text: str, owner_id: int = 0, meta: dict | None = None) -> None:
+    """Persist a notification event. owner_id=0 means broadcast. `meta` carries
+    routing hints for the owner app (e.g. the support conv_key) — the
+    notifications API returns it verbatim."""
     db = _db_or_none()
     if db is None: return
-    await db.owner_notifications.insert_one({
+    doc = {
         "event_key": event_key,
         "text": text,
         "owner_id": owner_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
-    })
+    }
+    if meta:
+        doc["meta"] = meta
+    await db.owner_notifications.insert_one(doc)
 
 
 async def get_notifications_since(since_iso: str, owner_id: int = 0, limit: int = 50) -> list:

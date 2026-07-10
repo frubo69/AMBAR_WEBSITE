@@ -1089,6 +1089,27 @@ async def get_recent_notifications(owner_id: int = 0, limit: int = 30) -> list:
     return await cursor.to_list(length=limit)
 
 
+# ── Broadcasts (owner self-serve promo sender) ───────────────────────────────
+async def save_broadcast(doc: dict) -> None:
+    """Upsert a broadcast job by job_id — live counters + final stats/history."""
+    db = _db_or_none()
+    if db is None or not doc.get("job_id"): return
+    await db.broadcasts.update_one({"job_id": doc["job_id"]}, {"$set": doc}, upsert=True)
+
+
+async def get_broadcast(job_id: str) -> dict | None:
+    db = _db_or_none()
+    if db is None or not job_id: return None
+    return await db.broadcasts.find_one({"job_id": job_id}, {"_id": 0})
+
+
+async def get_recent_broadcasts(limit: int = 10) -> list:
+    db = _db_or_none()
+    if db is None: return []
+    cursor = db.broadcasts.find({}, {"_id": 0}).sort("created_at", -1).limit(limit)
+    return await cursor.to_list(length=limit)
+
+
 # ── Crypto invoices (USDT TRC-20, watch-only) ────────────────────────────────
 # An invoice lifecycle: waiting → confirmed (terminal) or expired. We credit only
 # on irreversible (solidified) transfers, so there is no intermediate "detected"

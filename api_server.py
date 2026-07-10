@@ -2198,6 +2198,12 @@ def main():
         log.warning("⚠️  AMBAR_OWNER_BOT_TOKEN not set — /api/owner/* will 401 on every request!")
     install_validator(validate_owner_init_data)
     setup_owner_routes(app)
+    # Self-serve broadcast (owner sends promos from ambar star) — same auth.
+    try:
+        import broadcast_routes
+        broadcast_routes.setup(app)
+    except Exception as e:
+        log.error(f"broadcast routes setup failed: {e}")
 
     app.router.add_get("/",          handle_static)
     app.router.add_get("/{path:.+}", handle_static)

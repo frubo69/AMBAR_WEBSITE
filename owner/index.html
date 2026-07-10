@@ -924,7 +924,15 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 
 <!-- ============ MORE ============ -->
 <div class="page" id="pg-more">
-  <div style="padding:10px 4px 4px"><div style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600">Ещё</div><div style="font-size:12px;color:var(--muted);margin-top:2px">Отчёты · склад · настройки</div></div>
+  <div style="padding:10px 4px 4px"><div style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600">Ещё</div><div style="font-size:12px;color:var(--muted);margin-top:2px">Рассылки · отчёты · настройки</div></div>
+
+  <!-- Broadcast composer entry -->
+  <div class="sect"><div class="sect-t">Маркетинг</div></div>
+  <button class="all-clients-btn" onclick="openBroadcast()" style="margin:4px 0 0">
+    <div class="ac-btn-ico" style="font-size:17px">📣</div>
+    <div class="ac-btn-lbl"><div class="ac-btn-t">Рассылка</div><div class="ac-btn-s">Промо всем клиентам · RU / EN · с картинкой</div></div>
+    <span class="ac-btn-arrow">›</span>
+  </button>
 
   <!-- Alerts moved to header bell button. See #alertsOverlay below. -->
 
@@ -1960,6 +1968,80 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
 </div>
 
+<!-- ============ BROADCAST COMPOSER ============ -->
+<div class="cmd-overlay" id="bcastOverlay">
+  <div class="cmd-sheet ac-sheet">
+    <div class="tp-hdr">
+      <div style="flex:1">
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:600">Рассылка</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">Промо клиентам · каждому на его языке</div>
+      </div>
+      <button class="cmd-close" onclick="closeBroadcast()" aria-label="Закрыть"><span class="txt">ESC</span><span class="x">✕</span></button>
+    </div>
+    <div class="bcast-body" id="bcastBody">
+      <div class="bcast-lbl">Кому</div>
+      <div class="bcast-seg" id="bcastSeg">
+        <button class="on" data-t="all">Все</button>
+        <button data-t="ru">RU</button>
+        <button data-t="en">EN</button>
+        <button data-t="nolang">Без языка</button>
+        <button data-t="vip">VIP</button>
+      </div>
+      <div class="bcast-reach" id="bcastReach">Загрузка аудитории…</div>
+
+      <div class="bcast-lbl"><span class="lang-flag ru" style="width:13px;height:13px;display:inline-block;vertical-align:-1px;border-radius:50%;margin-right:6px"></span>Русский</div>
+      <textarea class="bcast-ta" id="bcastRuText" rows="3" maxlength="4096" placeholder="Текст для клиентов с русским языком…"></textarea>
+      <div class="bcast-img" id="bcastRuImg"></div>
+
+      <div class="bcast-lbl"><span class="lang-flag en" style="width:13px;height:13px;display:inline-block;vertical-align:-1px;border-radius:50%;margin-right:6px"></span>English <span style="color:var(--muted);font-weight:400;text-transform:none;letter-spacing:0">· клиенты без языка получат это</span></div>
+      <textarea class="bcast-ta" id="bcastEnText" rows="3" maxlength="4096" placeholder="Text for English / no-language customers…"></textarea>
+      <div class="bcast-img" id="bcastEnImg"></div>
+
+      <div class="bcast-note">🔑 Кнопка «Открыть AMBAR» добавляется автоматически. Если картинка добавлена только в одном языке — она уйдёт обеим группам. С картинкой текст ≤ 1024 символов.</div>
+
+      <div class="bcast-prog" id="bcastProg" style="display:none">
+        <div class="bcast-prog-bar"><div class="bcast-prog-fill" id="bcastProgFill"></div></div>
+        <div class="bcast-stats" id="bcastStats"></div>
+      </div>
+    </div>
+    <div class="bcast-foot" id="bcastFoot">
+      <button class="bcast-btn ghost" id="bcastTestBtn" onclick="bcastTest()">Тест себе</button>
+      <button class="bcast-btn gold" id="bcastSendBtn" onclick="bcastAskSend()">Отправить всем</button>
+    </div>
+  </div>
+</div>
+<style>
+.bcast-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:14px 16px 8px;min-height:0}
+.bcast-lbl{font-size:11px;text-transform:uppercase;letter-spacing:1px;color:var(--muted);margin:15px 0 7px;font-weight:600}
+.bcast-lbl:first-child{margin-top:2px}
+.bcast-seg{display:flex;gap:5px;background:var(--card2);border:1px solid var(--border2);border-radius:12px;padding:4px}
+.bcast-seg button{flex:1;padding:9px 3px;border:none;background:none;color:var(--muted);font-size:12px;font-weight:600;border-radius:9px;cursor:pointer;transition:.15s;font-family:inherit}
+.bcast-seg button.on{background:linear-gradient(135deg,#E8C98A,#C9A96E);color:#1a1408}
+.bcast-reach{margin-top:10px;font-size:13px;color:var(--gold2)}
+.bcast-reach b{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700}
+.bcast-ta{width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:11px 13px;color:var(--text);font-size:14px;font-family:inherit;line-height:1.5;resize:vertical;min-height:66px}
+.bcast-ta:focus{outline:none;border-color:rgba(201,169,110,.4)}
+.bcast-img{margin-top:8px}
+.bcast-img-add{width:100%;padding:11px;border:1px dashed var(--border2);border-radius:12px;background:var(--card2);color:var(--sub);font-size:13px;font-family:inherit;cursor:pointer;transition:.15s}
+.bcast-img-add:hover{border-color:rgba(201,169,110,.4);color:var(--gold2)}
+.bcast-thumb{position:relative;border-radius:12px;overflow:hidden;border:1px solid var(--border2)}
+.bcast-thumb img{width:100%;max-height:150px;object-fit:cover;display:block}
+.bcast-thumb-x{position:absolute;top:8px;right:8px;width:28px;height:28px;border-radius:50%;background:rgba(0,0,0,.6);border:none;color:#fff;font-size:14px;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.bcast-note{margin-top:15px;font-size:11.5px;color:var(--muted);line-height:1.55;background:var(--card);border:1px solid var(--border2);border-radius:10px;padding:10px 12px}
+.bcast-prog{margin-top:16px}
+.bcast-prog-bar{height:8px;border-radius:4px;background:var(--card2);overflow:hidden}
+.bcast-prog-fill{height:100%;width:0;background:linear-gradient(90deg,#E8C98A,#C9A96E);border-radius:4px;transition:width .3s}
+.bcast-stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px}
+.bcast-stat{background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:12px 6px;text-align:center}
+.bcast-stat-v{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700}
+.bcast-stat-l{font-size:9px;text-transform:uppercase;letter-spacing:.6px;color:var(--muted);margin-top:4px}
+.bcast-foot{display:flex;gap:10px;padding:12px 16px;border-top:1px solid var(--border2);background:var(--bg3);flex-shrink:0}
+.bcast-btn{flex:1;padding:14px;border-radius:12px;border:none;font-size:14px;font-weight:700;font-family:inherit;cursor:pointer;transition:.15s}
+.bcast-btn.ghost{background:var(--card2);border:1px solid var(--border2);color:var(--text)}
+.bcast-btn.gold{background:linear-gradient(135deg,#E8C98A,#C9A96E);color:#1a1408}
+.bcast-btn.danger{background:linear-gradient(135deg,#E86A6A,#C94E4E);color:#fff}
+.bcast-btn:disabled{opacity:.5;cursor:not-allowed}
+</style>
 <style>
 .ac-sheet{max-width:520px;height:calc(100vh - var(--safe-top) - 40px);max-height:calc(100vh - var(--safe-top) - 40px);margin-top:40px;display:flex;flex-direction:column}
 @media (max-width:520px),(pointer:coarse){.ac-sheet{height:calc(100vh - var(--safe-top) - 16px);max-height:calc(100vh - var(--safe-top) - 16px);margin-top:16px;border-radius:20px 20px 0 0;align-self:flex-end}}
@@ -4539,6 +4621,155 @@ function openAllClients(){
 function closeAllClients(){ if(acOv) acOv.classList.remove('show'); }
 if(acOv) acOv.addEventListener('click',e=>{ if(e.target===acOv) closeAllClients(); });
 document.addEventListener('keydown',e=>{ if(e.key==='Escape' && acOv && acOv.classList.contains('show')) closeAllClients(); });
+
+// ══════════════ BROADCAST COMPOSER ══════════════
+const _bcast = { target:'all', audience:null, ru_image:'', en_image:'', jobId:null, poll:null };
+function _bhaptic(k){ try{ Telegram.WebApp.HapticFeedback[k==='sel'?'selectionChanged':'impactOccurred'](k==='sel'?undefined:k); }catch(e){} }
+function bcastAlert(msg){ try{ if(Telegram.WebApp.showAlert){ Telegram.WebApp.showAlert(msg); return; } }catch(e){} try{ alert(msg); }catch(e){} }
+function openBroadcast(){
+  const ov=document.getElementById('bcastOverlay'); if(!ov) return;
+  ov.classList.add('show');
+  const b=document.getElementById('bcastBody'); if(b) b.scrollTop=0;
+  bcastResetProgress(); bcastRenderThumb('ru'); bcastRenderThumb('en');
+  bcastLoadAudience();
+  _bhaptic('light');
+}
+function closeBroadcast(){
+  const ov=document.getElementById('bcastOverlay'); if(ov) ov.classList.remove('show');
+  if(_bcast.poll){ clearInterval(_bcast.poll); _bcast.poll=null; }
+}
+document.getElementById('bcastOverlay')?.addEventListener('click',e=>{ if(e.target.id==='bcastOverlay') closeBroadcast(); });
+
+async function bcastLoadAudience(){
+  const el=document.getElementById('bcastReach');
+  try{ _bcast.audience = await ownerApi.ownerFetch('/api/owner/broadcast/audience'); }
+  catch(e){ if(el) el.textContent='Не удалось загрузить аудиторию'; return; }
+  bcastRenderReach();
+}
+function bcastReachFor(t){
+  const a=_bcast.audience; if(!a) return 0;
+  return t==='ru'?a.ru : t==='en'?a.en : t==='nolang'?a.nolang : t==='vip'?a.vip : a.all;
+}
+function bcastRenderReach(){
+  const el=document.getElementById('bcastReach'); if(!el) return;
+  const a=_bcast.audience; if(!a){ el.textContent='…'; return; }
+  const n=bcastReachFor(_bcast.target);
+  const extra = _bcast.target==='all' ? ` <span style="color:var(--muted)">· RU ${a.ru} · EN ${a.en}</span>` : '';
+  el.innerHTML=`≈ <b>${n.toLocaleString('ru-RU')}</b> получат${extra}`;
+}
+document.querySelectorAll('#bcastSeg button').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('#bcastSeg button').forEach(x=>x.classList.toggle('on',x===b));
+    _bcast.target=b.dataset.t; bcastRenderReach(); _bhaptic('sel');
+  });
+});
+
+function bcastRenderThumb(lang){
+  const cap=lang==='ru'?'Ru':'En';
+  const wrap=document.getElementById('bcast'+cap+'Img'); if(!wrap) return;
+  const url=_bcast[lang+'_image'];
+  if(url){
+    const abs=(ownerApi.AMBAR_API||'')+url;
+    wrap.innerHTML=`<div class="bcast-thumb"><img src="${abs}"/><button class="bcast-thumb-x" onclick="bcastClearImg('${lang}')">✕</button></div>`;
+  } else {
+    const fid='bcast'+cap+'File';
+    const label=lang==='ru'?'📷 Добавить картинку RU':'📷 Add EN image';
+    wrap.innerHTML=`<input type="file" accept="image/*" hidden id="${fid}"><button class="bcast-img-add" onclick="document.getElementById('${fid}').click()">${label}</button>`;
+    document.getElementById(fid)?.addEventListener('change',ev=>bcastUpload(lang,ev.target));
+  }
+}
+function bcastClearImg(lang){ _bcast[lang+'_image']=''; bcastRenderThumb(lang); _bhaptic('light'); }
+async function bcastUpload(lang,inp){
+  const file=inp.files&&inp.files[0]; if(!file) return;
+  const cap=lang==='ru'?'Ru':'En';
+  const wrap=document.getElementById('bcast'+cap+'Img');
+  if(wrap) wrap.innerHTML='<div style="padding:11px;color:var(--muted);font-size:13px;text-align:center">Загрузка…</div>';
+  try{
+    const fd=new FormData(); fd.append('image',file);
+    const res=await fetch((ownerApi.AMBAR_API||'')+'/api/owner/broadcast/upload',{method:'POST',headers:{'Authorization':'tma '+((Telegram.WebApp&&Telegram.WebApp.initData)||'')},body:fd});
+    const j=await res.json();
+    if(!res.ok||!j.url) throw new Error(j.error||'upload failed');
+    _bcast[lang+'_image']=j.url;
+  }catch(e){ bcastAlert('Не удалось загрузить картинку: '+(e.message||'')); }
+  bcastRenderThumb(lang);
+}
+
+async function bcastTest(){
+  const ru=document.getElementById('bcastRuText').value.trim();
+  const en=document.getElementById('bcastEnText').value.trim();
+  const base={ru_text:ru,en_text:en,ru_image:_bcast.ru_image,en_image:_bcast.en_image};
+  const btn=document.getElementById('bcastTestBtn'); const old=btn.textContent; btn.disabled=true; btn.textContent='Отправляю…';
+  let sent=0,tried=0;
+  for(const bucket of ['ru','en']){
+    const hasText=bucket==='ru'?ru:en;
+    const hasImg=_bcast[bucket+'_image']||_bcast.en_image||_bcast.ru_image;
+    if(!hasText&&!hasImg) continue;
+    tried++;
+    try{ const r=await ownerApi.ownerFetch('/api/owner/broadcast/test',{method:'POST',body:{...base,bucket}}); if(r.ok) sent++; }catch(e){}
+  }
+  btn.disabled=false; btn.textContent=old; _bhaptic('light');
+  bcastAlert(!tried?'Заполните текст или картинку':sent?('Тест отправлен вам ('+sent+') — проверьте бота AMBAR. Если не пришло — откройте бота и нажмите /start.'):'Не удалось отправить тест.');
+}
+
+function bcastFootDefault(){
+  document.getElementById('bcastFoot').innerHTML='<button class="bcast-btn ghost" id="bcastTestBtn" onclick="bcastTest()">Тест себе</button><button class="bcast-btn gold" id="bcastSendBtn" onclick="bcastAskSend()">Отправить всем</button>';
+}
+function bcastAskSend(){
+  const n=bcastReachFor(_bcast.target);
+  if(!n){ bcastAlert('В этой группе сейчас никого нет'); return; }
+  const ru=document.getElementById('bcastRuText').value.trim();
+  const en=document.getElementById('bcastEnText').value.trim();
+  const needRu=['all','ru','vip'].includes(_bcast.target);
+  const needEn=['all','en','nolang','vip'].includes(_bcast.target);
+  if(needRu && !ru && !_bcast.ru_image && !_bcast.en_image){ bcastAlert('Добавьте текст или картинку для RU'); return; }
+  if(needEn && !en && !_bcast.en_image && !_bcast.ru_image){ bcastAlert('Добавьте текст или картинку для EN'); return; }
+  _bhaptic('medium');
+  document.getElementById('bcastFoot').innerHTML=`<button class="bcast-btn ghost" onclick="bcastFootDefault()">Отмена</button><button class="bcast-btn danger" onclick="bcastSend()">Отправить ${n.toLocaleString('ru-RU')}</button>`;
+}
+async function bcastSend(){
+  bcastFootDefault();
+  const sendBtn=document.getElementById('bcastSendBtn'); if(sendBtn) sendBtn.disabled=true;
+  const ru=document.getElementById('bcastRuText').value.trim();
+  const en=document.getElementById('bcastEnText').value.trim();
+  const body={target:_bcast.target,ru_text:ru,en_text:en,ru_image:_bcast.ru_image,en_image:_bcast.en_image};
+  let r;
+  try{ r=await ownerApi.ownerFetch('/api/owner/broadcast/send',{method:'POST',body}); }
+  catch(e){
+    if(sendBtn) sendBtn.disabled=false;
+    const err=(e.payload&&e.payload.error)||'';
+    bcastAlert(e.status===409?'Рассылка уже идёт — дождитесь конца':('Ошибка запуска рассылки'+(err?': '+err:'')));
+    return;
+  }
+  _bcast.jobId=r.job_id; _bhaptic('heavy');
+  bcastShowProgress(); bcastPoll();
+}
+function bcastResetProgress(){
+  const p=document.getElementById('bcastProg'); if(p) p.style.display='none';
+  const f=document.getElementById('bcastProgFill'); if(f) f.style.width='0';
+  const s=document.getElementById('bcastStats'); if(s) s.innerHTML='';
+  bcastFootDefault();
+}
+function bcastShowProgress(){ const p=document.getElementById('bcastProg'); if(p){ p.style.display=''; p.scrollIntoView&&p.scrollIntoView({block:'center',behavior:'smooth'}); } }
+function bcastPoll(){
+  if(_bcast.poll) clearInterval(_bcast.poll);
+  const tick=async()=>{
+    if(!_bcast.jobId) return;
+    let s; try{ s=await ownerApi.ownerFetch('/api/owner/broadcast/status',{params:{job_id:_bcast.jobId}}); }catch(e){ return; }
+    bcastRenderStatus(s);
+    if(s.state==='done'||s.state==='error'){ clearInterval(_bcast.poll); _bcast.poll=null; _bhaptic('light'); }
+  };
+  tick(); _bcast.poll=setInterval(tick,1200);
+}
+function bcastRenderStatus(s){
+  const reach=s.reach||0, processed=(s.sent||0)+(s.failed||0);
+  const pct=reach?Math.min(100,Math.round(processed/reach*100)):(s.state==='done'?100:0);
+  const f=document.getElementById('bcastProgFill'); if(f) f.style.width=pct+'%';
+  const stat=(v,l,c)=>`<div class="bcast-stat"><div class="bcast-stat-v" style="color:${c}">${(v||0).toLocaleString('ru-RU')}</div><div class="bcast-stat-l">${l}</div></div>`;
+  const head=s.state==='sending'?`Идёт рассылка… ${pct}%`:s.state==='error'?'⚠️ Ошибка рассылки':'✅ Рассылка завершена';
+  const el=document.getElementById('bcastStats'); if(!el) return;
+  el.innerHTML=`<div style="grid-column:1/-1;font-size:12px;color:var(--muted);text-align:center;margin-bottom:2px">${head} · цель ${reach.toLocaleString('ru-RU')}</div>`+
+    stat(s.sent,'Доставлено','var(--up)')+stat(s.failed,'Не дошло','var(--dn)')+stat(s.skipped_banned,'Баны','var(--muted)');
+}
 
 let _acActiveFilter = null;
 const _7D = 7*24*60*60*1000;

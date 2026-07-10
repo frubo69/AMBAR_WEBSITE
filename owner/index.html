@@ -308,18 +308,23 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* (old .top-* and .prem-* classes removed — replaced by unified .cust-* system) */
 
 /* All-clients entry button */
-.all-clients-btn{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;margin:10px 0 0;border-radius:14px;
-  background:linear-gradient(90deg,rgba(255,255,255,.03),rgba(255,255,255,.01));
-  border:1px solid var(--border2);
+/* All-clients entry doubles as the headline "total customers" metric — the count is
+   the star: a big gold figure on the right, gold-accent bar + tinted icon so the whole
+   card reads as a KPI you can check at a glance. */
+.all-clients-btn{display:flex;align-items:center;gap:12px;width:100%;padding:15px 16px;margin:10px 0 0;border-radius:14px;
+  background:linear-gradient(90deg,rgba(201,169,110,.07),rgba(201,169,110,.02));
+  border:1px solid rgba(201,169,110,.2);box-shadow:inset 3px 0 0 rgba(201,169,110,.55);
   color:var(--text);cursor:pointer;transition:.18s var(--e1);text-align:left}
-.all-clients-btn:hover{background:linear-gradient(90deg,rgba(201,169,110,.06),rgba(201,169,110,.01));border-color:rgba(201,169,110,.22)}
+.all-clients-btn:hover{background:linear-gradient(90deg,rgba(201,169,110,.12),rgba(201,169,110,.03));border-color:rgba(201,169,110,.34)}
 .all-clients-btn:active{transform:scale(.985)}
-.ac-btn-ico{width:36px;height:36px;border-radius:10px;background:var(--card);border:1px solid var(--border2);display:flex;align-items:center;justify-content:center;color:var(--sub);flex-shrink:0;transition:.18s}
-.all-clients-btn:hover .ac-btn-ico{color:var(--gold2);border-color:rgba(201,169,110,.28)}
+.ac-btn-ico{width:38px;height:38px;border-radius:11px;background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.24);display:flex;align-items:center;justify-content:center;color:var(--gold2);flex-shrink:0;transition:.18s}
 .ac-btn-lbl{flex:1;min-width:0}
 .ac-btn-t{font-size:14px;font-weight:600;color:var(--text)}
 .ac-btn-s{font-size:11px;color:var(--muted);margin-top:2px;letter-spacing:.2px}
-.ac-btn-arrow{color:var(--gold2);font-size:18px;font-weight:600;flex-shrink:0}
+.ac-btn-count{display:flex;flex-direction:column;align-items:flex-end;line-height:1;flex-shrink:0}
+.ac-btn-num{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;color:var(--gold2);letter-spacing:-.5px;font-variant-numeric:tabular-nums;text-shadow:0 0 18px rgba(201,169,110,.3)}
+.ac-btn-num-lbl{font-size:8.5px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-top:4px}
+.ac-btn-arrow{color:var(--gold2);font-size:20px;font-weight:600;flex-shrink:0;opacity:.55;margin-left:2px}
 
 /* Customer search bar (People → Клиенты) */
 .cust-search{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--card);border:1px solid var(--border2);border-radius:12px;margin:0 0 12px;transition:.18s var(--e1)}
@@ -888,9 +893,10 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     </div>
     <div class="ac-btn-lbl">
       <div class="ac-btn-t">Все клиенты</div>
-      <div class="ac-btn-s">20 человек · A → Я · поиск</div>
+      <div class="ac-btn-s">по алфавиту · поиск</div>
     </div>
-    <span class="ac-btn-arrow">→</span>
+    <div class="ac-btn-count"><span class="ac-btn-num" id="acBtnCount">—</span><span class="ac-btn-num-lbl">клиентов</span></div>
+    <span class="ac-btn-arrow">›</span>
   </button>
 
   <!-- TOP-10 by spending -->
@@ -2640,6 +2646,23 @@ function fmtHM(iso){ const d=_dtParse(iso); if(!d) return ''; const p=n=>String(
 // Time for today's events, full dd/mm/yyyy hh:mm for anything older.
 function fmtWhen(iso){ const d=_dtParse(iso); if(!d) return ''; const t=fmtHM(iso); return fmtDMY(d)===fmtDMY(new Date())?t:fmtDMY(d)+' '+t; }
 function escS(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+// Count-up for headline metrics (ru thousands separator). Animates from the last value
+// so refreshes don't restart from 0; instant if unchanged or reduced-motion is on.
+function _animCount(el, to){
+  if(!el) return;
+  to = Math.max(0, Math.round(to||0));
+  const from = parseInt(el.dataset.n||'0',10) || 0;
+  el.dataset.n = String(to);
+  const fmt = n => n.toLocaleString('ru-RU');
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(from===to || reduce){ el.textContent = fmt(to); return; }
+  const dur=650, t0=performance.now();
+  (function step(now){
+    const p=Math.min(1,(now-t0)/dur), e=1-Math.pow(1-p,3);
+    el.textContent = fmt(Math.round(from+(to-from)*e));
+    if(p<1) requestAnimationFrame(step);
+  })(t0);
+}
 
 // IDs of finance/KPI placeholders that render skeleton shimmers while the
 // /api/owner/finance request is in flight. Mapped to size hints via CSS.
@@ -3170,9 +3193,8 @@ function renderCustomerSections(customers){
     if(pm) pm.innerHTML = `<span style="color:var(--text)">${vips.length}</span> активных`;
   }
 
-  // All clients button count
-  const acBtnSub = document.querySelector('.all-clients-btn .ac-btn-s');
-  if(acBtnSub) acBtnSub.textContent = `${customers.length} человек · A → Я · поиск`;
+  // All clients button — the headline "total customers" number
+  _animCount(document.getElementById('acBtnCount'), customers.length);
 
   // All Clients modal
   renderAllClientsList(customers);

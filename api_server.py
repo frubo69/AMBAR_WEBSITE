@@ -310,6 +310,23 @@ async def handle_create_order(request: web.Request) -> web.Response:
     )
 
 
+def _is_vetted(user_doc: dict | None) -> bool:
+    """A customer counts as vetted when formally verified OR with at least one
+    DELIVERED order — the courier has already met them face to face. Keeps the
+    verification wall for genuinely new customers, but never again holds a
+    regular's order from the operator (legacy customers predate the verify flow
+    and have no `verified` flag). Used by the operator hold, /api/me (the app's
+    wall) and the operator status label — one rule, so they can't disagree."""
+    if not user_doc:
+        return False
+    if user_doc.get("verified"):
+        return True
+    try:
+        return int(user_doc.get("orders_done", 0) or 0) > 0
+    except (TypeError, ValueError):
+        return False
+
+
 async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
                                    prepaid: dict | None = None) -> dict:
     """Persist an accepted order and run the full notification fan-out: customer
@@ -366,7 +383,7 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         # THIS, not "first order", so it stays in lock-step with the app's wall — an
         # unverified customer is held until they submit the form no matter how many
         # orders they've started (closes the place-a-second-order bypass).
-        _user_verified = bool(user_doc and user_doc.get("verified"))
+        _user_verified = _is_vetted(user_doc)
         # Reset verification for test accounts so each order triggers full flow
         if uid in _TEST_ALWAYS_FIRST:
             await db.set_user_field(uid, verified=False, verify_requested=False)
@@ -478,15 +495,24 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
     if not gmap_link and lat and lon:
         try: gmap_link = f"https://maps.google.com/maps?q={float(lat):.6f},{float(lon):.6f}"
         except (ValueError, TypeError): pass
-    # Address line: text name first, then link
+    # Address line: text name first, then link. User-typed address MUST be escaped —
+    # a stray "<" in it makes Telegram reject the whole HTML message (silent drop).
+    _addr_esc = _html_mod.escape(str(address or "—"))
     if address and address != "GPS" and address != "—":
-        addr_line = f"🏠 Адрес: {address}"
+        addr_line = f"🏠 Адрес: {_addr_esc}"
         if gmap_link:
             addr_line += f"\nGoogle Maps: {gmap_link}"
     elif gmap_link:
         addr_line = f"📍 GPS: {gmap_link}"
     else:
-        addr_line = f"🏠 Адрес: {address}"
+        addr_line = f"🏠 Адрес: {_addr_esc}"
+    # HTML-safe item lines for the operator message (stored item_lines stays raw —
+    # other consumers render it as plain text).
+    _item_lines_html = "\n".join(
+        f"  • {_html_mod.escape(str(i.get('name', '')))} ×{i.get('qty', 0)} = "
+        f"{i.get('line_total', (i.get('price', 0) or 0) * (i.get('qty', 0) or 0))} AED"
+        for i in items
+    )
 
     # Source info collected pre-payment (crypto auto-verify path). Shown on the paid
     # order's banner so the operator still sees where the customer came from — the same
@@ -547,7 +573,7 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         f"🏢 Офис: <b>{_html_mod.escape(office_nm)}</b>\n\n"
         f"🆕 <b>НОВЫЙ ЗАКАЗ #{oid}</b>\n\n"
         f"{addr_line}\n\n"
-        f"🛒 <b>Позиции:</b>\n{item_lines}\n"
+        f"🛒 <b>Позиции:</b>\n{_item_lines_html}\n"
         f"{tip_line}"
         f"\n💰 <b>Итого: {total} AED</b>"
         f"{paid_banner}"
@@ -578,10 +604,27 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
                 resp = await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text, parse_mode="HTML", reply_markup=op_kb)
                 if resp and resp.get("ok") and resp.get("result"):
                     op_msg_ids[str(op_id)] = resp["result"]["message_id"]
+                else:
+                    # ok:false (parse error / blocked / bad chat) was silently
+                    # swallowed before — the #1 way orders vanished for operators.
+                    log.error(f"Operator notify {op_id} REJECTED for #{oid}: {resp}")
             except Exception as e:
                 log.error(f"Operator notify {op_id}: {e}")
         if op_msg_ids:
             await db.update_order(oid, op_msg_ids=op_msg_ids)
+        elif OPERATOR_IDS:
+            # Not a single operator got the order — that's an outage, not a log line.
+            log.error(f"[order] #{oid} reached NO operator — check OPERATOR_BOT_TOKEN / OPERATOR_IDS")
+            try:
+                from owner_routes import notify_owners_force
+                await notify_owners_force(
+                    "orders.opFail",
+                    f"🛑 *Заказ #{oid} НЕ доставлен ни одному оператору!*\n"
+                    f"Он висит в списке «Новые заказы», но пуш не дошёл.\n"
+                    f"💰 {total} AED · {user_name}\n"
+                    f"Проверьте операторский бот.")
+            except Exception as e:
+                log.error(f"[owner-notif] opFail alert failed: {e}")
 
     # Award referral points (+5) to the referrer on first order
     if is_first_order and referred_by:
@@ -1293,7 +1336,7 @@ async def handle_me(request: web.Request) -> web.Response:
     # Verification status — referrals no longer skip the flow; they must
     # submit the form just like any other first-time user. The referrer info
     # is passed along to the operator as a hint when the form is submitted.
-    verified = user_doc.get("verified", False) if user_doc else False
+    verified = _is_vetted(user_doc)
     verify_requested = user_doc.get("verify_requested", False) if user_doc else False
     verify_declined = user_doc.get("verify_declined", False) if user_doc else False
 
@@ -1474,10 +1517,23 @@ async def handle_verify_request(request: web.Request) -> web.Response:
                 resp = await tg_send(OPERATOR_BOT_TOKEN, op_id, combined, parse_mode="HTML", reply_markup=op_kb)
                 if resp and resp.get("ok") and resp.get("result"):
                     op_msg_ids[str(op_id)] = resp["result"]["message_id"]
+                else:
+                    log.error(f"Verify+order notify {op_id} REJECTED for #{oid}: {resp}")
             except Exception as e:
                 log.error(f"Verify+order notify {op_id}: {e}")
         if op_msg_ids:
             await db.update_order(oid, op_msg_ids=op_msg_ids)
+        elif OPERATOR_IDS:
+            log.error(f"[verify-request] #{oid} reached NO operator — check OPERATOR_BOT_TOKEN / OPERATOR_IDS")
+            try:
+                from owner_routes import notify_owners_force
+                await notify_owners_force(
+                    "orders.opFail",
+                    f"🛑 *Заказ #{oid} (после верификации) НЕ доставлен ни одному оператору!*\n"
+                    f"Он висит в списке «Новые заказы», но пуш не дошёл.\n"
+                    f"Проверьте операторский бот.")
+            except Exception as e:
+                log.error(f"[owner-notif] opFail alert failed: {e}")
         # Clear the pending flag
         await db.update_order(oid, pending_verification=False)
         # (The owner "new order" ping already fired at placement — see
@@ -1688,10 +1744,10 @@ async def handle_support_send(request: web.Request) -> web.Response:
             if user_doc.get("verify_declined"):
                 status_tags.append("❌ Верификация отклонена")
                 highlight = True
-            elif user_doc.get("verify_requested") and not user_doc.get("verified"):
+            elif user_doc.get("verify_requested") and not _is_vetted(user_doc):
                 status_tags.append("⏳ Ожидает верификации")
                 highlight = True
-            elif not user_doc.get("verified"):
+            elif not _is_vetted(user_doc):
                 status_tags.append("🔴 Не верифицирован")
     except Exception:
         pass
@@ -1990,10 +2046,10 @@ async def handle_support_send_image(request: web.Request) -> web.Response:
             if user_doc.get("verify_declined"):
                 status_tags.append("❌ Верификация отклонена")
                 highlight = True
-            elif user_doc.get("verify_requested") and not user_doc.get("verified"):
+            elif user_doc.get("verify_requested") and not _is_vetted(user_doc):
                 status_tags.append("⏳ Ожидает верификации")
                 highlight = True
-            elif not user_doc.get("verified"):
+            elif not _is_vetted(user_doc):
                 status_tags.append("🔴 Не верифицирован")
     except Exception:
         pass

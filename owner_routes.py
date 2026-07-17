@@ -367,6 +367,8 @@ async def handle_finance(request):
             "total": o.get("total", 0),
             "crypto": bool(o.get("payment_method") == "crypto" and o.get("paid")),
             "crypto_usdt": o.get("crypto_amount_usdt") or 0,
+            "manual": bool(o.get("source") == "manual"),
+            "created_by_name": o.get("created_by_name", ""),
             "status": o.get("status",""),
             "ts": placed,
             "eta": o.get("eta",""),
@@ -443,6 +445,12 @@ async def handle_finance(request):
                 "count": len(inflight),
             },
         },
+        # App vs phone (operator POS) channel split — delivered orders in the period.
+        "by_channel": (lambda m_aed, m_cnt: {
+            "app":   {"aed": rev_curr - m_aed, "count": delivered_count - m_cnt},
+            "phone": {"aed": m_aed, "count": m_cnt},
+        })(sum(o.get("total", 0) for _, o in curr_orders if o.get("source") == "manual"),
+           sum(1 for _, o in curr_orders if o.get("source") == "manual")),
         "by_office": _by_office(curr_orders),
         "trend":     _bucket_trend(curr_orders, start, period),
         "bars_7d": {
@@ -811,11 +819,12 @@ async def notify_owners_force(event_key: str, text: str, parse_mode: str = "Mark
 
 async def notify_new_order(oid, total, user_name, phone, address, office,
                            uid, founder_id, premium_ids, worldwide_ids,
-                           items=None, prepaid=None, held=False):
+                           items=None, prepaid=None, held=False, manual=None):
     """Send exactly one new-order message per user at their highest matching tier
     (orders.new1000 → orders.new500 → orders.new). VIP notification is independent.
     Crypto-paid orders (prepaid set) ALWAYS reach every owner, bypassing the tier
-    filters AND quiet hours."""
+    filters AND quiet hours. `manual={"operator": name}` marks a phone-in order
+    punched in on the operator POS — same tier pipeline, unmistakable 📞 header."""
     items_txt = "\n".join(
         f"• {it.get('name','')} ×{it.get('qty',1)}" for it in (items or [])
     ) or "—"
@@ -830,6 +839,9 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
     if held:
         base = ("⏳ *ОЖИДАЕТ ВЕРИФИКАЦИИ* — клиент ещё не подтверждён.\n"
                 "Оператор получит заказ после заполнения формы.\n\n") + base
+    if manual:
+        base = (f"📞 *РУЧНОЙ ЗАКАЗ — по телефону*\n"
+                f"Оператор: {manual.get('operator','—')}\n\n") + base
 
     tiers = []
     if total >= 1000:
@@ -842,7 +854,8 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
     # Persist all matching events for the dashboard alerts.
     for event_key, text in tiers:
         try:
-            await db.insert_notification(event_key, text)
+            await db.insert_notification(event_key, text,
+                                         meta={"manual": True} if manual else None)
         except Exception:
             pass
 

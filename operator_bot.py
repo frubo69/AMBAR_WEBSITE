@@ -20,6 +20,8 @@ OPERATOR_BOT_TOKEN   = os.getenv("OPERATOR_BOT_TOKEN", "")
 BOT_TOKEN            = os.getenv("BOT_TOKEN", "")
 OPERATOR_IDS         = [int(x.strip()) for x in os.getenv("OPERATOR_IDS","").split(",") if x.strip().isdigit()]
 WEBAPP_URL           = os.getenv("WEBAPP_URL", "")
+# iPad POS for manual phone-in orders (operator/index.html, served by ambar-api)
+OPERATOR_WEBAPP_URL  = os.getenv("OPERATOR_WEBAPP_URL", "https://ambar-delivery.com/operator/")
 SUPPORT_BOT_USERNAME = "ambar_support_bot"
 _TEST_ACCOUNTS = {8251195567, 6731325660}
 
@@ -1104,6 +1106,14 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.effective_message.reply_text(
         "🛠 *AMBAR — Панель оператора*\n\nВыберите действие:",
         parse_mode="Markdown", reply_markup=kb_main())
+    # iPad POS launcher — manual phone-in orders (also pinned as the menu button)
+    try:
+        await update.effective_message.reply_text(
+            "📞 Заказы по телефону — принимайте в POS-панели:",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
+                "🖥 Открыть панель", web_app=WebAppInfo(url=OPERATOR_WEBAPP_URL))]]))
+    except Exception as e:
+        log.debug(f"pos launcher btn: {e}")
 
 
 # ── Inline callbacks ──────────────────────────────────────────────────────────
@@ -2103,6 +2113,14 @@ async def _do_ban(op: int, cid: int, oid: str, reason: str):
 # ── Init ──────────────────────────────────────────────────────────────────────
 async def post_init(app: Application):
     await db.connect()
+    # Default menu button for the operator bot = the iPad POS. Non-operators who
+    # somehow open it hit the app's own auth gate (initData + OPERATOR_IDS).
+    try:
+        await app.bot.set_chat_menu_button(
+            menu_button=MenuButtonWebApp(text="🖥 Панель",
+                                         web_app=WebAppInfo(url=OPERATOR_WEBAPP_URL)))
+    except Exception as e:
+        log.warning(f"POS menu button setup failed: {e}")
 
 
 def main():

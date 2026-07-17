@@ -2260,6 +2260,12 @@ def main():
         broadcast_routes.setup(app)
     except Exception as e:
         log.error(f"broadcast routes setup failed: {e}")
+    # Operator iPad POS (manual phone-in orders) — own auth vs OPERATOR_BOT_TOKEN.
+    try:
+        import operator_routes
+        operator_routes.setup(app)
+    except Exception as e:
+        log.error(f"operator routes setup failed: {e}")
 
     app.router.add_get("/",          handle_static)
     app.router.add_get("/{path:.+}", handle_static)

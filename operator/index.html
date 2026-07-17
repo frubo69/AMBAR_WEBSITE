@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>AMBAR · Операторская панель</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="api.js"></script>
+<style>
+:root{
+  --gold:#C9A96E;--gold2:#E8C98A;--gold3:#F5E0B0;--gold-soft:rgba(201,169,110,.12);
+  --bg:#000006;--bg2:#07070E;--bg3:#0C0C18;--card:#101020;--card2:#14142A;--card3:#1A1A32;
+  --border:rgba(201,169,110,.14);--border2:rgba(255,255,255,.06);--border3:rgba(255,255,255,.10);
+  --text:#EDE9E0;--sub:#9896AA;--muted:#54526A;
+  --up:#4CAF7D;--dn:#E05555;--info:#5B8DEF;--warn:#F3B44A;
+  --r:18px;--r2:14px;--r3:10px;--e1:cubic-bezier(.25,.8,.25,1);
+  --safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
+button{font-family:inherit;color:inherit;background:none;border:none;cursor:pointer}
+input,textarea{font-family:inherit;color:var(--text);background:var(--card);border:1px solid var(--border2);border-radius:var(--r3);padding:12px 14px;font-size:15px;width:100%;-webkit-user-select:text;user-select:text}
+input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
+
+/* ── frame ── */
+#app{display:flex;flex-direction:column;height:100%;padding-top:var(--safe-top)}
+.hdr{display:flex;align-items:center;gap:14px;padding:10px 18px;border-bottom:1px solid var(--border2);background:var(--bg2);flex-shrink:0}
+.hdr-logo{font-family:'Cormorant Garamond',serif;font-size:22px;letter-spacing:6px;color:var(--gold2)}
+.hdr-sub{font-size:10px;letter-spacing:2.5px;color:var(--muted);text-transform:uppercase;margin-top:1px}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:10px}
+.pill{font-size:11px;font-weight:600;padding:6px 12px;border-radius:999px;border:1px solid var(--border2);color:var(--sub);background:var(--card)}
+.pill.ok{color:var(--up);border-color:rgba(76,175,125,.3)}
+.pill.err{color:var(--dn);border-color:rgba(224,85,85,.35)}
+.office-seg{display:flex;gap:4px;background:var(--card);border:1px solid var(--border2);border-radius:999px;padding:3px}
+.office-seg button{padding:6px 14px;border-radius:999px;font-size:12px;font-weight:600;color:var(--muted);transition:.15s}
+.office-seg button.on{background:linear-gradient(135deg,#E8C98A,#C9A96E);color:#1a1408}
+
+.main{display:flex;flex:1;min-height:0}
+
+/* ── category rail ── */
+.rail{width:172px;flex-shrink:0;display:flex;flex-direction:column;border-right:1px solid var(--border2);background:var(--bg2)}
+.rail-scroll{flex:1;overflow-y:auto;padding:10px 8px;-webkit-overflow-scrolling:touch}
+.cat-btn{display:flex;align-items:center;gap:8px;width:100%;padding:13px 12px;border-radius:var(--r2);font-size:14px;font-weight:600;color:var(--sub);transition:.14s;text-align:left;margin-bottom:4px}
+.cat-btn .cnt{margin-left:auto;font-size:11px;color:var(--muted);font-weight:500}
+.cat-btn.on{background:var(--gold-soft);color:var(--gold2);box-shadow:inset 3px 0 0 rgba(201,169,110,.55)}
+.rail-foot{padding:10px 8px;border-top:1px solid var(--border2)}
+.orders-btn{display:flex;align-items:center;gap:9px;width:100%;padding:14px 12px;border-radius:var(--r2);font-size:14px;font-weight:700;color:var(--text);background:var(--card2);border:1px solid var(--border2);transition:.14s;position:relative}
+.orders-btn.on{background:var(--gold-soft);border-color:rgba(201,169,110,.35);color:var(--gold2)}
+.orders-btn .badge{position:absolute;right:10px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--gold);color:#1a1408;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
+
+/* ── product grid ── */
+.center{flex:1;display:flex;flex-direction:column;min-width:0}
+.search-row{padding:12px 14px 4px;flex-shrink:0}
+.grid-wrap{flex:1;overflow-y:auto;padding:10px 14px 20px;-webkit-overflow-scrolling:touch}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px}
+.tile{position:relative;background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);padding:14px 12px;min-height:96px;display:flex;flex-direction:column;justify-content:space-between;transition:.12s;text-align:left}
+.tile:active{transform:scale(.97);border-color:rgba(201,169,110,.4)}
+.tile .nm{font-size:13.5px;font-weight:600;line-height:1.3}
+.tile .pr{font-size:15px;font-weight:700;color:var(--gold2);margin-top:8px;font-family:'Space Grotesk',sans-serif}
+.tile .pr small{font-size:10px;color:var(--muted);font-weight:500}
+.tile.oos{opacity:.38;pointer-events:none}
+.tile .oos-lbl{position:absolute;top:8px;right:8px;font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--dn);border:1px solid rgba(224,85,85,.4);border-radius:6px;padding:2px 6px}
+.tile .qbadge{position:absolute;top:-7px;right:-7px;min-width:26px;height:26px;padding:0 7px;border-radius:13px;background:linear-gradient(135deg,#E8C98A,#C9A96E);color:#1a1408;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.5)}
+.tile .beer-tag{font-size:9.5px;color:var(--info);font-weight:700;letter-spacing:.5px;margin-top:2px}
+
+/* ── ticket ── */
+.ticket{width:340px;flex-shrink:0;display:flex;flex-direction:column;border-left:1px solid var(--border2);background:var(--bg3)}
+.ticket-hdr{padding:14px 16px 10px;flex-shrink:0;display:flex;align-items:center;gap:8px}
+.ticket-hdr .t{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700}
+.ticket-hdr .edit-tag{font-size:10px;font-weight:700;color:var(--warn);border:1px solid rgba(243,180,74,.4);border-radius:6px;padding:3px 8px}
+.ticket-clear{margin-left:auto;font-size:12px;color:var(--muted);padding:6px 10px;border-radius:8px}
+.ticket-clear:active{color:var(--dn)}
+.ticket-scroll{flex:1;overflow-y:auto;padding:0 14px 12px;-webkit-overflow-scrolling:touch}
+.tline{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border2)}
+.tline .nm{flex:1;min-width:0;font-size:13px;font-weight:600;line-height:1.25}
+.tline .lt{font-size:13px;font-weight:700;color:var(--gold2);font-family:'Space Grotesk',sans-serif;min-width:58px;text-align:right}
+.stepper{display:flex;align-items:center;gap:2px;background:var(--card);border:1px solid var(--border2);border-radius:10px}
+.stepper button{width:34px;height:34px;font-size:17px;font-weight:700;color:var(--gold2);display:flex;align-items:center;justify-content:center}
+.stepper .q{min-width:24px;text-align:center;font-size:14px;font-weight:700}
+.ticket-empty{padding:28px 10px;text-align:center;color:var(--muted);font-size:13px}
+.cust{padding:4px 0 2px}
+.cust .lbl{font-size:10px;text-transform:uppercase;letter-spacing:1.2px;color:var(--muted);font-weight:700;margin:10px 0 6px}
+.cust input,.cust textarea{margin-bottom:0}
+.cust .row2{display:flex;gap:8px}
+.ticket-foot{flex-shrink:0;padding:12px 14px calc(12px + var(--safe-bottom));border-top:1px solid var(--border2);background:var(--bg2)}
+.total-row{display:flex;align-items:baseline;margin-bottom:10px}
+.total-row .l{font-size:13px;color:var(--sub)}
+.total-row .v{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;color:var(--gold2)}
+.total-row .v small{font-size:13px;color:var(--muted);font-weight:500}
+.create-btn{width:100%;padding:16px;border-radius:var(--r2);background:linear-gradient(135deg,#E8C98A,#C9A96E);color:#1a1408;font-size:16px;font-weight:800;transition:.15s}
+.create-btn:active{transform:scale(.98)}
+.create-btn:disabled{opacity:.4}
+.create-btn.save{background:linear-gradient(135deg,#F3B44A,#D99A2B)}
+
+/* ── orders panel (replaces grid) ── */
+.orders-wrap{flex:1;overflow-y:auto;padding:12px 14px 20px;-webkit-overflow-scrolling:touch}
+.ocard{background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);padding:14px;margin-bottom:10px;transition:.12s}
+.ocard:active{border-color:rgba(201,169,110,.35)}
+.ocard .top{display:flex;align-items:center;gap:10px}
+.ocard .oid{font-family:'JetBrains Mono',monospace;font-size:13px;font-weight:700;color:var(--gold2)}
+.st-chip{font-size:10px;font-weight:700;letter-spacing:.5px;padding:3px 9px;border-radius:999px}
+.st-approved{color:var(--info);border:1px solid rgba(91,141,239,.4)}
+.st-delivered{color:var(--up);border:1px solid rgba(76,175,125,.4)}
+.st-cancelled{color:var(--dn);border:1px solid rgba(224,85,85,.4)}
+.ocard .sum{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:var(--gold2)}
+.ocard .who{font-size:12.5px;color:var(--sub);margin-top:6px}
+.ocard .items{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.45}
+.ocard .acts{display:flex;gap:8px;margin-top:10px}
+.oact{flex:1;padding:11px;border-radius:var(--r3);font-size:13px;font-weight:700;border:1px solid var(--border2);background:var(--card2)}
+.oact.deliver{color:var(--up);border-color:rgba(76,175,125,.35)}
+.oact.cancel{color:var(--dn);border-color:rgba(224,85,85,.35)}
+.oact.edit{color:var(--gold2);border-color:rgba(201,169,110,.3)}
+
+/* ── overlays ── */
+.ov{position:fixed;inset:0;z-index:100;background:rgba(0,0,10,.7);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center}
+.ov.show{display:flex}
+.sheet{background:var(--bg3);border:1px solid var(--border3);border-radius:20px;padding:22px;width:min(420px,92vw);box-shadow:0 24px 80px rgba(0,0,0,.7)}
+.sheet .t{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;margin-bottom:6px}
+.sheet .s{font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:16px}
+.sheet .btns{display:flex;gap:10px}
+.sbtn{flex:1;padding:14px;border-radius:var(--r2);font-size:14px;font-weight:700;background:var(--card2);border:1px solid var(--border2)}
+.sbtn.gold{background:linear-gradient(135deg,#E8C98A,#C9A96E);color:#1a1408;border:none}
+.sbtn.red{background:linear-gradient(135deg,#E86A6A,#C94E4E);color:#fff;border:none}
+.pack-btn{display:flex;align-items:center;width:100%;padding:16px;border-radius:var(--r2);background:var(--card);border:1px solid var(--border2);margin-bottom:10px;transition:.12s}
+.pack-btn:active{border-color:rgba(201,169,110,.5);transform:scale(.98)}
+.pack-btn .n{font-size:16px;font-weight:700}
+.pack-btn .p{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:var(--gold2)}
+
+#gate{position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;text-align:center;padding:30px}
+#gate .logo{font-family:'Cormorant Garamond',serif;font-size:34px;letter-spacing:10px;color:var(--gold2)}
+#gate .msg{font-size:14px;color:var(--sub);line-height:1.6;max-width:420px}
+#gate.hidden{display:none}
+
+.toast{position:fixed;top:calc(var(--safe-top) + 14px);left:50%;transform:translateX(-50%) translateY(-90px);z-index:300;background:var(--card3);border:1px solid var(--border3);border-radius:12px;padding:12px 20px;font-size:14px;font-weight:600;box-shadow:0 10px 34px rgba(0,0,0,.6);transition:transform .3s var(--e1);max-width:80vw}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.toast.ok{border-color:rgba(76,175,125,.45);color:var(--up)}
+.toast.err{border-color:rgba(224,85,85,.45);color:var(--dn)}
+
+@media (max-width:820px){ .ticket{width:300px} .rail{width:140px} }
+</style>
+</head>
+<body>
+
+<div id="gate"><div class="logo">AMBAR</div><div class="msg" id="gateMsg">Подключение…</div></div>
+
+<div id="app">
+  <div class="hdr">
+    <div><div class="hdr-logo">AMBAR</div><div class="hdr-sub">Панель оператора · 📞 заказы</div></div>
+    <div class="office-seg" id="officeSeg" style="display:none"></div>
+    <div class="hdr-right">
+      <span class="pill" id="opName">—</span>
+      <span class="pill" id="netPill">…</span>
+    </div>
+  </div>
+
+  <div class="main">
+    <!-- category rail -->
+    <div class="rail">
+      <div class="rail-scroll" id="catRail"></div>
+      <div class="rail-foot">
+        <button class="orders-btn" id="ordersBtn" onclick="toggleOrders()">
+          📋 Заказы
+          <span class="badge" id="ordersBadge" style="display:none">0</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- center: grid OR orders -->
+    <div class="center">
+      <div class="search-row" id="searchRow"><input type="search" id="searchIn" placeholder="Поиск по названию…" autocomplete="off"></div>
+      <div class="grid-wrap" id="gridWrap"><div class="grid" id="grid"></div></div>
+      <div class="orders-wrap" id="ordersWrap" style="display:none"></div>
+    </div>
+
+    <!-- ticket -->
+    <div class="ticket">
+      <div class="ticket-hdr">
+        <span class="t">Чек</span>
+        <span class="edit-tag" id="editTag" style="display:none">✏️ ПРАВКА</span>
+        <button class="ticket-clear" onclick="clearTicket(true)">Очистить</button>
+      </div>
+      <div class="ticket-scroll">
+        <div id="tlines"><div class="ticket-empty">Нажимайте на товары слева,<br>чтобы собрать заказ</div></div>
+        <div class="cust">
+          <div class="lbl">Клиент · по телефону</div>
+          <input id="cName" placeholder="Имя (необязательно)" autocomplete="off">
+          <div class="lbl">Телефон *</div>
+          <input id="cPhone" placeholder="+971 …" inputmode="tel" autocomplete="off">
+          <div class="lbl">Адрес</div>
+          <textarea id="cAddr" rows="2" placeholder="Район, здание, квартира…"></textarea>
+          <div class="lbl">Комментарий</div>
+          <input id="cComment" placeholder="Домофон, этаж, пожелания…" autocomplete="off">
+        </div>
+      </div>
+      <div class="ticket-foot">
+        <div class="total-row"><span class="l" id="totalLbl">Итого</span><span class="v"><span id="totalV">0</span> <small>AED</small></span></div>
+        <button class="create-btn" id="createBtn" onclick="askCreate()">📞 Создать заказ</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- beer pack chooser -->
+<div class="ov" id="packOv">
+  <div class="sheet">
+    <div class="t" id="packTitle">Упаковка</div>
+    <div class="s">Пиво продаётся упаковками — выберите размер</div>
+    <button class="pack-btn" onclick="packPick(12)"><span class="n">📦 ×12</span><span class="p" id="pack12">—</span></button>
+    <button class="pack-btn" onclick="packPick(24)"><span class="n">📦 ×24</span><span class="p" id="pack24">—</span></button>
+    <div class="btns"><button class="sbtn" onclick="hideOv('packOv')">Отмена</button></div>
+  </div>
+</div>
+
+<!-- confirm create / save -->
+<div class="ov" id="confirmOv">
+  <div class="sheet">
+    <div class="t" id="confT">Создать заказ?</div>
+    <div class="s" id="confS">—</div>
+    <div class="btns">
+      <button class="sbtn" onclick="hideOv('confirmOv')">Назад</button>
+      <button class="sbtn gold" id="confGo" onclick="doCreate()">Создать</button>
+    </div>
+  </div>
+</div>
+
+<!-- confirm cancel/deliver -->
+<div class="ov" id="actOv">
+  <div class="sheet">
+    <div class="t" id="actT">—</div>
+    <div class="s" id="actS">—</div>
+    <div class="btns">
+      <button class="sbtn" onclick="hideOv('actOv')">Назад</button>
+      <button class="sbtn" id="actGo">Да</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const tg = window.Telegram && window.Telegram.WebApp;
+try{ tg.ready(); tg.expand(); tg.setHeaderColor('#000006'); tg.setBackgroundColor('#000006'); tg.disableVerticalSwipes && tg.disableVerticalSwipes(); }catch(e){}
+
+// ── state ──
+let CATALOG=[], CATS=[], curCat='Все', search='';
+let TICKET={};                  // key = id or id_pcs → {id, pcs, qty}
+let OFFICES=[], curOffice='';
+let ORDERS=[], showOrders=false, editingOid=null, _pollT=null, _pendingBeer=null;
+
+const $=id=>document.getElementById(id);
+function toast(msg, cls){ const t=$('toast'); t.textContent=msg; t.className='toast show '+(cls||''); clearTimeout(t._h); t._h=setTimeout(()=>t.className='toast',2600); }
+function haptic(k){ try{ tg.HapticFeedback[k==='sel'?'selectionChanged':'impactOccurred'](k==='sel'?undefined:(k||'light')); }catch(e){} }
+function showOv(id){ $(id).classList.add('show'); }
+function hideOv(id){ $(id).classList.remove('show'); }
+
+// ── boot / auth gate ──
+async function boot(){
+  try{
+    const r = await opApi.opFetch('/api/operator/ping');
+    $('opName').textContent = r.operator || '—';
+    OFFICES = r.offices || [];
+    curOffice = (OFFICES[0]||{}).id || '';
+    renderOffices();
+    $('netPill').textContent='● online'; $('netPill').className='pill ok';
+    $('gate').classList.add('hidden');
+    await loadCatalog();
+    await loadOrders();
+    if(_pollT) clearInterval(_pollT);
+    _pollT = setInterval(loadOrders, 30000);
+  }catch(e){
+    const denied = e.status===401 || e.status===403;
+    $('gateMsg').innerHTML = denied
+      ? 'Доступ только для операторов AMBAR.<br>Откройте панель из операторского бота.'
+      : 'Нет связи с сервером. Проверьте интернет.<br><span style="color:var(--muted);font-size:12px">Повтор через 5 секунд…</span>';
+    if(!denied) setTimeout(boot, 5000);
+  }
+}
+
+function renderOffices(){
+  const seg=$('officeSeg');
+  if(OFFICES.length<=1){ seg.style.display='none'; return; }
+  seg.style.display='flex';
+  seg.innerHTML = OFFICES.map(o=>`<button class="${o.id===curOffice?'on':''}" onclick="pickOffice('${o.id}')">${o.name.replace('Ambar ','')}</button>`).join('');
+}
+function pickOffice(id){ curOffice=id; renderOffices(); haptic('sel'); }
+
+// ── catalog ──
+async function loadCatalog(){
+  const r = await opApi.opFetch('/api/operator/catalog');
+  CATALOG = r.items||[];
+  CATS = r.categories||[];
+  renderRail(); renderGrid();
+}
+function renderRail(){
+  const total = CATALOG.length;
+  let html = `<button class="cat-btn ${curCat==='Все'?'on':''}" onclick="pickCat('Все')">Все <span class="cnt">${total}</span></button>`;
+  html += CATS.map(c=>`<button class="cat-btn ${curCat===c.cat?'on':''}" onclick="pickCat('${c.cat}')">${c.cat} <span class="cnt">${c.count}</span></button>`).join('');
+  $('catRail').innerHTML = html;
+}
+function pickCat(c){ curCat=c; if(showOrders) toggleOrders(); renderRail(); renderGrid(); haptic('sel'); }
+$('searchIn').addEventListener('input',e=>{ search=e.target.value.trim().toLowerCase(); renderGrid(); });
+
+function ticketQtyFor(pid){
+  let n=0; for(const k in TICKET){ if(TICKET[k].id===pid) n+=TICKET[k].qty; } return n;
+}
+function renderGrid(){
+  const list = CATALOG.filter(p=>
+    (curCat==='Все'||p.cat===curCat) &&
+    (!search || p.name.toLowerCase().includes(search)));
+  $('grid').innerHTML = list.map(p=>{
+    const q = ticketQtyFor(p.id);
+    const price = p.isBeer
+      ? `<div class="pr">${p.pack12} <small>/ ×12</small></div><div class="beer-tag">УПАКОВКИ ×12 · ×24</div>`
+      : `<div class="pr">${p.price} <small>AED</small></div>`;
+    return `<button class="tile ${p.stock?'':'oos'}" onclick="tapTile('${p.id}')">
+      ${p.stock?'':'<span class="oos-lbl">НЕТ</span>'}
+      ${q?`<span class="qbadge">${q}</span>`:''}
+      <div class="nm">${p.name}</div>${price}
+    </button>`;
+  }).join('') || '<div style="grid-column:1/-1;padding:30px;text-align:center;color:var(--muted)">Ничего не найдено</div>';
+}
+
+// ── ticket ops ──
+function tapTile(pid){
+  const p = CATALOG.find(x=>x.id===pid); if(!p||!p.stock) return;
+  haptic('light');
+  if(p.isBeer){
+    _pendingBeer = p;
+    $('packTitle').textContent = p.name;
+    $('pack12').textContent = p.pack12+' AED';
+    $('pack24').textContent = p.pack24+' AED';
+    showOv('packOv');
+    return;
+  }
+  addLine(pid, null, 1);
+}
+function packPick(pcs){
+  hideOv('packOv');
+  if(_pendingBeer){ addLine(_pendingBeer.id, pcs, 1); _pendingBeer=null; }
+}
+function addLine(pid, pcs, d){
+  const key = pcs ? pid+'_'+pcs : pid;
+  const cur = TICKET[key] || {id:pid, pcs:pcs||undefined, qty:0};
+  cur.qty += d;
+  if(cur.qty<=0) delete TICKET[key]; else TICKET[key]=cur;
+  renderTicket(); renderGrid();
+}
+function lineUnit(l){
+  const p = CATALOG.find(x=>x.id===l.id); if(!p) return 0;
+  return l.pcs===24 ? p.pack24 : (l.pcs===12 ? p.pack12 : p.price);
+}
+function lineName(l){
+  const p = CATALOG.find(x=>x.id===l.id);
+  return (p?p.name:'?') + (l.pcs?` ×${l.pcs}`:'');
+}
+function renderTicket(){
+  const keys = Object.keys(TICKET);
+  const wrap = $('tlines');
+  if(!keys.length){
+    wrap.innerHTML = '<div class="ticket-empty">Нажимайте на товары слева,<br>чтобы собрать заказ</div>';
+  } else {
+    wrap.innerHTML = keys.map(k=>{
+      const l=TICKET[k], u=lineUnit(l);
+      return `<div class="tline">
+        <div class="nm">${lineName(l)}<br><small style="color:var(--muted)">${u} AED</small></div>
+        <div class="stepper">
+          <button onclick="addLine('${l.id}',${l.pcs||null},-1)">−</button>
+          <span class="q">${l.qty}</span>
+          <button onclick="addLine('${l.id}',${l.pcs||null},1)">+</button>
+        </div>
+        <div class="lt">${u*l.qty}</div>
+      </div>`;
+    }).join('');
+  }
+  const total = keys.reduce((s,k)=>s+lineUnit(TICKET[k])*TICKET[k].qty,0);
+  $('totalV').textContent = total;
+  $('createBtn').disabled = !keys.length;
+}
+function clearTicket(confirmIt){
+  if(confirmIt && Object.keys(TICKET).length===0 && !editingOid) return;
+  TICKET={}; editingOid=null;
+  $('editTag').style.display='none';
+  $('createBtn').textContent='📞 Создать заказ';
+  $('createBtn').classList.remove('save');
+  $('cName').value=''; $('cPhone').value=''; $('cAddr').value=''; $('cComment').value='';
+  renderTicket(); renderGrid();
+}
+
+// ── create / save ──
+function ticketItems(){
+  return Object.values(TICKET).map(l=>({id:l.id, qty:l.qty, pcs:l.pcs}));
+}
+function askCreate(){
+  if(!Object.keys(TICKET).length) return;
+  const phone = $('cPhone').value.trim();
+  if(!phone){ toast('Укажите телефон клиента','err'); $('cPhone').focus(); haptic('medium'); return; }
+  const total = $('totalV').textContent;
+  const offName = (OFFICES.find(o=>o.id===curOffice)||{}).name||'';
+  $('confT').textContent = editingOid ? `Сохранить изменения #${editingOid}?` : 'Создать заказ?';
+  $('confS').innerHTML = `💰 <b>${total} AED</b> · ${offName}<br>📱 ${phone}${editingOid?'':'<br><br>Заказ сразу уйдёт в работу («в пути»), время не указывается.'}`;
+  $('confGo').textContent = editingOid ? 'Сохранить' : 'Создать';
+  showOv('confirmOv'); haptic('medium');
+}
+async function doCreate(){
+  hideOv('confirmOv');
+  const btn=$('createBtn'); btn.disabled=true;
+  const body = {
+    items: ticketItems(),
+    customer_name: $('cName').value.trim(),
+    phone: $('cPhone').value.trim(),
+    address: $('cAddr').value.trim(),
+    comment: $('cComment').value.trim(),
+    office_id: curOffice,
+  };
+  try{
+    if(editingOid){
+      await opApi.opFetch('/api/operator/orders/'+editingOid, {method:'PATCH', body});
+      toast('✅ Заказ #'+editingOid+' обновлён','ok');
+    } else {
+      const r = await opApi.opFetch('/api/operator/orders', {method:'POST', body});
+      toast('✅ Заказ #'+r.order_id+' создан — в пути','ok');
+    }
+    haptic('heavy');
+    clearTicket(false);
+    await loadOrders();
+  }catch(e){
+    const err=(e.payload&&e.payload.error)||('код '+(e.status||'сеть'));
+    toast('Ошибка: '+err,'err');
+  }
+  btn.disabled=false; renderTicket();
+}
+
+// ── orders panel ──
+function toggleOrders(){
+  showOrders = !showOrders;
+  $('ordersBtn').classList.toggle('on', showOrders);
+  $('gridWrap').style.display = showOrders?'none':'';
+  $('searchRow').style.display = showOrders?'none':'';
+  $('ordersWrap').style.display = showOrders?'':'none';
+  if(showOrders) loadOrders();
+  haptic('sel');
+}
+async function loadOrders(){
+  let r;
+  try{ r = await opApi.opFetch('/api/operator/orders',{params:{scope:'today'}}); }
+  catch(e){ return; }
+  ORDERS = r.orders||[];
+  const active = ORDERS.filter(o=>o.status==='approved').length;
+  const b=$('ordersBadge');
+  if(active){ b.style.display=''; b.textContent=active; } else b.style.display='none';
+  if(showOrders) renderOrders();
+}
+function renderOrders(){
+  const stLbl={approved:'В ПУТИ',delivered:'ДОСТАВЛЕН',cancelled:'ОТМЕНЁН',pending:'НОВЫЙ'};
+  $('ordersWrap').innerHTML = ORDERS.length ? ORDERS.map(o=>{
+    const t = o.timestamp ? new Date(/Z$|[+-]\d{2}:?\d{2}$/.test(o.timestamp)?o.timestamp:o.timestamp+'Z') : null;
+    const hm = t&&!isNaN(t) ? String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0') : '';
+    const items = (o.items||[]).map(i=>`${i.name} ×${i.qty}`).join(' · ');
+    const acts = o.status==='approved' ? `
+      <div class="acts">
+        <button class="oact deliver" onclick="askAct('${o.order_id}','delivered')">✅ Доставлен</button>
+        <button class="oact edit" onclick="startEdit('${o.order_id}')">✏️ Изменить</button>
+        <button class="oact cancel" onclick="askAct('${o.order_id}','cancel')">🚫 Отменить</button>
+      </div>` : '';
+    return `<div class="ocard">
+      <div class="top">
+        <span class="oid">#${o.order_id}</span>
+        <span class="st-chip st-${o.status}">${stLbl[o.status]||o.status}</span>
+        <span style="font-size:11px;color:var(--muted)">${hm}</span>
+        <span class="sum">${o.total} <small style="font-size:11px;color:var(--muted)">AED</small></span>
+      </div>
+      <div class="who">👤 ${o.customer_name||'—'} · 📱 ${o.phone||'—'}${o.address?' · 🏠 '+o.address:''}</div>
+      <div class="items">${items}</div>
+      ${acts}
+    </div>`;
+  }).join('') : '<div style="padding:40px;text-align:center;color:var(--muted)">Сегодня ручных заказов ещё нет</div>';
+}
+function startEdit(oid){
+  const o = ORDERS.find(x=>x.order_id===oid); if(!o) return;
+  TICKET={};
+  (o.items||[]).forEach(i=>{
+    const key = i.pcs ? i.id+'_'+i.pcs : i.id;
+    TICKET[key]={id:i.id, pcs:i.pcs||undefined, qty:i.qty};
+  });
+  editingOid=oid;
+  $('cName').value=o.customer_name==='Телефонный клиент'?'':(o.customer_name||'');
+  $('cPhone').value=o.phone||''; $('cAddr').value=o.address||''; $('cComment').value=o.comment||'';
+  $('editTag').style.display='';
+  $('createBtn').textContent='💾 Сохранить изменения';
+  $('createBtn').classList.add('save');
+  if(showOrders) toggleOrders();
+  renderTicket(); renderGrid();
+  toast('Заказ #'+oid+' загружен в чек для правки');
+  haptic('medium');
+}
+function askAct(oid, act){
+  const isDel = act==='delivered';
+  $('actT').textContent = (isDel?'✅ Доставлен?':'🚫 Отменить заказ?')+' #'+oid;
+  $('actS').textContent = isDel ? 'Заказ будет закрыт и попадёт в выручку.' : 'Заказ будет отменён — действие необратимо.';
+  const go=$('actGo');
+  go.className='sbtn '+(isDel?'gold':'red');
+  go.textContent=isDel?'Доставлен':'Отменить';
+  go.onclick=async()=>{
+    hideOv('actOv'); haptic('heavy');
+    try{
+      await opApi.opFetch(`/api/operator/orders/${oid}/${act}`,{method:'POST',body:{}});
+      toast(isDel?'✅ #'+oid+' доставлен':'🚫 #'+oid+' отменён', isDel?'ok':'err');
+      if(editingOid===oid) clearTicket(false);
+      await loadOrders();
+    }catch(e){ toast('Ошибка: '+((e.payload&&e.payload.error)||e.status),'err'); }
+  };
+  showOv('actOv'); haptic('medium');
+}
+
+document.querySelectorAll('.ov').forEach(ov=>ov.addEventListener('click',e=>{ if(e.target===ov) ov.classList.remove('show'); }));
+boot();
+</script>
+</body>
+</html>

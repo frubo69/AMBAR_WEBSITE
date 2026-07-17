@@ -719,6 +719,17 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     </div>
   </div>
 
+  <!-- Channel split: app orders vs phone-in (operator POS) -->
+  <div class="sect"><div class="sect-t">Каналы</div></div>
+  <div class="card">
+    <div style="display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--card2);margin-bottom:12px">
+      <div id="chAppBar" style="width:100%;background:linear-gradient(90deg,#E8C98A,#C9A96E);transition:width .4s"></div>
+      <div id="chPhoneBar" style="width:0%;background:#5B8DEF;transition:width .4s"></div>
+    </div>
+    <div class="bar-row"><span class="bar-lbl" style="width:auto;min-width:110px">📱 Приложение</span><div style="flex:1"></div><span style="font-size:11px;color:var(--muted);margin-right:8px" id="chAppCnt">—</span><span class="bar-val" id="chAppVal" data-aed="">—</span></div>
+    <div class="bar-row" style="margin:0"><span class="bar-lbl" style="width:auto;min-width:110px">📞 Телефон</span><div style="flex:1"></div><span style="font-size:11px;color:var(--muted);margin-right:8px" id="chPhoneCnt">—</span><span class="bar-val" id="chPhoneVal" data-aed="">—</span></div>
+  </div>
+
   <!-- Hour heatmap -->
   <div class="sect"><div class="sect-t">Заказы по часам</div></div>
   <div class="card">
@@ -2898,6 +2909,8 @@ function renderFinance(p, f){
   renderPeriodBars(p, f.trend || []);
   // Payment split: crypto (already on the wallet) vs cash (courier collects)
   renderPaySplit(f.by_method);
+  // Channel split: app vs phone-in (operator POS)
+  renderChannels(f.by_channel);
   // Bento KPIs (real values)
   renderKpis(f.kpi);
   // Re-render with currency formatting
@@ -2924,6 +2937,20 @@ function renderPaySplit(bm){
     if(i.count){ infRow.style.display=''; inf.textContent = `⏳ в доставке, уже оплачено: ${i.aed} AED (≈ ${i.usdt} USDT · ${i.count} зак.)`; }
     else infRow.style.display='none';
   }
+}
+
+function renderChannels(bc){
+  bc = bc || {};
+  const a = bc.app || {}, p = bc.phone || {};
+  const aAed = a.aed || 0, pAed = p.aed || 0, tot = aAed + pAed;
+  const pPct = tot ? Math.max(0, Math.min(100, pAed / tot * 100)) : 0;
+  const ab = document.getElementById('chAppBar'), pb = document.getElementById('chPhoneBar');
+  if(ab) ab.style.width = (100 - pPct) + '%';
+  if(pb) pb.style.width = pPct + '%';
+  _setAed('chAppVal', aAed);
+  _setAed('chPhoneVal', pAed);
+  _setText('chAppCnt',  (a.count||0) + ' зак.');
+  _setText('chPhoneCnt', (p.count||0) + ' зак.');
 }
 
 function renderKpis(k){
@@ -6092,6 +6119,7 @@ const DETAIL = {
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Офис</div></div><div class="dt-row-r">${real.office||'—'}</div></div>
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Статус</div></div><div class="dt-row-r" style="color:${stClr[real.status]||'var(--muted)'}">${real.status==='cancelled'?(real.cancelled_by==='operator'?'отменён оператором':'отменён клиентом'):real.status==='declined'?'отклонён оператором':(stMap[real.status]||real.status)}</div></div>
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Оплата</div></div><div class="dt-row-r" style="${real.crypto?'color:#26A17B;font-weight:600':'color:var(--muted)'}">${real.crypto?('💎 Крипта · '+(real.crypto_usdt||'—')+' USDT · на кошельке'):'💵 Наличные'}</div></div>
+              ${real.manual?`<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Канал</div></div><div class="dt-row-r" style="color:var(--warn);font-weight:600">📞 По телефону · ${real.created_by_name||'оператор'}</div></div>`:''}
               ${(real.status==='cancelled'||real.status==='declined') && (real.cancel_reason||real.cancel_comment) ? `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Причина ${real.status==='cancelled'&&real.cancelled_by!=='operator'?'отмены':'отклонения'}</div></div><div class="dt-row-r" style="color:var(--dn);max-width:62%;text-align:right">${[real.cancel_reason, real.cancel_comment].filter(Boolean).join(' · ')}</div></div>` : ''}
             </div>
             <div class="dt-sect">Позиции</div>
@@ -6269,7 +6297,7 @@ const DETAIL = {
         const time = fmtWhen(o.ts);   // today → HH:MM, older → dd/mm/yyyy HH:MM
         const st = stLabel[o.status]||o.status;
         const sc = stColor[o.status]||'var(--muted)';
-        return `<div class="dt-row" data-detail="order:${o.id}"><div class="dt-row-l"><div class="dt-row-t">#${o.id}${o.crypto?' <span title="оплачено криптой" style="font-size:10px">💎</span>':''} <span class="dt-row-tiny" style="color:${sc}">${st}</span></div><div class="dt-row-s">${time}${o.items_short?' · '+o.items_short:''}${o.eta?' · ETA '+o.eta+' мин':''}</div></div><div class="dt-row-r ${o.crypto?'':'gold'}" ${o.crypto?'style="color:#26A17B"':''}>${o.total}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:2px">›</div></div>`;
+        return `<div class="dt-row" data-detail="order:${o.id}"><div class="dt-row-l"><div class="dt-row-t">#${o.id}${o.crypto?' <span title="оплачено криптой" style="font-size:10px">💎</span>':''}${o.manual?' <span title="ручной заказ · по телефону" style="font-size:10px">📞</span>':''} <span class="dt-row-tiny" style="color:${sc}">${st}</span></div><div class="dt-row-s">${time}${o.items_short?' · '+o.items_short:''}${o.eta?' · ETA '+o.eta+' мин':''}</div></div><div class="dt-row-r ${o.crypto?'':'gold'}" ${o.crypto?'style="color:#26A17B"':''}>${o.total}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:2px">›</div></div>`;
       }).join('');
       if(wrap) return `<div style="max-height:220px;overflow-y:auto;-webkit-overflow-scrolling:touch">${inner}</div>`;
       return inner;

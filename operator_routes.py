@@ -210,9 +210,12 @@ def _esc_lines(items: list) -> str:
 
 def _card_kb(order: dict) -> dict | None:
     """Approved manual orders keep the live buttons (cid=0 is parse-safe);
-    terminal states drop the keyboard."""
+    terminal states get «✅ Просмотрено» — the operator bot's existing delmsg
+    handler deletes the card to keep the chat clean."""
     if order.get("status") != "approved":
-        return None
+        return {"inline_keyboard": [
+            [{"text": "✅ Просмотрено", "callback_data": "delmsg"}],
+        ]}
     oid = order["order_id"]
     return {"inline_keyboard": [
         [{"text": "✅ Доставлен", "callback_data": f"done_{oid}_0"},

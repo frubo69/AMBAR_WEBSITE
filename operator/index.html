@@ -56,16 +56,19 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .center{flex:1;display:flex;flex-direction:column;min-width:0}
 .search-row{padding:12px 14px 4px;flex-shrink:0}
 .grid-wrap{flex:1;overflow-y:auto;padding:10px 14px 20px;-webkit-overflow-scrolling:touch}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(168px,1fr));gap:10px}
-.tile{position:relative;background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);padding:14px 12px;min-height:96px;display:flex;flex-direction:column;justify-content:space-between;transition:.12s;text-align:left}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px}
+.tile{position:relative;background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);padding:0 0 12px;min-height:96px;display:flex;flex-direction:column;transition:.12s;text-align:left;overflow:hidden}
 .tile:active{transform:scale(.97);border-color:rgba(201,169,110,.4)}
-.tile .nm{font-size:13.5px;font-weight:600;line-height:1.3}
-.tile .pr{font-size:15px;font-weight:700;color:var(--gold2);margin-top:8px;font-family:'Space Grotesk',sans-serif}
+.timg{width:100%;aspect-ratio:1.3;background:var(--card2);display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:9px}
+.timg img{width:100%;height:100%;object-fit:cover;display:block}
+.timg .ph{font-size:26px;opacity:.3}
+.tile .nm{font-size:13px;font-weight:600;line-height:1.3;padding:0 11px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.tile .pr{font-size:15px;font-weight:700;color:var(--gold2);margin-top:6px;font-family:'Space Grotesk',sans-serif;padding:0 11px}
 .tile .pr small{font-size:10px;color:var(--muted);font-weight:500}
 .tile.oos{opacity:.38;pointer-events:none}
-.tile .oos-lbl{position:absolute;top:8px;right:8px;font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--dn);border:1px solid rgba(224,85,85,.4);border-radius:6px;padding:2px 6px}
-.tile .qbadge{position:absolute;top:-7px;right:-7px;min-width:26px;height:26px;padding:0 7px;border-radius:13px;background:linear-gradient(135deg,#E8C98A,#C9A96E);color:#1a1408;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.5)}
-.tile .beer-tag{font-size:9.5px;color:var(--info);font-weight:700;letter-spacing:.5px;margin-top:2px}
+.tile .oos-lbl{position:absolute;top:8px;right:8px;z-index:2;font-size:9px;font-weight:700;letter-spacing:.5px;color:var(--dn);background:rgba(0,0,10,.75);border:1px solid rgba(224,85,85,.4);border-radius:6px;padding:2px 6px}
+.tile .qbadge{position:absolute;top:6px;left:6px;z-index:2;min-width:26px;height:26px;padding:0 7px;border-radius:13px;background:linear-gradient(135deg,#E8C98A,#C9A96E);color:#1a1408;font-size:13px;font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.5)}
+.tile .beer-tag{font-size:9.5px;color:var(--info);font-weight:700;letter-spacing:.5px;margin-top:2px;padding:0 11px}
 
 /* ── ticket ── */
 .ticket{width:340px;flex-shrink:0;display:flex;flex-direction:column;border-left:1px solid var(--border2);background:var(--bg3)}
@@ -326,6 +329,7 @@ function renderGrid(){
     return `<button class="tile ${p.stock?'':'oos'}" onclick="tapTile('${p.id}')">
       ${p.stock?'':'<span class="oos-lbl">НЕТ</span>'}
       ${q?`<span class="qbadge">${q}</span>`:''}
+      <div class="timg">${p.img?`<img src="${p.img}" loading="lazy" onerror="this.outerHTML='<span class=ph>🍾</span>'">`:'<span class="ph">🍾</span>'}</div>
       <div class="nm">${p.name}</div>${price}
     </button>`;
   }).join('') || '<div style="grid-column:1/-1;padding:30px;text-align:center;color:var(--muted)">Ничего не найдено</div>';

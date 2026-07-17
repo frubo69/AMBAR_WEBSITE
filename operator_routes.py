@@ -302,6 +302,7 @@ async def handle_catalog(request):
         row = {
             "id": p.get("id"), "cat": p.get("cat", ""), "name": p.get("name", ""),
             "price": base, "stock": bool(p.get("stock", True)), "isBeer": is_beer,
+            "img": p.get("img", ""),   # same hosted images the customer app shows
         }
         if is_beer:
             row["pack12"] = base

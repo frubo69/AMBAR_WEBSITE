@@ -27,7 +27,7 @@ input,textarea{font-family:inherit;color:var(--text);background:var(--card);bord
 input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 
 /* ── frame ── */
-#app{display:flex;flex-direction:column;height:100%;padding-top:var(--safe-top)}
+#app{display:flex;flex-direction:column;height:var(--tg-h,100%);padding-top:var(--safe-top)}
 .hdr{display:flex;align-items:center;gap:14px;padding:10px 18px;border-bottom:1px solid var(--border2);background:var(--bg2);flex-shrink:0}
 .hdr-logo{font-family:'Cormorant Garamond',serif;font-size:22px;letter-spacing:6px;color:var(--gold2)}
 .hdr-sub{font-size:10px;letter-spacing:2.5px;color:var(--muted);text-transform:uppercase;margin-top:1px}
@@ -251,8 +251,16 @@ try{
   // True fullscreen (no Telegram chrome) on Bot API 8+ — same as the owner app.
   if(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0') && tg.requestFullscreen) tg.requestFullscreen();
   tg.setHeaderColor('#000006'); tg.setBackgroundColor('#000006');
+  // The home-indicator strip has its OWN color (Bot API 7.10+) — without this it
+  // shows as a thin off-color line at the very bottom of the screen.
+  tg.setBottomBarColor && tg.setBottomBarColor('#000006');
   tg.enableClosingConfirmation && tg.enableClosingConfirmation();
   tg.disableVerticalSwipes && tg.disableVerticalSwipes();
+  // Pin the app to Telegram's live viewport height (100% can undershoot in fullscreen).
+  const updVph=()=>document.documentElement.style.setProperty('--tg-h',(tg.viewportHeight||window.innerHeight)+'px');
+  updVph();
+  window.addEventListener('resize',updVph);
+  tg.onEvent && tg.onEvent('viewportChanged',updVph);
 }catch(e){}
 
 // ── state ──

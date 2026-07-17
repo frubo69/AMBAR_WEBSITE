@@ -248,8 +248,12 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 const tg = window.Telegram && window.Telegram.WebApp;
 try{
   tg.ready(); tg.expand();
-  // True fullscreen (no Telegram chrome) on Bot API 8+ — same as the owner app.
-  if(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0') && tg.requestFullscreen) tg.requestFullscreen();
+  // True fullscreen (no Telegram chrome/frame). No version guard — just try; on iPad
+  // the request can be ignored if it fires too early in the load, so retry a few
+  // times until isFullscreen flips (or the client reports it unsupported).
+  const wantFS=()=>{ try{ if(tg.requestFullscreen && !tg.isFullscreen) tg.requestFullscreen(); }catch(e){} };
+  wantFS(); setTimeout(wantFS,300); setTimeout(wantFS,1000); setTimeout(wantFS,2500);
+  tg.onEvent && tg.onEvent('fullscreenFailed', e=>console.warn('fullscreen failed:', e && e.error));
   tg.setHeaderColor('#000006'); tg.setBackgroundColor('#000006');
   // The home-indicator strip has its OWN color (Bot API 7.10+) — without this it
   // shows as a thin off-color line at the very bottom of the screen.

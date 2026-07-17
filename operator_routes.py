@@ -327,9 +327,19 @@ async def handle_create(request):
     except Exception:
         return web.json_response({"error": "invalid json"}, status=400, headers=CORS_HEADERS)
 
+    # Name, phone and address are all mandatory for a phone-in order (comment stays
+    # optional). Phone is normalized to a single leading "+".
+    name = str(body.get("customer_name", "")).strip()
     phone = str(body.get("phone", "")).strip()
-    if not phone:
+    addr = str(body.get("address", "")).strip()
+    digits = "".join(ch for ch in phone if ch.isdigit())
+    if not name:
+        return web.json_response({"error": "name_required"}, status=400, headers=CORS_HEADERS)
+    if len(digits) < 7:
         return web.json_response({"error": "phone_required"}, status=400, headers=CORS_HEADERS)
+    if not addr:
+        return web.json_response({"error": "address_required"}, status=400, headers=CORS_HEADERS)
+    phone = "+" + phone.lstrip("+")
 
     items, err = _build_items(body.get("items"))
     if err:
@@ -350,10 +360,10 @@ async def handle_create(request):
     order = {
         "order_id": _new_oid(),
         "customer_id": 0,                       # int + present — see module docstring
-        "customer_name": str(body.get("customer_name", "")).strip() or "Телефонный клиент",
+        "customer_name": name,
         "username": "—",
         "phone": phone,
-        "address": str(body.get("address", "")).strip(),
+        "address": addr,
         "location": {}, "gmap_link": "", "is_gps": False,
         "items": items,
         "item_lines": _item_lines(items),
@@ -454,8 +464,10 @@ async def handle_patch(request):
     for f in ("customer_name", "phone", "address", "comment"):
         if f in body:
             v = str(body.get(f, "")).strip()
-            if f == "phone" and not v:
-                return web.json_response({"error": "phone_required"}, status=400, headers=CORS_HEADERS)
+            if f != "comment" and not v:
+                return web.json_response({"error": f"{f}_required"}, status=400, headers=CORS_HEADERS)
+            if f == "phone":
+                v = "+" + v.lstrip("+")
             upd[f] = v
     if not upd:
         return web.json_response({"error": "nothing to update"}, status=400, headers=CORS_HEADERS)

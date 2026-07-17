@@ -211,10 +211,11 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
         <div id="tlines"><div class="ticket-empty">Нажимайте на товары слева,<br>чтобы собрать заказ</div></div>
         <div class="cust">
           <div class="lbl">Клиент · по телефону</div>
-          <input id="cName" placeholder="Имя (необязательно)" autocomplete="off" enterkeyhint="next">
+          <div class="lbl" style="margin-top:6px">Имя *</div>
+          <input id="cName" placeholder="Имя клиента" autocomplete="off" enterkeyhint="next">
           <div class="lbl">Телефон *</div>
           <input id="cPhone" placeholder="+971 …" inputmode="tel" autocomplete="off" enterkeyhint="next">
-          <div class="lbl">Адрес</div>
+          <div class="lbl">Адрес *</div>
           <textarea id="cAddr" rows="2" placeholder="Район, здание, квартира…" enterkeyhint="next"></textarea>
           <div class="lbl">Комментарий</div>
           <input id="cComment" placeholder="Домофон, этаж, пожелания…" autocomplete="off" enterkeyhint="done">
@@ -490,8 +491,12 @@ function ticketItems(){
 }
 function askCreate(){
   if(!Object.keys(TICKET).length) return;
+  const name = $('cName').value.trim();
   const phone = $('cPhone').value.trim();
-  if(!phone){ toast('Укажите телефон клиента','err'); $('cPhone').focus(); haptic('medium'); return; }
+  const addr = $('cAddr').value.trim();
+  if(!name){ toast('Укажите имя клиента','err'); $('cName').focus(); haptic('medium'); return; }
+  if(phone.replace(/\D/g,'').length < 7){ toast('Укажите телефон клиента','err'); $('cPhone').focus(); haptic('medium'); return; }
+  if(!addr){ toast('Укажите адрес доставки','err'); $('cAddr').focus(); haptic('medium'); return; }
   const total = $('totalV').textContent;
   const offName = (OFFICES.find(o=>o.id===curOffice)||{}).name||'';
   $('confT').textContent = editingOid ? `Сохранить изменения #${editingOid}?` : 'Создать заказ?';
@@ -581,7 +586,7 @@ function startEdit(oid){
     TICKET[key]={id:i.id, pcs:i.pcs||undefined, qty:i.qty};
   });
   editingOid=oid;
-  $('cName').value=o.customer_name==='Телефонный клиент'?'':(o.customer_name||'');
+  $('cName').value=o.customer_name||'';
   $('cPhone').value=o.phone||''; $('cAddr').value=o.address||''; $('cComment').value=o.comment||'';
   $('editTag').style.display='';
   $('createBtn').textContent='💾 Сохранить изменения';
@@ -625,6 +630,17 @@ function toggleTheme(){
   applyTheme(t); haptic('sel');
 }
 applyTheme((()=>{ try{ return localStorage.getItem('pos_theme')||'dark'; }catch(e){ return 'dark'; } })());
+
+// ── phone: a leading "+" appears automatically and can't be deleted ──
+(function(){
+  const ph=$('cPhone'); if(!ph) return;
+  ph.addEventListener('focus',()=>{ if(!ph.value.trim()) ph.value='+'; });
+  ph.addEventListener('input',()=>{
+    // exactly one leading +, then digits/spaces/()- only
+    ph.value = '+' + ph.value.replace(/\+/g,'').replace(/[^\d\s()-]/g,'');
+  });
+  ph.addEventListener('blur',()=>{ if(ph.value.trim()==='+') ph.value=''; });
+})();
 
 // ── keyboard «Далее»: walk the customer fields one by one without closing ──
 const FIELD_CHAIN=['cName','cPhone','cAddr','cComment'];

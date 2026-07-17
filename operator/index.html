@@ -19,6 +19,16 @@
   --safe-top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + var(--tg-content-safe-area-inset-top,0px));
   --safe-bottom:calc(var(--tg-safe-area-inset-bottom,0px) + env(safe-area-inset-bottom,0px));
 }
+/* Light theme — same layout, white surfaces, darker gold for text contrast.
+   Toggled by the ☀️/🌙 header button, persisted in localStorage (pos_theme). */
+body.light{
+  --gold:#B08D4F;--gold2:#8A6A2E;--gold3:#6E541F;--gold-soft:rgba(176,141,79,.16);
+  --bg:#F5F3ED;--bg2:#FFFFFF;--bg3:#FAF8F3;
+  --card:#FFFFFF;--card2:#EFEBE2;--card3:#E7E2D5;
+  --border:rgba(150,120,60,.28);--border2:rgba(20,18,10,.10);--border3:rgba(20,18,10,.18);
+  --text:#211D13;--sub:#6E6957;--muted:#9B9481;
+}
+body{transition:background .25s,color .25s}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden}
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;-webkit-font-smoothing:antialiased;user-select:none;-webkit-user-select:none}
@@ -155,6 +165,7 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
     <div><div class="hdr-logo">AMBAR</div><div class="hdr-sub">Панель оператора · 📞 заказы</div></div>
     <div class="office-seg" id="officeSeg" style="display:none"></div>
     <div class="hdr-right">
+      <button class="pill" id="themeBtn" onclick="toggleTheme()" aria-label="Тема" style="cursor:pointer">☀️</button>
       <span class="pill" id="opName">—</span>
       <span class="pill" id="netPill">…</span>
     </div>
@@ -190,13 +201,13 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
         <div id="tlines"><div class="ticket-empty">Нажимайте на товары слева,<br>чтобы собрать заказ</div></div>
         <div class="cust">
           <div class="lbl">Клиент · по телефону</div>
-          <input id="cName" placeholder="Имя (необязательно)" autocomplete="off">
+          <input id="cName" placeholder="Имя (необязательно)" autocomplete="off" enterkeyhint="next">
           <div class="lbl">Телефон *</div>
-          <input id="cPhone" placeholder="+971 …" inputmode="tel" autocomplete="off">
+          <input id="cPhone" placeholder="+971 …" inputmode="tel" autocomplete="off" enterkeyhint="next">
           <div class="lbl">Адрес</div>
-          <textarea id="cAddr" rows="2" placeholder="Район, здание, квартира…"></textarea>
+          <textarea id="cAddr" rows="2" placeholder="Район, здание, квартира…" enterkeyhint="next"></textarea>
           <div class="lbl">Комментарий</div>
-          <input id="cComment" placeholder="Домофон, этаж, пожелания…" autocomplete="off">
+          <input id="cComment" placeholder="Домофон, этаж, пожелания…" autocomplete="off" enterkeyhint="done">
         </div>
       </div>
       <div class="ticket-foot">
@@ -554,6 +565,33 @@ function askAct(oid, act){
 }
 
 document.querySelectorAll('.ov').forEach(ov=>ov.addEventListener('click',e=>{ if(e.target===ov) ov.classList.remove('show'); }));
+
+// ── theme (dark ⇄ light) ──
+function applyTheme(t){
+  document.body.classList.toggle('light', t==='light');
+  const btn=$('themeBtn'); if(btn) btn.textContent = t==='light' ? '🌙' : '☀️';   // shows the switch target
+  const c = t==='light' ? '#F5F3ED' : '#000006';
+  try{ tg.setHeaderColor(c); tg.setBackgroundColor(c); tg.setBottomBarColor && tg.setBottomBarColor(c); }catch(e){}
+}
+function toggleTheme(){
+  const t = document.body.classList.contains('light') ? 'dark' : 'light';
+  try{ localStorage.setItem('pos_theme', t); }catch(e){}
+  applyTheme(t); haptic('sel');
+}
+applyTheme((()=>{ try{ return localStorage.getItem('pos_theme')||'dark'; }catch(e){ return 'dark'; } })());
+
+// ── keyboard «Далее»: walk the customer fields one by one without closing ──
+const FIELD_CHAIN=['cName','cPhone','cAddr','cComment'];
+FIELD_CHAIN.forEach((id,i)=>{
+  const el=$(id); if(!el) return;
+  el.addEventListener('keydown',e=>{
+    if(e.key!=='Enter') return;
+    e.preventDefault();                         // textarea too: jump, don't insert a newline
+    const next=FIELD_CHAIN[i+1];
+    if(next) $(next).focus(); else el.blur();   // last field → close the keyboard
+  });
+});
+
 boot();
 </script>
 </body>

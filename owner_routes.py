@@ -49,7 +49,7 @@ REVENUE_STATUSES = ("delivered",)
 # Office IDs (display order matches dashboard).
 OFFICE_IDS = ("office_central", "office_north", "office_south")
 
-VALID_PERIODS = ("today", "week", "month", "year")
+VALID_PERIODS = ("today", "yesterday", "week", "month", "year")
 
 
 # ─── helpers ────────────────────────────────────────────────────────────
@@ -79,6 +79,10 @@ def _period_window(period: str, ref: datetime = None):
     if period == "today":
         start, end = today_start, tomorrow_start
         prev_start, prev_end = start - timedelta(days=1), start
+    elif period == "yesterday":
+        end = today_start
+        start = today_start - timedelta(days=1)
+        prev_end, prev_start = start, start - timedelta(days=1)
     elif period == "week":
         end = tomorrow_start
         start = end - timedelta(days=7)
@@ -143,13 +147,15 @@ def _by_office(orders) -> dict:
 def _bucket_trend(orders, start_dt: datetime, period: str) -> list:
     """Bucket revenue into time slots appropriate for the period:
     today→24 hours, week→7 days, month→30 days, year→12 months."""
-    if period == "today":
+    if period in ("today", "yesterday"):
         buckets = [0] * 24
         for dt, o in orders:
             buckets[dt.hour] += int(o.get("total", 0) or 0)
-        # Trim to current hour so the sparkline doesn't show empty future hours.
-        cutoff = _now_dubai().hour + 1
-        return buckets[:cutoff] or [0]
+        if period == "today":
+            # Trim to current hour so the sparkline doesn't show empty future hours.
+            cutoff = _now_dubai().hour + 1
+            return buckets[:cutoff] or [0]
+        return buckets   # yesterday is a full past day — all 24 hours
     if period == "week":
         buckets = [0] * 7
         for dt, o in orders:
@@ -401,7 +407,7 @@ async def handle_finance(request):
         [o for _, o in curr_all if o.get("status") in ("declined","cancelled")],
         key=lambda x: x.get("timestamp",""), reverse=True)[:20]
 
-    period_lbl_for_rating = {"today":"сегодня","week":"неделя","month":"месяц","year":"год"}[period]
+    period_lbl_for_rating = {"today":"сегодня","yesterday":"вчера","week":"неделя","month":"месяц","year":"год"}[period]
 
     # ── Crypto vs cash split ─────────────────────────────────────────
     # Crypto lands on the wallet at PAYMENT time (order placement), cash arrives

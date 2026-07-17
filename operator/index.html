@@ -69,7 +69,11 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(148px,1fr));gap:10px}
 .tile{position:relative;background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);padding:0 0 12px;min-height:96px;display:flex;flex-direction:column;transition:.12s;text-align:left;overflow:hidden}
 .tile:active{transform:scale(.97);border-color:rgba(201,169,110,.4)}
-.timg{width:100%;aspect-ratio:1.3;background:var(--card2);display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:9px}
+.timg{width:100%;aspect-ratio:1.3;background:var(--card2);display:flex;align-items:center;justify-content:center;overflow:hidden;margin-bottom:9px;position:relative}
+/* on-card stepper — appears once the product is in the ticket */
+.tstep{position:absolute;left:6px;right:6px;bottom:6px;display:flex;justify-content:space-between;pointer-events:none}
+.ts-b{pointer-events:auto;width:36px;height:36px;border-radius:50%;background:rgba(0,0,10,.68);backdrop-filter:blur(4px);color:#F5E0B0;font-size:20px;font-weight:700;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.45);user-select:none}
+.ts-b:active{transform:scale(.88)}
 .timg img{width:100%;height:100%;object-fit:cover;display:block}
 .timg .ph{font-size:26px;opacity:.3}
 .tile .nm{font-size:13px;font-weight:600;line-height:1.3;padding:0 11px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -352,7 +356,7 @@ function renderGrid(){
     return `<button class="tile ${p.stock?'':'oos'}" data-pid="${p.id}" onclick="tapTile('${p.id}')">
       ${p.stock?'':'<span class="oos-lbl">НЕТ</span>'}
       ${q?`<span class="qbadge">${q}</span>`:''}
-      <div class="timg">${p.img?`<img src="${p.img}" loading="lazy" onerror="this.outerHTML='<span class=ph>🍾</span>'">`:'<span class="ph">🍾</span>'}</div>
+      <div class="timg">${p.img?`<img src="${p.img}" loading="lazy" onerror="this.outerHTML='<span class=ph>🍾</span>'">`:'<span class="ph">🍾</span>'}${q?'<div class="tstep"><span class="ts-b" data-d="-1">−</span><span class="ts-b" data-d="1">+</span></div>':''}</div>
       <div class="nm">${p.name}</div>${price}
     </button>`;
   }).join('') || '<div style="grid-column:1/-1;padding:30px;text-align:center;color:var(--muted)">Ничего не найдено</div>';
@@ -369,7 +373,34 @@ function syncBadges(){
       if(b) b.textContent = q;
       else { b=document.createElement('span'); b.className='qbadge'; b.textContent=q; t.prepend(b); }
     } else if(b) b.remove();
+    // on-card − / + stepper rides on the photo while the product is in the ticket
+    const img = t.querySelector('.timg');
+    let s = img && img.querySelector('.tstep');
+    if(q && img && !s){
+      s = document.createElement('div'); s.className='tstep';
+      s.innerHTML = '<span class="ts-b" data-d="-1">−</span><span class="ts-b" data-d="1">+</span>';
+      img.appendChild(s);
+    } else if(!q && s) s.remove();
   });
+}
+// Card steppers: capture-phase so the tile's own tap (+1) never double-fires.
+document.getElementById('grid').addEventListener('click', e=>{
+  const b = e.target.closest && e.target.closest('.ts-b');
+  if(!b) return;
+  e.stopPropagation(); e.preventDefault();
+  const tile = b.closest('.tile');
+  if(tile) tileStep(tile.dataset.pid, +b.dataset.d);
+}, true);
+function tileStep(pid, d){
+  const p = CATALOG.find(x=>x.id===pid); if(!p) return;
+  haptic('light');
+  if(!p.isBeer){ addLine(pid, null, d); return; }
+  if(d>0){ tapTile(pid); return; }               // beer +: pick the pack size again
+  // beer −: decrement the most recently added pack line of this product
+  const keys = Object.keys(TICKET).filter(k=>TICKET[k].id===pid);
+  if(!keys.length) return;
+  const l = TICKET[keys[keys.length-1]];
+  addLine(pid, l.pcs||null, -1);
 }
 
 // ── ticket ops ──

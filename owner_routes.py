@@ -869,11 +869,14 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
         log.warning("[owner-notif] OWNER_BOT_TOKEN empty — skipping new-order notify")
         return
 
-    if prepaid:
-        # CRYPTO-PAID → notify EVERY owner/manager, ignoring tier filters + quiet.
+    if prepaid or manual:
+        # CRYPTO (money already on the wallet) and MANUAL phone-in orders reach EVERY
+        # owner/manager, ignoring tier filters + quiet hours — a manual order once
+        # slipped past tier prefs unseen; the owner wants 100% visibility on them.
         head = ("💎 Очень крупный заказ" if total >= 1000
                 else ("💰 Крупный заказ" if total >= 500 else "🆕 Новый заказ"))
-        crypto_text = f"*{head} #{oid}* · 💳 КРИПТА\n\n{base}"
+        tag = " · 💳 КРИПТА" if prepaid else ""
+        force_text = f"*{head} #{oid}*{tag}\n\n{base}"
         try:
             recipients = set(await db.get_all_manager_ids())
         except Exception as e:
@@ -881,12 +884,15 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
             recipients = set()
         if founder_id:
             recipients.add(founder_id)
-        log.info(f"[owner-notif] CRYPTO order #{oid} → force {len(recipients)} owners: {recipients}")
+        kind = "CRYPTO" if prepaid else "MANUAL"
+        log.info(f"[owner-notif] {kind} order #{oid} → force {len(recipients)} owners: {recipients}")
         for uid_sub in recipients:
             try:
-                await tg_send(OWNER_BOT_TOKEN, uid_sub, crypto_text, parse_mode="Markdown")
+                r = await tg_send(OWNER_BOT_TOKEN, uid_sub, force_text, parse_mode="Markdown")
+                if not r or not r.get("ok"):
+                    log.error(f"[owner-notif] {kind} new-order → {uid_sub} REJECTED: {r}")
             except Exception as e:
-                log.error(f"[owner-notif] crypto new-order → {uid_sub} failed: {e}")
+                log.error(f"[owner-notif] {kind} new-order → {uid_sub} failed: {e}")
     else:
         # Normal: one message per user at their highest subscribed tier.
         all_subs = {}
@@ -903,7 +909,9 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
         tier_text = {ek: txt for ek, txt in tiers}
         for uid_sub, event_key in all_subs.items():
             try:
-                await tg_send(OWNER_BOT_TOKEN, uid_sub, tier_text[event_key], parse_mode="Markdown")
+                r = await tg_send(OWNER_BOT_TOKEN, uid_sub, tier_text[event_key], parse_mode="Markdown")
+                if not r or not r.get("ok"):
+                    log.error(f"[owner-notif] new-order {event_key} → {uid_sub} REJECTED: {r}")
             except Exception as e:
                 log.error(f"[owner-notif] new-order {event_key} → {uid_sub} failed: {e}")
 

@@ -153,6 +153,7 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .pack-btn .n{font-size:16px;font-weight:700}
 .pack-btn .p{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:var(--gold2)}
 
+.copy-pre{background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:14px;font-family:inherit;font-size:13.5px;line-height:1.55;white-space:pre-wrap;word-break:break-word;max-height:52vh;overflow-y:auto;-webkit-overflow-scrolling:touch;margin-bottom:14px;user-select:text;-webkit-user-select:text}
 #gate{position:fixed;inset:0;z-index:200;background:var(--bg);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:14px;text-align:center;padding:30px}
 #gate .logo{font-family:'Cormorant Garamond',serif;font-size:34px;letter-spacing:10px;color:var(--gold2)}
 #gate .msg{font-size:14px;color:var(--sub);line-height:1.6;max-width:420px}
@@ -260,6 +261,18 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
     <div class="btns">
       <button class="sbtn" onclick="hideOv('actOv')">Назад</button>
       <button class="sbtn" id="actGo">Да</button>
+    </div>
+  </div>
+</div>
+
+<!-- driver text — the exact order card, one-tap copy -->
+<div class="ov" id="copyOv">
+  <div class="sheet" style="width:min(500px,94vw)">
+    <div class="t">📋 Текст заказа — для водителя</div>
+    <pre class="copy-pre" id="copyText"></pre>
+    <div class="btns">
+      <button class="sbtn" style="flex:1" onclick="hideOv('copyOv')">Закрыть</button>
+      <button class="sbtn gold" style="flex:2" onclick="copyOrderText()">📋 Скопировать</button>
     </div>
   </div>
 </div>
@@ -516,16 +529,23 @@ async function doCreate(){
     office_id: curOffice,
   };
   try{
+    let newOid = null;
     if(editingOid){
       await opApi.opFetch('/api/operator/orders/'+editingOid, {method:'PATCH', body});
       toast('✅ Заказ #'+editingOid+' обновлён','ok');
     } else {
       const r = await opApi.opFetch('/api/operator/orders', {method:'POST', body});
       toast('✅ Заказ #'+r.order_id+' создан — в пути','ok');
+      newOid = r.order_id;
     }
     haptic('heavy');
     clearTicket(false);
     await loadOrders();
+    if(newOid){
+      // straight to Заказы so the fresh order is on screen, with the driver text ready to copy
+      if(!showOrders) toggleOrders(); else renderOrders();
+      showOrderText(newOid);
+    }
   }catch(e){
     const err=(e.payload&&e.payload.error)||('код '+(e.status||'сеть'));
     toast('Ошибка: '+err,'err');
@@ -561,10 +581,12 @@ function renderOrders(){
     const items = (o.items||[]).map(i=>`${i.name} ×${i.qty}`).join(' · ');
     const acts = o.status==='approved' ? `
       <div class="acts">
+        <button class="oact" onclick="showOrderText('${o.order_id}')">📋 Текст</button>
         <button class="oact deliver" onclick="askAct('${o.order_id}','delivered')">✅ Доставлен</button>
         <button class="oact edit" onclick="startEdit('${o.order_id}')">✏️ Изменить</button>
         <button class="oact cancel" onclick="askAct('${o.order_id}','cancel')">🚫 Отменить</button>
-      </div>` : '';
+      </div>` : `
+      <div class="acts"><button class="oact" onclick="showOrderText('${o.order_id}')">📋 Текст</button></div>`;
     return `<div class="ocard">
       <div class="top">
         <span class="oid">#${o.order_id}</span>
@@ -596,6 +618,39 @@ function startEdit(oid){
   toast('Заказ #'+oid+' загружен в чек для правки');
   haptic('medium');
 }
+// ── driver text: the order card as plain text, one-tap copy ──
+function _orderText(o){
+  const items=(o.items||[]).map(i=>`  • ${i.name} ×${i.qty} = ${(i.price||0)*(i.qty||1)} AED`).join('\n');
+  return `🏢 Офис: ${o.office_name||'—'}\n\n`+
+         `🆕 НОВЫЙ ЗАКАЗ #${o.order_id}\n\n`+
+         `👤 ${o.customer_name||'—'} · 📱 ${o.phone||'—'}\n`+
+         `🏠 Адрес: ${o.address||'—'}\n\n`+
+         `🛒 Позиции:\n${items}\n\n`+
+         `💰 Итого: ${o.total} AED`+
+         (o.comment?`\n\n💬 Комментарий: ${o.comment}`:'');
+}
+function showOrderText(oid){
+  const o = ORDERS.find(x=>x.order_id===oid); if(!o) return;
+  $('copyText').textContent = _orderText(o);
+  showOv('copyOv'); haptic('light');
+}
+async function _copy(t){
+  try{ await navigator.clipboard.writeText(t); return true; }
+  catch(e){
+    try{
+      const ta=document.createElement('textarea'); ta.value=t;
+      ta.style.position='fixed'; ta.style.opacity='0';
+      document.body.appendChild(ta); ta.select();
+      const ok=document.execCommand('copy'); ta.remove(); return ok;
+    }catch(_){ return false; }
+  }
+}
+async function copyOrderText(){
+  const ok = await _copy($('copyText').textContent);
+  if(ok){ toast('✅ Скопировано — отправьте водителю','ok'); haptic('heavy'); hideOv('copyOv'); }
+  else toast('Не удалось — выделите текст вручную','err');
+}
+
 function askAct(oid, act){
   const isDel = act==='delivered';
   $('actT').textContent = (isDel?'✅ Доставлен?':'🚫 Отменить заказ?')+' #'+oid;

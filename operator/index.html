@@ -16,7 +16,8 @@
   --text:#EDE9E0;--sub:#9896AA;--muted:#54526A;
   --up:#4CAF7D;--dn:#E05555;--info:#5B8DEF;--warn:#F3B44A;
   --r:18px;--r2:14px;--r3:10px;--e1:cubic-bezier(.25,.8,.25,1);
-  --safe-top:env(safe-area-inset-top,0px);--safe-bottom:env(safe-area-inset-bottom,0px);
+  --safe-top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + var(--tg-content-safe-area-inset-top,0px));
+  --safe-bottom:calc(var(--tg-safe-area-inset-bottom,0px) + env(safe-area-inset-bottom,0px));
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden}
@@ -242,7 +243,14 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 
 <script>
 const tg = window.Telegram && window.Telegram.WebApp;
-try{ tg.ready(); tg.expand(); tg.setHeaderColor('#000006'); tg.setBackgroundColor('#000006'); tg.disableVerticalSwipes && tg.disableVerticalSwipes(); }catch(e){}
+try{
+  tg.ready(); tg.expand();
+  // True fullscreen (no Telegram chrome) on Bot API 8+ — same as the owner app.
+  if(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0') && tg.requestFullscreen) tg.requestFullscreen();
+  tg.setHeaderColor('#000006'); tg.setBackgroundColor('#000006');
+  tg.enableClosingConfirmation && tg.enableClosingConfirmation();
+  tg.disableVerticalSwipes && tg.disableVerticalSwipes();
+}catch(e){}
 
 // ── state ──
 let CATALOG=[], CATS=[], curCat='Все', search='';

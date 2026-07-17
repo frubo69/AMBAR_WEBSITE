@@ -338,13 +338,27 @@ function renderGrid(){
     const price = p.isBeer
       ? `<div class="pr">${p.pack12} <small>/ ×12</small></div><div class="beer-tag">УПАКОВКИ ×12 · ×24</div>`
       : `<div class="pr">${p.price} <small>AED</small></div>`;
-    return `<button class="tile ${p.stock?'':'oos'}" onclick="tapTile('${p.id}')">
+    return `<button class="tile ${p.stock?'':'oos'}" data-pid="${p.id}" onclick="tapTile('${p.id}')">
       ${p.stock?'':'<span class="oos-lbl">НЕТ</span>'}
       ${q?`<span class="qbadge">${q}</span>`:''}
       <div class="timg">${p.img?`<img src="${p.img}" loading="lazy" onerror="this.outerHTML='<span class=ph>🍾</span>'">`:'<span class="ph">🍾</span>'}</div>
       <div class="nm">${p.name}</div>${price}
     </button>`;
   }).join('') || '<div style="grid-column:1/-1;padding:30px;text-align:center;color:var(--muted)">Ничего не найдено</div>';
+}
+
+// Update qty badges on the visible tiles WITHOUT rebuilding the grid — a full
+// renderGrid() recreates every <img>, which makes all product photos reload
+// on each +1. Full rebuilds are reserved for category/search changes.
+function syncBadges(){
+  document.querySelectorAll('.tile[data-pid]').forEach(t=>{
+    const q = ticketQtyFor(t.dataset.pid);
+    let b = t.querySelector('.qbadge');
+    if(q){
+      if(b) b.textContent = q;
+      else { b=document.createElement('span'); b.className='qbadge'; b.textContent=q; t.prepend(b); }
+    } else if(b) b.remove();
+  });
 }
 
 // ── ticket ops ──
@@ -370,7 +384,7 @@ function addLine(pid, pcs, d){
   const cur = TICKET[key] || {id:pid, pcs:pcs||undefined, qty:0};
   cur.qty += d;
   if(cur.qty<=0) delete TICKET[key]; else TICKET[key]=cur;
-  renderTicket(); renderGrid();
+  renderTicket(); syncBadges();
 }
 function lineUnit(l){
   const p = CATALOG.find(x=>x.id===l.id); if(!p) return 0;
@@ -410,7 +424,7 @@ function clearTicket(confirmIt){
   $('createBtn').textContent='📞 Создать заказ';
   $('createBtn').classList.remove('save');
   $('cName').value=''; $('cPhone').value=''; $('cAddr').value=''; $('cComment').value='';
-  renderTicket(); renderGrid();
+  renderTicket(); syncBadges();
 }
 
 // ── create / save ──
@@ -516,7 +530,7 @@ function startEdit(oid){
   $('createBtn').textContent='💾 Сохранить изменения';
   $('createBtn').classList.add('save');
   if(showOrders) toggleOrders();
-  renderTicket(); renderGrid();
+  renderTicket(); syncBadges();
   toast('Заказ #'+oid+' загружен в чек для правки');
   haptic('medium');
 }

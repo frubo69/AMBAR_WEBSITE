@@ -4,6 +4,11 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
 <title>AMBAR · Операторская панель</title>
+<meta name="theme-color" content="#000006">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="AMBAR POS">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@500;600&family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
 <script src="https://telegram.org/js/telegram-web-app.js"></script>
@@ -22,12 +27,14 @@
 /* Light theme — same layout, white surfaces, darker gold for text contrast.
    Toggled by the ☀️/🌙 header button, persisted in localStorage (pos_theme). */
 body.light{
-  --gold:#B08D4F;--gold2:#8A6A2E;--gold3:#6E541F;--gold-soft:rgba(176,141,79,.16);
-  --bg:#F5F3ED;--bg2:#FFFFFF;--bg3:#FAF8F3;
-  --card:#FFFFFF;--card2:#EFEBE2;--card3:#E7E2D5;
-  --border:rgba(150,120,60,.28);--border2:rgba(20,18,10,.10);--border3:rgba(20,18,10,.18);
-  --text:#211D13;--sub:#6E6957;--muted:#9B9481;
+  --gold:#B08D4F;--gold2:#8A6A2E;--gold3:#6E541F;--gold-soft:rgba(176,141,79,.18);
+  /* canvas noticeably darker than the white windows, so cards/inputs never blend in */
+  --bg:#E7E2D4;--bg2:#EFEBDF;--bg3:#EAE5D7;
+  --card:#FFFFFF;--card2:#F4F0E6;--card3:#EAE4D4;
+  --border:rgba(150,120,60,.34);--border2:rgba(20,18,10,.17);--border3:rgba(20,18,10,.28);
+  --text:#211D13;--sub:#645F4F;--muted:#8E8874;
 }
+body.light input,body.light textarea{background:#FFFFFF;border-color:rgba(20,18,10,.22)}
 body{transition:background .25s,color .25s}
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 html,body{height:100%;overflow:hidden}
@@ -37,7 +44,7 @@ input,textarea{font-family:inherit;color:var(--text);background:var(--card);bord
 input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 
 /* ── frame ── */
-#app{display:flex;flex-direction:column;height:var(--tg-h,100%);padding-top:var(--safe-top)}
+#app{display:flex;flex-direction:column;height:100%;height:var(--tg-h,100dvh);padding-top:var(--safe-top)}
 .hdr{display:flex;align-items:center;gap:14px;padding:10px 18px;border-bottom:1px solid var(--border2);background:var(--bg2);flex-shrink:0}
 .hdr-logo{font-family:'Cormorant Garamond',serif;font-size:22px;letter-spacing:6px;color:var(--gold2)}
 .hdr-sub{font-size:10px;letter-spacing:2.5px;color:var(--muted);text-transform:uppercase;margin-top:1px}
@@ -74,7 +81,7 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
    Only the PHOTO adds on tap — the text/white zone is an inert safety area. */
 .tbot{display:flex;align-items:center;gap:6px;padding:0 8px;margin-top:6px;width:100%}
 .tinfo{flex:1;min-width:0;text-align:left}
-.tstep{display:flex;gap:6px;flex-shrink:0}
+.tstep{display:flex;gap:13px;flex-shrink:0}   /* wide gap between − and + so a rushed finger can't hit the wrong one */
 .ts-b{width:33px;height:33px;border-radius:10px;background:var(--card2);border:1px solid var(--border3);color:var(--gold2);font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;user-select:none;transition:.12s;box-shadow:0 2px 8px rgba(0,0,0,.18)}
 .ts-b:active{transform:scale(.86);background:var(--gold-soft);border-color:rgba(201,169,110,.5)}
 /* while the steppers are shown, drop the price suffix (AED / ×12) so narrow
@@ -166,7 +173,24 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .toast.ok{border-color:rgba(76,175,125,.45);color:var(--up)}
 .toast.err{border-color:rgba(224,85,85,.45);color:var(--dn)}
 
-@media (max-width:820px){ .ticket{width:300px} .rail{width:140px} }
+/* fit ANY screen: columns shrink in steps so the grid + ticket + buttons always
+   stay reachable, and compact vertical paddings on short viewports */
+@media (max-width:900px){ .ticket{width:300px} .rail{width:150px} }
+@media (max-width:760px){
+  .ticket{width:268px} .rail{width:118px}
+  .cat-btn{padding:11px 9px;font-size:13px}
+  .grid{grid-template-columns:repeat(auto-fill,minmax(126px,1fr))}
+  .hdr{gap:8px;padding:8px 12px}
+  .office-seg button{padding:6px 10px}
+}
+@media (max-height:720px){
+  .hdr{padding:6px 14px}
+  .ticket-foot{padding:8px 12px calc(8px + var(--safe-bottom))}
+  .create-btn{padding:12px}
+  .cust input,.cust textarea{padding:9px 12px}
+  .cust .lbl{margin:7px 0 4px}
+  .total-row .v{font-size:23px}
+}
 </style>
 </head>
 <body>

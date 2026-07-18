@@ -794,7 +794,7 @@ async def notify_owners(event_key: str, text: str, parse_mode: str = "Markdown",
     log.info(f"[owner-notif] {event_key} → {owner_ids}")
     for oid in owner_ids:
         try:
-            result = await tg_send(OWNER_BOT_TOKEN, oid, text, parse_mode=parse_mode)
+            result = await _send_md(OWNER_BOT_TOKEN, oid, text, parse_mode=parse_mode)
             if result and result.get("ok"):
                 sent.append({"chat_id": oid, "message_id": result["result"]["message_id"]})
             else:
@@ -821,9 +821,35 @@ async def notify_owners_force(event_key: str, text: str, parse_mode: str = "Mark
     log.info(f"[owner-notif] FORCE {event_key} → {len(ids)} owners: {ids}")
     for oid in ids:
         try:
-            await tg_send(OWNER_BOT_TOKEN, oid, text, parse_mode=parse_mode)
+            await _send_md(OWNER_BOT_TOKEN, oid, text, parse_mode=parse_mode)
         except Exception as e:
             log.error(f"[owner-notif] force {event_key} → {oid} failed: {e}")
+
+
+def _md(s) -> str:
+    """Escape Telegram legacy-Markdown specials in USER-TYPED text.
+
+    An unmatched _ * ` or [ in a customer's name, address, comment or a product
+    name makes Telegram reject the WHOLE message ("can't parse entities") — the
+    notification then vanishes silently. Every interpolated user value must go
+    through this."""
+    out = str(s if s is not None else "")
+    for ch in ("_", "*", "`", "["):
+        out = out.replace(ch, "\\" + ch)
+    return out
+
+
+async def _send_md(token, chat_id, text, parse_mode="Markdown"):
+    """Send, and if Telegram refuses to parse the entities, resend as PLAIN text.
+
+    Belt-and-braces on top of _md(): a formatting slip must never cost the owner
+    an entire notification. Returns the final Telegram response."""
+    r = await tg_send(token, chat_id, text, parse_mode=parse_mode)
+    if r and not r.get("ok") and "parse" in str(r.get("description", "")).lower():
+        log.error(f"[owner-notif] parse error → retrying plain: {r.get('description')}")
+        plain = text.replace("*", "").replace("`", "").replace("\\", "")
+        r = await tg_send(token, chat_id, plain, parse_mode=None)
+    return r
 
 
 async def notify_new_order(oid, total, user_name, phone, address, office,
@@ -834,13 +860,14 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
     Crypto-paid orders (prepaid set) ALWAYS reach every owner, bypassing the tier
     filters AND quiet hours. `manual={"operator": name}` marks a phone-in order
     punched in on the operator POS — same tier pipeline, unmistakable 📞 header."""
+    # every value below is user-typed → must be escaped or Telegram drops the message
     items_txt = "\n".join(
-        f"• {it.get('name','')} ×{it.get('qty',1)}" for it in (items or [])
+        f"• {_md(it.get('name',''))} ×{it.get('qty',1)}" for it in (items or [])
     ) or "—"
     base = (f"Сумма: *{total} AED*\n"
-            f"Клиент: {user_name} ({phone})\n"
-            f"Адрес: {address}\n"
-            f"Офис: {office}\n"
+            f"Клиент: {_md(user_name)} ({_md(phone)})\n"
+            f"Адрес: {_md(address)}\n"
+            f"Офис: {_md(office)}\n"
             f"🛒 Позиции:\n{items_txt}")
     if prepaid:
         base += (f"\n\n✅💎 *ОПЛАЧЕНО КРИПТОЙ*\n"
@@ -850,12 +877,12 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
                 "Оператор получит заказ после заполнения формы.\n\n") + base
     if manual:
         head = (f"📞 *РУЧНОЙ ЗАКАЗ — по телефону*\n"
-                f"Принял: {manual.get('operator','—')}\n")
+                f"Принял: {_md(manual.get('operator','—'))}\n")
         if manual.get("district"):
-            head += (f"📍 Район: *{manual['district']}*"
-                     f" · оператор {manual.get('dispatch_operator','—')}\n")
+            head += (f"📍 Район: *{_md(manual['district'])}*"
+                     f" · оператор {_md(manual.get('dispatch_operator','—'))}\n")
         if manual.get("driver"):
-            head += f"🚗 Водитель: *{manual['driver']}*\n"
+            head += f"🚗 Водитель: *{_md(manual['driver'])}*\n"
         base = head + "\n" + base
 
     tiers = []
@@ -897,7 +924,7 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
         log.info(f"[owner-notif] {kind} order #{oid} → force {len(recipients)} owners: {recipients}")
         for uid_sub in recipients:
             try:
-                r = await tg_send(OWNER_BOT_TOKEN, uid_sub, force_text, parse_mode="Markdown")
+                r = await _send_md(OWNER_BOT_TOKEN, uid_sub, force_text)
                 if not r or not r.get("ok"):
                     log.error(f"[owner-notif] {kind} new-order → {uid_sub} REJECTED: {r}")
             except Exception as e:
@@ -918,7 +945,7 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
         tier_text = {ek: txt for ek, txt in tiers}
         for uid_sub, event_key in all_subs.items():
             try:
-                r = await tg_send(OWNER_BOT_TOKEN, uid_sub, tier_text[event_key], parse_mode="Markdown")
+                r = await _send_md(OWNER_BOT_TOKEN, uid_sub, tier_text[event_key])
                 if not r or not r.get("ok"):
                     log.error(f"[owner-notif] new-order {event_key} → {uid_sub} REJECTED: {r}")
             except Exception as e:
@@ -1289,7 +1316,7 @@ async def _alert_owners_unauthorized(user: dict, meta: dict, log_doc: dict) -> N
     text = _format_unauthorized_alert(user, meta, log_doc)
     for oid in OWNER_IDS:
         try:
-            await tg_send(OWNER_BOT_TOKEN, oid, text, parse_mode="Markdown")
+            await _send_md(OWNER_BOT_TOKEN, oid, text)
         except Exception as e:
             log.error(f"[owner-auth] alert send to {oid} failed: {e}")
 

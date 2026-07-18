@@ -159,8 +159,10 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 #gate .msg{font-size:14px;color:var(--sub);line-height:1.6;max-width:420px}
 #gate.hidden{display:none}
 
-.toast{position:fixed;top:calc(var(--safe-top) + 14px);left:50%;transform:translateX(-50%) translateY(-90px);z-index:300;background:var(--card3);border:1px solid var(--border3);border-radius:12px;padding:12px 20px;font-size:14px;font-weight:600;box-shadow:0 10px 34px rgba(0,0,0,.6);transition:transform .3s var(--e1);max-width:80vw}
-.toast.show{transform:translateX(-50%) translateY(0)}
+/* hidden state must clear the screen for ANY safe-top — a fixed -90px left the
+   toast half-visible («stuck») in fullscreen where safe-top is large */
+.toast{position:fixed;top:calc(var(--safe-top) + 14px);left:50%;transform:translateX(-50%) translateY(calc(-100% - var(--safe-top) - 30px));opacity:0;pointer-events:none;z-index:300;background:var(--card3);border:1px solid var(--border3);border-radius:12px;padding:12px 20px;font-size:14px;font-weight:600;box-shadow:0 10px 34px rgba(0,0,0,.6);transition:transform .3s var(--e1),opacity .25s;max-width:80vw}
+.toast.show{transform:translateX(-50%) translateY(0);opacity:1}
 .toast.ok{border-color:rgba(76,175,125,.45);color:var(--up)}
 .toast.err{border-color:rgba(224,85,85,.45);color:var(--dn)}
 

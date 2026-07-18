@@ -375,6 +375,9 @@ async def handle_finance(request):
             "crypto_usdt": o.get("crypto_amount_usdt") or 0,
             "manual": bool(o.get("source") == "manual"),
             "created_by_name": o.get("created_by_name", ""),
+            "district": o.get("district", ""),
+            "dispatch_operator": o.get("dispatch_operator", ""),
+            "driver": o.get("driver", ""),
             "status": o.get("status",""),
             "ts": placed,
             "eta": o.get("eta",""),
@@ -846,8 +849,14 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
         base = ("⏳ *ОЖИДАЕТ ВЕРИФИКАЦИИ* — клиент ещё не подтверждён.\n"
                 "Оператор получит заказ после заполнения формы.\n\n") + base
     if manual:
-        base = (f"📞 *РУЧНОЙ ЗАКАЗ — по телефону*\n"
-                f"Оператор: {manual.get('operator','—')}\n\n") + base
+        head = (f"📞 *РУЧНОЙ ЗАКАЗ — по телефону*\n"
+                f"Принял: {manual.get('operator','—')}\n")
+        if manual.get("district"):
+            head += (f"📍 Район: *{manual['district']}*"
+                     f" · оператор {manual.get('dispatch_operator','—')}\n")
+        if manual.get("driver"):
+            head += f"🚗 Водитель: *{manual['driver']}*\n"
+        base = head + "\n" + base
 
     tiers = []
     if total >= 1000:

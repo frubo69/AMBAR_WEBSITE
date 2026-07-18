@@ -128,7 +128,18 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .create-btn:disabled{opacity:.4}
 .create-btn.save{background:linear-gradient(135deg,#F3B44A,#D99A2B)}
 
+/* ── dispatch chips (район / водитель) ── */
+.dchips{display:flex;flex-wrap:wrap;gap:6px}
+.dchip{padding:10px 13px;border-radius:10px;background:var(--card);border:1px solid var(--border2);font-size:13px;font-weight:600;color:var(--sub);transition:.12s}
+.dchip.on{background:var(--gold-soft);border-color:rgba(201,169,110,.55);color:var(--gold2)}
+.dchip:active{transform:scale(.94)}
+.dchips .hint{font-size:12px;color:var(--muted);padding:8px 2px}
+
 /* ── orders panel (replaces grid) ── */
+.orders-hdr{display:flex;align-items:center;gap:12px;padding:12px 14px 4px;flex-shrink:0}
+.oback{padding:10px 14px;border-radius:10px;background:var(--card2);border:1px solid var(--border2);font-size:13px;font-weight:700;color:var(--gold2);transition:.12s}
+.oback:active{transform:scale(.95);background:var(--gold-soft)}
+.oh-t{font-size:13px;color:var(--muted);font-weight:600}
 .orders-wrap{flex:1;overflow-y:auto;padding:12px 14px 20px;-webkit-overflow-scrolling:touch}
 .ocard{background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);padding:14px;margin-bottom:10px;transition:.12s}
 .ocard:active{border-color:rgba(201,169,110,.35)}
@@ -204,6 +215,7 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
     <div><div class="hdr-logo">AMBAR</div><div class="hdr-sub">Панель оператора · 📞 заказы</div></div>
     <div class="office-seg" id="officeSeg" style="display:none"></div>
     <div class="hdr-right">
+      <button class="pill" id="dispatchBtn" onclick="showOv('opOv')" style="cursor:pointer;color:var(--gold2);border-color:rgba(201,169,110,.4)">👤 Оператор</button>
       <button class="pill" id="themeBtn" onclick="toggleTheme()" aria-label="Тема" style="cursor:pointer">☀️</button>
       <span class="pill" id="opName">—</span>
       <span class="pill" id="netPill">…</span>
@@ -226,6 +238,10 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
     <div class="center">
       <div class="search-row" id="searchRow"><input type="search" id="searchIn" placeholder="Поиск по названию…" autocomplete="off"></div>
       <div class="grid-wrap" id="gridWrap"><div class="grid" id="grid"></div></div>
+      <div class="orders-hdr" id="ordersHdr" style="display:none">
+        <button class="oback" onclick="toggleOrders()">← Назад к товарам</button>
+        <span class="oh-t">Заказы за сегодня</span>
+      </div>
       <div class="orders-wrap" id="ordersWrap" style="display:none"></div>
     </div>
 
@@ -239,6 +255,8 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
       <div class="ticket-scroll">
         <div id="tlines"><div class="ticket-empty">Нажимайте на товары слева,<br>чтобы собрать заказ</div></div>
         <div class="cust">
+          <div class="lbl">Район *</div>
+          <div class="dchips" id="distChips"></div>
           <div class="lbl">Клиент · по телефону</div>
           <div class="lbl" style="margin-top:6px">Имя *</div>
           <input id="cName" placeholder="Имя клиента" autocomplete="off" enterkeyhint="next">
@@ -248,6 +266,8 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
           <textarea id="cAddr" rows="2" placeholder="Район, здание, квартира…" enterkeyhint="next"></textarea>
           <div class="lbl">Комментарий</div>
           <input id="cComment" placeholder="Домофон, этаж, пожелания…" autocomplete="off" enterkeyhint="done">
+          <div class="lbl">🚗 Водитель *</div>
+          <div class="dchips" id="drvChips"></div>
         </div>
       </div>
       <div class="ticket-foot">
@@ -255,6 +275,16 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
         <button class="create-btn" id="createBtn" onclick="askCreate()">📞 Создать заказ</button>
       </div>
     </div>
+  </div>
+</div>
+
+<!-- who is taking orders right now -->
+<div class="ov" id="opOv">
+  <div class="sheet">
+    <div class="t">👤 Кто принимает заказы?</div>
+    <div class="s">Выберите себя — районы и водители подставятся автоматически</div>
+    <div id="opList"></div>
+    <div class="btns"><button class="sbtn" onclick="hideOv('opOv')">Закрыть</button></div>
   </div>
 </div>
 
@@ -335,6 +365,8 @@ let CATALOG=[], CATS=[], curCat='Все', search='';
 let TICKET={};                  // key = id or id_pcs → {id, pcs, qty}
 let OFFICES=[], curOffice='';
 let ORDERS=[], showOrders=false, editingOid=null, _pollT=null, _pendingBeer=null;
+// dispatch: who's taking calls (session) → район (per order) → водитель (per order)
+let DISTRICTS=[], curOp='', curDist='', curDriver='';
 
 const $=id=>document.getElementById(id);
 function toast(msg, cls){ const t=$('toast'); t.textContent=msg; t.className='toast show '+(cls||''); clearTimeout(t._h); t._h=setTimeout(()=>t.className='toast',2600); }
@@ -350,6 +382,10 @@ async function boot(){
     OFFICES = r.offices || [];
     curOffice = (OFFICES[0]||{}).id || '';
     renderOffices();
+    DISTRICTS = r.districts || [];
+    try{ curOp = localStorage.getItem('pos_op') || ''; }catch(e){}
+    if(!DISTRICTS.some(d=>d.operator===curOp)) curOp='';
+    renderDispatch();
     $('netPill').textContent='● online'; $('netPill').className='pill ok';
     $('gate').classList.add('hidden');
     await loadCatalog();
@@ -372,6 +408,51 @@ function renderOffices(){
   seg.innerHTML = OFFICES.map(o=>`<button class="${o.id===curOffice?'on':''}" onclick="pickOffice('${o.id}')">${o.name.replace('Ambar ','')}</button>`).join('');
 }
 function pickOffice(id){ curOffice=id; renderOffices(); haptic('sel'); }
+
+// ── dispatch: оператор → район → водитель ──
+function _ops(){ return [...new Set(DISTRICTS.map(d=>d.operator))]; }
+function _myDists(){ return DISTRICTS.filter(d=>d.operator===curOp); }
+function _dist(id){ return DISTRICTS.find(d=>d.id===id); }
+function renderDispatch(){
+  // header chip
+  const b=$('dispatchBtn');
+  if(b) b.textContent = curOp ? ('👤 '+curOp) : '👤 Выберите оператора';
+  // operator sheet
+  const ol=$('opList');
+  if(ol) ol.innerHTML = _ops().map(op=>{
+    const ds = DISTRICTS.filter(d=>d.operator===op).map(d=>d.name).join(' · ');
+    return `<button class="pack-btn" onclick="pickOp('${op}')" style="${op===curOp?'border-color:rgba(201,169,110,.5)':''}">
+      <span style="text-align:left"><span class="n">${op}</span><br><span style="font-size:11.5px;color:var(--muted)">${ds}</span></span>
+      ${op===curOp?'<span class="p">✓</span>':''}</button>`;
+  }).join('');
+  // район chips (only this operator's)
+  const dc=$('distChips');
+  if(dc){
+    const mine=_myDists();
+    dc.innerHTML = !curOp
+      ? '<div class="hint">Сначала выберите оператора вверху →</div>'
+      : mine.map(d=>`<button class="dchip ${d.id===curDist?'on':''}" onclick="pickDist('${d.id}')">${d.name}</button>`).join('');
+    if(curOp && mine.length===1 && !curDist) curDist=mine[0].id;   // single район → auto
+  }
+  renderDrivers();
+}
+function renderDrivers(){
+  const dv=$('drvChips'); if(!dv) return;
+  const d=_dist(curDist);
+  dv.innerHTML = !d
+    ? '<div class="hint">Выберите район — появятся водители</div>'
+    : d.drivers.map(n=>`<button class="dchip ${n===curDriver?'on':''}" onclick="pickDriver('${n}')">${n}</button>`).join('');
+}
+function pickOp(op){
+  curOp=op; try{ localStorage.setItem('pos_op',op); }catch(e){}
+  curDist=''; curDriver='';
+  renderDispatch(); hideOv('opOv'); haptic('sel');
+}
+function pickDist(id){
+  if(curDist!==id) curDriver='';        // drivers belong to the район
+  curDist=id; renderDispatch(); haptic('sel');
+}
+function pickDriver(n){ curDriver=n; renderDrivers(); haptic('sel'); }
 
 // ── catalog ──
 async function loadCatalog(){
@@ -524,6 +605,8 @@ function clearTicket(confirmIt){
   $('createBtn').textContent='📞 Создать заказ';
   $('createBtn').classList.remove('save');
   $('cName').value=''; $('cPhone').value=''; $('cAddr').value=''; $('cComment').value='';
+  curDist=''; curDriver='';          // район/водитель are per-order; оператор stays for the shift
+  renderDispatch();
   renderTicket(); syncBadges();
 }
 
@@ -539,10 +622,13 @@ function askCreate(){
   if(!name){ toast('Укажите имя клиента','err'); $('cName').focus(); haptic('medium'); return; }
   if(phone.replace(/\D/g,'').length < 7){ toast('Укажите телефон клиента','err'); $('cPhone').focus(); haptic('medium'); return; }
   if(!addr){ toast('Укажите адрес доставки','err'); $('cAddr').focus(); haptic('medium'); return; }
+  if(!curOp){ toast('Выберите оператора вверху','err'); showOv('opOv'); haptic('medium'); return; }
+  if(!curDist){ toast('Выберите район','err'); $('distChips').scrollIntoView({block:'center'}); haptic('medium'); return; }
+  if(!curDriver){ toast('Выберите водителя','err'); $('drvChips').scrollIntoView({block:'center'}); haptic('medium'); return; }
   const total = $('totalV').textContent;
-  const offName = (OFFICES.find(o=>o.id===curOffice)||{}).name||'';
+  const d=_dist(curDist);
   $('confT').textContent = editingOid ? `Сохранить изменения #${editingOid}?` : 'Создать заказ?';
-  $('confS').innerHTML = `💰 <b>${total} AED</b> · ${offName}<br>📱 ${phone}${editingOid?'':'<br><br>Заказ сразу уйдёт в работу («в пути»), время не указывается.'}`;
+  $('confS').innerHTML = `💰 <b>${total} AED</b><br>📍 ${d.name} · оператор ${d.operator}<br>🚗 Водитель: <b>${curDriver}</b>${editingOid?'':'<br><br>Заказ сразу уйдёт в работу («в пути»), время не указывается.'}`;
   $('confGo').textContent = editingOid ? 'Сохранить' : 'Создать';
   showOv('confirmOv'); haptic('medium');
 }
@@ -556,6 +642,8 @@ async function doCreate(){
     address: $('cAddr').value.trim(),
     comment: $('cComment').value.trim(),
     office_id: curOffice,
+    district_id: curDist,
+    driver: curDriver,
   };
   try{
     let newOid = null;
@@ -589,6 +677,7 @@ function toggleOrders(){
   $('gridWrap').style.display = showOrders?'none':'';
   $('searchRow').style.display = showOrders?'none':'';
   $('ordersWrap').style.display = showOrders?'':'none';
+  $('ordersHdr').style.display = showOrders?'flex':'none';
   if(showOrders) loadOrders();
   haptic('sel');
 }
@@ -624,6 +713,7 @@ function renderOrders(){
         <span class="sum">${o.total} <small style="font-size:11px;color:var(--muted)">AED</small></span>
       </div>
       <div class="who">👤 ${o.customer_name||'—'} · 📱 ${o.phone||'—'}${o.address?' · 🏠 '+o.address:''}</div>
+      ${o.district?`<div class="who" style="color:var(--gold2)">📍 ${o.district}${o.driver?' · 🚗 '+o.driver:''}</div>`:''}
       <div class="items">${items}</div>
       ${acts}
     </div>`;
@@ -639,6 +729,11 @@ function startEdit(oid){
   editingOid=oid;
   $('cName').value=o.customer_name||'';
   $('cPhone').value=o.phone||''; $('cAddr').value=o.address||''; $('cComment').value=o.comment||'';
+  if(o.district_id && _dist(o.district_id)){
+    curDist=o.district_id; curDriver=o.driver||'';
+    if(o.dispatch_operator){ curOp=o.dispatch_operator; try{ localStorage.setItem('pos_op',curOp); }catch(e){} }
+  }
+  renderDispatch();
   $('editTag').style.display='';
   $('createBtn').textContent='💾 Сохранить изменения';
   $('createBtn').classList.add('save');
@@ -648,11 +743,17 @@ function startEdit(oid){
   haptic('medium');
 }
 // ── driver text: the order card as plain text, one-tap copy ──
+// Text handed to the driver. Customer phone is deliberately NOT included.
 function _orderText(o){
   const items=(o.items||[]).map(i=>`  • ${i.name} ×${i.qty} = ${(i.price||0)*(i.qty||1)} AED`).join('\n');
-  return `🏢 Офис: ${o.office_name||'—'}\n\n`+
+  const disp = o.district
+    ? `📍 Район: ${o.district}${o.dispatch_operator?` · Оператор: ${o.dispatch_operator}`:''}\n`+
+      (o.driver?`🚗 Водитель: ${o.driver}\n`:'')
+    : '';
+  return `🏢 Офис: ${o.office_name||'—'}\n`+
+         disp+`\n`+
          `🆕 НОВЫЙ ЗАКАЗ #${o.order_id}\n\n`+
-         `👤 ${o.customer_name||'—'} · 📱 ${o.phone||'—'}\n`+
+         `👤 ${o.customer_name||'—'}\n`+
          `🏠 Адрес: ${o.address||'—'}\n\n`+
          `🛒 Позиции:\n${items}\n\n`+
          `💰 Итого: ${o.total} AED`+

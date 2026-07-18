@@ -43,6 +43,20 @@ OFFICE_NAMES = {
     "office_south":   "Ambar South",
 }
 
+# Dispatch structure: район → who takes the calls → who drives it.
+# The POS flow is operator → район (his own) → driver (that район's).
+DISTRICTS = [
+    {"id": "jvc",     "name": "JVC",        "operator": "Умар",      "drivers": ["Худоба", "Фарух"]},
+    {"id": "tecom",   "name": "Тиком",      "operator": "Умар",      "drivers": ["Файзуло", "Алишер"]},
+    {"id": "bbay",    "name": "Бизнес Бей", "operator": "Джанлбиль", "drivers": ["Парвиз", "Авазбек", "Бахадыр"]},
+    {"id": "silicon", "name": "Силикон",    "operator": "Фарух",     "drivers": ["Фаредун", "Азиз"]},
+    {"id": "alguses", "name": "Алгусес",    "operator": "Фарух",     "drivers": ["Сунат", "Даврон"]},
+]
+
+
+def _district(did: str) -> dict | None:
+    return next((d for d in DISTRICTS if d["id"] == did), None)
+
 DUBAI_TZ = timezone(timedelta(hours=4))
 
 _CATALOG_FILE = Path(__file__).parent / "catalog.json"
@@ -190,6 +204,8 @@ def _card_html(order: dict) -> str:
         f"{head} · <b>#{order['order_id']}</b>",
         "",
         f"🏢 Офис: <b>{_esc(order.get('office_name','—'))}</b>",
+        (f"📍 Район: <b>{_esc(order.get('district','—'))}</b> · Оператор: {_esc(order.get('dispatch_operator','—'))}\n"
+         f"🚗 Водитель: <b>{_esc(order.get('driver','—'))}</b>" if order.get("district") else ""),
         f"👤 {_esc(order.get('customer_name','—'))} · 📱 {_esc(order.get('phone','—'))}",
         f"🏠 Адрес: {_esc(order.get('address') or '—')}",
         "",
@@ -274,6 +290,10 @@ def _summary(o: dict) -> dict:
         "comment": o.get("comment", ""),
         "office_id": o.get("office_id", ""),
         "office_name": o.get("office_name", ""),
+        "district_id": o.get("district_id", ""),
+        "district": o.get("district", ""),
+        "dispatch_operator": o.get("dispatch_operator", ""),
+        "driver": o.get("driver", ""),
         "total": o.get("total", 0),
         "items": [{"id": i.get("id"), "name": i.get("name"), "qty": i.get("qty", 1),
                    "price": i.get("price", 0), "pcs": i.get("pcs")}
@@ -292,6 +312,7 @@ async def handle_ping(request):
         "ok": True,
         "operator": _op_name(request["op_user"]),
         "offices": [{"id": o, "name": OFFICE_NAMES.get(o, o)} for o in offs],
+        "districts": DISTRICTS,
         "server_time": datetime.now(timezone.utc).isoformat(),
     }, headers=CORS_HEADERS)
 
@@ -341,6 +362,14 @@ async def handle_create(request):
         return web.json_response({"error": "address_required"}, status=400, headers=CORS_HEADERS)
     phone = "+" + phone.lstrip("+")
 
+    # Dispatch: район (carries its оператор) + which of its drivers takes it.
+    dist = _district(str(body.get("district_id", "")).strip())
+    driver = str(body.get("driver", "")).strip()
+    if not dist:
+        return web.json_response({"error": "district_required"}, status=400, headers=CORS_HEADERS)
+    if driver not in dist["drivers"]:
+        return web.json_response({"error": "driver_required"}, status=400, headers=CORS_HEADERS)
+
     items, err = _build_items(body.get("items"))
     if err:
         return web.json_response({"error": err}, status=400, headers=CORS_HEADERS)
@@ -371,6 +400,11 @@ async def handle_create(request):
         "office_id": office_id,
         "office_name": OFFICE_NAMES.get(office_id, office_id),
         "comment": str(body.get("comment", "")).strip(),
+        # dispatch
+        "district_id": dist["id"],
+        "district": dist["name"],
+        "dispatch_operator": dist["operator"],
+        "driver": driver,
         # Accepted at creation — the operator on the phone IS the acceptor.
         # Deliberately NO eta / deliver_by: timing stays verbal (owner's call).
         "status": "approved",
@@ -395,7 +429,11 @@ async def handle_create(request):
         await notify_new_order(order["order_id"], total, order["customer_name"],
                                phone, order["address"] or "—", order["office_name"],
                                0, _FOUNDER_ID, _PREMIUM_IDS, _WORLDWIDE_IDS,
-                               items=items, manual={"operator": op_display})
+                               items=items,
+                               manual={"operator": op_display,
+                                       "district": dist["name"],
+                                       "dispatch_operator": dist["operator"],
+                                       "driver": driver})
     except Exception as e:
         log.error(f"[pos] owner notify failed: {e}")
 
@@ -461,6 +499,16 @@ async def handle_patch(request):
         items_changed = _items_sig(items) != _items_sig(order.get("items"))
         upd.update(items=items, item_lines=_item_lines(items),
                    subtotal=total, total=total)
+    # dispatch changes (район carries its operator; driver must belong to it)
+    if "district_id" in body or "driver" in body:
+        dist = _district(str(body.get("district_id", order.get("district_id", ""))).strip())
+        driver = str(body.get("driver", order.get("driver", ""))).strip()
+        if not dist:
+            return web.json_response({"error": "district_required"}, status=400, headers=CORS_HEADERS)
+        if driver not in dist["drivers"]:
+            return web.json_response({"error": "driver_required"}, status=400, headers=CORS_HEADERS)
+        upd.update(district_id=dist["id"], district=dist["name"],
+                   dispatch_operator=dist["operator"], driver=driver)
     for f in ("customer_name", "phone", "address", "comment"):
         if f in body:
             v = str(body.get(f, "")).strip()

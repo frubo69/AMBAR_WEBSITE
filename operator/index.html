@@ -746,9 +746,9 @@ function startEdit(oid){
 // Text handed to the driver. Customer phone is deliberately NOT included.
 function _orderText(o){
   const items=(o.items||[]).map(i=>`  • ${i.name} ×${i.qty} = ${(i.price||0)*(i.qty||1)} AED`).join('\n');
+  // no оператор here — the driver doesn't need to know who took the call
   const disp = o.district
-    ? `📍 Район: ${o.district}${o.dispatch_operator?` · Оператор: ${o.dispatch_operator}`:''}\n`+
-      (o.driver?`🚗 Водитель: ${o.driver}\n`:'')
+    ? `📍 Район: ${o.district}\n` + (o.driver?`🚗 Водитель: ${o.driver}\n`:'')
     : '';
   return `🏢 Офис: ${o.office_name||'—'}\n`+
          disp+`\n`+

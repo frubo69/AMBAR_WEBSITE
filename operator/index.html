@@ -176,6 +176,7 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
     <div><div class="hdr-logo">AMBAR</div><div class="hdr-sub">Панель оператора · 📞 заказы</div></div>
     <div class="office-seg" id="officeSeg" style="display:none"></div>
     <div class="hdr-right">
+      <button class="pill" id="fsBtn" onclick="goFS()" style="cursor:pointer;display:none;color:var(--gold2)">⛶ Развернуть</button>
       <button class="pill" id="themeBtn" onclick="toggleTheme()" aria-label="Тема" style="cursor:pointer">☀️</button>
       <span class="pill" id="opName">—</span>
       <span class="pill" id="netPill">…</span>
@@ -288,7 +289,19 @@ try{
   // times until isFullscreen flips (or the client reports it unsupported).
   const wantFS=()=>{ try{ if(tg.requestFullscreen && !tg.isFullscreen) tg.requestFullscreen(); }catch(e){} };
   wantFS(); setTimeout(wantFS,300); setTimeout(wantFS,1000); setTimeout(wantFS,2500);
-  tg.onEvent && tg.onEvent('fullscreenFailed', e=>console.warn('fullscreen failed:', e && e.error));
+  // If fullscreen doesn't engage, surface a manual ⛶ button (tap = user-gesture
+  // request, some clients demand that) and say WHY it failed — the space around a
+  // windowed mini app is Telegram's own UI, no page can paint it.
+  tg.onEvent && tg.onEvent('fullscreenChanged', ()=>_fsSync&&_fsSync());
+  tg.onEvent && tg.onEvent('fullscreenFailed', e=>{
+    console.warn('fullscreen failed:', e && e.error);
+    _fsSync && _fsSync();
+    if(!window.__fsWarned){
+      window.__fsWarned = true;
+      setTimeout(()=>toast(`Полный экран недоступен: ${(e&&e.error)||'?'} · Telegram ${tg.version||'?'} ${tg.platform||''}`,'err'), 600);
+    }
+  });
+  setTimeout(()=>_fsSync&&_fsSync(), 900);
   tg.setHeaderColor('#000006'); tg.setBackgroundColor('#000006');
   // The home-indicator strip has its OWN color (Bot API 7.10+) — without this it
   // shows as a thin off-color line at the very bottom of the screen.
@@ -671,6 +684,14 @@ function askAct(oid, act){
 }
 
 document.querySelectorAll('.ov').forEach(ov=>ov.addEventListener('click',e=>{ if(e.target===ov) ov.classList.remove('show'); }));
+
+// ── fullscreen: manual ⛶ (tap carries the user gesture some clients require) ──
+function goFS(){ try{ tg.requestFullscreen && tg.requestFullscreen(); }catch(e){} haptic('light'); }
+function _fsSync(){
+  const b=$('fsBtn'); if(!b) return;
+  const can = tg && tg.requestFullscreen && (tg.isVersionAtLeast ? tg.isVersionAtLeast('8.0') : true);
+  b.style.display = (can && !tg.isFullscreen) ? '' : 'none';
+}
 
 // ── theme (dark ⇄ light) ──
 function applyTheme(t){

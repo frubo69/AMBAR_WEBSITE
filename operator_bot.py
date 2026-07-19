@@ -471,6 +471,10 @@ async def order_card(o, full=True):
         lines.append("<blockquote>✅💎 <b>ОПЛАЧЕНО КРИПТОЙ</b>\n"
                      f"{o.get('crypto_amount_usdt', '?')} USDT · TRC-20 — наличные НЕ брать</blockquote>")
         lines.append("")
+    elif o.get("payment_method") == "debt":
+        lines.append("<blockquote>📒 <b>ОПЛАТА: В ДОЛГ</b> — наличные НЕ брать,\n"
+                     "сумма заказа записывается в долг клиента</blockquote>")
+        lines.append("")
     lines.append(f"🆕 <b>НОВЫЙ ЗАКАЗ #{o['order_id']}</b>")
     lines.append("")
     if full:
@@ -930,6 +934,10 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         # the courier must NOT have collected cash for it.
         crypto_rev = sum(o.get("total",0) for o in deliv
                          if o.get("payment_method")=="crypto" and o.get("paid"))
+        # В ДОЛГ goes out without money changing hands — split it out so the
+        # cash line matches what's actually in the courier's pocket.
+        debt_rev = sum(o.get("total",0) for o in deliv
+                       if o.get("payment_method")=="debt")
         await send(cid,
             f"📊 *Статистика сегодня — {today}*\n\n"
             f"🆕 Новых: *{len([o for o in tod if o.get('status')=='pending'])}*\n"
@@ -939,7 +947,8 @@ async def handle_menu(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             f"📦 Всего: *{len(tod)}*\n\n"
             f"💰 *Выручка: {int(rev)} AED*\n"
             f"  💎 Крипта (уже на кошельке): *{int(crypto_rev)} AED*\n"
-            f"  💵 Наличные: *{int(rev-crypto_rev)} AED*",
+            f"  📒 В долг: *{int(debt_rev)} AED*\n"
+            f"  💵 Наличные: *{int(rev-crypto_rev-debt_rev)} AED*",
             parse_mode="Markdown", reply_markup=_dismiss)
 
     elif "Помощь" in text:
@@ -1552,6 +1561,15 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             order = await db.get_order(oid)
             total = (order or {}).get("total", 0)
             await db._increment_user(cid, orders_done=1, total_spent=total)
+            # В ДОЛГ: goods handed over → the order amount lands on the customer's
+            # debt balance. claim_* makes it exactly-once even on a double-tap.
+            if (order or {}).get("payment_method") == "debt" and total:
+                try:
+                    if await db.claim_debt_delivery(oid):
+                        await db.add_debt(cid, total, order_id=oid, note="delivered")
+                        log.info(f"[debt] +{total} AED to uid={cid} for #{oid}")
+                except Exception as e:
+                    log.error(f"[debt] increment failed for #{oid}: {e}")
             await update_customer_card(oid)
             order = await db.get_order(oid)
             if order:
@@ -1577,6 +1595,14 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if order and order.get("status") == "delivered":
             total = order.get("total", 0)
             await db._increment_user(cid, orders_done=-1, total_spent=-total)
+            # В ДОЛГ: un-deliver rolls the amount back off the debt balance.
+            if order.get("payment_method") == "debt" and total:
+                try:
+                    if await db.unclaim_debt_delivery(oid):
+                        await db.add_debt(cid, -total, order_id=oid, note="delivery undone")
+                        log.info(f"[debt] -{total} AED from uid={cid} — #{oid} un-delivered")
+                except Exception as e:
+                    log.error(f"[debt] rollback failed for #{oid}: {e}")
             # Delete the "delivered" notification messages from @ambar_manage_bot
             try:
                 from api_server import tg_delete

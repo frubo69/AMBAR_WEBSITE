@@ -930,6 +930,15 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     <div style="padding:20px;color:var(--muted);font-size:13px;text-align:center;width:100%">Загрузка…</div>
   </div>
 
+  <!-- ДОЛЖНИКИ (debt programme: pay-later customers) -->
+  <div class="cust-sect">
+    <div><div class="cust-sect-t">Должники</div><div class="cust-sect-s">оплата «В долг»</div></div>
+    <div class="cust-sect-meta" id="debtSectMeta"><span style="color:var(--warn)">—</span> <span class="cur-unit">AED</span></div>
+  </div>
+  <div class="cust-scroll" id="debtScroll">
+    <div style="padding:20px;color:var(--muted);font-size:13px;text-align:center;width:100%">Загрузка…</div>
+  </div>
+
   </div><!-- /peopleCustomers -->
 
   <div class="foot">Нажми на карточку для профиля</div>
@@ -3241,6 +3250,52 @@ async function ownerUnbanCustomer(tgId){
   }
 }
 
+// ── Debt programme (В ДОЛГ) ───────────────────────────────────────────────────
+function _applyDebtResponse(tgId, r){
+  if(r && r.customer){
+    const i = (_customersCache||[]).findIndex(u=>String(u.telegram_id)===String(tgId));
+    if(i>-1) _customersCache[i] = r.customer;
+  }
+  renderCustomerSections(_customersCache||[]);
+  _refreshOpenDetail();
+  try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(e){}
+}
+
+async function ownerToggleDebtAllowed(tgId){
+  if(!window.ownerApi) return;
+  const c = (_customersCache||[]).find(u=>String(u.telegram_id)===String(tgId));
+  const target = !(c && c.debt_allowed);
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/customers/'+tgId+'/debt',
+                                        {method:'POST', body:{debt_allowed:target}});
+    _applyDebtResponse(tgId, r);
+  }catch(e){
+    alert('Ошибка: '+(e.message||'unknown'));
+  }
+}
+
+async function ownerSaveDebt(tgId){
+  if(!window.ownerApi) return;
+  const inp = document.getElementById('dtDebtInput');
+  const msg = document.getElementById('dtDebtMsg');
+  const val = parseFloat(inp && inp.value);
+  if(isNaN(val) || val < 0 || val > 1000000){
+    if(msg){ msg.textContent = 'Введите сумму от 0 до 1 000 000'; msg.className = 'ce-msg err'; }
+    return;
+  }
+  if(msg){ msg.textContent = 'Сохранение…'; msg.className = 'ce-msg'; }
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/customers/'+tgId+'/debt',
+                                        {method:'POST', body:{debt:val}});
+    _applyDebtResponse(tgId, r);
+    const newMsg = document.getElementById('dtDebtMsg');
+    if(newMsg){ newMsg.textContent = 'Сохранено ✓'; newMsg.className = 'ce-msg ok'; }
+  }catch(e){
+    const m = document.getElementById('dtDebtMsg');
+    if(m){ m.textContent = 'Ошибка: '+(e.payload?.error||e.message||'не удалось сохранить'); m.className = 'ce-msg err'; }
+  }
+}
+
 async function loadCustomers(){
   if(_customersCache) return _customersCache;
   if(!window.ownerApi) return [];
@@ -3312,6 +3367,34 @@ function renderCustomerSections(customers){
   if(premSect){
     const pm = premSect.querySelector('.cust-sect-meta');
     if(pm) pm.innerHTML = `<span style="color:var(--text)">${vips.length}</span> активных`;
+  }
+
+  // ДОЛЖНИКИ — debt programme: whitelisted for «В долг» OR carrying a balance.
+  // Two numbers per card: the debt (main, warn-colored) and total spent (sub).
+  const debtors = customers.filter(c=>c.debt_allowed || (c.debt||0)>0)
+                           .sort((a,b)=>(b.debt||0)-(a.debt||0));
+  const debtScroll = document.getElementById('debtScroll');
+  if(debtScroll){
+    if(debtors.length){
+      debtScroll.innerHTML = debtors.map(c=>{
+        const avSt = _cardAvStyle(c.card_type);
+        return `<div class="cust-card top" data-detail="customer:${c.telegram_id}">
+          <div class="cc-rank" style="color:var(--warn)">📒</div>
+          <div class="cc-av"${avSt?' style="'+avSt+'"':''}>${c.initials}</div>
+          <div class="cc-name">${c.full_name}</div>
+          <div class="cc-tier" style="color:var(--warn)">${(c.debt||0)>0?'ДОЛЖЕН':'В ДОЛГ ОК'}</div>
+          <div class="cc-value" style="color:var(--warn)"><span data-aed="${c.debt||0}">${fmt(c.debt||0)}</span> <span class="cur-unit" style="font-size:10px;color:var(--muted);font-weight:600;margin-left:3px;letter-spacing:.4px;text-transform:uppercase">AED</span></div>
+          <div class="cc-sub">потратил <span data-aed="${c.total_spent}">${fmt(c.total_spent)}</span> AED · ${_pluralOrders(c.orders_total)}</div>
+        </div>`;
+      }).join('');
+    } else {
+      debtScroll.innerHTML = '<div style="padding:16px;color:var(--muted);font-size:13px;text-align:center;width:100%">Нет должников</div>';
+    }
+  }
+  const debtMeta = document.getElementById('debtSectMeta');
+  if(debtMeta){
+    const totalDebt = debtors.reduce((s,c)=>s+(c.debt||0), 0);
+    debtMeta.innerHTML = `<span style="color:var(--warn)" data-aed="${totalDebt}">${fmt(totalDebt)}</span> <span class="cur-unit">AED</span>`;
   }
 
   // All clients button — the headline "total customers" number
@@ -5927,6 +6010,34 @@ const DETAIL = {
     const lastSeen = _relDate(c.last_seen);
     const banBadge = c.is_banned ? ' <span class="dt-badge" style="background:var(--dn-soft);color:var(--dn)">BANNED</span>' : '';
     const verBadge = !c.verified ? ' <span class="dt-badge" style="background:rgba(243,180,74,.15);color:var(--warn)">НЕ ВЕРИФИЦИРОВАН</span>' : '';
+    const debtBadge = (c.debt||0)>0 ? ` <span class="dt-badge" style="background:var(--warn-soft);color:var(--warn)">ДОЛГ ${fmt(c.debt)} AED</span>` : '';
+
+    // Debt programme controls: enroll/remove from «В долг» + edit the balance.
+    const debtSection = `
+      <div class="dt-sect">Долговая программа</div>
+      <div class="dt-card">
+        <div class="dt-row" style="border-bottom:1px solid var(--border2)">
+          <div class="dt-row-l">
+            <div class="dt-row-t">Оплата «В долг»</div>
+            <div class="dt-row-s">${c.debt_allowed?'включена — клиент видит кнопку в приложении':'выключена'}</div>
+          </div>
+          <button class="ce-toggle${c.debt_allowed?' on':''}" role="switch" aria-checked="${c.debt_allowed?'true':'false'}" onclick="ownerToggleDebtAllowed(${c.telegram_id})"><span class="ce-knob"></span></button>
+        </div>
+        <div class="dt-row">
+          <div class="dt-row-l">
+            <div class="dt-row-t">Текущий долг</div>
+            <div class="dt-row-s">получили наличные — впишите новый остаток</div>
+          </div>
+          <div class="ce-price">
+            <input type="number" id="dtDebtInput" inputmode="decimal" min="0" max="1000000" step="0.01" value="${c.debt||0}"/>
+            <span class="ce-price-cur">AED</span>
+          </div>
+        </div>
+        <div class="dt-row">
+          <button class="dt-btn pri" style="width:100%;justify-content:center" onclick="ownerSaveDebt(${c.telegram_id})">Сохранить долг</button>
+        </div>
+      </div>
+      <div id="dtDebtMsg" class="ce-msg" style="margin:0 0 4px"></div>`;
     const addrHtml = (c.addresses||[]).length ? (c.addresses||[]).map(a=>{
       const txt = a.address || a.text || '—';
       const loc = (a.lat && a.lng) ? `<a href="https://maps.google.com/?q=${a.lat},${a.lng}" target="_blank" style="color:var(--info);text-decoration:none;font-size:10px;margin-left:4px">📍</a>` : '';
@@ -5963,7 +6074,7 @@ const DETAIL = {
     }
 
     return {
-      title:`<div class="dt-tit-av plain"${cardAv?' style="'+cardAv+'"':''}>${c.initials}</div><div><div class="dt-tit-name">${c.full_name} ${cardLabel?`<span class="lrow-tag ${cardCl}" style="font-size:9px;padding:2px 6px;border-radius:4px;letter-spacing:.8px;font-weight:700">${cardLabel}${c.card_total?` №${String(c.card_number).padStart(3,'0')}/${c.card_total}`:''}</span>`:''}${banBadge}${verBadge}</div><div class="dt-sub">${uname} · ${ph||'нет телефона'} · <span style="color:var(--gold2)">в боте с ${joined}</span></div></div>`,
+      title:`<div class="dt-tit-av plain"${cardAv?' style="'+cardAv+'"':''}>${c.initials}</div><div><div class="dt-tit-name">${c.full_name} ${cardLabel?`<span class="lrow-tag ${cardCl}" style="font-size:9px;padding:2px 6px;border-radius:4px;letter-spacing:.8px;font-weight:700">${cardLabel}${c.card_total?` №${String(c.card_number).padStart(3,'0')}/${c.card_total}`:''}</span>`:''}${banBadge}${verBadge}${debtBadge}</div><div class="dt-sub">${uname} · ${ph||'нет телефона'} · <span style="color:var(--gold2)">в боте с ${joined}</span></div></div>`,
       body:`
         <div class="dt-stats">
           <div class="dt-stat"><div class="dt-stat-lbl">Потрачено</div><div class="dt-stat-val gold"><span data-aed="${c.total_spent}">${fmt(c.total_spent)}</span><span class="u">AED</span></div><div class="dt-stat-sub">всего</div></div>
@@ -5973,6 +6084,7 @@ const DETAIL = {
           <div class="dt-stat"><div class="dt-stat-lbl">Рефералы</div><div class="dt-stat-val up">${c.referrals_count}</div><div class="dt-stat-sub">${c.referral_points} баллов</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">Telegram ID</div><div class="dt-stat-val" style="font-size:12px;font-family:'JetBrains Mono',monospace">${c.telegram_id}</div></div>
         </div>
+        ${debtSection}
         ${verifyInfo}
         <div class="dt-sect">Адреса</div>
         <div class="dt-card">${addrHtml}</div>

@@ -78,6 +78,15 @@ CORS_HEADERS = {
 }
 
 
+def _fmt_aed(v) -> str:
+    """340.0 → '340', 340.5 → '340.50' — money without float noise."""
+    try:
+        f = round(float(v or 0), 2)
+    except (TypeError, ValueError):
+        return "0"
+    return f"{f:.2f}".rstrip("0").rstrip(".") if f != int(f) else str(int(f))
+
+
 # ── DB lifecycle ──────────────────────────────────────────────────────────────
 async def on_startup(app):
     await db.connect()
@@ -303,7 +312,20 @@ async def handle_create_order(request: web.Request) -> web.Response:
         prepaid = {"method": _c.get("asset", "USDT"), "txid": _c.get("txid"),
                    "amount_usdt": _c.get("amount"), "test": True}
 
-    result = await _finalize_accepted_order(data, user, oid, prepaid=prepaid)
+    # В ДОЛГ (pay-later): only for whitelisted customers — the server re-checks,
+    # the client-side gate is cosmetic.
+    debt = False
+    if data.get("payment_method") == "debt":
+        try:
+            debt = await db.is_debt_allowed(uid)
+        except Exception as e:
+            log.warning(f"[debt] allow check failed for uid={uid}: {e}")
+        if not debt:
+            log.warning(f"[order] rejected В ДОЛГ order {oid} from non-whitelisted uid={uid}")
+            return web.json_response({"error": "debt_not_allowed"},
+                                     status=403, headers=CORS_HEADERS)
+
+    result = await _finalize_accepted_order(data, user, oid, prepaid=prepaid, debt=debt)
     return web.json_response(
         {"ok": True, "order_id": oid, "needs_verification": result["needs_verification"]},
         headers=CORS_HEADERS,
@@ -328,7 +350,8 @@ def _is_vetted(user_doc: dict | None) -> bool:
 
 
 async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
-                                   prepaid: dict | None = None) -> dict:
+                                   prepaid: dict | None = None,
+                                   debt: bool = False) -> dict:
     """Persist an accepted order and run the full notification fan-out: customer
     card, first-order verification gate, operator + owner notifications, and
     referral points. Shared by the live POST /api/order path and the crypto
@@ -429,6 +452,8 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         order_doc["crypto_amount_usdt"] = prepaid.get("amount_usdt")
         if prepaid.get("test"):
             order_doc["crypto_test"]    = True   # demo order — not a real payment
+    elif debt:
+        order_doc["payment_method"] = "debt"
     if uid not in _TEST_ACCOUNTS:
         await db.save_order(oid, order_doc)
         user_fields = dict(name=original_name, full_name=original_name, first_name=user.get("first_name",""),
@@ -563,6 +588,24 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
             "\n\n<blockquote>✅💎 <b>ОПЛАЧЕНО ОНЛАЙН — КРИПТА</b>\n"
             f"💵 USDT · TRC-20 · <b>{prepaid.get('amount_usdt')} USDT</b>\n"
             "☑️ Уже зачислено — <b>наличные НЕ брать</b></blockquote>"
+        )
+    elif debt:
+        # В ДОЛГ: goods go out now, money comes later. Show the running balance so
+        # the operator decides accept/decline with the full picture in front of them.
+        _cur_debt = 0.0
+        try:
+            _cur_debt = await db.get_debt(uid)
+        except Exception as e:
+            log.warning(f"[debt] balance fetch failed for uid={uid}: {e}")
+        try:
+            _after = round(_cur_debt + float(total or 0), 2)
+        except (TypeError, ValueError):
+            _after = _cur_debt
+        paid_banner = (
+            "\n\n<blockquote>📒 <b>ОПЛАТА: В ДОЛГ</b>\n"
+            f"💰 Текущий долг: <b>{_fmt_aed(_cur_debt)} AED</b>\n"
+            f"➕ Этот заказ: {_fmt_aed(total)} AED → долг станет <b>{_fmt_aed(_after)} AED</b>\n"
+            "☑️ Наличные НЕ брать — сумма записывается в долг</blockquote>"
         )
     else:
         paid_banner = ""
@@ -1370,6 +1413,10 @@ async def handle_me(request: web.Request) -> web.Response:
         # The frontend uses this to switch off its client-side demo automatically,
         # so there is no way to half-activate (demo stays on until real mode is on).
         "crypto_real_mode": CRYPTO_REAL_MODE,
+        # В ДОЛГ (pay-later) programme: display gate + current balance. The order
+        # endpoint re-checks the whitelist server-side, so this is cosmetic.
+        "debt_allowed": bool(user_doc.get("debt_allowed")) if user_doc else False,
+        "debt": round(float(user_doc.get("debt") or 0), 2) if user_doc else 0,
     }, headers=CORS_HEADERS)
 
 
@@ -1495,6 +1542,23 @@ async def handle_verify_request(request: web.Request) -> web.Response:
                 paid_banner = (
                     f"<blockquote>💳 <b>ОПЛАЧЕНО ОНЛАЙН · USDT · TRC-20</b>\n"
                     f"Сумма: {order.get('crypto_amount_usdt')} USDT</blockquote>\n\n"
+                )
+            elif order.get("payment_method") == "debt":
+                # Same for В ДОЛГ — the strip would erase the debt banner.
+                _cur_debt = 0.0
+                try:
+                    _cur_debt = await db.get_debt(uid)
+                except Exception:
+                    pass
+                try:
+                    _after = round(_cur_debt + float(order.get("total") or 0), 2)
+                except (TypeError, ValueError):
+                    _after = _cur_debt
+                paid_banner = (
+                    "<blockquote>📒 <b>ОПЛАТА: В ДОЛГ</b>\n"
+                    f"💰 Текущий долг: <b>{_fmt_aed(_cur_debt)} AED</b>\n"
+                    f"➕ Этот заказ: {_fmt_aed(order.get('total'))} AED → долг станет <b>{_fmt_aed(_after)} AED</b>\n"
+                    "☑️ Наличные НЕ брать — сумма записывается в долг</blockquote>\n\n"
                 )
 
             if saved_op_text:

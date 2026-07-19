@@ -112,6 +112,24 @@ async def connect():
                     log.info(f"[owner-prefs] set default prefs_json for owner_id={doc.get('owner_id')}")
         except Exception as e:
             log.warning(f"[owner-prefs] migration: {e}")
+        # Seed the debt-program (В ДОЛГ) test account — idempotent.
+        try:
+            await _db.users.update_one(
+                {"telegram_id": DEBT_TEST_ACCOUNT},
+                {"$set": {"debt_allowed": True},
+                 "$setOnInsert": {
+                     "telegram_id": DEBT_TEST_ACCOUNT,
+                     "debt": 0.0,
+                     "is_banned": False,
+                     "first_seen": datetime.now(timezone.utc),
+                     "orders_total": 0, "orders_done": 0, "orders_declined": 0,
+                     "total_spent": 0, "support_tickets": 0,
+                     "notes": "", "verified": False, "verify_requested": False,
+                 }},
+                upsert=True,
+            )
+        except Exception as e:
+            log.warning(f"[debt] seed test account: {e}")
         log.info("✅ MongoDB connected — db: ambar")
     except Exception as e:
         log.error(f"MongoDB index error: {e}")
@@ -1271,3 +1289,123 @@ async def list_confirmed_unpromoted_crypto_invoices(limit: int = 50) -> list:
         {"status": "confirmed", "promoted_at_ms": {"$exists": False}}, {"_id": 0}
     ).limit(limit)
     return await cursor.to_list(length=limit)
+
+
+# ── Debt (В ДОЛГ) ─────────────────────────────────────────────────────────────
+# Selected customers may take orders on credit. Fields on the user doc:
+#   debt_allowed  — gates the В ДОЛГ payment option (whitelist, admin-managed)
+#   debt          — current balance in AED (grows on delivery, admin edits down)
+#   debt_history  — audit log: order deliveries and manual admin edits
+
+DEBT_TEST_ACCOUNT = 686932322
+
+
+def _round_aed(v) -> float:
+    try:
+        return round(float(v or 0), 2)
+    except (TypeError, ValueError):
+        return 0.0
+
+
+async def is_debt_allowed(telegram_id: int) -> bool:
+    u = await get_user(int(telegram_id))
+    return bool(u and u.get("debt_allowed") and not u.get("is_banned"))
+
+
+async def get_debt(telegram_id: int) -> float:
+    u = await get_user(int(telegram_id))
+    return _round_aed((u or {}).get("debt"))
+
+
+async def set_debt_allowed(telegram_id: int, allowed: bool, by: int = 0):
+    """Enable/disable the В ДОЛГ payment option for a customer."""
+    db = _db_or_none()
+    if db is None: return
+    now = datetime.now(timezone.utc)
+    await db.users.update_one(
+        {"telegram_id": int(telegram_id)},
+        {"$set": {"debt_allowed": bool(allowed),
+                  "debt_allowed_changed_at": now.isoformat(),
+                  "debt_allowed_changed_by": int(by) if by else 0},
+         "$setOnInsert": {
+             "telegram_id": int(telegram_id), "debt": 0.0,
+             "is_banned": False, "first_seen": now,
+             "orders_total": 0, "orders_done": 0, "orders_declined": 0,
+             "total_spent": 0, "support_tickets": 0,
+             "notes": "", "verified": False, "verify_requested": False,
+         }},
+        upsert=True,
+    )
+
+
+async def add_debt(telegram_id: int, amount: float, order_id: str = "", note: str = ""):
+    """Atomically shift a customer's debt by `amount` (negative to reduce).
+    Used when a В ДОЛГ order is delivered (+total) or delivery is undone (−total)."""
+    db = _db_or_none()
+    if db is None: return
+    delta = _round_aed(amount)
+    entry = {
+        "delta": delta,
+        "order_id": order_id,
+        "note": note,
+        "at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.users.update_one(
+        {"telegram_id": int(telegram_id)},
+        {"$inc": {"debt": delta}, "$push": {"debt_history": entry}},
+    )
+
+
+async def set_debt(telegram_id: int, new_amount: float, by: int = 0, note: str = "") -> dict:
+    """Admin edit: set debt to an absolute value (e.g. after a cash repayment).
+    Returns {"old": …, "new": …}."""
+    db = _db_or_none()
+    if db is None: return {}
+    old = await get_debt(telegram_id)
+    new = _round_aed(new_amount)
+    entry = {
+        "set": new, "old": old,
+        "by": int(by) if by else 0,
+        "note": note,
+        "at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.users.update_one(
+        {"telegram_id": int(telegram_id)},
+        {"$set": {"debt": new}, "$push": {"debt_history": entry}},
+    )
+    return {"old": old, "new": new}
+
+
+async def claim_debt_delivery(oid: str) -> bool:
+    """Exactly-once gate: True only the first time a В ДОЛГ order is counted
+    into the debt balance (protects against double-taps on «Доставлено»)."""
+    db = _db_or_none()
+    if db is None: return False
+    res = await db.orders.update_one(
+        {"order_id": oid, "debt_counted": {"$ne": True}},
+        {"$set": {"debt_counted": True}},
+    )
+    return res.modified_count == 1
+
+
+async def unclaim_debt_delivery(oid: str) -> bool:
+    """Reverse of claim_debt_delivery — used by undo-delivered."""
+    db = _db_or_none()
+    if db is None: return False
+    res = await db.orders.update_one(
+        {"order_id": oid, "debt_counted": True},
+        {"$set": {"debt_counted": False}},
+    )
+    return res.modified_count == 1
+
+
+async def get_debtors() -> list:
+    """Debt-program customers: whitelisted OR still carrying a balance
+    (so revoking debt_allowed never hides an unpaid debt). Biggest debt first."""
+    db = _db_or_none()
+    if db is None: return []
+    cursor = db.users.find(
+        {"$or": [{"debt_allowed": True}, {"debt": {"$gt": 0}}]},
+        {"_id": 0},
+    ).sort("debt", -1)
+    return await cursor.to_list(length=500)

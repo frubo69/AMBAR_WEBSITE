@@ -544,6 +544,9 @@ def _serialize_user(u: dict, orders: list | None = None) -> dict:
         "is_vip":        card["type"] != "standard",
         "verified":      bool(u.get("verified")),
         "is_banned":     bool(u.get("is_banned")),
+        # Debt programme (В ДОЛГ): whitelist flag + current balance in AED
+        "debt_allowed":  bool(u.get("debt_allowed")),
+        "debt":          round(float(u.get("debt") or 0), 2),
         "total_spent":   total_spent,
         "orders_total":  orders_total,
         "orders_done":   int(u.get("orders_done", 0) or 0),
@@ -1008,6 +1011,59 @@ async def handle_customer_ban(request):
         return web.json_response({"ok": True, "banned": False}, headers=CORS_HEADERS)
 
     return web.json_response({"error": "unknown action"}, status=400, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_customer_debt(request):
+    """Debt programme admin. POST body, any combination of:
+      {"debt": 250}          — set the balance to an absolute value (after a cash
+                               repayment, correction, etc.). Logged to debt_history.
+      {"debt_allowed": true} — enable/disable the В ДОЛГ payment option.
+    Returns the updated customer row."""
+    raw = request.match_info["telegram_id"]
+    try:
+        tg_id = int(raw)
+    except (ValueError, TypeError):
+        return web.json_response({"error": "invalid telegram_id"}, status=400, headers=CORS_HEADERS)
+
+    user = await db.get_user(tg_id)
+    if not user:
+        return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
+
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    owner_id = request["owner_id"]
+    changed = {}
+
+    if "debt_allowed" in body:
+        allowed = bool(body.get("debt_allowed"))
+        await db.set_debt_allowed(tg_id, allowed, by=owner_id)
+        changed["debt_allowed"] = allowed
+        log.info(f"[debt] owner {owner_id} set debt_allowed={allowed} for {tg_id}")
+
+    if "debt" in body:
+        try:
+            amount = float(body.get("debt"))
+        except (TypeError, ValueError):
+            return web.json_response({"error": "invalid debt amount"}, status=400, headers=CORS_HEADERS)
+        if amount < 0 or amount > 1_000_000:
+            return web.json_response({"error": "debt out of range"}, status=400, headers=CORS_HEADERS)
+        note = (body.get("note") or "").strip() or "manual edit"
+        res = await db.set_debt(tg_id, amount, by=owner_id, note=note)
+        changed["debt"] = res
+        log.info(f"[debt] owner {owner_id} set debt {res.get('old')}→{res.get('new')} AED for {tg_id}")
+
+    if not changed:
+        return web.json_response({"error": "nothing to change"}, status=400, headers=CORS_HEADERS)
+
+    fresh = await db.get_user(tg_id)
+    return web.json_response(
+        {"ok": True, "changed": changed, "customer": _serialize_user(fresh or {})},
+        headers=CORS_HEADERS,
+        dumps=lambda o: __import__("json").dumps(o, default=_json_default),
+    )
 
 
 # ─── Catalog (stock toggle + price edit) ────────────────────────────────
@@ -1582,6 +1638,8 @@ def setup(app):
     app.router.add_get(             "/api/owner/customers/{telegram_id}", handle_customer_detail)
     app.router.add_route("OPTIONS", "/api/owner/customers/{telegram_id}/{action:ban|unban}", handle_customer_ban)
     app.router.add_post(            "/api/owner/customers/{telegram_id}/{action:ban|unban}", handle_customer_ban)
+    app.router.add_route("OPTIONS", "/api/owner/customers/{telegram_id}/debt", handle_customer_debt)
+    app.router.add_post(            "/api/owner/customers/{telegram_id}/debt", handle_customer_debt)
     app.router.add_route("OPTIONS", "/api/owner/notifications", handle_notifications)
     app.router.add_get(             "/api/owner/notifications", handle_notifications)
     app.router.add_route("OPTIONS", "/api/owner/support-threads", handle_support_threads)

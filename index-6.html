@@ -466,6 +466,9 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 .pm-seg{position:relative;display:flex;gap:0;padding:5px;background:var(--bg3);border:1px solid var(--border2);border-radius:calc(var(--r2) + 4px)}
 .pm-thumb{position:absolute;top:5px;left:5px;width:calc(50% - 5px);height:calc(100% - 10px);border-radius:var(--r2);background:linear-gradient(160deg,rgba(201,169,110,.16),rgba(201,169,110,.05));border:1px solid var(--gold);box-shadow:0 0 0 1px var(--gold) inset,0 8px 22px rgba(201,169,110,.16);transform:translateX(0);transition:transform var(--dur-slow) cubic-bezier(.34,1.28,.5,1),opacity var(--dur-base);pointer-events:none;z-index:0}
 .pm-seg[data-sel="crypto"] .pm-thumb{transform:translateX(100%)}
+/* В ДОЛГ: third option, only rendered for whitelisted debt customers */
+.pm-seg.has-debt .pm-thumb{width:calc(33.333% - 3.4px)}
+.pm-seg[data-sel="debt"] .pm-thumb{transform:translateX(200%)}
 .pm-opt{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:13px 8px;min-height:80px;background:transparent;border:none;border-radius:var(--r2);cursor:pointer;color:var(--sub);outline:none;-webkit-tap-highlight-color:transparent;transition:color var(--dur-base),transform var(--dur-fast) var(--ease-standard)}
 .pm-opt:active{transform:scale(var(--press-card))}
 .pm-opt:focus-visible{box-shadow:0 0 0 2px var(--bg3),0 0 0 4px rgba(201,169,110,.7)}
@@ -2174,6 +2177,10 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
             <span class="pm-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M7.7 8.9h8.6"/><path d="M12 8.9v7.3"/><path d="M9.4 11.3h5.2"/></svg></span>
             <span class="pm-lbl" id="pm-crypto-lbl">Криптой</span>
           </button>
+          <button type="button" class="pm-opt" id="pm-debt" aria-pressed="false" style="display:none" onclick="selectPayMethod('debt')">
+            <span class="pm-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><path d="M9.5 7h7M9.5 11h7"/></svg></span>
+            <span class="pm-lbl" id="pm-debt-lbl">В долг</span>
+          </button>
         </div>
         <div class="pm-hint" id="pm-hint"></div>
       </div>
@@ -3142,6 +3149,10 @@ const tg=window.Telegram?.WebApp||null;
 // switched on server-side. CRYPTO_SIM keeps the flow demoable while the on-chain
 // detector is being built — flip to false once /api/crypto/* is live.
 let CRYPTO_ENABLED = localStorage.getItem('ambar_crypto_enabled')==='1';
+// В ДОЛГ (pay-later): per-user gate + running balance, both delivered by /api/me.
+// Display-only — POST /api/order re-checks the whitelist server-side.
+let DEBT_ENABLED = localStorage.getItem('ambar_debt_enabled')==='1';
+let DEBT_BALANCE = parseFloat(localStorage.getItem('ambar_debt_balance')||'0')||0;
 // Client-side demo flow. Auto-disabled by /api/me (crypto_real_mode) once the
 // server has a real receive wallet + on-chain watcher — see initMe(). Defaults
 // to demo so nothing can half-activate before the backend is truly live.
@@ -3259,6 +3270,11 @@ async function checkBanStatus(){
       // gate only — real on-chain endpoints must re-validate via signed initData.
       if(d.crypto_enabled){localStorage.setItem('ambar_crypto_enabled','1');CRYPTO_ENABLED=true;}
       else{localStorage.removeItem('ambar_crypto_enabled');CRYPTO_ENABLED=false;}
+      // В ДОЛГ gate + balance (display only — server re-checks on /api/order)
+      if(d.debt_allowed){localStorage.setItem('ambar_debt_enabled','1');DEBT_ENABLED=true;}
+      else{localStorage.removeItem('ambar_debt_enabled');DEBT_ENABLED=false;}
+      DEBT_BALANCE=+d.debt||0;
+      localStorage.setItem('ambar_debt_balance',String(DEBT_BALANCE));
       // Real on-chain flow once the server has a wallet+watcher; demo otherwise.
       // (undefined on an older backend ⇒ stays demo — safe default.)
       CRYPTO_SIM = !d.crypto_real_mode;
@@ -3725,6 +3741,7 @@ function applyLang(){
   set('co-pay-title',lang==='ru'?'Способ оплаты':'Payment method');
   set('pm-cash-lbl',lang==='ru'?'Наличными':'Cash');
   set('pm-crypto-lbl',lang==='ru'?'Криптой':'Crypto');
+  set('pm-debt-lbl',lang==='ru'?'В долг':'On tab');
   set('pm-soon',lang==='ru'?'Скоро':'Soon');
   el('tip-input').placeholder=lang==='ru'?'Введите сумму...':'Enter amount...';
   set('mtl-gps','GPS');set('mtl-manual',lang==='ru'?'Вручную':'Manual');
@@ -6204,7 +6221,7 @@ function placeOrder(){
     startCryptoPayment(_ctx);
     return;
   }
-  payload.payment_method='cash';
+  payload.payment_method=(payMethod==='debt'&&DEBT_ENABLED)?'debt':'cash';
 
   orders.unshift({order_id:oid,items,total,address:addr.label||addr.address,status:'pending',timestamp:new Date().toISOString()});
   localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
@@ -6284,6 +6301,7 @@ function selectPayMethod(m){
     showToast(lang==='ru'?'Оплата криптой скоро будет доступна':'Crypto payment is coming soon','err');
     return;
   }
+  if(m==='debt' && !DEBT_ENABLED)return; // hidden unless whitelisted — safety net
   payMethod=m;
   localStorage.setItem('ambar_pay_method',m);
   haptic.select();
@@ -6300,25 +6318,43 @@ function refreshPayMethodUI(){
     if(soon)soon.style.display='';
     if(payMethod==='crypto'){payMethod='cash';localStorage.setItem('ambar_pay_method','cash');}
   }
+  // В ДОЛГ: third segment option, only for whitelisted debt customers
+  const debtBtn=el('pm-debt'), _seg=el('pm-seg');
+  if(DEBT_ENABLED){
+    if(debtBtn)debtBtn.style.display='';
+    _seg&&_seg.classList.add('has-debt');
+  }else{
+    if(debtBtn)debtBtn.style.display='none';
+    _seg&&_seg.classList.remove('has-debt');
+    if(payMethod==='debt'){payMethod='cash';localStorage.setItem('ambar_pay_method','cash');}
+  }
   _applyPayMethodVisuals();
 }
 
+function _fmtAed(v){const f=Math.round((+v||0)*100)/100;return f===Math.trunc(f)?String(Math.trunc(f)):f.toFixed(2);}
+
 function _applyPayMethodVisuals(){
   const ru=lang==='ru';
-  const cashOn=payMethod!=='crypto';
-  const cryptoSel=!cashOn&&CRYPTO_ENABLED;
-  const cashBtn=el('pm-cash'), cryptoBtn=el('pm-crypto'), seg=el('pm-seg');
+  const cryptoSel=payMethod==='crypto'&&CRYPTO_ENABLED;
+  const debtSel=payMethod==='debt'&&DEBT_ENABLED;
+  const cashOn=!cryptoSel&&!debtSel;
+  const cashBtn=el('pm-cash'), cryptoBtn=el('pm-crypto'), debtBtn=el('pm-debt'), seg=el('pm-seg');
   cashBtn&&cashBtn.classList.toggle('on',cashOn);
   cryptoBtn&&cryptoBtn.classList.toggle('on',cryptoSel);
+  debtBtn&&debtBtn.classList.toggle('on',debtSel);
   cashBtn&&cashBtn.setAttribute('aria-pressed',cashOn?'true':'false');
   cryptoBtn&&cryptoBtn.setAttribute('aria-pressed',cryptoSel?'true':'false');
+  debtBtn&&debtBtn.setAttribute('aria-pressed',debtSel?'true':'false');
   // slide the gold thumb to the active option
-  seg&&seg.setAttribute('data-sel',cryptoSel?'crypto':'cash');
+  seg&&seg.setAttribute('data-sel',cryptoSel?'crypto':(debtSel?'debt':'cash'));
   const hint=el('pm-hint');
   if(hint){
-    hint.innerHTML = !cashOn
+    hint.innerHTML = cryptoSel
       ? (ru?'Оплата <b>USDT (TRC-20)</b> заранее. Как только сеть подтвердит перевод — заказ уйдёт оператору.'
            :'Pay <b>USDT (TRC-20)</b> upfront. As soon as the network confirms, your order goes to the operator.')
+      : debtSel
+      ? (ru?`Сумма заказа <b>запишется в долг</b>. Текущий долг: <b>${_fmtAed(DEBT_BALANCE)} AED</b>.`
+           :`The order amount <b>goes on your tab</b>. Current balance: <b>${_fmtAed(DEBT_BALANCE)} AED</b>.`)
       : (ru?'Оплата <b>наличными</b> курьеру при получении.'
            :'Pay the courier <b>in cash</b> on delivery.');
     // re-trigger the crossfade-in each time the hint text swaps
@@ -6326,7 +6362,7 @@ function _applyPayMethodVisuals(){
   }
   const cta=el('place-btn-text');
   if(cta){
-    cta.textContent = !cashOn
+    cta.textContent = cryptoSel
       ? (ru?'Перейти к оплате →':'Continue to payment →')
       : t('placeBtn');
   }

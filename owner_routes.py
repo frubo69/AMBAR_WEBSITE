@@ -867,9 +867,10 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
     items_txt = "\n".join(
         f"• {_md(it.get('name',''))} ×{it.get('qty',1)}" for it in (items or [])
     ) or "—"
+    _client = _md(user_name or "—") + (f" ({_md(phone)})" if phone and phone != "—" else "")
     base = (f"Сумма: *{total} AED*\n"
-            f"Клиент: {_md(user_name)} ({_md(phone)})\n"
-            f"Адрес: {_md(address)}\n"
+            f"Клиент: {_client}\n"
+            f"Адрес: {_md(address or '—')}\n"
             f"Офис: {_md(office)}\n"
             f"🛒 Позиции:\n{items_txt}")
     if prepaid:

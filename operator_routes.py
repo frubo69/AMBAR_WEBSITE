@@ -206,7 +206,8 @@ def _card_html(order: dict) -> str:
         f"🏢 Офис: <b>{_esc(order.get('office_name','—'))}</b>",
         (f"📍 Район: <b>{_esc(order.get('district','—'))}</b> · Оператор: {_esc(order.get('dispatch_operator','—'))}\n"
          f"🚗 Водитель: <b>{_esc(order.get('driver','—'))}</b>" if order.get("district") else ""),
-        f"👤 {_esc(order.get('customer_name','—'))} · 📱 {_esc(order.get('phone','—'))}",
+        f"👤 {_esc(order.get('customer_name') or '—')}"
+        + (f" · 📱 {_esc(order.get('phone'))}" if order.get("phone") else ""),
         f"🏠 Адрес: {_esc(order.get('address') or '—')}",
         "",
         f"🛒 <b>Позиции:</b>\n{_esc_lines(order.get('items', []))}",
@@ -348,21 +349,14 @@ async def handle_create(request):
     except Exception:
         return web.json_response({"error": "invalid json"}, status=400, headers=CORS_HEADERS)
 
-    # Name, phone and address are all mandatory for a phone-in order (comment stays
-    # optional). Phone is normalized to a single leading "+".
+    # Client details are OPTIONAL — the operator may not have them on the call.
     name = str(body.get("customer_name", "")).strip()
     phone = str(body.get("phone", "")).strip()
     addr = str(body.get("address", "")).strip()
-    digits = "".join(ch for ch in phone if ch.isdigit())
-    if not name:
-        return web.json_response({"error": "name_required"}, status=400, headers=CORS_HEADERS)
-    if len(digits) < 7:
-        return web.json_response({"error": "phone_required"}, status=400, headers=CORS_HEADERS)
-    if not addr:
-        return web.json_response({"error": "address_required"}, status=400, headers=CORS_HEADERS)
-    phone = "+" + phone.lstrip("+")
+    if phone:
+        phone = "+" + phone.lstrip("+")
 
-    # Dispatch: район (carries its оператор) + which of its drivers takes it.
+    # Dispatch is required — район (carries its оператор) + which of its drivers takes it.
     dist = _district(str(body.get("district_id", "")).strip())
     driver = str(body.get("driver", "")).strip()
     if not dist:
@@ -389,7 +383,7 @@ async def handle_create(request):
     order = {
         "order_id": _new_oid(),
         "customer_id": 0,                       # int + present — see module docstring
-        "customer_name": name,
+        "customer_name": name or "—",
         "username": "—",
         "phone": phone,
         "address": addr,
@@ -512,10 +506,10 @@ async def handle_patch(request):
     for f in ("customer_name", "phone", "address", "comment"):
         if f in body:
             v = str(body.get(f, "")).strip()
-            if f != "comment" and not v:
-                return web.json_response({"error": f"{f}_required"}, status=400, headers=CORS_HEADERS)
-            if f == "phone":
+            if f == "phone" and v:
                 v = "+" + v.lstrip("+")
+            if f == "customer_name" and not v:
+                v = "—"
             upd[f] = v
     if not upd:
         return web.json_response({"error": "nothing to update"}, status=400, headers=CORS_HEADERS)

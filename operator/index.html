@@ -257,13 +257,13 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
         <div class="cust">
           <div class="lbl">Район *</div>
           <div class="dchips" id="distChips"></div>
-          <div class="lbl">Клиент · по телефону</div>
-          <div class="lbl" style="margin-top:6px">Имя *</div>
-          <input id="cName" placeholder="Имя клиента" autocomplete="off" enterkeyhint="next">
-          <div class="lbl">Телефон *</div>
-          <input id="cPhone" placeholder="+971 …" inputmode="tel" autocomplete="off" enterkeyhint="next">
-          <div class="lbl">Адрес *</div>
-          <textarea id="cAddr" rows="2" placeholder="Район, здание, квартира…" enterkeyhint="next"></textarea>
+          <div class="lbl">Клиент · всё необязательно</div>
+          <div class="lbl" style="margin-top:6px">Имя</div>
+          <input id="cName" placeholder="Имя клиента (необязательно)" autocomplete="off" enterkeyhint="next">
+          <div class="lbl">Телефон</div>
+          <input id="cPhone" placeholder="+971 … (необязательно)" inputmode="tel" autocomplete="off" enterkeyhint="next">
+          <div class="lbl">Адрес</div>
+          <textarea id="cAddr" rows="2" placeholder="Район, здание, квартира… (необязательно)" enterkeyhint="next"></textarea>
           <div class="lbl">Комментарий</div>
           <input id="cComment" placeholder="Домофон, этаж, пожелания…" autocomplete="off" enterkeyhint="done">
           <div class="lbl">🚗 Водитель *</div>
@@ -632,9 +632,7 @@ function askCreate(){
   const name = $('cName').value.trim();
   const phone = $('cPhone').value.trim();
   const addr = $('cAddr').value.trim();
-  if(!name){ toast('Укажите имя клиента','err'); $('cName').focus(); haptic('medium'); return; }
-  if(phone.replace(/\D/g,'').length < 7){ toast('Укажите телефон клиента','err'); $('cPhone').focus(); haptic('medium'); return; }
-  if(!addr){ toast('Укажите адрес доставки','err'); $('cAddr').focus(); haptic('medium'); return; }
+  // client details (name/phone/address) are all optional now — only район + водитель are required
   if(!curOp){ toast('Выберите оператора вверху','err'); showOv('opOv'); haptic('medium'); return; }
   if(!curDist){ toast('Выберите район','err'); $('distChips').scrollIntoView({block:'center'}); haptic('medium'); return; }
   if(!curDriver){ toast('Выберите водителя','err'); $('drvChips').scrollIntoView({block:'center'}); haptic('medium'); return; }
@@ -725,7 +723,7 @@ function renderOrders(){
         <span style="font-size:11px;color:var(--muted)">${hm}</span>
         <span class="sum">${o.total} <small style="font-size:11px;color:var(--muted)">AED</small></span>
       </div>
-      <div class="who">👤 ${o.customer_name||'—'} · 📱 ${o.phone||'—'}${o.address?' · 🏠 '+o.address:''}</div>
+      <div class="who">👤 ${o.customer_name||'—'}${o.phone?' · 📱 '+o.phone:''}${o.address?' · 🏠 '+o.address:''}</div>
       ${o.district?`<div class="who" style="color:var(--gold2)">📍 ${o.district}${o.driver?' · 🚗 '+o.driver:''}</div>`:''}
       <div class="items">${items}</div>
       ${acts}

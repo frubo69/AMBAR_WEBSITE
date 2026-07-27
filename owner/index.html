@@ -189,8 +189,25 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .dn-b svg{width:13px;height:13px;display:block}
 .dn-b:active{background:rgba(201,169,110,.2);transform:scale(.9)}
 .dn-b[disabled]{opacity:.25;pointer-events:none}
-.dn-d{min-width:66px;text-align:center;font-size:11px;font-weight:700;color:var(--gold2);
-  font-family:'DM Sans',sans-serif;letter-spacing:.2px}
+/* the date doubles as "back to today" once you've stepped away */
+.dn-d{min-width:66px;height:24px;padding:0 6px;border:none;background:none;border-radius:999px;
+  font-size:11px;font-weight:700;color:var(--gold2);font-family:'DM Sans',sans-serif;letter-spacing:.2px;
+  display:flex;align-items:center;justify-content:center;gap:4px;transition:.15s var(--e1)}
+.dn-d[disabled]{cursor:default}
+.dn-d.back{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;cursor:pointer}
+.dn-d.back:active{transform:scale(.93)}
+.dn-d .dn-undo{display:none;font-size:12px;line-height:1}
+.dn-d.back .dn-undo{display:inline}
+/* Horizontal swipes on the hero are OURS — the page must not scroll under them.
+   Needs [data-detail] in the selector to outrank the generic
+   [data-detail]{touch-action:manipulation} rule declared further down. */
+.hero,.hero[data-detail]{touch-action:pan-y}
+@keyframes dayInL{from{opacity:0;transform:translateX(-18px)}to{opacity:1;transform:none}}
+@keyframes dayInR{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
+.hero.day-anim-l .hero-amt-row,.hero.day-anim-l .hero-row,.hero.day-anim-l .hero-spark{animation:dayInL .3s var(--e1) both}
+.hero.day-anim-r .hero-amt-row,.hero.day-anim-r .hero-row,.hero.day-anim-r .hero-spark{animation:dayInR .3s var(--e1) both}
+@keyframes kpiIn{from{opacity:.25}to{opacity:1}}
+.day-fade{animation:kpiIn .34s var(--e1) both}
 .hero.day-busy .hero-amt,.hero.day-busy .hero-row,.hero.day-busy .hero-spark{opacity:.45;transition:opacity .15s}
 .hero-spark{margin-top:12px;height:46px;position:relative}
 
@@ -510,12 +527,13 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
       <span class="day-nav" id="dayNav">
         <button class="dn-b" id="dnPrev" aria-label="Предыдущий день"
           onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayStep(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
-        <span class="dn-d" id="dnDate">сегодня</span>
+        <button class="dn-d" id="dnDate" disabled aria-label="Вернуться к сегодня"
+          onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayReset()"><span class="dn-undo">↩</span><span id="dnDateTxt">сегодня</span></button>
         <button class="dn-b" id="dnNext" aria-label="Следующий день" disabled
           onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayStep(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
       </span>
     </div>
-    <div>
+    <div class="hero-amt-row">
       <span class="hero-amt mono" id="heroRev" data-aed="">—</span><span class="hero-unit cur-unit">AED</span>
     </div>
     <div class="hero-row">
@@ -2876,7 +2894,10 @@ function _syncDayNav(p, w){
   const nav = document.getElementById('dayNav');
   if(nav) nav.style.display = _dayNavOn(p) ? 'flex' : 'none';
   const nx = document.getElementById('dnNext'); if(nx) nx.disabled = DAY_OFFSET <= 0;
-  _setText('dnDate', _dayLabel(w));
+  _setText('dnDateTxt', _dayLabel(w));
+  // The date chip becomes a one-tap "back to today" button once you've stepped away.
+  const chip = document.getElementById('dnDate');
+  if(chip){ chip.disabled = DAY_OFFSET <= 0; chip.classList.toggle('back', DAY_OFFSET > 0); }
   // The header must never contradict the date chip.
   const hl = document.getElementById('heroLbl');
   if(hl && DAY_OFFSET) hl.textContent = 'Выручка';
@@ -2884,14 +2905,32 @@ function _syncDayNav(p, w){
                                      : ((PERIOD_DATA[p] || {}).prev || 'vs вчера'));
 }
 
-async function _loadDay(p){
+// dir > 0 → moving back in time (new content slides in from the left), < 0 → forward.
+function _animDay(dir){
+  const hero = document.querySelector('#pg-overview .hero');
+  const bento = document.querySelector('#pg-overview .bento');
+  const cls = dir > 0 ? 'day-anim-l' : 'day-anim-r';
+  if(hero){
+    hero.classList.remove('day-anim-l','day-anim-r'); void hero.offsetWidth;
+    hero.classList.add(cls);
+    setTimeout(()=>hero.classList.remove(cls), 340);
+  }
+  if(bento){
+    bento.classList.remove('day-fade'); void bento.offsetWidth;
+    bento.classList.add('day-fade');
+    setTimeout(()=>bento.classList.remove('day-fade'), 380);
+  }
+}
+
+async function _loadDay(p, dir){
   const hero = document.querySelector('#pg-overview .hero');
   if(!DAY_OFFSET){                       // back to the live period view
     const hl = document.getElementById('heroLbl');
     if(hl) hl.textContent = 'Выручка · ' + ((PERIOD_DATA[p] || {}).lbl || '');
     const d = FINANCE_CACHE[p];
+    if(d){ renderFinance(p, d); applyCurrency(); } else { applyFinanceLive(p); }
     _syncDayNav(p, d && d.window);
-    if(d){ _paintHero(p, d); applyCurrency(); } else { applyFinanceLive(p); }
+    if(dir) _animDay(dir);
     return true;
   }
   const key = _fkey(p, DAY_OFFSET);
@@ -2910,9 +2949,10 @@ async function _loadDay(p){
     }
   }
   if(_fkey(p, DAY_OFFSET) !== key) return true;   // user kept swiping — drop stale response
-  _paintHero(p, data);
+  renderFinance(p, data);                          // whole page follows the day
   _syncDayNav(p, data.window);
   applyCurrency();
+  if(dir) _animDay(dir);
   return true;
 }
 
@@ -2924,26 +2964,44 @@ async function dayStep(delta){
   if(next === prev) return;
   DAY_OFFSET = next;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  const ok = await _loadDay(p);
+  const ok = await _loadDay(p, delta);
   if(!ok){                                        // failed → don't let the chip lie
     DAY_OFFSET = prev;
     _syncDayNav(p, (FINANCE_CACHE[_fkey(p, prev)] || {}).window);
   }
 }
 
-// Swipe the hero: right → older day, left → back toward today.
+// One tap on the date chip → straight back to today, however far you've walked.
+async function dayReset(){
+  if(!DAY_OFFSET) return;
+  const p = document.querySelector('#periodPicker button.on')?.dataset?.p || 'today';
+  DAY_OFFSET = 0;
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('medium'); }catch(e){}
+  await _loadDay(p, -1);
+}
+
+// Swipe the hero: right → older day, left → back toward today. The page must NOT
+// scroll while a horizontal swipe is in progress (touch-action:pan-y + preventDefault).
 (function(){
   const hero = document.querySelector('#pg-overview .hero');
   if(!hero) return;
-  let sx = 0, sy = 0, live = false;
+  let sx = 0, sy = 0, live = false, axis = 0;   // axis: 0 undecided, 1 horizontal, -1 vertical
   hero.addEventListener('touchstart', e=>{
     if(e.touches.length !== 1){ live = false; return; }
-    sx = e.touches[0].clientX; sy = e.touches[0].clientY; live = true;
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY; live = true; axis = 0;
   }, {passive:true});
+  hero.addEventListener('touchmove', e=>{
+    if(!live) return;
+    const t = e.touches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    if(!axis && (Math.abs(dx) > 8 || Math.abs(dy) > 8))
+      axis = Math.abs(dx) > Math.abs(dy) ? 1 : -1;
+    if(axis === 1) e.preventDefault();          // ours → no page scroll
+  }, {passive:false});
   hero.addEventListener('touchend', e=>{
     if(!live) return; live = false;
+    if(axis === -1) return;                     // vertical → leave the page scroll alone
     const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
-    if(Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.4) return;  // vertical scroll wins
+    if(Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
     dayStep(dx > 0 ? 1 : -1);
   }, {passive:true});
 })();
@@ -3030,9 +3088,10 @@ function _paintHero(p, f){
 function renderFinance(p, f){
   // Data has arrived — clear loading shimmers before painting real values.
   setFinanceSkel(false);
-  // Overview hero — skipped while the day browser is showing a past day, so the
-  // 15s poll can't yank the card back to the current period.
-  if(!DAY_OFFSET){ _paintHero(p, f); _syncDayNav(p, f.window); }
+  // The whole overview follows whatever window this payload describes — the live
+  // period, or a day reached via the hero's day browser.
+  _paintHero(p, f);
+  _syncDayNav(p, f.window);
   // By-office bars (Money tab)
   const off = f.by_office || {};
   const oc = off.office_central || 0;
@@ -7011,6 +7070,7 @@ applyFinanceLive('today');
 
   async function _pollFinance(){
     if(document.hidden) return;
+    if(DAY_OFFSET) return;   // browsing a past day — don't repaint it with live data
     const p = document.querySelector('#periodPicker button.on')?.dataset?.p || 'today';
     delete FINANCE_CACHE[p];
     try {

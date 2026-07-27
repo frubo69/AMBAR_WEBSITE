@@ -30,18 +30,14 @@ from aiohttp import web
 
 import db
 from owner_auth import CORS_HEADERS
-from config_offices import OFFICE_OPERATORS, DEFAULT_OPERATORS
+from config_offices import DEFAULT_OPERATORS
 
 log = logging.getLogger("operator_pos")
 
 OPERATOR_BOT_TOKEN = os.getenv("OPERATOR_BOT_TOKEN", "")
 OPERATOR_IDS = [int(x.strip()) for x in os.getenv("OPERATOR_IDS", "").split(",") if x.strip().isdigit()]
 
-OFFICE_NAMES = {
-    "office_central": "Ambar Central",
-    "office_north":   "Ambar North",
-    "office_south":   "Ambar South",
-}
+from config_offices import OFFICE_NAMES   # офис ≡ район, единый источник правды
 
 # Dispatch structure: район → who takes the calls → who drives it.
 # The POS flow is operator → район (his own) → driver (that район's).
@@ -108,9 +104,7 @@ def _op_name(user: dict) -> str:
             or str(user.get("id", "")))
 
 
-def _operator_offices(uid: int) -> list:
-    offs = [oid for oid, ops in OFFICE_OPERATORS.items() if uid in ops]
-    return offs or list(OFFICE_OPERATORS.keys())
+# (привязки офис→оператор нет: офис ручного заказа = выбранный район)
 
 
 # ── catalog ──────────────────────────────────────────────────────────────────
@@ -307,12 +301,12 @@ def _summary(o: dict) -> dict:
 # ── handlers ─────────────────────────────────────────────────────────────────
 @require_operator
 async def handle_ping(request):
-    uid = request["op_id"]
-    offs = _operator_offices(uid)
     return web.json_response({
         "ok": True,
         "operator": _op_name(request["op_user"]),
-        "offices": [{"id": o, "name": OFFICE_NAMES.get(o, o)} for o in offs],
+        # Офис ≡ район, отдельного переключателя офиса в POS больше нет —
+        # пустой список прячет его в интерфейсе.
+        "offices": [],
         "districts": DISTRICTS,
         "server_time": datetime.now(timezone.utc).isoformat(),
     }, headers=CORS_HEADERS)
@@ -369,10 +363,9 @@ async def handle_create(request):
         return web.json_response({"error": err}, status=400, headers=CORS_HEADERS)
 
     uid = request["op_id"]
-    offs = _operator_offices(uid)
-    office_id = body.get("office_id") or offs[0]
-    if office_id not in OFFICE_OPERATORS:
-        office_id = offs[0]
+    # Офис ≡ район: ручной заказ приписывается тому району, который выбрал
+    # оператор. Отдельного выбора офиса больше нет.
+    office_id = dist["id"]
 
     # Authoritative total from the catalog (never trust the iPad's math).
     from api_server import _recompute_order_total_aed   # lazy
@@ -446,9 +439,9 @@ async def _get_manual_order(oid: str):
 
 @require_operator
 async def handle_list(request):
-    """Today's (Dubai) manual orders across the operator's offices."""
+    """Today's (Dubai) manual orders. Привязки офис→оператор пока нет —
+    оператор видит все ручные заказы за сегодня."""
     uid = request["op_id"]
-    offs = set(_operator_offices(uid))
     today = datetime.now(DUBAI_TZ).date()
     out = []
     all_orders = await db.get_all_orders()

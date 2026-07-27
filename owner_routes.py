@@ -47,7 +47,7 @@ MARGIN_PCT = 35
 REVENUE_STATUSES = ("delivered",)
 
 # Office IDs (display order matches dashboard).
-OFFICE_IDS = ("office_central", "office_north", "office_south")
+from config_offices import OFFICE_IDS, OFFICE_NAMES   # офисы ≡ районы
 
 VALID_PERIODS = ("today", "yesterday", "week", "month", "year")
 
@@ -135,13 +135,20 @@ def _sum_field(orders, field: str) -> int:
     return sum(int(o.get(field, 0) or 0) for _, o in orders)
 
 
-def _by_office(orders) -> dict:
-    by = {oid: 0 for oid in OFFICE_IDS}
+def _by_office(orders) -> list:
+    """Выручка по офисам (районам) — списком, т.к. состав офисов теперь
+    настраиваемый. Всё, что пришло со старыми office_id, сворачивается
+    в «Архив», чтобы историческая выручка не пропадала из отчёта."""
+    tot = {}
     for _, o in orders:
-        oid = o.get("office_id")
-        if oid in by:
-            by[oid] += int(o.get("total", 0) or 0)
-    return by
+        oid = o.get("office_id") or ""
+        tot[oid] = tot.get(oid, 0) + int(o.get("total", 0) or 0)
+    rows = [{"id": oid, "name": OFFICE_NAMES[oid], "aed": tot.pop(oid, 0)}
+            for oid in OFFICE_IDS]
+    rest = sum(tot.values())
+    if rest:
+        rows.append({"id": "legacy", "name": "Архив", "aed": rest})
+    return rows
 
 
 def _bucket_trend(orders, start_dt: datetime, period: str) -> list:
@@ -279,7 +286,7 @@ async def handle_finance(request):
         revenue {current, previous, delta_pct, delta_label}
         profit  {current, margin_pct, estimated}
         tips
-        by_office {office_central, office_north, office_south}
+        by_office [{id, name, aed}] — офисы ≡ районы, состав настраиваемый
         trend []        — period-aware sparkline data
         bars_7d {values[7], average, total}  — always last 7 days for Money tab
     """

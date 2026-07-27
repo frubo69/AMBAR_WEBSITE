@@ -732,9 +732,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   <!-- Revenue by office bars -->
   <div class="sect"><div class="sect-t">По офисам</div></div>
   <div class="card">
-    <div class="bar-row"><span class="bar-lbl">Central</span><div class="bar-track"><div class="bar-fill" id="offCentralBar" style="width:0%"></div></div><span class="bar-val" id="offCentralRev" data-aed="">—</span></div>
-    <div class="bar-row"><span class="bar-lbl">North</span><div class="bar-track"><div class="bar-fill info" id="offNorthBar" style="width:0%"></div></div><span class="bar-val" id="offNorthRev" data-aed="">—</span></div>
-    <div class="bar-row" style="margin:0"><span class="bar-lbl">South</span><div class="bar-track"><div class="bar-fill up" id="offSouthBar" style="width:0%"></div></div><span class="bar-val" id="offSouthRev" data-aed="">—</span></div>
+    <div id="officeBars"><div style="padding:12px;color:var(--muted);font-size:13px;text-align:center">—</div></div>
   </div>
 
   <!-- Payment split: crypto (already on the wallet) vs cash (courier collects) -->
@@ -2819,7 +2817,7 @@ function _animCount(el, to){
 // /api/owner/finance request is in flight. Mapped to size hints via CSS.
 const _SKEL_IDS = [
   'heroRev','heroPrev','heroDelta','moneyHero','moneyProfit','moneyDelta',
-  'offCentralRev','offNorthRev','offSouthRev','bars7dAvg','bars7dTotal',
+  'bars7dAvg','bars7dTotal',
   'kOrders','kOrdersAvg','kOrdersDelta','kDeclined','kPending','kDone',
   'kInRoute','kInRouteVal','kAvg','kAvgSub','kLate','kLateCount','kRating'
 ];
@@ -3028,15 +3026,13 @@ function applyPeriod(p){
   } else {
     // Wipe live values so stale numbers don't show during the fetch.
     // Empty data-aed signals applyCurrency to leave the placeholder text alone.
-    ['heroRev','heroPrev','moneyHero','moneyProfit','offCentralRev','offNorthRev','offSouthRev','bars7dAvg','bars7dTotal'].forEach(id=>{
+    ['heroRev','heroPrev','moneyHero','moneyProfit','bars7dAvg','bars7dTotal'].forEach(id=>{
       const el = document.getElementById(id);
       if(el){ el.dataset.aed = ''; el.textContent = '—'; }
     });
     _setText('heroDelta', '…');
     _setText('moneyDelta', '…');
-    ['offCentralBar','offNorthBar','offSouthBar'].forEach(id=>{
-      const b = document.getElementById(id); if(b) b.style.width = '0%';
-    });
+    renderOfficeBars([]);
     // Clear period bars + title to avoid showing previous period's bars
     const pbg = document.getElementById('periodBarsGroup'); if(pbg) pbg.innerHTML = '';
     const pbl = document.getElementById('periodBarsLabels'); if(pbl) pbl.innerHTML = '';
@@ -3092,18 +3088,8 @@ function renderFinance(p, f){
   // period, or a day reached via the hero's day browser.
   _paintHero(p, f);
   _syncDayNav(p, f.window);
-  // By-office bars (Money tab)
-  const off = f.by_office || {};
-  const oc = off.office_central || 0;
-  const on = off.office_north   || 0;
-  const os = off.office_south   || 0;
-  _setAed('offCentralRev', oc);
-  _setAed('offNorthRev',   on);
-  _setAed('offSouthRev',   os);
-  const maxOff = Math.max(1, oc, on, os);
-  const cBar = document.getElementById('offCentralBar'); if(cBar) cBar.style.width = Math.round(oc/maxOff*100) + '%';
-  const nBar = document.getElementById('offNorthBar');   if(nBar) nBar.style.width = Math.round(on/maxOff*100) + '%';
-  const sBar = document.getElementById('offSouthBar');   if(sBar) sBar.style.width = Math.round(os/maxOff*100) + '%';
+  // By-office bars (Money tab) — состав офисов приходит с сервера
+  renderOfficeBars(f.by_office);
   // Money tab hero
   _setAed('moneyHero',   f.revenue.current);
   _setAed('moneyProfit', f.profit.current);
@@ -3145,6 +3131,26 @@ function renderPaySplit(bm){
     if(i.count){ infRow.style.display=''; inf.textContent = `⏳ в доставке, уже оплачено: ${i.aed} AED (≈ ${i.usdt} USDT · ${i.count} зак.)`; }
     else infRow.style.display='none';
   }
+}
+
+// Выручка по офисам (районам). Сервер присылает список — состав офисов
+// настраиваемый, поэтому ничего не захардкожено.
+function renderOfficeBars(rows){
+  const box = document.getElementById('officeBars'); if(!box) return;
+  const list = Array.isArray(rows) ? rows : [];
+  if(!list.length){
+    box.innerHTML = '<div style="padding:12px;color:var(--muted);font-size:13px;text-align:center">Нет данных</div>';
+    return;
+  }
+  const max = Math.max(1, ...list.map(r => r.aed || 0));
+  const tone = ['', 'info', 'up', 'warn', ''];
+  box.innerHTML = list.map((r, i) => `
+    <div class="bar-row"${i === list.length - 1 ? ' style="margin:0"' : ''}>
+      <span class="bar-lbl">${escS(r.name || r.id)}</span>
+      <div class="bar-track"><div class="bar-fill ${tone[i % tone.length]}" style="width:${Math.round((r.aed || 0) / max * 100)}%"></div></div>
+      <span class="bar-val" data-aed="${r.aed || 0}">${r.aed || 0}</span>
+    </div>`).join('');
+  applyCurrency();
 }
 
 function renderChannels(bc){

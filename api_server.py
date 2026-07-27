@@ -385,8 +385,21 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
     tip       = src.get("tip", 0)
     total     = src.get("total", 0)
     loc       = src.get("location", {})
-    office_id = src.get("office_id", "office_central")
-    office_nm = src.get("office_name", "Ambar")
+    # Офис определяет СЕРВЕР по координатам доставки: во фронтенде нет ни
+    # координат офисов, ни логики выбора (и не должно быть). Опорные точки
+    # приходят из .env — см. config_offices. Если координат нет (адрес введён
+    # руками) или точки не настроены — остаётся район, выбранный в форме.
+    office_id = src.get("office_id") or ""
+    office_nm = src.get("office_name") or ""
+    try:
+        from config_offices import nearest_office, office_name as _canon_office_name
+        _near = nearest_office(loc.get("lat"), loc.get("lon"))
+        if _near:
+            office_id, office_nm = _near
+        elif office_id:
+            office_nm = _canon_office_name(office_id)
+    except Exception as e:
+        log.error(f"[office] resolve failed: {e}")
     comment   = src.get("comment", "")
 
     item_lines = "\n".join(
@@ -751,8 +764,9 @@ def _crypto_order_payload(data: dict, uid: int, user: dict, oid: str, total_aed:
         "location": data.get("location", {}),
         "tip": data.get("tip", 0),
         "total": total_aed,
-        "office_id": data.get("office_id", "office_central"),
-        "office_name": data.get("office_name", "Ambar"),
+        # офис доопределит сервер по координатам при промоушене инвойса
+        "office_id": data.get("office_id", ""),
+        "office_name": data.get("office_name", ""),
         "comment": data.get("comment", ""),
         "lang": data.get("lang", "ru"),
         "customer_id": uid,

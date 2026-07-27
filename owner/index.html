@@ -180,11 +180,17 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .delta-sub{font-size:11px;color:var(--sub)}
 /* Hero day browser — swipe the card or tap the arrows to walk back through days.
    Completely independent of the period pills (they reset it to 0). */
-.day-nav{margin-left:auto;display:flex;align-items:center;gap:2px;letter-spacing:0;text-transform:none}
-.dn-b{width:30px;height:26px;border-radius:8px;background:var(--card2);border:1px solid var(--border2);color:var(--gold2);font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.14s var(--e1);padding:0}
-.dn-b:active{transform:scale(.88);background:var(--gold-soft)}
-.dn-b[disabled]{opacity:.28;pointer-events:none}
-.dn-d{min-width:74px;text-align:center;font-size:11px;font-weight:700;color:var(--gold2);font-family:'DM Sans',sans-serif}
+/* one cohesive stepper pill — not three boxes */
+.day-nav{margin-left:auto;display:flex;align-items:center;gap:0;padding:2px;border-radius:999px;
+  background:rgba(201,169,110,.07);border:1px solid rgba(201,169,110,.16);
+  letter-spacing:0;text-transform:none}
+.dn-b{width:26px;height:24px;padding:0;border:none;background:none;border-radius:999px;color:var(--gold2);
+  display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s var(--e1)}
+.dn-b svg{width:13px;height:13px;display:block}
+.dn-b:active{background:rgba(201,169,110,.2);transform:scale(.9)}
+.dn-b[disabled]{opacity:.25;pointer-events:none}
+.dn-d{min-width:66px;text-align:center;font-size:11px;font-weight:700;color:var(--gold2);
+  font-family:'DM Sans',sans-serif;letter-spacing:.2px}
 .hero.day-busy .hero-amt,.hero.day-busy .hero-row,.hero.day-busy .hero-spark{opacity:.45;transition:opacity .15s}
 .hero-spark{margin-top:12px;height:46px;position:relative}
 
@@ -503,10 +509,10 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
       <span id="heroLbl">Выручка · сегодня</span>
       <span class="day-nav" id="dayNav">
         <button class="dn-b" id="dnPrev" aria-label="Предыдущий день"
-          onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayStep(1)">‹</button>
+          onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayStep(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
         <span class="dn-d" id="dnDate">сегодня</span>
         <button class="dn-b" id="dnNext" aria-label="Следующий день" disabled
-          onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayStep(-1)">›</button>
+          onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayStep(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
       </span>
     </div>
     <div>

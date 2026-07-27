@@ -275,6 +275,57 @@ async def handle_ping(request):
     )
 
 
+def _order_summary(o):
+    placed = o.get("timestamp","")
+    confirmed = o.get("confirmed_at","")
+    delivered = o.get("updated_at","") if o.get("status") == "delivered" else ""
+    cancelled_at = o.get("cancelled_at","") or o.get("declined_at","")
+    cancelled_by = o.get("cancelled_by","")
+    cancel_reason = o.get("cancel_reason","") or o.get("decline_reason","") or o.get("declineReason","")
+    actual_min = None
+    base = confirmed or placed
+    if base and delivered:
+        try:
+            from datetime import datetime as _dt
+            p = _dt.fromisoformat(base.replace("Z","+00:00"))
+            d = _dt.fromisoformat(delivered.replace("Z","+00:00"))
+            actual_min = max(0, int((d - p).total_seconds() / 60))
+        except Exception:
+            pass
+    return {
+        "id": o.get("order_id",""),
+        "name": o.get("customer_name","—"),
+        "username": o.get("username","—"),
+        "customer_id": o.get("customer_id",""),
+        "phone": o.get("phone","—"),
+        "total": o.get("total", 0),
+        "crypto": bool(o.get("payment_method") == "crypto" and o.get("paid")),
+        "crypto_usdt": o.get("crypto_amount_usdt") or 0,
+        "manual": bool(o.get("source") == "manual"),
+        "created_by_name": o.get("created_by_name", ""),
+        "district": o.get("district", ""),
+        "dispatch_operator": o.get("dispatch_operator", ""),
+        "driver": o.get("driver", ""),
+        "status": o.get("status",""),
+        "ts": placed,
+        "eta": o.get("eta",""),
+        "confirmed_at": confirmed,
+        "delivered_at": delivered,
+        "cancelled_at": cancelled_at,
+        "cancelled_by": cancelled_by,
+        "cancel_reason": cancel_reason,
+        "actual_min": actual_min,
+        "office": o.get("office_name",""),
+        "address": o.get("address","—"),
+        "gmap_link": o.get("gmap_link",""),
+        "items_short": ", ".join(f"{it.get('name','')} ×{it.get('qty',1)}" for it in (o.get("items") or [])[:3]),
+        "items": [
+            {"id": it.get("id",""), "name": it.get("name",""), "qty": it.get("qty",1)}
+            for it in (o.get("items") or [])
+        ],
+        "cancel_comment": o.get("cancel_comment","") or o.get("comment",""),
+    }
+
 @require_owner
 async def handle_finance(request):
     """Finance summary powering the hero revenue card and Money tab.
@@ -364,56 +415,6 @@ async def handle_finance(request):
         if 0 <= idx < 7:
             orders_7d[idx] += 1
 
-    def _order_summary(o):
-        placed = o.get("timestamp","")
-        confirmed = o.get("confirmed_at","")
-        delivered = o.get("updated_at","") if o.get("status") == "delivered" else ""
-        cancelled_at = o.get("cancelled_at","") or o.get("declined_at","")
-        cancelled_by = o.get("cancelled_by","")
-        cancel_reason = o.get("cancel_reason","") or o.get("decline_reason","") or o.get("declineReason","")
-        actual_min = None
-        base = confirmed or placed
-        if base and delivered:
-            try:
-                from datetime import datetime as _dt
-                p = _dt.fromisoformat(base.replace("Z","+00:00"))
-                d = _dt.fromisoformat(delivered.replace("Z","+00:00"))
-                actual_min = max(0, int((d - p).total_seconds() / 60))
-            except Exception:
-                pass
-        return {
-            "id": o.get("order_id",""),
-            "name": o.get("customer_name","—"),
-            "username": o.get("username","—"),
-            "customer_id": o.get("customer_id",""),
-            "phone": o.get("phone","—"),
-            "total": o.get("total", 0),
-            "crypto": bool(o.get("payment_method") == "crypto" and o.get("paid")),
-            "crypto_usdt": o.get("crypto_amount_usdt") or 0,
-            "manual": bool(o.get("source") == "manual"),
-            "created_by_name": o.get("created_by_name", ""),
-            "district": o.get("district", ""),
-            "dispatch_operator": o.get("dispatch_operator", ""),
-            "driver": o.get("driver", ""),
-            "status": o.get("status",""),
-            "ts": placed,
-            "eta": o.get("eta",""),
-            "confirmed_at": confirmed,
-            "delivered_at": delivered,
-            "cancelled_at": cancelled_at,
-            "cancelled_by": cancelled_by,
-            "cancel_reason": cancel_reason,
-            "actual_min": actual_min,
-            "office": o.get("office_name",""),
-            "address": o.get("address","—"),
-            "gmap_link": o.get("gmap_link",""),
-            "items_short": ", ".join(f"{it.get('name','')} ×{it.get('qty',1)}" for it in (o.get("items") or [])[:3]),
-            "items": [
-                {"id": it.get("id",""), "name": it.get("name",""), "qty": it.get("qty",1)}
-                for it in (o.get("items") or [])
-            ],
-            "cancel_comment": o.get("cancel_comment","") or o.get("comment",""),
-        }
     pending_orders = sorted(
         [o for o in all_orders.values() if o.get("status") == "pending"],
         key=lambda x: x.get("timestamp",""), reverse=True)[:20]
@@ -768,6 +769,104 @@ async def handle_notif_test(request):
     except Exception as e:
         log.error(f"[owner-notif] test send failed: {e}")
         return web.json_response({"error": str(e)}, status=500, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_office(request):
+    """GET /api/owner/office?id=<office_id>&period=&day_offset= — детальный
+    разрез одного района: выручка и динамика, каналы, оплата, скорость,
+    рейтинг, водители, топ позиций и последние заказы."""
+    oid = request.query.get("id", "").strip()
+    if oid not in OFFICE_NAMES:
+        return web.json_response({"error": "unknown office"}, status=404, headers=CORS_HEADERS)
+    period = request.query.get("period", "today")
+    if period not in VALID_PERIODS:
+        period = "today"
+    try:
+        day_offset = max(0, min(365, int(request.query.get("day_offset", "0") or 0)))
+    except ValueError:
+        day_offset = 0
+
+    all_orders = await db.get_all_orders()
+    ref = (_now_dubai() - timedelta(days=day_offset)) if day_offset else None
+    start, end, prev_start, prev_end = _period_window(period, ref)
+
+    mine = lambda pairs: [(dt, o) for dt, o in pairs if (o.get("office_id") or "") == oid]
+    curr      = mine(_orders_in_window(all_orders, start, end))          # доставленные
+    prev      = mine(_orders_in_window(all_orders, prev_start, prev_end))
+    curr_all  = mine(_all_orders_in_window(all_orders, start, end))      # любой статус
+
+    rev = _sum_field(curr, "total")
+    rev_prev = _sum_field(prev, "total")
+    pct = _delta_pct(rev, rev_prev)
+
+    delivered = len(curr)
+    cancelled = sum(1 for _, o in curr_all if o.get("status") in ("declined", "cancelled"))
+    live_pending = sum(1 for o in all_orders.values()
+                       if o.get("status") == "pending" and (o.get("office_id") or "") == oid)
+    live_route = sum(1 for o in all_orders.values()
+                     if o.get("status") == "approved" and (o.get("office_id") or "") == oid)
+
+    # каналы и способ оплаты
+    _phone = [(dt, o) for dt, o in curr if o.get("source") == "manual"]
+    _crypto = [(dt, o) for dt, o in curr if o.get("payment_method") == "crypto" and o.get("paid")]
+    _crypto_aed = _sum_field(_crypto, "total")
+    _phone_aed = _sum_field(_phone, "total")
+
+    # рейтинг
+    revs = [int(o["review_score"]) for _, o in curr if o.get("review_score")]
+    dist = {i: 0 for i in range(1, 6)}
+    for r in revs:
+        if 1 <= r <= 5:
+            dist[r] += 1
+
+    # топ позиций
+    items_agg = {}
+    for _, o in curr:
+        for it in (o.get("items") or []):
+            nm = str(it.get("name", "")).strip() or "—"
+            e = items_agg.setdefault(nm, {"name": nm, "qty": 0, "aed": 0})
+            e["qty"] += int(it.get("qty", 1) or 1)
+            e["aed"] += int(it.get("line_total") or (it.get("price", 0) or 0) * (it.get("qty", 1) or 1))
+    top_items = sorted(items_agg.values(), key=lambda x: -x["aed"])[:8]
+
+    # водители (по ручным заказам района)
+    drv_agg = {}
+    for _, o in curr:
+        nm = (o.get("driver") or "").strip()
+        if not nm:
+            continue
+        e = drv_agg.setdefault(nm, {"name": nm, "orders": 0, "aed": 0})
+        e["orders"] += 1
+        e["aed"] += int(o.get("total", 0) or 0)
+    drivers = sorted(drv_agg.values(), key=lambda x: -x["aed"])
+
+    ds = _delivery_stats(curr)
+    recent = sorted([o for _, o in curr_all], key=lambda x: x.get("timestamp", ""), reverse=True)[:15]
+
+    return web.json_response({
+        "id": oid, "name": OFFICE_NAMES[oid], "period": period,
+        "window": {"date": start.strftime("%Y-%m-%d"),
+                   "today": _now_dubai().strftime("%Y-%m-%d"), "day_offset": day_offset},
+        "revenue": {"current": rev, "previous": rev_prev,
+                    "delta_pct": pct, "delta_label": _delta_label(pct)},
+        "orders": {"total": len(curr_all), "delivered": delivered,
+                   "cancelled": cancelled, "pending": live_pending, "in_route": live_route},
+        "avg_check": (rev // delivered) if delivered else 0,
+        "by_channel": {"app":   {"aed": rev - _phone_aed, "count": delivered - len(_phone)},
+                       "phone": {"aed": _phone_aed, "count": len(_phone)}},
+        "by_method":  {"crypto": {"aed": _crypto_aed, "count": len(_crypto)},
+                       "cash":   {"aed": rev - _crypto_aed, "count": delivered - len(_crypto)}},
+        "delivery": {"avg_min": ds["avg_min"], "sample": ds["sample"],
+                     "late_count": ds["late_count"], "late_pct": ds["late_pct"],
+                     "threshold": LATE_THRESHOLD_FALLBACK},
+        "rating": {"avg": round(sum(revs) / len(revs), 2) if revs else 0,
+                   "count": len(revs), "dist": dist},
+        "trend": _bucket_trend(curr, start, period),
+        "top_items": top_items,
+        "drivers": drivers,
+        "recent": [_order_summary(o) for o in recent],
+    }, headers=CORS_HEADERS)
 
 
 # ── Support conversations (owner app "переписка" window) ────────────────────
@@ -1704,6 +1803,8 @@ def setup(app):
     app.router.add_get(             "/api/owner/ping",    handle_ping)
     app.router.add_route("OPTIONS", "/api/owner/finance", handle_finance)
     app.router.add_get(             "/api/owner/finance", handle_finance)
+    app.router.add_route("OPTIONS", "/api/owner/office",  handle_office)
+    app.router.add_get(             "/api/owner/office",  handle_office)
     app.router.add_route("OPTIONS", "/api/owner/customers",              handle_customers)
     app.router.add_get(             "/api/owner/customers",              handle_customers)
     app.router.add_route("OPTIONS", "/api/owner/customers/{telegram_id}", handle_customer_detail)

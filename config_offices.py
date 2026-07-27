@@ -37,14 +37,11 @@ OFFICES = [
 OFFICE_IDS = tuple(o["id"] for o in OFFICES)
 OFFICE_NAMES = {o["id"]: o["name"] for o in OFFICES}
 
-# Офисы из прошлой схемы. Живых заказов туда больше не пишем, но старые
-# заказы на них ссылаются — чтобы история выручки и списки не ломались.
+# Старые id из прошлой схемы. История уже разложена по районам
+# (district_id / координаты / название района в адресе); сюда попадают лишь
+# единичные заказы, у которых нет вообще никаких признаков местоположения.
 LEGACY_OFFICE_IDS = ("office_central", "office_north", "office_south")
-LEGACY_OFFICE_NAMES = {
-    "office_central": "Архив · Central",
-    "office_north":   "Архив · North",
-    "office_south":   "Архив · South",
-}
+LEGACY_OFFICE_NAMES = {oid: "Без района" for oid in LEGACY_OFFICE_IDS}
 
 def office_name(office_id: str) -> str:
     return OFFICE_NAMES.get(office_id) or LEGACY_OFFICE_NAMES.get(office_id) or (office_id or "—")

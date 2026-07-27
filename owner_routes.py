@@ -137,8 +137,8 @@ def _sum_field(orders, field: str) -> int:
 
 def _by_office(orders) -> list:
     """Выручка по офисам (районам) — списком, т.к. состав офисов теперь
-    настраиваемый. Всё, что пришло со старыми office_id, сворачивается
-    в «Архив», чтобы историческая выручка не пропадала из отчёта."""
+    настраиваемый. Заказы без определимого района (их единицы) идут отдельной
+    строкой «Без района», чтобы сумма сходилась."""
     tot = {}
     for _, o in orders:
         oid = o.get("office_id") or ""
@@ -147,7 +147,7 @@ def _by_office(orders) -> list:
             for oid in OFFICE_IDS]
     rest = sum(tot.values())
     if rest:
-        rows.append({"id": "legacy", "name": "Архив", "aed": rest})
+        rows.append({"id": "legacy", "name": "Без района", "aed": rest})
     return rows
 
 
@@ -429,6 +429,52 @@ async def handle_finance(request):
 
     period_lbl_for_rating = {"today":"сегодня","yesterday":"вчера","week":"неделя","month":"месяц","year":"год"}[period]
 
+    # ── Разрез по офисам (страница «Офисы») ──────────────────────────────
+    # Только реальные данные: выручка, заказы, среднее время доставки, рейтинг
+    # и сколько заказов в работе прямо сейчас. Ничего выдуманного.
+    _deliv_by, _all_by, _live_by = {}, {}, {}
+    for _dt, _o in curr_orders:
+        _deliv_by.setdefault(_o.get("office_id") or "", []).append(_o)
+    for _dt, _o in curr_all:
+        _all_by.setdefault(_o.get("office_id") or "", []).append(_o)
+    for _o in all_orders.values():
+        if _o.get("status") in ("pending", "approved"):
+            _k = _o.get("office_id") or ""
+            _live_by[_k] = _live_by.get(_k, 0) + 1
+
+    offices_block = []
+    for _oid in OFFICE_IDS:
+        _dl = _deliv_by.get(_oid, [])
+        _ds = _delivery_stats([(None, x) for x in _dl])
+        _revs = [int(x["review_score"]) for x in _dl if x.get("review_score")]
+        offices_block.append({
+            "id":           _oid,
+            "name":         OFFICE_NAMES[_oid],
+            "aed":          sum(int(x.get("total", 0) or 0) for x in _dl),
+            "orders":       len(_all_by.get(_oid, [])),
+            "delivered":    len(_dl),
+            "avg_min":      _ds["avg_min"],
+            "avg_sample":   _ds["sample"],
+            "late_count":   _ds["late_count"],
+            "rating":       round(sum(_revs) / len(_revs), 2) if _revs else 0,
+            "rating_count": len(_revs),
+            "active":       _live_by.get(_oid, 0),
+        })
+    # Единичные заказы без признаков местоположения (нет района, координат и
+    # узнаваемого адреса) — отдельной строкой, чтобы сумма сходилась.
+    _legacy_dl = [x for k, v in _deliv_by.items() if k not in OFFICE_IDS for x in v]
+    if _legacy_dl:
+        _lds = _delivery_stats([(None, x) for x in _legacy_dl])
+        offices_block.append({
+            "id": "legacy", "name": "Без района", "legacy": True,
+            "aed": sum(int(x.get("total", 0) or 0) for x in _legacy_dl),
+            "orders": sum(len(v) for k, v in _all_by.items() if k not in OFFICE_IDS),
+            "delivered": len(_legacy_dl),
+            "avg_min": _lds["avg_min"], "avg_sample": _lds["sample"],
+            "late_count": _lds["late_count"], "rating": 0, "rating_count": 0,
+            "active": sum(v for k, v in _live_by.items() if k not in OFFICE_IDS),
+        })
+
     # ── Crypto vs cash split ─────────────────────────────────────────
     # Crypto lands on the wallet at PAYMENT time (order placement), cash arrives
     # with the courier at delivery — the owner needs to instantly see which part
@@ -485,6 +531,7 @@ async def handle_finance(request):
         })(sum(o.get("total", 0) for _, o in curr_orders if o.get("source") == "manual"),
            sum(1 for _, o in curr_orders if o.get("source") == "manual")),
         "by_office": _by_office(curr_orders),
+        "offices":   offices_block,
         "trend":     _bucket_trend(curr_orders, start, period),
         "bars_7d": {
             "values":  bars,

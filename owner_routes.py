@@ -151,11 +151,12 @@ def _bucket_trend(orders, start_dt: datetime, period: str) -> list:
         buckets = [0] * 24
         for dt, o in orders:
             buckets[dt.hour] += int(o.get("total", 0) or 0)
-        if period == "today":
-            # Trim to current hour so the sparkline doesn't show empty future hours.
-            cutoff = _now_dubai().hour + 1
-            return buckets[:cutoff] or [0]
-        return buckets   # yesterday is a full past day — all 24 hours
+        # Only the LIVE day is trimmed to the current hour (no empty future hours);
+        # any completed day — yesterday, or a day reached via day_offset — shows all 24.
+        now = _now_dubai()
+        if start_dt.date() == now.date():
+            return buckets[:now.hour + 1] or [0]
+        return buckets
     if period == "week":
         buckets = [0] * 7
         for dt, o in orders:
@@ -289,9 +290,18 @@ async def handle_finance(request):
             status=400, headers=CORS_HEADERS,
         )
 
+    # day_offset shifts the whole window N days into the past — powers the hero
+    # card's day browser (swipe / arrows) without touching the period pills.
+    try:
+        day_offset = int(request.query.get("day_offset", "0") or 0)
+    except ValueError:
+        day_offset = 0
+    day_offset = max(0, min(365, day_offset))
+
     all_orders = await db.get_all_orders()
 
-    start, end, prev_start, prev_end = _period_window(period)
+    ref = (_now_dubai() - timedelta(days=day_offset)) if day_offset else None
+    start, end, prev_start, prev_end = _period_window(period, ref)
     curr_orders = _orders_in_window(all_orders, start, end)        # delivered only
     prev_orders = _orders_in_window(all_orders, prev_start, prev_end)
     curr_all    = _all_orders_in_window(all_orders, start, end)    # any status
@@ -433,6 +443,13 @@ async def handle_finance(request):
     return web.json_response({
         "period": period,
         "currency": "AED",
+        # Authoritative Dubai-local dates for the window — the client labels the
+        # hero day from these (its own clock/TZ may differ from the office's).
+        "window": {
+            "date":       start.strftime("%Y-%m-%d"),
+            "today":      _now_dubai().strftime("%Y-%m-%d"),
+            "day_offset": day_offset,
+        },
         "revenue": {
             "current":     rev_curr,
             "previous":    rev_prev,

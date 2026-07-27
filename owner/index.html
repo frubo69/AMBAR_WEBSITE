@@ -178,6 +178,14 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .delta.up{background:var(--up-soft);color:var(--up);border:1px solid rgba(76,175,125,.22)}
 .delta.dn{background:var(--dn-soft);color:var(--dn);border:1px solid rgba(224,85,85,.22)}
 .delta-sub{font-size:11px;color:var(--sub)}
+/* Hero day browser — swipe the card or tap the arrows to walk back through days.
+   Completely independent of the period pills (they reset it to 0). */
+.day-nav{margin-left:auto;display:flex;align-items:center;gap:2px;letter-spacing:0;text-transform:none}
+.dn-b{width:30px;height:26px;border-radius:8px;background:var(--card2);border:1px solid var(--border2);color:var(--gold2);font-size:15px;line-height:1;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.14s var(--e1);padding:0}
+.dn-b:active{transform:scale(.88);background:var(--gold-soft)}
+.dn-b[disabled]{opacity:.28;pointer-events:none}
+.dn-d{min-width:74px;text-align:center;font-size:11px;font-weight:700;color:var(--gold2);font-family:'DM Sans',sans-serif}
+.hero.day-busy .hero-amt,.hero.day-busy .hero-row,.hero.day-busy .hero-spark{opacity:.45;transition:opacity .15s}
 .hero-spark{margin-top:12px;height:46px;position:relative}
 
 /* Bento grid */
@@ -493,6 +501,13 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   <div class="hero" data-detail="kpi:revenue">
     <div class="hero-lbl">
       <span id="heroLbl">Выручка · сегодня</span>
+      <span class="day-nav" id="dayNav">
+        <button class="dn-b" id="dnPrev" aria-label="Предыдущий день"
+          onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayStep(1)">‹</button>
+        <span class="dn-d" id="dnDate">сегодня</span>
+        <button class="dn-b" id="dnNext" aria-label="Следующий день" disabled
+          onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayStep(-1)">›</button>
+      </span>
     </div>
     <div>
       <span class="hero-amt mono" id="heroRev" data-aed="">—</span><span class="hero-unit cur-unit">AED</span>
@@ -2828,8 +2843,108 @@ function updateSparkline(p){
 // Cache live finance responses by period (avoids refetching on tab toggle).
 const FINANCE_CACHE = {};
 
+// ===== Hero day browser =====
+// Swipe the revenue card (or tap ‹ ›) to walk back through individual days.
+// Deliberately independent of the period pills: swiping never moves them, and
+// picking any period resets the browser — the app then behaves exactly as before.
+let DAY_OFFSET = 0;
+const _MONTHS_GEN = ['января','февраля','марта','апреля','мая','июня','июля',
+                     'августа','сентября','октября','ноября','декабря'];
+// offset 0 keeps the plain period key, so every other consumer of FINANCE_CACHE
+// (detail sheets, the 15s poll) is untouched by day browsing.
+const _fkey = (p, off) => off ? p + ':' + off : p;
+
+function _dayNavOn(p){ return p === 'today' || p === 'yesterday'; }
+
+function _dayLabel(w){
+  // Labelled from the SERVER's Dubai dates — the device's clock/TZ may differ.
+  if(!w || !w.date) return DAY_OFFSET ? DAY_OFFSET + ' дн. назад' : 'сегодня';
+  const d = new Date(w.date + 'T00:00:00'), t = new Date((w.today || w.date) + 'T00:00:00');
+  const diff = Math.round((t - d) / 86400000);
+  if(diff === 0) return 'сегодня';
+  if(diff === 1) return 'вчера';
+  return d.getDate() + ' ' + (_MONTHS_GEN[d.getMonth()] || '');
+}
+
+function _syncDayNav(p, w){
+  const nav = document.getElementById('dayNav');
+  if(nav) nav.style.display = _dayNavOn(p) ? 'flex' : 'none';
+  const nx = document.getElementById('dnNext'); if(nx) nx.disabled = DAY_OFFSET <= 0;
+  _setText('dnDate', _dayLabel(w));
+  // The header must never contradict the date chip.
+  const hl = document.getElementById('heroLbl');
+  if(hl && DAY_OFFSET) hl.textContent = 'Выручка';
+  _setText('heroPrevLbl', DAY_OFFSET ? 'vs пред. день'
+                                     : ((PERIOD_DATA[p] || {}).prev || 'vs вчера'));
+}
+
+async function _loadDay(p){
+  const hero = document.querySelector('#pg-overview .hero');
+  if(!DAY_OFFSET){                       // back to the live period view
+    const hl = document.getElementById('heroLbl');
+    if(hl) hl.textContent = 'Выручка · ' + ((PERIOD_DATA[p] || {}).lbl || '');
+    const d = FINANCE_CACHE[p];
+    _syncDayNav(p, d && d.window);
+    if(d){ _paintHero(p, d); applyCurrency(); } else { applyFinanceLive(p); }
+    return true;
+  }
+  const key = _fkey(p, DAY_OFFSET);
+  let data = FINANCE_CACHE[key];
+  if(!data){
+    if(hero) hero.classList.add('day-busy');
+    try{
+      data = await ownerApi.ownerFetch('/api/owner/finance',
+                                       {params:{period:p, day_offset:DAY_OFFSET}});
+      FINANCE_CACHE[key] = data;
+    }catch(e){
+      console.warn('[day] fetch failed', e);
+      return false;
+    }finally{
+      if(hero) hero.classList.remove('day-busy');
+    }
+  }
+  if(_fkey(p, DAY_OFFSET) !== key) return true;   // user kept swiping — drop stale response
+  _paintHero(p, data);
+  _syncDayNav(p, data.window);
+  applyCurrency();
+  return true;
+}
+
+async function dayStep(delta){
+  const p = document.querySelector('#periodPicker button.on')?.dataset?.p || 'today';
+  if(!_dayNavOn(p)) return;
+  const prev = DAY_OFFSET;
+  const next = Math.max(0, Math.min(365, prev + delta));
+  if(next === prev) return;
+  DAY_OFFSET = next;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  const ok = await _loadDay(p);
+  if(!ok){                                        // failed → don't let the chip lie
+    DAY_OFFSET = prev;
+    _syncDayNav(p, (FINANCE_CACHE[_fkey(p, prev)] || {}).window);
+  }
+}
+
+// Swipe the hero: right → older day, left → back toward today.
+(function(){
+  const hero = document.querySelector('#pg-overview .hero');
+  if(!hero) return;
+  let sx = 0, sy = 0, live = false;
+  hero.addEventListener('touchstart', e=>{
+    if(e.touches.length !== 1){ live = false; return; }
+    sx = e.touches[0].clientX; sy = e.touches[0].clientY; live = true;
+  }, {passive:true});
+  hero.addEventListener('touchend', e=>{
+    if(!live) return; live = false;
+    const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    if(Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.4) return;  // vertical scroll wins
+    dayStep(dx > 0 ? 1 : -1);
+  }, {passive:true});
+})();
+
 function applyPeriod(p){
   const d = PERIOD_DATA[p]; if(!d) return;
+  DAY_OFFSET = 0;   // any period pill resets the day browser — pre-swipe behaviour
   // Sync the active button across both period pickers (Overview + Money tab)
   // so switching on one reflects on the other.
   ['periodPicker', 'moneyPeriod'].forEach(gid=>{
@@ -2841,6 +2956,7 @@ function applyPeriod(p){
   // Header label (only thing pulled from PERIOD_DATA — everything else is API-driven)
   const heroLbl = document.getElementById('heroLbl'); if(heroLbl) heroLbl.textContent = 'Выручка · ' + d.lbl;
   _setText('heroPrevLbl', d.prev);
+  _syncDayNav(p, (FINANCE_CACHE[p] || {}).window);
   // If we have cached live data for this period, render instantly; otherwise
   // show placeholders so stale mock values don't flash.
   if(FINANCE_CACHE[p]){
@@ -2888,10 +3004,9 @@ async function applyFinanceLive(p){
   renderFinance(p, data);
 }
 
-function renderFinance(p, f){
-  // Data has arrived — clear loading shimmers before painting real values.
-  setFinanceSkel(false);
-  // Overview hero
+// Paints ONLY the hero revenue block (amount, delta, sparkline) — shared by the
+// period render and the day browser.
+function _paintHero(p, f){
   _setAed('heroRev',  f.revenue.current);
   _setAed('heroPrev', f.revenue.previous);
   _setText('heroDelta', f.revenue.delta_label);
@@ -2900,11 +3015,18 @@ function renderFinance(p, f){
     hd.classList.toggle('up', f.revenue.delta_pct >  0);
     hd.classList.toggle('dn', f.revenue.delta_pct <  0);
   }
-  // Sparkline trend (override mock)
   if(Array.isArray(f.trend) && f.trend.length){
     PERIOD_TREND[p] = f.trend.length === 1 ? [0, f.trend[0]] : f.trend;
     updateSparkline(p);
   }
+}
+
+function renderFinance(p, f){
+  // Data has arrived — clear loading shimmers before painting real values.
+  setFinanceSkel(false);
+  // Overview hero — skipped while the day browser is showing a past day, so the
+  // 15s poll can't yank the card back to the current period.
+  if(!DAY_OFFSET){ _paintHero(p, f); _syncDayNav(p, f.window); }
   // By-office bars (Money tab)
   const off = f.by_office || {};
   const oc = off.office_central || 0;

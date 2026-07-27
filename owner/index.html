@@ -786,6 +786,21 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     <div style="font-size:12px;color:var(--muted);margin-top:2px" id="offSub">районы · сравнение</div>
   </div>
 
+  <div class="period-bar" style="margin-top:14px">
+    <div class="periods" id="officePeriod">
+      <div class="period-pill"></div>
+      <button class="on" data-p="today">Сегодня</button>
+      <button data-p="yesterday">Вчера</button>
+      <button data-p="week">Неделя</button>
+      <button data-p="month">Месяц</button>
+      <button data-p="year">Год</button>
+    </div>
+    <button class="cal-btn" onclick="openDate('officePeriod')" aria-label="Свой период">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
+    </button>
+  </div>
+  <div class="range-chip" id="rangeChip-officePeriod" style="display:none"><span class="rc-icon">📅</span><span class="rc-text"></span><button class="rc-x" onclick="clearRange('officePeriod')">✕</button></div>
+
   <!-- карточки офисов — рендерятся из /api/owner/finance -->
   <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px" id="offCards">
     <div class="card" style="padding:16px;color:var(--muted);font-size:13px;text-align:center">Загрузка…</div>
@@ -2959,7 +2974,7 @@ function applyPeriod(p){
   DAY_OFFSET = 0;   // any period pill resets the day browser — pre-swipe behaviour
   // Sync the active button across both period pickers (Overview + Money tab)
   // so switching on one reflects on the other.
-  ['periodPicker', 'moneyPeriod'].forEach(gid=>{
+  ['periodPicker', 'moneyPeriod', 'officePeriod'].forEach(gid=>{
     const g = document.getElementById(gid);
     if(!g) return;
     g.querySelectorAll('button').forEach(b=>b.classList.toggle('on', b.dataset.p === p));
@@ -3085,6 +3100,115 @@ function renderPaySplit(bm){
   }
 }
 
+// Детальный разрез района: /api/owner/office за выбранный на странице период.
+// Ничего не выдумываем — блок не рисуется, если данных за период нет.
+async function _officeLoad(id){
+  const key = 'office:' + id;
+  const p = document.querySelector('#officePeriod button.on')?.dataset?.p
+         || document.querySelector('#periodPicker button.on')?.dataset?.p || 'today';
+  let d;
+  try{ d = await ownerApi.ownerFetch('/api/owner/office', {params:{id, period:p}}); }
+  catch(e){
+    if(_dtCurrent === key)
+      document.getElementById('offDetBody').innerHTML =
+        `<div class="dt-card"><div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--dn)">Не удалось загрузить район${e&&e.status?' ('+e.status+')':''}</div></div></div></div>`;
+    return;
+  }
+  if(_dtCurrent !== key) return;                      // пользователь уже ушёл
+
+  const lbl = {today:'сегодня',yesterday:'вчера',week:'неделя',month:'месяц',year:'год'}[p] || p;
+  _setText('offDetName', d.name);
+  _setText('offDetSub', `${lbl} · ${d.orders.delivered} доставлено из ${d.orders.total}`);
+
+  const row = (l, r, color) =>
+    `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${l}</div></div>`+
+    `<div class="dt-row-r"${color?` style="color:${color}"`:''}>${r}</div></div>`;
+  const money = v => `<span data-aed="${v||0}">${v||0}</span> AED`;
+  const bar = (name, val, max, cls) =>
+    `<div class="bar-row"><span class="bar-lbl" style="width:auto;min-width:108px;white-space:nowrap">${escS(name)}</span>`+
+    `<div class="bar-track"><div class="bar-fill ${cls||''}" style="width:${max?Math.round(val/max*100):0}%"></div></div>`+
+    `<span class="bar-val">${money(val)}</span></div>`;
+
+  const dl = d.delivery, rt = d.rating, ch = d.by_channel, pm = d.by_method;
+  const chMax = Math.max(1, ch.app.aed, ch.phone.aed);
+  const pmMax = Math.max(1, pm.crypto.aed, pm.cash.aed);
+  const stars = [5,4,3,2,1].filter(s => rt.dist[s]);
+
+  let html = `
+    <div style="padding:20px 16px;text-align:center;background:var(--card);border:1px solid var(--border2);border-radius:14px;margin-bottom:8px">
+      <div class="dt-stat-val gold" style="font-size:42px;line-height:1"><span data-aed="${d.revenue.current}">${d.revenue.current}</span><span class="u" style="font-size:15px;margin-left:8px">AED</span></div>
+      <div style="margin-top:10px;font-size:12px;color:var(--muted)">
+        <span class="delta ${d.revenue.delta_pct>0?'up':(d.revenue.delta_pct<0?'dn':'')}">${d.revenue.delta_label}</span>
+        · пред. период <span data-aed="${d.revenue.previous}">${d.revenue.previous}</span> AED
+      </div>
+    </div>
+
+    <div class="dt-sect">Заказы</div>
+    <div class="dt-card">
+      ${row('Доставлено', d.orders.delivered, 'var(--up)')}
+      ${row('Отменено / отклонено', d.orders.cancelled, d.orders.cancelled?'var(--dn)':'')}
+      ${row('Средний чек', money(d.avg_check))}
+      ${(d.orders.pending||d.orders.in_route) ? row('Сейчас в работе', `${d.orders.pending} ждут · ${d.orders.in_route} в пути`, 'var(--info)') : ''}
+    </div>
+
+    <div class="dt-sect">Каналы</div>
+    <div class="dt-card">
+      ${bar('📱 Приложение', ch.app.aed, chMax)}
+      ${bar('📞 Телефон', ch.phone.aed, chMax, 'info')}
+      <div style="font-size:11px;color:var(--muted);text-align:center;padding-top:8px;border-top:1px solid var(--border2);margin-top:4px">
+        ${ch.app.count} заказов через приложение · ${ch.phone.count} по телефону
+      </div>
+    </div>
+
+    <div class="dt-sect">Оплата</div>
+    <div class="dt-card">
+      ${bar('💵 Наличные', pm.cash.aed, pmMax)}
+      ${bar('💎 Крипта', pm.crypto.aed, pmMax, 'up')}
+    </div>
+
+    <div class="dt-sect">Скорость доставки</div>
+    <div class="dt-card">
+      ${dl.sample
+        ? row('Среднее время', `${dl.avg_min} мин`, dl.avg_min>40?'var(--warn)':'var(--up)') +
+          row('Опоздания', `${dl.late_count} (${dl.late_pct}%)`, dl.late_count?'var(--warn)':'var(--muted)') +
+          row('Замеров', dl.sample, 'var(--muted)')
+        : row('Замеров пока нет', '—', 'var(--muted)')}
+    </div>`;
+
+  if(rt.count){
+    html += `<div class="dt-sect">Рейтинг</div><div class="dt-card">
+      ${row('Средняя оценка', `★ ${rt.avg}`, 'var(--up)')}
+      ${stars.map(s => row('★'.repeat(s), rt.dist[s])).join('')}
+      ${row('Отзывов', rt.count, 'var(--muted)')}
+    </div>`;
+  }
+
+  if((d.drivers||[]).length){
+    const dMax = Math.max(1, ...d.drivers.map(x=>x.aed));
+    html += `<div class="dt-sect">Водители</div><div class="dt-card">
+      ${d.drivers.map(x => `<div class="bar-row"><span class="bar-lbl" style="width:auto;min-width:108px;white-space:nowrap">🚗 ${escS(x.name)}</span>
+        <div class="bar-track"><div class="bar-fill" style="width:${Math.round(x.aed/dMax*100)}%"></div></div>
+        <span class="bar-val">${money(x.aed)}</span></div>
+        <div style="font-size:10px;color:var(--muted);margin:-6px 0 8px 2px">${x.orders} заказов</div>`).join('')}
+    </div>`;
+  }
+
+  if((d.top_items||[]).length){
+    html += `<div class="dt-sect">Топ позиций</div><div class="dt-card">
+      ${d.top_items.map(i => `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${escS(i.name)}</div>
+        <div class="dt-row-s">${i.qty} шт</div></div><div class="dt-row-r gold">${money(i.aed)}</div></div>`).join('')}
+    </div>`;
+  }
+
+  if((d.recent||[]).length){
+    html += `<div class="dt-sect">Последние заказы</div>
+      <div class="dt-card"><div style="max-height:260px;overflow-y:auto;-webkit-overflow-scrolling:touch">${orderRows(d.recent)}</div></div>`;
+  }
+
+  document.getElementById('offDetBody').innerHTML = html;
+  applyCurrency();
+}
+
 // Страница «Офисы» — только реальные цифры из /api/owner/finance.
 // Ни выдуманных операторов, ни «в очереди», ни статусов «открыт/загружен»:
 // таких данных в системе нет, поэтому их и не показываем.
@@ -3113,7 +3237,7 @@ function renderOffices(rows){
     const rating = r.rating_count ? `${r.rating} <span style="font-size:10px;color:var(--muted)">(${r.rating_count})</span>` : '—';
     const avg = r.avg_sample ? `${r.avg_min}м` : '—';
     const avgColor = !r.avg_sample ? 'var(--muted)' : (r.avg_min > 40 ? 'var(--warn)' : 'var(--up)');
-    return `<div class="card" style="padding:16px${r.legacy?';opacity:.65':''}">
+    return `<div class="card" style="padding:16px${r.legacy?';opacity:.65':''}"${r.legacy?'':` data-detail="office:${r.id}"`}>
       <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
         <div class="office-badge ${r.legacy?'':'c'}">${escS(letter)}</div>
         <div style="flex:1;min-width:0">
@@ -5577,6 +5701,7 @@ document.querySelectorAll('.periods').forEach(g=>{
       }
       if(g.id==='periodPicker' && b.dataset.p) applyPeriod(b.dataset.p);
       if(g.id==='moneyPeriod' && b.dataset.p) applyPeriod(b.dataset.p);
+      if(g.id==='officePeriod' && b.dataset.p) applyPeriod(b.dataset.p);
       if(g.id==='peopleTabs' && b.dataset.tab) applyPeopleTab(b.dataset.tab);
       if(g.id==='opPeriod' && b.dataset.opP) applyOpPeriod(b.dataset.opP);
       try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
@@ -6107,47 +6232,33 @@ function syncActiveCount(){
   }
 }
 
+// Строки заказов — общий рендер для всех детальных экранов.
+const stColor = {delivered:'var(--up)',approved:'var(--info)',pending:'var(--warn)',declined:'var(--dn)',cancelled:'var(--dn)'};
+const stLabel = {delivered:'доставлен',approved:'в пути',pending:'ожидает',declined:'отклонён',cancelled:'отменён'};
+window.orderRows = (list)=>{
+  if(!list||!list.length) return '<div style="padding:20px 16px;text-align:center;color:var(--muted);font-size:13px">Нет заказов</div>';
+  const wrap = list.length > 3;
+  const inner = list.map(o=>{
+    const time = fmtWhen(o.ts);   // today → HH:MM, older → dd/mm/yyyy HH:MM
+    const st = stLabel[o.status]||o.status;
+    const sc = stColor[o.status]||'var(--muted)';
+    return `<div class="dt-row" data-detail="order:${o.id}"><div class="dt-row-l"><div class="dt-row-t">#${o.id}${o.crypto?' <span title="оплачено криптой" style="font-size:10px">💎</span>':''}${o.manual?' <span title="ручной заказ · по телефону" style="font-size:10px">📞</span>':''} <span class="dt-row-tiny" style="color:${sc}">${st}</span></div><div class="dt-row-s">${time}${o.items_short?' · '+o.items_short:''}${o.eta?' · ETA '+o.eta+' мин':''}</div></div><div class="dt-row-r ${o.crypto?'':'gold'}" ${o.crypto?'style="color:#26A17B"':''}>${o.total}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:2px">›</div></div>`;
+  }).join('');
+  if(wrap) return `<div style="max-height:220px;overflow-y:auto;-webkit-overflow-scrolling:touch">${inner}</div>`;
+  return inner;
+};
+
 const DETAIL = {
+  // Детальный разрез района. openDetail синхронный → рисуем скелет,
+  // _officeLoad() наполняет его данными с /api/owner/office.
   office: id=>{
-    const d = {
-      central:{name:'Ambar Central', b:'A', g:'c', st:'открыт', stc:'var(--up)', ops:3, rev:8420, ord:19, avg:35, rate:4.9, late:2, chk:443, delta:14, trend:[5200,4800,6100,5400,7200,7800,8420]},
-      north:  {name:'Ambar North',   b:'N', g:'n', st:'открыт', stc:'var(--up)', ops:2, rev:6240, ord:16, avg:41, rate:4.7, late:1, chk:390, delta:9,  trend:[4400,4100,4900,4600,5400,5800,6240]},
-      south:  {name:'Ambar South',   b:'S', g:'s', st:'загружен', stc:'var(--warn)', ops:2, rev:3760, ord:12, avg:43, rate:4.8, late:3, chk:313, delta:-3, trend:[3900,3700,4200,3800,3600,3900,3760]}
-    }[id];
-    const deltaH = d.delta>=0 ? `<span class="delta up">▲ ${d.delta}%</span>` : `<span class="delta dn">▼ ${Math.abs(d.delta)}%</span>`;
-    const max = Math.max(...d.trend);
-    const days = ['ПН','ВТ','СР','ЧТ','ПТ','СБ','СЕГ'];
-    const trend = d.trend.map((v,i)=>`<div class="dt-bar"><div class="dt-bar-l">${days[i]}${i===6?' · сегодня':''}</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:${Math.round(v/max*100)}%${i===6?';background:linear-gradient(90deg,var(--gold2),var(--gold3))':''}"></div></div><div class="dt-bar-v">${fmt(v)}</div></div>`).join('');
-    const op = {central:{n:'Ахмад К.',i:'АХ',gr:'c',top:true,resp:12,ra:4.9},north:{n:'Рашид Н.',i:'РН',gr:'n',top:false,resp:28,ra:4.7},south:{n:'Дима М.',i:'ДМ',gr:'s',top:false,resp:102,ra:4.8}}[id];
-    const respTxt = op.resp<60?`${op.resp} сек`:`${Math.floor(op.resp/60)}:${String(op.resp%60).padStart(2,'0')} мин`;
+    _officeLoad(id);
     return {
-      title: `<div class="dt-tit-av ${d.g}">${d.b}</div><div><div class="dt-tit-name">${d.name}</div><div class="dt-sub">● <span style="color:${d.stc}">${d.st}</span> · 1 оператор · ${deltaH}</div></div>`,
-      body: `
-        <div class="dt-stats">
-          <div class="dt-stat"><div class="dt-stat-lbl">Выручка</div><div class="dt-stat-val gold">${fmt(d.rev)}<span class="u">AED</span></div><div class="dt-stat-sub">сегодня</div></div>
-          <div class="dt-stat"><div class="dt-stat-lbl">Заказы</div><div class="dt-stat-val">${d.ord}</div><div class="dt-stat-sub">доставлено ${d.ord-d.late}</div></div>
-          <div class="dt-stat"><div class="dt-stat-lbl">Ср. время</div><div class="dt-stat-val ${d.avg>40?'warn':'up'}">${d.avg}<span class="u">мин</span></div><div class="dt-stat-sub">норматив 40</div></div>
-          <div class="dt-stat"><div class="dt-stat-lbl">★ Рейтинг</div><div class="dt-stat-val up">${d.rate}</div><div class="dt-stat-sub">34 оценки</div></div>
-          <div class="dt-stat"><div class="dt-stat-lbl">Опоздания</div><div class="dt-stat-val ${d.late>1?'warn':''}">${d.late}</div><div class="dt-stat-sub">дольше ETA</div></div>
-          <div class="dt-stat"><div class="dt-stat-lbl">Ср. чек</div><div class="dt-stat-val">${d.chk}<span class="u">AED</span></div><div class="dt-stat-sub">vs нед. +3%</div></div>
-        </div>
-        <div class="dt-sect">Выручка · 7 дней</div>
-        <div class="dt-card">${trend}</div>
-        <div class="dt-sect">Оператор офиса</div>
-        <div class="dt-card">
-          <div class="dt-row" data-detail="operator:${id}"><div class="lrow-av" style="background:linear-gradient(135deg,${op.top?'#c9a96e,#e8c98a':'#242440,#1a1a2e'});color:${op.top?'#0a0a14':'var(--sub)'};width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:12px;flex-shrink:0">${op.i}</div><div class="dt-row-l"><div class="dt-row-t">${op.n} ${op.top?'<span class="dt-badge" style="background:rgba(201,169,110,.2);color:var(--gold2)">TOP</span>':''}</div><div class="dt-row-s">реакция ${respTxt} · ★ ${op.ra}</div></div><div class="dt-row-r" style="color:var(--muted)">›</div></div>
-        </div>
-        <div class="dt-sect">Последние заказы</div>
-        <div class="dt-card">
-          <div class="dt-row" data-detail="order:AMB7601680"><div class="dt-row-l"><div class="dt-row-t">#AMB7601 680 <span class="dt-row-tiny" style="color:var(--up)">доставлен</span></div><div class="dt-row-s">18:42 · Absolut 1L + Coke · 34 мин</div></div><div class="dt-row-r gold">320</div></div>
-          <div class="dt-row" data-detail="order:AMB7601681"><div class="dt-row-l"><div class="dt-row-t">#AMB7601 678 <span class="dt-row-tiny" style="color:var(--up)">доставлен</span></div><div class="dt-row-s">18:22 · Heineken 6 · 38 мин</div></div><div class="dt-row-r gold">90</div></div>
-          <div class="dt-row" data-detail="order:AMB7601682"><div class="dt-row-l"><div class="dt-row-t">#AMB7601 672 <span class="dt-row-tiny" style="color:var(--dn)">отменён</span></div><div class="dt-row-s">17:58 · клиент не ответил</div></div><div class="dt-row-r" style="color:var(--muted)">— 420</div></div>
-        </div>
-      `,
-      foot: `<button class="dt-btn">Отчёт CSV</button><button class="dt-btn">Смены</button><button class="dt-btn pri">Все заказы</button>`
+      title:`<div class="dt-tit-av plain" style="background:var(--gold-soft);color:var(--gold2);font-size:16px">\u2302</div><div><div class="dt-tit-name" id="offDetName">Район</div><div class="dt-sub" id="offDetSub">загрузка\u2026</div></div>`,
+      body:`<div id="offDetBody"><div class="dt-card"><div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">Загрузка\u2026</div></div></div></div></div>`,
+      foot:''
     };
   },
-
   operator: id=>{
     const d = {
       central:{name:'Ахмад К.',  i:'АХ', g:'c', tgId:'686932322',  off:'Central', top:true,  shift:'с 09:00', ord:19, acc:18, dec:1,  resp:12,   handle:35, rate:4.9, reviews:22, late:0, lateList:[]},
@@ -6623,20 +6734,6 @@ const DETAIL = {
         const fill = color ? `background:${color}` : '';
         return `<div class="dt-bar"><div class="dt-bar-l">${labels[k]||k}</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:${pct}%${fill?';'+fill:''}"></div></div><div class="dt-bar-v">${fmtFn(v)}</div></div>`;
       }).join('');
-    };
-    const stColor = {delivered:'var(--up)',approved:'var(--info)',pending:'var(--warn)',declined:'var(--dn)',cancelled:'var(--dn)'};
-    const stLabel = {delivered:'доставлен',approved:'в пути',pending:'ожидает',declined:'отклонён',cancelled:'отменён'};
-    const orderRows = (list)=>{
-      if(!list||!list.length) return '<div style="padding:20px 16px;text-align:center;color:var(--muted);font-size:13px">Нет заказов</div>';
-      const wrap = list.length > 3;
-      const inner = list.map(o=>{
-        const time = fmtWhen(o.ts);   // today → HH:MM, older → dd/mm/yyyy HH:MM
-        const st = stLabel[o.status]||o.status;
-        const sc = stColor[o.status]||'var(--muted)';
-        return `<div class="dt-row" data-detail="order:${o.id}"><div class="dt-row-l"><div class="dt-row-t">#${o.id}${o.crypto?' <span title="оплачено криптой" style="font-size:10px">💎</span>':''}${o.manual?' <span title="ручной заказ · по телефону" style="font-size:10px">📞</span>':''} <span class="dt-row-tiny" style="color:${sc}">${st}</span></div><div class="dt-row-s">${time}${o.items_short?' · '+o.items_short:''}${o.eta?' · ETA '+o.eta+' мин':''}</div></div><div class="dt-row-r ${o.crypto?'':'gold'}" ${o.crypto?'style="color:#26A17B"':''}>${o.total}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:2px">›</div></div>`;
-      }).join('');
-      if(wrap) return `<div style="max-height:220px;overflow-y:auto;-webkit-overflow-scrolling:touch">${inner}</div>`;
-      return inner;
     };
     const noData = '<div style="padding:24px 16px;text-align:center;color:var(--muted);font-size:13px">Нет данных</div>';
     const noDataYet = '<div style="padding:24px 16px;text-align:center;color:var(--muted);font-size:13px">Этот показатель пока не считается — операторский бот не сохраняет время доставки.</div>';

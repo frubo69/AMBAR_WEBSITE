@@ -119,7 +119,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 
 /* Page */
 .page{padding:calc(76px + var(--safe-top)) 14px 20px;display:none;animation:fadeIn .3s var(--e1)}
-#pg-overview,#pg-money{padding-top:calc(122px + var(--safe-top))}
+#pg-overview,#pg-money,#pg-offices{padding-top:calc(122px + var(--safe-top))}
 .page.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 
@@ -253,11 +253,36 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Section heading */
 .sect{display:flex;align-items:center;justify-content:space-between;margin:22px 4px 10px}
 .sect-t{font-size:11px;font-weight:600;color:var(--sub);letter-spacing:2px;text-transform:uppercase}
+.sect-s{font-size:11px;color:var(--muted);font-weight:500}
+#offSpeed .bar-lbl{width:var(--lbl-w);min-width:var(--lbl-w);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .sect-a{font-size:12px;color:var(--gold2);font-weight:500}
 
 /* Office rows */
 .office{display:flex;align-items:center;gap:12px;padding:14px;border-radius:var(--r2);background:var(--card);border:1px solid var(--border2);margin-bottom:8px;transition:.15s var(--e1)}
 .office:active{transform:scale(.99);background:var(--card2)}
+
+/* ── карточки районов ─────────────────────────────────────────────────── */
+.off-card{position:relative;background:var(--card);border:1px solid var(--border2);border-radius:var(--r);
+  padding:15px 16px 14px;overflow:hidden;transition:.16s var(--e1)}
+.off-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--tone);opacity:.85}
+.off-card:active{transform:scale(.988);border-color:var(--border3)}
+.off-card.lead{border-color:rgba(201,169,110,.28);background:linear-gradient(160deg,rgba(201,169,110,.055),transparent 60%),var(--card)}
+.off-head{display:flex;align-items:center;gap:9px;margin-bottom:11px}
+.off-dot{width:8px;height:8px;border-radius:50%;background:var(--tone);flex-shrink:0;box-shadow:0 0 10px var(--tone)}
+.off-name{font-size:15px;font-weight:600;letter-spacing:.1px}
+.off-live{margin-left:auto;font-size:10.5px;font-weight:600;color:var(--info);
+  background:rgba(91,141,239,.12);border:1px solid rgba(91,141,239,.25);border-radius:999px;padding:3px 9px}
+.off-rev-row{display:flex;align-items:baseline;gap:8px}
+.off-rev{font-family:'Space Grotesk',sans-serif;font-size:27px;font-weight:700;letter-spacing:-.6px;color:var(--gold2)}
+.off-cur{font-size:11px;color:var(--muted);letter-spacing:.5px}
+.off-share{margin-left:auto;font-size:12px;font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums}
+.off-track{height:4px;border-radius:2px;background:rgba(255,255,255,.05);margin:10px 0 11px;overflow:hidden}
+.off-fill{height:100%;border-radius:2px;background:var(--tone);opacity:.9;transition:width .45s var(--e1)}
+.off-meta{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)}
+.off-meta b{color:var(--sub);font-weight:600}
+.off-meta .sep{opacity:.35}
+.off-meta .chev{margin-left:auto;color:var(--muted);font-size:15px;opacity:.5}
+.off-empty{padding:26px 16px;text-align:center;color:var(--muted);font-size:13px}
 .office-badge{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:#0a0a14;flex-shrink:0}
 .office-badge.c{background:linear-gradient(135deg,#C9A96E,#E8C98A)}
 .office-badge.n{background:linear-gradient(135deg,#5B8DEF,#7BA7F5)}
@@ -781,12 +806,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 
 <!-- ============ OFFICES ============ -->
 <div class="page" id="pg-offices">
-  <div style="padding:10px 4px 4px">
-    <div style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600">Офисы</div>
-    <div style="font-size:12px;color:var(--muted);margin-top:2px" id="offSub">районы · сравнение</div>
-  </div>
-
-  <div class="period-bar" style="margin-top:14px">
+  <div class="period-bar">
     <div class="periods" id="officePeriod">
       <div class="period-pill"></div>
       <button class="on" data-p="today">Сегодня</button>
@@ -801,18 +821,17 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
   <div class="range-chip" id="rangeChip-officePeriod" style="display:none"><span class="rc-icon">📅</span><span class="rc-text"></span><button class="rc-x" onclick="clearRange('officePeriod')">✕</button></div>
 
-  <!-- карточки офисов — рендерятся из /api/owner/finance -->
-  <div style="display:flex;flex-direction:column;gap:10px;margin-top:14px" id="offCards">
-    <div class="card" style="padding:16px;color:var(--muted);font-size:13px;text-align:center">Загрузка…</div>
+  <div class="sect" style="margin-top:2px"><div class="sect-t">Районы</div><div class="sect-s" id="offSub">—</div></div>
+  <div style="display:flex;flex-direction:column;gap:9px" id="offCards">
+    <div class="off-empty">Загрузка…</div>
   </div>
 
-  <!-- Скорость доставки -->
   <div class="sect"><div class="sect-t">Скорость доставки</div></div>
-  <div class="card" id="offSpeed">
-    <div style="padding:6px;color:var(--muted);font-size:13px;text-align:center">—</div>
+  <div class="card" id="offSpeed" style="--lbl-w:96px">
+    <div class="off-empty" style="padding:8px">—</div>
   </div>
 
-  <div class="foot">Данные за выбранный период</div>
+  <div class="foot">Нажми на район, чтобы раскрыть детали</div>
 </div>
 
 <!-- ============ PEOPLE ============ -->
@@ -3219,39 +3238,40 @@ function renderOffices(rows){
   const list = (Array.isArray(rows) ? rows : []).filter(r => !r.legacy || r.aed || r.orders);
   if(!box) return;
   if(!list.length){
-    box.innerHTML = '<div class="card" style="padding:16px;color:var(--muted);font-size:13px;text-align:center">Нет данных за период</div>';
-    if(speed) speed.innerHTML = '<div style="padding:6px;color:var(--muted);font-size:13px;text-align:center">—</div>';
+    box.innerHTML = '<div class="card"><div class="off-empty">Нет данных за период</div></div>';
+    if(speed) speed.innerHTML = '<div class="off-empty" style="padding:8px">—</div>';
+    if(sub) sub.textContent = '—';
     return;
   }
   const live = list.filter(r => !r.legacy);
-  if(sub) sub.textContent = `${live.length} ${pluralize(live.length,'район','района','районов')} · сравнение`;
+  const total = list.reduce((a, r) => a + (r.aed || 0), 0);
+  const top = Math.max(0, ...list.map(r => r.aed || 0));
+  if(sub) sub.textContent = `${live.length} ${pluralize(live.length,'район','района','районов')} · доля выручки`;
 
-  const stat = (lbl, val, color) =>
-    `<div><div style="font-size:9px;color:var(--muted);letter-spacing:1px;text-transform:uppercase">${lbl}</div>`+
-    `<div style="font-family:'DM Sans',sans-serif;font-weight:700;letter-spacing:-.3px;font-size:17px;margin-top:2px;${color?'color:'+color:''}">${val}</div></div>`;
+  list.forEach(r => { if(r.name) OFF_KNOWN[r.id] = r.name; });
 
   box.innerHTML = list.map(r => {
-    const letter = (r.name || '?').trim().charAt(0).toUpperCase();
-    const active = r.active ? `<span style="color:var(--info)">● ${r.active} в работе</span>`
-                            : '<span style="color:var(--muted)">нет активных</span>';
-    const rating = r.rating_count ? `${r.rating} <span style="font-size:10px;color:var(--muted)">(${r.rating_count})</span>` : '—';
-    const avg = r.avg_sample ? `${r.avg_min}м` : '—';
-    const avgColor = !r.avg_sample ? 'var(--muted)' : (r.avg_min > 40 ? 'var(--warn)' : 'var(--up)');
-    return `<div class="card" style="padding:16px${r.legacy?';opacity:.65':''}"${r.legacy?'':` data-detail="office:${r.id}"`}>
-      <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px">
-        <div class="office-badge ${r.legacy?'':'c'}">${escS(letter)}</div>
-        <div style="flex:1;min-width:0">
-          <div style="font-size:15px;font-weight:600">${escS(r.name)}</div>
-          <div style="font-size:11px;color:var(--muted);margin-top:2px">${r.legacy?'район не определён':active}</div>
-        </div>
-        <div style="font-size:11px;color:var(--muted)">${r.delivered||0} дост.</div>
+    const aed = r.aed || 0;
+    const share = total ? Math.round(aed / total * 100) : 0;
+    const width = top ? Math.max(aed ? 3 : 0, Math.round(aed / top * 100)) : 0;
+    const lead = !r.legacy && aed > 0 && aed === top;
+    const meta = [`<b>${r.orders || 0}</b> ${pluralize(r.orders||0,'заказ','заказа','заказов')}`];
+    if(r.avg_sample) meta.push(`<b>${r.avg_min}</b> мин`);
+    if(r.rating_count) meta.push(`★ <b>${r.rating}</b>`);
+    return `<div class="off-card${lead?' lead':''}" style="--tone:${OFF_TONE(r)}"${r.legacy?'':` data-detail="office:${r.id}"`}>
+      <div class="off-head">
+        <span class="off-dot"></span>
+        <span class="off-name">${escS(r.name)}</span>
+        ${r.legacy ? '<span class="off-live" style="color:var(--muted);background:rgba(255,255,255,.04);border-color:var(--border2)">без района</span>'
+                   : (r.active ? `<span class="off-live">${r.active} в работе</span>` : '')}
       </div>
-      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px">
-        ${stat('Выручка', `<span data-aed="${r.aed||0}">${r.aed||0}</span>`, 'var(--gold2)')}
-        ${stat('Заказы', r.orders||0)}
-        ${stat('⏱ Ср.', avg, avgColor)}
-        ${stat('★ Рейт.', rating, r.rating_count?'var(--up)':'var(--muted)')}
+      <div class="off-rev-row">
+        <span class="off-rev" data-aed="${aed}">${aed}</span>
+        <span class="off-cur cur-unit">AED</span>
+        <span class="off-share">${share}%</span>
       </div>
+      <div class="off-track"><div class="off-fill" style="width:${width}%"></div></div>
+      <div class="off-meta">${meta.join('<span class="sep">·</span>')}${r.legacy?'':'<span class="chev">›</span>'}</div>
     </div>`;
   }).join('');
 
@@ -3259,7 +3279,7 @@ function renderOffices(rows){
   if(speed){
     const withTime = live.filter(r => r.avg_sample);
     if(!withTime.length){
-      speed.innerHTML = '<div style="padding:6px;color:var(--muted);font-size:13px;text-align:center">Пока нет доставленных заказов с замером времени</div>';
+      speed.innerHTML = '<div class="off-empty" style="padding:8px">Пока нет доставленных заказов с замером времени</div>';
     } else {
       const max = Math.max(60, ...withTime.map(r => r.avg_min));
       speed.innerHTML = withTime.map((r,i) =>
@@ -3273,6 +3293,12 @@ function renderOffices(rows){
   }
   applyCurrency();
 }
+
+// Свой оттенок каждому району — чтобы взгляд цеплялся за строку, а не за текст.
+const OFF_TONES = {jvc:'#C9A96E', tecom:'#5B8DEF', bbay:'#4CAF7D', silicon:'#B98BE0', alguses:'#E88C6A'};
+const OFF_TONE = r => r.legacy ? '#4A4A55' : (OFF_TONES[r.id] || '#C9A96E');
+// Имена районов из последнего списка — чтобы шапка детали не мигала «Район».
+const OFF_KNOWN = {};
 
 // Выручка по офисам (районам). Сервер присылает список — состав офисов
 // настраиваемый, поэтому ничего не захардкожено.
@@ -6253,8 +6279,9 @@ const DETAIL = {
   // _officeLoad() наполняет его данными с /api/owner/office.
   office: id=>{
     _officeLoad(id);
+    const tone = OFF_TONES[id] || 'var(--gold2)';
     return {
-      title:`<div class="dt-tit-av plain" style="background:var(--gold-soft);color:var(--gold2);font-size:16px">\u2302</div><div><div class="dt-tit-name" id="offDetName">Район</div><div class="dt-sub" id="offDetSub">загрузка\u2026</div></div>`,
+      title:`<div class="dt-tit-av plain" style="background:${tone}22;color:${tone};font-size:16px">\u2302</div><div><div class="dt-tit-name" id="offDetName">${escS(OFF_KNOWN[id] || 'Район')}</div><div class="dt-sub" id="offDetSub">загрузка\u2026</div></div>`,
       body:`<div id="offDetBody"><div class="dt-card"><div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">Загрузка\u2026</div></div></div></div></div>`,
       foot:''
     };

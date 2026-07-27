@@ -24,6 +24,7 @@ AMBAR — офисы (районы) и определение ближайшег
 берётся из того, что прислал клиент (район из формы). Ничего не падает.
 """
 import os
+import re
 import math
 
 # id офиса == id района в POS (operator_routes.DISTRICTS): офис ≡ район.
@@ -92,11 +93,68 @@ def _km(lat1: float, lon1: float, lat2: float, lon2: float) -> float:
     return 2 * r * math.asin(math.sqrt(a))
 
 
+# Куда падает заказ, если определить район не удалось ничем. Настраивается
+# через AMBAR_DEFAULT_OFFICE. Существует, чтобы заказов «без района» не было
+# в принципе — такой заказ ломает финансовую разбивку.
+DEFAULT_OFFICE_ID = os.getenv("AMBAR_DEFAULT_OFFICE", "bbay")
+if DEFAULT_OFFICE_ID not in OFFICE_NAMES:
+    DEFAULT_OFFICE_ID = OFFICE_IDS[0]
+
+# Явные названия районов в свободном тексте адреса. Только однозначные слова.
+NAME_HINTS = {
+    "jvc":     ("jvc", "jvt", "jumeirah village"),
+    "tecom":   ("тиком", "tecom", "barsha", "барша"),
+    "bbay":    ("бизнес бей", "бизнес бэй", "business bay"),
+    "silicon": ("силикон", "silicon"),
+    "alguses": ("алгусес", "алгусайс", "qusais", "кусаис"),
+}
+_COORD_RE = re.compile(r"(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)")
+
+
+def resolve_office(src: dict):
+    """Определить район заказа. Возвращает (office_id, office_name, rule).
+
+    Заказ БЕЗ района невозможен: последним шагом отрабатывает дефолт, иначе
+    выручка повисает в «Без района» и портит разбивку по офисам.
+    Порядок — от самого достоверного признака к самому слабому."""
+    # 1. Оператор явно выбрал район в POS
+    d = src.get("district_id")
+    if d in OFFICE_NAMES:
+        return d, OFFICE_NAMES[d], "district"
+
+    # 2. Координаты точки доставки
+    loc = src.get("location") or {}
+    near = nearest_office(loc.get("lat"), loc.get("lon"))
+    if near:
+        return near[0], near[1], "geo"
+
+    # 3. Координаты внутри ссылки на карту
+    m = _COORD_RE.search(str(src.get("gmap_link") or ""))
+    if m:
+        near = nearest_office(m.group(1), m.group(2))
+        if near:
+            return near[0], near[1], "gmap"
+
+    # 4. Район, выбранный клиентом в форме
+    cid = src.get("office_id")
+    if cid in OFFICE_NAMES:
+        return cid, OFFICE_NAMES[cid], "form"
+
+    # 5. Название района прямо в тексте адреса/комментария
+    txt = (str(src.get("address") or "") + " " + str(src.get("comment") or "")).lower()
+    if txt.strip():
+        for oid, words in NAME_HINTS.items():
+            if any(w in txt for w in words):
+                return oid, OFFICE_NAMES[oid], "address"
+
+    # 6. Ничего не сработало — дефолтный район, чтобы заказ не потерялся
+    return DEFAULT_OFFICE_ID, OFFICE_NAMES[DEFAULT_OFFICE_ID], "default"
+
+
 def nearest_office(lat, lon):
     """(office_id, office_name) ближайшего офиса к точке доставки.
 
-    None — если координат нет (0,0 / мусор) или опорные точки не настроены;
-    вызывающий код тогда оставляет офис, выбранный по району в форме."""
+    None — если координат нет (0,0 / мусор) или опорные точки не настроены."""
     if not OFFICE_ANCHORS:
         return None
     try:

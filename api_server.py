@@ -392,12 +392,13 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
     office_id = src.get("office_id") or ""
     office_nm = src.get("office_name") or ""
     try:
-        from config_offices import nearest_office, office_name as _canon_office_name
-        _near = nearest_office(loc.get("lat"), loc.get("lon"))
-        if _near:
-            office_id, office_nm = _near
-        elif office_id:
-            office_nm = _canon_office_name(office_id)
+        from config_offices import resolve_office
+        office_id, office_nm, _rule = resolve_office(src)
+        # «default» значит, что у заказа не было ни координат, ни района, ни
+        # узнаваемого адреса — район подставлен, но это повод присмотреться.
+        log.info(f"[office] #{oid} → {office_id} (по признаку: {_rule})"
+                 if _rule != "default" else
+                 f"[office] #{oid} → {office_id} ПО УМОЛЧАНИЮ: определить район было нечем")
     except Exception as e:
         log.error(f"[office] resolve failed: {e}")
     comment   = src.get("comment", "")

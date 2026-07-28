@@ -2779,6 +2779,16 @@ function fmtHM(iso){ const d=_dtParse(iso); if(!d) return ''; const p=n=>String(
 // Time for today's events, full dd/mm/yyyy hh:mm for anything older.
 function fmtWhen(iso){ const d=_dtParse(iso); if(!d) return ''; const t=fmtHM(iso); return fmtDMY(d)===fmtDMY(new Date())?t:fmtDMY(d)+' '+t; }
 function escS(s){ return String(s??'').replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+// Ссылка из данных заказа. gmap_link приходит от КЛИЕНТА вместе с заказом, так
+// что схему проверяем сами: javascript:/data: в href — это выполнение кода уже
+// в сессии владельца. Всё, что не http(s), ссылкой не становится.
+function safeUrl(u){
+  const raw = String(u??'').trim();
+  try{
+    const p = new URL(raw, location.origin).protocol;
+    return (p==='http:'||p==='https:') ? escS(raw) : '';
+  }catch(e){ return ''; }
+}
 // Count-up for headline metrics (ru thousands separator). Animates from the last value
 // so refreshes don't restart from 0; instant if unchanged or reduced-motion is on.
 function _animCount(el, to){
@@ -3690,7 +3700,7 @@ function renderCustomerSections(customers){
         <div class="cc-name">${c.full_name}</div>
         ${cardBadge}
         <div class="cc-value"><span data-aed="${c.total_spent}">${fmt(c.total_spent)}</span> <span class="cur-unit" style="font-size:10px;color:var(--muted);font-weight:600;margin-left:3px;letter-spacing:.4px;text-transform:uppercase">AED</span></div>
-        <div class="cc-sub">${_pluralOrders(c.orders_total)} · ${c.username?'@'+c.username:'ID '+c.telegram_id}</div>
+        <div class="cc-sub">${_pluralOrders(c.orders_total)} · ${c.username?'@'+escS(c.username):'ID '+escS(c.telegram_id)}</div>
       </div>`;
     }).join('');
   }
@@ -4639,7 +4649,7 @@ function _renderMgr(){
     html += `<div class="mgr-row${isMe?' is-self':''}">
       <div class="mgr-av owner">${initials}</div>
       <div class="mgr-body-info">
-        <div class="mgr-name">${o.name || ('User '+o.telegram_id)}<span class="mgr-tag owner">owner</span>${isMe?'<span class="mgr-tag you">вы</span>':''}</div>
+        <div class="mgr-name">${escS(o.name || ('User '+o.telegram_id))}<span class="mgr-tag owner">owner</span>${isMe?'<span class="mgr-tag you">вы</span>':''}</div>
         <div class="mgr-sub">${_fmtMgrSub(o, isMe)}</div>
       </div>
     </div>`;
@@ -4662,14 +4672,14 @@ function _renderMgr(){
       // Block any non-owner, non-self user — including .env-sourced managers
       // (their block is recorded in access_log so it survives a restart).
       const blockBtn = (canManage && !isMe) ? `
-        <button class="mgr-block" data-mgr-block="${m.telegram_id}" data-name="${(m.name||'').replace(/"/g,'&quot;')}" aria-label="Заблокировать">
+        <button class="mgr-block" data-mgr-block="${m.telegram_id}" data-name="${escS(m.name||'')}" aria-label="Заблокировать">
           <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M5 5l14 14"/></svg>
           <span>Блок</span>
         </button>` : '';
       html += `<div class="mgr-row${isMe?' is-self':''}">
         <div class="mgr-av">${initials}</div>
         <div class="mgr-body-info">
-          <div class="mgr-name">${m.name || ('User '+m.telegram_id)}${tags.join('')}</div>
+          <div class="mgr-name">${escS(m.name || ('User '+m.telegram_id))}${tags.join('')}</div>
           <div class="mgr-sub">${_fmtMgrSub(m, isMe)}</div>
         </div>
         <div class="mgr-actions">${blockBtn}</div>
@@ -4694,7 +4704,7 @@ function _renderMgr(){
       html += `<div class="mgr-row is-blocked">
         <div class="mgr-av">${initials}</div>
         <div class="mgr-body-info">
-          <div class="mgr-name">${m.name || ('User '+m.telegram_id)}<span class="mgr-tag blocked">заблокирован</span></div>
+          <div class="mgr-name">${escS(m.name || ('User '+m.telegram_id))}<span class="mgr-tag blocked">заблокирован</span></div>
           <div class="mgr-sub">${_fmtMgrSub(m, false)}</div>
         </div>
         <div class="mgr-actions">
@@ -6442,8 +6452,8 @@ const DETAIL = {
         </div>
       `,
       foot: c.is_banned
-        ? `<button class="dt-btn" onclick="window.open('https://t.me/${c.username||''}','_blank')">Написать</button><button class="dt-btn pri" onclick="ownerUnbanCustomer(${c.telegram_id})">Разбанить</button>`
-        : `<button class="dt-btn" onclick="window.open('https://t.me/${c.username||''}','_blank')">Написать</button><button class="dt-btn dn" onclick="ownerBanCustomer(${c.telegram_id})">Забанить</button>`
+        ? `<button class="dt-btn" onclick="window.open('https://t.me/${escS(c.username||'')}','_blank')">Написать</button><button class="dt-btn pri" onclick="ownerUnbanCustomer(${c.telegram_id})">Разбанить</button>`
+        : `<button class="dt-btn" onclick="window.open('https://t.me/${escS(c.username||'')}','_blank')">Написать</button><button class="dt-btn dn" onclick="ownerBanCustomer(${c.telegram_id})">Забанить</button>`
     };
   },
 
@@ -6575,20 +6585,21 @@ const DETAIL = {
           body:`
             <div style="padding:20px 16px;text-align:center;background:var(--card);border:1px solid var(--border2);border-radius:14px;margin-bottom:6px">
               <div class="dt-stat-val gold" style="font-size:48px;line-height:1">${real.total}<span class="u" style="font-size:16px;margin-left:8px">AED</span></div>
-              <div style="font-size:12px;color:var(--muted);margin-top:10px">${real.name}${real.eta ? ' · ETA '+real.eta+' мин' : ''}</div>
+              <div style="font-size:12px;color:var(--muted);margin-top:10px">${escS(real.name)}${real.eta ? ' · ETA '+escS(real.eta)+' мин' : ''}</div>
               ${real.crypto ? '<div style="font-size:11px;color:#26A17B;font-weight:700;margin-top:8px">💎 ОПЛАЧЕНО КРИПТОЙ — деньги уже на кошельке</div>' : ''}
             </div>
             <div class="dt-sect">Информация</div>${real.customer_id ? `
             <div class="dt-card" style="margin-bottom:6px;cursor:pointer;border-color:rgba(201,169,110,.25);background:rgba(201,169,110,.06)" onclick="openDetail('customer:${real.customer_id}')">
               <div class="dt-row" style="justify-content:center;gap:10px;padding:14px 16px">
                 <span style="font-size:16px">👤</span>
-                <span style="font-size:14px;color:var(--text);font-weight:600">${real.name}</span>
+                <span style="font-size:14px;color:var(--text);font-weight:600">${escS(real.name)}</span>
                 <span style="font-size:13px;color:var(--muted)">›</span>
               </div>
             </div>` : ''}
             <div class="dt-card">
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Адрес</div></div><div class="dt-row-r" style="font-size:12px;max-width:60%;text-align:right">${real.gmap_link ? '<a href="'+real.gmap_link+'" target="_blank" style="color:var(--gold2)">'+( real.address && real.address!=='—' && real.address!=='GPS' ? real.address : '📍 Карта')+'</a>' : (real.address||'—')}</div></div>
-              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Офис</div></div><div class="dt-row-r">${real.office||'—'}</div></div>
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Адрес</div></div><div class="dt-row-r" style="font-size:12px;max-width:60%;text-align:right">${(()=>{const u=safeUrl(real.gmap_link), a=escS(real.address&&real.address!=='—'&&real.address!=='GPS'?real.address:'📍 Карта');
+                 return u ? `<a href="${u}" target="_blank" rel="noopener noreferrer" style="color:var(--gold2)">${a}</a>` : escS(real.address||'—');})()}</div></div>
+              <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Офис</div></div><div class="dt-row-r">${escS(real.office||'—')}</div></div>
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Статус</div></div><div class="dt-row-r" style="color:${stClr[real.status]||'var(--muted)'}">${real.status==='cancelled'?(real.cancelled_by==='operator'?'отменён оператором':'отменён клиентом'):real.status==='declined'?'отклонён оператором':(stMap[real.status]||real.status)}</div></div>
               <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Оплата</div></div><div class="dt-row-r" style="${real.crypto?'color:#26A17B;font-weight:600':'color:var(--muted)'}">${real.crypto?('💎 Крипта · '+(real.crypto_usdt||'—')+' USDT · на кошельке'):'💵 Наличные'}</div></div>
               ${real.manual?`<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Канал</div></div><div class="dt-row-r" style="color:var(--warn);font-weight:600">📞 По телефону · ${real.created_by_name||'оператор'}</div></div>`:''}
@@ -6600,8 +6611,8 @@ const DETAIL = {
             <div class="dt-card">
               ${(real.items && real.items.length)
                 ? real.items.map(it=>it.id
-                    ? `<div class="dt-row" data-detail="product:${it.id}"><div class="dt-row-l"><div class="dt-row-t">${it.name||''}</div></div><div class="dt-row-r" style="color:var(--muted)">×${it.qty||1}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>`
-                    : `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${it.name||''}</div></div><div class="dt-row-r" style="color:var(--muted)">×${it.qty||1}</div></div>`
+                    ? `<div class="dt-row" data-detail="product:${it.id}"><div class="dt-row-l"><div class="dt-row-t">${escS(it.name||'')}</div></div><div class="dt-row-r" style="color:var(--muted)">×${it.qty||1}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>`
+                    : `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${escS(it.name||'')}</div></div><div class="dt-row-r" style="color:var(--muted)">×${it.qty||1}</div></div>`
                   ).join('')
                 : (real.items_short ? real.items_short.split(', ').map(it=>`<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${it}</div></div></div>`).join('') : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">нет данных</div></div></div>')}
             </div>
@@ -7070,7 +7081,7 @@ async function _supportLoad(id){
     const r=await ownerApi.ownerFetch('/api/owner/support-thread',{params});
     if(_dtCurrent!==key||!bodyEl())return;
     const c=r.client||{};
-    if(subEl())subEl().textContent=`${c.name||'—'}${c.username?' @'+c.username:''}${r.order_id?' · заказ #'+r.order_id:' · общий вопрос'}`;
+    if(subEl())subEl().textContent=`${escS(c.name||'—')}${c.username?' @'+escS(c.username):''}${r.order_id?' · заказ #'+r.order_id:' · общий вопрос'}`;
     const msgs=r.messages||[];
     const base=(window.ownerApi&&ownerApi.AMBAR_API)||'';
     const rows=msgs.map(m=>{

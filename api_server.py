@@ -169,11 +169,59 @@ async def on_cleanup(app):
     db.close()
 
 
+# ── Rate limiting ─────────────────────────────────────────────────────────────
+# Nothing here was throttled: order creation, support messages and 5 MB image
+# uploads could all be fired in a loop. A single process serves everything, so an
+# in-memory sliding window is enough and costs nothing — this is a brake against
+# floods and disk-fill, not a defence against a distributed attacker.
+_rl_hits: dict[tuple[str, str], list[float]] = {}
+_RL_LAST_SWEEP = 0.0
+
+
+def _rate_limited(bucket: str, key, limit: int, per: float) -> bool:
+    """True when this key has already used up `limit` calls in the last `per` sec."""
+    global _RL_LAST_SWEEP
+    now = time.time()
+    k = (bucket, str(key))
+    hits = [t for t in _rl_hits.get(k, ()) if now - t < per]
+    # Periodic sweep so abandoned keys cannot grow the dict without bound.
+    if now - _RL_LAST_SWEEP > 300:
+        _RL_LAST_SWEEP = now
+        for dead in [kk for kk, ts in _rl_hits.items() if not ts or now - ts[-1] > 3600]:
+            _rl_hits.pop(dead, None)
+    if len(hits) >= limit:
+        _rl_hits[k] = hits
+        return True
+    hits.append(now)
+    _rl_hits[k] = hits
+    return False
+
+
+def _too_many(retry_after: int = 60) -> web.Response:
+    return web.json_response(
+        {"error": "rate_limited"}, status=429,
+        headers={**CORS_HEADERS, "Retry-After": str(retry_after)},
+    )
+
+
+def _client_ip(request) -> str:
+    fwd = request.headers.get("X-Forwarded-For", "")
+    return (fwd.split(",")[0].strip() if fwd else (request.remote or "?"))
+
+
 # ── Telegram initData validation ──────────────────────────────────────────────
 # initData is HMAC-SHA256 signed with the bot's token. Every Telegram bot
 # has its own token, so a miniapp launched from @ambar_bot and one launched
 # from @ambar_manage_bot produce initData signed differently — we validate
 # each against the right secret and never mix them.
+# A signature alone never expires: initData captured once (a proxy log, a shared
+# device, a screenshot of devtools) would stay a valid credential forever, and we
+# have no way to revoke it. Telegram signs an auth_date for exactly this reason —
+# treat initData older than this as expired. 24h is generous enough that a
+# miniapp left open all day keeps working; Telegram re-issues it on next launch.
+INIT_DATA_MAX_AGE = int(os.getenv("INIT_DATA_MAX_AGE", "86400"))
+
+
 def _validate_init_data_with_token(init_data: str, token: str) -> dict | None:
     if not token:
         return None
@@ -185,6 +233,15 @@ def _validate_init_data_with_token(init_data: str, token: str) -> dict | None:
         calc_hash  = hmac.new(secret_key, data_check.encode(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(calc_hash, hash_val):
             return None
+        if INIT_DATA_MAX_AGE > 0:
+            try:
+                age = time.time() - int(params.get("auth_date", "0"))
+            except (TypeError, ValueError):
+                return None
+            # Missing/zero auth_date lands far in the past and is refused too.
+            if age > INIT_DATA_MAX_AGE or age < -300:
+                log.warning(f"[auth] expired initData rejected (age {int(age)}s)")
+                return None
         return json.loads(params.get("user", "{}"))
     except Exception as e:
         log.debug(f"initData parse error: {e}")
@@ -270,6 +327,11 @@ async def tg_send_photo(token, chat_id, photo_path, caption=""):
 
 
 # ── POST /api/order ───────────────────────────────────────────────────────────
+def _new_order_id() -> str:
+    """Server-issued order id. Random tail so ids are not guessable or replayable."""
+    return f"AMB{int(time.time()) % 100000:05d}{uuid.uuid4().hex[:3].upper()}"
+
+
 async def handle_create_order(request: web.Request) -> web.Response:
     if request.method == "OPTIONS":
         return web.Response(status=200, headers=CORS_HEADERS)
@@ -284,6 +346,9 @@ async def handle_create_order(request: web.Request) -> web.Response:
         return web.json_response({"error": "auth failed"}, status=401, headers=CORS_HEADERS)
 
     uid = user.get("id")
+    if _rate_limited("order", uid, 10, 60):
+        log.warning(f"[rl] order flood from uid={uid}")
+        return _too_many()
     # Ban check — reject order if user is banned
     try:
         if await db.is_banned(uid):
@@ -292,7 +357,19 @@ async def handle_create_order(request: web.Request) -> web.Response:
     except Exception as e:
         log.warning(f"ban check failed: {e}")
 
-    oid = data.get("order_id", f"AMB{int(time.time()) % 100000:05d}")
+    # The order id is ours, not the client's. db.save_order upserts on order_id,
+    # so honouring a client-supplied id let anyone $set over an existing order —
+    # someone else's, or their own already-delivered one — by replaying the id.
+    # The client still gets the id back in the response, so nothing downstream
+    # needs it up front.
+    oid = _new_order_id()
+    for _ in range(5):
+        if not await db.get_order(oid):
+            break
+        oid = _new_order_id()
+    else:
+        log.error(f"[order] could not allocate a free order_id for uid={uid}")
+        return web.json_response({"error": "try_again"}, status=503, headers=CORS_HEADERS)
 
     # Crypto orders. The client may submit payment_method="crypto" / paid=true.
     #   • DEMO (CRYPTO_REAL_MODE off — today's state, no real wallet/watcher yet):
@@ -383,7 +460,20 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
     gmap_link = src.get("gmap_link", "")
     is_gps    = src.get("is_gps", False)
     tip       = src.get("tip", 0)
+    # The client's `total` is a display value, never the price. Re-derive it from
+    # item ids against catalog.json — the crypto path already did this (F4), the
+    # cash/card path did not, so a hand-crafted POST could book a 2000 AED basket
+    # as 1 AED and the operator card would print the lie.
     total     = src.get("total", 0)
+    try:
+        authoritative = await _recompute_order_total_aed(items, tip)
+        if authoritative > 0:
+            if abs(float(total or 0) - authoritative) > 0.5:
+                log.warning(f"[order] #{oid} total mismatch: client said {total}, "
+                            f"catalog says {authoritative} — using catalog")
+            total = authoritative
+    except Exception as e:
+        log.error(f"[order] total recompute failed for #{oid}: {e}")
     loc       = src.get("location", {})
     # Офис определяет СЕРВЕР по координатам доставки: во фронтенде нет ни
     # координат офисов, ни логики выбора (и не должно быть). Опорные точки
@@ -892,7 +982,7 @@ async def handle_crypto_invoice_create(request: web.Request) -> web.Response:
     except Exception as e:
         log.warning(f"[crypto] ban check failed: {e}")
 
-    oid = data.get("order_id") or f"AMB{int(time.time()) % 10000000:07d}"
+    oid = (data.get("order_id") or "").strip() or _new_order_id()
     # F4: never trust the client's `total`. Recompute the goods total from each
     # item's id + qty against the server-authoritative catalog (catalog.json).
     total_aed = await _recompute_order_total_aed(data.get("items", []), data.get("tip", 0))
@@ -901,6 +991,12 @@ async def handle_crypto_invoice_create(request: web.Request) -> web.Response:
 
     now_ms = int(time.time() * 1000)
     existing = await db.get_crypto_invoice(oid)
+    # The client is allowed to re-send its own order id so retries stay idempotent
+    # (handled just below), but it must never name an id that already belongs to a
+    # placed order — promoting that invoice would upsert straight over it.
+    if not existing and await db.get_order(oid):
+        log.warning(f"[crypto] uid={uid} asked for an invoice on existing order {oid}")
+        return web.json_response({"error": "order_conflict"}, status=409, headers=CORS_HEADERS)
     if existing:
         # Never reveal or mutate another customer's invoice for this order id.
         if existing.get("customer_id") != uid:
@@ -1355,11 +1451,16 @@ async def handle_me(request: web.Request) -> web.Response:
     """Returns ban status, referral points, and card type (founder/premium/standard)."""
     if request.method == "OPTIONS":
         return web.Response(status=200, headers=CORS_HEADERS)
-    uid_str = request.query.get("uid", "")
-    if not uid_str.lstrip("-").isdigit():
-        return web.json_response({"banned": False}, headers=CORS_HEADERS)
-    uid = int(uid_str)
-    lc = request.query.get("lc", "").strip()
+    # Identity comes from signed initData, never from a ?uid= the caller picked.
+    # This used to trust the query param, which made the whole profile — ban
+    # state, points, card tier, verification — readable for any Telegram id by
+    # anyone with curl, and let ?lc= write to any user's document.
+    auth = request.headers.get("Authorization", "")
+    user = validate_init_data(auth[4:]) if auth.startswith("tma ") else None
+    if not user or not user.get("id"):
+        return web.json_response({"error": "unauthorized"}, status=401, headers=CORS_HEADERS)
+    uid = int(user["id"])
+    lc = (request.query.get("lc", "") or user.get("language_code", "")).strip()
     if lc:
         try:
             await db.set_user_field(uid, language_code=lc)
@@ -1781,6 +1882,11 @@ async def handle_support_send(request: web.Request) -> web.Response:
         return web.json_response({"error": "auth failed"}, status=401, headers=CORS_HEADERS)
 
     uid       = user.get("id")
+    # Each message is relayed into the operators' Telegram — unthrottled it is a
+    # spam cannon pointed at the team's chat.
+    if _rate_limited("support", uid, 20, 60):
+        log.warning(f"[rl] support flood from uid={uid}")
+        return _too_many()
     user_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
     username  = user.get("username", "—")
     order_id  = data.get("order_id", "")
@@ -2042,12 +2148,13 @@ async def handle_review_skip(request: web.Request) -> web.Response:
 async def handle_active_order(request: web.Request) -> web.Response:
     if request.method == "OPTIONS":
         return web.Response(status=200, headers=CORS_HEADERS)
-    try:
-        uid = int(request.rel_url.query.get("uid", 0))
-    except (ValueError, TypeError):
-        return web.json_response({"active": False}, headers=CORS_HEADERS)
-    if not uid:
-        return web.json_response({"active": False}, headers=CORS_HEADERS)
+    # Was ?uid= with no auth at all — anyone could read any customer's live
+    # orders, including their delivery address and basket, by guessing ids.
+    auth = request.headers.get("Authorization", "")
+    user = validate_init_data(auth[4:]) if auth.startswith("tma ") else None
+    if not user or not user.get("id"):
+        return web.json_response({"error": "unauthorized"}, status=401, headers=CORS_HEADERS)
+    uid = int(user["id"])
     orders = await db.get_active_orders(uid)
     if not orders:
         return web.json_response({"active": False, "orders": []}, headers=CORS_HEADERS)
@@ -2064,6 +2171,28 @@ async def handle_active_order(request: web.Request) -> web.Response:
             "review_score": o.get("review_score"),
         } for o in orders],
     }, headers=CORS_HEADERS)
+
+
+# Magic-byte sniffing for uploads. Only real raster images get a filename, and
+# the extension is ours — SVG is deliberately absent, it is a script container.
+_IMAGE_MAGIC = (
+    (b"\xff\xd8\xff",                    ".jpg"),
+    (b"\x89PNG\r\n\x1a\n",               ".png"),
+    (b"GIF87a",                          ".gif"),
+    (b"GIF89a",                          ".gif"),
+)
+
+
+def _sniff_image_ext(blob: bytes) -> str | None:
+    for magic, ext in _IMAGE_MAGIC:
+        if blob.startswith(magic):
+            return ext
+    # WEBP and HEIC are container formats: "RIFF....WEBP" / "....ftypheic".
+    if blob[:4] == b"RIFF" and blob[8:12] == b"WEBP":
+        return ".webp"
+    if blob[4:8] == b"ftyp" and blob[8:12] in (b"heic", b"heix", b"mif1", b"msf1"):
+        return ".heic"
+    return None
 
 
 # ── POST /api/support/send-image ──────────────────────────────────────────────
@@ -2093,8 +2222,19 @@ async def handle_support_send_image(request: web.Request) -> web.Response:
         return web.json_response({"error": "file too large"}, status=400, headers=CORS_HEADERS)
 
     uid       = user.get("id")
+    if _rate_limited("upload", uid, 12, 300):
+        log.warning(f"[rl] upload flood from uid={uid}")
+        return _too_many(300)
     user_name = f"{user.get('first_name', '')} {user.get('last_name', '')}".strip()
     username  = user.get("username", "—")
+
+    # The extension used to come from the client's filename, and uploads/ is
+    # publicly served — so a support "photo" called evil.html or evil.svg became
+    # attacker-controlled markup hosted on our own origin. Ignore the claimed
+    # name entirely and derive the type from the actual bytes.
+    image_ext = _sniff_image_ext(image_data)
+    if not image_ext:
+        return web.json_response({"error": "not_an_image"}, status=400, headers=CORS_HEADERS)
 
     UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
     fname    = f"{uuid.uuid4().hex[:12]}{image_ext}"
@@ -2175,7 +2315,9 @@ async def handle_support_messages(request: web.Request) -> web.Response:
 
     uid      = user.get("id")
     conv_key = request.query.get("conv_key", "")
-    if not conv_key.startswith(str(uid)):
+    # Keys are "<uid>" or "<uid>_<order_id>". A bare startswith() also matched a
+    # longer id with the same prefix — uid 12345 could read 123456's thread.
+    if conv_key != str(uid) and not conv_key.startswith(f"{uid}_"):
         return web.json_response({"error": "forbidden"}, status=403, headers=CORS_HEADERS)
 
     conversation = await db.get_support_conv(conv_key)

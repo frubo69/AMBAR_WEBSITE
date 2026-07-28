@@ -60,8 +60,14 @@ _cat_cache = {"mtime": 0.0, "items": []}
 
 
 # ── auth ─────────────────────────────────────────────────────────────────────
+INIT_DATA_MAX_AGE = int(os.getenv("INIT_DATA_MAX_AGE", "86400"))
+
+
 def _validate_operator_init_data(init_data: str) -> dict | None:
-    """HMAC-validate Telegram WebApp initData against the OPERATOR bot token."""
+    """HMAC-validate Telegram WebApp initData against the OPERATOR bot token.
+
+    Also enforces auth_date freshness — a signature never expires on its own, so
+    without this a captured initData is a permanent POS credential."""
     if not OPERATOR_BOT_TOKEN:
         return None
     try:
@@ -72,6 +78,14 @@ def _validate_operator_init_data(init_data: str) -> dict | None:
         calc_hash = hmac.new(secret_key, data_check.encode(), hashlib.sha256).hexdigest()
         if not hmac.compare_digest(calc_hash, hash_val):
             return None
+        if INIT_DATA_MAX_AGE > 0:
+            try:
+                age = time.time() - int(params.get("auth_date", "0"))
+            except (TypeError, ValueError):
+                return None
+            if age > INIT_DATA_MAX_AGE or age < -300:
+                log.warning(f"[pos] expired initData rejected (age {int(age)}s)")
+                return None
         return json.loads(params.get("user", "{}"))
     except Exception as e:
         log.debug(f"[pos] initData parse error: {e}")

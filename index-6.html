@@ -3252,7 +3252,7 @@ async function checkBanStatus(){
   if(!uid){_hideBanBlocker();return;}
   try{
     const _lc=tg?.initDataUnsafe?.user?.language_code||'';
-    const resp=await fetch(`${AMBAR_API}/api/me?uid=${uid}&lc=${encodeURIComponent(_lc)}`);
+    const resp=await fetch(`${AMBAR_API}/api/me?lc=${encodeURIComponent(_lc)}`,{headers:{'Authorization':'tma '+(tg?.initData||'')}});
     if(resp.ok){
       const d=await resp.json();
       if(d.banned){_showBanWall();return;}
@@ -3581,7 +3581,7 @@ function _startVerifyPoll(){
     const uid=tg?.initDataUnsafe?.user?.id;
     if(!uid)return;
     try{
-      const resp=await fetch(`${AMBAR_API}/api/me?uid=${uid}`);
+      const resp=await fetch(`${AMBAR_API}/api/me`,{headers:{'Authorization':'tma '+(tg?.initData||'')}});
       if(resp.ok){
         const d=await resp.json();
         if(d.verified){
@@ -9018,7 +9018,7 @@ async function checkActiveOrder(){
   const uid=tg?.initDataUnsafe?.user?.id;
   if(!uid)return;
   try{
-    const r=await fetch(`${AMBAR_API}/api/active-order?uid=${uid}`);
+    const r=await fetch(`${AMBAR_API}/api/active-order`,{headers:{'Authorization':'tma '+(tg?.initData||'')}});
     if(!r.ok)return;
     const d=await r.json();
     const bar=el('aob');

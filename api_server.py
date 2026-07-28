@@ -37,6 +37,7 @@ OWNER_BOT_TOKEN    = os.getenv("AMBAR_OWNER_BOT_TOKEN", "")
 WEBAPP_URL         = os.getenv("WEBAPP_URL", "https://ambar-delivery.com/")
 OPERATOR_IDS       = [int(x.strip()) for x in os.getenv("OPERATOR_IDS", "").split(",") if x.strip().isdigit()]
 PORT               = int(os.getenv("WEBAPP_PORT", "8080"))
+HOST               = os.getenv("WEBAPP_HOST", "127.0.0.1")
 STATIC_DIR         = Path(__file__).parent
 UPLOAD_DIR         = STATIC_DIR / "uploads" / "support"
 _TEST_ACCOUNTS     = {8251195567, 6731325660}
@@ -2535,8 +2536,12 @@ def main():
     app.router.add_get("/",          handle_static)
     app.router.add_get("/{path:.+}", handle_static)
 
-    log.info(f"🍾 AMBAR API+Static → http://localhost:{PORT}")
-    web.run_app(app, host="0.0.0.0", port=PORT, access_log=None)
+    log.info(f"🍾 AMBAR API+Static → http://{HOST}:{PORT}")
+    # Bind loopback by default: nginx proxies to 127.0.0.1:8080, so listening on
+    # 0.0.0.0 only added a second door on the public IP that skips TLS, the
+    # Cloudflare edge and every nginx rule. Override with WEBAPP_HOST if the
+    # server ever needs to answer directly.
+    web.run_app(app, host=HOST, port=PORT, access_log=None)
 
 
 if __name__ == "__main__":

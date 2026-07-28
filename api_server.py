@@ -2251,15 +2251,59 @@ async def handle_points_history(request: web.Request) -> web.Response:
 
 
 # ── Static file handler ───────────────────────────────────────────────────────
+# STATIC_DIR is the repo root — the same directory that holds .env, .git and
+# every .py module. A traversal check alone is NOT enough here: it only stops
+# requests from escaping the directory, it happily serves the secrets sitting
+# inside it. So this is an allow-list: a request is served only if it names one
+# of the public root files, or lives under a public asset directory with a
+# harmless extension. Everything else is a 404 — including dotfiles, sources,
+# backups and dumps. Adding a new public asset means adding it here on purpose.
+PUBLIC_ROOT_FILES = {
+    "index-6.html", "manifest.json", "catalog.json", "qrcode.min.js",
+    "icon.png", "HOME_SCREEN_BG.webp", "BACKGROUND_NEW_ADD.png",
+    "CRYPTO_PROMO_AMBAR_RU.png", "CRYPTO_PROMO_AMBAR_EN.png",
+    "promo_banner_ru.png",  "promo_banner_en.png",
+    "promo_hero_ru.png",    "promo_hero_en.png",
+    "promo_modal_ru.png",   "promo_modal_en.png",
+    "promo_addhome_ru.png", "promo_addhome_en.png",
+}
+PUBLIC_DIRS = ("owner/", "operator/", "TEXTURES/", "fonts/", "LOGOS/", "uploads/")
+PUBLIC_EXTS = {
+    ".html", ".js", ".css", ".json", ".map",
+    ".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif", ".ico",
+    ".ttf", ".otf", ".woff", ".woff2", ".mp3", ".wav", ".ogg",
+}
+
+
+def _is_public_asset(rel: str) -> bool:
+    """rel is a STATIC_DIR-relative POSIX path with no traversal left in it."""
+    if not rel or rel.startswith("/"):
+        return False
+    parts = rel.split("/")
+    if any(p.startswith(".") for p in parts):      # .env, .git/…, .broadcast_sent_*
+        return False
+    if rel in PUBLIC_ROOT_FILES:
+        return True
+    if not rel.startswith(PUBLIC_DIRS):
+        return False
+    return ("." + rel.rsplit(".", 1)[-1].lower()) in PUBLIC_EXTS if "." in parts[-1] else False
+
+
 async def handle_static(request: web.Request) -> web.Response:
     path = request.match_info.get("path", "") or "index-6.html"
     if path in ("", "/"):
         path = "index-6.html"
     filepath = (STATIC_DIR / path).resolve()
     try:
-        filepath.relative_to(STATIC_DIR.resolve())
+        rel = filepath.relative_to(STATIC_DIR.resolve()).as_posix()
     except ValueError:
         return web.Response(status=403, text="Forbidden")
+    # Directory URLs (/owner/) resolve to their index.html below — allow the
+    # bare directory through the check by testing the file it maps to.
+    probe = rel + "/index.html" if filepath.is_dir() else rel
+    if not _is_public_asset(probe):
+        log.warning(f"[static] blocked non-public path: {rel}")
+        return web.Response(status=404, text="Not found")
     # Directory requests (e.g. /owner/) → serve index.html inside them, same
     # as any normal web server. Needed so the owner miniapp at /owner/ works
     # without requiring /owner/index.html in the URL.

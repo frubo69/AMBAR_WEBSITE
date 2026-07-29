@@ -68,12 +68,29 @@ def _parse_ts(ts: str):
     except (ValueError, TypeError):
         return None
 
+# ── Сутки бизнеса ≠ календарные ──────────────────────────────────────────────
+# Смена работает с 12:00 до 06:00 следующего дня, поэтому заказ, принятый в
+# 02:00, относится к вечеру предыдущего дня, а не к новому. Сутки считаем от
+# полудня до полудня: всё, что раньше 12:00, — это ещё вчерашний день.
+SHIFT_START_HOUR = int(os.getenv("AMBAR_SHIFT_START_HOUR", "12"))
+
+
+def _biz_day_start(ref: datetime) -> datetime:
+    """Начало рабочих суток, которым принадлежит момент `ref` (Дубай)."""
+    anchor = ref.replace(hour=SHIFT_START_HOUR, minute=0, second=0, microsecond=0)
+    return anchor if ref >= anchor else anchor - timedelta(days=1)
+
+
+def _biz_date(dt: datetime):
+    """Дата, которой подписаны рабочие сутки данного момента."""
+    return _biz_day_start(dt).date()
+
 
 def _period_window(period: str, ref: datetime = None):
     """Return (start, end, prev_start, prev_end) for the given period,
     all in Dubai TZ. `end` is exclusive (start of tomorrow for daily-aligned)."""
     ref = ref or _now_dubai()
-    today_start = ref.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = _biz_day_start(ref)
     tomorrow_start = today_start + timedelta(days=1)
 
     if period == "today":
@@ -156,32 +173,38 @@ def _bucket_trend(orders, start_dt: datetime, period: str) -> list:
     today→24 hours, week→7 days, month→30 days, year→12 months."""
     if period in ("today", "yesterday"):
         buckets = [0] * 24
+        # Слот 0 — это первый час смены (12:00), а не полночь: считаем смещение от
+        # начала суток, тогда график читается в том порядке, в каком шёл день.
         for dt, o in orders:
-            buckets[dt.hour] += int(o.get("total", 0) or 0)
-        # Only the LIVE day is trimmed to the current hour (no empty future hours);
-        # any completed day — yesterday, or a day reached via day_offset — shows all 24.
+            idx = int((dt - start_dt).total_seconds() // 3600)
+            if 0 <= idx < 24:
+                buckets[idx] += int(o.get("total", 0) or 0)
+        # Обрезаем по текущему часу только ЖИВЫЕ сутки, чтобы не рисовать пустое
+        # будущее; любой завершённый день показывает все 24 часа.
         now = _now_dubai()
-        if start_dt.date() == now.date():
-            return buckets[:now.hour + 1] or [0]
+        if start_dt == _biz_day_start(now):
+            elapsed = int((now - start_dt).total_seconds() // 3600)
+            return buckets[:max(0, min(23, elapsed)) + 1] or [0]
         return buckets
     if period == "week":
         buckets = [0] * 7
         for dt, o in orders:
-            idx = (dt.date() - start_dt.date()).days
+            idx = (_biz_date(dt) - start_dt.date()).days
             if 0 <= idx < 7:
                 buckets[idx] += int(o.get("total", 0) or 0)
         return buckets
     if period == "month":
         buckets = [0] * 30
         for dt, o in orders:
-            idx = (dt.date() - start_dt.date()).days
+            idx = (_biz_date(dt) - start_dt.date()).days
             if 0 <= idx < 30:
                 buckets[idx] += int(o.get("total", 0) or 0)
         return buckets
     if period == "year":
         buckets = [0] * 12
         for dt, o in orders:
-            months_diff = (dt.year - start_dt.year) * 12 + (dt.month - start_dt.month)
+            bd = _biz_date(dt)
+            months_diff = (bd.year - start_dt.year) * 12 + (bd.month - start_dt.month)
             if 0 <= months_diff < 12:
                 buckets[months_diff] += int(o.get("total", 0) or 0)
         return buckets
@@ -190,13 +213,13 @@ def _bucket_trend(orders, start_dt: datetime, period: str) -> list:
 
 def _last_7_days(all_orders: dict) -> list:
     """Last-7-days revenue bars (Money tab). Index 0 = 7 days ago, 6 = today."""
-    today_start = _now_dubai().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = _biz_day_start(_now_dubai())
     end = today_start + timedelta(days=1)
     start = end - timedelta(days=7)
     orders = _orders_in_window(all_orders, start, end)
     buckets = [0] * 7
     for dt, o in orders:
-        idx = (dt.date() - start.date()).days
+        idx = (_biz_date(dt) - start.date()).days
         if 0 <= idx < 7:
             buckets[idx] += int(o.get("total", 0) or 0)
     return buckets
@@ -404,14 +427,14 @@ async def handle_finance(request):
     avg_delta_min = deliv_curr["avg_min"] - deliv_prev["avg_min"] if deliv_prev["sample"] else 0
 
     # Last 7 days order count (any status) — for orders detail trend
-    today_start = _now_dubai().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = _biz_day_start(_now_dubai())
     week_end = today_start + timedelta(days=1)
     week_start = week_end - timedelta(days=7)
     orders_7d = [0] * 7
     for _, o in _all_orders_in_window(all_orders, week_start, week_end):
         dt = _parse_ts(o.get("timestamp"))
         if dt is None: continue
-        idx = (dt.date() - week_start.date()).days
+        idx = (_biz_date(dt) - week_start.date()).days
         if 0 <= idx < 7:
             orders_7d[idx] += 1
 

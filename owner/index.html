@@ -202,12 +202,26 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    Needs [data-detail] in the selector to outrank the generic
    [data-detail]{touch-action:manipulation} rule declared further down. */
 .hero,.hero[data-detail]{touch-action:pan-y}
-@keyframes dayInL{from{opacity:0;transform:translateX(-18px)}to{opacity:1;transform:none}}
-@keyframes dayInR{from{opacity:0;transform:translateX(18px)}to{opacity:1;transform:none}}
-.hero.day-anim-l .hero-amt-row,.hero.day-anim-l .hero-row,.hero.day-anim-l .hero-spark{animation:dayInL .3s var(--e1) both}
-.hero.day-anim-r .hero-amt-row,.hero.day-anim-r .hero-row,.hero.day-anim-r .hero-spark{animation:dayInR .3s var(--e1) both}
-@keyframes kpiIn{from{opacity:.25}to{opacity:1}}
-.day-fade{animation:kpiIn .34s var(--e1) both}
+/* Смена дня: лист целиком уезжает в сторону свайпа и новый приезжает с другой.
+   Свайп ВЛЕВО — уходим в прошлое, лист улетает влево, новый входит справа. */
+.day-slide{will-change:transform,opacity}
+@keyframes daySlideL{
+  0%{transform:none;opacity:1}
+  42%{transform:translateX(-24%) scale(.965);opacity:0}
+  43%{transform:translateX(24%) scale(.965);opacity:0}
+  100%{transform:none;opacity:1}}
+@keyframes daySlideR{
+  0%{transform:none;opacity:1}
+  42%{transform:translateX(24%) scale(.965);opacity:0}
+  43%{transform:translateX(-24%) scale(.965);opacity:0}
+  100%{transform:none;opacity:1}}
+.day-slide.day-anim-l{animation:daySlideL .44s cubic-bezier(.4,0,.2,1) both}
+.day-slide.day-anim-r{animation:daySlideR .44s cubic-bezier(.4,0,.2,1) both}
+/* палец тянет лист за собой, пока свайп ещё идёт */
+.day-slide.day-drag{transition:none}
+@media (prefers-reduced-motion: reduce){
+  .day-slide.day-anim-l,.day-slide.day-anim-r{animation-duration:.01s}
+}
 .hero.day-busy .hero-amt,.hero.day-busy .hero-row,.hero.day-busy .hero-spark{opacity:.45;transition:opacity .15s}
 .hero-spark{margin-top:12px;height:46px;position:relative}
 
@@ -545,6 +559,11 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
   <div class="range-chip" id="rangeChip-periodPicker" style="display:none"><span class="rc-icon">📅</span><span class="rc-text"></span><button class="rc-x" onclick="clearRange('periodPicker')">✕</button></div>
 
+  <!-- Всё ниже панели периодов смахивается одним слоем: обёртка нужна, потому
+       что .period-bar — position:fixed, и transform на общем родителе утащил бы
+       её вместе с содержимым. -->
+  <div class="day-slide" id="ovDay">
+
   <!-- Hero revenue -->
   <div class="hero" data-detail="kpi:revenue">
     <div class="hero-lbl">
@@ -703,6 +722,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
 
   <div class="foot">AMBAR · Owner Dashboard · v0.1 mock</div>
+  </div><!-- /day-slide -->
 </div>
 
 <!-- ============ MONEY ============ -->
@@ -2897,21 +2917,17 @@ function _syncDayNav(p, w){
                                      : ((PERIOD_DATA[p] || {}).prev || 'vs вчера'));
 }
 
-// dir > 0 → moving back in time (new content slides in from the left), < 0 → forward.
+// dir > 0 → уходим в прошлое: лист улетает влево, новый заезжает справа.
+// dir < 0 → возвращаемся к сегодня: наоборот.
 function _animDay(dir){
-  const hero = document.querySelector('#pg-overview .hero');
-  const bento = document.querySelector('#pg-overview .bento');
+  const sheet = document.getElementById('ovDay');
+  if(!sheet) return;
   const cls = dir > 0 ? 'day-anim-l' : 'day-anim-r';
-  if(hero){
-    hero.classList.remove('day-anim-l','day-anim-r'); void hero.offsetWidth;
-    hero.classList.add(cls);
-    setTimeout(()=>hero.classList.remove(cls), 340);
-  }
-  if(bento){
-    bento.classList.remove('day-fade'); void bento.offsetWidth;
-    bento.classList.add('day-fade');
-    setTimeout(()=>bento.classList.remove('day-fade'), 380);
-  }
+  sheet.classList.remove('day-drag','day-anim-l','day-anim-r');
+  sheet.style.transform = '';
+  void sheet.offsetWidth;                       // перезапуск анимации
+  sheet.classList.add(cls);
+  setTimeout(()=>sheet.classList.remove(cls), 460);
 }
 
 async function _loadDay(p, dir){
@@ -2972,30 +2988,51 @@ async function dayReset(){
   await _loadDay(p, -1);
 }
 
-// Swipe the hero: right → older day, left → back toward today. The page must NOT
-// scroll while a horizontal swipe is in progress (touch-action:pan-y + preventDefault).
+// Свайп по карточке выручки: ВЛЕВО — предыдущий день, ВПРАВО — обратно к сегодня.
+// Тянется весь лист, но ловим жест только на .hero — в остальной странице свайпы
+// не наши. Страница при этом не должна скроллиться (touch-action:pan-y + preventDefault).
 (function(){
-  const hero = document.querySelector('#pg-overview .hero');
-  if(!hero) return;
-  let sx = 0, sy = 0, live = false, axis = 0;   // axis: 0 undecided, 1 horizontal, -1 vertical
+  const hero  = document.querySelector('#pg-overview .hero');
+  const sheet = document.getElementById('ovDay');
+  if(!hero || !sheet) return;
+  let sx = 0, sy = 0, live = false, axis = 0;   // axis: 0 не решено, 1 гориз., -1 вертик.
+
+  const release = ()=>{
+    sheet.classList.remove('day-drag');
+    sheet.style.transform = '';
+    sheet.style.opacity   = '';
+  };
+
   hero.addEventListener('touchstart', e=>{
     if(e.touches.length !== 1){ live = false; return; }
     sx = e.touches[0].clientX; sy = e.touches[0].clientY; live = true; axis = 0;
   }, {passive:true});
+
   hero.addEventListener('touchmove', e=>{
     if(!live) return;
     const t = e.touches[0], dx = t.clientX - sx, dy = t.clientY - sy;
     if(!axis && (Math.abs(dx) > 8 || Math.abs(dy) > 8))
       axis = Math.abs(dx) > Math.abs(dy) ? 1 : -1;
-    if(axis === 1) e.preventDefault();          // ours → no page scroll
+    if(axis !== 1) return;
+    e.preventDefault();                          // жест наш → страница не едет
+    // Лист следует за пальцем, но с сопротивлением: полный ход отдаётся не 1:1,
+    // иначе жест ощущается развязным, а край листа улетает из-под пальца.
+    sheet.classList.add('day-drag');
+    const pull = Math.sign(dx) * Math.min(Math.abs(dx) * .55, 90);
+    sheet.style.transform = `translateX(${pull}px)`;
+    sheet.style.opacity   = String(1 - Math.min(Math.abs(pull) / 260, .35));
   }, {passive:false});
+
   hero.addEventListener('touchend', e=>{
     if(!live) return; live = false;
-    if(axis === -1) return;                     // vertical → leave the page scroll alone
+    if(axis !== 1){ release(); return; }
     const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    release();
     if(Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
-    dayStep(dx > 0 ? 1 : -1);
+    dayStep(dx < 0 ? 1 : -1);                    // влево → назад во времени
   }, {passive:true});
+
+  hero.addEventListener('touchcancel', ()=>{ live = false; release(); }, {passive:true});
 })();
 
 function applyPeriod(p){

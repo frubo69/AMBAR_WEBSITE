@@ -55,6 +55,16 @@ def _district(did: str) -> dict | None:
 
 DUBAI_TZ = timezone(timedelta(hours=4))
 
+# Смена идёт с 12:00 до 06:00, поэтому рабочие сутки считаем от полудня до
+# полудня — см. owner_routes._biz_day_start, правило общее для всей системы.
+SHIFT_START_HOUR = int(os.getenv("AMBAR_SHIFT_START_HOUR", "12"))
+
+
+def _biz_date(dt):
+    """Дата смены, которой принадлежит момент dt (Дубай)."""
+    anchor = dt.replace(hour=SHIFT_START_HOUR, minute=0, second=0, microsecond=0)
+    return (anchor if dt >= anchor else anchor - timedelta(days=1)).date()
+
 _CATALOG_FILE = Path(__file__).parent / "catalog.json"
 _cat_cache = {"mtime": 0.0, "items": []}
 
@@ -456,7 +466,9 @@ async def handle_list(request):
     """Today's (Dubai) manual orders. Привязки офис→оператор пока нет —
     оператор видит все ручные заказы за сегодня."""
     uid = request["op_id"]
-    today = datetime.now(DUBAI_TZ).date()
+    # «Сегодня» для оператора — его смена (12:00→12:00), а не календарные сутки:
+    # заказ, принятый в 02:00, всё ещё относится к текущей смене.
+    today = _biz_date(datetime.now(DUBAI_TZ))
     out = []
     all_orders = await db.get_all_orders()
     for o in all_orders.values():
@@ -469,7 +481,7 @@ async def handle_list(request):
                 tzinfo=timezone.utc).astimezone(DUBAI_TZ)
         except (ValueError, TypeError):
             continue
-        if ts.date() != today:
+        if _biz_date(ts) != today:
             continue
         out.append(_summary(o))
     out.sort(key=lambda x: x.get("timestamp", ""), reverse=True)

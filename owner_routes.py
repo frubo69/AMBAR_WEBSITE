@@ -524,7 +524,7 @@ async def handle_finance(request):
         # hero day from these (its own clock/TZ may differ from the office's).
         "window": {
             "date":       start.strftime("%Y-%m-%d"),
-            "today":      _now_dubai().strftime("%Y-%m-%d"),
+            "today":      _biz_day_start(_now_dubai()).strftime("%Y-%m-%d"),
             "day_offset": day_offset,
         },
         "revenue": {
@@ -870,7 +870,8 @@ async def handle_office(request):
     return web.json_response({
         "id": oid, "name": OFFICE_NAMES[oid], "period": period,
         "window": {"date": start.strftime("%Y-%m-%d"),
-                   "today": _now_dubai().strftime("%Y-%m-%d"), "day_offset": day_offset},
+                   "today": _biz_day_start(_now_dubai()).strftime("%Y-%m-%d"),
+                   "day_offset": day_offset},
         "revenue": {"current": rev, "previous": rev_prev,
                     "delta_pct": pct, "delta_label": _delta_label(pct)},
         "orders": {"total": len(curr_all), "delivered": delivered,

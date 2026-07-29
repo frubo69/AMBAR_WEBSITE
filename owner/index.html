@@ -156,7 +156,11 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   60%  { opacity:1 }
   100% { transform:translateX(calc(var(--active)*100%)) scale(1); opacity:1 }
 }
-.periods button{flex:1;padding:8px 0;font-size:12px;font-weight:600;color:var(--sub);border-radius:8px;transition:color .22s var(--e1);letter-spacing:.3px;position:relative;z-index:1;background:none;border:none;cursor:pointer;line-height:1.15;min-height:32px;display:flex;align-items:center;justify-content:center}
+.periods button{flex:1;padding:6px 0;font-size:12px;font-weight:600;color:var(--sub);border-radius:8px;transition:color .22s var(--e1);letter-spacing:.3px;position:relative;z-index:1;background:none;border:none;cursor:pointer;line-height:1.15;min-height:32px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1px}
+/* Конкретная дата под «Сегодня» и «Вчера» — чтобы не гадать, какой это день,
+   особенно когда сутки считаются от полудня. */
+.periods button .p-date{font-size:8.5px;font-weight:600;letter-spacing:.2px;opacity:.55;font-variant-numeric:tabular-nums;line-height:1}
+.periods button.on .p-date{opacity:.75}
 .periods button.on{color:#0a0a14;background:none;box-shadow:none}
 
 /* Hero KPI — the main money number */
@@ -202,25 +206,15 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    Needs [data-detail] in the selector to outrank the generic
    [data-detail]{touch-action:manipulation} rule declared further down. */
 .hero,.hero[data-detail]{touch-action:pan-y}
-/* Смена дня: лист целиком уезжает в сторону свайпа и новый приезжает с другой.
-   Свайп ВЛЕВО — уходим в прошлое, лист улетает влево, новый входит справа. */
-.day-slide{will-change:transform,opacity}
-@keyframes daySlideL{
-  0%{transform:none;opacity:1}
-  42%{transform:translateX(-24%) scale(.965);opacity:0}
-  43%{transform:translateX(24%) scale(.965);opacity:0}
-  100%{transform:none;opacity:1}}
-@keyframes daySlideR{
-  0%{transform:none;opacity:1}
-  42%{transform:translateX(24%) scale(.965);opacity:0}
-  43%{transform:translateX(-24%) scale(.965);opacity:0}
-  100%{transform:none;opacity:1}}
-.day-slide.day-anim-l{animation:daySlideL .44s cubic-bezier(.4,0,.2,1) both}
-.day-slide.day-anim-r{animation:daySlideR .44s cubic-bezier(.4,0,.2,1) both}
-/* палец тянет лист за собой, пока свайп ещё идёт */
-.day-slide.day-drag{transition:none}
+/* Обычный свайп карточки, как листание в любом приложении: под пальцем едет
+   один в один, отпустил — уехала и с другой стороны приехала новая. Двигается
+   ТОЛЬКО карточка выручки; остальная страница просто перерисовывает цифры. */
+.hero{will-change:transform}
+.hero.day-drag{transition:none}
+.hero.day-move{transition:transform .15s cubic-bezier(.3,0,.2,1)}
+.hero.day-back{transition:transform .2s cubic-bezier(.2,.8,.3,1)}
 @media (prefers-reduced-motion: reduce){
-  .day-slide.day-anim-l,.day-slide.day-anim-r{animation-duration:.01s}
+  .hero.day-move,.hero.day-back{transition-duration:.01s}
 }
 .hero.day-busy .hero-amt,.hero.day-busy .hero-row,.hero.day-busy .hero-spark{opacity:.45;transition:opacity .15s}
 .hero-spark{margin-top:12px;height:46px;position:relative}
@@ -547,8 +541,8 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   <div class="period-bar">
     <div class="periods" id="periodPicker">
       <div class="period-pill"></div>
-      <button class="on" data-p="today">Сегодня</button>
-      <button data-p="yesterday">Вчера</button>
+      <button class="on" data-p="today"><span>Сегодня</span><span class="p-date"></span></button>
+      <button data-p="yesterday"><span>Вчера</span><span class="p-date"></span></button>
       <button data-p="week">Неделя</button>
       <button data-p="month">Месяц</button>
       <button data-p="year">Год</button>
@@ -558,11 +552,6 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     </button>
   </div>
   <div class="range-chip" id="rangeChip-periodPicker" style="display:none"><span class="rc-icon">📅</span><span class="rc-text"></span><button class="rc-x" onclick="clearRange('periodPicker')">✕</button></div>
-
-  <!-- Всё ниже панели периодов смахивается одним слоем: обёртка нужна, потому
-       что .period-bar — position:fixed, и transform на общем родителе утащил бы
-       её вместе с содержимым. -->
-  <div class="day-slide" id="ovDay">
 
   <!-- Hero revenue -->
   <div class="hero" data-detail="kpi:revenue">
@@ -722,7 +711,6 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
 
   <div class="foot">AMBAR · Owner Dashboard · v0.1 mock</div>
-  </div><!-- /day-slide -->
 </div>
 
 <!-- ============ MONEY ============ -->
@@ -730,8 +718,8 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   <div class="period-bar">
     <div class="periods" id="moneyPeriod">
       <div class="period-pill"></div>
-      <button class="on" data-p="today">Сегодня</button>
-      <button data-p="yesterday">Вчера</button>
+      <button class="on" data-p="today"><span>Сегодня</span><span class="p-date"></span></button>
+      <button data-p="yesterday"><span>Вчера</span><span class="p-date"></span></button>
       <button data-p="week">Неделя</button>
       <button data-p="month">Месяц</button>
       <button data-p="year">Год</button>
@@ -829,8 +817,8 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   <div class="period-bar">
     <div class="periods" id="officePeriod">
       <div class="period-pill"></div>
-      <button class="on" data-p="today">Сегодня</button>
-      <button data-p="yesterday">Вчера</button>
+      <button class="on" data-p="today"><span>Сегодня</span><span class="p-date"></span></button>
+      <button data-p="yesterday"><span>Вчера</span><span class="p-date"></span></button>
       <button data-p="week">Неделя</button>
       <button data-p="month">Месяц</button>
       <button data-p="year">Год</button>
@@ -2892,6 +2880,35 @@ const _fkey = (p, off) => off ? p + ':' + off : p;
 
 function _dayNavOn(p){ return p === 'today' || p === 'yesterday'; }
 
+// Дата рабочих суток на N дней назад — считаем на клиенте, чтобы подпись
+// менялась в тот же кадр, что и свайп, не дожидаясь ответа сервера. Сервер потом
+// пришлёт свою и перезапишет — расхождений быть не должно, правило одно.
+const SHIFT_START_HOUR = 12;   // смена 12:00 → 12:00, см. owner_routes._biz_day_start
+function _bizToday(){
+  const n = new Date();
+  if(n.getHours() < SHIFT_START_HOUR) n.setDate(n.getDate() - 1);
+  n.setHours(0,0,0,0);
+  return n;
+}
+function _dayIsoFor(off){
+  const d = _bizToday();
+  d.setDate(d.getDate() - (off || 0));
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+// Проставляем конкретные числа под «Сегодня» и «Вчера» во всех трёх наборах
+// пилюль. Даты — рабочих суток (с полудня), поэтому до 12:00 «Сегодня» честно
+// показывает вчерашнее число: это та смена, которая ещё идёт.
+function _fillPeriodDates(){
+  const fmt = d => String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0');
+  const today = _bizToday();
+  const yest  = new Date(today); yest.setDate(yest.getDate() - 1);
+  document.querySelectorAll('.periods button[data-p="today"] .p-date')
+          .forEach(el => el.textContent = fmt(today));
+  document.querySelectorAll('.periods button[data-p="yesterday"] .p-date')
+          .forEach(el => el.textContent = fmt(yest));
+}
+
 function _dayLabel(w){
   // Labelled from the SERVER's Dubai dates — the device's clock/TZ may differ.
   if(!w || !w.date) return DAY_OFFSET ? DAY_OFFSET + ' дн. назад' : 'сегодня';
@@ -2917,90 +2934,103 @@ function _syncDayNav(p, w){
                                      : ((PERIOD_DATA[p] || {}).prev || 'vs вчера'));
 }
 
-// dir > 0 → уходим в прошлое: лист улетает влево, новый заезжает справа.
-// dir < 0 → возвращаемся к сегодня: наоборот.
-function _animDay(dir){
-  const sheet = document.getElementById('ovDay');
-  if(!sheet) return;
-  const cls = dir > 0 ? 'day-anim-l' : 'day-anim-r';
-  sheet.classList.remove('day-drag','day-anim-l','day-anim-r');
-  sheet.style.transform = '';
-  void sheet.offsetWidth;                       // перезапуск анимации
-  sheet.classList.add(cls);
-  setTimeout(()=>sheet.classList.remove(cls), 460);
-}
-
-async function _loadDay(p, dir){
+// Карточка уезжает в сторону свайпа и с другой стороны въезжает новая.
+// Возвращает промис, который резолвится на «перевороте» — в этот момент надо
+// подменить содержимое, чтобы новый день въехал уже с новыми цифрами.
+function _heroFlip(dir){
   const hero = document.querySelector('#pg-overview .hero');
-  if(!DAY_OFFSET){                       // back to the live period view
-    const hl = document.getElementById('heroLbl');
-    if(hl) hl.textContent = 'Выручка · ' + ((PERIOD_DATA[p] || {}).lbl || '');
-    const d = FINANCE_CACHE[p];
-    if(d){ renderFinance(p, d); applyCurrency(); } else { applyFinanceLive(p); }
-    _syncDayNav(p, d && d.window);
-    if(dir) _animDay(dir);
-    return true;
-  }
-  const key = _fkey(p, DAY_OFFSET);
-  let data = FINANCE_CACHE[key];
-  if(!data){
-    if(hero) hero.classList.add('day-busy');
-    try{
-      data = await ownerApi.ownerFetch('/api/owner/finance',
-                                       {params:{period:p, day_offset:DAY_OFFSET}});
-      FINANCE_CACHE[key] = data;
-    }catch(e){
-      console.warn('[day] fetch failed', e);
-      return false;
-    }finally{
-      if(hero) hero.classList.remove('day-busy');
-    }
-  }
-  if(_fkey(p, DAY_OFFSET) !== key) return true;   // user kept swiping — drop stale response
-  renderFinance(p, data);                          // whole page follows the day
-  _syncDayNav(p, data.window);
-  applyCurrency();
-  if(dir) _animDay(dir);
-  return true;
+  if(!hero) return Promise.resolve();
+  const W = hero.offsetWidth + 24;
+  const out = dir > 0 ? -W : W;            // назад во времени → уезжает влево
+  hero.classList.remove('day-drag','day-back');
+  hero.classList.add('day-move');
+  hero.style.transform = `translateX(${out}px)`;
+  return new Promise(res=>setTimeout(()=>{
+    res();                                  // здесь вызывающий обновляет содержимое
+    hero.classList.remove('day-move');      // мгновенно переставляем на другой край
+    hero.style.transform = `translateX(${-out}px)`;
+    void hero.offsetWidth;
+    hero.classList.add('day-back');
+    hero.style.transform = '';
+    setTimeout(()=>hero.classList.remove('day-back'), 220);
+  }, 150));
 }
 
-async function dayStep(delta){
+// Данные дня, если они уже лежат в кэше. Свайп никогда их не ждёт.
+function _dayCached(p){ return DAY_OFFSET ? FINANCE_CACHE[_fkey(p, DAY_OFFSET)] : FINANCE_CACHE[p]; }
+
+// Тихо тянем соседний день, чтобы следующий свайп был мгновенным.
+function _prefetchDay(p, off){
+  if(off < 0 || off > 365) return;
+  const key = off ? _fkey(p, off) : p;
+  if(FINANCE_CACHE[key] || !_dayNavOn(p)) return;
+  ownerApi.ownerFetch('/api/owner/finance', {params:{period:p, day_offset:off}})
+    .then(d=>{ FINANCE_CACHE[key] = d; })
+    .catch(()=>{});
+}
+
+// Рисуем день: из кэша — сразу, иначе показываем прошлые цифры приглушёнными и
+// подставляем настоящие, когда ответ придёт. Свайп к этому моменту уже прошёл.
+function _paintDay(p){
+  const hero = document.querySelector('#pg-overview .hero');
+  const stamp = _fkey(p, DAY_OFFSET);
+  const cached = _dayCached(p);
+  // Отрисовку страхуем: неполный ответ не должен обрывать остальное — иначе
+  // исключение тонет в .then(), прогрев не запускается, а карточка навсегда
+  // остаётся приглушённой.
+  const paint = d => {
+    try{ renderFinance(p, d); }catch(e){ console.warn('[day] render failed', e); }
+    _syncDayNav(p, d.window);
+    applyCurrency();
+    _prefetchDay(p, DAY_OFFSET + 1);
+  };
+  if(cached){ paint(cached); return; }
+  _syncDayNav(p, {date:_dayIsoFor(DAY_OFFSET), today:_dayIsoFor(0), day_offset:DAY_OFFSET});  // подпись — сразу
+  if(hero) hero.classList.add('day-busy');
+  const req = DAY_OFFSET
+    ? ownerApi.ownerFetch('/api/owner/finance', {params:{period:p, day_offset:DAY_OFFSET}})
+    : ownerApi.ownerFetch('/api/owner/finance', {params:{period:p}});
+  req.then(d=>{
+    FINANCE_CACHE[DAY_OFFSET ? _fkey(p, DAY_OFFSET) : p] = d;
+    if(_fkey(p, DAY_OFFSET) !== stamp) return;    // успел свайпнуть дальше — ответ протух
+    paint(d);
+  }).catch(e=>console.warn('[day] fetch failed', e))
+    .finally(()=>{ if(hero) hero.classList.remove('day-busy'); });
+}
+
+// Шаг по дням. Сначала едет карточка, данные догоняют — ожидание сети больше
+// не держит жест.
+function dayStep(delta){
   const p = document.querySelector('#periodPicker button.on')?.dataset?.p || 'today';
   if(!_dayNavOn(p)) return;
-  const prev = DAY_OFFSET;
-  const next = Math.max(0, Math.min(365, prev + delta));
-  if(next === prev) return;
+  const next = Math.max(0, Math.min(365, DAY_OFFSET + delta));
+  if(next === DAY_OFFSET) return;
   DAY_OFFSET = next;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  const ok = await _loadDay(p, delta);
-  if(!ok){                                        // failed → don't let the chip lie
-    DAY_OFFSET = prev;
-    _syncDayNav(p, (FINANCE_CACHE[_fkey(p, prev)] || {}).window);
-  }
+  _heroFlip(delta).then(()=>_paintDay(p));
 }
 
-// One tap on the date chip → straight back to today, however far you've walked.
-async function dayReset(){
+// Один тап по дате — сразу на сегодня, с какого бы дня ни зашли.
+function dayReset(){
   if(!DAY_OFFSET) return;
   const p = document.querySelector('#periodPicker button.on')?.dataset?.p || 'today';
   DAY_OFFSET = 0;
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('medium'); }catch(e){}
-  await _loadDay(p, -1);
+  _heroFlip(-1).then(()=>_paintDay(p));
 }
 
-// Свайп по карточке выручки: ВЛЕВО — предыдущий день, ВПРАВО — обратно к сегодня.
-// Тянется весь лист, но ловим жест только на .hero — в остальной странице свайпы
-// не наши. Страница при этом не должна скроллиться (touch-action:pan-y + preventDefault).
+// Свайп по карточке выручки: влево — предыдущий день, вправо — обратно к сегодня.
+// Карточка идёт за пальцем один в один; страница под ней не скроллится.
 (function(){
-  const hero  = document.querySelector('#pg-overview .hero');
-  const sheet = document.getElementById('ovDay');
-  if(!hero || !sheet) return;
+  const hero = document.querySelector('#pg-overview .hero');
+  if(!hero) return;
   let sx = 0, sy = 0, live = false, axis = 0;   // axis: 0 не решено, 1 гориз., -1 вертик.
 
-  const release = ()=>{
-    sheet.classList.remove('day-drag');
-    sheet.style.transform = '';
-    sheet.style.opacity   = '';
+  const settle = ()=>{
+    hero.classList.remove('day-drag');
+    hero.classList.add('day-back');
+    hero.style.transform = '';
+    setTimeout(()=>hero.classList.remove('day-back'), 220);
   };
 
   hero.addEventListener('touchstart', e=>{
@@ -3010,29 +3040,32 @@ async function dayReset(){
 
   hero.addEventListener('touchmove', e=>{
     if(!live) return;
-    const t = e.touches[0], dx = t.clientX - sx, dy = t.clientY - sy;
+    const t = e.touches[0];
+    let dx = t.clientX - sx;
+    const dy = t.clientY - sy;
     if(!axis && (Math.abs(dx) > 8 || Math.abs(dy) > 8))
       axis = Math.abs(dx) > Math.abs(dy) ? 1 : -1;
     if(axis !== 1) return;
     e.preventDefault();                          // жест наш → страница не едет
-    // Лист следует за пальцем, но с сопротивлением: полный ход отдаётся не 1:1,
-    // иначе жест ощущается развязным, а край листа улетает из-под пальца.
-    sheet.classList.add('day-drag');
-    const pull = Math.sign(dx) * Math.min(Math.abs(dx) * .55, 90);
-    sheet.style.transform = `translateX(${pull}px)`;
-    sheet.style.opacity   = String(1 - Math.min(Math.abs(pull) / 260, .35));
+    // Вперёд сегодняшнего дня хода нет — там упор, а не пустая страница.
+    if(dx > 0 && DAY_OFFSET === 0) dx = Math.min(dx * .25, 40);
+    hero.classList.remove('day-back');
+    hero.classList.add('day-drag');
+    hero.style.transform = `translateX(${dx}px)`;
   }, {passive:false});
 
   hero.addEventListener('touchend', e=>{
     if(!live) return; live = false;
-    if(axis !== 1){ release(); return; }
+    if(axis !== 1) return;
     const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
-    release();
-    if(Math.abs(dx) < 45 || Math.abs(dx) < Math.abs(dy) * 1.4) return;
+    const commit = Math.abs(dx) >= 55 && Math.abs(dx) > Math.abs(dy) * 1.2
+                   && !(dx > 0 && DAY_OFFSET === 0);
+    if(!commit){ settle(); return; }
+    hero.classList.remove('day-drag');
     dayStep(dx < 0 ? 1 : -1);                    // влево → назад во времени
   }, {passive:true});
 
-  hero.addEventListener('touchcancel', ()=>{ live = false; release(); }, {passive:true});
+  hero.addEventListener('touchcancel', ()=>{ live = false; settle(); }, {passive:true});
 })();
 
 function applyPeriod(p){
@@ -3093,6 +3126,9 @@ async function applyFinanceLive(p){
     FINANCE_CACHE[p] = data;
   }
   renderFinance(p, data);
+  _fillPeriodDates();
+  // Прогреваем вчерашний день, чтобы первый же свайп открылся без ожидания.
+  if(!DAY_OFFSET) _prefetchDay(p, 1);
 }
 
 // Paints ONLY the hero revenue block (amount, delta, sparkline) — shared by the

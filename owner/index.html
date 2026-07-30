@@ -185,7 +185,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Hero day browser — swipe the card or tap the arrows to walk back through days.
    Completely independent of the period pills (they reset it to 0). */
 /* one cohesive stepper pill — not three boxes */
-.day-nav{margin-left:auto;display:flex;align-items:center;gap:0;padding:2px;border-radius:999px;
+.day-nav{margin-left:auto;display:flex;align-items:center;gap:0;padding:2px;border-radius:12px;
   background:rgba(201,169,110,.07);border:1px solid rgba(201,169,110,.16);
   letter-spacing:0;text-transform:none}
 .dn-b{width:26px;height:24px;padding:0;border:none;background:none;border-radius:999px;color:var(--gold2);
@@ -193,15 +193,21 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .dn-b svg{width:13px;height:13px;display:block}
 .dn-b:active{background:rgba(201,169,110,.2);transform:scale(.9)}
 .dn-b[disabled]{opacity:.25;pointer-events:none}
-/* the date doubles as "back to today" once you've stepped away */
-.dn-d{min-width:66px;height:24px;padding:0 6px;border:none;background:none;border-radius:999px;
-  font-size:11px;font-weight:700;color:var(--gold2);font-family:'DM Sans',sans-serif;letter-spacing:.2px;
-  display:flex;align-items:center;justify-content:center;gap:4px;transition:.15s var(--e1)}
+/* Дата двумя строками: число сверху, «сегодня/вчера/27 июля» под ним — чтобы не
+   гадать, какой это день, особенно при сутках от полудня. */
+.dn-d{min-width:58px;height:30px;padding:0 7px;border:none;background:none;border-radius:9px;
+  font-family:'DM Sans',sans-serif;color:var(--gold2);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;transition:.15s var(--e1)}
 .dn-d[disabled]{cursor:default}
-.dn-d.back{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;cursor:pointer}
-.dn-d.back:active{transform:scale(.93)}
-.dn-d .dn-undo{display:none;font-size:12px;line-height:1}
-.dn-d.back .dn-undo{display:inline}
+.dn-num{font-size:11.5px;font-weight:700;letter-spacing:.2px;line-height:1.1;font-variant-numeric:tabular-nums}
+.dn-rel{font-size:8.5px;font-weight:600;letter-spacing:.2px;line-height:1.1;opacity:.6;text-transform:lowercase}
+/* Возврат к сегодня — отдельная подписанная кнопка, а не догадка про иконку.
+   Появляется только когда действительно есть куда возвращаться. */
+.dn-home{height:24px;padding:0 10px;margin-left:3px;border:none;border-radius:999px;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;
+  font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:.2px;
+  cursor:pointer;white-space:nowrap;transition:.15s var(--e1);box-shadow:0 2px 10px rgba(201,169,110,.3)}
+.dn-home:active{transform:scale(.92)}
 /* Horizontal swipes on the hero are OURS — the page must not scroll under them.
    Needs [data-detail] in the selector to outrank the generic
    [data-detail]{touch-action:manipulation} rule declared further down. */
@@ -560,10 +566,12 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
       <span class="day-nav" id="dayNav">
         <button class="dn-b" id="dnPrev" aria-label="Предыдущий день"
           onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayStep(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
-        <button class="dn-d" id="dnDate" disabled aria-label="Вернуться к сегодня"
-          onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayReset()"><span class="dn-undo">↩</span><span id="dnDateTxt">сегодня</span></button>
+        <button class="dn-d" id="dnDate" disabled aria-label="Дата дня"
+          onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayReset()"><span class="dn-num" id="dnDateNum">29.07</span><span class="dn-rel" id="dnDateTxt">сегодня</span></button>
         <button class="dn-b" id="dnNext" aria-label="Следующий день" disabled
           onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayStep(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+        <button class="dn-home" id="dnHome" style="display:none" aria-label="Вернуться к сегодня"
+          onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayReset()">Сегодня</button>
       </span>
     </div>
     <div class="hero-amt-row">
@@ -2909,24 +2917,34 @@ function _fillPeriodDates(){
           .forEach(el => el.textContent = fmt(yest));
 }
 
+// {num:'28.07', rel:'вчера'} — число всегда, слово под ним. Даты берём от СЕРВЕРА
+// (его дубайские сутки), часы устройства могут врать.
 function _dayLabel(w){
-  // Labelled from the SERVER's Dubai dates — the device's clock/TZ may differ.
-  if(!w || !w.date) return DAY_OFFSET ? DAY_OFFSET + ' дн. назад' : 'сегодня';
-  const d = new Date(w.date + 'T00:00:00'), t = new Date((w.today || w.date) + 'T00:00:00');
+  const iso = (w && w.date) || _dayIsoFor(DAY_OFFSET);
+  const d = new Date(iso + 'T00:00:00');
+  const t = new Date(((w && w.today) || _dayIsoFor(0)) + 'T00:00:00');
+  const num = String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0');
   const diff = Math.round((t - d) / 86400000);
-  if(diff === 0) return 'сегодня';
-  if(diff === 1) return 'вчера';
-  return d.getDate() + ' ' + (_MONTHS_GEN[d.getMonth()] || '');
+  let rel;
+  if(diff === 0)      rel = 'сегодня';
+  else if(diff === 1) rel = 'вчера';
+  else                rel = d.getDate() + ' ' + (_MONTHS_GEN[d.getMonth()] || '');
+  return {num, rel};
 }
 
 function _syncDayNav(p, w){
   const nav = document.getElementById('dayNav');
   if(nav) nav.style.display = _dayNavOn(p) ? 'flex' : 'none';
   const nx = document.getElementById('dnNext'); if(nx) nx.disabled = DAY_OFFSET <= 0;
-  _setText('dnDateTxt', _dayLabel(w));
-  // The date chip becomes a one-tap "back to today" button once you've stepped away.
+  const lbl = _dayLabel(w);
+  _setText('dnDateNum', lbl.num);
+  _setText('dnDateTxt', lbl.rel);
+  // Тап по дате тоже возвращает к сегодня — но полагаться на догадку не надо,
+  // рядом появляется подписанная кнопка.
   const chip = document.getElementById('dnDate');
-  if(chip){ chip.disabled = DAY_OFFSET <= 0; chip.classList.toggle('back', DAY_OFFSET > 0); }
+  if(chip) chip.disabled = DAY_OFFSET <= 0;
+  const home = document.getElementById('dnHome');
+  if(home) home.style.display = DAY_OFFSET > 0 ? 'block' : 'none';
   // The header must never contradict the date chip.
   const hl = document.getElementById('heroLbl');
   if(hl && DAY_OFFSET) hl.textContent = 'Выручка';
@@ -2937,15 +2955,18 @@ function _syncDayNav(p, w){
 // Карточка уезжает в сторону свайпа и с другой стороны въезжает новая.
 // Возвращает промис, который резолвится на «перевороте» — в этот момент надо
 // подменить содержимое, чтобы новый день въехал уже с новыми цифрами.
+let _flipTimer = null;
 function _heroFlip(dir){
   const hero = document.querySelector('#pg-overview .hero');
   if(!hero) return Promise.resolve();
+  clearTimeout(_flipTimer);                 // быстрый повторный свайп не должен
+  hero.classList.remove('day-back');        // оставить карточку на полпути
   const W = hero.offsetWidth + 24;
-  const out = dir > 0 ? -W : W;            // назад во времени → уезжает влево
+  const out = dir > 0 ? W : -W;            // назад во времени → уезжает вправо, за пальцем
   hero.classList.remove('day-drag','day-back');
   hero.classList.add('day-move');
   hero.style.transform = `translateX(${out}px)`;
-  return new Promise(res=>setTimeout(()=>{
+  return new Promise(res=>{_flipTimer = setTimeout(()=>{
     res();                                  // здесь вызывающий обновляет содержимое
     hero.classList.remove('day-move');      // мгновенно переставляем на другой край
     hero.style.transform = `translateX(${-out}px)`;
@@ -2953,7 +2974,7 @@ function _heroFlip(dir){
     hero.classList.add('day-back');
     hero.style.transform = '';
     setTimeout(()=>hero.classList.remove('day-back'), 220);
-  }, 150));
+  }, 150);});
 }
 
 // Данные дня, если они уже лежат в кэше. Свайп никогда их не ждёт.
@@ -3000,14 +3021,17 @@ function _paintDay(p){
 
 // Шаг по дням. Сначала едет карточка, данные догоняют — ожидание сети больше
 // не держит жест.
+// Возвращает false, если шагать некуда — тогда жест сам вернёт карточку на место,
+// иначе она осталась бы висеть там, где её отпустил палец.
 function dayStep(delta){
   const p = document.querySelector('#periodPicker button.on')?.dataset?.p || 'today';
-  if(!_dayNavOn(p)) return;
+  if(!_dayNavOn(p)) return false;
   const next = Math.max(0, Math.min(365, DAY_OFFSET + delta));
-  if(next === DAY_OFFSET) return;
+  if(next === DAY_OFFSET) return false;
   DAY_OFFSET = next;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   _heroFlip(delta).then(()=>_paintDay(p));
+  return true;
 }
 
 // Один тап по дате — сразу на сегодня, с какого бы дня ни зашли.
@@ -3019,7 +3043,7 @@ function dayReset(){
   _heroFlip(-1).then(()=>_paintDay(p));
 }
 
-// Свайп по карточке выручки: влево — предыдущий день, вправо — обратно к сегодня.
+// Свайп по карточке выручки: слева направо — предыдущий день, обратно — к сегодня.
 // Карточка идёт за пальцем один в один; страница под ней не скроллится.
 (function(){
   const hero = document.querySelector('#pg-overview .hero');
@@ -3048,7 +3072,7 @@ function dayReset(){
     if(axis !== 1) return;
     e.preventDefault();                          // жест наш → страница не едет
     // Вперёд сегодняшнего дня хода нет — там упор, а не пустая страница.
-    if(dx > 0 && DAY_OFFSET === 0) dx = Math.min(dx * .25, 40);
+    if(dx < 0 && DAY_OFFSET === 0) dx = Math.max(dx * .25, -40);
     hero.classList.remove('day-back');
     hero.classList.add('day-drag');
     hero.style.transform = `translateX(${dx}px)`;
@@ -3059,10 +3083,11 @@ function dayReset(){
     if(axis !== 1) return;
     const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
     const commit = Math.abs(dx) >= 55 && Math.abs(dx) > Math.abs(dy) * 1.2
-                   && !(dx > 0 && DAY_OFFSET === 0);
+                   && !(dx < 0 && DAY_OFFSET === 0);
     if(!commit){ settle(); return; }
     hero.classList.remove('day-drag');
-    dayStep(dx < 0 ? 1 : -1);                    // влево → назад во времени
+    // слева направо → назад во времени
+    if(!dayStep(dx > 0 ? 1 : -1)) settle();      // шагнуть некуда → плавно на место
   }, {passive:true});
 
   hero.addEventListener('touchcancel', ()=>{ live = false; settle(); }, {passive:true});

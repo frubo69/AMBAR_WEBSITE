@@ -656,18 +656,18 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
       <div style="display:flex;align-items:flex-end;gap:10px;margin-top:0">
         <div>
           <span class="star-num" id="kRating">—</span>
-          <span class="stars">
+          <span class="stars" id="kRatingStars">
             <svg viewBox="0 0 24 24"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z"/></svg>
             <svg viewBox="0 0 24 24"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z"/></svg>
             <svg viewBox="0 0 24 24"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z"/></svg>
             <svg viewBox="0 0 24 24"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z"/></svg>
-            <svg viewBox="0 0 24 24"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z" class="off"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z"/></svg>
           </span>
         </div>
         <div style="flex:1;display:flex;flex-direction:column;gap:3px">
-          <div class="bar-row" style="margin:0"><span class="bar-lbl" style="width:14px">5</span><div class="bar-track" style="height:5px"><div class="bar-fill" style="width:78%"></div></div><span class="bar-val" style="min-width:30px">24</span></div>
-          <div class="bar-row" style="margin:0"><span class="bar-lbl" style="width:14px">4</span><div class="bar-track" style="height:5px"><div class="bar-fill" style="width:45%"></div></div><span class="bar-val" style="min-width:30px">8</span></div>
-          <div class="bar-row" style="margin:0"><span class="bar-lbl" style="width:14px">3</span><div class="bar-track" style="height:5px"><div class="bar-fill" style="width:12%"></div></div><span class="bar-val" style="min-width:30px">2</span></div>
+          <div class="bar-row" style="margin:0"><span class="bar-lbl" style="width:14px">5</span><div class="bar-track" style="height:5px"><div class="bar-fill" id="kRb5" style="width:0%"></div></div><span class="bar-val" style="min-width:30px" id="kRv5">0</span></div>
+          <div class="bar-row" style="margin:0"><span class="bar-lbl" style="width:14px">4</span><div class="bar-track" style="height:5px"><div class="bar-fill" id="kRb4" style="width:0%"></div></div><span class="bar-val" style="min-width:30px" id="kRv4">0</span></div>
+          <div class="bar-row" style="margin:0"><span class="bar-lbl" style="width:24px;font-size:9px">≤3</span><div class="bar-track" style="height:5px"><div class="bar-fill" id="kRbLow" style="width:0%"></div></div><span class="bar-val" style="min-width:30px" id="kRvLow">0</span></div>
         </div>
       </div>
     </div>
@@ -3128,6 +3128,7 @@ function applyPeriod(p){
     const pbt = document.getElementById('periodBarsTitle'); if(pbt) pbt.textContent = _periodBarsTitle(p);
     // KPI placeholders (real values come from /api/owner/finance kpi block)
     ['kOrders','kOrdersAvg','kDeclined','kPending','kInRouteVal','kDone','kInRoute','kAvg','kLate','kLateCount','kRating'].forEach(id=>_setText(id,'—'));
+    _paintRating({});
     _setText('kOrdersDelta', '…');
     _setText('kRatingLbl', 'Рейтинг');
     _setText('kAvgSub', 'нет данных');
@@ -3442,6 +3443,33 @@ function renderChannels(bc){
   _setText('chPhoneCnt', (p.count||0) + ' зак.');
 }
 
+// Звёзды и распределение в карточке рейтинга. Раньше и то и другое было зашито
+// в разметку демо-числами (24/8/2 и четыре звезды), поэтому карточка спорила с
+// собственной деталью: там 7 оценок по 5★, тут 34 неизвестно откуда.
+// Третья строка — «≤3», а не «3»: иначе одна-две плохие оценки не видны вообще.
+function _paintRating(k){
+  const stars = document.getElementById('kRatingStars');
+  if(stars){
+    const lit = Math.round(k.rating || 0);
+    [...stars.querySelectorAll('path')].forEach((pth, i) => pth.classList.toggle('off', i >= lit));
+  }
+  const d = k.rating_dist || {};
+  const n = x => parseInt(d[x] || d[String(x)] || 0, 10) || 0;
+  const five = n(5), four = n(4), low = n(3) + n(2) + n(1);
+  const total = five + four + low;
+  const set = (bar, val, cnt) => {
+    const b = document.getElementById(bar); if(b) b.style.width = (total ? cnt / total * 100 : 0) + '%';
+    _setText(val, cnt);
+  };
+  set('kRb5',   'kRv5',   five);
+  set('kRb4',   'kRv4',   four);
+  set('kRbLow', 'kRvLow', low);
+  // Плохие оценки подсвечиваем — на них и надо смотреть.
+  const lowBar = document.getElementById('kRbLow');
+  if(lowBar) lowBar.style.background = low
+    ? 'linear-gradient(90deg,var(--warn),#F3C878)' : '';
+}
+
 function renderKpis(k){
   if(!k) return;
   // Orders
@@ -3465,6 +3493,7 @@ function renderKpis(k){
   // Rating
   _setText('kRating',    k.rating ? k.rating.toFixed(2) : '—');
   _setText('kRatingLbl', 'Рейтинг · ' + (k.rating_period || ''));
+  _paintRating(k);
   // Avg delivery time (in minutes). avg_min === 0 with sample 0 means we
   // have no delivered orders in the window yet, so keep the placeholder.
   const ad = document.getElementById('kAvgDelta');

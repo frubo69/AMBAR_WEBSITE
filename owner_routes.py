@@ -120,6 +120,32 @@ def _period_window(period: str, ref: datetime = None):
 
     return start, end, prev_start, prev_end
 
+def _open_at(all_orders: dict, end_dt: datetime, statuses, office_id=None) -> list:
+    """Заказы, до сих пор висящие в одном из `statuses` и созданные ДО конца окна.
+
+    «Ожидают» и «в пути» — это состояние, а не событие: истории статусов у заказа
+    нет, поэтому честно ответить «что висело вчера в 23:00» невозможно. Но заказ,
+    созданный ПОСЛЕ конца окна, к этому окну точно не относится — раньше такие
+    заказы подмешивались в цифры прошлых дней, и открыв вчера, можно было увидеть
+    сегодняшний зависший заказ.
+
+    Ограничения сверху достаточно: на живом дне окно кончается в будущем, поэтому
+    видно всё зависшее любой давности (это и нужно оператору), а на прошлом дне —
+    только то, что к тому моменту уже существовало и до сих пор не закрыто.
+    """
+    out = []
+    for o in all_orders.values():
+        if o.get("status") not in statuses:
+            continue
+        if office_id is not None and (o.get("office_id") or "") != office_id:
+            continue
+        dt = _parse_ts(o.get("timestamp"))
+        if dt is None or dt >= end_dt:
+            continue
+        out.append(o)
+    out.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    return out
+
 
 def _orders_in_window(all_orders: dict, start_dt: datetime, end_dt: datetime):
     """Yield (dubai_dt, order) pairs for delivered orders inside the window."""
@@ -211,9 +237,11 @@ def _bucket_trend(orders, start_dt: datetime, period: str) -> list:
     return []
 
 
-def _last_7_days(all_orders: dict) -> list:
-    """Last-7-days revenue bars (Money tab). Index 0 = 7 days ago, 6 = today."""
-    today_start = _biz_day_start(_now_dubai())
+def _last_7_days(all_orders: dict, ref_day_start: datetime = None) -> list:
+    """Столбики выручки за 7 дней. Индекс 6 — просматриваемый день, 0 — за 6 дней
+    до него. Раньше всегда упирались в «сегодня», поэтому, отлистав на три дня
+    назад, рядом с цифрами того дня продолжали висеть столбики сегодняшней недели."""
+    today_start = ref_day_start or _biz_day_start(_now_dubai())
     end = today_start + timedelta(days=1)
     start = end - timedelta(days=7)
     orders = _orders_in_window(all_orders, start, end)
@@ -392,7 +420,10 @@ async def handle_finance(request):
     rev_prev = _sum_field(prev_orders, "total")
     pct = _delta_pct(rev_curr, rev_prev)
 
-    bars = _last_7_days(all_orders)
+    # Столбики и 7-дневный тренд идут за просматриваемым днём: для «сегодня» это
+    # текущая неделя, для отлистанного дня — неделя, кончающаяся на нём.
+    _bars_anchor = _biz_day_start(ref) if day_offset else None
+    bars = _last_7_days(all_orders, _bars_anchor)
     bars_total = sum(bars)
 
     # ── KPI section ───────────────────────────────────────────────────
@@ -401,8 +432,10 @@ async def handle_finance(request):
     orders_delta_count = orders_count_curr - orders_count_prev
     delivered_count   = len(curr_orders)
     declined_count    = sum(1 for _, o in curr_all if o.get("status") in ("declined", "cancelled"))
-    pending_count     = sum(1 for o in all_orders.values() if o.get("status") == "pending")
-    in_route_count    = sum(1 for o in all_orders.values() if o.get("status") == "approved")
+    open_pending      = _open_at(all_orders, end, ("pending",))
+    open_route        = _open_at(all_orders, end, ("approved",))
+    pending_count     = len(open_pending)
+    in_route_count    = len(open_route)
     avg_check         = (rev_curr // delivered_count) if delivered_count else 0
     done_pct          = round(delivered_count / orders_count_curr * 100, 1) if orders_count_curr else 0
     # Order counts per office (any status, in window)
@@ -427,7 +460,7 @@ async def handle_finance(request):
     avg_delta_min = deliv_curr["avg_min"] - deliv_prev["avg_min"] if deliv_prev["sample"] else 0
 
     # Last 7 days order count (any status) — for orders detail trend
-    today_start = _biz_day_start(_now_dubai())
+    today_start = _bars_anchor or _biz_day_start(_now_dubai())
     week_end = today_start + timedelta(days=1)
     week_start = week_end - timedelta(days=7)
     orders_7d = [0] * 7
@@ -438,12 +471,8 @@ async def handle_finance(request):
         if 0 <= idx < 7:
             orders_7d[idx] += 1
 
-    pending_orders = sorted(
-        [o for o in all_orders.values() if o.get("status") == "pending"],
-        key=lambda x: x.get("timestamp",""), reverse=True)[:20]
-    inroute_orders = sorted(
-        [o for o in all_orders.values() if o.get("status") == "approved"],
-        key=lambda x: x.get("timestamp",""), reverse=True)[:20]
+    pending_orders = open_pending[:20]
+    inroute_orders = open_route[:20]
     delivered_orders_list = sorted(
         [o for _, o in curr_orders],
         key=lambda x: x.get("timestamp",""), reverse=True)[:20]
@@ -461,10 +490,9 @@ async def handle_finance(request):
         _deliv_by.setdefault(_o.get("office_id") or "", []).append(_o)
     for _dt, _o in curr_all:
         _all_by.setdefault(_o.get("office_id") or "", []).append(_o)
-    for _o in all_orders.values():
-        if _o.get("status") in ("pending", "approved"):
-            _k = _o.get("office_id") or ""
-            _live_by[_k] = _live_by.get(_k, 0) + 1
+    for _o in _open_at(all_orders, end, ("pending", "approved")):
+        _k = _o.get("office_id") or ""
+        _live_by[_k] = _live_by.get(_k, 0) + 1
 
     offices_block = []
     for _oid in OFFICE_IDS:
@@ -825,10 +853,8 @@ async def handle_office(request):
 
     delivered = len(curr)
     cancelled = sum(1 for _, o in curr_all if o.get("status") in ("declined", "cancelled"))
-    live_pending = sum(1 for o in all_orders.values()
-                       if o.get("status") == "pending" and (o.get("office_id") or "") == oid)
-    live_route = sum(1 for o in all_orders.values()
-                     if o.get("status") == "approved" and (o.get("office_id") or "") == oid)
+    live_pending = len(_open_at(all_orders, end, ("pending",), office_id=oid))
+    live_route   = len(_open_at(all_orders, end, ("approved",), office_id=oid))
 
     # каналы и способ оплаты
     _phone = [(dt, o) for dt, o in curr if o.get("source") == "manual"]

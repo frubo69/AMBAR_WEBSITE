@@ -197,6 +197,92 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
   .hdr{gap:8px;padding:8px 12px}
   .office-seg button{padding:6px 10px}
 }
+
+/* Полоса и затемнение существуют только на телефоне: объявляем скрытие ДО
+   медиазапроса, иначе оно перебьёт его — правила равной силы, побеждает
+   последнее. */
+.tk-bar,.tk-scrim{display:none}
+
+/* ── Телефон ────────────────────────────────────────────────────────────────
+   Три колонки (категории | сетка | чек) в портрет не помещаются. На узком
+   экране: категории — лентой сверху, товары в две колонки, чек — шторкой
+   снизу. Внизу всегда видна полоса с суммой: она и показывает, что товар
+   добавился, и открывает чек. Всё на CSS + один переключатель класса, чтобы
+   планшетная раскладка осталась ровно такой, какой была. */
+@media (max-width:640px){
+  .main{flex-direction:column}
+
+  /* категории — горизонтальная лента */
+  .rail{width:auto;flex-direction:row;align-items:stretch;border-right:none;
+        border-bottom:1px solid var(--border2);flex-shrink:0}
+  .rail-scroll{display:flex;flex-direction:row;gap:6px;padding:8px 10px;
+               overflow-x:auto;overflow-y:hidden;scrollbar-width:none}
+  .rail-scroll::-webkit-scrollbar{display:none}
+  .cat-btn{white-space:nowrap;padding:9px 13px;font-size:13px;flex-shrink:0;width:auto}
+  .cat-btn .n{margin-left:6px}
+  .rail-foot{border-top:none;border-left:1px solid var(--border2);padding:8px 10px;
+             display:flex;align-items:center;flex-shrink:0}
+
+  /* шапка: подпись в три строки на телефоне не нужна, оставляем логотип
+     и то, чем реально пользуются — оператор и тема */
+  .hdr{gap:8px;padding:8px 12px}
+  .hdr-logo{font-size:18px;letter-spacing:4px}
+  .hdr-sub{display:none}
+  .hdr-right{gap:6px}
+  .pill{font-size:11px;padding:6px 10px;white-space:nowrap}
+  .hdr-right .pill:not(#dispatchBtn):not(#themeBtn){display:none}
+
+  .center{flex:1;min-height:0}
+  .search-row{padding:10px 12px 2px}
+  .grid{grid-template-columns:repeat(2,1fr);gap:9px}
+  /* Плитка на телефоне ниже: с квадратной картинкой в экран влезало две с
+     половиной строки, теперь около четырёх — меньше скролла на смену. */
+  .timg{aspect-ratio:1.55;margin-bottom:7px}
+  .tile{padding-bottom:9px;min-height:0}
+  .tile .nm{font-size:12.5px;padding:0 8px}
+  .tile .pr{font-size:14px}
+  .ts-b{width:30px;height:30px;font-size:17px}
+  /* место под нижнюю полосу, иначе последний ряд прячется под ней */
+  .grid-wrap{padding:8px 12px calc(96px + var(--safe-bottom))}
+  .orders-wrap{padding-bottom:calc(96px + var(--safe-bottom))}
+
+  /* чек — шторка снизу */
+  .ticket{position:fixed;left:0;right:0;bottom:0;top:auto;width:auto;height:88vh;
+          max-height:calc(100vh - 44px);border-left:none;border-top:1px solid var(--border2);
+          border-radius:20px 20px 0 0;z-index:70;
+          transform:translateY(101%);transition:transform .3s cubic-bezier(.32,.72,0,1);
+          box-shadow:0 -18px 50px rgba(0,0,0,.45)}
+  body.tk-open .ticket{transform:translateY(0)}
+  .ticket-hdr{position:relative;padding-top:16px}
+  /* «ручка» шторки */
+  .ticket-hdr::before{content:'';position:absolute;top:6px;left:50%;transform:translateX(-50%);
+                      width:36px;height:4px;border-radius:2px;background:var(--border3);opacity:.7}
+
+  .tk-scrim{position:fixed;inset:0;background:rgba(0,0,10,.55);backdrop-filter:blur(3px);
+            z-index:65;opacity:0;pointer-events:none;transition:opacity .3s var(--e1)}
+  .tk-scrim{display:block}
+  body.tk-open .tk-scrim{opacity:1;pointer-events:auto}
+
+  /* полоса с итогом — всегда на виду, она же открывает чек */
+  .tk-bar{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:60;
+          align-items:center;justify-content:space-between;gap:12px;
+          padding:12px 16px calc(12px + var(--safe-bottom));
+          background:var(--bg2);border-top:1px solid var(--border2);
+          box-shadow:0 -8px 30px rgba(0,0,0,.28);
+          font-family:inherit;color:var(--text);cursor:pointer;
+          transition:transform .3s cubic-bezier(.32,.72,0,1)}
+  body.tk-open .tk-bar{transform:translateY(130%)}
+  .tk-bar-l{font-size:13px;color:var(--muted);font-weight:600}
+  .tk-bar-l b{color:var(--text)}
+  .tk-bar-r{display:flex;align-items:center;gap:8px;font-size:17px;font-weight:800;color:var(--gold2)}
+  .tk-bar-r small{font-size:11px;color:var(--muted);font-weight:600}
+  .tk-bar-go{padding:8px 14px;border-radius:999px;font-size:13px;font-weight:700;
+             background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408}
+  /* лёгкий толчок, когда товар добавили — подтверждение без всплывашки */
+  @keyframes tkPulse{0%{transform:none}40%{transform:scale(1.06)}100%{transform:none}}
+  .tk-bar.pulse .tk-bar-r{animation:tkPulse .28s var(--e1)}
+}
+
 @media (max-height:720px){
   .hdr{padding:6px 14px}
   .ticket-foot{padding:8px 12px calc(8px + var(--safe-bottom))}
@@ -278,6 +364,14 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
     </div>
   </div>
 </div>
+
+<!-- Телефон: затемнение под шторкой чека и всегда видимая полоса с итогом.
+     На планшете обе скрыты через CSS — раскладка там не меняется. -->
+<div class="tk-scrim" id="tkScrim" onclick="closeTicket()"></div>
+<button class="tk-bar" id="tkBar" onclick="openTicket()">
+  <span class="tk-bar-l" id="tkBarCnt">Чек пуст</span>
+  <span class="tk-bar-r"><span id="tkBarSum">0</span> <small>AED</small><span class="tk-bar-go">Оформить</span></span>
+</button>
 
 <!-- who is taking orders right now -->
 <div class="ov" id="opOv">
@@ -611,7 +705,42 @@ function renderTicket(){
   const total = keys.reduce((s,k)=>s+lineUnit(TICKET[k])*TICKET[k].qty,0);
   $('totalV').textContent = total;
   $('createBtn').disabled = !keys.length;
+  syncTkBar(keys.reduce((n,k)=>n+TICKET[k].qty,0), total);
 }
+
+// ── Телефон: нижняя полоса и шторка чека ───────────────────────────────────
+// На планшете полоса скрыта через CSS, поэтому функции просто ничего не меняют
+// визуально — отдельной ветки «если мобилка» не нужно.
+function isPhone(){ return window.matchMedia('(max-width:640px)').matches; }
+
+function syncTkBar(qty, total){
+  const cnt = $('tkBarCnt'), sum = $('tkBarSum'), bar = $('tkBar');
+  if(!bar) return;
+  if(cnt) cnt.innerHTML = qty ? `<b>${qty}</b> ${plural(qty,'позиция','позиции','позиций')}` : 'Чек пуст';
+  if(sum && sum.textContent !== String(total)){
+    sum.textContent = total;
+    bar.classList.remove('pulse'); void bar.offsetWidth; bar.classList.add('pulse');
+  } else if(sum) sum.textContent = total;
+}
+
+function plural(n, one, few, many){
+  const a = Math.abs(n) % 100, b = a % 10;
+  if(a > 10 && a < 20) return many;
+  if(b > 1 && b < 5)   return few;
+  if(b === 1)          return one;
+  return many;
+}
+
+function openTicket(){
+  if(!isPhone()) return;
+  document.body.classList.add('tk-open');
+  haptic('light');
+}
+function closeTicket(){
+  document.body.classList.remove('tk-open');
+}
+// Планшет после поворота/ресайза не должен остаться с открытой шторкой.
+window.addEventListener('resize', ()=>{ if(!isPhone()) closeTicket(); });
 function clearTicket(confirmIt){
   if(confirmIt && Object.keys(TICKET).length===0 && !editingOid) return;
   TICKET={}; editingOid=null;
@@ -635,8 +764,10 @@ function askCreate(){
   const addr = $('cAddr').value.trim();
   // client details (name/phone/address) are all optional now — only район + водитель are required
   if(!curOp){ toast('Выберите оператора вверху','err'); showOv('opOv'); haptic('medium'); return; }
-  if(!curDist){ toast('Выберите район','err'); $('distChips').scrollIntoView({block:'center'}); haptic('medium'); return; }
-  if(!curDriver){ toast('Выберите водителя','err'); $('drvChips').scrollIntoView({block:'center'}); haptic('medium'); return; }
+  // Район и водитель живут внутри чека: на телефоне он может быть закрыт, и
+  // подсветка полей была бы не видна — сначала открываем шторку.
+  if(!curDist){ toast('Выберите район','err'); openTicket(); $('distChips').scrollIntoView({block:'center'}); haptic('medium'); return; }
+  if(!curDriver){ toast('Выберите водителя','err'); openTicket(); $('drvChips').scrollIntoView({block:'center'}); haptic('medium'); return; }
   const total = $('totalV').textContent;
   const d=_dist(curDist);
   $('confT').textContent = editingOid ? `Сохранить изменения #${editingOid}?` : 'Создать заказ?';
@@ -669,6 +800,7 @@ async function doCreate(){
     }
     haptic('heavy');
     clearTicket(false);
+    closeTicket();                  // телефон: убираем шторку, чтобы был виден список
     await loadOrders();
     if(newOid){
       // straight to Заказы so the fresh order is on screen, with the driver text ready to copy
@@ -684,6 +816,7 @@ async function doCreate(){
 
 // ── orders panel ──
 function toggleOrders(){
+  closeTicket();
   showOrders = !showOrders;
   $('ordersBtn').classList.toggle('on', showOrders);
   $('gridWrap').style.display = showOrders?'none':'';

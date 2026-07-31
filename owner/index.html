@@ -6606,9 +6606,10 @@ const DETAIL = {
       const central = Math.round(total * cShare);
       const north   = Math.round(total * nShare);
       const south   = Math.max(0, total - central - north);
-      const avg = Math.max(1, Math.round((live.sold||7)/7));
-      const trend = [0,-1,1,-1,2,0,1].map(o=>Math.max(0, avg+o));
-      trend[6] = Math.max(0, (live.sold||0) - trend.slice(0,6).reduce((a,b)=>a+b,0));
+      // Продажи по дням — с сервера (_sales_by_day). Раньше здесь из среднего
+      // лепился фальшивый график, отсюда и подозрительно ровные столбики.
+      const trend = Array.isArray(live.trend7) && live.trend7.length === 7
+                    ? live.trend7.map(x=>parseInt(x,10)||0) : [0,0,0,0,0,0,0];
       d = {
         name: live.name + (live.vol?' · '+live.vol:''),
         i: live.i,
@@ -6616,6 +6617,8 @@ const DETAIL = {
         rev:  live.rev  || 0,
         price: live.price || 0,
         priceFull: live.price_full || live.price || 0,
+        week:  live.sold_week  || 0,
+        month: live.sold_month || 0,
         stock: {central, north, south},
         trend
       };
@@ -6628,7 +6631,14 @@ const DETAIL = {
     const totalStock = Object.values(d.stock).reduce((a,b)=>a+b,0);
     const low = totalStock < 20;
     const max = Math.max(1, ...d.trend);
-    const days = ['ПН','ВТ','СР','ЧТ','ПТ','СБ','СЕГ'];
+    // Подписи считаем от текущей смены назад: раньше стояло жёсткое ПН…СЕГ,
+    // что совпадало с реальностью только по воскресеньям.
+    const _dow = ['ВС','ПН','ВТ','СР','ЧТ','ПТ','СБ'];
+    const days = Array.from({length:7}, (_,i)=>{
+      if(i === 6) return 'СЕГ';
+      const dt = _bizToday(); dt.setDate(dt.getDate() - (6 - i));
+      return _dow[dt.getDay()];
+    });
     const editable = !!(catEditable && live);
     const subStock = liveStock===false ? '<span style="color:var(--warn)">нет в наличии</span>' : `${totalStock} на складах${low?' <span style="color:var(--warn)">· низкий</span>':''}`;
     const editSection = editable ? `
@@ -6663,8 +6673,8 @@ const DETAIL = {
           <div class="dt-stat"><div class="dt-stat-lbl">Приложение</div><div class="dt-stat-val">${d.price}<span class="u">${cur}</span></div><div class="dt-stat-sub">−5% онлайн</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">По телефону</div><div class="dt-stat-val">${d.priceFull||d.price}<span class="u">${cur}</span></div><div class="dt-stat-sub">полная цена</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">Остаток</div><div class="dt-stat-val ${low?'warn':''}">${totalStock}</div></div>
-          <div class="dt-stat"><div class="dt-stat-lbl">За неделю</div><div class="dt-stat-val">${d.trend.reduce((a,b)=>a+b,0)}</div></div>
-          <div class="dt-stat"><div class="dt-stat-lbl">За месяц</div><div class="dt-stat-val">~${d.sold*22}</div></div>
+          <div class="dt-stat"><div class="dt-stat-lbl">За неделю</div><div class="dt-stat-val">${d.week != null ? d.week : d.trend.reduce((a,b)=>a+b,0)}</div></div>
+          <div class="dt-stat"><div class="dt-stat-lbl">За месяц</div><div class="dt-stat-val">${d.month != null ? d.month : '—'}</div></div>
         </div>
         <div class="dt-sect">Продажи · 7 дней</div>
         <div class="dt-card">${d.trend.map((v,i)=>`<div class="dt-bar"><div class="dt-bar-l">${days[i]}</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:${Math.round(v/max*100)}%${i===6?';background:linear-gradient(90deg,var(--gold2),var(--gold3))':''}"></div></div><div class="dt-bar-v">${v} шт</div></div>`).join('')}</div>

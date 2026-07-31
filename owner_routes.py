@@ -1334,6 +1334,41 @@ async def _aggregate_sales(period: str = "month") -> dict:
     return agg
 
 
+async def _sales_by_day(days: int = 7) -> dict:
+    """{product_id: [шт за день, ...]} за последние `days` рабочих суток.
+
+    Индекс `days-1` — текущая смена, 0 — самая старая. Дни считаются от полудня
+    (_biz_date), как и всё остальное, иначе ночные продажи уезжали бы в
+    следующий столбик. Раньше этот график в карточке товара рисовался из
+    среднего со сдвигом — то есть был выдуман целиком."""
+    today = _biz_day_start(_now_dubai())
+    start = today - timedelta(days=days - 1)
+    end   = today + timedelta(days=1)
+    orders = await db.get_orders_in_range(
+        start.astimezone(timezone.utc).isoformat().replace("+00:00", ""),
+        end.astimezone(timezone.utc).isoformat().replace("+00:00", ""),
+    )
+    out = {}
+    for o in orders:
+        if o.get("status") not in REVENUE_STATUSES:
+            continue
+        dt = _parse_ts(o.get("timestamp"))
+        if dt is None:
+            continue
+        idx = (_biz_date(dt) - start.date()).days
+        if not (0 <= idx < days):
+            continue
+        for it in (o.get("items") or []):
+            pid = it.get("id")
+            if not pid:
+                continue
+            if it.get("is_custom") or str(pid).startswith("custom_"):
+                pid = "_custom"
+            row = out.setdefault(pid, [0] * days)
+            row[idx] += int(it.get("qty") or 0)
+    return out
+
+
 @require_owner
 async def handle_catalog_list(request):
     """Return full catalog joined with sold/rev aggregated from delivered orders.
@@ -1346,6 +1381,11 @@ async def handle_catalog_list(request):
 
     catalog = await asyncio.to_thread(_read_catalog)
     sales = await _aggregate_sales(period)
+    # Реальные продажи по дням и за неделю/месяц — карточка товара рисовала их
+    # из среднего, теперь берём из заказов.
+    trend  = await _sales_by_day(7)
+    week   = await _aggregate_sales("week")
+    month  = await _aggregate_sales("month")
 
     items = []
     for p in catalog:
@@ -1365,6 +1405,9 @@ async def handle_catalog_list(request):
             "desc":   p.get("desc") or "",
             "sold":   s["sold"],
             "rev":    s["rev"],
+            "trend7":     trend.get(pid) or [0] * 7,
+            "sold_week":  (week.get(pid)  or {}).get("sold", 0),
+            "sold_month": (month.get(pid) or {}).get("sold", 0),
         })
     # Append aggregated custom items row if any were sold
     custom_s = sales.get("_custom")
@@ -1379,6 +1422,9 @@ async def handle_catalog_list(request):
             "desc":  "Товары вне каталога, добавленные оператором",
             "sold":  custom_s["sold"],
             "rev":   custom_s["rev"],
+            "trend7":     trend.get("_custom") or [0] * 7,
+            "sold_week":  (week.get("_custom")  or {}).get("sold", 0),
+            "sold_month": (month.get("_custom") or {}).get("sold", 0),
         })
     return web.json_response({"period": period, "items": items}, headers=CORS_HEADERS)
 

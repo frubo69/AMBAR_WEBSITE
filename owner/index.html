@@ -4062,7 +4062,14 @@ function _shapeProduct(p, withRealStats){
     sold = p.stock !== false ? ((seed>>11) % 22) + 1 : 0;
     rev  = sold * (p.price||0);
   }
-  return {id:p.id, name:sp.n, vol:sp.v, cat:p.cat||'—', i:first, price:+p.price||0, stock: p.stock !== false, sold, rev, img:p.img, desc:p.desc};
+  // Список полей фиксированный, поэтому всё новое из ответа надо добавлять и
+  // сюда — иначе оно молча теряется по дороге к карточке товара.
+  return {id:p.id, name:sp.n, vol:sp.v, cat:p.cat||'—', i:first,
+          price:+p.price||0, price_full:+p.price_full||+p.price||0,
+          stock: p.stock !== false, sold, rev, img:p.img, desc:p.desc,
+          trend7: Array.isArray(p.trend7) ? p.trend7.map(x=>+x||0) : null,
+          sold_week: withRealStats ? (+p.sold_week||0) : null,
+          sold_month: withRealStats ? (+p.sold_month||0) : null};
 }
 
 async function loadCatalog(){
@@ -6707,8 +6714,8 @@ const DETAIL = {
       title:`<div class="dt-tit-av plain" style="background:linear-gradient(135deg,#2a2040,#1a1428);color:var(--gold)">${d.i}</div><div><div class="dt-tit-name">${d.name}</div><div class="dt-sub">${fmt(d.price)} / ${fmt(d.priceFull||d.price)} ${cur} · ${subStock}</div></div>`,
       body:`
         <div class="dt-stats">
-          <div class="dt-stat"><div class="dt-stat-lbl">Продано</div><div class="dt-stat-val">${d.sold}</div><div class="dt-stat-sub">сегодня</div></div>
-          <div class="dt-stat"><div class="dt-stat-lbl">Выручка</div><div class="dt-stat-val gold">${fmt(d.rev)}<span class="u">${cur}</span></div></div>
+          <div class="dt-stat"><div class="dt-stat-lbl">Продано</div><div class="dt-stat-val">${d.trend[6]}</div><div class="dt-stat-sub">сегодня</div></div>
+          <div class="dt-stat"><div class="dt-stat-lbl">Выручка</div><div class="dt-stat-val gold">${fmt(d.rev)}<span class="u">${cur}</span></div><div class="dt-stat-sub">за месяц</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">Приложение</div><div class="dt-stat-val">${d.price}<span class="u">${cur}</span></div><div class="dt-stat-sub">−5% онлайн</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">По телефону</div><div class="dt-stat-val">${d.priceFull||d.price}<span class="u">${cur}</span></div><div class="dt-stat-sub">полная цена</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">Остаток</div><div class="dt-stat-val ${low?'warn':''}">${totalStock}</div></div>

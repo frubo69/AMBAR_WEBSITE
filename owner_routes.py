@@ -1356,6 +1356,10 @@ async def handle_catalog_list(request):
             "cat":    p.get("cat") or "—",
             "name":   p.get("name") or "",
             "price":  int(p.get("price") or 0),
+            # Цен две: онлайновая (со скидкой 5% за заказ через приложение) и
+            # полная — по ней идут телефонные заказы. Отдаём обе, иначе в
+            # карточке товара видна только половина правды.
+            "price_full": int(p.get("price_full") or p.get("price") or 0),
             "stock":  bool(p.get("stock", True)),
             "img":    p.get("img") or "",
             "desc":   p.get("desc") or "",

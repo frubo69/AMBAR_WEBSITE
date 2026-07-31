@@ -6615,13 +6615,14 @@ const DETAIL = {
         sold: live.sold || 0,
         rev:  live.rev  || 0,
         price: live.price || 0,
+        priceFull: live.price_full || live.price || 0,
         stock: {central, north, south},
         trend
       };
     } else if(fixed[id]){
       d = fixed[id];
     } else {
-      d = {name:'—', i:'?', sold:0, rev:0, price:0, stock:{central:0,north:0,south:0}, trend:[0,0,0,0,0,0,0]};
+      d = {name:'—', i:'?', sold:0, rev:0, price:0, priceFull:0, stock:{central:0,north:0,south:0}, trend:[0,0,0,0,0,0,0]};
     }
     const cur = (typeof curCur === 'string' && curCur) ? curCur : 'AED';
     const totalStock = Object.values(d.stock).reduce((a,b)=>a+b,0);
@@ -6642,8 +6643,8 @@ const DETAIL = {
           </div>
           <div class="dt-row">
             <div class="dt-row-l">
-              <div class="dt-row-t">Цена</div>
-              <div class="dt-row-s">за единицу</div>
+              <div class="dt-row-t">Цена в приложении</div>
+              <div class="dt-row-s">со скидкой 5% · телефонная цена берётся из каталога</div>
             </div>
             <div class="ce-price">
               <input type="number" id="dtPriceInput" inputmode="numeric" pattern="[0-9]*" min="0" max="100000" step="1" value="${d.price}"/>
@@ -6654,12 +6655,13 @@ const DETAIL = {
         <div id="dtSaveMsg" class="ce-msg" style="margin:0 0 4px"></div>
     ` : '';
     return {
-      title:`<div class="dt-tit-av plain" style="background:linear-gradient(135deg,#2a2040,#1a1428);color:var(--gold)">${d.i}</div><div><div class="dt-tit-name">${d.name}</div><div class="dt-sub">${fmt(d.price)} ${cur} за ед. · ${subStock}</div></div>`,
+      title:`<div class="dt-tit-av plain" style="background:linear-gradient(135deg,#2a2040,#1a1428);color:var(--gold)">${d.i}</div><div><div class="dt-tit-name">${d.name}</div><div class="dt-sub">${fmt(d.price)} / ${fmt(d.priceFull||d.price)} ${cur} · ${subStock}</div></div>`,
       body:`
         <div class="dt-stats">
           <div class="dt-stat"><div class="dt-stat-lbl">Продано</div><div class="dt-stat-val">${d.sold}</div><div class="dt-stat-sub">сегодня</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">Выручка</div><div class="dt-stat-val gold">${fmt(d.rev)}<span class="u">${cur}</span></div></div>
-          <div class="dt-stat"><div class="dt-stat-lbl">Цена</div><div class="dt-stat-val">${d.price}<span class="u">${cur}</span></div></div>
+          <div class="dt-stat"><div class="dt-stat-lbl">Приложение</div><div class="dt-stat-val">${d.price}<span class="u">${cur}</span></div><div class="dt-stat-sub">−5% онлайн</div></div>
+          <div class="dt-stat"><div class="dt-stat-lbl">По телефону</div><div class="dt-stat-val">${d.priceFull||d.price}<span class="u">${cur}</span></div><div class="dt-stat-sub">полная цена</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">Остаток</div><div class="dt-stat-val ${low?'warn':''}">${totalStock}</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">За неделю</div><div class="dt-stat-val">${d.trend.reduce((a,b)=>a+b,0)}</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">За месяц</div><div class="dt-stat-val">~${d.sold*22}</div></div>

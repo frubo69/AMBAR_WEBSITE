@@ -132,11 +132,48 @@ def _op_name(user: dict) -> str:
 
 
 # ── catalog ──────────────────────────────────────────────────────────────────
-def _beer_pack24(base: int) -> int:
-    """24-pack = double the 12-pack minus a flat 5, snapped up to a clean 0/5 —
-    the shared rule (index-6.html beerPrice / api_server._catalog_unit_price)."""
-    import math
-    return int(math.ceil((base * 2 - 5) / 5) * 5) if base else 0
+# ── цены телефонного заказа ─────────────────────────────────────────────────
+# В каталоге две цены. `price` — онлайновая, она на 5% ниже: скидка положена
+# только за заказ через приложение. Телефонный заказ идёт по полной цене
+# `price_full`, поэтому POS считает ТОЛЬКО по ней и никогда по `price`.
+# Пачки пива заданы в каталоге поштучно (price_12_full / price_24_full) —
+# формулой они не выводятся, у части позиций свои цены.
+def _full_price(p: dict, pcs=None) -> int:
+    """Цена одной единицы для телефонного заказа: бутылка или пачка."""
+    try:
+        pcs = int(pcs)
+    except (TypeError, ValueError):
+        pcs = 0
+    if pcs == 24:
+        return int(p.get("price_24_full") or 0)
+    if pcs == 12:
+        return int(p.get("price_12_full") or p.get("price_full") or 0)
+    return int(p.get("price_full") or 0)
+
+
+async def _pos_total(items: list) -> int:
+    """Итог телефонного заказа по полным ценам каталога. Свой пересчёт, а не
+    api_server._recompute_order_total_aed: тот считает по онлайновым ценам и
+    занижал каждый ручной заказ."""
+    cat = _catalog_by_id()
+    total = 0
+    for it in (items or []):
+        try:
+            qty = int(it.get("qty", 0) or 0)
+        except (TypeError, ValueError):
+            qty = 0
+        if qty <= 0:
+            continue
+        p = cat.get(it.get("id"))
+        if p:
+            total += _full_price(p, it.get("pcs")) * qty
+        else:
+            # Позиции нет в каталоге — доверяем строке заказа, иначе потеряем сумму.
+            try:
+                total += int(float(it.get("line_total", 0) or 0))
+            except (TypeError, ValueError):
+                pass
+    return total
 
 
 def _load_catalog() -> list:
@@ -182,15 +219,14 @@ def _build_items(raw_items: list) -> tuple[list, str]:
             return [], f"bad qty for {pid}"
         if not p.get("stock", True):
             return [], f"out of stock: {p.get('name', pid)}"
-        base = int(p.get("price", 0) or 0)
         is_beer = p.get("cat") == "Пиво"
         pcs = None
         if is_beer:
             pcs = 24 if str(line.get("pcs", "")) == "24" else 12
-            unit = _beer_pack24(base) if pcs == 24 else base
+            unit = _full_price(p, pcs)
             name = f"{p.get('name','')} ×{pcs}"
         else:
-            unit = base
+            unit = _full_price(p)
             name = p.get("name", "")
         item = {"id": pid, "name": name, "price": unit, "qty": qty,
                 "line_total": unit * qty}
@@ -340,7 +376,7 @@ async def handle_ping(request):
 async def handle_catalog(request):
     items = []
     for p in _load_catalog():
-        base = int(p.get("price", 0) or 0)
+        base = _full_price(p)          # полная цена, без онлайн-скидки
         is_beer = p.get("cat") == "Пиво"
         row = {
             "id": p.get("id"), "cat": p.get("cat", ""), "name": p.get("name", ""),
@@ -348,8 +384,8 @@ async def handle_catalog(request):
             "img": p.get("img", ""),   # same hosted images the customer app shows
         }
         if is_beer:
-            row["pack12"] = base
-            row["pack24"] = _beer_pack24(base)
+            row["pack12"] = _full_price(p, 12)
+            row["pack24"] = _full_price(p, 24)
         items.append(row)
     cats = {}
     for r in items:
@@ -392,8 +428,7 @@ async def handle_create(request):
     office_id = dist["id"]
 
     # Authoritative total from the catalog (never trust the iPad's math).
-    from api_server import _recompute_order_total_aed   # lazy
-    total = int(await _recompute_order_total_aed(items, 0))
+    total = await _pos_total(items)
 
     now = datetime.now(timezone.utc).isoformat()
     op_display = _op_name(request["op_user"])
@@ -505,8 +540,7 @@ async def handle_patch(request):
         items, err = _build_items(body.get("items"))
         if err:
             return web.json_response({"error": err}, status=400, headers=CORS_HEADERS)
-        from api_server import _recompute_order_total_aed   # lazy
-        total = int(await _recompute_order_total_aed(items, 0))
+        total = await _pos_total(items)
         items_changed = _items_sig(items) != _items_sig(order.get("items"))
         upd.update(items=items, item_lines=_item_lines(items),
                    subtotal=total, total=total)

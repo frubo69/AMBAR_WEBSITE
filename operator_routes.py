@@ -474,8 +474,6 @@ async def handle_list(request):
     for o in all_orders.values():
         if o.get("source") != "manual":
             continue
-        if o.get("office_id") not in offs:
-            continue
         try:
             ts = datetime.fromisoformat(o.get("timestamp", "")).replace(
                 tzinfo=timezone.utc).astimezone(DUBAI_TZ)

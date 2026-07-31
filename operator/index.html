@@ -575,8 +575,13 @@ function renderRail(){
   html += CATS.map(c=>`<button class="cat-btn ${curCat===c.cat?'on':''}" onclick="pickCat('${c.cat}')">${c.cat} <span class="cnt">${c.count}</span></button>`).join('');
   $('catRail').innerHTML = html;
 }
-function pickCat(c){ curCat=c; if(showOrders) toggleOrders(); renderRail(); renderGrid(); haptic('sel'); }
-$('searchIn').addEventListener('input',e=>{ search=e.target.value.trim().toLowerCase(); renderGrid(); });
+// Сетка остаётся прокрученной там, где её оставили, а список под ней уже
+// другой — оператор попадал в середину новой категории. Смена набора товаров
+// всегда возвращает к началу.
+function gridTop(){ const w=$('gridWrap'); if(w) w.scrollTop=0; }
+
+function pickCat(c){ curCat=c; if(showOrders) toggleOrders(); renderRail(); renderGrid(); gridTop(); haptic('sel'); }
+$('searchIn').addEventListener('input',e=>{ search=e.target.value.trim().toLowerCase(); renderGrid(); gridTop(); });
 
 function ticketQtyFor(pid){
   let n=0; for(const k in TICKET){ if(TICKET[k].id===pid) n+=TICKET[k].qty; } return n;

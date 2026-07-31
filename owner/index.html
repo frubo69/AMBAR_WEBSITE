@@ -219,6 +219,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .hero.day-drag{transition:none}
 .hero.day-move{transition:transform .15s cubic-bezier(.3,0,.2,1)}
 .hero.day-back{transition:transform .2s cubic-bezier(.2,.8,.3,1)}
+
 @media (prefers-reduced-motion: reduce){
   .hero.day-move,.hero.day-back{transition-duration:.01s}
 }
@@ -2377,6 +2378,44 @@ button.pill:active{opacity:.6}
 .nfoot-btn:active{transform:scale(.97)}
 .nfoot-btn.sec{background:var(--card);border:1px solid var(--border2);color:var(--sub)}
 .nfoot-btn.pri{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0a0a14;box-shadow:0 6px 20px rgba(201,169,110,.3)}
+
+/* ── Широкий экран: планшет и компьютер ─────────────────────────────────────
+   Приложение свёрстано под телефон, и на iPad/ПК оно просто растягивалось:
+   пилюли периодов разъезжались через весь экран, а цифры в карточках жались
+   к левому краю посреди пустоты. Ограничиваем содержимое по ширине и
+   центрируем; фон шапки, панели периодов и нижнего меню при этом остаётся
+   во всю ширину, иначе на светлой части экрана были бы видны швы. */
+@media (min-width:760px){
+  :root{ --wide:1000px; }
+  .page{max-width:var(--wide);margin:0 auto;padding-left:20px;padding-right:20px}
+  /* Внутренний отступ вместо обёртки: разметку не трогаем, а содержимое
+     фиксированных панелей встаёт по той же сетке, что и страница. */
+  .hdr,.period-bar,.tabbar{
+    padding-left:max(20px, calc((100% - var(--wide)) / 2 + 20px));
+    padding-right:max(20px, calc((100% - var(--wide)) / 2 + 20px));
+  }
+  /* Карточки KPI: на телефоне их две в ряд, здесь помещается четыре —
+     иначе каждая растянута на пол-экрана ради одного числа. */
+  .bento{grid-template-columns:repeat(4,1fr);gap:10px}
+  .bento .wide{grid-column:span 2}
+  .hero{padding:26px 26px 22px}
+  .tabbar{justify-content:center;gap:8px}
+  .tb{flex:0 0 132px}
+  /* Ряды со списками не должны расползаться на километр */
+  .foot{max-width:var(--wide);margin:0 auto}
+}
+@media (min-width:1180px){
+  :root{ --wide:1120px; }
+  .bento{grid-template-columns:repeat(4,1fr)}
+}
+/* Мышь вместо пальца: наведение подсказывает, что карточка кликабельна. */
+@media (hover:hover) and (pointer:fine){
+  .card[data-detail],.hero[data-detail],.off-card{cursor:pointer;transition:.16s var(--e1)}
+  .card[data-detail]:hover,.off-card:hover{border-color:var(--border3);transform:translateY(-1px)}
+  .tb:hover{color:var(--sub)}
+}
+
+
 </style>
 
 <!-- ============ TAB BAR ============ -->

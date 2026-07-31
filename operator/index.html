@@ -157,6 +157,7 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .oact.deliver{color:var(--up);border-color:rgba(76,175,125,.35)}
 .oact.cancel{color:var(--dn);border-color:rgba(224,85,85,.35)}
 .oact.edit{color:var(--gold2);border-color:rgba(201,169,110,.3)}
+.oact.undo{color:var(--gold2);border-color:rgba(201,169,110,.3)}
 
 /* ── overlays ── */
 .ov{position:fixed;inset:0;z-index:100;background:rgba(0,0,10,.7);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center}
@@ -715,7 +716,10 @@ function renderOrders(){
         <button class="oact edit" onclick="startEdit('${o.order_id}')">✏️ Изменить</button>
         <button class="oact cancel" onclick="askAct('${o.order_id}','cancel')">🚫 Отменить</button>
       </div>` : `
-      <div class="acts"><button class="oact" onclick="showOrderText('${o.order_id}')">📋 Текст</button></div>`;
+      <div class="acts">
+        <button class="oact" onclick="showOrderText('${o.order_id}')">📋 Текст</button>
+        ${o.status==='delivered' ? `<button class="oact undo" onclick="askAct('${o.order_id}','undeliver')">🔄 Вернуть в доставку</button>` : ''}
+      </div>`;
     return `<div class="ocard">
       <div class="top">
         <span class="oid">#${o.order_id}</span>
@@ -792,18 +796,28 @@ async function copyOrderText(){
   else toast('Не удалось — выделите текст вручную','err');
 }
 
+const ACTS = {
+  delivered: {t:'✅ Доставлен?',            s:'Заказ будет закрыт и попадёт в выручку.',
+              btn:'Доставлен', cls:'gold', ok:oid=>'✅ #'+oid+' доставлен',  toast:'ok'},
+  cancel:    {t:'🚫 Отменить заказ?',       s:'Заказ будет отменён — действие необратимо.',
+              btn:'Отменить',  cls:'red',  ok:oid=>'🚫 #'+oid+' отменён',   toast:'err'},
+  // Нажали «Доставлен» по ошибке — заказ уже закрыт и посчитан в выручке.
+  // Возврат откатывает и то и другое, как кнопка в боте оператора.
+  undeliver: {t:'🔄 Вернуть в доставку?',   s:'Заказ снова станет активным и выйдет из выручки.',
+              btn:'Вернуть',   cls:'gold', ok:oid=>'🔄 #'+oid+' снова в пути', toast:'ok'},
+};
 function askAct(oid, act){
-  const isDel = act==='delivered';
-  $('actT').textContent = (isDel?'✅ Доставлен?':'🚫 Отменить заказ?')+' #'+oid;
-  $('actS').textContent = isDel ? 'Заказ будет закрыт и попадёт в выручку.' : 'Заказ будет отменён — действие необратимо.';
+  const a = ACTS[act]; if(!a) return;
+  $('actT').textContent = a.t+' #'+oid;
+  $('actS').textContent = a.s;
   const go=$('actGo');
-  go.className='sbtn '+(isDel?'gold':'red');
-  go.textContent=isDel?'Доставлен':'Отменить';
+  go.className='sbtn '+a.cls;
+  go.textContent=a.btn;
   go.onclick=async()=>{
     hideOv('actOv'); haptic('heavy');
     try{
       await opApi.opFetch(`/api/operator/orders/${oid}/${act}`,{method:'POST',body:{}});
-      toast(isDel?'✅ #'+oid+' доставлен':'🚫 #'+oid+' отменён', isDel?'ok':'err');
+      toast(a.ok(oid), a.toast);
       if(editingOid===oid) clearTicket(false);
       await loadOrders();
     }catch(e){ toast('Ошибка: '+((e.payload&&e.payload.error)||e.status),'err'); }

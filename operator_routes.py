@@ -598,6 +598,62 @@ async def handle_delivered(request):
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 
+@require_operator
+async def handle_undeliver(request):
+    """Вернуть доставленный заказ обратно в доставку — то же, что кнопка
+    «🔄 Вернуть в доставку» в боте оператора (operator_bot: undone_*).
+    Нужна, когда «Доставлен» нажали по ошибке: заказ иначе уже закрыт и
+    попадает в выручку."""
+    oid = request.match_info["oid"]
+    order = await _get_manual_order(oid)
+    if not order:
+        return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
+    if order.get("status") != "delivered":
+        return web.json_response({"error": "not_delivered"}, status=409, headers=CORS_HEADERS)
+
+    total = order.get("total", 0)
+    cid = order.get("customer_id") or 0
+    # У ручного заказа customer_id = 0 и оба вызова ниже безвредно ничего не
+    # делают, но заказ мог быть заведён и на реального клиента — тогда счётчики
+    # и долг надо откатить ровно так же, как это делает бот.
+    try:
+        await db._increment_user(cid, orders_done=-1, total_spent=-total)
+    except Exception as e:
+        log.error(f"[pos] undeliver counters failed for #{oid}: {e}")
+    if order.get("payment_method") == "debt" and total and cid:
+        try:
+            if await db.unclaim_debt_delivery(oid):
+                await db.add_debt(cid, -total, order_id=oid, note="delivery undone")
+        except Exception as e:
+            log.error(f"[pos] debt rollback failed for #{oid}: {e}")
+
+    # Снимаем у владельца уведомление «доставлен» — иначе оно противоречит факту.
+    try:
+        from api_server import tg_delete
+        from owner_routes import OWNER_BOT_TOKEN
+        for m in order.get("_delivered_notif_msgs", []) or []:
+            await tg_delete(OWNER_BOT_TOKEN, m["chat_id"], m["message_id"])
+    except Exception as e:
+        log.error(f"[pos] delete delivered msgs failed for #{oid}: {e}")
+
+    now = datetime.now(timezone.utc).isoformat()
+    await db.update_order(oid, status="approved", _delivered_notif_msgs=[], updated_at=now)
+    order.update(status="approved", _delivered_notif_msgs=[])
+    await _refresh_cards(order)
+
+    try:
+        from owner_routes import notify_owners_force
+        op = _op_name(request["op_user"])
+        await notify_owners_force(
+            "orders.reverted",
+            f"🔄 *Заказ возвращён в доставку #{oid}*\n"
+            f"Был «доставлен» — оператор {op} вернул его в активные.\n"
+            f"💰 {total} AED · {order.get('customer_name','—')}")
+    except Exception as e:
+        log.error(f"[pos] reverted notify failed for #{oid}: {e}")
+    return web.json_response({"ok": True, "status": "approved"}, headers=CORS_HEADERS)
+
+
 # ── mounting ─────────────────────────────────────────────────────────────────
 def _opt(request):
     return web.Response(status=200, headers=CORS_HEADERS)
@@ -619,4 +675,6 @@ def setup(app):
     r.add_post("/api/operator/orders/{oid}/cancel", handle_cancel)
     r.add_route("OPTIONS", "/api/operator/orders/{oid}/delivered", _opt)
     r.add_post("/api/operator/orders/{oid}/delivered", handle_delivered)
+    r.add_route("OPTIONS", "/api/operator/orders/{oid}/undeliver", _opt)
+    r.add_post("/api/operator/orders/{oid}/undeliver", handle_undeliver)
     log.info("[pos] operator routes mounted")

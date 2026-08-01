@@ -2163,15 +2163,27 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
             style="width:100%;padding:14px;border:none;border-radius:var(--r2);cursor:pointer;
                    background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;
                    font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700">
-            <span id="phone-share-lbl">📱 Поделиться номером</span>
+            <span style="display:inline-flex;align-items:center;gap:9px;justify-content:center">
+              <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+                   stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
+                <rect x="6" y="2" width="12" height="20" rx="2.5"/><path d="M11 18.5h2"/>
+              </svg>
+              <span id="phone-share-lbl">Поделиться номером</span>
+            </span>
           </button>
           <div id="phone-share-hint" style="font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5">
             Номер придёт из Telegram — так мы убеждаемся, что заказ настоящий.
-            После этого его можно будет изменить.
+            После этого его можно будет изменить или вы можете добавить
+            дополнительный номер, по которому вы сможете совершать заказы.
           </div>
         </div>
-        <div id="phone-ok" style="display:none;font-size:11.5px;color:var(--up);margin-bottom:8px">
-          ✅ <span id="phone-ok-txt">Номер подтверждён</span>
+        <div id="phone-ok" style="display:none;font-size:11.5px;color:var(--up);margin-bottom:8px;
+                                   align-items:center;gap:6px">
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor"
+               stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0">
+            <path d="M20 6 9 17l-5-5"/>
+          </svg>
+          <span id="phone-ok-txt">Номер подтверждён</span>
         </div>
         <div id="phone-row" style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r2);overflow:hidden">
           <span style="padding:0 10px;font-size:15px;font-weight:600;color:var(--sub);flex-shrink:0;border-right:1px solid var(--border2);height:100%;display:flex;align-items:center;line-height:48px">+</span>
@@ -3741,7 +3753,7 @@ function _phoneUI(){
   const verified = !!PHONE_VERIFIED;
   const inp = el('phone-in');
   el('phone-share-box').style.display = verified ? 'none' : 'block';
-  el('phone-ok').style.display        = verified ? 'block' : 'none';
+  el('phone-ok').style.display        = verified ? 'flex' : 'none';
   el('phone-extra-wrap').style.display= verified ? 'block' : 'none';
   el('phone-lbl').style.display       = verified ? '' : 'none';
   const row = el('phone-row'); if(row) row.style.display = verified ? 'flex' : 'none';
@@ -3794,7 +3806,7 @@ async function sharePhone(){
       }
     }
     btn.disabled = false;
-    lbl.textContent = lang==='ru' ? '📱 Поделиться номером' : '📱 Share my number';
+    lbl.textContent = lang==='ru' ? 'Поделиться номером' : 'Share my number';
     showToast(lang==='ru' ? 'Не дождались ответа, попробуйте ещё раз'
                           : 'No response yet, please try again','err');
   });

@@ -572,11 +572,13 @@ async def customer_card(o):
 
     phone_lines = []
     if shared:
-        phone_lines.append(f"📱 {shared} ✅ <i>Telegram</i>")
+        phone_lines.append(f"📱 {shared}  <i>подтверждён</i>")
     if deliv and deliv != shared:
-        phone_lines.append(f"📞 {deliv}" + ("  <i>для доставки</i>" if shared else "  ⚠️ <i>не подтверждён</i>"))
+        # «Отредактирован» только когда есть с чем сравнивать: в старых заказах
+        # подтверждённого номера нет вовсе, и подпись была бы враньём.
+        phone_lines.append(f"📞 {deliv}  " + ("<i>отредактирован</i>" if shared else "⚠️ <i>не подтверждён</i>"))
     if extra and extra not in (shared, deliv):
-        phone_lines.append(f"➕ {extra}  <i>доп.</i>")
+        phone_lines.append(f"➕ {extra}  <i>дополнительный</i>")
     if not phone_lines:
         phone_lines.append("📞 —")
 

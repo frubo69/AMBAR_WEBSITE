@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """AMBAR Customer Bot — opens mini app, receives orders, ban check"""
 import os, json, logging
+import re
 from datetime import datetime, timezone
 from pathlib import Path
 from dotenv import load_dotenv
@@ -258,6 +259,36 @@ async def post_init(app: Application):
     await db.connect()
 
 
+async def on_contact(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Клиент поделился номером из мини-аппа (WebApp.requestContact).
+
+    Единственный достоверный источник номера: Telegram присылает контакт сюда,
+    в бота, а не в браузер — подделать его на стороне клиента нельзя.
+    Обязательна сверка contact.user_id с отправителем: иначе можно переслать
+    чужую визитку и «подтвердить» чужой номер."""
+    msg = update.effective_message
+    c = getattr(msg, "contact", None)
+    if not c:
+        return
+    uid = update.effective_user.id
+    if c.user_id != uid:
+        log.warning(f"[phone] uid={uid} прислал чужой контакт (user_id={c.user_id}) — игнорируем")
+        return
+    digits = re.sub(r"\D", "", c.phone_number or "")
+    if len(digits) < 8:
+        return
+    try:
+        await db.set_user_field(
+            uid,
+            phone_verified=digits,
+            phone_verified_at=datetime.now(timezone.utc).isoformat(),
+        )
+        await db.upsert_user(uid, phone=digits)      # заодно в общий список номеров
+        log.info(f"[phone] uid={uid} подтвердил номер ···{digits[-4:]}")
+    except Exception as e:
+        log.error(f"[phone] сохранение номера uid={uid} не удалось: {e}")
+
+
 def main():
     if not BOT_TOKEN:  print("❌ BOT_TOKEN missing");  return
     if not WEBAPP_URL: print("❌ WEBAPP_URL missing"); return
@@ -265,6 +296,7 @@ def main():
     app = Application.builder().token(BOT_TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CallbackQueryHandler(cb_review, pattern=r"^rev_"))
+    app.add_handler(MessageHandler(filters.CONTACT, on_contact))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fallback))
     log.info("🍾 AMBAR Customer Bot started!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)

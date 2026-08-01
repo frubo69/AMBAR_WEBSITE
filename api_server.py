@@ -10,6 +10,7 @@ AMBAR API + Static file server — MongoDB edition
 All user/order data is stored in MongoDB Atlas (db: ambar).
 """
 from __future__ import annotations
+import re
 import os, json, hmac, hashlib, html as _html_mod, urllib.parse, mimetypes, logging, time, uuid, math, asyncio
 from datetime import datetime, timezone, timedelta
 DUBAI_TZ = timezone(timedelta(hours=4))
@@ -390,6 +391,19 @@ async def handle_create_order(request: web.Request) -> web.Response:
         prepaid = {"method": _c.get("asset", "USDT"), "txid": _c.get("txid"),
                    "amount_usdt": _c.get("amount"), "test": True}
 
+    # Номер должен быть подтверждён Telegram: клиент делится контактом, бот его
+    # ловит и кладёт в phone_verified. Без этого заказ не принимаем — именно
+    # ради отсечения выдуманных номеров всё и затевалось. Проверяем на сервере,
+    # блокировка кнопки во фронте — только удобство.
+    try:
+        _u = await db.get_user(uid)
+    except Exception:
+        _u = None
+    if not (_u or {}).get("phone_verified") and uid not in _TEST_ACCOUNTS:
+        log.warning(f"[order] uid={uid} без подтверждённого номера — отказ")
+        return web.json_response({"error": "phone_not_verified"},
+                                 status=403, headers=CORS_HEADERS)
+
     # В ДОЛГ (pay-later): only for whitelisted customers — the server re-checks,
     # the client-side gate is cosmetic.
     debt = False
@@ -457,6 +471,13 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
 
     items     = src.get("items", [])
     phone     = src.get("phone", "—")
+    # Три номера живут отдельно и намеренно: подтверждённый нельзя потерять,
+    # даже если клиент вписал в доставку другой. Оператор видит всё.
+    try:
+        phone_shared = (await db.get_user(uid) or {}).get("phone_verified") or ""
+    except Exception:
+        phone_shared = ""
+    phone_extra  = re.sub(r"\D", "", str(src.get("phone_extra") or ""))
     address   = src.get("address", "—")
     gmap_link = src.get("gmap_link", "")
     is_gps    = src.get("is_gps", False)
@@ -544,6 +565,8 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         "order_id": oid,        "customer_id": uid,
         "customer_name": user_name, "username": username,
         "phone": phone,         "address": address,   "location": loc,
+        # Номер из Telegram сохраняем всегда, даже если доставка на другой.
+        "phone_shared": phone_shared, "phone_extra": phone_extra,
         "gmap_link": gmap_link, "is_gps": is_gps,
         "items": items,         "item_lines": item_lines,
         "tip": tip,             "total": total,        "lang": lang,
@@ -715,12 +738,24 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
     else:
         paid_banner = ""
     tip_line = f"\n🎁 Чаевые: {tip} AED" if tip else ""
+    # Номера. Подтверждённый показываем всегда и первым — он единственный,
+    # за который Telegram поручился. Если в доставку вписан другой, видно оба.
+    _pd = re.sub(r"\D", "", str(phone or ""))
+    _lines = []
+    if phone_shared:
+        _lines.append(f"📱 Telegram: <b>+{phone_shared}</b> ✅")
+    if _pd and _pd != phone_shared:
+        _lines.append(f"📞 Для доставки: <b>+{_pd}</b>" + ("" if phone_shared else " ⚠️ не подтверждён"))
+    if phone_extra and phone_extra not in (_pd, phone_shared):
+        _lines.append(f"➕ Доп.: <b>+{phone_extra}</b>")
+    phones_line = ("\n".join(_lines) + "\n\n") if _lines else ""
     _comment_esc = _html_mod.escape(comment) if comment else ""
     op_text = (
         f"{first_order_banner}"
         f"🏢 Офис: <b>{_html_mod.escape(office_nm)}</b>\n\n"
         f"🆕 <b>НОВЫЙ ЗАКАЗ #{oid}</b>\n\n"
         f"{addr_line}\n\n"
+        f"{phones_line}"
         f"🛒 <b>Позиции:</b>\n{_item_lines_html}\n"
         f"{tip_line}"
         f"\n💰 <b>Итого: {total} AED</b>"
@@ -1521,6 +1556,9 @@ async def handle_me(request: web.Request) -> web.Response:
         "premium_index": premium_index,
         "demo": demo,
         "verified": verified,
+        # Подтверждённый номер: пришёл контактом в бота от самого Telegram.
+        # Фронт по нему решает, разблокировать ли ручной ввод и кнопку заказа.
+        "phone_verified": (user_doc or {}).get("phone_verified") or "",
         "verify_requested": verify_requested,
         "verify_declined": verify_declined,
         "verify_pending": verify_pending,

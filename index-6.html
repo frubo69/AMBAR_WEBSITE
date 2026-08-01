@@ -2156,11 +2156,44 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
       <div class="co-head"><div class="co-num">2</div><div class="co-title" id="ct2">Номер телефона</div></div>
       <div class="co-inner">
         <label class="flabel" id="phone-lbl">ТОЛЬКО ЦИФРЫ, 10–15 ЗНАКОВ</label>
-        <div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r2);overflow:hidden">
+        <!-- Пока номер не подтверждён, вписать его руками нельзя: сначала надо
+             поделиться контактом через Telegram. Разблокируется после этого. -->
+        <div id="phone-share-box" style="display:none;margin-bottom:10px">
+          <button type="button" id="phone-share-btn" onclick="sharePhone()"
+            style="width:100%;padding:14px;border:none;border-radius:var(--r2);cursor:pointer;
+                   background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;
+                   font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700">
+            <span id="phone-share-lbl">📱 Поделиться номером</span>
+          </button>
+          <div id="phone-share-hint" style="font-size:11.5px;color:var(--muted);margin-top:8px;line-height:1.5">
+            Номер придёт из Telegram — так мы убеждаемся, что заказ настоящий.
+            После этого его можно будет изменить.
+          </div>
+        </div>
+        <div id="phone-ok" style="display:none;font-size:11.5px;color:var(--up);margin-bottom:8px">
+          ✅ <span id="phone-ok-txt">Номер подтверждён</span>
+        </div>
+        <div id="phone-row" style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r2);overflow:hidden">
           <span style="padding:0 10px;font-size:15px;font-weight:600;color:var(--sub);flex-shrink:0;border-right:1px solid var(--border2);height:100%;display:flex;align-items:center;line-height:48px">+</span>
           <input class="finput" id="phone-in" type="tel" inputmode="numeric" placeholder="971501234567" style="border:none;border-radius:0;background:transparent;flex:1" oninput="this.classList.remove('err');el('phone-err').classList.remove('on');localStorage.setItem('ambar_phone',this.value.trim())">
         </div>
         <div class="ferr" id="phone-err"></div>
+        <div id="phone-extra-wrap" style="display:none;margin-top:12px">
+          <button type="button" id="phone-extra-add" onclick="toggleExtraPhone()"
+            style="background:none;border:none;padding:0;cursor:pointer;color:var(--gold2);
+                   font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:600">
+            + Добавить ещё номер
+          </button>
+          <div id="phone-extra-box" style="display:none;margin-top:8px">
+            <label class="flabel" id="phone-extra-lbl">ДОПОЛНИТЕЛЬНЫЙ НОМЕР</label>
+            <div style="display:flex;align-items:center;background:var(--bg3);border:1px solid var(--border2);border-radius:var(--r2);overflow:hidden">
+              <span style="padding:0 10px;font-size:15px;font-weight:600;color:var(--sub);flex-shrink:0;border-right:1px solid var(--border2);align-self:stretch;display:flex;align-items:center">+</span>
+              <input class="finput" id="phone-extra-in" type="tel" inputmode="numeric" placeholder="971501234567"
+                     style="border:none;border-radius:0;background:transparent;flex:1"
+                     oninput="localStorage.setItem('ambar_phone_extra',this.value.trim())">
+            </div>
+          </div>
+        </div>
       </div>
     </div>
     <div class="co-card">
@@ -3633,6 +3666,12 @@ window.addEventListener('DOMContentLoaded',()=>{
   // Pre-fill saved phone
   const savedPhone=localStorage.getItem('ambar_phone');
   if(savedPhone)el('phone-in').value=savedPhone;
+  const savedExtra=localStorage.getItem('ambar_phone_extra');
+  if(savedExtra&&el('phone-extra-in'))el('phone-extra-in').value=savedExtra;
+  // Номер, подтверждённый в прошлый раз, подставляется сам — повторно делиться
+  // не нужно. Состояние полей выставляем сразу, до ответа сервера.
+  _phoneUI();
+  _fetchVerifiedPhone().then(p=>{ if(p){ PHONE_VERIFIED=p; _phoneUI(); } });
   updateAddrPill();updateCartAddrBar();
   _cpbStart(); // resurface a still-pending crypto payment from a previous session
   // Tip input keyboard handling
@@ -3690,6 +3729,88 @@ window.addEventListener('DOMContentLoaded',()=>{
 
 // ── HELPERS ───────────────────────────────────────────────────────────────────
 function t(k){return TX[lang][k]||TX.ru[k]||k;}
+
+// ── Подтверждение номера через Telegram ─────────────────────────────────────
+// Номер приходит не в браузер, а контактом в бота — подделать его на стороне
+// клиента нельзя. Поэтому после requestContact мы опрашиваем свой сервер и
+// ждём, пока бот его запишет. Пока номер не подтверждён, поле ввода закрыто:
+// ручное редактирование открывается только поверх подтверждённого номера.
+let PHONE_VERIFIED = '';
+
+function _phoneUI(){
+  const verified = !!PHONE_VERIFIED;
+  const inp = el('phone-in');
+  el('phone-share-box').style.display = verified ? 'none' : 'block';
+  el('phone-ok').style.display        = verified ? 'block' : 'none';
+  el('phone-extra-wrap').style.display= verified ? 'block' : 'none';
+  el('phone-lbl').style.display       = verified ? '' : 'none';
+  const row = el('phone-row'); if(row) row.style.display = verified ? 'flex' : 'none';
+  inp.disabled = !verified;
+  if(verified){
+    el('phone-ok-txt').textContent = (lang==='ru' ? 'Подтверждён: +' : 'Verified: +') + PHONE_VERIFIED;
+    if(!inp.value.trim()) inp.value = PHONE_VERIFIED;
+  }
+  _syncOrderBtn();
+}
+
+function _syncOrderBtn(){
+  const b = el('confirm-order-btn') || document.getElementById('co-confirm');
+  if(!b) return;
+  b.disabled = !PHONE_VERIFIED;
+  b.style.opacity = PHONE_VERIFIED ? '' : '.45';
+  b.style.pointerEvents = PHONE_VERIFIED ? '' : 'none';
+}
+
+async function _fetchVerifiedPhone(){
+  try{
+    const r = await fetch(`${AMBAR_API}/api/me`, {headers:{'Authorization':'tma '+(tg?.initData||'')}});
+    if(!r.ok) return '';
+    const d = await r.json();
+    return d.phone_verified || '';
+  }catch(e){ return ''; }
+}
+
+async function sharePhone(){
+  const btn = el('phone-share-btn'), lbl = el('phone-share-lbl');
+  if(!tg?.requestContact){
+    showToast(lang==='ru' ? 'Обновите Telegram' : 'Please update Telegram','err');
+    return;
+  }
+  haptic.medium();
+  tg.requestContact(async (ok)=>{
+    if(!ok){ haptic.error(); return; }
+    // Контакт ушёл в бота — ждём, пока он до нас доедет.
+    btn.disabled = true;
+    lbl.textContent = lang==='ru' ? 'Проверяем…' : 'Checking…';
+    for(let i=0; i<12; i++){
+      await new Promise(r=>setTimeout(r, 700));
+      const p = await _fetchVerifiedPhone();
+      if(p){
+        PHONE_VERIFIED = p;
+        localStorage.setItem('ambar_phone', p);
+        haptic.success(); _phoneUI();
+        showToast(lang==='ru' ? 'Номер подтверждён' : 'Number verified','ok');
+        return;
+      }
+    }
+    btn.disabled = false;
+    lbl.textContent = lang==='ru' ? '📱 Поделиться номером' : '📱 Share my number';
+    showToast(lang==='ru' ? 'Не дождались ответа, попробуйте ещё раз'
+                          : 'No response yet, please try again','err');
+  });
+}
+
+function toggleExtraPhone(){
+  const box = el('phone-extra-box'), open = box.style.display !== 'none';
+  box.style.display = open ? 'none' : 'block';
+  el('phone-extra-add').textContent = open
+    ? (lang==='ru' ? '+ Добавить ещё номер' : '+ Add another number')
+    : (lang==='ru' ? '− Убрать' : '− Remove');
+  if(!open) el('phone-extra-in').focus();
+  haptic.light();
+}
+
+
 function el(id){return document.getElementById(id);}
 function set(id,v){const e=el(id);if(e)e.textContent=v;}
 
@@ -6184,6 +6305,11 @@ function placeOrder(){
   const addr=getSaved()[activeAddrIdx];
   if(!addr){showToast(t('noAddrWarning'),'err');return;}
 
+  if(!PHONE_VERIFIED){
+    showToast(lang==='ru'?'Сначала подтвердите номер':'Please verify your number first','err');
+    el('phone-share-btn')?.scrollIntoView({block:'center',behavior:'smooth'});
+    haptic.error(); return;
+  }
   const raw=el('phone-in').value.trim(),digits=raw.replace(/\D/g,'');
   if(digits.length<10||digits.length>15){
     el('phone-in').classList.add('err');el('phone-err').textContent=t('phoneErr');el('phone-err').classList.add('on');
@@ -6200,7 +6326,8 @@ function placeOrder(){
   const sub=cartSub(),total=sub+tip,oid='AMB'+Date.now().toString().slice(-7);
   const payload={
     action:'order',order_id:oid,items,subtotal:sub,tip,total,currency:'AED',
-    phone:'+'+digits,address:addr.address,address_label:addr.label,
+    phone:'+'+digits,phone_extra:(el('phone-extra-in')?.value||'').replace(/\D/g,''),
+    address:addr.address,address_label:addr.label,
     comment:[addr.comment,localStorage.getItem('ambar_delivery_note')].filter(Boolean).join(' | ')||'',
     gmap_link:addr.gmap_link||'',is_gps:addr.isGps||false,
     location:{lat:addr.lat||0,lon:addr.lon||0},

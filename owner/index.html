@@ -4235,9 +4235,10 @@ function _renderAccessBlock(){
   if(usersWrap){
     const me = _mgrCache.current_user;
     const rows = [];
-    owners.forEach(o => rows.push({tg:o.telegram_id, name:o.name, tag:'owner', isMe:o.telegram_id===me, src:''}));
-    activeMgrs.slice(0, 4).forEach(m => rows.push({
-      tg:m.telegram_id, name:m.name, tag:'мен.',
+    owners.forEach(o => rows.push({tg:o.telegram_id, name:o.name, username:o.username||'',
+                                   tag:'owner', isMe:o.telegram_id===me, src:''}));
+    activeMgrs.forEach(m => rows.push({
+      tg:m.telegram_id, name:m.name, username:m.username||'', tag:'мен.',
       isMe:m.telegram_id===me, src:m.source==='env'?'.env':''
     }));
     if(!rows.length){
@@ -4249,14 +4250,16 @@ function _renderAccessBlock(){
         const tagHtml = r.tag === 'owner'
           ? '<span style="font-size:9px;color:var(--gold2);background:rgba(201,169,110,.14);padding:2px 6px;border-radius:6px;margin-left:6px;font-weight:700;letter-spacing:.3px;text-transform:uppercase">owner</span>'
           : (r.isMe ? '<span style="font-size:9px;color:var(--info);background:rgba(91,141,239,.14);padding:2px 6px;border-radius:6px;margin-left:6px;font-weight:700;letter-spacing:.3px;text-transform:uppercase">вы</span>' : '');
-        return `<div class="cat-mini-row">
+        return `<div class="cat-mini-row" style="cursor:pointer"
+             onclick="openTgUser('${r.tg}','${(r.username||'').replace(/'/g,'')}')">
           <div class="cat-mini-av">${init}</div>
           <div class="cat-mini-body">
             <div class="cat-mini-n">${display}${tagHtml}</div>
-            <div class="cat-mini-sub">ID ${r.tg}${r.src?' · '+r.src:''}</div>
+            <div class="cat-mini-sub">ID ${r.tg}${r.src?' · '+r.src:''}${r.username?' · @'+escS(r.username):''}</div>
           </div>
+          <div class="cat-mini-r" style="color:var(--muted);font-size:15px">›</div>
         </div>`;
-      }).join('') + (activeMgrs.length>4 ? `<div class="cat-block-empty" style="padding-top:6px">…и ещё ${activeMgrs.length-4}</div>` : '');
+      }).join('');
     }
   }
 
@@ -4266,40 +4269,57 @@ function _renderAccessBlock(){
     if(pendingReqs.length){
       extraT.style.display = '';
       extraT.textContent = 'Запросы на доступ';
-      extraWrap.innerHTML = pendingReqs.slice(0,3).map(a => {
+      extraWrap.innerHTML = pendingReqs.map(a => {
         const fullName = ((a.first_name||'')+' '+(a.last_name||'')).trim() || ('User '+a.telegram_id);
-        return `<div class="cat-mini-row">
+        return `<div class="cat-mini-row" style="cursor:pointer"
+             onclick="openTgUser('${a.telegram_id}','${(a.username||'').replace(/'/g,'')}')">
           <div class="cat-mini-av">${_initials(fullName, a.telegram_id)}</div>
           <div class="cat-mini-body">
-            <div class="cat-mini-n">${fullName}</div>
-            <div class="cat-mini-sub">ID ${a.telegram_id} · ждёт решения</div>
+            <div class="cat-mini-n">${escS(fullName)}</div>
+            <div class="cat-mini-sub">ID ${a.telegram_id}${a.username?' · @'+escS(a.username):''} · ждёт решения</div>
           </div>
           <div class="cat-mini-r" style="color:var(--info)">●<span class="u">new</span></div>
         </div>`;
-      }).join('') + (pendingReqs.length>3 ? `<div class="cat-block-empty" style="padding-top:6px">…и ещё ${pendingReqs.length-3}</div>` : '');
+      }).join('');
     } else if(totalBlocked){
       extraT.style.display = '';
       extraT.textContent = 'Заблокированные';
       const blocked = [
-        ...blockedMgrs.map(m => ({tg:m.telegram_id, name:m.name})),
-        ...blockedOuts.map(a => ({tg:a.telegram_id, name:((a.first_name||'')+' '+(a.last_name||'')).trim()})),
+        ...blockedMgrs.map(m => ({tg:m.telegram_id, name:m.name, username:m.username||''})),
+        ...blockedOuts.map(a => ({tg:a.telegram_id, username:a.username||'',
+                                  name:((a.first_name||'')+' '+(a.last_name||'')).trim()})),
       ];
-      extraWrap.innerHTML = blocked.slice(0,3).map(b => {
+      extraWrap.innerHTML = blocked.map(b => {
         const display = b.name || ('User '+b.tg);
-        return `<div class="cat-mini-row">
+        return `<div class="cat-mini-row" style="cursor:pointer"
+             onclick="openTgUser('${b.tg}','${(b.username||'').replace(/'/g,'')}')">
           <div class="cat-mini-av" style="opacity:.55">${_initials(b.name, b.tg)}</div>
           <div class="cat-mini-body">
-            <div class="cat-mini-n" style="color:var(--muted)">${display}</div>
-            <div class="cat-mini-sub">ID ${b.tg} · доступ закрыт</div>
+            <div class="cat-mini-n" style="color:var(--muted)">${escS(display)}</div>
+            <div class="cat-mini-sub">ID ${b.tg}${b.username?' · @'+escS(b.username):''} · доступ закрыт</div>
           </div>
           <div class="cat-mini-r" style="color:var(--warn)">блок</div>
         </div>`;
-      }).join('') + (totalBlocked>3 ? `<div class="cat-block-empty" style="padding-top:6px">…и ещё ${totalBlocked-3}</div>` : '');
+      }).join('');
     } else {
       extraT.style.display = 'none';
       extraWrap.innerHTML = '';
     }
   }
+}
+
+
+// Открыть профиль Telegram по строке списка доступа. Если @username известен —
+// идём через t.me, это надёжнее всего. Если нет (у id из .env часто так) —
+// tg://user?id=…, его Telegram перехватывает сам и открывает карточку.
+function openTgUser(id, username){
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  const u = (username||'').replace(/^@/,'').trim();
+  try{
+    if(u){ Telegram.WebApp.openTelegramLink('https://t.me/'+u); return; }
+  }catch(e){}
+  try{ window.open('tg://user?id='+id, '_blank'); }
+  catch(e){ location.href = 'tg://user?id='+id; }
 }
 
 (function initAccessBlock(){

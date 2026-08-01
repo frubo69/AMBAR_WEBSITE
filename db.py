@@ -981,6 +981,15 @@ async def set_access_status(telegram_id: int, status: str, by: int = 0) -> bool:
     return res.matched_count > 0
 
 
+async def get_access_attempt(telegram_id: int) -> dict | None:
+    """Строка журнала попыток доступа. Нужна, чтобы подставить имя и @username
+    для id, которые есть только в .env и больше нигде."""
+    db = _db_or_none()
+    if db is None: return None
+    return await db.owner_access_log.find_one(
+        {"telegram_id": int(telegram_id)}, {"_id": 0})
+
+
 async def is_access_blocked(telegram_id: int) -> bool:
     """True if user has an access-log row with status='blocked'."""
     db = _db_or_none()

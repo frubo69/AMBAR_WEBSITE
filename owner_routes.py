@@ -1493,14 +1493,35 @@ async def handle_managers_list(request):
 
     db_managers = await db.get_managers()
     db_ids = {int(m["telegram_id"]) for m in db_managers}
+
+    async def _identify(tg_id: int) -> dict:
+        """Имя и @username для id из .env — там кроме самого id ничего нет.
+        Ищем в клиентах, потом в журнале доступа: этого хватает, чтобы в списке
+        стояли живые имена, а не «User 7865205960», и чтобы работала ссылка на
+        профиль."""
+        try:
+            u = await db.get_user(int(tg_id)) or {}
+        except Exception:
+            u = {}
+        name = (u.get("full_name") or u.get("name")
+                or f"{u.get('first_name','')} {u.get('last_name','')}".strip())
+        username = u.get("username") or ""
+        if not (name and username):
+            try:
+                a = await db.get_access_attempt(int(tg_id)) or {}
+            except Exception:
+                a = {}
+            name = name or f"{a.get('first_name','')} {a.get('last_name','')}".strip()
+            username = username or a.get("username") or ""
+        return {"name": name.strip(), "username": username}
     # access_log "blocked" rows let us mark env-managers as blocked too,
     # since they don't have an owner_managers row to flip.
     blocked_in_log = await db.get_blocked_access_ids()
 
-    owners = [
-        {"telegram_id": int(oid), "name": "", "username": "", "source": "owner", "blocked": False}
-        for oid in sorted(OWNER_IDS)
-    ]
+    owners = []
+    for oid in sorted(OWNER_IDS):
+        who = await _identify(oid)
+        owners.append({"telegram_id": int(oid), **who, "source": "owner", "blocked": False})
     managers = []
     # env managers come first. They CAN now be blocked — the block lives in
     # access_log instead of owner_managers since these IDs are sourced from
@@ -1509,9 +1530,10 @@ async def handle_managers_list(request):
     for mid in sorted(MANAGER_IDS):
         if int(mid) in db_ids or int(mid) in OWNER_IDS:
             continue
+        who = await _identify(mid)
         managers.append({
             "telegram_id": int(mid),
-            "name": "", "username": "",
+            **who,
             "source": "env",
             "blocked": int(mid) in blocked_in_log,
         })

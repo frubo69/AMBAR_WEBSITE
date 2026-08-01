@@ -7,7 +7,7 @@ AMBAR Operator Bot — MongoDB edition
 - Ban / unban customers
 - Stats
 """
-import os, asyncio, logging, math
+import os, re, asyncio, logging, math
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardMarkup, ReplyKeyboardRemove, MenuButtonCommands, MenuButtonWebApp, WebAppInfo
@@ -558,9 +558,31 @@ async def customer_card(o):
     name_line = f"👤 <b>{_esc(original)}</b>"
     if nickname:
         name_line += f"  <i>({_esc(nickname)})</i>"
+    # Номера обычным текстом, без <code>: внутри code-блока Telegram не делает
+    # ссылку, а нам нужен как раз родной тап по номеру — «Позвонить», «Написать»,
+    # «Добавить в контакты». Подтверждённый идёт первым, он единственный, за
+    # который поручился Telegram.
+    def _plus(v):
+        d = re.sub(r"\D", "", str(v or ""))
+        return f"+{d}" if d else ""
+
+    shared = _plus(o.get("phone_shared"))
+    deliv  = _plus(o.get("phone"))
+    extra  = _plus(o.get("phone_extra"))
+
+    phone_lines = []
+    if shared:
+        phone_lines.append(f"📱 {shared} ✅ <i>Telegram</i>")
+    if deliv and deliv != shared:
+        phone_lines.append(f"📞 {deliv}" + ("  <i>для доставки</i>" if shared else "  ⚠️ <i>не подтверждён</i>"))
+    if extra and extra not in (shared, deliv):
+        phone_lines.append(f"➕ {extra}  <i>доп.</i>")
+    if not phone_lines:
+        phone_lines.append("📞 —")
+
     lines = [
         name_line,
-        f"📞 <code>{_esc(o.get('phone','—'))}</code>",
+        *phone_lines,
         f"🔗 @{_esc(o.get('username','—'))}  |  ID: <code>{_esc(o.get('customer_id','—'))}</code>",
         "",
     ]

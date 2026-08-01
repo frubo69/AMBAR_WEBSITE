@@ -738,24 +738,15 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
     else:
         paid_banner = ""
     tip_line = f"\n🎁 Чаевые: {tip} AED" if tip else ""
-    # Номера. Подтверждённый показываем всегда и первым — он единственный,
-    # за который Telegram поручился. Если в доставку вписан другой, видно оба.
-    _pd = re.sub(r"\D", "", str(phone or ""))
-    _lines = []
-    if phone_shared:
-        _lines.append(f"📱 Telegram: <b>+{phone_shared}</b> ✅")
-    if _pd and _pd != phone_shared:
-        _lines.append(f"📞 Для доставки: <b>+{_pd}</b>" + ("" if phone_shared else " ⚠️ не подтверждён"))
-    if phone_extra and phone_extra not in (_pd, phone_shared):
-        _lines.append(f"➕ Доп.: <b>+{phone_extra}</b>")
-    phones_line = ("\n".join(_lines) + "\n\n") if _lines else ""
+    # Номера в карточку заказа НЕ попадают: она пересылается водителям и висит
+    # в общем чате операторов. Телефон живёт только за кнопкой «Клиент»
+    # (operator_bot.customer_card), где его видит тот, кому он нужен.
     _comment_esc = _html_mod.escape(comment) if comment else ""
     op_text = (
         f"{first_order_banner}"
         f"🏢 Офис: <b>{_html_mod.escape(office_nm)}</b>\n\n"
         f"🆕 <b>НОВЫЙ ЗАКАЗ #{oid}</b>\n\n"
         f"{addr_line}\n\n"
-        f"{phones_line}"
         f"🛒 <b>Позиции:</b>\n{_item_lines_html}\n"
         f"{tip_line}"
         f"\n💰 <b>Итого: {total} AED</b>"

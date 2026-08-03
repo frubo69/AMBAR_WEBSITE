@@ -1450,6 +1450,22 @@ async def get_last_stock_count(district: str, before_day: str | None = None) -> 
     return rows[0] if rows else None
 
 
+async def get_stock_counts_recent(district: str, before_day: str | None = None,
+                                  limit: int = 40) -> list:
+    """Последние пересчёты района, свежие первыми — с позициями.
+
+    Нужны, чтобы знать, когда каждую позицию последний раз реально считали
+    глазами: то, что не продавалось, всё равно может уйти боем или в карман,
+    и такие позиции надо возвращать на проверку по кругу."""
+    db = _db_or_none()
+    if db is None: return []
+    q = {"district": district}
+    if before_day:
+        q["day"] = {"$lte": before_day}
+    cur = db.stock_counts.find(q, {"_id": 0}).sort("day", -1).limit(int(limit))
+    return await cur.to_list(length=int(limit))
+
+
 async def get_stock_counts_for_day(day: str) -> list:
     db = _db_or_none()
     if db is None: return []

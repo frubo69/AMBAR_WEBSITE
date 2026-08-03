@@ -13,7 +13,11 @@ AMBAR — склад: пересчёт, перемещения, заявка и 
     ожидается = прошлый пересчёт + приход ± перемещения − продано по заказам
 
 Менеджер вводит фактический остаток, и разница — это недостача, отдельно от
-продаж. Дальше из тех же чисел собирается заявка:
+продаж. Важно: недостача бывает и там, где ничего не продавали — бой, пересорт,
+унесённая водителем бутылка. Поэтому позиции без продаж не «застывают»: каждая
+возвращается на проверку, если её не считали дольше STALE_DAYS.
+
+Дальше из тех же чисел собирается заявка:
 
     заявка = норма − остаток на руках
 
@@ -38,6 +42,8 @@ DUBAI_TZ = timezone(timedelta(hours=4))
 SHIFT_START_HOUR = 12       # рабочие сутки 12:00 → 12:00, как во всей системе
 NORM_COVER_DAYS = 3         # на сколько дней запаса рассчитана норма по умолчанию
 NORM_WINDOW_DAYS = 14       # по какому окну продаж её считать
+STALE_DAYS = 7              # через сколько дней позицию пора проверить заново
+HISTORY_DEPTH = 45          # сколько пересчётов смотреть назад в поисках проверки
 
 
 # ── сутки ────────────────────────────────────────────────────────────────────
@@ -47,6 +53,34 @@ def _biz_day(ref: datetime = None) -> str:
     ref = ref or datetime.now(DUBAI_TZ)
     anchor = ref.replace(hour=SHIFT_START_HOUR, minute=0, second=0, microsecond=0)
     return (ref if ref >= anchor else ref - timedelta(days=1)).strftime("%Y-%m-%d")
+
+
+def _days_between(day_a: str, day_b: str):
+    """Сколько дней прошло между двумя рабочими сутками. None — если не считали."""
+    if not day_a:
+        return None
+    try:
+        a = datetime.strptime(day_a, "%Y-%m-%d")
+        b = datetime.strptime(day_b, "%Y-%m-%d")
+    except ValueError:
+        return None
+    return max(0, (b - a).days)
+
+
+async def _last_checked(district: str, day: str) -> dict:
+    """{product_id: дата последней РУЧНОЙ проверки}.
+
+    Строка, перенесённая расчётом (counted=False), проверкой не считается:
+    её никто не видел, и бой или недостача по ней остались бы незамеченными.
+    У старых пересчётов поля нет — там сохраняли только то, что смотрели."""
+    out = {}
+    for c in await db.get_stock_counts_recent(district, before_day=day, limit=HISTORY_DEPTH):
+        d = c.get("day") or ""
+        for l in c.get("lines", []):
+            pid = l.get("id")
+            if pid and l.get("counted", True) and pid not in out:
+                out[pid] = d
+    return out
 
 
 def _day_bounds(day: str, days: int = 1):
@@ -139,6 +173,11 @@ async def handle_sheet(request):
     done = {l["id"]: l for l in (existing or {}).get("lines", [])}
     cat = _catalog()
 
+    # Когда каждую позицию последний раз считали руками. Продажи вычитаются
+    # сами, но бой и воровство продажами не считаются — позицию, которую давно
+    # никто не видел, надо вернуть на проверку, даже если её не заказывали.
+    last_checked = await _last_checked(district, day)
+
     # Перемещения: ушедшее из района вычитаем, пришедшее прибавляем.
     move_by_pid = {}
     for m in moves:
@@ -155,6 +194,7 @@ async def handle_sheet(request):
         was = int((prev_lines.get(pid) or {}).get("actual") or 0)
         s = int(sold.get(pid) or 0)
         mv = int(move_by_pid.get(pid) or 0)
+        ago = _days_between(last_checked.get(pid), day)
         rows.append({
             "id": pid, "name": p.get("name", ""), "cat": p.get("cat", ""),
             "price": _price(p),
@@ -162,10 +202,15 @@ async def handle_sheet(request):
             # На первом пересчёте сравнивать не с чем — вводим как отправную точку.
             "expected": None if first_time else max(0, was + mv - s),
             "touched": bool(s or mv),
+            "checked_day": last_checked.get(pid, ""),
+            "days_ago": ago,
+            "stale": (not first_time) and (ago is None or ago >= STALE_DAYS),
             "actual": (done.get(pid) or {}).get("actual"),
         })
-    # Сначала то, что двигалось: остальное физически измениться не могло.
-    rows.sort(key=lambda r: (not r["touched"], r["name"]))
+    # Сначала то, где расхождение видно сразу (двигалось), потом то, что давно
+    # не проверяли: именно там прячутся бой и недостача без продаж.
+    rows.sort(key=lambda r: (not r["touched"], not r["stale"],
+                             -(r["days_ago"] or 9999), r["name"]))
 
     return web.json_response({
         "district": district,
@@ -174,6 +219,8 @@ async def handle_sheet(request):
         "day": day, "first_time": first_time,
         "prev_day": (prev or {}).get("day", ""),
         "touched_count": sum(1 for r in rows if r["touched"]),
+        "stale_count": sum(1 for r in rows if r["stale"] and not r["touched"]),
+        "stale_days": STALE_DAYS,
         "total_count": len(rows),
         "saved": bool(existing),
         "rows": rows,
@@ -224,10 +271,10 @@ async def handle_save(request):
         s   = int(sold.get(pid) or 0)
         mv  = int(mv_by.get(pid) or 0)
         expected = None if first_time else max(0, was + income + mv - s)
-        # Позиция, которая за смену не продавалась и не переезжала, физически
-        # измениться не могла — её никто и не пересчитывал глазами. Такая строка
-        # сохраняется расчётным значением: она нужна, чтобы завтра было с чем
-        # сравнивать и чтобы заявка знала остаток, но расхождением быть не может.
+        # Строка, до которой не дошли руки. Она сохраняется расчётным значением
+        # — иначе завтра не с чем будет сравнивать и заявка не узнает остаток, —
+        # но проверкой не считается: бой и воровство продажами не пахнут и
+        # вылезают именно там, где никто не смотрел.
         auto = bool(raw.get("auto")) and expected is not None
         if auto:
             actual = expected

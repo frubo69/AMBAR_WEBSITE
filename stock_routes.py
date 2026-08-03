@@ -207,7 +207,7 @@ async def handle_save(request):
         if m.get("from") == district: mv_by[pid] = mv_by.get(pid, 0) - q
         if m.get("to")   == district: mv_by[pid] = mv_by.get(pid, 0) + q
 
-    lines, short_qty, short_aed, over_qty = [], 0, 0, 0
+    lines, short_qty, short_aed, over_qty, counted_qty = [], 0, 0, 0, 0
     for raw in (body.get("lines") or []):
         pid = raw.get("id"); p = cat.get(pid)
         if not p:
@@ -224,27 +224,39 @@ async def handle_save(request):
         s   = int(sold.get(pid) or 0)
         mv  = int(mv_by.get(pid) or 0)
         expected = None if first_time else max(0, was + income + mv - s)
+        # Позиция, которая за смену не продавалась и не переезжала, физически
+        # измениться не могла — её никто и не пересчитывал глазами. Такая строка
+        # сохраняется расчётным значением: она нужна, чтобы завтра было с чем
+        # сравнивать и чтобы заявка знала остаток, но расхождением быть не может.
+        auto = bool(raw.get("auto")) and expected is not None
+        if auto:
+            actual = expected
         diff = None if expected is None else (expected - actual)   # >0 — не хватает
         price = _price(p)
         if diff:
             if diff > 0: short_qty += diff; short_aed += diff * price
             else:        over_qty  += -diff
+        if not auto:
+            counted_qty += 1
         lines.append({"id": pid, "name": p.get("name", ""), "price": price,
                       "was": was, "income": income, "moved_qty": mv, "sold": s,
-                      "expected": expected, "actual": actual, "diff": diff})
+                      "expected": expected, "actual": actual, "diff": diff,
+                      "counted": not auto})
 
     doc = {"district": district, "district_name": OFFICE_NAMES.get(district, district),
            "day": day, "first_time": first_time,
            "counted_by": request["owner_id"],
            "counted_at": datetime.now(timezone.utc).isoformat(),
            "lines": lines, "short_qty": short_qty, "short_aed": short_aed,
-           "over_qty": over_qty}
+           "over_qty": over_qty,
+           "counted_qty": counted_qty, "total_qty": len(lines)}
     await db.save_stock_count(district, day, doc)
     log.info(f"[stock] {district} {day}: {len(lines)} позиций, "
              f"недостача {short_qty} шт / {short_aed} AED")
     return web.json_response(
         {"ok": True, "day": day, "first_time": first_time,
          "short_qty": short_qty, "short_aed": short_aed, "over_qty": over_qty,
+         "counted_qty": counted_qty, "total_qty": len(lines),
          "lines": [l for l in lines if l["diff"]]}, headers=CORS_HEADERS)
 
 

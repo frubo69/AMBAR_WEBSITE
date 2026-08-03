@@ -756,6 +756,12 @@ def _serialize_user(u: dict, orders: list | None = None) -> dict:
         "verify_source": u.get("verify_source", ""),
         "verify_recommender_name":  u.get("verify_recommender_name", ""),
         "verify_recommender_phone": u.get("verify_recommender_phone", ""),
+        # Откуда человек пришёл. Приглашение оператора несёт его id и район —
+        # так видно, кто и откуда перетащил телефонного клиента в приложение.
+        "invited_by_operator": u.get("invited_by_operator"),
+        "invited_district":    u.get("invited_district", ""),
+        "invited_at":          u.get("invited_at", ""),
+        "referred_by":         u.get("referred_by"),
     }
     if orders is not None:
         out["recent_orders"] = orders[:20]

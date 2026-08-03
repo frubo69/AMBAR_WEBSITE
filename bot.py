@@ -5,9 +5,13 @@ import re
 from datetime import datetime, timezone
 from pathlib import Path
 from dotenv import load_dotenv
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove, WebAppInfo, MenuButtonWebApp
-from telegram.ext import Application, CommandHandler, MessageHandler, CallbackQueryHandler, ContextTypes, filters
+from telegram import (Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyKeyboardRemove,
+                      WebAppInfo, MenuButtonWebApp, InlineQueryResultPhoto,
+                      InlineQueryResultsButton)
+from telegram.ext import (Application, CommandHandler, MessageHandler, CallbackQueryHandler,
+                          InlineQueryHandler, ContextTypes, filters)
 import db
+from config_offices import OFFICE_NAMES, OFFICE_CODES
 
 load_dotenv()
 BOT_TOKEN            = os.getenv("BOT_TOKEN", "")
@@ -17,6 +21,9 @@ WEBAPP_URL           = os.getenv("WEBAPP_URL", "")
 CATALOG_FILE         = "catalog.json"
 STOCK_FILE           = "stock.json"
 SUPPORT_BOT_USERNAME = "ambar_support_bot"
+from config import OWNER_IDS, MANAGER_IDS          # свои — те же, что и везде
+# Домен нужен для картинки в inline-карточке: Telegram забирает её по ссылке.
+PUBLIC_ORIGIN        = os.getenv("AMBAR_PUBLIC_ORIGIN", "https://ambar-delivery.com")
 
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -67,6 +74,38 @@ def kb_review(cid, lang):
 
 
 # ── Handlers ──────────────────────────────────────────────────────────────────
+def _parse_start_arg(arg: str, uid: int):
+    """Разбор deep link. → (кто пригласил из клиентов, id оператора, район).
+
+    Приглашать самого себя нельзя, иначе первый же переход по своей ссылке
+    записал бы человека приглашённым самим собой."""
+    referrer_id = None
+    invited_by_operator = None
+    invited_district = None
+    arg = (arg or "").strip()
+    if arg.startswith("ref_"):
+        try:
+            referrer_id = int(arg[4:])
+        except ValueError:
+            referrer_id = None
+        if referrer_id == uid:
+            referrer_id = None
+    elif arg == "op":
+        invited_by_operator = 0
+    elif arg.startswith("op_"):
+        who, _, dist = arg[3:].partition("_")
+        try:
+            invited_by_operator = int(who)
+        except ValueError:
+            invited_by_operator = None
+        if invited_by_operator == uid:
+            invited_by_operator = None
+        if dist in OFFICE_NAMES:
+            invited_district = dist
+    return referrer_id, invited_by_operator, invited_district
+
+
+
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid  = update.effective_user.id
     lang = ctx.user_data.get("lang", "ru")
@@ -75,27 +114,12 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # Deep links:
     #   /start ref_<id>   — customer-to-customer referral
     #   /start op_<id>    — specific-operator invite
+    #   /start op_<id>_<district> — то же, но известно откуда: планшет один на
+    #                     всех, поэтому район в ссылке — единственный способ
+    #                     понять, чьё это приглашение
     #   /start op         — common (shared) operator invite; stored as invited_by_operator=0
-    referrer_id = None
-    invited_by_operator = None
-    if ctx.args and ctx.args[0]:
-        arg = ctx.args[0]
-        if arg.startswith("ref_"):
-            try:
-                referrer_id = int(arg[4:])
-                if referrer_id == uid:
-                    referrer_id = None
-            except (ValueError, IndexError):
-                referrer_id = None
-        elif arg == "op":
-            invited_by_operator = 0
-        elif arg.startswith("op_"):
-            try:
-                invited_by_operator = int(arg[3:])
-                if invited_by_operator == uid:
-                    invited_by_operator = None
-            except (ValueError, IndexError):
-                invited_by_operator = None
+    referrer_id, invited_by_operator, invited_district = _parse_start_arg(
+        ctx.args[0] if ctx.args else "", uid)
 
     # Ban check — silently skip if DB is unavailable
     try:
@@ -169,7 +193,10 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if invited_by_operator is not None and (existing is None or existing.get("invited_by_operator") is None):
             user_fields["invited_by_operator"] = invited_by_operator
             user_fields["invited_at"] = datetime.now(timezone.utc)
-            log.info(f"[op-invite] user {uid} invited_by_operator={invited_by_operator}")
+            if invited_district:
+                user_fields["invited_district"] = invited_district
+            log.info(f"[op-invite] user {uid} invited_by_operator={invited_by_operator}"
+                     f"{' district=' + invited_district if invited_district else ''}")
         await db.upsert_user(uid, **user_fields)
     except Exception as e:
         log.warning(f"upsert_user failed: {e}")
@@ -289,6 +316,78 @@ async def on_contact(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         log.error(f"[phone] сохранение номера uid={uid} не удалось: {e}")
 
 
+# ── inline: приглашение кнопкой, а не ссылкой ────────────────────────────────
+# Клиенты, которые заказывают по телефону, боятся ссылок от незнакомых номеров —
+# и правильно делают. Поэтому оператор не копирует URL, а набирает в чате имя
+# бота и выбирает готовую карточку: уходит нормальное сообщение с фото и
+# кнопкой, от его же имени. Ссылка живёт внутри кнопки, вместе с кодом
+# приглашения, так что переход по-прежнему засчитывается оператору.
+#
+# Отвечаем только своим: inline-запрос может прислать кто угодно, а карточка
+# выглядит официально — чужим такое в руки давать нельзя.
+INLINE_TEXT = {
+    "ru": ("<b>AMBAR — премиальная доставка по Дубаю</b>\n\n"
+           "Заказ по телефону работает как работал. В приложении — быстрее "
+           "и на 5% дешевле: скидка действует только здесь.\n\n"
+           "Каталог, адрес и история заказов в одном месте."),
+    "en": ("<b>AMBAR — premium delivery across Dubai</b>\n\n"
+           "Ordering by phone works exactly as before. In the app it is faster "
+           "and 5% cheaper — the discount is in-app only.\n\n"
+           "Catalogue, address and order history in one place."),
+}
+INLINE_BTN = {"ru": "Открыть AMBAR", "en": "Open AMBAR"}
+
+
+def _inline_district(q: str):
+    """Район из того, что оператор набрал после имени бота. Планшет общий, и
+    без этого непонятно, чьё приглашение сработало."""
+    q = (q or "").strip().lower()
+    if not q:
+        return None
+    for oid, code in OFFICE_CODES.items():
+        if q == oid or q == code.lower() or q in OFFICE_NAMES[oid].lower():
+            return oid
+    return None
+
+
+async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    iq = update.inline_query
+    if iq is None:
+        return
+    uid = iq.from_user.id
+    if uid not in set(OPERATOR_IDS) | set(MANAGER_IDS) | set(OWNER_IDS):
+        # Посторонним карточку не отдаём, но и в тупик не отправляем: кнопка
+        # уводит в самого бота по общей ссылке.
+        await iq.answer([], cache_time=300, is_personal=True,
+                        button=InlineQueryResultsButton(text="Открыть AMBAR",
+                                                        start_parameter="op"))
+        return
+
+    dist = _inline_district(iq.query)
+    me = (await ctx.bot.get_me()).username
+    payload = f"op_{uid}" + (f"_{dist}" if dist else "")
+    url = f"https://t.me/{me}?start={payload}"
+    where = f" · {OFFICE_CODES[dist]} {OFFICE_NAMES[dist]}" if dist else ""
+
+    results = []
+    for lang in ("ru", "en"):
+        results.append(InlineQueryResultPhoto(
+            id=f"invite_{lang}_{dist or 'all'}",
+            photo_url=f"{PUBLIC_ORIGIN}/promo_hero_{lang}.png",
+            thumbnail_url=f"{PUBLIC_ORIGIN}/promo_hero_{lang}.png",
+            title=("Приглашение по-русски" if lang == "ru" else "Invite in English") + where,
+            description=("Фото, текст и кнопка — без ссылки в тексте"
+                         if lang == "ru" else "Photo, text and a button — no raw link"),
+            caption=INLINE_TEXT[lang],
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton(INLINE_BTN[lang], url=url)]]),
+        ))
+    # is_personal + cache_time=0: в ссылке код конкретного оператора, чужому
+    # её показывать нельзя ни секунды.
+    await iq.answer(results, cache_time=0, is_personal=True)
+
+
 def main():
     if not BOT_TOKEN:  print("❌ BOT_TOKEN missing");  return
     if not WEBAPP_URL: print("❌ WEBAPP_URL missing"); return
@@ -297,6 +396,7 @@ def main():
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CallbackQueryHandler(cb_review, pattern=r"^rev_"))
     app.add_handler(MessageHandler(filters.CONTACT, on_contact))
+    app.add_handler(InlineQueryHandler(on_inline))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fallback))
     log.info("🍾 AMBAR Customer Bot started!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)

@@ -7461,6 +7461,28 @@ const DETAIL = {
       return `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${txt}${loc}</div></div></div>`;
     }).join('') : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">Нет сохранённых адресов</div></div></div>';
 
+    // Кто привёл. Приглашение оператора несёт его id и район, поэтому видно,
+    // с какого именно приглашения человек дошёл до приложения.
+    const _invRows = [];
+    if(c.invited_by_operator != null){
+      const who = c.invited_by_operator
+        ? (((OPS.data||{}).operators||[]).find(o=>o.telegram_id===c.invited_by_operator)?.name
+           || ((OPS.data||{}).devices||[]).find(o=>o.telegram_id===c.invited_by_operator)?.name
+           || ('id '+c.invited_by_operator))
+        : 'общая ссылка';
+      const dis = (c.invited_district && ((OPS.data||{}).operators||[])
+        .flatMap(o=>o.districts||[]).find(x=>x.id===c.invited_district));
+      _invRows.push(`<div class="dt-row"><div class="dt-row-l">
+        <div class="dt-row-t">Приглашение оператора</div>
+        <div class="dt-row-s">${escS(who)}${dis?` · ${escS(dis.code)} ${escS(dis.name)}`:''}</div>
+      </div><div class="dt-row-r">${c.invited_at ? escS(String(c.invited_at).slice(0,10)) : ''}</div></div>`);
+    }
+    if(c.referred_by) _invRows.push(`<div class="dt-row" data-detail="customer:${c.referred_by}">
+        <div class="dt-row-l"><div class="dt-row-t">Привёл клиент</div>
+        <div class="dt-row-s">id ${c.referred_by}</div></div><div class="dt-row-r">›</div></div>`);
+    const inviteInfo = _invRows.length
+      ? `<div class="dt-sect">Как попал в приложение</div><div class="dt-card">${_invRows.join('')}</div>` : '';
+
     // Verification source info
     let verifyInfo = '';
     if(c.verify_source || c.verify_recommender_name){
@@ -7503,6 +7525,7 @@ const DETAIL = {
         </div>
         ${phoneSection}
         ${debtSection}
+        ${inviteInfo}
         ${verifyInfo}
         <div class="dt-sect">Адреса</div>
         <div class="dt-card">${addrHtml}</div>

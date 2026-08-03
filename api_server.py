@@ -2438,6 +2438,7 @@ PUBLIC_ROOT_FILES = {
     "promo_hero_ru.png",    "promo_hero_en.png",
     "promo_modal_ru.png",   "promo_modal_en.png",
     "promo_addhome_ru.png", "promo_addhome_en.png",
+    "promo_invite_ru.jpg",  "promo_invite_en.jpg",
 }
 PUBLIC_DIRS = ("owner/", "operator/", "TEXTURES/", "fonts/", "LOGOS/", "uploads/")
 PUBLIC_EXTS = {

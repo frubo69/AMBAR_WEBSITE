@@ -358,6 +358,7 @@ async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if uid not in set(OPERATOR_IDS) | set(MANAGER_IDS) | set(OWNER_IDS):
         # Посторонним карточку не отдаём, но и в тупик не отправляем: кнопка
         # уводит в самого бота по общей ссылке.
+        log.info(f"[inline] посторонний {uid} набрал имя бота — отдали только кнопку")
         await iq.answer([], cache_time=300, is_personal=True,
                         button=InlineQueryResultsButton(text="Открыть AMBAR",
                                                         start_parameter="op"))
@@ -373,8 +374,12 @@ async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     for lang in ("ru", "en"):
         results.append(InlineQueryResultPhoto(
             id=f"invite_{lang}_{dist or 'all'}",
-            photo_url=f"{PUBLIC_ORIGIN}/promo_hero_{lang}.png",
-            thumbnail_url=f"{PUBLIC_ORIGIN}/promo_hero_{lang}.png",
+            # Именно JPEG и именно лёгкий: Telegram забирает картинку по ссылке
+            # сам, и PNG на два мегабайта он либо не примет, либо будет тянуть
+            # на глазах у оператора.
+            photo_url=f"{PUBLIC_ORIGIN}/promo_invite_{lang}.jpg",
+            thumbnail_url=f"{PUBLIC_ORIGIN}/promo_invite_{lang}.jpg",
+            photo_width=1280, photo_height=640,
             title=("Приглашение по-русски" if lang == "ru" else "Invite in English") + where,
             description=("Фото, текст и кнопка — без ссылки в тексте"
                          if lang == "ru" else "Photo, text and a button — no raw link"),
@@ -386,6 +391,8 @@ async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     # is_personal + cache_time=0: в ссылке код конкретного оператора, чужому
     # её показывать нельзя ни секунды.
     await iq.answer(results, cache_time=0, is_personal=True)
+    log.info(f"[inline] оператор {uid} взял карточку"
+             f"{' по району ' + dist if dist else ' без района'}")
 
 
 def main():

@@ -1042,23 +1042,37 @@ async def handle_operators(request):
             "by_district": by_district,
         })
 
-    # Чужие устройства: кто-то принимает и заводит заказы, но в ростере его нет.
-    # Молчать об этом нельзя — это либо забытый оператор, либо чужой доступ.
+    # Общие устройства считаем отдельно: планшет — это не человек, статистику
+    # по нему дублировать не надо, но и «чужим» он не является.
+    # Всё, что не человек и не известное устройство, — повод разобраться.
     known = set(staff.SENIOR_IDS)
+    devices: dict[int, dict] = {}
     unknown: dict[int, dict] = {}
     for _dt, o in curr_all:
         for key in ("operator_id", "created_by"):
             v = o.get(key)
             if not isinstance(v, int) or v in known:
                 continue
-            e = unknown.setdefault(v, {"telegram_id": v, "accepted": 0, "created": 0})
+            dev = staff.DEVICE_BY_TG.get(v)
+            bucket = devices if dev else unknown
+            e = bucket.setdefault(v, {"telegram_id": v, "accepted": 0, "created": 0,
+                                      "name": (dev or {}).get("name", ""),
+                                      "username": (dev or {}).get("username", "")})
             e["accepted" if key == "operator_id" else "created"] += 1
+    for v, e in devices.items():
+        _d = [o for _dt, o in curr_all if o.get("created_by") == v]
+        e["by_district"] = sorted(
+            ({"code": OFFICE_CODES.get(k, ""), "name": OFFICE_NAMES.get(k, k), "orders": n}
+             for k, n in {d: sum(1 for x in _d if (x.get("office_id") or "") == d)
+                          for d in OFFICE_IDS}.items() if n),
+            key=lambda x: -x["orders"])
 
     return web.json_response({
         "period": period, "day_offset": day_offset,
         "norm_min": LATE_THRESHOLD_FALLBACK,
         "slow_sec": RESP_SLOW_SEC,
         "operators": out,
+        "devices": sorted(devices.values(), key=lambda x: -(x["accepted"] + x["created"])),
         "unknown_devices": sorted(unknown.values(),
                                   key=lambda x: -(x["accepted"] + x["created"])),
         # Заказы из приложения никому не назначают водителя — их чаевые

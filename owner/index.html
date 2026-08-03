@@ -6645,10 +6645,28 @@ function renderOperators(){
   // либо чужой доступ — в обоих случаях владелец должен об этом знать.
   const box = document.getElementById('opExtra');
   if(box){
+    const dev = OPS.data.devices || [];
     const unk = OPS.data.unknown_devices || [];
     const un  = OPS.data.tips_unassigned || 0;
     box.innerHTML =
-      (unk.length ? `<div class="sect"><div class="sect-t">Чужие устройства</div></div>
+      (dev.length ? `<div class="sect"><div class="sect-t">Устройства</div></div>
+        <div class="list">${dev.map(u=>`
+          <div class="lrow">
+            <div class="lrow-av">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+                   stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="4" y="2.5" width="16" height="19" rx="2.5"/><path d="M10 18.5h4"/></svg>
+            </div>
+            <div class="lrow-body">
+              <div class="lrow-name">${escS(u.name)}${u.username?` <span class="lrow-sub" style="font-family:'JetBrains Mono',monospace">@${escS(u.username)}</span>`:''}</div>
+              <div class="lrow-sub">${(u.by_district||[]).map(x=>x.code+' '+x.orders).join(' · ') || 'нет заказов'}</div>
+            </div>
+            <div style="text-align:right">
+              <div class="mono" style="font-family:'DM Sans',sans-serif;font-weight:700;font-size:15px">${u.created}</div>
+              <div style="font-size:10px;color:var(--muted)">по телефону</div>
+            </div>
+          </div>`).join('')}</div>` : '')
+    + (unk.length ? `<div class="sect"><div class="sect-t">Чужие устройства</div></div>
         <div class="list">${unk.map(u=>`
           <div class="lrow">
             <div class="lrow-av" style="color:var(--warn)">?</div>

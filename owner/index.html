@@ -574,20 +574,15 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
           onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayReset()">Назад</button>
       </span>
     </div>
-    <!-- Валовая выручка: мельче и тусклее, потому что главное число ниже —
-         то, что остаётся после чаевых операторам. -->
-    <div class="hero-gross" id="heroGrossRow" style="display:none">
-      <span id="heroGross" data-aed="">—</span> <span class="cur-unit">AED</span>
-      <span class="hero-gross-lbl">валовая</span>
-    </div>
     <div class="hero-amt-row">
       <span class="hero-amt mono" id="heroRev" data-aed="">—</span><span class="hero-unit cur-unit">AED</span>
-    </div>
-    <!-- Чаевые операторам за проданные бутылки из «чаевого» списка. -->
-    <div class="hero-tips" id="heroTipsRow" style="display:none">
-      <span class="hero-tips-lbl">чаевые операторам</span>
-      <span class="hero-tips-v"><span id="heroTips" data-aed="">—</span> <span class="cur-unit">AED</span></span>
-      <span class="hero-tips-n" id="heroTipsN"></span>
+      <!-- Справа от суммы пустовало полкарточки. Валовая и чаевые уходят туда
+           двумя тихими строчками — карточка не растёт, график остаётся на
+           месте, а крупным по-прежнему одно число, то самое важное. -->
+      <div class="hero-side" id="heroSide" style="display:none">
+        <div class="hero-side-r"><span class="hero-side-l">валовая</span><span class="hero-side-v" id="heroGross" data-aed="">—</span></div>
+        <div class="hero-side-r"><span class="hero-side-l">чаевые</span><span class="hero-side-v gold" id="heroTips" data-aed="">—</span></div>
+      </div>
     </div>
     <div class="hero-row">
       <span class="delta" id="heroDelta">…</span>
@@ -2389,16 +2384,19 @@ button.pill:active{opacity:.6}
 .nfoot-btn.pri{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0a0a14;box-shadow:0 6px 20px rgba(201,169,110,.3)}
 
 
-/* Три числа в карточке выручки: валовая сверху мелко, чистая крупно, чаевые под ней. */
-.hero-gross{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;
-  color:var(--muted);letter-spacing:-.2px;margin-bottom:2px;font-variant-numeric:tabular-nums}
-.hero-gross-lbl{font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;
-  letter-spacing:.6px;text-transform:uppercase;opacity:.55;margin-left:5px}
-.hero-tips{display:flex;align-items:baseline;gap:7px;margin-top:6px;font-size:12px}
-.hero-tips-lbl{font-size:10px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
-.hero-tips-v{font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--gold2);
-  font-variant-numeric:tabular-nums}
-.hero-tips-n{font-size:10.5px;color:var(--muted)}
+/* Валовая и чаевые — сбоку от крупной суммы, в пустом правом поле карточки.
+   Так карточка сохраняет прежнюю высоту и график никуда не уезжает.
+   Строке суммы нужен flex: без него боковой блок падает под число и карточка
+   вырастает ровно на ту высоту, которую мы пытались сэкономить. */
+.hero-amt-row{display:flex;align-items:baseline}
+.hero-side{margin-left:auto;display:flex;flex-direction:column;gap:3px;align-self:center;
+  padding-left:14px;text-align:right}
+.hero-side-r{display:flex;align-items:baseline;justify-content:flex-end;gap:7px;white-space:nowrap}
+.hero-side-l{font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:600;letter-spacing:.5px;
+  text-transform:uppercase;color:var(--muted);opacity:.75}
+.hero-side-v{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;
+  color:var(--sub);font-variant-numeric:tabular-nums;min-width:56px}
+.hero-side-v.gold{color:var(--gold2)}
 
 /* ── Широкий экран: планшет и компьютер ─────────────────────────────────────
    Приложение свёрстано под телефон, и на iPad/ПК оно просто растягивалось:
@@ -3229,14 +3227,11 @@ function _paintHero(p, f){
   const tips = t ? (+t.total || 0) : 0;
   _setAed('heroRev',  tips ? (t.net != null ? t.net : f.revenue.current - tips)
                            : f.revenue.current);
-  const gr = document.getElementById('heroGrossRow');
-  if(gr) gr.style.display = tips ? '' : 'none';
-  if(tips) _setAed('heroGross', f.revenue.current);
-  const tr = document.getElementById('heroTipsRow');
-  if(tr) tr.style.display = tips ? 'flex' : 'none';
+  const side = document.getElementById('heroSide');
+  if(side) side.style.display = tips ? 'flex' : 'none';
   if(tips){
-    _setAed('heroTips', tips);
-    _setText('heroTipsN', t.bottles ? `${t.bottles} ${pluralize(t.bottles,'бутылка','бутылки','бутылок')}` : '');
+    _setAed('heroGross', f.revenue.current);
+    _setAed('heroTips',  tips);
   }
   _setAed('heroPrev', f.revenue.previous);
   _setText('heroDelta', f.revenue.delta_label);

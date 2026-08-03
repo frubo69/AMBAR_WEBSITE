@@ -2555,6 +2555,12 @@ def main():
         broadcast_routes.setup(app)
     except Exception as e:
         log.error(f"broadcast routes setup failed: {e}")
+    # Склад: пересчёт, перемещения, заявка, норма — тоже owner-only.
+    try:
+        import stock_routes
+        stock_routes.setup(app)
+    except Exception as e:
+        log.error(f"stock routes setup failed: {e}")
     # Operator iPad POS (manual phone-in orders) — own auth vs OPERATOR_BOT_TOKEN.
     try:
         import operator_routes

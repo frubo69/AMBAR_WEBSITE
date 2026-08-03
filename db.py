@@ -1418,3 +1418,69 @@ async def get_debtors() -> list:
         {"_id": 0},
     ).sort("debt", -1)
     return await cursor.to_list(length=500)
+
+
+# ─── склад: пересчёты, перемещения, нормы ──────────────────────────────────
+# Пересчёт хранится целиком за день и район: так видно и что ввели, и с чем
+# сравнивали, а вчерашний документ служит опорой для завтрашнего ожидания.
+
+async def save_stock_count(district: str, day: str, doc: dict):
+    db = _db_or_none()
+    if db is None: return
+    await db.stock_counts.update_one(
+        {"district": district, "day": day}, {"$set": doc}, upsert=True)
+
+
+async def get_stock_count(district: str, day: str) -> dict | None:
+    db = _db_or_none()
+    if db is None: return None
+    return await db.stock_counts.find_one({"district": district, "day": day}, {"_id": 0})
+
+
+async def get_last_stock_count(district: str, before_day: str | None = None) -> dict | None:
+    """Последний пересчёт района. before_day — строго раньше этой даты: именно
+    он служит отправной точкой для ожидаемого остатка."""
+    db = _db_or_none()
+    if db is None: return None
+    q = {"district": district}
+    if before_day:
+        q["day"] = {"$lt": before_day}
+    cur = db.stock_counts.find(q, {"_id": 0}).sort("day", -1).limit(1)
+    rows = await cur.to_list(length=1)
+    return rows[0] if rows else None
+
+
+async def get_stock_counts_for_day(day: str) -> list:
+    db = _db_or_none()
+    if db is None: return []
+    return await db.stock_counts.find({"day": day}, {"_id": 0, "lines": 0}).to_list(length=50)
+
+
+async def add_stock_transfer(doc: dict):
+    db = _db_or_none()
+    if db is None: return
+    await db.stock_transfers.insert_one(dict(doc))
+
+
+async def get_stock_transfers(day: str) -> list:
+    db = _db_or_none()
+    if db is None: return []
+    return await db.stock_transfers.find({"day": day}).to_list(length=500)
+
+
+async def get_stock_norms() -> dict:
+    """{"district:product_id": норма} — только заданные вручную."""
+    db = _db_or_none()
+    if db is None: return {}
+    rows = await db.stock_norms.find({}, {"_id": 0}).to_list(length=2000)
+    return {f'{r["district"]}:{r["product_id"]}': int(r.get("norm") or 0) for r in rows}
+
+
+async def set_stock_norm(district: str, product_id: str, norm: int, by: int = 0):
+    db = _db_or_none()
+    if db is None: return
+    await db.stock_norms.update_one(
+        {"district": district, "product_id": product_id},
+        {"$set": {"district": district, "product_id": product_id, "norm": int(norm),
+                  "by": by, "at": datetime.now(timezone.utc).isoformat()}},
+        upsert=True)

@@ -700,6 +700,20 @@ def _initials(user: dict) -> str:
     return (fn + ln) or "?"
 
 
+def _invited_was_new(u: dict):
+    """Был ли человек новым, когда перешёл по приглашению.
+
+    None — если сравнить не с чем. Сутки запаса: между первым /start и
+    переходом по ссылке проходит время, и дробить это в минуты незачем."""
+    inv, first = u.get("invited_at"), u.get("first_seen")
+    if not inv or not first:
+        return None
+    try:
+        return (inv - first).total_seconds() < 86400
+    except TypeError:
+        return None
+
+
 def _serialize_user(u: dict, orders: list | None = None) -> dict:
     """Convert a user doc into a JSON-safe dict for the owner dashboard."""
     card = _card_for_user(u)
@@ -761,6 +775,10 @@ def _serialize_user(u: dict, orders: list | None = None) -> dict:
         "invited_by_operator": u.get("invited_by_operator"),
         "invited_district":    u.get("invited_district", ""),
         "invited_at":          u.get("invited_at", ""),
+        # Приглашение можно отправить и тому, кто в приложении давно. Считать
+        # такого приведённым нельзя — иначе «перетащил из офлайна» превращается
+        # в рассылку по своей же базе.
+        "invited_was_new":     _invited_was_new(u),
         "referred_by":         u.get("referred_by"),
     }
     if orders is not None:

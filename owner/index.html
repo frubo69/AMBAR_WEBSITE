@@ -574,8 +574,20 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
           onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayReset()">Назад</button>
       </span>
     </div>
+    <!-- Валовая выручка: мельче и тусклее, потому что главное число ниже —
+         то, что остаётся после чаевых операторам. -->
+    <div class="hero-gross" id="heroGrossRow" style="display:none">
+      <span id="heroGross" data-aed="">—</span> <span class="cur-unit">AED</span>
+      <span class="hero-gross-lbl">валовая</span>
+    </div>
     <div class="hero-amt-row">
       <span class="hero-amt mono" id="heroRev" data-aed="">—</span><span class="hero-unit cur-unit">AED</span>
+    </div>
+    <!-- Чаевые операторам за проданные бутылки из «чаевого» списка. -->
+    <div class="hero-tips" id="heroTipsRow" style="display:none">
+      <span class="hero-tips-lbl">чаевые операторам</span>
+      <span class="hero-tips-v"><span id="heroTips" data-aed="">—</span> <span class="cur-unit">AED</span></span>
+      <span class="hero-tips-n" id="heroTipsN"></span>
     </div>
     <div class="hero-row">
       <span class="delta" id="heroDelta">…</span>
@@ -2376,6 +2388,18 @@ button.pill:active{opacity:.6}
 .nfoot-btn.sec{background:var(--card);border:1px solid var(--border2);color:var(--sub)}
 .nfoot-btn.pri{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0a0a14;box-shadow:0 6px 20px rgba(201,169,110,.3)}
 
+
+/* Три числа в карточке выручки: валовая сверху мелко, чистая крупно, чаевые под ней. */
+.hero-gross{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;
+  color:var(--muted);letter-spacing:-.2px;margin-bottom:2px;font-variant-numeric:tabular-nums}
+.hero-gross-lbl{font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;
+  letter-spacing:.6px;text-transform:uppercase;opacity:.55;margin-left:5px}
+.hero-tips{display:flex;align-items:baseline;gap:7px;margin-top:6px;font-size:12px}
+.hero-tips-lbl{font-size:10px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.hero-tips-v{font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--gold2);
+  font-variant-numeric:tabular-nums}
+.hero-tips-n{font-size:10.5px;color:var(--muted)}
+
 /* ── Широкий экран: планшет и компьютер ─────────────────────────────────────
    Приложение свёрстано под телефон, и на iPad/ПК оно просто растягивалось:
    пилюли периодов разъезжались через весь экран, а цифры в карточках жались
@@ -3198,7 +3222,22 @@ async function applyFinanceLive(p){
 // Paints ONLY the hero revenue block (amount, delta, sparkline) — shared by the
 // period render and the day browser.
 function _paintHero(p, f){
-  _setAed('heroRev',  f.revenue.current);
+  // Крупная цифра — то, что остаётся после чаевых. Валовая уходит наверх
+  // мелким шрифтом, сами чаевые — под сумму. Если чаевых нет, обе строки
+  // прячем и карточка выглядит как раньше.
+  const t = f.tips_out || null;
+  const tips = t ? (+t.total || 0) : 0;
+  _setAed('heroRev',  tips ? (t.net != null ? t.net : f.revenue.current - tips)
+                           : f.revenue.current);
+  const gr = document.getElementById('heroGrossRow');
+  if(gr) gr.style.display = tips ? '' : 'none';
+  if(tips) _setAed('heroGross', f.revenue.current);
+  const tr = document.getElementById('heroTipsRow');
+  if(tr) tr.style.display = tips ? 'flex' : 'none';
+  if(tips){
+    _setAed('heroTips', tips);
+    _setText('heroTipsN', t.bottles ? `${t.bottles} ${pluralize(t.bottles,'бутылка','бутылки','бутылок')}` : '');
+  }
   _setAed('heroPrev', f.revenue.previous);
   _setText('heroDelta', f.revenue.delta_label);
   const hd = document.getElementById('heroDelta');
@@ -4065,7 +4104,7 @@ function _shapeProduct(p, withRealStats){
   // сюда — иначе оно молча теряется по дороге к карточке товара.
   return {id:p.id, name:sp.n, vol:sp.v, cat:p.cat||'—', i:first,
           price:+p.price||0, price_full:+p.price_full||+p.price||0,
-          stock: p.stock !== false, sold, rev, img:p.img, desc:p.desc,
+          stock: p.stock !== false, sold, rev, img:p.img, desc:p.desc, tip:+p.tip||0,
           trend7: Array.isArray(p.trend7) ? p.trend7.map(x=>+x||0) : null,
           sold_week: withRealStats ? (+p.sold_week||0) : null,
           sold_month: withRealStats ? (+p.sold_month||0) : null};
@@ -5044,6 +5083,14 @@ function rebuildCatFilters(){
   PRODUCTS.forEach(p=>{ counts[p.cat] = (counts[p.cat]||0)+1; });
   const cats = Object.keys(counts).sort((a,b)=>counts[b]-counts[a]);
   let html = `<button class="cat-f${catFilter==='all'?' on':''}" data-c="all">Все</button>`;
+  // Чаевые — не категория, а признак: позиции из разных категорий, за которые
+  // оператор получает выплату. Поэтому отдельной кнопкой сразу после «Все».
+  const tipN = PRODUCTS.filter(p=>+p.tip>0).length;
+  if(tipN){
+    html += `<button class="cat-f${catFilter==='__tips'?' on':''}" data-c="__tips"
+              style="color:var(--gold2);border-color:rgba(201,169,110,.35)">Чаевые
+              <span style="opacity:.6;margin-left:5px">${tipN}</span></button>`;
+  }
   cats.forEach(c=>{
     const ico = CAT_ICO[c] || '';
     const on = c===catFilter ? ' on' : '';
@@ -5158,7 +5205,8 @@ function renderCatalog(){
   const needle = clean(catQuery);
   // Filter
   let list = PRODUCTS.filter(p=>{
-    if(catFilter !== 'all' && p.cat !== catFilter) return false;
+    if(catFilter === '__tips'){ if(!(+p.tip > 0)) return false; }
+    else if(catFilter !== 'all' && p.cat !== catFilter) return false;
     if(!needle) return true;
     const hay = clean(p.name + ' ' + p.vol + ' ' + (p.cat||''));
     return hay.includes(needle);

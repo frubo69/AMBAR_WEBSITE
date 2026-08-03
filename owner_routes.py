@@ -86,6 +86,45 @@ def _biz_date(dt: datetime):
     return _biz_day_start(dt).date()
 
 
+def _tips_for(orders) -> dict:
+    """Чаевые операторам за проданные бутылки из «чаевого» списка.
+
+    Ставка живёт в catalog.json полем `tip` у самой позиции: список отмеченных
+    товаров и размер выплаты меняются правкой каталога, без выката кода.
+
+    Кому засчитывать: ручной заказ из POS знает своего оператора (created_by),
+    у заказа из приложения оператора нет вообще — такие идут в общий котёл,
+    владелец делит их сам.
+
+    Возвращает {total, pool, by_operator: {id: сумма}, bottles}.
+    """
+    cat = {p.get("id"): p for p in _read_catalog()}
+    total = pool = bottles = 0
+    by_op: dict[int, int] = {}
+    for item in orders:
+        o = item[1] if isinstance(item, tuple) else item
+        for it in (o.get("items") or []):
+            rate = int((cat.get(it.get("id")) or {}).get("tip") or 0)
+            if rate <= 0:
+                continue
+            try:
+                qty = int(it.get("qty") or 0)
+            except (TypeError, ValueError):
+                qty = 0
+            if qty <= 0:
+                continue
+            amount = rate * qty
+            total += amount
+            bottles += qty
+            op = o.get("created_by") if o.get("source") == "manual" else None
+            if op:
+                by_op[int(op)] = by_op.get(int(op), 0) + amount
+            else:
+                pool += amount
+    return {"total": total, "pool": pool, "bottles": bottles,
+            "by_operator": {str(k): v for k, v in sorted(by_op.items(), key=lambda x: -x[1])}}
+
+
 def _period_window(period: str, ref: datetime = None):
     """Return (start, end, prev_start, prev_end) for the given period,
     all in Dubai TZ. `end` is exclusive (start of tomorrow for daily-aligned)."""
@@ -561,6 +600,9 @@ async def handle_finance(request):
             "delta_pct":   pct,
             "delta_label": _delta_label(pct),
         },
+        # Чаевые за «чаевые» позиции и выручка за их вычетом — то, что реально
+        # остаётся, после того как операторы получат своё.
+        "tips_out": (lambda t: {**t, "net": rev_curr - t["total"]})(_tips_for(curr_orders)),
         "profit": {
             "current":    round(rev_curr * MARGIN_PCT / 100),
             "margin_pct": MARGIN_PCT,
@@ -1400,6 +1442,7 @@ async def handle_catalog_list(request):
             # полная — по ней идут телефонные заказы. Отдаём обе, иначе в
             # карточке товара видна только половина правды.
             "price_full": int(p.get("price_full") or p.get("price") or 0),
+            "tip":    int(p.get("tip") or 0),      # >0 — позиция приносит чаевые
             "stock":  bool(p.get("stock", True)),
             "img":    p.get("img") or "",
             "desc":   p.get("desc") or "",

@@ -5126,6 +5126,9 @@ function _alertClickTarget(n, fullText, ts, ico){
   return ()=>{ closeAlerts(); openDetail('alert:'+dkey); };
 }
 function _buildAlerts(){
+  // Данные по людям нужны и здесь, а страницу «Люди» могли ещё не открывать.
+  // Тянем один раз молча: подоспеют — попадут в следующий пересчёт алертов.
+  if(!OPS.data && !OPS.loading && window.ownerApi) loadOperators();
   const out = [];
   // Out-of-stock products → stock.out toggle
   const outItems = PRODUCTS.filter(p=>!p.stock);

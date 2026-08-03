@@ -41,12 +41,14 @@ from config_offices import OFFICE_NAMES   # офис ≡ район, едины�
 
 # Dispatch structure: район → who takes the calls → who drives it.
 # The POS flow is operator → район (his own) → driver (that район's).
+# The roster itself lives in config_staff — ambar star reads the same table to
+# work out whose orders, tips and delivery times these are.
+from config_staff import DISTRICT_STAFF
+
 DISTRICTS = [
-    {"id": "jvc",     "name": "JVC",        "operator": "Умар",      "drivers": ["Худоба", "Фарух"]},
-    {"id": "tecom",   "name": "Тиком",      "operator": "Умар",      "drivers": ["Файзуло", "Алишер"]},
-    {"id": "bbay",    "name": "Бизнес Бей", "operator": "Джанлбиль", "drivers": ["Парвиз", "Авазбек", "Бахадыр"]},
-    {"id": "silicon", "name": "Силикон",    "operator": "Фарух",     "drivers": ["Фаредун", "Азиз"]},
-    {"id": "alguses", "name": "Алгусес",    "operator": "Фарух",     "drivers": ["Сунат", "Даврон"]},
+    {"id": s["district"], "name": OFFICE_NAMES.get(s["district"], s["district"]),
+     "operator": s["operator"], "drivers": list(s["drivers"])}
+    for s in DISTRICT_STAFF
 ]
 
 

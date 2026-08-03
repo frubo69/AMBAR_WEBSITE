@@ -48,6 +48,7 @@ REVENUE_STATUSES = ("delivered",)
 
 # Office IDs (display order matches dashboard).
 from config_offices import OFFICE_IDS, OFFICE_NAMES, OFFICE_CODES   # офисы ≡ районы
+import config_staff as staff                                        # кто на каком районе
 
 VALID_PERIODS = ("today", "yesterday", "week", "month", "year")
 
@@ -298,6 +299,8 @@ def _last_7_days(all_orders: dict, ref_day_start: datetime = None) -> list:
 LATE_THRESHOLD_FALLBACK = 25
 # Grace period: delivery up to this many minutes over ETA is still OK.
 LATE_GRACE_MIN = 5
+# Дольше этого заказ висел неразобранным — реакцию считаем медленной.
+RESP_SLOW_SEC = 60
 
 
 def _delivery_stats(orders) -> dict:
@@ -890,6 +893,153 @@ async def handle_notif_test(request):
     except Exception as e:
         log.error(f"[owner-notif] test send failed: {e}")
         return web.json_response({"error": str(e)}, status=500, headers=CORS_HEADERS)
+
+
+# ── операторы ────────────────────────────────────────────────────────────────
+def _resp_stats(pairs) -> dict:
+    """Сколько заказ ждал принятия: confirmed_at − timestamp.
+
+    Только заказы из приложения: ручной заказ оператор сам же и создаёт уже
+    принятым, ждать там нечего, и нули размывали бы картину."""
+    secs = []
+    for _, o in pairs:
+        if o.get("source") == "manual":
+            continue
+        t0, t1 = o.get("timestamp"), o.get("confirmed_at")
+        if not t0 or not t1:
+            continue
+        try:
+            a = datetime.fromisoformat(str(t0)).replace(tzinfo=timezone.utc)
+            b = datetime.fromisoformat(str(t1)).replace(tzinfo=timezone.utc)
+        except (ValueError, TypeError):
+            continue
+        d = (b - a).total_seconds()
+        if 0 <= d < 6 * 3600:
+            secs.append(d)
+    if not secs:
+        return {"avg_sec": 0, "sample": 0, "slow": 0}
+    return {"avg_sec": round(sum(secs) / len(secs)),
+            "sample": len(secs),
+            "slow": sum(1 for s in secs if s > RESP_SLOW_SEC)}
+
+
+def _tips_by_driver(pairs) -> tuple:
+    """(всего чаевых, бутылок, {водитель: сумма}).
+
+    Ставка — в catalog.json у позиции. Чаевые идут тому, кто вёз: у ручного
+    заказа водитель записан явно, у заказа из приложения его никто не назначал —
+    такие складываются в «без водителя», и владелец делит их сам."""
+    cat = {p.get("id"): p for p in _read_catalog()}
+    total = bottles = 0
+    by_driver: dict[str, int] = {}
+    for _, o in pairs:
+        amount = qty_sum = 0
+        for it in (o.get("items") or []):
+            rate = int((cat.get(it.get("id")) or {}).get("tip") or 0)
+            if rate <= 0:
+                continue
+            try:
+                q = int(it.get("qty") or 0)
+            except (TypeError, ValueError):
+                q = 0
+            if q > 0:
+                amount += rate * q
+                qty_sum += q
+        if not amount:
+            continue
+        total += amount
+        bottles += qty_sum
+        who = (o.get("driver") or "").strip() or "—"
+        by_driver[who] = by_driver.get(who, 0) + amount
+    return total, bottles, by_driver
+
+
+@require_owner
+async def handle_operators(request):
+    """GET /api/owner/operators?period=&day_offset= — статистика по людям.
+
+    Разнесение описано в config_staff: реакция — тому, чьё устройство приняло
+    заказ (это только старший оператор, у остальных нет входа в бот), всё
+    остальное — району и, значит, его оператору и водителям."""
+    period = request.query.get("period", "today")
+    if period not in VALID_PERIODS:
+        period = "today"
+    try:
+        day_offset = max(0, min(365, int(request.query.get("day_offset", "0") or 0)))
+    except ValueError:
+        day_offset = 0
+
+    all_orders = await db.get_all_orders()
+    ref = (_now_dubai() - timedelta(days=day_offset)) if day_offset else None
+    start, end, _ps, _pe = _period_window(period, ref)
+    curr     = _orders_in_window(all_orders, start, end)        # доставленные
+    curr_all = _all_orders_in_window(all_orders, start, end)    # любой статус
+
+    out = []
+    for op in staff.operators():
+        if op["senior"]:
+            # Старший: его заказы — те, что он принял в боте или создал в POS.
+            tg = op["telegram_id"]
+            mine = lambda ps: [(dt, o) for dt, o in ps
+                               if o.get("operator_id") == tg or o.get("created_by") == tg]
+            scope = "все районы"
+        else:
+            ds = set(op["districts"])
+            mine = lambda ps, ds=ds: [(dt, o) for dt, o in ps
+                                      if (o.get("office_id") or "") in ds]
+            scope = " · ".join(OFFICE_CODES.get(d, "") for d in op["districts"])
+
+        dl, alls = mine(curr), mine(curr_all)
+        deliv = _delivery_stats(dl)
+        revs = [int(o["review_score"]) for _, o in dl if o.get("review_score")]
+        tips_total, tips_bottles, tips_by = _tips_by_driver(dl)
+        resp = _resp_stats(alls) if op["senior"] else {"avg_sec": 0, "sample": 0, "slow": 0}
+
+        # Разбивка по районам — у старшего показывает, где он сегодня работал.
+        by_district = []
+        for d in op["districts"]:
+            _d = [o for _, o in dl if (o.get("office_id") or "") == d]
+            if not _d and not op["senior"]:
+                by_district.append({"id": d, "code": OFFICE_CODES.get(d, ""),
+                                    "name": OFFICE_NAMES.get(d, d), "orders": 0, "aed": 0})
+                continue
+            if not _d:
+                continue
+            by_district.append({
+                "id": d, "code": OFFICE_CODES.get(d, ""), "name": OFFICE_NAMES.get(d, d),
+                "orders": len(_d), "aed": sum(int(x.get("total") or 0) for x in _d)})
+
+        out.append({
+            "id": op["id"], "name": op["name"], "senior": op["senior"],
+            "telegram_id": op["telegram_id"], "scope": scope,
+            "districts": [{"id": d, "code": OFFICE_CODES.get(d, ""),
+                           "name": OFFICE_NAMES.get(d, d)} for d in op["districts"]],
+            "orders": len(alls), "delivered": len(dl),
+            "aed": sum(int(o.get("total") or 0) for _, o in dl),
+            "manual": sum(1 for _, o in alls if o.get("source") == "manual"),
+            "cancelled": sum(1 for _, o in alls
+                             if o.get("status") in ("declined", "cancelled")),
+            "resp_sec": resp["avg_sec"], "resp_sample": resp["sample"],
+            "resp_slow": resp["slow"],
+            "avg_min": deliv["avg_min"], "avg_sample": deliv["sample"],
+            "late": deliv["late_count"], "late_pct": deliv["late_pct"],
+            "rating": round(sum(revs) / len(revs), 2) if revs else 0,
+            "rating_count": len(revs),
+            # Чаевые старшему не начисляются: бутылки возят водители районов.
+            "tips": 0 if op["senior"] else tips_total,
+            "tips_bottles": 0 if op["senior"] else tips_bottles,
+            "tips_by_driver": [] if op["senior"] else sorted(
+                ({"name": k, "aed": v} for k, v in tips_by.items()),
+                key=lambda x: -x["aed"]),
+            "by_district": by_district,
+        })
+
+    return web.json_response({
+        "period": period, "day_offset": day_offset,
+        "norm_min": LATE_THRESHOLD_FALLBACK,
+        "slow_sec": RESP_SLOW_SEC,
+        "operators": out,
+    }, headers=CORS_HEADERS)
 
 
 @require_owner
@@ -2002,6 +2152,8 @@ def setup(app):
     app.router.add_get(             "/api/owner/finance", handle_finance)
     app.router.add_route("OPTIONS", "/api/owner/office",  handle_office)
     app.router.add_get(             "/api/owner/office",  handle_office)
+    app.router.add_route("OPTIONS", "/api/owner/operators", handle_operators)
+    app.router.add_get(             "/api/owner/operators", handle_operators)
     app.router.add_route("OPTIONS", "/api/owner/customers",              handle_customers)
     app.router.add_get(             "/api/owner/customers",              handle_customers)
     app.router.add_route("OPTIONS", "/api/owner/customers/{telegram_id}", handle_customer_detail)

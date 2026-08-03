@@ -100,7 +100,7 @@ def _tips_for(orders) -> dict:
     """
     cat = {p.get("id"): p for p in _read_catalog()}
     total = pool = bottles = 0
-    by_op: dict[int, int] = {}
+    by_op: dict[str, int] = {}
     for item in orders:
         o = item[1] if isinstance(item, tuple) else item
         for it in (o.get("items") or []):
@@ -118,11 +118,13 @@ def _tips_for(orders) -> dict:
             bottles += qty
             op = o.get("created_by") if o.get("source") == "manual" else None
             if op:
-                by_op[int(op)] = by_op.get(int(op), 0) + amount
+                # Имя оператора хранится в заказе — в разбивке оно полезнее id.
+                key = o.get("created_by_name") or f"ID {op}"
+                by_op[key] = by_op.get(key, 0) + amount
             else:
                 pool += amount
     return {"total": total, "pool": pool, "bottles": bottles,
-            "by_operator": {str(k): v for k, v in sorted(by_op.items(), key=lambda x: -x[1])}}
+            "by_operator": dict(sorted(by_op.items(), key=lambda x: -x[1]))}
 
 
 def _period_window(period: str, ref: datetime = None):

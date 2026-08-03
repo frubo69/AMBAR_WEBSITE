@@ -7036,7 +7036,14 @@ const DETAIL = {
           <div class="dt-row" data-detail="kpi:done"><div class="dt-row-l"><div class="dt-row-t">Доставлено заказов</div><div class="dt-row-s">${k.done_pct||0}% от всех · ${k.in_route||0} в пути</div></div><div class="dt-row-r">${k.done||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
           <div class="dt-row" data-detail="kpi:pending"><div class="dt-row-l"><div class="dt-row-t">Не принято</div><div class="dt-row-s">ожидают ответа оператора</div></div><div class="dt-row-r ${(k.pending||0)>0?'warn':''}">${k.pending||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
           <div class="dt-row" data-detail="kpi:orders"><div class="dt-row-l"><div class="dt-row-t">Всего заказов</div><div class="dt-row-s">средний чек <span data-aed="${k.avg_check||0}">${fmt(k.avg_check||0)}</span> AED</div></div><div class="dt-row-r">${k.orders||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
-          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Чаевые</div></div><div class="dt-row-r"><span data-aed="${f.tips||0}">${fmt(f.tips||0)}</span> AED</div></div>
+          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Чаевые от клиентов</div><div class="dt-row-s">оставлены при заказе</div></div><div class="dt-row-r"><span data-aed="${f.tips||0}">${fmt(f.tips||0)}</span> AED</div></div>
+          ${(()=>{ const t=f.tips_out||{}; if(!(+t.total>0)) return '';
+             const parts=Object.entries(t.by_operator||{}).map(([n,v])=>`${escS(n)} ${fmt(v)}`);
+             if(+t.pool>0) parts.push('общий котёл '+fmt(t.pool));
+             return `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Чаевые операторам</div>
+               <div class="dt-row-s">${t.bottles||0} ${pluralize(t.bottles||0,'бутылка','бутылки','бутылок')}${parts.length?' · '+parts.join(' · '):''}</div></div>
+               <div class="dt-row-r" style="color:var(--gold2)"><span data-aed="${t.total}">${fmt(t.total)}</span> AED</div></div>`;
+           })()}
           <div class="dt-row" data-detail="kpi:late"><div class="dt-row-l"><div class="dt-row-t">Опоздания</div><div class="dt-row-s">дольше ETA + 5 мин</div></div><div class="dt-row-r ${(k.late_count||0)>0?'warn':''}">${k.late_count||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
           <div class="dt-row" data-detail="kpi:avg"><div class="dt-row-l"><div class="dt-row-t">Среднее время</div><div class="dt-row-s">от заказа до доставки</div></div><div class="dt-row-r">${k.avg_min_sample>0 ? k.avg_min+' мин' : '—'}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
         </div>

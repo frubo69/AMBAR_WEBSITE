@@ -28,13 +28,17 @@ import re
 import math
 
 # id офиса == id района в POS (operator_routes.DISTRICTS): офис ≡ район.
+# Порядок здесь — рабочий порядок владельца, B1…B5. От него отталкивается всё:
+# разбивка выручки, плитки районов, счётчики заказов. Меняется он тут и больше
+# нигде.
 OFFICES = [
-    {"id": "jvc",     "name": "JVC"},
-    {"id": "tecom",   "name": "Тиком"},
-    {"id": "bbay",    "name": "Бизнес Бей"},
-    {"id": "silicon", "name": "Силикон"},
-    {"id": "alguses", "name": "Алгусес"},
+    {"id": "jvc",     "code": "B1", "name": "JVC"},
+    {"id": "bbay",    "code": "B2", "name": "Бизнес Бей"},
+    {"id": "silicon", "code": "B3", "name": "Силикон"},
+    {"id": "alguses", "code": "B4", "name": "Алгусес"},
+    {"id": "tecom",   "code": "B5", "name": "Тиком"},
 ]
+OFFICE_CODES = {o["id"]: o["code"] for o in OFFICES}
 OFFICE_IDS = tuple(o["id"] for o in OFFICES)
 OFFICE_NAMES = {o["id"]: o["name"] for o in OFFICES}
 

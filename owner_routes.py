@@ -47,7 +47,7 @@ MARGIN_PCT = 35
 REVENUE_STATUSES = ("delivered",)
 
 # Office IDs (display order matches dashboard).
-from config_offices import OFFICE_IDS, OFFICE_NAMES   # офисы ≡ районы
+from config_offices import OFFICE_IDS, OFFICE_NAMES, OFFICE_CODES   # офисы ≡ районы
 
 VALID_PERIODS = ("today", "yesterday", "week", "month", "year")
 
@@ -227,7 +227,7 @@ def _by_office(orders) -> list:
     for _, o in orders:
         oid = o.get("office_id") or ""
         tot[oid] = tot.get(oid, 0) + int(o.get("total", 0) or 0)
-    rows = [{"id": oid, "name": OFFICE_NAMES[oid], "aed": tot.pop(oid, 0)}
+    rows = [{"id": oid, "code": OFFICE_CODES.get(oid, ""), "name": OFFICE_NAMES[oid], "aed": tot.pop(oid, 0)}
             for oid in OFFICE_IDS]
     rest = sum(tot.values())
     if rest:
@@ -542,6 +542,7 @@ async def handle_finance(request):
         _revs = [int(x["review_score"]) for x in _dl if x.get("review_score")]
         offices_block.append({
             "id":           _oid,
+            "code":         OFFICE_CODES.get(_oid, ""),
             "name":         OFFICE_NAMES[_oid],
             "aed":          sum(int(x.get("total", 0) or 0) for x in _dl),
             "orders":       len(_all_by.get(_oid, [])),
@@ -650,7 +651,7 @@ async def handle_finance(request):
             "rating_dist":      rating_dist,
             # Тем же списком [{id,name,count}], что и by_office: одна форма на оба
             # разреза, иначе фронт приходится учить двум разным.
-            "orders_by_office": [{"id": oid, "name": OFFICE_NAMES[oid],
+            "orders_by_office": [{"id": oid, "code": OFFICE_CODES.get(oid, ""), "name": OFFICE_NAMES[oid],
                                   "count": orders_by_office.get(oid, 0)}
                                  for oid in OFFICE_IDS],
             "orders_7d":        orders_7d,
@@ -942,7 +943,7 @@ async def handle_office(request):
     recent = sorted([o for _, o in curr_all], key=lambda x: x.get("timestamp", ""), reverse=True)[:15]
 
     return web.json_response({
-        "id": oid, "name": OFFICE_NAMES[oid], "period": period,
+        "id": oid, "code": OFFICE_CODES.get(oid, ""), "name": OFFICE_NAMES[oid], "period": period,
         "window": {"date": start.strftime("%Y-%m-%d"),
                    "today": _biz_day_start(_now_dubai()).strftime("%Y-%m-%d"),
                    "day_offset": day_offset},

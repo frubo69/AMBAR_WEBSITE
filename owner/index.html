@@ -276,6 +276,26 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .office{display:flex;align-items:center;gap:12px;padding:14px;border-radius:var(--r2);background:var(--card);border:1px solid var(--border2);margin-bottom:8px;transition:.15s var(--e1)}
 .office:active{transform:scale(.99);background:var(--card2)}
 
+
+/* Панель районов: сводка сверху, чипы сортировки, код B1…B5 на карточке. */
+.off-tot{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:2px}
+.off-tot-c{background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:10px 10px;min-width:0}
+.off-tot-l{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.off-tot-v{font-family:'DM Sans',sans-serif;font-size:17px;font-weight:700;letter-spacing:-.3px;margin-top:3px;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.off-sort{display:flex;gap:6px;overflow-x:auto;margin:0 0 10px;padding-bottom:2px;scrollbar-width:none}
+.off-sort::-webkit-scrollbar{display:none}
+.off-s{flex-shrink:0;padding:6px 12px;border-radius:999px;border:1px solid var(--border2);background:var(--card);
+  color:var(--muted);font-family:'DM Sans',sans-serif;font-size:11.5px;font-weight:600;cursor:pointer;
+  transition:.15s var(--e1);white-space:nowrap}
+.off-s.on{background:var(--gold-soft);border-color:rgba(201,169,110,.4);color:var(--gold2)}
+.off-code{font-family:'Space Grotesk',sans-serif;font-size:10px;font-weight:700;letter-spacing:.6px;
+  color:var(--tone);background:color-mix(in srgb, var(--tone) 14%, transparent);
+  border:1px solid color-mix(in srgb, var(--tone) 30%, transparent);
+  padding:2px 7px;border-radius:6px;flex-shrink:0}
+@media (min-width:760px){ .off-tot{grid-template-columns:repeat(4,1fr)} }
+
 /* ── карточки районов ─────────────────────────────────────────────────── */
 .off-card{position:relative;background:var(--card);border:1px solid var(--border2);border-radius:var(--r);
   padding:15px 16px 14px;overflow:hidden;transition:.16s var(--e1)}
@@ -842,7 +862,25 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
   <div class="range-chip" id="rangeChip-officePeriod" style="display:none"><span class="rc-icon">📅</span><span class="rc-text"></span><button class="rc-x" onclick="clearRange('officePeriod')">✕</button></div>
 
-  <div class="sect" style="margin-top:2px"><div class="sect-t">Районы</div><div class="sect-s" id="offSub">—</div></div>
+  <!-- Итог по всем районам: без него карточки — просто пять чисел, не с чем
+       сравнить и не видно, складываются ли они в то, что на «Обзоре». -->
+  <div class="off-tot" id="offTotals" style="display:none">
+    <div class="off-tot-c"><div class="off-tot-l">Выручка</div><div class="off-tot-v" id="offTotRev" data-aed="">—</div></div>
+    <div class="off-tot-c"><div class="off-tot-l">Заказы</div><div class="off-tot-v" id="offTotOrd">—</div></div>
+    <div class="off-tot-c"><div class="off-tot-l">Ср. чек</div><div class="off-tot-v" id="offTotAvg" data-aed="">—</div></div>
+    <div class="off-tot-c"><div class="off-tot-l">Время</div><div class="off-tot-v" id="offTotMin">—</div></div>
+  </div>
+
+  <div class="sect" style="margin-top:14px"><div class="sect-t">Районы</div><div class="sect-s" id="offSub">—</div></div>
+  <!-- Порядок B1…B5 — рабочий, поэтому он же и по умолчанию. Остальные
+       сортировки нужны, чтобы быстро увидеть отстающих. -->
+  <div class="off-sort" id="offSort">
+    <button class="off-s on" data-s="code">B1–B5</button>
+    <button class="off-s" data-s="rev">Выручка</button>
+    <button class="off-s" data-s="orders">Заказы</button>
+    <button class="off-s" data-s="min">Время</button>
+    <button class="off-s" data-s="rating">Рейтинг</button>
+  </div>
   <div style="display:flex;flex-direction:column;gap:9px" id="offCards">
     <div class="off-empty">Загрузка…</div>
   </div>
@@ -3413,6 +3451,7 @@ async function _officeLoad(id){
 // Ни выдуманных операторов, ни «в очереди», ни статусов «открыт/загружен»:
 // таких данных в системе нет, поэтому их и не показываем.
 function renderOffices(rows){
+  OFF_LAST = rows;                       // чтобы смена сортировки перерисовала то же
   const box = document.getElementById('offCards');
   const speed = document.getElementById('offSpeed');
   const sub = document.getElementById('offSub');
@@ -3427,9 +3466,40 @@ function renderOffices(rows){
   const live = list.filter(r => !r.legacy);
   const total = list.reduce((a, r) => a + (r.aed || 0), 0);
   const top = Math.max(0, ...list.map(r => r.aed || 0));
-  if(sub) sub.textContent = `${live.length} ${pluralize(live.length,'район','района','районов')} · доля выручки`;
+  if(sub) sub.textContent = `${live.length} ${pluralize(live.length,'район','района','районов')} · ${OFF_SORT_LBL[OFF_SORT]||''}`;
 
   list.forEach(r => { if(r.name) OFF_KNOWN[r.id] = r.name; });
+
+  // Итог по всем районам — проверка, что доли складываются в общую выручку.
+  const tot = document.getElementById('offTotals');
+  if(tot){
+    const ord = list.reduce((a,r)=>a+(r.orders||0),0);
+    const dl  = list.reduce((a,r)=>a+(r.delivered||0),0);
+    const mins = live.filter(r=>r.avg_sample);
+    tot.style.display = 'grid';
+    _setAed('offTotRev', total);
+    _setText('offTotOrd', ord);
+    _setAed('offTotAvg', dl ? Math.round(total/dl) : 0);
+    _setText('offTotMin', mins.length
+      ? Math.round(mins.reduce((a,r)=>a+r.avg_min*r.avg_sample,0) / mins.reduce((a,r)=>a+r.avg_sample,0)) + ' мин'
+      : '—');
+  }
+
+  // Порядок: по коду — как задан в конфиге (он же рабочий), остальные — по
+  // убыванию, кроме времени: там быстрее значит лучше. Строка «Без района»
+  // всегда последняя, что бы ни выбрали.
+  const key = OFF_SORT;
+  list.sort((a,b)=>{
+    if(!!a.legacy !== !!b.legacy) return a.legacy ? 1 : -1;
+    if(key === 'rev')    return (b.aed||0) - (a.aed||0);
+    if(key === 'orders') return (b.orders||0) - (a.orders||0);
+    if(key === 'rating') return (b.rating_count?b.rating:0) - (a.rating_count?a.rating:0);
+    if(key === 'min'){
+      const av = a.avg_sample ? a.avg_min : 1e9, bv = b.avg_sample ? b.avg_min : 1e9;
+      return av - bv;
+    }
+    return 0;   // порядок из конфига — список уже приходит в нём
+  });
 
   box.innerHTML = list.map(r => {
     const aed = r.aed || 0;
@@ -3441,7 +3511,7 @@ function renderOffices(rows){
     if(r.rating_count) meta.push(`★ <b>${r.rating}</b>`);
     return `<div class="off-card${lead?' lead':''}" style="--tone:${OFF_TONE(r)}"${r.legacy?'':` data-detail="office:${r.id}"`}>
       <div class="off-head">
-        <span class="off-dot"></span>
+        ${r.code ? `<span class="off-code">${escS(r.code)}</span>` : '<span class="off-dot"></span>'}
         <span class="off-name">${escS(r.name)}</span>
         ${r.legacy ? '<span class="off-live" style="color:var(--muted);background:rgba(255,255,255,.04);border-color:var(--border2)">без района</span>'
                    : (r.active ? `<span class="off-live">${r.active} в работе</span>` : '')}
@@ -3474,6 +3544,21 @@ function renderOffices(rows){
   }
   applyCurrency();
 }
+
+let OFF_SORT = 'code';
+const OFF_SORT_LBL = {code:'порядок B1–B5', rev:'по выручке', orders:'по заказам',
+                      min:'по времени доставки', rating:'по рейтингу'};
+(function initOffSort(){
+  const bar = document.getElementById('offSort'); if(!bar) return;
+  bar.addEventListener('click', e=>{
+    const b = e.target.closest('.off-s'); if(!b) return;
+    OFF_SORT = b.dataset.s;
+    bar.querySelectorAll('.off-s').forEach(x=>x.classList.toggle('on', x===b));
+    if(OFF_LAST) renderOffices(OFF_LAST);
+    try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
+  });
+})();
+let OFF_LAST = null;
 
 // Свой оттенок каждому району — чтобы взгляд цеплялся за строку, а не за текст.
 const OFF_TONES = {jvc:'#C9A96E', tecom:'#5B8DEF', bbay:'#4CAF7D', silicon:'#B98BE0', alguses:'#E88C6A'};

@@ -3536,15 +3536,18 @@ function renderOffices(rows){
       speed.innerHTML = withTime.map((r,i) =>
         `<div class="bar-row"${i===withTime.length-1?' style="margin:0"':''}>
           <span class="bar-lbl">${escS(r.name)}</span>
-          <div class="bar-track"><div class="bar-fill ${r.avg_min>40?'':'up'}" style="width:${Math.round(r.avg_min/max*100)}%${r.avg_min>40?';background:linear-gradient(90deg,var(--warn),#F3C878)':''}"></div></div>
+          <div class="bar-track"><div class="bar-fill ${r.avg_min>OFF_NORM?'':'up'}" style="width:${Math.round(r.avg_min/max*100)}%${r.avg_min>OFF_NORM?';background:linear-gradient(90deg,var(--warn),#F3C878)':''}"></div></div>
           <span class="bar-val">${r.avg_min} мин</span>
         </div>`).join('') +
-        '<div style="font-size:10px;color:var(--muted);margin-top:10px;text-align:center;padding-top:10px;border-top:1px solid var(--border2)">Норматив: <b style="color:var(--text)">≤ 40 мин</b></div>';
+        `<div style="font-size:10px;color:var(--muted);margin-top:10px;text-align:center;padding-top:10px;border-top:1px solid var(--border2)">Норматив: <b style="color:var(--text)">≤ ${OFF_NORM} мин</b> · от принятия заказа</div>`;
     }
   }
   applyCurrency();
 }
 
+// Норматив доставки приходит с сервера (late_threshold) — держать его копию
+// числом во фронте значило спорить с бэкендом при каждой правке.
+let OFF_NORM = 25;
 let OFF_SORT = 'code';
 const OFF_SORT_LBL = {code:'порядок B1–B5', rev:'по выручке', orders:'по заказам',
                       min:'по времени доставки', rating:'по рейтингу'};
@@ -3628,6 +3631,7 @@ function _paintRating(k){
 }
 
 function renderKpis(k){
+  if(k && +k.late_threshold > 0) OFF_NORM = +k.late_threshold;
   if(!k) return;
   // Orders
   _setText('kOrders', k.orders);

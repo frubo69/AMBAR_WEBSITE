@@ -301,14 +301,19 @@ LATE_GRACE_MIN = 5
 
 
 def _delivery_stats(orders) -> dict:
-    """Compute average delivery time + late count from delivered orders.
+    """Среднее время доставки и число опозданий по доставленным заказам.
 
-    Late = actual duration > order's ETA + grace (3 min).
-    If the order has no ETA, falls back to 25 min."""
+    Отсчёт идёт от ПРИНЯТИЯ заказа (confirmed_at), а не от его создания:
+    время, пока заказ висел неразобранным, к работе курьера не относится и
+    раздувало показатель. Если отметки принятия нет (единичные старые заказы),
+    откатываемся на timestamp, иначе заказ выпал бы из статистики совсем.
+
+    Опоздание = фактическое время > ETA заказа + 5 мин запаса; без ETA берём
+    норматив LATE_THRESHOLD_FALLBACK."""
     durations = []
     late_count = 0
     for _, o in orders:
-        placed_ts = o.get("timestamp")
+        placed_ts = o.get("confirmed_at") or o.get("timestamp")
         delivered_ts = o.get("updated_at") or o.get("delivered_at")
         if not placed_ts or not delivered_ts:
             continue

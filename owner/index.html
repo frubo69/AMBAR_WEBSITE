@@ -1036,52 +1036,17 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     <div class="op-ctrl-sect-lbl" style="margin-top:12px">Показатель</div>
     <div class="op-ctrl-chips" id="opFilters">
       <button class="op-f on" data-f="overall">Общий</button>
-      <button class="op-f" data-f="fast">⚡ Реакция</button>
-      <button class="op-f" data-f="rating">★ Рейтинг</button>
+      <button class="op-f" data-f="fast">Реакция</button>
+      <button class="op-f" data-f="rating">Рейтинг</button>
       <button class="op-f" data-f="orders">Заказы</button>
-      <button class="op-f" data-f="handle">⏱ Обработка</button>
-      <button class="op-f" data-f="late">⚠ Опоздания</button>
+      <button class="op-f" data-f="handle">Доставка</button>
+      <button class="op-f" data-f="late">Опоздания</button>
+      <button class="op-f" data-f="tips">Чаевые</button>
     </div>
   </div>
   <div class="sect"><div class="sect-t">Рейтинг операторов · <span id="opPeriodLbl">сегодня</span></div><div class="sect-a" style="font-size:10px;color:var(--muted)" id="opSortLbl">по общему</div></div>
-  <div class="list" id="opList">
-    <div class="lrow" data-detail="operator:central" data-op="central">
-      <div class="lrow-idx">1</div>
-      <div class="lrow-av" style="background:linear-gradient(135deg,#c9a96e,#e8c98a);color:#0a0a14">АХ</div>
-      <div class="lrow-body">
-        <div class="lrow-name">Ахмад К. <span class="lrow-tag tag-gold">TOP</span></div>
-        <div class="lrow-sub" data-op-sub="central">Central · 19 заказов · ★ 4.9</div>
-      </div>
-      <div style="text-align:right">
-        <div class="mono" data-op-resp="central" style="font-family:'DM Sans',sans-serif;font-weight:700;letter-spacing:-.2px;font-size:15px;color:var(--up)">12<span style="font-size:10px;color:var(--muted);margin-left:2px">сек</span></div>
-        <div style="font-size:10px;color:var(--muted)" data-op-resp-lbl="central">реакция</div>
-      </div>
-    </div>
-    <div class="lrow" data-detail="operator:north" data-op="north">
-      <div class="lrow-idx">2</div>
-      <div class="lrow-av">РН</div>
-      <div class="lrow-body">
-        <div class="lrow-name">Рашид Н.</div>
-        <div class="lrow-sub" data-op-sub="north">North · 16 заказов · ★ 4.7</div>
-      </div>
-      <div style="text-align:right">
-        <div class="mono" data-op-resp="north" style="font-family:'DM Sans',sans-serif;font-weight:700;letter-spacing:-.2px;font-size:15px">28<span style="font-size:10px;color:var(--muted);margin-left:2px">сек</span></div>
-        <div style="font-size:10px;color:var(--muted)" data-op-resp-lbl="north">реакция</div>
-      </div>
-    </div>
-    <div class="lrow" data-detail="operator:south" data-op="south">
-      <div class="lrow-idx">3</div>
-      <div class="lrow-av">ДМ</div>
-      <div class="lrow-body">
-        <div class="lrow-name">Дима М.</div>
-        <div class="lrow-sub" data-op-sub="south">South · 12 заказов · ★ 4.8</div>
-      </div>
-      <div style="text-align:right">
-        <div class="mono" data-op-resp="south" style="font-family:'DM Sans',sans-serif;font-weight:700;letter-spacing:-.2px;font-size:15px;color:var(--warn)">1:42<span style="font-size:10px;color:var(--muted);margin-left:2px">мин</span></div>
-        <div style="font-size:10px;color:var(--warn)" data-op-resp-lbl="south">медленно</div>
-      </div>
-    </div>
-  </div>
+  <div class="list" id="opList"></div>
+  <div id="opExtra"></div>
 
   </div><!-- /peopleOperators -->
 
@@ -4449,6 +4414,7 @@ function applyPeopleTab(tab){
   op.style.display = tab==='operators' ? '' : 'none';
   cu.style.display = tab==='customers' ? '' : 'none';
   if(tab==='customers') refreshCustomers();
+  if(tab==='operators' && !OPS.data && !OPS.loading) loadOperators();
 }
 async function refreshCustomers(){
   _customersCache = null;
@@ -5189,24 +5155,23 @@ function _buildAlerts(){
       onClick:()=>{ closeAlerts(); openCatalog(); }
     });
   }
-  // Late operator (from OP_PERIOD today)
+  // Медленная реакция и опоздания — по тем же данным, что и страница «Люди».
   try{
-    const td = OP_PERIOD.today;
-    Object.keys(td).filter(k=>k!=='lbl').forEach(k=>{
-      const op = td[k];
-      if(op.respSec > 60){
+    (OPS.data?.operators || []).forEach(op=>{
+      if(op.resp_sample && op.resp_sec > (OPS.data.slow_sec||60)){
+        const t = fmtSec(op.resp_sec);
         out.push({
-          id:'op:slow:'+k, sev:'warn', ico:'⏱', pref:'timing.notAccepted5',
-          t:`Медленная реакция · ${k.charAt(0).toUpperCase()+k.slice(1)}`,
-          s:`${fmtSec(op.respSec).v} ${fmtSec(op.respSec).u} · норма ≤ 60 сек`,
+          id:'op:slow:'+op.id, sev:'warn', ico:'⏱', pref:'timing.notAccepted5',
+          t:`Медленная реакция · ${op.name}`,
+          s:`${t.v} ${t.u} на ${op.resp_sample} ${pluralize(op.resp_sample,'заказе','заказах','заказах')} · норма ≤ ${OPS.data.slow_sec||60} сек`,
           onClick:()=>{ closeAlerts(); switchPage('people'); }
         });
       }
       if(op.late >= 2){
         out.push({
-          id:'op:late:'+k, sev:'dn', ico:'🚨', pref:'timing.late25',
-          t:`${op.late} ${pluralize(op.late,'опоздание','опоздания','опозданий')} · ${k.charAt(0).toUpperCase()+k.slice(1)}`,
-          s:'требует внимания',
+          id:'op:late:'+op.id, sev:'dn', ico:'🚨', pref:'timing.late25',
+          t:`${op.late} ${pluralize(op.late,'опоздание','опоздания','опозданий')} · ${op.name}`,
+          s:`${op.late_pct}% доставок мимо норматива`,
           onClick:()=>{ closeAlerts(); switchPage('people'); }
         });
       }
@@ -6562,93 +6527,147 @@ function fmtSec(s){
   const m = Math.floor(s/60), r = s%60;
   return {v: m + ':' + String(r).padStart(2,'0'), u:'мин'};
 }
-const OP_PERIOD = {
-  today: {
-    lbl:'сегодня',
-    central:{sub:'Central · 19 заказов',  respSec:12,  rate:4.9,  ord:19,  handle:35, late:0},
-    north:  {sub:'North · 16 заказов',    respSec:28,  rate:4.7,  ord:16,  handle:41, late:1},
-    south:  {sub:'South · 12 заказов',    respSec:102, rate:4.8,  ord:12,  handle:43, late:2}
-  },
-  week: {
-    lbl:'неделя',
-    central:{sub:'Central · 128 заказов', respSec:14,  rate:4.92, ord:128, handle:36, late:3},
-    north:  {sub:'North · 104 заказа',    respSec:31,  rate:4.71, ord:104, handle:42, late:5},
-    south:  {sub:'South · 84 заказа',     respSec:108, rate:4.83, ord:84,  handle:44, late:9}
-  },
-  month: {
-    lbl:'месяц',
-    central:{sub:'Central · 542 заказа',  respSec:16,  rate:4.89, ord:542, handle:37, late:12},
-    north:  {sub:'North · 432 заказа',    respSec:33,  rate:4.73, ord:432, handle:43, late:22},
-    south:  {sub:'South · 356 заказов',   respSec:95,  rate:4.81, ord:356, handle:45, late:38}
-  }
-};
+// Кто есть кто — с сервера. Разнесение описано в config_staff: реакция считается
+// тому, чьё устройство приняло заказ (это только старший оператор — у остальных
+// нет своего входа в бот), всё остальное принадлежит району и его людям.
+let OPS = {data:null, loading:false, err:''};
 
 let opPeriodCur = 'today';
 let opFilterCur = 'overall';
 
 const OP_SORT_LABEL = {
-  overall:'по общему',
+  overall:'по выручке',
   fast:'по скорости',
   rating:'по рейтингу',
   orders:'по заказам',
-  handle:'по обработке',
-  late:'по опозданиям'
+  handle:'по доставке',
+  late:'по опозданиям',
+  tips:'по чаевым'
 };
 
+async function loadOperators(){
+  OPS.loading = true; OPS.err = '';
+  renderOperators();
+  try{
+    OPS.data = await ownerApi.ownerFetch('/api/owner/operators', {params:{period:opPeriodCur}});
+  }catch(e){ OPS.err = 'Не удалось загрузить'; }
+  OPS.loading = false;
+  renderOperators();
+}
+
+function _opInitials(name){
+  const w = (name||'').trim().split(/\s+/);
+  return ((w[0]||'?')[0] + (w[1] ? w[1][0] : (w[0]||'?')[1] || '')).toUpperCase();
+}
+
+// Правая колонка карточки: то, по чему сейчас отсортирован список. Прочерк
+// вместо нуля там, где измерять нечего — выдуманная цифра хуже пустоты.
 function opMetric(op, filter){
-  if(filter==='fast' || filter==='overall'){
-    const {v,u} = fmtSec(op.respSec);
-    const slow = op.respSec > 60;
-    return { html:`${v}<span style="font-size:10px;color:var(--muted);margin-left:2px">${u}</span>`, label: slow?'медленно':'реакция', color: slow?'var(--warn)':(op.respSec<=15?'var(--up)':''), labelColor: slow?'var(--warn)':'var(--muted)' };
+  const dim = 'var(--muted)';
+  if(filter==='fast'){
+    if(!op.resp_sample) return {html:'—', label: op.senior?'нет данных':'нет входа в бот', color:dim};
+    const {v,u} = fmtSec(op.resp_sec);
+    const slow = op.resp_sec > (OPS.data?.slow_sec || 60);
+    return {html:`${v}<span style="font-size:10px;color:var(--muted);margin-left:2px">${u}</span>`,
+            label: slow?'медленно':'реакция', color: slow?'var(--warn)':(op.resp_sec<=15?'var(--up)':'')};
   }
-  if(filter==='rating') return { html:`★ ${op.rate.toFixed(2)}`, label:'рейтинг', color:'var(--up)', labelColor:'var(--muted)' };
-  if(filter==='orders') return { html:`${op.ord}<span style="font-size:10px;color:var(--muted);margin-left:2px">шт</span>`, label:'заказы', color:'', labelColor:'var(--muted)' };
-  if(filter==='handle') return { html:`${op.handle}<span style="font-size:10px;color:var(--muted);margin-left:2px">мин</span>`, label:'обработка', color: op.handle>40?'var(--warn)':'var(--up)', labelColor:'var(--muted)' };
+  if(filter==='rating') return op.rating_count
+    ? {html:`★ ${op.rating.toFixed(2)}`, label:`${op.rating_count} ${pluralize(op.rating_count,'оценка','оценки','оценок')}`, color:'var(--up)'}
+    : {html:'—', label:'нет оценок', color:dim};
+  if(filter==='orders') return {html:`${op.orders}<span style="font-size:10px;color:var(--muted);margin-left:2px">шт</span>`,
+                                label:`доставлено ${op.delivered}`, color:''};
+  if(filter==='handle') return op.avg_sample
+    ? {html:`${op.avg_min}<span style="font-size:10px;color:var(--muted);margin-left:2px">мин</span>`,
+       label:'доставка', color: op.avg_min > (OPS.data?.norm_min||25) ? 'var(--warn)':'var(--up)'}
+    : {html:'—', label:'нет доставок', color:dim};
   if(filter==='late'){
-    const c = op.late===0?'var(--up)':op.late<=1?'var(--warn)':'var(--dn)';
-    return { html:`${op.late}`, label: op.late===0?'идеально':(op.late===1?'опоздание':'опозданий'), color:c, labelColor: op.late>=2?'var(--dn)':(op.late===1?'var(--warn)':'var(--up)') };
+    if(!op.avg_sample) return {html:'—', label:'нет доставок', color:dim};
+    const c = op.late===0?'var(--up)':op.late<=2?'var(--warn)':'var(--dn)';
+    return {html:`${op.late}`, label: op.late===0?'без опозданий':`${op.late_pct}% заказов`, color:c};
   }
-  return { html:'—', label:'', color:'', labelColor:'' };
+  if(filter==='tips'){
+    const t = op.senior ? op.own_tips : op.tips;
+    return t ? {html:`${fmt(t)}<span style="font-size:10px;color:var(--muted);margin-left:2px">AED</span>`,
+                label: op.senior?'как водитель':'чаевые района', color:'var(--gold2)'}
+             : {html:'—', label:'нет чаевых', color:dim};
+  }
+  return {html:`${fmt(op.aed)}<span style="font-size:10px;color:var(--muted);margin-left:2px">AED</span>`,
+          label:`${op.delivered} ${pluralize(op.delivered,'заказ','заказа','заказов')}`, color:''};
 }
 
 function renderOperators(){
-  const d = OP_PERIOD[opPeriodCur]; if(!d) return;
-  const lbl = document.getElementById('opPeriodLbl'); if(lbl) lbl.textContent = d.lbl;
-  const sortLbl = document.getElementById('opSortLbl'); if(sortLbl) sortLbl.textContent = OP_SORT_LABEL[opFilterCur] || 'по общему';
-
-  const keys = ['central','north','south'];
-  let sorted = keys.map(k=>({ id:k, ...d[k] }));
-  if(opFilterCur==='fast' || opFilterCur==='overall') sorted.sort((a,b)=>a.respSec-b.respSec);
-  else if(opFilterCur==='rating') sorted.sort((a,b)=>b.rate-a.rate);
-  else if(opFilterCur==='orders') sorted.sort((a,b)=>b.ord-a.ord);
-  else if(opFilterCur==='handle') sorted.sort((a,b)=>a.handle-b.handle);
-  else if(opFilterCur==='late')   sorted.sort((a,b)=>a.late-b.late);
-
   const list = document.getElementById('opList'); if(!list) return;
-  sorted.forEach((op, i)=>{
-    const row = list.querySelector(`[data-op="${op.id}"]`); if(!row) return;
-    const idx = row.querySelector('.lrow-idx'); if(idx) idx.textContent = i+1;
-    // reorder DOM
-    list.appendChild(row);
-    // sub line stays as period's "Central · 19 заказов · ★ 4.9"-ish
-    const subEl = row.querySelector(`[data-op-sub="${op.id}"]`);
-    if(subEl) subEl.textContent = `${op.sub} · ★ ${op.rate.toFixed(1)}`;
-    // right side metric
-    const M = opMetric(op, opFilterCur);
-    const respEl = row.querySelector(`[data-op-resp="${op.id}"]`);
-    if(respEl){ respEl.innerHTML = M.html; respEl.style.color = M.color || ''; }
-    const lblEl = row.querySelector(`[data-op-resp-lbl="${op.id}"]`);
-    if(lblEl){ lblEl.textContent = M.label; lblEl.style.color = M.labelColor || 'var(--muted)'; }
-  });
+  const sortLbl = document.getElementById('opSortLbl');
+  if(sortLbl) sortLbl.textContent = OP_SORT_LABEL[opFilterCur] || 'по выручке';
+  const lbl = document.getElementById('opPeriodLbl');
+  if(lbl && !document.querySelector('#rangeChip-opPeriod[style*="flex"]'))
+    lbl.textContent = {today:'сегодня',week:'неделя',month:'месяц'}[opPeriodCur] || '';
+
+  if(OPS.err){ list.innerHTML = `<div class="stk-empty" style="color:var(--dn)">${OPS.err}</div>`; return; }
+  if(!OPS.data){ list.innerHTML = '<div class="stk-empty">Загрузка…</div>'; return; }
+
+  const ops = [...(OPS.data.operators || [])];
+  const f = opFilterCur;
+  if(f==='fast')        ops.sort((a,b)=>(a.resp_sample?a.resp_sec:1e9)-(b.resp_sample?b.resp_sec:1e9));
+  else if(f==='rating') ops.sort((a,b)=>b.rating-a.rating);
+  else if(f==='orders') ops.sort((a,b)=>b.orders-a.orders);
+  else if(f==='handle') ops.sort((a,b)=>(a.avg_sample?a.avg_min:1e9)-(b.avg_sample?b.avg_min:1e9));
+  else if(f==='late')   ops.sort((a,b)=>a.late-b.late);
+  else if(f==='tips')   ops.sort((a,b)=>((b.senior?b.own_tips:b.tips)-(a.senior?a.own_tips:a.tips)));
+  else                  ops.sort((a,b)=>b.aed-a.aed);
+
+  list.innerHTML = ops.map((op,i)=>{
+    const M = opMetric(op, f);
+    const where = op.senior
+      ? `все районы · принял ${op.orders}`
+      : op.districts.map(d=>d.code).join(' · ') + ` · ${op.orders} ${pluralize(op.orders,'заказ','заказа','заказов')}`;
+    const tag = op.senior
+      ? '<span class="lrow-tag tag-gold">СТАРШИЙ</span>'
+      : '';
+    return `<div class="lrow" data-detail="operator:${escS(op.id)}">
+      <div class="lrow-idx">${i+1}</div>
+      <div class="lrow-av"${op.senior?' style="background:linear-gradient(135deg,#c9a96e,#e8c98a);color:#0a0a14"':''}>${escS(_opInitials(op.name))}</div>
+      <div class="lrow-body">
+        <div class="lrow-name">${escS(op.name)} ${tag}</div>
+        <div class="lrow-sub">${escS(where)}</div>
+      </div>
+      <div style="text-align:right">
+        <div class="mono" style="font-family:'DM Sans',sans-serif;font-weight:700;letter-spacing:-.2px;font-size:15px;color:${M.color||''}">${M.html}</div>
+        <div style="font-size:10px;color:var(--muted)">${escS(M.label)}</div>
+      </div>
+    </div>`;
+  }).join('');
+
+  // Заказы с устройств, которых нет в списке людей. Это либо забытый оператор,
+  // либо чужой доступ — в обоих случаях владелец должен об этом знать.
+  const box = document.getElementById('opExtra');
+  if(box){
+    const unk = OPS.data.unknown_devices || [];
+    const un  = OPS.data.tips_unassigned || 0;
+    box.innerHTML =
+      (unk.length ? `<div class="sect"><div class="sect-t">Чужие устройства</div></div>
+        <div class="list">${unk.map(u=>`
+          <div class="lrow">
+            <div class="lrow-av" style="color:var(--warn)">?</div>
+            <div class="lrow-body">
+              <div class="lrow-name mono" style="font-family:'JetBrains Mono',monospace;font-size:12.5px">${u.telegram_id}</div>
+              <div class="lrow-sub">принял ${u.accepted} · завёл ${u.created} — этого id нет в списке людей</div>
+            </div>
+          </div>`).join('')}</div>` : '')
+    + (un ? `<div class="stk-note" style="margin:14px 2px 0">
+          <b>${fmt(un)} AED чаевых без водителя.</b> Это заказы из приложения: водителя
+          им никто не назначал, поэтому распределить их автоматически нельзя.
+        </div>` : '');
+  }
 }
 
-function applyOpPeriod(p){ opPeriodCur = p; renderOperators(); _syncOpCtrl(); }
+function applyOpPeriod(p){ opPeriodCur = p; _syncOpCtrl(); loadOperators(); }
 function applyOpFilter(f){
   opFilterCur = f;
   document.querySelectorAll('#opFilters .op-f').forEach(b=>b.classList.toggle('on', b.dataset.f===f));
   renderOperators(); _syncOpCtrl();
 }
-const _opFilterLabels = {overall:'Общий',fast:'⚡ Реакция',rating:'★ Рейтинг',orders:'Заказы',handle:'⏱ Обработка',late:'⚠ Опоздания'};
+const _opFilterLabels = {overall:'Выручка',fast:'Реакция',rating:'Рейтинг',orders:'Заказы',handle:'Доставка',late:'Опоздания',tips:'Чаевые'};
 const _opPeriodLabels = {today:'Сегодня',week:'Неделя',month:'Месяц'};
 function _opCtrlLabel(){
   const pKey = opPeriodCur||'today';
@@ -7257,62 +7276,100 @@ const DETAIL = {
     };
   },
   operator: id=>{
-    const d = {
-      central:{name:'Ахмад К.',  i:'АХ', g:'c', tgId:'686932322',  off:'Central', top:true,  shift:'с 09:00', ord:19, acc:18, dec:1,  resp:12,   handle:35, rate:4.9, reviews:22, late:0, lateList:[]},
-      north:  {name:'Рашид Н.',  i:'РН', g:'n', tgId:'1567466073', off:'North',   top:false, shift:'с 10:00', ord:16, acc:15, dec:1,  resp:28,   handle:41, rate:4.7, reviews:14, late:1, lateList:[{id:'AMB7601642', by:3, reason:'Клиент не брал трубку'}]},
-      south:  {name:'Дима М.',   i:'ДМ', g:'s', tgId:'625010022',  off:'South',   top:false, shift:'с 11:00', ord:12, acc:9,  dec:3,  resp:102,  handle:43, rate:4.8, reviews:11, late:2, lateList:[{id:'AMB7601674',by:13,reason:'Пробка'},{id:'AMB7601658',by:8,reason:'Не нашёл адрес'}]}
-    }[id] || {};
-    const topBadge = d.top ? `<span class="dt-badge" style="background:rgba(201,169,110,.2);color:var(--gold2)">TOP</span>` : '';
-    const accPct = Math.round(d.acc/d.ord*100);
-    const respTxt = d.resp < 60 ? `${d.resp}<span class="u">сек</span>` : `${Math.floor(d.resp/60)}:${String(d.resp%60).padStart(2,'0')}<span class="u">мин</span>`;
-    const respColor = d.resp<=30 ? 'up' : d.resp<=60 ? '' : 'warn';
+    const d = ((OPS.data||{}).operators || []).find(x => x.id === id);
+    if(!d) return {title:'<div class="dt-tit-av plain">?</div><div><div class="dt-tit-name">Нет данных</div></div>',
+                   body:'<div style="text-align:center;padding:40px;color:var(--muted)">Откройте «Люди → Операторы»</div>', foot:''};
+    const norm = (OPS.data||{}).norm_min || 25;
+    const slow = (OPS.data||{}).slow_sec || 60;
+    const per  = {today:'сегодня',week:'за неделю',month:'за месяц'}[opPeriodCur] || '';
+    const badge = d.senior
+      ? `<span class="dt-badge" style="background:rgba(201,169,110,.2);color:var(--gold2)">СТАРШИЙ</span>` : '';
+    const rTxt = d.resp_sample ? (()=>{ const t = fmtSec(d.resp_sec); return `${t.v}<span class="u">${t.u}</span>`; })() : '—';
+    const rCls = !d.resp_sample ? '' : d.resp_sec<=30 ? 'up' : d.resp_sec<=slow ? '' : 'warn';
+
+    const stat = (lbl, val, sub, cls) =>
+      `<div class="dt-stat"><div class="dt-stat-lbl">${lbl}</div>
+       <div class="dt-stat-val ${cls||''}">${val}</div><div class="dt-stat-sub">${sub}</div></div>`;
+
     return {
-      title:`<div class="dt-tit-av ${d.g}">${d.i}</div><div><div class="dt-tit-name">${d.name} ${topBadge}</div><div class="dt-sub">${d.off} · <span style="color:var(--up)">● активен</span> · tg ID <span style="font-family:'JetBrains Mono',monospace">${d.tgId}</span></div></div>`,
+      title:`<div class="dt-tit-av ${d.senior?'c':'plain'}">${escS(_opInitials(d.name))}</div>
+        <div><div class="dt-tit-name">${escS(d.name)} ${badge}</div>
+        <div class="dt-sub">${escS(d.scope)}${d.telegram_id
+          ? ` · tg ID <span style="font-family:'JetBrains Mono',monospace">${d.telegram_id}</span>`
+          : ' · нет входа в бот'}</div></div>`,
       body:`
         <div class="dt-stats">
-          <div class="dt-stat"><div class="dt-stat-lbl">Реакция</div><div class="dt-stat-val ${respColor}">${respTxt}</div><div class="dt-stat-sub">с прихода в бот</div></div>
-          <div class="dt-stat"><div class="dt-stat-lbl">Принял</div><div class="dt-stat-val up">${d.acc}</div><div class="dt-stat-sub">${accPct}% от входящих</div></div>
-          <div class="dt-stat"><div class="dt-stat-lbl">Отклонил</div><div class="dt-stat-val ${d.dec>2?'warn':''}">${d.dec}</div><div class="dt-stat-sub">${Math.round(d.dec/d.ord*100)}%</div></div>
-          <div class="dt-stat"><div class="dt-stat-lbl">Опозданий</div><div class="dt-stat-val ${d.late>=2?'dn':d.late===1?'warn':'up'}">${d.late}</div><div class="dt-stat-sub">${d.late===0?'идеально':'&gt; deliver_by'}</div></div>
-          <div class="dt-stat"><div class="dt-stat-lbl">Обработка</div><div class="dt-stat-val ${d.handle>40?'warn':'up'}">${d.handle}<span class="u">мин</span></div><div class="dt-stat-sub">приём → доставка</div></div>
-          <div class="dt-stat"><div class="dt-stat-lbl">★ Рейтинг</div><div class="dt-stat-val up">${d.rate}</div><div class="dt-stat-sub">${d.reviews} отзывов</div></div>
+          ${stat('Реакция', rTxt,
+                 d.resp_sample ? `${d.resp_sample} ${pluralize(d.resp_sample,'заказ','заказа','заказов')} из приложения`
+                               : 'заказы принимает старший', rCls)}
+          ${stat('Заказов', d.orders, `доставлено ${d.delivered}${d.cancelled?` · отменено ${d.cancelled}`:''}`)}
+          ${stat('Выручка', fmt(d.aed)+'<span class="u">AED</span>',
+                 d.manual ? `${d.manual} по телефону` : 'все из приложения')}
+          ${stat('Доставка', d.avg_sample ? d.avg_min+'<span class="u">мин</span>' : '—',
+                 d.avg_sample ? `норматив ${norm} мин` : 'нет доставок',
+                 d.avg_sample ? (d.avg_min > norm ? 'warn' : 'up') : '')}
+          ${stat('Опозданий', d.avg_sample ? d.late : '—',
+                 d.avg_sample ? (d.late ? d.late_pct+'% доставок' : 'все в норматив') : '—',
+                 !d.avg_sample ? '' : d.late===0 ? 'up' : d.late<=2 ? 'warn' : 'dn')}
+          ${stat('★ Рейтинг', d.rating_count ? d.rating : '—',
+                 d.rating_count ? `${d.rating_count} ${pluralize(d.rating_count,'оценка','оценки','оценок')}` : 'нет оценок',
+                 d.rating_count ? 'up' : '')}
         </div>
-        ${d.late>0 ? `
-        <div class="dt-sect">Опоздания · сегодня</div>
+
+        ${d.senior ? `
+        <div class="dt-sect">Что здесь считается</div>
         <div class="dt-card">
-          ${d.lateList.map(l=>`<div class="dt-row" data-detail="order:${l.id}"><div class="dt-row-l"><div class="dt-row-t">#${l.id.slice(0,6)} ${l.id.slice(6)} <span class="dt-row-tiny" style="color:var(--warn)">+${l.by} мин</span></div><div class="dt-row-s">причина: <b style="color:var(--text)">${l.reason}</b></div></div><div class="dt-row-r warn">${25+l.by} мин</div></div>`).join('')}
-        </div>
-        <div style="font-size:11px;color:var(--muted);padding:8px 4px 0;line-height:1.5">Причина ставится оператором в operator_bot сразу после «Доставлено», если фактическое время превысило <span style="color:var(--text)">deliver_by</span>. Варианты: Пробка · Клиент не отвечал · Адрес не нашёл · Погода · Другое (свободный текст).</div>
-        ` : `
-        <div class="dt-sect">Опоздания</div>
+          <div style="font-size:11.5px;color:var(--muted);padding:12px 4px;line-height:1.6">
+            Реакция — время от прихода заказа до принятия с его устройства. Заказы
+            он принимает по всем районам, поэтому доставка и оценки здесь — по тем
+            заказам, что взял он. Чаевые за бутылки идут району, который вёз.
+          </div>
+        </div>` : `
+        <div class="dt-sect">Что здесь считается</div>
         <div class="dt-card">
-          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t up">0 опозданий за сегодня</div><div class="dt-row-s">Все заказы в рамках deliver_by</div></div><div class="dt-row-r" style="font-size:22px">✓</div></div>
-        </div>
-        `}
-        <div class="dt-sect">Реакция на входящие · последние 6</div>
+          <div style="font-size:11.5px;color:var(--muted);padding:12px 4px;line-height:1.6">
+            Своего входа в бот нет — входящие принимает старший оператор, поэтому
+            реакция по нему не измеряется. Всё остальное считается по его районам:
+            ${escS(d.districts.map(x=>x.code+' '+x.name).join(', '))}.
+          </div>
+        </div>`}
+
+        <div class="dt-sect">По районам · ${per}</div>
         <div class="dt-card">
-          <div class="dt-row" data-detail="order:AMB7601680"><div class="dt-row-l"><div class="dt-row-t">#AMB7601 680 <span class="dt-row-tiny" style="color:var(--up)">принят</span></div><div class="dt-row-s">18:08 · Absolut 1L + Coke</div></div><div class="dt-row-r up">${Math.max(5,d.resp-5)} сек</div></div>
-          <div class="dt-row" data-detail="order:AMB7601678"><div class="dt-row-l"><div class="dt-row-t">#AMB7601 678 <span class="dt-row-tiny" style="color:var(--up)">принят</span></div><div class="dt-row-s">17:45 · Heineken 6</div></div><div class="dt-row-r up">${d.resp} сек</div></div>
-          <div class="dt-row" data-detail="order:AMB7601674"><div class="dt-row-l"><div class="dt-row-t">#AMB7601 674 <span class="dt-row-tiny" style="color:${d.resp>60?'var(--warn)':'var(--up)'}">${d.resp>60?'принят медленно':'принят'}</span></div><div class="dt-row-s">17:28 · Jack Daniel's 0.7</div></div><div class="dt-row-r ${d.resp>60?'warn':'up'}">${d.resp+15} сек</div></div>
-          ${d.dec>0?`<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">#AMB7601 670 <span class="dt-row-tiny" style="color:var(--dn)">отклонён</span></div><div class="dt-row-s">16:52 · вне зоны доставки</div></div><div class="dt-row-r">8 сек</div></div>`:''}
-          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">#AMB7601 665 <span class="dt-row-tiny" style="color:var(--up)">принят</span></div><div class="dt-row-s">16:33 · Corona 6-pack</div></div><div class="dt-row-r up">${Math.max(5,d.resp-10)} сек</div></div>
-          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">#AMB7601 660 <span class="dt-row-tiny" style="color:var(--up)">принят</span></div><div class="dt-row-s">16:15 · Chivas 0.7</div></div><div class="dt-row-r up">${d.resp+3} сек</div></div>
+          ${(d.by_district||[]).length ? d.by_district.map(x=>`
+            <div class="dt-row" data-detail="office:${escS(x.id)}">
+              <div class="dt-row-l"><div class="dt-row-t">${escS(x.code)} ${escS(x.name)}</div>
+              <div class="dt-row-s">${x.orders} ${pluralize(x.orders,'доставка','доставки','доставок')}</div></div>
+              <div class="dt-row-r">${fmt(x.aed)} <span style="font-size:11px;color:var(--muted)">AED</span></div>
+            </div>`).join('')
+          : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Пусто</div><div class="dt-row-s">за период доставок не было</div></div></div>'}
         </div>
-        <div class="dt-sect">Отзывы от клиентов</div>
+
+        ${!d.senior ? `
+        <div class="dt-sect">Чаевые · ${fmt(d.tips)} AED · ${d.tips_bottles} ${pluralize(d.tips_bottles,'бутылка','бутылки','бутылок')}</div>
         <div class="dt-card">
-          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">★ 5 · «${d.top?'Быстро и точно':'Всё ок, дошёл'}»</div><div class="dt-row-s">@nikita_k · 17 мин назад</div></div></div>
-          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">★ 5 · без комментария</div><div class="dt-row-s">@roma_m · 2 ч назад</div></div></div>
-          <div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">★ ${d.resp<=30?5:4} · «${d.resp<=30?'Быстро среагировал':'Долго подтверждал заказ'}»</div><div class="dt-row-s">@saska_b · вчера</div></div></div>
-        </div>
-        <div class="dt-sect">Загрузка · последние 7 дней</div>
+          ${(d.tips_by_driver||[]).length ? d.tips_by_driver.map(t=>`
+            <div class="dt-row">
+              <div class="dt-row-l"><div class="dt-row-t">${t.name==='—' ? 'Без водителя' : escS(t.name)}</div>
+              <div class="dt-row-s">${t.name==='—' ? 'заказы из приложения — водителя не назначали' : 'по ручным заказам'}</div></div>
+              <div class="dt-row-r" style="color:var(--gold2)">${fmt(t.aed)}</div>
+            </div>`).join('')
+          : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Нет чаевых</div><div class="dt-row-s">за период не продавали позиций со ставкой</div></div></div>'}
+        </div>` : ''}
+
+        ${d.drives && d.own_tips ? `
+        <div class="dt-sect">Как водитель</div>
         <div class="dt-card">
-          ${['ПН','ВТ','СР','ЧТ','ПТ','СБ','ВС'].map((day,i)=>{
-            const n = Math.max(d.ord-4+Math.floor(Math.random()*8),6);
-            return `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${day}${i===6?' · сегодня':''}</div><div class="dt-row-s">ср. реакция ~${Math.max(5,d.resp-10+Math.floor(Math.random()*20))} сек</div></div><div class="dt-row-r">${n} заказов</div></div>`;
-          }).join('')}
-        </div>
+          <div class="dt-row">
+            <div class="dt-row-l"><div class="dt-row-t">${fmt(d.own_tips)} AED чаевых</div>
+            <div class="dt-row-s">${d.own_bottles} ${pluralize(d.own_bottles,'бутылка','бутылки','бутылок')} — уже учтены в чаевых своего района</div></div>
+            <div class="dt-row-r" style="color:var(--gold2)">${fmt(d.own_tips)}</div>
+          </div>
+        </div>` : ''}
       `,
-      foot:`<button class="dt-btn">Написать в TG</button><button class="dt-btn">Бонус</button><button class="dt-btn pri">Отчёт</button>`
+      foot: d.telegram_id
+        ? `<button class="dt-btn" onclick="openTgUser('${d.telegram_id}','')">Открыть в TG</button>`
+        : ''
     };
   },
 

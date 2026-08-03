@@ -7011,13 +7011,20 @@ const DETAIL = {
     };
     const stars = (n,max=5,size=12)=>{ let s=''; for(let i=0;i<max;i++) s+=`<svg viewBox="0 0 24 24" width="${size}" height="${size}" style="vertical-align:-2px"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z" fill="${i<n?'#E8C98A':'#3a394d'}"/></svg>`; return s; };
     // Build a horizontal bars block from {label: value} pairs
-    const officeBars = (vals, fmtFn=v=>v, color='')=>{
-      const max = Math.max(1, ...Object.values(vals));
-      const labels = {office_central:'Central', office_north:'North', office_south:'South'};
-      return Object.entries(vals).map(([k,v])=>{
+    // Сервер отдаёт районы СПИСКОМ [{id,name,aed}] — состав районов настраиваемый.
+    // Раньше здесь ждали объект {id: сумма}, и Object.entries давал пары
+    // «индекс → объект»: в подписи стояли 0,1,2, а вместо суммы [object Object].
+    const officeBars = (rows, fmtFn=v=>v, color='')=>{
+      const list = Array.isArray(rows) ? rows
+                 : Object.entries(rows||{}).map(([id,aed])=>({id, name:id, aed}));
+      if(!list.length) return '<div style="padding:14px;color:var(--muted);font-size:13px;text-align:center">Нет данных</div>';
+      const max = Math.max(1, ...list.map(r=>+(r.aed != null ? r.aed : (r.count != null ? r.count : r.value))||0));
+      return list.map(r=>{
+        const k = r.name || r.id;
+        const v = +(r.aed != null ? r.aed : (r.count != null ? r.count : r.value)) || 0;
         const pct = Math.round((v/max)*100);
         const fill = color ? `background:${color}` : '';
-        return `<div class="dt-bar"><div class="dt-bar-l">${labels[k]||k}</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:${pct}%${fill?';'+fill:''}"></div></div><div class="dt-bar-v">${fmtFn(v)}</div></div>`;
+        return `<div class="dt-bar"><div class="dt-bar-l">${escS(k)}</div><div class="dt-bar-t"><div class="dt-bar-f" style="width:${pct}%${fill?';'+fill:''}"></div></div><div class="dt-bar-v">${fmtFn(v)}</div></div>`;
       }).join('');
     };
     const noData = '<div style="padding:24px 16px;text-align:center;color:var(--muted);font-size:13px">Нет данных</div>';
@@ -7065,7 +7072,7 @@ const DETAIL = {
           <div id="_expandDeclined" style="display:${_dtExpandState._declined?'block':'none'};margin:0 -14px;padding:4px 8px 4px 14px;background:rgba(0,0,0,.2);border-left:2px solid var(--dn)">${orderRows(k.declined_orders)}</div>
         </div>
         <div class="dt-sect">Заказы по офисам</div>
-        <div class="dt-card">${officeBars(k.orders_by_office||{}, v=>`${v} шт`)}</div>
+        <div class="dt-card">${officeBars(k.orders_by_office||[], v=>`${v} шт`)}</div>
         <div class="dt-sect">Заказы · 7 дней (шт)</div>
         <div class="dt-card" style="padding:14px">${line7(k.orders_7d||[], '#C9A96E')}</div>`;
     } else if(id === 'done'){

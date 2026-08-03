@@ -648,7 +648,11 @@ async def handle_finance(request):
             "rating_count":     rating_count,
             "rating_period":    period_lbl_for_rating,
             "rating_dist":      rating_dist,
-            "orders_by_office": orders_by_office,
+            # Тем же списком [{id,name,count}], что и by_office: одна форма на оба
+            # разреза, иначе фронт приходится учить двум разным.
+            "orders_by_office": [{"id": oid, "name": OFFICE_NAMES[oid],
+                                  "count": orders_by_office.get(oid, 0)}
+                                 for oid in OFFICE_IDS],
             "orders_7d":        orders_7d,
             # Delivery-time + late KPIs (computed from updated_at − timestamp
             # on delivered orders). avg_min = 0 means we have no samples yet.

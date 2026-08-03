@@ -994,6 +994,11 @@ async def handle_operators(request):
         revs = [int(o["review_score"]) for _, o in dl if o.get("review_score")]
         tips_total, tips_bottles, tips_by = _tips_by_driver(dl)
         resp = _resp_stats(alls) if op["senior"] else {"avg_sec": 0, "sample": 0, "slow": 0}
+        # Тот же человек может и возить: старший оператор в своём районе ездит
+        # как обычный водитель. Эти чаевые уже посчитаны району — здесь они
+        # показаны отдельно, как его личный заработок, а не второй раз кассе.
+        _own = [(dt, o) for dt, o in curr if (o.get("driver") or "").strip() == op["name"]]
+        own_tips, own_bottles, _ = _tips_by_driver(_own)
 
         # Разбивка по районам — у старшего показывает, где он сегодня работал.
         by_district = []
@@ -1031,14 +1036,35 @@ async def handle_operators(request):
             "tips_by_driver": [] if op["senior"] else sorted(
                 ({"name": k, "aed": v} for k, v in tips_by.items()),
                 key=lambda x: -x["aed"]),
+            "own_tips": own_tips, "own_bottles": own_bottles,
+            "drives": bool(_own) or op["name"] in {d for s in staff.DISTRICT_STAFF
+                                                   for d in s["drivers"]},
             "by_district": by_district,
         })
+
+    # Чужие устройства: кто-то принимает и заводит заказы, но в ростере его нет.
+    # Молчать об этом нельзя — это либо забытый оператор, либо чужой доступ.
+    known = set(staff.SENIOR_IDS)
+    unknown: dict[int, dict] = {}
+    for _dt, o in curr_all:
+        for key in ("operator_id", "created_by"):
+            v = o.get(key)
+            if not isinstance(v, int) or v in known:
+                continue
+            e = unknown.setdefault(v, {"telegram_id": v, "accepted": 0, "created": 0})
+            e["accepted" if key == "operator_id" else "created"] += 1
 
     return web.json_response({
         "period": period, "day_offset": day_offset,
         "norm_min": LATE_THRESHOLD_FALLBACK,
         "slow_sec": RESP_SLOW_SEC,
         "operators": out,
+        "unknown_devices": sorted(unknown.values(),
+                                  key=lambda x: -(x["accepted"] + x["created"])),
+        # Заказы из приложения никому не назначают водителя — их чаевые
+        # оседают в «без водителя», и делить их приходится вручную.
+        "tips_unassigned": sum(
+            d["aed"] for op in out for d in op["tips_by_driver"] if d["name"] == "—"),
     }, headers=CORS_HEADERS)
 
 

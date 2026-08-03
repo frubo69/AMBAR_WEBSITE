@@ -944,7 +944,11 @@ async def handle_office(request):
     for _, o in curr:
         for it in (o.get("items") or []):
             nm = str(it.get("name", "")).strip() or "—"
-            e = items_agg.setdefault(nm, {"name": nm, "qty": 0, "aed": 0})
+            # Группируем по названию, но тащим id: без него строка топа никуда
+            # не ведёт, а карточка товара открывается именно по нему.
+            e = items_agg.setdefault(nm, {"id": it.get("id") or "", "name": nm, "qty": 0, "aed": 0})
+            if not e["id"] and it.get("id"):
+                e["id"] = it["id"]
             e["qty"] += int(it.get("qty", 1) or 1)
             e["aed"] += int(it.get("line_total") or (it.get("price", 0) or 0) * (it.get("qty", 1) or 1))
     top_items = sorted(items_agg.values(), key=lambda x: -x["aed"])[:8]

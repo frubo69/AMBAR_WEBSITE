@@ -3434,7 +3434,7 @@ async function _officeLoad(id){
 
   if((d.top_items||[]).length){
     html += `<div class="dt-sect">Топ позиций</div><div class="dt-card">
-      ${d.top_items.map(i => `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${escS(i.name)}</div>
+      ${d.top_items.map(i => `<div class="dt-row"${i.id?` data-detail="product:${escS(i.id)}"`:''}><div class="dt-row-l"><div class="dt-row-t">${escS(i.name)}</div>
         <div class="dt-row-s">${i.qty} шт</div></div><div class="dt-row-r gold">${money(i.aed)}</div></div>`).join('')}
     </div>`;
   }
@@ -4237,11 +4237,13 @@ function _renderTopProducts(){
   if(!PRODUCTS.length){ wrap.innerHTML = '<div style="padding:18px;text-align:center;color:var(--muted);font-size:13px">Нет данных</div>'; return; }
   const top = [...PRODUCTS].sort((a,b)=>b.rev-a.rev).slice(0,4).filter(p=>p.rev>0);
   if(!top.length){ wrap.innerHTML = '<div style="padding:18px;text-align:center;color:var(--muted);font-size:13px">Пока нет продаж</div>'; return; }
-  wrap.innerHTML = top.map((p,i)=>`<div class="lrow">
+  // data-detail обязателен: строки открываются глобальным обработчиком по нему,
+  // без атрибута ряд выглядит кликабельным, но не реагирует.
+  wrap.innerHTML = top.map((p,i)=>`<div class="lrow" data-detail="product:${p.id}">
     <div class="lrow-idx">${i+1}</div>
-    <div class="lrow-av" style="background:linear-gradient(135deg,#2a2040,#1a1428);color:var(--gold)">${p.i}</div>
+    <div class="lrow-av" style="background:linear-gradient(135deg,#2a2040,#1a1428);color:var(--gold)">${escS(p.i)}</div>
     <div class="lrow-body">
-      <div class="lrow-name">${p.name}${p.vol?' · '+p.vol:''}</div>
+      <div class="lrow-name">${escS(p.name)}${p.vol?' · '+escS(p.vol):''}</div>
       <div class="lrow-sub">${p.sold} шт · ${fmt(p.price)} ${curCur} за бут.</div>
     </div>
     <div class="lrow-amt mono">${fmt(p.rev)}</div>

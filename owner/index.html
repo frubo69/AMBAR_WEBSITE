@@ -2056,6 +2056,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
         <button class="ac-chip" data-filter="banned">Забаненные</button>
         <button class="ac-chip" data-filter="hasReferrals">С рефералами</button>
         <button class="ac-chip" data-filter="hasPhone">С номером</button>
+        <button class="ac-chip" data-filter="phoneVerified">Номер подтверждён</button>
         <button class="ac-chip" data-filter="new7d">Новые (7д)</button>
         <button class="ac-chip" data-filter="inactive">Неактивные</button>
         <button class="ac-chip" data-filter="topSpent">Топ по тратам</button>
@@ -4084,7 +4085,7 @@ function renderAllClientsList(customers){
     const uname = c.username ? '@'+c.username : 'ID '+c.telegram_id;
     const _fs=c.first_seen?new Date(c.first_seen).getTime():0;
     const _ls=c.last_seen?new Date(c.last_seen).getTime():0;
-    html += `<div class="lrow" data-detail="customer:${c.telegram_id}" data-orders="${c.orders_total||0}" data-vip="${c.is_vip?1:0}" data-banned="${c.is_banned?1:0}" data-refs="${c.referrals_count||0}" data-phone="${c.phone?1:0}" data-firstseen="${_fs}" data-lastseen="${_ls}" data-spent="${c.total_spent||0}"><div class="lrow-av"${avSt?' style="'+avSt+'"':''}>${c.initials}</div><div class="lrow-body"><div class="lrow-name">${name}${tag}${c.is_banned?' <span class="lrow-tag" style="background:rgba(224,85,85,.15);color:#e05555">БАН</span>':''}</div><div class="lrow-sub">${uname} · ${_pluralOrders(c.orders_total)}</div></div><div class="lrow-amt mono" data-aed="${c.total_spent}">${fmt(c.total_spent)}</div></div>`;
+    html += `<div class="lrow" data-detail="customer:${c.telegram_id}" data-orders="${c.orders_total||0}" data-vip="${c.is_vip?1:0}" data-banned="${c.is_banned?1:0}" data-refs="${c.referrals_count||0}" data-phone="${c.phone?1:0}" data-pverified="${c.phone_verified?1:0}" data-firstseen="${_fs}" data-lastseen="${_ls}" data-spent="${c.total_spent||0}"><div class="lrow-av"${avSt?' style="'+avSt+'"':''}>${c.initials}</div><div class="lrow-body"><div class="lrow-name">${name}${tag}${c.is_banned?' <span class="lrow-tag" style="background:rgba(224,85,85,.15);color:#e05555">БАН</span>':''}</div><div class="lrow-sub">${uname} · ${_pluralOrders(c.orders_total)}</div></div><div class="lrow-amt mono" data-aed="${c.total_spent}">${fmt(c.total_spent)}</div></div>`;
   });
   html += '</div>';
   body.innerHTML = html;
@@ -5621,6 +5622,7 @@ function filterAllClients(q){
     if(show && _acActiveFilter === 'banned' && row.dataset.banned !== '1') show = false;
     if(show && _acActiveFilter === 'hasReferrals' && Number(row.dataset.refs) === 0) show = false;
     if(show && _acActiveFilter === 'hasPhone' && row.dataset.phone !== '1') show = false;
+    if(show && _acActiveFilter === 'phoneVerified' && row.dataset.pverified !== '1') show = false;
     if(show && _acActiveFilter === 'new7d'){const fs=Number(row.dataset.firstseen);if(!fs||now-fs>_7D) show=false;}
     if(show && _acActiveFilter === 'inactive'){const ls=Number(row.dataset.lastseen);const ord=Number(row.dataset.orders);if(ord===0||(ls&&now-ls<_30D)) show=false;}
     if(show && _acActiveFilter === 'topSpent' && Number(row.dataset.orders) === 0) show = false;
@@ -5647,7 +5649,7 @@ function filterAllClients(q){
   const sub = document.getElementById('acSubtitle');
   if(sub){
     const total = rows.length;
-    const _fNames={hasOrders:'с заказами',returning:'повторные',vip:'VIP',banned:'забаненные',hasReferrals:'с рефералами',hasPhone:'с номером',new7d:'новые 7д',inactive:'неактивные',topSpent:'по тратам ↓'};
+    const _fNames={hasOrders:'с заказами',returning:'повторные',vip:'VIP',banned:'забаненные',hasReferrals:'с рефералами',hasPhone:'с номером',phoneVerified:'номер подтверждён',new7d:'новые 7д',inactive:'неактивные',topSpent:'по тратам ↓'};
     const fLabel = _fNames[_acActiveFilter]||'';
     if(_acActiveFilter || needle) sub.textContent = `${visCount} из ${total}${fLabel?' · '+fLabel:''}`;
     else sub.textContent = `${total} человек · А → Я`;
@@ -6687,6 +6689,27 @@ const DETAIL = {
     const cardCl = _cardClass(c.card_type);
     const cardAv = _cardAvStyle(c.card_type);
     const ph = _fmtPhone(c.phone);
+    // Три номера, каждый со своим смыслом: подтверждённый прислал Telegram,
+    // отредактированный клиент вписал вместо него, дополнительный добавил
+    // сверху. Показываем только те, что есть — пустых строк быть не должно.
+    const phoneRows = [
+      c.phone_verified && {t:'Подтверждён',    v:c.phone_verified, s:'номер из Telegram',   gold:true},
+      c.phone_edited   && {t:'Отредактирован', v:c.phone_edited,   s:'указан для доставки'},
+      c.phone_extra    && {t:'Дополнительный', v:c.phone_extra,    s:'добавлен клиентом'},
+    ].filter(Boolean);
+    const phoneSection = phoneRows.length ? `
+        <div class="dt-sect">Телефоны</div>
+        <div class="dt-card">
+          ${phoneRows.map(r=>`<div class="dt-row">
+            <div class="dt-row-l"><div class="dt-row-t">${r.t}</div><div class="dt-row-s">${r.s}</div></div>
+            <div class="dt-row-r"${r.gold?' style="color:var(--gold2)"':''}>+${escS(r.v)}</div>
+          </div>`).join('')}
+        </div>` : (ph ? `
+        <div class="dt-sect">Телефоны</div>
+        <div class="dt-card"><div class="dt-row">
+          <div class="dt-row-l"><div class="dt-row-t">Номер</div><div class="dt-row-s">не подтверждён</div></div>
+          <div class="dt-row-r" style="color:var(--warn)">${escS(ph)}</div>
+        </div></div>` : '');
     const uname = c.username ? '@'+c.username : 'ID '+c.telegram_id;
     const joined = _joinedDate(c.first_seen);
     const lastSeen = _relDate(c.last_seen);
@@ -6756,7 +6779,7 @@ const DETAIL = {
     }
 
     return {
-      title:`<div class="dt-tit-av plain"${cardAv?' style="'+cardAv+'"':''}>${c.initials}</div><div><div class="dt-tit-name">${c.full_name} ${cardLabel?`<span class="lrow-tag ${cardCl}" style="font-size:9px;padding:2px 6px;border-radius:4px;letter-spacing:.8px;font-weight:700">${cardLabel}${c.card_total?` №${String(c.card_number).padStart(3,'0')}/${c.card_total}`:''}</span>`:''}${banBadge}${verBadge}${debtBadge}</div><div class="dt-sub">${uname} · ${ph||'нет телефона'} · <span style="color:var(--gold2)">в боте с ${joined}</span></div></div>`,
+      title:`<div class="dt-tit-av plain"${cardAv?' style="'+cardAv+'"':''}>${c.initials}</div><div><div class="dt-tit-name">${c.full_name} ${cardLabel?`<span class="lrow-tag ${cardCl}" style="font-size:9px;padding:2px 6px;border-radius:4px;letter-spacing:.8px;font-weight:700">${cardLabel}${c.card_total?` №${String(c.card_number).padStart(3,'0')}/${c.card_total}`:''}</span>`:''}${banBadge}${verBadge}${debtBadge}</div><div class="dt-sub">${uname} · ${c.phone_verified ? '+'+escS(c.phone_verified)+' ✓' : (ph||'нет телефона')} · <span style="color:var(--gold2)">в боте с ${joined}</span></div></div>`,
       body:`
         <div class="dt-stats">
           <div class="dt-stat"><div class="dt-stat-lbl">Потрачено</div><div class="dt-stat-val gold"><span data-aed="${c.total_spent}">${fmt(c.total_spent)}</span><span class="u">AED</span></div><div class="dt-stat-sub">всего</div></div>
@@ -6766,6 +6789,7 @@ const DETAIL = {
           <div class="dt-stat"><div class="dt-stat-lbl">Рефералы</div><div class="dt-stat-val up">${c.referrals_count}</div><div class="dt-stat-sub">${c.referral_points} баллов</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">Telegram ID</div><div class="dt-stat-val" style="font-size:12px;font-family:'JetBrains Mono',monospace">${c.telegram_id}</div></div>
         </div>
+        ${phoneSection}
         ${debtSection}
         ${verifyInfo}
         <div class="dt-sect">Адреса</div>

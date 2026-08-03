@@ -705,6 +705,19 @@ def _serialize_user(u: dict, orders: list | None = None) -> dict:
     avg_check = total_spent // orders_total if orders_total else 0
     phones = u.get("phones", [])
     phone = phones[0] if phones else (u.get("phone") or "")
+    # Номера теперь трёх сортов. Подтверждённый живёт на пользователе — его
+    # прислал Telegram. Отредактированный и дополнительный принадлежат заказу,
+    # поэтому берём их из последнего: именно по ним сейчас возят.
+    verified = re.sub(r"\D", "", str(u.get("phone_verified") or ""))
+    edited = extra = ""
+    if orders:
+        last = max(orders, key=lambda o: str(o.get("timestamp") or ""))
+        d = re.sub(r"\D", "", str(last.get("phone") or ""))
+        if d and d != verified:
+            edited = d
+        extra = re.sub(r"\D", "", str(last.get("phone_extra") or ""))
+        if extra in (verified, edited):
+            extra = ""
 
     out = {
         "telegram_id":   u.get("telegram_id"),
@@ -713,6 +726,9 @@ def _serialize_user(u: dict, orders: list | None = None) -> dict:
         "full_name":     u.get("full_name") or f'{u.get("first_name", "")} {u.get("last_name", "")}'.strip(),
         "username":      u.get("username", ""),
         "phone":         phone,
+        "phone_verified": verified,
+        "phone_edited":   edited,
+        "phone_extra":    extra,
         "initials":      _initials(u),
         "card_type":     card["type"],          # founder | premium | worldwide | standard
         "card_label":    card["label"],         # FOUNDER | ÉLITE | WORLDWIDE | ""

@@ -572,7 +572,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
         <button class="dn-b" id="dnNext" aria-label="Следующий день" disabled
           onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayStep(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
         <button class="dn-home" id="dnHome" style="display:none" aria-label="Вернуться к сегодня"
-          onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayReset()">Сегодня</button>
+          onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayReset()">Назад</button>
       </span>
     </div>
     <div class="hero-amt-row">
@@ -2956,19 +2956,19 @@ function _fillPeriodDates(){
           .forEach(el => el.textContent = fmt(yest));
 }
 
-// {num:'28.07', rel:'вчера'} — число всегда, слово под ним. Даты берём от СЕРВЕРА
-// (его дубайские сутки), часы устройства могут врать.
+// Что писать на плашке дня. У «сегодня» и «вчера» слово главное, число —
+// уточнение под ним. У остальных дней слово не нужно: «30.07» и «30 июля» —
+// это одна и та же дата дважды, поэтому остаётся только число.
+// Даты берём от СЕРВЕРА (его дубайские сутки), часы устройства могут врать.
 function _dayLabel(w){
   const iso = (w && w.date) || _dayIsoFor(DAY_OFFSET);
   const d = new Date(iso + 'T00:00:00');
   const t = new Date(((w && w.today) || _dayIsoFor(0)) + 'T00:00:00');
   const num = String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0');
   const diff = Math.round((t - d) / 86400000);
-  let rel;
-  if(diff === 0)      rel = 'сегодня';
-  else if(diff === 1) rel = 'вчера';
-  else                rel = d.getDate() + ' ' + (_MONTHS_GEN[d.getMonth()] || '');
-  return {num, rel};
+  if(diff === 0) return {top:'Сегодня', sub:num};
+  if(diff === 1) return {top:'Вчера',   sub:num};
+  return {top:num, sub:''};
 }
 
 function _syncDayNav(p, w){
@@ -2976,8 +2976,10 @@ function _syncDayNav(p, w){
   if(nav) nav.style.display = _dayNavOn(p) ? 'flex' : 'none';
   const nx = document.getElementById('dnNext'); if(nx) nx.disabled = DAY_OFFSET <= 0;
   const lbl = _dayLabel(w);
-  _setText('dnDateNum', lbl.num);
-  _setText('dnDateTxt', lbl.rel);
+  _setText('dnDateNum', lbl.top);
+  _setText('dnDateTxt', lbl.sub);
+  const sub = document.getElementById('dnDateTxt');
+  if(sub) sub.style.display = lbl.sub ? '' : 'none';
   // Тап по дате тоже возвращает к сегодня — но полагаться на догадку не надо,
   // рядом появляется подписанная кнопка.
   const chip = document.getElementById('dnDate');

@@ -296,6 +296,75 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   padding:2px 7px;border-radius:6px;flex-shrink:0}
 @media (min-width:760px){ .off-tot{grid-template-columns:repeat(4,1fr)} }
 
+
+/* ── Пересчёт склада ────────────────────────────────────────────────────────
+   Вход с страницы районов и полноэкранный мастер. Считаем по одной позиции:
+   крупное число «должно остаться» и две кнопки — так экран читается без
+   объяснений, а вводить приходится только там, где расходится. */
+.stk-entry{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;margin:2px 0 12px;
+  border-radius:14px;background:linear-gradient(90deg,rgba(201,169,110,.08),rgba(201,169,110,.02));
+  border:1px solid rgba(201,169,110,.22);box-shadow:inset 3px 0 0 rgba(201,169,110,.55);
+  color:var(--text);cursor:pointer;transition:.18s var(--e1);text-align:left;font-family:inherit}
+.stk-entry:active{transform:scale(.99)}
+.stk-e-ico{width:38px;height:38px;border-radius:11px;background:rgba(201,169,110,.1);
+  border:1px solid rgba(201,169,110,.24);display:flex;align-items:center;justify-content:center;
+  color:var(--gold2);flex-shrink:0}
+.stk-e-body{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.stk-e-t{font-size:14.5px;font-weight:700;letter-spacing:.1px}
+.stk-e-s{font-size:11.5px;color:var(--muted)}
+.stk-e-dots{display:flex;gap:4px;flex-shrink:0}
+.stk-d{width:22px;height:22px;border-radius:7px;display:flex;align-items:center;justify-content:center;
+  font-family:'Space Grotesk',sans-serif;font-size:9px;font-weight:700;
+  background:var(--card2);border:1px solid var(--border2);color:var(--muted)}
+.stk-d.ok{background:rgba(76,175,125,.16);border-color:rgba(76,175,125,.4);color:var(--up)}
+.stk-d.bad{background:rgba(224,85,85,.16);border-color:rgba(224,85,85,.4);color:var(--dn)}
+.stk-e-go{color:var(--muted);font-size:17px;flex-shrink:0}
+
+/* мастер */
+.stk-ov{position:fixed;inset:0;z-index:120;background:var(--bg);display:none;flex-direction:column}
+.stk-ov.show{display:flex}
+.stk-top{flex-shrink:0;padding:calc(12px + var(--safe-top)) 16px 10px;border-bottom:1px solid var(--border2)}
+.stk-top-r{display:flex;align-items:center;gap:10px}
+.stk-x{width:34px;height:34px;border-radius:10px;border:1px solid var(--border2);background:var(--card);
+  color:var(--sub);font-size:15px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0}
+.stk-ttl{flex:1;min-width:0}
+.stk-ttl-t{font-size:15px;font-weight:700}
+.stk-ttl-s{font-size:11px;color:var(--muted);margin-top:1px}
+.stk-bar{height:3px;border-radius:2px;background:var(--card2);margin-top:10px;overflow:hidden}
+.stk-bar-f{height:100%;background:linear-gradient(90deg,var(--gold),var(--gold2));
+  border-radius:2px;transition:width .25s var(--e1)}
+.stk-mid{flex:1;overflow-y:auto;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;padding:20px 18px;text-align:center;gap:4px}
+.stk-cat{font-size:10px;font-weight:600;letter-spacing:2px;text-transform:uppercase;color:var(--muted)}
+.stk-name{font-size:24px;font-weight:700;letter-spacing:-.5px;line-height:1.2;margin-top:4px;max-width:520px}
+.stk-hint{font-size:12px;color:var(--muted);margin-top:14px}
+.stk-num{font-family:'DM Sans',sans-serif;font-size:88px;font-weight:700;letter-spacing:-3px;
+  line-height:1;color:var(--gold2);margin:2px 0 4px;font-variant-numeric:tabular-nums}
+.stk-why{font-size:11.5px;color:var(--dim);max-width:420px;line-height:1.6}
+.stk-bot{flex-shrink:0;padding:12px 16px calc(14px + var(--safe-bottom));border-top:1px solid var(--border2);
+  display:flex;gap:10px;background:var(--bg2)}
+.stk-b{flex:1;padding:16px;border-radius:14px;border:1px solid var(--border2);background:var(--card);
+  color:var(--text);font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;cursor:pointer;
+  transition:.15s var(--e1)}
+.stk-b:active{transform:scale(.97)}
+.stk-b.pri{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;border:none}
+/* ввод другого числа */
+.stk-pad{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;width:100%;max-width:300px;margin-top:16px}
+.stk-k{padding:15px 0;border-radius:12px;border:1px solid var(--border2);background:var(--card);
+  color:var(--text);font-family:'DM Sans',sans-serif;font-size:20px;font-weight:600;cursor:pointer}
+.stk-k:active{background:var(--gold-soft)}
+.stk-in{font-family:'DM Sans',sans-serif;font-size:72px;font-weight:700;letter-spacing:-2px;
+  color:var(--text);min-height:76px;font-variant-numeric:tabular-nums}
+/* итог */
+.stk-res-num{font-family:'DM Sans',sans-serif;font-size:64px;font-weight:700;letter-spacing:-2px;line-height:1}
+.stk-res-ok{color:var(--up)} .stk-res-bad{color:var(--dn)}
+.stk-list{width:100%;max-width:560px;margin-top:18px;text-align:left}
+.stk-row{display:flex;align-items:center;gap:10px;padding:11px 0;border-bottom:1px solid var(--border2)}
+.stk-row:last-child{border-bottom:none}
+.stk-row-n{flex:1;min-width:0;font-size:13.5px}
+.stk-row-s{font-size:11px;color:var(--muted);margin-top:2px}
+.stk-row-d{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;white-space:nowrap}
+
 /* ── карточки районов ─────────────────────────────────────────────────── */
 .off-card{position:relative;background:var(--card);border:1px solid var(--border2);border-radius:var(--r);
   padding:15px 16px 14px;overflow:hidden;transition:.16s var(--e1)}
@@ -830,6 +899,23 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     </button>
   </div>
   <div class="range-chip" id="rangeChip-officePeriod" style="display:none"><span class="rc-icon">📅</span><span class="rc-text"></span><button class="rc-x" onclick="clearRange('officePeriod')">✕</button></div>
+
+  <!-- Пересчёт склада. Стоит первым на странице районов: это ежедневное
+       действие, а не отчёт, и открывать его надо в один тап. -->
+  <button class="stk-entry" id="stkEntry" onclick="openStock()">
+    <span class="stk-e-ico">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>
+      </svg>
+    </span>
+    <span class="stk-e-body">
+      <span class="stk-e-t">Пересчёт склада</span>
+      <span class="stk-e-s" id="stkEntrySub">проверьте остатки за смену</span>
+    </span>
+    <span class="stk-e-dots" id="stkEntryDots"></span>
+    <span class="stk-e-go">›</span>
+  </button>
 
   <!-- Итог по всем районам: без него карточки — просто пять чисел, не с чем
        сравнить и не видно, складываются ли они в то, что на «Обзоре». -->
@@ -3421,8 +3507,210 @@ async function _officeLoad(id){
 // Страница «Офисы» — только реальные цифры из /api/owner/finance.
 // Ни выдуманных операторов, ни «в очереди», ни статусов «открыт/загружен»:
 // таких данных в системе нет, поэтому их и не показываем.
+
+// ─── Пересчёт склада ────────────────────────────────────────────────────────
+// Смысл: приложение уже знает продажи по заказам, поэтому может предсказать
+// остаток. Менеджеру остаётся подтвердить или поправить — и только по тем
+// позициям, которые за смену вообще двигались. Из 122 наименований обычно
+// остаётся десяток.
+let STK = {district:null, sheet:null, queue:[], idx:0, answers:{}, mode:'pick', typed:''};
+
+async function openStock(){
+  document.getElementById('stkOv').classList.add('show');
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  STK = {district:null, sheet:null, queue:[], idx:0, answers:{}, mode:'pick', typed:''};
+  await stkRenderPicker();
+}
+function closeStock(){
+  document.getElementById('stkOv').classList.remove('show');
+  stkRefreshEntry();
+}
+
+function _stkSet(title, sub, mid, bot, pct){
+  _setText('stkTitle', title); _setText('stkSub', sub);
+  document.getElementById('stkMid').innerHTML = mid;
+  document.getElementById('stkBot').innerHTML = bot;
+  document.getElementById('stkBar').style.width = (pct||0) + '%';
+}
+
+// Шаг 1 — выбор района. Сразу видно, где пересчёт уже сделан.
+async function stkRenderPicker(){
+  _stkSet('Пересчёт склада', 'выберите район',
+    '<div style="color:var(--muted);font-size:13px">Загрузка…</div>', '', 0);
+  let st;
+  try{ st = await ownerApi.ownerFetch('/api/owner/stock/status'); }
+  catch(e){ _stkSet('Пересчёт склада','ошибка',
+      '<div style="color:var(--dn);font-size:13px">Не удалось загрузить</div>',''); return; }
+  STK.status = st;
+  const cards = st.districts.map(d=>`
+    <button class="stk-b" style="text-align:left;display:flex;align-items:center;gap:12px;margin-bottom:8px"
+            onclick="stkPick('${d.id}')">
+      <span style="font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;
+                   color:${d.done?'var(--up)':'var(--gold2)'};min-width:26px">${escS(d.code)}</span>
+      <span style="flex:1">${escS(d.name)}
+        <span style="display:block;font-size:11px;font-weight:500;color:var(--muted);margin-top:2px">
+          ${d.done ? (d.short_aed ? 'не хватает '+fmt(d.short_aed)+' AED' : 'всё сошлось') : 'ещё не считали'}
+        </span></span>
+      <span style="color:${d.done?'var(--up)':'var(--muted)'};font-size:15px">${d.done?'✓':'›'}</span>
+    </button>`).join('');
+  _stkSet('Пересчёт склада', `${st.done} из ${st.total} районов · ${st.day}`,
+    `<div style="width:100%;max-width:460px">${cards}</div>`, '', 0);
+}
+
+async function stkPick(district){
+  STK.district = district;
+  _stkSet('Загрузка…', '', '<div style="color:var(--muted);font-size:13px">Считаем ожидаемые остатки…</div>', '', 0);
+  let sh;
+  try{ sh = await ownerApi.ownerFetch('/api/owner/stock/sheet', {params:{district}}); }
+  catch(e){ return stkRenderPicker(); }
+  STK.sheet = sh;
+  // Проверяем только то, что двигалось: остальное физически измениться не могло.
+  // На первом пересчёте двигаться нечему — вводим всё как отправную точку.
+  STK.queue = sh.first_time ? sh.rows : sh.rows.filter(r=>r.touched);
+  STK.idx = 0; STK.answers = {};
+  if(!STK.queue.length) return stkDone(true);
+  stkStep();
+}
+
+function stkStep(){
+  const r = STK.queue[STK.idx];
+  if(!r) return stkSubmit();
+  const n = STK.queue.length, pct = Math.round(STK.idx / n * 100);
+  const sub = `${STK.sheet.district_code} ${STK.sheet.district_name} · ${STK.idx+1} из ${n}`;
+  STK.mode = 'pick'; STK.typed = '';
+
+  if(STK.sheet.first_time){
+    return _stkSet('Первый пересчёт', sub, `
+      <div class="stk-cat">${escS(r.cat||'')}</div>
+      <div class="stk-name">${escS(r.name)}</div>
+      <div class="stk-hint">Сколько сейчас на полке?</div>
+      <div class="stk-in" id="stkTyped">0</div>
+      ${stkPad()}`, `<button class="stk-b pri" onclick="stkTake(+ (document.getElementById('stkTyped').textContent||0))">Дальше</button>`, pct);
+  }
+
+  const why = [];
+  if(r.was)       why.push(`вчера было ${r.was}`);
+  if(r.sold)      why.push(`продано ${r.sold}`);
+  if(r.moved_qty) why.push(`перемещение ${r.moved_qty>0?'+':''}${r.moved_qty}`);
+  _stkSet('Пересчёт', sub, `
+    <div class="stk-cat">${escS(r.cat||'')}</div>
+    <div class="stk-name">${escS(r.name)}</div>
+    <div class="stk-hint">Должно остаться</div>
+    <div class="stk-num">${r.expected}</div>
+    <div class="stk-why">${why.join(' · ')}</div>`,
+    `<button class="stk-b" onclick="stkOther()">Другое число</button>
+     <button class="stk-b pri" onclick="stkTake(${r.expected})">Так и есть</button>`, pct);
+}
+
+function stkPad(){
+  const keys = [1,2,3,4,5,6,7,8,9,'⌫',0,'0'];
+  return `<div class="stk-pad">${
+    [1,2,3,4,5,6,7,8,9].map(k=>`<button class="stk-k" onclick="stkKey('${k}')">${k}</button>`).join('')
+  }<button class="stk-k" onclick="stkKey('back')">⌫</button>
+   <button class="stk-k" onclick="stkKey('0')">0</button>
+   <button class="stk-k" onclick="stkKey('clear')">C</button></div>`;
+}
+function stkKey(k){
+  const el = document.getElementById('stkTyped'); if(!el) return;
+  let v = STK.typed || '';
+  if(k === 'back')       v = v.slice(0, -1);
+  else if(k === 'clear') v = '';
+  else if(v.length < 4)  v += k;
+  STK.typed = v;
+  el.textContent = v === '' ? '0' : String(parseInt(v, 10));
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
+function stkOther(){
+  const r = STK.queue[STK.idx];
+  STK.mode = 'type'; STK.typed = '';
+  const n = STK.queue.length;
+  _stkSet('Пересчёт', `${STK.sheet.district_code} · ${STK.idx+1} из ${n}`, `
+    <div class="stk-name" style="font-size:19px">${escS(r.name)}</div>
+    <div class="stk-hint">Сколько на самом деле?</div>
+    <div class="stk-in" id="stkTyped">0</div>
+    ${stkPad()}`,
+    `<button class="stk-b" onclick="stkStep()">Назад</button>
+     <button class="stk-b pri" onclick="stkTake(+(STK.typed||0))">Готово</button>`,
+    Math.round(STK.idx / n * 100));
+}
+
+function stkTake(actual){
+  const r = STK.queue[STK.idx];
+  STK.answers[r.id] = {id:r.id, actual:Math.max(0, parseInt(actual,10) || 0)};
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  STK.idx++;
+  if(STK.idx >= STK.queue.length) stkSubmit(); else stkStep();
+}
+
+async function stkSubmit(){
+  _stkSet('Сохраняем…', '', '<div style="color:var(--muted);font-size:13px">Сверяем с продажами…</div>', '', 100);
+  let res;
+  try{
+    res = await ownerApi.ownerFetch('/api/owner/stock/count', {method:'POST',
+      body:{district:STK.district, day:STK.sheet.day, lines:Object.values(STK.answers)}});
+  }catch(e){
+    return _stkSet('Ошибка','',
+      '<div style="color:var(--dn);font-size:13px">Не удалось сохранить</div>',
+      '<button class="stk-b pri" onclick="stkSubmit()">Ещё раз</button>', 100);
+  }
+  stkDone(false, res);
+}
+
+function stkDone(nothing, res){
+  if(nothing){
+    return _stkSet('Нечего пересчитывать', STK.sheet ? STK.sheet.district_name : '',
+      `<div class="stk-res-num stk-res-ok">0</div>
+       <div class="stk-hint">За смену в этом районе ничего не двигалось —<br>остатки измениться не могли.</div>`,
+      '<button class="stk-b pri" onclick="stkRenderPicker()">К районам</button>', 100);
+  }
+  if(res.first_time){
+    return _stkSet('Готово', 'отправная точка сохранена',
+      `<div class="stk-res-num stk-res-ok">✓</div>
+       <div class="stk-hint">Это первый пересчёт района — сравнивать было не с чем.<br>
+       Со следующей смены приложение начнёт показывать недостачу.</div>`,
+      '<button class="stk-b pri" onclick="stkRenderPicker()">К районам</button>', 100);
+  }
+  const bad = (res.lines || []).filter(l => l.diff > 0);
+  const good = (res.lines || []).filter(l => l.diff < 0);
+  const rows = [...bad, ...good].map(l => `
+    <div class="stk-row">
+      <div class="stk-row-n">${escS(l.name)}
+        <div class="stk-row-s">ожидалось ${l.expected} · насчитали ${l.actual}</div></div>
+      <div class="stk-row-d" style="color:${l.diff>0?'var(--dn)':'var(--up)'}">
+        ${l.diff>0?'−':'+'}${Math.abs(l.diff)}
+        <span style="font-size:11px;color:var(--muted)"> · ${fmt(Math.abs(l.diff)*l.price)}</span>
+      </div>
+    </div>`).join('');
+  const ok = !res.short_qty && !res.over_qty;
+  _stkSet(ok ? 'Всё сошлось' : 'Есть расхождения',
+    `${STK.sheet.district_code} ${STK.sheet.district_name} · ${res.day}`,
+    ok ? `<div class="stk-res-num stk-res-ok">✓</div>
+          <div class="stk-hint">Остатки совпали с продажами до штуки.</div>`
+       : `<div class="stk-res-num stk-res-bad">${fmt(res.short_aed)}<span style="font-size:20px;color:var(--muted)"> AED</span></div>
+          <div class="stk-hint">не хватает ${res.short_qty} шт${res.over_qty?` · лишних ${res.over_qty} шт`:''}</div>
+          <div class="stk-list">${rows}</div>`,
+    '<button class="stk-b pri" onclick="stkRenderPicker()">К районам</button>', 100);
+}
+
+// Плашка на странице районов: сколько сделано и на сколько разошлось.
+async function stkRefreshEntry(){
+  const sub = document.getElementById('stkEntrySub');
+  const dots = document.getElementById('stkEntryDots');
+  if(!sub || !window.ownerApi) return;
+  try{
+    const st = await ownerApi.ownerFetch('/api/owner/stock/status');
+    dots.innerHTML = st.districts.map(d =>
+      `<span class="stk-d ${d.done ? (d.short_aed ? 'bad' : 'ok') : ''}">${escS(d.code)}</span>`).join('');
+    sub.textContent = st.done === st.total
+      ? (st.short_aed ? `все районы · не хватает ${fmt(st.short_aed)} AED` : 'все районы сошлись')
+      : `${st.done} из ${st.total} районов · проверьте остатки`;
+  }catch(e){ /* молча: плашка не должна ломать страницу */ }
+}
+
 function renderOffices(rows){
-  OFF_LAST = rows;                       // чтобы смена сортировки перерисовала то же
+  OFF_LAST = rows;
+  stkRefreshEntry();                       // чтобы смена сортировки перерисовала то же
   const box = document.getElementById('offCards');
   const speed = document.getElementById('offSpeed');
   const sub = document.getElementById('offSub');
@@ -7703,5 +7991,23 @@ if(window.ownerApi){
   });
 })();
 </script>
+
+<!-- Пересчёт склада: полноэкранный мастер. Показывается по одной позиции —
+     крупное число «должно остаться» и выбор из двух кнопок. -->
+<div class="stk-ov" id="stkOv">
+  <div class="stk-top">
+    <div class="stk-top-r">
+      <button class="stk-x" onclick="closeStock()" aria-label="Закрыть">✕</button>
+      <div class="stk-ttl">
+        <div class="stk-ttl-t" id="stkTitle">Пересчёт</div>
+        <div class="stk-ttl-s" id="stkSub">—</div>
+      </div>
+    </div>
+    <div class="stk-bar"><div class="stk-bar-f" id="stkBar" style="width:0%"></div></div>
+  </div>
+  <div class="stk-mid" id="stkMid"></div>
+  <div class="stk-bot" id="stkBot"></div>
+</div>
+
 </body>
 </html>

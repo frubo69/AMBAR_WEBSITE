@@ -6819,7 +6819,9 @@ const DETAIL = {
     let d = ORDERS[id];
     if(!d){
       const period = document.querySelector('#periodPicker button.on')?.dataset?.p || 'today';
-      const fc = FINANCE_CACHE[period];
+      // Заказ ищем в кэше просматриваемого дня — открытый из списка за 29-е
+      // в сегодняшнем кэше просто не нашёлся бы.
+      const fc = _dayCached(period);
       const k = fc?.kpi || {};
       const allLists = [...(k.pending_orders||[]),...(k.inroute_orders||[]),...(k.delivered_orders||[]),...(k.declined_orders||[])];
       const real = allLists.find(o=>o.id===id);
@@ -6989,8 +6991,13 @@ const DETAIL = {
   kpi: id=>{
     // Active period from periodPicker (today | week | month | year)
     const period = document.querySelector('#periodPicker button.on')?.dataset?.p || 'today';
-    const f = FINANCE_CACHE[period];
-    const periodLbl = {today:'сегодня', yesterday:'вчера', week:'неделя', month:'месяц', year:'год'}[period] || period;
+    // Если пролистали к прошлому дню — деталь должна показывать ЕГО, а не
+    // сегодняшний кэш: раньше карточка на экране была за 29-е, а раскрытие
+    // приносило цифры за сегодня.
+    const f = _dayCached(period);
+    const periodLbl = DAY_OFFSET
+      ? (l => l.sub ? `${l.top} ${l.sub}` : l.top)(_dayLabel((f||{}).window))
+      : ({today:'сегодня', yesterday:'вчера', week:'неделя', month:'месяц', year:'год'}[period] || period);
 
     // Helpers
     const line7 = (arr, stroke='#C9A96E', yFmt=v=>v)=>{

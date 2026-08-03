@@ -1462,6 +1462,19 @@ async def add_stock_transfer(doc: dict):
     await db.stock_transfers.insert_one(dict(doc))
 
 
+async def delete_stock_transfer(tid: str) -> bool:
+    """Убрать ошибочное перемещение. Физически удаляем: перемещение — не событие
+    истории, а поправка к остатку, и «отменённая» строка только путала бы счёт."""
+    from bson import ObjectId
+    db = _db_or_none()
+    if db is None: return False
+    try:
+        r = await db.stock_transfers.delete_one({"_id": ObjectId(tid)})
+    except Exception:
+        return False
+    return r.deleted_count > 0
+
+
 async def get_stock_transfers(day: str) -> list:
     db = _db_or_none()
     if db is None: return []

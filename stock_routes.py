@@ -282,11 +282,19 @@ async def handle_transfer(request):
 
 
 @require_owner
+async def handle_transfer_delete(request):
+    """Убрать перемещение, введённое по ошибке."""
+    tid = (request.match_info.get("tid") or "").strip()
+    ok = await db.delete_stock_transfer(tid)
+    return web.json_response({"ok": ok}, status=200 if ok else 404, headers=CORS_HEADERS)
+
+
+@require_owner
 async def handle_transfers(request):
     day = (request.query.get("day") or "").strip() or _biz_day()
     rows = await db.get_stock_transfers(day)
     for r in rows:
-        r.pop("_id", None)
+        r["id"] = str(r.pop("_id", ""))
         r["from_name"] = OFFICE_NAMES.get(r.get("from"), r.get("from"))
         r["to_name"] = OFFICE_NAMES.get(r.get("to"), r.get("to"))
     return web.json_response({"day": day, "transfers": rows}, headers=CORS_HEADERS)
@@ -416,10 +424,11 @@ def setup(app):
         ("/api/owner/stock/count",     handle_save,      "POST"),
         ("/api/owner/stock/transfer",  handle_transfer,  "POST"),
         ("/api/owner/stock/norm",      handle_set_norm,  "POST"),
+        ("/api/owner/stock/transfer/{tid}", handle_transfer_delete, "DELETE"),
     )
     seen = set()
     for path, handler, method in routes:
         if path not in seen:
             r.add_route("OPTIONS", path, _opt); seen.add(path)
-        (r.add_get if method == "GET" else r.add_post)(path, handler)
+        {"GET": r.add_get, "POST": r.add_post, "DELETE": r.add_delete}[method](path, handler)
     log.info("[stock] routes mounted")

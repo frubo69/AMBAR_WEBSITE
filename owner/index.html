@@ -709,43 +709,12 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   <!-- Live feed -->
   <div class="sect"><div class="sect-t">Активность</div><div class="live-dot" style="padding:2px 8px;font-size:9px">Live</div></div>
   <div class="card">
-    <div class="feed">
-      <div class="fev" data-detail="order:AMB7601680">
-        <span class="fev-time">18:42</span>
-        <span class="fev-dot up"></span>
-        <div class="fev-body">
-          <div class="fev-txt">Заказ <b>#AMB7601 680</b> доставлен · 34 мин</div>
-          <div class="fev-sub">Central · Absolut 1L + Coke · 320 AED</div>
-        </div>
-      </div>
-      <div class="fev" data-detail="order:AMB7601681">
-        <span class="fev-time">18:39</span>
-        <span class="fev-dot"></span>
-        <div class="fev-body">
-          <div class="fev-txt">Новый заказ <b>#AMB7601 681</b></div>
-          <div class="fev-sub">North · Heineken 6-pack · 90 AED</div>
-        </div>
-      </div>
-      <div class="fev" data-detail="customer:nikita">
-        <span class="fev-time">18:31</span>
-        <span class="fev-dot info"></span>
-        <div class="fev-body">
-          <div class="fev-txt">Отзыв 5★ · <b>@nikita_k</b></div>
-          <div class="fev-sub">«Быстрая доставка» · Central</div>
-        </div>
-      </div>
-      <div class="fev" data-detail="order:AMB7601674">
-        <span class="fev-time">18:24</span>
-        <span class="fev-dot dn"></span>
-        <div class="fev-body">
-          <div class="fev-txt">Задержка · <b>#AMB7601 674</b></div>
-          <div class="fev-sub">South · 48 мин в пути</div>
-        </div>
-      </div>
+    <div class="feed" id="feedList">
+      <div style="padding:18px;text-align:center;color:var(--muted);font-size:13px">Загрузка…</div>
     </div>
   </div>
 
-  <div class="foot">AMBAR · Owner Dashboard · v0.1 mock</div>
+  <div class="foot">AMBAR · Owner Dashboard</div>
 </div>
 
 <!-- ============ MONEY ============ -->
@@ -3313,6 +3282,7 @@ function renderFinance(p, f){
   renderChannels(f.by_channel);
   // Bento KPIs (real values)
   renderKpis(f.kpi);
+  renderFeed(f);
   // Re-render with currency formatting
   applyCurrency();
 }
@@ -3629,6 +3599,45 @@ function _paintRating(k){
   const lowBar = document.getElementById('kRbLow');
   if(lowBar) lowBar.style.background = low
     ? 'linear-gradient(90deg,var(--warn),#F3C878)' : '';
+}
+
+
+// Лента активности. Раньше здесь лежали четыре выдуманных заказа с названиями
+// удалённых офисов — теперь события собираются из тех же списков заказов, что
+// приходят с финансами, так что отдельного запроса не нужно.
+function renderFeed(f){
+  const box = document.getElementById('feedList'); if(!box) return;
+  const k = (f && f.kpi) || {};
+  const ev = [];
+  const push = (o, ts, kind, txt) => { if(o && ts) ev.push({o, ts, kind, txt}); };
+  (k.delivered_orders||[]).forEach(o => push(o, o.delivered_at || o.ts, 'up',
+      `Заказ <b>#${escS(o.id)}</b> доставлен${o.actual_min!=null?' · '+o.actual_min+' мин':''}`));
+  (k.inroute_orders||[]).forEach(o  => push(o, o.confirmed_at || o.ts, 'info',
+      `Заказ <b>#${escS(o.id)}</b> в пути`));
+  (k.pending_orders||[]).forEach(o  => push(o, o.ts, 'gold',
+      `Новый заказ <b>#${escS(o.id)}</b>`));
+  (k.declined_orders||[]).forEach(o => push(o, o.cancelled_at || o.ts, 'dn',
+      `Отменён <b>#${escS(o.id)}</b>${o.cancel_reason?' · '+escS(o.cancel_reason):''}`));
+
+  ev.sort((a,b) => String(b.ts).localeCompare(String(a.ts)));
+  const top = ev.slice(0, 6);
+  if(!top.length){
+    box.innerHTML = '<div style="padding:18px;text-align:center;color:var(--muted);font-size:13px">За период событий нет</div>';
+    return;
+  }
+  box.innerHTML = top.map(e => {
+    const o = e.o;
+    const sub = [o.district || o.office, o.items_short, (o.total!=null ? fmt(o.total)+' '+curCur : '')]
+                  .filter(Boolean).map(escS).join(' · ');
+    return `<div class="fev" data-detail="order:${escS(o.id)}">
+      <span class="fev-time">${fmtHM(e.ts)}</span>
+      <span class="fev-dot ${e.kind==='up'?'up':e.kind==='dn'?'dn':''}"${e.kind==='gold'?' style="background:var(--gold2)"':''}></span>
+      <div class="fev-body">
+        <div class="fev-txt">${e.txt}</div>
+        <div class="fev-sub">${sub}</div>
+      </div>
+    </div>`;
+  }).join('');
 }
 
 function renderKpis(k){

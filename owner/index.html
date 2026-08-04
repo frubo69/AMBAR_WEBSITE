@@ -567,6 +567,14 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .ac-btn-num-lbl{font-size:8.5px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-top:4px}
 .ac-btn-arrow{color:var(--gold2);font-size:20px;font-weight:600;flex-shrink:0;opacity:.55;margin-left:2px}
 
+/* Строка «Операторы | Водители» + кнопка фильтра */
+.team-row{display:flex;align-items:stretch;gap:8px;margin-bottom:10px}
+.team-fbtn{position:relative}
+.team-fdot{position:absolute;top:7px;right:7px;width:6px;height:6px;border-radius:50%;
+  background:var(--gold2);opacity:0;transition:.15s}
+.team-fbtn.dirty .team-fdot{opacity:1}
+.op-ctrl-panel.open{max-height:260px}
+
 /* Группа водителей по району */
 .team-grp{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
   margin:14px 2px 7px;font-size:10.5px;font-weight:700;letter-spacing:1.2px;
@@ -1050,21 +1058,37 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     <div class="sect-t">Команда</div>
     <div class="sect-a" style="font-size:10px;color:var(--muted)" id="opSortLbl">по выручке</div>
   </div>
-  <div class="periods" id="teamTabs" style="margin-bottom:10px">
-    <div class="period-pill"></div>
-    <button class="on" data-team="operators">Операторы</button>
-    <button data-team="drivers">Водители</button>
+  <!-- Переключатель и фильтр в одной строке: два ряда чипов съедали экран,
+       а нужны они через раз. Точка на кнопке говорит, что фильтр не пустой. -->
+  <div class="team-row">
+    <div class="periods" id="teamTabs" style="margin:0;flex:1">
+      <div class="period-pill"></div>
+      <button class="on" data-team="operators">Операторы</button>
+      <button data-team="drivers">Водители</button>
+    </div>
+    <button class="cal-btn team-fbtn" id="teamFBtn" onclick="toggleTeamFilter()" aria-label="Фильтр">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+           stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 5h18l-7 8v6l-4 2v-8z"/></svg>
+      <span class="team-fdot" id="teamFDot"></span>
+    </button>
   </div>
-  <div class="op-ctrl-chips" id="opFilters" style="margin-bottom:10px">
-    <button class="op-f on" data-f="overall">Выручка</button>
-    <button class="op-f" data-f="fast">Реакция</button>
-    <button class="op-f" data-f="rating">Рейтинг</button>
-    <button class="op-f" data-f="orders">Заказы</button>
-    <button class="op-f" data-f="handle">Доставка</button>
-    <button class="op-f" data-f="late">Опоздания</button>
-    <button class="op-f" data-f="tips">Чаевые</button>
+  <div class="op-ctrl-panel" id="teamFPanel">
+    <div class="op-ctrl-sect-lbl">Показатель</div>
+    <div class="op-ctrl-chips" id="opFilters">
+      <button class="op-f on" data-f="overall">Выручка</button>
+      <button class="op-f" data-f="fast">Реакция</button>
+      <button class="op-f" data-f="rating">Рейтинг</button>
+      <button class="op-f" data-f="orders">Заказы</button>
+      <button class="op-f" data-f="handle">Доставка</button>
+      <button class="op-f" data-f="late">Опоздания</button>
+      <button class="op-f" data-f="tips">Чаевые</button>
+    </div>
+    <div id="opDistWrap" style="display:none">
+      <div class="op-ctrl-sect-lbl" style="margin-top:12px">Район</div>
+      <div class="off-sort" id="opDistFilter" style="margin:0"></div>
+    </div>
   </div>
-  <div class="off-sort" id="opDistFilter" style="display:none"></div>
   <div class="list" id="opList"></div>
   <div id="opExtra"></div>
 
@@ -6836,6 +6860,7 @@ function renderOperators(){
   }
   document.querySelectorAll('#opFilters .op-f')
     .forEach(b => b.classList.toggle('on', b.dataset.f === opFilterCur));
+  _syncTeamFilterDot();
 
   if(OPS.err){ list.innerHTML = `<div class="stk-empty" style="color:var(--dn)">${OPS.err}</div>`; return; }
   if(!OPS.data){ list.innerHTML = '<div class="stk-empty">Загрузка…</div>'; return; }
@@ -6851,7 +6876,8 @@ function renderOperators(){
   // B1…B5 — тем же порядком, что и всё остальное в приложении.
   const dfil = document.getElementById('opDistFilter');
   if(dfil){
-    if(opTeamCur !== 'drivers'){ dfil.style.display = 'none'; opDistCur = 'all'; }
+    const wrap = document.getElementById('opDistWrap');
+    if(opTeamCur !== 'drivers'){ if(wrap) wrap.style.display = 'none'; opDistCur = 'all'; }
     else {
       const byD = {};
       ops.forEach(d => (d.districts.length ? d.districts : [{id:'none', code:'—'}])
@@ -6864,7 +6890,7 @@ function renderOperators(){
              onclick="applyOpDist('${x.id}')">${escS(x.code)} · ${byD[x.id].n}</button>`);
       if(byD.none) chips.push(`<button class="off-s ${opDistCur==='none'?'on':''}"
              onclick="applyOpDist('none')">Без района · ${byD.none.n}</button>`);
-      dfil.style.display = 'flex';
+      if(wrap) wrap.style.display = '';
       dfil.innerHTML = `<button class="off-s ${opDistCur==='all'?'on':''}"
           onclick="applyOpDist('all')">Все · ${ops.length}</button>` + chips.join('');
       if(opDistCur !== 'all')
@@ -6982,6 +7008,21 @@ function renderOperators(){
 }
 
 function applyOpDist(id){ opDistCur = id; renderOperators(); }
+
+function toggleTeamFilter(){
+  const p = document.getElementById('teamFPanel');
+  const b = document.getElementById('teamFBtn');
+  const open = p.classList.toggle('open');
+  b.classList.toggle('on', open);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
+// Точка на кнопке — единственный след фильтра, когда панель закрыта: без неё
+// непонятно, почему список отсортирован не так, как ожидалось.
+function _syncTeamFilterDot(){
+  const b = document.getElementById('teamFBtn');
+  if(b) b.classList.toggle('dirty', opFilterCur !== 'overall' || opDistCur !== 'all');
+}
 function applyOpTeam(t){
   opTeamCur = t; opDistCur = 'all';
   document.querySelectorAll('#teamTabs button')

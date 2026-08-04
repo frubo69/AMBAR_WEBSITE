@@ -1006,15 +1006,6 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
   <div class="range-chip" id="rangeChip-moneyPeriod" style="display:none"><span class="rc-icon">📅</span><span class="rc-text"></span><button class="rc-x" onclick="clearRange('moneyPeriod')">✕</button></div>
 
-  <div class="hero">
-    <div class="hero-lbl"><span>Выручка за период</span></div>
-    <div><span class="hero-amt mono" id="moneyHero" data-aed="">—</span><span class="hero-unit cur-unit">AED</span></div>
-    <div class="hero-row">
-      <span class="delta" id="moneyDelta">…</span>
-      <span class="delta-sub">прибыль ~ <span id="moneyProfit" data-aed="">—</span> <span class="cur-unit">AED</span></span>
-    </div>
-  </div>
-
   <!-- Место расчищено под новый учёт. Столбики за 30 дней и разбивки, что
        стояли здесь, переехали в «Обзор» или сняты — см. историю. -->
   <div class="rep-soon">
@@ -3124,8 +3115,7 @@ function _animCount(el, to){
 // IDs of finance/KPI placeholders that render skeleton shimmers while the
 // /api/owner/finance request is in flight. Mapped to size hints via CSS.
 const _SKEL_IDS = [
-  'heroRev','heroPrev','heroDelta','moneyHero','moneyProfit','moneyDelta',
-  'bars7dAvg','bars7dTotal',
+  'heroRev','heroPrev','heroDelta',
   'kOrders','kOrdersAvg','kOrdersDelta','kDeclined','kPending','kDone',
   'kInRoute','kInRouteVal','kAvg','kAvgSub','kLate','kLateCount','kRating'
 ];
@@ -3416,12 +3406,11 @@ function applyPeriod(p){
   } else {
     // Wipe live values so stale numbers don't show during the fetch.
     // Empty data-aed signals applyCurrency to leave the placeholder text alone.
-    ['heroRev','heroPrev','moneyHero','moneyProfit','bars7dAvg','bars7dTotal'].forEach(id=>{
+    ['heroRev','heroPrev'].forEach(id=>{
       const el = document.getElementById(id);
       if(el){ el.dataset.aed = ''; el.textContent = '—'; }
     });
     _setText('heroDelta', '…');
-    _setText('moneyDelta', '…');
     renderOfficeBars([]);
     // Clear period bars + title to avoid showing previous period's bars
     const pbg = document.getElementById('periodBarsGroup'); if(pbg) pbg.innerHTML = '';
@@ -3501,14 +3490,6 @@ function renderFinance(p, f){
   // Заказы по часам — теперь из тех же данных, а не из зашитого массива
   renderHours((f.kpi || {}).by_hour);
   // Money tab hero
-  _setAed('moneyHero',   f.revenue.current);
-  _setAed('moneyProfit', f.profit.current);
-  const md = document.getElementById('moneyDelta');
-  if(md){
-    md.textContent = f.revenue.delta_label;
-    md.classList.toggle('up',   f.revenue.delta_pct >  0);
-    md.classList.toggle('down', f.revenue.delta_pct <  0);
-  }
   // Money tab dynamic bars (period-aware)
   renderPeriodBars(p, f.trend || []);
   // Payment split: crypto (already on the wallet) vs cash (courier collects)

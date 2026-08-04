@@ -567,6 +567,15 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .ac-btn-num-lbl{font-size:8.5px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-top:4px}
 .ac-btn-arrow{color:var(--gold2);font-size:20px;font-weight:600;flex-shrink:0;opacity:.55;margin-left:2px}
 
+/* Группа водителей по району */
+.team-grp{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  margin:14px 2px 7px;font-size:10.5px;font-weight:700;letter-spacing:1.2px;
+  text-transform:uppercase;color:var(--muted)}
+.list .team-grp:first-child{margin-top:2px}
+.team-grp-m{font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:700;
+  letter-spacing:.2px;text-transform:none;color:var(--gold2);white-space:nowrap;
+  font-variant-numeric:tabular-nums}
+
 /* Шапка раздела «Клиенты» */
 .cust-hero{margin:6px 0 4px;padding:16px 16px 14px;border-radius:16px;cursor:pointer;
   background:linear-gradient(150deg,rgba(201,169,110,.09),rgba(201,169,110,.02) 60%);
@@ -1055,6 +1064,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     <button class="op-f" data-f="late">Опоздания</button>
     <button class="op-f" data-f="tips">Чаевые</button>
   </div>
+  <div class="off-sort" id="opDistFilter" style="display:none"></div>
   <div class="list" id="opList"></div>
   <div id="opExtra"></div>
 
@@ -6741,6 +6751,7 @@ function fmtSec(s){
 let OPS = {data:null, loading:false, err:''};
 
 let opTeamCur   = 'operators';     // операторы или водители
+let opDistCur   = 'all';           // район в списке водителей
 let opFilterCur = 'overall';
 // Период у команды общий со страницей районов: две шкалы времени на одном
 // экране — верный способ сравнить несравнимое.
@@ -6829,10 +6840,38 @@ function renderOperators(){
   if(OPS.err){ list.innerHTML = `<div class="stk-empty" style="color:var(--dn)">${OPS.err}</div>`; return; }
   if(!OPS.data){ list.innerHTML = '<div class="stk-empty">Загрузка…</div>'; return; }
 
-  const ops = opTeamCur === 'drivers'
+  let ops = opTeamCur === 'drivers'
     ? (OPS.data.drivers || []).map(d => ({...d, driver:true, senior:false,
         resp_sample:0, resp_sec:0, own_tips:d.tips}))
     : [...(OPS.data.operators || [])];
+
+  // Одиннадцать водителей подряд читаются как случайный набор: список скачет
+  // между районами, а сравнивать имеет смысл тех, кто ездит по одному району.
+  // Поэтому сверху район как фильтр, а без фильтра список идёт по районам
+  // B1…B5 — тем же порядком, что и всё остальное в приложении.
+  const dfil = document.getElementById('opDistFilter');
+  if(dfil){
+    if(opTeamCur !== 'drivers'){ dfil.style.display = 'none'; opDistCur = 'all'; }
+    else {
+      const byD = {};
+      ops.forEach(d => (d.districts.length ? d.districts : [{id:'none', code:'—'}])
+        .forEach(x => { byD[x.id] = byD[x.id] || {code:x.code, name:x.name || 'без района', n:0};
+                        byD[x.id].n++; }));
+      const order = (OPS.data.operators || []).flatMap(o => o.districts || [])
+        .filter((v,i,a) => a.findIndex(x=>x.id===v.id) === i);
+      const chips = order.filter(x => byD[x.id])
+        .map(x => `<button class="off-s ${opDistCur===x.id?'on':''}"
+             onclick="applyOpDist('${x.id}')">${escS(x.code)} · ${byD[x.id].n}</button>`);
+      if(byD.none) chips.push(`<button class="off-s ${opDistCur==='none'?'on':''}"
+             onclick="applyOpDist('none')">Без района · ${byD.none.n}</button>`);
+      dfil.style.display = 'flex';
+      dfil.innerHTML = `<button class="off-s ${opDistCur==='all'?'on':''}"
+          onclick="applyOpDist('all')">Все · ${ops.length}</button>` + chips.join('');
+      if(opDistCur !== 'all')
+        ops = ops.filter(d => (d.districts.length ? d.districts.map(x=>x.id) : ['none'])
+                                .includes(opDistCur));
+    }
+  }
   const f = opFilterCur;
   if(f==='fast')        ops.sort((a,b)=>(a.resp_sample?a.resp_sec:1e9)-(b.resp_sample?b.resp_sec:1e9));
   else if(f==='rating') ops.sort((a,b)=>b.rating-a.rating);
@@ -6847,12 +6886,19 @@ function renderOperators(){
     if(document.getElementById('opExtra')) document.getElementById('opExtra').innerHTML = '';
     return;
   }
-  list.innerHTML = ops.map((op,i)=>{
+  // Строка одна и та же, меняется только то, что вокруг неё.
+  const row = (op, i) => {
     const M = opMetric(op, f);
+    // Район и оператор уже стоят в заголовке группы, число заказов — справа.
+    // Здесь остаётся то, чего больше нигде не видно.
+    const drvBits = [
+      op.districts.length ? null : 'нет в списке',
+      op.tips ? `чай ${fmt(op.tips)}` : null,
+      op.avg_sample ? (op.late ? `${op.late} ${pluralize(op.late,'опоздание','опоздания','опозданий')}`
+                               : 'без опозданий') : null,
+    ].filter(Boolean);
     const where = op.driver
-      ? (op.districts.map(d=>d.code).join(' · ') || 'нет в списке')
-        + (op.operator ? ` · ${op.operator}` : '')
-        + ` · ${op.orders} ${pluralize(op.orders,'заказ','заказа','заказов')}`
+      ? (drvBits.join(' · ') || `${op.orders} ${pluralize(op.orders,'заказ','заказа','заказов')}`)
       : op.senior
         ? `все районы · принял ${op.orders}`
         : op.districts.map(d=>d.code).join(' · ') + ` · ${op.orders} ${pluralize(op.orders,'заказ','заказа','заказов')}`;
@@ -6870,7 +6916,28 @@ function renderOperators(){
         <div style="font-size:10px;color:var(--muted)">${escS(M.label)}</div>
       </div>
     </div>`;
-  }).join('');
+  };
+
+  if(opTeamCur === 'drivers' && opDistCur === 'all'){
+    // По районам: B1…B5, внутри — по выбранному показателю. У каждого района
+    // свой итог, иначе группы не с чем сравнить.
+    const seen = new Set(), groups = [];
+    ops.forEach(d => (d.districts.length ? d.districts : [{id:'none', code:'—', name:'Без района'}])
+      .forEach(x => { if(!seen.has(x.id)){ seen.add(x.id); groups.push(x); } }));
+    const order = (OPS.data.operators || []).flatMap(o => o.districts || []).map(x=>x.id);
+    groups.sort((a,b)=>(order.indexOf(a.id)+1 || 99) - (order.indexOf(b.id)+1 || 99));
+    list.innerHTML = groups.map(g => {
+      const mine = ops.filter(d => (d.districts.length ? d.districts.map(x=>x.id) : ['none']).includes(g.id));
+      const aed = mine.reduce((s,d)=>s+d.aed, 0);
+      const op = mine.find(d=>d.operator)?.operator || '';
+      return `<div class="team-grp">
+          <span>${escS(g.code)} ${escS(g.name || '')}${op ? ' · ' + escS(op) : ''}</span>
+          <span class="team-grp-m">${mine.length} · ${fmt(aed)} AED</span>
+        </div>` + mine.map((d,i)=>row(d,i)).join('');
+    }).join('');
+  } else {
+    list.innerHTML = ops.map((op,i)=>row(op,i)).join('');
+  }
 
   // Заказы с устройств, которых нет в списке людей. Это либо забытый оператор,
   // либо чужой доступ — в обоих случаях владелец должен об этом знать.
@@ -6914,8 +6981,9 @@ function renderOperators(){
   }
 }
 
+function applyOpDist(id){ opDistCur = id; renderOperators(); }
 function applyOpTeam(t){
-  opTeamCur = t;
+  opTeamCur = t; opDistCur = 'all';
   document.querySelectorAll('#teamTabs button')
     .forEach(b => b.classList.toggle('on', b.dataset.team === t));
   const g = document.getElementById('teamTabs'); if(g) movePill(g);

@@ -35,6 +35,7 @@ from aiohttp import web
 import db
 from owner_auth import require_owner, CORS_HEADERS
 from config_offices import OFFICE_IDS, OFFICE_NAMES, OFFICE_CODES
+from config_stock_order import order_key      # порядок обхода полок, как в таблице
 
 log = logging.getLogger("stock")
 
@@ -208,9 +209,10 @@ async def handle_sheet(request):
             "actual": (done.get(pid) or {}).get("actual"),
         })
     # Сначала то, где расхождение видно сразу (двигалось), потом то, что давно
-    # не проверяли: именно там прячутся бой и недостача без продаж.
-    rows.sort(key=lambda r: (not r["touched"], not r["stale"],
-                             -(r["days_ago"] or 9999), r["name"]))
+    # не проверяли: именно там прячутся бой и недостача без продаж. А внутри
+    # каждой группы — порядок таблицы, то есть порядок полок: считать удобнее
+    # подряд, чем прыгать по залу за алфавитом.
+    rows.sort(key=lambda r: (not r["touched"], not r["stale"], order_key(r["id"])))
 
     return web.json_response({
         "district": district,

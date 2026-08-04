@@ -1767,6 +1767,17 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .dt-card{background:var(--card);border:1px solid var(--border2);border-radius:12px;overflow:hidden;margin-bottom:10px}
 .dt-row{display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid var(--border2);font-size:13px}
 .dt-row:last-child{border-bottom:none}
+.dt-row.tap{cursor:pointer;transition:background .12s}
+.dt-row.tap:active{background:var(--card2)}
+.dt-ico{margin-left:5px;opacity:.45;vertical-align:-2px}
+/* Выше листа деталей (500): копируют номер как раз из открытой карточки, и
+   подтверждение под ней было бы не видно. И выше её нижних кнопок. */
+.toast{position:fixed;left:50%;bottom:calc(92px + var(--safe-bottom));transform:translate(-50%,14px);
+  z-index:900;max-width:88vw;padding:11px 16px;border-radius:12px;pointer-events:none;
+  background:var(--card);border:1px solid var(--border2);box-shadow:0 10px 30px rgba(0,0,0,.5);
+  color:var(--text);font-size:12.5px;font-weight:600;text-align:center;
+  opacity:0;transition:opacity .18s var(--e1), transform .18s var(--e1)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
 .dt-row-l{flex:1;min-width:0}
 .dt-row-t{font-size:13px;font-weight:500;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .dt-row-s{font-size:11px;color:var(--muted);margin-top:2px}
@@ -4067,7 +4078,7 @@ async function stkSubmit(){
       body:{district:STK.district, day:STK.sheet.day, lines}});
   }catch(e){
     btn.disabled = false; btn.textContent = 'Сохранить';
-    showToast ? showToast('Не удалось сохранить','err') : alert('Не удалось сохранить');
+    _toast('Не удалось сохранить');
     return;
   }
   btn.disabled = false; btn.textContent = 'Сохранить';
@@ -5150,6 +5161,49 @@ function _renderAccessBlock(){
   }
 }
 
+
+// Короткое подтверждение действия. Alert посреди работы сбивает, а тихое
+// копирование оставляет сомнение — скопировалось или нет.
+function _toast(msg){
+  let el = document.getElementById('_toast');
+  if(!el){
+    el = document.createElement('div');
+    el.id = '_toast'; el.className = 'toast';
+    document.body.appendChild(el);
+  }
+  el.textContent = msg;
+  el.classList.add('on');
+  clearTimeout(_toast._t);
+  _toast._t = setTimeout(()=> el.classList.remove('on'), 1600);
+}
+
+// Буфер обмена в вебвью Telegram: свежий API работает не везде, поэтому есть
+// откат на скрытое поле — иначе на части телефонов копирование молча не сработает.
+function copyText(text, label){
+  const done = ()=>{
+    _toast((label || 'Скопировано') + ' · ' + text);
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  };
+  try{
+    if(navigator.clipboard && window.isSecureContext){
+      navigator.clipboard.writeText(text).then(done).catch(()=>_copyFallback(text, done));
+      return;
+    }
+  }catch(e){}
+  _copyFallback(text, done);
+}
+function _copyFallback(text, done){
+  const ta = document.createElement('textarea');
+  ta.value = text;
+  ta.setAttribute('readonly','');
+  ta.style.cssText = 'position:fixed;top:-1000px;opacity:0';
+  document.body.appendChild(ta);
+  ta.select(); ta.setSelectionRange(0, text.length);
+  let ok = false;
+  try{ ok = document.execCommand('copy'); }catch(e){}
+  ta.remove();
+  ok ? done() : _toast('Не удалось скопировать');
+}
 
 // Открыть профиль Telegram по строке списка доступа. Если @username известен —
 // идём через t.me, это надёжнее всего. Если нет (у id из .env часто так) —
@@ -7528,19 +7582,35 @@ const DETAIL = {
       c.phone_edited   && {t:'Отредактирован', v:c.phone_edited,   s:'указан для доставки'},
       c.phone_extra    && {t:'Дополнительный', v:c.phone_extra,    s:'добавлен клиентом'},
     ].filter(Boolean);
-    const phoneSection = phoneRows.length ? `
-        <div class="dt-sect">Телефоны</div>
+    // Номер нажимают, чтобы позвонить или переслать, — значит он должен
+    // копироваться одним касанием. Телеграм рядом: тап уводит прямо в переписку,
+    // а не в профиль, откуда до чата ещё жать.
+    if(!phoneRows.length && ph)
+      phoneRows.push({t:'Номер', v:ph.replace(/^\+/,''), s:'не подтверждён', warn:true});
+    const tgTitle = c.username ? '@'+escS(c.username) : 'ID '+c.telegram_id;
+    const contactSection = `
+        <div class="dt-sect">Контакты</div>
         <div class="dt-card">
-          ${phoneRows.map(r=>`<div class="dt-row">
+          ${phoneRows.map(r=>`<div class="dt-row tap"
+              onclick="copyText('+${escS(r.v)}','Номер скопирован')">
             <div class="dt-row-l"><div class="dt-row-t">${r.t}</div><div class="dt-row-s">${r.s}</div></div>
-            <div class="dt-row-r"${r.gold?' style="color:var(--gold2)"':''}>+${escS(r.v)}</div>
+            <div class="dt-row-r"${r.gold?' style="color:var(--gold2)"':(r.warn?' style="color:var(--warn)"':'')}>+${escS(r.v)}
+              <svg class="dt-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+                   stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <rect x="9" y="9" width="11" height="11" rx="2"/>
+                <path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1"/></svg>
+            </div>
           </div>`).join('')}
-        </div>` : (ph ? `
-        <div class="dt-sect">Телефоны</div>
-        <div class="dt-card"><div class="dt-row">
-          <div class="dt-row-l"><div class="dt-row-t">Номер</div><div class="dt-row-s">не подтверждён</div></div>
-          <div class="dt-row-r" style="color:var(--warn)">${escS(ph)}</div>
-        </div></div>` : '');
+          <div class="dt-row tap" onclick="openTgUser('${c.telegram_id}','${escS(c.username||'')}')">
+            <div class="dt-row-l"><div class="dt-row-t">Telegram</div>
+              <div class="dt-row-s">${c.username ? 'открыть переписку' : 'юзернейма нет — откроем карточку'}</div></div>
+            <div class="dt-row-r" style="color:var(--info)">${tgTitle}
+              <svg class="dt-ico" viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+                   stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M7 17L17 7M9 7h8v8"/></svg>
+            </div>
+          </div>
+        </div>`;
     const uname = c.username ? '@'+c.username : 'ID '+c.telegram_id;
     const joined = _joinedDate(c.first_seen);
     const lastSeen = _relDate(c.last_seen);
@@ -7647,7 +7717,7 @@ const DETAIL = {
           <div class="dt-stat"><div class="dt-stat-lbl">Рефералы</div><div class="dt-stat-val up">${c.referrals_count}</div><div class="dt-stat-sub">${c.referral_points} баллов</div></div>
           <div class="dt-stat"><div class="dt-stat-lbl">Telegram ID</div><div class="dt-stat-val" style="font-size:12px;font-family:'JetBrains Mono',monospace">${c.telegram_id}</div></div>
         </div>
-        ${phoneSection}
+        ${contactSection}
         ${debtSection}
         ${inviteInfo}
         ${verifyInfo}

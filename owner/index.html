@@ -567,6 +567,29 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .ac-btn-num-lbl{font-size:8.5px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-top:4px}
 .ac-btn-arrow{color:var(--gold2);font-size:20px;font-weight:600;flex-shrink:0;opacity:.55;margin-left:2px}
 
+/* Панель сортировки */
+.team-panel{overflow:hidden;max-height:0;opacity:0;padding:0 14px;margin:0 -14px;
+  transition:max-height .26s var(--e1),opacity .2s var(--e1),padding .26s var(--e1)}
+.team-panel.open{max-height:520px;opacity:1;padding:12px 14px 4px}
+.tp-hdr{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
+.tp-reset{border:none;background:none;color:var(--gold2);font-family:inherit;font-size:11px;
+  font-weight:600;cursor:pointer;padding:2px 0;letter-spacing:.2px}
+.tp-list{display:flex;flex-direction:column;gap:2px;background:var(--card);
+  border:1px solid var(--border2);border-radius:12px;padding:4px;overflow:hidden}
+.tp-row{display:flex;align-items:center;gap:10px;width:100%;padding:10px 10px;border:none;
+  border-radius:9px;background:transparent;color:var(--sub);cursor:pointer;font-family:inherit;
+  font-size:13px;text-align:left;transition:.14s var(--e1)}
+.tp-row:active{background:var(--card2)}
+.tp-row.on{background:var(--gold-soft);color:var(--text)}
+.tp-dot{width:7px;height:7px;flex-shrink:0;border-radius:50%;border:1.5px solid var(--border3);
+  transition:.14s}
+.tp-row.on .tp-dot{background:var(--gold2);border-color:var(--gold2);
+  box-shadow:0 0 8px rgba(201,169,110,.5)}
+.tp-t{flex:1;min-width:0;font-weight:600}
+.tp-d{font-size:10.5px;color:var(--muted);white-space:nowrap}
+.tp-arr{display:flex;align-items:center;color:var(--gold2);flex-shrink:0;transition:transform .18s var(--e1)}
+.tp-arr.asc{transform:rotate(180deg)}
+
 /* Строка «Операторы | Водители» + кнопка фильтра */
 .team-row{display:flex;align-items:stretch;gap:8px;margin-bottom:10px}
 .team-fbtn{position:relative}
@@ -1073,19 +1096,14 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
       <span class="team-fdot" id="teamFDot"></span>
     </button>
   </div>
-  <div class="op-ctrl-panel" id="teamFPanel">
-    <div class="op-ctrl-sect-lbl">Показатель</div>
-    <div class="op-ctrl-chips" id="opFilters">
-      <button class="op-f on" data-f="overall">Выручка</button>
-      <button class="op-f" data-f="fast">Реакция</button>
-      <button class="op-f" data-f="rating">Рейтинг</button>
-      <button class="op-f" data-f="orders">Заказы</button>
-      <button class="op-f" data-f="handle">Доставка</button>
-      <button class="op-f" data-f="late">Опоздания</button>
-      <button class="op-f" data-f="tips">Чаевые</button>
+  <div class="team-panel" id="teamFPanel">
+    <div class="tp-hdr">
+      <span class="op-ctrl-sect-lbl" style="margin:0">Сортировка</span>
+      <button class="tp-reset" id="tpReset" onclick="resetTeamFilter()">Сбросить</button>
     </div>
+    <div class="tp-list" id="opFilters"></div>
     <div id="opDistWrap" style="display:none">
-      <div class="op-ctrl-sect-lbl" style="margin-top:12px">Район</div>
+      <div class="op-ctrl-sect-lbl" style="margin:14px 0 7px">Район</div>
       <div class="off-sort" id="opDistFilter" style="margin:0"></div>
     </div>
   </div>
@@ -6774,24 +6792,42 @@ function fmtSec(s){
 // нет своего входа в бот), всё остальное принадлежит району и его людям.
 let OPS = {data:null, loading:false, err:''};
 
+// Метрики в одном месте: как называется, как считать, как показать и в какую
+// сторону сортировать «по-хорошему». Раньше направление было зашито в порядок
+// сравнения и поменять его было нельзя — а «кто хуже всех» спрашивают не реже,
+// чем «кто лучше».
+//   val   → число для сортировки; null означает «мерить нечего»
+//   dir   → естественный порядок: у выручки сверху больше, у опозданий меньше
+//   hi/lo → подписи направлений, чтобы кнопка говорила на человеческом
+const OP_METRICS = {
+  overall: {t:'Выручка',       dir:'desc', hi:'больше сверху', lo:'меньше сверху',
+            val:o=>o.aed},
+  orders:  {t:'Заказы',        dir:'desc', hi:'больше сверху', lo:'меньше сверху',
+            val:o=>o.orders},
+  avg:     {t:'Средний чек',   dir:'desc', hi:'больше сверху', lo:'меньше сверху',
+            val:o=>o.delivered ? Math.round(o.aed / o.delivered) : null},
+  tips:    {t:'Чаевые',        dir:'desc', hi:'больше сверху', lo:'меньше сверху',
+            val:o=>(o.senior ? o.own_tips : o.tips) || 0},
+  handle:  {t:'Время доставки',dir:'asc',  hi:'дольше сверху', lo:'быстрее сверху',
+            val:o=>o.avg_sample ? o.avg_min : null},
+  late:    {t:'Опоздания',     dir:'asc',  hi:'больше сверху', lo:'меньше сверху',
+            val:o=>o.avg_sample ? o.late : null},
+  rating:  {t:'Рейтинг',       dir:'desc', hi:'выше сверху',   lo:'ниже сверху',
+            val:o=>o.rating_count ? o.rating : null},
+  fast:    {t:'Реакция',       dir:'asc',  hi:'дольше сверху', lo:'быстрее сверху',
+            val:o=>o.resp_sample ? o.resp_sec : null, opsOnly:true},
+};
+const OP_METRIC_ORDER = ['overall','orders','avg','tips','handle','late','rating','fast'];
+
 let opTeamCur   = 'operators';     // операторы или водители
 let opDistCur   = 'all';           // район в списке водителей
 let opFilterCur = 'overall';
+let opSortDir   = OP_METRICS.overall.dir;
 // Период у команды общий со страницей районов: две шкалы времени на одном
 // экране — верный способ сравнить несравнимое.
 function opPeriod(){
   return document.querySelector('#officePeriod button.on')?.dataset?.p || 'today';
 }
-
-const OP_SORT_LABEL = {
-  overall:'по выручке',
-  fast:'по скорости',
-  rating:'по рейтингу',
-  orders:'по заказам',
-  handle:'по доставке',
-  late:'по опозданиям',
-  tips:'по чаевым'
-};
 
 async function loadOperators(){
   const p = opPeriod();
@@ -6812,6 +6848,8 @@ function _opInitials(name){
 
 // Правая колонка карточки: то, по чему сейчас отсортирован список. Прочерк
 // вместо нуля там, где измерять нечего — выдуманная цифра хуже пустоты.
+const _u = t => `<span style="font-size:10px;color:var(--muted);margin-left:2px">${t}</span>`;
+
 function opMetric(op, filter){
   const dim = 'var(--muted)';
   if(filter==='fast'){
@@ -6819,17 +6857,21 @@ function opMetric(op, filter){
     if(!op.resp_sample) return {html:'—', label: op.senior?'нет данных':'нет входа в бот', color:dim};
     const {v,u} = fmtSec(op.resp_sec);
     const slow = op.resp_sec > (OPS.data?.slow_sec || 60);
-    return {html:`${v}<span style="font-size:10px;color:var(--muted);margin-left:2px">${u}</span>`,
-            label: slow?'медленно':'реакция', color: slow?'var(--warn)':(op.resp_sec<=15?'var(--up)':'')};
+    return {html:`${v}${_u(u)}`, label: slow?'медленно':`${op.resp_sample} принято`,
+            color: slow?'var(--warn)':(op.resp_sec<=15?'var(--up)':'')};
   }
   if(filter==='rating') return op.rating_count
     ? {html:`★ ${op.rating.toFixed(2)}`, label:`${op.rating_count} ${pluralize(op.rating_count,'оценка','оценки','оценок')}`, color:'var(--up)'}
     : {html:'—', label:'нет оценок', color:dim};
-  if(filter==='orders') return {html:`${op.orders}<span style="font-size:10px;color:var(--muted);margin-left:2px">шт</span>`,
+  if(filter==='orders') return {html:`${op.orders}${_u('шт')}`,
                                 label:`доставлено ${op.delivered}`, color:''};
+  if(filter==='avg') return op.delivered
+    ? {html:`${fmt(Math.round(op.aed/op.delivered))}${_u('AED')}`,
+       label:`${op.delivered} ${pluralize(op.delivered,'доставка','доставки','доставок')}`, color:''}
+    : {html:'—', label:'нет доставок', color:dim};
   if(filter==='handle') return op.avg_sample
-    ? {html:`${op.avg_min}<span style="font-size:10px;color:var(--muted);margin-left:2px">мин</span>`,
-       label:'доставка', color: op.avg_min > (OPS.data?.norm_min||25) ? 'var(--warn)':'var(--up)'}
+    ? {html:`${op.avg_min}${_u('мин')}`, label:`норматив ${OPS.data?.norm_min||25}`,
+       color: op.avg_min > (OPS.data?.norm_min||25) ? 'var(--warn)':'var(--up)'}
     : {html:'—', label:'нет доставок', color:dim};
   if(filter==='late'){
     if(!op.avg_sample) return {html:'—', label:'нет доставок', color:dim};
@@ -6838,28 +6880,27 @@ function opMetric(op, filter){
   }
   if(filter==='tips'){
     const t = op.senior ? op.own_tips : op.tips;
-    return t ? {html:`${fmt(t)}<span style="font-size:10px;color:var(--muted);margin-left:2px">AED</span>`,
+    return t ? {html:`${fmt(t)}${_u('AED')}`,
                 label: op.driver ? `${op.tips_bottles} ${pluralize(op.tips_bottles,'бутылка','бутылки','бутылок')}`
                      : (op.senior ? 'как водитель' : 'чаевые района'), color:'var(--gold2)'}
              : {html:'—', label:'нет чаевых', color:dim};
   }
-  return {html:`${fmt(op.aed)}<span style="font-size:10px;color:var(--muted);margin-left:2px">AED</span>`,
+  return {html:`${fmt(op.aed)}${_u('AED')}`,
           label:`${op.delivered} ${pluralize(op.delivered,'заказ','заказа','заказов')}`, color:''};
 }
 
 function renderOperators(){
   const list = document.getElementById('opList'); if(!list) return;
   const sortLbl = document.getElementById('opSortLbl');
-  if(sortLbl) sortLbl.textContent = OP_SORT_LABEL[opFilterCur] || 'по выручке';
+  const _m = OP_METRICS[opFilterCur] || OP_METRICS.overall;
+  if(sortLbl) sortLbl.textContent =
+    _m.t.toLowerCase() + ' · ' + (opSortDir === 'desc' ? _m.hi : _m.lo);
   // Реакция измеряется устройством, которое приняло заказ, — у водителя такого
   // устройства нет, поэтому чип просто прячем, чтобы не звал в пустоту.
-  const fastChip = document.querySelector('#opFilters .op-f[data-f="fast"]');
-  if(fastChip){
-    fastChip.style.display = opTeamCur === 'drivers' ? 'none' : '';
-    if(opTeamCur === 'drivers' && opFilterCur === 'fast') opFilterCur = 'overall';
+  // У водителя нет устройства, принимающего заказы, — реакцию по нему не меряют.
+  if(opTeamCur === 'drivers' && OP_METRICS[opFilterCur]?.opsOnly){
+    opFilterCur = 'overall'; opSortDir = OP_METRICS.overall.dir;
   }
-  document.querySelectorAll('#opFilters .op-f')
-    .forEach(b => b.classList.toggle('on', b.dataset.f === opFilterCur));
   _syncTeamFilterDot();
 
   if(OPS.err){ list.innerHTML = `<div class="stk-empty" style="color:var(--dn)">${OPS.err}</div>`; return; }
@@ -6899,13 +6940,17 @@ function renderOperators(){
     }
   }
   const f = opFilterCur;
-  if(f==='fast')        ops.sort((a,b)=>(a.resp_sample?a.resp_sec:1e9)-(b.resp_sample?b.resp_sec:1e9));
-  else if(f==='rating') ops.sort((a,b)=>b.rating-a.rating);
-  else if(f==='orders') ops.sort((a,b)=>b.orders-a.orders);
-  else if(f==='handle') ops.sort((a,b)=>(a.avg_sample?a.avg_min:1e9)-(b.avg_sample?b.avg_min:1e9));
-  else if(f==='late')   ops.sort((a,b)=>a.late-b.late);
-  else if(f==='tips')   ops.sort((a,b)=>((b.senior?b.own_tips:b.tips)-(a.senior?a.own_tips:a.tips)));
-  else                  ops.sort((a,b)=>b.aed-a.aed);
+  // Тем, у кого мерить нечего, место в конце при любом направлении: иначе
+  // «сначала меньше» выдаёт пачку прочерков вместо ответа на вопрос.
+  const m = OP_METRICS[f] || OP_METRICS.overall;
+  const sign = opSortDir === 'desc' ? -1 : 1;
+  ops.sort((a,b)=>{
+    const va = m.val(a), vb = m.val(b);
+    if(va == null && vb == null) return (a.name||'').localeCompare(b.name||'','ru');
+    if(va == null) return 1;
+    if(vb == null) return -1;
+    return (va - vb) * sign || (a.name||'').localeCompare(b.name||'','ru');
+  });
 
   if(!ops.length){
     list.innerHTML = '<div class="stk-empty">Пусто</div>';
@@ -7007,33 +7052,68 @@ function renderOperators(){
   }
 }
 
-function applyOpDist(id){ opDistCur = id; renderOperators(); }
+function applyOpDist(id){ opDistCur = id; renderOperators(); _renderTeamPanel(); }
 
 function toggleTeamFilter(){
   const p = document.getElementById('teamFPanel');
   const b = document.getElementById('teamFBtn');
   const open = p.classList.toggle('open');
   b.classList.toggle('on', open);
+  if(open) _renderTeamPanel();
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
+// Показатель строкой, а не чипом: у строки есть место сказать, что она значит и
+// в какую сторону сейчас отсортировано. Тап по выбранной строке переворачивает
+// порядок — это самый частый следующий жест после выбора.
+function _renderTeamPanel(){
+  const box = document.getElementById('opFilters'); if(!box) return;
+  box.innerHTML = OP_METRIC_ORDER
+    .filter(k => !(OP_METRICS[k].opsOnly && opTeamCur === 'drivers'))
+    .map(k => {
+      const m = OP_METRICS[k], on = k === opFilterCur;
+      const dirTxt = on ? (opSortDir === 'desc' ? m.hi : m.lo) : '';
+      return `<button class="tp-row ${on?'on':''}" onclick="applyOpFilter('${k}')">
+        <span class="tp-dot"></span>
+        <span class="tp-t">${m.t}</span>
+        <span class="tp-d">${dirTxt}</span>
+        ${on ? `<span class="tp-arr ${opSortDir}">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 5v14M6 13l6 6 6-6"/></svg></span>` : ''}
+      </button>`;
+    }).join('');
+  const r = document.getElementById('tpReset');
+  if(r) r.style.visibility = (opFilterCur === 'overall'
+      && opSortDir === OP_METRICS.overall.dir && opDistCur === 'all') ? 'hidden' : 'visible';
+}
+
+function resetTeamFilter(){
+  opFilterCur = 'overall'; opSortDir = OP_METRICS.overall.dir; opDistCur = 'all';
+  renderOperators(); _renderTeamPanel();
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 
 // Точка на кнопке — единственный след фильтра, когда панель закрыта: без неё
 // непонятно, почему список отсортирован не так, как ожидалось.
 function _syncTeamFilterDot(){
   const b = document.getElementById('teamFBtn');
-  if(b) b.classList.toggle('dirty', opFilterCur !== 'overall' || opDistCur !== 'all');
+  if(b) b.classList.toggle('dirty', opFilterCur !== 'overall'
+      || opSortDir !== OP_METRICS.overall.dir || opDistCur !== 'all');
 }
 function applyOpTeam(t){
   opTeamCur = t; opDistCur = 'all';
+  _renderTeamPanel();
   document.querySelectorAll('#teamTabs button')
     .forEach(b => b.classList.toggle('on', b.dataset.team === t));
   const g = document.getElementById('teamTabs'); if(g) movePill(g);
   renderOperators();
 }
 function applyOpFilter(f){
-  opFilterCur = f;
-  document.querySelectorAll('#opFilters .op-f').forEach(b=>b.classList.toggle('on', b.dataset.f===f));
-  renderOperators();
+  if(f === opFilterCur) opSortDir = opSortDir === 'desc' ? 'asc' : 'desc';
+  else { opFilterCur = f; opSortDir = (OP_METRICS[f] || OP_METRICS.overall).dir; }
+  renderOperators(); _renderTeamPanel();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 // Metric chips
 document.querySelectorAll('#opFilters .op-f').forEach(b=>{

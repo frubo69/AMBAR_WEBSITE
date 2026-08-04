@@ -50,13 +50,15 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
   display:flex;align-items:center;justify-content:space-between;gap:8px;pointer-events:none}
 .hdr>*{pointer-events:auto}
-.hdr-l{display:flex;align-items:center;gap:4px}
-.brand{font-family:'Cormorant Garamond',serif;font-size:26px;font-weight:700;letter-spacing:8px;position:relative;
+.hdr-l{display:flex;align-items:center;gap:4px;min-width:0}
+.brand{font-family:'Cormorant Garamond',serif;font-size:clamp(19px,5.3vw,26px);font-weight:700;
+  letter-spacing:clamp(3px,1.5vw,8px);margin-right:calc(-1 * clamp(3px,1.5vw,8px));position:relative;
   background:linear-gradient(135deg,var(--gold),var(--gold2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text}
 .brand-wrap{display:inline-flex;flex-direction:column;align-items:center;gap:2px;line-height:1}
 .brand-line{height:1px;background:linear-gradient(90deg,transparent 0%,rgba(201,169,110,.45) 50%,transparent 100%);flex-shrink:0}
 .brand-stroke{position:absolute;top:18%;left:.60em;width:1px;height:60%;background:linear-gradient(180deg,var(--gold),var(--gold2),var(--gold));transform:skewX(27deg);pointer-events:none}
-.live-dot{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:999px;background:var(--up-soft);border:1px solid rgba(76,175,125,.22);font-size:10px;font-weight:600;color:var(--up);letter-spacing:.6px;text-transform:uppercase}
+.live-dot{display:inline-flex;align-items:center;gap:6px;padding:4px clamp(7px,2.2vw,10px);border-radius:999px;
+  flex-shrink:0;white-space:nowrap;background:var(--up-soft);border:1px solid rgba(76,175,125,.22);font-size:10px;font-weight:600;color:var(--up);letter-spacing:.6px;text-transform:uppercase}
 .live-dot::before{content:'';width:6px;height:6px;border-radius:50%;background:var(--up);box-shadow:0 0 0 0 rgba(76,175,125,.6);animation:pulse 2s infinite}
 .live-dot.warn{background:var(--warn-soft);border-color:rgba(243,180,74,.22);color:var(--warn)}
 .live-dot.warn::before{background:var(--warn);box-shadow:0 0 0 0 rgba(243,180,74,.6);animation:pulse-warn 2s infinite}
@@ -132,6 +134,12 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .cal-btn:active{transform:scale(.92);color:var(--gold2);border-color:rgba(201,169,110,.35)}
 .cal-btn:hover{color:var(--gold2)}
 .cal-btn.on{color:var(--gold2);border-color:rgba(201,169,110,.45);background:linear-gradient(135deg,rgba(201,169,110,.14),rgba(201,169,110,.04))}
+
+/* На узком экране «Online» не помещается рядом с кнопками — оставляем точку:
+   статус читается по цвету, а кнопки перестают наезжать на текст. */
+@media (max-width:359px){
+  .hdr-l .live-dot{font-size:0;gap:0;padding:6px;border-radius:50%}
+}
 
 /* Range chip — shown when custom range selected */
 .range-chip{display:flex;align-items:center;gap:10px;padding:10px 14px;margin:-8px 0 16px;background:linear-gradient(135deg,rgba(201,169,110,.14),rgba(201,169,110,.04));border:1px solid rgba(201,169,110,.3);border-radius:12px}
@@ -567,6 +575,14 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .ac-btn-num-lbl{font-size:8.5px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-top:4px}
 .ac-btn-arrow{color:var(--gold2);font-size:20px;font-weight:600;flex-shrink:0;opacity:.55;margin-left:2px}
 
+/* Пустая вкладка «Отчёты» — не забытая страница, а расчищенное место */
+.rep-soon{display:flex;flex-direction:column;align-items:center;gap:9px;
+  padding:44px 24px;margin-top:6px;border-radius:16px;text-align:center;
+  background:var(--card);border:1px dashed var(--border3);color:var(--muted)}
+.rep-soon svg{opacity:.5}
+.rep-soon-t{font-size:14px;font-weight:600;color:var(--sub)}
+.rep-soon-s{font-size:11.5px;line-height:1.6}
+
 /* Панель сортировки */
 .team-panel{overflow:hidden;max-height:0;opacity:0;padding:0 14px;margin:0 -14px;
   transition:max-height .26s var(--e1),opacity .2s var(--e1),padding .26s var(--e1)}
@@ -914,13 +930,16 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
             stroke-dasharray="0 100" stroke-dashoffset="25" transform="rotate(-90 18 18)" stroke-linecap="round"/>
           <circle id="payCryptoArc" cx="18" cy="18" r="15.9" fill="none" stroke="#26A17B" stroke-width="3.5"
             stroke-dasharray="0 100" stroke-dashoffset="25" transform="rotate(-90 18 18)" stroke-linecap="round"/>
+          <circle id="payDebtArc" cx="18" cy="18" r="15.9" fill="none" stroke="#F3B44A" stroke-width="3.5"
+            stroke-dasharray="0 100" stroke-dashoffset="25" transform="rotate(-90 18 18)" stroke-linecap="round"/>
         </svg>
         <div class="donut-c"><div class="donut-val mono" id="payCryptoPct">—</div><div class="donut-lbl">крипта</div></div>
       </div>
       <div class="donut-leg">
-        <div class="dleg"><span class="dleg-dot" style="background:#26A17B"></span><span class="dleg-name"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;opacity:.75"><path d="M12 3l7 5-7 13-7-13z"/><path d="M5 8h14M12 3v18"/></svg>Крипта · на кошельке</span><span class="dleg-val" id="payCryptoVal" data-aed="">—</span></div>
+        <div class="dleg"><span class="dleg-dot" style="background:#26A17B"></span><span class="dleg-name"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;opacity:.75"><path d="M12 3l7 5-7 13-7-13z"/><path d="M5 8h14M12 3v18"/></svg>Крипта</span><span class="dleg-val" id="payCryptoVal" data-aed="">—</span></div>
         <div class="dleg"><span class="dleg-name" style="color:var(--muted);font-size:10px;padding-left:16px" id="payCryptoUsdt"></span></div>
         <div class="dleg"><span class="dleg-dot" style="background:#C9A96E"></span><span class="dleg-name"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;opacity:.75"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>Наличные</span><span class="dleg-val" id="payCashVal" data-aed="">—</span></div>
+        <div class="dleg" id="payDebtRow" style="display:none"><span class="dleg-dot" style="background:#F3B44A"></span><span class="dleg-name"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;opacity:.75"><path d="M4 7h16v12H4z"/><path d="M4 11h16M9 15h3"/></svg>В долг</span><span class="dleg-val" id="payDebtVal" data-aed="" style="color:var(--warn)">—</span></div>
         <div class="dleg" id="payInflightRow" style="display:none"><span class="dleg-name" style="color:#26A17B;font-size:10px" id="payInflight"></span></div>
       </div>
     </div>
@@ -986,7 +1005,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   <div class="range-chip" id="rangeChip-moneyPeriod" style="display:none"><span class="rc-icon">📅</span><span class="rc-text"></span><button class="rc-x" onclick="clearRange('moneyPeriod')">✕</button></div>
 
   <div class="hero">
-    <div class="hero-lbl"><span>Выручка · детально</span></div>
+    <div class="hero-lbl"><span>Выручка за период</span></div>
     <div><span class="hero-amt mono" id="moneyHero" data-aed="">—</span><span class="hero-unit cur-unit">AED</span></div>
     <div class="hero-row">
       <span class="delta" id="moneyDelta">…</span>
@@ -994,32 +1013,17 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     </div>
   </div>
 
-  <!-- Period bars (dynamic — re-rendered per period) -->
-  <div class="sect"><div class="sect-t" id="periodBarsTitle">Последние 7 дней</div></div>
-  <div class="card" style="position:relative">
-    <svg id="periodBarsSvg" viewBox="0 0 320 140" width="100%" height="140" preserveAspectRatio="none">
-      <defs>
-        <linearGradient id="bg1" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stop-color="#E8C98A"/>
-          <stop offset="100%" stop-color="#C9A96E" stop-opacity=".5"/>
-        </linearGradient>
-      </defs>
-      <line x1="0" y1="35"  x2="320" y2="35"  stroke="rgba(255,255,255,.04)"/>
-      <line x1="0" y1="70"  x2="320" y2="70"  stroke="rgba(255,255,255,.04)"/>
-      <line x1="0" y1="105" x2="320" y2="105" stroke="rgba(255,255,255,.04)"/>
-      <g id="periodBarsGroup"></g>
-      <g id="periodBarsLabels" font-family="DM Sans" font-size="9" fill="#54526A" text-anchor="middle"></g>
-    </svg>
-    <div id="periodBarTooltip" style="position:absolute;display:none;background:var(--card2);border:1px solid var(--gold2);border-radius:8px;padding:6px 10px;font-size:12px;font-weight:600;color:var(--gold2);pointer-events:none;white-space:nowrap;z-index:5;font-family:'DM Sans',sans-serif;box-shadow:0 4px 14px rgba(201,169,110,.25);transform:translate(-50%,-100%)"></div>
-    <div style="display:flex;justify-content:space-between;font-size:11px;color:var(--muted);padding:4px 10px 0;border-top:1px solid var(--border2);margin-top:8px;padding-top:10px">
-      <span>В среднем: <b id="bars7dAvg" data-aed="" style="color:var(--text)">—</b> <span class="cur-unit">AED</span></span>
-      <span>Всего: <b id="bars7dTotal" data-aed="" style="color:var(--gold2)">—</b> <span class="cur-unit" style="color:var(--gold2)">AED</span></span>
-    </div>
+  <!-- Место расчищено под новый учёт. Столбики за 30 дней и разбивки, что
+       стояли здесь, переехали в «Обзор» или сняты — см. историю. -->
+  <div class="rep-soon">
+    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
+         stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
+      <path d="M14 3v5h5M9 13h6M9 17h4"/></svg>
+    <div class="rep-soon-t">Здесь будут отчёты</div>
+    <div class="rep-soon-s">Выручка, источники и часы переехали в «Обзор».<br>
+      Место свободно под новый учёт.</div>
   </div>
-
-  <!-- Revenue by office bars -->
-  <!-- Payment split: crypto (already on the wallet) vs cash (courier collects) -->
-  <div class="foot">Данные за выбранный период</div>
 </div>
 
 <!-- ============ OFFICES ============ -->
@@ -2682,13 +2686,13 @@ button.pill:active{opacity:.6}
     <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/></svg>
     Обзор
   </button>
-  <button class="tb" data-pg="money">
-    <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 6-7"/></svg>
-    Деньги
-  </button>
   <button class="tb" data-pg="offices">
     <svg viewBox="0 0 24 24"><path d="M3 21h18"/><path d="M5 21V7l7-4 7 4v14"/><path d="M9 10h2M13 10h2M9 14h2M13 14h2"/></svg>
     Офисы
+  </button>
+  <button class="tb" data-pg="money">
+    <svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>
+    Отчёты
   </button>
   <button class="tb" data-pg="people">
     <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><circle cx="17" cy="7" r="3"/><path d="M21 21v-1a3 3 0 0 0-3-3"/></svg>
@@ -3518,16 +3522,27 @@ function renderFinance(p, f){
 
 function renderPaySplit(bm){
   bm = bm || {};
-  const c = bm.crypto || {}, k = bm.cash || {}, i = bm.crypto_inflight || {};
-  const cAed = c.aed || 0, kAed = k.aed || 0, tot = cAed + kAed;
-  const cLen = tot ? Math.max(0, Math.min(100, cAed / tot * 100)) : 0;
-  const kLen = tot ? 100 - cLen : 0;
-  const arcK = document.getElementById('payCashArc'), arcC = document.getElementById('payCryptoArc');
-  if(arcK){ arcK.setAttribute('stroke-dasharray', kLen.toFixed(1)+' 100'); arcK.setAttribute('stroke-dashoffset','25'); }
-  if(arcC){ arcC.setAttribute('stroke-dasharray', cLen.toFixed(1)+' 100'); arcC.setAttribute('stroke-dashoffset', String(25 - kLen)); }
-  _setText('payCryptoPct', (tot ? Math.round(cAed/tot*100) : 0) + '%');
+  const c = bm.crypto || {}, k = bm.cash || {}, i = bm.crypto_inflight || {}, dg = bm.debt || {};
+  const cAed = c.aed || 0, kAed = k.aed || 0, dAed = dg.aed || 0;
+  const tot = cAed + kAed + dAed;
+  const pct = v => tot ? Math.max(0, Math.min(100, v / tot * 100)) : 0;
+  // Три сектора подряд: наличные → крипта → долг. Каждый следующий начинается
+  // там, где кончился предыдущий, иначе они лягут друг на друга.
+  const kLen = pct(kAed), cLen = pct(cAed), dLen = pct(dAed);
+  const set = (id, len, off) => {
+    const el = document.getElementById(id); if(!el) return;
+    el.setAttribute('stroke-dasharray', len.toFixed(1) + ' 100');
+    el.setAttribute('stroke-dashoffset', String(off));
+  };
+  set('payCashArc',   kLen, 25);
+  set('payCryptoArc', cLen, 25 - kLen);
+  set('payDebtArc',   dLen, 25 - kLen - cLen);
+  _setText('payCryptoPct', Math.round(pct(cAed)) + '%');
   _setAed('payCryptoVal', cAed);
   _setAed('payCashVal',   kAed);
+  _setAed('payDebtVal',   dAed);
+  const dRow = document.getElementById('payDebtRow');
+  if(dRow) dRow.style.display = dAed ? '' : 'none';
   const cu = document.getElementById('payCryptoUsdt');
   if(cu) cu.textContent = c.count ? `≈ ${c.usdt} USDT · заказов: ${c.count}` : 'заказов: 0';
   // Paid on-chain but still in delivery — the money is ALREADY on the wallet.

@@ -690,7 +690,14 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Heatmap */
 .heat{display:grid;grid-template-columns:repeat(24,1fr);gap:2px;margin-top:10px}
 .heat-cell{aspect-ratio:1/2;border-radius:2px;background:var(--card2)}
-.heat-hours{display:grid;grid-template-columns:repeat(24,1fr);gap:2px;margin-top:4px}
+.heat-row{display:flex;align-items:center;gap:9px}
+.heat-cap{width:78px;flex-shrink:0;font-size:10px;font-weight:600;letter-spacing:.4px;
+  text-transform:uppercase;color:var(--muted)}
+.heat-row .heat{flex:1;min-width:0}
+.heat-hours{display:grid;grid-template-columns:repeat(24,1fr);gap:2px;margin-top:4px;
+  margin-left:87px}
+.heat-note{font-size:10.5px;color:var(--muted);margin-top:12px;line-height:1.55}
+.heat-note b{color:var(--gold2)}
 .heat-hours span{font-size:7px;color:var(--dim);text-align:center;font-family:'JetBrains Mono',monospace}
 
 /* Live feed */
@@ -895,26 +902,49 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
         <span class="card-hint" id="kLateHint">&gt; ETA + 5 мин</span>
       </div>
     </div>
-    <div class="card wide" data-detail="kpi:rating">
-      <div class="card-lbl"><span id="kRatingLbl">Рейтинг</span></div>
-      <div style="display:flex;align-items:flex-end;gap:10px;margin-top:0">
-        <div>
-          <span class="star-num" id="kRating">—</span>
-          <span class="stars" id="kRatingStars">
-            <svg viewBox="0 0 24 24"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z"/></svg>
-            <svg viewBox="0 0 24 24"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z"/></svg>
-            <svg viewBox="0 0 24 24"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z"/></svg>
-            <svg viewBox="0 0 24 24"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z"/></svg>
-            <svg viewBox="0 0 24 24"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z"/></svg>
-          </span>
-        </div>
-        <div style="flex:1;display:flex;flex-direction:column;gap:3px">
-          <div class="bar-row" style="margin:0"><span class="bar-lbl" style="width:14px">5</span><div class="bar-track" style="height:5px"><div class="bar-fill" id="kRb5" style="width:0%"></div></div><span class="bar-val" style="min-width:30px" id="kRv5">0</span></div>
-          <div class="bar-row" style="margin:0"><span class="bar-lbl" style="width:14px">4</span><div class="bar-track" style="height:5px"><div class="bar-fill" id="kRb4" style="width:0%"></div></div><span class="bar-val" style="min-width:30px" id="kRv4">0</span></div>
-          <div class="bar-row" style="margin:0"><span class="bar-lbl" style="width:24px;font-size:9px">≤3</span><div class="bar-track" style="height:5px"><div class="bar-fill" id="kRbLow" style="width:0%"></div></div><span class="bar-val" style="min-width:30px" id="kRvLow">0</span></div>
-        </div>
+  </div>
+
+  <div class="sect"><div class="sect-t">Способ оплаты</div></div>
+  <div class="card">
+    <div class="donut-wrap">
+      <div class="donut">
+        <svg viewBox="0 0 36 36" width="92" height="92">
+          <circle cx="18" cy="18" r="15.9" fill="none" stroke="#14142A" stroke-width="3.5"/>
+          <circle id="payCashArc" cx="18" cy="18" r="15.9" fill="none" stroke="#C9A96E" stroke-width="3.5"
+            stroke-dasharray="0 100" stroke-dashoffset="25" transform="rotate(-90 18 18)" stroke-linecap="round"/>
+          <circle id="payCryptoArc" cx="18" cy="18" r="15.9" fill="none" stroke="#26A17B" stroke-width="3.5"
+            stroke-dasharray="0 100" stroke-dashoffset="25" transform="rotate(-90 18 18)" stroke-linecap="round"/>
+        </svg>
+        <div class="donut-c"><div class="donut-val mono" id="payCryptoPct">—</div><div class="donut-lbl">крипта</div></div>
+      </div>
+      <div class="donut-leg">
+        <div class="dleg"><span class="dleg-dot" style="background:#26A17B"></span><span class="dleg-name"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;opacity:.75"><path d="M12 3l7 5-7 13-7-13z"/><path d="M5 8h14M12 3v18"/></svg>Крипта · на кошельке</span><span class="dleg-val" id="payCryptoVal" data-aed="">—</span></div>
+        <div class="dleg"><span class="dleg-name" style="color:var(--muted);font-size:10px;padding-left:16px" id="payCryptoUsdt"></span></div>
+        <div class="dleg"><span class="dleg-dot" style="background:#C9A96E"></span><span class="dleg-name"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;opacity:.75"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>Наличные</span><span class="dleg-val" id="payCashVal" data-aed="">—</span></div>
+        <div class="dleg" id="payInflightRow" style="display:none"><span class="dleg-name" style="color:#26A17B;font-size:10px" id="payInflight"></span></div>
       </div>
     </div>
+  </div>
+
+  <!-- Channel split: app orders vs phone-in (operator POS) -->
+  <div class="sect"><div class="sect-t">Каналы</div></div>
+  <div class="card">
+    <div style="display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--card2);margin-bottom:12px">
+      <div id="chAppBar" style="width:100%;background:linear-gradient(90deg,#E8C98A,#C9A96E);transition:width .4s"></div>
+      <div id="chPhoneBar" style="width:0%;background:#5B8DEF;transition:width .4s"></div>
+    </div>
+    <div class="bar-row"><span class="bar-lbl" style="width:auto;min-width:110px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;opacity:.75"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/></svg>Приложение</span><div style="flex:1"></div><span style="font-size:11px;color:var(--muted);margin-right:8px" id="chAppCnt">—</span><span class="bar-val" id="chAppVal" data-aed="">—</span></div>
+    <div class="bar-row" style="margin:0"><span class="bar-lbl" style="width:auto;min-width:110px"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;opacity:.75"><path d="M5 3h5l2 5-3 2a12 12 0 0 0 5 5l2-3 5 2v5a2 2 0 0 1-2 2A17 17 0 0 1 3 5a2 2 0 0 1 2-2z"/></svg>Телефон</span><div style="flex:1"></div><span style="font-size:11px;color:var(--muted);margin-right:8px" id="chPhoneCnt">—</span><span class="bar-val" id="chPhoneVal" data-aed="">—</span></div>
+  </div>
+
+  <!-- Заказы по часам. Смена идёт с полудня, поэтому и шкала начинается с 12:00:
+       иначе вечерний пик разрезается краем суток пополам. -->
+  <div class="sect"><div class="sect-t">Заказы по часам</div><div class="sect-a" style="font-size:10px;color:var(--muted)" id="heatSub">—</div></div>
+  <div class="card">
+    <div class="heat-row"><span class="heat-cap">Приложение</span><div class="heat" id="heatApp"></div></div>
+    <div class="heat-hours" id="heatHours"></div>
+    <div class="heat-row" style="margin-top:14px"><span class="heat-cap">Телефон</span><div class="heat" id="heatPhone"></div></div>
+    <div class="heat-note" id="heatNote"></div>
   </div>
 
   <!-- Top products (populated from /api/owner/catalog) -->
@@ -989,46 +1019,6 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
 
   <!-- Payment split: crypto (already on the wallet) vs cash (courier collects) -->
-  <div class="sect"><div class="sect-t">Способ оплаты</div></div>
-  <div class="card">
-    <div class="donut-wrap">
-      <div class="donut">
-        <svg viewBox="0 0 36 36" width="92" height="92">
-          <circle cx="18" cy="18" r="15.9" fill="none" stroke="#14142A" stroke-width="3.5"/>
-          <circle id="payCashArc" cx="18" cy="18" r="15.9" fill="none" stroke="#C9A96E" stroke-width="3.5"
-            stroke-dasharray="0 100" stroke-dashoffset="25" transform="rotate(-90 18 18)" stroke-linecap="round"/>
-          <circle id="payCryptoArc" cx="18" cy="18" r="15.9" fill="none" stroke="#26A17B" stroke-width="3.5"
-            stroke-dasharray="0 100" stroke-dashoffset="25" transform="rotate(-90 18 18)" stroke-linecap="round"/>
-        </svg>
-        <div class="donut-c"><div class="donut-val mono" id="payCryptoPct">—</div><div class="donut-lbl">крипта</div></div>
-      </div>
-      <div class="donut-leg">
-        <div class="dleg"><span class="dleg-dot" style="background:#26A17B"></span><span class="dleg-name">💎 Крипта · на кошельке</span><span class="dleg-val" id="payCryptoVal" data-aed="">—</span></div>
-        <div class="dleg"><span class="dleg-name" style="color:var(--muted);font-size:10px;padding-left:16px" id="payCryptoUsdt"></span></div>
-        <div class="dleg"><span class="dleg-dot" style="background:#C9A96E"></span><span class="dleg-name">💵 Наличные</span><span class="dleg-val" id="payCashVal" data-aed="">—</span></div>
-        <div class="dleg" id="payInflightRow" style="display:none"><span class="dleg-name" style="color:#26A17B;font-size:10px" id="payInflight"></span></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Channel split: app orders vs phone-in (operator POS) -->
-  <div class="sect"><div class="sect-t">Каналы</div></div>
-  <div class="card">
-    <div style="display:flex;height:10px;border-radius:5px;overflow:hidden;background:var(--card2);margin-bottom:12px">
-      <div id="chAppBar" style="width:100%;background:linear-gradient(90deg,#E8C98A,#C9A96E);transition:width .4s"></div>
-      <div id="chPhoneBar" style="width:0%;background:#5B8DEF;transition:width .4s"></div>
-    </div>
-    <div class="bar-row"><span class="bar-lbl" style="width:auto;min-width:110px">📱 Приложение</span><div style="flex:1"></div><span style="font-size:11px;color:var(--muted);margin-right:8px" id="chAppCnt">—</span><span class="bar-val" id="chAppVal" data-aed="">—</span></div>
-    <div class="bar-row" style="margin:0"><span class="bar-lbl" style="width:auto;min-width:110px">📞 Телефон</span><div style="flex:1"></div><span style="font-size:11px;color:var(--muted);margin-right:8px" id="chPhoneCnt">—</span><span class="bar-val" id="chPhoneVal" data-aed="">—</span></div>
-  </div>
-
-  <!-- Hour heatmap -->
-  <div class="sect"><div class="sect-t">Заказы по часам</div></div>
-  <div class="card">
-    <div class="heat" id="heat"></div>
-    <div class="heat-hours"><span>0</span><span></span><span></span><span>3</span><span></span><span></span><span>6</span><span></span><span></span><span>9</span><span></span><span></span><span>12</span><span></span><span></span><span>15</span><span></span><span></span><span>18</span><span></span><span></span><span>21</span><span></span><span></span></div>
-    <div style="font-size:10px;color:var(--muted);margin-top:10px;text-align:center">Пик: <b style="color:var(--gold2)">19:00 – 22:00</b></div>
-  </div>
   <div class="foot">Данные за выбранный период</div>
 </div>
 
@@ -1122,6 +1112,30 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
   <div style="display:flex;flex-direction:column;gap:9px" id="offCards">
     <div class="off-empty">Загрузка…</div>
+  </div>
+
+  <div class="sect"><div class="sect-t">Оценки клиентов</div></div>
+  <div class="kpi-grid" style="margin-bottom:2px">
+    <div class="card wide" data-detail="kpi:rating">
+      <div class="card-lbl"><span id="kRatingLbl">Рейтинг</span></div>
+      <div style="display:flex;align-items:flex-end;gap:10px;margin-top:0">
+        <div>
+          <span class="star-num" id="kRating">—</span>
+          <span class="stars" id="kRatingStars">
+            <svg viewBox="0 0 24 24"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z"/></svg>
+            <svg viewBox="0 0 24 24"><path d="M12 2l3 7 7 .5-5.5 4.5 2 7-6.5-4-6.5 4 2-7L2 9.5 9 9z"/></svg>
+          </span>
+        </div>
+        <div style="flex:1;display:flex;flex-direction:column;gap:3px">
+          <div class="bar-row" style="margin:0"><span class="bar-lbl" style="width:14px">5</span><div class="bar-track" style="height:5px"><div class="bar-fill" id="kRb5" style="width:0%"></div></div><span class="bar-val" style="min-width:30px" id="kRv5">0</span></div>
+          <div class="bar-row" style="margin:0"><span class="bar-lbl" style="width:14px">4</span><div class="bar-track" style="height:5px"><div class="bar-fill" id="kRb4" style="width:0%"></div></div><span class="bar-val" style="min-width:30px" id="kRv4">0</span></div>
+          <div class="bar-row" style="margin:0"><span class="bar-lbl" style="width:24px;font-size:9px">≤3</span><div class="bar-track" style="height:5px"><div class="bar-fill" id="kRbLow" style="width:0%"></div></div><span class="bar-val" style="min-width:30px" id="kRvLow">0</span></div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <div class="sect"><div class="sect-t">Скорость доставки</div></div>
@@ -3478,6 +3492,8 @@ function renderFinance(p, f){
   renderOfficeBars(f.by_office);
   // Страница «Офисы» — карточки районов + скорость доставки
   renderOffices(f.offices);
+  // Заказы по часам — теперь из тех же данных, а не из зашитого массива
+  renderHours((f.kpi || {}).by_hour);
   // Money tab hero
   _setAed('moneyHero',   f.revenue.current);
   _setAed('moneyProfit', f.profit.current);
@@ -8888,25 +8904,49 @@ if(window.ownerApi){
   }).catch(()=>{ /* fall back to localStorage state already applied */ });
 }
 
-// Heatmap mock data
-(()=>{
-  const heat = document.getElementById('heat');
-  if(!heat) return;
-  const hourly = [0,0,0,1,0,0,1,2,3,4,3,2,4,5,6,7,8,9,14,18,16,12,8,4];
-  const max = Math.max(...hourly);
-  hourly.forEach(v=>{
-    const d=document.createElement('div');
-    d.className='heat-cell';
-    const r=v/max;
-    if(r===0){ d.style.background='var(--card2)'; }
-    else{
-      const a = 0.18 + r*0.82;
-      d.style.background=`rgba(201,169,110,${a})`;
-      if(r>0.7) d.style.boxShadow='0 0 8px rgba(201,169,110,.3)';
-    }
-    heat.appendChild(d);
-  });
-})();
+// Заказы по часам — из тех же данных, что и всё остальное на странице.
+// Приложение и телефон нарисованы отдельно: у заказа из приложения время — это
+// когда клиент нажал «заказать», у телефонного — когда оператор завёл его в POS.
+// Если телефонные заносят пачкой в конце смены, их полоса это покажет, и выдать
+// работу с планшетом за спрос уже не получится.
+function _heatCells(box, counts){
+  if(!box) return;
+  const max = Math.max(1, ...counts);
+  box.innerHTML = counts.map((v,i)=>{
+    const r = v / max;
+    const bg = v ? `rgba(201,169,110,${(0.18 + r*0.82).toFixed(2)})` : 'var(--card2)';
+    const glow = r > 0.7 ? ';box-shadow:0 0 8px rgba(201,169,110,.3)' : '';
+    return `<div class="heat-cell" style="background:${bg}${glow}" title="${v}"></div>`;
+  }).join('');
+}
+
+function renderHours(h){
+  const app = document.getElementById('heatApp');
+  if(!app || !h || !Array.isArray(h.app)) return;
+  const start = h.start_hour ?? 12;
+  _heatCells(app, h.app);
+  _heatCells(document.getElementById('heatPhone'), h.phone);
+  const hrs = document.getElementById('heatHours');
+  if(hrs) hrs.innerHTML = Array.from({length:24}, (_,i)=>{
+    const hh = (start + i) % 24;
+    return `<span>${hh % 3 === 0 ? hh : ''}</span>`;
+  }).join('');
+  const sub = document.getElementById('heatSub');
+  if(sub) sub.textContent = `${h.app_total + h.phone_total} ${pluralize(h.app_total + h.phone_total,'заказ','заказа','заказов')}`;
+  const note = document.getElementById('heatNote');
+  if(note){
+    const pa = h.peak_app, pp = h.peak_phone;
+    const two = n => String(n).padStart(2,'0');
+    const bits = [];
+    if(h.app_total)   bits.push(`Из приложения густо в <b>${two(pa.from)}:00 – ${two(pa.to)}:00</b> — ${pa.count} из ${h.app_total}.`);
+    if(h.phone_total) bits.push(`По телефону — <b>${two(pp.from)}:00 – ${two(pp.to)}:00</b>, ${pp.count} из ${h.phone_total}.`);
+    // Узкий шип у телефонных значит не спрос, а привычку заносить заказы разом.
+    if(h.phone_total >= 10 && pp.count / h.phone_total > 0.6)
+      bits.push('Телефонные заносят в POS пачкой, поэтому их время — время занесения, а не звонка.');
+    note.innerHTML = bits.join(' ') || 'За период заказов не было.';
+  }
+}
+
 </script>
 
 <!-- Пересчёт склада. Список, а не опрос: все позиции на виду, править можно

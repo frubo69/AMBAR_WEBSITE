@@ -1466,6 +1466,20 @@ async def get_stock_counts_recent(district: str, before_day: str | None = None,
     return await cur.to_list(length=int(limit))
 
 
+async def get_finished_audits(limit: int = 40) -> list:
+    """Завершённые ревизии, свежие первыми — без позиций.
+
+    Позиции тянутся отдельно, когда открывают конкретный отчёт: список из сорока
+    ревизий по сто двадцать две строки в каждой — это мегабайты ради заголовков."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.stock_counts.find(
+        {"audit_finished_at": {"$exists": True}},
+        {"_id": 0, "lines": 0},
+    ).sort("audit_finished_at", -1).limit(int(limit))
+    return await cur.to_list(length=int(limit))
+
+
 async def get_stock_counts_for_day(day: str) -> list:
     db = _db_or_none()
     if db is None: return []

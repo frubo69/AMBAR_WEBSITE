@@ -252,6 +252,9 @@ async def handle_sheet(request):
             "days_ago": ago,
             "stale": (not first_time) and (ago is None or ago >= STALE_DAYS),
             "actual": (done.get(pid) or {}).get("actual"),
+            # Отметка ревизии: ok — проверено и сошлось, diff — расхождение.
+            # Хранится с прошлого захода, иначе ревизию нельзя прервать.
+            "mark": (done.get(pid) or {}).get("mark"),
         })
     # Сначала то, где расхождение видно сразу (двигалось), потом то, что давно
     # не проверяли: именно там прячутся бой и недостача без продаж. А внутри
@@ -265,6 +268,11 @@ async def handle_sheet(request):
         "district_code": OFFICE_CODES.get(district, ""),
         "day": day, "first_time": first_time,
         "prev_day": (prev or {}).get("day", ""),
+        "audit": {
+            "started_at":  (existing or {}).get("audit_started_at", ""),
+            "finished_at": (existing or {}).get("audit_finished_at", ""),
+            "marked": sum(1 for r in rows if r["mark"]),
+        },
         "touched_count": sum(1 for r in rows if r["touched"]),
         "stale_count": sum(1 for r in rows if r["stale"] and not r["touched"]),
         "stale_days": STALE_DAYS,
@@ -276,7 +284,15 @@ async def handle_sheet(request):
 
 @require_owner
 async def handle_save(request):
-    """Сохранить пересчёт. body: {district, day?, lines:[{id, actual, income?}]}"""
+    """Сохранить пересчёт или ревизию.
+
+    body: {district, day?, lines:[{id, actual, income?, auto?, mark?}],
+           audit?: bool, finish?: bool}
+
+    Ревизия — это тот же пересчёт, но пройденный целиком и с отметкой на каждой
+    позиции: ok — посмотрел, сошлось; diff — не сошлось. Закрыть её можно
+    только когда отмечены все, иначе «ревизия проведена» означало бы «часть
+    полок посмотрели, а часть посчитали на глаз»."""
     try:
         body = await request.json()
     except Exception:
@@ -301,7 +317,10 @@ async def handle_save(request):
         if m.get("from") == district: mv_by[pid] = mv_by.get(pid, 0) - q
         if m.get("to")   == district: mv_by[pid] = mv_by.get(pid, 0) + q
 
+    is_audit = bool(body.get("audit"))
+    finish = bool(body.get("finish"))
     lines, short_qty, short_aed, over_qty, counted_qty = [], 0, 0, 0, 0
+    marked = matched = mismatched = 0
     for raw in (body.get("lines") or []):
         pid = raw.get("id"); p = cat.get(pid)
         if not p:
@@ -332,19 +351,39 @@ async def handle_save(request):
             else:        over_qty  += -diff
         if not auto:
             counted_qty += 1
+        mark = raw.get("mark") if raw.get("mark") in ("ok", "diff") else None
+        if mark:
+            marked += 1
+            if mark == "ok": matched += 1
+            else:            mismatched += 1
         lines.append({"id": pid, "name": p.get("name", ""), "price": price,
                       "unit": _unit(p),
                       "was": was, "income": income, "moved_qty": mv, "sold": s,
                       "expected": expected, "actual": actual, "diff": diff,
-                      "counted": not auto})
+                      "counted": not auto, "mark": mark})
 
+    if finish and marked < len(lines):
+        return web.json_response(
+            {"error": "audit_incomplete", "marked": marked, "total": len(lines)},
+            status=409, headers=CORS_HEADERS)
+
+    now_iso = datetime.now(timezone.utc).isoformat()
+    prev_doc = await db.get_stock_count(district, day) or {}
     doc = {"district": district, "district_name": OFFICE_NAMES.get(district, district),
            "day": day, "first_time": first_time,
            "counted_by": request["owner_id"],
-           "counted_at": datetime.now(timezone.utc).isoformat(),
+           "counted_at": now_iso,
            "lines": lines, "short_qty": _num(short_qty), "short_aed": round(short_aed),
            "over_qty": _num(over_qty),
            "counted_qty": counted_qty, "total_qty": len(lines)}
+    if is_audit or marked:
+        doc["audit_started_at"] = prev_doc.get("audit_started_at") or now_iso
+        doc["marked_qty"] = marked
+        doc["matched_qty"] = matched
+        doc["mismatch_qty"] = mismatched
+        if finish:
+            doc["audit_finished_at"] = now_iso
+            doc["audit_by"] = request["owner_id"]
     await db.save_stock_count(district, day, doc)
     log.info(f"[stock] {district} {day}: {len(lines)} позиций, "
              f"недостача {short_qty} шт / {short_aed} AED")
@@ -353,6 +392,8 @@ async def handle_save(request):
          "short_qty": _num(short_qty), "short_aed": round(short_aed),
          "over_qty": _num(over_qty),
          "counted_qty": counted_qty, "total_qty": len(lines),
+         "audit": bool(is_audit or marked), "finished": bool(finish),
+         "marked": marked, "matched": matched, "mismatched": mismatched,
          "lines": [l for l in lines if l["diff"]]}, headers=CORS_HEADERS)
 
 
@@ -506,6 +547,30 @@ async def handle_status(request):
 
 
 @require_owner
+async def handle_audits(request):
+    """История ревизий: что и когда закрывали. Только заголовки — сами позиции
+    приходят с /stock/result, когда открывают конкретную."""
+    rows = await db.get_finished_audits(limit=40)
+    out = []
+    for c in rows:
+        out.append({
+            "district": c.get("district", ""),
+            "district_code": OFFICE_CODES.get(c.get("district"), ""),
+            "district_name": OFFICE_NAMES.get(c.get("district"), c.get("district", "")),
+            "day": c.get("day", ""),
+            "started_at": c.get("audit_started_at", ""),
+            "finished_at": c.get("audit_finished_at", ""),
+            "total": int(c.get("total_qty") or 0),
+            "matched": int(c.get("matched_qty") or 0),
+            "mismatched": int(c.get("mismatch_qty") or 0),
+            "short_qty": c.get("short_qty") or 0,
+            "short_aed": int(c.get("short_aed") or 0),
+            "over_qty": c.get("over_qty") or 0,
+        })
+    return web.json_response({"audits": out}, headers=CORS_HEADERS)
+
+
+@require_owner
 async def handle_result(request):
     district = (request.query.get("district") or "").strip()
     day = (request.query.get("day") or "").strip() or _biz_day()
@@ -513,7 +578,15 @@ async def handle_result(request):
     if not c:
         return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
     c.pop("_id", None)
-    c["lines"] = [l for l in c.get("lines", []) if l.get("diff")]
+    lines = c.get("lines", [])
+    # В отчёте нужны и расхождения, и то, что менеджер отметил крестиком: он мог
+    # поправить число до совпадения с ожидаемым, и diff обнулился — но факт,
+    # что на полке лежало иначе, из отчёта пропадать не должен.
+    c["lines"] = sorted(
+        [l for l in lines if l.get("diff") or l.get("mark") == "diff"],
+        key=lambda l: -abs((l.get("diff") or 0) * (l.get("price") or 0)))
+    c["counted_lines"] = sum(1 for l in lines if l.get("counted"))
+    c["district_code"] = OFFICE_CODES.get(c.get("district"), "")
     return web.json_response(c, headers=CORS_HEADERS)
 
 
@@ -529,6 +602,7 @@ def setup(app):
         ("/api/owner/stock/result",    handle_result,    "GET"),
         ("/api/owner/stock/order",     handle_order,     "GET"),
         ("/api/owner/stock/transfers", handle_transfers, "GET"),
+        ("/api/owner/stock/audits",    handle_audits,    "GET"),
         ("/api/owner/stock/count",     handle_save,      "POST"),
         ("/api/owner/stock/transfer",  handle_transfer,  "POST"),
         ("/api/owner/stock/norm",      handle_set_norm,  "POST"),

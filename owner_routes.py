@@ -1066,6 +1066,46 @@ async def handle_operators(request):
             "by_district": by_district,
         })
 
+    # Водители. Их имя стоит в заказе только у телефонных: онлайн-заказу водителя
+    # никто не назначает, поэтому у водителя видно ровно ту часть работы, которую
+    # он забрал через POS. Врать про остальное нельзя — так и подписано.
+    drv_home = {}
+    for st_ in staff.DISTRICT_STAFF:
+        for name in st_["drivers"]:
+            drv_home.setdefault(name, []).append(st_["district"])
+    seen_drv = {n: {"name": n, "districts": d, "known": True}
+                for n, d in drv_home.items()}
+    for _dt, o in curr_all:
+        n = (o.get("driver") or "").strip()
+        if n and n not in seen_drv:
+            seen_drv[n] = {"name": n, "districts": [], "known": False}
+
+    drivers = []
+    for n, info in seen_drv.items():
+        mine = lambda ps, n=n: [(dt, o) for dt, o in ps
+                                if (o.get("driver") or "").strip() == n]
+        dl, alls = mine(curr), mine(curr_all)
+        dv = _delivery_stats(dl)
+        revs = [int(o["review_score"]) for _, o in dl if o.get("review_score")]
+        tips, bottles, _ = _tips_by_driver(dl)
+        drivers.append({
+            "id": staff._slug(n), "name": n, "known": info["known"],
+            "districts": [{"id": d, "code": OFFICE_CODES.get(d, ""),
+                           "name": OFFICE_NAMES.get(d, d)} for d in info["districts"]],
+            "operator": staff.DISTRICT_OPERATOR.get(
+                info["districts"][0], "") if info["districts"] else "",
+            "orders": len(alls), "delivered": len(dl),
+            "aed": sum(int(o.get("total") or 0) for _, o in dl),
+            "cancelled": sum(1 for _, o in alls
+                             if o.get("status") in ("declined", "cancelled")),
+            "avg_min": dv["avg_min"], "avg_sample": dv["sample"],
+            "late": dv["late_count"], "late_pct": dv["late_pct"],
+            "rating": round(sum(revs) / len(revs), 2) if revs else 0,
+            "rating_count": len(revs),
+            "tips": tips, "tips_bottles": bottles,
+        })
+    drivers.sort(key=lambda d: (-d["aed"], d["name"]))
+
     # Общие устройства считаем отдельно: планшет — это не человек, статистику
     # по нему дублировать не надо, но и «чужим» он не является.
     # Всё, что не человек и не известное устройство, — повод разобраться.
@@ -1096,6 +1136,7 @@ async def handle_operators(request):
         "norm_min": LATE_THRESHOLD_FALLBACK,
         "slow_sec": RESP_SLOW_SEC,
         "operators": out,
+        "drivers": drivers,
         "devices": sorted(devices.values(), key=lambda x: -(x["accepted"] + x["created"])),
         "unknown_devices": sorted(unknown.values(),
                                   key=lambda x: -(x["accepted"] + x["created"])),

@@ -575,6 +575,10 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .ac-btn-num-lbl{font-size:8.5px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-top:4px}
 .ac-btn-arrow{color:var(--gold2);font-size:20px;font-weight:600;flex-shrink:0;opacity:.55;margin-left:2px}
 
+/* Карточка целиком открывает разбор */
+.tap-card{cursor:pointer;transition:.15s var(--e1)}
+.tap-card:active{transform:scale(.99);border-color:rgba(201,169,110,.28)}
+
 /* Пустая вкладка «Отчёты» — не забытая страница, а расчищенное место */
 .rep-soon{display:flex;flex-direction:column;align-items:center;gap:9px;
   padding:44px 24px;margin-top:6px;border-radius:16px;text-align:center;
@@ -920,8 +924,8 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     </div>
   </div>
 
-  <div class="sect"><div class="sect-t">Способ оплаты</div></div>
-  <div class="card">
+  <div class="sect"><div class="sect-t">Способ оплаты</div><div class="sect-a" style="font-size:10px;color:var(--muted)">подробнее ›</div></div>
+  <div class="card tap-card" data-detail="payment:all">
     <div class="donut-wrap">
       <div class="donut">
         <svg viewBox="0 0 36 36" width="92" height="92">
@@ -937,10 +941,8 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
       </div>
       <div class="donut-leg">
         <div class="dleg"><span class="dleg-dot" style="background:#26A17B"></span><span class="dleg-name"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;opacity:.75"><path d="M12 3l7 5-7 13-7-13z"/><path d="M5 8h14M12 3v18"/></svg>Крипта</span><span class="dleg-val" id="payCryptoVal" data-aed="">—</span></div>
-        <div class="dleg"><span class="dleg-name" style="color:var(--muted);font-size:10px;padding-left:16px" id="payCryptoUsdt"></span></div>
         <div class="dleg"><span class="dleg-dot" style="background:#C9A96E"></span><span class="dleg-name"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;opacity:.75"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>Наличные</span><span class="dleg-val" id="payCashVal" data-aed="">—</span></div>
         <div class="dleg" id="payDebtRow" style="display:none"><span class="dleg-dot" style="background:#F3B44A"></span><span class="dleg-name"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;opacity:.75"><path d="M4 7h16v12H4z"/><path d="M4 11h16M9 15h3"/></svg>В долг</span><span class="dleg-val" id="payDebtVal" data-aed="" style="color:var(--warn)">—</span></div>
-        <div class="dleg" id="payInflightRow" style="display:none"><span class="dleg-name" style="color:#26A17B;font-size:10px" id="payInflight"></span></div>
       </div>
     </div>
   </div>
@@ -3543,14 +3545,6 @@ function renderPaySplit(bm){
   _setAed('payDebtVal',   dAed);
   const dRow = document.getElementById('payDebtRow');
   if(dRow) dRow.style.display = dAed ? '' : 'none';
-  const cu = document.getElementById('payCryptoUsdt');
-  if(cu) cu.textContent = c.count ? `≈ ${c.usdt} USDT · заказов: ${c.count}` : 'заказов: 0';
-  // Paid on-chain but still in delivery — the money is ALREADY on the wallet.
-  const infRow = document.getElementById('payInflightRow'), inf = document.getElementById('payInflight');
-  if(infRow && inf){
-    if(i.count){ infRow.style.display=''; inf.textContent = `⏳ в доставке, уже оплачено: ${i.aed} AED (≈ ${i.usdt} USDT · ${i.count} зак.)`; }
-    else infRow.style.display='none';
-  }
 }
 
 // Детальный разрез района: /api/owner/office за выбранный на странице период.
@@ -8345,6 +8339,67 @@ const DETAIL = {
       foot: d.status==='in_progress'
         ? `<button class="dt-btn">Чек</button><button class="dt-btn dn">Отмена</button><button class="dt-btn pri">Связь с клиентом</button>`
         : `<button class="dt-btn">Чек</button><button class="dt-btn">Клиенту</button><button class="dt-btn pri">Повторить</button>`
+    };
+  },
+
+  // Разбор способов оплаты. В карточке — только суммы в дирхамах, чтобы не
+  // рябило; всё остальное (курс, число заказов, оплаченное в пути) здесь.
+  payment: id=>{
+    const period = document.querySelector('#periodPicker button.on')?.dataset?.p || 'today';
+    const f = _dayCached(period) || {};
+    const m = f.by_method || {};
+    const c = m.crypto || {}, k = m.cash || {}, d = m.debt || {}, inf = m.crypto_inflight || {};
+    const tot = (c.aed||0) + (k.aed||0) + (d.aed||0);
+    const pct = v => tot ? Math.round(v / tot * 100) : 0;
+    const per = DAY_OFFSET
+      ? (l => l.sub ? `${l.top} ${l.sub}` : l.top)(_dayLabel(f.window))
+      : ({today:'сегодня', yesterday:'вчера', week:'неделя', month:'месяц', year:'год'}[period] || period);
+
+    const row = (name, aed, cnt, color, extra) => `
+      <div class="dt-row">
+        <div class="dt-row-l">
+          <div class="dt-row-t">${name}</div>
+          <div class="dt-row-s">${cnt ? `${cnt} ${pluralize(cnt,'заказ','заказа','заказов')} · ${pct(aed)}%` : 'нет заказов'}${
+            extra ? ' · ' + extra : ''}</div>
+        </div>
+        <div class="dt-row-r" style="color:${color}">${fmt(aed)} <span style="font-size:11px;color:var(--muted)">AED</span></div>
+      </div>`;
+
+    return {
+      title:`<div class="dt-tit-av plain">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+               stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>
+        </div>
+        <div><div class="dt-tit-name">Способ оплаты</div>
+        <div class="dt-sub">${escS(per)} · всего ${fmt(tot)} AED</div></div>`,
+      body:`
+        <div class="dt-card">
+          ${row('Наличные', k.aed||0, k.count||0, 'var(--gold2)')}
+          ${row('Крипта', c.aed||0, c.count||0, '#26A17B',
+                c.usdt ? `${c.usdt} USDT` : '')}
+          ${row('В долг', d.aed||0, d.count||0, 'var(--warn)')}
+        </div>
+
+        ${inf.count ? `
+        <div class="dt-sect">Оплачено, ещё в пути</div>
+        <div class="dt-card">
+          <div class="dt-row">
+            <div class="dt-row-l"><div class="dt-row-t">${fmt(inf.aed)} AED${inf.usdt ? ` · ${inf.usdt} USDT` : ''}</div>
+            <div class="dt-row-s">${inf.count} ${pluralize(inf.count,'заказ','заказа','заказов')} — деньги на кошельке, товар ещё везут</div></div>
+          </div>
+        </div>` : ''}
+
+        <div class="dt-sect">Что это значит</div>
+        <div class="dt-card">
+          <div style="font-size:11.5px;color:var(--muted);padding:12px 4px;line-height:1.6">
+            Наличные привозит курьер, крипта приходит на кошелёк в момент заказа.
+            «В долг» — товар уехал, денег ещё нет: в кассе этой суммы не будет,
+            пока клиент не рассчитается.
+          </div>
+        </div>
+      `,
+      foot:''
     };
   },
 

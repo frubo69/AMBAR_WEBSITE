@@ -91,10 +91,42 @@ def _day_bounds(day: str, days: int = 1):
     return f(d), f(d + timedelta(days=days))
 
 
+# ── единица учёта ────────────────────────────────────────────────────────────
+# Крепкое и вино считают бутылками, пиво — ящиками. Ящик двадцать четыре, и
+# половина ящика — обычное дело: двенадцать банок продали, двенадцать остались.
+# Отсюда и остатки вида 9.5 в рабочей таблице. Так что единица пива — ящик, а
+# шаг — половина; целыми бутылками пиво на складе никто не считает.
+CASE = 24                   # бутылок в ящике
+STEP = 0.5                  # мельче половины ящика не бывает
+
+
+def _unit(p: dict) -> int:
+    """Сколько бутылок в одной учётной единице позиции."""
+    return CASE if (p.get("price_24_full") or p.get("price_12_full")) else 1
+
+
+def _round_step(v) -> float:
+    """К ближайшей половине. Считают глазами, дробей мельче не бывает.
+
+    Нечисло — ноль и запись в лог: одна битая строка не должна ронять
+    весь пересчёт района."""
+    try:
+        return round(round(float(v) / STEP) * STEP, 2)
+    except (TypeError, ValueError):
+        log.warning(f"[stock] в остатке нечисло: {v!r} — считаем нулём")
+        return 0.0
+
+
+def _num(v):
+    """9.5 остаётся 9.5, а 9.0 показывается как 9 — лишний ноль только мешает."""
+    v = _round_step(v)
+    return int(v) if v == int(v) else v
+
+
 # ── продажи из заказов ───────────────────────────────────────────────────────
 def _qty(it: dict) -> int:
-    """Штук в строке заказа. Пиво идёт пачками: qty=1 при pcs=12 — это 12 бутылок,
-    и на складе исчезнут именно двенадцать."""
+    """Бутылок в строке заказа. Пиво идёт пачками: qty=1 при pcs=12 — это
+    двенадцать бутылок, и со склада уйдут именно двенадцать."""
     try:
         q = int(it.get("qty") or 0)
     except (TypeError, ValueError):
@@ -109,10 +141,14 @@ def _qty(it: dict) -> int:
 
 
 async def _sold(day: str, district: str | None = None, days: int = 1) -> dict:
-    """{product_id: продано штук}. Только доставленные — отменённый заказ товар
-    со склада не уносит."""
+    """{product_id: продано в учётных единицах}.
+
+    Заказы знают бутылки, склад считает ящиками — здесь одно переводится в
+    другое, иначе проданная пачка пива выглядела бы как пропавшие двенадцать.
+    Только доставленные: отменённый заказ товар со склада не уносит."""
     start, end = _day_bounds(day, days)
     orders = await db.get_orders_in_range(start, end)
+    cat = _catalog()
     out = {}
     for o in orders:
         if o.get("status") != "delivered":
@@ -123,8 +159,8 @@ async def _sold(day: str, district: str | None = None, days: int = 1) -> dict:
             pid = it.get("id")
             q = _qty(it)
             if pid and q:
-                out[pid] = out.get(pid, 0) + q
-    return out
+                out[pid] = out.get(pid, 0) + q / _unit(cat.get(pid) or {})
+    return {k: _round_step(v) for k, v in out.items()}
 
 
 def _catalog():
@@ -133,8 +169,11 @@ def _catalog():
 
 
 def _price(p: dict) -> int:
-    """Цена штуки для оценки в деньгах — полная: пропавшая бутылка стоит
-    столько, сколько за неё платят, а не со скидкой приложения."""
+    """Цена одной учётной единицы — полная, без скидки приложения: пропавшее
+    стоит столько, сколько за него платят. Для пива это цена ящика, поэтому
+    недостача в полящика оценивается в цену двенадцати бутылок сама собой."""
+    if p.get("price_24_full"):
+        return int(p["price_24_full"])
     return int(p.get("price_full") or p.get("price") or 0)
 
 
@@ -182,7 +221,7 @@ async def handle_sheet(request):
     # Перемещения: ушедшее из района вычитаем, пришедшее прибавляем.
     move_by_pid = {}
     for m in moves:
-        pid, q = m.get("product_id"), int(m.get("qty") or 0)
+        pid, q = m.get("product_id"), _round_step(m.get("qty") or 0)
         if not pid or not q:
             continue
         if m.get("from") == district:
@@ -192,16 +231,22 @@ async def handle_sheet(request):
 
     rows = []
     for pid, p in cat.items():
-        was = int((prev_lines.get(pid) or {}).get("actual") or 0)
-        s = int(sold.get(pid) or 0)
-        mv = int(move_by_pid.get(pid) or 0)
+        was = _round_step((prev_lines.get(pid) or {}).get("actual") or 0)
+        s = _round_step(sold.get(pid) or 0)
+        mv = _round_step(move_by_pid.get(pid) or 0)
         ago = _days_between(last_checked.get(pid), day)
+        unit = _unit(p)
         rows.append({
             "id": pid, "name": p.get("name", ""), "cat": p.get("cat", ""),
+            "no": order_key(pid) + 1,          # номер строки в рабочей таблице
             "price": _price(p),
-            "was": was, "sold": s, "moved_qty": mv,
+            # Пиво считают ящиками по CASE бутылок и половинками ящика — фронт
+            # должен знать и шаг, и что вообще стоит за единицей.
+            "unit": unit, "step": STEP if unit > 1 else 1,
+            "unit_name": "ящик" if unit > 1 else "бутылка",
+            "was": _num(was), "sold": _num(s), "moved_qty": _num(mv),
             # На первом пересчёте сравнивать не с чем — вводим как отправную точку.
-            "expected": None if first_time else max(0, was + mv - s),
+            "expected": None if first_time else _num(max(0, was + mv - s)),
             "touched": bool(s or mv),
             "checked_day": last_checked.get(pid, ""),
             "days_ago": ago,
@@ -250,7 +295,7 @@ async def handle_save(request):
 
     mv_by = {}
     for m in moves:
-        pid, q = m.get("product_id"), int(m.get("qty") or 0)
+        pid, q = m.get("product_id"), _round_step(m.get("qty") or 0)
         if not pid or not q:
             continue
         if m.get("from") == district: mv_by[pid] = mv_by.get(pid, 0) - q
@@ -262,17 +307,17 @@ async def handle_save(request):
         if not p:
             continue
         try:
-            actual = max(0, int(raw.get("actual") or 0))
+            actual = max(0.0, _round_step(raw.get("actual") or 0))
         except (TypeError, ValueError):
             continue
         try:
-            income = max(0, int(raw.get("income") or 0))
+            income = max(0.0, _round_step(raw.get("income") or 0))
         except (TypeError, ValueError):
-            income = 0
-        was = int((prev_lines.get(pid) or {}).get("actual") or 0)
-        s   = int(sold.get(pid) or 0)
-        mv  = int(mv_by.get(pid) or 0)
-        expected = None if first_time else max(0, was + income + mv - s)
+            income = 0.0
+        was = _round_step((prev_lines.get(pid) or {}).get("actual") or 0)
+        s   = _round_step(sold.get(pid) or 0)
+        mv  = _round_step(mv_by.get(pid) or 0)
+        expected = None if first_time else max(0.0, _round_step(was + income + mv - s))
         # Строка, до которой не дошли руки. Она сохраняется расчётным значением
         # — иначе завтра не с чем будет сравнивать и заявка не узнает остаток, —
         # но проверкой не считается: бой и воровство продажами не пахнут и
@@ -280,7 +325,7 @@ async def handle_save(request):
         auto = bool(raw.get("auto")) and expected is not None
         if auto:
             actual = expected
-        diff = None if expected is None else (expected - actual)   # >0 — не хватает
+        diff = None if expected is None else _round_step(expected - actual)  # >0 — не хватает
         price = _price(p)
         if diff:
             if diff > 0: short_qty += diff; short_aed += diff * price
@@ -288,6 +333,7 @@ async def handle_save(request):
         if not auto:
             counted_qty += 1
         lines.append({"id": pid, "name": p.get("name", ""), "price": price,
+                      "unit": _unit(p),
                       "was": was, "income": income, "moved_qty": mv, "sold": s,
                       "expected": expected, "actual": actual, "diff": diff,
                       "counted": not auto})
@@ -296,15 +342,16 @@ async def handle_save(request):
            "day": day, "first_time": first_time,
            "counted_by": request["owner_id"],
            "counted_at": datetime.now(timezone.utc).isoformat(),
-           "lines": lines, "short_qty": short_qty, "short_aed": short_aed,
-           "over_qty": over_qty,
+           "lines": lines, "short_qty": _num(short_qty), "short_aed": round(short_aed),
+           "over_qty": _num(over_qty),
            "counted_qty": counted_qty, "total_qty": len(lines)}
     await db.save_stock_count(district, day, doc)
     log.info(f"[stock] {district} {day}: {len(lines)} позиций, "
              f"недостача {short_qty} шт / {short_aed} AED")
     return web.json_response(
         {"ok": True, "day": day, "first_time": first_time,
-         "short_qty": short_qty, "short_aed": short_aed, "over_qty": over_qty,
+         "short_qty": _num(short_qty), "short_aed": round(short_aed),
+         "over_qty": _num(over_qty),
          "counted_qty": counted_qty, "total_qty": len(lines),
          "lines": [l for l in lines if l["diff"]]}, headers=CORS_HEADERS)
 
@@ -324,7 +371,7 @@ async def handle_transfer(request):
     src, dst = str(body.get("from") or ""), str(body.get("to") or "")
     pid = str(body.get("product_id") or "")
     try:
-        qty = int(body.get("qty") or 0)
+        qty = _round_step(body.get("qty") or 0)     # полящика переехать тоже может
     except (TypeError, ValueError):
         qty = 0
     if src not in OFFICE_IDS or dst not in OFFICE_IDS or src == dst:
@@ -334,7 +381,7 @@ async def handle_transfer(request):
 
     day = str(body.get("day") or "").strip() or _biz_day()
     doc = {"day": day, "from": src, "to": dst, "product_id": pid,
-           "product_name": _catalog()[pid].get("name", ""), "qty": qty,
+           "product_name": _catalog()[pid].get("name", ""), "qty": _num(qty),
            "by": request["owner_id"],
            "at": datetime.now(timezone.utc).isoformat()}
     await db.add_stock_transfer(doc)

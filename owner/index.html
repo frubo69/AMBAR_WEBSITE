@@ -398,6 +398,34 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   background:rgba(91,141,239,.12);border:1px solid rgba(91,141,239,.28);
   font-size:11px;font-weight:600;color:var(--info)}
 .stk-mv-tag b{cursor:pointer;opacity:.6}
+/* номер позиции и единица учёта */
+.stk-no{width:26px;flex-shrink:0;text-align:right;font-family:'DM Sans',sans-serif;
+  font-size:11px;font-weight:600;color:var(--muted);opacity:.55;
+  font-variant-numeric:tabular-nums}
+.stk-unit{display:inline-block;margin-right:6px;padding:1px 5px;border-radius:4px;
+  font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--info);
+  background:rgba(91,141,239,.12);border:1px solid rgba(91,141,239,.25);white-space:nowrap}
+
+/* панель над клавиатурой */
+.stk-bar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:none;
+  align-items:center;gap:8px;padding:8px 10px;
+  background:var(--bg2);border-top:1px solid var(--border2);
+  box-shadow:0 -6px 20px rgba(0,0,0,.45)}
+.stk-bar.on{display:flex}
+.stk-bar-b{width:40px;height:40px;flex-shrink:0;border-radius:10px;cursor:pointer;
+  border:1px solid var(--border3);background:var(--card2);color:var(--gold2);
+  display:flex;align-items:center;justify-content:center}
+.stk-bar-b:disabled{opacity:.3;pointer-events:none}
+.stk-bar-b:active{transform:scale(.92)}
+.stk-bar-t{flex:1;min-width:0;text-align:center}
+.stk-bar-pos{font-size:10px;font-weight:600;letter-spacing:.8px;text-transform:uppercase;
+  color:var(--muted);font-variant-numeric:tabular-nums}
+.stk-bar-name{font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis;margin-top:1px}
+.stk-bar-done{flex-shrink:0;padding:10px 14px;border:none;border-radius:10px;cursor:pointer;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;
+  font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700}
+.stk-bar-done:active{transform:scale(.95)}
 /* итог */
 .stk-res{padding:30px 16px;text-align:center}
 .stk-res-num{font-family:'DM Sans',sans-serif;font-size:60px;font-weight:700;letter-spacing:-2px;line-height:1}
@@ -3744,6 +3772,12 @@ function stkRenderList(){
     + tail;
 }
 
+// Пиво считают ящиками, и половина ящика — норма: двенадцать банок продали,
+// двенадцать остались. Поэтому у таких строк шаг половинный, а у остальных —
+// целая бутылка.
+function _stkStep(r){ return r.step || 1; }
+function _stkFmt(v){ v = Math.round(v * 2) / 2; return v === Math.trunc(v) ? String(v) : v.toFixed(1); }
+
 function stkItem(r){
   const v = STK.vals[r.id] ?? 0;
   const exp = r.expected;
@@ -3752,21 +3786,23 @@ function stkItem(r){
   let why;
   if(exp == null)                            why = '';   // первый пересчёт: объясняет плашка
   else if(r.touched)                                     // формула: откуда взялось число
-    why = `${r.was}`
-        + (r.sold ? ` − ${r.sold}` : '')
-        + (r.moved_qty ? ` ${r.moved_qty>0?'+':'−'} ${Math.abs(r.moved_qty)}` : '')
-        + ` = ${exp}`;
+    why = `${_stkFmt(r.was)}`
+        + (r.sold ? ` − ${_stkFmt(r.sold)}` : '')
+        + (r.moved_qty ? ` ${r.moved_qty>0?'+':'−'} ${_stkFmt(Math.abs(r.moved_qty))}` : '')
+        + ` = ${_stkFmt(exp)}`;
   else if(!r.was)                            why = 'новая позиция';
-  else why = `на полке ${exp} · ` + (r.days_ago == null
+  else why = `на полке ${_stkFmt(exp)} · ` + (r.days_ago == null
       ? 'ни разу не проверяли'
       : r.days_ago === 0 ? 'проверяли сегодня'
       : `не проверяли ${r.days_ago} ${pluralize(r.days_ago,'день','дня','дней')}`);
   return `<div class="stk-wrap"><div class="stk-item ${cls}" id="stk-${escS(r.id)}">
+    <div class="stk-no">${r.no || ''}</div>
     <div class="stk-i-body">
       <div class="stk-i-n">${escS(r.name)}</div>
-      ${why ? `<div class="stk-i-s">${why}</div>` : ''}
+      ${(why || r.unit > 1) ? `<div class="stk-i-s">${r.unit > 1
+        ? '<span class="stk-unit">ящик</span>' : ''}${why}</div>` : ''}
       ${diff ? `<div class="stk-i-d ${diff>0?'low':'high'}">
-          ${diff>0?'не хватает':'излишек'} ${Math.abs(diff)} · ${fmt(Math.abs(diff)*r.price)} AED
+          ${diff>0?'не хватает':'излишек'} ${_stkFmt(Math.abs(diff))} · ${fmt(Math.round(Math.abs(diff)*r.price))} AED
         </div>` : ''}
     </div>
     <div class="stk-step">
@@ -3775,9 +3811,10 @@ function stkItem(r){
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M4 8h14M15 5l3 3-3 3M20 16H6M9 13l-3 3 3 3"/></svg></div>
       <div class="stk-sb" onclick="stkBump('${escS(r.id)}',-1)">−</div>
-      <input class="stk-qty" type="number" inputmode="numeric" min="0" max="9999"
-             value="${v}" onfocus="this.select()"
-             oninput="stkSet('${escS(r.id)}', this.value)">
+      <input class="stk-qty" type="text" inputmode="decimal" enterkeyhint="next"
+             data-stk="${escS(r.id)}" value="${_stkFmt(v)}" onfocus="stkFocus(this)"
+             oninput="stkSet('${escS(r.id)}', this.value)"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();stkNext(1)}">
       <div class="stk-sb" onclick="stkBump('${escS(r.id)}',1)">+</div>
     </div>
   </div><div class="stk-mv-panel" id="mv-${escS(r.id)}"></div></div>`;
@@ -3874,6 +3911,85 @@ async function stkReload(){
   stkRenderList();
 }
 
+
+// ── панель над клавиатурой ──────────────────────────────────────────────────
+// Цифровая клавиатура на телефоне не даёт ни «готово», ни «дальше»: ввёл число
+// — и сам ищи следующее поле пальцем, а клавиатура закрывает пол-экрана.
+// Панель висит над ней, показывает, где ты сейчас, и переводит на соседнюю
+// позицию, не закрывая клавиатуру: ста двадцати двум позициям это экономит
+// сотню лишних касаний.
+function stkFocus(inp){
+  try{ inp.select(); }catch(e){}
+  STK.focus = inp.dataset.stk;
+  stkBarShow();
+}
+
+function _stkInputs(){ return [...document.querySelectorAll('#stkMid .stk-qty')]; }
+
+function stkBarShow(){
+  const bar = document.getElementById('stkBar'); if(!bar) return;
+  const all = _stkInputs();
+  const i = all.findIndex(x => x.dataset.stk === STK.focus);
+  const r = (STK.sheet?.rows || []).find(x => x.id === STK.focus);
+  bar.classList.add('on');
+  document.getElementById('stkBarPos').textContent = i >= 0 ? `${i+1} из ${all.length}` : '';
+  document.getElementById('stkBarName').textContent = r ? r.name : '';
+  document.getElementById('stkBarPrev').disabled = i <= 0;
+  document.getElementById('stkBarNext').disabled = i < 0 || i >= all.length - 1;
+  _stkBarPlace();
+}
+
+// Клавиатура не двигает layout, поэтому высоту её берём у visualViewport —
+// иначе панель уедет под клавиатуру ровно там, где она нужна.
+function _stkBarPlace(){
+  const bar = document.getElementById('stkBar'); if(!bar) return;
+  const vv = window.visualViewport;
+  const under = vv ? Math.max(0, window.innerHeight - vv.height - vv.offsetTop) : 0;
+  bar.style.bottom = under + 'px';
+}
+
+function stkBarHide(){
+  const bar = document.getElementById('stkBar');
+  if(bar) bar.classList.remove('on');
+  STK.focus = null;
+}
+
+// Уводим фокус на соседнее поле, не отпуская клавиатуру: если сделать
+// blur+focus, iOS успевает её закрыть и открыть заново — экран прыгает.
+function stkNext(dir){
+  const all = _stkInputs();
+  const i = all.findIndex(x => x.dataset.stk === STK.focus);
+  const j = i + dir;
+  if(i < 0 || j < 0 || j >= all.length){ stkDone(); return; }
+  const el = all[j];
+  el.focus(); try{ el.select(); }catch(e){}
+  STK.focus = el.dataset.stk;
+  el.closest('.stk-wrap')?.scrollIntoView({block:'center', behavior:'smooth'});
+  stkBarShow();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
+function stkDone(){
+  const el = document.querySelector('#stkMid .stk-qty:focus');
+  if(el) el.blur();
+  stkBarHide();
+}
+
+(function initStkBar(){
+  if(window.visualViewport){
+    visualViewport.addEventListener('resize', _stkBarPlace);
+    visualViewport.addEventListener('scroll', _stkBarPlace);
+  }
+  // Клик мимо поля — панель не нужна. Слушаем на всплытии, чтобы не мешать
+  // самим кнопкам панели отработать.
+  document.addEventListener('focusout', e => {
+    setTimeout(() => {
+      const a = document.activeElement;
+      if(!a || !a.classList || !a.classList.contains('stk-qty')) stkBarHide();
+    }, 60);
+  }, true);
+})();
+
 function stkStats(){
   let diffs = 0, short = 0, over = 0;
   (STK.sheet?.rows || []).forEach(r => {
@@ -3897,7 +4013,7 @@ function _stkRedrawRow(id){
   el.classList.toggle('diff-low',  diff > 0);
   el.classList.toggle('diff-high', diff < 0);
   const d = el.querySelector('.stk-i-d');
-  const html = diff ? `${diff>0?'не хватает':'излишек'} ${Math.abs(diff)} · ${fmt(Math.abs(diff)*r.price)} AED` : '';
+  const html = diff ? `${diff>0?'не хватает':'излишек'} ${_stkFmt(Math.abs(diff))} · ${fmt(Math.round(Math.abs(diff)*r.price))} AED` : '';
   if(diff && !d){
     el.querySelector('.stk-i-body').insertAdjacentHTML('beforeend',
       `<div class="stk-i-d ${diff>0?'low':'high'}">${html}</div>`);
@@ -3913,16 +4029,19 @@ function _stkRedrawRow(id){
 }
 
 function _stkTyped(id){ (STK.typedIds = STK.typedIds || []).includes(id) || STK.typedIds.push(id); }
+// Запятая — то же, что точка: на телефоне под рукой оказывается то одна, то
+// другая, и заставлять человека попадать в нужную незачем.
 function stkSet(id, raw){
-  const n = Math.max(0, Math.min(9999, parseInt(raw, 10) || 0));
-  STK.vals[id] = n; _stkTyped(id);
+  const n = Math.max(0, Math.min(9999, parseFloat(String(raw).replace(',', '.')) || 0));
+  STK.vals[id] = Math.round(n * 2) / 2; _stkTyped(id);
   _stkRedrawRow(id);
 }
 function stkBump(id, delta){
-  const n = Math.max(0, (STK.vals[id] ?? 0) + delta);
-  STK.vals[id] = n; _stkTyped(id);
+  const r = (STK.sheet?.rows || []).find(x => x.id === id);
+  const n = Math.max(0, (STK.vals[id] ?? 0) + delta * _stkStep(r || {}));
+  STK.vals[id] = Math.round(n * 2) / 2; _stkTyped(id);
   const inp = document.querySelector(`#stk-${CSS.escape(id)} .stk-qty`);
-  if(inp) inp.value = n;
+  if(inp) inp.value = _stkFmt(STK.vals[id]);
   _stkRedrawRow(id);
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
@@ -3969,10 +4088,10 @@ function stkResult(res){
   const rows = (res.lines || []).sort((a,b)=>b.diff-a.diff).map(l=>`
     <div class="stk-row">
       <div class="stk-row-n">${escS(l.name)}
-        <div class="stk-row-s">ждали ${l.expected} · насчитали ${l.actual}</div></div>
+        <div class="stk-row-s">ждали ${_stkFmt(l.expected)} · насчитали ${_stkFmt(l.actual)}</div></div>
       <div class="stk-row-d" style="color:${l.diff>0?'var(--dn)':'var(--up)'}">
-        ${l.diff>0?'−':'+'}${Math.abs(l.diff)}
-        <span style="font-size:11px;color:var(--muted)"> · ${fmt(Math.abs(l.diff)*l.price)}</span></div>
+        ${l.diff>0?'−':'+'}${_stkFmt(Math.abs(l.diff))}
+        <span style="font-size:11px;color:var(--muted)"> · ${fmt(Math.round(Math.abs(l.diff)*l.price))}</span></div>
     </div>`).join('');
   const ok = !res.short_qty && !res.over_qty;
   const carried = (res.total_qty || 0) - (res.counted_qty || 0);
@@ -3984,7 +4103,7 @@ function stkResult(res){
     ${ok ? `<div class="stk-res-num stk-res-ok">✓</div>
             <div class="stk-hint">Остатки совпали с продажами до штуки.</div>`
          : `<div class="stk-res-num stk-res-bad">${fmt(res.short_aed)}<span style="font-size:19px;color:var(--muted)"> AED</span></div>
-            <div class="stk-hint">не хватает ${res.short_qty} шт${res.over_qty?` · излишек ${res.over_qty} шт`:''}</div>
+            <div class="stk-hint">не хватает ${_stkFmt(res.short_qty)}${res.over_qty?` · излишек ${_stkFmt(res.over_qty)}`:''}</div>
             <div class="stk-list">${rows}</div>`}
     ${foot}
     <div style="margin-top:24px;display:flex;gap:10px;justify-content:center">
@@ -8455,6 +8574,21 @@ if(window.ownerApi){
     </div>
   </div>
   <div class="stk-mid" id="stkMid"></div>
+  <div class="stk-bar" id="stkBar">
+    <button class="stk-bar-b" id="stkBarPrev" onclick="stkNext(-1)" aria-label="Предыдущая">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="stk-bar-t">
+      <div class="stk-bar-pos" id="stkBarPos"></div>
+      <div class="stk-bar-name" id="stkBarName"></div>
+    </div>
+    <button class="stk-bar-b" id="stkBarNext" onclick="stkNext(1)" aria-label="Следующая">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+           stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+    <button class="stk-bar-done" onclick="stkDone()">Готово</button>
+  </div>
 </div>
 
 </body>

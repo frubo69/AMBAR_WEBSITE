@@ -567,6 +567,33 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .ac-btn-num-lbl{font-size:8.5px;text-transform:uppercase;letter-spacing:1.5px;color:var(--muted);margin-top:4px}
 .ac-btn-arrow{color:var(--gold2);font-size:20px;font-weight:600;flex-shrink:0;opacity:.55;margin-left:2px}
 
+/* Шапка раздела «Клиенты» */
+.cust-hero{margin:6px 0 4px;padding:16px 16px 14px;border-radius:16px;cursor:pointer;
+  background:linear-gradient(150deg,rgba(201,169,110,.09),rgba(201,169,110,.02) 60%);
+  border:1px solid rgba(201,169,110,.2);transition:.18s var(--e1)}
+.cust-hero:active{transform:scale(.99)}
+.cust-hero:hover{border-color:rgba(201,169,110,.32)}
+.ch-top{display:flex;align-items:center;gap:12px}
+.ch-ico{width:40px;height:40px;flex-shrink:0;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;color:var(--gold2);
+  background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.24)}
+.ch-lbl{flex:1;min-width:0}
+.ch-t{font-size:14.5px;font-weight:600;white-space:nowrap}
+.ch-s{font-size:11px;color:var(--muted);margin-top:2px;letter-spacing:.2px}
+.ch-num{font-family:'Space Grotesk',sans-serif;font-size:31px;font-weight:700;line-height:1;
+  color:var(--gold2);letter-spacing:-1px;font-variant-numeric:tabular-nums;
+  text-shadow:0 0 20px rgba(201,169,110,.28)}
+.ch-go{color:var(--gold2);font-size:19px;opacity:.5;flex-shrink:0}
+.ch-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px;
+  padding-top:13px;border-top:1px solid rgba(201,169,110,.14)}
+.ch-m{display:flex;flex-direction:column;align-items:center;gap:3px;padding:7px 4px;
+  border:none;border-radius:10px;background:transparent;color:inherit;cursor:pointer;
+  font-family:inherit;transition:.14s}
+.ch-m:active{background:rgba(201,169,110,.1)}
+.ch-m-v{font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700;
+  font-variant-numeric:tabular-nums;line-height:1}
+.ch-m-l{font-size:9.5px;text-transform:uppercase;letter-spacing:1.1px;color:var(--muted)}
+
 /* Customer search bar (People → Клиенты) */
 .cust-search{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--card);border:1px solid var(--border2);border-radius:12px;margin:0 0 12px;transition:.18s var(--e1)}
 .cust-search:focus-within{border-color:rgba(201,169,110,.35);background:var(--card2)}
@@ -1058,21 +1085,38 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 
   <div id="peopleCustomers">
 
-  <!-- ALL CLIENTS entry -->
-  <button class="all-clients-btn" onclick="openAllClients()" style="margin:4px 0 4px">
-    <div class="ac-btn-ico">
-      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><circle cx="17" cy="7" r="3"/><path d="M21 21v-1a3 3 0 0 0-3-3"/></svg>
+  <!-- Шапка раздела. Раньше здесь была узкая полоска-кнопка: страница начиналась
+       ни с чего и сразу проваливалась в три одинаковых ряда карточек. Теперь
+       сверху стоит то, ради чего сюда заходят — размер базы, — а под ним три
+       числа, которые отвечают на следующий вопрос: кто из них VIP, кто должен и
+       сколько пришло за месяц. Каждое число ведёт в свой раздел. -->
+  <div class="cust-hero" onclick="openAllClients()">
+    <div class="ch-top">
+      <div class="ch-ico">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+             stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="9" cy="8" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/>
+          <circle cx="17" cy="7" r="3"/><path d="M21 21v-1a3 3 0 0 0-3-3"/></svg>
+      </div>
+      <div class="ch-lbl">
+        <div class="ch-t">Все клиенты</div>
+        <div class="ch-s">по алфавиту · поиск</div>
+      </div>
+      <div class="ch-num"><span id="acBtnCount">—</span></div>
+      <span class="ch-go">›</span>
     </div>
-    <div class="ac-btn-lbl">
-      <div class="ac-btn-t">Все клиенты</div>
-      <div class="ac-btn-s">по алфавиту · поиск</div>
+    <div class="ch-grid">
+      <button class="ch-m" onclick="event.stopPropagation();_custJump('vip')">
+        <span class="ch-m-v" id="chVip">—</span><span class="ch-m-l">VIP</span></button>
+      <button class="ch-m" onclick="event.stopPropagation();_custJump('debt')">
+        <span class="ch-m-v" id="chDebt">—</span><span class="ch-m-l">в долгу</span></button>
+      <button class="ch-m" onclick="event.stopPropagation();_custJump('top')">
+        <span class="ch-m-v" id="chNew">—</span><span class="ch-m-l">за месяц</span></button>
     </div>
-    <div class="ac-btn-count"><span class="ac-btn-num" id="acBtnCount">—</span><span class="ac-btn-num-lbl">клиентов</span></div>
-    <span class="ac-btn-arrow">›</span>
-  </button>
+  </div>
 
   <!-- TOP-10 by spending -->
-  <div class="cust-sect">
+  <div class="cust-sect" id="custTop">
     <div><div class="cust-sect-t">Топ-10 клиентов</div><div class="cust-sect-s">по сумме</div></div>
     <div class="cust-sect-meta"><span>—</span> <span class="cur-unit">AED</span></div>
   </div>
@@ -1081,7 +1125,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
 
   <!-- VIP cardholders (FOUNDER / ÉLITE / WORLDWIDE) -->
-  <div class="cust-sect">
+  <div class="cust-sect" id="custVip">
     <div><div class="cust-sect-t">VIP · держатели карт</div><div class="cust-sect-s">FOUNDER · ÉLITE · WORLDWIDE</div></div>
     <div class="cust-sect-meta"><span style="color:var(--text)">—</span> активных</div>
   </div>
@@ -1090,7 +1134,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
 
   <!-- ДОЛЖНИКИ (debt programme: pay-later customers) -->
-  <div class="cust-sect">
+  <div class="cust-sect" id="custDebt">
     <div><div class="cust-sect-t">Должники</div><div class="cust-sect-s">оплата «В долг»</div></div>
     <div class="cust-sect-meta" id="debtSectMeta"><span style="color:var(--warn)">—</span> <span class="cur-unit">AED</span></div>
   </div>
@@ -4688,7 +4732,7 @@ function renderCustomerSections(customers){
   }
 
   // Section header meta
-  const sectMeta = document.querySelector('#peopleCustomers .cust-sect:first-of-type .cust-sect-meta');
+  const sectMeta = document.querySelector('#custTop .cust-sect-meta');
   if(sectMeta){
     const totalSpent = top10.reduce((s,c)=>s+c.total_spent, 0);
     sectMeta.innerHTML = `<span data-aed="${totalSpent}">${fmt(totalSpent)}</span> <span class="cur-unit">AED</span>`;
@@ -4749,13 +4793,36 @@ function renderCustomerSections(customers){
     debtMeta.innerHTML = `<span style="color:var(--warn)" data-aed="${totalDebt}">${fmt(totalDebt)}</span> <span class="cur-unit">AED</span>`;
   }
 
-  // All clients button — the headline "total customers" number
+  // Шапка раздела: размер базы и три числа под ним.
   _animCount(document.getElementById('acBtnCount'), customers.length);
+  _animCount(document.getElementById('chVip'), vips.length);
+  const _debtN = debtors.length;
+  const _chD = document.getElementById('chDebt');
+  if(_chD){
+    _chD.textContent = _debtN;
+    _chD.style.color = _debtN ? 'var(--warn)' : 'var(--up)';
+  }
+  // Новые за месяц: видно, растёт база или стоит.
+  const _mAgo = Date.now() - 30*86400000;
+  const _new = customers.filter(c=>{
+    const t = Date.parse(c.first_seen || '');
+    return t && t >= _mAgo;
+  }).length;
+  _animCount(document.getElementById('chNew'), _new);
 
   // All Clients modal
   renderAllClientsList(customers);
 
   applyCurrency();
+}
+
+// Число в шапке — не украшение, а ссылка: тап уводит в тот раздел, о котором
+// оно говорит.
+function _custJump(what){
+  const el = document.getElementById({vip:'custVip', debt:'custDebt', top:'custTop'}[what]);
+  if(!el) return;
+  el.scrollIntoView({block:'start', behavior:'smooth'});
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 
 function renderAllClientsList(customers){

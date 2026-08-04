@@ -39,7 +39,7 @@ DEVICE_BY_TG = {d["telegram_id"]: d for d in DEVICES}
 DISTRICT_STAFF = [
     {"district": "jvc",     "operator": "Умар",      "drivers": ["Худоба", "Фарух"]},
     {"district": "tecom",   "operator": "Умар",      "drivers": ["Файзуло", "Алишер"]},
-    {"district": "bbay",    "operator": "Джанлбиль", "drivers": ["Парвиз", "Авазбек", "Бахадыр"]},
+    {"district": "bbay",    "operator": "Джанабиль", "drivers": ["Парвиз", "Авазбек", "Бахадыр"]},
     {"district": "silicon", "operator": "Фарух",     "drivers": ["Фаредун", "Азиз"]},
     {"district": "alguses", "operator": "Фарух",     "drivers": ["Сунат", "Даврон"]},
 ]

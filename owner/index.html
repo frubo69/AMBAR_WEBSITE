@@ -3889,6 +3889,7 @@ async function stkOpen(district){
   STK.marks = {};
   sh.rows.forEach(r => { if(r.mark) STK.marks[r.id] = r.mark; });
   STK.audit = !!(sh.audit && sh.audit.started_at && !sh.audit.finished_at);
+  _stkSyncMarks();
   // Стартовое значение — ожидаемое: не тронул строку, значит всё сошлось.
   STK.vals = {};
   sh.rows.forEach(r => { STK.vals[r.id] = r.actual != null ? r.actual
@@ -3898,6 +3899,7 @@ async function stkOpen(district){
   // Панель перемещения показывает уже записанное по товару и список соседних
   // районов — и то и другое нужно до первой отрисовки.
   await stkLoadContext();
+  _stkSyncMarks();
   stkRenderList();
 }
 
@@ -4035,12 +4037,39 @@ function stkAuditToggle(){
 }
 
 // Галочка ставится вручную — это подтверждение «посмотрел, столько и лежит».
-// Крестик руками не ставят: он появляется сам, когда число поправили.
+// Крестик руками не ставят и снять его нельзя: пока число расходится с
+// ожидаемым, строка остаётся расхождением. Иначе тапом по крестику ревизию
+// можно было бы закрыть словами «всё сошлось» там, где не сошлось.
 function stkMark(id){
+  const r = (STK.sheet?.rows || []).find(x => x.id === id);
+  const exp = r ? r.expected : null;
+  if(exp != null && (STK.vals[id] ?? 0) !== exp){
+    STK.marks[id] = 'diff';
+    _stkRedrawMark(id); _stkProgress();
+    _toast('Число не сходится — это расхождение');
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+    return;
+  }
   STK.marks[id] = STK.marks[id] === 'ok' ? null : 'ok';
   _stkRedrawMark(id);
   _stkProgress();
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
+// Отметки могли прийти с сервера, а значения — измениться: перемещение,
+// продажа, правка с другого устройства. Приводим одно к другому, иначе на
+// экране осталась бы галочка над числом, которое уже не сходится.
+function _stkSyncMarks(){
+  (STK.sheet?.rows || []).forEach(r => {
+    const m = STK.marks[r.id];
+    // Неотмеченную строку не трогаем никогда. Числа подставлены расчётом, они
+    // совпадают с ожидаемым у всех подряд — раздать по ним галочки значило бы
+    // закрыть ревизию, не подойдя к полкам.
+    if(!m || r.expected == null) return;
+    const v = STK.vals[r.id] ?? 0;
+    if(v !== r.expected)  STK.marks[r.id] = 'diff';
+    else if(m === 'diff') STK.marks[r.id] = 'ok';
+  });
 }
 
 function _stkRedrawMark(id){
@@ -4204,6 +4233,7 @@ async function stkReload(){
                    : (r.actual != null ? r.actual : (r.expected != null ? r.expected : 0));
   });
   await stkLoadContext();
+  _stkSyncMarks();
   stkRenderList();
 }
 

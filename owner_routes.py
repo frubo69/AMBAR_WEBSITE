@@ -520,6 +520,32 @@ async def handle_finance(request):
         if 0 <= idx < 7:
             orders_7d[idx] += 1
 
+    # Когда заказывают. Часы идут в порядке смены — с полудня и до полудня, —
+    # иначе вечерний пик разрывается пополам краем суток и его не видно.
+    # Считаем по всем заказам периода: отменённый заказ тоже был спросом.
+    by_hour = [0] * 24
+    for _, o in curr_all:
+        dt = _parse_ts(o.get("timestamp"))
+        if dt is None:
+            continue
+        h = dt.astimezone(DUBAI_TZ).hour
+        by_hour[(h - SHIFT_START_HOUR) % 24] += 1
+    # Пик — самое плотное окно в три часа подряд, а не один случайный час.
+    peak_i, peak_v = 0, -1
+    for i in range(24):
+        v = sum(by_hour[(i + k) % 24] for k in range(3))
+        if v > peak_v:
+            peak_i, peak_v = i, v
+    peak_from = (peak_i + SHIFT_START_HOUR) % 24
+    hours_block = {
+        "start_hour": SHIFT_START_HOUR,
+        "counts": by_hour,
+        "total": sum(by_hour),
+        "peak_from": peak_from,
+        "peak_to": (peak_from + 3) % 24,
+        "peak_count": max(0, peak_v),
+    }
+
     pending_orders = open_pending[:20]
     inroute_orders = open_route[:20]
     delivered_orders_list = sorted(
@@ -653,6 +679,7 @@ async def handle_finance(request):
             "in_route":         in_route_count,
             "pending":          pending_count,
             "declined":         declined_count,
+            "by_hour":          hours_block,
             "rating":           rating_avg,
             "rating_count":     rating_count,
             "rating_period":    period_lbl_for_rating,

@@ -623,6 +623,8 @@ async def handle_finance(request):
             return float(o.get("crypto_amount_usdt") or 0)
         except (TypeError, ValueError):
             return 0.0
+    debt_delivered = [o for _, o in curr_orders if o.get("payment_method") == "debt"]
+    debt_aed = sum(int(o.get("total", 0) or 0) for o in debt_delivered)
     crypto_delivered = [o for _, o in curr_orders if _is_crypto(o)]
     crypto_aed  = sum(o.get("total", 0) for o in crypto_delivered)
     crypto_usdt = round(sum(_usdt(o) for o in crypto_delivered), 2)
@@ -657,7 +659,11 @@ async def handle_finance(request):
         "tips":      _sum_field(curr_orders, "tip"),
         "by_method": {
             "crypto": {"aed": crypto_aed, "usdt": crypto_usdt, "count": len(crypto_delivered)},
-            "cash":   {"aed": rev_curr - crypto_aed, "count": delivered_count - len(crypto_delivered)},
+            # «В долг» — это не наличные: товар уехал, денег в кассе нет. Пока
+            # долг сидел в наличных, кассу показывало больше, чем в ней лежит.
+            "debt":   {"aed": debt_aed, "count": len(debt_delivered)},
+            "cash":   {"aed": rev_curr - crypto_aed - debt_aed,
+                       "count": delivered_count - len(crypto_delivered) - len(debt_delivered)},
             "crypto_inflight": {
                 "aed":   sum(o.get("total", 0) for o in inflight),
                 "usdt":  round(sum(_usdt(o) for o in inflight), 2),

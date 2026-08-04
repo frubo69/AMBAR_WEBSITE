@@ -522,28 +522,37 @@ async def handle_finance(request):
 
     # Когда заказывают. Часы идут в порядке смены — с полудня и до полудня, —
     # иначе вечерний пик разрывается пополам краем суток и его не видно.
-    # Считаем по всем заказам периода: отменённый заказ тоже был спросом.
-    by_hour = [0] * 24
+    #
+    # Приложение и телефон считаются отдельно, и это не косметика. У заказа из
+    # приложения timestamp — момент, когда клиент нажал «заказать». У телефонного
+    # это момент, когда оператор завёл его в POS, а заводят их пачкой под конец
+    # смены. Сложить одно с другим — значит выдать работу оператора с планшетом
+    # за спрос: в данных это выглядит как сотня заказов в пять утра.
+    # Отменённые тоже считаем: несостоявшийся заказ всё равно был спросом.
+    app_hours = [0] * 24
+    phone_hours = [0] * 24
     for _, o in curr_all:
         dt = _parse_ts(o.get("timestamp"))
         if dt is None:
             continue
-        h = dt.astimezone(DUBAI_TZ).hour
-        by_hour[(h - SHIFT_START_HOUR) % 24] += 1
-    # Пик — самое плотное окно в три часа подряд, а не один случайный час.
-    peak_i, peak_v = 0, -1
-    for i in range(24):
-        v = sum(by_hour[(i + k) % 24] for k in range(3))
-        if v > peak_v:
-            peak_i, peak_v = i, v
-    peak_from = (peak_i + SHIFT_START_HOUR) % 24
+        idx = (dt.astimezone(DUBAI_TZ).hour - SHIFT_START_HOUR) % 24
+        (phone_hours if o.get("source") == "manual" else app_hours)[idx] += 1
+
+    def _peak(counts):
+        """Самое плотное окно в три часа подряд — один час слишком случаен."""
+        best_i, best_v = 0, -1
+        for i in range(24):
+            v = sum(counts[(i + k) % 24] for k in range(3))
+            if v > best_v:
+                best_i, best_v = i, v
+        h = (best_i + SHIFT_START_HOUR) % 24
+        return {"from": h, "to": (h + 3) % 24, "count": max(0, best_v)}
+
     hours_block = {
         "start_hour": SHIFT_START_HOUR,
-        "counts": by_hour,
-        "total": sum(by_hour),
-        "peak_from": peak_from,
-        "peak_to": (peak_from + 3) % 24,
-        "peak_count": max(0, peak_v),
+        "app": app_hours, "phone": phone_hours,
+        "app_total": sum(app_hours), "phone_total": sum(phone_hours),
+        "peak_app": _peak(app_hours), "peak_phone": _peak(phone_hours),
     }
 
     pending_orders = open_pending[:20]

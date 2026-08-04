@@ -1007,6 +1007,30 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     <div class="off-tot-c"><div class="off-tot-l">Время</div><div class="off-tot-v" id="offTotMin">—</div></div>
   </div>
 
+
+  <!-- Команда района: те же люди, что и возят эти заказы, поэтому стоят рядом
+       с итогами и над самими районами. Период — общий со страницей. -->
+  <div class="sect" style="margin-top:16px">
+    <div class="sect-t">Команда</div>
+    <div class="sect-a" style="font-size:10px;color:var(--muted)" id="opSortLbl">по выручке</div>
+  </div>
+  <div class="periods" id="teamTabs" style="margin-bottom:10px">
+    <div class="period-pill"></div>
+    <button class="on" data-team="operators">Операторы</button>
+    <button data-team="drivers">Водители</button>
+  </div>
+  <div class="op-ctrl-chips" id="opFilters" style="margin-bottom:10px">
+    <button class="op-f on" data-f="overall">Выручка</button>
+    <button class="op-f" data-f="fast">Реакция</button>
+    <button class="op-f" data-f="rating">Рейтинг</button>
+    <button class="op-f" data-f="orders">Заказы</button>
+    <button class="op-f" data-f="handle">Доставка</button>
+    <button class="op-f" data-f="late">Опоздания</button>
+    <button class="op-f" data-f="tips">Чаевые</button>
+  </div>
+  <div class="list" id="opList"></div>
+  <div id="opExtra"></div>
+
   <div class="sect" style="margin-top:14px"><div class="sect-t">Районы</div><div class="sect-s" id="offSub">—</div></div>
   <!-- Порядок B1…B5 — рабочий, поэтому он же и по умолчанию. Остальные
        сортировки нужны, чтобы быстро увидеть отстающих. -->
@@ -1031,54 +1055,8 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 
 <!-- ============ PEOPLE ============ -->
 <div class="page" id="pg-people">
-  <div style="padding:10px 4px 4px"><div style="font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:600">Люди</div><div style="font-size:12px;color:var(--muted);margin-top:2px">Операторы · клиенты</div></div>
 
-  <div class="periods" id="peopleTabs" style="margin-top:14px">
-    <div class="period-pill"></div>
-    <button class="on" data-tab="operators">Операторы</button>
-    <button data-tab="customers">Клиенты</button>
-  </div>
-
-  <div id="peopleOperators">
-  <div class="op-ctrl-row">
-    <button class="op-ctrl-btn" id="opCtrlBtn">
-      <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;opacity:.7"><path d="M3 6h18M7 12h10M11 18h2"/></svg>
-      <span id="opCtrlLbl">Сегодня · Общий</span>
-      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="flex-shrink:0;margin-left:auto;opacity:.5" id="opCtrlChevron"><path d="M6 9l6 6 6-6"/></svg>
-    </button>
-  </div>
-  <div class="range-chip" id="rangeChip-opPeriod" style="display:none"><span class="rc-icon">📅</span><span class="rc-text"></span><button class="rc-x" onclick="clearRange('opPeriod')">✕</button></div>
-  <div class="op-ctrl-panel" id="opCtrlPanel">
-    <div class="op-ctrl-sect-lbl">Период</div>
-    <div class="period-bar" style="margin:0">
-      <div class="periods" id="opPeriod" style="margin:0">
-        <div class="period-pill"></div>
-        <button class="on" data-op-p="today">Сегодня</button>
-        <button data-op-p="week">Неделя</button>
-        <button data-op-p="month">Месяц</button>
-      </div>
-      <button class="cal-btn" onclick="openDate('opPeriod')" aria-label="Свой период">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
-      </button>
-    </div>
-    <div class="op-ctrl-sect-lbl" style="margin-top:12px">Показатель</div>
-    <div class="op-ctrl-chips" id="opFilters">
-      <button class="op-f on" data-f="overall">Общий</button>
-      <button class="op-f" data-f="fast">Реакция</button>
-      <button class="op-f" data-f="rating">Рейтинг</button>
-      <button class="op-f" data-f="orders">Заказы</button>
-      <button class="op-f" data-f="handle">Доставка</button>
-      <button class="op-f" data-f="late">Опоздания</button>
-      <button class="op-f" data-f="tips">Чаевые</button>
-    </div>
-  </div>
-  <div class="sect"><div class="sect-t">Рейтинг операторов · <span id="opPeriodLbl">сегодня</span></div><div class="sect-a" style="font-size:10px;color:var(--muted)" id="opSortLbl">по общему</div></div>
-  <div class="list" id="opList"></div>
-  <div id="opExtra"></div>
-
-  </div><!-- /peopleOperators -->
-
-  <div id="peopleCustomers" style="display:none">
+  <div id="peopleCustomers">
 
   <!-- ALL CLIENTS entry -->
   <button class="all-clients-btn" onclick="openAllClients()" style="margin:4px 0 4px">
@@ -2604,7 +2582,7 @@ button.pill:active{opacity:.6}
   </button>
   <button class="tb" data-pg="people">
     <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><circle cx="17" cy="7" r="3"/><path d="M21 21v-1a3 3 0 0 0-3-3"/></svg>
-    Люди
+    Клиенты
   </button>
   <button class="tb" data-pg="more">
     <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
@@ -2752,6 +2730,8 @@ document.querySelectorAll('.tb').forEach(btn=>{
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
     document.getElementById('pg-'+pg).classList.add('active');
     window.scrollTo({top:0,behavior:'instant'});
+    // Команда живёт на странице районов — тянем её при первом заходе туда.
+    if(pg === 'offices' && !OPS.data && !OPS.loading && window.ownerApi) loadOperators();
     try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   });
 });
@@ -2881,13 +2861,6 @@ function dpApply(){
     const hLbl = document.getElementById('heroLbl');
     if(hLbl) hLbl.textContent = `Выручка · ${strDate(dpFrom)} → ${strDate(dpTo)}`;
   }
-  if(dpTarget === 'opPeriod'){
-    const days = Math.round((dpTo-dpFrom)/86400000) + 1;
-    const p = days<=1 ? 'today' : days<=10 ? 'week' : 'month';
-    applyOpPeriod(p);
-    const lbl = document.getElementById('opPeriodLbl');
-    if(lbl) lbl.textContent = `${strDate(dpFrom)} → ${strDate(dpTo)}`;
-  }
   closeDate();
   try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(e){}
 }
@@ -2906,7 +2879,7 @@ function clearRange(targetId){
     first.classList.add('on');
     movePill(g);
     if(targetId==='periodPicker' && first.dataset.p) applyPeriod(first.dataset.p);
-    if(targetId==='opPeriod' && first.dataset.opP) applyOpPeriod(first.dataset.opP);
+
   }
   try{Telegram.WebApp.HapticFeedback.impactOccurred('light')}catch(e){}
 }
@@ -3309,6 +3282,7 @@ function applyPeriod(p){
   DAY_OFFSET = 0;   // any period pill resets the day browser — pre-swipe behaviour
   // Sync the active button across both period pickers (Overview + Money tab)
   // so switching on one reflects on the other.
+  if(typeof loadOperators === 'function' && window.ownerApi) loadOperators();
   ['periodPicker', 'moneyPeriod', 'officePeriod'].forEach(gid=>{
     const g = document.getElementById(gid);
     if(!g) return;
@@ -4537,15 +4511,6 @@ function renderPeriodBars(period, values){
   });
 })();
 
-function applyPeopleTab(tab){
-  const op = document.getElementById('peopleOperators');
-  const cu = document.getElementById('peopleCustomers');
-  if(!op || !cu) return;
-  op.style.display = tab==='operators' ? '' : 'none';
-  cu.style.display = tab==='customers' ? '' : 'none';
-  if(tab==='customers') refreshCustomers();
-  if(tab==='operators' && !OPS.data && !OPS.loading) loadOperators();
-}
 async function refreshCustomers(){
   _customersCache = null;
   const customers = await loadCustomers();
@@ -6708,8 +6673,13 @@ function fmtSec(s){
 // нет своего входа в бот), всё остальное принадлежит району и его людям.
 let OPS = {data:null, loading:false, err:''};
 
-let opPeriodCur = 'today';
+let opTeamCur   = 'operators';     // операторы или водители
 let opFilterCur = 'overall';
+// Период у команды общий со страницей районов: две шкалы времени на одном
+// экране — верный способ сравнить несравнимое.
+function opPeriod(){
+  return document.querySelector('#officePeriod button.on')?.dataset?.p || 'today';
+}
 
 const OP_SORT_LABEL = {
   overall:'по выручке',
@@ -6722,10 +6692,12 @@ const OP_SORT_LABEL = {
 };
 
 async function loadOperators(){
+  const p = opPeriod();
   OPS.loading = true; OPS.err = '';
   renderOperators();
   try{
-    OPS.data = await ownerApi.ownerFetch('/api/owner/operators', {params:{period:opPeriodCur}});
+    OPS.data = await ownerApi.ownerFetch('/api/owner/operators', {params:{period:p}});
+    OPS.period = p;
   }catch(e){ OPS.err = 'Не удалось загрузить'; }
   OPS.loading = false;
   renderOperators();
@@ -6741,6 +6713,7 @@ function _opInitials(name){
 function opMetric(op, filter){
   const dim = 'var(--muted)';
   if(filter==='fast'){
+    if(op.driver) return {html:'—', label:'реакция не про водителя', color:dim};
     if(!op.resp_sample) return {html:'—', label: op.senior?'нет данных':'нет входа в бот', color:dim};
     const {v,u} = fmtSec(op.resp_sec);
     const slow = op.resp_sec > (OPS.data?.slow_sec || 60);
@@ -6764,7 +6737,8 @@ function opMetric(op, filter){
   if(filter==='tips'){
     const t = op.senior ? op.own_tips : op.tips;
     return t ? {html:`${fmt(t)}<span style="font-size:10px;color:var(--muted);margin-left:2px">AED</span>`,
-                label: op.senior?'как водитель':'чаевые района', color:'var(--gold2)'}
+                label: op.driver ? `${op.tips_bottles} ${pluralize(op.tips_bottles,'бутылка','бутылки','бутылок')}`
+                     : (op.senior ? 'как водитель' : 'чаевые района'), color:'var(--gold2)'}
              : {html:'—', label:'нет чаевых', color:dim};
   }
   return {html:`${fmt(op.aed)}<span style="font-size:10px;color:var(--muted);margin-left:2px">AED</span>`,
@@ -6775,14 +6749,23 @@ function renderOperators(){
   const list = document.getElementById('opList'); if(!list) return;
   const sortLbl = document.getElementById('opSortLbl');
   if(sortLbl) sortLbl.textContent = OP_SORT_LABEL[opFilterCur] || 'по выручке';
-  const lbl = document.getElementById('opPeriodLbl');
-  if(lbl && !document.querySelector('#rangeChip-opPeriod[style*="flex"]'))
-    lbl.textContent = {today:'сегодня',week:'неделя',month:'месяц'}[opPeriodCur] || '';
+  // Реакция измеряется устройством, которое приняло заказ, — у водителя такого
+  // устройства нет, поэтому чип просто прячем, чтобы не звал в пустоту.
+  const fastChip = document.querySelector('#opFilters .op-f[data-f="fast"]');
+  if(fastChip){
+    fastChip.style.display = opTeamCur === 'drivers' ? 'none' : '';
+    if(opTeamCur === 'drivers' && opFilterCur === 'fast') opFilterCur = 'overall';
+  }
+  document.querySelectorAll('#opFilters .op-f')
+    .forEach(b => b.classList.toggle('on', b.dataset.f === opFilterCur));
 
   if(OPS.err){ list.innerHTML = `<div class="stk-empty" style="color:var(--dn)">${OPS.err}</div>`; return; }
   if(!OPS.data){ list.innerHTML = '<div class="stk-empty">Загрузка…</div>'; return; }
 
-  const ops = [...(OPS.data.operators || [])];
+  const ops = opTeamCur === 'drivers'
+    ? (OPS.data.drivers || []).map(d => ({...d, driver:true, senior:false,
+        resp_sample:0, resp_sec:0, own_tips:d.tips}))
+    : [...(OPS.data.operators || [])];
   const f = opFilterCur;
   if(f==='fast')        ops.sort((a,b)=>(a.resp_sample?a.resp_sec:1e9)-(b.resp_sample?b.resp_sec:1e9));
   else if(f==='rating') ops.sort((a,b)=>b.rating-a.rating);
@@ -6792,15 +6775,23 @@ function renderOperators(){
   else if(f==='tips')   ops.sort((a,b)=>((b.senior?b.own_tips:b.tips)-(a.senior?a.own_tips:a.tips)));
   else                  ops.sort((a,b)=>b.aed-a.aed);
 
+  if(!ops.length){
+    list.innerHTML = '<div class="stk-empty">Пусто</div>';
+    if(document.getElementById('opExtra')) document.getElementById('opExtra').innerHTML = '';
+    return;
+  }
   list.innerHTML = ops.map((op,i)=>{
     const M = opMetric(op, f);
-    const where = op.senior
-      ? `все районы · принял ${op.orders}`
-      : op.districts.map(d=>d.code).join(' · ') + ` · ${op.orders} ${pluralize(op.orders,'заказ','заказа','заказов')}`;
-    const tag = op.senior
-      ? '<span class="lrow-tag tag-gold">СТАРШИЙ</span>'
-      : '';
-    return `<div class="lrow" data-detail="operator:${escS(op.id)}">
+    const where = op.driver
+      ? (op.districts.map(d=>d.code).join(' · ') || 'нет в списке')
+        + (op.operator ? ` · ${op.operator}` : '')
+        + ` · ${op.orders} ${pluralize(op.orders,'заказ','заказа','заказов')}`
+      : op.senior
+        ? `все районы · принял ${op.orders}`
+        : op.districts.map(d=>d.code).join(' · ') + ` · ${op.orders} ${pluralize(op.orders,'заказ','заказа','заказов')}`;
+    const tag = op.senior ? '<span class="lrow-tag tag-gold">СТАРШИЙ</span>'
+              : (op.driver && !op.known ? '<span class="lrow-tag" style="background:var(--warn-soft);color:var(--warn)">НЕ В СПИСКЕ</span>' : '');
+    return `<div class="lrow" data-detail="${op.driver?'driver':'operator'}:${escS(op.id)}">
       <div class="lrow-idx">${i+1}</div>
       <div class="lrow-av"${op.senior?' style="background:linear-gradient(135deg,#c9a96e,#e8c98a);color:#0a0a14"':''}>${escS(_opInitials(op.name))}</div>
       <div class="lrow-body">
@@ -6817,7 +6808,8 @@ function renderOperators(){
   // Заказы с устройств, которых нет в списке людей. Это либо забытый оператор,
   // либо чужой доступ — в обоих случаях владелец должен об этом знать.
   const box = document.getElementById('opExtra');
-  if(box){
+  if(box && opTeamCur === 'drivers'){ box.innerHTML = ''; }
+  else if(box){
     const dev = OPS.data.devices || [];
     const unk = OPS.data.unknown_devices || [];
     const un  = OPS.data.tips_unassigned || 0;
@@ -6855,38 +6847,18 @@ function renderOperators(){
   }
 }
 
-function applyOpPeriod(p){ opPeriodCur = p; _syncOpCtrl(); loadOperators(); }
+function applyOpTeam(t){
+  opTeamCur = t;
+  document.querySelectorAll('#teamTabs button')
+    .forEach(b => b.classList.toggle('on', b.dataset.team === t));
+  const g = document.getElementById('teamTabs'); if(g) movePill(g);
+  renderOperators();
+}
 function applyOpFilter(f){
   opFilterCur = f;
   document.querySelectorAll('#opFilters .op-f').forEach(b=>b.classList.toggle('on', b.dataset.f===f));
-  renderOperators(); _syncOpCtrl();
+  renderOperators();
 }
-const _opFilterLabels = {overall:'Выручка',fast:'Реакция',rating:'Рейтинг',orders:'Заказы',handle:'Доставка',late:'Опоздания',tips:'Чаевые'};
-const _opPeriodLabels = {today:'Сегодня',week:'Неделя',month:'Месяц'};
-function _opCtrlLabel(){
-  const pKey = opPeriodCur||'today';
-  const fKey = opFilterCur||'overall';
-  const fLbl = (_opFilterLabels[fKey]||'Общий').replace(/[⚡★⏱⚠]\s?/g,'');
-  return (_opPeriodLabels[pKey]||'Сегодня')+' · '+fLbl;
-}
-function _syncOpCtrl(){
-  const lbl = document.getElementById('opCtrlLbl');
-  if(lbl) lbl.textContent = _opCtrlLabel();
-}
-// Ctrl button toggle
-(function(){
-  const btn = document.getElementById('opCtrlBtn');
-  const panel = document.getElementById('opCtrlPanel');
-  const chev = document.getElementById('opCtrlChevron');
-  if(!btn||!panel) return;
-  btn.addEventListener('click',()=>{
-    const open = panel.classList.toggle('open');
-    btn.classList.toggle('on',open);
-    if(chev) chev.style.transform = open ? 'rotate(180deg)' : '';
-    if(open){ const g=document.getElementById('opPeriod'); if(g) requestAnimationFrame(()=>movePill(g)); }
-    try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
-  });
-})();
 // Metric chips
 document.querySelectorAll('#opFilters .op-f').forEach(b=>{
   b.addEventListener('click',()=>{
@@ -6911,8 +6883,7 @@ document.querySelectorAll('.periods').forEach(g=>{
       if(g.id==='periodPicker' && b.dataset.p) applyPeriod(b.dataset.p);
       if(g.id==='moneyPeriod' && b.dataset.p) applyPeriod(b.dataset.p);
       if(g.id==='officePeriod' && b.dataset.p) applyPeriod(b.dataset.p);
-      if(g.id==='peopleTabs' && b.dataset.tab) applyPeopleTab(b.dataset.tab);
-      if(g.id==='opPeriod' && b.dataset.opP) applyOpPeriod(b.dataset.opP);
+      if(g.id==='teamTabs' && b.dataset.team) applyOpTeam(b.dataset.team);
       try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
     });
   });
@@ -7475,7 +7446,8 @@ const DETAIL = {
                    body:'<div style="text-align:center;padding:40px;color:var(--muted)">Откройте «Люди → Операторы»</div>', foot:''};
     const norm = (OPS.data||{}).norm_min || 25;
     const slow = (OPS.data||{}).slow_sec || 60;
-    const per  = {today:'сегодня',week:'за неделю',month:'за месяц'}[opPeriodCur] || '';
+    const per  = {today:'сегодня',yesterday:'за вчера',week:'за неделю',
+                  month:'за месяц',year:'за год'}[OPS.period || 'today'] || '';
     const badge = d.senior
       ? `<span class="dt-badge" style="background:rgba(201,169,110,.2);color:var(--gold2)">СТАРШИЙ</span>` : '';
     const rTxt = d.resp_sample ? (()=>{ const t = fmtSec(d.resp_sec); return `${t.v}<span class="u">${t.u}</span>`; })() : '—';
@@ -7564,6 +7536,65 @@ const DETAIL = {
       foot: d.telegram_id
         ? `<button class="dt-btn" onclick="openTgUser('${d.telegram_id}','')">Открыть в TG</button>`
         : ''
+    };
+  },
+
+  driver: id=>{
+    const d = ((OPS.data||{}).drivers || []).find(x => x.id === id);
+    if(!d) return {title:'<div class="dt-tit-av plain">?</div><div><div class="dt-tit-name">Нет данных</div></div>',
+                   body:'<div style="text-align:center;padding:40px;color:var(--muted)">Откройте «Офисы → Команда»</div>', foot:''};
+    const norm = (OPS.data||{}).norm_min || 25;
+    const per  = {today:'сегодня',yesterday:'за вчера',week:'за неделю',
+                  month:'за месяц',year:'за год'}[OPS.period || 'today'] || '';
+    const stat = (lbl, val, sub, cls) =>
+      `<div class="dt-stat"><div class="dt-stat-lbl">${lbl}</div>
+       <div class="dt-stat-val ${cls||''}">${val}</div><div class="dt-stat-sub">${sub}</div></div>`;
+    const where = d.districts.map(x=>x.code+' '+x.name).join(', ');
+    return {
+      title:`<div class="dt-tit-av plain">${escS(_opInitials(d.name))}</div>
+        <div><div class="dt-tit-name">${escS(d.name)}${d.known ? '' :
+          ' <span class="dt-badge" style="background:var(--warn-soft);color:var(--warn)">НЕ В СПИСКЕ</span>'}</div>
+        <div class="dt-sub">${escS(where || 'района нет в списке')}${
+          d.operator ? ' · оператор ' + escS(d.operator) : ''}</div></div>`,
+      body:`
+        <div class="dt-stats">
+          ${stat('Доставил', d.delivered, `${d.orders} назначено${d.cancelled?` · ${d.cancelled} отменено`:''}`)}
+          ${stat('Выручка', fmt(d.aed)+'<span class="u">AED</span>', 'по его заказам')}
+          ${stat('Чаевые', d.tips ? fmt(d.tips)+'<span class="u">AED</span>' : '—',
+                 d.tips ? `${d.tips_bottles} ${pluralize(d.tips_bottles,'бутылка','бутылки','бутылок')}` : 'нет позиций со ставкой',
+                 d.tips ? 'gold' : '')}
+          ${stat('Доставка', d.avg_sample ? d.avg_min+'<span class="u">мин</span>' : '—',
+                 d.avg_sample ? `норматив ${norm} мин` : 'нет доставок',
+                 d.avg_sample ? (d.avg_min > norm ? 'warn' : 'up') : '')}
+          ${stat('Опозданий', d.avg_sample ? d.late : '—',
+                 d.avg_sample ? (d.late ? d.late_pct+'% доставок' : 'все в норматив') : '—',
+                 !d.avg_sample ? '' : d.late===0 ? 'up' : d.late<=2 ? 'warn' : 'dn')}
+          ${stat('★ Рейтинг', d.rating_count ? d.rating : '—',
+                 d.rating_count ? `${d.rating_count} ${pluralize(d.rating_count,'оценка','оценки','оценок')}` : 'нет оценок',
+                 d.rating_count ? 'up' : '')}
+        </div>
+
+        <div class="dt-sect">Что здесь считается</div>
+        <div class="dt-card">
+          <div style="font-size:11.5px;color:var(--muted);padding:12px 4px;line-height:1.6">
+            Только заказы, где он записан водителем, — это телефонные заказы из POS.
+            Заказу из приложения водителя никто не назначает, поэтому такие сюда не
+            попадают: показывать их за ним было бы выдумкой.
+          </div>
+        </div>
+
+        <div class="dt-sect">Район · ${per}</div>
+        <div class="dt-card">
+          ${d.districts.length ? d.districts.map(x=>`
+            <div class="dt-row" data-detail="office:${escS(x.id)}">
+              <div class="dt-row-l"><div class="dt-row-t">${escS(x.code)} ${escS(x.name)}</div>
+              <div class="dt-row-s">${d.operator ? 'оператор ' + escS(d.operator) : ''}</div></div>
+              <div class="dt-row-r">›</div>
+            </div>`).join('')
+          : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Нет в списке людей</div><div class="dt-row-s">имя пришло из заказов, а в config_staff его нет</div></div></div>'}
+        </div>
+      `,
+      foot: ''
     };
   },
 

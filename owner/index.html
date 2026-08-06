@@ -647,6 +647,12 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   min-height:132px}
 .acc-tile:active{transform:scale(.98)}
 .acc-tile:hover{border-color:rgba(201,169,110,.28)}
+/* Главное — расходы: их трогают каждый день, склад и заявку реже. */
+.acc-tile.wide{grid-column:span 2;min-height:0;display:grid;
+  grid-template-columns:auto 1fr auto;align-items:center;gap:14px;padding:15px}
+.acc-tile.wide .acc-t{margin-top:0}
+.acc-tile.wide .acc-n{margin-top:0;padding-top:0;justify-self:end;text-align:right}
+.acc-tile.wide .acc-s{grid-column:2 / span 2;margin-top:2px}
 .acc-ico{width:34px;height:34px;flex-shrink:0;border-radius:10px;display:flex;
   align-items:center;justify-content:center;color:var(--gold2);
   background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.22)}
@@ -4726,8 +4732,6 @@ async function stkRefreshEntry(){
 const ACC = [
   {id:'expenses', t:'Расходы водителей', s:'питание и разовые траты',
    ico:'<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'},
-  {id:'period',   t:'Расходы за период', s:'по дням и по людям',
-   ico:'<path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 6-7"/>'},
   {id:'stock',    t:'Пересчёт склада',   s:'остатки, ревизия, перемещения',
    ico:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>'},
   {id:'order',    t:'Заявка на закупку', s:'сколько довезти до нормы',
@@ -4741,12 +4745,11 @@ function accRender(){
   // Подпись не повторяет цифру, а объясняет её: цифра говорит «сколько»,
   // подпись — «из чего» или «что с этим не так».
   const sub = {
-    expenses: t ? (t.marked < t.total_drivers
+    expenses: t ? ((t.marked < t.total_drivers
                 ? `не отмечено ${t.total_drivers - t.marked} из ${t.total_drivers}`
                 : `все отмечены · ${t.working} на смене`)
+                + (ACC_PERIOD ? ` · ${fmt(ACC_PERIOD.total)} за ${ACC_PERIOD.days} дней` : ''))
               : 'питание и разовые траты',
-    period:   ACC_PERIOD ? `питание ${fmt(ACC_PERIOD.total_meal)} · разовые ${fmt(ACC_PERIOD.total_extra)}`
-                         : 'по дням и по людям',
     stock:    ACC_STOCK  ? (ACC_STOCK.short_aed
                 ? `не хватает ${fmt(ACC_STOCK.short_aed)} AED`
                 : (ACC_STOCK.done === ACC_STOCK.total ? 'всё сошлось' : 'остатки за смену'))
@@ -4759,14 +4762,13 @@ function accRender(){
   // Крупная цифра на плитке отвечает на вопрос раздела одним взглядом, а
   // подпись объясняет, что это за цифра.
   const num = {
-    expenses: t ? [fmt(t.all), 'AED'] : ['—', 'AED'],
-    period:   ACC_PERIOD ? [fmt(ACC_PERIOD.total), `AED / ${ACC_PERIOD.days} дн`] : ['—', 'AED'],
+    expenses: t ? [fmt(t.all), 'AED сегодня'] : ['—', 'AED'],
     stock:    ACC_STOCK ? [`${ACC_STOCK.done}/${ACC_STOCK.total}`, 'районов'] : ['—', 'районов'],
     order:    ACC_ORDER ? [fmt(ACC_ORDER.total_qty), 'штук'] : ['—', 'штук'],
   };
-  box.innerHTML = `<div class="acc-grid">` + ACC.map(a => {
+  box.innerHTML = `<div class="acc-grid">` + ACC.map((a, i) => {
     const [v, u] = num[a.id] || ['—', ''];
-    return `<button class="acc-tile" onclick="accOpen('${a.id}')">
+    return `<button class="acc-tile ${i === 0 ? 'wide' : ''}" onclick="accOpen('${a.id}')">
       <span class="acc-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"
         stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${a.ico}</svg></span>
       <span class="acc-t">${a.t}</span>
@@ -4796,7 +4798,6 @@ function accOpen(id){
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
   if(id === 'expenses') accExpenses();
-  if(id === 'period')   accPeriod();
   if(id === 'order')    accOrder();
 }
 
@@ -4806,29 +4807,53 @@ function accClose(){
   accRender();
 }
 
+// День и период — один раздел, а не два: это одни и те же деньги, просто
+// разной длины окно. Переключатель наверху, а не отдельная плитка на панели.
+let EXP_TAB = 'day';
+
 async function accExpenses(){
   _setText('accTitle', 'Расходы водителей');
   _setText('accSub', 'загрузка…');
+  document.getElementById('accMid').innerHTML = `
+    <div class="periods" id="expTabs" style="margin:2px 0 12px">
+      <div class="period-pill"></div>
+      <button class="${EXP_TAB === 'day' ? 'on' : ''}" onclick="expTab('day')">День</button>
+      <button class="${EXP_TAB === 'period' ? 'on' : ''}" onclick="expTab('period')">30 дней</button>
+    </div>
+    <div id="expBody"><div class="exp-empty">Загрузка…</div></div>`;
+  const g = document.getElementById('expTabs'); if(g) requestAnimationFrame(()=>movePill(g));
+  await (EXP_TAB === 'day' ? accExpDay() : accExpPeriod());
+}
+
+function expTab(t){
+  EXP_TAB = t;
+  document.querySelectorAll('#expTabs button').forEach((b,i)=>
+    b.classList.toggle('on', (i === 0) === (t === 'day')));
+  const g = document.getElementById('expTabs'); if(g) movePill(g);
+  (t === 'day' ? accExpDay() : accExpPeriod());
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
+async function accExpDay(){
   await loadExpenses(EXP.day);
-  const d = EXP.data;
-  if(!d){ document.getElementById('accMid').innerHTML =
-    '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+  const d = EXP.data, body = document.getElementById('expBody');
+  if(!body) return;
+  if(!d){ body.innerHTML = '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
   _setText('accSub', d.day === d.today ? `сегодня · ${d.day}` : d.day);
-  document.getElementById('accMid').innerHTML =
-    '<div class="exp-sum" id="expSum"></div><div id="expList"></div>';
+  body.innerHTML = '<div class="exp-sum" id="expSum"></div><div id="expList"></div>';
   renderExpenses();
 }
 
-async function accPeriod(){
-  _setText('accTitle', 'Расходы за период');
+async function accExpPeriod(){
+  const body = document.getElementById('expBody'); if(!body) return;
   let d;
   try{ d = await ownerApi.ownerFetch('/api/owner/expenses/period', {params:{days:30}}); }
-  catch(e){ document.getElementById('accMid').innerHTML =
+  catch(e){ body.innerHTML =
     '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
   ACC_PERIOD = d;
   _setText('accSub', `${d.from} → ${d.to}`);
   const maxD = Math.max(1, ...d.by_day.map(x => x.meal + x.extra));
-  document.getElementById('accMid').innerHTML = `
+  body.innerHTML = `
     <div class="exp-sum">
       <div class="exp-tot">
         <span class="exp-tot-v">${fmt(d.total)}</span>

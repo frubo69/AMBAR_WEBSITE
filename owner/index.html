@@ -355,6 +355,16 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .stk-all.on{color:var(--gold2);border-color:rgba(201,169,110,.4);background:var(--gold-soft)}
 .stk-mid{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 14px calc(24px + var(--safe-bottom))}
 
+/* дата прямо на карточке: свайпом листают именно её, и подпись должна быть
+   там же, где палец, а не в шапке страницы */
+.off-day{margin-left:auto;font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:700;
+  letter-spacing:.3px;color:var(--muted);font-variant-numeric:tabular-nums;flex-shrink:0}
+.off-back{display:flex;align-items:center;gap:8px;margin:0 0 10px}
+.off-back-t{flex:1;padding:8px 12px;border-radius:10px;cursor:pointer;
+  border:1px solid rgba(201,169,110,.3);background:var(--gold-soft);color:var(--gold2);
+  font-family:inherit;font-size:12px;font-weight:600}
+.off-back-t:active{transform:scale(.98)}
+
 /* валовая и чаевые справа от выручки района — как на главной карточке */
 .off-side{margin-left:auto;display:flex;flex-direction:column;gap:1px;text-align:right;
   line-height:1.25;flex-shrink:0}
@@ -1146,18 +1156,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   <div class="list" id="opList"></div>
   <div id="opExtra"></div>
 
-  <div class="sect" style="margin-top:14px">
-    <div class="sect-t">Районы</div>
-    <span class="day-nav" id="offDayNav" style="display:none">
-      <button class="dn-b" onclick="dayStep(1)" aria-label="Предыдущий день">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
-      <button class="dn-d" id="offDnDate" onclick="dayReset()" aria-label="Дата">
-        <span class="dn-num" id="offDnNum">—</span><span class="dn-rel" id="offDnTxt"></span></button>
-      <button class="dn-b" id="offDnNext" onclick="dayStep(-1)" aria-label="Следующий день">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
-    </span>
-    <div class="sect-s" id="offSub">—</div>
-  </div>
+  <div class="sect" style="margin-top:14px"><div class="sect-t">Районы</div><div class="sect-s" id="offSub">—</div></div>
   <!-- Порядок B1…B5 — рабочий, поэтому он же и по умолчанию. Остальные
        сортировки нужны, чтобы быстро увидеть отстающих. -->
   <div class="off-sort" id="offSort">
@@ -1166,6 +1165,13 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     <button class="off-s" data-s="orders">Заказы</button>
     <button class="off-s" data-s="min">Время</button>
     <button class="off-s" data-s="rating">Рейтинг</button>
+  </div>
+  <div class="off-back" id="offDayNav" style="display:none">
+    <button class="dn-b" onclick="dayStep(1)" aria-label="Предыдущий день">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button class="off-back-t" onclick="dayReset()">Вернуться к сегодня</button>
+    <button class="dn-b" id="offDnNext" onclick="dayStep(-1)" aria-label="Следующий день">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
   </div>
   <div style="display:flex;flex-direction:column;gap:9px" id="offCards">
     <div class="off-empty">Загрузка…</div>
@@ -3306,17 +3312,21 @@ function _syncDayNav(p, w){
 // Та же навигация над карточками районов: день просмотра в приложении один,
 // поэтому и стрелки везде двигают его же — иначе «Обзор» и «Районы» показывали
 // бы разные дни и не сходились между собой.
+// Что написать на карточке района: «Сегодня», «Вчера» или просто дату.
+let _OFF_DAY_LBL = '';
+function _offDayLabel(){ return _OFF_DAY_LBL; }
+
 function _syncOffDayNav(p, w){
-  const nav = document.getElementById('offDayNav');
-  if(!nav) return;
-  nav.style.display = _dayNavOn(p) ? 'flex' : 'none';
   const lbl = _dayLabel(w);
-  _setText('offDnNum', lbl.top);
-  _setText('offDnTxt', lbl.sub);
-  const sub = document.getElementById('offDnTxt');
-  if(sub) sub.style.display = lbl.sub ? '' : 'none';
+  // На карточке и «Сегодня», и число: одно отвечает «какой это день»,
+  // другое — «какое именно число», и в отчёте нужны оба.
+  _OFF_DAY_LBL = lbl.sub ? `${lbl.top} · ${lbl.sub}` : lbl.top;
+  const nav = document.getElementById('offDayNav');
+  if(nav) nav.style.display = (_dayNavOn(p) && DAY_OFFSET > 0) ? 'flex' : 'none';
   const nx = document.getElementById('offDnNext'); if(nx) nx.disabled = DAY_OFFSET <= 0;
-  const chip = document.getElementById('offDnDate'); if(chip) chip.disabled = DAY_OFFSET <= 0;
+  // Подписи на карточках нарисованы раньше, чем пришёл ответ — обновляем их
+  // на месте, не перерисовывая список.
+  document.querySelectorAll('#offCards .off-day').forEach(e => { e.textContent = _OFF_DAY_LBL; });
 }
 
 // Карточка уезжает в сторону свайпа и с другой стороны въезжает новая.
@@ -4680,15 +4690,16 @@ function renderOffices(rows){
         <span class="off-name">${escS(r.name)}</span>
         ${r.legacy ? '<span class="off-live" style="color:var(--muted);background:rgba(255,255,255,.04);border-color:var(--border2)">без района</span>'
                    : (r.active ? `<span class="off-live">${r.active} в работе</span>` : '')}
+        <span class="off-day">${escS(_offDayLabel())}</span>
       </div>
       <div class="off-rev-row">
         <span class="off-rev" data-aed="${aed}">${aed}</span>
         <span class="off-cur cur-unit">AED</span>
         <span class="off-share">${share}%</span>
-        ${(r.gross != null && r.gross !== aed) ? `<span class="off-side">
-          <span><i>вал</i><b data-aed="${r.gross}">${r.gross}</b></span>
+        <span class="off-side">
+          <span><i>вал</i><b data-aed="${r.gross != null ? r.gross : aed}">${r.gross != null ? r.gross : aed}</b></span>
           <span><i>чай</i><b class="gold" data-aed="${r.tips||0}">${r.tips||0}</b></span>
-        </span>` : ''}
+        </span>
       </div>
       <div class="off-track"><div class="off-fill" style="width:${width}%"></div></div>
       <div class="off-meta">${meta.join('<span class="sep">·</span>')}${r.legacy?'':'<span class="chev">›</span>'}</div>

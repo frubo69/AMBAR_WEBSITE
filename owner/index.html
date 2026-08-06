@@ -638,13 +638,57 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .tap-card{cursor:pointer;transition:.15s var(--e1)}
 .tap-card:active{transform:scale(.99);border-color:rgba(201,169,110,.28)}
 
-/* Пустая вкладка «Отчёты» — не забытая страница, а расчищенное место */
-.rep-soon{display:flex;flex-direction:column;align-items:center;gap:9px;
-  padding:44px 24px;margin-top:6px;border-radius:16px;text-align:center;
-  background:var(--card);border:1px dashed var(--border3);color:var(--muted)}
-.rep-soon svg{opacity:.5}
-.rep-soon-t{font-size:14px;font-weight:600;color:var(--sub)}
-.rep-soon-s{font-size:11.5px;line-height:1.6}
+/* Расходы: сводка дня и строки водителей */
+.exp-sum{border:1px solid var(--border2);border-radius:14px;background:var(--card);
+  padding:13px 15px;margin-bottom:4px}
+.exp-empty{color:var(--muted);font-size:12.5px;text-align:center;padding:8px}
+.exp-tot{display:flex;align-items:baseline;gap:8px}
+.exp-tot-v{font-family:'Space Grotesk',sans-serif;font-size:27px;font-weight:700;
+  color:var(--gold2);letter-spacing:-.6px;font-variant-numeric:tabular-nums;line-height:1}
+.exp-tot-u{font-size:11px;color:var(--muted)}
+.exp-tot-r{margin-left:auto;text-align:right;font-size:11px;color:var(--muted);line-height:1.5}
+.exp-tot-r b{color:var(--sub);font-family:'DM Sans',sans-serif;font-weight:700}
+.exp-mark{margin-top:11px;padding-top:10px;border-top:1px solid var(--border2);
+  display:flex;align-items:center;gap:8px;font-size:11.5px;color:var(--muted)}
+.exp-mark-bar{flex:1;height:5px;border-radius:3px;background:var(--card2);overflow:hidden}
+.exp-mark-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--gold),var(--gold2));
+  transition:width .3s var(--e1)}
+.exp-grp{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
+  color:var(--muted);margin:16px 2px 7px}
+.exp-row{background:var(--card);border:1px solid var(--border2);border-radius:13px;
+  padding:11px 13px;margin-bottom:7px}
+.exp-row.todo{border-style:dashed;border-color:var(--border3)}
+.exp-head{display:flex;align-items:center;gap:10px}
+.exp-name{flex:1;min-width:0;font-size:13.5px;font-weight:600}
+.exp-seg{display:flex;gap:4px;flex-shrink:0}
+.exp-b{padding:6px 11px;border-radius:9px;border:1px solid var(--border3);background:var(--card2);
+  color:var(--muted);font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;
+  transition:.14s var(--e1);white-space:nowrap}
+.exp-b:active{transform:scale(.94)}
+.exp-b.on-work{background:rgba(76,175,125,.16);border-color:rgba(76,175,125,.45);color:var(--up)}
+.exp-b.on-off{background:rgba(243,180,74,.14);border-color:rgba(243,180,74,.4);color:var(--warn)}
+.exp-val{min-width:52px;text-align:right;font-family:'DM Sans',sans-serif;font-size:14px;
+  font-weight:700;font-variant-numeric:tabular-nums;flex-shrink:0}
+.exp-sub{font-size:11px;color:var(--muted);margin-top:5px;display:flex;flex-wrap:wrap;
+  align-items:center;gap:6px}
+.exp-tag{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:999px;
+  background:var(--card2);border:1px solid var(--border3);font-size:10.5px}
+.exp-tag b{font-family:'DM Sans',sans-serif;font-weight:700;color:var(--sub)}
+.exp-tag i{font-style:normal;color:var(--muted)}
+.exp-tag u{text-decoration:none;cursor:pointer;color:var(--muted);opacity:.6;font-size:12px}
+.exp-add{margin-left:auto;width:26px;height:26px;border-radius:8px;cursor:pointer;flex-shrink:0;
+  border:1px dashed var(--border3);background:transparent;color:var(--gold2);
+  font-size:15px;font-weight:700;line-height:1;display:flex;align-items:center;justify-content:center}
+.exp-add:active{transform:scale(.9)}
+.exp-form{display:flex;gap:6px;margin-top:9px;padding-top:9px;border-top:1px solid var(--border2)}
+.exp-form input{min-width:0;padding:8px 10px;border-radius:9px;border:1px solid var(--border2);
+  background:var(--bg3);color:var(--text);font-family:inherit;font-size:12.5px;outline:none}
+.exp-form input:focus{border-color:rgba(201,169,110,.5)}
+.exp-form .amt{width:74px;text-align:center;font-weight:700}
+.exp-form .cmt{flex:1}
+.exp-form button{padding:8px 12px;border:none;border-radius:9px;cursor:pointer;flex-shrink:0;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;
+  font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700}
 
 /* Панель сортировки */
 .team-panel{overflow:hidden;max-height:0;opacity:0;padding:0 14px;margin:0 -14px;
@@ -1065,17 +1109,14 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
   <div class="range-chip" id="rangeChip-moneyPeriod" style="display:none"><span class="rc-icon">📅</span><span class="rc-text"></span><button class="rc-x" onclick="clearRange('moneyPeriod')">✕</button></div>
 
-  <!-- Место расчищено под новый учёт. Столбики за 30 дней и разбивки, что
-       стояли здесь, переехали в «Обзор» или сняты — см. историю. -->
-  <div class="rep-soon">
-    <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
-         stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
-      <path d="M14 3v5h5M9 13h6M9 17h4"/></svg>
-    <div class="rep-soon-t">Здесь будет учёт</div>
-    <div class="rep-soon-s">Выручка, источники и часы переехали в «Обзор».<br>
-      Место свободно под новый учёт.</div>
+  <!-- Расходы по водителям. Начинается день с отметки «кто вышел»: от неё
+       зависит ставка питания, и без неё считать нечего. -->
+  <div class="sect"><div class="sect-t">Расходы водителей</div>
+    <div class="sect-a" style="font-size:10px;color:var(--muted)" id="expDay">—</div></div>
+  <div class="exp-sum" id="expSum">
+    <div class="exp-empty">Загрузка…</div>
   </div>
+  <div id="expList"></div>
 </div>
 
 <!-- ============ OFFICES ============ -->
@@ -2905,6 +2946,7 @@ document.querySelectorAll('.tb').forEach(btn=>{
     window.scrollTo({top:0,behavior:'instant'});
     // Команда живёт на странице районов — тянем её при первом заходе туда.
     if(pg === 'offices' && !OPS.data && !OPS.loading && window.ownerApi) loadOperators();
+    if(pg === 'money' && !EXP.data && window.ownerApi) loadExpenses();
     try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   });
 });
@@ -4622,6 +4664,156 @@ async function stkRefreshEntry(){
       ? (st.short_aed ? `все районы · не хватает ${fmt(st.short_aed)} AED` : 'все районы сошлись')
       : `${st.done} из ${st.total} районов · проверьте остатки`;
   }catch(e){ /* молча: плашка не должна ломать страницу */ }
+}
+
+
+// ─── Расходы водителей ──────────────────────────────────────────────────────
+// День начинается с отметки «кто вышел»: ставка питания зависит от неё, и пока
+// водитель не отмечен, за него не начисляется ничего. Подставить 80 или 40 «по
+// умолчанию» нельзя — это разные деньги, и владелец увидел бы сумму, которой
+// никто не подтверждал.
+let EXP = {day:null, data:null, open:null};
+
+async function loadExpenses(day){
+  const box = document.getElementById('expSum');
+  if(!box || !window.ownerApi) return;
+  try{
+    EXP.data = await ownerApi.ownerFetch('/api/owner/expenses',
+      {params: day ? {day} : {}});
+    EXP.day = EXP.data.day;
+  }catch(e){
+    box.innerHTML = '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+    return;
+  }
+  renderExpenses();
+}
+
+function renderExpenses(){
+  const d = EXP.data; if(!d) return;
+  const t = d.totals;
+  _setText('expDay', d.day === d.today ? 'сегодня · ' + d.day : d.day);
+
+  const sum = document.getElementById('expSum');
+  if(sum) sum.innerHTML = `
+    <div class="exp-tot">
+      <span class="exp-tot-v">${fmt(t.all)}</span><span class="exp-tot-u">AED за день</span>
+      <span class="exp-tot-r">
+        питание <b>${fmt(t.meal)}</b><br>разовые <b>${fmt(t.extra)}</b>
+      </span>
+    </div>
+    <div class="exp-mark">
+      <span>${t.marked} из ${t.total_drivers}</span>
+      <div class="exp-mark-bar"><div class="exp-mark-fill" style="width:${
+        t.total_drivers ? t.marked / t.total_drivers * 100 : 0}%"></div></div>
+      <span>${t.working} на смене · ${t.off} дома</span>
+    </div>`;
+
+  // Водители сгруппированы по районам — тем же порядком B1…B5, что и везде.
+  const list = document.getElementById('expList');
+  if(!list) return;
+  const groups = [];
+  d.drivers.forEach(r => {
+    let g = groups.find(x => x.id === r.district);
+    if(!g){ g = {id:r.district, code:r.district_code, name:r.district_name,
+                 operator:r.operator, rows:[]}; groups.push(g); }
+    g.rows.push(r);
+  });
+  list.innerHTML = groups.map(g => `
+    <div class="exp-grp">${escS(g.code)} ${escS(g.name)}${g.operator ? ' · ' + escS(g.operator) : ''}</div>
+    ${g.rows.map(r => expRow(r)).join('')}`).join('');
+}
+
+function expRow(r){
+  const w = r.working;
+  const open = EXP.open === r.name;
+  return `<div class="exp-row ${w === null ? 'todo' : ''}" id="exp-${escS(r.id)}">
+    <div class="exp-head">
+      <span class="exp-name">${escS(r.name)}</span>
+      <span class="exp-seg">
+        <button class="exp-b ${w === true ? 'on-work' : ''}"
+                onclick="expSetWork('${escS(r.name)}', ${w === true ? 'null' : 'true'})">Вышел</button>
+        <button class="exp-b ${w === false ? 'on-off' : ''}"
+                onclick="expSetWork('${escS(r.name)}', ${w === false ? 'null' : 'false'})">Дома</button>
+      </span>
+      <span class="exp-val" style="color:${r.total ? 'var(--text)' : 'var(--muted)'}">${r.total || '—'}</span>
+    </div>
+    <div class="exp-sub">
+      ${w === null ? '<span style="color:var(--warn)">не отмечен — питание не начислено</span>'
+                   : `<span class="exp-tag"><i>питание</i><b>${r.meal}</b></span>`}
+      ${(r.extras || []).map(e => `<span class="exp-tag" title="${escS(e.comment)}">
+          <i>${escS(e.comment)}</i><b>${e.amount}</b>
+          <u onclick="expDelExtra('${escS(r.name)}','${escS(e.id)}')">✕</u></span>`).join('')}
+      <button class="exp-add" onclick="expToggleForm('${escS(r.name)}')"
+              title="Разовый расход">${open ? '−' : '+'}</button>
+    </div>
+    ${open ? `<div class="exp-form">
+      <input class="amt" id="expAmt" type="text" inputmode="numeric" placeholder="AED"
+             onkeydown="if(event.key==='Enter')expAddExtra('${escS(r.name)}')">
+      <input class="cmt" id="expCmt" type="text" placeholder="за что — бензин, мойка, штраф"
+             onkeydown="if(event.key==='Enter')expAddExtra('${escS(r.name)}')">
+      <button onclick="expAddExtra('${escS(r.name)}')">Добавить</button>
+    </div>` : ''}
+  </div>`;
+}
+
+// Повторный тап по той же кнопке снимает отметку: ошибиться утром легко, а
+// «Вышел» и «Дома» — разные деньги, поэтому откат должен быть в один жест.
+async function expSetWork(driver, working){
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/expenses/working',
+      {method:'POST', body:{day:EXP.day, driver, working}});
+    _expReplace(r.driver);
+  }catch(e){ _toast('Не удалось отметить'); }
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
+function expToggleForm(driver){
+  EXP.open = EXP.open === driver ? null : driver;
+  renderExpenses();
+  if(EXP.open) setTimeout(()=>document.getElementById('expAmt')?.focus(), 50);
+}
+
+async function expAddExtra(driver){
+  const amount = parseInt((document.getElementById('expAmt')?.value || '').replace(/\D/g,''), 10);
+  const comment = (document.getElementById('expCmt')?.value || '').trim();
+  // Расход без объяснения через неделю не отличить от опечатки — поэтому
+  // комментарий обязателен, и сказать об этом надо здесь, а не после отправки.
+  if(!amount || !comment){ _toast(!amount ? 'Впишите сумму' : 'Впишите, за что'); return; }
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/expenses/extra',
+      {method:'POST', body:{day:EXP.day, driver, amount, comment}});
+    EXP.open = null;
+    _expReplace(r.driver);
+    _toast(`${driver}: +${amount} AED`);
+  }catch(e){ _toast('Не удалось добавить'); }
+}
+
+async function expDelExtra(driver, id){
+  try{
+    const r = await ownerApi.ownerFetch(
+      `/api/owner/expenses/extra/${encodeURIComponent(id)}`,
+      {method:'DELETE', params:{day:EXP.day, driver}});
+    _expReplace(r.driver);
+  }catch(e){ _toast('Не удалось убрать'); }
+}
+
+// Сервер возвращает пересчитанную строку — подменяем её и итоги, не дёргая
+// весь список: иначе форма закрывается и фокус улетает.
+function _expReplace(row){
+  if(!row || !EXP.data) return;
+  const i = EXP.data.drivers.findIndex(x => x.name === row.name);
+  if(i >= 0) EXP.data.drivers[i] = row;
+  const rows = EXP.data.drivers;
+  const marked = rows.filter(r => r.working !== null);
+  EXP.data.totals = {
+    meal: rows.reduce((s,r)=>s+r.meal,0),
+    extra: rows.reduce((s,r)=>s+r.extra_sum,0),
+    all: rows.reduce((s,r)=>s+r.total,0),
+    working: rows.filter(r=>r.working === true).length,
+    off: rows.filter(r=>r.working === false).length,
+    marked: marked.length, total_drivers: rows.length,
+  };
+  renderExpenses();
 }
 
 function renderOffices(rows){

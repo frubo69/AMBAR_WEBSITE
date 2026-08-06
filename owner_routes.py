@@ -583,11 +583,17 @@ async def handle_finance(request):
         _dl = _deliv_by.get(_oid, [])
         _ds = _delivery_stats([(None, x) for x in _dl])
         _revs = [int(x["review_score"]) for x in _dl if x.get("review_score")]
+        # Валовая по району и чаевые его людей: как на главной карточке, чтобы
+        # «выручка района» не значила два разных числа на двух экранах.
+        _gross = sum(int(x.get("total", 0) or 0) for x in _dl)
+        _tips = _tips_for(_dl)["total"]
         offices_block.append({
             "id":           _oid,
             "code":         OFFICE_CODES.get(_oid, ""),
             "name":         OFFICE_NAMES[_oid],
-            "aed":          sum(int(x.get("total", 0) or 0) for x in _dl),
+            "aed":          _gross - _tips,
+            "gross":        _gross,
+            "tips":         _tips,
             "orders":       len(_all_by.get(_oid, [])),
             "delivered":    len(_dl),
             "avg_min":      _ds["avg_min"],
@@ -605,6 +611,7 @@ async def handle_finance(request):
         offices_block.append({
             "id": "legacy", "name": "Без района", "legacy": True,
             "aed": sum(int(x.get("total", 0) or 0) for x in _legacy_dl),
+            "gross": sum(int(x.get("total", 0) or 0) for x in _legacy_dl), "tips": 0,
             "orders": sum(len(v) for k, v in _all_by.items() if k not in OFFICE_IDS),
             "delivered": len(_legacy_dl),
             "avg_min": _lds["avg_min"], "avg_sample": _lds["sample"],

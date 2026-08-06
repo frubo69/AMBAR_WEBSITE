@@ -17,8 +17,9 @@ AMBAR — приложение водителя.
   • записать расход — со статусом «на согласовании», пока менеджер не утвердит.
     В расходы дня такой не попадает: иначе водитель сам себе назначал бы траты.
 
-Токен тот же, что у операторского бота: отдельный бот ради одной роли — лишний
-токен, лишний чат и лишнее место, где всё это может разойтись.
+У водителей свой бот (DRIVER_BOT_TOKEN): подпись initData проверяется его
+токеном, а значит вход в приложение водителя невозможен из операторского — и
+наоборот. Роли не пересекаются даже случайно.
 """
 import hashlib
 import hmac
@@ -38,7 +39,7 @@ from owner_auth import CORS_HEADERS
 
 log = logging.getLogger("driver")
 
-OPERATOR_BOT_TOKEN = os.getenv("OPERATOR_BOT_TOKEN", "")
+DRIVER_BOT_TOKEN = os.getenv("DRIVER_BOT_TOKEN", "")
 INIT_DATA_MAX_AGE = 24 * 3600
 DUBAI_TZ = timezone(timedelta(hours=4))
 SHIFT_START_HOUR = 12
@@ -77,7 +78,7 @@ def require_driver(fn):
             return web.Response(status=200, headers=CORS_HEADERS)
         auth = request.headers.get("Authorization", "")
         init_data = auth[4:] if auth.startswith("tma ") else ""
-        user = _valid_init_data(init_data, OPERATOR_BOT_TOKEN)
+        user = _valid_init_data(init_data, DRIVER_BOT_TOKEN)
         if not user:
             return web.json_response({"error": "unauthorized"}, status=401, headers=CORS_HEADERS)
         me = staff.driver_by_tg(user.get("id"))

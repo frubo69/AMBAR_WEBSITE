@@ -317,6 +317,52 @@ async def _fanout_new(order: dict) -> dict:
     return op_msg_ids
 
 
+async def notify_driver(order: dict, kind: str = "new"):
+    """Заказ водителю — текстом в его бот.
+
+    Приложение показывает список, но водитель за рулём и в приложение не смотрит:
+    заказ должен прийти сам, как сообщение, со всем нужным — адресом, составом и
+    суммой. Телефон отдельной строкой: по нему звонят, а не читают.
+
+    Если водителя нет в списке доступа, молча выходим: заказ не должен падать
+    из-за того, что человеку ещё не выдали приложение."""
+    import os as _os
+    import html as _h
+    from api_server import tg_send            # lazy: circular import at load
+    import config_staff as _staff
+
+    name = (order.get("driver") or "").strip()
+    tid = _staff.DRIVER_IDS.get(name)
+    token = _os.getenv("DRIVER_BOT_TOKEN", "")
+    if not (tid and token):
+        return
+
+    lines = "\n".join(
+        f"• {_h.escape(str(i.get('name','')))} × {i.get('qty',0)}"
+        + (f" ({i.get('pcs')} шт)" if i.get("pcs") else "")
+        for i in (order.get("items") or []))
+    head = {"new": "🚗 <b>НОВЫЙ ЗАКАЗ</b>",
+            "edit": "✏️ <b>ЗАКАЗ ИЗМЕНЁН</b>",
+            "cancel": "🚫 <b>ЗАКАЗ ОТМЕНЁН</b>"}.get(kind, "🚗 <b>ЗАКАЗ</b>")
+    txt = (f"{head} #{_h.escape(order.get('order_id',''))}\n"
+           f"{_h.escape(order.get('district') or order.get('office_name',''))}\n\n"
+           f"📍 {_h.escape(order.get('address','') or 'адрес не указан')}\n\n"
+           f"{lines}\n\n"
+           f"💰 <b>{order.get('total',0)} AED</b>")
+    if order.get("payment_method") == "debt":
+        txt += "\n☑️ В ДОЛГ — наличные не брать"
+    if order.get("comment"):
+        txt += f"\n\n💬 {_h.escape(order['comment'])}"
+    if order.get("phone"):
+        txt += f"\n\n📱 {_h.escape(str(order['phone']))}"
+
+    try:
+        await tg_send(token, tid, txt, parse_mode="HTML")
+        log.info(f"[driver-bot] #{order.get('order_id')} → {name}")
+    except Exception as e:
+        log.warning(f"[driver-bot] #{order.get('order_id')} → {name}: {e}")
+
+
 async def _refresh_cards(order: dict):
     """Re-render the op cards after edit/cancel/delivered."""
     from api_server import tg_edit   # lazy
@@ -466,6 +512,7 @@ async def handle_create(request):
     await db.save_order(order["order_id"], order)
 
     op_msg_ids = await _fanout_new(order)
+    await notify_driver(order, "new")
     if op_msg_ids:
         await db.update_order(order["order_id"], op_msg_ids=op_msg_ids)
         order["op_msg_ids"] = op_msg_ids
@@ -570,6 +617,7 @@ async def handle_patch(request):
     await db.update_order(oid, **upd)
     order.update(upd)
     await _refresh_cards(order)
+    await notify_driver(order, "edit")     # у водителя на руках прошлая версия
 
     if items_changed:
         try:
@@ -598,6 +646,7 @@ async def handle_cancel(request):
     await db.update_order(oid, status="cancelled", cancelled_by="operator",
                           cancelled_at=now, updated_at=now)
     order.update(status="cancelled")
+    await notify_driver(order, "cancel")   # иначе водитель повезёт отменённый заказ
     await _refresh_cards(order)
     try:
         from owner_routes import notify_owners

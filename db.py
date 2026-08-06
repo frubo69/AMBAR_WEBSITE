@@ -1594,6 +1594,21 @@ async def add_driver_expense(day: str, driver: str, item: dict):
     )
 
 
+async def set_driver_expense_status(day: str, driver: str, item_id: str,
+                                    status: str, by: int) -> bool:
+    """Решение менеджера по трате. Позиционный $ обновляет ровно тот элемент
+    массива, что попал в фильтр, — соседние записи не трогаются."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.driver_days.update_one(
+        {"day": day, "driver": driver, "extras.id": item_id},
+        {"$set": {"extras.$.status": status,
+                  "extras.$.decided_by": by,
+                  "extras.$.decided_at": datetime.now(timezone.utc).isoformat()}},
+    )
+    return bool(r.matched_count)
+
+
 async def del_driver_expense(day: str, driver: str, item_id: str) -> bool:
     db = _db_or_none()
     if db is None: return False

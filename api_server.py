@@ -2562,6 +2562,12 @@ def main():
         stock_routes.setup(app)
     except Exception as e:
         log.error(f"stock routes setup failed: {e}")
+    # Расходы по водителям: питание и разовые траты — owner-only.
+    try:
+        import expense_routes
+        expense_routes.setup(app)
+    except Exception as e:
+        log.error(f"expense routes setup failed: {e}")
     # Operator iPad POS (manual phone-in orders) — own auth vs OPERATOR_BOT_TOKEN.
     try:
         import operator_routes

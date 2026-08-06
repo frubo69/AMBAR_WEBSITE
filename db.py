@@ -1466,6 +1466,63 @@ async def get_stock_counts_recent(district: str, before_day: str | None = None,
     return await cur.to_list(length=int(limit))
 
 
+# ── расходы по водителям ─────────────────────────────────────────────────────
+# Один документ на (день, водитель): отметка о выходе, ставка питания и список
+# разовых трат. Ключ составной, потому что и то и другое правят в течение дня по
+# одному человеку, а не всей сменой разом.
+
+async def get_driver_day(day: str, driver: str) -> dict | None:
+    db = _db_or_none()
+    if db is None: return None
+    return await db.driver_days.find_one({"day": day, "driver": driver}, {"_id": 0})
+
+
+async def get_driver_days(day: str) -> list:
+    db = _db_or_none()
+    if db is None: return []
+    return await db.driver_days.find({"day": day}, {"_id": 0}).to_list(length=200)
+
+
+async def get_driver_days_range(day_from: str, day_to: str) -> list:
+    """Расходы за отрезок — для сводки по неделе или месяцу."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.driver_days.find({"day": {"$gte": day_from, "$lte": day_to}}, {"_id": 0})
+    return await cur.to_list(length=5000)
+
+
+async def save_driver_day(day: str, driver: str, fields: dict):
+    db = _db_or_none()
+    if db is None: return
+    await db.driver_days.update_one(
+        {"day": day, "driver": driver},
+        {"$set": {**fields, "day": day, "driver": driver}},
+        upsert=True,
+    )
+
+
+async def add_driver_expense(day: str, driver: str, item: dict):
+    """Разовый расход. Пишется через $push, чтобы две записи подряд с разных
+    устройств не затирали друг друга."""
+    db = _db_or_none()
+    if db is None: return
+    await db.driver_days.update_one(
+        {"day": day, "driver": driver},
+        {"$push": {"extras": item}, "$setOnInsert": {"day": day, "driver": driver}},
+        upsert=True,
+    )
+
+
+async def del_driver_expense(day: str, driver: str, item_id: str) -> bool:
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.driver_days.update_one(
+        {"day": day, "driver": driver},
+        {"$pull": {"extras": {"id": item_id}}},
+    )
+    return bool(r.modified_count)
+
+
 async def get_finished_audits(limit: int = 40) -> list:
     """Завершённые ревизии, свежие первыми — без позиций.
 

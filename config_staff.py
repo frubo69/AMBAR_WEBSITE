@@ -44,6 +44,33 @@ DISTRICT_STAFF = [
     {"district": "alguses", "operator": "Фарух",     "drivers": ["Сунат", "Даврон"]},
 ]
 
+# ── расходы на питание ───────────────────────────────────────────────────────
+# Платят каждый день и всем, но по-разному: вышел на смену — одна ставка,
+# не вышел — другая. Поэтому «кто сегодня работает» приходится отмечать
+# руками, и пока не отмечено, начислять нечего: 80 и 40 — разные деньги.
+MEAL_WORKING = 80
+MEAL_OFF = 40
+
+
+def drivers() -> list:
+    """Все водители с их районом и оператором, в порядке районов B1…B5."""
+    from config_offices import OFFICE_CODES, OFFICE_NAMES
+    out, seen = [], set()
+    for st in DISTRICT_STAFF:
+        for name in st["drivers"]:
+            if name in seen:
+                continue
+            seen.add(name)
+            out.append({
+                "id": _slug(name), "name": name,
+                "district": st["district"],
+                "district_code": OFFICE_CODES.get(st["district"], ""),
+                "district_name": OFFICE_NAMES.get(st["district"], st["district"]),
+                "operator": st["operator"],
+            })
+    return out
+
+
 # ── производное ──────────────────────────────────────────────────────────────
 DISTRICT_OPERATOR = {s["district"]: s["operator"] for s in DISTRICT_STAFF}
 DISTRICT_DRIVERS = {s["district"]: list(s["drivers"]) for s in DISTRICT_STAFF}

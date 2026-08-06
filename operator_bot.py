@@ -1158,6 +1158,71 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if data == "noop": return
 
+    # ── правка от водителя ───────────────────────────────────────────────────
+    # Водитель на месте видит, чего не хватает, но заказ меняет оператор: цена и
+    # состав остаются здесь. Кнопка применяет предложенный состав целиком —
+    # сравнивать списки глазами в чате оператор не станет.
+    if data.startswith("drvedit_"):
+        _, verdict, oid = data.split("_", 2)
+        order = await db.get_order(oid)
+        req = (order or {}).get("edit_request") or {}
+        # Правку разбирают несколько операторов сразу — второму нужно увидеть,
+        # что решение уже принято, а не молча нажать в пустоту.
+        if not order or not req or req.get("status") != "open":
+            done = {"applied": "уже применена", "rejected": "уже отклонена"}.get(
+                req.get("status"), "не найдена")
+            try:
+                await q.edit_message_text(
+                    q.message.text_html + f"\n\n<i>Правка {done}</i>", parse_mode="HTML")
+            except Exception:
+                pass
+            return
+
+        import operator_routes as _pos
+        if verdict == "ok" and req.get("items"):
+            total = await _pos._pos_total(req["items"])
+            await db.update_order(oid, items=req["items"], total=total,
+                                  edit_request={**req, "status": "applied",
+                                                "decided_by": op})
+            order = await db.get_order(oid)
+            await _pos._refresh_cards(order)
+            await update_customer_card(oid)
+            await _pos.notify_driver(order, "edit")     # водитель везёт новый состав
+            await q.edit_message_text(
+                q.message.text_html + f"\n\n✅ <b>Применено</b> · сумма {total} AED",
+                parse_mode="HTML")
+            try:
+                from owner_routes import notify_owners_force
+                _it = "\n".join(f"• {i.get('name','')} ×{i.get('qty',1)}"
+                                for i in order.get("items", [])) or "—"
+                await notify_owners_force(
+                    "orders.edited",
+                    f"✏️ *Заказ изменён #{oid}* — по правке водителя "
+                    f"{req.get('by','—')}\n"
+                    f"💰 Новый итог: *{total} AED*\n"
+                    f"🛒 Позиции:\n{_it}")
+            except Exception as e:
+                log.error(f"[drvedit] уведомление владельцу: {e}")
+            log.info(f"[drvedit] #{oid} применена оператором {op}")
+        else:
+            await db.update_order(oid, edit_request={**req, "status": "rejected",
+                                                     "decided_by": op})
+            await q.edit_message_text(q.message.text_html + "\n\n🚫 <b>Отклонено</b>",
+                                      parse_mode="HTML")
+            # Водителю — ответ: молчание он прочитает как «не заметили».
+            try:
+                import os as _os
+                from api_server import tg_send as _send
+                import config_staff as _staff
+                tid = _staff.DRIVER_IDS.get(req.get("by"))
+                if tid:
+                    await _send(_os.getenv("DRIVER_BOT_TOKEN", ""), tid,
+                                f"Правка по заказу #{oid} отклонена оператором.")
+            except Exception as e:
+                log.warning(f"[drvedit] ответ водителю: {e}")
+            log.info(f"[drvedit] #{oid} отклонена оператором {op}")
+        return
+
     # Clear pending input flows when operator navigates away
     if not data.startswith("rename_") and not data.startswith("ban_input_"):
         ctx.user_data.pop("pending_ban", None)

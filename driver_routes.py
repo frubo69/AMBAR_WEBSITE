@@ -238,9 +238,54 @@ async def handle_delivered(request):
 
 
 @require_driver
+async def handle_catalog(request):
+    """Каталог для правки состава — только то, что есть в наличии.
+
+    Цены здесь полные: водитель довозит телефонный заказ, а скидка положена
+    только за заказ через приложение."""
+    from operator_routes import _load_catalog, _full_price
+    items = []
+    for p in _load_catalog():
+        if not p.get("stock"):
+            continue
+        pack = bool(p.get("price_24_full"))
+        items.append({"id": p.get("id"), "name": p.get("name", ""), "cat": p.get("cat", ""),
+                      "price": _full_price(p), "pack": pack,
+                      **({"p12": _full_price(p, 12), "p24": _full_price(p, 24)} if pack else {})})
+    items.sort(key=lambda x: (x["cat"], x["name"]))
+    cats = sorted({x["cat"] for x in items if x["cat"]})
+    return web.json_response({"items": items, "cats": cats}, headers=CORS_HEADERS)
+
+
+def _diff_lines(old_items: list, new_items: list) -> list:
+    """Что именно поменялось: убрали, добавили, изменили количество.
+
+    Оператор должен увидеть разницу, а не два списка — сравнивать их глазами
+    в чате он не станет."""
+    was = {i.get("id"): i for i in (old_items or [])}
+    now = {i.get("id"): i for i in (new_items or [])}
+    out = []
+    for pid, i in now.items():
+        prev = was.get(pid)
+        q, pq = int(i.get("qty") or 0), int((prev or {}).get("qty") or 0)
+        if not prev:
+            out.append({"kind": "add", "name": i.get("name", ""), "qty": q})
+        elif q != pq:
+            out.append({"kind": "qty", "name": i.get("name", ""), "from": pq, "qty": q})
+    for pid, i in was.items():
+        if pid not in now:
+            out.append({"kind": "del", "name": i.get("name", ""), "qty": int(i.get("qty") or 0)})
+    return out
+
+
+@require_driver
 async def handle_edit_request(request):
-    """Попросить правку. Водитель ничего не меняет сам: он описывает, что не так,
-    оператор решает. Цена и состав остаются под операторским контролем."""
+    """Правка от водителя — предложение, а не действие.
+
+    Два вида: изменить состав (items) или сообщить о проблеме (text). Ни то ни
+    другое не применяется само: заказ меняет оператор, у него же остаётся цена.
+    Водитель на месте видит, чего не хватает, — но решать, что везти и почём, не
+    его работа."""
     oid = (request.match_info.get("oid") or "").strip()
     me = request["driver"]
     try:
@@ -248,28 +293,72 @@ async def handle_edit_request(request):
     except Exception:
         return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
     text = str(body.get("text") or "").strip()[:400]
-    if not text:
-        return web.json_response({"error": "text_required"}, status=400, headers=CORS_HEADERS)
+    raw_items = body.get("items")
+
     o = await db.get_order(oid)
     if not o or (o.get("driver") or "").strip() != me["name"]:
         return web.json_response({"error": "not_your_order"}, status=403, headers=CORS_HEADERS)
 
-    req = {"text": text, "by": me["name"], "at": datetime.now(timezone.utc).isoformat(),
-           "status": "open"}
-    await db.update_order(oid, edit_request=req)
-    log.info(f"[driver] {me['name']} просит правку по #{oid}: {text[:60]}")
+    items, diff, total = None, [], None
+    if isinstance(raw_items, list):
+        from operator_routes import _catalog_by_id, _full_price, _pos_total
+        cat = _catalog_by_id()
+        items = []
+        for it in raw_items:
+            p = cat.get(it.get("id"))
+            if not p:
+                continue
+            try:
+                qty = max(0, int(it.get("qty") or 0))
+            except (TypeError, ValueError):
+                qty = 0
+            if qty <= 0:
+                continue
+            pcs = it.get("pcs")
+            price = _full_price(p, pcs)
+            items.append({"id": p["id"], "name": p.get("name", ""), "qty": qty,
+                          **({"pcs": int(pcs)} if pcs else {}),
+                          "price": price, "line_total": price * qty})
+        if not items:
+            return web.json_response({"error": "empty_items"}, status=400, headers=CORS_HEADERS)
+        diff = _diff_lines(o.get("items"), items)
+        if not diff and not text:
+            return web.json_response({"error": "nothing_changed"}, status=400, headers=CORS_HEADERS)
+        total = await _pos_total(items)
+    elif not text:
+        return web.json_response({"error": "text_or_items_required"}, status=400, headers=CORS_HEADERS)
 
-    # Операторам — в тот же чат, где живут карточки заказов.
+    req = {"text": text, "items": items, "diff": diff, "total": total,
+           "by": me["name"], "at": datetime.now(timezone.utc).isoformat(), "status": "open"}
+    await db.update_order(oid, edit_request=req)
+    log.info(f"[driver] {me['name']} правка #{oid}: "
+             f"{len(diff)} изменений, текст: {text[:40]}")
+
+    # Операторам — с кнопками: разбирать чужую просьбу руками по чату никто не
+    # станет, а применить её должен именно оператор.
     try:
         from api_server import tg_send, OPERATOR_BOT_TOKEN as _tok
         from operator_routes import OPERATOR_IDS
         import html as _h
+        sign = {"add": "+", "del": "−", "qty": "→"}
+        lines = "\n".join(
+            f"{sign.get(d['kind'],'·')} {_h.escape(d['name'])}"
+            + (f" ×{d['qty']}" if d["kind"] != "qty" else f" {d['from']} → {d['qty']}")
+            for d in diff) or "—"
         msg = (f"✏️ <b>Водитель просит правку</b>\n"
-               f"Заказ #{oid} · {_h.escape(me['name'])} ({me['district_code']})\n\n"
-               f"{_h.escape(text)}")
+               f"Заказ #{oid} · {_h.escape(me['name'])} ({me['district_code']})\n")
+        if diff:
+            msg += (f"\n{lines}\n\n"
+                    f"Сумма: {o.get('total', 0)} → <b>{total} AED</b>")
+        if text:
+            msg += f"\n\n💬 {_h.escape(text)}"
+        kb = {"inline_keyboard": [[
+            {"text": "✅ Применить", "callback_data": f"drvedit_ok_{oid}"},
+            {"text": "🚫 Отклонить",  "callback_data": f"drvedit_no_{oid}"},
+        ]]} if items else None
         for op_id in OPERATOR_IDS:
             try:
-                await tg_send(_tok, op_id, msg, parse_mode="HTML")
+                await tg_send(_tok, op_id, msg, parse_mode="HTML", reply_markup=kb)
             except Exception as e:
                 log.warning(f"[driver] правка #{oid} → {op_id}: {e}")
     except Exception as e:
@@ -341,6 +430,7 @@ def setup(app):
         ("/api/driver/ping",                    handle_ping,        "GET"),
         ("/api/driver/orders",                  handle_orders,      "GET"),
         ("/api/driver/history",                 handle_history,     "GET"),
+        ("/api/driver/catalog",                 handle_catalog,     "GET"),
         ("/api/driver/expenses",                handle_expenses,    "GET"),
         ("/api/driver/expenses",                handle_expense_add, "POST"),
         ("/api/driver/orders/{oid}/delivered",  handle_delivered,   "POST"),

@@ -353,6 +353,16 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .stk-all.on{color:var(--gold2);border-color:rgba(201,169,110,.4);background:var(--gold-soft)}
 .stk-mid{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 14px calc(24px + var(--safe-bottom))}
 
+/* валовая и чаевые справа от выручки района — как на главной карточке */
+.off-side{margin-left:auto;display:flex;flex-direction:column;gap:1px;text-align:right;
+  line-height:1.25;flex-shrink:0}
+.off-side span{display:flex;align-items:baseline;justify-content:flex-end;gap:5px}
+.off-side i{font-style:normal;font-size:8.5px;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--muted)}
+.off-side b{font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;
+  font-variant-numeric:tabular-nums;color:var(--sub)}
+.off-side b.gold{color:var(--gold2)}
+
 /* ревизия */
 .stk-aud-btn{width:38px;height:38px;flex-shrink:0;border-radius:10px;cursor:pointer;
   border:1px solid var(--border3);background:var(--card2);color:var(--sub);
@@ -1050,7 +1060,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
          stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
       <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
       <path d="M14 3v5h5M9 13h6M9 17h4"/></svg>
-    <div class="rep-soon-t">Здесь будут отчёты</div>
+    <div class="rep-soon-t">Здесь будет учёт</div>
     <div class="rep-soon-s">Выручка, источники и часы переехали в «Обзор».<br>
       Место свободно под новый учёт.</div>
   </div>
@@ -1134,7 +1144,18 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   <div class="list" id="opList"></div>
   <div id="opExtra"></div>
 
-  <div class="sect" style="margin-top:14px"><div class="sect-t">Районы</div><div class="sect-s" id="offSub">—</div></div>
+  <div class="sect" style="margin-top:14px">
+    <div class="sect-t">Районы</div>
+    <span class="day-nav" id="offDayNav" style="display:none">
+      <button class="dn-b" onclick="dayStep(1)" aria-label="Предыдущий день">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <button class="dn-d" id="offDnDate" onclick="dayReset()" aria-label="Дата">
+        <span class="dn-num" id="offDnNum">—</span><span class="dn-rel" id="offDnTxt"></span></button>
+      <button class="dn-b" id="offDnNext" onclick="dayStep(-1)" aria-label="Следующий день">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+    </span>
+    <div class="sect-s" id="offSub">—</div>
+  </div>
   <!-- Порядок B1…B5 — рабочий, поэтому он же и по умолчанию. Остальные
        сортировки нужны, чтобы быстро увидеть отстающих. -->
   <div class="off-sort" id="offSort">
@@ -2722,7 +2743,7 @@ button.pill:active{opacity:.6}
   </button>
   <button class="tb" data-pg="money">
     <svg viewBox="0 0 24 24"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>
-    Отчёты
+    Учёт
   </button>
   <button class="tb" data-pg="people">
     <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><circle cx="17" cy="7" r="3"/><path d="M21 21v-1a3 3 0 0 0-3-3"/></svg>
@@ -3260,6 +3281,7 @@ function _dayLabel(w){
 function _syncDayNav(p, w){
   const nav = document.getElementById('dayNav');
   if(nav) nav.style.display = _dayNavOn(p) ? 'flex' : 'none';
+  _syncOffDayNav(p, w);
   const nx = document.getElementById('dnNext'); if(nx) nx.disabled = DAY_OFFSET <= 0;
   const lbl = _dayLabel(w);
   _setText('dnDateNum', lbl.top);
@@ -3277,6 +3299,22 @@ function _syncDayNav(p, w){
   if(hl && DAY_OFFSET) hl.textContent = 'Выручка';
   _setText('heroPrevLbl', DAY_OFFSET ? 'vs пред. день'
                                      : ((PERIOD_DATA[p] || {}).prev || 'vs вчера'));
+}
+
+// Та же навигация над карточками районов: день просмотра в приложении один,
+// поэтому и стрелки везде двигают его же — иначе «Обзор» и «Районы» показывали
+// бы разные дни и не сходились между собой.
+function _syncOffDayNav(p, w){
+  const nav = document.getElementById('offDayNav');
+  if(!nav) return;
+  nav.style.display = _dayNavOn(p) ? 'flex' : 'none';
+  const lbl = _dayLabel(w);
+  _setText('offDnNum', lbl.top);
+  _setText('offDnTxt', lbl.sub);
+  const sub = document.getElementById('offDnTxt');
+  if(sub) sub.style.display = lbl.sub ? '' : 'none';
+  const nx = document.getElementById('offDnNext'); if(nx) nx.disabled = DAY_OFFSET <= 0;
+  const chip = document.getElementById('offDnDate'); if(chip) chip.disabled = DAY_OFFSET <= 0;
 }
 
 // Карточка уезжает в сторону свайпа и с другой стороны въезжает новая.
@@ -4586,6 +4624,10 @@ function renderOffices(rows){
         <span class="off-rev" data-aed="${aed}">${aed}</span>
         <span class="off-cur cur-unit">AED</span>
         <span class="off-share">${share}%</span>
+        ${(r.gross != null && r.gross !== aed) ? `<span class="off-side">
+          <span><i>вал</i><b data-aed="${r.gross}">${r.gross}</b></span>
+          <span><i>чай</i><b class="gold" data-aed="${r.tips||0}">${r.tips||0}</b></span>
+        </span>` : ''}
       </div>
       <div class="off-track"><div class="off-fill" style="width:${width}%"></div></div>
       <div class="off-meta">${meta.join('<span class="sep">·</span>')}${r.legacy?'':'<span class="chev">›</span>'}</div>

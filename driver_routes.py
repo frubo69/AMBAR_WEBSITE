@@ -93,8 +93,11 @@ def require_driver(fn):
 
 
 def _order_view(o: dict) -> dict:
-    """Заказ глазами водителя: адрес, состав, сумма. Телефон — отдельной кнопкой
-    в приложении, в списке его быть не должно."""
+    """Заказ глазами водителя: адрес, состав, сумма.
+
+    Номера клиента здесь нет и быть не может — ни в поле, ни за кнопкой. Это
+    строгое правило: телефон клиента водителю не отдаётся. Нужно позвонить —
+    звонит оператор."""
     return {
         "order_id": o.get("order_id", ""),
         "status": o.get("status", ""),
@@ -103,7 +106,6 @@ def _order_view(o: dict) -> dict:
         "location": o.get("location") or {},
         "district": o.get("district") or o.get("office_name", ""),
         "customer_name": o.get("customer_name", ""),
-        "phone": o.get("phone", ""),
         "items": [{"name": i.get("name", ""), "qty": i.get("qty", 0), "pcs": i.get("pcs")}
                   for i in (o.get("items") or [])],
         "total": int(o.get("total", 0) or 0),

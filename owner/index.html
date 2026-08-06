@@ -638,6 +638,37 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .tap-card{cursor:pointer;transition:.15s var(--e1)}
 .tap-card:active{transform:scale(.99);border-color:rgba(201,169,110,.28)}
 
+/* Панель учёта: входы плитками. Четыре строки во всю ширину оставляли
+   полэкрана пустым и читались как список настроек, а не как панель. */
+.acc-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:2px}
+.acc-tile{display:flex;flex-direction:column;align-items:flex-start;gap:0;
+  padding:14px;border-radius:15px;cursor:pointer;text-align:left;color:var(--text);
+  background:var(--card);border:1px solid var(--border2);transition:.16s var(--e1);
+  min-height:132px}
+.acc-tile:active{transform:scale(.98)}
+.acc-tile:hover{border-color:rgba(201,169,110,.28)}
+.acc-ico{width:34px;height:34px;flex-shrink:0;border-radius:10px;display:flex;
+  align-items:center;justify-content:center;color:var(--gold2);
+  background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.22)}
+.acc-t{font-size:12.5px;font-weight:600;line-height:1.25;margin-top:10px}
+.acc-n{margin-top:auto;padding-top:8px;display:flex;align-items:baseline;gap:5px;
+  font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;
+  letter-spacing:-.5px;color:var(--gold2);font-variant-numeric:tabular-nums;line-height:1}
+.acc-n i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:9px;font-weight:600;
+  letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+.acc-s{font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.35;
+  overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+.acc-line{display:flex;align-items:center;gap:10px;padding:11px 13px;margin-bottom:6px;
+  border-radius:11px;background:var(--card);border:1px solid var(--border2)}
+.acc-line-n{flex:1;min-width:0;font-size:13px;font-weight:600;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.acc-line-s{font-size:11px;color:var(--muted);white-space:nowrap}
+.acc-line-bar{flex:1.2;height:5px;border-radius:3px;background:var(--card2);overflow:hidden}
+.acc-line-bar i{display:block;height:100%;border-radius:3px;
+  background:linear-gradient(90deg,var(--gold),var(--gold2))}
+.acc-line-v{font-family:'DM Sans',sans-serif;font-size:13.5px;font-weight:700;
+  font-variant-numeric:tabular-nums;min-width:56px;text-align:right;flex-shrink:0}
+
 /* Расходы: сводка дня и строки водителей */
 .exp-sum{border:1px solid var(--border2);border-radius:14px;background:var(--card);
   padding:13px 15px;margin-bottom:4px}
@@ -661,7 +692,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .exp-row{background:var(--card);border:1px solid var(--border2);border-radius:14px;
   padding:13px 14px;margin-bottom:8px;transition:.15s var(--e1)}
 .exp-row.todo{background:transparent;border-style:dashed;border-color:var(--border3)}
-.exp-head{display:flex;align-items:flex-start;gap:12px}
+.exp-head{display:flex;align-items:center;gap:12px}
 .exp-who{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .exp-name{font-size:14px;font-weight:600;line-height:1.2}
 .exp-state{font-size:11px;line-height:1.2;color:var(--muted)}
@@ -674,28 +705,32 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   text-transform:uppercase;color:var(--muted)}
 .exp-val.zero{color:var(--dim)}
 .exp-val.zero i{opacity:.5}
-.exp-ctl{display:flex;align-items:center;gap:8px;margin-top:11px}
-.exp-seg{display:flex;gap:6px;flex:1}
-.exp-b{flex:1;padding:9px 8px;border-radius:10px;border:1px solid var(--border3);
-  background:var(--card2);color:var(--muted);font-family:inherit;font-size:12px;
-  font-weight:600;cursor:pointer;transition:.14s var(--e1)}
-.exp-b:active{transform:scale(.96)}
-.exp-b.on-work{background:rgba(76,175,125,.16);border-color:rgba(76,175,125,.45);color:var(--up)}
-.exp-b.on-off{background:rgba(243,180,74,.14);border-color:rgba(243,180,74,.4);color:var(--warn)}
-.exp-add{flex-shrink:0;padding:9px 12px;border-radius:10px;cursor:pointer;
-  border:1px solid var(--border2);background:transparent;color:var(--gold2);
-  font-family:inherit;font-size:11.5px;font-weight:600;white-space:nowrap;transition:.14s var(--e1)}
-.exp-add.on{background:var(--card2);color:var(--muted);border-color:var(--border3)}
-.exp-add:active{transform:scale(.95)}
-.exp-tags{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:10px;
+.exp-right{display:flex;align-items:center;gap:12px;flex-shrink:0}
+.exp-sqs{display:flex;gap:5px;flex-shrink:0}
+.exp-sq{width:36px;height:36px;flex-shrink:0;border-radius:10px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  border:1px solid var(--border3);background:var(--card2);color:var(--muted);
+  transition:.14s var(--e1)}
+.exp-sq:active{transform:scale(.9)}
+.exp-sq.on-work{background:rgba(76,175,125,.18);border-color:rgba(76,175,125,.5);color:var(--up)}
+.exp-sq.on-home{background:rgba(243,180,74,.16);border-color:rgba(243,180,74,.45);color:var(--warn)}
+/* Записанный расход выглядит как заполненная форма: та же сетка, те же поля.
+   Каждый следующий встаёт строкой ниже — список читается сверху вниз, а не
+   растекается облаком пилюль. */
+.exp-items{display:flex;flex-direction:column;gap:6px;margin-top:10px;padding-top:10px;
   border-top:1px solid var(--border2)}
-.exp-tag{display:inline-flex;align-items:center;gap:6px;padding:4px 9px;border-radius:999px;
-  background:var(--card2);border:1px solid var(--border3);font-size:11px;max-width:100%}
-.exp-tag i{font-style:normal;color:var(--muted);overflow:hidden;text-overflow:ellipsis;
-  white-space:nowrap}
-.exp-tag b{font-family:'DM Sans',sans-serif;font-weight:700;color:var(--text);flex-shrink:0}
-.exp-tag u{text-decoration:none;cursor:pointer;color:var(--muted);opacity:.55;font-size:12px;
-  flex-shrink:0;padding-left:1px}
+.exp-item{display:flex;align-items:center;gap:6px}
+.exp-item-a{width:74px;flex-shrink:0;padding:8px 10px;border-radius:9px;text-align:center;
+  border:1px solid var(--border3);background:var(--card2);
+  font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:700;
+  font-variant-numeric:tabular-nums;color:var(--text)}
+.exp-item-c{flex:1;min-width:0;padding:8px 10px;border-radius:9px;
+  border:1px solid var(--border3);background:var(--card2);font-size:12.5px;color:var(--sub);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.exp-item-x{width:32px;height:32px;flex-shrink:0;border-radius:9px;cursor:pointer;
+  border:1px solid var(--border3);background:transparent;color:var(--muted);
+  font-size:12px;line-height:1;transition:.14s}
+.exp-item-x:active{transform:scale(.9);color:var(--dn);border-color:rgba(224,85,85,.4)}
 .exp-form{display:flex;gap:6px;margin-top:9px;padding-top:9px;border-top:1px solid var(--border2)}
 .exp-form input{min-width:0;padding:8px 10px;border-radius:9px;border:1px solid var(--border2);
   background:var(--bg3);color:var(--text);font-family:inherit;font-size:12.5px;outline:none}
@@ -1125,14 +1160,10 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
   <div class="range-chip" id="rangeChip-moneyPeriod" style="display:none"><span class="rc-icon">📅</span><span class="rc-text"></span><button class="rc-x" onclick="clearRange('moneyPeriod')">✕</button></div>
 
-  <!-- Расходы по водителям. Начинается день с отметки «кто вышел»: от неё
-       зависит ставка питания, и без неё считать нечего. -->
-  <div class="sect"><div class="sect-t">Расходы водителей</div>
-    <div class="sect-a" style="font-size:10px;color:var(--muted)" id="expDay">—</div></div>
-  <div class="exp-sum" id="expSum">
-    <div class="exp-empty">Загрузка…</div>
-  </div>
-  <div id="expList"></div>
+  <!-- Панель учёта: от общего к частному. Здесь только вход в разделы и
+       короткая сводка по каждому — вся работа внутри, чтобы страница не
+       превращалась в простыню, по которой надо скроллить до нужного. -->
+  <div id="accHome"></div>
 </div>
 
 <!-- ============ OFFICES ============ -->
@@ -2962,7 +2993,11 @@ document.querySelectorAll('.tb').forEach(btn=>{
     window.scrollTo({top:0,behavior:'instant'});
     // Команда живёт на странице районов — тянем её при первом заходе туда.
     if(pg === 'offices' && !OPS.data && !OPS.loading && window.ownerApi) loadOperators();
-    if(pg === 'money' && !EXP.data && window.ownerApi) loadExpenses();
+    if(pg === 'money' && window.ownerApi){
+      accRender();
+      if(!EXP.data) loadExpenses().then(accRender);
+      if(!ACC_PERIOD) accLoadSummaries();
+    }
     try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   });
 });
@@ -4683,6 +4718,181 @@ async function stkRefreshEntry(){
 }
 
 
+
+// ─── Панель учёта ───────────────────────────────────────────────────────────
+// Одна страница со всем сразу превращается в простыню: чтобы отметить водителя,
+// пришлось бы прокручивать мимо заявки и склада. Поэтому здесь только входы с
+// короткой сводкой по каждому, а работа — внутри раздела.
+const ACC = [
+  {id:'expenses', t:'Расходы водителей', s:'питание и разовые траты',
+   ico:'<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'},
+  {id:'period',   t:'Расходы за период', s:'по дням и по людям',
+   ico:'<path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 6-7"/>'},
+  {id:'stock',    t:'Пересчёт склада',   s:'остатки, ревизия, перемещения',
+   ico:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>'},
+  {id:'order',    t:'Заявка на закупку', s:'сколько довезти до нормы',
+   ico:'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/>'},
+];
+let ACC_PERIOD = null, ACC_STOCK = null, ACC_ORDER = null, ACC_VIEW = null;
+
+function accRender(){
+  const box = document.getElementById('accHome'); if(!box) return;
+  const t = (EXP.data || {}).totals;
+  // Подпись не повторяет цифру, а объясняет её: цифра говорит «сколько»,
+  // подпись — «из чего» или «что с этим не так».
+  const sub = {
+    expenses: t ? (t.marked < t.total_drivers
+                ? `не отмечено ${t.total_drivers - t.marked} из ${t.total_drivers}`
+                : `все отмечены · ${t.working} на смене`)
+              : 'питание и разовые траты',
+    period:   ACC_PERIOD ? `питание ${fmt(ACC_PERIOD.total_meal)} · разовые ${fmt(ACC_PERIOD.total_extra)}`
+                         : 'по дням и по людям',
+    stock:    ACC_STOCK  ? (ACC_STOCK.short_aed
+                ? `не хватает ${fmt(ACC_STOCK.short_aed)} AED`
+                : (ACC_STOCK.done === ACC_STOCK.total ? 'всё сошлось' : 'остатки за смену'))
+              : 'остатки, ревизия, перемещения',
+    order:    ACC_ORDER  ? (ACC_ORDER.total_qty
+                ? `на ${fmt(ACC_ORDER.total_aed)} AED`
+                : 'остатков хватает')
+              : 'сколько довезти до нормы',
+  };
+  // Крупная цифра на плитке отвечает на вопрос раздела одним взглядом, а
+  // подпись объясняет, что это за цифра.
+  const num = {
+    expenses: t ? [fmt(t.all), 'AED'] : ['—', 'AED'],
+    period:   ACC_PERIOD ? [fmt(ACC_PERIOD.total), `AED / ${ACC_PERIOD.days} дн`] : ['—', 'AED'],
+    stock:    ACC_STOCK ? [`${ACC_STOCK.done}/${ACC_STOCK.total}`, 'районов'] : ['—', 'районов'],
+    order:    ACC_ORDER ? [fmt(ACC_ORDER.total_qty), 'штук'] : ['—', 'штук'],
+  };
+  box.innerHTML = `<div class="acc-grid">` + ACC.map(a => {
+    const [v, u] = num[a.id] || ['—', ''];
+    return `<button class="acc-tile" onclick="accOpen('${a.id}')">
+      <span class="acc-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+        stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${a.ico}</svg></span>
+      <span class="acc-t">${a.t}</span>
+      <span class="acc-n">${v}<i>${escS(u)}</i></span>
+      <span class="acc-s">${escS(sub[a.id] || a.s)}</span>
+    </button>`;
+  }).join('') + `</div>`;
+}
+
+// Сводки для входов тянем разом при открытии вкладки: «загрузка…» на четырёх
+// карточках сразу выглядит хуже, чем секунда ожидания.
+async function accLoadSummaries(){
+  const get = (p, params) => ownerApi.ownerFetch(p, params ? {params} : undefined).catch(()=>null);
+  const [per, st, ord] = await Promise.all([
+    get('/api/owner/expenses/period', {days:30}),
+    get('/api/owner/stock/status'),
+    get('/api/owner/stock/order'),
+  ]);
+  ACC_PERIOD = per; ACC_STOCK = st; ACC_ORDER = ord;
+  accRender();
+}
+
+function accOpen(id){
+  if(id === 'stock'){ openStock(); return; }          // у склада уже свой экран
+  document.getElementById('accOv').classList.add('show');
+  ACC_VIEW = id;
+  document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  if(id === 'expenses') accExpenses();
+  if(id === 'period')   accPeriod();
+  if(id === 'order')    accOrder();
+}
+
+function accClose(){
+  document.getElementById('accOv').classList.remove('show');
+  ACC_VIEW = null;
+  accRender();
+}
+
+async function accExpenses(){
+  _setText('accTitle', 'Расходы водителей');
+  _setText('accSub', 'загрузка…');
+  await loadExpenses(EXP.day);
+  const d = EXP.data;
+  if(!d){ document.getElementById('accMid').innerHTML =
+    '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+  _setText('accSub', d.day === d.today ? `сегодня · ${d.day}` : d.day);
+  document.getElementById('accMid').innerHTML =
+    '<div class="exp-sum" id="expSum"></div><div id="expList"></div>';
+  renderExpenses();
+}
+
+async function accPeriod(){
+  _setText('accTitle', 'Расходы за период');
+  let d;
+  try{ d = await ownerApi.ownerFetch('/api/owner/expenses/period', {params:{days:30}}); }
+  catch(e){ document.getElementById('accMid').innerHTML =
+    '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+  ACC_PERIOD = d;
+  _setText('accSub', `${d.from} → ${d.to}`);
+  const maxD = Math.max(1, ...d.by_day.map(x => x.meal + x.extra));
+  document.getElementById('accMid').innerHTML = `
+    <div class="exp-sum">
+      <div class="exp-tot">
+        <span class="exp-tot-v">${fmt(d.total)}</span>
+        <span class="exp-tot-u">AED<br>за ${d.days} дней</span>
+        <span class="exp-tot-r">
+          <span>питание<b>${fmt(d.total_meal)}</b></span>
+          <span>разовые<b>${fmt(d.total_extra)}</b></span>
+        </span>
+      </div>
+    </div>
+    ${d.by_driver.length ? '<div class="exp-grp">По людям</div>' +
+      d.by_driver.map(p => `<div class="acc-line">
+        <span class="acc-line-n">${escS(p.driver)}</span>
+        <span class="acc-line-s">${p.shifts} ${pluralize(p.shifts,'смена','смены','смен')}${
+          p.items ? ` · ${p.items} ${pluralize(p.items,'расход','расхода','расходов')}` : ''}</span>
+        <span class="acc-line-v">${fmt(p.meal + p.extra)}</span>
+      </div>`).join('') : '<div class="exp-empty">За период ничего не отмечали</div>'}
+    ${d.by_day.length ? '<div class="exp-grp">По дням</div>' +
+      d.by_day.map(x => {
+        const sum = x.meal + x.extra;
+        return `<div class="acc-line">
+          <span class="acc-line-n">${escS(x.day)}</span>
+          <span class="acc-line-bar"><i style="width:${Math.round(sum/maxD*100)}%"></i></span>
+          <span class="acc-line-v">${fmt(sum)}</span>
+        </div>`;
+      }).join('') : ''}`;
+}
+
+async function accOrder(){
+  _setText('accTitle', 'Заявка на закупку');
+  let d;
+  try{ d = await ownerApi.ownerFetch('/api/owner/stock/order'); }
+  catch(e){ document.getElementById('accMid').innerHTML =
+    '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+  ACC_ORDER = d;
+  _setText('accSub', `${d.day} · норма на ${d.cover_days} ${pluralize(d.cover_days,'день','дня','дней')}`);
+  const dist = d.districts || [];
+  document.getElementById('accMid').innerHTML = `
+    <div class="exp-sum">
+      <div class="exp-tot">
+        <span class="exp-tot-v">${fmt(d.total_qty)}</span>
+        <span class="exp-tot-u">штук<br>довезти</span>
+        <span class="exp-tot-r">
+          <span>на сумму<b>${fmt(d.total_aed)}</b></span>
+          ${d.frozen_aed ? `<span>сверх спроса<b style="color:var(--warn)">${fmt(d.frozen_aed)}</b></span>` : ''}
+        </span>
+      </div>
+    </div>
+    ${d.frozen_aed ? `<div class="stk-note" style="margin-top:10px">
+      <b>${fmt(d.frozen_aed)} AED стоят на полке сверх спроса.</b> Норма где-то выше,
+      чем реально берут за последние ${d.window_days} дней — эти деньги просто лежат.
+      </div>` : ''}
+    ${d.rows.length ? `<div class="exp-grp">Что довезти · ${d.rows.length}</div>` +
+      d.rows.map(r => `<div class="acc-line">
+        <span class="acc-line-n">${escS(r.name)}</span>
+        <span class="acc-line-s">${dist.map(x => {
+            const cell = r.cells[x.id] || {};
+            return cell.need ? `${x.code}·${cell.need}` : '';
+          }).filter(Boolean).join(' ')}</span>
+        <span class="acc-line-v">${r.need_total}</span>
+      </div>`).join('')
+    : '<div class="exp-empty">Довозить нечего — остатков хватает</div>'}`;
+}
+
 // ─── Расходы водителей ──────────────────────────────────────────────────────
 // День начинается с отметки «кто вышел»: ставка питания зависит от неё, и пока
 // водитель не отмечен, за него не начисляется ничего. Подставить 80 или 40 «по
@@ -4691,14 +4901,15 @@ async function stkRefreshEntry(){
 let EXP = {day:null, data:null, open:null};
 
 async function loadExpenses(day){
-  const box = document.getElementById('expSum');
-  if(!box || !window.ownerApi) return;
+  if(!window.ownerApi) return;
   try{
     EXP.data = await ownerApi.ownerFetch('/api/owner/expenses',
       {params: day ? {day} : {}});
     EXP.day = EXP.data.day;
   }catch(e){
-    box.innerHTML = '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+    const box = document.getElementById('expSum');
+    if(box) box.innerHTML =
+      '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
     return;
   }
   renderExpenses();
@@ -4707,9 +4918,8 @@ async function loadExpenses(day){
 function renderExpenses(){
   const d = EXP.data; if(!d) return;
   const t = d.totals;
-  _setText('expDay', d.day === d.today ? 'сегодня · ' + d.day : d.day);
-
   const sum = document.getElementById('expSum');
+  if(!sum) return;                    // экран раздела не открыт — рисовать негде
   if(sum) sum.innerHTML = `
     <div class="exp-tot">
       <span class="exp-tot-v">${fmt(t.all)}</span>
@@ -4751,29 +4961,48 @@ function expRow(r){
   const state = w === null ? 'не отмечен'
               : w ? `на смене · питание ${r.meal}`
                   : `дома · питание ${r.meal}`;
+  // Действия — тремя квадратами справа: во всю ширину они съедали карточку,
+  // а нажимают их раз в день. Что именно выбрано, говорит подпись под именем —
+  // иконка отвечает за действие, слово за состояние.
+  const ICO = {
+    work: '<path d="M20 6 9 17l-5-5"/>',
+    home: '<path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+    add:  '<path d="M12 5v14M5 12h14"/>',
+    cls:  '<path d="M18 6 6 18M6 6l12 12"/>',
+  };
+  const sq = (kind, on, title, onclick) => `
+    <button class="exp-sq ${on ? 'on-' + kind : ''}" title="${title}" aria-label="${title}"
+            onclick="${onclick}">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICO[kind]}</svg>
+    </button>`;
+
   return `<div class="exp-row ${w === null ? 'todo' : ''}" id="exp-${escS(r.id)}">
     <div class="exp-head">
       <span class="exp-who">
         <span class="exp-name">${escS(r.name)}</span>
         <span class="exp-state ${w === null ? 'off' : (w ? 'work' : 'home')}">${state}</span>
       </span>
-      <span class="exp-val ${r.total ? '' : 'zero'}">${r.total || '—'}<i>AED</i></span>
-    </div>
-
-    <div class="exp-ctl">
-      <span class="exp-seg">
-        <button class="exp-b ${w === true ? 'on-work' : ''}"
-                onclick="expSetWork('${escS(r.name)}', ${w === true ? 'null' : 'true'})">Вышел</button>
-        <button class="exp-b ${w === false ? 'on-off' : ''}"
-                onclick="expSetWork('${escS(r.name)}', ${w === false ? 'null' : 'false'})">Дома</button>
+      <span class="exp-right">
+        <span class="exp-val ${r.total ? '' : 'zero'}">${r.total || '—'}<i>AED</i></span>
+        <span class="exp-sqs">
+          ${sq('work', w === true, 'Вышел на смену',
+               `expSetWork('${escS(r.name)}', ${w === true ? 'null' : 'true'})`)}
+          ${sq('home', w === false, 'Дома',
+               `expSetWork('${escS(r.name)}', ${w === false ? 'null' : 'false'})`)}
+          ${sq(open ? 'cls' : 'add', false, open ? 'Отмена' : 'Разовый расход',
+               `expToggleForm('${escS(r.name)}')`)}
+        </span>
       </span>
-      <button class="exp-add ${open ? 'on' : ''}" onclick="expToggleForm('${escS(r.name)}')">
-        ${open ? 'Отмена' : '+ расход'}</button>
     </div>
 
-    ${extras.length ? `<div class="exp-tags">${extras.map(e => `
-      <span class="exp-tag"><i>${escS(e.comment)}</i><b>${e.amount}</b>
-        <u onclick="expDelExtra('${escS(r.name)}','${escS(e.id)}')">✕</u></span>`).join('')}
+    ${extras.length ? `<div class="exp-items">${extras.map(e => `
+      <div class="exp-item">
+        <span class="exp-item-a">${e.amount}</span>
+        <span class="exp-item-c">${escS(e.comment)}</span>
+        <button class="exp-item-x" onclick="expDelExtra('${escS(r.name)}','${escS(e.id)}')"
+                aria-label="Убрать">✕</button>
+      </div>`).join('')}
     </div>` : ''}
 
     ${open ? `<div class="exp-form">
@@ -4844,6 +5073,7 @@ function _expReplace(row){
     marked: marked.length, total_drivers: rows.length,
   };
   renderExpenses();
+  if(!ACC_VIEW) accRender();          // сводка на входе не должна отставать
 }
 
 function renderOffices(rows){
@@ -9680,6 +9910,20 @@ function renderHours(h){
     </button>
     <button class="stk-bar-done" onclick="stkDone()">Готово</button>
   </div>
+</div>
+
+<!-- ============ ПАНЕЛЬ УЧЁТА: экран раздела ============ -->
+<div class="stk-ov" id="accOv">
+  <div class="stk-top">
+    <div class="stk-top-r">
+      <button class="stk-x" onclick="accClose()" aria-label="Назад">‹</button>
+      <div class="stk-ttl">
+        <div class="stk-ttl-t" id="accTitle">Раздел</div>
+        <div class="stk-ttl-s" id="accSub">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="stk-mid" id="accMid"></div>
 </div>
 
 </body>

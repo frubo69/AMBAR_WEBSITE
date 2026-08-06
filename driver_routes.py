@@ -148,6 +148,47 @@ async def handle_orders(request):
 
 
 @require_driver
+async def handle_history(request):
+    """Мои заказы за прошлые дни. Водителю это нужно не из любопытства: спор
+    «я это возил» решается списком, а не памятью."""
+    me = request["driver"]
+    try:
+        days = max(1, min(60, int(request.query.get("days", "14"))))
+    except ValueError:
+        days = 14
+    today = _biz_day()
+    start = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=days - 1)
+             ).replace(hour=SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
+    end = datetime.strptime(today, "%Y-%m-%d").replace(hour=SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
+    f = lambda x: x.astimezone(timezone.utc).isoformat().replace("+00:00", "")
+    orders = await db.get_orders_in_range(f(start), f(end))
+    mine = [o for o in orders
+            if (o.get("driver") or "").strip() == me["name"] and o.get("status") == "delivered"]
+
+    # По дням: за какой день сколько увёз — так видно и объём, и выходные.
+    by_day = {}
+    for o in mine:
+        dt = o.get("confirmed_at") or o.get("timestamp") or ""
+        try:
+            d = datetime.fromisoformat(str(dt)).replace(tzinfo=timezone.utc).astimezone(DUBAI_TZ)
+            key = _biz_day(d)
+        except (ValueError, TypeError):
+            key = ""
+        g = by_day.setdefault(key, {"day": key, "count": 0, "aed": 0, "orders": []})
+        g["count"] += 1
+        g["aed"] += int(o.get("total", 0) or 0)
+        g["orders"].append(_order_view(o))
+    days_list = sorted(by_day.values(), key=lambda x: x["day"], reverse=True)
+    for g in days_list:
+        g["orders"].sort(key=lambda x: x.get("timestamp") or "", reverse=True)
+    return web.json_response({
+        "days": days_list,
+        "total_count": len(mine),
+        "total_aed": sum(int(o.get("total", 0) or 0) for o in mine),
+    }, headers=CORS_HEADERS)
+
+
+@require_driver
 async def handle_delivered(request):
     """Отметить доставку. Только свой заказ и только из работы — закрыть чужой
     или закрыть дважды нельзя."""
@@ -297,6 +338,7 @@ def setup(app):
     routes = (
         ("/api/driver/ping",                    handle_ping,        "GET"),
         ("/api/driver/orders",                  handle_orders,      "GET"),
+        ("/api/driver/history",                 handle_history,     "GET"),
         ("/api/driver/expenses",                handle_expenses,    "GET"),
         ("/api/driver/expenses",                handle_expense_add, "POST"),
         ("/api/driver/orders/{oid}/delivered",  handle_delivered,   "POST"),

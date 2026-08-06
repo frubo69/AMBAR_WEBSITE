@@ -733,10 +733,23 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .exp-item-c{flex:1;min-width:0;padding:8px 10px;border-radius:9px;
   border:1px solid var(--border3);background:var(--card2);font-size:12.5px;color:var(--sub);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.exp-item-x{width:32px;height:32px;flex-shrink:0;border-radius:9px;cursor:pointer;
-  border:1px solid var(--border3);background:transparent;color:var(--muted);
-  font-size:12px;line-height:1;transition:.14s}
-.exp-item-x:active{transform:scale(.9);color:var(--dn);border-color:rgba(224,85,85,.4)}
+.exp-item-x,.exp-item-ok,.exp-item-no{width:32px;height:32px;flex-shrink:0;border-radius:9px;
+  cursor:pointer;border:1px solid var(--border3);background:transparent;color:var(--muted);
+  font-size:13px;line-height:1;transition:.14s}
+.exp-item-x:active,.exp-item-no:active{transform:scale(.9);color:var(--dn);border-color:rgba(224,85,85,.4)}
+.exp-item-ok{color:var(--up);border-color:rgba(76,175,125,.4);background:rgba(76,175,125,.1)}
+.exp-item-ok:active{transform:scale(.9)}
+.exp-item-no{color:var(--dn);border-color:rgba(224,85,85,.3)}
+.exp-item.pending .exp-item-a{border-color:rgba(243,180,74,.45);color:var(--warn)}
+.exp-item.rejected{opacity:.45}
+.exp-item.rejected .exp-item-c{text-decoration:line-through}
+.exp-item-st{flex-shrink:0;font-size:10px;font-weight:700;letter-spacing:.3px;
+  text-transform:uppercase;color:var(--dn);padding:0 4px}
+.exp-from{font-style:normal;margin-left:6px;font-size:10px;color:var(--warn);opacity:.8}
+.exp-state.wait{color:var(--warn)}
+.exp-wait{margin-top:11px;padding:9px 11px;border-radius:10px;font-size:11.5px;line-height:1.5;
+  color:var(--sub);background:var(--warn-soft);border:1px solid rgba(243,180,74,.25)}
+.exp-wait b{color:var(--warn)}
 .exp-form{display:flex;gap:6px;margin-top:9px;padding-top:9px;border-top:1px solid var(--border2)}
 .exp-form input{min-width:0;padding:8px 10px;border-radius:9px;border:1px solid var(--border2);
   background:var(--bg3);color:var(--text);font-family:inherit;font-size:12.5px;outline:none}
@@ -4954,6 +4967,10 @@ function renderExpenses(){
         <span>разовые<b>${fmt(t.extra)}</b></span>
       </span>
     </div>
+    ${t.pending_count ? `<div class="exp-wait">
+      <b>${t.pending_count} ${pluralize(t.pending_count,'расход ждёт','расхода ждут','расходов ждут')}
+      решения</b> на ${fmt(t.pending)} AED — в сумму дня они пока не входят
+    </div>` : ''}
     <div class="exp-mark">
       <span>${t.marked} из ${t.total_drivers}</span>
       <div class="exp-mark-bar"><div class="exp-mark-fill" style="width:${
@@ -4983,9 +5000,10 @@ function expRow(r){
   const w = r.working;
   const open = EXP.open === r.name;
   const extras = r.extras || [];
-  const state = w === null ? 'не отмечен'
+  const state = (w === null ? 'не отмечен'
               : w ? `на смене · питание ${r.meal}`
-                  : `дома · питание ${r.meal}`;
+                  : `дома · питание ${r.meal}`)
+              + (r.pending_count ? ` · ${r.pending_count} ждёт решения` : '');
   // Действия — тремя квадратами справа: во всю ширину они съедали карточку,
   // а нажимают их раз в день. Что именно выбрано, говорит подпись под именем —
   // иконка отвечает за действие, слово за состояние.
@@ -5006,7 +5024,7 @@ function expRow(r){
     <div class="exp-head">
       <span class="exp-who">
         <span class="exp-name">${escS(r.name)}</span>
-        <span class="exp-state ${w === null ? 'off' : (w ? 'work' : 'home')}">${state}</span>
+        <span class="exp-state ${r.pending_count ? 'wait' : (w === null ? 'off' : (w ? 'work' : 'home'))}">${state}</span>
       </span>
       <span class="exp-right">
         <span class="exp-val ${r.total ? '' : 'zero'}">${r.total || '—'}<i>AED</i></span>
@@ -5021,14 +5039,23 @@ function expRow(r){
       </span>
     </div>
 
-    ${extras.length ? `<div class="exp-items">${extras.map(e => `
-      <div class="exp-item">
+    ${extras.length ? `<div class="exp-items">${extras.map(e => {
+      const st = e.status || 'approved';
+      return `<div class="exp-item ${st}">
         <span class="exp-item-a">${e.amount}</span>
-        <span class="exp-item-c">${escS(e.comment)}</span>
-        <button class="exp-item-x" onclick="expDelExtra('${escS(r.name)}','${escS(e.id)}')"
-                aria-label="Убрать">✕</button>
-      </div>`).join('')}
-    </div>` : ''}
+        <span class="exp-item-c">${escS(e.comment)}${
+          e.by_driver ? `<i class="exp-from">от водителя</i>` : ''}</span>
+        ${st === 'pending' ? `
+          <button class="exp-item-ok" title="Принять"
+                  onclick="expDecide('${escS(r.name)}','${escS(e.id)}','approve')">✓</button>
+          <button class="exp-item-no" title="Отклонить"
+                  onclick="expDecide('${escS(r.name)}','${escS(e.id)}','reject')">✕</button>`
+        : st === 'rejected'
+          ? `<span class="exp-item-st no">отклонён</span>`
+          : `<button class="exp-item-x" onclick="expDelExtra('${escS(r.name)}','${escS(e.id)}')"
+                     aria-label="Убрать">✕</button>`}
+      </div>`;
+    }).join('')}</div>` : ''}
 
     ${open ? `<div class="exp-form">
       <input class="amt" id="expAmt" type="text" inputmode="numeric" placeholder="AED"
@@ -5072,6 +5099,20 @@ async function expAddExtra(driver){
   }catch(e){ _toast('Не удалось добавить'); }
 }
 
+// Решение по трате водителя. Отклонённая не исчезает: водитель должен видеть,
+// что её рассмотрели, иначе пришлёт ту же ещё раз.
+async function expDecide(driver, id, action){
+  try{
+    const r = await ownerApi.ownerFetch(
+      `/api/owner/expenses/extra/${encodeURIComponent(id)}/${action}`,
+      {method:'POST', body:{day:EXP.day, driver}});
+    _expReplace(r.driver);
+    _toast(action === 'approve' ? 'Расход принят' : 'Расход отклонён');
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred(
+      action === 'approve' ? 'success' : 'warning'); }catch(e){}
+  }catch(e){ _toast('Не удалось'); }
+}
+
 async function expDelExtra(driver, id){
   try{
     const r = await ownerApi.ownerFetch(
@@ -5093,6 +5134,8 @@ function _expReplace(row){
     meal: rows.reduce((s,r)=>s+r.meal,0),
     extra: rows.reduce((s,r)=>s+r.extra_sum,0),
     all: rows.reduce((s,r)=>s+r.total,0),
+    pending: rows.reduce((s,r)=>s+(r.pending_sum||0),0),
+    pending_count: rows.reduce((s,r)=>s+(r.pending_count||0),0),
     working: rows.filter(r=>r.working === true).length,
     off: rows.filter(r=>r.working === false).length,
     marked: marked.length, total_drivers: rows.length,

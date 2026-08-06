@@ -42,6 +42,14 @@ async def connect():
         await _db.support_map.create_index("fwd_msg_id", unique=True)
         await _db.shifts.create_index([("operator_id", 1), ("status", 1)])
         await _db.owner_managers.create_index("telegram_id", unique=True)
+        await _db.drivers.create_index("name", unique=True)
+        # Один телеграм-аккаунт не может быть двумя водителями. Partial, потому
+        # что непривязанных записей с telegram_id=None может быть сколько угодно.
+        await _db.drivers.create_index(
+            "telegram_id", unique=True,
+            partialFilterExpression={"telegram_id": {"$type": "long"}},
+        )
+        await _db.driver_days.create_index([("day", 1), ("driver", 1)], unique=True)
         await _db.owner_access_log.create_index("telegram_id", unique=True)
         await _db.owner_access_log.create_index([("status", 1), ("last_attempt_at", -1)])
         await _db.owner_notifications.create_index([("created_at", -1)])
@@ -1464,6 +1472,79 @@ async def get_stock_counts_recent(district: str, before_day: str | None = None,
         q["day"] = {"$lte": before_day}
     cur = db.stock_counts.find(q, {"_id": 0}).sort("day", -1).limit(int(limit))
     return await cur.to_list(length=int(limit))
+
+
+# ── привязка водителей ───────────────────────────────────────────────────────
+# Водитель до сих пор существовал в системе только как имя в заказе. Чтобы он
+# мог открыть своё приложение, имя нужно связать с телеграм-аккаунтом, а связать
+# может только владелец: одноразовый код, ссылка, первый вход — и привязка
+# закрывается. Без этого любой, кто узнает имя, стал бы водителем.
+
+async def get_driver_link(telegram_id: int) -> dict | None:
+    db = _db_or_none()
+    if db is None: return None
+    return await db.drivers.find_one({"telegram_id": int(telegram_id)}, {"_id": 0})
+
+
+async def get_driver_by_name(name: str) -> dict | None:
+    db = _db_or_none()
+    if db is None: return None
+    return await db.drivers.find_one({"name": name}, {"_id": 0})
+
+
+async def get_driver_by_code(code: str) -> dict | None:
+    db = _db_or_none()
+    if db is None: return None
+    return await db.drivers.find_one({"code": code, "telegram_id": None}, {"_id": 0})
+
+
+async def get_driver_links() -> list:
+    db = _db_or_none()
+    if db is None: return []
+    return await db.drivers.find({}, {"_id": 0}).to_list(length=200)
+
+
+async def set_driver_code(name: str, code: str, by: int):
+    """Выдать (или перевыпустить) код привязки. Старый код с этого момента мёртв."""
+    db = _db_or_none()
+    if db is None: return
+    await db.drivers.update_one(
+        {"name": name},
+        {"$set": {"name": name, "code": code, "telegram_id": None,
+                  "code_by": by, "code_at": datetime.now(timezone.utc)}},
+        upsert=True,
+    )
+
+
+async def link_driver(code: str, telegram_id: int, tg: dict) -> dict | None:
+    """Привязать аккаунт к коду. Возвращает запись водителя или None.
+
+    Условие telegram_id: None в фильтре — защита от гонки: если код уже
+    сработал, второй запрос ничего не найдёт и никого не привяжет."""
+    db = _db_or_none()
+    if db is None: return None
+    r = await db.drivers.find_one_and_update(
+        {"code": code, "telegram_id": None},
+        {"$set": {"telegram_id": int(telegram_id),
+                  "tg_name": tg.get("first_name", ""),
+                  "tg_username": tg.get("username", ""),
+                  "linked_at": datetime.now(timezone.utc)}},
+        return_document=True,
+    )
+    if r:
+        r.pop("_id", None)
+    return r
+
+
+async def unlink_driver(name: str) -> bool:
+    """Отвязать аккаунт — водитель уволился или потерял телефон."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.drivers.update_one(
+        {"name": name},
+        {"$set": {"telegram_id": None, "code": None, "unlinked_at": datetime.now(timezone.utc)}},
+    )
+    return bool(r.modified_count)
 
 
 # ── расходы по водителям ─────────────────────────────────────────────────────

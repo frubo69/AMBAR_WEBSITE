@@ -44,6 +44,43 @@ DISTRICT_STAFF = [
     {"district": "alguses", "operator": "Фарух",     "drivers": ["Сунат", "Даврон"]},
 ]
 
+# ── доступы водителей ────────────────────────────────────────────────────────
+# Водитель заходит в своё приложение под собственным телеграмом, поэтому имени
+# мало — нужен id. Живут они в окружении, а не здесь: список меняется с людьми,
+# а не с кодом, и держать его в git значит выкатывать релиз ради нового водителя.
+#
+#   AMBAR_DRIVER_IDS="Худоба:123456789,Фарух:987654321"
+#
+# Пока водителя нет в списке, приложение его не пустит — это и есть выдача
+# доступа: вписали id, человек вошёл.
+import os as _os
+
+
+def _parse_driver_ids(raw: str) -> dict:
+    out = {}
+    for part in (raw or "").split(","):
+        part = part.strip()
+        if not part or ":" not in part:
+            continue
+        name, _, tid = part.rpartition(":")
+        name, tid = name.strip(), tid.strip()
+        if name and tid.isdigit():
+            out[name] = int(tid)
+    return out
+
+
+DRIVER_IDS = _parse_driver_ids(_os.getenv("AMBAR_DRIVER_IDS", ""))
+DRIVER_BY_TG = {v: k for k, v in DRIVER_IDS.items()}
+
+
+def driver_by_tg(telegram_id) -> dict | None:
+    """Кто это, если он вообще водитель. Возвращает запись из drivers()."""
+    name = DRIVER_BY_TG.get(int(telegram_id or 0))
+    if not name:
+        return None
+    return next((d for d in drivers() if d["name"] == name), None)
+
+
 # ── расходы на питание ───────────────────────────────────────────────────────
 # Платят каждый день и всем, но по-разному: вышел на смену — одна ставка,
 # не вышел — другая. Поэтому «кто сегодня работает» приходится отмечать
@@ -67,6 +104,7 @@ def drivers() -> list:
                 "district_code": OFFICE_CODES.get(st["district"], ""),
                 "district_name": OFFICE_NAMES.get(st["district"], st["district"]),
                 "operator": st["operator"],
+                "telegram_id": DRIVER_IDS.get(name),
             })
     return out
 

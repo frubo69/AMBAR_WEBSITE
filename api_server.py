@@ -2440,7 +2440,7 @@ PUBLIC_ROOT_FILES = {
     "promo_addhome_ru.png", "promo_addhome_en.png",
     "promo_invite_ru.jpg",  "promo_invite_en.jpg",
 }
-PUBLIC_DIRS = ("owner/", "operator/", "TEXTURES/", "fonts/", "LOGOS/", "uploads/")
+PUBLIC_DIRS = ("owner/", "operator/", "driver/", "TEXTURES/", "fonts/", "LOGOS/", "uploads/")
 PUBLIC_EXTS = {
     ".html", ".js", ".css", ".json", ".map",
     ".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif", ".ico",
@@ -2568,6 +2568,13 @@ def main():
         expense_routes.setup(app)
     except Exception as e:
         log.error(f"expense routes setup failed: {e}")
+    # Приложение водителя: те же initData операторского бота, но пускает только
+    # тех, кто вписан в AMBAR_DRIVER_IDS.
+    try:
+        import driver_routes
+        driver_routes.setup(app)
+    except Exception as e:
+        log.error(f"driver routes setup failed: {e}")
     # Operator iPad POS (manual phone-in orders) — own auth vs OPERATOR_BOT_TOKEN.
     try:
         import operator_routes

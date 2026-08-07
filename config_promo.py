@@ -40,10 +40,12 @@ MAX_LEN           = 400        # длинные простыни — обычн�
 # ── что отвечаем ─────────────────────────────────────────────────────────────
 # Коротко: в чужом чате длинный текст читается как вторжение.
 TEXT = {
-    "ru": ("<b>AMBAR — доставка по Дубаю</b>\n"
-           "Круглосуточно, весь ассортимент. В приложении на 5% дешевле."),
-    "en": ("<b>AMBAR — delivery across Dubai</b>\n"
-           "Around the clock, full range. 5% cheaper in the app."),
+    "ru": ("<b>AMBAR — доставка алкоголя по Дубаю</b>\n"
+           "Круглосуточно, весь ассортимент.\n"
+           "Заказ в приложении — на 5% дешевле."),
+    "en": ("<b>AMBAR — alcohol delivery across Dubai</b>\n"
+           "Around the clock, full range.\n"
+           "Order in the app — 5% cheaper."),
 }
 BTN = {"ru": "Открыть AMBAR", "en": "Open AMBAR"}
 

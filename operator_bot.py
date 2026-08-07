@@ -407,6 +407,31 @@ def kb_ban_confirm(cid, oid):
 
 
 # ── Order card formatter ──────────────────────────────────────────────────────
+_PROMO_TITLES = {}          # abs(chat_id) → название, обновляем раз в 10 минут
+_PROMO_TITLES_AT = 0
+
+
+async def _promo_source(via: str) -> str:
+    """Человеческое имя канала: «реклама · Dubai Expats», а не «chat_100234…»."""
+    global _PROMO_TITLES, _PROMO_TITLES_AT
+    if via.startswith("biz"):
+        return "приветствие в личке"
+    if not via.startswith("chat_"):
+        return via
+    key = via[5:]
+    if key == "direct":
+        return "рекламный бот напрямую"
+    import time as _t
+    if _t.time() - _PROMO_TITLES_AT > 600:
+        try:
+            _PROMO_TITLES = {str(c["_id"]): c.get("title") or str(c["_id"])
+                             for c in await db.get_promo_chats()}
+            _PROMO_TITLES_AT = _t.time()
+        except Exception as e:
+            log.warning(f"[promo] названия чатов: {e}")
+    return _PROMO_TITLES.get(key, f"чат {key}")
+
+
 async def order_card(o, full=True):
     st_map = {"pending":"🟡 Ожидает","approved":"🟢 Принят","delivered":"✅ Доставлен","declined":"🔴 Отклонён","cancelled":"🚫 Отменён клиентом"}
     st     = st_map.get(o.get("status",""), o.get("status",""))
@@ -434,6 +459,9 @@ async def order_card(o, full=True):
                 elif inv_op is not None and inv_op > 0:
                     title = "<b>НОВЫЙ КЛИЕНТ — ССЫЛКА ОПЕРАТОРА</b>"
                     bq = [f"🔴🔴🔴 {title} 🔴🔴🔴"]
+                elif (user_doc.get("invited_via") or "").startswith(("chat_", "biz")):
+                    title = "<b>НОВЫЙ КЛИЕНТ — ИЗ РЕКЛАМЫ</b>"
+                    bq = [f"🔴🔴🔴 {title} 🔴🔴🔴"]
                 elif inv_op == 0:
                     title = "<b>НОВЫЙ КЛИЕНТ — ОБЩАЯ ССЫЛКА</b>"
                     bq = [f"🔴🔴🔴 {title} 🔴🔴🔴"]
@@ -443,6 +471,10 @@ async def order_card(o, full=True):
                 if int(cid) not in _TEST_ACCOUNTS:
                     if inv_op is not None and inv_op > 0:
                         h = f"🔗 По ссылке оператора <code>{inv_op}</code>"
+                        if joined_str: h += f" · вступил {joined_str}"
+                        bq.append(h)
+                    elif (user_doc.get("invited_via") or "").startswith(("chat_", "biz")):
+                        h = f"📣 {await _promo_source(user_doc['invited_via'])}"
                         if joined_str: h += f" · вступил {joined_str}"
                         bq.append(h)
                     elif inv_op == 0:

@@ -1552,6 +1552,41 @@ async def unlink_driver(name: str) -> bool:
 # разовых трат. Ключ составной, потому что и то и другое правят в течение дня по
 # одному человеку, а не всей сменой разом.
 
+# ── реклама: откуда к нам приходят ──────────────────────────────────────────
+async def promo_chat_seen(chat_id: int, title: str):
+    """Реестр чатов, где рекламный бот отвечал.
+
+    Нужен ради названий: в ссылке едет id, а в отчёте владелец должен видеть
+    «Dubai Expats», а не «1002345678». Заодно считаем ответы — без них выйдет,
+    что чат не приводит клиентов, хотя бот там ни разу и не сработал."""
+    db = _db_or_none()
+    if db is None: return
+    now = datetime.now(timezone.utc)
+    await db.promo_chats.update_one(
+        {"_id": int(chat_id)},
+        {"$set": {"title": title, "last": now},
+         "$setOnInsert": {"first": now},
+         "$inc": {"replies": 1}},
+        upsert=True)
+
+
+async def get_promo_chats() -> list:
+    db = _db_or_none()
+    if db is None: return []
+    return await db.promo_chats.find({}).to_list(length=500)
+
+
+async def get_users_by_via() -> list:
+    """Все, у кого записан канал прихода, — сырьё для отчёта по рекламе."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.users.find(
+        {"invited_via": {"$exists": True, "$nin": [None, ""]}},
+        {"_id": 0, "telegram_id": 1, "invited_via": 1, "invited_at": 1,
+         "name": 1, "username": 1, "verified": 1})
+    return await cur.to_list(length=20000)
+
+
 async def biz_greeted(telegram_id: int) -> bool:
     """Здоровались ли уже с этим человеком от имени бизнес-аккаунта.
 

@@ -4749,8 +4749,10 @@ const ACC = [
    ico:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>'},
   {id:'order',    t:'Заявка на закупку', s:'сколько довезти до нормы',
    ico:'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/>'},
+  {id:'promo',    t:'Реклама',           s:'откуда приходят клиенты',
+   ico:'<path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12"/>'},
 ];
-let ACC_PERIOD = null, ACC_STOCK = null, ACC_ORDER = null, ACC_VIEW = null;
+let ACC_PERIOD = null, ACC_STOCK = null, ACC_ORDER = null, ACC_VIEW = null, ACC_PROMO = null;
 
 function accRender(){
   const box = document.getElementById('accHome'); if(!box) return;
@@ -4771,6 +4773,12 @@ function accRender(){
                 ? `на ${fmt(ACC_ORDER.total_aed)} AED`
                 : 'остатков хватает')
               : 'сколько довезти до нормы',
+    // Показы без денег ничего не значат, поэтому подпись — про выручку.
+    promo:    ACC_PROMO  ? (ACC_PROMO.totals.users
+                ? `${ACC_PROMO.totals.buyers} заказали · ${fmt(ACC_PROMO.totals.aed)} AED`
+                : (ACC_PROMO.replies ? `${ACC_PROMO.replies} ответов, никто не пришёл`
+                                     : 'бот ещё нигде не отвечал'))
+              : 'откуда приходят клиенты',
   };
   // Крупная цифра на плитке отвечает на вопрос раздела одним взглядом, а
   // подпись объясняет, что это за цифра.
@@ -4778,6 +4786,7 @@ function accRender(){
     expenses: t ? [fmt(t.all), 'AED сегодня'] : ['—', 'AED'],
     stock:    ACC_STOCK ? [`${ACC_STOCK.done}/${ACC_STOCK.total}`, 'районов'] : ['—', 'районов'],
     order:    ACC_ORDER ? [fmt(ACC_ORDER.total_qty), 'штук'] : ['—', 'штук'],
+    promo:    ACC_PROMO ? [fmt(ACC_PROMO.totals.users), 'пришло'] : ['—', 'пришло'],
   };
   box.innerHTML = `<div class="acc-grid">` + ACC.map((a, i) => {
     const [v, u] = num[a.id] || ['—', ''];
@@ -4795,12 +4804,13 @@ function accRender(){
 // карточках сразу выглядит хуже, чем секунда ожидания.
 async function accLoadSummaries(){
   const get = (p, params) => ownerApi.ownerFetch(p, params ? {params} : undefined).catch(()=>null);
-  const [per, st, ord] = await Promise.all([
+  const [per, st, ord, pr] = await Promise.all([
     get('/api/owner/expenses/period', {days:30}),
     get('/api/owner/stock/status'),
     get('/api/owner/stock/order'),
+    get('/api/owner/promo'),
   ]);
-  ACC_PERIOD = per; ACC_STOCK = st; ACC_ORDER = ord;
+  ACC_PERIOD = per; ACC_STOCK = st; ACC_ORDER = ord; ACC_PROMO = pr;
   accRender();
 }
 
@@ -4812,6 +4822,7 @@ function accOpen(id){
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
   if(id === 'expenses') accExpenses();
   if(id === 'order')    accOrder();
+  if(id === 'promo')    accPromo();
 }
 
 function accClose(){
@@ -4929,6 +4940,45 @@ async function accOrder(){
         <span class="acc-line-v">${r.need_total}</span>
       </div>`).join('')
     : '<div class="exp-empty">Довозить нечего — остатков хватает</div>'}`;
+}
+
+// ─── Реклама ────────────────────────────────────────────────────────────────
+// Раздел отвечает на один вопрос: за что мы платим. Поэтому строка канала
+// показывает не показы, а путь до денег — пришло, заказали, сколько принесли.
+async function accPromo(){
+  _setText('accTitle', 'Реклама');
+  _setText('accSub', 'загрузка…');
+  let d;
+  try{ d = await ownerApi.ownerFetch('/api/owner/promo'); }
+  catch(e){ document.getElementById('accMid').innerHTML =
+    '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+  ACC_PROMO = d;
+  const t = d.totals;
+  _setText('accSub', d.replies ? `${d.replies} ${pluralize(d.replies,'ответ','ответа','ответов')} в чатах`
+                               : 'бот ещё нигде не отвечал');
+  document.getElementById('accMid').innerHTML = `
+    <div class="exp-sum">
+      <div class="exp-tot">
+        <span class="exp-tot-v">${fmt(t.aed)}</span>
+        <span class="exp-tot-u">AED<br>принесли</span>
+        <span class="exp-tot-r">
+          <span>пришло<b>${fmt(t.users)}</b></span>
+          <span>заказали<b>${fmt(t.buyers)}</b></span>
+          <span>заказов<b>${fmt(t.orders)}</b></span>
+        </span>
+      </div>
+    </div>
+    ${d.sources.length ? `<div class="exp-grp">Каналы · ${d.sources.length}</div>` +
+      d.sources.map(r => `<div class="acc-line">
+        <span class="acc-line-n">${escS(r.name)}</span>
+        <span class="acc-line-s">${r.users
+          ? `${r.users} ${pluralize(r.users,'пришёл','пришло','пришло')} · ${r.buyers} ${
+              pluralize(r.buyers,'заказал','заказали','заказали')}${escS(r.note ? ' · ' + r.note : '')}`
+          : escS(r.note || 'пока никого')}</span>
+        <span class="acc-line-v" style="${r.aed ? '' : 'color:var(--muted)'}">${
+          r.aed ? fmt(r.aed) : '—'}</span>
+      </div>`).join('')
+    : '<div class="exp-empty">Каналов пока нет. Добавьте @ambarpr_bot администратором в чаты.</div>'}`;
 }
 
 // ─── Расходы водителей ──────────────────────────────────────────────────────

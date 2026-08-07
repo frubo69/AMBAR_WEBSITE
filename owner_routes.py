@@ -859,6 +859,77 @@ async def handle_customers(request):
 
 
 @require_owner
+async def handle_promo(request):
+    """Эффективность рекламных интеграций — по каналам прихода.
+
+    Вопрос, на который отвечает раздел: за что мы платим. Поэтому считаем не
+    показы, а деньги: сколько человек пришло из канала, сколько из них дошло до
+    заказа и сколько принесло. Канал без выручки виден сразу, даже если людей
+    оттуда много."""
+    chats = {str(c["_id"]): c for c in await db.get_promo_chats()}
+    users = await db.get_users_by_via()
+    orders = list((await db.get_all_orders()).values())
+
+    # Заказы раскладываем по клиенту один раз: иначе на каждый канал пришлось бы
+    # проходить весь список заново.
+    by_cust = {}
+    for o in orders:
+        if o.get("status") != "delivered" or o.get("test"):
+            continue
+        cid = o.get("customer_id")
+        if not cid:
+            continue
+        st = by_cust.setdefault(int(cid), {"n": 0, "aed": 0})
+        st["n"] += 1
+        st["aed"] += int(o.get("total") or 0)
+
+    def _label(via: str) -> tuple:
+        if via.startswith("biz"):
+            return ("biz", "Приветствие в личке", "бизнес-аккаунт")
+        if via == "chat_direct":
+            return (via, "Рекламный бот напрямую", "открыли самого бота")
+        if via.startswith("chat_"):
+            key = via[5:]
+            c = chats.get(key)
+            return (via, (c or {}).get("title") or f"Чат {key}",
+                    f"{(c or {}).get('replies', 0)} ответов" if c else "чат не в реестре")
+        return (via, via, "")
+
+    rows = {}
+    for u in users:
+        via = str(u.get("invited_via") or "")
+        if not via:
+            continue
+        key, name, note = _label(via)
+        r = rows.setdefault(key, {"id": key, "name": name, "note": note,
+                                  "users": 0, "buyers": 0, "orders": 0, "aed": 0})
+        r["users"] += 1
+        st = by_cust.get(int(u.get("telegram_id") or 0))
+        if st:
+            r["buyers"] += 1
+            r["orders"] += st["n"]
+            r["aed"] += st["aed"]
+
+    # Чаты, где бот отвечал, но никто не пришёл, тоже показываем: пустая строка
+    # здесь — это и есть ответ про эффективность.
+    for key, c in chats.items():
+        via = f"chat_{key}"
+        if via not in rows:
+            rows[via] = {"id": via, "name": c.get("title") or f"Чат {key}",
+                         "note": f"{c.get('replies', 0)} ответов",
+                         "users": 0, "buyers": 0, "orders": 0, "aed": 0}
+    out = sorted(rows.values(), key=lambda r: (-r["aed"], -r["users"]))
+    return web.json_response({
+        "sources": out,
+        "totals": {"users": sum(r["users"] for r in out),
+                   "buyers": sum(r["buyers"] for r in out),
+                   "orders": sum(r["orders"] for r in out),
+                   "aed": sum(r["aed"] for r in out)},
+        "replies": sum(int(c.get("replies") or 0) for c in chats.values()),
+    }, headers=CORS_HEADERS, dumps=lambda o: __import__("json").dumps(o, default=_json_default))
+
+
+@require_owner
 async def handle_customer_detail(request):
     """Return single customer profile + recent orders."""
     raw = request.match_info["telegram_id"]
@@ -2308,6 +2379,8 @@ def setup(app):
     app.router.add_get(             "/api/owner/office",  handle_office)
     app.router.add_route("OPTIONS", "/api/owner/operators", handle_operators)
     app.router.add_get(             "/api/owner/operators", handle_operators)
+    app.router.add_route("OPTIONS", "/api/owner/promo",   handle_promo)
+    app.router.add_get(             "/api/owner/promo",   handle_promo)
     app.router.add_route("OPTIONS", "/api/owner/customers",              handle_customers)
     app.router.add_get(             "/api/owner/customers",              handle_customers)
     app.router.add_route("OPTIONS", "/api/owner/customers/{telegram_id}", handle_customer_detail)

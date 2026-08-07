@@ -18,6 +18,7 @@ from telegram.constants import ChatMemberStatus
 from telegram.ext import (Application, CommandHandler, MessageHandler,
                           ContextTypes, filters)
 import config_promo as promo
+import db
 
 load_dotenv()
 PROMO_BOT_TOKEN = os.getenv("PROMO_BOT_TOKEN", "")
@@ -92,9 +93,15 @@ async def on_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     _last_chat[cid], _last_user[uid] = now, now
-    title, cnt = _stats.get(cid, (msg.chat.title or str(cid), 0))
-    _stats[cid] = (title, cnt + 1)
-    log.info(f"[promo] {msg.chat.title} · {uid} · «{msg.text[:60]}»")
+    title = msg.chat.title or str(cid)
+    _stats[cid] = (title, _stats.get(cid, (title, 0))[1] + 1)
+    # В ссылке едет abs(id) — под тем же ключом чат ложится в реестр, иначе в
+    # отчёте вместо названия будет голое число.
+    try:
+        await db.promo_chat_seen(abs(cid), title)
+    except Exception as e:
+        log.warning(f"[promo] реестр чатов: {e}")
+    log.info(f"[promo] {title} · {uid} · «{msg.text[:60]}»")
 
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -118,10 +125,14 @@ async def cmd_chats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(f"Ответов с перезапуска:\n{rows}")
 
 
+async def post_init(app):
+    await db.connect()
+
+
 def main():
     if not PROMO_BOT_TOKEN:
         print("❌ PROMO_BOT_TOKEN missing"); return
-    app = Application.builder().token(PROMO_BOT_TOKEN).build()
+    app = Application.builder().token(PROMO_BOT_TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start", cmd_start, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("chats", cmd_chats, filters=filters.ChatType.PRIVATE))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_message))

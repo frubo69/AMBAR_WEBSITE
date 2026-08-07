@@ -1552,6 +1552,24 @@ async def unlink_driver(name: str) -> bool:
 # разовых трат. Ключ составной, потому что и то и другое правят в течение дня по
 # одному человеку, а не всей сменой разом.
 
+async def biz_greeted(telegram_id: int) -> bool:
+    """Здоровались ли уже с этим человеком от имени бизнес-аккаунта.
+
+    Без базы возвращаем True: поздороваться дважды хуже, чем не поздороваться —
+    второе приветствие подряд выглядит как сбой."""
+    db = _db_or_none()
+    if db is None: return True
+    return await db.biz_greetings.find_one({"_id": telegram_id}) is not None
+
+
+async def mark_biz_greeted(telegram_id: int, **fields):
+    db = _db_or_none()
+    if db is None: return
+    await db.biz_greetings.update_one(
+        {"_id": telegram_id},
+        {"$setOnInsert": {"at": datetime.now(timezone.utc), **fields}}, upsert=True)
+
+
 async def get_driver_day(day: str, driver: str) -> dict | None:
     db = _db_or_none()
     if db is None: return None

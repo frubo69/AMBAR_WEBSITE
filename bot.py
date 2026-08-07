@@ -90,7 +90,9 @@ def _parse_start_arg(arg: str, uid: int):
             referrer_id = None
         if referrer_id == uid:
             referrer_id = None
-    elif arg == "op":
+    elif arg in ("op", "biz"):
+        # biz — приветствие бизнес-аккаунта: конкретного оператора за ним нет,
+        # но канал видно по invited_via.
         invited_by_operator = 0
     elif arg.startswith("op_"):
         who, _, dist = arg[3:].partition("_")
@@ -193,6 +195,8 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if invited_by_operator is not None and (existing is None or existing.get("invited_by_operator") is None):
             user_fields["invited_by_operator"] = invited_by_operator
             user_fields["invited_at"] = datetime.now(timezone.utc)
+            if (ctx.args[0] if ctx.args else "") == "biz":
+                user_fields["invited_via"] = "biz"       # приветствие бизнес-аккаунта
             if invited_district:
                 user_fields["invited_district"] = invited_district
             log.info(f"[op-invite] user {uid} invited_by_operator={invited_by_operator}"
@@ -395,6 +399,60 @@ async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
              f"{' по району ' + dist if dist else ' без района'}")
 
 
+# Кто владеет соединением: в business_message падают и сообщения самого
+# владельца, а здороваться с ним не надо.
+_BIZ_OWNERS = {}
+
+
+async def on_business_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Приветствие тому, кто впервые написал в бизнес-аккаунт.
+
+    Штатное приветствие Telegram Business — обычное сообщение человека, кнопку
+    под него повесить нельзя, остаётся ссылка в тексте. А ссылок клиенты и
+    боятся. Кнопку умеет только бот, поэтому здороваемся отсюда — той же
+    карточкой, что оператор отправляет вручную.
+
+    Пока бот не подключён в «Telegram Business → Чат-боты», обработчик просто
+    молчит: таких апдейтов не приходит."""
+    msg = update.business_message
+    if msg is None or msg.from_user is None or msg.from_user.is_bot:
+        return
+    cid = msg.business_connection_id
+    owner = _BIZ_OWNERS.get(cid)
+    if owner is None:
+        try:
+            owner = (await ctx.bot.get_business_connection(cid)).user.id
+            _BIZ_OWNERS[cid] = owner
+        except Exception as e:
+            log.warning(f"[biz] не узнали владельца соединения: {e}")
+            return
+    uid = msg.from_user.id
+    if uid == owner:                       # это владелец пишет клиенту
+        return
+    if await db.biz_greeted(uid):          # второй раз не здороваемся
+        return
+
+    lang = "ru" if (msg.from_user.language_code or "ru").startswith("ru") else "en"
+    try:
+        me = (await ctx.bot.get_me()).username
+        await ctx.bot.send_photo(
+            chat_id=msg.chat.id,
+            business_connection_id=cid,
+            photo=f"{PUBLIC_ORIGIN}/promo_invite_{lang}.jpg",
+            caption=INLINE_TEXT[lang],
+            parse_mode="HTML",
+            # Именно url, а не web_app: в сообщениях от имени бизнес-аккаунта
+            # Telegram разрешает только url, login_url и callback-кнопки.
+            reply_markup=InlineKeyboardMarkup([[
+                InlineKeyboardButton(INLINE_BTN[lang], url=f"https://t.me/{me}?start=biz")]]),
+        )
+        await db.mark_biz_greeted(uid, lang=lang,
+                                  username=msg.from_user.username or "—")
+        log.info(f"[biz] поздоровались с {uid} ({lang})")
+    except Exception as e:
+        log.warning(f"[biz] приветствие {uid}: {e}")
+
+
 def main():
     if not BOT_TOKEN:  print("❌ BOT_TOKEN missing");  return
     if not WEBAPP_URL: print("❌ WEBAPP_URL missing"); return
@@ -404,6 +462,7 @@ def main():
     app.add_handler(CallbackQueryHandler(cb_review, pattern=r"^rev_"))
     app.add_handler(MessageHandler(filters.CONTACT, on_contact))
     app.add_handler(InlineQueryHandler(on_inline))
+    app.add_handler(MessageHandler(filters.UpdateType.BUSINESS_MESSAGE, on_business_message))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fallback))
     log.info("🍾 AMBAR Customer Bot started!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)

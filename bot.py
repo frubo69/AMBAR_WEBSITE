@@ -90,10 +90,14 @@ def _parse_start_arg(arg: str, uid: int):
             referrer_id = None
         if referrer_id == uid:
             referrer_id = None
-    elif arg in ("op", "biz"):
-        # biz — приветствие бизнес-аккаунта: конкретного оператора за ним нет,
-        # но канал видно по invited_via.
+    elif arg == "op":
         invited_by_operator = 0
+    elif arg == "biz" or arg.startswith("biz_"):
+        # Приветствие бизнес-аккаунта. Аккаунтов может быть несколько, поэтому
+        # в ссылке едет владелец: операторский аккаунт получает приглашение
+        # себе, любой другой — в общий котёл. Канал видно по invited_via.
+        who = arg[4:]
+        invited_by_operator = int(who) if (who.isdigit() and int(who) != uid) else 0
     elif arg.startswith("op_"):
         who, _, dist = arg[3:].partition("_")
         try:
@@ -195,7 +199,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if invited_by_operator is not None and (existing is None or existing.get("invited_by_operator") is None):
             user_fields["invited_by_operator"] = invited_by_operator
             user_fields["invited_at"] = datetime.now(timezone.utc)
-            if (ctx.args[0] if ctx.args else "") == "biz":
+            if (ctx.args[0] if ctx.args else "").startswith("biz"):
                 user_fields["invited_via"] = "biz"       # приветствие бизнес-аккаунта
             if invited_district:
                 user_fields["invited_district"] = invited_district
@@ -444,7 +448,8 @@ async def on_business_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
             # Именно url, а не web_app: в сообщениях от имени бизнес-аккаунта
             # Telegram разрешает только url, login_url и callback-кнопки.
             reply_markup=InlineKeyboardMarkup([[
-                InlineKeyboardButton(INLINE_BTN[lang], url=f"https://t.me/{me}?start=biz")]]),
+                InlineKeyboardButton(INLINE_BTN[lang],
+                                     url=f"https://t.me/{me}?start=biz_{owner}")]]),
         )
         await db.mark_biz_greeted(uid, lang=lang,
                                   username=msg.from_user.username or "—")

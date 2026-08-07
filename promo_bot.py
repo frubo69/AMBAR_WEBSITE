@@ -79,7 +79,7 @@ async def on_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     lang = _lang(msg.text)
     try:
         await msg.reply_photo(
-            photo=f"{PUBLIC_ORIGIN}/promo_invite_{lang}.jpg",
+            photo=f"{PUBLIC_ORIGIN}/{promo.IMG[lang]}",
             caption=promo.TEXT[lang],
             parse_mode="HTML",
             # Ответом на конкретное сообщение, а не вбросом в чат: так это
@@ -101,7 +101,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Кто-то открыл самого рекламного бота — уводим в основной."""
     lang = _lang(update.effective_user.first_name or "")
     await update.message.reply_photo(
-        photo=f"{PUBLIC_ORIGIN}/promo_invite_{lang}.jpg",
+        photo=f"{PUBLIC_ORIGIN}/{promo.IMG[lang]}",
         caption=promo.TEXT[lang], parse_mode="HTML",
         reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
             promo.BTN[lang], url=f"https://t.me/{MAIN_BOT}?start=chat_direct")]]))

@@ -1228,9 +1228,30 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
 
 
-  <!-- Команда района: те же люди, что и возят эти заказы, поэтому стоят рядом
-       с итогами и над самими районами. Период — общий со страницей. -->
-  <div class="sect" style="margin-top:16px">
+  <div class="sect" style="margin-top:16px"><div class="sect-t">Районы</div><div class="sect-s" id="offSub">—</div></div>
+  <!-- Порядок B1…B5 — рабочий, поэтому он же и по умолчанию. Остальные
+       сортировки нужны, чтобы быстро увидеть отстающих. -->
+  <div class="off-sort" id="offSort">
+    <button class="off-s on" data-s="code">B1–B5</button>
+    <button class="off-s" data-s="rev">Выручка</button>
+    <button class="off-s" data-s="orders">Заказы</button>
+    <button class="off-s" data-s="min">Время</button>
+    <button class="off-s" data-s="rating">Рейтинг</button>
+  </div>
+  <div class="off-back" id="offDayNav" style="display:none">
+    <button class="dn-b" onclick="dayStep(1)" aria-label="Предыдущий день">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+    <button class="off-back-t" onclick="dayReset()">Вернуться к сегодня</button>
+    <button class="dn-b" id="offDnNext" onclick="dayStep(-1)" aria-label="Следующий день">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:9px" id="offCards">
+    <div class="off-empty">Загрузка…</div>
+  </div>
+
+  <!-- Команда — под районами: сначала «как отработали точки», потом «кто там
+       работает». Период — общий со страницей. -->
+  <div class="sect" style="margin-top:18px">
     <div class="sect-t">Команда</div>
     <div class="sect-a" style="font-size:10px;color:var(--muted)" id="opSortLbl">по выручке</div>
   </div>
@@ -1262,27 +1283,6 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
   <div class="list" id="opList"></div>
   <div id="opExtra"></div>
-
-  <div class="sect" style="margin-top:14px"><div class="sect-t">Районы</div><div class="sect-s" id="offSub">—</div></div>
-  <!-- Порядок B1…B5 — рабочий, поэтому он же и по умолчанию. Остальные
-       сортировки нужны, чтобы быстро увидеть отстающих. -->
-  <div class="off-sort" id="offSort">
-    <button class="off-s on" data-s="code">B1–B5</button>
-    <button class="off-s" data-s="rev">Выручка</button>
-    <button class="off-s" data-s="orders">Заказы</button>
-    <button class="off-s" data-s="min">Время</button>
-    <button class="off-s" data-s="rating">Рейтинг</button>
-  </div>
-  <div class="off-back" id="offDayNav" style="display:none">
-    <button class="dn-b" onclick="dayStep(1)" aria-label="Предыдущий день">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
-    <button class="off-back-t" onclick="dayReset()">Вернуться к сегодня</button>
-    <button class="dn-b" id="offDnNext" onclick="dayStep(-1)" aria-label="Следующий день">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
-  </div>
-  <div style="display:flex;flex-direction:column;gap:9px" id="offCards">
-    <div class="off-empty">Загрузка…</div>
-  </div>
 
   <div class="sect"><div class="sect-t">Оценки клиентов</div></div>
   <div class="kpi-grid" style="margin-bottom:2px">

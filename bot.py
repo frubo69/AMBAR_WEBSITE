@@ -98,6 +98,10 @@ def _parse_start_arg(arg: str, uid: int):
         # себе, любой другой — в общий котёл. Канал видно по invited_via.
         who = arg[4:]
         invited_by_operator = int(who) if (who.isdigit() and int(who) != uid) else 0
+    elif arg.startswith("chat_"):
+        # Реклама в чатах сообществ. Оператора за ней нет, но по invited_via
+        # видно, какой чат привёл человека, — иначе платить за 12 чатов вслепую.
+        invited_by_operator = 0
     elif arg.startswith("op_"):
         who, _, dist = arg[3:].partition("_")
         try:
@@ -199,8 +203,11 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         if invited_by_operator is not None and (existing is None or existing.get("invited_by_operator") is None):
             user_fields["invited_by_operator"] = invited_by_operator
             user_fields["invited_at"] = datetime.now(timezone.utc)
-            if (ctx.args[0] if ctx.args else "").startswith("biz"):
+            _a = ctx.args[0] if ctx.args else ""
+            if _a.startswith("biz"):
                 user_fields["invited_via"] = "biz"       # приветствие бизнес-аккаунта
+            elif _a.startswith("chat_"):
+                user_fields["invited_via"] = _a[:40]     # реклама в чате сообщества
             if invited_district:
                 user_fields["invited_district"] = invited_district
             log.info(f"[op-invite] user {uid} invited_by_operator={invited_by_operator}"

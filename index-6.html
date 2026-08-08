@@ -346,6 +346,16 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 .tip-done-btn{width:100%;margin-top:7px;height:38px;border-radius:var(--r3);border:1.5px solid var(--gold);background:rgba(201,169,110,.08);color:var(--gold);font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;display:none;transition:.15s}
 .tip-done-btn:active{background:rgba(201,169,110,.22)}
 .cart-foot{padding:14px 16px;background:var(--bg2);border-top:1px solid var(--border)}
+/* Строка подарка в корзине: тот же формат, что у товара, но без «плюс-минус»
+   и без свайпа — убрать то, что положено, нельзя. */
+.gift-ci{border:1px solid rgba(201,169,110,.3);background:rgba(201,169,110,.05)}
+/* Название подарка переносим, а не обрезаем: «Jacob Creek Shir…» не говорит
+   человеку, какое вино ему достанется. */
+.gift-ci .ci-name{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25}
+.gift-price{color:var(--gold)!important}
+.gift-tag{display:flex;align-items:center;gap:5px;flex-shrink:0;padding:7px 11px;
+  border-radius:10px;font-size:12px;font-weight:700;color:var(--gold);
+  background:rgba(201,169,110,.12);border:1px solid rgba(201,169,110,.3)}
 /* Подарок за сумму. Полоса нужна не для красоты: без неё человек не знает,
    что до бесплатной бутылки осталось двести дирхам, и акция не работает. */
 .gift-bar{padding:10px 12px;border-radius:12px;margin-bottom:10px;
@@ -6133,7 +6143,7 @@ function renderCart(){
       <div class="ci-info"><div class="ci-name">${nameLabel}</div><div class="ci-price">${displayPrice} AED</div></div>
       <div class="qctrl"><button class="qb" onclick="chgQty('${id}',-1)">−</button><span class="qn">${qty}</span><button class="qb" onclick="chgQty('${id}',1)">+</button></div>
     </div></div></div>`;
-  }).join('');
+  }).join('')+giftRow();
   initCartSwipe();
   el('tot-n').textContent=cartSub()+tip;foot.style.display='block';tipSec.style.display='block';
   renderGift();
@@ -6273,23 +6283,46 @@ function updCartTot(){el('tot-n').textContent=cartSub()+tip;renderGift();buildSu
 
 // ── Подарок за сумму заказа ──────────────────────────────────────────────────
 // Порог и позицию решает сервер, он же кладёт бутылку в заказ. Здесь только
-// витрина: сколько осталось добрать. Без этой строки акция не работает — человек
-// не узнает, что до бесплатного вина ему двести дирхам.
+// витрина: сколько осталось добрать и что уже причитается.
 const GIFT_MIN=1000, GIFT_ID='p105';
+function giftProduct(){
+  const g=P.find(x=>x.id===GIFT_ID);
+  return (g && g.stock!==false) ? g : null;                   // нет на полке — не обещаем
+}
+function giftOn(){ return !!giftProduct() && cartSub()>=GIFT_MIN; }
+
+// Подарок живёт отдельно от cart и намеренно: попади он в корзину — у него
+// появились бы плюс, минус и свайп, и человек смог бы «купить» его дважды или
+// удалить то, что ему и так положено. Здесь это строка, а не товар.
+function giftRow(){
+  const g=giftProduct(); if(!g||!giftOn()) return '';
+  return `<div class="ci gift-ci">
+    <img class="ci-img" src="${g.img}" alt="${g.name}">
+    <div class="ci-info">
+      <div class="ci-name">${g.name}</div>
+      <div class="ci-price gift-price">${lang==='ru'?'в подарок':'on the house'}</div>
+    </div>
+    <div class="gift-tag">
+      <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+        stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7"/></svg>
+      0 AED
+    </div>
+  </div>`;
+}
+
 function renderGift(){
   const bar=el('gift-bar'); if(!bar) return;
-  const g=P.find(x=>x.id===GIFT_ID);
-  if(!g||g.stock===false){bar.style.display='none';return;}   // нет на полке — не обещаем
-  const sub=cartSub();                                        // чаевые не в счёт
-  const left=GIFT_MIN-sub;
+  const g=giftProduct();
+  // Дошли до порога — полосу убираем: подарок уже лежит в списке строкой, и
+  // повторять то же самое второй раз значит шуметь.
+  if(!g||giftOn()){bar.style.display='none';return;}
+  const sub=cartSub(), left=GIFT_MIN-sub;
   bar.style.display='block';
-  bar.classList.toggle('on',left<=0);
   el('gift-fill').style.width=Math.min(100,Math.round(sub*100/GIFT_MIN))+'%';
-  el('gift-txt').textContent=left>0
-    ? (lang==='ru' ? `Ещё ${left} AED — и ${g.name} в подарок`
-                   : `${left} AED more — and ${g.name} is on us`)
-    : (lang==='ru' ? `${g.name} — в подарок к заказу`
-                   : `${g.name} — free with your order`);
+  el('gift-txt').textContent=lang==='ru'
+    ? `Ещё ${left} AED — и ${g.name} в подарок`
+    : `${left} AED more — and ${g.name} is on us`;
 }
 
 // ── SUMMARY ───────────────────────────────────────────────────────────────────
@@ -6301,7 +6334,9 @@ function buildSummary(){
     const unitPrice=beerPrice(p,pcs);
     const label=pcs?`${p.name} <span style="color:var(--gold);font-size:11px">(${pcs} ${lang==='ru'?'шт':'pcs'})</span>`:p.name;
     return`<div class="sum-line"><span>${label} ×${qty}</span><span>${unitPrice*qty} AED</span></div>`;
-  }).join('');
+  }).join('')+(giftOn()?`<div class="sum-line" style="color:var(--gold)">
+      <span>${giftProduct().name} ×1</span>
+      <span>${lang==='ru'?'подарок':'gift'}</span></div>`:'');
   const tr=el('sum-tip-row');
   if(tip>0){tr.style.display='flex';el('sum-tip-val').textContent=tip+' AED';}else tr.style.display='none';
   el('sum-tot-val').textContent=(sub+tip)+' AED';

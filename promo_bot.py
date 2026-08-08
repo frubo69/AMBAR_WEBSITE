@@ -129,6 +129,11 @@ async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     url = f"https://t.me/{MAIN_BOT}?start=post_{tag}"
     results = []
     for lang in ("ru", "en"):
+        # Карточку языка показываем, только если её картинка правда лежит:
+        # Telegram тянет фото по ссылке сам, и на битой он молча выкинет
+        # результат — в списке останется дыра без объяснений.
+        if not os.path.exists(promo.POST_IMG[lang]):
+            continue
         results.append(InlineQueryResultPhoto(
             id=f"post_{lang}_{tag}",
             # Telegram забирает картинку по ссылке сам: только JPEG и только
@@ -144,8 +149,10 @@ async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         ))
     # cache_time=0: метка меняется от запроса к запросу, закэшированный ответ
     # отдал бы чужую.
+    if not results:
+        log.error("[promo] нет ни одной картинки поста — карточку не собрать")
     await iq.answer(results, cache_time=0, is_personal=True)
-    log.info(f"[promo] пост {uid} · метка «{tag}»")
+    log.info(f"[promo] пост {uid} · метка «{tag}» · карточек {len(results)}")
 
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):

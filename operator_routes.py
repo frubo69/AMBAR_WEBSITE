@@ -480,16 +480,9 @@ async def handle_create(request):
 
     # Authoritative total from the catalog (never trust the iPad's math).
     total = await _pos_total(items)
-    # Акция действует и по телефону: клиент, который набрал на тысячу голосом,
-    # ничем не хуже того, кто набрал её в приложении.
-    try:
-        import config_gift as gift
-        _before = len(items)
-        items = gift.apply(items, total, _catalog_by_id())
-        if len(items) > _before:
-            log.info(f"[gift] телефонный заказ на {total} AED — {items[-1]['name']}")
-    except Exception as e:
-        log.error(f"[gift] телефонный заказ: {e}")
+    # Подарка по телефону НЕТ: акция существует ради перехода в приложение, и
+    # если она достаётся и голосом, переходить незачем. Оператор кладёт вино
+    # только руками — и тогда это его решение, а не автоматика.
 
     now = datetime.now(timezone.utc).isoformat()
     op_display = _op_name(request["op_user"])

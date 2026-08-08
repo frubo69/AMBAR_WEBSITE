@@ -811,7 +811,9 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 /* promo carousel — flex track translateX-es between full-width slides (like SWAPLY) */
 .promo-track{display:flex;height:100%;transition:transform .7s cubic-bezier(.7,.05,.2,1);will-change:transform}
 .promo-slide{flex:0 0 100%;height:100%}
-.promo-slide img{width:100%;height:100%;object-fit:cover;display:block}
+.promo-slide img{width:100%;height:100%;object-fit:cover;display:block;
+  -webkit-user-drag:none;user-select:none;pointer-events:none}
+.promo-track{touch-action:pan-y}          /* горизонталь наша, вертикаль — странице */
 .promo-dots{position:absolute;left:0;right:0;bottom:9px;z-index:3;display:flex;align-items:center;justify-content:center;gap:5px;pointer-events:none}
 .promo-dot{position:relative;flex:0 0 auto;width:18px;height:3px;padding:0;border:none;border-radius:2px;background:rgba(255,255,255,.26);overflow:hidden;cursor:pointer;pointer-events:auto;transition:width .35s cubic-bezier(.4,0,.2,1)}
 .promo-dot.active{width:38px}
@@ -1185,6 +1187,13 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
 .sheet-hdr-ttl{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;letter-spacing:1.5px;color:var(--gold)}
 /* promo detail sheet (tap the promo hero card → its story) */
 .pinfo-badge{font-family:'DM Sans',sans-serif;font-size:54px;font-weight:800;line-height:1;letter-spacing:-1.5px;text-align:center;margin:2px 0 14px;background:linear-gradient(135deg,var(--gold),var(--gold2),var(--gold));-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;color:transparent}
+/* Вместо крупной цифры — само вино: «0 AED» ничего не говорит о том, что
+   человек получит, а бутылку он узнаёт в лицо по карточке товара. */
+.pinfo-shot{display:flex;justify-content:center;margin:2px 0 14px}
+/* 120, а не 170: на 170 карточка переставала помещаться в лист, он открывался
+   уже прокрученным, и заголовок уезжал за верхний край. */
+.pinfo-shot img{height:120px;width:auto;max-width:60%;object-fit:contain;
+  border-radius:12px;filter:drop-shadow(0 10px 24px rgba(0,0,0,.55))}
 .pinfo-lead{font-size:14px;line-height:1.6;color:var(--sub);text-align:center;margin:0 2px 20px}
 .pinfo-list{display:flex;flex-direction:column;gap:12px;margin-bottom:22px}
 .pinfo-item{display:flex;align-items:flex-start;gap:11px;font-size:13.5px;line-height:1.4;color:var(--text)}
@@ -2355,6 +2364,7 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
       <div class="sheet-hdr-ttl" id="pinfo-title">ЦЕНЫ ДЛЯ СВОИХ</div>
     </div>
     <div class="pinfo-badge" id="pinfo-badge">−5%</div>
+    <div class="pinfo-shot" id="pinfo-shot" style="display:none"><img id="pinfo-shot-img" alt=""></div>
     <div class="pinfo-lead" id="pinfo-lead"></div>
     <div class="pinfo-list" id="pinfo-list"></div>
     <button class="btn-main" id="pinfo-cta" onclick="_closeSheet('promo-info-ov')">Понятно</button>
@@ -4005,6 +4015,7 @@ const PROMO_INFO = {
   },
   promo_gift: {
     badge: '0 AED',
+    shot: 'p105',              // то же фото, что в карточке товара
     title: {ru:'ВИНО В ПОДАРОК', en:'WINE ON THE HOUSE'},
     lead:  {ru:'Jacob Creek Shiraz 0.75 бесплатно к любому заказу от 1000 AED. Бутылка добавляется в корзину сама — просить ничего не нужно.',
             en:'Jacob Creek Shiraz 0.75 free with any order from 1000 AED. The bottle is added to your cart automatically — no need to ask.'},
@@ -4069,8 +4080,49 @@ function _promoFrame(now){
 function _promoStartAuto(){ _promoStopAuto(); _promoT0=0; _promoRAF=requestAnimationFrame(_promoFrame); }
 function _promoStopAuto(){ if(_promoRAF){cancelAnimationFrame(_promoRAF);_promoRAF=null;} }
 function _promoGo(n){ const len=_promoList().length; if(len<=1)return; _promoIdx=(n+len)%len; _promoSet(); _promoStartAuto(); }
+
+// Листание пальцем. Автопрокрутка сама решает, что показать, — а человек хочет
+// вернуться к слайду, который у него увели из-под носа.
+let _promoDrag=null, _promoSwiped=false;
+function initPromoSwipe(){
+  const hero=el('promo-hero'), track=el('promo-track');
+  if(!hero||!track||hero._swipeReady)return; hero._swipeReady=true;
+
+  hero.addEventListener('pointerdown',e=>{
+    if(_promoList().length<2)return;
+    _promoDrag={x:e.clientX,y:e.clientY,dx:0,lock:null};
+    _promoStopAuto(); track.style.transition='none';
+  });
+  hero.addEventListener('pointermove',e=>{
+    if(!_promoDrag)return;
+    const dx=e.clientX-_promoDrag.x, dy=e.clientY-_promoDrag.y;
+    // Пока не понятно, листают или скроллят страницу, — не мешаем ни тому ни другому.
+    if(_promoDrag.lock===null){
+      if(Math.abs(dx)<6&&Math.abs(dy)<6)return;
+      _promoDrag.lock=Math.abs(dx)>Math.abs(dy)?'x':'y';
+      if(_promoDrag.lock==='y'){_promoEndDrag(false);return;}
+    }
+    _promoDrag.dx=dx;
+    track.style.transform=`translateX(calc(-${_promoIdx*100}% + ${dx}px))`;
+  });
+  ['pointerup','pointercancel','pointerleave'].forEach(ev=>
+    hero.addEventListener(ev,()=>_promoEndDrag(true)));
+  // Свайп заканчивается кликом по баннеру — карточку акции при этом открывать
+  // не надо: человек листал, а не тыкал.
+  hero.addEventListener('click',e=>{ if(_promoSwiped){e.stopPropagation();e.preventDefault();} },true);
+}
+function _promoEndDrag(apply){
+  const track=el('promo-track'); if(!_promoDrag||!track)return;
+  const dx=_promoDrag.dx, moved=Math.abs(dx)>40;
+  _promoDrag=null;
+  track.style.transition='';
+  if(apply&&moved){
+    _promoSwiped=true; setTimeout(()=>_promoSwiped=false,350);
+    _promoGo(_promoIdx+(dx<0?1:-1));
+  }else{ _promoSet(); _promoStartAuto(); }
+}
 function _promoImgs(){const r=lang==='ru';return{hero:r?'promo_hero_ru.png':'promo_hero_en.png',modal:r?'promo_modal_ru.png':'promo_modal_en.png'};}
-function _setPromoImgs(){ _buildPromoCarousel(); const mi=el('promo-modal-img'); if(mi)mi.src=_promoImgs().modal; }
+function _setPromoImgs(){ _buildPromoCarousel(); initPromoSwipe(); const mi=el('promo-modal-img'); if(mi)mi.src=_promoImgs().modal; }
 function _promoExpired(key){const ts=localStorage.getItem(key);if(!ts)return true;return(Date.now()-Number(ts))>=_PROMO_12H;}
 function initPromo(){
   _setPromoImgs();
@@ -4104,7 +4156,18 @@ function showPromoInfo(){
   const ru=lang==='ru', L=ru?'ru':'en';
   const info=PROMO_INFO[key]||PROMO_INFO.promo_hero;   // content for the slide on screen
   set('pinfo-title', info.title[L]);
-  const badge=el('pinfo-badge'); if(badge)badge.textContent=info.badge;
+  // Карточка подарка показывает бутылку вместо цифры — фото берём из каталога,
+  // чтобы оно не разъехалось с карточкой товара, если сменится позиция.
+  const badge=el('pinfo-badge'), shot=el('pinfo-shot'), shotImg=el('pinfo-shot-img');
+  const shotProd=info.shot?P.find(x=>x.id===info.shot):null;
+  if(shotProd&&shotProd.img){
+    if(shotImg){shotImg.src=shotProd.img;shotImg.alt=shotProd.name;}
+    if(shot)shot.style.display='flex';
+    if(badge)badge.style.display='none';
+  }else{
+    if(shot)shot.style.display='none';
+    if(badge){badge.style.display='';badge.textContent=info.badge;}
+  }
   set('pinfo-lead', info.lead[L]);
   const items=info.items[L]||[];
   const check='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><polyline points="8.5 12 11 14.5 15.5 9.5"/></svg>';

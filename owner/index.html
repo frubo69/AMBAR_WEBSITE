@@ -4772,8 +4772,11 @@ const ACC = [
    ico:'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/>'},
   {id:'promo',    t:'Реклама',           s:'откуда приходят клиенты',
    ico:'<path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12"/>'},
+  {id:'gift',     t:'Акции',             s:'что раздали бесплатно',
+   ico:'<path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7"/>'},
 ];
-let ACC_PERIOD = null, ACC_STOCK = null, ACC_ORDER = null, ACC_VIEW = null, ACC_PROMO = null;
+let ACC_PERIOD = null, ACC_STOCK = null, ACC_ORDER = null, ACC_VIEW = null,
+    ACC_PROMO = null, ACC_GIFT = null;
 
 function accRender(){
   const box = document.getElementById('accHome'); if(!box) return;
@@ -4795,6 +4798,12 @@ function accRender(){
                 : 'остатков хватает')
               : 'сколько довезти до нормы',
     // Показы без денег ничего не значат, поэтому подпись — про выручку.
+    // Подарок мерим не бутылками, а тем, что он принёс: сто отданных бутылок
+    // при чеке в полторы тысячи и при чеке в тысячу — разные сто бутылок.
+    gift:     ACC_GIFT   ? (ACC_GIFT.totals.bottles
+                ? `${fmt(ACC_GIFT.totals.aed)} AED в этих заказах · чек ${fmt(ACC_GIFT.totals.avg_aed)}`
+                : 'пока ни одной бутылки')
+              : 'что раздали бесплатно',
     promo:    ACC_PROMO  ? (ACC_PROMO.totals.users
                 ? `${ACC_PROMO.totals.buyers} заказали · ${fmt(ACC_PROMO.totals.aed)} AED`
                 : (ACC_PROMO.replies ? `${ACC_PROMO.replies} ответов, никто не пришёл`
@@ -4808,12 +4817,14 @@ function accRender(){
     stock:    ACC_STOCK ? [`${ACC_STOCK.done}/${ACC_STOCK.total}`, 'районов'] : ['—', 'районов'],
     order:    ACC_ORDER ? [fmt(ACC_ORDER.total_qty), 'штук'] : ['—', 'штук'],
     promo:    ACC_PROMO ? [fmt(ACC_PROMO.totals.users), 'пришло'] : ['—', 'пришло'],
+    gift:     ACC_GIFT  ? [fmt(ACC_GIFT.totals.bottles), 'бутылок'] : ['—', 'бутылок'],
   };
   box.innerHTML = `<div class="acc-grid">` + ACC.map((a, i) => {
     const [v, u] = num[a.id] || ['—', ''];
-    // Четыре плитки — ровный квадрат. Широкая первая была нужна, пока их было
-    // три: тогда без неё оставалась дыра, теперь она сама её и создаёт.
-    return `<button class="acc-tile" onclick="accOpen('${a.id}')">
+    // Нечётное число плиток оставляет сироту в полряда, поэтому при нечётном
+    // первая занимает всю ширину — заодно это и есть ежедневное действие.
+    const wide = (ACC.length % 2 === 1) && i === 0;
+    return `<button class="acc-tile ${wide ? 'wide' : ''}" onclick="accOpen('${a.id}')">
       <span class="acc-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"
         stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${a.ico}</svg></span>
       <span class="acc-t">${a.t}</span>
@@ -4827,13 +4838,14 @@ function accRender(){
 // карточках сразу выглядит хуже, чем секунда ожидания.
 async function accLoadSummaries(){
   const get = (p, params) => ownerApi.ownerFetch(p, params ? {params} : undefined).catch(()=>null);
-  const [per, st, ord, pr] = await Promise.all([
+  const [per, st, ord, pr, gf] = await Promise.all([
     get('/api/owner/expenses/period', {days:30}),
     get('/api/owner/stock/status'),
     get('/api/owner/stock/order'),
     get('/api/owner/promo'),
+    get('/api/owner/promotions', {days:30}),
   ]);
-  ACC_PERIOD = per; ACC_STOCK = st; ACC_ORDER = ord; ACC_PROMO = pr;
+  ACC_PERIOD = per; ACC_STOCK = st; ACC_ORDER = ord; ACC_PROMO = pr; ACC_GIFT = gf;
   accRender();
 }
 
@@ -4846,6 +4858,7 @@ function accOpen(id){
   if(id === 'expenses') accExpenses();
   if(id === 'order')    accOrder();
   if(id === 'promo')    accPromo();
+  if(id === 'gift')     accGift();
 }
 
 function accClose(){
@@ -4963,6 +4976,48 @@ async function accOrder(){
         <span class="acc-line-v">${r.need_total}</span>
       </div>`).join('')
     : '<div class="exp-empty">Довозить нечего — остатков хватает</div>'}`;
+}
+
+// ─── Акции ──────────────────────────────────────────────────────────────────
+// Вопрос раздела один: окупается ли подарок. Поэтому рядом с числом бутылок
+// стоит выручка тех самых заказов и средний чек — иначе «раздали сто бутылок»
+// не значит ни хорошо, ни плохо.
+async function accGift(){
+  _setText('accTitle', 'Акции');
+  _setText('accSub', 'загрузка…');
+  let d;
+  try{ d = await ownerApi.ownerFetch('/api/owner/promotions', {params:{days:30}}); }
+  catch(e){ document.getElementById('accMid').innerHTML =
+    '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+  ACC_GIFT = d;
+  const t = d.totals;
+  _setText('accSub', `${escS(d.gift.name)} · от ${fmt(d.gift.min_aed)} AED · ${d.days} дней`);
+  document.getElementById('accMid').innerHTML = `
+    <div class="exp-sum">
+      <div class="exp-tot">
+        <span class="exp-tot-v">${fmt(t.bottles)}</span>
+        <span class="exp-tot-u">бутылок<br>отдано</span>
+        <span class="exp-tot-r">
+          <span>в заказах<b>${fmt(t.aed)}</b></span>
+          <span>средний чек<b>${fmt(t.avg_aed)}</b></span>
+          <span>по прайсу<b>${fmt(t.cost_aed)}</b></span>
+        </span>
+      </div>
+    </div>
+    ${t.bottles ? `<div class="exp-grp">По дням · ${d.by_day.length}</div>` +
+      d.by_day.map(r => `<div class="acc-line">
+        <span class="acc-line-n">${escS(r.day)}</span>
+        <span class="acc-line-s">${r.bottles} ${pluralize(r.bottles,'бутылка','бутылки','бутылок')} · ${
+          r.orders} ${pluralize(r.orders,'заказ','заказа','заказов')}</span>
+        <span class="acc-line-v">${fmt(r.aed)}</span>
+      </div>`).join('') +
+      `<div class="exp-grp">Заказы с подарком · ${d.orders_list.length}</div>` +
+      d.orders_list.map(r => `<div class="acc-line">
+        <span class="acc-line-n">#${escS(r.order_id)}</span>
+        <span class="acc-line-s">${escS(r.day)}${r.delivered ? '' : ' · не доставлен'}</span>
+        <span class="acc-line-v">${fmt(r.aed)}</span>
+      </div>`).join('')
+    : '<div class="exp-empty">Пока ни одной бутылки не отдано</div>'}`;
 }
 
 // ─── Реклама ────────────────────────────────────────────────────────────────

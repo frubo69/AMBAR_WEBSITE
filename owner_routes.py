@@ -962,6 +962,64 @@ async def handle_promo(request):
 
 
 @require_owner
+async def handle_promotions(request):
+    """Учёт акции: сколько бутылок отдано бесплатно и что они принесли.
+
+    Вопрос здесь один — окупается ли подарок. Поэтому рядом с числом бутылок
+    стоит выручка тех самых заказов: сто отданных бутылок при среднем чеке в
+    полторы тысячи и при чеке в тысячу — это разные сто бутылок."""
+    import config_gift as gift
+    from operator_routes import _catalog_by_id
+    cat = _catalog_by_id()
+    unit = int((cat.get(gift.ITEM_ID) or {}).get("price_full") or 0)   # во что нам обходится
+
+    days = int(request.query.get("days", 30) or 30)
+    since = (datetime.now(DUBAI_TZ) - timedelta(days=days)).astimezone(timezone.utc)
+
+    orders = list((await db.get_all_orders()).values())
+    rows, by_day = [], {}
+    for o in orders:
+        if o.get("test") or o.get("status") in ("cancelled", "declined"):
+            continue
+        gifts = [i for i in (o.get("items") or []) if i.get("gift")]
+        if not gifts:
+            continue
+        ts = str(o.get("confirmed_at") or o.get("timestamp") or "")
+        try:
+            when = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+            if when.tzinfo is None:
+                when = when.replace(tzinfo=timezone.utc)
+        except Exception:
+            when = None
+        if when and when < since:
+            continue
+        qty = sum(int(i.get("qty") or 1) for i in gifts)
+        day = (when.astimezone(DUBAI_TZ).strftime("%Y-%m-%d") if when else "—")
+        d = by_day.setdefault(day, {"day": day, "bottles": 0, "orders": 0, "aed": 0})
+        d["bottles"] += qty; d["orders"] += 1; d["aed"] += int(o.get("total") or 0)
+        rows.append({"order_id": o.get("order_id"), "day": day, "qty": qty,
+                     "aed": int(o.get("total") or 0),
+                     "name": o.get("customer_name") or "—",
+                     "delivered": o.get("status") == "delivered"})
+    rows.sort(key=lambda r: r["day"], reverse=True)
+    bottles = sum(r["qty"] for r in rows)
+    aed = sum(r["aed"] for r in rows)
+    return web.json_response({
+        "gift": {"id": gift.ITEM_ID, "min_aed": gift.MIN_AED,
+                 "name": (cat.get(gift.ITEM_ID) or {}).get("name", ""),
+                 "unit_aed": unit},
+        "days": days,
+        "totals": {"bottles": bottles, "orders": len(rows), "aed": aed,
+                   # Себестоимость подарка считаем по полной цене каталога: это
+                   # то, за сколько бутылка иначе была бы продана.
+                   "cost_aed": bottles * unit,
+                   "avg_aed": round(aed / len(rows)) if rows else 0},
+        "by_day": sorted(by_day.values(), key=lambda d: d["day"], reverse=True),
+        "orders_list": rows[:50],
+    }, headers=CORS_HEADERS, dumps=lambda o: __import__("json").dumps(o, default=_json_default))
+
+
+@require_owner
 async def handle_customer_detail(request):
     """Return single customer profile + recent orders."""
     raw = request.match_info["telegram_id"]
@@ -2411,6 +2469,8 @@ def setup(app):
     app.router.add_get(             "/api/owner/office",  handle_office)
     app.router.add_route("OPTIONS", "/api/owner/operators", handle_operators)
     app.router.add_get(             "/api/owner/operators", handle_operators)
+    app.router.add_route("OPTIONS", "/api/owner/promotions", handle_promotions)
+    app.router.add_get(             "/api/owner/promotions", handle_promotions)
     app.router.add_route("OPTIONS", "/api/owner/promo",   handle_promo)
     app.router.add_get(             "/api/owner/promo",   handle_promo)
     app.router.add_route("OPTIONS", "/api/owner/customers",              handle_customers)

@@ -690,6 +690,8 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .pr-kind-v{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;
   margin-top:3px;font-variant-numeric:tabular-nums}
 .pr-kind-s{font-size:11px;color:var(--muted);margin-top:2px}
+.pr-line[data-detail]{cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pr-line[data-detail]:active{background:var(--card2)}
 .acc-line-bar{flex:1.2;height:5px;border-radius:3px;background:var(--card2);overflow:hidden}
 .acc-line-bar i{display:block;height:100%;border-radius:3px;
   background:linear-gradient(90deg,var(--gold),var(--gold2))}
@@ -2446,6 +2448,8 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
         <button class="ac-chip" data-filter="vip">VIP</button>
         <button class="ac-chip" data-filter="banned">Забаненные</button>
         <button class="ac-chip" data-filter="hasReferrals">С рефералами</button>
+        <button class="ac-chip" data-filter="fromPost">Из рекламных постов</button>
+        <button class="ac-chip" data-filter="fromChat">Из ответов бота</button>
         <button class="ac-chip" data-filter="hasPhone">С номером</button>
         <button class="ac-chip" data-filter="phoneVerified">Номер подтверждён</button>
         <button class="ac-chip" data-filter="new7d">Новые (7д)</button>
@@ -5054,6 +5058,17 @@ async function accPromo(){
         <div class="pr-kind-v">${k.share_aed}<i style="font-size:11px;font-weight:500">%</i></div>
         <div class="pr-kind-s">${fmt(k.aed)} AED · конверсия ${k.conv}%</div>
       </div>`).join('') + `</div>` : ''}
+    ${(d.people||[]).length ? `<div class="exp-grp">Кто пришёл · ${d.people.length}</div>` +
+      d.people.map(p => `<div class="pr-line" data-detail="customer:${p.telegram_id}">
+        <div class="pr-line-t">
+          <span class="pr-line-n">${escS(p.name)}${p.username
+            ? ` <i style="font-style:normal;color:var(--muted);font-weight:500">@${escS(p.username)}</i>` : ''}</span>
+          <span class="pr-line-v" style="${p.aed ? '' : 'color:var(--muted)'}">${
+            p.aed ? fmt(p.aed) + ' AED' : '—'}</span>
+        </div>
+        <div class="pr-line-s">${escS(p.source)} · ${p.orders
+          ? `${p.orders} ${pluralize(p.orders,'заказ','заказа','заказов')}` : 'без заказов'}</div>
+      </div>`).join('') : ''}
     ${d.sources.length ? `<div class="exp-grp">Каналы · ${d.sources.length}</div>` +
       d.sources.map(r => `<div class="pr-line">
         <div class="pr-line-t">
@@ -5978,7 +5993,7 @@ function renderAllClientsList(customers){
     const uname = c.username ? '@'+c.username : 'ID '+c.telegram_id;
     const _fs=c.first_seen?new Date(c.first_seen).getTime():0;
     const _ls=c.last_seen?new Date(c.last_seen).getTime():0;
-    html += `<div class="lrow" data-detail="customer:${c.telegram_id}" data-orders="${c.orders_total||0}" data-vip="${c.is_vip?1:0}" data-banned="${c.is_banned?1:0}" data-refs="${c.referrals_count||0}" data-phone="${c.phone?1:0}" data-pverified="${c.phone_verified?1:0}" data-firstseen="${_fs}" data-lastseen="${_ls}" data-spent="${c.total_spent||0}"><div class="lrow-av"${avSt?' style="'+avSt+'"':''}>${c.initials}</div><div class="lrow-body"><div class="lrow-name">${name}${tag}${c.is_banned?' <span class="lrow-tag" style="background:rgba(224,85,85,.15);color:#e05555">БАН</span>':''}</div><div class="lrow-sub">${uname} · ${_pluralOrders(c.orders_total)}</div></div><div class="lrow-amt mono" data-aed="${c.total_spent}">${fmt(c.total_spent)}</div></div>`;
+    html += `<div class="lrow" data-detail="customer:${c.telegram_id}" data-orders="${c.orders_total||0}" data-vip="${c.is_vip?1:0}" data-banned="${c.is_banned?1:0}" data-refs="${c.referrals_count||0}" data-phone="${c.phone?1:0}" data-pverified="${c.phone_verified?1:0}" data-firstseen="${_fs}" data-lastseen="${_ls}" data-spent="${c.total_spent||0}" data-via="${escS(c.invited_via||'')}"><div class="lrow-av"${avSt?' style="'+avSt+'"':''}>${c.initials}</div><div class="lrow-body"><div class="lrow-name">${name}${tag}${c.is_banned?' <span class="lrow-tag" style="background:rgba(224,85,85,.15);color:#e05555">БАН</span>':''}</div><div class="lrow-sub">${uname} · ${_pluralOrders(c.orders_total)}</div></div><div class="lrow-amt mono" data-aed="${c.total_spent}">${fmt(c.total_spent)}</div></div>`;
   });
   html += '</div>';
   body.innerHTML = html;
@@ -7561,6 +7576,10 @@ function filterAllClients(q){
     if(show && _acActiveFilter === 'vip' && row.dataset.vip !== '1') show = false;
     if(show && _acActiveFilter === 'banned' && row.dataset.banned !== '1') show = false;
     if(show && _acActiveFilter === 'hasReferrals' && Number(row.dataset.refs) === 0) show = false;
+    // Пост и автоответ бота — разные интеграции и разные деньги, поэтому и
+    // фильтры разные: «пришёл с рекламы» ответа про то, какая, не даёт.
+    if(show && _acActiveFilter === 'fromPost' && !(row.dataset.via||'').startsWith('post_')) show = false;
+    if(show && _acActiveFilter === 'fromChat' && !(row.dataset.via||'').startsWith('chat_')) show = false;
     if(show && _acActiveFilter === 'hasPhone' && row.dataset.phone !== '1') show = false;
     if(show && _acActiveFilter === 'phoneVerified' && row.dataset.pverified !== '1') show = false;
     if(show && _acActiveFilter === 'new7d'){const fs=Number(row.dataset.firstseen);if(!fs||now-fs>_7D) show=false;}
@@ -7589,7 +7608,7 @@ function filterAllClients(q){
   const sub = document.getElementById('acSubtitle');
   if(sub){
     const total = rows.length;
-    const _fNames={hasOrders:'с заказами',returning:'повторные',vip:'VIP',banned:'забаненные',hasReferrals:'с рефералами',hasPhone:'с номером',phoneVerified:'номер подтверждён',new7d:'новые 7д',inactive:'неактивные',topSpent:'по тратам ↓'};
+    const _fNames={hasOrders:'с заказами',returning:'повторные',vip:'VIP',banned:'забаненные',hasReferrals:'с рефералами',hasPhone:'с номером',phoneVerified:'номер подтверждён',new7d:'новые 7д',inactive:'неактивные',topSpent:'по тратам ↓',fromPost:'из постов',fromChat:'из ответов бота'};
     const fLabel = _fNames[_acActiveFilter]||'';
     if(_acActiveFilter || needle) sub.textContent = `${visCount} из ${total}${fLabel?' · '+fLabel:''}`;
     else sub.textContent = `${total} человек · А → Я`;

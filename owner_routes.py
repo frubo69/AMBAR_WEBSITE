@@ -902,7 +902,7 @@ async def handle_promo(request):
                     f"{(c or {}).get('replies', 0)} ответов" if c else "чат не в реестре")
         return (via, via, "прочее", "")
 
-    rows = {}
+    rows, people = {}, []
     for u in users:
         via = str(u.get("invited_via") or "")
         if not via:
@@ -916,6 +916,16 @@ async def handle_promo(request):
             r["buyers"] += 1
             r["orders"] += st["n"]
             r["aed"] += st["aed"]
+        # Поимённо: «пришло шесть человек» — это ещё не ответ, владелец хочет
+        # видеть, кто именно, и провалиться в карточку.
+        people.append({
+            "telegram_id": u.get("telegram_id"),
+            "name": (u.get("name") or "").strip() or "Без имени",
+            "username": u.get("username") or "",
+            "source": name, "kind": kind, "via": via,
+            "at": u.get("invited_at") or "",
+            "orders": (st or {}).get("n", 0), "aed": (st or {}).get("aed", 0),
+        })
 
     # Чаты, где бот отвечал, но никто не пришёл, тоже показываем: пустая строка
     # здесь — это и есть ответ про эффективность.
@@ -953,8 +963,12 @@ async def handle_promo(request):
         k["share_aed"] = _pct(k["aed"], tot["aed"])
         k["conv"] = _pct(k["buyers"], k["users"])
 
+    # Сначала кто принёс деньги, потом кто просто зашёл: в длинном списке
+    # платящие иначе теряются среди зевак.
+    people.sort(key=lambda p: (-p["aed"], -p["orders"], str(p["at"])), reverse=False)
     return web.json_response({
         "sources": out,
+        "people": people,
         "kinds": sorted(kinds.values(), key=lambda k: -k["aed"]),
         "totals": {**tot, "conv": _pct(tot["buyers"], tot["users"])},
         "replies": sum(int(c.get("replies") or 0) for c in chats.values()),

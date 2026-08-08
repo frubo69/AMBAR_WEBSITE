@@ -348,7 +348,11 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 .cart-foot{padding:14px 16px;background:var(--bg2);border-top:1px solid var(--border)}
 /* Строка подарка в корзине: тот же формат, что у товара, но без «плюс-минус»
    и без свайпа — убрать то, что положено, нельзя. */
-.gift-ci{border:1px solid rgba(201,169,110,.3);background:rgba(201,169,110,.05)}
+/* Подарок стоит отдельной карточкой, а не последним звеном списка: человек
+   его не выбирал, и в одну цепочку с тем, что он сам положил, он не встаёт. */
+.gift-wrap{margin:9px 12px 0}
+.gift-ci{border:1px solid rgba(201,169,110,.3);background:rgba(201,169,110,.05);
+  border-radius:var(--r)}
 /* Название подарка переносим, а не обрезаем: «Jacob Creek Shir…» не говорит
    человеку, какое вино ему достанется. */
 .gift-ci .ci-name{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25}
@@ -1803,6 +1807,7 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
     <div id="cart-list"></div>
     <div id="cart-thumb"></div>
   </div>
+  <div id="gift-slot"></div>
   <div id="tip-section" style="display:none">
     <div class="tip-wrap">
       <div class="tip-label" id="tip-lbl">ЧАЕВЫЕ</div>
@@ -6124,6 +6129,7 @@ function renderCart(){
   const topbar=document.querySelector('.cart-topbar');
   if(!entries.length){
     el('cart-empty').style.display='flex';
+    el('gift-slot').innerHTML='';          // иначе подарок переживёт очистку корзины
     document.querySelector('.cart-list-wrap').style.display='none';
     if(topbar)topbar.style.display='none';
     el('ce-title').textContent=lang==='ru'?'пусто':'empty';
@@ -6143,7 +6149,8 @@ function renderCart(){
       <div class="ci-info"><div class="ci-name">${nameLabel}</div><div class="ci-price">${displayPrice} AED</div></div>
       <div class="qctrl"><button class="qb" onclick="chgQty('${id}',-1)">−</button><span class="qn">${qty}</span><button class="qb" onclick="chgQty('${id}',1)">+</button></div>
     </div></div></div>`;
-  }).join('')+giftRow();
+  }).join('');
+  el('gift-slot').innerHTML=giftRow();
   initCartSwipe();
   el('tot-n').textContent=cartSub()+tip;foot.style.display='block';tipSec.style.display='block';
   renderGift();
@@ -6296,7 +6303,7 @@ function giftOn(){ return !!giftProduct() && cartSub()>=GIFT_MIN; }
 // удалить то, что ему и так положено. Здесь это строка, а не товар.
 function giftRow(){
   const g=giftProduct(); if(!g||!giftOn()) return '';
-  return `<div class="ci gift-ci">
+  return `<div class="gift-wrap"><div class="ci gift-ci">
     <img class="ci-img" src="${g.img}" alt="${g.name}">
     <div class="ci-info">
       <div class="ci-name">${g.name}</div>
@@ -6308,7 +6315,7 @@ function giftRow(){
         <path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7"/></svg>
       0 AED
     </div>
-  </div>`;
+  </div></div>`;
 }
 
 function renderGift(){

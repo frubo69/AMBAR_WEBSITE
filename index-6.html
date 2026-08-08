@@ -346,6 +346,19 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 .tip-done-btn{width:100%;margin-top:7px;height:38px;border-radius:var(--r3);border:1.5px solid var(--gold);background:rgba(201,169,110,.08);color:var(--gold);font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;cursor:pointer;display:none;transition:.15s}
 .tip-done-btn:active{background:rgba(201,169,110,.22)}
 .cart-foot{padding:14px 16px;background:var(--bg2);border-top:1px solid var(--border)}
+/* Подарок за сумму. Полоса нужна не для красоты: без неё человек не знает,
+   что до бесплатной бутылки осталось двести дирхам, и акция не работает. */
+.gift-bar{padding:10px 12px;border-radius:12px;margin-bottom:10px;
+  background:rgba(201,169,110,.08);border:1px solid rgba(201,169,110,.25)}
+.gift-bar.on{background:rgba(76,175,125,.1);border-color:rgba(76,175,125,.35)}
+.gift-top{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:600;
+  color:var(--gold);line-height:1.3}
+.gift-bar.on .gift-top{color:#4CAF7D}
+.gift-track{height:4px;border-radius:2px;background:rgba(255,255,255,.08);
+  overflow:hidden;margin-top:8px}
+.gift-track i{display:block;height:100%;border-radius:2px;background:var(--gold);
+  transition:width .3s cubic-bezier(.4,0,.2,1)}
+.gift-bar.on .gift-track i{background:#4CAF7D}
 .total-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
 .total-lbl{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);font-weight:600}
 .total-val{font-family:'DM Sans',sans-serif;font-size:28px;color:var(--gold2);font-weight:600}
@@ -1790,6 +1803,15 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
   </div>
   <div id="cart-foot" style="display:none">
     <div class="cart-foot">
+      <div class="gift-bar" id="gift-bar" style="display:none">
+        <div class="gift-top">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7"/></svg>
+          <span id="gift-txt">—</span>
+        </div>
+        <div class="gift-track"><i id="gift-fill"></i></div>
+      </div>
       <div class="total-row"><span class="total-lbl" id="tot-lbl">ИТОГО</span><span class="total-val"><span id="tot-n">0</span> AED</span></div>
       <button class="btn-main" id="co-btn" onclick="tryOrder()"><span id="co-btn-text">Оформить заказ →</span><span class="btn-hours" id="co-btn-hours">Принимаем заказы с 12:00 до 06:00</span></button>
       <button class="btn-outline" id="clear-btn" onclick="clearCart()">Очистить корзину</button>
@@ -6114,6 +6136,7 @@ function renderCart(){
   }).join('');
   initCartSwipe();
   el('tot-n').textContent=cartSub()+tip;foot.style.display='block';tipSec.style.display='block';
+  renderGift();
   setTimeout(updateCartThumb,0);
 }
 function updateCartThumb(){
@@ -6246,7 +6269,28 @@ function pickTip(v,isCustom,btn){
   if(isCustom){inp.style.display='block';inp.focus();inp.oninput=()=>{tip=Math.max(0,parseFloat(inp.value)||0);updCartTot()};}
   else{inp.style.display='none';el('tip-done-btn').style.display='none';tip=v;updCartTot();}
 }
-function updCartTot(){el('tot-n').textContent=cartSub()+tip;buildSummary();}
+function updCartTot(){el('tot-n').textContent=cartSub()+tip;renderGift();buildSummary();}
+
+// ── Подарок за сумму заказа ──────────────────────────────────────────────────
+// Порог и позицию решает сервер, он же кладёт бутылку в заказ. Здесь только
+// витрина: сколько осталось добрать. Без этой строки акция не работает — человек
+// не узнает, что до бесплатного вина ему двести дирхам.
+const GIFT_MIN=1000, GIFT_ID='p105';
+function renderGift(){
+  const bar=el('gift-bar'); if(!bar) return;
+  const g=P.find(x=>x.id===GIFT_ID);
+  if(!g||g.stock===false){bar.style.display='none';return;}   // нет на полке — не обещаем
+  const sub=cartSub();                                        // чаевые не в счёт
+  const left=GIFT_MIN-sub;
+  bar.style.display='block';
+  bar.classList.toggle('on',left<=0);
+  el('gift-fill').style.width=Math.min(100,Math.round(sub*100/GIFT_MIN))+'%';
+  el('gift-txt').textContent=left>0
+    ? (lang==='ru' ? `Ещё ${left} AED — и ${g.name} в подарок`
+                   : `${left} AED more — and ${g.name} is on us`)
+    : (lang==='ru' ? `${g.name} — в подарок к заказу`
+                   : `${g.name} — free with your order`);
+}
 
 // ── SUMMARY ───────────────────────────────────────────────────────────────────
 function buildSummary(){

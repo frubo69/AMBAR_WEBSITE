@@ -487,6 +487,17 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
     # cash/card path did not, so a hand-crafted POST could book a 2000 AED basket
     # as 1 AED and the operator card would print the lie.
     total     = src.get("total", 0)
+    # Подарок кладёт сервер, а не клиент: иначе любой POST мог бы положить в
+    # заказ бесплатную бутылку без всякой тысячи.
+    try:
+        import config_gift as gift
+        _sub = await _goods_subtotal_aed(items)
+        _before = len(items)
+        items = gift.apply(items, _sub, await asyncio.to_thread(_load_catalog_by_id))
+        if len(items) > _before:
+            log.info(f"[gift] #{oid} заказ на {_sub:.0f} AED — добавлено {items[-1]['name']}")
+    except Exception as e:
+        log.error(f"[gift] #{oid}: {e}")
     try:
         authoritative = await _recompute_order_total_aed(items, tip)
         if authoritative > 0:
@@ -957,6 +968,32 @@ def _catalog_unit_price(p: dict, pcs) -> float:
         return float(math.ceil((base * 2 - 5) / 5) * 5)
     return base
 
+async def _goods_subtotal_aed(items: list) -> float:
+    """Товары без чаевых — по ценам каталога. Порог подарка считается отсюда:
+    чаевые водителю покупкой не являются и тысячу набивать не должны."""
+    catalog = await asyncio.to_thread(_load_catalog_by_id)
+    subtotal = 0.0
+    for it in (items or []):
+        # Подарок бесплатен и в свой же порог не засчитывается.
+        if it.get("gift"):
+            continue
+        try:
+            qty = int(it.get("qty", 0) or 0)
+        except (TypeError, ValueError):
+            qty = 0
+        if qty <= 0:
+            continue
+        p = catalog.get(it.get("id"))
+        if p:
+            subtotal += _catalog_unit_price(p, it.get("pcs")) * qty
+        else:
+            try:
+                subtotal += float(it.get("line_total", 0) or 0)
+            except (TypeError, ValueError):
+                pass
+    return subtotal
+
+
 async def _recompute_order_total_aed(items: list, tip: float) -> float:
     """Authoritative order total (AED) = Σ catalog_unit_price×qty + tip. Unknown
     ids fall back to the client's line_total so a valid order is never rejected;
@@ -964,6 +1001,8 @@ async def _recompute_order_total_aed(items: list, tip: float) -> float:
     catalog = await asyncio.to_thread(_load_catalog_by_id)
     subtotal = 0.0
     for it in (items or []):
+        if it.get("gift"):
+            continue
         try:
             qty = int(it.get("qty", 0) or 0)
         except (TypeError, ValueError):

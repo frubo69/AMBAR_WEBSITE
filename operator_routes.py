@@ -160,6 +160,8 @@ async def _pos_total(items: list) -> int:
     cat = _catalog_by_id()
     total = 0
     for it in (items or []):
+        if it.get("gift"):          # подарок бесплатен
+            continue
         try:
             qty = int(it.get("qty", 0) or 0)
         except (TypeError, ValueError):
@@ -478,6 +480,16 @@ async def handle_create(request):
 
     # Authoritative total from the catalog (never trust the iPad's math).
     total = await _pos_total(items)
+    # Акция действует и по телефону: клиент, который набрал на тысячу голосом,
+    # ничем не хуже того, кто набрал её в приложении.
+    try:
+        import config_gift as gift
+        _before = len(items)
+        items = gift.apply(items, total, _catalog_by_id())
+        if len(items) > _before:
+            log.info(f"[gift] телефонный заказ на {total} AED — {items[-1]['name']}")
+    except Exception as e:
+        log.error(f"[gift] телефонный заказ: {e}")
 
     now = datetime.now(timezone.utc).isoformat()
     op_display = _op_name(request["op_user"])

@@ -3988,8 +3988,8 @@ function _preloadHsHero(){
 // like; with 2+ the banner auto-scrolls through them with line indicators (like the
 // SWAPLY hero). They render in a fixed 2:1 frame (object-fit:cover), so keep them ~2:1.
 const PROMO_SLIDES = {
-  ru: ['promo_hero_ru.png', 'promo_banner_ru.png', 'promo_addhome_ru.png'],
-  en: ['promo_hero_en.png', 'promo_banner_en.png', 'promo_addhome_en.png'],
+  ru: ['promo_gift_ru.jpg', 'promo_hero_ru.png', 'promo_banner_ru.png', 'promo_addhome_ru.png'],
+  en: ['promo_gift_en.jpg', 'promo_hero_en.png', 'promo_banner_en.png', 'promo_addhome_en.png'],
 };
 // Tap-through info per slide, keyed by the slide's base filename (promo_hero → discount,
 // promo_banner → crypto). showPromoInfo() picks by the CURRENTLY shown slide; unknown
@@ -4003,6 +4003,14 @@ const PROMO_INFO = {
     items: {ru:['На все товары каталога','Применяется автоматически — без промокодов','Только в приложении, всегда'],
             en:['On every product in the catalog','Applied automatically — no promo codes','In the app, always']},
   },
+  promo_gift: {
+    badge: '0 AED',
+    title: {ru:'ВИНО В ПОДАРОК', en:'WINE ON THE HOUSE'},
+    lead:  {ru:'Jacob Creek Shiraz 0.75 бесплатно к любому заказу от 1000 AED. Бутылка добавляется в корзину сама — просить ничего не нужно.',
+            en:'Jacob Creek Shiraz 0.75 free with any order from 1000 AED. The bottle is added to your cart automatically — no need to ask.'},
+    items: {ru:['Порог — 1000 AED по товарам, без чаевых','Добавляется автоматически при оформлении','Пока вино есть в наличии'],
+            en:['Threshold — 1000 AED of goods, tips excluded','Added automatically at checkout','While the wine is in stock']},
+  },
   promo_banner: {
     badge: 'USDT',
     title: {ru:'ТЕПЕРЬ И КРИПТОЙ', en:'NOW IN CRYPTO'},
@@ -4012,7 +4020,7 @@ const PROMO_INFO = {
             en:['USDT · TRON network (TRC-20)','Confirmed on-chain — no extra questions','Receipt with QR right after payment']},
   },
 };
-function _promoInfoKey(){ return (_promoList()[_promoIdx]||'').replace(/.*\//,'').replace(/_(ru|en)\.png$/i,''); }
+function _promoInfoKey(){ return (_promoList()[_promoIdx]||'').replace(/.*\//,'').replace(/_(ru|en)\.(png|jpe?g|webp)$/i,''); }
 let _promoIdx=0,_promoRAF=null,_promoT0=0;
 const _PROMO_AUTO_MS=6000;   // dwell per slide — also how long each line takes to fill
 function _promoList(){ return PROMO_SLIDES[lang==='ru'?'ru':'en'] || PROMO_SLIDES.en || []; }

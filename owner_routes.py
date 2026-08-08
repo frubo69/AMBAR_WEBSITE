@@ -828,6 +828,9 @@ def _serialize_user(u: dict, orders: list | None = None) -> dict:
         # такого приведённым нельзя — иначе «перетащил из офлайна» превращается
         # в рассылку по своей же базе.
         "invited_was_new":     _invited_was_new(u),
+        # Канал рекламы: без него карточка показывает «общая ссылка» и там, где
+        # человек на самом деле пришёл из конкретного чата или поста.
+        "invited_via":         u.get("invited_via", ""),
         "referred_by":         u.get("referred_by"),
     }
     if orders is not None:
@@ -885,23 +888,27 @@ async def handle_promo(request):
 
     def _label(via: str) -> tuple:
         if via.startswith("biz"):
-            return ("biz", "Приветствие в личке", "бизнес-аккаунт")
+            return ("biz", "Приветствие в личке", "приветствие", "бизнес-аккаунт")
         if via == "chat_direct":
-            return (via, "Рекламный бот напрямую", "открыли самого бота")
+            return (via, "Рекламный бот напрямую", "прочее", "открыли самого бота")
+        if via.startswith("post_"):
+            tag = via[5:]
+            return (via, "Рекламный пост" + ("" if tag == "all" else f" · {tag}"),
+                    "посты", "")
         if via.startswith("chat_"):
             key = via[5:]
             c = chats.get(key)
-            return (via, (c or {}).get("title") or f"Чат {key}",
+            return (via, (c or {}).get("title") or f"Чат {key}", "автоответы",
                     f"{(c or {}).get('replies', 0)} ответов" if c else "чат не в реестре")
-        return (via, via, "")
+        return (via, via, "прочее", "")
 
     rows = {}
     for u in users:
         via = str(u.get("invited_via") or "")
         if not via:
             continue
-        key, name, note = _label(via)
-        r = rows.setdefault(key, {"id": key, "name": name, "note": note,
+        key, name, kind, note = _label(via)
+        r = rows.setdefault(key, {"id": key, "name": name, "kind": kind, "note": note,
                                   "users": 0, "buyers": 0, "orders": 0, "aed": 0})
         r["users"] += 1
         st = by_cust.get(int(u.get("telegram_id") or 0))
@@ -916,15 +923,40 @@ async def handle_promo(request):
         via = f"chat_{key}"
         if via not in rows:
             rows[via] = {"id": via, "name": c.get("title") or f"Чат {key}",
-                         "note": f"{c.get('replies', 0)} ответов",
+                         "kind": "автоответы", "note": f"{c.get('replies', 0)} ответов",
                          "users": 0, "buyers": 0, "orders": 0, "aed": 0}
     out = sorted(rows.values(), key=lambda r: (-r["aed"], -r["users"]))
+    tot = {"users": sum(r["users"] for r in out), "buyers": sum(r["buyers"] for r in out),
+           "orders": sum(r["orders"] for r in out), "aed": sum(r["aed"] for r in out)}
+
+    # Доли и конверсия. Абсолютные числа не отвечают на вопрос «какая рекламка
+    # работает»: канал с сотней зевак и канал с десятью покупателями выглядят
+    # одинаково, пока не поделишь.
+    def _pct(a, b):
+        return round(a * 100 / b, 1) if b else 0.0
+    for r in out:
+        r["share_users"] = _pct(r["users"], tot["users"])
+        r["share_aed"]   = _pct(r["aed"],   tot["aed"])
+        r["conv"]        = _pct(r["buyers"], r["users"])
+        r["avg"]         = round(r["aed"] / r["buyers"]) if r["buyers"] else 0
+
+    # Сводка по видам интеграций: посты против автоответов — это разные
+    # договорённости и разные деньги, их и сравнивают в первую очередь.
+    kinds = {}
+    for r in out:
+        k = kinds.setdefault(r["kind"], {"kind": r["kind"], "sources": 0, "users": 0,
+                                         "buyers": 0, "orders": 0, "aed": 0})
+        k["sources"] += 1
+        for f in ("users", "buyers", "orders", "aed"):
+            k[f] += r[f]
+    for k in kinds.values():
+        k["share_aed"] = _pct(k["aed"], tot["aed"])
+        k["conv"] = _pct(k["buyers"], k["users"])
+
     return web.json_response({
         "sources": out,
-        "totals": {"users": sum(r["users"] for r in out),
-                   "buyers": sum(r["buyers"] for r in out),
-                   "orders": sum(r["orders"] for r in out),
-                   "aed": sum(r["aed"] for r in out)},
+        "kinds": sorted(kinds.values(), key=lambda k: -k["aed"]),
+        "totals": {**tot, "conv": _pct(tot["buyers"], tot["users"])},
         "replies": sum(int(c.get("replies") or 0) for c in chats.values()),
     }, headers=CORS_HEADERS, dumps=lambda o: __import__("json").dumps(o, default=_json_default))
 

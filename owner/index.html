@@ -678,6 +678,18 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .pr-line-v{font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;
   font-variant-numeric:tabular-nums;flex-shrink:0}
 .pr-line-s{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.35}
+/* Доля канала полосой: проценты словами читаются по одному, полосы — все
+   сразу, и отстающий канал видно, не вчитываясь. */
+.pr-line-bar{height:4px;border-radius:2px;background:var(--card2);overflow:hidden;margin-top:7px}
+.pr-line-bar i{display:block;height:100%;border-radius:2px;
+  background:linear-gradient(90deg,var(--gold),var(--gold2))}
+.pr-kinds{display:flex;gap:8px;margin:12px 0 4px}
+.pr-kind{flex:1;padding:10px 11px;border-radius:12px;background:var(--card);
+  border:1px solid var(--border2)}
+.pr-kind-t{font-size:10px;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.pr-kind-v{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;
+  margin-top:3px;font-variant-numeric:tabular-nums}
+.pr-kind-s{font-size:11px;color:var(--muted);margin-top:2px}
 .acc-line-bar{flex:1.2;height:5px;border-radius:3px;background:var(--card2);overflow:hidden}
 .acc-line-bar i{display:block;height:100%;border-radius:3px;
   background:linear-gradient(90deg,var(--gold),var(--gold2))}
@@ -4965,8 +4977,10 @@ async function accPromo(){
     '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
   ACC_PROMO = d;
   const t = d.totals;
-  _setText('accSub', d.replies ? `${d.replies} ${pluralize(d.replies,'ответ','ответа','ответов')} в чатах`
-                               : 'бот ещё нигде не отвечал');
+  _setText('accSub', t.users
+    ? `${t.users} ${pluralize(t.users,'пришёл','пришло','пришло')} · ${t.conv}% дошли до заказа`
+    : (d.replies ? `${d.replies} ${pluralize(d.replies,'ответ','ответа','ответов')}, никто не пришёл`
+                 : 'бот ещё нигде не отвечал'));
   document.getElementById('accMid').innerHTML = `
     <div class="exp-sum">
       <div class="exp-tot">
@@ -4979,6 +4993,12 @@ async function accPromo(){
         </span>
       </div>
     </div>
+    ${(d.kinds || []).length > 1 ? `<div class="pr-kinds">` + d.kinds.map(k => `
+      <div class="pr-kind">
+        <div class="pr-kind-t">${escS(k.kind)}</div>
+        <div class="pr-kind-v">${k.share_aed}<i style="font-size:11px;font-weight:500">%</i></div>
+        <div class="pr-kind-s">${fmt(k.aed)} AED · конверсия ${k.conv}%</div>
+      </div>`).join('') + `</div>` : ''}
     ${d.sources.length ? `<div class="exp-grp">Каналы · ${d.sources.length}</div>` +
       d.sources.map(r => `<div class="pr-line">
         <div class="pr-line-t">
@@ -4987,11 +5007,11 @@ async function accPromo(){
             r.aed ? fmt(r.aed) + ' AED' : '—'}</span>
         </div>
         <div class="pr-line-s">${r.users
-          ? `${r.users} ${pluralize(r.users,'пришёл','пришло','пришло')} · ${r.buyers} ${
-              pluralize(r.buyers,'заказал','заказали','заказали')}${
-              r.orders ? ` · ${r.orders} ${pluralize(r.orders,'заказ','заказа','заказов')}` : ''}${
-              escS(r.note ? ' · ' + r.note : '')}`
+          ? `${r.users} ${pluralize(r.users,'пришёл','пришло','пришло')} · заказали ${
+              r.conv}%${r.avg ? ` · чек ${fmt(r.avg)}` : ''}${escS(r.note ? ' · ' + r.note : '')}`
           : escS(r.note || 'пока никого')}</div>
+        ${r.aed ? `<div class="pr-line-bar"><i style="width:${Math.max(2, r.share_aed)}%"></i></div>
+          <div class="pr-line-s">${r.share_aed}% всей выручки с рекламы</div>` : ''}
       </div>`).join('')
     : '<div class="exp-empty">Каналов пока нет. Добавьте @ambarpr_bot администратором в чаты.</div>'}`;
 }
@@ -8946,7 +8966,7 @@ const DETAIL = {
     // Кто привёл. Приглашение оператора несёт его id и район, поэтому видно,
     // с какого именно приглашения человек дошёл до приложения.
     const _invRows = [];
-    if(c.invited_by_operator != null){
+    if(c.invited_by_operator != null && !c.invited_via){
       const who = c.invited_by_operator
         ? (((OPS.data||{}).operators||[]).find(o=>o.telegram_id===c.invited_by_operator)?.name
            || ((OPS.data||{}).devices||[]).find(o=>o.telegram_id===c.invited_by_operator)?.name
@@ -8962,6 +8982,20 @@ const DETAIL = {
         <div class="dt-row-t">Приглашение оператора</div>
         <div class="dt-row-s">${escS(who)}${dis?` · ${escS(dis.code)} ${escS(dis.name)}`:''}</div>
         ${wasNew}
+      </div><div class="dt-row-r">${c.invited_at ? escS(String(c.invited_at).slice(0,10)) : ''}</div></div>`);
+    }
+    // Реклама. «Общая ссылка» здесь врёт: человек пришёл из конкретного чата
+    // или поста, и за этот чат мы платим.
+    if(c.invited_via){
+      const v = String(c.invited_via);
+      const nm = v.startsWith('post_')
+          ? 'Рекламный пост' + (v.slice(5) === 'all' ? '' : ' · ' + v.slice(5))
+        : v.startsWith('biz') ? 'Приветствие в личке'
+        : v === 'chat_direct' ? 'Открыл рекламного бота'
+        : ((ACC_PROMO?.sources || []).find(x => x.id === v)?.name || 'Чат ' + v.slice(5));
+      _invRows.push(`<div class="dt-row"><div class="dt-row-l">
+        <div class="dt-row-t">Пришёл из рекламы</div>
+        <div class="dt-row-s">${escS(nm)}</div>
       </div><div class="dt-row-r">${c.invited_at ? escS(String(c.invited_at).slice(0,10)) : ''}</div></div>`);
     }
     if(c.referred_by) _invRows.push(`<div class="dt-row" data-detail="customer:${c.referred_by}">

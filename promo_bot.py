@@ -13,10 +13,11 @@
 import os, logging, time
 from datetime import datetime, timezone
 from dotenv import load_dotenv
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram import (Update, InlineKeyboardButton, InlineKeyboardMarkup,
+                      InlineQueryResultPhoto, InlineQueryResultsButton)
 from telegram.constants import ChatMemberStatus
 from telegram.ext import (Application, CommandHandler, MessageHandler,
-                          ContextTypes, filters)
+                          InlineQueryHandler, ContextTypes, filters)
 import config_promo as promo
 import db
 
@@ -104,6 +105,49 @@ async def on_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     log.info(f"[promo] {title} · {uid} · «{msg.text[:60]}»")
 
 
+async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Рекламный пост: набрал имя бота в чате — выбрал карточку — она ушла.
+
+    Пост и автоответ — разные интеграции и разные деньги, поэтому у поста своя
+    метка. Площадку задаёт то, что набрано после имени бота: «@ambarpr_bot
+    marina» пометит переходы как marina. Без этого все посты слились бы в один
+    канал, и вопрос «какой чат окупается» остался бы без ответа."""
+    iq = update.inline_query
+    if iq is None:
+        return
+    uid = iq.from_user.id
+    if uid not in set(OWNER_IDS) | set(promo.POSTER_IDS):
+        # Посторонним карточку не отдаём: она выглядит официально, и любой
+        # желающий мог бы рассылать её от нашего имени.
+        log.info(f"[promo] посторонний {uid} набрал имя бота")
+        await iq.answer([], cache_time=300, is_personal=True,
+                        button=InlineQueryResultsButton(text="Открыть AMBAR",
+                                                        start_parameter="post_all"))
+        return
+
+    tag = promo.slug(iq.query)
+    url = f"https://t.me/{MAIN_BOT}?start=post_{tag}"
+    results = []
+    for lang in ("ru", "en"):
+        results.append(InlineQueryResultPhoto(
+            id=f"post_{lang}_{tag}",
+            # Telegram забирает картинку по ссылке сам: только JPEG и только
+            # лёгкий, иначе карточка не соберётся прямо на глазах у человека.
+            photo_url=f"{PUBLIC_ORIGIN}/{promo.POST_IMG[lang]}",
+            thumbnail_url=f"{PUBLIC_ORIGIN}/{promo.POST_IMG[lang]}",
+            title=f"Рекламный пост · {lang.upper()}",
+            description=f"метка «{tag}»",
+            caption=promo.POST_TEXT[lang],
+            parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
+                promo.BTN[lang], url=url)]]),
+        ))
+    # cache_time=0: метка меняется от запроса к запросу, закэшированный ответ
+    # отдал бы чужую.
+    await iq.answer(results, cache_time=0, is_personal=True)
+    log.info(f"[promo] пост {uid} · метка «{tag}»")
+
+
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Кто-то открыл самого рекламного бота — уводим в основной."""
     lang = _lang(update.effective_user.first_name or "")
@@ -135,6 +179,7 @@ def main():
     app = Application.builder().token(PROMO_BOT_TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start", cmd_start, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("chats", cmd_chats, filters=filters.ChatType.PRIVATE))
+    app.add_handler(InlineQueryHandler(on_inline))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_message))
     log.info(f"📣 AMBAR Promo Bot started · ведёт в @{MAIN_BOT}")
     app.run_polling(allowed_updates=Update.ALL_TYPES)

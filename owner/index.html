@@ -702,35 +702,87 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .qr-undo{flex:1;padding:0 14px;border-radius:12px;font-size:13px}
 .acc-line.qr-busy{opacity:.45;pointer-events:none}
-/* Экран сканирования: камера крупно, счётчик всегда на виду. */
-.scan-head{display:flex;align-items:center;gap:12px;padding:2px 2px 12px}
-.scan-head-l{flex:1;min-width:0}
-.scan-prod{font-size:15px;font-weight:700;line-height:1.25}
-.scan-dist{font-size:11.5px;color:var(--muted);margin-top:2px}
-.scan-n{text-align:right;flex-shrink:0}
-.scan-n span{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;
+/* Экран сканирования. Камера — герой, служебное лежит на ней стеклом. */
+.scan-bar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:10px;
+  padding:12px 13px;background:linear-gradient(rgba(0,0,0,.72),transparent);
+  backdrop-filter:blur(2px)}
+.scan-bar-l{flex:1;min-width:0}
+.scan-prod{font-size:15px;font-weight:700;line-height:1.2;color:#fff;
+  text-shadow:0 1px 8px rgba(0,0,0,.7)}
+.scan-dist{font-size:11px;color:rgba(255,255,255,.62);margin-top:2px;letter-spacing:.3px}
+.scan-foot{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:flex-end;
+  gap:12px;padding:13px;background:linear-gradient(transparent,rgba(0,0,0,.8))}
+.scan-count{flex-shrink:0;display:flex;align-items:baseline;gap:6px;
+  padding:7px 13px;border-radius:13px;background:rgba(255,255,255,.1);
+  border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(14px)}
+.scan-count span{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;
   color:var(--gold2);font-variant-numeric:tabular-nums;line-height:1}
-.scan-n i{display:block;font-style:normal;font-size:10px;letter-spacing:.5px;
-  color:var(--muted);margin-top:2px}
-.scan-cam{position:relative;border-radius:16px;overflow:hidden;background:#000;
+.scan-count i{font-style:normal;font-size:10px;letter-spacing:.6px;
+  color:rgba(255,255,255,.6);text-transform:uppercase}
+.scan-cam{position:relative;border-radius:18px;overflow:hidden;background:#000;
   border:1px solid var(--border2)}
-.scan-cam video{width:100%;display:block;height:44dvh;object-fit:cover}
-.scan-frame{position:absolute;inset:12% 12% auto 12%;aspect-ratio:1;border-radius:14px;
-  box-shadow:0 0 0 100vmax rgba(0,0,0,.35);border:2px solid rgba(255,255,255,.55);
-  pointer-events:none}
-.scan-torch{position:absolute;right:12px;top:12px;width:38px;height:38px;border-radius:50%;
+.scan-cam video{width:100%;display:block;height:54dvh;object-fit:cover}
+.scan-mask{position:absolute;inset:0;pointer-events:none;
+  background:radial-gradient(circle at 50% 50%,transparent 34%,rgba(0,0,0,.45) 72%)}
+/* Рамка = ровно та область, которую читает распознавание. Раньше человек
+   целился в один квадрат, а читался другой. */
+.scan-frame{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:min(62%,42dvh);aspect-ratio:1;border-radius:16px;pointer-events:none;
+  transition:box-shadow .18s var(--e1),background .18s var(--e1)}
+.scan-frame .c{position:absolute;width:26px;height:26px;border:3px solid rgba(255,255,255,.9);
+  transition:border-color .18s var(--e1)}
+.scan-frame .tl{top:-2px;left:-2px;border-right:none;border-bottom:none;border-radius:14px 0 0 0}
+.scan-frame .tr{top:-2px;right:-2px;border-left:none;border-bottom:none;border-radius:0 14px 0 0}
+.scan-frame .bl{bottom:-2px;left:-2px;border-right:none;border-top:none;border-radius:0 0 0 14px}
+.scan-frame .br{bottom:-2px;right:-2px;border-left:none;border-top:none;border-radius:0 0 14px 0}
+.scan-badge{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  font-size:13px;font-weight:800;letter-spacing:1.2px;white-space:nowrap;
+  padding:8px 14px;border-radius:11px;opacity:0;transition:opacity .12s}
+.scan-frame.ok    {background:rgba(76,175,125,.22);box-shadow:0 0 0 3px rgba(76,175,125,.85) inset,0 0 34px rgba(76,175,125,.5)}
+.scan-frame.dup   {background:rgba(243,180,74,.22);box-shadow:0 0 0 3px rgba(243,180,74,.9) inset,0 0 34px rgba(243,180,74,.5)}
+.scan-frame.again {background:rgba(243,180,74,.14);box-shadow:0 0 0 3px rgba(243,180,74,.75) inset}
+.scan-frame.err   {background:rgba(224,85,85,.22);box-shadow:0 0 0 3px rgba(224,85,85,.9) inset,0 0 34px rgba(224,85,85,.5)}
+.scan-frame.ok .c   {border-color:#4CAF7D}
+.scan-frame.dup .c,.scan-frame.again .c{border-color:var(--warn)}
+.scan-frame.err .c  {border-color:var(--dn)}
+.scan-frame.ok .scan-badge   {opacity:1;color:#0d2318;background:#4CAF7D}
+.scan-frame.dup .scan-badge,
+.scan-frame.again .scan-badge{opacity:1;color:#2a1f08;background:var(--warn)}
+.scan-frame.err .scan-badge  {opacity:1;color:#fff;background:var(--dn)}
+.scan-torch{flex-shrink:0;width:38px;height:38px;border-radius:12px;
   display:flex;align-items:center;justify-content:center;cursor:pointer;
-  background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.2);color:#fff}
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);color:#fff;
+  backdrop-filter:blur(14px)}
 .scan-torch.on{background:var(--gold);color:#1a1408;border-color:var(--gold)}
-.scan-hint{position:absolute;left:0;right:0;bottom:0;padding:9px 12px;font-size:12.5px;
-  text-align:center;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.75))}
+.scan-hint{flex:1;min-width:0;font-size:12px;line-height:1.35;padding-bottom:4px;
+  color:rgba(255,255,255,.72);text-align:right}
 .scan-hint.warn{color:var(--warn)}
-.scan-feed{margin-top:10px;max-height:26dvh;overflow-y:auto}
-.scan-row{padding-right:6px}
-.scan-del{flex-shrink:0;width:26px;height:26px;margin-left:6px;border-radius:8px;
+
+.scan-sect{display:flex;align-items:baseline;gap:8px;padding:16px 2px 8px;
+  font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.scan-sect i{margin-left:auto;font-style:normal;font-family:'DM Sans',sans-serif;
+  font-size:11px;font-weight:700;color:var(--gold2);letter-spacing:0}
+.scan-feed{max-height:24dvh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.scan-empty{padding:22px 12px;text-align:center;font-size:12.5px;color:var(--muted)}
+.scan-row{display:flex;align-items:center;gap:10px;padding:11px 13px;margin-bottom:6px;
+  border-radius:12px;background:var(--card);border:1px solid var(--border2)}
+.scan-row.sending{opacity:.6}
+.scan-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
+.scan-code{flex:1;min-width:0;font-family:'Space Grotesk',sans-serif;font-size:12.5px;
+  font-weight:600;letter-spacing:.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scan-state{font-size:11px;flex-shrink:0}
+.scan-del{flex-shrink:0;width:26px;height:26px;border-radius:8px;
   border:1px solid var(--border3);background:var(--card2);color:var(--muted);
   font-size:12px;line-height:1;cursor:pointer}
 .scan-del:active{background:var(--dn-soft);color:var(--dn)}
+
+.scan-acts{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
+.scan-btn{padding:15px;border-radius:14px;border:none;cursor:pointer;font-family:inherit;
+  font-size:14px;font-weight:700;transition:.15s var(--e1)}
+.scan-btn:active{transform:scale(.98)}
+.scan-btn.ghost{background:var(--card);border:1px solid var(--border3);color:var(--sub)}
+.scan-btn.ghost:disabled{opacity:.4}
+.scan-btn.gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408}
 .pr-line[data-detail]{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .pr-line[data-detail]:active{background:var(--card2)}
 .acc-line-bar{flex:1.2;height:5px;border-radius:3px;background:var(--card2);overflow:hidden}
@@ -5050,7 +5102,8 @@ async function accOrder(){
 const SCAN = {
   stream:null, video:null, cv:null, ctx:null, raf:null,
   seen:new Set(),          // коды этой сессии
-  onCode:null, onIdle:null,
+  onCode:null, onIdle:null, onRepeat:null,
+  lastRepeat:0,
   lastDecode:0, lastHit:0, frames:0, t0:0,
   DECODE_MS:80,            // ~12 распознаваний в секунду — глазу хватает
   CROP:0.82,               // центр кадра: по краям ловятся чужие коды с полки
@@ -5079,9 +5132,10 @@ const SCAN = {
     return (plain || pool[0]).deviceId;
   },
 
-  async start(videoEl, onCode, onIdle){
+  async start(videoEl, onCode, onIdle, onRepeat){
     this.stop();
     this.video = videoEl; this.onCode = onCode; this.onIdle = onIdle;
+    this.onRepeat = onRepeat;
     this.seen = new Set(); this.frames = 0; this.t0 = Date.now(); this.lastHit = Date.now();
     // Разрешение просим полное: распознаём мы всё равно уменьшенный кусок
     // кадра, но вырезаем его из детального — чем крупнее исходник, тем больше
@@ -5138,9 +5192,14 @@ const SCAN = {
     const v = this.video;
     if(!v || v.readyState !== v.HAVE_ENOUGH_DATA || !v.videoWidth) return;
 
-    // Берём центральный квадрат и ужимаем: и быстрее, и не хватает соседнюю
-    // бутылку, на которую человек не наводился.
-    const side = Math.min(v.videoWidth, v.videoHeight) * this.CROP;
+    // Распознаём ровно то, что обведено рамкой на экране. Видео показано с
+    // обрезкой по краям (object-fit: cover), поэтому центр кадра и центр
+    // картинки — не одно и то же: без пересчёта человек целится в рамку, а
+    // читается другой кусок, и он не понимает, почему код не ловится.
+    const cw = v.clientWidth || v.videoWidth, ch = v.clientHeight || v.videoHeight;
+    const scale = Math.max(cw / v.videoWidth, ch / v.videoHeight);
+    const visW = cw / scale, visH = ch / scale;          // что реально видно, в пикселях кадра
+    const side = Math.min(visW, visH) * this.CROP;
     const sx = (v.videoWidth - side) / 2, sy = (v.videoHeight - side) / 2;
     const px = Math.min(this.MAXPX, Math.round(side));
     this.cv.width = px; this.cv.height = px;
@@ -5151,9 +5210,16 @@ const SCAN = {
     if(hit && hit.data){
       const code = String(hit.data).trim();
       this.lastHit = Date.now();
-      // Тот же код в кадре — не событие. Пока человек не убрал бутылку, он
-      // читается каждый кадр, и без этого шли бы двенадцать запросов в секунду.
-      if(this.seen.has(code)) return;
+      // Тот же код в кадре читается каждый кадр — запрос слать не надо. Но и
+      // молчать нельзя: человек видит бутылку в рамке и ничего не происходит,
+      // а это выглядит как сломанное приложение. Поэтому говорим — редко.
+      if(this.seen.has(code)){
+        if(Date.now() - this.lastRepeat > 1200){
+          this.lastRepeat = Date.now();
+          if(this.onRepeat) this.onRepeat(code);
+        }
+        return;
+      }
       this.seen.add(code);
       if(this.onCode) this.onCode(code);
       return;
@@ -5326,7 +5392,7 @@ async function qrStart(pid){
   qrScreen();
   const v = document.getElementById('qrVideo');
   try{
-    await SCAN.start(v, qrSave, qrIdle);
+    await SCAN.start(v, qrSave, qrIdle, () => qrFlash('again'));
   }catch(e){
     // Камеры нет — не тупик: родной сканер Telegram работает всегда, просто
     // без счётчика на экране.
@@ -5343,29 +5409,72 @@ async function qrStart(pid){
 
 function qrScreen(){
   const d = (STK.districts || []).find(x => x.id === QR_DIST) || {};
+  // Камера — герой экрана, всё служебное лежит на ней стеклом: так остаётся
+  // место под кадр, а глазу не приходится метаться между камерой и цифрами.
   document.getElementById('accMid').innerHTML = `
-    <div class="scan-head">
-      <div class="scan-head-l">
-        <div class="scan-prod">${escS(QR_PROD.name)}</div>
-        <div class="scan-dist">${escS(d.code || '')} ${escS(d.name || '')}</div>
-      </div>
-      <div class="scan-n"><span id="qrN">0</span><i>записано</i></div>
-    </div>
-    <div class="scan-cam">
+    <div class="scan-cam" id="qrCam">
       <video id="qrVideo" playsinline muted autoplay></video>
-      <div class="scan-frame"></div>
-      <button class="scan-torch" id="qrTorch" onclick="qrTorch(this)" style="display:none">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
-          stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 2h6l-1 7h4l-8 13 2-9H8z"/></svg>
-      </button>
-      <div class="scan-hint" id="qrHint">Наведите на код</div>
+      <div class="scan-mask"></div>
+
+      <div class="scan-bar">
+        <div class="scan-bar-l">
+          <div class="scan-prod">${escS(QR_PROD.name)}</div>
+          <div class="scan-dist">${escS(d.code || '')} ${escS(d.name || '')}</div>
+        </div>
+        <button class="scan-torch" id="qrTorch" onclick="qrTorch(this)" style="display:none">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 2h6l-1 7h4l-8 13 2-9H8z"/></svg>
+        </button>
+      </div>
+
+      <div class="scan-frame" id="qrFrame">
+        <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+        <div class="scan-badge" id="qrBadge"></div>
+      </div>
+
+      <div class="scan-foot">
+        <div class="scan-count"><span id="qrN">0</span><i>записано</i></div>
+        <div class="scan-hint" id="qrHint">Наведите на код</div>
+      </div>
     </div>
-    <div id="qrFeed" class="scan-feed"><div class="exp-empty">Пока ничего не отсканировано</div></div>
-    <div class="qr-form" style="margin-top:12px">
-      <button class="btn-ico qr-undo" id="qrUndo" onclick="qrUndo()" disabled>Отменить последнюю</button>
-      <button class="btn-gold qr-btn" onclick="qrDone()">Готово</button>
+
+    <div class="scan-sect"><span>Последние</span><i id="qrCount"></i></div>
+    <div id="qrFeed" class="scan-feed"><div class="scan-empty">Наведите камеру на первую бутылку</div></div>
+
+    <div class="scan-acts">
+      <button class="scan-btn ghost" id="qrUndo" onclick="qrUndo()" disabled>Отменить последнюю</button>
+      <button class="scan-btn gold" onclick="qrDone()">Готово</button>
     </div>`;
+}
+
+// Обратная связь идёт на самой камере: человек смотрит в рамку, а не в список
+// под ней. Молчание он читает как «приложение сломалось» — поэтому у каждого
+// исхода свой цвет, своя надпись и своя вибрация.
+const FLASH = {
+  ok:     ['ЗАПИСАНА',        'success'],
+  dup:    ['УЖЕ СЧИТАЛИ',     'warning'],
+  again:  ['УЖЕ В ЭТОЙ СМЕНЕ','light'],
+  err:    ['НЕ СОХРАНИЛОСЬ',  'error'],
+};
+let _flashT = null;
+function qrFlash(kind){
+  const f = document.getElementById('qrFrame'), b = document.getElementById('qrBadge');
+  if(!f || !b) return;
+  const [text, hap] = FLASH[kind] || FLASH.ok;
+  b.textContent = text;
+  f.classList.remove('ok','dup','again','err');
+  // Перезапуск анимации: без этого две подряд одинаковые вспышки сливаются в
+  // одну, и вторая бутылка выглядит непосчитанной.
+  void f.offsetWidth;
+  f.classList.add(kind);
+  try{
+    const H = Telegram.WebApp.HapticFeedback;
+    if(hap === 'light') H.impactOccurred('light'); else H.notificationOccurred(hap);
+  }catch(e){}
+  clearTimeout(_flashT);
+  _flashT = setTimeout(() => { f.classList.remove('ok','dup','again','err'); b.textContent = ''; },
+                       kind === 'ok' ? 650 : 1100);
 }
 
 async function qrTorch(btn){
@@ -5394,7 +5503,9 @@ function qrSave(code){
   code = String(code || '').trim(); if(!code) return;
   QR_ROWS.unshift({code, state:'sending', at:''});
   qrRenderFeed();
-  try{ Telegram.WebApp.HapticFeedback.impactOccurred('medium'); }catch(e){}
+  // Зелёная вспышка сразу, не дожидаясь сервера: рука уже тянется к следующей
+  // бутылке. Если сервер возразит, цвет сменится — но это редкий случай.
+  qrFlash('ok');
   SCANQ.push({path:'/api/owner/qr/scan',
               body:{code, product_id: QR_PROD.id, district: QR_DIST}, code});
 }
@@ -5402,13 +5513,13 @@ function qrSave(code){
 SCANQ.onDone = (err, r, job) => {
   const row = QR_ROWS.find(x => x.code === job.code && x.state === 'sending');
   if(!row) return;                       // строку успели удалить руками
-  if(err){ row.state = 'fail'; }
+  if(err){ row.state = 'fail'; qrFlash('err'); }
   else if(r.new){ row.state = 'new'; }
   else{
     // Бутылка уже в реестре — её посчитали раньше, и в счётчик сессии она
     // попасть не должна: иначе остаток вырастет на пустом месте.
     row.state = 'dup'; row.at = String(r.at || '').slice(0,10);
-    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+    qrFlash('dup');
   }
   qrRenderFeed();
 };
@@ -5426,6 +5537,8 @@ function qrRenderFeed(){
   QR_SESSION = QR_ROWS.filter(r => r.state === 'new' || r.state === 'sending').length;
   _setText('qrN', String(QR_SESSION));
   const feed = document.getElementById('qrFeed'); if(!feed) return;
+  const cnt = document.getElementById('qrCount');
+  if(cnt) cnt.textContent = QR_ROWS.length ? QR_ROWS.length + '' : '';
   feed.innerHTML = QR_ROWS.slice(0, 40).map((r, i) => {
     const [txt, color, mark] = QR_STATE[r.state] || QR_STATE.sending;
     // Убрать можно только то, что записали в этой сессии. «Уже была» — это
@@ -5433,11 +5546,12 @@ function qrRenderFeed(){
     // касанием пропадёт бутылка, посчитанная на прошлой неделе.
     const del = (r.state === 'new' || r.state === 'fail')
       ? `<button class="scan-del" onclick="qrDrop(${i})" aria-label="Убрать">✕</button>` : '';
-    return `<div class="acc-line scan-row">
-      <span class="acc-line-n">${escS(r.code)}</span>
-      <span class="acc-line-s">${escS(txt)}${r.at ? ' · ' + escS(r.at) : ''}</span>
-      <span class="acc-line-v" style="color:${color}">${mark}</span>${del}</div>`;
-  }).join('') || '<div class="exp-empty">Пока ничего не отсканировано</div>';
+    return `<div class="scan-row ${r.state}">
+      <span class="scan-dot" style="background:${color}"></span>
+      <span class="scan-code">${escS(r.code)}</span>
+      <span class="scan-state" style="color:${color}">${escS(txt)}${
+        r.at ? ' · ' + escS(r.at) : ''}</span>${del}</div>`;
+  }).join('') || '<div class="scan-empty">Наведите камеру на первую бутылку</div>';
   const u = document.getElementById('qrUndo');
   if(u) u.disabled = !QR_ROWS.some(r => r.state === 'new');
 }

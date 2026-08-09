@@ -745,9 +745,15 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .qz-s{font-size:12.5px;color:var(--muted);line-height:1.5;margin-top:7px;
   max-width:280px;margin-left:auto;margin-right:auto}
 
+/* Колонка во всю высоту экрана: без неё кнопка «прилипает» только когда
+   контента много, а при коротком списке повисает посреди пустоты. margin-top
+   auto опускает её вниз, sticky удерживает при прокрутке длинного списка. */
+.qwrap{display:flex;flex-direction:column;min-height:100%}
+.qwrap > .scan-feed{flex-shrink:0}
+
 /* Кнопка внизу и во всю ширину: до верха экрана большим пальцем не достать, а
    нажимают её каждый раз, когда сюда заходят. */
-.qb-wrap{position:sticky;bottom:0;z-index:4;margin-top:18px;
+.qb-wrap{position:sticky;bottom:0;z-index:4;margin-top:auto;padding-top:18px;
   padding:14px 0 calc(8px + var(--safe-bottom));
   background:linear-gradient(transparent,var(--bg) 38%)}
 .qb{display:flex;align-items:center;justify-content:center;gap:11px;width:100%;
@@ -910,7 +916,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    за пределы экрана — «Готово» становилось недоступным ровно тогда, когда его
    пора нажимать. */
 .scan-acts{position:sticky;bottom:0;z-index:4;display:grid;grid-template-columns:1fr 1fr;
-  gap:9px;margin-top:14px;padding:12px 0 calc(6px + var(--safe-bottom));
+  gap:9px;margin-top:auto;padding:14px 0 calc(6px + var(--safe-bottom));
   background:linear-gradient(transparent,var(--bg) 34%)}
 .scan-btn{padding:15px;border-radius:14px;border:none;cursor:pointer;font-family:inherit;
   font-size:14px;font-weight:700;transition:.15s var(--e1)}
@@ -5485,6 +5491,7 @@ async function accQR(){
   });
 
   document.getElementById('accMid').innerHTML = `
+    <div class="qwrap">
     <div class="qh">
       <div class="qh-v">${fmt(t.active)}</div>
       <div class="qh-l">бутылок в реестре</div>
@@ -5527,6 +5534,7 @@ async function accQR(){
           <path d="M7 12h10"/></svg>
         Сканировать бутылки
       </button>
+    </div>
     </div>`;
 }
 
@@ -5692,6 +5700,7 @@ function qrScreen(){
   // Камера — герой экрана, всё служебное лежит на ней стеклом: так остаётся
   // место под кадр, а глазу не приходится метаться между камерой и цифрами.
   document.getElementById('accMid').innerHTML = `
+    <div class="qwrap">
     <div class="scan-cam" id="qrCam">
       <video id="qrVideo" playsinline muted autoplay></video>
       <div class="scan-mask"></div>
@@ -5732,6 +5741,7 @@ function qrScreen(){
     <div class="scan-acts">
       <button class="scan-btn ghost" id="qrUndo" onclick="qrUndo()" disabled>Отменить последнюю</button>
       <button class="scan-btn gold" onclick="qrDone()">Готово</button>
+    </div>
     </div>`;
 }
 

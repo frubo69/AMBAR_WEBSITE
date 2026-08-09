@@ -1657,6 +1657,47 @@ async def qr_last(limit: int = 20) -> list:
     return rows
 
 
+async def qr_lock_take(key: str, by: int, name: str, now, until):
+    """Занять позицию на точке под пересчёт.
+
+    Возвращает (заняли ли, кем занято). Атомарно: два человека жмут «считать
+    Absolut на B2» в одну секунду, и без этого оба получили бы «да» — а потом
+    посчитали бы одну полку дважды, каждый со своим числом."""
+    db = _db_or_none()
+    if db is None: return True, None
+    from pymongo import ReturnDocument
+    from pymongo.errors import DuplicateKeyError
+    try:
+        doc = await db.qr_locks.find_one_and_update(
+            {"_id": key, "$or": [{"by": by}, {"until": {"$lt": now}}]},
+            {"$set": {"by": by, "name": name, "until": until, "at": now}},
+            upsert=True, return_document=ReturnDocument.AFTER)
+        return True, doc
+    except DuplicateKeyError:
+        # Запись есть и она не наша и не протухла — значит занято.
+        return False, await db.qr_locks.find_one({"_id": key})
+
+
+async def qr_lock_free(key: str, by: int) -> bool:
+    db = _db_or_none()
+    if db is None: return True
+    r = await db.qr_locks.delete_one({"_id": key, "by": by})
+    return r.deleted_count > 0
+
+
+async def qr_locks(now) -> list:
+    """Кто что сейчас считает. Протухшие не показываем — человек просто ушёл."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.qr_locks.find({"until": {"$gte": now}})
+    rows = await cur.to_list(length=500)
+    for r in rows:
+        r["key"] = r.pop("_id")
+        r["until"] = str(r.get("until") or "")
+        r["at"] = str(r.get("at") or "")
+    return rows
+
+
 async def qr_get(code: str) -> dict | None:
     db = _db_or_none()
     if db is None: return None

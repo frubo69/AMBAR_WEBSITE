@@ -15,7 +15,7 @@
 тем же номером физически невозможна, а не «проверяется».
 """
 import logging, re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 from aiohttp import web
 
@@ -25,6 +25,15 @@ from owner_auth import require_owner, CORS_HEADERS
 log = logging.getLogger("qr")
 
 MAX_CODE = 120          # длиннее не бывает даже у акцизных марок
+
+# Позиция на точке занимается на время пересчёта. Срок нужен обязательно: без
+# него человек, закрывший приложение посреди полки, запер бы Absolut на B2
+# навсегда, и никто бы не понял почему. Каждый скан продлевает.
+LOCK_MIN = 15
+
+
+def _lock_key(district: str, product_id: str) -> str:
+    return f"{district}:{product_id}"
 
 
 def _clean(code: str) -> str:
@@ -41,7 +50,9 @@ async def handle_stats(request):
     st = await db.qr_stats()
     by_product = await db.qr_by_product()
     last = await db.qr_last(limit=20)
+    locks = await db.qr_locks(datetime.now(timezone.utc))
     return web.json_response({
+        "locks": locks,
         "totals": {
             "total":   sum(st.values()),
             "active":  st.get("active", 0),
@@ -52,6 +63,48 @@ async def handle_stats(request):
         "last": last,
     }, headers=CORS_HEADERS,
        dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
+@require_owner
+async def handle_lock(request):
+    """Занять позицию на точке под пересчёт.
+
+    Две пары рук на одной полке — это не удвоенная скорость, а два разных
+    числа: каждый считает своё, и потом непонятно, какое верное. Поэтому пока
+    один считает Absolut на B2, остальным эта пара недоступна."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    district = (body.get("district") or "").strip()
+    product_id = (body.get("product_id") or "").strip()
+    if not district or not product_id:
+        return web.json_response({"error": "district_and_product_required"},
+                                 status=400, headers=CORS_HEADERS)
+    me = request.get("owner_id") or 0
+    name = str(body.get("who") or "").strip()[:40]
+    now = datetime.now(timezone.utc)
+    ok, holder = await db.qr_lock_take(_lock_key(district, product_id), me, name,
+                                       now, now + timedelta(minutes=LOCK_MIN))
+    if not ok:
+        return web.json_response({"error": "busy",
+                                  "by": (holder or {}).get("name") or "другой сотрудник",
+                                  "since": str((holder or {}).get("at") or "")},
+                                 status=409, headers=CORS_HEADERS)
+    return web.json_response({"ok": True, "until_min": LOCK_MIN}, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_unlock(request):
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    district = (body.get("district") or "").strip()
+    product_id = (body.get("product_id") or "").strip()
+    ok = await db.qr_lock_free(_lock_key(district, product_id),
+                               request.get("owner_id") or 0)
+    return web.json_response({"ok": ok}, headers=CORS_HEADERS)
 
 
 @require_owner
@@ -76,10 +129,21 @@ async def handle_scan(request):
     if not p:
         return web.json_response({"error": "unknown_product"}, status=400, headers=CORS_HEADERS)
 
-    district = (body.get("district") or "").strip() or None
+    district = (body.get("district") or "").strip()
+    if not district:
+        return web.json_response({"error": "district_required"}, status=400,
+                                 headers=CORS_HEADERS)
+    me = request.get("owner_id") or 0
     now = datetime.now(timezone.utc)
-    added = await db.qr_add(code, product_id, p.get("name", ""), district,
-                            request.get("owner_id") or 0, now)
+    # Скан продлевает бронь: пока человек считает, позиция остаётся за ним, а
+    # отойдя на четверть часа он её отпускает сам.
+    ok, holder = await db.qr_lock_take(_lock_key(district, product_id), me, "",
+                                       now, now + timedelta(minutes=LOCK_MIN))
+    if not ok:
+        return web.json_response({"error": "busy",
+                                  "by": (holder or {}).get("name") or "другой сотрудник"},
+                                 status=409, headers=CORS_HEADERS)
+    added = await db.qr_add(code, product_id, p.get("name", ""), district, me, now)
     if not added:
         old = await db.qr_get(code)
         return web.json_response({
@@ -139,6 +203,8 @@ def setup(app):
     routes = (
         ("/api/owner/qr",             handle_stats,  "GET"),
         ("/api/owner/qr/scan",        handle_scan,   "POST"),
+        ("/api/owner/qr/lock",        handle_lock,   "POST"),
+        ("/api/owner/qr/unlock",      handle_unlock, "POST"),
         ("/api/owner/qr/undo",        handle_undo,   "POST"),
         ("/api/owner/qr/code/{code}", handle_lookup, "GET"),
     )

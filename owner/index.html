@@ -5107,7 +5107,7 @@ const SCAN = {
   stream:null, video:null, cv:null, ctx:null, raf:null,
   seen:new Set(),          // коды этой сессии
   seenAt:new Map(),        // код → когда его видели в кадре последний раз
-  onCode:null, onIdle:null, onRepeat:null,
+  onCode:null, onIdle:null, onRepeat:null, onHold:null,
   // Пока код не уходил из кадра дольше этого, считаем, что камера с него не
   // сходила: человек ещё не успел её отвести, ругаться не на что.
   GAP_MS:900,
@@ -5139,10 +5139,10 @@ const SCAN = {
     return (plain || pool[0]).deviceId;
   },
 
-  async start(videoEl, onCode, onIdle, onRepeat){
+  async start(videoEl, onCode, onIdle, onRepeat, onHold){
     this.stop();
     this.video = videoEl; this.onCode = onCode; this.onIdle = onIdle;
-    this.onRepeat = onRepeat;
+    this.onRepeat = onRepeat; this.onHold = onHold;
     this.seen = new Set(); this.seenAt = new Map();
     this.frames = 0; this.t0 = Date.now(); this.lastHit = Date.now();
     // Разрешение просим полное: распознаём мы всё равно уменьшенный кусок
@@ -5226,9 +5226,13 @@ const SCAN = {
         const gone = now - (this.seenAt.get(code) || 0);
         this.seenAt.set(code, now);
         if(gone > this.GAP_MS && this.onRepeat) this.onRepeat(code);
+        // Код всё ещё перед камерой — экран должен держать подтверждение, а не
+        // мигнуть им на треть секунды и погаснуть.
+        else if(this.onHold) this.onHold(code);
         return;
       }
       this.seen.add(code); this.seenAt.set(code, now);
+      if(this.onHold) this.onHold(code);
       if(this.onCode) this.onCode(code);
       return;
     }
@@ -5400,7 +5404,7 @@ async function qrStart(pid){
   qrScreen();
   const v = document.getElementById('qrVideo');
   try{
-    await SCAN.start(v, qrSave, qrIdle, () => qrFlash('again'));
+    await SCAN.start(v, qrSave, qrIdle, () => qrFlash('again'), qrHold);
   }catch(e){
     // Камеры нет — не тупик: родной сканер Telegram работает всегда, просто
     // без счётчика на экране.
@@ -5465,7 +5469,18 @@ const FLASH = {
   again:  ['уже посчитана',  'warning'],
   err:    ['не сохранилось', 'error'],
 };
-let _flashT = null;
+let _flashT = null, _flashAt = 0, _holdAt = 0, _flashOn = false;
+
+function qrFlashClear(){
+  const f = document.getElementById('qrFrame'), b = document.getElementById('qrBadge');
+  if(f) f.classList.remove('ok','dup','again','err');
+  if(b) b.textContent = '';
+  _flashOn = false;
+}
+
+// Подтверждение висит, пока код перед камерой, и гаснет, когда её отвели. Иначе
+// оно мелькает на треть секунды: человек ещё смотрит на бутылку, а на экране
+// уже ничего — и непонятно, посчиталась она или нет.
 function qrFlash(kind){
   const f = document.getElementById('qrFrame'), b = document.getElementById('qrBadge');
   if(!f || !b) return;
@@ -5476,16 +5491,19 @@ function qrFlash(kind){
   // одну, и вторая бутылка выглядит непосчитанной.
   void f.offsetWidth;
   f.classList.add(kind);
+  _flashOn = true; _flashAt = Date.now(); _holdAt = Date.now();
   try{
     const H = Telegram.WebApp.HapticFeedback;
     if(hap === 'light') H.impactOccurred('light'); else H.notificationOccurred(hap);
   }catch(e){}
   clearTimeout(_flashT);
-  // Успех гасим быстро: он подтверждение, а не событие. Отказ держим дольше —
-  // его надо успеть прочитать.
-  _flashT = setTimeout(() => { f.classList.remove('ok','dup','again','err'); b.textContent = ''; },
-                       kind === 'ok' ? 420 : 1000);
+  // Страховка: если код исчез из кадра мгновенно и onIdle не пришёл (камеру
+  // убрали в карман), подтверждение всё равно должно погаснуть.
+  _flashT = setTimeout(qrFlashClear, 6000);
 }
+
+// Код всё ещё перед камерой.
+function qrHold(){ _holdAt = Date.now(); }
 
 async function qrTorch(btn){
   const on = btn.classList.toggle('on');
@@ -5495,6 +5513,9 @@ async function qrTorch(btn){
 // Пока код не пойман — подсказываем, но не сразу: первые секунды человек просто
 // наводит камеру, и мигать ему в этот момент нечем.
 function qrIdle(sinceMs, frames, fps){
+  // Кода в кадре нет. Гасим подтверждение — но не раньше, чем его успеют
+  // прочитать: ответ сервера мог прийти, когда камеру уже отвели.
+  if(_flashOn && Date.now() - _holdAt > 350 && Date.now() - _flashAt > 700) qrFlashClear();
   const h = document.getElementById('qrHint'); if(!h) return;
   if(sinceMs < 2500){ h.textContent = 'Наведите на код'; h.className = 'scan-hint'; return; }
   if(!fps || fps < 4){ h.textContent = 'Телефон не успевает — уберите лишние приложения'; }

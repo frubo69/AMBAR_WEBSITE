@@ -2470,7 +2470,7 @@ async def handle_points_history(request: web.Request) -> web.Response:
 # harmless extension. Everything else is a 404 — including dotfiles, sources,
 # backups and dumps. Adding a new public asset means adding it here on purpose.
 PUBLIC_ROOT_FILES = {
-    "index-6.html", "manifest.json", "catalog.json", "qrcode.min.js",
+    "index-6.html", "manifest.json", "catalog.json", "qrcode.min.js", "jsQR.js",
     "icon.png", "HOME_SCREEN_BG.webp", "BACKGROUND_NEW_ADD.png",
     "CRYPTO_PROMO_AMBAR_RU.png", "CRYPTO_PROMO_AMBAR_EN.png",
     "promo_banner_ru.png",  "promo_banner_en.png",

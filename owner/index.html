@@ -702,6 +702,14 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .qr-undo{flex:1;padding:0 14px;border-radius:12px;font-size:13px}
 .acc-line.qr-busy{opacity:.45;pointer-events:none}
+.qr-camtest{width:100%;padding:11px;border-radius:12px;margin-top:12px;font-size:13px}
+.cam-box{margin-top:10px;border-radius:14px;overflow:hidden;border:1px solid var(--border2);
+  background:#000;position:relative}
+.cam-box video{width:100%;display:block;max-height:46dvh;object-fit:cover}
+.cam-out{padding:10px 12px;font-size:12.5px;line-height:1.5;color:var(--sub);
+  background:var(--card);border-top:1px solid var(--border2)}
+.cam-out b{color:var(--up)}
+.cam-out i{font-style:normal;color:var(--dn)}
 .pr-line[data-detail]{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .pr-line[data-detail]:active{background:var(--card2)}
 .acc-line-bar{flex:1.2;height:5px;border-radius:3px;background:var(--card2);overflow:hidden}
@@ -4889,6 +4897,7 @@ function accOpen(id){
 }
 
 function accClose(){
+  camStop();
   document.getElementById('accOv').classList.remove('show');
   ACC_VIEW = null;
   accRender();
@@ -5039,6 +5048,7 @@ async function accQR(){
       busy} ${pluralize(busy,'позицию','позиции','позиций')}. Занятые другими
       сотрудниками в списке недоступны — иначе одну полку посчитают дважды
       и получатся два разных числа.</div>` : ''}
+    <button class="btn-ico qr-camtest" onclick="camTest(this)">Проверить камеру</button>
     <button class="btn-gold qr-scan" onclick="qrDistrict()">
       <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -5218,6 +5228,66 @@ async function qrDone(){
   try{ await ownerApi.ownerFetch('/api/owner/qr/unlock',
     {method:'POST', body:{district: QR_DIST, product_id: QR_PROD.id}}); }catch(e){}
   accQR();
+}
+
+// Разовая проверка: пускает ли Telegram камеру в мини-апп на этом телефоне.
+// Проверять надо именно здесь, а не отдельной страницей в браузере: браузер
+// камеру даст всегда, а вопрос ровно в том, даст ли её этот webview.
+let CAM_STREAM = null, CAM_RAF = null;
+async function camTest(btn){
+  if(CAM_STREAM){ camStop(); btn.textContent = 'Проверить камеру'; return; }
+  const box = document.createElement('div');
+  box.className = 'cam-box'; box.id = 'camBox';
+  box.innerHTML = '<video id="camV" playsinline muted autoplay></video>' +
+                  '<div class="cam-out" id="camOut">Запрашиваю камеру…</div>';
+  btn.insertAdjacentElement('afterend', box);
+  btn.textContent = 'Остановить';
+  const out = document.getElementById('camOut');
+  const say = h => out.innerHTML = h;
+
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    say('<i>getUserMedia в этом webview отсутствует.</i><br>Свой сканер сделать нельзя — останется родной Telegram.');
+    return;
+  }
+  try{
+    CAM_STREAM = await navigator.mediaDevices.getUserMedia(
+      {video: {facingMode: {ideal: 'environment'}}, audio: false});
+  }catch(e){
+    say(`<i>Камера не открылась: ${escS(e.name || '')} ${escS(e.message || '')}</i>`
+        + '<br>Свой сканер сделать нельзя — останется родной Telegram.');
+    return;
+  }
+  const v = document.getElementById('camV');
+  v.srcObject = CAM_STREAM;
+  try{ await v.play(); }catch(e){}
+  say('<b>Камера работает.</b> Наведите на любой QR — проверим, читается ли он.');
+
+  // Читаем кадры: одной картинки мало, важно, что мы можем достать из неё код.
+  const cv = document.createElement('canvas'), ctx = cv.getContext('2d', {willReadFrequently:true});
+  if(!window.jsQR){ await new Promise(r => {
+    const sc = document.createElement('script'); sc.src = '../jsQR.js';
+    sc.onload = r; sc.onerror = r; document.head.appendChild(sc); }); }
+  const tick = () => {
+    if(!CAM_STREAM) return;
+    if(v.readyState === v.HAVE_ENOUGH_DATA && window.jsQR){
+      cv.width = v.videoWidth; cv.height = v.videoHeight;
+      ctx.drawImage(v, 0, 0, cv.width, cv.height);
+      const img = ctx.getImageData(0, 0, cv.width, cv.height);
+      const hit = jsQR(img.data, img.width, img.height, {inversionAttempts:'dontInvert'});
+      if(hit && hit.data){
+        say(`<b>Всё работает.</b> Прочитан код: ${escS(hit.data.slice(0,60))}`
+            + '<br>Можно делать свой экран сканирования со счётчиком.');
+        try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+      }
+    }
+    CAM_RAF = requestAnimationFrame(tick);
+  };
+  CAM_RAF = requestAnimationFrame(tick);
+}
+function camStop(){
+  if(CAM_RAF){ cancelAnimationFrame(CAM_RAF); CAM_RAF = null; }
+  if(CAM_STREAM){ CAM_STREAM.getTracks().forEach(t => t.stop()); CAM_STREAM = null; }
+  const b = document.getElementById('camBox'); if(b) b.remove();
 }
 
 // ─── Акции ──────────────────────────────────────────────────────────────────

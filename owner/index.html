@@ -758,6 +758,10 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);color:#fff;
   backdrop-filter:blur(14px)}
 .scan-torch.on{background:var(--gold);color:#1a1408;border-color:var(--gold)}
+.scan-torch .s-off{display:none}
+.scan-torch.muted{color:rgba(255,255,255,.45)}
+.scan-torch.muted .s-on{display:none}
+.scan-torch.muted .s-off{display:block}
 .scan-hint{flex:1;min-width:0;font-size:12px;line-height:1.35;padding-bottom:4px;
   color:rgba(255,255,255,.72);text-align:right}
 .scan-hint.warn{color:var(--warn)}
@@ -5091,6 +5095,49 @@ async function accOrder(){
     : '<div class="exp-empty">Довозить нечего — остатков хватает</div>'}`;
 }
 
+// ─── Звук сканера ───────────────────────────────────────────────────────────
+// Тон синтезируем, а не грузим файлом: так он короткий, тихий и без щелчков.
+// Кассовый «пик» — это меандр под три килогерца; за смену от него звенит в
+// ушах. Здесь синус в средних частотах, 60–90 мс, с мягким входом и затуханием.
+const SFX = {
+  ctx:null,
+  on: localStorage.getItem('ambar_scan_sound') !== '0',
+  _ac(){
+    if(!this.ctx){
+      const C = window.AudioContext || window.webkitAudioContext;
+      if(!C) return null;
+      this.ctx = new C();
+    }
+    // На iOS звук разрешён только после касания — экран открывается тапом по
+    // позиции, так что момент подходящий.
+    if(this.ctx.state === 'suspended') this.ctx.resume().catch(()=>{});
+    return this.ctx;
+  },
+  _tone(freq, ms, vol, at, glide){
+    const ac = this._ac(); if(!ac) return;
+    const t = ac.currentTime + (at || 0);
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(freq, t);
+    if(glide) o.frequency.exponentialRampToValueAtTime(glide, t + ms/1000);
+    // Плавные вход и выход: резкий старт даёт щелчок, и он-то и раздражает.
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + ms/1000);
+    o.connect(g); g.connect(ac.destination);
+    o.start(t); o.stop(t + ms/1000 + 0.02);
+  },
+  ok(){   if(this.on) this._tone(760, 80, 0.07, 0, 1010); },   // короткий подъём
+  warn(){ if(this.on){ this._tone(430, 70, 0.06); this._tone(430, 70, 0.06, 0.11); } },
+  err(){  if(this.on) this._tone(300, 160, 0.07, 0, 190); },   // мягкий спад
+  toggle(){
+    this.on = !this.on;
+    localStorage.setItem('ambar_scan_sound', this.on ? '1' : '0');
+    if(this.on) this.ok();
+    return this.on;
+  },
+};
+
 // ─── Сканер ─────────────────────────────────────────────────────────────────
 // Свой, а не телеграмовский: родной занимает весь экран, и счётчик «12 из 38»
 // поверх него не нарисовать.
@@ -5417,6 +5464,8 @@ async function qrStart(pid){
   }
   const t = document.getElementById('qrTorch');
   if(t) t.style.display = SCAN.hasTorch() ? '' : 'none';
+  const snd = document.getElementById('qrSound');
+  if(snd) snd.classList.toggle('muted', !SFX.on);
 }
 
 function qrScreen(){
@@ -5433,6 +5482,12 @@ function qrScreen(){
           <div class="scan-prod">${escS(QR_PROD.name)}</div>
           <div class="scan-dist">${escS(d.code || '')} ${escS(d.name || '')}</div>
         </div>
+        <button class="scan-torch" id="qrSound" onclick="qrSound(this)">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 5 6 9H2v6h4l5 4z"/><path class="s-on" d="M15.5 8.5a5 5 0 0 1 0 7"/>
+            <path class="s-off" d="M22 9l-6 6M16 9l6 6"/></svg>
+        </button>
         <button class="scan-torch" id="qrTorch" onclick="qrTorch(this)" style="display:none">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
             stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -5496,6 +5551,7 @@ function qrFlash(kind){
     const H = Telegram.WebApp.HapticFeedback;
     if(hap === 'light') H.impactOccurred('light'); else H.notificationOccurred(hap);
   }catch(e){}
+  if(kind === 'ok') SFX.ok(); else if(kind === 'err') SFX.err(); else SFX.warn();
   clearTimeout(_flashT);
   // Страховка: если код исчез из кадра мгновенно и onIdle не пришёл (камеру
   // убрали в карман), подтверждение всё равно должно погаснуть.
@@ -5504,6 +5560,10 @@ function qrFlash(kind){
 
 // Код всё ещё перед камерой.
 function qrHold(){ _holdAt = Date.now(); }
+
+function qrSound(btn){
+  btn.classList.toggle('muted', !SFX.toggle());
+}
 
 async function qrTorch(btn){
   const on = btn.classList.toggle('on');

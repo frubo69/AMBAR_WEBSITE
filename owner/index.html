@@ -735,20 +735,24 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .scan-frame .tr{top:-2px;right:-2px;border-left:none;border-bottom:none;border-radius:0 14px 0 0}
 .scan-frame .bl{bottom:-2px;left:-2px;border-right:none;border-top:none;border-radius:0 0 0 14px}
 .scan-frame .br{bottom:-2px;right:-2px;border-left:none;border-top:none;border-radius:0 0 14px 0}
-.scan-badge{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
-  font-size:13px;font-weight:800;letter-spacing:1.2px;white-space:nowrap;
-  padding:8px 14px;border-radius:11px;opacity:0;transition:opacity .12s}
-.scan-frame.ok    {background:rgba(76,175,125,.22);box-shadow:0 0 0 3px rgba(76,175,125,.85) inset,0 0 34px rgba(76,175,125,.5)}
-.scan-frame.dup   {background:rgba(243,180,74,.22);box-shadow:0 0 0 3px rgba(243,180,74,.9) inset,0 0 34px rgba(243,180,74,.5)}
-.scan-frame.again {background:rgba(243,180,74,.14);box-shadow:0 0 0 3px rgba(243,180,74,.75) inset}
-.scan-frame.err   {background:rgba(224,85,85,.22);box-shadow:0 0 0 3px rgba(224,85,85,.9) inset,0 0 34px rgba(224,85,85,.5)}
-.scan-frame.ok .c   {border-color:#4CAF7D}
-.scan-frame.dup .c,.scan-frame.again .c{border-color:var(--warn)}
-.scan-frame.err .c  {border-color:var(--dn)}
-.scan-frame.ok .scan-badge   {opacity:1;color:#0d2318;background:#4CAF7D}
+/* Подсветка приглушённая: рамка — служебный элемент, а не светофор. Цвет
+   уходит в углы и в тонкую заливку, подпись висит под рамкой мелким шрифтом.
+   Яркая вспышка во весь кадр каждые две секунды выглядит дёшево и мешает
+   смотреть на бутылки. */
+.scan-badge{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%);
+  font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;
+  white-space:nowrap;opacity:0;transition:opacity .16s var(--e1);
+  text-shadow:0 1px 6px rgba(0,0,0,.9)}
+.scan-frame.ok    {background:rgba(76,175,125,.07);box-shadow:0 0 0 1px rgba(76,175,125,.4) inset}
+.scan-frame.dup,
+.scan-frame.again {background:rgba(224,85,85,.08);box-shadow:0 0 0 1px rgba(224,85,85,.45) inset}
+.scan-frame.err   {background:rgba(224,85,85,.08);box-shadow:0 0 0 1px rgba(224,85,85,.45) inset}
+.scan-frame.ok .c {border-color:#4CAF7D}
+.scan-frame.dup .c,.scan-frame.again .c,.scan-frame.err .c{border-color:var(--dn)}
+.scan-frame.ok .scan-badge {opacity:1;color:#6FD79E}
 .scan-frame.dup .scan-badge,
-.scan-frame.again .scan-badge{opacity:1;color:#2a1f08;background:var(--warn)}
-.scan-frame.err .scan-badge  {opacity:1;color:#fff;background:var(--dn)}
+.scan-frame.again .scan-badge,
+.scan-frame.err .scan-badge{opacity:1;color:#FF8A8A}
 .scan-torch{flex-shrink:0;width:38px;height:38px;border-radius:12px;
   display:flex;align-items:center;justify-content:center;cursor:pointer;
   background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);color:#fff;
@@ -5102,8 +5106,11 @@ async function accOrder(){
 const SCAN = {
   stream:null, video:null, cv:null, ctx:null, raf:null,
   seen:new Set(),          // коды этой сессии
+  seenAt:new Map(),        // код → когда его видели в кадре последний раз
   onCode:null, onIdle:null, onRepeat:null,
-  lastRepeat:0,
+  // Пока код не уходил из кадра дольше этого, считаем, что камера с него не
+  // сходила: человек ещё не успел её отвести, ругаться не на что.
+  GAP_MS:900,
   lastDecode:0, lastHit:0, frames:0, t0:0,
   DECODE_MS:80,            // ~12 распознаваний в секунду — глазу хватает
   CROP:0.82,               // центр кадра: по краям ловятся чужие коды с полки
@@ -5136,7 +5143,8 @@ const SCAN = {
     this.stop();
     this.video = videoEl; this.onCode = onCode; this.onIdle = onIdle;
     this.onRepeat = onRepeat;
-    this.seen = new Set(); this.frames = 0; this.t0 = Date.now(); this.lastHit = Date.now();
+    this.seen = new Set(); this.seenAt = new Map();
+    this.frames = 0; this.t0 = Date.now(); this.lastHit = Date.now();
     // Разрешение просим полное: распознаём мы всё равно уменьшенный кусок
     // кадра, но вырезаем его из детального — чем крупнее исходник, тем больше
     // деталей в этом куске. И картинка на экране перестаёт быть мыльной.
@@ -5210,17 +5218,17 @@ const SCAN = {
     if(hit && hit.data){
       const code = String(hit.data).trim();
       this.lastHit = Date.now();
-      // Тот же код в кадре читается каждый кадр — запрос слать не надо. Но и
-      // молчать нельзя: человек видит бутылку в рамке и ничего не происходит,
-      // а это выглядит как сломанное приложение. Поэтому говорим — редко.
+      const now = Date.now();
       if(this.seen.has(code)){
-        if(Date.now() - this.lastRepeat > 1200){
-          this.lastRepeat = Date.now();
-          if(this.onRepeat) this.onRepeat(code);
-        }
+        // Камера всё ещё стоит на той же бутылке — это не повторная попытка,
+        // а тот же самый скан, растянутый на секунду. Ругаться здесь значит
+        // обвинять человека в том, чего он не делал.
+        const gone = now - (this.seenAt.get(code) || 0);
+        this.seenAt.set(code, now);
+        if(gone > this.GAP_MS && this.onRepeat) this.onRepeat(code);
         return;
       }
-      this.seen.add(code);
+      this.seen.add(code); this.seenAt.set(code, now);
       if(this.onCode) this.onCode(code);
       return;
     }
@@ -5452,10 +5460,10 @@ function qrScreen(){
 // под ней. Молчание он читает как «приложение сломалось» — поэтому у каждого
 // исхода свой цвет, своя надпись и своя вибрация.
 const FLASH = {
-  ok:     ['ЗАПИСАНА',        'success'],
-  dup:    ['УЖЕ СЧИТАЛИ',     'warning'],
-  again:  ['УЖЕ В ЭТОЙ СМЕНЕ','light'],
-  err:    ['НЕ СОХРАНИЛОСЬ',  'error'],
+  ok:     ['записана',       'success'],
+  dup:    ['уже в реестре',  'warning'],
+  again:  ['уже посчитана',  'warning'],
+  err:    ['не сохранилось', 'error'],
 };
 let _flashT = null;
 function qrFlash(kind){
@@ -5473,8 +5481,10 @@ function qrFlash(kind){
     if(hap === 'light') H.impactOccurred('light'); else H.notificationOccurred(hap);
   }catch(e){}
   clearTimeout(_flashT);
+  // Успех гасим быстро: он подтверждение, а не событие. Отказ держим дольше —
+  // его надо успеть прочитать.
   _flashT = setTimeout(() => { f.classList.remove('ok','dup','again','err'); b.textContent = ''; },
-                       kind === 'ok' ? 650 : 1100);
+                       kind === 'ok' ? 420 : 1000);
 }
 
 async function qrTorch(btn){
@@ -5527,7 +5537,7 @@ SCANQ.onDone = (err, r, job) => {
 const QR_STATE = {
   sending: ['отправляю…',  'var(--muted)', '·'],
   new:     ['записана',    'var(--up)',    '✓'],
-  dup:     ['уже была',    'var(--warn)',  'уже есть'],
+  dup:     ['уже в реестре','var(--dn)',   'есть'],
   fail:    ['не сохранилось','var(--dn)',  '✕'],
 };
 
@@ -5566,7 +5576,7 @@ async function qrDrop(i){
       {method:'POST', body:{code: row.code}}); }
     catch(e){ _toast('Не удалось убрать'); return; }
   }
-  SCAN.seen.delete(row.code);
+  SCAN.seen.delete(row.code); SCAN.seenAt.delete(row.code);
   QR_ROWS.splice(i, 1);
   qrRenderFeed();
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}

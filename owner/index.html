@@ -172,8 +172,13 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .periods button.on{color:#0a0a14;background:none;box-shadow:none}
 
 /* Hero KPI — the main money number */
-.hero{position:relative;padding:20px 20px 18px;border-radius:var(--r);margin-bottom:10px;
+/* Карточка выручки прилипает под переключателем периодов: за ней и заходят,
+   и листать дни хочется, не возвращаясь наверх. Прокрутили — она ужимается до
+   строки с числом и стрелками, график уходит. */
+.hero{position:sticky;top:calc(66px + var(--safe-top) + 48px);z-index:30;
+  padding:20px 20px 18px;border-radius:var(--r);margin-bottom:10px;
   height:210px;  /* HARD-LOCKED — outer box never reflows regardless of content state */
+  transition:height .26s var(--e1),padding .26s var(--e1),box-shadow .26s var(--e1);
   background:
     radial-gradient(ellipse 90% 60% at 15% 0%, rgba(201,169,110,.18), transparent 60%),
     linear-gradient(180deg,#161629 0%, #0F0F20 100%);
@@ -224,6 +229,30 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    один в один, отпустил — уехала и с другой стороны приехала новая. Двигается
    ТОЛЬКО карточка выручки; остальная страница просто перерисовывает цифры. */
 .hero{will-change:transform}
+
+/* Ужатое состояние. Остаётся то, ради чего сюда смотрят на ходу: само число,
+   изменение и стрелки по дням. Всё, что объясняет число, уходит. */
+.hero.compact{height:74px;padding:0 16px;display:flex;align-items:center;gap:10px;
+  background:linear-gradient(180deg,#171730,#101021);
+  box-shadow:0 12px 28px rgba(0,0,0,.5)}
+/* Подпись вместе со стрелками вынимаем из потока и растягиваем на карточку:
+   day-nav внутри неё прижат вправо, и в ужатом виде он оказывается ровно
+   напротив числа. */
+.hero.compact .hero-lbl{position:absolute;inset:0;margin:0;padding:0 16px;
+  align-items:center;pointer-events:none}
+.hero.compact .day-nav{pointer-events:auto}
+.hero.compact #heroLbl,
+.hero.compact .hero-side,
+.hero.compact .delta-sub{display:none}
+.hero.compact .hero-spark{height:0;opacity:0;overflow:hidden}
+.hero.compact .hero-amt-row{margin:0;flex:0 0 auto}
+.hero.compact .hero-row{margin:0;flex:0 0 auto}
+.hero.compact .hero-amt{font-size:27px;letter-spacing:-.8px}
+.hero.compact .hero-unit{font-size:11px;margin-left:5px}
+.hero.compact .delta{padding:3px 8px;font-size:11px}
+
+.hero-lbl,.hero-amt-row,.hero-row,.hero-spark,.hero-amt,.hero-unit{
+  transition:opacity .2s var(--e1),font-size .26s var(--e1),height .26s var(--e1)}
 .hero.day-drag{transition:none}
 #offCards.day-drag{transition:none}
 #offCards.day-back{transition:transform .2s cubic-bezier(.2,.8,.3,1)}
@@ -3279,6 +3308,24 @@ document.querySelectorAll('.tb').forEach(btn=>{
     try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   });
 });
+
+// Карточка выручки ужимается при прокрутке. Порог с запасом и гистерезисом:
+// без него на границе карточка дёргается туда-сюда от каждого пикселя.
+(function heroCompact(){
+  const hero = document.querySelector('#pg-overview .hero');
+  if(!hero) return;
+  let on = false, tick = false;
+  const upd = () => {
+    tick = false;
+    const y = window.scrollY || document.documentElement.scrollTop || 0;
+    if(!on && y > 120) { on = true;  hero.classList.add('compact'); }
+    else if(on && y < 80) { on = false; hero.classList.remove('compact'); }
+  };
+  window.addEventListener('scroll', () => {
+    if(tick) return; tick = true; requestAnimationFrame(upd);
+  }, {passive:true});
+  upd();
+})();
 
 // ===== Date range picker =====
 const dateOv = document.getElementById('dateOverlay');

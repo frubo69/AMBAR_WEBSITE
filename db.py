@@ -1764,6 +1764,20 @@ async def qr_locks(now) -> list:
     return rows
 
 
+async def qr_list(product_id: str, district: str, limit: int = 500) -> list:
+    """Бутылки этой позиции на этой точке — новые сверху."""
+    db = _db_or_none()
+    if db is None: return []
+    q = {"product_id": product_id, "status": "active"}
+    if district: q["district"] = district
+    cur = db.qr_codes.find(q).sort("at", -1).limit(limit)
+    rows = await cur.to_list(length=limit)
+    for r in rows:
+        r["code"] = r.pop("_id")
+        r["at"] = str(r.get("at") or "")
+    return rows
+
+
 async def qr_get(code: str) -> dict | None:
     db = _db_or_none()
     if db is None: return None

@@ -283,6 +283,24 @@ async def handle_undo(request):
 
 
 @require_owner
+async def handle_list(request):
+    """Что уже записано по позиции на точке.
+
+    Экран сканирования открывается не с нуля: если полку считали вчера, эти
+    бутылки надо видеть — иначе человек не понимает, продолжает он счёт или
+    начинает заново."""
+    pid = (request.query.get("product_id") or "").strip()
+    district = (request.query.get("district") or "").strip()
+    if not pid:
+        return web.json_response({"error": "product_required"}, status=400,
+                                 headers=CORS_HEADERS)
+    rows = await db.qr_list(pid, district)
+    return web.json_response({"items": rows, "total": len(rows)},
+                             headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
+@require_owner
 async def handle_lookup(request):
     """Что это за бутылка. Сюда же ляжет её история операций."""
     code = _clean(request.match_info.get("code"))
@@ -302,6 +320,7 @@ def setup(app):
     r = app.router
     routes = (
         ("/api/owner/qr",             handle_stats,  "GET"),
+        ("/api/owner/qr/list",        handle_list,   "GET"),
         ("/api/owner/qr/scan",        handle_scan,   "POST"),
         ("/api/owner/qr/lock",        handle_lock,   "POST"),
         ("/api/owner/qr/unlock",      handle_unlock, "POST"),

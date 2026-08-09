@@ -780,6 +780,8 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   color:var(--gold2);font-variant-numeric:tabular-nums;line-height:1}
 .scan-count i{font-style:normal;font-size:10px;letter-spacing:.6px;
   color:rgba(255,255,255,.6);text-transform:uppercase}
+.scan-count b{font-size:11px;font-weight:700;color:#6FD79E;margin-left:2px}
+.scan-row.old{opacity:.62}
 .scan-cam{position:relative;border-radius:18px;overflow:hidden;background:#000;
   border:1px solid var(--border2)}
 .scan-cam video{width:100%;display:block;height:54dvh;object-fit:cover}
@@ -5564,6 +5566,7 @@ async function qrStart(pid){
     _toast('Эту позицию уже считают'); accQR(); return;   // подтянем свежие брони
   }
   qrScreen();
+  qrLoadExisting();                      // не с нуля: полку могли считать вчера
   const v = document.getElementById('qrVideo');
   try{
     await SCAN.start(v, qrSave, qrIdle, () => qrFlash('again'), qrHold);
@@ -5616,13 +5619,14 @@ function qrScreen(){
       </div>
 
       <div class="scan-foot">
-        <div class="scan-count"><span id="qrN">0</span><i>записано</i></div>
+        <div class="scan-count"><span id="qrN">0</span><i>на точке</i>
+          <b id="qrAdded"></b></div>
         <div class="scan-hint" id="qrHint">Наведите на код</div>
       </div>
     </div>
 
-    <div class="scan-sect"><span>Последние</span><i id="qrCount"></i></div>
-    <div id="qrFeed" class="scan-feed"><div class="scan-empty">Наведите камеру на первую бутылку</div></div>
+    <div class="scan-sect"><span>Бутылки</span><i id="qrCount"></i></div>
+    <div id="qrFeed" class="scan-feed"><div class="scan-empty">Загрузка…</div></div>
 
     <div class="scan-acts">
       <button class="scan-btn ghost" id="qrUndo" onclick="qrUndo()" disabled>Отменить последнюю</button>
@@ -5680,6 +5684,22 @@ function qrSound(btn){
   btn.classList.toggle('muted', !SFX.toggle());
 }
 
+// Уже записанные бутылки этой позиции на этой точке. Их коды кладём сканеру в
+// «виденные»: иначе он предложит записать бутылку, которая давно в реестре, и
+// узнает об этом только от сервера — лишний запрос и лишняя красная вспышка.
+async function qrLoadExisting(){
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/qr/list',
+      {params:{product_id: QR_PROD.id, district: QR_DIST}});
+    const old = (r.items || []).map(x => ({
+      code: x.code, label: x.label || '', state: 'old',
+      at: String(x.at || '').slice(0, 10)}));
+    old.forEach(x => { SCAN.seen.add(x.code); SCAN.seenAt.set(x.code, 0); });
+    QR_ROWS = QR_ROWS.concat(old);       // новые всегда сверху
+    qrRenderFeed();
+  }catch(e){ /* не загрузилось — не повод не сканировать */ }
+}
+
 async function qrTorch(btn){
   const on = btn.classList.toggle('on');
   if(!(await SCAN.torch(on))) btn.classList.toggle('on', !on);
@@ -5734,18 +5754,23 @@ SCANQ.onDone = (err, r, job) => {
 const QR_STATE = {
   sending: ['отправляю…',  'var(--muted)', '·'],
   new:     ['записана',    'var(--up)',    '✓'],
+  old:     ['в реестре',   'var(--dim)',   ''],
   dup:     ['уже в реестре','var(--dn)',   'есть'],
   fail:    ['не сохранилось','var(--dn)',  '✕'],
 };
 
 function qrRenderFeed(){
-  // Счётчик — это длина ленты, а не отдельное число: иначе после удаления
-  // строки они разъезжаются, и верить нельзя ни тому ни другому.
+  // Крупное число — сколько бутылок этой позиции стоит на этой точке всего:
+  // и записанные раньше, и добавленные сейчас. Это и есть ответ на вопрос
+  // «сколько у нас Absolut на B1», ради которого всё считается.
+  const total = QR_ROWS.filter(r => ['new','sending','old'].includes(r.state)).length;
   QR_SESSION = QR_ROWS.filter(r => r.state === 'new' || r.state === 'sending').length;
-  _setText('qrN', String(QR_SESSION));
+  _setText('qrN', String(total));
+  const s = document.getElementById('qrAdded');
+  if(s) s.textContent = QR_SESSION ? `+${QR_SESSION} сейчас` : '';
   const feed = document.getElementById('qrFeed'); if(!feed) return;
   const cnt = document.getElementById('qrCount');
-  if(cnt) cnt.textContent = QR_ROWS.length ? QR_ROWS.length + '' : '';
+  if(cnt) cnt.textContent = total ? total + '' : '';
   feed.innerHTML = QR_ROWS.slice(0, 40).map((r, i) => {
     const [txt, color, mark] = QR_STATE[r.state] || QR_STATE.sending;
     // Убрать можно только то, что записали в этой сессии. «Уже была» — это
@@ -5764,7 +5789,7 @@ function qrRenderFeed(){
       </span>
       <span class="scan-state" style="color:${color}">${escS(txt)}${
         r.at ? ' · ' + escS(r.at) : ''}</span>${del}</div>`;
-  }).join('') || '<div class="scan-empty">Наведите камеру на первую бутылку</div>';
+  }).join('') || '<div class="scan-empty">Этой позиции здесь ещё нет — наведите на первую бутылку</div>';
   const u = document.getElementById('qrUndo');
   if(u) u.disabled = !QR_ROWS.some(r => r.state === 'new');
 }

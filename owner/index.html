@@ -696,6 +696,11 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   font-family:inherit;font-size:14px;font-weight:700;color:#1a1408;
   background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .qr-btn:disabled{opacity:.5}
+.qr-scan{width:100%;padding:14px;border-radius:14px;border:none;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;gap:9px;margin:12px 0 4px;
+  font-family:inherit;font-size:14.5px;font-weight:700;color:#1a1408;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.qr-undo{flex:1;padding:0 14px;border-radius:12px;font-size:13px}
 .pr-line[data-detail]{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .pr-line[data-detail]:active{background:var(--card2)}
 .acc-line-bar{flex:1.2;height:5px;border-radius:3px;background:var(--card2);overflow:hidden}
@@ -4784,7 +4789,7 @@ const ACC = [
    ico:'<path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12"/>'},
   {id:'gift',     t:'Акции',             s:'что раздали бесплатно',
    ico:'<path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7"/>'},
-  {id:'qr',       t:'QR-коды',           s:'одна бутылка — один код',
+  {id:'qr',       t:'QR-коды',           s:'сканируем коды с бутылок',
    ico:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/>'},
 ];
 let ACC_PERIOD = null, ACC_STOCK = null, ACC_ORDER = null, ACC_VIEW = null,
@@ -4810,12 +4815,12 @@ function accRender(){
                 : 'остатков хватает')
               : 'сколько довезти до нормы',
     // Показы без денег ничего не значат, поэтому подпись — про выручку.
-    // Свободные коды — это то, что можно клеить прямо сейчас; всё остальное
-    // уже на бутылках и в остатке.
     qr:       ACC_QR     ? (ACC_QR.totals.total
-                ? `${fmt(ACC_QR.totals.active)} на бутылках · ${fmt(ACC_QR.totals.free)} свободных`
-                : 'кодов ещё нет')
-              : 'одна бутылка — один код',
+                ? `${ACC_QR.by_product.length} ${pluralize(ACC_QR.by_product.length,
+                    'позиция','позиции','позиций')} · последний скан ${
+                    escS(String((ACC_QR.last[0]||{}).at||'').slice(0,10))}`
+                : 'ни одной бутылки не записано')
+              : 'сканируем коды с бутылок',
     // Подарок мерим не бутылками, а тем, что он принёс: сто отданных бутылок
     // при чеке в полторы тысячи и при чеке в тысячу — разные сто бутылок.
     gift:     ACC_GIFT   ? (ACC_GIFT.totals.bottles
@@ -4836,7 +4841,7 @@ function accRender(){
     order:    ACC_ORDER ? [fmt(ACC_ORDER.total_qty), 'штук'] : ['—', 'штук'],
     promo:    ACC_PROMO ? [fmt(ACC_PROMO.totals.users), 'пришло'] : ['—', 'пришло'],
     gift:     ACC_GIFT  ? [fmt(ACC_GIFT.totals.bottles), 'бутылок'] : ['—', 'бутылок'],
-    qr:       ACC_QR    ? [fmt(ACC_QR.totals.total), 'кодов'] : ['—', 'кодов'],
+    qr:       ACC_QR    ? [fmt(ACC_QR.totals.active), 'бутылок'] : ['—', 'бутылок'],
   };
   box.innerHTML = `<div class="acc-grid">` + ACC.map((a, i) => {
     const [v, u] = num[a.id] || ['—', ''];
@@ -5000,9 +5005,11 @@ async function accOrder(){
 }
 
 // ─── QR-коды (AMBAR STOCK) ──────────────────────────────────────────────────
-// Одна бутылка — один код — одна учётная единица. Наклейка сама по себе
-// остатка не меняет: пока код свободен, его как бы нет. Поэтому в сводке
-// свободные и наклеенные стоят порознь — это разные вещи, а не одна куча.
+// Коды уже есть на бутылках — мы их не печатаем, а переписываем в базу и
+// привязываем к позиции. Выбрал Absolut, открыл камеру, отсканировал —
+// бутылка в реестре.
+let QR_PROD = null, QR_SESSION = 0, QR_LAST = null;
+
 async function accQR(){
   _setText('accTitle', 'QR-коды');
   _setText('accSub', 'загрузка…');
@@ -5012,51 +5019,156 @@ async function accQR(){
     '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
   ACC_QR = d;
   const t = d.totals;
-  _setText('accSub', t.total ? `${fmt(t.total)} выпущено · ${d.batches.length} ${
-    pluralize(d.batches.length,'партия','партии','партий')}` : 'реестр пуст');
+  _setText('accSub', t.active
+    ? `${fmt(t.active)} ${pluralize(t.active,'бутылка','бутылки','бутылок')} в реестре`
+    : 'реестр пуст');
   document.getElementById('accMid').innerHTML = `
     <div class="exp-sum">
       <div class="exp-tot">
-        <span class="exp-tot-v">${fmt(t.free)}</span>
-        <span class="exp-tot-u">свободных<br>кодов</span>
+        <span class="exp-tot-v">${fmt(t.active)}</span>
+        <span class="exp-tot-u">бутылок<br>записано</span>
         <span class="exp-tot-r">
-          <span>на бутылках<b>${fmt(t.active)}</b></span>
+          <span>позиций<b>${d.by_product.length}</b></span>
           <span>продано<b>${fmt(t.sold)}</b></span>
           <span>списано<b>${fmt(t.written)}</b></span>
         </span>
       </div>
     </div>
-    <div class="stk-note" style="margin-top:10px">
-      <b>Наклейка сама по себе остаток не меняет.</b> Код становится бутылкой
-      только после скана на точке — поэтому «активировать партию целиком» нельзя
-      и не будет: иначе в остатке появятся бутылки, которых никто не видел.
-    </div>
-    <div class="exp-grp">Выпустить партию</div>
-    <div class="qr-form">
-      <input class="ed-search qr-inp" id="qrCount" type="number" inputmode="numeric"
-        placeholder="Сколько кодов" min="1" max="${d.max_batch}">
-      <button class="btn-gold qr-btn" onclick="qrCreate(this)">Создать</button>
-    </div>
-    ${d.batches.length ? `<div class="exp-grp">Партии · ${d.batches.length}</div>` +
-      d.batches.map(b => `<div class="acc-line">
-        <span class="acc-line-n">${escS(b.batch_id)}</span>
-        <span class="acc-line-s">${escS(String(b.at).slice(0,10))}${
-          b.product_name ? ' · ' + escS(b.product_name) : ' · без позиции'}</span>
-        <span class="acc-line-v">${fmt(b.count)}</span>
+    <button class="btn-gold qr-scan" onclick="qrPick()">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
+        <path d="M7 12h10"/></svg>
+      Сканировать бутылки
+    </button>
+    ${d.by_product.length ? `<div class="exp-grp">Позиции · ${d.by_product.length}</div>` +
+      d.by_product.map(r => `<div class="acc-line">
+        <span class="acc-line-n">${escS(r.name)}</span>
+        <span class="acc-line-s">${escS(String(r.last).slice(0,10))}</span>
+        <span class="acc-line-v">${fmt(r.count)}</span>
       </div>`).join('')
-    : '<div class="exp-empty">Партий пока нет</div>'}`;
+    : '<div class="exp-empty">Ни одной бутылки ещё не записано</div>'}`;
 }
 
-async function qrCreate(btn){
-  const n = parseInt((document.getElementById('qrCount').value || '').replace(/\D/g,''), 10);
-  if(!n){ _toast('Сколько кодов выпустить?'); return; }
-  btn.disabled = true;
+// Выбор позиции. Сначала товар, потом камера: код с бутылки сам по себе не
+// говорит, что это за напиток — привязку делает человек, один раз на партию.
+function qrPick(){
+  const items = (window.STK_CATALOG || []).length ? STK_CATALOG : null;
+  const box = document.getElementById('accMid');
+  box.innerHTML = `
+    <div class="sheet-hd" style="margin-bottom:12px">
+      <button class="sheet-x" onclick="accQR()">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+      </button>
+      <div><div class="acc-t" style="font-size:14px;font-weight:700">Что сканируем</div>
+      <div class="acc-s" style="font-size:11.5px;color:var(--muted)">позиция из каталога</div></div>
+    </div>
+    <input class="ed-search" id="qrQ" placeholder="Поиск по названию" oninput="qrRenderList()"
+      autocomplete="off" spellcheck="false">
+    <div id="qrList"><div class="exp-empty">Загрузка каталога…</div></div>`;
+  qrLoadCatalog();
+}
+
+let QR_CAT = null;
+async function qrLoadCatalog(){
+  if(!QR_CAT){
+    try{ QR_CAT = (await ownerApi.ownerFetch('/api/owner/catalog')).items || []; }
+    catch(e){ document.getElementById('qrList').innerHTML =
+      '<div class="exp-empty" style="color:var(--dn)">Каталог не загрузился</div>'; return; }
+  }
+  qrRenderList();
+}
+function qrRenderList(){
+  const q = (document.getElementById('qrQ')?.value || '').trim().toLowerCase();
+  const have = {}; (ACC_QR?.by_product || []).forEach(r => have[r.product_id] = r.count);
+  const rows = (QR_CAT || []).filter(p => !q || (p.name||'').toLowerCase().includes(q)).slice(0, 200);
+  document.getElementById('qrList').innerHTML = rows.length ? rows.map(p => `
+    <div class="acc-line" onclick="qrStart('${p.id}', ${JSON.stringify(p.name||'')})">
+      <span class="acc-line-n">${escS(p.name||'')}</span>
+      <span class="acc-line-s">${escS(p.cat||'')}</span>
+      <span class="acc-line-v" style="${have[p.id]?'':'color:var(--muted)'}">${have[p.id]||'—'}</span>
+    </div>`).join('') : '<div class="exp-empty">Ничего не нашлось</div>';
+}
+
+// Сканирование. Telegram держит камеру открытой и отдаёт код за кодом, пока
+// человек не закроет её сам, — поэтому считать полку можно подряд, не тыкая
+// «сканировать» на каждую бутылку.
+function qrStart(pid, pname){
+  QR_PROD = {id: pid, name: pname}; QR_SESSION = 0; QR_LAST = null;
+  const tg = window.Telegram && Telegram.WebApp;
+  if(!tg || !tg.showScanQrPopup){
+    _toast('Обновите Telegram — сканер требует версию 6.4 и выше'); return;
+  }
+  qrScreen();
   try{
-    const r = await ownerApi.ownerFetch('/api/owner/qr/batch', {method:'POST', body:{count:n}});
-    _toast(`Партия ${r.batch_id} · ${r.count} кодов`);
-    await accQR();
-  }catch(e){ _toast('Не получилось выпустить'); }
-  btn.disabled = false;
+    tg.showScanQrPopup({text: pname}, (text) => {
+      qrSave(text);
+      return false;                       // false — камера остаётся открытой
+    });
+  }catch(e){ _toast('Камера не открылась'); }
+}
+
+function qrScreen(){
+  document.getElementById('accMid').innerHTML = `
+    <div class="exp-sum">
+      <div class="exp-tot">
+        <span class="exp-tot-v" id="qrN">0</span>
+        <span class="exp-tot-u">бутылок<br>за сессию</span>
+        <span class="exp-tot-r"><span>позиция<b style="font-size:12px">${escS(QR_PROD.name)}</b></span></span>
+      </div>
+    </div>
+    <div id="qrFeed"><div class="exp-empty">Наведите камеру на код</div></div>
+    <div class="qr-form" style="margin-top:12px">
+      <button class="btn-ico qr-undo" id="qrUndo" onclick="qrUndo()" disabled>Отменить последнюю</button>
+      <button class="btn-gold qr-btn" onclick="qrDone()">Готово</button>
+    </div>`;
+}
+
+async function qrSave(text){
+  const code = String(text || '').trim();
+  if(!code) return;
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/qr/scan',
+      {method:'POST', body:{code, product_id: QR_PROD.id}});
+    const feed = document.getElementById('qrFeed'); if(!feed) return;
+    if(r.new){
+      QR_SESSION++; QR_LAST = code;
+      _setText('qrN', String(QR_SESSION));
+      const u = document.getElementById('qrUndo'); if(u) u.disabled = false;
+      try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+      feed.insertAdjacentHTML('afterbegin', `<div class="acc-line">
+        <span class="acc-line-n">${escS(code)}</span>
+        <span class="acc-line-s">записана</span>
+        <span class="acc-line-v" style="color:var(--up)">✓</span></div>`);
+    }else{
+      // Повтор — обычное дело у полки, а не ошибка: та же крышка попала в
+      // кадр дважды. Говорим спокойно и не считаем второй раз.
+      try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+      feed.insertAdjacentHTML('afterbegin', `<div class="acc-line">
+        <span class="acc-line-n">${escS(code)}</span>
+        <span class="acc-line-s">уже была · ${escS(String(r.at).slice(0,10))}</span>
+        <span class="acc-line-v" style="color:var(--warn)">уже есть</span></div>`);
+    }
+    const empty = feed.querySelector('.exp-empty'); if(empty) empty.remove();
+  }catch(e){ _toast('Скан не сохранился'); }
+}
+
+async function qrUndo(){
+  if(!QR_LAST) return;
+  try{
+    await ownerApi.ownerFetch('/api/owner/qr/undo', {method:'POST', body:{code: QR_LAST}});
+    QR_SESSION = Math.max(0, QR_SESSION - 1); _setText('qrN', String(QR_SESSION));
+    const feed = document.getElementById('qrFeed');
+    if(feed && feed.firstElementChild) feed.firstElementChild.remove();
+    QR_LAST = null;
+    const u = document.getElementById('qrUndo'); if(u) u.disabled = true;
+  }catch(e){ _toast('Не отменилось'); }
+}
+
+function qrDone(){
+  try{ Telegram.WebApp.closeScanQrPopup(); }catch(e){}
+  accQR();
 }
 
 // ─── Акции ──────────────────────────────────────────────────────────────────

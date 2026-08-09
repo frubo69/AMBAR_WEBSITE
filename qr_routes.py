@@ -1,20 +1,20 @@
-"""AMBAR STOCK — реестр QR-кодов. Одна бутылка = один код = одна учётная единица.
+"""AMBAR STOCK — реестр бутылок по их собственным кодам.
 
-Первый слой системы: выпуск кодов и их состояние. Сканирование и привязка к
-точке лягут сюда же, когда решим, где живёт сканер, — но реестр от этого не
-зависит и нужен раньше всего: печатать наклейки не из чего, пока кодов нет.
+Коды мы не печатаем: они уже есть на бутылках. Работа сводится к тому, чтобы
+переписать их в базу и привязать к позиции каталога: выбрал Absolut, открыл
+камеру, отсканировал — бутылка появилась в реестре.
 
-Жизненный цикл кода:
-    free      выпущен, напечатан, ещё ни на чём не наклеен — на остаток не влияет
-    active    отсканирован на точке, стал бутылкой в остатке
-    sold      ушёл с заказом
-    written   списан: бой, пересорт, недостача
+Жизненный цикл записи:
+    active    код отсканирован и привязан к позиции — бутылка в остатке
+    sold      ушла с заказом
+    written   списана: бой, пересорт, недостача
 
-Ключевое правило спецификации, которое здесь и держится: наклейка сама по себе
-остатка не меняет. Пока код free, его как бы нет. Поэтому массово «активировать
-диапазон» нельзя — только физический скан переводит код в active.
+Главная защита здесь — от повторного скана. Одна и та же бутылка, посчитанная
+дважды, даёт лишнюю единицу в остатке, и найти её потом нельзя: в базе она
+выглядит точно так же, как настоящая. Поэтому код — это _id: вторая запись с
+тем же номером физически невозможна, а не «проверяется».
 """
-import logging, secrets, string
+import logging, re
 from datetime import datetime, timezone
 
 from aiohttp import web
@@ -24,113 +24,104 @@ from owner_auth import require_owner, CORS_HEADERS
 
 log = logging.getLogger("qr")
 
-# Алфавит без похожих знаков. На крышке 25 мм QR читают под углом и в тени, а
-# код иногда придётся вбить руками — 0/O и 1/I/L там неразличимы.
-ALPHABET = "23456789ABCDEFGHJKMNPQRSTUVWXYZ"
-CODE_LEN = 8
-
-MAX_BATCH = 5000          # больше одной партии за раз печатать всё равно нечем
+MAX_CODE = 120          # длиннее не бывает даже у акцизных марок
 
 
-def _new_code() -> str:
-    return "".join(secrets.choice(ALPHABET) for _ in range(CODE_LEN))
+def _clean(code: str) -> str:
+    """Код с этикетки как есть, без пробелов и переносов.
 
-
-async def _unique_codes(n: int) -> list:
-    """n свежих кодов, которых ещё нет в базе.
-
-    31^8 — это 850 миллиардов комбинаций, при десятках тысяч кодов совпадение
-    почти невозможно. Но «почти» здесь мало: совпавший код — это две бутылки с
-    одним номером, то есть тихая ошибка в остатке, которую никто не найдёт."""
-    out, tries = set(), 0
-    while len(out) < n and tries < 20:
-        need = n - len(out)
-        batch = {_new_code() for _ in range(need)}
-        taken = await db.qr_existing(list(batch))
-        out |= (batch - set(taken))
-        tries += 1
-    if len(out) < n:
-        raise RuntimeError(f"не удалось выпустить {n} кодов, получилось {len(out)}")
-    return sorted(out)
+    Регистр не трогаем: у части марок он значащий, и приведение к верхнему
+    склеило бы разные бутылки в одну."""
+    return re.sub(r"\s+", "", str(code or ""))[:MAX_CODE]
 
 
 @require_owner
 async def handle_stats(request):
-    """Сводка реестра: сколько выпущено и в каком они состоянии."""
+    """Сводка реестра: сколько бутылок записано и по каким позициям."""
     st = await db.qr_stats()
-    batches = await db.qr_batches(limit=30)
+    by_product = await db.qr_by_product()
+    last = await db.qr_last(limit=20)
     return web.json_response({
         "totals": {
             "total":   sum(st.values()),
-            "free":    st.get("free", 0),
             "active":  st.get("active", 0),
             "sold":    st.get("sold", 0),
             "written": st.get("written", 0),
         },
-        "batches": batches,
-        "code_len": CODE_LEN,
-        "max_batch": MAX_BATCH,
-    }, headers=CORS_HEADERS)
+        "by_product": by_product,
+        "last": last,
+    }, headers=CORS_HEADERS,
+       dumps=lambda o: __import__("json").dumps(o, default=str))
 
 
 @require_owner
-async def handle_batch_create(request):
-    """Выпустить партию кодов.
+async def handle_scan(request):
+    """Записать отсканированную бутылку.
 
-    Позиция необязательна: наклейки можно печатать впрок и решать у полки, на
-    что их клеить. Если позиция задана, код с ней и родится — тогда при скане
-    товар подставится сам, без выбора из ста двадцати позиций."""
+    Повтор — не ошибка ввода, а нормальная ситуация: на полке легко навести
+    камеру на ту же крышку дважды. Поэтому отвечаем спокойно и говорим, что
+    эта бутылка уже посчитана и когда."""
     try:
         body = await request.json()
     except Exception:
         return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
-    try:
-        count = int(body.get("count") or 0)
-    except (TypeError, ValueError):
-        count = 0
-    if count < 1 or count > MAX_BATCH:
-        return web.json_response({"error": "bad_count", "max": MAX_BATCH},
-                                 status=400, headers=CORS_HEADERS)
 
-    product_id = (body.get("product_id") or "").strip() or None
-    product_name = ""
-    if product_id:
-        from operator_routes import _catalog_by_id
-        p = _catalog_by_id().get(product_id)
-        if not p:
-            return web.json_response({"error": "unknown_product"}, status=400,
-                                     headers=CORS_HEADERS)
-        product_name = p.get("name", "")
+    code = _clean(body.get("code"))
+    if not code:
+        return web.json_response({"error": "empty_code"}, status=400, headers=CORS_HEADERS)
 
-    note = str(body.get("note") or "").strip()[:80]
-    codes = await _unique_codes(count)
+    product_id = (body.get("product_id") or "").strip()
+    from operator_routes import _catalog_by_id
+    p = _catalog_by_id().get(product_id)
+    if not p:
+        return web.json_response({"error": "unknown_product"}, status=400, headers=CORS_HEADERS)
+
+    district = (body.get("district") or "").strip() or None
     now = datetime.now(timezone.utc)
-    batch_id = "B" + now.strftime("%y%m%d") + "-" + secrets.token_hex(2).upper()
+    added = await db.qr_add(code, product_id, p.get("name", ""), district,
+                            request.get("owner_id") or 0, now)
+    if not added:
+        old = await db.qr_get(code)
+        return web.json_response({
+            "ok": True, "new": False,
+            "code": code,
+            "product_name": (old or {}).get("product_name", ""),
+            "at": str((old or {}).get("at") or ""),
+        }, headers=CORS_HEADERS)
 
-    await db.qr_insert(batch_id, codes, product_id, product_name, note,
-                       request.get("owner_id") or 0, now)
-    log.info(f"[qr] партия {batch_id}: {count} кодов"
-             + (f" · {product_name}" if product_name else " · без позиции"))
-    return web.json_response({"ok": True, "batch_id": batch_id, "count": count,
-                              "product_id": product_id, "product_name": product_name},
+    total = await db.qr_count_product(product_id)
+    log.info(f"[qr] {p.get('name','')} · {code}"
+             + (f" · {district}" if district else ""))
+    return web.json_response({"ok": True, "new": True, "code": code,
+                              "product_id": product_id,
+                              "product_name": p.get("name", ""),
+                              "product_total": total},
                              headers=CORS_HEADERS)
 
 
 @require_owner
-async def handle_batch_codes(request):
-    """Коды партии — для печати наклеек."""
-    bid = request.match_info.get("bid", "")
-    codes = await db.qr_batch_codes(bid)
-    if not codes:
-        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
-    return web.json_response({"batch_id": bid, "count": len(codes), "codes": codes},
-                             headers=CORS_HEADERS)
+async def handle_undo(request):
+    """Отменить последний скан — тот, что человек только что сделал зря.
+
+    Убираем не «последний по базе», а конкретный код: пока один считает полку,
+    второй может сканировать в другом районе, и «последний» окажется чужим."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    code = _clean(body.get("code"))
+    if not code:
+        return web.json_response({"error": "empty_code"}, status=400, headers=CORS_HEADERS)
+    ok = await db.qr_remove(code)
+    if ok:
+        log.info(f"[qr] отменён скан {code}")
+    return web.json_response({"ok": ok, "code": code}, headers=CORS_HEADERS)
 
 
 @require_owner
 async def handle_lookup(request):
-    """Что это за код. Дальше сюда ляжет история операций бутылки."""
-    code = (request.match_info.get("code") or "").strip().upper()
+    """Что это за бутылка. Сюда же ляжет её история операций."""
+    code = _clean(request.match_info.get("code"))
     doc = await db.qr_get(code)
     if not doc:
         return web.json_response({"error": "unknown_code", "code": code},
@@ -146,10 +137,10 @@ async def _opt(request):
 def setup(app):
     r = app.router
     routes = (
-        ("/api/owner/qr",                 handle_stats,        "GET"),
-        ("/api/owner/qr/batch",           handle_batch_create, "POST"),
-        ("/api/owner/qr/batch/{bid}",     handle_batch_codes,  "GET"),
-        ("/api/owner/qr/code/{code}",     handle_lookup,       "GET"),
+        ("/api/owner/qr",             handle_stats,  "GET"),
+        ("/api/owner/qr/scan",        handle_scan,   "POST"),
+        ("/api/owner/qr/undo",        handle_undo,   "POST"),
+        ("/api/owner/qr/code/{code}", handle_lookup, "GET"),
     )
     seen = set()
     for path, handler, method in routes:

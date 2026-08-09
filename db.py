@@ -1587,28 +1587,32 @@ async def get_users_by_via() -> list:
     return await cur.to_list(length=20000)
 
 
-# ── AMBAR STOCK: реестр QR-кодов ────────────────────────────────────────────
-async def qr_existing(codes: list) -> list:
-    """Какие из этих кодов уже заняты."""
+# ── AMBAR STOCK: реестр бутылок по их кодам ─────────────────────────────────
+async def qr_add(code: str, product_id: str, product_name: str, district,
+                 by: int, at) -> bool:
+    """Записать бутылку. True — записали, False — этот код уже есть.
+
+    Код лежит в _id, поэтому вторая запись с тем же номером невозможна на
+    уровне базы, а не «проверяется кодом»: между проверкой и вставкой два
+    человека успевают отсканировать одну полку."""
     db = _db_or_none()
-    if db is None: return []
-    cur = db.qr_codes.find({"_id": {"$in": list(codes)}}, {"_id": 1})
-    return [d["_id"] for d in await cur.to_list(length=len(codes))]
+    if db is None: return False
+    from pymongo.errors import DuplicateKeyError
+    try:
+        await db.qr_codes.insert_one({
+            "_id": code, "status": "active", "product_id": product_id,
+            "product_name": product_name, "district": district,
+            "by": by, "at": at})
+        return True
+    except DuplicateKeyError:
+        return False
 
 
-async def qr_insert(batch_id: str, codes: list, product_id, product_name,
-                    note: str, by: int, at):
-    """Партия кодов одной вставкой: по одному 5000 документов писать нельзя."""
+async def qr_remove(code: str) -> bool:
     db = _db_or_none()
-    if db is None: return
-    docs = [{"_id": c, "batch": batch_id, "status": "free",
-             "product_id": product_id, "product_name": product_name,
-             "district": None, "at": at} for c in codes]
-    await db.qr_codes.insert_many(docs, ordered=False)
-    await db.qr_batches.insert_one({"_id": batch_id, "count": len(codes),
-                                    "product_id": product_id,
-                                    "product_name": product_name,
-                                    "note": note, "by": by, "at": at})
+    if db is None: return False
+    r = await db.qr_codes.delete_one({"_id": code})
+    return r.deleted_count > 0
 
 
 async def qr_stats() -> dict:
@@ -1618,22 +1622,39 @@ async def qr_stats() -> dict:
     return {d["_id"]: d["n"] for d in await cur.to_list(length=20)}
 
 
-async def qr_batches(limit: int = 30) -> list:
+async def qr_by_product() -> list:
+    """Сколько бутылок записано по каждой позиции — это и есть остаток в штуках."""
     db = _db_or_none()
     if db is None: return []
-    cur = db.qr_batches.find({}).sort("at", -1).limit(limit)
+    cur = db.qr_codes.aggregate([
+        {"$match": {"status": "active"}},
+        {"$group": {"_id": "$product_id",
+                    "name": {"$first": "$product_name"},
+                    "n": {"$sum": 1},
+                    "last": {"$max": "$at"}}},
+        {"$sort": {"n": -1}},
+    ])
+    rows = await cur.to_list(length=500)
+    return [{"product_id": r["_id"], "name": r.get("name") or r["_id"],
+             "count": r["n"], "last": str(r.get("last") or "")} for r in rows]
+
+
+async def qr_count_product(product_id: str) -> int:
+    db = _db_or_none()
+    if db is None: return 0
+    return await db.qr_codes.count_documents({"product_id": product_id,
+                                              "status": "active"})
+
+
+async def qr_last(limit: int = 20) -> list:
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.qr_codes.find({}).sort("at", -1).limit(limit)
     rows = await cur.to_list(length=limit)
     for r in rows:
-        r["batch_id"] = r.pop("_id")
+        r["code"] = r.pop("_id")
         r["at"] = str(r.get("at") or "")
     return rows
-
-
-async def qr_batch_codes(batch_id: str) -> list:
-    db = _db_or_none()
-    if db is None: return []
-    cur = db.qr_codes.find({"batch": batch_id}, {"_id": 1}).sort("_id", 1)
-    return [d["_id"] for d in await cur.to_list(length=10000)]
 
 
 async def qr_get(code: str) -> dict | None:

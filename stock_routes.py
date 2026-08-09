@@ -450,15 +450,17 @@ async def handle_transfers(request):
 
 
 # ── заявка ───────────────────────────────────────────────────────────────────
-@require_owner
-async def handle_order(request):
+async def order_rows(day: str = "") -> dict:
     """Заявка на закупку: сколько довезти в каждый район, чтобы вернуться к норме.
 
     заявка = норма − остаток на руках. Норма берётся сохранённая, а если её не
     задавали — рассчитанная по продажам. Отдаём и то и другое, чтобы владелец
     видел, где норма расходится с реальным спросом.
+
+    Отдельной функцией, потому что этим же расчётом выгружается Excel для
+    магазина: держать вторую копию формулы нельзя — разойдутся молча.
     """
-    day = (request.query.get("day") or "").strip() or _biz_day()
+    day = (day or "").strip() or _biz_day()
     cat = _catalog()
     saved_norms = await db.get_stock_norms()
     rows, total_aed, total_qty = [], 0, 0
@@ -492,7 +494,7 @@ async def handle_order(request):
                      "price": price, "need_total": item_total, "cells": cells})
 
     rows.sort(key=lambda r: (-r["need_total"], r["name"]))
-    return web.json_response({
+    return {
         "day": day,
         "districts": [{"id": o, "code": OFFICE_CODES.get(o, ""),
                        "name": OFFICE_NAMES.get(o, o),
@@ -501,7 +503,13 @@ async def handle_order(request):
         "frozen_aed": frozen_aed,
         "cover_days": NORM_COVER_DAYS, "window_days": NORM_WINDOW_DAYS,
         "rows": [r for r in rows if r["need_total"] > 0],
-    }, headers=CORS_HEADERS)
+    }
+
+
+@require_owner
+async def handle_order(request):
+    return web.json_response(await order_rows(request.query.get("day") or ""),
+                             headers=CORS_HEADERS)
 
 
 @require_owner

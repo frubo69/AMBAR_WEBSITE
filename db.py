@@ -1587,6 +1587,46 @@ async def get_users_by_via() -> list:
     return await cur.to_list(length=20000)
 
 
+# ── Поставки: заявка ушла в магазин, вернулась и стала списком на забор ─────
+async def supply_save(doc: dict):
+    db = _db_or_none()
+    if db is None: return
+    await db.supplies.replace_one({"_id": doc["_id"]}, doc, upsert=True)
+
+
+async def supply_get(sid: str) -> dict | None:
+    db = _db_or_none()
+    if db is None: return None
+    return await db.supplies.find_one({"_id": sid})
+
+
+async def supply_list(limit: int = 30, status: str = None) -> list:
+    db = _db_or_none()
+    if db is None: return []
+    q = {"status": status} if status else {}
+    cur = db.supplies.find(q).sort("at", -1).limit(limit)
+    rows = await cur.to_list(length=limit)
+    for r in rows:
+        r["supply_id"] = r.pop("_id")
+        r["at"] = str(r.get("at") or "")
+    return rows
+
+
+async def supply_bump(sid: str, product_id: str, by: int) -> dict | None:
+    """Отметить, что одна бутылка позиции забрана.
+
+    Считаем прямо в документе поставки: у водителя на экране должно быть
+    «7 из 12», а собирать это из реестра кодов на каждый скан — лишний проход
+    по всей коллекции ради одного числа."""
+    db = _db_or_none()
+    if db is None: return None
+    from pymongo import ReturnDocument
+    return await db.supplies.find_one_and_update(
+        {"_id": sid, "items.id": product_id},
+        {"$inc": {"items.$.scanned": 1}, "$set": {"last_by": by}},
+        return_document=ReturnDocument.AFTER)
+
+
 # ── AMBAR STOCK: реестр бутылок по их кодам ─────────────────────────────────
 async def qr_add(code: str, product_id: str, product_name: str, district,
                  by: int, at) -> bool:

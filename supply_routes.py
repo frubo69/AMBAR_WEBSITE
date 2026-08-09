@@ -23,12 +23,28 @@ from aiohttp import web
 import db
 from owner_auth import require_owner, CORS_HEADERS
 from config_offices import OFFICE_IDS, OFFICE_NAMES, OFFICE_CODES
+from config_stock_order import order_key      # порядок обхода полок, как в их таблице
 
 log = logging.getLogger("supply")
 
-CODE_COL = "Код"          # служебная колонка, по ней идёт возврат
-QTY_COL = "Заявлено"
-CONFIRM_COL = "Подтверждено"
+# Файл уходит в магазин — он на английском целиком. Заголовки читает их
+# сотрудник, и «Подтверждено» ему ничего не говорит.
+CODE_COL = "Code"          # служебная колонка, по ней идёт возврат
+QTY_COL = "Requested"
+CONFIRM_COL = "Confirmed"
+SHEET_MAIN = "Order"
+SHEET_DIST = "By location"
+
+# Категории в каталоге русские, а в файле всё английское.
+CAT_EN = {
+    "Арак": "Arak", "Вермут": "Vermouth", "Вино": "Wine", "Виски": "Whisky",
+    "Водка": "Vodka", "Джин": "Gin", "Коньяк": "Cognac", "Ликёр": "Liqueur",
+    "Пиво": "Beer", "Просекко": "Prosecco", "Ром": "Rum", "Текила": "Tequila",
+    "Шампанское": "Champagne",
+}
+# Названия точек у нас записаны кириллицей, хотя районы английские.
+DIST_EN = {"jvc": "JVC", "bbay": "Business Bay", "silicon": "Silicon Oasis",
+           "alguses": "Al Qusais", "tecom": "Tecom"}
 
 
 def _catalog_by_id():
@@ -58,31 +74,35 @@ async def handle_export(request):
 
     day = (request.query.get("day") or "").strip()
     data = await _order_rows(day)
-    rows = data["rows"]
+    # Порядок как в их таблице: заявку собирают, идя вдоль полок, и список,
+    # отсортированный по количеству, заставляет бегать по залу кругами.
+    rows = sorted(data["rows"], key=lambda r: order_key(r["id"]))
 
     wb = Workbook()
     ws = wb.active
-    ws.title = "Заявка"
+    ws.title = SHEET_MAIN
 
     head = Font(bold=True, color="FFFFFF")
     fill = PatternFill("solid", fgColor="1F2A37")
     ask = PatternFill("solid", fgColor="FFF3CD")      # колонку магазина видно сразу
 
-    ws.append([f"AMBAR · заявка на закупку от {data['day']}"])
+    ws.append([f"AMBAR · purchase order · {data['day']}"])
     ws["A1"].font = Font(bold=True, size=13)
-    ws.append([])
-    ws.append([CODE_COL, "Позиция", "Категория", QTY_COL, CONFIRM_COL, "Комментарий магазина"])
+    ws.append(["Please fill in the Confirmed column with the quantity you can supply, "
+               "and send the file back. Do not change the Code column."])
+    ws.append([CODE_COL, "Item", "Category", QTY_COL, CONFIRM_COL, "Supplier note"])
     for c in ws[3]:
         c.font = head; c.fill = fill; c.alignment = Alignment(horizontal="center")
 
     for r in rows:
-        ws.append([r["id"], r["name"], r["cat"], r["need_total"], None, None])
+        ws.append([r["id"], r["name"], CAT_EN.get(r["cat"], r["cat"]),
+                   r["need_total"], None, None])
     for row in ws.iter_rows(min_row=4, min_col=5, max_col=6):
         for c in row:
             c.fill = ask
 
     ws.append([])
-    ws.append([None, "ИТОГО", None, data["total_qty"], None, None])
+    ws.append([None, "TOTAL", None, sum(r["need_total"] for r in rows), None, None])
     ws.cell(row=ws.max_row, column=2).font = Font(bold=True)
     ws.cell(row=ws.max_row, column=4).font = Font(bold=True)
 
@@ -92,9 +112,10 @@ async def handle_export(request):
 
     # Второй лист — развозка. Магазину он безразличен, нам без него непонятно,
     # куда потом раскладывать привезённое.
-    ws2 = wb.create_sheet("По точкам")
+    ws2 = wb.create_sheet(SHEET_DIST)
     dist = [d["id"] for d in data["districts"]]
-    ws2.append(["Позиция"] + [f"{OFFICE_CODES.get(o,'')} {OFFICE_NAMES.get(o,o)}" for o in dist] + ["Итого"])
+    ws2.append(["Item"] + [f"{OFFICE_CODES.get(o,'')} {DIST_EN.get(o, OFFICE_NAMES.get(o,o))}"
+                           for o in dist] + ["Total"])
     for c in ws2[1]:
         c.font = head; c.fill = fill
     for r in rows:
@@ -154,7 +175,7 @@ async def handle_import(request):
     except Exception as e:
         return web.json_response({"error": "not_xlsx", "detail": str(e)[:120]},
                                  status=400, headers=CORS_HEADERS)
-    ws = wb["Заявка"] if "Заявка" in wb.sheetnames else wb.worksheets[0]
+    ws = wb[SHEET_MAIN] if SHEET_MAIN in wb.sheetnames else wb.worksheets[0]
 
     # Ищем строку заголовков, а не полагаемся на номер: магазин мог вставить
     # сверху свою шапку с логотипом, и жёсткая «третья строка» развалилась бы.

@@ -726,6 +726,11 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   text-align:center;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.75))}
 .scan-hint.warn{color:var(--warn)}
 .scan-feed{margin-top:10px;max-height:26dvh;overflow-y:auto}
+.scan-row{padding-right:6px}
+.scan-del{flex-shrink:0;width:26px;height:26px;margin-left:6px;border-radius:8px;
+  border:1px solid var(--border3);background:var(--card2);color:var(--muted);
+  font-size:12px;line-height:1;cursor:pointer}
+.scan-del:active{background:var(--dn-soft);color:var(--dn)}
 .pr-line[data-detail]{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .pr-line[data-detail]:active{background:var(--card2)}
 .acc-line-bar{flex:1.2;height:5px;border-radius:3px;background:var(--card2);overflow:hidden}
@@ -5051,17 +5056,50 @@ const SCAN = {
   CROP:0.82,               // центр кадра: по краям ловятся чужие коды с полки
   MAXPX:512,
 
+  // Ровно основная камера, а не «задняя вообще».
+  //
+  // По facingMode айфон отдаёт виртуальную камеру («Back Dual Wide», «Back
+  // Triple»), которая сама переключает линзы по расстоянию и освещению: на
+  // крышке бутылки она то и дело уходит на сверхширокую, где деталей меньше и
+  // код рассыпается. Нужна именно «Back Camera» — одна физическая линза.
+  async _mainCameraId(){
+    if(!navigator.mediaDevices.enumerateDevices) return null;
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    const cams = devs.filter(d => d.kind === 'videoinput');
+    // Названия появляются только после выданного доступа; без них выбирать
+    // не из чего, и остаёмся на том, что дали.
+    if(!cams.length || !cams.some(d => d.label)) return null;
+    const back = cams.filter(d => /back|rear|задн/i.test(d.label));
+    const pool = back.length ? back : cams;
+    const exact = pool.find(d => /^back camera$/i.test(d.label.trim()));
+    if(exact) return exact.deviceId;
+    // Иначе — любая, в названии которой нет признаков сверхширокой,
+    // телефото или виртуальной сборки.
+    const plain = pool.find(d => !/ultra|wide|dual|triple|telephoto/i.test(d.label));
+    return (plain || pool[0]).deviceId;
+  },
+
   async start(videoEl, onCode, onIdle){
     this.stop();
     this.video = videoEl; this.onCode = onCode; this.onIdle = onIdle;
     this.seen = new Set(); this.frames = 0; this.t0 = Date.now(); this.lastHit = Date.now();
+    // Разрешение просим полное: распознаём мы всё равно уменьшенный кусок
+    // кадра, но вырезаем его из детального — чем крупнее исходник, тем больше
+    // деталей в этом куске. И картинка на экране перестаёт быть мыльной.
+    const VIDEO = {width:{ideal:1920}, height:{ideal:1080},
+                   focusMode:{ideal:'continuous'}};
     this.stream = await navigator.mediaDevices.getUserMedia({
-      video: {facingMode:{ideal:'environment'},
-              width:{ideal:1280}, height:{ideal:720},
-              // Крышка бутылки — близко и под углом: без непрерывной
-              // фокусировки камера держит резкость на полке за ней.
-              focusMode:{ideal:'continuous'}},
-      audio:false});
+      video: {...VIDEO, facingMode:{ideal:'environment'}}, audio:false});
+    // Второй заход: названия камер доступны только после первого доступа.
+    try{
+      const id = await this._mainCameraId();
+      const cur = this.stream.getVideoTracks()[0];
+      if(id && cur && cur.getSettings && cur.getSettings().deviceId !== id){
+        this.stream.getTracks().forEach(t => t.stop());
+        this.stream = await navigator.mediaDevices.getUserMedia({
+          video: {...VIDEO, deviceId:{exact:id}}, audio:false});
+      }
+    }catch(e){ /* не вышло — работаем на той, что дали */ }
     videoEl.srcObject = this.stream;
     try{ await videoEl.play(); }catch(e){}
     if(!window.jsQR) await new Promise(r => {
@@ -5278,7 +5316,7 @@ function qrRenderList(){
 // бутылку.
 async function qrStart(pid){
   const p = (QR_CAT || []).find(x => x.id === pid); if(!p) return;
-  QR_PROD = {id: pid, name: p.name || ''}; QR_SESSION = 0; QR_LAST = null;
+  QR_PROD = {id: pid, name: p.name || ''}; QR_SESSION = 0; QR_LAST = null; QR_ROWS = [];
   try{
     await ownerApi.ownerFetch('/api/owner/qr/lock',
       {method:'POST', body:{district: QR_DIST, product_id: pid}});
@@ -5323,7 +5361,7 @@ function qrScreen(){
       </button>
       <div class="scan-hint" id="qrHint">Наведите на код</div>
     </div>
-    <div id="qrFeed" class="scan-feed"></div>
+    <div id="qrFeed" class="scan-feed"><div class="exp-empty">Пока ничего не отсканировано</div></div>
     <div class="qr-form" style="margin-top:12px">
       <button class="btn-ico qr-undo" id="qrUndo" onclick="qrUndo()" disabled>Отменить последнюю</button>
       <button class="btn-gold qr-btn" onclick="qrDone()">Готово</button>
@@ -5346,64 +5384,84 @@ function qrIdle(sinceMs, frames, fps){
   h.className = 'scan-hint warn';
 }
 
+// Лента сессии — состояние, а не разметка: любую строку можно убрать, и
+// счётчик обязан пересчитаться сам.
+// state: sending | new | dup | fail
+let QR_ROWS = [];
+
 // Скан не ждёт сервера: очередь отправит сама и повторит, если сеть моргнула.
 function qrSave(code){
   code = String(code || '').trim(); if(!code) return;
-  QR_SESSION++; QR_LAST = code;
-  _setText('qrN', String(QR_SESSION));
-  const u = document.getElementById('qrUndo'); if(u) u.disabled = false;
+  QR_ROWS.unshift({code, state:'sending', at:''});
+  qrRenderFeed();
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('medium'); }catch(e){}
-  qrFeedRow(code, 'отправляю…', 'var(--muted)', code);
   SCANQ.push({path:'/api/owner/qr/scan',
               body:{code, product_id: QR_PROD.id, district: QR_DIST}, code});
 }
 
 SCANQ.onDone = (err, r, job) => {
-  const row = document.querySelector(`[data-code="${CSS.escape(job.code)}"]`);
-  if(err){
-    if(row){ row.querySelector('.acc-line-s').textContent = 'не сохранилось';
-             row.querySelector('.acc-line-v').style.color = 'var(--dn)';
-             row.querySelector('.acc-line-v').textContent = '✕'; }
-    QR_SESSION = Math.max(0, QR_SESSION - 1); _setText('qrN', String(QR_SESSION));
-    return;
-  }
-  if(!row) return;
-  if(r.new){
-    row.querySelector('.acc-line-s').textContent = 'записана';
-    row.querySelector('.acc-line-v').style.color = 'var(--up)';
-    row.querySelector('.acc-line-v').textContent = '✓';
-  }else{
-    // Бутылка уже в реестре — значит её посчитали раньше, и в счётчик сессии
-    // она попасть не должна: иначе остаток вырастет на пустом месте.
-    QR_SESSION = Math.max(0, QR_SESSION - 1); _setText('qrN', String(QR_SESSION));
+  const row = QR_ROWS.find(x => x.code === job.code && x.state === 'sending');
+  if(!row) return;                       // строку успели удалить руками
+  if(err){ row.state = 'fail'; }
+  else if(r.new){ row.state = 'new'; }
+  else{
+    // Бутылка уже в реестре — её посчитали раньше, и в счётчик сессии она
+    // попасть не должна: иначе остаток вырастет на пустом месте.
+    row.state = 'dup'; row.at = String(r.at || '').slice(0,10);
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
-    row.querySelector('.acc-line-s').textContent =
-      'уже была · ' + String(r.at || '').slice(0,10);
-    row.querySelector('.acc-line-v').style.color = 'var(--warn)';
-    row.querySelector('.acc-line-v').textContent = 'уже есть';
   }
+  qrRenderFeed();
 };
 
-function qrFeedRow(title, sub, color, code){
+const QR_STATE = {
+  sending: ['отправляю…',  'var(--muted)', '·'],
+  new:     ['записана',    'var(--up)',    '✓'],
+  dup:     ['уже была',    'var(--warn)',  'уже есть'],
+  fail:    ['не сохранилось','var(--dn)',  '✕'],
+};
+
+function qrRenderFeed(){
+  // Счётчик — это длина ленты, а не отдельное число: иначе после удаления
+  // строки они разъезжаются, и верить нельзя ни тому ни другому.
+  QR_SESSION = QR_ROWS.filter(r => r.state === 'new' || r.state === 'sending').length;
+  _setText('qrN', String(QR_SESSION));
   const feed = document.getElementById('qrFeed'); if(!feed) return;
-  feed.insertAdjacentHTML('afterbegin', `<div class="acc-line" data-code="${escS(code)}">
-    <span class="acc-line-n">${escS(title)}</span>
-    <span class="acc-line-s">${escS(sub)}</span>
-    <span class="acc-line-v" style="color:${color}">·</span></div>`);
-  // Держим на экране последние — длинная лента только тормозит.
-  while(feed.children.length > 12) feed.lastElementChild.remove();
+  feed.innerHTML = QR_ROWS.slice(0, 40).map((r, i) => {
+    const [txt, color, mark] = QR_STATE[r.state] || QR_STATE.sending;
+    // Убрать можно только то, что записали в этой сессии. «Уже была» — это
+    // чужая запись, сделанная раньше; стирать её отсюда нельзя, иначе одним
+    // касанием пропадёт бутылка, посчитанная на прошлой неделе.
+    const del = (r.state === 'new' || r.state === 'fail')
+      ? `<button class="scan-del" onclick="qrDrop(${i})" aria-label="Убрать">✕</button>` : '';
+    return `<div class="acc-line scan-row">
+      <span class="acc-line-n">${escS(r.code)}</span>
+      <span class="acc-line-s">${escS(txt)}${r.at ? ' · ' + escS(r.at) : ''}</span>
+      <span class="acc-line-v" style="color:${color}">${mark}</span>${del}</div>`;
+  }).join('') || '<div class="exp-empty">Пока ничего не отсканировано</div>';
+  const u = document.getElementById('qrUndo');
+  if(u) u.disabled = !QR_ROWS.some(r => r.state === 'new');
+}
+
+// Убрать конкретную строку. Код при этом забывается сканером — иначе камера
+// будет игнорировать бутылку, которую только что стёрли, и пересканировать её
+// станет нечем.
+async function qrDrop(i){
+  const row = QR_ROWS[i]; if(!row) return;
+  if(row.state === 'new'){
+    try{ await ownerApi.ownerFetch('/api/owner/qr/undo',
+      {method:'POST', body:{code: row.code}}); }
+    catch(e){ _toast('Не удалось убрать'); return; }
+  }
+  SCAN.seen.delete(row.code);
+  QR_ROWS.splice(i, 1);
+  qrRenderFeed();
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 
 async function qrUndo(){
-  if(!QR_LAST) return;
-  try{
-    await ownerApi.ownerFetch('/api/owner/qr/undo', {method:'POST', body:{code: QR_LAST}});
-    QR_SESSION = Math.max(0, QR_SESSION - 1); _setText('qrN', String(QR_SESSION));
-    const feed = document.getElementById('qrFeed');
-    if(feed && feed.firstElementChild) feed.firstElementChild.remove();
-    QR_LAST = null;
-    const u = document.getElementById('qrUndo'); if(u) u.disabled = true;
-  }catch(e){ _toast('Не отменилось'); }
+  const i = QR_ROWS.findIndex(r => r.state === 'new');
+  if(i < 0) return;
+  await qrDrop(i);
 }
 
 async function qrDone(){

@@ -702,14 +702,30 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .qr-undo{flex:1;padding:0 14px;border-radius:12px;font-size:13px}
 .acc-line.qr-busy{opacity:.45;pointer-events:none}
-.qr-camtest{width:100%;padding:11px;border-radius:12px;margin-top:12px;font-size:13px}
-.cam-box{margin-top:10px;border-radius:14px;overflow:hidden;border:1px solid var(--border2);
-  background:#000;position:relative}
-.cam-box video{width:100%;display:block;max-height:46dvh;object-fit:cover}
-.cam-out{padding:10px 12px;font-size:12.5px;line-height:1.5;color:var(--sub);
-  background:var(--card);border-top:1px solid var(--border2)}
-.cam-out b{color:var(--up)}
-.cam-out i{font-style:normal;color:var(--dn)}
+/* Экран сканирования: камера крупно, счётчик всегда на виду. */
+.scan-head{display:flex;align-items:center;gap:12px;padding:2px 2px 12px}
+.scan-head-l{flex:1;min-width:0}
+.scan-prod{font-size:15px;font-weight:700;line-height:1.25}
+.scan-dist{font-size:11.5px;color:var(--muted);margin-top:2px}
+.scan-n{text-align:right;flex-shrink:0}
+.scan-n span{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;
+  color:var(--gold2);font-variant-numeric:tabular-nums;line-height:1}
+.scan-n i{display:block;font-style:normal;font-size:10px;letter-spacing:.5px;
+  color:var(--muted);margin-top:2px}
+.scan-cam{position:relative;border-radius:16px;overflow:hidden;background:#000;
+  border:1px solid var(--border2)}
+.scan-cam video{width:100%;display:block;height:44dvh;object-fit:cover}
+.scan-frame{position:absolute;inset:12% 12% auto 12%;aspect-ratio:1;border-radius:14px;
+  box-shadow:0 0 0 100vmax rgba(0,0,0,.35);border:2px solid rgba(255,255,255,.55);
+  pointer-events:none}
+.scan-torch{position:absolute;right:12px;top:12px;width:38px;height:38px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  background:rgba(0,0,0,.5);border:1px solid rgba(255,255,255,.2);color:#fff}
+.scan-torch.on{background:var(--gold);color:#1a1408;border-color:var(--gold)}
+.scan-hint{position:absolute;left:0;right:0;bottom:0;padding:9px 12px;font-size:12.5px;
+  text-align:center;color:#fff;background:linear-gradient(transparent,rgba(0,0,0,.75))}
+.scan-hint.warn{color:var(--warn)}
+.scan-feed{margin-top:10px;max-height:26dvh;overflow-y:auto}
 .pr-line[data-detail]{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .pr-line[data-detail]:active{background:var(--card2)}
 .acc-line-bar{flex:1.2;height:5px;border-radius:3px;background:var(--card2);overflow:hidden}
@@ -4897,7 +4913,7 @@ function accOpen(id){
 }
 
 function accClose(){
-  camStop();
+  SCAN.stop();
   document.getElementById('accOv').classList.remove('show');
   ACC_VIEW = null;
   accRender();
@@ -5048,7 +5064,6 @@ async function accQR(){
       busy} ${pluralize(busy,'позицию','позиции','позиций')}. Занятые другими
       сотрудниками в списке недоступны — иначе одну полку посчитают дважды
       и получатся два разных числа.</div>` : ''}
-    <button class="btn-ico qr-camtest" onclick="camTest(this)">Проверить камеру</button>
     <button class="btn-gold qr-scan" onclick="qrDistrict()">
       <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
         stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
@@ -5144,10 +5159,6 @@ function qrRenderList(){
 async function qrStart(pid){
   const p = (QR_CAT || []).find(x => x.id === pid); if(!p) return;
   QR_PROD = {id: pid, name: p.name || ''}; QR_SESSION = 0; QR_LAST = null;
-  const tg = window.Telegram && Telegram.WebApp;
-  if(!tg || !tg.showScanQrPopup){
-    _toast('Обновите Telegram — сканер требует версию 6.4 и выше'); return;
-  }
   try{
     await ownerApi.ownerFetch('/api/owner/qr/lock',
       {method:'POST', body:{district: QR_DIST, product_id: pid}});
@@ -5155,59 +5166,112 @@ async function qrStart(pid){
     _toast('Эту позицию уже считают'); accQR(); return;   // подтянем свежие брони
   }
   qrScreen();
+  const v = document.getElementById('qrVideo');
   try{
-    tg.showScanQrPopup({text: QR_PROD.name}, (text) => { qrSave(text); return false; });
-  }catch(e){ _toast('Камера не открылась'); }
+    await SCAN.start(v, qrSave, qrIdle);
+  }catch(e){
+    // Камеры нет — не тупик: родной сканер Telegram работает всегда, просто
+    // без счётчика на экране.
+    _setText('qrHint', 'Камера недоступна, включаю сканер Telegram');
+    const tg = window.Telegram && Telegram.WebApp;
+    if(tg && tg.showScanQrPopup){
+      tg.showScanQrPopup({text: QR_PROD.name}, t => { qrSave(t); return false; });
+    }else _toast('Сканер недоступен');
+    return;
+  }
+  const t = document.getElementById('qrTorch');
+  if(t) t.style.display = SCAN.hasTorch() ? '' : 'none';
 }
 
 function qrScreen(){
   const d = (STK.districts || []).find(x => x.id === QR_DIST) || {};
   document.getElementById('accMid').innerHTML = `
-    <div class="exp-sum">
-      <div class="exp-tot">
-        <span class="exp-tot-v" id="qrN">0</span>
-        <span class="exp-tot-u">бутылок<br>за сессию</span>
-        <span class="exp-tot-r">
-          <span>позиция<b style="font-size:12px">${escS(QR_PROD.name)}</b></span>
-          <span>точка<b style="font-size:12px">${escS(d.code || '')} ${escS(d.name || '')}</b></span>
-        </span>
+    <div class="scan-head">
+      <div class="scan-head-l">
+        <div class="scan-prod">${escS(QR_PROD.name)}</div>
+        <div class="scan-dist">${escS(d.code || '')} ${escS(d.name || '')}</div>
       </div>
+      <div class="scan-n"><span id="qrN">0</span><i>записано</i></div>
     </div>
-    <div id="qrFeed"><div class="exp-empty">Наведите камеру на код</div></div>
+    <div class="scan-cam">
+      <video id="qrVideo" playsinline muted autoplay></video>
+      <div class="scan-frame"></div>
+      <button class="scan-torch" id="qrTorch" onclick="qrTorch(this)" style="display:none">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+          stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 2h6l-1 7h4l-8 13 2-9H8z"/></svg>
+      </button>
+      <div class="scan-hint" id="qrHint">Наведите на код</div>
+    </div>
+    <div id="qrFeed" class="scan-feed"></div>
     <div class="qr-form" style="margin-top:12px">
       <button class="btn-ico qr-undo" id="qrUndo" onclick="qrUndo()" disabled>Отменить последнюю</button>
       <button class="btn-gold qr-btn" onclick="qrDone()">Готово</button>
     </div>`;
 }
 
-async function qrSave(text){
-  const code = String(text || '').trim();
-  if(!code) return;
-  let r;
-  try{
-    r = await ownerApi.ownerFetch('/api/owner/qr/scan',
-      {method:'POST', body:{code, product_id: QR_PROD.id, district: QR_DIST}});
-  }catch(e){ _toast('Скан не сохранился'); return; }
-  const feed = document.getElementById('qrFeed'); if(!feed) return;
-  if(r.new){
-    QR_SESSION++; QR_LAST = code;
-    _setText('qrN', String(QR_SESSION));
-    const u = document.getElementById('qrUndo'); if(u) u.disabled = false;
-    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    feed.insertAdjacentHTML('afterbegin', `<div class="acc-line">
-      <span class="acc-line-n">${escS(code)}</span>
-      <span class="acc-line-s">записана</span>
-      <span class="acc-line-v" style="color:var(--up)">✓</span></div>`);
-  }else{
-    // Повтор — обычное дело у полки, а не ошибка: та же крышка попала в кадр
-    // дважды. Говорим спокойно и не считаем второй раз.
-    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
-    feed.insertAdjacentHTML('afterbegin', `<div class="acc-line">
-      <span class="acc-line-n">${escS(code)}</span>
-      <span class="acc-line-s">уже была · ${escS(String(r.at).slice(0,10))}</span>
-      <span class="acc-line-v" style="color:var(--warn)">уже есть</span></div>`);
+async function qrTorch(btn){
+  const on = btn.classList.toggle('on');
+  if(!(await SCAN.torch(on))) btn.classList.toggle('on', !on);
+}
+
+// Пока код не пойман — подсказываем, но не сразу: первые секунды человек просто
+// наводит камеру, и мигать ему в этот момент нечем.
+function qrIdle(sinceMs, frames, fps){
+  const h = document.getElementById('qrHint'); if(!h) return;
+  if(sinceMs < 2500){ h.textContent = 'Наведите на код'; h.className = 'scan-hint'; return; }
+  if(!fps || fps < 4){ h.textContent = 'Телефон не успевает — уберите лишние приложения'; }
+  else if(sinceMs > 8000){ h.textContent = 'Не вижу код: ближе, ровнее, включите фонарик'; }
+  else{ h.textContent = 'Ищу код…'; }
+  h.className = 'scan-hint warn';
+}
+
+// Скан не ждёт сервера: очередь отправит сама и повторит, если сеть моргнула.
+function qrSave(code){
+  code = String(code || '').trim(); if(!code) return;
+  QR_SESSION++; QR_LAST = code;
+  _setText('qrN', String(QR_SESSION));
+  const u = document.getElementById('qrUndo'); if(u) u.disabled = false;
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('medium'); }catch(e){}
+  qrFeedRow(code, 'отправляю…', 'var(--muted)', code);
+  SCANQ.push({path:'/api/owner/qr/scan',
+              body:{code, product_id: QR_PROD.id, district: QR_DIST}, code});
+}
+
+SCANQ.onDone = (err, r, job) => {
+  const row = document.querySelector(`[data-code="${CSS.escape(job.code)}"]`);
+  if(err){
+    if(row){ row.querySelector('.acc-line-s').textContent = 'не сохранилось';
+             row.querySelector('.acc-line-v').style.color = 'var(--dn)';
+             row.querySelector('.acc-line-v').textContent = '✕'; }
+    QR_SESSION = Math.max(0, QR_SESSION - 1); _setText('qrN', String(QR_SESSION));
+    return;
   }
-  const empty = feed.querySelector('.exp-empty'); if(empty) empty.remove();
+  if(!row) return;
+  if(r.new){
+    row.querySelector('.acc-line-s').textContent = 'записана';
+    row.querySelector('.acc-line-v').style.color = 'var(--up)';
+    row.querySelector('.acc-line-v').textContent = '✓';
+  }else{
+    // Бутылка уже в реестре — значит её посчитали раньше, и в счётчик сессии
+    // она попасть не должна: иначе остаток вырастет на пустом месте.
+    QR_SESSION = Math.max(0, QR_SESSION - 1); _setText('qrN', String(QR_SESSION));
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+    row.querySelector('.acc-line-s').textContent =
+      'уже была · ' + String(r.at || '').slice(0,10);
+    row.querySelector('.acc-line-v').style.color = 'var(--warn)';
+    row.querySelector('.acc-line-v').textContent = 'уже есть';
+  }
+};
+
+function qrFeedRow(title, sub, color, code){
+  const feed = document.getElementById('qrFeed'); if(!feed) return;
+  feed.insertAdjacentHTML('afterbegin', `<div class="acc-line" data-code="${escS(code)}">
+    <span class="acc-line-n">${escS(title)}</span>
+    <span class="acc-line-s">${escS(sub)}</span>
+    <span class="acc-line-v" style="color:${color}">·</span></div>`);
+  // Держим на экране последние — длинная лента только тормозит.
+  while(feed.children.length > 12) feed.lastElementChild.remove();
 }
 
 async function qrUndo(){
@@ -5223,93 +5287,134 @@ async function qrUndo(){
 }
 
 async function qrDone(){
+  SCAN.stop();
   try{ Telegram.WebApp.closeScanQrPopup(); }catch(e){}
+  if(SCANQ.pending){ _toast(`Досылаю ${SCANQ.pending}…`); await new Promise(r => setTimeout(r, 900)); }
   // Отпускаем позицию сразу, а не через четверть часа: следующий может считать.
   try{ await ownerApi.ownerFetch('/api/owner/qr/unlock',
     {method:'POST', body:{district: QR_DIST, product_id: QR_PROD.id}}); }catch(e){}
   accQR();
 }
 
-// Разовая проверка: пускает ли Telegram камеру в мини-апп на этом телефоне.
-// Проверять надо именно здесь, а не отдельной страницей в браузере: браузер
-// камеру даст всегда, а вопрос ровно в том, даст ли её этот webview.
-let CAM_STREAM = null, CAM_RAF = null;
-async function camTest(btn){
-  if(CAM_STREAM){ camStop(); btn.textContent = 'Проверить камеру'; return; }
-  const box = document.createElement('div');
-  box.className = 'cam-box'; box.id = 'camBox';
-  box.innerHTML = '<video id="camV" playsinline muted autoplay></video>' +
-                  '<div class="cam-out" id="camOut">Запрашиваю камеру…</div>';
-  btn.insertAdjacentElement('afterend', box);
-  btn.textContent = 'Остановить';
-  const out = document.getElementById('camOut');
-  const say = h => out.innerHTML = h;
+// ─── Сканер ─────────────────────────────────────────────────────────────────
+// Свой, а не телеграмовский: родной занимает весь экран, и счётчик «12 из 38»
+// поверх него не нарисовать.
+//
+// Три вещи, без которых сканер не работает, хотя код при этом читается:
+//   • один код в кадре читается каждый кадр — двенадцать раз в секунду. Без
+//     подавления повторов это двенадцать вибраций и двенадцать запросов на
+//     одну бутылку;
+//   • распознавать полный кадр 1080p телефон не успевает, и код теряется не
+//     из-за камеры, а из-за того, что кадр не досчитан;
+//   • сеть моргает. Скан, не дошедший до сервера, должен уйти позже, а не
+//     пропасть: бутылку в руках уже отложили как посчитанную.
+const SCAN = {
+  stream:null, video:null, cv:null, ctx:null, raf:null,
+  seen:new Set(),          // коды этой сессии
+  onCode:null, onIdle:null,
+  lastDecode:0, lastHit:0, frames:0, t0:0,
+  DECODE_MS:80,            // ~12 распознаваний в секунду — глазу хватает
+  CROP:0.82,               // центр кадра: по краям ловятся чужие коды с полки
+  MAXPX:512,
 
-  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-    say('<i>getUserMedia в этом webview отсутствует.</i><br>Свой сканер сделать нельзя — останется родной Telegram.');
-    return;
-  }
-  try{
-    CAM_STREAM = await navigator.mediaDevices.getUserMedia(
-      {video: {facingMode: {ideal: 'environment'}}, audio: false});
-  }catch(e){
-    say(`<i>Камера не открылась: ${escS(e.name || '')} ${escS(e.message || '')}</i>`
-        + '<br>Свой сканер сделать нельзя — останется родной Telegram.');
-    return;
-  }
-  const v = document.getElementById('camV');
-  v.srcObject = CAM_STREAM;
-  try{ await v.play(); }catch(e){}
-  say('<b>Камера работает.</b> Наведите на любой QR — проверим, читается ли он.');
+  async start(videoEl, onCode, onIdle){
+    this.stop();
+    this.video = videoEl; this.onCode = onCode; this.onIdle = onIdle;
+    this.seen = new Set(); this.frames = 0; this.t0 = Date.now(); this.lastHit = Date.now();
+    this.stream = await navigator.mediaDevices.getUserMedia({
+      video: {facingMode:{ideal:'environment'},
+              width:{ideal:1280}, height:{ideal:720},
+              // Крышка бутылки — близко и под углом: без непрерывной
+              // фокусировки камера держит резкость на полке за ней.
+              focusMode:{ideal:'continuous'}},
+      audio:false});
+    videoEl.srcObject = this.stream;
+    try{ await videoEl.play(); }catch(e){}
+    if(!window.jsQR) await new Promise(r => {
+      const sc = document.createElement('script'); sc.src = 'jsQR.js?v=1';
+      sc.onload = r; sc.onerror = r; document.head.appendChild(sc); });
+    this.cv = document.createElement('canvas');
+    this.ctx = this.cv.getContext('2d', {willReadFrequently:true});
+    this.raf = requestAnimationFrame(t => this._loop(t));
+    return true;
+  },
 
-  // Читаем кадры: одной картинки мало, важно, что мы можем достать из неё код.
-  const cv = document.createElement('canvas'), ctx = cv.getContext('2d', {willReadFrequently:true});
-  // Рядом с index.html, а не в корне: owner-приложение живёт на своём
-  // поддомене, где всё проксируется внутрь /owner/, и «../» уходит в никуда.
-  // Версия в адресе — против кэша Cloudflare: пока файла не было, он закэшировал
-  // 404, и приложение получало его же ещё сутки.
-  if(!window.jsQR){ await new Promise(r => {
-    const sc = document.createElement('script'); sc.src = 'jsQR.js?v=1';
-    sc.onload = r; sc.onerror = r; document.head.appendChild(sc); }); }
-  if(!window.jsQR){
-    say('<i>Библиотека распознавания не загрузилась.</i> Камера при этом работает — значит дело только в файле.');
-    return;
-  }
+  stop(){
+    if(this.raf){ cancelAnimationFrame(this.raf); this.raf = null; }
+    if(this.stream){ this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
+    if(this.video) this.video.srcObject = null;
+  },
 
-  // Кадры уменьшаем: распознавать 1080p на телефоне каждый кадр — это лаг, из-за
-  // которого код и не ловится. 640 по ширине хватает, чтобы прочитать QR.
-  let frames = 0, hits = 0, t0 = Date.now();
-  const tick = () => {
-    if(!CAM_STREAM) return;
-    if(v.readyState === v.HAVE_ENOUGH_DATA && v.videoWidth){
-      const k = Math.min(1, 640 / v.videoWidth);
-      cv.width = Math.round(v.videoWidth * k); cv.height = Math.round(v.videoHeight * k);
-      ctx.drawImage(v, 0, 0, cv.width, cv.height);
-      const img = ctx.getImageData(0, 0, cv.width, cv.height);
-      const hit = jsQR(img.data, img.width, img.height, {inversionAttempts:'attemptBoth'});
-      frames++;
-      if(hit && hit.data){
-        hits++;
-        say(`<b>Всё работает.</b> Прочитан код: ${escS(hit.data.slice(0,70))}`
-            + `<br>кадров ${frames} · попаданий ${hits}`);
-        try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-      }else if(!hits){
-        // Пока не поймали — показываем, что цикл жив. Иначе непонятно, идёт
-        // ли распознавание вообще или экран просто застыл.
-        const fps = Math.round(frames / Math.max(1, (Date.now() - t0) / 1000));
-        say(`Ищу код… кадров ${frames} · ${fps} в секунду<br>`
-            + '<span style="color:var(--muted)">Держите QR в кадре целиком, 15–25 см, без бликов</span>');
-      }
+  // Фонарик: крышки бликуют и часто лежат в тени полки.
+  async torch(on){
+    const tr = this.stream && this.stream.getVideoTracks()[0];
+    if(!tr || !tr.getCapabilities) return false;
+    if(!(tr.getCapabilities().torch)) return false;
+    try{ await tr.applyConstraints({advanced:[{torch:!!on}]}); return true; }
+    catch(e){ return false; }
+  },
+  hasTorch(){
+    const tr = this.stream && this.stream.getVideoTracks()[0];
+    return !!(tr && tr.getCapabilities && tr.getCapabilities().torch);
+  },
+
+  _loop(ts){
+    if(!this.stream) return;
+    this.raf = requestAnimationFrame(t => this._loop(t));
+    if(ts - this.lastDecode < this.DECODE_MS) return;
+    this.lastDecode = ts;
+    const v = this.video;
+    if(!v || v.readyState !== v.HAVE_ENOUGH_DATA || !v.videoWidth) return;
+
+    // Берём центральный квадрат и ужимаем: и быстрее, и не хватает соседнюю
+    // бутылку, на которую человек не наводился.
+    const side = Math.min(v.videoWidth, v.videoHeight) * this.CROP;
+    const sx = (v.videoWidth - side) / 2, sy = (v.videoHeight - side) / 2;
+    const px = Math.min(this.MAXPX, Math.round(side));
+    this.cv.width = px; this.cv.height = px;
+    this.ctx.drawImage(v, sx, sy, side, side, 0, 0, px, px);
+    const img = this.ctx.getImageData(0, 0, px, px);
+    this.frames++;
+    const hit = jsQR(img.data, px, px, {inversionAttempts:'attemptBoth'});
+    if(hit && hit.data){
+      const code = String(hit.data).trim();
+      this.lastHit = Date.now();
+      // Тот же код в кадре — не событие. Пока человек не убрал бутылку, он
+      // читается каждый кадр, и без этого шли бы двенадцать запросов в секунду.
+      if(this.seen.has(code)) return;
+      this.seen.add(code);
+      if(this.onCode) this.onCode(code);
+      return;
     }
-    CAM_RAF = requestAnimationFrame(tick);
-  };
-  CAM_RAF = requestAnimationFrame(tick);
-}
-function camStop(){
-  if(CAM_RAF){ cancelAnimationFrame(CAM_RAF); CAM_RAF = null; }
-  if(CAM_STREAM){ CAM_STREAM.getTracks().forEach(t => t.stop()); CAM_STREAM = null; }
-  const b = document.getElementById('camBox'); if(b) b.remove();
-}
+    if(this.onIdle) this.onIdle(Date.now() - this.lastHit, this.frames,
+                                Math.round(this.frames / Math.max(1,(Date.now()-this.t0)/1000)));
+  },
+};
+
+// Очередь отправки. Скан не должен ждать сервер: рука уже тянется к следующей
+// бутылке, а на плохой связи запрос идёт секунду.
+const SCANQ = {
+  items:[], busy:false, onDone:null,
+  push(job){ this.items.push(job); this._run(); },
+  async _run(){
+    if(this.busy || !this.items.length) return;
+    this.busy = true;
+    const job = this.items.shift();
+    try{
+      const r = await ownerApi.ownerFetch(job.path, {method:'POST', body:job.body});
+      if(this.onDone) this.onDone(null, r, job);
+    }catch(e){
+      // Не дошло — возвращаем в начало очереди и ждём. Терять скан нельзя:
+      // бутылку уже отложили как посчитанную.
+      job.tries = (job.tries || 0) + 1;
+      if(job.tries < 6){ this.items.unshift(job); await new Promise(r => setTimeout(r, 1200)); }
+      else if(this.onDone) this.onDone(e, null, job);
+    }
+    this.busy = false;
+    if(this.items.length) this._run();
+  },
+  get pending(){ return this.items.length + (this.busy ? 1 : 0); },
+};
 
 // ─── Акции ──────────────────────────────────────────────────────────────────
 // Вопрос раздела один: окупается ли подарок. Поэтому рядом с числом бутылок

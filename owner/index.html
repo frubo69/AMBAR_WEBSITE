@@ -5266,24 +5266,39 @@ async function camTest(btn){
   const cv = document.createElement('canvas'), ctx = cv.getContext('2d', {willReadFrequently:true});
   // Рядом с index.html, а не в корне: owner-приложение живёт на своём
   // поддомене, где всё проксируется внутрь /owner/, и «../» уходит в никуда.
+  // Версия в адресе — против кэша Cloudflare: пока файла не было, он закэшировал
+  // 404, и приложение получало его же ещё сутки.
   if(!window.jsQR){ await new Promise(r => {
-    const sc = document.createElement('script'); sc.src = 'jsQR.js';
+    const sc = document.createElement('script'); sc.src = 'jsQR.js?v=1';
     sc.onload = r; sc.onerror = r; document.head.appendChild(sc); }); }
   if(!window.jsQR){
     say('<i>Библиотека распознавания не загрузилась.</i> Камера при этом работает — значит дело только в файле.');
     return;
   }
+
+  // Кадры уменьшаем: распознавать 1080p на телефоне каждый кадр — это лаг, из-за
+  // которого код и не ловится. 640 по ширине хватает, чтобы прочитать QR.
+  let frames = 0, hits = 0, t0 = Date.now();
   const tick = () => {
     if(!CAM_STREAM) return;
-    if(v.readyState === v.HAVE_ENOUGH_DATA){
-      cv.width = v.videoWidth; cv.height = v.videoHeight;
+    if(v.readyState === v.HAVE_ENOUGH_DATA && v.videoWidth){
+      const k = Math.min(1, 640 / v.videoWidth);
+      cv.width = Math.round(v.videoWidth * k); cv.height = Math.round(v.videoHeight * k);
       ctx.drawImage(v, 0, 0, cv.width, cv.height);
       const img = ctx.getImageData(0, 0, cv.width, cv.height);
-      const hit = jsQR(img.data, img.width, img.height, {inversionAttempts:'dontInvert'});
+      const hit = jsQR(img.data, img.width, img.height, {inversionAttempts:'attemptBoth'});
+      frames++;
       if(hit && hit.data){
-        say(`<b>Всё работает.</b> Прочитан код: ${escS(hit.data.slice(0,60))}`
-            + '<br>Можно делать свой экран сканирования со счётчиком.');
+        hits++;
+        say(`<b>Всё работает.</b> Прочитан код: ${escS(hit.data.slice(0,70))}`
+            + `<br>кадров ${frames} · попаданий ${hits}`);
         try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+      }else if(!hits){
+        // Пока не поймали — показываем, что цикл жив. Иначе непонятно, идёт
+        // ли распознавание вообще или экран просто застыл.
+        const fps = Math.round(frames / Math.max(1, (Date.now() - t0) / 1000));
+        say(`Ищу код… кадров ${frames} · ${fps} в секунду<br>`
+            + '<span style="color:var(--muted)">Держите QR в кадре целиком, 15–25 см, без бликов</span>');
       }
     }
     CAM_RAF = requestAnimationFrame(tick);

@@ -144,6 +144,8 @@ async def handle_stats(request):
     locks = await db.qr_locks(datetime.now(timezone.utc))
     return web.json_response({
         "locks": locks,
+        "by_district": await db.qr_by_district(),
+        "slugs": slug_map(),
         "totals": {
             "total":   sum(st.values()),
             "active":  st.get("active", 0),

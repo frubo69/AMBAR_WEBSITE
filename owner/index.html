@@ -702,6 +702,67 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .qr-undo{flex:1;padding:0 14px;border-radius:12px;font-size:13px}
 .acc-line.qr-busy{opacity:.45;pointer-events:none}
+/* Выбор точки и позиции. Обе страницы — список, но списком быть не должны:
+   человек ищет глазами и тычет на ходу, поэтому строки крупные, а всё, что
+   помогает выбрать (сколько уже записано, кто считает), стоит справа числом. */
+.pk-head{display:flex;align-items:center;gap:12px;padding:2px 0 14px}
+.pk-back{width:36px;height:36px;flex-shrink:0;border-radius:12px;display:flex;
+  align-items:center;justify-content:center;cursor:pointer;color:var(--sub);
+  background:var(--card);border:1px solid var(--border3)}
+.pk-back:active{background:var(--card2)}
+.pk-head-b{flex:1;min-width:0}
+.pk-t{font-size:17px;font-weight:700;letter-spacing:-.2px;line-height:1.2}
+.pk-s{font-size:11.5px;color:var(--muted);margin-top:2px}
+
+.pk-grid{display:flex;flex-direction:column;gap:8px}
+.pk-dist{display:flex;align-items:center;gap:12px;width:100%;padding:14px 14px;
+  border-radius:15px;cursor:pointer;text-align:left;font-family:inherit;
+  background:var(--card);border:1px solid var(--border2);transition:.15s var(--e1)}
+.pk-dist:active{transform:scale(.99);background:var(--card2)}
+.pk-code{flex-shrink:0;width:38px;height:38px;border-radius:11px;display:flex;
+  align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;
+  font-size:13px;font-weight:700;color:var(--gold2);background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.25)}
+.pk-dist-b{flex:1;min-width:0}
+.pk-dist-n{display:block;font-size:14.5px;font-weight:600;line-height:1.25}
+.pk-dist-s{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+.pk-dist-v{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:19px;
+  font-weight:700;color:var(--gold2);font-variant-numeric:tabular-nums}
+
+.pk-search{display:flex;align-items:center;gap:9px;padding:0 13px;height:44px;
+  border-radius:13px;background:var(--bg3);border:1px solid var(--border2);
+  color:var(--muted);margin-bottom:10px}
+.pk-search input{flex:1;min-width:0;background:none;border:none;outline:none;
+  color:var(--text);font-family:inherit;font-size:14px}
+.pk-search input::placeholder{color:var(--muted)}
+
+.pk-cats{display:flex;gap:7px;overflow-x:auto;-webkit-overflow-scrolling:touch;
+  padding-bottom:10px;margin:0 -2px;scrollbar-width:none}
+.pk-cats::-webkit-scrollbar{display:none}
+.pk-cat{flex-shrink:0;display:flex;align-items:center;gap:6px;padding:8px 13px;
+  border-radius:11px;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;
+  color:var(--sub);background:var(--card);border:1px solid var(--border3)}
+.pk-cat i{font-style:normal;font-size:10.5px;color:var(--muted);font-weight:700}
+.pk-cat.on{background:var(--gold-soft);border-color:rgba(201,169,110,.45);color:var(--gold2)}
+.pk-cat.on i{color:var(--gold2);opacity:.7}
+
+.pk-row{display:flex;align-items:center;gap:10px;width:100%;padding:13px 14px;
+  margin-bottom:6px;border-radius:13px;cursor:pointer;text-align:left;font-family:inherit;
+  background:var(--card);border:1px solid var(--border2);transition:.15s var(--e1)}
+.pk-row:active{transform:scale(.99);background:var(--card2)}
+.pk-row.off{opacity:.42;pointer-events:none}
+.pk-row-b{flex:1;min-width:0}
+.pk-name{display:block;font-size:14px;font-weight:600;line-height:1.25;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pk-slug{display:block;font-family:'Space Grotesk',sans-serif;font-size:10.5px;
+  color:var(--dim);letter-spacing:.4px;margin-top:2px}
+.pk-n{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
+  color:var(--gold2);font-variant-numeric:tabular-nums}
+.pk-busy,.pk-mine{flex-shrink:0;font-size:10px;font-weight:700;letter-spacing:.5px;
+  text-transform:uppercase;padding:5px 9px;border-radius:8px}
+.pk-busy{color:var(--dn);background:var(--dn-soft);border:1px solid rgba(224,85,85,.28)}
+.pk-mine{color:var(--up);background:var(--up-soft);border:1px solid rgba(76,175,125,.3)}
+
 /* Экран сканирования. Камера — герой, служебное лежит на ней стеклом. */
 .scan-bar{position:absolute;top:0;left:0;right:0;display:flex;align-items:center;gap:10px;
   padding:12px 13px;background:linear-gradient(rgba(0,0,0,.72),transparent);
@@ -5367,40 +5428,75 @@ async function accQR(){
 }
 
 function _qrHead(title, sub, back){
-  return `<div class="sheet-hd" style="margin-bottom:12px">
-      <button class="sheet-x" onclick="${back}">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+  return `<div class="pk-head">
+      <button class="pk-back" onclick="${back}" aria-label="Назад">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+          stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
       </button>
-      <div><div style="font-size:14px;font-weight:700">${escS(title)}</div>
-      <div style="font-size:11.5px;color:var(--muted)">${escS(sub)}</div></div>
+      <div class="pk-head-b">
+        <div class="pk-t">${escS(title)}</div>
+        <div class="pk-s">${escS(sub)}</div>
+      </div>
     </div>`;
 }
 
-// Район первым: одна и та же бутылка на разных точках — разные бутылки, и без
+// Кто я — чтобы отличить свою бронь от чужой. Своя не должна выглядеть занятой:
+// человек вышел из сканирования и вернулся, а позиция как будто у кого-то ещё.
+function _meId(){
+  try{ return Telegram.WebApp.initDataUnsafe.user.id; }catch(e){ return 0; }
+}
+function _lockOn(district, product_id){
+  const me = _meId();
+  for(const l of (ACC_QR?.locks || [])){
+    const [d, pid] = String(l.key || '').split(':');
+    if(d === district && pid === product_id)
+      return {mine: String(l.by) === String(me), name: l.name || 'другой сотрудник'};
+  }
+  return null;
+}
+
+// Точка первой: одна и та же бутылка на разных точках — разные бутылки, и без
 // точки запись бессмысленна.
 async function qrDistrict(){
   if(!STK.districts){
     try{ STK.districts = (await ownerApi.ownerFetch('/api/owner/stock/status')).districts; }
     catch(e){ STK.districts = []; }
   }
+  const have = (ACC_QR && ACC_QR.by_district) || {};
+  const busy = {};
+  (ACC_QR?.locks || []).forEach(l => {
+    const d = String(l.key || '').split(':')[0];
+    busy[d] = (busy[d] || 0) + 1;
+  });
   document.getElementById('accMid').innerHTML =
     _qrHead('Где считаем', 'точка хранения', 'accQR()') +
-    ((STK.districts || []).map(d => `<div class="acc-line" onclick="qrPick('${d.id}')">
-        <span class="acc-line-n">${escS(d.code)} ${escS(d.name)}</span>
-        <span class="acc-line-s"></span>
-        <span class="acc-line-v">›</span>
-      </div>`).join('') || '<div class="exp-empty">Точки не загрузились</div>');
+    `<div class="pk-grid">` + ((STK.districts || []).map(d => `
+      <button class="pk-dist" onclick="qrPick('${d.id}')">
+        <span class="pk-code">${escS(d.code)}</span>
+        <span class="pk-dist-b">
+          <span class="pk-dist-n">${escS(d.name)}</span>
+          <span class="pk-dist-s">${busy[d.id]
+            ? `считают ${busy[d.id]} ${pluralize(busy[d.id],'позицию','позиции','позиций')}`
+            : (have[d.id] ? 'в реестре' : 'ещё не считали')}</span>
+        </span>
+        <span class="pk-dist-v">${have[d.id] ? fmt(have[d.id]) : '—'}</span>
+      </button>`).join('') || '<div class="scan-empty">Точки не загрузились</div>') + `</div>`;
 }
 
+let QR_CATF = 'all';
 function qrPick(district){
-  QR_DIST = district;
+  QR_DIST = district; QR_CATF = 'all';
   const d = (STK.districts || []).find(x => x.id === district) || {};
   document.getElementById('accMid').innerHTML =
     _qrHead('Что сканируем', `${d.code || ''} ${d.name || ''}`.trim(), 'qrDistrict()') +
-    `<input class="ed-search" id="qrQ" placeholder="Поиск по названию" oninput="qrRenderList()"
-      autocomplete="off" spellcheck="false">
-     <div id="qrList"><div class="exp-empty">Загрузка каталога…</div></div>`;
+    `<div class="pk-search">
+       <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+         stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+       <input id="qrQ" placeholder="Поиск по названию" oninput="qrRenderList()"
+         autocomplete="off" spellcheck="false">
+     </div>
+     <div class="pk-cats" id="qrCats"></div>
+     <div id="qrList"><div class="scan-empty">Загрузка каталога…</div></div>`;
   qrLoadCatalog();
 }
 
@@ -5408,35 +5504,51 @@ async function qrLoadCatalog(){
   if(!QR_CAT){
     try{ QR_CAT = (await ownerApi.ownerFetch('/api/owner/catalog')).items || []; }
     catch(e){ document.getElementById('qrList').innerHTML =
-      '<div class="exp-empty" style="color:var(--dn)">Каталог не загрузился</div>'; return; }
+      '<div class="scan-empty" style="color:var(--dn)">Каталог не загрузился</div>'; return; }
   }
+  qrRenderCats();
   qrRenderList();
+}
+
+function qrRenderCats(){
+  const box = document.getElementById('qrCats'); if(!box) return;
+  const cnt = {};
+  (QR_CAT || []).forEach(p => { cnt[p.cat || '—'] = (cnt[p.cat || '—'] || 0) + 1; });
+  const cats = Object.keys(cnt).sort((a, b) => cnt[b] - cnt[a]);
+  box.innerHTML = [['all', 'Все', (QR_CAT || []).length]]
+    .concat(cats.map(c => [c, c, cnt[c]]))
+    .map(([id, name, n]) => `<button class="pk-cat ${QR_CATF === id ? 'on' : ''}"
+      onclick="qrCat('${escS(id)}')">${escS(name)}<i>${n}</i></button>`).join('');
+}
+function qrCat(id){
+  QR_CATF = id; qrRenderCats(); qrRenderList();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 
 function qrRenderList(){
   const q = (document.getElementById('qrQ')?.value || '').trim().toLowerCase();
   const have = {}; (ACC_QR?.by_product || []).forEach(r => have[r.product_id] = r.count);
-  // Занятые кем-то другим на этой же точке: на другой точке та же позиция
-  // свободна, это разные полки.
-  const busy = {};
-  (ACC_QR?.locks || []).forEach(l => {
-    const [dist, pid] = String(l.key || '').split(':');
-    if(dist === QR_DIST) busy[pid] = l.name || 'другой сотрудник';
-  });
-  const rows = (QR_CAT || []).filter(p => !q || (p.name||'').toLowerCase().includes(q)).slice(0, 200);
-  // Имя позиции берём из каталога по id внутри qrStart: подставлять его в
-  // onclick нельзя — кавычки в названии рвут атрибут, и не нажимается ничего.
-  document.getElementById('qrList').innerHTML = rows.length ? rows.map(p => busy[p.id]
-    ? `<div class="acc-line qr-busy">
-        <span class="acc-line-n">${escS(p.name||'')}</span>
-        <span class="acc-line-s">считает ${escS(busy[p.id])}</span>
-        <span class="acc-line-v" style="color:var(--warn);font-size:11px">занято</span>
-      </div>`
-    : `<div class="acc-line" onclick="qrStart('${p.id}')">
-        <span class="acc-line-n">${escS(p.name||'')}</span>
-        <span class="acc-line-s">${escS(p.cat||'')}</span>
-        <span class="acc-line-v" style="${have[p.id]?'':'color:var(--muted)'}">${have[p.id]||'—'}</span>
-      </div>`).join('') : '<div class="exp-empty">Ничего не нашлось</div>';
+  const slugs = (ACC_QR && ACC_QR.slugs) || {};
+  const rows = (QR_CAT || []).filter(p =>
+    (QR_CATF === 'all' || (p.cat || '—') === QR_CATF) &&
+    (!q || (p.name || '').toLowerCase().includes(q) ||
+           (slugs[p.id] || '').includes(q)));
+
+  document.getElementById('qrList').innerHTML = rows.length ? rows.map(p => {
+    const lock = _lockOn(QR_DIST, p.id);
+    // Своя бронь — не «занято», а «продолжить»: это та же сессия, просто
+    // человек выходил назад посмотреть список.
+    const busy = lock && !lock.mine;
+    const tag = busy ? `<span class="pk-busy">${escS(lock.name)}</span>`
+              : lock ? `<span class="pk-mine">вы считаете</span>`
+              : `<span class="pk-n">${have[p.id] ? fmt(have[p.id]) : '—'}</span>`;
+    return `<button class="pk-row ${busy ? 'off' : ''}" ${busy ? 'disabled' : ''}
+        onclick="qrStart('${p.id}')">
+        <span class="pk-row-b">
+          <span class="pk-name">${escS(p.name || '')}</span>
+          <span class="pk-slug">${escS(slugs[p.id] || '')}</span>
+        </span>${tag}</button>`;
+  }).join('') : '<div class="scan-empty">Ничего не нашлось</div>';
 }
 
 // Сканирование. Telegram держит камеру открытой и отдаёт код за кодом, пока

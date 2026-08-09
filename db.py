@@ -1694,6 +1694,17 @@ async def qr_by_product() -> list:
              "count": r["n"], "last": str(r.get("last") or "")} for r in rows]
 
 
+async def qr_by_district() -> dict:
+    """Сколько бутылок записано на каждой точке — для выбора точки."""
+    db = _db_or_none()
+    if db is None: return {}
+    cur = db.qr_codes.aggregate([
+        {"$match": {"status": "active"}},
+        {"$group": {"_id": "$district", "n": {"$sum": 1}}},
+    ])
+    return {d["_id"]: d["n"] for d in await cur.to_list(length=50) if d["_id"]}
+
+
 async def qr_count_product(product_id: str) -> int:
     db = _db_or_none()
     if db is None: return 0

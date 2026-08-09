@@ -5264,12 +5264,18 @@ async function camTest(btn){
 
   // Читаем кадры: одной картинки мало, важно, что мы можем достать из неё код.
   const cv = document.createElement('canvas'), ctx = cv.getContext('2d', {willReadFrequently:true});
+  // Рядом с index.html, а не в корне: owner-приложение живёт на своём
+  // поддомене, где всё проксируется внутрь /owner/, и «../» уходит в никуда.
   if(!window.jsQR){ await new Promise(r => {
-    const sc = document.createElement('script'); sc.src = '../jsQR.js';
+    const sc = document.createElement('script'); sc.src = 'jsQR.js';
     sc.onload = r; sc.onerror = r; document.head.appendChild(sc); }); }
+  if(!window.jsQR){
+    say('<i>Библиотека распознавания не загрузилась.</i> Камера при этом работает — значит дело только в файле.');
+    return;
+  }
   const tick = () => {
     if(!CAM_STREAM) return;
-    if(v.readyState === v.HAVE_ENOUGH_DATA && window.jsQR){
+    if(v.readyState === v.HAVE_ENOUGH_DATA){
       cv.width = v.videoWidth; cv.height = v.videoHeight;
       ctx.drawImage(v, 0, 0, cv.width, cv.height);
       const img = ctx.getImageData(0, 0, cv.width, cv.height);

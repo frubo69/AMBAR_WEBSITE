@@ -690,6 +690,12 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .pr-kind-v{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;
   margin-top:3px;font-variant-numeric:tabular-nums}
 .pr-kind-s{font-size:11px;color:var(--muted);margin-top:2px}
+.qr-form{display:flex;gap:8px;margin-bottom:4px}
+.qr-inp{flex:1;margin-bottom:0}
+.qr-btn{flex-shrink:0;padding:0 20px;border-radius:12px;border:none;cursor:pointer;
+  font-family:inherit;font-size:14px;font-weight:700;color:#1a1408;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.qr-btn:disabled{opacity:.5}
 .pr-line[data-detail]{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .pr-line[data-detail]:active{background:var(--card2)}
 .acc-line-bar{flex:1.2;height:5px;border-radius:3px;background:var(--card2);overflow:hidden}
@@ -4778,9 +4784,11 @@ const ACC = [
    ico:'<path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12"/>'},
   {id:'gift',     t:'Акции',             s:'что раздали бесплатно',
    ico:'<path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7"/>'},
+  {id:'qr',       t:'QR-коды',           s:'одна бутылка — один код',
+   ico:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/>'},
 ];
 let ACC_PERIOD = null, ACC_STOCK = null, ACC_ORDER = null, ACC_VIEW = null,
-    ACC_PROMO = null, ACC_GIFT = null;
+    ACC_PROMO = null, ACC_GIFT = null, ACC_QR = null;
 
 function accRender(){
   const box = document.getElementById('accHome'); if(!box) return;
@@ -4802,6 +4810,12 @@ function accRender(){
                 : 'остатков хватает')
               : 'сколько довезти до нормы',
     // Показы без денег ничего не значат, поэтому подпись — про выручку.
+    // Свободные коды — это то, что можно клеить прямо сейчас; всё остальное
+    // уже на бутылках и в остатке.
+    qr:       ACC_QR     ? (ACC_QR.totals.total
+                ? `${fmt(ACC_QR.totals.active)} на бутылках · ${fmt(ACC_QR.totals.free)} свободных`
+                : 'кодов ещё нет')
+              : 'одна бутылка — один код',
     // Подарок мерим не бутылками, а тем, что он принёс: сто отданных бутылок
     // при чеке в полторы тысячи и при чеке в тысячу — разные сто бутылок.
     gift:     ACC_GIFT   ? (ACC_GIFT.totals.bottles
@@ -4822,6 +4836,7 @@ function accRender(){
     order:    ACC_ORDER ? [fmt(ACC_ORDER.total_qty), 'штук'] : ['—', 'штук'],
     promo:    ACC_PROMO ? [fmt(ACC_PROMO.totals.users), 'пришло'] : ['—', 'пришло'],
     gift:     ACC_GIFT  ? [fmt(ACC_GIFT.totals.bottles), 'бутылок'] : ['—', 'бутылок'],
+    qr:       ACC_QR    ? [fmt(ACC_QR.totals.total), 'кодов'] : ['—', 'кодов'],
   };
   box.innerHTML = `<div class="acc-grid">` + ACC.map((a, i) => {
     const [v, u] = num[a.id] || ['—', ''];
@@ -4842,14 +4857,15 @@ function accRender(){
 // карточках сразу выглядит хуже, чем секунда ожидания.
 async function accLoadSummaries(){
   const get = (p, params) => ownerApi.ownerFetch(p, params ? {params} : undefined).catch(()=>null);
-  const [per, st, ord, pr, gf] = await Promise.all([
+  const [per, st, ord, pr, gf, qr] = await Promise.all([
     get('/api/owner/expenses/period', {days:30}),
     get('/api/owner/stock/status'),
     get('/api/owner/stock/order'),
     get('/api/owner/promo'),
     get('/api/owner/promotions', {days:30}),
+    get('/api/owner/qr'),
   ]);
-  ACC_PERIOD = per; ACC_STOCK = st; ACC_ORDER = ord; ACC_PROMO = pr; ACC_GIFT = gf;
+  ACC_PERIOD = per; ACC_STOCK = st; ACC_ORDER = ord; ACC_PROMO = pr; ACC_GIFT = gf; ACC_QR = qr;
   accRender();
 }
 
@@ -4863,6 +4879,7 @@ function accOpen(id){
   if(id === 'order')    accOrder();
   if(id === 'promo')    accPromo();
   if(id === 'gift')     accGift();
+  if(id === 'qr')       accQR();
 }
 
 function accClose(){
@@ -4980,6 +4997,66 @@ async function accOrder(){
         <span class="acc-line-v">${r.need_total}</span>
       </div>`).join('')
     : '<div class="exp-empty">Довозить нечего — остатков хватает</div>'}`;
+}
+
+// ─── QR-коды (AMBAR STOCK) ──────────────────────────────────────────────────
+// Одна бутылка — один код — одна учётная единица. Наклейка сама по себе
+// остатка не меняет: пока код свободен, его как бы нет. Поэтому в сводке
+// свободные и наклеенные стоят порознь — это разные вещи, а не одна куча.
+async function accQR(){
+  _setText('accTitle', 'QR-коды');
+  _setText('accSub', 'загрузка…');
+  let d;
+  try{ d = await ownerApi.ownerFetch('/api/owner/qr'); }
+  catch(e){ document.getElementById('accMid').innerHTML =
+    '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+  ACC_QR = d;
+  const t = d.totals;
+  _setText('accSub', t.total ? `${fmt(t.total)} выпущено · ${d.batches.length} ${
+    pluralize(d.batches.length,'партия','партии','партий')}` : 'реестр пуст');
+  document.getElementById('accMid').innerHTML = `
+    <div class="exp-sum">
+      <div class="exp-tot">
+        <span class="exp-tot-v">${fmt(t.free)}</span>
+        <span class="exp-tot-u">свободных<br>кодов</span>
+        <span class="exp-tot-r">
+          <span>на бутылках<b>${fmt(t.active)}</b></span>
+          <span>продано<b>${fmt(t.sold)}</b></span>
+          <span>списано<b>${fmt(t.written)}</b></span>
+        </span>
+      </div>
+    </div>
+    <div class="stk-note" style="margin-top:10px">
+      <b>Наклейка сама по себе остаток не меняет.</b> Код становится бутылкой
+      только после скана на точке — поэтому «активировать партию целиком» нельзя
+      и не будет: иначе в остатке появятся бутылки, которых никто не видел.
+    </div>
+    <div class="exp-grp">Выпустить партию</div>
+    <div class="qr-form">
+      <input class="ed-search qr-inp" id="qrCount" type="number" inputmode="numeric"
+        placeholder="Сколько кодов" min="1" max="${d.max_batch}">
+      <button class="btn-gold qr-btn" onclick="qrCreate(this)">Создать</button>
+    </div>
+    ${d.batches.length ? `<div class="exp-grp">Партии · ${d.batches.length}</div>` +
+      d.batches.map(b => `<div class="acc-line">
+        <span class="acc-line-n">${escS(b.batch_id)}</span>
+        <span class="acc-line-s">${escS(String(b.at).slice(0,10))}${
+          b.product_name ? ' · ' + escS(b.product_name) : ' · без позиции'}</span>
+        <span class="acc-line-v">${fmt(b.count)}</span>
+      </div>`).join('')
+    : '<div class="exp-empty">Партий пока нет</div>'}`;
+}
+
+async function qrCreate(btn){
+  const n = parseInt((document.getElementById('qrCount').value || '').replace(/\D/g,''), 10);
+  if(!n){ _toast('Сколько кодов выпустить?'); return; }
+  btn.disabled = true;
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/qr/batch', {method:'POST', body:{count:n}});
+    _toast(`Партия ${r.batch_id} · ${r.count} кодов`);
+    await accQR();
+  }catch(e){ _toast('Не получилось выпустить'); }
+  btn.disabled = false;
 }
 
 // ─── Акции ──────────────────────────────────────────────────────────────────

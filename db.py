@@ -1587,6 +1587,64 @@ async def get_users_by_via() -> list:
     return await cur.to_list(length=20000)
 
 
+# ── AMBAR STOCK: реестр QR-кодов ────────────────────────────────────────────
+async def qr_existing(codes: list) -> list:
+    """Какие из этих кодов уже заняты."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.qr_codes.find({"_id": {"$in": list(codes)}}, {"_id": 1})
+    return [d["_id"] for d in await cur.to_list(length=len(codes))]
+
+
+async def qr_insert(batch_id: str, codes: list, product_id, product_name,
+                    note: str, by: int, at):
+    """Партия кодов одной вставкой: по одному 5000 документов писать нельзя."""
+    db = _db_or_none()
+    if db is None: return
+    docs = [{"_id": c, "batch": batch_id, "status": "free",
+             "product_id": product_id, "product_name": product_name,
+             "district": None, "at": at} for c in codes]
+    await db.qr_codes.insert_many(docs, ordered=False)
+    await db.qr_batches.insert_one({"_id": batch_id, "count": len(codes),
+                                    "product_id": product_id,
+                                    "product_name": product_name,
+                                    "note": note, "by": by, "at": at})
+
+
+async def qr_stats() -> dict:
+    db = _db_or_none()
+    if db is None: return {}
+    cur = db.qr_codes.aggregate([{"$group": {"_id": "$status", "n": {"$sum": 1}}}])
+    return {d["_id"]: d["n"] for d in await cur.to_list(length=20)}
+
+
+async def qr_batches(limit: int = 30) -> list:
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.qr_batches.find({}).sort("at", -1).limit(limit)
+    rows = await cur.to_list(length=limit)
+    for r in rows:
+        r["batch_id"] = r.pop("_id")
+        r["at"] = str(r.get("at") or "")
+    return rows
+
+
+async def qr_batch_codes(batch_id: str) -> list:
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.qr_codes.find({"batch": batch_id}, {"_id": 1}).sort("_id", 1)
+    return [d["_id"] for d in await cur.to_list(length=10000)]
+
+
+async def qr_get(code: str) -> dict | None:
+    db = _db_or_none()
+    if db is None: return None
+    d = await db.qr_codes.find_one({"_id": code})
+    if d:
+        d["code"] = d.pop("_id")
+    return d
+
+
 async def biz_greeted(telegram_id: int) -> bool:
     """Здоровались ли уже с этим человеком от имени бизнес-аккаунта.
 

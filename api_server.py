@@ -2610,6 +2610,12 @@ def main():
         expense_routes.setup(app)
     except Exception as e:
         log.error(f"expense routes setup failed: {e}")
+    # AMBAR STOCK: реестр QR-кодов на бутылках — owner-only.
+    try:
+        import qr_routes
+        qr_routes.setup(app)
+    except Exception as e:
+        log.error(f"qr routes setup failed: {e}")
     # Приложение водителя: те же initData операторского бота, но пускает только
     # тех, кто вписан в AMBAR_DRIVER_IDS.
     try:

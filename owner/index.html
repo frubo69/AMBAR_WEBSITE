@@ -203,6 +203,16 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .day-nav{margin-left:auto;display:flex;align-items:center;gap:0;padding:2px;border-radius:12px;
   background:rgba(201,169,110,.07);border:1px solid rgba(201,169,110,.16);
   letter-spacing:0;text-transform:none}
+/* На карточке выручки стрелки лежат абсолютно: при сжатии их надо опускать к
+   середине, а в потоке они уезжали бы вместе с исчезающей подписью. */
+.hero .day-nav{position:absolute;right:20px;top:18px;margin:0}
+.hero .hero-lbl{padding-right:150px}
+/* Полностью сжатое состояние центрируем правилами, а не расчётом: на разных
+   телефонах свои шрифт и высота строки, и вычисленные смещения оставляли
+   число и стрелки на разных уровнях. */
+.hero.tight .hero-amt-row{position:absolute;left:20px;right:150px;top:50%;
+  transform:translateY(-50%)!important;margin:0}
+.hero.tight .day-nav{top:50%;transform:translateY(-50%)!important}
 .dn-b{width:26px;height:24px;padding:0;border:none;background:none;border-radius:999px;color:var(--gold2);
   display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s var(--e1)}
 .dn-b svg{width:13px;height:13px;display:block}
@@ -3320,12 +3330,21 @@ document.querySelectorAll('.tb').forEach(btn=>{
       Math.round(pbar.getBoundingClientRect().bottom + 8) + 'px');
   };
 
-  let raf = null, natural = 0;
-  const measure = () => {
-    // Родная позиция карточки в потоке — от неё считаем, насколько её уже
-    // «прижало» к переключателю.
-    const y = window.scrollY || document.documentElement.scrollTop || 0;
-    natural = hero.getBoundingClientRect().top + y;
+  // Момент прилипания не вычисляем, а ловим по факту: арифметика по отступам
+  // страницы промахивалась на пару десятков точек, сжатие начиналось позже, чем
+  // карточку прижимало, и плитки заказов успевали уйти под неё.
+  let raf = null;
+
+  // Развёрнутое состояние — это просто снятые инлайновые стили.
+  const reset = () => {
+    hero.classList.remove('tight');
+    hero.style.height = FULL + 'px';
+    hero.style.paddingTop = ''; hero.style.paddingBottom = '';
+    hero.style.marginBottom = ''; hero.style.boxShadow = '';
+    [lbl, side, spark, row].forEach(e => { if(e){ e.style.opacity = ''; e.style.transform = ''; } });
+    if(amt) amt.style.fontSize = '';
+    if(amtRow) amtRow.style.transform = '';
+    if(nav) nav.style.transform = '';
   };
 
   const apply = () => {
@@ -3335,11 +3354,21 @@ document.querySelectorAll('.tb').forEach(btn=>{
     const y = window.scrollY || document.documentElement.scrollTop || 0;
     const top = parseFloat(getComputedStyle(hero).top) || 0;
     // Сколько карточка уже «съела» прокрутки, будучи прижатой.
-    const stuck = Math.max(0, y - (natural - top));
-    const p = Math.max(0, Math.min(1, stuck / (FULL - MIN)));
+    // Карточка стоит вплотную под переключателем и прижата с самого начала:
+    // её место в потоке выше точки прилипания. Значит доля сжатия — это просто
+    // прокрутка, и высота падает ровно на столько, на сколько поднялся контент.
+    // Нижний край идёт вровень с плитками заказов, пока есть куда сжиматься.
+    const p = Math.max(0, Math.min(1, y / (FULL - MIN)));
 
     const h = FULL - (FULL - MIN) * p;
     hero.style.height = h + 'px';
+    // Освободившееся место отдаём обратно отступом. Без него сжатие вообще
+    // ничего не давало: карточка стоит в потоке, страница укорачивалась ровно
+    // на столько же, и плитки заказов подтягивались вверх с той же скоростью —
+    // сколько ни сжимай, они всё равно оказывались под карточкой. Теперь низ
+    // страницы стоит на месте, а карточка сдавливается в зазоре между
+    // переключателем периода и плитками.
+    hero.style.marginBottom = (10 + (FULL - h)) + 'px';
     hero.style.paddingTop = (20 - 10 * p) + 'px';
     hero.style.paddingBottom = (18 - 12 * p) + 'px';
     hero.style.boxShadow = p > .02 ? `0 ${10*p}px ${26*p}px rgba(0,0,0,${.5*p})` : '';
@@ -3358,23 +3387,27 @@ document.querySelectorAll('.tb').forEach(btn=>{
     // Исходные отступы берём измерением, а не константой: они сами меняются
     // вместе с padding карточки, и на глаз подобранные числа расходились —
     // число оказывалось ниже стрелок на полтора десятка точек.
+    // Опускается быстрее, чем сжимается карточка: подписи гаснут к середине
+    // пути, и если число ехало бы вровень с высотой, полкарточки стояло бы
+    // пустыми. К моменту, когда объяснения исчезли, число уже по центру.
+    const q = Math.min(1, p * 1.6);
     if(amtRow){
       const nat = amtRow.offsetTop;              // offsetTop не зависит от transform
       const want = (h - amtRow.offsetHeight) / 2;
-      amtRow.style.transform = `translateY(${(want - nat) * p}px)`;
+      amtRow.style.transform = `translateY(${(want - nat) * q}px)`;
     }
     if(nav){
       // Двигаем тем же способом, что и число: смещением от фактического
       // положения. Через top не выходило — он отсчитывается от края с
       // рамкой, и стрелки оставались на десяток точек выше числа.
       const now = nav.offsetTop + nav.offsetHeight / 2;
-      nav.style.transform = `translateY(${(h / 2 - now) * p}px)`;
+      nav.style.transform = `translateY(${(h / 2 - now) * q}px)`;
     }
   };
 
   const onScroll = () => { if(raf) return; raf = requestAnimationFrame(apply); };
 
-  const init = () => { hero.style.height = FULL + 'px'; measure(); apply(); };
+  const init = () => { reset(); apply(); };
   place(); init();
   window.addEventListener('scroll', onScroll, {passive:true});
   window.addEventListener('resize', () => { place(); init(); });
@@ -3382,7 +3415,7 @@ document.querySelectorAll('.tb').forEach(btn=>{
   // Смена вкладки или периода перестраивает страницу — родную позицию надо
   // переснять, иначе сжатие посчитается от старой.
   document.querySelectorAll('.tb, .periods button').forEach(b =>
-    b.addEventListener('click', () => setTimeout(() => { place(); measure(); apply(); }, 60)));
+    b.addEventListener('click', () => setTimeout(() => { place(); apply(); }, 60)));
 })();
 
 // ===== Date range picker =====

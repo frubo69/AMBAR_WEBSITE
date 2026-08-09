@@ -776,8 +776,11 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   border-radius:12px;background:var(--card);border:1px solid var(--border2)}
 .scan-row.sending{opacity:.6}
 .scan-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
-.scan-code{flex:1;min-width:0;font-family:'Space Grotesk',sans-serif;font-size:12.5px;
-  font-weight:600;letter-spacing:.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scan-b{flex:1;min-width:0}
+.scan-code{display:block;font-family:'Space Grotesk',sans-serif;font-size:13px;
+  font-weight:700;letter-spacing:.3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.scan-raw{display:block;font-size:10px;color:var(--dim);margin-top:1px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .scan-state{font-size:11px;flex-shrink:0}
 .scan-del{flex-shrink:0;width:26px;height:26px;border-radius:8px;
   border:1px solid var(--border3);background:var(--card2);color:var(--muted);
@@ -5592,7 +5595,7 @@ let QR_ROWS = [];
 // Скан не ждёт сервера: очередь отправит сама и повторит, если сеть моргнула.
 function qrSave(code){
   code = String(code || '').trim(); if(!code) return;
-  QR_ROWS.unshift({code, state:'sending', at:''});
+  QR_ROWS.unshift({code, state:'sending', at:'', label:''});
   qrRenderFeed();
   // Зелёная вспышка сразу, не дожидаясь сервера: рука уже тянется к следующей
   // бутылке. Если сервер возразит, цвет сменится — но это редкий случай.
@@ -5605,11 +5608,12 @@ SCANQ.onDone = (err, r, job) => {
   const row = QR_ROWS.find(x => x.code === job.code && x.state === 'sending');
   if(!row) return;                       // строку успели удалить руками
   if(err){ row.state = 'fail'; qrFlash('err'); }
-  else if(r.new){ row.state = 'new'; }
+  else if(r.new){ row.state = 'new'; row.label = r.label || ''; }
   else{
     // Бутылка уже в реестре — её посчитали раньше, и в счётчик сессии она
     // попасть не должна: иначе остаток вырастет на пустом месте.
     row.state = 'dup'; row.at = String(r.at || '').slice(0,10);
+    row.label = r.label || '';
     qrFlash('dup');
   }
   qrRenderFeed();
@@ -5637,9 +5641,15 @@ function qrRenderFeed(){
     // касанием пропадёт бутылка, посчитанная на прошлой неделе.
     const del = (r.state === 'new' || r.state === 'fail')
       ? `<button class="scan-del" onclick="qrDrop(${i})" aria-label="Убрать">✕</button>` : '';
+    // Крупно — наша метка, мелко — то, что реально лежит в коде. Второе нужно
+    // редко, но без него не понять, что «бутылка» оказалась ссылкой с экрана.
+    const raw = r.code.length > 26 ? r.code.slice(0, 24) + '…' : r.code;
     return `<div class="scan-row ${r.state}">
       <span class="scan-dot" style="background:${color}"></span>
-      <span class="scan-code">${escS(r.code)}</span>
+      <span class="scan-b">
+        <span class="scan-code">${escS(r.label || '…')}</span>
+        <span class="scan-raw">${escS(raw)}</span>
+      </span>
       <span class="scan-state" style="color:${color}">${escS(txt)}${
         r.at ? ' · ' + escS(r.at) : ''}</span>${del}</div>`;
   }).join('') || '<div class="scan-empty">Наведите камеру на первую бутылку</div>';

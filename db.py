@@ -1628,8 +1628,23 @@ async def supply_bump(sid: str, product_id: str, by: int) -> dict | None:
 
 
 # ── AMBAR STOCK: реестр бутылок по их кодам ─────────────────────────────────
+async def qr_next_seq(product_id: str) -> int:
+    """Номер следующей бутылки этой позиции.
+
+    Счётчик отдельным документом, а не «сколько сейчас в реестре»: после
+    удаления бутылки номер не должен переиспользоваться, иначе два разных
+    физических экземпляра однажды получат одну метку."""
+    db = _db_or_none()
+    if db is None: return 0
+    from pymongo import ReturnDocument
+    d = await db.counters.find_one_and_update(
+        {"_id": f"qr:{product_id}"}, {"$inc": {"n": 1}},
+        upsert=True, return_document=ReturnDocument.AFTER)
+    return int((d or {}).get("n") or 1)
+
+
 async def qr_add(code: str, product_id: str, product_name: str, district,
-                 by: int, at) -> bool:
+                 by: int, at, label: str = "") -> bool:
     """Записать бутылку. True — записали, False — этот код уже есть.
 
     Код лежит в _id, поэтому вторая запись с тем же номером невозможна на
@@ -1642,7 +1657,7 @@ async def qr_add(code: str, product_id: str, product_name: str, district,
         await db.qr_codes.insert_one({
             "_id": code, "status": "active", "product_id": product_id,
             "product_name": product_name, "district": district,
-            "by": by, "at": at})
+            "label": label, "by": by, "at": at})
         return True
     except DuplicateKeyError:
         return False

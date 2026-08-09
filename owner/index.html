@@ -784,13 +784,13 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .scan-row.old{opacity:.62}
 .scan-cam{position:relative;border-radius:18px;overflow:hidden;background:#000;
   border:1px solid var(--border2)}
-.scan-cam video{width:100%;display:block;height:54dvh;object-fit:cover}
+.scan-cam video{width:100%;display:block;height:44dvh;object-fit:cover}
 .scan-mask{position:absolute;inset:0;pointer-events:none;
   background:radial-gradient(circle at 50% 50%,transparent 34%,rgba(0,0,0,.45) 72%)}
 /* Рамка = ровно та область, которую читает распознавание. Раньше человек
    целился в один квадрат, а читался другой. */
 .scan-frame{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);
-  width:min(62%,42dvh);aspect-ratio:1;border-radius:16px;pointer-events:none;
+  width:min(62%,34dvh);aspect-ratio:1;border-radius:16px;pointer-events:none;
   transition:box-shadow .18s var(--e1),background .18s var(--e1)}
 .scan-frame .c{position:absolute;width:26px;height:26px;border:3px solid rgba(255,255,255,.9);
   transition:border-color .18s var(--e1)}
@@ -833,7 +833,8 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
 .scan-sect i{margin-left:auto;font-style:normal;font-family:'DM Sans',sans-serif;
   font-size:11px;font-weight:700;color:var(--gold2);letter-spacing:0}
-.scan-feed{max-height:24dvh;overflow-y:auto;-webkit-overflow-scrolling:touch}
+.scan-feed{max-height:26dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain}
 .scan-empty{padding:22px 12px;text-align:center;font-size:12.5px;color:var(--muted)}
 .scan-row{display:flex;align-items:center;gap:10px;padding:11px 13px;margin-bottom:6px;
   border-radius:12px;background:var(--card);border:1px solid var(--border2)}
@@ -850,7 +851,12 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   font-size:12px;line-height:1;cursor:pointer}
 .scan-del:active{background:var(--dn-soft);color:var(--dn)}
 
-.scan-acts{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:14px}
+/* Кнопки прилипают к низу: список бутылок растёт по мере счёта и утаскивал их
+   за пределы экрана — «Готово» становилось недоступным ровно тогда, когда его
+   пора нажимать. */
+.scan-acts{position:sticky;bottom:0;z-index:4;display:grid;grid-template-columns:1fr 1fr;
+  gap:9px;margin-top:14px;padding:12px 0 calc(6px + var(--safe-bottom));
+  background:linear-gradient(transparent,var(--bg) 34%)}
 .scan-btn{padding:15px;border-radius:14px;border:none;cursor:pointer;font-family:inherit;
   font-size:14px;font-weight:700;transition:.15s var(--e1)}
 .scan-btn:active{transform:scale(.98)}

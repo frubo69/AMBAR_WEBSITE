@@ -5030,6 +5030,126 @@ async function accOrder(){
     : '<div class="exp-empty">Довозить нечего — остатков хватает</div>'}`;
 }
 
+// ─── Сканер ─────────────────────────────────────────────────────────────────
+// Свой, а не телеграмовский: родной занимает весь экран, и счётчик «12 из 38»
+// поверх него не нарисовать.
+//
+// Три вещи, без которых сканер не работает, хотя код при этом читается:
+//   • один код в кадре читается каждый кадр — двенадцать раз в секунду. Без
+//     подавления повторов это двенадцать вибраций и двенадцать запросов на
+//     одну бутылку;
+//   • распознавать полный кадр 1080p телефон не успевает, и код теряется не
+//     из-за камеры, а из-за того, что кадр не досчитан;
+//   • сеть моргает. Скан, не дошедший до сервера, должен уйти позже, а не
+//     пропасть: бутылку в руках уже отложили как посчитанную.
+const SCAN = {
+  stream:null, video:null, cv:null, ctx:null, raf:null,
+  seen:new Set(),          // коды этой сессии
+  onCode:null, onIdle:null,
+  lastDecode:0, lastHit:0, frames:0, t0:0,
+  DECODE_MS:80,            // ~12 распознаваний в секунду — глазу хватает
+  CROP:0.82,               // центр кадра: по краям ловятся чужие коды с полки
+  MAXPX:512,
+
+  async start(videoEl, onCode, onIdle){
+    this.stop();
+    this.video = videoEl; this.onCode = onCode; this.onIdle = onIdle;
+    this.seen = new Set(); this.frames = 0; this.t0 = Date.now(); this.lastHit = Date.now();
+    this.stream = await navigator.mediaDevices.getUserMedia({
+      video: {facingMode:{ideal:'environment'},
+              width:{ideal:1280}, height:{ideal:720},
+              // Крышка бутылки — близко и под углом: без непрерывной
+              // фокусировки камера держит резкость на полке за ней.
+              focusMode:{ideal:'continuous'}},
+      audio:false});
+    videoEl.srcObject = this.stream;
+    try{ await videoEl.play(); }catch(e){}
+    if(!window.jsQR) await new Promise(r => {
+      const sc = document.createElement('script'); sc.src = 'jsQR.js?v=1';
+      sc.onload = r; sc.onerror = r; document.head.appendChild(sc); });
+    this.cv = document.createElement('canvas');
+    this.ctx = this.cv.getContext('2d', {willReadFrequently:true});
+    this.raf = requestAnimationFrame(t => this._loop(t));
+    return true;
+  },
+
+  stop(){
+    if(this.raf){ cancelAnimationFrame(this.raf); this.raf = null; }
+    if(this.stream){ this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
+    if(this.video) this.video.srcObject = null;
+  },
+
+  // Фонарик: крышки бликуют и часто лежат в тени полки.
+  async torch(on){
+    const tr = this.stream && this.stream.getVideoTracks()[0];
+    if(!tr || !tr.getCapabilities) return false;
+    if(!(tr.getCapabilities().torch)) return false;
+    try{ await tr.applyConstraints({advanced:[{torch:!!on}]}); return true; }
+    catch(e){ return false; }
+  },
+  hasTorch(){
+    const tr = this.stream && this.stream.getVideoTracks()[0];
+    return !!(tr && tr.getCapabilities && tr.getCapabilities().torch);
+  },
+
+  _loop(ts){
+    if(!this.stream) return;
+    this.raf = requestAnimationFrame(t => this._loop(t));
+    if(ts - this.lastDecode < this.DECODE_MS) return;
+    this.lastDecode = ts;
+    const v = this.video;
+    if(!v || v.readyState !== v.HAVE_ENOUGH_DATA || !v.videoWidth) return;
+
+    // Берём центральный квадрат и ужимаем: и быстрее, и не хватает соседнюю
+    // бутылку, на которую человек не наводился.
+    const side = Math.min(v.videoWidth, v.videoHeight) * this.CROP;
+    const sx = (v.videoWidth - side) / 2, sy = (v.videoHeight - side) / 2;
+    const px = Math.min(this.MAXPX, Math.round(side));
+    this.cv.width = px; this.cv.height = px;
+    this.ctx.drawImage(v, sx, sy, side, side, 0, 0, px, px);
+    const img = this.ctx.getImageData(0, 0, px, px);
+    this.frames++;
+    const hit = jsQR(img.data, px, px, {inversionAttempts:'attemptBoth'});
+    if(hit && hit.data){
+      const code = String(hit.data).trim();
+      this.lastHit = Date.now();
+      // Тот же код в кадре — не событие. Пока человек не убрал бутылку, он
+      // читается каждый кадр, и без этого шли бы двенадцать запросов в секунду.
+      if(this.seen.has(code)) return;
+      this.seen.add(code);
+      if(this.onCode) this.onCode(code);
+      return;
+    }
+    if(this.onIdle) this.onIdle(Date.now() - this.lastHit, this.frames,
+                                Math.round(this.frames / Math.max(1,(Date.now()-this.t0)/1000)));
+  },
+};
+
+// Очередь отправки. Скан не должен ждать сервер: рука уже тянется к следующей
+// бутылке, а на плохой связи запрос идёт секунду.
+const SCANQ = {
+  items:[], busy:false, onDone:null,
+  push(job){ this.items.push(job); this._run(); },
+  async _run(){
+    if(this.busy || !this.items.length) return;
+    this.busy = true;
+    const job = this.items.shift();
+    try{
+      const r = await ownerApi.ownerFetch(job.path, {method:'POST', body:job.body});
+      if(this.onDone) this.onDone(null, r, job);
+    }catch(e){
+      // Не дошло — возвращаем в начало очереди и ждём. Терять скан нельзя:
+      // бутылку уже отложили как посчитанную.
+      job.tries = (job.tries || 0) + 1;
+      if(job.tries < 6){ this.items.unshift(job); await new Promise(r => setTimeout(r, 1200)); }
+      else if(this.onDone) this.onDone(e, null, job);
+    }
+    this.busy = false;
+    if(this.items.length) this._run();
+  },
+  get pending(){ return this.items.length + (this.busy ? 1 : 0); },
+};
+
 // ─── QR-коды (AMBAR STOCK) ──────────────────────────────────────────────────
 // Коды уже есть на бутылках — мы их не печатаем, а переписываем в базу и
 // привязываем к позиции. Сначала район, потом позиция, потом камера.
@@ -5295,126 +5415,6 @@ async function qrDone(){
     {method:'POST', body:{district: QR_DIST, product_id: QR_PROD.id}}); }catch(e){}
   accQR();
 }
-
-// ─── Сканер ─────────────────────────────────────────────────────────────────
-// Свой, а не телеграмовский: родной занимает весь экран, и счётчик «12 из 38»
-// поверх него не нарисовать.
-//
-// Три вещи, без которых сканер не работает, хотя код при этом читается:
-//   • один код в кадре читается каждый кадр — двенадцать раз в секунду. Без
-//     подавления повторов это двенадцать вибраций и двенадцать запросов на
-//     одну бутылку;
-//   • распознавать полный кадр 1080p телефон не успевает, и код теряется не
-//     из-за камеры, а из-за того, что кадр не досчитан;
-//   • сеть моргает. Скан, не дошедший до сервера, должен уйти позже, а не
-//     пропасть: бутылку в руках уже отложили как посчитанную.
-const SCAN = {
-  stream:null, video:null, cv:null, ctx:null, raf:null,
-  seen:new Set(),          // коды этой сессии
-  onCode:null, onIdle:null,
-  lastDecode:0, lastHit:0, frames:0, t0:0,
-  DECODE_MS:80,            // ~12 распознаваний в секунду — глазу хватает
-  CROP:0.82,               // центр кадра: по краям ловятся чужие коды с полки
-  MAXPX:512,
-
-  async start(videoEl, onCode, onIdle){
-    this.stop();
-    this.video = videoEl; this.onCode = onCode; this.onIdle = onIdle;
-    this.seen = new Set(); this.frames = 0; this.t0 = Date.now(); this.lastHit = Date.now();
-    this.stream = await navigator.mediaDevices.getUserMedia({
-      video: {facingMode:{ideal:'environment'},
-              width:{ideal:1280}, height:{ideal:720},
-              // Крышка бутылки — близко и под углом: без непрерывной
-              // фокусировки камера держит резкость на полке за ней.
-              focusMode:{ideal:'continuous'}},
-      audio:false});
-    videoEl.srcObject = this.stream;
-    try{ await videoEl.play(); }catch(e){}
-    if(!window.jsQR) await new Promise(r => {
-      const sc = document.createElement('script'); sc.src = 'jsQR.js?v=1';
-      sc.onload = r; sc.onerror = r; document.head.appendChild(sc); });
-    this.cv = document.createElement('canvas');
-    this.ctx = this.cv.getContext('2d', {willReadFrequently:true});
-    this.raf = requestAnimationFrame(t => this._loop(t));
-    return true;
-  },
-
-  stop(){
-    if(this.raf){ cancelAnimationFrame(this.raf); this.raf = null; }
-    if(this.stream){ this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
-    if(this.video) this.video.srcObject = null;
-  },
-
-  // Фонарик: крышки бликуют и часто лежат в тени полки.
-  async torch(on){
-    const tr = this.stream && this.stream.getVideoTracks()[0];
-    if(!tr || !tr.getCapabilities) return false;
-    if(!(tr.getCapabilities().torch)) return false;
-    try{ await tr.applyConstraints({advanced:[{torch:!!on}]}); return true; }
-    catch(e){ return false; }
-  },
-  hasTorch(){
-    const tr = this.stream && this.stream.getVideoTracks()[0];
-    return !!(tr && tr.getCapabilities && tr.getCapabilities().torch);
-  },
-
-  _loop(ts){
-    if(!this.stream) return;
-    this.raf = requestAnimationFrame(t => this._loop(t));
-    if(ts - this.lastDecode < this.DECODE_MS) return;
-    this.lastDecode = ts;
-    const v = this.video;
-    if(!v || v.readyState !== v.HAVE_ENOUGH_DATA || !v.videoWidth) return;
-
-    // Берём центральный квадрат и ужимаем: и быстрее, и не хватает соседнюю
-    // бутылку, на которую человек не наводился.
-    const side = Math.min(v.videoWidth, v.videoHeight) * this.CROP;
-    const sx = (v.videoWidth - side) / 2, sy = (v.videoHeight - side) / 2;
-    const px = Math.min(this.MAXPX, Math.round(side));
-    this.cv.width = px; this.cv.height = px;
-    this.ctx.drawImage(v, sx, sy, side, side, 0, 0, px, px);
-    const img = this.ctx.getImageData(0, 0, px, px);
-    this.frames++;
-    const hit = jsQR(img.data, px, px, {inversionAttempts:'attemptBoth'});
-    if(hit && hit.data){
-      const code = String(hit.data).trim();
-      this.lastHit = Date.now();
-      // Тот же код в кадре — не событие. Пока человек не убрал бутылку, он
-      // читается каждый кадр, и без этого шли бы двенадцать запросов в секунду.
-      if(this.seen.has(code)) return;
-      this.seen.add(code);
-      if(this.onCode) this.onCode(code);
-      return;
-    }
-    if(this.onIdle) this.onIdle(Date.now() - this.lastHit, this.frames,
-                                Math.round(this.frames / Math.max(1,(Date.now()-this.t0)/1000)));
-  },
-};
-
-// Очередь отправки. Скан не должен ждать сервер: рука уже тянется к следующей
-// бутылке, а на плохой связи запрос идёт секунду.
-const SCANQ = {
-  items:[], busy:false, onDone:null,
-  push(job){ this.items.push(job); this._run(); },
-  async _run(){
-    if(this.busy || !this.items.length) return;
-    this.busy = true;
-    const job = this.items.shift();
-    try{
-      const r = await ownerApi.ownerFetch(job.path, {method:'POST', body:job.body});
-      if(this.onDone) this.onDone(null, r, job);
-    }catch(e){
-      // Не дошло — возвращаем в начало очереди и ждём. Терять скан нельзя:
-      // бутылку уже отложили как посчитанную.
-      job.tries = (job.tries || 0) + 1;
-      if(job.tries < 6){ this.items.unshift(job); await new Promise(r => setTimeout(r, 1200)); }
-      else if(this.onDone) this.onDone(e, null, job);
-    }
-    this.busy = false;
-    if(this.items.length) this._run();
-  },
-  get pending(){ return this.items.length + (this.busy ? 1 : 0); },
-};
 
 // ─── Акции ──────────────────────────────────────────────────────────────────
 // Вопрос раздела один: окупается ли подарок. Поэтому рядом с числом бутылок

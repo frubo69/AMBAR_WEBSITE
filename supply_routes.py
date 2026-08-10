@@ -175,12 +175,12 @@ async def handle_export(request):
         c.fill = sum_fill; c.font = bold; c.alignment = mid; c.border = box
 
     ws.column_dimensions["A"].width = 29.55                 # пустое поле слева
-    ws.column_dimensions[get_column_letter(N)].width = 7.1
+    ws.column_dimensions[get_column_letter(N)].width = 7.11
     ws.column_dimensions[get_column_letter(C)].width = 10
     ws.column_dimensions[get_column_letter(I)].width = 40
     for col in range(D0, LAST + 1):
         ws.column_dimensions[get_column_letter(col)].width = 15
-    ws.column_dimensions[get_column_letter(TOT)].width = 18.4
+    ws.column_dimensions[get_column_letter(TOT)].width = 18.44
     # Держим на виду номер, код и название: магазин листает вправо по точкам и
     # без этого перестаёт понимать, в какой он строке.
     ws.freeze_panes = f"{get_column_letter(D0)}{first}"

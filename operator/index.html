@@ -141,6 +141,66 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .oback:active{transform:scale(.95);background:var(--gold-soft)}
 .oh-t{font-size:13px;color:var(--muted);font-weight:600}
 .orders-wrap{flex:1;overflow-y:auto;padding:12px 14px 20px;-webkit-overflow-scrolling:touch}
+/* ── Очередь ───────────────────────────────────────────────────────────────
+   Три ленты по стадии заказа. Источник — полоска слева и значок в строке:
+   после принятия важно, что едет и куда, а не откуда пришло. */
+.tel-btn{display:block;width:100%;margin-top:8px;padding:13px 12px;border-radius:var(--r2);
+  font-size:13.5px;font-weight:700;color:#1a1408;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.tel-btn:active{transform:scale(.985)}
+.q-tabs{display:flex;gap:8px;margin-bottom:12px}
+.q-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:12px 10px;
+  border-radius:var(--r2);font-size:13.5px;font-weight:700;color:var(--muted);
+  background:var(--card2);border:1px solid var(--border2);cursor:pointer;transition:.14s}
+.q-tab.on{color:var(--text);border-color:rgba(201,169,110,.45);background:var(--card)}
+.q-tab i{font-style:normal;font-size:11.5px;font-weight:700;padding:2px 7px;border-radius:999px;
+  background:var(--card);color:var(--muted);border:1px solid var(--border2)}
+.q-tab i.hot{background:var(--gold2);color:#1a1408;border-color:transparent}
+.q-sub{display:flex;align-items:center;gap:12px;margin:-4px 0 12px;font-size:11.5px;color:var(--muted)}
+.q-fil{margin-left:auto;display:flex;gap:6px}
+.q-fil button{padding:6px 11px;border-radius:999px;font-size:11.5px;font-weight:600;
+  color:var(--muted);background:var(--card2);border:1px solid var(--border2);cursor:pointer}
+.q-fil button.on{color:var(--text);border-color:rgba(201,169,110,.45)}
+.q-grp{display:flex;align-items:center;gap:8px;margin:16px 0 8px;font-size:11px;font-weight:700;
+  letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
+.q-grp:first-child{margin-top:0}
+.q-grp i{font-style:normal;font-size:11px;padding:1px 7px;border-radius:999px;
+  background:var(--card2);border:1px solid var(--border2)}
+.q-r{position:relative;background:var(--card);border:1px solid var(--border2);
+  border-radius:var(--r2);padding:13px 14px 13px 17px;margin-bottom:9px;overflow:hidden}
+.q-r::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;opacity:.9}
+.q-r.app::before{background:var(--gold2)}
+.q-r.tel::before{background:var(--muted)}
+.q-r-h{display:flex;align-items:center;gap:9px}
+.src-i{width:14px;height:14px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round;opacity:.6}
+.q-r-n{flex:1;min-width:0;font-size:14px;font-weight:700;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.q-r-s{font-size:15px;font-weight:800;color:var(--gold2);white-space:nowrap}
+.q-r-s small{font-size:10px;color:var(--muted);font-weight:600}
+.q-age,.q-by{font-size:11px;color:var(--muted);white-space:nowrap;padding:3px 8px;
+  border-radius:999px;background:var(--card2);border:1px solid var(--border2)}
+.q-r-sub{font-size:12px;color:var(--sub);margin-top:5px}
+.q-r-it{font-size:11.5px;color:var(--muted);margin-top:3px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+/* Кнопка приёма крупная: по ней бьют пальцем, не глядя, и промах стоит минуты. */
+.q-take{display:block;width:100%;margin-top:11px;padding:14px;border-radius:var(--r2);
+  font-size:14.5px;font-weight:800;color:#1a1408;border:none;cursor:pointer;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.q-take:active{transform:scale(.99)}
+.q-acts{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.q-empty{padding:48px 20px;text-align:center}
+.q-empty-t{font-size:16px;font-weight:700;margin-bottom:8px}
+.q-empty-s{font-size:13px;color:var(--muted);line-height:1.5}
+.q-cta{margin-top:18px;padding:14px 22px;border-radius:var(--r2);font-size:14px;font-weight:700;
+  color:#1a1408;border:none;cursor:pointer;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.acc-sum{font-family:'DM Sans',sans-serif;font-size:26px;font-weight:800;color:var(--gold2);
+  margin:10px 0 4px}
+.acc-sum small{font-size:12px;color:var(--muted);font-weight:600}
+.sbtn.go{color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none}
+.sbtn.go:disabled{opacity:.45;background:var(--card2);color:var(--muted);border:1px solid var(--border2)}
+.dchip i{font-style:normal;font-size:10px;color:var(--muted);margin-left:6px}
+
 .ocard{background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);padding:14px;margin-bottom:10px;transition:.12s}
 .ocard:active{border-color:rgba(201,169,110,.35)}
 .ocard .top{display:flex;align-items:center;gap:10px}
@@ -315,9 +375,12 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
       <div class="rail-scroll" id="catRail"></div>
       <div class="rail-foot">
         <button class="orders-btn" id="ordersBtn" onclick="toggleOrders()">
-          📋 Заказы
+          Заказы
           <span class="badge" id="ordersBadge" style="display:none">0</span>
         </button>
+        <!-- Телефонный заказ — действие, которое начинает сам оператор, а не
+             вкладка наравне с очередью: панель открывается тем, что горит. -->
+        <button class="tel-btn" onclick="openCatalog()">+ Заказ по телефону</button>
       </div>
     </div>
 
@@ -380,6 +443,23 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
     <div class="s">Выберите себя — районы и водители подставятся автоматически</div>
     <div id="opList"></div>
     <div class="btns"><button class="sbtn" onclick="hideOv('opOv')">Закрыть</button></div>
+  </div>
+</div>
+
+<!-- приём заказа: водитель и время одним действием -->
+<div class="ov" id="accOv">
+  <div class="sheet">
+    <div class="t">Принять заказ</div>
+    <div class="s" id="accWho">—</div>
+    <div class="acc-sum"><span id="accSum">0</span> <small>AED</small></div>
+    <div class="lbl">Кому везёт</div>
+    <div class="dchips" id="accDrv"></div>
+    <div class="lbl">Через сколько</div>
+    <div class="dchips" id="accEta"></div>
+    <div class="btns">
+      <button class="sbtn" onclick="hideOv('accOv')">Отмена</button>
+      <button class="sbtn go" id="accGo" onclick="doAccept()" disabled>Выберите водителя и время</button>
+    </div>
   </div>
 </div>
 
@@ -471,6 +551,15 @@ const FALLBACK_DISTRICTS=[
   {id:'alguses', name:'Алгусес',    operator:'Фарух',     drivers:['Сунат','Даврон']},
 ];
 let DISTRICTS=[], curOp='', curDist='', curDriver='';
+// Кто может встать за планшет и что каждый видит. Планшет общий, аккаунт у
+// него один — по аккаунту Умара от Джанабиля не отличить, поэтому человек
+// называет себя сам, и его выбор решает, чьи районы показывать.
+let PEOPLE=[];
+// Очередь: три ленты. Делим по стадии, а не по источнику — онлайн приходит
+// требующим решения, телефонный рождается принятым. После принятия разницы
+// нет, и разводить их по экранам значит заставлять смотреть в два места.
+let Q={new:[],work:[],done:[],counts:{app:0,manual:0},districts:[]};
+let qLane='new', qFilter='all', acceptOid='', acceptDrv='', acceptEta=0;
 
 const $=id=>document.getElementById(id);
 function toast(msg, cls){ const t=$('toast'); t.textContent=msg; t.className='toast show '+(cls||''); clearTimeout(t._h); t._h=setTimeout(()=>t.className='toast',2600); }
@@ -489,15 +578,23 @@ async function boot(){
     DISTRICTS = (r.districts && r.districts.length) ? r.districts : FALLBACK_DISTRICTS;
     if(!(r.districts && r.districts.length))
       toast('Сервер не обновлён — районы взяты локально. Перезапустите ambar-api','err');
+    PEOPLE = r.people || DISTRICTS.map(d=>({name:d.operator,senior:false,districts:[d.id]}));
     try{ curOp = localStorage.getItem('pos_op') || ''; }catch(e){}
-    if(!DISTRICTS.some(d=>d.operator===curOp)) curOp='';
+    if(!PEOPLE.some(p=>p.name===curOp)) curOp='';
     renderDispatch();
     $('netPill').textContent='● online'; $('netPill').className='pill ok';
     $('gate').classList.add('hidden');
     await loadCatalog();
-    await loadOrders();
+    // Панель открывается очередью, а не каталогом: за планшет садятся отвечать
+    // на входящие, а не вбивать. Каталог — за отдельной кнопкой.
+    showOrders = true; applyView();
+    await loadQueue();
     if(_pollT) clearInterval(_pollT);
-    _pollT = setInterval(loadOrders, 30000);
+    // Приняли в боте или на другом планшете — лента поправится сама. Две
+    // секунды для глаза мгновенно, а спящую вкладку не опрашиваем вовсе.
+    _pollT = setInterval(()=>{ if(!document.hidden) loadQueue(); }, 2500);
+    document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) loadQueue(); });
+    if(!curOp) showOv('opOv');
   }catch(e){
     const denied = e.status===401 || e.status===403;
     $('gateMsg').innerHTML = denied
@@ -516,7 +613,8 @@ function renderOffices(){
 function pickOffice(id){ curOffice=id; renderOffices(); haptic('sel'); }
 
 // ── dispatch: оператор → район → водитель ──
-function _ops(){ return [...new Set(DISTRICTS.map(d=>d.operator))]; }
+function _ops(){ return PEOPLE.map(p=>p.name); }
+function _person(n){ return PEOPLE.find(p=>p.name===n) || null; }
 function _myDists(){ return DISTRICTS.filter(d=>d.operator===curOp); }
 function _dist(id){ return DISTRICTS.find(d=>d.id===id); }
 function renderDispatch(){
@@ -528,7 +626,9 @@ function renderDispatch(){
   if(ol && !_ops().length)
     ol.innerHTML = '<div style="padding:14px;color:var(--dn);font-size:13px;text-align:center">Список операторов пуст — обновите сервер (ambar-api) и переоткройте панель</div>';
   else if(ol) ol.innerHTML = _ops().map(op=>{
-    const ds = DISTRICTS.filter(d=>d.operator===op).map(d=>d.name).join(' · ');
+    const P=_person(op);
+    const ds = P && P.senior ? 'старший · все районы'
+             : DISTRICTS.filter(d=>d.operator===op).map(d=>d.name).join(' · ');
     return `<button class="pack-btn" onclick="pickOp('${op}')" style="${op===curOp?'border-color:rgba(201,169,110,.5)':''}">
       <span style="text-align:left"><span class="n">${op}</span><br><span style="font-size:11.5px;color:var(--muted)">${ds}</span></span>
       ${op===curOp?'<span class="p">✓</span>':''}</button>`;
@@ -806,10 +906,10 @@ async function doCreate(){
     haptic('heavy');
     clearTicket(false);
     closeTicket();                  // телефон: убираем шторку, чтобы был виден список
-    await loadOrders();
+    await loadQueue();
     if(newOid){
       // straight to Заказы so the fresh order is on screen, with the driver text ready to copy
-      if(!showOrders) toggleOrders(); else renderOrders();
+      if(!showOrders) toggleOrders(); else renderQueue();
       showOrderText(newOid);
     }
   }catch(e){
@@ -820,58 +920,179 @@ async function doCreate(){
 }
 
 // ── orders panel ──
-function toggleOrders(){
-  closeTicket();
-  showOrders = !showOrders;
+function applyView(){
   $('ordersBtn').classList.toggle('on', showOrders);
   $('gridWrap').style.display = showOrders?'none':'';
   $('searchRow').style.display = showOrders?'none':'';
   $('ordersWrap').style.display = showOrders?'':'none';
   $('ordersHdr').style.display = showOrders?'flex':'none';
-  if(showOrders) loadOrders();
+}
+function toggleOrders(){
+  closeTicket();
+  showOrders = !showOrders;
+  applyView();
+  if(showOrders) loadQueue();
   haptic('sel');
 }
-async function loadOrders(){
+function openCatalog(){
+  if(showOrders) toggleOrders();
+}
+
+// ── очередь ──
+async function loadQueue(){
+  if(!curOp) { renderQueue(); return; }
   let r;
-  try{ r = await opApi.opFetch('/api/operator/orders',{params:{scope:'today'}}); }
+  try{ r = await opApi.opFetch('/api/operator/queue',{params:{as:curOp}}); }
   catch(e){ return; }
-  ORDERS = r.orders||[];
-  const active = ORDERS.filter(o=>o.status==='approved').length;
+  Q = r;
+  ORDERS = [].concat(r.new||[], r.work||[], r.done||[]);   // правка чека берёт отсюда
   const b=$('ordersBadge');
-  if(active){ b.style.display=''; b.textContent=active; } else b.style.display='none';
-  if(showOrders) renderOrders();
+  const n=(r.new||[]).length;
+  if(n){ b.style.display=''; b.textContent=n; } else b.style.display='none';
+  if(showOrders) renderQueue();
 }
-function renderOrders(){
-  const stLbl={approved:'В ПУТИ',delivered:'ДОСТАВЛЕН',cancelled:'ОТМЕНЁН',pending:'НОВЫЙ'};
-  $('ordersWrap').innerHTML = ORDERS.length ? ORDERS.map(o=>{
-    const t = o.timestamp ? new Date(/Z$|[+-]\d{2}:?\d{2}$/.test(o.timestamp)?o.timestamp:o.timestamp+'Z') : null;
-    const hm = t&&!isNaN(t) ? String(t.getHours()).padStart(2,'0')+':'+String(t.getMinutes()).padStart(2,'0') : '';
-    const items = (o.items||[]).map(i=>`${i.name} ×${i.qty}`).join(' · ');
-    const acts = o.status==='approved' ? `
-      <div class="acts">
-        <button class="oact" onclick="showOrderText('${o.order_id}')">📋 Текст</button>
-        <button class="oact deliver" onclick="askAct('${o.order_id}','delivered')">✅ Доставлен</button>
-        <button class="oact edit" onclick="startEdit('${o.order_id}')">✏️ Изменить</button>
-        <button class="oact cancel" onclick="askAct('${o.order_id}','cancel')">🚫 Отменить</button>
-      </div>` : `
-      <div class="acts">
-        <button class="oact" onclick="showOrderText('${o.order_id}')">📋 Текст</button>
-        ${o.status==='delivered' ? `<button class="oact undo" onclick="askAct('${o.order_id}','undeliver')">🔄 Вернуть в доставку</button>` : ''}
-      </div>`;
-    return `<div class="ocard">
-      <div class="top">
-        <span class="oid">#${o.order_id}</span>
-        <span class="st-chip st-${o.status}">${stLbl[o.status]||o.status}</span>
-        <span style="font-size:11px;color:var(--muted)">${hm}</span>
-        <span class="sum">${o.total} <small style="font-size:11px;color:var(--muted)">AED</small></span>
-      </div>
-      <div class="who">👤 ${o.customer_name||'—'}${o.phone?' · 📱 '+o.phone:''}${o.address?' · 🏠 '+o.address:''}</div>
-      ${o.district?`<div class="who" style="color:var(--gold2)">📍 ${o.district}${o.driver?' · 🚗 '+o.driver:''}</div>`:''}
-      <div class="items">${items}</div>
-      ${acts}
-    </div>`;
-  }).join('') : '<div style="padding:40px;text-align:center;color:var(--muted)">Сегодня ручных заказов ещё нет</div>';
+
+const ICO_APP='<svg viewBox="0 0 24 24" class="src-i"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/></svg>';
+const ICO_TEL='<svg viewBox="0 0 24 24" class="src-i"><path d="M4.5 3.5h4l2 5-2.5 1.5a12 12 0 0 0 6 6L15.5 13l5 2v4a1.5 1.5 0 0 1-1.6 1.5A16.5 16.5 0 0 1 3 5.1 1.5 1.5 0 0 1 4.5 3.5z"/></svg>';
+const _esc=x=>String(x==null?'':x).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+
+function _age(ts){
+  const t = ts ? new Date(/Z$|[+-]\d{2}:?\d{2}$/.test(ts)?ts:ts+'Z') : null;
+  if(!t || isNaN(t)) return '';
+  const m = Math.max(0, Math.round((Date.now()-t)/60000));
+  return m < 60 ? m+' мин' : Math.floor(m/60)+' ч '+(m%60)+' мин';
 }
+function _distName(id){ const d=(Q.districts||[]).find(x=>x.id===id); return d ? d.name : ''; }
+function _distCode(id){
+  const i=(Q.districts||[]).findIndex(x=>x.id===id);
+  return i<0 ? '' : 'B'+(i+1);
+}
+
+function renderQueue(){
+  const wrap=$('ordersWrap');
+  if(!curOp){
+    wrap.innerHTML = `<div class="q-empty">
+      <div class="q-empty-t">Кто за планшетом?</div>
+      <div class="q-empty-s">Заказы показываются по районам выбранного оператора.<br>
+        Старший видит все районы.</div>
+      <button class="q-cta" onclick="showOv('opOv')">Выбрать оператора</button></div>`;
+    return;
+  }
+  const lanes=[['new','Новые',(Q.new||[]).length],
+               ['work','В работе',(Q.work||[]).length],
+               ['done','За день',(Q.done||[]).length]];
+  let list = Q[qLane] || [];
+  if(qLane!=='new' && qFilter!=='all') list = list.filter(o=>(o.source||'app')===qFilter);
+
+  const c=Q.counts||{app:0,manual:0};
+  wrap.innerHTML = `
+    <div class="q-tabs">${lanes.map(([k,t,n])=>
+      `<button class="q-tab${qLane===k?' on':''}" onclick="qLaneSet('${k}')">${t}
+         ${n?`<i${k==='new'&&n?' class="hot"':''}>${n}</i>`:''}</button>`).join('')}</div>
+    ${qLane==='work' ? `<div class="q-sub">
+        <span>${c.app} из приложения · ${c.manual} по телефону</span>
+        <span class="q-fil">${[['all','Все'],['app','Приложение'],['manual','Телефон']]
+          .map(([k,t])=>`<button class="${qFilter===k?'on':''}" onclick="qFilSet('${k}')">${t}</button>`)
+          .join('')}</span></div>` : ''}
+    <div class="q-list">${list.length ? _laneHtml(qLane, list)
+      : `<div class="q-empty"><div class="q-empty-s">${
+          qLane==='new' ? 'Новых заказов нет' :
+          qLane==='work' ? 'В работе пусто' : 'За смену пока ничего не закрыто'}</div></div>`}</div>`;
+}
+function qLaneSet(k){ qLane=k; haptic('sel'); renderQueue(); }
+function qFilSet(k){ qFilter=k; haptic('sel'); renderQueue(); }
+
+// Новые группируем по районам: даже два района в одной куче читаются как
+// случайный список, а старший видит все пять.
+function _laneHtml(lane, list){
+  if(lane!=='new') return list.map(o=>_row(o,lane)).join('');
+  const by={};
+  list.forEach(o=>{ (by[o.office_id||'']=by[o.office_id||'']||[]).push(o); });
+  const order=(Q.districts||[]).map(d=>d.id).filter(id=>by[id]);
+  if(by['']) order.push('');
+  return order.map(id=>`
+    <div class="q-grp">${id ? _esc(_distCode(id)+' '+_distName(id)) : 'Без района'}
+      <i>${by[id].length}</i></div>
+    ${by[id].map(o=>_row(o,lane)).join('')}`).join('');
+}
+
+function _row(o, lane){
+  const src=(o.source||'app')==='manual' ? 'tel' : 'app';
+  const right = lane==='new'
+    ? `<span class="q-age">${_age(o.timestamp)}</span>`
+    : (o.deliver_by ? `<span class="q-by">до ${_esc(o.deliver_by)}</span>` : '');
+  const sub = lane==='new'
+    ? _esc(o.address || o.customer_name || '—')
+    : `${_esc(o.driver || 'без водителя')}${o.operator_name?' · принял '+_esc(o.operator_name):''}`;
+  const acts = lane==='new'
+    ? `<button class="q-take" onclick="askAccept('${o.order_id}')">Принять</button>`
+    : lane==='work'
+      ? `<div class="q-acts">
+           <button class="oact" onclick="showOrderText('${o.order_id}')">Текст</button>
+           <button class="oact deliver" onclick="askAct('${o.order_id}','delivered')">Доставлен</button>
+           <button class="oact edit" onclick="startEdit('${o.order_id}')">Изменить</button>
+           <button class="oact cancel" onclick="askAct('${o.order_id}','cancel')">Отменить</button>
+         </div>`
+      : (o.status==='delivered'
+          ? `<div class="q-acts"><button class="oact undo" onclick="askAct('${o.order_id}','undeliver')">Вернуть в доставку</button></div>`
+          : '');
+  return `<div class="q-r ${src}">
+    <div class="q-r-h">
+      ${src==='tel'?ICO_TEL:ICO_APP}
+      <span class="q-r-n">${_esc(o.customer_name||'—')}</span>
+      <span class="q-r-s">${_esc(o.total)} <small>AED</small></span>
+      ${right}
+    </div>
+    <div class="q-r-sub">${sub}</div>
+    <div class="q-r-it">${_esc((o.items||[]).map(i=>i.name+' ×'+i.qty).join(' · '))}</div>
+    ${acts}</div>`;
+}
+
+// ── приём: водитель и время одним действием ──
+function askAccept(oid){
+  const o=(Q.new||[]).find(x=>x.order_id===oid); if(!o) return;
+  acceptOid=oid; acceptDrv=''; acceptEta=0;
+  $('accWho').textContent = _esc(o.customer_name||'—')+' · '+_esc(o.address||'');
+  $('accSum').textContent = o.total;
+  // Водители района заказа — сверху: везёт обычно свой.
+  const mine=(Q.districts||[]).find(d=>d.id===o.office_id);
+  const rest=(Q.districts||[]).filter(d=>d.id!==o.office_id);
+  const grp=(mine?[mine]:[]).concat(rest);
+  $('accDrv').innerHTML = grp.map(d=>(d.drivers||[]).map(n=>
+    `<button class="dchip" data-n="${_esc(n)}" onclick="accPickDrv('${_esc(n)}')">
+       ${_esc(n)}<i>${_esc(_distCode(d.id))}</i></button>`).join('')).join('');
+  $('accEta').innerHTML = [20,25,30,35,40,50,60].map(m=>
+    `<button class="dchip" data-m="${m}" onclick="accPickEta(${m})">${m} мин</button>`).join('');
+  _accSync(); showOv('accOv'); haptic('medium');
+}
+function accPickDrv(n){ acceptDrv=n; haptic('sel'); _accSync(); }
+function accPickEta(m){ acceptEta=m; haptic('sel'); _accSync(); }
+function _accSync(){
+  $('accDrv').querySelectorAll('.dchip').forEach(b=>b.classList.toggle('on', b.dataset.n===acceptDrv));
+  $('accEta').querySelectorAll('.dchip').forEach(b=>b.classList.toggle('on', +b.dataset.m===acceptEta));
+  const ok = !!acceptDrv && !!acceptEta;
+  const b=$('accGo'); b.disabled=!ok;
+  b.textContent = ok ? `Принять · ${acceptDrv} · ${acceptEta} мин` : 'Выберите водителя и время';
+}
+async function doAccept(){
+  const b=$('accGo'); if(b.disabled) return;
+  b.disabled=true; b.textContent='Принимаю…';
+  try{
+    await opApi.opFetch(`/api/operator/orders/${acceptOid}/accept`,
+      {method:'POST', body:{as:curOp, driver:acceptDrv, eta:acceptEta}});
+    hideOv('accOv'); toast('Заказ принят · '+acceptDrv); haptic('medium');
+  }catch(e){
+    // Не ошибка, а нормальный ответ: заказ висит у всех, и тянутся к нему двое.
+    const d=(e && e.data) || {};
+    hideOv('accOv');
+    toast(d.error==='already_taken'
+      ? `Заказ уже принял ${d.by||'кто-то'}${d.driver?' · везёт '+d.driver:''}`
+      : 'Не удалось принять — попробуйте ещё раз', 'err');
+    haptic('medium');
+  }
+  await loadQueue();
+}
+
 function startEdit(oid){
   const o = ORDERS.find(x=>x.order_id===oid); if(!o) return;
   TICKET={};
@@ -890,7 +1111,7 @@ function startEdit(oid){
   $('editTag').style.display='';
   $('createBtn').textContent='💾 Сохранить изменения';
   $('createBtn').classList.add('save');
-  if(showOrders) toggleOrders();
+  openCatalog();
   renderTicket(); syncBadges();
   toast('Заказ #'+oid+' загружен в чек для правки');
   haptic('medium');
@@ -957,7 +1178,7 @@ function askAct(oid, act){
       await opApi.opFetch(`/api/operator/orders/${oid}/${act}`,{method:'POST',body:{}});
       toast(a.ok(oid), a.toast);
       if(editingOid===oid) clearTicket(false);
-      await loadOrders();
+      await loadQueue();
     }catch(e){ toast('Ошибка: '+((e.payload&&e.payload.error)||e.status),'err'); }
   };
   showOv('actOv'); haptic('medium');

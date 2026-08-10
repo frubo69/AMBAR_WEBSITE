@@ -204,7 +204,13 @@ async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
 
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    """Кто-то открыл самого рекламного бота — уводим в основной."""
+    """Кто-то открыл самого рекламного бота — уводим в основной.
+
+    Заодно, если это владелец, загружаем картинку поста: первым бот написать
+    не может, и до этого «Start» ему просто некуда её отдать."""
+    if update.effective_user.id in set(OWNER_IDS) | set(promo.POSTER_IDS):
+        for lang_ in ("ru", "en"):
+            await _photo_id(ctx, promo.POST_IMG[lang_])
     lang = _lang(update.effective_user.first_name or "")
     await update.message.reply_photo(
         photo=f"{PUBLIC_ORIGIN}/{promo.IMG[lang]}",

@@ -109,6 +109,39 @@ def drivers() -> list:
     return out
 
 
+# ── перестановки ─────────────────────────────────────────────────────────────
+# Кто на каком районе меняется чаще, чем выходит релиз: отпуск, новый человек,
+# поменялись сменами. Поэтому список выше — то, как задумано, а поверх него
+# ложится перестановка из базы. Её всегда видно и всегда можно снять.
+#
+# Меняется только оператор. Водители привязаны к району, а не к оператору:
+# они возят по своим зданиям, кто бы ни принимал заказы.
+_BASE_OPERATOR = {s["district"]: s["operator"] for s in DISTRICT_STAFF}
+
+
+def apply_moves(moves: dict):
+    """Наложить перестановку. Пустой словарь возвращает всё как в коде."""
+    moves = moves or {}
+    for s in DISTRICT_STAFF:
+        s["operator"] = moves.get(s["district"]) or _BASE_OPERATOR[s["district"]]
+    DISTRICT_OPERATOR.clear()
+    DISTRICT_OPERATOR.update({s["district"]: s["operator"] for s in DISTRICT_STAFF})
+
+
+def base_operator(district: str) -> str:
+    """Кто стоит на районе в расписании — чтобы показать, от чего отступили."""
+    return _BASE_OPERATOR.get(district, "")
+
+
+def operator_names() -> list:
+    """Все, кого можно поставить на район: районные и старшие."""
+    seen, out = set(), []
+    for n in list(_BASE_OPERATOR.values()) + [s["name"] for s in SENIOR_OPERATORS]:
+        if n not in seen:
+            seen.add(n); out.append(n)
+    return out
+
+
 # ── производное ──────────────────────────────────────────────────────────────
 DISTRICT_OPERATOR = {s["district"]: s["operator"] for s in DISTRICT_STAFF}
 DISTRICT_DRIVERS = {s["district"]: list(s["drivers"]) for s in DISTRICT_STAFF}

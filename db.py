@@ -1606,6 +1606,29 @@ async def zayavka_last() -> dict:
     return (doc or {}).get("asked") or {}
 
 
+# ── Кто на каком районе ─────────────────────────────────────────────────────
+# Расписание живёт в config_staff, но люди меняются местами чаще, чем выходит
+# релиз: ушёл в отпуск, взяли нового, поменялись сменами. Перестановка лежит
+# здесь и накладывается поверх расписания, поэтому её всегда видно и всегда
+# можно снять — в коде остаётся то, как задумано.
+async def staff_map_get() -> dict:
+    db = _db_or_none()
+    if db is None: return {}
+    cur = db.staff_map.find({})
+    return {d["_id"]: d["operator"] async for d in cur if d.get("operator")}
+
+
+async def staff_map_set(district: str, operator: str):
+    db = _db_or_none()
+    if db is None: return
+    if operator:
+        await db.staff_map.replace_one(
+            {"_id": district}, {"_id": district, "operator": operator,
+                                "at": datetime.now(timezone.utc)}, upsert=True)
+    else:
+        await db.staff_map.delete_one({"_id": district})
+
+
 # ── Картинки, уже загруженные в телеграм ────────────────────────────────────
 # Раз отданный телеграму файл получает file_id и живёт у них вечно. Дальше
 # карточку можно собирать по этому id, и телеграму не нужно ходить к нам за

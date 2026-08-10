@@ -208,14 +208,9 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    середине, а в потоке они уезжали бы вместе с исчезающей подписью. */
 .hero .day-nav{position:absolute;right:20px;top:18px;margin:0}
 .hero .hero-lbl{padding-right:150px}
-/* Полностью сжатое состояние центрируем правилами, а не расчётом: на разных
-   телефонах свои шрифт и высота строки, и вычисленные смещения оставляли
-   число и стрелки на разных уровнях. */
-/* Без стрелок дня правый край свободен — валовая и чаевые занимают его сами. */
-.hero.nonav.tight .hero-amt-row{right:20px}
-.hero.tight .hero-amt-row{position:absolute;left:20px;right:150px;top:50%;
-  transform:translateY(-50%)!important;margin:0}
-.hero.tight .day-nav{top:50%;transform:translateY(-50%)!important}
+/* Тут когда-то жили правила для класса tight. Класс только снимался и нигде
+   не ставился, поэтому правила не срабатывали ни разу, а искали причину
+   несовпадения именно в них. Сжатое состояние считает скрипт. */
 .dn-b{width:26px;height:24px;padding:0;border:none;background:none;border-radius:999px;color:var(--gold2);
   display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s var(--e1)}
 .dn-b svg{width:13px;height:13px;display:block}
@@ -820,6 +815,34 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--muted);
   background:var(--card2);border:1px solid var(--border2)}
 .ord-reset:active{color:var(--text)}
+
+/* ── Кто на каком районе ───────────────────────────────────────────────── */
+.crew-entry{display:flex;align-items:center;gap:11px;width:100%;margin:0 0 10px;padding:12px 13px;
+  border-radius:13px;cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
+  background:var(--card);border:1px solid var(--border2)}
+.crew-entry:active{background:var(--card2)}
+.crew-entry > svg{flex:0 0 auto;opacity:.55}
+.crew-e-b{flex:1;min-width:0}
+.crew-e-b b{display:block;font-size:13px;font-weight:600}
+.crew-e-b i{display:block;font-style:normal;font-size:10.5px;color:var(--muted);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crew-e-go{color:var(--muted);font-size:15px;flex-shrink:0}
+.crew-d{display:flex;align-items:center;gap:11px;padding:13px;margin-bottom:7px;border-radius:13px;
+  background:var(--card);border:1px solid var(--border2)}
+.crew-d.moved{border-color:rgba(201,169,110,.32)}
+.crew-code{width:34px;height:34px;flex:0 0 auto;border-radius:10px;display:flex;align-items:center;
+  justify-content:center;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;
+  color:var(--gold2);background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.2)}
+.crew-b{flex:1;min-width:0}
+.crew-n{font-size:13px;font-weight:600}
+.crew-s{font-size:10.5px;color:var(--muted);margin-top:2px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.crew-pick{flex:0 0 auto;padding:8px 11px;border-radius:10px;cursor:pointer;
+  font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700;color:var(--text);
+  background:var(--card2);border:1px solid var(--border3);max-width:130px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crew-pick:active{border-color:var(--gold2)}
+.crew-pick.moved{color:var(--gold2);border-color:rgba(201,169,110,.35)}
 
 .acc-line{display:flex;align-items:center;gap:10px;padding:11px 13px;margin-bottom:6px;
   border-radius:11px;background:var(--card);border:1px solid var(--border2)}
@@ -1696,6 +1719,16 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
       <div class="off-sort" id="opDistFilter" style="margin:0"></div>
     </div>
   </div>
+  <!-- Кто на каком районе. Люди меняются местами чаще, чем выходит релиз, и
+       раньше это правилось только в коде. -->
+  <button class="crew-entry" id="crewEntry" onclick="crewOpen()">
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 13v-2a8 8 0 0 1 16 0v2"/><rect x="2" y="12.5" width="4.2" height="6" rx="1.6"/>
+      <rect x="17.8" y="12.5" width="4.2" height="6" rx="1.6"/></svg>
+    <span class="crew-e-b"><b>Кто на каком районе</b><i id="crewSub">B1 · B5 Умар · B2 Джанабиль…</i></span>
+    <span class="crew-e-go">›</span>
+  </button>
   <div class="list" id="opList"></div>
   <div id="opExtra"></div>
 
@@ -3656,7 +3689,12 @@ try{
     const q = Math.min(1, p * 1.6);
     if(amtRow){
       const nat = amtRow.offsetTop;              // offsetTop не зависит от transform
-      const want = (h - amtRow.offsetHeight) / 2;
+      // Ровняем по самому числу, а не по строке. В строке рядом с ним стоят
+      // «AED», валовая и чаевые, её бокс выше цифры на десяток точек — и
+      // выровненная по боксу цифра садилась выше стрелок.
+      const kid = amt || amtRow;
+      const inner = kid.getBoundingClientRect().top - amtRow.getBoundingClientRect().top;
+      const want = (h - kid.offsetHeight) / 2 - inner;
       amtRow.style.transform = `translateY(${(want - nat) * q}px)`;
     }
     if(nav){
@@ -9499,6 +9537,116 @@ function fmtSec(s){
 // нет своего входа в бот), всё остальное принадлежит району и его людям.
 let OPS = {data:null, loading:false, err:''};
 
+// ── Кто на каком районе ─────────────────────────────────────────────────────
+// Расписание живёт в коде, но люди меняются местами чаще, чем выходит релиз:
+// отпуск, новый человек, поменялись сменами. Перестановка ложится поверх
+// расписания, поэтому рядом всегда видно, кто стоял там изначально, и её можно
+// снять одним касанием.
+//
+// Меняется только оператор: водители привязаны к району, а не к нему — они
+// возят по своим зданиям, кто бы ни принимал заказы.
+let CREW = null;
+
+async function crewLoad(){
+  try{ CREW = await ownerApi.ownerFetch('/api/owner/staff'); }
+  catch(e){ CREW = null; }
+  crewSub();
+  return CREW;
+}
+
+// Подпись на входе: кто где, коротко. Одинаковых операторов схлопываем —
+// «B1 · B5 Умар» читается быстрее, чем «B1 Умар · B5 Умар».
+function crewSub(){
+  const el = document.getElementById('crewSub');
+  if(!el) return;
+  if(!CREW){ el.textContent = 'кто принимает заказы по районам'; return; }
+  const by = {};
+  CREW.districts.forEach(d => { (by[d.operator] = by[d.operator] || []).push(d.code); });
+  el.textContent = Object.keys(by).map(n => `${by[n].join(' · ')} ${n}`).join('  ·  ');
+}
+
+async function crewOpen(){
+  document.getElementById('accOv').classList.add('show');
+  ACC_VIEW = 'crew';
+  _setText('accTitle', 'Кто на каком районе');
+  _setText('accSub', 'принимает заказы');
+  document.getElementById('accFoot').innerHTML = '';
+  document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  await crewLoad();
+  crewRender();
+}
+
+function crewRender(){
+  const box = document.getElementById('accMid');
+  if(!CREW){ box.innerHTML =
+    '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+  const moved = CREW.districts.filter(d => d.moved).length;
+  box.innerHTML = `
+    <div class="stk-note" style="margin:0 0 12px">
+      Оператор отвечает за заказы своего района: по ним считаются его выручка,
+      время доставки и оценки. <b>Водители остаются на районе</b> — они возят по
+      своим зданиям, кто бы ни принимал заказы.
+      ${moved ? `<br><b style="color:var(--gold2)">Переставлено: ${moved}</b> —
+        в расписании стоят другие, вернуть можно тем же выбором.` : ''}
+    </div>
+    ${CREW.districts.map(d => `
+      <div class="crew-d${d.moved ? ' moved' : ''}">
+        <span class="crew-code">${escS(d.code)}</span>
+        <span class="crew-b">
+          <span class="crew-n">${escS(d.name)}</span>
+          <span class="crew-s">${d.drivers.length
+            ? escS(d.drivers.join(', ')) : 'водителей нет'}${
+            d.moved ? ` · в расписании ${escS(d.base)}` : ''}</span>
+        </span>
+        <button class="crew-pick${d.moved ? ' moved' : ''}"
+                onclick="crewPick('${d.id}')">${escS(d.operator || '—')}</button>
+      </div>`).join('')}`;
+}
+
+// Выбор — обычным списком поверх экрана: у нас четыре имени, и ради них
+// городить отдельную страницу не за чем.
+function crewPick(did){
+  const d = CREW.districts.find(x => x.id === did); if(!d) return;
+  closePinPop();
+  const back = document.createElement('div');
+  back.className = 'pin-back';
+  back.addEventListener('pointerdown', closePinPop);
+  const pop = document.createElement('div');
+  pop.className = 'pin-pop';
+  pop.style.maxHeight = '60vh'; pop.style.overflowY = 'auto';
+  pop.innerHTML = CREW.operators.map(n => `
+    <button onclick="crewSet('${did}','${n.replace(/'/g,"\\'")}')">
+      <span>${escS(n)}${n === d.base ? '<span class="pin-s">как в расписании</span>' : ''}</span>
+      ${n === d.operator ? '<i style="margin-left:auto;color:var(--gold2)">✓</i>' : ''}
+    </button>`).join('');
+  document.body.append(back, pop);
+  const r = document.querySelector(`.crew-d [onclick*="${did}"]`).getBoundingClientRect();
+  const w = pop.offsetWidth, hh = pop.offsetHeight;
+  pop.style.left = Math.max(10, Math.min(r.right - w, window.innerWidth - w - 10)) + 'px';
+  pop.style.top = (r.bottom + 8 + hh < window.innerHeight - 10
+                   ? r.bottom + 8 : Math.max(10, r.top - hh - 8)) + 'px';
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('medium'); }catch(e){}
+}
+
+async function crewSet(did, name){
+  closePinPop();
+  const d = CREW.districts.find(x => x.id === did);
+  if(d) d.operator = name;                       // рисуем сразу, ответ догонит
+  crewRender();
+  try{
+    CREW = await ownerApi.ownerFetch('/api/owner/staff/set', {method:'POST',
+      body:{district: did, operator: name}});
+    crewRender(); crewSub();
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    // Списки людей и районов считаются по этой же таблице — перечитываем.
+    if(window.ownerApi) loadOperators();
+  }catch(e){
+    await crewLoad(); crewRender();
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('error'); }catch(e2){}
+  }
+}
+
 // Метрики в одном месте: как называется, как считать, как показать и в какую
 // сторону сортировать «по-хорошему». Раньше направление было зашито в порядок
 // сравнения и поменять его было нельзя — а «кто хуже всех» спрашивают не реже,
@@ -9542,6 +9690,7 @@ async function loadOperators(){
   renderOperators();
   try{
     OPS.data = await ownerApi.ownerFetch('/api/owner/operators', {params:{period:p}});
+    if(!CREW) crewLoad();          // подпись «кто на каком районе» на входе
     OPS.period = p;
   }catch(e){ OPS.err = 'Не удалось загрузить'; }
   OPS.loading = false;

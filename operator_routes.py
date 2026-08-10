@@ -44,16 +44,37 @@ from config_offices import OFFICE_NAMES   # офис ≡ район, едины�
 # The roster itself lives in config_staff — ambar star reads the same table to
 # work out whose orders, tips and delivery times these are.
 from config_staff import DISTRICT_STAFF
+import config_staff as _staff_mod
 
-DISTRICTS = [
-    {"id": s["district"], "name": OFFICE_NAMES.get(s["district"], s["district"]),
-     "operator": s["operator"], "drivers": list(s["drivers"])}
-    for s in DISTRICT_STAFF
-]
+
+def _districts() -> list:
+    """Районы с их людьми — как в расписании, но с учётом перестановки.
+
+    Считаем каждый раз, а не один раз при запуске: владелец меняет, кто на
+    каком районе, из своего приложения, и POS обязан узнать об этом сразу, а
+    не при следующем перезапуске службы."""
+    return [
+        {"id": s["district"], "name": OFFICE_NAMES.get(s["district"], s["district"]),
+         "operator": s["operator"], "drivers": list(s["drivers"])}
+        for s in DISTRICT_STAFF
+    ]
+
+
+async def _fresh_districts() -> list:
+    try:
+        _staff_mod.apply_moves(await db.staff_map_get())
+    except Exception as e:
+        log.warning(f"[pos] перестановка районов не прочитана: {e}")
+    return _districts()
+
+
+# Оставлено для тех мест, где список нужен без ожидания: состав людей в нём
+# может отставать до первого обращения к _fresh_districts().
+DISTRICTS = _districts()
 
 
 def _district(did: str) -> dict | None:
-    return next((d for d in DISTRICTS if d["id"] == did), None)
+    return next((d for d in _districts() if d["id"] == did), None)
 
 DUBAI_TZ = timezone(timedelta(hours=4))
 
@@ -418,7 +439,7 @@ async def handle_ping(request):
         # Офис ≡ район, отдельного переключателя офиса в POS больше нет —
         # пустой список прячет его в интерфейсе.
         "offices": [],
-        "districts": DISTRICTS,
+        "districts": await _fresh_districts(),
         "server_time": datetime.now(timezone.utc).isoformat(),
     }, headers=CORS_HEADERS)
 

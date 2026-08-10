@@ -578,6 +578,7 @@ async def handle_finance(request):
         _k = _o.get("office_id") or ""
         _live_by[_k] = _live_by.get(_k, 0) + 1
 
+    await _staff_fresh()
     offices_block = []
     for _oid in OFFICE_IDS:
         _dl = _deliv_by.get(_oid, [])
@@ -1209,6 +1210,59 @@ def _tips_by_driver(pairs) -> tuple:
 
 
 @require_owner
+async def _staff_fresh():
+    """Подтянуть перестановку районов перед тем, как считать по людям.
+
+    Служб несколько, а перестановка одна: держать её в памяти процесса значило
+    бы, что владелец поменял оператора, а бот об этом узнает при следующем
+    перезапуске. Запрос крошечный — пять строк, — поэтому берём его каждый раз.
+    """
+    try:
+        staff.apply_moves(await db.staff_map_get())
+    except Exception as e:
+        log.warning(f"[staff] перестановка не прочитана: {e}")
+
+
+@require_owner
+async def handle_staff(request):
+    """Кто на каком районе — и кого туда можно поставить."""
+    await _staff_fresh()
+    moves = await db.staff_map_get()
+    return web.json_response({
+        "districts": [{"id": d, "code": OFFICE_CODES.get(d, ""),
+                       "name": OFFICE_NAMES.get(d, d),
+                       "operator": staff.DISTRICT_OPERATOR.get(d, ""),
+                       "base": staff.base_operator(d),
+                       "moved": bool(moves.get(d)),
+                       "drivers": list(staff.DISTRICT_DRIVERS.get(d, []))}
+                      for d in OFFICE_IDS],
+        "operators": staff.operator_names(),
+        "seniors": [x["name"] for x in staff.SENIOR_OPERATORS],
+    }, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_staff_set(request):
+    """Переставить оператора на район. Пусто — вернуть того, кто в расписании."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    district = (body.get("district") or "").strip()
+    if district not in OFFICE_IDS:
+        return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+    name = (body.get("operator") or "").strip()
+    if name and name not in staff.operator_names():
+        return web.json_response({"error": "unknown_operator"}, status=400, headers=CORS_HEADERS)
+    # Пустое имя — это не «район без оператора», а «вернуть как в расписании»:
+    # район без ответственного означает, что заказ оттуда некому вести.
+    await db.staff_map_set(district, name if name != staff.base_operator(district) else "")
+    await _staff_fresh()
+    log.info(f"[staff] {OFFICE_CODES.get(district)} → {name or staff.base_operator(district)}")
+    return await handle_staff(request)
+
+
+@require_owner
 async def handle_operators(request):
     """GET /api/owner/operators?period=&day_offset= — статистика по людям.
 
@@ -1223,6 +1277,7 @@ async def handle_operators(request):
     except ValueError:
         day_offset = 0
 
+    await _staff_fresh()
     all_orders = await db.get_all_orders()
     ref = (_now_dubai() - timedelta(days=day_offset)) if day_offset else None
     start, end, _ps, _pe = _period_window(period, ref)
@@ -1385,6 +1440,7 @@ async def handle_office(request):
     oid = request.query.get("id", "").strip()
     if oid not in OFFICE_NAMES:
         return web.json_response({"error": "unknown office"}, status=404, headers=CORS_HEADERS)
+    await _staff_fresh()
     period = request.query.get("period", "today")
     if period not in VALID_PERIODS:
         period = "today"
@@ -2504,6 +2560,10 @@ def setup(app):
     app.router.add_get(             "/api/owner/office",  handle_office)
     app.router.add_route("OPTIONS", "/api/owner/operators", handle_operators)
     app.router.add_get(             "/api/owner/operators", handle_operators)
+    app.router.add_route("OPTIONS", "/api/owner/staff", handle_staff)
+    app.router.add_get(             "/api/owner/staff", handle_staff)
+    app.router.add_route("OPTIONS", "/api/owner/staff/set", handle_staff_set)
+    app.router.add_post(            "/api/owner/staff/set", handle_staff_set)
     app.router.add_route("OPTIONS", "/api/owner/promotions", handle_promotions)
     app.router.add_get(             "/api/owner/promotions", handle_promotions)
     app.router.add_route("OPTIONS", "/api/owner/promo",   handle_promo)

@@ -20,6 +20,8 @@
 """
 import io
 import logging
+import re
+import zipfile
 from datetime import datetime, timezone
 
 from aiohttp import web
@@ -44,6 +46,38 @@ SHEET_MAIN = "Order"
 # Названия точек у нас записаны кириллицей, хотя районы английские.
 DIST_EN = {"jvc": "JVC", "bbay": "Business Bay", "silicon": "Silicon Oasis",
            "alguses": "Al Qusais", "tecom": "Tecom"}
+
+
+def _with_cached_values(raw: bytes, calc: dict) -> bytes:
+    """Дописать формулам посчитанный результат.
+
+    Книга, собранная программой, содержит формулу и ничего больше: значение
+    появится, когда файл откроют в Excel и он пересчитает. Но открывают его
+    сперва не в Excel — в предпросмотре телефона, в телеграме, в почте. Там
+    никто ничего не считает, и вся колонка Total показывает нули: файл выглядит
+    сломанным раньше, чем до него дойдут руки.
+
+    Поэтому кладём рядом с формулой её результат. Excel всё равно пересчитает
+    сам (fullCalcOnLoad), а просмотрщик покажет то, что мы посчитали.
+    """
+    buf = io.BytesIO()
+    with zipfile.ZipFile(io.BytesIO(raw)) as src, \
+         zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as dst:
+        for item in src.infolist():
+            data = src.read(item.filename)
+            if item.filename.startswith("xl/worksheets/sheet"):
+                xml = data.decode("utf-8")
+
+                def put(m):
+                    ref = m.group(2)
+                    v = calc.get(ref)
+                    return m.group(0) if v is None else \
+                        f"{m.group(1)}{m.group(3)}<v>{v}</v></c>"
+
+                xml = re.sub(r'(<c r="([A-Z]+\d+)"[^>]*>)(<f>.*?</f>)</c>', put, xml)
+                data = xml.encode("utf-8")
+            dst.writestr(item, data)
+    return buf.getvalue()
 
 
 def _catalog_by_id():
@@ -135,6 +169,9 @@ async def _build_book(day: str):
     dist = [d["id"] for d in data["districts"]]
 
     wb = Workbook()
+    # Excel пересчитывает книгу при открытии: подставленные нами значения —
+    # для просмотрщиков, а живая правка чисел по точкам должна менять итог.
+    wb.calculation.fullCalcOnLoad = True
     ws = wb.active
     ws.title = SHEET_MAIN
     ws.sheet_view.showGridLines = False        # рамки рисуем сами, сетка мешает
@@ -186,6 +223,7 @@ async def _build_book(day: str):
     ws.row_dimensions[3].height = 15
 
     first = 4
+    calc = {}                      # ссылка ячейки → посчитанный итог
     for n, r in enumerate(rows, 1):
         i = first + n - 1
         ws.cell(row=i, column=N, value=n).alignment = mid
@@ -200,6 +238,7 @@ async def _build_book(day: str):
         # переписанная руками сумма разошлась бы с ними на первой же правке.
         t = ws.cell(row=i, column=TOT,
                     value=f"=SUM({get_column_letter(D0)}{i}:{get_column_letter(LAST)}{i})")
+        calc[f"{get_column_letter(TOT)}{i}"] = r["need_total"]
         t.fill = sum_fill; t.font = bold
         t.alignment = mid; t.number_format = ZERO_BLANK
         for col in range(N, TOT + 1):
@@ -216,6 +255,9 @@ async def _build_book(day: str):
             L = get_column_letter(col)
             c.value = f"=SUM({L}{first}:{L}{last})"
             c.number_format = ZERO_BLANK
+            calc[f"{L}{i}"] = (sum(r["need_total"] for r in rows) if col == TOT
+                               else sum((r["cells"].get(dist[col - D0]) or {}).get("need", 0)
+                                        for r in rows))
         c.fill = sum_fill; c.font = bold; c.alignment = mid; c.border = box
 
     ws.column_dimensions["A"].width = 29.55                 # пустое поле слева
@@ -238,10 +280,11 @@ async def _build_book(day: str):
         log.warning(f"[supply] снимок заявки: {e}")
 
     buf = io.BytesIO(); wb.save(buf); buf.seek(0)
+    raw = _with_cached_values(buf.read(), calc)
     name = f"AMBAR-zayavka-{data['day']}.xlsx"
     log.info(f"[supply] выгрузка заявки {data['day']}: {len(rows)} позиций, "
              f"из них с потребностью {sum(1 for r in rows if r['need_total'])}")
-    return buf.read(), name
+    return raw, name
 
 
 def _num(v):

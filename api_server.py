@@ -2480,6 +2480,7 @@ PUBLIC_ROOT_FILES = {
     "promo_invite_ru.jpg",  "promo_invite_en.jpg",
     "promo_chat_ru.jpg",    "promo_chat_en.jpg",
     "promo_post_ru.jpg",    "promo_post_en.jpg",
+    "promo_post_ru2.jpg",
     "promo_gift_ru.jpg",    "promo_gift_en.jpg",
 }
 PUBLIC_DIRS = ("owner/", "operator/", "driver/", "TEXTURES/", "fonts/", "LOGOS/", "uploads/")

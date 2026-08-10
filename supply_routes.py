@@ -69,12 +69,15 @@ def _with_cached_values(raw: bytes, calc: dict) -> bytes:
                 xml = data.decode("utf-8")
 
                 def put(m):
-                    ref = m.group(2)
-                    v = calc.get(ref)
+                    v = calc.get(m.group(2))
                     return m.group(0) if v is None else \
                         f"{m.group(1)}{m.group(3)}<v>{v}</v></c>"
 
-                xml = re.sub(r'(<c r="([A-Z]+\d+)"[^>]*>)(<f>.*?</f>)</c>', put, xml)
+                # Пустой <v/> после формулы openpyxl ставит сам — в него и
+                # смотрит просмотрщик, показывая ноль.
+                xml = re.sub(
+                    r'(<c r="([A-Z]+\d+)"[^>]*>)(<f>.*?</f>)(?:<v\s*/>|<v>[^<]*</v>)?</c>',
+                    put, xml)
                 data = xml.encode("utf-8")
             dst.writestr(item, data)
     return buf.getvalue()

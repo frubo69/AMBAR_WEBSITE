@@ -44,11 +44,13 @@ MAX_LEN           = 400        # длинные простыни — обычн�
 # ручается админ со своей репутацией. Ссылаться на него прямо нельзя, но слово
 # «проверенная» с галочкой в его чате читается именно так.
 TEXT = {
+    # Часы работы те же, что в приложении: обещать круглосуточно и не открыть
+    # дверь в полдень — потерять человека навсегда, второй раз он не напишет.
     "ru": ("<b>AMBAR — проверенная доставка алкоголя по Дубаю ✅</b>\n"
-           "Круглосуточно, весь ассортимент.\n"
+           "Каждый день с 12:00 до 06:00, весь ассортимент.\n"
            "Заказ в приложении — на 5% дешевле."),
     "en": ("<b>AMBAR — trusted alcohol delivery across Dubai ✅</b>\n"
-           "Around the clock, full range.\n"
+           "Daily from 12 PM to 6 AM, full range.\n"
            "Order in the app — 5% cheaper."),
 }
 BTN = {"ru": "Открыть AMBAR", "en": "Open AMBAR"}
@@ -66,12 +68,12 @@ IMG = {"ru": "promo_chat_ru.jpg", "en": "promo_invite_en.jpg"}
 POST_IMG = {"ru": "promo_post_ru.jpg", "en": "promo_post_en.jpg"}
 POST_TEXT = {
     "ru": ("<b>AMBAR — проверенная доставка алкоголя по Дубаю ✅</b>\n\n"
-           "Круглосуточно, по всем районам. Виски, вино, шампанское, пиво — "
-           "весь ассортимент с ценами в приложении.\n\n"
+           "Каждый день с 12:00 до 06:00, по всем районам. Виски, вино, "
+           "шампанское, пиво — весь ассортимент с ценами в приложении.\n\n"
            "Оплата при получении. Заказ в приложении — на 5% дешевле."),
     "en": ("<b>AMBAR — trusted alcohol delivery across Dubai ✅</b>\n\n"
-           "Around the clock, every district. Whisky, wine, champagne, beer — "
-           "the full range with prices in the app.\n\n"
+           "Daily from 12 PM to 6 AM, every district. Whisky, wine, champagne, "
+           "beer — the full range with prices in the app.\n\n"
            "Pay on delivery. Order in the app — 5% cheaper."),
 }
 

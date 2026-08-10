@@ -25,6 +25,7 @@ lazy-imported inside handlers to avoid circular imports at module load.
 import os, json, time, hmac, hashlib, logging, urllib.parse
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
+from functools import wraps
 
 from aiohttp import web
 
@@ -155,6 +156,7 @@ def _validate_operator_init_data(init_data: str) -> dict | None:
 
 
 def require_operator(handler):
+    @wraps(handler)                     # без этого обёртка съедает имя и docstring
     async def wrapped(request):
         if request.method == "OPTIONS":
             return web.Response(status=200, headers=CORS_HEADERS)

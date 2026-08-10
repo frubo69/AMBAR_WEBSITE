@@ -359,7 +359,7 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 
 <div id="app">
   <div class="hdr">
-    <div><div class="hdr-logo">AMBAR</div><div class="hdr-sub">Панель оператора · 📞 заказы</div></div>
+    <div><div class="hdr-logo">AMBAR</div><div class="hdr-sub">Панель оператора</div></div>
     <div class="office-seg" id="officeSeg" style="display:none"></div>
     <div class="hdr-right">
       <button class="pill" id="dispatchBtn" onclick="showOv('opOv')" style="cursor:pointer;color:var(--gold2);border-color:rgba(201,169,110,.4)">👤 Оператор</button>
@@ -926,6 +926,12 @@ function applyView(){
   $('searchRow').style.display = showOrders?'none':'';
   $('ordersWrap').style.display = showOrders?'':'none';
   $('ordersHdr').style.display = showOrders?'flex':'none';
+  // Чек — про сборку заказа. Пока смотришь очередь, он занимает треть экрана
+  // ни за чем, а очередь из-за него читается в колонку шириной в ладонь.
+  const tk=document.querySelector('.ticket');
+  if(tk) tk.style.display = showOrders?'none':'';
+  // Категории товаров нужны каталогу, а не очереди.
+  $('catRail').style.display = showOrders?'none':'';
 }
 function toggleOrders(){
   closeTicket();

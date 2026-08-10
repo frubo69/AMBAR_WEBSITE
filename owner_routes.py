@@ -602,6 +602,12 @@ async def handle_finance(request):
             "rating":       round(sum(_revs) / len(_revs), 2) if _revs else 0,
             "rating_count": len(_revs),
             "active":       _live_by.get(_oid, 0),
+            # Кто на районе — видно сразу на плитке, без захода внутрь: чаще
+            # всего от списка районов и нужно понять, к кому идти с вопросом.
+            "operator":     staff.DISTRICT_OPERATOR.get(_oid, ""),
+            "operator_id":  staff._slug(staff.DISTRICT_OPERATOR[_oid])
+                            if staff.DISTRICT_OPERATOR.get(_oid) else "",
+            "drivers":      list(staff.DISTRICT_DRIVERS.get(_oid, [])),
         })
     # Единичные заказы без признаков местоположения (нет района, координат и
     # узнаваемого адреса) — отдельной строкой, чтобы сумма сходилась.
@@ -1468,6 +1474,21 @@ async def handle_office(request):
         "trend": _bucket_trend(curr, start, period),
         "top_items": top_items,
         "drivers": drivers,
+        # Состав района из расписания, а не из заказов: водитель без доставок
+        # за период всё равно на районе, и его отсутствие в списке читалось бы
+        # как «его тут нет», а не как «он ничего не отвёз».
+        "team": {
+            "operator": ({"id": staff._slug(staff.DISTRICT_OPERATOR[oid]),
+                          "name": staff.DISTRICT_OPERATOR[oid]}
+                         if staff.DISTRICT_OPERATOR.get(oid) else None),
+            "seniors": [{"id": x["id"], "name": x["name"]}
+                        for x in staff.SENIOR_OPERATORS],
+            "drivers": [{"id": staff._slug(n), "name": n,
+                         # Есть ли у него вход в приложение водителя: без id он
+                         # в системе только именем, и заказ ему не назначить.
+                         "has_login": bool(staff.DRIVER_IDS.get(n))}
+                        for n in staff.DISTRICT_DRIVERS.get(oid, [])],
+        },
         "recent": [_order_summary(o) for o in recent],
     }, headers=CORS_HEADERS)
 

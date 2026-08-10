@@ -463,6 +463,7 @@ async def order_rows(day: str = "") -> dict:
     day = (day or "").strip() or _biz_day()
     cat = _catalog()
     saved_norms = await db.get_stock_norms()
+    edits = await db.zayavka_edits(day)      # ручные правки поверх расчёта
     rows, total_aed, total_qty = [], 0, 0
     frozen_aed = 0          # деньги, стоящие на полке сверх реального спроса
 
@@ -477,13 +478,22 @@ async def order_rows(day: str = "") -> dict:
     for pid, p in cat.items():
         price = _price(p)
         cells, item_total = {}, 0
+        row_edited = False
         for oid in OFFICE_IDS:
             d = per_district[oid]
             have = int(d["have"].get(pid) or 0)
             sug = int(d["sug"].get(pid) or 0)
             norm = int((saved_norms.get(f"{oid}:{pid}") or sug or 0))
-            need = max(0, norm - have)
-            cells[oid] = {"have": have, "norm": norm, "suggested": sug, "need": need}
+            calc = max(0, norm - have)
+            # Правка заменяет расчёт, но не стирает его: рядом остаётся число,
+            # которое предлагала программа, иначе непонятно, от чего отступили.
+            fix = (edits.get(pid) or {}).get(oid)
+            need = max(0, int(fix)) if fix is not None else calc
+            if fix is not None and int(fix) != calc:
+                row_edited = True
+            cells[oid] = {"have": have, "norm": norm, "suggested": sug,
+                          "need": need, "calc": calc,
+                          "edited": fix is not None and int(fix) != calc}
             item_total += need
             if sug and norm > sug:
                 frozen_aed += (norm - sug) * price
@@ -491,7 +501,9 @@ async def order_rows(day: str = "") -> dict:
             total_qty += item_total
             total_aed += item_total * price
         rows.append({"id": pid, "name": p.get("name", ""), "cat": p.get("cat", ""),
-                     "price": price, "need_total": item_total, "cells": cells})
+                     "price": price, "need_total": item_total, "cells": cells,
+                     "calc_total": sum(c["calc"] for c in cells.values()),
+                     "edited": row_edited})
 
     rows.sort(key=lambda r: (-r["need_total"], r["name"]))
     return {
@@ -500,6 +512,7 @@ async def order_rows(day: str = "") -> dict:
                        "name": OFFICE_NAMES.get(o, o),
                        "counted": per_district[o]["counted"]} for o in OFFICE_IDS],
         "total_qty": total_qty, "total_aed": total_aed,
+        "edited_count": sum(1 for r in rows if r["edited"]),
         "frozen_aed": frozen_aed,
         "cover_days": NORM_COVER_DAYS, "window_days": NORM_WINDOW_DAYS,
         "rows": [r for r in rows if r["need_total"] > 0],
@@ -601,6 +614,63 @@ async def handle_result(request):
     return web.json_response(c, headers=CORS_HEADERS)
 
 
+@require_owner
+async def handle_order_edit(request):
+    """Поправить количество в заявке руками.
+
+    Правится клетка «позиция × точка», а не итог: развозить всё равно по
+    точкам, и правка «дай на десять меньше» без указания, где именно меньше,
+    не превращается в заявку. Пустое значение снимает правку и возвращает
+    расчёт."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+
+    day = (body.get("day") or "").strip() or _biz_day()
+    pid = (body.get("id") or "").strip()
+    if pid not in _catalog():
+        return web.json_response({"error": "unknown_product"}, status=400, headers=CORS_HEADERS)
+    district = (body.get("district") or "").strip()
+    if district not in OFFICE_IDS:
+        return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+
+    qty = body.get("qty")
+    if qty is None or qty == "":
+        await db.zayavka_edit_set(day, pid, district, None)
+    else:
+        try:
+            qty = max(0, min(9999, int(qty)))
+        except (TypeError, ValueError):
+            return web.json_response({"error": "bad_qty"}, status=400, headers=CORS_HEADERS)
+        await db.zayavka_edit_set(day, pid, district, qty)
+
+    data = await order_rows(day)
+    row = next((r for r in data["all_rows"] if r["id"] == pid), None)
+    return web.json_response({"ok": True, "row": row,
+                              "total_qty": data["total_qty"], "total_aed": data["total_aed"],
+                              "edited_count": data["edited_count"],
+                              "rows_count": len(data["rows"])},
+                             headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_order_reset(request):
+    """Снять правки: по одной позиции или по всей заявке."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    day = (body.get("day") or "").strip() or _biz_day()
+    await db.zayavka_edit_clear(day, (body.get("id") or "").strip() or None)
+    data = await order_rows(day)
+    return web.json_response({"ok": True, "total_qty": data["total_qty"],
+                              "total_aed": data["total_aed"],
+                              "edited_count": data["edited_count"],
+                              "rows": data["rows"], "districts": data["districts"]},
+                             headers=CORS_HEADERS)
+
+
 def _opt(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
@@ -612,6 +682,8 @@ def setup(app):
         ("/api/owner/stock/status",    handle_status,    "GET"),
         ("/api/owner/stock/result",    handle_result,    "GET"),
         ("/api/owner/stock/order",     handle_order,     "GET"),
+        ("/api/owner/stock/order/edit",  handle_order_edit,  "POST"),
+        ("/api/owner/stock/order/reset", handle_order_reset, "POST"),
         ("/api/owner/stock/transfers", handle_transfers, "GET"),
         ("/api/owner/stock/audits",    handle_audits,    "GET"),
         ("/api/owner/stock/count",     handle_save,      "POST"),

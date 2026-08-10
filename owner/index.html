@@ -386,6 +386,9 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   background:var(--card);color:var(--muted);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer}
 .stk-all.on{color:var(--gold2);border-color:rgba(201,169,110,.4);background:var(--gold-soft)}
 .stk-mid{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 14px calc(24px + var(--safe-bottom))}
+/* Колонка, чтобы липкая кнопка внизу знала, к чему прижиматься. */
+.stk-mid{display:flex;flex-direction:column}
+.stk-mid > *{flex-shrink:0}
 
 /* дата прямо на карточке: свайпом листают именно её, и подпись должна быть
    там же, где палец, а не в шапке страницы */
@@ -749,6 +752,72 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    смотрят. */
 .acc-s{font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.35;min-height:2.7em;
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+/* ── Заявка на закупку ──────────────────────────────────────────────────────
+   Список, в котором каждое число можно переспорить. Свёрнутая строка отвечает
+   «что и сколько», раскрытая — «сколько и куда»: правят именно точку, потому
+   что развозить по точкам. */
+.ord-sum{display:flex;align-items:center;gap:14px;padding:16px 18px;border-radius:16px;
+  background:linear-gradient(160deg,rgba(201,169,110,.07),transparent 60%),var(--card);
+  border:1px solid var(--border2)}
+.ord-sum-l{display:flex;align-items:baseline;gap:9px;min-width:0}
+.ord-sum-v{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;
+  letter-spacing:-.8px;color:var(--gold2);font-variant-numeric:tabular-nums}
+.ord-sum-u{font-size:10px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;
+  color:var(--muted);line-height:1.25}
+.ord-sum-r{margin-left:auto;display:flex;flex-direction:column;gap:4px;text-align:right}
+.ord-sum-r span{font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.ord-sum-r b{display:block;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;
+  color:var(--text);letter-spacing:-.2px;font-variant-numeric:tabular-nums;margin-top:1px}
+.ord-edited{display:flex;align-items:center;gap:8px;width:100%;margin-top:8px;padding:9px 13px;
+  border-radius:11px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11.5px;font-weight:600;
+  color:var(--gold2);background:rgba(201,169,110,.09);border:1px solid rgba(201,169,110,.24)}
+.ord-edited i{margin-left:auto;font-style:normal;color:var(--muted);font-size:11px}
+
+.ord-find{position:relative;display:flex;align-items:center;margin:12px 0 4px}
+.ord-find svg{position:absolute;left:12px;width:15px;height:15px;fill:none;stroke:var(--muted);
+  stroke-width:1.9;stroke-linecap:round;pointer-events:none}
+.ord-find input{width:100%;padding:11px 34px;border-radius:12px;background:var(--card);
+  border:1px solid var(--border2);color:var(--text);font-family:'DM Sans',sans-serif;
+  font-size:13px;outline:none;-webkit-appearance:none}
+.ord-find input:focus{border-color:var(--border3)}
+.ord-find-x{position:absolute;right:6px;width:26px;height:26px;border:0;border-radius:8px;
+  background:none;color:var(--muted);font-size:13px;cursor:pointer}
+
+.ord-r{margin-bottom:6px;border-radius:12px;background:var(--card);
+  border:1px solid var(--border2);overflow:hidden}
+.ord-r.fixed{border-color:rgba(201,169,110,.32)}
+.ord-r-h{display:flex;align-items:center;gap:10px;width:100%;padding:12px 13px;
+  border:0;background:none;color:var(--text);font-family:inherit;cursor:pointer;text-align:left}
+.ord-r-h:active{background:var(--card2)}
+.ord-r-n{flex:1;min-width:0;font-size:13px;font-weight:600;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.ord-r-d{font-size:11px;color:var(--muted);white-space:nowrap}
+.ord-r-v{font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;
+  font-variant-numeric:tabular-nums;min-width:34px;text-align:right}
+.ord-r-v.gold{color:var(--gold2)}
+.ord-r-go{width:12px;text-align:center;color:var(--muted);font-size:14px;flex-shrink:0}
+.ord-r-b{padding:2px 13px 12px;border-top:1px solid var(--border2)}
+.ord-c{display:flex;align-items:center;gap:10px;padding:9px 0}
+.ord-c + .ord-c{border-top:1px solid rgba(255,255,255,.04)}
+.ord-c-n{flex:1;min-width:0;font-size:12px;color:var(--sub);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.ord-c-n b{color:var(--gold2);font-weight:700;margin-right:4px}
+.ord-c-calc{font-size:10px;color:var(--muted);white-space:nowrap}
+/* Счётчик крупный: по нему тычут пальцем на ходу, стоя у полки. */
+.ord-st{display:flex;align-items:center;gap:2px;flex-shrink:0}
+.ord-st button{width:32px;height:32px;border-radius:9px;border:1px solid var(--border3);
+  background:var(--card2);color:var(--text);font-size:17px;font-weight:600;cursor:pointer;
+  display:flex;align-items:center;justify-content:center}
+.ord-st button:active{background:var(--card)}
+.ord-st input{width:46px;height:32px;text-align:center;border:0;background:none;
+  color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;
+  font-variant-numeric:tabular-nums;outline:none;-webkit-appearance:none}
+.ord-st input.fixed{color:var(--gold2)}
+.ord-reset{width:100%;margin-top:10px;padding:10px;border-radius:10px;cursor:pointer;
+  font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--muted);
+  background:var(--card2);border:1px solid var(--border2)}
+.ord-reset:active{color:var(--text)}
+
 .acc-line{display:flex;align-items:center;gap:10px;padding:11px 13px;margin-bottom:6px;
   border-radius:11px;background:var(--card);border:1px solid var(--border2)}
 .acc-line-n{flex:1;min-width:0;font-size:13px;font-weight:600;overflow:hidden;
@@ -5585,40 +5654,203 @@ async function accExpPeriod(){
       }).join('') : ''}`;
 }
 
+// ─── Заявка на закупку ──────────────────────────────────────────────────────
+// Расчёт по норме — предложение, а не приговор: владелец видит полку своими
+// глазами и знает то, чего не знает программа. Поэтому любое число правится
+// руками, правка отмечается, а рядом остаётся то, что считала программа —
+// иначе через день не вспомнить, от чего отступили и зачем.
+//
+// Правится клетка «позиция × точка», а не итог: развозить всё равно по точкам,
+// и «дай на десять меньше» без указания, где именно меньше, заявкой не станет.
+let ORD = {d:null, open:null, q:'', onlyEdited:false, busy:false};
+
 async function accOrder(){
   _setText('accTitle', 'Заявка на закупку');
+  _setText('accSub', 'загрузка…');
+  document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
   let d;
   try{ d = await ownerApi.ownerFetch('/api/owner/stock/order'); }
   catch(e){ document.getElementById('accMid').innerHTML =
     '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
   ACC_ORDER = d;
+  ORD = {d, open:null, q:'', onlyEdited:false, busy:false};
   _setText('accSub', `${d.day} · норма на ${d.cover_days} ${pluralize(d.cover_days,'день','дня','дней')}`);
+  ordRender();
+}
+
+// Строки, которые сейчас показываем. По умолчанию — только то, что надо
+// довезти; поиск открывает весь каталог, потому что дозаказать можно и то,
+// чего расчёт не просил.
+function ordList(){
+  const d = ORD.d || {};
+  const all = d.all_rows || d.rows || [];
+  const q = ORD.q.trim().toLowerCase();
+  let list = q ? all.filter(r => r.name.toLowerCase().includes(q))
+               : all.filter(r => r.need_total > 0 || r.edited);
+  if(ORD.onlyEdited) list = list.filter(r => r.edited);
+  return list;
+}
+
+function ordRender(){
+  const d = ORD.d; if(!d) return;
   const dist = d.districts || [];
+  const list = ordList();
+  const ed = d.edited_count || 0;
   document.getElementById('accMid').innerHTML = `
-    <div class="exp-sum">
-      <div class="exp-tot">
-        <span class="exp-tot-v">${fmt(d.total_qty)}</span>
-        <span class="exp-tot-u">штук<br>довезти</span>
-        <span class="exp-tot-r">
-          <span>на сумму<b>${fmt(d.total_aed)}</b></span>
-          ${d.frozen_aed ? `<span>сверх спроса<b style="color:var(--warn)">${fmt(d.frozen_aed)}</b></span>` : ''}
-        </span>
+    <div class="ord-sum">
+      <div class="ord-sum-l">
+        <span class="ord-sum-v" id="ordQty">${fmt(d.total_qty)}</span>
+        <span class="ord-sum-u">штук<br>довезти</span>
+      </div>
+      <div class="ord-sum-r">
+        <span>на сумму<b id="ordAed">${fmt(d.total_aed)}</b></span>
+        <span>позиций<b id="ordCnt">${(d.rows||[]).length}</b></span>
       </div>
     </div>
+    ${ed ? `<button class="ord-edited" onclick="ordToggleEdited()">
+        ${ORD.onlyEdited ? 'показать всё' : `правок вручную · ${ed}`}
+        <i>${ORD.onlyEdited ? '' : 'смотреть'}</i></button>` : ''}
     ${d.frozen_aed ? `<div class="stk-note" style="margin-top:10px">
       <b>${fmt(d.frozen_aed)} AED стоят на полке сверх спроса.</b> Норма где-то выше,
       чем реально берут за последние ${d.window_days} дней — эти деньги просто лежат.
       </div>` : ''}
-    ${d.rows.length ? `<div class="exp-grp">Что довезти · ${d.rows.length}</div>` +
-      d.rows.map(r => `<div class="acc-line">
-        <span class="acc-line-n">${escS(r.name)}</span>
-        <span class="acc-line-s">${dist.map(x => {
-            const cell = r.cells[x.id] || {};
-            return cell.need ? `${x.code}·${cell.need}` : '';
-          }).filter(Boolean).join(' ')}</span>
-        <span class="acc-line-v">${r.need_total}</span>
-      </div>`).join('')
-    : '<div class="exp-empty">Довозить нечего — остатков хватает</div>'}`;
+
+    <div class="ord-find">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="ordQ" type="search" placeholder="Найти позицию — можно любую из каталога"
+             value="${escS(ORD.q)}" oninput="ordSearch(this.value)">
+      ${ORD.q ? `<button class="ord-find-x" onclick="ordSearch('')" aria-label="Очистить">✕</button>` : ''}
+    </div>
+
+    <div class="exp-grp">${ORD.q ? `Найдено · ${list.length}`
+                                 : `Что довезти · ${list.length}`}</div>
+    <div id="ordRows">${list.length ? list.map(r => ordRow(r, dist)).join('')
+      : '<div class="exp-empty">' + (ORD.q ? 'Ничего не нашлось'
+          : 'Довозить нечего — остатков хватает') + '</div>'}</div>
+
+    <div class="qb-wrap">
+      <button class="qb" id="ordSend" onclick="ordSend()">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+        Прислать файл в телеграм
+      </button>
+    </div>`;
+}
+
+// Строка позиции. Свёрнутая — что и сколько; раскрытая — по точкам, каждая
+// со своим счётчиком, потому что править приходится именно точку.
+function ordRow(r, dist){
+  const open = ORD.open === r.id;
+  const cells = dist.map(x => ({x, c: r.cells[x.id] || {}}));
+  return `<div class="ord-r${open ? ' open' : ''}${r.edited ? ' fixed' : ''}" data-id="${r.id}">
+    <button class="ord-r-h" onclick="ordOpen('${r.id}')">
+      <span class="ord-r-n">${escS(r.name)}</span>
+      <span class="ord-r-d">${cells.filter(o => o.c.need)
+          .map(o => `${o.x.code}·${o.c.need}`).join(' ') || 'не нужно'}</span>
+      <span class="ord-r-v${r.edited ? ' gold' : ''}">${r.need_total}</span>
+      <span class="ord-r-go">${open ? '⌄' : '›'}</span>
+    </button>
+    ${open ? `<div class="ord-r-b">
+      ${cells.map(o => `<div class="ord-c">
+        <span class="ord-c-n"><b>${o.x.code}</b> ${escS(o.x.name)}</span>
+        <span class="ord-c-calc">${o.c.edited ? `расчёт ${o.c.calc}` : `на полке ${o.c.have||0}`}</span>
+        <span class="ord-st">
+          <button onclick="ordStep('${r.id}','${o.x.id}',-1)" aria-label="Меньше">−</button>
+          <input inputmode="numeric" value="${o.c.need||0}"
+                 onchange="ordSet('${r.id}','${o.x.id}',this.value)"
+                 class="${o.c.edited ? 'fixed' : ''}">
+          <button onclick="ordStep('${r.id}','${o.x.id}',1)" aria-label="Больше">+</button>
+        </span>
+      </div>`).join('')}
+      ${r.edited ? `<button class="ord-reset" onclick="ordReset('${r.id}')">
+        Вернуть расчёт · ${r.calc_total}</button>` : ''}
+    </div>` : ''}
+  </div>`;
+}
+
+function ordSearch(v){
+  ORD.q = v || '';
+  ordRender();
+  if(ORD.q){ const i = document.getElementById('ordQ'); if(i){ i.focus(); i.selectionStart = i.value.length; } }
+}
+function ordToggleEdited(){ ORD.onlyEdited = !ORD.onlyEdited; ordRender(); }
+function ordOpen(id){
+  ORD.open = ORD.open === id ? null : id;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  ordRender();
+}
+
+function _ordRow(id){ return (ORD.d.all_rows || []).find(r => r.id === id); }
+
+function ordStep(id, district, delta){
+  const r = _ordRow(id); if(!r) return;
+  const c = r.cells[district] || {};
+  ordSet(id, district, Math.max(0, (c.need || 0) + delta));
+}
+
+// Правка уходит на сервер сразу: заявка — не форма с кнопкой «сохранить», её
+// правят по одному числу и в любой момент могут закрыть экран.
+async function ordSet(id, district, qty){
+  if(ORD.busy) return;
+  const v = String(qty).trim();
+  ORD.busy = true;
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/stock/order/edit', {method:'POST',
+      body:{day: ORD.d.day, id, district, qty: v === '' ? null : v}});
+    ordApply(res);
+    try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  }catch(e){
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('error'); }catch(e2){}
+  }finally{ ORD.busy = false; }
+}
+
+async function ordReset(id){
+  if(ORD.busy) return;
+  ORD.busy = true;
+  try{
+    await ownerApi.ownerFetch('/api/owner/stock/order/reset', {method:'POST',
+      body:{day: ORD.d.day, id}});
+    const d = await ownerApi.ownerFetch('/api/owner/stock/order');
+    ORD.d = d; ACC_ORDER = d; ordRender();
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  }catch(e){}
+  finally{ ORD.busy = false; }
+}
+
+// Ответ правки несёт всю строку и новые итоги — перечитывать заявку целиком
+// ради одного числа незачем, на плохой связи это секунда на каждый шаг.
+function ordApply(res){
+  if(!res || !res.row) return;
+  const d = ORD.d;
+  const put = arr => { const i = (arr||[]).findIndex(r => r.id === res.row.id);
+                       if(i >= 0) arr[i] = res.row; };
+  put(d.all_rows);
+  const i = (d.rows || []).findIndex(r => r.id === res.row.id);
+  if(res.row.need_total > 0){ if(i >= 0) d.rows[i] = res.row; else d.rows.push(res.row); }
+  else if(i >= 0) d.rows.splice(i, 1);
+  d.total_qty = res.total_qty; d.total_aed = res.total_aed;
+  d.edited_count = res.edited_count;
+  ACC_ORDER = d;
+  ordRender();
+}
+
+// Файл уходит в телеграм владельцу: скачивать его в мини-приложении некуда, а
+// переслать документ из своего же чата магазину — одно движение.
+async function ordSend(){
+  const b = document.getElementById('ordSend'); if(!b || b.disabled) return;
+  const html = b.innerHTML;
+  b.disabled = true; b.innerHTML = 'Собираю файл…';
+  try{
+    await ownerApi.ownerFetch('/api/owner/supply/send', {method:'POST', body:{day: ORD.d.day}});
+    b.innerHTML = 'Готово — файл в чате с ботом';
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    setTimeout(()=>{ b.innerHTML = html; b.disabled = false; }, 2600);
+  }catch(e){
+    b.innerHTML = 'Не отправилось — попробуйте ещё раз';
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('error'); }catch(e2){}
+    setTimeout(()=>{ b.innerHTML = html; b.disabled = false; }, 2600);
+  }
 }
 
 // ─── Звук сканера ───────────────────────────────────────────────────────────

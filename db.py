@@ -1606,6 +1606,39 @@ async def zayavka_last() -> dict:
     return (doc or {}).get("asked") or {}
 
 
+# ── Ручные правки заявки ────────────────────────────────────────────────────
+# Расчёт по норме — предложение, а не приговор: владелец видит полку своими
+# глазами и знает, что через два дня свадьба, а по этой позиции магазин тянет.
+# Правка живёт отдельно от расчёта, поэтому её всегда можно снять и вернуться
+# к тому, что посчитала программа.
+async def zayavka_edit_set(day: str, pid: str, district: str, qty):
+    db = _db_or_none()
+    if db is None: return
+    key = f"by.{pid}.{district}"
+    if qty is None:
+        await db.zayavka_edits.update_one({"_id": day}, {"$unset": {key: ""}}, upsert=True)
+    else:
+        await db.zayavka_edits.update_one(
+            {"_id": day}, {"$set": {key: int(qty), "at": datetime.now(timezone.utc)}},
+            upsert=True)
+
+
+async def zayavka_edit_clear(day: str, pid: str = None):
+    db = _db_or_none()
+    if db is None: return
+    if pid:
+        await db.zayavka_edits.update_one({"_id": day}, {"$unset": {f"by.{pid}": ""}})
+    else:
+        await db.zayavka_edits.delete_one({"_id": day})
+
+
+async def zayavka_edits(day: str) -> dict:
+    db = _db_or_none()
+    if db is None: return {}
+    doc = await db.zayavka_edits.find_one({"_id": day})
+    return (doc or {}).get("by") or {}
+
+
 # ── Поставки: заявка ушла в магазин, вернулась и стала списком на забор ─────
 async def supply_save(doc: dict):
     db = _db_or_none()

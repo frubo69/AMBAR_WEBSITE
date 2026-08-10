@@ -62,6 +62,51 @@ async def _order_rows(day):
 
 @require_owner
 async def handle_export(request):
+    """Заявка файлом по ссылке — для браузера."""
+    raw, name = await _build_book((request.query.get("day") or "").strip())
+    return web.Response(
+        body=raw,
+        headers={**CORS_HEADERS,
+                 "Content-Type": "application/vnd.openxmlformats-officedocument."
+                                 "spreadsheetml.sheet",
+                 "Content-Disposition": f'attachment; filename="{name}"'})
+
+
+@require_owner
+async def handle_send(request):
+    """Прислать заявку файлом в телеграм — так её и отправляют дальше.
+
+    В мини-приложении скачать файл некуда: браузера у него нет, а «загрузки» на
+    телефоне ещё поискать. Зато переслать документ из своего же чата магазину —
+    одно движение, поэтому бот кладёт файл владельцу в переписку."""
+    from api_server import _aiohttp
+    from owner_routes import OWNER_BOT_TOKEN
+    if not OWNER_BOT_TOKEN:
+        return web.json_response({"error": "no_bot"}, status=500, headers=CORS_HEADERS)
+    raw, name = await _build_book((request.query.get("day") or "").strip())
+    form = _aiohttp.FormData()
+    form.add_field("chat_id", str(request.get("owner_id") or 0))
+    form.add_field("caption", f"Заявка в магазин · {name[15:-5]}")
+    form.add_field("document", raw, filename=name,
+                   content_type="application/vnd.openxmlformats-officedocument."
+                                "spreadsheetml.sheet")
+    url = f"https://api.telegram.org/bot{OWNER_BOT_TOKEN}/sendDocument"
+    to = _aiohttp.ClientTimeout(total=30)
+    try:
+        async with _aiohttp.ClientSession(timeout=to) as sess:
+            async with sess.post(url, data=form) as r:
+                res = await r.json()
+    except Exception as e:
+        log.error(f"[supply] отправка файла: {e}")
+        return web.json_response({"error": "send_failed"}, status=502, headers=CORS_HEADERS)
+    if not res.get("ok"):
+        log.error(f"[supply] телеграм отказал: {res.get('description')}")
+        return web.json_response({"error": "telegram", "detail": res.get("description")},
+                                 status=502, headers=CORS_HEADERS)
+    return web.json_response({"ok": True, "file": name}, headers=CORS_HEADERS)
+
+
+async def _build_book(day: str):
     """Заявка в .xlsx — тот файл, который уходит в магазин.
 
     Вид листа задан владельцем: он один раз разложил его так, как удобно
@@ -83,7 +128,6 @@ async def handle_export(request):
     from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from openpyxl.utils import get_column_letter
 
-    day = (request.query.get("day") or "").strip()
     data = await _order_rows(day)
     # Порядок как в их таблице: заявку собирают, идя вдоль полок, и список,
     # отсортированный по количеству, заставляет бегать по залу кругами.
@@ -197,12 +241,7 @@ async def handle_export(request):
     name = f"AMBAR-zayavka-{data['day']}.xlsx"
     log.info(f"[supply] выгрузка заявки {data['day']}: {len(rows)} позиций, "
              f"из них с потребностью {sum(1 for r in rows if r['need_total'])}")
-    return web.Response(
-        body=buf.read(),
-        headers={**CORS_HEADERS,
-                 "Content-Type": "application/vnd.openxmlformats-officedocument."
-                                 "spreadsheetml.sheet",
-                 "Content-Disposition": f'attachment; filename="{name}"'})
+    return buf.read(), name
 
 
 def _num(v):
@@ -352,6 +391,8 @@ def setup(app):
     r = app.router
     r.add_route("OPTIONS", "/api/owner/supply/export", _opt)
     r.add_get("/api/owner/supply/export", handle_export)
+    r.add_route("OPTIONS", "/api/owner/supply/send", _opt)
+    r.add_post("/api/owner/supply/send", handle_send)
     r.add_route("OPTIONS", "/api/owner/supply/import", _opt)
     r.add_post("/api/owner/supply/import", handle_import)
     r.add_route("OPTIONS", "/api/owner/supply", _opt)

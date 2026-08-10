@@ -1209,7 +1209,6 @@ def _tips_by_driver(pairs) -> tuple:
     return total, bottles, by_driver
 
 
-@require_owner
 async def _staff_fresh():
     """Подтянуть перестановку районов перед тем, как считать по людям.
 

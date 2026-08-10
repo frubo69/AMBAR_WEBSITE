@@ -38,7 +38,7 @@ log = logging.getLogger("operator_pos")
 OPERATOR_BOT_TOKEN = os.getenv("OPERATOR_BOT_TOKEN", "")
 OPERATOR_IDS = [int(x.strip()) for x in os.getenv("OPERATOR_IDS", "").split(",") if x.strip().isdigit()]
 
-from config_offices import OFFICE_NAMES   # офис ≡ район, единый источник правды
+from config_offices import OFFICE_NAMES, OFFICE_CODES   # офис ≡ район, единый источник правды
 
 # Dispatch structure: район → who takes the calls → who drives it.
 # The POS flow is operator → район (his own) → driver (that район's).
@@ -56,6 +56,9 @@ def _districts() -> list:
     не при следующем перезапуске службы."""
     return [
         {"id": s["district"], "name": OFFICE_NAMES.get(s["district"], s["district"]),
+         # Код района отдаём с сервера. Панель считала его по месту в списке, и
+         # у оператора с двумя районами Тиком становился B2 вместо B5.
+         "code": OFFICE_CODES.get(s["district"], ""),
          "operator": s["operator"], "drivers": list(s["drivers"])}
         for s in DISTRICT_STAFF
     ]

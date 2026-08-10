@@ -544,11 +544,11 @@ let ORDERS=[], showOrders=false, editingOid=null, _pollT=null, _pendingBeer=null
 // FALLBACK_DISTRICTS keeps the pickers usable if the API is older than this file
 // (server /ping didn't return districts yet) — server list always wins.
 const FALLBACK_DISTRICTS=[
-  {id:'jvc',     name:'JVC',        operator:'Умар',      drivers:['Худоба','Фарух']},
-  {id:'tecom',   name:'Тиком',      operator:'Умар',      drivers:['Файзуло','Алишер']},
-  {id:'bbay',    name:'Бизнес Бей', operator:'Джанабиль', drivers:['Парвиз','Авазбек','Бахадыр']},
-  {id:'silicon', name:'Силикон',    operator:'Фарух',     drivers:['Фаредун','Азиз']},
-  {id:'alguses', name:'Алгусес',    operator:'Фарух',     drivers:['Сунат','Даврон']},
+  {id:'jvc',     code:'B1', name:'JVC',        operator:'Умар',      drivers:['Худоба','Фарух']},
+  {id:'bbay',    code:'B2', name:'Бизнес Бей', operator:'Джанабиль', drivers:['Парвиз','Авазбек','Бахадыр']},
+  {id:'silicon', code:'B3', name:'Силикон',    operator:'Фарух',     drivers:['Фаредун','Азиз']},
+  {id:'alguses', code:'B4', name:'Алгусес',    operator:'Фарух',     drivers:['Сунат','Даврон']},
+  {id:'tecom',   code:'B5', name:'Тиком',      operator:'Умар',      drivers:['Файзуло','Алишер']},
 ];
 let DISTRICTS=[], curOp='', curDist='', curDriver='';
 // Кто может встать за планшет и что каждый видит. Планшет общий, аккаунт у
@@ -964,8 +964,8 @@ function _age(ts){
 }
 function _distName(id){ const d=(Q.districts||[]).find(x=>x.id===id); return d ? d.name : ''; }
 function _distCode(id){
-  const i=(Q.districts||[]).findIndex(x=>x.id===id);
-  return i<0 ? '' : 'B'+(i+1);
+  const d=(Q.districts||[]).find(x=>x.id===id);
+  return d ? (d.code||'') : '';
 }
 
 function renderQueue(){

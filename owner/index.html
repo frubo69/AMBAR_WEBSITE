@@ -312,7 +312,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 
 
 /* Панель районов: сводка сверху, чипы сортировки, код B1…B5 на карточке. */
-.off-tot{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-top:2px}
+.off-tot{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:2px}
 .off-tot-c{background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:10px 10px;min-width:0}
 .off-tot-l{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -538,6 +538,19 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .stk-pick-s{font-size:11.5px;color:var(--muted);margin-top:2px}
 
 /* ── карточки районов ─────────────────────────────────────────────────── */
+/* Свёрнутая карточка выручки на странице районов. Ровно то состояние, в
+   которое приходит карточка «Обзора» после прокрутки, только сразу и навсегда:
+   тут разворачивать нечего — сравнения и график живут на «Обзоре». */
+.ohero{position:sticky;top:var(--hero-top,124px);z-index:30;height:78px;
+  display:flex;align-items:center;gap:8px;padding:0 20px;
+  border-radius:var(--r);margin-bottom:10px;
+  background:
+    radial-gradient(ellipse 90% 60% at 15% 0%, rgba(201,169,110,.18), transparent 60%),
+    linear-gradient(180deg,#161629 0%, #0F0F20 100%);
+  border:1px solid var(--border);overflow:hidden;
+  box-shadow:0 8px 22px rgba(0,0,0,.45)}
+.ohero .hero-amt{font-size:26px}
+.ohero .day-nav{margin-left:auto;position:static}
 .off-card{position:relative;background:var(--card);border:1px solid var(--border2);border-radius:var(--r);
   padding:15px 16px 14px;overflow:hidden;transition:.16s var(--e1)}
 .off-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--tone);opacity:.85}
@@ -1495,30 +1508,31 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
   <div class="range-chip" id="rangeChip-officePeriod" style="display:none"><span class="rc-icon">📅</span><span class="rc-text"></span><button class="rc-x" onclick="clearRange('officePeriod')">✕</button></div>
 
-  <!-- Пересчёт склада. Стоит первым на странице районов: это ежедневное
-       действие, а не отчёт, и открывать его надо в один тап. -->
-  <button class="stk-entry" id="stkEntry" onclick="openStock()">
-    <span class="stk-e-ico">
-      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
-           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>
-      </svg>
+  <!-- Выручка дня — сразу в том виде, в каком она остаётся на «Обзоре» после
+       прокрутки: число и стрелки на одном уровне. Здесь она такой и рождается,
+       разворачивать нечего — на странице районов нужен не разбор выручки, а
+       ориентир, от которого читаются пять карточек. Прилипает под
+       переключателем периода, чтобы листать дни с любого места списка.
+       Вход в пересчёт склада переехал отсюда в «Учёт»: это ежедневное
+       действие, но не то, ради чего открывают районы. -->
+  <div class="ohero" id="offHero" data-detail="kpi:revenue">
+    <span class="hero-amt mono" id="offHeroRev" data-aed="">—</span><span class="hero-unit cur-unit">AED</span>
+    <span class="day-nav" id="offHeroNav">
+      <button class="dn-b" aria-label="Предыдущий день"
+        onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayStep(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <button class="dn-d" id="odnDate" disabled aria-label="Дата дня"
+        onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayReset()"><span class="dn-num" id="odnDateNum">—</span><span class="dn-rel" id="odnDateTxt"></span></button>
+      <button class="dn-b" id="odnNext" aria-label="Следующий день" disabled
+        onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayStep(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
     </span>
-    <span class="stk-e-body">
-      <span class="stk-e-t">Пересчёт склада</span>
-      <span class="stk-e-s" id="stkEntrySub">проверьте остатки за смену</span>
-    </span>
-    <span class="stk-e-dots" id="stkEntryDots"></span>
-    <span class="stk-e-go">›</span>
-  </button>
+  </div>
 
   <!-- Итог по всем районам: без него карточки — просто пять чисел, не с чем
        сравнить и не видно, складываются ли они в то, что на «Обзоре». -->
   <div class="off-tot" id="offTotals" style="display:none">
-    <div class="off-tot-c"><div class="off-tot-l">Выручка</div><div class="off-tot-v" id="offTotRev" data-aed="">—</div></div>
     <div class="off-tot-c"><div class="off-tot-l">Заказы</div><div class="off-tot-v" id="offTotOrd">—</div></div>
     <div class="off-tot-c"><div class="off-tot-l">Ср. чек</div><div class="off-tot-v" id="offTotAvg" data-aed="">—</div></div>
-    <div class="off-tot-c"><div class="off-tot-l">Время</div><div class="off-tot-v" id="offTotMin">—</div></div>
+    <div class="off-tot-c"><div class="off-tot-l">Ср. время</div><div class="off-tot-v" id="offTotMin">—</div></div>
   </div>
 
 
@@ -3339,8 +3353,16 @@ document.querySelectorAll('.tb').forEach(btn=>{
   const F_FULL = 44, F_MIN = 26;           // размер числа
 
   const place = () => {
-    hero.style.setProperty('--hero-top',
-      Math.round(pbar.getBoundingClientRect().bottom + 8) + 'px');
+    // Считаем по видимому переключателю, а не по первому в разметке: у каждой
+    // страницы он свой, скрытая отдаёт нули, и высота прилипания уезжала под
+    // самый верх экрана, стоило уйти с «Обзора».
+    const bottoms = [...document.querySelectorAll('.period-bar')]
+      .map(e => e.getBoundingClientRect().bottom).filter(v => v > 0);
+    if(!bottoms.length) return;
+    // На корне, а не на самой карточке: под тем же переключателем прилипает и
+    // свёрнутая карточка на странице районов, а высота у них общая.
+    document.documentElement.style.setProperty('--hero-top',
+      Math.round(Math.max(...bottoms) + 8) + 'px');
   };
 
   // Момент прилипания не вычисляем, а ловим по факту: арифметика по отступам
@@ -3422,6 +3444,7 @@ document.querySelectorAll('.tb').forEach(btn=>{
 
   const init = () => { reset(); apply(); };
   place(); init();
+  window.HERO_PLACE = place;
   window.addEventListener('scroll', onScroll, {passive:true});
   window.addEventListener('resize', () => { place(); init(); });
   if(window.visualViewport) visualViewport.addEventListener('resize', place);
@@ -3846,6 +3869,16 @@ function _syncOffDayNav(p, w){
   const nav = document.getElementById('offDayNav');
   if(nav) nav.style.display = (_dayNavOn(p) && DAY_OFFSET > 0) ? 'flex' : 'none';
   const nx = document.getElementById('offDnNext'); if(nx) nx.disabled = DAY_OFFSET <= 0;
+  // Те же стрелки на прилипшей карточке выручки. Для недели, месяца и года
+  // листать нечего — тогда остаётся только число.
+  const hn = document.getElementById('offHeroNav');
+  if(hn) hn.style.display = _dayNavOn(p) ? 'flex' : 'none';
+  _setText('odnDateNum', lbl.top);
+  _setText('odnDateTxt', lbl.sub);
+  const osub = document.getElementById('odnDateTxt');
+  if(osub) osub.style.display = lbl.sub ? '' : 'none';
+  const od = document.getElementById('odnDate'); if(od) od.disabled = DAY_OFFSET <= 0;
+  const on = document.getElementById('odnNext'); if(on) on.disabled = DAY_OFFSET <= 0;
   // Подписи на карточках нарисованы раньше, чем пришёл ответ — обновляем их
   // на месте, не перерисовывая список.
   document.querySelectorAll('#offCards .off-day').forEach(e => { e.textContent = _OFF_DAY_LBL; });
@@ -4359,7 +4392,7 @@ function openStock(){
 }
 function closeStock(){
   document.getElementById('stkOv').classList.remove('show');
-  stkRefreshEntry();
+  accLoadSummaries();              // плитка «Пересчёт склада» в «Учёте» — с новыми цифрами
 }
 // Крестик уводит на шаг назад, а не сразу из экрана: из списка — к районам,
 // из списка районов — наружу.
@@ -5164,22 +5197,9 @@ function stkResult(res){
     </div></div>`;
 }
 
-// Плашка на странице районов: сколько сделано и на сколько разошлось.
-async function stkRefreshEntry(){
-  const sub = document.getElementById('stkEntrySub');
-  const dots = document.getElementById('stkEntryDots');
-  if(!sub || !window.ownerApi) return;
-  try{
-    const st = await ownerApi.ownerFetch('/api/owner/stock/status');
-    dots.innerHTML = st.districts.map(d =>
-      `<span class="stk-d ${d.done ? (d.short_aed ? 'bad' : 'ok') : ''}">${escS(d.code)}</span>`).join('');
-    sub.textContent = st.done === st.total
-      ? (st.short_aed ? `все районы · не хватает ${fmt(st.short_aed)} AED` : 'все районы сошлись')
-      : `${st.done} из ${st.total} районов · проверьте остатки`;
-  }catch(e){ /* молча: плашка не должна ломать страницу */ }
-}
-
-
+// Плашка со сводкой пересчёта жила на странице районов, где её место занял
+// прилипший счётчик выручки. Сама сводка не потерялась: её показывает плитка
+// «Пересчёт склада» в «Учёте», и живёт она там же, где остальные такие плитки.
 
 // ─── Панель учёта ───────────────────────────────────────────────────────────
 // Одна страница со всем сразу превращается в простыню: чтобы отметить водителя,
@@ -6441,7 +6461,6 @@ function _expReplace(row){
 
 function renderOffices(rows){
   OFF_LAST = rows;
-  stkRefreshEntry();                       // чтобы смена сортировки перерисовала то же
   const box = document.getElementById('offCards');
   const speed = document.getElementById('offSpeed');
   const sub = document.getElementById('offSub');
@@ -6467,7 +6486,7 @@ function renderOffices(rows){
     const dl  = list.reduce((a,r)=>a+(r.delivered||0),0);
     const mins = live.filter(r=>r.avg_sample);
     tot.style.display = 'grid';
-    _setAed('offTotRev', total);
+    _setAed('offHeroRev', total);
     _setText('offTotOrd', ord);
     _setAed('offTotAvg', dl ? Math.round(total/dl) : 0);
     _setText('offTotMin', mins.length
@@ -9782,7 +9801,13 @@ function navTo(pg){
   // re-measure any sliding pills on the freshly visible page.
   // Hidden pages report offsetWidth=0, so wait until browser lays out the now-visible page.
   if(pgEl){
-    setTimeout(()=> pgEl.querySelectorAll('.periods').forEach(movePill), 60);
+    setTimeout(()=>{
+      pgEl.querySelectorAll('.periods').forEach(movePill);
+      // Переключатель периода у каждой страницы свой, и померить его можно
+      // только когда страница показана: отсюда и высота, на которой прилипают
+      // карточки выручки.
+      if(typeof HERO_PLACE === 'function') HERO_PLACE();
+    }, 60);
   }
 }
 

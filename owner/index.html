@@ -211,6 +211,8 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Полностью сжатое состояние центрируем правилами, а не расчётом: на разных
    телефонах свои шрифт и высота строки, и вычисленные смещения оставляли
    число и стрелки на разных уровнях. */
+/* Без стрелок дня правый край свободен — валовая и чаевые занимают его сами. */
+.hero.nonav.tight .hero-amt-row{right:20px}
 .hero.tight .hero-amt-row{position:absolute;left:20px;right:150px;top:50%;
   transform:translateY(-50%)!important;margin:0}
 .hero.tight .day-nav{top:50%;transform:translateY(-50%)!important}
@@ -249,7 +251,12 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    этой проблемы вовсе — карточка уезжает как обычно. */
 
 
-.hero.day-drag{transition:none}
+.hero.day-drag,.ohero.day-drag{transition:none}
+.ohero.day-move{transition:transform .15s cubic-bezier(.3,0,.2,1)}
+.ohero.day-back{transition:transform .2s cubic-bezier(.2,.8,.3,1)}
+.ohero.day-busy .hero-amt{opacity:.45;transition:opacity .15s}
+/* Горизонтальный жест по карточке — наш; вертикальную прокрутку не отбираем. */
+.ohero,.ohero[data-detail]{touch-action:pan-y}
 #offCards.day-drag{transition:none}
 #offCards.day-back{transition:transform .2s cubic-bezier(.2,.8,.3,1)}
 .hero.day-move{transition:transform .15s cubic-bezier(.3,0,.2,1)}
@@ -3554,7 +3561,8 @@ try{
     // середине пути на экране остаётся только число и стрелки.
     const fade = Math.max(0, 1 - p * 2);
     if(lbl)   lbl.style.opacity = fade;
-    if(side)  side.style.opacity = fade;
+    // Валовая и чаевые гаснут только там, где на их место встают стрелки дня.
+    if(side)  side.style.opacity = hero.classList.contains('nonav') ? 1 : fade;
     if(spark){ spark.style.opacity = fade; spark.style.transform = `translateY(${18*p}px)`; }
     if(row)   row.style.opacity = fade;
 
@@ -3979,6 +3987,9 @@ function _dayLabel(w){
 function _syncDayNav(p, w){
   const nav = document.getElementById('dayNav');
   if(nav) nav.style.display = _dayNavOn(p) ? 'flex' : 'none';
+  const hero0 = document.querySelector('#pg-overview .hero');
+  if(hero0) hero0.classList.toggle('nonav', !_dayNavOn(p));
+  if(typeof HERO_APPLY === 'function') HERO_APPLY();
   _syncOffDayNav(p, w);
   const nx = document.getElementById('dnNext'); if(nx) nx.disabled = DAY_OFFSET <= 0;
   const lbl = _dayLabel(w);
@@ -4033,8 +4044,17 @@ function _syncOffDayNav(p, w){
 // Возвращает промис, который резолвится на «перевороте» — в этот момент надо
 // подменить содержимое, чтобы новый день въехал уже с новыми цифрами.
 let _flipTimer = null;
+// Какая карточка выручки сейчас перед глазами: на «Обзоре» своя, на районах
+// своя. Переворот дня надо показывать на ней, а не на скрытой — иначе жест
+// выглядит так, будто ничего не произошло.
+function _flipTarget(){
+  const off = document.getElementById('pg-offices');
+  if(off && off.classList.contains('active')) return document.getElementById('offHero');
+  return document.querySelector('#pg-overview .hero');
+}
+
 function _heroFlip(dir){
-  const hero = document.querySelector('#pg-overview .hero');
+  const hero = _flipTarget();
   if(!hero) return Promise.resolve();
   clearTimeout(_flipTimer);                 // быстрый повторный свайп не должен
   hero.classList.remove('day-back');        // оставить карточку на полпути
@@ -4085,6 +4105,7 @@ function _paintDay(p){
   if(cached){ paint(cached); return; }
   _syncDayNav(p, {date:_dayIsoFor(DAY_OFFSET), today:_dayIsoFor(0), day_offset:DAY_OFFSET});  // подпись — сразу
   if(hero) hero.classList.add('day-busy');
+  const oh = document.getElementById('offHero'); if(oh) oh.classList.add('day-busy');
   const req = DAY_OFFSET
     ? ownerApi.ownerFetch('/api/owner/finance', {params:{period:p, day_offset:DAY_OFFSET}})
     : ownerApi.ownerFetch('/api/owner/finance', {params:{period:p}});
@@ -4093,7 +4114,8 @@ function _paintDay(p){
     if(_fkey(p, DAY_OFFSET) !== stamp) return;    // успел свайпнуть дальше — ответ протух
     paint(d);
   }).catch(e=>console.warn('[day] fetch failed', e))
-    .finally(()=>{ if(hero) hero.classList.remove('day-busy'); });
+    .finally(()=>{ if(hero) hero.classList.remove('day-busy');
+                   if(oh) oh.classList.remove('day-busy'); });
 }
 
 // Шаг по дням. Сначала едет карточка, данные догоняют — ожидание сети больше
@@ -4122,8 +4144,9 @@ function dayReset(){
 
 // Свайп по карточке выручки: слева направо — предыдущий день, обратно — к сегодня.
 // Карточка идёт за пальцем один в один; страница под ней не скроллится.
-(function(){
-  const hero = document.querySelector('#pg-overview .hero');
+// Жест один и тот же на «Обзоре» и на районах: день просмотра в приложении
+// общий, и привыкать к двум разным способам его листать незачем.
+function daySwipe(hero){
   if(!hero) return;
   let sx = 0, sy = 0, live = false, axis = 0;   // axis: 0 не решено, 1 гориз., -1 вертик.
 
@@ -4168,7 +4191,9 @@ function dayReset(){
   }, {passive:true});
 
   hero.addEventListener('touchcancel', ()=>{ live = false; settle(); }, {passive:true});
-})();
+}
+daySwipe(document.querySelector('#pg-overview .hero'));
+daySwipe(document.getElementById('offHero'));
 
 // Тот же жест на карточках районов: смахнул вправо — предыдущий день. Палец
 // тянет всю колонку разом, а не одну карточку: день у района не свой, он общий,

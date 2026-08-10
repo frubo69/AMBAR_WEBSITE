@@ -1587,6 +1587,25 @@ async def get_users_by_via() -> list:
     return await cur.to_list(length=20000)
 
 
+# ── Заявки: что именно мы просили у магазина ────────────────────────────────
+# Снимок нужен ради одной вещи — понять при возврате файла, что магазин
+# отказал. В файле все позиции каталога, и ноль в строке сам по себе ничего не
+# говорит: то ли не давали, то ли и не просили.
+async def zayavka_save(day: str, asked: dict):
+    db = _db_or_none()
+    if db is None: return
+    await db.zayavki.replace_one(
+        {"_id": day}, {"_id": day, "asked": asked, "at": datetime.now(timezone.utc)},
+        upsert=True)
+
+
+async def zayavka_last() -> dict:
+    db = _db_or_none()
+    if db is None: return {}
+    doc = await db.zayavki.find_one(sort=[("at", -1)])
+    return (doc or {}).get("asked") or {}
+
+
 # ── Поставки: заявка ушла в магазин, вернулась и стала списком на забор ─────
 async def supply_save(doc: dict):
     db = _db_or_none()

@@ -503,6 +503,9 @@ async def order_rows(day: str = "") -> dict:
         "frozen_aed": frozen_aed,
         "cover_days": NORM_COVER_DAYS, "window_days": NORM_WINDOW_DAYS,
         "rows": [r for r in rows if r["need_total"] > 0],
+        # Весь каталог, включая позиции без потребности: в Excel для
+        # магазина едут все, чтобы он мог дописать то, чего мы не заказали.
+        "all_rows": rows,
     }
 
 

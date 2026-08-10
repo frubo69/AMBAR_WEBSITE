@@ -13,6 +13,10 @@
 переставить или удалить строки; по названию сопоставлять нельзя, потому что
 «Absolut 1 ltr» у них в файле легко станет «ABSOLUT BLUE 1L». Код едет в файле
 и возвращается неизменным, а название рядом — чтобы человеку было понятно.
+
+Лист один и сразу по точкам: «сколько всего» — это сумма по строке, и хранить
+её отдельным листом значило держать два числа об одном и том же. Заодно из
+файла возвращается развозка — какая бутылка в какое здание, а не общий ворох.
 """
 import io
 import logging
@@ -30,18 +34,9 @@ log = logging.getLogger("supply")
 # Файл уходит в магазин — он на английском целиком. Заголовки читает их
 # сотрудник, и «Подтверждено» ему ничего не говорит.
 CODE_COL = "Code"          # служебная колонка, по ней идёт возврат
-QTY_COL = "Requested"
-CONFIRM_COL = "Confirmed"
+TOTAL_COL = "Total"          # считается формулой, а не нами
 SHEET_MAIN = "Order"
-SHEET_DIST = "By location"
 
-# Категории в каталоге русские, а в файле всё английское.
-CAT_EN = {
-    "Арак": "Arak", "Вермут": "Vermouth", "Вино": "Wine", "Виски": "Whisky",
-    "Водка": "Vodka", "Джин": "Gin", "Коньяк": "Cognac", "Ликёр": "Liqueur",
-    "Пиво": "Beer", "Просекко": "Prosecco", "Ром": "Rum", "Текила": "Tequila",
-    "Шампанское": "Champagne",
-}
 # Названия точек у нас записаны кириллицей, хотя районы английские.
 DIST_EN = {"jvc": "JVC", "bbay": "Business Bay", "silicon": "Silicon Oasis",
            "alguses": "Al Qusais", "tecom": "Tecom"}
@@ -65,18 +60,26 @@ async def _order_rows(day):
 async def handle_export(request):
     """Заявка в .xlsx — тот файл, который уходит в магазин.
 
-    Два листа: «Заявка» для магазина (что и сколько, плюс пустая колонка под
-    их подтверждение) и «По точкам» для нас — магазину она не нужна, а нам
-    развозить."""
+    Один лист и сразу в разрезе точек. Отдельная «просто заявка» была лишней:
+    магазин всё равно смотрит в неё, а нам потом нужно знать, куда развозить —
+    и два списка приходилось сверять глазами.
+
+    Позиции все, включая те, что сейчас не нужны. Магазину так проще: это
+    привычный ему прайс, в котором он правит числа, а не список из пятидесяти
+    строк, где не найти то, что он хочет предложить сверх заказа.
+
+    Total в строке — формула. Магазин правит числа по точкам, и переписанный
+    руками итог разошёлся бы с ними в первый же раз."""
     from openpyxl import Workbook
-    from openpyxl.styles import Font, Alignment, PatternFill
+    from openpyxl.styles import Font, Alignment, PatternFill, Border, Side
     from openpyxl.utils import get_column_letter
 
     day = (request.query.get("day") or "").strip()
     data = await _order_rows(day)
     # Порядок как в их таблице: заявку собирают, идя вдоль полок, и список,
     # отсортированный по количеству, заставляет бегать по залу кругами.
-    rows = sorted(data["rows"], key=lambda r: order_key(r["id"]))
+    rows = sorted(data.get("all_rows") or data["rows"], key=lambda r: order_key(r["id"]))
+    dist = [d["id"] for d in data["districts"]]
 
     wb = Workbook()
     ws = wb.active
@@ -84,51 +87,68 @@ async def handle_export(request):
 
     head = Font(bold=True, color="FFFFFF")
     fill = PatternFill("solid", fgColor="1F2A37")
-    ask = PatternFill("solid", fgColor="FFF3CD")      # колонку магазина видно сразу
+    ask = PatternFill("solid", fgColor="FFF3CD")      # что правит магазин
+    sum_fill = PatternFill("solid", fgColor="EAEAEA")
+    thin = Side(style="thin", color="BFBFBF")
+    box = Border(left=thin, right=thin, top=thin, bottom=thin)
 
     ws.append([f"AMBAR · purchase order · {data['day']}"])
     ws["A1"].font = Font(bold=True, size=13)
-    ws.append(["Please fill in the Confirmed column with the quantity you can supply, "
-               "and send the file back. Do not change the Code column."])
-    ws.append([CODE_COL, "Item", "Category", QTY_COL, CONFIRM_COL, "Supplier note"])
+    ws.append(["Please correct the quantities you can supply and send the file back. "
+               "The Total column adds up by itself. Do not change the Code column."])
+    ws.append([CODE_COL, "Item"] +
+              [f"{OFFICE_CODES.get(o,'')} {DIST_EN.get(o, OFFICE_NAMES.get(o,o))}"
+               for o in dist] + [TOTAL_COL])
     for c in ws[3]:
         c.font = head; c.fill = fill; c.alignment = Alignment(horizontal="center")
 
+    first = 4
+    n_d = len(dist)
     for r in rows:
-        ws.append([r["id"], r["name"], CAT_EN.get(r["cat"], r["cat"]),
-                   r["need_total"], None, None])
-    for row in ws.iter_rows(min_row=4, min_col=5, max_col=6):
-        for c in row:
-            c.fill = ask
+        ws.append([r["id"], r["name"]] +
+                  [(r["cells"].get(o) or {}).get("need", 0) for o in dist] + [None])
+        i = ws.max_row
+        c0, c1 = get_column_letter(3), get_column_letter(2 + n_d)
+        # Итог строки считает сам файл: магазин правит числа по точкам, и
+        # переписанная руками сумма разошлась бы с ними на первой же правке.
+        ws.cell(row=i, column=3 + n_d).value = f"=SUM({c0}{i}:{c1}{i})"
+        for col in range(3, 3 + n_d):
+            cell = ws.cell(row=i, column=col)
+            cell.fill = ask; cell.border = box
+            cell.alignment = Alignment(horizontal="center")
+        t = ws.cell(row=i, column=3 + n_d)
+        t.font = Font(bold=True); t.fill = sum_fill; t.border = box
+        t.alignment = Alignment(horizontal="center")
 
+    last = ws.max_row
     ws.append([])
-    ws.append([None, "TOTAL", None, sum(r["need_total"] for r in rows), None, None])
-    ws.cell(row=ws.max_row, column=2).font = Font(bold=True)
-    ws.cell(row=ws.max_row, column=4).font = Font(bold=True)
+    ws.append([None, "TOTAL"])
+    i = ws.max_row
+    for col in range(3, 4 + n_d):
+        L = get_column_letter(col)
+        c = ws.cell(row=i, column=col)
+        c.value = f"=SUM({L}{first}:{L}{last})"
+        c.font = Font(bold=True); c.alignment = Alignment(horizontal="center")
+    ws.cell(row=i, column=2).font = Font(bold=True)
 
-    for col, w in zip("ABCDEF", (10, 38, 16, 12, 15, 30)):
-        ws.column_dimensions[col].width = w
-    ws.freeze_panes = "A4"
+    ws.column_dimensions["A"].width = 10
+    ws.column_dimensions["B"].width = 40
+    for col in range(3, 4 + n_d):
+        ws.column_dimensions[get_column_letter(col)].width = 15
+    ws.freeze_panes = "C4"
 
-    # Второй лист — развозка. Магазину он безразличен, нам без него непонятно,
-    # куда потом раскладывать привезённое.
-    ws2 = wb.create_sheet(SHEET_DIST)
-    dist = [d["id"] for d in data["districts"]]
-    ws2.append(["Item"] + [f"{OFFICE_CODES.get(o,'')} {DIST_EN.get(o, OFFICE_NAMES.get(o,o))}"
-                           for o in dist] + ["Total"])
-    for c in ws2[1]:
-        c.font = head; c.fill = fill
-    for r in rows:
-        ws2.append([r["name"]] + [(r["cells"].get(o) or {}).get("need", 0) for o in dist]
-                   + [r["need_total"]])
-    ws2.column_dimensions["A"].width = 38
-    for i in range(2, len(dist) + 3):
-        ws2.column_dimensions[get_column_letter(i)].width = 14
-    ws2.freeze_panes = "B2"
+    # Снимок того, что просили: в файле все позиции каталога, и вернувшийся ноль
+    # сам по себе не отличает «магазин отказал» от «мы и не заказывали».
+    try:
+        await db.zayavka_save(data["day"],
+                              {r["id"]: r["need_total"] for r in rows if r["need_total"]})
+    except Exception as e:
+        log.warning(f"[supply] снимок заявки: {e}")
 
     buf = io.BytesIO(); wb.save(buf); buf.seek(0)
     name = f"AMBAR-zayavka-{data['day']}.xlsx"
-    log.info(f"[supply] выгрузка заявки {data['day']}: {len(rows)} позиций")
+    log.info(f"[supply] выгрузка заявки {data['day']}: {len(rows)} позиций, "
+             f"из них с потребностью {sum(1 for r in rows if r['need_total'])}")
     return web.Response(
         body=buf.read(),
         headers={**CORS_HEADERS,
@@ -144,6 +164,8 @@ def _num(v):
     if isinstance(v, (int, float)):
         return int(v)
     s = str(v).replace(",", ".").strip()
+    if s.startswith("="):          # формула, которую Excel не пересчитал
+        return None
     digits = "".join(ch for ch in s if ch.isdigit() or ch == ".")
     if not digits:
         return None
@@ -153,13 +175,33 @@ def _num(v):
         return None
 
 
+def _district_cols(cols: dict) -> dict:
+    """Колонки точек по заголовкам: «B2 Business Bay» → офис.
+
+    По коду, а не по названию: код мы ставим сами и он короткий, а название
+    магазин может перевести или сократить."""
+    out = {}
+    for title, col in cols.items():
+        head = str(title).strip()
+        for oid in OFFICE_IDS:
+            code = OFFICE_CODES.get(oid, "")
+            if code and (head == code or head.startswith(code + " ")):
+                out[oid] = col
+                break
+    return out
+
+
 @require_owner
 async def handle_import(request):
     """Ответ магазина: читаем файл и получаем поставку.
 
-    Берём «Подтверждено», а если магазин её не заполнил — «Заявлено»: файл,
-    вернувшийся без правок, значит «даём всё, что просили», и заставлять
-    человека дописывать те же числа руками незачем."""
+    Количество берём суммой по точкам, а не из Total: Total — формула, и если
+    магазин правил файл в Google Sheets или в редакторе попроще, в ячейке
+    приедет либо старое значение, либо сам текст формулы.
+
+    Строка с нулями — это либо отказ, либо позиция, которую мы и не просили.
+    Различаем по снимку заявки: без него пришлось бы либо терять отказы, либо
+    записывать в них весь каталог."""
     from openpyxl import load_workbook
 
     reader = await request.multipart()
@@ -189,6 +231,17 @@ async def handle_import(request):
         return web.json_response({"error": "no_code_column", "need": CODE_COL},
                                  status=400, headers=CORS_HEADERS)
 
+    dcols = _district_cols(cols)
+    if not dcols:
+        return web.json_response({"error": "no_district_columns"},
+                                 status=400, headers=CORS_HEADERS)
+
+    asked_map = {}
+    try:
+        asked_map = await db.zayavka_last()
+    except Exception as e:
+        log.warning(f"[supply] снимок заявки не прочитан: {e}")
+
     cat = _catalog_by_id()
     items, unknown, dropped = [], [], []
     for row in ws.iter_rows(min_row=hdr_row + 1):
@@ -199,16 +252,22 @@ async def handle_import(request):
         p = cat.get(pid)
         if not p:
             unknown.append(pid); continue
-        asked = _num(row[cols[QTY_COL] - 1].value) if QTY_COL in cols else None
-        conf = _num(row[cols[CONFIRM_COL] - 1].value) if CONFIRM_COL in cols else None
-        qty = conf if conf is not None else (asked or 0)
+        by_district = {}
+        for oid, col in dcols.items():
+            n = _num(row[col - 1].value) or 0
+            if n > 0:
+                by_district[oid] = n
+        qty = sum(by_district.values())
+        asked = int(asked_map.get(pid) or 0)
         if qty <= 0:
-            # Магазин прямо сказал «нет в наличии» — это не потеря строки, а
-            # ответ, и его надо показать: иначе водитель поедет за тем, чего нет.
-            dropped.append({"id": pid, "name": p.get("name", ""), "asked": asked or 0})
+            # Отказом считаем только то, что правда просили: иначе в отказы
+            # попал бы весь каталог, и водитель не нашёл бы в нём смысла.
+            if asked:
+                dropped.append({"id": pid, "name": p.get("name", ""), "asked": asked})
             continue
         items.append({"id": pid, "name": p.get("name", ""),
-                      "asked": asked or 0, "qty": qty, "scanned": 0})
+                      "asked": asked, "qty": qty, "scanned": 0,
+                      "by_district": by_district})
 
     if not items:
         return web.json_response({"error": "nothing_confirmed", "dropped": len(dropped)},

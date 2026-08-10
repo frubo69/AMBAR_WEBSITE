@@ -95,12 +95,13 @@ async def handle_export(request):
     ws.title = SHEET_MAIN
     ws.sheet_view.showGridLines = False        # рамки рисуем сами, сетка мешает
 
-    white = Font(bold=True, color="FFFFFF")
-    head_fill = PatternFill("solid", fgColor="1F2A37")
-    num_fill = PatternFill("solid", fgColor="000000")     # колонка «№»
-    ask = PatternFill("solid", fgColor="FFF3CD")          # что правит магазин
-    sum_fill = PatternFill("solid", fgColor="FFFF00")     # итоги
-    warn_fill = PatternFill("solid", fgColor="FF0000")    # просьба к магазину
+    white = Font(bold=True, size=11, color="FFFFFFFF")
+    bold = Font(bold=True, size=11)
+    head_fill = PatternFill("solid", fgColor="FF1F2A37")
+    num_fill = PatternFill("solid", fgColor="FF000000")     # колонка «№»
+    ask = PatternFill("solid", fgColor="FFFFF3CD")          # что правит магазин
+    sum_fill = PatternFill("solid", fgColor="FFFFFF00")     # итоги
+    warn_fill = PatternFill("solid", fgColor="FFFF0000")    # просьба к магазину
     thin = Side(style="thin")
     med = Side(style="medium")
     box = Border(left=thin, right=thin, top=thin, bottom=thin)
@@ -136,7 +137,7 @@ async def handle_export(request):
         c = ws.cell(row=3, column=N + i, value=title)
         c.alignment = mid; c.border = box
         if N + i == N:      c.fill = num_fill;  c.font = white
-        elif N + i == TOT:  c.fill = sum_fill;  c.font = Font(bold=True)
+        elif N + i == TOT:  c.fill = sum_fill;  c.font = bold
         else:               c.fill = head_fill; c.font = white
     ws.row_dimensions[3].height = 15
 
@@ -146,7 +147,7 @@ async def handle_export(request):
         ws.cell(row=i, column=N, value=n).alignment = mid
         ws.cell(row=i, column=C, value=r["id"]).alignment = mid
         nm = ws.cell(row=i, column=I, value=r["name"])
-        nm.font = Font(bold=True)
+        nm.font = bold
         nm.alignment = Alignment(horizontal="left", vertical="center")
         for k, o in enumerate(dist):
             c = ws.cell(row=i, column=D0 + k, value=(r["cells"].get(o) or {}).get("need", 0))
@@ -155,7 +156,7 @@ async def handle_export(request):
         # переписанная руками сумма разошлась бы с ними на первой же правке.
         t = ws.cell(row=i, column=TOT,
                     value=f"=SUM({get_column_letter(D0)}{i}:{get_column_letter(LAST)}{i})")
-        t.fill = sum_fill; t.font = Font(bold=True)
+        t.fill = sum_fill; t.font = bold
         t.alignment = mid; t.number_format = ZERO_BLANK
         for col in range(N, TOT + 1):
             ws.cell(row=i, column=col).border = box
@@ -171,9 +172,9 @@ async def handle_export(request):
             L = get_column_letter(col)
             c.value = f"=SUM({L}{first}:{L}{last})"
             c.number_format = ZERO_BLANK
-        c.fill = sum_fill; c.font = Font(bold=True); c.alignment = mid; c.border = box
+        c.fill = sum_fill; c.font = bold; c.alignment = mid; c.border = box
 
-    ws.column_dimensions["A"].width = 29.5                  # пустое поле слева
+    ws.column_dimensions["A"].width = 29.55                 # пустое поле слева
     ws.column_dimensions[get_column_letter(N)].width = 7.1
     ws.column_dimensions[get_column_letter(C)].width = 10
     ws.column_dimensions[get_column_letter(I)].width = 40

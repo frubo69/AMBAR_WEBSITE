@@ -386,9 +386,12 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   background:var(--card);color:var(--muted);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer}
 .stk-all.on{color:var(--gold2);border-color:rgba(201,169,110,.4);background:var(--gold-soft)}
 .stk-mid{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 14px calc(24px + var(--safe-bottom))}
-/* Колонка, чтобы липкая кнопка внизу знала, к чему прижиматься. */
-.stk-mid{display:flex;flex-direction:column}
-.stk-mid > *{flex-shrink:0}
+/* Подвал раздела: не участвует в прокрутке, поэтому кнопка в нём всегда внизу
+   экрана. Пустой — не занимает ничего. */
+.stk-foot{flex-shrink:0}
+.stk-foot:empty{display:none}
+.stk-foot .qb-wrap{position:static;padding:12px 14px calc(12px + var(--safe-bottom));
+  background:var(--bg);border-top:1px solid var(--border2)}
 
 /* дата прямо на карточке: свайпом листают именно её, и подпись должна быть
    там же, где палец, а не в шапке страницы */
@@ -5555,6 +5558,7 @@ function accOpen(id){
   document.getElementById('accOv').classList.add('show');
   ACC_VIEW = id;
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  document.getElementById('accFoot').innerHTML = '';   // подвал у каждого свой
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
   if(id === 'expenses') accExpenses();
   if(id === 'order')    accOrder();
@@ -5668,6 +5672,7 @@ async function accOrder(){
   _setText('accTitle', 'Заявка на закупку');
   _setText('accSub', 'загрузка…');
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  document.getElementById('accFoot').innerHTML = '';
   let d;
   try{ d = await ownerApi.ownerFetch('/api/owner/stock/order'); }
   catch(e){ document.getElementById('accMid').innerHTML =
@@ -5726,8 +5731,12 @@ function ordRender(){
                                  : `Что довезти · ${list.length}`}</div>
     <div id="ordRows">${list.length ? list.map(r => ordRow(r, dist)).join('')
       : '<div class="exp-empty">' + (ORD.q ? 'Ничего не нашлось'
-          : 'Довозить нечего — остатков хватает') + '</div>'}</div>
+          : 'Довозить нечего — остатков хватает') + '</div>'}</div>`;
 
+  // Кнопка живёт в подвале экрана, а не в конце списка: место у неё одно и
+  // постоянное, до него дотягивается большой палец, и список под ней не
+  // заканчивается на полуслове.
+  document.getElementById('accFoot').innerHTML = `
     <div class="qb-wrap">
       <button class="qb" id="ordSend" onclick="ordSend()">
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
@@ -11769,6 +11778,10 @@ function renderHours(h){
     </div>
   </div>
   <div class="stk-mid" id="accMid"></div>
+  <!-- Подвал вне прокручиваемой области. Липкая кнопка внутри списка вставала
+       по нижнему краю его содержимого, а не экрана, и на длинном списке
+       оказывалась посреди него. -->
+  <div class="stk-foot" id="accFoot"></div>
 </div>
 
 </body>

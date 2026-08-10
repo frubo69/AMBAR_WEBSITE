@@ -1606,6 +1606,26 @@ async def zayavka_last() -> dict:
     return (doc or {}).get("asked") or {}
 
 
+# ── Картинки, уже загруженные в телеграм ────────────────────────────────────
+# Раз отданный телеграму файл получает file_id и живёт у них вечно. Дальше
+# карточку можно собирать по этому id, и телеграму не нужно ходить к нам за
+# картинкой в момент, когда человек набирает имя бота: именно это хождение и
+# показывает пустую карточку — оно медленное и молча срывается.
+async def tg_file_get(name: str):
+    db = _db_or_none()
+    if db is None: return None
+    doc = await db.tg_files.find_one({"_id": name})
+    return (doc or {}).get("file_id")
+
+
+async def tg_file_set(name: str, file_id: str):
+    db = _db_or_none()
+    if db is None: return
+    await db.tg_files.replace_one(
+        {"_id": name}, {"_id": name, "file_id": file_id,
+                        "at": datetime.now(timezone.utc)}, upsert=True)
+
+
 # ── Ручные правки заявки ────────────────────────────────────────────────────
 # Расчёт по норме — предложение, а не приговор: владелец видит полку своими
 # глазами и знает, что через два дня свадьба, а по этой позиции магазин тянет.

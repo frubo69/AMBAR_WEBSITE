@@ -14,7 +14,8 @@ import os, logging, time
 from datetime import datetime, timezone
 from dotenv import load_dotenv
 from telegram import (Update, InlineKeyboardButton, InlineKeyboardMarkup,
-                      InlineQueryResultPhoto, InlineQueryResultsButton)
+                      InlineQueryResultPhoto, InlineQueryResultCachedPhoto,
+                      InlineQueryResultsButton)
 from telegram.constants import ChatMemberStatus
 from telegram.ext import (Application, CommandHandler, MessageHandler,
                           InlineQueryHandler, ContextTypes, filters)
@@ -105,6 +106,42 @@ async def on_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     log.info(f"[promo] {title} · {uid} · «{msg.text[:60]}»")
 
 
+async def _photo_id(ctx, path: str):
+    """file_id картинки в телеграме, загрузив её туда при первой надобности.
+
+    Карточку с фотографией по ссылке телеграм собирает, сходив за файлом к нам
+    прямо в момент набора. Полмегабайта через океан он ждать не будет: карточка
+    появляется пустой или не появляется вовсе. Отданный однажды файл получает
+    вечный id, и дальше карточка собирается мгновенно и из ничего.
+
+    Загружаем себе же в избранное и сразу убираем сообщение — id от удаления
+    не портится."""
+    fid = None
+    try:
+        fid = await db.tg_file_get(path)
+    except Exception as e:
+        log.warning(f"[promo] file_id из базы: {e}")
+    if fid:
+        return fid
+    if not os.path.exists(path) or not OWNER_IDS:
+        return None
+    try:
+        with open(path, "rb") as f:
+            m = await ctx.bot.send_photo(OWNER_IDS[0], photo=f,
+                                         caption=f"служебная загрузка · {path}")
+        fid = m.photo[-1].file_id
+        try:
+            await m.delete()
+        except Exception:
+            pass
+        await db.tg_file_set(path, fid)
+        log.info(f"[promo] картинка {path} загружена в телеграм")
+    except Exception as e:
+        log.error(f"[promo] не удалось загрузить {path}: {e}")
+        return None
+    return fid
+
+
 async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Рекламный пост: набрал имя бота в чате — выбрал карточку — она ушла.
 
@@ -130,23 +167,34 @@ async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     results = []
     for lang in ("ru", "en"):
         # Карточку языка показываем, только если её картинка правда лежит:
-        # Telegram тянет фото по ссылке сам, и на битой он молча выкинет
-        # результат — в списке останется дыра без объяснений.
-        if not os.path.exists(promo.POST_IMG[lang]):
+        # без файла результат окажется дырой без объяснений.
+        path = promo.POST_IMG[lang]
+        if not os.path.exists(path):
             continue
-        results.append(InlineQueryResultPhoto(
-            id=f"post_{lang}_{tag}",
-            # Telegram забирает картинку по ссылке сам: только JPEG и только
-            # лёгкий, иначе карточка не соберётся прямо на глазах у человека.
-            photo_url=f"{PUBLIC_ORIGIN}/{promo.POST_IMG[lang]}",
-            thumbnail_url=f"{PUBLIC_ORIGIN}/{promo.POST_IMG[lang]}",
-            title=f"Рекламный пост · {lang.upper()}",
-            description=f"метка «{tag}»",
-            caption=promo.POST_TEXT[lang],
-            parse_mode="HTML",
-            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
-                promo.BTN[lang], url=url)]]),
-        ))
+        kb = InlineKeyboardMarkup([[InlineKeyboardButton(promo.BTN[lang], url=url)]])
+        fid = await _photo_id(ctx, path)
+        if fid:
+            results.append(InlineQueryResultCachedPhoto(
+                id=f"post_{lang}_{tag}", photo_file_id=fid,
+                title=f"Рекламный пост · {lang.upper()}",
+                description=f"метка «{tag}»",
+                caption=promo.POST_TEXT[lang], parse_mode="HTML",
+                reply_markup=kb))
+        else:
+            # Запасной путь на случай, когда загрузить файл не вышло: пусть
+            # телеграм сходит по ссылке сам. Превью отдельным файлом — за
+            # тяжёлым он идёт неохотно и часто показывает пустоту.
+            thumb = path.replace(".jpg", "_thumb.jpg")
+            results.append(InlineQueryResultPhoto(
+                id=f"post_{lang}_{tag}",
+                photo_url=f"{PUBLIC_ORIGIN}/{path}",
+                thumbnail_url=f"{PUBLIC_ORIGIN}/"
+                              f"{thumb if os.path.exists(thumb) else path}",
+                photo_width=1536, photo_height=1024,
+                title=f"Рекламный пост · {lang.upper()}",
+                description=f"метка «{tag}»",
+                caption=promo.POST_TEXT[lang], parse_mode="HTML",
+                reply_markup=kb))
     # cache_time=0: метка меняется от запроса к запросу, закэшированный ответ
     # отдал бы чужую.
     if not results:

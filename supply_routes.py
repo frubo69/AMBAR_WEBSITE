@@ -35,6 +35,10 @@ log = logging.getLogger("supply")
 # сотрудник, и «Подтверждено» ему ничего не говорит.
 CODE_COL = "Code"          # служебная колонка, по ней идёт возврат
 TOTAL_COL = "Total"          # считается формулой, а не нами
+
+# Ноль показываем пустой клеткой. В файле все позиции каталога, и лист, залитый
+# нулями, читать невозможно: глаз ищет числа, а видит шум.
+ZERO_BLANK = "0;\\-0;;@"
 SHEET_MAIN = "Order"
 
 # Названия точек у нас записаны кириллицей, хотя районы английские.
@@ -60,6 +64,11 @@ async def _order_rows(day):
 async def handle_export(request):
     """Заявка в .xlsx — тот файл, который уходит в магазин.
 
+    Вид листа задан владельцем: он один раз разложил его так, как удобно
+    человеку в магазине, и дальше файл собирается по этому образцу. Отсюда
+    пустая колонка слева, нумерация строк, чёрная шапка и красная полоса с
+    просьбой — их видно раньше, чем начинают читать.
+
     Один лист и сразу в разрезе точек. Отдельная «просто заявка» была лишней:
     магазин всё равно смотрит в неё, а нам потом нужно знать, куда развозить —
     и два списка приходилось сверять глазами.
@@ -84,58 +93,96 @@ async def handle_export(request):
     wb = Workbook()
     ws = wb.active
     ws.title = SHEET_MAIN
+    ws.sheet_view.showGridLines = False        # рамки рисуем сами, сетка мешает
 
-    head = Font(bold=True, color="FFFFFF")
-    fill = PatternFill("solid", fgColor="1F2A37")
-    ask = PatternFill("solid", fgColor="FFF3CD")      # что правит магазин
-    sum_fill = PatternFill("solid", fgColor="EAEAEA")
-    thin = Side(style="thin", color="BFBFBF")
+    white = Font(bold=True, color="FFFFFF")
+    head_fill = PatternFill("solid", fgColor="1F2A37")
+    num_fill = PatternFill("solid", fgColor="000000")     # колонка «№»
+    ask = PatternFill("solid", fgColor="FFF3CD")          # что правит магазин
+    sum_fill = PatternFill("solid", fgColor="FFFF00")     # итоги
+    warn_fill = PatternFill("solid", fgColor="FF0000")    # просьба к магазину
+    thin = Side(style="thin")
+    med = Side(style="medium")
     box = Border(left=thin, right=thin, top=thin, bottom=thin)
+    mid = Alignment(horizontal="center", vertical="center")
 
-    ws.append([f"AMBAR · purchase order · {data['day']}"])
-    ws["A1"].font = Font(bold=True, size=13)
-    ws.append(["Please correct the quantities you can supply and send the file back. "
-               "The Total column adds up by itself. Do not change the Code column."])
-    ws.append([CODE_COL, "Item"] +
-              [f"{OFFICE_CODES.get(o,'')} {DIST_EN.get(o, OFFICE_NAMES.get(o,o))}"
-               for o in dist] + [TOTAL_COL])
-    for c in ws[3]:
-        c.font = head; c.fill = fill; c.alignment = Alignment(horizontal="center")
+    # Первая колонка пустая и широкая — поле, за которое лист приятно держать
+    # глазами. Всё остальное начинается с B.
+    N, C, I, D0 = 2, 3, 4, 5                   # №, Code, Item, первая точка
+    LAST = D0 + len(dist) - 1                  # последняя точка
+    TOT = LAST + 1                             # Total
+
+    ws.cell(row=1, column=N, value=f"AMBAR · purchase order · {data['day']}")
+    ws.cell(row=1, column=N).font = Font(bold=True, size=16)
+    ws.cell(row=1, column=N).border = Border(bottom=thin)
+    ws.merge_cells(start_row=1, start_column=N, end_row=1, end_column=I)
+    ws.row_dimensions[1].height = 21.6
+
+    ws.cell(row=2, column=N,
+            value="Please correct the quantities you can supply and send the file back. "
+                  "The Total column adds up by itself. Do not change the Code column.")
+    ws.merge_cells(start_row=2, start_column=N, end_row=2, end_column=TOT)
+    for col in range(N, TOT + 1):
+        c = ws.cell(row=2, column=col)
+        c.fill = warn_fill; c.font = Font(bold=True, size=12)
+        c.alignment = mid
+        c.border = Border(left=med, right=med, top=med, bottom=med)
+    ws.row_dimensions[2].height = 33.6
+
+    head = ["№", CODE_COL, "Item"] + \
+           [f"{OFFICE_CODES.get(o,'')} {DIST_EN.get(o, OFFICE_NAMES.get(o,o))}" for o in dist] + \
+           [TOTAL_COL]
+    for i, title in enumerate(head):
+        c = ws.cell(row=3, column=N + i, value=title)
+        c.alignment = mid; c.border = box
+        if N + i == N:      c.fill = num_fill;  c.font = white
+        elif N + i == TOT:  c.fill = sum_fill;  c.font = Font(bold=True)
+        else:               c.fill = head_fill; c.font = white
+    ws.row_dimensions[3].height = 15
 
     first = 4
-    n_d = len(dist)
-    for r in rows:
-        ws.append([r["id"], r["name"]] +
-                  [(r["cells"].get(o) or {}).get("need", 0) for o in dist] + [None])
-        i = ws.max_row
-        c0, c1 = get_column_letter(3), get_column_letter(2 + n_d)
+    for n, r in enumerate(rows, 1):
+        i = first + n - 1
+        ws.cell(row=i, column=N, value=n).alignment = mid
+        ws.cell(row=i, column=C, value=r["id"]).alignment = mid
+        nm = ws.cell(row=i, column=I, value=r["name"])
+        nm.font = Font(bold=True)
+        nm.alignment = Alignment(horizontal="left", vertical="center")
+        for k, o in enumerate(dist):
+            c = ws.cell(row=i, column=D0 + k, value=(r["cells"].get(o) or {}).get("need", 0))
+            c.fill = ask; c.alignment = mid; c.number_format = ZERO_BLANK
         # Итог строки считает сам файл: магазин правит числа по точкам, и
         # переписанная руками сумма разошлась бы с ними на первой же правке.
-        ws.cell(row=i, column=3 + n_d).value = f"=SUM({c0}{i}:{c1}{i})"
-        for col in range(3, 3 + n_d):
-            cell = ws.cell(row=i, column=col)
-            cell.fill = ask; cell.border = box
-            cell.alignment = Alignment(horizontal="center")
-        t = ws.cell(row=i, column=3 + n_d)
-        t.font = Font(bold=True); t.fill = sum_fill; t.border = box
-        t.alignment = Alignment(horizontal="center")
+        t = ws.cell(row=i, column=TOT,
+                    value=f"=SUM({get_column_letter(D0)}{i}:{get_column_letter(LAST)}{i})")
+        t.fill = sum_fill; t.font = Font(bold=True)
+        t.alignment = mid; t.number_format = ZERO_BLANK
+        for col in range(N, TOT + 1):
+            ws.cell(row=i, column=col).border = box
+        ws.row_dimensions[i].height = 17.4
 
-    last = ws.max_row
-    ws.append([])
-    ws.append([None, "TOTAL"])
-    i = ws.max_row
-    for col in range(3, 4 + n_d):
-        L = get_column_letter(col)
+    last = first + len(rows) - 1
+    i = last + 1
+    ws.cell(row=i, column=N, value="TOTAL")
+    ws.merge_cells(start_row=i, start_column=N, end_row=i, end_column=I)
+    for col in range(N, TOT + 1):
         c = ws.cell(row=i, column=col)
-        c.value = f"=SUM({L}{first}:{L}{last})"
-        c.font = Font(bold=True); c.alignment = Alignment(horizontal="center")
-    ws.cell(row=i, column=2).font = Font(bold=True)
+        if col >= D0:
+            L = get_column_letter(col)
+            c.value = f"=SUM({L}{first}:{L}{last})"
+            c.number_format = ZERO_BLANK
+        c.fill = sum_fill; c.font = Font(bold=True); c.alignment = mid; c.border = box
 
-    ws.column_dimensions["A"].width = 10
-    ws.column_dimensions["B"].width = 40
-    for col in range(3, 4 + n_d):
+    ws.column_dimensions["A"].width = 29.5                  # пустое поле слева
+    ws.column_dimensions[get_column_letter(N)].width = 7.1
+    ws.column_dimensions[get_column_letter(C)].width = 10
+    ws.column_dimensions[get_column_letter(I)].width = 40
+    for col in range(D0, LAST + 1):
         ws.column_dimensions[get_column_letter(col)].width = 15
-    ws.freeze_panes = "C4"
+    ws.column_dimensions[get_column_letter(TOT)].width = 18.4
+    # Держим на виду номер, код и название: магазин листает вправо по точкам и
+    # без этого перестаёт понимать, в какой он строке.
+    ws.freeze_panes = f"{get_column_letter(D0)}{first}"
 
     # Снимок того, что просили: в файле все позиции каталога, и вернувшийся ноль
     # сам по себе не отличает «магазин отказал» от «мы и не заказывали».

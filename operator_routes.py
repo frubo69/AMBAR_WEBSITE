@@ -76,6 +76,35 @@ DISTRICTS = _districts()
 def _district(did: str) -> dict | None:
     return next((d for d in _districts() if d["id"] == did), None)
 
+
+def _people(districts: list) -> list:
+    """Кого можно выбрать за планшетом и что каждый видит.
+
+    Районный оператор видит свои районы, старший — все: он принимает откуда
+    угодно, и подменять любого из троих — его работа."""
+    out, seen = [], set()
+    for d in districts:
+        n = d["operator"]
+        if n not in seen:
+            seen.add(n)
+            out.append({"name": n, "senior": False, "districts": []})
+        next(x for x in out if x["name"] == n)["districts"].append(d["id"])
+    for sr in _staff_mod.SENIOR_OPERATORS:
+        if sr["name"] in seen:
+            next(x for x in out if x["name"] == sr["name"])["senior"] = True
+        else:
+            out.append({"name": sr["name"], "senior": True,
+                        "districts": [d["id"] for d in districts]})
+    return out
+
+
+def _scope(people: list, who: str, districts: list) -> set:
+    """Районы, которые видит выбранный за планшетом человек."""
+    p = next((x for x in people if x["name"] == who), None)
+    if not p:
+        return set()
+    return {d["id"] for d in districts} if p["senior"] else set(p["districts"])
+
 DUBAI_TZ = timezone(timedelta(hours=4))
 
 # Смена идёт с 12:00 до 06:00, поэтому рабочие сутки считаем от полудня до
@@ -426,6 +455,16 @@ def _summary(o: dict) -> dict:
                    "price": i.get("price", 0), "pcs": i.get("pcs")}
                   for i in (o.get("items") or [])],
         "created_by_name": o.get("created_by_name", ""),
+        "operator_name": o.get("operator_name", ""),
+        # Источник помечаем явно. У старых онлайн-заказов поля нет вовсе, и
+        # «онлайн» до сих пор означало «не помечен телефонным» — так работать
+        # можно ровно пока каналов два.
+        "source": o.get("source") or "app",
+        "deliver_by": o.get("deliver_by", ""),
+        "eta": o.get("eta", 0),
+        "payment_method": o.get("payment_method", ""),
+        "prepaid": bool(o.get("prepaid")),
+        "lang": o.get("lang", "ru"),
         "timestamp": o.get("timestamp", ""),
     }
 
@@ -439,7 +478,10 @@ async def handle_ping(request):
         # Офис ≡ район, отдельного переключателя офиса в POS больше нет —
         # пустой список прячет его в интерфейсе.
         "offices": [],
-        "districts": await _fresh_districts(),
+        "districts": (_d := await _fresh_districts()),
+        # Кто может встать за планшет. Список решает и то, что человек увидит:
+        # выбрал себя — видишь свои районы, выбрал старшего — все.
+        "people": _people(_d),
         "server_time": datetime.now(timezone.utc).isoformat(),
     }, headers=CORS_HEADERS)
 
@@ -565,11 +607,13 @@ async def handle_create(request):
                              headers=CORS_HEADERS)
 
 
-async def _get_manual_order(oid: str):
+async def _get_pos_order(oid: str):
+    """Заказ, которым панель вправе управлять.
+
+    Раньше это были только телефонные. Теперь и онлайн: после принятия разницы
+    между ними нет — тот же адрес, тот же водитель, то же время."""
     order = await db.get_order(oid)
-    if not order or order.get("source") != "manual":
-        return None
-    return order
+    return order or None
 
 
 @require_operator
@@ -597,10 +641,172 @@ async def handle_list(request):
     return web.json_response({"orders": out}, headers=CORS_HEADERS)
 
 
+async def _customer_card(oid: str):
+    """Перерисовать карточку заказа у клиента.
+
+    Тем же текстом, что рисует бот: карточка живёт в customer_card.py как раз
+    затем, чтобы два процесса не рассказывали клиенту разное."""
+    from api_server import tg_edit, tg_send, BOT_TOKEN
+    from customer_card import render_customer_card
+    order = await db.get_order(oid)
+    cid = (order or {}).get("customer_id")
+    if not order or not cid:
+        return                                  # телефонный заказ — некому
+    text = render_customer_card(order, order.get("lang", "ru"))
+    mid = order.get("customer_msg_id") or (order.get("customer_msg_ids") or [None])[0]
+    if mid:
+        try:
+            r = await tg_edit(BOT_TOKEN, cid, mid, text, parse_mode="Markdown")
+            if r and r.get("ok"):
+                return
+        except Exception as e:
+            log.debug(f"[pos] карточка клиента {cid}/{mid}: {e}")
+    try:
+        r = await tg_send(BOT_TOKEN, cid, text, parse_mode="Markdown")
+        if r and r.get("ok"):
+            await db.update_order(oid, customer_msg_id=r["result"]["message_id"])
+    except Exception as e:
+        log.warning(f"[pos] клиенту {cid}: {e}")
+
+
+def _lane(o: dict) -> str:
+    """В какую ленту попадает заказ.
+
+    Делим по стадии, а не по источнику: онлайн приходит требующим решения,
+    телефонный рождается принятым. Источник — пометка на строке, не отдельный
+    экран: после принятия вопрос уже не «откуда», а «что едет и куда»."""
+    st = o.get("status", "")
+    if st == "pending":
+        return "new"
+    if st == "approved":
+        return "work"
+    if st in ("delivered", "cancelled", "declined"):
+        return "done"
+    return ""
+
+
+@require_operator
+async def handle_queue(request):
+    """Очередь панели: новые, в работе и закрытые за смену.
+
+    Кто спрашивает — тот и определяет, что видно: имя выбранного за планшетом
+    оператора приходит в запросе. Планшет общий, аккаунт у него один, и по
+    аккаунту отличить Умара от Джанабиля нельзя."""
+    districts = await _fresh_districts()
+    people = _people(districts)
+    who = (request.query.get("as") or "").strip()
+    scope = _scope(people, who, districts)
+    if not scope:
+        return web.json_response({"error": "unknown_operator", "people": people},
+                                 status=400, headers=CORS_HEADERS)
+
+    today = _biz_date(datetime.now(DUBAI_TZ))
+    lanes = {"new": [], "work": [], "done": []}
+    counts = {"app": 0, "manual": 0}
+    for o in (await db.get_all_orders()).values():
+        lane = _lane(o)
+        if not lane:
+            continue
+        # Район заказа определяется адресом ещё при создании; заказы без
+        # района видит только старший — иначе они не видны вообще никому.
+        oid_dist = o.get("office_id") or ""
+        if oid_dist not in scope and not (oid_dist == "" and len(scope) == len(districts)):
+            continue
+        try:
+            ts = datetime.fromisoformat(o.get("timestamp", "")).replace(
+                tzinfo=timezone.utc).astimezone(DUBAI_TZ)
+        except (ValueError, TypeError):
+            continue
+        # Новые показываем любого возраста: заказ, висящий с ночи, тем более
+        # требует ответа. Закрытые — только за текущую смену.
+        if lane != "new" and _biz_date(ts) != today:
+            continue
+        row = _summary(o)
+        lanes[lane].append(row)
+        if lane == "work":
+            counts["manual" if o.get("source") == "manual" else "app"] += 1
+    lanes["new"].sort(key=lambda x: x.get("timestamp", ""))          # старые сверху
+    lanes["work"].sort(key=lambda x: x.get("deliver_by", "") or "~")
+    lanes["done"].sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    return web.json_response({
+        "as": who, "senior": next(x["senior"] for x in people if x["name"] == who),
+        "districts": [d for d in districts if d["id"] in scope],
+        "new": lanes["new"], "work": lanes["work"], "done": lanes["done"],
+        "counts": counts,
+        "now": datetime.now(timezone.utc).isoformat(),
+    }, headers=CORS_HEADERS)
+
+
+@require_operator
+async def handle_accept(request):
+    """Принять онлайн-заказ: водитель и время одним действием.
+
+    Отдельного «принять сейчас, назначить потом» нет намеренно — это лишний
+    повод забыть, а заказ без водителя не виден никому."""
+    oid = request.match_info["oid"]
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+
+    districts = await _fresh_districts()
+    people = _people(districts)
+    who = (body.get("as") or "").strip()
+    if not _scope(people, who, districts):
+        return web.json_response({"error": "unknown_operator"}, status=400, headers=CORS_HEADERS)
+
+    order = await db.get_order(oid)
+    if not order:
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    if order.get("status") != "pending":
+        return web.json_response({"error": "already_taken",
+                                  "status": order.get("status"),
+                                  "by": order.get("operator_name") or "",
+                                  "driver": order.get("driver") or ""},
+                                 status=409, headers=CORS_HEADERS)
+
+    driver = str(body.get("driver", "")).strip()
+    known = {n for d in districts for n in d["drivers"]}
+    if driver not in known:
+        return web.json_response({"error": "driver_required"}, status=400, headers=CORS_HEADERS)
+    try:
+        eta = int(body.get("eta") or 0)
+    except (TypeError, ValueError):
+        eta = 0
+    if eta not in (20, 25, 30, 35, 40, 50, 60):
+        return web.json_response({"error": "eta_required"}, status=400, headers=CORS_HEADERS)
+
+    now = datetime.now(timezone.utc)
+    deliver_by = (datetime.now(DUBAI_TZ) + timedelta(minutes=eta)).strftime("%H:%M")
+    got = await db.claim_order(oid, {
+        "status": "approved", "eta": eta, "deliver_by": deliver_by,
+        "confirmed_at": now.isoformat(), "updated_at": now.isoformat(),
+        # Устройство одно на всех, поэтому в заказе живут оба: чей аккаунт
+        # принял и кто за ним сидел. Без имени вся статистика троих схлопнется
+        # в «Планшет операторов».
+        "operator_id": request["op_id"], "operator_name": who,
+        "accepted_via": "pos",
+        "driver": driver, "driver_assigned_at": now.isoformat(), "assigned_by": who,
+    })
+    if not got:
+        fresh = await db.get_order(oid) or {}
+        return web.json_response({"error": "already_taken",
+                                  "status": fresh.get("status"),
+                                  "by": fresh.get("operator_name") or "",
+                                  "driver": fresh.get("driver") or ""},
+                                 status=409, headers=CORS_HEADERS)
+
+    await _customer_card(oid)          # клиенту — подтверждение со временем
+    await _refresh_cards(got)          # операторам — карточки без «Принять»
+    await notify_driver(got, "new")    # водителю — заказ
+    log.info(f"[pos] #{oid} принял {who} · водитель {driver} · ETA {eta}")
+    return web.json_response({"ok": True, "order": _summary(got)}, headers=CORS_HEADERS)
+
+
 @require_operator
 async def handle_patch(request):
     oid = request.match_info["oid"]
-    order = await _get_manual_order(oid)
+    order = await _get_pos_order(oid)
     if not order:
         return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
     if order.get("status") != "approved":
@@ -664,7 +870,7 @@ async def handle_patch(request):
 @require_operator
 async def handle_cancel(request):
     oid = request.match_info["oid"]
-    order = await _get_manual_order(oid)
+    order = await _get_pos_order(oid)
     if not order:
         return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
     if order.get("status") != "approved":
@@ -675,11 +881,12 @@ async def handle_cancel(request):
     order.update(status="cancelled")
     await notify_driver(order, "cancel")   # иначе водитель повезёт отменённый заказ
     await _refresh_cards(order)
+    await _customer_card(oid)              # у телефонного заказа некому — молча выйдет
     try:
         from owner_routes import notify_owners
         await notify_owners(
             "orders.cancelled",
-            f"🚫 *Ручной заказ отменён #{oid}*\n"
+            f"🚫 *Заказ отменён #{oid}*\n"
             f"Оператор: {_op_name(request['op_user'])}\n"
             f"💰 {order.get('total', 0)} AED · {order.get('customer_name','—')}")
     except Exception as e:
@@ -690,7 +897,7 @@ async def handle_cancel(request):
 @require_operator
 async def handle_delivered(request):
     oid = request.match_info["oid"]
-    order = await _get_manual_order(oid)
+    order = await _get_pos_order(oid)
     if not order:
         return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
     if order.get("status") != "approved":
@@ -699,11 +906,12 @@ async def handle_delivered(request):
     await db.update_order(oid, status="delivered", updated_at=now)
     order.update(status="delivered")
     await _refresh_cards(order)
+    await _customer_card(oid)
     try:
         from owner_routes import notify_owners
         await notify_owners(
             "orders.delivered",
-            f"✅ *Ручной заказ доставлен #{oid}*\n"
+            f"✅ *Заказ доставлен #{oid}*\n"
             f"💰 {order.get('total', 0)} AED · {order.get('customer_name','—')}")
     except Exception as e:
         log.error(f"[pos] delivered notify failed: {e}")
@@ -717,7 +925,7 @@ async def handle_undeliver(request):
     Нужна, когда «Доставлен» нажали по ошибке: заказ иначе уже закрыт и
     попадает в выручку."""
     oid = request.match_info["oid"]
-    order = await _get_manual_order(oid)
+    order = await _get_pos_order(oid)
     if not order:
         return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
     if order.get("status") != "delivered":
@@ -778,6 +986,10 @@ def setup(app):
     r.add_get("/api/operator/ping", handle_ping)
     r.add_route("OPTIONS", "/api/operator/catalog", _opt)
     r.add_get("/api/operator/catalog", handle_catalog)
+    r.add_route("OPTIONS", "/api/operator/queue", _opt)
+    r.add_get("/api/operator/queue", handle_queue)
+    r.add_route("OPTIONS", "/api/operator/orders/{oid}/accept", _opt)
+    r.add_post("/api/operator/orders/{oid}/accept", handle_accept)
     r.add_route("OPTIONS", "/api/operator/orders", _opt)
     r.add_get("/api/operator/orders", handle_list)
     r.add_post("/api/operator/orders", handle_create)

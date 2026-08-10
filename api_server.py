@@ -582,7 +582,11 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         "items": items,         "item_lines": item_lines,
         "tip": tip,             "total": total,        "lang": lang,
         "office_id": office_id, "office_name": office_nm, "comment": comment,
+        # Канал помечаем явно. «Онлайн» до сих пор означало «не помечен
+        # телефонным», и третий канал сломал бы всё, что на этом построено.
+        "source": "app",
         "status": "pending",    "timestamp": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
     }
     if prepaid:
         order_doc["payment_method"]     = "crypto"

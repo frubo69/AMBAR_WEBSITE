@@ -37,6 +37,9 @@ async def connect():
     try:
         await _db.orders.create_index("order_id", unique=True)
         await _db.orders.create_index("customer_id")
+        # Очередь панели: что нового, что в работе, что тронули после отметки.
+        await _db.orders.create_index([("status", 1), ("timestamp", -1)])
+        await _db.orders.create_index("updated_at")
         await _db.users.create_index("telegram_id", unique=True)
         await _db.support_messages.create_index("conv_key", unique=True)
         await _db.support_map.create_index("fwd_msg_id", unique=True)
@@ -1604,6 +1607,37 @@ async def zayavka_last() -> dict:
     if db is None: return {}
     doc = await db.zayavki.find_one(sort=[("at", -1)])
     return (doc or {}).get("asked") or {}
+
+
+# ── Приём заказа: захват, а не запись ───────────────────────────────────────
+# Заказ достаётся одному. Два оператора с двух устройств нажимают «Принять»
+# одновременно чаще, чем кажется: карточка висит у всех, и когда она наконец
+# появляется, тянутся к ней сразу двое. Обычный update здесь молча пропустил бы
+# обоих — клиент получил бы два подтверждения с разным временем.
+#
+# Поэтому статус меняем условием: сработало — заказ твой, вернулось ничего —
+# его взяли раньше, и это не ошибка, а нормальный ответ, который надо показать.
+async def claim_order(oid: str, fields: dict) -> dict | None:
+    db = _db_or_none()
+    if db is None: return None
+    from pymongo import ReturnDocument
+    return await db.orders.find_one_and_update(
+        {"order_id": oid, "status": "pending"},
+        {"$set": fields},
+        projection={"_id": 0},
+        return_document=ReturnDocument.AFTER)
+
+
+async def orders_changed_since(iso: str, limit: int = 400) -> list:
+    """Заказы, тронутые после указанного момента — для опроса из панели.
+
+    Панель спрашивает «что нового» каждые пару секунд; выкачивать всю смену
+    ради одного изменившегося заказа незачем."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.orders.find({"updated_at": {"$gt": iso}}, {"_id": 0}) \
+                   .sort("updated_at", 1).limit(limit)
+    return await cur.to_list(length=limit)
 
 
 # ── Кто на каком районе ─────────────────────────────────────────────────────

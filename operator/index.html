@@ -176,13 +176,10 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 /* Заказы плиткой. Ширина колонки задана снизу — сколько влезет, столько и
    станет: на планшете две-три, на телефоне одна, и тогда это просто лента
    сверху вниз, как переписка. */
-/* Сводка по онлайн-заказу вместо полей клиента: что за заказ правим. */
-.cr-l{font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;
-  color:var(--muted);margin:14px 0 6px}
-.cr-v{font-size:15px;font-weight:700}
-.cr-s{font-size:12.5px;color:var(--sub);margin-top:3px;line-height:1.4}
-.cr-n{margin-top:10px;padding:10px 12px;border-radius:11px;font-size:11.5px;line-height:1.45;
-  color:var(--gold3);background:var(--gold-soft);border:1px solid rgba(201,169,110,.2)}
+/* Заголовок чека: в правке онлайн-заказа под именем клиента стоит его адрес. */
+.tk-ttl{flex:1;min-width:0}
+.tk-sub{display:block;font-size:11.5px;font-weight:500;color:var(--muted);margin-top:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 
 .q-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));
   gap:12px;align-items:start}
@@ -575,7 +572,10 @@ a.oc-row:active{background:var(--card2)}
     <!-- ticket -->
     <div class="ticket">
       <div class="ticket-hdr">
-        <span class="t">Чек</span>
+        <!-- В правке онлайн-заказа здесь стоит, чей это заказ: слово «Чек» в
+             этот момент не значит ничего, а имя с адресом — значит. -->
+        <span class="tk-ttl"><span class="t" id="tkTitle">Чек</span>
+          <span class="tk-sub" id="tkSub" style="display:none"></span></span>
         <span class="edit-tag" id="editTag" style="display:none"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M14 6l4 4"/></svg>ПРАВКА</span>
         <button class="ticket-clear" onclick="clearTicket(true)">Очистить</button>
       </div>
@@ -584,7 +584,6 @@ a.oc-row:active{background:var(--card2)}
         <div class="cust">
           <!-- Онлайн-заказ приходит с адресом и телефоном клиента: переписывать
                их оператору незачем, работа там только по составу. -->
-          <div id="custRead" style="display:none"></div>
           <!-- Район и водитель правятся всегда: заказ могут передать на другой
                район или переназначить водителя посреди смены. -->
           <div class="lbl">Район *</div>
@@ -1086,11 +1085,18 @@ function closeTicket(){
 }
 // Планшет после поворота/ресайза не должен остаться с открытой шторкой.
 window.addEventListener('resize', ()=>{ if(!isPhone()) closeTicket(); });
+// Заголовок чека: обычно «Чек», в правке онлайн-заказа — имя клиента и адрес.
+function _setTicketTitle(t, sub){
+  const a=$('tkTitle'), b=$('tkSub');
+  if(a) a.textContent = t;
+  if(b){ b.textContent = sub||''; b.style.display = sub?'':'none'; }
+}
+
 function clearTicket(confirmIt){
   if(confirmIt && Object.keys(TICKET).length===0 && !editingOid) return;
   TICKET={}; editingOid=null; editOnline=false;
   const _cf=$('custFields'); if(_cf) _cf.style.display='';
-  const _cr=$('custRead'); if(_cr){ _cr.style.display='none'; _cr.innerHTML=''; }
+  _setTicketTitle('Чек','');
   $('editTag').style.display='none';
   $('createBtn').innerHTML='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 3.5h4l2 5-2.5 1.5a12 12 0 0 0 6 6L15.5 13l5 2v4a1.5 1.5 0 0 1-1.6 1.5A16.5 16.5 0 0 1 3 5.1 1.5 1.5 0 0 1 4.5 3.5z"/></svg>'+'Создать заказ';
   $('createBtn').classList.remove('save');
@@ -1745,21 +1751,13 @@ function startEdit(oid){
   // Онлайн-заказ: адрес и телефон пришли от клиента, переписывать их не надо.
   // Остаётся состав, а водитель — только если заказ уже в пути.
   editOnline = (o.source||'app')!=='manual';
-  const cf=$('custFields'), cr=$('custRead');
+  const cf=$('custFields');
   if(cf) cf.style.display = editOnline?'none':'';
-  if(cr){
-    cr.style.display = editOnline?'':'none';
-    const d=_dist(_od);
-    cr.innerHTML = !editOnline ? '' : `
-      <div class="cr-l">Заказ клиента</div>
-      <div class="cr-v">${_esc(o.customer_name||'—')}</div>
-      <div class="cr-s">${_esc(o.address||'адрес не указан')}${
-        d?` · ${_esc(d.name)}`:''}</div>
-      <div class="cr-n">Правится состав, район и водитель. Адрес и телефон
-        пришли от клиента — их меняет он сам.</div>`;
-  }
+  const d=_dist(_od);
+  _setTicketTitle(editOnline ? (o.customer_name||'—') : 'Чек',
+    editOnline ? [(o.address||'адрес не указан'), d?d.name:''].filter(Boolean).join(' · ') : '');
   renderDispatch();
-  $('editTag').style.display='';
+  $('editTag').style.display = editOnline?'none':'';
   $('createBtn').innerHTML='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h7V3M8 21v-7h8v7"/></svg>'+'Сохранить изменения';
   $('createBtn').classList.add('save');
   openCatalog();

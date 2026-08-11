@@ -11,11 +11,16 @@ AMBAR — приложение водителя.
 Что он может
 ------------
   • видеть свои заказы — те, где он назначен водителем;
-  • отметить доставку — та же операция, что кнопка «Доставлен» в боте;
-  • попросить правку — сам он заказ не меняет, а отправляет просьбу оператору:
-    цена и состав остаются под операторским контролем;
+  • ПОПРОСИТЬ: отметить доставку, изменить состав, отменить заказ, передать
+    сообщение. Все четыре — просьбы, а не действия: заказ закрывает, меняет и
+    отменяет оператор. Водитель на месте видит, чего не хватает, но решать, что
+    везти, почём и считать ли заказ закрытым, — не его работа;
   • записать расход — со статусом «на согласовании», пока менеджер не утвердит.
     В расходы дня такой не попадает: иначе водитель сам себе назначал бы траты.
+
+Просьба живёт на заказе одним полем driver_req: {kind, status, by, at, …}.
+Открытая просьба всегда одна — вторая заменяет первую, иначе оператор разбирал
+бы очередь из противоречащих друг другу пожеланий.
 
 У водителей свой бот (DRIVER_BOT_TOKEN): подпись initData проверяется его
 токеном, а значит вход в приложение водителя невозможен из операторского — и
@@ -114,7 +119,7 @@ def _order_view(o: dict) -> dict:
         "timestamp": o.get("timestamp", ""),
         "confirmed_at": o.get("confirmed_at", ""),
         "deliver_by": o.get("deliver_by", ""),
-        "edit_request": o.get("edit_request") or None,
+        "driver_req": o.get("driver_req") or o.get("edit_request") or None,
     }
 
 
@@ -190,10 +195,54 @@ async def handle_history(request):
     }, headers=CORS_HEADERS)
 
 
+KIND_TITLE = {
+    "delivered": "отметил доставку",
+    "cancel":    "просит отменить заказ",
+    "edit":      "просит изменить состав",
+    "note":      "сообщение по заказу",
+}
+
+
+async def _notify_operators(oid: str, me: dict, req: dict, order: dict):
+    """Просьба уходит операторам с кнопками решения — разбирать её руками по
+    переписке никто не станет."""
+    try:
+        from api_server import tg_send, OPERATOR_BOT_TOKEN as _tok
+        from operator_routes import OPERATOR_IDS
+        import html as _h
+        icon = {"delivered": "📦", "cancel": "🚫", "edit": "✏️", "note": "💬"}
+        msg = (f"{icon.get(req['kind'],'•')} <b>Водитель {KIND_TITLE[req['kind']]}</b>\n"
+               f"Заказ #{oid} · {_h.escape(me['name'])} ({me['district_code']})\n"
+               f"{_h.escape(order.get('address',''))} · {order.get('total',0)} AED\n")
+        if req.get("diff"):
+            sign = {"add": "+", "del": "−", "qty": "→"}
+            msg += "\n" + "\n".join(
+                f"{sign.get(d['kind'],'·')} {_h.escape(d['name'])}"
+                + (f" ×{d['qty']}" if d["kind"] != "qty" else f" {d['from']} → {d['qty']}")
+                for d in req["diff"]) + f"\n\nСумма: {order.get('total',0)} → <b>{req.get('total')} AED</b>"
+        if req.get("text"):
+            msg += f"\n\n💬 {_h.escape(req['text'])}"
+        ok = {"delivered": "✅ Подтвердить доставку", "cancel": "✅ Отменить заказ",
+              "edit": "✅ Применить", "note": "✅ Принято"}[req["kind"]]
+        kb = {"inline_keyboard": [[
+            {"text": ok,           "callback_data": f"drvreq_ok_{oid}"},
+            {"text": "🚫 Отклонить", "callback_data": f"drvreq_no_{oid}"},
+        ]]}
+        for op_id in OPERATOR_IDS:
+            try:
+                await tg_send(_tok, op_id, msg, parse_mode="HTML", reply_markup=kb)
+            except Exception as e:
+                log.warning(f"[driver] просьба #{oid} → {op_id}: {e}")
+    except Exception as e:
+        log.error(f"[driver] уведомление о просьбе #{oid}: {e}")
+
+
 @require_driver
 async def handle_delivered(request):
-    """Отметить доставку. Только свой заказ и только из работы — закрыть чужой
-    или закрыть дважды нельзя."""
+    """«Доставил» — это пинг оператору, а не закрытие заказа.
+
+    Закрывает заказ оператор: деньги, выручка и спорные ситуации на нём. Но
+    видно ему должно быть сразу и явно, что водитель уже отметил."""
     oid = (request.match_info.get("oid") or "").strip()
     me = request["driver"]
     o = await db.get_order(oid)
@@ -202,39 +251,21 @@ async def handle_delivered(request):
     if o.get("status") != "approved":
         return web.json_response({"error": "wrong_status", "status": o.get("status")},
                                  status=409, headers=CORS_HEADERS)
-    now = datetime.now(timezone.utc).isoformat()
-    await db.update_order(oid, status="delivered", updated_at=now,
-                          delivered_by_driver=me["name"], delivered_at=now)
-    log.info(f"[driver] {me['name']} доставил #{oid}")
-    # Владельцу — тем же событием, что и доставка из бота, чтобы отметка из
-    # приложения не выглядела иначе. Но откуда она пришла, сказано прямо:
-    # закрыл водитель сам, а не оператор за него.
+    req = {"kind": "delivered", "text": "", "items": None, "diff": [], "total": None,
+           "by": me["name"], "at": datetime.now(timezone.utc).isoformat(), "status": "open"}
+    await db.update_order(oid, driver_req=req)
+    log.info(f"[driver] {me['name']} отметил доставку #{oid} — ждём оператора")
+    await _notify_operators(oid, me, req, o)
     try:
         from owner_routes import notify_owners
-        sent = await notify_owners("orders.delivered",
-            f"✅ *Заказ доставлен #{oid}*\n"
-            f"Клиент: {o.get('customer_name','—')}\n"
-            f"Сумма: {o.get('total',0)} AED\n"
-            f"Отметил водитель: {me['name']} ({me['district_code']})")
-        if sent:
-            await db.update_order(oid, _delivered_notif_msgs=sent)
+        await notify_owners("orders.driver_done",
+            f"📦 *Водитель отметил доставку #{oid}*\n"
+            f"{me['name']} ({me['district_code']}) · {o.get('total',0)} AED\n"
+            f"_Ждёт подтверждения оператора._")
     except Exception as e:
         log.warning(f"[driver] уведомление о доставке #{oid}: {e}")
-
-    # Карточка в операторском чате должна перестать звать к действию: заказ
-    # закрыт, и оператор не должен звонить клиенту следом за водителем.
-    try:
-        from api_server import tg_send, OPERATOR_BOT_TOKEN as _tok
-        for op_id, mid in (o.get("op_msg_ids") or {}).items():
-            try:
-                await tg_send(_tok, int(op_id),
-                              f"✅ Заказ #{oid} доставлен — отметил {me['name']}",
-                              parse_mode="HTML", reply_to_message_id=int(mid))
-            except Exception:
-                pass
-    except Exception as e:
-        log.warning(f"[driver] отметка в операторском чате #{oid}: {e}")
-    return web.json_response({"ok": True, "order_id": oid}, headers=CORS_HEADERS)
+    return web.json_response({"ok": True, "order_id": oid, "driver_req": req},
+                             headers=CORS_HEADERS)
 
 
 @require_driver
@@ -280,12 +311,11 @@ def _diff_lines(old_items: list, new_items: list) -> list:
 
 @require_driver
 async def handle_edit_request(request):
-    """Правка от водителя — предложение, а не действие.
+    """Просьба водителя — предложение, а не действие.
 
-    Два вида: изменить состав (items) или сообщить о проблеме (text). Ни то ни
-    другое не применяется само: заказ меняет оператор, у него же остаётся цена.
-    Водитель на месте видит, чего не хватает, — но решать, что везти и почём, не
-    его работа."""
+    Виды: изменить состав (items), отменить заказ, просто сообщение. Ни одно не
+    применяется само: заказ меняет, отменяет и закрывает оператор, у него же
+    остаётся цена."""
     oid = (request.match_info.get("oid") or "").strip()
     me = request["driver"]
     try:
@@ -294,10 +324,16 @@ async def handle_edit_request(request):
         return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
     text = str(body.get("text") or "").strip()[:400]
     raw_items = body.get("items")
+    kind = str(body.get("kind") or "").strip()
+    if kind not in ("edit", "cancel", "note", ""):
+        return web.json_response({"error": "bad_kind"}, status=400, headers=CORS_HEADERS)
 
     o = await db.get_order(oid)
     if not o or (o.get("driver") or "").strip() != me["name"]:
         return web.json_response({"error": "not_your_order"}, status=403, headers=CORS_HEADERS)
+    if o.get("status") != "approved":
+        return web.json_response({"error": "wrong_status", "status": o.get("status")},
+                                 status=409, headers=CORS_HEADERS)
 
     items, diff, total = None, [], None
     if isinstance(raw_items, list):
@@ -325,45 +361,23 @@ async def handle_edit_request(request):
         if not diff and not text:
             return web.json_response({"error": "nothing_changed"}, status=400, headers=CORS_HEADERS)
         total = await _pos_total(items)
-    elif not text:
+    elif not text and kind != "cancel":
         return web.json_response({"error": "text_or_items_required"}, status=400, headers=CORS_HEADERS)
 
-    req = {"text": text, "items": items, "diff": diff, "total": total,
+    kind = kind or ("edit" if items else "note")
+    req = {"kind": kind, "text": text, "items": items, "diff": diff, "total": total,
            "by": me["name"], "at": datetime.now(timezone.utc).isoformat(), "status": "open"}
-    await db.update_order(oid, edit_request=req)
-    log.info(f"[driver] {me['name']} правка #{oid}: "
+    await db.update_order(oid, driver_req=req)
+    log.info(f"[driver] {me['name']} просьба «{kind}» по #{oid}: "
              f"{len(diff)} изменений, текст: {text[:40]}")
+    await _notify_operators(oid, me, req, o)
+    return web.json_response({"ok": True, "driver_req": req}, headers=CORS_HEADERS)
 
-    # Операторам — с кнопками: разбирать чужую просьбу руками по чату никто не
-    # станет, а применить её должен именно оператор.
-    try:
-        from api_server import tg_send, OPERATOR_BOT_TOKEN as _tok
-        from operator_routes import OPERATOR_IDS
-        import html as _h
-        sign = {"add": "+", "del": "−", "qty": "→"}
-        lines = "\n".join(
-            f"{sign.get(d['kind'],'·')} {_h.escape(d['name'])}"
-            + (f" ×{d['qty']}" if d["kind"] != "qty" else f" {d['from']} → {d['qty']}")
-            for d in diff) or "—"
-        msg = (f"✏️ <b>Водитель просит правку</b>\n"
-               f"Заказ #{oid} · {_h.escape(me['name'])} ({me['district_code']})\n")
-        if diff:
-            msg += (f"\n{lines}\n\n"
-                    f"Сумма: {o.get('total', 0)} → <b>{total} AED</b>")
-        if text:
-            msg += f"\n\n💬 {_h.escape(text)}"
-        kb = {"inline_keyboard": [[
-            {"text": "✅ Применить", "callback_data": f"drvedit_ok_{oid}"},
-            {"text": "🚫 Отклонить",  "callback_data": f"drvedit_no_{oid}"},
-        ]]} if items else None
-        for op_id in OPERATOR_IDS:
-            try:
-                await tg_send(_tok, op_id, msg, parse_mode="HTML", reply_markup=kb)
-            except Exception as e:
-                log.warning(f"[driver] правка #{oid} → {op_id}: {e}")
-    except Exception as e:
-        log.error(f"[driver] уведомление о правке #{oid}: {e}")
-    return web.json_response({"ok": True, "edit_request": req}, headers=CORS_HEADERS)
+
+# Бензин и мойка — не «прочие расходы», а ежедневная работа машины: они
+# заводятся отдельными окнами, а не поиском в списке. Всё остальное — «ещё
+# расход» внизу, там комментарий обязателен.
+EXPENSE_KINDS = {"fuel": "Бензин", "wash": "Мойка", "other": ""}
 
 
 @require_driver
@@ -379,13 +393,16 @@ async def handle_expense_add(request):
         amount = max(0, int(round(float(body.get("amount") or 0))))
     except (TypeError, ValueError):
         amount = 0
-    comment = str(body.get("comment") or "").strip()[:200]
+    kind = str(body.get("kind") or "other").strip()
+    if kind not in EXPENSE_KINDS:
+        kind = "other"
+    comment = str(body.get("comment") or "").strip()[:200] or EXPENSE_KINDS[kind]
     if amount <= 0 or not comment:
         return web.json_response({"error": "amount_and_comment_required"},
                                  status=400, headers=CORS_HEADERS)
     day = _biz_day()
     item = {"id": secrets.token_hex(6), "amount": amount, "comment": comment,
-            "by_driver": me["name"], "status": "pending",
+            "kind": kind, "by_driver": me["name"], "status": "pending",
             "at": datetime.now(timezone.utc).isoformat()}
     await db.add_driver_expense(day, me["name"], item)
     log.info(f"[driver] {me['name']} просит {amount} AED — {comment}")
@@ -409,12 +426,30 @@ async def handle_expenses(request):
     d = await db.get_driver_day(day, me["name"]) or {}
     extras = list(d.get("extras") or [])
     st = lambda x: x.get("status") or "approved"      # старые записи — от менеджера
+
+    # Вид расхода у старых записей не проставлен — узнаём его по комментарию,
+    # иначе вчерашний бензин уехал бы в «прочее» и водитель завёл бы второй.
+    def _kind(x):
+        k = x.get("kind")
+        if k in EXPENSE_KINDS:
+            return k
+        c = (x.get("comment") or "").lower()
+        if "бензин" in c or "топлив" in c or "fuel" in c: return "fuel"
+        if "мойк" in c or "wash" in c:                    return "wash"
+        return "other"
+
+    for x in extras:
+        x["kind"] = _kind(x)
+    live = [x for x in extras if st(x) != "rejected"]
     return web.json_response({
         "day": day,
         "working": d.get("working"),
         "meal": staff.MEAL_WORKING if d.get("working") is True
                 else (staff.MEAL_OFF if d.get("working") is False else 0),
         "extras": extras,
+        "by_kind": {k: {"sum": sum(x.get("amount", 0) for x in live if x["kind"] == k),
+                        "count": sum(1 for x in live if x["kind"] == k)}
+                    for k in EXPENSE_KINDS},
         "pending": sum(x.get("amount", 0) for x in extras if st(x) == "pending"),
         "approved": sum(x.get("amount", 0) for x in extras if st(x) == "approved"),
     }, headers=CORS_HEADERS)

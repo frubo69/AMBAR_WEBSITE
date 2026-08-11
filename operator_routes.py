@@ -514,6 +514,10 @@ def _summary(o: dict) -> dict:
         "prepaid": bool(o.get("prepaid")),
         "lang": o.get("lang", "ru"),
         "timestamp": o.get("timestamp", ""),
+        # Просьба водителя едет вместе с заказом: она меняет то, что оператор
+        # должен с ним сделать, и прятать её за отдельным запросом нельзя.
+        "driver_req": o.get("driver_req") or o.get("edit_request") or None,
+        "delivered_by_driver": o.get("delivered_by_driver", ""),
     }
 
 
@@ -1086,9 +1090,68 @@ async def handle_cancel(request):
         return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
     if order.get("status") != "approved":
         return web.json_response({"error": "order is closed"}, status=409, headers=CORS_HEADERS)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    who = (body.get("as") or "").strip() or _op_name(request["op_user"])
+    req = order.get("driver_req") or {}
+    if req.get("kind") == "cancel" and req.get("status") == "open":
+        await db.update_order(oid, driver_req={**req, "status": "applied", "decided_by": who,
+                                               "decided_at": datetime.now(timezone.utc).isoformat()})
+        await tell_driver(req.get("by", ""), f"🚫 Оператор отменил заказ #{oid} по вашей просьбе")
+    await _do_cancel(oid, order, who, str(body.get("reason") or "").strip()[:200])
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+
+async def tell_driver(name: str, text: str):
+    """Короткое сообщение водителю в его бот. Решение оператора должно до него
+    доехать: молчание он прочитает как «не заметили»."""
+    import os as _os
+    from api_server import tg_send
+    import config_staff as _staff
+    tid = _staff.DRIVER_IDS.get((name or "").strip())
+    token = _os.getenv("DRIVER_BOT_TOKEN", "")
+    if not (tid and token):
+        return
+    try:
+        await tg_send(token, tid, text, parse_mode="HTML")
+    except Exception as e:
+        log.warning(f"[pos] сообщение водителю {name}: {e}")
+
+
+async def _close_delivered(oid: str, order: dict, who: str, by_driver: str = ""):
+    """Закрыть заказ доставкой. Единственная дверь: и кнопка оператора, и
+    подтверждение отметки водителя идут сюда, иначе выручка считалась бы
+    по-разному в зависимости от того, кто нажал."""
     now = datetime.now(timezone.utc).isoformat()
-    await db.update_order(oid, status="cancelled", cancelled_by="operator",
-                          cancelled_at=now, updated_at=now)
+    fields = {"status": "delivered", "updated_at": now, "delivered_at": now,
+              "delivered_by": who}
+    if by_driver:
+        fields["delivered_by_driver"] = by_driver
+    await db.update_order(oid, **fields)
+    order.update(status="delivered")
+    await _refresh_cards(order)
+    await _customer_card(oid)
+    try:
+        from owner_routes import notify_owners
+        sent = await notify_owners(
+            "orders.delivered",
+            f"✅ *Заказ доставлен #{oid}*\n"
+            f"💰 {order.get('total', 0)} AED · {order.get('customer_name','—')}"
+            + (f"\nОтметил водитель {by_driver}, подтвердил {who}" if by_driver else ""))
+        # Сохраняем id уведомлений: возврат из доставленных их снимает.
+        if sent:
+            await db.update_order(oid, _delivered_notif_msgs=sent)
+    except Exception as e:
+        log.error(f"[pos] delivered notify failed: {e}")
+
+
+async def _do_cancel(oid: str, order: dict, who: str, reason: str = ""):
+    now = datetime.now(timezone.utc).isoformat()
+    await db.update_order(oid, status="cancelled", cancelled_by=who,
+                          cancelled_at=now, updated_at=now,
+                          **({"cancel_reason": reason} if reason else {}))
     order.update(status="cancelled")
     await notify_driver(order, "cancel")   # иначе водитель повезёт отменённый заказ
     await _refresh_cards(order)
@@ -1098,11 +1161,11 @@ async def handle_cancel(request):
         await notify_owners(
             "orders.cancelled",
             f"🚫 *Заказ отменён #{oid}*\n"
-            f"Оператор: {_op_name(request['op_user'])}\n"
-            f"💰 {order.get('total', 0)} AED · {order.get('customer_name','—')}")
+            f"Оператор: {who}\n"
+            + (f"Причина: {reason}\n" if reason else "")
+            + f"💰 {order.get('total', 0)} AED · {order.get('customer_name','—')}")
     except Exception as e:
         log.error(f"[pos] cancel notify failed: {e}")
-    return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 
 @require_operator
@@ -1113,19 +1176,20 @@ async def handle_delivered(request):
         return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
     if order.get("status") != "approved":
         return web.json_response({"error": "order is closed"}, status=409, headers=CORS_HEADERS)
-    now = datetime.now(timezone.utc).isoformat()
-    await db.update_order(oid, status="delivered", updated_at=now)
-    order.update(status="delivered")
-    await _refresh_cards(order)
-    await _customer_card(oid)
     try:
-        from owner_routes import notify_owners
-        await notify_owners(
-            "orders.delivered",
-            f"✅ *Заказ доставлен #{oid}*\n"
-            f"💰 {order.get('total', 0)} AED · {order.get('customer_name','—')}")
-    except Exception as e:
-        log.error(f"[pos] delivered notify failed: {e}")
+        body = await request.json()
+    except Exception:
+        body = {}
+    who = (body.get("as") or "").strip() or _op_name(request["op_user"])
+    req = order.get("driver_req") or {}
+    # Водитель уже отмечал доставку — закрываем его же просьбу, чтобы она не
+    # висела в «требует внимания» после того, как вопрос решён.
+    if req.get("kind") == "delivered" and req.get("status") == "open":
+        await db.update_order(oid, driver_req={**req, "status": "applied",
+                                               "decided_by": who,
+                                               "decided_at": datetime.now(timezone.utc).isoformat()})
+        await tell_driver(req.get("by", ""), f"✅ Оператор подтвердил доставку заказа #{oid}")
+    await _close_delivered(oid, order, who, req.get("by", "") if req.get("kind") == "delivered" else "")
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 
@@ -1206,6 +1270,255 @@ async def handle_undeliver(request):
     except Exception as e:
         log.error(f"[pos] reverted notify failed for #{oid}: {e}")
     return web.json_response({"ok": True, "status": "approved"}, headers=CORS_HEADERS)
+
+
+# ── лента: что требует внимания и что уже произошло ──────────────────────────
+# Смена оператора — это не только очередь. Заказ может висеть непринятым, пока
+# все смотрят в другую вкладку; водитель может отметить доставку и ждать
+# подтверждения; клиент — задать вопрос. Всё это в одном месте, отсортированное
+# по тому, насколько долго ждёт, чтобы ни один заказ не остался без внимания.
+
+def _code_of(dist_id: str, districts: list) -> str:
+    return next((d.get("code", "") for d in districts if d["id"] == dist_id), "")
+
+
+def _mins_since(ts: str) -> int:
+    try:
+        d = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+        if d.tzinfo is None:
+            d = d.replace(tzinfo=timezone.utc)
+        return max(0, int((datetime.now(timezone.utc) - d).total_seconds() // 60))
+    except Exception:
+        return 0
+
+
+def _late_by(o: dict) -> int:
+    """На сколько минут просрочено обещанное время. 0 — не просрочено."""
+    hhmm = (o.get("deliver_by") or "").strip()
+    if not hhmm or ":" not in hhmm:
+        return 0
+    try:
+        h, m = (int(x) for x in hhmm.split(":", 1))
+    except ValueError:
+        return 0
+    now = datetime.now(DUBAI_TZ)
+    due = now.replace(hour=h, minute=m, second=0, microsecond=0)
+    # Смена переходит за полночь: обещанные 00:30 при текущих 23:50 — завтра.
+    if (due - now).total_seconds() < -12 * 3600:
+        due += timedelta(days=1)
+    elif (due - now).total_seconds() > 12 * 3600:
+        due -= timedelta(days=1)
+    late = int((now - due).total_seconds() // 60)
+    return late if late > 0 else 0
+
+
+DRV_REQ_TITLE = {
+    "delivered": "водитель отметил доставку",
+    "cancel":    "водитель просит отменить",
+    "edit":      "водитель просит правку",
+    "note":      "сообщение от водителя",
+}
+
+
+@require_operator
+async def handle_feed(request):
+    districts = await _fresh_districts()
+    people = _people(districts)
+    who = (request.query.get("as") or "").strip()
+    scope = _scope(people, who, districts)
+    if not scope:
+        return web.json_response({"error": "unknown_operator", "people": people},
+                                 status=400, headers=CORS_HEADERS)
+    today = _biz_date(datetime.now(DUBAI_TZ))
+    need, recent = [], []
+
+    for o in (await db.get_all_orders()).values():
+        oid = o.get("order_id") or ""
+        dist = o.get("office_id") or ""
+        if dist not in scope and not (dist == "" and len(scope) == len(districts)):
+            continue
+        st = o.get("status", "")
+        req = _req_of(o)
+        base = {"order_id": oid, "total": o.get("total", 0),
+                "address": o.get("address", ""), "driver": o.get("driver", ""),
+                "district": _code_of(dist, districts)}
+
+        if req and req.get("status") == "open":
+            need.append({**base, "type": "driver_req", "kind": req.get("kind") or "edit",
+                         "title": DRV_REQ_TITLE.get(req.get("kind") or "edit", "просьба водителя"),
+                         "sub": req.get("by", ""), "text": req.get("text", ""),
+                         "at": req.get("at", ""), "mins": _mins_since(req.get("at", "")),
+                         "weight": 0})
+        if st == "pending":
+            mins = _mins_since(o.get("timestamp", ""))
+            need.append({**base, "type": "pending", "kind": "pending",
+                         "title": "заказ не принят", "sub": o.get("customer_name", ""),
+                         "at": o.get("timestamp", ""), "mins": mins,
+                         "weight": 1 if mins >= 5 else 3})
+        elif st == "approved":
+            late = _late_by(o)
+            if late >= 5:
+                need.append({**base, "type": "late", "kind": "late",
+                             "title": "просрочено обещанное время",
+                             "sub": f"обещали к {o.get('deliver_by','')}",
+                             "at": o.get("confirmed_at") or o.get("timestamp", ""),
+                             "mins": late, "weight": 2})
+
+        # Недавнее — только за смену: лента про «что было сегодня», а не архив.
+        for fld, kind, title in (("delivered_at", "delivered", "доставлен"),
+                                 ("cancelled_at", "cancelled", "отменён"),
+                                 ("declined_at", "declined", "отклонён"),
+                                 ("confirmed_at", "accepted", "принят")):
+            ts = o.get(fld)
+            if not ts:
+                continue
+            try:
+                d = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+                if d.tzinfo is None:
+                    d = d.replace(tzinfo=timezone.utc)
+            except Exception:
+                continue
+            if _biz_date(d.astimezone(DUBAI_TZ)) != today:
+                continue
+            # «Принят» показываем только пока заказ едет: закрытый заказ
+            # интереснее строкой о том, чем он закончился.
+            if kind == "accepted" and st != "approved":
+                continue
+            recent.append({**base, "type": "event", "kind": kind, "title": title,
+                           "sub": (o.get("delivered_by") or o.get("cancelled_by")
+                                   or o.get("operator_name") or ""),
+                           "at": d.isoformat(), "mins": _mins_since(d.isoformat())})
+
+    # Поддержка: вопрос без ответа — та же незакрытая задача, что и заказ.
+    try:
+        for t in await _support_rows():
+            if not t.get("wait"):
+                continue
+            need.append({"type": "support", "kind": "support", "order_id": t.get("order_id", ""),
+                         "title": "вопрос в поддержку без ответа",
+                         "sub": (t.get("client") or {}).get("name", ""),
+                         "text": t.get("last_text", ""), "key": t.get("key", ""),
+                         "at": t.get("last_ts", ""), "mins": _mins_since(t.get("last_ts", "")),
+                         "total": 0, "address": "", "driver": "", "district": "",
+                         "weight": 1})
+    except Exception as e:
+        log.error(f"[pos] лента: поддержка не собралась: {e}")
+
+    need.sort(key=lambda x: (x["weight"], -x["mins"]))
+    recent.sort(key=lambda x: x["at"], reverse=True)
+    return web.json_response({
+        "need": need[:60],
+        "recent": recent[:40],
+        "count": sum(1 for x in need if x["weight"] <= 2),
+    }, headers=CORS_HEADERS)
+
+
+# ── просьбы водителя ─────────────────────────────────────────────────────────
+# Водитель ничего не решает сам: «доставил», «поменять состав», «отменить» —
+# это просьбы. Оператор соглашается в одно нажатие, отклоняет, либо правит
+# состав по-своему и соглашается уже со своим. Решение всегда за оператором,
+# потому что на нём деньги, клиент и спор, если что-то пойдёт не так.
+
+def _req_of(order: dict) -> dict:
+    return order.get("driver_req") or order.get("edit_request") or {}
+
+
+@require_operator
+async def handle_driver_req(request):
+    oid = request.match_info["oid"]
+    order = await db.get_order(oid)
+    if not order:
+        return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    act = (body.get("act") or "").strip()
+    who = (body.get("as") or "").strip() or _op_name(request["op_user"])
+    req = _req_of(order)
+    if not req or req.get("status") != "open":
+        return web.json_response({"error": "no_open_request",
+                                  "status": req.get("status", "")},
+                                 status=409, headers=CORS_HEADERS)
+    kind = req.get("kind") or "edit"
+    now = datetime.now(timezone.utc).isoformat()
+    drv = req.get("by", "")
+
+    if act == "reject":
+        await db.update_order(oid, driver_req={**req, "status": "rejected",
+                                               "decided_by": who, "decided_at": now})
+        await tell_driver(drv, {
+            "delivered": f"❌ Оператор не подтвердил доставку #{oid} — свяжитесь с ним",
+            "cancel":    f"❌ Отмена заказа #{oid} отклонена — заказ везём",
+            "edit":      f"❌ Правка по заказу #{oid} отклонена",
+            "note":      f"❌ Сообщение по заказу #{oid} отклонено",
+        }[kind])
+        await _refresh_cards(await db.get_order(oid) or order)
+        log.info(f"[pos] просьба «{kind}» по #{oid} отклонена ({who})")
+        return web.json_response({"ok": True, "status": "rejected"}, headers=CORS_HEADERS)
+
+    if act != "approve":
+        return web.json_response({"error": "bad_act"}, status=400, headers=CORS_HEADERS)
+
+    # Оператор мог поправить состав по-своему — тогда применяем его, а не
+    # водительский: последнее слово и цена остаются здесь.
+    if kind == "edit":
+        raw = body.get("items")
+        items = None
+        if isinstance(raw, list) and raw:
+            items, _ = _build_items(raw)
+        items = items or req.get("items")
+        if not items:
+            return web.json_response({"error": "empty_items"}, status=400, headers=CORS_HEADERS)
+        total = await _pos_total(items)
+        await db.update_order(oid, items=items, total=total, updated_at=now,
+                              driver_req={**req, "status": "applied", "decided_by": who,
+                                          "decided_at": now, "applied_total": total})
+        order = await db.get_order(oid) or order
+        await _refresh_cards(order)
+        await _customer_card(oid)
+        await notify_driver(order, "edit")
+        await tell_driver(drv, f"✅ Заказ #{oid} изменён оператором · итог {total} AED")
+        try:
+            from owner_routes import notify_owners_force
+            _it = "\n".join(f"• {i.get('name','')} ×{i.get('qty',1)}"
+                             for i in order.get("items", [])) or "—"
+            await notify_owners_force(
+                "orders.edited",
+                f"✏️ *Заказ изменён #{oid}* — по просьбе водителя {drv}\n"
+                f"Одобрил: {who}\n💰 Новый итог: *{total} AED*\n🛒 Позиции:\n{_it}")
+        except Exception as e:
+            log.error(f"[pos] edited notify failed: {e}")
+        log.info(f"[pos] правка по #{oid} применена ({who})")
+        return web.json_response({"ok": True, "status": "applied", "total": total},
+                                 headers=CORS_HEADERS)
+
+    if kind == "delivered":
+        if order.get("status") != "approved":
+            return web.json_response({"error": "order is closed"}, status=409, headers=CORS_HEADERS)
+        await db.update_order(oid, driver_req={**req, "status": "applied",
+                                               "decided_by": who, "decided_at": now})
+        await _close_delivered(oid, order, who, drv)
+        await tell_driver(drv, f"✅ Оператор подтвердил доставку заказа #{oid}")
+        log.info(f"[pos] доставка #{oid} подтверждена ({who})")
+        return web.json_response({"ok": True, "status": "applied"}, headers=CORS_HEADERS)
+
+    if kind == "cancel":
+        if order.get("status") != "approved":
+            return web.json_response({"error": "order is closed"}, status=409, headers=CORS_HEADERS)
+        await db.update_order(oid, driver_req={**req, "status": "applied",
+                                               "decided_by": who, "decided_at": now})
+        await _do_cancel(oid, order, who, req.get("text", ""))
+        await tell_driver(drv, f"🚫 Заказ #{oid} отменён оператором по вашей просьбе")
+        log.info(f"[pos] отмена #{oid} по просьбе водителя ({who})")
+        return web.json_response({"ok": True, "status": "applied"}, headers=CORS_HEADERS)
+
+    # note — просто «принято»: водителю важно знать, что прочитали.
+    await db.update_order(oid, driver_req={**req, "status": "applied",
+                                           "decided_by": who, "decided_at": now})
+    await tell_driver(drv, f"👌 Оператор принял ваше сообщение по заказу #{oid}")
+    await _refresh_cards(await db.get_order(oid) or order)
+    return web.json_response({"ok": True, "status": "applied"}, headers=CORS_HEADERS)
 
 
 # ── поддержка: переписки с клиентами ─────────────────────────────────────────
@@ -1463,6 +1776,10 @@ def setup(app):
     r.add_post("/api/operator/orders/{oid}/delivered", handle_delivered)
     r.add_route("OPTIONS", "/api/operator/orders/{oid}/undeliver", _opt)
     r.add_post("/api/operator/orders/{oid}/undeliver", handle_undeliver)
+    r.add_route("OPTIONS", "/api/operator/feed", _opt)
+    r.add_get("/api/operator/feed", handle_feed)
+    r.add_route("OPTIONS", "/api/operator/orders/{oid}/driver-req", _opt)
+    r.add_post("/api/operator/orders/{oid}/driver-req", handle_driver_req)
     r.add_route("OPTIONS", "/api/operator/support", _opt)
     r.add_get("/api/operator/support", handle_support_list)
     r.add_route("OPTIONS", "/api/operator/support/thread", _opt)

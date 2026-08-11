@@ -1190,36 +1190,56 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     if data == "noop": return
 
-    # ── правка от водителя ───────────────────────────────────────────────────
-    # Водитель на месте видит, чего не хватает, но заказ меняет оператор: цена и
-    # состав остаются здесь. Кнопка применяет предложенный состав целиком —
-    # сравнивать списки глазами в чате оператор не станет.
-    if data.startswith("drvedit_"):
+    # ── просьба водителя ─────────────────────────────────────────────────────
+    # Водитель ничего не решает сам: «доставил», «поменять состав», «отменить» —
+    # просьбы. Кнопка здесь — то же самое решение, что в панели, и идёт оно
+    # теми же функциями, чтобы выручка и карточки считались одинаково.
+    if data.startswith("drvreq_") or data.startswith("drvedit_"):
         _, verdict, oid = data.split("_", 2)
         order = await db.get_order(oid)
-        req = (order or {}).get("edit_request") or {}
-        # Правку разбирают несколько операторов сразу — второму нужно увидеть,
+        req = (order or {}).get("driver_req") or (order or {}).get("edit_request") or {}
+        # Просьбу разбирают несколько операторов сразу — второму нужно увидеть,
         # что решение уже принято, а не молча нажать в пустоту.
         if not order or not req or req.get("status") != "open":
-            done = {"applied": "уже применена", "rejected": "уже отклонена"}.get(
+            done = {"applied": "уже принята", "rejected": "уже отклонена"}.get(
                 req.get("status"), "не найдена")
             try:
                 await q.edit_message_text(
-                    q.message.text_html + f"\n\n<i>Правка {done}</i>", parse_mode="HTML")
+                    q.message.text_html + f"\n\n<i>Просьба {done}</i>", parse_mode="HTML")
             except Exception:
                 pass
             return
 
         import operator_routes as _pos
-        if verdict == "ok" and req.get("items"):
+        kind = req.get("kind") or "edit"
+        drv = req.get("by", "")
+        now = datetime.now(timezone.utc).isoformat()
+
+        if verdict != "ok":
+            await db.update_order(oid, driver_req={**req, "status": "rejected",
+                                                   "decided_by": op, "decided_at": now})
+            await _pos.tell_driver(drv, {
+                "delivered": f"❌ Оператор не подтвердил доставку #{oid} — свяжитесь с ним",
+                "cancel":    f"❌ Отмена заказа #{oid} отклонена — заказ везём",
+                "edit":      f"❌ Правка по заказу #{oid} отклонена",
+                "note":      f"❌ Сообщение по заказу #{oid} отклонено",
+            }.get(kind, f"❌ Просьба по заказу #{oid} отклонена"))
+            await _pos._refresh_cards(await db.get_order(oid) or order)
+            await q.edit_message_text(q.message.text_html + "\n\n🚫 <b>Отклонено</b>",
+                                      parse_mode="HTML")
+            log.info(f"[drvreq] #{oid} «{kind}» отклонена оператором {op}")
+            return
+
+        if kind == "edit" and req.get("items"):
             total = await _pos._pos_total(req["items"])
             await db.update_order(oid, items=req["items"], total=total,
-                                  edit_request={**req, "status": "applied",
-                                                "decided_by": op})
+                                  driver_req={**req, "status": "applied",
+                                              "decided_by": op, "decided_at": now})
             order = await db.get_order(oid)
             await _pos._refresh_cards(order)
             await update_customer_card(oid)
             await _pos.notify_driver(order, "edit")     # водитель везёт новый состав
+            await _pos.tell_driver(drv, f"✅ Заказ #{oid} изменён оператором · итог {total} AED")
             await q.edit_message_text(
                 q.message.text_html + f"\n\n✅ <b>Применено</b> · сумма {total} AED",
                 parse_mode="HTML")
@@ -1229,30 +1249,38 @@ async def cb(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
                                 for i in order.get("items", [])) or "—"
                 await notify_owners_force(
                     "orders.edited",
-                    f"✏️ *Заказ изменён #{oid}* — по правке водителя "
-                    f"{req.get('by','—')}\n"
-                    f"💰 Новый итог: *{total} AED*\n"
-                    f"🛒 Позиции:\n{_it}")
+                    f"✏️ *Заказ изменён #{oid}* — по правке водителя {drv}\n"
+                    f"Одобрил: {op}\n💰 Новый итог: *{total} AED*\n🛒 Позиции:\n{_it}")
             except Exception as e:
-                log.error(f"[drvedit] уведомление владельцу: {e}")
-            log.info(f"[drvedit] #{oid} применена оператором {op}")
-        else:
-            await db.update_order(oid, edit_request={**req, "status": "rejected",
-                                                     "decided_by": op})
-            await q.edit_message_text(q.message.text_html + "\n\n🚫 <b>Отклонено</b>",
-                                      parse_mode="HTML")
-            # Водителю — ответ: молчание он прочитает как «не заметили».
-            try:
-                import os as _os
-                from api_server import tg_send as _send
-                import config_staff as _staff
-                tid = _staff.DRIVER_IDS.get(req.get("by"))
-                if tid:
-                    await _send(_os.getenv("DRIVER_BOT_TOKEN", ""), tid,
-                                f"Правка по заказу #{oid} отклонена оператором.")
-            except Exception as e:
-                log.warning(f"[drvedit] ответ водителю: {e}")
-            log.info(f"[drvedit] #{oid} отклонена оператором {op}")
+                log.error(f"[drvreq] уведомление владельцу: {e}")
+            log.info(f"[drvreq] правка #{oid} применена оператором {op}")
+            return
+
+        if kind in ("delivered", "cancel"):
+            if order.get("status") != "approved":
+                await q.edit_message_text(
+                    q.message.text_html + "\n\n<i>Заказ уже закрыт</i>", parse_mode="HTML")
+                return
+            await db.update_order(oid, driver_req={**req, "status": "applied",
+                                                   "decided_by": op, "decided_at": now})
+            if kind == "delivered":
+                await _pos._close_delivered(oid, order, op, drv)
+                await _pos.tell_driver(drv, f"✅ Оператор подтвердил доставку заказа #{oid}")
+                await q.edit_message_text(q.message.text_html + "\n\n✅ <b>Доставлен</b>",
+                                          parse_mode="HTML")
+            else:
+                await _pos._do_cancel(oid, order, op, req.get("text", ""))
+                await _pos.tell_driver(drv, f"🚫 Заказ #{oid} отменён оператором по вашей просьбе")
+                await q.edit_message_text(q.message.text_html + "\n\n🚫 <b>Отменён</b>",
+                                          parse_mode="HTML")
+            log.info(f"[drvreq] #{oid} «{kind}» принята оператором {op}")
+            return
+
+        await db.update_order(oid, driver_req={**req, "status": "applied",
+                                               "decided_by": op, "decided_at": now})
+        await _pos.tell_driver(drv, f"👌 Оператор принял ваше сообщение по заказу #{oid}")
+        await _pos._refresh_cards(await db.get_order(oid) or order)
+        await q.edit_message_text(q.message.text_html + "\n\n👌 <b>Принято</b>", parse_mode="HTML")
         return
 
     # Clear pending input flows when operator navigates away

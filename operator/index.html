@@ -1195,6 +1195,9 @@ async function doCreate(){
         district_id: curDist,
         driver: curDriver,
       };
+  // После сохранения возвращаем в карточку того же заказа, а не в общий
+  // список: человек правил конкретный заказ и смотреть хочет на него.
+  const savedOid = editingOid;
   try{
     let newOid = null;
     if(editingOid){
@@ -1209,6 +1212,10 @@ async function doCreate(){
     clearTicket(false);
     closeTicket();                  // телефон: убираем шторку, чтобы был виден список
     await loadQueue();
+    if(savedOid){
+      if(!showOrders) toggleOrders();
+      openOrder(savedOid);
+    }
     if(newOid){
       // straight to Заказы so the fresh order is on screen, with the driver text ready to copy
       if(!showOrders) toggleOrders(); else renderQueue();

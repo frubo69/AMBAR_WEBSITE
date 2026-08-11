@@ -388,7 +388,7 @@ async def notify_driver(order: dict, kind: str = "new"):
     из-за того, что человеку ещё не выдали приложение."""
     import os as _os
     import html as _h
-    from api_server import tg_send            # lazy: circular import at load
+    from api_server import tg_send, tg_edit   # lazy: circular import at load
     import config_staff as _staff
 
     name = (order.get("driver") or "").strip()
@@ -414,11 +414,32 @@ async def notify_driver(order: dict, kind: str = "new"):
     if order.get("comment"):
         txt += f"\n\n💬 {_h.escape(order['comment'])}"
 
+    # Правим то же сообщение, а не шлём новое. Иначе после трёх правок у
+    # водителя в чате три версии одного заказа, и какая из них верная — видно
+    # только по времени. Новое отправляем, если заказ передали другому: у него
+    # этого сообщения ещё нет.
+    oid = order.get("order_id", "")
+    prev_id = order.get("driver_msg_id")
+    prev_to = (order.get("driver_msg_to") or "").strip()
+    if prev_id and prev_to == name:
+        try:
+            r = await tg_edit(token, tid, prev_id, txt, parse_mode="HTML")
+            if r and r.get("ok"):
+                log.info(f"[driver-bot] #{oid} → {name}: сообщение обновлено")
+                return
+            # «message is not modified» — тоже успех: у водителя уже то же самое.
+            if "not modified" in str((r or {}).get("description", "")).lower():
+                return
+        except Exception as e:
+            log.debug(f"[driver-bot] правка #{oid}: {e}")
     try:
-        await tg_send(token, tid, txt, parse_mode="HTML")
-        log.info(f"[driver-bot] #{order.get('order_id')} → {name}")
+        r = await tg_send(token, tid, txt, parse_mode="HTML")
+        if r and r.get("ok") and r.get("result"):
+            await db.update_order(oid, driver_msg_id=r["result"]["message_id"],
+                                  driver_msg_to=name)
+        log.info(f"[driver-bot] #{oid} → {name}")
     except Exception as e:
-        log.warning(f"[driver-bot] #{order.get('order_id')} → {name}: {e}")
+        log.warning(f"[driver-bot] #{oid} → {name}: {e}")
 
 
 async def _refresh_cards(order: dict):

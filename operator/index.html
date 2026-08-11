@@ -235,6 +235,10 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .cst-o-a{flex:1;min-width:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .q-r{cursor:pointer}
 
+#askI{width:100%;margin:12px 0 4px;padding:14px;border-radius:var(--r2);font-size:15px;
+  color:var(--text);background:var(--card2);border:1px solid var(--border2);outline:none}
+#askI:focus{border-color:rgba(201,169,110,.5)}
+
 .acc-sum{font-family:'DM Sans',sans-serif;font-size:26px;font-weight:800;color:var(--gold2);
   margin:10px 0 4px}
 .acc-sum small{font-size:12px;color:var(--muted);font-weight:600}
@@ -484,6 +488,21 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
     <div class="s">Выберите себя — районы и водители подставятся автоматически</div>
     <div id="opList"></div>
     <div class="btns"><button class="sbtn" onclick="hideOv('opOv')">Закрыть</button></div>
+  </div>
+</div>
+
+<!-- Ввод одной строки. Родной prompt в телеграмовском вебвью то работает, то
+     молча возвращает null — на нём «Отклонить» и «Заметка» просто не сработали
+     бы, и никто бы не понял почему. -->
+<div class="ov" id="askOv">
+  <div class="sheet">
+    <div class="t" id="askT">—</div>
+    <div class="s" id="askS"></div>
+    <input id="askI" autocomplete="off" enterkeyhint="done">
+    <div class="btns">
+      <button class="sbtn" onclick="askDone(null)">Отмена</button>
+      <button class="sbtn go" onclick="askDone($('askI').value)">Готово</button>
+    </div>
   </div>
 </div>
 
@@ -1115,6 +1134,17 @@ function _row(o, lane){
     ${acts}</div>`;
 }
 
+// Одна строка ввода вместо prompt: в телеграмовском вебвью родной prompt то
+// работает, то молча возвращает null.
+let _askCb=null;
+function askText(title, sub, value, cb){
+  $('askT').textContent=title; $('askS').textContent=sub||'';
+  $('askI').value=value||''; _askCb=cb;
+  showOv('askOv'); haptic('light');
+  setTimeout(()=>$('askI').focus(), 120);
+}
+function askDone(v){ hideOv('askOv'); const cb=_askCb; _askCb=null; if(cb && v!==null) cb(v); }
+
 // ── карточка заказа ──
 // В боте у оператора под рукой всё: кто клиент, что заказал, куда везти, карта,
 // правка, отклонение. Панель должна уметь столько же, иначе за ответом всё
@@ -1247,19 +1277,19 @@ async function custAct(act, extra){
   }catch(e){ toast('Не получилось','err'); }
 }
 function custNote(){
-  const v = prompt('Заметка к клиенту (пусто — убрать)', curCust.note||'');
-  if(v===null) return;
-  custAct('note', {note:v});
+  askText('Заметка к клиенту', 'Пустая строка уберёт заметку', curCust.note||'',
+          v=>custAct('note', {note:v}));
 }
 function custBan(){
-  const r = prompt('Причина блокировки');
-  if(r===null) return;
-  custAct('ban', {reason:r});
+  askText('Заблокировать клиента', 'Причина останется в его карточке', '',
+          r=>custAct('ban', {reason:r}));
 }
 
 function askDecline(oid){
-  const r = prompt('Причина отклонения (необязательно)', '');
-  if(r===null) return;
+  askText('Отклонить заказ', 'Причина необязательна, но по ней потом разбираются', '',
+          r=>_decline(oid, r));
+}
+function _decline(oid, r){
   (async()=>{
     try{
       await opApi.opFetch(`/api/operator/orders/${oid}/decline`,

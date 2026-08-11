@@ -941,6 +941,7 @@ let CATALOG=[], CATS=[], curCat='Все', search='';
 let TICKET={};                  // key = id or id_pcs → {id, pcs, qty}
 let OFFICES=[], curOffice='';
 let ORDERS=[], showOrders=false, editingOid=null, _pollT=null, _pendingBeer=null;
+let _landed=false;   // куда приземлились при открытии — решается один раз
 // dispatch: who's taking calls (session) → район (per order) → водитель (per order).
 // FALLBACK_DISTRICTS keeps the pickers usable if the API is older than this file
 // (server /ping didn't return districts yet) — server list always wins.
@@ -987,8 +988,9 @@ async function boot(){
     $('netPill').textContent='● online'; $('netPill').className='pill ok';
     $('gate').classList.add('hidden');
     await loadCatalog();
-    // Панель открывается очередью, а не каталогом: за планшет садятся отвечать
-    // на входящие, а не вбивать. Каталог — за отдельной кнопкой.
+    // Чем открыть панель, решает очередь: есть непринятые заказы — открываем
+    // ими, нет — сразу каталогом, чтобы вбивать телефонный заказ без лишнего
+    // шага. Выбор делается один раз за сеанс (см. _landed в loadQueue).
     showOrders = true; applyView();
     await loadQueue();
     if(_pollT) clearInterval(_pollT);
@@ -1432,6 +1434,12 @@ async function loadQueue(){
   try{ r = await opApi.opFetch('/api/operator/queue',{params:{as:curOp}}); }
   catch(e){ return; }
   Q = r;
+  // Первая загрузка после выбора оператора решает, где мы стоим: пустая
+  // очередь — не повод смотреть на надпись «Новых заказов нет».
+  if(!_landed){
+    _landed = true;
+    if(!(r.new||[]).length){ showOrders = false; applyView(); }
+  }
   ORDERS = [].concat(r.new||[], r.work||[], r.done||[]);   // правка чека берёт отсюда
   const b=$('ordersBadge');
   const n=(r.new||[]).length;

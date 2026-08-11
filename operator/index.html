@@ -150,10 +150,6 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 /* ── Очередь ───────────────────────────────────────────────────────────────
    Три ленты по стадии заказа. Источник — полоска слева и значок в строке:
    после принятия важно, что едет и куда, а не откуда пришло. */
-.tel-btn{display:block;width:100%;margin-top:8px;padding:13px 12px;border-radius:var(--r2);
-  font-size:13.5px;font-weight:700;color:#1a1408;border:none;cursor:pointer;
-  background:linear-gradient(135deg,var(--gold),var(--gold2))}
-.tel-btn:active{transform:scale(.985)}
 .q-tabs{display:flex;gap:8px;margin-bottom:12px}
 .q-tab{flex:1;display:flex;align-items:center;justify-content:center;gap:7px;padding:12px 10px;
   border-radius:var(--r2);font-size:13.5px;font-weight:700;color:var(--muted);
@@ -528,9 +524,7 @@ a.oc-row:active{background:var(--card2)}
           Заказы
           <span class="badge" id="ordersBadge" style="display:none">0</span>
         </button>
-        <!-- Телефонный заказ — действие, которое начинает сам оператор, а не
-             вкладка наравне с очередью: панель открывается тем, что горит. -->
-        <button class="tel-btn" onclick="openCatalog()">+ Заказ по телефону</button>
+
       </div>
     </div>
 
@@ -1137,12 +1131,12 @@ function applyView(){
   if(tk) tk.style.display = showOrders?'none':'';
   // Категории товаров нужны каталогу, а не очереди.
   $('catRail').style.display = showOrders?'none':'';
-  // Кнопка «Заказы» в очереди ведёт туда, где ты и так стоишь, а «Заказ по
-  // телефону» в каталоге — туда же, где ты уже. Каждая лишняя половину времени,
-  // и вдвоём они превращали угол экрана в свалку.
+  // В очереди левая колонка пуста: категории нужны каталогу, а кнопка «Заказы»
+  // вела туда, где ты и так стоишь. Прячем её целиком — экран шире, путь один:
+  // «К товарам» ведёт в каталог, «Заказы» из каталога обратно.
   $('ordersBtn').style.display = showOrders?'none':'';
-  const tb=document.querySelector('.tel-btn');
-  if(tb) tb.style.display = showOrders?'':'none';
+  const rail=document.querySelector('.rail');
+  if(rail) rail.style.display = showOrders?'none':'';
 }
 function toggleOrders(){
   closeTicket();

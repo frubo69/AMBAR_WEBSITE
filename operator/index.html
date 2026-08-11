@@ -2116,8 +2116,11 @@ function _supRow(t){
   const oid = t.order_id
     ? `<span class="sup-oid ${t.order_lane}">#${_esc(t.order_id)}</span>` : '';
   const pre = (t.last_role==='operator' ? '<i>Вы: </i>' : '') + _esc(t.last_text||'');
+  // Старый вопрос без ответа не считается ждущим, но отметку заслуживает —
+  // иначе в истории он неотличим от закрытого разговора.
+  const dead = (!t.wait && t.last_role==='user') ? '<span class="sup-oid">без ответа</span>' : '';
   return `<button class="sup-t ${t.key===supKey?'on':''}" onclick="supThread('${_esc(t.key)}')">
-    <div class="n">${t.wait?'<span class="sup-dot"></span>':''}<b>${_esc(c.name||'—')}</b>${oid}
+    <div class="n">${t.wait?'<span class="sup-dot"></span>':''}<b>${_esc(c.name||'—')}</b>${oid}${dead}
       <span class="r">${_when(t.last_ts)}</span></div>
     <div class="m">${pre||'—'}</div></button>`;
 }
@@ -2157,7 +2160,8 @@ function supChat(scroll){
   let last='';
   const body = msgs.map(m=>{
     const day=_dayLbl(m.ts); const sep = day!==last ? (last=day, `<div class="sup-day">${day}</div>`) : '';
-    const img = m.type==='photo' && m.url ? `<img src="${_esc(m.url)}" alt="">` : '';
+    const src = m.url && m.url.startsWith('/') ? (opApi.AMBAR_API + m.url) : m.url;
+    const img = m.type==='photo' && src ? `<img src="${_esc(src)}" alt="" onclick="tgOpen('${_esc(src)}')">` : '';
     const txt = _esc(m.text || m.caption || (m.type==='photo'?'':'—'));
     const by  = m.role==='operator' && m.by ? ' · '+_esc(m.by) : '';
     return `${sep}<div class="sup-m ${m.role==='operator'?'operator':'user'}">${img}${txt}

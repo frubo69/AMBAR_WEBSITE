@@ -219,22 +219,25 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if update.effective_user.id in set(OWNER_IDS) | set(promo.POSTER_IDS):
         for lang_ in ("ru", "en"):
             await _photo_id(ctx, promo.POST_IMG[lang_])
+    # Язык — по имени, но карточка существует только та, у которой есть
+    # картинка: английской пока нет, и инлайн её тоже не показывает. Отдать
+    # вместо поста короткую подсказку для чатов — не то же сообщение.
     lang = _lang(update.effective_user.first_name or "")
+    if not os.path.exists(promo.POST_IMG.get(lang, "")):
+        lang = next((l for l in ("ru", "en") if os.path.exists(promo.POST_IMG[l])), "")
     # Метка post_direct: переход считается постовым, но отличим от чатовых.
-    kb = InlineKeyboardMarkup([[InlineKeyboardButton(
-        promo.BTN[lang], url=f"https://t.me/{MAIN_BOT}?start=post_direct")]])
-    path = promo.POST_IMG[lang]
-    if os.path.exists(path):
-        fid = await _photo_id(ctx, path)
-        await update.message.reply_photo(
-            photo=fid or f"{PUBLIC_ORIGIN}/{path}",
-            caption=promo.POST_TEXT[lang], parse_mode="HTML", reply_markup=kb)
+    url = f"https://t.me/{MAIN_BOT}?start=post_direct"
+    if not lang:
+        log.error("[promo] нет ни одной картинки поста — на /start ответить нечем")
+        await update.message.reply_text(promo.TEXT["ru"], parse_mode="HTML",
+            reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(promo.BTN["ru"], url=url)]]))
         return
-    # Картинки поста для этого языка нет (английской пока не существует) —
-    # отдаём короткую карточку, но с тем же переходом.
+    path = promo.POST_IMG[lang]
+    fid = await _photo_id(ctx, path)
     await update.message.reply_photo(
-        photo=f"{PUBLIC_ORIGIN}/{promo.IMG[lang]}",
-        caption=promo.TEXT[lang], parse_mode="HTML", reply_markup=kb)
+        photo=fid or f"{PUBLIC_ORIGIN}/{path}",
+        caption=promo.POST_TEXT[lang], parse_mode="HTML",
+        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(promo.BTN[lang], url=url)]]))
 
 
 async def cmd_chats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):

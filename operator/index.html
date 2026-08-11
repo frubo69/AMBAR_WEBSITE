@@ -1242,7 +1242,8 @@ function renderOrder(){
             cancelled:['Отменён','no'],declined:['Отклонён','no']};
   const [stT,stC]=ST[o.status]||[o.status,''];
   const goods=(o.total||0)-(o.tip||0);
-  const n=(o.items||[]).reduce((a,i)=>a+(+i.qty||0),0);
+  const lines=(o.items||[]).length;
+  const units=(o.items||[]).reduce((a,i)=>a+(+i.qty||0),0);
   const pay = o.prepaid ? 'Крипта · оплачено'
             : (o.payment_method==='debt' ? 'В долг · наличные не брать' : 'Наличные при получении');
   const src=(o.source||'app')==='manual';
@@ -1295,7 +1296,8 @@ function renderOrder(){
     </div>`;
 
   const items = `<div class="oc-sect">
-      <div class="oc-h">Заказ · ${n} ${n%10===1&&n%100!==11?'позиция':(n%10>=2&&n%10<=4&&(n%100<10||n%100>=20)?'позиции':'позиций')}</div>
+      <div class="oc-h">Заказ · ${lines} ${lines%10===1&&lines%100!==11?'позиция':(lines%10>=2&&lines%10<=4&&(lines%100<10||lines%100>=20)?'позиции':'позиций')}${
+        units!==lines?` · ${units} шт`:''}</div>
       <div class="oc-box">
         ${(o.items||[]).map(i=>`<div class="oc-it">
           <span class="oc-it-n">${_esc(i.name)}${i.pcs?` <i>${i.pcs} шт</i>`:''}</span>

@@ -206,17 +206,29 @@ async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Кто-то открыл самого рекламного бота — уводим в основной.
 
-    Заодно, если это владелец, загружаем картинку поста: первым бот написать
-    не может, и до этого «Start» ему просто некуда её отдать."""
+    Отдаём ту же карточку, что уходит инлайном: человек, попавший сюда по
+    ссылке из поста, должен увидеть пост, а не короткую подсказку для чата.
+    Заодно, если это владелец, картинка поста заодно загружается в телеграм:
+    первым бот написать не может, и до «Start» ему просто некуда её отдать."""
     if update.effective_user.id in set(OWNER_IDS) | set(promo.POSTER_IDS):
         for lang_ in ("ru", "en"):
             await _photo_id(ctx, promo.POST_IMG[lang_])
     lang = _lang(update.effective_user.first_name or "")
+    # Метка post_direct: переход считается постовым, но отличим от чатовых.
+    kb = InlineKeyboardMarkup([[InlineKeyboardButton(
+        promo.BTN[lang], url=f"https://t.me/{MAIN_BOT}?start=post_direct")]])
+    path = promo.POST_IMG[lang]
+    if os.path.exists(path):
+        fid = await _photo_id(ctx, path)
+        await update.message.reply_photo(
+            photo=fid or f"{PUBLIC_ORIGIN}/{path}",
+            caption=promo.POST_TEXT[lang], parse_mode="HTML", reply_markup=kb)
+        return
+    # Картинки поста для этого языка нет (английской пока не существует) —
+    # отдаём короткую карточку, но с тем же переходом.
     await update.message.reply_photo(
         photo=f"{PUBLIC_ORIGIN}/{promo.IMG[lang]}",
-        caption=promo.TEXT[lang], parse_mode="HTML",
-        reply_markup=InlineKeyboardMarkup([[InlineKeyboardButton(
-            promo.BTN[lang], url=f"https://t.me/{MAIN_BOT}?start=chat_direct")]]))
+        caption=promo.TEXT[lang], parse_mode="HTML", reply_markup=kb)
 
 
 async def cmd_chats(update: Update, ctx: ContextTypes.DEFAULT_TYPE):

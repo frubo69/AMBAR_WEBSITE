@@ -118,6 +118,7 @@ def _order_view(o: dict) -> dict:
         "payment_method": o.get("payment_method", ""),
         "timestamp": o.get("timestamp", ""),
         "confirmed_at": o.get("confirmed_at", ""),
+        "delivered_at": o.get("delivered_at", ""),
         "deliver_by": o.get("deliver_by", ""),
         "driver_req": o.get("driver_req") or o.get("edit_request") or None,
     }

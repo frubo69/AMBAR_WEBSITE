@@ -384,6 +384,24 @@ a.oc-row:active{background:var(--card2)}
   color:var(--text);background:var(--card2);border:1px solid var(--border2);outline:none}
 #askI:focus{border-color:rgba(201,169,110,.5)}
 
+/* Лист приёма. Водители сгруппированы: свой район крупно сверху, остальные —
+   мельче и приглушённо, чтобы не спорили со своим. */
+.acc-l{font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;
+  color:var(--muted);margin:18px 0 8px}
+.acc-g + .acc-g{margin-top:12px}
+.acc-gt{font-size:11.5px;font-weight:700;color:var(--gold2);margin-bottom:7px}
+.acc-g.other .acc-gt{color:var(--muted);font-weight:600}
+.acc-g.other .dchip{font-size:12px;padding:9px 11px;color:var(--muted)}
+.acc-g.own .dchip{font-size:14px;padding:12px 16px;font-weight:700}
+.eta-row{display:flex;flex-wrap:wrap;gap:7px}
+.dchip.eta{flex:1;min-width:38px;text-align:center;padding:12px 4px;font-size:14px;
+  font-weight:700}
+.eta-row{gap:6px}
+.acc-when{margin-top:14px;padding:11px 13px;border-radius:11px;text-align:center;
+  font-size:13.5px;font-weight:700;color:var(--gold2);background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.28)}
+#accOv .btns .sbtn{flex:1}
+#accOv .btns #accGo{flex:1.5}
 .acc-sum{font-family:'DM Sans',sans-serif;font-size:26px;font-weight:800;color:var(--gold2);
   margin:10px 0 4px}
 .acc-sum small{font-size:12px;color:var(--muted);font-weight:600}
@@ -698,10 +716,11 @@ a.oc-row:active{background:var(--card2)}
     <div class="t">Принять заказ</div>
     <div class="s" id="accWho">—</div>
     <div class="acc-sum"><span id="accSum">0</span> <small>AED</small></div>
-    <div class="lbl">Кому везёт</div>
-    <div class="dchips" id="accDrv"></div>
-    <div class="lbl">Через сколько</div>
-    <div class="dchips" id="accEta"></div>
+    <div class="acc-l">Кому везёт</div>
+    <div id="accDrv"></div>
+    <div class="acc-l">Через сколько минут</div>
+    <div class="dchips eta-row" id="accEta"></div>
+    <div class="acc-when" id="accWhen" style="display:none"></div>
     <div class="btns">
       <button class="sbtn" onclick="hideOv('accOv')">Отмена</button>
       <button class="sbtn go" id="accGo" onclick="doAccept()" disabled>Выберите водителя и время</button>
@@ -1742,15 +1761,22 @@ function askAccept(oid){
   acceptOid=oid; acceptDrv=''; acceptEta=0;
   $('accWho').textContent = _esc(o.customer_name||'—')+' · '+_esc(o.address||'');
   $('accSum').textContent = o.total;
-  // Водители района заказа — сверху: везёт обычно свой.
+  // Водители района заказа отдельной группой сверху: везёт обычно свой, а
+  // одиннадцать имён вперемешку — это не выбор, а поиск.
   const mine=(Q.districts||[]).find(d=>d.id===o.office_id);
   const rest=(Q.districts||[]).filter(d=>d.id!==o.office_id);
-  const grp=(mine?[mine]:[]).concat(rest);
-  $('accDrv').innerHTML = grp.map(d=>(d.drivers||[]).map(n=>
-    `<button class="dchip" data-n="${_esc(n)}" onclick="accPickDrv('${_esc(n)}')">
-       ${_esc(n)}<i>${_esc(_distCode(d.id))}</i></button>`).join('')).join('');
+  const chip=(n,code)=>`<button class="dchip" data-n="${_esc(n)}"
+      onclick="accPickDrv('${_esc(n)}')">${_esc(n)}${code?`<i>${_esc(code)}</i>`:''}</button>`;
+  const block=(t,html,cls)=>`<div class="acc-g ${cls||''}"><div class="acc-gt">${t}</div>
+      <div class="dchips">${html}</div></div>`;
+  $('accDrv').innerHTML =
+    (mine ? block(`${_esc(_distCode(mine.id))} ${_esc(mine.name)} · район заказа`,
+                  (mine.drivers||[]).map(n=>chip(n,'')).join(''), 'own') : '')
+    + (rest.length ? block('Другие районы',
+        rest.map(d=>(d.drivers||[]).map(n=>chip(n,_distCode(d.id))).join('')).join(''),
+        'other') : '');
   $('accEta').innerHTML = [20,25,30,35,40,50,60].map(m=>
-    `<button class="dchip" data-m="${m}" onclick="accPickEta(${m})">${m} мин</button>`).join('');
+    `<button class="dchip eta" data-m="${m}" onclick="accPickEta(${m})">${m}</button>`).join('');
   _accSync(); showOv('accOv'); haptic('medium');
 }
 function accPickDrv(n){ acceptDrv=n; haptic('sel'); _accSync(); }
@@ -1760,7 +1786,15 @@ function _accSync(){
   $('accEta').querySelectorAll('.dchip').forEach(b=>b.classList.toggle('on', +b.dataset.m===acceptEta));
   const ok = !!acceptDrv && !!acceptEta;
   const b=$('accGo'); b.disabled=!ok;
-  b.textContent = ok ? `Принять · ${acceptDrv} · ${acceptEta} мин` : 'Выберите водителя и время';
+  // Кнопка проговаривает решение целиком: на планшете её жмут не глядя, и
+  // «принято не тому» стоит поездки.
+  // Кого и на сколько — строкой над кнопками: в самой кнопке это переносилось
+  // на две строки и читалось хуже, чем короткое «Принять».
+  const w=$('accWhen');
+  if(w){ w.textContent = ok ? `${acceptDrv} · через ${acceptEta} мин` : '';
+         w.style.display = ok ? '' : 'none'; }
+  b.textContent = ok ? 'Принять заказ'
+    : (!acceptDrv ? 'Выберите водителя' : 'Через сколько минут?');
 }
 async function doAccept(){
   const b=$('accGo'); if(b.disabled) return;

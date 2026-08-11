@@ -1261,11 +1261,26 @@ async def _support_rows() -> list:
         pre.append((key, uid, oid, msgs[-1]))
     users = await db.users_by_ids(list(uids))
 
+    now = datetime.now(timezone.utc)
+
+    def _hours(ts) -> float:
+        try:
+            d = datetime.fromisoformat(str(ts).replace("Z", "+00:00"))
+            if d.tzinfo is None:
+                d = d.replace(tzinfo=timezone.utc)
+            return (now - d).total_seconds() / 3600
+        except Exception:
+            return 1e9
+
     rows = []
     for key, uid, oid, last in pre:
         o = orders.get(oid) if oid else None
         lane = _lane(o) if o else ""
-        wait = (last.get("role") == "user")
+        # «Ждёт ответа» — это сегодняшний вопрос или вопрос по живому заказу.
+        # Мартовское «где курьер?» ответа уже не ждёт, и если считать его
+        # ждущим, счётчик показывает 31 и не значит ничего.
+        wait = (last.get("role") == "user") and (lane in ("new", "work")
+                                                 or _hours(last.get("ts")) <= 24)
         if wait:
             prio = 0 if lane == "new" else (1 if lane == "work" else 2)
         else:

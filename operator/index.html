@@ -195,33 +195,51 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .q-cta{margin-top:18px;padding:14px 22px;border-radius:var(--r2);font-size:14px;font-weight:700;
   color:#1a1408;border:none;cursor:pointer;background:linear-gradient(135deg,var(--gold),var(--gold2))}
 /* ── Карточка заказа ───────────────────────────────────────────────────────
-   Блоками, а не простынёй: деньги, клиент, куда везти, состав. У каждого блока
-   своя коробка и заголовок — глаз находит нужное, не читая всё подряд.
-   Действий три уровня: одно главное крупно, обычные ровным рядом, опасное
-   отдельно внизу. */
+   Плоский список подписанных полей. Коробки внутри коробок и бейджи рядом с
+   названием района спрашивали больше, чем отвечали: подпись слева сверху,
+   значение под ней, ничего разгадывать не нужно. */
 .sheet.wide{max-width:520px;max-height:92vh;overflow-y:auto;padding:0}
 .sheet.wide .t{display:flex;align-items:flex-start;gap:10px;margin:0;padding:18px 22px 14px;
   border-bottom:1px solid var(--border2);position:sticky;top:0;background:var(--bg3);z-index:2}
 .oc-hd{flex:1;min-width:0}
+.oc-id{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;letter-spacing:-.3px}
 .oc-meta2{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:7px;
   font-size:11.5px;color:var(--muted)}
-.oc-id{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;letter-spacing:-.3px}
-.oc-st{font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:999px;
+.oc-st{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:999px;
   background:var(--card2);border:1px solid var(--border2);color:var(--sub)}
 .oc-st.new{color:var(--gold2);border-color:rgba(201,169,110,.35);background:var(--gold-soft)}
 .oc-st.go{color:var(--info);border-color:rgba(91,141,239,.3)}
 .oc-st.ok{color:var(--up);border-color:rgba(76,175,125,.3)}
 .oc-st.no{color:var(--dn);border-color:rgba(224,85,85,.3)}
-.oc-x{margin-left:auto;width:32px;height:32px;border-radius:10px;font-size:14px;color:var(--sub);
+.oc-x{width:32px;height:32px;border-radius:10px;font-size:14px;color:var(--sub);
   background:var(--card2);border:1px solid var(--border2);cursor:pointer;flex-shrink:0}
-#ordBody,#custBody{padding:18px 22px 8px}
+#ordBody,#custBody{padding:6px 22px 8px}
 
-/* Итог стоит у кнопок и не уезжает при прокрутке: сумму спрашивают в момент
-   решения. Разложен на слагаемые — чаевые не товар, и в одну строку с итогом
-   они сливались. */
+.of{padding:14px 0;border-bottom:1px solid var(--border2)}
+.of-l{font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:6px}
+.of-v{font-size:15px;font-weight:600;line-height:1.35;word-break:break-word}
+.of-v i{display:block;font-style:normal;font-size:12px;font-weight:500;color:var(--muted);
+  margin-top:4px}
+.of-map{display:flex;align-items:center;justify-content:space-between;padding:13px 0;
+  border-bottom:1px solid var(--border2);text-decoration:none;color:var(--gold2);
+  font-size:14px;font-weight:700}
+.of-map span{color:var(--muted);font-size:17px;line-height:1}
+
+/* Состав листается сам, как корзина: адрес и итог при этом стоят на месте. */
+.of-items{max-height:34vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;margin:0 -4px;padding:0 4px}
+.of-it{display:flex;align-items:baseline;gap:12px;padding:7px 0;font-size:14.5px}
+.of-it-n{flex:1;min-width:0;font-weight:600;line-height:1.35}
+.of-it-n b{font-weight:700;color:var(--gold2);white-space:nowrap;font-variant-numeric:tabular-nums}
+.of-it-n i{font-style:normal;font-size:11.5px;color:var(--muted);font-weight:500;
+  font-variant-numeric:tabular-nums}
+.of-it-p{min-width:62px;text-align:right;font-family:'DM Sans',sans-serif;font-weight:700;
+  font-size:15px;font-variant-numeric:tabular-nums}
+
+/* Итог у кнопок и всегда на виду: сумму спрашивают в момент решения. */
 .oc-total{padding:12px 0 4px}
-.oc-tl{display:flex;align-items:baseline;gap:12px;font-size:12.5px;color:var(--muted);
-  padding:3px 0}
+.oc-tl{display:flex;align-items:baseline;gap:12px;font-size:12.5px;color:var(--muted);padding:3px 0}
 .oc-tl b{margin-left:auto;font-family:'DM Sans',sans-serif;font-weight:700;color:var(--sub)}
 .oc-tl.big{padding-top:8px;margin-top:5px;border-top:1px solid var(--border2);align-items:center}
 .oc-tl.big span{font-size:13.5px;font-weight:700;color:var(--text)}
@@ -230,69 +248,12 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .oc-tl.big b{font-size:28px;line-height:1;font-weight:800;color:var(--gold2);letter-spacing:-1.1px}
 .oc-tl.big small{font-size:12px;color:var(--muted);font-weight:600;margin-left:6px;letter-spacing:0}
 
-.oc-sect{margin-bottom:16px}
-.oc-h{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
-  color:var(--muted);margin-bottom:8px;padding-left:2px}
-/* Список товаров листается сам, как корзина: страница при этом стоит, и адрес
-   с итогом всегда на виду. */
-.oc-scroll{max-height:40vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
-  overscroll-behavior:contain}
-.oc-box{background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);overflow:hidden}
-
-.oc-cli{display:flex;align-items:center;gap:12px;padding:13px 14px}
-.oc-av{width:38px;height:38px;flex:0 0 auto;border-radius:12px;display:flex;align-items:center;
-  justify-content:center;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:800;
-  color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.22)}
-.oc-cli-b{flex:1;min-width:0}
-.oc-cli-b b{display:block;font-size:14.5px;font-weight:700;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap}
-.oc-cli-b i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:2px}
-.oc-mini{flex:0 0 auto;padding:8px 12px;border-radius:10px;font-size:11.5px;font-weight:700;
-  color:var(--sub);background:var(--card2);border:1px solid var(--border2);cursor:pointer}
-.oc-mini:active{color:var(--text)}
-
-.oc-row{display:flex;align-items:center;gap:9px;padding:12px 14px;text-decoration:none;
-  color:var(--text);border-top:1px solid var(--border2);font-size:13.5px}
-a.oc-row:active{background:var(--card2)}
-.oc-row-t{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.oc-tag{font-size:10px;color:var(--muted);padding:2px 7px;border-radius:999px;
-  background:var(--card2);border:1px solid var(--border2);white-space:nowrap}
-.oc-tag.warn{color:var(--warn);border-color:rgba(243,180,74,.3)}
-.oc-go{font-size:11.5px;font-weight:700;color:var(--gold2);white-space:nowrap}
-
-.oc-addr{display:flex;align-items:center;gap:12px;padding:15px 14px}
-.oc-dist{width:38px;height:38px;flex:0 0 auto;border-radius:12px;display:flex;align-items:center;
-  justify-content:center;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:800;
-  color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.22)}
-.oc-addr-t{flex:1;min-width:0;font-size:15px;font-weight:700;line-height:1.35;letter-spacing:-.1px}
-.oc-addr-t i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);
-  font-weight:500;margin-top:4px;letter-spacing:0}
-
-/* Строка чека: что, сколько и по чём — под названием, сумма строки справа.
-   Количество в квадратике читалось то ли номером строки, то ли кнопкой. */
-.oc-it{display:flex;align-items:center;gap:12px;padding:13px 14px;font-size:14px}
-.oc-it + .oc-it{border-top:1px solid var(--border2)}
-.oc-it-n{flex:1;min-width:0;font-weight:600;line-height:1.35}
-.oc-it-n b{font-weight:700;color:var(--gold2);white-space:nowrap;font-variant-numeric:tabular-nums}
-.oc-it-n i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);
-  font-weight:500;margin-top:4px;font-variant-numeric:tabular-nums}
-.oc-it-p{min-width:62px;text-align:right;font-family:'DM Sans',sans-serif;font-weight:700;
-  font-size:15px;font-variant-numeric:tabular-nums}
-.oc-cnt{font-size:11px;color:var(--muted);text-align:right;padding:7px 4px 0}
-
-/* Комментарий — строка внутри адреса: «домофон 12, 4 этаж» отвечает на вопрос
-   «куда», а не является примечанием к заказу. */
-.oc-row.note{background:var(--gold-soft);color:var(--gold3)}
-.oc-row.note .oc-row-t{white-space:normal;font-weight:600;line-height:1.4}
-.oc-chev{color:var(--muted);font-size:16px;line-height:1}
-
-/* Действия: одно главное, ряд обычных, опасное отдельно. */
+/* Действия: решение и отказ рядом, остальное строками ниже. */
 .ord-acts{display:block;padding:6px 22px calc(18px + var(--safe-bottom));position:sticky;
   bottom:0;background:var(--bg3);border-top:1px solid var(--border2);margin-top:10px}
 .oc-top{display:flex;gap:8px;margin-top:12px}
-.oc-main{flex:1.35;padding:16px 10px;border-radius:var(--r2);font-size:15px;
-  font-weight:800;color:#1a1408;border:none;cursor:pointer;
-  background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.oc-main{flex:1.35;padding:16px 10px;border-radius:var(--r2);font-size:15px;font-weight:800;
+  color:#1a1408;border:none;cursor:pointer;background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .oc-main:active{transform:scale(.99)}
 .oc-danger{flex:1;padding:16px 10px;border-radius:var(--r2);font-size:14px;font-weight:700;
   color:var(--dn);background:none;border:1px solid rgba(224,85,85,.28);cursor:pointer}
@@ -302,6 +263,19 @@ a.oc-row:active{background:var(--card2)}
   color:var(--sub);background:var(--card2);border:1px solid var(--border2);cursor:pointer}
 .oc-sec:active{color:var(--text);border-color:var(--border3)}
 .sheet.wide .btns{display:none}
+
+/* Строки телефонов в карточке клиента */
+.oc-box{background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);
+  overflow:hidden}
+.oc-row{display:flex;align-items:center;gap:9px;padding:12px 14px;text-decoration:none;
+  color:var(--text);font-size:13.5px}
+.oc-row + .oc-row{border-top:1px solid var(--border2)}
+a.oc-row:active{background:var(--card2)}
+.oc-row-t{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.oc-tag{font-size:10px;color:var(--muted);padding:2px 7px;border-radius:999px;
+  background:var(--card2);border:1px solid var(--border2);white-space:nowrap}
+.oc-tag.warn{color:var(--warn);border-color:rgba(243,180,74,.3)}
+.oc-go{font-size:11.5px;font-weight:700;color:var(--gold2);white-space:nowrap}
 
 .cst-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
 .cst-chip{font-size:11px;font-weight:700;padding:5px 11px;border-radius:999px;
@@ -1268,67 +1242,50 @@ function renderOrder(){
   const [stT,stC]=ST[o.status]||[o.status,''];
   const goods=(o.total||0)-(o.tip||0);
   const lines=(o.items||[]).length;
-  const units=(o.items||[]).reduce((a,i)=>a+(+i.qty||0),0);
   const pay = o.prepaid ? 'Крипта · оплачено'
             : (o.payment_method==='debt' ? 'В долг · наличные не брать' : 'Наличные при получении');
   const src=(o.source||'app')==='manual';
 
-  // Шапка отвечает «что это за заказ»: номер, состояние, откуда пришёл и
-  // сколько ждёт. Всё в двух строках — в одну не помещается и переносится
-  // как попало.
   const when = o.status==='pending' ? `${_age(o.timestamp)} назад`
              : (o.deliver_by ? `до ${_esc(o.deliver_by)}` : '');
-  const meta = [stT, src?'По телефону':'Из приложения', when,
+  const head = [stT, src?'По телефону':'Из приложения', when,
                 o.operator_name?`принял ${_esc(o.operator_name)}`:''].filter(Boolean);
   $('ordT').innerHTML =
     `<span class="oc-hd">
        <span class="oc-id">#${_esc(o.order_id)}</span>
-       <span class="oc-meta2"><span class="oc-st ${stC}">${meta[0]}</span>${
-         meta.slice(1).map(x=>`<span>${x}</span>`).join('')}</span>
+       <span class="oc-meta2"><span class="oc-st ${stC}">${head[0]}</span>${
+         head.slice(1).map(x=>`<span>${x}</span>`).join('')}</span>
      </span>
      <button class="oc-x" onclick="hideOv('ordOv')" aria-label="Закрыть">✕</button>`;
 
-  // Комментарий живёт в адресе, а не отдельной плашкой: «домофон 12, 4 этаж» —
-  // это часть ответа на вопрос «куда», а не примечание к заказу.
-  const where = `<div class="oc-sect">
-      <div class="oc-h">Куда везти</div>
-      <div class="oc-box">
-        <div class="oc-addr">
-          <span class="oc-dist">${_esc(_distCode(o.office_id)||'—')}</span>
-          <span class="oc-addr-t">${_esc(o.address||'адрес не указан')}
-            <i>${_esc(_distName(o.office_id)||o.office_name||'')}${o.is_gps?' · по геолокации':''}</i></span>
-        </div>
-        ${o.comment?`<div class="oc-row note"><span class="oc-row-t">${_esc(o.comment)}</span></div>`:''}
-        ${o.gmap_link?`<a class="oc-row" href="${_esc(o.gmap_link)}" target="_blank" rel="noopener">
-          <span class="oc-row-t">Открыть на карте</span><span class="oc-chev">›</span></a>`:''}
-        ${o.driver?`<div class="oc-row"><span class="oc-row-t">Водитель · ${_esc(o.driver)}</span>
-          ${o.deliver_by?`<span class="oc-tag">до ${_esc(o.deliver_by)}</span>`:''}</div>`:''}
-      </div>
-    </div>`;
+  // Плоский список подписанных полей: коробка в коробке и бейдж рядом с
+  // названием района спрашивали больше, чем отвечали. Подпись слева сверху,
+  // значение под ней — читается сверху вниз без разгадывания.
+  const f = (label, value, extra) => value ? `<div class="of">
+      <div class="of-l">${label}</div>
+      <div class="of-v">${value}${extra?`<i>${extra}</i>`:''}</div></div>` : '';
 
-  // Чек, а не список с бейджами: сколько, по чём и сколько вышло. Количество в
-  // квадратике читалось то ли номером строки, то ли кнопкой.
-  const items = `<div class="oc-sect">
-      <div class="oc-h">Что везём</div>
-      <div class="oc-box oc-scroll">
-        ${(o.items||[]).map(i=>{
+  const dist = [_distCode(o.office_id), _distName(o.office_id)||o.office_name]
+                 .filter(Boolean).join(' ');
+  const body =
+    f('Адрес', _esc(o.address||'не указан'),
+      [dist, o.is_gps?'по геолокации':''].filter(Boolean).join(' · '))
+    + (o.gmap_link?`<a class="of-map" href="${_esc(o.gmap_link)}" target="_blank" rel="noopener">
+        Открыть на карте<span>›</span></a>`:'')
+    + f('Комментарий', _esc(o.comment))
+    + (o.driver?f('Водитель', _esc(o.driver), o.deliver_by?`доставить до ${_esc(o.deliver_by)}`:''):'')
+    + `<div class="of">
+        <div class="of-l">Что везём${lines?` · ${lines}`:''}</div>
+        <div class="of-items">${(o.items||[]).map(i=>{
           const q=+i.qty||1, p=+i.price||0;
-          // Сколько штук — сразу за названием: собирая пакет, читают именно это,
-          // а цена за штуку нужна вторым вопросом и только когда штук больше одной.
           const cnt = i.pcs ? `${q} × ${i.pcs} шт` : `${q} шт`;
-          return `<div class="oc-it">
-            <span class="oc-it-n">${_esc(i.name)} <b>· ${cnt}</b>
-              ${q>1?`<i>по ${_esc(p)} AED</i>`:''}</span>
-            <span class="oc-it-p">${_esc(p*q)}</span></div>`;}).join('')}
-      </div>
-      <div class="oc-cnt">${lines} ${lines%10===1&&lines%100!==11?'позиция':(lines%10>=2&&lines%10<=4&&(lines%100<10||lines%100>=20)?'позиции':'позиций')}${
-        units!==lines?` · ${units} шт`:''}</div>
-    </div>`;
+          return `<div class="of-it">
+            <span class="of-it-n">${_esc(i.name)} <b>· ${cnt}</b>${
+              q>1?` <i>по ${_esc(p)} AED</i>`:''}</span>
+            <span class="of-it-p">${_esc(p*q)}</span></div>`;}).join('')}</div>
+      </div>`;
+  $('ordBody').innerHTML = body;
 
-  $('ordBody').innerHTML = where + items;
-
-  // Итог разложен на слагаемые: чаевые — не товар, и в списке товаров им не
-  // место, а в одну строку с итогом они сливались.
   const money = `<div class="oc-total">
       ${o.tip?`<div class="oc-tl"><span>Товары</span><b>${_esc(goods)}</b></div>
                <div class="oc-tl"><span>Чаевые водителю</span><b>${_esc(o.tip)}</b></div>`:''}

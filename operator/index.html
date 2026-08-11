@@ -1800,7 +1800,8 @@ async function doAccept(){
   try{
     await opApi.opFetch(`/api/operator/orders/${acceptOid}/accept`,
       {method:'POST', body:{as:curOp, driver:acceptDrv, eta:acceptEta}});
-    hideOv('accOv'); toast('Заказ принят · '+acceptDrv); haptic('medium');
+    // Заказ ушёл из «новых» — сразу показываем его там, где он теперь живёт.
+    hideOv('accOv'); qLane='work'; toast('Заказ принят · '+acceptDrv); haptic('medium');
   }catch(e){
     // Не ошибка, а нормальный ответ: заказ висит у всех, и тянутся к нему двое.
     const d=(e && e.data) || {};

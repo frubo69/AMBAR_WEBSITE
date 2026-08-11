@@ -781,7 +781,13 @@ function pickOffice(id){ curOffice=id; renderOffices(); haptic('sel'); }
 // ── dispatch: оператор → район → водитель ──
 function _ops(){ return PEOPLE.map(p=>p.name); }
 function _person(n){ return PEOPLE.find(p=>p.name===n) || null; }
-function _myDists(){ return DISTRICTS.filter(d=>d.operator===curOp); }
+function _myDists(){
+  // У старшего своих районов нет — он работает по всем. Раньше список районов
+  // фильтровался по имени оператора, и под ним оказывалась пустота: выбрать
+  // район было нечем, а заказ без района не создать и не сохранить.
+  const P=_person(curOp);
+  return (P && P.senior) ? DISTRICTS.slice() : DISTRICTS.filter(d=>d.operator===curOp);
+}
 function _dist(id){ return DISTRICTS.find(d=>d.id===id); }
 function renderDispatch(){
   // header chip
@@ -1496,10 +1502,10 @@ function startEdit(oid){
   editingOid=oid;
   $('cName').value=o.customer_name||'';
   $('cPhone').value=o.phone||''; $('cAddr').value=o.address||''; $('cComment').value=o.comment||'';
-  if(o.district_id && _dist(o.district_id)){
-    curDist=o.district_id; curDriver=o.driver||'';
-    if(o.dispatch_operator){ curOp=o.dispatch_operator; try{ localStorage.setItem('pos_op',curOp); }catch(e){} }
-  }
+  // Район берём из самого заказа: у онлайновых он определён по адресу, и
+  // подменять его тем, кто сейчас за планшетом, нельзя.
+  const _od = o.district_id || o.office_id || '';
+  if(_od && _dist(_od)){ curDist=_od; curDriver=o.driver||''; }
   renderDispatch();
   $('editTag').style.display='';
   $('createBtn').textContent='💾 Сохранить изменения';

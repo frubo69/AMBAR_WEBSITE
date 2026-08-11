@@ -12,7 +12,7 @@
   --card:#0E0E1B; --card2:#14142A; --card3:#1A1A32;
   --border:#1C1C33; --border2:#191930; --border3:#242440;
   --text:#F2F2F7; --sub:#A8A8C0; --muted:#6E6E8C; --dim:#40405C;
-  --gold:#C9A96E; --gold2:#E8C98A; --gold-soft:rgba(201,169,110,.1);
+  --gold:#C9A96E; --gold2:#E8C98A; --gold3:#F5E0B0; --gold-soft:rgba(201,169,110,.1);
   --up:#4CAF7D; --up-soft:rgba(76,175,125,.12);
   --dn:#E05555; --dn-soft:rgba(224,85,85,.12);
   --warn:#F3B44A; --warn-soft:rgba(243,180,74,.12);
@@ -58,24 +58,42 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 
 /* адрес — самое крупное на карточке: за ним водитель сюда и заходит */
 .ord-addr{display:block;width:100%;text-align:left;padding:0;border:none;background:none;
-  color:inherit;font-family:inherit;cursor:pointer;margin-bottom:14px}
-.ord-addr-t{font-size:17px;font-weight:700;line-height:1.3;letter-spacing:-.2px}
-.ord-addr-s{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--gold2);
-  margin-top:5px}
+  color:inherit;font-family:inherit;cursor:pointer;margin-bottom:10px}
+.ord-addr-t{font-size:19px;font-weight:700;line-height:1.25;letter-spacing:-.3px}
 .ord-addr:active .ord-addr-t{opacity:.6}
 
-.ord-items{display:flex;flex-direction:column;gap:7px;padding:12px 13px;margin-bottom:12px;
-  border-radius:12px;background:var(--bg3)}
-.ord-item{display:flex;align-items:baseline;gap:10px;font-size:13.5px}
-.ord-item span{flex:1;min-width:0;color:var(--sub)}
-.ord-item b{font-family:'DM Sans',sans-serif;font-weight:700;color:var(--text);
+/* Маршрут — главная кнопка водителя, а не ссылка под адресом: он жмёт её на
+   каждом заказе, часто на ходу и не глядя. */
+.ord-map{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;
+  height:52px;margin-bottom:12px;border-radius:14px;cursor:pointer;font-family:inherit;
+  font-size:15px;font-weight:700;letter-spacing:.2px;color:var(--gold2);
+  background:var(--gold-soft);border:1px solid rgba(201,169,110,.45)}
+.ord-map:active{transform:scale(.985);background:rgba(201,169,110,.18)}
+.ord-map svg{width:19px;height:19px}
+.ord-map i{font-style:normal;margin-left:auto;font-size:11px;font-weight:600;
+  color:var(--muted)}
+
+/* Сколько взять — вторая по важности строка: она про деньги в кармане. */
+.ord-cash{display:flex;align-items:center;gap:10px;padding:13px 14px;margin-bottom:10px;
+  border-radius:13px;background:var(--bg3);border:1px solid var(--border2)}
+.ord-cash-l{font-size:10px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;
+  color:var(--muted)}
+.ord-cash-v{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:27px;
+  font-weight:700;letter-spacing:0;font-variant-numeric:tabular-nums;line-height:1;
+  color:var(--gold3)}
+.ord-cash-u{font-size:10px;color:var(--muted);letter-spacing:.5px}
+.ord-cash.debt{background:var(--warn-soft);border-color:rgba(243,180,74,.35)}
+.ord-cash.debt .ord-cash-l{color:var(--warn)}
+.ord-cash.debt .ord-cash-v{color:var(--warn)}
+
+.ord-items{display:flex;flex-direction:column;gap:8px;padding:12px 13px;margin-bottom:11px;
+  border-radius:13px;background:var(--bg3);border:1px solid var(--border2)}
+.ord-items-h{display:flex;align-items:center;gap:7px;font-size:10px;font-weight:700;
+  letter-spacing:1.1px;text-transform:uppercase;color:var(--muted)}
+.ord-item{display:flex;align-items:baseline;gap:10px;font-size:14px}
+.ord-item span{flex:1;min-width:0;color:var(--text)}
+.ord-item b{font-family:'DM Sans',sans-serif;font-weight:700;color:var(--gold2);
   font-variant-numeric:tabular-nums;flex-shrink:0}
-.ord-tot{display:flex;align-items:baseline;gap:8px;padding-top:10px;margin-top:2px;
-  border-top:1px solid var(--border2)}
-.ord-tot-l{font-size:11.5px;color:var(--muted)}
-.ord-tot-v{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;
-  letter-spacing:-.5px;font-variant-numeric:tabular-nums}
-.ord-tot-u{font-size:10px;color:var(--muted);letter-spacing:.5px}
 
 .ord-flag{display:flex;gap:8px;font-size:12.5px;padding:10px 12px;border-radius:11px;
   margin-bottom:11px;line-height:1.45}
@@ -85,11 +103,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .ord-flag.ok{color:var(--up);background:var(--up-soft);border:1px solid rgba(76,175,125,.3)}
 .ord-flag.no{color:var(--dn);background:var(--dn-soft);border:1px solid rgba(224,85,85,.3)}
 .ord-acts{display:grid;grid-template-columns:1fr auto;gap:8px}
-.btn{padding:13px 10px;border:none;border-radius:12px;cursor:pointer;font-family:inherit;
-  font-size:13.5px;font-weight:700;transition:.15s var(--e1)}
+.btn{padding:15px 10px;border:none;border-radius:13px;cursor:pointer;font-family:inherit;
+  font-size:14.5px;font-weight:700;transition:.15s var(--e1)}
 .btn:active{transform:scale(.97)}
 .btn-pri{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408}
-.btn-ico{width:46px;padding:0;height:46px;background:var(--card2);color:var(--sub);
+.btn-ico{width:52px;padding:0;height:52px;background:var(--card2);color:var(--sub);
   border:1px solid var(--border3);display:flex;align-items:center;justify-content:center}
 .btn:disabled{opacity:.45;pointer-events:none}
 
@@ -430,6 +448,8 @@ const ICO = {
   fuel: '<path d="M4 20V5a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v15"/><path d="M3 20h12"/><path d="M13 9h3l2 2v6a2 2 0 0 0 2-2V8l-2.5-2.5"/>',
   wash: '<path d="M4 13h16"/><path d="M6 13V8a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v5"/><circle cx="8" cy="17" r="2"/><circle cx="16" cy="17" r="2"/>',
   plus2:'<path d="M12 5v14M5 12h14"/>',
+  nav:  '<path d="M3 11l18-8-8 18-2-8z"/>',
+  box:  '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
 };
 const svg = (d, w=19) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none"
   stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
@@ -502,7 +522,7 @@ function render(){
 function orderCard(o, i){
   const items = o.items.map(it => `<div class="ord-item">
       <span>${esc(it.name)}${it.pcs ? ` <i style="font-style:normal;color:var(--muted)">${it.pcs} шт</i>` : ''}</span>
-      <b>× ${it.qty}</b></div>`).join('');
+      <b>${it.qty} шт</b></div>`).join('');
   const addr = esc(o.address) || 'Адрес не указан';
   const hasMap = !!(o.gmap_link || (o.location && o.location.lat));
   const mapArgs = `${JSON.stringify(o.gmap_link || '')},${(o.location && o.location.lat) || 0},${
@@ -528,6 +548,9 @@ function orderCard(o, i){
         : req.status === 'rejected'
           ? ['no', `Оператор отклонил: ${(KIND[req.kind] || 'просьбу').toLowerCase()}`]
           : (DONE[req.kind] || ['ok','Оператор принял']));
+  // Порядок на карточке — порядок работы: куда ехать, сколько взять, что везти.
+  const debt = o.payment_method === 'debt';
+  const n = (o.items || []).length;
   return `<div class="ord ${i === 0 ? 'next' : ''}">
     <div class="ord-hd">
       <span class="ord-seq">${i + 1}</span>
@@ -539,19 +562,22 @@ function orderCard(o, i){
     <div class="ord-bd">
       <button class="ord-addr" onclick="route(${mapArgs})">
         <span class="ord-addr-t">${addr}</span>
-        ${hasMap ? `<span class="ord-addr-s">${svg(ICO.pin, 13)} Открыть маршрут</span>` : ''}
       </button>
+      ${hasMap ? `<button class="ord-map" onclick="route(${mapArgs})">
+        ${svg(ICO.nav, 19)} Маршрут <i>в картах</i></button>` : ''}
 
-      <div class="ord-items">
-        ${items}
-        <div class="ord-tot">
-          <span class="ord-tot-l">взять с клиента</span>
-          <span class="ord-tot-v">${fmt(o.total)}</span><span class="ord-tot-u">AED</span>
-        </div>
+      <div class="ord-cash ${debt ? 'debt' : ''}">
+        <span class="ord-cash-l">${debt ? 'В долг · не брать' : 'Взять с клиента'}</span>
+        <span class="ord-cash-v">${debt ? '0' : fmt(o.total)}</span>
+        <span class="ord-cash-u">AED</span>
       </div>
 
-      ${o.payment_method === 'debt'
-        ? `<div class="ord-flag warn">${svg(ICO.warn, 15)}<span><b>В долг</b> — наличные не брать</span></div>` : ''}
+      <div class="ord-items">
+        <div class="ord-items-h">${svg(ICO.box, 13)} Что везём · ${n}</div>
+        ${items}
+      </div>
+
+      ${debt ? `<div class="ord-flag warn">${svg(ICO.warn, 15)}<span>Заказ <b>в долг</b> — наличные с клиента не берём, сумма ${fmt(o.total)} AED уже за ним</span></div>` : ''}
       ${o.comment ? `<div class="ord-flag info">${svg(ICO.note, 15)}<span>${esc(o.comment)}</span></div>` : ''}
       ${req ? `<div class="ord-flag ${reqFlag[0]}">${svg(ICO.edit, 15)}<span>${reqFlag[1]}</span></div>` : ''}
 

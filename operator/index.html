@@ -394,14 +394,26 @@ a.oc-row:active{background:var(--card2)}
 .acc-sub{font-size:12.5px;font-weight:600;color:var(--muted);margin-top:2px}
 .acc-l{font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;
   color:var(--muted);margin:17px 0 8px}
-.acc-more{border-style:dashed;color:var(--muted)}
-.eta-row{display:flex;flex-wrap:nowrap;gap:6px}
-.dchip.eta{flex:1;min-width:0;text-align:center;padding:12px 2px;font-size:14px;
-  font-weight:700}
+/* Водители строками по районам: код слева, имена справа. Свой район —
+   первым и ярче. */
+.acc-row{display:flex;gap:9px;align-items:flex-start;margin-top:7px}
+.acc-row .cd{flex:0 0 20px;padding-top:11px;font-size:10.5px;font-weight:800;
+  letter-spacing:.4px;color:var(--muted)}
+.acc-row.own .cd{color:var(--gold2)}
+.acc-row .dchips{flex:1}
+.acc-row .dchip{font-size:12.5px;padding:10px 12px}
+.acc-row.own .dchip{font-size:13.5px;padding:11px 14px;font-weight:700;color:var(--text)}
+/* Время — один сегментный переключатель, а не семь отдельных коробок. */
+.eta-seg{display:flex;gap:2px;padding:3px;border-radius:13px;background:var(--card2);
+  border:1px solid var(--border2)}
+.eta-seg button{flex:1;padding:11px 0;border-radius:10px;background:transparent;border:none;
+  font-size:14px;font-weight:700;color:var(--sub);transition:.14s}
+.eta-seg button.on{background:var(--gold-soft);color:var(--gold2);
+  box-shadow:inset 0 0 0 1px rgba(201,169,110,.4)}
+.eta-seg button:active{transform:scale(.94)}
 #accGo{width:100%;margin-top:18px;padding:15px}
 .sbtn.go{color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2));border:none}
 .sbtn.go:disabled{opacity:.45;background:var(--card2);color:var(--muted);border:1px solid var(--border2)}
-.dchip i{font-style:normal;font-size:10px;color:var(--muted);margin-left:6px}
 
 .ocard{background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);padding:14px;margin-bottom:10px;transition:.12s}
 .ocard:active{border-color:rgba(201,169,110,.35)}
@@ -713,9 +725,9 @@ a.oc-row:active{background:var(--card2)}
     <div class="t">Принять заказ</div>
     <div class="acc-sub" id="accWho">—</div>
     <div class="acc-l">Водитель</div>
-    <div class="dchips" id="accDrv"></div>
-    <div class="acc-l">Через</div>
-    <div class="dchips eta-row" id="accEta"></div>
+    <div id="accDrv"></div>
+    <div class="acc-l">Через, мин</div>
+    <div class="eta-seg" id="accEta"></div>
     <button class="sbtn go" id="accGo" onclick="doAccept()" disabled>Принять</button>
   </div>
 </div>
@@ -831,7 +843,7 @@ let PEOPLE=[];
 // нет, и разводить их по экранам значит заставлять смотреть в два места.
 let Q={new:[],work:[],done:[],counts:{app:0,manual:0},districts:[]};
 let qLane='new', qFilter='all', acceptOid='', acceptDrv='', acceptEta=0;
-let accOrd=null, accAll=false;
+let accOrd=null;
 
 const $=id=>document.getElementById(id);
 function toast(msg, cls){ const t=$('toast'); t.textContent=msg; t.className='toast show '+(cls||''); clearTimeout(t._h); t._h=setTimeout(()=>t.className='toast',2600); }
@@ -1751,33 +1763,29 @@ function _decline(oid, r){
 // ── приём: водитель и время одним действием ──
 function askAccept(oid){
   const o=(Q.new||[]).find(x=>x.order_id===oid); if(!o) return;
-  acceptOid=oid; acceptDrv=''; acceptEta=0; accAll=false;
+  acceptOid=oid; acceptDrv=''; acceptEta=0;
   $('accWho').textContent = oid+' · '+o.total+' AED';
   accOrd=o; _accDrv();
   $('accEta').innerHTML = [20,25,30,35,40,50,60].map(m=>
-    `<button class="dchip eta" data-m="${m}" onclick="accPickEta(${m})">${m}</button>`).join('');
+    `<button data-m="${m}" onclick="accPickEta(${m})">${m}</button>`).join('');
   _accSync(); showOv('accOv'); haptic('medium');
 }
-// Водители своего района — сразу. Остальные прячутся за один чип: без него
-// в листе одиннадцать имён, и выбор превращается в поиск.
+// Водители строками по районам: имена вперемешку читаются как список, а не
+// как выбор. Район заказа — первой строкой и ярче.
 function _accDrv(){
   const o=accOrd||{};
-  const mine=(Q.districts||[]).find(d=>d.id===o.office_id);
-  const rest=(Q.districts||[]).filter(d=>d.id!==o.office_id);
-  const chip=(n,code)=>`<button class="dchip" data-n="${_esc(n)}"
-      onclick="accPickDrv('${_esc(n)}')">${_esc(n)}${code?`<i>${_esc(code)}</i>`:''}</button>`;
-  let h=(mine?(mine.drivers||[]):[]).map(n=>chip(n,'')).join('');
-  if(accAll) h+=rest.map(d=>(d.drivers||[]).map(n=>chip(n,_distCode(d.id))).join('')).join('');
-  else if(rest.some(d=>(d.drivers||[]).length))
-    h+=`<button class="dchip acc-more" onclick="accMore()">Другой район</button>`;
-  $('accDrv').innerHTML=h;
+  const ds=(Q.districts||[]).filter(d=>(d.drivers||[]).length);
+  const mine=ds.filter(d=>d.id===o.office_id).concat(ds.filter(d=>d.id!==o.office_id));
+  $('accDrv').innerHTML = mine.map(d=>`<div class="acc-row ${d.id===o.office_id?'own':''}">
+      <div class="cd">${_esc(_distCode(d.id))}</div>
+      <div class="dchips">${d.drivers.map(n=>`<button class="dchip" data-n="${_esc(n)}"
+        onclick="accPickDrv('${_esc(n)}')">${_esc(n)}</button>`).join('')}</div></div>`).join('');
 }
-function accMore(){ accAll=true; haptic('sel'); _accDrv(); _accSync(); }
 function accPickDrv(n){ acceptDrv=n; haptic('sel'); _accSync(); }
 function accPickEta(m){ acceptEta=m; haptic('sel'); _accSync(); }
 function _accSync(){
   $('accDrv').querySelectorAll('.dchip').forEach(b=>b.classList.toggle('on', b.dataset.n===acceptDrv));
-  $('accEta').querySelectorAll('.dchip').forEach(b=>b.classList.toggle('on', +b.dataset.m===acceptEta));
+  $('accEta').querySelectorAll('button').forEach(b=>b.classList.toggle('on', +b.dataset.m===acceptEta));
   const ok = !!acceptDrv && !!acceptEta;
   const b=$('accGo'); b.disabled=!ok;
   // Кнопка проговаривает решение: на планшете её жмут не глядя, и «принято

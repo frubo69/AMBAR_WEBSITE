@@ -1771,12 +1771,13 @@ function askAccept(oid){
   _accSync(); showOv('accOv'); haptic('medium');
 }
 // Водители строками по районам: имена вперемешку читаются как список, а не
-// как выбор. Район заказа — первой строкой и ярче.
+// как выбор. Порядок всегда B1→B5, район заказа выделен цветом — переставлять
+// строки под заказ значит каждый раз искать заново.
 function _accDrv(){
   const o=accOrd||{};
-  const ds=(Q.districts||[]).filter(d=>(d.drivers||[]).length);
-  const mine=ds.filter(d=>d.id===o.office_id).concat(ds.filter(d=>d.id!==o.office_id));
-  $('accDrv').innerHTML = mine.map(d=>`<div class="acc-row ${d.id===o.office_id?'own':''}">
+  const ds=(Q.districts||[]).filter(d=>(d.drivers||[]).length)
+    .slice().sort((a,b)=>String(a.code||'').localeCompare(String(b.code||'')));
+  $('accDrv').innerHTML = ds.map(d=>`<div class="acc-row ${d.id===o.office_id?'own':''}">
       <div class="cd">${_esc(_distCode(d.id))}</div>
       <div class="dchips">${d.drivers.map(n=>`<button class="dchip" data-n="${_esc(n)}"
         onclick="accPickDrv('${_esc(n)}')">${_esc(n)}</button>`).join('')}</div></div>`).join('');

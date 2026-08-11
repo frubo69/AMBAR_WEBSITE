@@ -123,23 +123,29 @@ async def _photo_id(ctx, path: str):
         log.warning(f"[promo] file_id из базы: {e}")
     if fid:
         return fid
-    if not os.path.exists(path) or not OWNER_IDS:
+    who = OWNER_IDS + [i for i in promo.POSTER_IDS if i not in OWNER_IDS]
+    if not os.path.exists(path) or not who:
         return None
-    try:
-        with open(path, "rb") as f:
-            m = await ctx.bot.send_photo(OWNER_IDS[0], photo=f,
-                                         caption=f"служебная загрузка · {path}")
-        fid = m.photo[-1].file_id
+    # Первым в списке может стоять тот, кто этого бота ни разу не открывал, —
+    # телеграм на такого отвечает «chat not found», и картинка не грузилась
+    # вовсе. Пробуем всех, кому вообще можно писать.
+    for chat in who:
         try:
-            await m.delete()
-        except Exception:
-            pass
-        await db.tg_file_set(path, fid)
-        log.info(f"[promo] картинка {path} загружена в телеграм")
-    except Exception as e:
-        log.error(f"[promo] не удалось загрузить {path}: {e}")
-        return None
-    return fid
+            with open(path, "rb") as f:
+                m = await ctx.bot.send_photo(chat, photo=f,
+                                             caption=f"служебная загрузка · {path}")
+            fid = m.photo[-1].file_id
+            try:
+                await m.delete()
+            except Exception:
+                pass
+            await db.tg_file_set(path, fid)
+            log.info(f"[promo] картинка {path} загружена в телеграм")
+            return fid
+        except Exception as e:
+            log.warning(f"[promo] {path} через {chat}: {e}")
+    log.error(f"[promo] не удалось загрузить {path} ни одному из своих")
+    return None
 
 
 async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):

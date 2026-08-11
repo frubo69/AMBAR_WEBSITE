@@ -198,9 +198,14 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
    Плоский список подписанных полей. Коробки внутри коробок и бейджи рядом с
    названием района спрашивали больше, чем отвечали: подпись слева сверху,
    значение под ней, ничего разгадывать не нужно. */
-.sheet.wide{max-width:520px;max-height:92vh;overflow-y:auto;padding:0}
-.sheet.wide .t{display:flex;align-items:flex-start;gap:10px;margin:0;padding:18px 22px 14px;
-  border-bottom:1px solid var(--border2);position:sticky;top:0;background:var(--bg3);z-index:2}
+/* Карточка целиком помещается в экран на любом устройстве: шапка и действия
+   не сжимаются, тело занимает остаток, а внутри него тянется только список
+   товаров. Прокрутки всей карточки нет — иначе на маленьком телефоне адрес
+   уезжал бы за край, а итог приходилось искать. */
+.sheet.wide{max-width:520px;max-height:92vh;height:auto;overflow:hidden;padding:0;
+  display:flex;flex-direction:column}
+.sheet.wide .t{flex:0 0 auto;display:flex;align-items:flex-start;gap:10px;margin:0;
+  padding:18px 22px 14px;border-bottom:1px solid var(--border2);background:var(--bg3)}
 .oc-hd{flex:1;min-width:0}
 .oc-id{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;letter-spacing:-.3px}
 .oc-meta2{display:flex;flex-wrap:wrap;align-items:center;gap:7px;margin-top:7px;
@@ -213,9 +218,13 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .oc-st.no{color:var(--dn);border-color:rgba(224,85,85,.3)}
 .oc-x{width:32px;height:32px;border-radius:10px;font-size:14px;color:var(--sub);
   background:var(--card2);border:1px solid var(--border2);cursor:pointer;flex-shrink:0}
-#ordBody,#custBody{padding:6px 22px 8px}
+#ordBody{flex:1;min-height:0;display:flex;flex-direction:column;padding:6px 22px 8px}
+#custBody{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:6px 22px 8px}
 
-.of{padding:14px 0;border-bottom:1px solid var(--border2)}
+.of{flex:0 0 auto;padding:14px 0;border-bottom:1px solid var(--border2)}
+/* Список товаров забирает всё, что осталось, и ужимается на маленьком экране. */
+.of.of-grow{flex:1;min-height:96px;display:flex;flex-direction:column;overflow:hidden}
 .of-l{font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;
   color:var(--muted);margin-bottom:6px}
 .of-v{font-size:15px;font-weight:600;line-height:1.35;word-break:break-word}
@@ -234,8 +243,8 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
   stroke-linecap:round;stroke-linejoin:round}
 
 /* Состав листается сам: длинный заказ не уносит адрес и итог за край экрана. */
-.of-items{max-height:32vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
-  overscroll-behavior:contain;padding:4px 14px}
+.of-items{flex:1;min-height:0;max-height:30vh;overflow-y:auto;
+  -webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:4px 14px}
 .of-it{display:flex;align-items:baseline;gap:12px;padding:9px 0;font-size:14.5px}
 .of-it + .of-it{border-top:1px solid var(--border2)}
 .of-it-n{flex:1;min-width:0;font-weight:600;line-height:1.35}
@@ -257,18 +266,21 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .oc-tl.big small{font-size:12px;color:var(--muted);font-weight:600;margin-left:6px;letter-spacing:0}
 
 /* Действия: решение и отказ рядом, остальное строками ниже. */
-.ord-acts{display:block;padding:6px 22px calc(18px + var(--safe-bottom));position:sticky;
-  bottom:0;background:var(--bg3);border-top:1px solid var(--border2);margin-top:10px}
+.ord-acts{flex:0 0 auto;display:block;padding:6px 22px calc(18px + var(--safe-bottom));
+  background:var(--bg3);border-top:1px solid var(--border2);margin-top:10px}
 .oc-top{display:flex;gap:8px;margin-top:12px}
-.oc-main{flex:1.35;padding:16px 10px;border-radius:var(--r2);font-size:15px;font-weight:800;
+.oc-main{flex:1;padding:16px 10px;border-radius:var(--r2);font-size:15px;font-weight:800;
   color:#1a1408;border:none;cursor:pointer;background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .oc-main:active{transform:scale(.99)}
 .oc-danger{flex:1;padding:16px 10px;border-radius:var(--r2);font-size:14px;font-weight:700;
   color:var(--dn);background:none;border:1px solid rgba(224,85,85,.28);cursor:pointer}
 .oc-danger:active{background:rgba(224,85,85,.08)}
 .oc-row2{display:flex;gap:8px;margin-top:8px}
-.oc-sec{flex:1;padding:13px 10px;border-radius:var(--r2);font-size:13px;font-weight:700;
+.oc-sec{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:13px 10px;border-radius:var(--r2);font-size:13px;font-weight:700;
   color:var(--sub);background:var(--card2);border:1px solid var(--border2);cursor:pointer}
+.oc-ico{width:15px;height:15px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round;opacity:.75}
 .oc-sec:active{color:var(--text);border-color:var(--border3)}
 .sheet.wide .btns{display:none}
 
@@ -1219,6 +1231,17 @@ function askText(title, sub, value, cb){
 }
 function askDone(v){ hideOv('askOv'); const cb=_askCb; _askCb=null; if(cb && v!==null) cb(v); }
 
+// Значки к кнопкам: одинаковые прямоугольники с текстом сливаются, и рука
+// каждый раз перечитывает, куда жать.
+const ICO_ACT = {
+  'Редактировать':'<path d="M4 20h4l10-10-4-4L4 16z"/><path d="M14 6l4 4"/>',
+  'Клиент':'<path d="M4 20a8 8 0 0 1 16 0"/><circle cx="12" cy="8" r="4"/>',
+  'Текст водителю':'<rect x="4" y="3" width="13" height="18" rx="2"/><path d="M8 8h5M8 12h5M8 16h3"/>',
+  'Вернуть в доставку':'<path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v5h5"/>',
+};
+const _actIco = t => ICO_ACT[t]
+  ? `<svg viewBox="0 0 24 24" class="oc-ico" aria-hidden="true">${ICO_ACT[t]}</svg>` : '';
+
 // ── карточка заказа ──
 // В боте у оператора под рукой всё: кто клиент, что заказал, куда везти, карта,
 // правка, отклонение. Панель должна уметь столько же, иначе за ответом всё
@@ -1292,7 +1315,7 @@ function renderOrder(){
 
   // Состав — своё окошко со своей прокруткой: длинный заказ не должен уносить
   // адрес и итог за край экрана.
-  const goodsBox = `<div class="of">
+  const goodsBox = `<div class="of of-grow">
       <div class="of-l">Что везём${lines?` · ${lines}`:''}</div>
       <div class="of-box of-items">${(o.items||[]).map(i=>{
         const q=+i.qty||1, p=+i.price||0;
@@ -1337,9 +1360,10 @@ function renderOrder(){
         <button class="oc-danger" onclick="${danger[1]}">${danger[0]}</button>
       </div>`:'')
     + (rest.length?`<div class="oc-row2">${rest.map(([t,fn])=>
-        `<button class="oc-sec" onclick="${fn}">${t}</button>`).join('')}</div>`:'')
+        `<button class="oc-sec" onclick="${fn}">${_actIco(t)}${t}</button>`).join('')}</div>`:'')
     + (o.customer_id?`<div class="oc-row2">
-        <button class="oc-sec" onclick="openCust(${o.customer_id})">Клиент</button></div>`:'');
+        <button class="oc-sec" onclick="openCust(${o.customer_id})">${
+          _actIco('Клиент')}Клиент</button></div>`:'');
 }
 
 // ── карточка клиента ──

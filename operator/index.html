@@ -213,19 +213,24 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
   background:var(--card2);border:1px solid var(--border2);cursor:pointer;flex-shrink:0}
 #ordBody,#custBody{padding:18px 22px 8px}
 
-/* Итого стоит у кнопок и не уезжает при прокрутке: сумму спрашивают в момент
-   решения, а не в начале чтения. */
-.oc-total{display:flex;align-items:center;gap:14px;padding:12px 0 2px}
-.oc-total-l{flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--sub)}
-.oc-total-l i{display:block;font-style:normal;font-size:11px;font-weight:500;
+/* Итог стоит у кнопок и не уезжает при прокрутке: сумму спрашивают в момент
+   решения. Разложен на слагаемые — чаевые не товар, и в одну строку с итогом
+   они сливались. */
+.oc-total{padding:12px 0 4px}
+.oc-tl{display:flex;align-items:baseline;gap:12px;font-size:12.5px;color:var(--muted);
+  padding:3px 0}
+.oc-tl b{margin-left:auto;font-family:'DM Sans',sans-serif;font-weight:700;color:var(--sub)}
+.oc-tl.big{padding-top:8px;margin-top:5px;border-top:1px solid var(--border2);align-items:center}
+.oc-tl.big span{font-size:13.5px;font-weight:700;color:var(--text)}
+.oc-tl.big i{display:block;font-style:normal;font-size:11px;font-weight:500;
   color:var(--muted);margin-top:3px}
-.oc-total-v{font-family:'DM Sans',sans-serif;font-size:30px;font-weight:800;line-height:1;
-  color:var(--gold2);letter-spacing:-1.2px;white-space:nowrap}
-.oc-total-v small{font-size:12px;color:var(--muted);font-weight:600;margin-left:6px;letter-spacing:0}
+.oc-tl.big b{font-size:28px;line-height:1;font-weight:800;color:var(--gold2);letter-spacing:-1.1px}
+.oc-tl.big small{font-size:12px;color:var(--muted);font-weight:600;margin-left:6px;letter-spacing:0}
 
 .oc-sect{margin-bottom:16px}
 .oc-h{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
   color:var(--muted);margin-bottom:8px;padding-left:2px}
+.oc-when{font-size:11.5px;color:var(--muted);white-space:nowrap}
 .oc-box{background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);overflow:hidden}
 
 .oc-cli{display:flex;align-items:center;gap:12px;padding:13px 14px}
@@ -257,24 +262,22 @@ a.oc-row:active{background:var(--card2)}
 .oc-addr-t i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);
   font-weight:500;margin-top:4px;letter-spacing:0}
 
-/* Количество — плашкой слева: по нему собирают пакет, и искать его в конце
-   строки, где стоят деньги, неудобно. */
-.oc-it{display:flex;align-items:center;gap:12px;padding:12px 14px;font-size:14px}
+/* Строка чека: что, сколько и по чём — под названием, сумма строки справа.
+   Количество в квадратике читалось то ли номером строки, то ли кнопкой. */
+.oc-it{display:flex;align-items:center;gap:12px;padding:13px 14px;font-size:14px}
 .oc-it + .oc-it{border-top:1px solid var(--border2)}
-.oc-it-q{width:30px;height:30px;flex:0 0 auto;border-radius:9px;display:flex;align-items:center;
-  justify-content:center;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:800;
-  color:var(--text);background:var(--card2);border:1px solid var(--border2)}
 .oc-it-n{flex:1;min-width:0;font-weight:600;line-height:1.3}
-.oc-it-n i{display:block;font-style:normal;font-size:11px;color:var(--muted);
-  font-weight:500;margin-top:2px}
-.oc-it-p{min-width:58px;text-align:right;font-family:'DM Sans',sans-serif;font-weight:700;
-  font-size:14px}
-.oc-it.tip .oc-it-n,.oc-it.tip .oc-it-p{color:var(--muted)}
-.oc-it.tip .oc-it-q{color:var(--muted);background:none}
+.oc-it-n i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);
+  font-weight:500;margin-top:4px;font-variant-numeric:tabular-nums}
+.oc-it-p{min-width:62px;text-align:right;font-family:'DM Sans',sans-serif;font-weight:700;
+  font-size:15px;font-variant-numeric:tabular-nums}
+.oc-cnt{font-size:11px;color:var(--muted);text-align:right;padding:7px 4px 0}
 
-.oc-note{padding:12px 14px;border-radius:var(--r2);font-size:13px;line-height:1.5;
-  color:var(--gold3);background:var(--gold-soft);border:1px solid rgba(201,169,110,.2);
-  margin-bottom:14px}
+/* Комментарий — строка внутри адреса: «домофон 12, 4 этаж» отвечает на вопрос
+   «куда», а не является примечанием к заказу. */
+.oc-row.note{background:var(--gold-soft);color:var(--gold3)}
+.oc-row.note .oc-row-t{white-space:normal;font-weight:600;line-height:1.4}
+.oc-chev{color:var(--muted);font-size:16px;line-height:1}
 .oc-meta{font-size:11px;color:var(--muted);text-align:center;padding-bottom:4px}
 
 /* Действия: одно главное, ряд обычных, опасное отдельно. */
@@ -1258,21 +1261,17 @@ function renderOrder(){
             : (o.payment_method==='debt' ? 'В долг · наличные не брать' : 'Наличные при получении');
   const src=(o.source||'app')==='manual';
 
+  // Сколько заказ ждёт — прямо в шапке. У нового это главный вопрос после
+  // «куда», а у принятого на его месте срок доставки.
+  const when = o.status==='pending' ? `<span class="oc-when">${_age(o.timestamp)} назад</span>`
+             : (o.deliver_by ? `<span class="oc-when">до ${_esc(o.deliver_by)}</span>` : '');
   $('ordT').innerHTML =
     `<span class="oc-id">#${_esc(o.order_id)}</span>
-     <span class="oc-st ${stC}">${stT}</span>
+     <span class="oc-st ${stC}">${stT}</span>${when}
      <button class="oc-x" onclick="hideOv('ordOv')" aria-label="Закрыть">✕</button>`;
 
-  // Сумма живёт внизу, у кнопок, и не уезжает при прокрутке: «сколько взять с
-  // человека» — вопрос, который задают в момент решения, а не в начале чтения.
-  const money = `<div class="oc-total">
-      <div class="oc-total-l">Итого<i>${o.tip?`товары ${goods} · чаевые ${o.tip} · `:''}${_esc(pay)}</i></div>
-      <div class="oc-total-v">${_esc(o.total)}<small>AED</small></div>
-    </div>`;
-
-  // Кто клиент — за кнопкой «Клиент», а не в карточке заказа. Решение брать
-  // или не брать принимают по адресу, составу и сумме; имя с телефоном нужны
-  // потом и не всем заказам, а место занимали всегда.
+  // Комментарий живёт в адресе, а не отдельной плашкой: «домофон 12, 4 этаж» —
+  // это часть ответа на вопрос «куда», а не примечание к заказу.
   const where = `<div class="oc-sect">
       <div class="oc-h">Куда везти</div>
       <div class="oc-box">
@@ -1281,37 +1280,43 @@ function renderOrder(){
           <span class="oc-addr-t">${_esc(o.address||'адрес не указан')}
             <i>${_esc(_distName(o.office_id)||o.office_name||'')}${o.is_gps?' · по геолокации':''}</i></span>
         </div>
+        ${o.comment?`<div class="oc-row note"><span class="oc-row-t">${_esc(o.comment)}</span></div>`:''}
         ${o.gmap_link?`<a class="oc-row" href="${_esc(o.gmap_link)}" target="_blank" rel="noopener">
-          <span class="oc-row-t">Открыть на карте</span><span class="oc-go">Карта</span></a>`:''}
-        ${o.driver?`<div class="oc-row"><span class="oc-row-t">${_esc(o.driver)}</span>
-          <span class="oc-tag">водитель</span>
-          ${o.deliver_by?`<span class="oc-go">до ${_esc(o.deliver_by)}</span>`:''}</div>`:''}
+          <span class="oc-row-t">Открыть на карте</span><span class="oc-chev">›</span></a>`:''}
+        ${o.driver?`<div class="oc-row"><span class="oc-row-t">Водитель · ${_esc(o.driver)}</span>
+          ${o.deliver_by?`<span class="oc-tag">до ${_esc(o.deliver_by)}</span>`:''}</div>`:''}
       </div>
     </div>`;
 
+  // Чек, а не список с бейджами: сколько, по чём и сколько вышло. Количество в
+  // квадратике читалось то ли номером строки, то ли кнопкой.
   const items = `<div class="oc-sect">
-      <div class="oc-h">Заказ · ${lines} ${lines%10===1&&lines%100!==11?'позиция':(lines%10>=2&&lines%10<=4&&(lines%100<10||lines%100>=20)?'позиции':'позиций')}${
-        units!==lines?` · ${units} шт`:''}</div>
+      <div class="oc-h">Что везём</div>
       <div class="oc-box">
         ${(o.items||[]).map(i=>`<div class="oc-it">
-          <span class="oc-it-q">${_esc(i.qty)}</span>
-          <span class="oc-it-n">${_esc(i.name)}${i.pcs?`<i>упаковка ${i.pcs} шт</i>`:''}</span>
+          <span class="oc-it-n">${_esc(i.name)}
+            <i>${_esc(i.qty)} × ${_esc(i.price||0)} AED${i.pcs?` · упаковка ${i.pcs} шт`:''}</i></span>
           <span class="oc-it-p">${_esc((i.price||0)*(i.qty||1))}</span></div>`).join('')}
-        ${o.tip?`<div class="oc-it tip"><span class="oc-it-q">＋</span>
-          <span class="oc-it-n">Чаевые водителю</span>
-          <span class="oc-it-p">${_esc(o.tip)}</span></div>`:''}
       </div>
+      <div class="oc-cnt">${lines} ${lines%10===1&&lines%100!==11?'позиция':(lines%10>=2&&lines%10<=4&&(lines%100<10||lines%100>=20)?'позиции':'позиций')}${
+        units!==lines?` · ${units} шт`:''}</div>
     </div>`;
 
-  const note = o.comment ? `<div class="oc-note">${_esc(o.comment)}</div>` : '';
-  const meta = `<div class="oc-meta">${src?'По телефону':'Из приложения'}${
+  const meta = `<div class="oc-meta">${src?'Заказ по телефону':'Заказ из приложения'}${
     o.operator_name?` · принял ${_esc(o.operator_name)}`:''}${
     o.created_by_name?` · завёл ${_esc(o.created_by_name)}`:''}</div>`;
 
-  $('ordBody').innerHTML = where + items + note + meta;
+  $('ordBody').innerHTML = where + items + meta;
 
-  // Решение и отказ рядом, в один ряд: это две стороны одного выбора, и рука
-  // ищет их вместе. Остальное — строкой ниже, ровным рядом.
+  // Итог разложен на слагаемые: чаевые — не товар, и в списке товаров им не
+  // место, а в одну строку с итогом они сливались.
+  const money = `<div class="oc-total">
+      ${o.tip?`<div class="oc-tl"><span>Товары</span><b>${_esc(goods)}</b></div>
+               <div class="oc-tl"><span>Чаевые водителю</span><b>${_esc(o.tip)}</b></div>`:''}
+      <div class="oc-tl big"><span>Итого<i>${_esc(pay)}</i></span>
+        <b>${_esc(o.total)}<small>AED</small></b></div>
+    </div>`;
+
   let main='', danger='', rest=[];
   if(o.status==='pending'){
     main=['Принять', `hideOv('ordOv');askAccept('${o.order_id}')`];
@@ -1335,7 +1340,6 @@ function renderOrder(){
       </div>`:'')
     + (rest.length?`<div class="oc-row2">${rest.map(([t,fn])=>
         `<button class="oc-sec" onclick="${fn}">${t}</button>`).join('')}</div>`:'')
-    // Клиент — отдельной строкой: это не действие с заказом, а другой разговор.
     + (o.customer_id?`<div class="oc-row2">
         <button class="oc-sec" onclick="openCust(${o.customer_id})">Клиент</button></div>`:'');
 }

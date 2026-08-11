@@ -126,7 +126,14 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .create-btn{width:100%;padding:16px;border-radius:var(--r2);background:linear-gradient(135deg,#E8C98A,#C9A96E);color:#1a1408;font-size:16px;font-weight:800;transition:.15s}
 .create-btn:active{transform:scale(.98)}
 .create-btn:disabled{opacity:.4}
-.create-btn.save{background:linear-gradient(135deg,#F3B44A,#D99A2B)}
+/* Пока правка не сохранена, по кнопке всё время идёт мягкий блик: чек можно
+   закрыть и уйти, а изменения останутся только на экране. */
+.create-btn.save{background:linear-gradient(135deg,#F3B44A,#D99A2B);position:relative;overflow:hidden}
+.create-btn.save::after{content:'';position:absolute;top:0;left:-45%;width:45%;height:100%;
+  background:linear-gradient(100deg,transparent,rgba(255,255,255,.32),transparent);
+  animation:saveSheen 2.8s ease-in-out infinite;pointer-events:none}
+@keyframes saveSheen{0%{left:-45%}60%{left:125%}100%{left:125%}}
+@media (prefers-reduced-motion:reduce){.create-btn.save::after{animation:none}}
 
 /* ── dispatch chips (район / водитель) ── */
 .dchips{display:flex;flex-wrap:wrap;gap:6px}
@@ -670,6 +677,18 @@ a.oc-row:active{background:var(--card2)}
     <div class="t" id="custT">Клиент</div>
     <div id="custBody"></div>
     <div class="ord-acts" id="custActs"></div>
+  </div>
+</div>
+
+<!-- уход из правки с несохранёнными изменениями -->
+<div class="ov" id="leaveOv">
+  <div class="sheet">
+    <div class="t">Изменения не сохранены</div>
+    <div class="s" id="leaveS">—</div>
+    <div class="btns">
+      <button class="sbtn" onclick="leaveDrop()">Уйти без сохранения</button>
+      <button class="sbtn go" onclick="hideOv('leaveOv');askCreate()">Сохранить</button>
+    </div>
   </div>
 </div>
 
@@ -1226,13 +1245,30 @@ function applyView(){
   const bar=document.querySelector('.tk-bar');
   if(bar) bar.style.display = showOrders?'none':'';
 }
+// Есть ли несохранённые правки. Уйти с ними в очередь — значит потерять их
+// молча: чек чистится, и вернуться уже некуда.
+function _unsaved(){ return !!editingOid && !!_editWas && _editSig()!==_editWas; }
+
 function toggleOrders(){
+  if(!showOrders && _unsaved()){
+    $('leaveS').textContent = 'Заказ #'+editingOid+' правился, но не сохранён.';
+    showOv('leaveOv'); haptic('medium');
+    return;
+  }
   closeTicket();
   showOrders = !showOrders;
   applyView();
   if(showOrders) loadQueue();
   haptic('sel');
 }
+function leaveDrop(){
+  hideOv('leaveOv');
+  clearTicket(false);
+  closeTicket();
+  showOrders = true; applyView(); loadQueue();
+  haptic('light');
+}
+
 function openCatalog(){
   if(showOrders) toggleOrders();
 }

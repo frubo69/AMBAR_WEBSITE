@@ -270,18 +270,18 @@ a.oc-row:active{background:var(--card2)}
 /* Действия: одно главное, ряд обычных, опасное отдельно. */
 .ord-acts{display:block;padding:6px 22px calc(18px + var(--safe-bottom));position:sticky;
   bottom:0;background:var(--bg3);border-top:1px solid var(--border2);margin-top:10px}
-.oc-main{display:block;width:100%;padding:16px;border-radius:var(--r2);font-size:15.5px;
+.oc-top{display:flex;gap:8px;margin-top:12px}
+.oc-main{flex:1.35;padding:16px 10px;border-radius:var(--r2);font-size:15px;
   font-weight:800;color:#1a1408;border:none;cursor:pointer;
-  background:linear-gradient(135deg,var(--gold),var(--gold2));margin-top:12px}
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .oc-main:active{transform:scale(.99)}
+.oc-danger{flex:1;padding:16px 10px;border-radius:var(--r2);font-size:14px;font-weight:700;
+  color:var(--dn);background:none;border:1px solid rgba(224,85,85,.28);cursor:pointer}
+.oc-danger:active{background:rgba(224,85,85,.08)}
 .oc-row2{display:flex;gap:8px;margin-top:8px}
 .oc-sec{flex:1;padding:13px 10px;border-radius:var(--r2);font-size:13px;font-weight:700;
   color:var(--sub);background:var(--card2);border:1px solid var(--border2);cursor:pointer}
 .oc-sec:active{color:var(--text);border-color:var(--border3)}
-.oc-danger{display:block;width:100%;margin-top:8px;padding:13px;border-radius:var(--r2);
-  font-size:13px;font-weight:700;color:var(--dn);background:none;
-  border:1px solid rgba(224,85,85,.28);cursor:pointer}
-.oc-danger:active{background:rgba(224,85,85,.08)}
 .sheet.wide .btns{display:none}
 
 .cst-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
@@ -1315,17 +1315,17 @@ function renderOrder(){
 
   $('ordBody').innerHTML = money + client + where + items + note + meta;
 
-  // Одно главное действие крупно, опасное — отдельно, остальное ровным рядом.
-  // Раньше кнопки шли вперемешку и читались как случайный набор.
+  // Решение и отказ рядом, в один ряд: это две стороны одного выбора, и рука
+  // ищет их вместе. Остальное — строкой ниже, ровным рядом.
   let main='', danger='', rest=[];
   if(o.status==='pending'){
-    main=`<button class="oc-main" onclick="hideOv('ordOv');askAccept('${o.order_id}')">Принять заказ</button>`;
-    danger=`<button class="oc-danger" onclick="askDecline('${o.order_id}')">Отклонить</button>`;
-    rest=[['Изменить состав',`hideOv('ordOv');startEdit('${o.order_id}')`]];
+    main=['Принять', `hideOv('ordOv');askAccept('${o.order_id}')`];
+    danger=['Отклонить', `askDecline('${o.order_id}')`];
+    rest=[['Редактировать',`hideOv('ordOv');startEdit('${o.order_id}')`]];
   }else if(o.status==='approved'){
-    main=`<button class="oc-main" onclick="hideOv('ordOv');askAct('${o.order_id}','delivered')">Доставлен</button>`;
-    danger=`<button class="oc-danger" onclick="hideOv('ordOv');askAct('${o.order_id}','cancel')">Отменить заказ</button>`;
-    rest=[['Изменить состав',`hideOv('ordOv');startEdit('${o.order_id}')`],
+    main=['Доставлен', `hideOv('ordOv');askAct('${o.order_id}','delivered')`];
+    danger=['Отменить', `hideOv('ordOv');askAct('${o.order_id}','cancel')`];
+    rest=[['Редактировать',`hideOv('ordOv');startEdit('${o.order_id}')`],
           ['Текст водителю',`showOrderText('${o.order_id}')`]];
   }else if(o.status==='delivered'){
     rest=[['Вернуть в доставку',`hideOv('ordOv');askAct('${o.order_id}','undeliver')`],
@@ -1333,10 +1333,13 @@ function renderOrder(){
   }else{
     rest=[['Текст водителю',`showOrderText('${o.order_id}')`]];
   }
-  $('ordActs').innerHTML = main
+  $('ordActs').innerHTML =
+    (main?`<div class="oc-top">
+        <button class="oc-main" onclick="${main[1]}">${main[0]}</button>
+        <button class="oc-danger" onclick="${danger[1]}">${danger[0]}</button>
+      </div>`:'')
     + (rest.length?`<div class="oc-row2">${rest.map(([t,fn])=>
-        `<button class="oc-sec" onclick="${fn}">${t}</button>`).join('')}</div>`:'')
-    + danger;
+        `<button class="oc-sec" onclick="${fn}">${t}</button>`).join('')}</div>`:'');
 }
 
 // ── карточка клиента ──

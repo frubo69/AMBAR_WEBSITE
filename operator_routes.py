@@ -979,8 +979,14 @@ async def handle_patch(request):
     order = await _get_pos_order(oid)
     if not order:
         return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
-    if order.get("status") != "approved":
-        return web.json_response({"error": "order is closed"}, status=409, headers=CORS_HEADERS)
+    # Править можно и непринятый заказ: состав чаще всего и правят до принятия —
+    # человек позвонил и попросил добавить бутылку. Проверка на «в пути»
+    # осталась с тех пор, когда панель знала только телефонные заказы, а те
+    # рождаются принятыми.
+    if order.get("status") not in ("pending", "approved"):
+        return web.json_response({"error": "order is closed",
+                                  "status": order.get("status")},
+                                 status=409, headers=CORS_HEADERS)
     try:
         body = await request.json()
     except Exception:

@@ -460,6 +460,14 @@ def _summary(o: dict) -> dict:
                    "price": i.get("price", 0), "pcs": i.get("pcs")}
                   for i in (o.get("items") or [])],
         "created_by_name": o.get("created_by_name", ""),
+        "customer_id": o.get("customer_id", 0),
+        "username": o.get("username", ""),
+        "phone_shared": o.get("phone_shared", ""),
+        "phone_extra": o.get("phone_extra", ""),
+        "gmap_link": o.get("gmap_link", ""),
+        "is_gps": bool(o.get("is_gps")),
+        "tip": o.get("tip", 0),
+        "review_score": o.get("review_score", 0),
         "operator_name": o.get("operator_name", ""),
         # Источник помечаем явно. У старых онлайн-заказов поля нет вовсе, и
         # «онлайн» до сих пор означало «не помечен телефонным» — так работать
@@ -809,6 +817,119 @@ async def handle_accept(request):
 
 
 @require_operator
+async def handle_customer(request):
+    """Карточка клиента — то же, что «Клиент» в боте.
+
+    Оператор решает не по одной строке адреса: сколько раз человек заказывал,
+    сколько отменил, верифицирован ли и нет ли на нём заметки. Без этого
+    принять заказ можно только вслепую."""
+    try:
+        cid = int(request.match_info["cid"])
+    except (TypeError, ValueError):
+        return web.json_response({"error": "bad_id"}, status=400, headers=CORS_HEADERS)
+    u = await db.get_user(cid) or {}
+    orders = [o for o in (await db.get_all_orders()).values()
+              if int(o.get("customer_id") or 0) == cid]
+    orders.sort(key=lambda x: x.get("timestamp", ""), reverse=True)
+    return web.json_response({
+        "customer_id": cid,
+        "name": u.get("full_name") or u.get("name") or "—",
+        "note": u.get("custom_name", ""),
+        "username": u.get("username", ""),
+        "phone_verified": u.get("phone_verified", ""),
+        "verified": bool(u.get("verified")),
+        "verify_source": u.get("verify_source", ""),
+        "verify_recommender_name": u.get("verify_recommender_name", ""),
+        "banned": bool(u.get("banned")),
+        "ban_reason": u.get("ban_reason", ""),
+        "first_seen": str(u.get("first_seen") or ""),
+        "orders_total": u.get("orders_total", 0),
+        "orders_done": u.get("orders_done", 0),
+        "orders_declined": u.get("orders_declined", 0),
+        "total_spent": u.get("total_spent", 0),
+        "invited_via": u.get("invited_via", ""),
+        "last": [{"order_id": o.get("order_id"), "status": o.get("status"),
+                  "total": o.get("total", 0), "timestamp": o.get("timestamp", ""),
+                  "address": o.get("address", "")} for o in orders[:8]],
+    }, headers=CORS_HEADERS)
+
+
+@require_operator
+async def handle_customer_act(request):
+    """Действия по клиенту: верификация, заметка, блокировка.
+
+    Те же три, что в боте. Разблокировка тоже здесь: заблокировать по ошибке
+    легко, а искать потом, где это отменить, — отдельное мучение."""
+    try:
+        cid = int(request.match_info["cid"])
+    except (TypeError, ValueError):
+        return web.json_response({"error": "bad_id"}, status=400, headers=CORS_HEADERS)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    act = (body.get("act") or "").strip()
+    me = request["op_id"]
+    if act == "verify":
+        await db.verify_user(cid)
+        try:
+            await db.undecline_verification(cid)
+        except Exception:
+            pass
+    elif act == "note":
+        await db.set_user_field(cid, custom_name=str(body.get("note", "")).strip())
+    elif act == "ban":
+        await db.ban_user(cid, str(body.get("reason", "")).strip() or "без причины", me)
+    elif act == "unban":
+        await db.set_user_field(cid, banned=False, ban_reason="")
+    else:
+        return web.json_response({"error": "unknown_act"}, status=400, headers=CORS_HEADERS)
+    log.info(f"[pos] клиент {cid}: {act} (оператор {me})")
+    request.match_info["cid"] = str(cid)
+    return await handle_customer(request)
+
+
+@require_operator
+async def handle_decline(request):
+    """Отклонить новый заказ — то же, что «Отклонить» в боте."""
+    oid = request.match_info["oid"]
+    order = await db.get_order(oid)
+    if not order:
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    if order.get("status") != "pending":
+        return web.json_response({"error": "already_taken", "status": order.get("status"),
+                                  "by": order.get("operator_name") or ""},
+                                 status=409, headers=CORS_HEADERS)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    now = datetime.now(timezone.utc).isoformat()
+    got = await db.claim_order(oid, {
+        "status": "declined", "updated_at": now, "declined_at": now,
+        "operator_id": request["op_id"], "operator_name": (body.get("as") or "").strip(),
+        "decline_reason": str(body.get("reason", "")).strip(),
+    })
+    if not got:
+        fresh = await db.get_order(oid) or {}
+        return web.json_response({"error": "already_taken", "status": fresh.get("status"),
+                                  "by": fresh.get("operator_name") or ""},
+                                 status=409, headers=CORS_HEADERS)
+    await _customer_card(oid)
+    await _refresh_cards(got)
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+
+@require_operator
+async def handle_one(request):
+    """Один заказ целиком — для карточки в панели."""
+    order = await db.get_order(request.match_info["oid"])
+    if not order:
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    return web.json_response({"order": _summary(order)}, headers=CORS_HEADERS)
+
+
+@require_operator
 async def handle_patch(request):
     oid = request.match_info["oid"]
     order = await _get_pos_order(oid)
@@ -995,6 +1116,14 @@ def setup(app):
     r.add_get("/api/operator/queue", handle_queue)
     r.add_route("OPTIONS", "/api/operator/orders/{oid}/accept", _opt)
     r.add_post("/api/operator/orders/{oid}/accept", handle_accept)
+    r.add_route("OPTIONS", "/api/operator/orders/{oid}/decline", _opt)
+    r.add_post("/api/operator/orders/{oid}/decline", handle_decline)
+    r.add_route("OPTIONS", "/api/operator/orders/{oid}/one", _opt)
+    r.add_get("/api/operator/orders/{oid}/one", handle_one)
+    r.add_route("OPTIONS", "/api/operator/customer/{cid}", _opt)
+    r.add_get("/api/operator/customer/{cid}", handle_customer)
+    r.add_route("OPTIONS", "/api/operator/customer/{cid}/act", _opt)
+    r.add_post("/api/operator/customer/{cid}/act", handle_customer_act)
     r.add_route("OPTIONS", "/api/operator/orders", _opt)
     r.add_get("/api/operator/orders", handle_list)
     r.add_post("/api/operator/orders", handle_create)

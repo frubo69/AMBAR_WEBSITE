@@ -194,6 +194,47 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .q-empty-s{font-size:13px;color:var(--muted);line-height:1.5}
 .q-cta{margin-top:18px;padding:14px 22px;border-radius:var(--r2);font-size:14px;font-weight:700;
   color:#1a1408;border:none;cursor:pointer;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+/* Карточка заказа и клиента: два столбца «что — значение», крупная сумма
+   сверху, действия снизу одной полосой. */
+.sheet.wide{max-width:560px;max-height:88vh;overflow-y:auto}
+.ord-st{font-size:10.5px;font-weight:700;padding:3px 9px;border-radius:999px;
+  background:var(--card2);border:1px solid var(--border2);color:var(--muted);vertical-align:middle}
+.ord-sum{font-family:'DM Sans',sans-serif;font-size:30px;font-weight:800;color:var(--gold2);
+  margin:6px 0 14px}
+.ord-sum small{font-size:12px;color:var(--muted);font-weight:600}
+.ord-sum i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);font-weight:600;margin-top:4px}
+.ord-grid{display:grid;grid-template-columns:88px 1fr;gap:9px 12px;font-size:13px;margin-bottom:14px}
+.ord-k{font-size:10.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+  color:var(--muted);padding-top:2px}
+.ord-v{min-width:0;word-break:break-word;line-height:1.45}
+.ord-v a{color:var(--gold2);text-decoration:none}
+.ord-mut{color:var(--muted);font-size:11.5px;margin-left:6px}
+.ord-items{border-top:1px solid var(--border2);padding-top:11px}
+.ord-it{display:flex;align-items:center;gap:10px;font-size:13px;padding:5px 0}
+.ord-it span:first-child{flex:1;min-width:0}
+.ord-it i{font-style:normal;font-size:11px;color:var(--muted)}
+.ord-it b{color:var(--sub);font-size:12.5px}
+.ord-it-p{width:58px;text-align:right;color:var(--muted);font-size:12.5px}
+.ord-acts{display:flex;flex-wrap:wrap;gap:8px;margin:16px 0 4px}
+.ord-acts .oact{flex:1 1 44%}
+.cst-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
+.cst-chip{font-size:11px;font-weight:700;padding:5px 11px;border-radius:999px;
+  background:var(--card2);border:1px solid var(--border2);color:var(--muted)}
+.cst-chip.ok{color:var(--ok,#4CAF7D);border-color:rgba(76,175,125,.35)}
+.cst-chip.warn{color:var(--gold2);border-color:rgba(201,169,110,.35)}
+.cst-chip.bad{color:var(--dn,#E5484D);border-color:rgba(229,72,77,.35)}
+.cst-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
+.cst-nums div{background:var(--card2);border:1px solid var(--border2);border-radius:12px;
+  padding:10px 8px;text-align:center}
+.cst-nums b{display:block;font-family:'DM Sans',sans-serif;font-size:17px;font-weight:800}
+.cst-nums span{font-size:9.5px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase}
+.cst-h{font-size:10.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  color:var(--muted);margin:14px 0 8px}
+.cst-o{display:flex;align-items:center;gap:10px;font-size:12.5px;padding:7px 0;
+  border-top:1px solid var(--border2)}
+.cst-o-a{flex:1;min-width:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.q-r{cursor:pointer}
+
 .acc-sum{font-family:'DM Sans',sans-serif;font-size:26px;font-weight:800;color:var(--gold2);
   margin:10px 0 4px}
 .acc-sum small{font-size:12px;color:var(--muted);font-weight:600}
@@ -443,6 +484,26 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
     <div class="s">Выберите себя — районы и водители подставятся автоматически</div>
     <div id="opList"></div>
     <div class="btns"><button class="sbtn" onclick="hideOv('opOv')">Закрыть</button></div>
+  </div>
+</div>
+
+<!-- карточка заказа: всё, что есть у оператора в боте -->
+<div class="ov" id="ordOv">
+  <div class="sheet wide">
+    <div class="t" id="ordT">Заказ</div>
+    <div id="ordBody"></div>
+    <div class="ord-acts" id="ordActs"></div>
+    <div class="btns"><button class="sbtn" onclick="hideOv('ordOv')">Закрыть</button></div>
+  </div>
+</div>
+
+<!-- карточка клиента -->
+<div class="ov" id="custOv">
+  <div class="sheet wide">
+    <div class="t" id="custT">Клиент</div>
+    <div id="custBody"></div>
+    <div class="ord-acts" id="custActs"></div>
+    <div class="btns"><button class="sbtn" onclick="hideOv('custOv')">Закрыть</button></div>
   </div>
 </div>
 
@@ -1031,18 +1092,18 @@ function _row(o, lane){
     ? _esc(o.address || o.customer_name || '—')
     : `${_esc(o.driver || 'без водителя')}${o.operator_name?' · принял '+_esc(o.operator_name):''}`;
   const acts = lane==='new'
-    ? `<button class="q-take" onclick="askAccept('${o.order_id}')">Принять</button>`
+    ? `<button class="q-take" onclick="event.stopPropagation();askAccept('${o.order_id}')">Принять</button>`
     : lane==='work'
-      ? `<div class="q-acts">
+      ? `<div class="q-acts" onclick="event.stopPropagation()">
            <button class="oact" onclick="showOrderText('${o.order_id}')">Текст</button>
            <button class="oact deliver" onclick="askAct('${o.order_id}','delivered')">Доставлен</button>
            <button class="oact edit" onclick="startEdit('${o.order_id}')">Изменить</button>
            <button class="oact cancel" onclick="askAct('${o.order_id}','cancel')">Отменить</button>
          </div>`
       : (o.status==='delivered'
-          ? `<div class="q-acts"><button class="oact undo" onclick="askAct('${o.order_id}','undeliver')">Вернуть в доставку</button></div>`
+          ? `<div class="q-acts" onclick="event.stopPropagation()"><button class="oact undo" onclick="askAct('${o.order_id}','undeliver')">Вернуть в доставку</button></div>`
           : '');
-  return `<div class="q-r ${src}">
+  return `<div class="q-r ${src}" onclick="openOrder('${o.order_id}')">
     <div class="q-r-h">
       ${src==='tel'?ICO_TEL:ICO_APP}
       <span class="q-r-n">${_esc(o.customer_name||'—')}</span>
@@ -1052,6 +1113,165 @@ function _row(o, lane){
     <div class="q-r-sub">${sub}</div>
     <div class="q-r-it">${_esc((o.items||[]).map(i=>i.name+' ×'+i.qty).join(' · '))}</div>
     ${acts}</div>`;
+}
+
+// ── карточка заказа ──
+// В боте у оператора под рукой всё: кто клиент, что заказал, куда везти, карта,
+// правка, отклонение. Панель должна уметь столько же, иначе за ответом всё
+// равно придётся лезть в переписку.
+let curOrder=null, curCust=null;
+
+async function openOrder(oid){
+  const o = ORDERS.find(x=>x.order_id===oid);
+  if(!o) return;
+  curOrder=o; renderOrder(); showOv('ordOv'); haptic('light');
+  try{ const r=await opApi.opFetch(`/api/operator/orders/${oid}/one`);
+       if(r && r.order && curOrder && curOrder.order_id===oid){ curOrder=r.order; renderOrder(); } }
+  catch(e){}
+}
+
+function _phones(o){
+  const p=v=>{const d=String(v||'').replace(/\D/g,''); return d?('+'+d):'';};
+  const sh=p(o.phone_shared), dl=p(o.phone), ex=p(o.phone_extra), out=[];
+  if(sh) out.push([sh,'подтверждён']);
+  if(dl && dl!==sh) out.push([dl, sh?'отредактирован':'не подтверждён']);
+  if(ex && ex!==sh && ex!==dl) out.push([ex,'дополнительный']);
+  return out.length?out:[['—','']];
+}
+
+function renderOrder(){
+  const o=curOrder; if(!o) return;
+  const st={pending:'Новый',approved:'В пути',delivered:'Доставлен',
+            cancelled:'Отменён',declined:'Отклонён'}[o.status]||o.status;
+  const src=(o.source||'app')==='manual';
+  const goods=(o.total||0)-(o.tip||0);
+  $('ordT').innerHTML = `#${_esc(o.order_id)} <span class="ord-st st-${o.status}">${st}</span>`;
+  $('ordBody').innerHTML = `
+    <div class="ord-sum">${_esc(o.total)} <small>AED</small>
+      ${o.tip?`<i>товары ${goods} · чай ${o.tip}</i>`:''}</div>
+    <div class="ord-grid">
+      <div class="ord-k">Клиент</div>
+      <div class="ord-v">${_esc(o.customer_name||'—')}
+        ${o.username&&o.username!=='—'?`<span class="ord-mut">@${_esc(o.username)}</span>`:''}</div>
+      <div class="ord-k">Телефон</div>
+      <div class="ord-v">${_phones(o).map(([n,t])=>
+        `<a href="tel:${_esc(n)}">${_esc(n)}</a>${t?`<span class="ord-mut">${t}</span>`:''}`).join('<br>')}</div>
+      <div class="ord-k">Адрес</div>
+      <div class="ord-v">${_esc(o.address||'—')}
+        ${o.gmap_link?`<br><a href="${_esc(o.gmap_link)}" target="_blank" rel="noopener">Открыть на карте${o.is_gps?' · по геолокации':''}</a>`:''}</div>
+      <div class="ord-k">Район</div>
+      <div class="ord-v">${_esc(_distCode(o.office_id)+' '+(_distName(o.office_id)||o.office_name||'—'))}</div>
+      ${o.driver?`<div class="ord-k">Водитель</div><div class="ord-v">${_esc(o.driver)}${
+        o.deliver_by?` · до ${_esc(o.deliver_by)}`:''}</div>`:''}
+      ${o.operator_name?`<div class="ord-k">Принял</div><div class="ord-v">${_esc(o.operator_name)}</div>`:''}
+      <div class="ord-k">Оплата</div>
+      <div class="ord-v">${o.prepaid?'Крипта · оплачено':(o.payment_method==='debt'?'В долг':'Наличные при получении')}</div>
+      <div class="ord-k">Источник</div>
+      <div class="ord-v">${src?'По телефону':'Из приложения'}</div>
+      ${o.comment?`<div class="ord-k">Комментарий</div><div class="ord-v">${_esc(o.comment)}</div>`:''}
+    </div>
+    <div class="ord-items">${(o.items||[]).map(i=>
+      `<div class="ord-it"><span>${_esc(i.name)}${i.pcs?` <i>${i.pcs} шт</i>`:''}</span>
+        <b>×${_esc(i.qty)}</b><span class="ord-it-p">${_esc((i.price||0)*(i.qty||1))}</span></div>`).join('')}</div>`;
+
+  const A=[];
+  if(o.status==='pending'){
+    A.push(['go','Принять',`hideOv('ordOv');askAccept('${o.order_id}')`]);
+    A.push(['dn','Отклонить',`askDecline('${o.order_id}')`]);
+  }
+  if(o.status==='approved'){
+    A.push(['go','Доставлен',`hideOv('ordOv');askAct('${o.order_id}','delivered')`]);
+    A.push(['dn','Отменить',`hideOv('ordOv');askAct('${o.order_id}','cancel')`]);
+  }
+  if(o.status==='delivered')
+    A.push(['','Вернуть в доставку',`hideOv('ordOv');askAct('${o.order_id}','undeliver')`]);
+  if(o.status==='approved'||o.status==='pending')
+    A.push(['','Изменить состав',`hideOv('ordOv');startEdit('${o.order_id}')`]);
+  A.push(['','Текст водителю',`showOrderText('${o.order_id}')`]);
+  if(o.customer_id) A.push(['','Клиент',`openCust(${o.customer_id})`]);
+  $('ordActs').innerHTML = A.map(([c,t,fn])=>
+    `<button class="oact ${c==='go'?'deliver':c==='dn'?'cancel':''}" onclick="${fn}">${t}</button>`).join('');
+}
+
+// ── карточка клиента ──
+async function openCust(cid){
+  curCust=null; $('custBody').innerHTML='<div class="ord-mut" style="padding:20px">Загрузка…</div>';
+  showOv('custOv'); haptic('light');
+  try{ curCust = await opApi.opFetch(`/api/operator/customer/${cid}`); renderCust(); }
+  catch(e){ $('custBody').innerHTML='<div class="ord-mut" style="padding:20px">Не удалось загрузить</div>'; }
+}
+function renderCust(){
+  const c=curCust; if(!c) return;
+  const since = c.first_seen ? String(c.first_seen).slice(0,10).split('-').reverse().join('.') : '';
+  $('custT').innerHTML = `${_esc(c.name)}${c.note?` <span class="ord-mut">(${_esc(c.note)})</span>`:''}`;
+  $('custBody').innerHTML = `
+    <div class="cst-chips">
+      <span class="cst-chip ${c.verified?'ok':'warn'}">${c.verified?'Верифицирован':
+        (c.verify_source?'Ждёт верификации':'Не верифицирован')}</span>
+      ${c.banned?`<span class="cst-chip bad">Заблокирован</span>`:''}
+      ${c.invited_via?`<span class="cst-chip">${_esc(c.invited_via)}</span>`:''}
+    </div>
+    <div class="cst-nums">
+      <div><b>${_esc(c.orders_total)}</b><span>заказов</span></div>
+      <div><b>${_esc(c.orders_done)}</b><span>доставлено</span></div>
+      <div><b>${_esc(c.orders_declined)}</b><span>отменено</span></div>
+      <div><b>${_esc(c.total_spent)}</b><span>AED всего</span></div>
+    </div>
+    <div class="ord-grid">
+      ${c.phone_verified?`<div class="ord-k">Телефон</div>
+        <div class="ord-v"><a href="tel:+${_esc(String(c.phone_verified).replace(/\D/g,''))}">+${
+          _esc(String(c.phone_verified).replace(/\D/g,''))}</a></div>`:''}
+      ${c.username?`<div class="ord-k">Телеграм</div><div class="ord-v">@${_esc(c.username)}</div>`:''}
+      ${since?`<div class="ord-k">Клиент с</div><div class="ord-v">${_esc(since)}</div>`:''}
+      ${c.verify_recommender_name?`<div class="ord-k">Рекомендовал</div>
+        <div class="ord-v">${_esc(c.verify_recommender_name)}</div>`:''}
+      ${c.banned&&c.ban_reason?`<div class="ord-k">Причина</div><div class="ord-v">${_esc(c.ban_reason)}</div>`:''}
+    </div>
+    ${(c.last||[]).length?`<div class="cst-h">Последние заказы</div>
+      ${c.last.map(o=>`<div class="cst-o"><span>${_esc(String(o.timestamp).slice(0,10).split('-').reverse().join('.'))}</span>
+        <span class="cst-o-a">${_esc(o.address||'')}</span>
+        <b>${_esc(o.total)}</b></div>`).join('')}`:''}`;
+  const A=[];
+  if(!c.verified) A.push(['go','Верифицировать',`custAct('verify')`]);
+  A.push(['','Заметка',`custNote()`]);
+  A.push([c.banned?'':'dn', c.banned?'Разблокировать':'Заблокировать',
+          c.banned?`custAct('unban')`:`custBan()`]);
+  $('custActs').innerHTML = A.map(([k,t,fn])=>
+    `<button class="oact ${k==='go'?'deliver':k==='dn'?'cancel':''}" onclick="${fn}">${t}</button>`).join('');
+}
+async function custAct(act, extra){
+  try{
+    curCust = await opApi.opFetch(`/api/operator/customer/${curCust.customer_id}/act`,
+      {method:'POST', body:Object.assign({act}, extra||{})});
+    renderCust(); toast('Готово'); haptic('medium');
+  }catch(e){ toast('Не получилось','err'); }
+}
+function custNote(){
+  const v = prompt('Заметка к клиенту (пусто — убрать)', curCust.note||'');
+  if(v===null) return;
+  custAct('note', {note:v});
+}
+function custBan(){
+  const r = prompt('Причина блокировки');
+  if(r===null) return;
+  custAct('ban', {reason:r});
+}
+
+function askDecline(oid){
+  const r = prompt('Причина отклонения (необязательно)', '');
+  if(r===null) return;
+  (async()=>{
+    try{
+      await opApi.opFetch(`/api/operator/orders/${oid}/decline`,
+        {method:'POST', body:{as:curOp, reason:r}});
+      hideOv('ordOv'); toast('Заказ отклонён'); haptic('medium');
+    }catch(e){
+      const d=(e&&e.data)||{};
+      hideOv('ordOv');
+      toast(d.error==='already_taken'?`Заказ уже взял ${d.by||'кто-то'}`:'Не получилось','err');
+    }
+    await loadQueue();
+  })();
 }
 
 // ── приём: водитель и время одним действием ──

@@ -166,29 +166,47 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .q-grp:first-child{margin-top:0}
 .q-grp i{font-style:normal;font-size:11px;padding:1px 7px;border-radius:999px;
   background:var(--card2);border:1px solid var(--border2)}
-.q-r{position:relative;background:var(--card);border:1px solid var(--border2);
-  border-radius:var(--r2);padding:13px 14px 13px 17px;margin-bottom:9px;overflow:hidden}
+.q-r{position:relative;display:flex;align-items:center;gap:18px;cursor:pointer;
+  background:var(--card);border:1px solid var(--border2);border-radius:var(--r2);
+  padding:14px 16px 14px 19px;margin-bottom:9px;overflow:hidden;transition:.12s}
+.q-r:active{background:var(--card2)}
 .q-r::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;opacity:.9}
 .q-r.app::before{background:var(--gold2)}
 .q-r.tel::before{background:var(--muted)}
-.q-r-h{display:flex;align-items:center;gap:9px}
+.q-r-l{flex:1;min-width:0}
+.q-r-h{display:flex;align-items:center;gap:8px}
 .src-i{width:14px;height:14px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.8;
-  stroke-linecap:round;stroke-linejoin:round;opacity:.6}
-.q-r-n{flex:1;min-width:0;font-size:14px;font-weight:700;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap}
-.q-r-s{font-size:15px;font-weight:800;color:var(--gold2);white-space:nowrap}
-.q-r-s small{font-size:10px;color:var(--muted);font-weight:600}
-.q-age,.q-by{font-size:11px;color:var(--muted);white-space:nowrap;padding:3px 8px;
+  stroke-linecap:round;stroke-linejoin:round;opacity:.55}
+.q-r-n{font-size:14.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.q-flag{font-size:10px;font-weight:700;color:var(--gold2);padding:2px 8px;border-radius:999px;
+  background:var(--gold-soft);border:1px solid rgba(201,169,110,.3);white-space:nowrap}
+.q-r-a{display:block;font-size:12.5px;color:var(--sub);margin-top:4px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.q-r-it{display:block;font-size:11.5px;color:var(--muted);margin-top:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Правый край — деньги и одно действие. Кнопка компактная: список из полос во
+   всю ширину читался как стопка панелей, а не как очередь. */
+.q-r-r{flex:0 0 auto;display:flex;align-items:center;gap:12px}
+.q-r-s{font-family:'DM Sans',sans-serif;font-size:17px;font-weight:800;color:var(--gold2);
+  white-space:nowrap;letter-spacing:-.4px}
+.q-r-s small{font-size:10px;color:var(--muted);font-weight:600;letter-spacing:0}
+.q-age,.q-by{font-size:11px;color:var(--muted);white-space:nowrap;padding:4px 9px;
   border-radius:999px;background:var(--card2);border:1px solid var(--border2)}
-.q-r-sub{font-size:12px;color:var(--sub);margin-top:5px}
-.q-r-it{font-size:11.5px;color:var(--muted);margin-top:3px;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap}
-/* Кнопка приёма крупная: по ней бьют пальцем, не глядя, и промах стоит минуты. */
-.q-take{display:block;width:100%;margin-top:11px;padding:14px;border-radius:var(--r2);
-  font-size:14.5px;font-weight:800;color:#1a1408;border:none;cursor:pointer;
-  background:linear-gradient(135deg,var(--gold),var(--gold2))}
-.q-take:active{transform:scale(.99)}
-.q-acts{display:flex;flex-wrap:wrap;gap:7px;margin-top:10px}
+.q-drv{font-size:12px;font-weight:700;color:var(--sub);white-space:nowrap}
+.q-st{font-size:10.5px;font-weight:700;padding:4px 10px;border-radius:999px;
+  background:var(--card2);border:1px solid var(--border2);color:var(--muted);white-space:nowrap}
+.q-st.ok{color:var(--up);border-color:rgba(76,175,125,.3)}
+.q-st.no{color:var(--dn);border-color:rgba(224,85,85,.3)}
+.q-take{padding:11px 20px;border-radius:11px;font-size:13.5px;font-weight:800;color:#1a1408;
+  border:none;cursor:pointer;background:linear-gradient(135deg,var(--gold),var(--gold2));
+  white-space:nowrap}
+.q-take:active{transform:scale(.97)}
+/* Телефон: правый край уходит под левый, иначе адрес сжимается в три буквы. */
+@media (max-width:560px){
+  .q-r{flex-direction:column;align-items:stretch;gap:11px}
+  .q-r-r{justify-content:flex-end}
+  .q-take{flex:1;text-align:center}
+}
 .q-empty{padding:48px 20px;text-align:center}
 .q-empty-t{font-size:16px;font-weight:700;margin-bottom:8px}
 .q-empty-s{font-size:13px;color:var(--muted);line-height:1.5}
@@ -1202,36 +1220,38 @@ function _laneHtml(lane, list){
     ${by[id].map(o=>_row(o,lane)).join('')}`).join('');
 }
 
+// Строка очереди — короткая сводка, по которой решают «этим заниматься или
+// следующим». Всё управление живёт в карточке, поэтому строка открывается по
+// нажатию целиком, а из действий на ней осталось одно и компактное: принять.
+// Полоса кнопок во всю ширину делала из списка стопку панелей.
 function _row(o, lane){
   const src=(o.source||'app')==='manual' ? 'tel' : 'app';
-  const right = lane==='new'
-    ? `<span class="q-age">${_age(o.timestamp)}</span>`
-    : (o.deliver_by ? `<span class="q-by">до ${_esc(o.deliver_by)}</span>` : '');
-  const sub = lane==='new'
-    ? _esc(o.address || o.customer_name || '—')
-    : `${_esc(o.driver || 'без водителя')}${o.operator_name?' · принял '+_esc(o.operator_name):''}`;
-  const acts = lane==='new'
-    ? `<button class="q-take" onclick="event.stopPropagation();askAccept('${o.order_id}')">Принять</button>`
-    : lane==='work'
-      ? `<div class="q-acts" onclick="event.stopPropagation()">
-           <button class="oact" onclick="showOrderText('${o.order_id}')">Текст</button>
-           <button class="oact deliver" onclick="askAct('${o.order_id}','delivered')">Доставлен</button>
-           <button class="oact edit" onclick="startEdit('${o.order_id}')">Изменить</button>
-           <button class="oact cancel" onclick="askAct('${o.order_id}','cancel')">Отменить</button>
-         </div>`
-      : (o.status==='delivered'
-          ? `<div class="q-acts" onclick="event.stopPropagation()"><button class="oact undo" onclick="askAct('${o.order_id}','undeliver')">Вернуть в доставку</button></div>`
-          : '');
+  const items=(o.items||[]).map(i=>i.name+' ×'+i.qty).join(' · ');
+  let right;
+  if(lane==='new'){
+    right = `<span class="q-age">${_age(o.timestamp)}</span>
+      <button class="q-take" onclick="event.stopPropagation();askAccept('${o.order_id}')">Принять</button>`;
+  }else if(lane==='work'){
+    right = `${o.deliver_by?`<span class="q-by">до ${_esc(o.deliver_by)}</span>`:''}
+      <span class="q-drv">${_esc(o.driver||'без водителя')}</span>`;
+  }else{
+    const ST={delivered:['Доставлен','ok'],cancelled:['Отменён','no'],declined:['Отклонён','no']};
+    const [t,c]=ST[o.status]||[o.status,''];
+    right = `<span class="q-st ${c}">${t}</span>`;
+  }
   return `<div class="q-r ${src}" onclick="openOrder('${o.order_id}')">
-    <div class="q-r-h">
-      ${src==='tel'?ICO_TEL:ICO_APP}
-      <span class="q-r-n">${_esc(o.customer_name||'—')}</span>
+    <span class="q-r-l">
+      <span class="q-r-h">${src==='tel'?ICO_TEL:ICO_APP}
+        <span class="q-r-n">${_esc(o.customer_name||'—')}</span>
+        ${o.needs_verify?'<span class="q-flag">не проверен</span>':''}</span>
+      <span class="q-r-a">${_esc(o.address||'адрес не указан')}</span>
+      <span class="q-r-it">${_esc(items)}</span>
+    </span>
+    <span class="q-r-r">
       <span class="q-r-s">${_esc(o.total)} <small>AED</small></span>
       ${right}
-    </div>
-    <div class="q-r-sub">${sub}</div>
-    <div class="q-r-it">${_esc((o.items||[]).map(i=>i.name+' ×'+i.qty).join(' · '))}</div>
-    ${acts}</div>`;
+    </span>
+  </div>`;
 }
 
 // Одна строка ввода вместо prompt: в телеграмовском вебвью родной prompt то

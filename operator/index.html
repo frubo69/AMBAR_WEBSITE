@@ -221,15 +221,23 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .of-v{font-size:15px;font-weight:600;line-height:1.35;word-break:break-word}
 .of-v i{display:block;font-style:normal;font-size:12px;font-weight:500;color:var(--muted);
   margin-top:4px}
-.of-map{display:flex;align-items:center;justify-content:space-between;padding:13px 0;
-  border-bottom:1px solid var(--border2);text-decoration:none;color:var(--gold2);
-  font-size:14px;font-weight:700}
-.of-map span{color:var(--muted);font-size:17px;line-height:1}
+.of-box{background:var(--card);border:1px solid var(--border2);border-radius:var(--r2)}
+.of-box.addr{display:flex;align-items:center;gap:12px;padding:13px 13px 13px 15px}
+.of-addr{flex:1;min-width:0;font-size:15px;font-weight:600;line-height:1.35;word-break:break-word}
+.of-addr i{display:block;font-style:normal;font-size:12px;font-weight:500;color:var(--muted);
+  margin-top:4px}
+.of-map{display:flex;align-items:center;gap:6px;flex-shrink:0;padding:10px 13px;border-radius:11px;
+  text-decoration:none;font-size:13px;font-weight:700;color:var(--gold2);
+  background:var(--gold-soft);border:1px solid rgba(201,169,110,.28)}
+.of-map:active{background:rgba(201,169,110,.2)}
+.of-map svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:1.9;
+  stroke-linecap:round;stroke-linejoin:round}
 
-/* Состав листается сам, как корзина: адрес и итог при этом стоят на месте. */
-.of-items{max-height:34vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
-  overscroll-behavior:contain;margin:0 -4px;padding:0 4px}
-.of-it{display:flex;align-items:baseline;gap:12px;padding:7px 0;font-size:14.5px}
+/* Состав листается сам: длинный заказ не уносит адрес и итог за край экрана. */
+.of-items{max-height:32vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  overscroll-behavior:contain;padding:4px 14px}
+.of-it{display:flex;align-items:baseline;gap:12px;padding:9px 0;font-size:14.5px}
+.of-it + .of-it{border-top:1px solid var(--border2)}
 .of-it-n{flex:1;min-width:0;font-weight:600;line-height:1.35}
 .of-it-n b{font-weight:700;color:var(--gold2);white-space:nowrap;font-variant-numeric:tabular-nums}
 .of-it-n i{font-style:normal;font-size:11.5px;color:var(--muted);font-weight:500;
@@ -1267,24 +1275,38 @@ function renderOrder(){
 
   const dist = [_distCode(o.office_id), _distName(o.office_id)||o.office_name]
                  .filter(Boolean).join(' ');
-  const body =
-    f('Адрес', _esc(o.address||'не указан'),
-      [dist, o.is_gps?'по геолокации':''].filter(Boolean).join(' · '))
-    + (o.gmap_link?`<a class="of-map" href="${_esc(o.gmap_link)}" target="_blank" rel="noopener">
-        Открыть на карте<span>›</span></a>`:'')
-    + f('Комментарий', _esc(o.comment))
+  const sub2 = [dist, o.is_gps?'по геолокации':''].filter(Boolean).join(' · ');
+
+  // Адрес и кнопка карты — одним окошком: они про одно и то же, и кнопка под
+  // адресом читалась как ещё один пункт списка.
+  const addr = `<div class="of">
+      <div class="of-l">Адрес</div>
+      <div class="of-box addr">
+        <span class="of-addr">${_esc(o.address||'не указан')}
+          ${sub2?`<i>${_esc(sub2)}</i>`:''}</span>
+        ${o.gmap_link?`<a class="of-map" href="${_esc(o.gmap_link)}" target="_blank" rel="noopener">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-5.7 7-11a7 7 0 1 0-14 0c0 5.3 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>
+          Карта</a>`:''}
+      </div>
+    </div>`;
+
+  // Состав — своё окошко со своей прокруткой: длинный заказ не должен уносить
+  // адрес и итог за край экрана.
+  const goodsBox = `<div class="of">
+      <div class="of-l">Что везём${lines?` · ${lines}`:''}</div>
+      <div class="of-box of-items">${(o.items||[]).map(i=>{
+        const q=+i.qty||1, p=+i.price||0;
+        const cnt = i.pcs ? `${q} × ${i.pcs} шт` : `${q} шт`;
+        return `<div class="of-it">
+          <span class="of-it-n">${_esc(i.name)} <b>· ${cnt}</b>${
+            q>1?` <i>по ${_esc(p)} AED</i>`:''}</span>
+          <span class="of-it-p">${_esc(p*q)}</span></div>`;}).join('')}</div>
+    </div>`;
+
+  $('ordBody').innerHTML = addr
     + (o.driver?f('Водитель', _esc(o.driver), o.deliver_by?`доставить до ${_esc(o.deliver_by)}`:''):'')
-    + `<div class="of">
-        <div class="of-l">Что везём${lines?` · ${lines}`:''}</div>
-        <div class="of-items">${(o.items||[]).map(i=>{
-          const q=+i.qty||1, p=+i.price||0;
-          const cnt = i.pcs ? `${q} × ${i.pcs} шт` : `${q} шт`;
-          return `<div class="of-it">
-            <span class="of-it-n">${_esc(i.name)} <b>· ${cnt}</b>${
-              q>1?` <i>по ${_esc(p)} AED</i>`:''}</span>
-            <span class="of-it-p">${_esc(p*q)}</span></div>`;}).join('')}</div>
-      </div>`;
-  $('ordBody').innerHTML = body;
+    + goodsBox
+    + f('Комментарий', _esc(o.comment));
 
   const money = `<div class="oc-total">
       ${o.tip?`<div class="oc-tl"><span>Товары</span><b>${_esc(goods)}</b></div>

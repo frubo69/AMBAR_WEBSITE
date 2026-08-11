@@ -25,7 +25,7 @@
   --safe-bottom:calc(var(--tg-safe-area-inset-bottom,0px) + env(safe-area-inset-bottom,0px));
 }
 /* Light theme — same layout, white surfaces, darker gold for text contrast.
-   Toggled by the ☀️/🌙 header button, persisted in localStorage (pos_theme). */
+   Toggled by the / header button, persisted in localStorage (pos_theme). */
 body.light{
   --gold:#B08D4F;--gold2:#8A6A2E;--gold3:#6E541F;--gold-soft:rgba(176,141,79,.18);
   /* canvas noticeably darker than the white windows, so cards/inputs never blend in */
@@ -176,6 +176,14 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 /* Заказы плиткой. Ширина колонки задана снизу — сколько влезет, столько и
    станет: на планшете две-три, на телефоне одна, и тогда это просто лента
    сверху вниз, как переписка. */
+/* Сводка по онлайн-заказу вместо полей клиента: что за заказ правим. */
+.cr-l{font-size:10px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;
+  color:var(--muted);margin:14px 0 6px}
+.cr-v{font-size:15px;font-weight:700}
+.cr-s{font-size:12.5px;color:var(--sub);margin-top:3px;line-height:1.4}
+.cr-n{margin-top:10px;padding:10px 12px;border-radius:11px;font-size:11.5px;line-height:1.45;
+  color:var(--gold3);background:var(--gold-soft);border:1px solid rgba(201,169,110,.2)}
+
 .q-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));
   gap:12px;align-items:start}
 .q-card{position:relative;display:flex;flex-direction:column;overflow:hidden;
@@ -183,8 +191,12 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .q-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;opacity:.9;z-index:1}
 .q-card.app::before{background:var(--gold2)}
 .q-card.tel::before{background:var(--muted)}
+/* Шапку видно как шапку: своя подложка, чуть светлее карточки, и чёткая
+   граница снизу. Карточки в ряду начинались одинаково серым, и где кончается
+   одна и начинается другая, глаз ловил не сразу. */
 .q-card-h{display:flex;align-items:center;flex-wrap:wrap;gap:8px;cursor:pointer;
-  padding:14px 16px 12px 19px;border-bottom:1px solid var(--border2)}
+  padding:13px 16px 13px 19px;background:var(--card2);
+  border-bottom:1px solid var(--border3)}
 .q-card-id{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;letter-spacing:-.2px}
 .q-card-when{margin-left:auto;font-size:11.5px;color:var(--muted);white-space:nowrap}
 .q-card-b{padding:12px 16px 4px 19px;cursor:pointer}
@@ -220,6 +232,13 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
   background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .qa.no{color:var(--dn);background:none;border-color:rgba(224,85,85,.28)}
 .qa .oc-ico{width:15px;height:15px;opacity:.7}
+/* Значки вместо эмодзи: у эмодзи на каждом устройстве свой размер и цвет, и
+   строка от них скачет. */
+.ic{width:15px;height:15px;flex:0 0 auto;fill:none;stroke:currentColor;stroke-width:1.8;
+  stroke-linecap:round;stroke-linejoin:round;vertical-align:-2px;margin-right:7px}
+.pill .ic,.create-btn .ic,.sbtn .ic{margin-right:6px}
+#themeBtn .ic{margin:0}
+.edit-tag .ic{width:12px;height:12px;margin-right:4px}
 .q-flag{font-size:10px;font-weight:700;color:var(--gold2);padding:2px 8px;border-radius:999px;
   background:var(--gold-soft);border:1px solid rgba(201,169,110,.3);white-space:nowrap}
 .q-empty{padding:48px 20px;text-align:center}
@@ -521,8 +540,8 @@ a.oc-row:active{background:var(--card2)}
     <div><div class="hdr-logo">AMBAR</div><div class="hdr-sub">Панель оператора</div></div>
     <div class="office-seg" id="officeSeg" style="display:none"></div>
     <div class="hdr-right">
-      <button class="pill" id="dispatchBtn" onclick="showOv('opOv')" style="cursor:pointer;color:var(--gold2);border-color:rgba(201,169,110,.4)">👤 Оператор</button>
-      <button class="pill" id="themeBtn" onclick="toggleTheme()" aria-label="Тема" style="cursor:pointer">☀️</button>
+      <button class="pill" id="dispatchBtn" onclick="showOv('opOv')" style="cursor:pointer;color:var(--gold2);border-color:rgba(201,169,110,.4)">Оператор</button>
+      <button class="pill" id="themeBtn" onclick="toggleTheme()" aria-label="Тема" style="cursor:pointer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg></button>
       <span class="pill" id="opName">—</span>
       <span class="pill" id="netPill">…</span>
     </div>
@@ -557,14 +576,20 @@ a.oc-row:active{background:var(--card2)}
     <div class="ticket">
       <div class="ticket-hdr">
         <span class="t">Чек</span>
-        <span class="edit-tag" id="editTag" style="display:none">✏️ ПРАВКА</span>
+        <span class="edit-tag" id="editTag" style="display:none"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20h4l10-10-4-4L4 16z"/><path d="M14 6l4 4"/></svg>ПРАВКА</span>
         <button class="ticket-clear" onclick="clearTicket(true)">Очистить</button>
       </div>
       <div class="ticket-scroll">
         <div id="tlines"><div class="ticket-empty">Нажимайте на товары слева,<br>чтобы собрать заказ</div></div>
         <div class="cust">
+          <!-- Онлайн-заказ приходит с адресом и телефоном клиента: переписывать
+               их оператору незачем, работа там только по составу. -->
+          <div id="custRead" style="display:none"></div>
+          <!-- Район и водитель правятся всегда: заказ могут передать на другой
+               район или переназначить водителя посреди смены. -->
           <div class="lbl">Район *</div>
           <div class="dchips" id="distChips"></div>
+          <div id="custFields">
           <div class="lbl">Клиент · всё необязательно</div>
           <div class="lbl" style="margin-top:6px">Имя</div>
           <input id="cName" placeholder="Имя клиента (необязательно)" autocomplete="off" enterkeyhint="next">
@@ -574,13 +599,16 @@ a.oc-row:active{background:var(--card2)}
           <textarea id="cAddr" rows="2" placeholder="Район, здание, квартира… (необязательно)" enterkeyhint="next"></textarea>
           <div class="lbl">Комментарий</div>
           <input id="cComment" placeholder="Домофон, этаж, пожелания…" autocomplete="off" enterkeyhint="done">
-          <div class="lbl">🚗 Водитель *</div>
-          <div class="dchips" id="drvChips"></div>
+          </div>
+          <div id="drvBlock">
+            <div class="lbl">Водитель *</div>
+            <div class="dchips" id="drvChips"></div>
+          </div>
         </div>
       </div>
       <div class="ticket-foot">
         <div class="total-row"><span class="l" id="totalLbl">Итого</span><span class="v"><span id="totalV">0</span> <small>AED</small></span></div>
-        <button class="create-btn" id="createBtn" onclick="askCreate()">📞 Создать заказ</button>
+        <button class="create-btn" id="createBtn" onclick="askCreate()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 3.5h4l2 5-2.5 1.5a12 12 0 0 0 6 6L15.5 13l5 2v4a1.5 1.5 0 0 1-1.6 1.5A16.5 16.5 0 0 1 3 5.1 1.5 1.5 0 0 1 4.5 3.5z"/></svg>Создать заказ</button>
       </div>
     </div>
   </div>
@@ -597,7 +625,7 @@ a.oc-row:active{background:var(--card2)}
 <!-- who is taking orders right now -->
 <div class="ov" id="opOv">
   <div class="sheet">
-    <div class="t">👤 Кто принимает заказы?</div>
+    <div class="t">Кто принимает заказы?</div>
     <div class="s">Выберите себя — районы и водители подставятся автоматически</div>
     <div id="opList"></div>
     <div class="btns"><button class="sbtn" onclick="hideOv('opOv')">Закрыть</button></div>
@@ -660,8 +688,8 @@ a.oc-row:active{background:var(--card2)}
   <div class="sheet">
     <div class="t" id="packTitle">Упаковка</div>
     <div class="s">Пиво продаётся упаковками — выберите размер</div>
-    <button class="pack-btn" onclick="packPick(12)"><span class="n">📦 ×12</span><span class="p" id="pack12">—</span></button>
-    <button class="pack-btn" onclick="packPick(24)"><span class="n">📦 ×24</span><span class="p" id="pack24">—</span></button>
+    <button class="pack-btn" onclick="packPick(12)"><span class="n"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/></svg>×12</span><span class="p" id="pack12">—</span></button>
+    <button class="pack-btn" onclick="packPick(24)"><span class="n"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/></svg>×24</span><span class="p" id="pack24">—</span></button>
     <div class="btns"><button class="sbtn" onclick="hideOv('packOv')">Отмена</button></div>
   </div>
 </div>
@@ -693,11 +721,11 @@ a.oc-row:active{background:var(--card2)}
 <!-- driver text — the exact order card, one-tap copy -->
 <div class="ov" id="copyOv">
   <div class="sheet" style="width:min(500px,94vw)">
-    <div class="t">📋 Текст заказа — для водителя</div>
+    <div class="t">Текст заказа — для водителя</div>
     <pre class="copy-pre" id="copyText"></pre>
     <div class="btns">
       <button class="sbtn" style="flex:1" onclick="hideOv('copyOv')">Закрыть</button>
-      <button class="sbtn gold" style="flex:2" onclick="copyOrderText()">📋 Скопировать</button>
+      <button class="sbtn gold" style="flex:2" onclick="copyOrderText()"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="8" y="3" width="12" height="15" rx="2"/><path d="M16 21H6a2 2 0 0 1-2-2V7"/></svg>Скопировать</button>
     </div>
   </div>
 </div>
@@ -832,7 +860,7 @@ function _dist(id){ return DISTRICTS.find(d=>d.id===id); }
 function renderDispatch(){
   // header chip
   const b=$('dispatchBtn');
-  if(b) b.textContent = curOp ? ('👤 '+curOp) : '👤 Выберите оператора';
+  if(b) b.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20a8 8 0 0 1 16 0"/><circle cx="12" cy="8" r="4"/></svg>' + (curOp ? _esc(curOp) : 'Выберите оператора');
   // operator sheet
   const ol=$('opList');
   if(ol && !_ops().length)
@@ -910,7 +938,7 @@ function renderGrid(){
     return `<button class="tile ${p.stock?'':'oos'}" data-pid="${p.id}">
       ${p.stock?'':'<span class="oos-lbl">НЕТ</span>'}
       ${q?`<span class="qbadge">${q}</span>`:''}
-      <div class="timg">${p.img?`<img src="${p.img}" loading="lazy" onerror="this.outerHTML='<span class=ph>🍾</span>'">`:'<span class="ph">🍾</span>'}</div>
+      <div class="timg">${p.img?`<img src="${p.img}" loading="lazy" onerror="this.outerHTML='<span class=ph></span>'">`:'<span class="ph"></span>'}</div>
       <div class="nm">${p.name}</div>
       <div class="tbot">${q?'<span class="ts-b" data-d="-1">−</span>':''}<div class="tinfo">${price}</div>${q?'<span class="ts-b" data-d="1">+</span>':''}</div>
     </button>`;
@@ -1060,9 +1088,11 @@ function closeTicket(){
 window.addEventListener('resize', ()=>{ if(!isPhone()) closeTicket(); });
 function clearTicket(confirmIt){
   if(confirmIt && Object.keys(TICKET).length===0 && !editingOid) return;
-  TICKET={}; editingOid=null;
+  TICKET={}; editingOid=null; editOnline=false;
+  const _cf=$('custFields'); if(_cf) _cf.style.display='';
+  const _cr=$('custRead'); if(_cr){ _cr.style.display='none'; _cr.innerHTML=''; }
   $('editTag').style.display='none';
-  $('createBtn').textContent='📞 Создать заказ';
+  $('createBtn').innerHTML='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 3.5h4l2 5-2.5 1.5a12 12 0 0 0 6 6L15.5 13l5 2v4a1.5 1.5 0 0 1-1.6 1.5A16.5 16.5 0 0 1 3 5.1 1.5 1.5 0 0 1 4.5 3.5z"/></svg>'+'Создать заказ';
   $('createBtn').classList.remove('save');
   $('cName').value=''; $('cPhone').value=''; $('cAddr').value=''; $('cComment').value='';
   curDist=''; curDriver='';          // район/водитель are per-order; оператор stays for the shift
@@ -1076,14 +1106,13 @@ function ticketItems(){
 }
 // Отпечаток правки: состав, район, водитель и поля клиента. По нему видно,
 // поменялось ли хоть что-нибудь.
-let _editWas=null;
+let _editWas=null, editOnline=false;
 function _editSig(){
-  return JSON.stringify([
-    Object.keys(TICKET).sort().map(k=>k+':'+TICKET[k].qty),
-    curDist, curDriver,
+  const items=Object.keys(TICKET).sort().map(k=>k+':'+TICKET[k].qty);
+  if(editOnline) return JSON.stringify([items, curDist, curDriver]);
+  return JSON.stringify([items, curDist, curDriver,
     $('cName').value.trim(), $('cPhone').value.trim(),
-    $('cAddr').value.trim(), $('cComment').value.trim(),
-  ]);
+    $('cAddr').value.trim(), $('cComment').value.trim()]);
 }
 
 function askCreate(){
@@ -1105,35 +1134,42 @@ function askCreate(){
   // Район и водитель живут внутри чека: на телефоне он может быть закрыт, и
   // подсветка полей была бы не видна — сначала открываем шторку.
   if(!curDist){ toast('Выберите район','err'); openTicket(); $('distChips').scrollIntoView({block:'center'}); haptic('medium'); return; }
-  if(!curDriver){ toast('Выберите водителя','err'); openTicket(); $('drvChips').scrollIntoView({block:'center'}); haptic('medium'); return; }
+  // У онлайн-заказа водитель назначается при принятии, а не здесь: до этого
+  // момента его просто нет, и требовать его — значит не дать поправить состав.
+  if(!curDriver && !editOnline){ toast('Выберите водителя','err'); openTicket(); $('drvChips').scrollIntoView({block:'center'}); haptic('medium'); return; }
   const total = $('totalV').textContent;
   const d=_dist(curDist);
   $('confT').textContent = editingOid ? `Сохранить изменения #${editingOid}?` : 'Создать заказ?';
-  $('confS').innerHTML = `💰 <b>${total} AED</b><br>📍 ${d.name} · оператор ${d.operator}<br>🚗 Водитель: <b>${curDriver}</b>${editingOid?'':'<br><br>Заказ сразу уйдёт в работу («в пути»), время не указывается.'}`;
+  $('confS').innerHTML = `<b>${total} AED</b><br>${d.name} · оператор ${d.operator}<br>Водитель: <b>${curDriver}</b>${editingOid?'':'<br><br>Заказ сразу уйдёт в работу («в пути»), время не указывается.'}`;
   $('confGo').textContent = editingOid ? 'Сохранить' : 'Создать';
   showOv('confirmOv'); haptic('medium');
 }
 async function doCreate(){
   hideOv('confirmOv');
   const btn=$('createBtn'); btn.disabled=true;
-  const body = {
-    items: ticketItems(),
-    customer_name: $('cName').value.trim(),
-    phone: $('cPhone').value.trim(),
-    address: $('cAddr').value.trim(),
-    comment: $('cComment').value.trim(),
-    office_id: curOffice,
-    district_id: curDist,
-    driver: curDriver,
-  };
+  // У онлайн-заказа отправляем только состав: пустые поля формы затёрли бы
+  // адрес и телефон, которые пришли от клиента.
+  const body = editOnline
+    ? Object.assign({items: ticketItems()},
+        (curDist && curDriver) ? {district_id: curDist, driver: curDriver} : {})
+    : {
+        items: ticketItems(),
+        customer_name: $('cName').value.trim(),
+        phone: $('cPhone').value.trim(),
+        address: $('cAddr').value.trim(),
+        comment: $('cComment').value.trim(),
+        office_id: curOffice,
+        district_id: curDist,
+        driver: curDriver,
+      };
   try{
     let newOid = null;
     if(editingOid){
       await opApi.opFetch('/api/operator/orders/'+editingOid, {method:'PATCH', body});
-      toast('✅ Заказ #'+editingOid+' обновлён','ok');
+      toast('Заказ #'+editingOid+' обновлён','ok');
     } else {
       const r = await opApi.opFetch('/api/operator/orders', {method:'POST', body});
-      toast('✅ Заказ #'+r.order_id+' создан — в пути','ok');
+      toast('Заказ #'+r.order_id+' создан — в пути','ok');
       newOid = r.order_id;
     }
     haptic('heavy');
@@ -1696,6 +1732,7 @@ function startEdit(oid){
     TICKET[key]={id:i.id, pcs:i.pcs||undefined, qty:i.qty};
   });
   editingOid=oid;
+  editOnline=false;
   // Снимок на входе в правку. Без него «Сохранить» одинаково спрашивает и когда
   // человек что-то поменял, и когда просто заглянул в состав и вышел.
   _editWas=null;
@@ -1705,9 +1742,25 @@ function startEdit(oid){
   // подменять его тем, кто сейчас за планшетом, нельзя.
   const _od = o.district_id || o.office_id || '';
   if(_od && _dist(_od)){ curDist=_od; curDriver=o.driver||''; }
+  // Онлайн-заказ: адрес и телефон пришли от клиента, переписывать их не надо.
+  // Остаётся состав, а водитель — только если заказ уже в пути.
+  editOnline = (o.source||'app')!=='manual';
+  const cf=$('custFields'), cr=$('custRead');
+  if(cf) cf.style.display = editOnline?'none':'';
+  if(cr){
+    cr.style.display = editOnline?'':'none';
+    const d=_dist(_od);
+    cr.innerHTML = !editOnline ? '' : `
+      <div class="cr-l">Заказ клиента</div>
+      <div class="cr-v">${_esc(o.customer_name||'—')}</div>
+      <div class="cr-s">${_esc(o.address||'адрес не указан')}${
+        d?` · ${_esc(d.name)}`:''}</div>
+      <div class="cr-n">Правится состав, район и водитель. Адрес и телефон
+        пришли от клиента — их меняет он сам.</div>`;
+  }
   renderDispatch();
   $('editTag').style.display='';
-  $('createBtn').textContent='💾 Сохранить изменения';
+  $('createBtn').innerHTML='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 3h11l3 3v15H5z"/><path d="M8 3v6h7V3M8 21v-7h8v7"/></svg>'+'Сохранить изменения';
   $('createBtn').classList.add('save');
   openCatalog();
   renderTicket(); syncBadges();
@@ -1721,16 +1774,16 @@ function _orderText(o){
   const items=(o.items||[]).map(i=>`  • ${i.name} ×${i.qty} = ${(i.price||0)*(i.qty||1)} AED`).join('\n');
   // no оператор here — the driver doesn't need to know who took the call
   const disp = o.district
-    ? `📍 Район: ${o.district}\n` + (o.driver?`🚗 Водитель: ${o.driver}\n`:'')
+    ? `Район: ${o.district}\n` + (o.driver?`Водитель: ${o.driver}\n`:'')
     : '';
-  return `🏢 Офис: ${o.office_name||'—'}\n`+
+  return `Офис: ${o.office_name||'—'}\n`+
          disp+`\n`+
-         `🆕 НОВЫЙ ЗАКАЗ #${o.order_id}\n\n`+
-         `👤 ${o.customer_name||'—'}\n`+
-         `🏠 Адрес: ${o.address||'—'}\n\n`+
-         `🛒 Позиции:\n${items}\n\n`+
-         `💰 Итого: ${o.total} AED`+
-         (o.comment?`\n\n💬 Комментарий: ${o.comment}`:'');
+         `НОВЫЙ ЗАКАЗ #${o.order_id}\n\n`+
+         `${o.customer_name||'—'}\n`+
+         `Адрес: ${o.address||'—'}\n\n`+
+         `Позиции:\n${items}\n\n`+
+         `Итого: ${o.total} AED`+
+         (o.comment?`\n\nКомментарий: ${o.comment}`:'');
 }
 function showOrderText(oid){
   const o = ORDERS.find(x=>x.order_id===oid); if(!o) return;
@@ -1750,19 +1803,19 @@ async function _copy(t){
 }
 async function copyOrderText(){
   const ok = await _copy($('copyText').textContent);
-  if(ok){ toast('✅ Скопировано — отправьте водителю','ok'); haptic('heavy'); hideOv('copyOv'); }
+  if(ok){ toast('Скопировано — отправьте водителю','ok'); haptic('heavy'); hideOv('copyOv'); }
   else toast('Не удалось — выделите текст вручную','err');
 }
 
 const ACTS = {
-  delivered: {t:'✅ Доставлен?',            s:'Заказ будет закрыт и попадёт в выручку.',
-              btn:'Доставлен', cls:'gold', ok:oid=>'✅ #'+oid+' доставлен',  toast:'ok'},
-  cancel:    {t:'🚫 Отменить заказ?',       s:'Заказ будет отменён — действие необратимо.',
-              btn:'Отменить',  cls:'red',  ok:oid=>'🚫 #'+oid+' отменён',   toast:'err'},
+  delivered: {t:'Доставлен?',            s:'Заказ будет закрыт и попадёт в выручку.',
+              btn:'Доставлен', cls:'gold', ok:oid=>'#'+oid+' доставлен',  toast:'ok'},
+  cancel:    {t:'Отменить заказ?',       s:'Заказ будет отменён — действие необратимо.',
+              btn:'Отменить',  cls:'red',  ok:oid=>'#'+oid+' отменён',   toast:'err'},
   // Нажали «Доставлен» по ошибке — заказ уже закрыт и посчитан в выручке.
   // Возврат откатывает и то и другое, как кнопка в боте оператора.
-  undeliver: {t:'🔄 Вернуть в доставку?',   s:'Заказ снова станет активным и выйдет из выручки.',
-              btn:'Вернуть',   cls:'gold', ok:oid=>'🔄 #'+oid+' снова в пути', toast:'ok'},
+  undeliver: {t:'Вернуть в доставку?',   s:'Заказ снова станет активным и выйдет из выручки.',
+              btn:'Вернуть',   cls:'gold', ok:oid=>'#'+oid+' снова в пути', toast:'ok'},
 };
 function askAct(oid, act){
   const a = ACTS[act]; if(!a) return;
@@ -1785,10 +1838,11 @@ function askAct(oid, act){
 
 document.querySelectorAll('.ov').forEach(ov=>ov.addEventListener('click',e=>{ if(e.target===ov) ov.classList.remove('show'); }));
 
-// ── theme (dark ⇄ light) ──
+// ── theme (dark  light) ──
 function applyTheme(t){
   document.body.classList.toggle('light', t==='light');
-  const btn=$('themeBtn'); if(btn) btn.textContent = t==='light' ? '🌙' : '☀️';   // shows the switch target
+  // Значок показывает, куда переключит: на тёмной теме — солнце, на светлой — луну.
+  const btn=$('themeBtn'); if(btn) btn.innerHTML = t==='light' ? '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14.5A8.5 8.5 0 1 1 9.5 4 6.8 6.8 0 0 0 20 14.5z"/></svg>' : '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg>';
   const c = t==='light' ? '#F5F3ED' : '#000006';
   try{ tg.setHeaderColor(c); tg.setBackgroundColor(c); tg.setBottomBarColor && tg.setBottomBarColor(c); }catch(e){}
 }

@@ -688,11 +688,25 @@ try{
   tg.setBottomBarColor && tg.setBottomBarColor('#000006');
   tg.enableClosingConfirmation && tg.enableClosingConfirmation();
   tg.disableVerticalSwipes && tg.disableVerticalSwipes();
-  // Pin the app to Telegram's live viewport height (100% can undershoot in fullscreen).
-  const updVph=()=>document.documentElement.style.setProperty('--tg-h',(tg.viewportHeight||window.innerHeight)+'px');
+  // Высота окна. При первом открытии телеграм сообщает её ДО того, как развернёт
+  // приложение и уберёт свою шапку: панель верстается по короткому экрану, и
+  // половина каталога с концом чека остаются за краем. После обновления
+  // страницы высота уже правильная — оттуда и разница, которую видно глазами.
+  //
+  // Поэтому берём наибольшее из того, что знаем, и перемеряем ещё несколько раз
+  // после старта: разворачивание анимированное, и точное число приходит позже
+  // самого события.
+  const updVph=()=>{
+    const h = Math.max(tg.viewportHeight||0, tg.viewportStableHeight||0,
+                       window.innerHeight||0);
+    if(h) document.documentElement.style.setProperty('--tg-h', h+'px');
+  };
   updVph();
+  [100,400,1200,2600].forEach(t=>setTimeout(updVph,t));
   window.addEventListener('resize',updVph);
+  window.addEventListener('orientationchange',()=>setTimeout(updVph,250));
   tg.onEvent && tg.onEvent('viewportChanged',updVph);
+  tg.onEvent && tg.onEvent('fullscreenChanged',()=>setTimeout(updVph,250));
 }catch(e){}
 
 // ── state ──

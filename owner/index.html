@@ -3333,9 +3333,20 @@ try{ if(window.Telegram && Telegram.WebApp){
   tg.setBackgroundColor && tg.setBackgroundColor('#000006');
   tg.enableClosingConfirmation && tg.enableClosingConfirmation();
   tg.disableVerticalSwipes && tg.disableVerticalSwipes();
-  function updVph(){document.documentElement.style.setProperty('--tg-h',(tg.viewportHeight||window.innerHeight)+'px');}
-  updVph(); window.addEventListener('resize',updVph);
+  // Та же беда, что была в панели оператора: при первом открытии телеграм
+  // сообщает высоту ДО того, как развернёт приложение. Берём наибольшее из
+  // известного и перемеряем ещё несколько раз — разворачивание анимированное.
+  function updVph(){
+    const h = Math.max(tg.viewportHeight||0, tg.viewportStableHeight||0,
+                       window.innerHeight||0);
+    if(h) document.documentElement.style.setProperty('--tg-h', h+'px');
+  }
+  updVph();
+  [100,400,1200,2600].forEach(t=>setTimeout(updVph,t));
+  window.addEventListener('resize',updVph);
+  window.addEventListener('orientationchange',()=>setTimeout(updVph,250));
   tg.onEvent('viewportChanged',updVph);
+  tg.onEvent('fullscreenChanged',()=>setTimeout(updVph,250));
 } }catch(e){}
 
 // ===== API liveness / auth probe =====

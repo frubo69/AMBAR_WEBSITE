@@ -219,8 +219,7 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .oc-x{width:32px;height:32px;border-radius:10px;font-size:14px;color:var(--sub);
   background:var(--card2);border:1px solid var(--border2);cursor:pointer;flex-shrink:0}
 #ordBody{flex:1;min-height:0;display:flex;flex-direction:column;padding:6px 22px 8px}
-#custBody{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
-  padding:6px 22px 8px}
+#custBody{flex:1;min-height:0;display:flex;flex-direction:column;padding:6px 22px 8px}
 
 .of{flex:0 0 auto;padding:14px 0;border-bottom:1px solid var(--border2)}
 /* Список товаров забирает всё, что осталось, и ужимается на маленьком экране. */
@@ -246,6 +245,8 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .of-items{flex:1;min-height:0;max-height:30vh;overflow-y:auto;
   -webkit-overflow-scrolling:touch;overscroll-behavior:contain;padding:4px 14px}
 .of-it{display:flex;align-items:baseline;gap:12px;padding:9px 0;font-size:14.5px}
+.of-it-n i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);
+  font-weight:500;margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .of-it + .of-it{border-top:1px solid var(--border2)}
 .of-it-n{flex:1;min-width:0;font-weight:600;line-height:1.35}
 .of-it-n b{font-weight:700;color:var(--gold2);white-space:nowrap;font-variant-numeric:tabular-nums}
@@ -269,6 +270,7 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .ord-acts{flex:0 0 auto;display:block;padding:6px 22px calc(18px + var(--safe-bottom));
   background:var(--bg3);border-top:1px solid var(--border2);margin-top:10px}
 .oc-top{display:flex;gap:8px;margin-top:12px}
+.ord-acts > .oc-main{display:block;width:100%;margin-top:12px}
 .oc-main{flex:1;padding:16px 10px;border-radius:var(--r2);font-size:15px;font-weight:800;
   color:#1a1408;border:none;cursor:pointer;background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .oc-main:active{transform:scale(.99)}
@@ -297,22 +299,15 @@ a.oc-row:active{background:var(--card2)}
 .oc-tag.warn{color:var(--warn);border-color:rgba(243,180,74,.3)}
 .oc-go{font-size:11.5px;font-weight:700;color:var(--gold2);white-space:nowrap}
 
-.cst-chips{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px}
-.cst-chip{font-size:11px;font-weight:700;padding:5px 11px;border-radius:999px;
-  background:var(--card2);border:1px solid var(--border2);color:var(--muted)}
-.cst-chip.ok{color:var(--ok,#4CAF7D);border-color:rgba(76,175,125,.35)}
-.cst-chip.warn{color:var(--gold2);border-color:rgba(201,169,110,.35)}
-.cst-chip.bad{color:var(--dn,#E5484D);border-color:rgba(229,72,77,.35)}
-.cst-nums{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:16px}
-.cst-nums div{background:var(--card2);border:1px solid var(--border2);border-radius:12px;
-  padding:10px 8px;text-align:center}
-.cst-nums b{display:block;font-family:'DM Sans',sans-serif;font-size:17px;font-weight:800}
-.cst-nums span{font-size:9.5px;color:var(--muted);letter-spacing:.4px;text-transform:uppercase}
-.cst-h{font-size:10.5px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
-  color:var(--muted);margin:14px 0 8px}
-.cst-o{display:flex;align-items:center;gap:10px;font-size:12.5px;padding:7px 0;
-  border-top:1px solid var(--border2)}
-.cst-o-a{flex:1;min-width:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Четыре числа в строку: заказы, доставлено, отменено, потрачено. Плитками
+   они разъезжались по высоте, а подписи переносились на вторую строку. */
+.cst-n{display:flex;gap:10px}
+.cst-n span{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;
+  font-size:10px;color:var(--muted);letter-spacing:.3px}
+.cst-n b{font-family:'DM Sans',sans-serif;font-size:19px;font-weight:800;color:var(--text);
+  letter-spacing:-.5px;line-height:1}
+.cst-n b.up{color:var(--up)} .cst-n b.dn{color:var(--dn)} .cst-n b.gold{color:var(--gold2)}
+
 .q-r{cursor:pointer}
 
 #askI{width:100%;margin:12px 0 4px;padding:14px;border-radius:var(--r2);font-size:15px;
@@ -602,7 +597,6 @@ a.oc-row:active{background:var(--card2)}
     <div class="t" id="custT">Клиент</div>
     <div id="custBody"></div>
     <div class="ord-acts" id="custActs"></div>
-    <div class="btns"><button class="sbtn" onclick="hideOv('custOv')">Закрыть</button></div>
   </div>
 </div>
 
@@ -1375,48 +1369,81 @@ async function openCust(cid){
   try{ curCust = await opApi.opFetch(`/api/operator/customer/${cid}`); renderCust(); }
   catch(e){ $('custBody').innerHTML='<div class="ord-mut" style="padding:20px">Не удалось загрузить</div>'; }
 }
+// Метка источника хранится как есть — «chat», «post_marina». В карточке она
+// должна читаться, а не требовать знания наших внутренних имён.
+function _via(v){
+  const s=String(v||'');
+  if(s==='direct'||s==='chat_direct') return 'написал боту напрямую';
+  if(s.startsWith('chat')) return 'из чата сообщества';
+  if(s.startsWith('post')) return 'с рекламного поста' + (s.slice(5)?` · ${s.slice(5)}`:'');
+  if(s.startsWith('biz')) return 'через бизнес-аккаунт';
+  return s;
+}
+
 function renderCust(){
   const c=curCust; if(!c) return;
   const since = c.first_seen ? String(c.first_seen).slice(0,10).split('-').reverse().join('.') : '';
-  $('custT').innerHTML = `${_esc(c.name)}${c.note?` <span class="ord-mut">(${_esc(c.note)})</span>`:''}`;
-  $('custBody').innerHTML = `
-    <div class="cst-chips">
-      <span class="cst-chip ${c.verified?'ok':'warn'}">${c.verified?'Верифицирован':
-        (c.verify_source?'Ждёт верификации':'Не верифицирован')}</span>
-      ${c.banned?`<span class="cst-chip bad">Заблокирован</span>`:''}
-      ${c.invited_via?`<span class="cst-chip">${_esc(c.invited_via)}</span>`:''}
-    </div>
-    <div class="cst-nums">
-      <div><b>${_esc(c.orders_total)}</b><span>заказов</span></div>
-      <div><b>${_esc(c.orders_done)}</b><span>доставлено</span></div>
-      <div><b>${_esc(c.orders_declined)}</b><span>отменено</span></div>
-      <div><b>${_esc(c.total_spent)}</b><span>AED всего</span></div>
-    </div>
-    ${curOrder && curOrder.customer_id===c.customer_id ? `<div class="oc-box" style="margin-bottom:14px">
-      ${_phones(curOrder).map(([num,tag])=>num==='—'?'':`
-        <a class="oc-row" href="tel:${_esc(num)}" style="border-top:0">
-          <span class="oc-row-t">${_esc(num)}</span>
-          ${tag?`<span class="oc-tag${tag==='не подтверждён'?' warn':''}">${tag}</span>`:''}
-          <span class="oc-go">Позвонить</span></a>`).join('')}</div>` : ''}
-    <div class="ord-grid">
-      ${c.username?`<div class="ord-k">Телеграм</div><div class="ord-v">@${_esc(c.username)}</div>`:''}
-      ${since?`<div class="ord-k">Клиент с</div><div class="ord-v">${_esc(since)}</div>`:''}
-      ${c.verify_recommender_name?`<div class="ord-k">Рекомендовал</div>
-        <div class="ord-v">${_esc(c.verify_recommender_name)}</div>`:''}
-      ${c.banned&&c.ban_reason?`<div class="ord-k">Причина</div><div class="ord-v">${_esc(c.ban_reason)}</div>`:''}
-    </div>
-    ${(c.last||[]).length?`<div class="cst-h">Последние заказы</div>
-      ${c.last.map(o=>`<div class="cst-o"><span>${_esc(String(o.timestamp).slice(0,10).split('-').reverse().join('.'))}</span>
-        <span class="cst-o-a">${_esc(o.address||'')}</span>
-        <b>${_esc(o.total)}</b></div>`).join('')}`:''}`;
-  const A=[];
-  if(!c.verified) A.push(['go','Верифицировать',`custAct('verify')`]);
-  A.push(['','Заметка',`custNote()`]);
-  A.push([c.banned?'':'dn', c.banned?'Разблокировать':'Заблокировать',
-          c.banned?`custAct('unban')`:`custBan()`]);
-  $('custActs').innerHTML = A.map(([k,t,fn])=>
-    `<button class="oact ${k==='go'?'deliver':k==='dn'?'cancel':''}" onclick="${fn}">${t}</button>`).join('');
+  const ver = c.verified ? ['Верифицирован','ok']
+            : (c.verify_source ? ['Ждёт верификации','warn'] : ['Не верифицирован','']);
+
+  $('custT').innerHTML =
+    `<span class="oc-hd">
+       <span class="oc-id">${_esc(c.name)}</span>
+       <span class="oc-meta2"><span class="oc-st ${ver[1]==='ok'?'ok':(ver[1]==='warn'?'new':'')}">${ver[0]}</span>
+         ${c.banned?'<span class="oc-st no">Заблокирован</span>':''}
+         ${c.note?`<span>${_esc(c.note)}</span>`:''}
+         ${since?`<span>клиент с ${_esc(since)}</span>`:''}</span>
+     </span>
+     <button class="oc-x" onclick="hideOv('custOv')" aria-label="Закрыть">✕</button>`;
+
+  // Тот же строй, что в карточке заказа: подпись сверху, значение под ней.
+  const f = (label, value) => value ? `<div class="of">
+      <div class="of-l">${label}</div><div class="of-v">${value}</div></div>` : '';
+
+  const phones = (curOrder && curOrder.customer_id===c.customer_id)
+    ? _phones(curOrder).filter(([n])=>n!=='—')
+    : (c.phone_verified ? [['+'+String(c.phone_verified).replace(/\D/g,''),'подтверждён']] : []);
+
+  $('custBody').innerHTML =
+    `<div class="of">
+       <div class="of-l">Заказы</div>
+       <div class="cst-n">
+         <span><b>${_esc(c.orders_total)}</b>всего</span>
+         <span><b class="up">${_esc(c.orders_done)}</b>доставлено</span>
+         <span><b class="${c.orders_declined?'dn':''}">${_esc(c.orders_declined)}</b>отменено</span>
+         <span><b class="gold">${_esc(c.total_spent)}</b>AED</span>
+       </div>
+     </div>`
+    + (phones.length?`<div class="of">
+        <div class="of-l">Телефон</div>
+        <div class="of-box">${phones.map(([num,tag])=>`
+          <a class="oc-row" href="tel:${_esc(num)}">
+            <span class="oc-row-t">${_esc(num)}</span>
+            ${tag?`<span class="oc-tag${tag==='не подтверждён'?' warn':''}">${tag}</span>`:''}
+            <span class="oc-go">Позвонить</span></a>`).join('')}</div>
+      </div>`:'')
+    + f('Телеграм', c.username?`@${_esc(c.username)}`:'')
+    + f('Пришёл', c.invited_via?_esc(_via(c.invited_via)):'')
+    + f('Рекомендовал', c.verify_recommender_name?_esc(c.verify_recommender_name):'')
+    + f('Причина блокировки', c.banned&&c.ban_reason?_esc(c.ban_reason):'')
+    + ((c.last||[]).length?`<div class="of of-grow">
+        <div class="of-l">Последние заказы</div>
+        <div class="of-box of-items">${c.last.map(o=>`<div class="of-it">
+          <span class="of-it-n">${_esc(String(o.timestamp).slice(0,10).split('-').reverse().join('.'))}
+            <i>${_esc(o.address||'')}</i></span>
+          <span class="of-it-p">${_esc(o.total)}</span></div>`).join('')}</div>
+      </div>`:'');
+
+  const sec = [['Заметка','custNote()'],
+               c.banned?['Разблокировать',"custAct('unban')"]:['Заблокировать','custBan()']];
+  $('custActs').innerHTML =
+    (c.verified?'':`<button class="oc-main" onclick="custAct('verify')">Верифицировать</button>`)
+    + `<div class="oc-row2">
+        <button class="oc-sec" onclick="${sec[0][1]}">Заметка</button>
+        <button class="oc-${c.banned?'sec':'danger'}" onclick="${sec[1][1]}">${sec[1][0]}</button>
+      </div>`;
 }
+
 async function custAct(act, extra){
   try{
     curCust = await opApi.opFetch(`/api/operator/customer/${curCust.customer_id}/act`,

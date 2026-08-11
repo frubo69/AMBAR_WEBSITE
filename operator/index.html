@@ -288,8 +288,7 @@ a.oc-row:active{background:var(--card2)}
 .oc-danger{flex:1;padding:16px 10px;border-radius:var(--r2);font-size:14px;font-weight:700;
   color:var(--dn);background:none;border:1px solid rgba(224,85,85,.28);cursor:pointer}
 .oc-danger:active{background:rgba(224,85,85,.08)}
-.oc-row2{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
-.oc-row2 .oc-sec{flex:1 1 30%;min-width:104px}
+.oc-row2{display:flex;gap:8px;margin-top:8px}
 .oc-sec{flex:1;padding:13px 10px;border-radius:var(--r2);font-size:13px;font-weight:700;
   color:var(--sub);background:var(--card2);border:1px solid var(--border2);cursor:pointer}
 .oc-sec:active{color:var(--text);border-color:var(--border3)}
@@ -1271,26 +1270,9 @@ function renderOrder(){
       <div class="oc-total-v">${_esc(o.total)}<small>AED</small></div>
     </div>`;
 
-  const ph=_phones(o);
-  const client = `<div class="oc-sect">
-      <div class="oc-h">Клиент</div>
-      <div class="oc-box">
-        <div class="oc-cli">
-          <span class="oc-av">${_esc((o.customer_name||'—').trim().slice(0,2).toUpperCase())}</span>
-          <span class="oc-cli-b">
-            <b>${_esc(o.customer_name||'—')}</b>
-            ${o.username&&o.username!=='—'?`<i>@${_esc(o.username)}</i>`:''}
-          </span>
-          ${o.customer_id?`<button class="oc-mini" onclick="openCust(${o.customer_id})">Карточка</button>`:''}
-        </div>
-        ${ph.map(([num,tag])=>num==='—'?'':`
-          <a class="oc-row" href="tel:${_esc(num)}">
-            <span class="oc-row-t">${_esc(num)}</span>
-            ${tag?`<span class="oc-tag${tag==='не подтверждён'?' warn':''}">${tag}</span>`:''}
-            <span class="oc-go">Позвонить</span></a>`).join('')}
-      </div>
-    </div>`;
-
+  // Кто клиент — за кнопкой «Клиент», а не в карточке заказа. Решение брать
+  // или не брать принимают по адресу, составу и сумме; имя с телефоном нужны
+  // потом и не всем заказам, а место занимали всегда.
   const where = `<div class="oc-sect">
       <div class="oc-h">Куда везти</div>
       <div class="oc-box">
@@ -1326,7 +1308,7 @@ function renderOrder(){
     o.operator_name?` · принял ${_esc(o.operator_name)}`:''}${
     o.created_by_name?` · завёл ${_esc(o.created_by_name)}`:''}</div>`;
 
-  $('ordBody').innerHTML = client + where + items + note + meta;
+  $('ordBody').innerHTML = where + items + note + meta;
 
   // Решение и отказ рядом, в один ряд: это две стороны одного выбора, и рука
   // ищет их вместе. Остальное — строкой ниже, ровным рядом.
@@ -1335,29 +1317,27 @@ function renderOrder(){
     main=['Принять', `hideOv('ordOv');askAccept('${o.order_id}')`];
     danger=['Отклонить', `askDecline('${o.order_id}')`];
     rest=[['Редактировать',`hideOv('ordOv');startEdit('${o.order_id}')`]];
-    if(o.customer_id) rest.push(['Клиент',`openCust(${o.customer_id})`]);
   }else if(o.status==='approved'){
     main=['Доставлен', `hideOv('ordOv');askAct('${o.order_id}','delivered')`];
     danger=['Отменить', `hideOv('ordOv');askAct('${o.order_id}','cancel')`];
     rest=[['Редактировать',`hideOv('ordOv');startEdit('${o.order_id}')`],
           ['Текст водителю',`showOrderText('${o.order_id}')`]];
-    if(o.customer_id) rest.push(['Клиент',`openCust(${o.customer_id})`]);
   }else if(o.status==='delivered'){
     rest=[['Вернуть в доставку',`hideOv('ordOv');askAct('${o.order_id}','undeliver')`],
           ['Текст водителю',`showOrderText('${o.order_id}')`]];
-    if(o.customer_id) rest.push(['Клиент',`openCust(${o.customer_id})`]);
   }else{
     rest=[['Текст водителю',`showOrderText('${o.order_id}')`]];
   }
-  // Кнопок бывает три — тогда они переносятся на вторую строку, а не жмутся
-  // в нечитаемые огрызки.
   $('ordActs').innerHTML = money
     + (main?`<div class="oc-top">
         <button class="oc-main" onclick="${main[1]}">${main[0]}</button>
         <button class="oc-danger" onclick="${danger[1]}">${danger[0]}</button>
       </div>`:'')
     + (rest.length?`<div class="oc-row2">${rest.map(([t,fn])=>
-        `<button class="oc-sec" onclick="${fn}">${t}</button>`).join('')}</div>`:'');
+        `<button class="oc-sec" onclick="${fn}">${t}</button>`).join('')}</div>`:'')
+    // Клиент — отдельной строкой: это не действие с заказом, а другой разговор.
+    + (o.customer_id?`<div class="oc-row2">
+        <button class="oc-sec" onclick="openCust(${o.customer_id})">Клиент</button></div>`:'');
 }
 
 // ── карточка клиента ──
@@ -1384,10 +1364,13 @@ function renderCust(){
       <div><b>${_esc(c.orders_declined)}</b><span>отменено</span></div>
       <div><b>${_esc(c.total_spent)}</b><span>AED всего</span></div>
     </div>
+    ${curOrder && curOrder.customer_id===c.customer_id ? `<div class="oc-box" style="margin-bottom:14px">
+      ${_phones(curOrder).map(([num,tag])=>num==='—'?'':`
+        <a class="oc-row" href="tel:${_esc(num)}" style="border-top:0">
+          <span class="oc-row-t">${_esc(num)}</span>
+          ${tag?`<span class="oc-tag${tag==='не подтверждён'?' warn':''}">${tag}</span>`:''}
+          <span class="oc-go">Позвонить</span></a>`).join('')}</div>` : ''}
     <div class="ord-grid">
-      ${c.phone_verified?`<div class="ord-k">Телефон</div>
-        <div class="ord-v"><a href="tel:+${_esc(String(c.phone_verified).replace(/\D/g,''))}">+${
-          _esc(String(c.phone_verified).replace(/\D/g,''))}</a></div>`:''}
       ${c.username?`<div class="ord-k">Телеграм</div><div class="ord-v">@${_esc(c.username)}</div>`:''}
       ${since?`<div class="ord-k">Клиент с</div><div class="ord-v">${_esc(since)}</div>`:''}
       ${c.verify_recommender_name?`<div class="ord-k">Рекомендовал</div>

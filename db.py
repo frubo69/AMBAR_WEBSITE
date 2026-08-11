@@ -368,6 +368,31 @@ async def get_support_conv(conv_key: str) -> list:
     return doc.get("messages", []) if doc else []
 
 
+async def support_threads_brief(limit: int = 300) -> list:
+    """Все переписки, но только с последним сообщением каждой.
+
+    Список тикетов в панели оператора обновляется постоянно, а переписки растут;
+    тянуть их целиком ради одной строки предпросмотра — лишний мегабайт на
+    каждый опрос."""
+    db = _db_or_none()
+    if db is None: return []
+    cursor = db.support_messages.find({}, {"_id": 0, "conv_key": 1, "messages": {"$slice": -1}})
+    return await cursor.to_list(length=limit)
+
+
+async def users_by_ids(ids: list) -> dict:
+    """Пачкой: {telegram_id: user}. По одному — это N запросов на список."""
+    db = _db_or_none()
+    if db is None: return {}
+    try:
+        want = [int(i) for i in ids]
+    except (TypeError, ValueError):
+        return {}
+    if not want: return {}
+    docs = await db.users.find({"telegram_id": {"$in": want}}, {"_id": 0}).to_list(length=len(want) + 10)
+    return {int(d.get("telegram_id") or 0): d for d in docs}
+
+
 async def get_recent_support_convs(limit: int = 50) -> list:
     """Recent support conversations, newest-last-message first (owner app list)."""
     db = _db_or_none()

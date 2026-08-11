@@ -1131,19 +1131,42 @@ async def handle_delivered(request):
 
 @require_operator
 async def handle_undeliver(request):
-    """Вернуть доставленный заказ обратно в доставку — то же, что кнопка
+    """Вернуть закрытый заказ обратно в доставку — то же, что кнопка
     «🔄 Вернуть в доставку» в боте оператора (operator_bot: undone_*).
-    Нужна, когда «Доставлен» нажали по ошибке: заказ иначе уже закрыт и
-    попадает в выручку."""
+
+    Возвращаем и «доставлен» (нажали по ошибке — заказ уже попал в выручку), и
+    «отменён»: отмену жмут и по звонку водителя, и промахом, а восстановить
+    заказ было нечем — оставалось заводить его заново другим номером."""
     oid = request.match_info["oid"]
     order = await _get_pos_order(oid)
     if not order:
         return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
-    if order.get("status") != "delivered":
-        return web.json_response({"error": "not_delivered"}, status=409, headers=CORS_HEADERS)
+    was = order.get("status")
+    if was not in ("delivered", "cancelled"):
+        return web.json_response({"error": "not_closed"}, status=409, headers=CORS_HEADERS)
 
     total = order.get("total", 0)
     cid = order.get("customer_id") or 0
+    if was == "cancelled":
+        # Отмена ничего не начисляла — откатывать нечего, только вернуть статус
+        # и позвать водителя обратно.
+        now = datetime.now(timezone.utc).isoformat()
+        await db.update_order(oid, status="approved", cancelled_by="", cancelled_at="",
+                              updated_at=now)
+        order.update(status="approved")
+        await notify_driver(order, "new")
+        await _refresh_cards(order)
+        await _customer_card(oid)
+        try:
+            from owner_routes import notify_owners_force
+            await notify_owners_force(
+                "orders.reverted",
+                f"🔄 *Отменённый заказ вернули в доставку #{oid}*\n"
+                f"Оператор: {_op_name(request['op_user'])}\n"
+                f"💰 {total} AED · {order.get('customer_name','—')}")
+        except Exception as e:
+            log.error(f"[pos] uncancel notify failed for #{oid}: {e}")
+        return web.json_response({"ok": True, "status": "approved"}, headers=CORS_HEADERS)
     # У ручного заказа customer_id = 0 и оба вызова ниже безвредно ничего не
     # делают, но заказ мог быть заведён и на реального клиента — тогда счётчики
     # и долг надо откатить ровно так же, как это делает бот.
@@ -1185,6 +1208,211 @@ async def handle_undeliver(request):
     return web.json_response({"ok": True, "status": "approved"}, headers=CORS_HEADERS)
 
 
+# ── поддержка: переписки с клиентами ─────────────────────────────────────────
+# Клиент пишет из своего приложения (api_server /api/support/send), оператор до
+# сих пор отвечал только реплаем в телеграме бота поддержки. Здесь та же
+# переписка, но в панели: список тикетов + чат, из которого можно и ответить, и
+# написать первым. Формат сообщений общий с приложением клиента:
+#   {role: "user"|"operator", type, text|url+caption, ts, by?}
+# conv_key: "{uid}" или "{uid}_{order_id}"; общий вопрос — "{uid}_general".
+
+def _conv_parts(key: str) -> tuple[int, str]:
+    head, _, tail = (key or "").partition("_")
+    uid = int(head) if head.isdigit() else 0
+    return uid, ("" if tail in ("", "general") else tail)
+
+
+def _msg_preview(m: dict) -> str:
+    return (m.get("text") or m.get("caption")
+            or ("Фото" if m.get("type") == "photo" else ""))[:90]
+
+
+def _client_brief(uid: int, u: dict) -> dict:
+    return {
+        "id": uid,
+        "name": (u.get("first_name") or u.get("name") or u.get("full_name")
+                 or (str(uid) if uid else "—")),
+        "username": u.get("username") or "",
+        "verified": bool(u.get("verified")),
+        "banned": bool(u.get("banned") or u.get("is_banned")),
+    }
+
+
+async def _support_rows() -> list:
+    """Тикеты, отсортированные по тому, кому оператор нужен прямо сейчас.
+
+    Первым — вопрос по непринятому заказу: человек ждёт и решения, и ответа.
+    Дальше — по заказу в работе, дальше остальные без ответа, и только потом
+    отвеченное. Хронология здесь врёт: свежий «спасибо» не важнее вчерашнего
+    вопроса, на который никто не ответил."""
+    docs = await db.support_threads_brief(400)
+    orders = await db.get_all_orders()
+    uids = set()
+    pre = []
+    for d in docs:
+        key = (d.get("conv_key") or "").strip()
+        msgs = d.get("messages") or []
+        if not key or not msgs:
+            continue
+        uid, oid = _conv_parts(key)
+        if not uid:
+            continue
+        uids.add(uid)
+        pre.append((key, uid, oid, msgs[-1]))
+    users = await db.users_by_ids(list(uids))
+
+    rows = []
+    for key, uid, oid, last in pre:
+        o = orders.get(oid) if oid else None
+        lane = _lane(o) if o else ""
+        wait = (last.get("role") == "user")
+        if wait:
+            prio = 0 if lane == "new" else (1 if lane == "work" else 2)
+        else:
+            prio = 3 if lane in ("new", "work") else 4
+        rows.append({
+            "key": key,
+            "order_id": oid,
+            "order_status": (o or {}).get("status", ""),
+            "order_lane": lane,
+            "order_total": (o or {}).get("total", 0),
+            "client": _client_brief(uid, users.get(uid) or {}),
+            "wait": wait,
+            "prio": prio,
+            "last_ts": last.get("ts", ""),
+            "last_role": last.get("role", ""),
+            "last_text": _msg_preview(last),
+        })
+    rows.sort(key=lambda r: (r["prio"], _neg_ts(r["last_ts"])))
+    return rows
+
+
+def _neg_ts(ts: str):
+    """Ключ сортировки «новее — выше» для строковых ISO-дат."""
+    return tuple(-ord(c) for c in (ts or ""))
+
+
+@require_operator
+async def handle_support_list(request):
+    rows = await _support_rows()
+    return web.json_response({
+        "threads": rows[:200],
+        "waiting": sum(1 for r in rows if r["wait"]),
+    }, headers=CORS_HEADERS)
+
+
+@require_operator
+async def handle_support_thread(request):
+    """Переписка целиком + все обращения этого же клиента.
+
+    История нужна рядом: тот же человек мог спрашивать про прошлый заказ, и
+    без этого оператор отвечает вслепую."""
+    key = (request.query.get("key") or "").strip()
+    uid, oid = _conv_parts(key)
+    if not uid:
+        return web.json_response({"error": "bad_key"}, status=400, headers=CORS_HEADERS)
+    msgs = await db.get_support_conv(key)
+    u = await db.get_user(uid) or {}
+    order = (await db.get_order(oid)) if oid else None
+    others = [r for r in await _support_rows() if r["client"]["id"] == uid and r["key"] != key]
+    return web.json_response({
+        "key": key,
+        "order_id": oid,
+        "order": {"order_id": oid, "status": (order or {}).get("status", ""),
+                  "total": (order or {}).get("total", 0),
+                  "address": (order or {}).get("address", ""),
+                  "lane": _lane(order) if order else ""} if order else None,
+        "client": {**_client_brief(uid, u),
+                   "phone": u.get("phone_verified", ""),
+                   "orders_total": u.get("orders_total", 0),
+                   "note": u.get("custom_name", "")},
+        "messages": msgs,
+        "others": others,
+    }, headers=CORS_HEADERS)
+
+
+@require_operator
+async def handle_support_send(request):
+    """Ответ оператора из панели.
+
+    Пишем в ту же переписку, что и бот поддержки, и точно так же пинаем клиента
+    в телеграм: приложение у него закрыто, и иначе ответ никто не увидит."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    key = (body.get("key") or "").strip()
+    text = (body.get("text") or "").strip()
+    uid, oid = _conv_parts(key)
+    if not uid or not text:
+        return web.json_response({"error": "bad_request"}, status=400, headers=CORS_HEADERS)
+    if len(text) > 3000:
+        text = text[:3000]
+
+    who = (body.get("as") or "").strip() or _op_name(request["op_user"])
+    ts = datetime.now(timezone.utc).isoformat()
+    msg = {"role": "operator", "type": "text", "text": text, "ts": ts, "by": who}
+    await db.append_support_msg(key, msg)
+
+    try:
+        from api_server import tg_send, BOT_TOKEN
+        await tg_send(BOT_TOKEN, uid,
+                      "💬 *Новое сообщение от поддержки*"
+                      + (f" по заказу #{oid}" if oid else "")
+                      + "\n\nОткройте приложение, чтобы прочитать ответ.",
+                      parse_mode="Markdown")
+    except Exception as e:
+        log.error(f"[pos] support nudge to {uid} failed: {e}")
+
+    try:
+        from owner_routes import notify_owners
+        u = await db.get_user(uid) or {}
+        cname = u.get("first_name") or u.get("name") or str(uid)
+        await notify_owners(
+            "support.replied",
+            f"🎧 *Оператор ответил в поддержке*\n"
+            f"Клиент: {cname} (@{u.get('username') or '—'})\n"
+            f"Контекст: {'заказ #' + oid if oid else 'общий вопрос'}\n"
+            f"Оператор: {who}\n"
+            f"_«{text[:150]}»_",
+            meta={"conv_key": key, "order_id": oid})
+    except Exception as e:
+        log.error(f"[pos] support.replied notify failed: {e}")
+
+    log.info(f"[pos] поддержка → {uid} ({who})")
+    return web.json_response({"ok": True, "msg": msg}, headers=CORS_HEADERS)
+
+
+@require_operator
+async def handle_support_customers(request):
+    """Поиск клиента, чтобы написать первым.
+
+    Ищем по имени, нику, телефону и id — оператор помнит человека по-разному, а
+    список из двух тысяч имён листать бесполезно."""
+    q = (request.query.get("q") or "").strip().lower().lstrip("@")
+    users = await db.get_all_customers()
+    digits = "".join(c for c in q if c.isdigit())
+    out = []
+    for u in users:
+        uid = int(u.get("telegram_id") or 0)
+        if not uid:
+            continue
+        name = (u.get("first_name") or u.get("name") or u.get("full_name") or "")
+        uname = u.get("username") or ""
+        phone = str(u.get("phone_verified") or "")
+        if q:
+            hit = (q in name.lower() or q in uname.lower() or q in str(uid)
+                   or (digits and digits in phone))
+            if not hit:
+                continue
+        out.append({**_client_brief(uid, u), "phone": phone,
+                    "orders_total": u.get("orders_total", 0),
+                    "last_seen": str(u.get("last_seen") or u.get("first_seen") or "")})
+        if len(out) >= 40:
+            break
+    return web.json_response({"customers": out}, headers=CORS_HEADERS)
+
+
 # ── mounting ─────────────────────────────────────────────────────────────────
 def _opt(request):
     return web.Response(status=200, headers=CORS_HEADERS)
@@ -1220,4 +1448,12 @@ def setup(app):
     r.add_post("/api/operator/orders/{oid}/delivered", handle_delivered)
     r.add_route("OPTIONS", "/api/operator/orders/{oid}/undeliver", _opt)
     r.add_post("/api/operator/orders/{oid}/undeliver", handle_undeliver)
+    r.add_route("OPTIONS", "/api/operator/support", _opt)
+    r.add_get("/api/operator/support", handle_support_list)
+    r.add_route("OPTIONS", "/api/operator/support/thread", _opt)
+    r.add_get("/api/operator/support/thread", handle_support_thread)
+    r.add_route("OPTIONS", "/api/operator/support/send", _opt)
+    r.add_post("/api/operator/support/send", handle_support_send)
+    r.add_route("OPTIONS", "/api/operator/support/customers", _opt)
+    r.add_get("/api/operator/support/customers", handle_support_customers)
     log.info("[pos] operator routes mounted")

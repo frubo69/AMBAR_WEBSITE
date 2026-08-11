@@ -559,6 +559,86 @@ a.oc-row:active{background:var(--card2)}
   .tk-bar.pulse .tk-bar-r{animation:tkPulse .28s var(--e1)}
 }
 
+/* ── поддержка: список тикетов + чат ─────────────────────────────────────
+   Пузыри те же, что в приложении клиента, но зеркально: свои сообщения справа,
+   как в любом мессенджере. */
+.sup-ov{position:fixed;inset:0;z-index:120;background:var(--bg);display:none;
+  flex-direction:column;padding-top:var(--safe-top)}
+.sup-ov.show{display:flex}
+.sup-hdr{display:flex;align-items:center;gap:12px;padding:12px 18px;background:var(--bg2);
+  border-bottom:1px solid var(--border2);flex-shrink:0}
+.sup-hdr .t{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700}
+.sup-hdr .sp{margin-left:auto}
+.sup-nb{padding:9px 14px;border-radius:11px;border:1px solid rgba(201,169,110,.4);
+  color:var(--gold2);font-size:12.5px;font-weight:700;background:var(--gold-soft)}
+.sup-nb:active{transform:scale(.96)}
+.sup-body{flex:1;min-height:0;display:flex}
+.sup-list{width:340px;flex:0 0 340px;border-right:1px solid var(--border2);
+  overflow-y:auto;padding:10px 10px 20px}
+.sup-sec{font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;
+  color:var(--muted);margin:14px 6px 7px}
+.sup-sec:first-child{margin-top:4px}
+.sup-t{width:100%;text-align:left;padding:11px 12px;border-radius:12px;
+  border:1px solid var(--border2);background:var(--card);margin-bottom:7px;display:block}
+.sup-t:active{transform:scale(.99)}
+.sup-t.on{border-color:rgba(201,169,110,.5);background:var(--gold-soft)}
+.sup-t .n{display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700}
+.sup-t .n b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
+.sup-t .r{margin-left:auto;font-size:10.5px;color:var(--muted);font-weight:600;flex-shrink:0}
+.sup-t .m{font-size:12px;color:var(--sub);margin-top:4px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.sup-t .m i{font-style:normal;color:var(--muted)}
+.sup-dot{width:7px;height:7px;border-radius:50%;background:var(--gold);flex-shrink:0}
+.sup-oid{font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:6px;
+  border:1px solid var(--border2);color:var(--muted);flex-shrink:0}
+.sup-oid.new{color:var(--gold2);border-color:rgba(201,169,110,.45)}
+.sup-oid.work{color:var(--info);border-color:rgba(91,141,239,.4)}
+.sup-chat{flex:1;min-width:0;display:flex;flex-direction:column}
+.sup-chd{display:flex;align-items:center;gap:10px;padding:11px 16px;flex-shrink:0;
+  border-bottom:1px solid var(--border2)}
+.sup-chd .who{font-size:14px;font-weight:700}
+.sup-chd .sub{font-size:11.5px;color:var(--muted);margin-top:1px}
+.sup-back{display:none;width:32px;height:32px;border-radius:10px;border:1px solid var(--border2);
+  background:var(--card2);color:var(--sub);align-items:center;justify-content:center;flex-shrink:0}
+.sup-hb{margin-left:auto;display:flex;gap:7px;flex-shrink:0}
+.sup-hb button{padding:8px 12px;border-radius:10px;border:1px solid var(--border2);
+  background:var(--card2);font-size:12px;font-weight:600;color:var(--sub)}
+.sup-hb button:active{transform:scale(.96)}
+.sup-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px}
+.sup-m{max-width:min(560px,72%);padding:10px 14px;font-size:13.5px;line-height:1.45;
+  word-break:break-word;white-space:pre-wrap}
+.sup-m.operator{align-self:flex-end;background:rgba(201,169,110,.12);
+  border:1px solid rgba(201,169,110,.2);border-radius:16px 16px 4px 16px}
+.sup-m.user{align-self:flex-start;background:var(--card);border:1px solid var(--border2);
+  border-radius:16px 16px 16px 4px}
+.sup-m .ts{font-size:10px;color:var(--muted);margin-top:4px}
+.sup-m.operator .ts{text-align:right}
+.sup-m img{max-width:100%;border-radius:10px;display:block;margin-bottom:5px}
+.sup-day{align-self:center;font-size:10.5px;font-weight:700;letter-spacing:.6px;
+  color:var(--muted);padding:3px 10px;border-radius:8px;background:var(--card2)}
+.sup-bar{display:flex;align-items:flex-end;gap:10px;padding:12px 16px calc(12px + var(--safe-bottom));
+  border-top:1px solid var(--border2);background:var(--bg2);flex-shrink:0}
+.sup-in{flex:1;resize:none;max-height:120px;border-radius:18px;padding:11px 16px;font-size:14px}
+.sup-send{width:42px;height:42px;border-radius:50%;flex-shrink:0;display:flex;
+  align-items:center;justify-content:center;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.sup-send:disabled{opacity:.35}
+.sup-send:active{transform:scale(.92)}
+.sup-send svg{width:17px;height:17px;fill:#1a1408}
+.sup-empty{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;
+  color:var(--muted);font-size:13px;padding:24px;line-height:1.6}
+.sup-hist{display:flex;gap:6px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid var(--border2)}
+.sup-hist button{padding:6px 10px;border-radius:9px;border:1px solid var(--border2);
+  background:var(--card);font-size:11.5px;font-weight:600;color:var(--sub)}
+.pill.has{color:var(--gold2);border-color:rgba(201,169,110,.45);background:var(--gold-soft)}
+@media (max-width:900px){
+  .sup-list{width:100%;flex:1 1 auto;border-right:none}
+  .sup-body.chat .sup-list{display:none}
+  .sup-chat{display:none}
+  .sup-body.chat .sup-chat{display:flex}
+  .sup-back{display:flex}
+  .sup-m{max-width:82%}
+}
+
 @media (max-height:720px){
   .hdr{padding:6px 14px}
   .ticket-foot{padding:8px 12px calc(8px + var(--safe-bottom))}
@@ -579,6 +659,10 @@ a.oc-row:active{background:var(--card2)}
     <div class="office-seg" id="officeSeg" style="display:none"></div>
     <div class="hdr-right">
       <button class="pill" id="dispatchBtn" onclick="showOv('opOv')" style="cursor:pointer;color:var(--gold2);border-color:rgba(201,169,110,.4)">Оператор</button>
+      <button class="pill" id="supBtn" onclick="supOpen()" aria-label="Поддержка"
+        style="cursor:pointer;display:flex;align-items:center;gap:6px"><svg class="ic" viewBox="0 0 24 24"
+        aria-hidden="true" style="margin:0"><path d="M20 14a2 2 0 0 1-2 2H8l-4 3.5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/></svg><span
+        id="supCnt">Поддержка</span></button>
       <button class="pill" id="themeBtn" onclick="toggleTheme()" aria-label="Тема" style="cursor:pointer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg></button>
       <span class="pill" id="opName">—</span>
       <span class="pill" id="netPill">…</span>
@@ -683,6 +767,38 @@ a.oc-row:active{background:var(--card2)}
     <div class="btns">
       <button class="sbtn" onclick="askDone(null)">Отмена</button>
       <button class="sbtn go" onclick="askDone($('askI').value)">Готово</button>
+    </div>
+  </div>
+</div>
+
+<!-- поддержка: тикеты клиентов и переписка -->
+<div class="sup-ov" id="supOv">
+  <div class="sup-hdr">
+    <div class="t">Поддержка</div>
+    <div class="sp"></div>
+    <button class="sup-nb" onclick="supNew()">Написать клиенту</button>
+    <button class="oc-x" onclick="supClose()" aria-label="Закрыть"><svg viewBox="0 0 24 24"
+      width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"
+      stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+  <div class="sup-body" id="supBody">
+    <div class="sup-list" id="supList"></div>
+    <div class="sup-chat" id="supChat">
+      <div class="sup-empty" id="supNone">Выберите обращение слева</div>
+    </div>
+  </div>
+</div>
+
+<!-- выбор клиента, чтобы написать первым -->
+<div class="ov" id="supPickOv">
+  <div class="sheet">
+    <div class="t">Написать клиенту</div>
+    <div class="acc-sub">Найдите по имени, нику, телефону или id</div>
+    <input id="supQ" placeholder="Поиск клиента…" autocomplete="off" style="margin-top:12px"
+      oninput="supSearch()">
+    <div id="supFound" style="max-height:46vh;overflow-y:auto;margin-top:10px"></div>
+    <div class="btns" style="margin-top:14px">
+      <button class="sbtn" onclick="hideOv('supPickOv')">Отмена</button>
     </div>
   </div>
 </div>
@@ -880,6 +996,9 @@ async function boot(){
     // секунды для глаза мгновенно, а спящую вкладку не опрашиваем вовсе.
     _pollT = setInterval(()=>{ if(!document.hidden) loadQueue(); }, 2500);
     document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) loadQueue(); });
+    // Тикеты — реже: на закрытом экране нужен только счётчик ждущих ответа.
+    loadSup();
+    setInterval(()=>{ if(!document.hidden && !$('supOv').classList.contains('show')) loadSup(); }, 25000);
     if(!curOp) showOv('opOv');
   }catch(e){
     const denied = e.status===401 || e.status===403;
@@ -1425,7 +1544,9 @@ function _card(o, lane){
         ${B('','Редактировать',`startEdit('${o.order_id}')`)}
         ${B('','Текст водителю',`showOrderText('${o.order_id}')`)}
       </div>` + cli;
-  }else if(o.status==='delivered'){
+  }else if(o.status==='delivered' || o.status==='cancelled'){
+    // Отменённый возвращается так же, как доставленный: отмену жмут и по
+    // звонку водителя, и промахом.
     acts = `<div class="q-arow">${B('','Вернуть в доставку',`askAct('${o.order_id}','undeliver')`)}</div>` + cli;
   }else{
     acts = cli;
@@ -1483,6 +1604,7 @@ const ICO_ACT = {
   'Клиент':'<path d="M4 20a8 8 0 0 1 16 0"/><circle cx="12" cy="8" r="4"/>',
   'Текст водителю':'<rect x="4" y="3" width="13" height="18" rx="2"/><path d="M8 8h5M8 12h5M8 16h3"/>',
   'Вернуть в доставку':'<path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v5h5"/>',
+  'Написать':'<path d="M20 14a2 2 0 0 1-2 2H8l-4 3.5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/>',
 };
 const _actIco = t => ICO_ACT[t]
   ? `<svg viewBox="0 0 24 24" class="oc-ico" aria-hidden="true">${ICO_ACT[t]}</svg>` : '';
@@ -1604,7 +1726,7 @@ function renderOrder(){
     danger=['Отменить', `hideOv('ordOv');askAct('${o.order_id}','cancel')`];
     rest=[['Редактировать',`hideOv('ordOv');startEdit('${o.order_id}')`],
           ['Текст водителю',`showOrderText('${o.order_id}')`]];
-  }else if(o.status==='delivered'){
+  }else if(o.status==='delivered' || o.status==='cancelled'){
     rest=[['Вернуть в доставку',`hideOv('ordOv');askAct('${o.order_id}','undeliver')`],
           ['Текст водителю',`showOrderText('${o.order_id}')`]];
   }else{
@@ -1722,8 +1844,14 @@ function renderCust(){
   // Верификации здесь нет намеренно: она решается на первом заказе, где видно,
   // что человек заказывает. Отдельная кнопка в карточке позволяла бы пропустить
   // заказ вперёд решения.
+  // «Написать» прямо отсюда: чаще всего вопрос к клиенту рождается именно
+  // при разглядывании его карточки.
   $('custActs').innerHTML = `<div class="oc-row2">
+      <button class="oc-sec" onclick="hideOv('custOv');supStart(${c.customer_id})">${
+        _actIco('Написать')}Написать</button>
       <button class="oc-sec" onclick="custNote()">${_actIco('Редактировать')}Заметка</button>
+    </div>
+    <div class="oc-row2">
       <button class="oc-${c.banned?'sec':'danger'}" onclick="${
         c.banned?"custAct('unban')":'custBan()'}">${c.banned?'Разблокировать':'Заблокировать'}</button>
     </div>`;
@@ -1896,7 +2024,7 @@ async function copyOrderText(){
 const ACTS = {
   delivered: {t:'Доставлен?',            s:'Заказ будет закрыт и попадёт в выручку.',
               btn:'Доставлен', cls:'gold', ok:oid=>'#'+oid+' доставлен',  toast:'ok'},
-  cancel:    {t:'Отменить заказ?',       s:'Заказ будет отменён — действие необратимо.',
+  cancel:    {t:'Отменить заказ?',       s:'Заказ уйдёт из работы. Вернуть его можно кнопкой «Вернуть в доставку».',
               btn:'Отменить',  cls:'red',  ok:oid=>'#'+oid+' отменён',   toast:'err'},
   // Нажали «Доставлен» по ошибке — заказ уже закрыт и посчитан в выручке.
   // Возврат откатывает и то и другое, как кнопка в боте оператора.
@@ -1905,8 +2033,10 @@ const ACTS = {
 };
 function askAct(oid, act){
   const a = ACTS[act]; if(!a) return;
+  const _o = (ORDERS||[]).find(x=>x.order_id===oid) || {};
   $('actT').textContent = a.t+' #'+oid;
-  $('actS').textContent = a.s;
+  $('actS').textContent = (act==='undeliver' && _o.status==='cancelled')
+    ? 'Заказ снова станет активным, водитель получит его обратно.' : a.s;
   const go=$('actGo');
   go.className='sbtn '+a.cls;
   go.textContent=a.btn;
@@ -1921,6 +2051,185 @@ function askAct(oid, act){
   };
   showOv('actOv'); haptic('medium');
 }
+
+
+// ── поддержка: тикеты и переписка ────────────────────────────────────────
+// Формат сообщений общий с приложением клиента: {role, type, text|url, ts}.
+// Своё — справа, клиентское — слева: оператор смотрит со своей стороны.
+let SUP={threads:[],waiting:0}, supKey='', supCur=null, supTimer=null, _supQT=null;
+
+function supBadge(){
+  const el=$('supCnt'), btn=$('supBtn'); if(!el) return;
+  const n=SUP.waiting||0;
+  el.textContent = n ? ('Поддержка · '+n) : 'Поддержка';
+  btn.classList.toggle('has', n>0);
+}
+
+async function loadSup(){
+  try{ SUP = await opApi.opFetch('/api/operator/support'); }catch(e){ return; }
+  supBadge();
+  if($('supOv').classList.contains('show')) supList();
+}
+
+function supOpen(){
+  $('supOv').classList.add('show'); haptic('light');
+  loadSup();
+  if(supTimer) clearInterval(supTimer);
+  // Открытый экран опрашиваем часто — это переписка, а не сводка.
+  supTimer = setInterval(()=>{ if(!document.hidden){ loadSup(); if(supKey) supThread(supKey, true); } }, 5000);
+}
+function supClose(){
+  $('supOv').classList.remove('show');
+  if(supTimer){ clearInterval(supTimer); supTimer=null; }
+}
+
+// Возраст обращения: свежее — минуты, сегодняшнее — время, дальше — дата.
+// «25 ч 0 мин» ни о чём не говорит.
+function _when(ts){
+  const d = ts ? new Date(/Z$|[+-]\d{2}:?\d{2}$/.test(ts)?ts:ts+'Z') : null;
+  if(!d || isNaN(d)) return '';
+  const m = Math.max(0, Math.round((Date.now()-d)/60000));
+  if(m < 60) return m+' мин';
+  const t=new Date(), y=new Date(Date.now()-864e5);
+  const same=(a,b)=>a.toDateString()===b.toDateString();
+  if(same(d,t)) return _hhmm(ts);
+  if(same(d,y)) return 'вчера';
+  return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'2-digit'});
+}
+function _hhmm(ts){
+  const d = ts ? new Date(/Z$|[+-]\d{2}:?\d{2}$/.test(ts)?ts:ts+'Z') : null;
+  if(!d || isNaN(d)) return '';
+  return d.toLocaleTimeString('ru-RU',{hour:'2-digit',minute:'2-digit'});
+}
+function _dayLbl(ts){
+  const d = ts ? new Date(/Z$|[+-]\d{2}:?\d{2}$/.test(ts)?ts:ts+'Z') : null;
+  if(!d || isNaN(d)) return '';
+  const t=new Date(), y=new Date(Date.now()-864e5);
+  const same=(a,b)=>a.toDateString()===b.toDateString();
+  if(same(d,t)) return 'Сегодня';
+  if(same(d,y)) return 'Вчера';
+  return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'long'});
+}
+
+function _supRow(t){
+  const c=t.client||{};
+  const oid = t.order_id
+    ? `<span class="sup-oid ${t.order_lane}">#${_esc(t.order_id)}</span>` : '';
+  const pre = (t.last_role==='operator' ? '<i>Вы: </i>' : '') + _esc(t.last_text||'');
+  return `<button class="sup-t ${t.key===supKey?'on':''}" onclick="supThread('${_esc(t.key)}')">
+    <div class="n">${t.wait?'<span class="sup-dot"></span>':''}<b>${_esc(c.name||'—')}</b>${oid}
+      <span class="r">${_when(t.last_ts)}</span></div>
+    <div class="m">${pre||'—'}</div></button>`;
+}
+
+function supList(){
+  const wrap=$('supList'); const th=SUP.threads||[];
+  if(!th.length){ wrap.innerHTML='<div class="sup-empty">Обращений пока нет</div>'; return; }
+  // Порядок задан сервером: сначала непринятые заказы, потом активные, потом
+  // всё остальное без ответа и только затем история.
+  const g=[['Ждут ответа', th.filter(t=>t.wait)],
+           ['По активным заказам', th.filter(t=>!t.wait && t.prio===3)],
+           ['История', th.filter(t=>!t.wait && t.prio>3)]];
+  wrap.innerHTML = g.filter(([,l])=>l.length).map(([t,l])=>
+    `<div class="sup-sec">${t} · ${l.length}</div>${l.map(_supRow).join('')}`).join('');
+}
+
+async function supThread(key, quiet){
+  if(!quiet){ supKey=key; supList(); $('supBody').classList.add('chat'); haptic('sel'); }
+  let r; try{ r = await opApi.opFetch('/api/operator/support/thread',{params:{key}}); }
+  catch(e){ return; }
+  if(supKey!==key) return;
+  const same = supCur && supCur.key===key
+    && (supCur.messages||[]).length===(r.messages||[]).length;
+  supCur=r;
+  supChat(!same);
+}
+
+function supChat(scroll){
+  const r=supCur; if(!r) return;
+  const c=r.client||{};
+  const ord = r.order ? `<button onclick="supClose();openOrder('${_esc(r.order.order_id)}')">Заказ #${_esc(r.order.order_id)}</button>` : '';
+  const hist = (r.others||[]).length
+    ? `<div class="sup-hist">${(r.others||[]).map(o=>
+        `<button onclick="supThread('${_esc(o.key)}')">${o.order_id?('#'+_esc(o.order_id)):'Общий вопрос'} · ${_when(o.last_ts)}</button>`).join('')}</div>`
+    : '';
+  const msgs = (r.messages||[]);
+  let last='';
+  const body = msgs.map(m=>{
+    const day=_dayLbl(m.ts); const sep = day!==last ? (last=day, `<div class="sup-day">${day}</div>`) : '';
+    const img = m.type==='photo' && m.url ? `<img src="${_esc(m.url)}" alt="">` : '';
+    const txt = _esc(m.text || m.caption || (m.type==='photo'?'':'—'));
+    const by  = m.role==='operator' && m.by ? ' · '+_esc(m.by) : '';
+    return `${sep}<div class="sup-m ${m.role==='operator'?'operator':'user'}">${img}${txt}
+      <div class="ts">${_hhmm(m.ts)}${by}</div></div>`;
+  }).join('');
+
+  $('supChat').innerHTML = `
+    <div class="sup-chd">
+      <button class="sup-back" onclick="supBack()"><svg viewBox="0 0 24 24" width="16" height="16"
+        fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+        stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div><div class="who">${_esc(c.name||'—')}</div>
+        <div class="sub">${c.username?('@'+_esc(c.username)):'без ника'}${
+          r.order_id?(' · заказ #'+_esc(r.order_id)):' · общий вопрос'}</div></div>
+      <div class="sup-hb">${ord}
+        ${c.id?`<button onclick="openCust(${c.id})">Клиент</button>`:''}
+        ${c.username?`<button onclick="tgOpen('https://t.me/${_esc(c.username)}')">Телеграм</button>`:''}
+      </div>
+    </div>${hist}
+    <div class="sup-msgs" id="supMsgs">${body || '<div class="sup-empty">Переписки ещё не было. Напишите первым.</div>'}</div>
+    <div class="sup-bar">
+      <textarea class="sup-in" id="supIn" rows="1" placeholder="Сообщение клиенту…"
+        oninput="supGrow(this)" onkeydown="supKeys(event)"></textarea>
+      <button class="sup-send" id="supGo" onclick="supSend()" aria-label="Отправить"><svg
+        viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg></button>
+    </div>`;
+  if(scroll!==false){ const m=$('supMsgs'); if(m) m.scrollTop=m.scrollHeight; }
+}
+
+function supBack(){ $('supBody').classList.remove('chat'); supKey=''; supCur=null; supList(); }
+function supGrow(el){ el.style.height='auto'; el.style.height=Math.min(120, el.scrollHeight)+'px'; }
+function supKeys(e){ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); supSend(); } }
+
+async function supSend(){
+  const inp=$('supIn'); if(!inp || !supKey) return;
+  const text=inp.value.trim(); if(!text) return;
+  const b=$('supGo'); b.disabled=true;
+  try{
+    const r = await opApi.opFetch('/api/operator/support/send',
+      {method:'POST', body:{key:supKey, text, as:curOp}});
+    inp.value=''; supGrow(inp);
+    if(r && r.msg){ (supCur.messages=supCur.messages||[]).push(r.msg); supChat(true); }
+    haptic('light'); loadSup();
+  }catch(e){ toast('Сообщение не ушло','err'); }
+  const b2=$('supGo'); if(b2) b2.disabled=false;
+  const i2=$('supIn'); if(i2) i2.focus();
+}
+
+// Написать первым: тому же ключу, что открывает у клиента «Общий вопрос», —
+// иначе он ответа просто не увидит.
+function supNew(){ $('supQ').value=''; $('supFound').innerHTML=''; showOv('supPickOv'); supSearch(); }
+function supSearch(){
+  clearTimeout(_supQT);
+  _supQT = setTimeout(async()=>{
+    const q=$('supQ').value.trim();
+    let r; try{ r = await opApi.opFetch('/api/operator/support/customers',{params:{q}}); }
+    catch(e){ return; }
+    const l=(r.customers||[]);
+    $('supFound').innerHTML = l.length ? l.map(c=>
+      `<button class="sup-t" onclick="supStart(${c.id})">
+        <div class="n"><b>${_esc(c.name||'—')}</b>${c.verified?'':'<span class="sup-oid">не проверен</span>'}
+          <span class="r">${c.orders_total||0} зак.</span></div>
+        <div class="m">${c.username?('@'+_esc(c.username)):('id '+c.id)}${c.phone?(' · +'+_esc(c.phone)):''}</div>
+      </button>`).join('') : '<div class="sup-empty">Никого не нашлось</div>';
+  }, 250);
+}
+function supStart(cid){
+  hideOv('supPickOv');
+  if(!$('supOv').classList.contains('show')) supOpen();
+  supThread(cid+'_general');
+}
+function tgOpen(url){ try{ tg.openTelegramLink(url); }catch(e){ window.open(url,'_blank'); } }
 
 document.querySelectorAll('.ov').forEach(ov=>ov.addEventListener('click',e=>{ if(e.target===ov) ov.classList.remove('show'); }));
 

@@ -699,6 +699,7 @@ async def get_quiet_msg_id(owner_id: int) -> int | None:
 _DEFAULT_PREFS = {
     "orders.new": True, "orders.new500": False, "orders.new1000": True,
     "orders.delivered": False, "orders.cancelled": True, "orders.declined": True,
+    "orders.driver_done": True, "orders.reverted": True, "orders.edited": True,
     "timing.late45": True, "timing.notAccepted5": True, "timing.enroute30": False,
     "reviews.bad3": True, "reviews.good5": False, "reviews.comment": True, "reviews.any": False,
     "digest.morning": True, "digest.evening": True, "digest.weekly": False, "digest.monthly": False,
@@ -816,7 +817,10 @@ async def get_owners_subscribed_to(event_key: str) -> list:
                 p = {}
         else:
             p = r.get("prefs") or {}
-        if not p.get(event_key):
+        # Ключа может не быть вовсе: событие завели позже, чем человек сохранил
+        # настройки. Молчать в этом случае — худший вариант: он не отказывался,
+        # он просто не знал. Берём значение по умолчанию.
+        if not p.get(event_key, _DEFAULT_PREFS.get(event_key, False)):
             continue
         q = r.get("quiet") or {}
         if q.get("enabled"):

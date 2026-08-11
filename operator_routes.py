@@ -620,6 +620,22 @@ async def handle_create(request):
                              headers=CORS_HEADERS)
 
 
+async def _needs_verify(order: dict) -> bool:
+    """Ждёт ли этот заказ решения по верификации.
+
+    Правило одно на всю систему и живёт в api_server: человек проверен, если
+    верифицирован формально ЛИБО уже получал заказ — курьер видел его в лицо.
+    Пока решения нет, заказ принимать нельзя, и панель обязана вести себя так
+    же, как бот: там на непроверенном клиенте вместо «Принять» стоят
+    «Верифицировать» и «Не верифицировать».
+    """
+    cid = int(order.get("customer_id") or 0)
+    if not cid:
+        return False                      # телефонный заказ — верифицировать некого
+    from api_server import _is_vetted
+    return not _is_vetted(await db.get_user(cid))
+
+
 async def _get_pos_order(oid: str):
     """Заказ, которым панель вправе управлять.
 
@@ -735,6 +751,8 @@ async def handle_queue(request):
         if lane != "new" and _biz_date(ts) != today:
             continue
         row = _summary(o)
+        if lane == "new":
+            row["needs_verify"] = await _needs_verify(o)
         lanes[lane].append(row)
         if lane == "work":
             counts["manual" if o.get("source") == "manual" else "app"] += 1
@@ -771,6 +789,11 @@ async def handle_accept(request):
     order = await db.get_order(oid)
     if not order:
         return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    # Сервер держит те же ворота, что и экран: кнопку можно не показать, но
+    # запрос всё равно придёт — со старой вкладки, с чужого устройства, откуда
+    # угодно.
+    if await _needs_verify(order):
+        return web.json_response({"error": "needs_verify"}, status=409, headers=CORS_HEADERS)
     if order.get("status") != "pending":
         return web.json_response({"error": "already_taken",
                                   "status": order.get("status"),
@@ -880,6 +903,25 @@ async def handle_customer_act(request):
         await db.set_user_field(cid, custom_name=str(body.get("note", "")).strip())
     elif act == "ban":
         await db.ban_user(cid, str(body.get("reason", "")).strip() or "без причины", me)
+    elif act == "decline_verify":
+        # Как в боте: отказ по человеку закрывает и его неотвеченные заказы —
+        # иначе они остались бы висеть в очереди навсегда.
+        await db.decline_verification(cid)
+        if body.get("reason"):
+            await db.set_user_field(cid, verify_decline_reason=str(body["reason"]).strip())
+        now = datetime.now(timezone.utc).isoformat()
+        for po in await db.get_pending_orders_for_user(cid):
+            poid = po.get("order_id")
+            if not poid:
+                continue
+            await db.update_order(poid, status="declined", updated_at=now,
+                                  declined_at=now, decline_reason="верификация не пройдена")
+            try:
+                await db._increment_user(cid, orders_declined=1)
+            except Exception:
+                pass
+            await _customer_card(poid)
+            await _refresh_cards(await db.get_order(poid) or {})
     elif act == "unban":
         await db.set_user_field(cid, banned=False, ban_reason="")
     else:
@@ -926,7 +968,9 @@ async def handle_one(request):
     order = await db.get_order(request.match_info["oid"])
     if not order:
         return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
-    return web.json_response({"order": _summary(order)}, headers=CORS_HEADERS)
+    row = _summary(order)
+    row["needs_verify"] = await _needs_verify(order)
+    return web.json_response({"order": row}, headers=CORS_HEADERS)
 
 
 @require_operator

@@ -271,6 +271,12 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
   background:var(--bg3);border-top:1px solid var(--border2);margin-top:10px}
 .oc-top{display:flex;gap:8px;margin-top:12px}
 .ord-acts > .oc-main{display:block;width:100%;margin-top:12px}
+/* Предупреждение перед воротами верификации: почему кнопки другие. */
+.oc-gate{margin-top:10px;padding:11px 13px;border-radius:var(--r2);font-size:12.5px;
+  line-height:1.45;color:var(--gold3);background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.25)}
+.of-link{display:inline-flex;align-items:center;gap:6px;color:var(--gold2);text-decoration:none}
+.of-link span{color:var(--muted);font-size:15px;line-height:1}
 .oc-main{flex:1;padding:16px 10px;border-radius:var(--r2);font-size:15px;font-weight:800;
   color:#1a1408;border:none;cursor:pointer;background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .oc-main:active{transform:scale(.99)}
@@ -1334,8 +1340,17 @@ function renderOrder(){
         <b>${_esc(o.total)}<small>AED</small></b></div>
     </div>`;
 
-  let main='', danger='', rest=[];
-  if(o.status==='pending'){
+  let main='', danger='', rest=[], gate='';
+  // Непроверенный клиент — сначала решение по нему, и только потом заказ.
+  // Так же устроен бот: там на таком заказе вместо «Принять» стоят
+  // «Верифицировать» и «Не верифицировать».
+  if(o.status==='pending' && o.needs_verify){
+    gate = `<div class="oc-gate">Первый заказ — клиент не проверен.<br>
+      Сначала решение по нему, потом заказ.</div>`;
+    main=['Верифицировать', `custVerify('${o.order_id}',${o.customer_id})`];
+    danger=['Не верифицировать', `custDecVerify('${o.order_id}',${o.customer_id})`];
+    rest=[];
+  }else if(o.status==='pending'){
     main=['Принять', `hideOv('ordOv');askAccept('${o.order_id}')`];
     danger=['Отклонить', `askDecline('${o.order_id}')`];
     rest=[['Редактировать',`hideOv('ordOv');startEdit('${o.order_id}')`]];
@@ -1350,7 +1365,7 @@ function renderOrder(){
   }else{
     rest=[['Текст водителю',`showOrderText('${o.order_id}')`]];
   }
-  $('ordActs').innerHTML = money
+  $('ordActs').innerHTML = gate + money
     + (main?`<div class="oc-top">
         <button class="oc-main" onclick="${main[1]}">${main[0]}</button>
         <button class="oc-danger" onclick="${danger[1]}">${danger[0]}</button>
@@ -1360,6 +1375,27 @@ function renderOrder(){
     + (o.customer_id?`<div class="oc-row2">
         <button class="oc-sec" onclick="openCust(${o.customer_id})">${
           _actIco('Клиент')}Клиент</button></div>`:'');
+}
+
+// Верификация решается прямо на заказе: оператор смотрит, кто заказал, и
+// отвечает «да» или «нет», не уходя с экрана.
+async function custVerify(oid, cid){
+  try{
+    await opApi.opFetch(`/api/operator/customer/${cid}/act`,{method:'POST',body:{act:'verify'}});
+    toast('Клиент верифицирован'); haptic('medium');
+    await loadQueue(); openOrder(oid);
+  }catch(e){ toast('Не получилось','err'); }
+}
+function custDecVerify(oid, cid){
+  askText('Не верифицировать', 'Заказ и другие его неотвеченные заказы будут отклонены', '',
+    async r=>{
+      try{
+        await opApi.opFetch(`/api/operator/customer/${cid}/act`,
+          {method:'POST',body:{act:'decline_verify',reason:r}});
+        hideOv('ordOv'); toast('Верификация отклонена'); haptic('medium');
+      }catch(e){ toast('Не получилось','err'); }
+      await loadQueue();
+    });
 }
 
 // ── карточка клиента ──
@@ -1422,7 +1458,9 @@ function renderCust(){
             ${tag?`<span class="oc-tag${tag==='не подтверждён'?' warn':''}">${tag}</span>`:''}
             <span class="oc-go">Позвонить</span></a>`).join('')}</div>
       </div>`:'')
-    + f('Телеграм', c.username?`@${_esc(c.username)}`:'')
+    + f('Телеграм', c.username
+        ? `<a href="https://t.me/${_esc(c.username)}" target="_blank" rel="noopener"
+             class="of-link">@${_esc(c.username)}<span>›</span></a>` : '')
     + f('Пришёл', c.invited_via?_esc(_via(c.invited_via)):'')
     + f('Рекомендовал', c.verify_recommender_name?_esc(c.verify_recommender_name):'')
     + f('Причина блокировки', c.banned&&c.ban_reason?_esc(c.ban_reason):'')
@@ -1434,14 +1472,14 @@ function renderCust(){
           <span class="of-it-p">${_esc(o.total)}</span></div>`).join('')}</div>
       </div>`:'');
 
-  const sec = [['Заметка','custNote()'],
-               c.banned?['Разблокировать',"custAct('unban')"]:['Заблокировать','custBan()']];
-  $('custActs').innerHTML =
-    (c.verified?'':`<button class="oc-main" onclick="custAct('verify')">Верифицировать</button>`)
-    + `<div class="oc-row2">
-        <button class="oc-sec" onclick="${sec[0][1]}">Заметка</button>
-        <button class="oc-${c.banned?'sec':'danger'}" onclick="${sec[1][1]}">${sec[1][0]}</button>
-      </div>`;
+  // Верификации здесь нет намеренно: она решается на первом заказе, где видно,
+  // что человек заказывает. Отдельная кнопка в карточке позволяла бы пропустить
+  // заказ вперёд решения.
+  $('custActs').innerHTML = `<div class="oc-row2">
+      <button class="oc-sec" onclick="custNote()">${_actIco('Редактировать')}Заметка</button>
+      <button class="oc-${c.banned?'sec':'danger'}" onclick="${
+        c.banned?"custAct('unban')":'custBan()'}">${c.banned?'Разблокировать':'Заблокировать'}</button>
+    </div>`;
 }
 
 async function custAct(act, extra){

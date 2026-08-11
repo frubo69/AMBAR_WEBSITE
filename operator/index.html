@@ -203,19 +203,49 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
   border:none;cursor:pointer;background:linear-gradient(135deg,var(--gold),var(--gold2));
   white-space:nowrap}
 .q-take:active{transform:scale(.97)}
-/* Действия прямо в строке — у заказов в работе. Мелкие и ровные: это не выбор,
-   а привычные движения, и выделять из них нечего, кроме «Доставлен». */
-.q-r.has-acts{align-items:flex-start}
-.q-r.has-acts .q-r-r{padding-top:2px}
-.q-acts{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
-.qa{display:flex;align-items:center;gap:6px;padding:9px 14px;border-radius:10px;
-  font-size:12.5px;font-weight:700;color:var(--sub);background:var(--card2);
+/* Заказ в работе — развёрнутая строка: что везём, куда, кому и к какому сроку
+   читается без единого нажатия, потому что за смену их перечитывают десятки
+   раз. Деньги и срок стоят в правом нижнем углу, где заканчивается взгляд. */
+.q-w{position:relative;cursor:pointer;background:var(--card);border:1px solid var(--border2);
+  border-radius:var(--r2);padding:16px 18px 16px 21px;margin-bottom:10px;overflow:hidden;
+  transition:.12s}
+.q-w:active{background:var(--card2)}
+.q-w::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;opacity:.9}
+.q-w.app::before{background:var(--gold2)}
+.q-w.tel::before{background:var(--muted)}
+.q-w-h{display:flex;align-items:center;gap:9px}
+.q-w-n{flex:1;min-width:0;font-size:16px;font-weight:700;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.q-map{display:flex;align-items:center;gap:7px;flex-shrink:0;padding:9px 15px;border-radius:11px;
+  text-decoration:none;font-size:13px;font-weight:700;color:var(--gold2);
+  background:var(--gold-soft);border:1px solid rgba(201,169,110,.28)}
+.q-map:active{background:rgba(201,169,110,.2)}
+.q-map svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.9;
+  stroke-linecap:round;stroke-linejoin:round}
+.q-w-a{font-size:14.5px;font-weight:600;color:var(--text);margin-top:8px;line-height:1.35}
+.q-w-it{font-size:14px;color:var(--sub);margin-top:5px;line-height:1.4}
+.q-w-f{display:flex;align-items:flex-end;gap:16px;margin-top:14px}
+.q-w-r{margin-left:auto;flex-shrink:0;text-align:right}
+.q-w-when{display:block;font-size:12px;color:var(--muted);white-space:nowrap;margin-bottom:3px}
+.q-w-s{font-family:'DM Sans',sans-serif;font-size:24px;font-weight:800;color:var(--gold2);
+  letter-spacing:-.7px;white-space:nowrap;line-height:1}
+.q-w-s small{font-size:11px;color:var(--muted);font-weight:600;letter-spacing:0}
+/* Кнопки крупные: по ним бьют пальцем на ходу, а промах стоит минуты. */
+.q-acts{display:flex;flex-wrap:wrap;gap:8px;flex:1;min-width:0}
+.qa{display:flex;align-items:center;gap:7px;padding:13px 18px;border-radius:11px;
+  font-size:13.5px;font-weight:700;color:var(--sub);background:var(--card2);
   border:1px solid var(--border2);cursor:pointer;white-space:nowrap;transition:.12s}
 .qa:active{color:var(--text);border-color:var(--border3)}
 .qa.go{color:#1a1408;border-color:transparent;
   background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .qa.no{color:var(--dn);background:none;border-color:rgba(224,85,85,.28)}
-.qa .oc-ico{width:14px;height:14px;opacity:.7}
+.qa .oc-ico{width:15px;height:15px;opacity:.7}
+@media (max-width:640px){
+  .q-w-f{flex-direction:column;align-items:stretch;gap:12px}
+  .q-w-r{margin-left:0;display:flex;align-items:baseline;justify-content:space-between}
+  .q-w-when{margin:0}
+  .qa{flex:1;justify-content:center}
+}
 
 /* Телефон: правый край уходит под левый, иначе адрес сжимается в три буквы. */
 @media (max-width:560px){
@@ -1075,8 +1105,29 @@ function clearTicket(confirmIt){
 function ticketItems(){
   return Object.values(TICKET).map(l=>({id:l.id, qty:l.qty, pcs:l.pcs}));
 }
+// Отпечаток правки: состав, район, водитель и поля клиента. По нему видно,
+// поменялось ли хоть что-нибудь.
+let _editWas=null;
+function _editSig(){
+  return JSON.stringify([
+    Object.keys(TICKET).sort().map(k=>k+':'+TICKET[k].qty),
+    curDist, curDriver,
+    $('cName').value.trim(), $('cPhone').value.trim(),
+    $('cAddr').value.trim(), $('cComment').value.trim(),
+  ]);
+}
+
 function askCreate(){
   if(!Object.keys(TICKET).length) return;
+  // Заглянул в состав и вышел — сохранять нечего, и спрашивать не о чем.
+  if(editingOid && _editWas && _editSig()===_editWas){
+    const oid=editingOid;
+    clearTicket(false); closeTicket();
+    if(!showOrders) toggleOrders();
+    toast('Изменений нет · #'+oid);
+    haptic('light');
+    return;
+  }
   const name = $('cName').value.trim();
   const phone = $('cPhone').value.trim();
   const addr = $('cAddr').value.trim();
@@ -1242,44 +1293,60 @@ function _laneHtml(lane, list){
 }
 
 // Строка очереди — короткая сводка, по которой решают «этим заниматься или
-// следующим». Всё управление живёт в карточке, поэтому строка открывается по
-// нажатию целиком, а из действий на ней осталось одно и компактное: принять.
-// Полоса кнопок во всю ширину делала из списка стопку панелей.
+// следующим». Строка открывается по нажатию целиком; всё остальное живёт в
+// карточке.
+//
+// У новых заказов вид короткий: там сперва решают, брать ли, и лишнее сбивает.
+// У заказов в работе — развёрнутый: смена идёт по всем сразу, и всё, что нужно
+// водителю и оператору, должно читаться, не открывая ничего.
 function _row(o, lane){
   const src=(o.source||'app')==='manual' ? 'tel' : 'app';
-  const items=(o.items||[]).map(i=>i.name+' ×'+i.qty).join(' · ');
+  const ico = src==='tel'?ICO_TEL:ICO_APP;
+  const items=(o.items||[]).map(i=>i.name+' · '+i.qty+' шт').join(' · ');
+
+  if(lane==='work') return `<div class="q-w ${src}" onclick="openOrder('${o.order_id}')">
+    <div class="q-w-h">
+      ${ico}<span class="q-w-n">${_esc(o.customer_name||'—')}</span>
+      ${o.gmap_link?`<a class="q-map" href="${_esc(o.gmap_link)}" target="_blank" rel="noopener"
+          onclick="event.stopPropagation()">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-5.7 7-11a7 7 0 1 0-14 0c0 5.3 7 11 7 11z"/><circle cx="12" cy="10" r="2.6"/></svg>
+          Карта</a>`:''}
+    </div>
+    <div class="q-w-a">${_esc(o.address||'адрес не указан')}</div>
+    <div class="q-w-it">${_esc(items)}</div>
+    <div class="q-w-f">
+      <span class="q-acts" onclick="event.stopPropagation()">
+        <button class="qa go" onclick="askAct('${o.order_id}','delivered')">Доставлен</button>
+        <button class="qa no" onclick="askAct('${o.order_id}','cancel')">Отменить</button>
+        <button class="qa" onclick="startEdit('${o.order_id}')">${_actIco('Редактировать')}Редактировать</button>
+        <button class="qa" onclick="showOrderText('${o.order_id}')">${_actIco('Текст водителю')}Текст</button>
+        ${o.customer_id?`<button class="qa" onclick="openCust(${o.customer_id})">${
+          _actIco('Клиент')}Клиент</button>`:''}
+      </span>
+      <span class="q-w-r">
+        <span class="q-w-when">${o.deliver_by?`до ${_esc(o.deliver_by)}`:''}${
+          o.driver?` · ${_esc(o.driver)}`:''}</span>
+        <span class="q-w-s">${_esc(o.total)} <small>AED</small></span>
+      </span>
+    </div>
+  </div>`;
+
   let right;
   if(lane==='new'){
     right = `<span class="q-age">${_age(o.timestamp)}</span>
       <button class="q-take" onclick="event.stopPropagation();askAccept('${o.order_id}')">Принять</button>`;
-  }else if(lane==='work'){
-    right = `${o.deliver_by?`<span class="q-by">до ${_esc(o.deliver_by)}</span>`:''}
-      <span class="q-drv">${_esc(o.driver||'без водителя')}</span>`;
   }else{
     const ST={delivered:['Доставлен','ok'],cancelled:['Отменён','no'],declined:['Отклонён','no']};
     const [t,c]=ST[o.status]||[o.status,''];
     right = `<span class="q-st ${c}">${t}</span>`;
   }
-  // У заказов в работе действия стоят прямо в строке: смена идёт по всем сразу,
-  // и открывать карточку ради «Доставлен» на каждом — лишний шаг тысячу раз за
-  // вечер. У новых так нельзя: там сперва решают, брать ли, и лишние кнопки
-  // сбивают.
-  const acts = lane!=='work' ? '' : `<span class="q-acts" onclick="event.stopPropagation()">
-      <button class="qa go" onclick="askAct('${o.order_id}','delivered')">Доставлен</button>
-      <button class="qa no" onclick="askAct('${o.order_id}','cancel')">Отменить</button>
-      <button class="qa" onclick="startEdit('${o.order_id}')">${_actIco('Редактировать')}Редактировать</button>
-      <button class="qa" onclick="showOrderText('${o.order_id}')">${_actIco('Текст водителю')}Текст</button>
-      ${o.customer_id?`<button class="qa" onclick="openCust(${o.customer_id})">${
-        _actIco('Клиент')}Клиент</button>`:''}
-    </span>`;
-  return `<div class="q-r ${src}${lane==='work'?' has-acts':''}" onclick="openOrder('${o.order_id}')">
+  return `<div class="q-r ${src}" onclick="openOrder('${o.order_id}')">
     <span class="q-r-l">
-      <span class="q-r-h">${src==='tel'?ICO_TEL:ICO_APP}
+      <span class="q-r-h">${ico}
         <span class="q-r-n">${_esc(o.customer_name||'—')}</span>
         ${o.needs_verify?'<span class="q-flag">не проверен</span>':''}</span>
       <span class="q-r-a">${_esc(o.address||'адрес не указан')}</span>
       <span class="q-r-it">${_esc(items)}</span>
-      ${acts}
     </span>
     <span class="q-r-r">
       <span class="q-r-s">${_esc(o.total)} <small>AED</small></span>
@@ -1638,6 +1705,9 @@ function startEdit(oid){
     TICKET[key]={id:i.id, pcs:i.pcs||undefined, qty:i.qty};
   });
   editingOid=oid;
+  // Снимок на входе в правку. Без него «Сохранить» одинаково спрашивает и когда
+  // человек что-то поменял, и когда просто заглянул в состав и вышел.
+  _editWas=null;
   $('cName').value=o.customer_name||'';
   $('cPhone').value=o.phone||''; $('cAddr').value=o.address||''; $('cComment').value=o.comment||'';
   // Район берём из самого заказа: у онлайновых он определён по адресу, и
@@ -1650,6 +1720,7 @@ function startEdit(oid){
   $('createBtn').classList.add('save');
   openCatalog();
   renderTicket(); syncBadges();
+  _editWas=_editSig();
   toast('Заказ #'+oid+' загружен в чек для правки');
   haptic('medium');
 }

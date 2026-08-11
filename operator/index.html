@@ -203,6 +203,20 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
   border:none;cursor:pointer;background:linear-gradient(135deg,var(--gold),var(--gold2));
   white-space:nowrap}
 .q-take:active{transform:scale(.97)}
+/* Действия прямо в строке — у заказов в работе. Мелкие и ровные: это не выбор,
+   а привычные движения, и выделять из них нечего, кроме «Доставлен». */
+.q-r.has-acts{align-items:flex-start}
+.q-r.has-acts .q-r-r{padding-top:2px}
+.q-acts{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+.qa{display:flex;align-items:center;gap:6px;padding:9px 14px;border-radius:10px;
+  font-size:12.5px;font-weight:700;color:var(--sub);background:var(--card2);
+  border:1px solid var(--border2);cursor:pointer;white-space:nowrap;transition:.12s}
+.qa:active{color:var(--text);border-color:var(--border3)}
+.qa.go{color:#1a1408;border-color:transparent;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.qa.no{color:var(--dn);background:none;border-color:rgba(224,85,85,.28)}
+.qa .oc-ico{width:14px;height:14px;opacity:.7}
+
 /* Телефон: правый край уходит под левый, иначе адрес сжимается в три буквы. */
 @media (max-width:560px){
   .q-r{flex-direction:column;align-items:stretch;gap:11px}
@@ -1246,13 +1260,26 @@ function _row(o, lane){
     const [t,c]=ST[o.status]||[o.status,''];
     right = `<span class="q-st ${c}">${t}</span>`;
   }
-  return `<div class="q-r ${src}" onclick="openOrder('${o.order_id}')">
+  // У заказов в работе действия стоят прямо в строке: смена идёт по всем сразу,
+  // и открывать карточку ради «Доставлен» на каждом — лишний шаг тысячу раз за
+  // вечер. У новых так нельзя: там сперва решают, брать ли, и лишние кнопки
+  // сбивают.
+  const acts = lane!=='work' ? '' : `<span class="q-acts" onclick="event.stopPropagation()">
+      <button class="qa go" onclick="askAct('${o.order_id}','delivered')">Доставлен</button>
+      <button class="qa no" onclick="askAct('${o.order_id}','cancel')">Отменить</button>
+      <button class="qa" onclick="startEdit('${o.order_id}')">${_actIco('Редактировать')}Редактировать</button>
+      <button class="qa" onclick="showOrderText('${o.order_id}')">${_actIco('Текст водителю')}Текст</button>
+      ${o.customer_id?`<button class="qa" onclick="openCust(${o.customer_id})">${
+        _actIco('Клиент')}Клиент</button>`:''}
+    </span>`;
+  return `<div class="q-r ${src}${lane==='work'?' has-acts':''}" onclick="openOrder('${o.order_id}')">
     <span class="q-r-l">
       <span class="q-r-h">${src==='tel'?ICO_TEL:ICO_APP}
         <span class="q-r-n">${_esc(o.customer_name||'—')}</span>
         ${o.needs_verify?'<span class="q-flag">не проверен</span>':''}</span>
       <span class="q-r-a">${_esc(o.address||'адрес не указан')}</span>
       <span class="q-r-it">${_esc(items)}</span>
+      ${acts}
     </span>
     <span class="q-r-r">
       <span class="q-r-s">${_esc(o.total)} <small>AED</small></span>

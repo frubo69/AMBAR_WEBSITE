@@ -397,6 +397,20 @@ async def notify_driver(order: dict, kind: str = "new"):
     if not (tid and token):
         return
 
+    # Пока заказ не принят, водителю ехать некуда. Оператор может выбрать его
+    # заранее, правя состав, — но это ещё не назначение: назначением заказ
+    # становится в момент принятия. Отмену шлём только тому, кому уже говорили
+    # везти: остальным сообщать не о чем.
+    st = (order.get("status") or "").strip()
+    told = bool(order.get("driver_msg_id")) and \
+           (order.get("driver_msg_to") or "").strip() == name
+    if kind == "cancel":
+        if not told:
+            return
+    elif st != "approved":
+        log.debug(f"[driver-bot] #{order.get('order_id')} ещё не принят — водителю молчим")
+        return
+
     lines = "\n".join(
         f"• {_h.escape(str(i.get('name','')))} × {i.get('qty',0)}"
         + (f" ({i.get('pcs')} шт)" if i.get("pcs") else "")

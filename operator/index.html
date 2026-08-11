@@ -136,10 +136,16 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .dchips .hint{font-size:12px;color:var(--muted);padding:8px 2px}
 
 /* ── orders panel (replaces grid) ── */
-.orders-hdr{display:flex;align-items:center;gap:12px;padding:12px 14px 4px;flex-shrink:0}
-.oback{padding:10px 14px;border-radius:10px;background:var(--card2);border:1px solid var(--border2);font-size:13px;font-weight:700;color:var(--gold2);transition:.12s}
-.oback:active{transform:scale(.95);background:var(--gold-soft)}
-.oh-t{font-size:13px;color:var(--muted);font-weight:600}
+/* Выход из очереди — одна крупная кнопка. Раньше рядом с ней в углу стояли
+   «Заказы» (ведёт туда, где стоишь) и подпись «Заказы за сегодня», и угол
+   экрана превращался в свалку из трёх одинаковых слов. */
+.orders-hdr{display:flex;align-items:center;gap:12px;padding:12px 14px 6px;flex-shrink:0}
+.oback{display:flex;align-items:center;gap:9px;padding:14px 20px;border-radius:var(--r2);
+  background:var(--card2);border:1px solid var(--border2);font-size:15px;font-weight:700;
+  color:var(--text);cursor:pointer;transition:.12s}
+.oback svg{width:16px;height:16px;fill:none;stroke:var(--gold2);stroke-width:2.4;
+  stroke-linecap:round;stroke-linejoin:round}
+.oback:active{transform:scale(.98);border-color:var(--border3)}
 .orders-wrap{flex:1;overflow-y:auto;padding:12px 14px 20px;-webkit-overflow-scrolling:touch}
 /* ── Очередь ───────────────────────────────────────────────────────────────
    Три ленты по стадии заказа. Источник — полоска слева и значок в строке:
@@ -533,8 +539,9 @@ a.oc-row:active{background:var(--card2)}
       <div class="search-row" id="searchRow"><input type="search" id="searchIn" placeholder="Поиск по названию…" autocomplete="off"></div>
       <div class="grid-wrap" id="gridWrap"><div class="grid" id="grid"></div></div>
       <div class="orders-hdr" id="ordersHdr" style="display:none">
-        <button class="oback" onclick="toggleOrders()">← Назад к товарам</button>
-        <span class="oh-t">Заказы за сегодня</span>
+        <button class="oback" onclick="toggleOrders()">
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 5l-7 7 7 7"/></svg>
+          К товарам</button>
       </div>
       <div class="orders-wrap" id="ordersWrap" style="display:none"></div>
     </div>
@@ -1130,6 +1137,12 @@ function applyView(){
   if(tk) tk.style.display = showOrders?'none':'';
   // Категории товаров нужны каталогу, а не очереди.
   $('catRail').style.display = showOrders?'none':'';
+  // Кнопка «Заказы» в очереди ведёт туда, где ты и так стоишь, а «Заказ по
+  // телефону» в каталоге — туда же, где ты уже. Каждая лишняя половину времени,
+  // и вдвоём они превращали угол экрана в свалку.
+  $('ordersBtn').style.display = showOrders?'none':'';
+  const tb=document.querySelector('.tel-btn');
+  if(tb) tb.style.display = showOrders?'':'none';
 }
 function toggleOrders(){
   closeTicket();

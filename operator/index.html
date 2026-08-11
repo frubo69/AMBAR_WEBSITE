@@ -163,11 +163,16 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .q-fil button{padding:6px 11px;border-radius:999px;font-size:11.5px;font-weight:600;
   color:var(--muted);background:var(--card2);border:1px solid var(--border2);cursor:pointer}
 .q-fil button.on{color:var(--text);border-color:rgba(201,169,110,.45)}
-.q-grp{display:flex;align-items:center;gap:8px;margin:16px 0 8px;font-size:11px;font-weight:700;
-  letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
-.q-grp:first-child{margin-top:0}
-.q-grp i{font-style:normal;font-size:11px;padding:1px 7px;border-radius:999px;
-  background:var(--card2);border:1px solid var(--border2)}
+/* Район — заголовок раздела, а не подпись: по нему разбивают смену, и он
+   должен ловиться взглядом раньше самих карточек. */
+.q-grp{display:flex;align-items:center;gap:10px;margin:26px 0 12px;font-size:16px;
+  font-weight:800;letter-spacing:-.2px;color:var(--text)}
+.q-grp:first-child{margin-top:6px}
+.q-grp::before{content:'';width:4px;height:18px;border-radius:2px;background:var(--gold2);
+  flex-shrink:0}
+.q-grp i{font-style:normal;font-size:12px;font-weight:700;color:var(--gold2);
+  padding:3px 10px;border-radius:999px;background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.28)}
 /* Заказы плиткой. Ширина колонки задана снизу — сколько влезет, столько и
    станет: на планшете две-три, на телефоне одна, и тогда это просто лента
    сверху вниз, как переписка. */
@@ -204,11 +209,12 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .q-card .of-map{padding:9px 12px;font-size:12px}
 
 /* Кнопки крупные: по ним бьют пальцем на ходу, а промах стоит минуты. */
-.q-acts{display:flex;flex-wrap:wrap;gap:8px}
-.qa{flex:1;min-width:96px;display:flex;align-items:center;justify-content:center;gap:7px;
-  padding:12px 12px;border-radius:11px;font-size:13px;font-weight:700;color:var(--sub);
+.q-acts{display:flex;flex-direction:column;gap:8px}
+.q-arow{display:flex;gap:8px}
+.qa{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:7px;
+  padding:13px 10px;border-radius:11px;font-size:13px;font-weight:700;color:var(--sub);
   background:var(--card2);border:1px solid var(--border2);cursor:pointer;
-  white-space:nowrap;transition:.12s}
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;transition:.12s}
 .qa:active{color:var(--text);border-color:var(--border3)}
 .qa.go{color:#1a1408;border-color:transparent;
   background:linear-gradient(135deg,var(--gold),var(--gold2))}
@@ -1275,20 +1281,36 @@ function _card(o, lane){
              : (o.deliver_by ? `до ${_esc(o.deliver_by)}` : '');
   const dist = [_distCode(o.office_id), _distName(o.office_id)||o.office_name]
                  .filter(Boolean).join(' ');
-  const acts = lane==='new'
-    ? (o.needs_verify
-        ? `<button class="qa go" onclick="custVerify('${o.order_id}',${o.customer_id})">Верифицировать</button>
-           <button class="qa no" onclick="custDecVerify('${o.order_id}',${o.customer_id})">Не верифицировать</button>`
-        : `<button class="qa go" onclick="askAccept('${o.order_id}')">Принять</button>
-           <button class="qa no" onclick="askDecline('${o.order_id}')">Отклонить</button>
-           <button class="qa" onclick="startEdit('${o.order_id}')">${_actIco('Редактировать')}Правка</button>`)
-    : lane==='work'
-      ? `<button class="qa go" onclick="askAct('${o.order_id}','delivered')">Доставлен</button>
-         <button class="qa no" onclick="askAct('${o.order_id}','cancel')">Отменить</button>
-         <button class="qa" onclick="startEdit('${o.order_id}')">${_actIco('Редактировать')}Правка</button>
-         <button class="qa" onclick="showOrderText('${o.order_id}')">${_actIco('Текст водителю')}Текст</button>`
-      : (o.status==='delivered'
-          ? `<button class="qa" onclick="askAct('${o.order_id}','undeliver')">Вернуть в доставку</button>` : '');
+  // Строй кнопок один и тот же везде: решение и отказ рядом, дальше обычные,
+  // «Клиент» последней строкой. На каждом экране одно и то же место под пальцем.
+  const B=(cls,t,fn)=>`<button class="qa ${cls}" onclick="${fn}">${_actIco(t)}${t}</button>`;
+  const cli = o.customer_id ? `<div class="q-arow">${B('','Клиент',`openCust(${o.customer_id})`)}</div>` : '';
+  let acts='';
+  if(lane==='new' && o.needs_verify){
+    acts = `<div class="q-arow">
+        ${B('go','Верифицировать',`custVerify('${o.order_id}',${o.customer_id})`)}
+        ${B('no','Не верифицировать',`custDecVerify('${o.order_id}',${o.customer_id})`)}
+      </div>` + cli;
+  }else if(lane==='new'){
+    acts = `<div class="q-arow">
+        ${B('go','Принять',`askAccept('${o.order_id}')`)}
+        ${B('no','Отклонить',`askDecline('${o.order_id}')`)}
+      </div>
+      <div class="q-arow">${B('','Редактировать',`startEdit('${o.order_id}')`)}</div>` + cli;
+  }else if(lane==='work'){
+    acts = `<div class="q-arow">
+        ${B('go','Доставлен',`askAct('${o.order_id}','delivered')`)}
+        ${B('no','Отменить',`askAct('${o.order_id}','cancel')`)}
+      </div>
+      <div class="q-arow">
+        ${B('','Редактировать',`startEdit('${o.order_id}')`)}
+        ${B('','Текст водителю',`showOrderText('${o.order_id}')`)}
+      </div>` + cli;
+  }else if(o.status==='delivered'){
+    acts = `<div class="q-arow">${B('','Вернуть в доставку',`askAct('${o.order_id}','undeliver')`)}</div>` + cli;
+  }else{
+    acts = cli;
+  }
 
   return `<div class="q-card ${src}">
     <div class="q-card-h" onclick="openOrder('${o.order_id}')">
@@ -1319,7 +1341,7 @@ function _card(o, lane){
         o.tip?`${_esc(goods)}/${_esc(o.tip)} (чай) · `:''}${_esc(pay)}${
         o.driver?` · ${_esc(o.driver)}`:''}</i></span>
         <b>${_esc(o.total)}<small>AED</small></b></div>
-      ${acts?`<div class="q-acts">${acts}</div>`:''}
+      ${acts?`<div class="q-acts" onclick="event.stopPropagation()">${acts}</div>`:''}
     </div>
   </div>`;
 }

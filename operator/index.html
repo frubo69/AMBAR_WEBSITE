@@ -559,6 +559,59 @@ a.oc-row:active{background:var(--card2)}
   .tk-bar.pulse .tk-bar-r{animation:tkPulse .28s var(--e1)}
 }
 
+/* ── просьба водителя ────────────────────────────────────────────────────
+   Заметна с первого взгляда: пока не ответили, заказ стоит и у водителя. */
+.q-card.req{border-color:rgba(243,180,74,.5);box-shadow:0 0 0 1px rgba(243,180,74,.18)}
+.q-flag.req{background:rgba(243,180,74,.14);color:var(--warn);
+  border:1px solid rgba(243,180,74,.35)}
+.dq{margin-top:9px;padding:10px 12px;border-radius:12px;background:rgba(243,180,74,.08);
+  border:1px solid rgba(243,180,74,.28)}
+.dq.ok{background:rgba(76,175,125,.08);border-color:rgba(76,175,125,.3)}
+.dq.no{background:rgba(224,85,85,.08);border-color:rgba(224,85,85,.3)}
+.dq-h{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--warn)}
+.dq.ok .dq-h{color:var(--up)} .dq.no .dq-h{color:var(--dn)}
+.dq-h b{font-weight:700}
+.dq-h .ic{width:15px;height:15px;flex:0 0 15px}
+.dq-h span{margin-left:auto;font-size:11px;color:var(--muted);font-weight:600}
+.dq-d{display:flex;flex-direction:column;gap:3px;margin-top:8px}
+.dq-l{font-size:12px;color:var(--sub)}
+.dq-l i{font-style:normal;display:inline-block;width:12px;font-weight:700;color:var(--text)}
+.dq-l.sum{margin-top:4px;color:var(--muted)}
+.dq-t{margin-top:7px;font-size:12.5px;color:var(--text);line-height:1.45}
+.oc-gate.req{background:rgba(243,180,74,.1);border-color:rgba(243,180,74,.35);color:var(--warn)}
+
+/* ── лента: что горит и что уже случилось ─────────────────────────────── */
+.fd-ov{position:fixed;inset:0;z-index:118;background:rgba(0,0,10,.55);display:none}
+.fd-ov.show{display:block}
+.fd{position:absolute;top:0;right:0;bottom:0;width:min(420px,100%);background:var(--bg2);
+  border-left:1px solid var(--border2);display:flex;flex-direction:column;
+  padding-top:var(--safe-top);animation:fdIn .18s var(--e1)}
+@keyframes fdIn{from{transform:translateX(24px);opacity:.4}to{transform:none;opacity:1}}
+.fd-h{display:flex;align-items:center;gap:10px;padding:14px 16px;flex-shrink:0;
+  border-bottom:1px solid var(--border2)}
+.fd-h .t{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700}
+.fd-b{flex:1;min-height:0;overflow-y:auto;padding:12px 14px calc(18px + var(--safe-bottom))}
+.fd-sec{font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;
+  color:var(--muted);margin:14px 4px 8px}
+.fd-sec:first-child{margin-top:2px}
+.fd-i{width:100%;text-align:left;display:flex;gap:10px;align-items:flex-start;
+  padding:11px 12px;margin-bottom:7px;border-radius:12px;background:var(--card);
+  border:1px solid var(--border2)}
+.fd-i:active{transform:scale(.99)}
+.fd-i.hot{border-color:rgba(243,180,74,.45);background:rgba(243,180,74,.07)}
+.fd-i.warm{border-color:rgba(201,169,110,.3)}
+.fd-i .ic{width:16px;height:16px;flex:0 0 16px;margin-top:1px;color:var(--muted)}
+.fd-i.hot .ic{color:var(--warn)}
+.fd-i .b{flex:1;min-width:0}
+.fd-i .n{font-size:13px;font-weight:700;display:flex;gap:6px;align-items:baseline}
+.fd-i .n em{font-style:normal;font-family:'Space Grotesk',sans-serif;color:var(--gold2);
+  font-size:11.5px}
+.fd-i .s{font-size:11.5px;color:var(--muted);margin-top:3px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.fd-i .r{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--muted);flex-shrink:0}
+.fd-i.hot .r{color:var(--warn)}
+.fd-empty{padding:36px 16px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6}
+
 /* ── поддержка: список тикетов + чат ─────────────────────────────────────
    Пузыри те же, что в приложении клиента, но зеркально: свои сообщения справа,
    как в любом мессенджере. */
@@ -659,6 +712,10 @@ a.oc-row:active{background:var(--card2)}
     <div class="office-seg" id="officeSeg" style="display:none"></div>
     <div class="hdr-right">
       <button class="pill" id="dispatchBtn" onclick="showOv('opOv')" style="cursor:pointer;color:var(--gold2);border-color:rgba(201,169,110,.4)">Оператор</button>
+      <button class="pill" id="fdBtn" onclick="fdOpen()" aria-label="События"
+        style="cursor:pointer;display:flex;align-items:center;gap:6px"><svg class="ic" viewBox="0 0 24 24"
+        aria-hidden="true" style="margin:0"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span
+        id="fdCnt">События</span></button>
       <button class="pill" id="supBtn" onclick="supOpen()" aria-label="Поддержка"
         style="cursor:pointer;display:flex;align-items:center;gap:6px"><svg class="ic" viewBox="0 0 24 24"
         aria-hidden="true" style="margin:0"><path d="M20 14a2 2 0 0 1-2 2H8l-4 3.5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/></svg><span
@@ -768,6 +825,19 @@ a.oc-row:active{background:var(--card2)}
       <button class="sbtn" onclick="askDone(null)">Отмена</button>
       <button class="sbtn go" onclick="askDone($('askI').value)">Готово</button>
     </div>
+  </div>
+</div>
+
+<!-- лента: что требует внимания и что уже произошло -->
+<div class="fd-ov" id="fdOv" onclick="if(event.target===this)fdClose()">
+  <div class="fd">
+    <div class="fd-h">
+      <div class="t">События</div>
+      <button class="oc-x" style="margin-left:auto" onclick="fdClose()" aria-label="Закрыть"><svg
+        viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+        stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="fd-b" id="fdBody"></div>
   </div>
 </div>
 
@@ -999,8 +1069,9 @@ async function boot(){
     _pollT = setInterval(()=>{ if(!document.hidden) loadQueue(); }, 2500);
     document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) loadQueue(); });
     // Тикеты — реже: на закрытом экране нужен только счётчик ждущих ответа.
-    loadSup();
+    loadSup(); loadFeed();
     setInterval(()=>{ if(!document.hidden && !$('supOv').classList.contains('show')) loadSup(); }, 25000);
+    setInterval(()=>{ if(!document.hidden && !$('fdOv').classList.contains('show')) loadFeed(); }, 15000);
     if(!curOp) showOv('opOv');
   }catch(e){
     const denied = e.status===401 || e.status===403;
@@ -1349,6 +1420,13 @@ async function doCreate(){
     let newOid = null;
     if(editingOid){
       await opApi.opFetch('/api/operator/orders/'+editingOid, {method:'PATCH', body});
+      // Правили по просьбе водителя — сохранение и есть одобрение: держать
+      // просьбу открытой после того, как состав уже поменяли, незачем.
+      if(_approveAfterSave===editingOid){
+        try{ await opApi.opFetch(`/api/operator/orders/${editingOid}/driver-req`,
+          {method:'POST', body:{act:'approve', as:curOp, items:body.items}}); }catch(e){}
+        _approveAfterSave='';
+      }
       toast('Заказ #'+editingOid+' обновлён','ok');
     } else {
       const r = await opApi.opFetch('/api/operator/orders', {method:'POST', body});
@@ -1543,6 +1621,20 @@ function _card(o, lane){
         ${B('no','Отклонить',`askDecline('${o.order_id}')`)}
       </div>
       <div class="q-arow">${B('','Редактировать',`startEdit('${o.order_id}')`)}</div>` + cli;
+  }else if(lane==='work' && _openReq(o)){
+    // Пока просьба не разобрана, обычные кнопки уводят в сторону: сначала
+    // ответ водителю, всё остальное потом.
+    const r=_openReq(o), d=DRQ[r.kind]||DRQ.note;
+    acts = `<div class="q-arow">
+        ${B(d.cls==='no'?'no':'go', d.ok, `drvReq('${o.order_id}','approve')`)}
+        ${B('no','Отклонить',`drvReq('${o.order_id}','reject')`)}
+      </div>`
+      + (r.kind==='edit' ? `<div class="q-arow">${
+          B('','Изменить и одобрить',`drvEditFix('${o.order_id}')`)}</div>` : '')
+      + `<div class="q-arow">
+        ${B('','Редактировать',`startEdit('${o.order_id}')`)}
+        ${B('','Текст водителю',`showOrderText('${o.order_id}')`)}
+      </div>` + cli;
   }else if(lane==='work'){
     acts = `<div class="q-arow">
         ${B('go','Доставлен',`askAct('${o.order_id}','delivered')`)}
@@ -1560,11 +1652,13 @@ function _card(o, lane){
     acts = cli;
   }
 
-  return `<div class="q-card ${src}">
+  const rq=_openReq(o);
+  return `<div class="q-card ${src}${rq?' req':''}">
     <div class="q-card-h" onclick="openOrder('${o.order_id}')">
       <span class="q-card-id">#${_esc(o.order_id)}</span>
       <span class="oc-st ${stC}">${stT}</span>
       ${o.needs_verify?'<span class="q-flag">не проверен</span>':''}
+      ${rq?`<span class="q-flag req">${_esc((DRQ[rq.kind]||DRQ.note).t)}</span>`:''}
       <span class="q-card-when">${when}</span>
     </div>
     <div class="q-card-b" onclick="openOrder('${o.order_id}')">
@@ -1583,6 +1677,7 @@ function _card(o, lane){
           <span class="of-it-n">${_esc(i.name)} <b>· ${cnt}</b></span>
           <span class="of-it-p">${_esc(p*q)}</span></div>`;}).join('')}</div>
       ${o.comment?`<div class="q-card-note">${_esc(o.comment)}</div>`:''}
+      ${_reqStrip(o)}
     </div>
     <div class="q-card-f">
       <div class="oc-tl big"><span>Итого<i>${
@@ -1613,6 +1708,12 @@ const ICO_ACT = {
   'Текст водителю':'<rect x="4" y="3" width="13" height="18" rx="2"/><path d="M8 8h5M8 12h5M8 16h3"/>',
   'Вернуть в доставку':'<path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v5h5"/>',
   'Написать':'<path d="M20 14a2 2 0 0 1-2 2H8l-4 3.5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/>',
+  'Изменить и одобрить':'<path d="M4 20h4l10-10-4-4L4 16z"/><path d="M14 6l4 4"/>',
+  'Подтвердить доставку':'<path d="M4 12.5l5 5L20 7"/>',
+  'Отменить заказ':'<circle cx="12" cy="12" r="9"/><path d="M8 8l8 8"/>',
+  'Применить':'<path d="M4 12.5l5 5L20 7"/>',
+  'Принято':'<path d="M4 12.5l5 5L20 7"/>',
+  'Отклонить':'<circle cx="12" cy="12" r="9"/><path d="M8 8l8 8"/>',
 };
 const _actIco = t => ICO_ACT[t]
   ? `<svg viewBox="0 0 24 24" class="oc-ico" aria-hidden="true">${ICO_ACT[t]}</svg>` : '';
@@ -1704,7 +1805,8 @@ function renderOrder(){
   $('ordBody').innerHTML = addr
     + (o.driver?f('Водитель', _esc(o.driver), o.deliver_by?`доставить до ${_esc(o.deliver_by)}`:''):'')
     + goodsBox
-    + f('Комментарий', _esc(o.comment));
+    + f('Комментарий', _esc(o.comment))
+    + _reqStrip(o);
 
   // Разбивка ужата в одну подпись: две отдельные строки съедали место, которое
   // на телефоне нужнее списку. Чаевые пишем, только если они есть — иначе это
@@ -1729,6 +1831,17 @@ function renderOrder(){
     main=['Принять', `hideOv('ordOv');askAccept('${o.order_id}')`];
     danger=['Отклонить', `askDecline('${o.order_id}')`];
     rest=[['Редактировать',`hideOv('ordOv');startEdit('${o.order_id}')`]];
+  }else if(o.status==='approved' && _openReq(o)){
+    // Открытая просьба водителя главнее всего остального: пока на неё не
+    // ответили, заказ висит и у него, и у оператора.
+    const r=_openReq(o), dd=DRQ[r.kind]||DRQ.note;
+    gate = `<div class="oc-gate req">${(DRQ[r.kind]||DRQ.note).t}${
+      r.by?` · ${_esc(r.by)}`:''}. Решение за вами.</div>`;
+    main=[dd.ok, `drvReq('${o.order_id}','approve')`];
+    danger=['Отклонить', `drvReq('${o.order_id}','reject')`];
+    rest=[...(r.kind==='edit'?[['Изменить и одобрить',`drvEditFix('${o.order_id}')`]]:[]),
+          ['Редактировать',`hideOv('ordOv');startEdit('${o.order_id}')`],
+          ['Текст водителю',`showOrderText('${o.order_id}')`]];
   }else if(o.status==='approved'){
     main=['Доставлен', `hideOv('ordOv');askAct('${o.order_id}','delivered')`];
     danger=['Отменить', `hideOv('ordOv');askAct('${o.order_id}','cancel')`];
@@ -2051,7 +2164,7 @@ function askAct(oid, act){
   go.onclick=async()=>{
     hideOv('actOv'); haptic('heavy');
     try{
-      await opApi.opFetch(`/api/operator/orders/${oid}/${act}`,{method:'POST',body:{}});
+      await opApi.opFetch(`/api/operator/orders/${oid}/${act}`,{method:'POST',body:{as:curOp}});
       toast(a.ok(oid), a.toast);
       if(editingOid===oid) clearTicket(false);
       await loadQueue();
@@ -2060,6 +2173,149 @@ function askAct(oid, act){
   showOv('actOv'); haptic('medium');
 }
 
+
+
+// ── просьбы водителя ─────────────────────────────────────────────────────
+// Водитель ничего не решает сам: он просит, решает оператор. Просьба не
+// прячется в карточку — она подменяет собой кнопки заказа, потому что пока
+// на неё не ответили, ничего другого с заказом делать не нужно.
+const DRQ = {
+  delivered:{t:'Водитель отметил доставку', ok:'Подтвердить доставку', cls:'ok'},
+  cancel:   {t:'Водитель просит отменить',  ok:'Отменить заказ',       cls:'no'},
+  edit:     {t:'Водитель просит правку',    ok:'Применить',            cls:'go'},
+  note:     {t:'Сообщение от водителя',     ok:'Принято',              cls:'go'},
+};
+function _openReq(o){
+  const r=o && o.driver_req;
+  return (r && r.status==='open') ? r : null;
+}
+function _reqStrip(o){
+  const r=_openReq(o); if(!r) return '';
+  const d=DRQ[r.kind]||DRQ.note;
+  const diff=(r.diff||[]).map(x=>{
+    const s={add:'+',del:'−',qty:'→'}[x.kind]||'·';
+    const q=x.kind==='qty' ? `${x.from} → ${x.qty}` : `×${x.qty}`;
+    return `<span class="dq-l"><i>${s}</i>${_esc(x.name)} ${q}</span>`;}).join('');
+  return `<div class="dq ${d.cls}">
+    <div class="dq-h">${_reqIco(r.kind)}<b>${d.t}</b>
+      <span>${_esc(r.by||'')}${r.at?' · '+_when(r.at):''}</span></div>
+    ${diff?`<div class="dq-d">${diff}${r.total?`<span class="dq-l sum">Итог ${_esc(o.total)} → <b>${_esc(r.total)} AED</b></span>`:''}</div>`:''}
+    ${r.text?`<div class="dq-t">${_esc(r.text)}</div>`:''}
+  </div>`;
+}
+const _REQ_ICO={
+  delivered:'<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+  cancel:'<circle cx="12" cy="12" r="9"/><path d="M8 8l8 8"/>',
+  edit:'<path d="M4 20h4l10-10-4-4L4 16z"/><path d="M14 6l4 4"/>',
+  note:'<path d="M20 14a2 2 0 0 1-2 2H8l-4 3.5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/>',
+};
+function _reqIco(k){
+  return `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${_REQ_ICO[k]||_REQ_ICO.note}</svg>`;
+}
+async function drvReq(oid, act){
+  try{
+    await opApi.opFetch(`/api/operator/orders/${oid}/driver-req`,
+      {method:'POST', body:{act, as:curOp}});
+    toast(act==='approve' ? 'Готово · водителю ушёл ответ' : 'Отклонено · водителю ушёл ответ',
+          act==='approve'?'ok':'err');
+    haptic('heavy'); hideOv('ordOv'); await loadQueue(); loadFeed();
+  }catch(e){
+    const err=(e.payload&&e.payload.error)||('код '+(e.status||'сеть'));
+    toast(err==='no_open_request' ? 'Просьбу уже разобрали' : 'Ошибка: '+err, 'err');
+    await loadQueue();
+  }
+}
+// «Изменить и одобрить»: в чек кладём то, что предложил водитель, — оператор
+// правит поверх и сохраняет уже своё. Одобрение уходит вместе с сохранением.
+function drvEditFix(oid){
+  const o=(ORDERS||[]).find(x=>x.order_id===oid); const r=_openReq(o);
+  if(!o||!r) return;
+  hideOv('ordOv');
+  startEdit(oid);
+  if(r.items && r.items.length){
+    TICKET={};
+    r.items.forEach(i=>{ const k=i.pcs?i.id+'_'+i.pcs:i.id;
+      TICKET[k]={id:i.id, pcs:i.pcs||undefined, qty:i.qty}; });
+    renderTicket();
+  }
+  _approveAfterSave=oid;
+  toast('Состав от водителя · поправьте и сохраните','ok');
+}
+let _approveAfterSave='';
+
+
+// ── лента событий ────────────────────────────────────────────────────────
+// Одно место, где видно всё незакрытое: просьба водителя, непринятый заказ,
+// просроченное время, вопрос без ответа. Плюс то, что уже сделано за смену —
+// чтобы понять, не потерялось ли что-то, пока смотрели в другую вкладку.
+let FEED={need:[],recent:[],count:0}, _fdT=null;
+
+const FD_ICO={
+  driver_req:'<path d="M3 16V7h11v9M14 10h4l3 3v3h-7"/><circle cx="7" cy="17.5" r="1.8"/><circle cx="17" cy="17.5" r="1.8"/>',
+  pending:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  late:'<path d="M12 3l9 16H3z"/><path d="M12 9v4M12 16.2v.1"/>',
+  support:'<path d="M20 14a2 2 0 0 1-2 2H8l-4 3.5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/>',
+  edit:'<path d="M4 20h4l10-10-4-4L4 16z"/><path d="M14 6l4 4"/>',
+  note:'<path d="M20 14a2 2 0 0 1-2 2H8l-4 3.5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/>',
+  delivered:'<path d="M4 12.5l5 5L20 7"/>',
+  cancelled:'<circle cx="12" cy="12" r="9"/><path d="M8 8l8 8"/>',
+  declined:'<circle cx="12" cy="12" r="9"/><path d="M8 8l8 8"/>',
+  accepted:'<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+};
+function _fdIco(k){
+  return `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true">${FD_ICO[k]||FD_ICO.pending}</svg>`;
+}
+function fdBadge(){
+  const el=$('fdCnt'), b=$('fdBtn'); if(!el) return;
+  const n=FEED.count||0;
+  el.textContent = n ? ('События · '+n) : 'События';
+  b.classList.toggle('has', n>0);
+}
+async function loadFeed(){
+  if(!curOp) return;
+  try{ FEED = await opApi.opFetch('/api/operator/feed',{params:{as:curOp}}); }catch(e){ return; }
+  fdBadge();
+  if($('fdOv').classList.contains('show')) fdRender();
+}
+function fdOpen(){ $('fdOv').classList.add('show'); haptic('light'); loadFeed(); fdRender();
+  if(_fdT) clearInterval(_fdT);
+  _fdT=setInterval(()=>{ if(!document.hidden) loadFeed(); }, 8000); }
+function fdClose(){ $('fdOv').classList.remove('show'); if(_fdT){ clearInterval(_fdT); _fdT=null; } }
+
+function _fdRow(x, hot){
+  const mins = x.mins ? (x.mins<60 ? x.mins+' мин' : Math.floor(x.mins/60)+' ч') : '';
+  const go = x.type==='support' ? `fdClose();supOpen();supThread('${_esc(x.key||'')}')`
+           : (x.order_id ? `fdClose();fdGo('${_esc(x.order_id)}')` : '');
+  const sub = [x.sub, x.text, x.address].filter(Boolean).join(' · ');
+  return `<button class="fd-i ${hot||''}" ${go?`onclick="${go}"`:''}>
+    ${_fdIco(x.kind)}
+    <div class="b">
+      <div class="n">${_esc(x.title)}${x.order_id?`<em>#${_esc(x.order_id)}</em>`:''}
+        ${mins?`<span class="r">${mins}</span>`:''}</div>
+      ${sub?`<div class="s">${_esc(sub)}</div>`:''}
+    </div></button>`;
+}
+function fdRender(){
+  const need=FEED.need||[], rec=FEED.recent||[];
+  // Просьбы водителя и просрочка — сверху и подсвечены: это то, что стоит.
+  const hot=need.filter(x=>x.weight<=2), cold=need.filter(x=>x.weight>2);
+  $('fdBody').innerHTML =
+    (hot.length?`<div class="fd-sec">Требует внимания · ${hot.length}</div>${
+      hot.map(x=>_fdRow(x,'hot')).join('')}`:
+      `<div class="fd-empty">Всё разобрано.<br>Ни одного заказа без ответа.</div>`)
+    + (cold.length?`<div class="fd-sec">На очереди · ${cold.length}</div>${
+      cold.map(x=>_fdRow(x,'warm')).join('')}`:'')
+    + (rec.length?`<div class="fd-sec">Сегодня уже сделано</div>${
+      rec.map(x=>_fdRow(x,'')).join('')}`:'');
+}
+// Из ленты — сразу в карточку заказа, даже если он в другой вкладке.
+function fdGo(oid){
+  const o=(ORDERS||[]).find(x=>x.order_id===oid); if(!o) return;
+  const lane = o.status==='pending' ? 'new' : (o.status==='approved' ? 'work' : 'done');
+  if(!showOrders) toggleOrders();
+  if(qLane!==lane){ qLane=lane; renderQueue(); }
+  openOrder(oid);
+}
 
 // ── поддержка: тикеты и переписка ────────────────────────────────────────
 // Формат сообщений общий с приложением клиента: {role, type, text|url, ts}.

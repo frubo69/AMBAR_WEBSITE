@@ -612,6 +612,9 @@ a.oc-row:active{background:var(--card2)}
 .of-it.ch em{font-style:normal;color:var(--dn);font-weight:800}
 .of-it.ad .of-it-n,.of-it.ad .of-it-p{color:var(--dn)}
 .of-it.ad .of-it-n b{color:var(--dn)}
+.of-it-s{display:inline-block;width:14px;flex-shrink:0;font-weight:800;color:var(--dn);
+  text-decoration:none}
+.of-it.dl .of-it-s{text-decoration:none}
 .oc-tl b s{color:var(--text);font-size:.78em;text-decoration-color:var(--dn);
   text-decoration-thickness:2px;margin-right:6px;font-weight:700}
 .oc-gate.req{background:rgba(243,180,74,.1);border-color:rgba(243,180,74,.35);color:var(--warn)}
@@ -2347,23 +2350,26 @@ function _itemRows(o){
   const r=_openReq(o);
   const d=(r && r.kind==='edit') ? (r.diff||[]) : [];
   const by={}; d.forEach(x=>{ by[x.name]=x; });
-  const line=(name,cnt,price,cls,extra)=>`<div class="of-it ${cls||''}">
-      <span class="of-it-n">${_esc(name)} <b>· ${cnt}</b>${extra||''}</span>
+  // Знак перед позицией: убрали — минус, добавили — плюс. У остальных строк
+  // пустое место той же ширины, иначе список поедет и читать его станет труднее.
+  const sg = d.length ? (ch=>`<span class="of-it-s">${ch||''}</span>`) : (()=> '');
+  const line=(name,cnt,price,cls,sign,extra)=>`<div class="of-it ${cls||''}">
+      <span class="of-it-n">${sg(sign)}${_esc(name)} <b>· ${cnt}</b>${extra||''}</span>
       <span class="of-it-p">${price}</span></div>`;
   let html=(o.items||[]).map(i=>{
     const q=+i.qty||1, p=+i.price||0;
     const cnt = i.pcs ? `${q} × ${i.pcs} шт` : `${q} шт`;
     const x=by[i.name];
-    if(x && x.kind==='del') return line(i.name, cnt, p*q, 'dl');
+    if(x && x.kind==='del') return line(i.name, cnt, p*q, 'dl', '−');
     if(x && x.kind==='qty'){
       const nq=+x.qty||0;
-      return line(i.name, `<s>${q} шт</s>`, `<s>${p*q}</s> ${p*nq}`, 'ch', ` <em>${nq} шт</em>`);
+      return line(i.name, `<s>${q} шт</s>`, `<s>${p*q}</s> ${p*nq}`, 'ch', '', ` <em>${nq} шт</em>`);
     }
-    return line(i.name, cnt, p*q, '');
+    return line(i.name, cnt, p*q, '', '');
   }).join('');
   html += d.filter(x=>x.kind==='add').map(x=>{
     const it=((r.items||[]).find(i=>i.name===x.name))||{};
-    return line(x.name, `${x.qty} шт`, (it.price||0)*(+x.qty||1), 'ad');
+    return line(x.name, `${x.qty} шт`, (it.price||0)*(+x.qty||1), 'ad', '+');
   }).join('');
   return html;
 }

@@ -563,6 +563,16 @@ a.oc-row:active{background:var(--card2)}
   .tk-bar.pulse .tk-bar-r{animation:tkPulse .28s var(--e1)}
 }
 
+/* Непринятый заказ моргает красным по белому и звенит раз в минуту, пока его
+   не возьмут. Тихую цифру в углу за работой не замечают. */
+@keyframes alarmBlink{
+  0%,49%  {background:#E05555;border-color:#E05555;color:#fff}
+  50%,100%{background:#FFFFFF;border-color:#FFFFFF;color:#12121F}
+}
+.alarm{animation:alarmBlink 1s steps(1,end) infinite}
+.alarm .badge{background:#12121F;color:#fff}
+.q-tab.alarm i,.q-tab.alarm i.hot{background:#12121F;color:#fff;border-color:transparent}
+
 /* ── просьба водителя ────────────────────────────────────────────────────
    Заметна с первого взгляда: пока не ответили, заказ стоит и у водителя. */
 .q-card.req{border-color:rgba(243,180,74,.5);box-shadow:0 0 0 1px rgba(243,180,74,.18)}
@@ -1528,7 +1538,17 @@ async function loadQueue(){
   const b=$('ordersBadge');
   const n=(r.new||[]).length;
   if(n){ b.style.display=''; b.textContent=n; } else b.style.display='none';
+  // Новый заказ — тот, которого не было в прошлом ответе. При первом заходе
+  // просто запоминаем, иначе панель кричала бы на каждое открытие.
+  const ids=new Set((r.new||[]).map(o=>o.order_id));
+  if(_seenNew===null) _seenNew=ids;
+  else{
+    const fresh=[...ids].filter(x=>!_seenNew.has(x));
+    _seenNew=ids;
+    if(fresh.length) alarmHit();
+  }
   if(showOrders) renderQueue();
+  if(n) alarmKeep(); else alarmStop();
 }
 
 const ICO_APP='<svg viewBox="0 0 24 24" class="src-i"><rect x="7" y="2" width="10" height="20" rx="2.5"/><path d="M11 18h2"/></svg>';
@@ -1577,6 +1597,8 @@ function renderQueue(){
       : `<div class="q-empty"><div class="q-empty-s">${
           qLane==='new' ? 'Новых заказов нет' :
           qLane==='work' ? 'В работе пусто' : 'За смену пока ничего не закрыто'}</div></div>`}</div>`;
+  // Вкладки перерисовались — вернуть мигание, если непринятые ещё есть.
+  _alarmPaint(!!(Q.new||[]).length);
 }
 function qLaneSet(k){ qLane=k; haptic('sel'); renderQueue(); }
 function qFilSet(k){ qFilter=k; haptic('sel'); renderQueue(); }
@@ -2180,6 +2202,60 @@ function askAct(oid, act){
 }
 
 
+
+
+// ── сигнал о новом заказе ────────────────────────────────────────────────
+// Заказ, который никто не взял, стоит денег: пока он висит, кнопка моргает,
+// а раз в минуту звенит. Звук синтезируем сами — файла нет, значит нечему не
+// загрузиться. Браузер не даёт звучать до первого касания, поэтому контекст
+// поднимаем на первом же нажатии оператора.
+let _ac=null, _alarmT=null, _seenNew=null;
+function _acUnlock(){
+  try{
+    if(!_ac) _ac = new (window.AudioContext||window.webkitAudioContext)();
+    if(_ac.state==='suspended') _ac.resume();
+  }catch(e){}
+}
+document.addEventListener('pointerdown', _acUnlock, {passive:true});
+document.addEventListener('touchstart',  _acUnlock, {passive:true});
+
+function _chime(){
+  _acUnlock(); if(!_ac) return;
+  const t0=_ac.currentTime;
+  // Две пары нот — короткая настойчивая трель, слышная в шумном помещении.
+  [[880,0],[1174.7,0.13],[880,0.34],[1174.7,0.47]].forEach(([f,dt])=>{
+    const o=_ac.createOscillator(), g=_ac.createGain();
+    o.type='triangle'; o.frequency.value=f;
+    g.gain.setValueAtTime(0.0001, t0+dt);
+    g.gain.exponentialRampToValueAtTime(0.35, t0+dt+0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+dt+0.12);
+    o.connect(g).connect(_ac.destination);
+    o.start(t0+dt); o.stop(t0+dt+0.14);
+  });
+}
+
+function _alarmPaint(on){
+  const b=$('ordersBtn'); if(b) b.classList.toggle('alarm', on);
+  document.querySelectorAll('.q-tab').forEach((t,i)=>t.classList.toggle('alarm', on && i===0));
+}
+function alarmStop(){
+  if(_alarmT){ clearInterval(_alarmT); _alarmT=null; }
+  _alarmPaint(false);
+}
+// Держим тревогу, пока есть непринятые: каждые полминуты напоминаем звуком.
+function alarmKeep(){
+  _alarmPaint(true);
+  if(_alarmT) return;
+  _alarmT = setInterval(()=>{
+    if(!(Q.new||[]).length){ alarmStop(); return; }
+    if(!document.hidden) _chime();
+  }, 30000);
+}
+function alarmHit(){
+  _chime(); haptic('heavy');
+  try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+  alarmKeep();
+}
 
 // ── просьбы водителя ─────────────────────────────────────────────────────
 // Водитель ничего не решает сам: он просит, решает оператор. Просьба не

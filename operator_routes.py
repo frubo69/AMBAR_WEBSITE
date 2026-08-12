@@ -613,14 +613,20 @@ async def handle_create(request):
         today = _biz_date(datetime.now(DUBAI_TZ))
         if d > today:
             return web.json_response({"error": "future_date"}, status=400, headers=CORS_HEADERS)
+        # Текущая смена ещё идёт — «задним числом» её не заполняют. Такой заказ
+        # проходит обычным путём, и закрывает его кнопка «Доставлен».
+        if d == today:
+            back = ""
+            d = None
         if (today - d).days > 30:
             return web.json_response({"error": "too_old"}, status=400, headers=CORS_HEADERS)
-        # Ставим вечернее время той смены: минуты берём с текущих часов, чтобы
-        # несколько заказов подряд не слиплись в одну секунду, а сам час — 20:00,
-        # он гарантированно внутри той же смены (она начинается в 12:00).
-        n = datetime.now(DUBAI_TZ)
-        back_dt = datetime(d.year, d.month, d.day, 20, n.minute, n.second,
-                           tzinfo=DUBAI_TZ).astimezone(timezone.utc)
+        if d:
+            # Ставим вечернее время той смены: минуты берём с текущих часов, чтобы
+            # несколько заказов подряд не слиплись в одну секунду, а час — 20:00,
+            # он гарантированно внутри той же смены (она начинается в 12:00).
+            n = datetime.now(DUBAI_TZ)
+            back_dt = datetime(d.year, d.month, d.day, 20, n.minute, n.second,
+                               tzinfo=DUBAI_TZ).astimezone(timezone.utc)
 
     now = (back_dt or datetime.now(timezone.utc)).isoformat()
     entered_at = datetime.now(timezone.utc).isoformat()

@@ -2229,6 +2229,7 @@ document.addEventListener('touchstart',  _acUnlock, {passive:true});
 
 function _chime(){
   _acUnlock(); if(!_ac) return;
+  _lastRing=Date.now();
   const t0=_ac.currentTime;
   // Короткий двойной сигнал: две ноты вверх, четверть секунды. Сирена на
   // полторы секунды раздражает за смену сильнее, чем помогает, а этот тембр
@@ -2255,6 +2256,24 @@ function _chime(){
 // Моргает только кнопка «Заказы» — та, что видно из каталога, когда оператор
 // занят другим. Внутри очереди вкладку не трогаем: там заказ и так перед
 // глазами, а мигающая вкладка мешает читать.
+// ПРАВИЛО: звук существует, чтобы позвать того, кто не смотрит. Если человек
+// за панелью и занят — хватит мигания. Один признак «занят» вместо списка
+// частных случаев, иначе каждый новый экран приходилось бы вписывать заново.
+let _lastAct=0, _lastRing=0;
+['pointerdown','keydown','wheel','touchstart'].forEach(ev=>
+  document.addEventListener(ev, ()=>{ _lastAct=Date.now(); }, {passive:true}));
+
+function _busy(){
+  if(document.hidden) return true;                    // экран не виден — звук всё равно мимо
+  if(showOrders && qLane==='new') return true;        // смотрит ровно на эти заказы
+  if(editingOid) return true;                         // правит заказ
+  if(Object.keys(TICKET).length) return true;         // собирает чек
+  if(document.querySelector('.ov.show,.sup-ov.show,.fd-ov.show')) return true;  // открыт лист
+  const el=document.activeElement;
+  if(el && /^(INPUT|TEXTAREA)$/.test(el.tagName)) return true;                  // печатает
+  return (Date.now()-_lastAct) < 25000;               // касался экрана только что
+}
+
 function _alarmPaint(on){
   const b=$('ordersBtn'); if(b) b.classList.toggle('alarm', on);
   document.querySelectorAll('.q-tab.alarm').forEach(t=>t.classList.remove('alarm'));
@@ -2267,19 +2286,20 @@ function alarmStop(){
 function alarmKeep(){
   _alarmPaint(true);
   if(_alarmT) return;
+  // Смотрим чаще, чем звеним: как только человек отошёл от панели, напоминание
+  // должно прозвучать сразу, а не ждать конца получасовой минуты.
   _alarmT = setInterval(()=>{
     if(!(Q.new||[]).length){ alarmStop(); return; }
-    // Оператор открыл «Новые» и смотрит на них — напоминать звуком незачем.
-    // Мигание при этом не гасим: пока заказ не принят и не отклонён, он
-    // остаётся нерешённым.
-    if(showOrders && qLane==='new') return;
-    if(!document.hidden) _chime();
-  }, 30000);
+    if(_busy()) return;
+    if(Date.now()-_lastRing < 30000) return;
+    _chime();
+  }, 5000);
 }
 function alarmHit(){
-  _chime(); haptic('heavy');
-  try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
-  alarmKeep();
+  alarmKeep();                       // мигание — всегда
+  haptic('heavy');
+  if(_busy()) return;                // занят: карточка и кнопка уже светятся
+  _chime();
 }
 
 // ── просьбы водителя ─────────────────────────────────────────────────────

@@ -149,6 +149,10 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         log.warning(f"ban check failed: {e}")
 
+    # Кнопка ставится персонально каждому и живёт в его чате вечно — вместе с
+    # адресом, который был на момент /start. Поэтому смена адреса приложения
+    # обязана сопровождаться проходом tools/refresh_menu.py по всем, иначе у
+    # людей продолжает открываться то, чего уже нет.
     if WEBAPP_URL:
         try:
             await ctx.bot.set_chat_menu_button(

@@ -571,6 +571,15 @@ a.oc-row:active{background:var(--card2)}
 }
 .alarm{animation:alarmBlink 1s steps(1,end) infinite}
 .alarm .badge{background:#12121F;color:#fff}
+/* Когда оператор уже в «Новых» и смотрит на заказы, кричать незачем: звук
+   умолкает, но карточки продолжают пульсировать, пока заказ не принят и не
+   отклонён. Золотом, а не красно-белым — в списке это должно подсказывать,
+   а не бить по глазам. */
+@keyframes waitPulse{
+  0%,100%{border-color:var(--border2);box-shadow:0 0 0 0 rgba(201,169,110,0)}
+  50%    {border-color:rgba(232,201,138,.85);box-shadow:0 0 0 3px rgba(201,169,110,.13)}
+}
+.q-card.wait{animation:waitPulse 1.6s ease-in-out infinite}
 
 /* ── просьба водителя ────────────────────────────────────────────────────
    Заметна с первого взгляда: пока не ответили, заказ стоит и у водителя. */
@@ -1680,7 +1689,7 @@ function _card(o, lane){
   }
 
   const rq=_openReq(o);
-  return `<div class="q-card ${src}${rq?' req':''}">
+  return `<div class="q-card ${src}${rq?' req':''}${lane==='new'?' wait':''}">
     <div class="q-card-h" onclick="openOrder('${o.order_id}')">
       <span class="q-card-id">#${_esc(o.order_id)}</span>
       <span class="oc-st ${stC}">${stT}</span>
@@ -2260,6 +2269,10 @@ function alarmKeep(){
   if(_alarmT) return;
   _alarmT = setInterval(()=>{
     if(!(Q.new||[]).length){ alarmStop(); return; }
+    // Оператор открыл «Новые» и смотрит на них — напоминать звуком незачем.
+    // Мигание при этом не гасим: пока заказ не принят и не отклонён, он
+    // остаётся нерешённым.
+    if(showOrders && qLane==='new') return;
     if(!document.hidden) _chime();
   }, 30000);
 }
@@ -2421,6 +2434,9 @@ function supBadge(){
   const n=SUP.waiting||0;
   el.textContent = n ? ('Поддержка · '+n) : 'Поддержка';
   btn.classList.toggle('has', n>0);
+  // Вопрос без ответа моргает так же заметно, как непринятый заказ, но молча:
+  // клиент ждёт ответа, а не бежит — звук здесь только мешал бы.
+  btn.classList.toggle('alarm', n>0);
 }
 
 async function loadSup(){

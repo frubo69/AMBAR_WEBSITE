@@ -1364,6 +1364,7 @@ function _setTicketTitle(t, sub){
 function clearTicket(confirmIt){
   if(confirmIt && Object.keys(TICKET).length===0 && !editingOid) return;
   TICKET={}; editingOid=null; editOnline=false;
+  _alarmPaint(!!(Q.new||[]).length);  // вышли из правки — мигание возвращается
   const _cf=$('custFields'); if(_cf) _cf.style.display='';
   _setTicketTitle('Чек','');
   $('editTag').style.display='none';
@@ -2112,6 +2113,7 @@ function startEdit(oid){
   });
   editingOid=oid;
   editOnline=false;
+  _alarmPaint(false);                 // вошли в правку — гасим сразу
   // Снимок на входе в правку. Без него «Сохранить» одинаково спрашивает и когда
   // человек что-то поменял, и когда просто заглянул в состав и вышел.
   _editWas=null;
@@ -2274,8 +2276,13 @@ function _busy(){
   return (Date.now()-_lastAct) < 25000;               // касался экрана только что
 }
 
+// Моргает только кнопка «Заказы» — та, что видно из каталога. Внутри очереди
+// вкладку не трогаем: заказ и так перед глазами. А во время правки не моргаем
+// вовсе: человек уже работает с заказом, и мигание в углу глаза только сбивает.
+// Вернётся, как только он выйдет из правки.
 function _alarmPaint(on){
-  const b=$('ordersBtn'); if(b) b.classList.toggle('alarm', on);
+  const show = on && !editingOid;
+  const b=$('ordersBtn'); if(b) b.classList.toggle('alarm', show);
   document.querySelectorAll('.q-tab.alarm').forEach(t=>t.classList.remove('alarm'));
 }
 function alarmStop(){

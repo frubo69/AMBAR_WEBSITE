@@ -2350,8 +2350,8 @@ function _itemRows(o){
   const r=_openReq(o);
   const d=(r && r.kind==='edit') ? (r.diff||[]) : [];
   const by={}; d.forEach(x=>{ by[x.name]=x; });
-  // Знак перед позицией: убрали — минус, добавили — плюс. У остальных строк
-  // пустое место той же ширины, иначе список поедет и читать его станет труднее.
+  // Знак нужен только добавленной позиции: у убранной и так перечёркнута вся
+  // строка. У остальных строк пустое место той же ширины, иначе список поедет.
   const sg = d.length ? (ch=>`<span class="of-it-s">${ch||''}</span>`) : (()=> '');
   const line=(name,cnt,price,cls,sign,extra)=>`<div class="of-it ${cls||''}">
       <span class="of-it-n">${sg(sign)}${_esc(name)} <b>· ${cnt}</b>${extra||''}</span>
@@ -2360,7 +2360,7 @@ function _itemRows(o){
     const q=+i.qty||1, p=+i.price||0;
     const cnt = i.pcs ? `${q} × ${i.pcs} шт` : `${q} шт`;
     const x=by[i.name];
-    if(x && x.kind==='del') return line(i.name, cnt, p*q, 'dl', '−');
+    if(x && x.kind==='del') return line(i.name, cnt, p*q, 'dl', '');
     if(x && x.kind==='qty'){
       const nq=+x.qty||0;
       return line(i.name, `<s>${q} шт</s>`, `<s>${p*q}</s> ${p*nq}`, 'ch', '', ` <em>${nq} шт</em>`);

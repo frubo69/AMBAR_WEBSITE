@@ -727,6 +727,14 @@ a.oc-row:active{background:var(--card2)}
 .sup-hist button{padding:6px 10px;border-radius:9px;border:1px solid var(--border2);
   background:var(--card);font-size:11.5px;font-weight:600;color:var(--sub)}
 .pill.has{color:var(--gold2);border-color:rgba(201,169,110,.45);background:var(--gold-soft)}
+/* Режим заполнения прошедшей смены должен быть виден постоянно: иначе легко
+   вбить сегодняшний заказ вчерашним числом и не заметить. */
+.pill.back{color:#1a1408;background:linear-gradient(135deg,var(--warn),#E8A33A);
+  border-color:transparent;font-weight:800}
+.ticket.back .ticket-hdr::after{content:'ЗАДНИМ ЧИСЛОМ';margin-left:auto;font-size:9.5px;
+  font-weight:800;letter-spacing:1.2px;color:var(--warn)}
+#dayInput{width:100%;padding:12px 14px;border-radius:12px;font-size:15px}
+.dchip i{font-style:normal;margin-left:auto;font-size:11px;color:var(--muted)}
 @media (max-width:900px){
   .sup-list{width:100%;flex:1 1 auto;border-right:none}
   .sup-body.chat .sup-list{display:none}
@@ -766,7 +774,10 @@ a.oc-row:active{background:var(--card2)}
         id="supCnt">Поддержка</span></button>
       <button class="pill" id="themeBtn" onclick="toggleTheme()" aria-label="Тема" style="cursor:pointer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg></button>
       <span class="pill" id="opName">—</span>
-      <span class="pill" id="netPill">…</span>
+      <button class="pill" id="dayBtn" onclick="dayOpen()" style="cursor:pointer;display:flex;
+        align-items:center;gap:6px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"
+        style="margin:0"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg><span
+        id="dayLbl">Сегодня</span></button>
     </div>
   </div>
 
@@ -868,6 +879,23 @@ a.oc-row:active{background:var(--card2)}
     <div class="btns">
       <button class="sbtn" onclick="askDone(null)">Отмена</button>
       <button class="sbtn go" onclick="askDone($('askI').value)">Готово</button>
+    </div>
+  </div>
+</div>
+
+<!-- заполнение смены задним числом -->
+<div class="ov" id="dayOv">
+  <div class="sheet">
+    <div class="t">За какой день заполняем</div>
+    <div class="acc-sub">Заказ за прошедший день сразу числится доставленным —
+      принимать и назначать по нему нечего.</div>
+    <div class="acc-l">День</div>
+    <div id="dayList"></div>
+    <div class="acc-l">Другая дата</div>
+    <input type="date" id="dayInput" onchange="dayPick(this.value)">
+    <div class="btns" style="margin-top:14px">
+      <button class="sbtn" onclick="hideOv('dayOv')">Отмена</button>
+      <button class="sbtn go" onclick="dayPick('')">Вернуться к сегодня</button>
     </div>
   </div>
 </div>
@@ -1101,7 +1129,7 @@ async function boot(){
     try{ curOp = localStorage.getItem('pos_op') || r.operator || ''; }catch(e){ curOp = r.operator || ''; }
     if(!PEOPLE.some(p=>p.name===curOp)) curOp='';
     renderDispatch();
-    $('netPill').textContent='● online'; $('netPill').className='pill ok';
+    dayPaint();
     $('gate').classList.add('hidden');
     await loadCatalog();
     // Чем открыть панель, решает очередь: есть непринятые заказы — открываем
@@ -1391,6 +1419,7 @@ function clearTicket(confirmIt){
   _setTicketTitle('Чек','');
   $('editTag').style.display='none';
   $('createBtn').innerHTML='<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 3.5h4l2 5-2.5 1.5a12 12 0 0 0 6 6L15.5 13l5 2v4a1.5 1.5 0 0 1-1.6 1.5A16.5 16.5 0 0 1 3 5.1 1.5 1.5 0 0 1 4.5 3.5z"/></svg>'+'Создать заказ';
+  dayPaint();
   $('createBtn').classList.remove('save');
   $('cName').value=''; $('cPhone').value=''; $('cAddr').value=''; $('cComment').value='';
   curDist=''; curDriver='';          // район/водитель are per-order; оператор stays for the shift
@@ -1437,8 +1466,13 @@ function askCreate(){
   if(!curDriver && !editOnline){ toast('Выберите водителя','err'); openTicket(); $('drvChips').scrollIntoView({block:'center'}); haptic('medium'); return; }
   const total = $('totalV').textContent;
   const d=_dist(curDist);
-  $('confT').textContent = editingOid ? `Сохранить изменения #${editingOid}?` : 'Создать заказ?';
-  $('confS').innerHTML = `<b>${total} AED</b><br>${d.name} · оператор ${d.operator}<br>Водитель: <b>${curDriver}</b>${editingOid?'':'<br><br>Заказ сразу уйдёт в работу («в пути»), время не указывается.'}`;
+  $('confT').textContent = editingOid ? `Сохранить изменения #${editingOid}?`
+    : (BACK_DAY ? `Добавить заказ за ${_dayName(BACK_DAY)}?` : 'Создать заказ?');
+  $('confS').innerHTML = `<b>${total} AED</b><br>${d.name} · оператор ${d.operator}<br>Водитель: <b>${curDriver}</b>`
+    + (editingOid ? ''
+       : (BACK_DAY
+          ? `<br><br>Заказ за <b>${_dayName(BACK_DAY)}</b> — сразу числится доставленным и попадёт в выручку того дня.`
+          : '<br><br>Заказ сразу уйдёт в работу («в пути»), время не указывается.'));
   $('confGo').textContent = editingOid ? 'Сохранить' : 'Создать';
   showOv('confirmOv'); haptic('medium');
 }
@@ -1459,6 +1493,8 @@ async function doCreate(){
         office_id: curOffice,
         district_id: curDist,
         driver: curDriver,
+        // Пустая строка = сегодня, обычный заказ.
+        ...(BACK_DAY && !editingOid ? {back_date: BACK_DAY} : {}),
       };
   // После сохранения возвращаем в карточку того же заказа, а не в общий
   // список: человек правил конкретный заказ и смотреть хочет на него.
@@ -1477,8 +1513,12 @@ async function doCreate(){
       toast('Заказ #'+editingOid+' обновлён','ok');
     } else {
       const r = await opApi.opFetch('/api/operator/orders', {method:'POST', body});
-      toast('Заказ #'+r.order_id+' создан — в пути','ok');
-      newOid = r.order_id;
+      if(r.back_date){
+        toast('Заказ за '+_dayName(r.back_date)+' добавлен · '+r.total+' AED','ok');
+      }else{
+        toast('Заказ #'+r.order_id+' создан — в пути','ok');
+        newOid = r.order_id;
+      }
     }
     haptic('heavy');
     clearTicket(false);
@@ -2331,6 +2371,57 @@ function alarmHit(){
   haptic('heavy');
   if(_busy()) return;                // занят: карточка и кнопка уже светятся
   _chime();
+}
+
+// ── заполнение смены задним числом ───────────────────────────────────────
+// Смену не заполнили вовремя — выручка должна встать на свой день, а не на
+// сегодня. Дата выбирается один раз, дальше всё как обычно: те же товары, тот
+// же чек. Заказ рождается доставленным, потому что он уже случился.
+let BACK_DAY='';                      // '' = сегодня
+
+// «12 августа» коротко и «12 августа, ср» полностью: сокращать через запятую
+// нельзя — в русской локали первым идёт день недели, и от даты остаётся «ср».
+function _dayName(iso, short){
+  const d=new Date(iso+'T12:00:00Z');
+  const dm=d.toLocaleDateString('ru-RU',{day:'numeric',month:'long'});
+  return short ? dm : dm+', '+d.toLocaleDateString('ru-RU',{weekday:'short'});
+}
+function _isoDay(shift){
+  const d=new Date(Date.now()-shift*864e5);
+  return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+}
+function dayOpen(){
+  const list=[];
+  for(let i=0;i<10;i++){
+    const iso=_isoDay(i);
+    const lbl = i===0 ? 'Сегодня' : (i===1 ? 'Вчера' : _dayName(iso));
+    list.push(`<button class="dchip ${(!BACK_DAY&&i===0)||BACK_DAY===iso?'on':''}"
+      style="width:100%;justify-content:flex-start;margin-bottom:6px"
+      onclick="dayPick('${i===0?'':iso}')">${lbl}<i>${iso.slice(8)}.${iso.slice(5,7)}</i></button>`);
+  }
+  $('dayList').innerHTML=list.join('');
+  $('dayInput').max=_isoDay(0); $('dayInput').min=_isoDay(30);
+  $('dayInput').value=BACK_DAY||'';
+  showOv('dayOv'); haptic('light');
+}
+function dayPick(iso){
+  BACK_DAY = (iso===_isoDay(0)) ? '' : (iso||'');
+  hideOv('dayOv'); haptic('sel'); dayPaint();
+  if(BACK_DAY) toast('Заполняем за '+_dayName(BACK_DAY),'ok');
+}
+function dayPaint(){
+  const b=$('dayBtn'), l=$('dayLbl'); if(!b) return;
+  b.classList.toggle('back', !!BACK_DAY);
+  const short = BACK_DAY ? _dayName(BACK_DAY, true) : '';
+  l.textContent = BACK_DAY ? ('За '+short) : 'Сегодня';
+  const tk=document.querySelector('.ticket');
+  if(tk) tk.classList.toggle('back', !!BACK_DAY);
+  // Кнопка создания говорит, что именно произойдёт.
+  const c=$('createBtn');
+  if(c && !editingOid)
+    c.innerHTML = BACK_DAY
+      ? '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg>Добавить за '+short
+      : '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4.5 3.5h4l2 5-2.5 1.5a12 12 0 0 0 6 6L15.5 13l5 2v4a1.5 1.5 0 0 1-1.6 1.5A16.5 16.5 0 0 1 3 5.1 1.5 1.5 0 0 1 4.5 3.5z"/></svg>Создать заказ';
 }
 
 // ── просьбы водителя ─────────────────────────────────────────────────────

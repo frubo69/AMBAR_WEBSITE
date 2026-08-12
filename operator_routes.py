@@ -599,7 +599,31 @@ async def handle_create(request):
     # если она достаётся и голосом, переходить незачем. Оператор кладёт вино
     # только руками — и тогда это его решение, а не автоматика.
 
-    now = datetime.now(timezone.utc).isoformat()
+    # Заказ задним числом: смену не заполнили вовремя (приложение лежало, было
+    # некогда), и выручка за тот день должна встать на своё место, а не на
+    # сегодня. Такой заказ рождается сразу доставленным: он уже случился,
+    # принимать и назначать по нему нечего.
+    back = str(body.get("back_date", "")).strip()
+    back_dt = None
+    if back:
+        try:
+            d = datetime.strptime(back, "%Y-%m-%d").date()
+        except ValueError:
+            return web.json_response({"error": "bad_date"}, status=400, headers=CORS_HEADERS)
+        today = _biz_date(datetime.now(DUBAI_TZ))
+        if d > today:
+            return web.json_response({"error": "future_date"}, status=400, headers=CORS_HEADERS)
+        if (today - d).days > 30:
+            return web.json_response({"error": "too_old"}, status=400, headers=CORS_HEADERS)
+        # Ставим вечернее время той смены: минуты берём с текущих часов, чтобы
+        # несколько заказов подряд не слиплись в одну секунду, а сам час — 20:00,
+        # он гарантированно внутри той же смены (она начинается в 12:00).
+        n = datetime.now(DUBAI_TZ)
+        back_dt = datetime(d.year, d.month, d.day, 20, n.minute, n.second,
+                           tzinfo=DUBAI_TZ).astimezone(timezone.utc)
+
+    now = (back_dt or datetime.now(timezone.utc)).isoformat()
+    entered_at = datetime.now(timezone.utc).isoformat()
     op_display = _op_name(request["op_user"])
     order = {
         "order_id": _new_oid(),
@@ -622,15 +646,42 @@ async def handle_create(request):
         "driver": driver,
         # Accepted at creation — the operator on the phone IS the acceptor.
         # Deliberately NO eta / deliver_by: timing stays verbal (owner's call).
-        "status": "approved",
+        # Задним числом — сразу доставлен: заказ уже состоялся.
+        "status": "delivered" if back_dt else "approved",
         "confirmed_at": now,
         "operator_id": uid,
         "source": "manual",
         "created_by": uid,
         "created_by_name": op_display,
         "timestamp": now,
+        **({"delivered_at": now, "delivered_by": op_display,
+            # След того, что заказ внесён позже: деньги, попавшие в отчёт задним
+            # числом, обязаны быть отличимы от обычных.
+            "backfilled": True, "backfill_day": back, "backfill_at": entered_at}
+           if back_dt else {}),
     }
     await db.save_order(order["order_id"], order)
+
+    if back_dt:
+        # Ни карточек операторам, ни сообщения водителю: решать по этому заказу
+        # нечего, везти — тем более. Владельцу — отдельным событием.
+        try:
+            from owner_routes import notify_owners_force
+            d_h, d_m = back[8:10], back[5:7]
+            _it = "\n".join(f"• {i.get('name','')} ×{i.get('qty',1)}" for i in items) or "—"
+            await notify_owners_force(
+                "orders.backfilled",
+                f"📅 *Заказ внесён задним числом*\n"
+                f"За {d_h}.{d_m} · #{order['order_id']}\n"
+                f"Внёс: {op_display} · район {dist['name']} · водитель {driver}\n"
+                f"💰 *{total} AED* — уже числится доставленным\n"
+                f"🛒 Позиции:\n{_it}")
+        except Exception as e:
+            log.error(f"[pos] backfill notify failed: {e}")
+        log.info(f"[pos] заказ задним числом #{order['order_id']} за {back} "
+                 f"({op_display}, {total} AED)")
+        return web.json_response({"order_id": order["order_id"], "total": total,
+                                  "back_date": back}, headers=CORS_HEADERS)
 
     op_msg_ids = await _fanout_new(order)
     await notify_driver(order, "new")

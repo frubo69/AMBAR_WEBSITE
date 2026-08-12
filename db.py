@@ -700,6 +700,7 @@ _DEFAULT_PREFS = {
     "orders.new": True, "orders.new500": False, "orders.new1000": True,
     "orders.delivered": False, "orders.cancelled": True, "orders.declined": True,
     "orders.driver_done": True, "orders.reverted": True, "orders.edited": True,
+    "orders.backfilled": True,
     "timing.late45": True, "timing.notAccepted5": True, "timing.enroute30": False,
     "reviews.bad3": True, "reviews.good5": False, "reviews.comment": True, "reviews.any": False,
     "digest.morning": True, "digest.evening": True, "digest.weekly": False, "digest.monthly": False,

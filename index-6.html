@@ -4865,6 +4865,16 @@ function openMapPicker(source,lat,lon){
   }
   _mapPicker=L.map('map-leaflet',{zoomControl:false,attributionControl:false}).setView([sLat,sLon],zoom);
   _mapTileLayer=L.tileLayer(MAP_TILES.dark,{maxZoom:21,subdomains:'0123'}).addTo(_mapPicker);
+  // Плитки берём у гугла, но если его тайлы не отдаются (у провайдера свои
+  // правила — мы это уже проходили), карта не должна оставаться серой: молча
+  // переходим на OpenStreetMap. Без карты клиент не поставит точку и не
+  // оформит заказ.
+  let _tileFails=0;
+  _mapTileLayer.on('tileerror',()=>{
+    if(++_tileFails<6 || _mapTileLayer._ambarFallback) return;
+    _mapTileLayer._ambarFallback=true;
+    _mapTileLayer.setUrl('https://tile.openstreetmap.org/{z}/{x}/{y}.png');
+  });
   _currentMapStyle='dark';
   // Apply dark filter to tiles (no filter needed on CSS pin)
   setTimeout(()=>{

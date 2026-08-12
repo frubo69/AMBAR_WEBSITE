@@ -1720,7 +1720,7 @@ async def notify_new_order(oid, total, user_name, phone, address, office,
     base = (f"Сумма: *{total} AED*\n"
             f"Клиент: {_client}\n"
             f"Адрес: {_md(address or '—')}\n"
-            f"Офис: {_md(office)}\n"
+            f"Район: {_md(office)}\n"
             f"🛒 Позиции:\n{items_txt}")
     if prepaid:
         base += (f"\n\n✅💎 *ОПЛАЧЕНО КРИПТОЙ*\n"

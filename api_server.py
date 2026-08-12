@@ -2487,7 +2487,11 @@ PUBLIC_ROOT_FILES = {
     "promo_post_ru3.jpg",  "promo_post_ru3_thumb.jpg",
     "promo_gift_ru.jpg",    "promo_gift_en.jpg",
 }
-PUBLIC_DIRS = ("owner/", "operator/", "driver/", "TEXTURES/", "fonts/", "LOGOS/", "uploads/")
+# products/ — фотографии товаров. Раньше они грузились с github.com: витрина
+# клиента целиком зависела от доступности чужого домена, и в ОАЭ плитки висели
+# пустыми. Теперь свои, сжатые в webp.
+PUBLIC_DIRS = ("owner/", "operator/", "driver/", "TEXTURES/", "fonts/", "LOGOS/",
+               "uploads/", "products/")
 PUBLIC_EXTS = {
     ".html", ".js", ".css", ".json", ".map",
     ".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif", ".ico",

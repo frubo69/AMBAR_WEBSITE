@@ -1052,7 +1052,9 @@ async function boot(){
     if(!(r.districts && r.districts.length))
       toast('Сервер не обновлён — районы взяты локально. Перезапустите ambar-api','err');
     PEOPLE = r.people || DISTRICTS.map(d=>({name:d.operator,senior:false,districts:[d.id]}));
-    try{ curOp = localStorage.getItem('pos_op') || ''; }catch(e){}
+    // Имя оператора хранится на устройстве, а оно привязано к адресу: после
+    // переезда панель открывалась пустой. Сервер имя знает — берём его.
+    try{ curOp = localStorage.getItem('pos_op') || r.operator || ''; }catch(e){ curOp = r.operator || ''; }
     if(!PEOPLE.some(p=>p.name===curOp)) curOp='';
     renderDispatch();
     $('netPill').textContent='● online'; $('netPill').className='pill ok';

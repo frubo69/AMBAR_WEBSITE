@@ -2491,7 +2491,7 @@ PUBLIC_ROOT_FILES = {
 # клиента целиком зависела от доступности чужого домена, и в ОАЭ плитки висели
 # пустыми. Теперь свои, сжатые в webp.
 PUBLIC_DIRS = ("owner/", "operator/", "driver/", "TEXTURES/", "fonts/", "LOGOS/",
-               "uploads/", "products/")
+               "uploads/", "products/", "vendor/")
 PUBLIC_EXTS = {
     ".html", ".js", ".css", ".json", ".map",
     ".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif", ".ico",
@@ -2517,6 +2517,14 @@ async def handle_static(request: web.Request) -> web.Response:
     path = request.match_info.get("path", "") or "index-6.html"
     if path in ("", "/"):
         path = "index-6.html"
+    # Приложения ссылаются на общие каталоги от корня (/vendor/…, /products/…),
+    # но панель владельца отдаётся ещё и с поддомена, где корень смещён на
+    # /owner/. Чтобы ссылка работала в обоих случаях, приводим её к корневой.
+    for _pref in ("owner/", "operator/", "driver/"):
+        for _shared in ("vendor/", "products/"):
+            if path.startswith(_pref + _shared):
+                path = path[len(_pref):]
+                break
     filepath = (STATIC_DIR / path).resolve()
     try:
         rel = filepath.relative_to(STATIC_DIR.resolve()).as_posix()

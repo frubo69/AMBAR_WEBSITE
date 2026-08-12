@@ -14,9 +14,15 @@
 <meta name="apple-mobile-web-app-title" content="AmBar">
 <meta name="theme-color" content="#07070E">
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600;700&family=Playfair+Display:ital,wght@0,700;0,800;0,900;1,700;1,900&family=Space+Grotesk:wght@400;500;600;700&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600;9..40,700&display=swap" rel="stylesheet">
-<script src="https://telegram.org/js/telegram-web-app.js"></script>
-<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
-<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Скрипт телеграма — со своего сервера. Раньше он грузился с telegram.org
+     блокирующим тегом: пока чужой домен не ответит, страница не рисуется вовсе,
+     а недоступен он ровно тогда, когда недоступно всё остальное. Копия лежит
+     рядом, оригинал остаётся страховкой на случай, если Telegram обновит API. -->
+<script src="/vendor/telegram-web-app.js"></script>
+<script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
+<link rel="stylesheet" href="/vendor/leaflet.css"/>
+<script src="/vendor/leaflet.js"></script>
+<script>if(!window.L){document.write('<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><scr'+'ipt src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/scr'+'ipt>');}</script>
 <script src="qrcode.min.js"></script>
 <style>
 :root{

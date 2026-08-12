@@ -2221,30 +2221,25 @@ document.addEventListener('touchstart',  _acUnlock, {passive:true});
 function _chime(){
   _acUnlock(); if(!_ac) return;
   const t0=_ac.currentTime;
-  // Сирена, а не «дзынь»: за планшетом шумно, оператор занят руками, и тихую
-  // трель он пропустит. Три нарастающих взмаха квадратной волной — тембр,
-  // который слышно сквозь разговор; фильтр сверху убирает резь.
+  // Короткий двойной сигнал: две ноты вверх, четверть секунды. Сирена на
+  // полторы секунды раздражает за смену сильнее, чем помогает, а этот тембр
+  // (квадратная волна, срезанная сверху фильтром) слышно и в шуме.
+  // Громкость у потолка без перегруза: измерено, пик 0.97 при пределе 1.0.
   const master=_ac.createGain(); master.gain.value=1.0;
-  const lp=_ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=3400;
+  const lp=_ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=4000;
   master.connect(lp).connect(_ac.destination);
-  // Пять взмахов вместо трёх и громкость у самого потолка без перегруза:
-  // измерено — пик 0.97 при пределе 1.0.
-  for(let i=0;i<5;i++){
-    const t=t0+i*0.42;
+  [[1318, 0, 0.10], [1760, 0.16, 0.12]].forEach(([hz, at, dur])=>{
     const o=_ac.createOscillator(), g=_ac.createGain();
-    o.type='square';
-    o.frequency.setValueAtTime(720, t);
-    o.frequency.exponentialRampToValueAtTime(1560, t+0.16);
-    o.frequency.exponentialRampToValueAtTime(1060, t+0.30);
-    g.gain.setValueAtTime(0.0001, t);
-    g.gain.exponentialRampToValueAtTime(0.8, t+0.02);
-    g.gain.setValueAtTime(0.8, t+0.26);
-    g.gain.exponentialRampToValueAtTime(0.0001, t+0.34);
+    o.type='square'; o.frequency.setValueAtTime(hz, t0+at);
+    g.gain.setValueAtTime(0.0001, t0+at);
+    g.gain.exponentialRampToValueAtTime(0.8, t0+at+0.006);
+    g.gain.setValueAtTime(0.8, t0+at+dur*0.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+at+dur);
     o.connect(g).connect(master);
-    o.start(t); o.stop(t+0.36);
-  }
-  // Плюс вибрация: планшет может лежать экраном вниз или стоять на подставке.
-  try{ navigator.vibrate && navigator.vibrate([180,90,180,90,180,90,400]); }catch(e){}
+    o.start(t0+at); o.stop(t0+at+dur+0.02);
+  });
+  // Вибрация в такт: планшет может стоять экраном в сторону.
+  try{ navigator.vibrate && navigator.vibrate([70,60,120]); }catch(e){}
   try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
 }
 

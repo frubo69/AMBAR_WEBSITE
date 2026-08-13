@@ -196,6 +196,21 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .sect{display:flex;align-items:baseline;gap:8px;margin:16px 2px 9px}
 .sect-t{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
 .sect-v{margin-left:auto;font-size:11px;color:var(--muted)}
+.sect-i{margin-left:auto;width:28px;height:28px;flex-shrink:0;border-radius:50%;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;color:var(--muted);
+  background:var(--card2);border:1px solid var(--border3)}
+.sect-i:active{transform:scale(.92);color:var(--gold2)}
+.inf-r{display:flex;align-items:flex-start;gap:12px;padding:11px 0;
+  border-top:1px solid var(--border3);font-size:13px;line-height:1.45}
+.inf-r:first-child{border-top:none}
+.inf-r b{display:block;font-size:13.5px;color:var(--text);margin-bottom:1px}
+.inf-r > span:last-child{color:var(--muted)}
+.inf-i{flex:none;width:34px;height:34px;border-radius:11px;display:grid;place-items:center;
+  background:var(--card2);color:var(--dim)}
+.inf-i.pending{color:var(--warn)}
+.inf-i.approved{color:var(--up)}
+.inf-i.rejected{color:var(--dn)}
+.inf-i.meal{color:var(--gold2)}
 
 /* нижняя панель */
 .tabbar{position:fixed;left:0;right:0;bottom:0;z-index:40;display:flex;
@@ -223,9 +238,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 /* Сообщение о том, что вышло, а что нет. Висит над панелью вкладок, но не
    на ней: серый брусок впритык к навигации читался как её часть. Значок
    слева отвечает на главный вопрос — получилось или нет — до чтения текста. */
-/* Сверху, а не снизу: внизу всегда либо ползунок, либо золотая кнопка —
-   сообщение садилось прямо на них. Под шапкой оно ничего не закрывает. */
-.toast{position:fixed;left:50%;top:calc(80px + var(--safe-top));transform:translate(-50%,-10px) scale(.97);
+/* Внизу, у большого пальца: там же, где кнопка, по которой водитель только
+   что ударил, — туда он и смотрит. */
+.toast{position:fixed;left:50%;bottom:calc(18px + var(--tabbar));transform:translate(-50%,10px) scale(.97);
   z-index:200;max-width:min(90vw,400px);padding:11px 16px 11px 13px;border-radius:14px;
   pointer-events:none;display:flex;align-items:center;gap:10px;
   background:rgba(18,18,26,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
@@ -555,6 +570,21 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   </button>
 </nav>
 
+<div class="sheet" id="infoSheet" onclick="if(event.target===this)infoClose()">
+  <div class="sheet-in">
+    <div class="sheet-hd">
+      <div style="flex:1;min-width:0">
+        <div class="sheet-t">Что значат значки</div>
+        <div class="sheet-s">Решение по расходу принимает старший</div>
+      </div>
+    </div>
+    <div id="infoBody"></div>
+    <div class="sheet-acts">
+      <button class="btn btn-pri" onclick="infoClose()">Понятно</button>
+    </div>
+  </div>
+</div>
+
 <div class="sheet" id="editSheet">
   <div class="sheet-in">
     <!-- экран правки -->
@@ -724,6 +754,7 @@ const ICO = {
   nav:  '<path d="M3 11l18-8-8 18-2-8z"/>',
   cash: '<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/>',
   box:  '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+  info: '<circle cx="12" cy="12" r="9"/><path d="M12 11.5v4.5M12 8h.01"/>',
   meal: '<path d="M7 3v5.4a2.3 2.3 0 0 0 4.6 0V3"/><path d="M9.3 8.7V21"/><path d="M17.6 3c-1.7 1.5-2.5 3.4-2.5 5.5 0 1.7.8 2.7 2.5 2.9V21"/>',
 };
 const svg = (d, w=19) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none"
@@ -1096,6 +1127,23 @@ function expTap(btn, kind){
   sendExpense(btn, kind);
 }
 
+// Значки водителю никто не объяснит: он получает приложение и едет. Пусть
+// объяснение лежит там же, где значки, и открывается одним касанием.
+function infoOpen(){
+  const r = (EXP && EXP.meal_rates) || {working: 80, off: 40};
+  const row = (ico, cls, t, s) => `<div class="inf-r">
+    <span class="inf-i ${cls}">${svg(ico, 16)}</span>
+    <span><b>${t}</b>${s}</span></div>`;
+  document.getElementById('infoBody').innerHTML =
+    row(ICO.clock, 'pending',  'Ждёт',     'отправлено на согласование') +
+    row(ICO.ok,    'approved', 'Принят',   'старший согласовал, сумма идёт в итог') +
+    row(ICO.ban,   'rejected', 'Отклонён', 'не приняли, в итог не идёт') +
+    row(ICO.meal,  'meal',     'Питание',  `${r.working} на смене, ${r.off} в выходной — ставит старший`);
+  document.getElementById('infoSheet').classList.add('show');
+  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+}
+function infoClose(){ document.getElementById('infoSheet').classList.remove('show'); }
+
 // Питание водитель не заводит и не выбирает: сколько — решает старший, отмечая
 // смену или выходной. Окно нужно, чтобы человек видел сумму и само правило, а
 // не спрашивал каждый день, почему сегодня столько.
@@ -1125,10 +1173,14 @@ function renderExpenses(){
   const pend = live.filter(x => EXP_ST(x) === 'pending').reduce((a, x) => a + (x.amount || 0), 0);
   const other = (EXP.extras || []).filter(x => x.kind === 'other');
   box.innerHTML = `
-    <div class="sect"><span class="sect-t">Каждый день</span></div>
+    <div class="sect"><span class="sect-t">Каждый день</span>
+      <button class="sect-i" onclick="infoOpen()" aria-label="Что значат значки">${svg(ICO.info, 15)}</button>
+    </div>
     ${mealBox()}
     ${expBox('fuel', 'Бензин', ICO.fuel)}
     ${expBox('wash', 'Мойка',  ICO.wash)}
+
+    ${other.map(otherBox).join('')}
 
     ${EXP_MORE ? `<div class="card exp-card">
         <div class="exp-hd">${svg(ICO.plus2, 17)}<span class="exp-t">Другой расход</span></div>
@@ -1143,8 +1195,6 @@ function renderExpenses(){
       </div>`
       : `<button class="exp-add" onclick="EXP_MORE=true;render()">
           ${svg(ICO.plus2, 15)} Ещё расход</button>`}
-
-    ${other.map(otherBox).join('')}
 
     <div class="exp-sp"></div>
     <div class="exp-bar"><div class="exp-bar-in">

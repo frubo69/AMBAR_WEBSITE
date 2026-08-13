@@ -725,6 +725,72 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 
 /* Панель учёта: входы плитками. Четыре строки во всю ширину оставляли
    полэкрана пустым и читались как список настроек, а не как панель. */
+/* Экран проверки: выбор водителя, лента бутылок, итог. */
+.chk-note{font-size:12px;color:var(--muted);line-height:1.5;padding:11px 13px;margin-bottom:4px;
+  border-radius:12px;background:var(--card);border:1px solid var(--border2)}
+.chk-grp{display:flex;align-items:center;gap:9px;margin:14px 2px 7px}
+.chk-code{width:30px;height:30px;flex:0 0 auto;border-radius:9px;display:flex;align-items:center;
+  justify-content:center;font-size:11px;font-weight:700;color:var(--gold2);
+  background:var(--card2);border:1px solid rgba(201,169,110,.22)}
+.chk-grp-n{font-size:12px;font-weight:700}
+.chk-row{display:flex;flex-wrap:wrap;gap:7px}
+.chk-drv{padding:10px 14px;border-radius:12px;cursor:pointer;font-family:inherit;
+  background:var(--card);border:1px solid var(--border2);color:var(--text);
+  font-size:13px;font-weight:600;text-align:left;line-height:1.3}
+.chk-drv i{display:block;font-style:normal;font-size:9.5px;font-weight:600;color:var(--muted);
+  margin-top:2px}
+.chk-drv:active{transform:scale(.97)}
+.chk-drv.bad{border-color:rgba(224,85,85,.45)}
+.chk-drv.bad i{color:var(--dn)}
+.chk-free{width:100%;margin-top:14px;padding:13px;border-radius:12px;cursor:pointer;
+  font-family:inherit;font-size:12.5px;font-weight:600;color:var(--sub);
+  background:var(--card2);border:1px dashed var(--border2)}
+.chk-free:active{transform:scale(.98)}
+.chk-item{padding:10px 12px;border-radius:11px;margin-bottom:6px;
+  background:var(--card);border:1px solid var(--border2);border-left:3px solid var(--up)}
+.chk-item.warn{border-left-color:var(--warn)}
+.chk-item.bad{border-left-color:var(--dn);background:var(--dn-soft)}
+.chk-item-t{display:flex;align-items:baseline;gap:8px;font-size:13px}
+.chk-item-t b{font-family:'Space Grotesk',sans-serif;font-weight:700}
+.chk-item-t span{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--up);
+  text-transform:uppercase;letter-spacing:.4px;text-align:right}
+.chk-item.warn .chk-item-t span{color:var(--warn)}
+.chk-item.bad .chk-item-t span{color:var(--dn)}
+.chk-item-s{font-size:11px;color:var(--muted);margin-top:3px}
+.chk-hist{padding:11px 13px;border-radius:12px;margin-bottom:7px;
+  background:var(--card);border:1px solid var(--border2);border-left:3px solid var(--border2)}
+.chk-hist.warn{border-left-color:var(--warn)}
+.chk-hist.bad{border-left-color:var(--dn)}
+.chk-hist-t{display:flex;align-items:baseline;gap:8px;font-size:13px;font-weight:600}
+.chk-hist-t span{margin-left:auto;font-size:10.5px;color:var(--muted);font-weight:600}
+.chk-hist-s{font-size:11px;color:var(--muted);margin-top:3px}
+.chk-hist-s b.bad{color:var(--dn)}
+.chk-sum{padding:22px 16px;border-radius:18px;text-align:center;
+  background:var(--card);border:1px solid var(--border2)}
+.chk-sum.bad{border-color:rgba(224,85,85,.45);background:var(--dn-soft)}
+.chk-sum-v{font-family:'Space Grotesk',sans-serif;font-size:40px;font-weight:700;
+  color:var(--gold2);line-height:1}
+.chk-sum.bad .chk-sum-v{color:var(--dn)}
+.chk-sum-l{font-size:12px;color:var(--muted);margin-top:4px}
+.chk-sum-ok{margin-top:12px;font-size:14px;font-weight:700;color:var(--up)}
+.chk-sum-bad{margin-top:12px;font-size:15px;font-weight:800;color:var(--dn)}
+.chk-sum-s{margin-top:6px;font-size:11.5px;color:var(--muted);line-height:1.5}
+.scan-count b.bad{color:var(--dn)}
+
+/* Проверка бутылок: панель во всю ширину, код по центру, подпись под ним. */
+.chk-big{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;
+  margin-top:14px;padding:20px 16px 18px;border-radius:18px;cursor:pointer;
+  font-family:inherit;background:var(--card);border:1px solid var(--border2);
+  transition:.16s var(--e1);-webkit-tap-highlight-color:transparent}
+.chk-big:active{transform:scale(.985)}
+.chk-big:hover{border-color:rgba(201,169,110,.3)}
+.chk-qr{width:64px;height:64px;border-radius:18px;display:grid;place-items:center;
+  color:var(--gold2);background:linear-gradient(135deg,rgba(201,169,110,.16),rgba(201,169,110,.05));
+  border:1px solid rgba(201,169,110,.28)}
+.chk-qr svg{width:34px;height:34px}
+.chk-big-t{font-size:15px;font-weight:700;font-family:'Space Grotesk',sans-serif}
+.chk-big-s{font-size:11.5px;color:var(--muted)}
+.chk-big-s.bad{color:var(--warn)}
 .acc-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:2px}
 .acc-tile{display:flex;flex-direction:column;align-items:flex-start;gap:0;
   padding:14px;border-radius:15px;cursor:pointer;text-align:left;color:var(--text);
@@ -5593,7 +5659,7 @@ const ACC = [
    ico:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/>'},
 ];
 let ACC_PERIOD = null, ACC_STOCK = null, ACC_ORDER = null, ACC_VIEW = null,
-    ACC_PROMO = null, ACC_GIFT = null, ACC_QR = null;
+    ACC_PROMO = null, ACC_GIFT = null, ACC_QR = null, ACC_CHK = null;
 
 function accRender(){
   const box = document.getElementById('accHome'); if(!box) return;
@@ -5646,7 +5712,35 @@ function accRender(){
         : `<span class="acc-v">${v}</span>`}<i>${escS(u)}</i></span>
       <span class="acc-s">${escS(sub[a.id] || a.s)}</span>
     </button>`;
-  }).join('') + `</div>`;
+  }).join('') + `</div>` + `
+    <!-- Проверка бутылок — не «раздел учёта», а действие, которое делают стоя
+         у машины. Поэтому большая панель внизу, а не плитка в общем ряду. -->
+    <button class="chk-big" onclick="accOpen('check')">
+      <span class="chk-qr">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
+             stroke-linecap="round" stroke-linejoin="round">
+          <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+          <rect x="3" y="14" width="7" height="7" rx="1.5"/>
+          <path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/>
+        </svg>
+      </span>
+      <span class="chk-big-t">Проверка бутылки</span>
+      <span class="chk-big-s" id="chkBigSub">что везёт водитель</span>
+    </button>`;
+  if(ACC_CHK) chkBigSub();
+}
+
+// Подпись на панели: сколько проверок за месяц и есть ли флажки.
+function chkBigSub(){
+  const el = document.getElementById('chkBigSub'); if(!el || !ACC_CHK) return;
+  const t = ACC_CHK.totals || {};
+  const flag = (ACC_CHK.drivers || []).filter(d => d.bad).length;
+  el.textContent = t.checks
+    ? `${t.checks} ${pluralize(t.checks,'проверка','проверки','проверок')} за месяц · ${
+        fmt(t.bottles)} ${pluralize(t.bottles,'бутылка','бутылки','бутылок')}`
+      + (flag ? ` · ${flag} с флажком` : '')
+    : 'что везёт водитель';
+  el.classList.toggle('bad', !!flag);
 }
 
 // Реклама и акции стоят на «Ещё» рядом с рассылкой, но открывают те же
@@ -5757,6 +5851,7 @@ function accOpen(id){
   if(id === 'promo')    accPromo();
   if(id === 'gift')     accGift();
   if(id === 'qr')       accQR();
+  if(id === 'check')    accCheck();
 }
 
 // Стрелка в шапке раздела ведёт на шаг назад, а не сразу наружу: у QR-кодов
@@ -9702,6 +9797,257 @@ function fmtSec(s){
 // тому, чьё устройство приняло заказ (это только старший оператор — у остальных
 // нет своего входа в бот), всё остальное принадлежит району и его людям.
 let OPS = {data:null, loading:false, err:''};
+
+// ── Проверка бутылок ────────────────────────────────────────────────────────
+// Проверка идёт стоя у машины: выбрал водителя, открыл камеру, ведёшь по
+// бутылкам. Всё, что человек должен понять за секунду, — наша это бутылка или
+// нет, поэтому цвет и слово важнее любой таблицы.
+let CHK = null;            // текущая проверка: {check_id, driver}
+let CHK_FEED = [];         // что уже просканировано в этой сессии
+let CHK_DRV = null;        // список водителей по районам
+
+const CHK_V = {
+  ok:             {c:'ok',   t:'наша'},
+  sold:           {c:'ok',   t:'наша · ушла с заказом'},
+  written:        {c:'warn', t:'списана — ездить не должна'},
+  other_district: {c:'warn', t:'заведена на другом районе'},
+  alien:          {c:'bad',  t:'НЕ НАША — нет в реестре'},
+};
+
+async function accCheck(){
+  ACC_BACK = null;
+  _setText('accTitle', 'Проверка бутылки');
+  _setText('accSub', 'загрузка…');
+  document.getElementById('accFoot').innerHTML = '';
+  try{
+    const [dr, h] = await Promise.all([
+      CHK_DRV ? Promise.resolve(CHK_DRV) : ownerApi.ownerFetch('/api/owner/qr/drivers'),
+      ownerApi.ownerFetch('/api/owner/qr/checks', {params:{days:30}}),
+    ]);
+    CHK_DRV = dr; ACC_CHK = h;
+  }catch(e){
+    document.getElementById('accMid').innerHTML =
+      '<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return;
+  }
+  chkHome();
+}
+
+function chkHome(){
+  const flags = {};
+  (ACC_CHK.drivers || []).forEach(d => flags[d.driver] = d);
+  const t = ACC_CHK.totals || {};
+  _setText('accSub', t.checks
+    ? `${t.checks} ${pluralize(t.checks,'проверка','проверки','проверок')} за 30 дней`
+    : 'проверок ещё не было');
+
+  document.getElementById('accMid').innerHTML = `
+    <div class="chk-note">Сканируем бутылки в машине. Наша — покажем, что это и
+      когда заведена. Не наша — красный флаг и отметка на водителе.</div>
+
+    <div class="scan-sect"><span>Кого проверяем</span></div>
+    ${(CHK_DRV.districts || []).filter(d => (d.drivers||[]).length).map(d => `
+      <div class="chk-grp"><span class="chk-code">${escS(d.code)}</span>
+        <span class="chk-grp-n">${escS(d.name)}</span></div>
+      <div class="chk-row">${d.drivers.map(n => {
+        const f = flags[n];
+        return `<button class="chk-drv${f && f.bad ? ' bad' : ''}" onclick="chkStart('${escS(n)}')">
+          ${escS(n)}${f && f.bad ? `<i>${f.bad} не наших</i>`
+            : (f ? `<i>${f.checks} ${pluralize(f.checks,'проверка','проверки','проверок')}</i>` : '')}
+        </button>`; }).join('')}</div>`).join('')}
+
+    <button class="chk-free" onclick="chkStart('')">Свободная проверка — без водителя</button>
+
+    <div class="scan-sect"><span>История</span><i>${(ACC_CHK.checks||[]).length}</i></div>
+    <div class="scan-feed">${(ACC_CHK.checks || []).length
+      ? ACC_CHK.checks.map(c => `
+        <div class="chk-hist ${c.bad ? 'bad' : (c.warn ? 'warn' : '')}">
+          <div class="chk-hist-t">
+            <b>${escS(c.driver || 'Свободная проверка')}</b>
+            <span>${escS(_when(c.at))}</span>
+          </div>
+          <div class="chk-hist-s">${c.total} ${pluralize(c.total,'бутылка','бутылки','бутылок')}${
+            c.bad ? ` · <b class="bad">не наших ${c.bad}</b>` : ''}${
+            c.warn ? ` · вопросов ${c.warn}` : ''}${
+            c.by_name ? ` · ${escS(c.by_name)}` : ''}</div>
+        </div>`).join('')
+      : '<div class="scan-empty">Проверок ещё не было</div>'}</div>`;
+}
+
+// Дата в истории: сегодняшнее время, вчерашнее «вчера», дальше — число.
+function _when(iso){
+  const d = new Date(String(iso || '').replace(' ', 'T'));
+  if(isNaN(d)) return '';
+  const now = new Date(), day = 86400000;
+  const midn = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+  const hm = d.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
+  if(d.getTime() >= midn) return hm;
+  if(d.getTime() >= midn - day) return 'вчера ' + hm;
+  return d.toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit'}) + ' ' + hm;
+}
+
+// Кто проверяет — из телеграма: в истории должно быть видно, кто ходил.
+function _meName(){
+  try{
+    const u = (Telegram.WebApp.initDataUnsafe || {}).user || {};
+    return [u.first_name, u.last_name].filter(Boolean).join(' ') || '';
+  }catch(e){ return ''; }
+}
+
+async function chkStart(driver){
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/qr/check/start',
+      {method:'POST', body:{driver, as: _meName()}});
+    CHK = {check_id: r.check_id, driver};
+    CHK_FEED = [];
+  }catch(e){ alert('Не удалось начать проверку'); return; }
+  ACC_BACK = chkHome;                 // стрелка ведёт к выбору, а не наружу
+  chkScreen();
+  const v = document.getElementById('chkVideo');
+  try{
+    await SCAN.start(v, chkScan, null, () => chkFlash('again'), null);
+  }catch(e){
+    document.getElementById('chkHint').textContent = 'Нет доступа к камере';
+  }
+  const t = document.getElementById('chkTorch');
+  if(t) t.style.display = SCAN.hasTorch && SCAN.hasTorch() ? '' : 'none';
+}
+
+function chkScreen(){
+  _setText('accTitle', CHK.driver || 'Свободная проверка');
+  _setText('accSub', 'ведите камерой по бутылкам');
+  document.getElementById('accMid').innerHTML = `
+    <div class="qwrap">
+    <div class="scan-cam" id="chkCam">
+      <video id="chkVideo" playsinline muted autoplay></video>
+      <div class="scan-mask"></div>
+      <div class="scan-bar">
+        <div class="scan-bar-l">
+          <div class="scan-prod">${escS(CHK.driver || 'Свободная проверка')}</div>
+          <div class="scan-dist">проверка бутылок</div>
+        </div>
+        <button class="scan-torch" id="chkTorch" onclick="chkTorch(this)" style="display:none">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 2h6l-1 7h4l-8 13 2-9H8z"/></svg>
+        </button>
+      </div>
+      <div class="scan-frame" id="chkFrame">
+        <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+        <div class="scan-badge" id="chkBadge"></div>
+      </div>
+      <div class="scan-foot">
+        <div class="scan-count"><span id="chkN">0</span><i>проверено</i><b id="chkBad"></b></div>
+        <div class="scan-hint" id="chkHint">Наведите на код</div>
+      </div>
+    </div>
+
+    <div class="scan-sect"><span>Бутылки</span><i id="chkCount"></i></div>
+    <div id="chkFeed" class="scan-feed"><div class="scan-empty">Пока ни одной</div></div>
+
+    <div class="scan-acts">
+      <button class="scan-btn gold" onclick="chkDone()">Готово</button>
+    </div>
+    </div>`;
+}
+
+async function chkTorch(btn){
+  const on = !SCAN.torchOn;
+  if(!(await SCAN.torch(on))) btn.classList.toggle('on', !on);
+  else btn.classList.toggle('on', on);
+}
+
+async function chkScan(code){
+  let r;
+  try{
+    r = await ownerApi.ownerFetch('/api/owner/qr/check/scan',
+      {method:'POST', body:{check_id: CHK.check_id, code}});
+  }catch(e){ chkFlash('err'); return; }
+  if(!r.new){ chkFlash('again'); return; }
+  CHK_FEED.unshift(r);
+  chkFlash(r.verdict);
+  chkFeed();
+}
+
+function chkFeed(){
+  const bad = CHK_FEED.filter(x => x.verdict === 'alien').length;
+  _setText('chkN', CHK_FEED.length);
+  const b = document.getElementById('chkBad');
+  if(b){ b.textContent = bad ? `не наших ${bad}` : ''; b.className = bad ? 'bad' : ''; }
+  _setText('chkCount', CHK_FEED.length ? CHK_FEED.length + '' : '');
+  document.getElementById('chkFeed').innerHTML = CHK_FEED.length
+    ? CHK_FEED.map(x => {
+        const v = CHK_V[x.verdict] || CHK_V.ok;
+        return `<div class="chk-item ${v.c}">
+          <div class="chk-item-t"><b>${escS(x.label || 'без метки')}</b>
+            <span>${escS(v.t)}</span></div>
+          <div class="chk-item-s">${x.product_name
+            ? escS(x.product_name) + (x.added_at ? ' · заведена ' + escS(_when(x.added_at)) : '')
+              + (x.district ? ' · ' + escS(x.district) : '')
+            : escS(String(x.code || '').slice(0, 34))}</div>
+        </div>`; }).join('')
+    : '<div class="scan-empty">Пока ни одной</div>';
+}
+
+// Ответ даём на самой камере: человек смотрит в рамку, а не в список под ней.
+const CHK_FLASH = {
+  ok:             ['наша',            'success'],
+  sold:           ['наша · в заказе', 'success'],
+  written:        ['списана',         'warning'],
+  other_district: ['другой район',    'warning'],
+  alien:          ['НЕ НАША',         'error'],
+  again:          ['уже проверена',   'warning'],
+  err:            ['не сохранилось',  'error'],
+};
+let _chkT = null;
+function chkFlash(kind){
+  const f = document.getElementById('chkFrame'), b = document.getElementById('chkBadge');
+  if(!f || !b) return;
+  const [txt, hap] = CHK_FLASH[kind] || CHK_FLASH.ok;
+  const cls = kind === 'alien' ? 'err' : (kind === 'ok' || kind === 'sold' ? 'ok' : 'dup');
+  f.classList.remove('ok','dup','err'); void f.offsetWidth; f.classList.add(cls);
+  b.textContent = txt;
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred(hap); }catch(e){}
+  clearTimeout(_chkT);
+  _chkT = setTimeout(() => { f.classList.remove('ok','dup','err'); b.textContent = ''; },
+                     kind === 'alien' ? 2600 : 1200);
+}
+
+async function chkDone(){
+  SCAN.stop();
+  let r = null;
+  try{ r = await ownerApi.ownerFetch('/api/owner/qr/check/end',
+    {method:'POST', body:{check_id: CHK.check_id}}); }catch(e){}
+  const total = (r && r.total) || CHK_FEED.length;
+  const bad = (r && r.bad) || 0, warn = (r && r.warn) || 0;
+  const who = CHK.driver || 'Свободная проверка';
+  CHK = null;
+  ACC_BACK = null;
+  _setText('accTitle', 'Проверка завершена');
+  _setText('accSub', who);
+  document.getElementById('accMid').innerHTML = `
+    <div class="chk-sum ${bad ? 'bad' : 'ok'}">
+      <div class="chk-sum-v">${total}</div>
+      <div class="chk-sum-l">${pluralize(total,'бутылка','бутылки','бутылок')} проверено</div>
+      ${bad ? `<div class="chk-sum-bad">Не наших: ${bad}</div>
+               <div class="chk-sum-s">Флажок на водителе и запись в истории.
+                 Владельцу отправлено сообщение.</div>`
+            : `<div class="chk-sum-ok">Все бутылки наши</div>`}
+      ${warn ? `<div class="chk-sum-s">С вопросами: ${warn} — списанные или с другого района</div>` : ''}
+    </div>
+    ${CHK_FEED.length ? `<div class="scan-sect"><span>Что проверили</span></div>
+      <div class="scan-feed">${CHK_FEED.map(x => {
+        const v = CHK_V[x.verdict] || CHK_V.ok;
+        return `<div class="chk-item ${v.c}">
+          <div class="chk-item-t"><b>${escS(x.label || 'без метки')}</b><span>${escS(v.t)}</span></div>
+          <div class="chk-item-s">${escS(x.product_name || String(x.code||'').slice(0,34))}</div>
+        </div>`; }).join('')}</div>` : ''}`;
+  document.getElementById('accFoot').innerHTML = `
+    <div class="qb-wrap"><button class="qb" onclick="accCheck()">К проверкам</button></div>`;
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred(bad ? 'error' : 'success'); }catch(e){}
+  // История и подпись на панели должны знать о новой проверке сразу.
+  try{ ACC_CHK = await ownerApi.ownerFetch('/api/owner/qr/checks', {params:{days:30}}); }catch(e){}
+  chkBigSub();
+}
 
 // ── Кто на каком районе ─────────────────────────────────────────────────────
 // Расписание живёт в коде, но люди меняются местами чаще, чем выходит релиз:

@@ -300,11 +300,16 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    Порядок строк — порядок работы курьера: куда ехать, что везти, сколько взять,
    что нажать. Всё о заказе живёт одним листом с разделителями: разбросанные по
    чёрному экрану куски не читаются как одно целое. */
-.inc{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;
-  background:radial-gradient(130% 70% at 50% -10%,#151527 0%,#0A0A14 50%,#000006 100%);
-  padding:calc(14px + var(--safe-top)) 14px calc(14px + var(--safe-bottom))}
-.inc.show{display:flex;animation:incIn .26s cubic-bezier(.2,.8,.3,1)}
-@keyframes incIn{from{transform:scale(.985);opacity:0}to{transform:none;opacity:1}}
+/* Шторка снизу поверх приложения: заказ не прячет остальное, но и уйти от него
+   нельзя — ни свайпом, ни касанием мимо. Только ползунок. */
+.inc{position:fixed;inset:0;z-index:200;display:none;align-items:flex-end;
+  background:rgba(0,0,6,.66);-webkit-backdrop-filter:blur(4px);backdrop-filter:blur(4px);
+  touch-action:none;overscroll-behavior:contain}
+.inc.show{display:flex;animation:incFade .2s ease-out}
+@keyframes incFade{from{opacity:0}to{opacity:1}}
+.inc-wrap{width:100%;padding:0 12px calc(12px + var(--safe-bottom));
+  animation:incUp .34s cubic-bezier(.16,.9,.24,1)}
+@keyframes incUp{from{transform:translateY(60px);opacity:.4}to{transform:none;opacity:1}}
 
 /* Мягкие вспышки при появлении: размытое свечение, а не мигание фона */
 .inc-glow{position:absolute;inset:-20%;pointer-events:none;opacity:0;
@@ -329,18 +334,32 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums}
 
 /* Лист с деталями */
-/* Лист занимает всё между верхом и кнопкой: положение и размер одинаковы у
-   любого заказа. Растягивается внутри только список товаров — остальные строки
-   всегда на своих местах. */
-.inc-sheet{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--bg3);
-  border-radius:22px;border:1px solid var(--border2);box-shadow:0 -2px 30px rgba(0,0,0,.5);
-  overflow:hidden}
-.inc-row-items{flex:1;min-height:0;overflow-y:auto}
+/* Лист по высоте содержимого, но не выше трёх четвертей экрана: длинный заказ
+   прокручивается внутри, ползунок всегда на виду. */
+.inc-sheet{display:flex;flex-direction:column;max-height:74vh;background:var(--bg3);
+  border-radius:24px;border:1px solid var(--border2);
+  box-shadow:0 -10px 40px rgba(0,0,0,.65);overflow:hidden}
+.inc-row-items{min-height:0;overflow-y:auto}
 .inc-row{padding:15px 17px;border-top:1px solid var(--border2)}
 .inc-row:first-child{border-top:none}
-.inc-row-top{display:flex;align-items:center;gap:10px;padding:13px 17px}
-.inc-dist{font-size:13.5px;font-weight:700;color:var(--gold2)}
-.inc-by{margin-left:auto;font-size:12.5px;color:var(--muted)}
+.inc-row-time{padding:13px 17px}
+.inc-dist{display:block;font-size:13.5px;font-weight:700;color:var(--gold2);margin-bottom:10px}
+/* Время — три отдельных факта в ряд, как приборная панель: когда приняли,
+   сколько обещали клиенту и к какому часу быть на месте. Подпись в углу мелким
+   шрифтом ни на один из этих вопросов не отвечала. */
+.tstrip{display:flex;border-radius:13px;background:var(--card2);
+  border:1px solid var(--border2);overflow:hidden}
+.ts{flex:1;min-width:0;padding:9px 11px;border-left:1px solid var(--border2)}
+.ts:first-child{border-left:none}
+.ts-l{font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
+  color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ts-v{font-size:18px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums;
+  letter-spacing:-.3px}
+.ts.due{background:var(--gold-soft)}
+.ts.due .ts-l{color:var(--gold2)}
+.ts.due .ts-v{color:var(--gold3)}
+.ts.late{background:var(--dn-soft)}
+.ts.late .ts-l,.ts.late .ts-v{color:var(--dn)}
 .inc-l{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
   color:var(--muted);margin-bottom:8px;display:flex;align-items:baseline;gap:7px}
 .inc-l b{font-weight:700;color:var(--sub);letter-spacing:.4px;text-transform:none;font-size:11.5px}
@@ -524,15 +543,17 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 
   <!-- Всё о заказе одним листом. Статус — его первая строка, а не отдельный
        заголовок в пустоте: плавающие сами по себе элементы выглядят случайными -->
+  <!-- Шторка целиком: лист + действие. Уехать от неё нельзя, пока не принял. -->
+  <div class="inc-wrap">
   <div class="inc-sheet">
     <div class="inc-row inc-row-new">
       <span class="inc-dot"></span>
       <span class="inc-title">Новый заказ</span>
       <span class="inc-wait" id="incWait">0:00</span>
     </div>
-    <div class="inc-row inc-row-top">
+    <div class="inc-row inc-row-time">
       <span class="inc-dist" id="incDist">—</span>
-      <span class="inc-by" id="incBy"></span>
+      <div class="tstrip" id="incTime"></div>
     </div>
 
     <div class="inc-row">
@@ -569,6 +590,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
           stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
       </div>
     </div>
+  </div>
   </div>
 </div>
 </div>
@@ -949,12 +971,38 @@ async function _wakeOn(){
 }
 function _wakeOff(){ try{ _wake && _wake.release(); }catch(e){} _wake = null; }
 
+// Три факта о времени. Последний — к какому часу быть на месте — тот, по
+// которому водителя оценивают, поэтому он и выделен.
+function timeStrip(o){
+  const took = hhmm(o.confirmed_at || o.timestamp);
+  const late = _isLate(o.deliver_by);
+  return [
+    took ? ['Принят', took, ''] : null,
+    o.eta ? ['Доставка', o.eta + ' мин', ''] : null,
+    o.deliver_by ? ['Быть до', esc(o.deliver_by), late ? 'late' : 'due'] : null,
+  ].filter(Boolean).map(([l, v, cls]) =>
+    `<div class="ts ${cls}"><div class="ts-l">${l}</div><div class="ts-v">${v}</div></div>`
+  ).join('');
+}
+// Просрочено ли обещанное время. Смена переходит за полночь, поэтому близкие
+// значения считаем сегодняшними, а далёкие — вчерашними.
+function _isLate(hm){
+  if(!hm || !/^\d{1,2}:\d{2}$/.test(hm)) return false;
+  const [h, m] = hm.split(':').map(Number);
+  const now = new Date(), due = new Date(now);
+  due.setHours(h, m, 0, 0);
+  const diff = (due - now) / 60000;
+  if(diff < -720) return false;
+  if(diff > 720) return true;
+  return diff < 0;
+}
+
 function incShow(o){
   INC = o;
   const debt = o.payment_method === 'debt', paid = !!o.prepaid;
   const n = (o.items||[]).length;
   document.getElementById('incDist').textContent = o.district || '';
-  document.getElementById('incBy').textContent = o.deliver_by ? 'до ' + o.deliver_by : '';
+  document.getElementById('incTime').innerHTML = timeStrip(o);
   document.getElementById('incAddr').textContent = o.address || 'Адрес не указан';
   document.getElementById('incCount').textContent =
     n + ' ' + (n === 1 ? 'позиция' : (n < 5 ? 'позиции' : 'позиций'));

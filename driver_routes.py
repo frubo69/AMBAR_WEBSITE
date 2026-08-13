@@ -123,6 +123,9 @@ def _order_view(o: dict) -> dict:
         "confirmed_at": o.get("confirmed_at", ""),
         "delivered_at": o.get("delivered_at", ""),
         "deliver_by": o.get("deliver_by", ""),
+        # Сколько минут обещали клиенту: водитель — единственный, кто может в
+        # них уложиться, и знать их он должен раньше всех.
+        "eta": o.get("eta", 0),
         "driver_ack_at": o.get("driver_ack_at", ""),
         "driver_req": o.get("driver_req") or o.get("edit_request") or None,
     }

@@ -296,6 +296,52 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   font-weight:600;color:var(--sub);background:none;border:1px dashed var(--border3)}
 .exp-add:active{transform:scale(.98)}
 
+/* Входящий заказ занимает весь экран: водитель за рулём, и заметить он должен
+   не значок, а весь телефон. Уйти можно только ползунком — случайным касанием
+   заказ не принимается. */
+.inc{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;
+  background:linear-gradient(180deg,#0B0B16,#000006);padding:calc(18px + var(--safe-top)) 16px
+  calc(16px + var(--safe-bottom))}
+.inc.show{display:flex;animation:incIn .22s cubic-bezier(.2,.8,.3,1)}
+@keyframes incIn{from{transform:translateY(14px);opacity:0}to{transform:none;opacity:1}}
+.inc-head{display:flex;align-items:center;gap:10px;margin-bottom:16px}
+.inc-tag{padding:7px 13px;border-radius:999px;font-size:12px;font-weight:800;letter-spacing:.6px;
+  text-transform:uppercase;color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2));
+  animation:incPulse 1.1s ease-in-out infinite}
+@keyframes incPulse{0%,100%{opacity:1}50%{opacity:.55}}
+.inc-dist{margin-left:auto;font-size:13px;font-weight:700;color:var(--gold2)}
+.inc-body{flex:1;min-height:0;overflow-y:auto}
+.inc-addr{font-size:27px;font-weight:800;line-height:1.2;letter-spacing:-.5px;margin-bottom:12px}
+.inc-money{display:flex;align-items:baseline;gap:7px;margin-bottom:16px}
+.inc-money span{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;
+  color:var(--gold3);line-height:1}
+.inc-money i{font-style:normal;font-size:11px;color:var(--muted);letter-spacing:.5px}
+.inc-money em{font-style:normal;margin-left:auto;font-size:12px;color:var(--sub)}
+.inc-items{display:flex;flex-direction:column;gap:9px;padding:14px;border-radius:14px;
+  background:var(--bg3);border:1px solid var(--border2)}
+.inc-items div{display:flex;gap:10px;font-size:15px}
+.inc-items div span{flex:1;min-width:0}
+.inc-items div b{color:var(--gold2);font-variant-numeric:tabular-nums}
+.inc-note{margin-top:11px;padding:11px 13px;border-radius:12px;font-size:13.5px;line-height:1.45;
+  color:var(--warn);background:var(--warn-soft);border:1px solid rgba(243,180,74,.3)}
+.inc-foot{flex-shrink:0;padding-top:14px}
+.inc-slide{position:relative;height:64px;border-radius:32px;background:var(--card2);
+  border:1px solid var(--border3);overflow:hidden;touch-action:none;user-select:none}
+.inc-slide.done{background:var(--up-soft);border-color:rgba(76,175,125,.5)}
+.inc-hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font-size:14.5px;font-weight:700;color:var(--sub);pointer-events:none;
+  animation:incHint 1.8s ease-in-out infinite}
+@keyframes incHint{0%,100%{opacity:.55}50%{opacity:1}}
+.inc-knob{position:absolute;top:5px;left:5px;width:54px;height:54px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;color:#1a1408;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));
+  box-shadow:0 4px 16px rgba(0,0,0,.45);transition:transform .18s cubic-bezier(.2,.8,.3,1)}
+.inc-slide.drag .inc-knob{transition:none}
+.inc-no{width:100%;margin-top:10px;padding:14px;border-radius:14px;cursor:pointer;
+  font-family:inherit;font-size:13.5px;font-weight:600;color:var(--muted);
+  background:none;border:1px solid var(--border2)}
+.inc-no:active{background:var(--card2)}
+
 /* выбор позиции */
 .ed-search{width:100%;padding:12px 13px;border-radius:12px;margin-bottom:10px;
   border:1px solid var(--border2);background:var(--bg3);color:var(--text);
@@ -415,6 +461,30 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   </div>
 </div>
 
+<!-- входящий заказ: поверх всего, пока водитель не проведёт ползунок -->
+<div class="inc" id="incOv">
+  <div class="inc-head">
+    <div class="inc-tag">Новый заказ</div>
+    <div class="inc-dist" id="incDist">—</div>
+  </div>
+  <div class="inc-body">
+    <div class="inc-addr" id="incAddr">—</div>
+    <div class="inc-money"><span id="incTotal">0</span><i>AED</i><em id="incPay">наличные</em></div>
+    <div class="inc-items" id="incItems"></div>
+    <div class="inc-note" id="incNote" hidden></div>
+  </div>
+  <div class="inc-foot">
+    <div class="inc-slide" id="incSlide">
+      <div class="inc-knob" id="incKnob">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+          stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
+      </div>
+      <span class="inc-hint">Проведите — принял, еду</span>
+    </div>
+    <button class="inc-no" onclick="incCant()">Не могу взять</button>
+  </div>
+</div>
+
 <div class="sheet" id="askSheet" onclick="if(event.target===this)askClose()">
   <div class="sheet-in">
     <div class="sheet-t" id="askT">—</div>
@@ -487,7 +557,10 @@ async function boot(){
   document.getElementById('dSub').textContent =
     `${ME.district_code} ${ME.district_name}${ME.operator ? ' · ' + ME.operator : ''}`;
   await load();
-  setInterval(load, 45000);          // новый заказ приходит сам, без перезахода
+  // Пять секунд, а не сорок пять: заказ должен появляться на экране почти сразу,
+  // как его назначили. Спящую вкладку не опрашиваем — телефон в кармане.
+  setInterval(()=>{ if(!document.hidden) load(); }, 5000);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) load(); });
 }
 
 async function load(){
@@ -498,6 +571,13 @@ async function load(){
     ]);
     ORDERS = o; EXP = e;
   }catch(err){ return; }
+  // Заказ, который назначили и который водитель ещё не подтвердил, показываем
+  // поверх всего. Первый в очереди — тот, что ждёт дольше.
+  const fresh = (ORDERS.active || []).filter(o => !o.driver_ack_at);
+  if(fresh.length){
+    if(!INC || INC.order_id !== fresh[0].order_id) incShow(fresh[0]);
+  }else if(INC){ incHide(); _wakeOff(); }
+
   const n = ORDERS.active.length;
   const b = document.getElementById('tbNum');
   b.style.display = n ? 'flex' : 'none'; b.textContent = n;
@@ -732,6 +812,144 @@ function renderExpenses(){
       Ждёт решения менеджера: <b style="color:var(--warn)">${fmt(EXP.pending)} AED</b></div>` : ''}`;
 }
 
+
+// ── входящий заказ ───────────────────────────────────────────────────────
+// Заказ водителю уже назначил оператор — решать нечего, но увидеть и тронуться
+// он должен сразу. Поэтому весь экран, сирена и ползунок: случайным касанием
+// такое не подтвердишь, а не заметить трудно.
+let INC = null, _incT = null, _wake = null, _ac = null, _lastRing = 0;
+
+function _acUnlock(){
+  try{
+    if(!_ac) _ac = new (window.AudioContext||window.webkitAudioContext)();
+    if(_ac.state === 'suspended') _ac.resume();
+  }catch(e){}
+}
+['pointerdown','touchstart'].forEach(ev =>
+  document.addEventListener(ev, _acUnlock, {passive:true}));
+
+function _siren(){
+  _acUnlock(); if(!_ac) return;
+  _lastRing = Date.now();
+  const t0 = _ac.currentTime;
+  const master = _ac.createGain(); master.gain.value = 1.0;
+  const lp = _ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 4000;
+  master.connect(lp).connect(_ac.destination);
+  [[1318,0,0.1],[1760,0.16,0.12],[1318,0.42,0.1],[1760,0.58,0.14]].forEach(([hz,at,dur])=>{
+    const o = _ac.createOscillator(), g = _ac.createGain();
+    o.type = 'square'; o.frequency.setValueAtTime(hz, t0+at);
+    g.gain.setValueAtTime(0.0001, t0+at);
+    g.gain.exponentialRampToValueAtTime(0.8, t0+at+0.006);
+    g.gain.setValueAtTime(0.8, t0+at+dur*0.6);
+    g.gain.exponentialRampToValueAtTime(0.0001, t0+at+dur);
+    o.connect(g).connect(master); o.start(t0+at); o.stop(t0+at+dur+0.02);
+  });
+  try{ navigator.vibrate && navigator.vibrate([180,80,180,80,320]); }catch(e){}
+  try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+}
+
+// Экран не должен гаснуть, пока заказ не принят: телефон лежит на держателе.
+async function _wakeOn(){
+  try{ if(!_wake && navigator.wakeLock) _wake = await navigator.wakeLock.request('screen'); }catch(e){}
+}
+function _wakeOff(){ try{ _wake && _wake.release(); }catch(e){} _wake = null; }
+
+function incShow(o){
+  INC = o;
+  document.getElementById('incDist').textContent = o.district || '';
+  document.getElementById('incAddr').textContent = o.address || 'Адрес не указан';
+  document.getElementById('incTotal').textContent = fmt(o.total);
+  document.getElementById('incPay').textContent =
+    o.payment_method === 'debt' ? 'в долг — денег не брать' : 'наличными при получении';
+  document.getElementById('incItems').innerHTML = (o.items||[]).map(it =>
+    `<div><span>${esc(it.name)}${it.pcs?` <i style="font-style:normal;color:var(--muted)">${it.pcs} шт</i>`:''}</span><b>${it.qty} шт</b></div>`).join('');
+  const n = document.getElementById('incNote');
+  n.hidden = !o.comment; n.textContent = o.comment || '';
+  incKnobReset();
+  document.getElementById('incOv').classList.add('show');
+  _siren(); _wakeOn();
+  if(_incT) clearInterval(_incT);
+  // Пока не принял — напоминаем. Молча висящий заказ ничем не лучше пропущенного.
+  _incT = setInterval(()=>{ if(!document.hidden) _siren(); }, 15000);
+}
+function incHide(){
+  document.getElementById('incOv').classList.remove('show');
+  if(_incT){ clearInterval(_incT); _incT = null; }
+  INC = null;
+}
+
+// ── ползунок ────────────────────────────────────────────────────────────
+function incKnobReset(){
+  const k = document.getElementById('incKnob');
+  k.style.transform = 'translateX(0)';
+  document.getElementById('incSlide').classList.remove('done','drag');
+}
+(function initSlide(){
+  const bar = document.getElementById('incSlide');
+  const knob = document.getElementById('incKnob');
+  if(!bar || !knob) return;
+  let dragging = false, x0 = 0, max = 0;
+  const start = e => {
+    dragging = true; bar.classList.add('drag');
+    x0 = (e.touches ? e.touches[0].clientX : e.clientX);
+    max = bar.offsetWidth - knob.offsetWidth - 10;
+    try{ tg.HapticFeedback.selectionChanged(); }catch(err){}
+  };
+  const move = e => {
+    if(!dragging) return;
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - x0;
+    const v = Math.max(0, Math.min(max, x));
+    knob.style.transform = `translateX(${v}px)`;
+    if(e.cancelable) e.preventDefault();
+  };
+  const end = () => {
+    if(!dragging) return;
+    dragging = false; bar.classList.remove('drag');
+    const v = parseFloat((knob.style.transform.match(/-?\d+\.?\d*/) || [0])[0]);
+    if(v >= max * 0.85){
+      knob.style.transform = `translateX(${max}px)`;
+      bar.classList.add('done');
+      incAccept();
+    }else{
+      knob.style.transform = 'translateX(0)';
+    }
+  };
+  knob.addEventListener('mousedown', start);
+  knob.addEventListener('touchstart', start, {passive:true});
+  document.addEventListener('mousemove', move);
+  document.addEventListener('touchmove', move, {passive:false});
+  document.addEventListener('mouseup', end);
+  document.addEventListener('touchend', end);
+})();
+
+async function incAccept(){
+  const oid = INC && INC.order_id; if(!oid) return;
+  try{
+    await drvApi.drvFetch(`/api/driver/orders/${encodeURIComponent(oid)}/ack`, {method:'POST'});
+    try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    toast('Принято — оператор видит, что вы выехали');
+  }catch(e){ toast('Не отправилось — попробуйте ещё раз'); incKnobReset(); return; }
+  incHide(); _wakeOff();
+  await load();
+}
+
+// «Не могу» — это просьба переназначить, а не отказ: решает оператор.
+function incCant(){
+  const oid = INC && INC.order_id; if(!oid) return;
+  ASK = {t:'Не можете взять заказ?', s:'Оператор получит просьбу переназначить его другому '
+        + 'водителю. Заказ останется на вас, пока он не решит.', btn:'Отправить',
+        fn:()=>incSendCant(oid)};
+  renderAsk();
+}
+async function incSendCant(oid){
+  try{
+    await drvApi.drvFetch(`/api/driver/orders/${encodeURIComponent(oid)}/edit`,
+      {method:'POST', body:{kind:'reassign', text:'Не могу взять заказ'}});
+    toast('Оператор предупреждён');
+  }catch(e){ toast('Не отправилось'); return; }
+  incHide(); _wakeOff(); await load();
+}
+
 // ── действия ──────────────────────────────────────────────────────────────
 // confirm() в телеграме показывается через раз — своё окно надёжнее и
 // выглядит как остальное приложение.
@@ -765,9 +983,17 @@ async function sendDeliver(oid){
   }
 }
 
+// Открываем не точку на карте, а сразу ведение: карты запускаются в режиме
+// навигации и начинают вести с текущего места. Свою карту внутри приложения не
+// строим намеренно — она всё равно была бы без пробок и без работы с погашенным
+// экраном, то есть заведомо хуже той, что уже стоит у водителя в телефоне.
+// Побочная выгода: координаты водителя не проходят ни через нас, ни через
+// чей-либо сервер — отслеживать нечего, потому что мы их не видим.
 function route(link, lat, lon, addr){
-  const url = link || (lat && lon ? `https://maps.google.com/?q=${lat},${lon}`
-                                  : (addr ? 'https://maps.google.com/?q=' + encodeURIComponent(addr) : ''));
+  const dest = (lat && lon) ? `${lat},${lon}` : (addr ? encodeURIComponent(addr) : '');
+  const url = dest
+    ? `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving&dir_action=navigate`
+    : link;
   if(!url) return;
   try{ tg.openLink(url); }catch(e){ window.open(url, '_blank'); }
 }

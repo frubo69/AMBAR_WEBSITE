@@ -518,6 +518,10 @@ def _summary(o: dict) -> dict:
         # должен с ним сделать, и прятать её за отдельным запросом нельзя.
         "driver_req": o.get("driver_req") or o.get("edit_request") or None,
         "delivered_by_driver": o.get("delivered_by_driver", ""),
+        # Водитель отметил, что увидел заказ и выехал. Координат тут нет и не
+        # будет: где он едет — не хранится нигде, чтобы историю перемещений
+        # нельзя было ни украсть, ни собрать.
+        "driver_ack_at": o.get("driver_ack_at", ""),
     }
 
 
@@ -1374,6 +1378,7 @@ DRV_REQ_TITLE = {
     "cancel":    "водитель просит отменить",
     "edit":      "водитель просит правку",
     "note":      "сообщение от водителя",
+    "reassign":  "водитель не может взять заказ",
 }
 
 
@@ -1413,6 +1418,16 @@ async def handle_feed(request):
                          "at": o.get("timestamp", ""), "mins": mins,
                          "weight": 1 if mins >= 5 else 3})
         elif st == "approved":
+            # Назначили и молчит: либо не видит приложение, либо не заметил.
+            # Дальше это превращается в опоздание, поэтому спрашиваем раньше.
+            if o.get("driver") and not o.get("driver_ack_at"):
+                mins = _mins_since(o.get("confirmed_at") or o.get("timestamp", ""))
+                if mins >= 3:
+                    need.append({**base, "type": "no_ack", "kind": "no_ack",
+                                 "title": "водитель не отозвался",
+                                 "sub": o.get("driver", ""),
+                                 "at": o.get("confirmed_at") or o.get("timestamp", ""),
+                                 "mins": mins, "weight": 2})
             late = _late_by(o)
             if late >= 5:
                 need.append({**base, "type": "late", "kind": "late",

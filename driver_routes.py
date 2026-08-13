@@ -120,6 +120,7 @@ def _order_view(o: dict) -> dict:
         "confirmed_at": o.get("confirmed_at", ""),
         "delivered_at": o.get("delivered_at", ""),
         "deliver_by": o.get("deliver_by", ""),
+        "driver_ack_at": o.get("driver_ack_at", ""),
         "driver_req": o.get("driver_req") or o.get("edit_request") or None,
     }
 
@@ -201,6 +202,7 @@ KIND_TITLE = {
     "cancel":    "просит отменить заказ",
     "edit":      "просит изменить состав",
     "note":      "сообщение по заказу",
+    "reassign":  "не может взять заказ",
 }
 
 
@@ -270,6 +272,34 @@ async def handle_delivered(request):
 
 
 @require_driver
+async def handle_ack(request):
+    """«Принял, еду» — не решение, а отметка: заказ водителю уже назначен.
+
+    Оператору важно знать, что человек увидел заказ и тронулся, и через сколько.
+    Никаких координат: где он в этот момент — не наше дело и в базе этого нет."""
+    oid = (request.match_info.get("oid") or "").strip()
+    me = request["driver"]
+    o = await db.get_order(oid)
+    if not o or (o.get("driver") or "").strip() != me["name"]:
+        return web.json_response({"error": "not_your_order"}, status=403, headers=CORS_HEADERS)
+    if o.get("status") != "approved":
+        return web.json_response({"error": "wrong_status", "status": o.get("status")},
+                                 status=409, headers=CORS_HEADERS)
+    if o.get("driver_ack_at"):
+        return web.json_response({"ok": True, "driver_ack_at": o["driver_ack_at"]},
+                                 headers=CORS_HEADERS)
+    now = datetime.now(timezone.utc).isoformat()
+    await db.update_order(oid, driver_ack_at=now, driver_ack_by=me["name"])
+    log.info(f"[driver] {me['name']} принял #{oid}")
+    try:
+        from operator_routes import _refresh_cards
+        await _refresh_cards({**o, "driver_ack_at": now})
+    except Exception as e:
+        log.warning(f"[driver] обновление карточек #{oid}: {e}")
+    return web.json_response({"ok": True, "driver_ack_at": now}, headers=CORS_HEADERS)
+
+
+@require_driver
 async def handle_catalog(request):
     """Каталог для правки состава — только то, что есть в наличии.
 
@@ -326,7 +356,7 @@ async def handle_edit_request(request):
     text = str(body.get("text") or "").strip()[:400]
     raw_items = body.get("items")
     kind = str(body.get("kind") or "").strip()
-    if kind not in ("edit", "cancel", "note", ""):
+    if kind not in ("edit", "cancel", "note", "reassign", ""):
         return web.json_response({"error": "bad_kind"}, status=400, headers=CORS_HEADERS)
 
     o = await db.get_order(oid)
@@ -362,7 +392,7 @@ async def handle_edit_request(request):
         if not diff and not text:
             return web.json_response({"error": "nothing_changed"}, status=400, headers=CORS_HEADERS)
         total = await _pos_total(items)
-    elif not text and kind != "cancel":
+    elif not text and kind not in ("cancel", "reassign"):
         return web.json_response({"error": "text_or_items_required"}, status=400, headers=CORS_HEADERS)
 
     kind = kind or ("edit" if items else "note")
@@ -469,6 +499,7 @@ def setup(app):
         ("/api/driver/catalog",                 handle_catalog,     "GET"),
         ("/api/driver/expenses",                handle_expenses,    "GET"),
         ("/api/driver/expenses",                handle_expense_add, "POST"),
+        ("/api/driver/orders/{oid}/ack",        handle_ack,         "POST"),
         ("/api/driver/orders/{oid}/delivered",  handle_delivered,   "POST"),
         ("/api/driver/orders/{oid}/edit",       handle_edit_request, "POST"),
     )

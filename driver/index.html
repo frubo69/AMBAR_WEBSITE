@@ -338,7 +338,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .exp-row input:focus{border-color:rgba(201,169,110,.5)}
 .exp-row .amt{flex:1;min-width:0;font-weight:700;font-size:16px}
 .exp-row .cmt{flex:1.4}
-.exp-row .amt.sent{color:var(--muted);background:var(--card2)}
+.exp-field.cmt input{width:100%;padding:12px;border:none;background:none;font-size:14px;
+  color:var(--text);font-family:inherit;outline:none}
+.exp-mine-i:first-child{border-top:none}
+.exp-field{flex:1;min-width:0;position:relative;display:flex;align-items:center;
+  border-radius:11px;border:1px solid var(--border2);background:var(--bg3)}
+.exp-field:focus-within{border-color:rgba(201,169,110,.5)}
+.exp-field .amt{flex:1;min-width:0;border:none;background:none;padding:12px}
+.exp-field.sent .amt{color:var(--muted)}
 /* Питание — та же сетка, но вместо кнопки пометка: нажимать здесь нечего. */
 .exp-fix-v{display:flex;align-items:baseline;gap:2px;letter-spacing:.01em;color:var(--dim)}
 .exp-fix-v b{font-weight:800}
@@ -348,14 +355,33 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   font-size:11.5px;line-height:1.35;color:var(--muted)}
 .exp-go{flex:0 0 auto;width:auto;padding:13px 22px}
 .exp-none{font-size:12.5px;color:var(--muted);padding:4px 2px}
-.exp-mine{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
-.exp-mine-i{padding:5px 10px;border-radius:999px;font-size:11px;font-weight:600;
-  background:var(--card2);border:1px solid var(--border3);color:var(--muted)}
-.exp-mine-i b{font-weight:800;color:var(--text)}
-.exp-mine-i.pending{background:var(--warn-soft);border-color:rgba(243,180,74,.3);color:var(--warn)}
-.exp-mine-i.approved{background:var(--up-soft);border-color:rgba(76,175,125,.3);color:var(--up)}
-.exp-mine-i.rejected{background:var(--dn-soft);border-color:rgba(224,85,85,.3);color:var(--dn)}
-.exp-mine-i.pending b,.exp-mine-i.approved b,.exp-mine-i.rejected b{color:inherit}
+/* Весь статус — один значок. Цвет только в нём. */
+.exp-mk{flex:none;display:flex;align-items:center;padding:0 13px 0 9px;color:var(--dim)}
+.exp-mk.pending{color:var(--warn)}
+.exp-mk.approved{color:var(--up)}
+.exp-mk.rejected{color:var(--dn)}
+.exp-mine{margin-top:9px;display:flex;flex-direction:column;gap:1px}
+.exp-mine-i{display:flex;align-items:center;gap:9px;padding:9px 2px;font-size:12.5px;
+  border-top:1px solid var(--border3)}
+.exp-mine-i b{font-weight:800;min-width:44px}
+.exp-mine-i span{flex:1;min-width:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+/* Итог не уезжает вверх вместе со списком: сколько сегодня набежало —
+   единственное число, ради которого водитель сюда заходит. */
+.exp-sp{height:96px}
+.exp-bar{position:fixed;left:0;right:0;bottom:var(--tabbar);z-index:40;padding:0 13px 12px;
+  background:linear-gradient(180deg,rgba(4,4,10,0),var(--bg) 42%)}
+.exp-bar-in{display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:17px;
+  background:var(--bg3);border:1px solid rgba(201,169,110,.28);
+  box-shadow:0 -4px 26px rgba(0,0,0,.6)}
+.exp-bar-l{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
+  color:var(--muted);line-height:1.3}
+.exp-bar-l i{display:block;font-style:normal;font-size:10px;letter-spacing:.2px;
+  text-transform:none;color:var(--warn);margin-top:3px}
+.exp-bar-v{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:700;
+  color:var(--gold3);letter-spacing:-1px;line-height:1}
+.exp-bar-v i{font-style:normal;font-size:11px;color:var(--muted);margin-left:6px;letter-spacing:0}
+.exp-other{padding-top:4px;padding-bottom:4px}
 .exp-add{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
   padding:13px;border-radius:14px;cursor:pointer;font-family:inherit;font-size:13.5px;
   font-weight:600;color:var(--sub);background:none;border:1px dashed var(--border3)}
@@ -986,15 +1012,20 @@ let EXP_MORE = false, EXP_EDIT = null;   // какой расход водите
 const EXP_ST  = x => x.status || 'approved';   // старые записи — от менеджера
 const EXP_LBL = {pending:'ждёт', approved:'принят', rejected:'отклонён'};
 
-// Что сегодня уже отправлено по этому виду и чем кончилось. Раньше это лежало
-// отдельным списком наверху — там водитель искал свою мойку глазами. Здесь она
-// прямо под полем, в которое он её вписал.
-function expMine(kind, withComment){
+// Судьба траты — одним значком у суммы: часы ждут решения, галочка принята,
+// крест отклонён. Слова и цветные плашки на этом месте кричали о том, что и
+// так видно, а экран водителя должен молчать, пока всё в порядке.
+const EXP_ICO = {pending: 'clock', approved: 'ok', rejected: 'ban'};
+const expMark = x => `<span class="exp-mk ${EXP_ST(x)}" title="${EXP_LBL[EXP_ST(x)] || ''}"
+  aria-label="${EXP_LBL[EXP_ST(x)] || ''}">${svg(ICO[EXP_ICO[EXP_ST(x)]] || ICO.clock, 15)}</span>`;
+
+// «Прочее» водитель заводит словами, и таких строк за смену бывает несколько —
+// им нужен свой список под кнопкой.
+function expMine(kind){
   const list = (EXP.extras || []).filter(x => x.kind === kind);
   if(!list.length) return '';
-  return `<div class="exp-mine">${list.map(x => `<span class="exp-mine-i ${EXP_ST(x)}">
-      <b>${fmt(x.amount)}</b>${withComment && x.comment ? ' · ' + esc(x.comment) : ''} ·
-      ${EXP_LBL[EXP_ST(x)] || EXP_ST(x)}</span>`).join('')}</div>`;
+  return `<div class="exp-mine">${list.map(x => `<div class="exp-mine-i">
+      <b>${fmt(x.amount)}</b><span>${esc(x.comment)}</span>${expMark(x)}</div>`).join('')}</div>`;
 }
 
 // Отправленное не стирается: сумма остаётся в поле серым, а кнопка становится
@@ -1007,13 +1038,15 @@ function expBox(kind, title, ico){
     <div class="exp-hd">${svg(ico, 17)}<span class="exp-t">${title}</span>
       <span class="exp-sum">${k.sum ? fmt(k.sum) + ' AED' : 'сегодня не было'}</span></div>
     <div class="exp-row">
-      <input class="amt${sent ? ' sent' : ''}" id="e_${kind}" type="text" inputmode="numeric"
-        placeholder="AED" autocomplete="off"
-        value="${sent ? sent.amount : ''}"${sent ? ' readonly' : ''}>
+      <div class="exp-field${sent ? ' sent' : ''}">
+        <input class="amt" id="e_${kind}" type="text" inputmode="numeric"
+          placeholder="AED" autocomplete="off"
+          value="${sent ? sent.amount : ''}"${sent ? ' readonly' : ''}>
+        ${sent ? expMark(sent) : ''}
+      </div>
       <button class="btn ${sent ? 'btn-sec' : 'btn-pri'} exp-go"
-        onclick="expTap(this,'${kind}')">${sent ? 'Редактировать' : 'Отправить'}</button>
+        onclick="expTap(this,'${kind}')">${sent ? 'Изменить' : 'Отправить'}</button>
     </div>
-    ${expMine(kind)}
   </div>`;
 }
 
@@ -1022,7 +1055,8 @@ function expBox(kind, title, ico){
 function expTap(btn, kind){
   const inp = document.getElementById('e_' + kind);
   if(inp && inp.readOnly){
-    inp.readOnly = false; inp.classList.remove('sent'); EXP_EDIT = kind;
+    inp.readOnly = false; EXP_EDIT = kind;
+    inp.closest('.exp-field').classList.remove('sent');
     inp.focus(); try{ inp.select(); }catch(e){}
     btn.textContent = 'Отправить';
     btn.classList.remove('btn-sec'); btn.classList.add('btn-pri');
@@ -1053,6 +1087,12 @@ function mealBox(){
 function renderExpenses(){
   const box = document.getElementById('body');
   if(!EXP){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
+  // Всего за смену — питание плюс всё, что не отклонили. Отклонённое в итог не
+  // идёт: это не деньги, а отказ.
+  const live = (EXP.extras || []).filter(x => EXP_ST(x) !== 'rejected');
+  const total = (EXP.meal || 0) + live.reduce((a, x) => a + (x.amount || 0), 0);
+  const pend = live.filter(x => EXP_ST(x) === 'pending').reduce((a, x) => a + (x.amount || 0), 0);
+  const other = (EXP.extras || []).filter(x => x.kind === 'other');
   box.innerHTML = `
     <div class="sect"><span class="sect-t">Каждый день</span></div>
     ${mealBox()}
@@ -1060,21 +1100,26 @@ function renderExpenses(){
     ${expBox('wash', 'Мойка',  ICO.wash)}
 
     ${EXP_MORE ? `<div class="card exp-card">
-        <div class="exp-hd">${svg(ICO.note,17)}<span class="exp-t">Другой расход</span></div>
+        <div class="exp-hd">${svg(ICO.plus2, 17)}<span class="exp-t">Другой расход</span></div>
         <div class="exp-row">
-          <input class="amt" id="e_other" type="text" inputmode="numeric" placeholder="AED" autocomplete="off">
-          <input class="cmt" id="e_other_c" type="text" placeholder="за что" autocomplete="off">
+          <div class="exp-field"><input class="amt" id="e_other" type="text" inputmode="numeric"
+            placeholder="AED" autocomplete="off"></div>
+          <div class="exp-field cmt"><input id="e_other_c" type="text" placeholder="за что"
+            autocomplete="off"></div>
         </div>
         <button class="btn btn-pri" style="width:100%;margin-top:8px"
           onclick="sendExpense(this,'other')">Отправить на согласование</button>
-        ${expMine('other', true)}
       </div>`
-      : `${expMine('other', true)}
-         <button class="exp-add" onclick="EXP_MORE=true;render()">
+      : `<button class="exp-add" onclick="EXP_MORE=true;render()">
           ${svg(ICO.plus2, 15)} Ещё расход</button>`}
 
-    ${EXP.pending ? `<div class="empty" style="padding:14px">
-      Ждёт решения менеджера: <b style="color:var(--warn)">${fmt(EXP.pending)} AED</b></div>` : ''}`;
+    ${other.length ? `<div class="card exp-card exp-other">${expMine('other')}</div>` : ''}
+
+    <div class="exp-sp"></div>
+    <div class="exp-bar"><div class="exp-bar-in">
+      <div class="exp-bar-l">Всего за смену${pend ? `<i>ждут решения ${fmt(pend)} AED</i>` : ''}</div>
+      <div class="exp-bar-v">${fmt(total)}<i>AED</i></div>
+    </div></div>`;
 }
 
 

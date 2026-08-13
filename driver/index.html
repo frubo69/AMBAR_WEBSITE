@@ -1234,6 +1234,7 @@ document.addEventListener('pointerdown', e => {
 // он должен сразу. Поэтому весь экран, сирена и ползунок: случайным касанием
 // такое не подтвердишь, а не заметить трудно.
 let INC = null, _incT = null, _incW = null, _wake = null, _ac = null, _lastRing = 0;
+let _rangFor = '', _rangOk = false, _incN = 0;   // по какому заказу звонили и вышло ли
 
 function _acUnlock(){
   try{
@@ -1256,7 +1257,20 @@ function _sndUnlock(){
   }catch(e){}
 }
 ['pointerdown','touchstart'].forEach(ev =>
-  document.addEventListener(ev, _sndUnlock, {passive:true}));
+  document.addEventListener(ev, () => {
+    _sndUnlock();
+    // Заказ пришёл, пока телефон лежал в кармане, и звук не пустили: первое
+    // касание — первая возможность его услышать.
+    if(INC && !_rangOk) _siren();
+  }, {passive:true}));
+
+// То же при возвращении в приложение: открыть его — уже действие человека,
+// и телефон обычно пускает звук.
+document.addEventListener('visibilitychange', () => {
+  if(document.hidden) return;
+  _acUnlock();
+  if(INC && !_rangOk) _siren();
+});
 
 // Звук нового заказа — свой файл с нашего сервера. Декодируем один раз и
 // держим в памяти: у водителя в машине рваный интернет, а сигнал не имеет
@@ -1277,17 +1291,21 @@ function _loadSound(){
   return _sndP;
 }
 
+// Сирена отмечает, прозвучала ли она на самом деле. Телефон пускает звук
+// только после касания, а заказ приходит, когда приложение свёрнуто и никто
+// ничего не касался: сигнал уходил в тишину, и водитель узнавал о заказе
+// молча. Раз не прозвучало — пробуем снова, как только появится возможность.
 function _siren(){
   try{ navigator.vibrate && navigator.vibrate([180,80,180,80,320]); }catch(e){}
   try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
   _lastRing = Date.now();
   _acUnlock();
   const play = buf => {
-    if(!buf || !_ac) return _fallback();
+    if(!buf || !_ac || _ac.state !== 'running') return _fallback();
     const src = _ac.createBufferSource();
     src.buffer = buf;
     src.connect(_ac.destination);
-    try{ src.start(); }catch(e){}
+    try{ src.start(); _rangOk = true; }catch(e){}
   };
   // Контекст мог не успеть проснуться: браузер запускает звук только после
   // касания, и resume асинхронный. Ждём его, а не бросаем сигнал в тишину.
@@ -1296,6 +1314,15 @@ function _siren(){
   if(_ac && _ac.state === 'suspended') _ac.resume().then(ring).catch(_fallback);
   else if(_ac) ring();
   else _fallback();
+}
+
+// Звоним один раз на заказ. Повтор — только пока заказ висит непринятым, и
+// не бесконечно: сирена каждые пятнадцать секунд полчаса подряд перестаёт
+// значить «новый заказ» и начинает значить «телефон опять шумит».
+function _sirenFor(oid){
+  if(oid === _rangFor && _rangOk) return;
+  _rangFor = oid; _rangOk = false;
+  _siren();
 }
 
 // Запасной путь: обычный тег audio. Иногда WebAudio не отдают вовсе — тогда
@@ -1383,7 +1410,7 @@ function incShow(o){
   // Три мягкие вспышки — только в момент появления, дальше зовёт звук.
   const g = document.getElementById('incGlow');
   g.classList.remove('on'); void g.offsetWidth; g.classList.add('on');
-  _siren(); _wakeOn();
+  _sirenFor(o.order_id); _wakeOn();
   // Секундомер: сколько заказ уже ждёт водителя. Оператор видит то же самое.
   const t0 = Date.now();
   const w = document.getElementById('incWait');
@@ -1392,10 +1419,17 @@ function incShow(o){
     w.textContent = Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); };
   tick(); _incW = setInterval(tick, 1000);
   if(_incT) clearInterval(_incT);
-  // Пока не принял — напоминаем. Молча висящий заказ ничем не лучше пропущенного.
-  _incT = setInterval(()=>{ if(!document.hidden) _siren(); }, 15000);
+  // Пока не принял — напоминаем, но конечное число раз: три минуты сигналов
+  // достаточно, дальше это уже не сообщение, а шум.
+  _incN = 0;
+  _incT = setInterval(()=>{
+    if(document.hidden) return;
+    if(++_incN > 6){ clearInterval(_incT); _incT = null; return; }
+    _siren();
+  }, 30000);
 }
 function incHide(){
+  _rangFor = ''; _rangOk = false;
   document.getElementById('incOv').classList.remove('show');
   if(_incT){ clearInterval(_incT); _incT = null; }
   if(_incW){ clearInterval(_incW); _incW = null; }

@@ -30,20 +30,38 @@
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,sans-serif;
   font-size:15px;line-height:1.4;min-height:100dvh;
-  padding:calc(10px + var(--safe-top)) 13px calc(18px + var(--tabbar))}
+  padding:calc(76px + var(--safe-top)) 13px calc(18px + var(--tabbar))}
 
 /* шапка */
-.hdr{display:flex;align-items:center;gap:11px;margin-bottom:14px}
-.hdr-av{width:42px;height:42px;flex-shrink:0;border-radius:13px;display:flex;align-items:center;
-  justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;
+/* Шапка приколочена к верху и не меняется при переключении вкладок: она про
+   приложение и про человека, а не про цифры текущего экрана. */
+.hdr{position:fixed;left:0;right:0;top:0;z-index:50;display:flex;align-items:center;gap:12px;
+  padding:calc(10px + var(--safe-top)) 14px 10px;
+  background:rgba(7,7,15,.9);-webkit-backdrop-filter:blur(18px);backdrop-filter:blur(18px);
+  border-bottom:1px solid var(--border2)}
+.hdr-brand{flex:1;min-width:0}
+.hdr-logo{font-family:'Cormorant Garamond',serif;font-size:21px;letter-spacing:6px;
+  color:var(--gold2);line-height:1}
+.hdr-sub{font-size:9px;letter-spacing:2.4px;text-transform:uppercase;color:var(--muted);
+  margin-top:3px}
+.hdr-me{display:flex;align-items:center;gap:10px;padding:5px 12px 5px 5px;border-radius:999px;
+  background:var(--card);border:1px solid var(--border2);max-width:62%}
+.hdr-av{width:34px;height:34px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:700;
   color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
-.hdr-b{flex:1;min-width:0}
-.hdr-n{font-size:16px;font-weight:700;line-height:1.2}
-.hdr-s{font-size:11.5px;color:var(--muted);margin-top:2px}
-.hdr-sum{text-align:right;flex-shrink:0}
-.hdr-sum-v{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;
-  color:var(--gold2);line-height:1;font-variant-numeric:tabular-nums}
-.hdr-sum-l{font-size:8.5px;letter-spacing:.7px;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.hdr-b{min-width:0}
+.hdr-n{font-size:14px;font-weight:700;line-height:1.15;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.hdr-s{font-size:10.5px;color:var(--muted);margin-top:1px;white-space:nowrap}
+
+/* Итог вкладки — там же, где её содержимое */
+.tot{display:flex;align-items:baseline;gap:9px;padding:13px 15px;margin-bottom:12px;
+  border-radius:15px;background:var(--bg3);border:1px solid var(--border2)}
+.tot-l{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
+  color:var(--muted)}
+.tot-v{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;
+  line-height:1;color:var(--gold3);font-variant-numeric:tabular-nums}
+.tot-v i{font-style:normal;font-size:10px;color:var(--muted);margin-left:5px}
 
 /* Активный заказ. Порядок сверху вниз — порядок действий: куда ехать, что
    везти, сколько взять, что нажать. Всё, что не помогает доехать, ниже. */
@@ -463,17 +481,22 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 </head>
 <body>
 
-<div class="hdr">
-  <div class="hdr-av" id="dAv">—</div>
-  <div class="hdr-b">
-    <div class="hdr-n" id="dName">Загрузка…</div>
-    <div class="hdr-s" id="dSub">—</div>
+<!-- Шапка приложения: марка слева, кто на смене справа. Всегда на виду и
+     всегда одна и та же — цифры переехали в свои вкладки, потому что в шапке
+     они меняли смысл при каждом переключении. -->
+<header class="hdr">
+  <div class="hdr-brand">
+    <div class="hdr-logo">AMBAR</div>
+    <div class="hdr-sub">Водитель</div>
   </div>
-  <div class="hdr-sum">
-    <div class="hdr-sum-v" id="dSum">—</div>
-    <div class="hdr-sum-l" id="dSumL">сдал за смену</div>
+  <div class="hdr-me">
+    <div class="hdr-av" id="dAv">—</div>
+    <div class="hdr-b">
+      <div class="hdr-n" id="dName">Загрузка…</div>
+      <div class="hdr-s" id="dSub2">—</div>
+    </div>
   </div>
-</div>
+</header>
 
 <div id="body"><div class="empty">Загрузка…</div></div>
 
@@ -692,7 +715,7 @@ async function boot(){
   catch(e){ document.getElementById('deny').classList.add('show'); return; }
   document.getElementById('dAv').textContent = ME.name.slice(0,2).toUpperCase();
   document.getElementById('dName').textContent = ME.name;
-  document.getElementById('dSub').textContent =
+  document.getElementById('dSub2').textContent =
     `${ME.district_code} ${ME.district_name}${ME.operator ? ' · ' + ME.operator : ''}`;
   await load();
   // Пять секунд, а не сорок пять: заказ должен появляться на экране почти сразу,
@@ -870,15 +893,16 @@ function doneRow(o){ return histCard(o); }
 function renderOrders(){
   const box = document.getElementById('body');
   if(!ORDERS){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
-  document.getElementById('dSum').textContent = fmt(ORDERS.total_aed);
-  document.getElementById('dSumL').textContent = 'сдал за смену';
   const {active, done} = ORDERS;
+  // Итог смены — там же, где заказы, и только если уже есть что показывать.
+  const tot = done.length ? `<div class="tot"><span class="tot-l">Сдал за смену</span>
+      <span class="tot-v">${fmt(ORDERS.total_aed)}<i>AED</i></span></div>` : '';
   if(!active.length && !done.length){
     box.innerHTML = `<div class="empty">На вас пока ничего не назначено.<br>
       Новый заказ придёт сообщением и появится здесь.</div>`;
     return;
   }
-  box.innerHTML =
+  box.innerHTML = tot +
     (active.length
       ? `<div class="sect"><span class="sect-t">В работе</span><span class="sect-v">${active.length}</span></div>`
         + active.map((o, i) => orderCard(o, i)).join('')
@@ -899,13 +923,14 @@ async function loadHistory(){
 function renderHistory(){
   const box = document.getElementById('body');
   if(!HIST){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
-  document.getElementById('dSum').textContent = fmt(HIST.total_aed);
-  document.getElementById('dSumL').textContent = 'за 14 дней';
+
   if(!HIST.days.length){
     box.innerHTML = '<div class="empty">За две недели закрытых заказов нет.</div>';
     return;
   }
-  box.innerHTML = HIST.days.map(g => `
+  box.innerHTML = `<div class="tot"><span class="tot-l">За 14 дней · ${HIST.total_count} заказов</span>
+      <span class="tot-v">${fmt(HIST.total_aed)}<i>AED</i></span></div>`
+    + HIST.days.map(g => `
     <div class="hist-day">
       <span class="hist-day-d">${dayLbl(g.day)}</span>
       <span class="sect-v">${g.count} ${g.count === 1 ? 'заказ' : g.count < 5 ? 'заказа' : 'заказов'}</span>
@@ -938,8 +963,7 @@ function renderExpenses(){
   const LBL = {pending:'ждёт', approved:'принят', rejected:'отклонён'};
   const meal = (EXP.working === null || EXP.working === undefined)
     ? 'смена ещё не отмечена' : (EXP.working ? 'питание · на смене' : 'питание · выходной');
-  document.getElementById('dSum').textContent = fmt(EXP.meal + EXP.approved);
-  document.getElementById('dSumL').textContent = 'расходы за день';
+
   const rows = (EXP.extras || []).map(x => `<div class="exp-line">
         <span class="exp-line-a">${x.amount}</span>
         <span class="exp-line-c">${esc(x.comment)}</span>
@@ -1013,17 +1037,37 @@ function _loadSound(){
 function _siren(){
   try{ navigator.vibrate && navigator.vibrate([180,80,180,80,320]); }catch(e){}
   try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
-  _acUnlock(); if(!_ac) return;
   _lastRing = Date.now();
+  _acUnlock();
   const play = buf => {
-    if(!buf) return;
+    if(!buf || !_ac) return;
     const src = _ac.createBufferSource();
     src.buffer = buf;
     src.connect(_ac.destination);
-    src.start();
+    try{ src.start(); }catch(e){}
   };
-  if(_snd) play(_snd);
-  else { const p = _loadSound(); if(p) p.then(play); }
+  // Контекст мог не успеть проснуться: браузер запускает звук только после
+  // касания, и resume асинхронный. Ждём его, а не бросаем сигнал в тишину.
+  const ring = () => { if(_snd) play(_snd); else { const p = _loadSound(); if(p) p.then(play); } };
+  if(_ac && _ac.state === 'suspended') _ac.resume().then(ring).catch(_fallback);
+  else if(_ac) ring();
+  else _fallback();
+}
+
+// Запасной путь: обычный тег audio. Иногда WebAudio не отдают вовсе — тогда
+// хотя бы так, лишь бы водитель услышал.
+function _fallback(){
+  try{
+    let a = document.getElementById('sndTag');
+    if(!a){
+      a = document.createElement('audio');
+      a.id = 'sndTag'; a.src = '/sounds/new-order.mp3';
+      a.preload = 'auto'; a.setAttribute('playsinline', '');
+      document.body.appendChild(a);
+    }
+    a.currentTime = 0;
+    const p = a.play(); p && p.catch(() => {});
+  }catch(e){}
 }
 
 // Экран не должен гаснуть, пока заказ не принят: телефон лежит на держателе.

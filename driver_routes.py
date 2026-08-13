@@ -483,6 +483,9 @@ async def handle_expenses(request):
         "working": d.get("working"),
         "meal": staff.MEAL_WORKING if d.get("working") is True
                 else (staff.MEAL_OFF if d.get("working") is False else 0),
+        # Ставки — на экран водителю: он должен видеть правило, а не только
+        # итог, иначе каждый раз спрашивает, почему сегодня 40, а не 80.
+        "meal_rates": {"working": staff.MEAL_WORKING, "off": staff.MEAL_OFF},
         "extras": extras,
         "by_kind": {k: {"sum": sum(x.get("amount", 0) for x in live if x["kind"] == k),
                         "count": sum(1 for x in live if x["kind"] == k)}

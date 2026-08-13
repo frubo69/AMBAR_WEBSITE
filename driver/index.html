@@ -222,11 +222,24 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .deny.show{display:flex}
 .deny-t{font-size:17px;font-weight:700}
 .deny-s{font-size:13px;color:var(--muted);line-height:1.6}
-.toast{position:fixed;left:50%;bottom:calc(16px + var(--tabbar));transform:translate(-50%,14px);
-  z-index:200;max-width:88vw;padding:12px 17px;border-radius:12px;pointer-events:none;
-  background:var(--card2);border:1px solid var(--border3);box-shadow:0 10px 30px rgba(0,0,0,.5);
-  font-size:13px;font-weight:600;opacity:0;transition:.18s var(--e1)}
-.toast.on{opacity:1;transform:translate(-50%,0)}
+/* Сообщение о том, что вышло, а что нет. Висит над панелью вкладок, но не
+   на ней: серый брусок впритык к навигации читался как её часть. Значок
+   слева отвечает на главный вопрос — получилось или нет — до чтения текста. */
+/* Сверху, а не снизу: внизу всегда либо ползунок, либо золотая кнопка —
+   сообщение садилось прямо на них. Под шапкой оно ничего не закрывает. */
+.toast{position:fixed;left:50%;top:calc(80px + var(--safe-top));transform:translate(-50%,-10px) scale(.97);
+  z-index:200;max-width:min(90vw,400px);padding:11px 16px 11px 13px;border-radius:14px;
+  pointer-events:none;display:flex;align-items:center;gap:10px;
+  background:rgba(18,18,26,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  border:1px solid rgba(255,255,255,.10);
+  box-shadow:0 14px 40px rgba(0,0,0,.62),0 0 0 1px rgba(0,0,0,.35);
+  font-size:13.5px;font-weight:600;line-height:1.35;letter-spacing:.01em;white-space:nowrap;
+  opacity:0;transition:opacity .2s var(--e1),transform .26s var(--e1)}
+.toast.on{opacity:1;transform:translate(-50%,0) scale(1)}
+.toast .t-i{flex:none;width:26px;height:26px;border-radius:9px;display:grid;place-items:center;
+  background:rgba(201,169,110,.14);color:var(--gold)}
+.toast.err .t-i{background:rgba(224,90,90,.16);color:#E9736F}
+.toast .t-x{overflow:hidden;text-overflow:ellipsis}
 
 /* шторка правки */
 .sheet{position:fixed;inset:0;z-index:90;display:none;align-items:flex-end;
@@ -329,6 +342,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .exp-hd{display:flex;align-items:center;gap:9px;margin-bottom:10px;color:var(--gold2)}
 .exp-t{font-size:14px;font-weight:700;color:var(--text)}
 .exp-sum{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--muted)}
+.exp-sum.set{font-size:14px;font-weight:800;color:var(--gold)}
+/* Окно без ввода: сумму сюда ставит старший, водителю здесь нечего нажимать. */
+.exp-fix .exp-hd{margin-bottom:6px}
+.exp-fix-s{font-size:11.5px;color:var(--muted);line-height:1.45}
 .exp-row{display:flex;gap:7px}
 .exp-row input{min-width:0;padding:12px;border-radius:11px;border:1px solid var(--border2);
   background:var(--bg3);color:var(--text);font-family:inherit;font-size:14px;outline:none}
@@ -695,6 +712,7 @@ const ICO = {
   nav:  '<path d="M3 11l18-8-8 18-2-8z"/>',
   cash: '<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/>',
   box:  '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+  meal: '<path d="M7 3v5.4a2.3 2.3 0 0 0 4.6 0V3"/><path d="M9.3 8.7V21"/><path d="M17.6 3c-1.7 1.5-2.5 3.4-2.5 5.5 0 1.7.8 2.7 2.5 2.9V21"/>',
 };
 const svg = (d, w=19) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none"
   stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
@@ -712,11 +730,18 @@ const ago = iso => { const d = _d(iso); if(!d) return '';
 const dayLbl = iso => { const d = _d(iso + 'T12:00:00Z'); if(!d) return iso;
   return d.toLocaleDateString('ru-RU', {day:'2-digit', month:'long', weekday:'short'}); };
 
-function toast(msg){
+// Неудачу отличаем по значку и цвету, а не по формулировке: водитель читает
+// это на ходу и часто не дочитывает. Длинную фразу держим на экране дольше.
+function toast(msg, kind){
   let el = document.getElementById('_t');
-  if(!el){ el = document.createElement('div'); el.id = '_t'; el.className = 'toast'; document.body.appendChild(el); }
-  el.textContent = msg; el.classList.add('on');
-  clearTimeout(toast._x); toast._x = setTimeout(()=>el.classList.remove('on'), 1900);
+  if(!el){ el = document.createElement('div'); el.id = '_t'; document.body.appendChild(el); }
+  const bad = kind === 'err' || /не |ошиб|уже закрыт|выберите|впишите/i.test(msg);
+  el.className = 'toast' + (bad ? ' err' : '');
+  el.innerHTML = `<span class="t-i">${svg(bad ? ICO.warn : ICO.ok, 15)}</span>` +
+                 `<span class="t-x">${esc(msg)}</span>`;
+  void el.offsetWidth; el.classList.add('on');
+  clearTimeout(toast._x);
+  toast._x = setTimeout(()=>el.classList.remove('on'), 2300);
 }
 
 async function boot(){
@@ -965,13 +990,28 @@ function expBox(kind, title, ico){
   </div>`;
 }
 
+// Питание водитель не заводит и не выбирает: сколько — решает старший, отмечая
+// смену или выходной. Окно нужно, чтобы человек видел сумму и само правило, а
+// не спрашивал каждый день, почему сегодня столько.
+function mealBox(){
+  const r = EXP.meal_rates || {working: 80, off: 40};
+  const set = EXP.working === true || EXP.working === false;
+  return `<div class="card exp-card exp-fix">
+    <div class="exp-hd">${svg(ICO.meal, 17)}<span class="exp-t">Питание</span>
+      <span class="exp-sum${set ? ' set' : ''}">${set ? fmt(EXP.meal) + ' AED' : 'назначит старший'}</span></div>
+    <div class="exp-fix-s">${set
+      ? (EXP.working ? 'смена отмечена старшим' : 'выходной — отметил старший')
+      : `назначает старший · на смене ${r.working}, выходной ${r.off} AED`}</div>
+  </div>`;
+}
+
 function renderExpenses(){
   const box = document.getElementById('body');
   if(!EXP){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
   const st = x => x.status || 'approved';
   const LBL = {pending:'ждёт', approved:'принят', rejected:'отклонён'};
   const meal = (EXP.working === null || EXP.working === undefined)
-    ? 'смена ещё не отмечена' : (EXP.working ? 'питание · на смене' : 'питание · выходной');
+    ? 'питание · смену ещё не отметили' : (EXP.working ? 'питание · на смене' : 'питание · выходной');
 
   const rows = (EXP.extras || []).map(x => `<div class="exp-line">
         <span class="exp-line-a">${x.amount}</span>
@@ -990,6 +1030,7 @@ function renderExpenses(){
     </div>
 
     <div class="sect"><span class="sect-t">Каждый день</span></div>
+    ${mealBox()}
     ${expBox('fuel', 'Бензин', ICO.fuel)}
     ${expBox('wash', 'Мойка',  ICO.wash)}
 
@@ -1191,7 +1232,7 @@ function incKnobReset(){
   t.style.opacity = '1'; t.style.filter = 'none';
   document.getElementById('incSlide').classList.remove('done','drag');
 }
-// Отдача по всему пути: щелчок на старте, короткие толчки на четвертях и
+// Отдача по всему пути: щелчок на старте, насечки под пальцем всю дорогу и
 // подтверждение в конце. Ползунок без отклика ощущается как картинка.
 function _tap(kind){
   try{
@@ -1209,7 +1250,11 @@ function _tap(kind){
   const fill = document.getElementById('incFill');
   const track = document.querySelector('.inc-track');
   if(!bar || !knob) return;
-  let dragging = false, x0 = 0, max = 0, step = 0;
+  let dragging = false, x0 = 0, max = 0, step = 0, lastTick = 0, armed = false;
+  // Ползунок должен ощущаться как ручка с насечками: пока палец идёт — щелчок
+  // за щелчком. Иначе непонятно, тянешь ты что-то или водишь по стеклу.
+  const NOTCH = 12;   // насечек на весь путь
+  const ARM = 0.85;   // отсюда отпускание уже засчитывается
   const paint = v => {
     knob.style.transform = `translateX(${v}px)`;
     const k = max ? v / max : 0;
@@ -1219,7 +1264,8 @@ function _tap(kind){
     track.style.filter = `blur(${(k * 3).toFixed(1)}px)`;
   };
   const start = e => {
-    dragging = true; bar.classList.add('drag'); step = 0;
+    dragging = true; bar.classList.add('drag');
+    step = 0; lastTick = 0; armed = false;
     x0 = (e.touches ? e.touches[0].clientX : e.clientX);
     max = bar.offsetWidth - knob.offsetWidth - 10;
     _tap('sel');
@@ -1229,9 +1275,18 @@ function _tap(kind){
     const x = (e.touches ? e.touches[0].clientX : e.clientX) - x0;
     const v = Math.max(0, Math.min(max, x));
     paint(v);
-    // Ступеньки на четвертях пути: палец чувствует, сколько осталось.
-    const st = Math.floor((v / max) * 4);
-    if(st !== step){ step = st; if(st > 0 && st < 4) _tap('light'); }
+    const k = max ? v / max : 0;
+    // Насечка за насечкой — и назад тоже. Порог отдачи в 40 мс: чаще телефон
+    // всё равно склеит щелчки в дребезг.
+    const st = Math.floor(k * NOTCH), now = Date.now();
+    if(st !== step && now - lastTick > 40){
+      step = st; lastTick = now;
+      if(st > 0 && st < NOTCH) _tap('sel');
+    }
+    // Точка, после которой заказ примется при отпускании, — отдельным толчком:
+    // палец узнаёт, что дальше можно не тянуть.
+    if(!armed && k >= ARM){ armed = true; _tap('light'); }
+    else if(armed && k < ARM) armed = false;
     if(e.cancelable) e.preventDefault();
   };
   const end = () => {
@@ -1261,8 +1316,8 @@ async function incAccept(){
   try{
     await drvApi.drvFetch(`/api/driver/orders/${encodeURIComponent(oid)}/ack`, {method:'POST'});
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    toast('Принято — оператор видит, что вы выехали');
-  }catch(e){ toast('Не отправилось — попробуйте ещё раз'); incKnobReset(); return; }
+    toast('Принято — оператор видит');
+  }catch(e){ toast('Не отправилось — повторите'); incKnobReset(); return; }
   incHide(); _wakeOff();
   await load();
 }
@@ -1298,7 +1353,7 @@ async function sendDeliver(oid){
     HIST = null;                       // история устарела
     await load();
   }catch(e){
-    toast(e.status === 409 ? 'Заказ уже закрыт' : 'Не получилось — попробуйте ещё раз');
+    toast(e.status === 409 ? 'Заказ уже закрыт' : 'Не получилось — повторите');
   }
 }
 
@@ -1443,7 +1498,7 @@ function pickAdd(pid, pcs){
   if(ex) ex.qty++;
   else EDIT_LINES.push({id: pid, name: p.name, qty: 1, was: 0, price,
                         ...(pcs ? {pcs} : {})});
-  toast(`${p.name} добавлен`);
+  toast(`${p.name.length > 20 ? p.name.slice(0, 19) + '…' : p.name} добавлен`);
   try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 
@@ -1461,17 +1516,17 @@ async function sendEdit(btn){
   const text = [EDIT_TAGS.join(', '), free].filter(Boolean).join(' — ');
   const body = {kind: EDIT_MODE === 'items' ? 'edit' : (EDIT_MODE === 'cancel' ? 'cancel' : 'note')};
   if(EDIT_MODE === 'cancel'){
-    if(!text){ toast('Выберите причину или напишите, что случилось'); return; }
+    if(!text){ toast('Выберите причину'); return; }
     body.text = text;
   }else if(EDIT_MODE === 'items'){
     const live = EDIT_LINES.filter(l => l.qty > 0);
-    if(!live.length){ toast('Не осталось позиций — тогда это отмена, вкладка справа'); return; }
+    if(!live.length){ toast('Убрали всё — это отмена'); return; }
     const changed = EDIT_LINES.some(l => l.qty !== l.was);
     if(!changed){ toast('Состав не изменён'); return; }
     body.items = live.map(l => ({id: l.id, qty: l.qty, ...(l.pcs ? {pcs: l.pcs} : {})}));
     if(text) body.text = text;
   }else{
-    if(!text){ toast('Выберите причину или напишите, что не так'); return; }
+    if(!text){ toast('Выберите причину'); return; }
     body.text = text;
   }
   btn.disabled = true;
@@ -1479,7 +1534,7 @@ async function sendEdit(btn){
     await drvApi.drvFetch(`/api/driver/orders/${encodeURIComponent(EDIT_OID)}/edit`,
       {method:'POST', body});
     closeEdit();
-    toast(EDIT_MODE === 'cancel' ? 'Просьба об отмене ушла оператору' : 'Отправлено оператору');
+    toast(EDIT_MODE === 'cancel' ? 'Отмена ушла оператору' : 'Отправлено оператору');
     await load();
   }catch(e){ toast('Не отправилось'); }
   btn.disabled = false;

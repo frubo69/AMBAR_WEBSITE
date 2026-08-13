@@ -417,6 +417,19 @@ async def handle_edit_request(request):
 EXPENSE_KINDS = {"fuel": "Бензин", "wash": "Мойка", "other": ""}
 
 
+def _kind_of(x: dict) -> str:
+    """Вид расхода. У записей до разделения по видам его нет — узнаём по
+    комментарию, иначе вчерашний бензин уедет в «прочее» и водитель заведёт
+    второй."""
+    k = x.get("kind")
+    if k in EXPENSE_KINDS:
+        return k
+    c = (x.get("comment") or "").lower()
+    if "бензин" in c or "топлив" in c or "fuel" in c: return "fuel"
+    if "мойк" in c or "wash" in c:                    return "wash"
+    return "other"
+
+
 @require_driver
 async def handle_expense_add(request):
     """Расход на согласование. Сразу в расходы дня он не попадает: иначе водитель
@@ -438,17 +451,35 @@ async def handle_expense_add(request):
         return web.json_response({"error": "amount_and_comment_required"},
                                  status=400, headers=CORS_HEADERS)
     day = _biz_day()
-    item = {"id": secrets.token_hex(6), "amount": amount, "comment": comment,
-            "kind": kind, "by_driver": me["name"], "status": "pending",
-            "at": datetime.now(timezone.utc).isoformat()}
-    await db.add_driver_expense(day, me["name"], item)
-    log.info(f"[driver] {me['name']} просит {amount} AED — {comment}")
+    now_iso = datetime.now(timezone.utc).isoformat()
+
+    # Бензин и мойка — одна запись за смену, водитель правит её же. Заправился
+    # дважды — пишет общее число, а не заводит вторую строку: в приложении у
+    # каждого вида одно поле, и оно должно совпадать с тем, что в учёте.
+    prev = None
+    if kind in ("fuel", "wash"):
+        d = await db.get_driver_day(day, me["name"]) or {}
+        prev = next((x for x in (d.get("extras") or []) if _kind_of(x) == kind), None)
+
+    if prev:
+        await db.update_driver_expense(day, me["name"], prev["id"], amount, comment)
+        item = {**prev, "amount": amount, "comment": comment, "kind": kind,
+                "status": "pending", "edited_at": now_iso}
+        log.info(f"[driver] {me['name']} поправил {comment}: "
+                 f"{prev.get('amount')} → {amount} AED")
+    else:
+        item = {"id": secrets.token_hex(6), "amount": amount, "comment": comment,
+                "kind": kind, "by_driver": me["name"], "status": "pending",
+                "at": now_iso}
+        await db.add_driver_expense(day, me["name"], item)
+        log.info(f"[driver] {me['name']} просит {amount} AED — {comment}")
     try:
         from owner_routes import notify_owners
+        was = f" (было {prev.get('amount')})" if prev else ""
         await notify_owners(
             "expenses.request",
-            f"💸 *Расход на согласование*\n"
-            f"{me['name']} ({me['district_code']}) — {amount} AED\n"
+            f"{'✏️ *Расход изменён*' if prev else '💸 *Расход на согласование*'}\n"
+            f"{me['name']} ({me['district_code']}) — {amount} AED{was}\n"
             f"_{comment}_")
     except Exception as e:
         log.warning(f"[driver] уведомление о расходе: {e}")
@@ -464,19 +495,8 @@ async def handle_expenses(request):
     extras = list(d.get("extras") or [])
     st = lambda x: x.get("status") or "approved"      # старые записи — от менеджера
 
-    # Вид расхода у старых записей не проставлен — узнаём его по комментарию,
-    # иначе вчерашний бензин уехал бы в «прочее» и водитель завёл бы второй.
-    def _kind(x):
-        k = x.get("kind")
-        if k in EXPENSE_KINDS:
-            return k
-        c = (x.get("comment") or "").lower()
-        if "бензин" in c or "топлив" in c or "fuel" in c: return "fuel"
-        if "мойк" in c or "wash" in c:                    return "wash"
-        return "other"
-
     for x in extras:
-        x["kind"] = _kind(x)
+        x["kind"] = _kind_of(x)
     live = [x for x in extras if st(x) != "rejected"]
     return web.json_response({
         "day": day,

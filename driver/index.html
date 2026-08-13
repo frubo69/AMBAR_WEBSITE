@@ -320,6 +320,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .btn-wait{display:flex;align-items:center;justify-content:center;gap:7px;
   background:var(--card2);color:var(--warn);border:1px solid rgba(243,180,74,.3)}
 .btn-danger{background:linear-gradient(135deg,#E86A6A,#C94E4E);color:#fff}
+.btn-sec{background:var(--card2);color:var(--sub);border:1px solid var(--border2)}
 .seg.seg3{grid-template-columns:1fr 1fr 1fr}
 .ed-warn{padding:10px 12px;margin-bottom:11px;border-radius:11px;font-size:12.5px;
   line-height:1.5;color:var(--warn);background:var(--warn-soft);
@@ -330,16 +331,21 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .exp-hd{display:flex;align-items:center;gap:9px;margin-bottom:10px;color:var(--gold2)}
 .exp-t{font-size:14px;font-weight:700;color:var(--text)}
 .exp-sum{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--muted)}
-.exp-sum.set{font-size:14px;font-weight:800;color:var(--gold)}
-/* Окно без ввода: сумму сюда ставит старший, водителю здесь нечего нажимать. */
-.exp-fix .exp-hd{margin-bottom:6px}
-.exp-fix-s{font-size:11.5px;color:var(--muted);line-height:1.45}
+
 .exp-row{display:flex;gap:7px}
 .exp-row input{min-width:0;padding:12px;border-radius:11px;border:1px solid var(--border2);
   background:var(--bg3);color:var(--text);font-family:inherit;font-size:14px;outline:none}
 .exp-row input:focus{border-color:rgba(201,169,110,.5)}
 .exp-row .amt{flex:1;min-width:0;font-weight:700;font-size:16px}
 .exp-row .cmt{flex:1.4}
+.exp-row .amt.sent{color:var(--muted);background:var(--card2)}
+/* Питание — та же сетка, но вместо кнопки пометка: нажимать здесь нечего. */
+.exp-fix-v{display:flex;align-items:baseline;gap:2px;letter-spacing:.01em;color:var(--dim)}
+.exp-fix-v b{font-weight:800}
+.exp-fix-v b.on{color:var(--gold)}
+.exp-fix-v i{font-style:normal;font-size:11px;font-weight:700;margin-left:4px;color:var(--muted)}
+.exp-fix-n{flex:0 0 auto;max-width:46%;align-self:center;text-align:right;
+  font-size:11.5px;line-height:1.35;color:var(--muted)}
 .exp-go{flex:0 0 auto;width:auto;padding:13px 22px}
 .exp-none{font-size:12.5px;color:var(--muted);padding:4px 2px}
 .exp-mine{display:flex;flex-wrap:wrap;gap:6px;margin-top:9px}
@@ -778,7 +784,7 @@ async function load(){
 }
 
 function setTab(t){
-  TAB = t;
+  TAB = t; EXP_EDIT = null;
   document.querySelectorAll('.tb').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   if(t === 'history' && !HIST) loadHistory(); else render();
   try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
@@ -788,6 +794,10 @@ function setTab(t){
 function render(){
   if(TAB === 'orders')   return renderOrders();
   if(TAB === 'history')  return renderHistory();
+  // Пока водитель вписывает сумму, экран не трогаем: обновление раз в пять
+  // секунд иначе стирает недописанное число прямо из-под пальца.
+  const a = document.activeElement;
+  if(EXP_EDIT || (a && a.tagName === 'INPUT')) return;
   return renderExpenses();
 }
 
@@ -972,7 +982,7 @@ function renderHistory(){
 // ── расходы ───────────────────────────────────────────────────────────────
 // Бензин и мойка — не «прочий расход», а ежедневная работа машины: у каждого
 // своё окно с суммой, чтобы вписать одно число и не объяснять, за что.
-let EXP_MORE = false;
+let EXP_MORE = false, EXP_EDIT = null;   // какой расход водитель правит прямо сейчас
 const EXP_ST  = x => x.status || 'approved';   // старые записи — от менеджера
 const EXP_LBL = {pending:'ждёт', approved:'принят', rejected:'отклонён'};
 
@@ -987,18 +997,38 @@ function expMine(kind, withComment){
       ${EXP_LBL[EXP_ST(x)] || EXP_ST(x)}</span>`).join('')}</div>`;
 }
 
+// Отправленное не стирается: сумма остаётся в поле серым, а кнопка становится
+// «Редактировать». Пустое поле после отправки не отвечало на единственный
+// вопрос водителя — дошло или нет.
 function expBox(kind, title, ico){
   const k = (EXP.by_kind || {})[kind] || {sum:0, count:0};
+  const sent = (EXP.extras || []).find(x => x.kind === kind);
   return `<div class="card exp-card">
     <div class="exp-hd">${svg(ico, 17)}<span class="exp-t">${title}</span>
       <span class="exp-sum">${k.sum ? fmt(k.sum) + ' AED' : 'сегодня не было'}</span></div>
     <div class="exp-row">
-      <input class="amt" id="e_${kind}" type="text" inputmode="numeric" placeholder="AED"
-        autocomplete="off">
-      <button class="btn btn-pri exp-go" onclick="sendExpense(this,'${kind}')">Отправить</button>
+      <input class="amt${sent ? ' sent' : ''}" id="e_${kind}" type="text" inputmode="numeric"
+        placeholder="AED" autocomplete="off"
+        value="${sent ? sent.amount : ''}"${sent ? ' readonly' : ''}>
+      <button class="btn ${sent ? 'btn-sec' : 'btn-pri'} exp-go"
+        onclick="expTap(this,'${kind}')">${sent ? 'Редактировать' : 'Отправить'}</button>
     </div>
     ${expMine(kind)}
   </div>`;
+}
+
+// Первое нажатие открывает поле, второе отправляет. Правка уходит той же
+// записью — у бензина за смену одна сумма, а не список попыток.
+function expTap(btn, kind){
+  const inp = document.getElementById('e_' + kind);
+  if(inp && inp.readOnly){
+    inp.readOnly = false; inp.classList.remove('sent'); EXP_EDIT = kind;
+    inp.focus(); try{ inp.select(); }catch(e){}
+    btn.textContent = 'Отправить';
+    btn.classList.remove('btn-sec'); btn.classList.add('btn-pri');
+    return;
+  }
+  sendExpense(btn, kind);
 }
 
 // Питание водитель не заводит и не выбирает: сколько — решает старший, отмечая
@@ -1006,13 +1036,17 @@ function expBox(kind, title, ico){
 // не спрашивал каждый день, почему сегодня столько.
 function mealBox(){
   const r = EXP.meal_rates || {working: 80, off: 40};
-  const set = EXP.working === true || EXP.working === false;
+  const on = EXP.working === true ? 'w' : (EXP.working === false ? 'o' : '');
   return `<div class="card exp-card exp-fix">
-    <div class="exp-hd">${svg(ICO.meal, 17)}<span class="exp-t">Питание</span>
-      <span class="exp-sum${set ? ' set' : ''}">${set ? fmt(EXP.meal) + ' AED' : 'назначит старший'}</span></div>
-    <div class="exp-fix-s">${set
-      ? (EXP.working ? 'смена отмечена старшим' : 'выходной — отметил старший')
-      : `назначает старший · на смене ${r.working}, выходной ${r.off} AED`}</div>
+    <div class="exp-hd">${svg(ICO.meal, 17)}<span class="exp-t">Питание</span></div>
+    <div class="exp-row">
+      <div class="amt exp-fix-v">
+        <b class="${on === 'w' ? 'on' : ''}">${r.working}</b>/<b class="${on === 'o' ? 'on' : ''}">${r.off}</b>
+        <i>AED</i>
+      </div>
+      <div class="exp-fix-n">${on ? (on === 'w' ? 'смену отметил старший' : 'выходной — отметил старший')
+                                  : 'отмечает старший'}</div>
+    </div>
   </div>`;
 }
 
@@ -1545,7 +1579,8 @@ async function sendExpense(btn, kind){
     await drvApi.drvFetch('/api/driver/expenses', {method:'POST', body:{amount, comment, kind}});
     toast('Отправлено на согласование');
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    EXP_MORE = false;
+    EXP_MORE = false; EXP_EDIT = null;
+    try{ btn.blur(); document.activeElement.blur(); }catch(e){}
     await load();
   }catch(e){ toast('Не отправилось'); }
   btn.disabled = false;

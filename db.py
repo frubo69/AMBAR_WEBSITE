@@ -2006,6 +2006,24 @@ async def add_driver_expense(day: str, driver: str, item: dict):
     )
 
 
+async def update_driver_expense(day: str, driver: str, item_id: str,
+                                amount: int, comment: str) -> bool:
+    """Водитель поправил свою же трату. Решение менеджера при этом сбрасывается:
+    утверждали одну сумму, а стала другая — значит, смотреть надо заново."""
+    db = _db_or_none()
+    if db is None: return False
+    now = datetime.now(timezone.utc).isoformat()
+    r = await db.driver_days.update_one(
+        {"day": day, "driver": driver, "extras.id": item_id},
+        {"$set": {"extras.$.amount": amount,
+                  "extras.$.comment": comment,
+                  "extras.$.status": "pending",
+                  "extras.$.edited_at": now},
+         "$unset": {"extras.$.decided_by": "", "extras.$.decided_at": ""}},
+    )
+    return bool(r.matched_count)
+
+
 async def set_driver_expense_status(day: str, driver: str, item_id: str,
                                     status: str, by: int) -> bool:
     """Решение менеджера по трате. Позиционный $ обновляет ровно тот элемент

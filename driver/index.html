@@ -47,67 +47,67 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 
 /* Активный заказ. Порядок сверху вниз — порядок действий: куда ехать, что
    везти, сколько взять, что нажать. Всё, что не помогает доехать, ниже. */
-.ord{background:var(--card);border:1px solid var(--border2);border-radius:18px;
+/* Карточка заказа — тот же лист со строками, что и на экране приёма: один
+   заказ не должен выглядеть по-разному в двух местах. */
+.ord{background:var(--bg3);border:1px solid var(--border2);border-radius:20px;
   margin-bottom:12px;overflow:hidden;transition:.2s var(--e1)}
-.ord.next{border-color:rgba(201,169,110,.4);background:linear-gradient(180deg,
-  rgba(201,169,110,.05),transparent 120px)}
-.ord-hd{display:flex;align-items:center;gap:8px;padding:10px 15px;font-size:11px;
-  color:var(--muted);border-bottom:1px solid var(--border2)}
-.ord-seq{width:22px;height:22px;flex-shrink:0;border-radius:7px;display:flex;align-items:center;
-  justify-content:center;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;
+.ord.next{border-color:rgba(201,169,110,.4)}
+.ord-row{padding:14px 16px;border-top:1px solid var(--border2)}
+.ord-row:first-child{border-top:none}
+.ord-row-hd{display:flex;align-items:center;gap:9px;padding:12px 16px;font-size:11.5px;
+  color:var(--muted)}
+.ord-seq{width:22px;height:22px;flex-shrink:0;border-radius:7px;display:flex;
+  align-items:center;justify-content:center;font-size:11px;font-weight:800;
   background:var(--card2);color:var(--muted)}
 .ord.next .ord-seq{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408}
 .ord-id{font-family:'Space Grotesk',sans-serif;font-size:11.5px;font-weight:700;color:var(--sub)}
-.ord-time{margin-left:auto}
-.ord-bd{padding:15px}
+.ord-dist{color:var(--gold2);font-weight:700}
+.ord-ago{margin-left:auto}
+.ord-l{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:8px;display:flex;align-items:baseline;gap:7px}
+.ord-l b{font-weight:700;color:var(--sub);letter-spacing:.4px;text-transform:none;font-size:11.5px}
 
-/* адрес — самое крупное на карточке: за ним водитель сюда и заходит */
-.ord-addr{display:block;width:100%;text-align:left;padding:0;border:none;background:none;
-  color:inherit;font-family:inherit;cursor:pointer;margin-bottom:10px}
-.ord-addr-t{font-size:19px;font-weight:700;line-height:1.25;letter-spacing:-.3px}
-.ord-addr:active .ord-addr-t{opacity:.6}
-
-/* Маршрут — главная кнопка водителя, а не ссылка под адресом: он жмёт её на
-   каждом заказе, часто на ходу и не глядя. */
+/* Адрес и маршрут — одно целое: сначала куда, сразу под ним чем доехать. */
+.ord-addr-t{font-size:22px;font-weight:800;line-height:1.2;letter-spacing:-.4px}
 .ord-map{display:flex;align-items:center;justify-content:center;gap:9px;width:100%;
-  height:52px;margin-bottom:12px;border-radius:14px;cursor:pointer;font-family:inherit;
-  font-size:15px;font-weight:700;letter-spacing:.2px;color:var(--gold2);
-  background:var(--gold-soft);border:1px solid rgba(201,169,110,.45)}
+  height:52px;margin-top:12px;border-radius:14px;cursor:pointer;font-family:inherit;
+  font-size:15px;font-weight:700;color:var(--gold2);background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.45)}
 .ord-map:active{transform:scale(.985);background:rgba(201,169,110,.18)}
-.ord-map svg{width:19px;height:19px}
-.ord-map i{font-style:normal;margin-left:auto;font-size:11px;font-weight:600;
-  color:var(--muted)}
 
-/* Сколько взять — вторая по важности строка: она про деньги в кармане. */
-.ord-cash{display:flex;align-items:center;gap:10px;padding:13px 14px;margin-bottom:10px;
-  border-radius:13px;background:var(--bg3);border:1px solid var(--border2)}
-.ord-cash-l{font-size:10px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;
-  color:var(--muted)}
-.ord-cash-v{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:27px;
-  font-weight:700;letter-spacing:0;font-variant-numeric:tabular-nums;line-height:1;
-  color:var(--gold3)}
-.ord-cash-u{font-size:10px;color:var(--muted);letter-spacing:.5px}
-.ord-cash.debt{background:var(--warn-soft);border-color:rgba(243,180,74,.35)}
-.ord-cash.debt .ord-cash-l{color:var(--warn)}
-.ord-cash.debt .ord-cash-v{color:var(--warn)}
-
-.ord-items{display:flex;flex-direction:column;gap:8px;padding:12px 13px;margin-bottom:11px;
-  border-radius:13px;background:var(--bg3);border:1px solid var(--border2)}
-.ord-items-h{display:flex;align-items:center;gap:7px;font-size:10px;font-weight:700;
-  letter-spacing:1.1px;text-transform:uppercase;color:var(--muted)}
-.ord-item{display:flex;align-items:baseline;gap:10px;font-size:14px}
+.ord-note{font-size:15px;line-height:1.4;color:var(--text)}
+.ord-items{display:flex;flex-direction:column;gap:9px}
+.ord-item{display:flex;gap:10px;font-size:15px}
 .ord-item span{flex:1;min-width:0;color:var(--text)}
-.ord-item b{font-family:'DM Sans',sans-serif;font-weight:700;color:var(--gold2);
-  font-variant-numeric:tabular-nums;flex-shrink:0}
+.ord-item span i{font-style:normal;color:var(--muted)}
+.ord-item b{color:var(--gold2);font-variant-numeric:tabular-nums;flex-shrink:0}
 
-.ord-flag{display:flex;gap:8px;font-size:12.5px;padding:10px 12px;border-radius:11px;
-  margin-bottom:11px;line-height:1.45}
-.ord-flag.warn{color:var(--warn);background:var(--warn-soft);border:1px solid rgba(243,180,74,.3)}
-.ord-flag.info{color:var(--sub);background:var(--card2);border:1px solid var(--border3)}
-.ord-flag.info b{color:var(--info);font-weight:600}
-.ord-flag.ok{color:var(--up);background:var(--up-soft);border:1px solid rgba(76,175,125,.3)}
-.ord-flag.no{color:var(--dn);background:var(--dn-soft);border:1px solid rgba(224,85,85,.3)}
-.ord-acts{display:grid;grid-template-columns:1fr auto;gap:8px}
+/* Оплата и итог — той же сеткой, что на экране приёма */
+.ord-row-pay{display:grid;grid-template-columns:1fr auto;column-gap:14px;row-gap:8px;
+  align-items:baseline;background:rgba(201,169,110,.05)}
+.ord-row-pay .ord-l{margin-bottom:0}
+.ord-l-r{justify-content:flex-end}
+.ord-method{display:flex;align-items:center;gap:7px;font-size:17px;font-weight:700;
+  line-height:1.1;color:var(--text);white-space:nowrap}
+.ord-method-s{grid-column:1 / -1;margin-top:-3px;padding-left:24px;font-size:12px;
+  color:var(--muted)}
+.ord-total{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;
+  line-height:1;letter-spacing:-.8px;color:var(--gold3);white-space:nowrap}
+.ord-total i{font-style:normal;font-size:11px;color:var(--muted);margin-left:5px}
+.ord-row-pay.debt{background:var(--warn-soft)}
+.ord-row-pay.debt .ord-method,.ord-row-pay.debt .ord-total{color:var(--warn)}
+.ord-row-pay.paid{background:var(--up-soft)}
+.ord-row-pay.paid .ord-method,.ord-row-pay.paid .ord-total{color:var(--up)}
+
+/* Строка о просьбе: на какой стадии решение оператора */
+.ord-row-req{display:flex;gap:9px;align-items:flex-start;font-size:13px;line-height:1.4}
+.ord-row-req.warn{color:var(--warn);background:var(--warn-soft)}
+.ord-row-req.ok{color:var(--up);background:var(--up-soft)}
+.ord-row-req.no{color:var(--dn);background:var(--dn-soft)}
+.ord-row-req svg{flex-shrink:0;margin-top:1px}
+
+.ord-foot{display:grid;grid-template-columns:1fr auto;gap:9px;padding:14px 16px;
+  border-top:1px solid var(--border2)}
 .btn{padding:15px 10px;border:none;border-radius:13px;cursor:pointer;font-family:inherit;
   font-size:14.5px;font-weight:700;transition:.15s var(--e1)}
 .btn:active{transform:scale(.97)}
@@ -271,7 +271,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 /* ждём оператора — кнопка есть, но она не действие, а состояние */
 .btn-wait{display:flex;align-items:center;justify-content:center;gap:7px;
   background:var(--card2);color:var(--warn);border:1px solid rgba(243,180,74,.3)}
-.ord-hint{margin-top:9px;font-size:11.5px;color:var(--muted);line-height:1.5}
 .btn-danger{background:linear-gradient(135deg,#E86A6A,#C94E4E);color:#fff}
 .seg.seg3{grid-template-columns:1fr 1fr 1fr}
 .ed-warn{padding:10px 12px;margin-bottom:11px;border-radius:11px;font-size:12.5px;
@@ -723,7 +722,7 @@ function render(){
 // равнозначных, и решать, куда ехать, приложение должно за него.
 function orderCard(o, i){
   const items = o.items.map(it => `<div class="ord-item">
-      <span>${esc(it.name)}${it.pcs ? ` <i style="font-style:normal;color:var(--muted)">${it.pcs} шт</i>` : ''}</span>
+      <span>${esc(it.name)}${it.pcs ? ` <i>${it.pcs} шт</i>` : ''}</span>
       <b>${it.qty} шт</b></div>`).join('');
   const addr = esc(o.address) || 'Адрес не указан';
   const hasMap = !!(o.gmap_link || (o.location && o.location.lat));
@@ -750,51 +749,61 @@ function orderCard(o, i){
         : req.status === 'rejected'
           ? ['no', `Оператор отклонил: ${(KIND[req.kind] || 'просьбу').toLowerCase()}`]
           : (DONE[req.kind] || ['ok','Оператор принял']));
-  // Порядок на карточке — порядок работы: куда ехать, сколько взять, что везти.
-  const debt = o.payment_method === 'debt';
+  const debt = o.payment_method === 'debt', paid = !!o.prepaid;
   const n = (o.items || []).length;
+  // Оплата описывается там же и теми же словами, что на экране приёма.
+  const PAY = paid ? {ico: ICO.ok,   t: 'Оплачено онлайн', s: 'денег не брать'}
+            : (debt ? {ico: ICO.warn, t: 'В долг',          s: 'денег не брать'}
+                    : {ico: ICO.cash, t: 'Наличными',       s: ''});
+  // Карточка живёт по той же грамматике, что и экран приёма: строки одна под
+  // другой в порядке работы, с разделителями. Разные оформления у одного и
+  // того же заказа заставляли читать его заново на каждом экране.
   return `<div class="ord ${i === 0 ? 'next' : ''}">
-    <div class="ord-hd">
+    <div class="ord-row ord-row-hd">
       <span class="ord-seq">${i + 1}</span>
       <span class="ord-id">#${esc(o.order_id)}</span>
-      <span>${esc(o.district || '')}</span>
-      <span class="ord-time">${ago(o.confirmed_at || o.timestamp)}${
-        o.deliver_by ? ' · до ' + esc(o.deliver_by) : ''}</span>
+      <span class="ord-dist">${esc(o.district || '')}</span>
+      <span class="ord-ago">${ago(o.confirmed_at || o.timestamp)}</span>
     </div>
-    <div class="ord-bd">
-      <button class="ord-addr" onclick="route(${mapArgs})">
-        <span class="ord-addr-t">${addr}</span>
-      </button>
+
+    <div class="ord-row">
+      <div class="tstrip">${timeStrip(o)}</div>
+    </div>
+
+    <div class="ord-row">
+      <div class="ord-l">Куда</div>
+      <div class="ord-addr-t">${addr}</div>
       ${hasMap ? `<button class="ord-map" onclick="route(${mapArgs})">
-        ${svg(ICO.nav, 19)} Маршрут <i>в картах</i></button>` : ''}
+        ${svg(ICO.nav, 19)} Маршрут</button>` : ''}
+    </div>
 
-      <div class="ord-cash ${debt ? 'debt' : ''}">
-        <span class="ord-cash-l">${debt ? 'В долг · не брать' : 'Взять с клиента'}</span>
-        <span class="ord-cash-v">${debt ? '0' : fmt(o.total)}</span>
-        <span class="ord-cash-u">AED</span>
-      </div>
+    ${o.comment ? `<div class="ord-row">
+      <div class="ord-l">Комментарий к заказу</div>
+      <div class="ord-note">${esc(o.comment)}</div>
+    </div>` : ''}
 
-      <div class="ord-items">
-        <div class="ord-items-h">${svg(ICO.box, 13)} Что везём · ${n}</div>
-        ${items}
-      </div>
+    <div class="ord-row">
+      <div class="ord-l">Что везём <b>${n} ${n === 1 ? 'позиция' : (n < 5 ? 'позиции' : 'позиций')}</b></div>
+      <div class="ord-items">${items}</div>
+    </div>
 
-      ${debt ? `<div class="ord-flag warn">${svg(ICO.warn, 15)}<span>Заказ <b>в долг</b> — наличные с клиента не берём, сумма ${fmt(o.total)} AED уже за ним</span></div>` : ''}
-      ${o.comment ? `<div class="ord-flag info">${svg(ICO.note, 15)}<span>${esc(o.comment)}</span></div>` : ''}
-      ${req ? `<div class="ord-flag ${reqFlag[0]}">${svg(ICO.edit, 15)}<span>${reqFlag[1]}</span></div>` : ''}
+    <div class="ord-row ord-row-pay ${paid ? 'paid' : (debt ? 'debt' : '')}">
+      <div class="ord-l">Оплата</div>
+      <div class="ord-l ord-l-r">Итого</div>
+      <div class="ord-method">${svg(PAY.ico, 17)}${PAY.t}</div>
+      <div class="ord-total">${fmt(o.total)}<i>AED</i></div>
+      ${PAY.s ? `<div class="ord-method-s">${PAY.s}</div>` : ''}
+    </div>
 
-      <div class="ord-acts">
-        ${open && (req.kind === 'delivered' || req.kind === 'cancel')
-          ? `<button class="btn btn-wait" disabled>${svg(ICO.clock,16)} Ждём оператора</button>`
-          : `<button class="btn btn-pri" onclick="askDeliver('${esc(o.order_id)}')">Доставил</button>`}
-        <button class="btn btn-ico" title="Изменить, отменить или сообщить"
-          onclick="openEdit('${esc(o.order_id)}')">${svg(ICO.edit)}</button>
-      </div>
-      ${open && req.kind === 'delivered'
-        ? '<div class="ord-hint">Заказ закрывает оператор — как только подтвердит, он уйдёт в «Закрыто сегодня».</div>'
-        : (open && req.kind === 'cancel'
-          ? '<div class="ord-hint">Отменяет заказ оператор. Передумали — отправьте новое сообщение кнопкой справа.</div>'
-          : '')}
+    ${req ? `<div class="ord-row ord-row-req ${reqFlag[0]}">
+      ${svg(ICO.edit, 15)}<span>${reqFlag[1]}</span></div>` : ''}
+
+    <div class="ord-foot">
+      ${open && (req.kind === 'delivered' || req.kind === 'cancel')
+        ? `<button class="btn btn-wait" disabled>${svg(ICO.clock,16)} Ждём оператора</button>`
+        : `<button class="btn btn-pri" onclick="askDeliver('${esc(o.order_id)}')">Доставил</button>`}
+      <button class="btn btn-ico" title="Изменить, отменить или сообщить"
+        onclick="openEdit('${esc(o.order_id)}')">${svg(ICO.edit)}</button>
     </div>
   </div>`;
 }

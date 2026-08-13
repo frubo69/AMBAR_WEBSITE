@@ -44,15 +44,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   color:var(--gold2);line-height:1}
 .hdr-sub{font-size:9px;letter-spacing:2.4px;text-transform:uppercase;color:var(--muted);
   margin-top:3px}
-.hdr-me{display:flex;align-items:center;gap:10px;padding:5px 12px 5px 5px;border-radius:999px;
-  background:var(--card);border:1px solid var(--border2);max-width:62%}
+.hdr-me{display:flex;align-items:center;gap:9px;padding:5px 14px 5px 5px;border-radius:999px;
+  background:var(--card);border:1px solid var(--border2);max-width:60%}
 .hdr-av{width:34px;height:34px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;
   justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:700;
   color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
-.hdr-b{min-width:0}
-.hdr-n{font-size:14px;font-weight:700;line-height:1.15;white-space:nowrap;overflow:hidden;
+.hdr-n{font-size:14.5px;font-weight:700;line-height:1;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis}
-.hdr-s{font-size:10.5px;color:var(--muted);margin-top:1px;white-space:nowrap}
 
 /* Итог вкладки — там же, где её содержимое */
 .tot{display:flex;align-items:baseline;gap:9px;padding:13px 15px;margin-bottom:12px;
@@ -67,13 +65,24 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    везти, сколько взять, что нажать. Всё, что не помогает доехать, ниже. */
 /* Карточка заказа — тот же лист со строками, что и на экране приёма: один
    заказ не должен выглядеть по-разному в двух местах. */
-.ord{background:var(--bg3);border:1px solid var(--border2);border-radius:20px;
-  margin-bottom:12px;overflow:hidden;transition:.2s var(--e1)}
-.ord.next{border-color:rgba(201,169,110,.4)}
+/* Между заказами должен быть виден шов: карточки тёмные на тёмном, и без
+   явного начала они читались как одна длинная лента. Шапка каждой — плашка со
+   своим фоном, а между карточками воздух вдвое больше внутренних отступов. */
+.ord{background:var(--bg3);border:1px solid var(--border3);border-radius:20px;
+  margin-bottom:24px;overflow:hidden;transition:.2s var(--e1);
+  box-shadow:0 6px 24px rgba(0,0,0,.35)}
+.ord.next{border-color:rgba(201,169,110,.45);box-shadow:0 8px 30px rgba(0,0,0,.5)}
 .ord-row{padding:14px 16px;border-top:1px solid var(--border2)}
 .ord-row:first-child{border-top:none}
-.ord-row-hd{display:flex;align-items:center;gap:9px;padding:12px 16px;font-size:11.5px;
+.ord-row-hd{display:flex;align-items:center;gap:8px;padding:11px 14px;font-size:11.5px;
+  color:var(--muted);background:var(--card2);border-bottom:1px solid var(--border3);
+  white-space:nowrap}
+.ord-row-hd > span{white-space:nowrap}
+.ord-row-hd .ord-id{overflow:hidden;text-overflow:ellipsis;min-width:0}
+.ord.next .ord-row-hd{background:linear-gradient(90deg,rgba(201,169,110,.18),rgba(201,169,110,.05))}
+.ord-num{font-size:10px;font-weight:800;letter-spacing:1.4px;text-transform:uppercase;
   color:var(--muted)}
+.ord.next .ord-num{color:var(--gold2)}
 .ord-seq{width:22px;height:22px;flex-shrink:0;border-radius:7px;display:flex;
   align-items:center;justify-content:center;font-size:11px;font-weight:800;
   background:var(--card2);color:var(--muted)}
@@ -491,10 +500,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   </div>
   <div class="hdr-me">
     <div class="hdr-av" id="dAv">—</div>
-    <div class="hdr-b">
-      <div class="hdr-n" id="dName">Загрузка…</div>
-      <div class="hdr-s" id="dSub2">—</div>
-    </div>
+    <div class="hdr-n" id="dName">Загрузка…</div>
   </div>
 </header>
 
@@ -715,8 +721,7 @@ async function boot(){
   catch(e){ document.getElementById('deny').classList.add('show'); return; }
   document.getElementById('dAv').textContent = ME.name.slice(0,2).toUpperCase();
   document.getElementById('dName').textContent = ME.name;
-  document.getElementById('dSub2').textContent =
-    `${ME.district_code} ${ME.district_name}${ME.operator ? ' · ' + ME.operator : ''}`;
+
   await load();
   // Пять секунд, а не сорок пять: заказ должен появляться на экране почти сразу,
   // как его назначили. Спящую вкладку не опрашиваем — телефон в кармане.
@@ -806,9 +811,10 @@ function orderCard(o, i){
   return `<div class="ord ${i === 0 ? 'next' : ''}">
     <div class="ord-row ord-row-hd">
       <span class="ord-seq">${i + 1}</span>
+      <span class="ord-num">${i === 0 ? 'Сейчас' : 'Заказ ' + (i + 1)}</span>
       <span class="ord-id">#${esc(o.order_id)}</span>
       <span class="ord-dist">${esc(o.district || '')}</span>
-      <span class="ord-ago">${ago(o.confirmed_at || o.timestamp)}</span>
+      <span class="ord-ago">${ago(o.confirmed_at || o.timestamp).replace(' назад', '')}</span>
     </div>
 
     <div class="ord-row">

@@ -72,6 +72,16 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   margin-bottom:24px;overflow:hidden;transition:.2s var(--e1);
   box-shadow:0 6px 24px rgba(0,0,0,.35)}
 .ord.next{border-color:rgba(201,169,110,.45);box-shadow:0 8px 30px rgba(0,0,0,.5)}
+/* История — тот же заказ, только он уже позади: строй тот же, шрифт спокойнее. */
+.ord.hist{margin-bottom:12px;border-radius:16px;box-shadow:none}
+.ord.hist .ord-row{padding:11px 14px}
+.ord.hist .ord-addr-t{font-size:17px;font-weight:700;letter-spacing:-.2px}
+.ord.hist .ord-item{font-size:14px}
+.ord.hist .ts-v{font-size:15px}
+.ord.hist .ord-method{font-size:14px}
+.ord.hist .ord-total{font-size:22px}
+.ord.hist .ord-row-pay{row-gap:5px}
+.ord-seq.ok{background:var(--up-soft);color:var(--up)}
 .ord-row{padding:14px 16px;border-top:1px solid var(--border2)}
 .ord-row:first-child{border-top:none}
 .ord-row-hd{display:flex;align-items:center;gap:8px;padding:11px 14px;font-size:11.5px;
@@ -292,29 +302,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .ed-sum s{color:var(--muted);font-size:13px;font-weight:600}
 
 /* закрытый заказ в истории — карточка той же грамматики, что и в работе */
-.hc{background:var(--bg3);border:1px solid var(--border2);border-radius:16px;
-  margin-bottom:9px;overflow:hidden}
-.hc-row{padding:12px 14px;border-top:1px solid var(--border2)}
-.hc-row:first-child{border-top:none}
-.hc-h{display:flex;align-items:center;gap:8px;padding:11px 14px}
-.hc-id{font-family:'Space Grotesk',sans-serif;font-size:11.5px;font-weight:700;color:var(--sub)}
-.hc-st{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:700;
-  color:var(--up);background:var(--up-soft);border:1px solid rgba(76,175,125,.28);
-  padding:3px 8px;border-radius:999px}
-.hc-t{margin-left:auto;font-size:11px;color:var(--muted);font-weight:600}
-.hc-l{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
-  color:var(--muted);margin-bottom:7px;display:flex;align-items:baseline;gap:7px}
-.hc-l b{font-weight:700;color:var(--sub);letter-spacing:.4px;text-transform:none;font-size:11px}
-.hc-a{font-size:17px;font-weight:700;line-height:1.25}
-.hc-i{display:flex;flex-direction:column;gap:7px}
-.hc-i div{display:flex;gap:10px;font-size:14px}
-.hc-i div span{flex:1;min-width:0;color:var(--sub)}
-.hc-i div span i{font-style:normal;color:var(--muted)}
-.hc-i div b{color:var(--text);font-variant-numeric:tabular-nums;flex-shrink:0}
-.hc-f{display:flex;align-items:baseline;gap:8px;font-size:11.5px;color:var(--muted)}
-.hc-f b{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:18px;
-  font-weight:700;color:var(--text)}
-.hc-f b i{font-style:normal;font-size:9.5px;color:var(--muted);margin-left:4px}
 
 /* ждём оператора — кнопка есть, но она не действие, а состояние */
 .btn-wait{display:flex;align-items:center;justify-content:center;gap:7px;
@@ -927,31 +914,64 @@ function orderCard(o, i){
 // Закрытый заказ — тот же лист строками, только тише: развозку перечитывают,
 // когда спорят о деньгах или о том, что привозили, и состав должен читаться,
 // а не угадываться из сплошной строки.
+// Доставленный заказ читается теми же строками и в том же порядке, что и
+// заказ в работе: шапка, время, куда, что везли, деньги. Своя вёрстка для
+// истории заставляла разбирать один и тот же заказ заново.
 function histCard(o){
   const n = (o.items || []).length;
-  const items = (o.items || []).map(it =>
-    `<div><span>${esc(it.name)}${it.pcs ? ` <i>${it.pcs} шт</i>` : ''}</span>
+  const items = (o.items || []).map(it => `<div class="ord-item">
+      <span>${esc(it.name)}${it.pcs ? ` <i>${it.pcs} шт</i>` : ''}</span>
       <b>${it.qty} шт</b></div>`).join('');
   // У телефонного заказа адреса может не быть вовсе — это способ оформления,
   // а не ошибка, и писать «адрес не указан» тут незачем.
   const addr = esc(o.address) || (o.customer_name ? esc(o.customer_name) : 'Телефонный заказ');
-  return `<div class="hc">
-    <div class="hc-row hc-h">
-      <span class="hc-id">#${esc(o.order_id)}</span>
-      <span class="hc-st">${svg(ICO.ok, 12)} доставлен</span>
-      <span class="hc-t">${hhmm(o.delivered_at || o.confirmed_at || o.timestamp)}</span>
+  const debt = o.payment_method === 'debt', paid = !!o.prepaid;
+  const PAY = paid ? {ico: ICO.ok,   t: 'Оплачено онлайн'}
+            : (debt ? {ico: ICO.warn, t: 'В долг'}
+                    : {ico: ICO.cash, t: 'Наличными'});
+  return `<div class="ord hist">
+    <div class="ord-row ord-row-hd">
+      <span class="ord-seq ok">${svg(ICO.ok, 13)}</span>
+      <span class="ord-num">Доставлен</span>
+      <span class="ord-id">#${esc(o.order_id)}</span>
+      <span class="ord-dist">${esc(o.district || '')}</span>
+      <span class="ord-ago">${hhmm(o.delivered_at || o.confirmed_at || o.timestamp)}</span>
     </div>
-    <div class="hc-row">
-      <div class="hc-l">Куда</div>
-      <div class="hc-a">${addr}</div>
+
+    <div class="ord-row"><div class="tstrip">${histStrip(o)}</div></div>
+
+    <div class="ord-row">
+      <div class="ord-l">Куда</div>
+      <div class="ord-addr-t">${addr}</div>
     </div>
-    ${n ? `<div class="hc-row">
-      <div class="hc-l">Что везли <b>${n} ${n === 1 ? 'позиция' : (n < 5 ? 'позиции' : 'позиций')}</b></div>
-      <div class="hc-i">${items}</div>
+
+    ${n ? `<div class="ord-row">
+      <div class="ord-l">Что везли <b>${n} ${n === 1 ? 'позиция' : (n < 5 ? 'позиции' : 'позиций')}</b></div>
+      <div class="ord-items">${items}</div>
     </div>` : ''}
-    <div class="hc-row hc-f"><span>${esc(o.district || '')}</span>
-      <b>${fmt(o.total)}<i>AED</i></b></div>
+
+    <div class="ord-row ord-row-pay ${paid ? 'paid' : (debt ? 'debt' : '')}">
+      <div class="ord-l">Оплата</div>
+      <div class="ord-l ord-l-r">Итого</div>
+      <div class="ord-method">${svg(PAY.ico, 16)}${PAY.t}</div>
+      <div class="ord-total">${fmt(o.total)}<i>AED</i></div>
+    </div>
   </div>`;
+}
+
+// Три факта о времени — те же, что и в работе, только уже в прошедшем виде.
+// Последний, сколько заняла дорога, и есть работа водителя за этот заказ.
+function histStrip(o){
+  const t0 = _d(o.confirmed_at || o.timestamp), t1 = _d(o.delivered_at);
+  const mins = (t0 && t1) ? Math.max(0, Math.round((t1 - t0) / 60000)) : null;
+  const kept = (mins !== null && o.eta) ? (mins <= o.eta ? 'due' : 'late') : '';
+  return [
+    t0 ? ['Принят', hhmm(o.confirmed_at || o.timestamp), ''] : null,
+    t1 ? ['Доставлен', hhmm(o.delivered_at), ''] : null,
+    mins !== null ? ['В пути', mins + ' мин', kept] : null,
+  ].filter(Boolean).map(([l, v, cls]) =>
+    `<div class="ts ${cls}"><div class="ts-l">${l}</div><div class="ts-v">${v}</div></div>`
+  ).join('');
 }
 
 function doneRow(o){ return histCard(o); }

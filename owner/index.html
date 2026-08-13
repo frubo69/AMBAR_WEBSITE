@@ -4669,7 +4669,7 @@ async function _officeLoad(id){
           <span class="bar-val">${money(x.aed||0)}</span></div>
         <div class="dt-team-s">${x.orders
             ? `${x.orders} ${pluralize(x.orders,'заказ','заказа','заказов')}`
-            : 'нет доставок за период'}${x.extra ? ' · не в расписании района' : ''}${
+            : 'нет доставок за период'}${x.extra ? ' · обычно не на этом районе' : ''}${
             x.has_login === false ? ' · нет входа в приложение' : ''}</div>`).join('');
     }
     teamHtml += `</div>`;
@@ -9789,7 +9789,7 @@ function crewRender(){
         <span class="crew-n">${escS(d.name)}</span>
         <span class="crew-s">${d.drivers.length
           ? escS(d.drivers.join(', ')) : 'водителей нет'}${
-          d.moved ? ` · в расписании ${escS(d.base)}` : ''}</span>
+          d.moved ? ` · обычно ${escS(d.base)}` : ''}</span>
       </span>
       <button class="crew-pick${d.moved ? ' moved' : ''}"
               onclick="crewPick('${d.id}')">${escS(d.operator || '—')}</button>
@@ -9810,8 +9810,8 @@ function crewRender(){
         <span class="crew-b">
           <span class="crew-n">${escS(n)}</span>
           <span class="crew-s">${v.moved
-            ? `в расписании ${escS(dOf(v.base).code || '')} ${escS(dOf(v.base).name || '')}`
-            : 'как в расписании'}</span>
+            ? `обычно ${escS(dOf(v.base).code || '')} ${escS(dOf(v.base).name || '')}`
+            : 'как обычно'}</span>
         </span>
         <button class="crew-pick${v.moved ? ' moved' : ''}"
                 onclick="crewPickD('${escS(n)}')">Перенести</button>
@@ -9825,7 +9825,7 @@ function crewRender(){
       <button class="${CREW_TAB === 'drv' ? 'on' : ''}" onclick="crewTab('drv')">Водители</button>
     </div>
     ${moved ? `<div class="crw-hint">
-        <span>Переставлено: <b>${moved}</b> — не как в расписании</span>
+        <span>Переставлено: <b>${moved}</b> — не как обычно</span>
         <button class="crw-cancel" onclick="crewResetAll()">Вернуть всё</button>
       </div>` : ''}
     ${CREW_TAB === 'ops' ? ops : drv}`;
@@ -9845,7 +9845,7 @@ function crewFoot(){
     </div>`;
 }
 
-// Отмена — не «вернуть расписание», а «как было, когда я сюда зашёл».
+// Отмена — не «вернуть как обычно», а «как было, когда я сюда зашёл».
 function crewRevert(){
   CREW_D = _copy(CREW);
   crewRender();
@@ -9932,7 +9932,7 @@ function crewPick(did){
   const d = CREW.districts.find(x => x.id === did); if(!d) return;
   _crewPop(`.crew-d [onclick*="${did}"]`, CREW.operators.map(n => `
     <button onclick="crewSet('${did}','${n.replace(/'/g,"\\'")}')">
-      <span>${escS(n)}${n === d.base ? '<span class="pin-s">как в расписании</span>' : ''}</span>
+      <span>${escS(n)}${n === d.base ? '<span class="pin-s">как обычно</span>' : ''}</span>
       ${n === d.operator ? '<i style="margin-left:auto;color:var(--gold2)">✓</i>' : ''}
     </button>`).join(''));
 }
@@ -9945,7 +9945,7 @@ function crewPickD(name){
   _crewPop(`.crew-d [onclick*="${esc}"]`, CREW.districts.map(d => `
     <button onclick="crewSetD('${esc}','${d.id}')">
       <span>${escS(d.code)} ${escS(d.name)}${
-        d.id === v.base ? '<span class="pin-s">как в расписании</span>' : ''}</span>
+        d.id === v.base ? '<span class="pin-s">как обычно</span>' : ''}</span>
       ${d.id === v.district ? '<i style="margin-left:auto;color:var(--gold2)">✓</i>' : ''}
     </button>`).join(''));
 }
@@ -9972,7 +9972,7 @@ function crewSetD(name, did){
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 
-// «Вернуть всё» — тоже правка черновика: сбрасывает на расписание, но уходит
+// «Вернуть всё» — тоже правка черновика: ставит всех как обычно, но уходит
 // на сервер только вместе с «Сохранить». Иначе кнопка сносила бы намеренные
 // перестановки прошлой недели одним касанием, без спроса.
 function crewResetAll(){

@@ -364,13 +364,19 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .inc-pay-l{flex:1;min-width:0}
 .inc-pay-r{text-align:right;flex-shrink:0}
 .inc-pay-r .inc-l{justify-content:flex-end}
-.inc-method{font-size:16px;font-weight:700;line-height:1.25;color:var(--text)}
+/* Способ оплаты — короткой строкой со значком, без переносов: это факт, а не
+   абзац. Уточнение уходит вниз мелким. */
+.inc-method{display:flex;align-items:center;gap:7px;font-size:17px;font-weight:700;
+  line-height:1.1;color:var(--text);white-space:nowrap}
+.inc-method svg{flex-shrink:0;opacity:.9}
+.inc-method-s{font-size:12px;color:var(--muted);margin-top:4px;padding-left:24px}
 .inc-total{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;
   line-height:1;letter-spacing:-1px;color:var(--gold3);white-space:nowrap}
 .inc-total i{font-style:normal;font-size:11px;color:var(--muted);letter-spacing:.5px;
   margin-left:5px}
 .inc-row-pay.debt{background:var(--warn-soft)}
 .inc-row-pay.debt .inc-method,.inc-row-pay.debt .inc-total{color:var(--warn)}
+.inc-row-pay.debt .inc-method-s,.inc-row-pay.paid .inc-method-s{color:inherit;opacity:.75}
 .inc-row-pay.paid{background:var(--up-soft)}
 .inc-row-pay.paid .inc-method,.inc-row-pay.paid .inc-total{color:var(--up)}
 
@@ -555,7 +561,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
     <div class="inc-row inc-row-pay">
       <div class="inc-pay-l">
         <div class="inc-l">Оплата</div>
-        <div class="inc-method" id="incPay">Наличными при получении</div>
+        <div class="inc-method" id="incPay"></div>
+        <div class="inc-method-s" id="incPayS"></div>
       </div>
       <div class="inc-pay-r">
         <div class="inc-l" id="incPayL">Взять с клиента</div>
@@ -616,6 +623,7 @@ const ICO = {
   wash: '<path d="M4 13h16"/><path d="M6 13V8a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v5"/><circle cx="8" cy="17" r="2"/><circle cx="16" cy="17" r="2"/>',
   plus2:'<path d="M12 5v14M5 12h14"/>',
   nav:  '<path d="M3 11l18-8-8 18-2-8z"/>',
+  cash: '<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/>',
   box:  '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
 };
 const svg = (d, w=19) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none"
@@ -920,7 +928,13 @@ function _acUnlock(){
 ['pointerdown','touchstart'].forEach(ev =>
   document.addEventListener(ev, _acUnlock, {passive:true}));
 
+// Звук временно выключен — будет другой. Вибрация остаётся: телефон на
+// держателе экраном в сторону всё равно должен дёрнуться.
+const SOUND_ON = false;
 function _siren(){
+  try{ navigator.vibrate && navigator.vibrate([180,80,180,80,320]); }catch(e){}
+  try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+  if(!SOUND_ON) return;
   _acUnlock(); if(!_ac) return;
   _lastRing = Date.now();
   const t0 = _ac.currentTime;
@@ -959,12 +973,15 @@ function incShow(o){
   // взять наличные там, где не надо, дороже любой ошибки в интерфейсе.
   const payRow = document.querySelector('.inc-row-pay');
   payRow.className = 'inc-row inc-row-pay' + (paid ? ' paid' : (debt ? ' debt' : ''));
-  document.getElementById('incPayL').textContent =
-    (paid || debt) ? 'Сумма заказа' : 'Взять с клиента';
+  document.getElementById('incPayL').textContent = 'Итого';
   document.getElementById('incTotal').textContent = fmt(o.total);
-  document.getElementById('incPay').textContent =
-    paid ? 'Уже оплачено онлайн — денег не брать'
-         : (debt ? 'В долг — денег не брать' : 'Наличными при получении');
+  const PAY = paid
+    ? {ico: ICO.ok,   t: 'Оплачено онлайн', s: 'денег не брать'}
+    : (debt
+      ? {ico: ICO.warn, t: 'В долг',          s: 'денег не брать'}
+      : {ico: ICO.cash, t: 'Наличными',       s: 'при получении'});
+  document.getElementById('incPay').innerHTML = svg(PAY.ico, 17) + PAY.t;
+  document.getElementById('incPayS').textContent = PAY.s;
   document.getElementById('incItems').innerHTML = (o.items||[]).map(it =>
     `<div><span>${esc(it.name)}${it.pcs?` <i style="font-style:normal;color:var(--muted)">${it.pcs} шт</i>`:''}</span><b>${it.qty} шт</b></div>`).join('');
   document.getElementById('incNoteRow').hidden = !o.comment;

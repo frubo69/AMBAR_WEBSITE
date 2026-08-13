@@ -832,6 +832,21 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   background:none;border:1px solid var(--border2);color:var(--muted);font-size:11px;
   font-weight:600;font-family:inherit}
 .crw-cancel:active{border-color:var(--gold2);color:var(--gold2)}
+/* Подвал сохранения и вопрос на выходе. */
+.crw-save{display:flex;gap:8px}
+.qb-ghost{background:var(--card2)!important;border:1px solid var(--border2)!important;
+  color:var(--sub)!important;box-shadow:none!important;flex:0 0 40%}
+.crw-ask{left:50%!important;top:50%!important;transform:translate(-50%,-50%);
+  width:min(88vw,320px);padding:16px;text-align:center}
+.crw-ask-t{font-size:15px;font-weight:700;margin-bottom:4px}
+.crw-ask-s{font-size:12px;color:var(--muted);line-height:1.45;margin-bottom:14px}
+.crw-ask-b{display:block;width:100%;margin-top:8px;padding:12px;border-radius:11px;
+  cursor:pointer;font-family:inherit;font-size:13px;font-weight:700;
+  background:var(--card2);border:1px solid var(--border2);color:var(--sub)}
+.crw-ask-b.go{background:linear-gradient(135deg,var(--gold),var(--gold2));
+  color:#1a1408;border-color:transparent}
+.crw-ask-b:active{transform:scale(.98)}
+
 /* Заголовок группы водителей: чей это район и кто на нём принимает. */
 .crw-grp{display:flex;align-items:center;gap:9px;margin:16px 2px 8px}
 .crw-grp:first-of-type{margin-top:4px}
@@ -5750,10 +5765,18 @@ function accBack(){
 }
 
 function accClose(){
+  // Уходить с несохранённой перестановкой молча нельзя: человек либо забудет,
+  // что натыкал, либо решит, что оно уже применено.
+  if(ACC_VIEW === 'crew' && typeof crewDirty === 'function' && crewDirty()){ crewAsk(); return; }
+  _accClose();
+}
+
+function _accClose(){
   ACC_BACK = null;
   SCAN.stop();
   document.getElementById('accOv').classList.remove('show');
   ACC_VIEW = null;
+  CREW_D = null;
   accRender(); mktRender(); promoBlockRender();
 }
 
@@ -9714,6 +9737,7 @@ async function crewOpen(){
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
   await crewLoad();
+  CREW_D = CREW ? _copy(CREW) : null;
   crewRender();
 }
 
@@ -9724,6 +9748,21 @@ async function crewOpen(){
 // Водители сгруппированы по районам. Плоским списком из одиннадцати имён
 // было не видно ни кто с кем ездит, ни где пусто.
 let CREW_TAB = 'ops';
+// Правки живут на экране, пока их не сохранили. Перестановка — не то действие,
+// которое делают уверенно с первого раза: человека двигают, смотрят, что вышло,
+// двигают обратно. Пока это уходило на сервер мгновенно, «как было» приходилось
+// вспоминать самому.
+let CREW_D = null;                     // черновик: то, что видно на экране
+const _copy = x => JSON.parse(JSON.stringify(x));
+
+function crewDirty(){
+  if(!CREW || !CREW_D) return false;
+  const a = CREW.districts.map(d => d.id + ':' + d.operator).join('|')
+          + '#' + (CREW.drivers || []).map(v => v.name + ':' + v.district).join('|');
+  const b = CREW_D.districts.map(d => d.id + ':' + d.operator).join('|')
+          + '#' + (CREW_D.drivers || []).map(v => v.name + ':' + v.district).join('|');
+  return a !== b;
+}
 
 function crewTab(t){
   CREW_TAB = t;
@@ -9735,12 +9774,15 @@ function crewRender(){
   const box = document.getElementById('accMid');
   if(!CREW){ box.innerHTML =
     '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
-  const dOf = id => CREW.districts.find(x => x.id === id) || {};
-  const drvOf = n => (CREW.drivers || []).find(x => x.name === n) || {};
-  const moved = CREW.districts.filter(d => d.moved).length
-              + (CREW.drivers || []).filter(v => v.moved).length;
+  if(!CREW_D) CREW_D = _copy(CREW);
+  const S = CREW_D;
+  const dOf = id => S.districts.find(x => x.id === id) || {};
+  const drvOf = n => (S.drivers || []).find(x => x.name === n) || {};
+  const moved = S.districts.filter(d => d.moved).length
+              + (S.drivers || []).filter(v => v.moved).length;
+  crewFoot();
 
-  const ops = CREW.districts.map(d => `
+  const ops = S.districts.map(d => `
     <div class="crew-d${d.moved ? ' moved' : ''}">
       <span class="crew-code">${escS(d.code)}</span>
       <span class="crew-b">
@@ -9755,7 +9797,7 @@ function crewRender(){
 
   // По районам, а не общим списком: водитель работает не сам по себе, а в
   // паре с оператором своего района, и смотрят на них вместе.
-  const drv = CREW.districts.map(d => `
+  const drv = S.districts.map(d => `
     <div class="crw-grp">
       <span class="crew-code">${escS(d.code)}</span>
       <span class="crw-grp-n">${escS(d.name)}</span>
@@ -9789,6 +9831,81 @@ function crewRender(){
     ${CREW_TAB === 'ops' ? ops : drv}`;
   const seg = document.getElementById('crewSeg');
   if(seg) movePill(seg);
+}
+
+// Подвал появляется только когда есть что сохранять — и говорит, сколько.
+function crewFoot(){
+  const foot = document.getElementById('accFoot');
+  if(!foot) return;
+  if(!crewDirty()){ foot.innerHTML = ''; return; }
+  foot.innerHTML = `
+    <div class="qb-wrap crw-save">
+      <button class="qb qb-ghost" onclick="crewRevert()">Отменить</button>
+      <button class="qb" onclick="crewApply()">Сохранить</button>
+    </div>`;
+}
+
+// Отмена — не «вернуть расписание», а «как было, когда я сюда зашёл».
+function crewRevert(){
+  CREW_D = _copy(CREW);
+  crewRender();
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+
+// Сохранение шлёт только разницу: что не менялось, того и не трогаем.
+async function crewApply(){
+  if(!crewDirty()) return;
+  const post = (body) => ownerApi.ownerFetch('/api/owner/staff/set',
+                                             {method:'POST', body});
+  try{
+    const allBase = CREW_D.districts.every(d => d.operator === d.base)
+                 && (CREW_D.drivers || []).every(v => v.district === v.base);
+    const hadMoves = CREW.districts.some(d => d.moved)
+                  || (CREW.drivers || []).some(v => v.moved);
+    if(allBase && hadMoves){
+      CREW = await ownerApi.ownerFetch('/api/owner/staff/reset', {method:'POST', body:{}});
+    }else{
+      for(const d of CREW_D.districts){
+        const was = CREW.districts.find(x => x.id === d.id);
+        if(was && was.operator !== d.operator) CREW = await post({district: d.id, operator: d.operator});
+      }
+      for(const v of (CREW_D.drivers || [])){
+        const was = (CREW.drivers || []).find(x => x.name === v.name);
+        if(was && was.district !== v.district) CREW = await post({driver: v.name, district: v.district});
+      }
+    }
+    CREW_D = _copy(CREW);
+    crewRender(); crewSub();
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    // Списки людей и районов считаются по этой же таблице — перечитываем.
+    if(window.ownerApi) loadOperators();
+  }catch(e){
+    await crewLoad(); CREW_D = _copy(CREW); crewRender();
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('error'); }catch(e2){}
+  }
+}
+
+// Выход с несохранённым: спрашиваем, а не молча теряем и не молча сохраняем.
+function crewAsk(){
+  closePinPop();
+  const back = document.createElement('div');
+  back.className = 'pin-back';
+  back.addEventListener('pointerdown', () => { closePinPop(); });
+  const box = document.createElement('div');
+  box.className = 'pin-pop crw-ask';
+  box.innerHTML = `
+    <div class="crw-ask-t">Сохранить изменения?</div>
+    <div class="crw-ask-s">Если нет — вернём так, как было при входе.</div>
+    <button class="crw-ask-b go" onclick="crewAskGo(1)">Сохранить</button>
+    <button class="crw-ask-b" onclick="crewAskGo(0)">Не сохранять</button>`;
+  document.body.append(back, box);
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+}
+
+async function crewAskGo(save){
+  closePinPop();
+  if(save) await crewApply(); else CREW_D = _copy(CREW);
+  _accClose();
 }
 
 // Выбор — обычным списком поверх экрана: у нас пять районов и четыре имени,
@@ -9833,49 +9950,39 @@ function crewPickD(name){
     </button>`).join(''));
 }
 
-async function crewSave(body, paint){
-  closePinPop();
-  paint();                                       // рисуем сразу, ответ догонит
-  crewRender();
-  try{
-    CREW = await ownerApi.ownerFetch('/api/owner/staff/set', {method:'POST', body});
-    crewRender(); crewSub();
-    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    // Списки людей и районов считаются по этой же таблице — перечитываем.
-    if(window.ownerApi) loadOperators();
-  }catch(e){
-    await crewLoad(); crewRender();
-    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('error'); }catch(e2){}
-  }
-}
-
 function crewSet(did, name){
-  const d = CREW.districts.find(x => x.id === did);
-  return crewSave({district: did, operator: name},
-                  () => { if(d){ d.operator = name; d.moved = name !== d.base; } });
+  closePinPop();
+  const d = CREW_D.districts.find(x => x.id === did);
+  if(d){ d.operator = name; d.moved = name !== d.base; }
+  crewRender();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 
 function crewSetD(name, did){
-  const v = (CREW.drivers || []).find(x => x.name === name);
-  const from = v && CREW.districts.find(x => x.id === v.district);
-  const to = CREW.districts.find(x => x.id === did);
-  return crewSave({driver: name, district: did}, () => {
-    if(!v) return;
+  closePinPop();
+  const v = (CREW_D.drivers || []).find(x => x.name === name);
+  if(v){
+    const from = CREW_D.districts.find(x => x.id === v.district);
+    const to = CREW_D.districts.find(x => x.id === did);
     if(from) from.drivers = from.drivers.filter(n => n !== name);
     if(to && !to.drivers.includes(name)) to.drivers.push(name);
     v.district = did; v.moved = did !== v.base;
-  });
+  }
+  crewRender();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 
-async function crewResetAll(){
-  try{
-    CREW = await ownerApi.ownerFetch('/api/owner/staff/reset', {method:'POST', body:{}});
-    crewRender(); crewSub();
-    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    if(window.ownerApi) loadOperators();
-  }catch(e){
-    await crewLoad(); crewRender();
-  }
+// «Вернуть всё» — тоже правка черновика: сбрасывает на расписание, но уходит
+// на сервер только вместе с «Сохранить». Иначе кнопка сносила бы намеренные
+// перестановки прошлой недели одним касанием, без спроса.
+function crewResetAll(){
+  CREW_D.districts.forEach(d => { d.operator = d.base; d.moved = false; });
+  (CREW_D.drivers || []).forEach(v => { v.district = v.base; v.moved = false; });
+  CREW_D.districts.forEach(d => {
+    d.drivers = (CREW_D.drivers || []).filter(v => v.district === d.id).map(v => v.name);
+  });
+  crewRender();
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('medium'); }catch(e){}
 }
 
 // Метрики в одном месте: как называется, как считать, как показать и в какую

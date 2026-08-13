@@ -364,6 +364,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .exp-mk.rejected{color:var(--dn)}
 .exp-t i{font-style:normal;font-weight:600;color:var(--muted)}
 .exp-row-c{padding-top:7px}
+.map-b{width:100%;margin-top:8px}
 .exp-row[hidden]{display:none}   /* display:flex у .exp-row перебивает hidden */
 /* Итог не уезжает вверх вместе со списком: сколько сегодня набежало —
    единственное число, ради которого водитель сюда заходит. */
@@ -569,6 +570,19 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
     <span>Расходы</span>
   </button>
 </nav>
+
+<div class="sheet" id="mapSheet" onclick="if(event.target===this)this.classList.remove('show')">
+  <div class="sheet-in">
+    <div class="sheet-hd">
+      <div style="flex:1;min-width:0">
+        <div class="sheet-t">В чём открыть?</div>
+        <div class="sheet-s">Запомним и дальше будем открывать сразу. Долгое нажатие
+          на значок карты — спросить снова.</div>
+      </div>
+    </div>
+    <div id="mapList"></div>
+  </div>
+</div>
 
 <div class="sheet" id="infoSheet" onclick="if(event.target===this)infoClose()">
   <div class="sheet-in">
@@ -850,9 +864,10 @@ function orderCard(o, i){
       <span>${esc(it.name)}${it.pcs ? ` <i>${it.pcs} шт</i>` : ''}</span>
       <b>${it.qty} шт</b></div>`).join('');
   const addr = esc(o.address) || 'Адрес не указан';
-  const hasMap = !!(o.gmap_link || (o.location && o.location.lat));
-  const mapArgs = `${JSON.stringify(o.gmap_link || '')},${(o.location && o.location.lat) || 0},${
-    (o.location && o.location.lon) || 0},'${esc(addr)}'`;
+  // Кнопке карты хватает номера заказа: адрес и точку она возьмёт из него
+  // сама. Раньше сюда подставлялась ссылка целиком — её кавычки обрывали
+  // атрибут onclick, и кнопка не делала ничего.
+  const hasMap = !!(o.gmap_link || (o.location && o.location.lat) || o.address);
   // Решение всегда за оператором: здесь видно только, на какой стадии просьба.
   const req = o.driver_req;
   const open = req && req.status === 'open';
@@ -901,7 +916,7 @@ function orderCard(o, i){
         <div class="ord-l">Куда</div>
         <div class="ord-addr-t">${addr}</div>
       </div>
-      ${hasMap ? `<button class="ord-mapb" onclick="route(${mapArgs})"
+      ${hasMap ? `<button class="ord-mapb" onclick="route('${esc(o.order_id)}')"
         aria-label="Открыть в картах">${svg(ICO.nav, 22)}</button>` : ''}
     </div>
 
@@ -1203,6 +1218,16 @@ function renderExpenses(){
     </div></div>`;
 }
 
+
+// Долгое нажатие на карту — забыть выбранное приложение и спросить снова.
+document.addEventListener('pointerdown', e => {
+  const b = e.target.closest && e.target.closest('.ord-mapb');
+  if(!b) return;
+  const t = setTimeout(() => { mapForget(); try{ tg.HapticFeedback.impactOccurred('heavy'); }catch(_){} }, 700);
+  const off = () => { clearTimeout(t); b.removeEventListener('pointerup', off);
+                      b.removeEventListener('pointerleave', off); };
+  b.addEventListener('pointerup', off); b.addEventListener('pointerleave', off);
+}, {passive:true});
 
 // ── входящий заказ ───────────────────────────────────────────────────────
 // Заказ водителю уже назначил оператор — решать нечего, но увидеть и тронуться
@@ -1516,13 +1541,59 @@ async function sendDeliver(oid){
 // экраном, то есть заведомо хуже той, что уже стоит у водителя в телефоне.
 // Побочная выгода: координаты водителя не проходят ни через нас, ни через
 // чей-либо сервер — отслеживать нечего, потому что мы их не видим.
-function route(link, lat, lon, addr){
-  const dest = (lat && lon) ? `${lat},${lon}` : (addr ? encodeURIComponent(addr) : '');
-  const url = dest
-    ? `https://www.google.com/maps/dir/?api=1&destination=${dest}&travelmode=driving&dir_action=navigate`
-    : link;
-  if(!url) return;
+// Куда вести — выбирает водитель. У одного стоит гугл, у другого вейз, у
+// третьего эпл: телефон сам такой выбор предлагает не везде, поэтому
+// спрашиваем сами. Выбранное запоминаем и в следующий раз открываем сразу.
+const MAPS = [
+  {id:'google', t:'Google Maps',
+   url:(p,a) => `https://www.google.com/maps/dir/?api=1&destination=${p||enc(a)}&travelmode=driving`},
+  {id:'apple',  t:'Apple Maps',
+   url:(p,a) => `https://maps.apple.com/?daddr=${p||enc(a)}&dirflg=d`},
+  {id:'waze',   t:'Waze',
+   url:(p,a) => p ? `https://waze.com/ul?ll=${p}&navigate=yes` : `https://waze.com/ul?q=${enc(a)}`},
+];
+const enc = s => encodeURIComponent(s || '');
+
+function _openMap(app, pt, addr){
+  const m = MAPS.find(x => x.id === app) || MAPS[0];
+  const url = m.url(pt, addr);
+  try{ localStorage.setItem('ambar_map', m.id); }catch(e){}
   try{ tg.openLink(url); }catch(e){ window.open(url, '_blank'); }
+}
+
+function route(oid){
+  // Заказ ищем и в работе, и в закрытых за смену, и во входящем: карта нужна
+  // с любого из этих экранов.
+  const all = [].concat((ORDERS && ORDERS.active) || [], (ORDERS && ORDERS.done) || [],
+                        INC ? [INC] : []);
+  const o = all.find(x => x.order_id === oid);
+  if(!o) return;
+  const lat = o.location && o.location.lat, lon = o.location && o.location.lon;
+  const pt = (lat && lon) ? `${lat},${lon}` : '';
+  const addr = o.address || '';
+  if(!pt && !addr) return;
+  let saved = ''; try{ saved = localStorage.getItem('ambar_map') || ''; }catch(e){}
+  if(saved && MAPS.some(m => m.id === saved)) return _openMap(saved, pt, addr);
+  mapAsk(pt, addr);
+}
+
+// Спрашиваем один раз. Сменить выбор можно долгим нажатием на ту же кнопку.
+function mapAsk(pt, addr){
+  const sh = document.getElementById('mapSheet');
+  document.getElementById('mapList').innerHTML = MAPS.map(m => `
+    <button class="btn btn-sec map-b" onclick="mapGo('${m.id}')">${m.t}</button>`).join('');
+  sh._pt = pt; sh._addr = addr;
+  sh.classList.add('show');
+  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+}
+function mapGo(app){
+  const sh = document.getElementById('mapSheet');
+  sh.classList.remove('show');
+  _openMap(app, sh._pt, sh._addr);
+}
+function mapForget(){
+  try{ localStorage.removeItem('ambar_map'); }catch(e){}
+  toast('Спросим заново, в чём открыть');
 }
 
 // Готовые причины: за рулём набирать текст неудобно, а оператору нужна не

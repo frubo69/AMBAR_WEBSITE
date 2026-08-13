@@ -1256,11 +1256,19 @@ function _sndUnlock(){
   _acUnlock(); _loadSound();
   try{
     const a = _sndTag();
-    if(a.dataset.ok) return;
-    a.muted = true;
+    if(a.dataset.tried) return;      // одна попытка, а не по одной на касание
+    a.dataset.tried = '1';
+    a.muted = false;                 // играть будем тишину — глушить нечего
     const p = a.play();
-    p && p.then(() => { a.pause(); a.currentTime = 0; a.muted = false; a.dataset.ok = '1'; })
-         .catch(() => { a.muted = false; });
+    if(p) p.then(() => { a.pause(); a.currentTime = 0; }).catch(() => {});
+  }catch(e){}
+  // WebAudio открывается пустым отрезком: он беззвучен по определению.
+  try{
+    if(_ac){
+      const s = _ac.createBufferSource();
+      s.buffer = _ac.createBuffer(1, 1, 22050);
+      s.connect(_ac.destination); s.start(0);
+    }
   }catch(e){}
 }
 ['pointerdown','touchstart'].forEach(ev =>
@@ -1303,6 +1311,9 @@ function _loadSound(){
 // ничего не касался: сигнал уходил в тишину, и водитель узнавал о заказе
 // молча. Раз не прозвучало — пробуем снова, как только появится возможность.
 function _siren(force){
+  // Сигнал существует только для заказа на экране. Это последняя преграда:
+  // что бы ни случилось в коде дальше, без входящего заказа звука не будет.
+  if(!INC) return;
   // Ни при каких обстоятельствах не чаще раза в пятнадцать секунд. Сигнал,
   // звучащий подряд, перестаёт быть сигналом.
   if(!force && Date.now() - _lastRing < 15000) return;
@@ -1351,11 +1362,17 @@ function _sirenRetry(){
 
 // Запасной путь: обычный тег audio. Иногда WebAudio не отдают вовсе — тогда
 // хотя бы так, лишь бы водитель услышал.
+// В теге по умолчанию лежит тишина, а не сигнал заказа. Разблокировка звука
+// требует проиграть что-нибудь по касанию — и раньше проигрывался боевой файл,
+// приглушённый флагом muted. Флаг в вебвью телеграма срабатывает не всегда, и
+// водитель слышал сирену от простого нажатия на «Историю». Тишину слышно быть
+// не может ни при каких условиях.
+const SND_SILENT = 'data:audio/wav;base64,UklGRkQDAABXQVZFZm10IBAAAAABAAEAQB8AAIA+AAACABAAZGF0YSADAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA==';
 function _sndTag(){
   let a = document.getElementById('sndTag');
   if(!a){
     a = document.createElement('audio');
-    a.id = 'sndTag'; a.src = SND_URL;
+    a.id = 'sndTag'; a.src = SND_SILENT;
     a.preload = 'auto'; a.setAttribute('playsinline', '');
     document.body.appendChild(a);
   }
@@ -1364,6 +1381,7 @@ function _sndTag(){
 function _fallback(){
   try{
     const a = _sndTag();
+    if(a.src !== SND_URL){ a.src = SND_URL; a.load(); }
     a.muted = false; a.currentTime = 0;
     const p = a.play();
     // Тег отыграл — значит водитель услышал, и досылать больше нечего.

@@ -1616,7 +1616,10 @@ function openCatalog(){
 async function loadQueue(){
   if(!curOp) { renderQueue(); return; }
   let r;
-  try{ r = await opApi.opFetch('/api/operator/queue',{params:{as:curOp}}); }
+  // Стоим на прошлой смене — и «за день» показывает её же: иначе оператор
+  // заполняет 11 августа, а список под руками сегодняшний.
+  try{ r = await opApi.opFetch('/api/operator/queue',
+         {params:{as:curOp, ...(BACK_DAY ? {day:BACK_DAY} : {})}}); }
   catch(e){ return; }
   Q = r;
   // Первая загрузка после выбора оператора решает, где мы стоим: пустая
@@ -1678,7 +1681,8 @@ function renderQueue(){
   }
   const lanes=[['new','Новые',(Q.new||[]).length],
                ['work','В работе',(Q.work||[]).length],
-               ['done','За день',(Q.done||[]).length]];
+               ['done', BACK_DAY ? ('За '+_dayName(BACK_DAY, true)) : 'За день',
+                (Q.done||[]).length]];
   let list = Q[qLane] || [];
   if(qLane!=='new' && qFilter!=='all') list = list.filter(o=>(o.source||'app')===qFilter);
 
@@ -1695,7 +1699,9 @@ function renderQueue(){
     <div class="q-list">${list.length ? _laneHtml(qLane, list)
       : `<div class="q-empty"><div class="q-empty-s">${
           qLane==='new' ? 'Новых заказов нет' :
-          qLane==='work' ? 'В работе пусто' : 'За смену пока ничего не закрыто'}</div></div>`}</div>`;
+          qLane==='work' ? 'В работе пусто'
+          : (BACK_DAY ? ('За '+_dayName(BACK_DAY)+' ничего не заведено')
+                      : 'За смену пока ничего не закрыто')}</div></div>`}</div>`;
   // Вкладки перерисовались — вернуть мигание, если нерешённое ещё есть.
   _alarmPaint(!!_attention);
 }
@@ -2426,6 +2432,10 @@ function dayOpen(){
 }
 function dayPick(iso){
   BACK_DAY = (iso===_isoDay(0)) ? '' : (iso||'');
+  // Встали на прошлую смену — значит и смотреть хотим её: показываем, что за
+  // тот день уже заведено, чтобы не завести то же самое второй раз.
+  if(BACK_DAY) qLane = 'done';
+  loadQueue();                       // список «за день» едет за выбранной датой
   hideOv('dayOv'); haptic('sel'); dayPaint();
   if(BACK_DAY) toast('Заполняем за '+_dayName(BACK_DAY),'ok');
 }

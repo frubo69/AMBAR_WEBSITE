@@ -830,6 +830,11 @@ async def handle_queue(request):
                                  status=400, headers=CORS_HEADERS)
 
     today = _biz_date(datetime.now(DUBAI_TZ))
+    # Оператор может стоять на прошлой смене — тогда «за день» показывает её,
+    # а не сегодняшнюю. Новые и в работе остаются живыми в любом случае:
+    # заказ, требующий ответа сейчас, не должен исчезать оттого, что человек
+    # заполняет позавчерашний день.
+    day = (request.query.get("day") or "").strip() or today
     lanes = {"new": [], "work": [], "done": []}
     counts = {"app": 0, "manual": 0}
     for o in (await db.get_all_orders()).values():
@@ -847,8 +852,10 @@ async def handle_queue(request):
         except (ValueError, TypeError):
             continue
         # Новые показываем любого возраста: заказ, висящий с ночи, тем более
-        # требует ответа. Закрытые — только за текущую смену.
-        if lane != "new" and _biz_date(ts) != today:
+        # требует ответа. В работе — всегда текущие. Закрытые — за выбранный день.
+        if lane == "work" and _biz_date(ts) != today:
+            continue
+        if lane == "done" and _biz_date(ts) != day:
             continue
         row = _summary(o)
         if lane == "new":
@@ -863,7 +870,7 @@ async def handle_queue(request):
         "as": who, "senior": next(x["senior"] for x in people if x["name"] == who),
         "districts": [d for d in districts if d["id"] in scope],
         "new": lanes["new"], "work": lanes["work"], "done": lanes["done"],
-        "counts": counts,
+        "counts": counts, "day": day,
         "now": datetime.now(timezone.utc).isoformat(),
     }, headers=CORS_HEADERS)
 

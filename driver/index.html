@@ -108,8 +108,15 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .ord-row-req.no{color:var(--dn);background:var(--dn-soft)}
 .ord-row-req svg{flex-shrink:0;margin-top:1px}
 
-.ord-foot{display:grid;grid-template-columns:1fr auto;gap:9px;padding:14px 16px;
-  border-top:1px solid var(--border2)}
+/* Правка живёт у позиций: карандаш в подвале выглядел как «изменить заказ
+   вообще», хотя правят именно состав. */
+.ord-edit{margin-left:auto;display:flex;align-items:center;gap:6px;padding:6px 11px;
+  border-radius:999px;cursor:pointer;font-family:inherit;font-size:11px;font-weight:700;
+  letter-spacing:.4px;text-transform:none;color:var(--sub);background:var(--card2);
+  border:1px solid var(--border3)}
+.ord-edit:active{transform:scale(.95);color:var(--gold2)}
+.ord-foot{display:block;padding:14px 16px;border-top:1px solid var(--border2)}
+.ord-foot .btn{width:100%}
 .btn{padding:15px 10px;border:none;border-radius:13px;cursor:pointer;font-family:inherit;
   font-size:14.5px;font-weight:700;transition:.15s var(--e1)}
 .btn:active{transform:scale(.97)}
@@ -787,7 +794,9 @@ function orderCard(o, i){
     </div>` : ''}
 
     <div class="ord-row">
-      <div class="ord-l">Что везём <b>${n} ${n === 1 ? 'позиция' : (n < 5 ? 'позиции' : 'позиций')}</b></div>
+      <div class="ord-l">Что везём <b>${n} ${n === 1 ? 'позиция' : (n < 5 ? 'позиции' : 'позиций')}</b>
+        <button class="ord-edit" onclick="openEdit('${esc(o.order_id)}')"
+          aria-label="Изменить состав">${svg(ICO.edit, 15)}Изменить</button></div>
       <div class="ord-items">${items}</div>
     </div>
 
@@ -806,8 +815,6 @@ function orderCard(o, i){
       ${open && (req.kind === 'delivered' || req.kind === 'cancel')
         ? `<button class="btn btn-wait" disabled>${svg(ICO.clock,16)} Ждём оператора</button>`
         : `<button class="btn btn-pri" onclick="askDeliver('${esc(o.order_id)}')">Доставил</button>`}
-      <button class="btn btn-ico" title="Изменить, отменить или сообщить"
-        onclick="openEdit('${esc(o.order_id)}')">${svg(ICO.edit)}</button>
     </div>
   </div>`;
 }

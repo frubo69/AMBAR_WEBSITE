@@ -116,6 +116,9 @@ def _order_view(o: dict) -> dict:
         "total": int(o.get("total", 0) or 0),
         "comment": o.get("comment", ""),
         "payment_method": o.get("payment_method", ""),
+        # Оплаченный криптой заказ водитель обязан видеть до выезда: взять
+        # наличные там, где уже заплачено, дороже любой ошибки в интерфейсе.
+        "prepaid": bool(o.get("prepaid")),
         "timestamp": o.get("timestamp", ""),
         "confirmed_at": o.get("confirmed_at", ""),
         "delivered_at": o.get("delivered_at", ""),

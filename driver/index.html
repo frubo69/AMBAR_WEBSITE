@@ -296,67 +296,81 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   font-weight:600;color:var(--sub);background:none;border:1px dashed var(--border3)}
 .exp-add:active{transform:scale(.98)}
 
-/* Входящий заказ занимает весь экран: водитель за рулём, и заметить он должен
-   не значок, а весь телефон. Уйти можно только ползунком — случайным касанием
-   заказ не принимается. Порядок сверху вниз — порядок вопросов: куда ехать,
-   что везти, сколько взять, что нажать. */
+/* Экран приёма заказа.
+   Порядок строк — порядок работы курьера: куда ехать, что везти, сколько взять,
+   что нажать. Всё о заказе живёт одним листом с разделителями: разбросанные по
+   чёрному экрану куски не читаются как одно целое. */
 .inc{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;
-  background:radial-gradient(120% 80% at 50% 0%,#12121F 0%,#07070E 45%,#000006 100%);
-  padding:calc(20px + var(--safe-top)) 20px calc(18px + var(--safe-bottom))}
+  background:radial-gradient(130% 70% at 50% -10%,#151527 0%,#0A0A14 50%,#000006 100%);
+  padding:calc(14px + var(--safe-top)) 14px calc(14px + var(--safe-bottom))}
 .inc.show{display:flex;animation:incIn .26s cubic-bezier(.2,.8,.3,1)}
-@keyframes incIn{from{transform:scale(.98);opacity:0}to{transform:none;opacity:1}}
+@keyframes incIn{from{transform:scale(.985);opacity:0}to{transform:none;opacity:1}}
 
-/* Мягкие вспышки при появлении: размытое белое свечение, а не мигание фона —
-   привлекает внимание, но не бьёт по глазам в тёмной машине. */
+/* Мягкие вспышки при появлении: размытое свечение, а не мигание фона */
 .inc-glow{position:absolute;inset:-20%;pointer-events:none;opacity:0;
-  background:radial-gradient(closest-side at 50% 38%,rgba(255,255,255,.55),transparent 70%);
+  background:radial-gradient(closest-side at 50% 30%,rgba(255,255,255,.5),transparent 70%);
   filter:blur(60px)}
 .inc-glow.on{animation:incFlash 1.05s cubic-bezier(.3,0,.2,1) 3}
-@keyframes incFlash{0%{opacity:0}18%{opacity:.85}55%{opacity:.12}100%{opacity:0}}
+@keyframes incFlash{0%{opacity:0}18%{opacity:.8}55%{opacity:.1}100%{opacity:0}}
 
-.inc-head{display:flex;align-items:center;gap:10px;flex-shrink:0}
-.inc-tag{padding:7px 13px;border-radius:999px;font-size:11px;font-weight:800;letter-spacing:1.2px;
-  text-transform:uppercase;color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
-.inc-dist{margin-left:auto;font-size:13px;font-weight:700;color:var(--gold2)}
+/* Верх: пульсирующая точка + секундомер. Заполняет место осмысленно и сразу
+   говорит: это только что прилетело и ждёт тебя. */
+.inc-top{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:6px;padding:10px 0 16px}
+.inc-pulse{position:relative;width:54px;height:54px;margin-bottom:4px}
+.inc-pulse i{position:absolute;inset:20px;border-radius:50%;
+  background:linear-gradient(135deg,var(--gold3),var(--gold));display:block}
+.inc-pulse span{position:absolute;inset:0;border-radius:50%;
+  border:2px solid rgba(201,169,110,.5);animation:incRing 2s ease-out infinite}
+.inc-pulse span:nth-child(2){animation-delay:1s}
+@keyframes incRing{0%{transform:scale(.35);opacity:.9}100%{transform:scale(1);opacity:0}}
+.inc-title{font-size:12px;font-weight:800;letter-spacing:2.4px;text-transform:uppercase;
+  color:var(--gold2)}
 .inc-wait{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;
-  color:var(--muted);font-variant-numeric:tabular-nums;min-width:52px;text-align:right}
+  color:var(--muted);font-variant-numeric:tabular-nums}
 
-/* Тело центрируем: пустота посреди экрана — то, из-за чего карточка выглядела
-   недоделанной. */
-.inc-body{flex:1;min-height:0;display:flex;flex-direction:column;justify-content:center;
-  gap:14px;overflow-y:auto;padding:26px 0 6px}
-.inc-body::before{content:'';flex:0 0 auto;height:8vh}
-.inc-to{font-size:10px;font-weight:700;letter-spacing:1.6px;text-transform:uppercase;
-  color:var(--muted)}
-.inc-addr{font-size:32px;font-weight:800;line-height:1.12;letter-spacing:-.8px}
-.inc-meta{display:flex;flex-wrap:wrap;gap:7px}
-.inc-meta span{padding:6px 11px;border-radius:999px;font-size:12px;font-weight:600;
-  color:var(--sub);background:var(--card2);border:1px solid var(--border2)}
-.inc-items{display:flex;flex-direction:column;gap:10px;padding:15px;border-radius:16px;
-  background:rgba(255,255,255,.03);border:1px solid var(--border2)}
-.inc-items div{display:flex;gap:10px;font-size:15.5px}
-.inc-items div span{flex:1;min-width:0}
-.inc-items div b{color:var(--gold2);font-variant-numeric:tabular-nums}
-.inc-note{padding:12px 14px;border-radius:13px;font-size:13.5px;line-height:1.45;
-  color:var(--warn);background:var(--warn-soft);border:1px solid rgba(243,180,74,.3)}
+/* Лист с деталями */
+.inc-sheet{flex:0 1 auto;min-height:0;margin-top:auto;overflow-y:auto;background:var(--bg3);
+  border-radius:22px;border:1px solid var(--border2);box-shadow:0 -2px 30px rgba(0,0,0,.5)}
+.inc-row{padding:15px 17px;border-top:1px solid var(--border2)}
+.inc-row:first-child{border-top:none}
+.inc-row-top{display:flex;align-items:center;gap:10px;padding:13px 17px}
+.inc-dist{font-size:13.5px;font-weight:700;color:var(--gold2)}
+.inc-by{margin-left:auto;font-size:12.5px;color:var(--muted)}
+.inc-l{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:8px;display:flex;align-items:baseline;gap:7px}
+.inc-l b{font-weight:700;color:var(--sub);letter-spacing:.4px;text-transform:none;font-size:11.5px}
+.inc-addr{font-size:25px;font-weight:800;line-height:1.15;letter-spacing:-.5px}
+.inc-note{margin-top:10px;padding:10px 12px;border-radius:11px;font-size:13.5px;line-height:1.4;
+  color:var(--warn);background:var(--warn-soft);border:1px solid rgba(243,180,74,.28)}
+.inc-items{display:flex;flex-direction:column;gap:9px}
+.inc-items div{display:flex;gap:10px;font-size:15px}
+.inc-items div span{flex:1;min-width:0;color:var(--text)}
+.inc-items div b{color:var(--gold2);font-variant-numeric:tabular-nums;flex-shrink:0}
+/* Деньги — последняя строка листа и самая крупная: это то, с чем курьер
+   выходит из машины. */
+.inc-row-pay{background:rgba(201,169,110,.05)}
+.inc-pay{display:flex;align-items:baseline;gap:8px}
+.inc-total{font-family:'Space Grotesk',sans-serif;font-size:36px;font-weight:700;
+  line-height:1;letter-spacing:-1px;color:var(--gold3)}
+.inc-pay i{font-style:normal;font-size:11px;color:var(--muted);letter-spacing:.5px}
+.inc-method{margin-left:auto;font-size:12px;font-weight:600;color:var(--sub);
+  padding:6px 11px;border-radius:999px;background:var(--card2);border:1px solid var(--border2)}
+.inc-row-pay.debt{background:var(--warn-soft)}
+.inc-row-pay.debt .inc-total{color:var(--warn)}
+.inc-row-pay.debt .inc-method{color:var(--warn);border-color:rgba(243,180,74,.4)}
+.inc-row-pay.paid{background:var(--up-soft)}
+.inc-row-pay.paid .inc-total{color:var(--up)}
+.inc-row-pay.paid .inc-method{color:var(--up);border-color:rgba(76,175,125,.4)}
 
-.inc-foot{flex-shrink:0}
-/* Деньги — прямо над ползунком: последнее, что водитель видит перед тем, как
-   тронуться, и первое, что спросят на адресе. */
-.inc-money{display:flex;align-items:baseline;gap:8px;padding:0 4px 14px}
-.inc-money-l{font-size:11px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;
-  color:var(--muted)}
-.inc-money-v{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:38px;
-  font-weight:700;line-height:1;letter-spacing:-1px;color:var(--gold3)}
-.inc-money i{font-style:normal;font-size:11px;color:var(--muted);letter-spacing:.5px}
-
+/* Действие */
+.inc-foot{flex:0 0 auto;padding-top:12px}
 .inc-slide{position:relative;height:68px;border-radius:34px;background:var(--card2);
   border:1px solid var(--border3);overflow:hidden;touch-action:none;user-select:none}
 .inc-slide.done{background:var(--up-soft);border-color:rgba(76,175,125,.55)}
 .inc-track{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   pointer-events:none;padding-left:56px}
-/* Шиммер бежит туда же, куда надо вести палец. Мигание яркостью выглядело
-   дёшево и ничего не подсказывало. */
+/* Блик бежит туда же, куда надо вести палец */
 .inc-hint{font-size:15px;font-weight:700;letter-spacing:.2px;
   background:linear-gradient(100deg,rgba(168,168,192,.55) 30%,#FFFFFF 48%,
     rgba(168,168,192,.55) 62%);
@@ -370,7 +384,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   box-shadow:0 6px 20px rgba(201,169,110,.35),0 2px 6px rgba(0,0,0,.5);
   transition:transform .2s cubic-bezier(.2,.8,.3,1)}
 .inc-slide.drag .inc-knob{transition:none}
-.inc-no{width:100%;margin-top:11px;padding:15px;border-radius:15px;cursor:pointer;
+.inc-no{width:100%;margin-top:10px;padding:14px;border-radius:15px;cursor:pointer;
   font-family:inherit;font-size:13.5px;font-weight:600;color:var(--muted);
   background:none;border:1px solid var(--border2)}
 .inc-no:active{background:var(--card2)}
@@ -497,25 +511,42 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 <!-- входящий заказ: поверх всего, пока водитель не проведёт ползунок -->
 <div class="inc" id="incOv">
   <div class="inc-glow" id="incGlow"></div>
-  <div class="inc-head">
-    <span class="inc-tag">Новый заказ</span>
-    <span class="inc-dist" id="incDist">—</span>
-    <span class="inc-wait" id="incWait">0 с</span>
+
+  <!-- Верх: живой индикатор — видно, что заказ только что прилетел и сколько ждёт -->
+  <div class="inc-top">
+    <div class="inc-pulse"><span></span><span></span><i></i></div>
+    <div class="inc-title">Новый заказ</div>
+    <div class="inc-wait" id="incWait">0 сек</div>
   </div>
 
-  <div class="inc-body">
-    <div class="inc-to">Куда</div>
-    <div class="inc-addr" id="incAddr">—</div>
-    <div class="inc-meta" id="incMeta"></div>
-    <div class="inc-items" id="incItems"></div>
-    <div class="inc-note" id="incNote" hidden></div>
+  <!-- Всё о заказе — одним листом, строками сверху вниз в порядке работы -->
+  <div class="inc-sheet">
+    <div class="inc-row inc-row-top">
+      <span class="inc-dist" id="incDist">—</span>
+      <span class="inc-by" id="incBy"></span>
+    </div>
+
+    <div class="inc-row">
+      <div class="inc-l">Куда</div>
+      <div class="inc-addr" id="incAddr">—</div>
+      <div class="inc-note" id="incNote" hidden></div>
+    </div>
+
+    <div class="inc-row">
+      <div class="inc-l">Что везём <b id="incCount"></b></div>
+      <div class="inc-items" id="incItems"></div>
+    </div>
+
+    <div class="inc-row inc-row-pay">
+      <div class="inc-l" id="incPayL">Взять с клиента</div>
+      <div class="inc-pay">
+        <span class="inc-total" id="incTotal">0</span><i>AED</i>
+        <span class="inc-method" id="incPay">наличными</span>
+      </div>
+    </div>
   </div>
 
   <div class="inc-foot">
-    <div class="inc-money">
-      <span class="inc-money-l" id="incPay">взять с клиента</span>
-      <span class="inc-money-v" id="incTotal">0</span><i>AED</i>
-    </div>
     <div class="inc-slide" id="incSlide">
       <div class="inc-track"><span class="inc-hint">Проведите — принял, еду</span></div>
       <div class="inc-knob" id="incKnob">
@@ -525,6 +556,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
     </div>
     <button class="inc-no" onclick="incCant()">Не могу взять</button>
   </div>
+</div>
 </div>
 
 <div class="sheet" id="askSheet" onclick="if(event.target===this)askClose()">
@@ -898,21 +930,26 @@ function _wakeOff(){ try{ _wake && _wake.release(); }catch(e){} _wake = null; }
 
 function incShow(o){
   INC = o;
-  const debt = o.payment_method === 'debt';
+  const debt = o.payment_method === 'debt', paid = !!o.prepaid;
+  const n = (o.items||[]).length;
   document.getElementById('incDist').textContent = o.district || '';
+  document.getElementById('incBy').textContent = o.deliver_by ? 'до ' + o.deliver_by : '';
   document.getElementById('incAddr').textContent = o.address || 'Адрес не указан';
-  document.getElementById('incTotal').textContent = debt ? '0' : fmt(o.total);
+  document.getElementById('incCount').textContent =
+    n + ' ' + (n === 1 ? 'позиция' : (n < 5 ? 'позиции' : 'позиций'));
+  // Деньги: сколько и чем. Оплаченный и долговой заказ обязаны читаться сразу —
+  // взять наличные там, где не надо, дороже любой ошибки в интерфейсе.
+  const payRow = document.querySelector('.inc-row-pay');
+  payRow.className = 'inc-row inc-row-pay' + (paid ? ' paid' : (debt ? ' debt' : ''));
+  document.getElementById('incPayL').textContent =
+    paid ? 'Уже оплачено' : (debt ? 'В долг' : 'Взять с клиента');
+  document.getElementById('incTotal').textContent = (paid || debt) ? '0' : fmt(o.total);
   document.getElementById('incPay').textContent =
-    debt ? 'в долг — денег не брать' : 'взять с клиента';
-  document.getElementById('incMeta').innerHTML = [
-    o.deliver_by ? `до ${esc(o.deliver_by)}` : '',
-    `${(o.items||[]).length} ${(o.items||[]).length===1?'позиция':'позиции'}`,
-    debt ? 'в долг' : '',
-  ].filter(Boolean).map(x => `<span>${x}</span>`).join('');
+    paid ? 'оплачено онлайн' : (debt ? 'денег не брать' : 'наличными');
   document.getElementById('incItems').innerHTML = (o.items||[]).map(it =>
     `<div><span>${esc(it.name)}${it.pcs?` <i style="font-style:normal;color:var(--muted)">${it.pcs} шт</i>`:''}</span><b>${it.qty} шт</b></div>`).join('');
-  const n = document.getElementById('incNote');
-  n.hidden = !o.comment; n.textContent = o.comment || '';
+  const note = document.getElementById('incNote');
+  note.hidden = !o.comment; note.textContent = o.comment || '';
   incKnobReset();
   document.getElementById('incOv').classList.add('show');
   // Три мягкие вспышки — только в момент появления, дальше зовёт звук.

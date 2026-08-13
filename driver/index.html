@@ -401,10 +401,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   box-shadow:0 6px 20px rgba(201,169,110,.35),0 2px 6px rgba(0,0,0,.5);
   transition:transform .2s cubic-bezier(.2,.8,.3,1)}
 .inc-slide.drag .inc-knob{transition:none}
-.inc-no{width:100%;margin-top:10px;padding:14px;border-radius:15px;cursor:pointer;
-  font-family:inherit;font-size:13.5px;font-weight:600;color:var(--muted);
-  background:none;border:1px solid var(--border2)}
-.inc-no:active{background:var(--card2)}
 
 /* выбор позиции */
 .ed-search{width:100%;padding:12px 13px;border-radius:12px;margin-bottom:10px;
@@ -577,7 +573,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
           stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
       </div>
     </div>
-    <button class="inc-no" onclick="incCant()">Не могу взять</button>
   </div>
 </div>
 </div>
@@ -1065,22 +1060,7 @@ async function incAccept(){
   await load();
 }
 
-// «Не могу» — это просьба переназначить, а не отказ: решает оператор.
-function incCant(){
-  const oid = INC && INC.order_id; if(!oid) return;
-  ASK = {t:'Не можете взять заказ?', s:'Оператор получит просьбу переназначить его другому '
-        + 'водителю. Заказ останется на вас, пока он не решит.', btn:'Отправить',
-        fn:()=>incSendCant(oid)};
-  renderAsk();
-}
-async function incSendCant(oid){
-  try{
-    await drvApi.drvFetch(`/api/driver/orders/${encodeURIComponent(oid)}/edit`,
-      {method:'POST', body:{kind:'reassign', text:'Не могу взять заказ'}});
-    toast('Оператор предупреждён');
-  }catch(e){ toast('Не отправилось'); return; }
-  incHide(); _wakeOff(); await load();
-}
+
 
 // ── действия ──────────────────────────────────────────────────────────────
 // confirm() в телеграме показывается через раз — своё окно надёжнее и

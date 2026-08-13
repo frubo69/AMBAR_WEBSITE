@@ -1047,6 +1047,12 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   background:linear-gradient(135deg,var(--gold),var(--gold2));
   box-shadow:0 8px 26px rgba(201,169,110,.22);transition:.15s var(--e1)}
 .qb:active{transform:scale(.985)}
+/* Рядом с «Поделиться» — маленькая квадратная: тот же путь, что был раньше. */
+.qb-row{display:flex;gap:9px}
+.qb-row .qb{flex:1;min-width:0}
+.qb-ico{flex:0 0 62px!important;width:62px;padding:0;height:62px;
+  background:var(--card2);color:var(--gold2);border:1px solid rgba(201,169,110,.3);
+  box-shadow:none}
 
 /* Выбор точки и позиции. Обе страницы — список, но списком быть не должны:
    человек ищет глазами и тычет на ходу, поэтому строки крупные, а всё, что
@@ -6031,13 +6037,23 @@ function ordRender(){
   // Кнопка живёт в подвале экрана, а не в конце списка: место у неё одно и
   // постоянное, до него дотягивается большой палец, и список под ней не
   // заканчивается на полуслове.
+  // Заявку отправляют не только себе: её шлют поставщику в ватсап или на
+  // почту. Поэтому главная кнопка отдаёт файл системе — оттуда он уходит
+  // куда угодно, — а рядом маленькая, которая по-прежнему кладёт его в чат
+  // с ботом: это привычный путь и он не должен пропасть.
   document.getElementById('accFoot').innerHTML = `
-    <div class="qb-wrap">
-      <button class="qb" id="ordSend" onclick="ordSend()">
+    <div class="qb-wrap qb-row">
+      <button class="qb" id="ordShare" onclick="ordShare()">
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v13M8 7l4-4 4 4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+        Поделиться
+      </button>
+      <button class="qb qb-ico" id="ordSend" onclick="ordSend()"
+              aria-label="Прислать файл в чат с ботом" title="В телеграм">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
-        Прислать файл в телеграм
       </button>
     </div>`;
 }
@@ -6141,20 +6157,65 @@ function ordApply(res){
 
 // Файл уходит в телеграм владельцу: скачивать его в мини-приложении некуда, а
 // переслать документ из своего же чата магазину — одно движение.
-async function ordSend(){
-  const b = document.getElementById('ordSend'); if(!b || b.disabled) return;
+// Файл берём тем же путём, каким его отдаёт браузеру ссылка «скачать», но
+// в память: чтобы отдать системе, его надо иметь на руках.
+async function _ordFile(){
+  const url = (ownerApi.AMBAR_API || '') + '/api/owner/supply/export'
+            + (ORD && ORD.d && ORD.d.day ? '?day=' + encodeURIComponent(ORD.d.day) : '');
+  const res = await fetch(url, {headers:{'Authorization':'tma '
+    + ((Telegram.WebApp && Telegram.WebApp.initData) || '')}});
+  if(!res.ok) throw new Error('export ' + res.status);
+  const blob = await res.blob();
+  const name = 'AMBAR-zayavka-' + ((ORD && ORD.d && ORD.d.day) || '') + '.xlsx';
+  return new File([blob], name,
+    {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+
+// «Поделиться» отдаёт файл системе: дальше человек сам выбирает ватсап,
+// почту или что угодно. Где системного окна нет — сохраняем файл, а если и
+// это закрыто, честно уходим в проверенный путь и говорим об этом.
+async function ordShare(){
+  const b = document.getElementById('ordShare'); if(!b || b.disabled) return;
   const html = b.innerHTML;
   b.disabled = true; b.innerHTML = 'Собираю файл…';
   try{
-    await ownerApi.ownerFetch('/api/owner/supply/send', {method:'POST', body:{day: ORD.d.day}});
-    b.innerHTML = 'Готово — файл в чате с ботом';
-    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    setTimeout(()=>{ b.innerHTML = html; b.disabled = false; }, 2600);
+    const file = await _ordFile();
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:'AMBAR — заявка на закупку'});
+      b.innerHTML = 'Отправлено';
+      try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    }else{
+      const u = URL.createObjectURL(file);
+      const a = document.createElement('a');
+      a.href = u; a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(u), 4000);
+      b.innerHTML = 'Файл сохранён';
+    }
   }catch(e){
-    b.innerHTML = 'Не отправилось — попробуйте ещё раз';
-    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('error'); }catch(e2){}
-    setTimeout(()=>{ b.innerHTML = html; b.disabled = false; }, 2600);
+    // Человек закрыл системное окно — это не ошибка, и пугать его нечем.
+    if(e && (e.name === 'AbortError' || e.name === 'NotAllowedError')){
+      b.innerHTML = html; b.disabled = false; return;
+    }
+    b.innerHTML = 'Не вышло — шлём в телеграм';
+    try{ await ownerApi.ownerFetch('/api/owner/supply/send',
+      {method:'POST', body:{day: ORD.d.day}}); b.innerHTML = 'Готово — файл в чате с ботом'; }
+    catch(e2){ b.innerHTML = 'Не отправилось — попробуйте ещё раз'; }
   }
+  setTimeout(()=>{ b.innerHTML = html; b.disabled = false; }, 2600);
+}
+
+async function ordSend(){
+  const b = document.getElementById('ordSend'); if(!b || b.disabled) return;
+  b.disabled = true; b.style.opacity = '.5';
+  try{
+    await ownerApi.ownerFetch('/api/owner/supply/send', {method:'POST', body:{day: ORD.d.day}});
+    _toast('Файл в чате с ботом');
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  }catch(e){
+    _toast('Не отправилось — попробуйте ещё раз');
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('error'); }catch(e2){}
+  }
+  b.disabled = false; b.style.opacity = '';
 }
 
 // ─── Звук сканера ───────────────────────────────────────────────────────────

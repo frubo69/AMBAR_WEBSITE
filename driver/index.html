@@ -363,6 +363,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .exp-mk.approved{color:var(--up)}
 .exp-mk.rejected{color:var(--dn)}
 .exp-t i{font-style:normal;font-weight:600;color:var(--muted)}
+.exp-x{margin-left:auto;width:28px;height:28px;flex-shrink:0;border-radius:50%;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;color:var(--muted);
+  background:var(--card2);border:1px solid var(--border3)}
+.exp-x:active{transform:scale(.92);color:var(--dn)}
 .exp-row-c{padding-top:7px}
 .map-b{width:100%;margin-top:8px}
 .exp-row[hidden]{display:none}   /* display:flex у .exp-row перебивает hidden */
@@ -769,6 +773,7 @@ const ICO = {
   cash: '<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/>',
   box:  '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11.5v4.5M12 8h.01"/>',
+  close:'<path d="M6 6l12 12M18 6L6 18"/>',
   meal: '<path d="M7 3v5.4a2.3 2.3 0 0 0 4.6 0V3"/><path d="M9.3 8.7V21"/><path d="M17.6 3c-1.7 1.5-2.5 3.4-2.5 5.5 0 1.7.8 2.7 2.5 2.9V21"/>',
 };
 const svg = (d, w=19) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none"
@@ -1198,7 +1203,9 @@ function renderExpenses(){
     ${other.map(otherBox).join('')}
 
     ${EXP_MORE ? `<div class="card exp-card">
-        <div class="exp-hd">${svg(ICO.plus2, 17)}<span class="exp-t">Другой расход</span></div>
+        <div class="exp-hd">${svg(ICO.plus2, 17)}<span class="exp-t">Другой расход</span>
+          <button class="exp-x" onclick="EXP_MORE=false;render()"
+            aria-label="Закрыть">${svg(ICO.close, 14)}</button></div>
         <div class="exp-row">
           <div class="exp-field"><input class="amt" id="e_other" type="text" inputmode="numeric"
             placeholder="AED" autocomplete="off"></div>

@@ -183,7 +183,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .tb.on{color:var(--gold2)}
 .tb svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.9;
   stroke-linecap:round;stroke-linejoin:round}
-.tb-badge{position:absolute;transform:translate(14px,-4px);min-width:16px;height:16px;padding:0 4px;
+/* Счётчик сидит на углу значка, а не под подписью: раньше он свисал вниз и
+   налезал на текст. */
+.tb-ic{position:relative;display:flex;align-items:center;justify-content:center}
+.tb-badge{position:absolute;top:-6px;right:-10px;min-width:17px;height:17px;padding:0 4px;
   border-radius:999px;background:var(--gold2);color:#1a1408;font-size:9px;font-weight:700;
   display:flex;align-items:center;justify-content:center}
 
@@ -261,19 +264,27 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .ed-sum s{color:var(--muted);font-size:13px;font-weight:600}
 
 /* закрытый заказ в истории — карточка той же грамматики, что и в работе */
-.hc{background:var(--card);border:1px solid var(--border2);border-radius:14px;
-  padding:12px 13px;margin-bottom:8px}
-.hc-h{display:flex;align-items:center;gap:8px;margin-bottom:8px}
+.hc{background:var(--bg3);border:1px solid var(--border2);border-radius:16px;
+  margin-bottom:9px;overflow:hidden}
+.hc-row{padding:12px 14px;border-top:1px solid var(--border2)}
+.hc-row:first-child{border-top:none}
+.hc-h{display:flex;align-items:center;gap:8px;padding:11px 14px}
 .hc-id{font-family:'Space Grotesk',sans-serif;font-size:11.5px;font-weight:700;color:var(--sub)}
 .hc-st{display:flex;align-items:center;gap:4px;font-size:10px;font-weight:700;
   color:var(--up);background:var(--up-soft);border:1px solid rgba(76,175,125,.28);
   padding:3px 8px;border-radius:999px}
 .hc-t{margin-left:auto;font-size:11px;color:var(--muted);font-weight:600}
-.hc-a{font-size:14.5px;font-weight:700;line-height:1.3}
-.hc-i{margin-top:6px;font-size:12px;color:var(--sub);line-height:1.45}
-.hc-f{display:flex;align-items:baseline;gap:8px;margin-top:10px;padding-top:9px;
-  border-top:1px solid var(--border2);font-size:11.5px;color:var(--muted)}
-.hc-f b{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:16px;
+.hc-l{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:7px;display:flex;align-items:baseline;gap:7px}
+.hc-l b{font-weight:700;color:var(--sub);letter-spacing:.4px;text-transform:none;font-size:11px}
+.hc-a{font-size:17px;font-weight:700;line-height:1.25}
+.hc-i{display:flex;flex-direction:column;gap:7px}
+.hc-i div{display:flex;gap:10px;font-size:14px}
+.hc-i div span{flex:1;min-width:0;color:var(--sub)}
+.hc-i div span i{font-style:normal;color:var(--muted)}
+.hc-i div b{color:var(--text);font-variant-numeric:tabular-nums;flex-shrink:0}
+.hc-f{display:flex;align-items:baseline;gap:8px;font-size:11.5px;color:var(--muted)}
+.hc-f b{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:18px;
   font-weight:700;color:var(--text)}
 .hc-f b i{font-style:normal;font-size:9.5px;color:var(--muted);margin-left:4px}
 
@@ -363,9 +374,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ts-v{font-size:18px;font-weight:800;margin-top:3px;font-variant-numeric:tabular-nums;
   letter-spacing:-.3px}
-.ts.due{background:var(--gold-soft)}
-.ts.due .ts-l{color:var(--gold2)}
-.ts.due .ts-v{color:var(--gold3)}
+.ts.due{background:var(--up-soft)}
+.ts.due .ts-l{color:var(--up)}
+.ts.due .ts-v{color:var(--up)}
 .ts.late{background:var(--dn-soft)}
 .ts.late .ts-l,.ts.late .ts-v{color:var(--dn)}
 .inc-l{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
@@ -468,16 +479,18 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 
 <nav class="tabbar" id="tabbar">
   <button class="tb on" data-tab="orders" onclick="setTab('orders')">
-    <svg viewBox="0 0 24 24"><path d="M5 3h14l1 5H4z"/><path d="M6 8v11a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>
-    <span>Заказы<span class="tb-badge" id="tbNum" style="display:none">0</span></span>
+    <span class="tb-ic"><svg viewBox="0 0 24 24"><path d="M5 3h14l1 5H4z"/><path d="M6 8v11a2 2 0 0 0 2 2h8a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>
+      <span class="tb-badge" id="tbNum" style="display:none">0</span></span>
+    <span>Заказы</span>
   </button>
   <button class="tb" data-tab="history" onclick="setTab('history')">
-    <svg viewBox="0 0 24 24"><path d="M3 3v5h5"/><path d="M3.5 8a9 9 0 1 0 2.2-3.4L3 8"/><path d="M12 7v5l3 2"/></svg>
+    <span class="tb-ic"><svg viewBox="0 0 24 24"><path d="M3 3v5h5"/><path d="M3.5 8a9 9 0 1 0 2.2-3.4L3 8"/><path d="M12 7v5l3 2"/></svg></span>
     <span>История</span>
   </button>
   <button class="tb" data-tab="expenses" onclick="setTab('expenses')">
-    <svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-    <span>Расходы<span class="tb-badge" id="tbExp" style="display:none">0</span></span>
+    <span class="tb-ic"><svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      <span class="tb-badge" id="tbExp" style="display:none">0</span></span>
+    <span>Расходы</span>
   </button>
 </nav>
 
@@ -822,18 +835,32 @@ function orderCard(o, i){
 // Закрытый заказ — та же карточка, только тише: адрес, что везли и сколько.
 // Голая строка «#AMB0385658 · 05:06 · 2000» не отвечает ни на один вопрос,
 // который водитель к ней приходит задать.
+// Закрытый заказ — тот же лист строками, только тише: развозку перечитывают,
+// когда спорят о деньгах или о том, что привозили, и состав должен читаться,
+// а не угадываться из сплошной строки.
 function histCard(o){
+  const n = (o.items || []).length;
   const items = (o.items || []).map(it =>
-    `${esc(it.name)}${it.pcs ? ` ${it.pcs}шт` : ''} ×${it.qty}`).join(' · ');
+    `<div><span>${esc(it.name)}${it.pcs ? ` <i>${it.pcs} шт</i>` : ''}</span>
+      <b>${it.qty} шт</b></div>`).join('');
+  // У телефонного заказа адреса может не быть вовсе — это способ оформления,
+  // а не ошибка, и писать «адрес не указан» тут незачем.
+  const addr = esc(o.address) || (o.customer_name ? esc(o.customer_name) : 'Телефонный заказ');
   return `<div class="hc">
-    <div class="hc-h">
+    <div class="hc-row hc-h">
       <span class="hc-id">#${esc(o.order_id)}</span>
       <span class="hc-st">${svg(ICO.ok, 12)} доставлен</span>
       <span class="hc-t">${hhmm(o.delivered_at || o.confirmed_at || o.timestamp)}</span>
     </div>
-    <div class="hc-a">${esc(o.address) || 'адрес не указан'}</div>
-    ${items ? `<div class="hc-i">${items}</div>` : ''}
-    <div class="hc-f"><span>${esc(o.district || '')}</span>
+    <div class="hc-row">
+      <div class="hc-l">Куда</div>
+      <div class="hc-a">${addr}</div>
+    </div>
+    ${n ? `<div class="hc-row">
+      <div class="hc-l">Что везли <b>${n} ${n === 1 ? 'позиция' : (n < 5 ? 'позиции' : 'позиций')}</b></div>
+      <div class="hc-i">${items}</div>
+    </div>` : ''}
+    <div class="hc-row hc-f"><span>${esc(o.district || '')}</span>
       <b>${fmt(o.total)}<i>AED</i></b></div>
   </div>`;
 }

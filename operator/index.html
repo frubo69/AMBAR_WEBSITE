@@ -52,8 +52,16 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .hdr{display:flex;align-items:center;gap:14px;padding:10px 18px;border-bottom:1px solid var(--border2);background:var(--bg2);flex-shrink:0}
 .hdr-logo{font-family:'Cormorant Garamond',serif;font-size:22px;letter-spacing:6px;color:var(--gold2)}
 .hdr-sub{font-size:10px;letter-spacing:2.5px;color:var(--muted);text-transform:uppercase;margin-top:1px}
-.hdr-right{margin-left:auto;display:flex;align-items:center;gap:10px}
-.pill{font-size:11px;font-weight:600;padding:6px 12px;border-radius:999px;border:1px solid var(--border2);color:var(--sub);background:var(--card)}
+.hdr-right{margin-left:auto;display:flex;align-items:center;gap:14px}
+/* Кнопки собраны в группы: внутри группы плотно, между группами — воздух.
+   Одинаковый рост и одна форма, иначе ряд выглядит случайным. */
+.hdr-grp{display:flex;align-items:center;gap:6px}
+.pill{display:flex;align-items:center;gap:6px;height:34px;padding:0 13px;font-size:11.5px;
+  font-weight:600;border-radius:999px;border:1px solid var(--border2);color:var(--sub);
+  background:var(--card);cursor:pointer;white-space:nowrap}
+.pill .ic{margin:0;width:15px;height:15px;flex-shrink:0}
+.pill-ico{padding:0;width:34px;justify-content:center}
+#dispatchBtn{color:var(--gold2);border-color:rgba(201,169,110,.4)}
 .pill.ok{color:var(--up);border-color:rgba(76,175,125,.3)}
 .pill.err{color:var(--dn);border-color:rgba(224,85,85,.35)}
 .office-seg{display:flex;gap:4px;background:var(--card);border:1px solid var(--border2);border-radius:999px;padding:3px}
@@ -510,7 +518,11 @@ a.oc-row:active{background:var(--card2)}
   .hdr-sub{display:none}
   .hdr-right{gap:6px}
   .pill{font-size:11px;padding:6px 10px;white-space:nowrap}
-  .hdr-right .pill:not(#dispatchBtn):not(#themeBtn){display:none}
+  .hdr-right{gap:8px}
+  .hdr-grp{gap:5px}
+  .pill{height:32px;padding:0 10px}
+  .pill span{display:none}
+  .pill#dayLbl,#dayBtn span,#dispatchBtn span{display:inline}
 
   .center{flex:1;min-height:0}
   .search-row{padding:10px 12px 2px}
@@ -762,22 +774,28 @@ a.oc-row:active{background:var(--card2)}
   <div class="hdr">
     <div><div class="hdr-logo">AMBAR</div><div class="hdr-sub">Панель оператора</div></div>
     <div class="office-seg" id="officeSeg" style="display:none"></div>
+    <!-- Шапка сгруппирована по смыслу: сначала то, что зовёт (события и
+         поддержка), потом контекст смены (кто за планшетом и за какой день),
+         последним — служебное. Аккаунт телеграма ушёл в лист выбора оператора:
+         в шапке он спорил с именем выбранного оператора. -->
     <div class="hdr-right">
-      <button class="pill" id="dispatchBtn" onclick="showOv('opOv')" style="cursor:pointer;color:var(--gold2);border-color:rgba(201,169,110,.4)">Оператор</button>
-      <button class="pill" id="fdBtn" onclick="fdOpen()" aria-label="События"
-        style="cursor:pointer;display:flex;align-items:center;gap:6px"><svg class="ic" viewBox="0 0 24 24"
-        aria-hidden="true" style="margin:0"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span
-        id="fdCnt">События</span></button>
-      <button class="pill" id="supBtn" onclick="supOpen()" aria-label="Поддержка"
-        style="cursor:pointer;display:flex;align-items:center;gap:6px"><svg class="ic" viewBox="0 0 24 24"
-        aria-hidden="true" style="margin:0"><path d="M20 14a2 2 0 0 1-2 2H8l-4 3.5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/></svg><span
-        id="supCnt">Поддержка</span></button>
-      <button class="pill" id="themeBtn" onclick="toggleTheme()" aria-label="Тема" style="cursor:pointer"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg></button>
-      <span class="pill" id="opName">—</span>
-      <button class="pill" id="dayBtn" onclick="dayOpen()" style="cursor:pointer;display:flex;
-        align-items:center;gap:6px"><svg class="ic" viewBox="0 0 24 24" aria-hidden="true"
-        style="margin:0"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg><span
-        id="dayLbl">Сегодня</span></button>
+      <div class="hdr-grp alerts">
+        <button class="pill" id="fdBtn" onclick="fdOpen()" aria-label="События"><svg class="ic"
+          viewBox="0 0 24 24" aria-hidden="true"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg><span
+          id="fdCnt">События</span></button>
+        <button class="pill" id="supBtn" onclick="supOpen()" aria-label="Поддержка"><svg class="ic"
+          viewBox="0 0 24 24" aria-hidden="true"><path d="M20 14a2 2 0 0 1-2 2H8l-4 3.5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/></svg><span
+          id="supCnt">Поддержка</span></button>
+      </div>
+      <div class="hdr-grp">
+        <button class="pill" id="dispatchBtn" onclick="showOv('opOv')"><svg class="ic"
+          viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c1.2-3.6 4-5.4 7-5.4s5.8 1.8 7 5.4"/></svg><span>Оператор</span></button>
+        <button class="pill" id="dayBtn" onclick="dayOpen()"><svg class="ic" viewBox="0 0 24 24"
+          aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg><span
+          id="dayLbl">Сегодня</span></button>
+      </div>
+      <button class="pill pill-ico" id="themeBtn" onclick="toggleTheme()" aria-label="Тема"><svg
+        class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg></button>
     </div>
   </div>
 
@@ -864,6 +882,7 @@ a.oc-row:active{background:var(--card2)}
     <div class="t">Кто принимает заказы?</div>
     <div class="s">Выберите себя — районы и водители подставятся автоматически</div>
     <div id="opList"></div>
+    <div class="acc-sub" style="margin-top:12px">Аккаунт телеграма: <b id="opAcc">—</b></div>
     <div class="btns"><button class="sbtn" onclick="hideOv('opOv')">Закрыть</button></div>
   </div>
 </div>
@@ -1116,7 +1135,8 @@ function hideOv(id){ $(id).classList.remove('show'); }
 async function boot(){
   try{
     const r = await opApi.opFetch('/api/operator/ping');
-    $('opName').textContent = r.operator || '—';
+    // Аккаунт телеграма показываем в листе выбора оператора, а не в шапке.
+    const acc = $('opAcc'); if(acc) acc.textContent = r.operator || '—';
     OFFICES = r.offices || [];
     curOffice = (OFFICES[0]||{}).id || '';
     renderOffices();

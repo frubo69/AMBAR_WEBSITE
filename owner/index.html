@@ -9929,8 +9929,9 @@ function _crewPop(anchorSel, html){
 }
 
 function crewPick(did){
-  const d = CREW.districts.find(x => x.id === did); if(!d) return;
-  _crewPop(`.crew-d [onclick*="${did}"]`, CREW.operators.map(n => `
+  const S = CREW_D || CREW;
+  const d = S.districts.find(x => x.id === did); if(!d) return;
+  _crewPop(`.crew-d [onclick*="${did}"]`, S.operators.map(n => `
     <button onclick="crewSet('${did}','${n.replace(/'/g,"\\'")}')">
       <span>${escS(n)}${n === d.base ? '<span class="pin-s">как обычно</span>' : ''}</span>
       ${n === d.operator ? '<i style="margin-left:auto;color:var(--gold2)">✓</i>' : ''}
@@ -9940,9 +9941,10 @@ function crewPick(did){
 // То же самое, только наоборот: выбираем не человека для района, а район для
 // человека — водителей на районе несколько, и «кто здесь» тут не вопрос.
 function crewPickD(name){
-  const v = (CREW.drivers || []).find(x => x.name === name); if(!v) return;
+  const S = CREW_D || CREW;
+  const v = (S.drivers || []).find(x => x.name === name); if(!v) return;
   const esc = name.replace(/'/g, "\\'");
-  _crewPop(`.crew-d [onclick*="${esc}"]`, CREW.districts.map(d => `
+  _crewPop(`.crew-d [onclick*="${esc}"]`, S.districts.map(d => `
     <button onclick="crewSetD('${esc}','${d.id}')">
       <span>${escS(d.code)} ${escS(d.name)}${
         d.id === v.base ? '<span class="pin-s">как обычно</span>' : ''}</span>

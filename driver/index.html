@@ -359,17 +359,17 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    выходит из машины. */
 /* Оплата и сумма — одной строкой, но двумя блоками: чем платят важно ровно
    настолько же, сколько платят. */
-.inc-row-pay{flex:0 0 auto;display:flex;align-items:flex-end;gap:14px;
-  background:rgba(201,169,110,.05)}
-.inc-pay-l{flex:1;min-width:0}
-.inc-pay-r{text-align:right;flex-shrink:0}
-.inc-pay-r .inc-l{justify-content:flex-end}
+.inc-row-pay{flex:0 0 auto;display:grid;grid-template-columns:1fr auto;
+  column-gap:14px;row-gap:8px;align-items:baseline;background:rgba(201,169,110,.05)}
+.inc-l-r{justify-content:flex-end}
+.inc-row-pay .inc-l{margin-bottom:0}
+.inc-row-pay .inc-method-s{grid-column:1 / -1;margin-top:-3px}
 /* Способ оплаты — короткой строкой со значком, без переносов: это факт, а не
    абзац. Уточнение уходит вниз мелким. */
 .inc-method{display:flex;align-items:center;gap:7px;font-size:17px;font-weight:700;
   line-height:1.1;color:var(--text);white-space:nowrap}
 .inc-method svg{flex-shrink:0;opacity:.9}
-.inc-method-s{font-size:12px;color:var(--muted);margin-top:4px;padding-left:24px}
+.inc-method-s{font-size:12px;color:var(--muted);padding-left:24px}
 .inc-total{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;
   line-height:1;letter-spacing:-1px;color:var(--gold3);white-space:nowrap}
 .inc-total i{font-style:normal;font-size:11px;color:var(--muted);letter-spacing:.5px;
@@ -559,15 +559,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
     </div>
 
     <div class="inc-row inc-row-pay">
-      <div class="inc-pay-l">
-        <div class="inc-l">Оплата</div>
-        <div class="inc-method" id="incPay"></div>
-        <div class="inc-method-s" id="incPayS"></div>
-      </div>
-      <div class="inc-pay-r">
-        <div class="inc-l" id="incPayL">Взять с клиента</div>
-        <div class="inc-total"><span id="incTotal">0</span><i>AED</i></div>
-      </div>
+      <!-- Сетка, а не два блока рядом: подписи стоят в одном ряду, значения —
+           в другом, и ни одна колонка не может уехать по высоте. -->
+      <div class="inc-l">Оплата</div>
+      <div class="inc-l inc-l-r" id="incPayL">Итого</div>
+      <div class="inc-method" id="incPay"></div>
+      <div class="inc-total"><span id="incTotal">0</span><i>AED</i></div>
+      <div class="inc-method-s" id="incPayS"></div>
     </div>
   </div>
 

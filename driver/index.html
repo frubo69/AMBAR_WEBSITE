@@ -327,7 +327,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .exp-row .cmt{flex:1.4}
 .exp-field.cmt input{width:100%;padding:12px;border:none;background:none;font-size:14px;
   color:var(--text);font-family:inherit;outline:none}
-.exp-mine-i:first-child{border-top:none}
+
 .exp-field{flex:1;min-width:0;position:relative;display:flex;align-items:center;
   border-radius:11px;border:1px solid var(--border2);background:var(--bg3)}
 .exp-field:focus-within{border-color:rgba(201,169,110,.5)}
@@ -347,12 +347,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .exp-mk.pending{color:var(--warn)}
 .exp-mk.approved{color:var(--up)}
 .exp-mk.rejected{color:var(--dn)}
-.exp-mine{margin-top:9px;display:flex;flex-direction:column;gap:1px}
-.exp-mine-i{display:flex;align-items:center;gap:9px;padding:9px 2px;font-size:12.5px;
-  border-top:1px solid var(--border3)}
-.exp-mine-i b{font-weight:800;min-width:44px}
-.exp-mine-i span{flex:1;min-width:0;color:var(--muted);overflow:hidden;text-overflow:ellipsis;
-  white-space:nowrap}
+.exp-t i{font-style:normal;font-weight:600;color:var(--muted)}
+.exp-row-c{padding-top:7px}
+.exp-row[hidden]{display:none}   /* display:flex у .exp-row перебивает hidden */
 /* Итог не уезжает вверх вместе со списком: сколько сегодня набежало —
    единственное число, ради которого водитель сюда заходит. */
 .exp-sp{height:96px}
@@ -368,7 +365,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .exp-bar-v{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:700;
   color:var(--gold3);letter-spacing:-1px;line-height:1}
 .exp-bar-v i{font-style:normal;font-size:11px;color:var(--muted);margin-left:6px;letter-spacing:0}
-.exp-other{padding-top:4px;padding-bottom:4px}
+
 .exp-add{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
   padding:13px;border-radius:14px;cursor:pointer;font-family:inherit;font-size:13.5px;
   font-weight:600;color:var(--sub);background:none;border:1px dashed var(--border3)}
@@ -1014,9 +1011,7 @@ function renderHistory(){
     box.innerHTML = '<div class="empty">За две недели закрытых заказов нет.</div>';
     return;
   }
-  box.innerHTML = `<div class="tot"><span class="tot-l">За 14 дней · ${HIST.total_count} заказов</span>
-      <span class="tot-v">${fmt(HIST.total_aed)}<i>AED</i></span></div>`
-    + HIST.days.map(g => `
+  box.innerHTML = HIST.days.map(g => `
     <div class="hist-day">
       <span class="hist-day-d">${dayLbl(g.day)}</span>
       <span class="sect-v">${g.count} ${g.count === 1 ? 'заказ' : g.count < 5 ? 'заказа' : 'заказов'}</span>
@@ -1039,13 +1034,27 @@ const EXP_ICO = {pending: 'clock', approved: 'ok', rejected: 'ban'};
 const expMark = x => `<span class="exp-mk ${EXP_ST(x)}" title="${EXP_LBL[EXP_ST(x)] || ''}"
   aria-label="${EXP_LBL[EXP_ST(x)] || ''}">${svg(ICO[EXP_ICO[EXP_ST(x)]] || ICO.clock, 15)}</span>`;
 
-// «Прочее» водитель заводит словами, и таких строк за смену бывает несколько —
-// им нужен свой список под кнопкой.
-function expMine(kind){
-  const list = (EXP.extras || []).filter(x => x.kind === kind);
-  if(!list.length) return '';
-  return `<div class="exp-mine">${list.map(x => `<div class="exp-mine-i">
-      <b>${fmt(x.amount)}</b><span>${esc(x.comment)}</span>${expMark(x)}</div>`).join('')}</div>`;
+// Каждый доп. расход живёт такой же карточкой, как бензин и мойка: сверху за
+// что, внутри сумма. Строчкой в общем списке он выглядел объедками.
+function otherBox(x){
+  const k = 'o_' + x.id;
+  return `<div class="card exp-card">
+    <div class="exp-hd">${svg(ICO.note, 17)}<span class="exp-t">Доп расход${
+      x.comment ? ` <i>${esc(x.comment)}</i>` : ''}</span>
+      <span class="exp-sum">${fmt(x.amount)} AED</span></div>
+    <div class="exp-row">
+      <div class="exp-field sent">
+        <input class="amt" id="e_${k}" type="text" inputmode="numeric" value="${x.amount}"
+          autocomplete="off" readonly>
+        ${expMark(x)}
+      </div>
+      <button class="btn btn-sec exp-go" onclick="expTap(this,'${k}')">Изменить</button>
+    </div>
+    <div class="exp-row exp-row-c" id="w_${k}" hidden>
+      <div class="exp-field cmt"><input id="c_${k}" type="text" placeholder="за что"
+        autocomplete="off" value="${esc(x.comment)}"></div>
+    </div>
+  </div>`;
 }
 
 // Отправленное не стирается: сумма остаётся в поле серым, а кнопка становится
@@ -1077,6 +1086,8 @@ function expTap(btn, kind){
   if(inp && inp.readOnly){
     inp.readOnly = false; EXP_EDIT = kind;
     inp.closest('.exp-field').classList.remove('sent');
+    const w = document.getElementById('w_' + kind);   // у доп. расхода правится и «за что»
+    if(w) w.hidden = false;
     inp.focus(); try{ inp.select(); }catch(e){}
     btn.textContent = 'Отправить';
     btn.classList.remove('btn-sec'); btn.classList.add('btn-pri');
@@ -1133,12 +1144,12 @@ function renderExpenses(){
       : `<button class="exp-add" onclick="EXP_MORE=true;render()">
           ${svg(ICO.plus2, 15)} Ещё расход</button>`}
 
-    ${other.length ? `<div class="card exp-card exp-other">${expMine('other')}</div>` : ''}
+    ${other.map(otherBox).join('')}
 
     <div class="exp-sp"></div>
     <div class="exp-bar"><div class="exp-bar-in">
       <div class="exp-bar-l">Всего за смену${pend ? `<i>ждут решения ${fmt(pend)} AED</i>` : ''}</div>
-      <div class="exp-bar-v">${fmt(total)}<i>AED</i></div>
+      <div class="exp-bar-v">−${fmt(total)}<i>AED</i></div>
     </div></div>`;
 }
 
@@ -1633,15 +1644,17 @@ async function sendEdit(btn){
 }
 
 async function sendExpense(btn, kind){
+  const id = kind.startsWith('o_') ? kind.slice(2) : '';
   const amount = parseInt(((document.getElementById('e_' + kind) || {}).value || '')
     .replace(/\D/g,''), 10);
-  const comment = kind === 'other'
-    ? ((document.getElementById('e_other_c') || {}).value || '').trim() : '';
+  const comment = id ? ((document.getElementById('c_' + kind) || {}).value || '').trim()
+    : (kind === 'other' ? ((document.getElementById('e_other_c') || {}).value || '').trim() : '');
   if(!amount){ toast('Впишите сумму'); return; }
-  if(kind === 'other' && !comment){ toast('Впишите, за что'); return; }
+  if((kind === 'other' || id) && !comment){ toast('Впишите, за что'); return; }
   btn.disabled = true;
   try{
-    await drvApi.drvFetch('/api/driver/expenses', {method:'POST', body:{amount, comment, kind}});
+    await drvApi.drvFetch('/api/driver/expenses', {method:'POST',
+      body:{amount, comment, kind: id ? 'other' : kind, ...(id ? {id} : {})}});
     toast('Отправлено на согласование');
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
     EXP_MORE = false; EXP_EDIT = null;

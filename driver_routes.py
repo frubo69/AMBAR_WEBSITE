@@ -456,10 +456,16 @@ async def handle_expense_add(request):
     # Бензин и мойка — одна запись за смену, водитель правит её же. Заправился
     # дважды — пишет общее число, а не заводит вторую строку: в приложении у
     # каждого вида одно поле, и оно должно совпадать с тем, что в учёте.
+    # Доп. расход правится по своему id: их за смену бывает несколько.
+    ent_id = str(body.get("id") or "").strip()
     prev = None
-    if kind in ("fuel", "wash"):
+    if ent_id or kind in ("fuel", "wash"):
         d = await db.get_driver_day(day, me["name"]) or {}
-        prev = next((x for x in (d.get("extras") or []) if _kind_of(x) == kind), None)
+        extras = d.get("extras") or []
+        prev = (next((x for x in extras if x.get("id") == ent_id), None) if ent_id
+                else next((x for x in extras if _kind_of(x) == kind), None))
+        if ent_id and prev is None:
+            return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
 
     if prev:
         await db.update_driver_expense(day, me["name"], prev["id"], amount, comment)

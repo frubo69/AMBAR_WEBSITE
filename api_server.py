@@ -2491,7 +2491,7 @@ PUBLIC_ROOT_FILES = {
 # клиента целиком зависела от доступности чужого домена, и в ОАЭ плитки висели
 # пустыми. Теперь свои, сжатые в webp.
 PUBLIC_DIRS = ("owner/", "operator/", "driver/", "TEXTURES/", "fonts/", "LOGOS/",
-               "uploads/", "products/", "vendor/")
+               "uploads/", "products/", "vendor/", "sounds/")
 PUBLIC_EXTS = {
     ".html", ".js", ".css", ".json", ".map",
     ".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif", ".ico",

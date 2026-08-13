@@ -401,8 +401,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .inc-slide{position:relative;height:68px;border-radius:34px;background:var(--card2);
   border:1px solid var(--border3);overflow:hidden;touch-action:none;user-select:none}
 .inc-slide.done{background:var(--up-soft);border-color:rgba(76,175,125,.55)}
+/* Дорожка заливается за ползунком: пройденное закрашивается, а подсказка
+   гаснет под ним — иначе текст странно торчит из-под пальца. */
+.inc-fill{position:absolute;left:0;top:0;bottom:0;width:0;pointer-events:none;
+  background:linear-gradient(90deg,rgba(201,169,110,.28),rgba(201,169,110,.14));
+  border-radius:34px}
 .inc-track{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
-  pointer-events:none;padding-left:56px}
+  pointer-events:none;padding-left:56px;transition:opacity .12s,filter .12s}
 /* Блик бежит туда же, куда надо вести палец */
 .inc-hint{font-size:15px;font-weight:700;letter-spacing:.2px;
   background:linear-gradient(100deg,rgba(168,168,192,.55) 30%,#FFFFFF 48%,
@@ -584,7 +589,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 
   <div class="inc-foot">
     <div class="inc-slide" id="incSlide">
-      <div class="inc-track"><span class="inc-hint">Проведите — принял, еду</span></div>
+      <div class="inc-fill" id="incFill"></div>
+      <div class="inc-track"><span class="inc-hint" id="incHint">Проведите — принял, еду</span></div>
       <div class="inc-knob" id="incKnob">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
           stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h13M13 6l6 6-6 6"/></svg>
@@ -936,33 +942,41 @@ function _acUnlock(){
     if(_ac.state === 'suspended') _ac.resume();
   }catch(e){}
 }
+// Первое касание разблокирует звук и сразу подтягивает файл: к моменту заказа
+// он уже лежит в памяти.
 ['pointerdown','touchstart'].forEach(ev =>
-  document.addEventListener(ev, _acUnlock, {passive:true}));
+  document.addEventListener(ev, () => { _acUnlock(); _loadSound(); }, {passive:true}));
 
-// Звук временно выключен — будет другой. Вибрация остаётся: телефон на
-// держателе экраном в сторону всё равно должен дёрнуться.
-const SOUND_ON = false;
+// Звук нового заказа — свой файл с нашего сервера. Декодируем один раз и
+// держим в памяти: у водителя в машине рваный интернет, а сигнал не имеет
+// права опоздать или не прозвучать.
+let _snd = null, _sndP = null;
+function _loadSound(){
+  if(_snd) return Promise.resolve(_snd);
+  if(_sndP) return _sndP;
+  _acUnlock(); if(!_ac) return null;
+  _sndP = fetch('/sounds/new-order.mp3')
+    .then(r => r.arrayBuffer())
+    .then(b => _ac.decodeAudioData(b))
+    .then(buf => { _snd = buf; return buf; })
+    .catch(() => null);
+  return _sndP;
+}
+
 function _siren(){
   try{ navigator.vibrate && navigator.vibrate([180,80,180,80,320]); }catch(e){}
   try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
-  if(!SOUND_ON) return;
   _acUnlock(); if(!_ac) return;
   _lastRing = Date.now();
-  const t0 = _ac.currentTime;
-  const master = _ac.createGain(); master.gain.value = 1.0;
-  const lp = _ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 4000;
-  master.connect(lp).connect(_ac.destination);
-  [[1318,0,0.1],[1760,0.16,0.12],[1318,0.42,0.1],[1760,0.58,0.14]].forEach(([hz,at,dur])=>{
-    const o = _ac.createOscillator(), g = _ac.createGain();
-    o.type = 'square'; o.frequency.setValueAtTime(hz, t0+at);
-    g.gain.setValueAtTime(0.0001, t0+at);
-    g.gain.exponentialRampToValueAtTime(0.8, t0+at+0.006);
-    g.gain.setValueAtTime(0.8, t0+at+dur*0.6);
-    g.gain.exponentialRampToValueAtTime(0.0001, t0+at+dur);
-    o.connect(g).connect(master); o.start(t0+at); o.stop(t0+at+dur+0.02);
-  });
-  try{ navigator.vibrate && navigator.vibrate([180,80,180,80,320]); }catch(e){}
-  try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+  const play = buf => {
+    if(!buf) return;
+    const src = _ac.createBufferSource();
+    src.buffer = buf;
+    src.connect(_ac.destination);
+    src.start();
+  };
+  if(_snd) play(_snd);
+  else { const p = _loadSound(); if(p) p.then(play); }
 }
 
 // Экран не должен гаснуть, пока заказ не принят: телефон лежит на держателе.
@@ -1051,26 +1065,53 @@ function incHide(){
 
 // ── ползунок ────────────────────────────────────────────────────────────
 function incKnobReset(){
-  const k = document.getElementById('incKnob');
-  k.style.transform = 'translateX(0)';
+  document.getElementById('incKnob').style.transform = 'translateX(0)';
+  document.getElementById('incFill').style.width = '0px';
+  const t = document.querySelector('.inc-track');
+  t.style.opacity = '1'; t.style.filter = 'none';
   document.getElementById('incSlide').classList.remove('done','drag');
 }
+// Отдача по всему пути: щелчок на старте, короткие толчки на четвертях и
+// подтверждение в конце. Ползунок без отклика ощущается как картинка.
+function _tap(kind){
+  try{
+    const h = tg.HapticFeedback;
+    if(kind === 'sel') h.selectionChanged();
+    else if(kind === 'ok') h.notificationOccurred('success');
+    else h.impactOccurred(kind);
+  }catch(e){}
+  try{ navigator.vibrate && navigator.vibrate(kind === 'ok' ? [40,50,90] : 12); }catch(e){}
+}
+
 (function initSlide(){
   const bar = document.getElementById('incSlide');
   const knob = document.getElementById('incKnob');
+  const fill = document.getElementById('incFill');
+  const track = document.querySelector('.inc-track');
   if(!bar || !knob) return;
-  let dragging = false, x0 = 0, max = 0;
+  let dragging = false, x0 = 0, max = 0, step = 0;
+  const paint = v => {
+    knob.style.transform = `translateX(${v}px)`;
+    const k = max ? v / max : 0;
+    fill.style.width = (v + knob.offsetWidth) + 'px';
+    // Подсказка гаснет и размывается по мере хода — из-под пальца ничего не торчит.
+    track.style.opacity = String(Math.max(0, 1 - k * 1.6));
+    track.style.filter = `blur(${(k * 3).toFixed(1)}px)`;
+  };
   const start = e => {
-    dragging = true; bar.classList.add('drag');
+    dragging = true; bar.classList.add('drag'); step = 0;
     x0 = (e.touches ? e.touches[0].clientX : e.clientX);
     max = bar.offsetWidth - knob.offsetWidth - 10;
-    try{ tg.HapticFeedback.selectionChanged(); }catch(err){}
+    _tap('sel');
   };
   const move = e => {
     if(!dragging) return;
     const x = (e.touches ? e.touches[0].clientX : e.clientX) - x0;
     const v = Math.max(0, Math.min(max, x));
-    knob.style.transform = `translateX(${v}px)`;
+    paint(v);
+    // Ступеньки на четвертях пути: палец чувствует, сколько осталось.
+    const st = Math.floor((v / max) * 4);
+    if(st !== step){ step = st; if(st > 0 && st < 4) _tap('light'); }
     if(e.cancelable) e.preventDefault();
   };
   const end = () => {
@@ -1078,11 +1119,13 @@ function incKnobReset(){
     dragging = false; bar.classList.remove('drag');
     const v = parseFloat((knob.style.transform.match(/-?\d+\.?\d*/) || [0])[0]);
     if(v >= max * 0.85){
-      knob.style.transform = `translateX(${max}px)`;
+      paint(max);
       bar.classList.add('done');
+      _tap('ok');
       incAccept();
     }else{
-      knob.style.transform = 'translateX(0)';
+      paint(0);
+      _tap('soft');
     }
   };
   knob.addEventListener('mousedown', start);

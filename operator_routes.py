@@ -834,7 +834,13 @@ async def handle_queue(request):
     # а не сегодняшнюю. Новые и в работе остаются живыми в любом случае:
     # заказ, требующий ответа сейчас, не должен исчезать оттого, что человек
     # заполняет позавчерашний день.
-    day = (request.query.get("day") or "").strip() or today
+    day = today
+    ask = (request.query.get("day") or "").strip()
+    if ask:
+        try:
+            day = datetime.strptime(ask, "%Y-%m-%d").date()
+        except ValueError:
+            day = today
     lanes = {"new": [], "work": [], "done": []}
     counts = {"app": 0, "manual": 0}
     for o in (await db.get_all_orders()).values():
@@ -870,7 +876,7 @@ async def handle_queue(request):
         "as": who, "senior": next(x["senior"] for x in people if x["name"] == who),
         "districts": [d for d in districts if d["id"] in scope],
         "new": lanes["new"], "work": lanes["work"], "done": lanes["done"],
-        "counts": counts, "day": day,
+        "counts": counts, "day": day.isoformat(),
         "now": datetime.now(timezone.utc).isoformat(),
     }, headers=CORS_HEADERS)
 

@@ -150,6 +150,9 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 /* ── dispatch chips (район / водитель) ── */
 .dchips{display:flex;flex-wrap:wrap;gap:6px}
 .dchip{padding:10px 13px;border-radius:10px;background:var(--card);border:1px solid var(--border2);font-size:13px;font-weight:600;color:var(--sub);transition:.12s}
+.dchip.alien{border-style:dashed}
+.dchip.alien i{display:block;font-style:normal;font-size:9px;font-weight:600;opacity:.75;
+  letter-spacing:.2px;margin-top:1px}
 .dchip.on{background:var(--gold-soft);border-color:rgba(201,169,110,.55);color:var(--gold2)}
 .dchip:active{transform:scale(.94)}
 .dchips .hint{font-size:12px;color:var(--muted);padding:8px 2px}
@@ -1114,6 +1117,12 @@ const FALLBACK_DISTRICTS=[
   {id:'tecom',   code:'B5', name:'Тиком',      operator:'Умар',      drivers:['Файзуло','Алишер']},
 ];
 let DISTRICTS=[], curOp='', curDist='', curDriver='';
+// Водитель, который стоит в самом заказе. Он не всегда есть в списке своего
+// района: водителя могли перевести на другой район, район заказа могли
+// поменять, а бывает и просто «сегодня везёт он». Такого водителя всё равно
+// показываем и держим выбранным — иначе правка состава молча переназначала бы
+// заказ на другого человека.
+let editDrvWas = '', editDistWas = '';
 // Кто может встать за планшет и что каждый видит. Планшет общий, аккаунт у
 // него один — по аккаунту Умара от Джанабиля не отличить, поэтому человек
 // называет себя сам, и его выбор решает, чьи районы показывать.
@@ -1225,9 +1234,17 @@ function renderDispatch(){
 function renderDrivers(){
   const dv=$('drvChips'); if(!dv) return;
   const d=_dist(curDist);
-  dv.innerHTML = !d
-    ? '<div class="hint">Выберите район — появятся водители</div>'
-    : d.drivers.map(n=>`<button class="dchip ${n===curDriver?'on':''}" onclick="pickDriver('${n}')">${n}</button>`).join('');
+  if(!d){ dv.innerHTML = '<div class="hint">Выберите район — появятся водители</div>'; return; }
+  const list = d.drivers.slice();
+  // Водитель заказа не из этого района — показываем его отдельной пометкой, а
+  // не прячем: оператор должен видеть, кто везёт, и менять это осознанно.
+  const alien = curDriver && !list.includes(curDriver) ? curDriver : '';
+  dv.innerHTML = list.map(n=>`<button class="dchip ${n===curDriver?'on':''}"
+      onclick="pickDriver('${_esc(n)}')">${_esc(n)}</button>`).join('')
+    + (alien ? `<button class="dchip on alien" onclick="pickDriver('${_esc(alien)}')"
+        title="Водитель не с этого района">${_esc(alien)}<i>не с этого района</i></button>` : '');
+  // В районе один водитель — выбирать не из чего, ставим сразу.
+  if(!curDriver && list.length===1){ curDriver=list[0]; renderDrivers(); }
 }
 function pickOp(op){
   curOp=op; try{ localStorage.setItem('pos_op',op); }catch(e){}
@@ -1235,7 +1252,14 @@ function pickOp(op){
   renderDispatch(); hideOv('opOv'); haptic('sel');
 }
 function pickDist(id){
-  if(curDist!==id) curDriver='';        // drivers belong to the район
+  if(curDist!==id){
+    // Водитель принадлежит району. Но если вернулись на район заказа — вернём
+    // того, кто на нём стоял, даже если он с другого района: человек просто
+    // посмотрел соседний список и передумал.
+    const d=_dist(id);
+    curDriver = (editingOid && id === editDistWas) ? editDrvWas
+      : ((editDrvWas && d && (d.drivers||[]).includes(editDrvWas)) ? editDrvWas : '');
+  }
   curDist=id; renderDispatch(); haptic('sel');
 }
 function pickDriver(n){ curDriver=n; renderDrivers(); haptic('sel'); }
@@ -1442,7 +1466,7 @@ function clearTicket(confirmIt){
   dayPaint();
   $('createBtn').classList.remove('save');
   $('cName').value=''; $('cPhone').value=''; $('cAddr').value=''; $('cComment').value='';
-  curDist=''; curDriver='';          // район/водитель are per-order; оператор stays for the shift
+  curDist=''; curDriver=''; editDrvWas=''; editDistWas='';   // район и водитель — под заказ
   renderDispatch();
   renderTicket(); syncBadges();
 }
@@ -2149,7 +2173,8 @@ function _decline(oid, r){
 // ── приём: водитель и время одним действием ──
 function askAccept(oid){
   const o=(Q.new||[]).find(x=>x.order_id===oid); if(!o) return;
-  acceptOid=oid; acceptDrv=''; acceptEta=0;
+  // Заказ мог уже побывать в доставке и вернуться — водитель на нём остался.
+  acceptOid=oid; acceptDrv=o.driver||''; acceptEta=0;
   $('accWho').textContent = oid+' · '+o.total+' AED';
   accOrd=o; _accDrv();
   $('accEta').innerHTML = [20,25,30,35,40,50,60].map(m=>
@@ -2165,7 +2190,8 @@ function _accDrv(){
     .slice().sort((a,b)=>String(a.code||'').localeCompare(String(b.code||'')));
   $('accDrv').innerHTML = ds.map(d=>`<div class="acc-row ${d.id===o.office_id?'own':''}">
       <div class="cd">${_esc(_distCode(d.id))}</div>
-      <div class="dchips">${d.drivers.map(n=>`<button class="dchip" data-n="${_esc(n)}"
+      <div class="dchips">${d.drivers.map(n=>`<button class="dchip${n===acceptDrv?' on':''}"
+        data-n="${_esc(n)}"
         onclick="accPickDrv('${_esc(n)}')">${_esc(n)}</button>`).join('')}</div></div>`).join('');
 }
 function accPickDrv(n){ acceptDrv=n; haptic('sel'); _accSync(); }
@@ -2217,8 +2243,13 @@ function startEdit(oid){
   $('cPhone').value=o.phone||''; $('cAddr').value=o.address||''; $('cComment').value=o.comment||'';
   // Район берём из самого заказа: у онлайновых он определён по адресу, и
   // подменять его тем, кто сейчас за планшетом, нельзя.
+  // Район и водитель уже назначены — подставляем их, а не заставляем выбирать
+  // заново: оператор один раз это решил, и правка состава решения не отменяет.
+  editDrvWas = o.driver || '';
   const _od = o.district_id || o.office_id || '';
-  if(_od && _dist(_od)){ curDist=_od; curDriver=o.driver||''; }
+  editDistWas = _od;
+  if(_od && _dist(_od)){ curDist=_od; curDriver=editDrvWas; }
+  else { curDist=''; curDriver=editDrvWas; }
   // Онлайн-заказ: адрес и телефон пришли от клиента, переписывать их не надо.
   // Остаётся состав, а водитель — только если заказ уже в пути.
   editOnline = (o.source||'app')!=='manual';

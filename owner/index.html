@@ -10519,7 +10519,12 @@ function renderOperators(){
         ? `все районы · принял ${op.orders}`
         : op.districts.map(d=>d.code).join(' · ') + ` · ${op.orders} ${pluralize(op.orders,'заказ','заказа','заказов')}`;
     const tag = op.senior ? '<span class="lrow-tag tag-gold">СТАРШИЙ</span>'
-              : (op.driver && !op.known ? '<span class="lrow-tag" style="background:var(--warn-soft);color:var(--warn)">НЕ В СПИСКЕ</span>' : '');
+              : (op.driver && !op.known ? '<span class="lrow-tag" style="background:var(--warn-soft);color:var(--warn)">НЕ В СПИСКЕ</span>' : '')
+              // Флажок с проверки бутылок. Не приговор, а повод спросить —
+              // поэтому метка, а не красная строка на весь список.
+              + (op.driver && op.qr_bad
+                  ? `<span class="lrow-tag" style="background:var(--dn-soft);color:var(--dn)"
+                       title="Проверка бутылок">не наших ${op.qr_bad}</span>` : '');
     return `<div class="lrow" data-detail="${op.driver?'driver':'operator'}:${escS(op.id)}">
       <div class="lrow-idx">${i+1}</div>
       <div class="lrow-av"${op.senior?' style="background:linear-gradient(135deg,#c9a96e,#e8c98a);color:#0a0a14"':''}>${escS(_opInitials(op.name))}</div>

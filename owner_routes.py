@@ -1423,6 +1423,24 @@ async def handle_operators(request):
             "rating_count": len(revs),
             "tips": tips, "tips_bottles": bottles,
         })
+    # Флажок с проверки бутылок: у этого водителя за месяц находили бутылки не
+    # из реестра. Старший смотрит на людей здесь, значит и знать он должен
+    # здесь — а не только внутри раздела проверок.
+    try:
+        checks = await db.qr_checks(30)
+        bad = {}
+        for c in checks:
+            n = (c.get("driver") or "").strip()
+            if n and c.get("bad"):
+                b = bad.setdefault(n, {"bad": 0, "at": ""})
+                b["bad"] += c.get("bad", 0)
+                b["at"] = b["at"] or str(c.get("at") or "")
+        for d in drivers:
+            f = bad.get(d["name"])
+            d["qr_bad"] = f["bad"] if f else 0
+            d["qr_bad_at"] = f["at"] if f else ""
+    except Exception as e:
+        log.warning(f"[people] флажки проверок: {e}")
     drivers.sort(key=lambda d: (-d["aed"], d["name"]))
 
     # Общие устройства считаем отдельно: планшет — это не человек, статистику

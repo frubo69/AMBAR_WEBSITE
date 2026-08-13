@@ -114,23 +114,48 @@ def drivers() -> list:
 # поменялись сменами. Поэтому список выше — то, как задумано, а поверх него
 # ложится перестановка из базы. Её всегда видно и всегда можно снять.
 #
-# Меняется только оператор. Водители привязаны к району, а не к оператору:
-# они возят по своим зданиям, кто бы ни принимал заказы.
+# Переставляются и операторы, и водители: водитель уходит в отпуск или его
+# перебрасывают на соседний район так же часто. Разница в том, что оператор у
+# района один, а водителей несколько, поэтому их перестановка хранится в другую
+# сторону — «этот водитель теперь здесь».
 _BASE_OPERATOR = {s["district"]: s["operator"] for s in DISTRICT_STAFF}
+_BASE_DRIVERS = {s["district"]: list(s["drivers"]) for s in DISTRICT_STAFF}
+_BASE_DRIVER_AT = {n: s["district"] for s in DISTRICT_STAFF for n in s["drivers"]}
 
 
-def apply_moves(moves: dict):
-    """Наложить перестановку. Пустой словарь возвращает всё как в коде."""
+def apply_moves(moves: dict, driver_moves: dict = None):
+    """Наложить перестановку. Пустые словари возвращают всё как в коде."""
     moves = moves or {}
     for s in DISTRICT_STAFF:
         s["operator"] = moves.get(s["district"]) or _BASE_OPERATOR[s["district"]]
     DISTRICT_OPERATOR.clear()
     DISTRICT_OPERATOR.update({s["district"]: s["operator"] for s in DISTRICT_STAFF})
 
+    dm = driver_moves or {}
+    at = {n: (dm.get(n) or d) for n, d in _BASE_DRIVER_AT.items()}
+    for s in DISTRICT_STAFF:
+        # Порядок держим по расписанию: сначала свои, потом пришедшие. Список
+        # водителей читают глазами, и прыгающий порядок мешает.
+        own = [n for n in _BASE_DRIVERS[s["district"]] if at.get(n) == s["district"]]
+        came = [n for n in _BASE_DRIVER_AT if at.get(n) == s["district"] and n not in own]
+        s["drivers"] = own + came
+    DISTRICT_DRIVERS.clear()
+    DISTRICT_DRIVERS.update({s["district"]: list(s["drivers"]) for s in DISTRICT_STAFF})
+
 
 def base_operator(district: str) -> str:
     """Кто стоит на районе в расписании — чтобы показать, от чего отступили."""
     return _BASE_OPERATOR.get(district, "")
+
+
+def base_district(driver: str) -> str:
+    """Где водитель стоит в расписании."""
+    return _BASE_DRIVER_AT.get(driver, "")
+
+
+def driver_names() -> list:
+    """Все водители в порядке районов расписания."""
+    return list(_BASE_DRIVER_AT)
 
 
 def operator_names() -> list:

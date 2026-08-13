@@ -1693,6 +1693,25 @@ async def staff_map_set(district: str, operator: str):
         await db.staff_map.delete_one({"_id": district})
 
 
+async def driver_map_get() -> dict:
+    """Кто из водителей стоит не там, где в расписании: имя → район."""
+    db = _db_or_none()
+    if db is None: return {}
+    cur = db.driver_map.find({})
+    return {d["_id"]: d["district"] async for d in cur if d.get("district")}
+
+
+async def driver_map_set(driver: str, district: str):
+    db = _db_or_none()
+    if db is None: return
+    if district:
+        await db.driver_map.replace_one(
+            {"_id": driver}, {"_id": driver, "district": district,
+                              "at": datetime.now(timezone.utc)}, upsert=True)
+    else:
+        await db.driver_map.delete_one({"_id": driver})
+
+
 # ── Картинки, уже загруженные в телеграм ────────────────────────────────────
 # Раз отданный телеграму файл получает file_id и живёт у них вечно. Дальше
 # карточку можно собирать по этому id, и телеграму не нужно ходить к нам за

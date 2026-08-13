@@ -1217,7 +1217,7 @@ async def _staff_fresh():
     перезапуске. Запрос крошечный — пять строк, — поэтому берём его каждый раз.
     """
     try:
-        staff.apply_moves(await db.staff_map_get())
+        staff.apply_moves(await db.staff_map_get(), await db.driver_map_get())
     except Exception as e:
         log.warning(f"[staff] перестановка не прочитана: {e}")
 
@@ -1237,6 +1237,16 @@ async def handle_staff(request):
                       for d in OFFICE_IDS],
         "operators": staff.operator_names(),
         "seniors": [x["name"] for x in staff.SENIOR_OPERATORS],
+        # Водители тоже переставляются: список тем же видом, что и районы, —
+        # у кого где стоит и от чего отступили.
+        "drivers": [{"name": n,
+                     "district": next((d for d in OFFICE_IDS
+                                       if n in staff.DISTRICT_DRIVERS.get(d, [])), ""),
+                     "base": staff.base_district(n),
+                     "moved": next((d for d in OFFICE_IDS
+                                    if n in staff.DISTRICT_DRIVERS.get(d, [])), "")
+                              != staff.base_district(n)}
+                    for n in staff.driver_names()],
     }, headers=CORS_HEADERS)
 
 
@@ -1250,6 +1260,18 @@ async def handle_staff_set(request):
     district = (body.get("district") or "").strip()
     if district not in OFFICE_IDS:
         return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+
+    # Водителя двигаем в другую сторону: у района операторов один, а водителей
+    # несколько, и запись «этот теперь здесь» сама убирает его с прошлого.
+    drv = (body.get("driver") or "").strip()
+    if drv:
+        if drv not in staff.driver_names():
+            return web.json_response({"error": "unknown_driver"}, status=400, headers=CORS_HEADERS)
+        await db.driver_map_set(drv, district if district != staff.base_district(drv) else "")
+        await _staff_fresh()
+        log.info(f"[staff] водитель {drv} → {OFFICE_CODES.get(district)}")
+        return await handle_staff(request)
+
     name = (body.get("operator") or "").strip()
     if name and name not in staff.operator_names():
         return web.json_response({"error": "unknown_operator"}, status=400, headers=CORS_HEADERS)

@@ -86,6 +86,13 @@ def require_driver(fn):
         user = _valid_init_data(init_data, DRIVER_BOT_TOKEN)
         if not user:
             return web.json_response({"error": "unauthorized"}, status=401, headers=CORS_HEADERS)
+        # Водителя могли переставить на другой район — узнаём об этом до того,
+        # как отдадим ему заказы: иначе он до перезапуска сервиса возит по
+        # старому району.
+        try:
+            staff.apply_moves(await db.staff_map_get(), await db.driver_map_get())
+        except Exception as e:
+            log.warning(f"[driver] перестановка не прочитана: {e}")
         me = staff.driver_by_tg(user.get("id"))
         if not me:
             log.warning(f"[driver] отказ: tg={user.get('id')} ({user.get('username')}) не в списке")

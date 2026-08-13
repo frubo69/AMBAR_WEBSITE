@@ -9690,7 +9690,7 @@ async function crewOpen(){
   document.getElementById('accOv').classList.add('show');
   ACC_VIEW = 'crew';
   _setText('accTitle', 'Кто на каком районе');
-  _setText('accSub', 'принимает заказы');
+  _setText('accSub', 'операторы и водители');
   document.getElementById('accFoot').innerHTML = '';
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
@@ -9698,20 +9698,27 @@ async function crewOpen(){
   crewRender();
 }
 
+// Оператор у района один, водителей несколько — поэтому и списки разные:
+// в «Операторах» строка это район, в «Водителях» — человек. Одним экраном с
+// двумя колонками это не показать, не заставив каждый раз читать оба.
+let CREW_TAB = 'ops';
+
+function crewTab(t){
+  CREW_TAB = t;
+  crewRender();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
 function crewRender(){
   const box = document.getElementById('accMid');
   if(!CREW){ box.innerHTML =
     '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
-  const moved = CREW.districts.filter(d => d.moved).length;
-  box.innerHTML = `
-    <div class="stk-note" style="margin:0 0 12px">
-      Оператор отвечает за заказы своего района: по ним считаются его выручка,
-      время доставки и оценки. <b>Водители остаются на районе</b> — они возят по
-      своим зданиям, кто бы ни принимал заказы.
-      ${moved ? `<br><b style="color:var(--gold2)">Переставлено: ${moved}</b> —
-        в расписании стоят другие, вернуть можно тем же выбором.` : ''}
-    </div>
-    ${CREW.districts.map(d => `
+  const dName = id => {
+    const d = CREW.districts.find(x => x.id === id);
+    return d ? `${d.code} ${d.name}` : '—';
+  };
+  const rows = CREW_TAB === 'ops'
+    ? CREW.districts.map(d => `
       <div class="crew-d${d.moved ? ' moved' : ''}">
         <span class="crew-code">${escS(d.code)}</span>
         <span class="crew-b">
@@ -9722,7 +9729,28 @@ function crewRender(){
         </span>
         <button class="crew-pick${d.moved ? ' moved' : ''}"
                 onclick="crewPick('${d.id}')">${escS(d.operator || '—')}</button>
-      </div>`).join('')}`;
+      </div>`).join('')
+    : (CREW.drivers || []).map(v => `
+      <div class="crew-d${v.moved ? ' moved' : ''}">
+        <span class="crew-code">${escS(v.name.trim().slice(0,2).toUpperCase())}</span>
+        <span class="crew-b">
+          <span class="crew-n">${escS(v.name)}</span>
+          <span class="crew-s">${v.moved
+            ? `в расписании ${escS(dName(v.base))}` : 'как в расписании'}</span>
+        </span>
+        <button class="crew-pick${v.moved ? ' moved' : ''}"
+                onclick="crewPickD('${v.name.replace(/'/g,"\\'")}')">${
+          escS(dName(v.district))}</button>
+      </div>`).join('');
+  box.innerHTML = `
+    <div class="periods" id="crewSeg" style="--count:2">
+      <div class="period-pill"></div>
+      <button class="${CREW_TAB === 'ops' ? 'on' : ''}" onclick="crewTab('ops')">Операторы</button>
+      <button class="${CREW_TAB === 'drv' ? 'on' : ''}" onclick="crewTab('drv')">Водители</button>
+    </div>
+    ${rows || '<div class="exp-empty">Пусто</div>'}`;
+  const seg = document.getElementById('crewSeg');
+  if(seg) movePill(seg);
 }
 
 // Выбор — обычным списком поверх экрана: у нас четыре имени, и ради них
@@ -9748,6 +9776,50 @@ function crewPick(did){
   pop.style.top = (r.bottom + 8 + hh < window.innerHeight - 10
                    ? r.bottom + 8 : Math.max(10, r.top - hh - 8)) + 'px';
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('medium'); }catch(e){}
+}
+
+// Тем же списком, что и оператор, только наоборот: выбираем не человека для
+// района, а район для человека.
+function crewPickD(name){
+  const v = (CREW.drivers || []).find(x => x.name === name); if(!v) return;
+  closePinPop();
+  const back = document.createElement('div');
+  back.className = 'pin-back';
+  back.addEventListener('pointerdown', closePinPop);
+  const pop = document.createElement('div');
+  pop.className = 'pin-pop';
+  pop.style.maxHeight = '60vh'; pop.style.overflowY = 'auto';
+  const esc = name.replace(/'/g, "\\'");
+  pop.innerHTML = CREW.districts.map(d => `
+    <button onclick="crewSetD('${esc}','${d.id}')">
+      <span>${escS(d.code)} ${escS(d.name)}${
+        d.id === v.base ? '<span class="pin-s">как в расписании</span>' : ''}</span>
+      ${d.id === v.district ? '<i style="margin-left:auto;color:var(--gold2)">✓</i>' : ''}
+    </button>`).join('');
+  document.body.append(back, pop);
+  const r = document.querySelector(`.crew-d [onclick*="${esc}"]`).getBoundingClientRect();
+  const w = pop.offsetWidth, hh = pop.offsetHeight;
+  pop.style.left = Math.max(10, Math.min(r.right - w, window.innerWidth - w - 10)) + 'px';
+  pop.style.top = (r.bottom + 8 + hh < window.innerHeight - 10
+                   ? r.bottom + 8 : Math.max(10, r.top - hh - 8)) + 'px';
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('medium'); }catch(e){}
+}
+
+async function crewSetD(name, did){
+  closePinPop();
+  const v = (CREW.drivers || []).find(x => x.name === name);
+  if(v){ v.district = did; v.moved = did !== v.base; }   // рисуем сразу
+  crewRender();
+  try{
+    CREW = await ownerApi.ownerFetch('/api/owner/staff/set', {method:'POST',
+      body:{driver: name, district: did}});
+    crewRender(); crewSub();
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    if(window.ownerApi) loadOperators();
+  }catch(e){
+    await crewLoad(); crewRender();
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('error'); }catch(e2){}
+  }
 }
 
 async function crewSet(did, name){

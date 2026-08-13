@@ -312,6 +312,206 @@ async def handle_lookup(request):
                              dumps=lambda o: __import__("json").dumps(o, default=str))
 
 
+# ── проверка бутылок ────────────────────────────────────────────────────────
+# Подошли к машине водителя и просканировали, что он в ней возит. Это не
+# ревизия склада, а проверка человека: главный ответ — «наша бутылка или нет».
+#
+# Вердикт считает сервер, а не приложение: правило одно на всех, и подменить
+# его с телефона нельзя.
+#
+#   ok             наша, в остатке — зелёная
+#   sold           наша, ушла с заказом: водитель её и везёт — зелёная
+#   written        наша, но списана — жёлтая: списанное ездить не должно
+#   other_district наша, но заведена на другом районе — жёлтая: так бывает,
+#                  когда перекидывают товар, но знать об этом надо
+#   alien          в реестре нет — красная, это и есть повод для флажка
+VERDICTS = ("ok", "sold", "written", "other_district", "alien")
+
+
+def _verdict(doc: dict, driver_district: str) -> str:
+    if not doc:
+        return "alien"
+    st = (doc.get("status") or "active").strip()
+    if st == "written":
+        return "written"
+    d = (doc.get("district") or "").strip()
+    if driver_district and d and d != driver_district:
+        return "other_district"
+    return "sold" if st == "sold" else "ok"
+
+
+def _driver_district(name: str) -> str:
+    if not name:
+        return ""
+    import config_staff as staff
+    for d, drivers in staff.DISTRICT_DRIVERS.items():
+        if name in drivers:
+            return d
+    return ""
+
+
+@require_owner
+async def handle_check_start(request):
+    """Начать проверку. Водитель необязателен: бывает и свободная проверка."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    driver = str(body.get("driver") or "").strip()
+    if driver:
+        import config_staff as staff
+        await _staff_fresh()
+        if driver not in staff.driver_names():
+            return web.json_response({"error": "unknown_driver"}, status=400,
+                                     headers=CORS_HEADERS)
+    me = request.get("owner_id") or 0
+    who = str(body.get("as") or "").strip()
+    cid = await db.qr_check_start(driver, _driver_district(driver), me, who)
+    log.info(f"[qr] проверка начата · {driver or 'свободная'} · {who or me}")
+    return web.json_response({"ok": True, "check_id": cid, "driver": driver},
+                             headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_check_scan(request):
+    """Проверить одну бутылку и записать её в проверку."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    code = _clean(body.get("code"))
+    if not code:
+        return web.json_response({"error": "empty_code"}, status=400, headers=CORS_HEADERS)
+    cid = str(body.get("check_id") or "").strip()
+    chk = await db.qr_check_get(cid) if cid else None
+    if not chk:
+        return web.json_response({"error": "no_check"}, status=400, headers=CORS_HEADERS)
+
+    doc = await db.qr_get(code)
+    verdict = _verdict(doc, chk.get("district") or "")
+    item = {
+        "code": code,
+        "at": datetime.now(timezone.utc),
+        "verdict": verdict,
+        "label": (doc or {}).get("label") or "",
+        "product_id": (doc or {}).get("product_id") or "",
+        "product_name": (doc or {}).get("product_name") or "",
+        "district": (doc or {}).get("district") or "",
+        "status": (doc or {}).get("status") or "",
+        "added_at": str((doc or {}).get("at") or ""),
+    }
+    fresh = await db.qr_check_add(cid, item)
+    if verdict == "alien":
+        log.warning(f"[qr] чужая бутылка при проверке {chk.get('driver') or 'свободной'}: {code[:40]}")
+    return web.json_response({"ok": True, "new": fresh, **item,
+                              "at": item["at"].isoformat()}, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_check_end(request):
+    """Закрыть проверку. Про чужие бутылки владелец узнаёт разом, по итогу:
+    сообщение на каждую превратило бы проверку в очередь уведомлений."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    cid = str(body.get("check_id") or "").strip()
+    chk = await db.qr_check_end(cid)
+    if not chk:
+        return web.json_response({"error": "no_check"}, status=404, headers=CORS_HEADERS)
+    bad, warn = chk.get("bad", 0), chk.get("warn", 0)
+    who = chk.get("driver") or "свободная проверка"
+    log.info(f"[qr] проверка закрыта · {who} · {chk.get('total',0)} шт · чужих {bad}")
+    if bad:
+        try:
+            from owner_routes import notify_owners_force
+            alien = [i for i in chk.get("items", []) if i.get("verdict") == "alien"]
+            await notify_owners_force(
+                "qr.alien",
+                f"🚩 *Проверка бутылок — {_md(who)}*\n"
+                f"Проверено: {chk.get('total', 0)}\n"
+                f"*Не наших: {bad}*" + (f" · вопросов: {warn}" if warn else "") + "\n"
+                + "\n".join(f"`{str(i.get('code',''))[:28]}`" for i in alien[:5]))
+        except Exception as e:
+            log.error(f"[qr] уведомление о чужих: {e}")
+    return web.json_response({"ok": True, **_check_view(chk)}, headers=CORS_HEADERS)
+
+
+def _md(s: str) -> str:
+    return str(s or "").replace("*", "").replace("_", "").replace("`", "")
+
+
+def _check_view(c: dict) -> dict:
+    return {
+        "id": c.get("id") or "",
+        "driver": c.get("driver") or "",
+        "district": c.get("district") or "",
+        "by_name": c.get("by_name") or "",
+        "at": str(c.get("at") or ""),
+        "open": bool(c.get("open")),
+        "total": c.get("total", 0),
+        "bad": c.get("bad", 0),
+        "warn": c.get("warn", 0),
+        "items": [{**i, "at": str(i.get("at") or "")} for i in (c.get("items") or [])],
+    }
+
+
+@require_owner
+async def handle_checks(request):
+    """История проверок и флажки по водителям.
+
+    Флажок — не наказание, а повод спросить: у этого водителя за период
+    находили бутылки не из реестра.
+    """
+    try:
+        days = max(1, min(180, int(request.query.get("days", "30") or 30)))
+    except ValueError:
+        days = 30
+    rows = await db.qr_checks(days)
+    by_driver = {}
+    for c in rows:
+        n = c.get("driver") or ""
+        if not n:
+            continue
+        d = by_driver.setdefault(n, {"driver": n, "checks": 0, "bottles": 0,
+                                     "bad": 0, "warn": 0, "last": ""})
+        d["checks"] += 1
+        d["bottles"] += c.get("total", 0)
+        d["bad"] += c.get("bad", 0)
+        d["warn"] += c.get("warn", 0)
+        d["last"] = d["last"] or str(c.get("at") or "")
+    return web.json_response({
+        "days": days,
+        "checks": [_check_view(c) for c in rows],
+        "drivers": sorted(by_driver.values(), key=lambda x: (-x["bad"], -x["checks"])),
+        "totals": {"checks": len(rows),
+                   "bottles": sum(c.get("total", 0) for c in rows),
+                   "bad": sum(c.get("bad", 0) for c in rows)},
+    }, headers=CORS_HEADERS)
+
+
+async def _staff_fresh():
+    import config_staff as staff
+    try:
+        staff.apply_moves(await db.staff_map_get(), await db.driver_map_get())
+    except Exception as e:
+        log.warning(f"[qr] перестановка не прочитана: {e}")
+
+
+@require_owner
+async def handle_drivers(request):
+    """Кого можно проверить: водители по районам, как их видит владелец."""
+    await _staff_fresh()
+    import config_staff as staff
+    from config_offices import OFFICE_IDS, OFFICE_CODES, OFFICE_NAMES
+    return web.json_response({
+        "districts": [{"id": d, "code": OFFICE_CODES.get(d, ""),
+                       "name": OFFICE_NAMES.get(d, d),
+                       "drivers": list(staff.DISTRICT_DRIVERS.get(d, []))}
+                      for d in OFFICE_IDS],
+    }, headers=CORS_HEADERS)
+
+
 async def _opt(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
@@ -326,6 +526,11 @@ def setup(app):
         ("/api/owner/qr/unlock",      handle_unlock, "POST"),
         ("/api/owner/qr/undo",        handle_undo,   "POST"),
         ("/api/owner/qr/code/{code}", handle_lookup, "GET"),
+        ("/api/owner/qr/drivers",     handle_drivers, "GET"),
+        ("/api/owner/qr/checks",      handle_checks,  "GET"),
+        ("/api/owner/qr/check/start", handle_check_start, "POST"),
+        ("/api/owner/qr/check/scan",  handle_check_scan,  "POST"),
+        ("/api/owner/qr/check/end",   handle_check_end,   "POST"),
     )
     seen = set()
     for path, handler, method in routes:

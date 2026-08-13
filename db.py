@@ -708,6 +708,9 @@ _DEFAULT_PREFS = {
     "customers.new": False, "customers.verify": True, "customers.verified": True, "customers.vip": False,
     "customers.vipReturn": False, "customers.vipChurn": False,
     "ops.officeEmpty": True,
+    # Чужая бутылка у водителя — не паника, но владелец должен узнать в тот же
+    # день: по умолчанию включено.
+    "qr.alien": True,
     "finance.revenueLow": True, "finance.avgDrop": True,
     "finance.cancelSpike": True, "finance.record": False, "finance.tipHigh": False,
     "support.new": False, "support.noreply": True, "support.complaint": True, "support.escalation": False,
@@ -1966,6 +1969,74 @@ async def qr_list(product_id: str, district: str, limit: int = 500) -> list:
         r["code"] = r.pop("_id")
         r["at"] = str(r.get("at") or "")
     return rows
+
+
+# ── проверки бутылок ────────────────────────────────────────────────────────
+# Проверка — это сессия: подошли к машине водителя и просканировали, что в ней
+# лежит. Хранится одним документом, потому что смысл имеет именно сессия
+# целиком: «двенадцать бутылок, одна чужая» читается, а двенадцать отдельных
+# записей — нет.
+
+async def qr_check_start(driver: str, district: str, by: int, by_name: str) -> str:
+    db = _db_or_none()
+    if db is None: return ""
+    r = await db.qr_checks.insert_one({
+        "driver": driver, "district": district, "by": by, "by_name": by_name,
+        "at": datetime.now(timezone.utc), "open": True,
+        "items": [], "total": 0, "bad": 0, "warn": 0})
+    return str(r.inserted_id)
+
+
+async def qr_check_add(check_id: str, item: dict) -> bool:
+    """Дописать бутылку в проверку. Повтор в той же сессии не считается."""
+    db = _db_or_none()
+    if db is None: return False
+    from bson import ObjectId
+    try: oid = ObjectId(check_id)
+    except Exception: return False
+    inc = {"total": 1}
+    if item.get("verdict") == "alien": inc["bad"] = 1
+    elif item.get("verdict") in ("written", "other_district"): inc["warn"] = 1
+    r = await db.qr_checks.update_one(
+        {"_id": oid, "items.code": {"$ne": item.get("code")}},
+        {"$push": {"items": item}, "$inc": inc})
+    return bool(r.modified_count)
+
+
+async def qr_check_end(check_id: str) -> dict | None:
+    db = _db_or_none()
+    if db is None: return None
+    from bson import ObjectId
+    try: oid = ObjectId(check_id)
+    except Exception: return None
+    await db.qr_checks.update_one({"_id": oid}, {"$set": {"open": False,
+                                  "closed_at": datetime.now(timezone.utc)}})
+    d = await db.qr_checks.find_one({"_id": oid})
+    if d: d["id"] = str(d.pop("_id"))
+    return d
+
+
+async def qr_check_get(check_id: str) -> dict | None:
+    db = _db_or_none()
+    if db is None: return None
+    from bson import ObjectId
+    try: oid = ObjectId(check_id)
+    except Exception: return None
+    d = await db.qr_checks.find_one({"_id": oid})
+    if d: d["id"] = str(d.pop("_id"))
+    return d
+
+
+async def qr_checks(days: int = 30) -> list:
+    """История проверок за период — новые сверху."""
+    db = _db_or_none()
+    if db is None: return []
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    out = []
+    async for d in db.qr_checks.find({"at": {"$gte": since}}).sort("at", -1).limit(200):
+        d["id"] = str(d.pop("_id"))
+        out.append(d)
+    return out
 
 
 async def qr_get(code: str) -> dict | None:

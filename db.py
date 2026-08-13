@@ -1693,6 +1693,18 @@ async def staff_map_set(district: str, operator: str):
         await db.staff_map.delete_one({"_id": district})
 
 
+async def staff_map_clear():
+    db = _db_or_none()
+    if db is None: return
+    await db.staff_map.delete_many({})
+
+
+async def driver_map_clear():
+    db = _db_or_none()
+    if db is None: return
+    await db.driver_map.delete_many({})
+
+
 async def driver_map_get() -> dict:
     """Кто из водителей стоит не там, где в расписании: имя → район."""
     db = _db_or_none()

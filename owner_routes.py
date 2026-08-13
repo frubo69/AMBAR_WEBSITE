@@ -1284,6 +1284,19 @@ async def handle_staff_set(request):
 
 
 @require_owner
+async def handle_staff_reset(request):
+    """Снять все перестановки разом — вернуть расписание как в коде.
+
+    Перестановки живут неделями и накапливаются: к концу месяца никто уже не
+    помнит, что где отступило от расписания. Одна кнопка возвращает всё."""
+    await db.staff_map_clear()
+    await db.driver_map_clear()
+    await _staff_fresh()
+    log.info("[staff] перестановки сняты — расписание как в коде")
+    return await handle_staff(request)
+
+
+@require_owner
 async def handle_operators(request):
     """GET /api/owner/operators?period=&day_offset= — статистика по людям.
 
@@ -2585,6 +2598,8 @@ def setup(app):
     app.router.add_get(             "/api/owner/staff", handle_staff)
     app.router.add_route("OPTIONS", "/api/owner/staff/set", handle_staff_set)
     app.router.add_post(            "/api/owner/staff/set", handle_staff_set)
+    app.router.add_route("OPTIONS", "/api/owner/staff/reset", handle_staff_reset)
+    app.router.add_post(            "/api/owner/staff/reset", handle_staff_reset)
     app.router.add_route("OPTIONS", "/api/owner/promotions", handle_promotions)
     app.router.add_get(             "/api/owner/promotions", handle_promotions)
     app.router.add_route("OPTIONS", "/api/owner/promo",   handle_promo)

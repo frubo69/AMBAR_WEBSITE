@@ -821,6 +821,48 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   background:var(--card2);border:1px solid var(--border2)}
 .ord-reset:active{color:var(--text)}
 
+/* ── Доска перестановок ─────────────────────────────────────────────────
+   Район — карточка, внутри оператор и водители. Взятый в руку человек
+   светится, районы-цели поднимаются рамкой: видно и кого несём, и куда. */
+.crw-hint{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:0 0 12px;
+  border-radius:12px;background:var(--card);border:1px solid rgba(201,169,110,.28);
+  font-size:12px;color:var(--sub);line-height:1.4}
+.crw-hint b{color:var(--gold2)}
+.crw-cancel{margin-left:auto;flex-shrink:0;padding:6px 11px;border-radius:9px;cursor:pointer;
+  background:none;border:1px solid var(--border2);color:var(--muted);font-size:11px;
+  font-weight:600;font-family:inherit}
+.crw-cancel:active{border-color:var(--gold2);color:var(--gold2)}
+.crw-d{padding:12px 13px;margin-bottom:8px;border-radius:14px;
+  background:var(--card);border:1px solid var(--border2);transition:.18s var(--e1)}
+.crw-d.target{border-color:rgba(201,169,110,.3)}
+.crw-d.from{opacity:.55}
+.crw-h{display:flex;align-items:center;gap:11px}
+.crw-n{flex:1;min-width:0;font-size:13px;font-weight:600}
+.crw-op{flex-shrink:0;padding:8px 12px;border-radius:10px;cursor:pointer;font-family:inherit;
+  background:var(--card2);border:1px solid var(--border2);color:var(--text);
+  font-size:12px;font-weight:700;line-height:1.25;text-align:right}
+.crw-op i{display:block;font-style:normal;font-size:9px;font-weight:600;color:var(--muted);
+  margin-top:2px}
+.crw-op.moved{color:var(--gold2);border-color:rgba(201,169,110,.35)}
+.crw-op.held,.crw-chip.held{background:linear-gradient(135deg,var(--gold),var(--gold2));
+  color:#1a1408;border-color:transparent}
+.crw-op.held i{color:rgba(26,20,8,.6)}
+.crw-drv{display:flex;flex-wrap:wrap;align-items:center;gap:6px;margin-top:10px}
+.crw-chip{padding:6px 10px;border-radius:999px;cursor:pointer;font-family:inherit;
+  background:var(--card2);border:1px solid var(--border2);color:var(--sub);
+  font-size:11.5px;font-weight:600}
+.crw-chip i{font-style:normal;font-size:9px;color:var(--muted);margin-left:5px}
+.crw-chip.moved{color:var(--gold2);border-color:rgba(201,169,110,.3)}
+.crw-chip.held i{color:rgba(26,20,8,.6)}
+.crw-none{font-size:11px;color:var(--muted)}
+.crw-drop{margin-left:auto;flex-shrink:0;padding:7px 13px;border-radius:10px;cursor:pointer;
+  font-family:inherit;font-size:11.5px;font-weight:700;color:var(--gold2);
+  background:linear-gradient(135deg,rgba(201,169,110,.18),rgba(201,169,110,.06));
+  border:1px solid rgba(201,169,110,.35)}
+.crw-drop:active{transform:scale(.97)}
+.crw-drop.is-here{background:none;border-style:dashed;border-color:var(--border2);
+  color:var(--muted);font-weight:600}
+
 /* ── Кто на каком районе ───────────────────────────────────────────────── */
 .crew-entry{display:flex;align-items:center;gap:11px;width:100%;margin:0 0 10px;padding:12px 13px;
   border-radius:13px;cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
@@ -9690,7 +9732,7 @@ async function crewOpen(){
   document.getElementById('accOv').classList.add('show');
   ACC_VIEW = 'crew';
   _setText('accTitle', 'Кто на каком районе');
-  _setText('accSub', 'операторы и водители');
+  _setText('accSub', 'коснитесь человека, потом района');
   document.getElementById('accFoot').innerHTML = '';
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
@@ -9698,121 +9740,94 @@ async function crewOpen(){
   crewRender();
 }
 
-// Оператор у района один, водителей несколько — поэтому и списки разные:
-// в «Операторах» строка это район, в «Водителях» — человек. Одним экраном с
-// двумя колонками это не показать, не заставив каждый раз читать оба.
-let CREW_TAB = 'ops';
+// Перестановка — это всегда «взять человека и поставить на район». Списком с
+// выпадашкой это выглядело как два разных дела: у оператора выбираешь имя для
+// района, у водителя — район для имени, и держать в голове приходилось оба.
+//
+// Здесь один экран: доска районов, на каждом оператор и его водители. Касание
+// по человеку берёт его в руку, касание по району — ставит. Пока человек в
+// руке, видно все районы и кто на них сейчас: решение принимается глядя на
+// расстановку, а не на список из одиннадцати имён.
+let CREW_PICK = null;          // {kind:'op'|'drv', name, from}
 
-function crewTab(t){
-  CREW_TAB = t;
+function crewTake(kind, name, from){
+  CREW_PICK = (CREW_PICK && CREW_PICK.name === name && CREW_PICK.kind === kind)
+    ? null : {kind, name, from};
   crewRender();
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred(CREW_PICK ? 'medium' : 'light'); }catch(e){}
 }
+
+function crewDrop(){ CREW_PICK = null; crewRender(); }
 
 function crewRender(){
   const box = document.getElementById('accMid');
   if(!CREW){ box.innerHTML =
     '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
-  const dName = id => {
-    const d = CREW.districts.find(x => x.id === id);
-    return d ? `${d.code} ${d.name}` : '—';
-  };
-  const rows = CREW_TAB === 'ops'
-    ? CREW.districts.map(d => `
-      <div class="crew-d${d.moved ? ' moved' : ''}">
+  const drvOf = n => (CREW.drivers || []).find(x => x.name === n) || {};
+  const dOf = id => CREW.districts.find(x => x.id === id) || {};
+  const p = CREW_PICK;
+  const moved = CREW.districts.filter(d => d.moved).length
+              + (CREW.drivers || []).filter(v => v.moved).length;
+
+  // Шапка говорит одно из двух: что сейчас переставлено или что мы держим.
+  const head = p
+    ? `<div class="crw-hint">
+         <span><b>${escS(p.name)}</b> — куда ставим?</span>
+         <button class="crw-cancel" onclick="crewDrop()">Отмена</button>
+       </div>`
+    : (moved ? `<div class="crw-hint">
+         <span>Переставлено: <b>${moved}</b> — не как в расписании</span>
+         <button class="crw-cancel" onclick="crewResetAll()">Вернуть всё</button>
+       </div>` : '');
+
+  box.innerHTML = head + CREW.districts.map(d => {
+    const here = p && p.from === d.id;
+    // Оператор у района один: поставить второго нельзя, поэтому вместо
+    // «поставить» предлагаем обмен — он и есть то, что происходит на смене.
+    const swap = p && p.kind === 'op' && !here && d.operator && d.operator !== p.name;
+    const act = !p ? ''
+      : here ? `<span class="crw-drop is-here">здесь сейчас</span>`
+      : `<button class="crw-drop" onclick="crewPlace('${d.id}')">${
+          swap ? 'Поменять местами' : 'Поставить сюда'}</button>`;
+    return `<div class="crw-d${p && !here ? ' target' : ''}${here ? ' from' : ''}">
+      <div class="crw-h">
         <span class="crew-code">${escS(d.code)}</span>
-        <span class="crew-b">
-          <span class="crew-n">${escS(d.name)}</span>
-          <span class="crew-s">${d.drivers.length
-            ? escS(d.drivers.join(', ')) : 'водителей нет'}${
-            d.moved ? ` · в расписании ${escS(d.base)}` : ''}</span>
-        </span>
-        <button class="crew-pick${d.moved ? ' moved' : ''}"
-                onclick="crewPick('${d.id}')">${escS(d.operator || '—')}</button>
-      </div>`).join('')
-    : (CREW.drivers || []).map(v => `
-      <div class="crew-d${v.moved ? ' moved' : ''}">
-        <span class="crew-code">${escS(v.name.trim().slice(0,2).toUpperCase())}</span>
-        <span class="crew-b">
-          <span class="crew-n">${escS(v.name)}</span>
-          <span class="crew-s">${v.moved
-            ? `в расписании ${escS(dName(v.base))}` : 'как в расписании'}</span>
-        </span>
-        <button class="crew-pick${v.moved ? ' moved' : ''}"
-                onclick="crewPickD('${v.name.replace(/'/g,"\\'")}')">${
-          escS(dName(v.district))}</button>
-      </div>`).join('');
-  box.innerHTML = `
-    <div class="periods" id="crewSeg" style="--count:2">
-      <div class="period-pill"></div>
-      <button class="${CREW_TAB === 'ops' ? 'on' : ''}" onclick="crewTab('ops')">Операторы</button>
-      <button class="${CREW_TAB === 'drv' ? 'on' : ''}" onclick="crewTab('drv')">Водители</button>
-    </div>
-    ${rows || '<div class="exp-empty">Пусто</div>'}`;
-  const seg = document.getElementById('crewSeg');
-  if(seg) movePill(seg);
+        <span class="crw-n">${escS(d.name)}</span>
+        <button class="crw-op${d.moved ? ' moved' : ''}${
+            p && p.kind === 'op' && p.name === d.operator ? ' held' : ''}"
+          onclick="crewTake('op','${escS(d.operator)}','${d.id}')">
+          ${escS(d.operator || '—')}${d.moved
+            ? `<i>в расписании ${escS(d.base)}</i>` : ''}</button>
+      </div>
+      <div class="crw-drv">
+        ${d.drivers.length ? d.drivers.map(n => {
+          const v = drvOf(n);
+          return `<button class="crw-chip${v.moved ? ' moved' : ''}${
+              p && p.kind === 'drv' && p.name === n ? ' held' : ''}"
+            onclick="crewTake('drv','${escS(n)}','${d.id}')">${escS(n)}${
+              v.moved ? `<i>${escS((dOf(v.base).code) || '')}</i>` : ''}</button>`;
+        }).join('') : '<span class="crw-none">водителей нет</span>'}
+        ${act}
+      </div>
+    </div>`;
+  }).join('');
 }
 
-// Выбор — обычным списком поверх экрана: у нас четыре имени, и ради них
-// городить отдельную страницу не за чем.
-function crewPick(did){
-  const d = CREW.districts.find(x => x.id === did); if(!d) return;
-  closePinPop();
-  const back = document.createElement('div');
-  back.className = 'pin-back';
-  back.addEventListener('pointerdown', closePinPop);
-  const pop = document.createElement('div');
-  pop.className = 'pin-pop';
-  pop.style.maxHeight = '60vh'; pop.style.overflowY = 'auto';
-  pop.innerHTML = CREW.operators.map(n => `
-    <button onclick="crewSet('${did}','${n.replace(/'/g,"\\'")}')">
-      <span>${escS(n)}${n === d.base ? '<span class="pin-s">как в расписании</span>' : ''}</span>
-      ${n === d.operator ? '<i style="margin-left:auto;color:var(--gold2)">✓</i>' : ''}
-    </button>`).join('');
-  document.body.append(back, pop);
-  const r = document.querySelector(`.crew-d [onclick*="${did}"]`).getBoundingClientRect();
-  const w = pop.offsetWidth, hh = pop.offsetHeight;
-  pop.style.left = Math.max(10, Math.min(r.right - w, window.innerWidth - w - 10)) + 'px';
-  pop.style.top = (r.bottom + 8 + hh < window.innerHeight - 10
-                   ? r.bottom + 8 : Math.max(10, r.top - hh - 8)) + 'px';
-  try{ Telegram.WebApp.HapticFeedback.impactOccurred('medium'); }catch(e){}
-}
-
-// Тем же списком, что и оператор, только наоборот: выбираем не человека для
-// района, а район для человека.
-function crewPickD(name){
-  const v = (CREW.drivers || []).find(x => x.name === name); if(!v) return;
-  closePinPop();
-  const back = document.createElement('div');
-  back.className = 'pin-back';
-  back.addEventListener('pointerdown', closePinPop);
-  const pop = document.createElement('div');
-  pop.className = 'pin-pop';
-  pop.style.maxHeight = '60vh'; pop.style.overflowY = 'auto';
-  const esc = name.replace(/'/g, "\\'");
-  pop.innerHTML = CREW.districts.map(d => `
-    <button onclick="crewSetD('${esc}','${d.id}')">
-      <span>${escS(d.code)} ${escS(d.name)}${
-        d.id === v.base ? '<span class="pin-s">как в расписании</span>' : ''}</span>
-      ${d.id === v.district ? '<i style="margin-left:auto;color:var(--gold2)">✓</i>' : ''}
-    </button>`).join('');
-  document.body.append(back, pop);
-  const r = document.querySelector(`.crew-d [onclick*="${esc}"]`).getBoundingClientRect();
-  const w = pop.offsetWidth, hh = pop.offsetHeight;
-  pop.style.left = Math.max(10, Math.min(r.right - w, window.innerWidth - w - 10)) + 'px';
-  pop.style.top = (r.bottom + 8 + hh < window.innerHeight - 10
-                   ? r.bottom + 8 : Math.max(10, r.top - hh - 8)) + 'px';
-  try{ Telegram.WebApp.HapticFeedback.impactOccurred('medium'); }catch(e){}
-}
-
-async function crewSetD(name, did){
-  closePinPop();
-  const v = (CREW.drivers || []).find(x => x.name === name);
-  if(v){ v.district = did; v.moved = did !== v.base; }   // рисуем сразу
-  crewRender();
+// Поставить того, кто в руке. Водитель просто переезжает; оператор меняется
+// местами с тем, кто там стоял, — иначе его район остался бы без старшего.
+async function crewPlace(did){
+  const p = CREW_PICK; if(!p || p.from === did) return;
+  CREW_PICK = null;
+  const body = p.kind === 'drv'
+    ? {driver: p.name, district: did}
+    : {district: did, operator: p.name};
+  const swapWith = p.kind === 'op' ? (CREW.districts.find(x => x.id === did) || {}).operator : '';
   try{
-    CREW = await ownerApi.ownerFetch('/api/owner/staff/set', {method:'POST',
-      body:{driver: name, district: did}});
+    CREW = await ownerApi.ownerFetch('/api/owner/staff/set', {method:'POST', body});
+    if(swapWith && swapWith !== p.name){
+      CREW = await ownerApi.ownerFetch('/api/owner/staff/set', {method:'POST',
+        body:{district: p.from, operator: swapWith}});
+    }
     crewRender(); crewSub();
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(window.ownerApi) loadOperators();
@@ -9822,21 +9837,15 @@ async function crewSetD(name, did){
   }
 }
 
-async function crewSet(did, name){
-  closePinPop();
-  const d = CREW.districts.find(x => x.id === did);
-  if(d) d.operator = name;                       // рисуем сразу, ответ догонит
-  crewRender();
+async function crewResetAll(){
   try{
-    CREW = await ownerApi.ownerFetch('/api/owner/staff/set', {method:'POST',
-      body:{district: did, operator: name}});
+    CREW = await ownerApi.ownerFetch('/api/owner/staff/reset', {method:'POST', body:{}});
+    CREW_PICK = null;
     crewRender(); crewSub();
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    // Списки людей и районов считаются по этой же таблице — перечитываем.
     if(window.ownerApi) loadOperators();
   }catch(e){
     await crewLoad(); crewRender();
-    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('error'); }catch(e2){}
   }
 }
 

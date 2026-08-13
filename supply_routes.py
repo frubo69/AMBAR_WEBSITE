@@ -70,8 +70,16 @@ def _with_cached_values(raw: bytes, calc: dict) -> bytes:
 
                 def put(m):
                     v = calc.get(m.group(2))
-                    return m.group(0) if v is None else \
-                        f"{m.group(1)}{m.group(3)}<v>{v}</v></c>"
+                    if v is None:
+                        return m.group(0)
+                    # Формула вернёт пустоту — её и кладём, иначе просмотрщик
+                    # покажет ноль там, где мы ничего не просили.
+                    if v == "":
+                        tag = m.group(1)
+                        if ' t="' not in tag:
+                            tag = tag[:-1] + ' t="str">'
+                        return f"{tag}{m.group(3)}<v></v></c>"
+                    return f"{m.group(1)}{m.group(3)}<v>{v}</v></c>"
 
                 # Пустой <v/> после формулы openpyxl ставит сам — в него и
                 # смотрит просмотрщик, показывая ноль.
@@ -184,6 +192,9 @@ async def _build_book(day: str):
     head_fill = PatternFill("solid", fgColor="FF1F2A37")
     num_fill = PatternFill("solid", fgColor="FF000000")     # колонка «№»
     ask = PatternFill("solid", fgColor="FFFFF3CD")          # что правит магазин
+    # Каждая вторая строка обесцвечена целиком: глаз ведёт линию через десяток
+    # колонок и без полосы соскакивает на соседнюю.
+    band = PatternFill("solid", fgColor="FFEEECE1")
     sum_fill = PatternFill("solid", fgColor="FFFFFF00")     # итоги
     warn_fill = PatternFill("solid", fgColor="FFFF0000")    # просьба к магазину
     thin = Side(style="thin")
@@ -234,18 +245,27 @@ async def _build_book(day: str):
         nm = ws.cell(row=i, column=I, value=r["name"])
         nm.font = bold
         nm.alignment = Alignment(horizontal="left", vertical="center")
+        stripe = (n % 2 == 0)          # полоса через строку — вести взгляд вдоль
         for k, o in enumerate(dist):
-            c = ws.cell(row=i, column=D0 + k, value=(r["cells"].get(o) or {}).get("need", 0))
-            c.fill = ask; c.alignment = mid; c.number_format = ZERO_BLANK
+            # Ноль не пишем вовсе: на листе из ста двадцати строк колонка нулей
+            # мешает увидеть те несколько чисел, ради которых заявку и читают.
+            need = (r["cells"].get(o) or {}).get("need", 0) or None
+            c = ws.cell(row=i, column=D0 + k, value=need)
+            c.fill = band if stripe else ask
+            c.alignment = mid; c.number_format = ZERO_BLANK
         # Итог строки считает сам файл: магазин правит числа по точкам, и
         # переписанная руками сумма разошлась бы с ними на первой же правке.
-        t = ws.cell(row=i, column=TOT,
-                    value=f"=SUM({get_column_letter(D0)}{i}:{get_column_letter(LAST)}{i})")
-        calc[f"{get_column_letter(TOT)}{i}"] = r["need_total"]
-        t.fill = sum_fill; t.font = bold
+        rng = f"{get_column_letter(D0)}{i}:{get_column_letter(LAST)}{i}"
+        t = ws.cell(row=i, column=TOT, value=f'=IF(SUM({rng})=0,"",SUM({rng}))')
+        calc[f"{get_column_letter(TOT)}{i}"] = r["need_total"] or ""
+        t.fill = band if stripe else sum_fill
+        t.font = bold
         t.alignment = mid; t.number_format = ZERO_BLANK
         for col in range(N, TOT + 1):
-            ws.cell(row=i, column=col).border = box
+            c = ws.cell(row=i, column=col)
+            c.border = box
+            if stripe and col < D0:
+                c.fill = band
         ws.row_dimensions[i].height = 17.4
 
     last = first + len(rows) - 1
@@ -256,11 +276,11 @@ async def _build_book(day: str):
         c = ws.cell(row=i, column=col)
         if col >= D0:
             L = get_column_letter(col)
-            c.value = f"=SUM({L}{first}:{L}{last})"
+            c.value = f'=IF(SUM({L}{first}:{L}{last})=0,"",SUM({L}{first}:{L}{last}))'
             c.number_format = ZERO_BLANK
             calc[f"{L}{i}"] = (sum(r["need_total"] for r in rows) if col == TOT
                                else sum((r["cells"].get(dist[col - D0]) or {}).get("need", 0)
-                                        for r in rows))
+                                        for r in rows)) or ""
         c.fill = sum_fill; c.font = bold; c.alignment = mid; c.border = box
 
     ws.column_dimensions["A"].width = 29.55                 # пустое поле слева

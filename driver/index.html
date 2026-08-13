@@ -357,12 +357,15 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   animation:incUp .34s cubic-bezier(.16,.9,.24,1)}
 @keyframes incUp{from{transform:translateY(60px);opacity:.4}to{transform:none;opacity:1}}
 
-/* Мягкие вспышки при появлении: размытое свечение, а не мигание фона */
-.inc-glow{position:absolute;inset:-20%;pointer-events:none;opacity:0;
-  background:radial-gradient(closest-side at 50% 30%,rgba(255,255,255,.5),transparent 70%);
-  filter:blur(60px)}
+/* Вспышка — прямоугольник во весь экран, растворяющийся к краям: пятно в
+   центре читалось как круг посреди тёмного экрана, а нужно, чтобы светлел
+   весь экран. */
+.inc-glow{position:absolute;inset:0;pointer-events:none;opacity:0;background:#FFFFFF;
+  -webkit-mask-image:radial-gradient(135% 100% at 50% 45%,#000 35%,rgba(0,0,0,.5) 72%,transparent 100%);
+  mask-image:radial-gradient(135% 100% at 50% 45%,#000 35%,rgba(0,0,0,.5) 72%,transparent 100%);
+  filter:blur(14px)}
 .inc-glow.on{animation:incFlash 1.05s cubic-bezier(.3,0,.2,1) 3}
-@keyframes incFlash{0%{opacity:0}18%{opacity:.8}55%{opacity:.1}100%{opacity:0}}
+@keyframes incFlash{0%{opacity:0}18%{opacity:.42}55%{opacity:.06}100%{opacity:0}}
 
 /* Верх: пульсирующая точка + секундомер. Заполняет место осмысленно и сразу
    говорит: это только что прилетело и ждёт тебя. */
@@ -1020,23 +1023,38 @@ function _acUnlock(){
   }catch(e){}
 }
 // Первое касание разблокирует звук и сразу подтягивает файл: к моменту заказа
-// он уже лежит в памяти.
+// он уже лежит в памяти. Открываем сразу оба пути — и WebAudio, и тег audio:
+// какой из них не пустит телефон, заранее не известно, а сигнал нужен точно.
+function _sndUnlock(){
+  _acUnlock(); _loadSound();
+  try{
+    const a = _sndTag();
+    if(a.dataset.ok) return;
+    a.muted = true;
+    const p = a.play();
+    p && p.then(() => { a.pause(); a.currentTime = 0; a.muted = false; a.dataset.ok = '1'; })
+         .catch(() => { a.muted = false; });
+  }catch(e){}
+}
 ['pointerdown','touchstart'].forEach(ev =>
-  document.addEventListener(ev, () => { _acUnlock(); _loadSound(); }, {passive:true}));
+  document.addEventListener(ev, _sndUnlock, {passive:true}));
 
 // Звук нового заказа — свой файл с нашего сервера. Декодируем один раз и
 // держим в памяти: у водителя в машине рваный интернет, а сигнал не имеет
 // права опоздать или не прозвучать.
+const SND_URL = new URL('../sounds/new-order.mp3', location.href).href;
 let _snd = null, _sndP = null;
 function _loadSound(){
   if(_snd) return Promise.resolve(_snd);
   if(_sndP) return _sndP;
   _acUnlock(); if(!_ac) return null;
-  _sndP = fetch('/sounds/new-order.mp3')
-    .then(r => r.arrayBuffer())
+  _sndP = fetch(SND_URL)
+    .then(r => { if(!r.ok) throw new Error('http ' + r.status); return r.arrayBuffer(); })
     .then(b => _ac.decodeAudioData(b))
     .then(buf => { _snd = buf; return buf; })
-    .catch(() => null);
+    // Сорвалась одна попытка — не хороним звук до перезапуска приложения:
+    // в машине связь рвётся, а следующий заказ обязан прозвучать.
+    .catch(() => { _sndP = null; return null; });
   return _sndP;
 }
 
@@ -1046,7 +1064,7 @@ function _siren(){
   _lastRing = Date.now();
   _acUnlock();
   const play = buf => {
-    if(!buf || !_ac) return;
+    if(!buf || !_ac) return _fallback();
     const src = _ac.createBufferSource();
     src.buffer = buf;
     src.connect(_ac.destination);
@@ -1054,7 +1072,8 @@ function _siren(){
   };
   // Контекст мог не успеть проснуться: браузер запускает звук только после
   // касания, и resume асинхронный. Ждём его, а не бросаем сигнал в тишину.
-  const ring = () => { if(_snd) play(_snd); else { const p = _loadSound(); if(p) p.then(play); } };
+  const ring = () => { if(_snd) return play(_snd);
+    const p = _loadSound(); if(p) p.then(play); else _fallback(); };
   if(_ac && _ac.state === 'suspended') _ac.resume().then(ring).catch(_fallback);
   else if(_ac) ring();
   else _fallback();
@@ -1062,16 +1081,20 @@ function _siren(){
 
 // Запасной путь: обычный тег audio. Иногда WebAudio не отдают вовсе — тогда
 // хотя бы так, лишь бы водитель услышал.
+function _sndTag(){
+  let a = document.getElementById('sndTag');
+  if(!a){
+    a = document.createElement('audio');
+    a.id = 'sndTag'; a.src = SND_URL;
+    a.preload = 'auto'; a.setAttribute('playsinline', '');
+    document.body.appendChild(a);
+  }
+  return a;
+}
 function _fallback(){
   try{
-    let a = document.getElementById('sndTag');
-    if(!a){
-      a = document.createElement('audio');
-      a.id = 'sndTag'; a.src = '/sounds/new-order.mp3';
-      a.preload = 'auto'; a.setAttribute('playsinline', '');
-      document.body.appendChild(a);
-    }
-    a.currentTime = 0;
+    const a = _sndTag();
+    a.muted = false; a.currentTime = 0;
     const p = a.play(); p && p.catch(() => {});
   }catch(e){}
 }

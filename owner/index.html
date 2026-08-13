@@ -1843,10 +1843,13 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   <!-- Broadcast composer entry -->
   <div class="sect"><div class="sect-t">Маркетинг</div></div>
   <button class="all-clients-btn" onclick="openBroadcast()" style="margin:4px 0 0">
-    <div class="ac-btn-ico" style="font-size:17px">📣</div>
+    <div class="ac-btn-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+      stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M22 2 11 13"/><path d="M22 2l-7 20-4-9-9-4z"/></svg></div>
     <div class="ac-btn-lbl"><div class="ac-btn-t">Рассылка</div><div class="ac-btn-s">Промо всем клиентам · RU / EN · с картинкой</div></div>
     <span class="ac-btn-arrow">›</span>
   </button>
+  <!-- Реклама и акции: сюда же, где рассылка, — это один и тот же вопрос. -->
+  <div id="mktEntries"></div>
 
   <!-- Alerts moved to header bell button. See #alertsOverlay below. -->
 
@@ -3483,6 +3486,10 @@ document.querySelectorAll('.tb').forEach(btn=>{
     if(pg === 'money' && window.ownerApi){
       accRender();
       if(!EXP.data) loadExpenses().then(accRender);
+      if(!ACC_PERIOD) accLoadSummaries();
+    }
+    if(pg === 'more' && window.ownerApi){
+      mktRender();
       if(!ACC_PERIOD) accLoadSummaries();
     }
     try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
@@ -5509,6 +5516,12 @@ function stkResult(res){
 // Одна страница со всем сразу превращается в простыню: чтобы отметить водителя,
 // пришлось бы прокручивать мимо заявки и склада. Поэтому здесь только входы с
 // короткой сводкой по каждому, а работа — внутри раздела.
+const MKT = {
+  promo: {t:'Реклама', s:'откуда приходят клиенты',
+    ico:'<path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12"/>'},
+  gift:  {t:'Акции',   s:'что раздали бесплатно',
+    ico:'<path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7"/>'},
+};
 const ACC = [
   {id:'expenses', t:'Расходы водителей', s:'питание и разовые траты',
    ico:'<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'},
@@ -5516,10 +5529,6 @@ const ACC = [
    ico:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>'},
   {id:'order',    t:'Заявка на закупку', s:'сколько довезти до нормы',
    ico:'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/>'},
-  {id:'promo',    t:'Реклама',           s:'откуда приходят клиенты',
-   ico:'<path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12"/>'},
-  {id:'gift',     t:'Акции',             s:'что раздали бесплатно',
-   ico:'<path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7"/>'},
   {id:'qr',       t:'QR-коды',           s:'сканируем коды с бутылок',
    ico:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/>'},
 ];
@@ -5552,17 +5561,6 @@ function accRender(){
                     escS(String((ACC_QR.last[0]||{}).at||'').slice(0,10))}`
                 : 'ни одной бутылки не записано')
               : 'сканируем коды с бутылок',
-    // Подарок мерим не бутылками, а тем, что он принёс: сто отданных бутылок
-    // при чеке в полторы тысячи и при чеке в тысячу — разные сто бутылок.
-    gift:     ACC_GIFT   ? (ACC_GIFT.totals.bottles
-                ? `${fmt(ACC_GIFT.totals.aed)} AED в этих заказах · чек ${fmt(ACC_GIFT.totals.avg_aed)}`
-                : 'пока ни одной бутылки')
-              : 'что раздали бесплатно',
-    promo:    ACC_PROMO  ? (ACC_PROMO.totals.users
-                ? `${ACC_PROMO.totals.buyers} заказали · ${fmt(ACC_PROMO.totals.aed)} AED`
-                : (ACC_PROMO.replies ? `${ACC_PROMO.replies} ответов, никто не пришёл`
-                                     : 'бот ещё нигде не отвечал'))
-              : 'откуда приходят клиенты',
   };
   // Крупная цифра на плитке отвечает на вопрос раздела одним взглядом, а
   // подпись объясняет, что это за цифра.
@@ -5572,8 +5570,6 @@ function accRender(){
     expenses: [t ? fmt(t.all) : null, 'AED сегодня'],
     stock:    [ACC_STOCK ? `${ACC_STOCK.done}/${ACC_STOCK.total}` : null, 'районов'],
     order:    [ACC_ORDER ? fmt(ACC_ORDER.total_qty) : null, 'штук'],
-    promo:    [ACC_PROMO ? fmt(ACC_PROMO.totals.users) : null, 'пришло'],
-    gift:     [ACC_GIFT  ? fmt(ACC_GIFT.totals.bottles) : null, 'бутылок'],
     qr:       [ACC_QR    ? fmt(ACC_QR.totals.active) : null, 'бутылок'],
   };
   box.innerHTML = `<div class="acc-grid">` + ACC.map((a, i) => {
@@ -5593,6 +5589,34 @@ function accRender(){
   }).join('') + `</div>`;
 }
 
+// Реклама и акции стоят на «Ещё» рядом с рассылкой, но открывают те же
+// разделы, что и раньше: переезжает вход, а не сам раздел.
+function mktRender(){
+  const box = document.getElementById('mktEntries'); if(!box) return;
+  const sub = {
+    promo: ACC_PROMO ? (ACC_PROMO.totals.users
+             ? `${fmt(ACC_PROMO.totals.users)} пришло · ${ACC_PROMO.totals.buyers} заказали · ${fmt(ACC_PROMO.totals.aed)} AED`
+             : (ACC_PROMO.replies ? `${ACC_PROMO.replies} ответов, никто не пришёл`
+                                  : 'бот ещё нигде не отвечал'))
+           : MKT.promo.s,
+    // Подарок мерим не бутылками, а тем, что он принёс: сто отданных бутылок
+    // при чеке в полторы тысячи и при чеке в тысячу — разные сто бутылок.
+    gift:  ACC_GIFT ? (ACC_GIFT.totals.bottles
+             ? `${fmt(ACC_GIFT.totals.bottles)} бутылок · ${fmt(ACC_GIFT.totals.aed)} AED · чек ${fmt(ACC_GIFT.totals.avg_aed)}`
+             : 'пока ни одной бутылки')
+           : MKT.gift.s,
+  };
+  box.innerHTML = Object.keys(MKT).map(id => `
+    <button class="all-clients-btn" onclick="accOpen('${id}')" style="margin:8px 0 0">
+      <div class="ac-btn-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+        stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+        stroke-linejoin="round">${MKT[id].ico}</svg></div>
+      <div class="ac-btn-lbl"><div class="ac-btn-t">${MKT[id].t}</div>
+        <div class="ac-btn-s">${escS(sub[id])}</div></div>
+      <span class="ac-btn-arrow">›</span>
+    </button>`).join('');
+}
+
 // Сводки для входов тянем разом при открытии вкладки: «загрузка…» на четырёх
 // карточках сразу выглядит хуже, чем секунда ожидания.
 async function accLoadSummaries(){
@@ -5606,7 +5630,7 @@ async function accLoadSummaries(){
     get('/api/owner/qr'),
   ]);
   ACC_PERIOD = per; ACC_STOCK = st; ACC_ORDER = ord; ACC_PROMO = pr; ACC_GIFT = gf; ACC_QR = qr;
-  accRender();
+  accRender(); mktRender();
 }
 
 function accOpen(id){
@@ -5636,7 +5660,7 @@ function accClose(){
   SCAN.stop();
   document.getElementById('accOv').classList.remove('show');
   ACC_VIEW = null;
-  accRender();
+  accRender(); mktRender();
 }
 
 // День и период — один раздел, а не два: это одни и те же деньги, просто

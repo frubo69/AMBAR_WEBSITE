@@ -572,8 +572,8 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .hero.free{position:static;box-shadow:none}
 /* Меню по долгому нажатию. Одно действие, поэтому не лист снизу, а маленькое
    окошко у самой карточки: лист ради одной строки — это лишний шаг. */
-.pin-back{position:fixed;inset:0;z-index:119}
-.pin-pop{position:fixed;z-index:120;min-width:186px;padding:6px;
+.pin-back{position:fixed;inset:0;z-index:130}
+.pin-pop{position:fixed;z-index:131;min-width:186px;padding:6px;
   background:var(--card);border:1px solid var(--border3);border-radius:13px;
   box-shadow:0 14px 34px rgba(0,0,0,.55);animation:pinIn .14s var(--e1)}
 @keyframes pinIn{from{opacity:0;transform:translateY(-6px) scale(.97)}to{opacity:1;transform:none}}
@@ -3626,7 +3626,7 @@ function openPinPop(k, anchor){
 
   const back = document.createElement('div');
   back.className = 'pin-back';
-  back.addEventListener('pointerdown', e => { e.stopPropagation(); closePinPop(); });
+  back.addEventListener('click', e => { e.stopPropagation(); closePinPop(); });
   const pop = document.createElement('div');
   pop.className = 'pin-pop';
   pop.innerHTML = PIN[k]
@@ -9890,7 +9890,7 @@ function crewAsk(){
   closePinPop();
   const back = document.createElement('div');
   back.className = 'pin-back';
-  back.addEventListener('pointerdown', () => { closePinPop(); });
+  back.addEventListener('click', () => { closePinPop(); });
   const box = document.createElement('div');
   box.className = 'pin-pop crw-ask';
   box.innerHTML = `
@@ -9914,7 +9914,7 @@ function _crewPop(anchorSel, html){
   closePinPop();
   const back = document.createElement('div');
   back.className = 'pin-back';
-  back.addEventListener('pointerdown', closePinPop);
+  back.addEventListener('click', closePinPop);
   const pop = document.createElement('div');
   pop.className = 'pin-pop';
   pop.style.maxHeight = '60vh'; pop.style.overflowY = 'auto';

@@ -116,6 +116,19 @@ DUBAI_TZ = timezone(timedelta(hours=4))
 SHIFT_START_HOUR = int(os.getenv("AMBAR_SHIFT_START_HOUR", "12"))
 
 
+_RU_MONTHS = ("января", "февраля", "марта", "апреля", "мая", "июня",
+              "июля", "августа", "сентября", "октября", "ноября", "декабря")
+
+
+def _day_ru(iso: str) -> str:
+    """«2026-08-11» → «11 августа». Пустое — «прошлую смену»."""
+    try:
+        d = datetime.strptime(iso, "%Y-%m-%d").date()
+        return f"{d.day} {_RU_MONTHS[d.month - 1]}"
+    except (ValueError, TypeError, IndexError):
+        return "прошлую смену"
+
+
 def _biz_date(dt):
     """Дата смены, которой принадлежит момент dt (Дубай)."""
     anchor = dt.replace(hour=SHIFT_START_HOUR, minute=0, second=0, microsecond=0)
@@ -518,6 +531,10 @@ def _summary(o: dict) -> dict:
         # должен с ним сделать, и прятать её за отдельным запросом нельзя.
         "driver_req": o.get("driver_req") or o.get("edit_request") or None,
         "delivered_by_driver": o.get("delivered_by_driver", ""),
+        # Заведён задним числом: такой правится прямо в закрытых, а не через
+        # возврат в доставку — в доставке он никогда не был.
+        "backfilled": bool(o.get("backfilled")),
+        "backfill_day": o.get("backfill_day", ""),
         # Водитель отметил, что увидел заказ и выехал. Координат тут нет и не
         # будет: где он едет — не хранится нигде, чтобы историю перемещений
         # нельзя было ни украсть, ни собрать.
@@ -1096,7 +1113,11 @@ async def handle_patch(request):
     # человек позвонил и попросил добавить бутылку. Проверка на «в пути»
     # осталась с тех пор, когда панель знала только телефонные заказы, а те
     # рождаются принятыми.
-    if order.get("status") not in ("pending", "approved"):
+    # Заказ, заведённый задним числом, рождается доставленным — вернуть его в
+    # доставку нельзя, он там никогда и не был. Значит правится как есть, а
+    # AMBAR STAR узнаёт о каждой такой правке: это деньги закрытого дня.
+    back = bool(order.get("backfilled"))
+    if not back and order.get("status") not in ("pending", "approved"):
         return web.json_response({"error": "order is closed",
                                   "status": order.get("status")},
                                  status=409, headers=CORS_HEADERS)
@@ -1107,6 +1128,7 @@ async def handle_patch(request):
 
     upd = {}
     items_changed = False
+    was_total = order.get("total", 0)
     if "items" in body:
         items, err = _build_items(body.get("items"))
         if err:
@@ -1141,16 +1163,32 @@ async def handle_patch(request):
     await _refresh_cards(order)
     await notify_driver(order, "edit")     # у водителя на руках прошлая версия
 
-    if items_changed:
+    # О правке заказа задним числом сообщаем всегда, даже если поменяли один
+    # адрес: день уже закрыт, и владелец должен знать, что в нём что-то трогали.
+    if items_changed or back:
         try:
             from owner_routes import notify_owners_force
             _items_txt = "\n".join(f"• {i.get('name','')} ×{i.get('qty',1)}"
                                    for i in order.get("items", [])) or "—"
-            await notify_owners_force(
-                "orders.edited",
-                f"✏️ *Заказ изменён #{oid}* — оператором {_op_name(request['op_user'])} (📞 ручной)\n"
-                f"💰 Новый итог: *{order.get('total', 0)} AED*\n"
-                f"🛒 Позиции:\n{_items_txt}")
+            who = _op_name(request["op_user"])
+            if back:
+                day = order.get("backfill_day") or ""
+                head = f"✏️ *Заказ за {_day_ru(day)} изменён #{oid}* — оператором {who}"
+                money = (f"💰 Итог: *{order.get('total', 0)} AED* (было {was_total})"
+                         if order.get("total", 0) != was_total
+                         else f"💰 Итог: *{order.get('total', 0)} AED* — без изменений")
+                what = ", ".join(k for k in upd if k in
+                                 ("items", "address", "comment", "customer_name",
+                                  "phone", "district_id", "driver")) or "—"
+                await notify_owners_force(
+                    "orders.edited",
+                    f"{head}\n{money}\n📝 Поправили: {what}\n🛒 Позиции:\n{_items_txt}")
+            else:
+                await notify_owners_force(
+                    "orders.edited",
+                    f"✏️ *Заказ изменён #{oid}* — оператором {who} (📞 ручной)\n"
+                    f"💰 Новый итог: *{order.get('total', 0)} AED*\n"
+                    f"🛒 Позиции:\n{_items_txt}")
         except Exception as e:
             log.error(f"[pos] edited notify failed: {e}")
     return web.json_response({"ok": True, "order": _summary(order)}, headers=CORS_HEADERS)

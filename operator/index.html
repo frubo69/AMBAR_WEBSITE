@@ -1488,8 +1488,12 @@ function askCreate(){
   const d=_dist(curDist);
   $('confT').textContent = editingOid ? `Сохранить изменения #${editingOid}?`
     : (BACK_DAY ? `Добавить заказ за ${_dayName(BACK_DAY)}?` : 'Создать заказ?');
+  const _ed = editingOid ? ORDERS.find(x=>x.order_id===editingOid) : null;
   $('confS').innerHTML = `<b>${total} AED</b><br>${d.name} · оператор ${d.operator}<br>Водитель: <b>${curDriver}</b>`
-    + (editingOid ? ''
+    + (editingOid
+       ? (_ed && _ed.backfilled
+          ? `<br><br>День <b>${_dayName(_ed.backfill_day||BACK_DAY)}</b> уже закрыт — правка уйдёт в AMBAR STAR.`
+          : '')
        : (BACK_DAY
           ? `<br><br>Заказ за <b>${_dayName(BACK_DAY)}</b> — сразу числится доставленным и попадёт в выручку того дня.`
           : '<br><br>Заказ сразу уйдёт в работу («в пути»), время не указывается.'));
@@ -1779,8 +1783,12 @@ function _card(o, lane){
       </div>` + cli;
   }else if(o.status==='delivered' || o.status==='cancelled'){
     // Отменённый возвращается так же, как доставленный: отмену жмут и по
-    // звонку водителя, и промахом.
-    acts = `<div class="q-arow">${B('','Вернуть в доставку',`askAct('${o.order_id}','undeliver')`)}</div>` + cli;
+    // звонку водителя, и промахом. Заказ, заведённый задним числом, вернуть
+    // некуда — в доставке он не был; его правят прямо здесь.
+    acts = (o.backfilled
+        ? `<div class="q-arow">${B('','Редактировать',`startEdit('${o.order_id}')`)}</div>`
+        : `<div class="q-arow">${B('','Вернуть в доставку',`askAct('${o.order_id}','undeliver')`)}</div>`)
+      + cli;
   }else{
     acts = cli;
   }
@@ -1971,7 +1979,9 @@ function renderOrder(){
     rest=[['Редактировать',`hideOv('ordOv');startEdit('${o.order_id}')`],
           ['Текст водителю',`showOrderText('${o.order_id}')`]];
   }else if(o.status==='delivered' || o.status==='cancelled'){
-    rest=[['Вернуть в доставку',`hideOv('ordOv');askAct('${o.order_id}','undeliver')`],
+    rest=[o.backfilled
+            ? ['Редактировать', `hideOv('ordOv');startEdit('${o.order_id}')`]
+            : ['Вернуть в доставку', `hideOv('ordOv');askAct('${o.order_id}','undeliver')`],
           ['Текст водителю',`showOrderText('${o.order_id}')`]];
   }else{
     rest=[['Текст водителю',`showOrderText('${o.order_id}')`]];
@@ -2224,7 +2234,9 @@ function startEdit(oid){
   openCatalog();
   renderTicket(); syncBadges();
   _editWas=_editSig();
-  toast('Заказ #'+oid+' загружен в чек для правки');
+  toast(o.backfilled
+    ? ('Правим заказ за '+_dayName(o.backfill_day||BACK_DAY, true)+' — AMBAR STAR узнает')
+    : ('Заказ #'+oid+' загружен в чек для правки'));
   haptic('medium');
 }
 // ── driver text: the order card as plain text, one-tap copy ──

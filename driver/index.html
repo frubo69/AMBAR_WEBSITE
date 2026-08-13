@@ -315,21 +315,18 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 
 /* Верх: пульсирующая точка + секундомер. Заполняет место осмысленно и сразу
    говорит: это только что прилетело и ждёт тебя. */
-/* Верх фиксированной высоты — лист всегда начинается на одном и том же месте,
-   независимо от длины адреса и числа позиций. */
-.inc-top{flex:0 0 128px;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;gap:5px}
-.inc-pulse{position:relative;width:54px;height:54px;margin-bottom:4px}
-.inc-pulse i{position:absolute;inset:20px;border-radius:50%;
-  background:linear-gradient(135deg,var(--gold3),var(--gold));display:block}
-.inc-pulse span{position:absolute;inset:0;border-radius:50%;
-  border:2px solid rgba(201,169,110,.5);animation:incRing 2s ease-out infinite}
-.inc-pulse span:nth-child(2){animation-delay:1s}
-@keyframes incRing{0%{transform:scale(.35);opacity:.9}100%{transform:scale(1);opacity:0}}
-.inc-title{font-size:12px;font-weight:800;letter-spacing:2.4px;text-transform:uppercase;
+/* Статус — первая строка листа: живая точка, надпись и время ожидания в один
+   ряд. Ничего не висит само по себе посреди экрана. */
+.inc-row-new{display:flex;align-items:center;gap:10px;padding:14px 17px;
+  background:linear-gradient(90deg,rgba(201,169,110,.16),rgba(201,169,110,.03))}
+.inc-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;background:var(--gold2);
+  animation:incDot 1.8s ease-out infinite}
+@keyframes incDot{0%{box-shadow:0 0 0 0 rgba(232,201,138,.55)}
+  70%{box-shadow:0 0 0 11px rgba(232,201,138,0)}100%{box-shadow:0 0 0 0 rgba(232,201,138,0)}}
+.inc-title{font-size:12px;font-weight:800;letter-spacing:1.8px;text-transform:uppercase;
   color:var(--gold2)}
-.inc-wait{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;
-  color:var(--muted);font-variant-numeric:tabular-nums}
+.inc-wait{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:13px;
+  font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums}
 
 /* Лист с деталями */
 /* Лист занимает всё между верхом и кнопкой: положение и размер одинаковы у
@@ -525,15 +522,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 <div class="inc" id="incOv">
   <div class="inc-glow" id="incGlow"></div>
 
-  <!-- Верх: живой индикатор — видно, что заказ только что прилетел и сколько ждёт -->
-  <div class="inc-top">
-    <div class="inc-pulse"><span></span><span></span><i></i></div>
-    <div class="inc-title">Новый заказ</div>
-    <div class="inc-wait" id="incWait">0 сек</div>
-  </div>
-
-  <!-- Всё о заказе — одним листом, строками сверху вниз в порядке работы -->
+  <!-- Всё о заказе одним листом. Статус — его первая строка, а не отдельный
+       заголовок в пустоте: плавающие сами по себе элементы выглядят случайными -->
   <div class="inc-sheet">
+    <div class="inc-row inc-row-new">
+      <span class="inc-dot"></span>
+      <span class="inc-title">Новый заказ</span>
+      <span class="inc-wait" id="incWait">0:00</span>
+    </div>
     <div class="inc-row inc-row-top">
       <span class="inc-dist" id="incDist">—</span>
       <span class="inc-by" id="incBy"></span>
@@ -992,7 +988,7 @@ function incShow(o){
   const w = document.getElementById('incWait');
   if(_incW) clearInterval(_incW);
   const tick = () => { const s = Math.round((Date.now()-t0)/1000);
-    w.textContent = s < 60 ? s+' с' : Math.floor(s/60)+' мин '+String(s%60).padStart(2,'0'); };
+    w.textContent = Math.floor(s/60)+':'+String(s%60).padStart(2,'0'); };
   tick(); _incW = setInterval(tick, 1000);
   if(_incT) clearInterval(_incT);
   // Пока не принял — напоминаем. Молча висящий заказ ничем не лучше пропущенного.

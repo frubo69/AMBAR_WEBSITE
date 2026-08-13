@@ -979,9 +979,11 @@ function incShow(o){
     ? {ico: ICO.ok,   t: 'Оплачено онлайн', s: 'денег не брать'}
     : (debt
       ? {ico: ICO.warn, t: 'В долг',          s: 'денег не брать'}
-      : {ico: ICO.cash, t: 'Наличными',       s: 'при получении'});
+      // У наличных уточнять нечего: «Наличными» — это и есть всё сообщение.
+      : {ico: ICO.cash, t: 'Наличными',       s: ''});
   document.getElementById('incPay').innerHTML = svg(PAY.ico, 17) + PAY.t;
-  document.getElementById('incPayS').textContent = PAY.s;
+  const ps = document.getElementById('incPayS');
+  ps.textContent = PAY.s; ps.hidden = !PAY.s;
   document.getElementById('incItems').innerHTML = (o.items||[]).map(it =>
     `<div><span>${esc(it.name)}${it.pcs?` <i style="font-style:normal;color:var(--muted)">${it.pcs} шт</i>`:''}</span><b>${it.qty} шт</b></div>`).join('');
   document.getElementById('incNoteRow').hidden = !o.comment;

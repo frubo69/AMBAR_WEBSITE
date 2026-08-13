@@ -315,8 +315,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 
 /* Верх: пульсирующая точка + секундомер. Заполняет место осмысленно и сразу
    говорит: это только что прилетело и ждёт тебя. */
-.inc-top{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;
-  justify-content:center;gap:6px;padding:10px 0 16px}
+/* Верх фиксированной высоты — лист всегда начинается на одном и том же месте,
+   независимо от длины адреса и числа позиций. */
+.inc-top{flex:0 0 128px;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:5px}
 .inc-pulse{position:relative;width:54px;height:54px;margin-bottom:4px}
 .inc-pulse i{position:absolute;inset:20px;border-radius:50%;
   background:linear-gradient(135deg,var(--gold3),var(--gold));display:block}
@@ -330,8 +332,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   color:var(--muted);font-variant-numeric:tabular-nums}
 
 /* Лист с деталями */
-.inc-sheet{flex:0 1 auto;min-height:0;margin-top:auto;overflow-y:auto;background:var(--bg3);
-  border-radius:22px;border:1px solid var(--border2);box-shadow:0 -2px 30px rgba(0,0,0,.5)}
+/* Лист занимает всё между верхом и кнопкой: положение и размер одинаковы у
+   любого заказа. Растягивается внутри только список товаров — остальные строки
+   всегда на своих местах. */
+.inc-sheet{flex:1;min-height:0;display:flex;flex-direction:column;background:var(--bg3);
+  border-radius:22px;border:1px solid var(--border2);box-shadow:0 -2px 30px rgba(0,0,0,.5);
+  overflow:hidden}
+.inc-row-items{flex:1;min-height:0;overflow-y:auto}
 .inc-row{padding:15px 17px;border-top:1px solid var(--border2)}
 .inc-row:first-child{border-top:none}
 .inc-row-top{display:flex;align-items:center;gap:10px;padding:13px 17px}
@@ -341,27 +348,31 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   color:var(--muted);margin-bottom:8px;display:flex;align-items:baseline;gap:7px}
 .inc-l b{font-weight:700;color:var(--sub);letter-spacing:.4px;text-transform:none;font-size:11.5px}
 .inc-addr{font-size:25px;font-weight:800;line-height:1.15;letter-spacing:-.5px}
-.inc-note{margin-top:10px;padding:10px 12px;border-radius:11px;font-size:13.5px;line-height:1.4;
-  color:var(--warn);background:var(--warn-soft);border:1px solid rgba(243,180,74,.28)}
+/* Комментарий — обычная строка листа, без рамок: он важен, но кричать ему
+   незачем, водитель читает его сразу после адреса. */
+.inc-note{font-size:15px;line-height:1.4;color:var(--text)}
 .inc-items{display:flex;flex-direction:column;gap:9px}
 .inc-items div{display:flex;gap:10px;font-size:15px}
 .inc-items div span{flex:1;min-width:0;color:var(--text)}
 .inc-items div b{color:var(--gold2);font-variant-numeric:tabular-nums;flex-shrink:0}
 /* Деньги — последняя строка листа и самая крупная: это то, с чем курьер
    выходит из машины. */
-.inc-row-pay{background:rgba(201,169,110,.05)}
-.inc-pay{display:flex;align-items:baseline;gap:8px}
-.inc-total{font-family:'Space Grotesk',sans-serif;font-size:36px;font-weight:700;
-  line-height:1;letter-spacing:-1px;color:var(--gold3)}
-.inc-pay i{font-style:normal;font-size:11px;color:var(--muted);letter-spacing:.5px}
-.inc-method{margin-left:auto;font-size:12px;font-weight:600;color:var(--sub);
-  padding:6px 11px;border-radius:999px;background:var(--card2);border:1px solid var(--border2)}
+/* Оплата и сумма — одной строкой, но двумя блоками: чем платят важно ровно
+   настолько же, сколько платят. */
+.inc-row-pay{flex:0 0 auto;display:flex;align-items:flex-end;gap:14px;
+  background:rgba(201,169,110,.05)}
+.inc-pay-l{flex:1;min-width:0}
+.inc-pay-r{text-align:right;flex-shrink:0}
+.inc-pay-r .inc-l{justify-content:flex-end}
+.inc-method{font-size:16px;font-weight:700;line-height:1.25;color:var(--text)}
+.inc-total{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;
+  line-height:1;letter-spacing:-1px;color:var(--gold3);white-space:nowrap}
+.inc-total i{font-style:normal;font-size:11px;color:var(--muted);letter-spacing:.5px;
+  margin-left:5px}
 .inc-row-pay.debt{background:var(--warn-soft)}
-.inc-row-pay.debt .inc-total{color:var(--warn)}
-.inc-row-pay.debt .inc-method{color:var(--warn);border-color:rgba(243,180,74,.4)}
+.inc-row-pay.debt .inc-method,.inc-row-pay.debt .inc-total{color:var(--warn)}
 .inc-row-pay.paid{background:var(--up-soft)}
-.inc-row-pay.paid .inc-total{color:var(--up)}
-.inc-row-pay.paid .inc-method{color:var(--up);border-color:rgba(76,175,125,.4)}
+.inc-row-pay.paid .inc-method,.inc-row-pay.paid .inc-total{color:var(--up)}
 
 /* Действие */
 .inc-foot{flex:0 0 auto;padding-top:12px}
@@ -529,19 +540,26 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
     <div class="inc-row">
       <div class="inc-l">Куда</div>
       <div class="inc-addr" id="incAddr">—</div>
-      <div class="inc-note" id="incNote" hidden></div>
     </div>
 
-    <div class="inc-row">
+    <div class="inc-row" id="incNoteRow" hidden>
+      <div class="inc-l">Комментарий к заказу</div>
+      <div class="inc-note" id="incNote"></div>
+    </div>
+
+    <div class="inc-row inc-row-items">
       <div class="inc-l">Что везём <b id="incCount"></b></div>
       <div class="inc-items" id="incItems"></div>
     </div>
 
     <div class="inc-row inc-row-pay">
-      <div class="inc-l" id="incPayL">Взять с клиента</div>
-      <div class="inc-pay">
-        <span class="inc-total" id="incTotal">0</span><i>AED</i>
-        <span class="inc-method" id="incPay">наличными</span>
+      <div class="inc-pay-l">
+        <div class="inc-l">Оплата</div>
+        <div class="inc-method" id="incPay">Наличными при получении</div>
+      </div>
+      <div class="inc-pay-r">
+        <div class="inc-l" id="incPayL">Взять с клиента</div>
+        <div class="inc-total"><span id="incTotal">0</span><i>AED</i></div>
       </div>
     </div>
   </div>
@@ -942,14 +960,15 @@ function incShow(o){
   const payRow = document.querySelector('.inc-row-pay');
   payRow.className = 'inc-row inc-row-pay' + (paid ? ' paid' : (debt ? ' debt' : ''));
   document.getElementById('incPayL').textContent =
-    paid ? 'Уже оплачено' : (debt ? 'В долг' : 'Взять с клиента');
-  document.getElementById('incTotal').textContent = (paid || debt) ? '0' : fmt(o.total);
+    (paid || debt) ? 'Сумма заказа' : 'Взять с клиента';
+  document.getElementById('incTotal').textContent = fmt(o.total);
   document.getElementById('incPay').textContent =
-    paid ? 'оплачено онлайн' : (debt ? 'денег не брать' : 'наличными');
+    paid ? 'Уже оплачено онлайн — денег не брать'
+         : (debt ? 'В долг — денег не брать' : 'Наличными при получении');
   document.getElementById('incItems').innerHTML = (o.items||[]).map(it =>
     `<div><span>${esc(it.name)}${it.pcs?` <i style="font-style:normal;color:var(--muted)">${it.pcs} шт</i>`:''}</span><b>${it.qty} шт</b></div>`).join('');
-  const note = document.getElementById('incNote');
-  note.hidden = !o.comment; note.textContent = o.comment || '';
+  document.getElementById('incNoteRow').hidden = !o.comment;
+  document.getElementById('incNote').textContent = o.comment || '';
   incKnobReset();
   document.getElementById('incOv').classList.add('show');
   // Три мягкие вспышки — только в момент появления, дальше зовёт звук.

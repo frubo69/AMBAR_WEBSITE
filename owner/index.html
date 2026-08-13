@@ -1848,8 +1848,32 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     <div class="ac-btn-lbl"><div class="ac-btn-t">Рассылка</div><div class="ac-btn-s">Промо всем клиентам · RU / EN · с картинкой</div></div>
     <span class="ac-btn-arrow">›</span>
   </button>
-  <!-- Реклама и акции: сюда же, где рассылка, — это один и тот же вопрос. -->
+  <!-- Акции — строкой, реклама — карточкой: у неё есть что показать до входа. -->
   <div id="mktEntries"></div>
+
+  <div class="cat-block" id="promoBlock">
+    <div class="cat-block-hdr" id="promoBlockHdr">
+      <div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+        stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12"/></svg></div>
+      <div class="cat-block-title">
+        <div class="cat-block-n">Реклама</div>
+        <div class="cat-block-sub" id="promoBlockSub">Загрузка…</div>
+      </div>
+      <svg class="cat-block-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="cat-block-kpis">
+      <div class="cat-kpi"><div class="cat-kpi-v" id="promoKpiAed">—</div><div class="cat-kpi-l">Принесла</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v" id="promoKpiUsers">—</div><div class="cat-kpi-l">Пришло</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v" id="promoKpiConv">—</div><div class="cat-kpi-l">Дошли до заказа</div></div>
+    </div>
+    <div class="cat-block-expand">
+      <div class="cat-block-sect-t">Каналы</div>
+      <div id="promoBlockSrc"></div>
+      <div class="cat-block-sect-t">Кто пришёл</div>
+      <div id="promoBlockWho"></div>
+      <button class="cat-block-open" onclick="event.stopPropagation();accOpen('promo')">Открыть рекламу →</button>
+    </div>
+  </div>
 
   <!-- Alerts moved to header bell button. See #alertsOverlay below. -->
 
@@ -3489,7 +3513,7 @@ document.querySelectorAll('.tb').forEach(btn=>{
       if(!ACC_PERIOD) accLoadSummaries();
     }
     if(pg === 'more' && window.ownerApi){
-      mktRender();
+      mktRender(); promoBlockRender();
       if(!ACC_PERIOD) accLoadSummaries();
     }
     try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
@@ -5517,8 +5541,6 @@ function stkResult(res){
 // пришлось бы прокручивать мимо заявки и склада. Поэтому здесь только входы с
 // короткой сводкой по каждому, а работа — внутри раздела.
 const MKT = {
-  promo: {t:'Реклама', s:'откуда приходят клиенты',
-    ico:'<path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12"/>'},
   gift:  {t:'Акции',   s:'что раздали бесплатно',
     ico:'<path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7"/>'},
 };
@@ -5594,11 +5616,6 @@ function accRender(){
 function mktRender(){
   const box = document.getElementById('mktEntries'); if(!box) return;
   const sub = {
-    promo: ACC_PROMO ? (ACC_PROMO.totals.users
-             ? `${fmt(ACC_PROMO.totals.users)} пришло · ${ACC_PROMO.totals.buyers} заказали · ${fmt(ACC_PROMO.totals.aed)} AED`
-             : (ACC_PROMO.replies ? `${ACC_PROMO.replies} ответов, никто не пришёл`
-                                  : 'бот ещё нигде не отвечал'))
-           : MKT.promo.s,
     // Подарок мерим не бутылками, а тем, что он принёс: сто отданных бутылок
     // при чеке в полторы тысячи и при чеке в тысячу — разные сто бутылок.
     gift:  ACC_GIFT ? (ACC_GIFT.totals.bottles
@@ -5617,6 +5634,63 @@ function mktRender(){
     </button>`).join('');
 }
 
+// Реклама показывает главное не открываясь: сколько принесла, кто пришёл и
+// откуда. Карточка та же, что у каталога, — на «Ещё» их читают подряд.
+function promoBlockRender(){
+  const block = document.getElementById('promoBlock'); if(!block) return;
+  const d = ACC_PROMO, t = (d && d.totals) || null;
+  _setText('promoBlockSub', !d ? 'загрузка…'
+    : (t.users ? `${t.users} ${pluralize(t.users,'пришёл','пришло','пришло')} · ${
+                  d.sources.length} ${pluralize(d.sources.length,'канал','канала','каналов')}`
+               : (d.replies ? `${d.replies} ${pluralize(d.replies,'ответ','ответа','ответов')}, никто не пришёл`
+                            : 'бот ещё нигде не отвечал')));
+  _setText('promoKpiAed',   t ? fmt(t.aed) : '—');
+  _setText('promoKpiUsers', t ? fmt(t.users) : '—');
+  document.getElementById('promoKpiConv').innerHTML = t
+    ? `${t.conv}<span class="u">%</span>` : '—';
+
+  const src = document.getElementById('promoBlockSrc');
+  if(src) src.innerHTML = (d && d.sources.length)
+    ? d.sources.slice(0,3).map(r => `<div class="cat-mini-row">
+        <div class="cat-mini-av">${escS((r.name||'?').trim().slice(0,2).toUpperCase())}</div>
+        <div class="cat-mini-body">
+          <div class="cat-mini-n">${escS(r.name)}</div>
+          <div class="cat-mini-sub">${r.users
+            ? `${r.users} ${pluralize(r.users,'пришёл','пришло','пришло')} · заказали ${r.conv}%`
+            : escS(r.note || 'пока никого')}</div>
+        </div>
+        <div class="cat-mini-r"${r.aed ? '' : ' style="color:var(--muted)"'}>${
+          r.aed ? fmt(r.aed) + '<span class="u">AED</span>' : '—'}</div>
+      </div>`).join('') + (d.sources.length > 3
+        ? `<div class="cat-block-empty" style="padding-top:6px">…и ещё ${d.sources.length-3}</div>` : '')
+    : '<div class="cat-block-empty">Каналов пока нет. Добавьте @ambarpr_bot в чаты.</div>';
+
+  const who = document.getElementById('promoBlockWho');
+  if(who) who.innerHTML = (d && (d.people||[]).length)
+    ? d.people.slice(0,3).map(p => `<div class="cat-mini-row">
+        <div class="cat-mini-av">${escS((p.name||'?').trim().slice(0,1).toUpperCase())}</div>
+        <div class="cat-mini-body">
+          <div class="cat-mini-n">${escS(p.name)}</div>
+          <div class="cat-mini-sub">${escS(p.source)} · ${p.orders
+            ? `${p.orders} ${pluralize(p.orders,'заказ','заказа','заказов')}` : 'без заказов'}</div>
+        </div>
+        <div class="cat-mini-r"${p.aed ? '' : ' style="color:var(--muted)"'}>${
+          p.aed ? fmt(p.aed) + '<span class="u">AED</span>' : '—'}</div>
+      </div>`).join('') + (d.people.length > 3
+        ? `<div class="cat-block-empty" style="padding-top:6px">…и ещё ${d.people.length-3}</div>` : '')
+    : '<div class="cat-block-empty">Пока никто не пришёл</div>';
+}
+
+(function initPromoBlock(){
+  const block = document.getElementById('promoBlock');
+  const hdr = document.getElementById('promoBlockHdr');
+  if(!block || !hdr) return;
+  hdr.addEventListener('click',()=>{
+    block.classList.toggle('open');
+    try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
+  });
+})();
+
 // Сводки для входов тянем разом при открытии вкладки: «загрузка…» на четырёх
 // карточках сразу выглядит хуже, чем секунда ожидания.
 async function accLoadSummaries(){
@@ -5630,7 +5704,7 @@ async function accLoadSummaries(){
     get('/api/owner/qr'),
   ]);
   ACC_PERIOD = per; ACC_STOCK = st; ACC_ORDER = ord; ACC_PROMO = pr; ACC_GIFT = gf; ACC_QR = qr;
-  accRender(); mktRender();
+  accRender(); mktRender(); promoBlockRender();
 }
 
 function accOpen(id){
@@ -5660,7 +5734,7 @@ function accClose(){
   SCAN.stop();
   document.getElementById('accOv').classList.remove('show');
   ACC_VIEW = null;
-  accRender(); mktRender();
+  accRender(); mktRender(); promoBlockRender();
 }
 
 // День и период — один раздел, а не два: это одни и те же деньги, просто

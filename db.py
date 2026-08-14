@@ -167,11 +167,13 @@ def _db_or_none():
 # кэш сразу, поэтому «свежесть» здесь ничем не жертвует — новый заказ виден в
 # тот же миг, что и раньше.
 _ORDERS_CACHE = {"at": 0.0, "docs": None}
+_ORDERS_WIN: dict = {}          # окно по времени → (когда прочитали, заказы)
 _ORDERS_TTL = 2.0
 
 
 def _orders_dirty():
     _ORDERS_CACHE["docs"] = None
+    _ORDERS_WIN.clear()
 
 
 async def save_order(oid: str, data: dict):
@@ -254,8 +256,12 @@ async def orders_from(since_iso: str) -> dict:
     Незакрытые берём любого возраста: заказ, висящий с ночи, обязан попасть в
     «в работе» независимо от выбранного окна.
     """
+    import time as _t
     db = _db_or_none()
     if db is None: return {}
+    hit = _ORDERS_WIN.get(since_iso)
+    if hit and _t.monotonic() - hit[0] < _ORDERS_TTL:
+        return hit[1]
     # Не тащим то, чем экран денег не пользуется: готовые строки чека и номера
     # сообщений в телеграме занимают треть каждого заказа и нужны только боту.
     cur = db.orders.find({"$or": [
@@ -264,7 +270,12 @@ async def orders_from(since_iso: str) -> dict:
     ]}, {"_id": 0, "item_lines": 0, "op_msg_ids": 0, "customer_msg_ids": 0,
          "_delivered_notif_msgs": 0})
     docs = await cur.to_list(length=2000)
-    return {o["order_id"]: o for o in docs}
+    out = {o["order_id"]: o for o in docs}
+    # Панель открывает несколько экранов сразу, и все спрашивают одно окно.
+    # Держим его те же две секунды, что и полный список.
+    if len(_ORDERS_WIN) > 8: _ORDERS_WIN.clear()
+    _ORDERS_WIN[since_iso] = (_t.monotonic(), out)
+    return out
 
 
 async def get_user_orders(tg_id: int) -> list:

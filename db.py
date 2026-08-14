@@ -40,6 +40,8 @@ async def connect():
         # Очередь панели: что нового, что в работе, что тронули после отметки.
         await _db.orders.create_index([("status", 1), ("timestamp", -1)])
         await _db.orders.create_index("updated_at")
+        # Окно по времени — самый частый запрос всех экранов денег.
+        await _db.orders.create_index("timestamp")
         await _db.users.create_index("telegram_id", unique=True)
         await _db.support_messages.create_index("conv_key", unique=True)
         await _db.support_map.create_index("fwd_msg_id", unique=True)
@@ -241,6 +243,25 @@ async def get_all_orders(office_id=None) -> dict:
         _ORDERS_CACHE["docs"] = out
         _ORDERS_CACHE["at"] = _t.monotonic()
     return out
+
+
+async def orders_from(since_iso: str) -> dict:
+    """Заказы с указанного момента плюс все незакрытые — их возраст не важен.
+
+    Экраны считают деньги за окно, а не за всю историю. Читать ради «сегодня»
+    четыреста заказов — это мегабайт по сети, и на нашем тарифе Atlas он идёт
+    семь секунд: скорость там режется по объёму, а не по числу запросов.
+    Незакрытые берём любого возраста: заказ, висящий с ночи, обязан попасть в
+    «в работе» независимо от выбранного окна.
+    """
+    db = _db_or_none()
+    if db is None: return {}
+    cur = db.orders.find({"$or": [
+        {"timestamp": {"$gte": since_iso}},
+        {"status": {"$in": ["pending", "approved"]}},
+    ]}, {"_id": 0})
+    docs = await cur.to_list(length=2000)
+    return {o["order_id"]: o for o in docs}
 
 
 async def get_user_orders(tg_id: int) -> list:

@@ -456,10 +456,15 @@ async def handle_finance(request):
         day_offset = 0
     day_offset = max(0, min(365, day_offset))
 
-    all_orders = await db.get_all_orders()
-
     ref = (_now_dubai() - timedelta(days=day_offset)) if day_offset else None
     start, end, prev_start, prev_end = _period_window(period, ref)
+    # Читаем не всю историю, а окно: текущее, предыдущее (для сравнения) и
+    # неделю для полосок, плюс сутки запаса на границы. Незакрытые заказы
+    # придут любого возраста. На нашем тарифе Atlas скорость режется по
+    # объёму, и лишний мегабайт — это лишние секунды на каждом экране.
+    since = min(prev_start, end - timedelta(days=8)) - timedelta(days=1)
+    all_orders = await db.orders_from(
+        since.astimezone(timezone.utc).isoformat().replace("+00:00", ""))
     curr_orders = _orders_in_window(all_orders, start, end)        # delivered only
     prev_orders = _orders_in_window(all_orders, prev_start, prev_end)
     curr_all    = _all_orders_in_window(all_orders, start, end)    # any status

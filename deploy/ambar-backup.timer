@@ -1,0 +1,12 @@
+[Unit]
+Description=AMBAR — копия базы каждую ночь
+
+[Timer]
+# 02:00 UTC = 06:00 в Дубае: смена уже отработала, до новой шесть часов.
+OnCalendar=*-*-* 02:00:00
+# Сервер мог быть выключен — снимем копию сразу после включения.
+Persistent=true
+RandomizedDelaySec=300
+
+[Install]
+WantedBy=timers.target

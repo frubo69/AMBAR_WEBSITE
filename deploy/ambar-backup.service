@@ -1,0 +1,13 @@
+[Unit]
+Description=AMBAR — резервная копия базы
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/ambar
+ExecStart=/opt/ambar/venv/bin/python /opt/ambar/tools/backup.py
+# Копия — не срочное дело: если сеть или Atlas тормозят, пусть ждёт, но не
+# висит вечно и не мешает боевым сервисам.
+TimeoutStartSec=900
+Nice=10
+IOSchedulingClass=idle

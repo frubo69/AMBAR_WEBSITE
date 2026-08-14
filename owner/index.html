@@ -1419,7 +1419,14 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Donut */
 .donut-wrap{display:flex;align-items:center;gap:16px}
 .donut{width:92px;height:92px;flex-shrink:0;position:relative}
-.donut-c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;pointer-events:none}
+.donut-c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;background:none;border:none;cursor:pointer;font-family:inherit;
+  color:inherit;padding:0;border-radius:50%;-webkit-tap-highlight-color:transparent;
+  transition:transform .12s var(--e1)}
+.donut-c:active{transform:scale(.94)}
+.donut-val,.donut-lbl{transition:opacity .16s var(--e1)}
+.donut-c.turn .donut-val,.donut-c.turn .donut-lbl{opacity:0}
+.donut svg circle{transition:stroke-width .25s var(--e1), opacity .25s var(--e1)}
 .donut-val{font-family:'DM Sans',sans-serif;font-size:18px;font-weight:700;line-height:1;letter-spacing:-.4px;font-variant-numeric:lining-nums tabular-nums}
 .donut-lbl{font-size:9px;color:var(--muted);letter-spacing:1.2px;text-transform:uppercase;margin-top:2px}
 .donut-leg{flex:1}
@@ -1658,7 +1665,11 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
           <circle id="payDebtArc" cx="18" cy="18" r="15.9" fill="none" stroke="#F3B44A" stroke-width="3.5"
             stroke-dasharray="0 100" stroke-dashoffset="25" transform="rotate(-90 18 18)" stroke-linecap="round"/>
         </svg>
-        <div class="donut-c"><div class="donut-val mono" id="payCryptoPct">—</div><div class="donut-lbl">крипта</div></div>
+        <button class="donut-c" id="payFocusBtn" onclick="event.stopPropagation();payFocusNext()"
+                aria-label="Переключить способ оплаты">
+          <div class="donut-val mono" id="payCryptoPct">—</div>
+          <div class="donut-lbl" id="payFocusLbl">крипта</div>
+        </button>
       </div>
       <div class="donut-leg">
         <div class="dleg"><span class="dleg-dot" style="background:#26A17B"></span><span class="dleg-name"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;opacity:.75"><path d="M12 3l7 5-7 13-7-13z"/><path d="M5 8h14M12 3v18"/></svg>Крипта</span><span class="dleg-val" id="payCryptoVal" data-aed="">—</span></div>
@@ -4765,6 +4776,61 @@ function renderFinance(p, f){
   applyCurrency();
 }
 
+// Кольцо показывает три доли сразу, а число в центре — одну. Какую именно,
+// решает касание: доля крипты нужна к разговору о комиссии, доля наличных —
+// к разговору об инкассации, и держать в голове «в центре всегда крипта»
+// человек не обязан.
+let PAY_FOCUS = 'crypto', PAY_LAST = null;
+const PAY_VIEW = {
+  crypto: {lbl:'крипта',   arc:'payCryptoArc'},
+  cash:   {lbl:'наличные', arc:'payCashArc'},
+  debt:   {lbl:'в долг',   arc:'payDebtArc'},
+};
+
+function payFocusNext(){
+  const has = ['crypto', 'cash'].concat((PAY_LAST && PAY_LAST.debt) ? ['debt'] : []);
+  const i = has.indexOf(PAY_FOCUS);
+  PAY_FOCUS = has[(i + 1) % has.length];
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  // Подпись гасим на время пересчёта: цифра едет, а слово под ней меняется
+  // мгновенно — иначе на середине пути «40% наличные» читается как факт.
+  const btn = document.getElementById('payFocusBtn');
+  if(btn){
+    btn.classList.add('turn');
+    setTimeout(() => { payPaintFocus(); btn.classList.remove('turn'); }, 160);
+  } else payPaintFocus();
+}
+
+function payPaintFocus(){
+  const d = PAY_LAST; if(!d) return;
+  const v = PAY_VIEW[PAY_FOCUS] || PAY_VIEW.crypto;
+  _setText('payFocusLbl', v.lbl);
+  _animPct(document.getElementById('payCryptoPct'), d.pct[PAY_FOCUS] || 0);
+  // Выбранная дуга выходит вперёд, остальные отступают: видно, о чём число.
+  Object.keys(PAY_VIEW).forEach(k => {
+    const el = document.getElementById(PAY_VIEW[k].arc); if(!el) return;
+    const on = k === PAY_FOCUS;
+    el.setAttribute('stroke-width', on ? '4.6' : '3.2');
+    el.style.opacity = on ? '1' : '.42';
+  });
+}
+
+// Тот же счётчик, что у остальных чисел, только с процентом.
+function _animPct(el, to){
+  if(!el) return;
+  to = Math.max(0, Math.round(to || 0));
+  const from = parseInt(el.dataset.n || '0', 10) || 0;
+  el.dataset.n = String(to);
+  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  if(from === to || reduce){ el.textContent = to + '%'; return; }
+  const dur = 620, t0 = performance.now();
+  (function step(now){
+    const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3);
+    el.textContent = Math.round(from + (to - from) * e) + '%';
+    if(p < 1) requestAnimationFrame(step);
+  })(t0);
+}
+
 function renderPaySplit(bm){
   bm = bm || {};
   const c = bm.crypto || {}, k = bm.cash || {}, i = bm.crypto_inflight || {}, dg = bm.debt || {};
@@ -4782,7 +4848,9 @@ function renderPaySplit(bm){
   set('payCashArc',   kLen, 25);
   set('payCryptoArc', cLen, 25 - kLen);
   set('payDebtArc',   dLen, 25 - kLen - cLen);
-  _setText('payCryptoPct', Math.round(pct(cAed)) + '%');
+  PAY_LAST = {pct: {crypto: pct(cAed), cash: pct(kAed), debt: pct(dAed)}, debt: dAed > 0};
+  if(PAY_FOCUS === 'debt' && !dAed) PAY_FOCUS = 'crypto';   // долг кончился — вернулись
+  payPaintFocus();
   _setAed('payCryptoVal', cAed);
   _setAed('payCashVal',   kAed);
   _setAed('payDebtVal',   dAed);

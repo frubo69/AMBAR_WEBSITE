@@ -256,10 +256,13 @@ async def orders_from(since_iso: str) -> dict:
     """
     db = _db_or_none()
     if db is None: return {}
+    # Не тащим то, чем экран денег не пользуется: готовые строки чека и номера
+    # сообщений в телеграме занимают треть каждого заказа и нужны только боту.
     cur = db.orders.find({"$or": [
         {"timestamp": {"$gte": since_iso}},
         {"status": {"$in": ["pending", "approved"]}},
-    ]}, {"_id": 0})
+    ]}, {"_id": 0, "item_lines": 0, "op_msg_ids": 0, "customer_msg_ids": 0,
+         "_delivered_notif_msgs": 0})
     docs = await cur.to_list(length=2000)
     return {o["order_id"]: o for o in docs}
 

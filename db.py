@@ -158,16 +158,32 @@ def _db_or_none():
 
 # ── Orders ────────────────────────────────────────────────────────────────────
 
+# Список заказов целиком читают почти все экраны: выручка, люди, районы,
+# очередь панели. Открытие AMBAR STAR — это десяток запросов подряд, и каждый
+# тянул все четыреста заказов из Atlas по сети заново. Держим их две секунды:
+# столько живёт одна пачка запросов от одной страницы. Любая запись сбрасывает
+# кэш сразу, поэтому «свежесть» здесь ничем не жертвует — новый заказ виден в
+# тот же миг, что и раньше.
+_ORDERS_CACHE = {"at": 0.0, "docs": None}
+_ORDERS_TTL = 2.0
+
+
+def _orders_dirty():
+    _ORDERS_CACHE["docs"] = None
+
+
 async def save_order(oid: str, data: dict):
     db = _db_or_none()
     if db is None: return
     await db.orders.update_one({"order_id": oid}, {"$set": data}, upsert=True)
+    _orders_dirty()
 
 
 async def update_order(oid: str, **kw):
     db = _db_or_none()
     if db is None: return
     await db.orders.update_one({"order_id": oid}, {"$set": kw})
+    _orders_dirty()
 
 
 async def get_order(oid: str) -> dict | None:
@@ -204,9 +220,13 @@ async def get_all_orders(office_id=None) -> dict:
                 handle multiple offices — central+north+south, etc.)
     Empty list is treated as 'no orders for this operator' to avoid
     accidentally returning everyone's orders to a non-operator."""
+    import time as _t
     db = _db_or_none()
     if db is None: return {}
     if office_id is None:
+        if _ORDERS_CACHE["docs"] is not None and \
+           _t.monotonic() - _ORDERS_CACHE["at"] < _ORDERS_TTL:
+            return _ORDERS_CACHE["docs"]
         filt = {}
     elif isinstance(office_id, (list, tuple, set)):
         if not office_id:
@@ -216,7 +236,11 @@ async def get_all_orders(office_id=None) -> dict:
         filt = {"office_id": office_id}
     cursor = db.orders.find(filt, {"_id": 0})
     docs = await cursor.to_list(length=2000)
-    return {o["order_id"]: o for o in docs}
+    out = {o["order_id"]: o for o in docs}
+    if office_id is None:
+        _ORDERS_CACHE["docs"] = out
+        _ORDERS_CACHE["at"] = _t.monotonic()
+    return out
 
 
 async def get_user_orders(tg_id: int) -> list:
@@ -1438,6 +1462,7 @@ async def claim_debt_delivery(oid: str) -> bool:
         {"order_id": oid, "debt_counted": {"$ne": True}},
         {"$set": {"debt_counted": True}},
     )
+    if res.modified_count: _orders_dirty()
     return res.modified_count == 1
 
 
@@ -1449,6 +1474,7 @@ async def unclaim_debt_delivery(oid: str) -> bool:
         {"order_id": oid, "debt_counted": True},
         {"$set": {"debt_counted": False}},
     )
+    if res.modified_count: _orders_dirty()
     return res.modified_count == 1
 
 
@@ -1654,11 +1680,13 @@ async def claim_order(oid: str, fields: dict) -> dict | None:
     db = _db_or_none()
     if db is None: return None
     from pymongo import ReturnDocument
-    return await db.orders.find_one_and_update(
+    doc = await db.orders.find_one_and_update(
         {"order_id": oid, "status": "pending"},
         {"$set": fields},
         projection={"_id": 0},
         return_document=ReturnDocument.AFTER)
+    if doc: _orders_dirty()
+    return doc
 
 
 async def orders_changed_since(iso: str, limit: int = 400) -> list:

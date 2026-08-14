@@ -4350,7 +4350,7 @@ function _heroFlip(dir){
 }
 
 // Данные дня, если они уже лежат в кэше. Свайп никогда их не ждёт.
-function _dayCached(p){ return DAY_OFFSET ? FINANCE_CACHE[_fkey(p, DAY_OFFSET)] : FINANCE_CACHE[p]; }
+function _dayCached(p){ return FINANCE_CACHE[_fkey(p, DAY_OFFSET)]; }
 
 // Тихо тянем соседний день, чтобы следующий свайп был мгновенным.
 function _prefetchDay(p, off){
@@ -4385,7 +4385,12 @@ function _paintDay(p){
     ? ownerApi.ownerFetch('/api/owner/finance', {params:{period:p, day_offset:DAY_OFFSET}})
     : ownerApi.ownerFetch('/api/owner/finance', {params:{period:p}});
   req.then(d=>{
-    FINANCE_CACHE[DAY_OFFSET ? _fkey(p, DAY_OFFSET) : p] = d;
+    // Кладём ответ под тот день, за который спрашивали, а не под тот, на
+    // котором человек стоит сейчас. Пока ответ шёл, он успевал листнуть
+    // дальше — и вчерашние цифры ложились в ячейку позавчера. Дальше этот
+    // день брался «из кэша» и показывал чужие числа: в пролистывании
+    // получалось 12, 11, 9, а десятое будто пропадало.
+    FINANCE_CACHE[stamp] = d;
     if(_fkey(p, DAY_OFFSET) !== stamp) return;    // успел свайпнуть дальше — ответ протух
     paint(d);
   }).catch(e=>console.warn('[day] fetch failed', e))

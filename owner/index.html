@@ -4259,7 +4259,20 @@ function _dayLabel(w){
   return {top:num, sub:''};
 }
 
+// Пока смотрим прошлый день, ни один период не подсвечен: «Сегодня» горящее
+// на позавчерашних цифрах — это прямая неправда. Возвращаемся к сегодня —
+// подсветка возвращается сама.
+function _syncPeriodPill(p){
+  ['periodPicker', 'moneyPeriod', 'officePeriod'].forEach(gid => {
+    const g = document.getElementById(gid); if(!g) return;
+    g.querySelectorAll('button').forEach(b =>
+      b.classList.toggle('on', !DAY_OFFSET && b.dataset.p === p));
+    if(typeof movePill === 'function') movePill(g);
+  });
+}
+
 function _syncDayNav(p, w){
+  _syncPeriodPill(p);
   const nav = document.getElementById('dayNav');
   if(nav) nav.style.display = _dayNavOn(p) ? 'flex' : 'none';
   const hero0 = document.querySelector('#pg-overview .hero');
@@ -10742,9 +10755,17 @@ document.querySelectorAll('#opFilters .op-f').forEach(b=>{
 document.querySelectorAll('.periods').forEach(g=>{
   g.querySelectorAll('button').forEach(b=>{
     b.addEventListener('click',()=>{
+      // Уже выбранный период, пока мы в прошлом дне, работает как «домой»:
+      // жать «Сегодня», стоя на девятом августа, человек может только за этим.
+      const same = b.classList.contains('on');
       g.querySelectorAll('button').forEach(x=>x.classList.remove('on'));
       b.classList.add('on');
       movePill(g);
+      if(same && DAY_OFFSET && b.dataset.p){
+        dayReset();
+        try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+        return;
+      }
       // If there was an active custom range for this group, clear it
       const chip = document.getElementById('rangeChip-'+g.id);
       if(chip && chip.style.display !== 'none'){

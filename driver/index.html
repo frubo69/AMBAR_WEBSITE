@@ -450,7 +450,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .gm.show{display:flex}
 .gm-top{flex:0 0 auto}
 .gm-logo{font-size:21px;font-weight:800;letter-spacing:3px;color:#5ad1ff;
-  text-align:center;text-shadow:0 0 18px rgba(90,209,255,.45)}
+  text-align:center;text-shadow:0 0 18px rgba(90,209,255,.45);
+  /* Иначе долгое нажатие по тексту телефон принимает за выделение: показывает
+     лупу, а приложению присылает отмену касания. */
+  -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
+  touch-action:manipulation;padding:6px 0;transition:opacity .2s var(--e1)}
+.gm-logo.hold{opacity:.55}
 .gm-logo span{color:#ffd166}
 .gm-stats{display:flex;justify-content:space-between;gap:8px;margin:12px 0 10px;
   padding:9px 14px;border-radius:12px;background:rgba(255,255,255,.05);
@@ -3418,14 +3423,32 @@ function gmInit(){
     });
     // Долгое нажатие на название — выход. Чужой человек название не держит, а
     // водитель делает это одной рукой, не глядя.
-    let t = null;
+    // Долгое нажатие пальцем по тексту телефон понимает по-своему: показывает
+    // лупу и меню «Скопировать», а нам присылает touchcancel — таймер сбрасывался,
+    // и выход не срабатывал ни разу. Поэтому у названия отключено выделение и
+    // системное меню, а само нажатие слушается через pointer-события: они
+    // приходят одинаково и от пальца, и от мыши.
     const logo = document.getElementById('gmLogo');
-    const down = () => { t = setTimeout(() => { _tap('ok'); panicSet(false); }, 2000); };
-    const up = () => { clearTimeout(t); };
-    logo.addEventListener('touchstart', down, {passive:true});
-    logo.addEventListener('mousedown', down);
-    ['touchend','touchcancel','mouseup','mouseleave'].forEach(e =>
-      logo.addEventListener(e, up));
+    let t = null, arm = null;
+    const stop = () => {
+      clearTimeout(t); clearTimeout(arm); t = arm = null;
+      logo.classList.remove('hold');
+    };
+    const down = e => {
+      if(t) return;
+      // На середине пути — короткий толчок: палец узнаёт, что удержание
+      // засчитывается, и его не убирают раньше времени.
+      arm = setTimeout(() => { _tap('light'); logo.classList.add('hold'); }, 900);
+      t = setTimeout(() => { stop(); _tap('ok'); panicSet(false); }, 1800);
+      if(e && e.preventDefault && e.cancelable) e.preventDefault();
+    };
+    logo.addEventListener('pointerdown', down);
+    ['pointerup','pointercancel','pointerleave'].forEach(e =>
+      logo.addEventListener(e, stop));
+    // Запасной путь для старых вебвью без pointer-событий.
+    logo.addEventListener('touchstart', down, {passive:false});
+    ['touchend','touchcancel'].forEach(e => logo.addEventListener(e, stop));
+    logo.addEventListener('contextmenu', e => e.preventDefault());
   }
   gmFit();
   if(!GM) gmStart(); else gmPaint();

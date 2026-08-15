@@ -500,16 +500,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 /* «Не было» — такой же ответ, как сумма, и стоит там же, где кнопка отправки.
    Крестиком без слова его нельзя: рядом с полем ввода крестик читается как
    «очистить», и водитель нажмёт его вместо стирания цифры. */
-.exp-no{width:100%;min-height:44px;margin-top:7px;display:flex;align-items:center;
-  justify-content:center;gap:7px;padding:11px;border-radius:11px;cursor:pointer;
-  font-family:inherit;font-size:12.5px;font-weight:600;color:var(--muted);
-  background:var(--card2);border:1px solid var(--border3)}
-.exp-no:active{transform:scale(.96);color:var(--text)}
-.exp-field.none{justify-content:space-between}
-.exp-field.none .exp-none{flex:1;padding:13px;color:var(--sub)}
-/* Пока не ответили — карточку видно среди отвеченных, но она не кричит. */
-.exp-card.ask{border-color:var(--border3)}
-.exp-card.ask .exp-sum{color:var(--warn)}
+.exp-field .exp-none{flex:1;padding:13px;color:var(--sub)}
 .sect-v.ask{color:var(--warn)}
 /* Весь статус — один значок. Цвет только в нём. */
 .exp-mk{flex:none;display:flex;align-items:center;padding:0 13px 0 9px;color:var(--dim)}
@@ -1315,42 +1306,70 @@ function otherBox(x){
 // Отправленное не стирается: сумма остаётся в поле серым, а кнопка становится
 // «Редактировать». Пустое поле после отправки не отвечало на единственный
 // вопрос водителя — дошло или нет.
-// По бензину и мойке водитель обязан ответить каждую смену — суммой или
-// «не было». Молчание неотличимо от забывчивости, а забытая заправка всплывает
-// через неделю, когда её уже не вспомнить. Поэтому у карточки три состояния, а
-// не два: ждём ответа, сумма, «не было».
+// По бензину и мойке водитель обязан ответить каждую смену — суммой или тем,
+// что расхода не было. Молчание неотличимо от забывчивости, а забытая заправка
+// всплывает через неделю, когда её уже не вспомнить.
+//
+// Ответ один, и кнопка под него одна. Пустое поле — это и есть «не было», так
+// она и подписана; появилась цифра — стала «Отправить» и загорелась. Двумя
+// кнопками рядом это выглядело как выбор из двух действий, хотя действие одно:
+// ответить. Заодно исчез вопрос, почему «не было» стоит раньше «Отправить».
 function expBox(kind, title, ico){
   const k = (EXP.by_kind || {})[kind] || {sum:0, count:0};
   const sent = (EXP.extras || []).find(x => x.kind === kind);
   const none = ((EXP.no_expense || {})[kind]) && !sent;
-  const head = sent ? fmt(k.sum) + ' AED' : none ? 'не было' : 'ждём ответа';
-  if(none) return `<div class="card exp-card none">
-    <div class="exp-hd">${svg(ico, 17)}<span class="exp-t">${title}</span>
-      <span class="exp-sum">${head}</span></div>
+  if(none) return `<div class="card exp-card">
+    <div class="exp-hd">${svg(ico, 17)}<span class="exp-t">${title}</span></div>
     <div class="exp-row">
-      <div class="exp-field sent none">
+      <div class="exp-field sent">
         <span class="exp-none">Сегодня не было</span>
         <span class="exp-mk approved">${svg(ICO.ok, 15)}</span>
       </div>
       <button class="btn btn-sec exp-go" onclick="expNone('${kind}', false)">Изменить</button>
     </div>
   </div>`;
-  return `<div class="card exp-card${sent ? '' : ' ask'}">
+  return `<div class="card exp-card">
     <div class="exp-hd">${svg(ico, 17)}<span class="exp-t">${title}</span>
-      <span class="exp-sum">${head}</span></div>
+      ${sent ? `<span class="exp-sum">${fmt(k.sum)} AED</span>` : ''}</div>
     <div class="exp-row">
       <div class="exp-field${sent ? ' sent' : ''}">
         <input class="amt" id="e_${kind}" type="text" inputmode="numeric"
-          placeholder="AED" autocomplete="off"
+          placeholder="AED" autocomplete="off" oninput="expTyped('${kind}')"
           value="${sent ? sent.amount : ''}"${sent ? ' readonly' : ''}>
         ${sent ? expMark(sent) : ''}
       </div>
-      <button class="btn ${sent ? 'btn-sec' : 'btn-pri'} exp-go"
-        onclick="expTap(this,'${kind}')">${sent ? 'Изменить' : 'Отправить'}</button>
+      <button class="btn ${sent ? 'btn-sec' : 'btn-gh'} exp-go" id="b_${kind}"
+        onclick="expTap(this,'${kind}')">${sent ? 'Изменить' : 'не было'}</button>
     </div>
-    ${sent ? '' : `<button class="exp-no" onclick="expNone('${kind}', true)">
-      ${svg(ICO.close, 14)}<span>Сегодня не было</span></button>`}
   </div>`;
+}
+
+// Кнопка следует за полем: пусто — «не было» серым, есть цифра — «Отправить»
+// золотым. У записанного расхода стереть сумму этой кнопкой нельзя: отменить
+// уже отправленное — не решение водителя, как и всё остальное в приложении.
+function expTyped(kind){
+  const inp = document.getElementById('e_' + kind);
+  const btn = document.getElementById('b_' + kind);
+  if(!inp || !btn) return;
+  const has = !!String(inp.value || '').replace(/\D/g, '');
+  const sent = (EXP.extras || []).some(x => x.kind === kind);
+  btn.classList.toggle('btn-pri', has);
+  btn.classList.toggle('btn-gh', !has);
+  btn.disabled = !has && sent;
+  btn.textContent = has ? 'Отправить' : (sent ? 'Отправить' : 'не было');
+}
+
+// У доп. расхода «не было» не бывает — его просто не заводят. Здесь кнопка
+// молчит, пока нет и суммы, и объяснения: без второго старший через неделю не
+// отличит трату от опечатки.
+function expOtherTyped(){
+  const a = document.getElementById('e_other'), c = document.getElementById('e_other_c');
+  const b = document.getElementById('b_other');
+  if(!a || !b) return;
+  const ok = !!String(a.value || '').replace(/\D/g, '') && !!String((c||{}).value || '').trim();
+  b.disabled = !ok;
+  b.classList.toggle('btn-pri', ok);
+  b.classList.toggle('btn-gh', !ok);
 }
 
 // «Не было» уходит сразу, без второго нажатия: это ответ из одного слова, и
@@ -1379,6 +1398,11 @@ function expTap(btn, kind){
     btn.classList.remove('btn-sec'); btn.classList.add('btn-pri');
     return;
   }
+  // Пустое поле по бензину или мойке — это ответ «расхода не было», а не
+  // забытая цифра: другого смысла у пустого обязательного поля нет.
+  const empty = !String((inp || {}).value || '').replace(/\D/g, '');
+  if(empty && (kind === 'fuel' || kind === 'wash')
+     && !(EXP.extras || []).some(x => x.kind === kind)) return expNone(kind, true);
   sendExpense(btn, kind);
 }
 
@@ -1446,11 +1470,11 @@ function renderExpenses(){
             aria-label="Закрыть">${svg(ICO.close, 14)}</button></div>
         <div class="exp-row">
           <div class="exp-field"><input class="amt" id="e_other" type="text" inputmode="numeric"
-            placeholder="AED" autocomplete="off"></div>
+            placeholder="AED" autocomplete="off" oninput="expOtherTyped()"></div>
           <div class="exp-field cmt"><input id="e_other_c" type="text" placeholder="за что"
-            autocomplete="off"></div>
+            autocomplete="off" oninput="expOtherTyped()"></div>
         </div>
-        <button class="btn btn-pri" style="width:100%;margin-top:8px"
+        <button class="btn btn-gh" id="b_other" disabled style="width:100%;margin-top:8px"
           onclick="sendExpense(this,'other')">Отправить на согласование</button>
       </div>`
       : `<button class="exp-add" onclick="EXP_MORE=true;render()">

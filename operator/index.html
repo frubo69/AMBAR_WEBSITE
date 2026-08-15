@@ -477,9 +477,7 @@ a.oc-row:active{background:var(--card2)}
   background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .sh-go.ghost{background:var(--card2);color:var(--sub);border:1px solid var(--border2)}
 .sh-go:disabled{opacity:.5;pointer-events:none}
-.sh-all{padding:12px 14px;border-radius:var(--r2);font-size:12.5px;
-  line-height:1.5;color:var(--gold);background:rgba(201,169,110,.1);
-  border:1px solid rgba(201,169,110,.3)}
+
 .sbtn.gold{background:linear-gradient(135deg,#E8C98A,#C9A96E);color:#1a1408;border:none}
 .sbtn.red{background:linear-gradient(135deg,#E86A6A,#C94E4E);color:#fff;border:none}
 .pack-btn{display:flex;align-items:center;width:100%;padding:16px;border-radius:var(--r2);background:var(--card);border:1px solid var(--border2);margin-bottom:10px;transition:.12s}
@@ -2538,9 +2536,7 @@ function shiftPaint(){
         onclick="${x.closed ? `shiftReopen('${x.district}')` : `shiftClose('${x.district}')`}">
         ${x.closed ? 'Открыть' : 'Закрыть'}</button>
     </div>`;
-  }).join('') + (d.all_closed
-    ? `<div class="sh-all">Смена закрыта у всех. Заявка в магазин собрана и
-       отправлена старшему файлом.</div>` : '');
+  }).join('');
 }
 
 async function shiftClose(oid){

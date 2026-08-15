@@ -967,15 +967,13 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .crw-empty{font-size:11px;color:var(--muted);padding:2px 2px 8px}
 
 /* ── Кто на каком районе ───────────────────────────────────────────────── */
-.crew-entry{display:flex;align-items:center;gap:11px;width:100%;margin:8px 0 10px;padding:12px 13px;
+.crew-entry{display:flex;align-items:center;gap:11px;width:100%;margin:8px 0 10px;padding:14px 13px;
   border-radius:13px;cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
   background:var(--card);border:1px solid var(--border2)}
 .crew-entry:active{background:var(--card2)}
 .crew-entry > svg{flex:0 0 auto;opacity:.55}
 .crew-e-b{flex:1;min-width:0}
 .crew-e-b b{display:block;font-size:13px;font-weight:600}
-.crew-e-b i{display:block;font-style:normal;font-size:10.5px;color:var(--muted);margin-top:2px;
-  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .crew-e-go{color:var(--muted);font-size:15px;flex-shrink:0}
 .crew-d{display:flex;align-items:center;gap:11px;padding:13px;margin-bottom:7px;border-radius:13px;
   background:var(--card);border:1px solid var(--border2)}
@@ -1862,7 +1860,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
       <circle cx="8" cy="7" r="3"/><path d="M2.5 20v-1.5A4.5 4.5 0 0 1 7 14h2"/>
       <path d="M14 8h7"/><path d="M18 5l3 3-3 3"/>
       <path d="M21 17h-7"/><path d="M17 14l-3 3 3 3"/></svg>
-    <span class="crew-e-b"><b>Переместить оператора / водителя</b><i id="crewSub">B1 · B5 Умар · B2 Джанабиль…</i></span>
+    <span class="crew-e-b"><b>Переместить оператора / водителя</b></span>
     <span class="crew-e-go">›</span>
   </button>
 
@@ -10495,19 +10493,7 @@ let CREW = null;
 async function crewLoad(){
   try{ CREW = await ownerApi.ownerFetch('/api/owner/staff'); }
   catch(e){ CREW = null; }
-  crewSub();
   return CREW;
-}
-
-// Подпись на входе: кто где, коротко. Одинаковых операторов схлопываем —
-// «B1 · B5 Умар» читается быстрее, чем «B1 Умар · B5 Умар».
-function crewSub(){
-  const el = document.getElementById('crewSub');
-  if(!el) return;
-  if(!CREW){ el.textContent = 'кто принимает заказы по районам'; return; }
-  const by = {};
-  CREW.districts.forEach(d => { (by[d.operator] = by[d.operator] || []).push(d.code); });
-  el.textContent = Object.keys(by).map(n => `${by[n].join(' · ')} ${n}`).join('  ·  ');
 }
 
 async function crewOpen(){
@@ -10657,7 +10643,7 @@ async function crewApply(){
       }
     }
     CREW_D = _copy(CREW);
-    crewRender(); crewSub();
+    crewRender();
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     // Списки людей и районов считаются по этой же таблице — перечитываем.
     if(window.ownerApi) loadOperators();

@@ -1685,8 +1685,9 @@ function renderOrders(){
   if(!ORDERS){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
   const {active, done} = ORDERS;
   if(!active.length){
-    box.innerHTML = blank(ICO.box, 'Заказов нет',
-      'Новый придёт сообщением и появится здесь — приложение можно закрыть');
+    // Без пояснения: водитель и так знает, что заказ придёт сообщением, — это
+    // его работа, а не новость.
+    box.innerHTML = blank(ICO.box, 'Заказов нет');
     return;
   }
   // Развёрнут один заказ — тот, которым водитель занят сейчас. Остальные

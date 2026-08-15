@@ -1036,11 +1036,42 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .crw-ask-b:active{transform:scale(.98)}
 
 /* Заголовок группы водителей: чей это район и кто на нём принимает. */
-.crw-grp{display:flex;align-items:center;gap:9px;margin:16px 2px 8px}
-.crw-grp:first-of-type{margin-top:4px}
-.crw-grp-n{font-size:12px;font-weight:700;letter-spacing:.3px}
-.crw-grp-o{margin-left:auto;font-size:10.5px;color:var(--muted)}
-.crw-empty{font-size:11px;color:var(--muted);padding:2px 2px 8px}
+/* Район — одна карточка: кто ведёт в шапке, кто возит фишками под ней. Так
+   он читается целиком, а не собирается в голове из двух списков. */
+.crw-c{margin-bottom:9px;border-radius:15px;background:var(--card);
+  border:1px solid var(--border2);overflow:hidden}
+.crw-c.moved{border-color:rgba(201,169,110,.4)}
+.crw-c-h{display:flex;align-items:center;gap:10px;padding:11px 12px;
+  background:var(--card2);border-bottom:1px solid var(--border2)}
+.crw-c-n{flex:1;min-width:0;font-size:14px;font-weight:700;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+/* Оператор — тоже фишка, только в шапке: он такой же человек на этом районе. */
+.crw-op{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:1px;
+  padding:7px 12px;border-radius:10px;cursor:pointer;font-family:inherit;
+  font-size:12.5px;font-weight:700;color:var(--text);background:var(--card3);
+  border:1px solid var(--border3)}
+.crw-op:active{border-color:var(--gold2)}
+.crw-op.moved{color:var(--gold2);border-color:rgba(201,169,110,.5);
+  background:var(--gold-soft)}
+.crw-op i{font-style:normal;font-size:9.5px;font-weight:600;color:var(--muted)}
+.crw-c-b{display:flex;flex-wrap:wrap;gap:7px;padding:11px 12px}
+/* Фишка человека. Нажимают на неё саму — отдельная кнопка «Перенести» у каждой
+   строки объясняла очевидное и съедала треть ширины. */
+.crw-p{display:flex;align-items:center;gap:8px;padding:6px 11px 6px 6px;
+  border-radius:999px;cursor:pointer;font-family:inherit;font-size:13px;
+  font-weight:600;color:var(--text);background:var(--card2);
+  border:1px solid var(--border3);transition:.15s var(--e1)}
+.crw-p:active{transform:scale(.96);border-color:var(--gold2)}
+.crw-p.moved{background:var(--gold-soft);border-color:rgba(201,169,110,.5)}
+.crw-p-a{width:26px;height:26px;flex:0 0 auto;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;font-size:10px;font-weight:800;
+  color:var(--gold2);background:var(--card3)}
+.crw-p.moved .crw-p-a{color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+/* Откуда пришёл — единственная подпись на экране: обычное состояние молчит. */
+.crw-p-f{font-size:10px;font-weight:700;color:var(--gold2);letter-spacing:.3px}
+.crw-none{font-size:12px;color:var(--muted);padding:4px 2px}
+.crw-tip{margin-top:14px;font-size:11.5px;line-height:1.5;color:var(--muted);
+  padding:0 2px}
 
 /* ── Кто на каком районе ───────────────────────────────────────────────── */
 .crew-entry{display:flex;align-items:center;gap:11px;width:100%;margin:8px 0 10px;padding:14px 13px;
@@ -10886,7 +10917,7 @@ async function crewOpen(){
 //
 // Водители сгруппированы по районам. Плоским списком из одиннадцати имён
 // было не видно ни кто с кем ездит, ни где пусто.
-let CREW_TAB = 'ops';
+
 // Правки живут на экране, пока их не сохранили. Перестановка — не то действие,
 // которое делают уверенно с первого раза: человека двигают, смотрят, что вышло,
 // двигают обратно. Пока это уходило на сервер мгновенно, «как было» приходилось
@@ -10903,11 +10934,6 @@ function crewDirty(){
   return a !== b;
 }
 
-function crewTab(t){
-  CREW_TAB = t;
-  crewRender();
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-}
 
 function crewRender(){
   const box = document.getElementById('accMid');
@@ -10921,56 +10947,51 @@ function crewRender(){
               + (S.drivers || []).filter(v => v.moved).length;
   crewFoot();
 
-  const ops = S.districts.map(d => `
-    <div class="crew-d${d.moved ? ' moved' : ''}">
-      <span class="crew-code">${escS(d.code)}</span>
-      <span class="crew-b">
-        <span class="crew-n">${escS(d.name)}</span>
-        <span class="crew-s">${d.drivers.length
-          ? escS(d.drivers.join(', ')) : 'водителей нет'}${
-          d.moved ? ` · обычно ${escS(d.base)}` : ''}</span>
-      </span>
-      <button class="crew-pick${d.moved ? ' moved' : ''}"
-              onclick="crewPick('${d.id}')">${escS(d.operator || '—')}</button>
-    </div>`).join('');
-
-  // По районам, а не общим списком: водитель работает не сам по себе, а в
-  // паре с оператором своего района, и смотрят на них вместе.
-  const drv = S.districts.map(d => `
-    <div class="crw-grp">
-      <span class="crew-code">${escS(d.code)}</span>
-      <span class="crw-grp-n">${escS(d.name)}</span>
-      <span class="crw-grp-o">${escS(d.operator || '—')}</span>
-    </div>
-    ${d.drivers.length ? d.drivers.map(n => {
+  // Район — карточка, люди в ней — фишки. Разделение на две вкладки заставляло
+  // складывать картину в голове: оператор в одном списке, его водители в
+  // другом, и в каждом вторая половина повторена серым. Здесь район виден
+  // целиком: кто ведёт — в шапке, кто возит — под ней.
+  //
+  // Кнопки «Перенести» у каждой строки больше нет: нажимают на самого человека.
+  // Одиннадцать одинаковых кнопок объясняли то, что и так очевидно, и съедали
+  // треть ширины.
+  //
+  // Подписи «как обычно» тоже нет. Обычное состояние — молчание; говорит только
+  // то, что от него отличается.
+  const per = S.districts.map(d => {
+    const chips = d.drivers.length ? d.drivers.map(n => {
       const v = drvOf(n);
-      return `<div class="crew-d${v.moved ? ' moved' : ''}">
-        <span class="crew-code sm">${escS(n.trim().slice(0,2).toUpperCase())}</span>
-        <span class="crew-b">
-          <span class="crew-n">${escS(n)}</span>
-          <span class="crew-s">${v.moved
-            ? `обычно ${escS(dOf(v.base).code || '')} ${escS(dOf(v.base).name || '')}`
-            : 'как обычно'}</span>
-        </span>
-        <button class="crew-pick${v.moved ? ' moved' : ''}"
-                onclick="crewPickD('${escS(n)}')">Перенести</button>
-      </div>`;
-    }).join('') : '<div class="crw-empty">водителей нет</div>'}`).join('');
+      const home = dOf(v.base);
+      return `<button class="crw-p${v.moved ? ' moved' : ''}"
+                      onclick="crewPickD('${escS(n)}')">
+        <span class="crw-p-a">${escS(n.trim().slice(0,2).toUpperCase())}</span>
+        <span class="crw-p-n">${escS(n)}</span>
+        ${v.moved ? `<span class="crw-p-f">из ${escS(home.code || '')}</span>` : ''}
+      </button>`;
+    }).join('') : '<span class="crw-none">никого нет</span>';
+    return `<div class="crw-c${d.moved ? ' moved' : ''}">
+      <div class="crw-c-h">
+        <span class="crew-code">${escS(d.code)}</span>
+        <span class="crw-c-n">${escS(d.name)}</span>
+        <button class="crw-op${d.moved ? ' moved' : ''}" onclick="crewPick('${d.id}')">
+          <span>${escS(d.operator || '—')}</span>
+          ${d.moved ? `<i>обычно ${escS(d.base)}</i>` : ''}
+        </button>
+      </div>
+      <div class="crw-c-b">${chips}</div>
+    </div>`;
+  }).join('');
 
   box.innerHTML = `
-    <div class="periods" id="crewSeg" style="--count:2">
-      <div class="period-pill"></div>
-      <button class="${CREW_TAB === 'ops' ? 'on' : ''}" onclick="crewTab('ops')">Операторы</button>
-      <button class="${CREW_TAB === 'drv' ? 'on' : ''}" onclick="crewTab('drv')">Водители</button>
-    </div>
     ${moved ? `<div class="crw-hint">
         <span>Переставлено: <b>${moved}</b> — не как обычно</span>
         <button class="crw-cancel" onclick="crewResetAll()">Вернуть всё</button>
       </div>` : ''}
-    ${CREW_TAB === 'ops' ? ops : drv}`;
-  const seg = document.getElementById('crewSeg');
-  if(seg) movePill(seg);
+    ${per}
+    <div class="crw-tip">Нажмите на человека, чтобы перевести его на другой район.
+      Оператор меняется в шапке района.</div>`;
 }
+
 
 // Подвал появляется только когда есть что сохранять — и говорит, сколько.
 function crewFoot(){
@@ -11070,7 +11091,7 @@ function _crewPop(anchorSel, html){
 function crewPick(did){
   const S = CREW_D || CREW;
   const d = S.districts.find(x => x.id === did); if(!d) return;
-  _crewPop(`.crew-d [onclick*="${did}"]`, S.operators.map(n => `
+  _crewPop(`.crw-op[onclick*="${did}"]`, S.operators.map(n => `
     <button onclick="crewSet('${did}','${n.replace(/'/g,"\\'")}')">
       <span>${escS(n)}${n === d.base ? '<span class="pin-s">как обычно</span>' : ''}</span>
       ${n === d.operator ? '<i style="margin-left:auto;color:var(--gold2)">✓</i>' : ''}
@@ -11083,7 +11104,7 @@ function crewPickD(name){
   const S = CREW_D || CREW;
   const v = (S.drivers || []).find(x => x.name === name); if(!v) return;
   const esc = name.replace(/'/g, "\\'");
-  _crewPop(`.crew-d [onclick*="${esc}"]`, S.districts.map(d => `
+  _crewPop(`.crw-p[onclick*="${esc}"]`, S.districts.map(d => `
     <button onclick="crewSetD('${esc}','${d.id}')">
       <span>${escS(d.code)} ${escS(d.name)}${
         d.id === v.base ? '<span class="pin-s">как обычно</span>' : ''}</span>

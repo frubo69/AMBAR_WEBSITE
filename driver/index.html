@@ -211,7 +211,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .ordm-t{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:15px;
   font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums}
 .ordm-t.late{color:var(--dn)}
-.ordm-go{flex:0 0 auto;color:var(--dim);font-size:15px}
+.ordm-go{flex:0 0 auto;display:flex;align-items:center;color:var(--dim)}
 /* Вокруг раскрытой карточки воздух одинаковый с обеих сторон: снизу его даёт
    она сама, сверху — свёрнутая строка над ней. Разные зазоры вокруг одного
    объекта читаются как сбой вёрстки. */
@@ -282,7 +282,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .hday-v{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;
   color:var(--gold2);font-variant-numeric:tabular-nums}
 .hday-v i{font-style:normal;font-size:10px;color:var(--muted);margin-left:4px}
-.hday-go{flex:0 0 auto;color:var(--dim);font-size:15px}
+.hday-go{flex:0 0 auto;display:flex;align-items:center;color:var(--dim)}
 .hday-list{margin-bottom:8px;padding:6px;border-radius:0 0 14px 14px;
   background:var(--bg3);border:1px solid var(--border3);border-top:none}
 
@@ -650,7 +650,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .li-v b{font-size:21px;font-weight:700;line-height:1;color:var(--gold3)}
 .li-v i{font-style:normal;font-size:13px;color:var(--muted)}
 .li.done .li-v b{color:var(--up)}
-.li-go{flex-shrink:0;color:var(--dim)}
+.li-go{flex-shrink:0;display:flex;align-items:center;color:var(--dim)}
 .li.done .li-go{display:none}
 .li-ok{flex-shrink:0;color:var(--up);display:none}
 .li.done .li-ok{display:block}
@@ -1742,7 +1742,7 @@ function ordMini(o, i){
       <span class="ordm-s">${items} ${plural(items,'бутылка','бутылки','бутылок')} · ${fmt(o.total)} AED</span>
     </span>
     ${o.deliver_by ? `<span class="ordm-t${late ? ' late' : ''}">${esc(o.deliver_by)}</span>` : ''}
-    <span class="ordm-go">›</span>
+    <span class="ordm-go"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span>
   </button>`;
 }
 
@@ -1910,7 +1910,7 @@ function renderHistory(){
             g.avg_min ? ` · ${g.avg_min} мин в среднем` : ''}</span>
         </span>
         <span class="hday-v">${fmt(g.aed)}<i>AED</i></span>
-        <span class="hday-go">${open ? '⌄' : '›'}</span>
+        <span class="hday-go">${open ? '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>' : '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>'}</span>
       </button>
       ${open ? `<div class="hday-list">${g.orders.map(o => histRow(o)).join('')}</div>` : ''}`;
   }).join('');
@@ -3008,7 +3008,7 @@ function supRenderTask(){
         <span class="li-s">${l.left ? 'осталось ' + fmt(l.left) : 'взято полностью'}</span>
       </span>
       <span class="li-v"><b>${fmt(l.got)}</b><i>/${fmt(l.need)}</i></span>
-      <span class="li-go">${svg(ICO.right || '<path d="M9 18l6-6-6-6"/>', 18)}</span>
+      <span class="li-go">${svg('<path d="M9 5l7 7-7 7"/>', 17)}</span>
       <span class="li-ok">${svg(ICO.ok, 19)}</span>
     </button>`).join('');
   const all = t.left === 0;

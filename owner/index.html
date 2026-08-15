@@ -6028,11 +6028,11 @@ let BCAST_AUD = null;
 function mktRender(){
   const box = document.getElementById('mktEntries'); if(!box) return;
   const a = BCAST_AUD;
-  const sub = a
-    ? `${fmt(a.all)} ${pluralize(a.all,'получатель','получателя','получателей')}`
-      + (a.ru || a.en ? ` · ${fmt(a.ru)} RU · ${fmt(a.en)} EN` : '')
-      + (a.banned ? ` · ${a.banned} заблокировали бота` : '')
-    : 'промо всем клиентам · RU / EN · с картинкой';
+  // Один факт, а не сводка: сколько людей получит. Разбивку по языкам и
+  // заблокировавших человек увидит внутри, когда будет выбирать аудиторию, —
+  // до нажатия они ничего не решают, а строку обрезают.
+  const sub = a ? `${fmt(a.all)} ${pluralize(a.all,'получатель','получателя','получателей')}`
+                : 'промо всем клиентам';
   box.innerHTML = '';
   const sub2 = document.querySelector('#pg-more .all-clients-btn .ac-btn-s');
   if(sub2) sub2.textContent = sub;

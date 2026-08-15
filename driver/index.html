@@ -1000,15 +1000,18 @@ async function boot(){
 
 async function load(){
   try{
+    // Заказы опрашиваются каждые пять секунд — от них зависит, поедет ли
+    // водитель прямо сейчас. Приёмка так часто не нужна: поставка появляется
+    // раз в сутки, и полминуты задержки не значат ничего, а лишний запрос от
+    // каждого водителя каждые пять секунд база чувствует.
+    const wantSup = Date.now() - _supAt > 30000;
     const [o, e, s] = await Promise.all([
       drvApi.drvFetch('/api/driver/orders'),
       drvApi.drvFetch('/api/driver/expenses'),
-      // Приёмка спрашивается вместе с остальным: она появляется не по нажатию
-      // водителя, а оттого, что старший загрузил ответ магазина, — и узнать
-      // об этом он должен, не заходя на вкладку.
-      drvApi.drvFetch('/api/driver/supply').catch(() => null),
+      wantSup ? drvApi.drvFetch('/api/driver/supply').catch(() => null) : null,
     ]);
-    ORDERS = o; EXP = e; if(s) SUP = s;
+    ORDERS = o; EXP = e;
+    if(wantSup){ _supAt = Date.now(); if(s) SUP = s; }
   }catch(err){ return; }
   // Заказ, который назначили и который водитель ещё не подтвердил, показываем
   // поверх всего. Первый в очереди — тот, что ждёт дольше.
@@ -2054,7 +2057,7 @@ let SUP = null;                 // {mine, free, taken}
 let TASK = null;                // открытая задача
 let LINE = null;                // позиция, которую считаем сейчас
 let SCAN_ROWS = [];             // лента текущей позиции
-let SUP_BUSY = false;
+let SUP_BUSY = false, _supAt = 0;
 
 function supBadge(){
   const b = document.getElementById('tbSup');
@@ -2067,6 +2070,7 @@ function supBadge(){
 }
 
 async function supLoad(){
+  _supAt = Date.now();
   try{ SUP = await drvApi.drvFetch('/api/driver/supply'); }
   catch(e){ SUP = SUP || {mine:[], free:[], taken:[]}; }
   supBadge();

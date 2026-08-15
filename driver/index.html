@@ -373,57 +373,118 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   cursor:pointer;padding:0}
 .sheet-hd .sheet-t,.sheet-hd .sheet-s{margin-bottom:0}
 
+/* Полки каталога: одно касание вместо прокрутки ста двадцати строк. */
+.pk-cats{display:flex;gap:6px;overflow-x:auto;margin:0 0 10px;padding-bottom:2px;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none}
+.pk-cats::-webkit-scrollbar{display:none}
+.pk-c{flex:0 0 auto;padding:8px 14px;border-radius:11px;cursor:pointer;
+  font-family:inherit;font-size:12.5px;font-weight:600;white-space:nowrap;
+  color:var(--sub);background:var(--card2);border:1px solid var(--border3)}
+.pk-c.on{background:var(--gold-soft);border-color:rgba(201,169,110,.45);color:var(--gold2)}
+.pk-add{flex:0 0 auto;min-width:46px;height:40px;padding:0 12px;border-radius:11px;
+  cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:700;
+  color:var(--gold2);background:var(--card2);border:1px solid var(--border3);
+  display:flex;align-items:center;justify-content:center}
+.pk-add:active{transform:scale(.94)}
+/* Счётчик встаёт на место «плюса»: то же место, тот же размер — строка не
+   прыгает, когда позицию набрали. */
+.pk-st{flex:0 0 auto;display:flex;align-items:center;gap:2px;height:40px;
+  border-radius:11px;background:var(--card2);border:1px solid rgba(201,169,110,.4)}
+.pk-st button{width:36px;height:38px;border:none;background:none;cursor:pointer;
+  color:var(--gold2);display:flex;align-items:center;justify-content:center;padding:0}
+.pk-st button:active{transform:scale(.9)}
+.pk-st b{min-width:20px;text-align:center;font-family:'Space Grotesk',sans-serif;
+  font-size:15px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+.ed-i.has{border-color:rgba(201,169,110,.35);background:var(--card2)}
+
 /* ══ Экстренная ситуация ═══════════════════════════════════════════════════
    Повторяет системный экран выключения: тот же чёрный фон, тот же ползунок,
    тот же круглый крест внизу. Знакомая форма здесь важнее оригинальности —
    человек в этот момент не изучает интерфейс. */
+/* Экран построен как системное предупреждение: значок, заголовок, одна строка
+   объяснения — и всё это узкой колонкой по центру. Широкий текст на всю ширину
+   телефона разваливается на четыре строки с висячими словами. */
 .pnc{position:fixed;inset:0;z-index:300;display:none;flex-direction:column;
-  align-items:center;justify-content:space-between;
-  padding:calc(58px + var(--safe-top)) 24px calc(46px + var(--safe-bottom));
+  align-items:center;
+  padding:calc(64px + var(--safe-top)) 22px calc(40px + var(--safe-bottom));
   background:#0a0a0c;-webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px)}
 .pnc.show{display:flex}
-.pnc-top{text-align:center}
-.pnc-t{font-size:19px;font-weight:700;letter-spacing:-.2px}
-.pnc-s{margin-top:9px;font-size:13px;line-height:1.55;color:var(--muted)}
+.pnc-top{text-align:center;max-width:300px}
+.pnc-ico{display:flex;width:58px;height:58px;margin:0 auto 20px;border-radius:50%;
+  align-items:center;justify-content:center;color:#E05555;
+  background:rgba(224,85,85,.14);border:1px solid rgba(224,85,85,.3)}
+.pnc-t{font-size:22px;font-weight:700;letter-spacing:-.4px;line-height:1.2}
+.pnc-s{margin-top:10px;font-size:14px;line-height:1.5;color:var(--sub)}
+/* Ползунок стоит в оптической середине оставшегося места, а не прибит к низу:
+   до него дотягиваются большим пальцем, не перехватывая телефон. */
 .pnc-slide{position:relative;width:100%;max-width:330px;height:68px;border-radius:999px;
-  overflow:hidden;background:rgba(255,255,255,.13);touch-action:pan-y}
+  overflow:hidden;background:rgba(255,255,255,.1);
+  border:1px solid rgba(255,255,255,.06);margin:auto 0;touch-action:pan-y}
 .pnc-fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:999px;
   background:rgba(224,85,85,.28)}
-.pnc-track{position:absolute;inset:0;display:flex;align-items:center;
-  justify-content:center;font-size:15.5px;font-weight:600;color:rgba(255,255,255,.62);
-  pointer-events:none}
+/* Подпись выровнена по свободной части дорожки, а не по всей: иначе она
+   упирается в ручку и читается как её продолжение. */
+.pnc-track{position:absolute;inset:0 18px 0 68px;display:flex;align-items:center;
+  justify-content:center;font-size:15.5px;font-weight:600;pointer-events:none}
+/* Блик бежит по надписи, как на системном «выключить»: он говорит, что это не
+   картинка, а то, что нужно тянуть. */
+.pnc-track span{background:linear-gradient(100deg,
+    rgba(255,255,255,.32) 30%, rgba(255,255,255,.92) 48%, rgba(255,255,255,.32) 66%);
+  background-size:280% 100%;-webkit-background-clip:text;background-clip:text;
+  color:transparent;animation:pncShine 2.6s linear infinite;white-space:nowrap}
+@keyframes pncShine{from{background-position:180% 0}to{background-position:-120% 0}}
+@media (prefers-reduced-motion:reduce){
+  .pnc-track span{animation:none;color:rgba(255,255,255,.7)}
+}
 .pnc-knob{position:absolute;top:5px;left:5px;width:58px;height:58px;border-radius:50%;
   display:flex;align-items:center;justify-content:center;color:#E05555;background:#fff;
   box-shadow:0 3px 14px rgba(0,0,0,.5);transition:transform .22s var(--e1)}
 .pnc-slide.drag .pnc-knob{transition:none}
-.pnc-x{display:flex;flex-direction:column;align-items:center;gap:11px;border:none;
+.pnc-x{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:11px;border:none;
   background:none;cursor:pointer;font-family:inherit;color:var(--text);padding:0}
 .pnc-x-c{width:66px;height:66px;border-radius:50%;display:flex;align-items:center;
   justify-content:center;background:rgba(255,255,255,.14)}
 .pnc-x:active .pnc-x-c{background:rgba(255,255,255,.22)}
 .pnc-x-t{font-size:15px}
 
-/* ── маскировка: калькулятор ───────────────────────────────────────────── */
-.calc{position:fixed;inset:0;z-index:400;display:none;flex-direction:column;
-  justify-content:flex-end;gap:10px;background:#000;
-  padding:0 11px calc(18px + var(--safe-bottom));
-  font-family:-apple-system,'SF Pro Display','Helvetica Neue',sans-serif}
-.calc.show{display:flex}
-.calc-out{padding:0 14px 6px;text-align:right;color:#fff;font-weight:300;
-  font-size:78px;line-height:1.05;letter-spacing:-2px;
-  overflow:hidden;text-overflow:clip;white-space:nowrap}
-.calc-pad{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
-.calc-b{height:0;padding-bottom:100%;position:relative;border:none;border-radius:999px;
-  cursor:pointer;background:#333;color:#fff;font-family:inherit;font-size:31px;
-  font-weight:400;transition:filter .1s}
-.calc-b span{position:absolute;inset:0;display:flex;align-items:center;
+/* ── маскировка: игра ──────────────────────────────────────────────────────
+   Всё, что делает её похожей на настоящую: своё имя с логотипом, счёт-линии-
+   уровень в шапке, следующая фигура, кнопки под большой палец и конец игры с
+   рекордом. Каждая из этих мелочей по отдельности не важна, а вместе они и
+   отличают игру от «экрана, который кто-то нарисовал». */
+.gm{position:fixed;inset:0;z-index:400;display:none;flex-direction:column;
+  background:#0b0e18;color:#e8ecf5;
+  padding:calc(14px + var(--safe-top)) 14px calc(14px + var(--safe-bottom));
+  font-family:-apple-system,'SF Pro Display','Segoe UI',sans-serif;user-select:none}
+.gm.show{display:flex}
+.gm-top{flex:0 0 auto}
+.gm-logo{font-size:21px;font-weight:800;letter-spacing:3px;color:#5ad1ff;
+  text-align:center;text-shadow:0 0 18px rgba(90,209,255,.45)}
+.gm-logo span{color:#ffd166}
+.gm-stats{display:flex;justify-content:space-between;gap:8px;margin:12px 0 10px;
+  padding:9px 14px;border-radius:12px;background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.07)}
+.gm-stats span{display:flex;flex-direction:column;align-items:center;gap:2px}
+.gm-stats i{font-style:normal;font-size:8.5px;letter-spacing:1.2px;color:#7d89a6}
+.gm-stats b{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+.gm-field{position:relative;flex:1;min-height:0;display:flex;align-items:center;
   justify-content:center}
-.calc-b:active{filter:brightness(1.6)}
-.calc-b.gray{background:#a5a5a5;color:#000}
-.calc-b.op{background:#ff9f0a}
-.calc-b.op.on{background:#fff;color:#ff9f0a}
-.calc-b.zero{grid-column:span 2;border-radius:999px}
-.calc-b.zero span{justify-content:flex-start;padding-left:31px}
+#gmC{border-radius:10px;background:#070a12;box-shadow:0 0 0 1px rgba(255,255,255,.07),
+  inset 0 0 40px rgba(0,0,0,.6)}
+.gm-over{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
+  justify-content:center;gap:9px;border-radius:10px;background:rgba(7,10,18,.9)}
+.gm-over.show{display:flex}
+.gm-over-t{font-size:20px;font-weight:800;letter-spacing:.4px}
+.gm-over-s{font-size:12.5px;color:#7d89a6}
+.gm-again{margin-top:8px;padding:12px 24px;border-radius:11px;border:none;cursor:pointer;
+  font-family:inherit;font-size:14px;font-weight:700;color:#06121c;
+  background:linear-gradient(135deg,#5ad1ff,#7ef0c8)}
+.gm-pad{flex:0 0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:9px;
+  margin-top:12px}
+.gm-b{height:58px;border-radius:14px;border:1px solid rgba(255,255,255,.09);
+  cursor:pointer;font-family:inherit;font-size:19px;color:#cfd8ea;
+  background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center}
+.gm-b:active{background:rgba(90,209,255,.22);color:#fff}
 
 /* ── разговор с оператором ────────────────────────────────────────────────
    Переписка идёт по заказу, а не «вообще»: обсуждают всегда этот адрес и эти
@@ -1007,14 +1068,18 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
      и его не надо объяснять человеку, которому сейчас не до обучения. -->
 <div class="pnc" id="pncOv">
   <div class="pnc-top">
-    <div class="pnc-t">Экстренная ситуация</div>
-    <div class="pnc-s">Приложение скроется. Старший и оператор узнают сразу.<br>
-      Вам ничего не покажется — экран просто станет другим.</div>
+    <span class="pnc-ico">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3 3 19.5h18z"/><path d="M12 10v4M12 17h.01"/></svg>
+    </span>
+    <h2 class="pnc-t">Экстренная ситуация</h2>
+    <p class="pnc-s">Приложение скроется, старший и оператор узнают сразу.</p>
   </div>
 
   <div class="pnc-slide" id="pncSlide">
     <div class="pnc-fill" id="pncFill"></div>
-    <div class="pnc-track" id="pncTrack">сдвиньте, чтобы скрыть</div>
+    <div class="pnc-track" id="pncTrack"><span>сдвиньте, чтобы скрыть</span></div>
     <div class="pnc-knob" id="pncKnob">
       <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
         stroke-width="2.2" stroke-linecap="round"><path d="M12 3v9"/>
@@ -1031,13 +1096,37 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   </button>
 </div>
 
-<!-- Маскировка. Обычный калькулятор — приложение, которое есть у всех и
-     которое никто не разглядывает. Считает по-настоящему: человек, взявший
-     телефон, скорее всего нажмёт пару кнопок, и они должны работать.
-     Выход — код и «=». -->
-<div class="calc" id="calcApp">
-  <div class="calc-out" id="calcOut">0</div>
-  <div class="calc-pad" id="calcPad"></div>
+<!-- Маскировка. Обычная игра-падалка: она есть на любом телефоне, её не
+     разглядывают и в неё, чего доброго, начнут играть — поэтому она играется
+     по-настоящему. Пустая картинка выдала бы себя первым же касанием.
+     Выход — долгое нажатие на название. -->
+<div class="gm" id="gameApp">
+  <div class="gm-top">
+    <div class="gm-logo" id="gmLogo">BLOCK<span>FALL</span></div>
+    <div class="gm-stats">
+      <span><i>СЧЁТ</i><b id="gmScore">0</b></span>
+      <span><i>ЛИНИИ</i><b id="gmLines">0</b></span>
+      <span><i>УРОВЕНЬ</i><b id="gmLevel">1</b></span>
+    </div>
+  </div>
+  <div class="gm-field">
+    <canvas id="gmC"></canvas>
+    <div class="gm-over" id="gmOver">
+      <div class="gm-over-t">Игра окончена</div>
+      <div class="gm-over-s" id="gmBest"></div>
+      <button class="gm-again" onclick="gmStart()">Играть снова</button>
+    </div>
+  </div>
+  <div class="gm-pad">
+    <button class="gm-b" data-a="left">◀</button>
+    <button class="gm-b" data-a="rot">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+    </button>
+    <button class="gm-b" data-a="right">▶</button>
+    <button class="gm-b wide" data-a="drop">▼</button>
+  </div>
 </div>
 
 <!-- Разговор с оператором по заказу. Один экран: что уже сказано, чем можно
@@ -1124,9 +1213,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
       </div>
       <input class="ed-search" id="edQ" placeholder="Поиск по названию" oninput="pickRender()"
         autocomplete="off" autocorrect="off" spellcheck="false">
+      <div class="pk-cats" id="edCats"></div>
       <div class="ed-list" id="edCat"><div class="empty">Загрузка каталога…</div></div>
       <div class="sheet-acts">
-        <button class="btn btn-pri" onclick="pickClose()">Готово</button>
+        <button class="btn btn-pri" onclick="pickClose()" id="pkDone">Готово</button>
       </div>
     </div>
   </div>
@@ -3213,8 +3303,7 @@ const CANCEL_REASONS = ['Клиент отказался', 'Клиент не о
 // Выход — код на калькуляторе и «=». Код лежит в коде приложения, и это не
 // тайна от того, кто умеет читать исходники, — но угроза здесь другая: чужой
 // человек рядом, а не программист.
-const PNC_CODE = '112233';
-let PANIC = false, _pncTaps = [], _calc = null;
+let PANIC = false, _pncTaps = [];
 
 // Тройное касание по имени. Считаем только быстрые серии: касания, разнесённые
 // на секунды, — это обычные промахи по шапке.
@@ -3261,12 +3350,12 @@ async function panicSet(on){
 }
 
 function paintPanic(){
-  const c = document.getElementById('calcApp');
+  const c = document.getElementById('gameApp');
   document.getElementById('pncOv').classList.remove('show');
   c.classList.toggle('show', PANIC);
   document.body.style.overflow = PANIC ? 'hidden' : '';
   if(PANIC){
-    calcInit();
+    gmInit();
     // Всё, что может выдать: опрос заказов, звук нового заказа, экран заказа.
     try{ incHide(); }catch(e){}
     try{ document.getElementById('caseSheet').classList.remove('show'); }catch(e){}
@@ -3275,84 +3364,203 @@ function paintPanic(){
   }
 }
 
-// ── калькулятор ────────────────────────────────────────────────────────────
-const CALC_KEYS = [
-  ['AC','gray'], ['+/−','gray'], ['%','gray'], ['÷','op'],
-  ['7',''], ['8',''], ['9',''], ['×','op'],
-  ['4',''], ['5',''], ['6',''], ['−','op'],
-  ['1',''], ['2',''], ['3',''], ['+','op'],
-  ['0','zero'], [',',''], ['=','op'],
+// ── игра ───────────────────────────────────────────────────────────────────
+// Настоящая падалка на семь фигур: вращение, ускорение, сгорание линий, рост
+// скорости, рекорд. Всё это здесь не ради игры, а ради правдоподобия: человек,
+// у которого в руках чужой телефон, скорее всего нажмёт пару кнопок — и они
+// должны отзываться так, как он ожидает.
+const GM_W = 10, GM_H = 20;
+const GM_PIECES = [
+  [[1,1,1,1]],                       // I
+  [[1,1],[1,1]],                     // O
+  [[0,1,0],[1,1,1]],                 // T
+  [[0,1,1],[1,1,0]],                 // S
+  [[1,1,0],[0,1,1]],                 // Z
+  [[1,0,0],[1,1,1]],                 // J
+  [[0,0,1],[1,1,1]],                 // L
 ];
+const GM_COLORS = ['#5ad1ff','#ffd166','#c792ea','#7ef0c8','#ff8fa3','#8ab4ff','#ffb26b'];
+let GM = null, _gmRaf = null, _gmCell = 0;
 
-function calcInit(){
-  const pad = document.getElementById('calcPad');
-  if(pad.dataset.ready) return;
-  pad.dataset.ready = '1';
-  pad.innerHTML = CALC_KEYS.map(([k, cls]) =>
-    `<button class="calc-b ${cls}" data-k="${k}"><span>${k}</span></button>`).join('');
-  pad.addEventListener('click', e => {
-    const b = e.target.closest('.calc-b');
-    if(b) calcKey(b.dataset.k);
-  });
-  _calc = {acc: null, op: null, cur: '0', fresh: true};
-  calcPaint();
-}
-
-function calcPaint(){
-  const el = document.getElementById('calcOut');
-  const v = _calc.cur;
-  el.textContent = v;
-  // Длинное число уменьшаем, как это делает настоящий калькулятор.
-  el.style.fontSize = v.length > 9 ? (v.length > 12 ? '44px' : '58px') : '78px';
-  document.querySelectorAll('.calc-b.op').forEach(b =>
-    b.classList.toggle('on', !!_calc.op && b.dataset.k === _calc.op && _calc.fresh));
-}
-
-const CALC_FN = {'+':(a,b)=>a+b, '−':(a,b)=>a-b, '×':(a,b)=>a*b, '÷':(a,b)=>b?a/b:NaN};
-
-function calcKey(k){
-  _tap('light');
-  const c = _calc;
-  if(/[0-9]/.test(k)){
-    c.cur = (c.fresh || c.cur === '0') ? k : (c.cur.length < 15 ? c.cur + k : c.cur);
-    c.fresh = false;
-  }else if(k === ','){
-    if(c.fresh){ c.cur = '0,'; c.fresh = false; }
-    else if(!c.cur.includes(',')) c.cur += ',';
-  }else if(k === 'AC'){
-    _calc = {acc: null, op: null, cur: '0', fresh: true};
-  }else if(k === '+/−'){
-    c.cur = c.cur.startsWith('-') ? c.cur.slice(1) : ('-' + c.cur);
-  }else if(k === '%'){
-    c.cur = _fmtCalc(_numCalc(c.cur) / 100); c.fresh = true;
-  }else if(k === '='){
-    // Выход из скрытого режима: код и «равно». Сначала проверяем его, потом
-    // считаем — иначе код превратился бы в число на экране.
-    if(c.cur.replace(/\D/g, '') === PNC_CODE){
-      _calc = {acc: null, op: null, cur: '0', fresh: true};
-      calcPaint();
-      panicSet(false);
-      return;
-    }
-    if(c.op !== null && c.acc !== null){
-      c.cur = _fmtCalc(CALC_FN[c.op](c.acc, _numCalc(c.cur)));
-      c.acc = null; c.op = null; c.fresh = true;
-    }
-  }else{
-    if(c.op !== null && c.acc !== null && !c.fresh){
-      c.cur = _fmtCalc(CALC_FN[c.op](c.acc, _numCalc(c.cur)));
-    }
-    c.acc = _numCalc(c.cur); c.op = k; c.fresh = true;
+function gmInit(){
+  const c = document.getElementById('gmC');
+  if(!c.dataset.ready){
+    c.dataset.ready = '1';
+    document.querySelectorAll('.gm-b').forEach(b => {
+      const act = () => gmAct(b.dataset.a);
+      b.addEventListener('click', act);
+    });
+    // Долгое нажатие на название — выход. Чужой человек название не держит, а
+    // водитель делает это одной рукой, не глядя.
+    let t = null;
+    const logo = document.getElementById('gmLogo');
+    const down = () => { t = setTimeout(() => { _tap('ok'); panicSet(false); }, 2000); };
+    const up = () => { clearTimeout(t); };
+    logo.addEventListener('touchstart', down, {passive:true});
+    logo.addEventListener('mousedown', down);
+    ['touchend','touchcancel','mouseup','mouseleave'].forEach(e =>
+      logo.addEventListener(e, up));
   }
-  calcPaint();
+  gmFit();
+  if(!GM) gmStart(); else gmPaint();
+  window.addEventListener('resize', gmFit);
 }
 
-const _numCalc = v => parseFloat(String(v).replace(',', '.')) || 0;
-function _fmtCalc(n){
-  if(!isFinite(n)) return 'Ошибка';
-  const s = Math.abs(n) >= 1e15 ? n.toExponential(6)
-          : String(Math.round(n * 1e10) / 1e10);
-  return s.replace('.', ',');
+function gmFit(){
+  const c = document.getElementById('gmC');
+  const box = c.parentElement.getBoundingClientRect();
+  if(!box.height) return;
+  _gmCell = Math.floor(Math.min(box.width / GM_W, box.height / GM_H));
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
+  c.style.width = (_gmCell * GM_W) + 'px';
+  c.style.height = (_gmCell * GM_H) + 'px';
+  c.width = _gmCell * GM_W * dpr;
+  c.height = _gmCell * GM_H * dpr;
+  c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+  if(GM) gmPaint();
+}
+
+function gmStart(){
+  document.getElementById('gmOver').classList.remove('show');
+  GM = {grid: Array.from({length: GM_H}, () => Array(GM_W).fill(0)),
+        p: null, next: gmRand(), score: 0, lines: 0, level: 1,
+        drop: 0, speed: 800, over: false, last: 0};
+  gmSpawn();
+  gmStats();
+  if(_gmRaf) cancelAnimationFrame(_gmRaf);
+  GM.last = 0;
+  _gmRaf = requestAnimationFrame(gmLoop);
+}
+
+const gmRand = () => {
+  const i = Math.floor(Math.random() * GM_PIECES.length);
+  return {sh: GM_PIECES[i].map(r => r.slice()), c: i + 1};
+};
+
+function gmSpawn(){
+  const n = GM.next;
+  GM.next = gmRand();
+  GM.p = {sh: n.sh, c: n.c, x: Math.floor((GM_W - n.sh[0].length) / 2), y: 0};
+  if(gmHit(GM.p.sh, GM.p.x, GM.p.y)) gmEnd();
+}
+
+function gmHit(sh, x, y){
+  for(let r = 0; r < sh.length; r++)
+    for(let k = 0; k < sh[r].length; k++){
+      if(!sh[r][k]) continue;
+      const nx = x + k, ny = y + r;
+      if(nx < 0 || nx >= GM_W || ny >= GM_H) return true;
+      if(ny >= 0 && GM.grid[ny][nx]) return true;
+    }
+  return false;
+}
+
+function gmMerge(){
+  const p = GM.p;
+  p.sh.forEach((row, r) => row.forEach((v, k) => {
+    if(v && p.y + r >= 0) GM.grid[p.y + r][p.x + k] = p.c;
+  }));
+  // Сгоревшие линии: считаем разом, чтобы очки за четыре сразу были больше,
+  // чем за четыре по одной, — так в этой игре и принято.
+  let burned = 0;
+  for(let r = GM_H - 1; r >= 0; r--){
+    if(GM.grid[r].every(v => v)){
+      GM.grid.splice(r, 1);
+      GM.grid.unshift(Array(GM_W).fill(0));
+      burned++; r++;
+    }
+  }
+  if(burned){
+    GM.lines += burned;
+    GM.score += [0, 100, 300, 500, 800][burned] * GM.level;
+    GM.level = 1 + Math.floor(GM.lines / 10);
+    GM.speed = Math.max(90, 800 - (GM.level - 1) * 70);
+    _tap('light');
+    gmStats();
+  }
+  gmSpawn();
+}
+
+function gmStats(){
+  _setText('gmScore', String(GM.score));
+  _setText('gmLines', String(GM.lines));
+  _setText('gmLevel', String(GM.level));
+}
+
+function gmEnd(){
+  GM.over = true;
+  let best = 0;
+  try{ best = parseInt(localStorage.getItem('bf_best') || '0', 10) || 0; }catch(e){}
+  if(GM.score > best){
+    best = GM.score;
+    try{ localStorage.setItem('bf_best', String(best)); }catch(e){}
+  }
+  _setText('gmBest', `Счёт ${GM.score} · рекорд ${best}`);
+  document.getElementById('gmOver').classList.add('show');
+}
+
+function gmAct(a){
+  if(!GM || GM.over) return;
+  const p = GM.p;
+  if(a === 'left'  && !gmHit(p.sh, p.x - 1, p.y)) p.x--;
+  if(a === 'right' && !gmHit(p.sh, p.x + 1, p.y)) p.x++;
+  if(a === 'rot'){
+    const r = p.sh[0].map((_, i) => p.sh.map(row => row[i]).reverse());
+    // Пристенное вращение: у стены фигура сдвигается, а не отказывается
+    // крутиться. Без этого игра ощущается сломанной.
+    for(const dx of [0, -1, 1, -2, 2]){
+      if(!gmHit(r, p.x + dx, p.y)){ p.sh = r; p.x += dx; break; }
+    }
+  }
+  if(a === 'drop'){
+    while(!gmHit(p.sh, p.x, p.y + 1)) p.y++;
+    gmMerge();
+  }
+  _tap('sel');
+  gmPaint();
+}
+
+function gmLoop(ts){
+  _gmRaf = requestAnimationFrame(gmLoop);
+  if(!GM || GM.over) return;
+  if(!GM.last) GM.last = ts;
+  if(ts - GM.last >= GM.speed){
+    GM.last = ts;
+    if(!gmHit(GM.p.sh, GM.p.x, GM.p.y + 1)) GM.p.y++;
+    else gmMerge();
+  }
+  gmPaint();
+}
+
+function gmPaint(){
+  const c = document.getElementById('gmC');
+  if(!c || !_gmCell || !GM) return;
+  const g = c.getContext('2d'), s = _gmCell;
+  g.clearRect(0, 0, GM_W * s, GM_H * s);
+  // Сетка поля — чуть заметная: без неё пустое поле выглядит как заливка.
+  g.strokeStyle = 'rgba(255,255,255,.04)'; g.lineWidth = 1;
+  for(let x = 1; x < GM_W; x++){ g.beginPath(); g.moveTo(x*s, 0); g.lineTo(x*s, GM_H*s); g.stroke(); }
+  for(let y = 1; y < GM_H; y++){ g.beginPath(); g.moveTo(0, y*s); g.lineTo(GM_W*s, y*s); g.stroke(); }
+  const cell = (x, y, ci) => {
+    g.fillStyle = GM_COLORS[ci - 1] || '#5ad1ff';
+    g.fillRect(x*s + 1, y*s + 1, s - 2, s - 2);
+    g.fillStyle = 'rgba(255,255,255,.22)';
+    g.fillRect(x*s + 1, y*s + 1, s - 2, Math.max(2, s * .18));
+  };
+  GM.grid.forEach((row, y) => row.forEach((v, x) => { if(v) cell(x, y, v); }));
+  if(GM.p && !GM.over){
+    // Тень падения: видно, куда встанет фигура. Есть в любой современной
+    // падалке, и её отсутствие бросается в глаза быстрее всего.
+    let gy = GM.p.y;
+    while(!gmHit(GM.p.sh, GM.p.x, gy + 1)) gy++;
+    g.fillStyle = 'rgba(255,255,255,.09)';
+    GM.p.sh.forEach((row, r) => row.forEach((v, k) => {
+      if(v) g.fillRect((GM.p.x+k)*s + 1, (gy+r)*s + 1, s - 2, s - 2);
+    }));
+    GM.p.sh.forEach((row, r) => row.forEach((v, k) => {
+      if(v && GM.p.y + r >= 0) cell(GM.p.x + k, GM.p.y + r, GM.p.c);
+    }));
+  }
 }
 
 // ══════════════════════════════════════════════════════════════════════════
@@ -3583,37 +3791,105 @@ function pickClose(){
   renderLines();
 }
 
+// Каталог — сто двадцать позиций, а водитель у двери ищет одну. Поэтому здесь
+// три вещи, которых не было: полки, счётчик прямо в строке и итог на кнопке.
+//
+// Полки (Водка, Виски, Пиво…) режут список одним касанием — искать по буквам
+// одной рукой, держа пакет, неудобно. Счётчик в строке избавляет от возврата
+// назад ради количества: набрал три бутылки не выходя. А кнопка внизу говорит,
+// что уже набрано, — иначе после пяти касаний непонятно, что получилось.
+let PK_CAT = '';
+
 function pickRender(){
   if(!CATALOG) return;
   const q = (document.getElementById('edQ').value || '').trim().toLowerCase();
-  const list = CATALOG.items.filter(p => !q || p.name.toLowerCase().includes(q));
+
+  // Полки показываем только когда не ищут: при поиске они врут — в них
+  // остаются категории, которых в найденном нет.
+  const cats = document.getElementById('edCats');
+  if(q){ cats.innerHTML = ''; }
+  else{
+    const all = [];
+    CATALOG.items.forEach(p => { if(p.cat && !all.includes(p.cat)) all.push(p.cat); });
+    cats.innerHTML = [['', 'Всё']].concat(all.map(c => [c, c])).map(([v, t]) =>
+      `<button class="pk-c ${PK_CAT === v ? 'on' : ''}" onclick="pickCat('${esc(v)}')">${esc(t)}</button>`).join('');
+  }
+
+  const list = CATALOG.items.filter(p =>
+    (!q || p.name.toLowerCase().includes(q)) && (q || !PK_CAT || p.cat === PK_CAT));
   let html = '', cat = null;
-  for(const p of list.slice(0, 160)){
-    if(p.cat !== cat){ cat = p.cat; html += `<div class="ed-cat">${esc(cat || '—')}</div>`; }
-    // Пиво продаётся пачками: спросить сразу дешевле, чем потом пересчитывать.
-    const btns = p.pack
-      ? `<button onclick="pickAdd('${p.id}',12)">×12 · ${p.p12}</button>
-         <button onclick="pickAdd('${p.id}',24)">×24 · ${p.p24}</button>`
-      : `<button onclick="pickAdd('${p.id}',0)">${svg(ICO.plus, 14)}</button>`;
-    html += `<div class="ed-i">
-      <div class="ed-i-b"><div class="ed-i-n">${esc(p.name)}</div>
-        <div class="ed-i-p">${p.pack ? 'пачка' : p.price + ' AED'}</div></div>
-      ${btns}</div>`;
+  for(const p of list.slice(0, 200)){
+    if(!PK_CAT && p.cat !== cat){ cat = p.cat; html += `<div class="ed-cat">${esc(cat || '—')}</div>`; }
+    html += pickRow(p);
   }
   document.getElementById('edCat').innerHTML = html ||
     '<div class="empty" style="padding:18px">Ничего не нашлось</div>';
+  pickFoot();
 }
 
-function pickAdd(pid, pcs){
+function pickCat(c){
+  PK_CAT = c;
+  pickRender();
+  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+  const l = document.getElementById('edCat'); if(l) l.scrollTop = 0;
+}
+
+// Строка позиции. Пока не набрана — цена и «плюс». Набрана — счётчик: то же
+// место, тот же размер, меняется только содержимое.
+function pickRow(p){
+  const line = pcs => EDIT_LINES.find(l => l.id === p.id && (l.pcs || 0) === (pcs || 0));
+  const step = (pcs, label) => {
+    const l = line(pcs);
+    return l && l.qty > 0
+      ? `<span class="pk-st">
+           <button onclick="pickStep('${p.id}',${pcs || 0},-1)">${svg(ICO.minus, 14)}</button>
+           <b>${l.qty}</b>
+           <button onclick="pickStep('${p.id}',${pcs || 0},1)">${svg(ICO.plus, 14)}</button>
+         </span>`
+      : `<button class="pk-add" onclick="pickStep('${p.id}',${pcs || 0},1)">${
+           label || svg(ICO.plus, 15)}</button>`;
+  };
+  // Пиво продаётся пачками: спросить сразу дешевле, чем потом пересчитывать.
+  const right = p.pack
+    ? step(12, `×12 · ${p.p12}`) + step(24, `×24 · ${p.p24}`)
+    : step(0, '');
+  const has = p.pack ? (line(12) || line(24)) : line(0);
+  return `<div class="ed-i${has ? ' has' : ''}">
+    <div class="ed-i-b"><div class="ed-i-n">${esc(p.name)}</div>
+      <div class="ed-i-p">${p.pack ? 'пачка' : p.price + ' AED'}</div></div>
+    ${right}</div>`;
+}
+
+function pickStep(pid, pcs, d){
   const p = CATALOG.items.find(x => x.id === pid);
   if(!p) return;
   const price = pcs === 12 ? p.p12 : (pcs === 24 ? p.p24 : p.price);
-  const ex = EDIT_LINES.find(l => l.id === pid && (l.pcs || 0) === (pcs || 0));
-  if(ex) ex.qty++;
-  else EDIT_LINES.push({id: pid, name: p.name, qty: 1, was: 0, price,
-                        ...(pcs ? {pcs} : {})});
-  toast(`${p.name.length > 20 ? p.name.slice(0, 19) + '…' : p.name} добавлен`);
-  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+  const i = EDIT_LINES.findIndex(l => l.id === pid && (l.pcs || 0) === (pcs || 0));
+  if(i < 0){
+    if(d < 0) return;
+    EDIT_LINES.push({id: pid, name: p.name, qty: 1, was: 0, price,
+                     ...(pcs ? {pcs} : {})});
+  }else{
+    EDIT_LINES[i].qty = Math.max(0, EDIT_LINES[i].qty + d);
+    // Позицию, которой не было в заказе и которую свели к нулю, убираем совсем:
+    // пустая строка в чеке — это мусор, а не «ноль штук».
+    if(EDIT_LINES[i].qty === 0 && !EDIT_LINES[i].was) EDIT_LINES.splice(i, 1);
+  }
+  _tap('light');
+  pickRender();
+}
+
+// Кнопка внизу отвечает за то, что произошло, пока водитель тыкал: сколько
+// бутылок в заказе сейчас и на сколько денег.
+function pickFoot(){
+  const b = document.getElementById('pkDone'); if(!b) return;
+  const live = EDIT_LINES.filter(l => l.qty > 0);
+  const n = live.reduce((a, l) => a + l.qty, 0);
+  const sum = live.reduce((a, l) => a + l.qty * (l.price || 0), 0);
+  b.innerHTML = n
+    ? `Готово <i style="font-style:normal;opacity:.65">· ${n} ${
+        plural(n,'бутылка','бутылки','бутылок')} · ${fmt(sum)} AED</i>`
+    : 'Готово';
 }
 
 function toggleTag(el, r){

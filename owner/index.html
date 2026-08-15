@@ -320,7 +320,14 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 
 
 /* Панель районов: сводка сверху, чипы сортировки, код B1…B5 на карточке. */
-.off-tot{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:2px}
+.off-tot{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:8px;margin-top:2px}
+/* Кнопка порядка стоит в том же ряду, что и цифры, и той же высоты. */
+.off-tot-f{width:46px;border-radius:12px;cursor:pointer;font-family:inherit;
+  display:flex;align-items:center;justify-content:center;color:var(--muted);
+  background:var(--card);border:1px solid var(--border2)}
+.off-tot-f:active{transform:scale(.95)}
+.off-tot-f.on{color:var(--gold2);border-color:rgba(201,169,110,.4);
+  background:rgba(201,169,110,.08)}
 .off-tot-c{background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:10px 10px;min-width:0}
 .off-tot-l{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -1842,16 +1849,6 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 
   <!-- Итог по всем районам: без него карточки — просто пять чисел, не с чем
        сравнить и не видно, складываются ли они в то, что на «Обзоре». -->
-  <div class="off-tot" id="offTotals" style="display:none">
-    <div class="off-tot-c"><div class="off-tot-l">Заказы</div><div class="off-tot-v" id="offTotOrd">—</div></div>
-    <div class="off-tot-c"><div class="off-tot-l">Ср. чек</div><div class="off-tot-v" id="offTotAvg" data-aed="">—</div></div>
-    <div class="off-tot-c"><div class="off-tot-l">Ср. время</div><div class="off-tot-v" id="offTotMin">—</div></div>
-  </div>
-
-
-  <!-- Люди меняются местами чаще, чем выходит релиз: отпуск, подмена, новый
-       человек. Вход стоит сразу под цифрами района: там и возникает вопрос,
-       кто за них отвечает. -->
   <button class="crew-entry" id="crewEntry" onclick="crewOpen()">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
          stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
@@ -1862,16 +1859,24 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     <span class="crew-e-go">›</span>
   </button>
 
-  <div class="sect" style="margin-top:16px"><div class="sect-t">Районы</div><div class="sect-s" id="offSub">—</div></div>
-  <!-- Порядок B1…B5 — рабочий, поэтому он же и по умолчанию. Остальные
-       сортировки нужны, чтобы быстро увидеть отстающих. -->
-  <div class="off-sort" id="offSort">
-    <button class="off-s on" data-s="code">B1–B5</button>
-    <button class="off-s" data-s="rev">Выручка</button>
-    <button class="off-s" data-s="orders">Заказы</button>
-    <button class="off-s" data-s="min">Время</button>
-    <button class="off-s" data-s="rating">Рейтинг</button>
+  <div class="off-tot" id="offTotals" style="display:none">
+    <div class="off-tot-c"><div class="off-tot-l">Заказы</div><div class="off-tot-v" id="offTotOrd">—</div></div>
+    <div class="off-tot-c"><div class="off-tot-l">Ср. чек</div><div class="off-tot-v" id="offTotAvg" data-aed="">—</div></div>
+    <div class="off-tot-c"><div class="off-tot-l">Ср. время</div><div class="off-tot-v" id="offTotMin">—</div></div>
+    <!-- Порядок районов меняют редко, а пять чипов занимали ряд каждый раз.
+         Кнопка на том же уровне, что и цифры; выбор — списком по касанию. -->
+    <button class="off-tot-f" id="offSortBtn" onclick="offSortPop()" aria-label="Порядок районов">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+           stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 6h16M7 12h10M10 18h4"/></svg>
+    </button>
   </div>
+
+
+  <!-- Люди меняются местами чаще, чем выходит релиз: отпуск, подмена, новый
+       человек. Вход стоит сразу под цифрами района: там и возникает вопрос,
+       кто за них отвечает. -->
+  <div class="sect" style="margin-top:16px"><div class="sect-t">Районы</div><div class="sect-s" id="offSub">—</div></div>
   <div class="off-back" id="offDayNav" style="display:none">
     <button class="dn-b" onclick="dayStep(1)" aria-label="Предыдущий день">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
@@ -7605,16 +7610,37 @@ let OFF_NORM = 25;
 let OFF_SORT = 'code';
 const OFF_SORT_LBL = {code:'порядок B1–B5', rev:'по выручке', orders:'по заказам',
                       min:'по времени доставки', rating:'по рейтингу'};
-(function initOffSort(){
-  const bar = document.getElementById('offSort'); if(!bar) return;
-  bar.addEventListener('click', e=>{
-    const b = e.target.closest('.off-s'); if(!b) return;
-    OFF_SORT = b.dataset.s;
-    bar.querySelectorAll('.off-s').forEach(x=>x.classList.toggle('on', x===b));
-    if(OFF_LAST) renderOffices(OFF_LAST);
-    try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
-  });
-})();
+// Порядок районов меняют редко — держать под него ряд чипов на каждом
+// открытии расточительно. Кнопка рядом с цифрами, выбор — списком.
+function offSortPop(){
+  const btn = document.getElementById('offSortBtn'); if(!btn) return;
+  closePinPop();
+  const back = document.createElement('div');
+  back.className = 'pin-back';
+  back.addEventListener('click', closePinPop);
+  const pop = document.createElement('div');
+  pop.className = 'pin-pop';
+  pop.innerHTML = Object.keys(OFF_SORT_LBL).map(k => `
+    <button onclick="offSortSet('${k}')">
+      <span>${escS(OFF_SORT_LBL[k])}</span>
+      ${k === OFF_SORT ? '<i style="margin-left:auto;color:var(--gold2)">✓</i>' : ''}
+    </button>`).join('');
+  document.body.append(back, pop);
+  const r = btn.getBoundingClientRect(), w = pop.offsetWidth, h = pop.offsetHeight;
+  pop.style.left = Math.max(10, Math.min(r.right - w, window.innerWidth - w - 10)) + 'px';
+  pop.style.top = (r.bottom + 8 + h < window.innerHeight - 10
+                   ? r.bottom + 8 : Math.max(10, r.top - h - 8)) + 'px';
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+
+function offSortSet(k){
+  closePinPop();
+  OFF_SORT = k;
+  const b = document.getElementById('offSortBtn');
+  if(b) b.classList.toggle('on', k !== 'code');    // не по умолчанию — видно сразу
+  if(OFF_LAST) renderOffices(OFF_LAST);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
 let OFF_LAST = null;
 
 // Свой оттенок каждому району — чтобы взгляд цеплялся за строку, а не за текст.

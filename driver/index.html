@@ -1300,7 +1300,22 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 <script src="api.js"></script>
 <script>
 const tg = window.Telegram?.WebApp;
-try{ tg.ready(); tg.expand(); tg.setHeaderColor?.('#000006'); tg.setBackgroundColor?.('#000006'); }catch(e){}
+try{
+  tg.ready(); tg.expand();
+  // Настоящий полный экран, без шапки телеграма. Без проверки версии — просто
+  // просим: на части телефонов запрос, посланный слишком рано, теряется, поэтому
+  // повторяем, пока не сработает.
+  const wantFS = () => { try{ if(tg.requestFullscreen && !tg.isFullscreen) tg.requestFullscreen(); }catch(e){} };
+  wantFS(); setTimeout(wantFS, 300); setTimeout(wantFS, 1000); setTimeout(wantFS, 2500);
+  tg.setHeaderColor?.('#000006'); tg.setBackgroundColor?.('#000006');
+  tg.setBottomBarColor?.('#000006');
+  // Спрашиваем перед закрытием: смахнуть приложение вниз посреди набранного
+  // расхода или недописанного сообщения оператору проще, чем кажется.
+  tg.enableClosingConfirmation?.();
+  // Свайп вниз по содержимому больше не закрывает окно — на экране приёмки и в
+  // переписке он означает прокрутку, а не выход.
+  tg.disableVerticalSwipes?.();
+}catch(e){}
 
 let ME = null, ORDERS = null, EXP = null, HIST = null;
 let TAB = 'orders', EDIT_OID = null, EDIT_TAGS = [];

@@ -725,27 +725,52 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 
 /* Панель учёта: входы плитками. Четыре строки во всю ширину оставляли
    полэкрана пустым и читались как список настроек, а не как панель. */
-/* Экран проверки: выбор водителя, лента бутылок, итог. */
-.chk-note{font-size:12px;color:var(--muted);line-height:1.5;padding:11px 13px;margin-bottom:4px;
-  border-radius:12px;background:var(--card);border:1px solid var(--border2)}
-.chk-grp{display:flex;align-items:center;gap:9px;margin:14px 2px 7px}
-.chk-code{width:30px;height:30px;flex:0 0 auto;border-radius:9px;display:flex;align-items:center;
-  justify-content:center;font-size:11px;font-weight:700;color:var(--gold2);
-  background:var(--card2);border:1px solid rgba(201,169,110,.22)}
-.chk-grp-n{font-size:12px;font-weight:700}
-.chk-row{display:flex;flex-wrap:wrap;gap:7px}
-.chk-drv{padding:10px 14px;border-radius:12px;cursor:pointer;font-family:inherit;
-  background:var(--card);border:1px solid var(--border2);color:var(--text);
-  font-size:13px;font-weight:600;text-align:left;line-height:1.3}
-.chk-drv i{display:block;font-style:normal;font-size:9.5px;font-weight:600;color:var(--muted);
-  margin-top:2px}
-.chk-drv:active{transform:scale(.97)}
-.chk-drv.bad{border-color:rgba(224,85,85,.45)}
-.chk-drv.bad i{color:var(--dn)}
-.chk-free{width:100%;margin-top:14px;padding:13px;border-radius:12px;cursor:pointer;
-  font-family:inherit;font-size:12.5px;font-weight:600;color:var(--sub);
-  background:var(--card2);border:1px dashed var(--border2)}
-.chk-free:active{transform:scale(.98)}
+/* Экран проверки. Всё сводится к одному вопросу — кого проверяем, — поэтому
+   выбор занимает экран, а не делит его с объяснениями. */
+.chk-free{display:flex;align-items:center;gap:12px;width:100%;margin:2px 0 4px;padding:13px 14px;
+  border-radius:14px;cursor:pointer;font-family:inherit;text-align:left;color:var(--text);
+  background:linear-gradient(135deg,rgba(201,169,110,.13),rgba(201,169,110,.04));
+  border:1px solid rgba(201,169,110,.3)}
+.chk-free:active{transform:scale(.99)}
+.chk-free-i{width:38px;height:38px;flex:none;border-radius:12px;display:grid;place-items:center;
+  color:var(--gold2);background:var(--card2);border:1px solid rgba(201,169,110,.25)}
+.chk-free-b{flex:1;min-width:0}
+.chk-free-b b{display:block;font-size:14px;font-weight:700}
+.chk-free-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px}
+.chk-free-go{color:var(--muted);font-size:17px}
+
+/* Сетка водителей: все плитки одного размера, поэтому ряды ровные, а район —
+   меткой в углу, а не отдельным заголовком на пол-экрана. */
+.chk-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
+/* Нечётное число водителей оставляло последнюю плитку сиротой в полряда —
+   она занимает ряд целиком, и сетка снова выглядит собранной. */
+.chk-t.wide{grid-column:span 2}
+.chk-t{position:relative;display:flex;flex-direction:column;justify-content:flex-end;
+  min-height:66px;padding:10px 11px;border-radius:13px;cursor:pointer;font-family:inherit;
+  text-align:left;background:var(--card);border:1px solid var(--border2);color:var(--text)}
+.chk-t:active{transform:scale(.98)}
+.chk-t-d{position:absolute;top:9px;left:11px;font-size:9px;font-weight:800;letter-spacing:.6px;
+  color:var(--gold2);opacity:.75}
+.chk-t-n{font-size:14px;font-weight:700;line-height:1.15;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.chk-t-s{font-size:10.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.chk-t.bad{border-color:rgba(224,85,85,.5);background:var(--dn-soft)}
+.chk-t.bad .chk-t-s{color:var(--dn);font-weight:700}
+.chk-t.bad .chk-t-d{color:var(--dn);opacity:1}
+
+/* История: одна строка на проверку — имя, сколько, сколько чужих, когда. */
+.chk-hist{border-radius:13px;overflow:hidden;border:1px solid var(--border2)}
+.chk-h{display:flex;align-items:baseline;gap:9px;padding:10px 12px;background:var(--card);
+  border-top:1px solid var(--border2);font-size:13px}
+.chk-h:first-child{border-top:none}
+.chk-h.bad{background:var(--dn-soft)}
+.chk-h-n{flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chk-h-v{font-family:'DM Sans',sans-serif;font-weight:700;color:var(--gold2)}
+.chk-h-v i{font-style:normal;font-size:9px;color:var(--muted);margin-left:2px}
+.chk-h-b{padding:2px 7px;border-radius:999px;font-size:10px;font-weight:800;
+  background:rgba(224,85,85,.16);color:var(--dn)}
+.chk-h-t{font-size:10.5px;color:var(--muted);white-space:nowrap}
 .chk-item{padding:10px 12px;border-radius:11px;margin-bottom:6px;
   background:var(--card);border:1px solid var(--border2);border-left:3px solid var(--up)}
 .chk-item.warn{border-left-color:var(--warn)}
@@ -10092,41 +10117,57 @@ function chkHome(){
   const flags = {};
   (ACC_CHK.drivers || []).forEach(d => flags[d.driver] = d);
   const t = ACC_CHK.totals || {};
+  const checks = ACC_CHK.checks || [];
   _setText('accSub', t.checks
-    ? `${t.checks} ${pluralize(t.checks,'проверка','проверки','проверок')} за 30 дней`
+    ? `${t.checks} ${pluralize(t.checks,'проверка','проверки','проверок')} · ${
+        fmt(t.bottles)} ${pluralize(t.bottles,'бутылка','бутылки','бутылок')} за 30 дней`
     : 'проверок ещё не было');
 
+  // Водители одной сеткой, а не пятью группами с заголовками. Район — меткой
+  // внутри плитки: он подсказка, а не раздел, и ради него не нужен ряд на пол-
+  // экрана. Плитки одного размера, поэтому сетка читается за один взгляд, а
+  // не собирается глазами из рваных строк.
+  const names = (CHK_DRV.districts || []).flatMap(d =>
+    (d.drivers || []).map(n => ({n, code: d.code})));
+  const tiles = names.map(({n, code}, i) => {
+    const last = (i === names.length - 1) && (names.length % 2 === 1);
+      const f = flags[n] || {};
+      const bad = f.bad || 0;
+      return `<button class="chk-t${bad ? ' bad' : ''}${last ? ' wide' : ''}"
+        onclick="chkStart('${escS(n)}')">
+        <span class="chk-t-d">${escS(code)}</span>
+        <span class="chk-t-n">${escS(n)}</span>
+        <span class="chk-t-s">${bad
+          ? `не наших ${bad}`
+          : (f.checks ? `${f.checks} ${pluralize(f.checks,'проверка','проверки','проверок')}`
+                      : 'не проверялся')}</span>
+      </button>`;
+  }).join('');
+
+  // Последние проверки — три штуки: они отвечают на «что было вчера», а не
+  // заменяют журнал. Весь список открывается отдельно.
+  const hist = checks.slice(0, 3).map(c => `
+    <div class="chk-h ${c.bad ? 'bad' : ''}">
+      <span class="chk-h-n">${escS(c.driver || 'Свободная')}</span>
+      <span class="chk-h-v">${c.total}<i>шт</i></span>
+      ${c.bad ? `<span class="chk-h-b">${c.bad}</span>` : ''}
+      <span class="chk-h-t">${escS(_when(c.at))}</span>
+    </div>`).join('');
+
   document.getElementById('accMid').innerHTML = `
-    <div class="chk-note">Сканируем бутылки в машине. Наша — покажем, что это и
-      когда заведена. Не наша — красный флаг и отметка на водителе.</div>
+    <button class="chk-free" onclick="chkStart('')">
+      <span class="chk-free-i">${IC('search',18)}</span>
+      <span class="chk-free-b"><b>Свободная проверка</b><i>без привязки к водителю</i></span>
+      <span class="chk-free-go">›</span>
+    </button>
 
-    <div class="scan-sect"><span>Кого проверяем</span></div>
-    ${(CHK_DRV.districts || []).filter(d => (d.drivers||[]).length).map(d => `
-      <div class="chk-grp"><span class="chk-code">${escS(d.code)}</span>
-        <span class="chk-grp-n">${escS(d.name)}</span></div>
-      <div class="chk-row">${d.drivers.map(n => {
-        const f = flags[n];
-        return `<button class="chk-drv${f && f.bad ? ' bad' : ''}" onclick="chkStart('${escS(n)}')">
-          ${escS(n)}${f && f.bad ? `<i>${f.bad} не наших</i>`
-            : (f ? `<i>${f.checks} ${pluralize(f.checks,'проверка','проверки','проверок')}</i>` : '')}
-        </button>`; }).join('')}</div>`).join('')}
+    <div class="scan-sect"><span>Кого проверяем</span><i>${(ACC_CHK.drivers||[]).filter(d=>d.bad).length
+      ? (ACC_CHK.drivers||[]).filter(d=>d.bad).length + ' с флажком' : ''}</i></div>
+    <div class="chk-grid">${tiles}</div>
 
-    <button class="chk-free" onclick="chkStart('')">Свободная проверка — без водителя</button>
-
-    <div class="scan-sect"><span>История</span><i>${(ACC_CHK.checks||[]).length}</i></div>
-    <div class="scan-feed">${(ACC_CHK.checks || []).length
-      ? ACC_CHK.checks.map(c => `
-        <div class="chk-hist ${c.bad ? 'bad' : (c.warn ? 'warn' : '')}">
-          <div class="chk-hist-t">
-            <b>${escS(c.driver || 'Свободная проверка')}</b>
-            <span>${escS(_when(c.at))}</span>
-          </div>
-          <div class="chk-hist-s">${c.total} ${pluralize(c.total,'бутылка','бутылки','бутылок')}${
-            c.bad ? ` · <b class="bad">не наших ${c.bad}</b>` : ''}${
-            c.warn ? ` · вопросов ${c.warn}` : ''}${
-            c.by_name ? ` · ${escS(c.by_name)}` : ''}</div>
-        </div>`).join('')
-      : '<div class="scan-empty">Проверок ещё не было</div>'}</div>`;
+    ${checks.length ? `<div class="scan-sect"><span>Последние проверки</span>${
+        checks.length > 3 ? `<i>${checks.length} всего</i>` : ''}</div>
+      <div class="chk-hist">${hist}</div>` : ''}`;
 }
 
 // Дата в истории: сегодняшнее время, вчерашнее «вчера», дальше — число.

@@ -2005,8 +2005,35 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     <div class="ac-btn-lbl"><div class="ac-btn-t">Рассылка</div><div class="ac-btn-s">Промо всем клиентам · RU / EN · с картинкой</div></div>
     <span class="ac-btn-arrow">›</span>
   </button>
-  <!-- Акции — строкой, реклама — карточкой: у неё есть что показать до входа. -->
+  <!-- Рассылка — действие, поэтому строка; под ней живой охват, который нужен
+       до нажатия, а не описание того, как всё устроено. -->
   <div id="mktEntries"></div>
+
+  <!-- Акции — отчёт: у них есть числа, ради которых сюда и ходят. Значит и
+       форма отчёта, как у рекламы и каталога. -->
+  <div class="cat-block" id="giftBlock">
+    <div class="cat-block-hdr" id="giftBlockHdr">
+      <div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+        stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7"/></svg></div>
+      <div class="cat-block-title">
+        <div class="cat-block-n">Акции</div>
+        <div class="cat-block-sub" id="giftBlockSub">Загрузка…</div>
+      </div>
+      <svg class="cat-block-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="cat-block-kpis">
+      <div class="cat-kpi"><div class="cat-kpi-v" id="giftKpiBottles">—</div><div class="cat-kpi-l">Бутылок</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v" id="giftKpiAed">—</div><div class="cat-kpi-l">В этих заказах</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v" id="giftKpiAvg">—</div><div class="cat-kpi-l">Средний чек</div></div>
+    </div>
+    <div class="cat-block-expand">
+      <div class="cat-block-sect-t">Правило</div>
+      <div id="giftBlockRule" class="cat-block-empty"></div>
+      <div class="cat-block-sect-t">Последние подарки</div>
+      <div id="giftBlockList"></div>
+      <button class="cat-block-open" onclick="event.stopPropagation();accOpen('gift')">Открыть акции →</button>
+    </div>
+  </div>
 
   <div class="sect"><div class="sect-t">PR</div></div>
   <div class="cat-block" id="promoBlock">
@@ -3671,7 +3698,7 @@ document.querySelectorAll('.tb').forEach(btn=>{
       if(!ACC_PERIOD) accLoadSummaries();
     }
     if(pg === 'more' && window.ownerApi){
-      mktRender(); promoBlockRender();
+      mktRender(); promoBlockRender(); giftBlockRender(); bcastAudience();
       if(!ACC_PERIOD) accLoadSummaries();
     }
     try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
@@ -5871,10 +5898,7 @@ function stkResult(res){
 // Одна страница со всем сразу превращается в простыню: чтобы отметить водителя,
 // пришлось бы прокручивать мимо заявки и склада. Поэтому здесь только входы с
 // короткой сводкой по каждому, а работа — внутри раздела.
-const MKT = {
-  gift:  {t:'Акции',   s:'что раздали бесплатно',
-    ico:'<path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7"/>'},
-};
+
 const ACC = [
   {id:'expenses', t:'Расходы водителей', s:'питание и разовые траты',
    ico:'<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'},
@@ -5988,26 +6012,73 @@ function chkBigSub(){
 
 // Реклама и акции стоят на «Ещё» рядом с рассылкой, но открывают те же
 // разделы, что и раньше: переезжает вход, а не сам раздел.
+// Рассылка — единственное здесь действие, и перед ним важен один факт:
+// скольким людям это уйдёт. Описание того, что бывает картинка и два языка,
+// человек прочтёт внутри — до нажатия оно ничего не решает.
+let BCAST_AUD = null;
 function mktRender(){
   const box = document.getElementById('mktEntries'); if(!box) return;
-  const sub = {
-    // Подарок мерим не бутылками, а тем, что он принёс: сто отданных бутылок
-    // при чеке в полторы тысячи и при чеке в тысячу — разные сто бутылок.
-    gift:  ACC_GIFT ? (ACC_GIFT.totals.bottles
-             ? `${fmt(ACC_GIFT.totals.bottles)} бутылок · ${fmt(ACC_GIFT.totals.aed)} AED · чек ${fmt(ACC_GIFT.totals.avg_aed)}`
-             : 'пока ни одной бутылки')
-           : MKT.gift.s,
-  };
-  box.innerHTML = Object.keys(MKT).map(id => `
-    <button class="all-clients-btn" onclick="accOpen('${id}')" style="margin:8px 0 0">
-      <div class="ac-btn-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"
-        stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-        stroke-linejoin="round">${MKT[id].ico}</svg></div>
-      <div class="ac-btn-lbl"><div class="ac-btn-t">${MKT[id].t}</div>
-        <div class="ac-btn-s">${escS(sub[id])}</div></div>
-      <span class="ac-btn-arrow">›</span>
-    </button>`).join('');
+  const a = BCAST_AUD;
+  const sub = a
+    ? `${fmt(a.all)} ${pluralize(a.all,'получатель','получателя','получателей')}`
+      + (a.ru || a.en ? ` · ${fmt(a.ru)} RU · ${fmt(a.en)} EN` : '')
+      + (a.banned ? ` · ${a.banned} заблокировали бота` : '')
+    : 'промо всем клиентам · RU / EN · с картинкой';
+  box.innerHTML = '';
+  const sub2 = document.querySelector('#pg-more .all-clients-btn .ac-btn-s');
+  if(sub2) sub2.textContent = sub;
 }
+
+// Охват спрашиваем один раз за сеанс: он меняется медленно, а строка нужна
+// сразу при открытии страницы.
+async function bcastAudience(){
+  if(BCAST_AUD || !window.ownerApi) return;
+  try{ BCAST_AUD = await ownerApi.ownerFetch('/api/owner/broadcast/audience'); }
+  catch(e){ return; }
+  mktRender();
+}
+
+// Акции: сколько бутылок отдали и что эти заказы принесли. Подарок мерим не
+// бутылками, а тем, что он привёл: сто бутылок при чеке в полторы тысячи и
+// при чеке в тысячу — разные сто бутылок.
+function giftBlockRender(){
+  const block = document.getElementById('giftBlock'); if(!block) return;
+  const d = ACC_GIFT, t = (d && d.totals) || null;
+  _setText('giftBlockSub', !d ? 'загрузка…'
+    : (t.bottles ? `${fmt(t.bottles)} ${pluralize(t.bottles,'бутылка','бутылки','бутылок')} за ${d.days} дней`
+                 : 'за 30 дней ни одной бутылки'));
+  _setText('giftKpiBottles', t ? fmt(t.bottles) : '—');
+  _setText('giftKpiAed',     t ? fmt(t.aed) : '—');
+  _setText('giftKpiAvg',     t ? fmt(t.avg_aed) : '—');
+
+  const rule = document.getElementById('giftBlockRule');
+  if(rule) rule.textContent = (d && d.gift)
+    ? `${d.gift.name || 'подарок'} в заказ от ${fmt(d.gift.min_aed)} AED`
+      + (d.gift.unit_aed ? ` · себестоимость ${fmt(d.gift.unit_aed)} AED за штуку` : '')
+    : 'правило не задано';
+
+  const list = document.getElementById('giftBlockList');
+  if(list) list.innerHTML = (d && (d.orders_list||[]).length)
+    ? d.orders_list.slice(0,3).map(r => `<div class="cat-mini-row">
+        <div class="cat-mini-av">${escS(String(r.qty||1))}</div>
+        <div class="cat-mini-body">
+          <div class="cat-mini-n">${escS(r.name || r.order_id || 'заказ')}</div>
+          <div class="cat-mini-sub">${escS(_when(r.day || r.at || ''))}</div>
+        </div>
+        <div class="cat-mini-r">${fmt(r.aed||0)}<span class="u">AED</span></div>
+      </div>`).join('')
+    : '<div class="cat-block-empty">Подарков пока не было</div>';
+}
+
+(function initGiftBlock(){
+  const block = document.getElementById('giftBlock');
+  const hdr = document.getElementById('giftBlockHdr');
+  if(!block || !hdr) return;
+  hdr.addEventListener('click', () => {
+    block.classList.toggle('open');
+    try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
+  });
+})();
 
 // Реклама показывает главное не открываясь: сколько принесла, кто пришёл и
 // откуда. Карточка та же, что у каталога, — на «Ещё» их читают подряд.
@@ -6083,7 +6154,7 @@ async function accLoadSummaries(){
   ]);
   ACC_PERIOD = per; ACC_STOCK = st; ACC_ORDER = ord; ACC_PROMO = pr; ACC_GIFT = gf; ACC_QR = qr;
   if(chk) ACC_CHK = chk;
-  accRender(); mktRender(); promoBlockRender();
+  accRender(); mktRender(); promoBlockRender(); giftBlockRender();
 }
 
 function accOpen(id){
@@ -6122,7 +6193,7 @@ function _accClose(){
   document.getElementById('accOv').classList.remove('show');
   ACC_VIEW = null;
   CREW_D = null;
-  accRender(); mktRender(); promoBlockRender();
+  accRender(); mktRender(); promoBlockRender(); giftBlockRender();
 }
 
 // День и период — один раздел, а не два: это одни и те же деньги, просто

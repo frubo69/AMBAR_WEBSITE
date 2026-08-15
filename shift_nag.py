@@ -116,6 +116,15 @@ async def tick(now: datetime = None) -> dict:
     if not (NAG_FROM <= now.hour < NAG_UNTIL):
         return {"skip": "не время", "day": day}
 
+    # Сутки, которые закончились раньше, чем появилась сама кнопка, не
+    # напоминаем: закрыть их было нечем, а человек, разбуженный требованием
+    # сделать то, чего вчера не существовало,в следующий раз просто отключит
+    # уведомления. Первый увиденный день записываем и пропускаем — работать
+    # начинаем со следующей смены.
+    first = await db.shift_nag_since(day)
+    if first and day <= first:
+        return {"skip": "первый день", "day": day}
+
     op_token = os.getenv("OPERATOR_BOT_TOKEN", "")
     drv_token = os.getenv("DRIVER_BOT_TOKEN", "")
     try:

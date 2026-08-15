@@ -2069,6 +2069,22 @@ async def shifts_for_day(day: str) -> dict:
     return {d["district"]: d async for d in cur}
 
 
+async def shift_nag_since(day: str) -> str:
+    """С каких суток напоминания вообще работают.
+
+    Записывается один раз — в первый же проход после появления функции. Всё,
+    что раньше, не напоминаем: закрыть те смены было нечем."""
+    db = _db_or_none()
+    if db is None: return ""
+    doc = await db.shift_days.find_one({"_id": "*:nag"})
+    if doc:
+        return doc.get("since") or ""
+    await db.shift_days.update_one(
+        {"_id": "*:nag"}, {"$setOnInsert": {"since": day, "day": day, "district": "*"}},
+        upsert=True)
+    return day
+
+
 async def shift_day_mark(day: str, field: str) -> bool:
     """Пометить день: «заявку по нему уже собрали». True — пометили мы.
 

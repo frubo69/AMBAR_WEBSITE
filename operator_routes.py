@@ -1119,6 +1119,44 @@ def _chat_new(o: dict, side: str) -> int:
 
 
 @require_operator
+async def handle_driver_chats(request):
+    """Разговоры с водителями — второй лист в «Поддержке».
+
+    Клиенты и водители лежат рядом не случайно: и там и там оператор отвечает
+    на вопрос, и вопрос ждёт. Разница в том, что клиент ждёт у телефона, а
+    водитель — у чужой двери, поэтому его непрочитанное всегда сверху."""
+    districts = await _fresh_districts()
+    people = _people(districts)
+    who = (request.query.get("as") or "").strip()
+    scope = _scope(people, who, districts)
+    rows = []
+    for o in (await db.get_all_orders()).values():
+        chat = o.get("chat") or []
+        if not chat:
+            continue
+        dist = o.get("office_id") or ""
+        if scope and dist not in scope and not (dist == "" and len(scope) == len(districts)):
+            continue
+        last = chat[-1]
+        rows.append({
+            "order_id": o.get("order_id", ""), "driver": o.get("driver", ""),
+            "address": o.get("address", ""), "status": o.get("status", ""),
+            "district": _code_of(dist, districts),
+            "n": len(chat), "unread": _chat_new(o, "operator"),
+            "last": last.get("text", ""), "last_by": last.get("by", ""),
+            "last_at": str(last.get("at") or ""),
+            "kind": next((m.get("kind") for m in reversed(chat) if m.get("kind")), ""),
+            "live": o.get("status") == "approved",
+        })
+    # Сверху непрочитанное, потом живые заказы, потом по свежести.
+    rows.sort(key=lambda r: (not r["unread"], not r["live"], r["last_at"]), reverse=False)
+    rows.sort(key=lambda r: (bool(r["unread"]), r["live"], r["last_at"]), reverse=True)
+    return web.json_response({"chats": rows[:60],
+                              "unread": sum(1 for r in rows if r["unread"])},
+                             headers=CORS_HEADERS)
+
+
+@require_operator
 async def handle_chat_send(request):
     """Ответ водителю по заказу.
 
@@ -2120,6 +2158,8 @@ def setup(app):
     r.add_post("/api/operator/orders/{oid}/driver-req", handle_driver_req)
     r.add_route("OPTIONS", "/api/operator/orders/{oid}/chat", _opt)
     r.add_post("/api/operator/orders/{oid}/chat", handle_chat_send)
+    r.add_route("OPTIONS", "/api/operator/driver-chats", _opt)
+    r.add_get("/api/operator/driver-chats", handle_driver_chats)
     r.add_route("OPTIONS", "/api/operator/support", _opt)
     r.add_get("/api/operator/support", handle_support_list)
     r.add_route("OPTIONS", "/api/operator/support/thread", _opt)

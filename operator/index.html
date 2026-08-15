@@ -463,6 +463,13 @@ a.oc-row:active{background:var(--card2)}
    по ней уже нечего делать, а разбирать список глазами придётся ещё не раз. */
 #shiftList{margin-bottom:16px}
 /* ── разговор с водителем в карточке заказа ───────────────────────────── */
+/* Переключатель листов поддержки: клиенты и водители */
+.sup-seg{display:grid;grid-template-columns:auto auto;gap:4px;margin-left:14px;width:auto}
+.sup-seg .seg-b{padding:8px 16px;white-space:nowrap;position:relative}
+.sup-seg-b{display:inline-flex;align-items:center;justify-content:center;min-width:17px;
+  height:17px;padding:0 5px;margin-left:6px;border-radius:999px;background:var(--dn);
+  color:#fff;font-size:9.5px;font-weight:700;font-style:normal}
+
 .och{margin:14px 0 0;padding:13px;border-radius:var(--r2);background:var(--card);
   border:1px solid var(--border2)}
 .och-l{font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;
@@ -1005,8 +1012,15 @@ a.oc-row:active{background:var(--card2)}
 <div class="sup-ov" id="supOv">
   <div class="sup-hdr">
     <div class="t">Поддержка</div>
+    <!-- Клиенты и водители рядом: и там и там оператор отвечает на вопрос,
+         который ждёт. Разница в том, что водитель ждёт у чужой двери. -->
+    <div class="seg sup-seg">
+      <button class="seg-b on" id="supTabC" onclick="supTab('clients')">Клиенты</button>
+      <button class="seg-b" id="supTabD" onclick="supTab('drivers')">Водители
+        <i class="sup-seg-b" id="supDrvN" style="display:none">0</i></button>
+    </div>
     <div class="sp"></div>
-    <button class="sup-nb" onclick="supNew()">Написать клиенту</button>
+    <button class="sup-nb" id="supNewB" onclick="supNew()">Написать клиенту</button>
     <button class="oc-x" onclick="supClose()" aria-label="Закрыть"><svg viewBox="0 0 24 24"
       width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"
       stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
@@ -2883,12 +2897,77 @@ async function loadSup(){
   if($('supOv').classList.contains('show')) supList();
 }
 
+// ── два листа поддержки ────────────────────────────────────────────────────
+let SUP_TAB = 'clients', DRV_CHATS = null;
+
+function supTab(t){
+  SUP_TAB = t;
+  $('supTabC').classList.toggle('on', t === 'clients');
+  $('supTabD').classList.toggle('on', t === 'drivers');
+  $('supNewB').style.display = t === 'clients' ? '' : 'none';
+  $('supBody').classList.remove('chat');
+  // Разговор с водителем открывается в карточке заказа — правая половина здесь
+  // не пустует зря, а объясняет, куда он денется.
+  const none = $('supNone');
+  if(none) none.textContent = t === 'drivers'
+    ? 'Разговор откроется в карточке заказа' : 'Выберите обращение слева';
+  haptic('sel');
+  if(t === 'drivers'){ loadDrvChats(); } else { supList(); }
+}
+
+async function loadDrvChats(){
+  try{ DRV_CHATS = await opApi.opFetch('/api/operator/driver-chats',{params:{as:curOp}}); }
+  catch(e){ return; }
+  const b = $('supDrvN');
+  if(b){ b.style.display = DRV_CHATS.unread ? '' : 'none'; b.textContent = DRV_CHATS.unread; }
+  if(SUP_TAB === 'drivers') drvList();
+}
+
+const DRV_CASE = {client:'Клиент не отвечает', address:'Не найти адрес',
+                  wait:'Просит подождать', other:'Вопрос по заказу'};
+
+function drvList(){
+  const wrap = $('supList');
+  const rows = (DRV_CHATS && DRV_CHATS.chats) || [];
+  if(!rows.length){
+    wrap.innerHTML = '<div class="sup-empty">Водители пока не писали</div>';
+    return;
+  }
+  const g = [['Ждут ответа', rows.filter(r => r.unread)],
+             ['По активным заказам', rows.filter(r => !r.unread && r.live)],
+             ['История', rows.filter(r => !r.unread && !r.live)]];
+  // Строка та же, что у клиентов: список один, и две разные строки в нём
+  // читались бы как два разных экрана, случайно оказавшихся рядом.
+  wrap.innerHTML = g.filter(([, l]) => l.length).map(([t, l]) =>
+    `<div class="sup-sec">${t} · ${l.length}</div>` + l.map(r => `
+      <button class="sup-t" onclick="drvOpen('${_esc(r.order_id)}')">
+        <div class="n">${r.unread ? '<span class="sup-dot"></span>' : ''}
+          <b>${_esc(r.driver || 'водитель')}</b>
+          <span class="sup-oid ${r.live ? 'go' : ''}">${
+            r.district ? _esc(r.district) + ' · ' : ''}${_esc(r.address || '#' + r.order_id)}</span>
+          <span class="r">${_when(r.last_at)}</span></div>
+        <div class="m">${r.kind ? `<i>${_esc(DRV_CASE[r.kind] || '')} · </i>` : ''}${
+          r.last_by === 'operator' ? '<i>Вы: </i>' : ''}${_esc(r.last || '—')}</div>
+      </button>`).join('')).join('');
+}
+
+// Разговор ведём там, где он и живёт, — в карточке заказа: отвечать, не видя
+// адреса и состава, значит отвечать наугад.
+function drvOpen(oid){
+  supClose();
+  openOrder(oid);
+}
+
 function supOpen(){
   $('supOv').classList.add('show'); haptic('light');
-  loadSup();
+  supTab(SUP_TAB);
+  loadSup(); loadDrvChats();
   if(supTimer) clearInterval(supTimer);
   // Открытый экран опрашиваем часто — это переписка, а не сводка.
-  supTimer = setInterval(()=>{ if(!document.hidden){ loadSup(); if(supKey) supThread(supKey, true); } }, 5000);
+  supTimer = setInterval(()=>{ if(!document.hidden){
+    loadSup(); loadDrvChats();
+    if(SUP_TAB === 'clients' && supKey) supThread(supKey, true);
+  } }, 5000);
 }
 function supClose(){
   $('supOv').classList.remove('show');

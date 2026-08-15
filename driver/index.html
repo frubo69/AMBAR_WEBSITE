@@ -176,7 +176,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .ord-edit:active{transform:scale(.95);color:var(--gold2)}
 .ord-foot{display:block;padding:14px 16px;border-top:1px solid var(--border2)}
 .ord-foot .btn{width:100%}
-.ord-foot-2{display:flex;align-items:center;gap:9px}
+.ord-foot-2{display:flex;align-items:stretch;gap:9px}
 .btn{padding:15px 10px;border:none;border-radius:13px;cursor:pointer;font-family:inherit;
   font-size:14.5px;font-weight:700;transition:.15s var(--e1)}
 .btn:active{transform:scale(.97)}
@@ -366,6 +366,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .sheet textarea:focus{border-color:rgba(201,169,110,.5)}
 .sheet-acts{display:flex;gap:8px;margin-top:14px}
 .sheet-acts .btn{flex:1}
+.sheet-acts-2{display:grid;grid-template-columns:1fr 1fr}
 .sheet-hd{display:flex;align-items:center;gap:10px;margin-bottom:14px}
 .sheet-x{width:34px;height:34px;flex-shrink:0;border-radius:11px;display:flex;align-items:center;
   justify-content:center;border:1px solid var(--border3);background:var(--card2);color:var(--sub);
@@ -393,8 +394,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 
 /* Ситуации в одно касание. Названы так, как их произносит водитель, — он
    думает «клиент не отвечает», а не «мне нужна правка состава». */
-.case-l{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
-  color:var(--muted);margin:2px 2px 9px}
+.case-l{display:flex;align-items:center;gap:8px;width:100%;padding:8px 2px;margin-bottom:5px;
+  border:none;background:none;cursor:pointer;font-family:inherit;font-size:10px;
+  font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted)}
+.case-l:active{color:var(--gold2)}
+.case-l-go{display:flex;margin-left:auto;color:var(--dim);transition:transform .18s var(--e1)}
+.case-l-go.on{transform:rotate(180deg)}
 .case-g{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:14px}
 .case-b{display:flex;align-items:center;gap:9px;padding:12px 13px;border-radius:13px;
   cursor:pointer;text-align:left;font-family:inherit;font-size:13px;font-weight:600;
@@ -423,7 +428,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   line-height:1.55}
 
 /* Кнопка разговора на карточке заказа */
-.ord-chat{position:relative;flex:0 0 auto;width:54px;height:54px;border-radius:16px;
+.ord-chat{position:relative;flex:0 0 auto;width:54px;border-radius:13px;
   cursor:pointer;display:flex;align-items:center;justify-content:center;
   color:var(--sub);background:var(--card2);border:1px solid var(--border3)}
 .ord-chat:active{transform:scale(.94)}
@@ -972,14 +977,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
     <div id="edMain">
       <div class="sheet-hd">
         <div style="flex:1;min-width:0">
-          <div class="sheet-t">Правка заказа</div>
+          <div class="sheet-t" id="editTitle">Изменить состав</div>
           <div class="sheet-s" id="editFor">—</div>
         </div>
-      </div>
-      <div class="seg seg3">
-        <button class="seg-b on" id="segItems" onclick="editMode('items')">Состав</button>
-        <button class="seg-b" id="segText" onclick="editMode('text')">Проблема</button>
-        <button class="seg-b" id="segCancel" onclick="editMode('cancel')">Отменить</button>
+        <button class="sheet-x" onclick="closeEdit()" aria-label="Закрыть">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+        </button>
       </div>
 
       <div id="edItems">
@@ -995,11 +999,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
         </div>
       </div>
 
-      <div id="edText" hidden>
-        <div class="chips" id="editChips"></div>
-        <textarea id="editText" placeholder="Опишите подробнее — что именно и на что менять"></textarea>
-      </div>
-
       <div id="edCancel" hidden>
         <div class="ed-warn">Заказ отменяет оператор. Напишите причину — он решит
           и ответит вам сообщением.</div>
@@ -1007,9 +1006,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
         <textarea id="cancelText" placeholder="Что случилось"></textarea>
       </div>
 
-      <div class="sheet-acts">
-        <button class="btn btn-ico" style="width:auto;padding:13px 16px" onclick="closeEdit()">Отмена</button>
-        <button class="btn btn-pri" id="edSend" onclick="sendEdit(this)">Отправить оператору</button>
+      <!-- Две равные кнопки: они одного веса — «передумал» и «отправил». Разная
+           ширина у пары намекала бы, что одна важнее, а выбирает здесь человек. -->
+      <div class="sheet-acts sheet-acts-2">
+        <button class="btn btn-gh" onclick="closeEdit()">Назад</button>
+        <button class="btn btn-pri" id="edSend" onclick="sendEdit(this)">Отправить</button>
       </div>
     </div>
 
@@ -1143,6 +1144,7 @@ const ICO = {
   search:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
   close:'<path d="M6 6l12 12M18 6L6 18"/>',
   chat: '<path d="M20 14a2 2 0 0 1-2 2H8l-4 3.5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/>',
+  chev: '<path d="M6 9l6 6 6-6"/>',
   meal: '<path d="M7 3v5.4a2.3 2.3 0 0 0 4.6 0V3"/><path d="M9.3 8.7V21"/><path d="M17.6 3c-1.7 1.5-2.5 3.4-2.5 5.5 0 1.7.8 2.7 2.5 2.9V21"/>',
 };
 const svg = (d, w=19) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none"
@@ -3012,6 +3014,8 @@ function mapForget(){
 
 // Готовые причины: за рулём набирать текст неудобно, а оператору нужна не
 // поэма, а понятная причина. Своими словами — по желанию, поверх тега.
+// Причины отмены — чипами: их немного и они повторяются, а печатать на ходу
+// одной рукой у подъезда неудобно.
 const EDIT_REASONS = ['Нет в наличии', 'Клиент просит другое', 'Изменить количество',
                       'Адрес не тот', 'Клиент не отвечает', 'Клиент отказался'];
 const CANCEL_REASONS = ['Клиент отказался', 'Клиент не отвечает', 'Адреса не существует',
@@ -3032,7 +3036,7 @@ const CANCEL_REASONS = ['Клиент отказался', 'Клиент не о
 //
 // Названия ситуаций — те, что он произносит вслух. «Клиент не отвечает», а не
 // «обращение по недоступности получателя».
-let CASE_OID = null, CASE_CHAT = [], CASE_BUSY = false;
+let CASE_OID = null, CASE_CHAT = [], CASE_BUSY = false, CASE_LIST = true;
 
 const CASES = [
   ['client',  'Клиент не отвечает', '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>'],
@@ -3040,8 +3044,17 @@ const CASES = [
   ['wait',    'Прошу подождать',    '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
 ];
 
+function caseToggle(){
+  CASE_LIST = !CASE_LIST;
+  caseRender();
+  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
 async function caseOpen(oid){
   CASE_OID = oid; CASE_CHAT = [];
+  // Пришли в пустой разговор — значит позвать; пришли в начатый — значит
+  // читать. Список раскрыт ровно там, где он и нужен.
+  CASE_LIST = true;
   document.getElementById('caseFor').textContent = `Заказ #${oid}`;
   document.getElementById('caseText').value = '';
   caseRender();
@@ -3050,6 +3063,7 @@ async function caseOpen(oid){
   try{
     const r = await drvApi.drvFetch(`/api/driver/orders/${oid}/chat`);
     CASE_CHAT = r.chat || [];
+    CASE_LIST = !CASE_CHAT.length;
     caseRender();
     // Прочитали — счётчик на карточке гаснет, не дожидаясь следующего опроса.
     const o = ((ORDERS && ORDERS.active) || []).find(x => x.order_id === oid);
@@ -3071,13 +3085,20 @@ function caseRender(){
       ${esc(m.text)}
       <span class="msg-t">${hhmm(m.at)}</span>
     </div>`).join('');
+  // Список ситуаций нужен один раз — чтобы позвать. Дальше он мешает: разговор
+  // уезжает вверх, а половину листа занимает то, чем уже воспользовались.
+  // Поэтому после нажатия он сворачивается сам, а заголовок остаётся кнопкой:
+  // ситуация может смениться, и второй повод должен быть в одно касание.
   box.innerHTML =
     (CASE_CHAT.length
       ? `<div class="case-w" id="caseW">${msgs}</div>`
       : `<div class="case-empty">Оператор видит этот заказ и ответит здесь же.<br>
            Нажмите, что случилось, или напишите своими словами.</div>`)
-    + `<div class="case-l">Что случилось</div>
-       <div class="case-g">
+    + `<button class="case-l" onclick="caseToggle()">
+         <span>Что случилось</span>
+         <i class="case-l-go${CASE_LIST ? ' on' : ''}">${svg(ICO.chev || '<path d="M6 9l6 6 6-6"/>', 15)}</i>
+       </button>
+       <div class="case-g" ${CASE_LIST ? '' : 'hidden'}>
          ${CASES.map(([k, t, ico]) => `<button class="case-b" onclick="caseSay('${k}')">
            ${svg(ico, 18)}<span>${t}</span></button>`).join('')}
          <button class="case-b" onclick="caseItems()">
@@ -3100,6 +3121,7 @@ async function caseSay(kind){
     const r = await drvApi.drvFetch(`/api/driver/orders/${CASE_OID}/chat`,
       {method:'POST', body:{kind}});
     CASE_CHAT = r.chat || CASE_CHAT;
+    CASE_LIST = false;              // позвал — список свою работу сделал
     caseRender();
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
     toast('Оператор увидит сразу');
@@ -3153,9 +3175,6 @@ function openEdit(oid){
     id: it.id, name: it.name, qty: it.qty, was: it.qty, price: it.price || 0, pcs: it.pcs}));
   EDIT_WAS = o ? o.total : 0;
   document.getElementById('editFor').textContent = `Заказ #${oid} · решает оператор`;
-  document.getElementById('editText').value = '';
-  document.getElementById('editChips').innerHTML = EDIT_REASONS.map(r =>
-    `<button class="chip" onclick="toggleTag(this,'${esc(r)}')">${esc(r)}</button>`).join('');
   document.getElementById('cancelText').value = '';
   document.getElementById('cancelChips').innerHTML = CANCEL_REASONS.map(r =>
     `<button class="chip" onclick="toggleTag(this,'${esc(r)}')">${esc(r)}</button>`).join('');
@@ -3164,16 +3183,16 @@ function openEdit(oid){
   document.getElementById('editSheet').classList.add('show');
 }
 
+// Экран делает что-то одно. Вкладки «Состав / Проблема / Отменить» заставляли
+// выбирать механизм на экране, куда пришли уже с решением: править состав или
+// просить отмену. Проблема переехала в разговор — там ей и место.
 function editMode(m){
   EDIT_MODE = m;
-  document.getElementById('segItems').classList.toggle('on', m === 'items');
-  document.getElementById('segText').classList.toggle('on', m === 'text');
-  document.getElementById('segCancel').classList.toggle('on', m === 'cancel');
   document.getElementById('edItems').hidden  = m !== 'items';
-  document.getElementById('edText').hidden   = m !== 'text';
   document.getElementById('edCancel').hidden = m !== 'cancel';
+  _setText('editTitle', m === 'cancel' ? 'Отменить заказ' : 'Изменить состав');
   const b = document.getElementById('edSend');
-  b.textContent = m === 'cancel' ? 'Попросить отмену' : 'Отправить оператору';
+  b.textContent = m === 'cancel' ? 'Просить отмену' : 'Отправить';
   b.classList.toggle('btn-danger', m === 'cancel');
   try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
 }
@@ -3272,23 +3291,21 @@ function toggleTag(el, r){
 function closeEdit(){ document.getElementById('editSheet').classList.remove('show'); EDIT_OID = null; }
 
 async function sendEdit(btn){
-  const free = (EDIT_MODE === 'cancel'
-    ? document.getElementById('cancelText') : document.getElementById('editText')).value.trim();
+  // Экран знает только два дела: изменить состав и попросить отмену. Всё
+  // остальное ушло в разговор с оператором.
+  const free = EDIT_MODE === 'cancel'
+    ? document.getElementById('cancelText').value.trim() : '';
   const text = [EDIT_TAGS.join(', '), free].filter(Boolean).join(' — ');
-  const body = {kind: EDIT_MODE === 'items' ? 'edit' : (EDIT_MODE === 'cancel' ? 'cancel' : 'note')};
+  const body = {kind: EDIT_MODE === 'cancel' ? 'cancel' : 'edit'};
   if(EDIT_MODE === 'cancel'){
     if(!text){ toast('Выберите причину'); return; }
     body.text = text;
-  }else if(EDIT_MODE === 'items'){
+  }else{
     const live = EDIT_LINES.filter(l => l.qty > 0);
     if(!live.length){ toast('Убрали всё — это отмена'); return; }
     const changed = EDIT_LINES.some(l => l.qty !== l.was);
     if(!changed){ toast('Состав не изменён'); return; }
     body.items = live.map(l => ({id: l.id, qty: l.qty, ...(l.pcs ? {pcs: l.pcs} : {})}));
-    if(text) body.text = text;
-  }else{
-    if(!text){ toast('Выберите причину'); return; }
-    body.text = text;
   }
   btn.disabled = true;
   try{

@@ -52,6 +52,28 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .hdr-n{font-size:14.5px;font-weight:700;line-height:1;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis}
 
+/* Шапка вкладки заказов. Одна крупная цифра — деньги, которые предстоит
+   собрать; справа мельче то, что и так видно по карточкам. Просрочка красит
+   рамку: это единственное, что должно менять поведение сразу. */
+.hsum{padding:14px 16px;margin-bottom:12px;border-radius:16px;
+  background:var(--bg3);border:1px solid var(--border2)}
+.hsum.late{border-color:rgba(224,85,85,.35)}
+.hsum-top{display:flex;align-items:flex-end;gap:14px}
+.hsum-b{flex:1;min-width:0}
+.hsum-k{display:block;font-size:10px;font-weight:700;letter-spacing:1.4px;
+  text-transform:uppercase;color:var(--muted)}
+.hsum-v{display:block;margin-top:5px;font-family:'Space Grotesk',sans-serif;
+  font-size:30px;font-weight:700;line-height:1;letter-spacing:-.8px;color:var(--gold3);
+  font-variant-numeric:tabular-nums}
+.hsum-v i{font-style:normal;font-size:11px;font-weight:600;color:var(--muted);margin-left:6px}
+.hsum-r{flex:0 0 auto;text-align:right;font-size:12.5px;color:var(--muted);line-height:1.4}
+.hsum-r b{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
+  color:var(--text);font-variant-numeric:tabular-nums}
+.hsum-r i{display:block;font-style:normal;font-size:11.5px}
+.hsum-f{display:flex;flex-wrap:wrap;gap:4px 14px;margin-top:11px;padding-top:10px;
+  border-top:1px solid var(--border2);font-size:11.5px;color:var(--muted)}
+.hsum-f .warn{color:var(--dn);font-weight:600}
+
 /* Итог вкладки — там же, где её содержимое */
 .tot{display:flex;align-items:baseline;gap:9px;padding:13px 15px;margin-bottom:12px;
   border-radius:15px;background:var(--bg3);border:1px solid var(--border2)}
@@ -1251,9 +1273,6 @@ function renderOrders(){
   const box = document.getElementById('body');
   if(!ORDERS){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
   const {active, done} = ORDERS;
-  // Итог смены — там же, где заказы, и только если уже есть что показывать.
-  const tot = done.length ? `<div class="tot"><span class="tot-l">Сдал за смену</span>
-      <span class="tot-v">${fmt(ORDERS.total_aed)}<i>AED</i></span></div>` : '';
   if(!active.length && !done.length){
     box.innerHTML = `<div class="empty">На вас пока ничего не назначено.<br>
       Новый заказ придёт сообщением и появится здесь.</div>`;
@@ -1267,7 +1286,7 @@ function renderOrders(){
   // следующий заказ: куда и к какому времени. Всё прочее нужно уже в работе,
   // а не при выборе.
   if(active.length && !active.some(o => o.order_id === OPEN_OID)) OPEN_OID = active[0].order_id;
-  box.innerHTML = tot +
+  box.innerHTML = ordHead(active) +
     (active.length
       ? `<div class="sect"><span class="sect-t">В работе</span><span class="sect-v">${active.length}</span></div>`
         + active.map((o, i) => o.order_id === OPEN_OID || active.length === 1
@@ -1275,6 +1294,44 @@ function renderOrders(){
       : '<div class="empty" style="padding:30px 20px">Активных заказов нет</div>');
   // Закрытых здесь нет: эта вкладка про то, что ещё надо сделать. Закрытое за
   // смену — во вкладке «История», а сколько сдано, говорит строка сверху.
+}
+
+// Шапка вкладки. Вопрос, на который она отвечает, — не «сколько я уже сделал»
+// (это позади и живёт в истории), а «что у меня на руках прямо сейчас».
+//
+// Крупно — деньги, которые предстоит собрать. Их водитель посчитать в уме не
+// может: заказов три, часть оплачена онлайн, а отвечает он ровно за наличные.
+// Число заказов рядом мельче — оно и так видно по карточкам под шапкой, там
+// свои номера 1-2-3.
+//
+// Долг и предоплата из суммы вычтены: «денег не брать» написано на карточке, и
+// шапка не должна обещать того, чего водитель не привезёт.
+function ordHead(active){
+  if(!active.length) return '';
+  const free = o => !!o.prepaid || o.payment_method === 'debt';
+  const cash = active.filter(o => !free(o)).reduce((a, o) => a + (o.total || 0), 0);
+  const paid = active.filter(free).reduce((a, o) => a + (o.total || 0), 0);
+  const units = active.reduce((a, o) =>
+    a + (o.items || []).reduce((b, i) => b + (i.qty || 0), 0), 0);
+  const late = active.filter(o => _isLate(o.deliver_by)).length;
+  const zero = cash === 0;
+  const foot = [];
+  if(!zero && paid) foot.push(`<span>${fmt(paid)} AED без оплаты на месте</span>`);
+  if(late) foot.push(`<span class="warn">${late === 1
+    ? 'один заказ просрочен' : late + ' заказа просрочено'}</span>`);
+  return `<div class="hsum${late ? ' late' : ''}">
+    <div class="hsum-top">
+      <span class="hsum-b">
+        <span class="hsum-k">${zero ? 'Оплачено заранее' : 'Собрать наличными'}</span>
+        <span class="hsum-v">${fmt(zero ? paid : cash)}<i>AED</i></span>
+      </span>
+      <span class="hsum-r">
+        <b>${active.length}</b> ${plural(active.length,'заказ','заказа','заказов')}
+        <i>${units} ${plural(units,'бутылка','бутылки','бутылок')}</i>
+      </span>
+    </div>
+    ${foot.length ? `<div class="hsum-f">${foot.join('')}</div>` : ''}
+  </div>`;
 }
 
 // Свёрнутый заказ. Номер в очереди слева — тот же, что и на раскрытом: по

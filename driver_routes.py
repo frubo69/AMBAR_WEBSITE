@@ -176,7 +176,7 @@ async def handle_history(request):
     «я это возил» решается списком, а не памятью."""
     me = request["driver"]
     try:
-        days = max(1, min(60, int(request.query.get("days", "14"))))
+        days = max(1, min(120, int(request.query.get("days", "30"))))
     except ValueError:
         days = 14
     today = _biz_day()
@@ -189,6 +189,23 @@ async def handle_history(request):
             if (o.get("driver") or "").strip() == me["name"] and o.get("status") == "delivered"]
 
     # По дням: за какой день сколько увёз — так видно и объём, и выходные.
+    #
+    # Наличные считаем отдельно от оплаченного онлайн и долга. Для водителя это
+    # разные деньги: за наличные он отчитывается, остальное проходит мимо него,
+    # и общая сумма на вопрос «сколько я сдал» не отвечает.
+    def _mins(o):
+        """Сколько заказ ехал. Нужно и водителю, и в спорах о скорости."""
+        a, b = o.get("confirmed_at"), o.get("delivered_at")
+        if not a or not b:
+            return None
+        try:
+            t0 = datetime.fromisoformat(str(a).replace("Z", ""))
+            t1 = datetime.fromisoformat(str(b).replace("Z", ""))
+        except (ValueError, TypeError):
+            return None
+        m = (t1 - t0).total_seconds() / 60
+        return int(round(m)) if 0 <= m < 600 else None
+
     by_day = {}
     for o in mine:
         dt = o.get("confirmed_at") or o.get("timestamp") or ""
@@ -197,15 +214,41 @@ async def handle_history(request):
             key = _biz_day(d)
         except (ValueError, TypeError):
             key = ""
-        g = by_day.setdefault(key, {"day": key, "count": 0, "aed": 0, "orders": []})
+        g = by_day.setdefault(key, {"day": key, "count": 0, "aed": 0, "cash": 0,
+                                    "online": 0, "mins": [], "orders": []})
+        total = int(o.get("total", 0) or 0)
         g["count"] += 1
-        g["aed"] += int(o.get("total", 0) or 0)
-        g["orders"].append(_order_view(o))
+        g["aed"] += total
+        if o.get("prepaid") or o.get("payment_method") == "debt":
+            g["online"] += total
+        else:
+            g["cash"] += total
+        m = _mins(o)
+        if m is not None:
+            g["mins"].append(m)
+        g["orders"].append({**_order_view(o), "mins": m})
+
     days_list = sorted(by_day.values(), key=lambda x: x["day"], reverse=True)
+    all_mins = []
     for g in days_list:
         g["orders"].sort(key=lambda x: x.get("timestamp") or "", reverse=True)
+        all_mins += g["mins"]
+        g["avg_min"] = int(round(sum(g["mins"]) / len(g["mins"]))) if g["mins"] else 0
+        g.pop("mins")
     return web.json_response({
         "days": days_list,
+        "range": days,
+        "totals": {
+            "count": len(mine),
+            "aed": sum(int(o.get("total", 0) or 0) for o in mine),
+            "cash": sum(g["cash"] for g in days_list),
+            "online": sum(g["online"] for g in days_list),
+            "avg_min": int(round(sum(all_mins) / len(all_mins))) if all_mins else 0,
+            "worked": len(days_list),
+            "best": max((g["aed"] for g in days_list), default=0),
+        },
+        # Оставлены для совместимости со старым приложением на телефоне
+        # водителя: оно обновится не в ту же секунду, что сервер.
         "total_count": len(mine),
         "total_aed": sum(int(o.get("total", 0) or 0) for o in mine),
     }, headers=CORS_HEADERS)

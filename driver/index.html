@@ -231,12 +231,54 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .form .amt{width:84px;text-align:center;font-weight:700}
 .form .cmt{flex:1}
 
-/* история */
-.hist-day{display:flex;align-items:baseline;gap:9px;margin:16px 2px 8px}
-.hist-day-d{font-size:12px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
-  color:var(--muted)}
-.hist-day-v{margin-left:auto;font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:700;
+/* ── история ─────────────────────────────────────────────────────────────
+   Период, поиск, дни, заказы. Ни одного экрана с лентой в полный рост: до
+   позавчера должно быть два касания, а не три экрана листания. */
+.seg.hist-seg{grid-template-columns:repeat(3,1fr);margin-bottom:10px}
+.hfind{display:flex;align-items:center;gap:9px;padding:0 12px;margin-bottom:14px;
+  border-radius:13px;background:var(--bg3);border:1px solid var(--border2);color:var(--dim)}
+.hfind:focus-within{border-color:rgba(201,169,110,.45);color:var(--gold2)}
+.hfind input{flex:1;min-width:0;padding:13px 0;border:none;background:none;outline:none;
+  color:var(--text);font-family:inherit;font-size:14px;-webkit-appearance:none}
+.hfind input::-webkit-search-cancel-button{display:none}
+.hfind-x{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;border:none;cursor:pointer;padding:0;
+  background:var(--card2);color:var(--muted)}
+
+/* День. Свёрнутый — одна строка: дата, объём, деньги. Раскрытый показывает
+   свои заказы и остаётся на месте, чтобы не терять положение в списке. */
+.hday{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;
+  margin-bottom:8px;border-radius:14px;cursor:pointer;text-align:left;
+  font-family:inherit;color:var(--text);background:var(--card);
+  border:1px solid var(--border2);transition:.16s var(--e1)}
+.hday:active{transform:scale(.99)}
+.hday.on{background:var(--bg3);border-color:var(--border3);margin-bottom:0;
+  border-radius:14px 14px 0 0}
+.hday-b{flex:1;min-width:0}
+.hday-d{display:block;font-size:14px;font-weight:700;line-height:1.2}
+.hday-s{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+.hday-v{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;
   color:var(--gold2);font-variant-numeric:tabular-nums}
+.hday-v i{font-style:normal;font-size:10px;color:var(--muted);margin-left:4px}
+.hday-go{flex:0 0 auto;color:var(--dim);font-size:15px}
+.hday-list{margin-bottom:8px;padding:6px;border-radius:0 0 14px 14px;
+  background:var(--bg3);border:1px solid var(--border3);border-top:none}
+
+/* Заказ в дне: во сколько привёз, куда и сколько. Тем же порядком, что и в
+   свёрнутом активном заказе, — привычка одна на всё приложение. */
+.hrow{display:flex;align-items:center;gap:11px;width:100%;padding:10px 8px;
+  border:none;background:none;cursor:pointer;text-align:left;color:var(--text);
+  font-family:inherit;border-radius:10px}
+.hrow:active{background:var(--card2)}
+.hrow + .hrow{box-shadow:inset 0 1px 0 var(--border2)}
+.hrow-t{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:12.5px;
+  font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums}
+.hrow-b{flex:1;min-width:0}
+.hrow-a{display:block;font-size:14px;font-weight:600;line-height:1.25;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hrow-s{display:block;font-size:11px;color:var(--muted);margin-top:1px}
+.hrow-v{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:14.5px;
+  font-weight:700;color:var(--gold3);font-variant-numeric:tabular-nums}
 
 /* прочее */
 .empty{padding:46px 20px;text-align:center;color:var(--muted);font-size:13.5px;line-height:1.6}
@@ -1008,6 +1050,7 @@ const ICO = {
   cash: '<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/>',
   box:  '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11.5v4.5M12 8h.01"/>',
+  search:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
   close:'<path d="M6 6l12 12M18 6L6 18"/>',
   meal: '<path d="M7 3v5.4a2.3 2.3 0 0 0 4.6 0V3"/><path d="M9.3 8.7V21"/><path d="M17.6 3c-1.7 1.5-2.5 3.4-2.5 5.5 0 1.7.8 2.7 2.5 2.9V21"/>',
 };
@@ -1361,28 +1404,164 @@ function ordOpen(oid){
 }
 
 // ── история ───────────────────────────────────────────────────────────────
+// ══════════════════════════════════════════════════════════════════════════
+//  ИСТОРИЯ
+// ══════════════════════════════════════════════════════════════════════════
+// Сюда приходят с конкретным вопросом, а не листать:
+//
+//   «сколько я сдал за месяц»          → итог сверху, наличные отдельно;
+//   «я возил на этот адрес?»           → поиск по адресу и номеру заказа;
+//   «что было в прошлую субботу»       → список дней, день раскрывается;
+//   «сколько я в среднем еду»          → среднее время в итоге.
+//
+// Раньше здесь лежала лента карточек в полный рост за две недели: чтобы
+// добраться до позавчера, приходилось пролистать три экрана. Теперь три
+// уровня, и на каждом ровно столько, сколько нужно, чтобы выбрать следующий:
+// период → день → заказ.
+let HIST_DAYS = 30, HIST_DAY = '', HIST_ORD = '', HIST_Q = '';
+const HIST_RANGES = [[7, 'Неделя'], [30, 'Месяц'], [90, '3 месяца']];
+
 async function loadHistory(){
   document.getElementById('body').innerHTML = '<div class="empty">Загрузка…</div>';
-  try{ HIST = await drvApi.drvFetch('/api/driver/history', {params:{days:14}}); }
+  try{ HIST = await drvApi.drvFetch('/api/driver/history', {params:{days: HIST_DAYS}}); }
   catch(e){ document.getElementById('body').innerHTML = '<div class="empty">Не удалось загрузить</div>'; return; }
   render();
+}
+
+function histRange(d){
+  if(HIST_DAYS === d) return;
+  HIST_DAYS = d; HIST_DAY = ''; HIST_ORD = '';
+  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+  loadHistory();
+}
+
+function histPick(day){
+  HIST_DAY = HIST_DAY === day ? '' : day;
+  HIST_ORD = '';
+  renderHistory();
+  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
+function histOrd(oid){
+  HIST_ORD = HIST_ORD === oid ? '' : oid;
+  renderHistory();
+  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+
+// Поиск идёт по адресу и номеру заказа — по тому, чем заказ называют вслух.
+// Найденное показывается плоским списком, без деления по дням: когда ищут
+// конкретную поездку, дата уже не способ навигации, а часть ответа.
+function histSearch(v){
+  HIST_Q = v;
+  renderHistory();
+}
+
+function histFound(){
+  const q = HIST_Q.trim().toLowerCase();
+  if(!q) return null;
+  const out = [];
+  (HIST.days || []).forEach(g => (g.orders || []).forEach(o => {
+    if((o.address || '').toLowerCase().includes(q)
+       || (o.order_id || '').toLowerCase().includes(q)) out.push({...o, _day: g.day});
+  }));
+  return out;
 }
 
 function renderHistory(){
   const box = document.getElementById('body');
   if(!HIST){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
+  const t = HIST.totals || {count: HIST.total_count || 0, aed: HIST.total_aed || 0,
+                            cash: 0, online: 0, avg_min: 0, worked: 0};
+  const found = histFound();
 
-  if(!HIST.days.length){
-    box.innerHTML = '<div class="empty">За две недели закрытых заказов нет.</div>';
+  const head = `
+    <div class="hsum">
+      <div class="hsum-top">
+        <span class="hsum-b">
+          <span class="hsum-k">Сдал наличными</span>
+          <span class="hsum-v">${fmt(t.cash || t.aed)}<i>AED</i></span>
+        </span>
+        <span class="hsum-r">
+          <b>${fmt(t.count)}</b> ${plural(t.count,'заказ','заказа','заказов')}
+          <i>${t.worked ? t.worked + ' ' + plural(t.worked,'смена','смены','смен') : 'смен нет'}</i>
+        </span>
+      </div>
+      ${(t.online || t.avg_min) ? `<div class="hsum-f">
+        ${t.online ? `<span>${fmt(t.online)} AED прошло мимо рук</span>` : ''}
+        ${t.avg_min ? `<span>${t.avg_min} мин в среднем в пути</span>` : ''}
+      </div>` : ''}
+    </div>
+
+    <div class="seg hist-seg">
+      ${HIST_RANGES.map(([d, l]) => `<button class="seg-b ${HIST_DAYS === d ? 'on' : ''}"
+        onclick="histRange(${d})">${l}</button>`).join('')}
+    </div>
+
+    <div class="hfind">
+      ${svg(ICO.search || '<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>', 17)}
+      <input type="search" id="histQ" placeholder="Адрес или номер заказа"
+             value="${esc(HIST_Q)}" oninput="histSearch(this.value)">
+      ${HIST_Q ? `<button class="hfind-x" onclick="histSearch('')"
+        aria-label="Очистить">${svg(ICO.close, 13)}</button>` : ''}
+    </div>`;
+
+  if(found){
+    box.innerHTML = head + (found.length
+      ? `<div class="sect"><span class="sect-t">Нашлось</span>
+           <span class="sect-v">${found.length}</span></div>`
+        + found.map(o => histRow(o, true)).join('')
+      : '<div class="empty">Ничего не нашлось</div>');
+    _histFocus();
     return;
   }
-  box.innerHTML = HIST.days.map(g => `
-    <div class="hist-day">
-      <span class="hist-day-d">${dayLbl(g.day)}</span>
-      <span class="sect-v">${g.count} ${g.count === 1 ? 'заказ' : g.count < 5 ? 'заказа' : 'заказов'}</span>
-      <span class="hist-day-v">${fmt(g.aed)} AED</span>
-    </div>
-    ${g.orders.map(histCard).join('')}`).join('');
+
+  if(!(HIST.days || []).length){
+    box.innerHTML = head + '<div class="empty">За этот период закрытых заказов нет.</div>';
+    _histFocus();
+    return;
+  }
+
+  box.innerHTML = head + HIST.days.map(g => {
+    const open = HIST_DAY === g.day;
+    return `<button class="hday${open ? ' on' : ''}" onclick="histPick('${g.day}')">
+        <span class="hday-b">
+          <span class="hday-d">${dayLbl(g.day)}</span>
+          <span class="hday-s">${g.count} ${plural(g.count,'заказ','заказа','заказов')}${
+            g.avg_min ? ` · ${g.avg_min} мин в среднем` : ''}</span>
+        </span>
+        <span class="hday-v">${fmt(g.aed)}<i>AED</i></span>
+        <span class="hday-go">${open ? '⌄' : '›'}</span>
+      </button>
+      ${open ? `<div class="hday-list">${g.orders.map(o => histRow(o)).join('')}</div>` : ''}`;
+  }).join('');
+  _histFocus();
+}
+
+// Поле поиска перерисовывается вместе со списком и теряет курсор — возвращаем
+// его туда, где он был, иначе набрать второе слово невозможно.
+function _histFocus(){
+  if(!HIST_Q) return;
+  const i = document.getElementById('histQ');
+  if(i && document.activeElement !== i){
+    i.focus(); try{ i.setSelectionRange(i.value.length, i.value.length); }catch(e){}
+  }
+}
+
+// Строка заказа в истории. Раскрывается в ту же карточку, что и на других
+// экранах: заказ не должен выглядеть по-разному в двух местах.
+function histRow(o, withDay){
+  const open = HIST_ORD === o.order_id;
+  if(open) return `<div onclick="histOrd('${esc(o.order_id)}')">${histCard(o)}</div>`;
+  const n = (o.items || []).reduce((a, i) => a + (i.qty || 0), 0);
+  return `<button class="hrow" onclick="histOrd('${esc(o.order_id)}')">
+    <span class="hrow-t">${hhmm(o.delivered_at || o.timestamp)}</span>
+    <span class="hrow-b">
+      <span class="hrow-a">${esc(o.address) || 'Адрес не указан'}</span>
+      <span class="hrow-s">${withDay ? dayLbl(o._day) + ' · ' : ''}${n} ${
+        plural(n,'бутылка','бутылки','бутылок')}${o.mins ? ` · ${o.mins} мин` : ''}</span>
+    </span>
+    <span class="hrow-v">${fmt(o.total)}</span>
+  </button>`;
 }
 
 // ── расходы ───────────────────────────────────────────────────────────────

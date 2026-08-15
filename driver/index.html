@@ -331,8 +331,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .sup-row{display:flex;align-items:center;gap:10px;padding:12px 14px;margin-bottom:7px;
   border-radius:13px;background:var(--card);border:1px solid var(--border2);opacity:.7}
 .sup-row-b{flex:1;min-width:0}
-.sup-row-t{font-size:13.5px;font-weight:600}
-.sup-row-s{font-size:11.5px;color:var(--muted);margin-top:1px}
+.sup-row-t{display:block;font-size:13.5px;font-weight:600}
+.sup-row-s{display:block;font-size:11.5px;color:var(--muted);margin-top:1px}
 
 /* Экран задачи: список позиций поверх всего, со своей шапкой и своим подвалом */
 .sup-scr{position:fixed;inset:0;z-index:95;display:none;flex-direction:column;background:var(--bg)}
@@ -431,9 +431,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   border-radius:12px;background:var(--card);border:1px solid var(--border2)}
 .sc-dot{width:7px;height:7px;flex-shrink:0;border-radius:50%}
 .sc-b{flex:1;min-width:0}
-.sc-code{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700}
-.sc-raw{font-size:10.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;
-  white-space:nowrap}
+.sc-code{display:block;font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700}
+.sc-raw{display:block;font-size:10.5px;color:var(--dim);margin-top:1px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sc-st{font-size:11px;font-weight:600;flex-shrink:0}
 .sc-acts{display:flex;gap:8px;margin-top:4px}
 .sc-acts .btn{flex:1}
@@ -497,6 +497,19 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   font-size:11.5px;line-height:1.35;color:var(--muted)}
 .exp-go{flex:0 0 auto;width:auto;padding:13px 22px}
 .exp-none{font-size:12.5px;color:var(--muted);padding:4px 2px}
+/* «Не было» — такой же ответ, как сумма, и стоит там же, где кнопка отправки.
+   Крестиком без слова его нельзя: рядом с полем ввода крестик читается как
+   «очистить», и водитель нажмёт его вместо стирания цифры. */
+.exp-no{flex:0 0 auto;display:flex;align-items:center;gap:5px;padding:13px 12px;
+  border-radius:11px;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;
+  color:var(--muted);background:var(--card2);border:1px solid var(--border3)}
+.exp-no:active{transform:scale(.96);color:var(--text)}
+.exp-field.none{justify-content:space-between}
+.exp-field.none .exp-none{flex:1;padding:13px;color:var(--sub)}
+/* Пока не ответили — карточку видно среди отвеченных, но она не кричит. */
+.exp-card.ask{border-color:var(--border3)}
+.exp-card.ask .exp-sum{color:var(--warn)}
+.sect-v.ask{color:var(--warn)}
 /* Весь статус — один значок. Цвет только в нём. */
 .exp-mk{flex:none;display:flex;align-items:center;padding:0 13px 0 9px;color:var(--dim)}
 .exp-mk.pending{color:var(--warn)}
@@ -1301,12 +1314,29 @@ function otherBox(x){
 // Отправленное не стирается: сумма остаётся в поле серым, а кнопка становится
 // «Редактировать». Пустое поле после отправки не отвечало на единственный
 // вопрос водителя — дошло или нет.
+// По бензину и мойке водитель обязан ответить каждую смену — суммой или
+// «не было». Молчание неотличимо от забывчивости, а забытая заправка всплывает
+// через неделю, когда её уже не вспомнить. Поэтому у карточки три состояния, а
+// не два: ждём ответа, сумма, «не было».
 function expBox(kind, title, ico){
   const k = (EXP.by_kind || {})[kind] || {sum:0, count:0};
   const sent = (EXP.extras || []).find(x => x.kind === kind);
-  return `<div class="card exp-card">
+  const none = ((EXP.no_expense || {})[kind]) && !sent;
+  const head = sent ? fmt(k.sum) + ' AED' : none ? 'не было' : 'ждём ответа';
+  if(none) return `<div class="card exp-card none">
     <div class="exp-hd">${svg(ico, 17)}<span class="exp-t">${title}</span>
-      <span class="exp-sum">${k.sum ? fmt(k.sum) + ' AED' : 'сегодня не было'}</span></div>
+      <span class="exp-sum">${head}</span></div>
+    <div class="exp-row">
+      <div class="exp-field sent none">
+        <span class="exp-none">Сегодня не было</span>
+        <span class="exp-mk approved">${svg(ICO.ok, 15)}</span>
+      </div>
+      <button class="btn btn-sec exp-go" onclick="expNone('${kind}', false)">Изменить</button>
+    </div>
+  </div>`;
+  return `<div class="card exp-card${sent ? '' : ' ask'}">
+    <div class="exp-hd">${svg(ico, 17)}<span class="exp-t">${title}</span>
+      <span class="exp-sum">${head}</span></div>
     <div class="exp-row">
       <div class="exp-field${sent ? ' sent' : ''}">
         <input class="amt" id="e_${kind}" type="text" inputmode="numeric"
@@ -1314,10 +1344,24 @@ function expBox(kind, title, ico){
           value="${sent ? sent.amount : ''}"${sent ? ' readonly' : ''}>
         ${sent ? expMark(sent) : ''}
       </div>
+      ${sent ? '' : `<button class="exp-no" onclick="expNone('${kind}', true)"
+        aria-label="Расхода не было">${svg(ICO.close, 14)}<span>не было</span></button>`}
       <button class="btn ${sent ? 'btn-sec' : 'btn-pri'} exp-go"
         onclick="expTap(this,'${kind}')">${sent ? 'Изменить' : 'Отправить'}</button>
     </div>
   </div>`;
+}
+
+// «Не было» уходит сразу, без второго нажатия: это ответ из одного слова, и
+// подтверждать его нечем. Вернуть можно тем же «Изменить».
+async function expNone(kind, none){
+  try{
+    await drvApi.drvFetch('/api/driver/expenses',
+      {method:'POST', body:{kind, none}});
+    try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+    if(none) toast('Записано: расхода не было');
+    await load();
+  }catch(e){ toast('Не отправилось', 'err'); }
 }
 
 // Первое нажатие открывает поле, второе отправляет. Правка уходит той же
@@ -1384,6 +1428,9 @@ function renderExpenses(){
   const other = (EXP.extras || []).filter(x => x.kind === 'other');
   box.innerHTML = `
     <div class="sect"><span class="sect-t">Каждый день</span>
+      ${(EXP.pending_answer || []).length
+        ? `<span class="sect-v ask">не сдано: ${(EXP.pending_answer || [])
+             .map(k => ({fuel:'бензин', wash:'мойка'})[k] || k).join(', ')}</span>` : ''}
       <button class="sect-i" onclick="infoOpen()" aria-label="Что значат значки">${svg(ICO.info, 15)}</button>
     </div>
     ${mealBox()}

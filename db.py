@@ -2366,6 +2366,26 @@ async def save_driver_day(day: str, driver: str, fields: dict):
     )
 
 
+async def set_driver_no_expense(day: str, driver: str, kind: str, none: bool):
+    """«Сегодня не заправлялся». Это ответ, а не расход.
+
+    Держим отдельным полем, а не записью на ноль дирхамов: ноль в списке трат
+    выглядит как ошибка ввода и занимает строку в учёте у старшего. А ответить
+    водитель обязан — иначе непонятно, то ли расхода не было, то ли он забыл.
+    Разница между «нет» и «молчит» и есть весь смысл поля."""
+    db = _db_or_none()
+    if db is None: return
+    key = f"no_expense.{kind}"
+    if none:
+        await db.driver_days.update_one(
+            {"day": day, "driver": driver},
+            {"$set": {key: datetime.now(timezone.utc).isoformat()},
+             "$setOnInsert": {"day": day, "driver": driver}}, upsert=True)
+    else:
+        await db.driver_days.update_one({"day": day, "driver": driver},
+                                        {"$unset": {key: ""}})
+
+
 async def add_driver_expense(day: str, driver: str, item: dict):
     """Разовый расход. Пишется через $push, чтобы две записи подряд с разных
     устройств не затирали друг друга."""

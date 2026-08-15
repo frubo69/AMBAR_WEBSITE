@@ -105,6 +105,13 @@ async def on_startup(app):
     # Read-only crypto watcher: polls TronGrid for confirmed USDT transfers and
     # promotes matching invoices to real orders. Inert unless CRYPTO_REAL_MODE.
     app["crypto_watcher"] = asyncio.create_task(_crypto_watch_loop(app))
+    # Напоминания о несданной смене: с шести утра тем, кто не закрыл район или
+    # не ответил по расходам. Молчит, пока всё сдано.
+    try:
+        import shift_nag
+        app["shift_nag"] = asyncio.create_task(shift_nag.loop(app))
+    except Exception as e:
+        log.warning(f"[nag] не запустились: {e}")
 
 
 async def _send_card_welcome(ids, flag_field, total, pad, title_ru, tag):

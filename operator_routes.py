@@ -1883,6 +1883,22 @@ def _opt(request):
 async def _shift_state(day, districts: list, scope: set) -> dict:
     closed = await db.shifts_for_day(day.isoformat())
     orders = list((await db.get_all_orders()).values())
+    # Кто из водителей не ответил по обязательным расходам. Оператору это видно
+    # здесь, а не только в напоминании от бота: напоминание приходит ему, а
+    # сделать он ничего не может, если не знает, кого подтолкнуть.
+    silent = {}
+    try:
+        from driver_routes import MUST_ANSWER, _kind_of
+        for d in await db.get_driver_days(day.isoformat()):
+            if d.get("working") is not True:
+                continue
+            no = d.get("no_expense") or {}
+            extras = d.get("extras") or []
+            if any(not no.get(k) and not any(_kind_of(x) == k for x in extras)
+                   for k in MUST_ANSWER):
+                silent[d.get("driver") or ""] = True
+    except Exception as e:
+        log.warning(f"[pos] расходы водителей не прочитаны: {e}")
     out = []
     for d in districts:
         if d["id"] not in scope:
@@ -1903,6 +1919,8 @@ async def _shift_state(day, districts: list, scope: set) -> dict:
             "open_ids": [o.get("order_id") for o in open_now][:12],
             "orders": len(done),
             "revenue": sum(int(o.get("total") or 0) for o in done),
+            "silent": [n for n in _staff_mod.DISTRICT_DRIVERS.get(d["id"], [])
+                       if silent.get(n)],
         })
     return {"day": day.isoformat(), "districts": out,
             "all_closed": bool(out) and all(x["closed"] for x in out)}

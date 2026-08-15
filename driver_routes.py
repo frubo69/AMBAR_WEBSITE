@@ -424,6 +424,11 @@ async def handle_edit_request(request):
 # расход» внизу, там комментарий обязателен.
 EXPENSE_KINDS = {"fuel": "Бензин", "wash": "Мойка", "other": ""}
 
+# Про эти два водитель обязан ответить каждую смену — суммой или «не было».
+# Молчание здесь неотличимо от забывчивости, а забытая заправка всплывает
+# через неделю, когда вспомнить её уже нельзя.
+MUST_ANSWER = ("fuel", "wash")
+
 
 def _kind_of(x: dict) -> str:
     """Вид расхода. У записей до разделения по видам его нет — узнаём по
@@ -455,10 +460,21 @@ async def handle_expense_add(request):
     if kind not in EXPENSE_KINDS:
         kind = "other"
     comment = str(body.get("comment") or "").strip()[:200] or EXPENSE_KINDS[kind]
+    day = _biz_day()
+
+    # «Не было» — обязательный ответ, а не расход. Пока водитель молчит, нельзя
+    # отличить пустую заправку от забытой, и смена не считается сданной.
+    if body.get("none") is not None and kind in MUST_ANSWER:
+        none = bool(body.get("none"))
+        await db.set_driver_no_expense(day, me["name"], kind, none)
+        log.info(f"[driver] {me['name']}: {EXPENSE_KINDS[kind]} — "
+                 + ("не было" if none else "ответ снят"))
+        return web.json_response({"ok": True, "none": none, "kind": kind},
+                                 headers=CORS_HEADERS)
+
     if amount <= 0 or not comment:
         return web.json_response({"error": "amount_and_comment_required"},
                                  status=400, headers=CORS_HEADERS)
-    day = _biz_day()
     now_iso = datetime.now(timezone.utc).isoformat()
 
     # Бензин и мойка — одна запись за смену, водитель правит её же. Заправился
@@ -486,6 +502,10 @@ async def handle_expense_add(request):
                 "kind": kind, "by_driver": me["name"], "status": "pending",
                 "at": now_iso}
         await db.add_driver_expense(day, me["name"], item)
+    # Вписал сумму после «не было» — ответ снимается сам: два взаимоисключающих
+    # ответа на один вопрос хуже, чем ни одного.
+    if kind in MUST_ANSWER:
+        await db.set_driver_no_expense(day, me["name"], kind, False)
         log.info(f"[driver] {me['name']} просит {amount} AED — {comment}")
     try:
         from owner_routes import notify_owners
@@ -512,9 +532,16 @@ async def handle_expenses(request):
     for x in extras:
         x["kind"] = _kind_of(x)
     live = [x for x in extras if st(x) != "rejected"]
+    no = d.get("no_expense") or {}
     return web.json_response({
         "day": day,
         "working": d.get("working"),
+        # На что водитель ответил «не было» — и по чему ещё молчит.
+        "no_expense": {k: bool(no.get(k)) for k in MUST_ANSWER},
+        "must_answer": list(MUST_ANSWER),
+        "pending_answer": [k for k in MUST_ANSWER
+                           if not no.get(k)
+                           and not any(_kind_of(x) == k for x in extras)],
         "meal": staff.MEAL_WORKING if d.get("working") is True
                 else (staff.MEAL_OFF if d.get("working") is False else 0),
         # Ставки — на экран водителю: он должен видеть правило, а не только

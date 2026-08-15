@@ -136,7 +136,27 @@ def _order_view(o: dict) -> dict:
         "eta": o.get("eta", 0),
         "driver_ack_at": o.get("driver_ack_at", ""),
         "driver_req": o.get("driver_req") or o.get("edit_request") or None,
+        # Разговор по заказу: сколько всего и есть ли непрочитанное. Саму
+        # переписку кладём только в открытый заказ — в списке она не нужна, а
+        # весит больше всего остального вместе взятого.
+        "chat_n": len(o.get("chat") or []),
+        "chat_new": _chat_new(o, "driver"),
+        "chat_at": o.get("chat_at", ""),
     }
+
+
+def _chat_new(o: dict, side: str) -> int:
+    """Сколько сообщений собеседника пришло после того, как эта сторона
+    последний раз открывала разговор."""
+    seen = str(o.get(f"chat_seen_{side}") or "")
+    return sum(1 for m in (o.get("chat") or [])
+               if m.get("by") != side and str(m.get("at") or "") > seen)
+
+
+def _chat_view(o: dict) -> list:
+    return [{"by": m.get("by", ""), "name": m.get("name", ""),
+             "text": m.get("text", ""), "at": str(m.get("at") or ""),
+             "kind": m.get("kind", "")} for m in (o.get("chat") or [])]
 
 
 @require_driver
@@ -563,6 +583,92 @@ async def handle_expense_add(request):
     return web.json_response({"ok": True, "item": item}, headers=CORS_HEADERS)
 
 
+# ── Разговор по заказу ──────────────────────────────────────────────────────
+# Раньше водитель мог только «попросить»: отправил — и жди решения. Половина
+# ситуаций на адресе так не решается. Клиент не открывает дверь; адрес не тот;
+# клиент хочет другое, но не то, что записано. На всё это нужен не запрос, а
+# разговор — и он должен идти внутри приложения, привязанным к заказу, а не в
+# личной переписке, где его потом никто не найдёт.
+CASE_KIND = {
+    "client":  "Клиент не отвечает",
+    "address": "Не найти адрес",
+    "wait":    "Прошу подождать",
+    "other":   "Вопрос по заказу",
+}
+
+
+@require_driver
+async def handle_chat(request):
+    """Переписка по заказу. Открытие ленты считается прочтением."""
+    me = request["driver"]
+    oid = (request.match_info.get("oid") or "").strip()
+    o = await db.get_order(oid)
+    if not o or (o.get("driver") or "").strip() != me["name"]:
+        return web.json_response({"error": "not_your_order"}, status=403, headers=CORS_HEADERS)
+    now = datetime.now(timezone.utc).isoformat()
+    if _chat_new(o, "driver"):
+        await db.order_chat_seen(oid, "driver", now)
+    return web.json_response({"order_id": oid, "chat": _chat_view(o),
+                              "operator": o.get("operator_name") or ""},
+                             headers=CORS_HEADERS)
+
+
+@require_driver
+async def handle_chat_send(request):
+    """Сообщение оператору. С видом — открывает обращение по заказу.
+
+    Обращение и разговор — одно и то же: первая реплика и есть повод. Отдельная
+    «карточка обращения» рядом с перепиской была бы двумя записями об одном
+    событии, и они разъехались бы в первый же спорный день."""
+    me = request["driver"]
+    oid = (request.match_info.get("oid") or "").strip()
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    text = str(body.get("text") or "").strip()[:600]
+    kind = str(body.get("kind") or "").strip()
+    if kind and kind not in CASE_KIND:
+        kind = "other"
+    if not text and not kind:
+        return web.json_response({"error": "empty"}, status=400, headers=CORS_HEADERS)
+
+    o = await db.get_order(oid)
+    if not o or (o.get("driver") or "").strip() != me["name"]:
+        return web.json_response({"error": "not_your_order"}, status=403, headers=CORS_HEADERS)
+
+    now = datetime.now(timezone.utc).isoformat()
+    msg = {"by": "driver", "name": me["name"], "text": text or CASE_KIND[kind],
+           "at": now, "kind": kind}
+    doc = await db.order_chat_add(oid, msg)
+    log.info(f"[driver] {me['name']} пишет по #{oid}"
+             + (f" ({kind})" if kind else "") + f": {msg['text'][:50]}")
+    try:
+        await _notify_chat(oid, me, msg, doc or o)
+    except Exception as e:
+        log.warning(f"[driver] уведомление о сообщении: {e}")
+    return web.json_response({"ok": True, "chat": _chat_view(doc or o)},
+                             headers=CORS_HEADERS)
+
+
+async def _notify_chat(oid: str, me: dict, msg: dict, o: dict):
+    """Операторам — в бот. В панели сообщение и так всплывёт в ленте, но
+    оператор может стоять к ней спиной, а водитель ждёт ответа на адресе."""
+    from api_server import tg_send, OPERATOR_BOT_TOKEN
+    from operator_routes import OPERATOR_IDS
+    if not OPERATOR_BOT_TOKEN:
+        return
+    head = ("❓ *" + CASE_KIND.get(msg.get("kind"), "") + "*\n") if msg.get("kind") else "💬 *Водитель пишет*\n"
+    text = (head + f"#{oid} · {me['district_code']} · {me['name']}\n"
+            f"{o.get('address', '')}\n\n_{msg['text']}_\n\n"
+            "Ответить — в панели, карточка заказа.")
+    for uid in OPERATOR_IDS:
+        try:
+            await tg_send(OPERATOR_BOT_TOKEN, uid, text)
+        except Exception as e:
+            log.warning(f"[driver] сообщение оператору {uid}: {e}")
+
+
 @require_driver
 async def handle_expenses(request):
     """Мои расходы за смену — и что из них уже утвердили."""
@@ -739,6 +845,8 @@ def setup(app):
         ("/api/driver/orders/{oid}/ack",        handle_ack,         "POST"),
         ("/api/driver/orders/{oid}/delivered",  handle_delivered,   "POST"),
         ("/api/driver/orders/{oid}/edit",       handle_edit_request, "POST"),
+        ("/api/driver/orders/{oid}/chat",       handle_chat,        "GET"),
+        ("/api/driver/orders/{oid}/chat",       handle_chat_send,   "POST"),
         ("/api/driver/supply/{sid}",            handle_supply_task,   "GET"),
         ("/api/driver/supply/{sid}/claim",      handle_supply_claim,  "POST"),
         ("/api/driver/supply/{sid}/release",    handle_supply_release, "POST"),

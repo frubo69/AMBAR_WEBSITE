@@ -194,6 +194,38 @@ async def update_order(oid: str, **kw):
     _orders_dirty()
 
 
+# ── Переписка по заказу ─────────────────────────────────────────────────────
+# Водитель и оператор разговаривают о конкретном заказе — и разговор живёт на
+# самом заказе, а не отдельной перепиской. Причина простая: обсуждают всегда
+# «этот адрес», «эти бутылки», и через неделю в споре нужна не переписка, а
+# заказ вместе с ней.
+#
+# Кто где остановился, помним двумя метками времени, а не флагом «прочитано» на
+# каждом сообщении: сторон всего две, и вопрос у обеих один — есть ли что-то
+# новее того, что я видел.
+async def order_chat_add(oid: str, msg: dict) -> dict | None:
+    db = _db_or_none()
+    if db is None: return None
+    from pymongo import ReturnDocument
+    doc = await db.orders.find_one_and_update(
+        {"order_id": oid},
+        {"$push": {"chat": msg},
+         "$set": {"chat_at": msg.get("at"),
+                  # Своё сообщение писавший уже видел — иначе счётчик
+                  # непрочитанного загорелся бы у самого автора.
+                  f"chat_seen_{msg.get('by')}": msg.get("at")}},
+        projection={"_id": 0}, return_document=ReturnDocument.AFTER)
+    if doc: _orders_dirty()
+    return doc
+
+
+async def order_chat_seen(oid: str, side: str, at: str) -> None:
+    db = _db_or_none()
+    if db is None: return
+    await db.orders.update_one({"order_id": oid}, {"$set": {f"chat_seen_{side}": at}})
+    _orders_dirty()
+
+
 async def get_order(oid: str) -> dict | None:
     db = _db_or_none()
     if db is None: return None

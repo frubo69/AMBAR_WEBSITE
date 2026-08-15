@@ -176,6 +176,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .ord-edit:active{transform:scale(.95);color:var(--gold2)}
 .ord-foot{display:block;padding:14px 16px;border-top:1px solid var(--border2)}
 .ord-foot .btn{width:100%}
+.ord-foot-2{display:flex;align-items:center;gap:9px}
 .btn{padding:15px 10px;border:none;border-radius:13px;cursor:pointer;font-family:inherit;
   font-size:14.5px;font-weight:700;transition:.15s var(--e1)}
 .btn:active{transform:scale(.97)}
@@ -318,6 +319,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .tb-badge{position:absolute;top:-6px;right:-10px;min-width:17px;height:17px;padding:0 4px;
   border-radius:999px;background:var(--gold2);color:#1a1408;font-size:9px;font-weight:700;
   display:flex;align-items:center;justify-content:center}
+.tb-badge.hot{background:var(--dn);color:#fff}
 
 .deny{position:fixed;inset:0;z-index:100;display:none;flex-direction:column;align-items:center;
   justify-content:center;gap:12px;padding:40px;text-align:center;background:var(--bg)}
@@ -369,6 +371,67 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   justify-content:center;border:1px solid var(--border3);background:var(--card2);color:var(--sub);
   cursor:pointer;padding:0}
 .sheet-hd .sheet-t,.sheet-hd .sheet-s{margin-bottom:0}
+
+/* ── разговор с оператором ────────────────────────────────────────────────
+   Переписка идёт по заказу, а не «вообще»: обсуждают всегда этот адрес и эти
+   бутылки, и через неделю в споре нужен заказ вместе с разговором. */
+.case-w{display:flex;flex-direction:column;gap:8px;max-height:44dvh;overflow-y:auto;
+  padding:2px 2px 4px;margin-bottom:12px}
+.msg{max-width:86%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.4}
+.msg.me{align-self:flex-end;background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.3);border-bottom-right-radius:5px}
+.msg.op{align-self:flex-start;background:var(--card2);border:1px solid var(--border3);
+  border-bottom-left-radius:5px}
+.msg-n{display:block;font-size:10px;font-weight:700;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--muted);margin-bottom:3px}
+.msg.me .msg-n{color:var(--gold2)}
+.msg-t{display:block;font-size:10.5px;color:var(--dim);margin-top:4px;text-align:right}
+/* Повод, с которого начался разговор, — не реплика, а заголовок над ней. */
+.msg-k{display:inline-flex;align-items:center;gap:5px;margin-bottom:5px;padding:2px 8px;
+  border-radius:999px;background:var(--warn-soft);color:var(--warn);
+  font-size:10px;font-weight:700;letter-spacing:.4px;text-transform:uppercase}
+
+/* Ситуации в одно касание. Названы так, как их произносит водитель, — он
+   думает «клиент не отвечает», а не «мне нужна правка состава». */
+.case-l{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
+  color:var(--muted);margin:2px 2px 9px}
+.case-g{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:14px}
+.case-b{display:flex;align-items:center;gap:9px;padding:12px 13px;border-radius:13px;
+  cursor:pointer;text-align:left;font-family:inherit;font-size:13px;font-weight:600;
+  color:var(--text);background:var(--card2);border:1px solid var(--border3);
+  transition:.15s var(--e1);min-height:56px}
+.case-b:active{transform:scale(.97);border-color:rgba(201,169,110,.4)}
+.case-b svg{flex:0 0 auto;color:var(--gold2)}
+.case-b.wide{grid-column:1 / -1;min-height:0}
+.case-b.danger{color:var(--dn)}
+.case-b.danger svg{color:var(--dn)}
+
+/* Поле ответа приколочено к низу листа: разговор читают сверху вниз, а
+   отвечают, не возвращаясь наверх. */
+.case-say{display:flex;align-items:center;gap:8px;padding-top:12px;
+  border-top:1px solid var(--border2)}
+.case-say input{flex:1;min-width:0;padding:13px 14px;border-radius:13px;
+  border:1px solid var(--border2);background:var(--bg3);color:var(--text);
+  font-family:inherit;font-size:14px;outline:none}
+.case-say input:focus{border-color:rgba(201,169,110,.5)}
+.case-go{flex:0 0 auto;width:48px;height:48px;border-radius:14px;border:none;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408}
+.case-go:active{transform:scale(.94)}
+.case-go:disabled{opacity:.4;pointer-events:none}
+.case-empty{padding:18px 4px 20px;text-align:center;font-size:12.5px;color:var(--muted);
+  line-height:1.55}
+
+/* Кнопка разговора на карточке заказа */
+.ord-chat{position:relative;flex:0 0 auto;width:54px;height:54px;border-radius:16px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  color:var(--sub);background:var(--card2);border:1px solid var(--border3)}
+.ord-chat:active{transform:scale(.94)}
+.ord-chat.new{color:var(--gold2);border-color:rgba(201,169,110,.45);
+  background:var(--gold-soft)}
+.ord-chat-b{position:absolute;top:-5px;right:-5px;min-width:19px;height:19px;padding:0 5px;
+  border-radius:999px;background:var(--dn);color:#fff;font-size:10px;font-weight:700;
+  display:flex;align-items:center;justify-content:center}
 
 /* переключатель режимов правки */
 .seg{display:grid;grid-template-columns:1fr 1fr;gap:4px;padding:4px;border-radius:13px;
@@ -798,6 +861,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
       <span class="tb-badge" id="tbNum" style="display:none">0</span></span>
     <span>Заказы</span>
   </button>
+  <button class="tb" data-tab="expenses" onclick="setTab('expenses')">
+    <span class="tb-ic"><svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+      <span class="tb-badge" id="tbExp" style="display:none">0</span></span>
+    <span>Расходы</span>
+  </button>
   <button class="tb" data-tab="supply" onclick="setTab('supply')">
     <span class="tb-ic"><svg viewBox="0 0 24 24"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4"/><path d="M12 11v10"/></svg>
       <span class="tb-badge" id="tbSup" style="display:none">0</span></span>
@@ -806,11 +874,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   <button class="tb" data-tab="history" onclick="setTab('history')">
     <span class="tb-ic"><svg viewBox="0 0 24 24"><path d="M3 3v5h5"/><path d="M3.5 8a9 9 0 1 0 2.2-3.4L3 8"/><path d="M12 7v5l3 2"/></svg></span>
     <span>История</span>
-  </button>
-  <button class="tb" data-tab="expenses" onclick="setTab('expenses')">
-    <span class="tb-ic"><svg viewBox="0 0 24 24"><path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-      <span class="tb-badge" id="tbExp" style="display:none">0</span></span>
-    <span>Расходы</span>
   </button>
 </nav>
 
@@ -872,6 +935,33 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
     <div id="infoBody"></div>
     <div class="sheet-acts">
       <button class="btn btn-pri" onclick="infoClose()">Понятно</button>
+    </div>
+  </div>
+</div>
+
+<!-- Разговор с оператором по заказу. Один экран: что уже сказано, чем можно
+     позвать в одно касание и поле, чтобы написать словами. -->
+<div class="sheet" id="caseSheet" onclick="if(event.target===this)caseClose()">
+  <div class="sheet-in">
+    <div class="sheet-hd">
+      <div style="flex:1;min-width:0">
+        <div class="sheet-t">Оператор</div>
+        <div class="sheet-s" id="caseFor">—</div>
+      </div>
+      <button class="sheet-x" onclick="caseClose()" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
+    </div>
+    <div id="caseBody"></div>
+    <div class="case-say">
+      <input id="caseText" type="text" placeholder="Написать оператору" autocomplete="off"
+             enterkeyhint="send" onkeydown="if(event.key==='Enter')caseSend()">
+      <button class="case-go" id="caseGo" onclick="caseSend()" aria-label="Отправить">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 12h15M13 6l6 6-6 6"/></svg>
+      </button>
     </div>
   </div>
 </div>
@@ -1052,6 +1142,7 @@ const ICO = {
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11.5v4.5M12 8h.01"/>',
   search:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
   close:'<path d="M6 6l12 12M18 6L6 18"/>',
+  chat: '<path d="M20 14a2 2 0 0 1-2 2H8l-4 3.5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/>',
   meal: '<path d="M7 3v5.4a2.3 2.3 0 0 0 4.6 0V3"/><path d="M9.3 8.7V21"/><path d="M17.6 3c-1.7 1.5-2.5 3.4-2.5 5.5 0 1.7.8 2.7 2.5 2.9V21"/>',
 };
 const svg = (d, w=19) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none"
@@ -1122,6 +1213,10 @@ async function load(){
   const n = ORDERS.active.length;
   const b = document.getElementById('tbNum');
   b.style.display = n ? 'flex' : 'none'; b.textContent = n;
+  // Ответ оператора — повод открыть приложение, даже если заказ один и он
+  // давно на экране. Значок на вкладке краснеет, пока не прочитали.
+  const unread = ORDERS.active.reduce((a, o) => a + (o.chat_new || 0), 0);
+  b.classList.toggle('hot', !!unread);
   const be = document.getElementById('tbExp');
   const pend = (EXP.extras || []).filter(x => (x.status || 'approved') === 'pending').length;
   be.style.display = pend ? 'flex' : 'none'; be.textContent = pend;
@@ -1238,7 +1333,12 @@ function orderCard(o, i){
     ${req ? `<div class="ord-row ord-row-req ${reqFlag[0]}">
       ${svg(ICO.edit, 15)}<span>${reqFlag[1]}</span></div>` : ''}
 
-    <div class="ord-foot">
+    <div class="ord-foot ord-foot-2">
+      <button class="ord-chat${o.chat_new ? ' new' : ''}" onclick="caseOpen('${esc(o.order_id)}')"
+        aria-label="Написать оператору">
+        ${svg(ICO.chat, 21)}
+        ${o.chat_new ? `<span class="ord-chat-b">${o.chat_new}</span>` : ''}
+      </button>
       ${open && (req.kind === 'delivered' || req.kind === 'cancel')
         ? `<button class="btn btn-wait" disabled>${svg(ICO.clock,16)} Ждём оператора</button>`
         : `<button class="btn btn-pri" onclick="askDeliver('${esc(o.order_id)}')">Доставил</button>`}
@@ -1359,7 +1459,12 @@ function ordHead(active){
   const late = active.filter(o => _isLate(o.deliver_by)).length;
   const zero = cash === 0;
   const foot = [];
-  if(!zero && paid) foot.push(`<span>${fmt(paid)} AED без оплаты на месте</span>`);
+  // Не «прошло мимо рук» и не «без оплаты на месте»: водителю важно, что с
+  // этих денег он ничего не берёт, — так и пишем, называя причину.
+  const pre = active.filter(o => o.prepaid).reduce((a, o) => a + (o.total || 0), 0);
+  const debt = paid - pre;
+  if(!zero && paid) foot.push(`<span>${fmt(paid)} AED не берём: ${
+    pre && debt ? 'оплачено онлайн и в долг' : pre ? 'оплачено онлайн' : 'в долг'}</span>`);
   if(late) foot.push(`<span class="warn">${late === 1
     ? 'один заказ просрочен' : late + ' заказа просрочено'}</span>`);
   return `<div class="hsum${late ? ' late' : ''}">
@@ -1487,7 +1592,7 @@ function renderHistory(){
         </span>
       </div>
       ${(t.online || t.avg_min) ? `<div class="hsum-f">
-        ${t.online ? `<span>${fmt(t.online)} AED прошло мимо рук</span>` : ''}
+        ${t.online ? `<span>${fmt(t.online)} AED оплатили без вас</span>` : ''}
         ${t.avg_min ? `<span>${t.avg_min} мин в среднем в пути</span>` : ''}
       </div>` : ''}
     </div>
@@ -2911,6 +3016,129 @@ const EDIT_REASONS = ['Нет в наличии', 'Клиент просит д�
                       'Адрес не тот', 'Клиент не отвечает', 'Клиент отказался'];
 const CANCEL_REASONS = ['Клиент отказался', 'Клиент не отвечает', 'Адреса не существует',
                         'Клиент не открывает', 'Нет денег у клиента', 'Дубль заказа'];
+
+// ══════════════════════════════════════════════════════════════════════════
+//  РАЗГОВОР С ОПЕРАТОРОМ
+// ══════════════════════════════════════════════════════════════════════════
+// До сих пор водитель мог только «попросить»: отправил — и жди решения.
+// Половина ситуаций на адресе так не решается. Клиент не открывает дверь;
+// адрес не тот; клиент хочет другое, но не то, что записано; охрана не пускает
+// в комплекс. На всё это нужен не запрос, а разговор.
+//
+// Экран один и на нём всё сразу: что уже сказано, чем позвать в одно касание и
+// поле, чтобы написать словами. Отдельные вкладки «Состав / Проблема /
+// Отменить» заставляли водителя сначала выбрать механизм, хотя он знает только
+// ситуацию.
+//
+// Названия ситуаций — те, что он произносит вслух. «Клиент не отвечает», а не
+// «обращение по недоступности получателя».
+let CASE_OID = null, CASE_CHAT = [], CASE_BUSY = false;
+
+const CASES = [
+  ['client',  'Клиент не отвечает', '<circle cx="12" cy="12" r="9"/><path d="M12 8v5M12 16h.01"/>'],
+  ['address', 'Не найти адрес',     '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0"/><path d="M12 7v6M12 15h.01"/>'],
+  ['wait',    'Прошу подождать',    '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'],
+];
+
+async function caseOpen(oid){
+  CASE_OID = oid; CASE_CHAT = [];
+  document.getElementById('caseFor').textContent = `Заказ #${oid}`;
+  document.getElementById('caseText').value = '';
+  caseRender();
+  document.getElementById('caseSheet').classList.add('show');
+  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+  try{
+    const r = await drvApi.drvFetch(`/api/driver/orders/${oid}/chat`);
+    CASE_CHAT = r.chat || [];
+    caseRender();
+    // Прочитали — счётчик на карточке гаснет, не дожидаясь следующего опроса.
+    const o = ((ORDERS && ORDERS.active) || []).find(x => x.order_id === oid);
+    if(o){ o.chat_new = 0; renderOrders(); }
+  }catch(e){}
+}
+
+function caseClose(){
+  document.getElementById('caseSheet').classList.remove('show');
+  CASE_OID = null;
+}
+
+function caseRender(){
+  const box = document.getElementById('caseBody');
+  const msgs = CASE_CHAT.map(m => `
+    <div class="msg ${m.by === 'driver' ? 'me' : 'op'}">
+      ${m.kind && CASE_TITLE[m.kind] ? `<span class="msg-k">${esc(CASE_TITLE[m.kind])}</span>` : ''}
+      <span class="msg-n">${m.by === 'driver' ? 'вы' : esc(m.name || 'оператор')}</span>
+      ${esc(m.text)}
+      <span class="msg-t">${hhmm(m.at)}</span>
+    </div>`).join('');
+  box.innerHTML =
+    (CASE_CHAT.length
+      ? `<div class="case-w" id="caseW">${msgs}</div>`
+      : `<div class="case-empty">Оператор видит этот заказ и ответит здесь же.<br>
+           Нажмите, что случилось, или напишите своими словами.</div>`)
+    + `<div class="case-l">Что случилось</div>
+       <div class="case-g">
+         ${CASES.map(([k, t, ico]) => `<button class="case-b" onclick="caseSay('${k}')">
+           ${svg(ico, 18)}<span>${t}</span></button>`).join('')}
+         <button class="case-b" onclick="caseItems()">
+           ${svg(ICO.edit, 18)}<span>Хочет другое</span></button>
+         <button class="case-b wide danger" onclick="caseCancel()">
+           ${svg(ICO.ban, 17)}<span>Клиент отказался — прошу отменить</span></button>
+       </div>`;
+  const w = document.getElementById('caseW');
+  if(w) w.scrollTop = w.scrollHeight;
+}
+
+const CASE_TITLE = {client:'Клиент не отвечает', address:'Не найти адрес',
+                    wait:'Прошу подождать', other:'Вопрос по заказу'};
+
+// Ситуация уходит одним касанием, без подтверждения и без формы: водитель
+// стоит у двери, и лишний экран здесь — это лишняя минута ожидания клиента.
+async function caseSay(kind){
+  if(CASE_BUSY) return; CASE_BUSY = true;
+  try{
+    const r = await drvApi.drvFetch(`/api/driver/orders/${CASE_OID}/chat`,
+      {method:'POST', body:{kind}});
+    CASE_CHAT = r.chat || CASE_CHAT;
+    caseRender();
+    try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    toast('Оператор увидит сразу');
+  }catch(e){ toast('Не отправилось', 'err'); }
+  finally{ CASE_BUSY = false; }
+}
+
+async function caseSend(){
+  const inp = document.getElementById('caseText');
+  const text = (inp.value || '').trim();
+  if(!text || CASE_BUSY) return;
+  CASE_BUSY = true;
+  document.getElementById('caseGo').disabled = true;
+  try{
+    const r = await drvApi.drvFetch(`/api/driver/orders/${CASE_OID}/chat`,
+      {method:'POST', body:{text}});
+    CASE_CHAT = r.chat || CASE_CHAT;
+    inp.value = '';
+    caseRender();
+    try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+  }catch(e){ toast('Не отправилось', 'err'); }
+  finally{ CASE_BUSY = false; document.getElementById('caseGo').disabled = false; }
+}
+
+// Две ситуации решаются не разговором, а тем, что уже построено: правкой
+// состава и просьбой об отмене. Ведём туда прямо отсюда.
+function caseItems(){
+  const oid = CASE_OID;
+  caseClose();
+  openEdit(oid);
+  editMode('items');
+}
+
+function caseCancel(){
+  const oid = CASE_OID;
+  caseClose();
+  openEdit(oid);
+  editMode('cancel');
+}
 
 let EDIT_MODE = 'items';   // items | text
 let EDIT_LINES = [];       // рабочая копия состава: {id,name,qty,was,price,pcs}

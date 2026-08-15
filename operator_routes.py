@@ -1100,7 +1100,58 @@ async def handle_one(request):
         return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
     row = _summary(order)
     row["needs_verify"] = await _needs_verify(order)
+    # Разговор кладём только в открытый заказ: в списке он не нужен, а весит
+    # больше всей остальной карточки.
+    row["chat"] = [{"by": m.get("by", ""), "name": m.get("name", ""),
+                    "text": m.get("text", ""), "at": str(m.get("at") or ""),
+                    "kind": m.get("kind", "")} for m in (order.get("chat") or [])]
+    # Открыли карточку — значит прочитали.
+    if _chat_new(order, "operator"):
+        await db.order_chat_seen(row["order_id"], "operator",
+                                 datetime.now(timezone.utc).isoformat())
     return web.json_response({"order": row}, headers=CORS_HEADERS)
+
+
+def _chat_new(o: dict, side: str) -> int:
+    seen = str(o.get(f"chat_seen_{side}") or "")
+    return sum(1 for m in (o.get("chat") or [])
+               if m.get("by") != side and str(m.get("at") or "") > seen)
+
+
+@require_operator
+async def handle_chat_send(request):
+    """Ответ водителю по заказу.
+
+    Оператор до сих пор мог только решить по просьбе — «принять» или
+    «отклонить». Половина ситуаций на адресе так не решается: сначала надо
+    спросить. Ответ уходит водителю в бот и остаётся на заказе."""
+    oid = request.match_info["oid"]
+    order = await db.get_order(oid)
+    if not order:
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    text = str(body.get("text") or "").strip()[:600]
+    if not text:
+        return web.json_response({"error": "empty"}, status=400, headers=CORS_HEADERS)
+    who = (body.get("as") or "").strip() or _op_name(request["op_user"])
+    now = datetime.now(timezone.utc).isoformat()
+    doc = await db.order_chat_add(oid, {"by": "operator", "name": who,
+                                        "text": text, "at": now, "kind": ""})
+    log.info(f"[pos] {who} отвечает по #{oid}: {text[:50]}")
+    drv = (order.get("driver") or "").strip()
+    if drv:
+        await tell_driver(drv, f"💬 <b>Оператор по заказу #{oid}</b>\n{_esc_html(text)}")
+    return web.json_response({"ok": True, "chat": [
+        {"by": m.get("by", ""), "name": m.get("name", ""), "text": m.get("text", ""),
+         "at": str(m.get("at") or ""), "kind": m.get("kind", "")}
+        for m in ((doc or order).get("chat") or [])]}, headers=CORS_HEADERS)
+
+
+def _esc_html(x) -> str:
+    return (str(x or "").replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;"))
 
 
 @require_operator
@@ -1430,6 +1481,7 @@ DRV_REQ_TITLE = {
     "edit":      "водитель просит правку",
     "note":      "сообщение от водителя",
     "reassign":  "водитель не может взять заказ",
+    "chat":      "водитель ждёт ответа",
 }
 
 
@@ -1456,6 +1508,16 @@ async def handle_feed(request):
                 "address": o.get("address", ""), "driver": o.get("driver", ""),
                 "district": _code_of(dist, districts)}
 
+        # Непрочитанное сообщение водителя — такой же повод вмешаться, как и
+        # просьба: он стоит на адресе и ждёт ответа.
+        n_new = _chat_new(o, "operator")
+        if n_new and st == "approved":
+            last = (o.get("chat") or [])[-1]
+            need.append({**base, "type": "chat", "kind": "chat",
+                         "title": DRV_REQ_TITLE.get("chat", "водитель пишет"),
+                         "sub": last.get("name", ""), "text": last.get("text", ""),
+                         "at": last.get("at", ""), "mins": _mins_since(last.get("at", "")),
+                         "unread": n_new, "weight": 0})
         if req and req.get("status") == "open":
             need.append({**base, "type": "driver_req", "kind": req.get("kind") or "edit",
                          "title": DRV_REQ_TITLE.get(req.get("kind") or "edit", "просьба водителя"),
@@ -2056,6 +2118,8 @@ def setup(app):
     r.add_get("/api/operator/feed", handle_feed)
     r.add_route("OPTIONS", "/api/operator/orders/{oid}/driver-req", _opt)
     r.add_post("/api/operator/orders/{oid}/driver-req", handle_driver_req)
+    r.add_route("OPTIONS", "/api/operator/orders/{oid}/chat", _opt)
+    r.add_post("/api/operator/orders/{oid}/chat", handle_chat_send)
     r.add_route("OPTIONS", "/api/operator/support", _opt)
     r.add_get("/api/operator/support", handle_support_list)
     r.add_route("OPTIONS", "/api/operator/support/thread", _opt)

@@ -462,6 +462,35 @@ a.oc-row:active{background:var(--card2)}
 /* Конец смены. Строка района — итог дня и одно действие. Закрытая гаснет:
    по ней уже нечего делать, а разбирать список глазами придётся ещё не раз. */
 #shiftList{margin-bottom:16px}
+/* ── разговор с водителем в карточке заказа ───────────────────────────── */
+.och{margin:14px 0 0;padding:13px;border-radius:var(--r2);background:var(--card);
+  border:1px solid var(--border2)}
+.och-l{font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:10px}
+.och-w{display:flex;flex-direction:column;gap:7px;max-height:230px;overflow-y:auto;
+  margin-bottom:11px}
+.omsg{max-width:88%;padding:8px 11px;border-radius:13px;font-size:13px;line-height:1.4}
+.omsg.me{align-self:flex-end;background:rgba(201,169,110,.12);
+  border:1px solid rgba(201,169,110,.28);border-bottom-right-radius:5px}
+.omsg.drv{align-self:flex-start;background:var(--card2);border:1px solid var(--border2);
+  border-bottom-left-radius:5px}
+.omsg-n{display:block;font-size:9.5px;font-weight:700;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--sub);margin-bottom:3px}
+.omsg-k{display:inline-flex;margin-bottom:4px;padding:2px 8px;border-radius:999px;
+  background:rgba(243,180,74,.14);color:var(--warn);font-size:9.5px;font-weight:700;
+  letter-spacing:.4px;text-transform:uppercase}
+.omsg-t{display:block;font-size:10px;color:var(--sub);opacity:.7;margin-top:3px;text-align:right}
+.och-e{font-size:12.5px;color:var(--sub);line-height:1.5;margin-bottom:11px}
+.och-say{display:flex;align-items:center;gap:8px}
+.och-say input{flex:1;min-width:0;padding:12px 13px;border-radius:var(--r2);
+  border:1px solid var(--border2);background:var(--bg3);color:var(--text);
+  font-family:inherit;font-size:14px;outline:none}
+.och-say input:focus{border-color:rgba(201,169,110,.5)}
+.och-go{flex:0 0 auto;width:46px;height:46px;border-radius:var(--r2);border:none;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408}
+.och-go:disabled{opacity:.4;pointer-events:none}
+
 .sh-r{display:flex;align-items:center;gap:12px;padding:13px 14px;margin-bottom:8px;
   border-radius:var(--r2);background:var(--card);border:1px solid var(--border2)}
 .sh-r:last-child{margin-bottom:0}
@@ -1009,6 +1038,7 @@ a.oc-row:active{background:var(--card2)}
   <div class="sheet wide">
     <div class="t" id="ordT">Заказ</div>
     <div id="ordBody"></div>
+    <div id="ordChat"></div>
     <div class="ord-acts" id="ordActs"></div>
     <div class="btns"><button class="sbtn" onclick="hideOv('ordOv')">Закрыть</button></div>
   </div>
@@ -2047,6 +2077,7 @@ function renderOrder(){
   }else{
     rest=[['Текст водителю',`showOrderText('${o.order_id}')`]];
   }
+  chatRender();
   $('ordActs').innerHTML = gate + money
     + (main?`<div class="oc-top">
         <button class="oc-main" onclick="${main[1]}">${main[0]}</button>
@@ -2324,6 +2355,62 @@ function _orderText(o){
          `Итого: ${o.total} AED`+
          (o.comment?`\n\nКомментарий: ${o.comment}`:'');
 }
+// ── Разговор с водителем ────────────────────────────────────────────────────
+// Оператор до сих пор мог только решить по просьбе: «принять» или «отклонить».
+// Половина ситуаций на адресе так не решается — сначала надо спросить. Ответ
+// уходит водителю в бот и остаётся на заказе: через неделю в разборе нужна не
+// переписка отдельно и заказ отдельно, а заказ вместе с разговором.
+const CASE_TITLE = {client:'Клиент не отвечает', address:'Не найти адрес',
+                    wait:'Просит подождать', other:'Вопрос по заказу'};
+
+function chatRender(){
+  const o = curOrder || {};
+  const box = $('ordChat'); if(!box) return;
+  const chat = o.chat || [];
+  if(!chat.length && o.status !== 'approved'){ box.innerHTML = ''; return; }
+  box.innerHTML = `
+    <div class="och">
+      <div class="och-l">Разговор с водителем${o.driver ? ' · ' + _esc(o.driver) : ''}</div>
+      ${chat.length ? `<div class="och-w" id="ochW">${chat.map(m => `
+        <div class="omsg ${m.by === 'operator' ? 'me' : 'drv'}">
+          ${m.kind && CASE_TITLE[m.kind]
+            ? `<span class="omsg-k">${_esc(CASE_TITLE[m.kind])}</span>` : ''}
+          <span class="omsg-n">${_esc(m.by === 'operator' ? (m.name || 'оператор') : (m.name || 'водитель'))}</span>
+          ${_esc(m.text)}
+          <span class="omsg-t">${_hhmm(m.at)}</span>
+        </div>`).join('')}</div>`
+        : `<div class="och-e">Водитель ещё ничего не писал. Можно написать первым —
+             например, что клиент просит перезвонить.</div>`}
+      <div class="och-say">
+        <input id="ochText" type="text" placeholder="Ответить водителю" autocomplete="off"
+               enterkeyhint="send" onkeydown="if(event.key==='Enter')chatSend()">
+        <button class="och-go" id="ochGo" onclick="chatSend()" aria-label="Отправить">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M4 12h15M13 6l6 6-6 6"/></svg>
+        </button>
+      </div>
+    </div>`;
+  const w = $('ochW'); if(w) w.scrollTop = w.scrollHeight;
+}
+
+let CHAT_BUSY = false;
+async function chatSend(){
+  const inp = $('ochText'); const t = (inp.value || '').trim();
+  if(!t || CHAT_BUSY || !curOrder) return;
+  CHAT_BUSY = true; $('ochGo').disabled = true;
+  try{
+    const r = await opApi.opFetch(`/api/operator/orders/${curOrder.order_id}/chat`,
+      {method:'POST', body:{text: t, as: curOp}});
+    curOrder.chat = r.chat || curOrder.chat;
+    inp.value = '';
+    chatRender();
+    haptic('ok');
+    toast('Ушло водителю','ok');
+  }catch(e){ toast('Не отправилось','err'); }
+  finally{ CHAT_BUSY = false; const g = $('ochGo'); if(g) g.disabled = false; }
+}
+
 function showOrderText(oid){
   const o = ORDERS.find(x=>x.order_id===oid); if(!o) return;
   $('copyText').textContent = _orderText(o);

@@ -381,22 +381,6 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   font-family:inherit;font-size:12.5px;font-weight:600;white-space:nowrap;
   color:var(--sub);background:var(--card2);border:1px solid var(--border3)}
 .pk-c.on{background:var(--gold-soft);border-color:rgba(201,169,110,.45);color:var(--gold2)}
-.pk-add{flex:0 0 auto;min-width:46px;height:40px;padding:0 12px;border-radius:11px;
-  cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:700;
-  color:var(--gold2);background:var(--card2);border:1px solid var(--border3);
-  display:flex;align-items:center;justify-content:center}
-.pk-add:active{transform:scale(.94)}
-/* Счётчик встаёт на место «плюса»: то же место, тот же размер — строка не
-   прыгает, когда позицию набрали. */
-.pk-st{flex:0 0 auto;display:flex;align-items:center;gap:2px;height:40px;
-  border-radius:11px;background:var(--card2);border:1px solid rgba(201,169,110,.4)}
-.pk-st button{width:36px;height:38px;border:none;background:none;cursor:pointer;
-  color:var(--gold2);display:flex;align-items:center;justify-content:center;padding:0}
-.pk-st button:active{transform:scale(.9)}
-.pk-st b{min-width:20px;text-align:center;font-family:'Space Grotesk',sans-serif;
-  font-size:15px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
-.ed-i.has{border-color:rgba(201,169,110,.35);background:var(--card2)}
-
 /* ══ Экстренная ситуация ═══════════════════════════════════════════════════
    Повторяет системный экран выключения: тот же чёрный фон, тот же ползунок,
    тот же круглый крест внизу. Знакомая форма здесь важнее оригинальности —
@@ -953,6 +937,22 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   font-family:inherit;font-size:12px;font-weight:700;color:var(--gold2);
   background:var(--gold-soft);border:1px solid rgba(201,169,110,.35)}
 .ed-i button:active{transform:scale(.94)}
+/* Счётчик — одна рамка, а не рамка в рамке. Плюс и минус внутри без своих
+   фонов: они части одного элемента, а не две отдельные кнопки рядом. */
+.ed-i .pk-add{flex:0 0 auto;min-width:44px;height:34px;padding:0 12px;border-radius:10px;
+  cursor:pointer;font-family:inherit;font-size:12px;font-weight:700;color:var(--gold2);
+  background:var(--gold-soft);border:1px solid rgba(201,169,110,.35);
+  display:flex;align-items:center;justify-content:center}
+.ed-i .pk-add:active{transform:scale(.94)}
+.ed-i .pk-st{flex:0 0 auto;display:flex;align-items:center;gap:2px;height:34px;padding:2px;
+  border-radius:10px;background:var(--card2);border:1px solid var(--border3)}
+.ed-i .pk-st button{width:30px;height:30px;padding:0;border:none;background:none;
+  border-radius:8px;color:var(--sub);cursor:pointer;display:flex;align-items:center;
+  justify-content:center}
+.ed-i .pk-st button:active{background:var(--card3);color:var(--gold2);transform:none}
+.ed-i .pk-st b{min-width:22px;text-align:center;font-family:'Space Grotesk',sans-serif;
+  font-size:14px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums}
+.ed-i.has{border-color:rgba(201,169,110,.3)}
 </style>
 </head>
 <body>

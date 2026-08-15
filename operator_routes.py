@@ -524,7 +524,10 @@ def _summary(o: dict) -> dict:
         "deliver_by": o.get("deliver_by", ""),
         "eta": o.get("eta", 0),
         "payment_method": o.get("payment_method", ""),
-        "prepaid": bool(o.get("prepaid")),
+        # Оплачено онлайн: у криптового заказа в базе стоит paid и
+        # payment_method, а поля prepaid нет вовсе — читаем все три.
+        "prepaid": bool(o.get("prepaid") or o.get("paid")
+                        or o.get("payment_method") == "crypto"),
         "lang": o.get("lang", "ru"),
         "timestamp": o.get("timestamp", ""),
         # Просьба водителя едет вместе с заказом: она меняет то, что оператор

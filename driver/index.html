@@ -1677,7 +1677,9 @@ function renderOrders(){
 // шапка не должна обещать того, чего водитель не привезёт.
 function ordHead(active){
   if(!active.length) return '';
-  const free = o => !!o.prepaid || o.payment_method === 'debt';
+  // Оплачено онлайн или в долг — этих денег водитель не касается.
+  const free = o => !!o.prepaid || o.payment_method === 'crypto'
+                 || o.payment_method === 'debt';
   const cash = active.filter(o => !free(o)).reduce((a, o) => a + (o.total || 0), 0);
   const paid = active.filter(free).reduce((a, o) => a + (o.total || 0), 0);
   const units = active.reduce((a, o) =>
@@ -1687,7 +1689,8 @@ function ordHead(active){
   const foot = [];
   // Не «прошло мимо рук» и не «без оплаты на месте»: водителю важно, что с
   // этих денег он ничего не берёт, — так и пишем, называя причину.
-  const pre = active.filter(o => o.prepaid).reduce((a, o) => a + (o.total || 0), 0);
+  const pre = active.filter(o => o.prepaid || o.payment_method === 'crypto')
+    .reduce((a, o) => a + (o.total || 0), 0);
   const debt = paid - pre;
   if(!zero && paid) foot.push(`<span>${fmt(paid)} AED не берём: ${
     pre && debt ? 'оплачено онлайн и в долг' : pre ? 'оплачено онлайн' : 'в долг'}</span>`);

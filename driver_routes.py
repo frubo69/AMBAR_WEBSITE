@@ -105,6 +105,20 @@ def require_driver(fn):
     return wrapper
 
 
+def _is_prepaid(o: dict) -> bool:
+    """Заказ уже оплачен — денег с клиента не брать.
+
+    Поле в базе называется не так, как его читали. Криптовый заказ рождается с
+    `paid: True` и `payment_method: "crypto"`, а приложение спрашивало `prepaid`
+    — которого в документе нет вовсе. Водитель видел «Наличными» на заказе,
+    который клиент уже оплатил, и вёз его забирать деньги второй раз.
+
+    Поэтому один ответ на всё приложение и три признака: как только любой из
+    них сказал «оплачено», денег не берём."""
+    return bool(o.get("prepaid") or o.get("paid")
+                or o.get("payment_method") == "crypto")
+
+
 def _order_view(o: dict) -> dict:
     """Заказ глазами водителя: адрес, состав, сумма.
 
@@ -126,7 +140,7 @@ def _order_view(o: dict) -> dict:
         "payment_method": o.get("payment_method", ""),
         # Оплаченный криптой заказ водитель обязан видеть до выезда: взять
         # наличные там, где уже заплачено, дороже любой ошибки в интерфейсе.
-        "prepaid": bool(o.get("prepaid")),
+        "prepaid": _is_prepaid(o),
         "timestamp": o.get("timestamp", ""),
         "confirmed_at": o.get("confirmed_at", ""),
         "delivered_at": o.get("delivered_at", ""),
@@ -312,7 +326,7 @@ async def handle_history(request):
         total = int(o.get("total", 0) or 0)
         g["count"] += 1
         g["aed"] += total
-        if o.get("prepaid") or o.get("payment_method") == "debt":
+        if _is_prepaid(o) or o.get("payment_method") == "debt":
             g["online"] += total
         else:
             g["cash"] += total

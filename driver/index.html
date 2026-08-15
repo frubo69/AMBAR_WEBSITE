@@ -373,6 +373,58 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   cursor:pointer;padding:0}
 .sheet-hd .sheet-t,.sheet-hd .sheet-s{margin-bottom:0}
 
+/* ══ Экстренная ситуация ═══════════════════════════════════════════════════
+   Повторяет системный экран выключения: тот же чёрный фон, тот же ползунок,
+   тот же круглый крест внизу. Знакомая форма здесь важнее оригинальности —
+   человек в этот момент не изучает интерфейс. */
+.pnc{position:fixed;inset:0;z-index:300;display:none;flex-direction:column;
+  align-items:center;justify-content:space-between;
+  padding:calc(58px + var(--safe-top)) 24px calc(46px + var(--safe-bottom));
+  background:#0a0a0c;-webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px)}
+.pnc.show{display:flex}
+.pnc-top{text-align:center}
+.pnc-t{font-size:19px;font-weight:700;letter-spacing:-.2px}
+.pnc-s{margin-top:9px;font-size:13px;line-height:1.55;color:var(--muted)}
+.pnc-slide{position:relative;width:100%;max-width:330px;height:68px;border-radius:999px;
+  overflow:hidden;background:rgba(255,255,255,.13);touch-action:pan-y}
+.pnc-fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:999px;
+  background:rgba(224,85,85,.28)}
+.pnc-track{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center;font-size:15.5px;font-weight:600;color:rgba(255,255,255,.62);
+  pointer-events:none}
+.pnc-knob{position:absolute;top:5px;left:5px;width:58px;height:58px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;color:#E05555;background:#fff;
+  box-shadow:0 3px 14px rgba(0,0,0,.5);transition:transform .22s var(--e1)}
+.pnc-slide.drag .pnc-knob{transition:none}
+.pnc-x{display:flex;flex-direction:column;align-items:center;gap:11px;border:none;
+  background:none;cursor:pointer;font-family:inherit;color:var(--text);padding:0}
+.pnc-x-c{width:66px;height:66px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;background:rgba(255,255,255,.14)}
+.pnc-x:active .pnc-x-c{background:rgba(255,255,255,.22)}
+.pnc-x-t{font-size:15px}
+
+/* ── маскировка: калькулятор ───────────────────────────────────────────── */
+.calc{position:fixed;inset:0;z-index:400;display:none;flex-direction:column;
+  justify-content:flex-end;gap:10px;background:#000;
+  padding:0 11px calc(18px + var(--safe-bottom));
+  font-family:-apple-system,'SF Pro Display','Helvetica Neue',sans-serif}
+.calc.show{display:flex}
+.calc-out{padding:0 14px 6px;text-align:right;color:#fff;font-weight:300;
+  font-size:78px;line-height:1.05;letter-spacing:-2px;
+  overflow:hidden;text-overflow:clip;white-space:nowrap}
+.calc-pad{display:grid;grid-template-columns:repeat(4,1fr);gap:11px}
+.calc-b{height:0;padding-bottom:100%;position:relative;border:none;border-radius:999px;
+  cursor:pointer;background:#333;color:#fff;font-family:inherit;font-size:31px;
+  font-weight:400;transition:filter .1s}
+.calc-b span{position:absolute;inset:0;display:flex;align-items:center;
+  justify-content:center}
+.calc-b:active{filter:brightness(1.6)}
+.calc-b.gray{background:#a5a5a5;color:#000}
+.calc-b.op{background:#ff9f0a}
+.calc-b.op.on{background:#fff;color:#ff9f0a}
+.calc-b.zero{grid-column:span 2;border-radius:999px}
+.calc-b.zero span{justify-content:flex-start;padding-left:31px}
+
 /* ── разговор с оператором ────────────────────────────────────────────────
    Переписка идёт по заказу, а не «вообще»: обсуждают всегда этот адрес и эти
    бутылки, и через неделю в споре нужен заказ вместе с разговором. */
@@ -852,7 +904,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
     <div class="hdr-logo">AMBAR</div>
     <div class="hdr-sub">Водитель</div>
   </div>
-  <div class="hdr-me">
+  <!-- Тройное касание по имени открывает экстренный экран. Случайно так не
+       выходит, а нарочно получается не глядя: имя всегда на одном месте. -->
+  <div class="hdr-me" onclick="pncTap()">
     <div class="hdr-av" id="dAv">—</div>
     <div class="hdr-n" id="dName">Загрузка…</div>
   </div>
@@ -942,6 +996,48 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
       <button class="btn btn-pri" onclick="infoClose()">Понятно</button>
     </div>
   </div>
+</div>
+
+<!-- ═══ Экстренная ситуация ══════════════════════════════════════════════
+     Тройное касание по своему имени в шапке. Три касания подряд — потому что
+     случайно так не выходит, а нарочно получается не глядя, одной рукой в
+     кармане: имя всегда на одном и том же месте.
+
+     Вид намеренно как у системного «выключить»: этот жест руки знает каждый,
+     и его не надо объяснять человеку, которому сейчас не до обучения. -->
+<div class="pnc" id="pncOv">
+  <div class="pnc-top">
+    <div class="pnc-t">Экстренная ситуация</div>
+    <div class="pnc-s">Приложение скроется. Старший и оператор узнают сразу.<br>
+      Вам ничего не покажется — экран просто станет другим.</div>
+  </div>
+
+  <div class="pnc-slide" id="pncSlide">
+    <div class="pnc-fill" id="pncFill"></div>
+    <div class="pnc-track" id="pncTrack">сдвиньте, чтобы скрыть</div>
+    <div class="pnc-knob" id="pncKnob">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
+        stroke-width="2.2" stroke-linecap="round"><path d="M12 3v9"/>
+        <path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>
+    </div>
+  </div>
+
+  <button class="pnc-x" onclick="pncClose()">
+    <span class="pnc-x-c">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
+        stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </span>
+    <span class="pnc-x-t">Отмена</span>
+  </button>
+</div>
+
+<!-- Маскировка. Обычный калькулятор — приложение, которое есть у всех и
+     которое никто не разглядывает. Считает по-настоящему: человек, взявший
+     телефон, скорее всего нажмёт пару кнопок, и они должны работать.
+     Выход — код и «=». -->
+<div class="calc" id="calcApp">
+  <div class="calc-out" id="calcOut">0</div>
+  <div class="calc-pad" id="calcPad"></div>
 </div>
 
 <!-- Разговор с оператором по заказу. Один экран: что уже сказано, чем можно
@@ -1178,16 +1274,31 @@ function toast(msg, kind){
 }
 
 async function boot(){
-  try{ ME = (await drvApi.drvFetch('/api/driver/ping')).driver; }
-  catch(e){ document.getElementById('deny').classList.add('show'); return; }
+  // Скрытый режим рисуем до того, как о чём-то спросим сервер: между запуском
+  // и ответом — полсекунды, и все полсекунды на экране был бы список заказов.
+  try{ PANIC = localStorage.getItem('ambar_panic') === '1'; }catch(e){}
+  if(PANIC) paintPanic();
+
+  let r;
+  try{ r = await drvApi.drvFetch('/api/driver/ping'); ME = r.driver; }
+  catch(e){ if(!PANIC) document.getElementById('deny').classList.add('show'); return; }
   document.getElementById('dAv').textContent = ME.name.slice(0,2).toUpperCase();
   document.getElementById('dName').textContent = ME.name;
+
+  // Последнее слово за сервером: телефон могли перезагрузить, а память вкладки
+  // очистить — режим от этого не заканчивается.
+  if(!!r.panic !== PANIC){
+    PANIC = !!r.panic;
+    try{ localStorage.setItem('ambar_panic', PANIC ? '1' : '0'); }catch(e){}
+    paintPanic();
+  }
+  if(PANIC) return;          // в скрытом режиме ничего не грузим и не опрашиваем
 
   await load();
   // Пять секунд, а не сорок пять: заказ должен появляться на экране почти сразу,
   // как его назначили. Спящую вкладку не опрашиваем — телефон в кармане.
-  setInterval(()=>{ if(!document.hidden) load(); }, 5000);
-  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden) load(); });
+  setInterval(()=>{ if(!document.hidden && !PANIC) load(); }, 5000);
+  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && !PANIC) load(); });
 }
 
 async function load(){
@@ -2238,6 +2349,65 @@ function _tap(kind){
   document.addEventListener('touchend', end);
 })();
 
+// Ползунок тревоги — тот же механизм, что у приёма заказа: насечки под пальцем
+// всю дорогу и толчок в точке, после которой можно отпускать.
+(function initPanicSlide(){
+  const bar = document.getElementById('pncSlide');
+  const knob = document.getElementById('pncKnob');
+  const fill = document.getElementById('pncFill');
+  const track = document.getElementById('pncTrack');
+  if(!bar || !knob) return;
+  let dragging = false, x0 = 0, max = 0, step = 0, lastTick = 0, armed = false;
+  const NOTCH = 12, ARM = 0.85;
+  const paint = v => {
+    knob.style.transform = `translateX(${v}px)`;
+    const k = max ? v / max : 0;
+    fill.style.width = (v + knob.offsetWidth) + 'px';
+    track.style.opacity = String(Math.max(0, 1 - k * 1.6));
+    track.style.filter = `blur(${(k * 3).toFixed(1)}px)`;
+  };
+  const start = e => {
+    dragging = true; bar.classList.add('drag');
+    step = 0; lastTick = 0; armed = false;
+    x0 = (e.touches ? e.touches[0].clientX : e.clientX);
+    max = bar.offsetWidth - knob.offsetWidth - 10;
+    _tap('sel');
+  };
+  const move = e => {
+    if(!dragging) return;
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - x0;
+    const v = Math.max(0, Math.min(max, x));
+    paint(v);
+    const k = max ? v / max : 0;
+    const st = Math.floor(k * NOTCH), now = Date.now();
+    if(st !== step && now - lastTick > 40){
+      step = st; lastTick = now;
+      if(st > 0 && st < NOTCH) _tap('sel');
+    }
+    if(!armed && k >= ARM){ armed = true; _tap('light'); }
+    else if(armed && k < ARM) armed = false;
+    if(e.cancelable) e.preventDefault();
+  };
+  const end = () => {
+    if(!dragging) return;
+    dragging = false; bar.classList.remove('drag');
+    const v = parseFloat((knob.style.transform.match(/-?\d+\.?\d*/) || [0])[0]);
+    if(v >= max * 0.85){
+      // Ни вспышки, ни звука, ни тоста: рядом кто-то есть.
+      panicSet(true);
+    }else{
+      paint(0);
+      _tap('soft');
+    }
+  };
+  knob.addEventListener('mousedown', start);
+  knob.addEventListener('touchstart', start, {passive:true});
+  document.addEventListener('mousemove', move);
+  document.addEventListener('touchmove', move, {passive:false});
+  document.addEventListener('mouseup', end);
+  document.addEventListener('touchend', end);
+})();
+
 async function incAccept(){
   const oid = INC && INC.order_id; if(!oid) return;
   try{
@@ -3020,6 +3190,170 @@ const EDIT_REASONS = ['Нет в наличии', 'Клиент просит д�
                       'Адрес не тот', 'Клиент не отвечает', 'Клиент отказался'];
 const CANCEL_REASONS = ['Клиент отказался', 'Клиент не отвечает', 'Адреса не существует',
                         'Клиент не открывает', 'Нет денег у клиента', 'Дубль заказа'];
+
+// ══════════════════════════════════════════════════════════════════════════
+//  ЭКСТРЕННАЯ СИТУАЦИЯ
+// ══════════════════════════════════════════════════════════════════════════
+// Водитель может оказаться там, где в его телефон смотрит кто-то ещё. Тогда он
+// трижды касается своего имени в шапке и сдвигает ползунок — приложение
+// перестаёт быть приложением доставки.
+//
+// Три решения, на которых всё держится:
+//
+//   • маскировка — калькулятор. Он есть у всех, его никто не разглядывает, и
+//     он должен по-настоящему считать: человек, взявший телефон, скорее всего
+//     нажмёт пару кнопок. Пустая картинка выдаёт себя первым же нажатием;
+//   • после сдвига не появляется ничего. Ни тоста, ни галочки, ни «отправлено»:
+//     рядом кто-то есть, и подтверждение увидит он же. Экран просто становится
+//     другим;
+//   • режим живёт на сервере. Закрыть приложение, выгрузить его из памяти,
+//     открыть заново — маскировка на месте. Иначе достаточно было бы свернуть
+//     телеграм, чтобы всё слетело.
+//
+// Выход — код на калькуляторе и «=». Код лежит в коде приложения, и это не
+// тайна от того, кто умеет читать исходники, — но угроза здесь другая: чужой
+// человек рядом, а не программист.
+const PNC_CODE = '112233';
+let PANIC = false, _pncTaps = [], _calc = null;
+
+// Тройное касание по имени. Считаем только быстрые серии: касания, разнесённые
+// на секунды, — это обычные промахи по шапке.
+function pncTap(){
+  const now = Date.now();
+  _pncTaps = _pncTaps.filter(t => now - t < 1200);
+  _pncTaps.push(now);
+  if(_pncTaps.length >= 3){ _pncTaps = []; pncOpen(); }
+}
+
+function pncOpen(){
+  document.getElementById('pncOv').classList.add('show');
+  pncKnobReset();
+  _tap('light');
+}
+
+function pncClose(){
+  document.getElementById('pncOv').classList.remove('show');
+  pncKnobReset();
+}
+
+function pncKnobReset(){
+  const k = document.getElementById('pncKnob'), f = document.getElementById('pncFill');
+  const t = document.getElementById('pncTrack');
+  if(k) k.style.transform = 'translateX(0)';
+  if(f) f.style.width = '0px';
+  if(t){ t.style.opacity = '1'; t.style.filter = 'none'; }
+  document.getElementById('pncSlide').classList.remove('drag');
+}
+
+// Включение и выключение — одна дорога, разница только в направлении.
+async function panicSet(on){
+  PANIC = on;
+  try{ localStorage.setItem('ambar_panic', on ? '1' : '0'); }catch(e){}
+  paintPanic();
+  // Запрос уходит следом и молча: если сеть подведёт, маскировка всё равно уже
+  // на экране — она важнее записи в базе.
+  try{ await drvApi.drvFetch('/api/driver/panic', {method:'POST', body:{on}}); }
+  catch(e){}
+  // Выйдя из режима, поднимаем приложение заново. В скрытом режиме оно ничего
+  // не грузило и не опрашивало, и оживлять его по частям — верный способ
+  // забыть одну из частей.
+  if(!on) setTimeout(() => location.reload(), 120);
+}
+
+function paintPanic(){
+  const c = document.getElementById('calcApp');
+  document.getElementById('pncOv').classList.remove('show');
+  c.classList.toggle('show', PANIC);
+  document.body.style.overflow = PANIC ? 'hidden' : '';
+  if(PANIC){
+    calcInit();
+    // Всё, что может выдать: опрос заказов, звук нового заказа, экран заказа.
+    try{ incHide(); }catch(e){}
+    try{ document.getElementById('caseSheet').classList.remove('show'); }catch(e){}
+    try{ document.getElementById('editSheet').classList.remove('show'); }catch(e){}
+    try{ document.getElementById('supScr').classList.remove('show'); }catch(e){}
+  }
+}
+
+// ── калькулятор ────────────────────────────────────────────────────────────
+const CALC_KEYS = [
+  ['AC','gray'], ['+/−','gray'], ['%','gray'], ['÷','op'],
+  ['7',''], ['8',''], ['9',''], ['×','op'],
+  ['4',''], ['5',''], ['6',''], ['−','op'],
+  ['1',''], ['2',''], ['3',''], ['+','op'],
+  ['0','zero'], [',',''], ['=','op'],
+];
+
+function calcInit(){
+  const pad = document.getElementById('calcPad');
+  if(pad.dataset.ready) return;
+  pad.dataset.ready = '1';
+  pad.innerHTML = CALC_KEYS.map(([k, cls]) =>
+    `<button class="calc-b ${cls}" data-k="${k}"><span>${k}</span></button>`).join('');
+  pad.addEventListener('click', e => {
+    const b = e.target.closest('.calc-b');
+    if(b) calcKey(b.dataset.k);
+  });
+  _calc = {acc: null, op: null, cur: '0', fresh: true};
+  calcPaint();
+}
+
+function calcPaint(){
+  const el = document.getElementById('calcOut');
+  const v = _calc.cur;
+  el.textContent = v;
+  // Длинное число уменьшаем, как это делает настоящий калькулятор.
+  el.style.fontSize = v.length > 9 ? (v.length > 12 ? '44px' : '58px') : '78px';
+  document.querySelectorAll('.calc-b.op').forEach(b =>
+    b.classList.toggle('on', !!_calc.op && b.dataset.k === _calc.op && _calc.fresh));
+}
+
+const CALC_FN = {'+':(a,b)=>a+b, '−':(a,b)=>a-b, '×':(a,b)=>a*b, '÷':(a,b)=>b?a/b:NaN};
+
+function calcKey(k){
+  _tap('light');
+  const c = _calc;
+  if(/[0-9]/.test(k)){
+    c.cur = (c.fresh || c.cur === '0') ? k : (c.cur.length < 15 ? c.cur + k : c.cur);
+    c.fresh = false;
+  }else if(k === ','){
+    if(c.fresh){ c.cur = '0,'; c.fresh = false; }
+    else if(!c.cur.includes(',')) c.cur += ',';
+  }else if(k === 'AC'){
+    _calc = {acc: null, op: null, cur: '0', fresh: true};
+  }else if(k === '+/−'){
+    c.cur = c.cur.startsWith('-') ? c.cur.slice(1) : ('-' + c.cur);
+  }else if(k === '%'){
+    c.cur = _fmtCalc(_numCalc(c.cur) / 100); c.fresh = true;
+  }else if(k === '='){
+    // Выход из скрытого режима: код и «равно». Сначала проверяем его, потом
+    // считаем — иначе код превратился бы в число на экране.
+    if(c.cur.replace(/\D/g, '') === PNC_CODE){
+      _calc = {acc: null, op: null, cur: '0', fresh: true};
+      calcPaint();
+      panicSet(false);
+      return;
+    }
+    if(c.op !== null && c.acc !== null){
+      c.cur = _fmtCalc(CALC_FN[c.op](c.acc, _numCalc(c.cur)));
+      c.acc = null; c.op = null; c.fresh = true;
+    }
+  }else{
+    if(c.op !== null && c.acc !== null && !c.fresh){
+      c.cur = _fmtCalc(CALC_FN[c.op](c.acc, _numCalc(c.cur)));
+    }
+    c.acc = _numCalc(c.cur); c.op = k; c.fresh = true;
+  }
+  calcPaint();
+}
+
+const _numCalc = v => parseFloat(String(v).replace(',', '.')) || 0;
+function _fmtCalc(n){
+  if(!isFinite(n)) return 'Ошибка';
+  const s = Math.abs(n) >= 1e15 ? n.toExponential(6)
+          : String(Math.round(n * 1e10) / 1e10);
+  return s.replace('.', ',');
+}
 
 // ══════════════════════════════════════════════════════════════════════════
 //  РАЗГОВОР С ОПЕРАТОРОМ

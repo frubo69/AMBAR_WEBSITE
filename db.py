@@ -194,6 +194,38 @@ async def update_order(oid: str, **kw):
     _orders_dirty()
 
 
+# ── Экстренная ситуация ─────────────────────────────────────────────────────
+# Водитель может оказаться там, где в его телефон смотрит кто-то ещё. Тогда он
+# переводит приложение в скрытый режим, и оно перестаёт быть приложением
+# доставки. Состояние держим на сервере, а не только в телефоне: снаружи должно
+# быть видно, что человек в беде, а само приложение может быть закрыто,
+# переустановлено или разряжено.
+async def panic_set(driver: str, on: bool, at, meta: dict = None) -> None:
+    db = _db_or_none()
+    if db is None: return
+    if on:
+        await db.panic.replace_one(
+            {"_id": driver}, {"_id": driver, "on": True, "at": at, **(meta or {})},
+            upsert=True)
+    else:
+        await db.panic.update_one({"_id": driver},
+                                  {"$set": {"on": False, "off_at": at}})
+
+
+async def panic_get(driver: str) -> dict | None:
+    db = _db_or_none()
+    if db is None: return None
+    doc = await db.panic.find_one({"_id": driver})
+    return doc if (doc or {}).get("on") else None
+
+
+async def panic_all() -> list:
+    """Кто сейчас в скрытом режиме — для панели и для владельца."""
+    db = _db_or_none()
+    if db is None: return []
+    return await db.panic.find({"on": True}).to_list(length=50)
+
+
 # ── Переписка по заказу ─────────────────────────────────────────────────────
 # Водитель и оператор разговаривают о конкретном заказе — и разговор живёт на
 # самом заказе, а не отдельной перепиской. Причина простая: обсуждают всегда
@@ -811,6 +843,9 @@ _DEFAULT_PREFS = {
     # Чужая бутылка у водителя — не паника, но владелец должен узнать в тот же
     # день: по умолчанию включено.
     "qr.alien": True,
+    # Экстренная ситуация у водителя. Выключить нельзя по смыслу — здесь стоит
+    # ради того, чтобы событие было в общем списке уведомлений.
+    "driver.panic": True,
     "finance.revenueLow": True, "finance.avgDrop": True,
     "finance.cancelSpike": True, "finance.record": False, "finance.tipHigh": False,
     "support.new": False, "support.noreply": True, "support.complaint": True, "support.escalation": False,

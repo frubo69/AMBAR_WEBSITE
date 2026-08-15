@@ -162,12 +162,85 @@ def _chat_view(o: dict) -> list:
 @require_driver
 async def handle_ping(request):
     me = request["driver"]
+    # Скрытый режим переживает закрытие приложения и смену телефона: он живёт
+    # на сервере, а не во вкладке браузера. Иначе достаточно было бы выгрузить
+    # приложение из памяти, чтобы маскировка слетела в самый неподходящий момент.
     return web.json_response({
         "ok": True,
         "driver": {k: me[k] for k in ("id", "name", "district", "district_code",
                                       "district_name", "operator")},
         "day": _biz_day(),
+        "panic": bool(await db.panic_get(me["name"])),
     }, headers=CORS_HEADERS)
+
+
+@require_driver
+async def handle_panic(request):
+    """Экстренная ситуация: приложение маскируется, наши узнают.
+
+    Ответ намеренно пустой и мгновенный: водитель нажимает это, когда рядом
+    кто-то есть, и никакого «отправлено» на экране появиться не должно."""
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    on = bool(body.get("on"))
+    now = datetime.now(timezone.utc)
+    await db.panic_set(me["name"], on, now.isoformat(),
+                       {"district": me.get("district", ""),
+                        "district_code": me.get("district_code", ""),
+                        "operator": me.get("operator", "")})
+    log.warning(f"[driver] {me['name']}: скрытый режим {'ВКЛЮЧЁН' if on else 'снят'}")
+    try:
+        await _notify_panic(me, on, now)
+    except Exception as e:
+        log.error(f"[driver] тревога не ушла: {e}")
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+
+async def _notify_panic(me: dict, on: bool, now):
+    """Старшему и на планшет района — сразу, владельцу — тоже.
+
+    Отдельно предупреждаем, что писать водителю в бот нельзя: уведомление
+    всплывёт баннером на его экране и выдаст маскировку с головой."""
+    from api_server import tg_send, OPERATOR_BOT_TOKEN
+    import config_staff as staff
+    day = _biz_day()
+    live = 0
+    try:
+        start = datetime.strptime(day, "%Y-%m-%d").replace(hour=SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
+        f = lambda x: x.astimezone(timezone.utc).isoformat().replace("+00:00", "")
+        orders = await db.get_orders_in_range(f(start), f(start + timedelta(days=1)))
+        live = sum(1 for o in orders if (o.get("driver") or "").strip() == me["name"]
+                   and o.get("status") == "approved")
+    except Exception:
+        pass
+
+    hhmm = now.astimezone(DUBAI_TZ).strftime("%H:%M")
+    if on:
+        text = ("🆘 *ЭКСТРЕННАЯ СИТУАЦИЯ*\n"
+                f"{me['name']} · {me.get('district_code','')} {me.get('district_name','')}\n"
+                f"Приложение переведено в скрытый режим в {hhmm}.\n"
+                f"Заказов в работе: {live}.\n\n"
+                "*Не пишите ему в приложение и в бот* — уведомление всплывёт у него "
+                "на экране. Позвоните.")
+    else:
+        text = (f"✅ *Скрытый режим снят*\n{me['name']} · "
+                f"{me.get('district_code','')} {me.get('district_name','')} · {hhmm}")
+
+    ids = list(staff.SENIOR_IDS) + [d["telegram_id"] for d in staff.DEVICES]
+    if OPERATOR_BOT_TOKEN:
+        for uid in ids:
+            try:
+                await tg_send(OPERATOR_BOT_TOKEN, uid, text)
+            except Exception as e:
+                log.error(f"[driver] тревога {uid}: {e}")
+    try:
+        from owner_routes import notify_owners_force
+        await notify_owners_force("driver.panic", text)
+    except Exception as e:
+        log.error(f"[driver] тревога владельцу: {e}")
 
 
 @require_driver
@@ -842,6 +915,7 @@ def setup(app):
         ("/api/driver/expenses",                handle_expenses,    "GET"),
         ("/api/driver/expenses",                handle_expense_add, "POST"),
         ("/api/driver/supply",                  handle_supply_list, "GET"),
+        ("/api/driver/panic",                   handle_panic,       "POST"),
         ("/api/driver/orders/{oid}/ack",        handle_ack,         "POST"),
         ("/api/driver/orders/{oid}/delivered",  handle_delivered,   "POST"),
         ("/api/driver/orders/{oid}/edit",       handle_edit_request, "POST"),

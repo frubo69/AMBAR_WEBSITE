@@ -1307,7 +1307,12 @@ async def handle_cancel(request):
 
 async def tell_driver(name: str, text: str):
     """Короткое сообщение водителю в его бот. Решение оператора должно до него
-    доехать: молчание он прочитает как «не заметили»."""
+    доехать: молчание он прочитает как «не заметили».
+
+    Кроме одного случая. Если водитель включил скрытый режим, значит в его
+    телефон смотрит кто-то ещё — и всплывший баннер от «AMBAR Водитель» выдаст
+    маскировку вернее, чем что угодно на экране. Пока режим не снят, мы молчим:
+    оператору об этом сказано в самой тревоге, связываться нужно звонком."""
     import os as _os
     from api_server import tg_send
     import config_staff as _staff
@@ -1315,6 +1320,12 @@ async def tell_driver(name: str, text: str):
     token = _os.getenv("DRIVER_BOT_TOKEN", "")
     if not (tid and token):
         return
+    try:
+        if await db.panic_get((name or "").strip()):
+            log.warning(f"[pos] {name} в скрытом режиме — сообщение не отправлено")
+            return
+    except Exception as e:
+        log.warning(f"[pos] проверка скрытого режима: {e}")
     try:
         await tg_send(token, tid, text, parse_mode="HTML")
     except Exception as e:

@@ -458,6 +458,26 @@ a.oc-row:active{background:var(--card2)}
 .sheet .s{font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:16px}
 .sheet .btns{display:flex;gap:10px}
 .sbtn{flex:1;padding:14px;border-radius:var(--r2);font-size:14px;font-weight:700;background:var(--card2);border:1px solid var(--border2)}
+
+/* Конец смены. Строка района — итог дня и одно действие. Закрытая гаснет:
+   по ней уже нечего делать, а разбирать список глазами придётся ещё не раз. */
+.sh-r{display:flex;align-items:center;gap:12px;padding:13px 14px;margin-bottom:8px;
+  border-radius:var(--r2);background:var(--card);border:1px solid var(--border2)}
+.sh-r.off{opacity:.55}
+.sh-code{display:inline-flex;align-items:center;height:22px;padding:0 9px;border-radius:7px;
+  background:var(--card2);color:var(--gold);font-size:11px;font-weight:800;letter-spacing:.6px}
+.sh-b{flex:1;min-width:0}
+.sh-n{font-size:14px;font-weight:700;line-height:1.2}
+.sh-s{font-size:11.5px;color:var(--sub);margin-top:2px}
+.sh-s b{color:var(--warn)}
+.sh-go{flex:0 0 auto;padding:10px 15px;border-radius:var(--r2);font-family:inherit;
+  font-size:12.5px;font-weight:700;cursor:pointer;color:#1a1408;border:none;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.sh-go.ghost{background:var(--card2);color:var(--sub);border:1px solid var(--border2)}
+.sh-go:disabled{opacity:.5;pointer-events:none}
+.sh-all{margin-top:12px;padding:12px 14px;border-radius:var(--r2);font-size:12.5px;
+  line-height:1.5;color:var(--gold);background:rgba(201,169,110,.1);
+  border:1px solid rgba(201,169,110,.3)}
 .sbtn.gold{background:linear-gradient(135deg,#E8C98A,#C9A96E);color:#1a1408;border:none}
 .sbtn.red{background:linear-gradient(135deg,#E86A6A,#C94E4E);color:#fff;border:none}
 .pack-btn{display:flex;align-items:center;width:100%;padding:16px;border-radius:var(--r2);background:var(--card);border:1px solid var(--border2);margin-bottom:10px;transition:.12s}
@@ -796,6 +816,9 @@ a.oc-row:active{background:var(--card2)}
         <button class="pill" id="dayBtn" onclick="dayOpen()"><svg class="ic" viewBox="0 0 24 24"
           aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg><span
           id="dayLbl">Сегодня</span></button>
+        <button class="pill" id="shiftBtn" onclick="shiftOpen()"><svg class="ic" viewBox="0 0 24 24"
+          aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span
+          id="shiftLbl">Смена</span></button>
       </div>
       <button class="pill pill-ico" id="themeBtn" onclick="toggleTheme()" aria-label="Тема"><svg
         class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg></button>
@@ -887,6 +910,20 @@ a.oc-row:active{background:var(--card2)}
     <div id="opList"></div>
     <div class="acc-sub" style="margin-top:12px">Аккаунт телеграма: <b id="opAcc">—</b></div>
     <div class="btns"><button class="sbtn" onclick="hideOv('opOv')">Закрыть</button></div>
+  </div>
+</div>
+
+<!-- Конец смены. Оператор объявляет, что заказов больше не будет: после
+     этого продажи дня считаются окончательными, и по ним собирается заявка. -->
+<div class="ov" id="shiftOv">
+  <div class="sheet">
+    <div class="t">Конец смены</div>
+    <div class="s">Закрывается по району. После этого продажи дня считаются
+      окончательными — по ним программа соберёт заявку в магазин.</div>
+    <div id="shiftList"><div class="acc-sub">Загрузка…</div></div>
+    <!-- «Готово», а не «Закрыть»: рядом три кнопки «Закрыть смену», и четвёртая
+         с тем же словом означала бы совсем другое. -->
+    <div class="btns"><button class="sbtn" onclick="hideOv('shiftOv')">Готово</button></div>
   </div>
 </div>
 
@@ -2459,6 +2496,75 @@ function _isoDay(shift){
   const d=new Date(Date.now()-shift*864e5);
   return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
 }
+// ── Конец смены ────────────────────────────────────────────────────────────
+// Оператор говорит «на сегодня всё». Программа этого знать не может: она видит
+// только, что заказов давно не было, а это ещё не значит, что их не будет.
+//
+// Из объявления следует всё дальнейшее — продажи дня окончательны, по ним
+// собирается заявка в магазин, и старший получает её к пробуждению. Поэтому
+// кнопка не прячется в настройках: это последнее действие смены.
+let SHIFT = null, SHIFT_BUSY = false;
+const _num = n => Number(n || 0).toLocaleString('ru-RU').replace(/,/g, ' ');
+
+async function shiftOpen(){
+  showOv('shiftOv'); haptic('light');
+  $('shiftList').innerHTML = '<div class="acc-sub">Загрузка…</div>';
+  try{ SHIFT = await opApi.opFetch('/api/operator/shift', {params:{as:curOp}}); }
+  catch(e){ $('shiftList').innerHTML = '<div class="acc-sub">Не удалось загрузить</div>'; return; }
+  shiftPaint();
+}
+
+function shiftPaint(){
+  const d = SHIFT; if(!d) return;
+  $('shiftList').innerHTML = (d.districts || []).map(x => {
+    // Незакрытые заказы не запрещают закрыть смену — так бывает, что заказ
+    // висит с вечера и уже никуда не поедет. Но они на виду и уезжают
+    // старшему вместе с итогом: молча потерянный заказ хуже некрасивой цифры.
+    const sub = x.closed
+      ? `закрыл ${_esc(x.closed_by || x.operator)} · ${_hhmm(x.closed_at)}`
+      : `${x.orders} ${plural(x.orders,'заказ','заказа','заказов')} · ${_num(x.revenue)} AED`
+        + (x.open ? ` · <b>висит ${x.open}</b>` : '');
+    return `<div class="sh-r ${x.closed ? 'off' : ''}">
+      <span class="sh-code">${_esc(x.code)}</span>
+      <span class="sh-b"><span class="sh-n">${_esc(x.name)}</span>
+        <span class="sh-s">${sub}</span></span>
+      <button class="sh-go ${x.closed ? 'ghost' : ''}"
+        onclick="${x.closed ? `shiftReopen('${x.district}')` : `shiftClose('${x.district}')`}">
+        ${x.closed ? 'Открыть' : 'Закрыть'}</button>
+    </div>`;
+  }).join('') + (d.all_closed
+    ? `<div class="sh-all">Смена закрыта у всех. Заявка в магазин собрана и
+       отправлена старшему файлом.</div>` : '');
+}
+
+async function shiftClose(oid){
+  if(SHIFT_BUSY) return;
+  const x = (SHIFT.districts || []).find(d => d.district === oid);
+  if(x && x.open && !confirm(`В районе ${x.code} ${x.open} ${plural(x.open,'заказ','заказа','заказов')} `
+      + `не закрыт. Всё равно закрыть смену?`)) return;
+  SHIFT_BUSY = true;
+  try{
+    const r = await opApi.opFetch('/api/operator/shift/close',
+      {method:'POST', body:{district: oid, as: curOp}});
+    haptic('ok');
+    toast(r.all_closed ? 'Смена закрыта у всех — заявка ушла старшему'
+                       : `Смена закрыта · ${_num(r.revenue)} AED`, 'ok');
+    await shiftOpen();
+  }catch(e){ toast('Не удалось закрыть', 'err'); }
+  finally{ SHIFT_BUSY = false; }
+}
+
+async function shiftReopen(oid){
+  if(SHIFT_BUSY) return; SHIFT_BUSY = true;
+  try{
+    await opApi.opFetch('/api/operator/shift/reopen',
+      {method:'POST', body:{district: oid, as: curOp}});
+    haptic('sel');
+    await shiftOpen();
+  }catch(e){ toast('Не вышло', 'err'); }
+  finally{ SHIFT_BUSY = false; }
+}
+
 function dayOpen(){
   const list=[];
   for(let i=0;i<10;i++){

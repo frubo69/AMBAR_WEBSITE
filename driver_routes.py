@@ -31,6 +31,7 @@ import hmac
 import json
 import logging
 import os
+import re
 import secrets
 import time
 from datetime import datetime, timedelta, timezone
@@ -528,6 +529,129 @@ async def handle_expenses(request):
     }, headers=CORS_HEADERS)
 
 
+# ── Приём товара ────────────────────────────────────────────────────────────
+# Водитель забирает поставку в магазине и сканирует каждую бутылку. Вся логика
+# и все проверки — в supply_routes: документ поставки принадлежит ему, и второй
+# набор правил рядом с первым разошёлся бы в первую же неделю.
+#
+# Здесь только вход: кто спрашивает и от чьего имени.
+@require_driver
+async def handle_supply_list(request):
+    """Что можно забрать: мои задачи, свободные, взятые другими."""
+    import supply_routes
+    me = request["driver"]
+    return web.json_response(
+        await supply_routes.tasks_for_driver(me["name"], me.get("district") or ""),
+        headers=CORS_HEADERS)
+
+
+@require_driver
+async def handle_supply_claim(request):
+    """Взять задачу. Достаётся одному — кто нажал первым."""
+    import supply_routes
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    sid = request.match_info.get("sid") or ""
+    oid = str(body.get("district") or "").strip()
+    ok, task = await db.supply_task_claim(sid, oid, me["name"],
+                                          request["tg"].get("id") or 0,
+                                          datetime.now(timezone.utc))
+    if not ok:
+        return web.json_response({"ok": False, "error": "taken",
+                                  "driver": (task or {}).get("driver") or ""},
+                                 status=409, headers=CORS_HEADERS)
+    log.info(f"[driver] {me['name']} взял приёмку {sid}/{oid}")
+    sup = await db.supply_get(sid)
+    return web.json_response(
+        supply_routes._task_view(sid, sup, oid, (sup.get("tasks") or {}).get(oid) or {},
+                                 me["name"]),
+        headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
+
+
+@require_driver
+async def handle_supply_release(request):
+    """Отдать задачу обратно: не еду."""
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    sid = request.match_info.get("sid") or ""
+    oid = str(body.get("district") or "").strip()
+    ok = await db.supply_task_release(sid, oid, me["name"])
+    return web.json_response({"ok": ok}, headers=CORS_HEADERS)
+
+
+@require_driver
+async def handle_supply_task(request):
+    """Одна задача целиком — экран приёмки."""
+    import supply_routes
+    me = request["driver"]
+    sid = request.match_info.get("sid") or ""
+    oid = (request.query.get("district") or "").strip()
+    sup = await db.supply_get(sid)
+    task = ((sup or {}).get("tasks") or {}).get(oid)
+    if not sup or not task:
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    return web.json_response(supply_routes._task_view(sid, sup, oid, task, me["name"]),
+                             headers=CORS_HEADERS,
+                             dumps=lambda o: json.dumps(o, default=str))
+
+
+@require_driver
+async def handle_supply_scan(request):
+    """Одна бутылка в приёмку."""
+    import supply_routes
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    code = re.sub(r"\s+", "", str(body.get("code") or ""))[:120]
+    if not code:
+        return web.json_response({"error": "empty_code"}, status=400, headers=CORS_HEADERS)
+    res = await supply_routes.task_scan(
+        request.match_info.get("sid") or "",
+        str(body.get("district") or "").strip(),
+        str(body.get("product_id") or "").strip(),
+        code, me["name"], request["tg"].get("id") or 0,
+        str(body.get("at_dev") or ""))
+    return web.json_response(res, headers=CORS_HEADERS)
+
+
+@require_driver
+async def handle_supply_undo(request):
+    import supply_routes
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    res = await supply_routes.task_undo(
+        request.match_info.get("sid") or "",
+        str(body.get("district") or "").strip(),
+        re.sub(r"\s+", "", str(body.get("code") or ""))[:120], me["name"])
+    return web.json_response(res, headers=CORS_HEADERS)
+
+
+@require_driver
+async def handle_supply_finish(request):
+    import supply_routes
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    res = await supply_routes.task_finish(
+        request.match_info.get("sid") or "",
+        str(body.get("district") or "").strip(),
+        me["name"], str(body.get("note") or ""))
+    return web.json_response(res, headers=CORS_HEADERS)
+
+
 async def _opt(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
@@ -541,9 +665,16 @@ def setup(app):
         ("/api/driver/catalog",                 handle_catalog,     "GET"),
         ("/api/driver/expenses",                handle_expenses,    "GET"),
         ("/api/driver/expenses",                handle_expense_add, "POST"),
+        ("/api/driver/supply",                  handle_supply_list, "GET"),
         ("/api/driver/orders/{oid}/ack",        handle_ack,         "POST"),
         ("/api/driver/orders/{oid}/delivered",  handle_delivered,   "POST"),
         ("/api/driver/orders/{oid}/edit",       handle_edit_request, "POST"),
+        ("/api/driver/supply/{sid}",            handle_supply_task,   "GET"),
+        ("/api/driver/supply/{sid}/claim",      handle_supply_claim,  "POST"),
+        ("/api/driver/supply/{sid}/release",    handle_supply_release, "POST"),
+        ("/api/driver/supply/{sid}/scan",       handle_supply_scan,   "POST"),
+        ("/api/driver/supply/{sid}/undo",       handle_supply_undo,   "POST"),
+        ("/api/driver/supply/{sid}/finish",     handle_supply_finish, "POST"),
     )
     seen = set()
     for path, handler, method in routes:

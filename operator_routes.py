@@ -1869,9 +1869,144 @@ def _opt(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
 
+# ── Конец смены ─────────────────────────────────────────────────────────────
+# Операторы работают до утра и уходят спать примерно тогда, когда встаёт
+# старший. «Смена закрыта» — это заявление человека, а не срабатывание часов:
+# программа не знает, будет ли ещё один звонок, а оператор знает.
+#
+# Из этого заявления следует всё остальное: продажи дня окончательны, значит
+# по ним можно считать, чего не хватает, и собирать заявку в магазин. Поэтому
+# закрытие смены — не запись в журнал, а спусковой крючок.
+#
+# Закрывается по району, а не «вообще»: районы работают независимо, и один
+# оператор не может отвечать за чужую точку.
+async def _shift_state(day, districts: list, scope: set) -> dict:
+    closed = await db.shifts_for_day(day.isoformat())
+    orders = list((await db.get_all_orders()).values())
+    out = []
+    for d in districts:
+        if d["id"] not in scope:
+            continue
+        mine = [o for o in orders if (o.get("office_id") or "") == d["id"]]
+        # Незакрытые заказы — единственное, что мешает считать день посчитанным:
+        # заказ в работе ещё может стать выручкой, а может отмениться.
+        open_now = [o for o in mine if _lane(o) in ("new", "work")]
+        done = [o for o in mine if o.get("status") == "delivered"
+                and _biz_date_of(o) == day]
+        c = closed.get(d["id"])
+        out.append({
+            "district": d["id"], "code": d.get("code", ""), "name": d.get("name", ""),
+            "operator": d.get("operator", ""),
+            "closed": bool(c), "closed_at": str((c or {}).get("closed_at") or ""),
+            "closed_by": (c or {}).get("by_name") or "",
+            "open": len(open_now),
+            "open_ids": [o.get("order_id") for o in open_now][:12],
+            "orders": len(done),
+            "revenue": sum(int(o.get("total") or 0) for o in done),
+        })
+    return {"day": day.isoformat(), "districts": out,
+            "all_closed": bool(out) and all(x["closed"] for x in out)}
+
+
+def _biz_date_of(o: dict):
+    try:
+        return _biz_date(datetime.fromisoformat(o.get("timestamp", "")).replace(
+            tzinfo=timezone.utc).astimezone(DUBAI_TZ))
+    except (ValueError, TypeError):
+        return None
+
+
+@require_operator
+async def handle_shift(request):
+    districts = await _fresh_districts()
+    people = _people(districts)
+    who = (request.query.get("as") or "").strip()
+    scope = _scope(people, who, districts)
+    if not scope:
+        return web.json_response({"error": "unknown_operator"}, status=400,
+                                 headers=CORS_HEADERS)
+    return web.json_response(
+        await _shift_state(_biz_date(datetime.now(DUBAI_TZ)), districts, scope),
+        headers=CORS_HEADERS)
+
+
+@require_operator
+async def handle_shift_close(request):
+    """Закрыть смену района.
+
+    Незакрытые заказы не мешают: бывает, что заказ висит с вечера и уже никуда
+    не поедет. Но их число уезжает старшему вместе с итогом — молча потерянный
+    заказ хуже некрасивой цифры."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    districts = await _fresh_districts()
+    people = _people(districts)
+    who = str(body.get("as") or "").strip()
+    scope = _scope(people, who, districts)
+    oid = str(body.get("district") or "").strip()
+    if oid not in scope:
+        return web.json_response({"error": "not_yours"}, status=403, headers=CORS_HEADERS)
+
+    day = _biz_date(datetime.now(DUBAI_TZ))
+    state = await _shift_state(day, districts, {oid})
+    mine = next((x for x in state["districts"] if x["district"] == oid), None)
+    if not mine:
+        return web.json_response({"error": "unknown_district"}, status=400,
+                                 headers=CORS_HEADERS)
+    ok = await db.shift_close(day.isoformat(), oid, {
+        "closed_at": datetime.now(timezone.utc), "by": request.get("op_id") or 0,
+        "by_name": who, "operator": mine["operator"],
+        "orders": mine["orders"], "revenue": mine["revenue"],
+        "open": mine["open"], "open_ids": mine["open_ids"]})
+    if not ok:
+        return web.json_response({"error": "already_closed"}, status=409,
+                                 headers=CORS_HEADERS)
+    log.info(f"[pos] смена закрыта: {oid} · {who} · {mine['orders']} заказов · "
+             f"{mine['revenue']} AED · висит {mine['open']}")
+
+    full = await _shift_state(day, districts, {d["id"] for d in districts})
+    if full["all_closed"]:
+        # Заявку собирает тот, кто закрылся последним, — и ровно один раз:
+        # пометка дня ставится атомарно, второму вернётся False.
+        try:
+            import shift_end
+            await shift_end.on_all_closed(day.isoformat(), full)
+        except Exception as e:
+            log.error(f"[pos] конец смены: {e}")
+    return web.json_response({"ok": True, "all_closed": full["all_closed"],
+                              **{k: mine[k] for k in ("orders", "revenue", "open")}},
+                             headers=CORS_HEADERS)
+
+
+@require_operator
+async def handle_shift_reopen(request):
+    """Открыть смену обратно: закрыли, а телефон зазвонил."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    districts = await _fresh_districts()
+    scope = _scope(_people(districts), str(body.get("as") or "").strip(), districts)
+    oid = str(body.get("district") or "").strip()
+    if oid not in scope:
+        return web.json_response({"error": "not_yours"}, status=403, headers=CORS_HEADERS)
+    ok = await db.shift_reopen(_biz_date(datetime.now(DUBAI_TZ)).isoformat(), oid)
+    if ok:
+        log.info(f"[pos] смена открыта заново: {oid}")
+    return web.json_response({"ok": ok}, headers=CORS_HEADERS)
+
+
 def setup(app):
     """Mount operator POS routes. Called from api_server.main()."""
     r = app.router
+    r.add_route("OPTIONS", "/api/operator/shift", _opt)
+    r.add_get("/api/operator/shift", handle_shift)
+    r.add_route("OPTIONS", "/api/operator/shift/close", _opt)
+    r.add_post("/api/operator/shift/close", handle_shift_close)
+    r.add_route("OPTIONS", "/api/operator/shift/reopen", _opt)
+    r.add_post("/api/operator/shift/reopen", handle_shift_reopen)
     r.add_route("OPTIONS", "/api/operator/ping", _opt)
     r.add_get("/api/operator/ping", handle_ping)
     r.add_route("OPTIONS", "/api/operator/catalog", _opt)

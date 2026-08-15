@@ -298,6 +298,146 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .er-p{font-size:11px;color:var(--muted);margin-top:2px}
 .er-st{display:flex;align-items:center;gap:2px;flex-shrink:0;border-radius:10px;
   background:var(--card2);border:1px solid var(--border3);padding:2px}
+
+/* ═══ Приём товара ═══════════════════════════════════════════════════════════
+   Три экрана и один вопрос на каждом: что забрать → какую позицию считаем →
+   сколько ещё осталось. Крупное число на экране всегда отвечает именно на тот
+   вопрос, который стоит сейчас, — у водителя заняты руки и он смотрит одним
+   глазом. */
+.sup{background:var(--bg3);border:1px solid var(--border3);border-radius:20px;
+  margin-bottom:14px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,.35)}
+.sup.mine{border-color:rgba(201,169,110,.45)}
+.sup-hd{display:flex;align-items:center;gap:9px;padding:11px 14px;font-size:11.5px;
+  color:var(--muted);background:var(--card2);border-bottom:1px solid var(--border3)}
+.sup.mine .sup-hd{background:linear-gradient(90deg,rgba(201,169,110,.18),rgba(201,169,110,.05))}
+.sup-code{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:6px;
+  background:var(--card3);color:var(--gold2);font-size:10.5px;font-weight:800;letter-spacing:.6px}
+.sup-when{margin-left:auto;font-variant-numeric:tabular-nums}
+.sup-b{padding:14px 16px}
+.sup-n{font-size:22px;font-weight:800;line-height:1.15;letter-spacing:-.4px}
+.sup-s{font-size:12.5px;color:var(--muted);margin-top:3px}
+.sup-big{display:flex;align-items:baseline;gap:8px;margin-top:12px}
+.sup-big b{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;line-height:1;
+  letter-spacing:-1px;color:var(--gold3);font-variant-numeric:tabular-nums}
+.sup-big i{font-style:normal;font-size:12px;color:var(--muted)}
+/* Полоса прогресса — единственное, что водитель ищет глазами, вернувшись в
+   приложение с ящиком в руках. */
+.sup-bar{height:5px;border-radius:99px;background:var(--card3);overflow:hidden;margin-top:12px}
+.sup-bar i{display:block;height:100%;border-radius:99px;
+  background:linear-gradient(90deg,var(--gold),var(--gold2));transition:width .3s var(--e1)}
+.sup-foot{padding:13px 16px;border-top:1px solid var(--border2)}
+.sup-foot .btn{width:100%}
+/* Взятое другим: видно, что задача не бесхозная, и не более того. */
+.sup-row{display:flex;align-items:center;gap:10px;padding:12px 14px;margin-bottom:7px;
+  border-radius:13px;background:var(--card);border:1px solid var(--border2);opacity:.7}
+.sup-row-b{flex:1;min-width:0}
+.sup-row-t{font-size:13.5px;font-weight:600}
+.sup-row-s{font-size:11.5px;color:var(--muted);margin-top:1px}
+
+/* Экран задачи: список позиций поверх всего, со своей шапкой и своим подвалом */
+.sup-scr{position:fixed;inset:0;z-index:95;display:none;flex-direction:column;background:var(--bg)}
+.sup-scr.show{display:flex}
+.sup-top{display:flex;align-items:center;gap:11px;flex-shrink:0;
+  padding:calc(10px + var(--safe-top)) 13px 11px;
+  background:rgba(7,7,15,.94);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border-bottom:1px solid var(--border2)}
+.sup-back{width:38px;height:38px;flex-shrink:0;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;border:1px solid var(--border3);background:var(--card2);color:var(--sub);
+  cursor:pointer;padding:0}
+.sup-back:active{transform:scale(.94)}
+.sup-top-b{flex:1;min-width:0}
+.sup-top-t{font-size:15.5px;font-weight:700;line-height:1.2;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.sup-top-s{font-size:11.5px;color:var(--muted);margin-top:2px}
+.sup-top-v{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;
+  color:var(--gold3);font-variant-numeric:tabular-nums}
+.sup-top-v u{text-decoration:none;color:var(--muted);font-size:13px}
+.sup-mid{flex:1;overflow-y:auto;padding:12px 13px 8px;-webkit-overflow-scrolling:touch}
+
+/* Строка позиции. Слева — что брать, справа — сколько уже взято из скольких.
+   Закрытая строка гаснет и перестаёт быть кнопкой: по ней больше нечего
+   делать, и оставлять её нажимаемой значит обещать несуществующее действие. */
+.li{display:flex;align-items:center;gap:12px;width:100%;padding:14px;margin-bottom:8px;
+  border-radius:15px;cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
+  background:var(--bg3);border:1px solid var(--border3);transition:.16s var(--e1)}
+.li:active{transform:scale(.985);background:var(--card2)}
+.li.done{opacity:.42;pointer-events:none;background:var(--card);border-color:var(--border2)}
+.li-b{flex:1;min-width:0}
+.li-n{display:block;font-size:15px;font-weight:700;line-height:1.25}
+.li-s{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+.li-v{flex-shrink:0;display:flex;align-items:baseline;gap:2px;
+  font-family:'Space Grotesk',sans-serif;font-variant-numeric:tabular-nums}
+.li-v b{font-size:21px;font-weight:700;line-height:1;color:var(--gold3)}
+.li-v i{font-style:normal;font-size:13px;color:var(--muted)}
+.li.done .li-v b{color:var(--up)}
+.li-go{flex-shrink:0;color:var(--dim)}
+.li.done .li-go{display:none}
+.li-ok{flex-shrink:0;color:var(--up);display:none}
+.li.done .li-ok{display:block}
+
+/* Подвал экрана задачи: итог и одна кнопка. Всегда на месте — водитель
+   заканчивает приём, глядя на неё, а не листая список до конца. */
+.sup-bot{flex-shrink:0;padding:12px 13px calc(12px + var(--safe-bottom));
+  background:rgba(7,7,15,.94);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  border-top:1px solid var(--border2)}
+.sup-bot .btn{width:100%;margin-top:10px}
+.sup-tot{display:flex;align-items:baseline;gap:9px}
+.sup-tot-l{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
+  color:var(--muted)}
+.sup-tot-v{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;
+  line-height:1;color:var(--gold3);font-variant-numeric:tabular-nums}
+.sup-tot-v u{text-decoration:none;color:var(--muted);font-size:14px}
+
+/* ── камера ───────────────────────────────────────────────────────────────
+   Ответ на скан живёт на самой рамке: водитель смотрит в неё, а не в список
+   под ней. Молчание он читает как «не сработало» и сканирует второй раз. */
+.cam{position:relative;border-radius:18px;overflow:hidden;background:#000;
+  aspect-ratio:1/1;margin-bottom:11px}
+.cam video{width:100%;height:100%;object-fit:cover;display:block}
+.cam-frame{position:absolute;inset:8% 11% 23%;border-radius:14px;transition:.14s var(--e1)}
+.cam-frame .c{position:absolute;width:26px;height:26px;border:3px solid rgba(255,255,255,.85);
+  border-radius:3px}
+.cam-frame .tl{top:0;left:0;border-right:none;border-bottom:none;border-radius:10px 0 0 0}
+.cam-frame .tr{top:0;right:0;border-left:none;border-bottom:none;border-radius:0 10px 0 0}
+.cam-frame .bl{bottom:0;left:0;border-right:none;border-top:none;border-radius:0 0 0 10px}
+.cam-frame .br{bottom:0;right:0;border-left:none;border-top:none;border-radius:0 0 10px 0}
+.cam-frame.ok{background:rgba(76,175,125,.3);box-shadow:inset 0 0 0 3px var(--up)}
+.cam-frame.dup{background:rgba(243,180,74,.3);box-shadow:inset 0 0 0 3px var(--warn)}
+.cam-frame.err{background:rgba(224,85,85,.32);box-shadow:inset 0 0 0 3px var(--dn)}
+.cam-badge{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);
+  padding:7px 14px;border-radius:11px;background:rgba(0,0,0,.6);font-size:14px;font-weight:700;
+  white-space:nowrap;text-align:center}
+.cam-tools{position:absolute;top:11px;right:11px;display:flex;gap:7px;z-index:2}
+.cam-t{width:38px;height:38px;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;border:1px solid rgba(255,255,255,.18);color:#fff;
+  background:rgba(0,0,0,.45);cursor:pointer;padding:0}
+.cam-t.on{background:var(--gold2);color:#1a1408;border-color:transparent}
+.cam-t.muted{opacity:.5}
+.cam-t .s-off{display:none}
+.cam-t.muted .s-on{display:none}
+.cam-t.muted .s-off{display:block}
+/* Крупно — сколько ОСТАЛОСЬ. Именно это число водитель держит в голове, пока
+   достаёт бутылки: «сколько уже» ему считать незачем. */
+.cam-left{position:absolute;left:0;right:0;bottom:0;padding:14px;
+  background:linear-gradient(transparent,rgba(0,0,0,.72));display:flex;align-items:flex-end;gap:10px}
+.cam-left b{font-family:'Space Grotesk',sans-serif;font-size:40px;font-weight:700;line-height:.9;
+  letter-spacing:-1.5px;font-variant-numeric:tabular-nums}
+.cam-left span{font-size:12px;color:rgba(255,255,255,.75);padding-bottom:4px}
+.cam-hint{margin-left:auto;padding-bottom:4px;font-size:11.5px;text-align:right;
+  color:rgba(255,255,255,.7);max-width:52%}
+.cam-hint.warn{color:var(--warn)}
+
+.sc-row{display:flex;align-items:center;gap:10px;padding:9px 12px;margin-bottom:6px;
+  border-radius:12px;background:var(--card);border:1px solid var(--border2)}
+.sc-dot{width:7px;height:7px;flex-shrink:0;border-radius:50%}
+.sc-b{flex:1;min-width:0}
+.sc-code{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700}
+.sc-raw{font-size:10.5px;color:var(--dim);overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.sc-st{font-size:11px;font-weight:600;flex-shrink:0}
+.sc-acts{display:flex;gap:8px;margin-top:4px}
+.sc-acts .btn{flex:1}
+.btn-gh{background:var(--card2);color:var(--sub);border:1px solid var(--border3)}
 .er-st button{width:30px;height:30px;border:none;background:none;color:var(--sub);cursor:pointer;
   border-radius:8px;display:flex;align-items:center;justify-content:center;padding:0}
 .er-st button:active{background:var(--border3)}
@@ -564,6 +704,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
       <span class="tb-badge" id="tbNum" style="display:none">0</span></span>
     <span>Заказы</span>
   </button>
+  <button class="tb" data-tab="supply" onclick="setTab('supply')">
+    <span class="tb-ic"><svg viewBox="0 0 24 24"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4"/><path d="M12 11v10"/></svg>
+      <span class="tb-badge" id="tbSup" style="display:none">0</span></span>
+    <span>Приём</span>
+  </button>
   <button class="tb" data-tab="history" onclick="setTab('history')">
     <span class="tb-ic"><svg viewBox="0 0 24 24"><path d="M3 3v5h5"/><path d="M3.5 8a9 9 0 1 0 2.2-3.4L3 8"/><path d="M12 7v5l3 2"/></svg></span>
     <span>История</span>
@@ -574,6 +719,40 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
     <span>Расходы</span>
   </button>
 </nav>
+
+<!-- Экран приёмки: список позиций или камера. Поверх всего и без нижних
+     вкладок — пока водитель считает ящик, переключаться ему некуда. -->
+<div class="sup-scr" id="supScr">
+  <div class="sup-top">
+    <button class="sup-back" onclick="supBack()" aria-label="Назад">
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
+    </button>
+    <div class="sup-top-b">
+      <div class="sup-top-t" id="supT">Приёмка</div>
+      <div class="sup-top-s" id="supS"></div>
+    </div>
+    <div class="sup-top-v" id="supV"></div>
+  </div>
+  <div class="sup-mid" id="supMid"></div>
+  <div class="sup-bot" id="supBot"></div>
+</div>
+
+<div class="sheet" id="finSheet" onclick="if(event.target===this)finClose()">
+  <div class="sheet-in">
+    <div class="sheet-hd">
+      <div style="flex:1;min-width:0">
+        <div class="sheet-t" id="finT">Завершить приём</div>
+        <div class="sheet-s" id="finS"></div>
+      </div>
+    </div>
+    <div id="finBody"></div>
+    <div class="sheet-acts">
+      <button class="btn btn-gh" onclick="finClose()">Назад</button>
+      <button class="btn btn-pri" id="finGo" onclick="finSend()">Завершить</button>
+    </div>
+  </div>
+</div>
 
 <div class="sheet" id="mapSheet" onclick="if(event.target===this)this.classList.remove('show')">
   <div class="sheet-in">
@@ -821,11 +1000,15 @@ async function boot(){
 
 async function load(){
   try{
-    const [o, e] = await Promise.all([
+    const [o, e, s] = await Promise.all([
       drvApi.drvFetch('/api/driver/orders'),
       drvApi.drvFetch('/api/driver/expenses'),
+      // Приёмка спрашивается вместе с остальным: она появляется не по нажатию
+      // водителя, а оттого, что старший загрузил ответ магазина, — и узнать
+      // об этом он должен, не заходя на вкладку.
+      drvApi.drvFetch('/api/driver/supply').catch(() => null),
     ]);
-    ORDERS = o; EXP = e;
+    ORDERS = o; EXP = e; if(s) SUP = s;
   }catch(err){ return; }
   // Заказ, который назначили и который водитель ещё не подтвердил, показываем
   // поверх всего. Первый в очереди — тот, что ждёт дольше.
@@ -840,19 +1023,23 @@ async function load(){
   const be = document.getElementById('tbExp');
   const pend = (EXP.extras || []).filter(x => (x.status || 'approved') === 'pending').length;
   be.style.display = pend ? 'flex' : 'none'; be.textContent = pend;
+  supBadge();
   render();
 }
 
 function setTab(t){
   TAB = t; EXP_EDIT = null;
   document.querySelectorAll('.tb').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
-  if(t === 'history' && !HIST) loadHistory(); else render();
+  if(t === 'history' && !HIST) loadHistory();
+  else if(t === 'supply') supLoad();
+  else render();
   try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
   window.scrollTo({top:0});
 }
 
 function render(){
   if(TAB === 'orders')   return renderOrders();
+  if(TAB === 'supply')   return renderSupply();
   if(TAB === 'history')  return renderHistory();
   // Пока водитель вписывает сумму, экран не трогаем: обновление раз в пять
   // секунд иначе стирает недописанное число прямо из-под пальца.
@@ -1626,6 +1813,672 @@ async function sendDeliver(oid){
 // Куда вести — выбирает водитель. У одного стоит гугл, у другого вейз, у
 // третьего эпл: телефон сам такой выбор предлагает не везде, поэтому
 // спрашиваем сами. Выбранное запоминаем и в следующий раз открываем сразу.
+// ─── Звук сканера ───────────────────────────────────────────────────────────
+// Тон синтезируем, а не грузим файлом: так он короткий, тихий и без щелчков.
+// Кассовый «пик» — это меандр под три килогерца; за смену от него звенит в
+// ушах. Здесь синус в средних частотах, 60–90 мс, с мягким входом и затуханием.
+const SFX = {
+  ctx:null,
+  on: localStorage.getItem('ambar_scan_sound') !== '0',
+  _ac(){
+    if(!this.ctx){
+      const C = window.AudioContext || window.webkitAudioContext;
+      if(!C) return null;
+      this.ctx = new C();
+    }
+    // На iOS звук разрешён только после касания — экран открывается тапом по
+    // позиции, так что момент подходящий.
+    if(this.ctx.state === 'suspended') this.ctx.resume().catch(()=>{});
+    return this.ctx;
+  },
+  _tone(freq, ms, vol, at, glide){
+    const ac = this._ac(); if(!ac) return;
+    const t = ac.currentTime + (at || 0);
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = 'sine';
+    o.frequency.setValueAtTime(freq, t);
+    if(glide) o.frequency.exponentialRampToValueAtTime(glide, t + ms/1000);
+    // Плавные вход и выход: резкий старт даёт щелчок, и он-то и раздражает.
+    g.gain.setValueAtTime(0.0001, t);
+    g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
+    g.gain.exponentialRampToValueAtTime(0.0001, t + ms/1000);
+    o.connect(g); g.connect(ac.destination);
+    o.start(t); o.stop(t + ms/1000 + 0.02);
+  },
+  ok(){   if(this.on) this._tone(760, 80, 0.07, 0, 1010); },   // короткий подъём
+  warn(){ if(this.on){ this._tone(430, 70, 0.06); this._tone(430, 70, 0.06, 0.11); } },
+  err(){  if(this.on) this._tone(300, 160, 0.07, 0, 190); },   // мягкий спад
+  toggle(){
+    this.on = !this.on;
+    localStorage.setItem('ambar_scan_sound', this.on ? '1' : '0');
+    if(this.on) this.ok();
+    return this.on;
+  },
+};
+
+// ─── Сканер ─────────────────────────────────────────────────────────────────
+// Свой, а не телеграмовский: родной занимает весь экран, и счётчик «12 из 38»
+// поверх него не нарисовать.
+//
+// Три вещи, без которых сканер не работает, хотя код при этом читается:
+//   • один код в кадре читается каждый кадр — двенадцать раз в секунду. Без
+//     подавления повторов это двенадцать вибраций и двенадцать запросов на
+//     одну бутылку;
+//   • распознавать полный кадр 1080p телефон не успевает, и код теряется не
+//     из-за камеры, а из-за того, что кадр не досчитан;
+//   • сеть моргает. Скан, не дошедший до сервера, должен уйти позже, а не
+//     пропасть: бутылку в руках уже отложили как посчитанную.
+const SCAN = {
+  stream:null, video:null, cv:null, ctx:null, raf:null,
+  seen:new Set(),          // коды этой сессии
+  seenAt:new Map(),        // код → когда его видели в кадре последний раз
+  onCode:null, onIdle:null, onRepeat:null, onHold:null,
+  // Пока код не уходил из кадра дольше этого, считаем, что камера с него не
+  // сходила: человек ещё не успел её отвести, ругаться не на что.
+  GAP_MS:900,
+  lastDecode:0, lastHit:0, frames:0, t0:0, torchOn:false, alt:false,
+  DECODE_MS:80,            // ~12 распознаваний в секунду — глазу хватает
+  CROP:0.82,               // центр кадра: по краям ловятся чужие коды с полки
+  MAXPX:512,
+
+  // Ровно основная камера, а не «задняя вообще».
+  //
+  // По facingMode айфон отдаёт виртуальную камеру («Back Dual Wide», «Back
+  // Triple»), которая сама переключает линзы по расстоянию и освещению: на
+  // крышке бутылки она то и дело уходит на сверхширокую, где деталей меньше и
+  // код рассыпается. Нужна именно «Back Camera» — одна физическая линза.
+  async _mainCameraId(){
+    if(!navigator.mediaDevices.enumerateDevices) return null;
+    const devs = await navigator.mediaDevices.enumerateDevices();
+    const cams = devs.filter(d => d.kind === 'videoinput');
+    // Названия появляются только после выданного доступа; без них выбирать
+    // не из чего, и остаёмся на том, что дали.
+    if(!cams.length || !cams.some(d => d.label)) return null;
+    const back = cams.filter(d => /back|rear|задн/i.test(d.label));
+    const pool = back.length ? back : cams;
+    const exact = pool.find(d => /^back camera$/i.test(d.label.trim()));
+    if(exact) return exact.deviceId;
+    // Иначе — любая, в названии которой нет признаков сверхширокой,
+    // телефото или виртуальной сборки.
+    const plain = pool.find(d => !/ultra|wide|dual|triple|telephoto/i.test(d.label));
+    return (plain || pool[0]).deviceId;
+  },
+
+  async start(videoEl, onCode, onIdle, onRepeat, onHold){
+    this.stop();
+    this.video = videoEl; this.onCode = onCode; this.onIdle = onIdle;
+    this.onRepeat = onRepeat; this.onHold = onHold;
+    this.seen = new Set(); this.seenAt = new Map();
+    this.frames = 0; this.t0 = Date.now(); this.lastHit = Date.now();
+    // Разрешение просим полное: распознаём мы всё равно уменьшенный кусок
+    // кадра, но вырезаем его из детального — чем крупнее исходник, тем больше
+    // деталей в этом куске. И картинка на экране перестаёт быть мыльной.
+    const VIDEO = {width:{ideal:1920}, height:{ideal:1080},
+                   focusMode:{ideal:'continuous'}};
+    this.stream = await navigator.mediaDevices.getUserMedia({
+      video: {...VIDEO, facingMode:{ideal:'environment'}}, audio:false});
+    // Второй заход: названия камер доступны только после первого доступа.
+    try{
+      const id = await this._mainCameraId();
+      const cur = this.stream.getVideoTracks()[0];
+      if(id && cur && cur.getSettings && cur.getSettings().deviceId !== id){
+        this.stream.getTracks().forEach(t => t.stop());
+        this.stream = await navigator.mediaDevices.getUserMedia({
+          video: {...VIDEO, deviceId:{exact:id}}, audio:false});
+      }
+    }catch(e){ /* не вышло — работаем на той, что дали */ }
+    videoEl.srcObject = this.stream;
+    try{ await videoEl.play(); }catch(e){}
+    if(!window.jsQR) await new Promise(r => {
+      const sc = document.createElement('script'); sc.src = 'jsQR.js?v=1';
+      sc.onload = r; sc.onerror = r; document.head.appendChild(sc); });
+    this.cv = document.createElement('canvas');
+    this.ctx = this.cv.getContext('2d', {willReadFrequently:true});
+    this.raf = requestAnimationFrame(t => this._loop(t));
+    return true;
+  },
+
+  stop(){
+    if(this.raf){ cancelAnimationFrame(this.raf); this.raf = null; }
+    if(this.stream){ this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
+    if(this.video) this.video.srcObject = null;
+  },
+
+  // Фонарик: крышки бликуют и часто лежат в тени полки.
+  async torch(on){
+    const tr = this.stream && this.stream.getVideoTracks()[0];
+    if(!tr || !tr.getCapabilities) return false;
+    if(!(tr.getCapabilities().torch)) return false;
+    try{ await tr.applyConstraints({advanced:[{torch:!!on}]});
+         this.torchOn = !!on; return true; }
+    catch(e){ return false; }
+  },
+  hasTorch(){
+    const tr = this.stream && this.stream.getVideoTracks()[0];
+    return !!(tr && tr.getCapabilities && tr.getCapabilities().torch);
+  },
+
+  _loop(ts){
+    if(!this.stream) return;
+    this.raf = requestAnimationFrame(t => this._loop(t));
+    if(ts - this.lastDecode < this.DECODE_MS) return;
+    this.lastDecode = ts;
+    const v = this.video;
+    if(!v || v.readyState !== v.HAVE_ENOUGH_DATA || !v.videoWidth) return;
+
+    // Распознаём ровно то, что обведено рамкой на экране. Видео показано с
+    // обрезкой по краям (object-fit: cover), поэтому центр кадра и центр
+    // картинки — не одно и то же: без пересчёта человек целится в рамку, а
+    // читается другой кусок, и он не понимает, почему код не ловится.
+    const cw = v.clientWidth || v.videoWidth, ch = v.clientHeight || v.videoHeight;
+    const scale = Math.max(cw / v.videoWidth, ch / v.videoHeight);
+    const visW = cw / scale, visH = ch / scale;          // что реально видно, в пикселях кадра
+    const side = Math.min(visW, visH) * this.CROP;
+    const sx = (v.videoWidth - side) / 2, sy = (v.videoHeight - side) / 2;
+    // Один и тот же кусок читаем попеременно в двух масштабах. Распознавание
+    // ищет модули кода по резкости перепада: на смазанном или засвеченном
+    // кадре крупная картинка рассыпается в шум, а та же, но вдвое мельче,
+    // читается — мелкие детали усредняются, и границы модулей проступают.
+    // Обратное тоже верно, поэтому и по очереди, а не всегда мельче.
+    this.alt = !this.alt;
+    const full = Math.min(this.MAXPX, Math.round(side));
+    const px = this.alt ? full : Math.max(160, Math.round(full / 2));
+    this.cv.width = px; this.cv.height = px;
+    this.ctx.drawImage(v, sx, sy, side, side, 0, 0, px, px);
+    const img = this.ctx.getImageData(0, 0, px, px);
+    this.frames++;
+    const hit = jsQR(img.data, px, px, {inversionAttempts:'attemptBoth'});
+    if(hit && hit.data){
+      const code = String(hit.data).trim();
+      this.lastHit = Date.now();
+      const now = Date.now();
+      if(this.seen.has(code)){
+        // Камера всё ещё стоит на той же бутылке — это не повторная попытка,
+        // а тот же самый скан, растянутый на секунду. Ругаться здесь значит
+        // обвинять человека в том, чего он не делал.
+        const gone = now - (this.seenAt.get(code) || 0);
+        this.seenAt.set(code, now);
+        if(gone > this.GAP_MS && this.onRepeat) this.onRepeat(code);
+        // Код всё ещё перед камерой — экран должен держать подтверждение, а не
+        // мигнуть им на треть секунды и погаснуть.
+        else if(this.onHold) this.onHold(code);
+        return;
+      }
+      this.seen.add(code); this.seenAt.set(code, now);
+      if(this.onHold) this.onHold(code);
+      if(this.onCode) this.onCode(code);
+      return;
+    }
+    if(this.onIdle) this.onIdle(Date.now() - this.lastHit, this.frames,
+                                Math.round(this.frames / Math.max(1,(Date.now()-this.t0)/1000)));
+  },
+};
+
+// Очередь отправки. Скан не должен ждать сервер: рука уже тянется к следующей
+// бутылке, а на плохой связи запрос идёт секунду.
+const SCANQ = {
+  items:[], busy:false, onDone:null,
+  push(job){ this.items.push(job); this._run(); },
+  async _run(){
+    if(this.busy || !this.items.length) return;
+    this.busy = true;
+    const job = this.items.shift();
+    try{
+      const r = await drvApi.drvFetch(job.path, {method:'POST', body:job.body});
+      if(this.onDone) this.onDone(null, r, job);
+    }catch(e){
+      // Не дошло — возвращаем в начало очереди и ждём. Терять скан нельзя:
+      // бутылку уже отложили как посчитанную.
+      job.tries = (job.tries || 0) + 1;
+      if(job.tries < 6){ this.items.unshift(job); await new Promise(r => setTimeout(r, 1200)); }
+      else if(this.onDone) this.onDone(e, null, job);
+    }
+    this.busy = false;
+    if(this.items.length) this._run();
+  },
+  get pending(){ return this.items.length + (this.busy ? 1 : 0); },
+};
+
+// ══════════════════════════════════════════════════════════════════════════
+//  ПРИЁМ ТОВАРА
+// ══════════════════════════════════════════════════════════════════════════
+// Водитель забирает поставку в магазине. Заявка уже согласована: по каждой
+// позиции известно точное число, и приёмка — это не «сколько дали», а «дошли
+// ли до этого числа». Отсюда весь вид экрана: везде на виду остаток, а не
+// набранное. «Осталось 4» продолжает работу, «принято 19» её только описывает.
+//
+// Сканирование — единственный способ ввода. Кнопки «+1» здесь нет и не будет:
+// она превратила бы приёмку в набор числа, а весь смысл в том, что за каждой
+// единицей стоит конкретная бутылка с конкретным кодом.
+let SUP = null;                 // {mine, free, taken}
+let TASK = null;                // открытая задача
+let LINE = null;                // позиция, которую считаем сейчас
+let SCAN_ROWS = [];             // лента текущей позиции
+let SUP_BUSY = false;
+
+function supBadge(){
+  const b = document.getElementById('tbSup');
+  if(!b) return;
+  const mine = (SUP && SUP.mine || []).reduce((a, t) => a + t.left, 0);
+  const free = (SUP && SUP.free || []).length;
+  const n = mine || free;
+  b.style.display = n ? 'flex' : 'none';
+  b.textContent = n;
+}
+
+async function supLoad(){
+  try{ SUP = await drvApi.drvFetch('/api/driver/supply'); }
+  catch(e){ SUP = SUP || {mine:[], free:[], taken:[]}; }
+  supBadge();
+  if(TAB === 'supply') renderSupply();
+}
+
+function supWhen(t){
+  const d = _d(t.at);
+  return d ? d.toLocaleDateString('ru-RU', {day:'2-digit', month:'2-digit'}) + ' · ' + hhmm(t.at) : '';
+}
+
+// Карточка задачи. Взятая мной и свободная — одна и та же карточка с разным
+// подвалом: это одна и та же работа на разных стадиях, и перерисовывать её
+// другим макетом значит заставлять искать глазами то же самое заново.
+function supCard(t){
+  const pct = t.need ? Math.round(t.got / t.need * 100) : 0;
+  const started = t.mine && t.got > 0;
+  return `<div class="sup ${t.mine ? 'mine' : ''}">
+    <div class="sup-hd">
+      <span class="sup-code">${esc(t.district_code)}</span>
+      <span>${esc(t.district_name)}</span>
+      ${t.home && !t.mine ? '<span style="color:var(--gold2)">ваш район</span>' : ''}
+      <span class="sup-when">${esc(supWhen(t))}</span>
+    </div>
+    <div class="sup-b">
+      <div class="sup-n">${started ? 'Осталось ' + fmt(t.left) : fmt(t.need) + ' ' + plural(t.need, 'бутылка','бутылки','бутылок')}</div>
+      <div class="sup-s">${t.positions} ${plural(t.positions,'позиция','позиции','позиций')}${
+        started ? ` · принято ${fmt(t.got)} из ${fmt(t.need)}` : ''}</div>
+      ${started ? `<div class="sup-bar"><i style="width:${pct}%"></i></div>` : ''}
+    </div>
+    <div class="sup-foot">
+      ${t.mine
+        ? `<button class="btn btn-pri" onclick="supOpen('${t.supply_id}','${t.district}')">${
+             started ? 'Продолжить приём' : 'Начать приём'}</button>`
+        : `<button class="btn btn-pri" onclick="supClaim('${t.supply_id}','${t.district}')">Взять на себя</button>`}
+    </div>
+  </div>`;
+}
+
+const plural = (n, a, b, c) => {
+  const x = Math.abs(n) % 100, y = x % 10;
+  return x > 10 && x < 20 ? c : y > 1 && y < 5 ? b : y === 1 ? a : c;
+};
+
+function renderSupply(){
+  const body = document.getElementById('body');
+  const S = SUP || {mine:[], free:[], taken:[]};
+  if(!S.mine.length && !S.free.length && !S.taken.length){
+    body.innerHTML = `<div class="empty">Принимать пока нечего.<br>
+      Когда старший загрузит ответ магазина, заявка появится здесь.</div>`;
+    return;
+  }
+  let h = '';
+  if(S.mine.length){
+    h += `<div class="sect"><span class="sect-t">Моя приёмка</span></div>`;
+    h += S.mine.map(supCard).join('');
+  }
+  if(S.free.length){
+    h += `<div class="sect"><span class="sect-t">Свободные</span>
+            <span class="sect-v">${S.free.length}</span></div>`;
+    h += S.free.map(supCard).join('');
+  }
+  if(S.taken.length){
+    h += `<div class="sect"><span class="sect-t">Забрали другие</span></div>`;
+    h += S.taken.map(t => `<div class="sup-row">
+      <span class="sup-code">${esc(t.district_code)}</span>
+      <span class="sup-row-b">
+        <span class="sup-row-t">${esc(t.driver)}</span>
+        <span class="sup-row-s">${fmt(t.need)} бут. · принято ${fmt(t.got)}</span>
+      </span></div>`).join('');
+  }
+  body.innerHTML = h;
+}
+
+async function supClaim(sid, oid){
+  if(SUP_BUSY) return; SUP_BUSY = true;
+  try{
+    const t = await drvApi.drvFetch(`/api/driver/supply/${sid}/claim`,
+      {method:'POST', body:{district: oid}});
+    try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    await supLoad();
+    supOpen(sid, oid, t);
+  }catch(e){
+    // Задачу успел взять другой — это не ошибка, а обычный исход: карточка
+    // висит у всех водителей района.
+    const who = (e.payload || {}).driver;
+    toast(who ? `Уже взял ${who}` : 'Не удалось взять', 'err');
+    supLoad();
+  }finally{ SUP_BUSY = false; }
+}
+
+// ── экран задачи ───────────────────────────────────────────────────────────
+async function supOpen(sid, oid, pre){
+  TASK = pre || null;
+  document.getElementById('supScr').classList.add('show');
+  supRenderTask();
+  if(!pre){
+    try{ TASK = await drvApi.drvFetch(`/api/driver/supply/${sid}`, {params:{district: oid}}); }
+    catch(e){ toast('Не удалось открыть', 'err'); return supBack(); }
+    supRenderTask();
+  }
+}
+
+function supBack(){
+  if(LINE) return supLineClose();          // из камеры — к списку позиций
+  document.getElementById('supScr').classList.remove('show');
+  TASK = null;
+  supLoad();
+}
+
+function supRenderTask(){
+  const t = TASK;
+  if(!t) return;
+  _setText('supT', `Приёмка · ${t.district_code} ${t.district_name}`);
+  _setText('supS', `${t.positions} ${plural(t.positions,'позиция','позиции','позиций')} · ${supWhen(t)}`);
+  document.getElementById('supV').innerHTML = `${fmt(t.got)}<u> / ${fmt(t.need)}</u>`;
+  // Добранное уезжает вниз — так же, как его отдаёт сервер. Иначе строка,
+  // закрытая минуту назад, остаётся посреди списка и водитель каждый раз
+  // перечитывает её, ища следующую.
+  const lines = t.lines.slice().sort((a, b) =>
+    (a.left === 0) - (b.left === 0) || a.name.localeCompare(b.name, 'ru'));
+  document.getElementById('supMid').innerHTML = lines.map(l => `
+    <button class="li ${l.left ? '' : 'done'}" onclick="supLineOpen('${l.id}')">
+      <span class="li-b">
+        <span class="li-n">${esc(l.name)}</span>
+        <span class="li-s">${l.left ? 'осталось ' + fmt(l.left) : 'взято полностью'}</span>
+      </span>
+      <span class="li-v"><b>${fmt(l.got)}</b><i>/${fmt(l.need)}</i></span>
+      <span class="li-go">${svg(ICO.right || '<path d="M9 18l6-6-6-6"/>', 18)}</span>
+      <span class="li-ok">${svg(ICO.ok, 19)}</span>
+    </button>`).join('');
+  const all = t.left === 0;
+  const none = t.got === 0;
+  document.getElementById('supBot').innerHTML = `
+    <div class="sup-tot">
+      <span class="sup-tot-l">${all ? 'Взято полностью' : 'Осталось забрать'}</span>
+      <span class="sup-tot-v">${all ? fmt(t.got) : fmt(t.left)}<u> ${all ? 'бут.' : 'из ' + fmt(t.need)}</u></span>
+    </div>
+    ${none
+      ? `<button class="btn btn-gh" onclick="supGiveBack()">Вернуть задачу</button>`
+      : `<button class="btn ${all ? 'btn-pri' : 'btn-gh'}" onclick="finOpen()">${
+           all ? 'Завершить приём' : 'Завершить с недобором'}</button>`}`;
+}
+
+const _setText = (id, v) => { const e = document.getElementById(id); if(e) e.textContent = v; };
+
+// ── камера ─────────────────────────────────────────────────────────────────
+async function supLineOpen(pid){
+  const l = (TASK.lines || []).find(x => x.id === pid);
+  if(!l || !l.left) return;
+  LINE = {...l};
+  SCAN_ROWS = [];
+  supRenderCam();
+  try{
+    await SCAN.start(document.getElementById('camV'), supScan, supIdle, null, camHold);
+    const tb = document.getElementById('camTorch');
+    if(tb) tb.style.display = SCAN.hasTorch() ? 'flex' : 'none';
+  }catch(e){
+    toast('Нет доступа к камере', 'err');
+    supLineClose();
+  }
+}
+
+function supLineClose(){
+  SCAN.stop();
+  LINE = null; SCAN_ROWS = [];
+  supRenderTask();
+}
+
+function supRenderCam(){
+  const l = LINE;
+  _setText('supT', l.name);
+  _setText('supS', 'Наводите на код каждой бутылки');
+  document.getElementById('supV').innerHTML = `${fmt(l.got)}<u> / ${fmt(l.need)}</u>`;
+  document.getElementById('supMid').innerHTML = `
+    <div class="cam">
+      <video id="camV" playsinline muted autoplay></video>
+      <div class="cam-tools">
+        <button class="cam-t ${SFX.on ? '' : 'muted'}" onclick="camSound(this)" aria-label="Звук">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M11 5 6 9H2v6h4l5 4z"/><path class="s-on" d="M15.5 8.5a5 5 0 0 1 0 7"/>
+            <path class="s-off" d="M22 9l-6 6M16 9l6 6"/></svg>
+        </button>
+        <button class="cam-t" id="camTorch" onclick="camTorch(this)" style="display:none" aria-label="Фонарик">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 2h6l-1 7h4l-8 13 2-9H8z"/></svg>
+        </button>
+      </div>
+      <div class="cam-frame" id="camF">
+        <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+        <div class="cam-badge" id="camB"></div>
+      </div>
+      <div class="cam-left">
+        <b id="camLeft">${fmt(l.left)}</b><span>осталось</span>
+        <span class="cam-hint" id="camHint">Наведите на код</span>
+      </div>
+    </div>
+    <div id="camFeed"></div>`;
+  document.getElementById('supBot').innerHTML = `
+    <div class="sc-acts">
+      <button class="btn btn-gh" id="camUndo" onclick="camUndo()" disabled>Отменить скан</button>
+      <button class="btn btn-pri" onclick="supLineClose()">К списку</button>
+    </div>`;
+  camFeed();
+}
+
+function camSound(b){ b.classList.toggle('muted', !SFX.toggle()); }
+async function camTorch(b){
+  const on = b.classList.toggle('on');
+  if(!(await SCAN.torch(on))) b.classList.toggle('on', !on);
+}
+
+const CAM_FLASH = {
+  ok:   ['принята',        'success'],
+  dup:  ['уже в реестре',  'warning'],
+  full: ['по этой всё',    'warning'],
+  err:  ['не сохранилось', 'error'],
+};
+let _fOn = false, _fAt = 0, _hAt = 0, _fT = null;
+
+function camFlash(kind, text){
+  const f = document.getElementById('camF'), b = document.getElementById('camB');
+  if(!f || !b) return;
+  const [t, hap] = CAM_FLASH[kind] || CAM_FLASH.ok;
+  b.textContent = text || t;
+  f.classList.remove('ok','dup','err');
+  void f.offsetWidth;
+  f.classList.add(kind === 'full' ? 'dup' : kind === 'dup' ? 'dup' : kind);
+  _fOn = true; _fAt = Date.now(); _hAt = Date.now();
+  try{ tg.HapticFeedback.notificationOccurred(hap); }catch(e){}
+  if(kind === 'ok') SFX.ok(); else if(kind === 'err') SFX.err(); else SFX.warn();
+  clearTimeout(_fT);
+  _fT = setTimeout(camFlashClear, 6000);
+}
+function camFlashClear(){
+  const f = document.getElementById('camF'), b = document.getElementById('camB');
+  if(f) f.classList.remove('ok','dup','err');
+  if(b) b.textContent = '';
+  _fOn = false;
+}
+function camHold(){ _hAt = Date.now(); }
+
+function supIdle(sinceMs, frames, fps){
+  if(_fOn && Date.now() - _hAt > 350 && Date.now() - _fAt > 700) camFlashClear();
+  const h = document.getElementById('camHint'); if(!h) return;
+  if(sinceMs < 2500){ h.textContent = 'Наведите на код'; h.className = 'cam-hint'; return; }
+  if(!fps || fps < 4){ h.textContent = 'Телефон не успевает'; }
+  else if(sinceMs > 8000){
+    h.textContent = SCAN.torchOn ? 'Блик — выключите фонарик' : 'Ближе, ровнее, включите фонарик';
+  }else{ h.textContent = 'Ищу код…'; }
+  h.className = 'cam-hint warn';
+}
+
+// Скан не ждёт сервера: рука уже тянется к следующей бутылке. Зелёная вспышка
+// сразу, а если сервер возразит — цвет сменится.
+function supScan(code){
+  if(!LINE) return;
+  SCAN_ROWS.unshift({code, state:'sending', label:''});
+  camFlash('ok');
+  camFeed();
+  SCANQ.push({path:`/api/driver/supply/${TASK.supply_id}/scan`,
+              body:{district: TASK.district, product_id: LINE.id, code,
+                    at_dev: new Date().toISOString()}, code});
+}
+
+SCANQ.onDone = (err, r, job) => {
+  const row = SCAN_ROWS.find(x => x.code === job.code && x.state === 'sending');
+  if(err){ if(row){ row.state = 'fail'; camFlash('err'); camFeed(); } return; }
+  if(r.ok){
+    if(row){ row.state = 'new'; row.label = r.label || ''; }
+    if(LINE){ LINE.got = r.got; LINE.left = r.left; }
+    supSyncLine(r);
+    camFeed();
+    // Строка добрана — водителю больше нечего здесь делать, и держать камеру
+    // включённой значит ждать от него лишнего действия.
+    if(r.left === 0){
+      camFlash('ok', 'всё, ' + r.need);
+      setTimeout(() => { if(LINE){ supLineClose();
+        toast(`${r.name} — взято полностью`); } }, 700);
+    }
+    return;
+  }
+  if(row){ row.state = r.verdict === 'known' ? 'dup' : 'fail'; row.label = r.label || ''; }
+  const MSG = {
+    known: 'Эта бутылка уже в реестре',
+    full:  'По этой позиции уже всё',
+    not_mine: 'Задачу забрал другой',
+    closed: 'Приёмка уже закрыта',
+    not_in_supply: 'Этой позиции нет в поставке',
+    no_supply: 'Поставка закрыта',
+  };
+  camFlash(r.verdict === 'full' ? 'full' : r.verdict === 'known' ? 'dup' : 'err',
+           r.verdict === 'known' ? 'уже в реестре' : null);
+  if(MSG[r.verdict] && r.verdict !== 'known') toast(MSG[r.verdict], 'err');
+  camFeed();
+};
+
+// Число на экране должно совпадать с базой, а не с нашим представлением о ней.
+function supSyncLine(r){
+  if(!TASK) return;
+  const l = (TASK.lines || []).find(x => x.id === (LINE && LINE.id));
+  if(l){ l.got = r.got; l.left = r.left; }
+  TASK.got = (TASK.lines || []).reduce((a, x) => a + x.got, 0);
+  TASK.left = Math.max(0, TASK.need - TASK.got);
+  const v = document.getElementById('supV');
+  if(v && LINE) v.innerHTML = `${fmt(r.got)}<u> / ${fmt(r.need)}</u>`;
+  _setText('camLeft', fmt(r.left));
+}
+
+const SC_STATE = {
+  sending: ['отправляю…',   'var(--muted)'],
+  new:     ['принята',      'var(--up)'],
+  dup:     ['уже в реестре','var(--dn)'],
+  fail:    ['не прошла',    'var(--dn)'],
+};
+
+function camFeed(){
+  const f = document.getElementById('camFeed'); if(!f) return;
+  f.innerHTML = SCAN_ROWS.slice(0, 25).map(r => {
+    const [txt, color] = SC_STATE[r.state] || SC_STATE.sending;
+    const raw = r.code.length > 24 ? r.code.slice(0, 22) + '…' : r.code;
+    return `<div class="sc-row">
+      <span class="sc-dot" style="background:${color}"></span>
+      <span class="sc-b">
+        <span class="sc-code">${esc(r.label || '…')}</span>
+        <span class="sc-raw">${esc(raw)}</span>
+      </span>
+      <span class="sc-st" style="color:${color}">${esc(txt)}</span></div>`;
+  }).join('');
+  const u = document.getElementById('camUndo');
+  if(u) u.disabled = !SCAN_ROWS.some(r => r.state === 'new');
+}
+
+// Отмена — только что записанной и только несколько раз за приёмку. Правило
+// стоит на сервере, здесь лишь показываем его ответ.
+async function camUndo(){
+  const row = SCAN_ROWS.find(r => r.state === 'new');
+  if(!row) return;
+  let r;
+  try{ r = await drvApi.drvFetch(`/api/driver/supply/${TASK.supply_id}/undo`,
+    {method:'POST', body:{district: TASK.district, code: row.code}}); }
+  catch(e){ return toast('Не удалось отменить', 'err'); }
+  if(!r.ok){
+    const M = {undo_limit: `Отменить можно ${r.limit} раза за приёмку — дальше только к старшему`,
+               too_late: 'Отменить можно сразу после скана', not_ours: 'Эта бутылка не из приёмки'};
+    return toast(M[r.verdict] || 'Не удалось отменить', 'err');
+  }
+  SCAN.seen.delete(row.code); SCAN.seenAt.delete(row.code);
+  SCAN_ROWS.splice(SCAN_ROWS.indexOf(row), 1);
+  if(LINE){ LINE.got--; LINE.left++; supSyncLine({got: LINE.got, left: LINE.left, need: LINE.need}); }
+  camFeed();
+  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+
+// ── завершение ─────────────────────────────────────────────────────────────
+// Недобор считает сервер по строкам — у водителя спрашиваем только то, чего в
+// базе нет: почему. И спрашиваем один раз, а не по каждой позиции.
+function finOpen(){
+  const t = TASK; if(!t) return;
+  const gaps = (t.lines || []).filter(l => l.left > 0);
+  _setText('finT', gaps.length ? 'Недобор' : 'Завершить приём');
+  _setText('finS', gaps.length
+    ? `Не хватает ${fmt(t.left)} ${plural(t.left,'бутылки','бутылок','бутылок')}. Старший увидит это списком.`
+    : `Принято ${fmt(t.got)} из ${fmt(t.need)}. Задача закроется.`);
+  document.getElementById('finBody').innerHTML =
+    (gaps.length ? `<div class="card" style="margin-bottom:12px">${
+      gaps.slice(0, 8).map(l => `<div class="ord-item" style="margin-bottom:7px">
+        <span>${esc(l.name)}</span><b>${l.got} из ${l.need}</b></div>`).join('')
+      }${gaps.length > 8 ? `<div class="sup-row-s">…и ещё ${gaps.length - 8}</div>` : ''}</div>` : '') +
+    `<textarea id="finNote" placeholder="${gaps.length
+      ? 'Почему не хватает: магазин не дал, бой, не было на складе…'
+      : 'Комментарий старшему — если нужен'}"></textarea>`;
+  document.getElementById('finGo').textContent = gaps.length ? 'Отправить недобор' : 'Завершить';
+  document.getElementById('finSheet').classList.add('show');
+}
+
+function finClose(){ document.getElementById('finSheet').classList.remove('show'); }
+
+// Ничего не приняли — значит и закрывать нечего: задача возвращается в общий
+// список, а не закрывается недобором на всю поставку.
+async function supGiveBack(){
+  const t = TASK; if(!t) return;
+  try{ await drvApi.drvFetch(`/api/driver/supply/${t.supply_id}/release`,
+    {method:'POST', body:{district: t.district}}); }
+  catch(e){ return toast('Не удалось вернуть', 'err'); }
+  document.getElementById('supScr').classList.remove('show');
+  TASK = null; toast('Задача снова свободна');
+  supLoad();
+}
+
+async function finSend(){
+  const t = TASK; if(!t || SUP_BUSY) return;
+  const note = (document.getElementById('finNote') || {}).value || '';
+  if(t.left > 0 && !note.trim()) return toast('Впишите, почему не хватает', 'err');
+  SUP_BUSY = true;
+  const btn = document.getElementById('finGo'); btn.disabled = true;
+  try{
+    const r = await drvApi.drvFetch(`/api/driver/supply/${t.supply_id}/finish`,
+      {method:'POST', body:{district: t.district, note}});
+    if(!r.ok) throw new Error(r.verdict);
+    finClose();
+    document.getElementById('supScr').classList.remove('show');
+    TASK = null;
+    try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    toast('Приёмка закрыта');
+    supLoad();
+  }catch(e){ toast('Не удалось закрыть', 'err'); }
+  finally{ SUP_BUSY = false; btn.disabled = false; }
+}
+
 const MAPS = [
   {id:'google', t:'Google Maps',
    url:(p,a) => `https://www.google.com/maps/dir/?api=1&destination=${p||enc(a)}&travelmode=driving`},

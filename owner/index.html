@@ -848,6 +848,82 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   padding:14px;cursor:pointer;text-align:left;color:var(--text);
   background:none;border:none;transition:.16s var(--e1);min-height:126px}
 .acc-cell + .acc-cell{box-shadow:inset 1px 0 0 var(--border2)}
+/* Три плитки в ряду по две: третья занимает всю ширину, иначе рядом с ней
+   остаётся пустая половина клетки — глаз читает её как «здесь что-то не
+   загрузилось». Шов у неё сверху, а не слева. */
+.acc-3 .acc-cell:nth-child(3){grid-column:1 / -1;min-height:104px;
+  box-shadow:inset 0 1px 0 var(--border2)}
+
+/* ── Поставка ───────────────────────────────────────────────────────────── */
+/* Три числа в ряд: просили → подтвердили → приняли. Разницу между ними никто
+   не должен считать в уме, поэтому они стоят рядом, а не на разных экранах. */
+.sup-sum{display:grid;grid-template-columns:repeat(3,1fr);margin-bottom:12px;
+  border-radius:15px;overflow:hidden;background:var(--card);border:1px solid var(--border2)}
+.sup-sum-c{padding:13px 12px;text-align:center}
+.sup-sum-c + .sup-sum-c{box-shadow:inset 1px 0 0 var(--border2)}
+.sup-sum-c b{display:block;font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;
+  line-height:1;letter-spacing:-.6px;color:var(--text);font-variant-numeric:tabular-nums}
+.sup-sum-c i{display:block;margin-top:5px;font-style:normal;font-size:9.5px;font-weight:600;
+  letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.sup-sum-c.dn b{color:var(--dn)}
+.sup-sum-c.up b{color:var(--up)}
+.sup-sum-c.warn b{color:var(--warn)}
+
+.sup-short{padding:14px;border-radius:15px;background:var(--card);
+  border:1px solid var(--border2);margin-bottom:10px}
+.sup-short-h{display:flex;align-items:center;gap:11px;padding-bottom:11px;margin-bottom:8px;
+  border-bottom:1px solid var(--border2)}
+.sup-short-v{font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:700;line-height:1;
+  letter-spacing:-1px;color:var(--dn);font-variant-numeric:tabular-nums}
+.sup-short-u{font-size:10.5px;font-weight:600;letter-spacing:.4px;text-transform:uppercase;
+  color:var(--muted);line-height:1.35}
+.sup-sr{display:flex;align-items:center;gap:11px;padding:8px 0;
+  border-top:1px solid var(--border2)}
+.sup-sr:first-of-type{border-top:none}
+.sup-sr-b{flex:1;min-width:0}
+.sup-sr-n{display:block;font-size:13.5px;font-weight:600;line-height:1.25}
+.sup-sr-s{display:block;font-size:11px;color:var(--muted);margin-top:1px}
+.sup-sr-v{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;
+  color:var(--dn);font-variant-numeric:tabular-nums}
+.sup-sr-v.up{color:var(--up)}
+.sup-sr-more{padding-top:8px;font-size:11.5px;color:var(--muted)}
+.sup-allgood{padding:14px;margin-bottom:10px;border-radius:15px;font-size:13px;
+  color:var(--up);background:var(--up-soft);border:1px solid rgba(76,175,125,.25)}
+
+/* Задача района. Рамка слева цветом состояния: их четыре, и по цвету видно
+   быстрее, чем по слову. */
+.sup-t{padding:13px 14px;margin-bottom:9px;border-radius:15px;background:var(--card);
+  border:1px solid var(--border2);border-left:3px solid var(--border3)}
+.sup-t.live{border-left-color:var(--gold)}
+.sup-t.ok{border-left-color:var(--up)}
+.sup-t.dn{border-left-color:var(--dn)}
+.sup-t-h{display:flex;align-items:center;gap:9px;margin-bottom:9px}
+.sup-code{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:6px;
+  background:var(--card2);color:var(--gold2);font-size:10.5px;font-weight:800;letter-spacing:.6px}
+.sup-t-n{flex:1;min-width:0;font-size:14.5px;font-weight:700;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.sup-t-st{flex-shrink:0;font-size:10px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
+  color:var(--muted)}
+.sup-t.live .sup-t-st{color:var(--gold2)}
+.sup-t.ok .sup-t-st{color:var(--up)}
+.sup-t.dn .sup-t-st{color:var(--dn)}
+.sup-t-b{display:flex;align-items:baseline;gap:10px}
+.sup-t-v{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;line-height:1;
+  color:var(--gold3);font-variant-numeric:tabular-nums}
+.sup-t-v u{text-decoration:none;font-size:13px;color:var(--muted)}
+.sup-t-s{flex:1;min-width:0;font-size:11.5px;color:var(--muted);text-align:right}
+.sup-bar{height:4px;border-radius:99px;background:var(--card3);overflow:hidden;margin-top:10px}
+.sup-bar i{display:block;height:100%;border-radius:99px;
+  background:linear-gradient(90deg,var(--gold),var(--gold2))}
+.sup-t.ok .sup-bar i{background:var(--up)}
+.sup-t.dn .sup-bar i{background:var(--dn)}
+.sup-t-fl{margin-top:9px;padding:7px 10px;border-radius:9px;font-size:11.5px;
+  color:var(--warn);background:var(--warn-soft)}
+.sup-t-note{margin-top:8px;font-size:12.5px;color:var(--sub);line-height:1.4}
+.sup-t-rel{margin-top:10px;width:100%;padding:9px;border-radius:10px;cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:600;color:var(--muted);
+  background:var(--card2);border:1px solid var(--border3)}
+.sup-t-rel:active{transform:scale(.98);color:var(--dn)}
 .acc-cell:active{background:var(--card2)}
 .acc-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:2px}
 .acc-ico{width:34px;height:34px;flex-shrink:0;border-radius:10px;display:flex;
@@ -2538,6 +2614,9 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Низкий остаток</div><div class="nrow-s">По каждому SKU свой порог</div></div><label class="tg"><input type="checkbox" data-p="stock.low" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">SKU закончился</div><div class="nrow-s">Полное отсутствие товара</div></div><label class="tg"><input type="checkbox" data-p="stock.out" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Списание / инвентаризация</div><div class="nrow-s">Действия оператора</div></div><label class="tg"><input type="checkbox" data-p="stock.writeoff"><i></i></label></div>
+          <div class="nrow"><div class="nrow-body"><div class="nrow-t">Смена закрыта у всех</div><div class="nrow-s">Утренний итог и заявка в магазин файлом</div></div><label class="tg"><input type="checkbox" data-p="shift.closed" checked><i></i></label></div>
+          <div class="nrow"><div class="nrow-body"><div class="nrow-t">Приёмка закрыта</div><div class="nrow-s">Что водитель забрал и чего не хватило</div></div><label class="tg"><input type="checkbox" data-p="supply.done" checked><i></i></label></div>
+          <div class="nrow"><div class="nrow-body"><div class="nrow-t">Приёмка требует взгляда</div><div class="nrow-s">Темп сканирования, отмены, странные коды</div></div><label class="tg"><input type="checkbox" data-p="supply.flag" checked><i></i></label></div>
         </div>
       </div>
 
@@ -5913,11 +5992,13 @@ const ACC = [
    ico:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>'},
   {id:'order',    t:'Заявка на закупку', s:'сколько довезти до нормы',
    ico:'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/>'},
+  {id:'supply',   t:'Поставка',          s:'ответ магазина и приёмка',
+   ico:'<path d="M3 9h18M6 3h12l3 6v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9z"/><path d="M9 13h6"/>'},
   {id:'qr',       t:'Внести товар',      s:'сканируем коды с бутылок',
    ico:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/>'},
 ];
 let ACC_PERIOD = null, ACC_STOCK = null, ACC_ORDER = null, ACC_VIEW = null,
-    ACC_PROMO = null, ACC_GIFT = null, ACC_QR = null, ACC_CHK = null;
+    ACC_PROMO = null, ACC_GIFT = null, ACC_QR = null, ACC_CHK = null, ACC_SUP = null;
 
 function accRender(){
   const box = document.getElementById('accHome'); if(!box) return;
@@ -5947,6 +6028,9 @@ function accRender(){
                     'позиция','позиции','позиций')} в реестре`
                 : 'ни одной бутылки не записано')
               : 'сканируем коды с бутылок',
+    // Подпись отвечает на вопрос стадии: пока никто не забрал — сколько ждёт,
+    // пока везут — сколько уже принято, после — чего не хватило.
+    supply:   ACC_SUP ? supSub(ACC_SUP) : 'ответ магазина и приёмка',
   };
   // Крупная цифра на плитке отвечает на вопрос раздела одним взглядом, а
   // подпись объясняет, что это за цифра.
@@ -5960,6 +6044,10 @@ function accRender(){
                ACC_ORDER ? pluralize(ACC_ORDER.total_qty,'штука','штуки','штук') : 'штук'],
     qr:       [ACC_QR    ? fmt(ACC_QR.totals.active) : null,
                ACC_QR ? pluralize(ACC_QR.totals.active,'бутылка','бутылки','бутылок') : 'бутылок'],
+    supply:   [ACC_SUP ? (ACC_SUP.open ? fmt(ACC_SUP.open.total_qty) : '—') : null,
+               ACC_SUP && ACC_SUP.open
+                 ? pluralize(ACC_SUP.open.total_qty,'бутылка','бутылки','бутылок')
+                 : 'нет поставки'],
   };
   // Плитка одна и та же, меняется только раздел, в котором она стоит.
   const tile = a => {
@@ -5981,9 +6069,12 @@ function accRender(){
   // ничего не добавляло к тому, что и так видно, зато резало страницу на
   // куски. Общая подложка делает ту же работу молча.
   const pick = ids => ACC.filter(a => ids.includes(a.id)).map(tile).join('');
+  // Три плитки о товаре под одной подложкой и в порядке его пути: что просим →
+  // что подтвердили и кто везёт → что легло на полку. Третья занимает ряд
+  // целиком: одинокая половинка читается как незаполненная ячейка.
   box.innerHTML = `
     <div class="acc-group">${pick(['expenses','stock'])}</div>
-    <div class="acc-group">${pick(['order','qr'])}</div>` + `
+    <div class="acc-group acc-3">${pick(['order','supply','qr'])}</div>` + `
     <!-- Проверка закреплена внизу: это то, ради чего сюда заходят стоя у
          машины, и она не должна уезжать вместе со списком. -->
     <div class="chk-dock"><button class="chk-big" onclick="accOpen('check')">
@@ -6148,7 +6239,7 @@ function promoBlockRender(){
 // карточках сразу выглядит хуже, чем секунда ожидания.
 async function accLoadSummaries(){
   const get = (p, params) => ownerApi.ownerFetch(p, params ? {params} : undefined).catch(()=>null);
-  const [per, st, ord, pr, gf, qr, chk] = await Promise.all([
+  const [per, st, ord, pr, gf, qr, chk, sup] = await Promise.all([
     get('/api/owner/expenses/period', {days:30}),
     get('/api/owner/stock/status'),
     get('/api/owner/stock/order'),
@@ -6158,9 +6249,12 @@ async function accLoadSummaries(){
     // Проверки тянем сразу: подпись на панели должна говорить живыми числами
     // с первого открытия, а не после того, как человек туда зайдёт.
     get('/api/owner/qr/checks', {days: 30}),
+    get('/api/owner/supply'),
   ]);
   ACC_PERIOD = per; ACC_STOCK = st; ACC_ORDER = ord; ACC_PROMO = pr; ACC_GIFT = gf; ACC_QR = qr;
   if(chk) ACC_CHK = chk;
+  if(sup) ACC_SUP = {list: sup.supplies || [],
+                     open: (sup.supplies || []).find(x => x.status === 'open') || null};
   accRender(); mktRender(); promoBlockRender(); giftBlockRender();
 }
 
@@ -6176,6 +6270,7 @@ function accOpen(id){
   if(id === 'promo')    accPromo();
   if(id === 'gift')     accGift();
   if(id === 'qr')       accQR();
+  if(id === 'supply')   accSupply();
   if(id === 'check')    accCheck();
 }
 
@@ -7250,6 +7345,280 @@ async function qrDone(){
   try{ await ownerApi.ownerFetch('/api/owner/qr/unlock',
     {method:'POST', body:{district: QR_DIST, product_id: QR_PROD.id}}); }catch(e){}
   accQR();
+}
+
+// ─── Поставка ───────────────────────────────────────────────────────────────
+// Экран отвечает на три вопроса подряд, в том порядке, в каком они возникают
+// у старшего утром:
+//
+//   1. что магазин не дал     → это надо купить в другом месте, и сегодня;
+//   2. кто повёз              → задача на район с именем и прогрессом;
+//   3. что в итоге не доехало → повод для разговора с магазином и с водителем.
+//
+// Первым стоит недобор, а не список поставки: сама поставка едет сама собой,
+// а вот дыра в ней требует решения, пока магазины открыты.
+let SUP_ID = null, SUP_D = null, SUP_BUSY = false;
+
+function supSub(a){
+  if(!a || !a.open){
+    const last = (a && a.list || [])[0];
+    return last ? 'последняя ' + String(last.at || '').slice(0, 10) : 'ответа магазина ещё не было';
+  }
+  const o = a.open;
+  const took = Object.values(o.tasks || {}).reduce((x, t) => x + (t.scanned || 0), 0);
+  const free = Object.values(o.tasks || {}).filter(t => !t.driver && !t.done_at).length;
+  if(took) return `принято ${fmt(took)} из ${fmt(o.total_qty)}`;
+  return free ? `${free} ${pluralize(free,'район','района','районов')} никто не взял`
+              : 'водители забрали задачи';
+}
+
+async function accSupply(){
+  _setText('accTitle', 'Поставка');
+  _setText('accSub', 'загрузка…');
+  let list = ACC_SUP && ACC_SUP.list;
+  if(!list){
+    try{ list = ((await ownerApi.ownerFetch('/api/owner/supply')).supplies) || []; }
+    catch(e){ list = []; }
+    ACC_SUP = {list, open: list.find(x => x.status === 'open') || null};
+  }
+  const cur = list.find(x => x.status === 'open') || list[0];
+  if(!cur){ supEmpty(); return; }
+  await supLoad(cur.supply_id);
+}
+
+// Поставки ещё не было — экран не пустой, а объясняющий: сюда приходят, когда
+// магазин прислал файл, и главное здесь именно кнопка загрузки.
+function supEmpty(){
+  _setText('accSub', 'ответа магазина ещё не было');
+  document.getElementById('accMid').innerHTML = `
+    <div class="exp-empty" style="padding:30px 16px;line-height:1.6">
+      Магазин ещё не присылал ответ.<br>
+      Отправьте ему заявку из раздела «Заявка на закупку», а вернувшийся файл
+      загрузите здесь — программа сверит его с нашей заявкой.
+    </div>`;
+  supFoot();
+}
+
+async function supLoad(sid){
+  SUP_ID = sid;
+  try{ SUP_D = await ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(sid)); }
+  catch(e){
+    document.getElementById('accMid').innerHTML =
+      '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+    return;
+  }
+  supRender();
+}
+
+function supRender(){
+  const d = SUP_D; if(!d) return;
+  const short = d.shortfall || {rows:[], qty:0};
+  const D = d.districts || {};
+  const dn = o => `${(D[o]||{}).code || ''} ${(D[o]||{}).name || o}`.trim();
+  _setText('accSub', `${_dayName(d.day || String(d.at||'').slice(0,10))} · ${
+    d.status === 'done' ? 'закрыта' : 'в работе'}`);
+
+  // Шапка: три числа одной строкой — просили, дали, приняли. Разница между
+  // ними и есть весь смысл экрана, и считать её в уме не должен никто.
+  const head = `
+    <div class="sup-sum">
+      <div class="sup-sum-c"><b>${fmt(d.asked_qty)}</b><i>просили</i></div>
+      <div class="sup-sum-c ${d.total_qty < d.asked_qty ? 'dn' : ''}">
+        <b>${fmt(d.total_qty)}</b><i>подтвердили</i></div>
+      <div class="sup-sum-c ${d.took < d.total_qty ? 'warn' : 'up'}">
+        <b>${fmt(d.took)}</b><i>приняли</i></div>
+    </div>`;
+
+  // Недобор — первым и с кнопками: это единственное на экране, что требует
+  // действия прямо сейчас.
+  const why = {dropped:'магазин отказал', short:'урезал', gap:'не выдал при отгрузке'};
+  const shortBlock = short.rows.length ? `
+    <div class="exp-grp">Заказать на доп. складах</div>
+    <div class="sup-short">
+      <div class="sup-short-h">
+        <span class="sup-short-v">${fmt(short.qty)}</span>
+        <span class="sup-short-u">${pluralize(short.qty,'бутылка','бутылки','бутылок')}<br>не хватает</span>
+      </div>
+      ${short.rows.slice(0, 40).map(r => `<div class="sup-sr">
+        <span class="sup-sr-b">
+          <span class="sup-sr-n">${escS(r.name)}</span>
+          <span class="sup-sr-s">${escS(why[r.why] || '')} · ${
+            Object.entries(r.by_district).map(([o, n]) => `${(D[o]||{}).code || o} ${n}`).join(' · ')}</span>
+        </span>
+        <span class="sup-sr-v">${r.gap}</span></div>`).join('')}
+      ${short.rows.length > 40 ? `<div class="sup-sr-more">…и ещё ${short.rows.length - 40}</div>` : ''}
+      <div class="qb-wrap qb-row" style="margin-top:12px">
+        <button class="qb" id="supShare" onclick="supShare()">
+          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v13M8 7l4-4 4 4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+          Поделиться списком
+        </button>
+        <button class="qb qb-ico" id="supSend" onclick="supSend()"
+                aria-label="Прислать файл в чат с ботом" title="В телеграм">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+        </button>
+      </div>
+    </div>` : `<div class="sup-allgood">Магазин дал всё, о чём просили.</div>`;
+
+  // Задачи: по одной на район. Имя водителя — главное, что здесь ищут.
+  const tasks = (d.tasks || []).map(t => {
+    const pct = t.need ? Math.round(t.got / t.need * 100) : 0;
+    const fl = t.flags || {};
+    const marks = [];
+    if(fl.fast)  marks.push(`${fl.fast} ${pluralize(fl.fast,'быстрый скан','быстрых скана','быстрых сканов')}`);
+    if(fl.shape) marks.push(`${fl.shape} ${pluralize(fl.shape,'странный код','странных кода','странных кодов')}`);
+    if(fl.undo)  marks.push(`${fl.undo} ${pluralize(fl.undo,'отмена','отмены','отмен')}`);
+    const state = t.done_at ? (t.got < t.need ? 'недобор' : 'принято')
+                : t.driver ? (t.got ? 'везёт' : 'взял') : 'свободна';
+    return `<div class="sup-t ${t.done_at ? (t.got < t.need ? 'dn' : 'ok') : t.driver ? 'live' : ''}">
+      <div class="sup-t-h">
+        <span class="sup-code">${escS((D[t.district]||{}).code || '')}</span>
+        <span class="sup-t-n">${escS(t.driver || 'Никто не взял')}</span>
+        <span class="sup-t-st">${state}</span>
+      </div>
+      <div class="sup-t-b">
+        <span class="sup-t-v">${fmt(t.got)}<u> / ${fmt(t.need)}</u></span>
+        <span class="sup-t-s">${escS((D[t.district]||{}).name || t.district)} · ${
+          t.positions} ${pluralize(t.positions,'позиция','позиции','позиций')}${
+          t.done_at ? ' · ' + _hm(t.done_at) : t.started_at ? ' · с ' + _hm(t.started_at) : ''}</span>
+      </div>
+      <div class="sup-bar"><i style="width:${pct}%"></i></div>
+      ${marks.length ? `<div class="sup-t-fl">${escS(marks.join(' · '))}</div>` : ''}
+      ${t.note ? `<div class="sup-t-note">${escS(t.note)}</div>` : ''}
+      ${t.driver && !t.done_at ? `<button class="sup-t-rel" onclick="supRelease('${t.district}')">
+        Снять с водителя</button>` : ''}
+    </div>`;
+  }).join('');
+
+  // Что магазин дописал сам: незапланированные деньги, и увидеть их надо
+  // отдельно от того, что мы просили.
+  const extra = (d.extra || []).length ? `
+    <div class="exp-grp">Магазин предложил сверх заказа</div>
+    <div class="sup-short">${d.extra.slice(0, 20).map(r => `<div class="sup-sr">
+      <span class="sup-sr-b"><span class="sup-sr-n">${escS(r.name)}</span>
+        <span class="sup-sr-s">${Object.entries(r.by_district)
+          .map(([o, n]) => `${(D[o]||{}).code || o} ${n}`).join(' · ')}</span></span>
+      <span class="sup-sr-v up">+${r.qty}</span></div>`).join('')}</div>` : '';
+
+  document.getElementById('accMid').innerHTML =
+    head + shortBlock +
+    `<div class="exp-grp">Кто везёт</div>${tasks || '<div class="exp-empty">Районов нет</div>'}` +
+    extra;
+  supFoot();
+}
+
+const _dayName = d => { const x = d ? new Date(d + 'T12:00:00Z') : null;
+  return x && !isNaN(x) ? x.toLocaleDateString('ru-RU', {day:'numeric', month:'long'}) : (d || ''); };
+const _hm = iso => { const d = iso ? new Date(/Z$|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + 'Z') : null;
+  return d && !isNaN(d) ? d.toLocaleTimeString('ru-RU',
+    {hour:'2-digit', minute:'2-digit', timeZone:'Asia/Dubai'}) : ''; };
+
+// Загрузка ответа магазина живёт в подвале и на всех стадиях: файл приходит
+// когда придёт, а иногда и вторым письмом с правками.
+function supFoot(){
+  document.getElementById('accFoot').innerHTML = `
+    <div class="qb-wrap">
+      <button class="qb" onclick="document.getElementById('supFile').click()" id="supUp">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 16V3M8 7l4-4 4 4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+        Загрузить ответ магазина
+      </button>
+    </div>
+    <input type="file" id="supFile" accept=".xlsx" style="display:none" onchange="supImport(this)">`;
+}
+
+async function supImport(inp){
+  const f = inp.files && inp.files[0];
+  inp.value = '';
+  if(!f) return;
+  const b = document.getElementById('supUp');
+  const html = b.innerHTML; b.disabled = true; b.innerHTML = 'Читаю файл…';
+  try{
+    const fd = new FormData(); fd.append('file', f, f.name);
+    const res = await fetch((ownerApi.AMBAR_API || '') + '/api/owner/supply/import',
+      {method:'POST', body:fd,
+       headers:{'Authorization':'tma ' + ((Telegram.WebApp && Telegram.WebApp.initData) || '')}});
+    const j = await res.json();
+    if(!res.ok) throw j;
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    _toast(`Поставка на ${j.total_qty} бутылок`);
+    ACC_SUP = null;
+    await supLoad(j.supply_id);
+    try{ ACC_SUP = {list: (await ownerApi.ownerFetch('/api/owner/supply')).supplies || []};
+         ACC_SUP.open = ACC_SUP.list.find(x => x.status === 'open') || null; accRender(); }catch(e){}
+  }catch(e){
+    const E = {not_xlsx:'Это не .xlsx', no_code_column:'В файле нет колонки Code',
+               no_district_columns:'Не нашёл колонки районов',
+               nothing_confirmed:'Магазин не подтвердил ни одной позиции',
+               file_required:'Файл не пришёл', empty_file:'Файл пустой'};
+    _toast(E[(e||{}).error] || 'Файл не прочитался');
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('error'); }catch(e2){}
+  }
+  b.disabled = false; b.innerHTML = html;
+}
+
+async function supRelease(oid){
+  if(SUP_BUSY) return; SUP_BUSY = true;
+  try{
+    await ownerApi.ownerFetch(`/api/owner/supply/${SUP_ID}/release`,
+      {method:'POST', body:{district: oid}});
+    _toast('Задача снова свободна');
+    await supLoad(SUP_ID);
+  }catch(e){ _toast('Не вышло'); }
+  finally{ SUP_BUSY = false; }
+}
+
+async function _supFile(){
+  const res = await fetch((ownerApi.AMBAR_API || '')
+    + `/api/owner/supply/${encodeURIComponent(SUP_ID)}/shortfall`,
+    {headers:{'Authorization':'tma ' + ((Telegram.WebApp && Telegram.WebApp.initData) || '')}});
+  if(!res.ok) throw new Error('shortfall ' + res.status);
+  const blob = await res.blob();
+  return new File([blob], `AMBAR-shortfall-${(SUP_D && SUP_D.day) || SUP_ID}.xlsx`,
+    {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+
+async function supShare(){
+  const b = document.getElementById('supShare'); if(!b || b.disabled) return;
+  const html = b.innerHTML; b.disabled = true; b.innerHTML = 'Собираю файл…';
+  try{
+    const file = await _supFile();
+    if(navigator.canShare && navigator.canShare({files:[file]})){
+      await navigator.share({files:[file], title:'AMBAR — заказать на доп. складах'});
+      b.innerHTML = 'Отправлено';
+      try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    }else{
+      const u = URL.createObjectURL(file);
+      const a = document.createElement('a');
+      a.href = u; a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(()=>URL.revokeObjectURL(u), 4000);
+      b.innerHTML = 'Файл сохранён';
+    }
+  }catch(e){
+    if(e && (e.name === 'AbortError' || e.name === 'NotAllowedError')){
+      b.innerHTML = html; b.disabled = false; return;
+    }
+    b.innerHTML = 'Не вышло — шлём в телеграм';
+    try{ await ownerApi.ownerFetch(`/api/owner/supply/${SUP_ID}/shortfall/send`, {method:'POST'});
+         b.innerHTML = 'Готово — файл в чате с ботом'; }
+    catch(e2){ b.innerHTML = 'Не отправилось'; }
+  }
+  setTimeout(()=>{ b.innerHTML = html; b.disabled = false; }, 2600);
+}
+
+async function supSend(){
+  const b = document.getElementById('supSend'); if(!b || b.disabled) return;
+  b.disabled = true; b.style.opacity = '.5';
+  try{
+    await ownerApi.ownerFetch(`/api/owner/supply/${SUP_ID}/shortfall/send`, {method:'POST'});
+    _toast('Файл в чате с ботом');
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  }catch(e){ _toast('Не отправилось'); }
+  b.disabled = false; b.style.opacity = '';
 }
 
 // ─── Акции ──────────────────────────────────────────────────────────────────
@@ -8871,6 +9240,7 @@ function _buildAlerts(){
       'timing.late25':'dn','timing.notAccepted5':'warn','timing.enroute30':'warn',
       'reviews.bad3':'dn','reviews.good5':'info','reviews.comment':'info','reviews.any':'info',
       'stock.out':'warn','stock.low':'info',
+      'shift.closed':'info','supply.done':'info','supply.flag':'warn',
       'customers.new':'info','customers.verify':'warn','customers.verified':'info','customers.vip':'info',
       'support.new':'warn','support.escalation':'dn','support.unresolved':'warn',
       'support.complaint':'dn','support.replied':'info',
@@ -8885,6 +9255,7 @@ function _buildAlerts(){
       'reviews.bad3':IC('warn'),'reviews.good5':IC('star'),'reviews.comment':IC('chat'),
       'reviews.any':IC('note'),
       'stock.out':IC('emptyBox'),'stock.low':IC('zzz'),
+      'shift.closed':IC('clock'),'supply.done':IC('box'),'supply.flag':IC('warn'),
       'customers.new':IC('user'),'customers.verify':IC('note'),'customers.vip':IC('gem'),
       'support.new':IC('chat'),'support.escalation':IC('siren'),'support.unresolved':IC('inbox'),
       'support.complaint':IC('warn'),'support.replied':IC('headset'),
@@ -12668,6 +13039,7 @@ const DETAIL = {
       'operations.shiftStart':'Начало смены','operations.shiftEnd':'Конец смены',
       'reviews.any':'Новый отзыв','reviews.comment':'Отзыв с комментарием','reviews.good5':'Отличный отзыв','reviews.bad3':'Плохой отзыв',
       'stock.out':'Нет в наличии','stock.low':'Мало на складе',
+      'shift.closed':'Смена закрыта','supply.done':'Приёмка','supply.flag':'Приёмка — вопрос',
       'customers.new':'Новый клиент','customers.vip':'VIP-клиент','customers.verified':'Клиент верифицирован',
       'orders.delivered':'Заказ доставлен'
     };

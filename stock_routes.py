@@ -84,6 +84,19 @@ async def _last_checked(district: str, day: str) -> dict:
     return out
 
 
+def _dt_of(iso: str):
+    """Момент из строки, как её пишет пересчёт. Пустая или кривая — None: это
+    значит «пересчёта не было», и приход добавлять не к чему."""
+    s = str(iso or "").strip()
+    if not s:
+        return None
+    try:
+        d = datetime.fromisoformat(s.replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+
 def _day_bounds(day: str, days: int = 1):
     """(начало, конец) в UTC-ISO для выборки заказов за N рабочих суток."""
     d = datetime.strptime(day, "%Y-%m-%d").replace(hour=SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
@@ -471,8 +484,20 @@ async def order_rows(day: str = "") -> dict:
     for oid in OFFICE_IDS:
         cnt = await db.get_last_stock_count(oid, before_day=None)
         have = {l["id"]: int(l.get("actual") or 0) for l in (cnt or {}).get("lines", [])}
+        # Пересчёт был вчера, ночью водитель принял поставку. Без этой добавки
+        # программа завтра закажет то, что уже стоит на полке, — и так каждый
+        # день, пока кто-нибудь не пересчитает заново.
+        came = {}
+        try:
+            since = _dt_of((cnt or {}).get("counted_at") or "")
+            if since:
+                came = await db.intake_since(oid, since)
+                for pid, n in came.items():
+                    have[pid] = int(have.get(pid) or 0) + int(n)
+        except Exception as e:
+            log.warning(f"[stock] приход после пересчёта не учтён ({oid}): {e}")
         sug = await _suggested_norms(oid, day)
-        per_district[oid] = {"have": have, "sug": sug,
+        per_district[oid] = {"have": have, "sug": sug, "came": came,
                              "counted": (cnt or {}).get("day", "")}
 
     for pid, p in cat.items():
@@ -493,6 +518,9 @@ async def order_rows(day: str = "") -> dict:
                 row_edited = True
             cells[oid] = {"have": have, "norm": norm, "suggested": sug,
                           "need": need, "calc": calc,
+                          # Сколько из «есть» приехало уже после пересчёта:
+                          # владелец должен видеть, что число не с полки.
+                          "came": int(d["came"].get(pid) or 0),
                           "edited": fix is not None and int(fix) != calc}
             item_total += need
             if sug and norm > sug:
@@ -510,7 +538,8 @@ async def order_rows(day: str = "") -> dict:
         "day": day,
         "districts": [{"id": o, "code": OFFICE_CODES.get(o, ""),
                        "name": OFFICE_NAMES.get(o, o),
-                       "counted": per_district[o]["counted"]} for o in OFFICE_IDS],
+                       "counted": per_district[o]["counted"],
+                       "came": sum(per_district[o]["came"].values())} for o in OFFICE_IDS],
         "total_qty": total_qty, "total_aed": total_aed,
         "edited_count": sum(1 for r in rows if r["edited"]),
         "frozen_aed": frozen_aed,

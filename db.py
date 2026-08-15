@@ -46,6 +46,10 @@ async def connect():
         await _db.support_messages.create_index("conv_key", unique=True)
         await _db.support_map.create_index("fwd_msg_id", unique=True)
         await _db.shifts.create_index([("operator_id", 1), ("status", 1)])
+        # Приход после пересчёта спрашивается на каждую заявку — по району,
+        # источнику и времени.
+        await _db.qr_codes.create_index([("district", 1), ("src", 1), ("at", 1)])
+        await _db.shift_days.create_index([("day", 1)])
         await _db.owner_managers.create_index("telegram_id", unique=True)
         await _db.drivers.create_index("name", unique=True)
         # Один телеграм-аккаунт не может быть двумя водителями. Partial, потому
@@ -764,6 +768,11 @@ _DEFAULT_PREFS = {
     "reviews.bad3": True, "reviews.good5": False, "reviews.comment": True, "reviews.any": False,
     "digest.morning": True, "digest.evening": True, "digest.weekly": False, "digest.monthly": False,
     "stock.low": True, "stock.out": True,
+    # Смена закрыта у всех — с этим сообщением приходит и заявка в магазин:
+    # выключать его незачем, но право такое есть.
+    "shift.closed": True,
+    # Приёмка: итог по району и отдельно — то, на что стоит посмотреть глазами.
+    "supply.done": True, "supply.flag": True,
     "customers.new": False, "customers.verify": True, "customers.verified": True, "customers.vip": False,
     "customers.vipReturn": False, "customers.vipChurn": False,
     "ops.officeEmpty": True,
@@ -1688,11 +1697,16 @@ async def get_users_by_via() -> list:
 # Снимок нужен ради одной вещи — понять при возврате файла, что магазин
 # отказал. В файле все позиции каталога, и ноль в строке сам по себе ничего не
 # говорит: то ли не давали, то ли и не просили.
-async def zayavka_save(day: str, asked: dict):
+async def zayavka_save(day: str, asked: dict, by: dict = None):
+    """Снимок заявки. `asked` — итоги по позициям, `by` — те же числа по точкам.
+
+    Разбивка нужна разнице: магазин урезал Absolut с 20 до 12, и вопрос не
+    «сколько не хватает», а «в какой район не доедет»."""
     db = _db_or_none()
     if db is None: return
     await db.zayavki.replace_one(
-        {"_id": day}, {"_id": day, "asked": asked, "at": datetime.now(timezone.utc)},
+        {"_id": day}, {"_id": day, "asked": asked, "by": by or {},
+                       "at": datetime.now(timezone.utc)},
         upsert=True)
 
 
@@ -1701,6 +1715,12 @@ async def zayavka_last() -> dict:
     if db is None: return {}
     doc = await db.zayavki.find_one(sort=[("at", -1)])
     return (doc or {}).get("asked") or {}
+
+
+async def zayavka_last_full() -> dict:
+    db = _db_or_none()
+    if db is None: return {}
+    return await db.zayavki.find_one(sort=[("at", -1)]) or {}
 
 
 # ── Приём заказа: захват, а не запись ───────────────────────────────────────
@@ -1883,6 +1903,193 @@ async def supply_bump(sid: str, product_id: str, by: int) -> dict | None:
         return_document=ReturnDocument.AFTER)
 
 
+# ── Приёмка: задача района и принятые по ней бутылки ────────────────────────
+# Поставка приходит одна на все районы, а забирают её по частям: у каждого
+# района свой водитель и своя машина. Поэтому единица работы — не поставка, а
+# пара «поставка × район»: её берут, по ней сканируют и её закрывают.
+#
+# Захват атомарный по той же причине, что и заказ: карточка висит у всех
+# водителей района, и тянутся к ней сразу двое. Обычный update молча пропустил
+# бы обоих, и в магазин поехали бы две машины за одним товаром.
+async def supply_task_claim(sid: str, district: str, driver: str,
+                            driver_id: int, now) -> tuple:
+    db = _db_or_none()
+    if db is None: return False, None
+    from pymongo import ReturnDocument
+    doc = await db.supplies.find_one_and_update(
+        {"_id": sid, "status": "open",
+         f"tasks.{district}.driver": "", f"tasks.{district}.done_at": None},
+        {"$set": {f"tasks.{district}.driver": driver,
+                  f"tasks.{district}.driver_id": driver_id,
+                  f"tasks.{district}.claimed_at": now}},
+        return_document=ReturnDocument.AFTER)
+    if doc:
+        return True, (doc.get("tasks") or {}).get(district)
+    cur = await db.supplies.find_one({"_id": sid}, {"tasks": 1})
+    return False, ((cur or {}).get("tasks") or {}).get(district)
+
+
+async def supply_task_release(sid: str, district: str, driver: str = None) -> bool:
+    """Отпустить задачу. driver задан — отпускает сам водитель и только свою."""
+    db = _db_or_none()
+    if db is None: return False
+    q = {"_id": sid, f"tasks.{district}.done_at": None}
+    if driver is not None:
+        q[f"tasks.{district}.driver"] = driver
+    r = await db.supplies.update_one(q, {"$set": {
+        f"tasks.{district}.driver": "", f"tasks.{district}.driver_id": 0,
+        f"tasks.{district}.claimed_at": None}})
+    return r.modified_count > 0
+
+
+async def supply_take(sid: str, district: str, product_id: str, limit: int, now):
+    """Принять одну бутылку по строке задачи. None — строка уже добрана.
+
+    Условие «принято меньше подтверждённого» стоит в самом запросе, а не в
+    коде над ним: между «посмотрел» и «прибавил» помещается ещё один скан, и
+    тогда по строке из 23 бутылок приедет 24-я. Лишняя бутылка в остатке
+    страшнее отказа: её потом не отличить от настоящей."""
+    db = _db_or_none()
+    if db is None: return None
+    from pymongo import ReturnDocument
+    return await db.supplies.find_one_and_update(
+        {"_id": sid, "status": "open",
+         "items": {"$elemMatch": {"id": product_id, f"got.{district}": {"$lt": limit}}}},
+        {"$inc": {f"items.$.got.{district}": 1, "items.$.scanned": 1,
+                  f"tasks.{district}.scanned": 1},
+         "$set": {f"tasks.{district}.last_at": now}},
+        return_document=ReturnDocument.AFTER)
+
+
+async def supply_untake(sid: str, district: str, product_id: str) -> bool:
+    """Снять одну бутылку — водитель отменил последний скан."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.supplies.update_one(
+        {"_id": sid, "items": {"$elemMatch": {"id": product_id,
+                                              f"got.{district}": {"$gt": 0}}}},
+        {"$inc": {f"items.$.got.{district}": -1, "items.$.scanned": -1,
+                  f"tasks.{district}.scanned": -1, f"tasks.{district}.undo": 1}})
+    return r.modified_count > 0
+
+
+async def supply_task_start(sid: str, district: str, now) -> None:
+    """Отметить начало приёмки — только первый раз.
+
+    Время начала и время конца дают окно, в которое всё происходило. По нему
+    видно и честную разгрузку на сорок минут, и «приём» за полторы минуты."""
+    db = _db_or_none()
+    if db is None: return
+    await db.supplies.update_one(
+        {"_id": sid, f"tasks.{district}.started_at": None},
+        {"$set": {f"tasks.{district}.started_at": now}})
+
+
+async def supply_task_finish(sid: str, district: str, gaps: list,
+                             note: str, now) -> dict | None:
+    """Закрыть задачу района. Возвращает поставку целиком."""
+    db = _db_or_none()
+    if db is None: return None
+    from pymongo import ReturnDocument
+    doc = await db.supplies.find_one_and_update(
+        {"_id": sid, f"tasks.{district}.done_at": None},
+        {"$set": {f"tasks.{district}.done_at": now,
+                  f"tasks.{district}.gaps": gaps,
+                  f"tasks.{district}.note": note}},
+        return_document=ReturnDocument.AFTER)
+    if not doc:
+        return None
+    # Поставка закрыта, когда закрыт последний район: пока хоть один в работе,
+    # она остаётся открытой и видна водителям.
+    if all((t or {}).get("done_at") for t in (doc.get("tasks") or {}).values()):
+        await db.supplies.update_one({"_id": sid},
+                                     {"$set": {"status": "done", "done_at": now}})
+        doc["status"] = "done"
+    return doc
+
+
+async def supply_task_flag(sid: str, district: str, flag: dict) -> None:
+    """Пометка о странном на приёмке. Не блокирует — показывает старшему."""
+    db = _db_or_none()
+    if db is None: return
+    await db.supplies.update_one({"_id": sid},
+                                 {"$push": {f"tasks.{district}.flags": flag}})
+
+
+async def supplies_with_open_tasks(limit: int = 10) -> list:
+    """Поставки, в которых есть незакрытые задачи — то, что видит водитель."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.supplies.find({"status": "open"}).sort("at", -1).limit(limit)
+    return await cur.to_list(length=limit)
+
+
+async def intake_since(district: str, since) -> dict:
+    """Сколько бутылок принято на район после указанного момента: позиция → шт.
+
+    Нужно заявке: пересчёт был вчера, ночью пришла поставка, и без этого
+    программа завтра закажет то, что уже стоит на полке."""
+    db = _db_or_none()
+    if db is None or not since: return {}
+    cur = db.qr_codes.aggregate([
+        {"$match": {"district": district, "src": "intake", "at": {"$gt": since}}},
+        {"$group": {"_id": "$product_id", "n": {"$sum": 1}}},
+    ])
+    return {d["_id"]: d["n"] for d in await cur.to_list(length=500) if d["_id"]}
+
+
+# ── Смена: день закрыт, продажи посчитаны ───────────────────────────────────
+# Смена закрывается по району: сутки считает не программа по часам, а человек,
+# который знает, что заказов больше не будет. Пока район не закрыт, продажи
+# этого дня не окончательны и заявку по ним собирать нельзя.
+async def shift_close(day: str, district: str, doc: dict) -> bool:
+    """Закрыть смену района. False — её уже закрывали."""
+    db = _db_or_none()
+    if db is None: return False
+    from pymongo.errors import DuplicateKeyError
+    try:
+        await db.shift_days.insert_one({"_id": f"{day}:{district}", "day": day,
+                                        "district": district, **doc})
+        return True
+    except DuplicateKeyError:
+        return False
+
+
+async def shift_reopen(day: str, district: str) -> bool:
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.shift_days.delete_one({"_id": f"{day}:{district}"})
+    return r.deleted_count > 0
+
+
+async def shifts_for_day(day: str) -> dict:
+    db = _db_or_none()
+    if db is None: return {}
+    cur = db.shift_days.find({"day": day})
+    return {d["district"]: d async for d in cur}
+
+
+async def shift_day_mark(day: str, field: str) -> bool:
+    """Пометить день: «заявку по нему уже собрали». True — пометили мы.
+
+    Отдельным документом на день, а не флагом на последнем районе: закрыться
+    последним может любой район, а собрать заявку нужно ровно один раз. Кто
+    первым поставил пометку, тот и собирает — остальным вернётся False, и они
+    ничего не сделают."""
+    db = _db_or_none()
+    if db is None: return False
+    from pymongo.errors import DuplicateKeyError
+    try:
+        r = await db.shift_days.update_one(
+            {"_id": f"{day}:*", field: {"$exists": False}},
+            {"$set": {field: datetime.now(timezone.utc), "day": day, "district": "*"}},
+            upsert=True)
+        return bool(r.modified_count or r.upserted_id)
+    except DuplicateKeyError:
+        # Документ дня уже есть и пометка в нём стоит — собрал кто-то другой.
+        return False
+
+
 # ── AMBAR STOCK: реестр бутылок по их кодам ─────────────────────────────────
 async def qr_next_seq(product_id: str) -> int:
     """Номер следующей бутылки этой позиции.
@@ -1900,7 +2107,7 @@ async def qr_next_seq(product_id: str) -> int:
 
 
 async def qr_add(code: str, product_id: str, product_name: str, district,
-                 by: int, at, label: str = "") -> bool:
+                 by: int, at, label: str = "", extra: dict = None) -> bool:
     """Записать бутылку. True — записали, False — этот код уже есть.
 
     Код лежит в _id, поэтому вторая запись с тем же номером невозможна на
@@ -1913,7 +2120,7 @@ async def qr_add(code: str, product_id: str, product_name: str, district,
         await db.qr_codes.insert_one({
             "_id": code, "status": "active", "product_id": product_id,
             "product_name": product_name, "district": district,
-            "label": label, "by": by, "at": at})
+            "label": label, "by": by, "at": at, **(extra or {})})
         return True
     except DuplicateKeyError:
         return False

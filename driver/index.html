@@ -305,7 +305,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    вопрос, который стоит сейчас, — у водителя заняты руки и он смотрит одним
    глазом. */
 .sup{background:var(--bg3);border:1px solid var(--border3);border-radius:20px;
-  margin-bottom:14px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,.35)}
+  margin-bottom:12px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,.35)}
 .sup.mine{border-color:rgba(201,169,110,.45)}
 .sup-hd{display:flex;align-items:center;gap:9px;padding:11px 14px;font-size:11.5px;
   color:var(--muted);background:var(--card2);border-bottom:1px solid var(--border3)}
@@ -392,7 +392,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    Ответ на скан живёт на самой рамке: водитель смотрит в неё, а не в список
    под ней. Молчание он читает как «не сработало» и сканирует второй раз. */
 .cam{position:relative;border-radius:18px;overflow:hidden;background:#000;
-  aspect-ratio:1/1;margin-bottom:11px}
+  aspect-ratio:1/1;margin-bottom:12px}
 .cam video{width:100%;height:100%;object-fit:cover;display:block}
 .cam-frame{position:absolute;inset:8% 11% 23%;border-radius:14px;transition:.14s var(--e1)}
 .cam-frame .c{position:absolute;width:26px;height:26px;border:3px solid rgba(255,255,255,.85);
@@ -500,9 +500,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 /* «Не было» — такой же ответ, как сумма, и стоит там же, где кнопка отправки.
    Крестиком без слова его нельзя: рядом с полем ввода крестик читается как
    «очистить», и водитель нажмёт его вместо стирания цифры. */
-.exp-no{flex:0 0 auto;display:flex;align-items:center;gap:5px;padding:13px 12px;
-  border-radius:11px;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;
-  color:var(--muted);background:var(--card2);border:1px solid var(--border3)}
+.exp-no{width:100%;min-height:44px;margin-top:7px;display:flex;align-items:center;
+  justify-content:center;gap:7px;padding:11px;border-radius:11px;cursor:pointer;
+  font-family:inherit;font-size:12.5px;font-weight:600;color:var(--muted);
+  background:var(--card2);border:1px solid var(--border3)}
 .exp-no:active{transform:scale(.96);color:var(--text)}
 .exp-field.none{justify-content:space-between}
 .exp-field.none .exp-none{flex:1;padding:13px;color:var(--sub)}
@@ -1344,11 +1345,11 @@ function expBox(kind, title, ico){
           value="${sent ? sent.amount : ''}"${sent ? ' readonly' : ''}>
         ${sent ? expMark(sent) : ''}
       </div>
-      ${sent ? '' : `<button class="exp-no" onclick="expNone('${kind}', true)"
-        aria-label="Расхода не было">${svg(ICO.close, 14)}<span>не было</span></button>`}
       <button class="btn ${sent ? 'btn-sec' : 'btn-pri'} exp-go"
         onclick="expTap(this,'${kind}')">${sent ? 'Изменить' : 'Отправить'}</button>
     </div>
+    ${sent ? '' : `<button class="exp-no" onclick="expNone('${kind}', true)">
+      ${svg(ICO.close, 14)}<span>Сегодня не было</span></button>`}
   </div>`;
 }
 

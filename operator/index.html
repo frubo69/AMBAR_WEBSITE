@@ -573,19 +573,22 @@ a.oc-row:active{background:var(--card2)}
   /* шапка: подпись в три строки на телефоне не нужна, оставляем логотип
      и то, чем реально пользуются — оператор и тема */
   .hdr{gap:8px;padding:8px 12px}
-  .hdr-logo{font-size:18px;letter-spacing:4px}
+  .hdr-logo{font-size:17px;letter-spacing:2px}
   .hdr-sub{display:none}
   .hdr-right{gap:6px}
   .pill{font-size:11px;padding:6px 10px;white-space:nowrap}
-  .hdr-right{gap:8px}
+  /* Без подписей шесть одинаковых кружков сливались в один ряд. Воздух между
+     группами возвращает смысл: слева то, что зовёт, посередине контекст смены,
+     справа служебное. */
+  .hdr-right{gap:13px}
   .hdr-grp{gap:5px}
   /* На телефоне в шапке остаются одни значки. Слова «События», «Парвиз»,
      «Сегодня» выталкивали последнюю кнопку за край экрана — а именно она
      закрывает смену. Число событий не пропадает: оно становится точкой с
      цифрой на самом значке. */
-  .pill{width:36px;height:36px;padding:0;justify-content:center;position:relative;
+  .pill{width:36px;height:36px;padding:0;gap:0;justify-content:center;position:relative;
     overflow:hidden;flex:0 0 auto}
-  .pill .ic{flex:0 0 auto}
+  .pill .ic{flex:0 0 auto;margin:0;width:17px;height:17px;vertical-align:0}
   .pill span{display:none}
   .pill[data-n]:not([data-n="0"])::after{content:attr(data-n);position:absolute;
     top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;

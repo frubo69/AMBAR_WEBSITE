@@ -239,6 +239,20 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .form .amt{width:84px;text-align:center;font-weight:700}
 .form .cmt{flex:1}
 
+/* Мерцающая плашка на месте числа, которое сейчас считается. Размер задаёт
+   тот, кто её ставит: она должна занимать ровно столько же, сколько займёт
+   пришедшее значение. */
+.sk{display:inline-block;height:1em;vertical-align:middle;border-radius:6px;
+  background:linear-gradient(90deg,var(--card2) 25%,var(--card3) 37%,var(--card2) 63%);
+  background-size:400% 100%;animation:skShine 1.3s ease-in-out infinite}
+.sk.big{height:.78em;border-radius:8px}
+.sk.sm{height:.86em;border-radius:5px}
+.sk-row{height:62px;border:none;pointer-events:none;
+  background:linear-gradient(90deg,var(--card) 25%,var(--card2) 37%,var(--card) 63%);
+  background-size:400% 100%;animation:skShine 1.3s ease-in-out infinite}
+@keyframes skShine{from{background-position:100% 0}to{background-position:-100% 0}}
+@media (prefers-reduced-motion:reduce){.sk,.sk-row{animation:none}}
+
 /* ── история ─────────────────────────────────────────────────────────────
    Период, поиск, дни, заказы. Ни одного экрана с лентой в полный рост: до
    позавчера должно быть два касания, а не три экрана листания. */
@@ -1760,15 +1774,30 @@ function ordOpen(oid){
 let HIST_DAYS = 30, HIST_DAY = '', HIST_ORD = '', HIST_Q = '';
 const HIST_RANGES = [[7, 'Неделя'], [30, 'Месяц'], [90, '3 месяца']];
 
+// Переключение периода меняет числа и список — но не экран. Раньше всё
+// содержимое подменялось словом «Загрузка…», и вместе с ним исчезал тот самый
+// переключатель, по которому только что нажали: палец оставался висеть над
+// пустотой. Шапка, период и поиск теперь стоят на месте, а мерцают ровно те
+// места, которые сейчас пересчитываются.
+let HIST_BUSY = false;
+
 async function loadHistory(){
-  document.getElementById('body').innerHTML = '<div class="empty">Загрузка…</div>';
+  HIST_BUSY = true;
+  if(TAB === 'history') renderHistory();
   try{ HIST = await drvApi.drvFetch('/api/driver/history', {params:{days: HIST_DAYS}}); }
-  catch(e){ document.getElementById('body').innerHTML = '<div class="empty">Не удалось загрузить</div>'; return; }
+  catch(e){
+    HIST_BUSY = false;
+    if(!HIST) document.getElementById('body').innerHTML =
+      '<div class="empty">Не удалось загрузить</div>';
+    else{ renderHistory(); toast('Не удалось обновить', 'err'); }
+    return;
+  }
+  HIST_BUSY = false;
   render();
 }
 
 function histRange(d){
-  if(HIST_DAYS === d) return;
+  if(HIST_DAYS === d || HIST_BUSY) return;
   HIST_DAYS = d; HIST_DAY = ''; HIST_ORD = '';
   try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
   loadHistory();
@@ -1808,26 +1837,30 @@ function histFound(){
 
 function renderHistory(){
   const box = document.getElementById('body');
-  if(!HIST){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
-  const t = HIST.totals || {count: HIST.total_count || 0, aed: HIST.total_aed || 0,
-                            cash: 0, online: 0, avg_min: 0, worked: 0};
-  const found = histFound();
+  const t = (HIST && HIST.totals) || {count: 0, aed: 0, cash: 0, online: 0,
+                                      avg_min: 0, worked: 0};
+  // Пока считается — вместо чисел плашки того же размера: строка не прыгает,
+  // когда придёт ответ, и старые цифры не выдают себя за новые.
+  const sk = (w, cls) => `<span class="sk ${cls || ''}" style="width:${w}"></span>`;
+  const found = HIST_BUSY ? null : histFound();
 
   const head = `
     <div class="hsum">
       <div class="hsum-top">
         <span class="hsum-b">
           <span class="hsum-k">Сдал наличными</span>
-          <span class="hsum-v">${fmt(t.cash || t.aed)}<i>AED</i></span>
+          <span class="hsum-v">${HIST_BUSY ? sk('120px','big') : fmt(t.cash || t.aed)}<i>AED</i></span>
         </span>
         <span class="hsum-r">
-          <b>${fmt(t.count)}</b> ${plural(t.count,'заказ','заказа','заказов')}
-          <i>${t.worked ? t.worked + ' ' + plural(t.worked,'смена','смены','смен') : 'смен нет'}</i>
+          ${HIST_BUSY ? sk('64px') : `<b>${fmt(t.count)}</b> ${plural(t.count,'заказ','заказа','заказов')}`}
+          <i>${HIST_BUSY ? sk('54px','sm') : (t.worked
+            ? t.worked + ' ' + plural(t.worked,'смена','смены','смен') : 'смен нет')}</i>
         </span>
       </div>
-      ${(t.online || t.avg_min) ? `<div class="hsum-f">
-        ${t.online ? `<span>${fmt(t.online)} AED оплатили без вас</span>` : ''}
-        ${t.avg_min ? `<span>${t.avg_min} мин в среднем в пути</span>` : ''}
+      ${HIST_BUSY || t.online || t.avg_min ? `<div class="hsum-f">
+        ${HIST_BUSY ? sk('120px','sm') + sk('92px','sm')
+          : (t.online ? `<span>${fmt(t.online)} AED оплатили без вас</span>` : '')
+            + (t.avg_min ? `<span>${t.avg_min} мин в среднем в пути</span>` : '')}
       </div>` : ''}
     </div>
 
@@ -1850,6 +1883,14 @@ function renderHistory(){
            <span class="sect-v">${found.length}</span></div>`
         + found.map(o => histRow(o, true)).join('')
       : '<div class="empty">Ничего не нашлось</div>');
+    _histFocus();
+    return;
+  }
+
+  if(HIST_BUSY){
+    // Дни ещё едут — вместо них строки того же роста.
+    box.innerHTML = head + Array.from({length: 4}, () =>
+      '<div class="hday sk-row"></div>').join('');
     _histFocus();
     return;
   }

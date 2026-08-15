@@ -802,25 +802,29 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .chk-sum-s{margin-top:6px;font-size:11.5px;color:var(--muted);line-height:1.5}
 .scan-count b.bad{color:var(--dn)}
 
-/* Проверка бутылок: панель во всю ширину, код по центру, подпись под ним. */
-.chk-big{display:flex;flex-direction:column;align-items:center;gap:8px;width:100%;
-  margin-top:14px;padding:20px 16px 18px;border-radius:18px;cursor:pointer;
-  font-family:inherit;background:var(--card);border:1px solid var(--border2);
+/* Проверка бутылок: во всю ширину, но строкой — как вход, а не как плакат. */
+.chk-big{display:flex;align-items:center;gap:13px;width:100%;padding:13px 14px;
+  border-radius:15px;cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
+  background:var(--card);border:1px solid var(--border2);
   transition:.16s var(--e1);-webkit-tap-highlight-color:transparent}
-.chk-big:active{transform:scale(.985)}
+.chk-big:active{transform:scale(.99)}
 .chk-big:hover{border-color:rgba(201,169,110,.3)}
-.chk-qr{width:64px;height:64px;border-radius:18px;display:grid;place-items:center;
+.chk-qr{width:46px;height:46px;flex:none;border-radius:14px;display:grid;place-items:center;
   color:var(--gold2);background:linear-gradient(135deg,rgba(201,169,110,.16),rgba(201,169,110,.05));
   border:1px solid rgba(201,169,110,.28)}
-.chk-qr svg{width:34px;height:34px}
-.chk-big-t{font-size:15px;font-weight:700;font-family:'Space Grotesk',sans-serif}
-.chk-big-s{font-size:11.5px;color:var(--muted)}
-.chk-big-s.bad{color:var(--warn)}
+.chk-qr svg{width:26px;height:26px}
+.chk-big-b{flex:1;min-width:0}
+.chk-big-b b{display:block;font-size:14px;font-weight:700;
+  font-family:'Space Grotesk',sans-serif}
+.chk-big-b i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);
+  margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.chk-big-b i.bad{color:var(--warn)}
+.chk-big-go{color:var(--muted);font-size:17px;flex:none}
 .acc-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:2px}
 .acc-tile{display:flex;flex-direction:column;align-items:flex-start;gap:0;
   padding:14px;border-radius:15px;cursor:pointer;text-align:left;color:var(--text);
   background:var(--card);border:1px solid var(--border2);transition:.16s var(--e1);
-  min-height:132px}
+  min-height:126px}
 .acc-tile:active{transform:scale(.98)}
 .acc-tile:hover{border-color:rgba(201,169,110,.28)}
 /* Главное — расходы: их трогают каждый день, склад и заявку реже. */
@@ -5882,10 +5886,13 @@ function accRender(){
   // Подпись не повторяет цифру, а объясняет её: цифра говорит «сколько»,
   // подпись — «из чего» или «что с этим не так».
   const sub = {
-    expenses: t ? ((t.marked < t.total_drivers
+    // Подпись — одна строка: две ломают ряд, и соседняя плитка становится
+    // ниже. Из двух фактов оставляем тот, который требует действия сегодня.
+    expenses: t ? (t.marked < t.total_drivers
                 ? `не отмечено ${t.total_drivers - t.marked} из ${t.total_drivers}`
-                : `все отмечены · ${t.working} на смене`)
-                + (ACC_PERIOD ? ` · ${fmt(ACC_PERIOD.total)} за ${ACC_PERIOD.days} дней` : ''))
+                : (ACC_PERIOD && ACC_PERIOD.total
+                    ? `${fmt(ACC_PERIOD.total)} AED за ${ACC_PERIOD.days} дней`
+                    : `все отмечены · ${t.working} на смене`))
               : 'питание и разовые траты',
     stock:    ACC_STOCK  ? (ACC_STOCK.short_aed
                 ? `не хватает ${fmt(ACC_STOCK.short_aed)} AED`
@@ -5898,8 +5905,7 @@ function accRender(){
     // Показы без денег ничего не значат, поэтому подпись — про выручку.
     qr:       ACC_QR     ? (ACC_QR.totals.total
                 ? `${ACC_QR.by_product.length} ${pluralize(ACC_QR.by_product.length,
-                    'позиция','позиции','позиций')} · последний скан ${
-                    escS(String((ACC_QR.last[0]||{}).at||'').slice(0,10))}`
+                    'позиция','позиции','позиций')} в реестре`
                 : 'ни одной бутылки не записано')
               : 'сканируем коды с бутылок',
   };
@@ -5909,16 +5915,17 @@ function accRender(){
   // читается как «данных нет», хотя они просто едут; шиммер честнее.
   const num = {
     expenses: [t ? fmt(t.all) : null, 'AED сегодня'],
-    stock:    [ACC_STOCK ? `${ACC_STOCK.done}/${ACC_STOCK.total}` : null, 'районов'],
-    order:    [ACC_ORDER ? fmt(ACC_ORDER.total_qty) : null, 'штук'],
-    qr:       [ACC_QR    ? fmt(ACC_QR.totals.active) : null, 'бутылок'],
+    stock:    [ACC_STOCK ? `${ACC_STOCK.done}/${ACC_STOCK.total}` : null,
+               ACC_STOCK ? pluralize(ACC_STOCK.total,'район','района','районов') : 'районов'],
+    order:    [ACC_ORDER ? fmt(ACC_ORDER.total_qty) : null,
+               ACC_ORDER ? pluralize(ACC_ORDER.total_qty,'штука','штуки','штук') : 'штук'],
+    qr:       [ACC_QR    ? fmt(ACC_QR.totals.active) : null,
+               ACC_QR ? pluralize(ACC_QR.totals.active,'бутылка','бутылки','бутылок') : 'бутылок'],
   };
-  box.innerHTML = `<div class="acc-grid">` + ACC.map((a, i) => {
+  // Плитка одна и та же, меняется только раздел, в котором она стоит.
+  const tile = a => {
     const [v, u] = num[a.id] || [null, ''];
-    // Нечётное число плиток оставляет сироту в полряда, поэтому при нечётном
-    // первая занимает всю ширину — заодно это и есть ежедневное действие.
-    const wide = (ACC.length % 2 === 1) && i === 0;
-    return `<button class="acc-tile ${wide ? 'wide' : ''}" onclick="accOpen('${a.id}')">
+    return `<button class="acc-tile" onclick="accOpen('${a.id}')">
       <span class="acc-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"
         stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${a.ico}</svg></span>
       <span class="acc-t">${a.t}</span>
@@ -5927,9 +5934,19 @@ function accRender(){
         : `<span class="acc-v">${v}</span>`}<i>${escS(u)}</i></span>
       <span class="acc-s">${escS(sub[a.id] || a.s)}</span>
     </button>`;
-  }).join('') + `</div>` + `
-    <!-- Проверка бутылок — не «раздел учёта», а действие, которое делают стоя
-         у машины. Поэтому большая панель внизу, а не плитка в общем ряду. -->
+  };
+  // Два раздела вместо ровного ряда из четырёх: слева от заголовка сразу
+  // понятно, что трогают каждую смену, а что — по случаю. Раньше все четыре
+  // выглядели одинаково срочными.
+  const pick = ids => ACC.filter(a => ids.includes(a.id)).map(tile).join('');
+  box.innerHTML = `
+    <div class="sect"><div class="sect-t">Каждую смену</div></div>
+    <div class="acc-grid">${pick(['expenses','stock'])}</div>
+    <div class="sect"><div class="sect-t">Товар</div></div>
+    <div class="acc-grid">${pick(['order','qr'])}</div>
+    <div class="sect"><div class="sect-t">Проверка</div></div>` + `
+    <!-- Проверка — действие, которое делают стоя у машины: во всю ширину,
+         но строкой. Блок в треть экрана ради одной кнопки съедал страницу. -->
     <button class="chk-big" onclick="accOpen('check')">
       <span class="chk-qr">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
@@ -5939,8 +5956,11 @@ function accRender(){
           <path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/>
         </svg>
       </span>
-      <span class="chk-big-t">Проверка бутылки</span>
-      <span class="chk-big-s" id="chkBigSub">что везёт водитель</span>
+      <span class="chk-big-b">
+        <b>Проверка бутылки</b>
+        <i id="chkBigSub">что везёт водитель</i>
+      </span>
+      <span class="chk-big-go">›</span>
     </button>`;
   if(ACC_CHK) chkBigSub();
 }
@@ -6042,15 +6062,19 @@ function promoBlockRender(){
 // карточках сразу выглядит хуже, чем секунда ожидания.
 async function accLoadSummaries(){
   const get = (p, params) => ownerApi.ownerFetch(p, params ? {params} : undefined).catch(()=>null);
-  const [per, st, ord, pr, gf, qr] = await Promise.all([
+  const [per, st, ord, pr, gf, qr, chk] = await Promise.all([
     get('/api/owner/expenses/period', {days:30}),
     get('/api/owner/stock/status'),
     get('/api/owner/stock/order'),
     get('/api/owner/promo'),
     get('/api/owner/promotions', {days:30}),
     get('/api/owner/qr'),
+    // Проверки тянем сразу: подпись на панели должна говорить живыми числами
+    // с первого открытия, а не после того, как человек туда зайдёт.
+    get('/api/owner/qr/checks', {days: 30}),
   ]);
   ACC_PERIOD = per; ACC_STOCK = st; ACC_ORDER = ord; ACC_PROMO = pr; ACC_GIFT = gf; ACC_QR = qr;
+  if(chk) ACC_CHK = chk;
   accRender(); mktRender(); promoBlockRender();
 }
 

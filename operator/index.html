@@ -579,9 +579,16 @@ a.oc-row:active{background:var(--card2)}
   .pill{font-size:11px;padding:6px 10px;white-space:nowrap}
   .hdr-right{gap:8px}
   .hdr-grp{gap:5px}
-  .pill{height:32px;padding:0 10px}
+  /* На телефоне в шапке остаются одни значки. Слова «События», «Парвиз»,
+     «Сегодня» выталкивали последнюю кнопку за край экрана — а именно она
+     закрывает смену. Число событий не пропадает: оно становится точкой с
+     цифрой на самом значке. */
+  .pill{width:36px;height:36px;padding:0;justify-content:center;position:relative}
   .pill span{display:none}
-  .pill#dayLbl,#dayBtn span,#dispatchBtn span{display:inline}
+  .pill[data-n]:not([data-n="0"])::after{content:attr(data-n);position:absolute;
+    top:-4px;right:-4px;min-width:16px;height:16px;padding:0 4px;border-radius:999px;
+    background:var(--dn);color:#fff;font-size:9.5px;font-weight:700;
+    display:flex;align-items:center;justify-content:center}
 
   .center{flex:1;min-height:0}
   .search-row{padding:10px 12px 2px}
@@ -2828,6 +2835,8 @@ function fdBadge(){
   const el=$('fdCnt'), b=$('fdBtn'); if(!el) return;
   const n=FEED.count||0;
   el.textContent = n ? ('События · '+n) : 'События';
+  // На телефоне подпись скрыта — число переезжает на сам значок.
+  b.dataset.n = n || 0;
   b.classList.toggle('has', n>0);
 }
 async function loadFeed(){
@@ -2885,6 +2894,7 @@ function supBadge(){
   const el=$('supCnt'), btn=$('supBtn'); if(!el) return;
   const n=SUP.waiting||0;
   el.textContent = n ? ('Поддержка · '+n) : 'Поддержка';
+  btn.dataset.n = n || 0;
   btn.classList.toggle('has', n>0);
   // Вопрос без ответа моргает так же заметно, как непринятый заказ, но молча:
   // клиент ждёт ответа, а не бежит — звук здесь только мешал бы.
@@ -2920,6 +2930,10 @@ async function loadDrvChats(){
   catch(e){ return; }
   const b = $('supDrvN');
   if(b){ b.style.display = DRV_CHATS.unread ? '' : 'none'; b.textContent = DRV_CHATS.unread; }
+  // На телефоне подпись «Поддержка» скрыта: складываем клиентов и водителей в
+  // одно число на значке — иначе непрочитанное от водителя нигде не видно.
+  const btn = $('supBtn');
+  if(btn) btn.dataset.n = (SUP.waiting || 0) + (DRV_CHATS.unread || 0);
   if(SUP_TAB === 'drivers') drvList();
 }
 

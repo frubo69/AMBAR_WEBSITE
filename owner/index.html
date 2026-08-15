@@ -827,7 +827,11 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .chk-big:active{transform:scale(.99)}
 .chk-big:hover{border-color:rgba(201,169,110,.3)}
 /* Место под закреплённую строку, чтобы последняя группа не пряталась. */
-#pg-money{padding-bottom:86px}
+/* Отступ под закреплённой панелью: ровно её высота плюс воздух, не больше.
+   Лишние двадцать пикселей делали страницу на двадцать пикселей длиннее
+   экрана — она начинала прокручиваться на пустом месте, и верхний ряд плиток
+   уезжал под полосу периода. */
+#pg-money{padding-bottom:calc(74px + var(--safe-bottom))}
 .chk-qr{width:46px;height:46px;flex:none;border-radius:14px;display:grid;place-items:center;
   color:var(--gold2);background:linear-gradient(135deg,rgba(201,169,110,.16),rgba(201,169,110,.05));
   border:1px solid rgba(201,169,110,.28)}
@@ -2151,14 +2155,14 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
         stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 12v9H4v-9M2 7h20v5H2zM12 21V7M12 7H7.5a2.5 2.5 0 0 1 0-5C11 2 12 7 12 7M12 7h4.5a2.5 2.5 0 0 0 0-5C13 2 12 7 12 7"/></svg></div>
       <div class="cat-block-title">
         <div class="cat-block-n">Акции</div>
-        <div class="cat-block-sub" id="giftBlockSub">Загрузка…</div>
+        <div class="cat-block-sub is-skel" id="giftBlockSub" style="min-width:130px">0000</div>
       </div>
       <svg class="cat-block-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
     </div>
     <div class="cat-block-kpis">
-      <div class="cat-kpi"><div class="cat-kpi-v" id="giftKpiBottles">—</div><div class="cat-kpi-l">Бутылок</div></div>
-      <div class="cat-kpi"><div class="cat-kpi-v" id="giftKpiAed">—</div><div class="cat-kpi-l">В этих заказах</div></div>
-      <div class="cat-kpi"><div class="cat-kpi-v" id="giftKpiAvg">—</div><div class="cat-kpi-l">Средний чек</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="giftKpiBottles">0000</div><div class="cat-kpi-l">Бутылок</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="giftKpiAed">0000</div><div class="cat-kpi-l">В этих заказах</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="giftKpiAvg">0000</div><div class="cat-kpi-l">Средний чек</div></div>
     </div>
     <div class="cat-block-expand">
       <div class="cat-block-sect-t">Правило</div>
@@ -2175,14 +2179,14 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
         stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11v2a1 1 0 0 0 1 1h2l4 4V6L6 10H4a1 1 0 0 0-1 1z"/><path d="M15 9a4 4 0 0 1 0 6M18 6a8 8 0 0 1 0 12"/></svg></div>
       <div class="cat-block-title">
         <div class="cat-block-n">Реклама</div>
-        <div class="cat-block-sub" id="promoBlockSub">Загрузка…</div>
+        <div class="cat-block-sub is-skel" id="promoBlockSub" style="min-width:130px">0000</div>
       </div>
       <svg class="cat-block-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
     </div>
     <div class="cat-block-kpis">
-      <div class="cat-kpi"><div class="cat-kpi-v" id="promoKpiAed">—</div><div class="cat-kpi-l">Принесла</div></div>
-      <div class="cat-kpi"><div class="cat-kpi-v" id="promoKpiUsers">—</div><div class="cat-kpi-l">Пришло</div></div>
-      <div class="cat-kpi"><div class="cat-kpi-v" id="promoKpiConv">—</div><div class="cat-kpi-l">Дошли до заказа</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="promoKpiAed">0000</div><div class="cat-kpi-l">Принесла</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="promoKpiUsers">0000</div><div class="cat-kpi-l">Пришло</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="promoKpiConv">0000</div><div class="cat-kpi-l">Дошли до заказа</div></div>
     </div>
     <div class="cat-block-expand">
       <div class="cat-block-sect-t">Каналы</div>
@@ -6211,15 +6215,24 @@ async function bcastAudience(){
 // Акции: сколько бутылок отдали и что эти заказы принесли. Подарок мерим не
 // бутылками, а тем, что он привёл: сто бутылок при чеке в полторы тысячи и
 // при чеке в тысячу — разные сто бутылок.
+// Число или подпись, которых ещё нет: вместо них плашка того же размера.
+// Прочерк читается как «данных нет», хотя они просто в пути.
+function _skel(id, ready, text, minw){
+  const el = document.getElementById(id); if(!el) return;
+  el.classList.toggle('is-skel', !ready);
+  el.style.minWidth = ready ? '' : (minw ? minw + 'px' : '');
+  el.textContent = ready ? text : '0000';
+}
+
 function giftBlockRender(){
   const block = document.getElementById('giftBlock'); if(!block) return;
   const d = ACC_GIFT, t = (d && d.totals) || null;
-  _setText('giftBlockSub', !d ? 'загрузка…'
-    : (t.bottles ? `${fmt(t.bottles)} ${pluralize(t.bottles,'бутылка','бутылки','бутылок')} за ${d.days} дней`
-                 : 'за 30 дней ни одной бутылки'));
-  _setText('giftKpiBottles', t ? fmt(t.bottles) : '—');
-  _setText('giftKpiAed',     t ? fmt(t.aed) : '—');
-  _setText('giftKpiAvg',     t ? fmt(t.avg_aed) : '—');
+  _skel('giftBlockSub', !!d, d
+    ? (t.bottles ? `${fmt(t.bottles)} ${pluralize(t.bottles,'бутылка','бутылки','бутылок')} за ${d.days} дней`
+                 : 'за 30 дней ни одной бутылки') : '', 130);
+  _skel('giftKpiBottles', !!t, t ? fmt(t.bottles) : '');
+  _skel('giftKpiAed',     !!t, t ? fmt(t.aed) : '');
+  _skel('giftKpiAvg',     !!t, t ? fmt(t.avg_aed) : '');
 
   const rule = document.getElementById('giftBlockRule');
   if(rule) rule.textContent = (d && d.gift)
@@ -6255,15 +6268,18 @@ function giftBlockRender(){
 function promoBlockRender(){
   const block = document.getElementById('promoBlock'); if(!block) return;
   const d = ACC_PROMO, t = (d && d.totals) || null;
-  _setText('promoBlockSub', !d ? 'загрузка…'
-    : (t.users ? `${t.users} ${pluralize(t.users,'пришёл','пришло','пришло')} · ${
+  _skel('promoBlockSub', !!d, d
+    ? (t.users ? `${t.users} ${pluralize(t.users,'пришёл','пришло','пришло')} · ${
                   d.sources.length} ${pluralize(d.sources.length,'канал','канала','каналов')}`
                : (d.replies ? `${d.replies} ${pluralize(d.replies,'ответ','ответа','ответов')}, никто не пришёл`
-                            : 'бот ещё нигде не отвечал')));
-  _setText('promoKpiAed',   t ? fmt(t.aed) : '—');
-  _setText('promoKpiUsers', t ? fmt(t.users) : '—');
-  document.getElementById('promoKpiConv').innerHTML = t
-    ? `${t.conv}<span class="u">%</span>` : '—';
+                            : 'бот ещё нигде не отвечал')) : '', 130);
+  _skel('promoKpiAed',   !!t, t ? fmt(t.aed) : '');
+  _skel('promoKpiUsers', !!t, t ? fmt(t.users) : '');
+  const cv = document.getElementById('promoKpiConv');
+  if(cv){
+    cv.classList.toggle('is-skel', !t);
+    cv.innerHTML = t ? `${t.conv}<span class="u">%</span>` : '00';
+  }
 
   const src = document.getElementById('promoBlockSrc');
   if(src) src.innerHTML = (d && d.sources.length)

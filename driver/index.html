@@ -304,6 +304,20 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 
 /* прочее */
 .empty{padding:46px 20px;text-align:center;color:var(--muted);font-size:13.5px;line-height:1.6}
+
+/* Пустой экран — это тоже экран, а не отсутствие экрана. Раньше на нём висела
+   строка серого текста под самой шапкой: она читалась как обрезанная страница.
+   Теперь значок, заголовок и одна поясняющая строка стоят в оптическом центре
+   свободного места — там, куда падает взгляд, когда смотреть больше не на что. */
+.blank{display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:14px;text-align:center;padding:20px 24px;
+  min-height:calc(100dvh - 76px - var(--safe-top) - 18px - var(--tabbar) - 24px)}
+.blank-i{width:76px;height:76px;border-radius:26px;display:flex;align-items:center;
+  justify-content:center;color:var(--gold2);background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.22)}
+.blank b{font-size:17px;font-weight:700;letter-spacing:-.2px}
+.blank i{font-style:normal;font-size:13px;line-height:1.5;color:var(--muted);
+  max-width:270px;margin-top:-6px}
 .sect{display:flex;align-items:baseline;gap:8px;margin:16px 2px 9px}
 .sect-t{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--muted)}
 .sect-v{margin-left:auto;font-size:11px;color:var(--muted)}
@@ -1479,6 +1493,15 @@ function setTab(t){
   window.scrollTo({top:0});
 }
 
+// Пустой экран: значок, заголовок, строка объяснения.
+function blank(ico, title, sub){
+  return `<div class="blank">
+    <span class="blank-i">${svg(ico, 34)}</span>
+    <b>${title}</b>
+    ${sub ? `<i>${sub}</i>` : ''}
+  </div>`;
+}
+
 function render(){
   if(TAB === 'orders')   return renderOrders();
   if(TAB === 'supply')   return renderSupply();
@@ -1661,9 +1684,9 @@ function renderOrders(){
   const box = document.getElementById('body');
   if(!ORDERS){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
   const {active, done} = ORDERS;
-  if(!active.length && !done.length){
-    box.innerHTML = `<div class="empty">На вас пока ничего не назначено.<br>
-      Новый заказ придёт сообщением и появится здесь.</div>`;
+  if(!active.length){
+    box.innerHTML = blank(ICO.box, 'Заказов нет',
+      'Новый придёт сообщением и появится здесь — приложение можно закрыть');
     return;
   }
   // Развёрнут один заказ — тот, которым водитель занят сейчас. Остальные
@@ -1679,7 +1702,7 @@ function renderOrders(){
       ? `<div class="sect"><span class="sect-t">В работе</span><span class="sect-v">${active.length}</span></div>`
         + active.map((o, i) => o.order_id === OPEN_OID || active.length === 1
             ? orderCard(o, i) : ordMini(o, i)).join('')
-      : '<div class="empty" style="padding:30px 20px">Активных заказов нет</div>');
+      : '');
   // Закрытых здесь нет: эта вкладка про то, что ещё надо сделать. Закрытое за
   // смену — во вкладке «История», а сколько сдано, говорит строка сверху.
 }
@@ -1882,7 +1905,8 @@ function renderHistory(){
       ? `<div class="sect"><span class="sect-t">Нашлось</span>
            <span class="sect-v">${found.length}</span></div>`
         + found.map(o => histRow(o, true)).join('')
-      : '<div class="empty">Ничего не нашлось</div>');
+      : blank(ICO.search, 'Ничего не нашлось',
+          'Искать можно по части адреса или по номеру заказа'));
     _histFocus();
     return;
   }
@@ -1896,7 +1920,8 @@ function renderHistory(){
   }
 
   if(!(HIST.days || []).length){
-    box.innerHTML = head + '<div class="empty">За этот период закрытых заказов нет.</div>';
+    box.innerHTML = head + blank(ICO.clock, 'За этот период пусто',
+      'Выберите другой период или загляните позже');
     _histFocus();
     return;
   }
@@ -2928,8 +2953,9 @@ function renderSupply(){
   const body = document.getElementById('body');
   const S = SUP || {mine:[], free:[], taken:[]};
   if(!S.mine.length && !S.free.length && !S.taken.length){
-    body.innerHTML = `<div class="empty">Принимать пока нечего.<br>
-      Когда старший загрузит ответ магазина, заявка появится здесь.</div>`;
+    body.innerHTML = blank('<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4"/><path d="M12 11v10"/>',
+      'Принимать нечего',
+      'Как только старший загрузит ответ магазина, поставка появится здесь');
     return;
   }
   let h = '';

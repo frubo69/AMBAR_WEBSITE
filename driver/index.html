@@ -162,6 +162,31 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   border:1px solid var(--border3);display:flex;align-items:center;justify-content:center}
 .btn:disabled{opacity:.45;pointer-events:none}
 
+/* Свёрнутый активный заказ. Строка отвечает на то, что решают до выезда:
+   куда и к какому времени. Ростом с палец и на всю ширину — по ней попадают,
+   не целясь. */
+.ordm{display:flex;align-items:center;gap:12px;width:100%;min-height:64px;
+  padding:12px 14px;margin-bottom:9px;border-radius:16px;cursor:pointer;
+  text-align:left;font-family:inherit;color:var(--text);
+  background:var(--bg3);border:1px solid var(--border3);transition:.16s var(--e1)}
+.ordm:active{transform:scale(.99);background:var(--card2)}
+.ordm.late{border-color:rgba(224,85,85,.4)}
+.ordm-n{flex:0 0 auto;width:24px;height:24px;border-radius:8px;display:flex;
+  align-items:center;justify-content:center;font-size:11.5px;font-weight:800;
+  background:var(--card2);color:var(--muted)}
+.ordm-b{flex:1;min-width:0}
+.ordm-a{display:block;font-size:15px;font-weight:700;line-height:1.25;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ordm-s{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+.ordm-t{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:15px;
+  font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums}
+.ordm-t.late{color:var(--dn)}
+.ordm-go{flex:0 0 auto;color:var(--dim);font-size:15px}
+/* Вокруг раскрытой карточки воздух одинаковый с обеих сторон: снизу его даёт
+   она сама, сверху — свёрнутая строка над ней. Разные зазоры вокруг одного
+   объекта читаются как сбой вёрстки. */
+.ordm + .ord{margin-top:24px}
+
 /* закрытый заказ — компактная строка */
 .done-row{display:flex;align-items:center;gap:10px;padding:11px 13px;margin-bottom:6px;
   border-radius:12px;background:var(--card);border:1px solid var(--border2);opacity:.62}
@@ -938,6 +963,7 @@ try{ tg.ready(); tg.expand(); tg.setHeaderColor?.('#000006'); tg.setBackgroundCo
 
 let ME = null, ORDERS = null, EXP = null, HIST = null;
 let TAB = 'orders', EDIT_OID = null, EDIT_TAGS = [];
+let OPEN_OID = '';   // какой из активных заказов раскрыт
 
 const ICO = {
   pin:  '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
@@ -953,7 +979,10 @@ const ICO = {
   fuel: '<path d="M4 20V5a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v15"/><path d="M3 20h12"/><path d="M13 9h3l2 2v6a2 2 0 0 0 2-2V8l-2.5-2.5"/>',
   wash: '<path d="M4 13h16"/><path d="M6 13V8a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v5"/><circle cx="8" cy="17" r="2"/><circle cx="16" cy="17" r="2"/>',
   plus2:'<path d="M12 5v14M5 12h14"/>',
-  nav:  '<path d="M3 11l18-8-8 18-2-8z"/>',
+  // Сложенная карта, а не стрелка навигатора: стрелка в интерфейсе означает
+  // «отправить», и кнопка рядом с адресом читалась как «послать сообщение».
+  nav:  '<path d="M9 4 3 6.2v13.6L9 17.6l6 2.2 6-2.2V4.2L15 6.4z"/>'
+      + '<path d="M9 4v13.6M15 6.4V20"/>',
   cash: '<rect x="2.5" y="6" width="19" height="12" rx="2.5"/><circle cx="12" cy="12" r="2.6"/><path d="M6 9.5v5M18 9.5v5"/>',
   box:  '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11.5v4.5M12 8h.01"/>',
@@ -1098,10 +1127,11 @@ function orderCard(o, i){
   // Карточка живёт по той же грамматике, что и экран приёма: строки одна под
   // другой в порядке работы, с разделителями. Разные оформления у одного и
   // того же заказа заставляли читать его заново на каждом экране.
-  return `<div class="ord ${i === 0 ? 'next' : ''}">
+  const now = o.order_id === OPEN_OID || i === 0;
+  return `<div class="ord ${now ? 'next' : ''}">
     <div class="ord-row ord-row-hd">
       <span class="ord-seq">${i + 1}</span>
-      <span class="ord-num">${i === 0 ? 'Сейчас' : 'Заказ ' + (i + 1)}</span>
+      <span class="ord-num">${now ? 'Сейчас' : 'Заказ ' + (i + 1)}</span>
       <span class="ord-id">#${esc(o.order_id)}</span>
       <span class="ord-dist">${esc(o.district || '')}</span>
       <span class="ord-ago">${ago(o.confirmed_at || o.timestamp).replace(' назад', '')}</span>
@@ -1231,14 +1261,49 @@ function renderOrders(){
       Новый заказ придёт сообщением и появится здесь.</div>`;
     return;
   }
+  // Развёрнут один заказ — тот, которым водитель занят сейчас. Остальные
+  // строкой: карточка в тысячу пикселей хороша, пока она одна, а на трёх
+  // заказах до второго приходится листать полэкрана вслепую.
+  //
+  // Свёрнутая строка отвечает на единственный вопрос, который возникает про
+  // следующий заказ: куда и к какому времени. Всё прочее нужно уже в работе,
+  // а не при выборе.
+  if(active.length && !active.some(o => o.order_id === OPEN_OID)) OPEN_OID = active[0].order_id;
   box.innerHTML = tot +
     (active.length
       ? `<div class="sect"><span class="sect-t">В работе</span><span class="sect-v">${active.length}</span></div>`
-        + active.map((o, i) => orderCard(o, i)).join('')
+        + active.map((o, i) => o.order_id === OPEN_OID || active.length === 1
+            ? orderCard(o, i) : ordMini(o, i)).join('')
       : '<div class="empty" style="padding:30px 20px">Активных заказов нет</div>')
     + (done.length
       ? `<div class="sect"><span class="sect-t">Закрыто сегодня</span><span class="sect-v">${done.length}</span></div>`
         + done.map(doneRow).join('') : '');
+}
+
+// Свёрнутый заказ. Номер в очереди слева — тот же, что и на раскрытом: по
+// нему видно, какой это по счёту, без пересчёта карточек глазами.
+function ordMini(o, i){
+  const late = _isLate(o.deliver_by);
+  const items = (o.items || []).reduce((a, x) => a + (x.qty || 0), 0);
+  return `<button class="ordm${late ? ' late' : ''}" onclick="ordOpen('${esc(o.order_id)}')">
+    <span class="ordm-n">${i + 1}</span>
+    <span class="ordm-b">
+      <span class="ordm-a">${esc(o.address) || 'Адрес не указан'}</span>
+      <span class="ordm-s">${items} ${plural(items,'бутылка','бутылки','бутылок')} · ${fmt(o.total)} AED</span>
+    </span>
+    ${o.deliver_by ? `<span class="ordm-t${late ? ' late' : ''}">${esc(o.deliver_by)}</span>` : ''}
+    <span class="ordm-go">›</span>
+  </button>`;
+}
+
+// Раскрыть другой заказ. Предыдущий сворачивается сам: два раскрытых — это уже
+// то самое листание, от которого уходили.
+function ordOpen(oid){
+  OPEN_OID = oid;
+  renderOrders();
+  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+  const el = document.querySelector('.ord.next') || document.querySelector('.ord');
+  if(el) el.scrollIntoView({behavior:'smooth', block:'start'});
 }
 
 // ── история ───────────────────────────────────────────────────────────────

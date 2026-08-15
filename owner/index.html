@@ -7507,7 +7507,10 @@ function renderOffices(rows){
   const live = list.filter(r => !r.legacy);
   const total = list.reduce((a, r) => a + (r.aed || 0), 0);
   const top = Math.max(0, ...list.map(r => r.aed || 0));
-  if(sub) sub.textContent = `${live.length} ${pluralize(live.length,'район','района','районов')} · ${OFF_SORT_LBL[OFF_SORT]||''}`;
+  // Подпись нужна только когда порядок не обычный: «5 районов · порядок
+  // B1–B5» повторяет то, что и так видно в списке, и висит всегда.
+  if(sub) sub.textContent = OFF_SORT === 'code' ? ''
+    : `${live.length} ${pluralize(live.length,'район','района','районов')} · ${OFF_SORT_LBL[OFF_SORT]||''}`;
 
   list.forEach(r => { if(r.name) OFF_KNOWN[r.id] = r.name; });
 

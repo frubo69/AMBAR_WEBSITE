@@ -1247,8 +1247,6 @@ function histStrip(o){
   ).join('');
 }
 
-function doneRow(o){ return histCard(o); }
-
 function renderOrders(){
   const box = document.getElementById('body');
   if(!ORDERS){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
@@ -1274,10 +1272,9 @@ function renderOrders(){
       ? `<div class="sect"><span class="sect-t">В работе</span><span class="sect-v">${active.length}</span></div>`
         + active.map((o, i) => o.order_id === OPEN_OID || active.length === 1
             ? orderCard(o, i) : ordMini(o, i)).join('')
-      : '<div class="empty" style="padding:30px 20px">Активных заказов нет</div>')
-    + (done.length
-      ? `<div class="sect"><span class="sect-t">Закрыто сегодня</span><span class="sect-v">${done.length}</span></div>`
-        + done.map(doneRow).join('') : '');
+      : '<div class="empty" style="padding:30px 20px">Активных заказов нет</div>');
+  // Закрытых здесь нет: эта вкладка про то, что ещё надо сделать. Закрытое за
+  // смену — во вкладке «История», а сколько сдано, говорит строка сверху.
 }
 
 // Свёрнутый заказ. Номер в очереди слева — тот же, что и на раскрытом: по

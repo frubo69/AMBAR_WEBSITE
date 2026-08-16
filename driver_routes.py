@@ -206,11 +206,56 @@ async def handle_panic(request):
                         "district_code": me.get("district_code", ""),
                         "operator": me.get("operator", "")})
     log.warning(f"[driver] {me['name']}: скрытый режим {'ВКЛЮЧЁН' if on else 'снят'}")
+    if on:
+        try:
+            n = await _wipe_chat(me)
+            if n:
+                log.warning(f"[driver] {me['name']}: убрано сообщений в чате {n}")
+        except Exception as e:
+            log.error(f"[driver] чат не почищен: {e}")
     try:
         await _notify_panic(me, on, now)
     except Exception as e:
         log.error(f"[driver] тревога не ушла: {e}")
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+
+async def _wipe_chat(me: dict) -> int:
+    """Убрать переписку бота с этим водителем.
+
+    Маскировать приложение и оставить чат — половина дела: в сообщениях бота
+    адреса, суммы и состав заказов, и открыть их можно, не заходя в приложение.
+    Поэтому вместе со шторой уходит и переписка.
+
+    Чего это НЕ делает и не должно:
+      • не трогает ничего, кроме чата этого водителя с его ботом. Токен здесь
+        только водительский, chat_id — только его;
+      • не трогает AMBAR STAR, операторов и старших: их переписка — это
+        документы по деньгам и заказам, и удалять её нельзя ни при каких
+        обстоятельствах;
+      • ничего не удаляет в базе. Заказы, расходы и история остаются целыми:
+        убираются копии сообщений в телеграме, а не сами данные.
+
+    Телеграм разрешает боту удалять сообщения не старше двух суток. Что старше,
+    останется — сказать об этом честно лучше, чем притворяться, что чат чист.
+    """
+    import os as _os
+    from api_server import tg_delete
+    import config_staff as _staff
+    tid = _staff.DRIVER_IDS.get((me.get("name") or "").strip())
+    token = _os.getenv("DRIVER_BOT_TOKEN", "")
+    if not (tid and token):
+        return 0
+    ids = await db.drv_msgs_take(int(tid))
+    gone = 0
+    for mid in ids:
+        try:
+            res = await tg_delete(token, tid, mid)
+            if (res or {}).get("ok"):
+                gone += 1
+        except Exception:
+            pass
+    return gone
 
 
 async def _notify_panic(me: dict, on: bool, now):

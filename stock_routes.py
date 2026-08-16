@@ -669,8 +669,38 @@ def base_drop():
     _BASE["key"] = None
 
 
+async def _sold_after(since: dict) -> dict:
+    """{район: {позиция: продано в учётных единицах}} после его пересчёта.
+
+    Читаем один раз от самого старого пересчёта и уже в памяти отсекаем по
+    каждому району свой момент: пересчёты у всех разные, а пять выборок вместо
+    одной — это пять раз по мегабайту на тарифе, где скорость режется объёмом."""
+    live = [s for s in since.values() if s]
+    if not live:
+        return {}
+    first = min(live).astimezone(timezone.utc).isoformat().replace("+00:00", "")
+    orders = await db.sold_since(first)
+    cat = _catalog()
+    out = {}
+    for o in orders:
+        oid = o.get("office_id") or ""
+        edge = since.get(oid)
+        if not edge:
+            continue
+        ts = _dt_of(o.get("timestamp") or "")
+        if not ts or ts <= edge:
+            continue
+        for it in (o.get("items") or []):
+            pid, q = it.get("id"), _qty(it)
+            if not pid or not q:
+                continue
+            row = out.setdefault(oid, {})
+            row[pid] = row.get(pid, 0) + q / _unit(cat.get(pid) or {})
+    return out
+
+
 async def _district_base(day: str) -> dict:
-    """Остатки, приход после пересчёта и норма — по каждому району.
+    """Остатки, приход и продажи после пересчёта, норма — по каждому району.
 
     Это вся тяжесть заявки: пять чтений склада, пять по приходу и расчёт нормы
     по восьми неделям продаж. От ручных правок ничего из этого не зависит, а
@@ -680,24 +710,36 @@ async def _district_base(day: str) -> dict:
     import time as _t
     if _BASE["key"] == day and _t.monotonic() - _BASE["at"] < BASE_TTL:
         return _BASE["data"]
+    cat = _catalog()
+    # Пересчёт — снимок на момент времени. Пока его не повторили, честный
+    # остаток = снимок + приход − продажи. Оба слагаемых обязательны и по
+    # одной причине: без прихода программа закажет то, что уже привезли, без
+    # продаж — не закажет то, что уже продали. Второе дороже: это пустая полка.
+    counts, since = {}, {}
+    for oid in OFFICE_IDS:
+        counts[oid] = await db.get_last_stock_count(oid, before_day=None)
+        since[oid] = _dt_of((counts[oid] or {}).get("counted_at") or "")
+    sold = await _sold_after(since)
+
     out = {}
     for oid in OFFICE_IDS:
-        cnt = await db.get_last_stock_count(oid, before_day=None)
-        have = {l["id"]: int(l.get("actual") or 0) for l in (cnt or {}).get("lines", [])}
-        # Пересчёт был вчера, ночью водитель принял поставку. Без этой добавки
-        # программа завтра закажет то, что уже стоит на полке, — и так каждый
-        # день, пока кто-нибудь не пересчитает заново.
-        came = {}
+        cnt = counts[oid]
+        have = {l["id"]: float(l.get("actual") or 0) for l in (cnt or {}).get("lines", [])}
+        came, gone = {}, sold.get(oid) or {}
         try:
-            since = _dt_of((cnt or {}).get("counted_at") or "")
-            if since:
-                came = await db.intake_since(oid, since)
-                for pid, n in came.items():
-                    have[pid] = int(have.get(pid) or 0) + int(n)
+            if since[oid]:
+                came = await db.intake_since(oid, since[oid])
         except Exception as e:
             log.warning(f"[stock] приход после пересчёта не учтён ({oid}): {e}")
-        out[oid] = {"have": have, "sug": await _suggested_norms(oid, day), "came": came,
-                    "counted": (cnt or {}).get("day", "")}
+        for pid, n in came.items():
+            # Приёмка считает бутылки, склад — учётные единицы: ящик пива это
+            # одна единица и двадцать четыре кода.
+            have[pid] = (have.get(pid) or 0) + n / _unit(cat.get(pid) or {})
+        for pid, n in gone.items():
+            have[pid] = max(0, (have.get(pid) or 0) - n)
+        out[oid] = {"have": {k: int(v) for k, v in have.items()},
+                    "sug": await _suggested_norms(oid, day), "came": came,
+                    "gone": gone, "counted": (cnt or {}).get("day", "")}
     _BASE.update(key=day, at=_t.monotonic(), data=out)
     return out
 
@@ -739,9 +781,11 @@ async def order_rows(day: str = "") -> dict:
                 row_edited = True
             cells[oid] = {"have": have, "norm": norm, "suggested": sug,
                           "need": need, "calc": calc,
-                          # Сколько из «есть» приехало уже после пересчёта:
-                          # владелец должен видеть, что число не с полки.
+                          # Сколько из «есть» приехало уже после пересчёта и
+                          # сколько с тех пор продали: владелец должен видеть,
+                          # что число не с полки, а посчитанное.
                           "came": int(d["came"].get(pid) or 0),
+                          "gone": int(d["gone"].get(pid) or 0),
                           "edited": fix is not None and int(fix) != calc}
             item_total += need
             if sug and norm > sug:

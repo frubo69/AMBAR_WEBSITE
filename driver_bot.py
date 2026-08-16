@@ -11,12 +11,14 @@ AMBAR — бот водителя.
 """
 import logging
 import os
+from datetime import datetime, timezone
 
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, MenuButtonWebApp
 from telegram.ext import Application, CommandHandler, ContextTypes
 
 import config_staff as staff
+import db
 
 load_dotenv()
 DRIVER_BOT_TOKEN = os.getenv("DRIVER_BOT_TOKEN", "")
@@ -26,8 +28,25 @@ logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=lo
 log = logging.getLogger("driver-bot")
 
 
+# Что сказано в этом чате, помним по номерам сообщений: в скрытом режиме
+# приложение маскируется, и переписка должна уйти вместе с ним. Здесь это
+# только два ответа на команды — всё остальное водителю шлёт сервер и
+# запоминает у себя. Ничего, кроме чата водителя с его ботом, сюда не попадает.
+async def _remember(msg):
+    if not msg:
+        return
+    try:
+        await db.drv_msg_add(msg.chat_id, msg.message_id, datetime.now(timezone.utc))
+    except Exception as e:
+        log.debug(f"номер сообщения не записан: {e}")
+
+
 async def post_init(app):
     """Кнопка приложения рядом с полем ввода — чтобы её не искали в меню."""
+    try:
+        await db.connect()
+    except Exception as e:
+        log.warning(f"база недоступна, чистка чата работать не будет: {e}")
     try:
         await app.bot.set_chat_menu_button(
             menu_button=MenuButtonWebApp(text="Заказы", web_app=WebAppInfo(url=DRIVER_WEBAPP_URL)))
@@ -49,17 +68,23 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         log.info(f"вход без доступа: {uid} (@{update.effective_user.username})")
         return
 
-    await update.message.reply_text(
+    await _remember(update.message)
+    sent = await update.message.reply_text(
         f"{me['name']}, здравствуйте.\n"
         f"Ваш район: {me['district_code']} {me['district_name']}\n\n"
         "В приложении — заказы на смену, отметка доставки и расходы.",
         reply_markup=InlineKeyboardMarkup([[
             InlineKeyboardButton("Открыть заказы", web_app=WebAppInfo(url=DRIVER_WEBAPP_URL))]]))
+    await _remember(sent)
     log.info(f"вход: {me['name']} ({uid})")
 
 
 async def cmd_id(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(f"Ваш ID: {update.effective_user.id}")
+    if staff.driver_by_tg(update.effective_user.id):
+        await _remember(update.message)
+    sent = await update.message.reply_text(f"Ваш ID: {update.effective_user.id}")
+    if staff.driver_by_tg(update.effective_user.id):
+        await _remember(sent)
 
 
 def main():

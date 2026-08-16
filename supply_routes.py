@@ -41,6 +41,11 @@ TOTAL_COL = "Total"          # считается формулой, а не на
 # Ноль показываем пустой клеткой. В файле все позиции каталога, и лист, залитый
 # нулями, читать невозможно: глаз ищет числа, а видит шум.
 ZERO_BLANK = "0;\\-0;;@"
+# Пустые строки под итогом. Итог — последняя строка листа, и на телефоне
+# просмотрщик прижимает её к самому низу экрана: она наполовину уходит под
+# край и её приходится выкручивать пальцем. Несколько пустых строк снизу
+# ничего не стоят, а итог перестаёт липнуть к краю.
+TAIL_ROWS = 8
 SHEET_MAIN = "Order"
 
 # Названия точек у нас записаны кириллицей, хотя районы английские.
@@ -283,6 +288,8 @@ async def _build_book(day: str):
                                         for r in rows)) or ""
         c.fill = sum_fill; c.font = bold; c.alignment = mid; c.border = box
 
+    _tail(ws, i, N)
+
     ws.column_dimensions["A"].width = 29.55                 # пустое поле слева
     ws.column_dimensions[get_column_letter(N)].width = 7.11
     ws.column_dimensions[get_column_letter(C)].width = 10
@@ -311,6 +318,18 @@ async def _build_book(day: str):
     log.info(f"[supply] выгрузка заявки {data['day']}: {len(rows)} позиций, "
              f"из них с потребностью {sum(1 for r in rows if r['need_total'])}")
     return raw, name
+
+
+def _tail(ws, last_row: int, col: int):
+    """Пустые строки под итогом, чтобы он не упирался в край экрана.
+
+    Строку в файле создаёт ячейка, а не высота: пустое значение openpyxl не
+    записывает вовсе, и строгий просмотрщик считает строку несуществующей —
+    рисует лист ровно до итога. Пустая строка «» даёт настоящую ячейку без
+    единого символа внутри: и строка есть, и в ней ничего нет."""
+    for r in range(last_row + 1, last_row + 1 + TAIL_ROWS):
+        ws.cell(row=r, column=col, value="")
+        ws.row_dimensions[r].height = 17.4
 
 
 def _num(v):
@@ -941,6 +960,8 @@ def _short_book(sup: dict, short: dict):
                        else short["qty"]) or None
             c.number_format = ZERO_BLANK
         c.fill = sum_fill; c.font = bold; c.alignment = mid; c.border = box
+
+    _tail(ws, i, N)
 
     ws.column_dimensions["A"].width = 29.55
     ws.column_dimensions[get_column_letter(N)].width = 7.11

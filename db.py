@@ -2118,6 +2118,53 @@ async def intake_since(district: str, since) -> dict:
     return {d["_id"]: d["n"] for d in await cur.to_list(length=500) if d["_id"]}
 
 
+async def sold_since(since_iso: str) -> list:
+    """Доставленные заказы с указанного момента — для отката остатка вперёд.
+
+    Пересчёт склада — это снимок на момент времени. Пока его не повторили,
+    честный остаток = снимок + приход − продажи. Без последнего слагаемого
+    заявка считает, что всё проданное с того дня по-прежнему стоит на полке."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.orders.find({"timestamp": {"$gte": since_iso}, "status": "delivered"},
+                         {"_id": 0, "timestamp": 1, "office_id": 1, "items": 1})
+    return await cur.to_list(length=None)
+
+
+# ── Сообщения боту водителя ─────────────────────────────────────────────────
+# Что мы отправили водителю в телеграм, помним по номерам сообщений: иначе в
+# скрытом режиме их нечем убрать. Только водительский бот и только его чат —
+# ничего из переписки старших и операторов сюда не попадает и попасть не может.
+async def drv_msg_add(chat_id: int, mid: int, at):
+    """Запомнить отправленное. Держим двое суток: дольше телеграм удалять не
+    даёт, и хранить номера, которыми уже нельзя воспользоваться, незачем."""
+    db = _db_or_none()
+    if db is None or not (chat_id and mid): return
+    from datetime import datetime as _dt, timedelta as _td, timezone as _tz
+    edge = (at if hasattr(at, "isoformat") else _dt.now(_tz.utc)) - _td(hours=48)
+    try:
+        await db.driver_msgs.update_one(
+            {"_id": int(chat_id)},
+            {"$push": {"msgs": {"$each": [{"m": int(mid), "at": at}], "$slice": -300}}},
+            upsert=True)
+        await db.driver_msgs.update_one(
+            {"_id": int(chat_id)}, {"$pull": {"msgs": {"at": {"$lt": edge}}}})
+    except Exception as e:
+        log.debug(f"drv_msg_add {chat_id}/{mid}: {e}")
+
+
+async def drv_msgs_take(chat_id: int) -> list:
+    """Забрать номера и сразу забыть их: удаление — дело одноразовое, а
+    повторная попытка по тем же номерам только шумит в логах."""
+    db = _db_or_none()
+    if db is None or not chat_id: return []
+    from pymongo import ReturnDocument
+    doc = await db.driver_msgs.find_one_and_update(
+        {"_id": int(chat_id)}, {"$set": {"msgs": []}},
+        return_document=ReturnDocument.BEFORE)
+    return [int(m["m"]) for m in ((doc or {}).get("msgs") or []) if m.get("m")]
+
+
 # ── Смена: день закрыт, продажи посчитаны ───────────────────────────────────
 # Смена закрывается по району: сутки считает не программа по часам, а человек,
 # который знает, что заказов больше не будет. Пока район не закрыт, продажи

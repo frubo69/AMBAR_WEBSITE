@@ -300,7 +300,36 @@ async def tg_send(token, chat_id, text, parse_mode="Markdown", reply_markup=None
     _to = _aiohttp.ClientTimeout(total=20)
     async with _aiohttp.ClientSession(timeout=_to) as session:
         async with session.post(url, json=payload) as resp:
-            return await resp.json()
+            res = await resp.json()
+    await _remember_driver_msg(token, chat_id, res)
+    return res
+
+
+async def _remember_driver_msg(token, chat_id, res):
+    """Запомнить номер сообщения, отправленного водителю.
+
+    В скрытом режиме приложение маскируется, а переписка с ботом остаётся: там
+    адреса, суммы и состав заказов. Убрать её можно, только зная номера
+    сообщений, — поэтому запоминаем их здесь, в единственном месте, через
+    которое проходят все отправки. Иначе очередное новое уведомление однажды
+    добавили бы мимо, и в чате осталась бы ровно одна выдающая строка.
+
+    Только водительский бот и только его чат. Ни операторская переписка, ни
+    AMBAR STAR сюда не попадают: условие — совпадение токена, а он у каждого
+    бота свой.
+    """
+    drv = os.getenv("DRIVER_BOT_TOKEN", "")
+    if not drv or token != drv:
+        return
+    mid = ((res or {}).get("result") or {}).get("message_id")
+    if not mid:
+        return
+    try:
+        import db as _db
+        from datetime import datetime as _dt, timezone as _tz
+        await _db.drv_msg_add(int(chat_id), int(mid), _dt.now(_tz.utc))
+    except Exception as e:
+        log.debug(f"drv msg log {chat_id}/{mid}: {e}")
 
 async def tg_edit(token, chat_id, message_id, text, parse_mode="HTML", reply_markup=None):
     url = f"https://api.telegram.org/bot{token}/editMessageText"

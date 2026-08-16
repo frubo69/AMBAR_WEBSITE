@@ -866,6 +866,110 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .acc-3 .acc-cell:nth-child(3) .acc-n{margin-top:7px;padding-top:0;justify-content:center}
 .acc-3 .acc-cell:nth-child(3) .acc-s{margin-top:4px;min-height:0}
 
+
+/* ── Скрытый режим ─────────────────────────────────────────────────────────
+   Панель — это выручка, долги и люди. Иногда рядом оказывается тот, кому этого
+   видеть не нужно: сосед в самолёте, гость за столом, чужой человек в машине.
+   Тогда приложение становится игрой.
+
+   У водителя тот же экран называется экстренной ситуацией и поднимает всех на
+   ноги. Здесь ничего такого нет и быть не должно: никто никуда не пишет, ни
+   старший, ни оператор об этом не узнают. Это не тревога, а штора.
+
+   Поэтому и вид другой: не красный предупреждающий, а обычный. И подпись
+   прямо говорит, как вернуться, — прятаться от себя же незачем. */
+.hid{position:fixed;inset:0;z-index:300;display:none;flex-direction:column;
+  align-items:center;
+  padding:calc(64px + var(--safe-top)) 22px calc(40px + var(--safe-bottom));
+  background:#000006;-webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px)}
+.hid.show{display:flex}
+.hid-top{text-align:center;max-width:300px}
+.hid-ico{display:flex;width:58px;height:58px;margin:0 auto 20px;border-radius:50%;
+  align-items:center;justify-content:center;color:var(--gold2);
+  background:var(--gold-soft);border:1px solid rgba(201,169,110,.3)}
+.hid-t{font-size:22px;font-weight:700;letter-spacing:-.4px;line-height:1.2}
+.hid-s{margin-top:10px;font-size:14px;line-height:1.5;color:var(--muted)}
+.hid-s b{color:var(--text);font-weight:600}
+/* Ползунок стоит в оптической середине оставшегося места, а не прибит к низу:
+   до него дотягиваются большим пальцем, не перехватывая телефон. */
+.hid-slide{position:relative;width:100%;max-width:330px;height:68px;border-radius:999px;
+  overflow:hidden;background:rgba(255,255,255,.1);
+  border:1px solid rgba(255,255,255,.06);margin:auto 0;touch-action:pan-y}
+.hid-fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:999px;
+  background:rgba(201,169,110,.26)}
+/* Подпись выровнена по свободной части дорожки, а не по всей: иначе она
+   упирается в ручку и читается как её продолжение. */
+.hid-track{position:absolute;inset:0 18px 0 68px;display:flex;align-items:center;
+  justify-content:center;font-size:15.5px;font-weight:600;pointer-events:none}
+/* Блик бежит по надписи, как на системном «выключить»: он говорит, что это не
+   картинка, а то, что нужно тянуть. */
+.hid-track span{background:linear-gradient(100deg,
+    rgba(255,255,255,.32) 30%, rgba(255,255,255,.92) 48%, rgba(255,255,255,.32) 66%);
+  background-size:280% 100%;-webkit-background-clip:text;background-clip:text;
+  color:transparent;animation:hidShine 2.6s linear infinite;white-space:nowrap}
+@keyframes hidShine{from{background-position:180% 0}to{background-position:-120% 0}}
+@media (prefers-reduced-motion:reduce){
+  .hid-track span{animation:none;color:rgba(255,255,255,.7)}
+}
+.hid-knob{position:absolute;top:5px;left:5px;width:58px;height:58px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;color:#1a1408;background:#fff;
+  box-shadow:0 3px 14px rgba(0,0,0,.5);transition:transform .22s var(--e1)}
+.hid-slide.drag .hid-knob{transition:none}
+.hid-x{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:11px;
+  border:none;background:none;cursor:pointer;font-family:inherit;color:var(--text);padding:0}
+.hid-x-c{width:66px;height:66px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;background:rgba(255,255,255,.14)}
+.hid-x:active .hid-x-c{background:rgba(255,255,255,.22)}
+.hid-x-t{font-size:15px}
+/* Логотип в шапке — вход в режим: три касания. Обычному нажатию он не
+   отзывается ничем, поэтому и выделяться не должен. */
+.brand-wrap,.stk-ttl{-webkit-touch-callout:none;-webkit-user-select:none;
+  user-select:none;touch-action:manipulation;cursor:default}
+
+/* ── маскировка: игра ──────────────────────────────────────────────────────
+   Всё, что делает её похожей на настоящую: своё имя с логотипом, счёт-линии-
+   уровень в шапке, следующая фигура, кнопки под большой палец и конец игры с
+   рекордом. Каждая из этих мелочей по отдельности не важна, а вместе они и
+   отличают игру от «экрана, который кто-то нарисовал». */
+.gm{position:fixed;inset:0;z-index:400;display:none;flex-direction:column;
+  background:#0b0e18;color:#e8ecf5;
+  padding:calc(14px + var(--safe-top)) 14px calc(14px + var(--safe-bottom));
+  font-family:-apple-system,'SF Pro Display','Segoe UI',sans-serif;user-select:none}
+.gm.show{display:flex}
+.gm-top{flex:0 0 auto}
+.gm-logo{font-size:21px;font-weight:800;letter-spacing:3px;color:#5ad1ff;
+  text-align:center;text-shadow:0 0 18px rgba(90,209,255,.45);
+  /* Иначе долгое нажатие по тексту телефон принимает за выделение: показывает
+     лупу, а приложению присылает отмену касания. */
+  -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
+  touch-action:manipulation;padding:6px 0;transition:opacity .2s var(--e1)}
+.gm-logo.hold{opacity:.55}
+.gm-logo span{color:#ffd166}
+.gm-stats{display:flex;justify-content:space-between;gap:8px;margin:12px 0 10px;
+  padding:9px 14px;border-radius:12px;background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.07)}
+.gm-stats span{display:flex;flex-direction:column;align-items:center;gap:2px}
+.gm-stats i{font-style:normal;font-size:8.5px;letter-spacing:1.2px;color:#7d89a6}
+.gm-stats b{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+.gm-field{position:relative;flex:1;min-height:0;display:flex;align-items:center;
+  justify-content:center}
+#gmC{border-radius:10px;background:#070a12;box-shadow:0 0 0 1px rgba(255,255,255,.07),
+  inset 0 0 40px rgba(0,0,0,.6)}
+.gm-over{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
+  justify-content:center;gap:9px;border-radius:10px;background:rgba(7,10,18,.9)}
+.gm-over.show{display:flex}
+.gm-over-t{font-size:20px;font-weight:800;letter-spacing:.4px}
+.gm-over-s{font-size:12.5px;color:#7d89a6}
+.gm-again{margin-top:8px;padding:12px 24px;border-radius:11px;border:none;cursor:pointer;
+  font-family:inherit;font-size:14px;font-weight:700;color:#06121c;
+  background:linear-gradient(135deg,#5ad1ff,#7ef0c8)}
+.gm-pad{flex:0 0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:9px;
+  margin-top:12px}
+.gm-b{height:58px;border-radius:14px;border:1px solid rgba(255,255,255,.09);
+  cursor:pointer;font-family:inherit;font-size:19px;color:#cfd8ea;
+  background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center}
+.gm-b:active{background:rgba(90,209,255,.22);color:#fff}
+
 /* ── Путь закупки ───────────────────────────────────────────────────────
    Один блок вместо трёх. Три шага в ряд, под каждым его число: сколько
    попросили, сколько дал магазин, сколько приняли на складе. Так весь путь
@@ -1750,7 +1854,7 @@ button.path:active{transform:scale(.995)}
 <!-- ============ HEADER ============ -->
 <header class="hdr">
   <div class="hdr-l">
-    <div class="brand-wrap"><div class="brand-line"></div><div class="brand">A<span class="brand-stroke"></span>MBAR</div><div class="brand-line"></div></div>
+    <div class="brand-wrap" onclick="hidTap()"><div class="brand-line"></div><div class="brand">A<span class="brand-stroke"></span>MBAR</div><div class="brand-line"></div></div>
     <div class="live-dot" id="liveDot" title="API status">Online</div>
   </div>
   <div class="hdr-r">
@@ -1766,6 +1870,81 @@ button.path:active{transform:scale(.995)}
     </button>
   </div>
 </header>
+
+
+<!-- ═══ Скрытый режим ════════════════════════════════════════════════════
+     Три касания по логотипу в шапке. Логотип есть на каждом экране, он всегда
+     на одном месте и ни на что другое не отзывается — промахнуться некуда, а
+     нарочно попасть можно не глядя.
+
+     Ползунок, а не кнопка: случайное касание не прячет панель, а нарочное
+     движение — прячет, и этот жест руке знаком по системному «выключить». -->
+<div class="hid" id="hidOv">
+  <div class="hid-top">
+    <span class="hid-ico">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 3l18 18"/><path d="M10.6 5.1A9.9 9.9 0 0 1 12 5c5 0 9 4.5 10 7
+          a15 15 0 0 1-2.6 3.6"/><path d="M6.6 6.7C4.3 8.1 2.6 10.2 2 12c1 2.5 5 7 10 7
+          a9.7 9.7 0 0 0 4.5-1.1"/><path d="M9.9 9.9a3 3 0 0 0 4.2 4.2"/></svg>
+    </span>
+    <h2 class="hid-t">Скрытый режим</h2>
+    <p class="hid-s">Панель станет игрой. Никто ничего не узнает — сообщений
+      не будет.<br>Вернуться — <b>долгим нажатием на название игры</b>.</p>
+  </div>
+
+  <div class="hid-slide" id="hidSlide">
+    <div class="hid-fill" id="hidFill"></div>
+    <div class="hid-track" id="hidTrack"><span>сдвиньте, чтобы скрыть</span></div>
+    <div class="hid-knob" id="hidKnob">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
+        stroke-width="2.2" stroke-linecap="round"><path d="M12 3v9"/>
+        <path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>
+    </div>
+  </div>
+
+  <button class="hid-x" onclick="hidClose()">
+    <span class="hid-x-c">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
+        stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </span>
+    <span class="hid-x-t">Отмена</span>
+  </button>
+</div>
+
+<!-- Маскировка. Обычная игра-падалка: она есть на любом телефоне, её не
+     разглядывают и в неё, чего доброго, начнут играть — поэтому она играется
+     по-настоящему. Пустая картинка выдала бы себя первым же касанием.
+     Та же игра, что в приложении водителя: одна маскировка на всю систему.
+     Выход — долгое нажатие на название. -->
+<div class="gm" id="gameApp">
+  <div class="gm-top">
+    <div class="gm-logo" id="gmLogo">BLOCK<span>FALL</span></div>
+    <div class="gm-stats">
+      <span><i>СЧЁТ</i><b id="gmScore">0</b></span>
+      <span><i>ЛИНИИ</i><b id="gmLines">0</b></span>
+      <span><i>УРОВЕНЬ</i><b id="gmLevel">1</b></span>
+    </div>
+  </div>
+  <div class="gm-field">
+    <canvas id="gmC"></canvas>
+    <div class="gm-over" id="gmOver">
+      <div class="gm-over-t">Игра окончена</div>
+      <div class="gm-over-s" id="gmBest"></div>
+      <button class="gm-again" onclick="gmStart()">Играть снова</button>
+    </div>
+  </div>
+  <div class="gm-pad">
+    <button class="gm-b" data-a="left">◀</button>
+    <button class="gm-b" data-a="rot">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+    </button>
+    <button class="gm-b" data-a="right">▶</button>
+    <button class="gm-b wide" data-a="drop">▼</button>
+  </div>
+</div>
 
 <!-- ============ OVERVIEW ============ -->
 <div class="page active" id="pg-overview">
@@ -3729,6 +3908,11 @@ button.pill:active{opacity:.6}
 </nav>
 
 <script>
+// Скрытый режим — самое первое, что узнаёт панель о себе: опросы связи и
+// уведомлений заводятся ниже по файлу и стартуют немедленно, а спрашивать они
+// будут именно этот флаг.
+var HIDE = false;
+try{ HIDE = localStorage.getItem('ambar_hide') === '1'; }catch(e){}
 // Size brand logo lines to match text width
 (function(){const b=document.querySelector('.brand');if(!b)return;const w=Math.round(b.offsetWidth*1.45)+'px';document.querySelectorAll('.brand-line').forEach(l=>l.style.width=w)})();
 // Telegram WebApp integration
@@ -3817,6 +4001,7 @@ try{ if(window.Telegram && Telegram.WebApp){
   }
 
   async function probe(){
+    if(HIDE) return;
     if(denied) return;
     try{
       const r = await window.ownerApi.ownerFetch('/api/owner/ping');
@@ -3848,6 +4033,7 @@ try{ if(window.Telegram && Telegram.WebApp){
   let _lastSeen = '';
   window._serverNotifs = [];
   async function pollNotifs(){
+    if(HIDE) return;
     try{
       const params = _lastSeen ? {since:_lastSeen} : {};
       const data = await ownerApi.ownerFetch('/api/owner/notifications',{params});
@@ -4376,6 +4562,401 @@ const PERIOD_DATA = {
 };
 
 function _setAed(id, val){ const el = document.getElementById(id); if(el){ el.dataset.aed = String(val); } }
+
+// ══════════════════════════════════════════════════════════════════════════
+//  СКРЫТЫЙ РЕЖИМ
+// ══════════════════════════════════════════════════════════════════════════
+// На этих экранах выручка, долги, закупочные цены и люди поимённо. Иногда
+// рядом оказывается тот, кому этого видеть не нужно, и закрывать приложение
+// при нём — само по себе жест, который замечают. Поэтому панель не
+// закрывается, а становится игрой.
+//
+// Чем это отличается от того же режима у водителя. У него это экстренная
+// ситуация: старший и оператор получают сообщение, бот замолкает, запись
+// живёт на сервере. Здесь ничего этого нет и не должно быть — никто никуда не
+// пишет, ничего не записывается. Это не тревога, а штора, и рычаг от неё
+// только в руках хозяина.
+//
+// Что важно в мелочах:
+//   • вход — три касания по логотипу. Он на каждом экране, всегда на одном
+//     месте и ни на что другое не отзывается: промахнуться некуда, а нарочно
+//     попасть можно не глядя. На полноэкранных разделах — «Заявка», «Учёт»,
+//     «Поставка» — логотип закрыт, поэтому там то же самое делает заголовок
+//     раздела: прятать оттуда нужно не реже, а искать второй жест человеку
+//     некогда;
+//   • подтверждение — ползунок, а не кнопка: случайное касание панель не
+//     прячет;
+//   • режим переживает закрытие. Иначе достаточно было бы свернуть телеграм,
+//     чтобы всё слетело — а сворачивают его как раз в такие моменты;
+//   • пока штора опущена, панель молчит: опросы выручки, уведомлений и связи
+//     не идут. Не ради экономии, а чтобы ничто не мигнуло поверх игры.
+let _hidTaps = [];
+
+function _gtap(kind){
+  try{
+    const h = Telegram.WebApp.HapticFeedback;
+    if(kind === 'ok') h.notificationOccurred('success');
+    else if(kind === 'light') h.impactOccurred('light');
+    else if(kind === 'soft') h.impactOccurred('soft');
+    else h.selectionChanged();
+  }catch(e){}
+}
+
+// Тройное касание по логотипу. Считаем только быстрые серии: касания,
+// разнесённые на секунды, — это обычные промахи по шапке.
+function hidTap(){
+  const now = Date.now();
+  _hidTaps = _hidTaps.filter(t => now - t < 1200);
+  _hidTaps.push(now);
+  if(_hidTaps.length >= 3){ _hidTaps = []; hidOpen(); }
+}
+
+function hidOpen(){
+  document.getElementById('hidOv').classList.add('show');
+  hidKnobReset();
+  _gtap('light');
+}
+
+function hidClose(){
+  document.getElementById('hidOv').classList.remove('show');
+  hidKnobReset();
+}
+
+function hidKnobReset(){
+  const k = document.getElementById('hidKnob'), f = document.getElementById('hidFill');
+  const t = document.getElementById('hidTrack');
+  if(k) k.style.transform = 'translateX(0)';
+  if(f) f.style.width = '0px';
+  if(t){ t.style.opacity = '1'; t.style.filter = 'none'; }
+  const s = document.getElementById('hidSlide');
+  if(s) s.classList.remove('drag');
+}
+
+// Включение и выключение — одна дорога, разница только в направлении.
+function hideSet(on){
+  HIDE = on;
+  try{ localStorage.setItem('ambar_hide', on ? '1' : '0'); }catch(e){}
+  paintHide();
+  // Выйдя из режима, поднимаем панель заново. Пока штора была опущена, она
+  // не сделала ни одного запроса, и оживлять её по частям — верный способ
+  // забыть одну из частей.
+  if(!on) setTimeout(() => location.reload(), 120);
+}
+
+function paintHide(){
+  const c = document.getElementById('gameApp');
+  if(!c) return;
+  const ov = document.getElementById('hidOv');
+  if(ov) ov.classList.remove('show');
+  c.classList.toggle('show', HIDE);
+  document.body.style.overflow = HIDE ? 'hidden' : '';
+  // Под шторой панель не ходит в сеть вовсе. Дверь к данным одна на всё
+  // приложение — её и закрываем, вместо того чтобы гасить два десятка
+  // загрузчиков по отдельности и однажды забыть один. Запрос не падает с
+  // ошибкой, а просто не отвечает: падение нарисовало бы «нет связи» — а
+  // рисовать под шторой нечего.
+  hidGate(20);
+  if(!HIDE) return;
+  gmInit();
+  // Всё, что может всплыть поверх игры: открытые окна, листы, разделы.
+  ['cmdOverlay','setOverlay','alertsOverlay','dtOverlay','accOv','stkOv',
+   'crewOv','dateOv','bcOv'].forEach(id => {
+    const el = document.getElementById(id);
+    if(el) el.classList.remove('show');
+  });
+  document.querySelectorAll('.ov.show, .sheet.show').forEach(el => el.classList.remove('show'));
+}
+
+// Дверь ставим один раз и на всё время: после выхода она пропускает всё, а
+// панель всё равно перезагружается. Если api.js почему-то ещё не поднялся,
+// пробуем ещё — молча остаться без двери хуже, чем подождать полсекунды.
+function hidGate(tries){
+  if(window.ownerApi && !ownerApi._hidWrapped){
+    ownerApi._hidWrapped = true;
+    const real = ownerApi.ownerFetch.bind(ownerApi);
+    ownerApi.ownerFetch = function(){
+      return HIDE ? new Promise(function(){}) : real.apply(null, arguments);
+    };
+    return;
+  }
+  if(tries > 0) setTimeout(() => hidGate(tries - 1), 100);
+}
+
+// Ползунок: насечки под пальцем всю дорогу и толчок в точке, после которой
+// можно отпускать.
+(function initHideSlide(){
+  const bar = document.getElementById('hidSlide');
+  const knob = document.getElementById('hidKnob');
+  const fill = document.getElementById('hidFill');
+  const track = document.getElementById('hidTrack');
+  if(!bar || !knob) return;
+  let dragging = false, x0 = 0, max = 0, step = 0, lastTick = 0, armed = false;
+  const NOTCH = 12, ARM = 0.85;
+  const paint = v => {
+    knob.style.transform = `translateX(${v}px)`;
+    const k = max ? v / max : 0;
+    fill.style.width = (v + knob.offsetWidth) + 'px';
+    track.style.opacity = String(Math.max(0, 1 - k * 1.6));
+    track.style.filter = `blur(${(k * 3).toFixed(1)}px)`;
+  };
+  const start = e => {
+    dragging = true; bar.classList.add('drag');
+    step = 0; lastTick = 0; armed = false;
+    x0 = (e.touches ? e.touches[0].clientX : e.clientX);
+    max = bar.offsetWidth - knob.offsetWidth - 10;
+    _gtap('sel');
+  };
+  const move = e => {
+    if(!dragging) return;
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - x0;
+    const v = Math.max(0, Math.min(max, x));
+    paint(v);
+    const k = max ? v / max : 0;
+    const st = Math.floor(k * NOTCH), now = Date.now();
+    if(st !== step && now - lastTick > 40){
+      step = st; lastTick = now;
+      if(st > 0 && st < NOTCH) _gtap('sel');
+    }
+    if(!armed && k >= ARM){ armed = true; _gtap('light'); }
+    else if(armed && k < ARM) armed = false;
+    if(e.cancelable) e.preventDefault();
+  };
+  const end = () => {
+    if(!dragging) return;
+    dragging = false; bar.classList.remove('drag');
+    const v = parseFloat((knob.style.transform.match(/-?\d+\.?\d*/) || [0])[0]);
+    if(v >= max * 0.85) hideSet(true);
+    else { paint(0); _gtap('soft'); }
+  };
+  knob.addEventListener('mousedown', start);
+  knob.addEventListener('touchstart', start, {passive:true});
+  document.addEventListener('mousemove', move);
+  document.addEventListener('touchmove', move, {passive:false});
+  document.addEventListener('mouseup', end);
+  document.addEventListener('touchend', end);
+})();
+
+// ── игра ───────────────────────────────────────────────────────────────────
+// Настоящая падалка на семь фигур: вращение, ускорение, сгорание линий, рост
+// скорости, рекорд. Та же, что в приложении водителя. Всё это здесь не ради
+// игры, а ради правдоподобия: человек, взявший телефон в руки, скорее всего
+// нажмёт пару кнопок — и они должны отзываться так, как он ожидает.
+const GM_W = 10, GM_H = 20;
+const GM_PIECES = [
+  [[1,1,1,1]],                       // I
+  [[1,1],[1,1]],                     // O
+  [[0,1,0],[1,1,1]],                 // T
+  [[0,1,1],[1,1,0]],                 // S
+  [[1,1,0],[0,1,1]],                 // Z
+  [[1,0,0],[1,1,1]],                 // J
+  [[0,0,1],[1,1,1]],                 // L
+];
+const GM_COLORS = ['#5ad1ff','#ffd166','#c792ea','#7ef0c8','#ff8fa3','#8ab4ff','#ffb26b'];
+let GM = null, _gmRaf = null, _gmCell = 0;
+
+function gmInit(){
+  const c = document.getElementById('gmC');
+  if(!c.dataset.ready){
+    c.dataset.ready = '1';
+    document.querySelectorAll('.gm-b').forEach(b => {
+      const act = () => gmAct(b.dataset.a);
+      b.addEventListener('click', act);
+    });
+    // Долгое нажатие на название — выход. Чужой человек название не держит, а
+    // водитель делает это одной рукой, не глядя.
+    // Долгое нажатие пальцем по тексту телефон понимает по-своему: показывает
+    // лупу и меню «Скопировать», а нам присылает touchcancel — таймер сбрасывался,
+    // и выход не срабатывал ни разу. Поэтому у названия отключено выделение и
+    // системное меню, а само нажатие слушается через pointer-события: они
+    // приходят одинаково и от пальца, и от мыши.
+    const logo = document.getElementById('gmLogo');
+    let t = null, arm = null;
+    const stop = () => {
+      clearTimeout(t); clearTimeout(arm); t = arm = null;
+      logo.classList.remove('hold');
+    };
+    const down = e => {
+      if(t) return;
+      // На середине пути — короткий толчок: палец узнаёт, что удержание
+      // засчитывается, и его не убирают раньше времени.
+      arm = setTimeout(() => { _gtap('light'); logo.classList.add('hold'); }, 900);
+      t = setTimeout(() => { stop(); _gtap('ok'); hideSet(false); }, 1800);
+      if(e && e.preventDefault && e.cancelable) e.preventDefault();
+    };
+    logo.addEventListener('pointerdown', down);
+    ['pointerup','pointercancel','pointerleave'].forEach(e =>
+      logo.addEventListener(e, stop));
+    // Запасной путь для старых вебвью без pointer-событий.
+    logo.addEventListener('touchstart', down, {passive:false});
+    ['touchend','touchcancel'].forEach(e => logo.addEventListener(e, stop));
+    logo.addEventListener('contextmenu', e => e.preventDefault());
+  }
+  gmFit();
+  if(!GM) gmStart(); else gmPaint();
+  window.addEventListener('resize', gmFit);
+}
+
+function gmFit(){
+  const c = document.getElementById('gmC');
+  const box = c.parentElement.getBoundingClientRect();
+  if(!box.height) return;
+  _gmCell = Math.floor(Math.min(box.width / GM_W, box.height / GM_H));
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
+  c.style.width = (_gmCell * GM_W) + 'px';
+  c.style.height = (_gmCell * GM_H) + 'px';
+  c.width = _gmCell * GM_W * dpr;
+  c.height = _gmCell * GM_H * dpr;
+  c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+  if(GM) gmPaint();
+}
+
+function gmStart(){
+  document.getElementById('gmOver').classList.remove('show');
+  GM = {grid: Array.from({length: GM_H}, () => Array(GM_W).fill(0)),
+        p: null, next: gmRand(), score: 0, lines: 0, level: 1,
+        drop: 0, speed: 800, over: false, last: 0};
+  gmSpawn();
+  gmStats();
+  if(_gmRaf) cancelAnimationFrame(_gmRaf);
+  GM.last = 0;
+  _gmRaf = requestAnimationFrame(gmLoop);
+}
+
+const gmRand = () => {
+  const i = Math.floor(Math.random() * GM_PIECES.length);
+  return {sh: GM_PIECES[i].map(r => r.slice()), c: i + 1};
+};
+
+function gmSpawn(){
+  const n = GM.next;
+  GM.next = gmRand();
+  GM.p = {sh: n.sh, c: n.c, x: Math.floor((GM_W - n.sh[0].length) / 2), y: 0};
+  if(gmHit(GM.p.sh, GM.p.x, GM.p.y)) gmEnd();
+}
+
+function gmHit(sh, x, y){
+  for(let r = 0; r < sh.length; r++)
+    for(let k = 0; k < sh[r].length; k++){
+      if(!sh[r][k]) continue;
+      const nx = x + k, ny = y + r;
+      if(nx < 0 || nx >= GM_W || ny >= GM_H) return true;
+      if(ny >= 0 && GM.grid[ny][nx]) return true;
+    }
+  return false;
+}
+
+function gmMerge(){
+  const p = GM.p;
+  p.sh.forEach((row, r) => row.forEach((v, k) => {
+    if(v && p.y + r >= 0) GM.grid[p.y + r][p.x + k] = p.c;
+  }));
+  // Сгоревшие линии: считаем разом, чтобы очки за четыре сразу были больше,
+  // чем за четыре по одной, — так в этой игре и принято.
+  let burned = 0;
+  for(let r = GM_H - 1; r >= 0; r--){
+    if(GM.grid[r].every(v => v)){
+      GM.grid.splice(r, 1);
+      GM.grid.unshift(Array(GM_W).fill(0));
+      burned++; r++;
+    }
+  }
+  if(burned){
+    GM.lines += burned;
+    GM.score += [0, 100, 300, 500, 800][burned] * GM.level;
+    GM.level = 1 + Math.floor(GM.lines / 10);
+    GM.speed = Math.max(90, 800 - (GM.level - 1) * 70);
+    _gtap('light');
+    gmStats();
+  }
+  gmSpawn();
+}
+
+function gmStats(){
+  _setText('gmScore', String(GM.score));
+  _setText('gmLines', String(GM.lines));
+  _setText('gmLevel', String(GM.level));
+}
+
+function gmEnd(){
+  GM.over = true;
+  let best = 0;
+  try{ best = parseInt(localStorage.getItem('bf_best') || '0', 10) || 0; }catch(e){}
+  if(GM.score > best){
+    best = GM.score;
+    try{ localStorage.setItem('bf_best', String(best)); }catch(e){}
+  }
+  _setText('gmBest', `Счёт ${GM.score} · рекорд ${best}`);
+  document.getElementById('gmOver').classList.add('show');
+}
+
+function gmAct(a){
+  if(!GM || GM.over) return;
+  const p = GM.p;
+  if(a === 'left'  && !gmHit(p.sh, p.x - 1, p.y)) p.x--;
+  if(a === 'right' && !gmHit(p.sh, p.x + 1, p.y)) p.x++;
+  if(a === 'rot'){
+    const r = p.sh[0].map((_, i) => p.sh.map(row => row[i]).reverse());
+    // Пристенное вращение: у стены фигура сдвигается, а не отказывается
+    // крутиться. Без этого игра ощущается сломанной.
+    for(const dx of [0, -1, 1, -2, 2]){
+      if(!gmHit(r, p.x + dx, p.y)){ p.sh = r; p.x += dx; break; }
+    }
+  }
+  if(a === 'drop'){
+    while(!gmHit(p.sh, p.x, p.y + 1)) p.y++;
+    gmMerge();
+  }
+  _gtap('sel');
+  gmPaint();
+}
+
+function gmLoop(ts){
+  _gmRaf = requestAnimationFrame(gmLoop);
+  if(!GM || GM.over) return;
+  if(!GM.last) GM.last = ts;
+  if(ts - GM.last >= GM.speed){
+    GM.last = ts;
+    if(!gmHit(GM.p.sh, GM.p.x, GM.p.y + 1)) GM.p.y++;
+    else gmMerge();
+  }
+  gmPaint();
+}
+
+function gmPaint(){
+  const c = document.getElementById('gmC');
+  if(!c || !_gmCell || !GM) return;
+  const g = c.getContext('2d'), s = _gmCell;
+  g.clearRect(0, 0, GM_W * s, GM_H * s);
+  // Сетка поля — чуть заметная: без неё пустое поле выглядит как заливка.
+  g.strokeStyle = 'rgba(255,255,255,.04)'; g.lineWidth = 1;
+  for(let x = 1; x < GM_W; x++){ g.beginPath(); g.moveTo(x*s, 0); g.lineTo(x*s, GM_H*s); g.stroke(); }
+  for(let y = 1; y < GM_H; y++){ g.beginPath(); g.moveTo(0, y*s); g.lineTo(GM_W*s, y*s); g.stroke(); }
+  const cell = (x, y, ci) => {
+    g.fillStyle = GM_COLORS[ci - 1] || '#5ad1ff';
+    g.fillRect(x*s + 1, y*s + 1, s - 2, s - 2);
+    g.fillStyle = 'rgba(255,255,255,.22)';
+    g.fillRect(x*s + 1, y*s + 1, s - 2, Math.max(2, s * .18));
+  };
+  GM.grid.forEach((row, y) => row.forEach((v, x) => { if(v) cell(x, y, v); }));
+  if(GM.p && !GM.over){
+    // Тень падения: видно, куда встанет фигура. Есть в любой современной
+    // падалке, и её отсутствие бросается в глаза быстрее всего.
+    let gy = GM.p.y;
+    while(!gmHit(GM.p.sh, GM.p.x, gy + 1)) gy++;
+    g.fillStyle = 'rgba(255,255,255,.09)';
+    GM.p.sh.forEach((row, r) => row.forEach((v, k) => {
+      if(v) g.fillRect((GM.p.x+k)*s + 1, (gy+r)*s + 1, s - 2, s - 2);
+    }));
+    GM.p.sh.forEach((row, r) => row.forEach((v, k) => {
+      if(v && GM.p.y + r >= 0) cell(GM.p.x + k, GM.p.y + r, GM.p.c);
+    }));
+  }
+}
+
+// Штора опущена ещё до первой отрисовки: если так вышло, что панель открыли
+// заново, никто не должен успеть увидеть её содержимое.
+if(HIDE) paintHide();
+
 function _setText(id, txt){ const el = document.getElementById(id); if(el) el.textContent = txt; }
 // ── Date helpers ──────────────────────────────────────────────────────────
 // Server timestamps are UTC ISO — some carry an offset (+00:00), some don't.
@@ -13587,7 +14168,7 @@ applyFinanceLive('today');
   const POLL_MS = 15000;
 
   async function _pollFinance(){
-    if(document.hidden) return;
+    if(document.hidden || HIDE) return;
     if(DAY_OFFSET) return;   // browsing a past day — don't repaint it with live data
     const p = document.querySelector('#periodPicker button.on')?.dataset?.p || 'today';
     delete FINANCE_CACHE[p];
@@ -13702,7 +14283,7 @@ function renderHours(h){
   <div class="stk-top">
     <div class="stk-top-r">
       <button class="stk-x" onclick="stkBack()" aria-label="Назад" id="stkBackBtn"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-      <div class="stk-ttl">
+      <div class="stk-ttl" onclick="hidTap()">
         <div class="stk-ttl-t" id="stkTitle">Пересчёт</div>
         <div class="stk-ttl-s" id="stkSub">—</div>
       </div>
@@ -13746,7 +14327,7 @@ function renderHours(h){
   <div class="stk-top">
     <div class="stk-top-r">
       <button class="stk-x" onclick="accBack()" aria-label="Назад"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
-      <div class="stk-ttl">
+      <div class="stk-ttl" onclick="hidTap()">
         <div class="stk-ttl-t" id="accTitle">Раздел</div>
         <div class="stk-ttl-s" id="accSub">—</div>
       </div>

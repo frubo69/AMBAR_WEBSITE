@@ -827,11 +827,9 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .chk-big:active{transform:scale(.99)}
 .chk-big:hover{border-color:rgba(201,169,110,.3)}
 /* Место под закреплённую строку, чтобы последняя группа не пряталась. */
-/* Отступ под закреплённой панелью: ровно её высота плюс воздух, не больше.
-   Лишние двадцать пикселей делали страницу на двадцать пикселей длиннее
-   экрана — она начинала прокручиваться на пустом месте, и верхний ряд плиток
-   уезжал под полосу периода. */
-#pg-money{padding-bottom:calc(74px + var(--safe-bottom))}
+/* Панели внизу больше нет — и отступа под неё тоже. Он делал страницу длиннее
+   экрана, она прокручивалась на пустом месте, и верхний ряд плиток уезжал под
+   полосу периода. */
 .chk-qr{width:46px;height:46px;flex:none;border-radius:14px;display:grid;place-items:center;
   color:var(--gold2);background:linear-gradient(135deg,rgba(201,169,110,.16),rgba(201,169,110,.05));
   border:1px solid rgba(201,169,110,.28)}
@@ -866,6 +864,47 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .acc-3 .acc-cell:nth-child(3) .acc-t{margin-top:13px;font-size:13.5px}
 .acc-3 .acc-cell:nth-child(3) .acc-n{margin-top:7px;padding-top:0;justify-content:center}
 .acc-3 .acc-cell:nth-child(3) .acc-s{margin-top:4px;min-height:0}
+
+/* ── Путь закупки: полоса шагов ─────────────────────────────────────────
+   Четыре точки на линии. Пройденное приглушено, текущее золотом, будущее
+   тускло — ни одной цифры: числа живут ниже, а здесь только «мы сейчас где». */
+.proc{display:flex;align-items:flex-start;margin:0 0 14px;padding:0 2px}
+.proc-s{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;
+  position:relative;min-width:0}
+.proc-s i{width:11px;height:11px;border-radius:50%;background:var(--card3);
+  border:1px solid var(--border3);z-index:1}
+/* Линия между точками — часть шага, а не отдельный элемент: так она не
+   разъезжается при любой ширине экрана. */
+.proc-s::before{content:'';position:absolute;top:5px;right:50%;left:-50%;height:1px;
+  background:var(--border2)}
+.proc-s:first-child::before{display:none}
+.proc-s b{font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
+  color:var(--dim);text-align:center;line-height:1.2}
+.proc-s.done i{background:var(--gold);border-color:var(--gold)}
+.proc-s.done b{color:var(--muted)}
+.proc-s.done::before{background:rgba(201,169,110,.5)}
+.proc-s.now i{background:var(--gold2);border-color:var(--gold2);
+  box-shadow:0 0 0 4px var(--gold-soft)}
+.proc-s.now b{color:var(--gold2)}
+.proc-s.now::before{background:rgba(201,169,110,.5)}
+
+/* Мост между половинами пути: ответ магазина пришёл — вот он, и вот вход. */
+.proc-c{display:block;width:100%;margin:0 0 14px;padding:13px 14px;border-radius:15px;
+  cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
+  background:linear-gradient(180deg,rgba(201,169,110,.09),rgba(201,169,110,.03));
+  border:1px solid rgba(201,169,110,.32)}
+.proc-c:active{transform:scale(.995)}
+.proc-c-h{display:flex;align-items:center;gap:8px;margin-bottom:9px}
+.proc-c-t{flex:1;min-width:0;font-size:10px;font-weight:700;letter-spacing:1.3px;
+  text-transform:uppercase;color:var(--gold2)}
+.proc-c-go{flex:0 0 auto;display:flex;align-items:center;color:var(--gold2)}
+.proc-c-b{display:flex;align-items:baseline;gap:10px}
+.proc-c-v{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;
+  line-height:1;color:var(--gold3);font-variant-numeric:tabular-nums}
+.proc-c-v u{text-decoration:none;font-size:15px;color:var(--muted)}
+.proc-c-s{flex:1;min-width:0;font-size:11.5px;color:var(--muted);text-align:right}
+.proc-c-gap{display:block;margin-top:10px;padding-top:9px;font-size:11.5px;
+  color:var(--dn);border-top:1px solid var(--border2)}
 
 /* ── Поставка ───────────────────────────────────────────────────────────── */
 /* Три числа в ряд: просили → подтвердили → приняли. Разницу между ними никто
@@ -1035,6 +1074,10 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .crw-cancel:active{border-color:var(--gold2);color:var(--gold2)}
 /* Подвал сохранения и вопрос на выходе. */
 .crw-save{display:flex;gap:8px}
+/* Второй шаг под первым: во всю ширину и тише — он следующий по времени, а не
+   по важности. */
+.qb-wide{width:100%;color:var(--sub)!important}
+.qb-second{padding-top:0!important;margin-top:-4px}
 .qb-ghost{background:var(--card2)!important;border:1px solid var(--border2)!important;
   color:var(--sub)!important;box-shadow:none!important;flex:0 0 40%}
 .crw-ask{left:50%!important;top:50%!important;transform:translate(-50%,-50%);
@@ -1077,9 +1120,11 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .crw-p:active{transform:scale(.96);border-color:var(--gold2)}
 .crw-p.moved{background:var(--gold-soft);border-color:rgba(201,169,110,.5)}
 .crw-p-a{width:26px;height:26px;flex:0 0 auto;border-radius:50%;display:flex;
-  align-items:center;justify-content:center;font-size:10px;font-weight:800;
-  color:var(--gold2);background:var(--card3)}
+  align-items:center;justify-content:center;color:var(--gold2);background:var(--card3)}
+.crw-op-n{display:flex;align-items:center;gap:6px}
+.crw-op-n svg{opacity:.75}
 .crw-p.moved .crw-p-a{color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.crw-p.moved .crw-p-a svg{stroke-width:2}
 /* Откуда пришёл — единственная подпись на экране: обычное состояние молчит. */
 .crw-p-f{font-size:10px;font-weight:700;color:var(--gold2);letter-spacing:.3px}
 .crw-none{font-size:12px;color:var(--muted);padding:4px 2px}
@@ -1089,6 +1134,13 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .crew-entry{display:flex;align-items:center;gap:11px;width:100%;margin:8px 0 10px;padding:14px 13px;
   border-radius:13px;cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
   background:var(--card);border:1px solid var(--border2)}
+/* На странице районов кнопка встала на место карточки выручки и так же
+   прилипает под переключателем периода: перестановкой людей занимаются, глядя
+   на список, а не пролистав его до конца. Фон непрозрачный — под кнопкой
+   проезжают карточки. */
+.crew-entry.pinned{position:sticky;top:calc(var(--hero-top,124px) - 4px);z-index:30;
+  margin:0 0 14px;padding:15px 14px;border-radius:15px;background:var(--card);
+  box-shadow:0 6px 18px rgba(0,0,0,.45)}
 .crew-entry:active{background:var(--card2)}
 .crew-entry > svg{flex:0 0 auto;opacity:.55}
 .crew-e-b{flex:1;min-width:0}
@@ -1964,28 +2016,11 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   </div>
   <div class="range-chip" id="rangeChip-officePeriod" style="display:none"><span class="rc-icon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span><span class="rc-text"></span><button class="rc-x" onclick="clearRange('officePeriod')">✕</button></div>
 
-  <!-- Выручка дня — сразу в том виде, в каком она остаётся на «Обзоре» после
-       прокрутки: число и стрелки на одном уровне. Здесь она такой и рождается,
-       разворачивать нечего — на странице районов нужен не разбор выручки, а
-       ориентир, от которого читаются пять карточек. Прилипает под
-       переключателем периода, чтобы листать дни с любого места списка.
-       Вход в пересчёт склада переехал отсюда в «Учёт»: это ежедневное
-       действие, но не то, ради чего открывают районы. -->
-  <div class="ohero" id="offHero" data-detail="kpi:revenue">
-    <span class="hero-amt mono" id="offHeroRev" data-aed="">—</span><span class="hero-unit cur-unit">AED</span>
-    <span class="day-nav" id="offHeroNav">
-      <button class="dn-b" aria-label="Предыдущий день"
-        onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayStep(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
-      <button class="dn-d" id="odnDate" disabled aria-label="Дата дня"
-        onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayReset()"><span class="dn-num" id="odnDateNum">—</span><span class="dn-rel" id="odnDateTxt"></span></button>
-      <button class="dn-b" id="odnNext" aria-label="Следующий день" disabled
-        onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayStep(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
-    </span>
-  </div>
-
-  <!-- Итог по всем районам: без него карточки — просто пять чисел, не с чем
-       сравнить и не видно, складываются ли они в то, что на «Обзоре». -->
-  <button class="crew-entry" id="crewEntry" onclick="crewOpen()">
+  <!-- Выручку дня отсюда убрали: на странице районов её и так видно пятью
+       карточками, а сверху нужнее то, ради чего сюда заходят между делом, —
+       перестановка людей. Прилипает под переключателем периода, чтобы быть
+       под рукой с любого места списка. -->
+  <button class="crew-entry pinned" id="crewEntry" onclick="crewOpen()">
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
          stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
       <circle cx="8" cy="7" r="3"/><path d="M2.5 20v-1.5A4.5 4.5 0 0 1 7 14h2"/>
@@ -4788,7 +4823,7 @@ function daySwipe(hero){
   hero.addEventListener('touchcancel', ()=>{ live = false; settle(); }, {passive:true});
 }
 daySwipe(document.querySelector('#pg-overview .hero'));
-daySwipe(document.getElementById('offHero'));
+// Карточки выручки на районах больше нет — свайпать нечего.
 
 // Тот же жест на карточках районов: смахнул вправо — предыдущий день. Палец
 // тянет всю колонку разом, а не одну карточку: день у района не свой, он общий,
@@ -6054,8 +6089,6 @@ const ACC = [
    ico:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>'},
   {id:'order',    t:'Заявка на закупку', s:'сколько довезти до нормы',
    ico:'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/>'},
-  {id:'supply',   t:'Поставка',          s:'ответ магазина и приёмка',
-   ico:'<path d="M3 9h18M6 3h12l3 6v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V9z"/><path d="M9 13h6"/>'},
   {id:'qr',       t:'Внести товар',      s:'сканируем коды с бутылок',
    ico:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/>'},
   {id:'check',    t:'Проверка бутылки',  s:'что везёт водитель',
@@ -6063,6 +6096,22 @@ const ACC = [
 ];
 let ACC_PERIOD = null, ACC_STOCK = null, ACC_ORDER = null, ACC_VIEW = null,
     ACC_PROMO = null, ACC_GIFT = null, ACC_QR = null, ACC_CHK = null, ACC_SUP = null;
+
+// Заявка и поставка — один процесс, и подпись плитки говорит, на каком он шаге.
+// Пока ответа магазина нет, вопрос один: сколько довезти. Как только он пришёл,
+// важно другое: кто везёт и сколько уже принято.
+function ordTileSub(){
+  const sup = ACC_SUP && ACC_SUP.open;
+  if(sup){
+    const took = Object.values(sup.tasks || {}).reduce((a, t) => a + (t.scanned || 0), 0);
+    const free = Object.values(sup.tasks || {}).filter(t => !t.driver && !t.done_at).length;
+    if(took) return `принято ${fmt(took)} из ${fmt(sup.total_qty)}`;
+    return free ? `${free} ${pluralize(free,'район','района','районов')} никто не взял`
+                : 'водители забрали задачи';
+  }
+  if(!ACC_ORDER) return 'сколько довезти до нормы';
+  return ACC_ORDER.total_qty ? `на ${fmt(ACC_ORDER.total_aed)} AED` : 'остатков хватает';
+}
 
 function accRender(){
   const box = document.getElementById('accHome'); if(!box) return;
@@ -6082,10 +6131,7 @@ function accRender(){
                 ? `не хватает ${fmt(ACC_STOCK.short_aed)} AED`
                 : (ACC_STOCK.done === ACC_STOCK.total ? 'всё сошлось' : 'остатки за смену'))
               : 'остатки, ревизия, перемещения',
-    order:    ACC_ORDER  ? (ACC_ORDER.total_qty
-                ? `на ${fmt(ACC_ORDER.total_aed)} AED`
-                : 'остатков хватает')
-              : 'сколько довезти до нормы',
+    order:    ordTileSub(),
     // Показы без денег ничего не значат, поэтому подпись — про выручку.
     qr:       ACC_QR     ? (ACC_QR.totals.total
                 ? `${ACC_QR.by_product.length} ${pluralize(ACC_QR.by_product.length,
@@ -6105,8 +6151,13 @@ function accRender(){
     expenses: [t ? fmt(t.all) : null, 'AED сегодня'],
     stock:    [ACC_STOCK ? `${ACC_STOCK.done}/${ACC_STOCK.total}` : null,
                ACC_STOCK ? pluralize(ACC_STOCK.total,'район','района','районов') : 'районов'],
-    order:    [ACC_ORDER ? fmt(ACC_ORDER.total_qty) : null,
-               ACC_ORDER ? pluralize(ACC_ORDER.total_qty,'штука','штуки','штук') : 'штук'],
+    order:    (() => {
+      const sup = ACC_SUP && ACC_SUP.open;
+      if(sup) return [fmt(sup.total_qty),
+                      pluralize(sup.total_qty,'бутылка','бутылки','бутылок')];
+      return [ACC_ORDER ? fmt(ACC_ORDER.total_qty) : null,
+              ACC_ORDER ? pluralize(ACC_ORDER.total_qty,'штука','штуки','штук') : 'штук'];
+    })(),
     qr:       [ACC_QR    ? fmt(ACC_QR.totals.active) : null,
                ACC_QR ? pluralize(ACC_QR.totals.active,'бутылка','бутылки','бутылок') : 'бутылок'],
     supply:   [ACC_SUP ? (ACC_SUP.open ? fmt(ACC_SUP.open.total_qty) : '—') : null,
@@ -6142,25 +6193,7 @@ function accRender(){
   // целиком: одинокая половинка читается как незаполненная ячейка.
   box.innerHTML = `
     <div class="acc-group">${pick(['expenses','order'])}</div>
-    <div class="acc-group acc-3">${pick(['stock','supply','check'])}</div>` + `
-    <!-- Внесение товара закреплено внизу: это то, ради чего сюда заходят стоя
-         у полки, и оно не должно уезжать вместе со списком. -->
-    <div class="chk-dock"><button class="chk-big" onclick="accOpen('qr')">
-      <span class="chk-qr">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"
-             stroke-linecap="round" stroke-linejoin="round">
-          <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
-          <rect x="3" y="14" width="7" height="7" rx="1.5"/>
-          <path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/>
-        </svg>
-      </span>
-      <span class="chk-big-b">
-        <b>Внести товар</b>
-        <i id="chkBigSub">сканируем коды с бутылок</i>
-      </span>
-      <span class="chk-big-go"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span>
-    </button></div>`;
-  qrBigSub();
+    <div class="acc-group acc-3">${pick(['stock','qr','check'])}</div>`;
 }
 
 // Подпись плитки проверок: сколько за месяц и есть ли флажки.
@@ -6172,17 +6205,6 @@ function chkSub(c){
        + (flag ? ` · ${flag} с флажком` : '');
 }
 
-// Подпись на закреплённой панели: что уже в реестре.
-function qrBigSub(){
-  const el = document.getElementById('chkBigSub'); if(!el) return;
-  if(!ACC_QR){ el.textContent = 'сканируем коды с бутылок'; return; }
-  const t = ACC_QR.totals || {};
-  el.textContent = t.total
-    ? `${fmt(t.active)} ${pluralize(t.active,'бутылка','бутылки','бутылок')} в реестре · ${
-        (ACC_QR.by_product || []).length} ${pluralize((ACC_QR.by_product||[]).length,
-        'позиция','позиции','позиций')}`
-    : 'ни одной бутылки не записано';
-}
 
 // Реклама и акции стоят на «Ещё» рядом с рассылкой, но открывают те же
 // разделы, что и раньше: переезжает вход, а не сам раздел.
@@ -6471,6 +6493,13 @@ async function accExpPeriod(){
 // и «дай на десять меньше» без указания, где именно меньше, заявкой не станет.
 let ORD = {d:null, open:null, q:'', onlyEdited:false, busy:false};
 
+// Заявка и поставка — не два раздела, а один путь: посчитали, чего не хватает →
+// отправили в магазин → он ответил → водители забрали → приняли на полку.
+// Раньше первая половина пути жила в одной плитке, вторая в другой, и связь
+// между ними надо было держать в голове.
+//
+// Теперь всё в «Заявке», а наверху полоса шагов: она отвечает на единственный
+// вопрос, с которым сюда заходят, — «мы сейчас где».
 async function accOrder(){
   _setText('accTitle', 'Заявка на закупку');
   _setText('accSub', 'загрузка…');
@@ -6482,8 +6511,63 @@ async function accOrder(){
     '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
   ACC_ORDER = d;
   ORD = {d, open:null, q:'', onlyEdited:false, busy:false};
-  _setText('accSub', `${d.day} · норма на ${d.cover_days} ${pluralize(d.cover_days,'день','дня','дней')}`);
+  _setText('accSub', `${_dayName(d.day)} · норма на ${d.cover_days} ${pluralize(d.cover_days,'день','дня','дней')}`);
+  // Поставку спрашиваем здесь же: без неё непонятно, на каком мы шаге.
+  if(!ACC_SUP){
+    try{
+      const r = await ownerApi.ownerFetch('/api/owner/supply');
+      ACC_SUP = {list: r.supplies || [],
+                 open: (r.supplies || []).find(x => x.status === 'open') || null};
+    }catch(e){ ACC_SUP = {list: [], open: null}; }
+  }
   ordRender();
+}
+
+// Полоса шагов. Пройденное — приглушённо, текущее — золотом, будущее — тускло.
+// Ни одной цифры: числа живут в блоках под ней, а здесь только «где мы».
+const PROC_STEPS = ['Собрали', 'У магазина', 'Везут', 'На полке'];
+
+function procBar(){
+  const sup = ACC_SUP && ACC_SUP.open;
+  const last = ACC_SUP && (ACC_SUP.list || [])[0];
+  let step = 0;                                   // заявка собрана
+  if(sup){
+    const tasks = Object.values(sup.tasks || {});
+    const took = tasks.reduce((a, t) => a + (t.scanned || 0), 0);
+    step = took ? 2 : 1;
+  }else if(last && last.status === 'done'){
+    step = 3;
+  }
+  return `<div class="proc">${PROC_STEPS.map((t, i) => `
+    <span class="proc-s ${i < step ? 'done' : i === step ? 'now' : ''}">
+      <i></i><b>${t}</b>
+    </span>`).join('')}</div>`;
+}
+
+// Карточка перехода к поставке. Она и есть мост между половинами пути: пока
+// ответа магазина нет — приглашение его загрузить, как только пришёл — итог
+// с переходом внутрь.
+function procCard(){
+  const sup = ACC_SUP && ACC_SUP.open;
+  if(!sup) return '';
+  const tasks = Object.values(sup.tasks || {});
+  const took = tasks.reduce((a, t) => a + (t.scanned || 0), 0);
+  const free = tasks.filter(t => !t.driver && !t.done_at).length;
+  const gap = sup.gap_qty || 0;
+  return `<button class="proc-c" onclick="accSupply()">
+    <span class="proc-c-h">
+      <span class="proc-c-t">Магазин ответил</span>
+      <span class="proc-c-go"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+        stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 5l7 7-7 7"/></svg></span>
+    </span>
+    <span class="proc-c-b">
+      <span class="proc-c-v">${fmt(took)}<u> / ${fmt(sup.total_qty)}</u></span>
+      <span class="proc-c-s">${took ? 'принято' : 'подтвердил'}${
+        free ? ` · ${free} ${pluralize(free,'район','района','районов')} никто не взял` : ''}</span>
+    </span>
+    ${gap ? `<span class="proc-c-gap">Не хватает ${fmt(gap)} — забрать в другом месте</span>` : ''}
+  </button>`;
 }
 
 // Строки, которые сейчас показываем. По умолчанию — только то, что надо
@@ -6504,11 +6588,11 @@ function ordRender(){
   const dist = d.districts || [];
   const list = ordList();
   const ed = d.edited_count || 0;
-  document.getElementById('accMid').innerHTML = `
+  document.getElementById('accMid').innerHTML = procBar() + procCard() + `
     <div class="ord-sum">
       <div class="ord-sum-l">
         <span class="ord-sum-v" id="ordQty">${fmt(d.total_qty)}</span>
-        <span class="ord-sum-u">штук<br>довезти</span>
+        <span class="ord-sum-u">штук<br>${(ACC_SUP && ACC_SUP.open) ? 'просили' : 'довезти'}</span>
       </div>
       <div class="ord-sum-r">
         <span>на сумму<b id="ordAed">${fmt(d.total_aed)}</b></span>
@@ -6531,7 +6615,8 @@ function ordRender(){
     </div>
 
     <div class="exp-grp">${ORD.q ? `Найдено · ${list.length}`
-                                 : `Что довезти · ${list.length}`}</div>
+      : ((ACC_SUP && ACC_SUP.open) ? `Что просили · ${list.length}`
+                                   : `Что довезти · ${list.length}`)}</div>
     <div id="ordRows">${list.length ? list.map(r => ordRow(r, dist)).join('')
       : '<div class="exp-empty">' + (ORD.q ? 'Ничего не нашлось'
           : 'Довозить нечего — остатков хватает') + '</div>'}</div>`;
@@ -6557,6 +6642,19 @@ function ordRender(){
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
       </button>
+    </div>
+    <!-- Следующий шаг пути стоит здесь же: отправил файл — вернулся с ответом.
+         Искать эту кнопку в другом разделе было бы странно. -->
+    <div class="qb-wrap qb-second">
+    <button class="qb qb-ghost qb-wide" id="ordUp"
+            onclick="document.getElementById('ordFile').click()">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 16V3M8 7l4-4 4 4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+      Загрузить ответ магазина
+    </button>
+    <input type="file" id="ordFile" accept=".xlsx" style="display:none"
+           onchange="supImport(this,'ordUp')">
     </div>`;
 }
 
@@ -7461,6 +7559,7 @@ function supSub(a){
 }
 
 async function accSupply(){
+  ACC_BACK = accOrder;              // поставка живёт внутри заявки
   _setText('accTitle', 'Поставка');
   _setText('accSub', 'загрузка…');
   let list = ACC_SUP && ACC_SUP.list;
@@ -7619,11 +7718,11 @@ function supFoot(){
     <input type="file" id="supFile" accept=".xlsx" style="display:none" onchange="supImport(this)">`;
 }
 
-async function supImport(inp){
+async function supImport(inp, btnId){
   const f = inp.files && inp.files[0];
   inp.value = '';
   if(!f) return;
-  const b = document.getElementById('supUp');
+  const b = document.getElementById(btnId || 'supUp');
   const html = b.innerHTML; b.disabled = true; b.innerHTML = 'Читаю файл…';
   try{
     const fd = new FormData(); fd.append('file', f, f.name);
@@ -7636,6 +7735,7 @@ async function supImport(inp){
     _toast(`Поставка на ${j.total_qty} бутылок`);
     ACC_SUP = null;
     await supLoad(j.supply_id);
+    ACC_BACK = accOrder;
     try{ ACC_SUP = {list: (await ownerApi.ownerFetch('/api/owner/supply')).supplies || []};
          ACC_SUP.open = ACC_SUP.list.find(x => x.status === 'open') || null; accRender(); }catch(e){}
   }catch(e){
@@ -11042,7 +11142,7 @@ function crewRender(){
       const home = dOf(v.base);
       return `<button class="crw-p${v.moved ? ' moved' : ''}"
                       onclick="crewPickD('${escS(n)}')">
-        <span class="crw-p-a">${escS(n.trim().slice(0,2).toUpperCase())}</span>
+        <span class="crw-p-a">${IC('car', 15)}</span>
         <span class="crw-p-n">${escS(n)}</span>
         ${v.moved ? `<span class="crw-p-f">из ${escS(home.code || '')}</span>` : ''}
       </button>`;
@@ -11052,7 +11152,7 @@ function crewRender(){
         <span class="crew-code">${escS(d.code)}</span>
         <span class="crw-c-n">${escS(d.name)}</span>
         <button class="crw-op${d.moved ? ' moved' : ''}" onclick="crewPick('${d.id}')">
-          <span>${escS(d.operator || '—')}</span>
+          <span class="crw-op-n">${IC('headset', 15)}${escS(d.operator || '—')}</span>
           ${d.moved ? `<i>обычно ${escS(d.base)}</i>` : ''}
         </button>
       </div>

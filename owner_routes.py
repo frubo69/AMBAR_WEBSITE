@@ -883,20 +883,9 @@ async def handle_promo(request):
     оттуда много."""
     chats = {str(c["_id"]): c for c in await db.get_promo_chats()}
     users = await db.get_users_by_via()
-    orders = list((await db.get_all_orders()).values())
-
-    # Заказы раскладываем по клиенту один раз: иначе на каждый канал пришлось бы
-    # проходить весь список заново.
-    by_cust = {}
-    for o in orders:
-        if o.get("status") != "delivered" or o.get("test"):
-            continue
-        cid = o.get("customer_id")
-        if not cid:
-            continue
-        st = by_cust.setdefault(int(cid), {"n": 0, "aed": 0})
-        st["n"] += 1
-        st["aed"] += int(o.get("total") or 0)
+    # Считает база: раньше сюда вычитывались все заказы целиком ради трёх чисел
+    # на клиента — мегабайт по сети и восемь секунд на нашем тарифе.
+    by_cust = await db.spend_by_customer()
 
     def _label(via: str) -> tuple:
         if via.startswith("biz"):
@@ -978,13 +967,53 @@ async def handle_promo(request):
     # Сначала кто принёс деньги, потом кто просто зашёл: в длинном списке
     # платящие иначе теряются среди зевак.
     people.sort(key=lambda p: (-p["aed"], -p["orders"], str(p["at"])), reverse=False)
+
+    posts, replies = await _promo_log(people)
     return web.json_response({
         "sources": out,
         "people": people,
+        "posts": posts,
+        "replies_log": replies,
         "kinds": sorted(kinds.values(), key=lambda k: -k["aed"]),
         "totals": {**tot, "conv": _pct(tot["buyers"], tot["users"])},
         "replies": sum(int(c.get("replies") or 0) for c in chats.values()),
     }, headers=CORS_HEADERS, dumps=lambda o: __import__("json").dumps(o, default=_json_default))
+
+
+async def _promo_log(people: list) -> tuple:
+    """Журнал публикаций и срабатываний, с людьми, привязанными к событию.
+
+    Человека к конкретному событию привязываем по времени: он пришёл по метке
+    этого поста (или из этого чата) и позже него, но раньше следующего такого
+    же. Точнее телеграм не даёт — в ссылке едет только метка канала, — но для
+    вопроса «из какого разговора этот человек» этого достаточно: два ответа в
+    одном чате подряд идут редко, а между ними обычно часы."""
+    rows = await db.promo_log(limit=400)
+    posts = [dict(r) for r in rows if r.get("kind") == "post"]
+    replies = [dict(r) for r in rows if r.get("kind") == "reply"]
+
+    def attach(events, via_of, key_of):
+        # События идут от свежих к старым, поэтому «следующее такое же» — это
+        # предыдущее в списке.
+        until, span = {}, []
+        for e in events:
+            k = key_of(e)
+            span.append((via_of(e), str(e.get("at") or ""), until.get(k, ""), e))
+            until[k] = str(e.get("at") or "")
+            e["people"] = []
+        for p in people:
+            at = str(p.get("at") or "")
+            for via, since, till, e in span:
+                if p["via"] == via and at >= since and (not till or at < till):
+                    e["people"].append(p)
+                    break
+        for e in events:
+            e["users"] = len(e["people"])
+            e["aed"] = sum(x.get("aed") or 0 for x in e["people"])
+
+    attach(posts, lambda e: f"post_{e.get('tag') or 'all'}", lambda e: e.get("tag") or "all")
+    attach(replies, lambda e: f"chat_{e.get('chat_key')}", lambda e: e.get("chat_key"))
+    return posts, replies
 
 
 @require_owner

@@ -1756,6 +1756,56 @@ async def promo_chat_seen(chat_id: int, title: str):
         upsert=True)
 
 
+# ── Журнал рекламы ──────────────────────────────────────────────────────────
+# Счётчик «11 ответов» говорит, что бот сработал, но не говорит ни когда, ни на
+# чей вопрос, ни где это сообщение лежит. А спрашивают всегда именно это:
+# человек пришёл — откуда именно, из какого поста, из какого разговора.
+# Поэтому каждое срабатывание пишется отдельной строкой, со ссылкой на само
+# сообщение там, где телеграм её позволяет собрать.
+async def promo_log_add(doc: dict):
+    db = _db_or_none()
+    if db is None: return
+    doc.setdefault("at", datetime.now(timezone.utc))
+    try:
+        await db.promo_log.insert_one(doc)
+    except Exception as e:
+        log.warning(f"promo_log_add: {e}")
+
+
+async def promo_log(kind: str = "", limit: int = 300) -> list:
+    """Журнал от свежего к старому. kind: 'reply' | 'post' | пусто — всё."""
+    db = _db_or_none()
+    if db is None: return []
+    q = {"kind": kind} if kind else {}
+    rows = await db.promo_log.find(q, {"_id": 0}).sort("at", -1).to_list(length=limit)
+    for r in rows:
+        r["at"] = str(r.get("at") or "")
+    return rows
+
+
+async def spend_by_customer() -> dict:
+    """{telegram_id: {n, aed}} по доставленным заказам.
+
+    Считает база, а не сервер: раньше ради этой сводки вычитывались все заказы
+    целиком — мегабайт по сети и восемь секунд на тарифе, где скорость режется
+    объёмом. Здесь же наружу выходит по три числа на клиента."""
+    db = _db_or_none()
+    if db is None: return {}
+    cur = db.orders.aggregate([
+        {"$match": {"status": "delivered", "test": {"$ne": True},
+                    "customer_id": {"$nin": [None, 0]}}},
+        {"$group": {"_id": "$customer_id", "n": {"$sum": 1},
+                    "aed": {"$sum": {"$ifNull": ["$total", 0]}}}},
+    ])
+    out = {}
+    for d in await cur.to_list(length=5000):
+        try:
+            out[int(d["_id"])] = {"n": int(d["n"]), "aed": int(d["aed"] or 0)}
+        except (TypeError, ValueError):
+            continue
+    return out
+
+
 async def get_promo_chats() -> list:
     db = _db_or_none()
     if db is None: return []

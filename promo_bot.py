@@ -18,7 +18,8 @@ from telegram import (Update, InlineKeyboardButton, InlineKeyboardMarkup,
                       InlineQueryResultsButton)
 from telegram.constants import ChatMemberStatus
 from telegram.ext import (Application, CommandHandler, MessageHandler,
-                          InlineQueryHandler, ContextTypes, filters)
+                          InlineQueryHandler, ChosenInlineResultHandler,
+                          ContextTypes, filters)
 import config_promo as promo
 import db
 
@@ -81,7 +82,7 @@ async def on_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
 
     lang = _lang(msg.text)
     try:
-        await msg.reply_photo(
+        sent = await msg.reply_photo(
             photo=f"{PUBLIC_ORIGIN}/{promo.IMG[lang]}",
             caption=promo.TEXT[lang],
             parse_mode="HTML",
@@ -97,6 +98,20 @@ async def on_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     _last_chat[cid], _last_user[uid] = now, now
     title = msg.chat.title or str(cid)
     _stats[cid] = (title, _stats.get(cid, (title, 0))[1] + 1)
+    # Строка в журнал: когда, где, на чей вопрос и — главное — ссылка на само
+    # сообщение. Владелец спрашивает не «сколько раз сработало», а «покажи, из
+    # какого разговора пришёл этот человек».
+    try:
+        await db.promo_log_add({
+            "kind": "reply", "chat_id": cid, "chat_key": abs(cid),
+            "title": title, "username": msg.chat.username or "",
+            "msg_id": sent.message_id, "ask_id": msg.message_id,
+            "ask_text": (msg.text or "")[:200],
+            "ask_by": uid, "ask_name": (msg.from_user.full_name or "").strip(),
+            "ask_user": msg.from_user.username or "",
+            "lang": lang, "link": _msg_link(msg.chat, sent.message_id)})
+    except Exception as e:
+        log.warning(f"[promo] журнал ответа: {e}")
     # В ссылке едет abs(id) — под тем же ключом чат ложится в реестр, иначе в
     # отчёте вместо названия будет голое число.
     try:
@@ -104,6 +119,21 @@ async def on_message(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         log.warning(f"[promo] реестр чатов: {e}")
     log.info(f"[promo] {title} · {uid} · «{msg.text[:60]}»")
+
+
+def _msg_link(chat, mid: int) -> str:
+    """Ссылка на сообщение в чате.
+
+    У публичного чата она открывается у кого угодно, у закрытой супергруппы —
+    только у того, кто в ней состоит. Владелец в них состоит: он их сам и
+    находил. Где ссылку собрать нельзя (обычная группа без id вида -100),
+    отдаём пусто — лучше без ссылки, чем битая."""
+    if getattr(chat, "username", ""):
+        return f"https://t.me/{chat.username}/{mid}"
+    cid = str(getattr(chat, "id", ""))
+    if cid.startswith("-100"):
+        return f"https://t.me/c/{cid[4:]}/{mid}"
+    return ""
 
 
 async def _photo_id(ctx, path: str):
@@ -209,6 +239,35 @@ async def on_inline(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     log.info(f"[promo] пост {uid} · метка «{tag}» · карточек {len(results)}")
 
 
+async def on_chosen(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Карточку выбрали — значит пост опубликован. Пишем это в журнал.
+
+    Что телеграм даёт и чего не даёт. Даёт: момент, метку, язык и того, кто
+    опубликовал. Не даёт ссылки: у инлайн-сообщения нет ни чата, ни номера —
+    только внутренний inline_message_id, из которого ссылку не собрать. Поэтому
+    у постов есть время и метка, но нет перехода к самому посту, и метка —
+    единственный способ отличить одну площадку от другой.
+
+    Приходит это только если в BotFather включена инлайн-обратная связь
+    (/setinlinefeedback → 100%). Пока она выключена, журнал постов пуст, и об
+    этом честно сказано на экране рекламы."""
+    r = update.chosen_inline_result
+    if r is None:
+        return
+    parts = (r.result_id or "").split("_", 2)      # post_<lang>_<tag>
+    lang = parts[1] if len(parts) > 2 else ""
+    tag = parts[2] if len(parts) > 2 else promo.slug(r.query)
+    try:
+        await db.promo_log_add({
+            "kind": "post", "tag": tag, "lang": lang,
+            "by": r.from_user.id, "by_name": (r.from_user.full_name or "").strip(),
+            "by_user": r.from_user.username or "",
+            "inline_id": r.inline_message_id or ""})
+    except Exception as e:
+        log.warning(f"[promo] журнал поста: {e}")
+    log.info(f"[promo] пост опубликован · метка «{tag}» · {lang}")
+
+
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     """Кто-то открыл самого рекламного бота — уводим в основной.
 
@@ -262,6 +321,7 @@ def main():
     app.add_handler(CommandHandler("start", cmd_start, filters=filters.ChatType.PRIVATE))
     app.add_handler(CommandHandler("chats", cmd_chats, filters=filters.ChatType.PRIVATE))
     app.add_handler(InlineQueryHandler(on_inline))
+    app.add_handler(ChosenInlineResultHandler(on_chosen))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, on_message))
     log.info(f"📣 AMBAR Promo Bot started · ведёт в @{MAIN_BOT}")
     app.run_polling(allowed_updates=Update.ALL_TYPES)

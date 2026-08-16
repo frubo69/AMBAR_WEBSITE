@@ -1300,6 +1300,54 @@ button.path:active{transform:scale(.995)}
 .pr-kind-v{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;
   margin-top:3px;font-variant-numeric:tabular-nums}
 .pr-kind-s{font-size:11px;color:var(--muted);margin-top:2px}
+
+/* ── Реклама: журнал ───────────────────────────────────────────────────────
+   Раньше раздел отвечал на один вопрос — сколько принёс канал. А спрашивают
+   другое: из какого поста и из какого разговора пришёл вот этот человек.
+   Поэтому три вкладки: публикации, срабатывания в чатах и люди. */
+.pr-tabs{display:grid;grid-template-columns:repeat(3,1fr);gap:4px;padding:4px;
+  margin:12px 0 10px;border-radius:13px;background:var(--card);border:1px solid var(--border2)}
+.pr-tab{padding:9px 6px;border-radius:10px;border:none;background:none;cursor:pointer;
+  font-family:inherit;font-size:12.5px;font-weight:600;color:var(--muted)}
+.pr-tab.on{background:var(--card2);color:var(--text);box-shadow:0 1px 6px rgba(0,0,0,.3)}
+.pr-tab i{font-style:normal;font-size:11px;color:var(--muted);margin-left:4px}
+.pr-tab.on i{color:var(--gold2)}
+/* Событие журнала: сверху что и когда, ниже — на чей вопрос, снизу — кто
+   пришёл. Раскрывается по нажатию: свёрнутых событий в списке десятки. */
+.pr-ev{margin-bottom:6px;border-radius:12px;background:var(--card);
+  border:1px solid var(--border2);overflow:hidden}
+.pr-ev.open{border-color:var(--border3)}
+.pr-ev-h{display:block;width:100%;padding:11px 13px;text-align:left;cursor:pointer;
+  font-family:inherit;color:var(--text);background:none;border:none}
+.pr-ev-t{display:flex;align-items:baseline;gap:10px}
+.pr-ev-n{flex:1;min-width:0;font-size:13.5px;font-weight:600;line-height:1.3;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pr-ev-v{flex-shrink:0;font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700;
+  font-variant-numeric:tabular-nums;color:var(--gold2)}
+.pr-ev-v.zero{color:var(--muted);font-weight:600}
+.pr-ev-s{font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.35}
+/* Сам вопрос, на который бот ответил, — цитатой: это чужие слова, и по ним
+   владелец сразу понимает, тот ли это разговор. */
+.pr-ev-q{margin-top:7px;padding:7px 10px;border-left:2px solid var(--border3);
+  border-radius:0 8px 8px 0;background:var(--bg3);font-size:12px;line-height:1.4;
+  color:var(--sub)}
+.pr-ev-b{padding:0 13px 11px}
+.pr-ev-go{display:flex;align-items:center;justify-content:center;gap:7px;width:100%;
+  margin-top:8px;padding:10px;border-radius:10px;cursor:pointer;font-family:inherit;
+  font-size:12.5px;font-weight:600;color:var(--gold2);background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.28)}
+.pr-ev-go:active{background:rgba(201,169,110,.16)}
+.pr-who{display:flex;align-items:baseline;gap:9px;padding:8px 0;
+  border-top:1px solid var(--border2);font-size:12.5px}
+.pr-who-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pr-who-n i{font-style:normal;color:var(--muted)}
+.pr-who-v{flex-shrink:0;font-family:'DM Sans',sans-serif;font-weight:700;
+  font-variant-numeric:tabular-nums}
+.pr-who-v.zero{color:var(--dim);font-weight:500}
+.pr-note{padding:11px 13px;margin-bottom:8px;border-radius:12px;font-size:11.5px;
+  line-height:1.45;color:var(--muted);background:var(--card);
+  border:1px solid var(--border2)}
+.pr-note b{color:var(--gold2);font-weight:600}
 .qr-form{display:flex;gap:8px;margin-bottom:4px}
 .qr-inp{flex:1;margin-bottom:0}
 .qr-btn{flex-shrink:0;padding:0 20px;border-radius:12px;border:none;cursor:pointer;
@@ -8575,6 +8623,8 @@ async function accGift(){
 // ─── Реклама ────────────────────────────────────────────────────────────────
 // Раздел отвечает на один вопрос: за что мы платим. Поэтому строка канала
 // показывает не показы, а путь до денег — пришло, заказали, сколько принесли.
+let PR = {tab:'posts', open:null};
+
 async function accPromo(){
   _setText('accTitle', 'Реклама');
   _setText('accSub', 'загрузка…');
@@ -8583,11 +8633,42 @@ async function accPromo(){
   catch(e){ document.getElementById('accMid').innerHTML =
     '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
   ACC_PROMO = d;
+  PR.open = null;
   const t = d.totals;
   _setText('accSub', t.users
     ? `${t.users} ${pluralize(t.users,'пришёл','пришло','пришло')} · ${t.conv}% дошли до заказа`
     : (d.replies ? `${d.replies} ${pluralize(d.replies,'ответ','ответа','ответов')}, никто не пришёл`
                  : 'бот ещё нигде не отвечал'));
+  prRender();
+}
+
+function prTab(id){
+  PR.tab = id; PR.open = null;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  prRender();
+}
+
+function prOpen(k){
+  PR.open = PR.open === k ? null : k;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  prRender();
+}
+
+// Переход к самому сообщению. Ссылка телеграмная, и открывать её надо не
+// браузером, а телеграмом — иначе он покажет страницу-заглушку вместо чата.
+function prGo(url){
+  if(!url) return;
+  try{ Telegram.WebApp.openTelegramLink(url); }
+  catch(e){ try{ window.open(url, '_blank'); }catch(e2){} }
+}
+
+function prRender(){
+  const d = ACC_PROMO; if(!d) return;
+  const t = d.totals;
+  const posts = d.posts || [], reps = d.replies_log || [], people = d.people || [];
+  const body = PR.tab === 'posts' ? prPosts(posts)
+             : PR.tab === 'chats' ? prChats(reps)
+             : prPeople(people, posts, reps);
   document.getElementById('accMid').innerHTML = `
     <div class="exp-sum">
       <div class="exp-tot">
@@ -8600,38 +8681,144 @@ async function accPromo(){
         </span>
       </div>
     </div>
-    ${(d.kinds || []).length > 1 ? `<div class="pr-kinds">` + d.kinds.map(k => `
-      <div class="pr-kind">
-        <div class="pr-kind-t">${escS(k.kind)}</div>
-        <div class="pr-kind-v">${k.share_aed}<i style="font-size:11px;font-weight:500">%</i></div>
-        <div class="pr-kind-s">${fmt(k.aed)} AED · конверсия ${k.conv}%</div>
-      </div>`).join('') + `</div>` : ''}
-    ${(d.people||[]).length ? `<div class="exp-grp">Кто пришёл · ${d.people.length}</div>` +
-      d.people.map(p => `<div class="pr-line" data-detail="customer:${p.telegram_id}">
-        <div class="pr-line-t">
-          <span class="pr-line-n">${escS(p.name)}${p.username
-            ? ` <i style="font-style:normal;color:var(--muted);font-weight:500">@${escS(p.username)}</i>` : ''}</span>
-          <span class="pr-line-v" style="${p.aed ? '' : 'color:var(--muted)'}">${
-            p.aed ? fmt(p.aed) + ' AED' : '—'}</span>
-        </div>
-        <div class="pr-line-s">${escS(p.source)} · ${p.orders
-          ? `${p.orders} ${pluralize(p.orders,'заказ','заказа','заказов')}` : 'без заказов'}</div>
-      </div>`).join('') : ''}
-    ${d.sources.length ? `<div class="exp-grp">Каналы · ${d.sources.length}</div>` +
-      d.sources.map(r => `<div class="pr-line">
-        <div class="pr-line-t">
-          <span class="pr-line-n">${escS(r.name)}</span>
-          <span class="pr-line-v" style="${r.aed ? '' : 'color:var(--muted)'}">${
-            r.aed ? fmt(r.aed) + ' AED' : '—'}</span>
-        </div>
-        <div class="pr-line-s">${r.users
-          ? `${r.users} ${pluralize(r.users,'пришёл','пришло','пришло')} · заказали ${
-              r.conv}%${r.avg ? ` · чек ${fmt(r.avg)}` : ''}${escS(r.note ? ' · ' + r.note : '')}`
-          : escS(r.note || 'пока никого')}</div>
-        ${r.aed ? `<div class="pr-line-bar"><i style="width:${Math.max(2, r.share_aed)}%"></i></div>
-          <div class="pr-line-s">${r.share_aed}% всей выручки с рекламы</div>` : ''}
-      </div>`).join('')
-    : '<div class="exp-empty">Каналов пока нет. Добавьте @ambarpr_bot администратором в чаты.</div>'}`;
+    <div class="pr-tabs">
+      <button class="pr-tab${PR.tab==='posts'?' on':''}" onclick="prTab('posts')">
+        Посты<i>${posts.length}</i></button>
+      <button class="pr-tab${PR.tab==='chats'?' on':''}" onclick="prTab('chats')">
+        Автоответы<i>${reps.length}</i></button>
+      <button class="pr-tab${PR.tab==='people'?' on':''}" onclick="prTab('people')">
+        Кто пришёл<i>${people.length}</i></button>
+    </div>
+    ${body}`;
+}
+
+// Строка «кто пришёл» внутри события: имя, откуда и сколько принёс.
+function prWho(list){
+  return (list || []).map(p => `<div class="pr-who" data-detail="customer:${p.telegram_id}">
+    <span class="pr-who-n">${escS(p.name)}${p.username
+      ? ` <i>@${escS(p.username)}</i>` : ''}</span>
+    <span class="pr-who-v${p.aed ? '' : ' zero'}">${p.aed ? fmt(p.aed) + ' AED' : '—'}</span>
+  </div>`).join('');
+}
+
+// Итог по площадкам — тот же, что был, но теперь внутри своей вкладки: у
+// постов свои площадки, у чатов свои, и сравнивать их между собой смысла нет.
+function prSources(kinds){
+  const rows = (ACC_PROMO.sources || []).filter(r => kinds.includes(r.kind));
+  if(!rows.length) return '';
+  return `<div class="exp-grp">Площадки · ${rows.length}</div>` + rows.map(r => `
+    <div class="pr-line">
+      <div class="pr-line-t">
+        <span class="pr-line-n">${escS(r.name)}</span>
+        <span class="pr-line-v" style="${r.aed ? '' : 'color:var(--muted)'}">${
+          r.aed ? fmt(r.aed) + ' AED' : '—'}</span>
+      </div>
+      <div class="pr-line-s">${r.users
+        ? `${r.users} ${pluralize(r.users,'пришёл','пришло','пришло')} · заказали ${
+            r.conv}%${r.avg ? ` · чек ${fmt(r.avg)}` : ''}${escS(r.note ? ' · ' + r.note : '')}`
+        : escS(r.note || 'пока никого')}</div>
+      ${r.aed ? `<div class="pr-line-bar"><i style="width:${Math.max(2, r.share_aed)}%"></i></div>
+        <div class="pr-line-s">${r.share_aed}% всей выручки с рекламы</div>` : ''}
+    </div>`).join('');
+}
+
+// ── публикации постов ──────────────────────────────────────────────────────
+// Пост уходит инлайном, и телеграм не отдаёт ни чата, ни номера сообщения —
+// только внутренний идентификатор, из которого ссылку не собрать. Поэтому
+// здесь время, метка и язык: по ним пост находится в своей ленте за секунду,
+// а метка — единственное, что отличает одну площадку от другой.
+function prPosts(rows){
+  const head = prSources(['посты']);
+  if(!rows.length) return head + `<div class="pr-note">
+    Журнал публикаций пуст. Телеграм присылает отметку о публикации, только если
+    у рекламного бота включена инлайн-обратная связь: <b>@BotFather →
+    /setinlinefeedback → @ambarpr_bot → 100%</b>. После этого каждый пост будет
+    записан здесь — со временем, меткой площадки и тем, кто его опубликовал.
+    </div>`;
+  return head + `<div class="exp-grp">Публикации · ${rows.length}</div>` + rows.map((e, i) => {
+    const k = 'p' + i, open = PR.open === k;
+    return `<div class="pr-ev${open?' open':''}">
+      <button class="pr-ev-h" onclick="prOpen('${k}')">
+        <span class="pr-ev-t">
+          <span class="pr-ev-n">Пост · метка «${escS(e.tag || 'all')}»</span>
+          <span class="pr-ev-v${e.aed?'':' zero'}">${e.aed ? fmt(e.aed)+' AED' : '—'}</span>
+        </span>
+        <span class="pr-ev-s">${fmtWhen(e.at)}${e.lang ? ' · ' + escS(e.lang.toUpperCase()) : ''}${
+          e.by_name ? ' · опубликовал ' + escS(e.by_name) : ''} · пришло ${e.users}</span>
+      </button>
+      ${open ? `<div class="pr-ev-b">${e.users ? prWho(e.people)
+        : '<div class="pr-ev-s">По этой публикации пока никто не пришёл</div>'}</div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ── срабатывания в чатах ───────────────────────────────────────────────────
+// Здесь ссылка есть: ответ бота лежит в конкретном чате под конкретным
+// номером. По ней открывается тот самый разговор — с вопросом человека и
+// нашим ответом под ним.
+function prChats(rows){
+  const head = prSources(['автоответы']);
+  if(!rows.length) return head + `<div class="pr-note">
+    Срабатываний пока не записано. Счётчик ответов у чатов есть, но он появился
+    раньше журнала — каждое новое срабатывание попадёт сюда целиком: чат, время,
+    сам вопрос и переход к сообщению.</div>`;
+  return head + `<div class="exp-grp">Срабатывания · ${rows.length}</div>` + rows.map((e, i) => {
+    const k = 'c' + i, open = PR.open === k;
+    return `<div class="pr-ev${open?' open':''}">
+      <button class="pr-ev-h" onclick="prOpen('${k}')">
+        <span class="pr-ev-t">
+          <span class="pr-ev-n">${escS(e.title || ('Чат ' + e.chat_key))}</span>
+          <span class="pr-ev-v${e.aed?'':' zero'}">${e.aed ? fmt(e.aed)+' AED' : '—'}</span>
+        </span>
+        <span class="pr-ev-s">${fmtWhen(e.at)} · спросил ${escS(e.ask_name || 'кто-то')}${
+          e.ask_user ? ' @' + escS(e.ask_user) : ''} · пришло ${e.users}</span>
+      </button>
+      ${open ? `<div class="pr-ev-b">
+        ${e.ask_text ? `<div class="pr-ev-q">${escS(e.ask_text)}</div>` : ''}
+        ${e.link ? `<button class="pr-ev-go" onclick="prGo('${escS(e.link)}')">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+            <path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
+          Открыть это сообщение</button>`
+        : `<div class="pr-ev-s" style="margin-top:8px">Ссылку на сообщение телеграм
+           для этого чата не даёт — это обычная группа, а не супергруппа.</div>`}
+        ${e.users ? prWho(e.people) : ''}
+      </div>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// ── кто пришёл ─────────────────────────────────────────────────────────────
+// Список людей с переходом к тому самому событию: у чатовых — прямо к
+// сообщению, у постовых — к его публикации.
+function prPeople(people, posts, reps){
+  const tail = prSources(['прочее', 'приветствие']);
+  if(!people.length) return '<div class="exp-empty">Пока никто не пришёл</div>' + tail;
+  const evOf = p => {
+    const list = p.via.startsWith('chat_') ? reps : posts;
+    return list.find(e => (e.people || []).some(x => x.telegram_id === p.telegram_id));
+  };
+  return people.map(p => {
+    const e = evOf(p) || {};
+    return `<div class="pr-line">
+      <div class="pr-line-t" data-detail="customer:${p.telegram_id}">
+        <span class="pr-line-n">${escS(p.name)}${p.username
+          ? ` <i style="font-style:normal;color:var(--muted);font-weight:500">@${escS(p.username)}</i>` : ''}</span>
+        <span class="pr-line-v" style="${p.aed ? '' : 'color:var(--muted)'}">${
+          p.aed ? fmt(p.aed) + ' AED' : '—'}</span>
+      </div>
+      <div class="pr-line-s">${escS(p.source)} · ${p.orders
+        ? `${p.orders} ${pluralize(p.orders,'заказ','заказа','заказов')}` : 'без заказов'}${
+        e.at ? ' · ' + fmtWhen(p.at) : ''}</div>
+      ${e.link ? `<button class="pr-ev-go" onclick="prGo('${escS(e.link)}')">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
+          <path d="M15 3h6v6"/><path d="M10 14L21 3"/></svg>
+        Разговор, из которого он пришёл</button>` : ''}
+    </div>`;
+  }).join('') + tail;
 }
 
 // ─── Расходы водителей ──────────────────────────────────────────────────────

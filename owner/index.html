@@ -125,7 +125,8 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 }
 
 /* Page */
-.page{padding:calc(76px + var(--safe-top)) 14px 20px;display:none;animation:fadeIn .3s var(--e1)}
+.page{--pad:14px;padding:calc(76px + var(--safe-top)) var(--pad) 20px;
+  display:none;animation:fadeIn .3s var(--e1)}
 #pg-overview,#pg-money,#pg-offices{padding-top:calc(122px + var(--safe-top))}
 .page.active{display:block}
 @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
@@ -865,50 +866,57 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .acc-3 .acc-cell:nth-child(3) .acc-n{margin-top:7px;padding-top:0;justify-content:center}
 .acc-3 .acc-cell:nth-child(3) .acc-s{margin-top:4px;min-height:0}
 
-/* ── Путь закупки: полоса шагов ─────────────────────────────────────────
-   Четыре точки на линии. Пройденное приглушено, текущее золотом, будущее
-   тускло — ни одной цифры: числа живут ниже, а здесь только «мы сейчас где». */
-.proc{display:flex;align-items:flex-start;margin:0 0 14px;padding:0 2px}
-.proc-s{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;
+/* ── Путь закупки ───────────────────────────────────────────────────────
+   Один блок вместо трёх. Три шага в ряд, под каждым его число: сколько
+   попросили, сколько дал магазин, сколько приняли на складе. Так весь путь
+   читается слева направо за один взгляд, а разрыв между «просили» и «дали»
+   виден сам, без единого пояснения. Пока идёт приёмка, блок ещё и кнопка:
+   ведёт внутрь поставки, к водителям и строкам. */
+.path{display:block;width:100%;margin:0 0 12px;padding:14px 12px 11px;border-radius:16px;
+  text-align:left;font-family:inherit;color:var(--text);
+  background:linear-gradient(160deg,rgba(201,169,110,.07),transparent 62%),var(--card);
+  border:1px solid var(--border2)}
+button.path{cursor:pointer}
+button.path{border-color:rgba(201,169,110,.3)}
+button.path:active{transform:scale(.995)}
+.path-r{display:flex;align-items:flex-start}
+.path-s{flex:1;display:flex;flex-direction:column;align-items:center;gap:7px;
   position:relative;min-width:0}
-.proc-s i{width:11px;height:11px;border-radius:50%;background:var(--card3);
-  border:1px solid var(--border3);z-index:1}
 /* Линия между точками — часть шага, а не отдельный элемент: так она не
    разъезжается при любой ширине экрана. */
-.proc-s::before{content:'';position:absolute;top:5px;right:50%;left:-50%;height:1px;
+.path-s::before{content:'';position:absolute;top:5px;right:50%;left:-50%;height:1px;
   background:var(--border2)}
-.proc-s:first-child::before{display:none}
-.proc-s b{font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
+.path-s:first-child::before{display:none}
+.path-s i{width:11px;height:11px;border-radius:50%;background:var(--card3);
+  border:1px solid var(--border3);z-index:1}
+.path-s b{font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
   color:var(--dim);text-align:center;line-height:1.2}
-.proc-s.done i{background:var(--gold);border-color:var(--gold)}
-.proc-s.done b{color:var(--muted)}
-.proc-s.done::before{background:rgba(201,169,110,.5)}
-.proc-s.now i{background:var(--gold2);border-color:var(--gold2);
+.path-s u{text-decoration:none;font-family:'Space Grotesk',sans-serif;font-size:21px;
+  font-weight:700;line-height:1;letter-spacing:-.5px;color:var(--dim);
+  font-variant-numeric:tabular-nums}
+.path-s.done i{background:var(--gold);border-color:var(--gold)}
+.path-s.done::before{background:rgba(201,169,110,.5)}
+.path-s.done b{color:var(--muted)}
+.path-s.done u{color:var(--text)}
+.path-s.now i{background:var(--gold2);border-color:var(--gold2);
   box-shadow:0 0 0 4px var(--gold-soft)}
-.proc-s.now b{color:var(--gold2)}
-.proc-s.now::before{background:rgba(201,169,110,.5)}
-
-/* Мост между половинами пути: ответ магазина пришёл — вот он, и вот вход. */
-.proc-c{display:block;width:100%;margin:0 0 14px;padding:13px 14px;border-radius:15px;
-  cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
-  background:linear-gradient(180deg,rgba(201,169,110,.09),rgba(201,169,110,.03));
-  border:1px solid rgba(201,169,110,.32)}
-.proc-c:active{transform:scale(.995)}
-.proc-c-h{display:flex;align-items:center;gap:8px;margin-bottom:9px}
-.proc-c-t{flex:1;min-width:0;font-size:10px;font-weight:700;letter-spacing:1.3px;
-  text-transform:uppercase;color:var(--gold2)}
-.proc-c-go{flex:0 0 auto;display:flex;align-items:center;color:var(--gold2)}
-.proc-c-b{display:flex;align-items:baseline;gap:10px}
-.proc-c-v{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;
-  line-height:1;color:var(--gold3);font-variant-numeric:tabular-nums}
-.proc-c-v u{text-decoration:none;font-size:15px;color:var(--muted)}
-.proc-c-s{flex:1;min-width:0;font-size:11.5px;color:var(--muted);text-align:right}
-.proc-c-gap{display:block;margin-top:10px;padding-top:9px;font-size:11.5px;
+.path-s.now::before{background:rgba(201,169,110,.5)}
+.path-s.now b{color:var(--gold2)}
+.path-s.now u{color:var(--gold2)}
+.path-f{display:flex;align-items:center;gap:10px;margin-top:13px;padding-top:10px;
+  border-top:1px solid var(--border2);font-size:11.5px;color:var(--muted)}
+.path-f b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
+.path-go{margin-left:auto;display:flex;align-items:center;gap:3px;flex-shrink:0;
+  font-size:11.5px;font-weight:600;color:var(--gold2)}
+.path-gap{display:block;margin-top:12px;padding-top:10px;font-size:11.5px;
   color:var(--dn);border-top:1px solid var(--border2)}
+/* Черта в блоке одна: она отделяет путь от того, что про него сказано. Две
+   подряд разрезали бы карточку на три полосы. */
+.path-gap + .path-f{margin-top:9px;padding-top:0;border-top:0}
 
 /* ── Поставка ───────────────────────────────────────────────────────────── */
-/* Три числа в ряд: просили → подтвердили → приняли. Разницу между ними никто
-   не должен считать в уме, поэтому они стоят рядом, а не на разных экранах. */
+/* Те же три числа, что и в заявке, в том же порядке: экран поставки —
+   продолжение пути, а не отдельная таблица. */
 .sup-sum{display:grid;grid-template-columns:repeat(3,1fr);margin-bottom:12px;
   border-radius:15px;overflow:hidden;background:var(--card);border:1px solid var(--border2)}
 .sup-sum-c{padding:13px 12px;text-align:center}
@@ -999,22 +1007,12 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    Список, в котором каждое число можно переспорить. Свёрнутая строка отвечает
    «что и сколько», раскрытая — «сколько и куда»: правят именно точку, потому
    что развозить по точкам. */
-.ord-sum{display:flex;align-items:center;gap:14px;padding:16px 18px;border-radius:16px;
-  background:linear-gradient(160deg,rgba(201,169,110,.07),transparent 60%),var(--card);
-  border:1px solid var(--border2)}
-.ord-sum-l{display:flex;align-items:baseline;gap:9px;min-width:0}
-.ord-sum-v{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;
-  letter-spacing:-.8px;color:var(--gold2);font-variant-numeric:tabular-nums}
-.ord-sum-u{font-size:10px;font-weight:600;letter-spacing:.6px;text-transform:uppercase;
-  color:var(--muted);line-height:1.25}
-.ord-sum-r{margin-left:auto;display:flex;flex-direction:column;gap:4px;text-align:right}
-.ord-sum-r span{font-size:10px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
-.ord-sum-r b{display:block;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;
-  color:var(--text);letter-spacing:-.2px;font-variant-numeric:tabular-nums;margin-top:1px}
 .ord-edited{display:flex;align-items:center;gap:8px;width:100%;margin-top:8px;padding:9px 13px;
   border-radius:11px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11.5px;font-weight:600;
   color:var(--gold2);background:rgba(201,169,110,.09);border:1px solid rgba(201,169,110,.24)}
 .ord-edited i{margin-left:auto;font-style:normal;color:var(--muted);font-size:11px}
+.ord-hint{padding:2px 2px 0;font-size:11.5px;line-height:1.4;color:var(--muted)}
+.ord-hint b{color:var(--gold2);font-weight:600}
 
 .ord-find{position:relative;display:flex;align-items:center;margin:12px 0 4px}
 .ord-find svg{position:absolute;left:12px;width:15px;height:15px;fill:none;stroke:var(--muted);
@@ -1137,10 +1135,14 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* На странице районов кнопка встала на место карточки выручки и так же
    прилипает под переключателем периода: перестановкой людей занимаются, глядя
    на список, а не пролистав его до конца. Фон непрозрачный — под кнопкой
-   проезжают карточки. */
+   проезжают карточки.
+   Во всю ширину и без верхних скруглений: прилипшая кнопка — не карточка в
+   колонке, а продолжение шапки. Так она и шире под палец, и сразу видно, что
+   она держится сверху, а не едет вместе со списком. */
 .crew-entry.pinned{position:sticky;top:calc(var(--hero-top,124px) - 4px);z-index:30;
-  margin:0 0 14px;padding:15px 14px;border-radius:15px;background:var(--card);
-  box-shadow:0 6px 18px rgba(0,0,0,.45)}
+  width:calc(100% + var(--pad) * 2);margin:0 calc(var(--pad) * -1) 14px;padding:15px calc(var(--pad) + 1px);
+  border-radius:0 0 16px 16px;border-top:0;border-left:0;border-right:0;
+  background:var(--card);box-shadow:0 8px 20px rgba(0,0,0,.5)}
 .crew-entry:active{background:var(--card2)}
 .crew-entry > svg{flex:0 0 auto;opacity:.55}
 .crew-e-b{flex:1;min-width:0}
@@ -3666,7 +3668,7 @@ button.pill:active{opacity:.6}
    во всю ширину, иначе на светлой части экрана были бы видны швы. */
 @media (min-width:760px){
   :root{ --wide:1000px; }
-  .page{max-width:var(--wide);margin:0 auto;padding-left:20px;padding-right:20px}
+  .page{--pad:20px;max-width:var(--wide);margin:0 auto}
   /* Внутренний отступ вместо обёртки: разметку не трогаем, а содержимое
      фиксированных панелей встаёт по той же сетке, что и страница. */
   .hdr,.period-bar,.tabbar{
@@ -6523,51 +6525,57 @@ async function accOrder(){
   ordRender();
 }
 
-// Полоса шагов. Пройденное — приглушённо, текущее — золотом, будущее — тускло.
-// Ни одной цифры: числа живут в блоках под ней, а здесь только «где мы».
-const PROC_STEPS = ['Собрали', 'У магазина', 'Везут', 'На полке'];
+// Путь закупки одним блоком: три шага и число под каждым.
+//
+// Шагов ровно столько, сколько в жизни: мы просим — магазин даёт — водитель
+// привозит и мы принимаем. Числа под шагами — из одного и того же товара,
+// поэтому их можно честно сравнивать глазами: 464 → 96 → 61 рассказывает всю
+// историю поставки без единого слова.
+//
+// Пока приёмка идёт, блок ещё и вход в поставку: следующий экран — не
+// «другой раздел», а этот же путь вблизи.
+const PATH_STEPS = ['Заявка', 'Магазин дал', 'Приняли'];
 
-function procBar(){
-  const sup = ACC_SUP && ACC_SUP.open;
-  const last = ACC_SUP && (ACC_SUP.list || [])[0];
-  let step = 0;                                   // заявка собрана
-  if(sup){
-    const tasks = Object.values(sup.tasks || {});
-    const took = tasks.reduce((a, t) => a + (t.scanned || 0), 0);
-    step = took ? 2 : 1;
-  }else if(last && last.status === 'done'){
-    step = 3;
-  }
-  return `<div class="proc">${PROC_STEPS.map((t, i) => `
-    <span class="proc-s ${i < step ? 'done' : i === step ? 'now' : ''}">
-      <i></i><b>${t}</b>
-    </span>`).join('')}</div>`;
-}
-
-// Карточка перехода к поставке. Она и есть мост между половинами пути: пока
-// ответа магазина нет — приглашение его загрузить, как только пришёл — итог
-// с переходом внутрь.
-function procCard(){
-  const sup = ACC_SUP && ACC_SUP.open;
-  if(!sup) return '';
-  const tasks = Object.values(sup.tasks || {});
-  const took = tasks.reduce((a, t) => a + (t.scanned || 0), 0);
-  const free = tasks.filter(t => !t.driver && !t.done_at).length;
-  const gap = sup.gap_qty || 0;
-  return `<button class="proc-c" onclick="accSupply()">
-    <span class="proc-c-h">
-      <span class="proc-c-t">Магазин ответил</span>
-      <span class="proc-c-go"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
-        stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M9 5l7 7-7 7"/></svg></span>
-    </span>
-    <span class="proc-c-b">
-      <span class="proc-c-v">${fmt(took)}<u> / ${fmt(sup.total_qty)}</u></span>
-      <span class="proc-c-s">${took ? 'принято' : 'подтвердил'}${
-        free ? ` · ${free} ${pluralize(free,'район','района','районов')} никто не взял` : ''}</span>
-    </span>
-    ${gap ? `<span class="proc-c-gap">Не хватает ${fmt(gap)} — забрать в другом месте</span>` : ''}
-  </button>`;
+function pathCard(){
+  const d = ORD.d || {};
+  const list = (ACC_SUP && ACC_SUP.list) || [];
+  const sup = (ACC_SUP && ACC_SUP.open) || list[0] || null;
+  const took = sup ? Object.values(sup.tasks || {})
+                           .reduce((a, t) => a + (t.scanned || 0), 0) : 0;
+  // Шаг, на котором стоим: без ответа магазина ждём его, с ответом идёт
+  // приёмка, закрытая поставка — путь пройден целиком.
+  const step = !sup ? 1 : (sup.status === 'open' ? 2 : 3);
+  const vals = [
+    // Пока поставки нет, «заявка» — это сегодняшний расчёт. Как только она
+    // появилась, показываем то, что просили на самом деле: расчёт с тех пор
+    // уменьшился ровно на принятое, и сравнивать его с ответом магазина
+    // значило бы сравнивать разные вещи.
+    fmt(sup ? (sup.asked_qty || 0) : (d.total_qty || 0)),
+    sup ? fmt(sup.total_qty || 0) : '—',
+    sup ? fmt(took) : '—',
+  ];
+  const free = sup ? Object.values(sup.tasks || {})
+                           .filter(t => !t.driver && !t.done_at).length : 0;
+  const gap = sup && sup.status === 'open' ? (sup.gap_qty || 0) : 0;
+  const inner = `
+    <span class="path-r">${PATH_STEPS.map((t, i) => `
+      <span class="path-s ${i < step ? 'done' : i === step ? 'now' : ''}">
+        <i></i><b>${t}</b><u>${vals[i]}</u>
+      </span>`).join('')}</span>
+    ${gap ? `<span class="path-gap">Магазин не дал ${fmt(gap)} ${
+        pluralize(gap,'бутылку','бутылки','бутылок')} — добрать в другом месте</span>` : ''}
+    <span class="path-f">
+      <span>${(d.rows||[]).length} ${pluralize((d.rows||[]).length,'позиция','позиции','позиций')}
+        · <b>${fmt(d.total_aed)}</b> AED</span>
+      ${sup ? `<span class="path-go">${
+        free ? `${free} ${pluralize(free,'район','района','районов')} без водителя`
+             : (sup.status === 'open' ? 'Поставка' : 'Принято')}
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M9 5l7 7-7 7"/></svg></span>` : ''}
+    </span>`;
+  return sup ? `<button class="path" onclick="accSupply()">${inner}</button>`
+             : `<div class="path">${inner}</div>`;
 }
 
 // Строки, которые сейчас показываем. По умолчанию — только то, что надо
@@ -6588,35 +6596,22 @@ function ordRender(){
   const dist = d.districts || [];
   const list = ordList();
   const ed = d.edited_count || 0;
-  document.getElementById('accMid').innerHTML = procBar() + procCard() + `
-    <div class="ord-sum">
-      <div class="ord-sum-l">
-        <span class="ord-sum-v" id="ordQty">${fmt(d.total_qty)}</span>
-        <span class="ord-sum-u">штук<br>${(ACC_SUP && ACC_SUP.open) ? 'просили' : 'довезти'}</span>
-      </div>
-      <div class="ord-sum-r">
-        <span>на сумму<b id="ordAed">${fmt(d.total_aed)}</b></span>
-        <span>позиций<b id="ordCnt">${(d.rows||[]).length}</b></span>
-      </div>
-    </div>
+  document.getElementById('accMid').innerHTML = pathCard() + `
     ${ed ? `<button class="ord-edited" onclick="ordToggleEdited()">
         ${ORD.onlyEdited ? 'показать всё' : `правок вручную · ${ed}`}
         <i>${ORD.onlyEdited ? '' : 'смотреть'}</i></button>` : ''}
-    ${d.frozen_aed ? `<div class="stk-note" style="margin-top:10px">
-      <b>${fmt(d.frozen_aed)} AED стоят на полке сверх спроса.</b> Норма где-то выше,
-      чем реально берут за последние ${d.window_days} дней — эти деньги просто лежат.
-      </div>` : ''}
+    ${d.frozen_aed ? `<div class="ord-hint">Норма выше спроса — на полке лишнего
+      на <b>${fmt(d.frozen_aed)} AED</b></div>` : ''}
 
     <div class="ord-find">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-      <input id="ordQ" type="search" placeholder="Найти позицию — можно любую из каталога"
+      <input id="ordQ" type="search" placeholder="Поиск"
              value="${escS(ORD.q)}" oninput="ordSearch(this.value)">
       ${ORD.q ? `<button class="ord-find-x" onclick="ordSearch('')" aria-label="Очистить">✕</button>` : ''}
     </div>
 
     <div class="exp-grp">${ORD.q ? `Найдено · ${list.length}`
-      : ((ACC_SUP && ACC_SUP.open) ? `Что просили · ${list.length}`
-                                   : `Что довезти · ${list.length}`)}</div>
+                                  : `Что довезти · ${list.length}`}</div>
     <div id="ordRows">${list.length ? list.map(r => ordRow(r, dist)).join('')
       : '<div class="exp-empty">' + (ORD.q ? 'Ничего не нашлось'
           : 'Довозить нечего — остатков хватает') + '</div>'}</div>`;
@@ -6634,7 +6629,7 @@ function ordRender(){
         <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 3v13M8 7l4-4 4 4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
-        Поделиться
+        Отправить в магазин
       </button>
       <button class="qb qb-ico" id="ordSend" onclick="ordSend()"
               aria-label="Прислать файл в чат с ботом" title="В телеграм">
@@ -6649,8 +6644,9 @@ function ordRender(){
     <button class="qb qb-ghost qb-wide" id="ordUp"
             onclick="document.getElementById('ordFile').click()">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
-           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M12 16V3M8 7l4-4 4 4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+           stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
+        <path d="M14 3v5h5"/><path d="M12 11v6M9.5 14.5L12 17l2.5-2.5"/></svg>
       Загрузить ответ магазина
     </button>
     <input type="file" id="ordFile" accept=".xlsx" style="display:none"

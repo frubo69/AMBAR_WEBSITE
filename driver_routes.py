@@ -291,7 +291,10 @@ async def handle_history(request):
              ).replace(hour=SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
     end = datetime.strptime(today, "%Y-%m-%d").replace(hour=SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
     f = lambda x: x.astimezone(timezone.utc).isoformat().replace("+00:00", "")
-    orders = await db.get_orders_in_range(f(start), f(end))
+    # История берётся за месяц и больше. С предельными пятьюстами заказами по
+    # всем районам ранние дни просто исчезали бы из его истории — а водитель
+    # смотрит её как раз затем, чтобы сверить свои деньги за период.
+    orders = await db.get_orders_in_range(f(start), f(end), limit=None)
     mine = [o for o in orders
             if (o.get("driver") or "").strip() == me["name"] and o.get("status") == "delivered"]
 

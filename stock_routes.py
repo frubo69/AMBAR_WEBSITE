@@ -42,7 +42,6 @@ log = logging.getLogger("stock")
 DUBAI_TZ = timezone(timedelta(hours=4))
 SHIFT_START_HOUR = 12       # рабочие сутки 12:00 → 12:00, как во всей системе
 NORM_COVER_DAYS = 3         # на сколько дней запаса рассчитана норма по умолчанию
-NORM_WINDOW_DAYS = 14       # по какому окну продаж её считать
 STALE_DAYS = 7              # через сколько дней позицию пора проверить заново
 HISTORY_DEPTH = 45          # сколько пересчётов смотреть назад в поисках проверки
 
@@ -190,22 +189,154 @@ def _price(p: dict) -> int:
     return int(p.get("price_full") or p.get("price") or 0)
 
 
-# ── норма ────────────────────────────────────────────────────────────────────
-async def _suggested_norms(district: str, day: str) -> dict:
-    """{product_id: норма} по фактическим продажам района.
+# ══ норма ═══════════════════════════════════════════════════════════════════
+# Раньше норма была плоским средним за две недели: сложили продажи, поделили на
+# четырнадцать, умножили на три дня запаса. Такое среднее врёт дважды.
+#
+# Первое: пятница и вторник в этом деле — разные дни, а среднее размазывает их
+# в одно число. Заказывая по нему, к выходным не хватает, а к среде лишнее
+# стоит на полке.
+#
+# Второе: две позиции с одинаковым средним, но разным разбросом требуют разного
+# запаса. Та, что уходит ровно по две в день, и та, что то ноль, то восемь, —
+# это разный риск остаться без товара, и одинаковая норма для них неправильна.
+#
+# Поэтому здесь три вещи:
+#   • ожидаемый спрос считается по дням недели, на которые придётся запас;
+#   • сверху кладётся страховой запас, пропорциональный разбросу;
+#   • у ходовых позиций запас больше, у редких — нет вовсе: держать подушку по
+#     бутылке, которую берут раз в месяц, значит замораживать деньги.
+NORM_HIST_DAYS = 56          # восемь недель: восемь наблюдений каждого дня недели
+NORM_DOW_MIN = 3             # меньше трёх наблюдений — дню недели не верим
+NORM_DOW_CLAMP = (0.55, 2.2) # правдоподобные границы: остальное — выброс
+# Насколько глубоко страхуемся от разброса. Ходовое — почти наверняка, среднее —
+# обычно, редкое — не страхуем вовсе.
+NORM_Z = {"top": 1.28, "mid": 0.84, "tail": 0.0}
+NORM_TOP_SHARE = 0.7         # позиции, дающие 70% штук, считаем ходовыми
+NORM_MID_SHARE = 0.95
 
-    Норма = средние продажи в день × запас на NORM_COVER_DAYS, округлённые
-    вверх. В таблице норма проставлена руками и годами не менялась — здесь она
-    всегда отражает то, как реально берут именно в этом районе.
-    """
-    start_day = (datetime.strptime(day, "%Y-%m-%d") - timedelta(days=NORM_WINDOW_DAYS - 1)
-                 ).strftime("%Y-%m-%d")
-    sold = await _sold(start_day, district, days=NORM_WINDOW_DAYS)
-    out = {}
-    for pid, total in sold.items():
-        per_day = total / NORM_WINDOW_DAYS
-        out[pid] = max(1, -(-int(per_day * NORM_COVER_DAYS * 100) // 100))  # ceil
+_DEMAND = {"key": None, "at": 0.0, "data": None}
+
+
+async def _demand(day: str, days: int = NORM_HIST_DAYS) -> dict:
+    """Продажи по дням: {район: {позиция: [шт в день 0..N-1]}} + дни недели.
+
+    Читаем заказы один раз на все районы и держим пять минут: заявка спрашивает
+    норму по каждому из пяти районов, и пять одинаковых выборок за восемь
+    недель — это ровно тот способ, которым база и укладывается."""
+    import time as _t
+    key = f"{day}:{days}"
+    if _DEMAND["key"] == key and _t.time() - _DEMAND["at"] < 300:
+        return _DEMAND["data"]
+
+    # Окно заканчивается вчерашним днём: сегодняшний ещё идёт, и его неполные
+    # продажи занизили бы среднее ровно в тот момент, когда собирают заявку.
+    last = datetime.strptime(day, "%Y-%m-%d")
+    first = last - timedelta(days=days)
+    start, end = _day_bounds(first.strftime("%Y-%m-%d"), days)
+    # Без предела и с проекцией: обрезка отрезала бы старые дни окна, и норма
+    # просела бы там, где продажи как раз есть. Из заказа нужны четыре поля —
+    # остальное по сети не тащим.
+    orders = await db.get_orders_in_range(start, end, limit=None,
+                                          fields=["timestamp", "office_id",
+                                                  "status", "items"])
+    cat = _catalog()
+
+    idx = {}                      # 'YYYY-MM-DD' → номер дня в окне
+    wd = []
+    for i in range(days):
+        d = first + timedelta(days=i)
+        idx[d.strftime("%Y-%m-%d")] = i
+        wd.append(d.weekday())
+
+    per = {}
+    for o in orders:
+        if o.get("status") != "delivered":
+            continue
+        try:
+            ts = datetime.fromisoformat(str(o.get("timestamp") or "")).replace(
+                tzinfo=timezone.utc).astimezone(DUBAI_TZ)
+        except (ValueError, TypeError):
+            continue
+        i = idx.get(_biz_day(ts))
+        if i is None:
+            continue
+        dist = o.get("office_id") or ""
+        for it in (o.get("items") or []):
+            pid, q = it.get("id"), _qty(it)
+            if not pid or not q:
+                continue
+            row = per.setdefault(dist, {}).setdefault(pid, [0.0] * days)
+            row[i] += q / _unit(cat.get(pid) or {})
+
+    data = {"days": days, "wd": wd, "per": per}
+    _DEMAND.update(key=key, at=_t.time(), data=data)
+    return data
+
+
+def _class_of(rows: dict) -> dict:
+    """Ходовое, среднее или редкое — по доле в штуках района.
+
+    Классы нужны затем, что страховой запас стоит денег: по ходовым он окупается
+    сорванным заказом, по редким — просто лежит."""
+    tot = {pid: sum(v) for pid, v in rows.items()}
+    order = sorted(tot.items(), key=lambda x: -x[1])
+    total = sum(tot.values()) or 1
+    out, acc = {}, 0.0
+    for pid, v in order:
+        # Класс определяет доля, накопленная ДО этой позиции: та, что пересекает
+        # границу, ещё принадлежит верхней группе. Иначе две одинаковые по
+        # продажам позиции, случайно оказавшиеся по разные стороны черты,
+        # получили бы разный запас — а разницы между ними нет никакой.
+        out[pid] = "top" if acc < NORM_TOP_SHARE else (
+                   "mid" if acc < NORM_MID_SHARE else "tail")
+        acc += v / total
     return out
+
+
+async def _suggested_norms(district: str, day: str) -> dict:
+    """{позиция: норма} по продажам района."""
+    d = await _demand(day)
+    rows = (d["per"].get(district) or {})
+    if not rows:
+        return {}
+    wd, n = d["wd"], d["days"]
+    cls = _class_of(rows)
+
+    # На какие дни недели придётся запас: считаем спрос именно этих дней, а не
+    # усреднённого дня вообще.
+    base_day = datetime.strptime(day, "%Y-%m-%d")
+    cover_wd = [(base_day + timedelta(days=i + 1)).weekday()
+                for i in range(NORM_COVER_DAYS)]
+
+    norms = {}
+    for pid, series in rows.items():
+        total = sum(series)
+        if total <= 0:
+            continue
+        base = total / n
+        # Коэффициент дня недели: во сколько раз этот день отличается от обычного.
+        k = {}
+        for w in range(7):
+            vals = [series[i] for i in range(n) if wd[i] == w]
+            if len(vals) >= NORM_DOW_MIN and base > 0:
+                f = (sum(vals) / len(vals)) / base
+                k[w] = min(NORM_DOW_CLAMP[1], max(NORM_DOW_CLAMP[0], f))
+            else:
+                k[w] = 1.0
+        expect = sum(base * k[w] for w in cover_wd)
+
+        # Разброс считаем по остаткам от предсказания, а не вокруг среднего.
+        # Иначе пятничный всплеск, который мы только что учли коэффициентом,
+        # был бы застрахован второй раз — и позиция с ярким, но предсказуемым
+        # ритмом получила бы запас больше, чем непредсказуемая.
+        res = [series[i] - base * k[wd[i]] for i in range(n)]
+        sigma = (sum(x * x for x in res) / max(1, n - 1)) ** 0.5
+        z = NORM_Z[cls.get(pid, "tail")]
+        safety = z * sigma * (NORM_COVER_DAYS ** 0.5)
+
+        norms[pid] = max(1, -(-int((expect + safety) * 100) // 100))   # ceil
+    return norms
 
 
 # ── лист пересчёта ───────────────────────────────────────────────────────────
@@ -543,7 +674,7 @@ async def order_rows(day: str = "") -> dict:
         "total_qty": total_qty, "total_aed": total_aed,
         "edited_count": sum(1 for r in rows if r["edited"]),
         "frozen_aed": frozen_aed,
-        "cover_days": NORM_COVER_DAYS, "window_days": NORM_WINDOW_DAYS,
+        "cover_days": NORM_COVER_DAYS, "window_days": NORM_HIST_DAYS,
         "rows": [r for r in rows if r["need_total"] > 0],
         # Весь каталог, включая позиции без потребности: в Excel для
         # магазина едут все, чтобы он мог дописать то, чего мы не заказали.

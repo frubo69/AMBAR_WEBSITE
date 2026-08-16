@@ -1998,9 +1998,13 @@ def _write_catalog(catalog: list) -> None:
 async def _aggregate_sales(period: str = "month") -> dict:
     """Return {product_id: {sold, rev}} aggregated over the given period."""
     start, end, _, _ = _period_window(period)
+    # Период тут — до года. С обрезкой на пятистах заказах «продано за год»
+    # означало бы «продано за последние пятьсот заказов», и чем лучше идут
+    # дела, тем короче становился бы год.
     orders = await db.get_orders_in_range(
         start.astimezone(timezone.utc).isoformat().replace("+00:00", ""),
         end.astimezone(timezone.utc).isoformat().replace("+00:00", ""),
+        limit=None, fields=["status", "items"],
     )
     agg = {}
     for o in orders:
@@ -2034,6 +2038,7 @@ async def _sales_by_day(days: int = 7) -> dict:
     orders = await db.get_orders_in_range(
         start.astimezone(timezone.utc).isoformat().replace("+00:00", ""),
         end.astimezone(timezone.utc).isoformat().replace("+00:00", ""),
+        limit=None, fields=["status", "items", "timestamp"],
     )
     out = {}
     for o in orders:

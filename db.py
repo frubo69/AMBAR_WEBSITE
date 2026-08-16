@@ -702,15 +702,28 @@ async def get_active_shift(operator_id: int) -> dict | None:
     )
 
 
-async def get_orders_in_range(start_iso: str, end_iso: str, office_id: str = None) -> list:
-    """Return all orders with timestamp between start and end."""
+async def get_orders_in_range(start_iso: str, end_iso: str, office_id: str = None,
+                              limit: int | None = 500, fields: list = None) -> list:
+    """Заказы за период.
+
+    limit обрезает по убыванию времени, то есть отрезает всегда самое старое.
+    Для суток пятисот хватает с запасом, а на длинных окнах такая обрезка
+    выглядит как «в начале месяца ничего не продавали» — и портит ровно те
+    числа, ради которых длинное окно и берут. Кто просит месяц и больше,
+    передаёт limit=None: пусть лучше запрос будет тяжелее, чем итог неверным.
+
+    fields — проекция: на длинных окнах из заказа нужны четыре поля, а не
+    адреса с перепиской. Меньше байтов по сети — быстрее и дешевле."""
     db = _db_or_none()
     if db is None: return []
     filt = {"timestamp": {"$gte": start_iso, "$lte": end_iso}}
     if office_id:
         filt["office_id"] = office_id
-    cursor = db.orders.find(filt, {"_id": 0}).sort("timestamp", -1)
-    return await cursor.to_list(length=500)
+    proj = {"_id": 0}
+    if fields:
+        proj.update({f: 1 for f in fields})
+    cursor = db.orders.find(filt, proj).sort("timestamp", -1)
+    return await cursor.to_list(length=limit)
 
 
 async def get_unverified_users_with_orders() -> list:

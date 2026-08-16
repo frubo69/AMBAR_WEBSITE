@@ -594,6 +594,7 @@ async def handle_save(request):
             doc["audit_finished_at"] = now_iso
             doc["audit_by"] = request["owner_id"]
     await db.save_stock_count(district, day, doc)
+    base_drop()                      # остатки изменились — заявку считать заново
     log.info(f"[stock] {district} {day}: {len(lines)} позиций, "
              f"недостача {short_qty} шт / {short_aed} AED")
     return web.json_response(
@@ -659,6 +660,48 @@ async def handle_transfers(request):
 
 
 # ── заявка ───────────────────────────────────────────────────────────────────
+_BASE = {"key": None, "at": 0.0, "data": None}
+BASE_TTL = 60          # секунд
+
+
+def base_drop():
+    """Забыть основу заявки: пересчитали склад или приняли товар."""
+    _BASE["key"] = None
+
+
+async def _district_base(day: str) -> dict:
+    """Остатки, приход после пересчёта и норма — по каждому району.
+
+    Это вся тяжесть заявки: пять чтений склада, пять по приходу и расчёт нормы
+    по восьми неделям продаж. От ручных правок ничего из этого не зависит, а
+    правку жмут по одному нажатию на клетку — и раньше каждое такое нажатие
+    пересчитывало всю заявку с нуля. Держим минуту: пересчёт склада и приёмка
+    сбрасывают кэш сами, а больше основе меняться неоткуда."""
+    import time as _t
+    if _BASE["key"] == day and _t.monotonic() - _BASE["at"] < BASE_TTL:
+        return _BASE["data"]
+    out = {}
+    for oid in OFFICE_IDS:
+        cnt = await db.get_last_stock_count(oid, before_day=None)
+        have = {l["id"]: int(l.get("actual") or 0) for l in (cnt or {}).get("lines", [])}
+        # Пересчёт был вчера, ночью водитель принял поставку. Без этой добавки
+        # программа завтра закажет то, что уже стоит на полке, — и так каждый
+        # день, пока кто-нибудь не пересчитает заново.
+        came = {}
+        try:
+            since = _dt_of((cnt or {}).get("counted_at") or "")
+            if since:
+                came = await db.intake_since(oid, since)
+                for pid, n in came.items():
+                    have[pid] = int(have.get(pid) or 0) + int(n)
+        except Exception as e:
+            log.warning(f"[stock] приход после пересчёта не учтён ({oid}): {e}")
+        out[oid] = {"have": have, "sug": await _suggested_norms(oid, day), "came": came,
+                    "counted": (cnt or {}).get("day", "")}
+    _BASE.update(key=day, at=_t.monotonic(), data=out)
+    return out
+
+
 async def order_rows(day: str = "") -> dict:
     """Заявка на закупку: сколько довезти в каждый район, чтобы вернуться к норме.
 
@@ -676,25 +719,7 @@ async def order_rows(day: str = "") -> dict:
     rows, total_aed, total_qty = [], 0, 0
     frozen_aed = 0          # деньги, стоящие на полке сверх реального спроса
 
-    per_district = {}
-    for oid in OFFICE_IDS:
-        cnt = await db.get_last_stock_count(oid, before_day=None)
-        have = {l["id"]: int(l.get("actual") or 0) for l in (cnt or {}).get("lines", [])}
-        # Пересчёт был вчера, ночью водитель принял поставку. Без этой добавки
-        # программа завтра закажет то, что уже стоит на полке, — и так каждый
-        # день, пока кто-нибудь не пересчитает заново.
-        came = {}
-        try:
-            since = _dt_of((cnt or {}).get("counted_at") or "")
-            if since:
-                came = await db.intake_since(oid, since)
-                for pid, n in came.items():
-                    have[pid] = int(have.get(pid) or 0) + int(n)
-        except Exception as e:
-            log.warning(f"[stock] приход после пересчёта не учтён ({oid}): {e}")
-        sug = await _suggested_norms(oid, day)
-        per_district[oid] = {"have": have, "sug": sug, "came": came,
-                             "counted": (cnt or {}).get("day", "")}
+    per_district = await _district_base(day)
 
     for pid, p in cat.items():
         price = _price(p)
@@ -768,6 +793,7 @@ async def handle_set_norm(request):
     if d not in OFFICE_IDS or pid not in _catalog():
         return web.json_response({"error": "bad_args"}, status=400, headers=CORS_HEADERS)
     await db.set_stock_norm(d, pid, norm, request["owner_id"])
+    base_drop()
     return web.json_response({"ok": True, "district": d, "product_id": pid, "norm": norm},
                              headers=CORS_HEADERS)
 

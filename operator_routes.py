@@ -1996,7 +1996,15 @@ def _opt(request):
 # оператор не может отвечать за чужую точку.
 async def _shift_state(day, districts: list, scope: set) -> dict:
     closed = await db.shifts_for_day(day.isoformat())
-    orders = list((await db.get_all_orders()).values())
+    # Читаем окно смены, а не всю историю. Полный список — это мегабайт, и на
+    # нашем тарифе Atlas он идёт восемь секунд: скорость там режется по объёму.
+    # Именно из-за него окно закрытия смены висело — и на открытии, и на каждом
+    # нажатии «Закрыть». Незакрытые заказы orders_from отдаёт любого возраста,
+    # так что заказ, висящий со вчера, из подсчёта не выпадет.
+    since = (datetime(day.year, day.month, day.day, SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
+             - timedelta(hours=1))
+    orders = list((await db.orders_from(
+        since.astimezone(timezone.utc).isoformat().replace("+00:00", ""))).values())
     # Кто из водителей не ответил по обязательным расходам. Оператору это видно
     # здесь, а не только в напоминании от бота: напоминание приходит ему, а
     # сделать он ничего не может, если не знает, кого подтолкнуть.
@@ -2082,8 +2090,11 @@ async def handle_shift_close(request):
         return web.json_response({"error": "not_yours"}, status=403, headers=CORS_HEADERS)
 
     day = _biz_date(datetime.now(DUBAI_TZ))
-    state = await _shift_state(day, districts, {oid})
-    mine = next((x for x in state["districts"] if x["district"] == oid), None)
+    # Состояние считаем один раз на все районы: свой район берём из него же, а
+    # «все ли закрылись» — после того, как отметим себя. Раньше здесь было два
+    # полных подсчёта подряд, и закрытие смены ждало обоих.
+    full = await _shift_state(day, districts, {d["id"] for d in districts})
+    mine = next((x for x in full["districts"] if x["district"] == oid), None)
     if not mine:
         return web.json_response({"error": "unknown_district"}, status=400,
                                  headers=CORS_HEADERS)
@@ -2098,7 +2109,10 @@ async def handle_shift_close(request):
     log.info(f"[pos] смена закрыта: {oid} · {who} · {mine['orders']} заказов · "
              f"{mine['revenue']} AED · висит {mine['open']}")
 
-    full = await _shift_state(day, districts, {d["id"] for d in districts})
+    mine["closed"] = True
+    mine["closed_by"] = who
+    mine["closed_at"] = str(datetime.now(timezone.utc))
+    full["all_closed"] = all(x["closed"] for x in full["districts"])
     if full["all_closed"]:
         # Заявку собирает тот, кто закрылся последним, — и ровно один раз:
         # пометка дня ставится атомарно, второму вернётся False.

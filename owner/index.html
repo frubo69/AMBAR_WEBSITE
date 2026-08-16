@@ -1011,6 +1011,10 @@ button.path:active{transform:scale(.995)}
   border-radius:11px;cursor:pointer;font-family:'DM Sans',sans-serif;font-size:11.5px;font-weight:600;
   color:var(--gold2);background:rgba(201,169,110,.09);border:1px solid rgba(201,169,110,.24)}
 .ord-edited i{margin-left:auto;font-style:normal;color:var(--muted);font-size:11px}
+/* Кнопка возврата расчёта всегда в разметке, но видна только у правленой
+   строки: так правка не заставляет перерисовывать раскрытую строку целиком. */
+.ord-r:not(.fixed) .ord-reset{display:none}
+.ord-edited[hidden]{display:none}
 .ord-hint{padding:2px 2px 0;font-size:11.5px;line-height:1.4;color:var(--muted)}
 .ord-hint b{color:var(--gold2);font-weight:600}
 
@@ -6493,7 +6497,7 @@ async function accExpPeriod(){
 //
 // Правится клетка «позиция × точка», а не итог: развозить всё равно по точкам,
 // и «дай на десять меньше» без указания, где именно меньше, заявкой не станет.
-let ORD = {d:null, open:null, q:'', onlyEdited:false, busy:false};
+let ORD = {d:null, open:null, q:'', onlyEdited:false, busy:false, pend:{}, timer:null};
 
 // Заявка и поставка — не два раздела, а один путь: посчитали, чего не хватает →
 // отправили в магазин → он ответил → водители забрали → приняли на полку.
@@ -6512,7 +6516,7 @@ async function accOrder(){
   catch(e){ document.getElementById('accMid').innerHTML =
     '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
   ACC_ORDER = d;
-  ORD = {d, open:null, q:'', onlyEdited:false, busy:false};
+  ORD = {d, open:null, q:'', onlyEdited:false, busy:false, pend:{}, timer:null};
   _setText('accSub', `${_dayName(d.day)} · норма на ${d.cover_days} ${pluralize(d.cover_days,'день','дня','дней')}`);
   // Поставку спрашиваем здесь же: без неё непонятно, на каком мы шаге.
   if(!ACC_SUP){
@@ -6557,7 +6561,26 @@ function pathCard(){
   const free = sup ? Object.values(sup.tasks || {})
                            .filter(t => !t.driver && !t.done_at).length : 0;
   const gap = sup && sup.status === 'open' ? (sup.gap_qty || 0) : 0;
-  const inner = `
+  return sup ? `<button class="path" onclick="accSupply()">${pathInner()}</button>`
+             : `<div class="path">${pathInner()}</div>`;
+}
+
+function pathInner(){
+  const d = ORD.d || {};
+  const list = (ACC_SUP && ACC_SUP.list) || [];
+  const sup = (ACC_SUP && ACC_SUP.open) || list[0] || null;
+  const took = sup ? Object.values(sup.tasks || {})
+                           .reduce((a, t) => a + (t.scanned || 0), 0) : 0;
+  const step = !sup ? 1 : (sup.status === 'open' ? 2 : 3);
+  const vals = [
+    fmt(sup ? (sup.asked_qty || 0) : (d.total_qty || 0)),
+    sup ? fmt(sup.total_qty || 0) : '—',
+    sup ? fmt(took) : '—',
+  ];
+  const free = sup ? Object.values(sup.tasks || {})
+                           .filter(t => !t.driver && !t.done_at).length : 0;
+  const gap = sup && sup.status === 'open' ? (sup.gap_qty || 0) : 0;
+  return `
     <span class="path-r">${PATH_STEPS.map((t, i) => `
       <span class="path-s ${i < step ? 'done' : i === step ? 'now' : ''}">
         <i></i><b>${t}</b><u>${vals[i]}</u>
@@ -6574,8 +6597,13 @@ function pathCard(){
              stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M9 5l7 7-7 7"/></svg></span>` : ''}
     </span>`;
-  return sup ? `<button class="path" onclick="accSupply()">${inner}</button>`
-             : `<div class="path">${inner}</div>`;
+}
+
+// Перерисовать только шапку пути: её числа меняются от каждой правки, а список
+// под ней — нет.
+function pathPaint(){
+  const el = document.querySelector('.path');
+  if(el) el.innerHTML = pathInner();
 }
 
 // Строки, которые сейчас показываем. По умолчанию — только то, что надо
@@ -6597,9 +6625,9 @@ function ordRender(){
   const list = ordList();
   const ed = d.edited_count || 0;
   document.getElementById('accMid').innerHTML = pathCard() + `
-    ${ed ? `<button class="ord-edited" onclick="ordToggleEdited()">
-        ${ORD.onlyEdited ? 'показать всё' : `правок вручную · ${ed}`}
-        <i>${ORD.onlyEdited ? '' : 'смотреть'}</i></button>` : ''}
+    <button class="ord-edited" onclick="ordToggleEdited()"${ed ? '' : ' hidden'}>
+      <span>${ORD.onlyEdited ? 'показать всё' : `правок вручную · ${ed}`}</span>
+      <i>${ORD.onlyEdited ? '' : 'смотреть'}</i></button>
     ${d.frozen_aed ? `<div class="ord-hint">Норма выше спроса — на полке лишнего
       на <b>${fmt(d.frozen_aed)} AED</b></div>` : ''}
 
@@ -6668,7 +6696,7 @@ function ordRow(r, dist){
       <span class="ord-r-go">${open ? '⌄' : '›'}</span>
     </button>
     ${open ? `<div class="ord-r-b">
-      ${cells.map(o => `<div class="ord-c">
+      ${cells.map(o => `<div class="ord-c" data-d="${o.x.id}">
         <span class="ord-c-n"><b>${o.x.code}</b> ${escS(o.x.name)}</span>
         <span class="ord-c-calc">${o.c.edited ? `расчёт ${o.c.calc}` : `на полке ${o.c.have||0}`}</span>
         <span class="ord-st">
@@ -6679,8 +6707,8 @@ function ordRow(r, dist){
           <button onclick="ordStep('${r.id}','${o.x.id}',1)" aria-label="Больше">+</button>
         </span>
       </div>`).join('')}
-      ${r.edited ? `<button class="ord-reset" onclick="ordReset('${r.id}')">
-        Вернуть расчёт · ${r.calc_total}</button>` : ''}
+      <button class="ord-reset" onclick="ordReset('${r.id}')">
+        Вернуть расчёт · <b>${r.calc_total}</b></button>
     </div>` : ''}
   </div>`;
 }
@@ -6702,23 +6730,132 @@ function _ordRow(id){ return (ORD.d.all_rows || []).find(r => r.id === id); }
 function ordStep(id, district, delta){
   const r = _ordRow(id); if(!r) return;
   const c = r.cells[district] || {};
-  ordSet(id, district, Math.max(0, (c.need || 0) + delta));
+  ordPut(id, district, Math.max(0, (c.need || 0) + delta));
 }
 
-// Правка уходит на сервер сразу: заявка — не форма с кнопкой «сохранить», её
-// правят по одному числу и в любой момент могут закрыть экран.
-async function ordSet(id, district, qty){
-  if(ORD.busy) return;
-  const v = String(qty).trim();
+function ordSet(id, district, qty){
+  ordPut(id, district, qty);
+  ordFlush();                       // ввод руками — не серия нажатий, шлём сразу
+}
+
+// Число меняется под пальцем, сервер узнаёт следом.
+//
+// Раньше каждое нажатие уходило на сервер и только с ответом появлялась цифра,
+// а пока ответ шёл, остальные нажатия просто терялись. Плюс перерисовывался
+// весь экран целиком — сотня строк ради одной клетки.
+//
+// Теперь наоборот: считаем у себя, чиним ровно те два числа, которые
+// изменились, а правки копим и отправляем пачкой. Правда всё равно за
+// сервером — его ответ ложится сверху, но человек к этому моменту уже нажал
+// столько раз, сколько хотел.
+const ORD_SAVE_MS = 400;
+
+function ordPut(id, district, qty){
+  const r = _ordRow(id); if(!r) return;
+  const c = r.cells[district] || (r.cells[district] = {});
+  qty = Math.max(0, Math.min(9999, parseInt(qty, 10) || 0));
+  c.need = qty;
+  c.edited = qty !== (c.calc || 0);
+  r.need_total = Object.values(r.cells).reduce((a, x) => a + (x.need || 0), 0);
+  r.edited = Object.values(r.cells).some(x => x.edited);
+  ordTotals();
+  ordPatch(r, district);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  ORD.pend[id + '|' + district] = qty;
+  clearTimeout(ORD.timer);
+  ORD.timer = setTimeout(ordFlush, ORD_SAVE_MS);
+}
+
+// Итоги пересчитываются из строк, а не спрашиваются у сервера: они складываются
+// из тех же чисел, что уже на экране.
+function ordTotals(){
+  const d = ORD.d; if(!d) return;
+  let q = 0, aed = 0, ed = 0;
+  (d.all_rows || []).forEach(r => {
+    q += r.need_total; aed += r.need_total * (r.price || 0); if(r.edited) ed++;
+  });
+  d.total_qty = q; d.total_aed = aed; d.edited_count = ed;
+  d.rows = (d.all_rows || []).filter(r => r.need_total > 0);
+  ACC_ORDER = d;
+}
+
+function ordPatch(r, district){
+  const root = document.querySelector('.ord-r[data-id="' + r.id + '"]');
+  if(root){
+    root.classList.toggle('fixed', !!r.edited);
+    const v = root.querySelector('.ord-r-v');
+    if(v){ v.textContent = r.need_total; v.classList.toggle('gold', !!r.edited); }
+    const sub = root.querySelector('.ord-r-d');
+    if(sub) sub.textContent = (ORD.d.districts || [])
+      .filter(x => (r.cells[x.id] || {}).need)
+      .map(x => x.code + '·' + r.cells[x.id].need).join(' ') || 'не нужно';
+    if(district){
+      const cell = root.querySelector('.ord-c[data-d="' + district + '"]');
+      const c = r.cells[district] || {};
+      if(cell){
+        const i = cell.querySelector('input');
+        if(i && document.activeElement !== i) i.value = c.need || 0;
+        if(i) i.classList.toggle('fixed', !!c.edited);
+        const calc = cell.querySelector('.ord-c-calc');
+        if(calc) calc.textContent = c.edited ? ('расчёт ' + (c.calc || 0))
+                                             : ('на полке ' + (c.have || 0));
+      }
+    }
+  }
+  pathPaint();
+  const ed = document.querySelector('.ord-edited');
+  if(ed && !ORD.onlyEdited){
+    const n = ORD.d.edited_count || 0;
+    ed.hidden = !n;
+    ed.querySelector('span').textContent = 'правок вручную · ' + n;
+  }
+}
+
+async function ordFlush(){
+  clearTimeout(ORD.timer);
+  if(ORD.busy) return;                     // отправка идёт — эта пачка уедет следом
+  const keys = Object.keys(ORD.pend);
+  if(!keys.length) return;
   ORD.busy = true;
   try{
-    const res = await ownerApi.ownerFetch('/api/owner/stock/order/edit', {method:'POST',
-      body:{day: ORD.d.day, id, district, qty: v === '' ? null : v}});
-    ordApply(res);
-    try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+    for(const k of keys){
+      const qty = ORD.pend[k];
+      const i = k.indexOf('|');
+      const res = await ownerApi.ownerFetch('/api/owner/stock/order/edit',
+        {method:'POST', body:{day: ORD.d.day, id: k.slice(0, i),
+                              district: k.slice(i + 1), qty: String(qty)}});
+      // Удаляем только если за время запроса это число не успели изменить.
+      if(ORD.pend[k] === qty) delete ORD.pend[k];
+      ordSync(res);
+    }
   }catch(e){
+    // Сервер не принял — правда за ним, перечитываем.
+    ORD.pend = {};
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('error'); }catch(e2){}
-  }finally{ ORD.busy = false; }
+    try{
+      const d = await ownerApi.ownerFetch('/api/owner/stock/order');
+      ORD.d = d; ACC_ORDER = d; ordRender();
+    }catch(e3){}
+  }finally{
+    ORD.busy = false;
+    if(Object.keys(ORD.pend).length) ORD.timer = setTimeout(ordFlush, 60);
+  }
+}
+
+// Ответ сервера ложится поверх наших чисел — кроме тех клеток, которые человек
+// успел нажать ещё раз, пока запрос летел.
+function ordSync(res){
+  if(!res || !res.row) return;
+  const cur = _ordRow(res.row.id);
+  if(!cur){ return; }
+  Object.keys(res.row.cells || {}).forEach(o => {
+    if(ORD.pend[res.row.id + '|' + o] === undefined) cur.cells[o] = res.row.cells[o];
+  });
+  cur.calc_total = res.row.calc_total;
+  cur.need_total = Object.values(cur.cells).reduce((a, x) => a + (x.need || 0), 0);
+  cur.edited = Object.values(cur.cells).some(x => x.edited);
+  ordTotals();
+  ordPatch(cur, null);
 }
 
 async function ordReset(id){

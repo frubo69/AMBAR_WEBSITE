@@ -672,6 +672,13 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
         await db.supply_untake(sid, oid, pid)
         return {"ok": False, "verdict": "known", "name": item.get("name", "")}
 
+    # Бутылка встала на полку — заявка про неё ещё не знает.
+    try:
+        import stock_routes
+        stock_routes.base_drop()
+    except Exception:
+        pass
+
     # ── то, что нельзя запретить, но нужно показать ──────────────────────────
     flags = []
     prev = task.get("last_at")

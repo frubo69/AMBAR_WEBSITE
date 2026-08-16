@@ -3574,7 +3574,14 @@ button.path:active{transform:scale(.995)}
 .ac-filter-dot{position:absolute;top:7px;right:7px;width:6px;height:6px;border-radius:50%;background:var(--gold2);display:none}
 .ac-filter-dot.show{display:block}
 .ac-filter-panel{display:flex;gap:6px;flex-wrap:wrap;overflow:hidden;max-height:0;opacity:0;transition:max-height .22s var(--e1),opacity .18s var(--e1),padding .22s var(--e1);padding:0}
-.ac-filter-panel.open{max-height:120px;opacity:1;padding-top:10px}
+/* Высота была прибита к 120 пикселям — ровно на три ряда чипов. Чипов стало
+   двенадцать, на телефоне они встают в четыре ряда, и последний уезжал под
+   обрез: фильтры были, но их не было видно. Теперь потолок с большим запасом,
+   а если рядов когда-нибудь станет ещё больше — панель прокрутится, но ни один
+   фильтр не пропадёт молча. */
+.ac-filter-panel.open{max-height:min(44vh,320px);opacity:1;padding-top:10px;
+  overflow-y:auto;overscroll-behavior:contain}
+.ac-filter-panel.open::-webkit-scrollbar{display:none}
 .ac-chip{padding:5px 14px;background:var(--card);border:1px solid var(--border2);border-radius:20px;color:var(--sub);font-size:11px;font-weight:600;cursor:pointer;transition:.15s var(--e1);letter-spacing:.2px;white-space:nowrap;-webkit-user-select:none;user-select:none;touch-action:manipulation}
 .ac-chip:active{transform:scale(.95)}
 .ac-chip.on{background:linear-gradient(135deg,rgba(201,169,110,.15),rgba(201,169,110,.04));border-color:rgba(201,169,110,.35);color:var(--gold2)}

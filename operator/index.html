@@ -2797,12 +2797,14 @@ function whMapPaint(){
   if(WH.sel && tr.length > 1){
     WH.line = L.polyline(tr.map(p => [p.lat, p.lon]),
                          {color:'#C9A96E', weight:3, opacity:.85}).addTo(WH.map);
-    WH.map.fitBounds(WH.line.getBounds().pad(0.25));
+    // Потолок приближения: короткий маршрут иначе растягивается на весь экран,
+    // и вместо «где ездил» видно две улицы крупным планом.
+    WH.map.fitBounds(WH.line.getBounds().pad(0.25), {maxZoom: 15});
   }else if(WH.sel){
     const me = (d.drivers || []).find(r => r.driver === WH.sel && r.has);
     if(me) WH.map.setView([me.lat, me.lon], 15);
   }else if(pts.length){
-    WH.map.fitBounds(L.latLngBounds(pts).pad(0.3));
+    WH.map.fitBounds(L.latLngBounds(pts).pad(0.3), {maxZoom: 15});
   }
 }
 

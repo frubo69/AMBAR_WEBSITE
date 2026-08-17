@@ -892,8 +892,8 @@ async def handle_where(request):
             names.append(n)
             who[n] = {"district": oid, "code": OFFICE_CODES.get(oid, ""),
                       "name": OFFICE_NAMES.get(oid, oid)}
-    day = pos._biz_date(datetime.now(pos.DUBAI_TZ)).isoformat()
-    data = await pos.drivers_live(names, day, (request.query.get("track") or "").strip())
+    data = await pos.drivers_live(names, pos._biz_date(datetime.now(pos.DUBAI_TZ)),
+                                  (request.query.get("track") or "").strip())
     for r in data["drivers"]:
         r.update(who.get(r["driver"]) or {})
     return web.json_response(data, headers=CORS_HEADERS,

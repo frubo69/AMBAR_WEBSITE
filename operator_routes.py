@@ -2059,14 +2059,51 @@ def _biz_date_of(o: dict):
 # ── где водители ───────────────────────────────────────────────────────────
 # Оператор видит своих, владелец — всех. Клиенту и другим водителям координаты
 # не отдаются нигде и никогда.
-async def drivers_live(names: list, day: str, want_track: str = "") -> dict:
+async def _orders_by_driver(day) -> dict:
+    """{водитель: {в пути, доставлено за смену}}.
+
+    Список водителей без этого отвечает только на «где он», а спрашивают
+    обычно «кому отдать следующий» — и тут решает не расстояние само по себе,
+    а расстояние вместе с тем, сколько у человека уже на руках."""
+    since = (datetime(day.year, day.month, day.day, SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
+             - timedelta(hours=1))
+    orders = (await db.orders_from(
+        since.astimezone(timezone.utc).isoformat().replace("+00:00", ""))).values()
+    out = {}
+    for o in orders:
+        name = (o.get("driver") or "").strip()
+        if not name:
+            continue
+        st = (o.get("status") or "").strip()
+        if st not in ("approved", "delivered"):
+            continue
+        r = out.setdefault(name, {"live": 0, "done": 0})
+        if st == "approved":
+            r["live"] += 1
+        elif _biz_date_of(o) == day:
+            r["done"] += 1
+    return out
+
+
+async def drivers_live(names: list, day, want_track: str = "") -> dict:
+    if not isinstance(day, str):
+        day_obj, day = day, day.isoformat()
+    else:
+        day_obj = datetime.strptime(day, "%Y-%m-%d").date()
     rows = {r["driver"]: r for r in await db.driver_pos_all(names)}
+    try:
+        work = await _orders_by_driver(day_obj)
+    except Exception as e:
+        log.warning(f"[where] заказы водителей не прочитаны: {e}")
+        work = {}
     now = datetime.now(timezone.utc)
     out = []
     for name in names:
+        w = work.get(name) or {}
         r = rows.get(name)
         if not r:
-            out.append({"driver": name, "has": False})
+            out.append({"driver": name, "has": False,
+                        "orders": w.get("live", 0), "done": w.get("done", 0)})
             continue
         at = _dt_utc(r.get("at"))
         age = int((now - at).total_seconds()) if at else None
@@ -2078,7 +2115,14 @@ async def drivers_live(names: list, day: str, want_track: str = "") -> dict:
             # Трансляция живёт восемь часов и кончается сама. Точка, которой
             # полчаса, — это не «водитель тут», это «телефон замолчал».
             "live": bool(until and until > now and age is not None and age < 300),
+            # Сколько минут трансляции осталось: у неё потолок в восемь часов,
+            # и знать, что она кончится через двадцать минут, полезнее, чем
+            # узнать это по погасшей метке. Считаем здесь — на телефоне часы
+            # свои, и разбор чужого времени в браузере уже подводил.
+            "left": int((until - now).total_seconds() // 60)
+                    if (until and until > now) else 0,
             "day": r.get("day") or "",
+            "orders": w.get("live", 0), "done": w.get("done", 0),
         })
     res = {"drivers": out, "day": day}
     if want_track:
@@ -2106,8 +2150,8 @@ async def handle_where(request):
     names = []
     for oid in scope:
         names += list(_staff_mod.DISTRICT_DRIVERS.get(oid) or [])
-    day = _biz_date(datetime.now(DUBAI_TZ)).isoformat()
-    data = await drivers_live(names, day, (request.query.get("track") or "").strip())
+    data = await drivers_live(names, _biz_date(datetime.now(DUBAI_TZ)),
+                              (request.query.get("track") or "").strip())
     # К каждому — район и оператор: на карте пять точек, и без подписи они
     # одинаковые.
     who = {}

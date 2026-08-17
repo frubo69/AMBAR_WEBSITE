@@ -1314,23 +1314,52 @@ button.path:active{transform:scale(.995)}
    посреди тёмной панели бьёт по глазам в ночную смену. */
 #whMap .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) saturate(.18) brightness(.9)}
 .leaflet-control-attribution,.leaflet-control-zoom{display:none!important}
-.wh-r{display:flex;align-items:center;gap:11px;width:100%;padding:12px 13px;
-  margin-bottom:6px;border-radius:12px;text-align:left;cursor:pointer;
-  font-family:inherit;color:var(--text);
-  background:var(--card);border:1px solid var(--border2)}
-.wh-r.on{border-color:var(--gold);background:var(--card2)}
-.wh-r.off{opacity:.55}
-.wh-code{width:31px;height:31px;flex:0 0 auto;border-radius:9px;display:flex;
-  align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;
-  font-size:10.5px;font-weight:800;background:var(--card2);
-  border:1px solid var(--border2);color:var(--muted)}
+/* Строка водителя.
+   Она отвечает не на «как его зовут» — это и так известно, — а на «кому отдать
+   следующий заказ». Поэтому слева состояние связи, справа сколько у человека
+   уже на руках, а под именем район и до какого часа хватит трансляции. Без
+   последнего трансляция гаснет молча посреди смены.
+   Тот, кто не на связи, не прячется и не кричит: он приглушён, но читается —
+   диспетчеру важно видеть и его тоже. */
+.wh-r{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;
+  margin-bottom:8px;border-radius:15px;text-align:left;cursor:pointer;
+  font-family:inherit;color:var(--text);background:var(--card);
+  border:1px solid var(--border2);transition:border-color .18s var(--e1),
+  background .18s var(--e1)}
+.wh-r.on{border-color:rgba(201,169,110,.5);
+  background:linear-gradient(160deg,rgba(201,169,110,.09),transparent 60%),var(--card2)}
+.wh-r.off{background:var(--bg3)}
+.wh-r.off .wh-n{color:var(--sub)}
+/* Огонёк связи. Живой пульсирует — глаз ловит движение раньше, чем читает
+   подпись; погасший просто тускл. */
+.wh-i{position:relative;width:34px;height:34px;flex:0 0 auto;border-radius:12px;
+  display:flex;align-items:center;justify-content:center;background:var(--bg3);
+  border:1px solid var(--border2);color:var(--dim)}
+.wh-r.live .wh-i{background:rgba(61,220,132,.1);border-color:rgba(61,220,132,.32);
+  color:#3ddc84}
+.wh-r.live .wh-i::after{content:'';position:absolute;inset:-1px;border-radius:12px;
+  border:1px solid rgba(61,220,132,.55);animation:whPulse 2.2s ease-out infinite}
+@keyframes whPulse{0%{transform:scale(1);opacity:.75}70%{transform:scale(1.28);opacity:0}
+  100%{opacity:0}}
+@media (prefers-reduced-motion:reduce){.wh-r.live .wh-i::after{animation:none}}
 .wh-b{flex:1;min-width:0}
-.wh-n{font-size:13.5px;font-weight:600;line-height:1.25;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap}
-.wh-s{font-size:11.5px;color:var(--muted);margin-top:2px}
-.wh-dot{width:8px;height:8px;flex:0 0 auto;border-radius:50%;background:var(--dim)}
-.wh-dot.live{background:#3ddc84;box-shadow:0 0 0 3px rgba(61,220,132,.18)}
-/* Метка на карте несёт код района — тот же, что в списке: глаз связывает их
+.wh-n{display:flex;align-items:baseline;gap:7px;font-size:14.5px;font-weight:600;
+  line-height:1.2}
+.wh-n u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;
+  font-weight:700;letter-spacing:.6px;color:var(--muted)}
+.wh-s{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);
+  margin-top:4px;line-height:1.25}
+.wh-s b{color:#3ddc84;font-weight:600}
+.wh-s i{font-style:normal;color:var(--dim)}
+/* Сколько заказов на руках — то, ради чего в этот список и смотрят перед тем,
+   как отдать следующий. */
+.wh-w{flex:0 0 auto;text-align:right;min-width:52px}
+.wh-w-v{display:block;font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;
+  line-height:1;color:var(--gold2);font-variant-numeric:tabular-nums}
+.wh-w-v.zero{color:var(--dim)}
+.wh-w-l{display:block;font-size:9.5px;letter-spacing:.5px;text-transform:uppercase;
+  color:var(--muted);margin-top:4px}
+/* Метка на карте несёт код района — тот же, что в строке: глаз связывает их
    без легенды. */
 .wh-pin{display:flex;align-items:center;justify-content:center;width:30px;height:30px;
   border-radius:50% 50% 50% 4px;transform:rotate(-45deg);
@@ -1339,7 +1368,20 @@ button.path:active{transform:scale(.995)}
   box-shadow:0 3px 10px rgba(0,0,0,.5)}
 .wh-pin span{transform:rotate(45deg)}
 .wh-pin.stale{background:#6b7280;color:#0b0e18}
-.wh-note{padding:12px 2px 4px;font-size:11.5px;line-height:1.45;color:var(--muted)}
+/* Начало и конец маршрута: без них линия не читается — непонятно, откуда куда. */
+.wh-dotp{width:12px;height:12px;border-radius:50%;background:var(--gold2);
+  border:2px solid #0b0e18;box-shadow:0 0 0 1px rgba(201,169,110,.6)}
+.wh-note{padding:14px 4px 4px;font-size:11px;line-height:1.5;color:var(--dim)}
+/* Шапка списка: одной строкой то, что иначе пришлось бы считать по строкам. */
+.wh-sum{display:flex;gap:7px;padding:2px 2px 10px}
+.wh-sum span{flex:1;padding:9px 10px;border-radius:11px;background:var(--card);
+  border:1px solid var(--border2);text-align:center}
+.wh-sum b{display:block;font-family:'Space Grotesk',sans-serif;font-size:17px;
+  font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.wh-sum i{display:block;font-style:normal;font-size:9.5px;letter-spacing:.5px;
+  text-transform:uppercase;color:var(--muted);margin-top:5px}
+.wh-sum span.ok b{color:#3ddc84}
+.wh-sum span.dim b{color:var(--dim)}
 
 /* ── Реклама: журнал ───────────────────────────────────────────────────────
    Раньше раздел отвечал на один вопрос — сколько принёс канал. А спрашивают
@@ -4727,27 +4769,58 @@ function whAgo(sec){
   return h < 24 ? h + ' ч назад' : Math.floor(h / 24) + ' дн назад';
 }
 
+const IC_LIVE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" '
+  + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+  + '<path d="M12 2v3M12 19v3M2 12h3M19 12h3"/><circle cx="12" cy="12" r="4"/></svg>';
+const IC_OFF = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" '
+  + 'stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">'
+  + '<path d="M3 3l18 18"/><path d="M18.5 12.6A7.9 7.9 0 0 0 19 10a7 7 0 0 0-11.4-5.4"/>'
+  + '<path d="M5.4 6.6A7 7 0 0 0 5 10c0 5.2 7 11 7 11a29 29 0 0 0 3.3-3.4"/></svg>';
+
+// Строка водителя отвечает на «кому отдать следующий заказ», а не «как его
+// зовут»: имя и так известно. Поэтому в ней три вещи — связь, район вместе с
+// остатком трансляции и сколько заказов уже на руках.
+function whRow(r, trackOn){
+  const cls = r.live ? 'live' : (r.has ? '' : 'off');
+  const where = [r.code, r.name].filter(Boolean).join(' ');
+  let state;
+  if(!r.has)      state = 'не транслирует';
+  else if(r.live) state = `<b>на связи</b>${r.left
+      ? ` <i>· ещё ${r.left < 60 ? r.left + ' мин' : Math.floor(r.left / 60) + ' ч'}</i>` : ''}`;
+  else            state = 'молчит ' + whAgo(r.age).replace(' назад', '');
+  return `<button class="wh-r ${cls}${WH.sel === r.driver ? ' on' : ''}"
+          onclick="whPick('${escS(r.driver)}')">
+    <span class="wh-i">${r.has && r.live ? IC_LIVE : IC_OFF}</span>
+    <span class="wh-b">
+      <span class="wh-n">${escS(r.driver)}<u>${escS(where)}</u></span>
+      <span class="wh-s">${state}${trackOn ? ' <i>· маршрут на карте</i>' : ''}</span>
+    </span>
+    <span class="wh-w">
+      <span class="wh-w-v${r.orders ? '' : ' zero'}">${r.orders || r.done || '—'}</span>
+      <span class="wh-w-l">${r.orders ? 'в пути' : (r.done ? 'сдал' : 'пусто')}</span>
+    </span>
+  </button>`;
+}
+
 function whPaint(){
   const d = WH.data; if(!d) return;
   const rows = d.drivers || [];
   const live = rows.filter(r => r.live).length;
+  const work = rows.reduce((a, r) => a + (r.orders || 0), 0);
   _setText('whSub', live ? `${live} из ${rows.length} на связи`
                          : (rows.length ? 'никто не транслирует' : 'водителей нет'));
-  document.getElementById('whList').innerHTML = (rows.map(r => `
-    <button class="wh-r${WH.sel === r.driver ? ' on' : ''}${r.live ? '' : ' off'}"
-            onclick="whPick('${escS(r.driver)}')">
-      <span class="wh-code">${escS(r.code || '')}</span>
-      <span class="wh-b">
-        <span class="wh-n">${escS(r.driver)}</span>
-        <span class="wh-s">${r.has ? whAgo(r.age) : 'не транслирует'}${
-          WH.sel === r.driver && (d.track || []).length > 1
-            ? ' · маршрут за смену' : ''}</span>
-      </span>
-      <span class="wh-dot${r.live ? ' live' : ''}"></span>
-    </button>`).join('') || '<div class="exp-empty">Водителей нет</div>')
-    + `<div class="wh-note">Точка приходит живой трансляцией телеграма — водитель
-       включает её сам и видит у себя в чате. Маршрут за смену стирается, когда
-       смену закрывают.</div>`;
+  const trackOn = (d.track || []).length > 1;
+  document.getElementById('whList').innerHTML = (rows.length ? `
+    <div class="wh-sum">
+      <span class="ok"><b>${live}</b><i>на связи</i></span>
+      <span class="${work ? '' : 'dim'}"><b>${work}</b><i>${
+        pluralize(work,'заказ','заказа','заказов')} в пути</i></span>
+      <span class="dim"><b>${rows.length - live}</b><i>не видно</i></span>
+    </div>` + rows.map(r => whRow(r, WH.sel === r.driver && trackOn)).join('')
+    : '<div class="exp-empty">Водителей нет</div>')
+    + `<div class="wh-note">Точку присылает живая трансляция телеграма — водитель
+       включает её сам. Её хватает на восемь часов, дальше бот напомнит. Маршрут
+       за смену стирается при её закрытии.</div>`;
   whMapPaint();
 }
 
@@ -4784,17 +4857,49 @@ function whMapPaint(){
 
   const tr = d.track || [];
   if(WH.sel && tr.length > 1){
-    WH.line = L.polyline(tr.map(p => [p.lat, p.lon]),
-                         {color:'#C9A96E', weight:3, opacity:.85}).addTo(WH.map);
+    const pth = whSmooth(tr.map(p => [p.lat, p.lon]));
+    // Линия в два слоя: широкая полупрозрачная снизу и узкая сверху. Так она
+    // читается и на светлых кварталах, и на тёмной воде, а не теряется.
+    WH.line = L.layerGroup([
+      L.polyline(pth, {color:'#C9A96E', weight:9, opacity:.16,
+                       lineJoin:'round', lineCap:'round'}),
+      L.polyline(pth, {color:'#E8D5AC', weight:3.5, opacity:.95,
+                       lineJoin:'round', lineCap:'round'}),
+      // Откуда и докуда: без этих двух точек линия не читается — непонятно,
+      // в какую сторону человек ехал.
+      L.marker(pth[0], {icon: L.divIcon({className:'', iconSize:[12,12],
+        iconAnchor:[6,6], html:'<div class="wh-dotp"></div>'})}),
+    ]).addTo(WH.map);
+    WH.line.getBounds = () => L.latLngBounds(pth);
     // Потолок приближения: короткий маршрут иначе растягивается на весь экран,
     // и вместо «где ездил» видно две улицы крупным планом.
-    WH.map.fitBounds(WH.line.getBounds().pad(0.25), {maxZoom: 15});
+    WH.map.fitBounds(L.latLngBounds(pth).pad(0.25), {maxZoom: 15});
   }else if(WH.sel){
     const me = (d.drivers || []).find(r => r.driver === WH.sel && r.has);
     if(me) WH.map.setView([me.lat, me.lon], 15);
   }else if(pts.length){
     WH.map.fitBounds(L.latLngBounds(pts).pad(0.3), {maxZoom: 15});
   }
+}
+
+// Сглаживание срезанием углов. Телефон присылает точку раз в десяток секунд,
+// и между ними водитель успевает проехать поворот — прямая через квартал
+// выглядит так, будто он летел насквозь. Скругление не выдумывает дорог,
+// которых не было: оно лишь убирает изломы, которых на пути тоже не было.
+function whSmooth(pts){
+  if(pts.length < 3) return pts;
+  let out = pts;
+  for(let k = 0; k < 2; k++){
+    const next = [out[0]];
+    for(let i = 0; i < out.length - 1; i++){
+      const a = out[i], b = out[i + 1];
+      next.push([a[0] + (b[0] - a[0]) * 0.25, a[1] + (b[1] - a[1]) * 0.25]);
+      next.push([a[0] + (b[0] - a[0]) * 0.75, a[1] + (b[1] - a[1]) * 0.75]);
+    }
+    next.push(out[out.length - 1]);
+    out = next;
+  }
+  return out;
 }
 
 function whPick(name){

@@ -2056,6 +2056,71 @@ def _biz_date_of(o: dict):
         return None
 
 
+# ── где водители ───────────────────────────────────────────────────────────
+# Оператор видит своих, владелец — всех. Клиенту и другим водителям координаты
+# не отдаются нигде и никогда.
+async def drivers_live(names: list, day: str, want_track: str = "") -> dict:
+    rows = {r["driver"]: r for r in await db.driver_pos_all(names)}
+    now = datetime.now(timezone.utc)
+    out = []
+    for name in names:
+        r = rows.get(name)
+        if not r:
+            out.append({"driver": name, "has": False})
+            continue
+        at = _dt_utc(r.get("at"))
+        age = int((now - at).total_seconds()) if at else None
+        until = _dt_utc(r.get("until"))
+        out.append({
+            "driver": name, "has": True,
+            "lat": r.get("lat"), "lon": r.get("lon"),
+            "at": r.get("at"), "age": age, "acc": r.get("acc"),
+            # Трансляция живёт восемь часов и кончается сама. Точка, которой
+            # полчаса, — это не «водитель тут», это «телефон замолчал».
+            "live": bool(until and until > now and age is not None and age < 300),
+            "day": r.get("day") or "",
+        })
+    res = {"drivers": out, "day": day}
+    if want_track:
+        res["track"] = await db.driver_track(want_track, day)
+        res["track_of"] = want_track
+    return res
+
+
+def _dt_utc(v):
+    if not v:
+        return None
+    if isinstance(v, datetime):
+        return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+    try:
+        d = datetime.fromisoformat(str(v).replace("Z", ""))
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError):
+        return None
+
+
+@require_operator
+async def handle_where(request):
+    districts = await _fresh_districts()
+    scope = _scope(_people(districts), (request.query.get("as") or "").strip(), districts)
+    names = []
+    for oid in scope:
+        names += list(_staff_mod.DISTRICT_DRIVERS.get(oid) or [])
+    day = _biz_date(datetime.now(DUBAI_TZ)).isoformat()
+    data = await drivers_live(names, day, (request.query.get("track") or "").strip())
+    # К каждому — район и оператор: на карте пять точек, и без подписи они
+    # одинаковые.
+    who = {}
+    for d in districts:
+        for n in (_staff_mod.DISTRICT_DRIVERS.get(d["id"]) or []):
+            who[n] = {"district": d["id"], "code": d.get("code", ""),
+                      "name": d.get("name", ""), "operator": d.get("operator", "")}
+    for r in data["drivers"]:
+        r.update(who.get(r["driver"]) or {})
+    return web.json_response(data, headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
 @require_operator
 async def handle_shift(request):
     districts = await _fresh_districts()
@@ -2109,6 +2174,17 @@ async def handle_shift_close(request):
     log.info(f"[pos] смена закрыта: {oid} · {who} · {mine['orders']} заказов · "
              f"{mine['revenue']} AED · висит {mine['open']}")
 
+    # Смена закрыта — маршрут за неё больше никому не нужен. Точка «сейчас»
+    # остаётся: по ней видно, что водитель ещё в сети.
+    try:
+        names = list(_staff_mod.DISTRICT_DRIVERS.get(oid) or [])
+        if names:
+            n = await db.driver_track_clear(names)
+            if n:
+                log.info(f"[pos] треки за смену стёрты: {oid} · {n}")
+    except Exception as e:
+        log.warning(f"[pos] треки не стёрты ({oid}): {e}")
+
     mine["closed"] = True
     mine["closed_by"] = who
     mine["closed_at"] = str(datetime.now(timezone.utc))
@@ -2147,6 +2223,8 @@ async def handle_shift_reopen(request):
 def setup(app):
     """Mount operator POS routes. Called from api_server.main()."""
     r = app.router
+    r.add_route("OPTIONS", "/api/operator/where", _opt)
+    r.add_get("/api/operator/where", handle_where)
     r.add_route("OPTIONS", "/api/operator/shift", _opt)
     r.add_get("/api/operator/shift", handle_shift)
     r.add_route("OPTIONS", "/api/operator/shift/close", _opt)

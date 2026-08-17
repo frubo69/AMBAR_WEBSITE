@@ -50,6 +50,11 @@ async def connect():
         # источнику и времени.
         await _db.qr_codes.create_index([("district", 1), ("src", 1), ("at", 1)])
         await _db.shift_days.create_index([("day", 1)])
+        # Страховка на случай незакрытой смены: полтора суток без обновлений —
+        # и запись о положении водителя уходит сама. Срок считается от «at», а
+        # он переписывается каждой точкой, так что живого водителя это не
+        # трогает.
+        await _db.driver_pos.create_index("at", expireAfterSeconds=36 * 3600)
         await _db.owner_managers.create_index("telegram_id", unique=True)
         await _db.drivers.create_index("name", unique=True)
         # Один телеграм-аккаунт не может быть двумя водителями. Partial, потому
@@ -2213,6 +2218,69 @@ async def drv_msgs_take(chat_id: int) -> list:
         {"_id": int(chat_id)}, {"$set": {"msgs": []}},
         return_document=ReturnDocument.BEFORE)
     return [int(m["m"]) for m in ((doc or {}).get("msgs") or []) if m.get("m")]
+
+
+# ── Где водители ────────────────────────────────────────────────────────────
+# Координаты приходят живой трансляцией телеграма: водитель сам включает её на
+# смену и сам видит её у себя в чате с таймером и кнопкой «остановить».
+#
+# Что храним и почему именно так. Точка «сейчас» — одна на водителя, с
+# перезаписью: диспетчеру нужна не история, а текущее положение. Трек — только
+# за идущую смену, и он стирается, когда район закрывают. Сверху страховка
+# сроком жизни: если смену забыли закрыть, документ уйдёт сам через полтора
+# суток после последнего обновления.
+#
+# Чего здесь нет: вечного архива передвижений. Он не нужен для работы, а
+# украсть его можно только тогда, когда он есть.
+TRACK_MAX = 2000              # точек на смену: восемь часов раз в пятнадцать секунд
+
+async def driver_pos_set(name: str, day: str, lat: float, lon: float, at,
+                         until=None, acc=None) -> None:
+    db = _db_or_none()
+    if db is None or not name: return
+    pt = {"lat": round(float(lat), 6), "lon": round(float(lon), 6), "at": at}
+    doc = {"$set": {"lat": pt["lat"], "lon": pt["lon"], "at": at, "day": day},
+           "$push": {"track": {"$each": [pt], "$slice": -TRACK_MAX}}}
+    if until is not None:
+        doc["$set"]["until"] = until
+    if acc is not None:
+        doc["$set"]["acc"] = round(float(acc), 1)
+    await db.driver_pos.update_one({"_id": name}, doc, upsert=True)
+
+
+async def driver_pos_all(names: list = None) -> list:
+    """Последние точки. Трек не отдаём: он тяжёлый и нужен по одному водителю."""
+    db = _db_or_none()
+    if db is None: return []
+    q = {"_id": {"$in": list(names)}} if names else {}
+    rows = await db.driver_pos.find(q, {"track": 0}).to_list(length=100)
+    for r in rows:
+        r["driver"] = r.pop("_id")
+        r["at"] = str(r.get("at") or "")
+        r["until"] = str(r.get("until") or "")
+    return rows
+
+
+async def driver_track(name: str, day: str = "") -> list:
+    db = _db_or_none()
+    if db is None or not name: return []
+    d = await db.driver_pos.find_one({"_id": name}, {"track": 1, "day": 1})
+    if not d or (day and d.get("day") != day):
+        return []
+    return [{"lat": p["lat"], "lon": p["lon"], "at": str(p.get("at") or "")}
+            for p in (d.get("track") or [])]
+
+
+async def driver_track_clear(names: list) -> int:
+    """Стереть треки: смену закрыли, маршрут больше никому не нужен.
+
+    Точка «сейчас» остаётся — по ней видно, что водитель ещё в сети, — а вот
+    маршрут за смену уходит совсем."""
+    db = _db_or_none()
+    if db is None or not names: return 0
+    res = await db.driver_pos.update_many({"_id": {"$in": list(names)}},
+                                          {"$set": {"track": []}})
+    return res.modified_count
 
 
 # ── Смена: день закрыт, продажи посчитаны ───────────────────────────────────

@@ -112,6 +112,13 @@ async def on_startup(app):
         app["shift_nag"] = asyncio.create_task(shift_nag.loop(app))
     except Exception as e:
         log.warning(f"[nag] не запустились: {e}")
+    # Живая трансляция телеграма живёт восемь часов, а смена — восемнадцать.
+    # Напоминаем включить заново за десять минут до конца.
+    try:
+        import geo_nag
+        app["geo_nag"] = asyncio.create_task(geo_nag.loop(app))
+    except Exception as e:
+        log.warning(f"[geo] не запустились: {e}")
 
 
 async def _send_card_welcome(ids, flag_field, total, pad, title_ru, tag):

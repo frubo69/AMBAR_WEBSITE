@@ -11,11 +11,12 @@ AMBAR — бот водителя.
 """
 import logging
 import os
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 
 from dotenv import load_dotenv
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, MenuButtonWebApp
-from telegram.ext import Application, CommandHandler, ContextTypes
+from telegram.ext import (Application, CommandHandler, MessageHandler,
+                          ContextTypes, filters)
 
 import config_staff as staff
 import db
@@ -79,6 +80,73 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     log.info(f"вход: {me['name']} ({uid})")
 
 
+# ── где водитель ───────────────────────────────────────────────────────────
+# Живую трансляцию водитель включает сам: скрепка → Геопозиция → Транслировать.
+# Дальше телефон шлёт точки сюда даже при свёрнутом телеграме, а у водителя всё
+# это время висит его собственная трансляция с таймером и кнопкой «остановить».
+#
+# Почему не геолокация из мини-аппа: браузер отдаёт координаты, только пока
+# приложение открыто на экране. За рулём оно свёрнуто — то есть работало бы
+# ровно тогда, когда не нужно.
+SHIFT_START_HOUR = int(os.getenv("AMBAR_SHIFT_START_HOUR", "12"))
+DUBAI = timezone(timedelta(hours=4))
+
+
+def _biz_day(ref=None) -> str:
+    ref = ref or datetime.now(DUBAI)
+    anchor = ref.replace(hour=SHIFT_START_HOUR, minute=0, second=0, microsecond=0)
+    return (ref if ref >= anchor else ref - timedelta(days=1)).strftime("%Y-%m-%d")
+
+
+async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Точка от водителя: и первая, и каждая следующая из трансляции.
+
+    Живые обновления приходят правкой того же сообщения, поэтому здесь оба
+    случая — и message, и edited_message."""
+    msg = update.effective_message
+    loc = getattr(msg, "location", None) if msg else None
+    if not loc or not update.effective_user:
+        return
+    me = staff.driver_by_tg(update.effective_user.id)
+    if not me:
+        return                       # чужие координаты нам не нужны и не хранятся
+    now = datetime.now(timezone.utc)
+    until = None
+    if getattr(loc, "live_period", None):
+        until = now + timedelta(seconds=int(loc.live_period))
+    try:
+        await db.driver_pos_set(me["name"], _biz_day(), loc.latitude, loc.longitude,
+                                now, until=until,
+                                acc=getattr(loc, "horizontal_accuracy", None))
+    except Exception as e:
+        log.warning(f"точка {me['name']} не записана: {e}")
+        return
+    # Отвечаем один раз — на включение трансляции. На каждую точку писать
+    # нельзя: телефон шлёт их десятками, и чат превратится в ленту.
+    if update.message and loc.live_period:
+        await _remember(update.message)
+        sent = await update.message.reply_text(
+            "Трансляция включена — спасибо. Оператор видит, где вы.\n"
+            "Выключить можно в любой момент кнопкой «Остановить» в этом сообщении.")
+        await _remember(sent)
+        log.info(f"трансляция включена: {me['name']} на {loc.live_period//3600} ч")
+
+
+async def cmd_where(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Напоминание, как включить трансляцию: словами и один раз."""
+    if not staff.driver_by_tg(update.effective_user.id):
+        return
+    await _remember(update.message)
+    sent = await update.message.reply_text(
+        "Чтобы оператор видел, где вы:\n\n"
+        "1. Скрепка в этом чате\n"
+        "2. «Геопозиция»\n"
+        "3. «Транслировать» — на 8 часов\n\n"
+        "Телефон будет сам присылать точку, даже когда телеграм свёрнут. "
+        "Маршрут стирается, когда закрывают смену.")
+    await _remember(sent)
+
+
 async def cmd_id(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     if staff.driver_by_tg(update.effective_user.id):
         await _remember(update.message)
@@ -94,6 +162,11 @@ def main():
     app = Application.builder().token(DRIVER_BOT_TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("id", cmd_id))
+    app.add_handler(CommandHandler("where", cmd_where))
+    # И первое сообщение с точкой, и каждая правка живой трансляции.
+    app.add_handler(MessageHandler(filters.LOCATION, on_location))
+    app.add_handler(MessageHandler(
+        filters.UpdateType.EDITED_MESSAGE & filters.LOCATION, on_location))
     log.info(f"бот водителя запущен · доступ у {len(staff.DRIVER_IDS)}")
     app.run_polling(allowed_updates=Update.ALL_TYPES)
 

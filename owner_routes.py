@@ -874,6 +874,33 @@ async def handle_customers(request):
 
 
 @require_owner
+async def handle_where(request):
+    """Где водители — для панели владельца: все районы разом.
+
+    Расчёт один и тот же, что у оператора: держать вторую копию нельзя, они
+    разойдутся молча, и на двух экранах будут разные машины."""
+    import operator_routes as pos
+    import config_staff as staff
+    from config_offices import OFFICE_IDS, OFFICE_CODES, OFFICE_NAMES
+    try:
+        staff.apply_moves(await db.staff_map_get(), await db.driver_map_get())
+    except Exception as e:
+        log.warning(f"[where] перестановка не прочитана: {e}")
+    names, who = [], {}
+    for oid in OFFICE_IDS:
+        for n in (staff.DISTRICT_DRIVERS.get(oid) or []):
+            names.append(n)
+            who[n] = {"district": oid, "code": OFFICE_CODES.get(oid, ""),
+                      "name": OFFICE_NAMES.get(oid, oid)}
+    day = pos._biz_date(datetime.now(pos.DUBAI_TZ)).isoformat()
+    data = await pos.drivers_live(names, day, (request.query.get("track") or "").strip())
+    for r in data["drivers"]:
+        r.update(who.get(r["driver"]) or {})
+    return web.json_response(data, headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
+@require_owner
 async def handle_promo(request):
     """Эффективность рекламных интеграций — по каналам прихода.
 
@@ -2659,6 +2686,8 @@ def setup(app):
     app.router.add_post(            "/api/owner/staff/reset", handle_staff_reset)
     app.router.add_route("OPTIONS", "/api/owner/promotions", handle_promotions)
     app.router.add_get(             "/api/owner/promotions", handle_promotions)
+    app.router.add_route("OPTIONS", "/api/owner/where", handle_where)
+    app.router.add_get(             "/api/owner/where", handle_where)
     app.router.add_route("OPTIONS", "/api/owner/promo",   handle_promo)
     app.router.add_get(             "/api/owner/promo",   handle_promo)
     app.router.add_route("OPTIONS", "/api/owner/customers",              handle_customers)

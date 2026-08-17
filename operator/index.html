@@ -10,6 +10,8 @@
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
 <meta name="apple-mobile-web-app-title" content="AMBAR POS">
 <link rel="stylesheet" href="/vendor/fonts.css">
+<link rel="stylesheet" href="/vendor/leaflet.css">
+<script src="/vendor/leaflet.js"></script>
 <!-- Скрипт телеграма — со своего сервера. Раньше он грузился с telegram.org
      блокирующим тегом: пока чужой домен не ответит, страница не рисуется вовсе,
      а недоступен он ровно тогда, когда недоступно всё остальное. Копия лежит
@@ -453,6 +455,53 @@ a.oc-row:active{background:var(--card2)}
 /* ── overlays ── */
 .ov{position:fixed;inset:0;z-index:100;background:rgba(0,0,10,.7);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center}
 .ov.show{display:flex}
+/* ── Где водители ─────────────────────────────────────────────────────────
+   Карта занимает всё, что остаётся: на ней и работают. Список слева узкий —
+   он отвечает на вопрос «кто вообще на связи», а «где именно» отвечает карта. */
+.wh{display:flex;width:min(1280px,96vw);height:min(820px,92vh);border-radius:20px;
+  overflow:hidden;background:var(--bg3);border:1px solid var(--border3);
+  box-shadow:0 24px 80px rgba(0,0,0,.7)}
+.wh-side{width:290px;flex:0 0 auto;display:flex;flex-direction:column;
+  border-right:1px solid var(--border2)}
+.wh-hd{display:flex;align-items:flex-start;gap:10px;padding:18px 18px 12px}
+.wh-hd .t{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700}
+.wh-hd .s{font-size:12px;color:var(--sub);margin-top:3px}
+.wh-x{margin-left:auto;width:34px;height:34px;flex:0 0 auto;border-radius:10px;
+  background:var(--card2);border:1px solid var(--border2);font-size:15px;color:var(--sub)}
+.wh-list{flex:1;overflow-y:auto;padding:0 12px 12px}
+.wh-note{padding:12px 18px 16px;font-size:11px;line-height:1.45;color:var(--dim);
+  border-top:1px solid var(--border2)}
+.wh-map{flex:1;min-width:0;position:relative;background:#0b0e18}
+#whMap{position:absolute;inset:0}
+/* Тайлы гасим тем же фильтром, что и в клиентском приложении: светлая карта
+   посреди тёмной панели бьёт по глазам в ночную смену. */
+#whMap .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) saturate(.18) brightness(.9)}
+.leaflet-control-attribution,.leaflet-control-zoom{display:none!important}
+/* Строка водителя: код района, имя, и когда его видели в последний раз. */
+.wh-r{display:flex;align-items:center;gap:10px;width:100%;padding:11px 10px;
+  margin-bottom:6px;border-radius:12px;text-align:left;cursor:pointer;
+  background:var(--card);border:1px solid var(--border2);color:var(--text)}
+.wh-r.on{border-color:var(--gold);background:var(--card2)}
+.wh-r.off{opacity:.55}
+.wh-code{width:30px;height:30px;flex:0 0 auto;border-radius:9px;display:flex;
+  align-items:center;justify-content:center;font-size:10.5px;font-weight:800;
+  background:var(--card2);border:1px solid var(--border2);color:var(--sub)}
+.wh-b{flex:1;min-width:0}
+.wh-n{font-size:13.5px;font-weight:600;line-height:1.25;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.wh-s{font-size:11px;color:var(--sub);margin-top:2px}
+.wh-dot{width:8px;height:8px;flex:0 0 auto;border-radius:50%;background:var(--dim)}
+.wh-dot.live{background:#3ddc84;box-shadow:0 0 0 3px rgba(61,220,132,.18)}
+/* Метка на карте: тот же код района, что и в списке, — глаз связывает их без
+   легенды. */
+.wh-pin{display:flex;align-items:center;justify-content:center;width:30px;height:30px;
+  border-radius:50% 50% 50% 4px;transform:rotate(-45deg);
+  font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:10px;
+  background:#3ddc84;color:#06241a;border:2px solid rgba(0,0,0,.35);
+  box-shadow:0 3px 10px rgba(0,0,0,.5)}
+.wh-pin span{transform:rotate(45deg)}
+.wh-pin.stale{background:var(--dim);color:#111}
+
 .sheet{background:var(--bg3);border:1px solid var(--border3);border-radius:20px;padding:22px;width:min(420px,92vw);box-shadow:0 24px 80px rgba(0,0,0,.7)}
 .sheet .t{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;margin-bottom:6px}
 .sheet .s{font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:16px}
@@ -864,6 +913,9 @@ a.oc-row:active{background:var(--card2)}
         <button class="pill" id="dayBtn" onclick="dayOpen()"><svg class="ic" viewBox="0 0 24 24"
           aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg><span
           id="dayLbl">Сегодня</span></button>
+        <button class="pill" id="whereBtn" onclick="whereOpen()"><svg class="ic" viewBox="0 0 24 24"
+          aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0"/><circle
+          cx="12" cy="10" r="2.6"/></svg><span id="whereLbl">Водители</span></button>
         <button class="pill" id="shiftBtn" onclick="shiftOpen()"><svg class="ic" viewBox="0 0 24 24"
           aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span
           id="shiftLbl">Смена</span></button>
@@ -963,6 +1015,29 @@ a.oc-row:active{background:var(--card2)}
 
 <!-- Конец смены. Оператор объявляет, что заказов больше не будет: после
      этого продажи дня считаются окончательными, и по ним собирается заявка. -->
+<!-- Где водители. Карта во весь экран, список сбоку: на планшете он всегда
+     помещается рядом, и оператору не приходится закрывать карту, чтобы
+     посмотреть, кто на связи. -->
+<div class="ov" id="whereOv">
+  <div class="wh">
+    <div class="wh-side">
+      <div class="wh-hd">
+        <div>
+          <div class="t">Где водители</div>
+          <div class="s" id="whSub">—</div>
+        </div>
+        <button class="wh-x" onclick="whereClose()" aria-label="Закрыть">✕</button>
+      </div>
+      <div class="wh-list" id="whList"></div>
+      <div class="wh-note">
+        Точка приходит живой трансляцией: водитель включает её сам и видит у
+        себя в чате. Маршрут за смену стирается при её закрытии.
+      </div>
+    </div>
+    <div class="wh-map"><div id="whMap"></div></div>
+  </div>
+</div>
+
 <div class="ov" id="shiftOv">
   <div class="sheet">
     <div class="t">Конец смены</div>
@@ -2617,6 +2692,126 @@ function _isoDay(shift){
 // Из объявления следует всё дальнейшее — продажи дня окончательны, по ним
 // собирается заявка в магазин, и старший получает её к пробуждению. Поэтому
 // кнопка не прячется в настройках: это последнее действие смены.
+// ── Где водители ──────────────────────────────────────────────────────────
+// Точки приходят живой трансляцией телеграма: водитель включает её сам и всё
+// это время видит у себя в чате таймер и кнопку «остановить». Мы показываем
+// последнее известное положение и, если нажать на водителя, его маршрут за
+// текущую смену — он стирается, когда смену закрывают.
+//
+// Тонкость, ради которой всё и сделано так: точка, которой полчаса, — это не
+// «водитель здесь», а «телефон замолчал». Поэтому у каждого рядом время, а
+// зелёная метка только у тех, кто на связи прямо сейчас.
+let WH = {map:null, layer:null, line:null, sel:null, timer:null, data:null};
+const WH_MS = 20000;
+
+async function whereOpen(){
+  showOv('whereOv'); haptic('light');
+  $('whList').innerHTML = '<div class="wh-note" style="border:0">Загрузка…</div>';
+  await whereLoad();
+  clearInterval(WH.timer);
+  WH.timer = setInterval(() => { if(!document.hidden) whereLoad(); }, WH_MS);
+}
+
+function whereClose(){
+  hideOv('whereOv');
+  clearInterval(WH.timer); WH.timer = null;
+}
+
+async function whereLoad(){
+  let d;
+  try{
+    d = await opApi.opFetch('/api/operator/where',
+      {params: {as: curOp, ...(WH.sel ? {track: WH.sel} : {})}});
+  }catch(e){
+    $('whList').innerHTML = '<div class="wh-note" style="border:0">Не удалось загрузить</div>';
+    return;
+  }
+  WH.data = d;
+  whPaint();
+}
+
+function whAgo(sec){
+  if(sec == null) return 'никогда';
+  if(sec < 90) return 'только что';
+  if(sec < 3600) return Math.round(sec / 60) + ' мин назад';
+  const h = Math.floor(sec / 3600);
+  return h < 24 ? h + ' ч назад' : Math.floor(h / 24) + ' дн назад';
+}
+
+function whPaint(){
+  const d = WH.data; if(!d) return;
+  const rows = d.drivers || [];
+  const live = rows.filter(r => r.live).length;
+  $('whSub').textContent = live
+    ? `${live} из ${rows.length} на связи`
+    : (rows.length ? 'никто не транслирует' : 'водителей нет');
+
+  $('whList').innerHTML = rows.map(r => `
+    <button class="wh-r${WH.sel === r.driver ? ' on' : ''}${r.live ? '' : ' off'}"
+            onclick="whPick('${_esc(r.driver)}')">
+      <span class="wh-code">${_esc(r.code || '')}</span>
+      <span class="wh-b">
+        <span class="wh-n">${_esc(r.driver)}</span>
+        <span class="wh-s">${r.has ? whAgo(r.age) : 'не транслирует'}</span>
+      </span>
+      <span class="wh-dot${r.live ? ' live' : ''}"></span>
+    </button>`).join('') ||
+    '<div class="wh-note" style="border:0">В ваших районах водителей нет</div>';
+
+  whMapPaint();
+}
+
+function whMapPaint(){
+  const d = WH.data; if(!d || !window.L) return;
+  const box = document.getElementById('whMap');
+  // Пока окно только открылось, у карты нулевой размер, и подгонка масштаба по
+  // точкам даёт вид на весь глобус. Ждём, пока контейнер получит высоту.
+  if(!box || !box.clientHeight){ setTimeout(whMapPaint, 60); return; }
+  if(!WH.map){
+    // Центр — Дубай: если никто не транслирует, карта не должна открываться
+    // посреди океана.
+    WH.map = L.map('whMap', {zoomControl:false, attributionControl:false})
+              .setView([25.15, 55.25], 11);
+    L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+                {maxZoom:20, subdomains:'0123'}).addTo(WH.map);
+    WH.layer = L.layerGroup().addTo(WH.map);
+  }
+  try{ WH.map.invalidateSize(); }catch(e){}
+  WH.layer.clearLayers();
+  if(WH.line){ WH.map.removeLayer(WH.line); WH.line = null; }
+
+  const pts = [];
+  (d.drivers || []).forEach(r => {
+    if(!r.has || r.lat == null) return;
+    pts.push([r.lat, r.lon]);
+    L.marker([r.lat, r.lon], {icon: L.divIcon({
+        className:'', iconSize:[30,30], iconAnchor:[15,30],
+        html:`<div class="wh-pin${r.live ? '' : ' stale'}"><span>${
+          _esc(r.code || '')}</span></div>`})})
+     .addTo(WH.layer)
+     .bindTooltip(`${_esc(r.driver)} · ${whAgo(r.age)}`, {direction:'top'});
+  });
+
+  // Маршрут выбранного водителя — линией поверх меток.
+  const tr = d.track || [];
+  if(WH.sel && tr.length > 1){
+    WH.line = L.polyline(tr.map(p => [p.lat, p.lon]),
+                         {color:'#C9A96E', weight:3, opacity:.85}).addTo(WH.map);
+    WH.map.fitBounds(WH.line.getBounds().pad(0.25));
+  }else if(WH.sel){
+    const me = (d.drivers || []).find(r => r.driver === WH.sel && r.has);
+    if(me) WH.map.setView([me.lat, me.lon], 15);
+  }else if(pts.length){
+    WH.map.fitBounds(L.latLngBounds(pts).pad(0.3));
+  }
+}
+
+function whPick(name){
+  WH.sel = WH.sel === name ? null : name;
+  haptic('sel');
+  whereLoad();
+}
+
 let SHIFT = null, SHIFT_BUSY = false;
 const _num = n => Number(n || 0).toLocaleString('ru-RU').replace(/,/g, ' ');
 

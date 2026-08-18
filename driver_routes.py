@@ -243,10 +243,17 @@ async def handle_geo_help(request):
             "скрепка → «Геопозиция» → «Транслировать» → 8 часов.")
     kb = {"keyboard": [[{"text": "📍 Я здесь", "request_location": True}]],
           "resize_keyboard": True, "is_persistent": True}
+    # Ответ телеграма проверяем: он умеет отвечать «принято» кодом 200 и
+    # отказом внутри тела. Молча отрапортовать успех и не отправить — худшее из
+    # возможного: человек ждёт сообщение, которого нет.
     try:
-        await tg_send(token, tid, text, parse_mode=None, reply_markup=kb)
+        res = await tg_send(token, tid, text, parse_mode=None, reply_markup=kb)
     except Exception as e:
         log.warning(f"[driver] кнопка «я здесь» не ушла ({me.get('name')}): {e}")
+        return web.json_response({"ok": False}, headers=CORS_HEADERS)
+    if not (res or {}).get("ok"):
+        log.error(f"[driver] кнопка «я здесь» отвергнута телеграмом "
+                  f"({me.get('name')}): {(res or {}).get('description')}")
         return web.json_response({"ok": False}, headers=CORS_HEADERS)
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 

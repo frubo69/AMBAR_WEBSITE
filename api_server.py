@@ -293,7 +293,11 @@ async def _resolve_op_bot_username():
 
 async def tg_send(token, chat_id, text, parse_mode="Markdown", reply_markup=None, reply_to_message_id=None):
     url     = f"https://api.telegram.org/bot{token}/sendMessage"
-    payload = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
+    payload = {"chat_id": chat_id, "text": text}
+    # Пустой parse_mode нельзя класть в запрос: телеграм отвечает «unsupported
+    # parse_mode» и не отправляет ничего. Разметки нет — значит поля нет.
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
     if reply_markup:
         payload["reply_markup"] = json.dumps(reply_markup)
     if reply_to_message_id:

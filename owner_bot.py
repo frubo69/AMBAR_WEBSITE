@@ -27,6 +27,7 @@ from telegram import (
     InlineKeyboardMarkup,
     WebAppInfo,
     MenuButtonWebApp,
+    MenuButtonDefault,
 )
 from telegram.ext import (
     Application,
@@ -73,16 +74,26 @@ def launcher_keyboard() -> InlineKeyboardMarkup:
 
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Everyone gets the launcher button. Access control happens inside
-    the miniapp itself (full-screen block overlay) and server-side in
-    require_owner — so even if someone accidentally gets pointed at this
-    bot, they can't do anything. Letting them tap the button is fine."""
+    """Кнопку получает только тот, кто в списке.
+
+    Раньше её отдавали всем: доступ всё равно проверяется и в приложении, и на
+    каждом запросе к серверу, так что нажать было безопасно. Но безопасно ≠
+    правильно. Посторонний, нажав кнопку, грузил приложение, получал семь
+    отказов подряд и поднимал тревогу — а главное, узнавал, что за этим ботом
+    что-то есть.
+
+    Теперь чужому не отдаётся ничего, кроме двух слов. Ни названия панели, ни
+    кнопки, ни намёка, что список доступа существует и в него можно попроситься.
+    """
     uid = update.effective_user.id
     allowed = is_allowed(uid)
     log.info(
         "/start uid=%s @%s allowed=%s",
         uid, update.effective_user.username, allowed,
     )
+    if not allowed:
+        await update.message.reply_text("Нет доступа")
+        return
     await update.message.reply_text(
         "Панель владельца AMBAR",
         reply_markup=launcher_keyboard(),
@@ -90,10 +101,11 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def on_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Any non-command message → re-send the launcher. Same reasoning as
-    cmd_start: the miniapp and /api/owner/* both gate access, so the bot
-    can be uniformly welcoming."""
+    """Любое сообщение — снова кнопка. Чужому — те же два слова."""
     if not update.effective_user:
+        return
+    if not is_allowed(update.effective_user.id):
+        await update.message.reply_text("Нет доступа")
         return
     await update.message.reply_text(
         "Панель владельца AMBAR",
@@ -102,19 +114,29 @@ async def on_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 
 async def post_init(application: Application):
-    """Set the bot's menu button programmatically too — BotFather's UI
-    setting is authoritative but this makes the button show up for users
-    even on fresh installs without relying on BotFather config drift."""
+    """Кнопка приложения — только у тех, кто в списке.
+
+    Общая кнопка меню ставится сразу всем, кто откроет бота: телеграм показывает
+    её ещё до первого сообщения. Поэтому общую снимаем, а каждому из своих
+    ставим личную — телеграм умеет и так."""
     try:
-        await application.bot.set_chat_menu_button(
-            menu_button=MenuButtonWebApp(
-                text="Панель",
-                web_app=WebAppInfo(url=OWNER_WEBAPP_URL),
-            )
-        )
-        log.info("menu button set to %s", OWNER_WEBAPP_URL)
+        await application.bot.set_chat_menu_button(menu_button=MenuButtonDefault())
+        log.info("общая кнопка меню снята — она видна посторонним")
     except Exception as e:
-        log.warning("could not set menu button: %s", e)
+        log.warning("не удалось снять общую кнопку: %s", e)
+    for uid in sorted(OWNER_IDS | MANAGER_IDS):
+        try:
+            await application.bot.set_chat_menu_button(
+                chat_id=uid,
+                menu_button=MenuButtonWebApp(
+                    text="Панель",
+                    web_app=WebAppInfo(url=OWNER_WEBAPP_URL),
+                ),
+            )
+        except Exception as e:
+            # Не открывал бота — телеграму некуда ставить. Появится при /start.
+            log.info("кнопка для %s не поставлена: %s", uid, str(e)[:80])
+    log.info("кнопка приложения выдана %s своим", len(OWNER_IDS | MANAGER_IDS))
 
 
 def main():

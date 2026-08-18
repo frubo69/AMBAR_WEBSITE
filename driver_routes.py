@@ -285,6 +285,7 @@ def _iso(v) -> str:
 
 
 WO_MAX_PHOTO = 900_000          # больше — не фотография, а недосжатая картинка
+WO_MAX_THUMB = 30_000           # превью в самой записи: список должен открываться
 WO_MAX_QTY = 240                # ящик пива это 24; больше похоже на опечатку
 
 
@@ -333,9 +334,15 @@ async def handle_writeoff_add(request):
     if len(photo) < 2000 or photo[:2] not in (b"\xff\xd8", b"\x89P"):
         return web.json_response({"error": "no_photo"}, status=400, headers=CORS_HEADERS)
 
+    # Превью лежит в самой записи: иначе список списаний открывается пустыми
+    # квадратами, а ради квадратов раздел никто открывать не станет.
+    thumb = (body.get("thumb") or "")
+    if not thumb.startswith("data:image/") or len(thumb) > WO_MAX_THUMB:
+        thumb = ""
+
     now = datetime.now(timezone.utc)
     wid = await db.writeoff_add({
-        "at": now, "day": _biz_day(), "item": pid,
+        "at": now, "day": _biz_day(), "item": pid, "thumb": thumb,
         "name": cat[pid].get("name", ""), "qty": qty, "kind": kind,
         "note": (body.get("note") or "").strip()[:200],
         "district": me.get("district") or "", "district_code": me.get("district_code") or "",

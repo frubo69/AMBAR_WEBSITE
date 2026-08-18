@@ -12473,7 +12473,7 @@ function woHome(){
   // раздел и открывают. Строки ниже отвечают уже на «что именно».
   const kinds = (w.by_kind || []).map(k => `<div class="wo-k">
       <span class="wo-k-n" style="color:${WO_TINT[k.kind] || 'var(--sub)'}">${fmt(k.qty)}</span>
-      <span class="wo-k-t">${esc(k.kind)}</span></div>`).join('');
+      <span class="wo-k-t">${escS(k.kind)}</span></div>`).join('');
   mid.innerHTML = `
     <div class="wo-sum">
       <div class="wo-sum-l">
@@ -12483,7 +12483,7 @@ function woHome(){
       <div class="wo-ks">${kinds}</div>
     </div>
     ${(w.by_driver || []).length > 1 ? `<div class="wo-drv">${
-      w.by_driver.map(d => `<span class="wo-drv-i"><b>${esc(d.driver)}</b> ${fmt(d.qty)}</span>`)
+      w.by_driver.map(d => `<span class="wo-drv-i"><b>${escS(d.driver)}</b> ${fmt(d.qty)}</span>`)
         .join('')}</div>` : ''}
     <div class="wo-rows">${w.rows.map(woRow).join('')}</div>`;
 }
@@ -12492,14 +12492,15 @@ function woRow(r){
   const d = new Date(/Z$|[+-]\d{2}:?\d{2}$/.test(r.at) ? r.at : r.at + 'Z');
   const when = isNaN(d) ? (r.day || '') : d.toLocaleString('ru-RU',
     {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Dubai'});
-  return `<div class="wo-row" onclick="woShot('${esc(r.id)}','${esc(r.name)}')">
-    <div class="wo-th" id="woth-${esc(r.id)}"></div>
+  return `<div class="wo-row" onclick="woShot('${escS(r.id)}','${escS(r.name)}')">
+    <div class="wo-th" id="woth-${escS(r.id)}">${
+      r.thumb ? `<img src="${escS(r.thumb)}" alt="">` : ''}</div>
     <div class="wo-b">
-      <div class="wo-n">${esc(r.name)}
+      <div class="wo-n">${escS(r.name)}
         <span class="wo-q">× ${fmt(r.qty)}</span></div>
-      <div class="wo-m"><span style="color:${WO_TINT[r.kind] || 'var(--sub)'}">${esc(r.kind)}</span>
-        · ${esc(r.by)}${r.district_code ? ' · ' + esc(r.district_code) : ''} · ${when}</div>
-      ${r.note ? `<div class="wo-note-t">${esc(r.note)}</div>` : ''}
+      <div class="wo-m"><span style="color:${WO_TINT[r.kind] || 'var(--sub)'}">${escS(r.kind)}</span>
+        · ${escS(r.by)}${r.district_code ? ' · ' + escS(r.district_code) : ''} · ${when}</div>
+      ${r.note ? `<div class="wo-note-t">${escS(r.note)}</div>` : ''}
     </div>
     <div class="wo-aed">${fmt(r.aed)}<i>AED</i></div>
   </div>`;
@@ -12522,7 +12523,7 @@ async function woShot(id, name){
     ov.onclick = () => ov.classList.remove('show');
     document.body.appendChild(ov);
   }
-  ov.innerHTML = `<img src="${url}" alt="Снимок списания"><span>${esc(name || '')}</span>`;
+  ov.innerHTML = `<img src="${url}" alt="Снимок списания"><span>${escS(name || '')}</span>`;
   ov.classList.add('show');
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }

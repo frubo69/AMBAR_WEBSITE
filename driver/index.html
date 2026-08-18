@@ -437,6 +437,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .blank{display:flex;flex-direction:column;align-items:center;justify-content:center;
   gap:14px;text-align:center;padding:20px 24px;
   min-height:calc(100dvh - 76px - var(--safe-top) - 18px - var(--tabbar) - 24px)}
+/* Когда под пустым экраном есть что показать, он ужимается: иначе кнопка
+   списания уезжает за нижний край ровно в тот день, когда она и нужна. */
+.blank.short{min-height:auto;padding:26px 24px 4px}
+.blank.short .blank-i{width:60px;height:60px;border-radius:20px}
 .blank-i{width:76px;height:76px;border-radius:26px;display:flex;align-items:center;
   justify-content:center;color:var(--gold2);background:var(--gold-soft);
   border:1px solid rgba(201,169,110,.22)}
@@ -1838,8 +1842,8 @@ function setTab(t){
 }
 
 // Пустой экран: значок, заголовок, строка объяснения.
-function blank(ico, title, sub){
-  return `<div class="blank">
+function blank(ico, title, sub, cls){
+  return `<div class="blank ${cls || ''}">
     <span class="blank-i">${svg(ico, 34)}</span>
     <b>${title}</b>
     ${sub ? `<i>${sub}</i>` : ''}
@@ -2106,6 +2110,13 @@ function woShot(inp){
     c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
     c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
     WO.photo = c.toDataURL('image/jpeg', 0.72);
+    // Заодно крошечная копия: она поедет внутри самой записи, чтобы список
+    // списаний у владельца открывался с картинками, а не с пустыми рамками.
+    const t = document.createElement('canvas');
+    const tk = Math.min(1, 96 / Math.max(img.width, img.height));
+    t.width = Math.round(img.width * tk); t.height = Math.round(img.height * tk);
+    t.getContext('2d').drawImage(img, 0, 0, t.width, t.height);
+    WO.thumb = t.toDataURL('image/jpeg', 0.5);
     woPaint();
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
   };
@@ -2176,7 +2187,8 @@ async function woSend(){
   const snap = {name: WO.name, qty: WO.qty, kind: WO.kind};
   try{
     await drvApi.drvFetch('/api/driver/writeoff', {method: 'POST', body: {
-      item: WO.item, qty: WO.qty, kind: WO.kind, note: WO.note || '', photo: WO.photo}});
+      item: WO.item, qty: WO.qty, kind: WO.kind, note: WO.note || '',
+      photo: WO.photo, thumb: WO.thumb || ''}});
     WO_LOG.unshift({...snap, at: new Date().toISOString()});
     toast(`Списали: ${snap.name} × ${snap.qty}`);
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
@@ -3687,7 +3699,8 @@ function renderSupply(){
   if(!S.mine.length && !S.free.length && !S.taken.length){
     body.innerHTML = blank('<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4"/><path d="M12 11v10"/>',
       'Принимать нечего',
-      'Как только старший загрузит ответ магазина, поставка появится здесь') + woFoot();
+      'Как только старший загрузит ответ магазина, поставка появится здесь',
+      'short') + woFoot();
     return;
   }
   let h = '';

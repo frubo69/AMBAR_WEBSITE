@@ -1010,7 +1010,7 @@ async def handle_writeoffs(request):
             "item": pid, "name": r.get("name", "") or (cat.get(pid) or {}).get("name", ""),
             "qty": qty, "aed": aed, "kind": r.get("kind", ""), "note": r.get("note", ""),
             "by": r.get("by", ""), "district": r.get("district", ""),
-            "district_code": r.get("district_code", ""),
+            "district_code": r.get("district_code", ""), "thumb": r.get("thumb", ""),
         })
         k = by_kind.setdefault(r.get("kind", "—"), {"kind": r.get("kind", "—"),
                                                     "qty": 0, "aed": 0.0})

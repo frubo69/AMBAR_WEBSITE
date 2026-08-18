@@ -4722,7 +4722,7 @@ function grabGPS(){
     // Open full-screen map for fine-tuning
     openMapPicker('gps',lat,lon);
   },()=>fail(),{timeout:10000,maximumAge:60000,enableHighAccuracy:true});
-  function fail(){btn.style.opacity='1';set('gps-lbl',t('gpsBtn'));stat.className='gps-status fail';stat.textContent=t('gpsFail');}
+  function fail(){btn.style.opacity='1';set('gps-lbl',t('gpsBtn'));stat.className='gps-status fail';stat.textContent=geoHint();}
 }
 
 // ── MAP PICKER (Leaflet + Google tiles) ──────────────────────────────────────
@@ -4780,51 +4780,84 @@ function _lm(){
   const lm = tgw && tgw.LocationManager;
   // Версию проверяем сами и до всего остального. У старых клиентов объект в
   // библиотеке есть, а метода в самом телеграме нет: init() тогда молча
-  // возвращается, не вызвав колбэк, и приложение ждёт ответа вечно. Именно так
-  // «Определяем…» и висело.
+  // возвращается, не вызвав колбэк, и приложение ждёт ответа вечно.
   if(!lm || typeof lm.getLocation !== 'function') return null;
   if(!(tgw.isVersionAtLeast && tgw.isVersionAtLeast('8.0'))) return null;
   if(lm.isLocationAvailable === false) return null;
   return lm;
 }
 
-function hasGeo(){ return !!(_lm() || navigator.geolocation); }
-
-// Ответ приходит от клиента телеграма, а он может не ответить вовсе — тогда
-// нельзя ни ждать, ни молчать: человеку нужен адрес. Поэтому у каждого шага
-// свой предел терпения, после которого идём обычной дорогой.
+// Геопозицию спрашиваем ТОЛЬКО через телеграм.
+//
+// Браузерного пути здесь больше нет, и это осознанный размен. Он показывал
+// системное окно с адресом сайта — «150-241-70-116.sslip.io хочет знать ваше
+// местоположение», — а в Эмиратах засвеченный домен живёт до первой
+// блокировки; переезжать дороже, чем обойтись без автоопределения у тех
+// немногих, у кого телеграм старее восьмой версии.
+//
+// Что видит человек, если телеграм не отдал точку: обычную подсказку выбрать
+// место на карте. Карта работает без геопозиции, адрес указывается пальцем, и
+// заказ не теряется — теряется только одно нажатие удобства.
 const GEO_WAIT = 7000;
+let _geoWhy = '';
+
+function hasGeo(){ return !!_lm(); }
+
+function geoWhy(){
+  const tgw = window.Telegram && Telegram.WebApp;
+  if(!tgw) return 'вне телеграма';
+  if(!tgw.LocationManager) return 'телеграм ' + (tgw.version || '?') + ' без геопозиции';
+  if(!(tgw.isVersionAtLeast && tgw.isVersionAtLeast('8.0')))
+    return 'телеграм ' + (tgw.version || '?') + ' старее 8.0';
+  if(tgw.LocationManager.isLocationAvailable === false) return 'геопозиция выключена в телефоне';
+  return _geoWhy || 'телеграм не ответил';
+}
+
+// Человеку — не диагноз, а что сделать. Причина у каждого отказа своя, и
+// действие тоже: одному обновить телеграм, другому включить геолокацию в
+// телефоне, третьему просто ткнуть в карту.
+function geoHint(){
+  const ru = lang === 'ru';
+  const why = geoWhy();
+  if(why.indexOf('доступ не дан') >= 0)
+    return ru ? 'Разрешите геопозицию в настройках Telegram'
+              : 'Allow location access in Telegram settings';
+  if(why.indexOf('выключена в телефоне') >= 0)
+    return ru ? 'Включите геолокацию в настройках телефона'
+              : 'Turn on location services in your phone settings';
+  if(why.indexOf('старее') >= 0 || why.indexOf('без геопозиции') >= 0)
+    return ru ? 'Обновите Telegram — или укажите адрес на карте'
+              : 'Update Telegram — or pick the address on the map';
+  return ru ? 'Не удалось определить — укажите адрес на карте'
+            : 'Could not detect — pick the address on the map';
+}
 
 function askGeo(ok, err, opts){
   let done = false;
-  const finish = fn => (...a) => { if(done) return; done = true; fn(...a); };
-  const good = finish(ok);
-  const browser = finish(() => {
-    if(!navigator.geolocation) return err && err();
-    navigator.geolocation.getCurrentPosition(ok, err, opts || {});
-  });
+  const fin = fn => (...a) => { if(!done){ done = true; fn(...a); } };
+  const good = fin(ok);
+  const fail = fin(() => err && err());
   const lm = _lm();
-  if(!lm) return browser();
+  if(!lm){ _geoWhy = ''; return fail(); }
 
-  // Не ответил за отведённое время — не бросаем человека на полпути.
-  const guard = setTimeout(browser, GEO_WAIT);
+  // Клиент может не ответить вовсе — не держим человека в ожидании.
+  const guard = setTimeout(() => { _geoWhy = 'телеграм не ответил'; fail(); }, GEO_WAIT);
   const read = () => {
     try{
       lm.getLocation(d => {
         clearTimeout(guard);
         if(d && typeof d.latitude === 'number'){
+          _geoWhy = '';
           good({coords:{latitude: d.latitude, longitude: d.longitude,
                         accuracy: d.horizontal_accuracy || 0}});
         }else{
-          // Отказ — это ответ, а не сбой: браузером не переспрашиваем, иначе
-          // всплывёт то самое окно с адресом сайта.
-          finish(() => err && err())();
+          _geoWhy = 'доступ не дан';
+          fail();
         }
       });
-    }catch(e){ clearTimeout(guard); browser(); }
+    }catch(e){ clearTimeout(guard); _geoWhy = 'телеграм отказал'; fail(); }
   };
-  if(lm.isInited) read();
-  else lm.init(() => { read(); });
+  if(lm.isInited) read(); else lm.init(() => { read(); });
 }
 
 const MAP_TILES={
@@ -5115,7 +5148,7 @@ function startGPSAdd(){
   const btn=el('btn-add-gps');
   if(btn){btn.classList.add('loading');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=lang==='ru'?'Определяем...':'Getting location...';}
   if(!hasGeo()){
-    if(btn){btn.classList.remove('loading');btn.classList.add('err');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=lang==='ru'?'GPS недоступен':'GPS unavailable';}
+    if(btn){btn.classList.remove('loading');btn.classList.add('err');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=geoHint();}
     return;
   }
   askGeo(pos=>{
@@ -5340,22 +5373,22 @@ function confirmGpsMiniEdit(){
 function _gpsMiniLocateMe(){
   if(!_miniMap||!_miniEditing)return;
   haptic.light();
-  if(!hasGeo()){showToast(lang==='ru'?'GPS недоступен':'GPS unavailable','err');return;}
+  if(!hasGeo()){showToast(geoHint(),'err');return;}
   askGeo(pos=>{
     _miniMap.setView([pos.coords.latitude,pos.coords.longitude],17,{animate:true});
     haptic.success();
   },()=>{
-    showToast(lang==='ru'?'Не удалось определить':'Could not get location','err');
+    showToast(geoHint(),'err');
   },{timeout:8000,maximumAge:30000,enableHighAccuracy:true});
 }
 
 function _mapGoToUserLocation(){
   if(!_mapPicker)return;
   haptic.light();
-  if(!hasGeo()){showToast(lang==='ru'?'GPS недоступен':'GPS unavailable','err');return;}
+  if(!hasGeo()){showToast(geoHint(),'err');return;}
   askGeo(pos=>{
     _mapPicker.setView([pos.coords.latitude,pos.coords.longitude],17,{animate:true});
-  },()=>{showToast(lang==='ru'?'Не удалось получить геолокацию':'Could not get location','err');},
+  },()=>{showToast(geoHint(),'err');},
   {timeout:8000,maximumAge:30000,enableHighAccuracy:true});
 }
 

@@ -15,7 +15,7 @@ from datetime import datetime, timezone, timedelta
 
 from dotenv import load_dotenv
 from telegram import (Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo,
-                      MenuButtonWebApp, KeyboardButton, ReplyKeyboardMarkup)
+                      MenuButtonWebApp, ReplyKeyboardRemove)
 from telegram.ext import (Application, CommandHandler, MessageHandler,
                           ContextTypes, filters)
 
@@ -78,13 +78,11 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup([[
             InlineKeyboardButton("Открыть заказы", web_app=WebAppInfo(url=DRIVER_WEBAPP_URL))]]))
     await _remember(sent)
-    # Кнопка «я здесь» ставится отдельным сообщением: телеграм не умеет
-    # показывать инлайн-кнопку и клавиатуру у поля ввода в одном.
+    # Заодно снимаем старую клавиатуру, если она осталась с прошлых версий.
     kb = await update.message.reply_text(
-        "Кнопка ниже отправляет вашу точку одним касанием — она останется у поля "
-        "ввода.\n\nЧтобы оператор видел вас всю смену, включите трансляцию: "
+        "Чтобы оператор видел вас всю смену, включите трансляцию: "
         "скрепка → «Геопозиция» → «Транслировать» → 8 часов.",
-        reply_markup=where_keyboard())
+        reply_markup=drop_keyboard())
     await _remember(kb)
     log.info(f"вход: {me['name']} ({uid})")
 
@@ -107,16 +105,18 @@ def _biz_day(ref=None) -> str:
     return (ref if ref >= anchor else ref - timedelta(days=1)).strftime("%Y-%m-%d")
 
 
-def where_keyboard() -> ReplyKeyboardMarkup:
-    """Кнопка «я здесь» у поля ввода — насовсем.
-
-    Одно касание отправляет текущую точку. Это самый короткий путь, который
-    телеграм вообще даёт: без меню, без скрепки, без выбора. Живую трансляцию
-    так не включить — её кнопка нативная и живёт в скрепке, — но отметиться
-    здесь и сейчас можно за одно движение."""
-    return ReplyKeyboardMarkup(
-        [[KeyboardButton("📍 Я здесь", request_location=True)]],
-        resize_keyboard=True, is_persistent=True)
+# Кнопки «я здесь» у поля ввода больше нет.
+#
+# Она была нужна, пока приложение не умело брать точку само. Теперь умеет —
+# и точка уходит без единого нажатия, просто когда водитель открывает
+# приложение. А кнопка осталась бы висеть серой полосой под полем ввода всю
+# смену, занимая место и напоминая о себе без повода. Одноразовая польза,
+# постоянная цена.
+#
+# Убираем и у тех, у кого она уже стоит: клавиатура живёт в чате, пока её
+# явно не снимут.
+def drop_keyboard() -> ReplyKeyboardRemove:
+    return ReplyKeyboardRemove()
 
 
 async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -172,8 +172,8 @@ async def cmd_where(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "3. «Транслировать» — на 8 часов\n\n"
         "Телефон будет сам присылать точку, даже когда телеграм свёрнут. "
         "Маршрут стирается, когда закрывают смену.\n\n"
-        "Отметиться разово — кнопкой ниже.",
-        reply_markup=where_keyboard())
+        "Пока приложение открыто, точка уходит и без трансляции — сама.",
+        reply_markup=drop_keyboard())
     await _remember(sent)
 
 

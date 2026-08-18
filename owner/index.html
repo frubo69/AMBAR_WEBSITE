@@ -1303,35 +1303,61 @@ button.path:active{transform:scale(.995)}
   margin-top:3px;font-variant-numeric:tabular-nums}
 .pr-kind-s{font-size:11px;color:var(--muted);margin-top:2px}
 
-/* ── Где водители ─────────────────────────────────────────────────────────
-   Карта сверху на треть экрана, список под ней. На телефоне иначе никак: карта
-   во весь экран прячет, кто на связи, а список во весь экран не отвечает на
-   вопрос «где». */
-.wh-map{position:relative;flex:0 0 42vh;background:#0b0e18;
-  border-bottom:1px solid var(--border2)}
+/* ── Где водители ──────────────────────────────────────────────────────────
+   Карта во весь экран, поверх неё шторка, которую тянут пальцем. Так сделано
+   в Find My, и сделано правильно: карта — главное, а список нужен то целиком,
+   то одной строкой. Три положения вместо одного фиксированного размера
+   избавляют от выбора «или карта, или список». */
+.wh-ov{padding:0}
+/* z-index обязателен, хотя карта и так лежит первой: Leaflet раскладывает свои
+   слои числами до семисот, и без собственного контекста наложения они
+   перекрывали и шторку, и кнопку «назад» — те просто не появлялись на экране. */
+.wh-map{position:absolute;inset:0;z-index:0;background:#0b0e18}
 #whMap{position:absolute;inset:0}
 /* Тайлы гасим тем же фильтром, что и в клиентском приложении: светлая карта
    посреди тёмной панели бьёт по глазам в ночную смену. */
 #whMap .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) saturate(.18) brightness(.9)}
 .leaflet-control-attribution,.leaflet-control-zoom{display:none!important}
+/* Назад — кружком поверх карты: шапки здесь нет, её место занимает карта. */
+.wh-back{position:absolute;top:calc(12px + var(--safe-top));left:12px;z-index:5;
+  width:40px;height:40px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;color:var(--text);background:rgba(10,10,14,.72);
+  border:1px solid var(--border2);-webkit-backdrop-filter:blur(14px);
+  backdrop-filter:blur(14px);box-shadow:0 4px 16px rgba(0,0,0,.4)}
+
+.wh-sheet{position:absolute;left:0;right:0;bottom:0;z-index:6;
+  height:88vh;display:flex;flex-direction:column;
+  border-radius:18px 18px 0 0;background:rgba(12,12,18,.9);
+  -webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);
+  border-top:1px solid var(--border2);box-shadow:0 -12px 40px rgba(0,0,0,.55);
+  transform:translateY(0);transition:transform .34s var(--e1);
+  touch-action:none}
+.wh-sheet.drag{transition:none}
+.wh-hd{flex:0 0 auto;padding:8px 18px 12px;cursor:grab;user-select:none;
+  -webkit-user-select:none}
+.wh-grab{display:block;width:38px;height:4px;margin:0 auto 12px;border-radius:2px;
+  background:rgba(255,255,255,.22)}
+.wh-ttl{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;
+  letter-spacing:-.3px}
+.wh-sub{font-size:12px;color:var(--muted);margin-top:3px}
+.wh-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  padding:6px 14px calc(20px + var(--safe-bottom));touch-action:pan-y}
+.wh-body::-webkit-scrollbar{display:none}
+
 /* Строка водителя.
-   Она отвечает не на «как его зовут» — это и так известно, — а на «кому отдать
+   Отвечает не на «как его зовут» — это и так известно, — а на «кому отдать
    следующий заказ». Поэтому слева состояние связи, справа сколько у человека
-   уже на руках, а под именем район и до какого часа хватит трансляции. Без
-   последнего трансляция гаснет молча посреди смены.
-   Тот, кто не на связи, не прячется и не кричит: он приглушён, но читается —
-   диспетчеру важно видеть и его тоже. */
-.wh-r{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;
+   уже на руках, а под именем район и до какого часа хватит трансляции. */
+.wh-r{display:flex;align-items:center;gap:12px;width:100%;padding:12px 13px;
   margin-bottom:8px;border-radius:15px;text-align:left;cursor:pointer;
-  font-family:inherit;color:var(--text);background:var(--card);
+  font-family:inherit;color:var(--text);background:rgba(255,255,255,.045);
   border:1px solid var(--border2);transition:border-color .18s var(--e1),
   background .18s var(--e1)}
-.wh-r.on{border-color:rgba(201,169,110,.5);
-  background:linear-gradient(160deg,rgba(201,169,110,.09),transparent 60%),var(--card2)}
-.wh-r.off{background:var(--bg3)}
+.wh-r.on{border-color:rgba(201,169,110,.5);background:rgba(201,169,110,.1)}
+.wh-r.off{background:rgba(255,255,255,.02)}
 .wh-r.off .wh-n{color:var(--sub)}
 /* Огонёк связи. Живой пульсирует — глаз ловит движение раньше, чем читает
-   подпись; погасший просто тускл. */
+   подпись; свежая точка без трансляции золотая и без пульса; погасший тускл. */
 .wh-i{position:relative;width:34px;height:34px;flex:0 0 auto;border-radius:12px;
   display:flex;align-items:center;justify-content:center;background:var(--bg3);
   border:1px solid var(--border2);color:var(--dim)}
@@ -1339,14 +1365,12 @@ button.path:active{transform:scale(.995)}
   color:#3ddc84}
 .wh-r.live .wh-i::after{content:'';position:absolute;inset:-1px;border-radius:12px;
   border:1px solid rgba(61,220,132,.55);animation:whPulse 2.2s ease-out infinite}
-/* Свежая точка без трансляции: не зелёный — он обещал бы связь, которой нет,
-   и не серый — водитель был здесь минуту назад. Золотой, без пульса. */
-.wh-r.snap .wh-i{background:var(--gold-soft);border-color:rgba(201,169,110,.35);
-  color:var(--gold2)}
-.wh-r.snap .wh-s u{text-decoration:none;color:var(--gold2);font-weight:600}
 @keyframes whPulse{0%{transform:scale(1);opacity:.75}70%{transform:scale(1.28);opacity:0}
   100%{opacity:0}}
 @media (prefers-reduced-motion:reduce){.wh-r.live .wh-i::after{animation:none}}
+.wh-r.snap .wh-i{background:var(--gold-soft);border-color:rgba(201,169,110,.35);
+  color:var(--gold2)}
+.wh-r.snap .wh-s u{text-decoration:none;color:var(--gold2);font-weight:600}
 .wh-b{flex:1;min-width:0}
 .wh-n{display:flex;align-items:baseline;gap:7px;font-size:14.5px;font-weight:600;
   line-height:1.2}
@@ -1356,33 +1380,29 @@ button.path:active{transform:scale(.995)}
   margin-top:4px;line-height:1.25}
 .wh-s b{color:#3ddc84;font-weight:600}
 .wh-s i{font-style:normal;color:var(--dim)}
-/* Сколько заказов на руках — то, ради чего в этот список и смотрят перед тем,
-   как отдать следующий. */
 .wh-w{flex:0 0 auto;text-align:right;min-width:52px}
-.wh-w-v{display:block;font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;
-  line-height:1;color:var(--gold2);font-variant-numeric:tabular-nums}
+.wh-w-v{display:block;font-family:'Space Grotesk',sans-serif;font-size:19px;
+  font-weight:700;line-height:1;color:var(--gold2);font-variant-numeric:tabular-nums}
 .wh-w-v.zero{color:var(--dim)}
 .wh-w-l{display:block;font-size:9.5px;letter-spacing:.5px;text-transform:uppercase;
   color:var(--muted);margin-top:4px}
-/* Метка на карте несёт код района — тот же, что в строке: глаз связывает их
-   без легенды. */
-.wh-pin{display:flex;align-items:center;justify-content:center;width:30px;height:30px;
-  border-radius:50% 50% 50% 4px;transform:rotate(-45deg);
-  font-family:'Space Grotesk',sans-serif;font-weight:800;font-size:10px;
-  background:#3ddc84;color:#06241a;border:2px solid rgba(0,0,0,.35);
-  box-shadow:0 3px 10px rgba(0,0,0,.5)}
-.wh-pin span{transform:rotate(45deg)}
+
+/* Метка на карте — кружок с буквами района, как в Find My. Она читается на
+   любом фоне и не спорит с картой формой, а состояние несёт цветом кольца. */
+.wh-pin{display:flex;align-items:center;justify-content:center;width:38px;height:38px;
+  border-radius:50%;font-family:'Space Grotesk',sans-serif;font-weight:800;
+  font-size:12px;letter-spacing:.3px;color:#06241a;background:#3ddc84;
+  border:2.5px solid rgba(255,255,255,.92);
+  box-shadow:0 4px 14px rgba(0,0,0,.55)}
 .wh-pin.snap{background:#C9A96E;color:#1a1408}
-.wh-pin.stale{background:#6b7280;color:#0b0e18}
-/* Начало и конец маршрута: без них линия не читается — непонятно, откуда куда. */
+.wh-pin.stale{background:#7d879c;color:#0b0e18}
+.wh-pin.sel{transform:scale(1.14)}
 .wh-dotp{width:12px;height:12px;border-radius:50%;background:var(--gold2);
   border:2px solid #0b0e18;box-shadow:0 0 0 1px rgba(201,169,110,.6)}
 .wh-note{padding:14px 4px 4px;font-size:11px;line-height:1.5;color:var(--dim)}
-/* Шапка списка: одной строкой то, что иначе пришлось бы считать по строкам. */
 .wh-sum{display:flex;flex-wrap:wrap;gap:7px;padding:2px 2px 10px}
-.wh-sum span{flex:1 1 30%}
-.wh-sum span{flex:1;padding:9px 10px;border-radius:11px;background:var(--card);
-  border:1px solid var(--border2);text-align:center}
+.wh-sum span{flex:1 1 0;min-width:0;padding:9px 10px;border-radius:11px;
+  background:rgba(255,255,255,.05);border:1px solid var(--border2);text-align:center}
 .wh-sum b{display:block;font-family:'Space Grotesk',sans-serif;font-size:17px;
   font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
 .wh-sum i{display:block;font-style:normal;font-size:9.5px;letter-spacing:.5px;
@@ -3616,20 +3636,25 @@ button.path:active{transform:scale(.995)}
 </div>
 
 <!-- ============ ГДЕ ВОДИТЕЛИ ============ -->
-<!-- Карта сверху, список снизу: на телефоне это единственный порядок, при
-     котором видно и то и другое, не листая. -->
-<div class="stk-ov" id="whOv">
-  <div class="stk-top">
-    <div class="stk-top-r">
-      <button class="stk-x" onclick="whereClose()" aria-label="Назад"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
-      <div class="stk-ttl" onclick="hidTap()">
-        <div class="stk-ttl-t">Где водители</div>
-        <div class="stk-ttl-s" id="whSub">—</div>
-      </div>
-    </div>
-  </div>
+<!-- Карта во весь экран, поверх — шторка, которую можно тянуть пальцем.
+     Так устроен Find My, и устроен правильно: карта — главное, список —
+     столько, сколько человеку сейчас нужно. Одним движением он либо смотрит,
+     где все, либо читает, кто чем занят. -->
+<div class="stk-ov wh-ov" id="whOv">
   <div class="wh-map"><div id="whMap"></div></div>
-  <div class="stk-mid" id="whList"></div>
+  <button class="wh-back" onclick="whereClose()" aria-label="Назад">
+    <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+         stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M15 5l-7 7 7 7"/></svg>
+  </button>
+  <div class="wh-sheet" id="whSheet">
+    <div class="wh-hd" id="whGrab">
+      <span class="wh-grab"></span>
+      <div class="wh-ttl">Где водители</div>
+      <div class="wh-sub" id="whSub">—</div>
+    </div>
+    <div class="wh-body" id="whList"></div>
+  </div>
 </div>
 
 <!-- ============ BROADCAST COMPOSER ============ -->
@@ -4744,9 +4769,88 @@ let WH = {map:null, layer:null, line:null, sel:null, timer:null, data:null};
 // последние точки и заказы, всё из памяти.
 const WH_MS = 10000;
 
+// ── шторка ────────────────────────────────────────────────────────────────
+// Три положения вместо одного фиксированного размера: сложенная показывает
+// одну строку итога и отдаёт экран карте, средняя — половину списка, полная —
+// весь. Так человеку не приходится выбирать между «вижу, где все» и «читаю,
+// кто чем занят»: он берёт то, что нужно сейчас, одним движением пальца.
+//
+// Тянется вся шапка, а не только полоска: попасть в четыре пикселя на ходу
+// невозможно, и Find My поэтому тоже ловит движение по всей верхушке.
+const WH_SNAP = {full: 0.12, half: 0.52, peek: 0.78};   // доля высоты экрана
+let _whY = 'half', _whDrag = null;
+
+function whSheetY(pos){
+  const h = document.getElementById('whSheet').offsetHeight || innerHeight * 0.88;
+  return Math.round(h * (WH_SNAP[pos] - WH_SNAP.full) / (1 - WH_SNAP.full) * 1.0);
+}
+
+function whSnap(pos, smooth){
+  _whY = pos;
+  const sh = document.getElementById('whSheet');
+  if(!sh) return;
+  sh.classList.toggle('drag', !smooth);
+  sh.style.transform = `translateY(${Math.round(sh.offsetHeight * (WH_SNAP[pos] - WH_SNAP.full) / (1 - WH_SNAP.full))}px)`;
+  if(smooth) requestAnimationFrame(() => sh.classList.remove('drag'));
+  // Карта живёт в оставшейся части экрана: её центр сдвигается вместе со
+  // шторкой, иначе метки уезжают под неё.
+  setTimeout(() => { try{ WH.map && WH.map.invalidateSize(); }catch(e){} }, 360);
+}
+
+function whDragInit(){
+  const sh = document.getElementById('whSheet'), hd = document.getElementById('whGrab');
+  const body = document.getElementById('whList');
+  if(!sh || !hd || hd.dataset.on) return;
+  hd.dataset.on = '1';
+  const cur = () => sh.offsetHeight * (WH_SNAP[_whY] - WH_SNAP.full) / (1 - WH_SNAP.full);
+  const start = e => {
+    _whDrag = {y0: (e.touches ? e.touches[0].clientY : e.clientY), base: cur(), moved: 0};
+    sh.classList.add('drag');
+  };
+  const move = e => {
+    if(!_whDrag) return;
+    const y = (e.touches ? e.touches[0].clientY : e.clientY) - _whDrag.y0;
+    _whDrag.moved = y;
+    const max = sh.offsetHeight * (WH_SNAP.peek - WH_SNAP.full) / (1 - WH_SNAP.full);
+    const v = Math.max(-20, Math.min(max + 20, _whDrag.base + y));
+    sh.style.transform = `translateY(${v}px)`;
+    if(e.cancelable) e.preventDefault();
+  };
+  const end = () => {
+    if(!_whDrag) return;
+    const moved = _whDrag.moved;
+    _whDrag = null;
+    // Быстрый короткий свайп листает на одно положение, медленный — тянет
+    // туда, куда отпустили.
+    const order = ['full', 'half', 'peek'];
+    let i = order.indexOf(_whY);
+    if(moved < -40) i = Math.max(0, i - 1);
+    else if(moved > 40) i = Math.min(order.length - 1, i + 1);
+    whSnap(order[i], true);
+    try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  };
+  hd.addEventListener('mousedown', start);
+  hd.addEventListener('touchstart', start, {passive:true});
+  document.addEventListener('mousemove', move);
+  document.addEventListener('touchmove', move, {passive:false});
+  document.addEventListener('mouseup', end);
+  document.addEventListener('touchend', end);
+  // Тап по шапке в сложенном виде раскрывает: жест не единственный способ.
+  hd.addEventListener('click', () => {
+    if(_whDrag) return;
+    if(_whY === 'peek') whSnap('half', true);
+  });
+  // Список докручен доверху и тянут вниз — это жест шторки, а не прокрутки.
+  body.addEventListener('touchstart', e => {
+    if(body.scrollTop <= 0) start(e);
+  }, {passive:true});
+}
+
 async function whereOpen(){
   const ov = document.getElementById('whOv');
   ov.classList.add('show');
+  whDragInit();
+  whSnap('half', false);
   document.getElementById('whList').innerHTML =
     '<div class="exp-empty">Загрузка…</div>';
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
@@ -4860,7 +4964,6 @@ function whPaint(){
       <span class="${snap ? '' : 'dim'}"><b>${snap}</b><i>недавно</i></span>
       <span class="${work ? '' : 'dim'}"><b>${work}</b><i>${
         pluralize(work,'заказ','заказа','заказов')} в пути</i></span>
-      <span class="dim"><b>${rows.length - live - snap}</b><i>не видно</i></span>
     </div>` + rows.map(r => whRow(r, WH.sel === r.driver && trackOn)).join('')
     : '<div class="exp-empty">Водителей нет</div>')
     + `<div class="wh-note">Точку присылает живая трансляция телеграма — водитель
@@ -4895,7 +4998,8 @@ function whMapPaint(){
     const st = whState(r);
     L.marker([r.lat, r.lon], {icon: L.divIcon({
         className:'', iconSize:[30,30], iconAnchor:[15,30],
-        html:`<div class="wh-pin${st === 'stream' ? '' : (st === 'snap' ? ' snap' : ' stale')}"><span>${
+        html:`<div class="wh-pin${st === 'stream' ? '' : (st === 'snap' ? ' snap' : ' stale')}${
+          WH.sel === r.driver ? ' sel' : ''}"><span>${
           escS(r.code || '')}</span></div>`})})
      .addTo(WH.layer)
      .bindTooltip(`${escS(r.driver)} · ${whAgo(r.age)}`, {direction:'top'});
@@ -4924,7 +5028,13 @@ function whMapPaint(){
     const me = (d.drivers || []).find(r => r.driver === WH.sel && r.has);
     if(me) WH.map.setView([me.lat, me.lon], 15);
   }else if(pts.length){
-    WH.map.fitBounds(L.latLngBounds(pts).pad(0.3), {maxZoom: 15});
+    // Нижняя часть карты закрыта шторкой — просим Leaflet уложить точки в то,
+    // что видно. Иначе половина меток оказывается под ней.
+    const sh = document.getElementById('whSheet');
+    const hide = sh ? Math.max(0, innerHeight - sh.getBoundingClientRect().top) : 0;
+    WH.map.fitBounds(L.latLngBounds(pts).pad(0.15),
+                     {maxZoom: 15, paddingTopLeft: [20, 20],
+                      paddingBottomRight: [20, hide + 20]});
   }
 }
 
@@ -4951,6 +5061,9 @@ function whSmooth(pts){
 function whPick(name){
   WH.sel = WH.sel === name ? null : name;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  // Выбрали человека — значит смотрят на карту, а не в список: уступаем ей
+  // место, но не всё, чтобы выбранная строка осталась на виду.
+  if(WH.sel && _whY === 'full') whSnap('half', true);
   whereLoad();
 }
 

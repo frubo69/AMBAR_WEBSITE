@@ -544,8 +544,7 @@ a.oc-row:active{background:var(--card2)}
 
 /* Шапка списка: одной строкой то, что иначе пришлось бы считать по строкам. */
 .wh-sum{display:flex;flex-wrap:wrap;gap:7px;padding:2px 2px 10px}
-.wh-sum span{flex:1 1 30%}
-.wh-sum span{flex:1;padding:9px 10px;border-radius:11px;background:var(--card);
+.wh-sum span{flex:1 1 0;min-width:0;padding:9px 10px;border-radius:11px;background:var(--card);
   border:1px solid var(--border2);text-align:center}
 .wh-sum b{display:block;font-family:'Space Grotesk',sans-serif;font-size:17px;
   font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
@@ -2869,7 +2868,6 @@ function whPaint(){
       <span class="ok"><b>${live}</b><i>на связи</i></span>
       <span class="${snap ? '' : 'dim'}"><b>${snap}</b><i>недавно</i></span>
       <span class="${work ? '' : 'dim'}"><b>${work}</b><i>${plural(work,'заказ','заказа','заказов')} в пути</i></span>
-      <span class="dim"><b>${rows.length - live - snap}</b><i>не видно</i></span>
     </div>` + rows.map(r => whRow(r, WH.sel === r.driver && trackOn)).join('')
     : '<div class="wh-note" style="border:0">Водителей нет</div>')
     + `<div class="wh-note">Точку присылает живая трансляция телеграма — водитель

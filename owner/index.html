@@ -4143,7 +4143,10 @@ try{ if(window.Telegram && Telegram.WebApp){
     if(denied) return;
     denied = true;
     const copy = DENY_COPY[reason] || DENY_COPY._default;
-    if(emoji) emoji.textContent = copy.emoji;
+    // Иконка здесь — разметка, а не текст: через textContent она выводилась
+    // на экран исходником, и человек вместо замка видел стену из тегов.
+    // Строка своя, из константы выше, чужого в неё не попадает.
+    if(emoji) emoji.innerHTML = copy.emoji;
     if(title) title.textContent = copy.title;
     if(sub)   sub.textContent   = copy.sub;
     if(meta)  meta.textContent  = reason ? 'code: ' + reason : '';

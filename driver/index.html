@@ -1445,7 +1445,18 @@ async function boot(){
   if(PANIC) paintPanic();
 
   let r;
-  try{ r = await drvApi.drvFetch('/api/driver/ping'); ME = r.driver; }
+  // Заодно говорим серверу, что у нас с геопозицией: версия телеграма живёт
+  // на телефоне, и без этого причина «точка не уходит» остаётся догадкой.
+  const lm = tg.LocationManager;
+  const geoCan = !!(lm && typeof lm.getLocation === 'function'
+                    && tg.isVersionAtLeast && tg.isVersionAtLeast('8.0')
+                    && lm.isLocationAvailable !== false);
+  try{
+    r = await drvApi.drvFetch('/api/driver/ping', {params:{
+      v: tg.version || '?',
+      lm: geoCan ? 'есть' : (lm ? 'клиент не умеет' : 'нет объекта')}});
+    ME = r.driver;
+  }
   catch(e){ if(!PANIC) document.getElementById('deny').classList.add('show'); return; }
   document.getElementById('dAv').textContent = ME.name.slice(0,2).toUpperCase();
   document.getElementById('dName').textContent = ME.name;
@@ -1874,7 +1885,8 @@ function geoBar(){
       stroke-linejoin="round">${ICO.pin}</svg></span>
     <span class="geo-b">
       <b>Оператор не видит, где вы</b>
-      <i>Нажмите — включим. Так вам отдают ближние заказы</i>
+      <i>Нажмите — пришлём кнопку в чат. Чтобы видел всю смену, включите
+         в чате трансляцию геопозиции на 8 часов</i>
     </span>
     <span class="geo-go">›</span>
   </button>`;

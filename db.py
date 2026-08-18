@@ -1567,8 +1567,10 @@ async def debts_of(ids: list) -> dict:
     клиентам смены, а спрашивать по одному — это запрос на каждый заказ."""
     db = _db_or_none()
     if db is None or not ids: return {}
+    # $ne: 0 в монго ловит и тех, у кого поля нет вовсе, — а это почти все.
     cur = db.users.find({"telegram_id": {"$in": [int(i) for i in ids]},
-                         "debt": {"$ne": 0}}, {"_id": 0, "telegram_id": 1, "debt": 1})
+                         "debt": {"$exists": True, "$ne": 0}},
+                        {"_id": 0, "telegram_id": 1, "debt": 1})
     return {int(u["telegram_id"]): _round_aed(u.get("debt"))
             for u in await cur.to_list(length=200)}
 

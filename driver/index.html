@@ -1495,7 +1495,7 @@ async function boot(){
 //   • не спрашиваем чаще раза в минуту: чаще незачем, а батарею жалко;
 //   • не мешаем работе. Не дал разрешение — приложение работает как работало,
 //     заказы важнее.
-let GEO = {last: 0, state: '', busy: false};
+let GEO = {last: 0, state: '', busy: false, denied: false};
 const GEO_EVERY_MS = 60000;
 
 function geoState(v){
@@ -1504,29 +1504,42 @@ function geoState(v){
   try{ if(TAB === 'orders') render(); }catch(e){}
 }
 
-// Точка из телеграма, а если он не умеет — из браузера. Второе работает
-// в старых клиентах и в отладке.
+// Спрашиваем через телеграм, а не через браузер. Разница в том, кто рисует
+// окно с вопросом: браузер называет адрес сайта, телеграм — имя приложения.
+// Домен светить незачем, тем более в Эмиратах, где засвеченный домен живёт до
+// первой блокировки.
+//
+// И спрашивает телеграм ровно один раз за всё время: ответ он запоминает сам.
+// Поэтому дальше мы только читаем — молча, без единого окна. Если человек
+// однажды отказал, мы не переспрашиваем никогда: это его решение, а не сбой,
+// и второе окно ничего не изменит, кроме раздражения.
+//
+// Браузерного пути здесь нет намеренно. Он показал бы ровно то окно с
+// доменом, от которого мы уходим.
 function geoRead(){
   return new Promise(resolve => {
     const lm = tg.LocationManager;
-    if(lm && lm.isLocationAvailable !== false && typeof lm.getLocation === 'function'){
-      const ask = () => lm.getLocation(d => resolve(d && d.latitude ? {
-        lat: d.latitude, lon: d.longitude,
-        acc: d.horizontal_accuracy || null} : null));
-      if(lm.isInited) ask();
-      else lm.init(ask);
-      return;
-    }
-    if(!navigator.geolocation) return resolve(null);
-    navigator.geolocation.getCurrentPosition(
-      p => resolve({lat: p.coords.latitude, lon: p.coords.longitude,
-                    acc: p.coords.accuracy || null}),
-      () => resolve(null), {enableHighAccuracy: true, timeout: 8000, maximumAge: 30000});
+    if(!lm || typeof lm.getLocation !== 'function' || lm.isLocationAvailable === false)
+      return resolve(null);
+    const read = () => {
+      // Спросили и получили отказ — больше не трогаем. Разрешение человек
+      // вернёт в настройках телеграма, для этого есть строка на экране.
+      if(lm.isAccessRequested && !lm.isAccessGranted){ GEO.denied = true; return resolve(null); }
+      lm.getLocation(d => {
+        if(d && typeof d.latitude === 'number')
+          return resolve({lat: d.latitude, lon: d.longitude,
+                          acc: d.horizontal_accuracy || null});
+        GEO.denied = true;
+        resolve(null);
+      });
+    };
+    if(lm.isInited) read(); else lm.init(read);
   });
 }
 
 async function geoPush(force){
-  if(PANIC || GEO.busy) return;
+  // Отказали — не дёргаемся ни раз в минуту, ни на каждое действие.
+  if(PANIC || GEO.busy || GEO.denied) return;
   const now = Date.now();
   if(!force && now - GEO.last < GEO_EVERY_MS) return;
   GEO.busy = true;

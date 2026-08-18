@@ -4699,8 +4699,8 @@ function renderFields(p,tp){
 function grabGPS(){
   const btn=el('gps-btn'),stat=el('gps-status');
   btn.style.opacity='0.6';set('gps-lbl',t('gpsBtnLoading'));stat.className='gps-status';
-  if(!navigator.geolocation){fail();return;}
-  navigator.geolocation.getCurrentPosition(pos=>{
+  if(!hasGeo()){fail();return;}
+  askGeo(pos=>{
     const{latitude:lat,longitude:lon}=pos.coords;
     const off=nearestOffice(lat,lon);
     locInfo={lat,lon,office_id:off.id,office_name:off.name,street:''};
@@ -4762,6 +4762,42 @@ function _mapPanoRefresh(){
 }
 let _mapGeoTimer=null,_mapLastGeo='',_mapGeoResult=null;
 const DUBAI_CENTER=[25.2048,55.2708];
+// ── Геопозиция ────────────────────────────────────────────────────────────
+// Спрашиваем через телеграм, а не через браузер. Разница видна человеку: окно
+// браузера называет адрес сайта — «такой-то домен хочет знать ваше
+// местоположение», — а окно телеграма называет приложение. Домен при этом
+// нигде не всплывает, и это не косметика: в Эмиратах засвеченный домен живёт
+// до первой блокировки, а переезжать дороже, чем не показывать.
+//
+// Телеграм спрашивает один раз и помнит ответ. Если человек отказал, второго
+// окна не будет — и мы намеренно НЕ переспрашиваем через браузер: это было бы
+// ровно то окно с доменом, от которого мы уходим.
+//
+// Браузерный путь остаётся только там, где телеграмовского нет вовсе: старый
+// клиент или открытая в обычном браузере страница.
+function _lm(){
+  const lm = window.Telegram && Telegram.WebApp && Telegram.WebApp.LocationManager;
+  return (lm && typeof lm.getLocation === 'function'
+          && lm.isLocationAvailable !== false) ? lm : null;
+}
+
+function hasGeo(){ return !!(_lm() || navigator.geolocation); }
+
+function askGeo(ok, err, opts){
+  const lm = _lm();
+  if(!lm){
+    if(!hasGeo()) return err && err();
+    return askGeo(ok, err, opts || {});
+  }
+  const read = () => lm.getLocation(d => {
+    if(d && typeof d.latitude === 'number'){
+      ok({coords:{latitude: d.latitude, longitude: d.longitude,
+                  accuracy: d.horizontal_accuracy || 0}});
+    }else if(err){ err(); }
+  });
+  if(lm.isInited) read(); else lm.init(read);
+}
+
 const MAP_TILES={
   dark:'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
   sat:'https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
@@ -5049,11 +5085,11 @@ function startGPSAdd(){
   editingAddrIdx=null;
   const btn=el('btn-add-gps');
   if(btn){btn.classList.add('loading');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=lang==='ru'?'Определяем...':'Getting location...';}
-  if(!navigator.geolocation){
+  if(!hasGeo()){
     if(btn){btn.classList.remove('loading');btn.classList.add('err');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=lang==='ru'?'GPS недоступен':'GPS unavailable';}
     return;
   }
-  navigator.geolocation.getCurrentPosition(pos=>{
+  askGeo(pos=>{
     const{latitude:lat,longitude:lon}=pos.coords;
     const off=nearestOffice(lat,lon);
     locInfo={lat,lon,office_id:off.id,office_name:off.name,street:'',isGps:true};
@@ -5081,9 +5117,9 @@ function startMapSearch(){
     if(btn){btn.classList.remove('loading');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=t('btnMapSub');}
     openMapPicker('map_search',lat,lon);
   };
-  if(navigator.geolocation){
+  if(hasGeo()){
     if(btn){btn.classList.add('loading');const sub=btn.querySelector('.addr-method-card-sub');if(sub)sub.textContent=lang==='ru'?'Определяем...':'Getting location...';}
-    navigator.geolocation.getCurrentPosition(
+    askGeo(
       pos=>open(pos.coords.latitude,pos.coords.longitude),
       ()=>open(locInfo?.lat||DUBAI_CENTER[0],locInfo?.lon||DUBAI_CENTER[1]),
       {timeout:6000,maximumAge:60000,enableHighAccuracy:true}
@@ -5275,8 +5311,8 @@ function confirmGpsMiniEdit(){
 function _gpsMiniLocateMe(){
   if(!_miniMap||!_miniEditing)return;
   haptic.light();
-  if(!navigator.geolocation){showToast(lang==='ru'?'GPS недоступен':'GPS unavailable','err');return;}
-  navigator.geolocation.getCurrentPosition(pos=>{
+  if(!hasGeo()){showToast(lang==='ru'?'GPS недоступен':'GPS unavailable','err');return;}
+  askGeo(pos=>{
     _miniMap.setView([pos.coords.latitude,pos.coords.longitude],17,{animate:true});
     haptic.success();
   },()=>{
@@ -5287,8 +5323,8 @@ function _gpsMiniLocateMe(){
 function _mapGoToUserLocation(){
   if(!_mapPicker)return;
   haptic.light();
-  if(!navigator.geolocation){showToast(lang==='ru'?'GPS недоступен':'GPS unavailable','err');return;}
-  navigator.geolocation.getCurrentPosition(pos=>{
+  if(!hasGeo()){showToast(lang==='ru'?'GPS недоступен':'GPS unavailable','err');return;}
+  askGeo(pos=>{
     _mapPicker.setView([pos.coords.latitude,pos.coords.longitude],17,{animate:true});
   },()=>{showToast(lang==='ru'?'Не удалось получить геолокацию':'Could not get location','err');},
   {timeout:8000,maximumAge:30000,enableHighAccuracy:true});
@@ -6450,8 +6486,8 @@ function tryOrder(){
 
   // Check location mismatch
   const addr=getSaved()[activeAddrIdx];
-  if(addr.lat&&addr.lon&&navigator.geolocation&&!pendingOrderConfirmed){
-    navigator.geolocation.getCurrentPosition(pos=>{
+  if(addr.lat&&addr.lon&&hasGeo()&&!pendingOrderConfirmed){
+    askGeo(pos=>{
       const dist=hav(pos.coords.latitude,pos.coords.longitude,addr.lat,addr.lon);
       if(dist>15){ // more than 15km away → warn
         showLocConfirm();

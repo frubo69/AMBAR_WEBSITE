@@ -465,6 +465,24 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .pnc-x:active .pnc-x-c{background:rgba(255,255,255,.22)}
 .pnc-x-t{font-size:15px}
 
+/* ── Геопозиция ────────────────────────────────────────────────────────────
+   Строка появляется, только когда доступа нет: тогда она и объяснение, и
+   единственная дверь к разрешению. Когда всё в порядке — её нет вовсе, потому
+   что сказать нечего, а место на экране водителя дорого. */
+.geo-bar{display:flex;align-items:center;gap:11px;width:100%;margin-bottom:10px;
+  padding:12px 13px;border-radius:14px;text-align:left;cursor:pointer;
+  font-family:inherit;color:var(--text);
+  background:rgba(224,85,85,.08);border:1px solid rgba(224,85,85,.26)}
+.geo-bar:active{background:rgba(224,85,85,.14)}
+.geo-ic{display:flex;width:32px;height:32px;flex:0 0 auto;border-radius:11px;
+  align-items:center;justify-content:center;color:#E05555;
+  background:rgba(224,85,85,.12);border:1px solid rgba(224,85,85,.24)}
+.geo-b{flex:1;min-width:0}
+.geo-b b{display:block;font-size:13px;font-weight:600;line-height:1.25}
+.geo-b i{display:block;font-style:normal;font-size:11.5px;color:var(--sub);
+  margin-top:3px;line-height:1.35}
+.geo-go{flex:0 0 auto;color:var(--sub);font-size:17px}
+
 /* ── маскировка: игра ──────────────────────────────────────────────────────
    Всё, что делает её похожей на настоящую: своё имя с логотипом, счёт-линии-
    уровень в шапке, следующая фигура, кнопки под большой палец и конец игры с
@@ -1442,10 +1460,92 @@ async function boot(){
   if(PANIC) return;          // в скрытом режиме ничего не грузим и не опрашиваем
 
   await load();
+  geoPush(true);
   // Пять секунд, а не сорок пять: заказ должен появляться на экране почти сразу,
   // как его назначили. Спящую вкладку не опрашиваем — телефон в кармане.
   setInterval(()=>{ if(!document.hidden && !PANIC) load(); }, 5000);
-  document.addEventListener('visibilitychange', ()=>{ if(!document.hidden && !PANIC) load(); });
+  // Точка — раз в минуту, пока приложение открыто: чаще незачем, а батарея у
+  // водителя должна дожить до конца смены.
+  setInterval(()=>{ if(!document.hidden && !PANIC) geoPush(); }, GEO_EVERY_MS);
+  document.addEventListener('visibilitychange', ()=>{
+    if(document.hidden || PANIC) return;
+    load(); geoPush();
+  });
+}
+
+// ══════════════════════════════════════════════════════════════════════════
+//  ГЕОПОЗИЦИЯ
+// ══════════════════════════════════════════════════════════════════════════
+// Оператору нужно видеть, где машины, чтобы отдавать заказ ближнему, а не
+// первому попавшемуся. Способов ровно два, и оба нужны.
+//
+// Живую трансляцию включает сам телеграм — из приложения её не запустить, это
+// его нативная кнопка. Она одна умеет присылать точки в фоне, когда телефон в
+// кармане, и живёт восемь часов.
+//
+// Здесь второй способ: приложение спрашивает у телефона, где он, и отправляет
+// точку молча. Разрешение телеграм спрашивает один раз своим диалогом, дальше
+// вопросов нет. Водитель за смену открывает приложение десятки раз — принял
+// заказ, отметил доставку, посмотрел следующий, — и точка обновляется сама, по
+// естественному ритму работы. Ни одного лишнего нажатия.
+//
+// Что здесь намеренно не делается:
+//   • не спрашиваем в скрытом режиме. Приложение притворяется игрой, и любой
+//     всплывший диалог телеграма выдал бы его с головой;
+//   • не спрашиваем чаще раза в минуту: чаще незачем, а батарею жалко;
+//   • не мешаем работе. Не дал разрешение — приложение работает как работало,
+//     заказы важнее.
+let GEO = {last: 0, state: '', busy: false};
+const GEO_EVERY_MS = 60000;
+
+function geoState(v){
+  if(GEO.state === v) return;
+  GEO.state = v;
+  try{ if(TAB === 'orders') render(); }catch(e){}
+}
+
+// Точка из телеграма, а если он не умеет — из браузера. Второе работает
+// в старых клиентах и в отладке.
+function geoRead(){
+  return new Promise(resolve => {
+    const lm = tg.LocationManager;
+    if(lm && lm.isLocationAvailable !== false && typeof lm.getLocation === 'function'){
+      const ask = () => lm.getLocation(d => resolve(d && d.latitude ? {
+        lat: d.latitude, lon: d.longitude,
+        acc: d.horizontal_accuracy || null} : null));
+      if(lm.isInited) ask();
+      else lm.init(ask);
+      return;
+    }
+    if(!navigator.geolocation) return resolve(null);
+    navigator.geolocation.getCurrentPosition(
+      p => resolve({lat: p.coords.latitude, lon: p.coords.longitude,
+                    acc: p.coords.accuracy || null}),
+      () => resolve(null), {enableHighAccuracy: true, timeout: 8000, maximumAge: 30000});
+  });
+}
+
+async function geoPush(force){
+  if(PANIC || GEO.busy) return;
+  const now = Date.now();
+  if(!force && now - GEO.last < GEO_EVERY_MS) return;
+  GEO.busy = true;
+  try{
+    const pt = await geoRead();
+    if(!pt){ geoState('off'); return; }
+    await drvApi.drvFetch('/api/driver/pos', {method:'POST', body: pt});
+    GEO.last = now;
+    geoState('on');
+  }catch(e){
+    // Молча: не дошло — дойдёт со следующим действием. Заказы важнее.
+  }finally{ GEO.busy = false; }
+}
+
+// Открыть настройки доступа — единственное, что можно сделать, если человек
+// однажды отказал: сам телеграм больше не спросит.
+function geoSettings(){
+  try{ tg.LocationManager.openSettings(); }
+  catch(e){ toast('Разрешение к геопозиции меняется в настройках телеграма'); }
 }
 
 async function load(){
@@ -1688,7 +1788,7 @@ function renderOrders(){
   if(!active.length){
     // Без пояснения: водитель и так знает, что заказ придёт сообщением, — это
     // его работа, а не новость.
-    box.innerHTML = blank(ICO.box, 'Заказов нет');
+    box.innerHTML = geoBar() + blank(ICO.box, 'Заказов нет');
     return;
   }
   // Развёрнут один заказ — тот, которым водитель занят сейчас. Остальные
@@ -1699,7 +1799,7 @@ function renderOrders(){
   // следующий заказ: куда и к какому времени. Всё прочее нужно уже в работе,
   // а не при выборе.
   if(active.length && !active.some(o => o.order_id === OPEN_OID)) OPEN_OID = active[0].order_id;
-  box.innerHTML = ordHead(active) +
+  box.innerHTML = geoBar() + ordHead(active) +
     (active.length
       ? `<div class="sect"><span class="sect-t">В работе</span><span class="sect-v">${active.length}</span></div>`
         + active.map((o, i) => o.order_id === OPEN_OID || active.length === 1
@@ -1707,6 +1807,23 @@ function renderOrders(){
       : '');
   // Закрытых здесь нет: эта вкладка про то, что ещё надо сделать. Закрытое за
   // смену — во вкладке «История», а сколько сдано, говорит строка сверху.
+}
+
+// Строка о геопозиции. Прятать её нельзя: человек имеет право знать, что его
+// видно, — и это же единственное место, где он может дать разрешение, если
+// однажды отказал. Когда всё в порядке, строка молчит и не занимает места.
+function geoBar(){
+  if(GEO.state !== 'off') return '';
+  return `<button class="geo-bar" onclick="geoSettings()">
+    <span class="geo-ic"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+      stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
+      stroke-linejoin="round">${ICO.pin}</svg></span>
+    <span class="geo-b">
+      <b>Оператор не видит, где вы</b>
+      <i>Разрешите геопозицию — так вам отдают ближние заказы</i>
+    </span>
+    <span class="geo-go">›</span>
+  </button>`;
 }
 
 // Шапка вкладки. Вопрос, на который она отвечает, — не «сколько я уже сделал»
@@ -2601,6 +2718,7 @@ async function incAccept(){
   const oid = INC && INC.order_id; if(!oid) return;
   try{
     await drvApi.drvFetch(`/api/driver/orders/${encodeURIComponent(oid)}/ack`, {method:'POST'});
+    geoPush(true);              // взял заказ — оператор должен видеть, откуда едет
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
     toast('Принято — оператор видит');
   }catch(e){ toast('Не отправилось — повторите'); incKnobReset(); return; }
@@ -2634,6 +2752,7 @@ function renderAsk(){
 async function sendDeliver(oid){
   try{
     await drvApi.drvFetch(`/api/driver/orders/${encodeURIComponent(oid)}/delivered`, {method:'POST'});
+    geoPush(true);              // доставил — точка обновилась на адресе
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
     toast('Отправлено оператору');
     HIST = null;                       // история устарела

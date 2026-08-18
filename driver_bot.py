@@ -14,7 +14,8 @@ import os
 from datetime import datetime, timezone, timedelta
 
 from dotenv import load_dotenv
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo, MenuButtonWebApp
+from telegram import (Update, InlineKeyboardButton, InlineKeyboardMarkup, WebAppInfo,
+                      MenuButtonWebApp, KeyboardButton, ReplyKeyboardMarkup)
 from telegram.ext import (Application, CommandHandler, MessageHandler,
                           ContextTypes, filters)
 
@@ -77,6 +78,14 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         reply_markup=InlineKeyboardMarkup([[
             InlineKeyboardButton("Открыть заказы", web_app=WebAppInfo(url=DRIVER_WEBAPP_URL))]]))
     await _remember(sent)
+    # Кнопка «я здесь» ставится отдельным сообщением: телеграм не умеет
+    # показывать инлайн-кнопку и клавиатуру у поля ввода в одном.
+    kb = await update.message.reply_text(
+        "Кнопка ниже отправляет вашу точку одним касанием — она останется у поля "
+        "ввода.\n\nЧтобы оператор видел вас всю смену, включите трансляцию: "
+        "скрепка → «Геопозиция» → «Транслировать» → 8 часов.",
+        reply_markup=where_keyboard())
+    await _remember(kb)
     log.info(f"вход: {me['name']} ({uid})")
 
 
@@ -96,6 +105,18 @@ def _biz_day(ref=None) -> str:
     ref = ref or datetime.now(DUBAI)
     anchor = ref.replace(hour=SHIFT_START_HOUR, minute=0, second=0, microsecond=0)
     return (ref if ref >= anchor else ref - timedelta(days=1)).strftime("%Y-%m-%d")
+
+
+def where_keyboard() -> ReplyKeyboardMarkup:
+    """Кнопка «я здесь» у поля ввода — насовсем.
+
+    Одно касание отправляет текущую точку. Это самый короткий путь, который
+    телеграм вообще даёт: без меню, без скрепки, без выбора. Живую трансляцию
+    так не включить — её кнопка нативная и живёт в скрепке, — но отметиться
+    здесь и сейчас можно за одно движение."""
+    return ReplyKeyboardMarkup(
+        [[KeyboardButton("📍 Я здесь", request_location=True)]],
+        resize_keyboard=True, is_persistent=True)
 
 
 async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -121,7 +142,14 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         log.warning(f"точка {me['name']} не записана: {e}")
         return
-    # Отвечаем один раз — на включение трансляции. На каждую точку писать
+    # Разовая точка — одно короткое подтверждение: без него человек не знает,
+    # дошло ли, и жмёт ещё раз.
+    if update.message and not loc.live_period:
+        ok = await update.message.reply_text("Точка принята — оператор вас видит.")
+        await _remember(update.message)
+        await _remember(ok)
+        return
+    # На включение трансляции отвечаем один раз. На каждую её точку писать
     # нельзя: телефон шлёт их десятками, и чат превратится в ленту.
     if update.message and loc.live_period:
         await _remember(update.message)
@@ -138,12 +166,14 @@ async def cmd_where(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
     await _remember(update.message)
     sent = await update.message.reply_text(
-        "Чтобы оператор видел, где вы:\n\n"
+        "Чтобы оператор видел вас всю смену:\n\n"
         "1. Скрепка в этом чате\n"
         "2. «Геопозиция»\n"
         "3. «Транслировать» — на 8 часов\n\n"
         "Телефон будет сам присылать точку, даже когда телеграм свёрнут. "
-        "Маршрут стирается, когда закрывают смену.")
+        "Маршрут стирается, когда закрывают смену.\n\n"
+        "Отметиться разово — кнопкой ниже.",
+        reply_markup=where_keyboard())
     await _remember(sent)
 
 

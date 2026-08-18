@@ -189,6 +189,36 @@ async def handle_ping(request):
 
 
 @require_driver
+async def handle_pos(request):
+    """Одна точка из приложения.
+
+    Живую трансляцию включает сам телеграм — из мини-аппа её не запустить, это
+    его нативная кнопка. Зато приложение умеет спросить у телефона, где он
+    сейчас, и прислать одну точку. Для слежения за сменой этого мало, а вот
+    для дела достаточно: водитель открывает приложение десятки раз за ночь, и
+    точка обновляется сама, без единого нажатия.
+
+    Точка ложится туда же, куда и трансляция, и живёт по тем же правилам: одна
+    последняя на водителя, маршрут за смену, стирается при её закрытии."""
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    try:
+        lat, lon = float(body.get("lat")), float(body.get("lon"))
+    except (TypeError, ValueError):
+        return web.json_response({"error": "bad_coords"}, status=400, headers=CORS_HEADERS)
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return web.json_response({"error": "bad_coords"}, status=400, headers=CORS_HEADERS)
+    acc = body.get("acc")
+    now = datetime.now(timezone.utc)
+    await db.driver_pos_set(me["name"], _biz_day(), lat, lon, now,
+                            acc=acc if isinstance(acc, (int, float)) else None)
+    return web.json_response({"ok": True, "at": now.isoformat()}, headers=CORS_HEADERS)
+
+
+@require_driver
 async def handle_panic(request):
     """Экстренная ситуация: приложение маскируется, наши узнают.
 
@@ -978,6 +1008,7 @@ def setup(app):
         ("/api/driver/expenses",                handle_expense_add, "POST"),
         ("/api/driver/supply",                  handle_supply_list, "GET"),
         ("/api/driver/panic",                   handle_panic,       "POST"),
+        ("/api/driver/pos",                     handle_pos,         "POST"),
         ("/api/driver/orders/{oid}/ack",        handle_ack,         "POST"),
         ("/api/driver/orders/{oid}/delivered",  handle_delivered,   "POST"),
         ("/api/driver/orders/{oid}/edit",       handle_edit_request, "POST"),

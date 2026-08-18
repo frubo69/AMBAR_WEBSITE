@@ -1518,22 +1518,35 @@ function geoState(v){
 // доменом, от которого мы уходим.
 function geoRead(){
   return new Promise(resolve => {
+    let done = false;
+    const fin = v => { if(!done){ done = true; resolve(v); } };
     const lm = tg.LocationManager;
-    if(!lm || typeof lm.getLocation !== 'function' || lm.isLocationAvailable === false)
-      return resolve(null);
+    // Версию проверяем сами. У старых клиентов объект в библиотеке есть, а
+    // метода в самом телеграме нет: init() тогда молча возвращается, не вызвав
+    // колбэк, и ожидание не кончается никогда.
+    if(!lm || typeof lm.getLocation !== 'function'
+       || !(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0'))
+       || lm.isLocationAvailable === false) return fin(null);
+
+    // Клиент может не ответить вовсе — тогда просто пропускаем эту точку.
+    // Следующая уйдёт через минуту, а заказы ждать не должны.
+    const guard = setTimeout(() => fin(null), 7000);
     const read = () => {
-      // Спросили и получили отказ — больше не трогаем. Разрешение человек
-      // вернёт в настройках телеграма, для этого есть строка на экране.
-      if(lm.isAccessRequested && !lm.isAccessGranted){ GEO.denied = true; return resolve(null); }
-      lm.getLocation(d => {
-        if(d && typeof d.latitude === 'number')
-          return resolve({lat: d.latitude, lon: d.longitude,
-                          acc: d.horizontal_accuracy || null});
-        GEO.denied = true;
-        resolve(null);
-      });
+      if(lm.isAccessRequested && !lm.isAccessGranted){
+        clearTimeout(guard); GEO.denied = true; return fin(null);
+      }
+      try{
+        lm.getLocation(d => {
+          clearTimeout(guard);
+          if(d && typeof d.latitude === 'number')
+            return fin({lat: d.latitude, lon: d.longitude,
+                        acc: d.horizontal_accuracy || null});
+          GEO.denied = true;
+          fin(null);
+        });
+      }catch(e){ clearTimeout(guard); fin(null); }
     };
-    if(lm.isInited) read(); else lm.init(read);
+    if(lm.isInited) read(); else lm.init(() => { read(); });
   });
 }
 

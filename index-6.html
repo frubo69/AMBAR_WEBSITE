@@ -4776,26 +4776,55 @@ const DUBAI_CENTER=[25.2048,55.2708];
 // Браузерный путь остаётся только там, где телеграмовского нет вовсе: старый
 // клиент или открытая в обычном браузере страница.
 function _lm(){
-  const lm = window.Telegram && Telegram.WebApp && Telegram.WebApp.LocationManager;
-  return (lm && typeof lm.getLocation === 'function'
-          && lm.isLocationAvailable !== false) ? lm : null;
+  const tgw = window.Telegram && Telegram.WebApp;
+  const lm = tgw && tgw.LocationManager;
+  // Версию проверяем сами и до всего остального. У старых клиентов объект в
+  // библиотеке есть, а метода в самом телеграме нет: init() тогда молча
+  // возвращается, не вызвав колбэк, и приложение ждёт ответа вечно. Именно так
+  // «Определяем…» и висело.
+  if(!lm || typeof lm.getLocation !== 'function') return null;
+  if(!(tgw.isVersionAtLeast && tgw.isVersionAtLeast('8.0'))) return null;
+  if(lm.isLocationAvailable === false) return null;
+  return lm;
 }
 
 function hasGeo(){ return !!(_lm() || navigator.geolocation); }
 
+// Ответ приходит от клиента телеграма, а он может не ответить вовсе — тогда
+// нельзя ни ждать, ни молчать: человеку нужен адрес. Поэтому у каждого шага
+// свой предел терпения, после которого идём обычной дорогой.
+const GEO_WAIT = 7000;
+
 function askGeo(ok, err, opts){
-  const lm = _lm();
-  if(!lm){
-    if(!hasGeo()) return err && err();
-    return askGeo(ok, err, opts || {});
-  }
-  const read = () => lm.getLocation(d => {
-    if(d && typeof d.latitude === 'number'){
-      ok({coords:{latitude: d.latitude, longitude: d.longitude,
-                  accuracy: d.horizontal_accuracy || 0}});
-    }else if(err){ err(); }
+  let done = false;
+  const finish = fn => (...a) => { if(done) return; done = true; fn(...a); };
+  const good = finish(ok);
+  const browser = finish(() => {
+    if(!navigator.geolocation) return err && err();
+    navigator.geolocation.getCurrentPosition(ok, err, opts || {});
   });
-  if(lm.isInited) read(); else lm.init(read);
+  const lm = _lm();
+  if(!lm) return browser();
+
+  // Не ответил за отведённое время — не бросаем человека на полпути.
+  const guard = setTimeout(browser, GEO_WAIT);
+  const read = () => {
+    try{
+      lm.getLocation(d => {
+        clearTimeout(guard);
+        if(d && typeof d.latitude === 'number'){
+          good({coords:{latitude: d.latitude, longitude: d.longitude,
+                        accuracy: d.horizontal_accuracy || 0}});
+        }else{
+          // Отказ — это ответ, а не сбой: браузером не переспрашиваем, иначе
+          // всплывёт то самое окно с адресом сайта.
+          finish(() => err && err())();
+        }
+      });
+    }catch(e){ clearTimeout(guard); browser(); }
+  };
+  if(lm.isInited) read();
+  else lm.init(() => { read(); });
 }
 
 const MAP_TILES={

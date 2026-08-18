@@ -279,6 +279,113 @@ async def handle_debt_settle(request):
                              headers=CORS_HEADERS)
 
 
+# ── Списания ────────────────────────────────────────────────────────────────
+def _iso(v) -> str:
+    return v.isoformat() if hasattr(v, "isoformat") else str(v or "")
+
+
+WO_MAX_PHOTO = 900_000          # больше — не фотография, а недосжатая картинка
+WO_MAX_QTY = 240                # ящик пива это 24; больше похоже на опечатку
+
+
+@require_driver
+async def handle_writeoff_add(request):
+    """Списать товар: бой, брак, просрочка, потеря.
+
+    Фотография обязательна. Это единственное, что отделяет списание от способа
+    закрыть недостачу: рассказать можно что угодно, показать разбитую бутылку —
+    только разбив её. Поэтому нет ни одной ветки, где запись проходит без фото.
+
+    Списываем на район водителя: товар лежал на его полке, и вычесть его надо
+    из его же остатка, иначе заявка привезёт туда лишнее."""
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    from operator_routes import _load_catalog
+    cat = {p.get("id"): p for p in _load_catalog()}
+    pid = (body.get("item") or "").strip()
+    if pid not in cat:
+        return web.json_response({"error": "no_item"}, status=400, headers=CORS_HEADERS)
+    try:
+        qty = int(body.get("qty") or 0)
+    except (TypeError, ValueError):
+        qty = 0
+    if not (1 <= qty <= WO_MAX_QTY):
+        return web.json_response({"error": "bad_qty"}, status=400, headers=CORS_HEADERS)
+    kind = (body.get("kind") or "").strip()
+    if kind not in db.WRITEOFF_KINDS:
+        return web.json_response({"error": "bad_kind"}, status=400, headers=CORS_HEADERS)
+
+    raw = (body.get("photo") or "")
+    if "," in raw[:64]:
+        raw = raw.split(",", 1)[1]
+    if len(raw) > WO_MAX_PHOTO:
+        return web.json_response({"error": "photo_big"}, status=400, headers=CORS_HEADERS)
+    try:
+        import base64
+        photo = base64.b64decode(raw, validate=True) if raw else b""
+    except Exception:
+        photo = b""
+    # Проверяем не длину строки, а начало файла: пустая или битая картинка
+    # ничего не доказывает, а выглядит в истории точно так же.
+    if len(photo) < 2000 or photo[:2] not in (b"\xff\xd8", b"\x89P"):
+        return web.json_response({"error": "no_photo"}, status=400, headers=CORS_HEADERS)
+
+    now = datetime.now(timezone.utc)
+    wid = await db.writeoff_add({
+        "at": now, "day": _biz_day(), "item": pid,
+        "name": cat[pid].get("name", ""), "qty": qty, "kind": kind,
+        "note": (body.get("note") or "").strip()[:200],
+        "district": me.get("district") or "", "district_code": me.get("district_code") or "",
+        "by": me["name"], "by_id": int(me.get("id") or 0),
+        "supply_id": (body.get("supply_id") or "").strip()[:40],
+    }, photo)
+    try:
+        import stock_routes
+        stock_routes.base_drop()          # заявка должна узнать об этом сразу
+    except Exception as e:
+        log.warning(f"[writeoff] кэш заявки не сброшен: {e}")
+    log.info(f"[writeoff] {me['name']} ({me.get('district_code','')}): "
+             f"{kind} · {cat[pid].get('name','')} × {qty}")
+    await _writeoff_tell(me, cat[pid].get("name", ""), qty, kind,
+                         (body.get("note") or "").strip()[:200])
+    return web.json_response({"ok": True, "id": wid}, headers=CORS_HEADERS)
+
+
+async def _writeoff_tell(me: dict, name: str, qty: int, kind: str, note: str):
+    """Владельцу — сразу. Списание это убыток, и узнавать о нём из отчёта в
+    конце месяца поздно: спросить «как это вышло» можно только по горячему."""
+    try:
+        from owner_routes import notify_owners
+        await notify_owners(
+            "stock.writeoff",
+            f"🗑 *Списание · {kind}*\n"
+            f"{name} × {qty}\n"
+            f"{me['name']} ({me.get('district_code') or '—'})"
+            + (f"\n_{note}_" if note else ""))
+    except Exception as e:
+        log.warning(f"[writeoff] владельцу не ушло: {e}")
+
+
+@require_driver
+async def handle_writeoffs(request):
+    """Мои списания за сегодня — чтобы видеть, что запись прошла."""
+    me = request["driver"]
+    day = _biz_day()
+    start = datetime.strptime(day, "%Y-%m-%d").replace(
+        hour=SHIFT_START_HOUR, tzinfo=DUBAI_TZ).astimezone(timezone.utc)
+    rows = await db.writeoff_list(since=start, by=me["name"], limit=60)
+    return web.json_response({"day": day, "rows": [{
+        "id": r.get("_id"), "item": r.get("item"), "name": r.get("name", ""),
+        "qty": int(r.get("qty") or 0), "kind": r.get("kind", ""),
+        # isoformat, а не str(): у str разделитель — пробел, и сафари такую
+        # дату не разбирает вовсе.
+        "note": r.get("note", ""), "at": _iso(r.get("at")),
+    } for r in rows]}, headers=CORS_HEADERS)
+
+
 @require_driver
 async def handle_pos(request):
     """Одна точка из приложения.
@@ -690,9 +797,12 @@ async def handle_catalog(request):
     Цены здесь полные: водитель довозит телефонный заказ, а скидка положена
     только за заказ через приложение."""
     from operator_routes import _load_catalog, _full_price
+    # Для списания нужен весь список: разбитая бутылка есть на полке и тогда,
+    # когда позиция снята с продажи.
+    everything = request.query.get("all") == "1"
     items = []
     for p in _load_catalog():
-        if not p.get("stock"):
+        if not (p.get("stock") or everything):
             continue
         pack = bool(p.get("price_24_full"))
         items.append({"id": p.get("id"), "name": p.get("name", ""), "cat": p.get("cat", ""),
@@ -1149,6 +1259,8 @@ def setup(app):
         ("/api/driver/expenses",                handle_expenses,    "GET"),
         ("/api/driver/expenses",                handle_expense_add, "POST"),
         ("/api/driver/supply",                  handle_supply_list, "GET"),
+        ("/api/driver/writeoff",                handle_writeoff_add, "POST"),
+        ("/api/driver/writeoffs",               handle_writeoffs,   "GET"),
         ("/api/driver/panic",                   handle_panic,       "POST"),
         ("/api/driver/pos",                     handle_pos,         "POST"),
         ("/api/driver/geo/help",                handle_geo_help,    "POST"),

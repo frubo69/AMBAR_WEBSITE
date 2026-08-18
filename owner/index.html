@@ -1770,6 +1770,55 @@ button.path:active{transform:scale(.995)}
 .exp-sum{border:1px solid var(--border2);border-radius:14px;background:var(--card);
   padding:13px 15px;margin-bottom:4px}
 .exp-empty{color:var(--muted);font-size:12.5px;text-align:center;padding:8px}
+
+/* ── Списания ────────────────────────────────────────────────────────────
+   Сверху деньги и причины — ответ на «много ли». Ниже строки со снимками —
+   ответ на «что именно». */
+.wo-sum{display:flex;align-items:center;gap:14px;padding:16px;border-radius:16px;
+  background:var(--card);border:1px solid var(--border);margin-bottom:12px}
+.wo-sum-l{flex:1;min-width:0}
+.wo-sum-n{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;
+  letter-spacing:-.8px;line-height:1;color:var(--dn)}
+.wo-sum-n i{font-style:normal;font-size:10px;color:var(--muted);margin-left:5px;
+  letter-spacing:1px}
+.wo-sum-s{font-size:11.5px;color:var(--muted);margin-top:5px}
+.wo-ks{display:flex;gap:14px;flex-shrink:0}
+.wo-k{text-align:center}
+.wo-k-n{display:block;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700}
+.wo-k-t{display:block;font-size:10px;color:var(--muted);margin-top:2px}
+.wo-drv{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px}
+.wo-drv-i{padding:6px 11px;border-radius:9px;font-size:11.5px;color:var(--muted);
+  background:var(--card);border:1px solid var(--border)}
+.wo-drv-i b{color:var(--text);font-weight:600;margin-right:5px}
+.wo-rows{display:flex;flex-direction:column;gap:8px}
+.wo-row{display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;
+  cursor:pointer;background:var(--card);border:1px solid var(--border)}
+.wo-row:active{transform:scale(.995);border-color:var(--border2)}
+.wo-th{width:46px;height:46px;flex-shrink:0;border-radius:11px;overflow:hidden;
+  background:var(--bg2);border:1px solid var(--border);display:flex;
+  align-items:center;justify-content:center}
+/* Пустая рамка вместо снимка, пока его не открывали: :empty гаснет сам,
+   как только внутрь попадает картинка. */
+.wo-th:empty::after{content:'';width:15px;height:13px;border-radius:3px;
+  border:1.6px solid var(--muted);opacity:.5}
+.wo-th img{width:100%;height:100%;object-fit:cover}
+.wo-b{flex:1;min-width:0}
+.wo-n{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.wo-q{color:var(--muted);font-weight:400;margin-left:5px}
+.wo-m{font-size:11.5px;color:var(--muted);margin-top:3px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.wo-note-t{font-size:12px;color:var(--sub);margin-top:4px;line-height:1.35}
+.wo-aed{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:15px;
+  font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums}
+.wo-aed i{font-style:normal;font-size:9px;color:var(--muted);margin-left:3px}
+/* Снимок во весь экран: сам кадр и подпись, закрывается нажатием куда угодно. */
+.wo-full{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;
+  align-items:center;justify-content:center;gap:14px;padding:22px;
+  background:rgba(0,0,0,.92);backdrop-filter:blur(6px)}
+.wo-full.show{display:flex}
+.wo-full img{max-width:100%;max-height:78dvh;border-radius:14px;object-fit:contain}
+.wo-full span{font-size:13px;color:var(--sub);text-align:center}
 .exp-tot{display:flex;align-items:center;gap:9px}
 .exp-tot-v{font-family:'Space Grotesk',sans-serif;font-size:27px;font-weight:700;
   color:var(--gold2);letter-spacing:-.6px;font-variant-numeric:tabular-nums;line-height:1}
@@ -3111,6 +3160,7 @@ button.path:active{transform:scale(.995)}
         <div class="ncat-body">
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Низкий остаток</div><div class="nrow-s">По каждому SKU свой порог</div></div><label class="tg"><input type="checkbox" data-p="stock.low" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">SKU закончился</div><div class="nrow-s">Полное отсутствие товара</div></div><label class="tg"><input type="checkbox" data-p="stock.out" checked><i></i></label></div>
+          <div class="nrow"><div class="nrow-body"><div class="nrow-t">Списание</div><div class="nrow-s">Бой, брак, просрочка — с фотографией</div></div><label class="tg"><input type="checkbox" data-p="stock.writeoff" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Списание / инвентаризация</div><div class="nrow-s">Действия оператора</div></div><label class="tg"><input type="checkbox" data-p="stock.writeoff"><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Смена закрыта у всех</div><div class="nrow-s">Утренний итог и заявка в магазин файлом</div></div><label class="tg"><input type="checkbox" data-p="shift.closed" checked><i></i></label></div>
           <div class="nrow"><div class="nrow-body"><div class="nrow-t">Приёмка закрыта</div><div class="nrow-s">Что водитель забрал и чего не хватило</div></div><label class="tg"><input type="checkbox" data-p="supply.done" checked><i></i></label></div>
@@ -7388,6 +7438,8 @@ const ACC = [
    ico:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>'},
   {id:'order',    t:'Заявка на закупку', s:'сколько довезти до нормы',
    ico:'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/>'},
+  {id:'writeoff', t:'Списания',          s:'бой, брак, просрочка',
+   ico:'<path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6.5 7l1 12.5h9L17.5 7"/><path d="M10 11v5M14 11v5"/>'},
   {id:'qr',       t:'Внести товар',      s:'сканируем коды с бутылок',
    ico:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/>'},
   {id:'check',    t:'Проверка бутылки',  s:'что везёт водитель',
@@ -7681,6 +7733,7 @@ function accOpen(id){
   if(id === 'qr')       accQR();
   if(id === 'supply')   accSupply();
   if(id === 'check')    accCheck();
+  if(id === 'writeoff') accWriteoffs();
 }
 
 // Стрелка в шапке раздела ведёт на шаг назад, а не сразу наружу: у QR-кодов
@@ -12381,6 +12434,98 @@ const CHK_V = {
   other_district: {c:'warn', t:'заведена на другом районе'},
   alien:          {c:'bad',  t:'НЕ НАША — нет в реестре'},
 };
+
+/* ── Списания ──────────────────────────────────────────────────────────────
+   Раздел существует ради фотографий. Список сам по себе доказывает только то,
+   что кто-то его написал; поэтому снимок открывается в один палец, а не
+   «по запросу в поддержку».                                                */
+let ACC_WO = null;
+const WO_TINT = {'бой': 'var(--dn)', 'брак': 'var(--warn)',
+                 'просрочка': 'var(--warn)', 'потеря': 'var(--dn)'};
+
+async function accWriteoffs(){
+  ACC_BACK = null;
+  _setText('accTitle', 'Списания');
+  _setText('accSub', 'загрузка…');
+  document.getElementById('accFoot').innerHTML = '';
+  try{
+    ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs', {params:{days:30}});
+  }catch(e){
+    document.getElementById('accMid').innerHTML =
+      '<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+    return;
+  }
+  woHome();
+}
+
+function woHome(){
+  const w = ACC_WO || {rows: [], by_kind: [], by_driver: []};
+  _setText('accSub', w.rows.length
+    ? `${fmt(w.total_qty)} ${pluralize(w.total_qty,'бутылка','бутылки','бутылок')} за 30 дней`
+    : 'за 30 дней ничего не списывали');
+  const mid = document.getElementById('accMid');
+  if(!w.rows.length){
+    mid.innerHTML = `<div class="scan-empty">Списаний нет.<br>
+      Водитель записывает бой и брак в своём приложении — с фотографией.</div>`;
+    return;
+  }
+  // Сверху — деньги и причины: это ответ на вопрос «много ли», ради которого
+  // раздел и открывают. Строки ниже отвечают уже на «что именно».
+  const kinds = (w.by_kind || []).map(k => `<div class="wo-k">
+      <span class="wo-k-n" style="color:${WO_TINT[k.kind] || 'var(--sub)'}">${fmt(k.qty)}</span>
+      <span class="wo-k-t">${esc(k.kind)}</span></div>`).join('');
+  mid.innerHTML = `
+    <div class="wo-sum">
+      <div class="wo-sum-l">
+        <div class="wo-sum-n">${fmt(w.total_aed)}<i>AED</i></div>
+        <div class="wo-sum-s">по прайсу, за 30 дней</div>
+      </div>
+      <div class="wo-ks">${kinds}</div>
+    </div>
+    ${(w.by_driver || []).length > 1 ? `<div class="wo-drv">${
+      w.by_driver.map(d => `<span class="wo-drv-i"><b>${esc(d.driver)}</b> ${fmt(d.qty)}</span>`)
+        .join('')}</div>` : ''}
+    <div class="wo-rows">${w.rows.map(woRow).join('')}</div>`;
+}
+
+function woRow(r){
+  const d = new Date(/Z$|[+-]\d{2}:?\d{2}$/.test(r.at) ? r.at : r.at + 'Z');
+  const when = isNaN(d) ? (r.day || '') : d.toLocaleString('ru-RU',
+    {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Dubai'});
+  return `<div class="wo-row" onclick="woShot('${esc(r.id)}','${esc(r.name)}')">
+    <div class="wo-th" id="woth-${esc(r.id)}"></div>
+    <div class="wo-b">
+      <div class="wo-n">${esc(r.name)}
+        <span class="wo-q">× ${fmt(r.qty)}</span></div>
+      <div class="wo-m"><span style="color:${WO_TINT[r.kind] || 'var(--sub)'}">${esc(r.kind)}</span>
+        · ${esc(r.by)}${r.district_code ? ' · ' + esc(r.district_code) : ''} · ${when}</div>
+      ${r.note ? `<div class="wo-note-t">${esc(r.note)}</div>` : ''}
+    </div>
+    <div class="wo-aed">${fmt(r.aed)}<i>AED</i></div>
+  </div>`;
+}
+
+// Снимок во весь экран по нажатию на строку. Заодно кладём его в саму строку —
+// один раз загруженный кадр дальше виден списком, без второго запроса.
+const _woImg = {};
+async function woShot(id, name){
+  let url = _woImg[id];
+  try{
+    if(!url){ url = _woImg[id] = await ownerApi.ownerBlob(
+      '/api/owner/stock/writeoff/' + encodeURIComponent(id) + '/photo'); }
+  }catch(e){ _toast('Снимка не нашлось'); return; }
+  const th = document.getElementById('woth-' + id);
+  if(th && !th.firstChild) th.innerHTML = `<img src="${url}" alt="">`;
+  let ov = document.getElementById('woFull');
+  if(!ov){
+    ov = document.createElement('div'); ov.id = 'woFull'; ov.className = 'wo-full';
+    ov.onclick = () => ov.classList.remove('show');
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = `<img src="${url}" alt="Снимок списания"><span>${esc(name || '')}</span>`;
+  ov.classList.add('show');
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
 
 async function accCheck(){
   ACC_BACK = null;

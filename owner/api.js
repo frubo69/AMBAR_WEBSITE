@@ -40,5 +40,14 @@
     return res.json();
   }
 
-  window.ownerApi = { ownerFetch, AMBAR_API };
+  // Картинка за авторизацией: <img src> не умеет слать заголовок, поэтому
+  // тянем сами и отдаём blob-адрес. Отзывать его — забота вызывающего.
+  async function ownerBlob(path) {
+    const res = await fetch(AMBAR_API + path,
+      { headers: { 'Authorization': 'tma ' + getInitData() } });
+    if (!res.ok) throw new Error('owner api ' + res.status);
+    return URL.createObjectURL(await res.blob());
+  }
+
+  window.ownerApi = { ownerFetch, ownerBlob, AMBAR_API };
 })();

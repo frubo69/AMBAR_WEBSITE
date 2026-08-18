@@ -720,6 +720,11 @@ async def _district_base(day: str) -> dict:
         counts[oid] = await db.get_last_stock_count(oid, before_day=None)
         since[oid] = _dt_of((counts[oid] or {}).get("counted_at") or "")
     sold = await _sold_after(since)
+    try:
+        broken = await db.writeoff_since(since)
+    except Exception as e:
+        log.warning(f"[stock] списания не учтены: {e}")
+        broken = {}
 
     out = {}
     for oid in OFFICE_IDS:
@@ -737,9 +742,15 @@ async def _district_base(day: str) -> dict:
             have[pid] = (have.get(pid) or 0) + n / _unit(cat.get(pid) or {})
         for pid, n in gone.items():
             have[pid] = max(0, (have.get(pid) or 0) - n)
+        # Разбитая бутылка ушла со склада так же честно, как проданная. Без
+        # этого вычитания заявка возит на полку то, чего на ней уже нет, а
+        # недостача каждый раз выглядит ошибкой пересчёта.
+        for pid, n in (broken.get(oid) or {}).items():
+            have[pid] = max(0, (have.get(pid) or 0) - n / _unit(cat.get(pid) or {}))
         out[oid] = {"have": {k: int(v) for k, v in have.items()},
                     "sug": await _suggested_norms(oid, day), "came": came,
-                    "gone": gone, "counted": (cnt or {}).get("day", "")}
+                    "gone": gone, "lost": broken.get(oid) or {},
+                    "counted": (cnt or {}).get("day", "")}
     _BASE.update(key=day, at=_t.monotonic(), data=out)
     return out
 
@@ -970,6 +981,67 @@ def _opt(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
 
+# ── Списания ────────────────────────────────────────────────────────────────
+@require_owner
+async def handle_writeoffs(request):
+    """История боя и брака. Фотографии — отдельными запросами: тридцать
+    снимков в одном ответе это тридцать мегабайт, и открывался бы раздел
+    полминуты ради списка из восьми строк."""
+    try:
+        days = max(1, min(180, int(request.query.get("days", "30") or 30)))
+    except ValueError:
+        days = 30
+    since = datetime.now(timezone.utc) - timedelta(days=days)
+    rows = await db.writeoff_list(since=since, limit=400)
+    cat = _catalog()
+    out, by_kind, by_driver = [], {}, {}
+    for r in rows:
+        qty = int(r.get("qty") or 0)
+        pid = r.get("item") or ""
+        # Считаем и деньги: «пять бутылок» и «пять бутылок Хеннесси» — разные
+        # новости, а понять это по названию можно, только зная прайс наизусть.
+        # Цена продажная: закупочной система не знает, и честнее назвать это
+        # «по прайсу», чем выдать выдуманную себестоимость за факт. Делим на
+        # единицу учёта: списывают бутылки, а цена у пива — за ящик.
+        p = cat.get(pid) or {}
+        aed = round(_price(p) / max(1, _unit(p)) * qty, 2)
+        out.append({
+            "id": r.get("_id"), "at": _iso_of(r.get("at")), "day": r.get("day", ""),
+            "item": pid, "name": r.get("name", "") or (cat.get(pid) or {}).get("name", ""),
+            "qty": qty, "aed": aed, "kind": r.get("kind", ""), "note": r.get("note", ""),
+            "by": r.get("by", ""), "district": r.get("district", ""),
+            "district_code": r.get("district_code", ""),
+        })
+        k = by_kind.setdefault(r.get("kind", "—"), {"kind": r.get("kind", "—"),
+                                                    "qty": 0, "aed": 0.0})
+        k["qty"] += qty; k["aed"] = round(k["aed"] + aed, 2)
+        d = by_driver.setdefault(r.get("by", "—"), {"driver": r.get("by", "—"),
+                                                    "qty": 0, "aed": 0.0, "n": 0})
+        d["qty"] += qty; d["aed"] = round(d["aed"] + aed, 2); d["n"] += 1
+    return web.json_response({
+        "days": days, "rows": out,
+        "total_qty": sum(x["qty"] for x in out),
+        "total_aed": round(sum(x["aed"] for x in out), 2),
+        "by_kind": sorted(by_kind.values(), key=lambda x: -x["qty"]),
+        "by_driver": sorted(by_driver.values(), key=lambda x: -x["qty"]),
+    }, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_writeoff_photo(request):
+    """Сам снимок. Ради него всё и затевалось: строка в списке доказывает
+    только то, что кто-то её написал."""
+    img = await db.writeoff_photo((request.match_info.get("wid") or "").strip())
+    if not img:
+        return web.json_response({"error": "no_photo"}, status=404, headers=CORS_HEADERS)
+    return web.Response(body=img, content_type="image/jpeg",
+                        headers={**CORS_HEADERS, "Cache-Control": "private, max-age=86400"})
+
+
+def _iso_of(v) -> str:
+    return v.isoformat() if hasattr(v, "isoformat") else str(v or "")
+
+
 def setup(app):
     r = app.router
     routes = (
@@ -984,6 +1056,8 @@ def setup(app):
         ("/api/owner/stock/count",     handle_save,      "POST"),
         ("/api/owner/stock/transfer",  handle_transfer,  "POST"),
         ("/api/owner/stock/norm",      handle_set_norm,  "POST"),
+        ("/api/owner/stock/writeoffs",  handle_writeoffs, "GET"),
+        ("/api/owner/stock/writeoff/{wid}/photo", handle_writeoff_photo, "GET"),
         ("/api/owner/stock/transfer/{tid}", handle_transfer_delete, "DELETE"),
     )
     seen = set()

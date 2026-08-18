@@ -850,6 +850,8 @@ _DEFAULT_PREFS = {
     "reviews.bad3": True, "reviews.good5": False, "reviews.comment": True, "reviews.any": False,
     "digest.morning": True, "digest.evening": True, "digest.weekly": False, "digest.monthly": False,
     "stock.low": True, "stock.out": True,
+    # Списание — это убыток, и узнавать о нём из отчёта в конце месяца поздно.
+    "stock.writeoff": True,
     # Смена закрыта у всех — с этим сообщением приходит и заявка в магазин:
     # выключать его незачем, но право такое есть.
     "shift.closed": True,
@@ -2184,6 +2186,71 @@ async def intake_since(district: str, since) -> dict:
         {"$group": {"_id": "$product_id", "n": {"$sum": 1}}},
     ])
     return {d["_id"]: d["n"] for d in await cur.to_list(length=500) if d["_id"]}
+
+
+# ── Списания: бой, брак, просрочка, потеря ─────────────────────────────────
+# Списание — это признание, что товар исчез не через кассу. Пока такого места
+# не было, исчезнувшее превращалось в «пересчёт наврал», и заявка каждый раз
+# заказывала то, чего уже нет. Поэтому у списания три обязательных свойства:
+# кто, что именно и фотография. Без фотографии запись не принимается — не из
+# недоверия, а потому что иначе списание становится способом закрыть недостачу.
+WRITEOFF_KINDS = ("бой", "брак", "просрочка", "потеря")
+
+
+async def writeoff_add(doc: dict, photo: bytes = b"") -> str:
+    """Записать списание. Фото кладём отдельно: список читают часто, а
+    картинки в тех же документах тянули бы по мегабайту на каждое открытие."""
+    db = _db_or_none()
+    if db is None: return ""
+    import uuid
+    wid = uuid.uuid4().hex[:12]
+    doc = {**doc, "_id": wid}
+    await db.writeoffs.insert_one(doc)
+    if photo:
+        from bson.binary import Binary
+        await db.writeoff_photos.insert_one(
+            {"_id": wid, "img": Binary(photo), "at": doc.get("at")})
+    return wid
+
+
+async def writeoff_photo(wid: str) -> bytes:
+    db = _db_or_none()
+    if db is None or not wid: return b""
+    d = await db.writeoff_photos.find_one({"_id": wid}, {"_id": 0, "img": 1})
+    return bytes((d or {}).get("img") or b"")
+
+
+async def writeoff_list(since=None, district: str = "", by: str = "",
+                        limit: int = 300) -> list:
+    """История списаний, новые сверху. Без фотографий — их берут по одной."""
+    db = _db_or_none()
+    if db is None: return []
+    q = {}
+    if since:   q["at"] = {"$gte": since}
+    if district: q["district"] = district
+    if by:       q["by"] = by
+    cur = db.writeoffs.find(q, {"img": 0}).sort("at", -1).limit(int(limit))
+    return await cur.to_list(length=int(limit))
+
+
+async def writeoff_since(since: dict) -> dict:
+    """Сколько бутылок списано после пересчёта: {район: {позиция: шт}}.
+
+    Тому же расчёту, что учитывает приход и продажи: разбитая бутылка ушла со
+    склада так же честно, как проданная, и заявка должна знать об этом раньше,
+    чем следующий пересчёт."""
+    db = _db_or_none()
+    out = {}
+    if db is None or not since: return out
+    for district, dt in (since or {}).items():
+        if not dt: continue
+        cur = db.writeoffs.aggregate([
+            {"$match": {"district": district, "at": {"$gt": dt}}},
+            {"$group": {"_id": "$item", "n": {"$sum": "$qty"}}},
+        ])
+        got = {d["_id"]: int(d["n"] or 0) for d in await cur.to_list(length=500) if d["_id"]}
+        if got: out[district] = got
+    return out
 
 
 async def sold_since(since_iso: str) -> list:

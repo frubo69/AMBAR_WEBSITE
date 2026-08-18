@@ -1771,6 +1771,53 @@ button.path:active{transform:scale(.995)}
   padding:13px 15px;margin-bottom:4px}
 .exp-empty{color:var(--muted);font-size:12.5px;text-align:center;padding:8px}
 
+/* ── Нормы ───────────────────────────────────────────────────────────────
+   Норма — обещание: столько бутылок стоит на полке. Расчёт делает его из
+   продаж, последнее слово за владельцем, и на экране оба числа рядом. */
+.nm-head{display:flex;align-items:center;gap:14px;padding:16px;border-radius:16px;
+  background:var(--card);border:1px solid var(--border);margin-bottom:10px}
+.nm-head-l{flex:1;min-width:0}
+.nm-head-n{font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;
+  letter-spacing:-.7px;line-height:1;color:var(--gold2)}
+.nm-head-n i{font-style:normal;font-size:10px;color:var(--muted);margin-left:5px;
+  letter-spacing:1px}
+.nm-head-s{font-size:11.5px;color:var(--muted);margin-top:5px;line-height:1.45}
+.nm-head-r{flex-shrink:0;text-align:right}
+.nm-head-r b{display:block;font-family:'Space Grotesk',sans-serif;font-size:17px;
+  font-weight:700;color:var(--warn)}
+.nm-head-r span{display:block;font-size:10px;color:var(--muted);margin-top:2px}
+.nm-tabs{display:flex;gap:7px;margin-bottom:12px;overflow-x:auto;padding-bottom:2px;
+  -webkit-overflow-scrolling:touch;scrollbar-width:none}
+.nm-tabs::-webkit-scrollbar{display:none}
+.nm-tab{flex-shrink:0;min-height:38px;padding:10px 15px;border-radius:11px;cursor:pointer;
+  font-size:13px;font-weight:700;color:var(--muted);background:var(--card);
+  border:1px solid var(--border)}
+.nm-tab.on{color:var(--gold2);background:var(--gold-soft);border-color:rgba(201,169,110,.45)}
+.nm-rows{display:flex;flex-direction:column;gap:8px}
+.nm-row{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:14px;
+  background:var(--card);border:1px solid var(--border)}
+.nm-row.fix{border-color:rgba(201,169,110,.4);background:var(--gold-soft)}
+.nm-b{flex:1;min-width:0}
+.nm-n{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.nm-m{font-size:11.5px;color:var(--muted);margin-top:3px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+/* У ручной строки подпись переносится: «вернуть расчёт» в одну строку с
+   остальным обрезалось многоточием ровно на том слове, ради которого его и
+   читают. */
+.nm-row.fix .nm-m{white-space:normal;line-height:1.5}
+.nm-m b{color:var(--sub);font-weight:600}
+.nm-back{display:inline-block;margin-top:3px;color:var(--gold2);cursor:pointer;
+  text-decoration:underline;text-underline-offset:2px;white-space:nowrap}
+.nm-st{display:flex;align-items:center;gap:2px;flex-shrink:0}
+.nm-qb{width:38px;height:38px;flex-shrink:0;border-radius:11px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;font-size:19px;font-weight:700;
+  color:var(--sub);background:var(--bg2);border:1px solid var(--border)}
+.nm-qb:active{transform:scale(.92);color:var(--gold2)}
+.nm-v{min-width:44px;text-align:center;font-family:'Space Grotesk',sans-serif;
+  font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
+.nm-row.fix .nm-v{color:var(--gold2)}
+
 /* ── Списания ────────────────────────────────────────────────────────────
    Сверху деньги и причины — ответ на «много ли». Ниже строки со снимками —
    ответ на «что именно». */
@@ -7438,6 +7485,8 @@ const ACC = [
    ico:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>'},
   {id:'order',    t:'Заявка на закупку', s:'сколько довезти до нормы',
    ico:'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/>'},
+  {id:'norms',    t:'Нормы',             s:'сколько держим на полке',
+   ico:'<path d="M3 20h18"/><path d="M6 20V10M11 20V4M16 20v-8M21 20v-5"/>'},
   {id:'writeoff', t:'Списания',          s:'бой, брак, просрочка',
    ico:'<path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6.5 7l1 12.5h9L17.5 7"/><path d="M10 11v5M14 11v5"/>'},
   {id:'qr',       t:'Внести товар',      s:'сканируем коды с бутылок',
@@ -7734,6 +7783,7 @@ function accOpen(id){
   if(id === 'supply')   accSupply();
   if(id === 'check')    accCheck();
   if(id === 'writeoff') accWriteoffs();
+  if(id === 'norms')    accNorms();
 }
 
 // Стрелка в шапке раздела ведёт на шаг назад, а не сразу наружу: у QR-кодов
@@ -12434,6 +12484,139 @@ const CHK_V = {
   other_district: {c:'warn', t:'заведена на другом районе'},
   alien:          {c:'bad',  t:'НЕ НАША — нет в реестре'},
 };
+
+/* ── Нормы ─────────────────────────────────────────────────────────────────
+   Норма отвечает на вопрос «сколько держим», а не «сколько привезти»: заявка
+   считается от неё, и поправить её один раз дешевле, чем править заявку
+   каждый день. Расчёт по продажам виден рядом с решением — иначе непонятно,
+   от чего отступили и во что это обошлось.                                */
+let NM = null, NM_D = '', NM_PEND = {};
+const NM_SAVE_MS = 400;
+
+async function accNorms(district){
+  ACC_BACK = null;
+  _setText('accTitle', 'Нормы');
+  _setText('accSub', 'загрузка…');
+  document.getElementById('accFoot').innerHTML = '';
+  if(!NM) document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  try{
+    NM = await ownerApi.ownerFetch('/api/owner/stock/norms',
+      {params: district ? {district} : {}});
+    NM_D = NM.district;
+  }catch(e){
+    document.getElementById('accMid').innerHTML =
+      '<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+    return;
+  }
+  nmPaint();
+}
+
+function nmPaint(){
+  const w = NM; if(!w) return;
+  const dist = (w.districts || []).find(d => d.id === w.district) || {};
+  _setText('accSub', `${dist.code || ''} · ${fmt(w.norm_qty)} ${
+    pluralize(w.norm_qty,'бутылка','бутылки','бутылок')} на полке`);
+  document.getElementById('accMid').innerHTML = `
+    <div class="nm-head">
+      <div class="nm-head-l">
+        <div class="nm-head-n" id="nmAed">${fmt(w.norm_aed)}<i>AED</i></div>
+        <div class="nm-head-s">столько стоит полка целиком, если стоит по норме.
+          Расчёт держит запас на ${w.cover_days} ${
+          pluralize(w.cover_days,'день','дня','дней')} по продажам за ${w.window_days} дней</div>
+      </div>
+      ${w.manual ? `<div class="nm-head-r"><b id="nmFix">${fmt(w.manual)}</b>
+        <span>вручную</span></div>` : ''}
+    </div>
+    <div class="nm-tabs">${(w.districts || []).map(d =>
+      `<button class="nm-tab ${d.id === w.district ? 'on' : ''}"
+        onclick="accNorms('${escS(d.id)}')">${escS(d.code || d.name)}</button>`).join('')}</div>
+    <div class="nm-rows">${(w.rows || []).map(nmRow).join('')}</div>`;
+}
+
+function nmRow(r){
+  return `<div class="nm-row ${r.manual ? 'fix' : ''}" id="nm-${escS(r.id)}">
+    <div class="nm-b">
+      <div class="nm-n">${escS(r.name)}</div>
+      <div class="nm-m">${nmMeta(r)}</div>
+    </div>
+    <div class="nm-st">
+      <button class="nm-qb" onclick="nmSet('${escS(r.id)}',-1)" aria-label="Меньше">−</button>
+      <span class="nm-v">${fmt(r.norm)}</span>
+      <button class="nm-qb" onclick="nmSet('${escS(r.id)}',1)" aria-label="Больше">+</button>
+    </div>
+  </div>`;
+}
+
+// Подпись объясняет число, а не повторяет его: сколько уходит в день, что
+// предлагал расчёт и сколько лежит прямо сейчас.
+function nmMeta(r){
+  const bits = [];
+  if(r.per_day) bits.push(`≈${(+r.per_day).toFixed(1).replace('.0','')}/дн`);
+  bits.push(r.suggested ? `расчёт <b>${fmt(r.suggested)}</b>` : 'расчёта нет');
+  bits.push(`сейчас <b>${fmt(r.have)}</b>`);
+  return bits.join(' · ') + (r.manual
+    ? `<br><span class="nm-back" onclick="nmReset('${escS(r.id)}')">вернуть расчёт</span>` : '');
+}
+
+// Считаем у себя, сервер узнаёт следом — той же механикой, что и заявка:
+// нажимают сериями, и ждать ответа на каждое нажатие нельзя.
+function nmSet(pid, d){
+  const r = (NM.rows || []).find(x => x.id === pid); if(!r) return;
+  r.norm = Math.max(0, Math.min(9999, (r.norm || 0) + d));
+  r.manual = true;
+  nmPatch(r);
+  NM_PEND[NM_D + '|' + pid] = r.norm;
+  clearTimeout(nmSet._t);
+  nmSet._t = setTimeout(nmFlush, NM_SAVE_MS);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
+// Чиним ровно одну строку: перерисовка всего списка ради одной клетки съедала
+// и палец, и прокрутку.
+function nmPatch(r){
+  const el = document.getElementById('nm-' + r.id); if(!el) return;
+  el.classList.toggle('fix', !!r.manual);
+  const v = el.querySelector('.nm-v'); if(v) v.textContent = fmt(r.norm);
+  const m = el.querySelector('.nm-m'); if(m) m.innerHTML = nmMeta(r);
+  nmTotals();
+}
+
+function nmTotals(){
+  const rows = NM.rows || [];
+  NM.norm_qty = rows.reduce((a, r) => a + (r.norm || 0), 0);
+  NM.norm_aed = Math.round(rows.reduce((a, r) => a + (r.norm || 0) * (r.price || 0), 0));
+  NM.manual = rows.filter(r => r.manual).length;
+  const a = document.getElementById('nmAed');
+  if(a) a.innerHTML = `${fmt(NM.norm_aed)}<i>AED</i>`;
+  const f = document.getElementById('nmFix');
+  if(f) f.textContent = fmt(NM.manual);
+  const dist = (NM.districts || []).find(d => d.id === NM.district) || {};
+  _setText('accSub', `${dist.code || ''} · ${fmt(NM.norm_qty)} ${
+    pluralize(NM.norm_qty,'бутылка','бутылки','бутылок')} на полке`);
+}
+
+async function nmFlush(){
+  const pend = NM_PEND; NM_PEND = {};
+  for(const [key, norm] of Object.entries(pend)){
+    const i = key.indexOf('|');
+    try{
+      await ownerApi.ownerFetch('/api/owner/stock/norm', {method:'POST',
+        body:{district: key.slice(0, i), product_id: key.slice(i + 1), norm}});
+    }catch(e){ _toast('Норма не сохранилась'); }
+  }
+}
+
+async function nmReset(pid){
+  const r = (NM.rows || []).find(x => x.id === pid); if(!r) return;
+  delete NM_PEND[NM_D + '|' + pid];
+  r.norm = r.suggested; r.manual = false;
+  nmPatch(r);
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  try{
+    await ownerApi.ownerFetch('/api/owner/stock/norm/reset',
+      {method:'POST', body:{district: NM_D, product_id: pid}});
+  }catch(e){ _toast('Не вернулось к расчёту'); }
+}
 
 /* ── Списания ──────────────────────────────────────────────────────────────
    Раздел существует ради фотографий. Список сам по себе доказывает только то,

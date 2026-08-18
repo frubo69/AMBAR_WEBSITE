@@ -340,8 +340,13 @@ def _class_of(rows: dict) -> dict:
     return out
 
 
-async def _suggested_norms(district: str, day: str) -> dict:
-    """{позиция: норма} по продажам района."""
+async def _suggested_norms(district: str, day: str, detail: bool = False) -> dict:
+    """{позиция: норма} по продажам района.
+
+    С detail=True отдаёт вместо числа разбор: сколько ждём продать за дни
+    покрытия, сколько к этому добавили подушкой и к какому классу отнесли
+    позицию. Это нужно экрану норм: править число, не видя, из чего оно
+    сложилось, — то же самое, что придумывать его на глаз."""
     d = await _demand(day)
     src = (d["per"].get(district) or {})
     if not src:
@@ -400,7 +405,10 @@ async def _suggested_norms(district: str, day: str) -> dict:
         # быть правдой.
         safety = min(safety, expect * NORM_SAFETY_CAP)
 
-        norms[pid] = max(1, -(-int((expect + safety) * 100) // 100))   # ceil
+        norm = max(1, -(-int((expect + safety) * 100) // 100))          # ceil
+        norms[pid] = ({"norm": norm, "expect": round(expect, 2),
+                       "safety": round(safety, 2), "base": round(base, 2),
+                       "cls": cls.get(pid, "tail")} if detail else norm)
     return norms
 
 
@@ -853,6 +861,80 @@ async def handle_set_norm(request):
                              headers=CORS_HEADERS)
 
 
+@require_owner
+async def handle_norms(request):
+    """Нормы района: что предлагает расчёт и что стоит на самом деле.
+
+    Норма — это обещание: столько бутылок мы держим на полке, чтобы хватило
+    на дни покрытия. Расчёт делает его из продаж, но последнее слово за
+    владельцем: он знает про завоз, праздник и клиента, который завтра купит
+    ящик. Поэтому здесь видно оба числа сразу — и во что обходится разница."""
+    d = (request.query.get("district") or "").strip() or OFFICE_IDS[0]
+    if d not in OFFICE_IDS:
+        return web.json_response({"error": "bad_district"}, status=400, headers=CORS_HEADERS)
+    day = (request.query.get("day") or "").strip() or _biz_day()
+    cat = _catalog()
+    base = await _district_base(day)
+    saved = await db.get_stock_norms()
+    det = await _suggested_norms(d, day, detail=True)
+    have = (base.get(d) or {}).get("have") or {}
+
+    rows, frozen, manual = [], 0, 0
+    for pid, p in cat.items():
+        info = det.get(pid) or {}
+        sug = int(info.get("norm") or 0)
+        fix = saved.get(f"{d}:{pid}")
+        norm = int(fix if fix is not None else sug)
+        if fix is not None and int(fix) != sug:
+            manual += 1
+        price = _price(p) / max(1, _unit(p))
+        # Замороженное — только то, что стоит сверх расчёта: норма как таковая
+        # не убыток, а разница между «решили» и «посчитали» — деньги, которые
+        # держит на полке решение, а не спрос.
+        if sug and norm > sug:
+            frozen += (norm - sug) * price
+        if not (sug or norm or have.get(pid)):
+            continue
+        rows.append({
+            "id": pid, "name": p.get("name", ""), "cat": p.get("cat", ""),
+            "price": round(price, 2), "norm": norm, "suggested": sug,
+            "manual": fix is not None, "have": int(have.get(pid) or 0),
+            "expect": info.get("expect", 0), "safety": info.get("safety", 0),
+            "per_day": info.get("base", 0), "cls": info.get("cls", ""),
+        })
+    # Сверху то, где расчёт и решение расходятся сильнее всего: если норму
+    # смотрят, то ради этих строк.
+    rows.sort(key=lambda r: (-abs(r["norm"] - r["suggested"]), -r["norm"], r["name"]))
+    return web.json_response({
+        "day": day, "district": d,
+        "districts": [{"id": o, "code": OFFICE_CODES.get(o, ""),
+                       "name": OFFICE_NAMES.get(o, o)} for o in OFFICE_IDS],
+        "cover_days": NORM_COVER_DAYS, "window_days": NORM_HIST_DAYS,
+        "manual": manual, "frozen_aed": round(frozen, 2),
+        "norm_qty": sum(r["norm"] for r in rows),
+        "norm_aed": round(sum(r["norm"] * r["price"] for r in rows), 2),
+        "rows": rows,
+    }, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_norm_reset(request):
+    """Убрать ручную норму: позиция возвращается к расчёту.
+
+    Отдельным действием, а не «поставьте ноль»: ноль — это тоже решение,
+    и означает «не держим вовсе»."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    d, pid = str(body.get("district") or ""), str(body.get("product_id") or "")
+    if d not in OFFICE_IDS or pid not in _catalog():
+        return web.json_response({"error": "bad_args"}, status=400, headers=CORS_HEADERS)
+    await db.del_stock_norm(d, pid)
+    base_drop()
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+
 # ── сводка дня ───────────────────────────────────────────────────────────────
 @require_owner
 async def handle_status(request):
@@ -1056,6 +1138,8 @@ def setup(app):
         ("/api/owner/stock/count",     handle_save,      "POST"),
         ("/api/owner/stock/transfer",  handle_transfer,  "POST"),
         ("/api/owner/stock/norm",      handle_set_norm,  "POST"),
+        ("/api/owner/stock/norms",      handle_norms,     "GET"),
+        ("/api/owner/stock/norm/reset", handle_norm_reset, "POST"),
         ("/api/owner/stock/writeoffs",  handle_writeoffs, "GET"),
         ("/api/owner/stock/writeoff/{wid}/photo", handle_writeoff_photo, "GET"),
         ("/api/owner/stock/transfer/{tid}", handle_transfer_delete, "DELETE"),

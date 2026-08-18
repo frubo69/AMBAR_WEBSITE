@@ -2835,6 +2835,13 @@ async def get_stock_norms() -> dict:
     return {f'{r["district"]}:{r["product_id"]}': int(r.get("norm") or 0) for r in rows}
 
 
+async def del_stock_norm(district: str, product_id: str):
+    """Убрать ручную норму — позиция снова считается по продажам."""
+    db = _db_or_none()
+    if db is None: return
+    await db.stock_norms.delete_one({"district": district, "product_id": product_id})
+
+
 async def set_stock_norm(district: str, product_id: str, norm: int, by: int = 0):
     db = _db_or_none()
     if db is None: return

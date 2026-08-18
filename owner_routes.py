@@ -2405,14 +2405,25 @@ def _format_unauthorized_alert(user: dict, meta: dict, log_doc: dict) -> str:
     return "\n".join(lines)
 
 
+# Кому уходит тревога о чужом входе. Владелец — всегда, но смотреть за этим
+# должен не только он: в списке доступа сидят люди, и решать по ним надо
+# быстро. Дополнительные адресаты живут в AMBAR_SECURITY_IDS — отдельно от
+# списка доступа, потому что это разные вещи: одно про то, кому можно внутрь,
+# другое про то, кому сообщать о стучащихся.
+SECURITY_IDS = set(OWNER_IDS) | {
+    int(x.strip()) for x in os.getenv("AMBAR_SECURITY_IDS", "").split(",")
+    if x.strip().isdigit()
+}
+
+
 async def _alert_owners_unauthorized(user: dict, meta: dict, log_doc: dict) -> None:
-    """Push a security alert to every OWNER_IDS via @ambar_manage_bot.
+    """Push a security alert to SECURITY_IDS via @ambar_manage_bot.
     Called from owner_auth.require_owner — best-effort, swallows errors."""
     if not OWNER_BOT_TOKEN:
         log.warning("[owner-auth] OWNER_BOT_TOKEN not set — can't send security alert")
         return
     text = _format_unauthorized_alert(user, meta, log_doc)
-    for oid in OWNER_IDS:
+    for oid in SECURITY_IDS:
         try:
             await _send_md(OWNER_BOT_TOKEN, oid, text)
         except Exception as e:

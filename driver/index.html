@@ -162,6 +162,59 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .ord-total{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;
   line-height:1;letter-spacing:-.8px;color:var(--gold3);white-space:nowrap}
 .ord-total i{font-style:normal;font-size:11px;color:var(--muted);margin-left:5px}
+/* Расчёт наличными. Строка живёт внутри блока оплаты, потому что это про те
+   же деньги: сумма заказа сверху, сколько взяли на самом деле — под ней. */
+.ord-settle{grid-column:1 / -1;margin-top:2px;padding-top:11px;
+  border-top:1px dashed var(--border2);display:flex;align-items:center;gap:9px;
+  flex-wrap:wrap;font-size:13px;line-height:1.35}
+.ord-settle-b{display:flex;align-items:center;gap:7px;padding:9px 13px;min-height:38px;
+  border-radius:11px;cursor:pointer;font-size:13px;font-weight:600;
+  color:var(--sub);background:var(--card2);border:1px solid var(--border3)}
+.ord-settle-b:active{transform:scale(.97);color:var(--gold2)}
+.ord-settle-v{flex:1;min-width:0;color:var(--sub)}
+.ord-settle-v b{color:var(--text);font-variant-numeric:tabular-nums;white-space:nowrap}
+.ord-settle-v.owe b{color:var(--warn)}
+.ord-settle-v.get b{color:var(--up)}
+
+/* Мы должны этому клиенту. Стоит первой строкой после шапки: это не часть
+   доставки, а то, что надо вспомнить до того, как выйдешь из машины. */
+.ord-owe{display:flex;align-items:center;gap:11px;background:var(--warn-soft);
+  border-bottom:1px solid var(--border2);padding:12px 14px}
+.ord-owe > svg{flex-shrink:0;color:var(--warn)}
+.ord-owe-t{flex:1;min-width:0;font-size:13px;line-height:1.35;color:var(--text)}
+.ord-owe-t b{display:block;font-size:15px;color:var(--warn);font-variant-numeric:tabular-nums}
+.ord-owe-b{flex-shrink:0;min-height:38px;padding:9px 15px;border-radius:11px;cursor:pointer;
+  font-size:13px;font-weight:700;color:#1a1408;background:var(--warn);border:none}
+.ord-owe-b:active{transform:scale(.96)}
+
+/* Окно расчёта: одно число крупно, под ним — что оно означает. */
+.stl-in{display:flex;align-items:baseline;gap:10px;padding:14px 16px;border-radius:14px;
+  background:var(--card2);border:1px solid var(--border3)}
+.stl-in:focus-within{border-color:rgba(201,169,110,.5)}
+.stl-in input{flex:1;min-width:0;width:100%;border:none;background:none;outline:none;
+  color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;
+  letter-spacing:-1px;font-variant-numeric:tabular-nums}
+.stl-in i{font-style:normal;font-size:12px;font-weight:700;color:var(--muted);
+  letter-spacing:1.2px}
+.stl-chips{display:flex;gap:8px;margin-top:10px;flex-wrap:wrap}
+.stl-chip{min-height:40px;padding:10px 14px;border-radius:11px;cursor:pointer;font-size:13px;
+  font-weight:700;color:var(--sub);background:var(--card2);border:1px solid var(--border3);
+  font-variant-numeric:tabular-nums}
+.stl-chip:active{transform:scale(.96)}
+.stl-chip.on{color:var(--gold2);border-color:rgba(201,169,110,.5);background:var(--gold-soft)}
+/* Высота задана заранее: строка меняется на каждой цифре, и прыгать кнопкам
+   под ней нельзя. */
+.stl-out{min-height:58px;margin-top:12px;padding:12px 14px;border-radius:13px;
+  display:flex;align-items:center;gap:10px;font-size:14px;line-height:1.35;
+  background:var(--card2);color:var(--muted)}
+.stl-out svg{flex-shrink:0}
+.stl-out b{font-variant-numeric:tabular-nums}
+.stl-out.owe{background:var(--warn-soft);color:var(--warn)}
+.stl-out.get{background:var(--gold-soft);color:var(--gold3)}
+.stl-out.even{background:var(--up-soft);color:var(--up)}
+.stl-back{font-size:14px;line-height:1.5;color:var(--sub)}
+.stl-back b{display:block;font-family:'Space Grotesk',sans-serif;font-size:32px;
+  font-weight:700;letter-spacing:-1px;color:var(--warn);margin-bottom:6px}
 .ord-row-pay.debt{background:var(--warn-soft)}
 .ord-row-pay.debt .ord-method,.ord-row-pay.debt .ord-total{color:var(--warn)}
 .ord-row-pay.paid{background:var(--up-soft)}
@@ -1088,6 +1141,24 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   </div>
 </div>
 
+<!-- Расчёт наличными: сколько денег реально в руке. Разницу с суммой заказа
+     считаем сами — водитель не должен в уме превращать деньги в долг. -->
+<div class="sheet" id="stlSheet" onclick="if(event.target===this)stlClose()">
+  <div class="sheet-in">
+    <div class="sheet-hd">
+      <div style="flex:1;min-width:0">
+        <div class="sheet-t" id="stlT">Сколько взяли наличными</div>
+        <div class="sheet-s" id="stlS"></div>
+      </div>
+    </div>
+    <div id="stlBody"></div>
+    <div class="sheet-acts sheet-acts-2">
+      <button class="btn btn-gh" onclick="stlClose()">Назад</button>
+      <button class="btn btn-pri" id="stlGo" onclick="stlSend()">Сохранить</button>
+    </div>
+  </div>
+</div>
+
 <div class="sheet" id="mapSheet" onclick="if(event.target===this)this.classList.remove('show')">
   <div class="sheet-in">
     <div class="sheet-hd">
@@ -1741,6 +1812,7 @@ function orderCard(o, i){
       <span class="ord-dist">${esc(o.district || '')}</span>
       <span class="ord-ago">${ago(o.confirmed_at || o.timestamp).replace(' назад', '')}</span>
     </div>
+    ${oweRow(o)}
 
     <div class="ord-row">
       <div class="tstrip">${timeStrip(o)}</div>
@@ -1773,6 +1845,7 @@ function orderCard(o, i){
       <div class="ord-method">${svg(PAY.ico, 17)}${PAY.t}</div>
       <div class="ord-total">${fmt(o.total)}<i>AED</i></div>
       ${PAY.s ? `<div class="ord-method-s">${PAY.s}</div>` : ''}
+      ${settleRow(o, paid || debt)}
     </div>
 
     ${req ? `<div class="ord-row ord-row-req ${reqFlag[0]}">
@@ -1838,8 +1911,183 @@ function histCard(o){
       <div class="ord-l ord-l-r">Итого</div>
       <div class="ord-method">${svg(PAY.ico, 16)}${PAY.t}</div>
       <div class="ord-total">${fmt(o.total)}<i>AED</i></div>
+      ${settleRow(o, paid || debt)}
     </div>
   </div>`;
+}
+
+/* ═══ Расчёт наличными и долги ══════════════════════════════════════════
+   Долг заводится сам собой на адресе: у водителя нет мелочи, клиент даёт
+   больше, разницу обещают вернуть «в следующий раз» — и до сих пор она жила
+   только в чьей-то памяти. Теперь у неё есть одно место.
+
+   Считаем не долг, а деньги: водитель вписывает, сколько наличных у него в
+   руке, разницу с суммой заказа выводим сами. Знак у долга один — плюс,
+   если должен клиент, минус, если мы; поэтому один и тот же ввод закрывает
+   оба случая, и водителю не надо выбирать между двумя кнопками, стоя в
+   подъезде.                                                              */
+var STL = null;                      // {oid, total, mode:'take'|'back', owed}
+
+function _ordById(oid){
+  const all = ((ORDERS && ORDERS.active) || []).concat((ORDERS && ORDERS.done) || []);
+  return all.find(o => o.order_id === oid) || null;
+}
+
+// Полоса «мы должны» — первой строкой карточки: об этом надо вспомнить до
+// того, как выйдешь из машины, а не когда уже отдал сдачу и уехал.
+function oweRow(o){
+  if(!(o.owed > 0)) return '';
+  return `<div class="ord-owe">
+    ${svg(ICO.cash, 20)}
+    <div class="ord-owe-t">Мы должны этому клиенту
+      <b>${fmt(o.owed)} AED</b></div>
+    <button class="ord-owe-b" onclick="stlBack('${esc(o.order_id)}')">Отдал</button>
+  </div>`;
+}
+
+// Строка расчёта внутри блока оплаты. Пока всё сошлось — это тихая кнопка;
+// как только разошлось — сумма и в какую сторону.
+function settleRow(o, hidden){
+  if(hidden) return '';                        // онлайн и долг мимо рук водителя
+  const st = o.settle;
+  if(!st || !st.diff) return `<div class="ord-settle">
+    <button class="ord-settle-b" onclick="stlOpen('${esc(o.order_id)}')">
+      ${svg(ICO.edit, 14)}Рассчитались не ровно</button></div>`;
+  const owe = st.diff > 0;                     // взяли больше — должны мы
+  return `<div class="ord-settle">
+    <span class="ord-settle-v ${owe ? 'owe' : 'get'}">Взяли <b>${fmt(st.taken)}</b> —
+      ${owe ? 'должны клиенту' : 'клиент должен'} <b>${fmt(Math.abs(st.diff))} AED</b></span>
+    <button class="ord-settle-b" onclick="stlOpen('${esc(o.order_id)}')"
+      aria-label="Исправить расчёт">${svg(ICO.edit, 14)}Исправить</button>
+  </div>`;
+}
+
+// Подсказки — не ограничение, а частые случаи: ровно по заказу, до полусотни,
+// до сотни и одной купюрой. Вписать можно любое число.
+function stlChips(total){
+  const notes = [50, 100, 200, 500, 1000];
+  const up = k => Math.ceil(total / k) * k;
+  const note = notes.find(n => n >= total) || up(1000);
+  return [...new Set([total, up(50), up(100), note])].filter(v => v > 0).slice(0, 4);
+}
+
+function stlOpen(oid){
+  const o = _ordById(oid); if(!o) return;
+  STL = {oid, total: o.total || 0, mode: 'take'};
+  const was = (o.settle || {}).taken;
+  document.getElementById('stlT').textContent = 'Сколько взяли наличными';
+  document.getElementById('stlS').textContent =
+    `По заказу ${fmt(STL.total)} AED. Впишите, сколько денег реально у вас на руках — ` +
+    `разницу посчитаем сами.`;
+  document.getElementById('stlBody').innerHTML = `
+    <div class="stl-in">
+      <input id="stlV" type="text" inputmode="decimal" autocomplete="off"
+        aria-label="Сколько взяли наличными" value="${was != null ? was : ''}"
+        placeholder="${STL.total}"><i>AED</i>
+    </div>
+    <div class="stl-chips">${stlChips(STL.total).map(v =>
+      `<button class="stl-chip" onclick="stlSet(${v})">${fmt(v)}</button>`).join('')}</div>
+    <div class="stl-out" id="stlOut"></div>`;
+  document.getElementById('stlGo').textContent = 'Сохранить';
+  document.getElementById('stlV').addEventListener('input', stlPaint);
+  stlPaint();
+  document.getElementById('stlSheet').classList.add('show');
+  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+
+function stlSet(v){
+  const el = document.getElementById('stlV'); if(!el) return;
+  el.value = v; stlPaint();
+  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
+function stlNum(){
+  const el = document.getElementById('stlV'); if(!el) return null;
+  const v = parseFloat(String(el.value).replace(',', '.').replace(/\s/g, ''));
+  return (isFinite(v) && v >= 0) ? Math.round(v * 100) / 100 : null;
+}
+
+// Что означает вписанное число — словами и сразу, а не после сохранения.
+function stlPaint(){
+  const out = document.getElementById('stlOut'); if(!out || !STL) return;
+  const go = document.getElementById('stlGo');
+  const v = stlNum();
+  document.querySelectorAll('.stl-chip').forEach(c =>
+    c.classList.toggle('on', v !== null && fmt(v) === c.textContent));
+  if(v === null){
+    out.className = 'stl-out';
+    out.innerHTML = 'Сумма наличных, которые вы забрали у клиента';
+    go.disabled = true; return;
+  }
+  const d = Math.round((v - STL.total) * 100) / 100;
+  go.disabled = false;
+  if(!d){
+    out.className = 'stl-out even';
+    out.innerHTML = `${svg(ICO.ok, 17)}<span>Ровно по заказу. Долгов не остаётся.</span>`;
+  }else if(d > 0){
+    out.className = 'stl-out owe';
+    out.innerHTML = `${svg(ICO.warn, 17)}<span>Сдача <b>${fmt(d)} AED</b> — ` +
+      `мы должны клиенту. Отдать можно в следующий приезд.</span>`;
+  }else{
+    out.className = 'stl-out get';
+    out.innerHTML = `${svg(ICO.warn, 17)}<span>Клиент недодал <b>${fmt(-d)} AED</b> — ` +
+      `останется за ним.</span>`;
+  }
+}
+
+// Возврат долга — то же окно, но считать нечего: сумма известна, нужно только
+// подтвердить, что деньги отданы из рук в руки.
+function stlBack(oid){
+  const o = _ordById(oid); if(!o || !(o.owed > 0)) return;
+  STL = {oid, total: o.total || 0, mode: 'back', owed: o.owed};
+  document.getElementById('stlT').textContent = 'Вернуть клиенту';
+  document.getElementById('stlS').textContent =
+    'Отметьте, только когда деньги уже отданы: долг закроется сразу.';
+  document.getElementById('stlBody').innerHTML =
+    `<div class="stl-out owe"><b style="font-size:26px">${fmt(o.owed)} AED</b></div>
+     <div class="stl-back" style="margin-top:10px">Это сдача, которую мы не смогли отдать
+       в прошлый раз. Отдайте наличными сверх сегодняшнего заказа.</div>`;
+  document.getElementById('stlGo').disabled = false;
+  document.getElementById('stlGo').textContent = 'Отдал';
+  document.getElementById('stlSheet').classList.add('show');
+  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+
+function stlClose(){
+  document.getElementById('stlSheet').classList.remove('show');
+  STL = null;
+}
+
+const STL_ERR = {not_yours: 'Это уже не ваш заказ', not_cash: 'Здесь наличные не берут',
+  bad_amount: 'Проверьте сумму', nothing_owed: 'Клиенту уже ничего не должны',
+  no_customer: 'У заказа нет клиента'};
+
+async function stlSend(){
+  if(!STL) return;
+  const go = document.getElementById('stlGo');
+  const back = STL.mode === 'back', oid = STL.oid;
+  const v = back ? null : stlNum();
+  if(!back && v === null) return toast('Впишите сумму', 'err');
+  go.disabled = true;
+  try{
+    if(back){
+      const r = await drvApi.drvFetch(`/api/driver/orders/${oid}/debt-back`,
+        {method: 'POST', body: {}});
+      toast(`Отдали ${fmt(r.returned)} AED — долг закрыт`);
+    }else{
+      const r = await drvApi.drvFetch(`/api/driver/orders/${oid}/settle`,
+        {method: 'POST', body: {taken: v}});
+      toast(!r.diff ? 'Расчёт сошёлся'
+        : r.diff > 0 ? `Записали: должны клиенту ${fmt(r.diff)} AED`
+                     : `Записали: клиент должен ${fmt(-r.diff)} AED`);
+    }
+    try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    stlClose();
+    await load();
+  }catch(e){
+    go.disabled = false;
+    toast(STL_ERR[(e.payload || {}).error] || 'Не сохранилось, попробуйте ещё раз', 'err');
+  }
 }
 
 // Три факта о времени — те же, что и в работе, только уже в прошедшем виде.

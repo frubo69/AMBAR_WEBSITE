@@ -2550,6 +2550,16 @@ button.path:active{transform:scale(.995)}
     <div style="padding:20px;color:var(--muted);font-size:13px;text-align:center;width:100%">Загрузка…</div>
   </div>
 
+  <!-- МЫ ДОЛЖНЫ — обратная сторона того же счёта. Долг здесь заводится сам:
+       у водителя не нашлось сдачи, он записал это на адресе, и до возврата
+       сумма висит здесь. Раздел появляется, только когда есть что возвращать:
+       пустой он говорил бы, что мы кому-то должны, каждый день. -->
+  <div class="cust-sect" id="custOwed" style="display:none">
+    <div><div class="cust-sect-t">Мы должны</div><div class="cust-sect-s">не отдали сдачу</div></div>
+    <div class="cust-sect-meta" id="owedSectMeta"><span style="color:var(--dn)">—</span> <span class="cur-unit">AED</span></div>
+  </div>
+  <div class="cust-scroll" id="owedScroll" style="display:none"></div>
+
   </div><!-- /peopleCustomers -->
 
   <div class="foot">Нажми на карточку для профиля</div>
@@ -10340,12 +10350,13 @@ function renderCustomerSections(customers){
     if(debtors.length){
       debtScroll.innerHTML = debtors.map(c=>{
         const avSt = _cardAvStyle(c.card_type);
+        const dv = Math.max(0, c.debt || 0);
         return `<div class="cust-card top" data-detail="customer:${c.telegram_id}">
           <div class="cc-rank" style="color:var(--warn)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M5 3h13a2 2 0 0 1 2 2v16H7a2 2 0 0 1-2-2z"/><path d="M5 17h15M9 7h7M9 11h7"/></svg></div>
           <div class="cc-av"${avSt?' style="'+avSt+'"':''}>${c.initials}</div>
           <div class="cc-name">${c.full_name}</div>
-          <div class="cc-tier" style="color:var(--warn)">${(c.debt||0)>0?'ДОЛЖЕН':'В ДОЛГ ОК'}</div>
-          <div class="cc-value" style="color:var(--warn)"><span data-aed="${c.debt||0}">${fmt(c.debt||0)}</span> <span class="cur-unit" style="font-size:10px;color:var(--muted);font-weight:600;margin-left:3px;letter-spacing:.4px;text-transform:uppercase">AED</span></div>
+          <div class="cc-tier" style="color:var(--warn)">${dv>0?'ДОЛЖЕН':'В ДОЛГ ОК'}</div>
+          <div class="cc-value" style="color:var(--warn)"><span data-aed="${dv}">${fmt(dv)}</span> <span class="cur-unit" style="font-size:10px;color:var(--muted);font-weight:600;margin-left:3px;letter-spacing:.4px;text-transform:uppercase">AED</span></div>
           <div class="cc-sub">потратил <span data-aed="${c.total_spent}">${fmt(c.total_spent)}</span> AED · ${_pluralOrders(c.orders_total)}</div>
         </div>`;
       }).join('');
@@ -10353,9 +10364,37 @@ function renderCustomerSections(customers){
       debtScroll.innerHTML = '<div style="padding:16px;color:var(--muted);font-size:13px;text-align:center;width:100%">Нет должников</div>';
     }
   }
+  // МЫ ДОЛЖНЫ — тот же счёт с другим знаком. Минус появляется, когда водитель
+  // взял больше суммы заказа: сдачи не нашлось, разницу записали за нами.
+  const owed = customers.filter(c => (c.debt || 0) < 0)
+                        .sort((a, b) => (a.debt || 0) - (b.debt || 0));
+  const owedSect = document.getElementById('custOwed');
+  const owedScroll = document.getElementById('owedScroll');
+  if(owedSect && owedScroll){
+    owedSect.style.display = owed.length ? '' : 'none';
+    owedScroll.style.display = owed.length ? '' : 'none';
+    owedScroll.innerHTML = owed.map(c=>{
+      const avSt = _cardAvStyle(c.card_type);
+      const sum = Math.abs(c.debt || 0);
+      return `<div class="cust-card top" data-detail="customer:${c.telegram_id}">
+        <div class="cc-rank" style="color:var(--dn)"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><path d="M9 14 4 9l5-5"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg></div>
+        <div class="cc-av"${avSt?' style="'+avSt+'"':''}>${c.initials}</div>
+        <div class="cc-name">${c.full_name}</div>
+        <div class="cc-tier" style="color:var(--dn)">ВЕРНУТЬ</div>
+        <div class="cc-value" style="color:var(--dn)"><span data-aed="${sum}">${fmt(sum)}</span> <span class="cur-unit" style="font-size:10px;color:var(--muted);font-weight:600;margin-left:3px;letter-spacing:.4px;text-transform:uppercase">AED</span></div>
+        <div class="cc-sub">отдать при следующей доставке</div>
+      </div>`;
+    }).join('');
+    const om = document.getElementById('owedSectMeta');
+    if(om){
+      const t = owed.reduce((a, c) => a + Math.abs(c.debt || 0), 0);
+      om.innerHTML = `<span style="color:var(--dn)" data-aed="${t}">${fmt(t)}</span> <span class="cur-unit">AED</span>`;
+    }
+  }
+
   const debtMeta = document.getElementById('debtSectMeta');
   if(debtMeta){
-    const totalDebt = debtors.reduce((s,c)=>s+(c.debt||0), 0);
+    const totalDebt = debtors.reduce((s,c)=>s+Math.max(0, c.debt||0), 0);
     debtMeta.innerHTML = `<span style="color:var(--warn)" data-aed="${totalDebt}">${fmt(totalDebt)}</span> <span class="cur-unit">AED</span>`;
   }
 

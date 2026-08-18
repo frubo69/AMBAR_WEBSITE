@@ -156,6 +156,10 @@ def _order_view(o: dict) -> dict:
         "chat_n": len(o.get("chat") or []),
         "chat_new": _chat_new(o, "driver"),
         "chat_at": o.get("chat_at", ""),
+        # Расчёт наличными: сколько денег реально оказалось в руке. Пока строки
+        # нет — заказ считается рассчитанным ровно, и водителю ничего не
+        # показывается: обычный случай не должен занимать место на экране.
+        "settle": o.get("settle") or None,
     }
 
 
@@ -194,6 +198,85 @@ async def handle_ping(request):
         "day": _biz_day(),
         "panic": bool(await db.panic_get(me["name"])),
     }, headers=CORS_HEADERS)
+
+
+@require_driver
+async def handle_settle(request):
+    """Рассчитались не ровно: водитель говорит, сколько денег у него в руке.
+
+    Одно поле вместо двух кнопок «дал сдачу» и «остался должен». Это не
+    бухгалтерская абстракция, а физика: водитель считает не долг, а деньги, и
+    вводит ровно то, что видит. Разницу с суммой заказа считаем сами.
+
+      взял больше суммы — сдачи не нашлось, мы должны клиенту;
+      взял меньше      — клиент остался должен.
+
+    Долг у клиента один, со знаком: плюс — должен он, минус — должны мы. Так
+    не нужно ни второй сущности, ни второго экрана, ни второго журнала, а
+    зачесть одно другим можно просто сложением.
+
+    Правку повторного расчёта считаем от прошлой: водитель может ошибиться и
+    ввести заново, и второе число должно заменить первое, а не удвоить его."""
+    me = request["driver"]
+    oid = (request.match_info.get("oid") or "").strip()
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    o = await db.get_order(oid)
+    if not o or (o.get("driver") or "").strip() != me["name"]:
+        return web.json_response({"error": "not_yours"}, status=403, headers=CORS_HEADERS)
+    if _is_prepaid(o) or o.get("payment_method") == "debt":
+        # Там, где деньги не идут через руки водителя, и расчёта быть не может.
+        return web.json_response({"error": "not_cash"}, status=400, headers=CORS_HEADERS)
+    try:
+        taken = round(float(body.get("taken")), 2)
+    except (TypeError, ValueError):
+        return web.json_response({"error": "bad_amount"}, status=400, headers=CORS_HEADERS)
+    total = int(o.get("total") or 0)
+    if not (0 <= taken <= total + 100000):
+        return web.json_response({"error": "bad_amount"}, status=400, headers=CORS_HEADERS)
+
+    diff = round(taken - total, 2)
+    prev = round(float((o.get("settle") or {}).get("diff") or 0), 2)
+    now = datetime.now(timezone.utc)
+    await db.update_order(oid, settle={
+        "taken": taken, "diff": diff, "by": me["name"], "at": now.isoformat()})
+
+    cid = int(o.get("customer_id") or 0)
+    if cid and diff != prev:
+        # Знак: взяли больше — уходим в минус, это наш долг клиенту.
+        await db.add_debt(cid, -(diff - prev), order_id=oid,
+                          note=f"расчёт наличными · {me['name']}")
+    log.info(f"[driver] {me['name']}: заказ {oid} — взято {taken} из {total} "
+             f"(разница {diff:+})")
+    return web.json_response({"ok": True, "diff": diff,
+                              "debt": (await db.get_debt(cid)) if cid else 0},
+                             headers=CORS_HEADERS)
+
+
+@require_driver
+async def handle_debt_settle(request):
+    """Водитель вернул клиенту то, что мы были должны.
+
+    Долг закрывается там же, где возник, — на адресе. Иначе он висит до тех
+    пор, пока о нём вспомнит владелец, а клиент вспоминает раньше."""
+    me = request["driver"]
+    oid = (request.match_info.get("oid") or "").strip()
+    o = await db.get_order(oid)
+    if not o or (o.get("driver") or "").strip() != me["name"]:
+        return web.json_response({"error": "not_yours"}, status=403, headers=CORS_HEADERS)
+    cid = int(o.get("customer_id") or 0)
+    if not cid:
+        return web.json_response({"error": "no_customer"}, status=400, headers=CORS_HEADERS)
+    debt = await db.get_debt(cid)
+    if debt >= 0:
+        return web.json_response({"error": "nothing_owed", "debt": debt},
+                                 status=400, headers=CORS_HEADERS)
+    await db.add_debt(cid, -debt, order_id=oid, note=f"вернул водитель · {me['name']}")
+    log.info(f"[driver] {me['name']}: вернул клиенту {-debt} по заказу {oid}")
+    return web.json_response({"ok": True, "returned": -debt, "debt": 0.0},
+                             headers=CORS_HEADERS)
 
 
 @require_driver
@@ -391,6 +474,18 @@ async def handle_orders(request):
     mine = [o for o in orders if (o.get("driver") or "").strip() == me["name"]]
     active = [_order_view(o) for o in mine if o.get("status") == "approved"]
     done = [_order_view(o) for o in mine if o.get("status") == "delivered"]
+    # Кому из этих клиентов мы должны. Долг возник, когда у водителя не нашлось
+    # сдачи, и закрыть его проще всего в следующий приезд — но только если
+    # водитель о нём узнает раньше, чем уедет.
+    try:
+        ids = {int(o.get("customer_id") or 0) for o in mine} - {0}
+        owed = await db.debts_of(list(ids)) if ids else {}
+        for v, o in list(zip(active, [x for x in mine if x.get("status") == "approved"])) + \
+                    list(zip(done, [x for x in mine if x.get("status") == "delivered"])):
+            d = owed.get(int(o.get("customer_id") or 0), 0)
+            v["owed"] = round(-d, 2) if d < 0 else 0
+    except Exception as e:
+        log.warning(f"[driver] долги клиентов не прочитаны: {e}")
     active.sort(key=lambda x: x.get("confirmed_at") or x.get("timestamp") or "")
     done.sort(key=lambda x: x.get("timestamp") or "", reverse=True)
     return web.json_response({
@@ -1057,6 +1152,8 @@ def setup(app):
         ("/api/driver/panic",                   handle_panic,       "POST"),
         ("/api/driver/pos",                     handle_pos,         "POST"),
         ("/api/driver/geo/help",                handle_geo_help,    "POST"),
+        ("/api/driver/orders/{oid}/settle",     handle_settle,      "POST"),
+        ("/api/driver/orders/{oid}/debt-back",  handle_debt_settle, "POST"),
         ("/api/driver/orders/{oid}/ack",        handle_ack,         "POST"),
         ("/api/driver/orders/{oid}/delivered",  handle_delivered,   "POST"),
         ("/api/driver/orders/{oid}/edit",       handle_edit_request, "POST"),

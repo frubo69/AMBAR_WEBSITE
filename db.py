@@ -1562,6 +1562,17 @@ async def add_debt(telegram_id: int, amount: float, order_id: str = "", note: st
     )
 
 
+async def debts_of(ids: list) -> dict:
+    """{telegram_id: долг} пачкой. Водителю на экран нужен долг сразу по всем
+    клиентам смены, а спрашивать по одному — это запрос на каждый заказ."""
+    db = _db_or_none()
+    if db is None or not ids: return {}
+    cur = db.users.find({"telegram_id": {"$in": [int(i) for i in ids]},
+                         "debt": {"$ne": 0}}, {"_id": 0, "telegram_id": 1, "debt": 1})
+    return {int(u["telegram_id"]): _round_aed(u.get("debt"))
+            for u in await cur.to_list(length=200)}
+
+
 async def set_debt(telegram_id: int, new_amount: float, by: int = 0, note: str = "") -> dict:
     """Admin edit: set debt to an absolute value (e.g. after a cash repayment).
     Returns {"old": …, "new": …}."""

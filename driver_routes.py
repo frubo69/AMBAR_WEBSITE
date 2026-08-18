@@ -219,6 +219,39 @@ async def handle_pos(request):
 
 
 @require_driver
+async def handle_geo_help(request):
+    """Прислать водителю в чат кнопку «Я здесь».
+
+    Приложение зовёт это перед тем, как закрыться. Иначе получается пустой
+    жест: оно закрывается, человек оказывается в чате, а там ничего нового —
+    клавиатура с кнопкой появляется только вместе с сообщением от бота, и если
+    бот давно молчал, её там нет.
+
+    Работает на любой версии телеграма: и кнопка у поля ввода, и трансляция в
+    скрепке — это его собственные механизмы, а не наши."""
+    me = request["driver"]
+    import os as _os
+    from api_server import tg_send
+    import config_staff as _staff
+    tid = _staff.DRIVER_IDS.get((me.get("name") or "").strip())
+    token = _os.getenv("DRIVER_BOT_TOKEN", "")
+    if not (tid and token):
+        return web.json_response({"ok": False}, headers=CORS_HEADERS)
+    text = ("Кнопка ниже отправляет вашу точку одним касанием — она останется "
+            "у поля ввода.\n\n"
+            "Чтобы оператор видел вас всю смену, включите трансляцию: "
+            "скрепка → «Геопозиция» → «Транслировать» → 8 часов.")
+    kb = {"keyboard": [[{"text": "📍 Я здесь", "request_location": True}]],
+          "resize_keyboard": True, "is_persistent": True}
+    try:
+        await tg_send(token, tid, text, parse_mode=None, reply_markup=kb)
+    except Exception as e:
+        log.warning(f"[driver] кнопка «я здесь» не ушла ({me.get('name')}): {e}")
+        return web.json_response({"ok": False}, headers=CORS_HEADERS)
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+
+@require_driver
 async def handle_panic(request):
     """Экстренная ситуация: приложение маскируется, наши узнают.
 
@@ -1009,6 +1042,7 @@ def setup(app):
         ("/api/driver/supply",                  handle_supply_list, "GET"),
         ("/api/driver/panic",                   handle_panic,       "POST"),
         ("/api/driver/pos",                     handle_pos,         "POST"),
+        ("/api/driver/geo/help",                handle_geo_help,    "POST"),
         ("/api/driver/orders/{oid}/ack",        handle_ack,         "POST"),
         ("/api/driver/orders/{oid}/delivered",  handle_delivered,   "POST"),
         ("/api/driver/orders/{oid}/edit",       handle_edit_request, "POST"),

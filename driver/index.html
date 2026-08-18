@@ -1592,10 +1592,14 @@ async function geoFix(){
      && lm.isAccessRequested && !lm.isAccessGranted){
     try{ lm.openSettings(); return; }catch(e){}
   }
-  // Последняя и самая надёжная дорога: чат с ботом. Закрытие приложения
-  // возвращает ровно туда, откуда его открыли.
+  // Последняя и самая надёжная дорога: чат с ботом. Но сперва просим бота
+  // прислать туда кнопку — иначе выйдет пустой жест: приложение закроется, а
+  // в чате человека ничего не ждёт. Клавиатура с кнопкой появляется только
+  // вместе с сообщением, и если бот давно молчал, её там нет.
   _tap('light');
-  try{ tg.close(); }catch(e){}
+  toast('Открываю чат — там кнопка «Я здесь»');
+  try{ await drvApi.drvFetch('/api/driver/geo/help', {method:'POST'}); }catch(e){}
+  setTimeout(() => { try{ tg.close(); }catch(e){} }, 900);
 }
 
 async function load(){

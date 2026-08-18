@@ -1318,12 +1318,24 @@ button.path:active{transform:scale(.995)}
    посреди тёмной панели бьёт по глазам в ночную смену. */
 #whMap .leaflet-tile-pane{filter:invert(1) hue-rotate(180deg) saturate(.18) brightness(.9)}
 .leaflet-control-attribution,.leaflet-control-zoom{display:none!important}
-/* Назад — кружком поверх карты: шапки здесь нет, её место занимает карта. */
-.wh-back{position:absolute;top:calc(12px + var(--safe-top));left:12px;z-index:5;
-  width:40px;height:40px;border-radius:50%;display:flex;align-items:center;
-  justify-content:center;color:var(--text);background:rgba(10,10,14,.72);
-  border:1px solid var(--border2);-webkit-backdrop-filter:blur(14px);
-  backdrop-filter:blur(14px);box-shadow:0 4px 16px rgba(0,0,0,.4)}
+/* Кнопки живут поверх карты кружками, а не в шапке: шапки здесь нет, её место
+   занимает карта, и отнимать у неё полосу ради трёх иконок жалко. */
+.wh-fab{width:40px;height:40px;flex:0 0 auto;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;color:var(--text);
+  background:rgba(10,10,14,.72);border:1px solid var(--border2);
+  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
+  box-shadow:0 4px 16px rgba(0,0,0,.45)}
+.wh-fab:active{background:rgba(30,30,40,.85)}
+.wh-back{position:absolute;top:calc(12px + var(--safe-top));left:12px;z-index:5}
+.wh-tools{position:absolute;top:calc(12px + var(--safe-top));right:12px;z-index:5;
+  display:flex;flex-direction:column;gap:8px}
+
+/* Шапка шторки. В карточке слева появляется стрелка «к списку» — как в Find My,
+   где шторка ведёт себя стопкой экранов, а не одной страницей. */
+.wh-hd-r{display:flex;align-items:flex-start;gap:10px}
+.wh-hd-back{width:30px;height:30px;flex:0 0 auto;margin-top:2px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;color:var(--text);
+  background:var(--card2);border:1px solid var(--border2)}
 
 .wh-sheet{position:absolute;left:0;right:0;bottom:0;z-index:6;
   height:88vh;display:flex;flex-direction:column;
@@ -1343,6 +1355,43 @@ button.path:active{transform:scale(.995)}
 .wh-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
   padding:6px 14px calc(20px + var(--safe-bottom));touch-action:pan-y}
 .wh-body::-webkit-scrollbar{display:none}
+
+/* Карточка водителя — то же место, что и список: шторка ведёт себя стопкой
+   экранов. Наверху крупно состояние, ниже факты, внизу действия. */
+.wh-card{padding:2px 2px 4px}
+.wh-card-top{display:flex;align-items:center;gap:14px;padding:6px 4px 16px}
+.wh-card-i{width:46px;height:46px;flex:0 0 auto;border-radius:16px;display:flex;
+  align-items:center;justify-content:center;background:var(--bg3);
+  border:1px solid var(--border2);color:var(--dim)}
+.wh-card-i svg{width:20px;height:20px}
+.wh-card.live .wh-card-i{background:rgba(61,220,132,.12);
+  border-color:rgba(61,220,132,.35);color:#3ddc84}
+.wh-card.snap .wh-card-i{background:var(--gold-soft);
+  border-color:rgba(201,169,110,.35);color:var(--gold2)}
+.wh-card-b{flex:1;min-width:0}
+.wh-card-n{font-size:15px;font-weight:600;line-height:1.4}
+.wh-card-n b{color:#3ddc84;font-weight:700}
+.wh-card-n u{text-decoration:none;color:var(--gold2);font-weight:700}
+.wh-card-s{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.35}
+.wh-card-s b{color:#3ddc84;font-weight:600}
+.wh-card-s u{text-decoration:none;color:var(--gold2);font-weight:600}
+/* Факты в ряд: то, что спрашивают про водителя чаще всего. */
+.wh-facts{display:flex;gap:7px;margin-bottom:10px}
+.wh-facts span{flex:1 1 0;min-width:0;padding:11px 10px;border-radius:12px;
+  background:rgba(255,255,255,.05);border:1px solid var(--border2);text-align:center}
+.wh-facts b{display:block;font-family:'Space Grotesk',sans-serif;font-size:18px;
+  font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.wh-facts i{display:block;font-style:normal;font-size:9.5px;letter-spacing:.5px;
+  text-transform:uppercase;color:var(--muted);margin-top:5px}
+.wh-act{display:flex;align-items:center;gap:10px;width:100%;padding:13px 14px;
+  margin-bottom:8px;border-radius:14px;cursor:pointer;font-family:inherit;
+  font-size:13.5px;font-weight:600;color:var(--text);
+  background:rgba(255,255,255,.05);border:1px solid var(--border2);text-align:left}
+.wh-act:active{background:rgba(255,255,255,.09)}
+.wh-act.on{color:var(--gold2);background:var(--gold-soft);
+  border-color:rgba(201,169,110,.35)}
+.wh-act svg{flex:0 0 auto;opacity:.8}
+.wh-act i{margin-left:auto;font-style:normal;font-size:11.5px;color:var(--muted)}
 
 /* Строка водителя.
    Отвечает не на «как его зовут» — это и так известно, — а на «кому отдать
@@ -3636,22 +3685,47 @@ button.path:active{transform:scale(.995)}
 </div>
 
 <!-- ============ ГДЕ ВОДИТЕЛИ ============ -->
-<!-- Карта во весь экран, поверх — шторка, которую можно тянуть пальцем.
-     Так устроен Find My, и устроен правильно: карта — главное, список —
-     столько, сколько человеку сейчас нужно. Одним движением он либо смотрит,
-     где все, либо читает, кто чем занят. -->
+<!-- Устройство взято у Find My, и не ради вида.
+     Карта занимает всё, шторка лежит поверх и тянется пальцем. Главное же в
+     другом: шторка — не список под картой, а само приложение. Выбрал
+     человека — она стала его карточкой, назад — снова список. Метка на карте
+     открывает ту же карточку, карта сдвигается так, чтобы выбранный не ушёл
+     под шторку, а её кнопки живут поверх карты и не отнимают у неё место. -->
 <div class="stk-ov wh-ov" id="whOv">
   <div class="wh-map"><div id="whMap"></div></div>
-  <button class="wh-back" onclick="whereClose()" aria-label="Назад">
+  <button class="wh-fab wh-back" onclick="whereClose()" aria-label="Назад">
     <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
          stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
       <path d="M15 5l-7 7 7 7"/></svg>
   </button>
+  <div class="wh-tools">
+    <button class="wh-fab" onclick="whFitAll()" aria-label="Показать всех">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/></svg>
+    </button>
+    <button class="wh-fab" onclick="whLayer()" aria-label="Слой карты" id="whLayerBtn">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+           stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3 3 7.5l9 4.5 9-4.5z"/><path d="M3 12.5 12 17l9-4.5"/>
+        <path d="M3 17.5 12 22l9-4.5"/></svg>
+    </button>
+  </div>
   <div class="wh-sheet" id="whSheet">
     <div class="wh-hd" id="whGrab">
       <span class="wh-grab"></span>
-      <div class="wh-ttl">Где водители</div>
-      <div class="wh-sub" id="whSub">—</div>
+      <div class="wh-hd-r">
+        <button class="wh-hd-back" id="whCardBack" onclick="whBack()" style="display:none"
+                aria-label="К списку">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+               stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 5l-7 7 7 7"/></svg>
+        </button>
+        <div style="flex:1;min-width:0">
+          <div class="wh-ttl" id="whTtl">Где водители</div>
+          <div class="wh-sub" id="whSub">—</div>
+        </div>
+      </div>
     </div>
     <div class="wh-body" id="whList"></div>
   </div>
@@ -4763,7 +4837,8 @@ function _setAed(id, val){ const el = document.getElementById(id); if(el){ el.da
 //
 // Точка, которой полчаса, — это не «водитель здесь», а «телефон замолчал».
 // Поэтому у каждого стоит время, а зелёная метка только у тех, кто на связи.
-let WH = {map:null, layer:null, line:null, sel:null, timer:null, data:null};
+let WH = {map:null, tiles:null, group:null, line:null, sel:null, timer:null,
+          data:null, view:'list', track:false, layer:'map', fit:true};
 // Десять секунд, а не двадцать: водитель открыл приложение — оператор
 // должен увидеть его почти сразу, не перезагружая экран. Запрос лёгкий:
 // последние точки и заказы, всё из памяти.
@@ -4851,6 +4926,7 @@ async function whereOpen(){
   ov.classList.add('show');
   whDragInit();
   whSnap('half', false);
+  WH.view = 'list'; WH.sel = null; WH.track = false; WH.fit = true;
   document.getElementById('whList').innerHTML =
     '<div class="exp-empty">Загрузка…</div>';
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
@@ -4868,7 +4944,7 @@ async function whereLoad(){
   let d;
   try{
     d = await ownerApi.ownerFetch('/api/owner/where',
-      {params: WH.sel ? {track: WH.sel} : {}});
+      {params: (WH.sel && WH.track) ? {track: WH.sel} : {}});
   }catch(e){
     document.getElementById('whList').innerHTML =
       '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
@@ -4946,8 +5022,24 @@ function whRow(r, trackOn){
   </button>`;
 }
 
+// Шторка ведёт себя стопкой экранов, как в Find My: список → карточка →
+// назад. Это и есть главное отличие от «списка под картой»: выбрав человека,
+// оператор получает не подсветку строки, а его экран — с состоянием, фактами
+// и действиями, — и карта под ним работает на этот экран.
+function whBack(){
+  WH.sel = null; WH.view = 'list';
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  whereLoad();
+}
+
 function whPaint(){
   const d = WH.data; if(!d) return;
+  document.getElementById('whCardBack').style.display =
+    WH.view === 'card' ? 'flex' : 'none';
+  if(WH.view === 'card') return whCard();
+  // Вернулись к списку — вернулся и заголовок: иначе в шапке остаётся имя
+  // человека, которого на экране уже нет.
+  _setText('whTtl', 'Где водители');
   const rows = d.drivers || [];
   const live = rows.filter(r => whState(r) === 'stream').length;
   const snap = rows.filter(r => whState(r) === 'snap').length;
@@ -4983,12 +5075,15 @@ function whMapPaint(){
     // посреди океана.
     WH.map = L.map('whMap', {zoomControl:false, attributionControl:false})
               .setView([25.15, 55.25], 11);
-    L.tileLayer('https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
-                {maxZoom:20, subdomains:'0123'}).addTo(WH.map);
-    WH.layer = L.layerGroup().addTo(WH.map);
+    WH.tiles = L.tileLayer(WH_TILES[WH.layer], {maxZoom:20, subdomains:'0123'})
+                .addTo(WH.map);
+    WH.group = L.layerGroup().addTo(WH.map);
+    // Тап по пустой карте — то же, что «назад» из карточки: в Find My так же,
+    // и это единственный жест, который приходит в голову, когда карточка мешает.
+    WH.map.on('click', () => { if(WH.view === 'card') whBack(); });
   }
   try{ WH.map.invalidateSize(); }catch(e){}
-  WH.layer.clearLayers();
+  WH.group.clearLayers();
   if(WH.line){ WH.map.removeLayer(WH.line); WH.line = null; }
 
   const pts = [];
@@ -4996,17 +5091,18 @@ function whMapPaint(){
     if(!r.has || r.lat == null) return;
     pts.push([r.lat, r.lon]);
     const st = whState(r);
-    L.marker([r.lat, r.lon], {icon: L.divIcon({
+    const mk = L.marker([r.lat, r.lon], {icon: L.divIcon({
         className:'', iconSize:[30,30], iconAnchor:[15,30],
         html:`<div class="wh-pin${st === 'stream' ? '' : (st === 'snap' ? ' snap' : ' stale')}${
           WH.sel === r.driver ? ' sel' : ''}"><span>${
           escS(r.code || '')}</span></div>`})})
-     .addTo(WH.layer)
-     .bindTooltip(`${escS(r.driver)} · ${whAgo(r.age)}`, {direction:'top'});
+     .addTo(WH.group);
+    // Метка — не картинка: нажатие открывает карточку того же человека.
+    mk.on('click', () => whPick(r.driver));
   });
 
-  const tr = d.track || [];
-  if(WH.sel && tr.length > 1){
+  const tr = (WH.sel && WH.track) ? (d.track || []) : [];
+  if(tr.length > 1){
     const pth = whSmooth(tr.map(p => [p.lat, p.lon]));
     // Линия в два слоя: широкая полупрозрачная снизу и узкая сверху. Так она
     // читается и на светлых кварталах, и на тёмной воде, а не теряется.
@@ -5024,10 +5120,12 @@ function whMapPaint(){
     // Потолок приближения: короткий маршрут иначе растягивается на весь экран,
     // и вместо «где ездил» видно две улицы крупным планом.
     WH.map.fitBounds(L.latLngBounds(pth).pad(0.25), {maxZoom: 15});
-  }else if(WH.sel){
+  }else if(WH.sel && WH.pan){
     const me = (d.drivers || []).find(r => r.driver === WH.sel && r.has);
-    if(me) WH.map.setView([me.lat, me.lon], 15);
-  }else if(pts.length){
+    if(me) whCenter(me.lat, me.lon, 15);
+    WH.pan = false;
+  }else if(WH.fit && pts.length){
+    WH.fit = false;
     // Нижняя часть карты закрыта шторкой — просим Leaflet уложить точки в то,
     // что видно. Иначе половина меток оказывается под ней.
     const sh = document.getElementById('whSheet');
@@ -5058,12 +5156,111 @@ function whSmooth(pts){
   return out;
 }
 
-function whPick(name){
-  WH.sel = WH.sel === name ? null : name;
+// ── карточка водителя ─────────────────────────────────────────────────────
+function whCard(){
+  const d = WH.data, r = (d.drivers || []).find(x => x.driver === WH.sel);
+  if(!r){ whBack(); return; }
+  const st = whState(r);
+  const track = (d.track || []).length > 1;
+  _setText('whTtl', r.driver);
+  _setText('whSub', [r.code, r.name].filter(Boolean).join(' ') || 'водитель');
+  let state;
+  if(st === 'stream') state = `<b>на связи</b> · трансляция ещё ${r.left < 60
+      ? r.left + ' мин' : Math.floor(r.left / 60) + ' ч'}`;
+  else if(st === 'snap') state = `<u>был здесь ${whAgo(r.age)}</u> · приложение закрыто`;
+  else if(r.has)        state = `молчит ${whAgo(r.age).replace(' назад','')} · последняя известная точка`;
+  else                  state = 'геопозицией не делится';
+
+  document.getElementById('whList').innerHTML = `
+    <div class="wh-card ${st === 'stream' ? 'live' : (st === 'snap' ? 'snap' : '')}">
+      <div class="wh-card-top">
+        <span class="wh-card-i">${st === 'stream' ? IC_LIVE
+          : (st === 'snap' ? IC_SNAP : IC_OFF)}</span>
+        <span class="wh-card-b">
+          <span class="wh-card-n">${state}</span>
+        </span>
+      </div>
+      <div class="wh-facts">
+        <span><b class="${r.orders ? '' : 'zero'}">${r.orders || '—'}</b><i>в пути</i></span>
+        <span><b>${r.done || '—'}</b><i>сдал за смену</i></span>
+        <span><b>${!r.has ? '—' : (r.age < 90 ? 'сейчас'
+          : (r.age < 3600 ? Math.round(r.age / 60) + ' мин'
+                          : Math.floor(r.age / 3600) + ' ч'))}</b><i>точка</i></span>
+      </div>
+      ${r.has ? `<button class="wh-act${track ? ' on' : ''}" onclick="whTrack()">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+             stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19s3-9 8-9 8 9 8 9"/><circle cx="4" cy="19" r="2"/><circle cx="20" cy="19" r="2"/></svg>
+        Маршрут за смену<i>${track ? 'скрыть' : 'показать'}</i></button>
+      <button class="wh-act" onclick="whFocus()">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+             stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+        Приблизить<i></i></button>` : ''}
+      <div class="wh-note">${st === 'stream'
+        ? 'Трансляция включена — водителя видно, даже когда телефон в кармане.'
+        : (st === 'snap'
+          ? 'Точка пришла из приложения. Пока трансляция не включена, следующая появится, только когда водитель снова его откроет.'
+          : 'Чтобы видеть водителя постоянно, он включает трансляцию в чате с ботом на 8 часов. Бот напоминает об этом сам.')}</div>
+    </div>`;
+  whMapPaint();
+}
+
+// Приблизить — с оглядкой на шторку: центр карты не середина экрана, а
+// середина того, что из неё видно.
+function whFocus(){
+  const r = (WH.data.drivers || []).find(x => x.driver === WH.sel);
+  if(!r || !r.has || !WH.map) return;
+  whCenter(r.lat, r.lon, 16);
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+
+function whCenter(lat, lon, zoom){
+  if(!WH.map) return;
+  const sh = document.getElementById('whSheet');
+  const hide = sh ? Math.max(0, innerHeight - sh.getBoundingClientRect().top) : 0;
+  WH.map.setView([lat, lon], zoom || WH.map.getZoom(), {animate:true});
+  // Сдвигаем на половину закрытой части: метка встаёт в середину видимого.
+  if(hide > 40) WH.map.panBy([0, hide / 2], {animate:true});
+}
+
+function whTrack(){
+  WH.track = !WH.track;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  // Выбрали человека — значит смотрят на карту, а не в список: уступаем ей
-  // место, но не всё, чтобы выбранная строка осталась на виду.
-  if(WH.sel && _whY === 'full') whSnap('half', true);
+  whereLoad();
+}
+
+function whFitAll(){
+  WH.sel = null; WH.view = 'list';
+  WH.fit = true;
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  whereLoad();
+}
+
+// Слой карты: схема и спутник. В Find My это первая кнопка, к которой тянутся,
+// когда «а что там за здание» — и здесь она нужна ровно за тем же.
+const WH_TILES = {
+  map: 'https://mt{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}',
+  sat: 'https://mt{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}',
+};
+function whLayer(){
+  WH.layer = WH.layer === 'sat' ? 'map' : 'sat';
+  if(WH.tiles) WH.tiles.setUrl(WH_TILES[WH.layer]);
+  const pane = document.querySelector('#whMap .leaflet-tile-pane');
+  // Спутник не гасим: тёмный фильтр превращает его в грязь.
+  if(pane) pane.style.filter = WH.layer === 'sat'
+    ? 'brightness(.92) contrast(1.04)'
+    : 'invert(1) hue-rotate(180deg) saturate(.18) brightness(.9)';
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
+function whPick(name){
+  const same = WH.sel === name;
+  WH.sel = name; WH.view = 'card'; WH.pan = true;
+  if(!same) WH.track = false;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  // Карточке хватает половины экрана, а карта под ней должна остаться рабочей.
+  if(_whY === 'full') whSnap('half', true);
   whereLoad();
 }
 

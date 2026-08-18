@@ -1567,11 +1567,35 @@ async function geoPush(force){
   }finally{ GEO.busy = false; }
 }
 
-// Открыть настройки доступа — единственное, что можно сделать, если человек
-// однажды отказал: сам телеграм больше не спросит.
-function geoSettings(){
-  try{ tg.LocationManager.openSettings(); }
-  catch(e){ toast('Разрешение к геопозиции меняется в настройках телеграма'); }
+// Нажали на строку — надо не объяснить, а починить.
+//
+// Порядок такой: сперва пробуем спросить разрешение (телеграм покажет своё
+// окно). Если он этого не умеет — версия старая — или человек уже отказал,
+// уводим в чат с ботом. Там кнопка «Я здесь» прямо у поля ввода и трансляция
+// в скрепке, и они работают в любой версии телеграма, без всяких разрешений
+// внутри приложения.
+//
+// Тост здесь был тупиком: он ничего не чинил, а на узком экране ещё и
+// обрезался на полуслове.
+async function geoFix(){
+  const lm = tg.LocationManager;
+  const can = lm && typeof lm.getLocation === 'function'
+              && tg.isVersionAtLeast && tg.isVersionAtLeast('8.0')
+              && lm.isLocationAvailable !== false;
+
+  if(can && !(lm.isAccessRequested && !lm.isAccessGranted)){
+    GEO.denied = false;
+    await geoPush(true);
+    if(GEO.state === 'on'){ _tap('ok'); return; }
+  }
+  if(can && typeof lm.openSettings === 'function'
+     && lm.isAccessRequested && !lm.isAccessGranted){
+    try{ lm.openSettings(); return; }catch(e){}
+  }
+  // Последняя и самая надёжная дорога: чат с ботом. Закрытие приложения
+  // возвращает ровно туда, откуда его открыли.
+  _tap('light');
+  try{ tg.close(); }catch(e){}
 }
 
 async function load(){
@@ -1840,13 +1864,13 @@ function renderOrders(){
 // однажды отказал. Когда всё в порядке, строка молчит и не занимает места.
 function geoBar(){
   if(GEO.state !== 'off') return '';
-  return `<button class="geo-bar" onclick="geoSettings()">
+  return `<button class="geo-bar" onclick="geoFix()">
     <span class="geo-ic"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
       stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
       stroke-linejoin="round">${ICO.pin}</svg></span>
     <span class="geo-b">
       <b>Оператор не видит, где вы</b>
-      <i>Разрешите геопозицию — так вам отдают ближние заказы</i>
+      <i>Нажмите — включим. Так вам отдают ближние заказы</i>
     </span>
     <span class="geo-go">›</span>
   </button>`;

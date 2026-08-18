@@ -4794,22 +4794,36 @@ function geoReady(){
     const lm = _lmRaw();
     if(!lm) return resolve(null);
     if(lm.isInited) return resolve(lm.isLocationAvailable ? lm : null);
-    const guard = setTimeout(() => resolve(null), 5000);
+    const guard = setTimeout(() => resolve(null), GEO_INIT_WAIT);
     try{
       lm.init(() => { clearTimeout(guard); resolve(lm.isLocationAvailable ? lm : null); });
     }catch(e){ clearTimeout(guard); resolve(null); }
   });
 }
 
-// Сначала телеграм, браузер — запасным.
+// Спрашиваем один раз и чем-то одним.
 //
 // Телеграм спрашивает своим окном, с именем приложения, и один раз за всё
 // время. Браузер — своим, с адресом сайта, и его мы показывать не хотим: в
 // Эмиратах засвеченный домен живёт до первой блокировки. Но без геопозиции
 // человек не укажет адрес и заказ потеряется, а это дороже. Поэтому запасной
 // путь остаётся — именно запасным.
-const GEO_WAIT = 7000;
+//
+// Главное правило: кем спрашивать, решаем ДО того, как показали окно, и по
+// одному признаку — умеет ли этот телеграм отдавать геопозицию сам. Раньше
+// решение принималось задним числом: если телеграм не ответил за семь секунд,
+// вдогонку спрашивал браузер. Семь секунд — это ровно столько, сколько
+// человек читает окно телеграма (а на первом разе поверх него ещё и системное
+// окно телефона). Поэтому оба окна и появлялись разом: мы спрашивали второй
+// раз, пока он отвечал на первый.
+//
+// Теперь если телеграм умеет — ждём только его. Молчание телеграма считаем
+// отказом, а не поводом переспросить: у человека всегда остаётся карта, и она
+// дешевле засвеченного домена.
+const GEO_WAIT = 45000;        // столько ждём ответа на окно телеграма
+const GEO_INIT_WAIT = 8000;    // и столько — на рукопожатие с клиентом
 let _geoWhy = '';
+let _geoBusy = null;           // один запрос в один момент времени
 
 function hasGeo(){ return !!(_lmRaw() || navigator.geolocation); }
 
@@ -4838,38 +4852,59 @@ function geoHint(){
             : 'Could not detect — pick the address on the map';
 }
 
-async function askGeo(ok, err, opts){
-  let done = false;
-  const fin = fn => (...a) => { if(!done){ done = true; fn(...a); } };
-  const good = fin(ok);
-  // Запасная дорога: браузер. Только если телеграмовской нет вовсе или он не
-  // ответил — но не тогда, когда человек прямо отказал.
-  const browser = fin(() => {
-    if(!navigator.geolocation) return err && err();
-    navigator.geolocation.getCurrentPosition(ok, err, opts || {});
-  });
-  const refuse = fin(() => err && err());
-
-  const lm = await geoReady();
-  if(!lm){
-    _geoWhy = _lmRaw() ? 'геопозиция недоступна' : '';
-    return browser();
+function askGeo(ok, err, opts){
+  // Второе нажатие не заводит второй запрос, а становится в очередь к первому.
+  // Иначе двойной тык по кнопке — это два окна, и снова оба сразу.
+  if(_geoBusy){
+    _geoBusy.then(r => r ? (ok && ok(r)) : (err && err()));
+    return _geoBusy;
   }
-  const guard = setTimeout(() => { _geoWhy = 'телеграм не ответил'; browser(); }, GEO_WAIT);
-  try{
-    lm.getLocation(d => {
-      clearTimeout(guard);
-      if(d && typeof d.latitude === 'number'){
-        _geoWhy = '';
-        good({coords:{latitude: d.latitude, longitude: d.longitude,
-                      accuracy: d.horizontal_accuracy || 0}});
-      }else{
-        // Сказал «нет» — значит нет. Переспрашивать браузером было бы обманом.
-        _geoWhy = 'доступ не дан';
-        refuse();
+  _geoBusy = _askGeo(opts).finally(() => { _geoBusy = null; });
+  _geoBusy.then(r => r ? (ok && ok(r)) : (err && err()));
+  return _geoBusy;
+}
+
+// Отдаёт позицию или null. Ничего не показывает и ни о чём не сообщает —
+// только добывает.
+function _askGeo(opts){
+  return new Promise(async resolve => {
+    let done = false;
+    const fin = v => { if(!done){ done = true; resolve(v); } };
+    const pos = d => fin({coords:{latitude: d.latitude, longitude: d.longitude,
+                                 accuracy: d.horizontal_accuracy || 0}});
+
+    // Телеграм умеет — значит спрашивает он, и только он. Браузер сюда уже не
+    // зовём ни при каком ответе: ни при отказе, ни при молчании.
+    if(_lmRaw()){
+      const lm = await geoReady();
+      if(!lm){
+        // Рукопожатие не состоялось или геопозиция выключена в самом телефоне.
+        // Браузер в этом случае упрётся в тот же системный запрет, а домен
+        // покажет. Отправляем на карту — и говорим, что именно чинить.
+        const raw = _lmRaw();
+        _geoWhy = (raw && raw.isLocationAvailable === false)
+          ? 'выключена в телефоне' : 'телеграм не ответил';
+        return fin(null);
       }
-    });
-  }catch(e){ clearTimeout(guard); _geoWhy = 'телеграм отказал'; browser(); }
+      const guard = setTimeout(() => { _geoWhy = 'телеграм не ответил'; fin(null); }, GEO_WAIT);
+      try{
+        lm.getLocation(d => {
+          clearTimeout(guard);
+          if(d && typeof d.latitude === 'number'){ _geoWhy = ''; return pos(d); }
+          // Сказал «нет» — значит нет. Переспрашивать браузером было бы обманом.
+          _geoWhy = 'доступ не дан';
+          fin(null);
+        });
+      }catch(e){ clearTimeout(guard); _geoWhy = 'телеграм отказал'; fin(null); }
+      return;
+    }
+
+    // Телеграм старый и геопозицию не отдаёт. Только здесь — браузер.
+    if(!navigator.geolocation){ _geoWhy = ''; return fin(null); }
+    _geoWhy = '';
+    navigator.geolocation.getCurrentPosition(
+      p => fin(p), () => { _geoWhy = 'доступ не дан'; fin(null); }, opts || {});
+  });
 }
 
 const MAP_TILES={

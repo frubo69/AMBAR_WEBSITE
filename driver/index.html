@@ -1447,14 +1447,11 @@ async function boot(){
   let r;
   // Заодно говорим серверу, что у нас с геопозицией: версия телеграма живёт
   // на телефоне, и без этого причина «точка не уходит» остаётся догадкой.
-  const lm = tg.LocationManager;
-  const geoCan = !!(lm && typeof lm.getLocation === 'function'
-                    && tg.isVersionAtLeast && tg.isVersionAtLeast('8.0')
-                    && lm.isLocationAvailable !== false);
+  const geoCan = !!(await geoReady());
   try{
     r = await drvApi.drvFetch('/api/driver/ping', {params:{
       v: tg.version || '?',
-      lm: geoCan ? 'есть' : (lm ? 'клиент не умеет' : 'нет объекта')}});
+      lm: geoCan ? 'есть' : (tg.LocationManager ? 'клиент не умеет' : 'нет объекта')}});
     ME = r.driver;
   }
   catch(e){ if(!PANIC) document.getElementById('deny').classList.add('show'); return; }
@@ -1527,37 +1524,53 @@ function geoState(v){
 //
 // Браузерного пути здесь нет намеренно. Он показал бы ровно то окно с
 // доменом, от которого мы уходим.
-function geoRead(){
+// Готов ли телеграм отдавать геопозицию.
+//
+// Порядок важен и был перепутан. isLocationAvailable у телеграма изначально
+// false — это не «нельзя», а «ещё не спрашивали»: настоящее значение приходит
+// только после init(), когда клиент ответит. Я проверял его до init, поэтому
+// приложение ни разу даже не попыталось, хотя телефон всё умел.
+//
+// Правильно так: версия → init → и только теперь смотреть, доступна ли
+// геопозиция.
+function geoReady(){
+  return new Promise(resolve => {
+    const lm = tg.LocationManager;
+    if(!lm || typeof lm.getLocation !== 'function'
+       || !(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0'))) return resolve(null);
+    if(lm.isInited) return resolve(lm.isLocationAvailable ? lm : null);
+    // Клиент может не ответить — тогда не ждём дольше пяти секунд.
+    const guard = setTimeout(() => resolve(null), 5000);
+    try{
+      lm.init(() => {
+        clearTimeout(guard);
+        resolve(lm.isLocationAvailable ? lm : null);
+      });
+    }catch(e){ clearTimeout(guard); resolve(null); }
+  });
+}
+
+// Спрашиваем через телеграм, а не через браузер: он показывает своё окно с
+// именем приложения, а не адрес сайта, и спрашивает один раз за всё время.
+// Отказ запоминаем — второе окно ничего не изменит, кроме раздражения.
+async function geoRead(){
+  const lm = await geoReady();
+  if(!lm) return null;
+  if(lm.isAccessRequested && !lm.isAccessGranted){ GEO.denied = true; return null; }
   return new Promise(resolve => {
     let done = false;
     const fin = v => { if(!done){ done = true; resolve(v); } };
-    const lm = tg.LocationManager;
-    // Версию проверяем сами. У старых клиентов объект в библиотеке есть, а
-    // метода в самом телеграме нет: init() тогда молча возвращается, не вызвав
-    // колбэк, и ожидание не кончается никогда.
-    if(!lm || typeof lm.getLocation !== 'function'
-       || !(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0'))
-       || lm.isLocationAvailable === false) return fin(null);
-
-    // Клиент может не ответить вовсе — тогда просто пропускаем эту точку.
-    // Следующая уйдёт через минуту, а заказы ждать не должны.
     const guard = setTimeout(() => fin(null), 7000);
-    const read = () => {
-      if(lm.isAccessRequested && !lm.isAccessGranted){
-        clearTimeout(guard); GEO.denied = true; return fin(null);
-      }
-      try{
-        lm.getLocation(d => {
-          clearTimeout(guard);
-          if(d && typeof d.latitude === 'number')
-            return fin({lat: d.latitude, lon: d.longitude,
-                        acc: d.horizontal_accuracy || null});
-          GEO.denied = true;
-          fin(null);
-        });
-      }catch(e){ clearTimeout(guard); fin(null); }
-    };
-    if(lm.isInited) read(); else lm.init(() => { read(); });
+    try{
+      lm.getLocation(d => {
+        clearTimeout(guard);
+        if(d && typeof d.latitude === 'number')
+          return fin({lat: d.latitude, lon: d.longitude,
+                      acc: d.horizontal_accuracy || null});
+        GEO.denied = true;
+        fin(null);
+      });
+    }catch(e){ clearTimeout(guard); fin(null); }
   });
 }
 
@@ -1589,10 +1602,8 @@ async function geoPush(force){
 // Тост здесь был тупиком: он ничего не чинил, а на узком экране ещё и
 // обрезался на полуслове.
 async function geoFix(){
-  const lm = tg.LocationManager;
-  const can = lm && typeof lm.getLocation === 'function'
-              && tg.isVersionAtLeast && tg.isVersionAtLeast('8.0')
-              && lm.isLocationAvailable !== false;
+  const lm = await geoReady();
+  const can = !!lm;
 
   if(can && !(lm.isAccessRequested && !lm.isAccessGranted)){
     GEO.denied = false;

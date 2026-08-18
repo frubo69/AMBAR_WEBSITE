@@ -4775,31 +4775,43 @@ const DUBAI_CENTER=[25.2048,55.2708];
 //
 // Браузерный путь остаётся только там, где телеграмовского нет вовсе: старый
 // клиент или открытая в обычном браузере страница.
-function _lm(){
+// Готов ли телеграм отдавать геопозицию.
+//
+// Порядок важен и был перепутан. isLocationAvailable у телеграма изначально
+// false — это не «нельзя», а «ещё не спрашивали»: настоящее значение приходит
+// только после init(). Проверка до init означала «никогда», и приложение
+// молча уходило на браузерный путь, показывая окно с адресом сайта.
+function _lmRaw(){
   const tgw = window.Telegram && Telegram.WebApp;
   const lm = tgw && tgw.LocationManager;
-  // Версию проверяем сами и до всего остального. У старых клиентов объект в
-  // библиотеке есть, а метода в самом телеграме нет: init() тогда молча
-  // возвращается, не вызвав колбэк, и приложение ждёт ответа вечно.
   if(!lm || typeof lm.getLocation !== 'function') return null;
   if(!(tgw.isVersionAtLeast && tgw.isVersionAtLeast('8.0'))) return null;
-  if(lm.isLocationAvailable === false) return null;
   return lm;
+}
+
+function geoReady(){
+  return new Promise(resolve => {
+    const lm = _lmRaw();
+    if(!lm) return resolve(null);
+    if(lm.isInited) return resolve(lm.isLocationAvailable ? lm : null);
+    const guard = setTimeout(() => resolve(null), 5000);
+    try{
+      lm.init(() => { clearTimeout(guard); resolve(lm.isLocationAvailable ? lm : null); });
+    }catch(e){ clearTimeout(guard); resolve(null); }
+  });
 }
 
 // Сначала телеграм, браузер — запасным.
 //
 // Телеграм спрашивает своим окном, с именем приложения, и один раз за всё
-// время. Браузер спрашивает своим — с адресом сайта, и показывать его не
-// хочется: в Эмиратах засвеченный домен живёт до первой блокировки.
-//
-// Но геопозицию телеграм отдаёт мини-приложению только с версии 8.0, а без
-// неё человек не укажет адрес и заказ потеряется. Потерянный заказ дороже
-// показанного домена — поэтому запасной путь остаётся, но именно запасным.
+// время. Браузер — своим, с адресом сайта, и его мы показывать не хотим: в
+// Эмиратах засвеченный домен живёт до первой блокировки. Но без геопозиции
+// человек не укажет адрес и заказ потеряется, а это дороже. Поэтому запасной
+// путь остаётся — именно запасным.
 const GEO_WAIT = 7000;
 let _geoWhy = '';
 
-function hasGeo(){ return !!(_lm() || navigator.geolocation); }
+function hasGeo(){ return !!(_lmRaw() || navigator.geolocation); }
 
 function geoWhy(){
   const tgw = window.Telegram && Telegram.WebApp;
@@ -4807,13 +4819,9 @@ function geoWhy(){
   if(!tgw.LocationManager) return 'телеграм ' + (tgw.version || '?') + ' без геопозиции';
   if(!(tgw.isVersionAtLeast && tgw.isVersionAtLeast('8.0')))
     return 'телеграм ' + (tgw.version || '?') + ' старее 8.0';
-  if(tgw.LocationManager.isLocationAvailable === false) return 'геопозиция выключена в телефоне';
   return _geoWhy || 'телеграм не ответил';
 }
 
-// Человеку — не диагноз, а что сделать. Причина у каждого отказа своя, и
-// действие тоже: одному обновить телеграм, другому включить геолокацию в
-// телефоне, третьему просто ткнуть в карту.
 function geoHint(){
   const ru = lang === 'ru';
   const why = geoWhy();
@@ -4830,40 +4838,38 @@ function geoHint(){
             : 'Could not detect — pick the address on the map';
 }
 
-function askGeo(ok, err, opts){
+async function askGeo(ok, err, opts){
   let done = false;
   const fin = fn => (...a) => { if(!done){ done = true; fn(...a); } };
   const good = fin(ok);
-  // Запасная дорога: браузер. Ходим по ней, только если телеграмовской нет
-  // вовсе или он не ответил — но не тогда, когда человек прямо отказал.
+  // Запасная дорога: браузер. Только если телеграмовской нет вовсе или он не
+  // ответил — но не тогда, когда человек прямо отказал.
   const browser = fin(() => {
     if(!navigator.geolocation) return err && err();
     navigator.geolocation.getCurrentPosition(ok, err, opts || {});
   });
   const refuse = fin(() => err && err());
 
-  const lm = _lm();
-  if(!lm){ _geoWhy = ''; return browser(); }
-
+  const lm = await geoReady();
+  if(!lm){
+    _geoWhy = _lmRaw() ? 'геопозиция недоступна' : '';
+    return browser();
+  }
   const guard = setTimeout(() => { _geoWhy = 'телеграм не ответил'; browser(); }, GEO_WAIT);
-  const read = () => {
-    try{
-      lm.getLocation(d => {
-        clearTimeout(guard);
-        if(d && typeof d.latitude === 'number'){
-          _geoWhy = '';
-          good({coords:{latitude: d.latitude, longitude: d.longitude,
-                        accuracy: d.horizontal_accuracy || 0}});
-        }else{
-          // Сказал «нет» — значит нет. Переспрашивать браузером было бы
-          // обманом: человек уже ответил.
-          _geoWhy = 'доступ не дан';
-          refuse();
-        }
-      });
-    }catch(e){ clearTimeout(guard); _geoWhy = 'телеграм отказал'; browser(); }
-  };
-  if(lm.isInited) read(); else lm.init(() => { read(); });
+  try{
+    lm.getLocation(d => {
+      clearTimeout(guard);
+      if(d && typeof d.latitude === 'number'){
+        _geoWhy = '';
+        good({coords:{latitude: d.latitude, longitude: d.longitude,
+                      accuracy: d.horizontal_accuracy || 0}});
+      }else{
+        // Сказал «нет» — значит нет. Переспрашивать браузером было бы обманом.
+        _geoWhy = 'доступ не дан';
+        refuse();
+      }
+    });
+  }catch(e){ clearTimeout(guard); _geoWhy = 'телеграм отказал'; browser(); }
 }
 
 const MAP_TILES={

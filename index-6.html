@@ -4787,21 +4787,19 @@ function _lm(){
   return lm;
 }
 
-// Геопозицию спрашиваем ТОЛЬКО через телеграм.
+// Сначала телеграм, браузер — запасным.
 //
-// Браузерного пути здесь больше нет, и это осознанный размен. Он показывал
-// системное окно с адресом сайта — «150-241-70-116.sslip.io хочет знать ваше
-// местоположение», — а в Эмиратах засвеченный домен живёт до первой
-// блокировки; переезжать дороже, чем обойтись без автоопределения у тех
-// немногих, у кого телеграм старее восьмой версии.
+// Телеграм спрашивает своим окном, с именем приложения, и один раз за всё
+// время. Браузер спрашивает своим — с адресом сайта, и показывать его не
+// хочется: в Эмиратах засвеченный домен живёт до первой блокировки.
 //
-// Что видит человек, если телеграм не отдал точку: обычную подсказку выбрать
-// место на карте. Карта работает без геопозиции, адрес указывается пальцем, и
-// заказ не теряется — теряется только одно нажатие удобства.
+// Но геопозицию телеграм отдаёт мини-приложению только с версии 8.0, а без
+// неё человек не укажет адрес и заказ потеряется. Потерянный заказ дороже
+// показанного домена — поэтому запасной путь остаётся, но именно запасным.
 const GEO_WAIT = 7000;
 let _geoWhy = '';
 
-function hasGeo(){ return !!_lm(); }
+function hasGeo(){ return !!(_lm() || navigator.geolocation); }
 
 function geoWhy(){
   const tgw = window.Telegram && Telegram.WebApp;
@@ -4836,12 +4834,18 @@ function askGeo(ok, err, opts){
   let done = false;
   const fin = fn => (...a) => { if(!done){ done = true; fn(...a); } };
   const good = fin(ok);
-  const fail = fin(() => err && err());
-  const lm = _lm();
-  if(!lm){ _geoWhy = ''; return fail(); }
+  // Запасная дорога: браузер. Ходим по ней, только если телеграмовской нет
+  // вовсе или он не ответил — но не тогда, когда человек прямо отказал.
+  const browser = fin(() => {
+    if(!navigator.geolocation) return err && err();
+    navigator.geolocation.getCurrentPosition(ok, err, opts || {});
+  });
+  const refuse = fin(() => err && err());
 
-  // Клиент может не ответить вовсе — не держим человека в ожидании.
-  const guard = setTimeout(() => { _geoWhy = 'телеграм не ответил'; fail(); }, GEO_WAIT);
+  const lm = _lm();
+  if(!lm){ _geoWhy = ''; return browser(); }
+
+  const guard = setTimeout(() => { _geoWhy = 'телеграм не ответил'; browser(); }, GEO_WAIT);
   const read = () => {
     try{
       lm.getLocation(d => {
@@ -4851,11 +4855,13 @@ function askGeo(ok, err, opts){
           good({coords:{latitude: d.latitude, longitude: d.longitude,
                         accuracy: d.horizontal_accuracy || 0}});
         }else{
+          // Сказал «нет» — значит нет. Переспрашивать браузером было бы
+          // обманом: человек уже ответил.
           _geoWhy = 'доступ не дан';
-          fail();
+          refuse();
         }
       });
-    }catch(e){ clearTimeout(guard); _geoWhy = 'телеграм отказал'; fail(); }
+    }catch(e){ clearTimeout(guard); _geoWhy = 'телеграм отказал'; browser(); }
   };
   if(lm.isInited) read(); else lm.init(() => { read(); });
 }

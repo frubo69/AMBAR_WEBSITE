@@ -35,6 +35,7 @@ import re
 import secrets
 import time
 from datetime import datetime, timedelta, timezone
+from functools import wraps
 from urllib.parse import parse_qsl
 
 from aiohttp import web
@@ -177,6 +178,148 @@ def _chat_view(o: dict) -> list:
              "kind": m.get("kind", "")} for m in (o.get("chat") or [])]
 
 
+# ── Смена водителя ──────────────────────────────────────────────────────────
+# Смена начинается не в полдень, а тогда, когда человек её открыл.
+#
+# Раньше она начиналась по часам: наступило двенадцать — считается, что все
+# работают. Из-за этого нельзя было ответить ни на один вопрос про день: во
+# сколько человек реально вышел, был ли он на связи, чем кончилась смена.
+#
+# Открыть смену можно при двух условиях, и оба проверяются не на слово:
+#
+#   1. Оператор отметил водителя вышедшим. Кто сегодня работает, решает не
+#      сам водитель — это же решение определяет питание.
+#   2. Идёт живая трансляция геопозиции. Без неё оператор не видит машину, а
+#      значит не может ни распределить заказ, ни ответить клиенту «водитель в
+#      пяти минутах».
+#
+# Трансляция телеграма живёт восемь часов, а смена — восемнадцать. Значит за
+# ночь её включают два-три раза, и это нормально: смена НЕ закрывается, когда
+# трансляция кончилась. Требовать её заново при каждом действии значило бы
+# останавливать работу посреди подъезда. Про конец напоминает бот за десять
+# минут (geo_nag), а если водитель замолчал надолго — узнаёт оператор.
+GEO_FRESH_SEC = 15 * 60         # столько считаем точку свежей при открытии
+
+
+def _dt_of(v):
+    if not v:
+        return None
+    if isinstance(v, datetime):
+        return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+    try:
+        d = datetime.fromisoformat(str(v).replace("Z", ""))
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError):
+        return None
+
+
+def _iso_at(v) -> str:
+    return v.isoformat() if hasattr(v, "isoformat") else str(v or "")
+
+
+async def _geo_state(name: str) -> dict:
+    """Что сейчас с геопозицией водителя: идёт ли трансляция и до какого часа."""
+    rows = await db.driver_pos_all([name])
+    r = (rows or [{}])[0] if rows else {}
+    now = datetime.now(timezone.utc)
+    at, until = _dt_of(r.get("at")), _dt_of(r.get("until"))
+    fresh = bool(at and (now - at).total_seconds() < GEO_FRESH_SEC)
+    live = bool(until and until > now)
+    return {"ok": fresh and live, "fresh": fresh, "stream": live,
+            "until": _iso_at(until) if until else "",
+            "left_min": int((until - now).total_seconds() // 60) if live else 0,
+            "age_sec": int((now - at).total_seconds()) if at else None}
+
+
+def _must_left(d: dict) -> list:
+    """Обязательные расходы, по которым водитель ещё не ответил.
+
+    «Ответил» — это либо запись, либо честное «сегодня не было». Пустое место
+    ответом не считается: смена, закрытая молча, через неделю не отличается от
+    смены, где просто забыли про бензин."""
+    no = d.get("no_expense") or {}
+    extras = d.get("extras") or []
+    return [k for k in MUST_ANSWER
+            if not no.get(k) and not any(_kind_of(x) == k for x in extras)]
+
+
+async def _shift_view(me: dict) -> dict:
+    day = _biz_day()
+    d = await db.get_driver_day(day, me["name"]) or {}
+    geo = await _geo_state(me["name"])
+    must = _must_left(d)
+    opened, closed = d.get("shift_open_at"), d.get("shift_close_at")
+    return {
+        "day": day, "working": d.get("working"),
+        "opened": bool(opened), "opened_at": _iso_at(opened),
+        "closed": bool(closed), "closed_at": _iso_at(closed),
+        "geo": geo, "must": must,
+        "must_names": [EXPENSE_KINDS.get(k) or k for k in must],
+        "can_open": d.get("working") is True and geo["ok"] and not opened,
+        "can_close": bool(opened) and not closed and not must,
+    }
+
+
+@require_driver
+async def handle_shift(request):
+    return web.json_response(await _shift_view(request["driver"]), headers=CORS_HEADERS)
+
+
+@require_driver
+async def handle_shift_open(request):
+    """Открыть смену: отметка оператора плюс живая трансляция."""
+    me = request["driver"]
+    day = _biz_day()
+    d = await db.get_driver_day(day, me["name"]) or {}
+    if d.get("shift_open_at") and not d.get("shift_close_at"):
+        return web.json_response({"error": "already_open"}, status=409, headers=CORS_HEADERS)
+    if d.get("working") is not True:
+        return web.json_response({"error": "not_marked"}, status=409, headers=CORS_HEADERS)
+    geo = await _geo_state(me["name"])
+    if not geo["ok"]:
+        return web.json_response({"error": "no_geo", "geo": geo},
+                                 status=409, headers=CORS_HEADERS)
+    await db.save_driver_day(day, me["name"], {
+        "shift_open_at": datetime.now(timezone.utc), "shift_close_at": None})
+    log.info(f"[driver] {me['name']}: смена открыта · трансляция ещё {geo['left_min']} мин")
+    return web.json_response(await _shift_view(me), headers=CORS_HEADERS)
+
+
+@require_driver
+async def handle_shift_close(request):
+    """Закрыть смену. Пока обязательные расходы без ответа — нельзя.
+
+    Это не бюрократия: «сегодня не заправлялся» — такой же ответ, как чек на
+    двести дирхам, и он занимает одно нажатие."""
+    me = request["driver"]
+    day = _biz_day()
+    d = await db.get_driver_day(day, me["name"]) or {}
+    if not d.get("shift_open_at"):
+        return web.json_response({"error": "not_open"}, status=409, headers=CORS_HEADERS)
+    if d.get("shift_close_at"):
+        return web.json_response({"error": "already_closed"}, status=409, headers=CORS_HEADERS)
+    must = _must_left(d)
+    if must:
+        return web.json_response({"error": "expenses_left", "must": must},
+                                 status=409, headers=CORS_HEADERS)
+    await db.save_driver_day(day, me["name"], {"shift_close_at": datetime.now(timezone.utc)})
+    log.info(f"[driver] {me['name']}: смена закрыта")
+    return web.json_response(await _shift_view(me), headers=CORS_HEADERS)
+
+
+def needs_shift(handler):
+    """Не пускать к работе, пока смена не открыта."""
+    @wraps(handler)
+    async def wrapped(request):
+        me = request.get("driver") or {}
+        d = await db.get_driver_day(_biz_day(), me.get("name") or "") or {}
+        if not d.get("shift_open_at") or d.get("shift_close_at"):
+            return web.json_response({"error": "shift_closed"}, status=409,
+                                     headers=CORS_HEADERS)
+        return await handler(request)
+    return wrapped
+
+
 @require_driver
 async def handle_ping(request):
     me = request["driver"]
@@ -201,6 +344,7 @@ async def handle_ping(request):
 
 
 @require_driver
+@needs_shift
 async def handle_settle(request):
     """Рассчитались не ровно: водитель говорит, сколько денег у него в руке.
 
@@ -256,6 +400,7 @@ async def handle_settle(request):
 
 
 @require_driver
+@needs_shift
 async def handle_debt_settle(request):
     """Водитель вернул клиенту то, что мы были должны.
 
@@ -295,6 +440,7 @@ WO_MAX_QTY = 240                # ящик пива это 24; больше по
 
 
 @require_driver
+@needs_shift
 async def handle_writeoff_add(request):
     """Списать товар: бой, брак, просрочка, потеря.
 
@@ -747,6 +893,7 @@ async def _notify_operators(oid: str, me: dict, req: dict, order: dict):
 
 
 @require_driver
+@needs_shift
 async def handle_delivered(request):
     """«Доставил» — это пинг оператору, а не закрытие заказа.
 
@@ -795,6 +942,7 @@ async def handle_delivered(request):
 
 
 @require_driver
+@needs_shift
 async def handle_ack(request):
     """«Принял, еду» — не решение, а отметка: заказ водителю уже назначен.
 
@@ -867,6 +1015,7 @@ def _diff_lines(old_items: list, new_items: list) -> list:
 
 
 @require_driver
+@needs_shift
 async def handle_edit_request(request):
     """Просьба водителя — предложение, а не действие.
 
@@ -1293,6 +1442,9 @@ def setup(app):
         ("/api/driver/supply",                  handle_supply_list, "GET"),
         ("/api/driver/writeoff",                handle_writeoff_add, "POST"),
         ("/api/driver/writeoffs",               handle_writeoffs,   "GET"),
+        ("/api/driver/shift",                   handle_shift,       "GET"),
+        ("/api/driver/shift/open",              handle_shift_open,  "POST"),
+        ("/api/driver/shift/close",             handle_shift_close, "POST"),
         ("/api/driver/panic",                   handle_panic,       "POST"),
         ("/api/driver/pos",                     handle_pos,         "POST"),
         ("/api/driver/geo/help",                handle_geo_help,    "POST"),

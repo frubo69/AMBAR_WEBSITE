@@ -571,6 +571,49 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   cursor:pointer;font-size:13px;font-weight:600;color:var(--gold2);
   background:none;border:1px dashed rgba(201,169,110,.35)}
 .ask-alt:active{transform:scale(.98);background:var(--gold-soft)}
+/* Экран смены. Не модальное окно, а состояние приложения: пока смена
+   закрыта, за ним ничего нет. */
+.shscr{position:fixed;inset:0;z-index:95;display:none;align-items:center;
+  justify-content:center;padding:24px;background:var(--bg);overflow-y:auto}
+.shscr.show{display:flex}
+.shscr-in{width:100%;max-width:420px;text-align:center}
+.shscr-i{width:78px;height:78px;margin:0 auto 18px;border-radius:26px;display:flex;
+  align-items:center;justify-content:center;color:var(--gold2);background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.22)}
+.shscr-t{font-size:21px;font-weight:800;letter-spacing:-.3px}
+.shscr-s{font-size:13.5px;line-height:1.5;color:var(--muted);margin-top:7px;
+  margin-bottom:22px}
+/* Условие: слева состояние, справа что сделать. Пока не выполнено — читается
+   как задача, выполненное гаснет и не отвлекает. */
+.shc{display:flex;align-items:flex-start;gap:12px;padding:14px;margin-bottom:9px;
+  border-radius:15px;text-align:left;background:var(--bg3);
+  border:1px solid var(--border3)}
+.shc.on{border-color:rgba(61,220,132,.35);background:rgba(61,220,132,.06)}
+.shc-i{width:26px;height:26px;flex-shrink:0;border-radius:9px;display:flex;
+  align-items:center;justify-content:center;color:var(--muted);background:var(--card2)}
+.shc.on .shc-i{color:#3ddc84;background:rgba(61,220,132,.14)}
+.shc-b{flex:1;min-width:0}
+.shc-t{display:block;font-size:14px;font-weight:700;line-height:1.3}
+.shc.on .shc-t{color:#3ddc84}
+.shc-s{display:block;font-size:12px;line-height:1.5;color:var(--muted);margin-top:4px}
+.shc-s b{color:var(--gold2);font-weight:600}
+.shscr-go{margin-top:16px}
+.shscr-alt{width:100%;margin-top:10px;padding:12px;border-radius:12px;cursor:pointer;
+  font-size:13px;font-weight:600;color:var(--muted);background:none;
+  border:1px solid var(--border3)}
+.shscr-alt:active{transform:scale(.98);color:var(--gold2)}
+/* Полоса «смена идёт» — в шапке расходов, там же где её закрывают. */
+.shbar{display:flex;align-items:center;gap:12px;padding:13px 15px;margin-bottom:14px;
+  border-radius:16px;background:var(--bg3);border:1px solid var(--border3)}
+.shbar-b{flex:1;min-width:0}
+.shbar-t{display:block;font-size:13.5px;font-weight:700}
+.shbar-s{display:block;font-size:11.5px;color:var(--muted);margin-top:2px}
+.shbar-s b{color:var(--warn)}
+.shbar-go{flex-shrink:0;padding:10px 14px;border-radius:12px;cursor:pointer;
+  font-size:12.5px;font-weight:700;color:var(--sub);background:var(--card2);
+  border:1px solid var(--border3)}
+.shbar-go:active{transform:scale(.96)}
+.shbar-go.ok{color:var(--gold2);border-color:rgba(201,169,110,.4);background:var(--gold-soft)}
 .sheet-acts{display:flex;gap:8px;margin-top:14px}
 .sheet-acts .btn{flex:1}
 .sheet-acts-2{display:grid;grid-template-columns:1fr 1fr}
@@ -1336,6 +1379,20 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 
      Вид намеренно как у системного «выключить»: этот жест руки знает каждый,
      и его не надо объяснять человеку, которому сейчас не до обучения. -->
+<!-- Смена не открыта. Экран поверх всего: пока смена закрыта, работать
+     нельзя, и показывать список заказов значило бы предлагать то, что не
+     сработает. Два условия видно сразу, оба с ответом «что сделать». -->
+<div class="shscr" id="shScr">
+  <div class="shscr-in">
+    <div class="shscr-i" id="shIco"></div>
+    <div class="shscr-t" id="shT">Смена не открыта</div>
+    <div class="shscr-s" id="shS">Пока смена закрыта, заказы не приходят</div>
+    <div id="shList"></div>
+    <button class="btn btn-pri shscr-go" id="shGo" onclick="shOpen()">Открыть смену</button>
+    <button class="shscr-alt" onclick="shLoad(true)">Проверить ещё раз</button>
+  </div>
+</div>
+
 <div class="pnc" id="pncOv">
   <div class="pnc-top">
     <span class="pnc-ico">
@@ -1684,6 +1741,7 @@ async function boot(){
   }
   if(PANIC) return;          // в скрытом режиме ничего не грузим и не опрашиваем
 
+  await shLoad();
   await load();
   geoPush(true);
   // Пять секунд, а не сорок пять: заказ должен появляться на экране почти сразу,
@@ -2060,6 +2118,167 @@ function histCard(o){
       ${settleRow(o, paid || debt)}
     </div>
   </div>`;
+}
+
+/* ═══ Смена ═══════════════════════════════════════════════════════════════
+   Смена начинается не в полдень, а когда человек её открыл.
+
+   Два условия, и оба не на слово: оператор отметил тебя вышедшим, и идёт
+   живая трансляция геопозиции. Первое — потому что кто сегодня работает,
+   решает не сам водитель: это же решение определяет питание. Второе — потому
+   что без точки оператор не может ни отдать заказ, ни ответить клиенту
+   «водитель в пяти минутах».
+
+   Трансляция живёт восемь часов, смена — восемнадцать. Поэтому её включают за
+   ночь два-три раза, и смена от этого не закрывается: требовать её заново на
+   каждом действии значило бы останавливать работу посреди подъезда. Про конец
+   напоминает бот, а надолго замолчавшего видит оператор.                  */
+var SH = null;
+
+// Винительный падеж отдельно: «ответьте про мойка» читается как ошибка, а
+// склонять названия расходов на лету не из чего.
+const SH_ASK = {fuel: 'бензин', wash: 'мойку'};
+const _shAsk = ks => (ks || []).map(k => SH_ASK[k] || k).join(' и ');
+
+const SH_ICO = {
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  done:  '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.6 2.6L16 9.5"/>',
+  tick:  '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
+  dot:   '<circle cx="12" cy="12" r="3.2"/>',
+};
+
+async function shLoad(loud){
+  try{ SH = await drvApi.drvFetch('/api/driver/shift'); }
+  catch(e){ if(loud) toast('Не удалось проверить', 'err'); return; }
+  shPaint();
+}
+
+// Пока смена закрыта, за этим экраном ничего нет: показывать список заказов
+// значило бы предлагать то, что всё равно не сработает.
+function shPaint(){
+  const scr = document.getElementById('shScr');
+  if(!SH || PANIC){ scr.classList.remove('show'); return; }
+  const on = SH.opened && !SH.closed;
+  scr.classList.toggle('show', !on);
+  document.body.style.overflow = on ? '' : 'hidden';
+  if(on){ render(); return; }
+
+  const shut = SH.closed;
+  document.getElementById('shIco').innerHTML = svg(shut ? SH_ICO.done : SH_ICO.clock, 34);
+  document.getElementById('shT').textContent = shut ? 'Смена закрыта' : 'Смена не открыта';
+  document.getElementById('shS').textContent = shut
+    ? `Закрыли в ${hhmm(SH.closed_at)}. Заказы больше не придут. Если это ошибка — `
+      + `откройте смену снова.`
+    : 'Пока смена закрыта, заказы не приходят и отметить ничего нельзя';
+
+  const geo = SH.geo || {};
+  const marked = SH.working === true;
+  document.getElementById('shList').innerHTML = `
+    <div class="shc ${marked ? 'on' : ''}">
+      <span class="shc-i">${svg(marked ? SH_ICO.tick : SH_ICO.dot, 15)}</span>
+      <span class="shc-b">
+        <span class="shc-t">Оператор отметил вас на смене</span>
+        <span class="shc-s">${marked ? 'отмечено — питание за рабочий день'
+          : (SH.working === false
+             ? 'на сегодня вы отмечены как выходной. Если это ошибка — напишите оператору'
+             : 'оператор отмечает бригаду в начале смены. Если он опаздывает — напишите ему')}</span>
+      </span>
+    </div>
+    <div class="shc ${geo.ok ? 'on' : ''}">
+      <span class="shc-i">${svg(geo.ok ? SH_ICO.tick : SH_ICO.dot, 15)}</span>
+      <span class="shc-b">
+        <span class="shc-t">Геопозиция транслируется</span>
+        <span class="shc-s">${geo.ok
+          ? `идёт, хватит ещё на ${_hleft(geo.left_min)}`
+          : 'В чате с ботом: <b>скрепка → Геопозиция → Транслировать → 8 часов</b>.'
+            + ' Трансляции хватает на восемь часов, за десять минут до конца бот напомнит.'}</span>
+      </span>
+    </div>`;
+  const go = document.getElementById('shGo');
+  // Закрытую смену можно открыть заново — условия те же. Прятать кнопку
+  // значило бы отправлять человека звонить оператору из-за промаха пальцем.
+  go.style.display = '';
+  go.disabled = !(SH.working === true && (SH.geo || {}).ok);
+  go.textContent = shut ? 'Открыть смену снова' : 'Открыть смену';
+}
+
+function _hleft(m){
+  if(!m) return 'меньше минуты';
+  const h = Math.floor(m / 60);
+  return h ? `${h} ч ${m % 60} мин` : `${m} мин`;
+}
+
+async function shOpen(){
+  const b = document.getElementById('shGo');
+  b.disabled = true;
+  try{
+    SH = await drvApi.drvFetch('/api/driver/shift/open', {method:'POST'});
+    try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    toast('Смена открыта');
+    shPaint();
+    await load();
+  }catch(e){
+    const err = (e.payload || {}).error;
+    if(e.payload) SH = {...SH, ...(e.payload.geo ? {geo: e.payload.geo} : {})};
+    toast(err === 'no_geo' ? 'Сначала включите трансляцию геопозиции'
+        : err === 'not_marked' ? 'Оператор ещё не отметил вас на смене'
+        : 'Не получилось — повторите', 'err');
+    await shLoad();
+  }
+}
+
+// Закрыть смену можно, только ответив по обязательным расходам. Это не
+// бюрократия: «сегодня не заправлялся» — такой же ответ, как чек, и он стоит
+// одного нажатия. А смена, закрытая молча, через неделю не отличается от той,
+// где просто забыли.
+function shBar(){
+  if(!SH || !SH.opened || SH.closed) return '';
+  const left = SH.must || [];
+  return `<div class="shbar">
+    <span class="shbar-b">
+      <span class="shbar-t">Смена идёт с ${hhmm(SH.opened_at)}</span>
+      <span class="shbar-s">${left.length
+        ? `<b>ответьте про ${esc(_shAsk(SH.must))}</b> — без этого не закрыть`
+        : 'всё заполнено, можно закрывать'}</span>
+    </span>
+    <button class="shbar-go ${left.length ? '' : 'ok'}" onclick="shClose()">Закрыть</button>
+  </div>`;
+}
+
+async function shClose(){
+  if(!SH) return;
+  const left = SH.must || [];
+  if(left.length){
+    toast(`Сначала ответьте про ${_shAsk(left)}`, 'err');
+    try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+    return;
+  }
+  ASK = {t:'Закрыть смену?', s:'Заказы больше не придут, и отметить по ним ничего '
+        + 'будет нельзя. Если закрыли по ошибке — откройте снова, пока идёт трансляция.',
+        btn:'Закрыть смену', fn: shCloseGo};
+  renderAsk();
+}
+
+async function shCloseGo(){
+  try{
+    SH = await drvApi.drvFetch('/api/driver/shift/close', {method:'POST'});
+    try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    toast('Смена закрыта');
+    shPaint();
+  }catch(e){
+    const err = (e.payload || {}).error;
+    toast(err === 'expenses_left' ? 'Сначала ответьте по расходам' : 'Не получилось', 'err');
+    await shLoad();
+  }
+}
+
+// Действие не прошло, потому что смена закрыта: показываем не ошибку, а тот
+// экран, где это чинится.
+function shBlocked(e){
+  if(((e && e.payload) || {}).error !== 'shift_closed') return false;
+  toast('Смена закрыта', 'err');
+  shLoad(); 
+  return true;
 }
 
 /* ═══ Списания: бой, брак, просрочка, потеря ═══════════════════════════
@@ -2895,6 +3114,7 @@ async function expNone(kind, none){
       {method:'POST', body:{kind, none}});
     try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
     if(none) toast('Записано: расхода не было');
+    await shLoad();
     await load();
   }catch(e){ toast('Не отправилось', 'err'); }
 }
@@ -2958,6 +3178,8 @@ function mealBox(){
 }
 
 function renderExpenses(){
+  // Полоса смены живёт здесь: закрыть её можно только ответив по расходам, и
+  // держать кнопку рядом с тем, что ей мешает, — единственный честный способ.
   const box = document.getElementById('body');
   if(!EXP){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
   // Всего за смену — питание плюс всё, что не отклонили. Отклонённое в итог не
@@ -2966,7 +3188,7 @@ function renderExpenses(){
   const total = (EXP.meal || 0) + live.reduce((a, x) => a + (x.amount || 0), 0);
   const pend = live.filter(x => EXP_ST(x) === 'pending').reduce((a, x) => a + (x.amount || 0), 0);
   const other = (EXP.extras || []).filter(x => x.kind === 'other');
-  box.innerHTML = `
+  box.innerHTML = shBar() + `
     <div class="sect"><span class="sect-t">Каждый день</span>
       ${(EXP.pending_answer || []).length
         ? `<span class="sect-v ask">не сдано: ${(EXP.pending_answer || [])
@@ -3491,6 +3713,7 @@ async function sendDeliver(oid){
     HIST = null;                       // история устарела
     await load();
   }catch(e){
+    if(shBlocked(e)) return;
     toast((e.payload || {}).error === 'need_settle' ? 'Сначала подтвердите расчёт'
           : e.status === 409 ? 'Заказ уже закрыт' : 'Не получилось — повторите');
   }
@@ -4951,6 +5174,7 @@ async function sendExpense(btn, kind){
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
     EXP_MORE = false; EXP_EDIT = null;
     try{ btn.blur(); document.activeElement.blur(); }catch(e){}
+    await shLoad();
     await load();
   }catch(e){ toast('Не отправилось'); }
   btn.disabled = false;

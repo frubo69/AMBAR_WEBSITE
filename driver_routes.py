@@ -312,7 +312,16 @@ def needs_shift(handler):
     @wraps(handler)
     async def wrapped(request):
         me = request.get("driver") or {}
-        d = await db.get_driver_day(_biz_day(), me.get("name") or "") or {}
+        day = _biz_day()
+        # День, в который запрет появился, не запираем: водитель, который
+        # сейчас стоит у двери клиента, не должен упереться в новый экран
+        # из-за того, что обновление вышло посреди его смены.
+        try:
+            if day <= await db.driver_gate_since(day):
+                return await handler(request)
+        except Exception as e:
+            log.warning(f"[driver] начало запрета не прочитано: {e}")
+        d = await db.get_driver_day(day, me.get("name") or "") or {}
         if not d.get("shift_open_at") or d.get("shift_close_at"):
             return web.json_response({"error": "shift_closed"}, status=409,
                                      headers=CORS_HEADERS)

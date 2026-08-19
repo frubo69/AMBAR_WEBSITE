@@ -2414,6 +2414,23 @@ async def shift_gate_since(day: str) -> str:
     return day
 
 
+async def driver_gate_since(day: str) -> str:
+    """С каких суток водителю нельзя работать без открытой смены.
+
+    Тот же приём, что и у операторов, и по той же причине: водитель, который
+    сейчас на адресе, не должен упереться в новый экран из-за того, что мы
+    выкатили обновление посреди его смены."""
+    db = _db_or_none()
+    if db is None: return ""
+    doc = await db.shift_opens.find_one({"_id": "*:dgate"})
+    if doc:
+        return doc.get("since") or ""
+    await db.shift_opens.update_one(
+        {"_id": "*:dgate"}, {"$setOnInsert": {"since": day, "day": day, "district": "*"}},
+        upsert=True)
+    return day
+
+
 async def shift_opens_for_day(day: str) -> dict:
     db = _db_or_none()
     if db is None: return {}

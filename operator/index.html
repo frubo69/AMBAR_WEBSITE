@@ -472,6 +472,45 @@ a.oc-row:active{background:var(--card2)}
 .wh-note{padding:12px 18px 16px;font-size:11px;line-height:1.45;color:var(--dim);
   border-top:1px solid var(--border2)}
 .wh-map{flex:1;min-width:0;position:relative;background:#0b0e18}
+
+/* ── Карта на телефоне ───────────────────────────────────────────────────
+   Планшетная раскладка — список слева, карта справа — на телефоне даёт
+   девяностопиксельную полоску карты: смотреть не на что. На узком экране
+   работает то же, что в приложении владельца, и то же, что в «Локаторе»:
+   карта во весь экран, список — шторкой поверх неё.
+
+   Шторка живёт на трёх высотах. Развёрнутая — читаем список. Половина —
+   и список, и карта одновременно, это рабочее положение. Свёрнутая до
+   полоски — карта целиком, а шторка остаётся ручкой, за которую её
+   возвращают. Выбрал водителя — шторка сама уходит на половину: значит,
+   смотреть будут на карту.                                              */
+@media (max-width:760px){
+  #whereOv{align-items:stretch;justify-content:stretch;padding:0;backdrop-filter:none}
+  #whereOv .wh{display:block;position:relative;width:100vw;height:100dvh;
+    border-radius:0;border:none;box-shadow:none}
+  #whereOv .wh-map{position:absolute;inset:0;z-index:0}
+  #whereOv .wh-side{position:absolute;left:0;right:0;bottom:0;top:auto;z-index:6;
+    width:auto;height:86dvh;border-right:none;border-top:1px solid var(--border2);
+    border-radius:18px 18px 0 0;background:rgba(10,10,16,.92);
+    -webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);
+    box-shadow:0 -12px 40px rgba(0,0,0,.55);
+    transform:translateY(0);transition:transform .34s cubic-bezier(.32,.72,0,1);
+    touch-action:none}
+  #whereOv .wh-side.drag{transition:none}
+  /* Шапка — она же ручка: за неё тянут, и она всегда на виду. */
+  #whereOv .wh-hd{padding:8px 16px 12px;cursor:grab;user-select:none;
+    -webkit-user-select:none;position:relative}
+  #whereOv .wh-hd::before{content:'';position:absolute;left:50%;top:5px;
+    width:38px;height:4px;margin-left:-19px;border-radius:2px;
+    background:rgba(255,255,255,.22)}
+  #whereOv .wh-hd > div:first-child{margin-top:6px}
+  #whereOv .wh-list{padding:0 12px calc(24px + var(--safe-bottom));touch-action:pan-y}
+  /* Объяснение про трансляцию на телефоне уводим: место дороже, а правило
+     то же самое написано у водителя в его приложении. */
+  #whereOv .wh-side > .wh-note{display:none}
+  /* Кнопка «на весь экран» карте не нужна — она и так во весь экран. */
+  #whereOv .wh-x{width:38px;height:38px}
+}
 #whMap{position:absolute;inset:0}
 /* Тайлы гасим тем же фильтром, что и в клиентском приложении: светлая карта
    посреди тёмной панели бьёт по глазам в ночную смену. */
@@ -2837,6 +2876,10 @@ const WH_MS = 10000;
 
 async function whereOpen(){
   showOv('whereOv'); haptic('light');
+  whDragInit();
+  // Открываем на половине: сразу видно и кто на связи, и где они. Список
+  // целиком — на один жест вверх, карта целиком — на один вниз.
+  if(_whPhone()) requestAnimationFrame(() => whSnap('half'));
   $('whList').innerHTML = '<div class="wh-note" style="border:0">Загрузка…</div>';
   await whereLoad();
   clearInterval(WH.timer);
@@ -3037,7 +3080,82 @@ function whSmooth(pts){
 function whPick(name){
   WH.sel = WH.sel === name ? null : name;
   haptic('sel');
+  // Выбрал водителя — значит смотреть будет на карту: шторка уходит на
+  // половину и открывает её. Снял выбор — возвращаем список.
+  if(_whPhone()) whSnap(WH.sel ? 'half' : 'full', true);
   whereLoad();
+}
+
+/* ── Шторка карты на телефоне ─────────────────────────────────────────────
+   Три высоты вместо двух состояний «открыто/закрыто»: список, список плюс
+   карта, и карта целиком. Промежуточное положение — рабочее, поэтому оно
+   достижимо и пальцем, и само собой при выборе водителя.
+
+   Тянут за шапку, а не за весь лист: внутри списка вертикальный жест должен
+   листать список, иначе шторка уезжает при попытке прокрутить.           */
+const WH_SNAP = {full: 0.14, half: 0.55, peek: 0.82};   // доля высоты экрана
+let _whY = 'full';
+
+function _whPhone(){ return window.matchMedia('(max-width:760px)').matches; }
+
+function _whOff(pos, h){
+  // Смещение считаем от высоты самой шторки: она 86dvh, а верх при «full»
+  // стоит на 14% экрана — значит нулевое смещение это и есть «full».
+  return Math.round(h * (WH_SNAP[pos] - WH_SNAP.full) / (1 - WH_SNAP.full));
+}
+
+function whSnap(pos, smooth){
+  const sh = document.querySelector('#whereOv .wh-side');
+  if(!sh || !_whPhone()) return;
+  _whY = pos;
+  sh.classList.toggle('drag', !smooth);
+  sh.style.transform = `translateY(${_whOff(pos, sh.offsetHeight)}px)`;
+  if(!smooth) requestAnimationFrame(() => sh.classList.remove('drag'));
+  try{ WH.map && setTimeout(() => WH.map.invalidateSize(), 360); }catch(e){}
+}
+
+function whDragInit(){
+  const sh = document.querySelector('#whereOv .wh-side');
+  const hd = document.querySelector('#whereOv .wh-hd');
+  if(!sh || !hd || hd._wh) return;
+  hd._wh = true;
+  let y0 = 0, base = 0, on = false;
+  const cur = () => _whOff(_whY, sh.offsetHeight);
+  hd.addEventListener('pointerdown', e => {
+    if(!_whPhone() || e.target.closest('.wh-x')) return;
+    on = true; y0 = e.clientY; base = cur();
+    sh.classList.add('drag');
+    hd.setPointerCapture(e.pointerId);
+  });
+  hd.addEventListener('pointermove', e => {
+    if(!on) return;
+    const max = _whOff('peek', sh.offsetHeight);
+    // За края не пускаем: резинка тут не нужна, а уехавшая за экран шторка
+    // выглядит как поломка.
+    const v = Math.max(0, Math.min(max, base + (e.clientY - y0)));
+    sh.style.transform = `translateY(${v}px)`;
+  });
+  const up = e => {
+    if(!on) return;
+    on = false; sh.classList.remove('drag');
+    const h = sh.offsetHeight;
+    const v = base + (e.clientY - y0);
+    // Ближайшая из трёх — но быстрый бросок засчитываем как переход к
+    // соседней: так шторка слушается запястья, а не только пальца.
+    const fast = Math.abs(e.clientY - y0) > 60 ? Math.sign(e.clientY - y0) : 0;
+    const order = ['full', 'half', 'peek'];
+    let pos;
+    if(fast){
+      pos = order[Math.max(0, Math.min(2, order.indexOf(_whY) + fast))];
+    }else{
+      pos = order.reduce((a, p) =>
+        Math.abs(_whOff(p, h) - v) < Math.abs(_whOff(a, h) - v) ? p : a, 'full');
+    }
+    whSnap(pos, true);
+    haptic('sel');
+  };
+  hd.addEventListener('pointerup', up);
+  hd.addEventListener('pointercancel', up);
 }
 
 let SHIFT = null, SHIFT_BUSY = false;

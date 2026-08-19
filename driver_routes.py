@@ -279,6 +279,11 @@ async def handle_debt_settle(request):
                              headers=CORS_HEADERS)
 
 
+def _needs_settle(o: dict) -> bool:
+    """Брал ли водитель наличные по этому заказу."""
+    return not (_is_prepaid(o) or o.get("payment_method") in ("debt", "crypto"))
+
+
 # ── Списания ────────────────────────────────────────────────────────────────
 def _iso(v) -> str:
     return v.isoformat() if hasattr(v, "isoformat") else str(v or "")
@@ -746,12 +751,29 @@ async def handle_delivered(request):
     видно ему должно быть сразу и явно, что водитель уже отметил."""
     oid = (request.match_info.get("oid") or "").strip()
     me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
     o = await db.get_order(oid)
     if not o or (o.get("driver") or "").strip() != me["name"]:
         return web.json_response({"error": "not_your_order"}, status=403, headers=CORS_HEADERS)
     if o.get("status") != "approved":
         return web.json_response({"error": "wrong_status", "status": o.get("status")},
                                  status=409, headers=CORS_HEADERS)
+    # Деньги закрываются на адресе или не закрываются никогда.
+    #
+    # Наличный заказ нельзя отметить доставленным, не сказав, сошлись ли деньги.
+    # Не из недоверия: разница всплывает через сутки, когда никто уже не помнит,
+    # кто кому остался должен, и превращается в спор. Вопрос задаётся ровно там,
+    # где на него ещё есть ответ, — у двери.
+    #
+    # Там, где наличные через руки водителя не идут, вопроса нет: онлайн-оплата
+    # и заказ «в долг» — это другая история, и спрашивать про сдачу с человека,
+    # который денег не брал, значит приучить его нажимать не глядя.
+    if _needs_settle(o) and not (body.get("settled") is True or (o.get("settle") or {})):
+        return web.json_response({"error": "need_settle", "total": o.get("total") or 0},
+                                 status=400, headers=CORS_HEADERS)
     req = {"kind": "delivered", "text": "", "items": None, "diff": [], "total": None,
            "by": me["name"], "at": datetime.now(timezone.utc).isoformat(), "status": "open"}
     await db.update_order(oid, driver_req=req)

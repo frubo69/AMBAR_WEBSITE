@@ -926,6 +926,18 @@ a.oc-row:active{background:var(--card2)}
   .sup-m{max-width:82%}
 }
 
+/* На телефоне шапка поддержки не помещалась в строку и уезжала вправо вместе
+   с крестиком — выйти было нечем. Теперь она переносится, а выход стоит первым
+   и слева: это единственная кнопка, которая обязана быть на месте всегда. */
+@media (max-width:640px){
+  .sup-hdr{flex-wrap:wrap;gap:9px;padding:10px 12px}
+  .sup-hdr .oc-x{order:-1;margin-right:2px}
+  .sup-hdr .t{font-size:16px}
+  .sup-hdr .sp{display:none}
+  .sup-nb{margin-left:auto;font-size:12px;padding:8px 11px}
+  .sup-seg{order:1;flex-basis:100%;margin-left:0}
+}
+
 @media (max-height:720px){
   .hdr{padding:6px 14px}
   .ticket-foot{padding:8px 12px calc(8px + var(--safe-bottom))}

@@ -527,6 +527,30 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   border:1px solid var(--border2);background:var(--bg3);color:var(--text);
   font-family:inherit;font-size:13.5px;outline:none}
 .sheet textarea:focus{border-color:rgba(201,169,110,.5)}
+/* Галочка расчёта. Это не поле формы, а утверждение, под которым водитель
+   подписывается, — поэтому во всю ширину и крупно, а не мелким квадратиком
+   сбоку. Пока не нажата, «Отметил» не работает. */
+.ask-ck{display:flex;align-items:flex-start;gap:12px;width:100%;padding:14px;
+  border-radius:14px;cursor:pointer;text-align:left;
+  background:var(--card2);border:1px solid var(--border3)}
+.ask-ck:active{transform:scale(.99)}
+.ask-ck.on{background:var(--up-soft);border-color:rgba(61,220,132,.45)}
+.ask-ck-b{width:24px;height:24px;flex-shrink:0;margin-top:1px;border-radius:8px;
+  background:var(--bg2);border:1.5px solid var(--border);position:relative}
+.ask-ck.on .ask-ck-b{background:var(--up);border-color:var(--up)}
+.ask-ck.on .ask-ck-b::after{content:'';position:absolute;left:8px;top:3.5px;
+  width:6px;height:11px;border:solid #08130c;border-width:0 2.4px 2.4px 0;
+  transform:rotate(43deg)}
+.ask-ck-t{flex:1;min-width:0;font-size:14.5px;font-weight:700;line-height:1.3}
+.ask-ck.on .ask-ck-t{color:var(--up)}
+.ask-ck-t i{display:block;font-style:normal;font-size:12px;font-weight:400;
+  color:var(--muted);margin-top:3px}
+.ask-ck.on .ask-ck-t i{color:rgba(61,220,132,.75)}
+/* Выход для честного случая: деньги не сошлись — путь не спрятан. */
+.ask-alt{display:block;width:100%;margin-top:9px;padding:11px;border-radius:12px;
+  cursor:pointer;font-size:13px;font-weight:600;color:var(--gold2);
+  background:none;border:1px dashed rgba(201,169,110,.35)}
+.ask-alt:active{transform:scale(.98);background:var(--gold-soft)}
 .sheet-acts{display:flex;gap:8px;margin-top:14px}
 .sheet-acts .btn{flex:1}
 .sheet-acts-2{display:grid;grid-template-columns:1fr 1fr}
@@ -1510,6 +1534,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   <div class="sheet-in">
     <div class="sheet-t" id="askT">—</div>
     <div class="sheet-s" id="askS">—</div>
+    <div id="askExtra"></div>
     <div class="sheet-acts">
       <button class="btn btn-ico" style="width:auto;padding:13px 16px" onclick="askClose()">Отмена</button>
       <button class="btn btn-pri" id="askGo">Да</button>
@@ -3341,9 +3366,30 @@ async function incAccept(){
 // confirm() в телеграме показывается через раз — своё окно надёжнее и
 // выглядит как остальное приложение.
 let ASK = null;
+// Деньги закрываются у двери или не закрываются никогда.
+//
+// Разница всплывает через сутки, когда никто уже не помнит, кто кому остался
+// должен, и превращается в спор. Поэтому по наличному заказу спрашиваем ровно
+// там, где на вопрос ещё есть ответ. Там, где наличные через руки водителя не
+// шли — оплачено онлайн, заказ в долг, — не спрашиваем вовсе: человек, который
+// денег не брал, приучится нажимать не глядя.
 function askDeliver(oid){
-  ASK = {t:'Отметить доставку?', s:'Оператор увидит отметку и закроет заказ. Деньги и '
-        + 'выручка считаются по его подтверждению.', btn:'Отметил', fn:()=>sendDeliver(oid)};
+  const o = _ordById(oid);
+  const cash = o && !o.prepaid && o.payment_method !== 'debt' && o.payment_method !== 'crypto';
+  const st = (o && o.settle) || null;
+  ASK = {t:'Отметить доставку?',
+         s:'Оператор увидит отметку и закроет заказ. Деньги и выручка считаются '
+           + 'по его подтверждению.',
+         btn:'Отметил', fn:()=>sendDeliver(oid)};
+  if(cash){
+    ASK.check = st && st.diff
+      ? {t: st.diff > 0 ? `Разница записана: должны клиенту ${fmt(Math.abs(st.diff))} AED`
+                        : `Разница записана: клиент должен ${fmt(Math.abs(st.diff))} AED`,
+         s: 'Отмечаю, что так и есть'}
+      : {t: 'Рассчитались ровно', s: 'Никто никому не должен'};
+    ASK.alt = {t: st ? 'Исправить расчёт' : 'Рассчитались не ровно',
+               fn: () => { askClose(); stlOpen(oid); }};
+  }
   renderAsk();
 }
 function askClose(){ ASK = null; document.getElementById('askSheet').classList.remove('show'); }
@@ -3351,23 +3397,43 @@ function renderAsk(){
   if(!ASK) return;
   document.getElementById('askT').textContent = ASK.t;
   document.getElementById('askS').textContent = ASK.s;
+  const box = document.getElementById('askExtra');
+  box.innerHTML = ASK.check ? `
+    <button class="ask-ck" id="askCk" onclick="askTick()" aria-pressed="false">
+      <span class="ask-ck-b"></span>
+      <span class="ask-ck-t">${esc(ASK.check.t)}<i>${esc(ASK.check.s)}</i></span>
+    </button>
+    ${ASK.alt ? `<button class="ask-alt" onclick="ASK.alt.fn()">${esc(ASK.alt.t)}</button>` : ''}`
+    : '';
+  ASK.ticked = false;
   const b = document.getElementById('askGo');
-  b.textContent = ASK.btn; b.disabled = false;
+  b.textContent = ASK.btn; b.disabled = !!ASK.check;
   b.onclick = () => { const f = ASK.fn; askClose(); f(); };
   document.getElementById('askSheet').classList.add('show');
   try{ tg.HapticFeedback.impactOccurred('medium'); }catch(e){}
 }
 
+function askTick(){
+  if(!ASK) return;
+  ASK.ticked = !ASK.ticked;
+  const c = document.getElementById('askCk');
+  if(c){ c.classList.toggle('on', ASK.ticked); c.setAttribute('aria-pressed', ASK.ticked); }
+  document.getElementById('askGo').disabled = !ASK.ticked;
+  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
 async function sendDeliver(oid){
   try{
-    await drvApi.drvFetch(`/api/driver/orders/${encodeURIComponent(oid)}/delivered`, {method:'POST'});
+    await drvApi.drvFetch(`/api/driver/orders/${encodeURIComponent(oid)}/delivered`,
+      {method:'POST', body:{settled: true}});
     geoPush(true);              // доставил — точка обновилась на адресе
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
     toast('Отправлено оператору');
     HIST = null;                       // история устарела
     await load();
   }catch(e){
-    toast(e.status === 409 ? 'Заказ уже закрыт' : 'Не получилось — повторите');
+    toast((e.payload || {}).error === 'need_settle' ? 'Сначала подтвердите расчёт'
+          : e.status === 409 ? 'Заказ уже закрыт' : 'Не получилось — повторите');
   }
 }
 

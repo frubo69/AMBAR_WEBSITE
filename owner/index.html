@@ -1023,6 +1023,22 @@ button.path:active{transform:scale(.995)}
 /* ── Поставка ───────────────────────────────────────────────────────────── */
 /* Те же три числа, что и в заявке, в том же порядке: экран поставки —
    продолжение пути, а не отдельная таблица. */
+/* Два окна на экране приёмки: счёт и работа. Карточка держит их врозь — без
+   неё числа и списки читались как одна простыня. */
+.sup-card{padding:14px;border-radius:18px;margin-bottom:12px;background:var(--card);
+  border:1px solid var(--border)}
+.sup-card-t{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
+  color:var(--muted);margin:2px 2px 12px}
+/* Переключатель внутри второго окна: два списка про одно и то же — кто везёт
+   наш товар и чего в нём не хватает. */
+.sup-seg2{display:grid;grid-template-columns:1fr 1fr;gap:6px;padding:4px;margin-bottom:12px;
+  border-radius:13px;background:var(--bg2);border:1px solid var(--border)}
+.sup-seg2 button{padding:10px 8px;border-radius:10px;font-family:inherit;font-size:12.5px;
+  font-weight:700;cursor:pointer;color:var(--muted);background:none;border:none}
+.sup-seg2 button.on{color:var(--gold2);background:var(--card);
+  box-shadow:0 2px 8px rgba(0,0,0,.3)}
+.sup-seg2 i{font-style:normal;margin-left:5px;padding:1px 6px;border-radius:999px;
+  font-size:10.5px;background:var(--warn-soft);color:var(--warn)}
 .sup-sum{display:grid;grid-template-columns:repeat(3,1fr);margin-bottom:12px;
   border-radius:15px;overflow:hidden;background:var(--card);border:1px solid var(--border2)}
 .sup-sum-c{padding:13px 12px;text-align:center}
@@ -1109,7 +1125,7 @@ button.path:active{transform:scale(.995)}
    смотрят. */
 .acc-s{font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.35;min-height:2.7em;
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
-/* ── Заявка на закупку ──────────────────────────────────────────────────────
+/* ── Закуп ──────────────────────────────────────────────────────────────────
    Список, в котором каждое число можно переспорить. Свёрнутая строка отвечает
    «что и сколько», раскрытая — «сколько и куда»: правят именно точку, потому
    что развозить по точкам. */
@@ -7510,7 +7526,7 @@ const ACC = [
    ico:'<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'},
   {id:'stock',    t:'Учёт · Перемещение · Ревизии', s:'остатки, ревизия, перемещения',
    ico:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>'},
-  {id:'order',    t:'Заявка на закупку', s:'сколько довезти до нормы',
+  {id:'order',    t:'Закуп',             s:'сколько довезти до нормы',
    ico:'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/>'},
   {id:'shifts',   t:'Смены',             s:'кто открыл, кто вышел, кто закрыл',
    ico:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'},
@@ -7915,7 +7931,7 @@ async function accExpPeriod(){
       }).join('') : ''}`;
 }
 
-// ─── Заявка на закупку ──────────────────────────────────────────────────────
+// ─── Закуп ──────────────────────────────────────────────────────────────────
 // Расчёт по норме — предложение, а не приговор: владелец видит полку своими
 // глазами и знает то, чего не знает программа. Поэтому любое число правится
 // руками, правка отмечается, а рядом остаётся то, что считала программа —
@@ -7933,7 +7949,7 @@ let ORD = {d:null, open:null, q:'', onlyEdited:false, busy:false, pend:{}, timer
 // Теперь всё в «Заявке», а наверху полоса шагов: она отвечает на единственный
 // вопрос, с которым сюда заходят, — «мы сейчас где».
 async function accOrder(){
-  _setText('accTitle', 'Заявка на закупку');
+  _setText('accTitle', 'Закуп');
   _setText('accSub', 'загрузка…');
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
   document.getElementById('accFoot').innerHTML = '';
@@ -8340,7 +8356,7 @@ async function ordShare(){
   try{
     const file = await _ordFile();
     if(navigator.canShare && navigator.canShare({files:[file]})){
-      await navigator.share({files:[file], title:'AMBAR — заявка на закупку'});
+      await navigator.share({files:[file], title:'AMBAR — закуп'});
       b.innerHTML = 'Отправлено';
       try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     }else{
@@ -9139,7 +9155,7 @@ function supEmpty(){
   document.getElementById('accMid').innerHTML = `
     <div class="exp-empty" style="padding:30px 16px;line-height:1.6">
       Магазин ещё не присылал ответ.<br>
-      Отправьте ему заявку из раздела «Заявка на закупку», а вернувшийся файл
+      Отправьте ему заявку из раздела «Закуп», а вернувшийся файл
       загрузите здесь — программа сверит его с нашей заявкой.
     </div>`;
   supFoot();
@@ -9154,6 +9170,14 @@ async function supLoad(sid){
     return;
   }
   supRender();
+}
+
+let SUP_TAB = 'who';
+
+function supTab(t){
+  SUP_TAB = t;
+  supRender();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 
 function supRender(){
@@ -9179,7 +9203,6 @@ function supRender(){
   // действия прямо сейчас.
   const why = {dropped:'магазин отказал', short:'урезал', gap:'не выдал при отгрузке'};
   const shortBlock = short.rows.length ? `
-    <div class="exp-grp">Заказать на доп. складах</div>
     <div class="sup-short">
       <div class="sup-short-h">
         <span class="sup-short-v">${fmt(short.qty)}</span>
@@ -9249,10 +9272,29 @@ function supRender(){
           .map(([o, n]) => `${(D[o]||{}).code || o} ${n}`).join(' · ')}</span></span>
       <span class="sup-sr-v up">+${r.qty}</span></div>`).join('')}</div>` : '';
 
-  document.getElementById('accMid').innerHTML =
-    head + shortBlock +
-    `<div class="exp-grp">Кто везёт</div>${tasks || '<div class="exp-empty">Районов нет</div>'}` +
-    extra;
+  // Экран делится на два окна, и это не украшение.
+  //
+  // Сверху — счёт: просили, дали, приняли. Это ответ на «как прошло» и он
+  // нужен целиком, одним взглядом, не листая.
+  //
+  // Снизу — работа: кто поехал и что докупить. Два списка про одно и то же
+  // (кто везёт наш товар и чего в нём не хватает), поэтому они живут в одном
+  // окне и переключаются, а не тянутся друг под другом на два экрана.
+  document.getElementById('accMid').innerHTML = `
+    <div class="sup-card">
+      <div class="sup-card-t">Приёмка</div>
+      ${head}
+    </div>
+    <div class="sup-card">
+      <div class="sup-seg2">
+        <button class="${SUP_TAB === 'buy' ? '' : 'on'}" onclick="supTab('who')">Кто поехал</button>
+        <button class="${SUP_TAB === 'buy' ? 'on' : ''}" onclick="supTab('buy')">Докупить${
+          short.qty ? ` <i>${fmt(short.qty)}</i>` : ''}</button>
+      </div>
+      ${SUP_TAB === 'buy' ? shortBlock
+        : (tasks || '<div class="exp-empty">Районов нет</div>')}
+    </div>
+    ${extra}`;
   supFoot();
 }
 

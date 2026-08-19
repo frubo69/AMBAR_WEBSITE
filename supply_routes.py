@@ -102,7 +102,7 @@ def _catalog_by_id():
 
 
 async def _order_rows(day):
-    """Строки заявки — тем же расчётом, что и на экране «Заявка на закупку»."""
+    """Строки заявки — тем же расчётом, что и на экране «Закуп»."""
     import stock_routes
     from aiohttp.test_utils import make_mocked_request
     # Логика заявки живёт в stock_routes и там же должна остаться: два расчёта

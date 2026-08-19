@@ -6741,7 +6741,7 @@ function _stkHead(title, sub, save){
 // ── шаг 1: районы ───────────────────────────────────────────────────────────
 async function stkPicker(){
   STK.view = 'pick'; STK.sheet = null; STK.vals = {};
-  _stkHead('Пересчёт склада', 'загрузка…', false);
+  _stkHead('Ревизия', 'загрузка…', false);
   document.getElementById('stkMid').innerHTML =
     '<div class="stk-empty">Загрузка…</div>';
   let st;
@@ -6752,7 +6752,7 @@ async function stkPicker(){
     return;
   }
   STK.districts = st.districts;
-  _stkHead('Пересчёт склада', `${st.done} из ${st.total} районов · ${st.day}`, false);
+  _stkHead('Ревизия', `${st.done} из ${st.total} районов · ${st.day}`, false);
   const cards = st.districts.map(d=>`
     <button class="stk-pick" onclick="stkOpen('${d.id}')">
       <span class="stk-pick-c" style="color:${d.done?'var(--up)':'var(--gold2)'}">${escS(d.code)}</span>
@@ -7524,7 +7524,7 @@ function stkResult(res){
 const ACC = [
   {id:'expenses', t:'Расходы водителей', s:'питание и разовые траты',
    ico:'<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'},
-  {id:'stock',    t:'Учёт · Перемещение · Ревизии', s:'остатки, ревизия, перемещения',
+  {id:'stock',    t:'Ревизия',           s:'пересчёт, перемещения, история',
    ico:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>'},
   {id:'order',    t:'Закуп',             s:'сколько довезти до нормы',
    ico:'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/>'},

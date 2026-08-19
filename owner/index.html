@@ -1771,6 +1771,33 @@ button.path:active{transform:scale(.995)}
   padding:13px 15px;margin-bottom:4px}
 .exp-empty{color:var(--muted);font-size:12.5px;text-align:center;padding:8px}
 
+/* ── Журнал смен ─────────────────────────────────────────────────────────
+   Два события в сутки на район: открыли и закрыли. Читаются подряд, поэтому
+   день — заголовок, а событие — строка. */
+.shl-day{display:flex;align-items:baseline;gap:9px;margin:18px 4px 9px;flex-wrap:wrap}
+.shl-day:first-child{margin-top:2px}
+.shl-day-t{font-size:12px;font-weight:700;letter-spacing:.3px}
+.shl-day-s{font-size:11px;color:var(--muted)}
+.shl-r{display:flex;gap:11px;padding:12px 13px;border-radius:14px;margin-bottom:7px;
+  background:var(--card);border:1px solid var(--border)}
+.shl-i{flex-shrink:0;width:22px;height:22px;border-radius:7px;display:flex;
+  align-items:center;justify-content:center;font-size:9px;line-height:1}
+.shl-r.op .shl-i{color:#3ddc84;background:rgba(61,220,132,.12)}
+.shl-r.cl .shl-i{color:var(--muted);background:var(--bg2)}
+.shl-b{flex:1;min-width:0}
+.shl-t{display:block;font-size:13px;line-height:1.35}
+.shl-t b{color:var(--gold2);font-weight:700;margin-right:3px}
+.shl-t i{font-style:normal;color:var(--muted);margin-left:5px;font-variant-numeric:tabular-nums}
+.shl-c{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+/* Бригада: вышедшие подсвечены, оставшиеся дома — приглушены. Список тот же,
+   потому что вопрос «кого сегодня не было» задают так же часто. */
+.shl-p{padding:4px 9px;border-radius:8px;font-size:11px;color:var(--muted);
+  background:var(--bg2);border:1px solid var(--border)}
+.shl-p.on{color:#3ddc84;background:rgba(61,220,132,.1);border-color:rgba(61,220,132,.28)}
+.shl-sum{font-size:11.5px;color:var(--muted)}
+.shl-sum b{color:var(--warn)}
+.shl-none{font-size:11.5px;color:var(--muted)}
+
 /* ── Нормы ───────────────────────────────────────────────────────────────
    Норма — обещание: столько бутылок стоит на полке. Расчёт делает его из
    продаж, последнее слово за владельцем, и на экране оба числа рядом. */
@@ -7485,6 +7512,8 @@ const ACC = [
    ico:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>'},
   {id:'order',    t:'Заявка на закупку', s:'сколько довезти до нормы',
    ico:'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/>'},
+  {id:'shifts',   t:'Смены',             s:'кто открыл, кто вышел, кто закрыл',
+   ico:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'},
   {id:'norms',    t:'Нормы',             s:'сколько держим на полке',
    ico:'<path d="M3 20h18"/><path d="M6 20V10M11 20V4M16 20v-8M21 20v-5"/>'},
   {id:'writeoff', t:'Списания',          s:'бой, брак, просрочка',
@@ -7784,6 +7813,7 @@ function accOpen(id){
   if(id === 'check')    accCheck();
   if(id === 'writeoff') accWriteoffs();
   if(id === 'norms')    accNorms();
+  if(id === 'shifts')   accShifts();
 }
 
 // Стрелка в шапке раздела ведёт на шаг назад, а не сразу наружу: у QR-кодов
@@ -12484,6 +12514,84 @@ const CHK_V = {
   other_district: {c:'warn', t:'заведена на другом районе'},
   alien:          {c:'bad',  t:'НЕ НАША — нет в реестре'},
 };
+
+/* ── Журнал смен ───────────────────────────────────────────────────────────
+   Смена — это два события и один вопрос между ними: во сколько начали, кто
+   сегодня в машинах, во сколько сдали и с каким итогом. Раньше ответ был
+   только в чужой памяти.                                                  */
+let ACC_SH = null;
+
+async function accShifts(){
+  ACC_BACK = null;
+  _setText('accTitle', 'Смены');
+  _setText('accSub', 'загрузка…');
+  document.getElementById('accFoot').innerHTML = '';
+  try{
+    ACC_SH = await ownerApi.ownerFetch('/api/owner/stock/shifts', {params:{days:14}});
+  }catch(e){
+    document.getElementById('accMid').innerHTML =
+      '<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+    return;
+  }
+  shLogPaint();
+}
+
+function shLogPaint(){
+  const w = ACC_SH || {list: []};
+  _setText('accSub', w.list.length ? `за ${w.days} ${pluralize(w.days,'день','дня','дней')}`
+                                   : 'смены пока не отмечали');
+  const mid = document.getElementById('accMid');
+  if(!w.list.length){
+    mid.innerHTML = `<div class="scan-empty">Пока пусто.<br>
+      Оператор открывает смену в своём приложении — здесь появится, кто и когда.</div>`;
+    return;
+  }
+  mid.innerHTML = w.list.map(d => `
+    <div class="shl-day">
+      <span class="shl-day-t">${_dayLbl(d.day)}</span>
+      <span class="shl-day-s">${d.opened} ${pluralize(d.opened,'открытие','открытия','открытий')}
+        · ${d.closed} ${pluralize(d.closed,'закрытие','закрытия','закрытий')}${
+        d.revenue ? ` · ${fmt(d.revenue)} AED` : ''}</span>
+    </div>
+    ${d.rows.map(shLogRow).join('')}`).join('');
+}
+
+function shLogRow(r){
+  const t = _hmDubai(r.at);
+  const open = r.kind === 'open';
+  // У открытия главное — бригада, у закрытия — итог. Одна строка на событие,
+  // и в ней ровно то, ради чего событие смотрят.
+  const body = open
+    ? (r.crew || []).length
+      ? (r.crew || []).map(c => `<span class="shl-p ${c.working ? 'on' : ''}">${escS(c.name)}</span>`).join('')
+      : '<span class="shl-none">водители не назначены</span>'
+    : `<span class="shl-sum">${fmt(r.orders)} ${pluralize(r.orders,'заказ','заказа','заказов')}
+       · ${fmt(r.revenue)} AED${r.open ? ` · <b>висело ${r.open}</b>` : ''}</span>`;
+  return `<div class="shl-r ${open ? 'op' : 'cl'}">
+    <span class="shl-i">${open ? '▲' : '▼'}</span>
+    <span class="shl-b">
+      <span class="shl-t"><b>${escS(r.code || r.district)}</b>
+        ${open ? 'смену открыл' : 'смену закрыл'} ${escS(r.by || r.operator || '—')}
+        <i>${t}</i></span>
+      <span class="shl-c">${body}</span>
+    </span>
+  </div>`;
+}
+
+// Время события — по Дубаю, а не по часам того, кто смотрит: смена начинается
+// в полдень по Дубаю, и «08:05» вместо «12:05» превращает журнал в загадку.
+function _hmDubai(iso){
+  if(!iso) return '';
+  const d = new Date(/Z$|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : iso + 'Z');
+  return isNaN(d) ? '' : d.toLocaleTimeString('ru-RU',
+    {hour:'2-digit', minute:'2-digit', timeZone:'Asia/Dubai'});
+}
+
+function _dayLbl(iso){
+  const d = new Date(iso + 'T12:00:00Z');
+  return isNaN(d) ? iso : d.toLocaleDateString('ru-RU',
+    {day:'2-digit', month:'long', weekday:'short'});
+}
 
 /* ── Нормы ─────────────────────────────────────────────────────────────────
    Норма отвечает на вопрос «сколько держим», а не «сколько привезти»: заявка

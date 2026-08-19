@@ -635,6 +635,27 @@ a.oc-row:active{background:var(--card2)}
 .sh-ch.on{color:#3ddc84;background:rgba(61,220,132,.12);border-color:rgba(61,220,132,.4)}
 .sh-ch.off{color:var(--sub);background:var(--bg2);border-color:var(--border)}
 .sh-none{margin-top:10px;font-size:12px;color:var(--muted)}
+.sh-log-b{width:100%;margin-top:4px;padding:12px;border-radius:var(--r2);
+  font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--sub);
+  background:var(--card2);border:1px solid var(--border2)}
+.sh-log-b:active{transform:scale(.98)}
+/* Журнал: день — заголовок, событие — строка. */
+.shl-day{margin:16px 2px 8px;font-size:11px;font-weight:700;letter-spacing:.4px;
+  color:var(--muted)}
+.shl-day:first-child{margin-top:2px}
+.shl-r{display:flex;gap:10px;padding:11px 12px;border-radius:var(--r2);margin-bottom:6px;
+  background:var(--card);border:1px solid var(--border2)}
+.shl-r.op{border-left:2px solid rgba(61,220,132,.5)}
+.shl-r.cl{border-left:2px solid var(--border)}
+.shl-b{flex:1;min-width:0}
+.shl-t{display:block;font-size:13px;line-height:1.35}
+.shl-t b{color:var(--gold);font-weight:800;margin-right:3px}
+.shl-t i{font-style:normal;color:var(--muted);margin-left:5px}
+.shl-c{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
+.shl-p{padding:4px 9px;border-radius:8px;font-size:11px;color:var(--muted);
+  background:var(--bg3);border:1px solid var(--border2)}
+.shl-p.on{color:#3ddc84;background:rgba(61,220,132,.1);border-color:rgba(61,220,132,.28)}
+.shl-none{font-size:11.5px;color:var(--muted)}
 .pill.hot{border-color:rgba(243,180,74,.5);background:rgba(243,180,74,.1);
   color:var(--warn)}
 
@@ -1132,6 +1153,7 @@ a.oc-row:active{background:var(--card2)}
       заказы обрабатывать нельзя — смотреть можно всё. После закрытия продажи
       дня считаются окончательными, и по ним программа соберёт заявку.</div>
     <div id="shiftList"><div class="acc-sub">Загрузка…</div></div>
+    <button class="sh-log-b" onclick="shLogOpen()">История смен</button>
     <!-- «Готово», а не «Закрыть»: рядом три кнопки «Закрыть смену», и четвёртая
          с тем же словом означала бы совсем другое. -->
     <div class="btns"><button class="sbtn" onclick="hideOv('shiftOv')">Готово</button></div>
@@ -1141,6 +1163,19 @@ a.oc-row:active{background:var(--card2)}
 <!-- Ввод одной строки. Родной prompt в телеграмовском вебвью то работает, то
      молча возвращает null — на нём «Отклонить» и «Заметка» просто не сработали
      бы, и никто бы не понял почему. -->
+<!-- Журнал смен: те же события, что видит владелец. По всем районам —
+     оператор каждый день спрашивает, закрылись ли соседи. -->
+<div class="ov" id="shLogOv">
+  <div class="sheet wide">
+    <div class="t">История смен</div>
+    <div class="s">Кто открыл, кого отметил, кто закрыл и с каким итогом</div>
+    <div id="shLogBody" style="max-height:62vh;overflow-y:auto"></div>
+    <div class="btns" style="margin-top:14px">
+      <button class="sbtn" onclick="hideOv('shLogOv')">Закрыть</button>
+    </div>
+  </div>
+</div>
+
 <div class="ov" id="askOv">
   <div class="sheet">
     <div class="t" id="askT">—</div>
@@ -3139,6 +3174,45 @@ function shiftBlocked(e){
   toast('Сначала откройте смену', 'err');
   shiftOpen();
   return true;
+}
+
+async function shLogOpen(){
+  showOv('shLogOv'); haptic('light');
+  $('shLogBody').innerHTML = '<div class="acc-sub">Загрузка…</div>';
+  let d;
+  try{ d = await opApi.opFetch('/api/operator/shift/log', {params:{days:7}}); }
+  catch(e){ $('shLogBody').innerHTML = '<div class="acc-sub">Не удалось загрузить</div>'; return; }
+  $('shLogBody').innerHTML = (d.list || []).length
+    ? d.list.map(x => `<div class="shl-day">${_dayRu(x.day)}</div>` + x.rows.map(r => {
+        const open = r.kind === 'open';
+        const crew = (r.crew || []).map(c =>
+          `<span class="shl-p ${c.working ? 'on' : ''}">${_esc(c.name)}</span>`).join('');
+        return `<div class="shl-r ${open ? 'op' : 'cl'}">
+          <span class="shl-b">
+            <span class="shl-t"><b>${_esc(r.code || r.district)}</b>
+              ${open ? 'открыл' : 'закрыл'} ${_esc(r.by || r.operator || '—')}
+              <i>${_hmDubai(r.at)}</i></span>
+            <span class="shl-c">${open ? (crew || '<span class="shl-none">водителей нет</span>')
+              : `<span class="shl-none">${_num(r.orders)} ${plural(r.orders,'заказ','заказа','заказов')}
+                 · ${_num(r.revenue)} AED</span>`}</span>
+          </span></div>`;
+      }).join('')).join('')
+    : '<div class="acc-sub">Пока пусто</div>';
+}
+
+// Время — по Дубаю: смена начинается в полдень по Дубаю, и час из другой
+// зоны делает журнал бессмысленным.
+function _hmDubai(iso){
+  if(!iso) return '';
+  const d = new Date(/Z$|[+-]\d{2}:?\d{2}$/.test(iso) ? iso : iso + 'Z');
+  return isNaN(d) ? '' : d.toLocaleTimeString('ru-RU',
+    {hour:'2-digit', minute:'2-digit', timeZone:'Asia/Dubai'});
+}
+
+function _dayRu(iso){
+  const d = new Date(iso + 'T12:00:00Z');
+  return isNaN(d) ? iso : d.toLocaleDateString('ru-RU',
+    {day:'2-digit', month:'long', weekday:'short'});
 }
 
 async function shiftClose(oid){

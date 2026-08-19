@@ -1063,6 +1063,52 @@ def _opt(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
 
+# ── Журнал смен ─────────────────────────────────────────────────────────────
+# Открытие и закрытие лежат в разных коллекциях, потому что это разные события,
+# но читают их вместе: вопрос всегда один — что было со сменой. Кто открыл, во
+# сколько, кто вышел, кто закрыл и с каким итогом.
+def shift_log_rows(rows: list) -> list:
+    from config_offices import OFFICE_CODES as _C, OFFICE_NAMES as _N
+    out = []
+    for r in rows:
+        d = r.get("district") or ""
+        crew = r.get("drivers") or {}
+        out.append({
+            "kind": r.get("kind"), "day": r.get("day", ""), "district": d,
+            "code": _C.get(d, ""), "name": _N.get(d, d),
+            "at": _iso_of(r.get("at")), "by": r.get("by_name") or "",
+            "operator": r.get("operator") or "",
+            "crew": [{"name": n, "working": bool(v)} for n, v in sorted(crew.items())],
+            "orders": int(r.get("orders") or 0), "revenue": int(r.get("revenue") or 0),
+            "open": int(r.get("open") or 0),
+        })
+    return out
+
+
+@require_owner
+async def handle_shift_log(request):
+    """История смен: кто открыл, кого отметил, кто закрыл и с каким итогом."""
+    try:
+        days = max(1, min(90, int(request.query.get("days", "14") or 14)))
+    except ValueError:
+        days = 14
+    today = _biz_day()
+    d0 = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    rows = shift_log_rows(await db.shift_journal(d0, today))
+    # Группируем по суткам: смену смотрят днями, а не событиями подряд.
+    by_day = {}
+    for r in rows:
+        by_day.setdefault(r["day"], []).append(r)
+    days_out = [{"day": k, "rows": v,
+                 "orders": sum(x["orders"] for x in v if x["kind"] == "close"),
+                 "revenue": sum(x["revenue"] for x in v if x["kind"] == "close"),
+                 "opened": sum(1 for x in v if x["kind"] == "open"),
+                 "closed": sum(1 for x in v if x["kind"] == "close")}
+                for k in sorted(by_day, reverse=True)]
+    return web.json_response({"days": days, "from": d0, "to": today,
+                              "list": days_out}, headers=CORS_HEADERS)
+
+
 # ── Списания ────────────────────────────────────────────────────────────────
 @require_owner
 async def handle_writeoffs(request):
@@ -1141,6 +1187,7 @@ def setup(app):
         ("/api/owner/stock/norms",      handle_norms,     "GET"),
         ("/api/owner/stock/norm/reset", handle_norm_reset, "POST"),
         ("/api/owner/stock/writeoffs",  handle_writeoffs, "GET"),
+        ("/api/owner/stock/shifts",     handle_shift_log, "GET"),
         ("/api/owner/stock/writeoff/{wid}/photo", handle_writeoff_photo, "GET"),
         ("/api/owner/stock/transfer/{tid}", handle_transfer_delete, "DELETE"),
     )

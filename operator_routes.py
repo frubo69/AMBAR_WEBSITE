@@ -2352,6 +2352,28 @@ async def _tell_crew(district: str, names: list, crew: dict, who: str):
 
 
 @require_operator
+async def handle_shift_log(request):
+    """История смен — та же, что видит владелец.
+
+    По всем районам, а не только по своему: оператор каждый день спрашивает,
+    закрылись ли соседи, и до сих пор спрашивал голосом."""
+    try:
+        days = max(1, min(31, int(request.query.get("days", "7") or 7)))
+    except ValueError:
+        days = 7
+    today = _biz_date(datetime.now(DUBAI_TZ)).isoformat()
+    d0 = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=days - 1)).strftime("%Y-%m-%d")
+    import stock_routes
+    rows = stock_routes.shift_log_rows(await db.shift_journal(d0, today))
+    by_day = {}
+    for r in rows:
+        by_day.setdefault(r["day"], []).append(r)
+    return web.json_response({"from": d0, "to": today, "list": [
+        {"day": k, "rows": by_day[k]} for k in sorted(by_day, reverse=True)]},
+        headers=CORS_HEADERS)
+
+
+@require_operator
 async def handle_shift_close(request):
     """Закрыть смену района.
 
@@ -2443,6 +2465,8 @@ def setup(app):
     r.add_get("/api/operator/where", handle_where)
     r.add_route("OPTIONS", "/api/operator/shift", _opt)
     r.add_get("/api/operator/shift", handle_shift)
+    r.add_route("OPTIONS", "/api/operator/shift/log", _opt)
+    r.add_get("/api/operator/shift/log", handle_shift_log)
     r.add_route("OPTIONS", "/api/operator/shift/open", _opt)
     r.add_post("/api/operator/shift/open", handle_shift_open)
     r.add_route("OPTIONS", "/api/operator/shift/close", _opt)

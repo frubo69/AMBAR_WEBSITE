@@ -864,6 +864,36 @@ SHORT_WHY = {"dropped": "магазин отказал", "short": "магази�
              "gap": "не выдал при отгрузке"}
 
 
+async def _unmarked(sup: dict, short: dict) -> dict:
+    """Немаркированные бутылки по районам: {район: {надо, внесли, осталось}}.
+
+    Недобор едут закрывать на доп. склады. Купленное там приезжает на точку
+    физически, но в базе его нет: кодов на этих бутылках наших ещё нет, и
+    заводят их потом, поштучно, через «Внести товар». Между этими двумя
+    моментами на полке стоит товар, которого система не видит, — и именно это
+    число здесь.
+
+    Считаем разницей, а не отдельным журналом: сколько не хватило (это уже
+    посчитано) минус сколько с тех пор внесли руками. Пока внесли не всё —
+    число тает само, от десяти к нулю, и ничего отмечать не надо."""
+    need = {}
+    for r in short.get("rows") or []:
+        for oid, n in (r.get("by_district") or {}).items():
+            need[oid] = need.get(oid, 0) + int(n or 0)
+    if not need:
+        return {}
+    try:
+        marked = await db.qr_marked_since(sup.get("at"), list(need.keys()))
+    except Exception as e:
+        log.warning(f"[supply] внесённые коды не прочитаны: {e}")
+        marked = {}
+    out = {}
+    for oid, n in need.items():
+        got = int(marked.get(oid) or 0)
+        out[oid] = {"need": n, "marked": min(got, n), "left": max(0, n - got)}
+    return out
+
+
 def _shortfall(sup: dict) -> dict:
     rows = {}
 
@@ -987,7 +1017,7 @@ def _short_book(sup: dict, short: dict):
     return buf.read(), f"AMBAR-shortfall-{sup.get('day') or sup['_id']}.xlsx"
 
 
-def _supply_view(sup: dict) -> dict:
+async def _supply_view(sup: dict) -> dict:
     sid = sup.get("_id")
     tasks = []
     for oid, t in (sup.get("tasks") or {}).items():
@@ -1005,6 +1035,7 @@ def _supply_view(sup: dict) -> dict:
     short = _shortfall(sup)
     return {
         "supply_id": sid, "at": str(sup.get("at") or ""), "day": sup.get("day") or "",
+        "unmarked": await _unmarked(sup, short),
         "status": sup.get("status") or "open",
         "total_qty": sup.get("total_qty", 0), "asked_qty": sup.get("asked_qty", 0),
         "took": sum(t["got"] for t in tasks),
@@ -1021,7 +1052,7 @@ async def handle_one(request):
     sup = await db.supply_get(request.match_info.get("sid") or "")
     if not sup:
         return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
-    return web.json_response(_supply_view(sup), headers=CORS_HEADERS,
+    return web.json_response(await _supply_view(sup), headers=CORS_HEADERS,
                              dumps=lambda o: __import__("json").dumps(o, default=str))
 
 

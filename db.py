@@ -2552,6 +2552,22 @@ async def qr_add(code: str, product_id: str, product_name: str, district,
         return False
 
 
+async def qr_marked_since(since, districts: list = None) -> dict:
+    """Сколько бутылок внесли в базу руками после указанного момента.
+
+    Руками — то есть не приёмкой: приход от магазина считается отдельно и уже
+    попал в «приняли». Здесь остаётся ровно то, что довозили с доп. складов и
+    заводили через «Внести товар»."""
+    db = _db_or_none()
+    if db is None or not since: return {}
+    q = {"at": {"$gt": since}, "src": {"$ne": "intake"}}
+    if districts:
+        q["district"] = {"$in": list(districts)}
+    cur = db.qr_codes.aggregate([{"$match": q},
+                                 {"$group": {"_id": "$district", "n": {"$sum": 1}}}])
+    return {d["_id"]: int(d["n"] or 0) for d in await cur.to_list(length=50) if d["_id"]}
+
+
 async def qr_remove(code: str) -> bool:
     db = _db_or_none()
     if db is None: return False

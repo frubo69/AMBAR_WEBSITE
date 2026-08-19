@@ -382,6 +382,26 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    Период, поиск, дни, заказы. Ни одного экрана с лентой в полный рост: до
    позавчера должно быть два касания, а не три экрана листания. */
 .seg.hist-seg{grid-template-columns:repeat(3,1fr);margin-bottom:10px}
+/* Листалка дней. Стрелки по краям, дата посередине и она же кнопка «вернуться
+   к сегодня»: три элемента вместо строки периодов, и ни один не требует
+   вспоминать дату. */
+.hnav{display:flex;align-items:center;gap:6px;margin:0 0 14px;padding:4px;
+  border-radius:14px;background:var(--card2);border:1px solid var(--border3)}
+.hnav-b{width:40px;height:40px;flex-shrink:0;border-radius:11px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;color:var(--gold2);
+  background:none;border:none}
+.hnav-b:active{transform:scale(.9);background:var(--gold-soft)}
+.hnav-b[disabled]{opacity:.25;pointer-events:none}
+.hnav-d{flex:1;min-width:0;padding:6px 8px;border-radius:11px;cursor:pointer;
+  background:none;border:none;text-align:center;color:var(--text)}
+.hnav-d[disabled]{cursor:default}
+.hnav-t{display:block;font-size:15px;font-weight:700;line-height:1.15}
+.hnav-s{display:block;font-size:11px;color:var(--muted);margin-top:2px;
+  font-variant-numeric:tabular-nums}
+.hnav-home{flex-shrink:0;padding:9px 12px;border-radius:11px;cursor:pointer;
+  font-size:12px;font-weight:700;color:var(--gold2);background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.35)}
+.hnav-home:active{transform:scale(.95)}
 .hfind{display:flex;align-items:center;gap:9px;padding:0 12px;margin-bottom:14px;
   border-radius:13px;background:var(--bg3);border:1px solid var(--border2);color:var(--dim)}
 .hfind:focus-within{border-color:rgba(201,169,110,.45);color:var(--gold2)}
@@ -1171,13 +1191,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
      всегда одна и та же — цифры переехали в свои вкладки, потому что в шапке
      они меняли смысл при каждом переключении. -->
 <header class="hdr">
-  <div class="hdr-brand">
+  <!-- Тройное касание по названию открывает экстренный экран. Случайно так не
+       выходит, а нарочно получается не глядя: логотип всегда на одном месте,
+       в левом верхнем углу, и он один и тот же во всех наших приложениях. -->
+  <div class="hdr-brand" onclick="pncTap()">
     <div class="hdr-logo">AMBAR</div>
     <div class="hdr-sub">Водитель</div>
   </div>
-  <!-- Тройное касание по имени открывает экстренный экран. Случайно так не
-       выходит, а нарочно получается не глядя: имя всегда на одном месте. -->
-  <div class="hdr-me" onclick="pncTap()">
+  <div class="hdr-me">
     <div class="hdr-av" id="dAv">—</div>
     <div class="hdr-n" id="dName">Загрузка…</div>
   </div>
@@ -1199,7 +1220,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   <button class="tb" data-tab="supply" onclick="setTab('supply')">
     <span class="tb-ic"><svg viewBox="0 0 24 24"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4"/><path d="M12 11v10"/></svg>
       <span class="tb-badge" id="tbSup" style="display:none">0</span></span>
-    <span>Приём</span>
+    <span>Товар</span>
   </button>
   <button class="tb" data-tab="history" onclick="setTab('history')">
     <span class="tb-ic"><svg viewBox="0 0 24 24"><path d="M3 3v5h5"/><path d="M3.5 8a9 9 0 1 0 2.2-3.4L3 8"/><path d="M12 7v5l3 2"/></svg></span>
@@ -2547,8 +2568,15 @@ function ordOpen(oid){
 // добраться до позавчера, приходилось пролистать три экрана. Теперь три
 // уровня, и на каждом ровно столько, сколько нужно, чтобы выбрать следующий:
 // период → день → заказ.
-let HIST_DAYS = 30, HIST_DAY = '', HIST_ORD = '', HIST_Q = '';
-const HIST_RANGES = [[7, 'Неделя'], [30, 'Месяц'], [90, '3 месяца']];
+let HIST_DAYS = 30, HIST_ORD = '', HIST_Q = '';
+// История — это один день на экране, а не месяц списком.
+//
+// Водитель приходит сюда с вопросом «что было в тот день»: сколько сдал, куда
+// возил, сколько ехал. Месяц в виде списка свёрнутых дней отвечал на него в
+// два нажатия и требовал сначала вспомнить дату. Теперь день листается
+// стрелками, как в приложении владельца, и открывается тот, который нужен, —
+// сегодня, вчера, позавчера.
+let HIST_OFF = 0;                    // на сколько дней назад смотрим
 
 // Переключение периода меняет числа и список — но не экран. Раньше всё
 // содержимое подменялось словом «Загрузка…», и вместе с ним исчезал тот самый
@@ -2572,18 +2600,45 @@ async function loadHistory(){
   render();
 }
 
-function histRange(d){
-  if(HIST_DAYS === d || HIST_BUSY) return;
-  HIST_DAYS = d; HIST_DAY = ''; HIST_ORD = '';
+// Листаем по одному дню. Вперёд дальше сегодня некуда, назад — до края
+// загруженного окна, а край отодвигается сам: за девяносто дней истории
+// водитель не заглядывает, но упереться в стену на тридцатом дне обиднее,
+// чем подождать секунду.
+function histStep(d){
+  const next = HIST_OFF + d;
+  if(next < 0 || HIST_BUSY) return;
+  HIST_OFF = next; HIST_ORD = ''; HIST_Q = '';
   try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
-  loadHistory();
+  if(next >= HIST_DAYS - 1 && HIST_DAYS < 120){ HIST_DAYS = 120; loadHistory(); return; }
+  renderHistory();
 }
 
-function histPick(day){
-  HIST_DAY = HIST_DAY === day ? '' : day;
-  HIST_ORD = '';
+function histHome(){
+  if(!HIST_OFF) return;
+  HIST_OFF = 0; HIST_ORD = '';
+  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
   renderHistory();
-  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
+// Какой день сейчас на экране. Дату «сегодня» берём от сервера: до полудня
+// рабочие сутки и календарные не совпадают, и телефон съехал бы на день.
+function histIso(off){
+  const base = (HIST && HIST.today) || '';
+  const d = base ? new Date(base + 'T12:00:00Z') : new Date();
+  d.setUTCDate(d.getUTCDate() - (off || 0));
+  return d.toISOString().slice(0, 10);
+}
+
+// «Сегодня» и «Вчера» — слово главное, число под ним уточняет. Дальше слово не
+// нужно: «12.08» и «12 августа» — это одна дата дважды.
+function histLbl(off){
+  const iso = histIso(off);
+  const d = new Date(iso + 'T12:00:00Z');
+  const num = String(d.getUTCDate()).padStart(2, '0') + '.'
+            + String(d.getUTCMonth() + 1).padStart(2, '0');
+  if(off === 0) return {top: 'Сегодня', sub: num};
+  if(off === 1) return {top: 'Вчера', sub: num};
+  return {top: num, sub: d.toLocaleDateString('ru-RU', {weekday: 'short'})};
 }
 
 function histOrd(oid){
@@ -2613,8 +2668,13 @@ function histFound(){
 
 function renderHistory(){
   const box = document.getElementById('body');
-  const t = (HIST && HIST.totals) || {count: 0, aed: 0, cash: 0, online: 0,
-                                      avg_min: 0, worked: 0};
+  const iso = histIso(HIST_OFF);
+  const g = ((HIST && HIST.days) || []).find(x => x.day === iso) || null;
+  // Числа в шапке — про день на экране, а не про месяц: месяц не отвечает ни
+  // на один вопрос, с которым сюда приходят.
+  const t = g ? {count: g.count, aed: g.aed, cash: g.cash, online: g.online,
+                 avg_min: g.avg_min, worked: 1}
+              : {count: 0, aed: 0, cash: 0, online: 0, avg_min: 0, worked: 0};
   // Пока считается — вместо чисел плашки того же размера: строка не прыгает,
   // когда придёт ответ, и старые цифры не выдают себя за новые.
   const sk = (w, cls) => `<span class="sk ${cls || ''}" style="width:${w}"></span>`;
@@ -2640,9 +2700,16 @@ function renderHistory(){
       </div>` : ''}
     </div>
 
-    <div class="seg hist-seg">
-      ${HIST_RANGES.map(([d, l]) => `<button class="seg-b ${HIST_DAYS === d ? 'on' : ''}"
-        onclick="histRange(${d})">${l}</button>`).join('')}
+    <div class="hnav">
+      <button class="hnav-b" onclick="histStep(1)" aria-label="Предыдущий день">
+        ${svg('<path d="M15 5l-7 7 7 7"/>', 16)}</button>
+      <button class="hnav-d" onclick="histHome()" ${HIST_OFF ? '' : 'disabled'}>
+        <span class="hnav-t">${histLbl(HIST_OFF).top}</span>
+        <span class="hnav-s">${histLbl(HIST_OFF).sub}</span>
+      </button>
+      <button class="hnav-b" onclick="histStep(-1)" ${HIST_OFF ? '' : 'disabled'}
+        aria-label="Следующий день">${svg('<path d="M9 5l7 7-7 7"/>', 16)}</button>
+      ${HIST_OFF ? `<button class="hnav-home" onclick="histHome()">Сегодня</button>` : ''}
     </div>
 
     <div class="hfind">
@@ -2665,33 +2732,25 @@ function renderHistory(){
   }
 
   if(HIST_BUSY){
-    // Дни ещё едут — вместо них строки того же роста.
-    box.innerHTML = head + Array.from({length: 4}, () =>
+    // День ещё едет — вместо него строки того же роста.
+    box.innerHTML = head + Array.from({length: 3}, () =>
       '<div class="hday sk-row"></div>').join('');
     _histFocus();
     return;
   }
 
-  if(!(HIST.days || []).length){
-    box.innerHTML = head + blank(ICO.clock, 'За этот период пусто',
-      'Выберите другой период или загляните позже');
+  if(!g){
+    box.innerHTML = head + blank(ICO.clock,
+      HIST_OFF ? 'В этот день заказов не было' : 'Сегодня заказов ещё не было',
+      'Листайте стрелками — соседние дни рядом');
     _histFocus();
     return;
   }
 
-  box.innerHTML = head + HIST.days.map(g => {
-    const open = HIST_DAY === g.day;
-    return `<button class="hday${open ? ' on' : ''}" onclick="histPick('${g.day}')">
-        <span class="hday-b">
-          <span class="hday-d">${dayLbl(g.day)}</span>
-          <span class="hday-s">${g.count} ${plural(g.count,'заказ','заказа','заказов')}${
-            g.avg_min ? ` · ${g.avg_min} мин в среднем` : ''}</span>
-        </span>
-        <span class="hday-v">${fmt(g.aed)}<i>AED</i></span>
-        <span class="hday-go">${open ? '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>' : '<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>'}</span>
-      </button>
-      ${open ? `<div class="hday-list">${g.orders.map(o => histRow(o)).join('')}</div>` : ''}`;
-  }).join('');
+  box.innerHTML = head
+    + `<div class="sect"><span class="sect-t">Что возили</span>
+         <span class="sect-v">${g.count}</span></div>`
+    + (g.orders || []).map(o => histRow(o)).join('');
   _histFocus();
 }
 
@@ -3791,7 +3850,7 @@ function renderSupply(){
   body.innerHTML = h + woFoot();
 }
 
-// Списание живёт на «Приёме» и внизу: бутылка бьётся не по расписанию, и
+// Списание живёт на «Товаре» и внизу: бутылка бьётся не по расписанию, и
 // кнопка нужна всегда, но искать её первой не должен никто.
 function woFoot(){
   const log = WO_LOG.map(w => `<div class="wo-done">

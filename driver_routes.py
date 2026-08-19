@@ -684,6 +684,9 @@ async def handle_history(request):
     return web.json_response({
         "days": days_list,
         "range": days,
+        # Сегодняшние рабочие сутки — от сервера: до полудня телефон и сервер
+        # считают «сегодня» разными днями, и листалка съезжала бы на день.
+        "today": today,
         "totals": {
             "count": len(mine),
             "aed": sum(int(o.get("total", 0) or 0) for o in mine),

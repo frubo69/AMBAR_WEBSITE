@@ -612,6 +612,31 @@ a.oc-row:active{background:var(--card2)}
   background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .sh-go.ghost{background:var(--card2);color:var(--sub);border:1px solid var(--border2)}
 .sh-go:disabled{opacity:.5;pointer-events:none}
+.sh-go.wide{width:100%;margin-top:12px;padding:13px}
+
+/* Неоткрытая смена. Строка разворачивается в столбец: пока день не начат,
+   единственный вопрос — кто сегодня вышел, и он занимает всё место. */
+.sh-r.sh-open{display:block;border-color:rgba(243,180,74,.35);
+  background:linear-gradient(160deg,rgba(243,180,74,.07),transparent 60%),var(--card)}
+.sh-hd{display:flex;align-items:center;gap:12px}
+.sh-open .sh-s{color:var(--warn)}
+.sh-crew{margin-top:12px;display:flex;flex-direction:column;gap:7px}
+.sh-drv{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:var(--r2);
+  background:var(--bg3);border:1px solid var(--border2)}
+.sh-drv-n{flex:1;min-width:0;font-size:13.5px;font-weight:600;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.sh-drv-b{display:flex;gap:6px;flex-shrink:0}
+/* Две кнопки, а не галочка: «не отмечен» и «не работает» — разные вещи, и
+   различать их должно нажатие, а не его отсутствие. */
+.sh-ch{padding:8px 12px;border-radius:10px;font-family:inherit;font-size:12px;
+  font-weight:700;cursor:pointer;color:var(--sub);background:var(--card2);
+  border:1px solid var(--border2);white-space:nowrap}
+.sh-ch:active{transform:scale(.95)}
+.sh-ch.on{color:#3ddc84;background:rgba(61,220,132,.12);border-color:rgba(61,220,132,.4)}
+.sh-ch.off{color:var(--sub);background:var(--bg2);border-color:var(--border)}
+.sh-none{margin-top:10px;font-size:12px;color:var(--muted)}
+.pill.hot{border-color:rgba(243,180,74,.5);background:rgba(243,180,74,.1);
+  color:var(--warn)}
 
 .sbtn.gold{background:linear-gradient(135deg,#E8C98A,#C9A96E);color:#1a1408;border:none}
 .sbtn.red{background:linear-gradient(135deg,#E86A6A,#C94E4E);color:#fff;border:none}
@@ -1102,9 +1127,10 @@ a.oc-row:active{background:var(--card2)}
 
 <div class="ov" id="shiftOv">
   <div class="sheet">
-    <div class="t">Конец смены</div>
-    <div class="s">Закрывается по району. После этого продажи дня считаются
-      окончательными — по ним программа соберёт заявку в магазин.</div>
+    <div class="t">Смена</div>
+    <div class="s">Открывается и закрывается по району. Пока смена не открыта,
+      заказы обрабатывать нельзя — смотреть можно всё. После закрытия продажи
+      дня считаются окончательными, и по ним программа соберёт заявку.</div>
     <div id="shiftList"><div class="acc-sub">Загрузка…</div></div>
     <!-- «Готово», а не «Закрыть»: рядом три кнопки «Закрыть смену», и четвёртая
          с тем же словом означала бы совсем другое. -->
@@ -1406,6 +1432,9 @@ async function boot(){
     setInterval(()=>{ if(!document.hidden && !$('supOv').classList.contains('show')) loadSup(); }, 25000);
     setInterval(()=>{ if(!document.hidden && !$('fdOv').classList.contains('show')) loadFeed(); }, 15000);
     if(!curOp) showOv('opOv');
+    // Смена — первое, что оператор делает за день, и последнее, о чём он сам
+    // вспомнит. Проверяем молча; открываем экран, только если открывать нечем.
+    shiftCheck();
   }catch(e){
     const denied = e.status===401 || e.status===403;
     $('gateMsg').innerHTML = denied
@@ -1814,7 +1843,7 @@ async function doCreate(){
     }
   }catch(e){
     const err=(e.payload&&e.payload.error)||('код '+(e.status||'сеть'));
-    toast('Ошибка: '+err,'err');
+    if(!shiftBlocked(e)) toast('Ошибка: '+err,'err');
   }
   btn.disabled=false; renderTicket();
 }
@@ -2261,7 +2290,7 @@ async function custVerify(oid, cid){
     await opApi.opFetch(`/api/operator/customer/${cid}/act`,{method:'POST',body:{act:'verify'}});
     toast('Клиент верифицирован'); haptic('medium');
     await loadQueue(); openOrder(oid);
-  }catch(e){ toast('Не получилось','err'); }
+  }catch(e){ if(!shiftBlocked(e)) toast('Не получилось','err'); }
 }
 function custDecVerify(oid, cid){
   askText('Не верифицировать', 'Заказ и другие его неотвеченные заказы будут отклонены', '',
@@ -2270,7 +2299,7 @@ function custDecVerify(oid, cid){
         await opApi.opFetch(`/api/operator/customer/${cid}/act`,
           {method:'POST',body:{act:'decline_verify',reason:r}});
         hideOv('ordOv'); toast('Верификация отклонена'); haptic('medium');
-      }catch(e){ toast('Не получилось','err'); }
+      }catch(e){ if(!shiftBlocked(e)) toast('Не получилось','err'); }
       await loadQueue();
     });
 }
@@ -2372,7 +2401,7 @@ async function custAct(act, extra){
     curCust = await opApi.opFetch(`/api/operator/customer/${curCust.customer_id}/act`,
       {method:'POST', body:Object.assign({act}, extra||{})});
     renderCust(); toast('Готово'); haptic('medium');
-  }catch(e){ toast('Не получилось','err'); }
+  }catch(e){ if(!shiftBlocked(e)) toast('Не получилось','err'); }
 }
 function custNote(){
   askText('Заметка к клиенту', 'Пустая строка уберёт заметку', curCust.note||'',
@@ -2394,9 +2423,10 @@ function _decline(oid, r){
         {method:'POST', body:{as:curOp, reason:r}});
       hideOv('ordOv'); toast('Заказ отклонён'); haptic('medium');
     }catch(e){
-      const d=(e&&e.data)||{};
+      const d=(e && e.payload) || {};
       hideOv('ordOv');
-      toast(d.error==='already_taken'?`Заказ уже взял ${d.by||'кто-то'}`:'Не получилось','err');
+      if(!shiftBlocked(e))
+        toast(d.error==='already_taken'?`Заказ уже взял ${d.by||'кто-то'}`:'Не получилось','err');
     }
     await loadQueue();
   })();
@@ -2448,8 +2478,9 @@ async function doAccept(){
     hideOv('accOv'); qLane='work'; toast('Заказ принят · '+acceptDrv); haptic('medium');
   }catch(e){
     // Не ошибка, а нормальный ответ: заказ висит у всех, и тянутся к нему двое.
-    const d=(e && e.data) || {};
+    const d=(e && e.payload) || {};
     hideOv('accOv');
+    if(shiftBlocked(e)){ b.disabled=false; b.textContent='Принять'; return; }
     toast(d.error==='already_taken'
       ? `Заказ уже принял ${d.by||'кто-то'}${d.driver?' · везёт '+d.driver:''}`
       : 'Не удалось принять — попробуйте ещё раз', 'err');
@@ -2977,17 +3008,38 @@ function whPick(name){
 let SHIFT = null, SHIFT_BUSY = false;
 const _num = n => Number(n || 0).toLocaleString('ru-RU').replace(/,/g, ' ');
 
+// Тихая проверка на старте: состояние смены нужно и пилюле в шапке, и
+// решению, показывать ли экран сразу.
+async function shiftCheck(){
+  if(!curOp) return;
+  try{ SHIFT = await opApi.opFetch('/api/operator/shift', {params:{as:curOp}}); }
+  catch(e){ return; }
+  shiftPill();
+  if((SHIFT.districts || []).some(x => !x.opened)){
+    shiftPaint();
+    showOv('shiftOv');
+  }
+}
+
 async function shiftOpen(){
   showOv('shiftOv'); haptic('light');
   $('shiftList').innerHTML = '<div class="acc-sub">Загрузка…</div>';
   try{ SHIFT = await opApi.opFetch('/api/operator/shift', {params:{as:curOp}}); }
   catch(e){ $('shiftList').innerHTML = '<div class="acc-sub">Не удалось загрузить</div>'; return; }
   shiftPaint();
+  shiftPill();
 }
+
+// Кого отметили перед открытием: {район: {водитель: вышел}}. Живёт до
+// открытия — дальше правда на сервере.
+let SH_CREW = {};
 
 function shiftPaint(){
   const d = SHIFT; if(!d) return;
   $('shiftList').innerHTML = (d.districts || []).map(x => {
+    // Смена ещё не открыта: вместо итогов — бригада. Это первое, что оператор
+    // делает за день, и единственное, что от него сейчас нужно.
+    if(!x.opened) return shiftOpenRow(x);
     // Незакрытые заказы не запрещают закрыть смену — так бывает, что заказ
     // висит с вечера и уже никуда не поедет. Но они на виду и уезжают
     // старшему вместе с итогом: молча потерянный заказ хуже некрасивой цифры.
@@ -3008,6 +3060,85 @@ function shiftPaint(){
         ${x.closed ? 'Открыть' : 'Закрыть'}</button>
     </div>`;
   }).join('');
+}
+
+// Строка неоткрытого района: кто сегодня работает. Двумя кнопками, а не
+// галочкой: «не отмечен» и «не работает» — разные вещи, и различать их должен
+// не пропуск, а нажатие.
+function shiftOpenRow(x){
+  const names = x.drivers || [];
+  const mark = SH_CREW[x.district] || (SH_CREW[x.district] = {});
+  const left = names.filter(n => typeof mark[n] !== 'boolean').length;
+  return `<div class="sh-r sh-open">
+    <div class="sh-hd">
+      <span class="sh-code">${_esc(x.code)}</span>
+      <span class="sh-b"><span class="sh-n">${_esc(x.name)}</span>
+        <span class="sh-s">смена не открыта · отметьте бригаду</span></span>
+    </div>
+    ${names.length ? `<div class="sh-crew">${names.map(n => `
+      <div class="sh-drv">
+        <span class="sh-drv-n">${_esc(n)}</span>
+        <span class="sh-drv-b">
+          <button class="sh-ch ${mark[n] === true ? 'on' : ''}"
+            onclick="shCrew('${x.district}','${_esc(n)}',true)">На смене</button>
+          <button class="sh-ch ${mark[n] === false ? 'off' : ''}"
+            onclick="shCrew('${x.district}','${_esc(n)}',false)">Дома</button>
+        </span>
+      </div>`).join('')}</div>`
+      : '<div class="sh-none">В районе не назначено ни одного водителя</div>'}
+    <button class="sh-go wide" ${left ? 'disabled' : ''}
+      onclick="shiftDoOpen('${x.district}')">
+      ${left ? `Отметьте ещё ${left}` : 'Открыть смену'}</button>
+  </div>`;
+}
+
+function shCrew(oid, name, val){
+  const m = SH_CREW[oid] || (SH_CREW[oid] = {});
+  m[name] = m[name] === val ? undefined : val;
+  if(m[name] === undefined) delete m[name];
+  haptic('sel');
+  shiftPaint();
+}
+
+async function shiftDoOpen(oid){
+  if(SHIFT_BUSY) return;
+  SHIFT_BUSY = true;
+  try{
+    const r = await opApi.opFetch('/api/operator/shift/open',
+      {method:'POST', body:{district: oid, as: curOp, drivers: SH_CREW[oid] || {}}});
+    haptic('ok');
+    const n = Object.values(r.drivers || {}).filter(Boolean).length;
+    toast(`Смена открыта · на смене ${n} ${plural(n,'водитель','водителя','водителей')}`, 'ok');
+    delete SH_CREW[oid];
+    await shiftOpen();
+    shiftPill();
+  }catch(e){
+    toast((e.payload || {}).error === 'crew_incomplete' ? 'Отметьте всех водителей'
+          : (e.payload || {}).error === 'already_open' ? 'Смена уже открыта'
+          : 'Не удалось открыть', 'err');
+  }
+  finally{ SHIFT_BUSY = false; }
+}
+
+// Пилюля в шапке говорит состояние смены до того, как оператор нажмёт хоть
+// что-нибудь: узнавать о закрытой смене из отказа в действии — плохой способ.
+function shiftPill(){
+  const lbl = $('shiftLbl'), btn = $('shiftBtn'); if(!lbl || !btn) return;
+  const ds = (SHIFT && SHIFT.districts) || [];
+  const shut = ds.filter(x => !x.opened);
+  btn.classList.toggle('hot', !!shut.length);
+  lbl.textContent = !ds.length ? 'Смена'
+    : shut.length ? (ds.length === 1 ? 'Смена не открыта' : `Не открыто: ${shut.length}`)
+    : (ds.every(x => x.closed) ? 'Смена закрыта' : 'Смена');
+}
+
+// Смена не открыта — действие не проходит, и это надо не проглотить, а
+// показать вместе с тем экраном, где это чинится.
+function shiftBlocked(e){
+  if((e && e.payload || {}).error !== 'shift_not_open') return false;
+  toast('Сначала откройте смену', 'err');
+  shiftOpen();
+  return true;
 }
 
 async function shiftClose(oid){

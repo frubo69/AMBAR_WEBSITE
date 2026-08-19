@@ -2380,6 +2380,74 @@ async def shift_close(day: str, district: str, doc: dict) -> bool:
         return False
 
 
+async def shift_open(day: str, district: str, doc: dict) -> bool:
+    """Открыть смену района. False — её уже открывали сегодня.
+
+    Отдельным документом, а не флагом в закрытии: открытие и закрытие — два
+    разных события с разным временем и разными людьми, и в истории они должны
+    стоять порознь."""
+    db = _db_or_none()
+    if db is None: return False
+    from pymongo.errors import DuplicateKeyError
+    try:
+        await db.shift_opens.insert_one({"_id": f"{day}:{district}", "day": day,
+                                         "district": district, **doc})
+        return True
+    except DuplicateKeyError:
+        return False
+
+
+async def shift_gate_since(day: str) -> str:
+    """С каких суток запрет «работать только после открытия смены» действует.
+
+    Записывается один раз — в первый же проход после появления запрета. День
+    выката не считается: люди уже работают, и запирать их посреди смены за то,
+    что утром такой кнопки не существовало, нельзя."""
+    db = _db_or_none()
+    if db is None: return ""
+    doc = await db.shift_opens.find_one({"_id": "*:gate"})
+    if doc:
+        return doc.get("since") or ""
+    await db.shift_opens.update_one(
+        {"_id": "*:gate"}, {"$setOnInsert": {"since": day, "day": day, "district": "*"}},
+        upsert=True)
+    return day
+
+
+async def shift_opens_for_day(day: str) -> dict:
+    db = _db_or_none()
+    if db is None: return {}
+    cur = db.shift_opens.find({"day": day, "district": {"$ne": "*"}})
+    return {d["district"]: d async for d in cur}
+
+
+async def shift_open_drop(day: str, district: str) -> bool:
+    """Убрать отметку об открытии — на случай ошибки старшего."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.shift_opens.delete_one({"_id": f"{day}:{district}"})
+    return r.deleted_count > 0
+
+
+async def shift_journal(day_from: str, day_to: str) -> list:
+    """История открытий и закрытий за период, одним списком.
+
+    Открытие и закрытие лежат в разных коллекциях, потому что это разные
+    события, но читают их вместе: вопрос всегда один — что было со сменой."""
+    db = _db_or_none()
+    if db is None: return []
+    # Служебные пометки («с какого дня напоминаем», «с какого дня запрет»)
+    # лежат в тех же коллекциях под районом «*». Это не события смены.
+    q = {"day": {"$gte": day_from, "$lte": day_to}, "district": {"$ne": "*"}}
+    out = []
+    for d in await db.shift_opens.find(q).to_list(length=1000):
+        out.append({**d, "kind": "open", "at": d.get("opened_at")})
+    for d in await db.shift_days.find(q).to_list(length=1000):
+        out.append({**d, "kind": "close", "at": d.get("closed_at")})
+    out.sort(key=lambda x: str(x.get("at") or ""), reverse=True)
+    return out
+
+
 async def shift_reopen(day: str, district: str) -> bool:
     db = _db_or_none()
     if db is None: return False

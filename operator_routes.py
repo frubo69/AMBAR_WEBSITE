@@ -116,6 +116,67 @@ DUBAI_TZ = timezone(timedelta(hours=4))
 SHIFT_START_HOUR = int(os.getenv("AMBAR_SHIFT_START_HOUR", "12"))
 
 
+# Пока смена не открыта, заказы не обрабатываются. Смотреть можно всё: запрет
+# на чтение никого не дисциплинирует, а мешает всем.
+_OPENS = {"day": "", "at": 0.0, "set": set()}
+
+
+def _opens_drop():
+    _OPENS["at"] = 0.0
+
+
+async def _is_open(district: str) -> bool:
+    import time as _t
+    day = _biz_date(datetime.now(DUBAI_TZ)).isoformat()
+    # День, в который запрет появился, не считается: люди уже работают, и
+    # запирать их посреди смены за то, что утром такой кнопки не было, нельзя.
+    try:
+        if day <= await db.shift_gate_since(day):
+            return True
+    except Exception as e:
+        log.warning(f"[pos] начало запрета не прочитано: {e}")
+    if _OPENS["day"] != day or _t.monotonic() - _OPENS["at"] > 20:
+        _OPENS.update(day=day, at=_t.monotonic(),
+                      set=set((await db.shift_opens_for_day(day)).keys()))
+    return district in _OPENS["set"]
+
+
+def needs_open(handler):
+    """Не пускать к действию, пока смена района не открыта."""
+    @wraps(handler)
+    async def wrapped(request):
+        try:
+            district = await _district_of(request)
+        except Exception as e:
+            log.warning(f"[pos] район для проверки смены не определён: {e}")
+            district = ""
+        if district and not await _is_open(district):
+            return web.json_response({"error": "shift_not_open", "district": district},
+                                     status=409, headers=CORS_HEADERS)
+        return await handler(request)
+    return wrapped
+
+
+async def _district_of(request) -> str:
+    """Район действия: у заказа — свой, у создания — из тела, иначе по человеку."""
+    oid = (request.match_info.get("oid") or "").strip()
+    if oid:
+        o = await db.get_order(oid)
+        return (o or {}).get("office_id") or ""
+    body = {}
+    try:
+        body = await request.json()
+    except Exception:
+        pass
+    d = str(body.get("district") or body.get("district_id")
+            or body.get("office_id") or "").strip()
+    if d:
+        return d
+    districts = await _fresh_districts()
+    scope = _scope(_people(districts), str(body.get("as") or "").strip(), districts)
+    return next(iter(scope)) if len(scope) == 1 else ""
+
+
 _RU_MONTHS = ("января", "февраля", "марта", "апреля", "мая", "июня",
               "июля", "августа", "сентября", "октября", "ноября", "декабря")
 
@@ -587,6 +648,7 @@ async def handle_catalog(request):
 
 
 @require_operator
+@needs_open
 async def handle_create(request):
     try:
         body = await request.json()
@@ -902,6 +964,7 @@ async def handle_queue(request):
 
 
 @require_operator
+@needs_open
 async def handle_accept(request):
     """Принять онлайн-заказ: водитель и время одним действием.
 
@@ -1065,6 +1128,7 @@ async def handle_customer_act(request):
 
 
 @require_operator
+@needs_open
 async def handle_decline(request):
     """Отклонить новый заказ — то же, что «Отклонить» в боте."""
     oid = request.match_info["oid"]
@@ -1287,6 +1351,7 @@ async def handle_patch(request):
 
 
 @require_operator
+@needs_open
 async def handle_cancel(request):
     oid = request.match_info["oid"]
     order = await _get_pos_order(oid)
@@ -1384,6 +1449,7 @@ async def _do_cancel(oid: str, order: dict, who: str, reason: str = ""):
 
 
 @require_operator
+@needs_open
 async def handle_delivered(request):
     oid = request.match_info["oid"]
     order = await _get_pos_order(oid)
@@ -1409,6 +1475,7 @@ async def handle_delivered(request):
 
 
 @require_operator
+@needs_open
 async def handle_undeliver(request):
     """Вернуть закрытый заказ обратно в доставку — то же, что кнопка
     «🔄 Вернуть в доставку» в боте оператора (operator_bot: undone_*).
@@ -1661,6 +1728,7 @@ def _req_of(order: dict) -> dict:
 
 
 @require_operator
+@needs_open
 async def handle_driver_req(request):
     oid = request.match_info["oid"]
     order = await db.get_order(oid)
@@ -1996,6 +2064,7 @@ def _opt(request):
 # оператор не может отвечать за чужую точку.
 async def _shift_state(day, districts: list, scope: set) -> dict:
     closed = await db.shifts_for_day(day.isoformat())
+    opens = await db.shift_opens_for_day(day.isoformat())
     # Читаем окно смены, а не всю историю. Полный список — это мегабайт, и на
     # нашем тарифе Atlas он идёт восемь секунд: скорость там режется по объёму.
     # Именно из-за него окно закрытия смены висело — и на открытии, и на каждом
@@ -2032,9 +2101,14 @@ async def _shift_state(day, districts: list, scope: set) -> dict:
         done = [o for o in mine if o.get("status") == "delivered"
                 and _biz_date_of(o) == day]
         c = closed.get(d["id"])
+        op = opens.get(d["id"])
         out.append({
             "district": d["id"], "code": d.get("code", ""), "name": d.get("name", ""),
             "operator": d.get("operator", ""),
+            "opened": bool(op), "opened_at": str((op or {}).get("opened_at") or ""),
+            "opened_by": (op or {}).get("by_name") or "",
+            "crew": (op or {}).get("drivers") or {},
+            "drivers": list(_staff_mod.DISTRICT_DRIVERS.get(d["id"], [])),
             "closed": bool(c), "closed_at": str((c or {}).get("closed_at") or ""),
             "closed_by": (c or {}).get("by_name") or "",
             "open": len(open_now),
@@ -2045,7 +2119,8 @@ async def _shift_state(day, districts: list, scope: set) -> dict:
                        if silent.get(n)],
         })
     return {"day": day.isoformat(), "districts": out,
-            "all_closed": bool(out) and all(x["closed"] for x in out)}
+            "all_closed": bool(out) and all(x["closed"] for x in out),
+            "all_open": bool(out) and all(x["opened"] for x in out)}
 
 
 def _biz_date_of(o: dict):
@@ -2190,6 +2265,92 @@ async def handle_shift(request):
         headers=CORS_HEADERS)
 
 
+# Смена открывается явно, и это не формальность.
+#
+# До сих пор рабочий день начинался сам собой: заказ приходил — оператор его
+# брал. Из-за этого никто не знал двух вещей, которые нужны каждый день: кто
+# сегодня за пультом и кто из водителей вышел. Второе стоит денег буквально —
+# питание платят по факту выхода, и отмечал его старший, глядя в потолок.
+#
+# Теперь день начинается с одного экрана: оператор отмечает свою бригаду и
+# открывает смену. Пока она не открыта, заказы обрабатывать нельзя — смотреть
+# можно всё.
+@require_operator
+async def handle_shift_open(request):
+    """Открыть смену района и отметить, кто из водителей сегодня работает."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    districts = await _fresh_districts()
+    who = str(body.get("as") or "").strip()
+    scope = _scope(_people(districts), who, districts)
+    oid = str(body.get("district") or "").strip()
+    if oid not in scope:
+        return web.json_response({"error": "not_yours"}, status=403, headers=CORS_HEADERS)
+
+    crew = body.get("drivers") or {}
+    names = list(_staff_mod.DISTRICT_DRIVERS.get(oid) or [])
+    # Отмечены должны быть все: пропущенный водитель — это не «неизвестно», а
+    # человек без питания, который об этом узнает в конце месяца.
+    missing = [n for n in names if not isinstance(crew.get(n), bool)]
+    if missing:
+        return web.json_response({"error": "crew_incomplete", "missing": missing},
+                                 status=400, headers=CORS_HEADERS)
+
+    day = _biz_date(datetime.now(DUBAI_TZ)).isoformat()
+    ok = await db.shift_open(day, oid, {
+        "opened_at": datetime.now(timezone.utc), "by": request.get("op_id") or 0,
+        "by_name": who, "operator": next((d.get("operator", "") for d in districts
+                                          if d["id"] == oid), ""),
+        "drivers": {n: bool(crew.get(n)) for n in names}})
+    if not ok:
+        return web.json_response({"error": "already_open"}, status=409, headers=CORS_HEADERS)
+    _opens_drop()
+
+    # Питание считается по этой отметке — она же и есть факт выхода.
+    for n in names:
+        try:
+            await db.save_driver_day(day, n, {"working": bool(crew.get(n))})
+        except Exception as e:
+            log.warning(f"[pos] выход {n} не сохранён: {e}")
+    log.info(f"[pos] смена открыта: {oid} · {who} · "
+             f"вышли {sum(1 for n in names if crew.get(n))} из {len(names)}")
+    await _tell_crew(oid, names, crew, who)
+    return web.json_response({"ok": True, "day": day, "district": oid,
+                              "drivers": {n: bool(crew.get(n)) for n in names}},
+                             headers=CORS_HEADERS)
+
+
+async def _tell_crew(district: str, names: list, crew: dict, who: str):
+    """Сказать водителям, что их отметили.
+
+    Питание считается по этой отметке, а узнавать о своих деньгах из чужого
+    отчёта человек не должен. Заодно это проверка оператора: отметил не того —
+    тот сразу напишет."""
+    import os as _os
+    token = _os.getenv("DRIVER_BOT_TOKEN", "")
+    if not token:
+        return
+    try:
+        from api_server import tg_send
+        import config_staff as st
+        for n in names:
+            cid = st.DRIVER_IDS.get(n)
+            if not cid:
+                continue
+            work = bool(crew.get(n))
+            txt = (f"🚗 Смена открыта. {who} отметил, что вы сегодня работаете.\n"
+                   f"Питание за сегодня — {st.MEAL_WORKING} AED."
+                   if work else
+                   f"🏠 Смена открыта. {who} отметил, что сегодня вы не работаете.\n"
+                   f"Питание за сегодня — {st.MEAL_OFF} AED.\n\n"
+                   f"Если это ошибка — напишите оператору.")
+            await tg_send(token, cid, txt)
+    except Exception as e:
+        log.warning(f"[pos] бригаде не сообщили ({district}): {e}")
+
+
 @require_operator
 async def handle_shift_close(request):
     """Закрыть смену района.
@@ -2282,6 +2443,8 @@ def setup(app):
     r.add_get("/api/operator/where", handle_where)
     r.add_route("OPTIONS", "/api/operator/shift", _opt)
     r.add_get("/api/operator/shift", handle_shift)
+    r.add_route("OPTIONS", "/api/operator/shift/open", _opt)
+    r.add_post("/api/operator/shift/open", handle_shift_open)
     r.add_route("OPTIONS", "/api/operator/shift/close", _opt)
     r.add_post("/api/operator/shift/close", handle_shift_close)
     r.add_route("OPTIONS", "/api/operator/shift/reopen", _opt)

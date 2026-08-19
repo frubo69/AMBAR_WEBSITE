@@ -2873,13 +2873,13 @@ function infoOpen(){
     row(ICO.clock, 'pending',  'Ждёт',     'отправлено на согласование') +
     row(ICO.ok,    'approved', 'Принят',   'старший согласовал, сумма идёт в итог') +
     row(ICO.ban,   'rejected', 'Отклонён', 'не приняли, в итог не идёт') +
-    row(ICO.meal,  'meal',     'Питание',  `${r.working} на смене, ${r.off} в выходной — ставит старший`);
+    row(ICO.meal,  'meal',     'Питание',  `${r.working} на смене, ${r.off} в выходной — ставит оператор`);
   document.getElementById('infoSheet').classList.add('show');
   try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
 }
 function infoClose(){ document.getElementById('infoSheet').classList.remove('show'); }
 
-// Питание водитель не заводит и не выбирает: сколько — решает старший, отмечая
+// Питание водитель не заводит и не выбирает: сколько — решает оператор, отмечая
 // смену или выходной. Окно нужно, чтобы человек видел сумму и само правило, а
 // не спрашивал каждый день, почему сегодня столько.
 function mealBox(){
@@ -2892,8 +2892,8 @@ function mealBox(){
         <b class="${on === 'w' ? 'on' : ''}">${r.working}</b>/<b class="${on === 'o' ? 'on' : ''}">${r.off}</b>
         <i>AED</i>
       </div>
-      <div class="exp-fix-n">${on ? (on === 'w' ? 'смену отметил старший' : 'выходной — отметил старший')
-                                  : 'отмечает старший'}</div>
+      <div class="exp-fix-n">${on ? (on === 'w' ? 'смену отметил оператор' : 'выходной — отметил оператор')
+                                  : 'отметит оператор, когда откроет смену'}</div>
     </div>
   </div>`;
 }

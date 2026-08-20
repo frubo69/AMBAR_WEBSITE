@@ -2218,11 +2218,15 @@ async def handle_catalog_list(request):
     week   = await _aggregate_sales("week")
     month  = await _aggregate_sales("month")
 
+    # Номер строки рабочей таблицы. Каталог сам по себе сортируется иначе, но
+    # экраны склада должны говорить с человеком номерами с листа.
+    from config_stock_order import order_key
     items = []
     for p in catalog:
         pid = p.get("id")
         s = sales.get(pid, {"sold": 0, "rev": 0})
         items.append({
+            "no":     order_key(pid) + 1,
             "id":     pid,
             "cat":    p.get("cat") or "—",
             "name":   p.get("name") or "",

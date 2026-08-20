@@ -140,6 +140,14 @@ async def handle_stats(request):
     """Сводка реестра: сколько бутылок записано и по каким позициям."""
     st = await db.qr_stats()
     by_product = await db.qr_by_product()
+    # Позиции — в порядке рабочей таблицы, тем же номером от 1 до 123, что на
+    # бумажном листе и в отчётах. Реестр заполняют, стоя у полки, и «по убыванию
+    # количества» здесь означает прыгать по залу: ряд идёт как идёт, а глазами
+    # человек сверяется со строкой листа.
+    from config_stock_order import order_key
+    for r in by_product:
+        r["no"] = order_key(r.get("product_id") or "") + 1
+    by_product.sort(key=lambda r: r["no"])
     last = await db.qr_last(limit=20)
     locks = await db.qr_locks(datetime.now(timezone.utc))
     by_district = await db.qr_by_district()

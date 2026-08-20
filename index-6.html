@@ -401,8 +401,8 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
   background:rgba(224,85,85,.09);border:1px solid rgba(224,85,85,.32)}
 .smoke-bar svg{flex-shrink:0;margin-top:1px;stroke:#e07b55}
 .smoke-b{flex:1;min-width:0}
-.smoke-t{font-size:12.5px;font-weight:700;color:#e07b55;line-height:1.3}
-.smoke-s{font-size:11.5px;color:var(--muted);line-height:1.4;margin-top:3px}
+.smoke-t{display:block;font-size:12.5px;font-weight:700;color:#e07b55;line-height:1.3}
+.smoke-s{display:block;font-size:11.5px;color:var(--muted);line-height:1.4;margin-top:4px}
 .smoke-go{margin-top:9px;padding:7px 12px;border-radius:9px;font-family:inherit;
   font-size:11.5px;font-weight:700;cursor:pointer;color:var(--gold2);
   background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.35)}
@@ -6497,7 +6497,7 @@ function renderCart(){
     const pcs=isBeerItem?(beerPcs[id]||''):null;
     const displayPrice=(isBeerItem?beerPrice(p,pcs):p.price)*qty;
     const nameLabel=isBeerItem?`${p.name} <span style="color:var(--gold);font-size:12px">${pcs} ${lang==='ru'?'шт':'pcs'}</span>`:p.name;
-    return`<div class="ci-swipe-wrap" data-cid="${id}"><div class="ci-del-bg" onclick="confirmSwipeDel('${id}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></div><div class="ci-swipe-inner"><div class="ci"><img class="ci-img" src="${p.img}" alt="${p.name}" onerror="this.classList.add('noimg');this.removeAttribute('src')">
+    return`<div class="ci-swipe-wrap" data-cid="${id}"><div class="ci-del-bg" onclick="confirmSwipeDel('${id}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></div><div class="ci-swipe-inner"><div class="ci"><img class="ci-img" src="${p.img}" alt="${p.name}" onerror="this.classList.add('noimg');this.src='data:image/gif;base64,R0lGODlhAQABAAAAACH5BAEKAAEALAAAAAABAAEAAAICTAEAOw=='">
       <div class="ci-info"><div class="ci-name">${nameLabel}</div><div class="ci-price">${displayPrice} AED</div></div>
       <div class="qctrl"><button class="qb" onclick="chgQty('${id}',-1)">−</button><span class="qn">${qty}</span><button class="qb" onclick="chgQty('${id}',1)">+</button></div>
     </div></div></div>`;

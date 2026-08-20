@@ -7327,7 +7327,7 @@ function stkActs(){
   const sh = STK.sheet || {};
   const coded = (sh.rows || []).filter(r => r.coded > 0).length;
   const sc = sh.scan || {};
-  const scan = `
+  const scan = !STK.audit ? '' : `
     <button class="stk-act scan ${coded ? '' : 'off'}" onclick="stkScanTap()">
       <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -7420,10 +7420,7 @@ function stkRenderList(){
         это отправная точка. Со следующей смены числа будут подставляться сами, и
         проверять придётся только то, что продавалось.
         ${coded ? `<br><br><b>${coded} ${pluralize(coded,'позиция заведена','позиции заведены','позиций заведены')} кодами</b>
-        — их не надо вбивать руками: нажмите «Сканировать» и пройдите полку камерой.`
-        : `<br><br>Считать камерой здесь пока нельзя: на точке нет кодов. Бутылки
-        заводят в реестр разово через «Внести товар» — после этого ревизия идёт
-        сканированием, а не руками.`}
+        — их можно не вбивать руками: включите «Ревизию» и пройдите полку камерой.` : ''}
       </div>` + rows.map(r => stkItem(r)).join('');
     return;
   }

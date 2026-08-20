@@ -398,10 +398,16 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .stk-mid{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:10px 14px calc(24px + var(--safe-bottom))}
 /* Подвал раздела: не участвует в прокрутке, поэтому кнопка в нём всегда внизу
    экрана. Пустой — не занимает ничего. */
-.stk-foot{flex-shrink:0}
+/* Подвал — одна полоса на весь подвал, а не по одной на каждую кнопку. Когда
+   фон и черта висели на самих кнопках, два ряда давали две полосы, двойные
+   отступы и треть экрана под ними. */
+.stk-foot{flex-shrink:0;background:var(--bg);border-top:1px solid var(--border2)}
 .stk-foot:empty{display:none}
-.stk-foot .qb-wrap{position:static;padding:12px 14px calc(12px + var(--safe-bottom));
-  background:var(--bg);border-top:1px solid var(--border2)}
+.stk-foot .qb-wrap{position:static;background:none;border:none;
+  padding:12px 14px calc(12px + var(--safe-bottom))}
+.stk-foot .qb-wrap + .qb-wrap{padding-top:0}
+/* Второй ряд — следующий шаг, а не второе главное действие: он тише и ниже. */
+.stk-foot .qb-wide{padding:14px;font-size:14px;border-radius:14px}
 
 /* дата прямо на карточке: свайпом листают именно её, и подпись должна быть
    там же, где палец, а не в шапке страницы */
@@ -1028,6 +1034,12 @@ button.path:active{transform:scale(.995)}
 .path-s u{text-decoration:none;font-family:'Space Grotesk',sans-serif;font-size:21px;
   font-weight:700;line-height:1;letter-spacing:-.5px;color:var(--dim);
   font-variant-numeric:tabular-nums}
+/* Деньги под числом шага. Бутылки отвечают на «сколько», деньги — «дорого ли»:
+   пятьдесят бутылок пива и пятьдесят виски это разные закупы. Мелко и тускло —
+   читают их вторым взглядом, а не первым. */
+.path-s em{font-style:normal;font-size:10px;line-height:1;color:var(--dim);
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.path-s.done em,.path-s.now em{color:var(--muted)}
 .path-s.done i{background:var(--gold);border-color:var(--gold)}
 .path-s.done::before{background:rgba(201,169,110,.5)}
 .path-s.done b{color:var(--muted)}
@@ -1062,24 +1074,21 @@ button.path:active{transform:scale(.995)}
 /* ── Поставка ───────────────────────────────────────────────────────────── */
 /* Те же три числа, что и в заявке, в том же порядке: экран поставки —
    продолжение пути, а не отдельная таблица. */
-/* Шапка закупа: когда пришёл ответ магазина и чем всё кончилось. Дата здесь
-   не украшение — закупов много, и открытый вслепую из истории должен сразу
-   говорить, какой он. */
-.sup-hd{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.sup-hd-d{flex:1;min-width:0;font-size:13px;font-weight:600}
-.sup-hd-d i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);
-  font-weight:400;margin-top:3px}
-.sup-hd-st{flex-shrink:0;padding:5px 10px;border-radius:9px;font-size:10.5px;
-  font-weight:700;letter-spacing:.3px;color:var(--gold2);background:var(--card);
-  border:1px solid rgba(201,169,110,.3)}
-.sup-hd-st.done{color:var(--up);border-color:rgba(90,190,130,.32)}
-/* Деньги под числами. Бутылки отвечают «сколько», деньги — «дорого ли»:
-   пятьдесят бутылок пива и пятьдесят виски это разные закупы. */
-.sup-sum-c u{display:block;margin-top:5px;font-size:11px;text-decoration:none;
-  color:var(--muted);font-variant-numeric:tabular-nums}
-.sup-foot-n{display:flex;flex-wrap:wrap;gap:6px 14px;margin:-2px 0 12px 2px;
-  font-size:11.5px;color:var(--muted)}
-.sup-foot-n b{color:var(--sub);font-weight:600}
+/* Бутылки, купленные на доп. складах: они уже на полке, а в базе их нет — и до
+   тех пор их не видит ни заявка, ни ревизия. Это напоминание, а не тревога:
+   число тает само, пока коды заводят. Поэтому одна строка, а не карточка во
+   всю ширину рядом с недобором — иначе два блока спорят за внимание, и
+   проигрывает тот, что важнее. */
+.sup-nc{display:flex;align-items:flex-start;gap:10px;padding:11px 13px;
+  border-radius:13px;margin-bottom:10px;background:var(--card);
+  border:1px solid rgba(243,180,74,.28)}
+.sup-nc-d{flex-shrink:0;width:7px;height:7px;margin-top:5px;border-radius:50%;
+  background:var(--warn)}
+.sup-nc-b{flex:1;min-width:0}
+.sup-nc-t{display:block;font-size:12.5px;font-weight:600;line-height:1.35}
+.sup-nc-t b{color:var(--warn);font-weight:700}
+.sup-nc-s{display:block;font-size:11px;color:var(--muted);margin-top:3px;line-height:1.4}
+.sup-nc-s b{color:var(--sub);font-weight:600}
 /* История закупов. Строка отвечает на «когда и чем кончилось», а открывается
    в ту же карточку — это один и тот же экран, просто другой закуп. */
 .sh-row{display:flex;align-items:center;gap:12px;width:100%;padding:12px 13px;
@@ -1162,9 +1171,12 @@ button.path:active{transform:scale(.995)}
 .sup-t-fl{margin-top:9px;padding:7px 10px;border-radius:9px;font-size:11.5px;
   color:var(--warn);background:var(--warn-soft)}
 .sup-t-note{margin-top:8px;font-size:12.5px;color:var(--sub);line-height:1.4}
-.sup-t-rel{margin-top:10px;width:100%;padding:9px;border-radius:10px;cursor:pointer;
-  font-family:inherit;font-size:12px;font-weight:600;color:var(--muted);
-  background:var(--card2);border:1px solid var(--border3)}
+/* «Снять с водителя» — редкое действие: взял задачу и не поехал. Кнопка во всю
+   ширину карточки весила как главное действие экрана, хотя жмут её раз в
+   неделю. Теперь это тихая кнопка по правому краю. */
+.sup-t-rel{margin-top:9px;padding:6px 11px;border-radius:9px;cursor:pointer;
+  font-family:inherit;font-size:11.5px;font-weight:600;color:var(--muted);
+  background:none;border:1px solid var(--border3)}
 .sup-t-rel:active{transform:scale(.98);color:var(--dn)}
 .acc-cell:active{background:var(--card2)}
 .acc-grid{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:2px}
@@ -1664,9 +1676,16 @@ button.path:active{transform:scale(.995)}
 
 /* Кнопка внизу и во всю ширину: до верха экрана большим пальцем не достать, а
    нажимают её каждый раз, когда сюда заходят. */
-.qb-wrap{position:sticky;bottom:0;z-index:4;margin-top:auto;padding-top:18px;
+.qb-wrap{position:sticky;bottom:0;z-index:4;margin-top:auto;
   padding:14px 0 calc(8px + var(--safe-bottom));
   background:linear-gradient(transparent,var(--bg) 38%)}
+/* Липкость имеет смысл только у подвала экрана. Внутри прокручиваемого списка
+   кнопка липнет к нижнему краю СОДЕРЖИМОГО, а не экрана: на длинном списке
+   она повисает посреди строк и накрывает их полосой в цвет фона — ровно то,
+   что выглядит как «кнопка висит в воздухе в чёрной рамке». Подвал у панели
+   один, #accFoot, и место кнопки там. Здесь же — страховка на будущее: даже
+   если кто-то снова положит .qb-wrap в список, она останется обычным блоком. */
+#accMid .qb-wrap{position:static;padding:0;margin-top:14px;background:none}
 .qb{display:flex;align-items:center;justify-content:center;gap:11px;width:100%;
   padding:19px;border-radius:17px;border:none;cursor:pointer;font-family:inherit;
   font-size:16px;font-weight:700;color:#1a1408;letter-spacing:-.2px;
@@ -8404,6 +8423,20 @@ function pathCard(){
   return `<div class="path">${pathInner()}</div>${sup ? pathActs(sup) : ''}`;
 }
 
+// Три шага пути одним рядом — один и тот же компонент на «Закупе» и внутри
+// поставки. Раньше у поставки была своя шапка из трёх колонок: те же числа,
+// другая вёрстка, и два экрана про одно и то же читались как два разных.
+//
+// Деньги идут под числом, если они известны: «469 бутылок» не отвечает на
+// вопрос «дорого ли», а «469 · 68 354 AED» отвечает.
+function pathSteps(vals, money, step){
+  return `<span class="path-r">${PATH_STEPS.map((t, i) => `
+      <span class="path-s ${i < step ? 'done' : i === step ? 'now' : ''}">
+        <i></i><b>${t}</b><u>${vals[i]}</u>${
+        money && money[i] != null ? `<em>${fmt(money[i])} AED</em>` : ''}
+      </span>`).join('')}</span>`;
+}
+
 function pathInner(){
   const d = ORD.d || {};
   const list = (ACC_SUP && ACC_SUP.list) || [];
@@ -8416,17 +8449,15 @@ function pathInner(){
     sup ? fmt(sup.total_qty || 0) : '—',
     sup ? fmt(took) : '—',
   ];
+  const m = (sup && sup.money) || null;
+  const money = m ? [m.asked, m.confirmed, m.took] : [d.total_aed, null, null];
   const gap = sup && sup.status === 'open' ? (sup.gap_qty || 0) : 0;
-  return `
-    <span class="path-r">${PATH_STEPS.map((t, i) => `
-      <span class="path-s ${i < step ? 'done' : i === step ? 'now' : ''}">
-        <i></i><b>${t}</b><u>${vals[i]}</u>
-      </span>`).join('')}</span>
+  return pathSteps(vals, money, step) + `
     ${gap ? `<span class="path-gap">Магазин не дал ${fmt(gap)} ${
         pluralize(gap,'бутылку','бутылки','бутылок')} — добрать в другом месте</span>` : ''}
     <span class="path-f">
       <span>${(d.rows||[]).length} ${pluralize((d.rows||[]).length,'позиция','позиции','позиций')}
-        · <b>${fmt(d.total_aed)}</b> AED</span>
+        · суммы по прайсу</span>
       ${sup ? `<span class="path-go">${
         sup.status === 'open' ? 'поставка идёт' : 'принято'}</span>` : ''}
     </span>`;
@@ -8566,7 +8597,7 @@ function ordRender(){
     </div>
     <!-- Следующий шаг пути стоит здесь же: отправил файл — вернулся с ответом.
          Искать эту кнопку в другом разделе было бы странно. -->
-    <div class="qb-wrap qb-second">
+    <div class="qb-wrap">
     <button class="qb qb-ghost qb-wide" id="ordUp"
             onclick="document.getElementById('ordFile').click()">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
@@ -9146,6 +9177,10 @@ async function accQR(){
           с крышки — бутылка появится здесь</div>
       </div>`}
 
+    </div>`;
+  // Кнопка — в подвале экрана, а не в конце списка позиций: список длинный, и
+  // липкая кнопка внутри него вставала посреди строк.
+  document.getElementById('accFoot').innerHTML = `
     <div class="qb-wrap">
       <button class="qb" onclick="qrDistrict()">
         <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
@@ -9154,7 +9189,6 @@ async function accQR(){
           <path d="M7 12h10"/></svg>
         Сканировать бутылки
       </button>
-    </div>
     </div>`;
 }
 
@@ -9163,6 +9197,9 @@ async function accQR(){
 function _qrHead(title, sub, back){
   _setText('accTitle', title);
   _setText('accSub', sub);
+  // Подвал принадлежит экрану, а не разделу: «Сканировать бутылки» имеет смысл
+  // только на первом, и таскать её за собой по выбору точки незачем.
+  document.getElementById('accFoot').innerHTML = '';
   ACC_BACK = back;
   return '';
 }
@@ -9641,43 +9678,23 @@ function supRender(){
   _setText('accSub', `${_dayName(d.day || String(d.at||'').slice(0,10))} · ${
     d.status === 'done' ? 'закрыта' : 'в работе'}`);
 
-  // Шапка: три числа одной строкой — просили, дали, приняли. Разница между
-  // ними и есть весь смысл экрана, и считать её в уме не должен никто.
-  //
-  // Под каждым числом — деньги по прайсу. Бутылки отвечают на «сколько», а
-  // «дорого ли вышло» по ним не понять: пятьдесят бутылок пива и пятьдесят
-  // виски — разные закупы. Цена продажная и так и подписана: закупочной
-  // система не знает, и выдавать за неё выдуманную себестоимость нельзя.
+  // Шапка — тот же путь, что и на «Закупе», просто вблизи: экран поставки это
+  // продолжение той же дороги, а не отдельная таблица. Дата и статус живут в
+  // подзаголовке панели и второй раз здесь не нужны.
   const m = d.money || {};
-  const took_all = d.took >= d.total_qty && d.total_qty > 0;
-  // Кто принял. Имена — то, что на этом экране ищут первым, поэтому они стоят
-  // в шапке, а не только в списке задач ниже.
-  const who = (d.tasks || []).filter(t => t.driver).map(t => t.driver);
-  const uniq = [...new Set(who)];
-  const head = `
-    <div class="sup-hd">
-      <div class="sup-hd-d">Ответ магазина${_hm(d.at) ? ' · ' + _hm(d.at) : ''}
-        <i>${escS(_dayName(d.day || String(d.at||'').slice(0,10)))} · ${
-          d.positions || 0} ${pluralize(d.positions||0,'позиция','позиции','позиций')}
-          · ${(d.tasks||[]).length} ${pluralize((d.tasks||[]).length,'район','района','районов')}</i>
-      </div>
-      <span class="sup-hd-st ${d.status === 'done' ? 'done' : ''}">${
-        d.status === 'done' ? 'закрыта' : 'в работе'}</span>
-    </div>
-    <div class="sup-sum">
-      <div class="sup-sum-c"><b>${fmt(d.asked_qty)}</b><i>просили</i>
-        <u>${fmt(m.asked || 0)} AED</u></div>
-      <div class="sup-sum-c ${d.total_qty < d.asked_qty ? 'dn' : ''}">
-        <b>${fmt(d.total_qty)}</b><i>подтвердили</i>
-        <u>${fmt(m.confirmed || 0)} AED</u></div>
-      <div class="sup-sum-c ${took_all ? 'up' : 'warn'}">
-        <b>${fmt(d.took)}</b><i>приняли</i>
-        <u>${fmt(m.took || 0)} AED</u></div>
-    </div>
-    <div class="sup-foot-n">
-      <span>по прайсу, не по закупочной</span>
-      ${uniq.length ? `<span>везли <b>${escS(uniq.join(', '))}</b></span>` : ''}
-    </div>`;
+  const step = d.status === 'open' ? 2 : 3;
+  const head = `<div class="path">
+    ${pathSteps([fmt(d.asked_qty), fmt(d.total_qty), fmt(d.took)],
+                [m.asked, m.confirmed, m.took], step)}
+    ${short.qty ? `<span class="path-gap">Магазин не дал ${fmt(short.qty)} ${
+        pluralize(short.qty,'бутылку','бутылки','бутылок')} — добрать в другом месте</span>` : ''}
+    <span class="path-f">
+      <span>${d.positions || 0} ${pluralize(d.positions||0,'позиция','позиции','позиций')}
+        · ${(d.tasks||[]).length} ${pluralize((d.tasks||[]).length,'район','района','районов')}
+        · суммы по прайсу</span>
+      <span class="path-go">${d.status === 'done' ? 'принято' : 'поставка идёт'}</span>
+    </span>
+  </div>`;
 
   // Недобор — первым и с кнопками: это единственное на экране, что требует
   // действия прямо сейчас.
@@ -9687,16 +9704,16 @@ function supRender(){
   const um = d.unmarked || {};
   const umLeft = Object.values(um).reduce((a, x) => a + (x.left || 0), 0);
   const umBlock = umLeft ? `
-    <div class="sup-um">
-      <div class="sup-um-h">
-        <span class="sup-um-v">${fmt(umLeft)}</span>
-        <span class="sup-um-u">${pluralize(umLeft,'бутылка','бутылки','бутылок')}<br>без кода в базе</span>
-      </div>
-      <div class="sup-um-l">${Object.entries(um).filter(([, x]) => x.left)
-        .map(([o, x]) => `<span class="sup-um-d"><b>${escS((D[o]||{}).code || o)}</b>
-          ${fmt(x.left)}${x.marked ? `<i>внесли ${fmt(x.marked)} из ${fmt(x.need)}</i>` : ''}
-        </span>`).join('')}</div>
-      <div class="sup-um-s">Заводите их через «Внести товар» — число тает само</div>
+    <div class="sup-nc">
+      <span class="sup-nc-d"></span>
+      <span class="sup-nc-b">
+        <span class="sup-nc-t"><b>${fmt(umLeft)} ${
+          pluralize(umLeft,'бутылка','бутылки','бутылок')}</b> на полке, но без кода в базе</span>
+        <span class="sup-nc-s">${Object.entries(um).filter(([, x]) => x.left)
+          .map(([o, x]) => `<b>${escS((D[o]||{}).code || o)}</b> ${fmt(x.left)}${
+            x.marked ? ` (внесли ${fmt(x.marked)} из ${fmt(x.need)})` : ''}`).join(' · ')}
+          — заводите через «Внести товар», число тает само</span>
+      </span>
     </div>` : '';
   const shortBlock = short.rows.length ? umBlock + `
     <div class="exp-grp">Заказать на доп. складах</div>
@@ -9713,20 +9730,6 @@ function supRender(){
         </span>
         <span class="sup-sr-v">${r.gap}</span></div>`).join('')}
       ${short.rows.length > 40 ? `<div class="sup-sr-more">…и ещё ${short.rows.length - 40}</div>` : ''}
-      <div class="qb-wrap qb-row" style="margin-top:12px">
-        <button class="qb" id="supShare" onclick="supShare()">
-          <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 3v13M8 7l4-4 4 4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
-          Поделиться списком
-        </button>
-        <button class="qb qb-ico" id="supSend" onclick="supSend()"
-                aria-label="Прислать файл в чат с ботом" title="В телеграм">
-          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
-               stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
-        </button>
-      </div>
     </div>` : `<div class="sup-allgood">Магазин дал всё, о чём просили.</div>`;
 
   // Задачи: по одной на район. Имя водителя — главное, что здесь ищут.
@@ -9754,8 +9757,8 @@ function supRender(){
       <div class="sup-bar"><i style="width:${pct}%"></i></div>
       ${marks.length ? `<div class="sup-t-fl">${escS(marks.join(' · '))}</div>` : ''}
       ${t.note ? `<div class="sup-t-note">${escS(t.note)}</div>` : ''}
-      ${t.driver && !t.done_at ? `<button class="sup-t-rel" onclick="supRelease('${t.district}')">
-        Снять с водителя</button>` : ''}
+      ${t.driver && !t.done_at ? `<div style="text-align:right"><button class="sup-t-rel"
+        onclick="supRelease('${t.district}')">Снять с водителя</button></div>` : ''}
     </div>`;
   }).join('');
 
@@ -9862,19 +9865,44 @@ const _hm = iso => {
   return d && !isNaN(d) ? d.toLocaleTimeString('ru-RU',
     {hour:'2-digit', minute:'2-digit', timeZone:'Asia/Dubai'}) : ''; };
 
-// Загрузка ответа магазина живёт в подвале и на всех стадиях: файл приходит
-// когда придёт, а иногда и вторым письмом с правками.
+// Подвал поставки. Действий тут два, и они не равны: пока магазин чего-то не
+// дал — главное это отдать список на доп. склады, а загрузка ответа ждёт своей
+// очереди. Дал всё — грузить ответ и есть единственное дело, и кнопка
+// становится главной.
+//
+// Обе кнопки живут здесь, а не в списке. Раньше «Поделиться списком» стояла
+// внутри карточки недобора и была липкой: она приклеивалась к нижнему краю
+// содержимого, а не экрана, и на длинном списке висела посреди строк, накрыв
+// их полосой в цвет фона.
 function supFoot(){
-  document.getElementById('accFoot').innerHTML = `
+  const short = ((SUP_D || {}).shortfall || {}).rows || [];
+  const up = `
     <div class="qb-wrap">
-      <button class="qb" onclick="document.getElementById('supFile').click()" id="supUp">
-        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 16V3M8 7l4-4 4 4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+      <button class="qb ${short.length ? 'qb-ghost qb-wide' : ''}" id="supUp"
+              onclick="document.getElementById('supFile').click()">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+             stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
+          <path d="M14 3v5h5"/><path d="M12 11v6M9.5 14.5L12 17l2.5-2.5"/></svg>
         Загрузить ответ магазина
       </button>
     </div>
     <input type="file" id="supFile" accept=".xlsx" style="display:none" onchange="supImport(this)">`;
+  document.getElementById('accFoot').innerHTML = (short.length ? `
+    <div class="qb-wrap qb-row">
+      <button class="qb" id="supShare" onclick="supShare()">
+        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v13M8 7l4-4 4 4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
+        Поделиться списком
+      </button>
+      <button class="qb qb-ico" id="supSend" onclick="supSend()"
+              aria-label="Прислать файл в чат с ботом" title="В телеграм">
+        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
+      </button>
+    </div>` : '') + up;
 }
 
 async function supImport(inp, btnId){

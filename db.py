@@ -2599,6 +2599,59 @@ async def qr_by_product() -> list:
              "count": r["n"], "last": str(r.get("last") or "")} for r in rows]
 
 
+async def qr_since_by_district() -> dict:
+    """С какого момента на каждой точке ведётся реестр — первый её код."""
+    db = _db_or_none()
+    if db is None: return {}
+    cur = db.qr_codes.aggregate([{"$group": {"_id": "$district", "at": {"$min": "$at"}}}])
+    return {d["_id"]: d["at"] for d in await cur.to_list(length=50) if d["_id"] and d["at"]}
+
+
+async def qr_consumed(since: dict) -> dict:
+    """Сколько с тех пор продано и списано на каждой точке.
+
+    Реестр знает, что бутылку внесли, и не знает, что её увезли: на доставке
+    коды никто не сканирует. Поэтому «продано» считаем не по кодам, а по
+    доставленным заказам — тем же способом, что и остаток на складе. Иначе в
+    реестре вечно стоит число, которое было верным один день."""
+    db = _db_or_none()
+    out = {k: {"sold": 0, "written": 0} for k in (since or {})}
+    if db is None or not since:
+        return out
+    lo = min(since.values())
+    lo_iso = lo.isoformat() if hasattr(lo, "isoformat") else str(lo)
+    cur = db.orders.find({"timestamp": {"$gte": lo_iso}, "status": "delivered"},
+                         {"_id": 0, "timestamp": 1, "office_id": 1, "items": 1})
+    for o in await cur.to_list(length=None):
+        oid = o.get("office_id") or ""
+        if oid not in out:
+            continue
+        ts = str(o.get("timestamp") or "")
+        s = since[oid]
+        s_iso = s.isoformat() if hasattr(s, "isoformat") else str(s)
+        if ts < s_iso:
+            continue
+        out[oid]["sold"] += sum(int(i.get("qty") or 0) for i in (o.get("items") or []))
+    for district, dt in since.items():
+        cur = db.writeoffs.aggregate([
+            {"$match": {"district": district, "at": {"$gte": dt}}},
+            {"$group": {"_id": None, "n": {"$sum": "$qty"}}}])
+        rows = await cur.to_list(length=1)
+        out[district]["written"] = int((rows[0]["n"] if rows else 0) or 0)
+    return out
+
+
+async def qr_by_product_district(district: str) -> dict:
+    """{позиция: сколько бутылок с кодами лежит на этой точке}."""
+    db = _db_or_none()
+    if db is None or not district: return {}
+    cur = db.qr_codes.aggregate([
+        {"$match": {"status": "active", "district": district}},
+        {"$group": {"_id": "$product_id", "n": {"$sum": 1}}},
+    ])
+    return {d["_id"]: int(d["n"] or 0) for d in await cur.to_list(length=500) if d["_id"]}
+
+
 async def qr_by_district() -> dict:
     """Сколько бутылок записано на каждой точке — для выбора точки."""
     db = _db_or_none()

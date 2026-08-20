@@ -152,6 +152,42 @@ def _qty(it: dict) -> int:
     return q * (pcs if pcs else 1)
 
 
+async def _registry_was(district: str, day: str) -> dict:
+    """Сколько лежит на точке по реестру кодов — на начало пересчитываемых суток.
+
+    Коды заводят поштучно, значит реестр знает количество точно. Из него
+    вычитаем то, что с тех пор ушло: проданное по доставленным заказам и
+    списанное. Сегодняшние продажи не трогаем — их вычтет сам лист, тем же
+    способом, что и после ручного пересчёта."""
+    codes = await db.qr_by_product_district(district)
+    if not codes:
+        return {}
+    since = (await db.qr_since_by_district()).get(district)
+    if not since:
+        return {}
+    cat = _catalog()
+    start, _ = _day_bounds(day, 1)
+    since_iso = since.isoformat() if hasattr(since, "isoformat") else str(since)
+    out = {pid: n / _unit(cat.get(pid) or {}) for pid, n in codes.items()}
+    for o in await db.sold_since(min(since_iso, start)):
+        if (o.get("office_id") or "") != district:
+            continue
+        ts = str(o.get("timestamp") or "")
+        if ts < since_iso or ts >= start:
+            continue
+        for it in (o.get("items") or []):
+            pid, q = it.get("id"), _qty(it)
+            if pid in out and q:
+                out[pid] -= q / _unit(cat.get(pid) or {})
+    try:
+        for pid, n in ((await db.writeoff_since({district: since})).get(district) or {}).items():
+            if pid in out:
+                out[pid] -= n / _unit(cat.get(pid) or {})
+    except Exception as e:
+        log.warning(f"[stock] списания в реестре не учтены ({district}): {e}")
+    return {pid: max(0, _round_step(v)) for pid, v in out.items() if v > 0}
+
+
 async def _sold(day: str, district: str | None = None, days: int = 1) -> dict:
     """{product_id: продано в учётных единицах}.
 
@@ -424,6 +460,27 @@ async def handle_sheet(request):
     prev = await db.get_last_stock_count(district, before_day=day)
     first_time = prev is None
     prev_lines = {l["id"]: l for l in (prev or {}).get("lines", [])}
+    # Реестр как отправная точка.
+    #
+    # Пересчёта на точке могло не быть ни разу, но если бутылки заводили
+    # кодами, приложение прекрасно знает, сколько их лежит: каждая внесена
+    # поштучно. Говорить в этом случае «сравнивать не с чем» — неправда, из-за
+    # которой человек вбивает руками то, что уже посчитано.
+    #
+    # Ручной пересчёт остаётся главнее: он про физическую полку, а реестр —
+    # про то, что в неё клали. Поэтому из реестра берём, только когда пересчёта
+    # не было вовсе.
+    from_registry = False
+    if first_time:
+        try:
+            reg = await _registry_was(district, day)
+        except Exception as e:
+            log.warning(f"[stock] реестр не прочитан ({district}): {e}")
+            reg = {}
+        if reg:
+            prev_lines = {pid: {"id": pid, "actual": q} for pid, q in reg.items()}
+            first_time = False
+            from_registry = True
     sold = await _sold(day, district)
     moves = await db.get_stock_transfers(day)
     existing = await db.get_stock_count(district, day)
@@ -483,7 +540,7 @@ async def handle_sheet(request):
         "district": district,
         "district_name": OFFICE_NAMES.get(district, district),
         "district_code": OFFICE_CODES.get(district, ""),
-        "day": day, "first_time": first_time,
+        "day": day, "first_time": first_time, "from_registry": from_registry,
         "prev_day": (prev or {}).get("day", ""),
         "audit": {
             "started_at":  (existing or {}).get("audit_started_at", ""),

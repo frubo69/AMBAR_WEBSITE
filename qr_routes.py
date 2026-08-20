@@ -142,15 +142,36 @@ async def handle_stats(request):
     by_product = await db.qr_by_product()
     last = await db.qr_last(limit=20)
     locks = await db.qr_locks(datetime.now(timezone.utc))
+    by_district = await db.qr_by_district()
+    # Реестр знает, что бутылку внесли, и не знает, что её увезли: на доставке
+    # коды никто не сканирует. Поэтому «продано» и «списано» берём оттуда, где
+    # это правда, — из доставленных заказов и журнала списаний, с того дня,
+    # когда на точке начали вести реестр. Иначе экран вечно показывает число,
+    # которое было верным ровно один день.
+    sold = written = 0
+    left = {}
+    try:
+        since = await db.qr_since_by_district()
+        used = await db.qr_consumed(since)
+        for oid, n in by_district.items():
+            u = used.get(oid) or {}
+            sold += int(u.get("sold") or 0)
+            written += int(u.get("written") or 0)
+            left[oid] = max(0, n - int(u.get("sold") or 0) - int(u.get("written") or 0))
+    except Exception as e:
+        log.warning(f"[qr] расход по реестру не посчитан: {e}")
+        left = dict(by_district)
     return web.json_response({
         "locks": locks,
-        "by_district": await db.qr_by_district(),
+        "by_district": by_district,
+        "left_by_district": left,
         "slugs": slug_map(),
         "totals": {
             "total":   sum(st.values()),
             "active":  st.get("active", 0),
-            "sold":    st.get("sold", 0),
-            "written": st.get("written", 0),
+            "sold":    sold,
+            "written": written,
+            "left":    max(0, st.get("active", 0) - sold - written),
         },
         "by_product": by_product,
         "last": last,

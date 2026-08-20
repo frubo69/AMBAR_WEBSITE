@@ -552,6 +552,10 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .stk-act.on{color:#1a1408;border-color:transparent;
   background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .stk-act.scan{color:var(--gold2);border-color:rgba(201,169,110,.42)}
+/* Кнопка есть всегда, даже когда сканировать пока нечего: спрятанная кнопка
+   не объясняет, куда делась, — человек ищет её глазами и не находит. Тусклая
+   объясняет: нажми, и скажу, чего не хватает. */
+.stk-act.off{opacity:.5}
 .stk-act u{text-decoration:none;font-family:'Space Grotesk',sans-serif;font-size:13px;
   color:var(--muted);font-variant-numeric:tabular-nums}
 .stk-act.scan u{color:var(--gold)}
@@ -7323,14 +7327,14 @@ function stkActs(){
   const sh = STK.sheet || {};
   const coded = (sh.rows || []).filter(r => r.coded > 0).length;
   const sc = sh.scan || {};
-  const scan = coded ? `
-    <button class="stk-act scan" onclick="stkScan()">
+  const scan = `
+    <button class="stk-act scan ${coded ? '' : 'off'}" onclick="stkScanTap()">
       <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
         <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
         <path d="M7 12h10"/></svg>
       ${sc.total ? 'Продолжить' : 'Сканировать'}${sc.total ? `<u>${fmt(sc.total)}</u>` : ''}
-    </button>` : '';
+    </button>`;
   return `<div class="stk-acts ${scan ? '' : 'one'}">
     <button class="stk-act ${STK.audit ? 'on' : ''}" onclick="stkAuditToggle()">
       <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
@@ -7416,7 +7420,10 @@ function stkRenderList(){
         это отправная точка. Со следующей смены числа будут подставляться сами, и
         проверять придётся только то, что продавалось.
         ${coded ? `<br><br><b>${coded} ${pluralize(coded,'позиция заведена','позиции заведены','позиций заведены')} кодами</b>
-        — их не надо вбивать руками: нажмите «Сканировать» и пройдите полку камерой.` : ''}
+        — их не надо вбивать руками: нажмите «Сканировать» и пройдите полку камерой.`
+        : `<br><br>Считать камерой здесь пока нельзя: на точке нет кодов. Бутылки
+        заводят в реестр разово через «Внести товар» — после этого ревизия идёт
+        сканированием, а не руками.`}
       </div>` + rows.map(r => stkItem(r)).join('');
     return;
   }
@@ -7549,6 +7556,25 @@ function _stkProgress(){
   if(hint) hint.textContent = done < total
     ? `Осталось отметить ${total - done} ${pluralize(total-done,'позицию','позиции','позиций')}`
     : 'Все позиции проверены';
+}
+
+// Сканировать можно то, что заведено. Ревизия камерой считает бутылки по их
+// кодам: код говорит, что это за товар, и строка растёт сама. Если на точке
+// кодов нет вовсе, камере нечего узнавать — бутылки сначала заводят в реестр
+// через «Внести товар», и это отдельная работа, разовая.
+//
+// Поэтому кнопка не прячется, а объясняет и уводит туда, где эта работа
+// делается, — на ту же точку, чтобы не выбирать её заново.
+function stkScanTap(){
+  const coded = ((STK.sheet || {}).rows || []).filter(r => r.coded > 0).length;
+  if(coded){ stkScan(); return; }
+  const d = (STK.districts || []).find(x => x.id === STK.district) || {};
+  if(!confirm(`На ${d.code || 'этой точке'} ещё нет ни одного кода — камере нечего узнавать.\n\n`
+    + 'Бутылки сначала заводят в реестр: выбираете позицию и сканируете её бутылки. '
+    + 'Это разовая работа, дальше ревизия идёт камерой.\n\nОткрыть «Внести товар»?')) return;
+  distRemember('qr', STK.district);
+  closeStock();
+  accOpen('qr');
 }
 
 // ── ревизия сканированием ───────────────────────────────────────────────────

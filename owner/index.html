@@ -586,6 +586,74 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .stk-row-n{flex:1;min-width:0;font-size:13.5px}
 .stk-row-s{font-size:11px;color:var(--muted);margin-top:2px}
 .stk-row-d{font-family:'Space Grotesk',sans-serif;font-weight:700;font-size:15px;white-space:nowrap}
+/* ── РАЙОН — КОНТЕКСТ, А НЕ ШАГ ─────────────────────────────────────────────
+   Раньше каждый заход в ревизию начинался с экрана «где считаем»: пять жирных
+   строк на весь экран и пустота под ними. Но район выбирают не каждый раз —
+   его выбирают один раз и работают в нём весь вечер. Переспрашивать на каждом
+   входе значит брать плату за то, что и так известно.
+
+   Поэтому район теперь живёт полосой над списком: он всегда виден, всегда
+   понятно, где ты, и переключение стоит один тап без ухода с экрана. Полоса
+   липнет к верху — уехать вниз по длинному списку и потерять из виду, какой
+   это район, нельзя. */
+.drail{display:flex;gap:7px;overflow-x:auto;scrollbar-width:none;-ms-overflow-style:none;
+  padding:10px 14px 9px;background:var(--bg);border-bottom:1px solid var(--border2)}
+.drail::-webkit-scrollbar{display:none}
+.dchip{flex-shrink:0;display:flex;align-items:center;gap:7px;padding:8px 12px;
+  border-radius:12px;cursor:pointer;font-family:inherit;white-space:nowrap;
+  color:var(--sub);background:var(--card);border:1px solid var(--border2)}
+.dchip:active{transform:scale(.96)}
+.dchip b{font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:700;
+  color:var(--gold2)}
+/* Название показываем только у выбранного района. Пять чипов с именами не
+   влезают в телефон и уезжают за край — а уехавший за край активный чип это
+   экран, который не отвечает на вопрос «где я». Кодов же хватает: B1–B5 висят
+   на самих точках, и люди говорят именно так. */
+.dchip span{font-size:12.5px;display:none}
+.dchip.on span{display:inline}
+/* Точка состояния — то, ради чего раньше открывали экран выбора: где считали, а
+   где нет. Теперь это видно, не уходя из района. */
+.dchip i{width:6px;height:6px;border-radius:50%;background:var(--gold);flex-shrink:0}
+.dchip i.ok{background:var(--up)}
+.dchip i.dn{background:var(--dn)}
+.dchip.on{background:linear-gradient(135deg,var(--gold),var(--gold2));border-color:transparent;
+  color:#1a1408;font-weight:700}
+.dchip.on b{color:#1a1408}
+.dchip.on i{background:rgba(26,20,8,.45)}
+.dchip-all{padding:8px 10px;color:var(--muted)}
+.dchip-all svg{display:block}
+
+/* Обзор всех районов — плитками в две колонки. Пять строк во всю ширину
+   оставляли под собой полэкрана пустоты и заставляли водить глазом сверху
+   вниз; плитки читаются как карта точек. Шестая клетка — вход в историю: она
+   и место занимает с пользой, и стоит там, где взгляд заканчивает обход. */
+.dgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+.dtile{display:flex;flex-direction:column;justify-content:space-between;gap:14px;
+  min-height:112px;padding:13px;border-radius:16px;cursor:pointer;text-align:left;
+  font-family:inherit;color:var(--text);background:var(--card);
+  border:1px solid var(--border2)}
+.dtile:active{transform:scale(.985)}
+.dtile-h{display:flex;align-items:flex-start;justify-content:space-between;gap:8px}
+.dtile-c{flex-shrink:0;display:inline-flex;align-items:center;justify-content:center;
+  width:34px;height:34px;border-radius:11px;font-family:'Space Grotesk',sans-serif;
+  font-size:13px;font-weight:700;color:var(--gold2);background:var(--gold-soft)}
+.dtile-v{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;
+  line-height:1;color:var(--gold2);font-variant-numeric:tabular-nums;
+  letter-spacing:-.5px;padding-top:5px}
+.dtile-v.dim{color:var(--dim)}
+.dtile-v.dn{color:var(--dn)}
+.dtile-v.ok{color:var(--up)}
+.dtile-n{display:block;font-size:14px;font-weight:600;line-height:1.2;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dtile-s{display:block;font-size:11px;color:var(--muted);margin-top:3px}
+.dtile-s.ok{color:var(--up)}
+.dtile-s.dn{color:var(--dn)}
+.dtile.busy{border-color:rgba(201,169,110,.45)}
+/* Шестая клетка. Пунктир говорит, что это не точка хранения, а дверь. */
+.dtile-more{align-items:center;justify-content:center;text-align:center;gap:8px;
+  border-style:dashed;border-color:var(--border3);background:none;color:var(--muted)}
+.dtile-more svg{color:var(--gold2)}
+.dtile-more span{font-size:12.5px;font-weight:600;color:var(--sub)}
 .stk-pick{width:100%;display:flex;align-items:center;gap:12px;padding:15px 16px;margin-bottom:8px;
   border-radius:13px;background:var(--card);border:1px solid var(--border2);color:var(--text);
   font-family:inherit;cursor:pointer;text-align:left;transition:.15s var(--e1)}
@@ -6822,13 +6890,79 @@ async function _officeLoad(id){
 let STK = {view:'pick', district:null, sheet:null, vals:{}, showAll:false, q:'',
            audit:false, marks:{}};
 
+// Последний район запоминается на устройство и привязан к учётной записи:
+// панель открывают с разных телефонов и разными людьми, и подставлять соседу
+// его район было бы хуже, чем спросить.
+function _distKey(k){ return `ambar_${k}_dist_${_meId()}`; }
+function distSaved(k){ try{ return localStorage.getItem(_distKey(k)) || ''; }catch(e){ return ''; } }
+function distRemember(k, id){ try{ localStorage.setItem(_distKey(k), id || ''); }catch(e){} }
+
+// Полоса переключения. Первый чип — «все районы»: обзор никуда не делся, просто
+// перестал быть обязательным шагом на входе.
+//
+// dots: {район: 'ok'|'dn'|''} — состояние точкой. Без него полоса была бы
+// просто навигацией, а с ним отвечает и на вопрос «где ещё не считали».
+function distRail(active, fn, dots){
+  const list = STK.districts || [];
+  if(!list.length) return '';
+  return `<div class="drail">
+    <button class="dchip dchip-all" onclick="${fn}('')" aria-label="Все районы">
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>
+        <rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>
+    </button>
+    ${list.map(d => `<button class="dchip ${d.id === active ? 'on' : ''}"
+        onclick="${fn}('${d.id}')">
+      ${dots ? `<i class="${dots[d.id] || ''}"></i>` : ''}
+      <b>${escS(d.code)}</b><span>${escS(d.name)}</span>
+    </button>`).join('')}
+  </div>`;
+}
+
+// Плитка района. Одна разметка на оба обзора — ревизии и реестра кодов.
+function distTile(d, fn, opts){
+  const o = opts || {};
+  return `<button class="dtile ${o.cls || ''}" onclick="${fn}('${d.id}')">
+    <span class="dtile-h">
+      <span class="dtile-c">${escS(d.code)}</span>
+      <span class="dtile-v ${o.vcls || ''}">${o.value}</span>
+    </span>
+    <span>
+      <span class="dtile-n">${escS(d.name)}</span>
+      <span class="dtile-s ${o.scls || ''}">${escS(o.sub || '')}</span>
+    </span>
+  </button>`;
+}
+
+function distMoreTile(onclick, label){
+  return `<button class="dtile dtile-more" onclick="${onclick}">
+    <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+         stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M3 3v5h5"/><path d="M3.5 8a9 9 0 1 0 2.2-3.4L3 8"/><path d="M12 7v5l3 2"/></svg>
+    <span>${label}</span>
+  </button>`;
+}
+
 function openStock(){
   document.getElementById('stkOv').classList.add('show');
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
-  stkPicker();
+  // Открываемся там, где работали в прошлый раз. Экран выбора остаётся, но по
+  // требованию, а не по умолчанию: район меняют реже, чем заходят.
+  const last = distSaved('stk');
+  if(last) stkGo(last); else stkPicker();
+}
+
+// Переключение района внутри экрана. Пустой id — обзор всех.
+function stkGo(id){
+  if(!id){ distRemember('stk', ''); stkPicker(); return; }
+  distRemember('stk', id);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  stkOpen(id);
 }
 function closeStock(){
   if(STK.view === 'scan'){ try{ SCAN.stop(); }catch(e){} }
+  _setRail('stkRail', '');
   document.getElementById('stkOv').classList.remove('show');
   accLoadSummaries();              // плитка «Пересчёт склада» в «Учёте» — с новыми цифрами
 }
@@ -6864,8 +6998,26 @@ function _stkHead(title, sub, save){
 }
 
 // ── шаг 1: районы ───────────────────────────────────────────────────────────
+function _setRail(id, html){
+  const el = document.getElementById(id);
+  if(!el) return;
+  el.innerHTML = html || '';
+  // Районов может стать больше пяти, и тогда полоса начнёт прокручиваться.
+  // Экран, открывшийся на невидимом активном чипе, не отвечает на вопрос
+  // «где я» — поэтому подводим его к центру сразу.
+  const on = el.querySelector('.dchip.on');
+  if(on) requestAnimationFrame(() => {
+    const box = on.parentElement; if(!box) return;
+    const l = on.offsetLeft, r = l + on.offsetWidth;
+    if(l >= box.scrollLeft && r <= box.scrollLeft + box.clientWidth) return;
+    try{ box.scrollTo({left: Math.max(0, l - (box.clientWidth - on.offsetWidth) / 2),
+                       behavior:'auto'}); }catch(e){}
+  });
+}
+
 async function stkPicker(){
   STK.view = 'pick'; STK.sheet = null; STK.vals = {};
+  _setRail('stkRail', '');            // обзор — это и есть «все районы»
   _stkHead('Ревизия', 'загрузка…', false);
   document.getElementById('stkMid').innerHTML =
     '<div class="stk-empty">Загрузка…</div>';
@@ -6877,29 +7029,19 @@ async function stkPicker(){
     return;
   }
   STK.districts = st.districts;
-  _stkHead('Ревизия', `${st.done} из ${st.total} районов · ${st.day}`, false);
-  const cards = st.districts.map(d=>`
-    <button class="stk-pick" onclick="stkOpen('${d.id}')">
-      <span class="stk-pick-c" style="color:${d.done?'var(--up)':'var(--gold2)'}">${escS(d.code)}</span>
-      <span class="stk-pick-b">
-        <span class="stk-pick-n">${escS(d.name)}</span>
-        <span class="stk-pick-s">${d.done
-          ? (d.short_aed ? 'не хватает '+fmt(d.short_aed)+' AED' : 'всё сошлось')
-          : 'ещё не считали'}</span>
-      </span>
-      <span style="color:${d.done?'var(--up)':'var(--muted)'};font-size:15px">${d.done?'✓':'›'}</span>
-    </button>`).join('');
-  document.getElementById('stkMid').innerHTML = cards +
-    `<button class="stk-pick" onclick="stkAudits()" style="margin-top:8px">
-       <span class="stk-pick-c" style="color:var(--gold2)">
-         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-              stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-           <path d="M3 3v5h5"/><path d="M3.5 8a9 9 0 1 0 2.2-3.4L3 8"/><path d="M12 7v5l3 2"/></svg>
-       </span>
-       <span class="stk-pick-b"><span class="stk-pick-n">История ревизий</span>
-         <span class="stk-pick-s" id="stkAudSub">закрытые ревизии по районам</span></span>
-       <span style="color:var(--muted);font-size:15px">›</span>
-     </button>` +
+  _stkHead('Ревизия', `${st.done} из ${st.total} районов · ${_dayName(st.day)}`, false);
+  // Плитками, а не строками: пять строк во всю ширину оставляли под собой
+  // полэкрана пустоты. Число на плитке — то, ради чего сюда заходят: недостача
+  // в деньгах там, где считали, и прочерк там, где ещё нет.
+  const cards = st.districts.map(d => distTile(d, 'stkGo', {
+    cls:   d.done ? '' : 'busy',
+    value: d.done ? (d.short_aed ? fmt(d.short_aed) : '✓') : '—',
+    vcls:  d.done ? (d.short_aed ? 'dn' : 'ok') : 'dim',
+    sub:   d.done ? (d.short_aed ? 'AED не хватает' : 'всё сошлось') : 'ещё не считали',
+    scls:  d.done && !d.short_aed ? 'ok' : (d.done ? 'dn' : ''),
+  })).join('');
+  document.getElementById('stkMid').innerHTML =
+    `<div class="dgrid">${cards}${distMoreTile('stkAudits()', 'История ревизий')}</div>` +
     '<div class="stk-grp">Перемещения между районами</div>' +
     '<div id="stkMoves"><div class="stk-empty" style="padding:14px">Загрузка…</div></div>';
   stkLoadMoves();
@@ -6942,7 +7084,7 @@ async function stkMoveDel(id){
 // отвечают на вопрос поинтереснее: у кого сходится всегда, а у кого каждый раз
 // не хватает — и на сколько.
 async function stkAudits(){
-  STK.view = 'audits';
+  STK.view = 'audits'; _setRail('stkRail', '');
   _stkHead('История ревизий', 'загрузка…', false);
   const box = document.getElementById('stkMid');
   box.innerHTML = '<div class="stk-empty">Загрузка…</div>';
@@ -7074,6 +7216,13 @@ function stkRows(){
 
 function stkRenderList(){
   const sh = STK.sheet, box = document.getElementById('stkMid');
+  // Где считали, а где нет — точкой на чипе: это и был единственный смысл
+  // экрана выбора, и теперь он виден, не уходя из района.
+  const dots = {};
+  (STK.districts || []).forEach(d => {
+    dots[d.id] = d.done ? (d.short_aed ? 'dn' : 'ok') : '';
+  });
+  _setRail('stkRail', distRail(STK.district, 'stkGo', dots));
   const rows = stkRows();
   const st = stkStats();
   _stkHead(`${sh.district_code} ${sh.district_name}`,
@@ -7126,14 +7275,14 @@ function stkRenderList(){
           значит их нет на полке.</div>
         <button class="stk-lost-b" onclick="stkScanMissing()">Отметить недостачей</button>
       </div>` : ''}
-      <div class="stk-note">
-        <b>Ревизия.</b> ${coded.length
-          ? 'Всё, что заведено кодами, считает камера: сколько бутылок она увидела, столько и лежит. '
-          : ''}Остальное${hand.length ? ` — ${hand.length} ${
-            pluralize(hand.length,'позиция','позиции','позиций')}` : ''} сверяется глазами:
-        сошлось — галочка, поправили число — крестик встанет сам.
-        Завершить можно, только когда отмечены все ${total}.
-      </div>`
+      ${hand.length ? `<div class="stk-note">
+        <b>${hand.length} ${pluralize(hand.length,'позиция','позиции','позиций')} без кодов</b>
+        — сверяется глазами: сошлось, галочка; поправили число, крестик встанет сам.
+        Ревизия закроется, когда отмечены все ${total}.
+      </div>` : `<div class="stk-note">
+        Ревизия закроется, когда отмечены все ${total} ${
+          pluralize(total,'позиция','позиции','позиций')}.
+      </div>`}`
       + rows.map(r => stkItem(r)).join('')
       + `<button class="stk-fin" id="stkFinBtn" onclick="stkFinishAudit()" disabled>Завершить ревизию</button>
          <div class="stk-fin-hint" id="stkFinHint"></div>`;
@@ -7321,7 +7470,7 @@ const AUD_V = {
 };
 
 async function stkScan(){
-  STK.view = 'scan';
+  STK.view = 'scan'; _setRail('stkRail', '');
   AUD = {rows: [], counts: {}, total: 0, positions: 0};
   const sh = STK.sheet || {};
   _stkHead(`${sh.district_code || ''} ${sh.district_name || ''}`.trim(), 'проход камерой', false);
@@ -7546,9 +7695,14 @@ function stkItem(r){
   const mk = STK.marks[r.id];
   // Откуда взялось число, важнее самого числа: «камера насчитала 12» и «человек
   // вбил 12» — разные утверждения, и в ревизии их надо различать глазами.
+  //
+  // У позиции с кодами камера отвечает вместо расчёта: приписывать к ней ещё и
+  // «на полке столько, не проверяли три дня» значит городить три строки там,
+  // где вопрос уже закрыт.
   if(STK.audit && r.coded)
-    why = (r.scanned == null ? 'камера ещё не дошла' : `камерой ${_stkFmt(r.scanned)}`)
-        + ` из ${_stkFmt(r.coded)} с кодами` + (why ? ' · ' + why : '');
+    why = r.scanned == null
+      ? `камера не дошла · ${_stkFmt(r.coded)} с кодами`
+      : `камерой ${_stkFmt(r.scanned)} из ${_stkFmt(r.coded)}`;
   return `<div class="stk-wrap"><div class="stk-item ${cls}${STK.audit && !mk ? ' aud-todo' : ''}" id="stk-${escS(r.id)}">
     ${STK.audit ? `<div class="stk-mark ${mk||''}" onclick="stkMark('${escS(r.id)}')"
         >${mk === 'ok' ? '✓' : mk === 'diff' ? '✕' : ''}</div>` : ''}
@@ -7860,7 +8014,7 @@ async function stkFinishAudit(){
 }
 
 function stkAuditReport(res){
-  STK.view = 'result'; STK.audit = false;
+  STK.view = 'result'; STK.audit = false; _setRail('stkRail', '');
   const mis = res.mismatched || 0, ok = res.matched || 0;
   _stkHead('Ревизия закрыта',
            `${STK.sheet.district_code} ${STK.sheet.district_name} · ${res.day}`, false);
@@ -8244,6 +8398,7 @@ async function accLoadSummaries(){
 
 function accOpen(id){
   if(id === 'stock'){ openStock(); return; }          // у склада уже свой экран
+  _setRail('accRail', '');
   document.getElementById('accOv').classList.add('show');
   ACC_VIEW = id;
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
@@ -9113,6 +9268,7 @@ let QR_PROD = null, QR_DIST = null, QR_SESSION = 0, QR_LAST = null, QR_CAT = nul
 
 async function accQR(){
   ACC_BACK = null;
+  _setRail('accRail', '');
   _setText('accTitle', 'Внести товар');
   _setText('accSub', 'загрузка…');
   let d;
@@ -9197,6 +9353,7 @@ async function accQR(){
 function _qrHead(title, sub, back){
   _setText('accTitle', title);
   _setText('accSub', sub);
+  _setRail('accRail', '');
   // Подвал принадлежит экрану, а не разделу: «Сканировать бутылки» имеет смысл
   // только на первом, и таскать её за собой по выбору точки незачем.
   document.getElementById('accFoot').innerHTML = '';
@@ -9221,38 +9378,52 @@ function _lockOn(district, product_id){
 
 // Точка первой: одна и та же бутылка на разных точках — разные бутылки, и без
 // точки запись бессмысленна.
-async function qrDistrict(){
+// Переключение точки внутри раздела: пустой id — обзор всех точек.
+function qrGo(id){
+  if(!id){ distRemember('qr', ''); qrDistrict(true); return; }
+  distRemember('qr', id);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  qrPick(id);
+}
+
+async function qrDistrict(force){
   if(!STK.districts){
     try{ STK.districts = (await ownerApi.ownerFetch('/api/owner/stock/status')).districts; }
     catch(e){ STK.districts = []; }
   }
+  // Считают всегда на одной точке и подряд. Спрашивать её на каждом входе —
+  // брать плату за то, что и так известно.
+  const last = distSaved('qr');
+  if(!force && last && (STK.districts || []).some(d => d.id === last)){ qrPick(last); return; }
   const have = (ACC_QR && ACC_QR.by_district) || {};
   const busy = {};
   (ACC_QR?.locks || []).forEach(l => {
     const d = String(l.key || '').split(':')[0];
     busy[d] = (busy[d] || 0) + 1;
   });
-  document.getElementById('accMid').innerHTML =
-    _qrHead('Где считаем', 'выберите точку хранения', accQR) +
-    `<div class="pk-grid">` + ((STK.districts || []).map(d => `
-      <button class="pk-dist" onclick="qrPick('${d.id}')">
-        <span class="pk-code">${escS(d.code)}</span>
-        <span class="pk-dist-b">
-          <span class="pk-dist-n">${escS(d.name)}</span>
-          <span class="pk-dist-s">${busy[d.id]
-            ? `считают ${busy[d.id]} ${pluralize(busy[d.id],'позицию','позиции','позиций')}`
-            : (have[d.id] ? 'в реестре' : 'ещё не считали')}</span>
-        </span>
-        <span class="pk-dist-v">${have[d.id] ? fmt(have[d.id]) : '—'}</span>
-      </button>`).join('') || '<div class="scan-empty">Точки не загрузились</div>') + `</div>`;
+  const head = _qrHead('Где считаем', 'выберите точку хранения', accQR);
+  _setRail('accRail', '');
+  document.getElementById('accMid').innerHTML = head +
+    `<div class="dgrid">` + ((STK.districts || []).map(d => distTile(d, 'qrGo', {
+        cls:   busy[d.id] ? 'busy' : '',
+        value: have[d.id] ? fmt(have[d.id]) : '—',
+        vcls:  have[d.id] ? '' : 'dim',
+        sub:   busy[d.id]
+                 ? `считают ${busy[d.id]} ${pluralize(busy[d.id],'позицию','позиции','позиций')}`
+                 : (have[d.id] ? 'бутылок в реестре' : 'ещё не заводили'),
+      })).join('') || '<div class="scan-empty">Точки не загрузились</div>') + `</div>`;
 }
 
 let QR_CATF = 'all';
 function qrPick(district){
   QR_DIST = district; QR_CATF = 'all';
+  distRemember('qr', district);
   const d = (STK.districts || []).find(x => x.id === district) || {};
-  document.getElementById('accMid').innerHTML =
-    _qrHead('Что сканируем', `${d.code || ''} ${d.name || ''}`.trim(), qrDistrict) +
+  const head = _qrHead('Что сканируем', `${d.code || ''} ${d.name || ''}`.trim(), accQR);
+  // В реестре точка — тот же контекст, что и район в ревизии: полоса сверху,
+  // переключение одним тапом, обзор всех точек — по первому чипу.
+  _setRail('accRail', distRail(district, 'qrGo', null));
+  document.getElementById('accMid').innerHTML = head +
     `<div class="pk-search">
        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
          stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
@@ -9354,6 +9525,8 @@ async function qrStart(pid){
 
 function qrScreen(){
   const d = (STK.districts || []).find(x => x.id === QR_DIST) || {};
+  // На камере переключать точку нечем и незачем: идёт счёт одной полки.
+  _setRail('accRail', '');
   // Камера — герой экрана, всё служебное лежит на ней стеклом: так остаётся
   // место под кадр, а глазу не приходится метаться между камерой и цифрами.
   document.getElementById('accMid').innerHTML = `
@@ -9600,7 +9773,13 @@ async function qrDone(){
   // Отпускаем позицию сразу, а не через четверть часа: следующий может считать.
   try{ await ownerApi.ownerFetch('/api/owner/qr/unlock',
     {method:'POST', body:{district: QR_DIST, product_id: QR_PROD.id}}); }catch(e){}
-  accQR();
+  // Обратно к позициям этой же точки, а не в начало раздела: за одну ходку на
+  // полку считают несколько позиций подряд, и возвращать человека на витрину
+  // значит заставлять его каждый раз пробираться обратно.
+  if(QR_DIST){
+    qrPick(QR_DIST);
+    try{ ACC_QR = await ownerApi.ownerFetch('/api/owner/qr'); qrRenderList(); }catch(e){}
+  }else accQR();
 }
 
 // ─── Поставка ───────────────────────────────────────────────────────────────
@@ -16305,6 +16484,9 @@ function renderHours(h){
       </div>
     </div>
   </div>
+  <!-- Полоса районов живёт между шапкой и списком, вне прокрутки: она про то,
+       где ты находишься, и уезжать вместе с содержимым не должна. -->
+  <div id="stkRail"></div>
   <div class="stk-mid" id="stkMid"></div>
   <div class="stk-bar" id="stkBar">
     <button class="stk-bar-b" id="stkBarPrev" onclick="stkNext(-1)" aria-label="Предыдущая">
@@ -16334,6 +16516,7 @@ function renderHours(h){
       </div>
     </div>
   </div>
+  <div id="accRail"></div>
   <div class="stk-mid" id="accMid"></div>
   <!-- Подвал вне прокручиваемой области. Липкая кнопка внутри списка вставала
        по нижнему краю его содержимого, а не экрана, и на длинном списке

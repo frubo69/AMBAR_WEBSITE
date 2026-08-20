@@ -308,7 +308,12 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 .pbadge.oos{left:8px;top:8px;background:rgba(0,0,0,.7);border:1px solid var(--border2);color:var(--muted)}
 .pimg-box.oos .pimg{filter:grayscale(1) opacity(.55) drop-shadow(0 6px 20px rgba(0,0,0,.7))}
 .oos-overlay{position:absolute;inset:0;z-index:1;background:rgba(0,0,0,.38);display:flex;align-items:center;justify-content:center;color:rgba(255,255,255,.6);font-size:9px;font-weight:700;letter-spacing:2.5px;text-transform:uppercase}
-.pbadge.isnew{right:8px;top:8px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E}
+/* NEW уезжает влево: справа сверху живёт сердечко избранного, и до первой
+   новинки в каталоге они просто ни разу не встретились на одной карточке.
+   Слева стоит «нет в наличии» — если позиция и новая, и кончилась, NEW уходит
+   вниз, а не под неё. */
+.pbadge.isnew{left:8px;top:8px;background:linear-gradient(135deg,var(--gold),var(--gold2));color:#07070E}
+.pimg-box.oos .pbadge.isnew{top:auto;bottom:8px}
 .pinfo{padding:10px 11px 12px;flex:1;display:flex;flex-direction:column;gap:4px}
 .pcat{font-size:8px;letter-spacing:2px;text-transform:uppercase;color:var(--gold);font-weight:600}
 .pname{font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;line-height:1.2}

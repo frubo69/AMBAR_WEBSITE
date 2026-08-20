@@ -904,6 +904,15 @@ async def order_rows(day: str = "") -> dict:
                      "edited": row_edited})
 
     rows.sort(key=lambda r: (-r["need_total"], r["name"]))
+    # Табак считается наравне со всем остальным — норма, остаток, недостача, —
+    # но в заявку магазину не идёт: сигареты мы пока берём в другом месте.
+    # Поэтому он уходит из общих чисел и из книги для магазина в свой список:
+    # сколько докупить, владелец всё равно должен видеть, просто не здесь.
+    import tobacco
+    smokes = [r for r in rows if r["cat"] in tobacco.NON_ALCOHOL]
+    rows = [r for r in rows if r["cat"] not in tobacco.NON_ALCOHOL]
+    total_qty = sum(r["need_total"] for r in rows)
+    total_aed = sum(r["need_total"] * r["price"] for r in rows)
     return {
         "day": day,
         "districts": [{"id": o, "code": OFFICE_CODES.get(o, ""),
@@ -917,7 +926,11 @@ async def order_rows(day: str = "") -> dict:
         "rows": [r for r in rows if r["need_total"] > 0],
         # Весь каталог, включая позиции без потребности: в Excel для
         # магазина едут все, чтобы он мог дописать то, чего мы не заказали.
+        # Табака здесь нет и быть не должно — он закупается мимо магазина.
         "all_rows": rows,
+        "tobacco_rows": [r for r in smokes if r["need_total"] > 0],
+        "tobacco_qty": sum(r["need_total"] for r in smokes),
+        "tobacco_aed": sum(r["need_total"] * r["price"] for r in smokes),
     }
 
 

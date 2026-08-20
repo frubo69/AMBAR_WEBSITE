@@ -464,6 +464,21 @@ async def handle_create_order(request: web.Request) -> web.Response:
             return web.json_response({"error": "debt_not_allowed"},
                                      status=403, headers=CORS_HEADERS)
 
+    # Сигареты — только в паре с алкоголем (правило и его причина в tobacco.py).
+    # Приложение это уже проверило, но корзина живёт на телефоне: решает сервер.
+    # Проверка падает — заказ пропускаем: потерять живой заказ из-за сбоя в
+    # правиле хуже, чем разово увезти одну пачку.
+    try:
+        import tobacco
+        if tobacco.order_blocked(data.get("items") or [],
+                                 await asyncio.to_thread(_load_catalog_by_id)):
+            log.warning(f"[order] uid={uid}: в заказе только табак — отказ")
+            return web.json_response({"error": "tobacco_needs_alcohol",
+                                      "why": tobacco.WHY_RU},
+                                     status=400, headers=CORS_HEADERS)
+    except Exception as e:
+        log.error(f"[tobacco] проверка не выполнена: {e}")
+
     result = await _finalize_accepted_order(data, user, oid, prepaid=prepaid, debt=debt)
     return web.json_response(
         {"ok": True, "order_id": oid, "needs_verification": result["needs_verification"]},
@@ -1105,6 +1120,22 @@ async def handle_crypto_invoice_create(request: web.Request) -> web.Response:
     total_aed = await _recompute_order_total_aed(data.get("items", []), data.get("tip", 0))
     if total_aed <= 0:
         return web.json_response({"error": "bad_total"}, status=400, headers=CORS_HEADERS)
+
+    # Сигареты — только в паре с алкоголем (правило и его причина в tobacco.py).
+    # Приложение это уже проверило, но корзина живёт на телефоне: решает сервер.
+    # Проверка падает — заказ пропускаем: потерять живой заказ из-за сбоя в
+    # правиле хуже, чем разово увезти одну пачку.
+    try:
+        import tobacco
+        if tobacco.order_blocked(data.get("items") or [],
+                                 await asyncio.to_thread(_load_catalog_by_id)):
+            log.warning(f"[order] uid={uid}: в заказе только табак — отказ")
+            return web.json_response({"error": "tobacco_needs_alcohol",
+                                      "why": tobacco.WHY_RU},
+                                     status=400, headers=CORS_HEADERS)
+    except Exception as e:
+        log.error(f"[tobacco] проверка не выполнена: {e}")
+
 
     now_ms = int(time.time() * 1000)
     existing = await db.get_crypto_invoice(oid)

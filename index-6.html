@@ -285,6 +285,18 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 .pimg-box{height:148px;background:linear-gradient(155deg,#0E0E1E,#090916);display:flex;align-items:center;justify-content:center;padding:10px;position:relative;overflow:hidden}
 .pimg-box::after{content:'';position:absolute;inset:0;background:linear-gradient(90deg,transparent,rgba(201,169,110,.11),transparent);transform:translateX(-100%);animation:skSweep 2s linear infinite;z-index:0;pointer-events:none}
 .pimg-box.loaded::after{display:none}
+/* Снимка ещё нет. Раньше на его месте стояла эмодзи-бутылка: она рендерится
+   по-разному на iOS и в вебе, не наследует цвет темы и в тёмно-золотом
+   оформлении выглядит дёшево — а главное, читается как поломка. Вместо неё
+   имя товара золотом: карточка остаётся карточкой, пока едет картинка. */
+.pimg-box.noimg{padding:14px}
+.pimg-box.noimg::before{content:attr(data-nm);position:relative;z-index:1;
+  font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:600;
+  line-height:1.35;text-align:center;color:var(--gold);opacity:.85;
+  letter-spacing:.4px;display:-webkit-box;-webkit-line-clamp:3;
+  -webkit-box-orient:vertical;overflow:hidden}
+.ci-img.noimg{background:linear-gradient(155deg,#0E0E1E,#090916);
+  border:1px solid rgba(201,169,110,.22)}
 /* seamless sweep: the band is fully off-screen at both ends, so the loop never snaps */
 @keyframes skSweep{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
 /* generic skeleton shimmer block (used for points-history loading rows) */
@@ -379,6 +391,29 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 .gift-track i{display:block;height:100%;border-radius:2px;background:var(--gold);
   transition:width .3s cubic-bezier(.4,0,.2,1)}
 .gift-bar.on .gift-track i{background:#4CAF7D}
+/* Сигареты едут только с алкоголем. Плашка стоит над итогом и говорит это до
+   того, как человек ткнёт в «Оформить»: отказ на кнопке — плохая новость,
+   условие, известное заранее, — просто условие. Полосы прогресса здесь нет
+   намеренно: до бесплатной бутылки можно «дособирать», а тут не число, а
+   да/нет — либо в корзине есть бутылка, либо нет. */
+.smoke-bar{display:flex;align-items:flex-start;gap:9px;padding:11px 12px;
+  border-radius:12px;margin-bottom:10px;
+  background:rgba(224,85,85,.09);border:1px solid rgba(224,85,85,.32)}
+.smoke-bar svg{flex-shrink:0;margin-top:1px;stroke:#e07b55}
+.smoke-b{flex:1;min-width:0}
+.smoke-t{font-size:12.5px;font-weight:700;color:#e07b55;line-height:1.3}
+.smoke-s{font-size:11.5px;color:var(--muted);line-height:1.4;margin-top:3px}
+.smoke-go{margin-top:9px;padding:7px 12px;border-radius:9px;font-family:inherit;
+  font-size:11.5px;font-weight:700;cursor:pointer;color:var(--gold2);
+  background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.35)}
+/* Кнопка не исчезает и не блокируется намеренно: нажатие — это вопрос
+   «почему нельзя», и на него надо ответить, а не проглотить. Но выглядеть
+   готовой к нажатию она не должна. */
+.btn-main.locked{opacity:.55}
+/* Подпись под заголовком категории: условие видно там же, где товар. */
+.cat-note{padding:0 14px 8px;margin-top:-4px;font-size:11.5px;color:var(--muted);
+  display:flex;align-items:center;gap:6px}
+.cat-note svg{flex-shrink:0;stroke:#e07b55}
 .total-row{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:12px}
 .total-lbl{font-size:9px;letter-spacing:2.5px;text-transform:uppercase;color:var(--muted);font-weight:600}
 .total-val{font-family:'DM Sans',sans-serif;font-size:28px;color:var(--gold2);font-weight:600}
@@ -779,6 +814,10 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 .pdm-img-box{height:300px;background:linear-gradient(155deg,#0E0E1E,#090916);display:flex;align-items:center;justify-content:center;padding:10px;position:relative;overflow:hidden;touch-action:none}
 .pdm-img-box::after{content:'';position:absolute;width:28px;height:28px;border:2px solid rgba(201,169,110,.15);border-top-color:rgba(201,169,110,.5);border-radius:50%;animation:spin .7s linear infinite;z-index:0;pointer-events:none}
 .pdm-img-box.loaded::after{display:none}
+.pdm-img-box.noimg::before{content:attr(data-nm);position:relative;z-index:1;
+  font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:600;
+  line-height:1.35;text-align:center;color:var(--gold);opacity:.85;
+  letter-spacing:.4px;padding:0 24px}
 .pdm-img{max-height:260px;max-width:85%;object-fit:contain;filter:drop-shadow(0 12px 32px rgba(0,0,0,.8));transform-origin:center center;will-change:transform;user-select:none;pointer-events:none;position:relative;z-index:1}
 .pdm-zoom-hint{position:absolute;bottom:8px;left:50%;transform:translateX(-50%);font-size:10px;color:rgba(255,255,255,.3);pointer-events:none;white-space:nowrap}
 .pdm-body{padding:20px 18px 0}
@@ -1841,6 +1880,17 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
           <span id="gift-txt">—</span>
         </div>
         <div class="gift-track"><i id="gift-fill"></i></div>
+      </div>
+      <div class="smoke-bar" id="smoke-bar" style="display:none">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke-width="1.8"
+             stroke-linecap="round" stroke-linejoin="round">
+          <path d="M2 15h14v4H2zM18 15h1.5v4H18zM21 15h1v4h-1"/>
+          <path d="M13 11c0-2 2-2 2-4s-2-2-2-4"/><path d="M17.5 12c0-1.5 1.5-1.8 1.5-3"/></svg>
+        <span class="smoke-b">
+          <span class="smoke-t" id="smoke-t">Сигареты — только с алкоголем</span>
+          <span class="smoke-s" id="smoke-s"></span>
+          <button class="smoke-go" id="smoke-go" onclick="go('catalog')">Выбрать из бара</button>
+        </span>
       </div>
       <div class="total-row"><span class="total-lbl" id="tot-lbl">ИТОГО</span><span class="total-val"><span id="tot-n">0</span> AED</span></div>
       <button class="btn-main" id="co-btn" onclick="tryOrder()"><span id="co-btn-text">Оформить заказ →</span><span class="btn-hours" id="co-btn-hours">Принимаем заказы с 12:00 до 06:00</span></button>
@@ -3100,6 +3150,11 @@ ru:{
   noOrders:'Заказов пока нет',noActive:'Нет активных заказов',
   stP:'🟡 Ожидает',stC:'🟢 Принят',stD:'✅ Доставлен',stX:'❌ Отменён',
   added:'Добавлено',emptyCart:'Корзина пуста',
+  smokeT:'Сигареты — только с алкоголем',
+  smokeS:'Отдельно сигареты не доставляем. Добавьте что-нибудь из бара — и заказ можно оформить.',
+  smokeGo:'Выбрать из бара',
+  smokeAdded:'Добавили. Сигареты уедут вместе с алкоголем',
+  smokeNote:'только вместе с алкоголем',
   placed:'Заказ оформлен! Ожидайте звонка.',
   activeOrders:'Активные заказы',oos:'НЕТ',oosLabel:'Нет в наличии',
   statOrders:'ЗАКАЗОВ',statActive:'АКТИВНЫХ',statSpent:'ПОТРАЧЕНО',
@@ -3150,6 +3205,11 @@ en:{
   noOrders:'No orders yet',noActive:'No active orders',
   stP:'🟡 Pending',stC:'🟢 Confirmed',stD:'✅ Delivered',stX:'❌ Cancelled',
   added:'Added',emptyCart:'Cart is empty',
+  smokeT:'Cigarettes come with alcohol',
+  smokeS:'We don\'t deliver cigarettes on their own. Add something from the bar and you\'re good to go.',
+  smokeGo:'Pick from the bar',
+  smokeAdded:'Added. Cigarettes ship together with alcohol',
+  smokeNote:'only together with alcohol',
   placed:'Order placed! We\'ll call you.',
   activeOrders:'Active orders',oos:'N/A',oosLabel:'Out of stock',
   statOrders:'ORDERS',statActive:'ACTIVE',statSpent:'SPENT AED',
@@ -6244,7 +6304,7 @@ function renderGrid(){
       const cat=lang==='ru'?p.cat:p.catE;
       if(cat!==lastCat){
         if(lastCat!==null)html+='</div>'; // close previous grid-group
-        html+=`<div class="cat-section-hdr" data-cat="${p.cat}">${cat}</div><div class="grid-group">`;
+        html+=`<div class="cat-section-hdr" data-cat="${p.cat}">${cat}</div>${catNote(p)}<div class="grid-group">`;
         lastCat=cat;
       }
       html+=renderCard(p);
@@ -6262,11 +6322,11 @@ function renderCard(p){
   const desc=lang==='ru'?p.desc:p.descE;
   const catVal=lang==='ru'?p.cat:p.catE;
   return`<div class="pcard" onclick="openPDM('${p.id}')" style="cursor:pointer" data-cat="${p.cat}">
-    <div class="pimg-box${!p.stock?' oos':''}">
+    <div class="pimg-box${!p.stock?' oos':''}" data-nm="${escAttr(lang==='ru'?p.name:p.nameE)}">
       ${!p.stock?`<div class="oos-overlay">${t('oosLabel')}</div>`:''}
       ${p.isNew?`<span class="pbadge isnew">NEW</span>`:''}
       <button class="pfav${favs.has(p.id)?' on':''}" id="pfav-${p.id}" aria-label="${favs.has(p.id)?(lang==='ru'?'Убрать из избранного':'Remove from favourites'):(lang==='ru'?'Добавить в избранное':'Add to favourites')}" aria-pressed="${favs.has(p.id)?'true':'false'}" onclick="event.stopPropagation();toggleFav('${p.id}')" style="z-index:3"><svg viewBox="0 0 24 24" fill="none" stroke="white" stroke-width="2" aria-hidden="true"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg></button>
-      <img class="pimg" src="${p.img}" alt="${p.name}" loading="lazy" decoding="async" onload="this.parentElement.classList.add('loaded')" onerror="this.parentElement.classList.add('loaded');this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 80 80%22><text y=%2268%22 font-size=%2264%22>🍾</text></svg>'">
+      <img class="pimg" src="${p.img}" alt="${p.name}" loading="lazy" decoding="async" onload="this.parentElement.classList.add('loaded')" onerror="this.style.display='none';this.parentElement.classList.add('loaded','noimg')">
     </div>
     <div class="pinfo">
       <div class="pcat">${catVal}</div>
@@ -6323,6 +6383,63 @@ function highlightChip(cat){
   });
 }
 
+/* ── СИГАРЕТЫ ТОЛЬКО С АЛКОГОЛЕМ ───────────────────────────────────────────
+   Пачка за двадцать пять дирхам не окупает ни машину, ни водителя: табак — то,
+   что докладывают к бутылке, а не то, за чем едет доставка.
+
+   Правило одно, а мест, где человек может об него удариться, три: момент
+   добавления, корзина и нажатие «Оформить». Молчать в первых двух и отказать в
+   третьем — худший из вариантов: человек уже выбрал адрес и достал телефон.
+   Поэтому в корзине висит плашка, при добавлении идёт спокойная подсказка, а
+   отказ на кнопке — это уже напоминание, а не новость.
+
+   Тот же расчёт продублирован на сервере (tobacco.py): фронт тут для удобства,
+   а не для защиты.                                                          */
+const SMOKE_CATS=['Сигареты','Cigarettes'];
+function isSmoke(p){ return !!p && SMOKE_CATS.includes(p.cat); }
+// Алкоголь — это весь каталог, кроме табака. Когда появятся снеки или лёд, их
+// надо дописать в SMOKE_CATS-подобный список, а не надеяться, что чипсы не
+// разблокируют пачку.
+function cartSmoke(){
+  let smokes=0,booze=0;
+  for(const [id,q] of Object.entries(cart)){
+    if(!(q>0))continue;
+    const p=P.find(x=>x.id===id); if(!p)continue;
+    if(isSmoke(p))smokes+=q; else booze+=q;
+  }
+  return {smokes,booze,blocked:smokes>0&&booze===0};
+}
+function renderSmokeBar(){
+  const bar=el('smoke-bar'),btn=el('co-btn'); if(!bar)return;
+  const st=cartSmoke();
+  bar.style.display=st.blocked?'flex':'none';
+  if(btn)btn.classList.toggle('locked',st.blocked);
+  if(!st.blocked)return;
+  el('smoke-t').textContent=t('smokeT');
+  el('smoke-s').textContent=t('smokeS');
+  el('smoke-go').textContent=t('smokeGo');
+}
+// Пуш, а не тост: человек нажал «Оформить» и ждёт результата, а получает
+// условие — это событие того же веса, что «заказ принят», и жить оно должно
+// там же, в колокольчике. В ленте хватит одной записи, а всплывать она обязана
+// каждый раз: второй отказ без объяснения выглядит поломкой.
+function smokePush(){
+  addNotification('cart',t('smokeT'),t('smokeS'),{action:'catalog',dedup_key:'smoke_gate'});
+  _showPushToast('cart',t('smokeT'),t('smokeS'));
+  haptic.error();
+}
+// Условие видно там же, где товар, — под заголовком категории. Узнать про пару
+// с алкоголем в корзине уже поздно: человек успел выбрать.
+// В названиях товара живут кавычки и амперсанды — в атрибут они так не лягут.
+function escAttr(v){return String(v==null?'':v).replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');}
+function catNote(p){
+  if(!isSmoke(p))return '';
+  return `<div class="cat-note">
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke-width="1.8"
+         stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/>
+      <path d="M12 8h.01M11 12h1v4h1"/></svg>
+    <span>${t('smokeNote')}</span></div>`;
+}
 function ctrlHTML(p,qty){
   if(qty===0)return`<button class="add-btn"${!p.stock?' disabled':''} onclick="addItem('${p.id}')">+</button>`;
   return`<div class="qctrl"><button class="qb" onclick="chgQty('${p.id}',-1)">−</button><span class="qn">${qty}</span><button class="qb" onclick="chgQty('${p.id}',1)">+</button></div>`;
@@ -6336,7 +6453,10 @@ function addItem(id){
   if(isBeer(p)){openPDM(id);return;}
   const max=p.stockQty||999;
   if((cart[id]||0)>=max){showToast(lang==='ru'?`Доступно: ${max}`:`Only ${max} available`,'err');return;}
-  cart[id]=1;syncCtrl(id);updHdr();haptic.light();showToast(t('added')+': '+p.name,'ok');
+  cart[id]=1;syncCtrl(id);updHdr();haptic.light();
+  // Про условие говорим сразу, но спокойно: это подсказка, а не отказ — пачка
+  // в корзину легла, и никто её оттуда не выкидывает.
+  showToast(isSmoke(p)&&cartSmoke().blocked?t('smokeAdded'):t('added')+': '+p.name,'ok');
 }
 function chgQty(id,d){
   const p=P.find(x=>x.id===id),max=p?(p.stockQty||999):999,nq=(cart[id]||0)+d;
@@ -6377,7 +6497,7 @@ function renderCart(){
     const pcs=isBeerItem?(beerPcs[id]||''):null;
     const displayPrice=(isBeerItem?beerPrice(p,pcs):p.price)*qty;
     const nameLabel=isBeerItem?`${p.name} <span style="color:var(--gold);font-size:12px">${pcs} ${lang==='ru'?'шт':'pcs'}</span>`:p.name;
-    return`<div class="ci-swipe-wrap" data-cid="${id}"><div class="ci-del-bg" onclick="confirmSwipeDel('${id}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></div><div class="ci-swipe-inner"><div class="ci"><img class="ci-img" src="${p.img}" alt="${p.name}" onerror="this.src='data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 52 62%22><text y=%2248%22 font-size=%2240%22>🍾</text></svg>'">
+    return`<div class="ci-swipe-wrap" data-cid="${id}"><div class="ci-del-bg" onclick="confirmSwipeDel('${id}')"><svg viewBox="0 0 24 24"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/><line x1="10" y1="11" x2="10" y2="17"/><line x1="14" y1="11" x2="14" y2="17"/></svg></div><div class="ci-swipe-inner"><div class="ci"><img class="ci-img" src="${p.img}" alt="${p.name}" onerror="this.classList.add('noimg');this.removeAttribute('src')">
       <div class="ci-info"><div class="ci-name">${nameLabel}</div><div class="ci-price">${displayPrice} AED</div></div>
       <div class="qctrl"><button class="qb" onclick="chgQty('${id}',-1)">−</button><span class="qn">${qty}</span><button class="qb" onclick="chgQty('${id}',1)">+</button></div>
     </div></div></div>`;
@@ -6385,7 +6505,7 @@ function renderCart(){
   el('gift-slot').innerHTML=giftRow();
   initCartSwipe();
   el('tot-n').textContent=cartSub()+tip;foot.style.display='block';tipSec.style.display='block';
-  renderGift();
+  renderGift();renderSmokeBar();
   setTimeout(updateCartThumb,0);
 }
 function updateCartThumb(){
@@ -6586,6 +6706,10 @@ function tryOrder(){
   const entries=Object.entries(cart).filter(([,q])=>q>0);
   if(!entries.length){showToast(t('emptyCart'),'err');return;}
 
+  // Одни сигареты дальше корзины не едут. Проверяем до адреса и до оплаты:
+  // отказ на последнем шаге — это потраченное время человека.
+  if(cartSmoke().blocked){ smokePush(); renderSmokeBar(); return; }
+
   // No address → send to address page
   if(activeAddrIdx===null||!getSaved()[activeAddrIdx]){
     showToast(t('noAddrWarning'),'err');
@@ -6631,6 +6755,10 @@ function proceedToCheckout(){
 function placeOrder(){
   const entries=Object.entries(cart).filter(([,q])=>q>0);
   if(!entries.length){showToast(t('emptyCart'),'err');return;}
+
+  // Второй рубеж: до этого экрана с одними сигаретами не дойти, но корзину
+  // правят и в другой вкладке, и с другого телефона.
+  if(cartSmoke().blocked){ smokePush(); go('cart'); return; }
 
   const addr=getSaved()[activeAddrIdx];
   if(!addr){showToast(t('noAddrWarning'),'err');return;}
@@ -6710,12 +6838,22 @@ function placeOrder(){
         // momentarily true (e.g., stale flag) but server says otherwise.
         showVerifyWall();
       }
+    } else if(res.error==='tobacco_needs_alcohol'){
+      // Досюда доходят только те, у кого корзина изменилась мимо приложения.
+      // Возвращаем всё как было: остаться без заказа и без корзины — худшее,
+      // что может случиться после нажатия «Подтвердить».
+      cart={..._snap.cart};beerPcs={..._snap.beerPcs};tip=_snap.tip;saveCart();
+      Object.keys(cart).forEach(id=>syncCtrl(id));updHdr();buildTips();
+      orders=orders.filter(o=>o.order_id!==oid);
+      localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
+      smokePush();go('cart');
     } else {
       console.error('Order API error:', res.error);
     }
   }).catch(err=>{console.error('Order fetch error:', err);});
 
   const _placedIds=Object.keys(cart);
+  const _snap={cart:{...cart},beerPcs:{...beerPcs},tip};
   cart={};beerPcs={};tip=0;saveCart();el('phone-err').classList.remove('on');el('phone-in').classList.remove('err');
   _placedIds.forEach(id=>syncCtrl(id));
   updHdr();buildTips();haptic.success();
@@ -8765,8 +8903,13 @@ function openPDM(id){
   const img=el('pdm-img');
   const imgBox=el('pdm-img-box');imgBox.classList.remove('loaded');
   img.onload=function(){imgBox.classList.add('loaded');};
-  img.src=p.img||'data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><text y="68" font-size="64">🍾</text></svg>';
-  img.onerror=function(){imgBox.classList.add('loaded');this.src='data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 80 80"><text y="68" font-size="64">🍾</text></svg>';};
+  // Снимка нет — на его месте имя золотом, а не эмодзи: см. .pimg-box.noimg.
+  imgBox.classList.remove('noimg');
+  imgBox.dataset.nm=lang==='ru'?p.name:p.nameE;
+  img.style.display='';
+  img.onerror=function(){this.style.display='none';imgBox.classList.add('loaded','noimg');};
+  img.src=p.img||'';
+  if(!p.img){img.onerror();}
   img.style.transform='translate(0px,0px) scale(1)';img.style.transition='';
   el('pdm-cat').textContent=lang==='ru'?p.cat:p.catE;
   // For beer pairs show the base name without "– 12 pcs" suffix

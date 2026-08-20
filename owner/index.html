@@ -1185,6 +1185,25 @@ button.path:active{transform:scale(.995)}
    смотрят. */
 .acc-s{font-size:10.5px;color:var(--muted);margin-top:4px;line-height:1.35;min-height:2.7em;
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
+/* Закупаем отдельно. Табак считается наравне со всем — норма, остаток,
+   недостача, — но едет мимо магазина, и в заявке ему делать нечего. Отдельный
+   блок отвечает на «сколько взять», не притворяясь строкой заказа: править
+   здесь нечего, потому что править нечего и в жизни — файл уходит не сюда. */
+.sep-buy{padding:13px 14px;border-radius:15px;margin-top:14px;background:var(--card);
+  border:1px dashed rgba(201,169,110,.4)}
+.sep-buy-h{display:flex;align-items:center;gap:9px;margin-bottom:10px}
+.sep-buy-t{flex:1;min-width:0;font-size:13px;font-weight:700}
+.sep-buy-t i{display:block;font-style:normal;font-size:11px;color:var(--muted);
+  font-weight:400;margin-top:3px}
+.sep-buy-v{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:20px;
+  font-weight:700;color:var(--gold2);font-variant-numeric:tabular-nums}
+.sep-r{display:flex;align-items:center;gap:10px;padding:9px 0;
+  border-top:1px solid var(--border2)}
+.sep-r-b{flex:1;min-width:0}
+.sep-r-n{display:block;font-size:13px;font-weight:600}
+.sep-r-s{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+.sep-r-v{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:15px;
+  font-weight:700;font-variant-numeric:tabular-nums}
 /* ── Закуп ──────────────────────────────────────────────────────────────────
    Список, в котором каждое число можно переспорить. Свёрнутая строка отвечает
    «что и сколько», раскрытая — «сколько и куда»: правят именно точку, потому
@@ -8459,6 +8478,31 @@ function pathPaint(){
   if(el) el.innerHTML = pathInner();
 }
 
+// Что берём не в магазине. Сигареты считаются тем же расчётом — норма минус
+// остаток, — но в файл магазину не попадают и на общие числа заявки не влияют.
+// Показать их всё равно надо: иначе «сколько докупить» знает только программа.
+function ordSeparate(d, dist){
+  const rows = d.tobacco_rows || [];
+  if(!rows.length) return '';
+  const code = o => (dist.find(x => x.id === o) || {}).code || o;
+  return `<div class="sep-buy">
+    <div class="sep-buy-h">
+      <span class="sep-buy-t">Закупаем отдельно
+        <i>сигареты — берём не в магазине, в заявку и в файл не идут</i></span>
+      <span class="sep-buy-v">${fmt(d.tobacco_qty || 0)}</span>
+    </div>
+    ${rows.map(r => `<div class="sep-r">
+      <span class="sep-r-b">
+        <span class="sep-r-n">${escS(r.name)}</span>
+        <span class="sep-r-s">${Object.entries(r.cells)
+          .filter(([, c]) => c.need)
+          .map(([o, c]) => `${escS(code(o))} ${c.need}`).join(' · ') || 'по норме хватает'}</span>
+      </span>
+      <span class="sep-r-v">${fmt(r.need_total)}</span>
+    </div>`).join('')}
+  </div>`;
+}
+
 // Строки, которые сейчас показываем. По умолчанию — только то, что надо
 // довезти; поиск открывает весь каталог, потому что дозаказать можно и то,
 // чего расчёт не просил.
@@ -8495,7 +8539,8 @@ function ordRender(){
                                   : `Что довезти · ${list.length}`}</div>
     <div id="ordRows">${list.length ? list.map(r => ordRow(r, dist)).join('')
       : '<div class="exp-empty">' + (ORD.q ? 'Ничего не нашлось'
-          : 'Довозить нечего — остатков хватает') + '</div>'}</div>`;
+          : 'Довозить нечего — остатков хватает') + '</div>'}</div>
+    ${ordSeparate(d, dist)}`;
 
   // Кнопка живёт в подвале экрана, а не в конце списка: место у неё одно и
   // постоянное, до него дотягивается большой палец, и список под ней не

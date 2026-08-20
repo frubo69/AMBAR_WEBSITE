@@ -520,9 +520,28 @@ async def handle_import(request):
 
 @require_owner
 async def handle_list(request):
-    """Поставки: что в работе и что уже забрали."""
+    """Поставки: что в работе и что уже забрали.
+
+    Экран заявки спрашивает этот список на каждом открытии и берёт из него
+    только шапку пути. Возвращать вместе с ней по сотне строк товара на каждую
+    из тридцати поставок — это мегабайты ради шести чисел, поэтому список
+    короткий. Кому нужны сами строки, тот открывает поставку.
+
+    Задачи остаются: по ним считается, кто поехал и сколько уже принято, — а
+    это и есть то, ради чего в список смотрят."""
     rows = await db.supply_list(limit=30)
-    return web.json_response({"supplies": rows}, headers=CORS_HEADERS,
+    out = []
+    for r in rows:
+        brief = _sup_brief(r)
+        # Задачи нужны шапке пути на «Закупе»: она считает по ним принятое и
+        # незанятые районы. Оставляем их, но без списков товара внутри.
+        brief["tasks"] = {o: {"driver": t.get("driver", ""),
+                              "scanned": int(t.get("scanned") or 0),
+                              "qty": int(t.get("qty") or 0),
+                              "done_at": str(t.get("done_at") or "")}
+                          for o, t in (r.get("tasks") or {}).items()}
+        out.append(brief)
+    return web.json_response({"supplies": out}, headers=CORS_HEADERS,
                              dumps=lambda o: __import__("json").dumps(o, default=str))
 
 
@@ -1017,6 +1036,60 @@ def _short_book(sup: dict, short: dict):
     return buf.read(), f"AMBAR-shortfall-{sup.get('day') or sup['_id']}.xlsx"
 
 
+# ── деньги закупа ───────────────────────────────────────────────────────────
+# Три числа поставки — просили, дали, приняли — считаются в бутылках, и по ним
+# нельзя понять, дорого вышло или дёшево: пятьдесят бутылок пива и пятьдесят
+# бутылок виски это разные закупы. Поэтому рядом всегда идёт цена.
+#
+# Цена продажная, по прайсу. Закупочной система не знает, и выдавать за неё
+# выдуманную себестоимость — врать в единственной цифре, ради которой карточку
+# и открывают. «По прайсу» — честная мера: она одинаковая для всех строк и
+# позволяет сравнивать закупы между собой.
+def _bottle_price(p: dict) -> float:
+    """Цена одной бутылки. В прайсе пиво стоит ящиком — делим."""
+    price = int(p.get("price_24_full") or p.get("price_full") or p.get("price") or 0)
+    unit = 24 if (p.get("price_24_full") or p.get("price_12_full")) else 1
+    return price / max(1, unit)
+
+
+def _money(sup: dict) -> dict:
+    cat = _catalog_by_id()
+    asked = confirmed = took = 0.0
+    for it in (sup.get("items") or []):
+        pr = _bottle_price(cat.get(it.get("id")) or {})
+        asked += pr * int(it.get("asked") or 0)
+        confirmed += pr * int(it.get("qty") or 0)
+        took += pr * sum(int(v or 0) for v in (it.get("got") or {}).values())
+    # Отказы просили тоже — без них «просили» окажется меньше, чем было на
+    # самом деле, и недобор в деньгах не сойдётся.
+    for d in (sup.get("dropped") or []):
+        asked += _bottle_price(cat.get(d.get("id")) or {}) * int(d.get("asked") or 0)
+    return {"asked": round(asked), "confirmed": round(confirmed), "took": round(took)}
+
+
+def _sup_brief(sup: dict) -> dict:
+    """Строка закупа в истории. Без items и без задач целиком: список читают
+    ради «когда, на сколько и чем кончилось», а весит поставка сотни строк."""
+    tasks = sup.get("tasks") or {}
+    took = sum(sum(int(v or 0) for v in (it.get("got") or {}).values())
+               for it in (sup.get("items") or []))
+    return {
+        "supply_id": sup.get("_id") or sup.get("supply_id") or "",
+        "at": str(sup.get("at") or ""), "day": sup.get("day") or "",
+        "status": sup.get("status") or "open",
+        "asked_qty": int(sup.get("asked_qty") or 0),
+        "total_qty": int(sup.get("total_qty") or 0),
+        "gap_qty": int(sup.get("gap_qty") or 0),
+        "took": took,
+        "positions": len(sup.get("items") or []),
+        "districts": len(tasks),
+        "done": sum(1 for t in tasks.values() if t.get("done_at")),
+        "free": sum(1 for t in tasks.values() if not t.get("driver") and not t.get("done_at")),
+        "drivers": sorted({(t.get("driver") or "") for t in tasks.values() if t.get("driver")}),
+        "money": _money(sup),
+    }
+
+
 async def _supply_view(sup: dict) -> dict:
     sid = sup.get("_id")
     tasks = []
@@ -1037,6 +1110,9 @@ async def _supply_view(sup: dict) -> dict:
         "supply_id": sid, "at": str(sup.get("at") or ""), "day": sup.get("day") or "",
         "unmarked": await _unmarked(sup, short),
         "status": sup.get("status") or "open",
+        "closed_at": str(sup.get("closed_at") or ""),
+        "positions": len(sup.get("items") or []),
+        "money": _money(sup),
         "total_qty": sup.get("total_qty", 0), "asked_qty": sup.get("asked_qty", 0),
         "took": sum(t["got"] for t in tasks),
         "dropped": sup.get("dropped") or [], "short": sup.get("short") or [],

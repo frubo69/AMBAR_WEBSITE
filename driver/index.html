@@ -287,6 +287,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .wo-done-s{font-size:11.5px;color:var(--muted);margin-top:2px}
 .wo-done-n{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;
   color:var(--warn);flex-shrink:0}
+/* Решение владельца по списанию. Пока его нет, бутылки числятся на водителе —
+   и он должен видеть это у себя, а не узнавать в пересчёте. */
+.wo-done.wait{border-color:rgba(243,180,74,.3)}
+.wo-done.no{border-color:rgba(226,106,106,.3)}
+.wo-done-v{font-size:11px;font-weight:700;margin-top:3px}
+.wo-done-v.wait{color:var(--warn)}
+.wo-done-v.no{color:var(--dn)}
+.wo-done-v.ok{color:var(--up)}
 .ord-row-pay.debt{background:var(--warn-soft)}
 .ord-row-pay.debt .ord-method,.ord-row-pay.debt .ord-total{color:var(--warn)}
 .ord-row-pay.paid{background:var(--up-soft)}
@@ -2454,7 +2462,7 @@ async function woSend(){
     await drvApi.drvFetch('/api/driver/writeoff', {method: 'POST', body: {
       item: WO.item, qty: WO.qty, kind: WO.kind, note: WO.note || '',
       photo: WO.photo, thumb: WO.thumb || ''}});
-    WO_LOG.unshift({...snap, at: new Date().toISOString()});
+    WO_LOG.unshift({...snap, state:'pending', at: new Date().toISOString()});
     toast(`Списали: ${snap.name} × ${snap.qty}`);
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
     woClose();
@@ -3994,7 +4002,7 @@ async function supLoad(){
 // закрывают по десять раз за ночь, и «я же записал» должно оставаться видимым.
 var _woAt = 0;
 async function woLoad(){
-  if(Date.now() - _woAt < 30000) return;
+  if(Date.now() - _woAt < 30000) return;   // решение приходит и сообщением в бот
   _woAt = Date.now();
   try{
     const r = await drvApi.drvFetch('/api/driver/writeoffs');
@@ -4076,14 +4084,24 @@ function renderSupply(){
 // Списание живёт на «Товаре» и внизу: бутылка бьётся не по расписанию, и
 // кнопка нужна всегда, но искать её первой не должен никто.
 function woFoot(){
-  const log = WO_LOG.map(w => `<div class="wo-done">
+  // Само по себе «записал» ещё ничего не значит: пока старший не согласовал,
+  // бутылки числятся за водителем. Поэтому у каждой строки видно решение, а не
+  // только факт записи.
+  const VERD = {pending: ['wait', 'ждёт решения старшего'],
+                no:      ['no',   'отклонено — это недостача'],
+                ok:      ['ok',   'принято']};
+  const log = WO_LOG.map(w => {
+    const [cls, txt] = VERD[w.state || 'ok'] || VERD.ok;
+    return `<div class="wo-done ${cls === 'ok' ? '' : cls}">
     ${svg(ICO.trash, 17)}
     <span class="wo-done-b">
       <span class="wo-done-t">${esc(w.name)}</span>
       <span class="wo-done-s">${esc(w.kind)} · ${hhmm(w.at)}</span>
+      <span class="wo-done-v ${cls}">${txt}${
+        w.decided_note ? ' · ' + esc(w.decided_note) : ''}</span>
     </span>
     <span class="wo-done-n">−${w.qty}</span>
-  </div>`).join('');
+  </div>`; }).join('');
   return `<div class="sect" style="margin-top:26px"><span class="sect-t">Списание</span>
       ${WO_LOG.length ? `<span class="sect-v">${WO_LOG.length}</span>` : ''}</div>
     ${log}
@@ -4091,7 +4109,7 @@ function woFoot(){
       onclick="woOpen()">${svg(ICO.trash, 17)}Списать бой или брак</button>
     <div style="margin-top:9px;font-size:12px;line-height:1.5;color:var(--muted);
       text-align:center;padding:0 14px">Разбилось, потекло, вышел срок — запишите
-      с фотографией, чтобы это не превратилось в недостачу</div>`;
+      с фотографией. Старший согласует, и это перестанет быть недостачей</div>`;
 }
 
 async function supClaim(sid, oid){

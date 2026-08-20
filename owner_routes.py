@@ -1770,6 +1770,89 @@ async def notify_owners(event_key: str, text: str, parse_mode: str = "Markdown",
     return sent
 
 
+async def notify_owners_photo(event_key: str, caption: str, photo: bytes,
+                              reply_markup: dict | None = None,
+                              parse_mode: str = "HTML") -> list:
+    """То же, что notify_owners, но снимком.
+
+    Есть события, где фотография и есть сообщение: списание доказывается
+    разбитой бутылкой, а не строкой текста. Пересказывать её словами и звать
+    владельца в приложение ради картинки — лишний шаг там, где решение
+    принимается за секунду.
+
+    Возвращает список {"chat_id", "message_id"} — по нему потом снимают кнопки
+    у остальных владельцев, когда кто-то один уже решил."""
+    try:
+        # В приложении лента уведомлений — просто текст. Разметка подписи там
+        # была бы видна тегами, поэтому храним её без них.
+        await db.insert_notification(event_key, re.sub(r"<[^>]+>", "", caption))
+    except Exception as e:
+        log.error(f"[owner-notif] persist failed for {event_key}: {e}")
+    sent = []
+    if not OWNER_BOT_TOKEN or not photo:
+        return sent
+    try:
+        owner_ids = await db.get_owners_subscribed_to(event_key)
+    except Exception as e:
+        log.error(f"[owner-notif] subscriber lookup failed for {event_key}: {e}")
+        return sent
+    log.info(f"[owner-notif] {event_key} (photo) → {owner_ids}")
+    for oid in owner_ids:
+        try:
+            res = await tg_send_photo_bytes(OWNER_BOT_TOKEN, oid, photo, caption,
+                                            parse_mode=parse_mode,
+                                            reply_markup=reply_markup)
+            if res and res.get("ok"):
+                sent.append({"chat_id": oid, "message_id": res["result"]["message_id"]})
+            else:
+                log.error(f"[owner-notif] photo {event_key} → {oid}: {res}")
+        except Exception as e:
+            log.error(f"[owner-notif] photo {event_key} → {oid} failed: {e}")
+    return sent
+
+
+async def tg_send_photo_bytes(token, chat_id, photo: bytes, caption: str = "",
+                              parse_mode: str = "HTML",
+                              reply_markup: dict | None = None):
+    """Снимок из памяти, а не из файла: фотографии списаний лежат в базе, и
+    выкладывать их на диск ради отправки незачем."""
+    import aiohttp as _ah
+    data = _ah.FormData()
+    data.add_field("chat_id", str(chat_id))
+    if caption:
+        data.add_field("caption", caption[:1024])
+        if parse_mode:
+            data.add_field("parse_mode", parse_mode)
+    if reply_markup:
+        data.add_field("reply_markup", json.dumps(reply_markup))
+    data.add_field("photo", photo, filename="photo.jpg", content_type="image/jpeg")
+    async with _ah.ClientSession() as sess:
+        async with sess.post(f"https://api.telegram.org/bot{token}/sendPhoto",
+                             data=data) as r:
+            return await r.json()
+
+
+async def tg_edit_caption(token, chat_id, message_id, caption: str,
+                          parse_mode: str = "HTML", reply_markup=None):
+    """Переписать подпись у уже отправленного снимка — и убрать кнопки.
+
+    Кнопка, которая больше ничего не делает, хуже отсутствующей: по ней жмут и
+    получают отказ, не понимая, что вопрос давно решён."""
+    import aiohttp as _ah
+    payload = {"chat_id": chat_id, "message_id": message_id,
+               "caption": caption[:1024], "parse_mode": parse_mode,
+               "reply_markup": json.dumps(reply_markup or {"inline_keyboard": []})}
+    try:
+        async with _ah.ClientSession() as sess:
+            async with sess.post(
+                    f"https://api.telegram.org/bot{token}/editMessageCaption",
+                    json=payload) as r:
+                return await r.json()
+    except Exception as e:
+        log.debug(f"tg_edit_caption {chat_id}/{message_id}: {e}")
+        return None
+
+
 async def notify_owners_force(event_key: str, text: str, parse_mode: str = "Markdown") -> None:
     """Send to EVERY owner/manager, bypassing prefs + quiet hours — for critical
     alerts (crypto-paid orders, order edits) that must always be seen."""

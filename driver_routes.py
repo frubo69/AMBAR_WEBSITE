@@ -515,23 +515,56 @@ async def handle_writeoff_add(request):
     except Exception as e:
         log.warning(f"[writeoff] кэш заявки не сброшен: {e}")
     log.info(f"[writeoff] {me['name']} ({me.get('district_code','')}): "
-             f"{kind} · {cat[pid].get('name','')} × {qty}")
-    await _writeoff_tell(me, cat[pid].get("name", ""), qty, kind,
-                         (body.get("note") or "").strip()[:200])
-    return web.json_response({"ok": True, "id": wid}, headers=CORS_HEADERS)
+             f"{kind} · {cat[pid].get('name','')} × {qty} · ждёт согласования")
+    await _writeoff_tell(wid, me, cat[pid], qty, kind,
+                         (body.get("note") or "").strip()[:200], photo)
+    return web.json_response({"ok": True, "id": wid, "state": "pending"},
+                             headers=CORS_HEADERS)
 
 
-async def _writeoff_tell(me: dict, name: str, qty: int, kind: str, note: str):
-    """Владельцу — сразу. Списание это убыток, и узнавать о нём из отчёта в
-    конце месяца поздно: спросить «как это вышло» можно только по горячему."""
+async def _writeoff_tell(wid: str, me: dict, p: dict, qty: int, kind: str,
+                         note: str, photo: bytes):
+    """Владельцу — сразу, и сразу же снимком с двумя кнопками.
+
+    Списание ждёт его решения: до «Согласовать» товар со склада не вычитается.
+    Значит сообщение — не новость, а вопрос, и отвечать на него надо там же,
+    где он задан. Гонять владельца в приложение ради двух кнопок под
+    фотографией, которую он и так видит, — лишний шаг в единственном месте,
+    где решение занимает секунду.
+
+    Снимок здесь тот же, что ушёл в базу: он и есть всё доказательство, и
+    пересказ его словами ничего не решает."""
     try:
-        from owner_routes import notify_owners
-        await notify_owners(
-            "stock.writeoff",
-            f"🗑 *Списание · {kind}*\n"
-            f"{name} × {qty}\n"
-            f"{me['name']} ({me.get('district_code') or '—'})"
-            + (f"\n_{note}_" if note else ""))
+        import writeoff_msg as wm
+        from owner_routes import notify_owners_photo
+        # Цена продажная, «по прайсу»: закупочной система не знает, а выдумывать
+        # себестоимость в сообщении о убытке — врать в цифре, по которой примут
+        # решение. Делим на единицу учёта: списывают бутылки, а пиво в прайсе
+        # стоит ящиком.
+        price = int(p.get("price_24_full") or p.get("price_full") or p.get("price") or 0)
+        unit = 24 if p.get("price_24_full") or p.get("price_12_full") else 1
+        aed = round(price / max(1, unit) * qty)
+        cap = wm.caption(p.get("name", ""), qty, kind, me["name"],
+                         me.get("district_code") or "", note, aed)
+        sent = await notify_owners_photo("stock.writeoff", cap, photo,
+                                         reply_markup=wm.keyboard(wid))
+        # Запоминаем, куда ушло: когда один владелец решит, у остальных надо
+        # снять кнопки — иначе второй жмёт по решённому и упирается в отказ.
+        if sent:
+            await db.writeoff_note_msg(wid, sent)
+        else:
+            # Снимок не ушёл — телеграм отказал, картинка не открылась, что
+            # угодно. Вопрос всё равно должен дойти: несогласованное списание
+            # висит и держит товар на полке, и молчать о нём нельзя. Без
+            # кнопок — решать придётся в приложении.
+            from owner_routes import notify_owners
+            await notify_owners(
+                "stock.writeoff",
+                f"Списание · {kind}\n{p.get('name','')} × {qty}"
+                f" · {aed} AED\n{me['name']} ({me.get('district_code') or '—'})"
+                + (f"\n{note}" if note else "")
+                + "\n\nЖдёт согласования в панели — со склада не вычтено.",
+                parse_mode=None)
     except Exception as e:
         log.warning(f"[writeoff] владельцу не ушло: {e}")
 
@@ -547,6 +580,11 @@ async def handle_writeoffs(request):
     return web.json_response({"day": day, "rows": [{
         "id": r.get("_id"), "item": r.get("item"), "name": r.get("name", ""),
         "qty": int(r.get("qty") or 0), "kind": r.get("kind", ""),
+        # Решение владельца водитель должен видеть у себя: пока списание висит
+        # несогласованным, эти бутылки числятся за ним, и узнавать об этом в
+        # конце смены поздно.
+        "state": r.get("state") or "ok",
+        "decided_note": r.get("decided_note", ""),
         # isoformat, а не str(): у str разделитель — пробел, и сафари такую
         # дату не разбирает вовсе.
         "note": r.get("note", ""), "at": _iso(r.get("at")),

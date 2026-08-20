@@ -486,6 +486,17 @@ async def handle_sheet(request):
     existing = await db.get_stock_count(district, day)
     done = {l["id"]: l for l in (existing or {}).get("lines", [])}
     cat = _catalog()
+    # Ревизию проходят камерой: у позиции, бутылки которой заведены кодами,
+    # факт берётся из прохода, а не с клавиатуры. Поэтому лист должен знать
+    # две вещи про каждую строку — сколько бутылок у неё с кодами и сколько
+    # из них сегодня увидела камера. Разница между ними и есть недостача.
+    try:
+        codes = await db.qr_by_product_district(district)
+        scanned = await db.audit_scan_counts(district, day)
+        scan_stats = await db.audit_scan_stats(district, day)
+    except Exception as e:
+        log.warning(f"[stock] проход камерой не прочитан ({district}): {e}")
+        codes, scanned, scan_stats = {}, {}, {"total": 0, "odd": 0, "at": ""}
 
     # Когда каждую позицию последний раз считали руками. Продажи вычитаются
     # сами, но бой и воровство продажами не считаются — позицию, которую давно
@@ -529,6 +540,11 @@ async def handle_sheet(request):
             # Отметка ревизии: ok — проверено и сошлось, diff — расхождение.
             # Хранится с прошлого захода, иначе ревизию нельзя прервать.
             "mark": (done.get(pid) or {}).get("mark"),
+            # Сколько бутылок позиции заведено кодами и сколько из них увидела
+            # камера. None — не увидела ни одной: это не ноль, а «до полки ещё
+            # не дошли», и путать их нельзя.
+            "coded": _num(codes.get(pid, 0) / unit) if codes.get(pid) else 0,
+            "scanned": _num(scanned[pid] / unit) if pid in scanned else None,
         })
     # Сначала то, где расхождение видно сразу (двигалось), потом то, что давно
     # не проверяли: именно там прячутся бой и недостача без продаж. А внутри
@@ -542,6 +558,11 @@ async def handle_sheet(request):
         "district_code": OFFICE_CODES.get(district, ""),
         "day": day, "first_time": first_time, "from_registry": from_registry,
         "prev_day": (prev or {}).get("day", ""),
+        # Проход камерой: сколько бутылок записано, сколько позиций он закрыл и
+        # у скольких позиций коды вообще есть. Последнее — потолок скана: то,
+        # что кодами не заведено, придётся считать глазами.
+        "scan": {**scan_stats, "positions": len(scanned),
+                 "coded_positions": sum(1 for pid in codes if codes[pid])},
         "audit": {
             "started_at":  (existing or {}).get("audit_started_at", ""),
             "finished_at": (existing or {}).get("audit_finished_at", ""),
@@ -651,6 +672,13 @@ async def handle_save(request):
            "over_qty": _num(over_qty),
            "counted_qty": counted_qty, "total_qty": len(lines)}
     if is_audit or marked:
+        # Чем проходили ревизию — часть её итога. Через месяц «сошлось» от
+        # ревизии, пройденной камерой, и от ревизии, отмеченной галочками,
+        # стоят разного, и в истории это должно быть видно.
+        try:
+            doc["scan_qty"] = (await db.audit_scan_stats(district, day)).get("total", 0)
+        except Exception as e:
+            log.warning(f"[stock] проход камерой не записан ({district}): {e}")
         doc["audit_started_at"] = prev_doc.get("audit_started_at") or now_iso
         doc["marked_qty"] = marked
         doc["matched_qty"] = matched
@@ -668,6 +696,7 @@ async def handle_save(request):
          "over_qty": _num(over_qty),
          "counted_qty": counted_qty, "total_qty": len(lines),
          "audit": bool(is_audit or marked), "finished": bool(finish),
+         "scan_qty": int(doc.get("scan_qty") or 0),
          "marked": marked, "matched": matched, "mismatched": mismatched,
          "lines": [l for l in lines if l["diff"]]}, headers=CORS_HEADERS)
 
@@ -1006,13 +1035,170 @@ async def handle_status(request):
         "short_aed": int((by_d.get(oid) or {}).get("short_aed") or 0),
         "counted_at": (by_d.get(oid) or {}).get("counted_at", ""),
     } for oid in OFFICE_IDS]
+    # Сколько списаний ждёт решения — здесь, а не в своём разделе: панель учёта
+    # тянет этот ответ и так, а список списаний вместе с превью снимков весит
+    # мегабайты и ради одного числа его грузить незачем.
+    try:
+        pend = len(await db.writeoff_pending(limit=200))
+    except Exception as e:
+        log.warning(f"[stock] очередь списаний не посчитана: {e}")
+        pend = 0
     return web.json_response({
         "day": day,
         "done": sum(1 for d in districts if d["done"]), "total": len(districts),
         "short_aed": sum(d["short_aed"] for d in districts),
         "short_qty": sum(d["short_qty"] for d in districts),
+        "writeoff_pending": pend,
         "districts": districts,
     }, headers=CORS_HEADERS)
+
+
+# ── ревизия сканированием ───────────────────────────────────────────────────
+# Ревизия отвечает на вопрос «что лежит на полке», и честнее камеры на него не
+# отвечает ничто: галочка означает «посмотрел», а код означает «вот эта самая
+# бутылка, и вот она здесь». Поэтому проход камерой идёт по всему району
+# подряд, без выбора позиции: каждый код сам находит свою строку, а то, чего
+# камера не увидела, остаётся недостачей.
+#
+# Вердикт считает сервер, а не приложение: правило одно на всех, и подменить
+# его с телефона нельзя.
+#
+#   ok       наша бутылка, заведена на этой точке — так и должно быть
+#   other    наша, но числится на другом районе: физически она здесь, значит
+#            здесь и считаем, а расхождение по бумагам показываем глазами
+#   written  списанная бутылка на полке: либо списали зря, либо не ту
+#   sold     ушла с заказом, а лежит здесь — то же самое, вопрос к учёту
+#   alien    в реестре нет вовсе: код с чужой наклейки или бутылка, которую
+#            не завели. Такую в счёт не берём — приписать её некуда
+def _scan_verdict(doc: dict, district: str) -> str:
+    if not doc:
+        return "alien"
+    st = (doc.get("status") or "active").strip()
+    if st == "written":
+        return "written"
+    if (doc.get("district") or "").strip() != district:
+        return "other"
+    return "sold" if st == "sold" else "ok"
+
+
+def _scan_state(district: str, day: str, counts: dict, odd: list,
+                stats: dict, cat: dict) -> dict:
+    """Состояние прохода — одинаковое и после скана, и при открытии экрана."""
+    return {
+        "district": district, "day": day, **stats,
+        "counts": counts,
+        "positions": len(counts),
+        "odd": [{"code": o.get("code", ""), "verdict": o.get("verdict", ""),
+                 "label": o.get("label", ""),
+                 "name": o.get("product_name", "") or
+                         (cat.get(o.get("product_id") or "") or {}).get("name", ""),
+                 "at": _iso_of(o.get("at"))} for o in odd],
+    }
+
+
+@require_owner
+async def handle_audit_scan(request):
+    """Записать бутылку в проход. body: {district, code, day?}
+
+    Повтор — не ошибка человека, а обычное дело: камера легко ловит ту же
+    крышку дважды. Поэтому отвечаем спокойно и говорим, что эта бутылка уже
+    посчитана; вставить её вторым разом всё равно нельзя — ключ занят."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    district = str(body.get("district") or "").strip()
+    if district not in OFFICE_IDS:
+        return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+    day = str(body.get("day") or "").strip() or _biz_day()
+    import re as _re
+    code = _re.sub(r"\s+", "", str(body.get("code") or ""))[:120]
+    if not code:
+        return web.json_response({"error": "empty_code"}, status=400, headers=CORS_HEADERS)
+
+    doc = await db.qr_get(code)
+    verdict = _scan_verdict(doc, district)
+    pid = (doc or {}).get("product_id") or ""
+    cat = _catalog()
+    p = cat.get(pid) or {}
+    fresh = await db.audit_scan_add(district, day, code, {
+        "at": datetime.now(timezone.utc), "by": request["owner_id"],
+        "product_id": pid if verdict != "alien" else "",
+        "product_name": (doc or {}).get("product_name") or p.get("name", ""),
+        "label": (doc or {}).get("label") or "",
+        "verdict": verdict,
+        "home": (doc or {}).get("district") or "",
+    })
+    counts = await db.audit_scan_counts(district, day)
+    unit = _unit(p) if p else 1
+    if verdict == "alien":
+        log.warning(f"[audit] {district}: код не из реестра — {code[:40]}")
+    return web.json_response({
+        "ok": True, "new": fresh, "code": code, "verdict": verdict,
+        "product_id": pid, "name": (doc or {}).get("product_name") or p.get("name", ""),
+        "label": (doc or {}).get("label") or "",
+        "home": (doc or {}).get("district") or "",
+        "home_code": OFFICE_CODES.get((doc or {}).get("district") or "", ""),
+        # Счёт по позиции — в бутылках: на экране скана человек считает
+        # бутылки, а не ящики, и делить их пополам там незачем.
+        "count": int(counts.get(pid) or 0),
+        "unit": unit,
+        "total": sum(counts.values()),
+        "positions": len(counts),
+    }, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_audit_scan_state(request):
+    """Что уже насчитал проход. Экран открывается не с нуля: ревизию прерывают
+    и возвращаются к ней, и человек должен видеть, продолжает он счёт или
+    начинает заново."""
+    district = (request.query.get("district") or "").strip()
+    if district not in OFFICE_IDS:
+        return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+    day = (request.query.get("day") or "").strip() or _biz_day()
+    return web.json_response(
+        _scan_state(district, day, await db.audit_scan_counts(district, day),
+                    await db.audit_scan_odd(district, day),
+                    await db.audit_scan_stats(district, day), _catalog()),
+        headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_audit_scan_undo(request):
+    """Убрать бутылку из прохода — ту, которую только что записали зря.
+
+    Убираем конкретный код, а не «последний по базе»: район могут проходить
+    вдвоём, и последним окажется чужой скан."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    district = str(body.get("district") or "").strip()
+    day = str(body.get("day") or "").strip() or _biz_day()
+    import re as _re
+    code = _re.sub(r"\s+", "", str(body.get("code") or ""))[:120]
+    ok = await db.audit_scan_del(district, day, code)
+    counts = await db.audit_scan_counts(district, day)
+    return web.json_response({"ok": ok, "code": code, "total": sum(counts.values()),
+                              "positions": len(counts)}, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_audit_scan_reset(request):
+    """Начать проход заново. Нужно редко и всегда по одной причине: посреди
+    ревизии выяснилось, что считали не ту полку."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    district = str(body.get("district") or "").strip()
+    if district not in OFFICE_IDS:
+        return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+    day = str(body.get("day") or "").strip() or _biz_day()
+    n = await db.audit_scan_clear(district, day)
+    log.info(f"[audit] {district} {day}: проход сброшен, снято {n}")
+    return web.json_response({"ok": True, "removed": n}, headers=CORS_HEADERS)
 
 
 @require_owner
@@ -1027,6 +1213,7 @@ async def handle_audits(request):
             "district_code": OFFICE_CODES.get(c.get("district"), ""),
             "district_name": OFFICE_NAMES.get(c.get("district"), c.get("district", "")),
             "day": c.get("day", ""),
+            "scan_qty": int(c.get("scan_qty") or 0),
             "started_at": c.get("audit_started_at", ""),
             "finished_at": c.get("audit_finished_at", ""),
             "total": int(c.get("total_qty") or 0),
@@ -1167,11 +1354,41 @@ async def handle_shift_log(request):
 
 
 # ── Списания ────────────────────────────────────────────────────────────────
+def _wo_row(r: dict, cat: dict) -> dict:
+    """Одна строка списания для владельца — и в очереди, и в истории."""
+    qty = int(r.get("qty") or 0)
+    pid = r.get("item") or ""
+    # Считаем и деньги: «пять бутылок» и «пять бутылок Хеннесси» — разные
+    # новости, а понять это по названию можно, только зная прайс наизусть.
+    # Цена продажная: закупочной система не знает, и честнее назвать это
+    # «по прайсу», чем выдать выдуманную себестоимость за факт. Делим на
+    # единицу учёта: списывают бутылки, а цена у пива — за ящик.
+    p = cat.get(pid) or {}
+    return {
+        "id": r.get("_id"), "at": _iso_of(r.get("at")), "day": r.get("day", ""),
+        "item": pid, "name": r.get("name", "") or p.get("name", ""),
+        "qty": qty, "aed": round(_price(p) / max(1, _unit(p)) * qty, 2),
+        "kind": r.get("kind", ""), "note": r.get("note", ""),
+        "by": r.get("by", ""), "district": r.get("district", ""),
+        "district_code": r.get("district_code", ""), "thumb": r.get("thumb", ""),
+        # Списания старше согласования поля не имеют вовсе — они были учтены
+        # сразу, и показывать их вечно ждущими решения нельзя.
+        "state": r.get("state") or "ok",
+        "decided_at": _iso_of(r.get("decided_at")) if r.get("decided_at") else "",
+        "decided_by_name": r.get("decided_by_name", ""),
+        "decided_note": r.get("decided_note", ""),
+    }
+
+
 @require_owner
 async def handle_writeoffs(request):
     """История боя и брака. Фотографии — отдельными запросами: тридцать
     снимков в одном ответе это тридцать мегабайт, и открывался бы раздел
-    полминуты ради списка из восьми строк."""
+    полминуты ради списка из восьми строк.
+
+    Ждущие решения идут отдельным списком и без окна в тридцать дней: пока
+    списание не согласовано, товар числится на полке, и забытая заявка
+    недельной давности — это расхождение, которое некому объяснить."""
     try:
         days = max(1, min(180, int(request.query.get("days", "30") or 30)))
     except ValueError:
@@ -1179,37 +1396,116 @@ async def handle_writeoffs(request):
     since = datetime.now(timezone.utc) - timedelta(days=days)
     rows = await db.writeoff_list(since=since, limit=400)
     cat = _catalog()
+    pend = [_wo_row(r, cat) for r in await db.writeoff_pending(limit=200)]
     out, by_kind, by_driver = [], {}, {}
     for r in rows:
-        qty = int(r.get("qty") or 0)
-        pid = r.get("item") or ""
-        # Считаем и деньги: «пять бутылок» и «пять бутылок Хеннесси» — разные
-        # новости, а понять это по названию можно, только зная прайс наизусть.
-        # Цена продажная: закупочной система не знает, и честнее назвать это
-        # «по прайсу», чем выдать выдуманную себестоимость за факт. Делим на
-        # единицу учёта: списывают бутылки, а цена у пива — за ящик.
-        p = cat.get(pid) or {}
-        aed = round(_price(p) / max(1, _unit(p)) * qty, 2)
-        out.append({
-            "id": r.get("_id"), "at": _iso_of(r.get("at")), "day": r.get("day", ""),
-            "item": pid, "name": r.get("name", "") or (cat.get(pid) or {}).get("name", ""),
-            "qty": qty, "aed": aed, "kind": r.get("kind", ""), "note": r.get("note", ""),
-            "by": r.get("by", ""), "district": r.get("district", ""),
-            "district_code": r.get("district_code", ""), "thumb": r.get("thumb", ""),
-        })
-        k = by_kind.setdefault(r.get("kind", "—"), {"kind": r.get("kind", "—"),
-                                                    "qty": 0, "aed": 0.0})
+        if (r.get("state") or "ok") == "pending":
+            continue        # висит в очереди сверху, второй раз не показываем
+        v = _wo_row(r, cat)
+        out.append(v)
+        # Отклонённое в деньги не идёт: это не убыток, а недостача, и складывать
+        # их в одну сумму значит потерять разницу между «разбили» и «пропало».
+        if v["state"] == "no":
+            continue
+        qty, aed = v["qty"], v["aed"]
+        k = by_kind.setdefault(v["kind"] or "—", {"kind": v["kind"] or "—",
+                                                  "qty": 0, "aed": 0.0})
         k["qty"] += qty; k["aed"] = round(k["aed"] + aed, 2)
-        d = by_driver.setdefault(r.get("by", "—"), {"driver": r.get("by", "—"),
-                                                    "qty": 0, "aed": 0.0, "n": 0})
+        d = by_driver.setdefault(v["by"] or "—", {"driver": v["by"] or "—",
+                                                  "qty": 0, "aed": 0.0, "n": 0})
         d["qty"] += qty; d["aed"] = round(d["aed"] + aed, 2); d["n"] += 1
+    ok_rows = [x for x in out if x["state"] != "no"]
     return web.json_response({
-        "days": days, "rows": out,
-        "total_qty": sum(x["qty"] for x in out),
-        "total_aed": round(sum(x["aed"] for x in out), 2),
+        "days": days, "rows": out, "pending": pend,
+        "pending_qty": sum(x["qty"] for x in pend),
+        "pending_aed": round(sum(x["aed"] for x in pend), 2),
+        "total_qty": sum(x["qty"] for x in ok_rows),
+        "total_aed": round(sum(x["aed"] for x in ok_rows), 2),
         "by_kind": sorted(by_kind.values(), key=lambda x: -x["qty"]),
         "by_driver": sorted(by_driver.values(), key=lambda x: -x["qty"]),
     }, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_writeoff_decide(request):
+    """Согласовать списание или отклонить. body: {ok: bool, note?, as?}
+
+    До решения бутылки со склада не вычтены: списание — это заявление
+    водителя, а фотография доказывает, что бутылка разбита, но не то, что она
+    была наша и стояла на полке. Согласование и есть та черта, после которой
+    заявление становится убытком компании.
+
+    Отклонение ничего не удаляет. Запись остаётся, но в остаток не идёт —
+    значит эти бутылки вылезут недостачей в ближайшем пересчёте, у того, у
+    кого они пропали. Это и есть весь смысл: отказ не спор о фотографии, а
+    возврат вопроса на полку."""
+    wid = (request.match_info.get("wid") or "").strip()
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    ok = bool(body.get("ok"))
+    note = str(body.get("note") or "").strip()[:200]
+    who = str(body.get("as") or "").strip()[:60]
+    doc = await db.writeoff_decide(wid, ok, request.get("owner_id") or 0, who, note)
+    if not doc:
+        cur = await db.writeoff_get(wid)
+        if not cur:
+            return web.json_response({"error": "not_found"}, status=404,
+                                     headers=CORS_HEADERS)
+        # Решение уже принято — вторым нажатием его не переписывают. Это не
+        # ошибка вызывающего: два владельца видят одну очередь.
+        return web.json_response({"error": "already_decided",
+                                  "state": cur.get("state") or "ok",
+                                  "by": cur.get("decided_by_name", "")},
+                                 status=409, headers=CORS_HEADERS)
+    if ok:
+        base_drop()          # остаток изменился — заявку считать заново
+    log.info(f"[writeoff] {wid}: {'согласовано' if ok else 'отклонено'} "
+             f"({who or request.get('owner_id')})")
+    await _writeoff_after(doc, ok, who)
+    return web.json_response({"ok": True, "id": wid, "state": doc.get("state")},
+                             headers=CORS_HEADERS)
+
+
+async def _writeoff_after(doc: dict, ok: bool, by_name: str = ""):
+    """Что происходит после решения, кроме самой записи.
+
+    Первое — снять кнопки в чатах владельцев. Кнопка, которая больше ничего не
+    делает, хуже отсутствующей: по ней жмут и получают отказ, не понимая, что
+    вопрос давно закрыт.
+
+    Второе — сказать водителю. Он ждёт ответа: от него зависит, зачтён ему бой
+    или эти бутылки спросят с него в пересчёте."""
+    import writeoff_msg as wm
+    try:
+        from owner_routes import tg_edit_caption, OWNER_BOT_TOKEN
+        cat = _catalog()
+        p = cat.get(doc.get("item") or "") or {}
+        base = wm.caption(doc.get("name", "") or p.get("name", ""),
+                          int(doc.get("qty") or 0), doc.get("kind", ""),
+                          doc.get("by", ""), doc.get("district_code", ""),
+                          doc.get("note", ""),
+                          round(_price(p) / max(1, _unit(p)) * int(doc.get("qty") or 0)))
+        cap = wm.decided_caption(base, ok, by_name)
+        for m in (doc.get("msgs") or []):
+            await tg_edit_caption(OWNER_BOT_TOKEN, m.get("chat_id"),
+                                  m.get("message_id"), cap)
+    except Exception as e:
+        log.warning(f"[writeoff] кнопки не сняты: {e}")
+    try:
+        import os as _os
+        import config_staff as _staff
+        from api_server import tg_send
+        tid = _staff.DRIVER_IDS.get((doc.get("by") or "").strip())
+        token = _os.getenv("DRIVER_BOT_TOKEN", "")
+        if tid and token:
+            await tg_send(token, tid,
+                          wm.driver_text(doc.get("name", ""), int(doc.get("qty") or 0),
+                                         ok, doc.get("decided_note", "")),
+                          parse_mode=None)
+    except Exception as e:
+        log.warning(f"[writeoff] водителю не ушло: {e}")
 
 
 @require_owner
@@ -1238,6 +1534,10 @@ def setup(app):
         ("/api/owner/stock/order/reset", handle_order_reset, "POST"),
         ("/api/owner/stock/transfers", handle_transfers, "GET"),
         ("/api/owner/stock/audits",    handle_audits,    "GET"),
+        ("/api/owner/stock/audit/scan",       handle_audit_scan_state, "GET"),
+        ("/api/owner/stock/audit/scan",       handle_audit_scan,       "POST"),
+        ("/api/owner/stock/audit/scan/undo",  handle_audit_scan_undo,  "POST"),
+        ("/api/owner/stock/audit/scan/reset", handle_audit_scan_reset, "POST"),
         ("/api/owner/stock/count",     handle_save,      "POST"),
         ("/api/owner/stock/transfer",  handle_transfer,  "POST"),
         ("/api/owner/stock/norm",      handle_set_norm,  "POST"),
@@ -1246,6 +1546,7 @@ def setup(app):
         ("/api/owner/stock/writeoffs",  handle_writeoffs, "GET"),
         ("/api/owner/stock/shifts",     handle_shift_log, "GET"),
         ("/api/owner/stock/writeoff/{wid}/photo", handle_writeoff_photo, "GET"),
+        ("/api/owner/stock/writeoff/{wid}/decide", handle_writeoff_decide, "POST"),
         ("/api/owner/stock/transfer/{tid}", handle_transfer_delete, "DELETE"),
     )
     seen = set()

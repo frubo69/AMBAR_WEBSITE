@@ -49,6 +49,9 @@ async def connect():
         # Приход после пересчёта спрашивается на каждую заявку — по району,
         # источнику и времени.
         await _db.qr_codes.create_index([("district", 1), ("src", 1), ("at", 1)])
+        # Проход камерой по полке: счёт по позициям спрашивается после каждого
+        # скана, и без индекса это перебор всего прохода на каждую бутылку.
+        await _db.audit_scans.create_index([("district", 1), ("day", 1)])
         await _db.shift_days.create_index([("day", 1)])
         # Страховка на случай незакрытой смены: полтора суток без обновлений —
         # и запись о положении водителя уходит сама. Срок считается от «at», а
@@ -2204,13 +2207,67 @@ async def writeoff_add(doc: dict, photo: bytes = b"") -> str:
     if db is None: return ""
     import uuid
     wid = uuid.uuid4().hex[:12]
-    doc = {**doc, "_id": wid}
+    # Списание не вычитается со склада, пока владелец его не согласовал: до
+    # решения это заявление водителя, а не факт. Записи, сделанные до того,
+    # как согласование появилось, поля не имеют вовсе — они были учтены сразу,
+    # и отменять их задним числом нечестно.
+    doc = {**doc, "_id": wid, "state": doc.get("state") or "pending"}
     await db.writeoffs.insert_one(doc)
     if photo:
         from bson.binary import Binary
         await db.writeoff_photos.insert_one(
             {"_id": wid, "img": Binary(photo), "at": doc.get("at")})
     return wid
+
+
+# Что считается вычтенным со склада: согласованное и всё старое, у которого
+# поля state нет вовсе. Отклонённое и ждущее решения на остаток не влияют —
+# бутылка либо ещё стоит на полке, либо это недостача, а не бой.
+WRITEOFF_COUNTED = {"state": {"$nin": ["pending", "no"]}}
+
+
+async def writeoff_get(wid: str) -> dict | None:
+    db = _db_or_none()
+    if db is None or not wid: return None
+    return await db.writeoffs.find_one({"_id": wid}, {"img": 0})
+
+
+async def writeoff_decide(wid: str, ok: bool, by: int, by_name: str = "",
+                          note: str = "") -> dict | None:
+    """Согласовать списание или отклонить — ровно один раз.
+
+    Решение принимают в двух местах сразу: кнопкой в мини-аппе и кнопкой в
+    боте под фотографией. Плюс телеграм переспрашивает нажатие при плохой
+    связи. Поэтому переход разрешён только из «ждёт»: второе нажатие ничего не
+    меняет и возвращает пусто, а не переписывает уже принятое решение."""
+    db = _db_or_none()
+    if db is None or not wid: return None
+    from pymongo import ReturnDocument
+    return await db.writeoffs.find_one_and_update(
+        {"_id": wid, "state": "pending"},
+        {"$set": {"state": "ok" if ok else "no",
+                  "decided_at": datetime.now(timezone.utc),
+                  "decided_by": int(by or 0),
+                  "decided_by_name": str(by_name or "")[:60],
+                  "decided_note": str(note or "")[:200]}},
+        projection={"img": 0}, return_document=ReturnDocument.AFTER)
+
+
+async def writeoff_pending(limit: int = 100) -> list:
+    """Списания, ждущие решения — старые сверху: первым разбирают то, что
+    висит дольше всех."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.writeoffs.find({"state": "pending"}, {"img": 0}).sort("at", 1).limit(int(limit))
+    return await cur.to_list(length=int(limit))
+
+
+async def writeoff_note_msg(wid: str, sent: list) -> None:
+    """Запомнить сообщения в чатах владельцев — чтобы после решения убрать у
+    них кнопки. Иначе второй владелец жмёт по уже решённому и получает отказ."""
+    db = _db_or_none()
+    if db is None or not wid or not sent: return
+    await db.writeoffs.update_one({"_id": wid}, {"$set": {"msgs": sent}})
 
 
 async def writeoff_photo(wid: str) -> bytes:
@@ -2221,7 +2278,7 @@ async def writeoff_photo(wid: str) -> bytes:
 
 
 async def writeoff_list(since=None, district: str = "", by: str = "",
-                        limit: int = 300) -> list:
+                        state: str = "", limit: int = 300) -> list:
     """История списаний, новые сверху. Без фотографий — их берут по одной."""
     db = _db_or_none()
     if db is None: return []
@@ -2229,6 +2286,7 @@ async def writeoff_list(since=None, district: str = "", by: str = "",
     if since:   q["at"] = {"$gte": since}
     if district: q["district"] = district
     if by:       q["by"] = by
+    if state:    q["state"] = state
     cur = db.writeoffs.find(q, {"img": 0}).sort("at", -1).limit(int(limit))
     return await cur.to_list(length=int(limit))
 
@@ -2245,7 +2303,7 @@ async def writeoff_since(since: dict) -> dict:
     for district, dt in (since or {}).items():
         if not dt: continue
         cur = db.writeoffs.aggregate([
-            {"$match": {"district": district, "at": {"$gt": dt}}},
+            {"$match": {"district": district, "at": {"$gt": dt}, **WRITEOFF_COUNTED}},
             {"$group": {"_id": "$item", "n": {"$sum": "$qty"}}},
         ])
         got = {d["_id"]: int(d["n"] or 0) for d in await cur.to_list(length=500) if d["_id"]}
@@ -2634,11 +2692,88 @@ async def qr_consumed(since: dict) -> dict:
         out[oid]["sold"] += sum(int(i.get("qty") or 0) for i in (o.get("items") or []))
     for district, dt in since.items():
         cur = db.writeoffs.aggregate([
-            {"$match": {"district": district, "at": {"$gte": dt}}},
+            {"$match": {"district": district, "at": {"$gte": dt}, **WRITEOFF_COUNTED}},
             {"$group": {"_id": None, "n": {"$sum": "$qty"}}}])
         rows = await cur.to_list(length=1)
         out[district]["written"] = int((rows[0]["n"] if rows else 0) or 0)
     return out
+
+
+# ── ревизия сканированием ───────────────────────────────────────────────────
+# Проход по полке камерой: каждая бутылка отмечается своим кодом. Отсюда
+# берётся факт — сколько штук позиции на точке лежит на самом деле, — а всё,
+# чего камера не увидела, остаётся недостачей.
+#
+# Ключ записи — район, день и сам код. Двойной скан одной бутылки физически не
+# может дать двойку в остатке: вторая запись с тем же ключом не вставится.
+# Проверять это отдельно нельзя — посчитанная дважды бутылка в базе выглядит
+# точно так же, как настоящая, и найти её потом не по чему.
+
+def _audit_key(district: str, day: str, code: str) -> str:
+    return f"{district}:{day}:{code}"
+
+
+async def audit_scan_add(district: str, day: str, code: str, doc: dict) -> bool:
+    """Записать бутылку в проход. False — эту уже сканировали сегодня."""
+    db = _db_or_none()
+    if db is None: return False
+    try:
+        await db.audit_scans.insert_one({
+            "_id": _audit_key(district, day, code), "district": district,
+            "day": day, "code": code, **doc})
+        return True
+    except DuplicateKeyError:
+        return False
+
+
+async def audit_scan_del(district: str, day: str, code: str) -> bool:
+    """Убрать последний скан — тот, что человек только что сделал зря."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.audit_scans.delete_one({"_id": _audit_key(district, day, code)})
+    return bool(r.deleted_count)
+
+
+async def audit_scan_counts(district: str, day: str) -> dict:
+    """{позиция: сколько бутылок увидела камера}. Чужие коды сюда не попадают:
+    у них нет позиции, и приписать их некуда."""
+    db = _db_or_none()
+    if db is None: return {}
+    cur = db.audit_scans.aggregate([
+        {"$match": {"district": district, "day": day, "product_id": {"$ne": ""}}},
+        {"$group": {"_id": "$product_id", "n": {"$sum": 1}}}])
+    return {d["_id"]: int(d["n"] or 0) for d in await cur.to_list(length=800) if d["_id"]}
+
+
+async def audit_scan_odd(district: str, day: str, limit: int = 60) -> list:
+    """Всё, на что стоит посмотреть глазами: коды не из реестра, бутылки с
+    чужой точки и уже списанные. Каждая такая — вопрос, а не ошибка скана."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.audit_scans.find({"district": district, "day": day,
+                               "verdict": {"$ne": "ok"}}).sort("at", -1).limit(limit)
+    return await cur.to_list(length=limit)
+
+
+async def audit_scan_stats(district: str, day: str) -> dict:
+    db = _db_or_none()
+    if db is None: return {"total": 0, "odd": 0, "at": ""}
+    total = await db.audit_scans.count_documents({"district": district, "day": day})
+    odd = await db.audit_scans.count_documents(
+        {"district": district, "day": day, "verdict": {"$ne": "ok"}})
+    last = await db.audit_scans.find({"district": district, "day": day}) \
+                               .sort("at", -1).limit(1).to_list(length=1)
+    return {"total": int(total), "odd": int(odd),
+            "at": str((last[0].get("at") if last else "") or "")}
+
+
+async def audit_scan_clear(district: str, day: str) -> int:
+    """Начать проход заново. Нужно, когда посреди ревизии стало ясно, что
+    считали не ту полку: дочищать по одной бутылке — не вариант."""
+    db = _db_or_none()
+    if db is None: return 0
+    r = await db.audit_scans.delete_many({"district": district, "day": day})
+    return int(r.deleted_count)
 
 
 async def qr_by_product_district(district: str) -> dict:

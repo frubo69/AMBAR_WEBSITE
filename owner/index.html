@@ -532,6 +532,34 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;
   font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700}
 .stk-bar-done:active{transform:scale(.95)}
+/* Вход в проход камерой. Стоит выше списка: в ревизии это главное действие,
+   а не одна из кнопок — всё, что заведено кодами, закрывается отсюда. */
+.stk-scan{display:flex;align-items:center;gap:12px;width:100%;padding:14px;
+  margin-bottom:10px;border-radius:16px;cursor:pointer;font-family:inherit;
+  text-align:left;color:var(--text);background:var(--card);
+  border:1px solid rgba(201,169,110,.32)}
+.stk-scan:active{transform:scale(.99)}
+.stk-scan svg{flex-shrink:0;color:var(--gold2)}
+.stk-scan-b{flex:1;min-width:0}
+.stk-scan-t{display:block;font-size:14px;font-weight:700}
+.stk-scan-s{display:block;font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.35}
+.stk-scan-v{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:20px;
+  font-weight:700;color:var(--gold2);font-variant-numeric:tabular-nums}
+/* Ненайденное. Отдельной плашкой и с кнопкой: это единственное место ревизии,
+   где число превращается в недостачу одним нажатием. */
+.stk-lost{padding:13px 14px;border-radius:15px;margin-bottom:10px;
+  background:var(--warn-soft);border:1px solid rgba(243,180,74,.3)}
+.stk-lost-t{font-size:12.5px;line-height:1.5;color:var(--warn)}
+.stk-lost-b{width:100%;margin-top:11px;padding:10px;border-radius:11px;
+  font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;
+  color:var(--dn);background:rgba(0,0,0,.22);border:1px solid rgba(226,106,106,.3)}
+.stk-odd{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:12px;
+  margin-bottom:6px;background:var(--card);border:1px solid var(--border2)}
+.stk-odd-b{flex:1;min-width:0}
+.stk-odd-n{display:block;font-size:13px;font-weight:600;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.stk-odd-s{display:block;font-size:11px;color:var(--muted);margin-top:2px}
+.stk-odd-v{flex-shrink:0;font-size:11px;font-weight:700}
 /* сводка ревизии */
 .stk-aud-sum{max-width:420px;margin:22px auto 0;text-align:left;
   border:1px solid var(--border2);border-radius:13px;overflow:hidden}
@@ -1034,6 +1062,43 @@ button.path:active{transform:scale(.995)}
 /* ── Поставка ───────────────────────────────────────────────────────────── */
 /* Те же три числа, что и в заявке, в том же порядке: экран поставки —
    продолжение пути, а не отдельная таблица. */
+/* Шапка закупа: когда пришёл ответ магазина и чем всё кончилось. Дата здесь
+   не украшение — закупов много, и открытый вслепую из истории должен сразу
+   говорить, какой он. */
+.sup-hd{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.sup-hd-d{flex:1;min-width:0;font-size:13px;font-weight:600}
+.sup-hd-d i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);
+  font-weight:400;margin-top:3px}
+.sup-hd-st{flex-shrink:0;padding:5px 10px;border-radius:9px;font-size:10.5px;
+  font-weight:700;letter-spacing:.3px;color:var(--gold2);background:var(--card);
+  border:1px solid rgba(201,169,110,.3)}
+.sup-hd-st.done{color:var(--up);border-color:rgba(90,190,130,.32)}
+/* Деньги под числами. Бутылки отвечают «сколько», деньги — «дорого ли»:
+   пятьдесят бутылок пива и пятьдесят виски это разные закупы. */
+.sup-sum-c u{display:block;margin-top:5px;font-size:11px;text-decoration:none;
+  color:var(--muted);font-variant-numeric:tabular-nums}
+.sup-foot-n{display:flex;flex-wrap:wrap;gap:6px 14px;margin:-2px 0 12px 2px;
+  font-size:11.5px;color:var(--muted)}
+.sup-foot-n b{color:var(--sub);font-weight:600}
+/* История закупов. Строка отвечает на «когда и чем кончилось», а открывается
+   в ту же карточку — это один и тот же экран, просто другой закуп. */
+.sh-row{display:flex;align-items:center;gap:12px;width:100%;padding:12px 13px;
+  margin-bottom:7px;border-radius:14px;cursor:pointer;font-family:inherit;
+  text-align:left;color:var(--text);background:var(--card);border:1px solid var(--border2)}
+.sh-row:active{transform:scale(.995)}
+.sh-d{flex-shrink:0;width:42px;text-align:center;font-family:'Space Grotesk',sans-serif}
+.sh-d b{display:block;font-size:17px;font-weight:700;line-height:1;color:var(--gold2)}
+.sh-d i{display:block;font-style:normal;font-size:9.5px;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--muted);margin-top:3px}
+.sh-b{flex:1;min-width:0}
+.sh-t{display:block;font-size:13.5px;font-weight:600}
+.sh-s{display:block;font-size:11.5px;color:var(--muted);margin-top:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sh-v{flex-shrink:0;text-align:right}
+.sh-v b{display:block;font-family:'Space Grotesk',sans-serif;font-size:15px;
+  font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums}
+.sh-v i{display:block;font-style:normal;font-size:10px;color:var(--muted);margin-top:2px}
+.pact-wide{grid-column:1 / -1}
 .sup-sum{display:grid;grid-template-columns:repeat(3,1fr);margin-bottom:12px;
   border-radius:15px;overflow:hidden;background:var(--card);border:1px solid var(--border2)}
 .sup-sum-c{padding:13px 12px;text-align:center}
@@ -1897,6 +1962,31 @@ button.path:active{transform:scale(.995)}
 .wo-aed{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:15px;
   font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums}
 .wo-aed i{font-style:normal;font-size:9px;color:var(--muted);margin-left:3px}
+/* Очередь согласования. Пока владелец не решил, товар со склада не вычтен —
+   поэтому очередь стоит выше истории и выглядит как вопрос, а не как список:
+   рамка тёплая, кнопки крупные, читать нечего кроме сути. */
+.wo-q-head{display:flex;align-items:center;gap:12px;padding:14px;border-radius:16px;
+  margin-bottom:10px;background:var(--warn-soft);border:1px solid rgba(243,180,74,.3)}
+.wo-q-v{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;
+  line-height:1;color:var(--warn)}
+.wo-q-u{font-size:11px;line-height:1.35;color:var(--warn);opacity:.85}
+.wo-q-aed{margin-left:auto;text-align:right;font-size:11.5px;color:var(--muted)}
+.wo-q-aed b{display:block;font-family:'Space Grotesk',sans-serif;font-size:16px;
+  font-weight:700;color:var(--sub)}
+.wo-row.pend{border-color:rgba(243,180,74,.34);flex-wrap:wrap}
+.wo-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;margin-top:11px;
+  padding-top:11px;border-top:1px solid var(--border2)}
+.wo-act{padding:11px 10px;border-radius:12px;font-family:inherit;font-size:13px;
+  font-weight:700;cursor:pointer;background:var(--card2);border:1px solid var(--border2);
+  color:var(--sub)}
+.wo-act:active{transform:scale(.985)}
+.wo-act.ok{color:var(--up);border-color:rgba(90,190,130,.35)}
+.wo-act.no{color:var(--dn);border-color:rgba(226,106,106,.32)}
+.wo-act[disabled]{opacity:.5}
+.wo-st{display:inline-flex;align-items:center;gap:5px;margin-top:5px;padding:3px 8px;
+  border-radius:8px;font-size:10.5px;font-weight:700;letter-spacing:.3px}
+.wo-st.wait{color:var(--warn);background:var(--warn-soft)}
+.wo-st.no{color:var(--dn);background:rgba(226,106,106,.12)}
 /* Снимок во весь экран: сам кадр и подпись, закрывается нажатием куда угодно. */
 .wo-full{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;
   align-items:center;justify-content:center;gap:14px;padding:22px;
@@ -6700,6 +6790,7 @@ function openStock(){
   stkPicker();
 }
 function closeStock(){
+  if(STK.view === 'scan'){ try{ SCAN.stop(); }catch(e){} }
   document.getElementById('stkOv').classList.remove('show');
   accLoadSummaries();              // плитка «Пересчёт склада» в «Учёте» — с новыми цифрами
 }
@@ -6711,6 +6802,7 @@ function stkBack(){
       ? 'Выйти из ревизии? Отметки сохранятся только после «Сохранить».'
       : 'Выйти без сохранения? Введённые числа пропадут.')) return;
   }
+  if(STK.view === 'scan'){ stkScanDone(); return; }
   if(STK.view === 'audit-one'){ stkAudits(); return; }
   if(STK.view === 'pick') closeStock(); else stkPicker();
 }
@@ -6843,7 +6935,10 @@ async function stkAudits(){
         <span class="stk-pick-n">${escS(a.district_name)} · ${escS(a.day)}</span>
         <span class="stk-pick-s">${a.mismatched
           ? `${a.mismatched} ${pluralize(a.mismatched,'расхождение','расхождения','расхождений')} · не хватает ${fmt(a.short_aed)} AED`
-          : `всё сошлось · ${a.total} ${pluralize(a.total,'позиция','позиции','позиций')}`}</span>
+          : `всё сошлось · ${a.total} ${pluralize(a.total,'позиция','позиции','позиций')}`}${
+          // Чем проходили — часть итога: «сошлось» по камере и «сошлось» по
+          // галочкам через месяц стоят разного.
+          a.scan_qty ? ` · камерой ${fmt(a.scan_qty)}` : ''}</span>
       </span>
       <span style="color:var(--muted);font-size:15px">›</span>
     </button>`).join('');
@@ -6906,6 +7001,10 @@ async function stkOpen(district){
   // Панель перемещения показывает уже записанное по товару и список соседних
   // районов — и то и другое нужно до первой отрисовки.
   await stkLoadContext();
+  // Проход камерой живёт на сервере и переживает закрытие приложения. Если он
+  // уже был, его числа должны стоять в строках с первого взгляда: иначе
+  // человек видит расчётные остатки и думает, что скан пропал.
+  if(STK.audit && (sh.scan || {}).total) _stkApplyScan(true);
   _stkSyncMarks();
   stkRenderList();
 }
@@ -6957,14 +7056,44 @@ function stkRenderList(){
 
   if(STK.audit){
     const total = rows.length;
+    const sc = sh.scan || {};
+    // Что закрывается камерой, а что руками. Кодами заведена не вся полка, и
+    // делать вид, что проход отвечает за всё, нельзя: непройденное глазами
+    // должно остаться видимой работой, а не молча зачесться.
+    const coded = rows.filter(r => r.coded > 0);
+    const lost  = coded.filter(r => r.scanned == null);
+    const hand  = rows.filter(r => !r.coded);
     box.innerHTML = `
       <div class="stk-prog">
         <span class="stk-prog-n" id="stkProgNum">0 / ${total}</span>
         <div class="stk-prog-bar"><div class="stk-prog-fill" id="stkProgFill" style="width:0%"></div></div>
       </div>
+      <button class="stk-scan" onclick="stkScan()">
+        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
+             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
+          <path d="M7 12h10"/></svg>
+        <span class="stk-scan-b">
+          <span class="stk-scan-t">${sc.total ? 'Продолжить проход' : 'Пройти камерой'}</span>
+          <span class="stk-scan-s">${coded.length
+            ? `${coded.length} ${pluralize(coded.length,'позиция заведена','позиции заведены','позиций заведены')} кодами`
+            : 'кодами здесь пока ничего не заведено'}</span>
+        </span>
+        <span class="stk-scan-v">${sc.total ? fmt(sc.total) : ''}</span>
+      </button>
+      ${lost.length ? `<div class="stk-lost">
+        <div class="stk-lost-t"><b>Камера не нашла ${lost.length} ${
+          pluralize(lost.length,'позицию','позиции','позиций')}</b> из тех, что заведены
+          кодами. Пока проход не закончен — это просто «не дошли». Закончили —
+          значит их нет на полке.</div>
+        <button class="stk-lost-b" onclick="stkScanMissing()">Отметить недостачей</button>
+      </div>` : ''}
       <div class="stk-note">
-        <b>Ревизия.</b> Числа подставлены расчётом — сверьте каждую строку с полкой.
-        Сошлось — поставьте галочку. Поправили число — крестик встанет сам.
+        <b>Ревизия.</b> ${coded.length
+          ? 'Всё, что заведено кодами, считает камера: сколько бутылок она увидела, столько и лежит. '
+          : ''}Остальное${hand.length ? ` — ${hand.length} ${
+            pluralize(hand.length,'позиция','позиции','позиций')}` : ''} сверяется глазами:
+        сошлось — галочка, поправили число — крестик встанет сам.
         Завершить можно, только когда отмечены все ${total}.
       </div>`
       + rows.map(r => stkItem(r)).join('')
@@ -7048,7 +7177,11 @@ function _stkFmt(v){ v = Math.round(v * 2) / 2; return v === Math.trunc(v) ? Str
 // бы «часть полок посмотрели, а часть посчитали на глаз».
 function stkAuditToggle(){
   STK.audit = !STK.audit;
-  if(STK.audit){ STK.showAll = true; STK.q = ''; const i = document.getElementById('stkSearch'); if(i) i.value=''; }
+  if(STK.audit){
+    STK.showAll = true; STK.q = ''; const i = document.getElementById('stkSearch'); if(i) i.value='';
+    // Проход мог быть сделан раньше, а режим ревизии включён только сейчас.
+    if((STK.sheet?.scan || {}).total){ _stkApplyScan(true); _stkSyncMarks(); }
+  }
   document.getElementById('stkAudBtn')?.classList.toggle('on', STK.audit);
   stkRenderList();
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('medium'); }catch(e){}
@@ -7118,6 +7251,243 @@ function _stkProgress(){
     : 'Все позиции проверены';
 }
 
+// ── ревизия сканированием ───────────────────────────────────────────────────
+// Галочка на строке значит «я посмотрел». Код значит «вот эта самая бутылка, и
+// вот она здесь». Поэтому проход идёт по всему району подряд, без выбора
+// позиции: каждый код сам находит свою строку. Не выбирать позицию — не
+// мелочь: на полке они стоят вперемешку, и человек, который перед каждой
+// бутылкой лезет в список, до конца ревизии не дойдёт.
+//
+// Ненайденное превращается в недостачу отдельным нажатием, а не выходом из
+// камеры. Иначе случайный выход посреди прохода списал бы весь склад.
+let AUD = {rows: [], counts: {}, total: 0, positions: 0};
+
+// Своя очередь отправки: у сканера кодов она уже занята своим обработчиком, и
+// один на двоих означал бы, что ответ про бутылку ревизии прилетает в чужой
+// экран.
+//
+// Собирается при первом скане, а не сразу: SCANQ объявлен ниже по файлу, и
+// копировать его на разборе значит уронить всё приложение на ровном месте.
+let AUDQ = null;
+function audQ(){
+  if(!AUDQ) AUDQ = Object.assign({}, SCANQ, {items: [], busy: false, onDone: audDone});
+  return AUDQ;
+}
+
+const AUD_V = {
+  ok:      ['ok',    'посчитана',        'var(--up)'],
+  other:   ['dup',   'с другой точки',   'var(--warn)'],
+  written: ['dup',   'была списана',     'var(--warn)'],
+  sold:    ['dup',   'ушла с заказом',   'var(--warn)'],
+  alien:   ['err',   'нет в реестре',    'var(--dn)'],
+};
+
+async function stkScan(){
+  STK.view = 'scan';
+  AUD = {rows: [], counts: {}, total: 0, positions: 0};
+  const sh = STK.sheet || {};
+  _stkHead(`${sh.district_code || ''} ${sh.district_name || ''}`.trim(), 'проход камерой', false);
+  document.getElementById('stkTools').style.display = 'none';
+  const seg = document.getElementById('stkSeg'); if(seg) seg.style.display = 'none';
+  document.getElementById('stkMid').innerHTML = `
+    <div class="scan-cam" id="qrCam">
+      <video id="qrVideo" playsinline muted autoplay></video>
+      <div class="scan-mask"></div>
+      <div class="scan-bar">
+        <div class="scan-bar-l">
+          <div class="scan-prod">Ревизия · весь район</div>
+          <div class="scan-dist" id="audPos">позиций закрыто 0</div>
+        </div>
+        <button class="scan-torch" id="qrTorch" onclick="qrTorch(this)" style="display:none">
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 2h6l-1 7h4l-8 13 2-9H8z"/></svg>
+        </button>
+      </div>
+      <div class="scan-frame" id="qrFrame">
+        <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+        <div class="scan-badge" id="qrBadge"></div>
+      </div>
+      <div class="scan-foot">
+        <div class="scan-count"><span id="audN">0</span><i>бутылок</i></div>
+        <div class="scan-hint" id="qrHint">Наведите на код</div>
+      </div>
+    </div>
+    <div class="scan-sect"><span>Проход</span><i id="audCnt"></i></div>
+    <div id="audFeed" class="scan-feed"><div class="scan-empty">Загрузка…</div></div>
+    <div class="scan-acts">
+      <button class="scan-btn ghost" id="audUndo" onclick="audUndo()" disabled>Отменить последнюю</button>
+      <button class="scan-btn gold" onclick="stkScanDone()">Готово</button>
+    </div>`;
+  audLoadState();
+  try{
+    await SCAN.start(document.getElementById('qrVideo'), audSave, qrIdle,
+                     () => qrFlash('again', 'уже посчитана'), qrHold);
+  }catch(e){
+    // Камеры нет — не тупик: родной сканер телеграма работает всегда, просто
+    // без счётчика на экране.
+    _setText('qrHint', 'Камера недоступна, включаю сканер Telegram');
+    const tg = window.Telegram && Telegram.WebApp;
+    if(tg && tg.showScanQrPopup) tg.showScanQrPopup({text:'Ревизия'}, t => { audSave(t); return false; });
+    else _toast('Сканер недоступен');
+    return;
+  }
+  const t = document.getElementById('qrTorch');
+  if(t) t.style.display = SCAN.hasTorch() ? '' : 'none';
+}
+
+// Проход прерывают и возвращаются к нему: ревизия большого района — это час
+// работы, и телефон за это время успевают и заблокировать, и уронить.
+async function audLoadState(){
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/stock/audit/scan',
+      {params:{district: STK.district, day: (STK.sheet||{}).day || ''}});
+    AUD.counts = r.counts || {}; AUD.total = r.total || 0;
+    AUD.positions = r.positions || 0;
+    // Странное показываем сразу и сверху: это единственное, ради чего в ленту
+    // вообще смотрят.
+    AUD.rows = (r.odd || []).map(o => ({code:o.code, state:'old', verdict:o.verdict,
+                                        label:o.label || '', name:o.name || ''}));
+  }catch(e){}
+  audPaint();
+}
+
+function audSave(code){
+  code = String(code || '').trim(); if(!code) return;
+  AUD.rows.unshift({code, state:'sending', verdict:'', label:'', name:''});
+  AUD.total++;
+  audPaint();
+  // Зелёная вспышка сразу, не дожидаясь сервера: рука уже тянется к следующей
+  // бутылке. Возразит — цвет сменится, но это редкий случай.
+  qrFlash('ok', 'посчитана');
+  audQ().push({path:'/api/owner/stock/audit/scan',
+               body:{code, district: STK.district, day: (STK.sheet||{}).day || ''}, code});
+}
+
+function audDone(err, r, job){
+  const row = AUD.rows.find(x => x.code === job.code && x.state === 'sending');
+  if(err){ if(row){ row.state = 'fail'; } qrFlash('err', 'не сохранилось'); audPaint(); return; }
+  const [flash, say] = AUD_V[r.verdict] || AUD_V.ok;
+  if(row){
+    row.state = r.new ? 'new' : 'dup';
+    row.verdict = r.verdict; row.label = r.label || ''; row.name = r.name || '';
+    row.home_code = r.home_code || '';
+  }
+  AUD.total = r.total || AUD.total; AUD.positions = r.positions || AUD.positions;
+  if(r.product_id) AUD.counts[r.product_id] = r.count;
+  // Бутылка, которую камера уже видела, вторым разом в остаток не идёт — иначе
+  // он вырастет на пустом месте.
+  if(!r.new) qrFlash('again', 'уже посчитана');
+  else if(r.verdict !== 'ok') qrFlash(flash, r.verdict === 'other' && r.home_code
+    ? `числится на ${r.home_code}` : say);
+  audPaint();
+}
+
+function audPaint(){
+  _setText('audN', String(AUD.total));
+  _setText('audPos', `позиций закрыто ${AUD.positions}`);
+  const cnt = document.getElementById('audCnt');
+  if(cnt) cnt.textContent = AUD.total ? String(AUD.total) : '';
+  const feed = document.getElementById('audFeed'); if(!feed) return;
+  feed.innerHTML = AUD.rows.slice(0, 40).map((r, i) => {
+    const [, say, color] = AUD_V[r.verdict] || ['', 'отправляю…', 'var(--muted)'];
+    const txt = r.state === 'sending' ? 'отправляю…'
+              : r.state === 'fail'    ? 'не сохранилось'
+              : r.state === 'dup'     ? 'уже посчитана'
+              : (r.verdict === 'other' && r.home_code) ? `числится на ${r.home_code}` : say;
+    const col = r.state === 'sending' ? 'var(--muted)'
+              : r.state === 'fail' ? 'var(--dn)' : color;
+    const del = r.state === 'new'
+      ? `<button class="scan-del" onclick="audDrop(${i})" aria-label="Убрать">✕</button>` : '';
+    const raw = r.code.length > 26 ? r.code.slice(0, 24) + '…' : r.code;
+    return `<div class="scan-row ${r.state}">
+      <span class="scan-dot" style="background:${col}"></span>
+      <span class="scan-b">
+        <span class="scan-code">${escS(r.name || r.label || '…')}</span>
+        <span class="scan-raw">${escS(r.label ? r.label + ' · ' + raw : raw)}</span>
+      </span>
+      <span class="scan-state" style="color:${col}">${escS(txt)}</span>${del}</div>`;
+  }).join('') || '<div class="scan-empty">Наведите камеру на код с крышки</div>';
+  const u = document.getElementById('audUndo');
+  if(u) u.disabled = !AUD.rows.some(r => r.state === 'new');
+}
+
+async function audDrop(i){
+  const row = AUD.rows[i]; if(!row || row.state !== 'new') return;
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/stock/audit/scan/undo',
+      {method:'POST', body:{code: row.code, district: STK.district,
+                            day: (STK.sheet||{}).day || ''}});
+    AUD.total = r.total || 0; AUD.positions = r.positions || 0;
+  }catch(e){ _toast('Не удалось убрать'); return; }
+  // Забываем код и у сканера — иначе камера будет молчать на бутылку, которую
+  // только что стёрли, и пересканировать её станет нечем.
+  SCAN.seen.delete(row.code); SCAN.seenAt.delete(row.code);
+  AUD.rows.splice(i, 1);
+  audPaint();
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+
+async function audUndo(){
+  const i = AUD.rows.findIndex(r => r.state === 'new');
+  if(i >= 0) await audDrop(i);
+}
+
+// Выход из камеры — не конец ревизии, а конец прохода. Числа подставляются по
+// тому, что камера увидела, а решение про ненайденное человек принимает сам,
+// глядя в список.
+async function stkScanDone(){
+  SCAN.stop();
+  const d = STK.district;
+  document.getElementById('stkMid').innerHTML =
+    '<div class="stk-empty">Считаем, что получилось…</div>';
+  let sh;
+  try{ sh = await ownerApi.ownerFetch('/api/owner/stock/sheet', {params:{district: d}}); }
+  catch(e){ return stkPicker(); }
+  STK.sheet = sh; STK.view = 'sheet';
+  sh.rows.forEach(r => {
+    if(STK.vals[r.id] == null)
+      STK.vals[r.id] = r.actual != null ? r.actual
+                     : (r.expected != null ? r.expected : 0);
+  });
+  _stkApplyScan();
+  _stkSyncMarks();
+  stkRenderList();
+}
+
+// Что увидела камера — то и лежит. Позиции, которых она не видела, не трогаем
+// вовсе: «не дошли» и «нет на полке» — разные вещи, и путать их нельзя.
+//
+// onlyNew — при возврате в открытую ревизию. Число, уже сохранённое по строке,
+// человек мог поправить руками после прохода: он держал бутылку в руках, а
+// камера видела наклейку. Рука главнее камеры, и затирать её нельзя.
+function _stkApplyScan(onlyNew){
+  (STK.sheet?.rows || []).forEach(r => {
+    if(r.scanned == null) return;
+    if(onlyNew && r.actual != null) return;
+    STK.vals[r.id] = r.scanned;
+    STK.marks[r.id] = (r.expected != null && r.scanned !== r.expected) ? 'diff' : 'ok';
+  });
+}
+
+// Ненайденное — недостача. Отдельным нажатием и с вопросом: это то место, где
+// ревизия превращается в деньги, и делать это молча, за спиной человека,
+// нельзя.
+function stkScanMissing(){
+  const lost = (STK.sheet?.rows || []).filter(r => r.coded > 0 && r.scanned == null);
+  if(!lost.length) return;
+  const aed = lost.reduce((a, r) => a + (r.price || 0) * (STK.vals[r.id] ?? r.expected ?? 0), 0);
+  if(!confirm(`Камера не нашла ${lost.length} ${pluralize(lost.length,'позицию','позиции','позиций')}`
+    + `${aed ? ' на ' + fmt(Math.round(aed)) + ' AED' : ''}.\n`
+    + 'Отметить их недостачей? Проход должен быть закончен.')) return;
+  lost.forEach(r => {
+    STK.vals[r.id] = 0;
+    STK.marks[r.id] = (r.expected != null && r.expected !== 0) ? 'diff' : 'ok';
+  });
+  stkRenderList();
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+}
+
 function stkItem(r){
   const v = STK.vals[r.id] ?? 0;
   const exp = r.expected;
@@ -7136,6 +7506,11 @@ function stkItem(r){
       : r.days_ago === 0 ? 'проверяли сегодня'
       : `не проверяли ${r.days_ago} ${pluralize(r.days_ago,'день','дня','дней')}`);
   const mk = STK.marks[r.id];
+  // Откуда взялось число, важнее самого числа: «камера насчитала 12» и «человек
+  // вбил 12» — разные утверждения, и в ревизии их надо различать глазами.
+  if(STK.audit && r.coded)
+    why = (r.scanned == null ? 'камера ещё не дошла' : `камерой ${_stkFmt(r.scanned)}`)
+        + ` из ${_stkFmt(r.coded)} с кодами` + (why ? ' · ' + why : '');
   return `<div class="stk-wrap"><div class="stk-item ${cls}${STK.audit && !mk ? ' aud-todo' : ''}" id="stk-${escS(r.id)}">
     ${STK.audit ? `<div class="stk-mark ${mk||''}" onclick="stkMark('${escS(r.id)}')"
         >${mk === 'ok' ? '✓' : mk === 'diff' ? '✕' : ''}</div>` : ''}
@@ -7468,6 +7843,8 @@ function stkAuditReport(res){
       : `Все ${res.total_qty} позиций сошлись`}</div>
     <div class="stk-aud-sum">
       <div><span>Проверено</span><b>${ok + mis} из ${res.total_qty}</b></div>
+      ${res.scan_qty ? `<div><span>Прошли камерой</span><b>${fmt(res.scan_qty)} ${
+        pluralize(res.scan_qty,'бутылка','бутылки','бутылок')}</b></div>` : ''}
       <div><span>Сошлось</span><b style="color:var(--up)">${ok}</b></div>
       <div><span>Расхождений</span><b style="color:${mis?'var(--dn)':'var(--up)'}">${mis}</b></div>
       <div><span>Не хватает</span><b style="color:var(--dn)">${fmt(res.short_aed||0)} AED</b></div>
@@ -7583,6 +7960,12 @@ function accRender(){
                 : (ACC_STOCK.done === ACC_STOCK.total ? 'всё сошлось' : 'остатки за смену'))
               : 'остатки, ревизия, перемещения',
     order:    ordTileSub(),
+    // Ждущее решения важнее месячной суммы: пока владелец не ответил, товар
+    // числится на полке, и заявка его не закажет.
+    writeoff: ACC_STOCK && ACC_STOCK.writeoff_pending
+                ? `${ACC_STOCK.writeoff_pending} ${pluralize(ACC_STOCK.writeoff_pending,
+                    'ждёт','ждут','ждут')} решения`
+                : 'бой, брак, просрочка',
     // Показы без денег ничего не значат, поэтому подпись — про выручку.
     qr:       ACC_QR     ? (ACC_QR.totals.total
                 ? `${ACC_QR.by_product.length} ${pluralize(ACC_QR.by_product.length,
@@ -7615,6 +7998,8 @@ function accRender(){
                ACC_SUP && ACC_SUP.open
                  ? pluralize(ACC_SUP.open.total_qty,'бутылка','бутылки','бутылок')
                  : 'нет поставки'],
+    writeoff: [ACC_STOCK ? fmt(ACC_STOCK.writeoff_pending || 0) : null,
+               'на согласовании'],
     check:    [ACC_CHK ? fmt((ACC_CHK.totals || {}).checks || 0) : null,
                ACC_CHK ? pluralize((ACC_CHK.totals||{}).checks||0,
                  'проверка','проверки','проверок') + ' за месяц' : 'за месяц'],
@@ -8049,7 +8434,22 @@ function pathActs(sup){
         ? `${fmt(gap)} ${pluralize(gap,'бутылка','бутылки','бутылок')}`
         : 'магазин дал всё'}</span>
     </button>
+    ${supHistLine()}
   </div>`;
+}
+
+// Прошлые закупы. Один закуп отвечает «как прошло сегодня»; несколько подряд
+// отвечают на вопрос поинтереснее: сколько магазин обычно не даёт и во что нам
+// это встаёт. Поэтому вход в историю стоит рядом с текущим, а не в «Ещё».
+function supHistLine(){
+  const list = (ACC_SUP && ACC_SUP.list) || [];
+  if(list.length < 2) return '';
+  const aed = list.reduce((a, x) => a + ((x.money || {}).took || 0), 0);
+  return `<button class="pact pact-wide" onclick="supHistory()">
+    <span class="pact-t">История закупов</span>
+    <span class="pact-s">${list.length} ${pluralize(list.length,'закуп','закупа','закупов')}
+      · приняли на ${fmt(aed)} AED по прайсу</span>
+  </button>`;
 }
 
 // Перерисовать только шапку пути: её числа меняются от каждой правки, а список
@@ -8941,11 +9341,13 @@ function qrFlashClear(){
 // Подтверждение висит, пока код перед камерой, и гаснет, когда её отвели. Иначе
 // оно мелькает на треть секунды: человек ещё смотрит на бутылку, а на экране
 // уже ничего — и непонятно, посчиталась она или нет.
-function qrFlash(kind){
+function qrFlash(kind, say){
   const f = document.getElementById('qrFrame'), b = document.getElementById('qrBadge');
   if(!f || !b) return;
   const [text, hap] = FLASH[kind] || FLASH.ok;
-  b.textContent = text;
+  // Проход ревизии говорит про бутылку своё — «числится на B3», «списана», —
+  // а цвет, вибрация и звук у него те же. Слова отдельно от цвета.
+  b.textContent = say || text;
   f.classList.remove('ok','dup','again','err');
   // Перезапуск анимации: без этого две подряд одинаковые вспышки сливаются в
   // одну, и вторая бутылка выглядит непосчитанной.
@@ -9196,13 +9598,40 @@ function supRender(){
 
   // Шапка: три числа одной строкой — просили, дали, приняли. Разница между
   // ними и есть весь смысл экрана, и считать её в уме не должен никто.
+  //
+  // Под каждым числом — деньги по прайсу. Бутылки отвечают на «сколько», а
+  // «дорого ли вышло» по ним не понять: пятьдесят бутылок пива и пятьдесят
+  // виски — разные закупы. Цена продажная и так и подписана: закупочной
+  // система не знает, и выдавать за неё выдуманную себестоимость нельзя.
+  const m = d.money || {};
+  const took_all = d.took >= d.total_qty && d.total_qty > 0;
+  // Кто принял. Имена — то, что на этом экране ищут первым, поэтому они стоят
+  // в шапке, а не только в списке задач ниже.
+  const who = (d.tasks || []).filter(t => t.driver).map(t => t.driver);
+  const uniq = [...new Set(who)];
   const head = `
+    <div class="sup-hd">
+      <div class="sup-hd-d">Ответ магазина${_hm(d.at) ? ' · ' + _hm(d.at) : ''}
+        <i>${escS(_dayName(d.day || String(d.at||'').slice(0,10)))} · ${
+          d.positions || 0} ${pluralize(d.positions||0,'позиция','позиции','позиций')}
+          · ${(d.tasks||[]).length} ${pluralize((d.tasks||[]).length,'район','района','районов')}</i>
+      </div>
+      <span class="sup-hd-st ${d.status === 'done' ? 'done' : ''}">${
+        d.status === 'done' ? 'закрыта' : 'в работе'}</span>
+    </div>
     <div class="sup-sum">
-      <div class="sup-sum-c"><b>${fmt(d.asked_qty)}</b><i>просили</i></div>
+      <div class="sup-sum-c"><b>${fmt(d.asked_qty)}</b><i>просили</i>
+        <u>${fmt(m.asked || 0)} AED</u></div>
       <div class="sup-sum-c ${d.total_qty < d.asked_qty ? 'dn' : ''}">
-        <b>${fmt(d.total_qty)}</b><i>подтвердили</i></div>
-      <div class="sup-sum-c ${d.took < d.total_qty ? 'warn' : 'up'}">
-        <b>${fmt(d.took)}</b><i>приняли</i></div>
+        <b>${fmt(d.total_qty)}</b><i>подтвердили</i>
+        <u>${fmt(m.confirmed || 0)} AED</u></div>
+      <div class="sup-sum-c ${took_all ? 'up' : 'warn'}">
+        <b>${fmt(d.took)}</b><i>приняли</i>
+        <u>${fmt(m.took || 0)} AED</u></div>
+    </div>
+    <div class="sup-foot-n">
+      <span>по прайсу, не по закупочной</span>
+      ${uniq.length ? `<span>везли <b>${escS(uniq.join(', '))}</b></span>` : ''}
     </div>`;
 
   // Недобор — первым и с кнопками: это единственное на экране, что требует
@@ -9308,9 +9737,83 @@ function supRender(){
   }
 }
 
+// История закупов. Открывается в ту же карточку — это один и тот же экран,
+// просто другой закуп: заводить под прошлый закуп отдельный вид значило бы
+// научить человека читать поставку дважды.
+async function supHistory(){
+  ACC_BACK = accOrder;
+  _setText('accTitle', 'История закупов');
+  _setText('accSub', 'загрузка…');
+  document.getElementById('accFoot').innerHTML = '';
+  let list = (ACC_SUP && ACC_SUP.list) || null;
+  if(!list){
+    try{ list = ((await ownerApi.ownerFetch('/api/owner/supply')).supplies) || []; }
+    catch(e){ list = []; }
+    ACC_SUP = {list, open: list.find(x => x.status === 'open') || null};
+  }
+  const mid = document.getElementById('accMid');
+  if(!list.length){
+    _setText('accSub', 'закупов ещё не было');
+    mid.innerHTML = `<div class="exp-empty" style="padding:30px 16px;line-height:1.6">
+      Ни одного ответа магазина ещё не загружали.</div>`;
+    return;
+  }
+  const aed = list.reduce((a, x) => a + ((x.money || {}).took || 0), 0);
+  const gap = list.reduce((a, x) => a + (x.gap_qty || 0), 0);
+  _setText('accSub', `${list.length} ${pluralize(list.length,'закуп','закупа','закупов')} · ${
+    fmt(aed)} AED принято`);
+  mid.innerHTML = `
+    <div class="sup-sum">
+      <div class="sup-sum-c"><b>${list.length}</b><i>закупов</i></div>
+      <div class="sup-sum-c up"><b>${fmt(aed)}</b><i>AED принято</i></div>
+      <div class="sup-sum-c ${gap ? 'dn' : ''}"><b>${fmt(gap)}</b><i>не дал магазин</i></div>
+    </div>` + list.map(supHistRow).join('');
+}
+
+function supHistRow(x){
+  const dt = x.day || String(x.at || '').slice(0, 10);
+  const d = dt ? new Date(dt + 'T12:00:00Z') : null;
+  const day = d && !isNaN(d) ? String(d.getUTCDate()) : '—';
+  const mon = d && !isNaN(d)
+    ? d.toLocaleDateString('ru-RU', {month:'short', timeZone:'UTC'}).replace('.', '') : '';
+  // Чем кончилось — важнее, чем сколько было: закуп, где район остался без
+  // водителя, и закуп, принятый целиком, читаются по-разному.
+  const state = x.status === 'done'
+    ? (x.took < x.total_qty
+        ? `приняли ${fmt(x.took)} из ${fmt(x.total_qty)}`
+        : 'приняли всё')
+    : (x.free ? `${x.free} ${pluralize(x.free,'район','района','районов')} без водителя`
+              : `в работе · ${x.done} из ${x.districts} приняли`);
+  return `<button class="sh-row" onclick="supOpenOne('${escS(x.supply_id)}')">
+    <span class="sh-d"><b>${day}</b><i>${escS(mon)}</i></span>
+    <span class="sh-b">
+      <span class="sh-t">${fmt(x.total_qty)} ${pluralize(x.total_qty,'бутылка','бутылки','бутылок')}
+        из ${fmt(x.asked_qty)}</span>
+      <span class="sh-s">${escS(state)}${x.gap_qty
+        ? ` · не дал ${fmt(x.gap_qty)}` : ''}</span>
+    </span>
+    <span class="sh-v"><b>${fmt((x.money || {}).took || 0)}</b><i>AED</i></span>
+  </button>`;
+}
+
+// Из истории карточка открывается так же, как текущая, — но стрелка ведёт
+// обратно в историю, а не в заявку: человек пришёл оттуда.
+async function supOpenOne(sid){
+  _setText('accTitle', 'Поставка');
+  _setText('accSub', 'загрузка…');
+  document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  await supLoad(sid);
+  ACC_BACK = supHistory;
+}
+
 const _dayName = d => { const x = d ? new Date(d + 'T12:00:00Z') : null;
   return x && !isNaN(x) ? x.toLocaleDateString('ru-RU', {day:'numeric', month:'long'}) : (d || ''); };
-const _hm = iso => { const d = iso ? new Date(/Z$|[+-]\d\d:?\d\d$/.test(iso) ? iso : iso + 'Z') : null;
+const _hm = iso => {
+  if(!iso) return '';
+  // str() у монги отдаёт «2026-08-20 04:33:50+00:00» — с пробелом вместо T.
+  // Сафари такую строку не разбирает вовсе, и время молча пропадает с экрана.
+  const t = String(iso).replace(' ', 'T');
+  const d = new Date(/Z$|[+-]\d\d:?\d\d$/.test(t) ? t : t + 'Z');
   return d && !isNaN(d) ? d.toLocaleTimeString('ru-RU',
     {hour:'2-digit', minute:'2-digit', timeZone:'Asia/Dubai'}) : ''; };
 
@@ -12802,22 +13305,37 @@ async function accWriteoffs(){
 }
 
 function woHome(){
-  const w = ACC_WO || {rows: [], by_kind: [], by_driver: []};
-  _setText('accSub', w.rows.length
-    ? `${fmt(w.total_qty)} ${pluralize(w.total_qty,'бутылка','бутылки','бутылок')} за 30 дней`
-    : 'за 30 дней ничего не списывали');
+  const w = ACC_WO || {rows: [], pending: [], by_kind: [], by_driver: []};
+  const pend = w.pending || [];
+  _setText('accSub', pend.length
+    ? `${pend.length} ${pluralize(pend.length,'ждёт','ждут','ждут')} решения`
+    : (w.rows.length
+        ? `${fmt(w.total_qty)} ${pluralize(w.total_qty,'бутылка','бутылки','бутылок')} за 30 дней`
+        : 'за 30 дней ничего не списывали'));
   const mid = document.getElementById('accMid');
-  if(!w.rows.length){
+  if(!w.rows.length && !pend.length){
     mid.innerHTML = `<div class="scan-empty">Списаний нет.<br>
       Водитель записывает бой и брак в своём приложении — с фотографией.</div>`;
     return;
   }
+  // Очередь согласования — выше всего остального и без окна в тридцать дней.
+  // Пока решения нет, эти бутылки числятся на полке: заявка их не заказывает,
+  // ревизия ищет их глазами. Забытая на неделю строка — это расхождение,
+  // которое некому объяснить, поэтому старые идут первыми.
+  const queue = pend.length ? `
+    <div class="wo-q-head">
+      <span class="wo-q-v">${pend.length}</span>
+      <span class="wo-q-u">${pluralize(pend.length,'списание','списания','списаний')}<br>ждёт решения</span>
+      <span class="wo-q-aed"><b>${fmt(w.pending_aed || 0)}</b>AED по прайсу</span>
+    </div>
+    <div class="wo-rows" id="woQueue">${pend.map(woRow).join('')}</div>
+    <div class="exp-grp">История</div>` : '';
   // Сверху — деньги и причины: это ответ на вопрос «много ли», ради которого
   // раздел и открывают. Строки ниже отвечают уже на «что именно».
   const kinds = (w.by_kind || []).map(k => `<div class="wo-k">
       <span class="wo-k-n" style="color:${WO_TINT[k.kind] || 'var(--sub)'}">${fmt(k.qty)}</span>
       <span class="wo-k-t">${escS(k.kind)}</span></div>`).join('');
-  mid.innerHTML = `
+  mid.innerHTML = queue + `
     <div class="wo-sum">
       <div class="wo-sum-l">
         <div class="wo-sum-n">${fmt(w.total_aed)}<i>AED</i></div>
@@ -12831,11 +13349,44 @@ function woHome(){
     <div class="wo-rows">${w.rows.map(woRow).join('')}</div>`;
 }
 
+// Решение принимается здесь же, в строке: уводить ради двух кнопок на
+// отдельный экран незачем — всё, на чём оно основано, уже видно.
+//
+// Отклонение ничего не удаляет. Запись остаётся, но со склада не вычитается —
+// значит эти бутылки вылезут недостачей в ближайшем пересчёте, у того, у кого
+// они пропали. Так что «Отклонить» это не спор о фотографии, а возврат вопроса
+// на полку, и переспрашивать перед ним есть о чём.
+async function woDecide(ev, id, ok){
+  ev.stopPropagation();
+  if(!ok && !confirm('Отклонить списание? Бутылки останутся недостачей на водителе.')) return;
+  const row = document.getElementById('wo-' + id);
+  row?.querySelectorAll('.wo-act').forEach(b => b.disabled = true);
+  try{
+    await ownerApi.ownerFetch('/api/owner/stock/writeoff/' + encodeURIComponent(id) + '/decide',
+      {method:'POST', body:{ok: !!ok, as: _meName()}});
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    _toast(ok ? 'Согласовано — списано со склада' : 'Отклонено — осталось недостачей');
+  }catch(e){
+    // Второй владелец мог решить первым: это не ошибка, а новость. Показываем
+    // её словами и обновляем экран — спорить тут не о чем.
+    const p = (e || {}).payload || {};
+    _toast(p.error === 'already_decided'
+      ? 'Уже решено' + (p.by ? ' — ' + p.by : '')
+      : 'Не удалось — попробуйте ещё раз');
+    row?.querySelectorAll('.wo-act').forEach(b => b.disabled = false);
+  }
+  try{ ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs', {params:{days:30}}); }
+  catch(e){}
+  woHome();
+}
+
 function woRow(r){
   const d = new Date(/Z$|[+-]\d{2}:?\d{2}$/.test(r.at) ? r.at : r.at + 'Z');
   const when = isNaN(d) ? (r.day || '') : d.toLocaleString('ru-RU',
     {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Dubai'});
-  return `<div class="wo-row" onclick="woShot('${escS(r.id)}','${escS(r.name)}')">
+  const wait = r.state === 'pending', no = r.state === 'no';
+  return `<div class="wo-row ${wait ? 'pend' : ''}" id="wo-${escS(r.id)}"
+       onclick="woShot('${escS(r.id)}','${escS(r.name)}')">
     <div class="wo-th" id="woth-${escS(r.id)}">${
       r.thumb ? `<img src="${escS(r.thumb)}" alt="">` : ''}</div>
     <div class="wo-b">
@@ -12844,8 +13395,16 @@ function woRow(r){
       <div class="wo-m"><span style="color:${WO_TINT[r.kind] || 'var(--sub)'}">${escS(r.kind)}</span>
         · ${escS(r.by)}${r.district_code ? ' · ' + escS(r.district_code) : ''} · ${when}</div>
       ${r.note ? `<div class="wo-note-t">${escS(r.note)}</div>` : ''}
+      ${wait ? '<span class="wo-st wait">не вычтено со склада</span>' : ''}
+      ${no ? `<span class="wo-st no">отклонено${
+        r.decided_by_name ? ' · ' + escS(r.decided_by_name) : ''}</span>` : ''}
     </div>
-    <div class="wo-aed">${fmt(r.aed)}<i>AED</i></div>
+    <div class="wo-aed" ${no ? 'style="text-decoration:line-through;opacity:.55"' : ''}>${
+      fmt(r.aed)}<i>AED</i></div>
+    ${wait ? `<div class="wo-acts">
+      <button class="wo-act no" onclick="woDecide(event,'${escS(r.id)}',false)">Отклонить</button>
+      <button class="wo-act ok" onclick="woDecide(event,'${escS(r.id)}',true)">Согласовать</button>
+    </div>` : ''}
   </div>`;
 }
 

@@ -538,6 +538,23 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;
   font-family:'DM Sans',sans-serif;font-size:13px;font-weight:700}
 .stk-bar-done:active{transform:scale(.95)}
+/* Два действия над списком. Раньше «Ревизия» была безымянной иконкой в углу
+   шапки, а камера пряталась внутри режима ревизии — то есть за иконкой, о
+   которой надо было догадаться. Оба действия равноправны и подписаны словами:
+   их ищут глазами, а не вспоминают. */
+.stk-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.stk-acts.one{grid-template-columns:1fr}
+.stk-act{display:flex;align-items:center;justify-content:center;gap:9px;padding:14px 10px;
+  border-radius:15px;cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;
+  color:var(--sub);background:var(--card);border:1px solid var(--border2)}
+.stk-act:active{transform:scale(.985)}
+.stk-act svg{flex-shrink:0}
+.stk-act.on{color:#1a1408;border-color:transparent;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.stk-act.scan{color:var(--gold2);border-color:rgba(201,169,110,.42)}
+.stk-act u{text-decoration:none;font-family:'Space Grotesk',sans-serif;font-size:13px;
+  color:var(--muted);font-variant-numeric:tabular-nums}
+.stk-act.scan u{color:var(--gold)}
 /* Вход в проход камерой. Стоит выше списка: в ревизии это главное действие,
    а не одна из кнопок — всё, что заведено кодами, закрывается отсюда. */
 .stk-scan{display:flex;align-items:center;gap:12px;width:100%;padding:14px;
@@ -7064,8 +7081,9 @@ function _stkHead(title, sub, save){
   }
   _setText('stkSub', sub);
   document.getElementById('stkSaveBtn').style.display = save ? '' : 'none';
+  // Иконка ревизии из шапки убрана: теперь это подписанная кнопка над списком.
   const ab = document.getElementById('stkAudBtn');
-  if(ab){ ab.style.display = save ? 'flex' : 'none'; ab.classList.toggle('on', STK.audit); }
+  if(ab) ab.style.display = 'none';
   // Поиск и фильтры в ревизии не нужны: список и так весь, и прятать из него
   // строки — верный способ «потерять» непроверенную позицию.
   document.getElementById('stkTools').style.display   = (save && !STK.audit) ? 'flex' : 'none';
@@ -7297,10 +7315,38 @@ function stkRows(){
   return sh.rows.filter(r => r.touched || r.stale);
 }
 
+// Два действия, которые нужны на этом экране всегда: включить ревизию и
+// пройти полку камерой. Камеру больше не прячем внутрь режима ревизии — она
+// закрывает позиции с кодами одинаково хорошо и в обычном пересчёте, и в
+// первом, где иначе пришлось бы вбивать сто двадцать три числа руками.
+function stkActs(){
+  const sh = STK.sheet || {};
+  const coded = (sh.rows || []).filter(r => r.coded > 0).length;
+  const sc = sh.scan || {};
+  const scan = coded ? `
+    <button class="stk-act scan" onclick="stkScan()">
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+           stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
+        <path d="M7 12h10"/></svg>
+      ${sc.total ? 'Продолжить' : 'Сканировать'}${sc.total ? `<u>${fmt(sc.total)}</u>` : ''}
+    </button>` : '';
+  return `<div class="stk-acts ${scan ? '' : 'one'}">
+    <button class="stk-act ${STK.audit ? 'on' : ''}" onclick="stkAuditToggle()">
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+           stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 11l2 2 4-4"/>
+        <path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>
+      ${STK.audit ? 'Идёт ревизия' : 'Ревизия'}
+    </button>${scan}
+  </div>`;
+}
+
 function stkRenderList(){
   const sh = STK.sheet, box = document.getElementById('stkMid');
   const rows = stkRows();
   const st = stkStats();
+  const acts = stkActs();
   _stkHead(`${sh.district_code} ${sh.district_name}`,
     sh.first_time
       ? `первый пересчёт · ${sh.total_count} позиций`
@@ -7326,24 +7372,11 @@ function stkRenderList(){
     const coded = rows.filter(r => r.coded > 0);
     const lost  = coded.filter(r => r.scanned == null);
     const hand  = rows.filter(r => !r.coded);
-    box.innerHTML = `
+    box.innerHTML = acts + `
       <div class="stk-prog">
         <span class="stk-prog-n" id="stkProgNum">0 / ${total}</span>
         <div class="stk-prog-bar"><div class="stk-prog-fill" id="stkProgFill" style="width:0%"></div></div>
       </div>
-      <button class="stk-scan" onclick="stkScan()">
-        <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
-             stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
-          <path d="M7 12h10"/></svg>
-        <span class="stk-scan-b">
-          <span class="stk-scan-t">${sc.total ? 'Продолжить проход' : 'Пройти камерой'}</span>
-          <span class="stk-scan-s">${coded.length
-            ? `${coded.length} ${pluralize(coded.length,'позиция заведена','позиции заведены','позиций заведены')} кодами`
-            : 'кодами здесь пока ничего не заведено'}</span>
-        </span>
-        <span class="stk-scan-v">${sc.total ? fmt(sc.total) : ''}</span>
-      </button>
       ${lost.length ? `<div class="stk-lost">
         <div class="stk-lost-t"><b>Камера не нашла ${lost.length} ${
           pluralize(lost.length,'позицию','позиции','позиций')}</b> из тех, что заведены
@@ -7373,13 +7406,17 @@ function stkRenderList(){
     return;
   }
 
+
   // Первый пересчёт: считать не от чего, приложение ещё не знает, что на полке.
   if(sh.first_time){
-    box.innerHTML = `<div class="stk-note stk-note-hot">
+    const coded = (sh.rows || []).filter(r => r.coded > 0).length;
+    box.innerHTML = acts + `<div class="stk-note stk-note-hot">
         <b>Первый пересчёт района.</b> Сравнивать пока не с чем — приложение не знает,
         сколько товара лежит сейчас. Введите фактические остатки по всем позициям:
         это отправная точка. Со следующей смены числа будут подставляться сами, и
         проверять придётся только то, что продавалось.
+        ${coded ? `<br><br><b>${coded} ${pluralize(coded,'позиция заведена','позиции заведены','позиций заведены')} кодами</b>
+        — их не надо вбивать руками: нажмите «Сканировать» и пройдите полку камерой.` : ''}
       </div>` + rows.map(r => stkItem(r)).join('');
     return;
   }
@@ -7387,7 +7424,7 @@ function stkRenderList(){
   // Числа пришли из реестра кодов, а не с прошлого пересчёта. Сказать об этом
   // надо прямо: человек должен понимать, с чем именно он сверяет полку.
   if(sh.from_registry){
-    box.innerHTML = `<div class="stk-note">
+    box.innerHTML = acts + `<div class="stk-note">
         <b>Считаем от реестра.</b> Пересчёта здесь ещё не было, но бутылки заводили
         кодами — приложение знает каждую поштучно. В строках стоит то, что внесли,
         минус проданное и списанное. Сверьте с полкой: расхождение и есть недостача.
@@ -7398,7 +7435,7 @@ function stkRenderList(){
   // Дальше — обычная смена. Продажи известны из заказов (и приложение, и телефон)
   // и уже вычтены. Остаётся сверить с полкой — и не забыть про то, что уходит
   // без продажи: бой и недостачу видно только глазами.
-  const note = `<div class="stk-note">
+  const note = acts + `<div class="stk-note">
       <b>Продажи вычтены сами.</b> Приложение знает заказы — и из приложения, и по
       телефону: было − продано ± перемещения. Но бутылка пропадает и без заказа —
       бой, пересорт, водитель. Поэтому проверяйте по полке: расхождение и есть
@@ -7729,7 +7766,11 @@ function _stkApplyScan(onlyNew){
     if(r.scanned == null) return;
     if(onlyNew && r.actual != null) return;
     STK.vals[r.id] = r.scanned;
-    STK.marks[r.id] = (r.expected != null && r.scanned !== r.expected) ? 'diff' : 'ok';
+    // Отметки — принадлежность ревизии. В обычном пересчёте камера подставляет
+    // числа и только: расставить галочки молча значило бы записать пересчёт
+    // ревизией, о которой человек не просил.
+    if(STK.audit)
+      STK.marks[r.id] = (r.expected != null && r.scanned !== r.expected) ? 'diff' : 'ok';
   });
 }
 

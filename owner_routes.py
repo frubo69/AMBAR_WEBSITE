@@ -427,6 +427,39 @@ def _order_summary(o):
     }
 
 @require_owner
+async def _drivers_spend(start, end) -> dict:
+    """Расходы водителей за окно: питание плюс согласованные разовые.
+
+    Считаем ровно то, что уже стало расходом. Ждущее согласования — ещё не
+    деньги: владелец может отклонить, и вычитать это из выручки заранее значит
+    показывать ему убыток, которого может не случиться.
+
+    Дни здесь учётные, а не календарные: driver_days пишется тем же учётным
+    днём, что и заказы, поэтому окно берём по его границам."""
+    import config_staff as _staff
+    d_from = start.strftime("%Y-%m-%d")
+    d_to = (end - timedelta(seconds=1)).strftime("%Y-%m-%d")
+    try:
+        rows = await db.get_driver_days_range(d_from, d_to)
+    except Exception as e:
+        log.warning(f"[finance] расходы водителей не прочитаны: {e}")
+        return {"total": 0, "meal": 0, "extra": 0}
+    meal = extra = 0
+    for r in rows:
+        w = r.get("working")
+        meal += _staff.MEAL_WORKING if w is True else (_staff.MEAL_OFF if w is False else 0)
+        for e in (r.get("extras") or []):
+            st = (e.get("status") or "").strip().lower()
+            if st and st != "approved":
+                continue
+            try:
+                extra += float(e.get("amount") or 0)
+            except (TypeError, ValueError):
+                pass
+    return {"total": round(meal + extra), "meal": round(meal), "extra": round(extra)}
+
+
+@require_owner
 async def handle_finance(request):
     """Finance summary powering the hero revenue card and Money tab.
 
@@ -669,7 +702,12 @@ async def handle_finance(request):
         },
         # Чаевые за «чаевые» позиции и выручка за их вычетом — то, что реально
         # остаётся, после того как операторы получат своё.
+        # Чаевые и расходы водителей — то, что физически уходит из выручки. В
+        # шапке крупным числом стоит остаток, а эти две строки объясняют, из
+        # чего он получился: иначе «валовая 25 475» и «в руках 24 725» выглядят
+        # как ошибка.
         "tips_out": (lambda t: {**t, "net": rev_curr - t["total"]})(_tips_for(curr_orders)),
+        "spend_out": await _drivers_spend(start, end),
         "profit": {
             "current":    round(rev_curr * MARGIN_PCT / 100),
             "margin_pct": MARGIN_PCT,

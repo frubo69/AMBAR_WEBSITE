@@ -2600,6 +2600,7 @@ button.path:active{transform:scale(.995)}
       <div class="hero-side" id="heroSide" style="display:none">
         <div class="hero-side-r"><span class="hero-side-l">валовая</span><span class="hero-side-v" id="heroGross" data-aed="">—</span></div>
         <div class="hero-side-r"><span class="hero-side-l">чаевые</span><span class="hero-side-v gold" id="heroTips" data-aed="">—</span></div>
+        <div class="hero-side-r"><span class="hero-side-l">расход</span><span class="hero-side-v dn" id="heroSpend" data-aed="">—</span></div>
       </div>
     </div>
     <div class="hero-row">
@@ -4524,6 +4525,7 @@ button.pill:active{opacity:.6}
   text-transform:uppercase;color:var(--muted);opacity:.75}
 .hero-side-v{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;
   color:var(--sub);font-variant-numeric:tabular-nums;min-width:56px}
+.hero-side-v.dn{color:var(--dn)}
 .hero-side-v.gold{color:var(--gold2)}
 
 /* ── Широкий экран: планшет и компьютер ─────────────────────────────────────
@@ -6688,12 +6690,16 @@ function _paintHero(p, f){
   // чаевых — это тоже ответ, причём такой, который хотят видеть.
   const t = f.tips_out || null;
   const tips = t ? (+t.total || 0) : 0;
-  _setAed('heroRev',  tips ? (t.net != null ? t.net : f.revenue.current - tips)
-                           : f.revenue.current);
+  // Расходы водителей — питание и согласованные разовые. Ждущее согласования
+  // сюда не идёт: владелец может отклонить, и вычитать заранее значит показать
+  // убыток, которого может не случиться.
+  const spend = +((f.spend_out || {}).total) || 0;
+  _setAed('heroRev', f.revenue.current - tips - spend);
   const side = document.getElementById('heroSide');
   if(side) side.style.display = 'flex';
   _setAed('heroGross', f.revenue.current);
   _setAed('heroTips',  tips);
+  _setAed('heroSpend', spend);
   _setAed('heroPrev', f.revenue.previous);
   _setText('heroDelta', f.revenue.delta_label);
   const hd = document.getElementById('heroDelta');

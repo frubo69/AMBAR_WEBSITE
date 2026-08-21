@@ -4525,7 +4525,11 @@ button.pill:active{opacity:.6}
    Строке суммы нужен flex: без него боковой блок падает под число и карточка
    вырастает ровно на ту высоту, которую мы пытались сэкономить. */
 .hero-amt-row{display:flex;align-items:baseline}
+/* Сдвинуты вниз относительным смещением, а не отступом: отступ раздвинул бы
+   строку с числом, карточка бы выросла, и график снова уехал бы за нижний
+   край. relative/top двигает только картинку, вёрстка остаётся прежней. */
 .hero-side{margin-left:auto;display:flex;flex-direction:column;gap:2px;align-self:center;
+  position:relative;top:10px;
   padding-left:14px;text-align:right}
 .hero-side-r{display:flex;align-items:baseline;justify-content:flex-end;gap:7px;white-space:nowrap}
 .hero-side-l{font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:600;letter-spacing:.5px;

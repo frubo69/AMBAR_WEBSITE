@@ -226,12 +226,13 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .dn-b[disabled]{opacity:.25;pointer-events:none}
 /* Дата двумя строками: число сверху, «сегодня/вчера/27 июля» под ним — чтобы не
    гадать, какой это день, особенно при сутках от полудня. */
-.dn-d{min-width:58px;height:30px;padding:0 7px;border:none;background:none;border-radius:9px;
+.dn-d{min-width:58px;height:33px;padding:0 7px;border:none;background:none;border-radius:9px;
   font-family:'DM Sans',sans-serif;color:var(--gold2);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;transition:.15s var(--e1)}
 .dn-d[disabled]{cursor:default}
 .dn-num{font-size:11.5px;font-weight:700;letter-spacing:.2px;line-height:1.1;font-variant-numeric:tabular-nums}
-.dn-rel{font-size:8.5px;font-weight:600;letter-spacing:.2px;line-height:1.1;opacity:.6;text-transform:lowercase}
+.dn-rel{font-size:8.5px;font-weight:600;letter-spacing:.2px;line-height:1.1;opacity:.6;
+  text-transform:lowercase;margin-top:2.5px}
 /* Возврат к сегодня — отдельная подписанная кнопка, а не догадка про иконку.
    Появляется только когда действительно есть куда возвращаться. */
 .dn-home{height:24px;padding:0 10px;margin-left:3px;border:none;border-radius:999px;
@@ -902,6 +903,26 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 
 /* Сетка водителей: все плитки одного размера, поэтому ряды ровные, а район —
    меткой в углу, а не отдельным заголовком на пол-экрана. */
+/* Кого проверяем — районами, теми же карточками, что и «Кто на каком районе»:
+   один и тот же вопрос «кто где» не должен выглядеть на двух экранах по-разному.
+   Операторов здесь нет — проверяют то, что человек возит, а возят водители.
+
+   Фишка в две строки, а не в одну: у водителя кроме имени есть состояние —
+   сколько раз проверяли и находили ли чужие бутылки. Ради него всё и открывают. */
+.chk-p{display:flex;align-items:center;gap:9px;padding:7px 13px 7px 7px;
+  border-radius:14px;cursor:pointer;font-family:inherit;text-align:left;
+  color:var(--text);background:var(--card2);border:1px solid var(--border3)}
+.chk-p:active{transform:scale(.97);border-color:var(--gold2)}
+.chk-p-a{width:28px;height:28px;flex:0 0 auto;border-radius:9px;display:flex;
+  align-items:center;justify-content:center;color:var(--gold2);background:var(--card3)}
+.chk-p-b{min-width:0}
+.chk-p-n{display:block;font-size:13.5px;font-weight:700;line-height:1.15}
+.chk-p-s{display:block;font-size:10.5px;color:var(--muted);margin-top:2px}
+/* Флажок — не наказание, а повод спросить: у этого водителя находили бутылки
+   не из реестра. Поэтому красным, но без заливки — это вопрос, а не приговор. */
+.chk-p.bad{border-color:rgba(226,106,106,.45);background:rgba(226,106,106,.08)}
+.chk-p.bad .chk-p-a{color:var(--dn)}
+.chk-p.bad .chk-p-s{color:var(--dn);font-weight:700}
 .chk-grid{display:grid;grid-template-columns:1fr 1fr;gap:7px}
 /* Нечётное число водителей оставляло последнюю плитку сиротой в полряда —
    она занимает ряд целиком, и сетка снова выглядит собранной. */
@@ -13899,25 +13920,33 @@ function chkHome(){
         fmt(t.bottles)} ${pluralize(t.bottles,'бутылка','бутылки','бутылок')} за 30 дней`
     : 'проверок ещё не было');
 
-  // Водители одной сеткой, а не пятью группами с заголовками. Район — меткой
-  // внутри плитки: он подсказка, а не раздел, и ради него не нужен ряд на пол-
-  // экрана. Плитки одного размера, поэтому сетка читается за один взгляд, а
-  // не собирается глазами из рваных строк.
-  const names = (CHK_DRV.districts || []).flatMap(d =>
-    (d.drivers || []).map(n => ({n, code: d.code})));
-  const tiles = names.map(({n, code}, i) => {
-    const last = (i === names.length - 1) && (names.length % 2 === 1);
+  // Районами, а не общей сеткой. Проверять едут на точку, и вопрос звучит как
+  // «кто сегодня на B2», а не «где здесь Бахадыр». Карточка района — та же, что
+  // на экране «Кто на каком районе»: один и тот же вопрос не должен выглядеть
+  // на двух экранах по-разному. Операторов тут нет — проверяют то, что человек
+  // возит, а возят водители.
+  const tiles = (CHK_DRV.districts || []).map(d => {
+    const chips = (d.drivers || []).map(n => {
       const f = flags[n] || {};
       const bad = f.bad || 0;
-      return `<button class="chk-t${bad ? ' bad' : ''}${last ? ' wide' : ''}"
-        onclick="chkStart('${escS(n)}')">
-        <span class="chk-t-d">${escS(code)}</span>
-        <span class="chk-t-n">${escS(n)}</span>
-        <span class="chk-t-s">${bad
-          ? `не наших ${bad}`
-          : (f.checks ? `${f.checks} ${pluralize(f.checks,'проверка','проверки','проверок')}`
-                      : 'не проверялся')}</span>
+      return `<button class="chk-p${bad ? ' bad' : ''}" onclick="chkStart('${escS(n)}')">
+        <span class="chk-p-a">${IC('car', 15)}</span>
+        <span class="chk-p-b">
+          <span class="chk-p-n">${escS(n)}</span>
+          <span class="chk-p-s">${bad
+            ? `не наших ${bad}`
+            : (f.checks ? `${f.checks} ${pluralize(f.checks,'проверка','проверки','проверок')}`
+                        : 'не проверялся')}</span>
+        </span>
       </button>`;
+    }).join('') || '<span class="crw-none">водителей нет</span>';
+    return `<div class="crw-c">
+      <div class="crw-c-h">
+        <span class="crew-code">${escS(d.code)}</span>
+        <span class="crw-c-n">${escS(d.name)}</span>
+      </div>
+      <div class="crw-c-b">${chips}</div>
+    </div>`;
   }).join('');
 
   // Последние проверки — три штуки: они отвечают на «что было вчера», а не
@@ -13939,7 +13968,7 @@ function chkHome(){
 
     <div class="scan-sect"><span>Кого проверяем</span><i>${(ACC_CHK.drivers||[]).filter(d=>d.bad).length
       ? (ACC_CHK.drivers||[]).filter(d=>d.bad).length + ' с флажком' : ''}</i></div>
-    <div class="chk-grid">${tiles}</div>
+    <div>${tiles}</div>
 
     ${checks.length ? `<div class="scan-sect"><span>Последние проверки</span>${
         checks.length > 3 ? `<i>${checks.length} всего</i>` : ''}</div>

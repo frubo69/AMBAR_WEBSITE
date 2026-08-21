@@ -4069,13 +4069,22 @@ function _preloadHsHero(){
 // like; with 2+ the banner auto-scrolls through them with line indicators (like the
 // SWAPLY hero). They render in a fixed 2:1 frame (object-fit:cover), so keep them ~2:1.
 const PROMO_SLIDES = {
-  ru: ['promo_gift_ru.jpg', 'promo_hero_ru.png', 'promo_banner_ru.png', 'promo_addhome_ru.png'],
-  en: ['promo_gift_en.jpg', 'promo_hero_en.png', 'promo_banner_en.png', 'promo_addhome_en.png'],
+  ru: ['promo_smoke_ru.jpg', 'promo_gift_ru.jpg', 'promo_hero_ru.png', 'promo_banner_ru.png', 'promo_addhome_ru.png'],
+  en: ['promo_smoke_en.jpg', 'promo_gift_en.jpg', 'promo_hero_en.png', 'promo_banner_en.png', 'promo_addhome_en.png'],
 };
 // Tap-through info per slide, keyed by the slide's base filename (promo_hero → discount,
 // promo_banner → crypto). showPromoInfo() picks by the CURRENTLY shown slide; unknown
 // slides fall back to the discount card.
 const PROMO_INFO = {
+  promo_smoke: {
+    badge: 'NEW',
+    shot: 'p124',              // то же фото, что в карточке товара
+    title: {ru:'ТЕПЕРЬ И СИГАРЕТЫ', en:'AND NOW CIGARETTES'},
+    lead:  {ru:'Marlboro Gold и стики TEREA — Sienna и Amber. Доставляем только вместе с алкоголем: пачка сама по себе не окупает машину, поэтому сигареты едут к бутылке, а не вместо неё.',
+            en:'Marlboro Gold and TEREA sticks — Sienna and Amber. Delivered only together with alcohol: a pack on its own doesn\'t pay for the car, so cigarettes ride along with a bottle, not instead of one.'},
+    items: {ru:['Marlboro Gold — 50 AED','TEREA Sienna и Amber — 200 AED','Добавляются к любому заказу, где есть алкоголь'],
+            en:['Marlboro Gold — 50 AED','TEREA Sienna and Amber — 200 AED','Add them to any order that has alcohol in it']},
+  },
   promo_hero: {
     badge: '−5%',
     title: {ru:'ЦЕНЫ ДЛЯ СВОИХ', en:'INSIDER PRICING'},

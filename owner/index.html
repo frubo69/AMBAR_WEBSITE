@@ -188,7 +188,14 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    числа и положением стрелок управляет скрипт. */
 .hero{position:sticky;top:var(--hero-top,124px);z-index:30;
   padding:14px 20px 18px;border-radius:var(--r);margin-bottom:20px;
-  height:210px;  /* базовая высота — дальше ею управляет скрипт */
+  /* Базовая высота — дальше ею управляет скрипт, и это ЕДИНСТВЕННОЕ место,
+     где она задана вместе с константой FULL в самом скрипте. Высота жёсткая,
+     а карточка режет всё лишнее (overflow:hidden), поэтому добавленная справа
+     строка не «раздвигает» её, а выталкивает график за нижний край — что и
+     случилось, когда к «валовой» и «чаевым» добавился «расход». Строк справа
+     три, каждая ~16px, и они выше самого числа: если добавите четвёртую —
+     поднимите высоту здесь и FULL в скрипте на те же ~16px. */
+  height:226px;
   background:
     radial-gradient(ellipse 90% 60% at 15% 0%, rgba(201,169,110,.18), transparent 60%),
     linear-gradient(180deg,#161629 0%, #0F0F20 100%);
@@ -4518,7 +4525,7 @@ button.pill:active{opacity:.6}
    Строке суммы нужен flex: без него боковой блок падает под число и карточка
    вырастает ровно на ту высоту, которую мы пытались сэкономить. */
 .hero-amt-row{display:flex;align-items:baseline}
-.hero-side{margin-left:auto;display:flex;flex-direction:column;gap:3px;align-self:center;
+.hero-side{margin-left:auto;display:flex;flex-direction:column;gap:2px;align-self:center;
   padding-left:14px;text-align:right}
 .hero-side-r{display:flex;align-items:baseline;justify-content:flex-end;gap:7px;white-space:nowrap}
 .hero-side-l{font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:600;letter-spacing:.5px;
@@ -4904,7 +4911,7 @@ try{
   const row   = hero.querySelector('.hero-row');
   const nav   = hero.querySelector('.day-nav');
 
-  const FULL = 210, MIN = 78;              // высоты карточки
+  const FULL = 226, MIN = 78;              // высоты карточки (см. .hero в стилях)
   const F_FULL = 44, F_MIN = 26;           // размер числа
 
   const place = () => {

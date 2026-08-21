@@ -1456,9 +1456,18 @@ button.path:active{transform:scale(.995)}
 
 
 /* ── Кто на каком районе ───────────────────────────────────────────────── */
-.crew-entry{display:flex;align-items:center;gap:11px;width:100%;margin:8px 0 10px;padding:14px 13px;
-  border-radius:13px;cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
-  background:var(--card);border:1px solid var(--border2)}
+/* Вход в перестановку. Была тонкая полоска в тринадцать пикселей текста —
+   рядом с карточкой выручки она читалась как подпись, а не как действие, и
+   пальцем в неё попадали через раз.
+   Теперь это карточка того же роста, что и свёрнутая выручка (78px): такой же
+   рост, такой же радиус, такая же посадка — два соседа одного веса. Заметной
+   её делает не цвет, а размер и иконка в золотой плашке: кричать цветом здесь
+   нечему, перестановка это рутина, а не тревога. */
+.crew-entry{display:flex;align-items:center;gap:13px;width:100%;height:78px;
+  margin:8px 0 10px;padding:0 16px;
+  border-radius:var(--r);cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
+  background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
+  border:1px solid var(--border)}
 /* На странице районов кнопка встала на место карточки выручки и так же
    прилипает под переключателем периода: перестановкой людей занимаются, глядя
    на список, а не пролистав его до конца. Фон непрозрачный — под кнопкой
@@ -1466,14 +1475,20 @@ button.path:active{transform:scale(.995)}
    Во всю ширину и без верхних скруглений: прилипшая кнопка — не карточка в
    колонке, а продолжение шапки. Так она и шире под палец, и сразу видно, что
    она держится сверху, а не едет вместе со списком. */
+/* Прилипает под переключателем периода — чтобы быть под рукой с любого места
+   списка. Во всю ширину, как и выручка, а не встык к краям экрана. */
 .crew-entry.pinned{position:sticky;top:calc(var(--hero-top,124px) - 4px);z-index:30;
-  width:calc(100% + var(--pad) * 2);margin:0 calc(var(--pad) * -1) 14px;padding:15px calc(var(--pad) + 1px);
-  border-radius:0 0 16px 16px;border-top:0;border-left:0;border-right:0;
-  background:var(--card);box-shadow:0 8px 20px rgba(0,0,0,.5)}
-.crew-entry:active{background:var(--card2)}
-.crew-entry > svg{flex:0 0 auto;opacity:.55}
+  margin:0 0 14px;box-shadow:0 6px 18px rgba(0,0,0,.45)}
+.crew-entry:active{transform:scale(.99)}
+/* Иконка в плашке — то, что делает строку карточкой: у неё появляется левый
+   якорь, и глаз цепляется за него раньше, чем начинает читать. */
+.crew-e-ico{flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+  width:42px;height:42px;border-radius:13px;color:var(--gold2);
+  background:var(--gold-soft);border:1px solid rgba(201,169,110,.22)}
 .crew-e-b{flex:1;min-width:0}
-.crew-e-b b{display:block;font-size:13px;font-weight:600}
+.crew-e-b b{display:block;font-size:15px;font-weight:700;line-height:1.2}
+.crew-e-b i{display:block;font-style:normal;font-size:12px;color:var(--muted);
+  margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .crew-e-go{display:flex;align-items:center;color:var(--muted);flex-shrink:0}
 .crew-d{display:flex;align-items:center;gap:11px;padding:13px;margin-bottom:7px;border-radius:13px;
   background:var(--card);border:1px solid var(--border2)}
@@ -2784,12 +2799,15 @@ button.path:active{transform:scale(.995)}
        перестановка людей. Прилипает под переключателем периода, чтобы быть
        под рукой с любого места списка. -->
   <button class="crew-entry pinned" id="crewEntry" onclick="crewOpen()">
-    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
-         stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
-      <circle cx="8" cy="7" r="3"/><path d="M2.5 20v-1.5A4.5 4.5 0 0 1 7 14h2"/>
-      <path d="M14 8h7"/><path d="M18 5l3 3-3 3"/>
-      <path d="M21 17h-7"/><path d="M17 14l-3 3 3 3"/></svg>
-    <span class="crew-e-b"><b>Переместить оператора / водителя</b></span>
+    <span class="crew-e-ico">
+      <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="8" cy="7" r="3"/><path d="M2.5 20v-1.5A4.5 4.5 0 0 1 7 14h2"/>
+        <path d="M14 8h7"/><path d="M18 5l3 3-3 3"/>
+        <path d="M21 17h-7"/><path d="M17 14l-3 3 3 3"/></svg>
+    </span>
+    <span class="crew-e-b"><b>Кто на каком районе</b>
+      <i>переставить оператора или водителя</i></span>
     <span class="crew-e-go"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span>
   </button>
 
@@ -6641,19 +6659,20 @@ async function applyFinanceLive(p){
 // Paints ONLY the hero revenue block (amount, delta, sparkline) — shared by the
 // period render and the day browser.
 function _paintHero(p, f){
-  // Крупная цифра — то, что остаётся после чаевых. Валовая уходит наверх
-  // мелким шрифтом, сами чаевые — под сумму. Если чаевых нет, обе строки
-  // прячем и карточка выглядит как раньше.
+  // Крупная цифра — то, что остаётся после чаевых. Валовая и чаевые стоят
+  // рядом двумя тихими строчками — всегда, даже когда чаевых не было.
+  //
+  // Раньше в такой день обе строки прятались, и карточка меняла состав: вчера
+  // «валовая» была, сегодня нет. Читать её приходилось заново, а ноль в
+  // чаевых — это тоже ответ, причём такой, который хотят видеть.
   const t = f.tips_out || null;
   const tips = t ? (+t.total || 0) : 0;
   _setAed('heroRev',  tips ? (t.net != null ? t.net : f.revenue.current - tips)
                            : f.revenue.current);
   const side = document.getElementById('heroSide');
-  if(side) side.style.display = tips ? 'flex' : 'none';
-  if(tips){
-    _setAed('heroGross', f.revenue.current);
-    _setAed('heroTips',  tips);
-  }
+  if(side) side.style.display = 'flex';
+  _setAed('heroGross', f.revenue.current);
+  _setAed('heroTips',  tips);
   _setAed('heroPrev', f.revenue.previous);
   _setText('heroDelta', f.revenue.delta_label);
   const hd = document.getElementById('heroDelta');

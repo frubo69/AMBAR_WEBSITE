@@ -133,31 +133,39 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return                       # чужие координаты нам не нужны и не хранятся
     now = datetime.now(timezone.utc)
     until = None
-    if getattr(loc, "live_period", None):
-        until = now + timedelta(seconds=int(loc.live_period))
+    period = getattr(loc, "live_period", None)
+    if period:
+        until = now + timedelta(seconds=int(period))
+    # Трансляцию выключили. Телеграм сообщает об этом правкой того же сообщения:
+    # точка приходит, а срока у неё больше нет. Разовая точка отдельным
+    # сообщением — не то же самое, её шлют и поверх идущей трансляции.
+    stop = bool(update.edited_message and not period)
     try:
         await db.driver_pos_set(me["name"], _biz_day(), loc.latitude, loc.longitude,
-                                now, until=until,
+                                now, until=until, stop_live=stop,
                                 acc=getattr(loc, "horizontal_accuracy", None))
     except Exception as e:
         log.warning(f"точка {me['name']} не записана: {e}")
         return
     # Разовая точка — одно короткое подтверждение: без него человек не знает,
     # дошло ли, и жмёт ещё раз.
-    if update.message and not loc.live_period:
+    if update.message and not period:
         ok = await update.message.reply_text("Точка принята — оператор вас видит.")
         await _remember(update.message)
         await _remember(ok)
         return
     # На включение трансляции отвечаем один раз. На каждую её точку писать
     # нельзя: телефон шлёт их десятками, и чат превратится в ленту.
-    if update.message and loc.live_period:
+    if update.message and period:
         await _remember(update.message)
         sent = await update.message.reply_text(
             "Трансляция включена — спасибо. Оператор видит, где вы.\n"
             "Выключить можно в любой момент кнопкой «Остановить» в этом сообщении.")
         await _remember(sent)
-        log.info(f"трансляция включена: {me['name']} на {loc.live_period//3600} ч")
+        # Бессрочная трансляция приходит служебным сроком 0x7FFFFFFF — это
+        # шестьдесят восемь лет, и печатать их часами незачем.
+        log.info(f"трансляция включена: {me['name']} · "
+                 + ("бессрочно" if period > 86400 else f"{period // 3600} ч"))
 
 
 async def cmd_where(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
@@ -169,9 +177,10 @@ async def cmd_where(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         "Чтобы оператор видел вас всю смену:\n\n"
         "1. Скрепка в этом чате\n"
         "2. «Геопозиция»\n"
-        "3. «Транслировать» — на 8 часов\n\n"
-        "Телефон будет сам присылать точку, даже когда телеграм свёрнут. "
-        "Маршрут стирается, когда закрывают смену.\n\n"
+        "3. «Транслировать» → «Пока не выключу»\n\n"
+        "Включить хватит один раз: телефон будет сам присылать точку, даже "
+        "когда телеграм свёрнут. Маршрут стирается, когда закрывают смену, "
+        "а в отпуске трансляцию можно выключить тем же меню.\n\n"
         "Пока приложение открыто, точка уходит и без трансляции — сама.",
         reply_markup=drop_keyboard())
     await _remember(sent)

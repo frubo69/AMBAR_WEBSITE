@@ -2373,13 +2373,23 @@ async def drv_msgs_take(chat_id: int) -> list:
 TRACK_MAX = 2000              # точек на смену: восемь часов раз в пятнадцать секунд
 
 async def driver_pos_set(name: str, day: str, lat: float, lon: float, at,
-                         until=None, acc=None) -> None:
+                         until=None, acc=None, stop_live: bool = False) -> None:
+    """Точка водителя. until — до какого времени идёт трансляция.
+
+    stop_live гасит признак трансляции. Раньше его не было, потому что срок
+    кончался сам: восемь часов истекали, и «идёт ли трансляция» отвечало время.
+    С бессрочной трансляцией отвечать стало нечему — телеграм присылает срок на
+    шестьдесят восемь лет вперёд, и выключенная трансляция навсегда осталась бы
+    для нас включённой. Единственный честный признак её конца — сообщение от
+    самого телеграма, что она кончилась."""
     db = _db_or_none()
     if db is None or not name: return
     pt = {"lat": round(float(lat), 6), "lon": round(float(lon), 6), "at": at}
     doc = {"$set": {"lat": pt["lat"], "lon": pt["lon"], "at": at, "day": day},
            "$push": {"track": {"$each": [pt], "$slice": -TRACK_MAX}}}
-    if until is not None:
+    if stop_live:
+        doc["$unset"] = {"until": ""}
+    elif until is not None:
         doc["$set"]["until"] = until
     if acc is not None:
         doc["$set"]["acc"] = round(float(acc), 1)

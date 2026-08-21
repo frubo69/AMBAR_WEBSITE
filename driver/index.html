@@ -581,35 +581,57 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .ask-alt:active{transform:scale(.98);background:var(--gold-soft)}
 /* Экран смены. Не модальное окно, а состояние приложения: пока смена
    закрыта, за ним ничего нет. */
+/* ── ЭКРАН-ЗАМОК ────────────────────────────────────────────────────────────
+   Он показывается человеку, который пришёл работать и не может. Значит на нём
+   должно быть ровно три вещи: что происходит, чего не хватает, что нажать.
+
+   Что здесь наведено осознанно:
+
+   • Один шаг сетки — 8. Все отступы кратны ему, поэтому блоки не выглядят
+     расставленными на глаз.
+   • Один акцентный цвет — золото, и он только у действия: у кнопки и у пути,
+     который надо повторить в телеграме. Зелёный остался единственной галочкой
+     и больше нигде: раньше выполненное условие красилось целиком — рамка, фон
+     и заголовок, — и кричало громче невыполненного, хотя делать с ним нечего.
+   • Условия одного размера и одной высоты, независимо от длины текста: список
+     из двух строк не должен выглядеть как список из двух разных вещей.
+   • Текста ровно столько, чтобы сделать. Объяснения «почему так устроено» с
+     этого экрана убраны — человек стоит у машины. */
 .shscr{position:fixed;inset:0;z-index:95;display:none;align-items:center;
   justify-content:center;padding:24px;background:var(--bg);overflow-y:auto}
 .shscr.show{display:flex}
-.shscr-in{width:100%;max-width:420px;text-align:center}
-.shscr-i{width:78px;height:78px;margin:0 auto 18px;border-radius:26px;display:flex;
+.shscr-in{width:100%;max-width:400px;text-align:center}
+.shscr-i{width:64px;height:64px;margin:0 auto 16px;border-radius:20px;display:flex;
   align-items:center;justify-content:center;color:var(--gold2);background:var(--gold-soft);
-  border:1px solid rgba(201,169,110,.22)}
-.shscr-t{font-size:21px;font-weight:800;letter-spacing:-.3px}
-.shscr-s{font-size:13.5px;line-height:1.5;color:var(--muted);margin-top:7px;
-  margin-bottom:22px}
-/* Условие: слева состояние, справа что сделать. Пока не выполнено — читается
-   как задача, выполненное гаснет и не отвлекает. */
-.shc{display:flex;align-items:flex-start;gap:12px;padding:14px;margin-bottom:9px;
-  border-radius:15px;text-align:left;background:var(--bg3);
+  border:1px solid rgba(201,169,110,.2)}
+.shscr-t{font-size:20px;font-weight:800;letter-spacing:-.3px;line-height:1.2}
+.shscr-s{font-size:13.5px;line-height:1.45;color:var(--muted);margin:8px auto 24px;
+  max-width:320px}
+/* Условие. Слева состояние, справа что сделать. Выполненное гаснет: делать с
+   ним нечего, и внимания оно забирать не должно. */
+.shc{display:flex;align-items:flex-start;gap:12px;padding:16px;margin-bottom:8px;
+  border-radius:16px;text-align:left;background:var(--bg3);
   border:1px solid var(--border3)}
-.shc.on{border-color:rgba(61,220,132,.35);background:rgba(61,220,132,.06)}
-.shc-i{width:26px;height:26px;flex-shrink:0;border-radius:9px;display:flex;
+.shc-i{width:24px;height:24px;flex-shrink:0;border-radius:8px;display:flex;
   align-items:center;justify-content:center;color:var(--muted);background:var(--card2)}
-.shc.on .shc-i{color:#3ddc84;background:rgba(61,220,132,.14)}
+.shc.on .shc-i{color:#3ddc84;background:rgba(61,220,132,.12)}
+.shc.on .shc-t,.shc.on .shc-s{opacity:.55}
 .shc-b{flex:1;min-width:0}
 .shc-t{display:block;font-size:14px;font-weight:700;line-height:1.3}
-.shc.on .shc-t{color:#3ddc84}
-.shc-s{display:block;font-size:12px;line-height:1.5;color:var(--muted);margin-top:4px}
-.shc-s b{color:var(--gold2);font-weight:600}
-.shscr-go{margin-top:16px}
+.shc-s{display:block;font-size:12.5px;line-height:1.45;color:var(--muted);margin-top:5px}
+/* Путь в телеграме — не проза, а инструкция: показываем его строкой шагов,
+   которую глаз повторяет пальцем, не перечитывая абзац. */
+.shc-way{display:flex;flex-wrap:wrap;align-items:center;gap:5px;margin-top:9px}
+.shc-way span{padding:5px 9px;border-radius:8px;font-size:12px;font-weight:700;
+  color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.25)}
+.shc-way i{font-style:normal;color:var(--muted);font-size:11px}
+.shscr-go{width:100%;margin-top:16px}
 .shscr-alt{width:100%;margin-top:10px;padding:12px;border-radius:12px;cursor:pointer;
   font-size:13px;font-weight:600;color:var(--muted);background:none;
   border:1px solid var(--border3)}
 .shscr-alt:active{transform:scale(.98);color:var(--gold2)}
+.shscr-alt.solo{color:#1a1408;font-weight:700;border-color:transparent;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
 /* Полоса «смена идёт» — в шапке расходов, там же где её закрывают. */
 .shbar{display:flex;align-items:center;gap:12px;padding:13px 15px;margin-bottom:14px;
   border-radius:16px;background:var(--bg3);border:1px solid var(--border3)}
@@ -1397,7 +1419,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
     <div class="shscr-s" id="shS">Пока смена закрыта, заказы не приходят</div>
     <div id="shList"></div>
     <button class="btn btn-pri shscr-go" id="shGo" onclick="shOpen()">Открыть смену</button>
-    <button class="shscr-alt" onclick="shLoad(true)">Проверить ещё раз</button>
+    <button class="shscr-alt" id="shAlt" onclick="shLoad(true)">Проверить ещё раз</button>
   </div>
 </div>
 
@@ -1755,6 +1777,9 @@ async function boot(){
   // Пять секунд, а не сорок пять: заказ должен появляться на экране почти сразу,
   // как его назначили. Спящую вкладку не опрашиваем — телефон в кармане.
   setInterval(()=>{ if(!document.hidden && !PANIC) load(); }, 5000);
+  // Смена и трансляция — раз в полминуты: если трансляция погасла, экран
+  // должен закрыться сам, а не ждать, пока водитель что-нибудь нажмёт.
+  setInterval(()=>{ if(!document.hidden && !PANIC) shLoad(); }, 30000);
   // Точка — раз в минуту, пока приложение открыто: чаще незачем, а батарея у
   // водителя должна дожить до конца смены.
   setInterval(()=>{ if(!document.hidden && !PANIC) geoPush(); }, GEO_EVERY_MS);
@@ -2153,6 +2178,8 @@ const SH_ICO = {
   done:  '<circle cx="12" cy="12" r="9"/><path d="M8 12.5l2.6 2.6L16 9.5"/>',
   tick:  '<path d="M5 12.5l4.5 4.5L19 7.5"/>',
   dot:   '<circle cx="12" cy="12" r="3.2"/>',
+  geo:   '<path d="M12 21s7-5.4 7-11a7 7 0 1 0-14 0c0 5.6 7 11 7 11z"/>'
+       + '<circle cx="12" cy="10" r="2.6"/>',
 };
 
 async function shLoad(loud){
@@ -2163,50 +2190,92 @@ async function shLoad(loud){
 
 // Пока смена закрыта, за этим экраном ничего нет: показывать список заказов
 // значило бы предлагать то, что всё равно не сработает.
+// Путь, который надо повторить в телеграме. Один на все экраны: инструкция,
+// написанная в двух местах по-разному, — это две инструкции.
+const GEO_WAY = ['Скрепка', 'Геопозиция', 'Транслировать', 'Пока не выключу'];
+function _geoWay(){
+  return `<span class="shc-way">${GEO_WAY.map((w, i) =>
+    (i ? '<i>→</i>' : '') + `<span>${w}</span>`).join('')}</span>`;
+}
+
+// За этим экраном ничего нет, и это намеренно.
+//
+// Смена не открыта — показывать заказы значило бы предлагать то, что не
+// сработает. Трансляция погасла посреди смены — оператор не видит машину и
+// не может отдать заказ ближнему; работать в таком виде нельзя, и честнее
+// сказать это в лоб, чем тихо перестать присылать заказы.
 function shPaint(){
   const scr = document.getElementById('shScr');
   if(!SH || PANIC){ scr.classList.remove('show'); return; }
   const on = SH.opened && !SH.closed;
-  scr.classList.toggle('show', !on);
-  document.body.style.overflow = on ? '' : 'hidden';
-  if(on){ render(); return; }
+  const geo = SH.geo || {};
+  // Блокируем по «трансляция не идёт», а не по «точка устарела»: первое
+  // человек выключил сам и может включить, второе бывает от метро и туннеля,
+  // и запирать за это экран — наказывать за отсутствие связи.
+  const lost = on && !geo.stream;
+  scr.classList.toggle('show', !on || lost);
+  document.body.style.overflow = (on && !lost) ? '' : 'hidden';
+  if(on && !lost){ render(); return; }
+
+  const ico = document.getElementById('shIco');
+  const list = document.getElementById('shList');
+  const go = document.getElementById('shGo');
+
+  // Трансляция пропала на открытой смене. Условие здесь одно, и кнопка одна.
+  if(lost){
+    ico.innerHTML = svg(SH_ICO.geo, 30);
+    document.getElementById('shT').textContent = 'Геопозиция не транслируется';
+    document.getElementById('shS').textContent =
+      'Смена идёт, но оператор не видит, где вы. Заказы не придут, пока трансляция не вернётся.';
+    list.innerHTML = `
+      <div class="shc">
+        <span class="shc-i">${svg(SH_ICO.dot, 14)}</span>
+        <span class="shc-b">
+          <span class="shc-t">Включите трансляцию в чате с ботом</span>
+          <span class="shc-s">Включить хватит один раз — она не кончится сама.</span>
+          ${_geoWay()}
+        </span>
+      </div>`;
+    go.style.display = 'none';
+    document.getElementById('shAlt').classList.add('solo');
+    return;
+  }
 
   const shut = SH.closed;
-  document.getElementById('shIco').innerHTML = svg(shut ? SH_ICO.done : SH_ICO.clock, 34);
+  ico.innerHTML = svg(shut ? SH_ICO.done : SH_ICO.clock, 30);
   document.getElementById('shT').textContent = shut ? 'Смена закрыта' : 'Смена не открыта';
   document.getElementById('shS').textContent = shut
-    ? `Закрыли в ${hhmm(SH.closed_at)}. Заказы больше не придут. Если это ошибка — `
-      + `откройте смену снова.`
+    ? `Закрыли в ${hhmm(SH.closed_at)}. Заказы больше не придут — если это ошибка, откройте снова.`
     : 'Пока смена закрыта, заказы не приходят и отметить ничего нельзя';
 
-  const geo = SH.geo || {};
   const marked = SH.working === true;
-  document.getElementById('shList').innerHTML = `
+  list.innerHTML = `
     <div class="shc ${marked ? 'on' : ''}">
-      <span class="shc-i">${svg(marked ? SH_ICO.tick : SH_ICO.dot, 15)}</span>
+      <span class="shc-i">${svg(marked ? SH_ICO.tick : SH_ICO.dot, 14)}</span>
       <span class="shc-b">
         <span class="shc-t">Оператор отметил вас на смене</span>
-        <span class="shc-s">${marked ? 'отмечено — питание за рабочий день'
+        <span class="shc-s">${marked ? 'Отмечено — питание за рабочий день.'
           : (SH.working === false
-             ? 'на сегодня вы отмечены как выходной. Если это ошибка — напишите оператору'
-             : 'оператор отмечает бригаду в начале смены. Если он опаздывает — напишите ему')}</span>
+             ? 'Сегодня вы отмечены как выходной. Если это ошибка — напишите оператору.'
+             : 'Оператор отмечает бригаду в начале смены. Опаздывает — напишите ему.')}</span>
       </span>
     </div>
     <div class="shc ${geo.ok ? 'on' : ''}">
-      <span class="shc-i">${svg(geo.ok ? SH_ICO.tick : SH_ICO.dot, 15)}</span>
+      <span class="shc-i">${svg(geo.ok ? SH_ICO.tick : SH_ICO.dot, 14)}</span>
       <span class="shc-b">
         <span class="shc-t">Геопозиция транслируется</span>
         <span class="shc-s">${geo.ok
-          ? `идёт, хватит ещё на ${_hleft(geo.left_min)}`
-          : 'В чате с ботом: <b>скрепка → Геопозиция → Транслировать → 8 часов</b>.'
-            + ' Трансляции хватает на восемь часов, за десять минут до конца бот напомнит.'}</span>
+          ? (geo.endless ? 'Идёт и не кончится сама.'
+                         : `Идёт, хватит ещё на ${_hleft(geo.left_min)}.`)
+          : 'Включить хватит один раз — она не кончится сама.'}</span>
+        ${geo.ok ? '' : _geoWay()}
       </span>
     </div>`;
-  const go = document.getElementById('shGo');
   // Закрытую смену можно открыть заново — условия те же. Прятать кнопку
   // значило бы отправлять человека звонить оператору из-за промаха пальцем.
   go.style.display = '';
-  go.disabled = !(SH.working === true && (SH.geo || {}).ok);
+  document.getElementById('shAlt').classList.remove('solo');
+  go.disabled = !(marked && geo.ok);
   go.textContent = shut ? 'Открыть смену снова' : 'Открыть смену';
 }
 

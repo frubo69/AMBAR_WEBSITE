@@ -225,9 +225,13 @@ async def _geo_state(name: str) -> dict:
     at, until = _dt_of(r.get("at")), _dt_of(r.get("until"))
     fresh = bool(at and (now - at).total_seconds() < GEO_FRESH_SEC)
     live = bool(until and until > now)
+    left = int((until - now).total_seconds() // 60) if live else 0
+    # Бессрочная трансляция приходит сроком на десятки лет. Показывать «хватит
+    # ещё на 596523 ч» бессмысленно: у неё просто нет конца, так и говорим.
+    endless = left > 24 * 60
     return {"ok": fresh and live, "fresh": fresh, "stream": live,
-            "until": _iso_at(until) if until else "",
-            "left_min": int((until - now).total_seconds() // 60) if live else 0,
+            "until": "" if endless else (_iso_at(until) if until else ""),
+            "left_min": 0 if endless else left, "endless": endless,
             "age_sec": int((now - at).total_seconds()) if at else None}
 
 
@@ -641,9 +645,10 @@ async def handle_geo_help(request):
     if not (tid and token):
         return web.json_response({"ok": False}, headers=CORS_HEADERS)
     text = ("Чтобы оператор видел, где вы, включите трансляцию геопозиции:\n\n"
-            "скрепка (📎) → «Геопозиция» → «Транслировать» → 8 часов.\n\n"
-            "Телефон будет присылать точку сам, даже когда телеграм свёрнут. "
-            "Маршрут за смену стирается, когда её закрывают.")
+            "скрепка (📎) → «Геопозиция» → «Транслировать» → «Пока не выключу».\n\n"
+            "Включить хватит один раз: телефон будет присылать точку сам, даже "
+            "когда телеграм свёрнут. Маршрут за смену стирается, когда её "
+            "закрывают, а в отпуске трансляцию выключают тем же меню.")
     kb = {"remove_keyboard": True}
     # Ответ телеграма проверяем: он умеет отвечать «принято» кодом 200 и
     # отказом внутри тела. Молча отрапортовать успех и не отправить — худшее из

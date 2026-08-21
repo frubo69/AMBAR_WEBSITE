@@ -175,7 +175,7 @@ async def cmd_where(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await _remember(update.message)
     sent = await update.message.reply_text(
         "Чтобы оператор видел вас всю смену:\n\n"
-        "1. Скрепка в этом чате\n"
+        "1. Нажмите 📎 слева от поля ввода\n"
         "2. «Геопозиция»\n"
         "3. «Транслировать» → «Пока не выключу»\n\n"
         "Включить хватит один раз: телефон будет сам присылать точку, даже "

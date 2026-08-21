@@ -426,7 +426,6 @@ def _order_summary(o):
         "cancel_comment": o.get("cancel_comment","") or o.get("comment",""),
     }
 
-@require_owner
 async def _drivers_spend(start, end) -> dict:
     """Расходы водителей за окно: питание плюс согласованные разовые.
 

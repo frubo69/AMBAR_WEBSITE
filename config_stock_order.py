@@ -148,6 +148,14 @@ STOCK_ORDER = [
     "p95",    # 121 Zonin Prosecco 0.75  # ZONIN PROSECCO 75CL
     "p104",   # 122 Oyster Bay Sauvignon Blanc 0.75  # OYSTER BAY SAUVIGNON
     "p15",    # 123 Ballantines Finest 1 ltr
+    # Табак. На бумажном листе магазина его нет и не будет — сигареты берём не
+    # у Баракуды. Но на полке они стоят и в пересчёте участвуют наравне со
+    # всеми, поэтому и номер у них свой, продолжающий тот же счёт. Без этого
+    # все позиции вне листа получали один номер на всех и вставали в списке в
+    # случайном порядке.
+    "p124",   # 124 Marlboro Gold
+    "p125",   # 125 TEREA Sienna
+    "p126",   # 126 TEREA Amber
 ]
 
 STOCK_ORDER_INDEX = {pid: i for i, pid in enumerate(STOCK_ORDER)}

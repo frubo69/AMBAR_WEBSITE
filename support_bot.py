@@ -123,6 +123,32 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
               "📎 Получили файл! Скоро ответим здесь.")
         )
 
+    # Пишем в ту же переписку, что и приложение: панель оператора читает
+    # support_messages, и без этой записи письмо в бот для неё не существует —
+    # оно жило только пересылкой в чате админов.
+    conv_key = str(user.id)
+    ts = datetime.now(timezone.utc).isoformat()
+    try:
+        await db.support_set_channel(conv_key, "bot")
+        if msg.photo:
+            f = await msg.photo[-1].get_file()
+            upload_dir = Path(__file__).parent / "uploads" / "support"
+            upload_dir.mkdir(parents=True, exist_ok=True)
+            fname = f"{uuid.uuid4().hex[:12]}.jpg"
+            await f.download_to_drive(str(upload_dir / fname))
+            await db.append_support_msg(conv_key, {
+                "role": "user", "type": "photo",
+                "url": f"/uploads/support/{fname}",
+                "caption": msg.caption or "", "ts": ts,
+            })
+        else:
+            await db.append_support_msg(conv_key, {
+                "role": "user", "type": "text",
+                "text": msg.text or msg.caption or "(файл)", "ts": ts,
+            })
+    except Exception as e:
+        print(f"⚠️ Failed to save user message to DB: {e}")
+
     # Check ban status for this user
     ban_notice = ""
     try:
@@ -153,6 +179,15 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
 
             # Map forwarded message to user
             MESSAGE_MAP[forwarded.message_id] = user.id
+            # Дублируем связку в базу: MESSAGE_MAP умирает вместе с процессом,
+            # и после рестарта ответы оператора уходили в никуда.
+            try:
+                await db.save_support_map_entry(str(forwarded.message_id), {
+                    "user_id": user.id, "conv_key": conv_key,
+                    "order_id": "", "channel": "bot",
+                })
+            except Exception as e:
+                print(f"⚠️ DB map save failed: {e}")
 
         except Exception as e:
             print(f"⚠️ Could not forward to admin {admin_id}: {e}")
@@ -200,23 +235,21 @@ async def handle_admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE)
         return
 
     replied_id = msg.reply_to_message.message_id
-    user_id = MESSAGE_MAP.get(replied_id)
 
-    # Check MongoDB for mini app conversations
+    # База — первая: в ней лежат и переписки из приложения, и прямые письма в
+    # бот. Память оставляем запасным вариантом для старых пересылок.
     conv_info = None
-    if not user_id:
-        try:
-            conv_info = await db.get_support_map_entry(str(replied_id))
-            if conv_info:
-                user_id = conv_info["user_id"]
-        except Exception as e:
-            print(f"⚠️ DB lookup failed: {e}")
+    try:
+        conv_info = await db.get_support_map_entry(str(replied_id))
+    except Exception as e:
+        print(f"⚠️ DB lookup failed: {e}")
+    user_id = (conv_info or {}).get("user_id") or MESSAGE_MAP.get(replied_id)
 
     if not user_id:
         return
 
-    # Mini app conversation — save reply to MongoDB so it appears in the app
-    if conv_info:
+    # Известная переписка — сохраняем ответ в базу, чтобы он был в истории
+    if conv_info and conv_info.get("conv_key"):
         conv_key = conv_info["conv_key"]
         ts = datetime.now(timezone.utc).isoformat()
 
@@ -248,14 +281,21 @@ async def handle_admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE)
         except Exception as e:
             print(f"⚠️ Failed to save operator reply to DB: {e}")
 
-        # Notify user via main bot
         order_id = conv_info.get("order_id", "")
-        notif = (
-            f"💬 *Новое сообщение от поддержки*"
-            + (f" по заказу #{order_id}" if order_id else "")
-            + f"\n\nОткройте приложение, чтобы прочитать ответ."
-        )
-        await _notify_user(user_id, notif)
+        if (conv_info.get("channel") or "") == "bot":
+            # Человек писал прямо сюда — ответ должен прийти в этот же чат,
+            # а не «откройте приложение».
+            try:
+                await msg.copy(chat_id=user_id)
+            except Exception as e:
+                print(f"⚠️ Could not send reply to user {user_id}: {e}")
+        else:
+            notif = (
+                f"💬 *Новое сообщение от поддержки*"
+                + (f" по заказу #{order_id}" if order_id else "")
+                + f"\n\nОткройте приложение, чтобы прочитать ответ."
+            )
+            await _notify_user(user_id, notif)
         await _notify_owners_replied(msg, user_id, order_id, conv_key=conv_key)
         return
 

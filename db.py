@@ -511,7 +511,8 @@ async def support_threads_brief(limit: int = 300) -> list:
     каждый опрос."""
     db = _db_or_none()
     if db is None: return []
-    cursor = db.support_messages.find({}, {"_id": 0, "conv_key": 1, "messages": {"$slice": -1}})
+    cursor = db.support_messages.find(
+        {}, {"_id": 0, "conv_key": 1, "channel": 1, "messages": {"$slice": -1}})
     return await cursor.to_list(length=limit)
 
 
@@ -3149,3 +3150,20 @@ async def set_stock_norm(district: str, product_id: str, norm: int, by: int = 0)
         {"$set": {"district": district, "product_id": product_id, "norm": int(norm),
                   "by": by, "at": datetime.now(timezone.utc).isoformat()}},
         upsert=True)
+
+
+async def support_set_channel(conv_key: str, channel: str):
+    """Откуда пришёл клиент: 'bot' — писал прямо в бот поддержки, 'app' — из
+    приложения. От этого зависит, куда доставлять ответ оператора."""
+    db = _db_or_none()
+    if db is None: return
+    await db.support_messages.update_one(
+        {"conv_key": conv_key}, {"$set": {"channel": channel}}, upsert=True)
+
+
+async def support_channel(conv_key: str) -> str:
+    db = _db_or_none()
+    if db is None: return ""
+    doc = await db.support_messages.find_one({"conv_key": conv_key},
+                                             {"_id": 0, "channel": 1})
+    return (doc or {}).get("channel", "")

@@ -3775,12 +3775,14 @@ function _supRow(t){
   const c=t.client||{};
   const oid = t.order_id
     ? `<span class="sup-oid ${t.order_lane}">#${_esc(t.order_id)}</span>` : '';
+  // Клиент писал прямо в бот поддержки — ответ уйдёт туда же, не в приложение.
+  const via = t.channel==='bot' ? '<span class="sup-oid">бот</span>' : '';
   const pre = (t.last_role==='operator' ? '<i>Вы: </i>' : '') + _esc(t.last_text||'');
   // Старый вопрос без ответа не считается ждущим, но отметку заслуживает —
   // иначе в истории он неотличим от закрытого разговора.
   const dead = (!t.wait && t.last_role==='user') ? '<span class="sup-oid">без ответа</span>' : '';
   return `<button class="sup-t ${t.key===supKey?'on':''}" onclick="supThread('${_esc(t.key)}')">
-    <div class="n">${t.wait?'<span class="sup-dot"></span>':''}<b>${_esc(c.name||'—')}</b>${oid}${dead}
+    <div class="n">${t.wait?'<span class="sup-dot"></span>':''}<b>${_esc(c.name||'—')}</b>${oid}${via}${dead}
       <span class="r">${_when(t.last_ts)}</span></div>
     <div class="m">${pre||'—'}</div></button>`;
 }
@@ -3835,7 +3837,8 @@ function supChat(scroll){
         stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
       <div><div class="who">${_esc(c.name||'—')}</div>
         <div class="sub">${c.username?('@'+_esc(c.username)):'без ника'}${
-          r.order_id?(' · заказ #'+_esc(r.order_id)):' · общий вопрос'}</div></div>
+          r.order_id?(' · заказ #'+_esc(r.order_id))
+            :(r.channel==='bot'?' · чат бота':' · общий вопрос')}</div></div>
       <div class="sup-hb">${ord}
         ${c.id?`<button onclick="openCust(${c.id})">Клиент</button>`:''}
         ${c.username?`<button onclick="tgOpen('https://t.me/${_esc(c.username)}')">Телеграм</button>`:''}
@@ -3843,7 +3846,7 @@ function supChat(scroll){
     </div>${hist}
     <div class="sup-msgs" id="supMsgs">${body || '<div class="sup-empty">Переписки ещё не было. Напишите первым.</div>'}</div>
     <div class="sup-bar">
-      <textarea class="sup-in" id="supIn" rows="1" placeholder="Сообщение клиенту…"
+      <textarea class="sup-in" id="supIn" rows="1" placeholder="${r.channel==='bot'?'Ответ в чат бота…':'Сообщение клиенту…'}"
         oninput="supGrow(this)" onkeydown="supKeys(event)"></textarea>
       <button class="sup-send" id="supGo" onclick="supSend()" aria-label="Отправить"><svg
         viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg></button>

@@ -1876,7 +1876,7 @@ async def _support_rows() -> list:
         if not uid:
             continue
         uids.add(uid)
-        pre.append((key, uid, oid, msgs[-1]))
+        pre.append((key, uid, oid, msgs[-1], d.get("channel") or ""))
     users = await db.users_by_ids(list(uids))
 
     now = datetime.now(timezone.utc)
@@ -1891,7 +1891,7 @@ async def _support_rows() -> list:
             return 1e9
 
     rows = []
-    for key, uid, oid, last in pre:
+    for key, uid, oid, last, channel in pre:
         o = orders.get(oid) if oid else None
         lane = _lane(o) if o else ""
         # «Ждёт ответа» — это сегодняшний вопрос или вопрос по живому заказу.
@@ -1915,6 +1915,7 @@ async def _support_rows() -> list:
             "last_ts": last.get("ts", ""),
             "last_role": last.get("role", ""),
             "last_text": _msg_preview(last),
+            "channel": channel,
         })
     rows.sort(key=lambda r: (r["prio"], _neg_ts(r["last_ts"])))
     return rows
@@ -1951,6 +1952,7 @@ async def handle_support_thread(request):
     return web.json_response({
         "key": key,
         "order_id": oid,
+        "channel": await db.support_channel(key),
         "order": {"order_id": oid, "status": (order or {}).get("status", ""),
                   "total": (order or {}).get("total", 0),
                   "address": (order or {}).get("address", ""),
@@ -1988,12 +1990,22 @@ async def handle_support_send(request):
     await db.append_support_msg(key, msg)
 
     try:
-        from api_server import tg_send, BOT_TOKEN
-        await tg_send(BOT_TOKEN, uid,
-                      "💬 *Новое сообщение от поддержки*"
-                      + (f" по заказу #{oid}" if oid else "")
-                      + "\n\nОткройте приложение, чтобы прочитать ответ.",
-                      parse_mode="Markdown")
+        channel = await db.support_channel(key)
+    except Exception:
+        channel = ""
+
+    try:
+        from api_server import tg_send, BOT_TOKEN, SUPPORT_BOT_TOKEN
+        if channel == "bot":
+            # Клиент писал прямо в бот поддержки — туда же кладём и сам ответ:
+            # приложение он может вообще не открывать.
+            await tg_send(SUPPORT_BOT_TOKEN or BOT_TOKEN, uid, f"💬 {text}")
+        else:
+            await tg_send(BOT_TOKEN, uid,
+                          "💬 *Новое сообщение от поддержки*"
+                          + (f" по заказу #{oid}" if oid else "")
+                          + "\n\nОткройте приложение, чтобы прочитать ответ.",
+                          parse_mode="Markdown")
     except Exception as e:
         log.error(f"[pos] support nudge to {uid} failed: {e}")
 

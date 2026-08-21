@@ -126,7 +126,9 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Пишем в ту же переписку, что и приложение: панель оператора читает
     # support_messages, и без этой записи письмо в бот для неё не существует —
     # оно жило только пересылкой в чате админов.
-    conv_key = str(user.id)
+    # Тот же ключ, что у «Общего вопроса» в приложении, — переписка одна, где
+    # бы человек ни написал, и наш ответ он увидит в обоих местах.
+    conv_key = f"{user.id}_general"
     ts = datetime.now(timezone.utc).isoformat()
     try:
         await db.support_set_channel(conv_key, "bot")

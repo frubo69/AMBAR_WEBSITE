@@ -2063,6 +2063,8 @@ async def handle_support_send(request: web.Request) -> web.Response:
         msg_doc["reply_to_text"] = reply_to_text
         msg_doc["reply_to_role"] = reply_to_role
     await db.append_support_msg(conv_key, msg_doc)
+    # Куда отвечать: человек пишет из приложения — ответ ждёт там же.
+    await db.support_set_channel(conv_key, "app")
 
     # Build context line
     if order_id and order_id != "general":
@@ -2400,6 +2402,7 @@ async def handle_support_send_image(request: web.Request) -> web.Response:
         "role": "user", "type": "photo", "url": url_path,
         "caption": caption, "ts": server_ts
     })
+    await db.support_set_channel(conv_key, "app")
 
     if order_id and order_id != "general":
         ctx_line = f"📦 Заказ: #{order_id}"

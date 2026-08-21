@@ -508,6 +508,20 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 /* Счётчик сидит на углу значка, а не под подписью: раньше он свисал вниз и
    налезал на текст. */
 .tb-ic{position:relative;display:flex;align-items:center;justify-content:center}
+/* Центральная кнопка приподнята над панелью: она отвечает за состояние дня, а
+   не за экран, и должна быть отличима от соседей на ощупь, не только глазом.
+   Цветом она говорит то же, что и текст под ней: смена идёт — золото, смена
+   закрыта или не открыта — тихий контур. */
+.tb-mid{position:relative}
+.tb-mid-ic{width:46px;height:46px;margin-top:-16px;margin-bottom:1px;border-radius:16px;
+  background:var(--bg3);border:1px solid var(--border3);
+  box-shadow:0 6px 16px rgba(0,0,0,.45)}
+.tb-mid-ic svg{width:21px;height:21px}
+.tb-mid.on .tb-mid-ic{color:#1a1408;border-color:transparent;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.tb-mid-ic.live{color:var(--gold2);border-color:rgba(201,169,110,.45);
+  background:var(--gold-soft)}
+.tb-mid.on .tb-mid-ic.live{color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .tb-badge{position:absolute;top:-6px;right:-10px;min-width:17px;height:17px;padding:0 4px;
   border-radius:999px;background:var(--gold2);color:#1a1408;font-size:9px;font-weight:700;
   display:flex;align-items:center;justify-content:center}
@@ -619,6 +633,47 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .shc-b{flex:1;min-width:0}
 .shc-t{display:block;font-size:14px;font-weight:700;line-height:1.3}
 .shc-s{display:block;font-size:12.5px;line-height:1.45;color:var(--muted);margin-top:5px}
+/* ── РАЗДЕЛ «СМЕНА» ─────────────────────────────────────────────────────────
+   Состояние дня одним экраном. Всё той же сеткой в восемь пикселей и с тем же
+   правилом про цвет: золото — у действия, зелёный — только у выполненного
+   условия, остальное молчит. */
+.shd{padding:18px;border-radius:18px;margin-bottom:10px;background:var(--bg3);
+  border:1px solid var(--border3)}
+/* Идущая смена — единственное состояние, которое имеет право светиться: это
+   ответ на вопрос, ради которого сюда заходят. */
+.shd.live{border-color:rgba(201,169,110,.4);
+  background:linear-gradient(160deg,var(--gold-soft),transparent 65%),var(--bg3)}
+.shd-t{display:block;font-size:18px;font-weight:800;letter-spacing:-.3px;line-height:1.2}
+.shd-s{display:block;font-size:13px;color:var(--muted);margin-top:6px;line-height:1.4}
+/* Счёт смены. Три числа в ряд и без украшений: их читают, а не любуются. */
+.shsum{display:grid;grid-template-columns:repeat(3,1fr);margin-bottom:10px;
+  border-radius:16px;overflow:hidden;background:var(--bg3);border:1px solid var(--border3)}
+.shsum-c{padding:13px 8px;text-align:center}
+.shsum-c + .shsum-c{box-shadow:inset 1px 0 0 var(--border2)}
+.shsum-c b{display:block;font-family:'Space Grotesk',sans-serif;font-size:20px;
+  font-weight:700;line-height:1;color:var(--text);font-variant-numeric:tabular-nums}
+.shsum-c i{display:block;margin-top:5px;font-style:normal;font-size:10px;font-weight:600;
+  letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+/* Условие. Та же карточка, что на экране-замке: один и тот же вопрос «чего не
+   хватает» не должен выглядеть в двух местах по-разному. */
+.shx{display:flex;align-items:flex-start;gap:12px;padding:16px;margin-bottom:8px;
+  border-radius:16px;background:var(--bg3);border:1px solid var(--border3)}
+.shx-i{width:24px;height:24px;flex-shrink:0;border-radius:8px;display:flex;
+  align-items:center;justify-content:center;color:var(--muted);background:var(--card2)}
+.shx.ok .shx-i{color:#3ddc84;background:rgba(61,220,132,.12)}
+.shx.ok .shx-t,.shx.ok .shx-s{opacity:.55}
+.shx-b{flex:1;min-width:0}
+.shx-t{display:block;font-size:14px;font-weight:700;line-height:1.3}
+.shx-s{display:block;font-size:12.5px;line-height:1.45;color:var(--muted);margin-top:5px}
+.shx-go{flex-shrink:0;align-self:center;padding:8px 13px;border-radius:11px;cursor:pointer;
+  font-family:inherit;font-size:12.5px;font-weight:700;color:var(--gold2);
+  background:var(--gold-soft);border:1px solid rgba(201,169,110,.3)}
+.shx-go:active{transform:scale(.95)}
+.shbtn{margin-top:16px}
+.shx-alt{width:100%;margin-top:9px;padding:12px;border-radius:12px;cursor:pointer;
+  font-family:inherit;font-size:13px;font-weight:600;color:var(--muted);background:none;
+  border:1px solid var(--border3)}
+.shx-alt:active{transform:scale(.98);color:var(--gold2)}
 /* ── ИНСТРУКЦИЯ ПО ШАГАМ ────────────────────────────────────────────────────
    Строка шагов над кнопкой отвечает тому, кто уже включал и просто забыл
    порядок. Тому, кто видит это впервые, она не отвечает никак: он не знает,
@@ -1345,6 +1400,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
       <span class="tb-badge" id="tbExp" style="display:none">0</span></span>
     <span>Расходы</span>
   </button>
+  <!-- Смена — по центру и приподнята. Это не «ещё один раздел», а рубильник
+       дня: с него начинается работа и им же заканчивается, и всё, что мешает
+       закрыться, собрано там же. Центр нижней панели — единственное место,
+       куда большой палец попадает не глядя. -->
+  <button class="tb tb-mid" data-tab="shift" onclick="setTab('shift')">
+    <span class="tb-ic tb-mid-ic" id="tbShIc"><svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg></span>
+    <span>Смена</span>
+  </button>
   <button class="tb" data-tab="supply" onclick="setTab('supply')">
     <span class="tb-ic"><svg viewBox="0 0 24 24"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4"/><path d="M12 11v10"/></svg>
       <span class="tb-badge" id="tbSup" style="display:none">0</span></span>
@@ -2048,6 +2111,7 @@ function setTab(t){
   document.querySelectorAll('.tb').forEach(b => b.classList.toggle('on', b.dataset.tab === t));
   if(t === 'history' && !HIST) loadHistory();
   else if(t === 'supply') supLoad();
+  else if(t === 'shift'){ shPaint(); shLoad(); }
   else render();
   try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
   window.scrollTo({top:0});
@@ -2063,6 +2127,7 @@ function blank(ico, title, sub, cls){
 }
 
 function render(){
+  if(TAB === 'shift')    return renderShift();
   if(TAB === 'orders')   return renderOrders();
   if(TAB === 'supply')   return renderSupply();
   if(TAB === 'history')  return renderHistory();
@@ -2343,9 +2408,14 @@ function shPaint(){
   // человек выключил сам и может включить, второе бывает от метро и туннеля,
   // и запирать за это экран — наказывать за отсутствие связи.
   const lost = on && !geo.stream;
-  scr.classList.toggle('show', !on || lost);
-  document.body.style.overflow = (on && !lost) ? '' : 'hidden';
-  if(on && !lost){ render(); return; }
+  const blocked = !on || lost;
+  // Кнопка смены в панели светится, пока смена идёт: состояние дня видно с
+  // любого экрана, не заходя внутрь.
+  const mid = document.getElementById('tbShIc');
+  if(mid) mid.classList.toggle('live', on && !lost);
+  scr.classList.toggle('show', blocked && TAB !== 'shift');
+  document.body.style.overflow = (blocked && TAB !== 'shift') ? 'hidden' : '';
+  if(!blocked || TAB === 'shift'){ render(); return; }
 
   const ico = document.getElementById('shIco');
   const list = document.getElementById('shList');
@@ -3390,9 +3460,85 @@ function mealBox(){
   </div>`;
 }
 
+/* ── СМЕНА ──────────────────────────────────────────────────────────────────
+   Управление сменой было размазано: открыть — на экране-замке, закрыть —
+   полосой поверх расходов, геопозиция — третьим местом, а итог дня не собирался
+   нигде. Человек не знал, где посмотреть «что у меня со сменой», потому что
+   такого места не было.
+
+   Теперь оно есть. Здесь всё, что относится к состоянию дня: сколько идёт
+   смена, что сделано, что мешает её закрыть, и сама кнопка. Заказы, расходы и
+   товар остались работой — тут только рубильник и счёт. */
+function renderShift(){
+  const box = document.getElementById('body');
+  if(!SH){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
+  const on = SH.opened && !SH.closed;
+  const geo = SH.geo || {};
+  const must = SH.must || [];
+  const mustNames = (SH.must_names || must).join(', ');
+
+  // Счёт смены. Считаем ровно то, что знаем точно: заказы из своего же списка
+  // и расходы из своих же ответов. Придумывать недостающее нельзя — это цифры,
+  // по которым с человеком считаются деньгами.
+  const done = ((ORDERS || {}).done || []).length;
+  const live = ((EXP || {}).extras || []).filter(x => EXP_ST(x) !== 'rejected');
+  const spent = ((EXP || {}).meal || 0) + live.reduce((a, x) => a + (x.amount || 0), 0);
+
+  const stat = on
+    ? {t:`Смена идёт с ${hhmm(SH.opened_at)}`, s:'Заказы приходят, отметки принимаются.'}
+    : SH.closed
+      ? {t:`Смена закрыта в ${hhmm(SH.closed_at)}`, s:'Заказы больше не придут. Открыть снова можно.'}
+      : {t:'Смена не открыта', s:'Пока она закрыта, заказы не приходят.'};
+
+  const row = (ok, t, sub, action) => `
+    <div class="shx ${ok ? 'ok' : ''}">
+      <span class="shx-i">${svg(ok ? ICO.ok : ICO.clock, 13)}</span>
+      <span class="shx-b"><span class="shx-t">${t}</span>
+        <span class="shx-s">${sub}</span></span>
+      ${action || ''}
+    </div>`;
+
+  box.innerHTML = `
+    <div class="shd ${on ? 'live' : ''}">
+      <span class="shd-t">${stat.t}</span>
+      <span class="shd-s">${stat.s}</span>
+    </div>
+
+    ${on ? `<div class="shsum">
+      <div class="shsum-c"><b>${done}</b><i>доставлено</i></div>
+      <div class="shsum-c"><b>${fmt(spent)}</b><i>расход, AED</i></div>
+      <div class="shsum-c"><b>${geo.stream ? 'да' : 'нет'}</b><i>трансляция</i></div>
+    </div>` : ''}
+
+    <div class="sect"><span class="sect-t">${on ? 'Чтобы закрыть' : 'Чтобы открыть'}</span></div>
+    ${on
+      ? row(!must.length, 'Расходы за день',
+            must.length ? `Не отвечено: ${esc(mustNames)}` : 'Всё заполнено.',
+            must.length ? `<button class="shx-go" onclick="setTab('expenses')">Заполнить</button>` : '')
+      : row(SH.working === true, 'Оператор отметил вас',
+            SH.working === true ? 'Отмечено.'
+              : SH.working === false ? 'Сегодня вы отмечены как выходной.'
+              : 'Оператор отмечает бригаду в начале смены.')}
+    ${row(!!geo.stream, 'Геопозиция транслируется',
+          geo.stream ? (geo.endless ? 'Идёт и не кончится сама.' : 'Идёт.')
+                     : 'Оператор не видит, где вы.',
+          geo.stream ? '' : `<button class="shx-go" onclick="tutOpen()">Как включить</button>`)}
+
+    <div class="shbtn">
+      ${on
+        ? `<button class="btn btn-pri" style="width:100%" ${must.length ? 'disabled' : ''}
+             onclick="shClose()">Закрыть смену</button>`
+        : `<button class="btn btn-pri" style="width:100%"
+             ${(SH.working === true && geo.ok) ? '' : 'disabled'}
+             onclick="shOpen()">${SH.closed ? 'Открыть смену снова' : 'Открыть смену'}</button>`}
+      <button class="shx-alt" onclick="shLoad(true)">Проверить ещё раз</button>
+    </div>`;
+}
+
 function renderExpenses(){
-  // Полоса смены живёт здесь: закрыть её можно только ответив по расходам, и
-  // держать кнопку рядом с тем, что ей мешает, — единственный честный способ.
+  // Полоса смены отсюда ушла в свой раздел: закрывать смену со страницы
+  // расходов было удобно ровно до того дня, когда человек начал искать, где
+  // вообще посмотреть, идёт ли она.
   const box = document.getElementById('body');
   if(!EXP){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
   // Всего за смену — питание плюс всё, что не отклонили. Отклонённое в итог не
@@ -3401,7 +3547,7 @@ function renderExpenses(){
   const total = (EXP.meal || 0) + live.reduce((a, x) => a + (x.amount || 0), 0);
   const pend = live.filter(x => EXP_ST(x) === 'pending').reduce((a, x) => a + (x.amount || 0), 0);
   const other = (EXP.extras || []).filter(x => x.kind === 'other');
-  box.innerHTML = shBar() + `
+  box.innerHTML = `
     <div class="sect"><span class="sect-t">Каждый день</span>
       ${(EXP.pending_answer || []).length
         ? `<span class="sect-v ask">не сдано: ${(EXP.pending_answer || [])

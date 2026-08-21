@@ -229,6 +229,13 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 .chip{white-space:nowrap;padding:7px 13px;border-radius:20px;border:none;outline:none;-webkit-tap-highlight-color:transparent;background:rgba(255,255,255,.07);color:rgba(255,255,255,.45);font-size:12px;font-weight:500;cursor:pointer;transition:.18s;letter-spacing:.1px}
 .chip:active{transform:scale(.93);opacity:.8}
 .chip.on{background:var(--gold);color:#0a0a12;font-weight:700;box-shadow:0 2px 14px rgba(201,169,110,.35)}
+/* Новая категория. Словом, а не точкой: точку в ленте чипов принимают за
+   украшение, а «NEW» читается сразу и тем же словом, что на карточках товара —
+   в приложении не должно быть двух разных способов сказать «новое». */
+.chip-nb{font-style:normal;font-size:8px;font-weight:800;letter-spacing:.8px;
+  margin-left:6px;padding:2px 5px;border-radius:5px;vertical-align:2px;
+  color:#0a0a12;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.chip.on .chip-nb{color:var(--gold);background:#0a0a12}
 .sec-h{padding:10px 14px 8px;font-family:'DM Sans',sans-serif;font-size:20px;display:flex;align-items:center;gap:10px;flex-shrink:0}
 #sh-saved-addr{font-size:18px;font-weight:700;color:var(--text);letter-spacing:-.3px}
 .sec-h::after{content:'';flex:1;height:1px;background:linear-gradient(90deg,var(--border2),transparent)}
@@ -1822,7 +1829,7 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
     </div>
   </div>
   <!-- ═══ PROMO HERO BANNER ═══ -->
-  <div id="promo-hero" class="promo-hero has-img" style="display:none" onclick="showPromoInfo()">
+  <div id="promo-hero" class="promo-hero has-img" style="display:none" onclick="promoTap()">
     <button class="promo-hero-close" onclick="event.stopPropagation();dismissPromoHero()" aria-label="Close">✕</button>
     <div class="promo-track" id="promo-track"></div>
     <div class="promo-dots" id="promo-dots"></div>
@@ -4112,6 +4119,26 @@ const PROMO_INFO = {
   },
 };
 function _promoInfoKey(){ return (_promoList()[_promoIdx]||'').replace(/.*\//,'').replace(/_(ru|en)\.(png|jpe?g|webp)$/i,''); }
+// Куда ведёт слайд. Акция про скидку или про крипту объясняется карточкой —
+// там нечего открывать, кроме объяснения. А слайд про новый товар должен вести
+// к товару: человек нажал на пачку, значит хочет пачку, а не текст про неё.
+const PROMO_GOTO = {promo_smoke: 'Сигареты'};
+function promoTap(){
+  const cat = PROMO_GOTO[_promoInfoKey()];
+  if(!cat){ showPromoInfo(); return; }
+  haptic.light();
+  go('catalog');
+  // Раздел появляется в сетке не мгновенно: страница каталога могла быть ещё
+  // не отрисована, а поиск и фильтр — сбиты. Сначала возвращаем обычный вид.
+  setTimeout(()=>{
+    if(showFavOnly||searchQ||sortMode!=='none'||catFilter){
+      showFavOnly=false; searchQ=''; sortMode='none'; catFilter=null;
+      const si=el('search-input'); if(si) si.value='';
+      buildChips(); renderGrid();
+    }
+    setCat(cat);
+  }, 60);
+}
 let _promoIdx=0,_promoRAF=null,_promoT0=0;
 const _PROMO_AUTO_MS=6000;   // dwell per slide — also how long each line takes to fill
 function _promoList(){ return PROMO_SLIDES[lang==='ru'?'ru':'en'] || PROMO_SLIDES.en || []; }
@@ -6154,7 +6181,11 @@ function buildChips(){
   el('cat-chips').innerHTML=cats.map(c=>{
     const label=lang==='ru'?c:(P.find(p=>p.cat===c)?.catE||c);
     const isOn=catFilter===c;
-    return`<button class="chip${isOn?' on':''}" data-cat="${c}" ontouchstart="_chipTS(event,this)" ontouchend="_chipTE(event,this)">${label}</button>`;
+    // Категория целиком новая — значок на чипе. Пометка на самих карточках
+    // отвечает «что нового внутри», а эта — «сюда вообще стоит зайти»: в ряду
+    // из тринадцати чипов новый иначе не заметят.
+    const isNew=P.some(p=>p.cat===c&&p.isNew);
+    return`<button class="chip${isOn?' on':''}" data-cat="${c}" ontouchstart="_chipTS(event,this)" ontouchend="_chipTE(event,this)">${label}${isNew?'<i class="chip-nb">NEW</i>':''}</button>`;
   }).join('');
 }
 function setCat(c,btn){

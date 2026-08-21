@@ -453,7 +453,14 @@ a.oc-row:active{background:var(--card2)}
 .oact.undo{color:var(--gold2);border-color:rgba(201,169,110,.3)}
 
 /* ── overlays ── */
-.ov{position:fixed;inset:0;z-index:100;background:rgba(0,0,10,.7);backdrop-filter:blur(6px);display:none;align-items:center;justify-content:center}
+/* Окно выше экрана прокручивается, а не обрезается. Страница у оператора не
+   скроллится вовсе (html,body{overflow:hidden}), поэтому всё, что не влезло,
+   раньше уезжало за край и становилось недоступным — например бригада из пяти
+   районов. Прокрутка живёт на подложке, а margin:auto держит окно по центру,
+   пока оно помещается. */
+.ov{position:fixed;inset:0;z-index:100;background:rgba(0,0,10,.7);backdrop-filter:blur(6px);
+  display:none;align-items:center;justify-content:center;overflow-y:auto;
+  -webkit-overflow-scrolling:touch;padding:16px;overscroll-behavior:contain}
 .ov.show{display:flex}
 /* ── Где водители ─────────────────────────────────────────────────────────
    Карта занимает всё, что остаётся: на ней и работают. Список слева узкий —
@@ -591,7 +598,8 @@ a.oc-row:active{background:var(--card2)}
   text-transform:uppercase;color:var(--muted);margin-top:5px}
 .wh-sum span.ok b{color:#3ddc84}
 .wh-sum span.dim b{color:var(--dim)}
-.sheet{background:var(--bg3);border:1px solid var(--border3);border-radius:20px;padding:22px;width:min(420px,92vw);box-shadow:0 24px 80px rgba(0,0,0,.7)}
+.sheet{background:var(--bg3);border:1px solid var(--border3);border-radius:20px;padding:22px;
+  width:min(420px,92vw);box-shadow:0 24px 80px rgba(0,0,0,.7);margin:auto;flex-shrink:0}
 .sheet .t{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;margin-bottom:6px}
 .sheet .s{font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:16px}
 .sheet .btns{display:flex;gap:10px}
@@ -659,20 +667,38 @@ a.oc-row:active{background:var(--card2)}
   background:linear-gradient(160deg,rgba(243,180,74,.07),transparent 60%),var(--card)}
 .sh-hd{display:flex;align-items:center;gap:12px}
 .sh-open .sh-s{color:var(--warn)}
-.sh-crew{margin-top:12px;display:flex;flex-direction:column;gap:7px}
-.sh-drv{display:flex;align-items:center;gap:10px;padding:9px 11px;border-radius:var(--r2);
+/* Отметить бригаду — первое дело оператора за день. Раньше на одного человека
+   уходила строка в шестьдесят пикселей с двумя крупными кнопками: район из
+   трёх водителей занимал экран, пять районов — пять экранов, и всё ради
+   одиннадцати нажатий. Теперь строка вдвое ниже, а выбор — переключатель на
+   два положения: он занимает место одной кнопки, но по-прежнему различает
+   «дома» и «ещё не отметили». */
+.sh-crew{margin-top:10px;display:flex;flex-direction:column;gap:5px}
+.sh-drv{display:flex;align-items:center;gap:10px;padding:5px 6px 5px 12px;border-radius:var(--r2);
   background:var(--bg3);border:1px solid var(--border2)}
 .sh-drv-n{flex:1;min-width:0;font-size:13.5px;font-weight:600;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
-.sh-drv-b{display:flex;gap:6px;flex-shrink:0}
+.sh-drv-b{display:flex;gap:2px;flex-shrink:0;padding:2px;border-radius:10px;
+  background:var(--bg2);border:1px solid var(--border2)}
+/* «Все на смене» — одно нажатие вместо одиннадцати: бригада почти всегда на
+   месте целиком, а исключения оператор перещёлкивает по одному. */
+.sh-all{flex-shrink:0;padding:7px 12px;border-radius:10px;font-family:inherit;
+  font-size:12px;font-weight:700;cursor:pointer;color:var(--gold);
+  background:var(--gold-soft);border:1px solid var(--border)}
+.sh-all:active{transform:scale(.95)}
+/* Пока отмечены не все, открытие — не кнопка, а строка состояния: большой
+   золотой блок, на который нельзя нажать, читается как поломка. */
+.sh-left{margin-top:12px;padding:11px;border-radius:var(--r2);text-align:center;
+  font-size:12.5px;font-weight:600;color:var(--muted);background:var(--bg2);
+  border:1px dashed var(--border2)}
 /* Две кнопки, а не галочка: «не отмечен» и «не работает» — разные вещи, и
    различать их должно нажатие, а не его отсутствие. */
-.sh-ch{padding:8px 12px;border-radius:10px;font-family:inherit;font-size:12px;
-  font-weight:700;cursor:pointer;color:var(--sub);background:var(--card2);
-  border:1px solid var(--border2);white-space:nowrap}
-.sh-ch:active{transform:scale(.95)}
-.sh-ch.on{color:#3ddc84;background:rgba(61,220,132,.12);border-color:rgba(61,220,132,.4)}
-.sh-ch.off{color:var(--sub);background:var(--bg2);border-color:var(--border)}
+.sh-ch{padding:6px 11px;border-radius:8px;font-family:inherit;font-size:12px;
+  font-weight:700;cursor:pointer;color:var(--muted);background:none;border:none;
+  white-space:nowrap}
+.sh-ch:active{transform:scale(.94)}
+.sh-ch.on{color:#0f2e1c;background:#3ddc84}
+.sh-ch.off{color:var(--text);background:var(--card3)}
 .sh-none{margin-top:10px;font-size:12px;color:var(--muted)}
 .sh-log-b{width:100%;margin-top:4px;padding:12px;border-radius:var(--r2);
   font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--sub);
@@ -3222,11 +3248,14 @@ function shiftOpenRow(x){
   const names = x.drivers || [];
   const mark = SH_CREW[x.district] || (SH_CREW[x.district] = {});
   const left = names.filter(n => typeof mark[n] !== 'boolean').length;
+  const allOn = names.length && names.every(n => mark[n] === true);
   return `<div class="sh-r sh-open">
     <div class="sh-hd">
       <span class="sh-code">${_esc(x.code)}</span>
       <span class="sh-b"><span class="sh-n">${_esc(x.name)}</span>
         <span class="sh-s">смена не открыта · отметьте бригаду</span></span>
+      ${names.length ? `<button class="sh-all" onclick="shCrewAll('${x.district}')">
+        ${allOn ? 'Снять' : 'Все на смене'}</button>` : ''}
     </div>
     ${names.length ? `<div class="sh-crew">${names.map(n => `
       <div class="sh-drv">
@@ -3239,10 +3268,22 @@ function shiftOpenRow(x){
         </span>
       </div>`).join('')}</div>`
       : '<div class="sh-none">В районе не назначено ни одного водителя</div>'}
-    <button class="sh-go wide" ${left ? 'disabled' : ''}
-      onclick="shiftDoOpen('${x.district}')">
-      ${left ? `Отметьте ещё ${left}` : 'Открыть смену'}</button>
+    ${left ? `<div class="sh-left">Осталось отметить ${left} ${
+        plural(left,'человека','человек','человек')}</div>`
+      : `<button class="sh-go wide" onclick="shiftDoOpen('${x.district}')">Открыть смену</button>`}
   </div>`;
+}
+
+// Отметить всех разом. Второе нажатие снимает: оператор мог ткнуть не в тот
+// район, и отменять по одному было бы издевательством.
+function shCrewAll(oid){
+  const x = (SHIFT.districts || []).find(d => d.district === oid) || {};
+  const names = x.drivers || [];
+  const m = SH_CREW[oid] || (SH_CREW[oid] = {});
+  const allOn = names.length && names.every(n => m[n] === true);
+  names.forEach(n => { if(allOn) delete m[n]; else m[n] = true; });
+  haptic('sel');
+  shiftPaint();
 }
 
 function shCrew(oid, name, val){

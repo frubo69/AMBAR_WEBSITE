@@ -4121,7 +4121,12 @@ function _buildPromoCarousel(){
   track.innerHTML=''; if(dotsEl)dotsEl.innerHTML='';
   imgs.forEach((src,i)=>{
     const sl=document.createElement('div'); sl.className='promo-slide';
-    const im=document.createElement('img'); im.src=src; im.alt='promo'; im.draggable=false; im.loading='lazy';
+    const im=document.createElement('img');
+    // Версия в адресе — не суеверие. Пока баннера не было в белом списке
+    // статики, cloudflare успел закэшировать по этому адресу четырёхсотку и
+    // отдавал её ещё сутки после того, как файл появился. Новый адрес —
+    // новый кэш; менять цифру нужно, когда меняется сам файл.
+    im.src=src+(src.includes('?')?'':'?v=2'); im.alt='promo'; im.draggable=false; im.loading='lazy';
     sl.appendChild(im); track.appendChild(sl);
     if(dotsEl){
       const d=document.createElement('button'); d.type='button'; d.className='promo-dot'; d.setAttribute('aria-label','Слайд '+(i+1));

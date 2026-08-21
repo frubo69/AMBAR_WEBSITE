@@ -117,9 +117,22 @@ def _parse_start_arg(arg: str, uid: int):
 
 
 
+def _lang_of(user) -> str:
+    """Язык клиента — тот, на котором у него телефон.
+
+    Правило то же, что в рассылке (broadcast_routes._bucket): ru* — по-русски,
+    всё остальное и пустое — по-английски. Одинаковое правило важнее удобного:
+    иначе человек получает приветствие на одном языке, а рассылку на другом.
+
+    Раньше здесь стояло ctx.user_data.get("lang", "ru") — состояние, которое
+    ничто и никогда не заполняло. Значит любой клиент, чей телеграм на любом
+    языке мира, получал «Привет» по-русски."""
+    return "ru" if (getattr(user, "language_code", "") or "").strip().lower().startswith("ru") else "en"
+
+
 async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     uid  = update.effective_user.id
-    lang = ctx.user_data.get("lang", "ru")
+    lang = _lang_of(update.effective_user)
     name = update.effective_user.first_name
 
     # Deep links:
@@ -290,7 +303,7 @@ async def fallback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         return
 
     if SUPPORT_BOT_USERNAME and text in ("🆘 Поддержка", "🆘 Support"):
-        lang  = ctx.user_data.get("lang", "ru")
+        lang  = _lang_of(update.effective_user)
         label = "🆘 Открыть поддержку" if lang == "ru" else "🆘 Open Support"
         kb    = InlineKeyboardMarkup([[
             InlineKeyboardButton(label, url=f"https://t.me/{SUPPORT_BOT_USERNAME}")

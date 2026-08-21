@@ -2564,6 +2564,7 @@ PUBLIC_ROOT_FILES = {
     "promo_post_ru.jpg",    "promo_post_en.jpg",
     "promo_post_ru3.jpg",  "promo_post_ru3_thumb.jpg",
     "promo_gift_ru.jpg",    "promo_gift_en.jpg",
+    "promo_smoke_ru.jpg",   "promo_smoke_en.jpg",
 }
 # products/ — фотографии товаров. Раньше они грузились с github.com: витрина
 # клиента целиком зависела от доступности чужого домена, и в ОАЭ плитки висели

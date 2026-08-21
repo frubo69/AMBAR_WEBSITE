@@ -705,22 +705,42 @@ a.oc-row:active{background:var(--card2)}
   background:var(--card2);border:1px solid var(--border2)}
 .sh-log-b:active{transform:scale(.98)}
 /* Журнал: день — заголовок, событие — строка. */
-.shl-day{margin:16px 2px 8px;font-size:11px;font-weight:700;letter-spacing:.4px;
-  color:var(--muted)}
+/* ── ЖУРНАЛ СМЕН ────────────────────────────────────────────────────────────
+   Это лента событий, а не список карточек. Раньше каждая строка была отдельной
+   белой плашкой: десять событий давали десять одинаковых прямоугольников,
+   между которыми глазу не за что зацепиться, а время терялось в конце строки.
+
+   Теперь день — одна карточка, а внутри лента: слева время своей колонкой,
+   рядом рельса с точкой, дальше событие. По такому списку ведут пальцем сверху
+   вниз и читают, что происходило: время стоит столбиком и не прыгает от длины
+   имени. */
+/* Окно журнала без внутренних полей (.sheet.wide), поэтому подпись и лента
+   отступают сами — иначе они прилипают к левому краю, а заголовок стоит с
+   отступом, и шапка выглядит съехавшей. */
+#shLogOv .s{padding:0 16px}
+#shLogBody{padding:0 14px 14px}
+.shl-day{margin:18px 2px 8px;font-size:10px;font-weight:700;letter-spacing:1.4px;
+  text-transform:uppercase;color:var(--muted)}
 .shl-day:first-child{margin-top:2px}
-.shl-r{display:flex;gap:10px;padding:11px 12px;border-radius:var(--r2);margin-bottom:6px;
+.shl-card{padding:6px 14px 10px;border-radius:var(--r2);
   background:var(--card);border:1px solid var(--border2)}
-.shl-r.op{border-left:2px solid rgba(61,220,132,.5)}
-.shl-r.cl{border-left:2px solid var(--border)}
+.shl-r{display:flex;gap:12px;padding:9px 0}
+.shl-time{flex:0 0 42px;padding-top:1px;font-family:'Space Grotesk',sans-serif;
+  font-size:12px;font-weight:600;color:var(--muted);font-variant-numeric:tabular-nums}
+/* Рельса — точка и линия под ней. Линия часть строки, поэтому не разъезжается
+   при любой высоте события и обрывается сама на последнем. */
+.shl-rail{flex:0 0 9px;position:relative}
+.shl-rail::before{content:'';position:absolute;left:2px;top:5px;width:5px;height:5px;
+  border-radius:50%;background:var(--muted)}
+.shl-r.op .shl-rail::before{background:var(--gold);box-shadow:0 0 0 3px var(--gold-soft)}
+.shl-rail::after{content:'';position:absolute;left:4px;top:13px;bottom:-9px;width:1px;
+  background:var(--border2)}
+.shl-r:last-child .shl-rail::after{display:none}
 .shl-b{flex:1;min-width:0}
-.shl-t{display:block;font-size:13px;line-height:1.35}
-.shl-t b{color:var(--gold);font-weight:800;margin-right:3px}
-.shl-t i{font-style:normal;color:var(--muted);margin-left:5px}
-.shl-c{display:flex;flex-wrap:wrap;gap:5px;margin-top:6px}
-.shl-p{padding:4px 9px;border-radius:8px;font-size:11px;color:var(--muted);
-  background:var(--bg3);border:1px solid var(--border2)}
-.shl-p.on{color:#3ddc84;background:rgba(61,220,132,.1);border-color:rgba(61,220,132,.28)}
-.shl-none{font-size:11.5px;color:var(--muted)}
+.shl-t{display:block;font-size:13.5px;line-height:1.3}
+.shl-t b{color:var(--gold);font-weight:800;margin-right:4px}
+.shl-c{display:block;font-size:12px;line-height:1.4;color:var(--muted);margin-top:3px}
+.shl-c i{font-style:normal;opacity:.75}
 .pill.hot{border-color:rgba(243,180,74,.5);background:rgba(243,180,74,.1);
   color:var(--warn)}
 
@@ -3342,20 +3362,28 @@ async function shLogOpen(){
   try{ d = await opApi.opFetch('/api/operator/shift/log', {params:{days:7}}); }
   catch(e){ $('shLogBody').innerHTML = '<div class="acc-sub">Не удалось загрузить</div>'; return; }
   $('shLogBody').innerHTML = (d.list || []).length
-    ? d.list.map(x => `<div class="shl-day">${_dayRu(x.day)}</div>` + x.rows.map(r => {
+    ? d.list.map(x => `<div class="shl-day">${_dayRu(x.day)}</div><div class="shl-card">`
+      + x.rows.map(r => {
         const open = r.kind === 'open';
-        const crew = (r.crew || []).map(c =>
-          `<span class="shl-p ${c.working ? 'on' : ''}">${_esc(c.name)}</span>`).join('');
+        // Имена строкой, а не плашками: три плашки занимали целый ряд и
+        // выглядели кнопками, хотя нажимать там нечего. Кто дома — рядом и
+        // тише: это уточнение, а не вторая половина списка.
+        const on  = (r.crew || []).filter(c => c.working).map(c => c.name);
+        const off = (r.crew || []).filter(c => !c.working).map(c => c.name);
+        const sub = open
+          ? (on.length ? _esc(on.join(', ')) : 'водителей нет')
+            + (off.length ? ` <i>· дома: ${_esc(off.join(', '))}</i>` : '')
+          : `${_num(r.orders)} ${plural(r.orders,'заказ','заказа','заказов')}`
+            + ` · ${_num(r.revenue)} AED`;
         return `<div class="shl-r ${open ? 'op' : 'cl'}">
+          <span class="shl-time">${_hmDubai(r.at)}</span>
+          <span class="shl-rail"></span>
           <span class="shl-b">
-            <span class="shl-t"><b>${_esc(r.code || r.district)}</b>
-              ${open ? 'открыл' : 'закрыл'} ${_esc(r.by || r.operator || '—')}
-              <i>${_hmDubai(r.at)}</i></span>
-            <span class="shl-c">${open ? (crew || '<span class="shl-none">водителей нет</span>')
-              : `<span class="shl-none">${_num(r.orders)} ${plural(r.orders,'заказ','заказа','заказов')}
-                 · ${_num(r.revenue)} AED</span>`}</span>
+            <span class="shl-t"><b>${_esc(r.code || r.district)}</b>${
+              open ? 'открыл' : 'закрыл'} ${_esc(r.by || r.operator || '—')}</span>
+            <span class="shl-c">${sub}</span>
           </span></div>`;
-      }).join('')).join('')
+      }).join('') + `</div>`).join('')
     : '<div class="acc-sub">Пока пусто</div>';
 }
 

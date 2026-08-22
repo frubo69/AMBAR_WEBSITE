@@ -2858,15 +2858,16 @@ async def handle_archive_export(request):
         "exp": (now + timedelta(minutes=20)).isoformat(),
         "at": now.isoformat(),
     })
-    base = os.getenv("OWNER_WEBAPP_URL", "") or os.getenv("WEBAPP_URL", "")
-    base = base.split("/owner")[0].rstrip("/")
-    if not base:
-        proto = request.headers.get("X-Forwarded-Proto", "https")
-        base = f"{proto}://{request.headers.get('Host', '')}"
+    # Отдаём путь, а не адрес: панель знает, с какого хоста она пришла, а
+    # угадывать его по переменным окружения — как раз тот случай, когда
+    # ссылка однажды уедет на другой домен и молча перестанет открываться.
+    path = f"/api/owner/archive/file?t={token}"
+    proto = request.headers.get("X-Forwarded-Proto", "https")
+    host = request.headers.get("Host", "")
     name = f"AMBAR-arhiv-{now.astimezone(timezone(timedelta(hours=4))).strftime('%Y-%m-%d')}.html"
     log.info(f"[archive] выгрузка для {request['owner_id']}")
     return web.json_response(
-        {"url": f"{base}/api/owner/archive/file?t={token}", "name": name},
+        {"path": path, "url": (f"{proto}://{host}{path}" if host else path), "name": name},
         headers=CORS_HEADERS)
 
 

@@ -12540,8 +12540,9 @@ async function arcExport(){
   b.disabled = true; b.textContent = 'Готовим…';
   try{
     const r = await ownerApi.ownerFetch('/api/owner/archive/export', {method:'POST', body:{}});
-    if(r && r.url){
-      try{ Telegram.WebApp.openLink(r.url); }catch(e){ window.open(r.url,'_blank'); }
+    const url = r && (r.path ? ownerApi.AMBAR_API + r.path : r.url);
+    if(url){
+      try{ Telegram.WebApp.openLink(url); }catch(e){ window.open(url,'_blank'); }
     }
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
   }catch(e){

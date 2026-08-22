@@ -20,6 +20,8 @@ DUBAI = timezone(timedelta(hours=4))
 GROUPS = [
     ("Доступ и безопасность", [
         "security.unauthorized", "delivery.browser",
+    ]),
+    ("Система", [
         "system.botDown", "system.dbDown", "system.apiErrors", "system.maintenance",
     ]),
     ("Заявки и приёмка", [

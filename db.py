@@ -3216,11 +3216,26 @@ async def owner_msg_drop(chat_id: int, message_id: int) -> None:
 
 async def notifications_search(keys: list | None = None, q: str = "",
                                frm: str = "", to: str = "",
-                               limit: int = 50, offset: int = 0) -> tuple:
-    """Архив уведомлений: поиск по тексту, тип и период. Возвращает (строки, всего)."""
+                               limit: int = 50, offset: int = 0,
+                               skip_test: bool = True) -> tuple:
+    """Архив уведомлений: поиск по тексту, тип и период. Возвращает (строки, всего).
+
+    Тестовые аккаунты владельца отсекаем прямо в запросе, а не после выборки:
+    иначе «всего» и постраничная подгрузка врали бы на количество выброшенных
+    строк. Условие по тексту, потому что структурного поля с автором у старых
+    записей нет — а вычищать их надо и задним числом."""
     db = _db_or_none()
     if db is None: return [], 0
     filt: dict = {}
+    if skip_test:
+        try:
+            import config_test
+            pats = config_test.skip_patterns()
+        except Exception:
+            pats = []
+        if pats:
+            filt["$nor"] = [{"text": {"$regex": re.escape(p), "$options": "i"}}
+                            for p in pats]
     if keys:
         filt["event_key"] = {"$in": list(keys)}
     if frm or to:

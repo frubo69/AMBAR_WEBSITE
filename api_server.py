@@ -119,6 +119,13 @@ async def on_startup(app):
         app["geo_nag"] = asyncio.create_task(geo_nag.loop(app))
     except Exception as e:
         log.warning(f"[geo] не запустились: {e}")
+    # Переписка владельца с ботом живёт не дольше 47 часов: позже телеграм
+    # запретит её удалять, и в тревожный момент она останется в телефоне.
+    try:
+        import owner_sweep
+        app["owner_sweep"] = asyncio.create_task(owner_sweep.loop(app))
+    except Exception as e:
+        log.warning(f"[owner-sweep] не запустился: {e}")
 
 
 async def _send_card_welcome(ids, flag_field, total, pad, title_ru, tag):
@@ -313,6 +320,7 @@ async def tg_send(token, chat_id, text, parse_mode="Markdown", reply_markup=None
         async with session.post(url, json=payload) as resp:
             res = await resp.json()
     await _remember_driver_msg(token, chat_id, res)
+    await _remember_owner_msg(token, chat_id, res)
     return res
 
 
@@ -341,6 +349,27 @@ async def _remember_driver_msg(token, chat_id, res):
         await _db.drv_msg_add(int(chat_id), int(mid), _dt.now(_tz.utc))
     except Exception as e:
         log.debug(f"drv msg log {chat_id}/{mid}: {e}")
+
+async def _remember_owner_msg(token, chat_id, res, event_key=""):
+    """То же самое для AMBAR STAR.
+
+    У владельца в чате не адреса клиентов, а вся кухня: выручка, списания,
+    заявки, доступы. Телеграм разрешает боту стирать только своё и только за
+    двое суток, поэтому реестр ведём с первой же отправки: по нему свипер
+    убирает переписку на 47-м часу, а тревога — всё, что осталось. Содержимое
+    при этом не пропадает — важные события лежат в архиве и в бэкапах базы."""
+    own = os.getenv("AMBAR_OWNER_BOT_TOKEN", "")
+    if not own or token != own:
+        return
+    mid = ((res or {}).get("result") or {}).get("message_id")
+    if not mid:
+        return
+    try:
+        import db as _db
+        await _db.owner_msg_add(int(chat_id), int(mid), event_key)
+    except Exception as e:
+        log.debug(f"owner msg log {chat_id}/{mid}: {e}")
+
 
 async def tg_edit(token, chat_id, message_id, text, parse_mode="HTML", reply_markup=None):
     url = f"https://api.telegram.org/bot{token}/editMessageText"

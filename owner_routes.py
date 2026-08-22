@@ -1866,7 +1866,10 @@ async def tg_send_photo_bytes(token, chat_id, photo: bytes, caption: str = "",
     async with _ah.ClientSession() as sess:
         async with sess.post(f"https://api.telegram.org/bot{token}/sendPhoto",
                              data=data) as r:
-            return await r.json()
+            res = await r.json()
+    from api_server import _remember_owner_msg
+    await _remember_owner_msg(token, chat_id, res)
+    return res
 
 
 async def tg_edit_caption(token, chat_id, message_id, caption: str,
@@ -2547,6 +2550,12 @@ async def _alert_owners_unauthorized(user: dict, meta: dict, log_doc: dict) -> N
         log.warning("[owner-auth] OWNER_BOT_TOKEN not set — can't send security alert")
         return
     text = _format_unauthorized_alert(user, meta, log_doc)
+    # Раньше это жило только в чате: чат чистится, а «кто пытался войти» —
+    # ровно то, что должно храниться дольше всего.
+    try:
+        await db.insert_notification("security.unauthorized", text)
+    except Exception as e:
+        log.error(f"[owner-auth] persist unauthorized alert failed: {e}")
     for oid in SECURITY_IDS:
         try:
             await _send_md(OWNER_BOT_TOKEN, oid, text)
@@ -2798,6 +2807,117 @@ async def _monitor_pending_orders():
             log.error(f"[monitor] pending check failed: {e}")
 
 
+# ── Архив важных событий ───────────────────────────────────────────────────
+# Переписка с ботом теперь недолговечна: свипер стирает её на 47-м часу, а по
+# тревоге не остаётся ничего. Чтобы это не значило «потеряли», важные события
+# лежат здесь — с поиском и выгрузкой в файл, который переживёт что угодно.
+
+@require_owner
+async def handle_archive(request):
+    import owner_archive as oa
+    q = request.query
+    text = (q.get("q") or "").strip()[:80]
+    grp = (q.get("group") or "").strip()
+    keys = None
+    if grp and grp != "all":
+        keys = dict(oa.GROUPS).get(grp) or []
+    elif (q.get("scope") or "important") != "all":
+        keys = oa.IMPORTANT
+    try:
+        limit = min(int(q.get("limit", "40")), 200)
+        offset = max(int(q.get("offset", "0")), 0)
+    except (TypeError, ValueError):
+        limit, offset = 40, 0
+    rows, total = await db.notifications_search(
+        keys=keys, q=text, frm=(q.get("from") or "").strip(),
+        to=(q.get("to") or "").strip(), limit=limit, offset=offset)
+    for r in rows:
+        r["group"] = oa.group_of(r.get("event_key", ""))
+        r["title"] = oa.title_of(r.get("event_key", ""))
+    return web.json_response(
+        {"items": rows, "total": total, "offset": offset,
+         "groups": [g for g, _ in oa.GROUPS]},
+        headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_archive_export(request):
+    """Одноразовая ссылка на файл. Ссылку открывает браузер, а он про initData
+    ничего не знает — поэтому право на выгрузку кладём в короткоживущий токен."""
+    import secrets
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    now = datetime.now(timezone.utc)
+    token = secrets.token_urlsafe(24)
+    await db.export_token_put(token, {
+        "owner_id": request["owner_id"],
+        "from": (body.get("from") or "").strip(),
+        "to": (body.get("to") or "").strip(),
+        "exp": (now + timedelta(minutes=20)).isoformat(),
+        "at": now.isoformat(),
+    })
+    base = os.getenv("OWNER_WEBAPP_URL", "") or os.getenv("WEBAPP_URL", "")
+    base = base.split("/owner")[0].rstrip("/")
+    if not base:
+        proto = request.headers.get("X-Forwarded-Proto", "https")
+        base = f"{proto}://{request.headers.get('Host', '')}"
+    name = f"AMBAR-arhiv-{now.astimezone(timezone(timedelta(hours=4))).strftime('%Y-%m-%d')}.html"
+    log.info(f"[archive] выгрузка для {request['owner_id']}")
+    return web.json_response(
+        {"url": f"{base}/api/owner/archive/file?t={token}", "name": name},
+        headers=CORS_HEADERS)
+
+
+async def handle_archive_file(request):
+    """Сам файл. Открывается по токену: обычной авторизации у браузера нет."""
+    import owner_archive as oa
+    token = (request.query.get("t") or "").strip()
+    doc = await db.export_token_get(token) if token else None
+    if not doc:
+        return web.Response(status=404, text="not found")
+    try:
+        if datetime.fromisoformat(doc["exp"]) < datetime.now(timezone.utc):
+            return web.Response(status=410, text="link expired")
+    except Exception:
+        return web.Response(status=410, text="link expired")
+
+    rows, _ = await db.notifications_search(
+        keys=oa.IMPORTANT, frm=doc.get("from", ""), to=doc.get("to", ""),
+        limit=5000, offset=0)
+    who = ""
+    try:
+        u = await db.get_user(int(doc.get("owner_id") or 0)) or {}
+        who = (u.get("first_name") or "").strip()
+    except Exception:
+        pass
+    html = oa.render_html(rows, frm=doc.get("from", ""), to=doc.get("to", ""),
+                          generated_by=who)
+    fname = f"AMBAR-arhiv-{datetime.now(timezone(timedelta(hours=4))).strftime('%Y-%m-%d')}.html"
+    return web.Response(
+        body=html.encode("utf-8"), status=200,
+        headers={"Content-Type": "text/html; charset=utf-8",
+                 "Content-Disposition": f'attachment; filename="{fname}"',
+                 "Cache-Control": "no-store"})
+
+
+@require_owner
+async def handle_owner_panic(request):
+    """Штора опущена — переписки с ботом больше нет.
+
+    Ответ пустой и мгновенный: панель прячется в игру, и никаких «готово» на
+    экране появиться не должно. Данные остаются в архиве."""
+    import owner_sweep
+    oid = request["owner_id"]
+    try:
+        n = await owner_sweep.wipe_chat(int(oid))
+        log.warning(f"[owner] штора у {oid}: убрано сообщений {n}")
+    except Exception as e:
+        log.error(f"[owner] чат не почищен: {e}")
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+
 def setup(app):
     """Wire owner routes into the aiohttp app. Called from api_server.main()."""
     app.on_startup.append(lambda _: _backfill_delivery_times())
@@ -2833,6 +2953,13 @@ def setup(app):
     app.router.add_post(            "/api/owner/customers/{telegram_id}/{action:ban|unban}", handle_customer_ban)
     app.router.add_route("OPTIONS", "/api/owner/customers/{telegram_id}/debt", handle_customer_debt)
     app.router.add_post(            "/api/owner/customers/{telegram_id}/debt", handle_customer_debt)
+    app.router.add_route("OPTIONS", "/api/owner/archive", handle_archive)
+    app.router.add_get(             "/api/owner/archive", handle_archive)
+    app.router.add_route("OPTIONS", "/api/owner/archive/export", handle_archive_export)
+    app.router.add_post(            "/api/owner/archive/export", handle_archive_export)
+    app.router.add_get(             "/api/owner/archive/file", handle_archive_file)
+    app.router.add_route("OPTIONS", "/api/owner/panic", handle_owner_panic)
+    app.router.add_post(            "/api/owner/panic", handle_owner_panic)
     app.router.add_route("OPTIONS", "/api/owner/notifications", handle_notifications)
     app.router.add_get(             "/api/owner/notifications", handle_notifications)
     app.router.add_route("OPTIONS", "/api/owner/support-threads", handle_support_threads)

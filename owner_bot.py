@@ -106,12 +106,30 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         uid, update.effective_user.username, allowed,
     )
     if not allowed:
-        await update.message.reply_text("Нет доступа")
+        await _track(await update.message.reply_text("Нет доступа"))
         return
-    await update.message.reply_text(
+    await _track(await update.message.reply_text(
         "Панель владельца AMBAR",
         reply_markup=launcher_keyboard(),
-    )
+    ))
+
+
+async def _track(msg):
+    """Записать сообщение в реестр чата владельца.
+
+    По этому реестру переписка стирается на 47-м часу и целиком — по тревоге
+    (owner_sweep). Пишем и свои ответы, и входящие: в приватном чате телеграм
+    разрешает боту удалять и те, и другие, но только если знаешь их номера."""
+    try:
+        if msg is not None:
+            await db.owner_msg_add(msg.chat_id, msg.message_id, "bot")
+    except Exception as e:
+        log.debug("реестр: %s", e)
+
+
+async def on_any_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Первым делом — запомнить входящее, что бы это ни было."""
+    await _track(update.effective_message)
 
 
 async def on_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -119,12 +137,12 @@ async def on_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if not update.effective_user:
         return
     if not is_allowed(update.effective_user.id):
-        await update.message.reply_text("Нет доступа")
+        await _track(await update.message.reply_text("Нет доступа"))
         return
-    await update.message.reply_text(
+    await _track(await update.message.reply_text(
         "Панель владельца AMBAR",
         reply_markup=launcher_keyboard(),
-    )
+    ))
 
 
 async def on_writeoff(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -262,6 +280,7 @@ def main():
         .post_init(post_init)
         .build()
     )
+    app.add_handler(MessageHandler(filters.ALL, on_any_update), group=-1)
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CallbackQueryHandler(on_writeoff, pattern=r"^wo:(ok|no):"))
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, on_any_message))

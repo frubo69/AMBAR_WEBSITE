@@ -71,6 +71,9 @@ async def connect():
         await _db.owner_access_log.create_index([("status", 1), ("last_attempt_at", -1)])
         await _db.owner_notifications.create_index([("created_at", -1)])
         await _db.owner_notifications.create_index("event_key")
+        # Реестр переписки owner-бота: свипер ходит по дате, тревога — по чату.
+        await _db.owner_msgs.create_index("at")
+        await _db.owner_msgs.create_index("chat_id")
         # Crypto invoices: one per order; a txid binds to exactly one invoice so
         # a transfer can never credit two orders. Partial (string-only) index so
         # the many invoices with txid=None/unset don't collide on the null value.
@@ -3167,3 +3170,79 @@ async def support_channel(conv_key: str) -> str:
     doc = await db.support_messages.find_one({"conv_key": conv_key},
                                              {"_id": 0, "channel": 1})
     return (doc or {}).get("channel", "")
+
+
+# ── Переписка owner-бота: реестр, чистка и архив ──────────────────────────
+# Телеграм разрешает боту удалять только свои сообщения не старше 48 часов.
+# Поэтому переписку с владельцем ведём по реестру: каждое отправленное и
+# принятое сообщение записываем, чуть раньше срока стираем (свипер на 47-м
+# часу), а по тревоге сносим всё, что в реестре осталось. Содержимое при этом
+# не теряется: текст события лежит в owner_notifications и в бэкапах.
+
+async def owner_msg_add(chat_id: int, message_id: int, event_key: str = "",
+                        at: str = "") -> None:
+    db = _db_or_none()
+    if db is None or not (chat_id and message_id): return
+    await db.owner_msgs.update_one(
+        {"_id": f"{chat_id}:{message_id}"},
+        {"$setOnInsert": {
+            "chat_id": int(chat_id), "message_id": int(message_id),
+            "event_key": event_key,
+            "at": at or datetime.now(timezone.utc).isoformat(),
+        }},
+        upsert=True)
+
+
+async def owner_msgs_due(before_iso: str, limit: int = 300) -> list:
+    """Что пора стереть: всё, что старше порога."""
+    db = _db_or_none()
+    if db is None: return []
+    cursor = db.owner_msgs.find({"at": {"$lt": before_iso}}, {"_id": 0}).limit(limit)
+    return await cursor.to_list(length=limit)
+
+
+async def owner_msgs_of(chat_id: int, limit: int = 2000) -> list:
+    db = _db_or_none()
+    if db is None: return []
+    cursor = db.owner_msgs.find({"chat_id": int(chat_id)}, {"_id": 0}).limit(limit)
+    return await cursor.to_list(length=limit)
+
+
+async def owner_msg_drop(chat_id: int, message_id: int) -> None:
+    db = _db_or_none()
+    if db is None: return
+    await db.owner_msgs.delete_one({"_id": f"{chat_id}:{message_id}"})
+
+
+async def notifications_search(keys: list | None = None, q: str = "",
+                               frm: str = "", to: str = "",
+                               limit: int = 50, offset: int = 0) -> tuple:
+    """Архив уведомлений: поиск по тексту, тип и период. Возвращает (строки, всего)."""
+    db = _db_or_none()
+    if db is None: return [], 0
+    filt: dict = {}
+    if keys:
+        filt["event_key"] = {"$in": list(keys)}
+    if frm or to:
+        rng = {}
+        if frm: rng["$gte"] = frm
+        if to:  rng["$lte"] = to
+        filt["created_at"] = rng
+    if q:
+        filt["text"] = {"$regex": re.escape(q), "$options": "i"}
+    total = await db.owner_notifications.count_documents(filt)
+    cursor = (db.owner_notifications.find(filt, {"_id": 0})
+              .sort("created_at", -1).skip(max(0, offset)).limit(limit))
+    return await cursor.to_list(length=limit), total
+
+
+async def export_token_put(token: str, doc: dict) -> None:
+    db = _db_or_none()
+    if db is None: return
+    await db.export_tokens.update_one({"_id": token}, {"$set": doc}, upsert=True)
+
+
+async def export_token_get(token: str) -> dict | None:
+    db = _db_or_none()
+    if db is None: return None
+    return await db.export_tokens.find_one({"_id": token}, {"_id": 0})

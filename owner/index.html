@@ -3110,6 +3110,7 @@ button.path:active{transform:scale(.995)}
     <div class="lrow lrow-tog" data-tog="sound"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg></div><div class="lrow-body"><div class="lrow-name">Звук уведомлений</div><div class="lrow-sub">только важные события</div></div><span class="tog on" id="togSound"></span></div>
     <div class="lrow lrow-tog" data-tog="quiet"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8"/></svg></div><div class="lrow-body"><div class="lrow-name">Тихие часы</div><div class="lrow-sub">23:00 → 09:00 · только критичные</div></div><span class="tog" id="togQuiet"></span></div>
     <div class="lrow" onclick="whereOpen()"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="2.6"/></svg></div><div class="lrow-body"><div class="lrow-name">Где водители</div><div class="lrow-sub">живая карта смены</div></div><span style="color:var(--muted)">›</span></div>
+    <div class="lrow" onclick="arcOpen()"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M2 3h20v4H2z"/><path d="M10 12h4"/></svg></div><div class="lrow-body"><div class="lrow-name">Архив событий</div><div class="lrow-sub">важное — списания, заявки, доступы</div></div><span style="color:var(--muted)">›</span></div>
     <div class="lrow" onclick="qaExport()"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg></div><div class="lrow-body"><div class="lrow-name">Экспорт CSV / XLSX</div><div class="lrow-sub">данные за выбранный период</div></div><span style="color:var(--muted)">›</span></div>
     <div class="lrow" onclick="openNotif()"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v2.2M12 19.8V22M22 12h-2.2M4.2 12H2M19.1 4.9l-1.6 1.6M6.5 17.5l-1.6 1.6M19.1 19.1l-1.6-1.6M6.5 6.5 4.9 4.9"/></svg></div><div class="lrow-body"><div class="lrow-name">Тонкая настройка алертов</div><div class="lrow-sub">пресеты · пороги · каналы</div></div><span style="color:var(--muted)">›</span></div>
   </div>
@@ -3373,6 +3374,28 @@ button.path:active{transform:scale(.995)}
 </style>
 
 <!-- ============ NOTIFICATIONS DETAILED ============ -->
+<div class="cmd-overlay" id="arcOverlay">
+  <div class="cmd-sheet notif-sheet">
+    <div class="notif-hdr">
+      <div class="notif-hdr-l">
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:600;line-height:1.1">Архив</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:3px">важные события · хранятся в базе, а не в чате</div>
+      </div>
+      <button class="cmd-close" onclick="arcClose()" aria-label="Закрыть"><span class="txt">ESC</span><span class="x">✕</span></button>
+    </div>
+    <div class="arc-bar">
+      <input class="arc-in" id="arcQ" placeholder="Поиск по тексту…" autocomplete="off"
+             autocorrect="off" autocapitalize="off" spellcheck="false" oninput="arcSearch()">
+      <div class="arc-chips" id="arcChips"></div>
+    </div>
+    <div class="notif-body" id="arcBody"></div>
+    <div class="arc-foot">
+      <div class="arc-note">Файл открывается в браузере и сохраняется на устройство.</div>
+      <button class="arc-dl" id="arcDl" onclick="arcExport()">Выгрузить файл</button>
+    </div>
+  </div>
+</div>
+
 <div class="cmd-overlay" id="notifOverlay">
   <div class="cmd-sheet notif-sheet">
     <div class="notif-hdr">
@@ -4445,6 +4468,40 @@ button.path:active{transform:scale(.995)}
 .notif-hdr-l{flex:1;min-width:0}
 .notif-body{flex:1;overflow-y:auto;padding:8px 12px 8px;min-height:0}
 .notif-body::-webkit-scrollbar{display:none}
+/* ── Архив событий ───────────────────────────────────────────────
+   Переписка с ботом живёт двое суток, важное — здесь. Список читают глазами
+   и ищут в нём конкретный день, поэтому день — это заголовок, а не подпись
+   мелким шрифтом внутри карточки. */
+.arc-bar{position:sticky;top:0;z-index:2;background:var(--bg);padding:10px 12px 8px;
+  border-bottom:1px solid var(--border2);min-width:0;max-width:100%}
+.arc-in{width:100%;padding:11px 13px;border-radius:12px;border:1px solid var(--border2);
+  background:var(--card2);color:var(--text);font-family:inherit;font-size:14px;outline:none}
+.arc-in:focus{border-color:var(--gold)}
+.arc-chips{display:flex;gap:6px;overflow-x:auto;margin-top:9px;padding-bottom:2px;
+  scrollbar-width:none;min-width:0;max-width:100%}
+.arc-chips::-webkit-scrollbar{display:none}
+.arc-chip{flex:0 0 auto;padding:7px 12px;border-radius:99px;border:1px solid var(--border2);
+  background:var(--card2);color:var(--sub);font-size:12px;font-weight:600;
+  white-space:nowrap;cursor:pointer}
+.arc-chip.on{background:var(--gold);border-color:var(--gold);color:#171310}
+.arc-day{font-size:11px;letter-spacing:1.6px;text-transform:uppercase;color:var(--sub);
+  font-weight:700;margin:16px 4px 8px}
+.arc-it{border:1px solid var(--border2);background:var(--card2);border-radius:13px;
+  padding:12px 14px;margin-bottom:8px}
+.arc-it-h{display:flex;justify-content:space-between;gap:10px;align-items:baseline}
+.arc-it-t{font-size:12.5px;font-weight:700;color:var(--gold)}
+.arc-it-d{font-size:11px;color:var(--sub);font-variant-numeric:tabular-nums;white-space:nowrap}
+.arc-it-b{font-size:13.5px;line-height:1.5;margin-top:6px;color:var(--text);
+  white-space:pre-wrap;word-break:break-word}
+.arc-more{width:100%;padding:12px;margin:6px 0 2px;border-radius:12px;border:1px solid var(--border2);
+  background:var(--card2);color:var(--muted);font-family:inherit;font-size:13px;font-weight:600;cursor:pointer}
+.arc-empty{color:var(--muted);font-size:13px;text-align:center;padding:34px 10px}
+.arc-foot{padding:10px 12px calc(12px + var(--safe-bottom));border-top:1px solid var(--border2);
+  display:flex;gap:8px;align-items:center;background:var(--bg)}
+.arc-dl{flex:1;padding:13px;border-radius:13px;border:none;background:var(--gold);
+  color:#171310;font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.arc-dl:disabled{opacity:.55}
+.arc-note{font-size:10.5px;color:var(--muted);line-height:1.35;flex:1}
 .notif-master{display:flex;align-items:center;gap:12px;padding:14px 14px;background:linear-gradient(135deg,rgba(201,169,110,.08),rgba(201,169,110,.03));border:1px solid var(--border);border-radius:14px;margin:8px 0 10px;transition:background .3s var(--e1),border-color .3s var(--e1),opacity .3s var(--e1)}
 .notif-master.off{background:linear-gradient(135deg,rgba(255,255,255,.02),rgba(255,255,255,.01));border-color:var(--border2)}
 .notif-master.off > div:first-child > div:first-child{color:var(--sub)}
@@ -5772,6 +5829,17 @@ function hidKnobReset(){
 function hideSet(on){
   HIDE = on;
   try{ localStorage.setItem('ambar_hide', on ? '1' : '0'); }catch(e){}
+  // Переписка с ботом уходит вместе со шторой: в ней выручка, списания и
+  // заявки. Просим сервер снести её и не ждём ответа — на экране не должно
+  // появиться ни галочки, ни задержки. Запрос идёт мимо ownerApi: дверь к
+  // данным закрывается тем же движением и проглотила бы его.
+  if(on) try{
+    fetch(ownerApi.AMBAR_API + '/api/owner/panic', {
+      method:'POST', keepalive:true,
+      headers:{'Authorization':'tma ' + (Telegram.WebApp.initData||''),
+               'Content-Type':'application/json'},
+      body:'{}'});
+  }catch(e){}
   paintHide();
   // Выйдя из режима, поднимаем панель заново. Пока штора была опущена, она
   // не сделала ни одного запроса, и оживлять её по частям — верный способ
@@ -12375,6 +12443,113 @@ function switchPage(pg){
 }
 
 function qaShowAllAlerts(){ openAlerts && openAlerts(); }
+// ==== Архив событий ====
+// Чат с ботом теперь недолговечен: сервер стирает переписку на 47-м часу, а по
+// шторе — целиком. Значит смотреть историю нужно здесь, и здесь же забирать
+// файл, который переживёт и чистку, и телефон.
+const ARC = {q:'', group:'', items:[], total:0, offset:0, busy:false, groups:[], t:null};
+
+function arcOpen(){
+  try{ closeSet(); }catch(e){}
+  setTimeout(()=>{
+    document.getElementById('arcOverlay').classList.add('show');
+    ARC.q=''; ARC.group=''; const inp=document.getElementById('arcQ'); if(inp) inp.value='';
+    arcLoad(true);
+  }, 60);
+}
+function arcClose(){ document.getElementById('arcOverlay').classList.remove('show'); }
+
+function arcSearch(){
+  clearTimeout(ARC.t);
+  ARC.t = setTimeout(()=>{ ARC.q = (document.getElementById('arcQ').value||'').trim(); arcLoad(true); }, 280);
+}
+
+function arcPick(g){ ARC.group = (ARC.group===g ? '' : g); arcLoad(true); }
+
+async function arcLoad(reset){
+  if(ARC.busy) return;
+  ARC.busy = true;
+  if(reset){ ARC.offset = 0; ARC.items = []; }
+  const params = {limit:40, offset:ARC.offset};
+  if(ARC.q) params.q = ARC.q;
+  if(ARC.group) params.group = ARC.group;
+  let d;
+  try{ d = await ownerApi.ownerFetch('/api/owner/archive', {params}); }
+  catch(e){ ARC.busy=false; document.getElementById('arcBody').innerHTML =
+    '<div class="arc-empty">Архив не открылся. Попробуйте ещё раз.</div>'; return; }
+  ARC.items = ARC.items.concat(d.items||[]);
+  ARC.total = d.total||0;
+  ARC.offset = ARC.items.length;
+  ARC.groups = d.groups||[];
+  ARC.busy = false;
+  arcPaint();
+}
+
+function _arcDay(ts){
+  try{
+    const d = new Date(ts);
+    return new Intl.DateTimeFormat('ru-RU',{day:'2-digit',month:'long',year:'numeric',
+      timeZone:'Asia/Dubai'}).format(d);
+  }catch(e){ return String(ts||'').slice(0,10); }
+}
+function _arcTime(ts){
+  try{
+    return new Intl.DateTimeFormat('ru-RU',{hour:'2-digit',minute:'2-digit',
+      timeZone:'Asia/Dubai'}).format(new Date(ts));
+  }catch(e){ return ''; }
+}
+function _arcEsc(t){ return String(t==null?'':t)
+  .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function _arcBody(t){
+  // Текст пришёл размеченным для телеграма. Заголовок события уже стоит в
+  // шапке карточки — первую жирную строку убираем, чтобы не двоилось.
+  const lines = String(t||'').split('\n');
+  if(lines.length && /^\s*[^\w*]*\*[^*]+\*\s*$/.test(lines[0])) lines.shift();
+  return _arcEsc(lines.join('\n').trim()).replace(/\*([^*\n]+)\*/g,'<b>$1</b>');
+}
+
+function arcPaint(){
+  const chips = document.getElementById('arcChips');
+  if(chips) chips.innerHTML =
+    `<div class="arc-chip ${ARC.group?'':'on'}" onclick="arcPick('')">Всё важное</div>` +
+    (ARC.groups||[]).map(g =>
+      `<div class="arc-chip ${ARC.group===g?'on':''}" onclick="arcPick('${_arcEsc(g)}')">${_arcEsc(g)}</div>`).join('');
+
+  const body = document.getElementById('arcBody');
+  if(!ARC.items.length){
+    body.innerHTML = '<div class="arc-empty">' +
+      (ARC.q || ARC.group ? 'Ничего не нашлось' : 'Пока пусто') + '</div>';
+    return;
+  }
+  let day = '', out = [];
+  ARC.items.forEach(it=>{
+    const d = _arcDay(it.created_at);
+    if(d !== day){ day = d; out.push(`<div class="arc-day">${_arcEsc(d)}</div>`); }
+    out.push(`<div class="arc-it"><div class="arc-it-h">
+      <div class="arc-it-t">${_arcEsc(it.title||'')}</div>
+      <div class="arc-it-d">${_arcTime(it.created_at)}</div></div>
+      <div class="arc-it-b">${_arcBody(it.text)}</div></div>`);
+  });
+  if(ARC.items.length < ARC.total)
+    out.push(`<button class="arc-more" onclick="arcLoad(false)">Показать ещё · ${ARC.total - ARC.items.length}</button>`);
+  body.innerHTML = out.join('');
+}
+
+async function arcExport(){
+  const b = document.getElementById('arcDl');
+  b.disabled = true; b.textContent = 'Готовим…';
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/archive/export', {method:'POST', body:{}});
+    if(r && r.url){
+      try{ Telegram.WebApp.openLink(r.url); }catch(e){ window.open(r.url,'_blank'); }
+    }
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  }catch(e){
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('error'); }catch(_){}
+  }
+  b.disabled = false; b.textContent = 'Выгрузить файл';
+}
+
 function qaExport(){
   try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(_){}
   alert('Экспорт CSV/XLSX скоро будет доступен');

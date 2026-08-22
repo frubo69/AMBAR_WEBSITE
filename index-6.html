@@ -1763,7 +1763,7 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
       <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="var(--gold)" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="opacity:.45;margin-bottom:18px;"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
       <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:10px;" id="verify-wait-title">Ожидайте подтверждения</div>
       <div style="font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:28px;" id="verify-wait-desc">Возможно поступит звонок для уточнения деталей</div>
-      <a href="https://t.me/ambar_support_bot" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;background:linear-gradient(135deg,rgba(255,255,255,.1),rgba(255,255,255,.06));border:1px solid rgba(255,255,255,.15);border-radius:14px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;text-decoration:none;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span id="verify-wait-btn-text">Написать в поддержку</span></a>
+      <a href="https://t.me/ambar_support_bot" target="_blank" onclick="openSupportChat(event)" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;background:linear-gradient(135deg,rgba(255,255,255,.1),rgba(255,255,255,.06));border:1px solid rgba(255,255,255,.15);border-radius:14px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;text-decoration:none;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span id="verify-wait-btn-text">Написать в поддержку</span></a>
     </div>
   </div>
 
@@ -1773,7 +1773,7 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
       <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#e05555" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="margin-bottom:18px;"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
       <div style="font-size:18px;font-weight:600;color:var(--text);margin-bottom:10px;" id="verify-declined-title">Верификация отклонена</div>
       <div style="font-size:13px;color:var(--sub);line-height:1.6;margin-bottom:28px;" id="verify-declined-desc">Свяжитесь с поддержкой для уточнения деталей</div>
-      <a id="verify-declined-btn" href="https://t.me/ambar_support_bot" target="_blank" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;background:linear-gradient(135deg,rgba(255,255,255,.1),rgba(255,255,255,.06));border:1px solid rgba(255,255,255,.15);border-radius:14px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;text-decoration:none;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span id="verify-declined-btn-text">Написать в поддержку</span></a>
+      <a id="verify-declined-btn" href="https://t.me/ambar_support_bot" target="_blank" onclick="openSupportChat(event)" style="display:flex;align-items:center;justify-content:center;gap:8px;width:100%;padding:15px;background:linear-gradient(135deg,rgba(255,255,255,.1),rgba(255,255,255,.06));border:1px solid rgba(255,255,255,.15);border-radius:14px;color:#fff;font-size:15px;font-weight:600;cursor:pointer;font-family:'DM Sans',sans-serif;text-decoration:none;"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg><span id="verify-declined-btn-text">Написать в поддержку</span></a>
     </div>
   </div>
 
@@ -3388,6 +3388,17 @@ function alignLogoSubs(){
 // ── BAN WALL ──────────────────────────────────────────────────────────────────
 // The blocker div is already in the HTML — always visible on load.
 // We only REMOVE it if the user is confirmed not-banned.
+
+// Кнопки «написать в поддержку» на экранах, куда человек упирается до входа
+// в приложение (бан, ожидание и отказ верификации). Внутри телеграма ссылку
+// нужно открывать его же средствами, иначе WebView уводит человека в браузер
+// — а это ровно те люди, которым до нас и так тяжело достучаться.
+function openSupportChat(e){
+  if(e && e.preventDefault) e.preventDefault();
+  const u='https://t.me/ambar_support_bot';
+  if(window.tg && tg.openTelegramLink) tg.openTelegramLink(u);
+  else window.open(u,'_blank');
+}
 
 function _showBanWall(){
   // Switch splash anim → ban card (stays forever, can't be dismissed)

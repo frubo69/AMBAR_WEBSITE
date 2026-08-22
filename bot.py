@@ -11,6 +11,7 @@ from telegram import (Update, InlineKeyboardButton, InlineKeyboardMarkup, ReplyK
 from telegram.ext import (Application, CommandHandler, MessageHandler, CallbackQueryHandler,
                           InlineQueryHandler, ContextTypes, filters)
 import db
+import support_inbox
 from config_offices import OFFICE_NAMES, OFFICE_CODES
 
 load_dotenv()
@@ -311,6 +312,26 @@ async def fallback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         msg = "💬 Напишите нам в поддержку:" if lang == "ru" else "💬 Contact our support:"
         await update.message.reply_text(msg, reply_markup=kb)
         return
+
+    # Свободный текст в основной бот — это обращение, а не промах по меню.
+    # Раньше в ответ молча открывалось стартовое меню: вопрос не видел никто,
+    # ни оператор в панели, ни история клиента.
+    if text.strip():
+        body = text.strip()[:3000]
+        try:
+            u = await db.get_user(uid)
+            key, _ = await support_inbox.capture(
+                uid, channel=support_inbox.CHANNEL_MAIN, text=body)
+            await support_inbox.notify_operators(
+                uid, u, body, support_inbox.CHANNEL_MAIN, key)
+            lang = _lang_of(update.effective_user)
+            await update.message.reply_text(
+                "✅ Приняли! Ответим здесь же."
+                if lang == "ru" else "✅ Got it! We'll reply right here.")
+            log.info(f"[support] main-bot user={uid}")
+            return
+        except Exception as e:
+            log.error(f"[support] приём из основного бота uid={uid}: {e}")
 
     await cmd_start(update, ctx)
 

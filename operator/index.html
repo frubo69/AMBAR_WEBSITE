@@ -3771,18 +3771,27 @@ function _dayLbl(ts){
   return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'long'});
 }
 
+const SUP_VIA = {bot:'бот поддержки', mainbot:'бот AMBAR'};
+function _supVia(ch){
+  return SUP_VIA[ch] ? `<span class="sup-oid">${SUP_VIA[ch]}</span>` : '';
+}
+
 function _supRow(t){
   const c=t.client||{};
   const oid = t.order_id
     ? `<span class="sup-oid ${t.order_lane}">#${_esc(t.order_id)}</span>` : '';
-  // Клиент писал прямо в бот поддержки — ответ уйдёт туда же, не в приложение.
-  const via = t.channel==='bot' ? '<span class="sup-oid">бот</span>' : '';
+  // Где человек написал последним — туда уйдёт ответ.
+  const via = _supVia(t.channel);
+  // Почти все обращения из ботов — от тех, кто застрял на верификации и в
+  // приложение просто не попадает. Оператору это нужно видеть сразу.
+  const st = c.verify_declined ? '<span class="sup-oid">отклонён</span>'
+           : (c.verify_wait ? '<span class="sup-oid">ждёт проверки</span>' : '');
   const pre = (t.last_role==='operator' ? '<i>Вы: </i>' : '') + _esc(t.last_text||'');
   // Старый вопрос без ответа не считается ждущим, но отметку заслуживает —
   // иначе в истории он неотличим от закрытого разговора.
   const dead = (!t.wait && t.last_role==='user') ? '<span class="sup-oid">без ответа</span>' : '';
   return `<button class="sup-t ${t.key===supKey?'on':''}" onclick="supThread('${_esc(t.key)}')">
-    <div class="n">${t.wait?'<span class="sup-dot"></span>':''}<b>${_esc(c.name||'—')}</b>${oid}${via}${dead}
+    <div class="n">${t.wait?'<span class="sup-dot"></span>':''}<b>${_esc(c.name||'—')}</b>${oid}${via}${st}${dead}
       <span class="r">${_when(t.last_ts)}</span></div>
     <div class="m">${pre||'—'}</div></button>`;
 }
@@ -3836,9 +3845,9 @@ function supChat(scroll){
         fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
         stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
       <div><div class="who">${_esc(c.name||'—')}</div>
-        <div class="sub">${c.username?('@'+_esc(c.username)):'без ника'}${
+        <div class="sub">${c.verify_declined?'верификация отклонена · ':(c.verify_wait?'ждёт проверки · ':'')}${c.username?('@'+_esc(c.username)):'без ника'}${
           r.order_id?(' · заказ #'+_esc(r.order_id))
-            :(r.channel==='bot'?' · чат бота':' · общий вопрос')}</div></div>
+            :(SUP_VIA[r.channel]?(' · '+SUP_VIA[r.channel]):' · общий вопрос')}</div></div>
       <div class="sup-hb">${ord}
         ${c.id?`<button onclick="openCust(${c.id})">Клиент</button>`:''}
         ${c.username?`<button onclick="tgOpen('https://t.me/${_esc(c.username)}')">Телеграм</button>`:''}
@@ -3846,7 +3855,7 @@ function supChat(scroll){
     </div>${hist}
     <div class="sup-msgs" id="supMsgs">${body || '<div class="sup-empty">Переписки ещё не было. Напишите первым.</div>'}</div>
     <div class="sup-bar">
-      <textarea class="sup-in" id="supIn" rows="1" placeholder="${r.channel==='bot'?'Ответ в чат бота…':'Сообщение клиенту…'}"
+      <textarea class="sup-in" id="supIn" rows="1" placeholder="${SUP_VIA[r.channel]?('Ответ в '+SUP_VIA[r.channel]+'…'):'Сообщение клиенту…'}"
         oninput="supGrow(this)" onkeydown="supKeys(event)"></textarea>
       <button class="sup-send" id="supGo" onclick="supSend()" aria-label="Отправить"><svg
         viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg></button>

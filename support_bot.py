@@ -14,6 +14,7 @@ from telegram.ext import (
 
 from config import BOT_TOKEN, ADMIN_IDS
 import db
+import support_inbox
 
 # Main customer bot token (for sending notifications to users)
 MAIN_BOT_TOKEN = os.getenv("BOT_TOKEN", "")
@@ -126,28 +127,21 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
     # Пишем в ту же переписку, что и приложение: панель оператора читает
     # support_messages, и без этой записи письмо в бот для неё не существует —
     # оно жило только пересылкой в чате админов.
-    # Тот же ключ, что у «Общего вопроса» в приложении, — переписка одна, где
-    # бы человек ни написал, и наш ответ он увидит в обоих местах.
-    conv_key = f"{user.id}_general"
-    ts = datetime.now(timezone.utc).isoformat()
+    conv_key = support_inbox.conv_key(user.id)
     try:
-        await db.support_set_channel(conv_key, "bot")
         if msg.photo:
             f = await msg.photo[-1].get_file()
             upload_dir = Path(__file__).parent / "uploads" / "support"
             upload_dir.mkdir(parents=True, exist_ok=True)
             fname = f"{uuid.uuid4().hex[:12]}.jpg"
             await f.download_to_drive(str(upload_dir / fname))
-            await db.append_support_msg(conv_key, {
-                "role": "user", "type": "photo",
-                "url": f"/uploads/support/{fname}",
-                "caption": msg.caption or "", "ts": ts,
-            })
+            await support_inbox.capture(
+                user.id, channel=support_inbox.CHANNEL_SUPPORT,
+                photo_url=f"/uploads/support/{fname}", caption=msg.caption or "")
         else:
-            await db.append_support_msg(conv_key, {
-                "role": "user", "type": "text",
-                "text": msg.text or msg.caption or "(файл)", "ts": ts,
-            })
+            await support_inbox.capture(
+                user.id, channel=support_inbox.CHANNEL_SUPPORT,
+                text=msg.text or msg.caption or "(файл)")
     except Exception as e:
         print(f"⚠️ Failed to save user message to DB: {e}")
 
@@ -284,13 +278,21 @@ async def handle_admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE)
             print(f"⚠️ Failed to save operator reply to DB: {e}")
 
         order_id = conv_info.get("order_id", "")
-        if (conv_info.get("channel") or "") == "bot":
+        ch = conv_info.get("channel") or ""
+        if ch == support_inbox.CHANNEL_SUPPORT:
             # Человек писал прямо сюда — ответ должен прийти в этот же чат,
             # а не «откройте приложение».
             try:
                 await msg.copy(chat_id=user_id)
             except Exception as e:
                 print(f"⚠️ Could not send reply to user {user_id}: {e}")
+        elif ch == support_inbox.CHANNEL_MAIN:
+            # Писал в основной бот — переслать копию оттуда нельзя, отправляем
+            # текст его же ботом, чтобы ответ пришёл в тот самый чат.
+            body = msg.text or msg.caption or ""
+            await support_inbox.send_as_main(
+                user_id, f"💬 {body}" if body else
+                "💬 Поддержка прислала файл — откройте чат @ambar_support_bot")
         else:
             notif = (
                 f"💬 *Новое сообщение от поддержки*"

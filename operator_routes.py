@@ -1853,6 +1853,11 @@ def _client_brief(uid: int, u: dict) -> dict:
         "username": u.get("username") or "",
         "verified": bool(u.get("verified")),
         "banned": bool(u.get("banned") or u.get("is_banned")),
+        # Чаще всего пишет тот, кто застрял на верификации: оператор должен
+        # видеть это в списке, а не выяснять по ходу разговора.
+        "verify_wait": bool(u.get("verify_requested") and not u.get("verified")
+                            and not u.get("verify_declined")),
+        "verify_declined": bool(u.get("verify_declined")),
     }
 
 
@@ -1995,11 +2000,16 @@ async def handle_support_send(request):
         channel = ""
 
     try:
-        from api_server import tg_send, BOT_TOKEN, SUPPORT_BOT_TOKEN
-        if channel == "bot":
-            # Клиент писал прямо в бот поддержки — туда же кладём и сам ответ:
-            # приложение он может вообще не открывать.
-            await tg_send(SUPPORT_BOT_TOKEN or BOT_TOKEN, uid, f"💬 {text}")
+        import support_inbox
+        from api_server import tg_send, BOT_TOKEN
+        if channel in (support_inbox.CHANNEL_SUPPORT, support_inbox.CHANNEL_MAIN):
+            # Клиент писал в телеграм-бот — туда же кладём и сам ответ, целиком:
+            # приложение он может вообще не открывать, а половина этих людей
+            # висит на верификации и внутрь просто не попадает.
+            if channel == support_inbox.CHANNEL_SUPPORT:
+                await support_inbox.send_as_support(uid, f"💬 {text}")
+            else:
+                await support_inbox.send_as_main(uid, f"💬 {text}")
         else:
             await tg_send(BOT_TOKEN, uid,
                           "💬 *Новое сообщение от поддержки*"

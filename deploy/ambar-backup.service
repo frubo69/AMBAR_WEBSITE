@@ -5,7 +5,10 @@ After=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory=/opt/ambar
-ExecStart=/opt/ambar/venv/bin/python /opt/ambar/tools/backup.py
+# --mirror: та же копия сразу разворачивается в запасную базу на этом же
+# сервере. Файл спасает данные, зеркало — работу: переключение сводится
+# к замене MONGO_URI на MONGO_URI_STANDBY и перезапуску сервисов.
+ExecStart=/opt/ambar/venv/bin/python /opt/ambar/tools/backup.py --mirror
 # Копия — не срочное дело: если сеть или Atlas тормозят, пусть ждёт, но не
 # висит вечно и не мешает боевым сервисам.
 TimeoutStartSec=900

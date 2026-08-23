@@ -41,15 +41,21 @@ KEEP_DAILY, KEEP_WEEKLY = 14, 8
 SKIP = {"qr_locks"}                             # живёт минуты, восстанавливать нечего
 
 
+def _env(name: str) -> str:
+    """Значение из окружения, а если его нет — из .env: скрипт живёт вне сервиса."""
+    val = os.getenv(name, "")
+    if val:
+        return val
+    env = os.path.join("/opt/ambar", ".env")
+    if os.path.exists(env):
+        for line in open(env, encoding="utf-8"):
+            if line.strip().startswith(name + "="):
+                return line.split("=", 1)[1].strip().strip('"').strip("'")
+    return ""
+
+
 def _uri():
-    uri = os.getenv("MONGO_URI", "")
-    if not uri:                                  # .env читаем сами: скрипт живёт вне сервиса
-        env = os.path.join("/opt/ambar", ".env")
-        if os.path.exists(env):
-            for line in open(env, encoding="utf-8"):
-                if line.strip().startswith("MONGO_URI="):
-                    uri = line.split("=", 1)[1].strip().strip('"').strip("'")
-                    break
+    uri = _env("MONGO_URI")
     if not uri:
         sys.exit("MONGO_URI не найден")
     return uri
@@ -119,10 +125,10 @@ def _rotate():
             print(f"  убрано старое: {os.path.basename(p)}")
 
 
-async def restore(path, into, yes):
+async def restore(path, into, yes, uri: str = ""):
     if into == "ambar" and not yes:
         sys.exit("Восстановление поверх боевой базы требует --yes")
-    cli = motor.motor_asyncio.AsyncIOMotorClient(_uri(), serverSelectionTimeoutMS=20000)
+    cli = motor.motor_asyncio.AsyncIOMotorClient(uri or _uri(), serverSelectionTimeoutMS=20000)
     db = cli[into]
     cur, batch, n, coll = None, [], 0, {}
     with gzip.open(path, "rt", encoding="utf-8") as f:
@@ -164,14 +170,28 @@ def main():
     ap.add_argument("--list", action="store_true")
     ap.add_argument("--restore")
     ap.add_argument("--into", default="ambar_restore_test")
+    ap.add_argument("--uri", default="", help="куда восстанавливать (по умолчанию — боевой кластер)")
     ap.add_argument("--yes", action="store_true")
+    ap.add_argument("--mirror", action="store_true",
+                    help="после копии залить её в запасную базу (MONGO_URI_STANDBY)")
     a = ap.parse_args()
     if a.list:
         show()
     elif a.restore:
-        asyncio.run(restore(a.restore, a.into, a.yes))
+        asyncio.run(restore(a.restore, a.into, a.yes, a.uri))
     else:
-        asyncio.run(dump())
+        path = asyncio.run(dump())
+        if a.mirror:
+            # Копия на диске защищает данные, но не работу: если кластер погасят,
+            # без запасной базы приложение просто встанет. Поэтому свежий дамп
+            # сразу разворачиваем в локальный mongod — переключение сводится к
+            # замене MONGO_URI и перезапуску сервисов.
+            tgt = _env("MONGO_URI_STANDBY")
+            if not tgt:
+                print("зеркало пропущено: MONGO_URI_STANDBY не задан")
+            else:
+                print("\nзеркалим в запасную базу…")
+                asyncio.run(restore(path, _db_name(tgt), yes=True, uri=tgt))
 
 
 if __name__ == "__main__":

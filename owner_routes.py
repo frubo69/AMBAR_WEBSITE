@@ -2965,15 +2965,25 @@ async def _cover_send(oid: int) -> None:
         "web_app": {"url": os.getenv("OWNER_WEBAPP_URL", "https://owner.ambar-delivery.com/")},
     }]]}
     img = Path(__file__).parent / "cover_game.jpg"
+
+    async def _try(markup):
+        if img.exists():
+            return await tg_send_photo_bytes(OWNER_BOT_TOKEN, oid, img.read_bytes(),
+                                             COVER_TEXT, parse_mode="Markdown",
+                                             reply_markup=markup)
+        return await tg_send(OWNER_BOT_TOKEN, oid, COVER_TEXT,
+                             parse_mode="Markdown", reply_markup=markup)
+
     res = None
     try:
-        if img.exists():
-            res = await tg_send_photo_bytes(OWNER_BOT_TOKEN, oid, img.read_bytes(),
-                                            COVER_TEXT, parse_mode="Markdown",
-                                            reply_markup=kb)
-        else:
-            res = await tg_send(OWNER_BOT_TOKEN, oid, COVER_TEXT,
-                                parse_mode="Markdown", reply_markup=kb)
+        res = await _try(kb)
+        # Кнопку с мини-аппом телеграм принимает не в любом окружении. Отказ
+        # из-за неё не должен оставлять чат вовсе без прикрытия: тогда шлём
+        # то же самое без кнопки.
+        if not (res or {}).get("ok"):
+            log.warning(f"[owner] прикрытие с кнопкой отклонено: "
+                        f"{(res or {}).get('description')}")
+            res = await _try(None)
     except Exception as e:
         log.error(f"[owner] прикрытие не отправлено: {e}")
         return

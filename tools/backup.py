@@ -27,7 +27,7 @@ import gzip
 import json
 import os
 import sys
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 
 sys.path.insert(0, "/opt/ambar")
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
@@ -36,6 +36,7 @@ from bson import json_util                      # noqa: E402
 import motor.motor_asyncio                      # noqa: E402
 
 DIR = os.getenv("AMBAR_BACKUP_DIR", "/opt/ambar/backups")
+KEEP_HOURS = 48                                 # последние двое суток — все копии
 KEEP_DAILY, KEEP_WEEKLY = 14, 8
 SKIP = {"qr_locks"}                             # живёт минуты, восстанавливать нечего
 
@@ -87,13 +88,31 @@ async def dump():
     return path
 
 
+def _stamp(path):
+    """Дата и время из имени файла: ambar-20260823-0006.jsonl.gz"""
+    return datetime.strptime(os.path.basename(path)[6:19], "%Y%m%d-%H%M")
+
+
 def _rotate():
-    """Оставляем 14 последних и 8 воскресных — остальное удаляем."""
+    """Двое суток целиком, дальше — по копии в день, дальше — по воскресеньям.
+
+    Копии снимаются раз в час, и «последние четырнадцать файлов» — это уже не
+    две недели, а полдня: считать надо по времени, а не по количеству. Место
+    не жмёт (копия — треть мегабайта), но свалка из тысячи файлов мешает найти
+    нужную дату."""
     files = sorted(glob.glob(os.path.join(DIR, "ambar-*.jsonl.gz")))
-    keep = set(files[-KEEP_DAILY:])
-    sundays = [p for p in files
-               if datetime.strptime(os.path.basename(p)[6:14], "%Y%m%d").weekday() == 6]
-    keep |= set(sundays[-KEEP_WEEKLY:])
+    if not files:
+        return
+    now = _stamp(files[-1])
+    keep = {p for p in files if now - _stamp(p) <= timedelta(hours=KEEP_HOURS)}
+    by_day = {}
+    for p in files:                                  # files отсортированы: остаётся
+        by_day[_stamp(p).date()] = p                 # последняя копия за день
+    for d in sorted(by_day)[-KEEP_DAILY:]:
+        keep.add(by_day[d])
+    sundays = {d: p for d, p in by_day.items() if d.weekday() == 6}
+    for d in sorted(sundays)[-KEEP_WEEKLY:]:
+        keep.add(sundays[d])
     for p in files:
         if p not in keep:
             os.remove(p)

@@ -28,9 +28,14 @@ SERVICES = ("ambar-api ambar-bot ambar-operator ambar-owner-bot "
             "ambar-driver-bot ambar-support ambar-promo-bot")
 
 
-def _val(s: str, key: str) -> str:
-    m = re.search(rf"^{key}=(.+)$", s, re.M)
-    return m.group(1).strip() if m else ""
+def _vals(s: str, key: str) -> list:
+    """Все значения ключа, а не первое.
+
+    В .env исторически лежат две строки MONGO_URI, и это не опечатка, которую
+    можно молча поправить в одном месте: dotenv берёт последнюю, а глазами
+    читается первая. Поэтому собираем все, а пишем ровно по одной строке на
+    ключ — иначе «переключил» и «переключилось» опять разойдутся."""
+    return [m.strip() for m in re.findall(rf"^{key}=(.+)$", s, re.M)]
 
 
 def _kind(uri: str) -> str:
@@ -46,6 +51,28 @@ def _label(uri: str) -> str:
             "atlas": "Atlas (облако)"}.get(_kind(uri), "неизвестно")
 
 
+def _write(s: str, key: str, value: str) -> str:
+    """Одна строка на ключ: первую заменяем, остальные убираем."""
+    seen = {"n": 0}
+
+    def sub(m):
+        seen["n"] += 1
+        return f"{key}={value}" if seen["n"] == 1 else None
+
+    out = []
+    for line in s.split("\n"):
+        if re.match(rf"^{key}=", line):
+            seen["n"] += 1
+            if seen["n"] == 1:
+                out.append(f"{key}={value}")
+            # повторные строки просто не переносим
+        else:
+            out.append(line)
+    if seen["n"] == 0:
+        out.append(f"{key}={value}")
+    return "\n".join(out)
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--swap", action="store_true", help="поменять местами")
@@ -53,31 +80,47 @@ def main():
     a = ap.parse_args()
 
     s = io.open(ENV, encoding="utf-8").read()
-    main_uri, spare_uri = _val(s, "MONGO_URI"), _val(s, "MONGO_URI_STANDBY")
-    if not main_uri or not spare_uri:
-        sys.exit("в .env нет пары MONGO_URI / MONGO_URI_STANDBY — ничего не трогаю")
+    mains, spares = _vals(s, "MONGO_URI"), _vals(s, "MONGO_URI_STANDBY")
+    if not mains:
+        sys.exit("в .env нет MONGO_URI — ничего не трогаю")
 
-    print(f"сейчас боевая:  {_label(main_uri)}")
-    print(f"сейчас зеркало: {_label(spare_uri)}")
+    # Действует последняя строка — так читает dotenv, так работает приложение.
+    effective = mains[-1]
+    known = {}
+    for uri in mains + spares:
+        k = _kind(uri)
+        if k != "?":
+            known[k] = uri
+    if len(mains) > 1:
+        print(f"внимание: строк MONGO_URI в .env — {len(mains)}, действует последняя")
+    print(f"сейчас боевая:  {_label(effective)}")
+    if spares:
+        print(f"сейчас зеркало: {_label(spares[-1])}")
 
     if not (a.swap or a.to):
         print("\nничего не менял. Для смены: --swap или --to local|atlas")
         return
-    if a.to and _kind(main_uri) == a.to:
-        print(f"\nбоевая уже {_label(main_uri)} — менять нечего")
+
+    target = a.to or ("atlas" if _kind(effective) == "local" else "local")
+    other = "atlas" if target == "local" else "local"
+    if target not in known:
+        sys.exit(f"строки подключения к «{target}» в .env нет — не могу переключить")
+    if other not in known:
+        sys.exit(f"строки подключения к «{other}» в .env нет — не на что менять зеркало")
+    if _kind(effective) == target and len(mains) == 1:
+        print(f"\nбоевая уже {_label(effective)} — менять нечего")
         return
-    if _kind(main_uri) == "?" or _kind(spare_uri) == "?":
-        sys.exit("не могу опознать одну из строк подключения — не трогаю")
 
     bak = f"{ENV}.bak-{datetime.now().strftime('%Y%m%d-%H%M%S')}"
     shutil.copy2(ENV, bak)
-    s = re.sub(r"^MONGO_URI=.*$", "MONGO_URI=" + spare_uri, s, count=1, flags=re.M)
-    s = re.sub(r"^MONGO_URI_STANDBY=.*$", "MONGO_URI_STANDBY=" + main_uri, s, count=1, flags=re.M)
+    s = _write(s, "MONGO_URI", known[target])
+    s = _write(s, "MONGO_URI_STANDBY", known[other])
     io.open(ENV, "w", encoding="utf-8").write(s)
     os.chmod(ENV, 0o600)
 
-    print(f"\nстало боевой:   {_label(spare_uri)}")
-    print(f"стало зеркалом: {_label(main_uri)}")
+    after = _vals(io.open(ENV, encoding="utf-8").read(), "MONGO_URI")
+    print(f"\nстало боевой:   {_label(after[-1])}  (строк MONGO_URI: {len(after)})")
+    print(f"стало зеркалом: {_label(known[other])}")
     print(f"копия прежнего .env: {bak}")
     print(f"\nтеперь перезапусти сервисы:\n  systemctl restart {SERVICES}")
 

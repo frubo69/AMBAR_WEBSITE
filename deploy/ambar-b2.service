@@ -1,0 +1,11 @@
+[Unit]
+Description=AMBAR — копия базы в хранилище Backblaze B2
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/ambar
+ExecStart=/opt/ambar/venv/bin/python /opt/ambar/tools/b2_upload.py
+TimeoutStartSec=600
+Nice=15
+IOSchedulingClass=idle

@@ -436,8 +436,11 @@ async def _drivers_spend(start, end) -> dict:
     Дни здесь учётные, а не календарные: driver_days пишется тем же учётным
     днём, что и заказы, поэтому окно берём по его границам."""
     import config_staff as _staff
-    d_from = start.strftime("%Y-%m-%d")
-    d_to = (end - timedelta(seconds=1)).strftime("%Y-%m-%d")
+    # Окно приходит в часах (12:00 → 12:00), а driver_days подписан учётным
+    # днём. Форматировать границы как календарные даты нельзя: сутки лежат на
+    # двух датах, и один день считался бы дважды — ровно это и произошло.
+    d_from = _biz_day_start(start).strftime("%Y-%m-%d")
+    d_to = _biz_day_start(end - timedelta(seconds=1)).strftime("%Y-%m-%d")
     try:
         rows = await db.get_driver_days_range(d_from, d_to)
     except Exception as e:

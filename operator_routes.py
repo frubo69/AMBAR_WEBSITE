@@ -2135,6 +2135,13 @@ async def _shift_state(day, districts: list, scope: set) -> dict:
             "closed_by": (c or {}).get("by_name") or "",
             "open": len(open_now),
             "open_ids": [o.get("order_id") for o in open_now][:12],
+            # Заказ в пути — не то же самое, что незакрытый. Висящий с вечера
+            # непринятый заказ закрыть смену не мешает, а тот, что человек
+            # сейчас везёт, — мешает: смена закрыта, а бутылка едет.
+            "in_route": len([o for o in mine if _lane(o) == "work"]),
+            "in_route_ids": [o.get("order_id") for o in mine if _lane(o) == "work"][:12],
+            "in_route_drivers": sorted({(o.get("driver") or "").strip()
+                                        for o in mine if _lane(o) == "work"} - {""}),
             "orders": len(done),
             "revenue": sum(int(o.get("total") or 0) for o in done),
             "silent": [n for n in _staff_mod.DISTRICT_DRIVERS.get(d["id"], [])
@@ -2423,6 +2430,15 @@ async def handle_shift_close(request):
     if not mine:
         return web.json_response({"error": "unknown_district"}, status=400,
                                  headers=CORS_HEADERS)
+    # Пока по району что-то едет, смену не закрываем. Это не формальность:
+    # после закрытия по заказу нельзя отметить доставку, и он повисает между
+    # выручкой и потерей.
+    if mine.get("in_route"):
+        return web.json_response(
+            {"error": "orders_in_route", "count": mine["in_route"],
+             "ids": mine.get("in_route_ids") or [],
+             "drivers": mine.get("in_route_drivers") or []},
+            status=409, headers=CORS_HEADERS)
     ok = await db.shift_close(day.isoformat(), oid, {
         "closed_at": datetime.now(timezone.utc), "by": request.get("op_id") or 0,
         "by_name": who, "operator": mine["operator"],

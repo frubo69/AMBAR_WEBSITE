@@ -3405,6 +3405,14 @@ function _dayRu(iso){
 async function shiftClose(oid){
   if(SHIFT_BUSY) return;
   const x = (SHIFT.districts || []).find(d => d.district === oid);
+  // Заказ в пути — не предупреждение, а запрет: после закрытия смены по нему
+  // нельзя отметить доставку, и он повисает между выручкой и потерей.
+  if(x && x.in_route){
+    toast(`${x.in_route} ${plural(x.in_route,'заказ','заказа','заказов')} в пути — `
+        + `сначала отметьте доставку`, 'err');
+    haptic('medium');
+    return;
+  }
   if(x && x.open && !confirm(`В районе ${x.code} ${x.open} ${plural(x.open,'заказ','заказа','заказов')} `
       + `не закрыт. Всё равно закрыть смену?`)) return;
   SHIFT_BUSY = true;
@@ -3415,7 +3423,17 @@ async function shiftClose(oid){
     toast(r.all_closed ? 'Смена закрыта у всех — заявка ушла старшему'
                        : `Смена закрыта · ${_num(r.revenue)} AED`, 'ok');
     await shiftOpen();
-  }catch(e){ toast('Не удалось закрыть', 'err'); }
+  }catch(e){
+    const p = (e && e.payload) || {};
+    if(p.error === 'orders_in_route'){
+      const ids = (p.ids || []).slice(0, 3).map(i => '#' + i).join(', ');
+      toast(`${p.count || (p.ids||[]).length} в пути${ids ? ': ' + ids : ''} — `
+          + `сначала отметьте доставку`, 'err');
+      await shiftOpen();
+    } else {
+      toast('Не удалось закрыть', 'err');
+    }
+  }
   finally{ SHIFT_BUSY = false; }
 }
 

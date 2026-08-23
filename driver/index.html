@@ -2517,19 +2517,32 @@ async function shOpen(){
 function shBar(){
   if(!SH || !SH.opened || SH.closed) return '';
   const left = SH.must || [];
+  const route = SH.in_route || [];
+  const stop = left.length || route.length;
   return `<div class="shbar">
     <span class="shbar-b">
       <span class="shbar-t">Смена идёт с ${hhmm(SH.opened_at)}</span>
-      <span class="shbar-s">${left.length
-        ? `<b>ответьте про ${esc(_shAsk(SH.must))}</b> — без этого не закрыть`
-        : 'всё заполнено, можно закрывать'}</span>
+      <span class="shbar-s">${route.length
+        ? `<b>${route.length} ${plural(route.length,'заказ','заказа','заказов')} в пути</b> — сначала доставка`
+        : (left.length
+          ? `<b>ответьте про ${esc(_shAsk(SH.must))}</b> — без этого не закрыть`
+          : 'всё заполнено, можно закрывать')}</span>
     </span>
-    <button class="shbar-go ${left.length ? '' : 'ok'}" onclick="shClose()">Закрыть</button>
+    <button class="shbar-go ${stop ? '' : 'ok'}" onclick="shClose()">Закрыть</button>
   </div>`;
 }
 
 async function shClose(){
   if(!SH) return;
+  // Пока заказ едет, смену не закрываем: после закрытия отметить доставку
+  // будет нельзя, и заказ повиснет ни доставленным, ни отменённым.
+  const route = SH.in_route || [];
+  if(route.length){
+    toast(`${route.length} ${plural(route.length,'заказ','заказа','заказов')} в пути — `
+        + `сначала отметьте доставку`, 'err');
+    try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+    return;
+  }
   const left = SH.must || [];
   if(left.length){
     toast(`Сначала ответьте про ${_shAsk(left)}`, 'err');
@@ -2549,8 +2562,12 @@ async function shCloseGo(){
     toast('Смена закрыта');
     shPaint();
   }catch(e){
-    const err = (e.payload || {}).error;
-    toast(err === 'expenses_left' ? 'Сначала ответьте по расходам' : 'Не получилось', 'err');
+    const p = e.payload || {};
+    const msg = p.error === 'expenses_left' ? 'Сначала ответьте по расходам'
+              : p.error === 'orders_in_route'
+                ? `У вас ${(p.ids||[]).length} ${plural((p.ids||[]).length,'заказ','заказа','заказов')} в пути — сначала отметьте доставку`
+                : 'Не получилось';
+    toast(msg, 'err');
     await shLoad();
   }
 }
@@ -3526,8 +3543,12 @@ function renderShift(){
 
     <div class="shbtn">
       ${on
-        ? `<button class="btn btn-pri" style="width:100%" ${must.length ? 'disabled' : ''}
-             onclick="shClose()">Закрыть смену</button>`
+        ? `<button class="btn btn-pri" style="width:100%"
+             ${(must.length || (SH.in_route||[]).length) ? 'disabled' : ''}
+             onclick="shClose()">Закрыть смену</button>
+           ${(SH.in_route||[]).length ? `<div class="shd" style="margin-top:8px">
+             ${(SH.in_route||[]).length} ${plural((SH.in_route||[]).length,'заказ','заказа','заказов')}
+             в пути — смена закроется, когда отметите доставку</div>` : ''}`
         : `<button class="btn btn-pri" style="width:100%"
              ${(SH.working === true && geo.ok) ? '' : 'disabled'}
              onclick="shOpen()">${SH.closed ? 'Открыть смену снова' : 'Открыть смену'}</button>`}

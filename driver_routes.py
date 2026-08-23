@@ -247,20 +247,40 @@ def _must_left(d: dict) -> list:
             if not no.get(k) and not any(_kind_of(x) == k for x in extras)]
 
 
+async def _in_route(me: dict) -> list:
+    """Заказы, которые водитель прямо сейчас везёт.
+
+    Смену с ними закрывать нельзя: после закрытия отметить доставку уже не
+    получится, и заказ повиснет — ни выручки, ни отказа."""
+    day = _biz_day()
+    start = datetime.strptime(day, "%Y-%m-%d").replace(hour=SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
+    f = lambda x: x.astimezone(timezone.utc).isoformat().replace("+00:00", "")
+    try:
+        orders = await db.get_orders_in_range(f(start), f(start + timedelta(days=1)))
+    except Exception as e:
+        log.warning(f"[driver] заказы в пути не прочитаны: {e}")
+        return []
+    return [o.get("order_id") for o in orders
+            if (o.get("driver") or "").strip() == me["name"]
+            and o.get("status") == "approved"]
+
+
 async def _shift_view(me: dict) -> dict:
     day = _biz_day()
     d = await db.get_driver_day(day, me["name"]) or {}
     geo = await _geo_state(me["name"])
     must = _must_left(d)
     opened, closed = d.get("shift_open_at"), d.get("shift_close_at")
+    route = await _in_route(me) if opened and not closed else []
     return {
         "day": day, "working": d.get("working"),
         "opened": bool(opened), "opened_at": _iso_at(opened),
         "closed": bool(closed), "closed_at": _iso_at(closed),
         "geo": geo, "must": must,
         "must_names": [EXPENSE_KINDS.get(k) or k for k in must],
+        "in_route": route,
         "can_open": d.get("working") is True and geo["ok"] and not opened,
-        "can_close": bool(opened) and not closed and not must,
+        "can_close": bool(opened) and not closed and not must and not route,
     }
 
 
@@ -305,6 +325,10 @@ async def handle_shift_close(request):
     must = _must_left(d)
     if must:
         return web.json_response({"error": "expenses_left", "must": must},
+                                 status=409, headers=CORS_HEADERS)
+    route = await _in_route(me)
+    if route:
+        return web.json_response({"error": "orders_in_route", "ids": route},
                                  status=409, headers=CORS_HEADERS)
     await db.save_driver_day(day, me["name"], {"shift_close_at": datetime.now(timezone.utc)})
     log.info(f"[driver] {me['name']}: смена закрыта")

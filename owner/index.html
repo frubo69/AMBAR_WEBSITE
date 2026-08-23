@@ -804,6 +804,96 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .dt-team-h{font-size:10px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted);
   padding:12px 2px 9px;margin-top:4px;border-top:1px solid var(--border2)}
 .dt-team-s{font-size:10px;color:var(--muted);margin:-6px 0 9px 2px}
+
+/* ── Карточка района ──────────────────────────────────────────────────────
+   Один экран должен отвечать на четыре вопроса подряд: сколько денег, что
+   происходит прямо сейчас, кто на районе и как он работает. Всё остальное —
+   ниже, для тех, кто пришёл разбираться. Поэтому шапка не «ещё одна карточка»,
+   а единственное крупное пятно, а показатели под ней читаются одним взглядом,
+   без строчек-списков. */
+.ofd-hero{position:relative;overflow:hidden;background:
+    radial-gradient(120% 140% at 50% -20%, var(--tone-soft, rgba(201,169,110,.16)) 0%, transparent 62%),
+    var(--card);
+  border:1px solid var(--border);border-radius:16px;padding:22px 16px 0;margin-bottom:10px}
+.ofd-hero::after{content:'';position:absolute;left:0;right:0;top:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--tone,var(--gold2)),transparent);opacity:.5}
+.ofd-sum{display:flex;align-items:baseline;justify-content:center;gap:8px}
+.ofd-sum b{font-family:'DM Sans',sans-serif;font-size:44px;font-weight:700;line-height:1;
+  letter-spacing:-1.4px;color:var(--gold2);font-variant-numeric:lining-nums tabular-nums}
+.ofd-sum i{font-style:normal;font-size:13px;font-weight:600;color:var(--muted);letter-spacing:.6px}
+.ofd-delta{display:flex;justify-content:center;align-items:center;gap:7px;margin-top:9px;
+  font-size:11.5px;color:var(--muted)}
+.ofd-chip{display:inline-flex;align-items:center;gap:4px;padding:3px 9px;border-radius:99px;
+  font-size:11px;font-weight:700;letter-spacing:.2px;background:rgba(255,255,255,.05);color:var(--sub)}
+.ofd-chip.up{background:var(--up-soft);color:var(--up)}
+.ofd-chip.dn{background:var(--dn-soft);color:var(--dn)}
+.ofd-kpi{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));margin:18px -16px 0;
+  border-top:1px solid var(--border2)}
+.ofd-kpi > div{padding:12px 6px 13px;text-align:center;border-right:1px solid var(--border2)}
+.ofd-kpi > div:last-child{border-right:none}
+.ofd-kpi b{display:block;font-family:'DM Sans',sans-serif;font-size:19px;font-weight:700;
+  line-height:1;letter-spacing:-.4px;color:var(--text);font-variant-numeric:tabular-nums}
+.ofd-kpi b.warn{color:var(--warn)} .ofd-kpi b.dim{color:var(--muted)}
+.ofd-kpi span{display:block;margin-top:6px;font-size:9.5px;letter-spacing:1.1px;
+  text-transform:uppercase;color:var(--muted)}
+
+/* Живая строка: показывается, только когда прямо сейчас что-то происходит.
+   Пустой «0 в пути» — это шум, который учит не читать эту строку вовсе. */
+.ofd-live{display:flex;align-items:center;gap:9px;padding:11px 14px;margin-bottom:10px;
+  border-radius:12px;background:var(--info-soft);border:1px solid rgba(91,141,239,.22);
+  font-size:12.5px;color:var(--text)}
+.ofd-live .dot{width:7px;height:7px;border-radius:50%;background:var(--info);flex:0 0 auto;
+  box-shadow:0 0 0 0 rgba(91,141,239,.6);animation:ofdPulse 2s infinite}
+@keyframes ofdPulse{70%{box-shadow:0 0 0 7px rgba(91,141,239,0)}100%{box-shadow:0 0 0 0 rgba(91,141,239,0)}}
+.ofd-live b{font-weight:700} .ofd-live span{color:var(--muted)}
+
+/* Человек в списке: кружок с инициалом вместо иконки — так строка читается
+   как «кто», а не как «ещё один пункт». Полоса внизу строки — доля выручки,
+   и она же убирает нужду в отдельном столбце с процентами. */
+.ofd-p{position:relative;display:flex;align-items:center;gap:11px;padding:11px 13px;
+  border-bottom:1px solid var(--border2)}
+.ofd-p:last-child{border-bottom:none}
+.ofd-p[data-detail]{cursor:pointer}
+.ofd-p[data-detail]:active{background:rgba(255,255,255,.03)}
+.ofd-av{flex:0 0 auto;width:30px;height:30px;border-radius:50%;display:grid;place-items:center;
+  font-size:12px;font-weight:700;letter-spacing:.2px;background:rgba(255,255,255,.06);color:var(--sub)}
+.ofd-av.op{background:rgba(201,169,110,.14);color:var(--gold2)}
+.ofd-p-b{flex:1;min-width:0}
+.ofd-p-n{font-size:13.5px;font-weight:600;color:var(--text);white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.ofd-p-s{font-size:10.5px;color:var(--muted);margin-top:2px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.ofd-p-v{font-size:13px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;
+  white-space:nowrap}
+.ofd-p-v.dim{color:var(--dim);font-weight:600}
+.ofd-p-line{position:absolute;left:0;bottom:0;height:2px;background:var(--gold);opacity:.5;
+  transition:width .4s var(--e1)}
+.ofd-chev{color:var(--dim);font-size:15px;flex:0 0 auto}
+
+/* Доли: одна полоса вместо двух столбиков. Видно не «сколько у каждого», а
+   «как это делится» — вопрос, который на самом деле и задают. */
+.ofd-split{padding:13px 14px;border-bottom:1px solid var(--border2)}
+.ofd-split:last-child{border-bottom:none}
+.ofd-split-t{font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);
+  margin-bottom:9px}
+.ofd-track{display:flex;height:8px;border-radius:99px;overflow:hidden;background:rgba(255,255,255,.05)}
+.ofd-seg{height:100%;transition:width .45s var(--e1)}
+.ofd-seg.a{background:linear-gradient(90deg,var(--gold),var(--gold2))}
+.ofd-seg.b{background:var(--info)}
+.ofd-seg.c{background:var(--up)}
+.ofd-legend{display:flex;flex-wrap:wrap;gap:6px 14px;margin-top:9px;font-size:11.5px;color:var(--sub)}
+.ofd-legend > span{display:inline-flex;align-items:center;gap:6px}
+.ofd-dot{width:7px;height:7px;border-radius:2px;flex:0 0 auto}
+.ofd-dot.a{background:var(--gold2)} .ofd-dot.b{background:var(--info)} .ofd-dot.c{background:var(--up)}
+.ofd-legend b{color:var(--text);font-weight:700;font-variant-numeric:tabular-nums}
+.ofd-legend i{font-style:normal;color:var(--dim)}
+
+/* Топ позиций: номер вместо иконки — короче, честнее и не требует иконок,
+   которых у товаров нет. */
+.ofd-num{flex:0 0 auto;width:22px;height:22px;border-radius:7px;display:grid;place-items:center;
+  font-size:10.5px;font-weight:700;background:rgba(255,255,255,.05);color:var(--muted)}
+.ofd-num.top{background:rgba(201,169,110,.16);color:var(--gold2)}
+.ofd-empty{padding:16px 14px;text-align:center;font-size:12px;color:var(--muted)}
 .dt-row-t svg,.bar-lbl svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.7;
   stroke-linecap:round;stroke-linejoin:round;opacity:.55;vertical-align:-1px;margin-right:2px}
 .office-badge{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:#0a0a14;flex-shrink:0}
@@ -6948,24 +7038,47 @@ async function _officeLoad(id){
   _setText('offDetName', d.name);
   _setText('offDetSub', `${lbl} · ${d.orders.delivered} доставлено из ${d.orders.total}`);
 
-  const row = (l, r, color) =>
-    `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${l}</div></div>`+
-    `<div class="dt-row-r"${color?` style="color:${color}"`:''}>${r}</div></div>`;
   const money = v => `<span data-aed="${v||0}">${v||0}</span> AED`;
-  const bar = (name, val, max, cls) =>
-    `<div class="bar-row"><span class="bar-lbl" style="width:auto;min-width:108px;white-space:nowrap">${escS(name)}</span>`+
-    `<div class="bar-track"><div class="bar-fill ${cls||''}" style="width:${max?Math.round(val/max*100):0}%"></div></div>`+
-    `<span class="bar-val">${money(val)}</span></div>`;
+  const init = n => escS(String(n||'—').trim().charAt(0).toUpperCase() || '—');
+  const pct = (v, t) => t > 0 ? Math.round(v / t * 100) : 0;
 
   const dl = d.delivery, rt = d.rating, ch = d.by_channel, pm = d.by_method;
-  const chMax = Math.max(1, ch.app.aed, ch.phone.aed);
-  const pmMax = Math.max(1, pm.crypto.aed, pm.cash.aed);
-  const stars = [5,4,3,2,1].filter(s => rt.dist[s]);
 
-  // Состав района. Раньше здесь были только водители с доставками за период —
-  // человек без заказов пропадал, и было не понять, он не работал или его на
-  // районе нет. Теперь список из расписания, а цифры подставляются тем, у кого
-  // они есть.
+  // Человек в списке: кружок с инициалом, имя, чем занимался, сколько привёз.
+  // Полоса под строкой — доля от лучшего: она заменяет столбец с процентами,
+  // который никто не читает.
+  const person = (name, sub, right, opts) => {
+    const o = opts || {};
+    return `<div class="ofd-p"${o.detail ? ` data-detail="${escS(o.detail)}"` : ''}>
+      <div class="ofd-av${o.op ? ' op' : ''}">${init(name)}</div>
+      <div class="ofd-p-b">
+        <div class="ofd-p-n">${escS(name)}</div>
+        <div class="ofd-p-s">${sub}</div>
+      </div>
+      ${right || ''}
+      ${o.detail ? '<div class="ofd-chev">\u203A</div>' : ''}
+      ${o.line ? `<div class="ofd-p-line" style="width:${o.line}%"></div>` : ''}
+    </div>`;
+  };
+
+  // Доли одной полосой: вопрос к этому блоку всегда «как делится», а не
+  // «сколько абсолютно» — абсолютное стоит рядом в легенде.
+  const split = (title, parts) => {
+    const tot = parts.reduce((s, x) => s + (x.v || 0), 0);
+    // Полоса из нулей — это не «поровну», это «данных нет». Рисовать её значит
+    // врать точной цифрой 0% там, где считать нечего.
+    if(!tot) return `<div class="ofd-split"><div class="ofd-split-t">${title}</div>
+      <div class="ofd-p-s" style="margin:2px 0 0">за период нет данных</div></div>`;
+    return `<div class="ofd-split">
+      <div class="ofd-split-t">${title}</div>
+      <div class="ofd-track">${parts.map(x =>
+        `<div class="ofd-seg ${x.k}" style="width:${pct(x.v, tot)}%"></div>`).join('')}</div>
+      <div class="ofd-legend">${parts.map(x =>
+        `<span><i class="ofd-dot ${x.k}"></i>${escS(x.name)}
+          <b>${pct(x.v, tot)}%</b>${x.note ? ` <i>${x.note}</i>` : ''}</span>`).join('')}</div>
+    </div>`;
+  };
+
   const team = d.team || {};
   const byName = {};
   (d.drivers || []).forEach(x => { byName[x.name] = x; });
@@ -6975,89 +7088,98 @@ async function _officeLoad(id){
   (d.drivers || []).forEach(x => {
     if(!roster.some(r => r.name === x.name)) roster.push({...x, extra:true});
   });
+
   let teamHtml = '';
   if(team.operator || roster.length){
     const dMax = Math.max(1, ...roster.map(x => x.aed || 0));
     teamHtml = `<div class="dt-sect">Команда</div><div class="dt-card">`;
     if(team.operator){
-      teamHtml += `<div class="dt-row" data-detail="operator:${escS(team.operator.id)}">
-        <div class="dt-row-l"><div class="dt-row-t">${ICO_OP} ${escS(team.operator.name)}</div>
-        <div class="dt-row-s">оператор района</div></div>
-        <div class="dt-row-r" style="color:var(--muted);font-size:15px">\u203A</div></div>`;
+      teamHtml += person(team.operator.name, 'оператор района', '',
+                         {op:true, detail:'operator:' + team.operator.id});
     }
     (team.seniors || []).forEach(x => {
-      teamHtml += `<div class="dt-row" data-detail="operator:${escS(x.id)}">
-        <div class="dt-row-l"><div class="dt-row-t">${ICO_OP} ${escS(x.name)}</div>
-        <div class="dt-row-s">старший — принимает входящие по всем районам</div></div>
-        <div class="dt-row-r" style="color:var(--muted);font-size:15px">\u203A</div></div>`;
+      teamHtml += person(x.name, 'старший \u00b7 входящие по всем районам', '',
+                         {op:true, detail:'operator:' + x.id});
     });
-    if(roster.length){
-      teamHtml += `<div class="dt-team-h">Водители</div>` + roster.map(x => `
-        <div class="bar-row"><span class="bar-lbl" style="width:auto;min-width:108px;white-space:nowrap">${ICO_CAR} ${escS(x.name)}</span>
-          <div class="bar-track"><div class="bar-fill" style="width:${Math.round((x.aed||0)/dMax*100)}%"></div></div>
-          <span class="bar-val">${money(x.aed||0)}</span></div>
-        <div class="dt-team-s">${x.orders
-            ? `${x.orders} ${pluralize(x.orders,'заказ','заказа','заказов')}`
-            : 'нет доставок за период'}${x.extra ? ' · обычно не на этом районе' : ''}${
-            x.has_login === false ? ' · нет входа в приложение' : ''}</div>`).join('');
-    }
+    roster.forEach(x => {
+      const sub = [
+        x.orders ? `${x.orders} ${pluralize(x.orders,'заказ','заказа','заказов')}` : 'без доставок',
+        x.extra ? 'подменял' : '',
+        x.has_login === false ? 'не заходил в приложение' : '',
+      ].filter(Boolean).join(' \u00b7 ');
+      const val = `<div class="ofd-p-v${x.aed ? '' : ' dim'}">${x.aed ? money(x.aed) : '—'}</div>`;
+      teamHtml += person(x.name, sub, val, {line: Math.round((x.aed || 0) / dMax * 100)});
+    });
     teamHtml += `</div>`;
   }
 
+  const dlt = d.revenue.delta_pct;
+  const tone = OFF_TONES[id] || 'var(--gold2)';
+  const live = (d.orders.in_route || 0) + (d.orders.pending || 0);
 
   let html = `
-    <div style="padding:20px 16px;text-align:center;background:var(--card);border:1px solid var(--border2);border-radius:14px;margin-bottom:8px">
-      <div class="dt-stat-val gold" style="font-size:42px;line-height:1"><span data-aed="${d.revenue.current}">${d.revenue.current}</span><span class="u" style="font-size:15px;margin-left:8px">AED</span></div>
-      <div style="margin-top:10px;font-size:12px;color:var(--muted)">
-        <span class="delta ${d.revenue.delta_pct>0?'up':(d.revenue.delta_pct<0?'dn':'')}">${d.revenue.delta_label}</span>
-        · пред. период <span data-aed="${d.revenue.previous}">${d.revenue.previous}</span> AED
+    <div class="ofd-hero" style="--tone:${tone}">
+      <div class="ofd-sum">
+        <b data-aed="${d.revenue.current}">${d.revenue.current}</b><i>AED</i>
+      </div>
+      <div class="ofd-delta">
+        <span class="ofd-chip ${dlt > 0 ? 'up' : (dlt < 0 ? 'dn' : '')}">${escS(d.revenue.delta_label)}</span>
+        <span>пред. период <span data-aed="${d.revenue.previous}">${d.revenue.previous}</span> AED</span>
+      </div>
+      <div class="ofd-kpi">
+        <div><b>${d.orders.delivered}</b><span>доставлено</span></div>
+        <div><b data-aed="${d.avg_check||0}">${d.avg_check||0}</b><span>средний чек</span></div>
+        <div><b class="${!dl.sample ? 'dim' : (dl.avg_min > 40 ? 'warn' : '')}">${
+          dl.sample ? dl.avg_min + ' мин' : '—'}</b><span>время доставки</span></div>
       </div>
     </div>
+
+    ${live ? `<div class="ofd-live"><span class="dot"></span>
+      <div>${d.orders.in_route ? `<b>${d.orders.in_route}</b> в пути` : ''}${
+        d.orders.in_route && d.orders.pending ? ' \u00b7 ' : ''}${
+        d.orders.pending ? `<b>${d.orders.pending}</b> ждут оператора` : ''}
+        <span>&nbsp;сейчас</span></div></div>` : ''}
+
     ${teamHtml}
-    <div class="dt-sect">Заказы</div>
+
+    <div class="dt-sect">Как шли заказы</div>
     <div class="dt-card">
-      ${row('Доставлено', d.orders.delivered, 'var(--up)')}
-      ${row('Отменено / отклонено', d.orders.cancelled, d.orders.cancelled?'var(--dn)':'')}
-      ${row('Средний чек', money(d.avg_check))}
-      ${(d.orders.pending||d.orders.in_route) ? row('Сейчас в работе', `${d.orders.pending} ждут · ${d.orders.in_route} в пути`, 'var(--info)') : ''}
+      ${split('Откуда', [
+        {k:'a', name:'Приложение', v:ch.app.aed,   note:`${ch.app.count} шт`},
+        {k:'b', name:'Телефон',    v:ch.phone.aed, note:`${ch.phone.count} шт`},
+      ])}
+      ${split('Чем платили', [
+        {k:'a', name:'Наличные', v:pm.cash.aed,   note:money(pm.cash.aed)},
+        {k:'c', name:'Крипта',   v:pm.crypto.aed, note:money(pm.crypto.aed)},
+      ])}
     </div>
 
-    <div class="dt-sect">Каналы</div>
+    <div class="dt-sect">Качество</div>
     <div class="dt-card">
-      ${bar(IC('mobile',13)+' Приложение', ch.app.aed, chMax)}
-      ${bar(IC('phone',13)+' Телефон', ch.phone.aed, chMax, 'info')}
-      <div style="font-size:11px;color:var(--muted);text-align:center;padding-top:8px;border-top:1px solid var(--border2);margin-top:4px">
-        ${ch.app.count} заказов через приложение · ${ch.phone.count} по телефону
-      </div>
-    </div>
-
-    <div class="dt-sect">Оплата</div>
-    <div class="dt-card">
-      ${bar(IC('cash',13)+' Наличные', pm.cash.aed, pmMax)}
-      ${bar(IC('gem',13)+' Крипта', pm.crypto.aed, pmMax, 'up')}
-    </div>
-
-    <div class="dt-sect">Скорость доставки</div>
-    <div class="dt-card">
-      ${dl.sample
-        ? row('Среднее время', `${dl.avg_min} мин`, dl.avg_min>40?'var(--warn)':'var(--up)') +
-          row('Опоздания', `${dl.late_count} (${dl.late_pct}%)`, dl.late_count?'var(--warn)':'var(--muted)') +
-          row('Замеров', dl.sample, 'var(--muted)')
-        : row('Замеров пока нет', '—', 'var(--muted)')}
+      ${dl.sample ? `
+        <div class="ofd-p"><div class="ofd-p-b"><div class="ofd-p-n">Опоздания</div>
+          <div class="ofd-p-s">дольше обещанного больше чем на 5 минут</div></div>
+          <div class="ofd-p-v" style="color:${dl.late_count ? 'var(--warn)' : 'var(--up)'}">${
+            dl.late_count} <span style="color:var(--dim);font-weight:600">из ${dl.sample}</span></div></div>` : ''}
+      ${rt.count ? `
+        <div class="ofd-p"><div class="ofd-p-b"><div class="ofd-p-n">Оценка клиентов</div>
+          <div class="ofd-p-s">${rt.count} ${pluralize(rt.count,'отзыв','отзыва','отзывов')} за период</div></div>
+          <div class="ofd-p-v" style="color:var(--gold2)">\u2605 ${rt.avg}</div></div>` : ''}
+      ${(!dl.sample && !rt.count) ? '<div class="ofd-empty">За период нет ни замеров времени, ни отзывов</div>' : ''}
+      ${d.orders.cancelled ? `
+        <div class="ofd-p"><div class="ofd-p-b"><div class="ofd-p-n">Отменено и отклонено</div>
+          <div class="ofd-p-s">из ${d.orders.total} ${pluralize(d.orders.total,'заказа','заказов','заказов')} за период</div></div>
+          <div class="ofd-p-v" style="color:var(--dn)">${d.orders.cancelled}</div></div>` : ''}
     </div>`;
-
-  if(rt.count){
-    html += `<div class="dt-sect">Рейтинг</div><div class="dt-card">
-      ${row('Средняя оценка', `★ ${rt.avg}`, 'var(--up)')}
-      ${stars.map(s => row('★'.repeat(s), rt.dist[s])).join('')}
-      ${row('Отзывов', rt.count, 'var(--muted)')}
-    </div>`;
-  }
 
   if((d.top_items||[]).length){
-    html += `<div class="dt-sect">Топ позиций</div><div class="dt-card">
-      ${d.top_items.map(i => `<div class="dt-row"${i.id?` data-detail="product:${escS(i.id)}"`:''}><div class="dt-row-l"><div class="dt-row-t">${escS(i.name)}</div>
-        <div class="dt-row-s">${i.qty} шт</div></div><div class="dt-row-r gold">${money(i.aed)}</div></div>`).join('')}
+    html += `<div class="dt-sect">Что берут</div><div class="dt-card">
+      ${d.top_items.map((i, n) => `<div class="ofd-p"${i.id?` data-detail="product:${escS(i.id)}"`:''}>
+        <div class="ofd-num${n === 0 ? ' top' : ''}">${n + 1}</div>
+        <div class="ofd-p-b"><div class="ofd-p-n">${escS(i.name)}</div>
+          <div class="ofd-p-s">${i.qty} шт</div></div>
+        <div class="ofd-p-v" style="color:var(--gold2)">${money(i.aed)}</div>
+        ${i.id ? '<div class="ofd-chev">\u203A</div>' : ''}</div>`).join('')}
     </div>`;
   }
 

@@ -156,6 +156,14 @@ def main():
         r = upload(enc, a)
         print(f"отправлено: {r['fileName']} · {r['contentLength']/1024:.0f} КБ · "
               f"нельзя удалить до {r['_retain_until'].strftime('%d.%m.%Y')}")
+        # Отметка для сторожа: ходить в B2 каждые десять минут ради проверки —
+        # лишний трафик и лишние ключи в лишнем месте, а дата файла говорит
+        # ровно то же самое.
+        try:
+            open(os.path.join(ROOT, ".b2-last"), "w").write(
+                datetime.now(timezone.utc).isoformat())
+        except OSError:
+            pass
     finally:
         try:
             os.unlink(enc)

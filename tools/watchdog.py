@@ -87,6 +87,23 @@ def check_backup() -> list:
     return []
 
 
+def check_offsite() -> list:
+    """Копия наружу уходит четыре раза в сутки. Если её нет больше суток —
+    третьего места у нас фактически не осталось, и знать об этом надо до того,
+    как оно понадобится."""
+    stamp = ROOT / ".b2-last"
+    if not stamp.exists():
+        return []                      # выгрузка ещё не настроена — не шумим
+    try:
+        at = datetime.fromisoformat(stamp.read_text().strip())
+    except Exception:
+        return ["не разобрать отметку о выгрузке в хранилище"]
+    hours = (datetime.now(timezone.utc) - at).total_seconds() / 3600
+    if hours > 26:
+        return [f"копия не уходила в хранилище {hours/24:.1f} сут"]
+    return []
+
+
 def check_disk() -> list:
     u = shutil.disk_usage("/")
     pct = u.used / u.total * 100
@@ -115,7 +132,8 @@ def check_api() -> list:
     return [] if code in ("200", "401", "403", "404") else [f"API не отвечает (код {code or '—'})"]
 
 
-CHECKS = [check_services, check_mongo, check_backup, check_disk, check_mem, check_api]
+CHECKS = [check_services, check_mongo, check_backup, check_offsite,
+          check_disk, check_mem, check_api]
 
 
 def notify(text: str) -> None:

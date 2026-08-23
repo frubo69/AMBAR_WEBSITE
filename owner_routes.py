@@ -2942,19 +2942,93 @@ async def handle_archive_file(request):
                  "Cache-Control": "no-store"})
 
 
+# Прикрытие: сообщение, которое остаётся в пустом чате вместо переписки.
+# Пустой чат с ботом сам по себе выглядит странно — «почему тут ничего нет?» —
+# а чат с приглашением в игру не выглядит никак. Текст нарочно бытовой, без
+# следов фирменного стиля: это не наше приложение, это просто игра.
+COVER_TEXT = (
+    "🎮 *BLOCKFALL — классический тетрис*\n\n"
+    "Тот самый: фигуры падают, ряды исчезают, скорость растёт. "
+    "Без регистрации, без интернета, без рекламы.\n\n"
+    "Управление одной рукой, партия занимает пару минут — "
+    "как раз чтобы скоротать ожидание.\n\n"
+    "Рекорд сохраняется. Побейте свой."
+)
+
+
+async def _cover_send(oid: int) -> None:
+    """Положить в опустевший чат приглашение в игру."""
+    if not OWNER_BOT_TOKEN:
+        return
+    kb = {"inline_keyboard": [[{
+        "text": "▶️ Играть",
+        "web_app": {"url": os.getenv("OWNER_WEBAPP_URL", "https://owner.ambar-delivery.com/")},
+    }]]}
+    img = Path(__file__).parent / "cover_game.jpg"
+    res = None
+    try:
+        if img.exists():
+            res = await tg_send_photo_bytes(OWNER_BOT_TOKEN, oid, img.read_bytes(),
+                                            COVER_TEXT, parse_mode="Markdown",
+                                            reply_markup=kb)
+        else:
+            res = await tg_send(OWNER_BOT_TOKEN, oid, COVER_TEXT,
+                                parse_mode="Markdown", reply_markup=kb)
+    except Exception as e:
+        log.error(f"[owner] прикрытие не отправлено: {e}")
+        return
+    mid = ((res or {}).get("result") or {}).get("message_id")
+    if mid:
+        # Из реестра убираем: это сообщение живёт по своим правилам — его
+        # снимает выход из режима, а не почасовой чистильщик.
+        try:
+            await db.owner_msg_drop(int(oid), int(mid))
+            await db.set_cover_msg_id(int(oid), int(mid))
+        except Exception as e:
+            log.error(f"[owner] прикрытие не запомнено: {e}")
+
+
+async def _cover_drop(oid: int) -> None:
+    """Снять приглашение в игру: режим выключен, чат снова рабочий."""
+    try:
+        mid = await db.get_cover_msg_id(int(oid))
+    except Exception:
+        mid = None
+    if not mid:
+        return
+    try:
+        await tg_delete(OWNER_BOT_TOKEN, oid, mid)
+    except Exception as e:
+        log.error(f"[owner] прикрытие не снято: {e}")
+    try:
+        await db.set_cover_msg_id(int(oid), None)
+    except Exception:
+        pass
+
+
 @require_owner
 async def handle_owner_panic(request):
-    """Штора опущена — переписки с ботом больше нет.
+    """Штора опущена — переписки с ботом больше нет, вместо неё игра.
 
-    Ответ пустой и мгновенный: панель прячется в игру, и никаких «готово» на
-    экране появиться не должно. Данные остаются в архиве."""
+    Ответ пустой и мгновенный: панель прячется, и никаких «готово» на экране
+    появиться не должно. Данные остаются в архиве."""
     import owner_sweep
     oid = request["owner_id"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    on = body.get("on", True) is not False
+    if not on:
+        await _cover_drop(oid)
+        log.info(f"[owner] штора снята у {oid}")
+        return web.json_response({"ok": True}, headers=CORS_HEADERS)
     try:
         n = await owner_sweep.wipe_chat(int(oid))
         log.warning(f"[owner] штора у {oid}: убрано сообщений {n}")
     except Exception as e:
         log.error(f"[owner] чат не почищен: {e}")
+    await _cover_send(oid)
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 

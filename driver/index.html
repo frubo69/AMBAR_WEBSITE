@@ -1,6 +1,20 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+<!-- Скрытый режим решается ДО первой отрисовки.
+     Флаг лежит в localStorage, но читался он глубоко в теле страницы, а штора
+     опускалась ещё позже — и на входе в приложение панель успевала мелькнуть.
+     Здесь это первое, что выполняет документ: класс на <html> ставится раньше,
+     чем браузер нарисует хоть один пиксель тела. -->
+<script>try{ if(localStorage.getItem('ambar_panic') === '1')
+  document.documentElement.classList.add('hid-boot'); }catch(e){}</script>
+<style>
+html.hid-boot{background:#0b0e18}
+html.hid-boot body{visibility:hidden}
+html.hid-boot #gameApp{display:flex!important;visibility:visible}
+html.hid-boot #gameApp *{visibility:visible}
+</style>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,viewport-fit=cover">
 <title>AMBAR · Водитель</title>
@@ -4952,6 +4966,8 @@ async function panicSet(on){
 }
 
 function paintPanic(){
+  // Класс, поднимающий штору до первой отрисовки, держим в согласии с флагом.
+  document.documentElement.classList.toggle('hid-boot', !!PANIC);
   const c = document.getElementById('gameApp');
   document.getElementById('pncOv').classList.remove('show');
   c.classList.toggle('show', PANIC);

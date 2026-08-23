@@ -3265,3 +3265,27 @@ async def export_token_get(token: str) -> dict | None:
     db = _db_or_none()
     if db is None: return None
     return await db.export_tokens.find_one({"_id": token}, {"_id": 0})
+
+
+async def set_cover_msg_id(owner_id: int, msg_id: int | None) -> None:
+    """Номер сообщения-прикрытия («игра») в чате владельца.
+
+    Его нужно снять ровно тогда, когда владелец выходит из скрытого режима:
+    иначе приглашение в тетрис останется висеть в рабочем чате и будет
+    выглядеть ровно тем, чем является."""
+    db = _db_or_none()
+    if db is None: return
+    if msg_id is None:
+        await db.owner_prefs.update_one({"owner_id": owner_id},
+                                        {"$unset": {"_cover_msg_id": ""}})
+    else:
+        await db.owner_prefs.update_one({"owner_id": owner_id},
+                                        {"$set": {"_cover_msg_id": msg_id}}, upsert=True)
+
+
+async def get_cover_msg_id(owner_id: int) -> int | None:
+    db = _db_or_none()
+    if db is None: return None
+    doc = await db.owner_prefs.find_one({"owner_id": owner_id},
+                                        {"_id": 0, "_cover_msg_id": 1})
+    return (doc or {}).get("_cover_msg_id")

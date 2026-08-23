@@ -1,6 +1,20 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
+<!-- Скрытый режим решается ДО первой отрисовки.
+     Флаг лежит в localStorage, но читался он глубоко в теле страницы, а штора
+     опускалась ещё позже — и на входе в приложение панель успевала мелькнуть.
+     Здесь это первое, что выполняет документ: класс на <html> ставится раньше,
+     чем браузер нарисует хоть один пиксель тела. -->
+<script>try{ if(localStorage.getItem('ambar_hide') === '1')
+  document.documentElement.classList.add('hid-boot'); }catch(e){}</script>
+<style>
+html.hid-boot{background:#0b0e18}
+html.hid-boot body{visibility:hidden}
+html.hid-boot #gameApp{display:flex!important;visibility:visible}
+html.hid-boot #gameApp *{visibility:visible}
+</style>
+
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>AMBAR · Owner</title>
@@ -5839,16 +5853,19 @@ function hidKnobReset(){
 function hideSet(on){
   HIDE = on;
   try{ localStorage.setItem('ambar_hide', on ? '1' : '0'); }catch(e){}
+  // Тот же класс, что ставится до первой отрисовки: снимаем его сразу, иначе
+  // между выходом из режима и перезагрузкой страница осталась бы пустой.
+  document.documentElement.classList.toggle('hid-boot', !!on);
   // Переписка с ботом уходит вместе со шторой: в ней выручка, списания и
   // заявки. Просим сервер снести её и не ждём ответа — на экране не должно
   // появиться ни галочки, ни задержки. Запрос идёт мимо ownerApi: дверь к
   // данным закрывается тем же движением и проглотила бы его.
-  if(on) try{
+  try{
     fetch(ownerApi.AMBAR_API + '/api/owner/panic', {
       method:'POST', keepalive:true,
       headers:{'Authorization':'tma ' + (Telegram.WebApp.initData||''),
                'Content-Type':'application/json'},
-      body:'{}'});
+      body: JSON.stringify({on: !!on})});
   }catch(e){}
   paintHide();
   // Выйдя из режима, поднимаем панель заново. Пока штора была опущена, она

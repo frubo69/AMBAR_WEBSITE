@@ -1,0 +1,11 @@
+[Unit]
+Description=AMBAR — учебное восстановление базы из копии
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/ambar
+ExecStart=/opt/ambar/venv/bin/python /opt/ambar/tools/restore_drill.py
+TimeoutStartSec=900
+Nice=15
+IOSchedulingClass=idle

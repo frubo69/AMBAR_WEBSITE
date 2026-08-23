@@ -1,0 +1,10 @@
+[Unit]
+Description=AMBAR — сторож сервера и базы
+After=network-online.target
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/ambar
+ExecStart=/opt/ambar/venv/bin/python /opt/ambar/tools/watchdog.py
+TimeoutStartSec=180
+Nice=10

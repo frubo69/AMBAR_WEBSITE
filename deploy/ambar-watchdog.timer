@@ -1,0 +1,12 @@
+[Unit]
+Description=AMBAR — проверка сервера каждые 10 минут
+
+[Timer]
+# Каждые десять минут: этого хватает, чтобы узнать о поломке раньше смены, и
+# мало, чтобы что-то нагрузить — проверка занимает доли секунды.
+OnCalendar=*:0/10
+Persistent=true
+RandomizedDelaySec=60
+
+[Install]
+WantedBy=timers.target

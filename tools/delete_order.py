@@ -65,7 +65,7 @@ async def main(order_id: str) -> int:
     client = motor.motor_asyncio.AsyncIOMotorClient(
         MONGO_URI,
         serverSelectionTimeoutMS=8000,
-        tlsCAFile=certifi.where(),
+        **({"tlsCAFile": certifi.where()} if MONGO_URI.startswith("mongodb+srv://") else {}),
     )
     db = client.ambar
 

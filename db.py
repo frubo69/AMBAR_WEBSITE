@@ -28,11 +28,15 @@ async def connect():
     if not MONGO_URI:
         log.warning("⚠️  MONGO_URI not set — DB unavailable")
         return None
-    _client = motor.motor_asyncio.AsyncIOMotorClient(
-        MONGO_URI,
-        serverSelectionTimeoutMS=8000,
-        tlsCAFile=certifi.where(),   # use up-to-date CA bundle, fixes Atlas TLS on old servers
-    )
+    # tlsCAFile передаём ТОЛЬКО облачным адресам: сам факт этой настройки
+    # включает в драйвере TLS, и локальная база, которая по TLS не слушает,
+    # отвечает обрывом рукопожатия. Для Atlas свежий набор корневых
+    # сертификатов по-прежнему нужен — на старых системах иначе не соединиться.
+    _opts = {"serverSelectionTimeoutMS": 8000}
+    if MONGO_URI.startswith("mongodb+srv://") or "tls=true" in MONGO_URI \
+            or "ssl=true" in MONGO_URI:
+        _opts["tlsCAFile"] = certifi.where()
+    _client = motor.motor_asyncio.AsyncIOMotorClient(MONGO_URI, **_opts)
     _db = _client.ambar
     try:
         await _db.orders.create_index("order_id", unique=True)

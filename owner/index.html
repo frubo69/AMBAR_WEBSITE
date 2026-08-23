@@ -16975,5 +16975,50 @@ function renderHours(h){
   <div class="stk-foot" id="accFoot"></div>
 </div>
 
+
+<!-- Тап по шапке — наверх.
+     Системную полосу со временем и зарядом трогать нельзя: она принадлежит iOS
+     и телеграму, окно приложения начинается ниже, и события оттуда до веба не
+     доходят. Поэтому цель — наша собственная верхняя полоса: палец идёт в то же
+     место, просто чуть ниже. Кнопки в шапке продолжают работать: тап по любому
+     интерактивному элементу мы пропускаем мимо. -->
+<script>
+(function(){
+  var ZONE = 76;            // высота полосы, считая от верха окна
+  var IGNORE = 'button,a,input,select,textarea,label,summary,[onclick],[role="button"],'
+             + '.tog,.tab,.chip,.cmd-close,.off-card,.dt-row,.lrow';
+
+  function scroller(x, y){
+    var el = document.elementFromPoint(x, y);
+    while (el && el !== document.documentElement){
+      var st = getComputedStyle(el);
+      if (/(auto|scroll)/.test(st.overflowY) && el.scrollHeight > el.clientHeight + 4) return el;
+      el = el.parentElement;
+    }
+    return document.scrollingElement || document.body;
+  }
+
+  function toTop(){
+    var el = scroller(window.innerWidth / 2, Math.round(window.innerHeight * 0.7));
+    if (!el || el.scrollTop <= 0) return false;
+    var was = el.scrollTop;
+    try { el.scrollTo({top: 0, behavior: 'smooth'}); }
+    catch (e) { el.scrollTop = 0; }
+    // В части вебвью плавная прокрутка не поддерживается и молча ничего не
+    // делает — тогда доезжаем рывком, но доезжаем.
+    setTimeout(function(){ if (el.scrollTop === was) el.scrollTop = 0; }, 350);
+    try { Telegram.WebApp.HapticFeedback.impactOccurred('light'); } catch (e) {}
+    return true;
+  }
+
+  document.addEventListener('click', function(e){
+    if (e.clientY > ZONE) return;
+    if (e.target && e.target.closest && e.target.closest(IGNORE)) return;
+    toTop();
+  }, true);
+
+  window.scrollPageTop = toTop;      // на случай, если понадобится кнопкой
+})();
+</script>
 </body>
 </html>

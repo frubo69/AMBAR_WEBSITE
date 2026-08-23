@@ -35,6 +35,12 @@ STALE_MIN = 20                 # молчит дольше этого — счи
 ASK_EVERY_H = 4                # как часто напоминать тому, кто вовсе не включил
 
 _LAST = {}                     # chat_id → {"at": datetime, "mid": int, "why": str}
+# Первые минуты после старта не судим никого: свежесть точек мы читаем из базы,
+# а база могла только что перезапуститься, восстановиться из копии или
+# переключиться. Один раз мы так и сказали водителю «геопозиция не
+# транслируется», пока он ехал и транслировал.
+_STARTED = None
+GRACE_MIN = 15
 
 
 def _biz_day(ref: datetime = None) -> str:
@@ -97,6 +103,21 @@ async def tick(now: datetime = None) -> dict:
     rows = {r["driver"]: r for r in await db.driver_pos_all(working)}
     utc = now.astimezone(timezone.utc)
     ends, silent, sent = [], [], 0
+
+    if _STARTED and (utc - _STARTED).total_seconds() < GRACE_MIN * 60:
+        log.info("[geo] только поднялись — напоминания подождут")
+        return {"day": day, "working": len(working), "sent": 0, "grace": True}
+
+    # Если молчат разом все — дело не в водителях, а в нас: так выглядит
+    # перезапуск, восстановление из копии или отвалившаяся база. Писать всем
+    # «вас не видно» в такой момент — верный способ перестать быть услышанным.
+    def _fresh(name) -> bool:
+        at = _dt((rows.get(name) or {}).get("at"))
+        return bool(at and (utc - at).total_seconds() < STALE_MIN * 60)
+
+    if len(working) > 1 and not any(_fresh(n) for n in working):
+        log.warning("[geo] точек нет ни у кого — молчим, это похоже на нашу проблему")
+        return {"day": day, "working": len(working), "sent": 0, "blind": True}
 
     for name in working:
         cid = staff.DRIVER_IDS[name]
@@ -161,6 +182,8 @@ def _dt(v):
 async def loop(app):
     """Раз в минуту смотрим, у кого кончается. Сама редкость — в tick."""
     import asyncio
+    global _STARTED
+    _STARTED = datetime.now(timezone.utc)
     await asyncio.sleep(35)            # дать серверу подняться
     while True:
         try:

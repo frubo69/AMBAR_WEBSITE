@@ -16318,6 +16318,28 @@ const DETAIL = {
                <div class="dt-row-s">${t.bottles||0} ${pluralize(t.bottles||0,'бутылка','бутылки','бутылок')}${parts.length?' · '+parts.join(' · '):''}</div></div>
                <div class="dt-row-r" style="color:var(--gold2)"><span data-aed="${t.total}">${fmt(t.total)}</span> AED</div></div>`;
            })()}
+          ${(()=>{ const sp=f.spend_out||{}; if(!(+sp.total>0)) return '';
+             // Расход в шапке — одна цифра, а вопрос всегда следующий: из чего.
+             // Поэтому строка раскрывается: сначала по людям, потом сами разовые
+             // с комментарием водителя, за что он их просил.
+             const parts=[];
+             if(+sp.meal>0)  parts.push('питание '+fmt(sp.meal));
+             if(+sp.extra>0) parts.push('разовые '+fmt(sp.extra));
+             const r=sp.meal_rates||{};
+             if(sp.days_working||sp.days_off) parts.push(
+               (sp.days_working||0)+' раб.'+((sp.days_off||0)?' · '+sp.days_off+' вых.':''));
+             const men=(sp.by_driver||[]).map(d=>
+               `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${escS(d.name)}</div>
+                 <div class="dt-row-s">${d.days} ${pluralize(d.days,'день','дня','дней')} · питание <span data-aed="${d.meal}">${fmt(d.meal)}</span>${d.extra?' · разовые <span data-aed="'+d.extra+'">'+fmt(d.extra)+'</span>':''}</div></div>
+                 <div class="dt-row-r"><span data-aed="${d.total}">${fmt(d.total)}</span> AED</div></div>`).join('');
+             const its=(sp.items||[]).map(i=>
+               `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${escS(i.comment||'разовый расход')}</div>
+                 <div class="dt-row-s">${escS(i.driver)} · ${escS(String(i.day||'').slice(8,10))}.${escS(String(i.day||'').slice(5,7))}</div></div>
+                 <div class="dt-row-r"><span data-aed="${i.amount}">${fmt(i.amount)}</span> AED</div></div>`).join('');
+             const note=`<div class="dt-row"><div class="dt-row-l"><div class="dt-row-s" style="line-height:1.5">Питание считается по ставке: ${fmt(r.working||0)} за рабочий день, ${fmt(r.off||0)} за выходной. Разовые попадают сюда только после вашего согласования — ожидающие не вычитаются.</div></div></div>`;
+             return `<div class="dt-row" style="cursor:pointer" onclick="var el=document.getElementById('_expandSpend'),a=this.querySelector('[data-arr]'),o=el.style.display==='none';el.style.display=o?'block':'none';_dtExpandState._spend=o;if(a)a.textContent=o?'⌃':'⌵'"><div class="dt-row-l"><div class="dt-row-t">Расход водителей</div><div class="dt-row-s">${parts.join(' · ')}</div></div><div class="dt-row-r dn">−<span data-aed="${sp.total}">${fmt(sp.total)}</span> AED</div><div class="dt-row-r" data-arr style="color:var(--muted);font-size:16px;margin-left:4px">${_dtExpandState._spend?'⌃':'⌵'}</div></div>
+             <div id="_expandSpend" style="display:${_dtExpandState._spend?'block':'none'};margin:0 -14px;padding:4px 8px 4px 14px;background:rgba(0,0,0,.2);border-left:2px solid var(--dn)">${men}${its}${note}</div>`;
+           })()}
           <div class="dt-row" data-detail="kpi:late"><div class="dt-row-l"><div class="dt-row-t">Опоздания</div><div class="dt-row-s">дольше ETA + 5 мин</div></div><div class="dt-row-r ${(k.late_count||0)>0?'warn':''}">${k.late_count||0}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
           <div class="dt-row" data-detail="kpi:avg"><div class="dt-row-l"><div class="dt-row-t">Среднее время</div><div class="dt-row-s">от заказа до доставки</div></div><div class="dt-row-r">${k.avg_min_sample>0 ? k.avg_min+' мин' : '—'}</div><div class="dt-row-r" style="color:var(--muted);font-size:16px;margin-left:4px">›</div></div>
         </div>

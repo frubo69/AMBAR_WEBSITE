@@ -443,19 +443,51 @@ async def _drivers_spend(start, end) -> dict:
     except Exception as e:
         log.warning(f"[finance] расходы водителей не прочитаны: {e}")
         return {"total": 0, "meal": 0, "extra": 0}
-    meal = extra = 0
+    # Кроме суммы отдаём и её состав: «расход 1 550» без ответа на вопрос
+    # «из чего» — повод открыть базу руками, а не показатель.
+    meal = extra = 0.0
+    days_working = days_off = 0
+    by_driver: dict = {}
+    items = []
     for r in rows:
+        name = (r.get("driver") or "").strip() or "—"
         w = r.get("working")
-        meal += _staff.MEAL_WORKING if w is True else (_staff.MEAL_OFF if w is False else 0)
+        m = _staff.MEAL_WORKING if w is True else (_staff.MEAL_OFF if w is False else 0)
+        if w is True:
+            days_working += 1
+        elif w is False:
+            days_off += 1
+        meal += m
+        ex = 0.0
         for e in (r.get("extras") or []):
             st = (e.get("status") or "").strip().lower()
             if st and st != "approved":
                 continue
             try:
-                extra += float(e.get("amount") or 0)
+                amt = float(e.get("amount") or 0)
             except (TypeError, ValueError):
-                pass
-    return {"total": round(meal + extra), "meal": round(meal), "extra": round(extra)}
+                continue
+            ex += amt
+            items.append({"day": r.get("day", ""), "driver": name,
+                          "comment": (e.get("comment") or "").strip()[:80],
+                          "amount": round(amt)})
+        extra += ex
+        d = by_driver.setdefault(name, {"name": name, "meal": 0.0, "extra": 0.0, "days": 0})
+        d["meal"] += m
+        d["extra"] += ex
+        if w is not None:
+            d["days"] += 1
+
+    drivers = sorted(
+        ({"name": d["name"], "meal": round(d["meal"]), "extra": round(d["extra"]),
+          "total": round(d["meal"] + d["extra"]), "days": d["days"]}
+         for d in by_driver.values()),
+        key=lambda x: -x["total"])
+    items.sort(key=lambda x: (x["day"], x["driver"]), reverse=True)
+    return {"total": round(meal + extra), "meal": round(meal), "extra": round(extra),
+            "days_working": days_working, "days_off": days_off,
+            "meal_rates": {"working": _staff.MEAL_WORKING, "off": _staff.MEAL_OFF},
+            "by_driver": drivers, "items": items[:60]}
 
 
 @require_owner

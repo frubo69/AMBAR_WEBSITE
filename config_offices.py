@@ -31,6 +31,56 @@ import math
 # Порядок здесь — рабочий порядок владельца, B1…B5. От него отталкивается всё:
 # разбивка выручки, плитки районов, счётчики заказов. Меняется он тут и больше
 # нигде.
+# ── Телефоны точек ────────────────────────────────────────────────────────
+# Рабочие линии районов: у каждой точки своя сим-карта, у Бизнес Бей их две.
+# Номер нужен в карточке района — чаще всего владелец смотрит на неё как раз
+# затем, чтобы позвонить на точку, а не чтобы искать номер в записной книжке.
+#
+# Значения по умолчанию пустые: настоящие номера кладём в /opt/ambar/.env,
+# рядом с остальными живыми данными, а не в репозиторий. Формат одной строкой:
+#
+#   AMBAR_OFFICE_PHONES=jvc:001=+9715xxxxxxx|bbay:002_1=+9715xxxxxxx,002_2=+9715xxxxxxx
+#
+# Пока переменной нет, строка с телефоном просто не рисуется — ничего не
+# ломается и пустых плашек не появляется.
+OFFICE_PHONES = {
+    "jvc":     [("001", "")],
+    "bbay":    [("002_1", ""), ("002_2", "")],
+    "silicon": [("003", "")],
+    "alguses": [("004", "")],
+    "tecom":   [("005", "")],
+}
+
+
+def _load_phones() -> dict:
+    raw = os.getenv("AMBAR_OFFICE_PHONES", "").strip()
+    if not raw:
+        return {k: [(lbl, num) for lbl, num in v if num] for k, v in OFFICE_PHONES.items()}
+    out = {}
+    for part in raw.split("|"):
+        part = part.strip()
+        if not part or ":" not in part:
+            continue
+        oid, lines = part.split(":", 1)
+        items = []
+        for chunk in lines.split(","):
+            chunk = chunk.strip()
+            if not chunk:
+                continue
+            label, _, num = chunk.partition("=")
+            num = (num or label).strip()
+            items.append(((label.strip() if num != label.strip() else ""), num))
+        if items:
+            out[oid.strip()] = items
+    return out
+
+
+def phones_for(office_id: str) -> list:
+    """[{"label": "002_1", "number": "+9715..."}] — пусто, если номер не задан."""
+    return [{"label": lbl, "number": num}
+            for lbl, num in _load_phones().get(office_id, []) if num]
+
+
 OFFICES = [
     {"id": "jvc",     "code": "B1", "name": "JVC"},
     {"id": "bbay",    "code": "B2", "name": "Бизнес Бей"},

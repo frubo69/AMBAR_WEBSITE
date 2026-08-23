@@ -752,6 +752,15 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   padding:15px 16px 14px;overflow:hidden;transition:.16s var(--e1)}
 .off-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--tone);opacity:.85}
 .off-card:active{transform:scale(.988);border-color:var(--border3)}
+/* Телефон точки на плитке района. Тап звонит: искать номер в записной книжке,
+   стоя над карточкой района, — ровно тот шаг, который здесь лишний. */
+.off-tel{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:8px;
+  font-size:12.5px;color:var(--sub)}
+.off-tel svg{width:13px;height:13px;flex:0 0 auto;color:var(--muted)}
+.off-tel a{color:var(--gold2);text-decoration:none;font-variant-numeric:tabular-nums;
+  font-weight:600;letter-spacing:.2px;padding:2px 0}
+.off-tel a:active{opacity:.6}
+.off-tel i{font-style:normal;color:var(--muted);font-size:11px;margin-right:3px}
 .off-card.lead{border-color:rgba(201,169,110,.28);background:linear-gradient(160deg,rgba(201,169,110,.055),transparent 60%),var(--card)}
 .off-head{display:flex;align-items:center;gap:9px;margin-bottom:11px}
 .off-dot{width:8px;height:8px;border-radius:50%;background:var(--tone);flex-shrink:0;box-shadow:0 0 10px var(--tone)}
@@ -10992,6 +11001,13 @@ function renderOffices(rows){
       ${(r.drivers||[]).length ? `<span class="sep">·</span>${ICO_CAR}
         <span class="drv">${escS(r.drivers.join(', '))}</span>` : ''}
     </div>` : '';
+    // Телефон точки. Ссылка tel: — тап открывает набор номера; клик по ней
+    // не должен раскрывать карточку района, поэтому гасим всплытие.
+    const tel = (r.phones||[]).length ? `<div class="off-tel" onclick="event.stopPropagation()">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+        stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .4 1.9.7 2.8a2 2 0 0 1-.5 2.1L8.1 9.9a16 16 0 0 0 6 6l1.3-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.6 2.8.7a2 2 0 0 1 1.7 2z"/></svg>
+      ${(r.phones||[]).map(p=>`<span>${p.label?`<i>${escS(p.label)}</i>`:''}<a href="tel:${escS(String(p.number).replace(/[^\d+]/g,''))}">${escS(p.number)}</a></span>`).join('')}
+    </div>` : '';
     const meta = [`<b>${r.orders || 0}</b> ${pluralize(r.orders||0,'заказ','заказа','заказов')}`];
     if(r.avg_sample) meta.push(`<b>${r.avg_min}</b> мин`);
     if(r.rating_count) meta.push(`★ <b>${r.rating}</b>`);
@@ -11013,7 +11029,7 @@ function renderOffices(rows){
         </span>
       </div>
       <div class="off-track"><div class="off-fill" style="width:${width}%"></div></div>
-      ${team}
+      ${team}${tel}
       <div class="off-meta">${meta.join('<span class="sep">·</span>')}${r.legacy?'':'<span class="chev">›</span>'}</div>
     </div>`;
   }).join('');

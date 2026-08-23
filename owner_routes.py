@@ -48,6 +48,7 @@ REVENUE_STATUSES = ("delivered",)
 
 # Office IDs (display order matches dashboard).
 from config_offices import OFFICE_IDS, OFFICE_NAMES, OFFICE_CODES   # офисы ≡ районы
+import config_offices as _offices
 import config_staff as staff                                        # кто на каком районе
 
 VALID_PERIODS = ("today", "yesterday", "week", "month", "year")
@@ -681,6 +682,9 @@ async def handle_finance(request):
             "operator_id":  staff._slug(staff.DISTRICT_OPERATOR[_oid])
                             if staff.DISTRICT_OPERATOR.get(_oid) else "",
             "drivers":      list(staff.DISTRICT_DRIVERS.get(_oid, [])),
+            # Телефон точки — там же, где имена: карточку района открывают в
+            # том числе чтобы позвонить туда, а не искать номер отдельно.
+            "phones":       _offices.phones_for(_oid),
         })
     # Единичные заказы без признаков местоположения (нет района, координат и
     # узнаваемого адреса) — отдельной строкой, чтобы сумма сходилась.

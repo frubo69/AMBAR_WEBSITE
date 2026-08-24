@@ -163,6 +163,27 @@ def _period_window(period: str, ref: datetime = None):
 
     return start, end, prev_start, prev_end
 
+
+def _range_window(frm: str, to: str):
+    """Окно по выбранным в календаре датам — теми же учётными сутками.
+
+    Календарь отдаёт две календарные даты, а сутки у нас идут с полудня. День
+    «24 августа» — это 24-е с 12:00 по 25-е 11:59, и конец диапазона обязан
+    включать выбранный день целиком: иначе «22–24» показывало бы два дня
+    вместо трёх.
+
+    Для сравнения берём предыдущий отрезок такой же длины — «на сколько лучше
+    или хуже, чем в столько же предыдущих дней».
+    """
+    d_from = datetime.strptime(frm, "%Y-%m-%d").replace(
+        hour=SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
+    d_to = datetime.strptime(to, "%Y-%m-%d").replace(
+        hour=SHIFT_START_HOUR, tzinfo=DUBAI_TZ) + timedelta(days=1)
+    if d_to <= d_from:
+        d_from, d_to = d_to - timedelta(days=1), d_from + timedelta(days=1)
+    span = d_to - d_from
+    return d_from, d_to, d_from - span, d_from
+
 def _open_at(all_orders: dict, end_dt: datetime, statuses, office_id=None) -> list:
     """Заказы, до сих пор висящие в одном из `statuses` и созданные ДО конца окна.
 
@@ -510,7 +531,20 @@ async def handle_finance(request):
         bars_7d {values[7], average, total}  — always last 7 days for Money tab
     """
     period = request.query.get("period", "today")
-    if period not in VALID_PERIODS:
+    # Календарь присылает даты, а не название периода. Раньше их некуда было
+    # деть, и панель подменяла выбранный отрезок ближайшим пресетом: три дня
+    # показывались как неделя, пятнадцать — как месяц. Цифры были честные,
+    # только не за тот период, который выбрал человек.
+    frm = (request.query.get("from") or "").strip()
+    to = (request.query.get("to") or "").strip()
+    custom = None
+    if frm and to:
+        try:
+            custom = _range_window(frm, to)
+        except ValueError:
+            return web.json_response({"error": "bad range (use YYYY-MM-DD)"},
+                                     status=400, headers=CORS_HEADERS)
+    elif period not in VALID_PERIODS:
         return web.json_response(
             {"error": f"invalid period (use one of: {', '.join(VALID_PERIODS)})"},
             status=400, headers=CORS_HEADERS,
@@ -525,7 +559,7 @@ async def handle_finance(request):
     day_offset = max(0, min(365, day_offset))
 
     ref = (_now_dubai() - timedelta(days=day_offset)) if day_offset else None
-    start, end, prev_start, prev_end = _period_window(period, ref)
+    start, end, prev_start, prev_end = custom or _period_window(period, ref)
     # Читаем не всю историю, а окно: текущее, предыдущее (для сравнения) и
     # неделю для полосок, плюс сутки запаса на границы. Незакрытые заказы
     # придут любого возраста. На нашем тарифе Atlas скорость режется по

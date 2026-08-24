@@ -4549,12 +4549,20 @@ button.path:active{transform:scale(.995)}
 .dp-month-lbl{flex:1;text-align:center;font-size:14px;font-weight:600;color:var(--text);letter-spacing:.3px;text-transform:capitalize}
 .dp-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding:0 2px 6px}
 .dp-dow span{text-align:center;font-size:9px;font-weight:700;color:var(--muted);letter-spacing:1px;padding:4px 0}
-.dp-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:2px}
-.dp-cell{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:500;color:var(--text);cursor:pointer;border-radius:8px;transition:background .15s var(--e1),color .15s var(--e1);font-variant-numeric:lining-nums tabular-nums;position:relative;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
+/* Без зазоров по горизонтали: лента выбранного отрезка должна читаться как
+   одна полоса, а не как семь отдельных плиток в ряд. */
+.dp-grid{display:grid;grid-template-columns:repeat(7,1fr);row-gap:2px;column-gap:0}
+.dp-cell{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:500;color:var(--text);cursor:pointer;border-radius:8px;transition:background .15s var(--e1),color .15s var(--e1);font-variant-numeric:lining-nums tabular-nums;position:relative;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
 .dp-cell:active{transform:scale(.88)}
 .dp-cell.off{color:var(--dim);cursor:default;pointer-events:none}
 .dp-cell.today{color:var(--gold2);font-weight:700}
-.dp-cell.in-range{background:rgba(201,169,110,.12);border-radius:0}
+.dp-cell.in-range{background:rgba(201,169,110,.13);border-radius:0}
+/* Будущее выбирать нечего: цифры за него не существует. Гасим, но оставляем
+   видимым — иначе месяц выглядит обрезанным. */
+.dp-cell.future{color:var(--dim);pointer-events:none;opacity:.45}
+.dp-cell.today:not(.range-start):not(.range-end){box-shadow:inset 0 0 0 1px rgba(201,169,110,.45)}
+.dp-nav.dim{opacity:.3;pointer-events:none}
+.nfoot-btn.pri:disabled{opacity:.4;pointer-events:none}
 .dp-cell.range-start{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0a0a14;font-weight:700;border-radius:8px 0 0 8px;box-shadow:0 4px 14px rgba(201,169,110,.25)}
 .dp-cell.range-end{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0a0a14;font-weight:700;border-radius:0 8px 8px 0;box-shadow:0 4px 14px rgba(201,169,110,.25)}
 .dp-cell.range-start.range-end{border-radius:8px}
@@ -5276,6 +5284,10 @@ try{
 // ===== Date range picker =====
 const dateOv = document.getElementById('dateOverlay');
 let dpTarget = 'periodPicker';
+// Выбранный отрезок живёт отдельно от пресетов: он их перебивает, пока его
+// не сбросят. Формат — учётная дата YYYY-MM-DD, ровно та, что понимает сервер.
+let RANGE = null;
+const _ymd = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
 let dpView = new Date();       // currently visible month
 let dpFrom = null;             // Date
 let dpTo = null;               // Date
@@ -5308,42 +5320,49 @@ function strDate(d){ return d.getDate() + ' ' + MONTHS_RU_SHORT[d.getMonth()]; }
 function renderDp(){
   const y = dpView.getFullYear(), m = dpView.getMonth();
   document.getElementById('dpMonth').textContent = MONTHS_RU[m] + ' ' + y;
-  const today = new Date();
+  const today = new Date(); today.setHours(0,0,0,0);
   const first = new Date(y, m, 1);
-  let startDow = first.getDay() - 1; if(startDow<0) startDow = 6; // Monday=0
-  const lastDate = new Date(y, m+1, 0).getDate();
+  let startDow = first.getDay() - 1; if(startDow < 0) startDow = 6;   // понедельник первый
+  const lastDate = new Date(y, m + 1, 0).getDate();
   const cells = [];
-  // Previous month tail
   const prevLast = new Date(y, m, 0).getDate();
-  for(let i=startDow-1;i>=0;i--) cells.push({d:new Date(y,m-1,prevLast-i), off:true});
-  // Current month
-  for(let i=1;i<=lastDate;i++) cells.push({d:new Date(y,m,i), off:false});
-  // Next month head (to fill 6 rows = 42 cells)
+  for(let i = startDow - 1; i >= 0; i--) cells.push({d:new Date(y, m - 1, prevLast - i), off:true});
+  for(let i = 1; i <= lastDate; i++)     cells.push({d:new Date(y, m, i), off:false});
   let nd = 1;
-  while(cells.length < 42) cells.push({d:new Date(y,m+1,nd++), off:true});
+  while(cells.length < 42) cells.push({d:new Date(y, m + 1, nd++), off:true});
+
+  // Ленту диапазона рисуем и по дням соседних месяцев: иначе отрезок,
+  // перешагнувший границу месяца, разваливается на куски.
+  const inRange = d => dpFrom && dpTo && d > dpFrom && d < dpTo;
 
   const grid = document.getElementById('dpGrid');
   grid.innerHTML = '';
-  cells.forEach(c=>{
+  cells.forEach(c => {
     const el = document.createElement('div');
-    el.className = 'dp-cell' + (c.off?' off':'');
+    el.className = 'dp-cell' + (c.off ? ' off' : '');
     el.textContent = c.d.getDate();
+    // Будущее выбирать нечем: заказов там ещё нет, а выбранный «завтрашний»
+    // период показывал бы пустоту и выглядел поломкой.
+    const future = c.d > today;
+    if(future) el.classList.add('future');
     if(sameDay(c.d, today)) el.classList.add('today');
-    if(dpFrom && dpTo){
-      if(sameDay(c.d, dpFrom)) el.classList.add('range-start');
-      if(sameDay(c.d, dpTo)) el.classList.add('range-end');
-      if(c.d > dpFrom && c.d < dpTo && !c.off) el.classList.add('in-range');
-    } else if(dpFrom && sameDay(c.d, dpFrom)){
-      el.classList.add('range-start','range-end');
-    }
-    if(!c.off){
-      el.addEventListener('click',()=> pickDp(c.d));
-    }
+    if(dpFrom && sameDay(c.d, dpFrom)) el.classList.add('range-start');
+    if(dpTo && sameDay(c.d, dpTo)) el.classList.add('range-end');
+    if(!dpTo && dpFrom && sameDay(c.d, dpFrom)) el.classList.add('range-start','range-end');
+    if(inRange(c.d)) el.classList.add('in-range');
+    if(!c.off && !future) el.addEventListener('click', () => pickDp(c.d));
     grid.appendChild(el);
   });
+
+  // Листать вперёд дальше текущего месяца незачем — там пусто.
+  const nav = document.querySelector('.dp-month-hdr .dp-nav:last-child');
+  if(nav){
+    const ahead = (y > today.getFullYear()) ||
+                  (y === today.getFullYear() && m >= today.getMonth());
+    nav.classList.toggle('dim', ahead);
+    nav.disabled = ahead;
+  }
   updateDpLbl();
-  // clear quick-highlight
-  document.querySelectorAll('.dp-quick button').forEach(b=>b.classList.remove('on'));
 }
 
 function pickDp(d){
@@ -5360,6 +5379,15 @@ function pickDp(d){
 
 function updateDpLbl(){
   const lbl = document.getElementById('dpRangeLbl');
+  const apply = document.getElementById('dpApplyBtn');
+  if(apply){
+    // Нечего применять — кнопка не должна выглядеть рабочей.
+    apply.disabled = !dpFrom;
+    apply.textContent = dpFrom && dpTo && !sameDay(dpFrom, dpTo)
+      ? `Показать ${Math.round((dpTo - dpFrom) / 86400000) + 1} ${
+          pluralize(Math.round((dpTo - dpFrom) / 86400000) + 1, 'день', 'дня', 'дней')}`
+      : (dpFrom ? 'Показать день' : 'Применить');
+  }
   if(!lbl) return;
   if(dpFrom && dpTo){
     lbl.innerHTML = `<span style="color:var(--text)">${strDate(dpFrom)}</span> <span style="color:var(--muted)">→</span> <span style="color:var(--text)">${strDate(dpTo)}</span> <span style="color:var(--muted);font-size:11px;font-weight:500;margin-left:8px">${Math.round((dpTo-dpFrom)/86400000)+1} дн</span>`;
@@ -5371,6 +5399,14 @@ function updateDpLbl(){
 }
 
 function dpReset(){ dpFrom=null; dpTo=null; renderDp(); }
+
+// Снять отметку выбранного отрезка: и чип с датами, и подсветку кнопки
+// календаря. Раньше чип оставался висеть даже после переключения периода.
+function _clearRangeChip(){
+  document.querySelectorAll('[id^="rangeChip-"]').forEach(c => c.style.display = 'none');
+  document.querySelectorAll('.cal-btn.on').forEach(b => b.classList.remove('on'));
+}
+
 
 function dpApply(){
   if(!dpFrom) return;
@@ -5389,14 +5425,19 @@ function dpApply(){
   // mark cal-btn as active
   const calBtn = document.querySelector(`.cal-btn[onclick*="'${dpTarget}'"]`);
   if(calBtn) calBtn.classList.add('on');
-  // Apply mock data based on range length
   if(dpTarget === 'periodPicker'){
-    const days = Math.round((dpTo-dpFrom)/86400000) + 1;
-    const p = days<=1 ? 'today' : days<=10 ? 'week' : days<=60 ? 'month' : 'year';
-    applyPeriod(p);
-    // override hero label with custom range text
+    // Спрашиваем ровно выбранное. Раньше здесь длина отрезка превращалась в
+    // пресет, и «22–24 августа» показывало неделю: цифры честные, период чужой.
+    RANGE = {from: _ymd(dpFrom), to: _ymd(dpTo)};
+    DAY_OFFSET = 0;
+    const days = Math.round((dpTo - dpFrom) / 86400000) + 1;
     const hLbl = document.getElementById('heroLbl');
-    if(hLbl) hLbl.textContent = `Выручка · ${strDate(dpFrom)} → ${strDate(dpTo)}`;
+    if(hLbl) hLbl.textContent = sameDay(dpFrom, dpTo)
+      ? `Выручка · ${strDate(dpFrom)}`
+      : `Выручка · ${strDate(dpFrom)} → ${strDate(dpTo)}`;
+    _setText('heroPrevLbl', days === 1 ? 'пред. день'
+                                       : `пред. ${days} ${pluralize(days,'день','дня','дней')}`);
+    _paintDay('month');
   }
   closeDate();
   try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(e){}
@@ -6609,7 +6650,10 @@ const _MONTHS_GEN = ['января','февраля','марта','апреля'
                      'августа','сентября','октября','ноября','декабря'];
 // offset 0 keeps the plain period key, so every other consumer of FINANCE_CACHE
 // (detail sheets, the 15s poll) is untouched by day browsing.
-const _fkey = (p, off) => off ? p + ':' + off : p;
+// Ключ кэша. Выбранный отрезок кэшируется под своим ключом: иначе он ложится
+// в ячейку «месяц» и потом выдаёт себя за месяц, когда календарь уже сброшен.
+const _fkey = (p, off) => RANGE ? `range:${RANGE.from}:${RANGE.to}`
+                                : (off ? p + ':' + off : p);
 
 function _dayNavOn(p){ return p === 'today' || p === 'yesterday'; }
 
@@ -6816,9 +6860,12 @@ function _paintDay(p){
   setFinanceSkel(true);
   renderOfficeBars([]);
   _paintRating({});
-  const req = DAY_OFFSET
-    ? ownerApi.ownerFetch('/api/owner/finance', {params:{period:p, day_offset:DAY_OFFSET}})
-    : ownerApi.ownerFetch('/api/owner/finance', {params:{period:p}});
+  // Выбранный в календаре отрезок побеждает пресеты: если он есть, спрашиваем
+  // именно его, а не «ближайший похожий период».
+  const params = RANGE
+    ? {period:'month', from:RANGE.from, to:RANGE.to}
+    : (DAY_OFFSET ? {period:p, day_offset:DAY_OFFSET} : {period:p});
+  const req = ownerApi.ownerFetch('/api/owner/finance', {params});
   req.then(d=>{
     // Кладём ответ под тот день, за который спрашивали, а не под тот, на
     // котором человек стоит сейчас. Пока ответ шёл, он успевал листнуть
@@ -6972,6 +7019,9 @@ daySwipe(document.querySelector('#pg-overview .hero'));
 function applyPeriod(p){
   const d = PERIOD_DATA[p]; if(!d) return;
   DAY_OFFSET = 0;   // any period pill resets the day browser — pre-swipe behaviour
+  // Нажали пресет — выбранный в календаре отрезок больше не действует.
+  // Иначе кнопка «Сегодня» подсвечивается, а цифры остаются от диапазона.
+  if(RANGE){ RANGE = null; _clearRangeChip(); }
   // Sync the active button across both period pickers (Overview + Money tab)
   // so switching on one reflects on the other.
   if(typeof loadOperators === 'function' && window.ownerApi) loadOperators();

@@ -667,6 +667,9 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         "order_id": oid,        "customer_id": uid,
         "customer_name": user_name, "username": username,
         "phone": phone,         "address": address,   "location": loc,
+        # Название адреса клиент даёт сам («Colorcode Beauty saloon»), и до сих
+        # пор оно терялось на входе: в заказе оставалась голая строка.
+        "address_label": (data.get("address_label") or "").strip()[:80],
         # Номер из Telegram сохраняем всегда, даже если доставка на другой.
         "phone_shared": phone_shared, "phone_extra": phone_extra,
         "gmap_link": gmap_link, "is_gps": is_gps,
@@ -698,6 +701,18 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
             user_fields["phone"] = phone
         await db.upsert_user(uid, **user_fields)
         await db._increment_user(uid, orders_total=1)
+        # Адрес заказа — в книгу адресов клиента. Раньше он жил только в памяти
+        # его телефона: сменил устройство — и адресов будто не было никогда.
+        try:
+            await db.save_address(uid, {
+                "address": address,
+                "label": (data.get("address_label") or "").strip()[:80],
+                "gmap_link": gmap_link, "is_gps": is_gps,
+                "lat": (loc or {}).get("lat", 0), "lon": (loc or {}).get("lon", 0),
+                "office_id": office_id, "office_name": office_nm,
+            })
+        except Exception as e:
+            log.warning(f"[order] адрес не сохранён в профиль {uid}: {e}")
 
     # ── Customer confirmation (single live status msg, edited through lifecycle) ─
     # Purge the live msgs from previous *finished* orders so the chat stays clean.

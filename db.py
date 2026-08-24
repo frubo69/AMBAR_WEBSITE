@@ -475,13 +475,32 @@ async def get_all_banned() -> list:
 # ── Addresses ─────────────────────────────────────────────────────────────────
 
 async def save_address(telegram_id: int, addr_entry: dict):
-    """Push address to front of list (max 5, no duplicate streets)."""
-    u    = await get_user(telegram_id) or {}
-    lst  = u.get("addresses", [])
-    norm = addr_entry.get("address", "").strip().lower()
-    lst  = [a for a in lst if a.get("address", "").strip().lower() != norm]
-    lst.insert(0, addr_entry)
-    await upsert_user(telegram_id, addresses=lst[:5])
+    """Адрес клиента — в его профиль, наверх списка, максимум восемь.
+
+    Приложение держит адреса в памяти телефона, и до сих пор этим всё и
+    заканчивалось: в заказ уезжала копия строки, а в базе у человека адресов
+    не было вовсе. Отсюда «нет сохранённых адресов» у клиента, который только
+    что сделал заказ, и невозможность подсказать адрес оператору по телефону.
+    Теперь каждый заказ пополняет книгу адресов: повтор не плодим, считаем,
+    сколько раз ездили, и помним, когда были в последний раз."""
+    db = _db_or_none()
+    if db is None: return
+    addr = (addr_entry.get("address") or "").strip()
+    if not addr:
+        return
+    u = await get_user(telegram_id) or {}
+    lst = list(u.get("addresses", []) or [])
+    norm = addr.lower()
+    prev = next((a for a in lst if (a.get("address") or "").strip().lower() == norm), None)
+    lst = [a for a in lst if (a.get("address") or "").strip().lower() != norm]
+    entry = {**(prev or {}), **{k: v for k, v in addr_entry.items() if v not in (None, "", {})}}
+    entry["address"] = addr
+    entry["orders"] = int((prev or {}).get("orders") or 0) + 1
+    entry["used_at"] = addr_entry.get("used_at") or datetime.now(timezone.utc).isoformat()
+    if not prev:
+        entry["first_at"] = entry["used_at"]
+    lst.insert(0, entry)
+    await upsert_user(telegram_id, addresses=lst[:8])
 
 
 # ── User state ────────────────────────────────────────────────────────────────

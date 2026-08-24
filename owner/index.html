@@ -898,6 +898,16 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   font-size:10.5px;font-weight:700;background:rgba(255,255,255,.05);color:var(--muted)}
 .ofd-num.top{background:rgba(201,169,110,.16);color:var(--gold2)}
 .ofd-empty{padding:16px 14px;text-align:center;font-size:12px;color:var(--muted)}
+/* Скелет: контур того, что грузится. Пустой экран со словом «загрузка»
+   заставляет ждать вслепую и каждый раз кажется поломкой. */
+.sk{display:inline-block;border-radius:6px;color:transparent!important;
+  background:linear-gradient(90deg,rgba(255,255,255,.045) 25%,rgba(255,255,255,.085) 37%,
+    rgba(255,255,255,.045) 63%);background-size:400% 100%;animation:skWave 1.4s ease infinite}
+.sk-num{width:170px;height:40px;border-radius:10px}
+.sk-sm{width:56px;height:17px}
+.sk-line{height:11px}
+.ofd-av.sk{border-radius:50%}
+@keyframes skWave{0%{background-position:100% 50%}100%{background-position:0 50%}}
 .dt-row-t svg,.bar-lbl svg{width:12px;height:12px;fill:none;stroke:currentColor;stroke-width:1.7;
   stroke-linecap:round;stroke-linejoin:round;opacity:.55;vertical-align:-1px;margin-right:2px}
 .office-badge{width:44px;height:44px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:#0a0a14;flex-shrink:0}
@@ -15722,7 +15732,23 @@ const DETAIL = {
     const tone = OFF_TONES[id] || 'var(--gold2)';
     return {
       title:`<div class="dt-tit-av plain" style="background:${tone}22;color:${tone};font-size:16px">\u2302</div><div><div class="dt-tit-name" id="offDetName">${escS(OFF_KNOWN[id] || 'Район')}</div><div class="dt-sub" id="offDetSub">загрузка\u2026</div></div>`,
-      body:`<div id="offDetBody"><div class="dt-card"><div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">Загрузка\u2026</div></div></div></div></div>`,
+      body:`<div id="offDetBody">
+        <div class="ofd-hero" style="--tone:${tone}">
+          <div class="ofd-sum"><b class="sk sk-num">&nbsp;</b></div>
+          <div class="ofd-delta"><span class="sk sk-line" style="width:150px">&nbsp;</span></div>
+          <div class="ofd-kpi">
+            <div><b class="sk sk-sm">&nbsp;</b><span>доставлено</span></div>
+            <div><b class="sk sk-sm">&nbsp;</b><span>средний чек</span></div>
+            <div><b class="sk sk-sm">&nbsp;</b><span>время доставки</span></div>
+          </div>
+        </div>
+        <div class="dt-sect">Команда</div>
+        <div class="dt-card">${[0,1,2].map(()=>`<div class="ofd-p">
+          <div class="ofd-av sk">&nbsp;</div>
+          <div class="ofd-p-b"><div class="sk sk-line" style="width:40%">&nbsp;</div>
+            <div class="sk sk-line" style="width:26%;height:8px;margin-top:6px">&nbsp;</div></div>
+          <div class="sk sk-line" style="width:52px">&nbsp;</div></div>`).join('')}</div>
+      </div>`,
       foot:''
     };
   },

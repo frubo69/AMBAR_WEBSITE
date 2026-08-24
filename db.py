@@ -3308,3 +3308,22 @@ async def get_cover_msg_id(owner_id: int) -> int | None:
     doc = await db.owner_prefs.find_one({"owner_id": owner_id},
                                         {"_id": 0, "_cover_msg_id": 1})
     return (doc or {}).get("_cover_msg_id")
+
+
+async def shift_day_snapshot(day: str, snap: dict = None):
+    """Слепок дня на момент сборки заявки: сколько было заказов и денег.
+
+    Заявка собирается один раз — по первому моменту, когда закрылись все
+    районы. Но район могут открыть заново и добить в него заказы, и тогда
+    отправленный файл уже неполный. Слепок позволяет это заметить: если при
+    следующем закрытии цифры дня разошлись со слепком, заявку надо уточнить.
+    """
+    db = _db_or_none()
+    if db is None: return {}
+    if snap is None:
+        doc = await db.shift_days.find_one({"_id": f"{day}:*"}, {"_id": 0, "snap": 1})
+        return (doc or {}).get("snap") or {}
+    await db.shift_days.update_one({"_id": f"{day}:*"},
+                                   {"$set": {"snap": snap, "day": day, "district": "*"}},
+                                   upsert=True)
+    return snap

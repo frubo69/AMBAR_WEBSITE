@@ -41,26 +41,61 @@ def _fmt(n) -> str:
     return f"{int(n or 0):,}".replace(",", " ")
 
 
-async def on_all_closed(day: str, state: dict) -> bool:
-    """Последний район закрылся. True — мы и собрали заявку."""
-    first = await db.shift_day_mark(day, "order_built")
-    if not first:
-        log.info(f"[shift] {day}: заявку уже собрал кто-то другой")
-        return False
+def _plural(n, one, few, many) -> str:
+    n = abs(int(n or 0)) % 100
+    d = n % 10
+    if 10 < n < 20: return many
+    if 1 < d < 5:   return few
+    if d == 1:      return one
+    return many
 
+
+async def on_all_closed(day: str, state: dict) -> bool:
+    """Последний район закрылся. True — мы собрали заявку (или уточнили её).
+
+    Заявка собирается один раз — и это правильно, пока день действительно
+    закончился. Но район можно открыть заново и добить в него заказы: так
+    23 августа Силикон и Алгусес закрыли с нулём, заявка ушла, а через три
+    секунды их открыли и пробили в них пять заказов. Файл у владельца остался
+    неполным, и второе закрытие молчало — «заявку уже собрал кто-то другой».
+
+    Поэтому теперь сравниваем день со слепком на момент сборки: цифры
+    разошлись — собираем заново и говорим, что именно изменилось.
+    """
     dd = state.get("districts") or []
     orders = sum(d["orders"] for d in dd)
     revenue = sum(d["revenue"] for d in dd)
     hanging = sum(d["open"] for d in dd)
+
+    first = await db.shift_day_mark(day, "order_built")
+    again = None
+    if not first:
+        snap = await db.shift_day_snapshot(day)
+        if snap.get("orders") == orders and snap.get("revenue") == revenue:
+            log.info(f"[shift] {day}: заявка уже собрана, изменений нет")
+            return False
+        again = {"orders": orders - int(snap.get("orders") or 0),
+                 "revenue": revenue - int(snap.get("revenue") or 0)}
+        log.warning(f"[shift] {day}: день изменился после сборки заявки "
+                    f"(+{again['orders']} зак., +{again['revenue']} AED) — уточняем")
+    await db.shift_day_snapshot(day, {"orders": orders, "revenue": revenue})
 
     rows = "\n".join(
         f"• {_md(d['code'])} {_md(d['name'])} — {d['orders']} зак. · {_fmt(d['revenue'])} AED"
         + (f" · висит {d['open']}" if d["open"] else "")
         for d in dd)
 
-    head = (f"*Смена закрыта — {day}*\n"
-            f"Закрылись все районы. Продажи дня окончательны.\n\n"
-            f"{rows}\n\n*Итого: {orders} заказов · {_fmt(revenue)} AED*")
+    if again:
+        head = (f"*Заявка уточнена — {day}*\n"
+                f"После первой сборки район открывали заново и добавили "
+                f"{again['orders']} {_plural(again['orders'], 'заказ', 'заказа', 'заказов')} "
+                f"на {_fmt(again['revenue'])} AED. Прежний файл неполный — "
+                f"пользуйтесь этим.\n\n"
+                f"{rows}\n\n*Итого: {orders} заказов · {_fmt(revenue)} AED*")
+    else:
+        head = (f"*Смена закрыта — {day}*\n"
+                f"Закрылись все районы. Продажи дня окончательны.\n\n"
+                f"{rows}\n\n*Итого: {orders} заказов · {_fmt(revenue)} AED*")
     if hanging:
         head += (f"\n\n_Незакрытых заказов: {hanging}. Они не попали в этот итог "
                  f"и не учтены в заявке._")
@@ -97,7 +132,8 @@ async def on_all_closed(day: str, state: dict) -> bool:
         for uid in ids:
             try:
                 ok, err = await supply_routes._send_doc(
-                    uid, raw, name, f"Заявка в магазин · {day}")
+                    uid, raw, name,
+                    ("Уточнённая заявка · " if again else "Заявка в магазин · ") + day)
                 if not ok:
                     log.warning(f"[shift] файл {uid}: {err}")
             except Exception as e:

@@ -2490,9 +2490,26 @@ async def handle_shift_reopen(request):
     oid = str(body.get("district") or "").strip()
     if oid not in scope:
         return web.json_response({"error": "not_yours"}, status=403, headers=CORS_HEADERS)
-    ok = await db.shift_reopen(_biz_date(datetime.now(DUBAI_TZ)).isoformat(), oid)
+    day = _biz_date(datetime.now(DUBAI_TZ)).isoformat()
+    ok = await db.shift_reopen(day, oid)
     if ok:
         log.info(f"[pos] смена открыта заново: {oid}")
+        # Заявку по этому дню могли уже собрать и отправить. Владелец должен
+        # узнать об этом сразу, а не обнаружить расхождение в магазине: файл
+        # у него на руках уже неполный.
+        try:
+            snap = await db.shift_day_snapshot(day)
+            if snap:
+                from owner_routes import notify_owners
+                d = next((x for x in districts if x["id"] == oid), {})
+                await notify_owners(
+                    "shift.closed",
+                    f"↩️ *Район открыт заново — {day}*\n"
+                    f"{d.get('code','')} {d.get('name', oid)}. Заявка по этому дню "
+                    f"уже собрана и отправлена: файл на руках неполный.\n\n"
+                    f"Когда район закроют снова, пришлю уточнённую заявку.")
+        except Exception as e:
+            log.error(f"[pos] предупреждение о переоткрытии не ушло: {e}")
     return web.json_response({"ok": ok}, headers=CORS_HEADERS)
 
 

@@ -6538,6 +6538,19 @@ function _syncDayNav(p, w){
 // бы разные дни и не сходились между собой.
 // Что написать на карточке района: «Сегодня», «Вчера» или просто дату.
 let _OFF_DAY_LBL = '';
+// Короткая дата для подписей: «сегодня», «вчера» или «14 авг».
+function _dayLabelShort(ts){
+  try{
+    const d = new Date(ts), now = new Date();
+    const day = x => new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime();
+    const diff = Math.round((day(now) - day(d)) / 86400000);
+    if(diff <= 0) return 'сегодня';
+    if(diff === 1) return 'вчера';
+    return new Intl.DateTimeFormat('ru-RU',{day:'numeric',month:'short',
+      timeZone:'Asia/Dubai'}).format(d);
+  }catch(e){ return ''; }
+}
+
 function _offDayLabel(){ return _OFF_DAY_LBL; }
 
 function _syncOffDayNav(p, w){
@@ -15944,11 +15957,27 @@ const DETAIL = {
         </div>
       </div>
       <div id="dtDebtMsg" class="ce-msg" style="margin:0 0 4px"></div>`;
+    // Адрес — это место, куда поедет водитель, а не строка текста. Поэтому
+    // название (как назвал сам клиент) наверху, сам адрес под ним, справа —
+    // сколько раз туда возили, и вся строка ведёт на карту.
     const addrHtml = (c.addresses||[]).length ? (c.addresses||[]).map(a=>{
-      const txt = a.address || a.text || '—';
-      const loc = (a.lat && a.lng) ? `<a href="https://maps.google.com/?q=${a.lat},${a.lng}" target="_blank" style="color:var(--info);text-decoration:none;font-size:10px;margin-left:4px">${IC('pin',12)}</a>` : '';
-      return `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${txt}${loc}</div></div></div>`;
-    }).join('') : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t" style="color:var(--muted)">Нет сохранённых адресов</div></div></div>';
+      const txt   = escS(a.address || a.text || '—');
+      const label = escS(a.label || '');
+      const lat = a.lat || a.latitude, lon = a.lon || a.lng || a.longitude;
+      const map = a.gmap_link || ((lat && lon) ? `https://maps.google.com/?q=${lat},${lon}` : '');
+      const times = a.orders ? `${a.orders} ${pluralize(a.orders,'заказ','заказа','заказов')}` : '';
+      const when  = a.used_at ? _dayLabelShort(a.used_at) : '';
+      const sub   = [label ? txt : '', times, when].filter(Boolean).join(' · ');
+      const inner = `<div class="ofd-p" ${map?'style="cursor:pointer"':''}>
+        <div class="ofd-av">${IC('pin',14)}</div>
+        <div class="ofd-p-b">
+          <div class="ofd-p-n">${label || txt}</div>
+          ${sub ? `<div class="ofd-p-s">${sub}</div>` : ''}
+        </div>
+        ${map ? '<div class="ofd-chev">\u203A</div>' : ''}
+      </div>`;
+      return map ? `<a href="${escS(map)}" target="_blank" style="text-decoration:none;color:inherit;display:block">${inner}</a>` : inner;
+    }).join('') : `<div class="ofd-empty">Адресов пока нет — появятся после первого заказа</div>`;
 
     // Кто привёл. Приглашение оператора несёт его id и район, поэтому видно,
     // с какого именно приглашения человек дошёл до приложения.

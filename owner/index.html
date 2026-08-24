@@ -4505,7 +4505,7 @@ button.path:active{transform:scale(.995)}
 <div class="cmd-overlay" id="dateOverlay">
   <div class="cmd-sheet dp-sheet">
     <div class="tp-hdr">
-      <div style="font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:600">Выбрать период</div>
+      <div style="font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:600;letter-spacing:.2px">Период</div>
       <button class="cmd-close" onclick="closeDate()" aria-label="Закрыть"><span class="txt">ESC</span><span class="x">✕</span></button>
     </div>
     <div class="dp-body">
@@ -4534,39 +4534,74 @@ button.path:active{transform:scale(.995)}
 </div>
 
 <style>
-.dp-sheet{max-width:380px;margin-top:10vh}
-@media (max-width:520px),(pointer:coarse){.dp-sheet{margin-top:6vh;max-height:calc(100vh - 40px)}}
-.dp-body{flex:1;overflow-y:auto;padding:14px}
+/* ── Календарь ────────────────────────────────────────────────────────────
+   Минимализм здесь не про «меньше элементов», а про один центр внимания:
+   выбранный отрезок. Всё остальное — служебное и тихое.
+
+   Центрируем margin:auto, а не отступом сверху: у оверлея выравнивание по
+   верхнему краю, и прежние 60px плюс 10vh сажали окно заметно ниже середины —
+   на телефоне это читалось как «съехало». */
+.dp-sheet{max-width:340px;margin:auto;max-height:calc(100vh - 90px)}
+/* Общий оверлей отодвигает содержимое от верха на 60px — для окон, которые
+   выравниваются по верхнему краю. Календарь центрируется, и этот отступ
+   смещал его вниз: на телефоне выглядело как «съехало». */
+#dateOverlay{padding-top:calc(12px + var(--safe-top))}
+.dp-body{flex:1;overflow-y:auto;padding:16px 16px 6px}
 .dp-body::-webkit-scrollbar{display:none}
-.dp-range-lbl{text-align:center;padding:8px 4px 12px;font-size:14px;font-weight:600;color:var(--gold2);font-family:'DM Sans',sans-serif;letter-spacing:.2px}
-.dp-quick{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-bottom:14px}
-.dp-quick button{padding:8px 4px;background:var(--card);border:1px solid var(--border2);border-radius:8px;color:var(--sub);font-size:11px;font-weight:600;cursor:pointer;transition:.15s var(--e1);letter-spacing:.2px}
-.dp-quick button:active{transform:scale(.95)}
-.dp-quick button.on{background:linear-gradient(135deg,rgba(201,169,110,.15),rgba(201,169,110,.04));border-color:rgba(201,169,110,.35);color:var(--gold2)}
-.dp-month-hdr{display:flex;align-items:center;gap:10px;padding:4px 0 10px}
-.dp-nav{width:34px;height:34px;border-radius:10px;background:var(--card);border:1px solid var(--border2);color:var(--sub);cursor:pointer;display:flex;align-items:center;justify-content:center;transition:.15s var(--e1)}
+
+/* Выбранное — единственное крупное на экране. Пока не выбрано, здесь
+   подсказка тем же местом: строка не прыгает. */
+.dp-range-lbl{text-align:center;padding:2px 0 16px;font-family:'DM Sans',sans-serif;
+  font-size:17px;font-weight:600;color:var(--text);letter-spacing:-.2px;line-height:1.3}
+.dp-range-lbl .hint{font-size:13.5px;font-weight:500;color:var(--muted);letter-spacing:0}
+.dp-range-lbl .arw{color:var(--dim);margin:0 6px;font-weight:400}
+.dp-range-lbl .days{display:block;margin-top:3px;font-size:11.5px;font-weight:600;
+  color:var(--gold2);letter-spacing:.3px}
+
+/* Быстрые периоды — подсказки, а не кнопки: без рамок и заливок, пока не
+   выбраны. Четыре обведённых прямоугольника в ряд перетягивали на себя
+   внимание с самого календаря. */
+.dp-quick{display:flex;gap:6px;margin-bottom:14px}
+.dp-quick button{flex:1;padding:7px 2px;background:none;border:none;border-radius:9px;
+  color:var(--sub);font-family:inherit;font-size:11.5px;font-weight:600;cursor:pointer;
+  transition:.16s var(--e1);white-space:nowrap}
+.dp-quick button:active{transform:scale(.94)}
+.dp-quick button.on{background:rgba(201,169,110,.14);color:var(--gold2)}
+
+.dp-month-hdr{display:flex;align-items:center;gap:4px;padding:2px 0 10px}
+.dp-nav{width:32px;height:32px;flex:0 0 auto;border-radius:10px;background:none;
+  border:none;color:var(--sub);cursor:pointer;display:grid;place-items:center;
+  transition:.16s var(--e1)}
 .dp-nav:active{transform:scale(.9);color:var(--gold2)}
-.dp-month-lbl{flex:1;text-align:center;font-size:14px;font-weight:600;color:var(--text);letter-spacing:.3px;text-transform:capitalize}
-.dp-dow{display:grid;grid-template-columns:repeat(7,1fr);gap:2px;padding:0 2px 6px}
-.dp-dow span{text-align:center;font-size:9px;font-weight:700;color:var(--muted);letter-spacing:1px;padding:4px 0}
-/* Без зазоров по горизонтали: лента выбранного отрезка должна читаться как
-   одна полоса, а не как семь отдельных плиток в ряд. */
-.dp-grid{display:grid;grid-template-columns:repeat(7,1fr);row-gap:2px;column-gap:0}
-.dp-cell{aspect-ratio:1/1;display:flex;align-items:center;justify-content:center;font-size:13.5px;font-weight:500;color:var(--text);cursor:pointer;border-radius:8px;transition:background .15s var(--e1),color .15s var(--e1);font-variant-numeric:lining-nums tabular-nums;position:relative;user-select:none;-webkit-user-select:none;-webkit-tap-highlight-color:transparent}
-.dp-cell:active{transform:scale(.88)}
-.dp-cell.off{color:var(--dim);cursor:default;pointer-events:none}
-.dp-cell.today{color:var(--gold2);font-weight:700}
-.dp-cell.in-range{background:rgba(201,169,110,.2);border-radius:0;color:var(--gold3)}
-/* Будущее выбирать нечего: цифры за него не существует. Гасим, но оставляем
-   видимым — иначе месяц выглядит обрезанным. */
-.dp-cell.future{color:var(--dim);pointer-events:none;opacity:.45}
-.dp-cell.today:not(.range-start):not(.range-end){box-shadow:inset 0 0 0 1px rgba(201,169,110,.45)}
-.dp-nav.dim{opacity:.3;pointer-events:none}
-.nfoot-btn.pri:disabled{opacity:.4;pointer-events:none}
-.dp-cell.range-start{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0a0a14;font-weight:700;border-radius:8px 0 0 8px;box-shadow:0 4px 14px rgba(201,169,110,.25)}
-.dp-cell.range-end{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#0a0a14;font-weight:700;border-radius:0 8px 8px 0;box-shadow:0 4px 14px rgba(201,169,110,.25)}
-.dp-cell.range-start.range-end{border-radius:8px}
-.dp-cell:not(.off):hover{background:rgba(201,169,110,.08)}
+.dp-nav.dim{opacity:.25;pointer-events:none}
+.dp-month-lbl{flex:1;text-align:center;font-size:14.5px;font-weight:600;color:var(--text);
+  letter-spacing:.2px}
+
+.dp-dow{display:grid;grid-template-columns:repeat(7,1fr);padding:0 0 4px}
+.dp-dow span{text-align:center;font-size:9.5px;font-weight:700;color:var(--dim);
+  letter-spacing:.8px;padding:3px 0}
+
+/* Без горизонтальных зазоров: выбранный отрезок обязан читаться одной
+   полосой, а не семью плитками в ряд. */
+.dp-grid{display:grid;grid-template-columns:repeat(7,1fr);row-gap:1px;column-gap:0}
+.dp-cell{position:relative;aspect-ratio:1/1;display:flex;align-items:center;
+  justify-content:center;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:500;
+  color:var(--text);cursor:pointer;font-variant-numeric:tabular-nums;
+  transition:background .15s var(--e1), color .15s var(--e1)}
+.dp-cell:active{transform:scale(.9)}
+.dp-cell.off{color:var(--dim);pointer-events:none}
+.dp-cell.future{color:var(--dim);opacity:.4;pointer-events:none}
+/* Сегодня — точкой под числом, а не рамкой: рамка спорит с выделением
+   отрезка и в паре с ним выглядит грязно. */
+.dp-cell.today::after{content:'';position:absolute;bottom:5px;left:50%;
+  width:3px;height:3px;margin-left:-1.5px;border-radius:50%;background:var(--gold2)}
+.dp-cell.in-range{background:rgba(201,169,110,.16);color:var(--gold3)}
+.dp-cell.range-start,.dp-cell.range-end{background:var(--gold2);color:#0d0d10;font-weight:700}
+.dp-cell.range-start{border-radius:11px 0 0 11px}
+.dp-cell.range-end{border-radius:0 11px 11px 0}
+.dp-cell.range-start.range-end{border-radius:11px}
+.dp-cell.range-start::after,.dp-cell.range-end::after{background:#0d0d10;opacity:.5}
+.dp-cell:not(.off):not(.future):hover{background:rgba(255,255,255,.05)}
 </style>
 
 <!-- ============ TIME PICKER ============ -->
@@ -5292,6 +5327,10 @@ let dpView = new Date();       // currently visible month
 let dpFrom = null;             // Date
 let dpTo = null;               // Date
 const MONTHS_RU = ['Январь','Февраль','Март','Апрель','Май','Июнь','Июль','Август','Сентябрь','Октябрь','Ноябрь','Декабрь'];
+// Родительный падеж: «22 августа», а не «22 август». Заголовок читают
+// вслух про себя, и падеж в нём слышно.
+const MONTHS_GEN = ['января','февраля','марта','апреля','мая','июня','июля',
+                    'августа','сентября','октября','ноября','декабря'];
 const MONTHS_RU_SHORT = ['янв','фев','мар','апр','мая','июн','июл','авг','сен','окт','ноя','дек'];
 
 function openDate(targetId){
@@ -5380,21 +5419,27 @@ function pickDp(d){
 function updateDpLbl(){
   const lbl = document.getElementById('dpRangeLbl');
   const apply = document.getElementById('dpApplyBtn');
+  const days = dpFrom && dpTo ? Math.round((dpTo - dpFrom) / 86400000) + 1 : 0;
   if(apply){
     // Нечего применять — кнопка не должна выглядеть рабочей.
     apply.disabled = !dpFrom;
-    apply.textContent = dpFrom && dpTo && !sameDay(dpFrom, dpTo)
-      ? `Показать ${Math.round((dpTo - dpFrom) / 86400000) + 1} ${
-          pluralize(Math.round((dpTo - dpFrom) / 86400000) + 1, 'день', 'дня', 'дней')}`
-      : (dpFrom ? 'Показать день' : 'Применить');
+    apply.textContent = days > 1 ? `Показать ${days} ${pluralize(days,'день','дня','дней')}`
+                                 : (dpFrom ? 'Показать день' : 'Выберите даты');
   }
   if(!lbl) return;
   if(dpFrom && dpTo){
-    lbl.innerHTML = `<span style="color:var(--text)">${strDate(dpFrom)}</span> <span style="color:var(--muted)">→</span> <span style="color:var(--text)">${strDate(dpTo)}</span> <span style="color:var(--muted);font-size:11px;font-weight:500;margin-left:8px">${Math.round((dpTo-dpFrom)/86400000)+1} дн</span>`;
+    // Один месяц — не повторяем его дважды: «20 — 22 августа», а не
+    // «20 авг → 22 авг». Разные месяцы называем оба.
+    const same = dpFrom.getMonth() === dpTo.getMonth() && dpFrom.getFullYear() === dpTo.getFullYear();
+    const txt = sameDay(dpFrom, dpTo)
+      ? `${dpFrom.getDate()} ${MONTHS_GEN[dpFrom.getMonth()]}`
+      : (same ? `${dpFrom.getDate()}<span class="arw">—</span>${dpTo.getDate()} ${MONTHS_GEN[dpTo.getMonth()]}`
+              : `${strDate(dpFrom)}<span class="arw">—</span>${strDate(dpTo)}`);
+    lbl.innerHTML = `${txt}<span class="days">${days} ${pluralize(days,'день','дня','дней')}</span>`;
   } else if(dpFrom){
-    lbl.innerHTML = `<span style="color:var(--text)">${strDate(dpFrom)}</span> <span style="color:var(--muted)">→ выбери конец</span>`;
+    lbl.innerHTML = `${dpFrom.getDate()} ${MONTHS_GEN[dpFrom.getMonth()]}<span class="days">выберите конец периода</span>`;
   } else {
-    lbl.innerHTML = '<span style="color:var(--muted)">выбери начало и конец периода</span>';
+    lbl.innerHTML = '<span class="hint">Выберите начало и конец</span>';
   }
 }
 

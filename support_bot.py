@@ -57,6 +57,9 @@ def format_user_info(user):
     username = f"@{user.username}" if user.username else "—"
     lang = user.language_code or "—"
 
+    # Без Markdown намеренно: имя клиента приходит от него самого, и одна
+    # звёздочка или подчёркивание в нём роняли отправку целиком — вместе с
+    # пересылкой сообщения и связкой «ответ → переписка».
     return (
         "👤 New support message\n\n"
         f"Name: {name}\n"
@@ -153,7 +156,7 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
             banned_at = (user_doc.get("banned_at") or "")[:10]
             ban_reason = user_doc.get("ban_reason") or "—"
             ban_notice = (
-                f"\n\n🔴 *ПОЛЬЗОВАТЕЛЬ ЗАБЛОКИРОВАН*"
+                f"\n\n🔴 ПОЛЬЗОВАТЕЛЬ ЗАБЛОКИРОВАН"
                 f"\nДата: {banned_at}"
                 f"\nПричина: {ban_reason}"
             )
@@ -165,25 +168,33 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
         try:
             # Send user info first (with ban notice if applicable)
             info_msg = await context.bot.send_message(
-                chat_id=admin_id,
-                text=format_user_info(user) + ban_notice,
-                parse_mode="Markdown"
-            )
+                chat_id=admin_id, text=format_user_info(user) + ban_notice)
 
             # Forward actual user message
-            forwarded = await msg.forward(chat_id=admin_id)
+            try:
+                forwarded = await msg.forward(chat_id=admin_id)
+            except Exception as e:
+                # Пересылку может запрещать приватность клиента. Копия доходит
+                # всегда, а без неё оператор видел карточку без самого вопроса.
+                print(f"⚠️ Forward blocked, copying instead: {e}")
+                forwarded = await msg.copy(chat_id=admin_id)
 
             # Map forwarded message to user
             MESSAGE_MAP[forwarded.message_id] = user.id
+            MESSAGE_MAP[info_msg.message_id] = user.id
             # Дублируем связку в базу: MESSAGE_MAP умирает вместе с процессом,
             # и после рестарта ответы оператора уходили в никуда.
-            try:
-                await db.save_support_map_entry(str(forwarded.message_id), {
-                    "user_id": user.id, "conv_key": conv_key,
-                    "order_id": "", "channel": "bot",
-                })
-            except Exception as e:
-                print(f"⚠️ DB map save failed: {e}")
+            # Карточку клиента привязываем наравне с сообщением: оператор
+            # отвечает на ту из двух, что попалась под палец, — а ответ на
+            # карточку раньше не находил переписку и пропадал молча.
+            for mid in (forwarded.message_id, info_msg.message_id):
+                try:
+                    await db.save_support_map_entry(str(mid), {
+                        "user_id": user.id, "conv_key": conv_key,
+                        "order_id": "", "channel": "bot",
+                    })
+                except Exception as e:
+                    print(f"⚠️ DB map save failed: {e}")
 
         except Exception as e:
             print(f"⚠️ Could not forward to admin {admin_id}: {e}")
@@ -242,6 +253,19 @@ async def handle_admin_reply(update: Update, context: ContextTypes.DEFAULT_TYPE)
     user_id = (conv_info or {}).get("user_id") or MESSAGE_MAP.get(replied_id)
 
     if not user_id:
+        # Ответ на сообщение, которое ни с кем не связано. Если отвечали боту,
+        # значит целились в клиента и промахнулись — молчать нельзя: оператор
+        # уверен, что ответил.
+        try:
+            to = msg.reply_to_message.from_user
+            if to and to.id == context.bot.id:
+                await msg.reply_text(
+                    "⚠️ Не понял, кому этот ответ: переписка старше перезапуска "
+                    "бота или сообщение уже не связано с клиентом.\n"
+                    "Ответьте на свежую карточку клиента — или напишите ему из "
+                    "панели оператора.")
+        except Exception as e:
+            print(f"⚠️ orphan reply notice failed: {e}")
         return
 
     # Известная переписка — сохраняем ответ в базу, чтобы он был в истории
@@ -347,9 +371,15 @@ def main():
 
     app.add_handler(CommandHandler("start", start))
 
-    # admin replies FIRST
+    # Ответы админов — в отдельной группе, и это важно. Телеграм отдаёт
+    # сообщение только первому подошедшему хендлеру внутри группы. Пока оба
+    # стояли рядом, любое сообщение клиента, отправленное реплаем — а так
+    # отвечают почти все, — попадало в ветку админа, там отсеивалось по
+    # is_admin и исчезало совсем: без подтверждения клиенту, без записи в
+    # переписку и без пересылки оператору. Разные группы обрабатываются
+    # независимо, поэтому теперь каждое сообщение доходит до своей ветки.
     app.add_handler(
-        MessageHandler(filters.REPLY & filters.ALL, handle_admin_reply)
+        MessageHandler(filters.REPLY & filters.ALL, handle_admin_reply), group=-1
     )
 
     # user messages

@@ -1845,12 +1845,26 @@ def _msg_preview(m: dict) -> str:
             or ("Фото" if m.get("type") == "photo" else ""))[:90]
 
 
+def _uname(v) -> str:
+    """Ник клиента, годный для ссылки.
+
+    У клиента без ника в базе лежит прочерк — так его кладут карточки заказа.
+    Панель считала прочерк ником, писала в шапке «@—» и вела кнопку «Телеграм»
+    на t.me/—, то есть в никуда."""
+    s = str(v or "").strip().lstrip("@")
+    return "" if s in ("", "—", "-", "None") else s
+
+
 def _client_brief(uid: int, u: dict) -> dict:
     return {
         "id": uid,
         "name": (u.get("first_name") or u.get("name") or u.get("full_name")
                  or (str(uid) if uid else "—")),
-        "username": u.get("username") or "",
+        "username": _uname(u.get("username")),
+        # Ника нет почти у половины клиентов, а подтверждённый номер есть:
+        # телеграм открывает чат и по номеру, и оператору больше незачем
+        # искать человека руками.
+        "phone": str(u.get("phone_verified") or ""),
         "verified": bool(u.get("verified")),
         "banned": bool(u.get("banned") or u.get("is_banned")),
         # Чаще всего пишет тот, кто застрял на верификации: оператор должен
@@ -1991,14 +2005,18 @@ async def handle_support_send(request):
 
     who = (body.get("as") or "").strip() or _op_name(request["op_user"])
     ts = datetime.now(timezone.utc).isoformat()
-    msg = {"role": "operator", "type": "text", "text": text, "ts": ts, "by": who}
-    await db.append_support_msg(key, msg)
 
     try:
         channel = await db.support_channel(key)
     except Exception:
         channel = ""
 
+    # Отправляем до записи, чтобы записать вместе с судьбой отправки. Ответ
+    # ложится в переписку в любом случае, но «ушло» и «дошло» — разные вещи:
+    # клиент мог не открывать бот или заблокировать его, и тогда оператор
+    # закрывает вопрос, которого никто не услышал.
+    via_bot = channel in ("bot", "mainbot")
+    sent_ok = False
     try:
         import support_inbox
         from api_server import tg_send, BOT_TOKEN
@@ -2007,17 +2025,29 @@ async def handle_support_send(request):
             # приложение он может вообще не открывать, а половина этих людей
             # висит на верификации и внутрь просто не попадает.
             if channel == support_inbox.CHANNEL_SUPPORT:
-                await support_inbox.send_as_support(uid, f"💬 {text}")
+                r = await support_inbox.send_as_support(uid, f"💬 {text}")
             else:
-                await support_inbox.send_as_main(uid, f"💬 {text}")
+                r = await support_inbox.send_as_main(uid, f"💬 {text}")
         else:
-            await tg_send(BOT_TOKEN, uid,
-                          "💬 *Новое сообщение от поддержки*"
-                          + (f" по заказу #{oid}" if oid else "")
-                          + "\n\nОткройте приложение, чтобы прочитать ответ.",
-                          parse_mode="Markdown")
+            r = await tg_send(BOT_TOKEN, uid,
+                              "💬 *Новое сообщение от поддержки*"
+                              + (f" по заказу #{oid}" if oid else "")
+                              + "\n\nОткройте приложение, чтобы прочитать ответ.",
+                              parse_mode="Markdown")
+        sent_ok = bool((r or {}).get("ok"))
+        if not sent_ok:
+            log.warning(f"[pos] support nudge to {uid} rejected: {r}")
     except Exception as e:
         log.error(f"[pos] support nudge to {uid} failed: {e}")
+
+    # Из приложения ответ виден и без телеграма — там не дошёл лишь звонок в
+    # дверь. А из бота сам ответ и есть сообщение: не ушло — значит не дошло.
+    delivered = sent_ok or not via_bot
+
+    msg = {"role": "operator", "type": "text", "text": text, "ts": ts, "by": who}
+    if not delivered:
+        msg["delivered"] = False
+    await db.append_support_msg(key, msg)
 
     try:
         from owner_routes import notify_owners
@@ -2034,8 +2064,9 @@ async def handle_support_send(request):
     except Exception as e:
         log.error(f"[pos] support.replied notify failed: {e}")
 
-    log.info(f"[pos] поддержка → {uid} ({who})")
-    return web.json_response({"ok": True, "msg": msg}, headers=CORS_HEADERS)
+    log.info(f"[pos] поддержка → {uid} ({who}, доставлено={delivered})")
+    return web.json_response({"ok": True, "msg": msg, "delivered": delivered},
+                             headers=CORS_HEADERS)
 
 
 @require_operator
@@ -2047,24 +2078,27 @@ async def handle_support_customers(request):
     q = (request.query.get("q") or "").strip().lower().lstrip("@")
     users = await db.get_all_customers()
     digits = "".join(c for c in q if c.isdigit())
-    out = []
+    hits = []
     for u in users:
         uid = int(u.get("telegram_id") or 0)
         if not uid:
             continue
         name = (u.get("first_name") or u.get("name") or u.get("full_name") or "")
-        uname = u.get("username") or ""
+        uname = _uname(u.get("username"))
         phone = str(u.get("phone_verified") or "")
         if q:
             hit = (q in name.lower() or q in uname.lower() or q in str(uid)
                    or (digits and digits in phone))
             if not hit:
                 continue
-        out.append({**_client_brief(uid, u), "phone": phone,
-                    "orders_total": u.get("orders_total", 0),
-                    "last_seen": str(u.get("last_seen") or u.get("first_seen") or "")})
-        if len(out) >= 40:
-            break
+        hits.append((str(u.get("last_seen") or u.get("first_seen") or ""), uid, u, phone))
+    # Сначала те, кто был здесь недавно. Раньше список обрывался на первых
+    # сорока в порядке базы — с пустым поиском это были самые старые клиенты,
+    # и «Написать клиенту» открывалось архивом двухлетней давности.
+    hits.sort(key=lambda h: h[0], reverse=True)
+    out = [{**_client_brief(uid, u), "phone": phone,
+            "orders_total": u.get("orders_total", 0), "last_seen": seen}
+           for seen, uid, u, phone in hits[:40]]
     return web.json_response({"customers": out}, headers=CORS_HEADERS)
 
 

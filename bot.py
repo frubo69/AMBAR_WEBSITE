@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """AMBAR Customer Bot — opens mini app, receives orders, ban check"""
-import os, json, logging
+import os, json, logging, uuid
 import re
 from datetime import datetime, timezone
 from pathlib import Path
@@ -336,6 +336,44 @@ async def fallback(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     await cmd_start(update, ctx)
 
 
+async def on_media(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    """Фото и файлы в основной бот — тоже обращение.
+
+    Обработчика на них не было вовсе: человек присылал фото чека или экрана с
+    ошибкой и не получал в ответ даже «получили», а для панели оператора этого
+    сообщения просто не существовало."""
+    msg = update.message
+    if msg is None:            # деловые сообщения разбирает свой обработчик
+        return
+    uid = update.effective_user.id
+    lang = _lang_of(update.effective_user)
+    cap = (msg.caption or "").strip()
+    try:
+        u = await db.get_user(uid)
+        if msg.photo:
+            f = await msg.photo[-1].get_file()
+            d = Path(__file__).parent / "uploads" / "support"
+            d.mkdir(parents=True, exist_ok=True)
+            fname = f"{uuid.uuid4().hex[:12]}.jpg"
+            await f.download_to_drive(str(d / fname))
+            key, _ = await support_inbox.capture(
+                uid, channel=support_inbox.CHANNEL_MAIN,
+                photo_url=f"/uploads/support/{fname}", caption=cap[:600])
+            body = "📷 фото" + (f": {cap[:300]}" if cap else "")
+        else:
+            key, _ = await support_inbox.capture(
+                uid, channel=support_inbox.CHANNEL_MAIN, text=(cap or "(файл)")[:600])
+            body = "📎 файл" + (f": {cap[:300]}" if cap else "")
+        # Само изображение операторам не уходит — его видно в панели, в этой же
+        # переписке; в чат летит только то, что кто-то написал.
+        await support_inbox.notify_operators(uid, u, body, support_inbox.CHANNEL_MAIN, key)
+        await msg.reply_text("✅ Приняли! Ответим здесь же."
+                             if lang == "ru" else "✅ Got it! We'll reply right here.")
+        log.info(f"[support] main-bot media uid={uid}")
+    except Exception as e:
+        log.error(f"[support] медиа из основного бота uid={uid}: {e}")
+
+
 async def post_init(app: Application):
     await db.connect()
 
@@ -514,6 +552,9 @@ def main():
     app.add_handler(MessageHandler(filters.CONTACT, on_contact))
     app.add_handler(InlineQueryHandler(on_inline))
     app.add_handler(MessageHandler(filters.UpdateType.BUSINESS_MESSAGE, on_business_message))
+    app.add_handler(MessageHandler(
+        (filters.PHOTO | filters.Document.ALL | filters.VIDEO | filters.VOICE) & ~filters.COMMAND,
+        on_media))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, fallback))
     log.info("🍾 AMBAR Customer Bot started!")
     app.run_polling(allowed_updates=Update.ALL_TYPES)

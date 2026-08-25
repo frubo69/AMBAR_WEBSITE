@@ -462,7 +462,7 @@ a.oc-row:active{background:var(--card2)}
    раньше уезжало за край и становилось недоступным — например бригада из пяти
    районов. Прокрутка живёт на подложке, а margin:auto держит окно по центру,
    пока оно помещается. */
-.ov{position:fixed;inset:0;z-index:100;background:rgba(0,0,10,.7);backdrop-filter:blur(6px);
+.ov{position:fixed;inset:0;z-index:140;background:rgba(0,0,10,.7);backdrop-filter:blur(6px);
   display:none;align-items:center;justify-content:center;overflow-y:auto;
   -webkit-overflow-scrolling:touch;padding:16px;overscroll-behavior:contain}
 .ov.show{display:flex}
@@ -614,11 +614,7 @@ a.oc-row:active{background:var(--card2)}
 #shiftList{margin-bottom:16px}
 /* ── разговор с водителем в карточке заказа ───────────────────────────── */
 /* Переключатель листов поддержки: клиенты и водители */
-.sup-seg{display:grid;grid-template-columns:auto auto;gap:4px;margin-left:14px;width:auto}
-.sup-seg .seg-b{padding:8px 16px;white-space:nowrap;position:relative}
-.sup-seg-b{display:inline-flex;align-items:center;justify-content:center;min-width:17px;
-  height:17px;padding:0 5px;margin-left:6px;border-radius:999px;background:var(--dn);
-  color:#fff;font-size:9.5px;font-weight:700;font-style:normal}
+.sup-seg{margin-left:14px}
 
 .och{margin:14px 0 0;padding:13px;border-radius:var(--r2);background:var(--card);
   border:1px solid var(--border2)}
@@ -973,51 +969,119 @@ a.oc-row:active{background:var(--card2)}
 .fd-i.hot .r{color:var(--warn)}
 .fd-empty{padding:36px 16px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6}
 
-/* ── поддержка: список тикетов + чат ─────────────────────────────────────
-   Пузыри те же, что в приложении клиента, но зеркально: свои сообщения справа,
-   как в любом мессенджере. */
+/* ── поддержка: очередь обращений + переписка ────────────────────────────
+   Экран поделён на три зоны, и каждая читается сама по себе: шапка на своей
+   подложке, слева очередь на подложке потемнее, справа разговор. Раньше всё
+   лежало на одном фоне сплошной простынёй, а «Клиенты» и «Водители» были
+   двумя голыми словами — какое из них выбрано, приходилось угадывать по
+   содержимому списка. */
 .sup-ov{position:fixed;inset:0;z-index:120;background:var(--bg);display:none;
   flex-direction:column;padding-top:var(--safe-top)}
 .sup-ov.show{display:flex}
-.sup-hdr{display:flex;align-items:center;gap:12px;padding:12px 18px;background:var(--bg2);
+
+.sup-hdr{display:flex;align-items:center;gap:14px;padding:11px 18px;background:var(--bg2);
   border-bottom:1px solid var(--border2);flex-shrink:0}
-.sup-hdr .t{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700}
+.sup-ttl{min-width:0}
+.sup-ttl .t{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;line-height:1.15}
+/* Подпись под заголовком — не украшение: до открытия списка она одна отвечает
+   на вопрос «сколько людей сейчас ждут». */
+.sup-ttl .s{font-size:11px;color:var(--muted);margin-top:2px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.sup-ttl .s b{color:var(--gold2);font-weight:700}
 .sup-hdr .sp{margin-left:auto}
-.sup-nb{padding:9px 14px;border-radius:11px;border:1px solid rgba(201,169,110,.4);
-  color:var(--gold2);font-size:12.5px;font-weight:700;background:var(--gold-soft)}
+
+.seg{display:inline-flex;gap:3px;background:var(--card);border:1px solid var(--border2);
+  border-radius:999px;padding:3px;flex-shrink:0}
+.seg-b{display:inline-flex;align-items:center;justify-content:center;gap:7px;padding:8px 18px;
+  border-radius:999px;font-size:12.5px;font-weight:700;color:var(--muted);white-space:nowrap;
+  transition:.16s var(--e1)}
+.seg-b:active{transform:scale(.97)}
+.seg-b.on{background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1a1408;
+  box-shadow:0 2px 10px rgba(201,169,110,.22)}
+.seg-n{display:none;min-width:18px;height:18px;padding:0 5px;border-radius:999px;
+  align-items:center;justify-content:center;background:var(--dn);color:#fff;line-height:1;
+  font-size:9.5px;font-weight:800;font-style:normal}
+.seg-n.has{display:inline-flex}
+.seg-b.on .seg-n{background:rgba(0,0,10,.36);color:#F7EAD0}  /* на светлой теме
+  переменная --gold3 темнеет и число на тёмном кружке пропадало */
+
+.sup-nb{display:inline-flex;align-items:center;gap:7px;height:36px;padding:0 14px;
+  border-radius:11px;border:1px solid rgba(201,169,110,.4);color:var(--gold2);
+  font-size:12.5px;font-weight:700;background:var(--gold-soft);flex-shrink:0}
+.sup-nb svg{width:14px;height:14px}
 .sup-nb:active{transform:scale(.96)}
+
 .sup-body{flex:1;min-height:0;display:flex}
-.sup-list{width:340px;flex:0 0 340px;border-right:1px solid var(--border2);
-  overflow-y:auto;padding:10px 10px 20px}
-.sup-sec{font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;
-  color:var(--muted);margin:14px 6px 7px}
-.sup-sec:first-child{margin-top:4px}
-.sup-t{width:100%;text-align:left;padding:11px 12px;border-radius:12px;
-  border:1px solid var(--border2);background:var(--card);margin-bottom:7px;display:block}
+.sup-list{width:352px;flex:0 0 352px;border-right:1px solid var(--border2);
+  overflow-y:auto;padding:8px 10px 20px;background:var(--bg2)}
+
+/* Заголовок группы с числом в чипе и линией до края: три группы подряд иначе
+   сливаются в один список. */
+.sup-sec{display:flex;align-items:center;gap:9px;font-size:10px;font-weight:700;
+  letter-spacing:1.2px;text-transform:uppercase;color:var(--muted);margin:17px 6px 9px}
+.sup-sec::after{content:'';flex:1;height:1px;background:var(--border2)}
+.sup-sec i{font-style:normal;padding:2px 7px;border-radius:999px;background:var(--card2);
+  color:var(--sub);font-size:9.5px;letter-spacing:.4px}
+.sup-sec:first-child{margin-top:6px}
+
+/* Строка обращения: аватар, имя со временем, превью и метки отдельной строкой.
+   Метки стояли в одной строке с именем и съедали его — от «Mohammad»
+   оставалось «M», а это единственное, по чему оператор узнаёт человека. */
+.sup-t{width:100%;text-align:left;display:grid;grid-template-columns:38px 1fr;gap:11px;
+  padding:11px 12px;border-radius:14px;border:1px solid var(--border2);background:var(--card);
+  margin-bottom:7px;position:relative;overflow:hidden;transition:.14s var(--e1)}
 .sup-t:active{transform:scale(.99)}
 .sup-t.on{border-color:rgba(201,169,110,.5);background:var(--gold-soft)}
-.sup-t .n{display:flex;align-items:center;gap:7px;font-size:13.5px;font-weight:700}
-.sup-t .n b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:700}
-.sup-t .r{margin-left:auto;font-size:10.5px;color:var(--muted);font-weight:600;flex-shrink:0}
-.sup-t .m{font-size:12px;color:var(--sub);margin-top:4px;overflow:hidden;
+.sup-t.wait{border-color:rgba(201,169,110,.26)}
+.sup-t.wait::before{content:'';position:absolute;left:0;top:11px;bottom:11px;width:3px;
+  border-radius:0 3px 3px 0;background:linear-gradient(180deg,var(--gold2),var(--gold))}
+.sup-av{width:38px;height:38px;border-radius:13px;background:var(--card3);display:flex;
+  align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;
+  font-size:15px;font-weight:700;color:var(--sub);text-transform:uppercase;flex-shrink:0}
+.sup-t.wait .sup-av{background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1a1408}
+.sup-tb{min-width:0}
+.sup-t .n{display:flex;align-items:baseline;gap:8px}
+.sup-t .n b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
+  font-size:13.5px;font-weight:700}
+.sup-t .r{font-size:10.5px;color:var(--muted);font-weight:600;flex-shrink:0}
+.sup-t.wait .r{color:var(--gold2)}
+.sup-t .m{display:block;font-size:12px;color:var(--sub);margin-top:3px;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
 .sup-t .m i{font-style:normal;color:var(--muted)}
-.sup-dot{width:7px;height:7px;border-radius:50%;background:var(--gold);flex-shrink:0}
-.sup-oid{font-size:9.5px;font-weight:700;padding:2px 6px;border-radius:6px;
-  border:1px solid var(--border2);color:var(--muted);flex-shrink:0}
-.sup-oid.new{color:var(--gold2);border-color:rgba(201,169,110,.45)}
-.sup-oid.work{color:var(--info);border-color:rgba(91,141,239,.4)}
+.sup-tags{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.sup-tags:empty{display:none}
+.sup-oid{display:inline-block;max-width:100%;font-size:9.5px;font-weight:700;padding:2px 7px;border-radius:7px;
+  border:1px solid var(--border2);color:var(--muted);background:var(--bg2);flex-shrink:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sup-oid.new{color:var(--gold2);border-color:rgba(201,169,110,.45);background:var(--gold-soft)}
+.sup-oid.work{color:var(--info);border-color:rgba(91,141,239,.4);background:rgba(91,141,239,.1)}
+.sup-oid.warn{color:var(--warn);border-color:rgba(243,180,74,.4);background:rgba(243,180,74,.1)}
+.sup-oid.no{color:var(--dn);border-color:rgba(224,85,85,.4);background:rgba(224,85,85,.1)}
+
 .sup-chat{flex:1;min-width:0;display:flex;flex-direction:column}
-.sup-chd{display:flex;align-items:center;gap:10px;padding:11px 16px;flex-shrink:0;
-  border-bottom:1px solid var(--border2)}
-.sup-chd .who{font-size:14px;font-weight:700}
-.sup-chd .sub{font-size:11.5px;color:var(--muted);margin-top:1px}
+.sup-chd{display:flex;align-items:center;gap:11px;padding:10px 16px;flex-shrink:0;
+  border-bottom:1px solid var(--border2);background:var(--bg2)}
+.sup-who{flex:1;min-width:0}
+.sup-chd .who{font-size:14.5px;font-weight:700;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+/* Метки клиента — одной строкой с прокруткой: на телефоне они вставали
+   лесенкой и растягивали шапку разговора на три строки. */
+.sup-sub{display:flex;gap:5px;margin-top:4px;flex-wrap:nowrap;overflow-x:auto;
+  scrollbar-width:none;-ms-overflow-style:none}
+.sup-sub::-webkit-scrollbar{display:none}
+.sup-sub .sup-oid{max-width:170px}
 .sup-back{display:none;width:32px;height:32px;border-radius:10px;border:1px solid var(--border2);
   background:var(--card2);color:var(--sub);align-items:center;justify-content:center;flex-shrink:0}
+/* Кнопки шапки на телефоне остаются иконками: с подписями они не помещались
+   в строку и «Телеграм» уезжал за край экрана. */
 .sup-hb{margin-left:auto;display:flex;gap:7px;flex-shrink:0}
-.sup-hb button{padding:8px 12px;border-radius:10px;border:1px solid var(--border2);
-  background:var(--card2);font-size:12px;font-weight:600;color:var(--sub)}
+.sup-hb button{display:inline-flex;align-items:center;gap:6px;height:34px;padding:0 12px;
+  border-radius:11px;border:1px solid var(--border2);background:var(--card2);
+  font-size:12px;font-weight:600;color:var(--sub)}
+.sup-hb button svg{width:14px;height:14px;flex-shrink:0}
+.sup-hb button.gold{color:var(--gold2);border-color:rgba(201,169,110,.35);background:var(--gold-soft)}
 .sup-hb button:active{transform:scale(.96)}
+
 .sup-msgs{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:8px}
 .sup-m{max-width:min(560px,72%);padding:10px 14px;font-size:13.5px;line-height:1.45;
   word-break:break-word;white-space:pre-wrap}
@@ -1027,6 +1091,10 @@ a.oc-row:active{background:var(--card2)}
   border-radius:16px 16px 16px 4px}
 .sup-m .ts{font-size:10px;color:var(--muted);margin-top:4px}
 .sup-m.operator .ts{text-align:right}
+/* Ответ, который не дошёл до телеграма, обязан выглядеть недошедшим: иначе
+   оператор продолжает писать в пустоту. */
+.sup-m.fail{border-color:rgba(224,85,85,.45)}
+.sup-m .ts em{font-style:normal;color:var(--dn)}
 .sup-m img{max-width:100%;border-radius:10px;display:block;margin-bottom:5px}
 .sup-day{align-self:center;font-size:10.5px;font-weight:700;letter-spacing:.6px;
   color:var(--muted);padding:3px 10px;border-radius:8px;background:var(--card2)}
@@ -1040,7 +1108,17 @@ a.oc-row:active{background:var(--card2)}
 .sup-send svg{width:17px;height:17px;fill:#1a1408}
 .sup-empty{flex:1;display:flex;align-items:center;justify-content:center;text-align:center;
   color:var(--muted);font-size:13px;padding:24px;line-height:1.6}
-.sup-hist{display:flex;gap:6px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid var(--border2)}
+/* Пустая правая половина раньше была строчкой текста посреди чёрного поля.
+   Теперь это зона: знак, заголовок и что делать дальше. */
+.sup-none{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:11px;text-align:center;padding:30px}
+.sup-none .ic{width:44px;height:44px;border-radius:15px;background:var(--card);
+  border:1px solid var(--border2);display:flex;align-items:center;justify-content:center}
+.sup-none .ic svg{width:21px;height:21px;color:var(--muted)}
+.sup-none .h{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700}
+.sup-none .s{font-size:12.5px;color:var(--muted);line-height:1.6;max-width:330px}
+.sup-hist{display:flex;gap:6px;flex-wrap:wrap;padding:8px 16px;border-bottom:1px solid var(--border2);
+  background:var(--bg2)}
 .sup-hist button{padding:6px 10px;border-radius:9px;border:1px solid var(--border2);
   background:var(--card);font-size:11.5px;font-weight:600;color:var(--sub)}
 .pill.has{color:var(--gold2);border-color:rgba(201,169,110,.45);background:var(--gold-soft)}
@@ -1053,24 +1131,47 @@ a.oc-row:active{background:var(--card2)}
 #dayInput{width:100%;padding:12px 14px;border-radius:12px;font-size:15px}
 .dchip i{font-style:normal;margin-left:auto;font-size:11px;color:var(--muted)}
 @media (max-width:900px){
-  .sup-list{width:100%;flex:1 1 auto;border-right:none}
-  .sup-body.chat .sup-list{display:none}
+  .sup-list{width:100%;flex:1 1 auto;border-right:none;background:var(--bg)}
+  .sup-ov.chat .sup-list{display:none}
   .sup-chat{display:none}
-  .sup-body.chat .sup-chat{display:flex}
+  .sup-ov.chat .sup-chat{display:flex}
   .sup-back{display:flex}
-  .sup-m{max-width:82%}
+  .sup-m{max-width:84%}
+  /* В открытой переписке шапка экрана не нужна: место дороже, а «Написать
+     клиенту» относится к списку, а не к разговору, который уже идёт. */
+  .sup-ov.chat .sup-hdr{display:none}
 }
 
-/* На телефоне шапка поддержки не помещалась в строку и уезжала вправо вместе
-   с крестиком — выйти было нечем. Теперь она переносится, а выход стоит первым
-   и слева: это единственная кнопка, которая обязана быть на месте всегда. */
+/* На телефоне шапка не помещалась в строку и уезжала вправо вместе с
+   крестиком — выйти было нечем. Теперь она переносится, выход стоит первым и
+   слева, переключатель занимает всю ширину, а подписи кнопок уступают место
+   иконкам: «Телеграм» в переписке вылезал за край экрана. */
 @media (max-width:640px){
-  .sup-hdr{flex-wrap:wrap;gap:9px;padding:10px 12px}
+  .sup-hdr{flex-wrap:wrap;gap:10px;padding:10px 12px}
   .sup-hdr .oc-x{order:-1;margin-right:2px}
-  .sup-hdr .t{font-size:16px}
+  .sup-ttl .t{font-size:16px}
   .sup-hdr .sp{display:none}
-  .sup-nb{margin-left:auto;font-size:12px;padding:8px 11px}
-  .sup-seg{order:1;flex-basis:100%;margin-left:0}
+  .sup-nb{margin-left:auto;width:36px;padding:0;justify-content:center}
+  .sup-nb span{display:none}
+  .sup-seg{order:1;flex-basis:100%;display:grid;grid-template-columns:1fr 1fr}
+  .sup-chd{padding:10px 12px;gap:9px}
+  .sup-hb{gap:6px}
+  .sup-hb button{padding:0 9px}
+  .sup-hb button span{display:none}
+  .sup-msgs{padding:14px 12px}
+  .sup-bar{padding:10px 12px calc(10px + var(--safe-bottom))}
+}
+
+/* Ряд значков в шапке на узком телефоне (375 и уже) не помещался и выпихивал
+   страницу за край экрана — весь макет уезжал вбок вместе с последней
+   кнопкой. Уменьшаем сами значки, а не выкидываем кнопки: каждая из них
+   кому-то нужна каждый день. */
+@media (max-width:400px){
+  .hdr{gap:6px;padding:8px 10px}
+  .hdr-right{gap:9px}
+  .hdr-grp{gap:4px}
+  .pill{width:32px;height:32px}
+  .pill .ic{width:16px;height:16px}
 }
 
 @media (max-height:720px){
@@ -1310,25 +1411,29 @@ a.oc-row:active{background:var(--card2)}
 <!-- поддержка: тикеты клиентов и переписка -->
 <div class="sup-ov" id="supOv">
   <div class="sup-hdr">
-    <div class="t">Поддержка</div>
+    <div class="sup-ttl">
+      <div class="t">Поддержка</div>
+      <div class="s" id="supHint">—</div>
+    </div>
     <!-- Клиенты и водители рядом: и там и там оператор отвечает на вопрос,
          который ждёт. Разница в том, что водитель ждёт у чужой двери. -->
     <div class="seg sup-seg">
-      <button class="seg-b on" id="supTabC" onclick="supTab('clients')">Клиенты</button>
-      <button class="seg-b" id="supTabD" onclick="supTab('drivers')">Водители
-        <i class="sup-seg-b" id="supDrvN" style="display:none">0</i></button>
+      <button class="seg-b on" id="supTabC" onclick="supTab('clients')">Клиенты<i
+        class="seg-n" id="supCliN">0</i></button>
+      <button class="seg-b" id="supTabD" onclick="supTab('drivers')">Водители<i
+        class="seg-n" id="supDrvN">0</i></button>
     </div>
     <div class="sp"></div>
-    <button class="sup-nb" id="supNewB" onclick="supNew()">Написать клиенту</button>
+    <button class="sup-nb" id="supNewB" onclick="supNew()" aria-label="Написать клиенту"><svg
+      viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"
+      stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg><span>Написать клиенту</span></button>
     <button class="oc-x" onclick="supClose()" aria-label="Закрыть"><svg viewBox="0 0 24 24"
       width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.2"
       stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
   <div class="sup-body" id="supBody">
     <div class="sup-list" id="supList"></div>
-    <div class="sup-chat" id="supChat">
-      <div class="sup-empty" id="supNone">Выберите обращение слева</div>
-    </div>
+    <div class="sup-chat" id="supChat"></div>
   </div>
 </div>
 
@@ -2269,12 +2374,17 @@ const _actIco = t => ICO_ACT[t]
 let curOrder=null, curCust=null;
 
 async function openOrder(oid){
-  const o = ORDERS.find(x=>x.order_id===oid);
-  if(!o) return;
-  curOrder=o; renderOrder(); showOv('ordOv'); haptic('light');
-  try{ const r=await opApi.opFetch(`/api/operator/orders/${oid}/one`);
-       if(r && r.order && curOrder && curOrder.order_id===oid){ curOrder=r.order; renderOrder(); } }
-  catch(e){}
+  // Из поддержки приходят и старые заказы, которых нет в сегодняшней очереди.
+  // Раньше кнопка «Заказ» на таком обращении просто молчала.
+  const local = ORDERS.find(x=>x.order_id===oid) || null;
+  if(local){ curOrder=local; renderOrder(); showOv('ordOv'); haptic('light'); }
+  let r=null;
+  try{ r = await opApi.opFetch(`/api/operator/orders/${oid}/one`); }catch(e){}
+  const fresh = r && r.order;
+  if(!fresh){ if(!local) toast('Заказ не найден','err'); return; }
+  if(local && !(curOrder && curOrder.order_id===oid)) return;   // оператор ушёл дальше
+  curOrder=fresh; renderOrder();
+  if(!local){ showOv('ordOv'); haptic('light'); }
 }
 
 function _phones(o){
@@ -2490,9 +2600,10 @@ function renderCust(){
             ${tag?`<span class="oc-tag${tag==='не подтверждён'?' warn':''}">${tag}</span>`:''}
             <span class="oc-go">Позвонить</span></a>`).join('')}</div>
       </div>`:'')
-    + f('Телеграм', c.username
-        ? `<a href="https://t.me/${_esc(c.username)}" target="_blank" rel="noopener"
-             class="of-link">@${_esc(c.username)}<span>›</span></a>` : '')
+    + (_tgHref(c) ? f('Телеграм',
+        `<a href="${_tgHref(c)}" target="_blank" rel="noopener" class="of-link">${
+          _uname(c.username) ? ('@'+_esc(_uname(c.username))) : 'открыть чат по номеру'
+        }<span>›</span></a>`) : '')
     + f('Пришёл', c.invited_via?_esc(_via(c.invited_via)):'')
     + f('Рекомендовал', c.verify_recommender_name?_esc(c.verify_recommender_name):'')
     + f('Причина блокировки', c.banned&&c.ban_reason?_esc(c.ban_reason):'')
@@ -3657,12 +3768,13 @@ function fdRender(){
 function fdGo(oid){
   const o=(ORDERS||[]).find(x=>x.order_id===oid); if(!o) return;
   const lane = o.status==='pending' ? 'new' : (o.status==='approved' ? 'work' : 'done');
+  fdClose();
   if(!showOrders) toggleOrders();
   if(qLane!==lane){ qLane=lane; renderQueue(); }
   openOrder(oid);
 }
 
-// ── поддержка: тикеты и переписка ────────────────────────────────────────
+// ── поддержка: очередь обращений и переписка ─────────────────────────────
 // Формат сообщений общий с приложением клиента: {role, type, text|url, ts}.
 // Своё — справа, клиентское — слева: оператор смотрит со своей стороны.
 let SUP={threads:[],waiting:0}, supKey='', supCur=null, supTimer=null, _supQT=null;
@@ -3676,28 +3788,46 @@ function supBadge(){
   // Вопрос без ответа моргает так же заметно, как непринятый заказ, но молча:
   // клиент ждёт ответа, а не бежит — звук здесь только мешал бы.
   btn.classList.toggle('alarm', n>0);
+  supCounts();
+}
+
+// Счётчики на переключателе и подпись под заголовком. Пока список не открыт,
+// эта строка — единственный ответ на вопрос «сколько людей сейчас ждут».
+function supCounts(){
+  const w=SUP.waiting||0, d=(DRV_CHATS&&DRV_CHATS.unread)||0;
+  const cn=$('supCliN'); if(cn){ cn.textContent=w; cn.classList.toggle('has', w>0); }
+  const dn=$('supDrvN'); if(dn){ dn.textContent=d; dn.classList.toggle('has', d>0); }
+  const h=$('supHint');
+  if(h) h.innerHTML = (w ? `<b>${w}</b> ждут ответа` : 'никто не ждёт ответа')
+    + (d ? ` · <b>${d}</b> от водителей` : '')
+    + ` · ${(SUP.threads||[]).length} в списке`;
 }
 
 async function loadSup(){
   try{ SUP = await opApi.opFetch('/api/operator/support'); }catch(e){ return; }
   supBadge();
-  if($('supOv').classList.contains('show')) supList();
+  if($('supOv').classList.contains('show') && SUP_TAB==='clients') supList();
 }
 
 // ── два листа поддержки ────────────────────────────────────────────────────
-let SUP_TAB = 'clients', DRV_CHATS = null;
+let SUP_TAB = 'clients', DRV_CHATS = null, _supListHtml='', _drvListHtml='';
+
+// Список и переписка на телефоне занимают один экран по очереди. Класс висит
+// и на теле, и на самом окне: по нему прячется шапка — в открытом разговоре
+// она только отнимает место.
+function supMode(chat){
+  $('supBody').classList.toggle('chat', !!chat);
+  $('supOv').classList.toggle('chat', !!chat);
+}
 
 function supTab(t){
   SUP_TAB = t;
   $('supTabC').classList.toggle('on', t === 'clients');
   $('supTabD').classList.toggle('on', t === 'drivers');
   $('supNewB').style.display = t === 'clients' ? '' : 'none';
-  $('supBody').classList.remove('chat');
-  // Разговор с водителем открывается в карточке заказа — правая половина здесь
-  // не пустует зря, а объясняет, куда он денется.
-  const none = $('supNone');
-  if(none) none.textContent = t === 'drivers'
-    ? 'Разговор откроется в карточке заказа' : 'Выберите обращение слева';
+  supMode(false);
+  _supListHtml=''; _drvListHtml='';
+  supNone(t);
   haptic('sel');
   if(t === 'drivers'){ loadDrvChats(); } else { supList(); }
 }
@@ -3705,12 +3835,11 @@ function supTab(t){
 async function loadDrvChats(){
   try{ DRV_CHATS = await opApi.opFetch('/api/operator/driver-chats',{params:{as:curOp}}); }
   catch(e){ return; }
-  const b = $('supDrvN');
-  if(b){ b.style.display = DRV_CHATS.unread ? '' : 'none'; b.textContent = DRV_CHATS.unread; }
   // На телефоне подпись «Поддержка» скрыта: складываем клиентов и водителей в
   // одно число на значке — иначе непрочитанное от водителя нигде не видно.
   const btn = $('supBtn');
   if(btn) btn.dataset.n = (SUP.waiting || 0) + (DRV_CHATS.unread || 0);
+  supCounts();
   if(SUP_TAB === 'drivers') drvList();
 }
 
@@ -3720,26 +3849,28 @@ const DRV_CASE = {client:'Клиент не отвечает', address:'Не н�
 function drvList(){
   const wrap = $('supList');
   const rows = (DRV_CHATS && DRV_CHATS.chats) || [];
-  if(!rows.length){
-    wrap.innerHTML = '<div class="sup-empty">Водители пока не писали</div>';
-    return;
-  }
-  const g = [['Ждут ответа', rows.filter(r => r.unread)],
-             ['По активным заказам', rows.filter(r => !r.unread && r.live)],
-             ['История', rows.filter(r => !r.unread && !r.live)]];
-  // Строка та же, что у клиентов: список один, и две разные строки в нём
-  // читались бы как два разных экрана, случайно оказавшихся рядом.
-  wrap.innerHTML = g.filter(([, l]) => l.length).map(([t, l]) =>
-    `<div class="sup-sec">${t} · ${l.length}</div>` + l.map(r => `
-      <button class="sup-t" onclick="drvOpen('${_esc(r.order_id)}')">
-        <div class="n">${r.unread ? '<span class="sup-dot"></span>' : ''}
-          <b>${_esc(r.driver || 'водитель')}</b>
-          <span class="sup-oid ${r.live ? 'go' : ''}">${
-            r.district ? _esc(r.district) + ' · ' : ''}${_esc(r.address || '#' + r.order_id)}</span>
-          <span class="r">${_when(r.last_at)}</span></div>
-        <div class="m">${r.kind ? `<i>${_esc(DRV_CASE[r.kind] || '')} · </i>` : ''}${
-          r.last_by === 'operator' ? '<i>Вы: </i>' : ''}${_esc(r.last || '—')}</div>
-      </button>`).join('')).join('');
+  const html = !rows.length
+    ? '<div class="sup-empty">Водители пока не писали</div>'
+    : [['Ждут ответа', rows.filter(r => r.unread)],
+       ['По активным заказам', rows.filter(r => !r.unread && r.live)],
+       ['История', rows.filter(r => !r.unread && !r.live)]]
+      .filter(([, l]) => l.length).map(([t, l]) =>
+        `<div class="sup-sec">${t}<i>${l.length}</i></div>` + l.map(r => `
+      <button class="sup-t ${r.unread ? 'wait' : ''}" onclick="drvOpen('${_esc(r.order_id)}')">
+        <span class="sup-av">${_esc(_ini(r.driver))}</span>
+        <span class="sup-tb">
+          <span class="n"><b>${_esc(r.driver || 'водитель')}</b>
+            <span class="r">${_when(r.last_at)}</span></span>
+          <span class="m">${r.last_by === 'operator' ? '<i>Вы: </i>' : ''}${_esc(r.last || '—')}</span>
+          <span class="sup-tags">${
+            r.kind && DRV_CASE[r.kind] ? `<i class="sup-oid warn">${_esc(DRV_CASE[r.kind])}</i>` : ''}${
+            r.district ? `<i class="sup-oid">${_esc(r.district)}</i>` : ''}${
+            r.address ? `<i class="sup-oid ${r.live ? 'work' : ''}">${_esc(r.address)}</i>`
+                      : `<i class="sup-oid">#${_esc(r.order_id)}</i>`}</span>
+        </span></button>`).join('')).join('');
+  if(html === _drvListHtml) return;
+  const keep = wrap.scrollTop;
+  wrap.innerHTML = html; _drvListHtml = html; _supListHtml=''; wrap.scrollTop = keep;
 }
 
 // Разговор ведём там, где он и живёт, — в карточке заказа: отвечать, не видя
@@ -3751,6 +3882,7 @@ function drvOpen(oid){
 
 function supOpen(){
   $('supOv').classList.add('show'); haptic('light');
+  supKey=''; supCur=null;
   supTab(SUP_TAB);
   loadSup(); loadDrvChats();
   if(supTimer) clearInterval(supTimer);
@@ -3793,45 +3925,94 @@ function _dayLbl(ts){
   return d.toLocaleDateString('ru-RU',{day:'2-digit',month:'long'});
 }
 
+// Буква для аватара. Список из одинаковых карточек читается плохо: глаз
+// цепляется за форму и цвет раньше, чем за текст.
+function _ini(name){
+  const s=String(name||'').trim();
+  return s ? s[0] : '?';
+}
+
+// У клиента без ника в базе лежит прочерк — ссылка t.me/— никуда не ведёт.
+function _uname(v){
+  const s=String(v||'').trim().replace(/^@/,'');
+  return (!s || s==='—' || s==='-') ? '' : s;
+}
+// Ника нет почти у половины клиентов, а подтверждённый номер есть. Телеграм
+// открывает чат и по номеру — оператору больше незачем искать человека руками.
+function _tgHref(c){
+  const u=_uname(c && c.username);
+  if(u) return 'https://t.me/'+u;
+  const ph=String((c && (c.phone || c.phone_verified)) || '').replace(/\D/g,'');
+  return ph.length>=8 ? 'https://t.me/+'+ph : '';
+}
+
 const SUP_VIA = {bot:'бот поддержки', mainbot:'бот AMBAR'};
-function _supVia(ch){
-  return SUP_VIA[ch] ? `<span class="sup-oid">${SUP_VIA[ch]}</span>` : '';
+
+const ICO_ORD='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l4 4v16H6z"/><path d="M9 12h7M9 16h5"/></svg>';
+const ICO_USR='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c1.2-3.6 4-5.4 7-5.4s5.8 1.8 7 5.4"/></svg>';
+const ICO_TG ='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M21 4L3 11l6 2 2 6 3-4 4 3z"/><path d="M9 13l8-6"/></svg>';
+const ICO_CHT='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 14a2 2 0 0 1-2 2H8l-4 3.5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/></svg>';
+
+// Пустая половина экрана раньше была строчкой текста посреди чёрного поля.
+function _noneBox(h, s){
+  return `<div class="sup-none"><div class="ic">${ICO_CHT}</div>
+    <div class="h">${h}</div><div class="s">${s}</div></div>`;
+}
+function supNone(t){
+  const box=$('supChat'); if(!box) return;
+  supShell='';
+  box.innerHTML = t === 'drivers'
+    ? _noneBox('Разговор с водителем',
+        'Он открывается в карточке заказа: отвечать, не видя адреса и состава, значит отвечать наугад.')
+    : _noneBox('Выберите обращение',
+        'Слева очередь. Сверху те, кто ждёт ответа, — с них и начинайте; ниже история, её разбирать не нужно.');
 }
 
 function _supRow(t){
   const c=t.client||{};
-  const oid = t.order_id
-    ? `<span class="sup-oid ${t.order_lane}">#${_esc(t.order_id)}</span>` : '';
-  // Где человек написал последним — туда уйдёт ответ.
-  const via = _supVia(t.channel);
+  const tags=[];
+  if(t.order_id) tags.push(`<i class="sup-oid ${t.order_lane||''}">#${_esc(t.order_id)}</i>`);
+  if(SUP_VIA[t.channel]) tags.push(`<i class="sup-oid">${SUP_VIA[t.channel]}</i>`);
   // Почти все обращения из ботов — от тех, кто застрял на верификации и в
   // приложение просто не попадает. Оператору это нужно видеть сразу.
-  const st = c.verify_declined ? '<span class="sup-oid">отклонён</span>'
-           : (c.verify_wait ? '<span class="sup-oid">ждёт проверки</span>' : '');
-  const pre = (t.last_role==='operator' ? '<i>Вы: </i>' : '') + _esc(t.last_text||'');
+  if(c.banned) tags.push('<i class="sup-oid no">заблокирован</i>');
+  else if(c.verify_declined) tags.push('<i class="sup-oid no">отклонён</i>');
+  else if(c.verify_wait) tags.push('<i class="sup-oid warn">ждёт проверки</i>');
   // Старый вопрос без ответа не считается ждущим, но отметку заслуживает —
   // иначе в истории он неотличим от закрытого разговора.
-  const dead = (!t.wait && t.last_role==='user') ? '<span class="sup-oid">без ответа</span>' : '';
-  return `<button class="sup-t ${t.key===supKey?'on':''}" onclick="supThread('${_esc(t.key)}')">
-    <div class="n">${t.wait?'<span class="sup-dot"></span>':''}<b>${_esc(c.name||'—')}</b>${oid}${via}${st}${dead}
-      <span class="r">${_when(t.last_ts)}</span></div>
-    <div class="m">${pre||'—'}</div></button>`;
+  if(!t.wait && t.last_role==='user') tags.push('<i class="sup-oid">без ответа</i>');
+  const pre = (t.last_role==='operator' ? '<i>Вы: </i>' : '') + _esc(t.last_text||'');
+  return `<button class="sup-t ${t.wait?'wait':''} ${t.key===supKey?'on':''}"
+    onclick="supThread('${_esc(t.key)}')">
+    <span class="sup-av">${_esc(_ini(c.name))}</span>
+    <span class="sup-tb">
+      <span class="n"><b>${_esc(c.name||'—')}</b><span class="r">${_when(t.last_ts)}</span></span>
+      <span class="m">${pre||'—'}</span>
+      <span class="sup-tags">${tags.join('')}</span>
+    </span></button>`;
 }
 
 function supList(){
   const wrap=$('supList'); const th=SUP.threads||[];
-  if(!th.length){ wrap.innerHTML='<div class="sup-empty">Обращений пока нет</div>'; return; }
   // Порядок задан сервером: сначала непринятые заказы, потом активные, потом
   // всё остальное без ответа и только затем история.
-  const g=[['Ждут ответа', th.filter(t=>t.wait)],
-           ['По активным заказам', th.filter(t=>!t.wait && t.prio===3)],
-           ['История', th.filter(t=>!t.wait && t.prio>3)]];
-  wrap.innerHTML = g.filter(([,l])=>l.length).map(([t,l])=>
-    `<div class="sup-sec">${t} · ${l.length}</div>${l.map(_supRow).join('')}`).join('');
+  const html = !th.length
+    ? '<div class="sup-empty">Обращений пока нет</div>'
+    : [['Ждут ответа', th.filter(t=>t.wait)],
+       ['По активным заказам', th.filter(t=>!t.wait && t.prio===3)],
+       ['История', th.filter(t=>!t.wait && t.prio>3)]]
+      .filter(([,l])=>l.length)
+      .map(([t,l])=>`<div class="sup-sec">${t}<i>${l.length}</i></div>${l.map(_supRow).join('')}`)
+      .join('');
+  if(html===_supListHtml) return;
+  // Список перерисовывается каждые пять секунд. Раньше вместе с этим он
+  // отматывался в начало, и оператор, читавший историю, терял место.
+  const keep=wrap.scrollTop;
+  wrap.innerHTML=html; _supListHtml=html; _drvListHtml=''; wrap.scrollTop=keep;
 }
 
 async function supThread(key, quiet){
-  if(!quiet){ supKey=key; supList(); $('supBody').classList.add('chat'); haptic('sel'); }
+  if(!quiet){ supKey=key; supList(); supMode(true); haptic('sel'); }
   let r; try{ r = await opApi.opFetch('/api/operator/support/thread',{params:{key}}); }
   catch(e){ return; }
   if(supKey!==key) return;
@@ -3849,11 +4030,30 @@ let supShell='', _supHead='', _supBody='';
 function supChat(toBottom){
   const r=supCur; if(!r) return;
   const c=r.client||{};
-  const ord = r.order ? `<button onclick="supClose();openOrder('${_esc(r.order.order_id)}')">Заказ #${_esc(r.order.order_id)}</button>` : '';
+
+  const chips=[];
+  if(c.banned) chips.push('<i class="sup-oid no">заблокирован</i>');
+  if(c.verify_declined) chips.push('<i class="sup-oid no">верификация отклонена</i>');
+  else if(c.verify_wait) chips.push('<i class="sup-oid warn">ждёт проверки</i>');
+  const un=_uname(c.username);
+  chips.push(`<i class="sup-oid">${un?('@'+_esc(un)):'без ника'}</i>`);
+  if(r.order_id) chips.push(`<i class="sup-oid ${(r.order&&r.order.lane)||''}">заказ #${_esc(r.order_id)}</i>`);
+  else if(SUP_VIA[r.channel]) chips.push(`<i class="sup-oid">${SUP_VIA[r.channel]}</i>`);
+  else chips.push('<i class="sup-oid">общий вопрос</i>');
+
+  // Карточку заказа и карточку клиента открываем поверх поддержки: закрывать
+  // разговор, чтобы посмотреть, кому отвечаешь, — потеря места и мысли.
+  const tgh=_tgHref(c);
+  const btns = (r.order?`<button class="gold" onclick="openOrder('${_esc(r.order.order_id)}')"
+        >${ICO_ORD}<span>Заказ</span></button>`:'')
+    + (c.id?`<button onclick="openCust(${c.id})">${ICO_USR}<span>Клиент</span></button>`:'')
+    + (tgh?`<button onclick="tgOpen('${tgh}')">${ICO_TG}<span>Телеграм</span></button>`:'');
+
   const hist = (r.others||[]).length
     ? `<div class="sup-hist">${(r.others||[]).map(o=>
         `<button onclick="supThread('${_esc(o.key)}')">${o.order_id?('#'+_esc(o.order_id)):'Общий вопрос'} · ${_when(o.last_ts)}</button>`).join('')}</div>`
     : '';
+
   const msgs = (r.messages||[]);
   let last='';
   const body = msgs.map(m=>{
@@ -3862,23 +4062,24 @@ function supChat(toBottom){
     const img = m.type==='photo' && src ? `<img src="${_esc(src)}" alt="" onclick="tgOpen('${_esc(src)}')">` : '';
     const txt = _esc(m.text || m.caption || (m.type==='photo'?'':'—'));
     const by  = m.role==='operator' && m.by ? ' · '+_esc(m.by) : '';
-    return `${sep}<div class="sup-m ${m.role==='operator'?'operator':'user'}">${img}${txt}
-      <div class="ts">${_hhmm(m.ts)}${by}</div></div>`;
+    // Ответ, не дошедший до телеграма, обязан выглядеть недошедшим: иначе
+    // оператор продолжает писать в пустоту.
+    const bad = m.delivered===false;
+    return `${sep}<div class="sup-m ${m.role==='operator'?'operator':'user'}${bad?' fail':''}">${img}${txt}
+      <div class="ts">${_hhmm(m.ts)}${by}${bad?' · <em>не доставлено</em>':''}</div></div>`;
   }).join('');
 
   const head = `
     <div class="sup-chd">
-      <button class="sup-back" onclick="supBack()"><svg viewBox="0 0 24 24" width="16" height="16"
-        fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
-        stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
-      <div><div class="who">${_esc(c.name||'—')}</div>
-        <div class="sub">${c.verify_declined?'верификация отклонена · ':(c.verify_wait?'ждёт проверки · ':'')}${c.username?('@'+_esc(c.username)):'без ника'}${
-          r.order_id?(' · заказ #'+_esc(r.order_id))
-            :(SUP_VIA[r.channel]?(' · '+SUP_VIA[r.channel]):' · общий вопрос')}</div></div>
-      <div class="sup-hb">${ord}
-        ${c.id?`<button onclick="openCust(${c.id})">Клиент</button>`:''}
-        ${c.username?`<button onclick="tgOpen('https://t.me/${_esc(c.username)}')">Телеграм</button>`:''}
+      <button class="sup-back" onclick="supBack()" aria-label="Назад"><svg viewBox="0 0 24 24"
+        width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2"
+        stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <span class="sup-av">${_esc(_ini(c.name))}</span>
+      <div class="sup-who">
+        <div class="who">${_esc(c.name||'—')}</div>
+        <div class="sup-sub">${chips.join('')}</div>
       </div>
+      <div class="sup-hb">${btns}</div>
     </div>${hist}`;
 
   // Новая переписка — новый каркас; иначе трогаем только то, что изменилось.
@@ -3907,10 +4108,16 @@ function supChat(toBottom){
     const keep = m.scrollTop;
     m.innerHTML=html; _supBody=html;
     m.scrollTop = stick ? m.scrollHeight : keep;
+    // Фотографии приходят с задержкой и раздвигают ленту уже после отрисовки:
+    // без этого последнее сообщение оставалось под полем ввода.
+    if(stick) m.querySelectorAll('img').forEach(im=>{
+      if(!im.complete) im.addEventListener('load', ()=>{ m.scrollTop=m.scrollHeight; }, {once:true});
+    });
   }else if(toBottom){ m.scrollTop=m.scrollHeight; }
 }
 
-function supBack(){ $('supBody').classList.remove('chat'); supKey=''; supCur=null; supShell=''; supList(); }
+function supBack(){ supMode(false); supKey=''; supCur=null; supShell='';
+  _supListHtml=''; supNone(SUP_TAB); supList(); }
 function supGrow(el){ el.style.height='auto'; el.style.height=Math.min(120, el.scrollHeight)+'px'; }
 function supKeys(e){ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); supSend(); } }
 
@@ -3923,6 +4130,10 @@ async function supSend(){
       {method:'POST', body:{key:supKey, text, as:curOp}});
     inp.value=''; supGrow(inp);
     if(r && r.msg){ (supCur.messages=supCur.messages||[]).push(r.msg); supChat(true); }
+    // Ответ записан в переписку всегда, а до телеграма доходит не всегда:
+    // клиент мог не открывать бот или заблокировать его. Молчать об этом
+    // нельзя — оператор считает вопрос закрытым.
+    if(r && r.delivered===false) toast('Клиенту не доставлено','err');
     haptic('light'); loadSup();
   }catch(e){ toast('Сообщение не ушло','err'); }
   const b2=$('supGo'); if(b2) b2.disabled=false;
@@ -3939,17 +4150,22 @@ function supSearch(){
     let r; try{ r = await opApi.opFetch('/api/operator/support/customers',{params:{q}}); }
     catch(e){ return; }
     const l=(r.customers||[]);
-    $('supFound').innerHTML = l.length ? l.map(c=>
-      `<button class="sup-t" onclick="supStart(${c.id})">
-        <div class="n"><b>${_esc(c.name||'—')}</b>${c.verified?'':'<span class="sup-oid">не проверен</span>'}
-          <span class="r">${c.orders_total||0} зак.</span></div>
-        <div class="m">${c.username?('@'+_esc(c.username)):('id '+c.id)}${c.phone?(' · +'+_esc(c.phone)):''}</div>
-      </button>`).join('') : '<div class="sup-empty">Никого не нашлось</div>';
+    $('supFound').innerHTML = l.length ? l.map(c=>`
+      <button class="sup-t" onclick="supStart(${c.id})">
+        <span class="sup-av">${_esc(_ini(c.name))}</span>
+        <span class="sup-tb">
+          <span class="n"><b>${_esc(c.name||'—')}</b>
+            <span class="r">${c.orders_total||0} зак.</span></span>
+          <span class="m">${_uname(c.username)?('@'+_esc(_uname(c.username))):('id '+c.id)}${
+            c.phone?(' · +'+_esc(c.phone)):''}</span>
+          <span class="sup-tags">${c.verified?'':'<i class="sup-oid warn">не проверен</i>'}</span>
+        </span></button>`).join('') : '<div class="sup-empty">Никого не нашлось</div>';
   }, 250);
 }
 function supStart(cid){
   hideOv('supPickOv');
   if(!$('supOv').classList.contains('show')) supOpen();
+  if(SUP_TAB!=='clients') supTab('clients');
   supThread(cid+'_general');
 }
 function tgOpen(url){ try{ tg.openTelegramLink(url); }catch(e){ window.open(url,'_blank'); } }

@@ -4012,5 +4012,22 @@ boot();
   window.scrollPageTop = toTop;      // на случай, если понадобится кнопкой
 })();
 </script>
+
+<script>
+// iOS игнорирует user-scalable=no в вебвью: страницу можно свести пальцами, и
+// она остаётся увеличенной — тогда шапка и карточки «обрезаются» справа, как
+// будто сломана вёрстка. Гасим сам жест и двойной тап: приложение — не
+// документ, масштабировать его незачем.
+(function(){
+  ['gesturestart','gesturechange','gestureend'].forEach(t =>
+    document.addEventListener(t, e => e.preventDefault(), {passive:false}));
+  let last = 0;
+  document.addEventListener('touchend', e => {
+    const now = Date.now();
+    if(now - last < 300 && e.cancelable) e.preventDefault();
+    last = now;
+  }, {passive:false});
+})();
+</script>
 </body>
 </html>

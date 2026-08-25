@@ -20,6 +20,10 @@
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
 <style>
+/* Двойной тап не должен масштабировать страницу: это приложение,
+   а не документ. Одиночные и быстрые тапы при этом работают. */
+html{touch-action:manipulation}
+
 :root{
   --gold:#C9A96E;--gold2:#E8C98A;--gold3:#F5E0B0;--gold-soft:rgba(201,169,110,.12);
   --bg:#000006;--bg2:#07070E;--bg3:#0C0C18;--card:#101020;--card2:#14142A;--card3:#1A1A32;
@@ -4021,12 +4025,10 @@ boot();
 (function(){
   ['gesturestart','gesturechange','gestureend'].forEach(t =>
     document.addEventListener(t, e => e.preventDefault(), {passive:false}));
-  let last = 0;
-  document.addEventListener('touchend', e => {
-    const now = Date.now();
-    if(now - last < 300 && e.cancelable) e.preventDefault();
-    last = now;
-  }, {passive:false});
+  // Двойной тап гасим через CSS (touch-action: manipulation), а не отменой
+  // touchend: отмена события убивает и сам клик, а быстрые тапы у нас
+  // осмысленные — тремя по логотипу открывается скрытый режим. Первый
+  // вариант этой защиты как раз его и сломал.
 })();
 </script>
 </body>

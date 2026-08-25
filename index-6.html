@@ -25,6 +25,10 @@
 <script>if(!window.L){document.write('<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/><scr'+'ipt src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"><\/scr'+'ipt>');}</script>
 <script src="qrcode.min.js"></script>
 <style>
+/* Двойной тап не должен масштабировать страницу: это приложение,
+   а не документ. Одиночные и быстрые тапы при этом работают. */
+html{touch-action:manipulation}
+
 :root{
   /* ── Brand colour ─────────────────────────────────────────────────── */
   --gold:#C9A96E;--gold2:#E8C98A;--gold3:#F5E0B0;
@@ -10872,12 +10876,10 @@ function _bossMode(){
 (function(){
   ['gesturestart','gesturechange','gestureend'].forEach(t =>
     document.addEventListener(t, e => e.preventDefault(), {passive:false}));
-  let last = 0;
-  document.addEventListener('touchend', e => {
-    const now = Date.now();
-    if(now - last < 300 && e.cancelable) e.preventDefault();
-    last = now;
-  }, {passive:false});
+  // Двойной тап гасим через CSS (touch-action: manipulation), а не отменой
+  // touchend: отмена события убивает и сам клик, а быстрые тапы у нас
+  // осмысленные — тремя по логотипу открывается скрытый режим. Первый
+  // вариант этой защиты как раз его и сломал.
 })();
 </script>
 </body>

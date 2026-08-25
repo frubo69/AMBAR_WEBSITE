@@ -9,6 +9,10 @@
 <script>try{ if(localStorage.getItem('ambar_hide') === '1')
   document.documentElement.classList.add('hid-boot'); }catch(e){}</script>
 <style>
+/* Двойной тап не должен масштабировать страницу: это приложение,
+   а не документ. Одиночные и быстрые тапы при этом работают. */
+html{touch-action:manipulation}
+
 html.hid-boot{background:#0b0e18}
 html.hid-boot body{visibility:hidden}
 html.hid-boot #gameApp{display:flex!important;visibility:visible}
@@ -17625,12 +17629,10 @@ function renderHours(h){
 (function(){
   ['gesturestart','gesturechange','gestureend'].forEach(t =>
     document.addEventListener(t, e => e.preventDefault(), {passive:false}));
-  let last = 0;
-  document.addEventListener('touchend', e => {
-    const now = Date.now();
-    if(now - last < 300 && e.cancelable) e.preventDefault();
-    last = now;
-  }, {passive:false});
+  // Двойной тап гасим через CSS (touch-action: manipulation), а не отменой
+  // touchend: отмена события убивает и сам клик, а быстрые тапы у нас
+  // осмысленные — тремя по логотипу открывается скрытый режим. Первый
+  // вариант этой защиты как раз его и сломал.
 })();
 </script>
 </body>

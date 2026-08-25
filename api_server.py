@@ -669,7 +669,7 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         "phone": phone,         "address": address,   "location": loc,
         # Название адреса клиент даёт сам («Colorcode Beauty saloon»), и до сих
         # пор оно терялось на входе: в заказе оставалась голая строка.
-        "address_label": (data.get("address_label") or "").strip()[:80],
+        "address_label": (src.get("address_label") or "").strip()[:80],
         # Номер из Telegram сохраняем всегда, даже если доставка на другой.
         "phone_shared": phone_shared, "phone_extra": phone_extra,
         "gmap_link": gmap_link, "is_gps": is_gps,
@@ -706,7 +706,7 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         try:
             await db.save_address(uid, {
                 "address": address,
-                "label": (data.get("address_label") or "").strip()[:80],
+                "label": (src.get("address_label") or "").strip()[:80],
                 "gmap_link": gmap_link, "is_gps": is_gps,
                 "lat": (loc or {}).get("lat", 0), "lon": (loc or {}).get("lon", 0),
                 "office_id": office_id, "office_name": office_nm,

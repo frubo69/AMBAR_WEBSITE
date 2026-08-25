@@ -5042,15 +5042,25 @@ function gmInit(){
     logo.addEventListener('contextmenu', e => e.preventDefault());
   }
   gmFit();
+  gmWatch();
   if(!GM) gmStart(); else gmPaint();
   window.addEventListener('resize', gmFit);
 }
 
 function gmFit(){
   const c = document.getElementById('gmC');
+  if(!c) return;
   const box = c.parentElement.getBoundingClientRect();
-  if(!box.height) return;
-  _gmCell = Math.floor(Math.min(box.width / GM_W, box.height / GM_H));
+  // Размер поля считаем и по своему боксу, и по экрану. При запуске телеграм
+  // какое-то время отдаёт вебвью высоту больше настоящей, и клетка получалась
+  // огромной: на экране оставался кусок поля в несколько клеток. Экран здесь —
+  // верхняя граница, ниже которой поле обязано поместиться целиком.
+  const vw = Math.min(box.width || innerWidth, innerWidth);
+  const vh = Math.min(box.height || innerHeight, innerHeight);
+  if(!vh || !vw) return;
+  const cell = Math.floor(Math.min(vw / GM_W, vh / GM_H));
+  if(cell < 4 || cell === _gmCell) { if(cell === _gmCell && GM) gmPaint(); return; }
+  _gmCell = cell;
   const dpr = Math.min(3, window.devicePixelRatio || 1);
   c.style.width = (_gmCell * GM_W) + 'px';
   c.style.height = (_gmCell * GM_H) + 'px';
@@ -5058,6 +5068,22 @@ function gmFit(){
   c.height = _gmCell * GM_H * dpr;
   c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
   if(GM) gmPaint();
+}
+
+// Поле пересобирается всякий раз, когда меняется его коробка: возврат в
+// приложение, поворот, появление клавиатуры, доезд анимации телеграма. Раньше
+// размер считался один раз при открытии — и оставался неверным до перезапуска.
+function gmWatch(){
+  const c = document.getElementById('gmC');
+  if(!c || gmWatch._on) return;
+  gmWatch._on = true;
+  try{
+    new ResizeObserver(() => gmFit()).observe(c.parentElement);
+  }catch(e){}
+  addEventListener('orientationchange', () => setTimeout(gmFit, 120));
+  document.addEventListener('visibilitychange', () => { if(!document.hidden) setTimeout(gmFit, 60); });
+  addEventListener('pageshow', () => setTimeout(gmFit, 60));
+  try{ Telegram.WebApp.onEvent('viewportChanged', () => setTimeout(gmFit, 60)); }catch(e){}
 }
 
 function gmStart(){

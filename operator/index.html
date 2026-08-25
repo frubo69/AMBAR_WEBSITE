@@ -3835,13 +3835,18 @@ async function supThread(key, quiet){
   let r; try{ r = await opApi.opFetch('/api/operator/support/thread',{params:{key}}); }
   catch(e){ return; }
   if(supKey!==key) return;
-  const same = supCur && supCur.key===key
-    && (supCur.messages||[]).length===(r.messages||[]).length;
   supCur=r;
-  supChat(!same);
+  // Вниз мотаем только когда переписку открыли заново; при фоновом опросе
+  // решает supChat — оператор, ушедший читать старое, остаётся где стоял.
+  supChat(!quiet);
 }
 
-function supChat(scroll){
+// Каркас переписки (шапка, лента, поле ответа) живёт между опросами: раньше он
+// собирался заново каждые пять секунд, и вместе с ним рождался новый <textarea>
+// — набранный ответ исчезал прямо из-под рук, а лента отматывалась в начало.
+let supShell='', _supHead='', _supBody='';
+
+function supChat(toBottom){
   const r=supCur; if(!r) return;
   const c=r.client||{};
   const ord = r.order ? `<button onclick="supClose();openOrder('${_esc(r.order.order_id)}')">Заказ #${_esc(r.order.order_id)}</button>` : '';
@@ -3861,7 +3866,7 @@ function supChat(scroll){
       <div class="ts">${_hhmm(m.ts)}${by}</div></div>`;
   }).join('');
 
-  $('supChat').innerHTML = `
+  const head = `
     <div class="sup-chd">
       <button class="sup-back" onclick="supBack()"><svg viewBox="0 0 24 24" width="16" height="16"
         fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
@@ -3874,18 +3879,38 @@ function supChat(scroll){
         ${c.id?`<button onclick="openCust(${c.id})">Клиент</button>`:''}
         ${c.username?`<button onclick="tgOpen('https://t.me/${_esc(c.username)}')">Телеграм</button>`:''}
       </div>
-    </div>${hist}
-    <div class="sup-msgs" id="supMsgs">${body || '<div class="sup-empty">Переписки ещё не было. Напишите первым.</div>'}</div>
-    <div class="sup-bar">
-      <textarea class="sup-in" id="supIn" rows="1" placeholder="${SUP_VIA[r.channel]?('Ответ в '+SUP_VIA[r.channel]+'…'):'Сообщение клиенту…'}"
-        oninput="supGrow(this)" onkeydown="supKeys(event)"></textarea>
-      <button class="sup-send" id="supGo" onclick="supSend()" aria-label="Отправить"><svg
-        viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg></button>
-    </div>`;
-  if(scroll!==false){ const m=$('supMsgs'); if(m) m.scrollTop=m.scrollHeight; }
+    </div>${hist}`;
+
+  // Новая переписка — новый каркас; иначе трогаем только то, что изменилось.
+  if(supShell!==r.key || !$('supMsgs')){
+    $('supChat').innerHTML = `<div id="supHead"></div>
+      <div class="sup-msgs" id="supMsgs"></div>
+      <div class="sup-bar">
+        <textarea class="sup-in" id="supIn" rows="1"
+          oninput="supGrow(this)" onkeydown="supKeys(event)"></textarea>
+        <button class="sup-send" id="supGo" onclick="supSend()" aria-label="Отправить"><svg
+          viewBox="0 0 24 24"><path d="M2 21l21-9L2 3v7l15 2-15 2z"/></svg></button>
+      </div>`;
+    supShell=r.key; _supHead=''; _supBody=''; toBottom=true;
+  }
+  const inp=$('supIn');
+  if(inp) inp.placeholder = SUP_VIA[r.channel]
+    ? ('Ответ в '+SUP_VIA[r.channel]+'…') : 'Сообщение клиенту…';
+  if(head!==_supHead){ $('supHead').innerHTML=head; _supHead=head; }
+
+  const m=$('supMsgs'); if(!m) return;
+  const html = body || '<div class="sup-empty">Переписки ещё не было. Напишите первым.</div>';
+  if(html!==_supBody){
+    // Кто стоял у низа — остаётся у низа и увидит новое сообщение; кто отмотал
+    // вверх, читает дальше с того же места.
+    const stick = toBottom || (m.scrollHeight - m.scrollTop - m.clientHeight < 80);
+    const keep = m.scrollTop;
+    m.innerHTML=html; _supBody=html;
+    m.scrollTop = stick ? m.scrollHeight : keep;
+  }else if(toBottom){ m.scrollTop=m.scrollHeight; }
 }
 
-function supBack(){ $('supBody').classList.remove('chat'); supKey=''; supCur=null; supList(); }
+function supBack(){ $('supBody').classList.remove('chat'); supKey=''; supCur=null; supShell=''; supList(); }
 function supGrow(el){ el.style.height='auto'; el.style.height=Math.min(120, el.scrollHeight)+'px'; }
 function supKeys(e){ if(e.key==='Enter' && !e.shiftKey){ e.preventDefault(); supSend(); } }
 

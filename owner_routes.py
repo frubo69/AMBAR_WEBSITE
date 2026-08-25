@@ -1671,10 +1671,21 @@ async def handle_office(request):
         day_offset = max(0, min(365, int(request.query.get("day_offset", "0") or 0)))
     except ValueError:
         day_offset = 0
+    # Район обязан показывать тот же отрезок, что и главная: и выбранный в
+    # календаре, и пролистанный день. Раньше он знал только про период —
+    # и, открыв вчерашний день, человек видел карточку за сегодня.
+    frm = (request.query.get("from") or "").strip()
+    to = (request.query.get("to") or "").strip()
+    custom = None
+    if frm and to:
+        try:
+            custom = _range_window(frm, to)
+        except ValueError:
+            custom = None
 
     all_orders = await db.get_all_orders()
     ref = (_now_dubai() - timedelta(days=day_offset)) if day_offset else None
-    start, end, prev_start, prev_end = _period_window(period, ref)
+    start, end, prev_start, prev_end = custom or _period_window(period, ref)
 
     mine = lambda pairs: [(dt, o) for dt, o in pairs if (o.get("office_id") or "") == oid]
     curr      = mine(_orders_in_window(all_orders, start, end))          # доставленные

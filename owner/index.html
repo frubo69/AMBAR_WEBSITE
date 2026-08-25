@@ -7429,7 +7429,12 @@ async function _officeLoad(id){
   const p = document.querySelector('#officePeriod button.on')?.dataset?.p
          || document.querySelector('#periodPicker button.on')?.dataset?.p || 'today';
   let d;
-  try{ d = await ownerApi.ownerFetch('/api/owner/office', {params:{id, period:p}}); }
+  // Карточка района обязана показывать ровно то, что на главной: выбранный в
+  // календаре отрезок или пролистанный день. Иначе, листнув на вчера и открыв
+  // район, человек видит сегодняшние цифры — и не понимает, какие верные.
+  const params = RANGE ? {id, period:'month', from:RANGE.from, to:RANGE.to}
+                       : (DAY_OFFSET ? {id, period:p, day_offset:DAY_OFFSET} : {id, period:p});
+  try{ d = await ownerApi.ownerFetch('/api/owner/office', {params}); }
   catch(e){
     if(_dtCurrent === key)
       document.getElementById('offDetBody').innerHTML =
@@ -7440,7 +7445,9 @@ async function _officeLoad(id){
 
   const lbl = {today:'сегодня',yesterday:'вчера',week:'неделя',month:'месяц',year:'год'}[p] || p;
   _setText('offDetName', d.name);
-  _setText('offDetSub', `${lbl} · ${d.orders.delivered} доставлено из ${d.orders.total}`);
+  const when = RANGE ? `${strDate(dpFrom || new Date(RANGE.from))} → ${strDate(dpTo || new Date(RANGE.to))}`
+                     : (DAY_OFFSET ? _dayLabelShort(new Date(Date.now() - DAY_OFFSET * 86400000)) : lbl);
+  _setText('offDetSub', `${when} · ${d.orders.delivered} доставлено из ${d.orders.total}`);
 
   const money = v => `<span data-aed="${v||0}">${v||0}</span> AED`;
   const init = n => escS(String(n||'—').trim().charAt(0).toUpperCase() || '—');

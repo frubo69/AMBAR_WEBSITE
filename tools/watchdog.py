@@ -18,6 +18,7 @@ import argparse
 import json
 import os
 import shutil
+import re
 import subprocess
 import sys
 import urllib.parse
@@ -87,6 +88,38 @@ def check_backup() -> list:
     return []
 
 
+def check_errors() -> list:
+    """Необработанные исключения в логах за последние минуты.
+
+    Сутки заказы из приложения падали на одной строке кода, и узнали мы об
+    этом от клиента. Сторож смотрел на базу, копии, диск и память — но не на
+    то, отвечает ли API вообще. Теперь смотрит: любое падение обработчика
+    видно в течение десяти минут, вместе с текстом ошибки.
+    """
+    out = _sh("journalctl", "-u", "ambar-api", "-u", "ambar-operator",
+              "--since", "-12min", "--no-pager")
+    if not out:
+        return []
+    lines = out.split("\n")
+    # Считаем именно падения запросов: одиночные WARNING — это норма жизни.
+    kinds: dict = {}
+    for i, line in enumerate(lines):
+        if "Error handling request" in line or "Traceback (most recent call last)" in line:
+            # тип ошибки лежит в конце трассировки — ищем ниже по тексту
+            for nxt in lines[i:i + 25]:
+                m = re.search(r"([A-Za-z_]+Error|Exception)\b:?(.*)$", nxt)
+                if m and "Traceback" not in nxt:
+                    key = (m.group(1) + ":" + m.group(2).strip())[:120]
+                    kinds[key] = kinds.get(key, 0) + 1
+                    break
+    if not kinds:
+        return []
+    top = sorted(kinds.items(), key=lambda kv: -kv[1])[:3]
+    total = sum(kinds.values())
+    lines_out = " · ".join(f"{k} ×{n}" for k, n in top)
+    return [f"падений запросов за 12 мин: {total} — {lines_out}"]
+
+
 def check_offsite() -> list:
     """Копия наружу уходит четыре раза в сутки. Если её нет больше суток —
     третьего места у нас фактически не осталось, и знать об этом надо до того,
@@ -132,8 +165,8 @@ def check_api() -> list:
     return [] if code in ("200", "401", "403", "404") else [f"API не отвечает (код {code or '—'})"]
 
 
-CHECKS = [check_services, check_mongo, check_backup, check_offsite,
-          check_disk, check_mem, check_api]
+CHECKS = [check_services, check_mongo, check_errors, check_backup,
+          check_offsite, check_disk, check_mem, check_api]
 
 
 def notify(text: str) -> None:

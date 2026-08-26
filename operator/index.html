@@ -655,6 +655,8 @@ a.oc-row:active{background:var(--card2)}
 .och-ctx{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:11px 22px;
   background:var(--bg3);border-bottom:1px solid var(--border2)}
 .och-ctx .b{flex:1;min-width:0}
+.och-who{display:none;font-size:10px;font-weight:700;letter-spacing:1.2px;
+  text-transform:uppercase;color:var(--muted)}
 .och-ctx-r{display:flex;align-items:center;gap:10px;flex-shrink:0}
 .och-ctx .a{font-size:13.5px;font-weight:700;line-height:1.3;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
@@ -1239,6 +1241,39 @@ a.oc-row:active{background:var(--card2)}
   .hdr-grp{gap:4px}
   .pill{width:32px;height:32px}
   .pill .ic{width:16px;height:16px}
+}
+
+/* На широком экране карточку незачем делить на вкладки: разговор и заказ
+   помещаются рядом. Слева — переписка, справа — сам заказ с кнопками, и
+   решение принимается, не отрывая глаз от того, что пишет водитель.
+   Раскладка включается только там, где разговор вообще есть. */
+@media (min-width:900px){
+  .sheet.wide.has-chat{
+    max-width:980px;width:min(980px,94vw);height:88vh;
+    display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);
+    grid-template-rows:auto minmax(0,1fr) auto;
+    grid-template-areas:"head head" "chat body" "chat acts"}
+  .sheet.wide.has-chat > .t{grid-area:head}
+  .sheet.wide.has-chat > .oc-tabs{display:none}
+  .sheet.wide.has-chat > #ordChat{grid-area:chat;display:flex;
+    border-right:1px solid var(--border2)}
+  .sheet.wide.has-chat > #ordBody{grid-area:body;display:block}
+  .sheet.wide.has-chat > .ord-acts{grid-area:acts;margin-top:0}
+  /* Низ колонок выравниваем по кнопкам: поле ввода стояло на шесть пикселей
+     ниже последнего ряда справа, и это было видно. */
+  .sheet.wide.has-chat .och-say{padding-bottom:calc(18px + var(--safe-bottom))}
+  /* Подпись колонки — просто подпись: полоса с заливкой обрывалась о границу
+     колонок и читалась как недочерченная линия. */
+  .sheet.wide.has-chat .och-ctx{background:none;border-bottom:none;padding:20px 22px 4px}  /* 20px — чтобы подпись слева встала на одну строку с «АДРЕС» справа */
+  /* Вкладочные правила здесь не действуют: видно и то и другое целиком. */
+  .sheet.wide.has-chat.chat > .ord-acts .oc-total{display:block}
+  .sheet.wide.has-chat.chat > .ord-acts .oc-top ~ .oc-row2,
+  .sheet.wide.has-chat.chat > .ord-acts .oc-row2 ~ .oc-row2{display:flex}
+  /* Адрес и сумма стоят в правой колонке — в шапке разговора они были бы
+     вторым экземпляром того же самого. */
+  .sheet.wide.has-chat .och-who{display:block}
+  .sheet.wide.has-chat .och-ctx .b,
+  .sheet.wide.has-chat .och-ctx-r{display:none}
 }
 
 @media (max-height:720px){
@@ -2912,6 +2947,9 @@ function chatRender(toBottom){
   // первым пишет оператор.
   const on = chat.length || o.status === 'approved';
   if(tabs) tabs.style.display = on ? '' : 'none';
+  // На широком экране по этому же признаку карточка раскладывается в две
+  // колонки: слева разговор, справа заказ — переключать нечего.
+  const sh = $('ordSheet'); if(sh) sh.classList.toggle('has-chat', !!on);
   if(!on){ box.innerHTML = ''; _ochShell = ''; ordSet('order'); return; }
 
   const n = _drvWait(chat);
@@ -2936,6 +2974,7 @@ function chatRender(toBottom){
   if(_ochShell !== o.order_id || !$('ochW')){
     box.innerHTML = `
       <div class="och-ctx">
+        <div class="och-who" id="ochWho"></div>
         <div class="b"><div class="a" id="ochAddr"></div><div class="s" id="ochSub"></div></div>
         <div class="och-ctx-r" id="ochAct"></div>
       </div>
@@ -2953,6 +2992,9 @@ function chatRender(toBottom){
       </div>`;
     _ochShell = o.order_id; _ochBody = ''; toBottom = true;
   }
+  // В две колонки адрес и сумма стоят справа, в самом заказе: слева тогда
+  // достаточно знать, с кем разговор.
+  $('ochWho').textContent = 'Разговор с водителем' + (o.driver ? ' · ' + o.driver : '');
   $('ochAddr').textContent = o.address || 'адрес не указан';
   $('ochSub').textContent = [o.customer_name, _distName(o.office_id) || o.district || '',
                              o.driver ? ('водитель ' + o.driver) : ''].filter(Boolean).join(' · ');

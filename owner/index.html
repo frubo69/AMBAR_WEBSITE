@@ -2849,6 +2849,11 @@ button.path:active{transform:scale(.995)}
 /* Donut */
 .donut-wrap{display:flex;align-items:center;gap:16px}
 .donut{width:92px;height:92px;flex-shrink:0;position:relative}
+/* Кольцо отвечает на касание вместе с цифрой: выбранная доля отрисовывается
+   заново, остальные отступают толщиной и прозрачностью. */
+.pay-arc{transition:stroke-dasharray .55s cubic-bezier(.25,.8,.25,1),
+  stroke-width .3s var(--e1),opacity .3s var(--e1)}
+@media (prefers-reduced-motion: reduce){.pay-arc{transition:none}}
 .donut-c{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
   justify-content:center;background:none;border:none;cursor:pointer;font-family:inherit;
   color:inherit;padding:0;border-radius:50%;-webkit-tap-highlight-color:transparent;
@@ -3179,11 +3184,11 @@ button.path:active{transform:scale(.995)}
       <div class="donut">
         <svg viewBox="0 0 36 36" width="92" height="92">
           <circle cx="18" cy="18" r="15.9" fill="none" stroke="#14142A" stroke-width="3.5"/>
-          <circle id="payCashArc" cx="18" cy="18" r="15.9" fill="none" stroke="#C9A96E" stroke-width="3.5"
+          <circle id="payCashArc" class="pay-arc" cx="18" cy="18" r="15.9" fill="none" stroke="#C9A96E" stroke-width="3.5"
             stroke-dasharray="0 100" stroke-dashoffset="25" transform="rotate(-90 18 18)" stroke-linecap="round"/>
-          <circle id="payCryptoArc" cx="18" cy="18" r="15.9" fill="none" stroke="#26A17B" stroke-width="3.5"
+          <circle id="payCryptoArc" class="pay-arc" cx="18" cy="18" r="15.9" fill="none" stroke="#26A17B" stroke-width="3.5"
             stroke-dasharray="0 100" stroke-dashoffset="25" transform="rotate(-90 18 18)" stroke-linecap="round"/>
-          <circle id="payDebtArc" cx="18" cy="18" r="15.9" fill="none" stroke="#F3B44A" stroke-width="3.5"
+          <circle id="payDebtArc" class="pay-arc" cx="18" cy="18" r="15.9" fill="none" stroke="#F3B44A" stroke-width="3.5"
             stroke-dasharray="0 100" stroke-dashoffset="25" transform="rotate(-90 18 18)" stroke-linecap="round"/>
         </svg>
         <button class="donut-c" id="payFocusBtn" onclick="event.stopPropagation();payFocusNext()"
@@ -7641,45 +7646,87 @@ const PAY_VIEW = {
 };
 
 function payFocusNext(){
-  const has = ['crypto', 'cash'].concat((PAY_LAST && PAY_LAST.debt) ? ['debt'] : []);
+  // Три способа всегда: долг — не редкое событие, а способ расчёта, и ноль в
+  // нём такой же ответ, как и любое другое число.
+  const has = ['crypto', 'cash', 'debt'];
   const i = has.indexOf(PAY_FOCUS);
   PAY_FOCUS = has[(i + 1) % has.length];
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  // Подпись гасим на время пересчёта: цифра едет, а слово под ней меняется
-  // мгновенно — иначе на середине пути «40% наличные» читается как факт.
+  // Рисуем сразу. Раньше перерисовка была отложена на 160 мс «чтобы подпись
+  // не мигала», и из-за этой отсрочки число с подписью расходились: пока
+  // таймер ждал, приходил следующий пересчёт, и в центре оставалась доля
+  // предыдущего способа. Мигание убирает класс, а не задержка.
   const btn = document.getElementById('payFocusBtn');
   if(btn){
     btn.classList.add('turn');
-    setTimeout(() => { payPaintFocus(); btn.classList.remove('turn'); }, 160);
-  } else payPaintFocus();
+    setTimeout(() => btn.classList.remove('turn'), 220);
+  }
+  payPaintFocus();
 }
 
 function payPaintFocus(){
   const d = PAY_LAST; if(!d) return;
   const v = PAY_VIEW[PAY_FOCUS] || PAY_VIEW.crypto;
   _setText('payFocusLbl', v.lbl);
-  _animPct(document.getElementById('payCryptoPct'), d.pct[PAY_FOCUS] || 0);
+  // Ноль и «меньше процента» — разные новости. За год криптой пришло 555 AED
+  // из полутора миллионов: это 0,04%, и округлённый ноль читался как «крипты
+  // не было вовсе», хотя деньги пришли.
+  _animPct(document.getElementById('payCryptoPct'), d.pct[PAY_FOCUS] || 0,
+           (d.aed || {})[PAY_FOCUS] || 0);
   // Выбранная дуга выходит вперёд, остальные отступают: видно, о чём число.
+  // Она же и перерисовывается заново — кольцо отвечает на касание вместе с
+  // цифрой, а не стоит неподвижным фоном.
   Object.keys(PAY_VIEW).forEach(k => {
     const el = document.getElementById(PAY_VIEW[k].arc); if(!el) return;
     const on = k === PAY_FOCUS;
     el.setAttribute('stroke-width', on ? '4.6' : '3.2');
     el.style.opacity = on ? '1' : '.42';
+    if(on && !_reduceMotion()){
+      const len = el.getAttribute('stroke-dasharray');
+      el.style.transition = 'none';
+      el.setAttribute('stroke-dasharray', '0 100');
+      void el.getBoundingClientRect();
+      el.style.transition = '';
+      el.setAttribute('stroke-dasharray', len);
+    }
   });
 }
 
+function _reduceMotion(){
+  return !!(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches);
+}
+
 // Тот же счётчик, что у остальных чисел, только с процентом.
-function _animPct(el, to){
+function _animPct(el, to, aed){
   if(!el) return;
-  to = Math.max(0, Math.round(to || 0));
-  const from = parseInt(el.dataset.n || '0', 10) || 0;
+  const raw = to || 0;
+  to = Math.max(0, Math.round(raw));
+  // Есть деньги, но доля не дотягивает до процента — так и пишем.
+  const txt = n => (n === 0 && (aed || 0) > 0 && raw > 0) ? '<1%' : n + '%';
+  // Считаем от того, что человек видит, а не от того, что мы когда-то
+  // задумали показать. Раньше «откуда» бралось из памяти элемента, и стоило
+  // одному счётчику оборваться на середине — следующий стартовал от числа,
+  // которого на экране не было, и цифра застывала на шаг позади подписи.
+  const seen = parseInt(String(el.textContent || '').replace(/[^\d]/g, ''), 10);
+  const from = Number.isFinite(seen) ? seen : 0;
   el.dataset.n = String(to);
-  const reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
-  if(from === to || reduce){ el.textContent = to + '%'; return; }
+  const reduce = _reduceMotion();
+  // Каждый запуск отменяет предыдущий: два счётчика на одном элементе
+  // дописывали друг за другом и оставляли чужое число.
+  const my = String((+el.dataset.anim || 0) + 1);
+  el.dataset.anim = my;
+  if(from === to || reduce){ el.textContent = txt(to); return; }
   const dur = 620, t0 = performance.now();
+  // Верное число дописываем по таймеру, а не только последним кадром. Кадры
+  // может отменить кто угодно — новый счётчик, уход вкладки в фон, — и тогда
+  // на экране оставалось значение с середины пути. Анимация здесь украшение,
+  // правда — вот эта строка.
+  clearTimeout(el._pctT);
+  el._pctT = setTimeout(() => { el.textContent = txt(to); }, dur + 60);
   (function step(now){
+    if(el.dataset.anim !== my) return;          // нас обогнали — уходим молча
     const p = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - p, 3);
-    el.textContent = Math.round(from + (to - from) * e) + '%';
+    el.textContent = p < 1 ? Math.round(from + (to - from) * e) + '%' : txt(to);
     if(p < 1) requestAnimationFrame(step);
   })(t0);
 }
@@ -7701,14 +7748,14 @@ function renderPaySplit(bm){
   set('payCashArc',   kLen, 25);
   set('payCryptoArc', cLen, 25 - kLen);
   set('payDebtArc',   dLen, 25 - kLen - cLen);
-  PAY_LAST = {pct: {crypto: pct(cAed), cash: pct(kAed), debt: pct(dAed)}, debt: dAed > 0};
-  if(PAY_FOCUS === 'debt' && !dAed) PAY_FOCUS = 'crypto';   // долг кончился — вернулись
+  PAY_LAST = {pct: {crypto: pct(cAed), cash: pct(kAed), debt: pct(dAed)},
+              aed: {crypto: cAed, cash: kAed, debt: dAed}, debt: dAed > 0};
   payPaintFocus();
   _setAed('payCryptoVal', cAed);
   _setAed('payCashVal',   kAed);
   _setAed('payDebtVal',   dAed);
   const dRow = document.getElementById('payDebtRow');
-  if(dRow) dRow.style.display = dAed ? '' : 'none';
+  if(dRow) dRow.style.display = '';
 }
 
 // Детальный разрез района: /api/owner/office за выбранный на странице период.

@@ -292,8 +292,6 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .ohero.day-busy .hero-amt{opacity:.45;transition:opacity .15s}
 /* Горизонтальный жест по карточке — наш; вертикальную прокрутку не отбираем. */
 .ohero,.ohero[data-detail]{touch-action:pan-y}
-#offCards.day-drag{transition:none}
-#offCards.day-back{transition:transform .2s cubic-bezier(.2,.8,.3,1)}
 .hero.day-move{transition:transform .15s cubic-bezier(.3,0,.2,1)}
 .hero.day-back{transition:transform .2s cubic-bezier(.2,.8,.3,1)}
 
@@ -7141,66 +7139,10 @@ function daySwipe(hero){
   hero.addEventListener('touchcancel', ()=>{ live = false; settle(); }, {passive:true});
 }
 daySwipe(document.querySelector('#pg-overview .hero'));
-// Карточки выручки на районах больше нет — свайпать нечего.
-
-// Тот же жест на карточках районов: смахнул вправо — предыдущий день. Палец
-// тянет всю колонку разом, а не одну карточку: день у района не свой, он общий,
-// и разъезжающиеся в разные даты карточки означали бы, что складывать их между
-// собой уже нельзя.
-(function(){
-  const box = document.getElementById('offCards');
-  if(!box) return;
-  let sx = 0, sy = 0, live = false, axis = 0, moved = false;
-
-  const settle = ()=>{
-    box.classList.remove('day-drag');
-    box.classList.add('day-back');
-    box.style.transform = '';
-    setTimeout(()=>box.classList.remove('day-back'), 220);
-  };
-
-  box.addEventListener('touchstart', e=>{
-    if(e.touches.length !== 1){ live = false; return; }
-    sx = e.touches[0].clientX; sy = e.touches[0].clientY;
-    live = true; axis = 0; moved = false;
-  }, {passive:true});
-
-  box.addEventListener('touchmove', e=>{
-    if(!live) return;
-    const t = e.touches[0];
-    let dx = t.clientX - sx;
-    const dy = t.clientY - sy;
-    if(!axis && (Math.abs(dx) > 8 || Math.abs(dy) > 8))
-      axis = Math.abs(dx) > Math.abs(dy) ? 1 : -1;
-    if(axis !== 1) return;
-    e.preventDefault();
-    moved = true;
-    if(dx < 0 && DAY_OFFSET === 0) dx = Math.max(dx * .25, -40);  // вперёд хода нет
-    box.classList.remove('day-back');
-    box.classList.add('day-drag');
-    box.style.transform = `translateX(${dx}px)`;
-  }, {passive:false});
-
-  box.addEventListener('touchend', e=>{
-    if(!live) return; live = false;
-    if(axis !== 1) return;
-    const t = e.changedTouches[0], dx = t.clientX - sx, dy = t.clientY - sy;
-    const commit = Math.abs(dx) >= 55 && Math.abs(dx) > Math.abs(dy) * 1.2
-                   && !(dx < 0 && DAY_OFFSET === 0);
-    if(!commit){ settle(); return; }
-    box.classList.remove('day-drag');
-    if(!dayStep(dx > 0 ? 1 : -1)) settle();
-    else settle();                                // цифры перерисуются, колонка вернётся
-  }, {passive:true});
-
-  box.addEventListener('touchcancel', ()=>{ live = false; settle(); }, {passive:true});
-
-  // Свайп не должен открывать карточку района: палец уехал — значит это жест,
-  // а не тап. Ловим на всплытии, до делегата data-detail.
-  box.addEventListener('click', e=>{
-    if(moved){ e.stopPropagation(); e.preventDefault(); moved = false; }
-  }, true);
-})();
+// Тот же жест на районах — по карточке выручки, а не по списку. Тянуть колонку
+// районов было странно вдвойне: день у района не свой, он общий, и жест жил на
+// том, к чему относится меньше всего. Карточка выручки — это и есть день.
+daySwipe(document.getElementById('offHero'));
 
 function applyPeriod(p){
   const d = PERIOD_DATA[p]; if(!d) return;

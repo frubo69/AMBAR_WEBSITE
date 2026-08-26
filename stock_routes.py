@@ -1356,12 +1356,12 @@ async def handle_shift_log(request):
     by_day = {}
     for r in rows:
         by_day.setdefault(r["day"], []).append(r)
-    days_out = [{"day": k, "rows": v,
-                 "orders": sum(x["orders"] for x in v if x["kind"] == "close"),
-                 "revenue": sum(x["revenue"] for x in v if x["kind"] == "close"),
-                 "opened": sum(1 for x in v if x["kind"] == "open"),
-                 "closed": sum(1 for x in v if x["kind"] == "close")}
-                for k in sorted(by_day, reverse=True)]
+    days_out = [{"day": k, "rows": rs,
+                 "orders": sum(x["orders"] for x in rs if x["kind"] == "close"),
+                 "revenue": sum(x["revenue"] for x in rs if x["kind"] == "close"),
+                 "opened": sum(1 for x in rs if x["kind"] == "open"),
+                 "closed": sum(1 for x in rs if x["kind"] == "close")}
+                for k, rs in sorted(by_day.items(), reverse=True)]
     return web.json_response({"days": days, "from": d0, "to": today,
                               "list": days_out}, headers=CORS_HEADERS)
 

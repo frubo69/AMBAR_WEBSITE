@@ -164,6 +164,11 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    выручки, стоящую вплотную, и карточка выглядела грязной сверху. */
 .period-bar{display:flex;gap:8px;margin:0;align-items:stretch;position:fixed;top:calc(66px + var(--safe-top));left:0;right:0;z-index:35;background:var(--bg);padding:4px 14px 8px;pointer-events:none}
 .period-bar>*{pointer-events:auto}
+/* Полоса периодов кончается, а карточка выручки прилипает на восемь точек
+   ниже — и в этот зазор пролезал прокручиваемый контент: над карточкой
+   ползли обрезанные плитки. Закрашиваем зазор той же подложкой. */
+.period-bar::after{content:'';position:absolute;left:0;right:0;top:100%;height:10px;
+  background:var(--bg);pointer-events:none}
 .period-bar .periods{flex:1;margin:0}
 .cal-btn{width:40px;height:auto;padding:0;border-radius:11px;background:var(--card);border:1px solid var(--border2);color:var(--sub);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s var(--e1);flex-shrink:0}
 .cal-btn:active{transform:scale(.92);color:var(--gold2);border-color:rgba(201,169,110,.35)}
@@ -266,10 +271,13 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   text-transform:lowercase;margin-top:2.5px}
 /* Возврат к сегодня — отдельная подписанная кнопка, а не догадка про иконку.
    Появляется только когда действительно есть куда возвращаться. */
-.dn-home{height:24px;padding:0 10px;margin-left:3px;border:none;border-radius:999px;
+/* Значком, а не словом: «Назад» занимало полкарточки, и рядом с датой уже
+   ничему не оставалось места. Смысл тот же, ширина втрое меньше. */
+.dn-home{width:24px;height:24px;padding:0;margin-left:3px;border:none;border-radius:999px;
+  display:flex;align-items:center;justify-content:center;
   background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;
-  font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:700;letter-spacing:.2px;
-  cursor:pointer;white-space:nowrap;transition:.15s var(--e1);box-shadow:0 2px 10px rgba(201,169,110,.3)}
+  cursor:pointer;transition:.15s var(--e1);box-shadow:0 2px 10px rgba(201,169,110,.3)}
+.dn-home svg{width:13px;height:13px;display:block}
 .dn-home:active{transform:scale(.92)}
 /* Horizontal swipes on the hero are OURS — the page must not scroll under them.
    Needs [data-detail] in the selector to outrank the generic
@@ -3088,18 +3096,25 @@ button.path:active{transform:scale(.995)}
         <button class="dn-b" id="dnNext" aria-label="Следующий день" disabled
           onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayStep(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
         <button class="dn-home" id="dnHome" style="display:none" aria-label="Вернуться к сегодня"
-          onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayReset()">Назад</button>
+          title="Вернуться к сегодня"
+          onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayReset()"><svg
+          viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+          stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v4h4"/></svg></button>
       </span>
     </div>
-    <div class="hero-amt-row">
-      <span class="hero-amt mono" id="heroRev" data-aed="">—</span><span class="hero-unit cur-unit">AED</span>
-      <!-- Справа от суммы пустовало полкарточки. Валовая и чаевые уходят туда
-           двумя тихими строчками — карточка не растёт, график остаётся на
-           месте, а крупным по-прежнему одно число, то самое важное. -->
+    <div class="hero-main">
+      <div class="hero-amt-row">
+        <span class="hero-amt mono" id="heroRev" data-aed="">—</span><span class="hero-unit cur-unit">AED</span>
+      </div>
+      <!-- Четыре числа под суммой одной строкой: они объясняют, из чего она
+           получилась, и остаются на экране даже когда карточка свёрнута —
+           «в руках» без «вала, чая, расхода и долга» ничего не говорит.
+           Строкой, а не столбиком: столбик не помещался рядом с датой. -->
       <div class="hero-side" id="heroSide" style="display:none">
-        <div class="hero-side-r"><span class="hero-side-l">валовая</span><span class="hero-side-v" id="heroGross" data-aed="">—</span></div>
-        <div class="hero-side-r"><span class="hero-side-l">чаевые</span><span class="hero-side-v gold" id="heroTips" data-aed="">—</span></div>
-        <div class="hero-side-r"><span class="hero-side-l">расход</span><span class="hero-side-v dn" id="heroSpend" data-aed="">—</span></div>
+        <span class="hero-side-r"><i>вал</i><b id="heroGross" data-aed="">—</b></span>
+        <span class="hero-side-r"><i>чай</i><b class="gold" id="heroTips" data-aed="">—</b></span>
+        <span class="hero-side-r"><i>расх</i><b class="dn" id="heroSpend" data-aed="">—</b></span>
+        <span class="hero-side-r"><i>долг</i><b class="warn" id="heroDebt" data-aed="">—</b></span>
       </div>
     </div>
     <div class="hero-row">
@@ -5239,16 +5254,33 @@ button.pill:active{opacity:.6}
 /* Сдвинуты вниз относительным смещением, а не отступом: отступ раздвинул бы
    строку с числом, карточка бы выросла, и график снова уехал бы за нижний
    край. relative/top двигает только картинку, вёрстка остаётся прежней. */
-.hero-side{margin-left:auto;display:flex;flex-direction:column;gap:2px;align-self:center;
-  position:relative;top:10px;
-  padding-left:14px;text-align:right}
-.hero-side-r{display:flex;align-items:baseline;justify-content:flex-end;gap:7px;white-space:nowrap}
-.hero-side-l{font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:600;letter-spacing:.5px;
-  text-transform:uppercase;color:var(--muted);opacity:.75}
-.hero-side-v{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;
-  color:var(--sub);font-variant-numeric:tabular-nums;min-width:56px}
-.hero-side-v.dn{color:var(--dn)}
-.hero-side-v.gold{color:var(--gold2)}
+/* Четыре числа одной строкой под суммой. Столбиком справа они не помещались
+   рядом с датой ни на одном телефоне: строка занимает ту же высоту, что и
+   один их ряд, и переживает сжатие карточки. */
+/* Кегль задан на всей строке, а подпись и число — долями от него: тогда
+   строку можно сузить одним числом, когда годовые суммы не влезают. */
+.hero-side{display:flex;align-items:baseline;flex-wrap:nowrap;gap:11px;margin-top:8px;
+  overflow:hidden;font-size:12px}
+.hero-side-r{display:inline-flex;align-items:baseline;gap:5px;white-space:nowrap;flex:0 0 auto}
+.hero-side-r i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:.75em;
+  font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);opacity:.8}
+.hero-side-r b{font-family:'Space Grotesk',sans-serif;font-size:1.04em;font-weight:700;
+  color:var(--sub);font-variant-numeric:tabular-nums}
+.hero-side-r b.dn{color:var(--dn)}
+.hero-side-r b.gold{color:var(--gold2)}
+.hero-side-r b.warn{color:var(--warn-t)}
+/* Сжатая карточка: числа мельче, дата теряет подпись и кнопку возврата —
+   всё, что объясняет, уступает место тому, что отвечает. */
+.hero.tight .hero-side{gap:9px;margin-top:5px;font-size:10.5px}
+.hero.tight .dn-rel,.hero.tight .dn-home{display:none}
+.hero.tight .dn-d{min-width:44px;height:24px}
+.hero.tight .dn-b{width:22px}
+/* Узкие телефоны (320 точек): в развёрнутом виде четвёртое число упиралось в
+   край и «долг» срезало. Тем же мелким кеглем, что и в сжатом, влезают все. */
+@media (max-width:360px){
+  .hero-side{gap:8px;font-size:10.5px}
+  .hero-side-r{gap:4px}
+}
 
 /* ── Широкий экран: планшет и компьютер ─────────────────────────────────────
    Приложение свёрстано под телефон, и на iPad/ПК оно просто растягивалось:
@@ -5642,6 +5674,25 @@ try{
   });
 }catch(e){}
 
+// Годовые числа в четвёрке под суммой на узком телефоне не помещаются, а
+// строка обрезана по краю: первым пропадал «долг» — молча, без единого знака.
+// Сжимаем строку ровно настолько, насколько не хватило места, и не мельче
+// восьми десятых: ниже цифры уже не читаются, и лучше честный обрез.
+function heroSideFit(){
+  const side = document.getElementById('heroSide');
+  if(!side || !side.clientWidth) return;
+  // Кегль, а не масштаб: строка сама себе обрезчик, и transform уменьшил бы
+  // уже обрезанную картинку — «долг» так и остался бы за краем.
+  side.style.fontSize = '';
+  for(let k = 0; k < 8; k++){
+    if(side.scrollWidth <= side.clientWidth + 1) return;
+    const now = parseFloat(getComputedStyle(side).fontSize);
+    if(now <= 8.5) return;                       // мельче уже не читается
+    side.style.fontSize = (now - .5) + 'px';
+  }
+}
+window.addEventListener('resize', heroSideFit);
+
 (function heroShrink(){
   const hero = document.querySelector('#pg-overview .hero');
   const pbar = document.querySelector('.period-bar');
@@ -5649,7 +5700,7 @@ try{
   const lbl   = hero.querySelector('#heroLbl');
   const side  = hero.querySelector('.hero-side');
   const spark = hero.querySelector('.hero-spark');
-  const amtRow= hero.querySelector('.hero-amt-row');
+  const amtRow= hero.querySelector('.hero-main') || hero.querySelector('.hero-amt-row');
   const amt   = hero.querySelector('.hero-amt');
   const row   = hero.querySelector('.hero-row');
   const nav   = hero.querySelector('.day-nav');
@@ -5718,8 +5769,17 @@ try{
     // середине пути на экране остаётся только число и стрелки.
     const fade = Math.max(0, 1 - p * 2);
     if(lbl)   lbl.style.opacity = fade;
-    // Валовая и чаевые гаснут только там, где на их место встают стрелки дня.
-    if(side)  side.style.opacity = hero.classList.contains('nonav') ? 1 : fade;
+    // Четыре числа не гаснут вовсе: ради них карточку и сворачивают — «сколько
+    // в руках» без «валовой, чая, расхода и долга» ничего не объясняет.
+    if(side)  side.style.opacity = 1;
+    // Со второй половины пути карточка переходит в сжатый вид: дата теряет
+    // подпись и кнопку «назад», числа мельчают. Класс ставится здесь, и это
+    // единственное место, где он ставится.
+    const wasTight = hero.classList.contains('tight');
+    hero.classList.toggle('tight', p > .55);
+    // Кегль строки подбираем только на переломе: считать его каждый кадр —
+    // это принудительный пересчёт вёрстки на каждую точку прокрутки.
+    if(hero.classList.contains('tight') !== wasTight) heroSideFit();
     if(spark){ spark.style.opacity = fade; spark.style.transform = `translateY(${18*p}px)`; }
     if(row)   row.style.opacity = fade;
 
@@ -7594,6 +7654,11 @@ function _paintHero(p, f){
   _setAed('heroGross', f.revenue.current);
   _setAed('heroTips',  tips);
   _setAed('heroSpend', spend);
+  // Долг — не выручка в кассе, а товар, уехавший под слово. В шапке он стоит
+  // рядом с расходом: и то и другое объясняет разницу между «валовой» и тем,
+  // что реально в руках.
+  _setAed('heroDebt', ((f.by_method || {}).debt || {}).aed || 0);
+  heroSideFit();
   _setAed('heroPrev', f.revenue.previous);
   _setText('heroDelta', f.revenue.delta_label);
   const hd = document.getElementById('heroDelta');
@@ -7610,6 +7675,11 @@ function _paintHero(p, f){
 function renderFinance(p, f){
   // Data has arrived — clear loading shimmers before painting real values.
   setFinanceSkel(false);
+  // Пересчитать сжатие карточки после каждой отрисовки. Переключение периода
+  // приходит ответом сервера, и до этой строки карточка возвращалась в полный
+  // рост, хотя страница осталась прокрученной: она наезжала на плитки заказов
+  // — то самое «всё съехало» на «Неделе».
+  setTimeout(() => { if(window.HERO_APPLY) HERO_APPLY(); }, 0);
   // The whole overview follows whatever window this payload describes — the live
   // period, or a day reached via the hero's day browser.
   _paintHero(p, f);

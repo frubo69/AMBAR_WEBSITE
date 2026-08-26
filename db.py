@@ -3135,6 +3135,37 @@ async def get_finished_audits(limit: int = 40) -> list:
     return await cur.to_list(length=int(limit))
 
 
+# ── Чек-лист смены ─────────────────────────────────────────────────────────
+# Галочка ставится сама везде, где её можно вывести из данных. Здесь хранится
+# только то, чего система не видит: деньги на руках, разговор с человеком,
+# решение по норме. Ключ — рабочие сутки, а не календарный день.
+
+async def checklist_get(day: str) -> dict:
+    db = _db_or_none()
+    if db is None:
+        return {}
+    doc = await db.checklist.find_one({"day": day}, {"_id": 0, "items": 1})
+    return (doc or {}).get("items") or {}
+
+
+async def checklist_set(day: str, item: str, done: bool, by: str = "") -> dict:
+    db = _db_or_none()
+    if db is None:
+        return {}
+    now = datetime.now(timezone.utc).isoformat()
+    if done:
+        val = {"done": True, "by": by, "at": now}
+        await db.checklist.update_one({"day": day},
+                                      {"$set": {f"items.{item}": val, "day": day}},
+                                      upsert=True)
+    else:
+        val = {}
+        await db.checklist.update_one({"day": day},
+                                      {"$unset": {f"items.{item}": ""},
+                                       "$set": {"day": day}}, upsert=True)
+    return val
+
+
 async def get_stock_counts_for_day(day: str) -> list:
     db = _db_or_none()
     if db is None: return []

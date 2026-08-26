@@ -3087,6 +3087,300 @@ async def handle_owner_panic(request):
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 
+# ── Чек-лист смены ─────────────────────────────────────────────────────────
+# У старшего и у смены разные часы, и в этом вся сложность. Смена операторов и
+# водителей идёт с 12:00 до 06:00 — это ровно рабочие сутки системы. Старший
+# работает с 06:00 до часу-двух ночи, то есть его день пересекает границу
+# суток и делится надвое:
+#
+#   06:00 → 12:00   хвост вчерашних суток — он их закрывает
+#   12:00 → 02:00   начало сегодняшних   — он их открывает и ведёт
+#   02:00 → 06:00   смена работает без него
+#
+# Отсюда три блока, а не два: утренний (закрыть), дневной (открыть) и
+# «перед уходом» — то, что нельзя оставлять на ночь, когда решать некому.
+#
+# Галочка ставится сама везде, где её можно вывести из данных. Руками — только
+# то, чего система не видит: деньги на руках, разговор с человеком, решение по
+# норме. Иначе чек-лист превращается в форму, которую заполняют не глядя.
+#
+# Невыполненное не исчезает в полдень: пункт уходящих суток остаётся с пометкой
+# «долг». Список, который забывает, — способ забыть.
+
+CHK_MANUAL = {"cash", "order_sent", "norms"}     # эти система знать не может
+SHIFT_END_HOUR = 6        # смена операторов и водителей кончается в шесть утра
+CHK_NIGHT_HOUR = 22       # с этого часа показываем «перед уходом»
+
+
+def _chk_item(iid, title, hint, done, *, go="", n=0, manual=False, warn=False):
+    return {"id": iid, "t": title, "s": hint, "done": bool(done),
+            "manual": manual, "go": go, "n": n, "warn": warn}
+
+
+async def _chk_shift(day: str):
+    """Открытые и закрытые районы за сутки."""
+    try:
+        closed = await db.shifts_for_day(day)
+        opens = await db.shift_opens_for_day(day)
+    except Exception as e:
+        log.warning(f"[chk] смены за {day}: {e}")
+        closed, opens = {}, {}
+    total = len(OFFICE_IDS)
+    n_closed = sum(1 for o in OFFICE_IDS if closed.get(o))
+    n_open = sum(1 for o in OFFICE_IDS if opens.get(o))
+    crew_ok = sum(1 for o in OFFICE_IDS if (opens.get(o) or {}).get("drivers"))
+    last_at = max([str((closed.get(o) or {}).get("closed_at") or "")
+                   for o in OFFICE_IDS] or [""])
+    return {"total": total, "closed": n_closed, "open": n_open,
+            "crew": crew_ok, "closed_at": last_at}
+
+
+async def _chk_orders(day_start, day_end):
+    """Заказы суток: сколько ещё в пути и сколько просьб водителей без ответа."""
+    try:
+        since = (day_start - timedelta(hours=1)).astimezone(timezone.utc)
+        orders = list((await db.orders_from(
+            since.isoformat().replace("+00:00", ""))).values())
+    except Exception as e:
+        log.warning(f"[chk] заказы за сутки: {e}")
+        return {"route": 0, "req": 0}
+    route = req = 0
+    for o in orders:
+        try:
+            ts = datetime.fromisoformat(o.get("timestamp", "")).replace(
+                tzinfo=timezone.utc).astimezone(DUBAI_TZ)
+        except (ValueError, TypeError):
+            continue
+        if not (day_start <= ts < day_end):
+            continue
+        if o.get("status") == "approved":
+            route += 1
+        r = o.get("driver_req") or {}
+        if r.get("status") == "open":
+            req += 1
+    return {"route": route, "req": req}
+
+
+async def _chk_expenses(day: str):
+    """Разовые траты водителей, ждущие решения владельца."""
+    try:
+        rows = await db.get_driver_days(day)
+    except Exception as e:
+        log.warning(f"[chk] расходы за {day}: {e}")
+        return 0
+    n = 0
+    for d in rows:
+        for e in (d.get("extras") or []):
+            if (e.get("status") or "approved") == "pending":
+                n += 1
+    return n
+
+
+async def _chk_support():
+    """Обращения, которые ждут ответа: клиент написал последним и оператор их
+    ещё не открывал. Правило то же, что в панели оператора."""
+    try:
+        docs = await db.support_threads_brief(400)
+    except Exception as e:
+        log.warning(f"[chk] поддержка: {e}")
+        return 0
+    n = 0
+    for d in docs:
+        msgs = d.get("messages") or []
+        if not msgs:
+            continue
+        last = msgs[-1]
+        seen = str(d.get("seen_operator") or "")
+        if last.get("role") == "user" and str(last.get("ts") or "") > seen:
+            n += 1
+    return n
+
+
+async def _chk_supply(day: str):
+    """Поставка этих суток: пришла ли, роздана ли по водителям, чем кончилась."""
+    try:
+        rows = await db.supply_list(limit=10)
+    except Exception as e:
+        log.warning(f"[chk] поставки: {e}")
+        rows = []
+    sup = next((r for r in rows if (r.get("day") or "") == day), None)
+    if not sup:
+        return {"exists": False, "free": 0, "gap": 0, "done": False, "total": 0}
+    tasks = (sup.get("tasks") or {})
+    free = sum(1 for t in tasks.values() if not t.get("driver") and not t.get("done_at"))
+    return {"exists": True, "free": free, "gap": int(sup.get("gap_qty") or 0),
+            "done": (sup.get("status") or "open") != "open", "total": len(tasks)}
+
+
+async def _chk_group_close(day: str, marks: dict):
+    """Закрыть уходящие сутки. Всё, что случилось за смену, уже окончательно —
+    остаётся решить то, что требует человека."""
+    sh = await _chk_shift(day)
+    start = datetime.strptime(day, "%Y-%m-%d").replace(
+        hour=SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
+    orders = await _chk_orders(start, start + timedelta(days=1))
+    exp = await _chk_expenses(day)
+    try:
+        wo = len(await db.writeoff_pending(limit=200))
+    except Exception:
+        wo = 0
+    try:
+        counts = await db.get_stock_counts_for_day(day)
+    except Exception:
+        counts = []
+    rev = len({c.get("district") for c in counts})
+    sup = await _chk_supply(day)
+
+    items = [
+        _chk_item("shift_closed", "Смены закрыты по всем районам",
+                  f"закрыто {sh['closed']} из {sh['total']}",
+                  sh["closed"] >= sh["total"], go="shifts",
+                  n=sh["total"] - sh["closed"]),
+        _chk_item("no_route", "Нет заказов, зависших в пути",
+                  "заказ в пути после смены — бутылка едет, а смена закрыта",
+                  orders["route"] == 0, go="shifts", n=orders["route"], warn=True),
+        _chk_item("expenses", "Согласовать расходы водителей",
+                  f"{exp} ждут решения" if exp else "все разобраны",
+                  exp == 0, go="expenses", n=exp),
+        _chk_item("writeoffs", "Согласовать списания",
+                  f"{wo} ждут решения" if wo else "бой, брак, просрочка разобраны",
+                  wo == 0, go="writeoff", n=wo),
+        _chk_item("revision", "Ревизия проведена",
+                  f"посчитано {rev} из {sh['total']}",
+                  rev >= sh["total"], go="stock", n=sh["total"] - rev),
+        _chk_item("cash", "Деньги за смену приняты",
+                  "наличные по доставленным заказам", bool(marks.get("cash")),
+                  manual=True),
+        _chk_item("order_sent", "Заявка отправлена в магазин",
+                  "магазин уже ответил" if sup["exists"]
+                  else "считается по свежим остаткам после ревизии",
+                  sup["exists"] or bool(marks.get("order_sent")),
+                  go="order", manual=not sup["exists"]),
+    ]
+    sub = _day_human(day)
+    if sh["closed_at"]:
+        sub += " · закрыта " + sh["closed_at"][11:16]
+    return {"id": "close", "t": "Закрыть смену", "s": sub, "day": day, "items": items}
+
+
+async def _chk_group_open(day: str, marks: dict):
+    """Открыть сутки: люди на местах и товар в пути."""
+    sh = await _chk_shift(day)
+    sup = await _chk_supply(day)
+    items = [
+        _chk_item("shift_open", "Все районы открыли смену",
+                  f"открыто {sh['open']} из {sh['total']}",
+                  sh["open"] >= sh["total"], go="shifts",
+                  n=sh["total"] - sh["open"]),
+        _chk_item("crew", "Назначены операторы и водители",
+                  f"с бригадой {sh['crew']} из {sh['total']}",
+                  sh["crew"] >= sh["total"], go="shifts",
+                  n=sh["total"] - sh["crew"]),
+        _chk_item("supply_in", "Ответ магазина загружен, приёмка роздана",
+                  ("ждём ответ магазина" if not sup["exists"]
+                   else (f"{sup['free']} районов без водителя" if sup["free"]
+                         else "все районы разобраны")),
+                  sup["exists"] and not sup["free"], go="order", n=sup["free"]),
+        _chk_item("norms", "Нормы поправлены",
+                  "если вчера чего-то не хватило", bool(marks.get("norms")),
+                  go="norms", manual=True),
+    ]
+    return {"id": "open", "t": "Открыть смену", "s": _day_human(day),
+            "day": day, "items": items}
+
+
+async def _chk_group_night(day: str, marks: dict):
+    """Перед уходом. С двух до шести смена работает без старшего: всё, что
+    требует его решения, до утра зависнет."""
+    sup = await _chk_supply(day)
+    start = datetime.strptime(day, "%Y-%m-%d").replace(
+        hour=SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
+    orders = await _chk_orders(start, start + timedelta(days=1))
+    sos = await _chk_support()
+    items = [
+        _chk_item("support", "Поддержка разобрана",
+                  f"{sos} ждут ответа" if sos else "никто не ждёт ответа",
+                  sos == 0, n=sos),
+        _chk_item("drv_req", "На просьбы водителей отвечено",
+                  f"{orders['req']} без решения" if orders["req"] else "решений не ждут",
+                  orders["req"] == 0, go="shifts", n=orders["req"], warn=True),
+        _chk_item("receiving", "Приёмка закрыта или роздана",
+                  ("поставки нет" if not sup["exists"]
+                   else ("закрыта" if sup["done"]
+                         else (f"{sup['free']} районов без водителя" if sup["free"]
+                               else "у каждого района есть водитель"))),
+                  (not sup["exists"]) or sup["done"] or not sup["free"],
+                  go="order", n=sup["free"]),
+        _chk_item("shortfall", "Недобор выписан на доп. склад",
+                  f"{sup['gap']} бутылок не дал магазин" if sup["gap"] else "магазин дал всё",
+                  sup["gap"] == 0 or bool(marks.get("shortfall")),
+                  go="order", n=sup["gap"], manual=bool(sup["gap"])),
+    ]
+    return {"id": "night", "t": "Перед уходом", "s": "смена останется без вас",
+            "day": day, "items": items}
+
+
+_MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля",
+           "августа", "сентября", "октября", "ноября", "декабря"]
+
+
+def _day_human(day: str) -> str:
+    try:
+        d = datetime.strptime(day, "%Y-%m-%d")
+        return f"{d.day} {_MONTHS[d.month - 1]}"
+    except (ValueError, IndexError):
+        return day
+
+
+@require_owner
+async def handle_checklist(request):
+    """Чек-лист старшего: что проверить и согласовать по каждой смене."""
+    now = datetime.now(DUBAI_TZ)
+    cur = _biz_day_start(now).date().isoformat()
+    prev = (datetime.strptime(cur, "%Y-%m-%d") - timedelta(days=1)).date().isoformat()
+    # Граница здесь не полдень, а шесть утра: до шести смена ещё идёт, хотя
+    # рабочие сутки уже помечены вчерашним числом. С шести до полудня смены
+    # нет вовсе — это и есть окно, в котором старший её закрывает.
+    shift_over = SHIFT_END_HOUR <= now.hour < SHIFT_START_HOUR
+    close_day = cur if shift_over else prev
+    open_day = None if shift_over else cur
+
+    marks_close = await db.checklist_get(close_day)
+    groups = [await _chk_group_close(close_day, marks_close)]
+    if open_day:
+        marks_open = await db.checklist_get(open_day)
+        groups.append(await _chk_group_open(open_day, marks_open))
+        # Ночной блок — только когда до ухода уже близко: днём он был бы
+        # списком того, что и так впереди.
+        if now.hour >= CHK_NIGHT_HOUR or now.hour < SHIFT_END_HOUR:
+            groups.append(await _chk_group_night(open_day, marks_open))
+    phase = ("morning" if shift_over else
+             ("night" if (now.hour >= CHK_NIGHT_HOUR or now.hour < SHIFT_END_HOUR)
+              else "day"))
+    # Долг — незакрытые пункты уходящих суток, когда новые уже идут.
+    if open_day:
+        groups[0]["debt"] = any(not i["done"] for i in groups[0]["items"])
+    return web.json_response({"now": now.isoformat(), "phase": phase,
+                              "close_day": close_day, "open_day": open_day,
+                              "groups": groups}, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_checklist_mark(request):
+    """Отметить пункт, который система знать не может."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    day = (body.get("day") or "").strip()
+    item = (body.get("item") or "").strip()
+    if not day or item not in CHK_MANUAL | {"shortfall"}:
+        return web.json_response({"error": "bad_args"}, status=400, headers=CORS_HEADERS)
+    who = str(request.get("owner_id") or "")
+    await db.checklist_set(day, item, bool(body.get("done")), who)
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+
 def setup(app):
     """Wire owner routes into the aiohttp app. Called from api_server.main()."""
     app.on_startup.append(lambda _: _backfill_delivery_times())
@@ -3131,6 +3425,10 @@ def setup(app):
     app.router.add_post(            "/api/owner/panic", handle_owner_panic)
     app.router.add_route("OPTIONS", "/api/owner/notifications", handle_notifications)
     app.router.add_get(             "/api/owner/notifications", handle_notifications)
+    app.router.add_route("OPTIONS", "/api/owner/checklist", handle_checklist)
+    app.router.add_get(             "/api/owner/checklist", handle_checklist)
+    app.router.add_route("OPTIONS", "/api/owner/checklist/mark", handle_checklist_mark)
+    app.router.add_post(            "/api/owner/checklist/mark", handle_checklist_mark)
     app.router.add_route("OPTIONS", "/api/owner/support-threads", handle_support_threads)
     app.router.add_get(             "/api/owner/support-threads", handle_support_threads)
     app.router.add_route("OPTIONS", "/api/owner/support-thread",  handle_support_thread)

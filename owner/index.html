@@ -804,6 +804,13 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    и идут с вопросом по району. */
 .off-team .drv{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .off-team .sep{opacity:.35;flex:0 0 auto}
+/* Число водителей стоит перед именами: «сколько их сегодня» спрашивают чаще,
+   чем «как зовут», а считать имена глазами — работа, которой можно не быть. */
+.off-team .drvn{flex:0 0 auto;min-width:17px;height:17px;padding:0 5px;border-radius:999px;
+  display:inline-flex;align-items:center;justify-content:center;font-size:10px;
+  font-weight:700;color:var(--sub);background:var(--card2);border:1px solid var(--border2);
+  font-variant-numeric:tabular-nums}
+.off-team .drv.none{color:var(--warn-t)}
 .off-meta{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)}
 .off-meta b{color:var(--sub);font-weight:600}
 .off-meta .sep{opacity:.35}
@@ -1162,6 +1169,66 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .acc-group{display:grid;grid-template-columns:1fr 1fr;margin:0;flex:1 1 auto;
   border-radius:16px;overflow:hidden;background:var(--card);
   border:1px solid var(--border2)}
+/* ── Экран чек-листа ────────────────────────────────────────────────────── */
+/* Сводка сверху отвечает на единственный вопрос, с которым сюда заходят:
+   «мне ещё что-то нужно сделать?». Список ниже отвечает на «что именно». */
+.ck-sum{padding:15px 16px 14px;border-radius:16px;margin:0 0 4px;
+  background:linear-gradient(160deg,rgba(201,169,110,.07),transparent 62%),var(--card);
+  border:1px solid var(--border2)}
+.ck-sum.ok{border-color:rgba(76,175,125,.28)}
+.ck-sum-h{display:flex;align-items:baseline;gap:10px}
+.ck-sum-n{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;
+  line-height:1;letter-spacing:-1.2px;color:var(--gold2);font-variant-numeric:tabular-nums}
+.ck-sum.ok .ck-sum-n{color:var(--up)}
+.ck-sum-n u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:13px;
+  font-weight:600;color:var(--muted);margin-left:8px;letter-spacing:0}
+.ck-sum-p{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:15px;
+  font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums}
+.ck-bar{height:6px;border-radius:3px;margin:12px 0 10px;overflow:hidden;background:var(--card3)}
+.ck-bar i{display:block;height:100%;border-radius:3px;
+  background:linear-gradient(90deg,var(--gold),var(--gold2));transition:width .4s var(--e1)}
+.ck-sum.ok .ck-bar i{background:var(--up)}
+.ck-sum-s{font-size:11.5px;color:var(--muted);line-height:1.4}
+.ck-h{display:flex;align-items:center;gap:8px;margin:16px 0 7px;font-size:10px;
+  font-weight:700;letter-spacing:1.4px;text-transform:uppercase;color:var(--muted)}
+.ck-hs{flex:1;min-width:0;margin-left:auto;text-align:right;font-style:normal;
+  font-size:10.5px;font-weight:500;letter-spacing:0;text-transform:none;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ck-debt{font-style:normal;flex:0 0 auto;padding:2px 7px;border-radius:999px;
+  font-size:9px;font-weight:700;letter-spacing:.3px;color:var(--dn);
+  background:rgba(224,85,85,.12);border:1px solid rgba(224,85,85,.3)}
+
+/* Пункты одной группы — одной подложкой: список дел, а не россыпь карточек. */
+.ck-g{border-radius:16px;overflow:hidden;background:var(--card);
+  border:1px solid var(--border2)}
+.ck-i{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;
+  cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
+  background:none;border:0}
+.ck-i + .ck-i{border-top:1px solid var(--border2)}
+.ck-i:active{background:rgba(255,255,255,.03)}
+/* Кружок: пустой — не сделано, галочка — сделано. Ручной обведён золотом,
+   потому что он единственный, по которому надо нажать. */
+.ck-b{flex:0 0 auto;width:24px;height:24px;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;color:transparent;
+  border:1.5px solid var(--border3);background:var(--card2)}
+.ck-b.on{color:#1a1408;background:linear-gradient(135deg,var(--gold2),var(--gold));
+  border-color:transparent}
+.ck-b.hand{border-color:rgba(201,169,110,.5);border-style:dashed}
+.ck-b.hand.on{border-style:solid}
+.ck-b.hand:active{transform:scale(.9)}
+.ck-t{flex:1;min-width:0}
+.ck-t b{display:block;font-size:13.5px;font-weight:600;line-height:1.3}
+.ck-t i{display:block;font-style:normal;font-size:11px;color:var(--muted);
+  margin-top:3px;line-height:1.35}
+.ck-i.done .ck-t b{color:var(--sub);font-weight:500}
+.ck-i.warn .ck-t b{color:var(--warn-t)}
+.ck-n{flex-shrink:0;min-width:22px;height:22px;padding:0 7px;border-radius:999px;
+  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;
+  color:var(--dn);background:rgba(224,85,85,.12);border:1px solid rgba(224,85,85,.28);
+  font-variant-numeric:tabular-nums}
+.ck-i.warn .ck-n{color:var(--warn-t);background:rgba(243,180,74,.12);
+  border-color:rgba(243,180,74,.3)}
+
 /* Вход в чек-лист. Ростом и посадкой — как строка «Кто на каком районе» на
    районах: то же обещание «одно нажатие — и ты в работе». */
 .chk-entry{display:flex;align-items:center;gap:13px;width:100%;flex:0 0 auto;
@@ -9216,7 +9283,7 @@ function accRender(){
   // что подтвердили и кто везёт → что легло на полку. Третья занимает ряд
   // целиком: одинокая половинка читается как незаполненная ячейка.
   box.innerHTML = `
-    <button class="chk-entry" onclick="chkSoon()">
+    <button class="chk-entry" onclick="accOpen('checklist')">
       <span class="chk-e-ico"><svg viewBox="0 0 24 24" width="21" height="21" fill="none"
         stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
         <path d="M9 5h10M9 12h10M9 19h10"/><path d="M3.5 5l1.4 1.4L7.5 3.8"/>
@@ -9230,10 +9297,95 @@ function accRender(){
     <div class="acc-group acc-3">${pick(['stock','qr','check'])}</div>`;
 }
 
-// Пасхалка до тех пор, пока список задач не собран по-настоящему.
-function chkSoon(){
-  _toast('Это пока в разработке — создатель :)');
-  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+// ── Чек-лист смены ─────────────────────────────────────────────────────────
+// У старшего и у смены разные часы: смена идёт с полудня до шести утра, а он
+// работает с шести утра до часу ночи. Поэтому список делится на три блока —
+// закрыть ушедшую смену, открыть новую и то, что нельзя оставить на ночь,
+// когда решать будет некому. Какой блок сейчас главный, решает сервер.
+let CKL = null, CKL_BUSY = false;
+
+const CKL_PHASE = {
+  morning: 'утро · закрываем смену',
+  day:     'смена идёт',
+  night:   'скоро уходить',
+};
+
+async function accChecklist(){
+  ACC_BACK = null;
+  _setText('accTitle', 'Чек-лист смены');
+  _setText('accSub', 'загрузка…');
+  document.getElementById('accFoot').innerHTML = '';
+  document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  try{ CKL = await ownerApi.ownerFetch('/api/owner/checklist'); }
+  catch(e){
+    document.getElementById('accMid').innerHTML =
+      '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+    return;
+  }
+  chkRender();
+}
+
+function chkRender(){
+  const d = CKL; if(!d) return;
+  const groups = d.groups || [];
+  const all = groups.reduce((a, g) => a + g.items.length, 0);
+  const done = groups.reduce((a, g) => a + g.items.filter(i => i.done).length, 0);
+  const left = groups.flatMap(g => g.items.filter(i => !i.done));
+  _setText('accSub', CKL_PHASE[d.phase] || '');
+
+  const pct = all ? Math.round(done / all * 100) : 100;
+  const head = `<div class="ck-sum ${done >= all ? 'ok' : ''}">
+    <div class="ck-sum-h">
+      <span class="ck-sum-n">${done}<u>из ${all}</u></span>
+      <span class="ck-sum-p">${pct}%</span>
+    </div>
+    <div class="ck-bar"><i style="width:${pct}%"></i></div>
+    <div class="ck-sum-s">${left.length
+      ? 'осталось: ' + left.slice(0, 3).map(i => escS(i.t.toLowerCase())).join(', ')
+        + (left.length > 3 ? ` и ещё ${left.length - 3}` : '')
+      : 'всё разобрано'}</div>
+  </div>`;
+
+  document.getElementById('accMid').innerHTML = head + groups.map(g => `
+    <div class="ck-h"><span>${escS(g.t)}</span>${
+      g.debt ? '<i class="ck-debt">долг</i>' : ''}<i class="ck-hs">${escS(g.s)}</i></div>
+    <div class="ck-g">${g.items.map(i => chkRow(g, i)).join('')}</div>`).join('');
+}
+
+function chkRow(g, i){
+  // Автоматическая галочка — это ответ, а не действие: нажатие ведёт туда, где
+  // пункт закрывается. Ручную ставит человек, и кружок у неё нажимается сам.
+  const box = i.manual
+    ? `<span class="ck-b hand ${i.done ? 'on' : ''}" onclick="event.stopPropagation();chkMark('${
+        g.day}','${i.id}',${i.done ? 'false' : 'true'})">${i.done ? ICO_TICK : ''}</span>`
+    : `<span class="ck-b ${i.done ? 'on' : ''}">${i.done ? ICO_TICK : ''}</span>`;
+  const act = i.go ? `onclick="accOpen('${i.go}')"` : '';
+  return `<button class="ck-i ${i.done ? 'done' : (i.warn ? 'warn' : '')}" ${act}>
+    ${box}
+    <span class="ck-t"><b>${escS(i.t)}</b><i>${escS(i.s)}</i></span>
+    ${i.n && !i.done ? `<span class="ck-n">${fmt(i.n)}</span>` : ''}
+    ${i.go ? `<span class="pnav-go">${ICO_CHEV}</span>` : ''}
+  </button>`;
+}
+
+const ICO_TICK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>';
+
+async function chkMark(day, item, done){
+  if(CKL_BUSY) return;
+  CKL_BUSY = true;
+  // Ставим сразу, сервер догоняет: галочка не должна ждать сети.
+  (CKL.groups || []).forEach(g => (g.items || []).forEach(i => {
+    if(g.day === day && i.id === item) i.done = done;
+  }));
+  chkRender();
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  try{
+    await ownerApi.ownerFetch('/api/owner/checklist/mark',
+      {method:'POST', body:{day, item, done}});
+  }catch(e){
+    _toast('Не сохранилось');
+    try{ CKL = await ownerApi.ownerFetch('/api/owner/checklist'); chkRender(); }catch(e2){}
+  }finally{ CKL_BUSY = false; }
 }
 
 // Подпись плитки проверок: сколько за месяц и есть ли флажки.
@@ -9426,6 +9578,7 @@ function accOpen(id){
   if(id === 'writeoff') accWriteoffs();
   if(id === 'norms')    accNorms();
   if(id === 'shifts')   accShifts();
+  if(id === 'checklist') accChecklist();
 }
 
 // Стрелка в шапке раздела ведёт на шаг назад, а не сразу наружу: у QR-кодов
@@ -11804,10 +11957,14 @@ function renderOffices(rows){
     const lead = !r.legacy && aed > 0 && aed === top;
     // Кто на районе — прямо на плитке: до этого имена были видны только
     // внутри карточки, а спрашивают о них чаще, чем о среднем времени.
-    const team = (r.operator || (r.drivers||[]).length) ? `<div class="off-team">
+    // Сколько водителей — числом, а не счётом имён глазами: это первое, что
+    // спрашивают о районе, а имена нужны вторым взглядом и ужимаются.
+    const drv = (r.drivers || []).length;
+    const team = (r.operator || drv || !r.legacy) ? `<div class="off-team">
       ${ICO_OP}${r.operator ? `<b>${escS(r.operator)}</b>` : '<span>оператор не назначен</span>'}
-      ${(r.drivers||[]).length ? `<span class="sep">·</span>${ICO_CAR}
-        <span class="drv">${escS(r.drivers.join(', '))}</span>` : ''}
+      <span class="sep">·</span>${ICO_CAR}${drv
+        ? `<b class="drvn">${drv}</b><span class="drv">${escS(r.drivers.join(', '))}</span>`
+        : '<span class="drv none">нет водителей</span>'}
     </div>` : '';
     // Телефон точки. Ссылка tel: — тап открывает набор номера; клик по ней
     // не должен раскрывать карточку района, поэтому гасим всплытие.

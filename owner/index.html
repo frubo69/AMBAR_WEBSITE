@@ -224,6 +224,13 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
     radial-gradient(ellipse 90% 60% at 15% 0%, rgba(201,169,110,.18), transparent 60%),
     linear-gradient(180deg,#161629 0%, #0F0F20 100%);
   border:1px solid var(--border); overflow:hidden}
+/* Прижатая карточка непрозрачная, и плитки уходят под неё резаным краем —
+   выглядит так, будто им отрезали верх. Под нижней кромкой лежит полоска, в
+   которой контент растворяется в фоне: край перестаёт быть разрезом. */
+.hero-veil{position:fixed;left:0;right:0;height:18px;z-index:29;pointer-events:none;
+  opacity:0;transition:opacity .18s var(--e1);
+  background:linear-gradient(180deg,var(--bg) 0%,rgba(10,10,20,0) 100%)}
+.hero-veil.on{opacity:1}
 .hero::before{content:'';position:absolute;inset:0;
   background:radial-gradient(ellipse 60% 40% at 100% 100%, rgba(76,175,125,.08), transparent 60%);
   pointer-events:none}
@@ -5743,13 +5750,21 @@ window.addEventListener('resize', heroSideFit);
   const FULL = 226, MIN = 78;              // высоты карточки (см. .hero в стилях)
   const F_FULL = 44, F_MIN = 26;           // размер числа
 
+  let placeTry = 0;
   const place = () => {
     // Считаем по видимому переключателю, а не по первому в разметке: у каждой
     // страницы он свой, скрытая отдаёт нули, и высота прилипания уезжала под
     // самый верх экрана, стоило уйти с «Обзора».
     const bottoms = [...document.querySelectorAll('.period-bar')]
       .map(e => e.getBoundingClientRect().bottom).filter(v => v > 0);
-    if(!bottoms.length) return;
+    // Пока страница не разложена, мерить нечего. Раньше на этом всё и
+    // кончалось: карточка прилипала по запасному числу из стилей, на пару
+    // точек ниже полосы, и в щель было видно проезжающий контент.
+    if(!bottoms.length){
+      if(placeTry++ < 30) requestAnimationFrame(place);
+      return;
+    }
+    placeTry = 0;
     // На корне, а не на самой карточке: под тем же переключателем прилипает и
     // свёрнутая карточка на странице районов, а высота у них общая.
     // Вплотную к полосе, без зазора: в зазор пролезал прокручиваемый контент,
@@ -5766,6 +5781,7 @@ window.addEventListener('resize', heroSideFit);
 
   // Развёрнутое состояние — это просто снятые инлайновые стили.
   const reset = () => {
+    veil.classList.remove('on');
     hero.classList.remove('tight');
     hero.style.height = FULL + 'px';
     hero.style.paddingTop = ''; hero.style.paddingBottom = '';
@@ -5779,7 +5795,7 @@ window.addEventListener('resize', heroSideFit);
   const apply = () => {
     raf = null;
     const ov = document.getElementById('pg-overview');
-    if(!ov || !ov.classList.contains('active')) return;
+    if(!ov || !ov.classList.contains('active')){ veil.classList.remove('on'); return; }
     if(!PIN.over){ reset(); return; }      // откреплённая едет как обычное окно
     const y = window.scrollY || document.documentElement.scrollTop || 0;
     const top = parseFloat(getComputedStyle(hero).top) || 0;
@@ -5802,6 +5818,10 @@ window.addEventListener('resize', heroSideFit);
     hero.style.paddingTop = (20 - 10 * p) + 'px';
     hero.style.paddingBottom = (18 - 12 * p) + 'px';
     hero.style.boxShadow = p > .02 ? `0 ${10*p}px ${26*p}px rgba(0,0,0,${.5*p})` : '';
+    // Полоска нужна только с того мига, когда сжиматься больше некуда и
+    // плитки пошли под карточку. До этого её низ и так вровень с ними.
+    veil.style.top = (top + h) + 'px';
+    veil.classList.toggle('on', p >= 1);
 
     // Всё, что объясняет число, гаснет вдвое быстрее самой карточки: к
     // середине пути на экране остаётся только число и стрелки.
@@ -5855,6 +5875,13 @@ window.addEventListener('resize', heroSideFit);
       nav.style.transform = `translateY(${(h / 2 - now) * q}px)`;
     }
   };
+
+  // Полоску держим на body: у карточки will-change:transform, и fixed внутри
+  // неё считался бы от неё самой, а не от окна.
+  const veil = document.createElement('div');
+  veil.className = 'hero-veil';
+  veil.setAttribute('aria-hidden', 'true');
+  document.body.appendChild(veil);
 
   const onScroll = () => { if(raf) return; raf = requestAnimationFrame(apply); };
 
@@ -7735,7 +7762,14 @@ function renderFinance(p, f){
   // приходит ответом сервера, и до этой строки карточка возвращалась в полный
   // рост, хотя страница осталась прокрученной: она наезжала на плитки заказов
   // — то самое «всё съехало» на «Неделе».
-  setTimeout(() => { if(window.HERO_APPLY) HERO_APPLY(); }, 0);
+  setTimeout(() => {
+    // Переснять точку прилипания тоже: при первом запуске полоса периодов
+    // ещё не разложена, place() уходит ни с чем, и карточка прилипает по
+    // запасному числу из стилей — на пару точек ниже полосы, а в эту щель
+    // видно проезжающий контент.
+    if(window.HERO_PLACE) HERO_PLACE();
+    if(window.HERO_APPLY) HERO_APPLY();
+  }, 0);
   // The whole overview follows whatever window this payload describes — the live
   // period, or a day reached via the hero's day browser.
   _paintHero(p, f);

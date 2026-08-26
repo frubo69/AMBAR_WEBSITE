@@ -3224,11 +3224,9 @@ async def _chk_group_close(day: str, marks: dict):
         wo = len(await db.writeoff_pending(limit=200))
     except Exception:
         wo = 0
-    try:
-        counts = await db.get_stock_counts_for_day(day)
-    except Exception:
-        counts = []
-    rev = len({c.get("district") for c in counts})
+    # Ревизии в списке нет намеренно: её делают не каждую смену, а держать в
+    # чек-листе пункт, который штатно остаётся невыполненным, — значит научить
+    # человека не верить всему списку. Пересчёт живёт своей плиткой в «Учёте».
     sup = await _chk_supply(day)
 
     items = [
@@ -3245,15 +3243,12 @@ async def _chk_group_close(day: str, marks: dict):
         _chk_item("writeoffs", "Согласовать списания",
                   f"{wo} ждут решения" if wo else "бой, брак, просрочка разобраны",
                   wo == 0, go="writeoff", n=wo),
-        _chk_item("revision", "Ревизия проведена",
-                  f"посчитано {rev} из {sh['total']}",
-                  rev >= sh["total"], go="stock", n=sh["total"] - rev),
         _chk_item("cash", "Деньги за смену приняты",
                   "наличные по доставленным заказам", bool(marks.get("cash")),
                   manual=True),
         _chk_item("order_sent", "Заявка отправлена в магазин",
                   "магазин уже ответил" if sup["exists"]
-                  else "считается по свежим остаткам после ревизии",
+                  else "расчёт по остаткам на полке",
                   sup["exists"] or bool(marks.get("order_sent")),
                   go="order", manual=not sup["exists"]),
     ]

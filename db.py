@@ -538,8 +538,21 @@ async def support_threads_brief(limit: int = 300) -> list:
     db = _db_or_none()
     if db is None: return []
     cursor = db.support_messages.find(
-        {}, {"_id": 0, "conv_key": 1, "channel": 1, "messages": {"$slice": -1}})
+        {}, {"_id": 0, "conv_key": 1, "channel": 1, "seen_operator": 1,
+             "messages": {"$slice": -1}})
     return await cursor.to_list(length=limit)
+
+
+async def support_mark_seen(conv_key: str, ts: str):
+    """Оператор открыл переписку — значит прочитал её по это сообщение.
+
+    Хранится метка времени последнего увиденного сообщения, а не флаг: придёт
+    новое — переписка снова станет непрочитанной сама, без отдельного сброса."""
+    db = _db_or_none()
+    if db is None or not ts:
+        return
+    await db.support_messages.update_one(
+        {"conv_key": conv_key}, {"$set": {"seen_operator": str(ts)}}, upsert=True)
 
 
 async def users_by_ids(ids: list) -> dict:

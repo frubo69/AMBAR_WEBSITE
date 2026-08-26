@@ -1106,6 +1106,9 @@ a.oc-row:active{background:var(--card2)}
 .sup-t .n b{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   font-size:13.5px;font-weight:700}
 .sup-t .r{font-size:10.5px;color:var(--muted);font-weight:600;flex-shrink:0}
+/* Прочитано, но без ответа: не тревога, а напоминание. */
+.sup-noans{width:8px;height:8px;border-radius:50%;background:var(--warn);flex-shrink:0;
+  align-self:center;margin-right:1px;box-shadow:0 0 0 3px rgba(243,180,74,.13)}
 .sup-t.wait .r{color:var(--gold2)}
 .sup-t .m{display:block;font-size:12px;color:var(--sub);margin-top:3px;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
@@ -4185,15 +4188,16 @@ function _supRow(t){
   if(c.banned) tags.push('<i class="sup-oid no">заблокирован</i>');
   else if(c.verify_declined) tags.push('<i class="sup-oid no">отклонён</i>');
   else if(c.verify_wait) tags.push('<i class="sup-oid warn">ждёт проверки</i>');
-  // Старый вопрос без ответа не считается ждущим, но отметку заслуживает —
-  // иначе в истории он неотличим от закрытого разговора.
-  if(!t.wait && t.last_role==='user') tags.push('<i class="sup-oid">без ответа</i>');
   const pre = (t.last_role==='operator' ? '<i>Вы: </i>' : '') + _esc(t.last_text||'');
+  // Прочитано, но без ответа. Красным звать уже незачем — оператор его видел, —
+  // а забыть нельзя: жёлтая точка у имени заметна и не кричит.
+  const noans = !t.wait && t.last_role==='user'
+    ? '<i class="sup-noans" title="вы не ответили"></i>' : '';
   return `<button class="sup-t ${t.wait?'wait':''} ${t.key===supKey?'on':''}"
     onclick="supThread('${_esc(t.key)}')">
     <span class="sup-av">${_esc(_ini(c.name))}</span>
     <span class="sup-tb">
-      <span class="n"><b>${_esc(c.name||'—')}</b><span class="r">${_when(t.last_ts)}</span></span>
+      <span class="n">${noans}<b>${_esc(c.name||'—')}</b><span class="r">${_when(t.last_ts)}</span></span>
       <span class="m">${pre||'—'}</span>
       <span class="sup-tags">${tags.join('')}</span>
     </span></button>`;
@@ -4242,6 +4246,10 @@ function supChat(toBottom){
   if(c.banned) chips.push('<i class="sup-oid no">заблокирован</i>');
   if(c.verify_declined) chips.push('<i class="sup-oid no">верификация отклонена</i>');
   else if(c.verify_wait) chips.push('<i class="sup-oid warn">ждёт проверки</i>');
+  // Тот же смысл, что и жёлтая точка в списке, но здесь есть место на слова.
+  const msgs0=(r.messages||[]);
+  if(msgs0.length && msgs0[msgs0.length-1].role!=='operator')
+    chips.push('<i class="sup-oid warn">вы не ответили</i>');
   const un=_uname(c.username);
   chips.push(`<i class="sup-oid">${un?('@'+_esc(un)):'без ника'}</i>`);
   if(r.order_id) chips.push(`<i class="sup-oid ${(r.order&&r.order.lane)||''}">заказ #${_esc(r.order_id)}</i>`);

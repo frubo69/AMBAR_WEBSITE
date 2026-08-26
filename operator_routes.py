@@ -1895,7 +1895,8 @@ async def _support_rows() -> list:
         if not uid:
             continue
         uids.add(uid)
-        pre.append((key, uid, oid, msgs[-1], d.get("channel") or ""))
+        pre.append((key, uid, oid, msgs[-1], d.get("channel") or "",
+                    str(d.get("seen_operator") or "")))
     users = await db.users_by_ids(list(uids))
 
     now = datetime.now(timezone.utc)
@@ -1910,14 +1911,19 @@ async def _support_rows() -> list:
             return 1e9
 
     rows = []
-    for key, uid, oid, last, channel in pre:
+    for key, uid, oid, last, channel, seen in pre:
         o = orders.get(oid) if oid else None
         lane = _lane(o) if o else ""
         # «Ждёт ответа» — это сегодняшний вопрос или вопрос по живому заказу.
         # Мартовское «где курьер?» ответа уже не ждёт, и если считать его
         # ждущим, счётчик показывает 31 и не значит ничего.
-        wait = (last.get("role") == "user") and (lane in ("new", "work")
-                                                 or _hours(last.get("ts")) <= 24)
+        #
+        # И только пока оператор его не открывал. Раньше значок горел до
+        # ответа, а отвечать нужно не всегда: «спасибо, всё приехало» закрывать
+        # нечем, и счётчик висел вечно. Прочитанное без ответа не пропадает —
+        # оно помечено в списке жёлтым, но больше не зовёт.
+        fresh = (last.get("role") == "user") and str(last.get("ts") or "") > seen
+        wait = fresh and (lane in ("new", "work") or _hours(last.get("ts")) <= 24)
         if wait:
             prio = 0 if lane == "new" else (1 if lane == "work" else 2)
         else:
@@ -1935,6 +1941,7 @@ async def _support_rows() -> list:
             "last_role": last.get("role", ""),
             "last_text": _msg_preview(last),
             "channel": channel,
+            "seen": not fresh,
         })
     rows.sort(key=lambda r: (r["prio"], _neg_ts(r["last_ts"])))
     return rows
@@ -1965,6 +1972,13 @@ async def handle_support_thread(request):
     if not uid:
         return web.json_response({"error": "bad_key"}, status=400, headers=CORS_HEADERS)
     msgs = await db.get_support_conv(key)
+    # Открыл — значит прочитал. Иначе значок поддержки горит до ответа, а
+    # отвечать нужно не всегда.
+    if msgs:
+        try:
+            await db.support_mark_seen(key, str(msgs[-1].get("ts") or ""))
+        except Exception as e:
+            log.warning(f"[pos] support seen {key}: {e}")
     u = await db.get_user(uid) or {}
     order = (await db.get_order(oid)) if oid else None
     others = [r for r in await _support_rows() if r["client"]["id"] == uid and r["key"] != key]

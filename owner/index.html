@@ -1318,27 +1318,170 @@ button.path:active{transform:scale(.995)}
 .path-s.now::before{background:rgba(201,169,110,.5)}
 .path-s.now b{color:var(--gold2)}
 .path-s.now u{color:var(--gold2)}
-.path-f{display:flex;align-items:center;gap:10px;margin-top:13px;padding-top:10px;
-  border-top:1px solid var(--border2);font-size:11.5px;color:var(--muted)}
-.path-f b{color:var(--text);font-weight:600;font-variant-numeric:tabular-nums}
-.path-go{margin-left:auto;display:flex;align-items:center;gap:3px;flex-shrink:0;
-  font-size:11.5px;font-weight:600;color:var(--gold2)}
-/* Второе окно: два входа в работу. Нажимают здесь, а не по цифрам сверху. */
-.path-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:0 0 12px}
-.pact{display:block;padding:13px 14px;border-radius:16px;cursor:pointer;text-align:left;
-  font-family:inherit;color:var(--text);background:var(--card);
-  border:1px solid rgba(201,169,110,.28)}
-.pact:active{transform:scale(.985);border-color:rgba(201,169,110,.5)}
-.pact-t{display:block;font-size:13.5px;font-weight:700}
-.pact-s{display:block;font-size:11.5px;color:var(--muted);margin-top:4px;line-height:1.3}
-.pact-s.warn{color:var(--warn)}
-.pact-s.dn{color:var(--dn)}
-.pact-s.ok{color:var(--up)}
-.path-gap{display:block;margin-top:12px;padding-top:10px;font-size:11.5px;
-  color:var(--dn);border-top:1px solid var(--border2)}
-/* Черта в блоке одна: она отделяет путь от того, что про него сказано. Две
-   подряд разрезали бы карточку на три полосы. */
-.path-gap + .path-f{margin-top:9px;padding-top:0;border-top:0}
+/* Два входа в работу — внутри той же карточки, под теми числами, к которым
+   они относятся. Раньше под цифрами лежала строка мелкого текста, а входы
+   стояли отдельными плитками ниже: одно и то же читалось в три приёма. */
+.qb svg{width:19px;height:19px;flex:0 0 auto}
+.qb-ico svg{width:20px;height:20px}
+.pbox{margin:0 0 12px;border-radius:16px;overflow:hidden;background:var(--card);
+  border:1px solid var(--border2)}
+.pbox .path{margin:0;border:0;border-radius:0;background:
+  linear-gradient(160deg,rgba(201,169,110,.07),transparent 62%)}
+.pnav{border-top:1px solid var(--border2)}
+.pnav-r{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;
+  cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
+  background:none;border:0}
+.pnav-r + .pnav-r{border-top:1px solid var(--border2)}
+.pnav-r:active{background:rgba(255,255,255,.03)}
+.pnav-r.off{cursor:default;opacity:.55}
+.pnav-i{flex:0 0 auto;width:36px;height:36px;border-radius:12px;display:flex;
+  align-items:center;justify-content:center;color:var(--sub);
+  background:var(--card2);border:1px solid var(--border2)}
+.pnav-i svg{width:18px;height:18px}
+.pnav-i.warn{color:var(--warn-t);background:rgba(243,180,74,.12);
+  border-color:rgba(243,180,74,.3)}
+.pnav-i.live{color:var(--gold2);background:var(--gold-soft);
+  border-color:rgba(201,169,110,.32)}
+.pnav-i.ok{color:var(--up);background:rgba(76,175,125,.1);
+  border-color:rgba(76,175,125,.28)}
+.pnav-b{flex:1;min-width:0}
+.pnav-b b{display:block;font-size:14px;font-weight:700;line-height:1.25}
+.pnav-b i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);
+  margin-top:3px;line-height:1.35}
+.pnav-v{flex-shrink:0;text-align:right;font-family:'Space Grotesk',sans-serif;
+  font-size:17px;font-weight:700;color:var(--text);font-variant-numeric:tabular-nums;
+  letter-spacing:-.3px}
+.pnav-v u{display:block;text-decoration:none;font-family:'DM Sans',sans-serif;
+  font-size:10px;font-weight:600;color:var(--muted);margin-top:3px;letter-spacing:0}
+.pnav-tag{flex-shrink:0;padding:3px 8px;border-radius:999px;font-size:10px;
+  font-weight:700;color:var(--gold2);background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.3)}
+.pnav-go{flex:0 0 auto;width:16px;height:16px;color:var(--dim)}
+.pnav-go svg{width:16px;height:16px;display:block}
+
+/* Недобор — единственное на экране, что требует действия прямо сейчас,
+   поэтому он и выглядит как требование, а не как строка статистики. */
+.pgap{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;
+  margin:0 0 12px;border-radius:16px;cursor:pointer;text-align:left;
+  font-family:inherit;color:var(--text);background:rgba(224,85,85,.07);
+  border:1px solid rgba(224,85,85,.3)}
+.pgap:active{transform:scale(.995)}
+.pgap-v{flex:0 0 auto;min-width:36px;text-align:center;
+  font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;
+  line-height:1;color:var(--dn);font-variant-numeric:tabular-nums}
+.pgap-b{flex:1;min-width:0}
+.pgap-b b{display:block;font-size:14px;font-weight:700;line-height:1.25}
+.pgap-b i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:3px}
+
+.phist{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;
+  border-radius:16px;cursor:pointer;text-align:left;font-family:inherit;
+  color:var(--text);background:var(--card);border:1px solid var(--border2)}
+.phist:active{transform:scale(.995)}
+
+/* ── Страница заявки ────────────────────────────────────────────────────── */
+/* Итог тех же трёх чисел, что уедут в магазин: их надо видеть, пока правишь,
+   а не после отправки. */
+.ord-sum{display:grid;grid-template-columns:repeat(3,1fr);margin:0 0 10px;
+  border-radius:16px;overflow:hidden;background:var(--card);
+  border:1px solid var(--border2)}
+.ord-sum-c{padding:12px 10px;text-align:center;min-width:0}
+.ord-sum-c + .ord-sum-c{box-shadow:inset 1px 0 0 var(--border2)}
+.ord-sum-c b{display:block;font-family:'Space Grotesk',sans-serif;font-size:21px;
+  font-weight:700;line-height:1;letter-spacing:-.5px;color:var(--text);
+  font-variant-numeric:tabular-nums}
+.ord-sum-c i{display:block;margin-top:5px;font-style:normal;font-size:9.5px;
+  font-weight:600;letter-spacing:.5px;text-transform:uppercase;color:var(--muted)}
+.ord-tabs{display:flex;gap:6px;margin:0 0 12px;overflow-x:auto;
+  scrollbar-width:none;-ms-overflow-style:none}
+.ord-tabs::-webkit-scrollbar{display:none}
+.ord-tab{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;
+  padding:8px 13px;border-radius:999px;cursor:pointer;font-family:inherit;
+  font-size:12.5px;font-weight:600;color:var(--muted);background:var(--card);
+  border:1px solid var(--border2)}
+.ord-tab i{font-style:normal;font-size:10.5px;font-weight:700;color:var(--dim);
+  font-variant-numeric:tabular-nums}
+.ord-tab.on{color:var(--gold2);background:var(--gold-soft);
+  border-color:rgba(201,169,110,.4)}
+.ord-tab.on i{color:var(--gold2)}
+
+/* ── Приёмка ────────────────────────────────────────────────────────────── */
+/* Главное число экрана — сколько бутылок уже на полке. Всё остальное здесь
+   объясняет именно его. */
+.rcv{padding:15px 16px 14px;border-radius:16px;margin:0 0 12px;
+  background:linear-gradient(160deg,rgba(201,169,110,.07),transparent 62%),var(--card);
+  border:1px solid var(--border2)}
+.rcv-h{display:flex;align-items:center;gap:10px;margin-bottom:11px}
+.rcv-st{padding:4px 10px;border-radius:999px;font-size:10.5px;font-weight:700;
+  letter-spacing:.4px;text-transform:uppercase;color:var(--muted);
+  background:var(--card2);border:1px solid var(--border2)}
+.rcv-st.warn{color:var(--warn-t);background:rgba(243,180,74,.12);
+  border-color:rgba(243,180,74,.3)}
+.rcv-st.live{color:var(--gold2);background:var(--gold-soft);
+  border-color:rgba(201,169,110,.35)}
+.rcv-st.ok{color:var(--up);background:rgba(76,175,125,.1);
+  border-color:rgba(76,175,125,.28)}
+.rcv-when{margin-left:auto;font-size:11px;color:var(--muted)}
+.rcv-n{display:flex;align-items:baseline;gap:9px}
+.rcv-v{font-family:'Space Grotesk',sans-serif;font-size:38px;font-weight:700;
+  line-height:1;letter-spacing:-1.4px;color:var(--gold2);
+  font-variant-numeric:tabular-nums}
+.rcv-of{font-size:13px;font-weight:600;color:var(--muted);
+  font-variant-numeric:tabular-nums}
+.rcv-pct{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:15px;
+  font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums}
+.rcv-bar{height:6px;border-radius:3px;margin:12px 0 10px;overflow:hidden;
+  background:var(--card3)}
+.rcv-bar i{display:block;height:100%;border-radius:3px;
+  background:linear-gradient(90deg,var(--gold),var(--gold2));transition:width .4s var(--e1)}
+.rcv-f{display:flex;align-items:center;gap:10px;font-size:11.5px;color:var(--muted)}
+.rcv-aed{margin-left:auto;font-weight:600;color:var(--sub);
+  font-variant-numeric:tabular-nums}
+
+/* Задача района. Водитель — главное, что здесь ищут, поэтому он и стоит
+   первым; свободные районы подняты наверх: это единственные строки, по
+   которым надо кому-то звонить. */
+.rt{padding:13px 14px 12px;border-radius:15px;margin-bottom:8px;
+  background:var(--card);border:1px solid var(--border2)}
+.rt.free{border-color:rgba(243,180,74,.32);background:rgba(243,180,74,.05)}
+.rt.live{border-color:rgba(201,169,110,.32)}
+.rt.ok{border-color:rgba(76,175,125,.26)}
+.rt.dn{border-color:rgba(224,85,85,.3)}
+.rt-h{display:flex;align-items:center;gap:11px}
+.rt-code{flex:0 0 auto;width:34px;height:34px;border-radius:11px;display:flex;
+  align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;
+  font-size:11px;font-weight:700;color:var(--gold2);
+  background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.2)}
+.rt-b{flex:1;min-width:0}
+.rt-b b{display:block;font-size:14px;font-weight:700;line-height:1.25;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rt-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);
+  margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.rt-st{flex-shrink:0;padding:3px 9px;border-radius:999px;font-size:10px;
+  font-weight:700;letter-spacing:.3px;color:var(--muted);background:var(--card2);
+  border:1px solid var(--border2)}
+.rt.free .rt-st{color:var(--warn-t);border-color:rgba(243,180,74,.3)}
+.rt.live .rt-st{color:var(--gold2);border-color:rgba(201,169,110,.3)}
+.rt.ok .rt-st{color:var(--up);border-color:rgba(76,175,125,.28)}
+.rt.dn .rt-st{color:var(--dn);border-color:rgba(224,85,85,.3)}
+.rt-n{display:flex;align-items:baseline;gap:9px;margin-top:11px}
+.rt-v{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;
+  line-height:1;color:var(--text);font-variant-numeric:tabular-nums}
+.rt-v u{text-decoration:none;font-size:13px;font-weight:600;color:var(--muted)}
+.rt-pos{font-size:11px;color:var(--muted)}
+.rt-left{margin-left:auto;font-size:11px;font-weight:600;color:var(--muted)}
+.rt-left.dn{color:var(--dn)}
+.rt-bar{height:4px;border-radius:2px;margin-top:9px;overflow:hidden;background:var(--card3)}
+.rt-bar i{display:block;height:100%;border-radius:2px;background:var(--gold);
+  transition:width .3s var(--e1)}
+.rt.ok .rt-bar i{background:var(--up)}
+.rt.dn .rt-bar i{background:var(--dn)}
+.rt-fl{margin-top:9px;font-size:10.5px;color:var(--warn-t)}
+.rt-note{margin-top:9px;padding:8px 10px;border-radius:10px;font-size:11.5px;
+  color:var(--sub);background:var(--card2);line-height:1.4}
+.rt-rel{margin-top:10px;padding:7px 12px;border-radius:9px;cursor:pointer;
+  font-family:inherit;font-size:11.5px;font-weight:600;color:var(--muted);
+  background:var(--card2);border:1px solid var(--border2)}
+.rt-rel:active{color:var(--dn);border-color:rgba(224,85,85,.35)}
 
 /* ── Поставка ───────────────────────────────────────────────────────────── */
 /* Те же три числа, что и в заявке, в том же порядке: экран поставки —
@@ -1497,7 +1640,7 @@ button.path:active{transform:scale(.995)}
    строки: так правка не заставляет перерисовывать раскрытую строку целиком. */
 .ord-r:not(.fixed) .ord-reset{display:none}
 .ord-edited[hidden]{display:none}
-.ord-hint{padding:2px 2px 0;font-size:11.5px;line-height:1.4;color:var(--muted)}
+.ord-hint{padding:2px 0 0;font-size:11.5px;line-height:1.4;color:var(--muted)}
 .ord-hint b{color:var(--gold2);font-weight:600}
 
 .ord-find{position:relative;display:flex;align-items:center;margin:12px 0 4px}
@@ -2364,7 +2507,7 @@ button.path:active{transform:scale(.995)}
 .exp-mark-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--gold),var(--gold2));
   transition:width .3s var(--e1)}
 .exp-grp{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
-  color:var(--muted);margin:16px 2px 7px}
+  color:var(--muted);margin:16px 0 7px}
 .exp-row{background:var(--card);border:1px solid var(--border2);border-radius:14px;
   padding:13px 14px;margin-bottom:8px;transition:.15s var(--e1)}
 .exp-row.todo{background:transparent;border-style:dashed;border-color:var(--border3)}
@@ -8876,7 +9019,7 @@ const ACC = [
    ico:'<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'},
   {id:'stock',    t:'Ревизия',           s:'пересчёт, перемещения, история',
    ico:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>'},
-  {id:'order',    t:'Закуп',             s:'сколько довезти до нормы',
+  {id:'order',    t:'Закупка',           s:'сколько довезти до нормы',
    ico:'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/>'},
   {id:'shifts',   t:'Смены',             s:'кто открыл, кто вышел, кто закрыл',
    ico:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'},
@@ -9298,7 +9441,7 @@ async function accExpPeriod(){
 //
 // Правится клетка «позиция × точка», а не итог: развозить всё равно по точкам,
 // и «дай на десять меньше» без указания, где именно меньше, заявкой не станет.
-let ORD = {d:null, open:null, q:'', onlyEdited:false, busy:false, pend:{}, timer:null};
+let ORD = {d:null, open:null, q:'', tab:'need', busy:false, pend:{}, timer:null};
 
 // Заявка и поставка — не два раздела, а один путь: посчитали, чего не хватает →
 // отправили в магазин → он ответил → водители забрали → приняли на полку.
@@ -9308,7 +9451,8 @@ let ORD = {d:null, open:null, q:'', onlyEdited:false, busy:false, pend:{}, timer
 // Теперь всё в «Заявке», а наверху полоса шагов: она отвечает на единственный
 // вопрос, с которым сюда заходят, — «мы сейчас где».
 async function accOrder(){
-  _setText('accTitle', 'Закуп');
+  ACC_BACK = null;
+  _setText('accTitle', 'Закупка');
   _setText('accSub', 'загрузка…');
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
   document.getElementById('accFoot').innerHTML = '';
@@ -9317,8 +9461,7 @@ async function accOrder(){
   catch(e){ document.getElementById('accMid').innerHTML =
     '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
   ACC_ORDER = d;
-  ORD = {d, open:null, q:'', onlyEdited:false, busy:false, pend:{}, timer:null};
-  _setText('accSub', `${_dayName(d.day)} · норма на ${d.cover_days} ${pluralize(d.cover_days,'день','дня','дней')}`);
+  ORD = {d, open:null, q:'', tab:'need', busy:false, pend:{}, timer:null};
   // Поставку спрашиваем здесь же: без неё непонятно, на каком мы шаге.
   if(!ACC_SUP){
     try{
@@ -9327,38 +9470,43 @@ async function accOrder(){
                  open: (r.supplies || []).find(x => x.status === 'open') || null};
     }catch(e){ ACC_SUP = {list: [], open: null}; }
   }
-  ordRender();
+  ordHub();
 }
 
 // Путь закупки одним блоком: три шага и число под каждым.
 //
 // Шагов ровно столько, сколько в жизни: мы просим — магазин даёт — водитель
 // привозит и мы принимаем. Числа под шагами — из одного и того же товара,
-// поэтому их можно честно сравнивать глазами: 464 → 96 → 61 рассказывает всю
+// поэтому их можно честно сравнивать глазами: 441 → 469 → 0 рассказывает всю
 // историю поставки без единого слова.
-//
-// Пока приёмка идёт, блок ещё и вход в поставку: следующий экран — не
-// «другой раздел», а этот же путь вблизи.
 const PATH_STEPS = ['Заявка', 'Магазин дал', 'Приняли'];
 
-function pathCard(){
+// На каком мы шаге и что это значит словами. Одно место, где это решается:
+// раньше «поставка идёт» писалось в трёх местах по трём разным правилам.
+function supStage(){
   const list = (ACC_SUP && ACC_SUP.list) || [];
   const sup = (ACC_SUP && ACC_SUP.open) || list[0] || null;
-  // Карточка делится надвое, и это не украшение.
-  //
-  // Сверху счёт: просили, дали, приняли — ответ на «как идёт», который читают
-  // взглядом и по которому ничего не нажимают. Снизу два входа в работу: кто
-  // поехал и что докупить. Раньше это была одна кнопка на всю карточку, и
-  // нажать на неё выходило случайно — глядя на цифры.
-  return `<div class="path">${pathInner()}</div>${sup ? pathActs(sup) : ''}`;
+  if(!sup) return {k:'none', sup:null, all:0, done:0, took:0,
+                   t:'Магазин ещё не ответил', s:'загрузите ответ — появятся задачи'};
+  const tasks = Object.values(sup.tasks || {});
+  const all = tasks.length;
+  const done = tasks.filter(t => t.done_at).length;
+  const busy = tasks.filter(t => t.driver && !t.done_at).length;
+  const took = tasks.reduce((a, t) => a + (t.scanned || 0), 0);
+  const base = {sup, all, done, took, free: all - done - busy};
+  if(sup.status !== 'open')
+    return {...base, k:'done', t:'Приём закончен',
+            s:`принято ${fmt(took)} из ${fmt(sup.total_qty || 0)}`};
+  if(!busy && !done)
+    return {...base, k:'wait', t:'Ожидает приёма',
+            s:`${all} ${pluralize(all,'район','района','районов')} ждут водителя`};
+  return {...base, k:'live', t:'Идёт приём',
+          s:`${done} из ${all} ${pluralize(all,'района','районов','районов')} приняли`};
 }
 
-// Три шага пути одним рядом — один и тот же компонент на «Закупе» и внутри
-// поставки. Раньше у поставки была своя шапка из трёх колонок: те же числа,
-// другая вёрстка, и два экрана про одно и то же читались как два разных.
-//
-// Деньги идут под числом, если они известны: «469 бутылок» не отвечает на
-// вопрос «дорого ли», а «469 · 68 354 AED» отвечает.
+// Три шага пути одним рядом — один и тот же компонент на «Закупке» и внутри
+// приёмки. Деньги идут под числом: «469 бутылок» не отвечает на вопрос
+// «дорого ли», а «469 · 68 354 AED» отвечает.
 function pathSteps(vals, money, step){
   return `<span class="path-r">${PATH_STEPS.map((t, i) => `
       <span class="path-s ${i < step ? 'done' : i === step ? 'now' : ''}">
@@ -9369,74 +9517,119 @@ function pathSteps(vals, money, step){
 
 function pathInner(){
   const d = ORD.d || {};
-  const list = (ACC_SUP && ACC_SUP.list) || [];
-  const sup = (ACC_SUP && ACC_SUP.open) || list[0] || null;
-  const took = sup ? Object.values(sup.tasks || {})
-                           .reduce((a, t) => a + (t.scanned || 0), 0) : 0;
+  const st = supStage(), sup = st.sup;
   const step = !sup ? 1 : (sup.status === 'open' ? 2 : 3);
   const vals = [
     fmt(sup ? (sup.asked_qty || 0) : (d.total_qty || 0)),
     sup ? fmt(sup.total_qty || 0) : '—',
-    sup ? fmt(took) : '—',
+    sup ? fmt(st.took) : '—',
   ];
   const m = (sup && sup.money) || null;
   const money = m ? [m.asked, m.confirmed, m.took] : [d.total_aed, null, null];
-  const gap = sup && sup.status === 'open' ? (sup.gap_qty || 0) : 0;
-  return pathSteps(vals, money, step) + `
-    ${gap ? `<span class="path-gap">Магазин не дал ${fmt(gap)} ${
-        pluralize(gap,'бутылку','бутылки','бутылок')} — добрать в другом месте</span>` : ''}
-    <span class="path-f">
-      <span>${(d.rows||[]).length} ${pluralize((d.rows||[]).length,'позиция','позиции','позиций')}
-        · суммы по прайсу</span>
-      ${sup ? `<span class="path-go">${
-        sup.status === 'open' ? 'поставка идёт' : 'принято'}</span>` : ''}
-    </span>`;
+  return pathSteps(vals, money, step);
 }
 
-// Два входа в поставку. Числа на них — не украшение, а причина зайти: если
-// районы разобраны и добирать нечего, заходить незачем, и это видно, не
-// открывая экран.
-function pathActs(sup){
-  const free = Object.values(sup.tasks || {}).filter(t => !t.driver && !t.done_at).length;
-  const gap = sup.status === 'open' ? (sup.gap_qty || 0) : 0;
-  const done = Object.values(sup.tasks || {}).filter(t => t.done_at).length;
-  const all = Object.values(sup.tasks || {}).length;
-  return `<div class="path-acts">
-    <button class="pact" onclick="accSupply('who')">
-      <span class="pact-t">Кто поехал</span>
-      <span class="pact-s ${free ? 'warn' : ''}">${free
-        ? `${free} ${pluralize(free,'район','района','районов')} без водителя`
-        : (all && done === all ? 'все приняли' : `${done} из ${all} приняли`)}</span>
+// Два входа в работу прямо в карточке пути — под теми же числами, к которым
+// они относятся. Раньше под цифрами лежала строка мелкого текста, а входы
+// стояли отдельными плитками ниже: читать приходилось в три приёма.
+function pathNav(){
+  const d = ORD.d || {};
+  const st = supStage();
+  const pos = (d.rows || []).length;
+  const sub = st.k === 'none'
+    ? `${fmt(d.total_qty || 0)} ${pluralize(d.total_qty||0,'бутылка','бутылки','бутылок')}
+       · ${pos} ${pluralize(pos,'позиция','позиции','позиций')}`
+    : `просили ${fmt((st.sup||{}).asked_qty || 0)} · ${pos} ${
+       pluralize(pos,'позиция','позиции','позиций')}`;
+  const ed = d.edited_count || 0;
+  const KIND = {none:'', wait:'warn', live:'live', done:'ok'};
+  return `<div class="pnav">
+    <button class="pnav-r" onclick="accOrderList()">
+      <span class="pnav-i">${ICO_LIST}</span>
+      <span class="pnav-b"><b>Заявка</b><i>${sub}</i></span>
+      ${ed ? `<span class="pnav-tag">правок ${ed}</span>` : ''}
+      <span class="pnav-go">${ICO_CHEV}</span>
     </button>
-    <button class="pact" onclick="accSupply()">
-      <span class="pact-t">Докупить</span>
-      <span class="pact-s ${gap ? 'dn' : 'ok'}">${gap
-        ? `${fmt(gap)} ${pluralize(gap,'бутылка','бутылки','бутылок')}`
-        : 'магазин дал всё'}</span>
+    <button class="pnav-r ${st.k === 'none' ? 'off' : ''}" ${
+      st.k === 'none' ? 'disabled' : `onclick="accSupply('who')"`}>
+      <span class="pnav-i ${KIND[st.k]}">${ICO_TRUCK}</span>
+      <span class="pnav-b"><b>${st.t}</b><i>${st.s}</i></span>
+      ${st.k === 'none' ? '' : `<span class="pnav-v">${fmt(st.took)}<u>из ${
+        fmt((st.sup||{}).total_qty || 0)}</u></span>`}
+      <span class="pnav-go">${st.k === 'none' ? '' : ICO_CHEV}</span>
     </button>
-    ${supHistLine()}
   </div>`;
 }
 
-// Прошлые закупы. Один закуп отвечает «как прошло сегодня»; несколько подряд
-// отвечают на вопрос поинтереснее: сколько магазин обычно не даёт и во что нам
-// это встаёт. Поэтому вход в историю стоит рядом с текущим, а не в «Ещё».
+const ICO_CHEV  = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>';
+const ICO_LIST  = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M8 6h12M8 12h12M8 18h12"/><path d="M4 6h.01M4 12h.01M4 18h.01"/></svg>';
+const ICO_TRUCK = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h11v9H3z"/><path d="M14 10h4l3 3v3h-7z"/><circle cx="7" cy="18" r="1.6"/><circle cx="17" cy="18" r="1.6"/></svg>';
+const ICO_UP    = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 11v6M9.5 14.5L12 17l2.5-2.5"/></svg>';
+const ICO_SHARE = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M8 7l4-4 4 4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>';
+const ICO_TG    = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>';
+
+// Недобор — единственное на хабе, что требует действия прямо сейчас, поэтому
+// он и выглядит как требование, а не как строка статистики.
+function pathGap(){
+  const st = supStage();
+  const gap = st.sup && st.sup.status === 'open' ? (st.sup.gap_qty || 0) : 0;
+  if(!gap) return '';
+  return `<button class="pgap" onclick="accSupply('short')">
+    <span class="pgap-v">${fmt(gap)}</span>
+    <span class="pgap-b"><b>Докупить в другом месте</b>
+      <i>магазин не дал ${fmt(gap)} ${pluralize(gap,'бутылку','бутылки','бутылок')}</i></span>
+    <span class="pnav-go">${ICO_CHEV}</span>
+  </button>`;
+}
+
+// Прошлые закупки. Одна отвечает «как прошло сегодня»; несколько подряд —
+// на вопрос поинтереснее: сколько магазин обычно не даёт и во что это встаёт.
 function supHistLine(){
   const list = (ACC_SUP && ACC_SUP.list) || [];
   if(list.length < 2) return '';
   const aed = list.reduce((a, x) => a + ((x.money || {}).took || 0), 0);
-  return `<button class="pact pact-wide" onclick="supHistory()">
-    <span class="pact-t">История закупов</span>
-    <span class="pact-s">${list.length} ${pluralize(list.length,'закуп','закупа','закупов')}
-      · приняли на ${fmt(aed)} AED по прайсу</span>
+  return `<button class="phist" onclick="supHistory()">
+    <span class="pnav-b"><b>История закупок</b>
+      <i>${list.length} ${pluralize(list.length,'закупка','закупки','закупок')}
+        · приняли на ${fmt(aed)} AED по прайсу</i></span>
+    <span class="pnav-go">${ICO_CHEV}</span>
   </button>`;
 }
 
-// Перерисовать только шапку пути: её числа меняются от каждой правки, а список
-// под ней — нет.
+// Хаб закупки: путь, два входа, недобор, история. Списка здесь нет намеренно —
+// он живёт на своей странице и не мешает увидеть, где мы сейчас.
+function ordHub(){
+  const d = ORD.d; if(!d) return;
+  _setText('accSub', `${_dayName(d.day)} · норма на ${d.cover_days} ${
+    pluralize(d.cover_days,'день','дня','дней')}`);
+  const st = supStage();
+  // Путь и два входа — одна карточка, а не две встык: это одно и то же место,
+  // просто сверху числа, снизу двери.
+  document.getElementById('accMid').innerHTML =
+    `<div class="pbox"><div class="path">${pathInner()}</div>${pathNav()}</div>` +
+    pathGap() + supHistLine();
+
+  // Подвал хаба — ровно один шаг, тот, который сейчас ждут. Пока ответа
+  // магазина нет, это он; пока идёт приёмка — не ждут ничего, и подвала нет.
+  document.getElementById('accFoot').innerHTML =
+    (st.k === 'none' || st.k === 'done') ? `
+      <div class="qb-wrap">
+        <button class="qb ${st.k === 'done' ? 'qb-ghost qb-wide' : ''}" id="ordUp"
+                onclick="document.getElementById('ordFile').click()">
+          ${ICO_UP}Загрузить ответ магазина
+        </button>
+        <input type="file" id="ordFile" accept=".xlsx" style="display:none"
+               onchange="supImport(this,'ordUp')">
+      </div>` : '';
+}
+
+// Перерисовать сводку — на хабе это путь, на странице заявки строка итогов.
+// Числа меняются от каждой правки, а список под ними — нет.
 function pathPaint(){
   const el = document.querySelector('.path');
-  if(el) el.innerHTML = pathInner();
+  if(el){ el.innerHTML = pathInner(); return; }
+  const sum = document.querySelector('.ord-sum');
+  if(sum) sum.innerHTML = ordSumInner();
 }
 
 // Что берём не в магазине. Сигареты считаются тем же расчётом — норма минус
@@ -9464,17 +9657,45 @@ function ordSeparate(d, dist){
   </div>`;
 }
 
+// Страница заявки: тот самый список, который раньше лежал под карточкой пути
+// и занимал экран целиком. Здесь ему и место — сюда приходят править, а не
+// смотреть, на каком мы шаге.
+function accOrderList(){
+  ACC_BACK = accOrder;
+  _setText('accTitle', 'Заявка');
+  ordRender();
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+
 // Строки, которые сейчас показываем. По умолчанию — только то, что надо
-// довезти; поиск открывает весь каталог, потому что дозаказать можно и то,
-// чего расчёт не просил.
+// довезти; «весь каталог» открывает всё, потому что дозаказать можно и то,
+// чего расчёт не просил. Поиск идёт по каталогу всегда — искать в отфильтрованном
+// списке значит не находить.
 function ordList(){
   const d = ORD.d || {};
   const all = d.all_rows || d.rows || [];
   const q = ORD.q.trim().toLowerCase();
-  let list = q ? all.filter(r => r.name.toLowerCase().includes(q))
-               : all.filter(r => r.need_total > 0 || r.edited);
-  if(ORD.onlyEdited) list = list.filter(r => r.edited);
-  return list;
+  if(q) return all.filter(r => r.name.toLowerCase().includes(q));
+  if(ORD.tab === 'edited') return all.filter(r => r.edited);
+  if(ORD.tab === 'all')    return all;
+  return all.filter(r => r.need_total > 0 || r.edited);
+}
+
+// Итог заявки одной строкой: сколько бутылок, на сколько денег, из скольких
+// позиций. Это те же три числа, что уедут в магазин, — и они должны быть
+// видны, пока правишь, а не после отправки.
+function ordSumInner(){
+  const d = ORD.d || {};
+  const pos = (d.rows || []).length;
+  return `<span class="ord-sum-c"><b>${fmt(d.total_qty || 0)}</b><i>бутылок</i></span>
+    <span class="ord-sum-c"><b>${fmt(d.total_aed || 0)}</b><i>AED по прайсу</i></span>
+    <span class="ord-sum-c"><b>${pos}</b><i>позиций</i></span>`;
+}
+
+function ordTab(t){
+  ORD.tab = t; ORD.q = '';
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  ordRender();
 }
 
 function ordRender(){
@@ -9482,62 +9703,47 @@ function ordRender(){
   const dist = d.districts || [];
   const list = ordList();
   const ed = d.edited_count || 0;
-  document.getElementById('accMid').innerHTML = pathCard() + `
-    <button class="ord-edited" onclick="ordToggleEdited()"${ed ? '' : ' hidden'}>
-      <span>${ORD.onlyEdited ? 'показать всё' : `правок вручную · ${ed}`}</span>
-      <i>${ORD.onlyEdited ? '' : 'смотреть'}</i></button>
-    ${d.frozen_aed ? `<div class="ord-hint">Норма выше спроса — на полке лишнего
-      на <b>${fmt(d.frozen_aed)} AED</b></div>` : ''}
+  const q = ORD.q.trim();
+  _setText('accSub', `${_dayName(d.day)} · норма на ${d.cover_days} ${
+    pluralize(d.cover_days,'день','дня','дней')}`);
+
+  const tab = (k, t, n) => `<button class="ord-tab ${!q && ORD.tab === k ? 'on' : ''}"
+    onclick="ordTab('${k}')">${t}${n != null ? `<i>${n}</i>` : ''}</button>`;
+
+  document.getElementById('accMid').innerHTML = `
+    <div class="ord-sum">${ordSumInner()}</div>
 
     <div class="ord-find">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-      <input id="ordQ" type="search" placeholder="Поиск"
+      <input id="ordQ" type="search" placeholder="Найти позицию"
              value="${escS(ORD.q)}" oninput="ordSearch(this.value)">
-      ${ORD.q ? `<button class="ord-find-x" onclick="ordSearch('')" aria-label="Очистить">✕</button>` : ''}
+      ${q ? `<button class="ord-find-x" onclick="ordSearch('')" aria-label="Очистить">✕</button>` : ''}
     </div>
 
-    <div class="exp-grp">${ORD.q ? `Найдено · ${list.length}`
-                                  : `Что довезти · ${list.length}`}</div>
+    <div class="ord-tabs">
+      ${tab('need', 'Что довезти', (d.rows || []).length)}
+      ${ed ? tab('edited', 'Правки', ed) : ''}
+      ${tab('all', 'Весь каталог')}
+    </div>
+
+    ${d.frozen_aed ? `<div class="ord-hint">Норма выше спроса — на полке лишнего
+      на <b>${fmt(d.frozen_aed)} AED</b></div>` : ''}
+
+    <div class="exp-grp">${q ? `Найдено · ${list.length}` : `Позиции · ${list.length}`}</div>
     <div id="ordRows">${list.length ? list.map(r => ordRow(r, dist)).join('')
-      : '<div class="exp-empty">' + (ORD.q ? 'Ничего не нашлось'
+      : '<div class="exp-empty">' + (q ? 'Ничего не нашлось'
           : 'Довозить нечего — остатков хватает') + '</div>'}</div>
     ${ordSeparate(d, dist)}`;
 
-  // Кнопка живёт в подвале экрана, а не в конце списка: место у неё одно и
-  // постоянное, до него дотягивается большой палец, и список под ней не
-  // заканчивается на полуслове.
-  // Заявку отправляют не только себе: её шлют поставщику в ватсап или на
-  // почту. Поэтому главная кнопка отдаёт файл системе — оттуда он уходит
-  // куда угодно, — а рядом маленькая, которая по-прежнему кладёт его в чат
-  // с ботом: это привычный путь и он не должен пропасть.
+  // Заявку отправляют не только себе: её шлют поставщику в ватсап или на почту.
+  // Поэтому главная кнопка отдаёт файл системе — оттуда он уходит куда угодно, —
+  // а рядом маленькая, которая кладёт его в чат с ботом: привычный путь.
+  // Стоит она здесь, а не на хабе: отправляют то, что только что смотрели.
   document.getElementById('accFoot').innerHTML = `
     <div class="qb-wrap qb-row">
-      <button class="qb" id="ordShare" onclick="ordShare()">
-        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 3v13M8 7l4-4 4 4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
-        Отправить в магазин
-      </button>
+      <button class="qb" id="ordShare" onclick="ordShare()">${ICO_SHARE}Отправить в магазин</button>
       <button class="qb qb-ico" id="ordSend" onclick="ordSend()"
-              aria-label="Прислать файл в чат с ботом" title="В телеграм">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
-      </button>
-    </div>
-    <!-- Следующий шаг пути стоит здесь же: отправил файл — вернулся с ответом.
-         Искать эту кнопку в другом разделе было бы странно. -->
-    <div class="qb-wrap">
-    <button class="qb qb-ghost qb-wide" id="ordUp"
-            onclick="document.getElementById('ordFile').click()">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
-           stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
-        <path d="M14 3v5h5"/><path d="M12 11v6M9.5 14.5L12 17l2.5-2.5"/></svg>
-      Загрузить ответ магазина
-    </button>
-    <input type="file" id="ordFile" accept=".xlsx" style="display:none"
-           onchange="supImport(this,'ordUp')">
+              aria-label="Прислать файл в чат с ботом" title="В телеграм">${ICO_TG}</button>
     </div>`;
 }
 
@@ -9577,7 +9783,7 @@ function ordSearch(v){
   ordRender();
   if(ORD.q){ const i = document.getElementById('ordQ'); if(i){ i.focus(); i.selectionStart = i.value.length; } }
 }
-function ordToggleEdited(){ ORD.onlyEdited = !ORD.onlyEdited; ordRender(); }
+
 function ordOpen(id){
   ORD.open = ORD.open === id ? null : id;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
@@ -9662,12 +9868,12 @@ function ordPatch(r, district){
     }
   }
   pathPaint();
-  const ed = document.querySelector('.ord-edited');
-  if(ed && !ORD.onlyEdited){
-    const n = ORD.d.edited_count || 0;
-    ed.hidden = !n;
-    ed.querySelector('span').textContent = 'правок вручную · ' + n;
-  }
+  // Счётчик правок на вкладке — единственное, что меняется вне самой строки.
+  const t = document.querySelector('.ord-tab.on i, .ord-tabs .ord-tab i');
+  const n = ORD.d.edited_count || 0;
+  const et = [...document.querySelectorAll('.ord-tabs .ord-tab')]
+    .find(b => (b.getAttribute('onclick') || '').includes("'edited'"));
+  if(et){ const i = et.querySelector('i'); if(i) i.textContent = n; et.hidden = !n; }
 }
 
 async function ordFlush(){
@@ -9773,7 +9979,7 @@ async function ordShare(){
   try{
     const file = await _ordFile();
     if(navigator.canShare && navigator.canShare({files:[file]})){
-      await navigator.share({files:[file], title:'AMBAR — закуп'});
+      await navigator.share({files:[file], title:'AMBAR — закупка'});
       b.innerHTML = 'Отправлено';
       try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     }else{
@@ -10635,7 +10841,7 @@ function supEmpty(){
   document.getElementById('accMid').innerHTML = `
     <div class="exp-empty" style="padding:30px 16px;line-height:1.6">
       Магазин ещё не присылал ответ.<br>
-      Отправьте ему заявку из раздела «Закуп», а вернувшийся файл
+      Отправьте ему заявку из раздела «Закупка», а вернувшийся файл
       загрузите здесь — программа сверит его с нашей заявкой.
     </div>`;
   supFoot();
@@ -10658,31 +10864,40 @@ function supRender(){
   const d = SUP_D; if(!d) return;
   const short = d.shortfall || {rows:[], qty:0};
   const D = d.districts || {};
-  const dn = o => `${(D[o]||{}).code || ''} ${(D[o]||{}).name || o}`.trim();
+  const tasks = d.tasks || [];
+  const all = tasks.length;
+  const done = tasks.filter(t => t.done_at).length;
+  const free = tasks.filter(t => !t.driver && !t.done_at).length;
+  const busy = all - done - free;
+  const need = tasks.reduce((a, t) => a + (t.need || 0), 0);
+  const got  = tasks.reduce((a, t) => a + (t.got || 0), 0);
+  const pct  = need ? Math.round(got / need * 100) : 0;
+  const state = d.status !== 'open' ? ['Приём закончен','ok']
+              : (!busy && !done) ? ['Ожидает приёма','warn'] : ['Идёт приём','live'];
+  _setText('accTitle', 'Приёмка');
   _setText('accSub', `${_dayName(d.day || String(d.at||'').slice(0,10))} · ${
-    d.status === 'done' ? 'закрыта' : 'в работе'}`);
+    d.positions || 0} ${pluralize(d.positions||0,'позиция','позиции','позиций')}`);
 
-  // Шапка — тот же путь, что и на «Закупе», просто вблизи: экран поставки это
-  // продолжение той же дороги, а не отдельная таблица. Дата и статус живут в
-  // подзаголовке панели и второй раз здесь не нужны.
+  // Главное число экрана — сколько бутылок уже на полке. Всё остальное здесь
+  // объясняет именно его: кто везёт, чего не хватает, где ещё никто не взял.
   const m = d.money || {};
-  const step = d.status === 'open' ? 2 : 3;
-  const head = `<div class="path">
-    ${pathSteps([fmt(d.asked_qty), fmt(d.total_qty), fmt(d.took)],
-                [m.asked, m.confirmed, m.took], step)}
-    ${short.qty ? `<span class="path-gap">Магазин не дал ${fmt(short.qty)} ${
-        pluralize(short.qty,'бутылку','бутылки','бутылок')} — добрать в другом месте</span>` : ''}
-    <span class="path-f">
-      <span>${d.positions || 0} ${pluralize(d.positions||0,'позиция','позиции','позиций')}
-        · ${(d.tasks||[]).length} ${pluralize((d.tasks||[]).length,'район','района','районов')}
-        · суммы по прайсу</span>
-      <span class="path-go">${d.status === 'done' ? 'принято' : 'поставка идёт'}</span>
-    </span>
+  const head = `<div class="rcv">
+    <div class="rcv-h">
+      <span class="rcv-st ${state[1]}">${state[0]}</span>
+      ${d.closed_at ? `<span class="rcv-when">закрыта ${_hm(d.closed_at)}</span>` : ''}
+    </div>
+    <div class="rcv-n">
+      <span class="rcv-v">${fmt(got)}</span>
+      <span class="rcv-of">из ${fmt(need)}</span>
+      <span class="rcv-pct">${pct}%</span>
+    </div>
+    <div class="rcv-bar"><i style="width:${Math.min(100, pct)}%"></i></div>
+    <div class="rcv-f">
+      <span>${done} из ${all} ${pluralize(all,'района','районов','районов')} приняли</span>
+      ${m.took != null ? `<span class="rcv-aed">${fmt(m.took)} AED</span>` : ''}
+    </div>
   </div>`;
 
-  // Недобор — первым и с кнопками: это единственное на экране, что требует
-  // действия прямо сейчас.
-  const why = {dropped:'магазин отказал', short:'урезал', gap:'не выдал при отгрузке'};
   // Немаркированные: купленное на доп. складах уже стоит на полке, а в базе
   // его ещё нет. Число тает само, пока коды заводят через «Внести товар».
   const um = d.unmarked || {};
@@ -10699,13 +10914,56 @@ function supRender(){
           — заводите через «Внести товар», число тает само</span>
       </span>
     </div>` : '';
-  const shortBlock = short.rows.length ? umBlock + `
-    <div class="exp-grp">Заказать на доп. складах</div>
-    <div class="sup-short">
-      <div class="sup-short-h">
-        <span class="sup-short-v">${fmt(short.qty)}</span>
-        <span class="sup-short-u">${pluralize(short.qty,'бутылка','бутылки','бутылок')}<br>не хватает</span>
+
+  // Кто везёт. Ради этого списка сюда и заходят: водитель, район, сколько уже
+  // принято и чем кончилось. Незанятые районы — первыми: это единственные
+  // строки, по которым надо кому-то звонить.
+  const order = t => t.done_at ? 2 : (t.driver ? 1 : 0);
+  const rows = [...tasks].sort((a, b) => order(a) - order(b));
+  const cards = rows.map(t => {
+    const p = t.need ? Math.round(t.got / t.need * 100) : 0;
+    const fl = t.flags || {};
+    const marks = [];
+    if(fl.fast)  marks.push(`${fl.fast} ${pluralize(fl.fast,'быстрый скан','быстрых скана','быстрых сканов')}`);
+    if(fl.shape) marks.push(`${fl.shape} ${pluralize(fl.shape,'странный код','странных кода','странных кодов')}`);
+    if(fl.undo)  marks.push(`${fl.undo} ${pluralize(fl.undo,'отмена','отмены','отмен')}`);
+    const cls = t.done_at ? (t.got < t.need ? 'dn' : 'ok') : t.driver ? 'live' : 'free';
+    const st  = t.done_at ? (t.got < t.need ? 'недобор' : 'принято')
+              : t.driver ? (t.got ? 'везёт' : 'взял') : 'никто не взял';
+    const when = t.done_at ? 'закрыл ' + _hm(t.done_at)
+               : t.started_at ? 'с ' + _hm(t.started_at)
+               : t.claimed_at ? 'взял ' + _hm(t.claimed_at) : '';
+    return `<div class="rt ${cls}">
+      <div class="rt-h">
+        <span class="rt-code">${escS((D[t.district]||{}).code || '')}</span>
+        <span class="rt-b">
+          <b>${escS(t.driver || 'Свободна')}</b>
+          <i>${escS((D[t.district]||{}).name || t.district)}${when ? ' · ' + when : ''}</i>
+        </span>
+        <span class="rt-st">${st}</span>
       </div>
+      <div class="rt-n">
+        <span class="rt-v">${fmt(t.got)}<u>/${fmt(t.need)}</u></span>
+        <span class="rt-pos">${t.positions} ${
+          pluralize(t.positions,'позиция','позиции','позиций')}</span>
+        ${t.left && (t.driver || t.done_at)
+          ? `<span class="rt-left ${t.done_at ? 'dn' : ''}">${
+              t.done_at ? 'не хватает' : 'осталось'} ${fmt(t.left)}</span>` : ''}
+      </div>
+      <div class="rt-bar"><i style="width:${Math.min(100, p)}%"></i></div>
+      ${marks.length ? `<div class="rt-fl">${escS(marks.join(' · '))}</div>` : ''}
+      ${t.note ? `<div class="rt-note">${escS(t.note)}</div>` : ''}
+      ${t.driver && !t.done_at ? `<button class="rt-rel"
+        onclick="supRelease('${t.district}')">Снять с водителя</button>` : ''}
+    </div>`;
+  }).join('');
+
+  // Недобор — то, что придётся купить в другом месте. Ниже водителей: сначала
+  // «как идёт приём», потом «что с ним не так».
+  const why = {dropped:'магазин отказал', short:'урезал', gap:'не выдал при отгрузке'};
+  const shortBlock = short.rows.length ? `
+    <div class="exp-grp" id="supShort">Докупить в другом месте · ${fmt(short.qty)}</div>
+    <div class="sup-short">
       ${short.rows.slice(0, 40).map(r => `<div class="sup-sr">
         <span class="sup-sr-b">
           <span class="sup-sr-n">${escS(r.name)}</span>
@@ -10714,40 +10972,8 @@ function supRender(){
         </span>
         <span class="sup-sr-v">${r.gap}</span></div>`).join('')}
       ${short.rows.length > 40 ? `<div class="sup-sr-more">…и ещё ${short.rows.length - 40}</div>` : ''}
-    </div>` : `<div class="sup-allgood">Магазин дал всё, о чём просили.</div>`;
+    </div>` : '';
 
-  // Задачи: по одной на район. Имя водителя — главное, что здесь ищут.
-  const tasks = (d.tasks || []).map(t => {
-    const pct = t.need ? Math.round(t.got / t.need * 100) : 0;
-    const fl = t.flags || {};
-    const marks = [];
-    if(fl.fast)  marks.push(`${fl.fast} ${pluralize(fl.fast,'быстрый скан','быстрых скана','быстрых сканов')}`);
-    if(fl.shape) marks.push(`${fl.shape} ${pluralize(fl.shape,'странный код','странных кода','странных кодов')}`);
-    if(fl.undo)  marks.push(`${fl.undo} ${pluralize(fl.undo,'отмена','отмены','отмен')}`);
-    const state = t.done_at ? (t.got < t.need ? 'недобор' : 'принято')
-                : t.driver ? (t.got ? 'везёт' : 'взял') : 'свободна';
-    return `<div class="sup-t ${t.done_at ? (t.got < t.need ? 'dn' : 'ok') : t.driver ? 'live' : ''}">
-      <div class="sup-t-h">
-        <span class="sup-code">${escS((D[t.district]||{}).code || '')}</span>
-        <span class="sup-t-n">${escS(t.driver || 'Никто не взял')}</span>
-        <span class="sup-t-st">${state}</span>
-      </div>
-      <div class="sup-t-b">
-        <span class="sup-t-v">${fmt(t.got)}<u> / ${fmt(t.need)}</u></span>
-        <span class="sup-t-s">${escS((D[t.district]||{}).name || t.district)} · ${
-          t.positions} ${pluralize(t.positions,'позиция','позиции','позиций')}${
-          t.done_at ? ' · ' + _hm(t.done_at) : t.started_at ? ' · с ' + _hm(t.started_at) : ''}</span>
-      </div>
-      <div class="sup-bar"><i style="width:${pct}%"></i></div>
-      ${marks.length ? `<div class="sup-t-fl">${escS(marks.join(' · '))}</div>` : ''}
-      ${t.note ? `<div class="sup-t-note">${escS(t.note)}</div>` : ''}
-      ${t.driver && !t.done_at ? `<div style="text-align:right"><button class="sup-t-rel"
-        onclick="supRelease('${t.district}')">Снять с водителя</button></div>` : ''}
-    </div>`;
-  }).join('');
-
-  // Что магазин дописал сам: незапланированные деньги, и увидеть их надо
-  // отдельно от того, что мы просили.
   const extra = (d.extra || []).length ? `
     <div class="exp-grp">Магазин предложил сверх заказа</div>
     <div class="sup-short">${d.extra.slice(0, 20).map(r => `<div class="sup-sr">
@@ -10756,15 +10982,15 @@ function supRender(){
           .map(([o, n]) => `${(D[o]||{}).code || o} ${n}`).join(' · ')}</span></span>
       <span class="sup-sr-v up">+${r.qty}</span></div>`).join('')}</div>` : '';
 
-  document.getElementById('accMid').innerHTML =
-    head + shortBlock +
-    `<div class="exp-grp" id="supWho">Кто везёт</div>${
-      tasks || '<div class="exp-empty">Районов нет</div>'}` +
-    extra;
+  document.getElementById('accMid').innerHTML = head + umBlock +
+    `<div class="exp-grp" id="supWho">Кто везёт · ${done} из ${all}</div>${
+      cards || '<div class="exp-empty">Районов нет</div>'}` +
+    shortBlock + extra;
   supFoot();
-  if(SUP_GOTO === 'who'){
-    SUP_GOTO = '';
-    const el = document.getElementById('supWho');
+  const goto = SUP_GOTO === 'short' ? 'supShort' : SUP_GOTO === 'who' ? 'supWho' : '';
+  SUP_GOTO = '';
+  if(goto){
+    const el = document.getElementById(goto);
     if(el) requestAnimationFrame(() => el.scrollIntoView({block:'start', behavior:'smooth'}));
   }
 }
@@ -10774,7 +11000,7 @@ function supRender(){
 // научить человека читать поставку дважды.
 async function supHistory(){
   ACC_BACK = accOrder;
-  _setText('accTitle', 'История закупов');
+  _setText('accTitle', 'История закупок');
   _setText('accSub', 'загрузка…');
   document.getElementById('accFoot').innerHTML = '';
   let list = (ACC_SUP && ACC_SUP.list) || null;
@@ -10785,18 +11011,18 @@ async function supHistory(){
   }
   const mid = document.getElementById('accMid');
   if(!list.length){
-    _setText('accSub', 'закупов ещё не было');
+    _setText('accSub', 'закупок ещё не было');
     mid.innerHTML = `<div class="exp-empty" style="padding:30px 16px;line-height:1.6">
       Ни одного ответа магазина ещё не загружали.</div>`;
     return;
   }
   const aed = list.reduce((a, x) => a + ((x.money || {}).took || 0), 0);
   const gap = list.reduce((a, x) => a + (x.gap_qty || 0), 0);
-  _setText('accSub', `${list.length} ${pluralize(list.length,'закуп','закупа','закупов')} · ${
+  _setText('accSub', `${list.length} ${pluralize(list.length,'закупка','закупки','закупок')} · ${
     fmt(aed)} AED принято`);
   mid.innerHTML = `
     <div class="sup-sum">
-      <div class="sup-sum-c"><b>${list.length}</b><i>закупов</i></div>
+      <div class="sup-sum-c"><b>${list.length}</b><i>закупок</i></div>
       <div class="sup-sum-c up"><b>${fmt(aed)}</b><i>AED принято</i></div>
       <div class="sup-sum-c ${gap ? 'dn' : ''}"><b>${fmt(gap)}</b><i>не дал магазин</i></div>
     </div>` + list.map(supHistRow).join('');
@@ -10831,7 +11057,7 @@ function supHistRow(x){
 // Из истории карточка открывается так же, как текущая, — но стрелка ведёт
 // обратно в историю, а не в заявку: человек пришёл оттуда.
 async function supOpenOne(sid){
-  _setText('accTitle', 'Поставка');
+  _setText('accTitle', 'Приёмка');
   _setText('accSub', 'загрузка…');
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
   await supLoad(sid);
@@ -10860,33 +11086,15 @@ const _hm = iso => {
 // их полосой в цвет фона.
 function supFoot(){
   const short = ((SUP_D || {}).shortfall || {}).rows || [];
-  const up = `
-    <div class="qb-wrap">
-      <button class="qb ${short.length ? 'qb-ghost qb-wide' : ''}" id="supUp"
-              onclick="document.getElementById('supFile').click()">
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
-             stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/>
-          <path d="M14 3v5h5"/><path d="M12 11v6M9.5 14.5L12 17l2.5-2.5"/></svg>
-        Загрузить ответ магазина
-      </button>
-    </div>
-    <input type="file" id="supFile" accept=".xlsx" style="display:none" onchange="supImport(this)">`;
-  document.getElementById('accFoot').innerHTML = (short.length ? `
+  // Единственная бумага, которая рождается на этом экране, — список того, чего
+  // магазин не дал: с ним едут на доп. склад. Ответ магазина грузят на хабе,
+  // тут его ждать неоткуда.
+  document.getElementById('accFoot').innerHTML = short.length ? `
     <div class="qb-wrap qb-row">
-      <button class="qb" id="supShare" onclick="supShare()">
-        <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 3v13M8 7l4-4 4 4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>
-        Поделиться списком
-      </button>
+      <button class="qb" id="supShare" onclick="supShare()">${ICO_SHARE}Список для доп. склада</button>
       <button class="qb qb-ico" id="supSend" onclick="supSend()"
-              aria-label="Прислать файл в чат с ботом" title="В телеграм">
-        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>
-      </button>
-    </div>` : '') + up;
+              aria-label="Прислать файл в чат с ботом" title="В телеграм">${ICO_TG}</button>
+    </div>` : '';
 }
 
 async function supImport(inp, btnId){

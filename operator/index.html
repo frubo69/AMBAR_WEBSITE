@@ -30,6 +30,9 @@ html{touch-action:manipulation}
   --border:rgba(201,169,110,.14);--border2:rgba(255,255,255,.06);--border3:rgba(255,255,255,.10);
   --text:#EDE9E0;--sub:#9896AA;--muted:#54526A;
   --up:#4CAF7D;--dn:#E05555;--info:#5B8DEF;--warn:#F3B44A;
+  /* Тот же янтарь, но для текста: на светлой теме заливочный слишком
+     светел и предупреждения на нём переставали читаться. */
+  --warn-t:#F3B44A;
   --r:18px;--r2:14px;--r3:10px;--e1:cubic-bezier(.25,.8,.25,1);
   --safe-top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + var(--tg-content-safe-area-inset-top,0px));
   --safe-bottom:calc(var(--tg-safe-area-inset-bottom,0px) + env(safe-area-inset-bottom,0px));
@@ -42,7 +45,7 @@ body.light{
   --bg:#E7E2D4;--bg2:#EFEBDF;--bg3:#EAE5D7;
   --card:#FFFFFF;--card2:#F4F0E6;--card3:#EAE4D4;
   --border:rgba(150,120,60,.34);--border2:rgba(20,18,10,.17);--border3:rgba(20,18,10,.28);
-  --text:#211D13;--sub:#645F4F;--muted:#8E8874;
+  --text:#211D13;--sub:#645F4F;--muted:#8E8874;--warn-t:#8A5A00;
 }
 body.light input,body.light textarea{background:#FFFFFF;border-color:rgba(20,18,10,.22)}
 body{transition:background .25s,color .25s}
@@ -121,7 +124,7 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .ticket{width:340px;flex-shrink:0;display:flex;flex-direction:column;border-left:1px solid var(--border2);background:var(--bg3)}
 .ticket-hdr{padding:14px 16px 10px;flex-shrink:0;display:flex;align-items:center;gap:8px}
 .ticket-hdr .t{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700}
-.ticket-hdr .edit-tag{font-size:10px;font-weight:700;color:var(--warn);border:1px solid rgba(243,180,74,.4);border-radius:6px;padding:3px 8px}
+.ticket-hdr .edit-tag{font-size:10px;font-weight:700;color:var(--warn-t);border:1px solid rgba(243,180,74,.4);border-radius:6px;padding:3px 8px}
 .ticket-clear{margin-left:auto;font-size:12px;color:var(--muted);padding:6px 10px;border-radius:8px}
 .ticket-clear:active{color:var(--dn)}
 .ticket-scroll{flex:1;overflow-y:auto;padding:0 14px 12px;-webkit-overflow-scrolling:touch}
@@ -305,8 +308,16 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
   background:var(--card2);border:1px solid var(--border2);cursor:pointer;flex-shrink:0;
   display:flex;align-items:center;justify-content:center}
 .oc-x:active{transform:scale(.92)}
-#ordBody{flex:1;min-height:0;display:flex;flex-direction:column;padding:6px 22px 8px}
-#custBody{flex:1;min-height:0;display:flex;flex-direction:column;padding:6px 22px 8px}
+/* Одна прокрутка на всё тело карточки. Раньше их было три вложенных — состав
+   внутри тела внутри листа, — и каждая резала содержимое на середине строки:
+   список товаров ужимался до полутора позиций, «Водитель» обрывался пополам,
+   а разговор с водителем ложился поверх карточки отдельной белой плитой. */
+#ordBody{flex:1;min-height:0;display:block;overflow-y:auto;overscroll-behavior:contain;
+  padding:6px 22px 12px}
+#custBody{flex:1;min-height:0;display:block;overflow-y:auto;overscroll-behavior:contain;
+  padding:6px 22px 12px}
+.sheet.wide .of.of-grow{flex:0 0 auto;display:block;overflow:visible}
+.sheet.wide .of-items{flex:none;max-height:none;overflow:visible}
 
 .of{flex:0 0 auto;padding:14px 0;border-bottom:1px solid var(--border2)}
 /* Список товаров забирает всё, что осталось, и ужимается на маленьком экране. */
@@ -389,7 +400,7 @@ a.oc-row:active{background:var(--card2)}
 .oc-row-t{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .oc-tag{font-size:10px;color:var(--muted);padding:2px 7px;border-radius:999px;
   background:var(--card2);border:1px solid var(--border2);white-space:nowrap}
-.oc-tag.warn{color:var(--warn);border-color:rgba(243,180,74,.3)}
+.oc-tag.warn{color:var(--warn-t);border-color:rgba(243,180,74,.3)}
 .oc-go{font-size:11.5px;font-weight:700;color:var(--gold2);white-space:nowrap}
 
 /* Четыре числа в строку: заказы, доставлено, отменено, потрачено. Плитками
@@ -616,13 +627,49 @@ a.oc-row:active{background:var(--card2)}
 /* Переключатель листов поддержки: клиенты и водители */
 .sup-seg{margin-left:14px}
 
-.och{margin:14px 0 0;padding:13px;border-radius:var(--r2);background:var(--card);
-  border:1px solid var(--border2)}
-.och-l{font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;
-  color:var(--muted);margin-bottom:10px}
-.och-w{display:flex;flex-direction:column;gap:7px;max-height:230px;overflow-y:auto;
-  margin-bottom:11px}
-.omsg{max-width:88%;padding:8px 11px;border-radius:13px;font-size:13px;line-height:1.4}
+/* Разговор с водителем — вторая вкладка карточки, а не плита поверх неё.
+   Раньше он висел между телом и кнопками: без полей по бокам, на белой
+   подложке, ростом в 230 px — и одновременно душил список товаров и обрывал
+   собственные сообщения. Теперь у него весь рост карточки, а шапка и кнопки
+   заказа остаются на месте: видно, о каком заказе речь, и решение — рядом. */
+.oc-tabs{flex:0 0 auto;padding:10px 22px;background:var(--bg3);
+  border-bottom:1px solid var(--border2)}
+.oc-tabs .seg{display:grid;grid-template-columns:1fr 1fr;width:100%}
+
+#ordChat{display:none;flex:1;min-height:0;flex-direction:column}
+.sheet.wide.chat #ordBody{display:none}
+.sheet.wide.chat #ordChat{display:flex}
+/* В разговоре карточка держит постоянный рост: переключение вкладок не должно
+   подпрыгивать под пальцем, а переписке нужен весь экран. */
+.sheet.wide.chat{height:92vh}
+/* Из кнопок заказа остаётся первый ряд — то самое решение, за которым водитель
+   и написал. Остальное на вкладке «Заказ», а место здесь дороже. Сумма уходит
+   в строку контекста: у двери её спрашивают, но большой цифрой она тут лишняя. */
+.sheet.wide.chat .ord-acts{margin-top:0}
+.sheet.wide.chat .ord-acts .oc-total{display:none}
+.sheet.wide.chat .ord-acts .oc-top ~ .oc-row2{display:none}
+.sheet.wide.chat .ord-acts .oc-row2 ~ .oc-row2{display:none}
+
+/* Строка контекста: адрес и кто едет. Отвечать «клиенту не отвечает», не видя
+   адреса, — это отвечать наугад. */
+.och-ctx{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:11px 22px;
+  background:var(--bg3);border-bottom:1px solid var(--border2)}
+.och-ctx .b{flex:1;min-width:0}
+.och-ctx-r{display:flex;align-items:center;gap:10px;flex-shrink:0}
+.och-ctx .a{font-size:13.5px;font-weight:700;line-height:1.3;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.och-ctx .s{font-size:11.5px;color:var(--muted);margin-top:3px;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.och-sum{flex-shrink:0;font-family:'DM Sans',sans-serif;font-size:17px;font-weight:800;
+  color:var(--gold2);letter-spacing:-.4px;white-space:nowrap}
+.och-sum small{font-size:10px;font-weight:600;color:var(--muted);margin-left:3px;
+  letter-spacing:0}
+.och-sum i{display:block;font-style:normal;font-size:10px;font-weight:600;
+  color:var(--muted);text-align:right;margin-top:2px;letter-spacing:0}
+.och-w{flex:1;min-height:0;display:flex;flex-direction:column;gap:8px;
+  overflow-y:auto;overscroll-behavior:contain;padding:14px 22px}
+.omsg{max-width:82%;padding:9px 12px;border-radius:14px;font-size:13.5px;line-height:1.45;
+  word-break:break-word}
 .omsg.me{align-self:flex-end;background:rgba(201,169,110,.12);
   border:1px solid rgba(201,169,110,.28);border-bottom-right-radius:5px}
 .omsg.drv{align-self:flex-start;background:var(--card2);border:1px solid var(--border2);
@@ -630,18 +677,31 @@ a.oc-row:active{background:var(--card2)}
 .omsg-n{display:block;font-size:9.5px;font-weight:700;letter-spacing:.6px;
   text-transform:uppercase;color:var(--sub);margin-bottom:3px}
 .omsg-k{display:inline-flex;margin-bottom:4px;padding:2px 8px;border-radius:999px;
-  background:rgba(243,180,74,.14);color:var(--warn);font-size:9.5px;font-weight:700;
+  background:rgba(243,180,74,.14);color:var(--warn-t);font-size:9.5px;font-weight:700;
   letter-spacing:.4px;text-transform:uppercase}
 .omsg-t{display:block;font-size:10px;color:var(--sub);opacity:.7;margin-top:3px;text-align:right}
-.och-e{font-size:12.5px;color:var(--sub);line-height:1.5;margin-bottom:11px}
-.och-say{display:flex;align-items:center;gap:8px}
-.och-say input{flex:1;min-width:0;padding:12px 13px;border-radius:var(--r2);
-  border:1px solid var(--border2);background:var(--bg3);color:var(--text);
+.och-sp{flex:1 1 auto;min-height:0}
+.och-e{margin:auto;text-align:center;font-size:12.5px;color:var(--muted);line-height:1.6;
+  max-width:300px}
+
+/* Готовые ответы: водитель стоит у двери, и печатать «ждите пять минут»
+   каждый раз — это те самые полминуты, которых у него нет. Нажатие
+   подставляет текст в поле, а не отправляет: последнее слово за оператором. */
+.och-q{flex:0 0 auto;display:flex;gap:6px;padding:0 22px;overflow-x:auto;
+  scrollbar-width:none;-ms-overflow-style:none}
+.och-q::-webkit-scrollbar{display:none}
+.och-q button{flex-shrink:0;padding:7px 12px;border-radius:999px;border:1px solid var(--border2);
+  background:var(--card);font-size:12px;font-weight:600;color:var(--sub);white-space:nowrap}
+.och-q button:active{transform:scale(.96);color:var(--text)}
+.och-say{flex:0 0 auto;display:flex;align-items:center;gap:10px;padding:12px 22px}
+.och-say input{flex:1;min-width:0;padding:12px 15px;border-radius:999px;
+  border:1px solid var(--border2);background:var(--card);color:var(--text);
   font-family:inherit;font-size:14px;outline:none}
 .och-say input:focus{border-color:rgba(201,169,110,.5)}
-.och-go{flex:0 0 auto;width:46px;height:46px;border-radius:var(--r2);border:none;
+.och-go{flex:0 0 auto;width:44px;height:44px;border-radius:50%;border:none;
   cursor:pointer;display:flex;align-items:center;justify-content:center;
   background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408}
+.och-go:active{transform:scale(.92)}
 .och-go:disabled{opacity:.4;pointer-events:none}
 
 .sh-r{display:flex;align-items:center;gap:12px;padding:13px 14px;margin-bottom:8px;
@@ -653,7 +713,7 @@ a.oc-row:active{background:var(--card2)}
 .sh-b{flex:1;min-width:0}
 .sh-n{display:block;font-size:14px;font-weight:700;line-height:1.2}
 .sh-s{display:block;font-size:11.5px;color:var(--sub);margin-top:2px}
-.sh-s b{color:var(--warn)}
+.sh-s b{color:var(--warn-t)}
 .sh-go{flex:0 0 auto;padding:10px 15px;border-radius:var(--r2);font-family:inherit;
   font-size:12.5px;font-weight:700;cursor:pointer;color:#1a1408;border:none;
   background:linear-gradient(135deg,var(--gold),var(--gold2))}
@@ -666,7 +726,7 @@ a.oc-row:active{background:var(--card2)}
 .sh-r.sh-open{display:block;border-color:rgba(243,180,74,.35);
   background:linear-gradient(160deg,rgba(243,180,74,.07),transparent 60%),var(--card)}
 .sh-hd{display:flex;align-items:center;gap:12px}
-.sh-open .sh-s{color:var(--warn)}
+.sh-open .sh-s{color:var(--warn-t)}
 /* Отметить бригаду — первое дело оператора за день. Раньше на одного человека
    уходила строка в шестьдесят пикселей с двумя крупными кнопками: район из
    трёх водителей занимал экран, пять районов — пять экранов, и всё ради
@@ -742,7 +802,7 @@ a.oc-row:active{background:var(--card2)}
 .shl-c{display:block;font-size:12px;line-height:1.4;color:var(--muted);margin-top:3px}
 .shl-c i{font-style:normal;opacity:.75}
 .pill.hot{border-color:rgba(243,180,74,.5);background:rgba(243,180,74,.1);
-  color:var(--warn)}
+  color:var(--warn-t)}
 
 .sbtn.gold{background:linear-gradient(135deg,#E8C98A,#C9A96E);color:#1a1408;border:none}
 .sbtn.red{background:linear-gradient(135deg,#E86A6A,#C94E4E);color:#fff;border:none}
@@ -897,11 +957,11 @@ a.oc-row:active{background:var(--card2)}
 /* ── просьба водителя ────────────────────────────────────────────────────
    Заметна с первого взгляда: пока не ответили, заказ стоит и у водителя. */
 .q-card.req{border-color:rgba(243,180,74,.5);box-shadow:0 0 0 1px rgba(243,180,74,.18)}
-.q-flag.req{background:rgba(243,180,74,.14);color:var(--warn);
+.q-flag.req{background:rgba(243,180,74,.14);color:var(--warn-t);
   border:1px solid rgba(243,180,74,.35)}
 .dq{display:flex;flex-direction:column;gap:6px;margin-top:9px;padding:9px 12px;
   border-radius:11px;background:rgba(243,180,74,.1);border:1px solid rgba(243,180,74,.32)}
-.dq-h{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--warn)}
+.dq-h{display:flex;align-items:center;gap:7px;font-size:12.5px;color:var(--warn-t)}
 .dq-h b{font-weight:700}
 .dq-h .ic{width:15px;height:15px;flex:0 0 15px}
 .dq-h span{margin-left:auto;font-size:11px;color:var(--muted);font-weight:600}
@@ -925,7 +985,7 @@ a.oc-row:active{background:var(--card2)}
 /* Новое количество — жёлтым: красной остаётся только полоса, которой
    зачёркнуто прежнее. Красный текст здесь читался как ошибка, хотя это
    просто другое число. */
-.of-it.ch em{font-style:normal;color:var(--warn);font-weight:800}
+.of-it.ch em{font-style:normal;color:var(--warn-t);font-weight:800}
 /* Добавленная позиция — зелёным: убрали и добавили это разные события, и
    одинаковым красным они читались как одна ошибка. */
 .of-it.ad .of-it-n,.of-it.ad .of-it-p{color:var(--up)}
@@ -935,7 +995,7 @@ a.oc-row:active{background:var(--card2)}
 .of-it.dl .of-it-s{text-decoration:none}
 .oc-tl b s{color:var(--text);font-size:.78em;text-decoration-color:var(--dn);
   text-decoration-thickness:2px;margin-right:6px;font-weight:700}
-.oc-gate.req{background:rgba(243,180,74,.1);border-color:rgba(243,180,74,.35);color:var(--warn)}
+.oc-gate.req{background:rgba(243,180,74,.1);border-color:rgba(243,180,74,.35);color:var(--warn-t)}
 
 /* ── лента: что горит и что уже случилось ─────────────────────────────── */
 .fd-ov{position:fixed;inset:0;z-index:118;background:rgba(0,0,10,.55);display:none}
@@ -958,7 +1018,7 @@ a.oc-row:active{background:var(--card2)}
 .fd-i.hot{border-color:rgba(243,180,74,.45);background:rgba(243,180,74,.07)}
 .fd-i.warm{border-color:rgba(201,169,110,.3)}
 .fd-i .ic{width:16px;height:16px;flex:0 0 16px;margin-top:1px;color:var(--muted)}
-.fd-i.hot .ic{color:var(--warn)}
+.fd-i.hot .ic{color:var(--warn-t)}
 .fd-i .b{flex:1;min-width:0}
 .fd-i .n{font-size:13px;font-weight:700;display:flex;gap:6px;align-items:baseline}
 .fd-i .n em{font-style:normal;font-family:'Space Grotesk',sans-serif;color:var(--gold2);
@@ -966,7 +1026,7 @@ a.oc-row:active{background:var(--card2)}
 .fd-i .s{font-size:11.5px;color:var(--muted);margin-top:3px;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
 .fd-i .r{margin-left:auto;font-size:10.5px;font-weight:700;color:var(--muted);flex-shrink:0}
-.fd-i.hot .r{color:var(--warn)}
+.fd-i.hot .r{color:var(--warn-t)}
 .fd-empty{padding:36px 16px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6}
 
 /* ── поддержка: очередь обращений + переписка ────────────────────────────
@@ -1055,7 +1115,7 @@ a.oc-row:active{background:var(--card2)}
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sup-oid.new{color:var(--gold2);border-color:rgba(201,169,110,.45);background:var(--gold-soft)}
 .sup-oid.work{color:var(--info);border-color:rgba(91,141,239,.4);background:rgba(91,141,239,.1)}
-.sup-oid.warn{color:var(--warn);border-color:rgba(243,180,74,.4);background:rgba(243,180,74,.1)}
+.sup-oid.warn{color:var(--warn-t);border-color:rgba(243,180,74,.4);background:rgba(243,180,74,.1)}
 .sup-oid.no{color:var(--dn);border-color:rgba(224,85,85,.4);background:rgba(224,85,85,.1)}
 
 .sup-chat{flex:1;min-width:0;display:flex;flex-direction:column}
@@ -1127,7 +1187,7 @@ a.oc-row:active{background:var(--card2)}
 .pill.back{color:#1a1408;background:linear-gradient(135deg,var(--warn),#E8A33A);
   border-color:transparent;font-weight:800}
 .ticket.back .ticket-hdr::after{content:'ЗАДНИМ ЧИСЛОМ';margin-left:auto;font-size:9.5px;
-  font-weight:800;letter-spacing:1.2px;color:var(--warn)}
+  font-weight:800;letter-spacing:1.2px;color:var(--warn-t)}
 #dayInput{width:100%;padding:12px 14px;border-radius:12px;font-size:15px}
 .dchip i{font-style:normal;margin-left:auto;font-size:11px;color:var(--muted)}
 @media (max-width:900px){
@@ -1160,6 +1220,13 @@ a.oc-row:active{background:var(--card2)}
   .sup-hb button span{display:none}
   .sup-msgs{padding:14px 12px}
   .sup-bar{padding:10px 12px calc(10px + var(--safe-bottom))}
+  /* Карточка заказа на телефоне: поля по 22 px съедали ширину, из-за чего
+     «Вернуть в доставку» ломалось на две строки. Отступ один на все полосы —
+     шапка, тело, разговор и кнопки стоят по одной линии. */
+  #ordBody,#custBody,.oc-tabs,.och-ctx,.och-w,.och-q,.och-say{
+    padding-left:16px;padding-right:16px}
+  .sheet.wide .t{padding-left:16px;padding-right:16px}
+  .ord-acts{padding-left:16px;padding-right:16px}
 }
 
 /* Ряд значков в шапке на узком телефоне (375 и уже) не помещался и выпихивал
@@ -1453,8 +1520,17 @@ a.oc-row:active{background:var(--card2)}
 
 <!-- карточка заказа: всё, что есть у оператора в боте -->
 <div class="ov" id="ordOv">
-  <div class="sheet wide">
+  <div class="sheet wide" id="ordSheet">
     <div class="t" id="ordT">Заказ</div>
+    <!-- Вкладки появляются только там, где есть о чём говорить: заказ в
+         доставке или уже начатый разговор. -->
+    <div class="oc-tabs" id="ordTabs" style="display:none">
+      <div class="seg">
+        <button class="seg-b on" id="ordTabO" onclick="ordTab('order')">Заказ</button>
+        <button class="seg-b" id="ordTabC" onclick="ordTab('chat')">Разговор<i
+          class="seg-n" id="ordChatN">0</i></button>
+      </div>
+    </div>
     <div id="ordBody"></div>
     <div id="ordChat"></div>
     <div class="ord-acts" id="ordActs"></div>
@@ -2373,18 +2449,23 @@ const _actIco = t => ICO_ACT[t]
 // равно придётся лезть в переписку.
 let curOrder=null, curCust=null;
 
-async function openOrder(oid){
+async function openOrder(oid, mode){
   // Из поддержки приходят и старые заказы, которых нет в сегодняшней очереди.
   // Раньше кнопка «Заказ» на таком обращении просто молчала.
+  _ordWant = mode === 'chat' ? 'chat' : 'order';
   const local = ORDERS.find(x=>x.order_id===oid) || null;
-  if(local){ curOrder=local; renderOrder(); showOv('ordOv'); haptic('light'); }
+  // Показываем окно до отрисовки, а не после: скрытый элемент имеет нулевую
+  // высоту, и лента сообщений «прокручивалась вниз» в ноль — последнее
+  // сообщение оставалось наполовину срезанным.
+  if(local){ curOrder=local; showOv('ordOv'); renderOrder(); haptic('light'); }
   let r=null;
   try{ r = await opApi.opFetch(`/api/operator/orders/${oid}/one`); }catch(e){}
   const fresh = r && r.order;
   if(!fresh){ if(!local) toast('Заказ не найден','err'); return; }
   if(local && !(curOrder && curOrder.order_id===oid)) return;   // оператор ушёл дальше
-  curOrder=fresh; renderOrder();
+  curOrder=fresh;
   if(!local){ showOv('ordOv'); haptic('light'); }
+  renderOrder();
 }
 
 function _phones(o){
@@ -2726,6 +2807,9 @@ async function doAccept(){
 
 function startEdit(oid){
   const o = ORDERS.find(x=>x.order_id===oid); if(!o) return;
+  // Правка происходит на основном экране: всё, что лежит поверх, надо убрать —
+  // иначе оператор смотрит на поддержку и думает, что кнопка не сработала.
+  supClose(); fdClose();
   TICKET={};
   (o.items||[]).forEach(i=>{
     const key = i.pcs ? i.id+'_'+i.pcs : i.id;
@@ -2793,24 +2877,71 @@ function _orderText(o){
 const CASE_TITLE = {client:'Клиент не отвечает', address:'Не найти адрес',
                     wait:'Просит подождать', other:'Вопрос по заказу'};
 
-function chatRender(){
+// Готовые ответы. Порядок — по тому, как часто это нужно у двери.
+const OCH_Q = ['Ждите 5 минут', 'Звоню клиенту', 'Оставьте у двери', 'Возвращайтесь'];
+
+// Сколько сообщений водителя осталось без ответа — это и есть число на вкладке.
+function _drvWait(chat){
+  let n = 0;
+  for(let i = chat.length - 1; i >= 0; i--){ if(chat[i].by === 'operator') break; n++; }
+  return n;
+}
+
+let ordMode = 'order', _ordWant = '', _ochShell = '', _ochBody = '';
+
+function ordSet(m){
+  ordMode = m;
+  const sh = $('ordSheet'); if(!sh) return;
+  sh.classList.toggle('chat', m === 'chat');
+  $('ordTabO').classList.toggle('on', m === 'order');
+  $('ordTabC').classList.toggle('on', m === 'chat');
+}
+function ordTab(m){
+  ordSet(m); haptic('sel');
+  if(m === 'chat'){
+    chatRender(true);
+    const w = $('ochW'); if(w) w.scrollTop = w.scrollHeight;
+  }
+}
+
+function chatRender(toBottom){
   const o = curOrder || {};
-  const box = $('ordChat'); if(!box) return;
+  const box = $('ordChat'), tabs = $('ordTabs'); if(!box) return;
   const chat = o.chat || [];
-  if(!chat.length && o.status !== 'approved'){ box.innerHTML = ''; return; }
-  box.innerHTML = `
-    <div class="och">
-      <div class="och-l">Разговор с водителем${o.driver ? ' · ' + _esc(o.driver) : ''}</div>
-      ${chat.length ? `<div class="och-w" id="ochW">${chat.map(m => `
-        <div class="omsg ${m.by === 'operator' ? 'me' : 'drv'}">
-          ${m.kind && CASE_TITLE[m.kind]
-            ? `<span class="omsg-k">${_esc(CASE_TITLE[m.kind])}</span>` : ''}
-          <span class="omsg-n">${_esc(m.by === 'operator' ? (m.name || 'оператор') : (m.name || 'водитель'))}</span>
-          ${_esc(m.text)}
-          <span class="omsg-t">${_hhmm(m.at)}</span>
-        </div>`).join('')}</div>`
-        : `<div class="och-e">Водитель ещё ничего не писал. Можно написать первым —
-             например, что клиент просит перезвонить.</div>`}
+  // Заказ в доставке — разговор возможен даже до первого сообщения: иногда
+  // первым пишет оператор.
+  const on = chat.length || o.status === 'approved';
+  if(tabs) tabs.style.display = on ? '' : 'none';
+  if(!on){ box.innerHTML = ''; _ochShell = ''; ordSet('order'); return; }
+
+  const n = _drvWait(chat);
+  const b = $('ordChatN'); if(b){ b.textContent = n; b.classList.toggle('has', n > 0); }
+
+  // Распорка прижимает короткий разговор к полю ввода, как в мессенджере, и
+  // схлопывается сама, когда сообщений становится много.
+  const body = '<div class="och-sp"></div>' + (chat.length ? chat.map(m => `
+      <div class="omsg ${m.by === 'operator' ? 'me' : 'drv'}">
+        ${m.kind && CASE_TITLE[m.kind]
+          ? `<span class="omsg-k">${_esc(CASE_TITLE[m.kind])}</span>` : ''}
+        <span class="omsg-n">${_esc(m.by === 'operator' ? (m.name || 'оператор')
+                                                        : (m.name || 'водитель'))}</span>
+        ${_esc(m.text)}
+        <span class="omsg-t">${_hhmm(m.at)}</span>
+      </div>`).join('')
+    : `<div class="och-e">Водитель ещё ничего не писал.<br>Можно написать первым —
+         например, что клиент просит перезвонить.</div>`);
+
+  // Каркас переживает перерисовку: иначе набранный ответ пропадал бы при
+  // каждом обновлении карточки, как это было в поддержке.
+  if(_ochShell !== o.order_id || !$('ochW')){
+    box.innerHTML = `
+      <div class="och-ctx">
+        <div class="b"><div class="a" id="ochAddr"></div><div class="s" id="ochSub"></div></div>
+        <div class="och-ctx-r" id="ochAct"></div>
+      </div>
+      <div class="och-w" id="ochW"></div>
+      <div class="och-q">${OCH_Q.map((t, i) =>
+        `<button onclick="chatQuick(${i})">${_esc(t)}</button>`).join('')}</div>
       <div class="och-say">
         <input id="ochText" type="text" placeholder="Ответить водителю" autocomplete="off"
                enterkeyhint="send" onkeydown="if(event.key==='Enter')chatSend()">
@@ -2819,9 +2950,39 @@ function chatRender(){
             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
             <path d="M4 12h15M13 6l6 6-6 6"/></svg>
         </button>
-      </div>
-    </div>`;
-  const w = $('ochW'); if(w) w.scrollTop = w.scrollHeight;
+      </div>`;
+    _ochShell = o.order_id; _ochBody = ''; toBottom = true;
+  }
+  $('ochAddr').textContent = o.address || 'адрес не указан';
+  $('ochSub').textContent = [o.customer_name, _distName(o.office_id) || o.district || '',
+                             o.driver ? ('водитель ' + o.driver) : ''].filter(Boolean).join(' · ');
+  // Сумма и способ оплаты — прямо здесь: у двери спрашивают именно их.
+  $('ochAct').innerHTML = `<div class="och-sum">${_esc(o.total)}<small>AED</small>
+      <i>${o.prepaid ? 'оплачено' : (o.payment_method === 'debt' ? 'в долг' : 'наличными')}</i></div>`
+    + (o.gmap_link
+      ? `<a class="of-map" href="${_esc(o.gmap_link)}" target="_blank" rel="noopener"><svg
+          viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-5.7 7-11a7 7 0 1 0-14 0c0 5.3 7 11 7 11z"/><circle
+          cx="12" cy="10" r="2.6"/></svg>Карта</a>` : '');
+
+  const w = $('ochW');
+  if(body !== _ochBody){
+    const stick = toBottom || (w.scrollHeight - w.scrollTop - w.clientHeight < 60);
+    const keep = w.scrollTop;
+    w.innerHTML = body; _ochBody = body;
+    w.scrollTop = stick ? w.scrollHeight : keep;
+  }else if(toBottom){ w.scrollTop = w.scrollHeight; }
+
+  // Открыли карточку на разговоре — значит туда и шли.
+  if(_ordWant){ ordSet(_ordWant); _ordWant = ''; if(ordMode === 'chat') w.scrollTop = w.scrollHeight; }
+}
+
+// Подставляем в поле, а не отправляем: у двери бывает по-разному, и последнее
+// слово должно остаться за оператором.
+function chatQuick(i){
+  const inp = $('ochText'); if(!inp) return;
+  const t = OCH_Q[i], had = inp.value.trim();
+  inp.value = had ? (had + ' ' + t) : t;
+  inp.focus(); haptic('sel');
 }
 
 let CHAT_BUSY = false;
@@ -2834,7 +2995,7 @@ async function chatSend(){
       {method:'POST', body:{text: t, as: curOp}});
     curOrder.chat = r.chat || curOrder.chat;
     inp.value = '';
-    chatRender();
+    chatRender(true);
     haptic('ok');
     toast('Ушло водителю','ok');
   }catch(e){ toast('Не отправилось','err'); }
@@ -3644,7 +3805,10 @@ function _itemRows(o){
     const it=((r.items||[]).find(i=>i.name===x.name))||{};
     return line(x.name, `${x.qty} шт`, (it.price||0)*(+x.qty||1), 'ad', '+');
   }).join('');
-  return html;
+  // Пустой заказ — это не пустое место в карточке: без строки коробка
+  // схлопывалась в полоску и выглядела сломанной вёрсткой.
+  return html || `<div class="of-it"><span class="of-it-n"
+    style="color:var(--muted);font-weight:500">Позиции не указаны</span></div>`;
 }
 
 function _reqStrip(o){
@@ -3874,10 +4038,11 @@ function drvList(){
 }
 
 // Разговор ведём там, где он и живёт, — в карточке заказа: отвечать, не видя
-// адреса и состава, значит отвечать наугад.
+// адреса и состава, значит отвечать наугад. Поддержку не закрываем: карточка
+// ложится поверх, и после ответа оператор возвращается к списку, а не начинает
+// путь заново.
 function drvOpen(oid){
-  supClose();
-  openOrder(oid);
+  openOrder(oid, 'chat');
 }
 
 function supOpen(){

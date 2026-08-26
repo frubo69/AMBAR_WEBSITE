@@ -1169,6 +1169,24 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .acc-group{display:grid;grid-template-columns:1fr 1fr;margin:0;flex:1 1 auto;
   border-radius:16px;overflow:hidden;background:var(--card);
   border:1px solid var(--border2)}
+/* ── История заказов ────────────────────────────────────────────────────── */
+/* Строка заказа: адрес крупно — по нему и вспоминают, что это было, — под ним
+   время, номер, водитель и клиент. Справа сумма и состояние. */
+.ck-i.ords{align-items:center}
+.ck-i.ords .ck-t b{font-size:13.5px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ords-r{flex-shrink:0;display:flex;flex-direction:column;align-items:flex-end;gap:5px}
+.ords-v{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
+  color:var(--gold2);font-variant-numeric:tabular-nums;line-height:1}
+.ords-r .pstat-c{padding:2px 8px;font-size:9.5px;animation:none}
+.pstat-c.no{color:var(--dn);background:rgba(224,85,85,.1);
+  border-color:rgba(224,85,85,.3)}
+.ord-more{padding:14px 4px 2px;text-align:center;font-size:11.5px;color:var(--muted)}
+/* Ряды фильтров идут встык: район сверху, состояние под ним. */
+.ord-tabs + .ord-tabs{margin-top:-6px}
+.dt-sect-a{margin-left:auto;padding:0;border:0;background:none;cursor:pointer;
+  font-family:inherit;font-size:10.5px;font-weight:600;letter-spacing:0;
+  text-transform:none;color:var(--gold2)}
+
 /* ── Экран чек-листа ────────────────────────────────────────────────────── */
 /* Сводка сверху отвечает на единственный вопрос, с которым сюда заходят:
    «мне ещё что-то нужно сделать?». Список ниже отвечает на «что именно». */
@@ -3355,6 +3373,17 @@ button.path:active{transform:scale(.995)}
     <div class="off-empty">Загрузка…</div>
   </div>
 
+  <!-- История заказов: разбивка по районам. Стоит сразу под районами — это
+       тот же вопрос, только вблизи: не «сколько район привёз», а «что именно
+       и куда ехало». -->
+  <button class="phist" style="margin-top:12px" onclick="accOpen('orders')">
+    <span class="pnav-b"><b>История заказов</b>
+      <i>все заказы периода с разбивкой по районам</i></span>
+    <span class="pnav-go"><svg viewBox="0 0 24 24" width="16" height="16" fill="none"
+      stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+      stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span>
+  </button>
+
   <!-- Команда — под районами: сначала «как отработали точки», потом «кто там
        работает». Период — общий со страницей. -->
   <div class="sect" style="margin-top:18px">
@@ -4208,7 +4237,7 @@ button.path:active{transform:scale(.995)}
 .dt-stat-sub{font-size:10px;color:var(--muted);margin-top:4px;font-weight:500}
 
 /* Section */
-.dt-sect{font-size:10px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:var(--sub);padding:14px 4px 8px}
+.dt-sect{display:flex;align-items:baseline;gap:8px;font-size:10px;font-weight:700;letter-spacing:1.8px;text-transform:uppercase;color:var(--sub);padding:14px 4px 8px}
 .dt-card{background:var(--card);border:1px solid var(--border2);border-radius:12px;overflow:hidden;margin-bottom:10px}
 .dt-row{display:flex;align-items:center;gap:10px;padding:11px 13px;border-bottom:1px solid var(--border2);font-size:13px}
 .dt-row:last-child{border-bottom:none}
@@ -7855,7 +7884,10 @@ async function _officeLoad(id){
   }
 
   if((d.recent||[]).length){
-    html += `<div class="dt-sect">Последние заказы</div>
+    // Пятнадцать последних — не история, а хвост. Ссылка ведёт туда, где
+    // видно всё окно и с чем сравнивать: в общую историю, уже на этом районе.
+    html += `<div class="dt-sect">Последние заказы
+        <button class="dt-sect-a" onclick="ordsOpen('${escS(d.id)}')">все заказы →</button></div>
       <div class="dt-card"><div style="max-height:260px;overflow-y:auto;-webkit-overflow-scrolling:touch">${orderRows(d.recent)}</div></div>`;
   }
 
@@ -9319,6 +9351,131 @@ function accRender(){
     <div class="acc-group acc-3">${pick(['stock','qr','check'])}</div>`;
 }
 
+// ── История заказов ────────────────────────────────────────────────────────
+// Заказы жили кусками: пятнадцать последних в карточке района, четыре списка
+// по статусам в шите «Заказы», три строки в карточке клиента. На вопрос «что и
+// куда сегодня ехало» не отвечал ни один: в общем списке не видно района, а в
+// районе виден только хвост.
+//
+// Здесь один список на всё окно с разбивкой по районам. Разбивка и есть ответ:
+// сначала район со своим итогом, под ним его заказы.
+let ORDS = null, ORDF = {district:'', status:'', q:''}, _ordsQT = null, _ordsWant = null, _ordsSeq = 0;
+// Открыть историю сразу на нужном районе — из карточки района.
+function ordsOpen(d){ _ordsWant = d || ''; try{ closeDetail(); }catch(e){} accOpen('orders'); }
+
+const ORD_ST = [['', 'Все'], ['delivered', 'Доставлены'], ['route', 'В пути'],
+                ['new', 'Новые'], ['cancelled', 'Отменены']];
+
+async function accOrders(district){
+  ACC_BACK = null;
+  if(district !== undefined) ORDF = {district: district || '', status:'', q:''};
+  _setText('accTitle', 'Заказы');
+  _setText('accSub', 'загрузка…');
+  document.getElementById('accFoot').innerHTML = '';
+  if(!ORDS) document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  await ordsLoad();
+}
+
+async function ordsLoad(){
+  const p = {...(RANGE ? {period:'month', from:RANGE.from, to:RANGE.to}
+                       : {period: curPeriod(), ...(DAY_OFFSET ? {day_offset:DAY_OFFSET} : {})})};
+  if(ORDF.district) p.district = ORDF.district;
+  if(ORDF.status)   p.status   = ORDF.status;
+  if(ORDF.q)        p.q        = ORDF.q;
+  // Ответы могут вернуться не в том порядке, в каком их спрашивали: человек
+  // жмёт район, потом статус, а первый ответ приходит вторым и затирает
+  // второй. Рисуем только последний запрос.
+  const my = ++_ordsSeq;
+  let r;
+  try{ r = await ownerApi.ownerFetch('/api/owner/orders', {params:p}); }
+  catch(e){
+    if(my !== _ordsSeq) return;
+    document.getElementById('accMid').innerHTML =
+      '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+    return;
+  }
+  if(my !== _ordsSeq) return;
+  ORDS = r;
+  ordsRender();
+}
+
+// Период берём тот же, что на странице: у заказов не может быть своего «вчера».
+function curPeriod(){
+  return document.querySelector('#periodPicker button.on')?.dataset?.p
+      || document.querySelector('#officePeriod button.on')?.dataset?.p || 'today';
+}
+
+function ordsSet(k, v){
+  ORDF[k] = v;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  ordsLoad();
+}
+function ordsSearch(v){
+  ORDF.q = v || '';
+  clearTimeout(_ordsQT);
+  _ordsQT = setTimeout(ordsLoad, 280);
+}
+
+function ordsRender(){
+  const d = ORDS; if(!d) return;
+  const gs = d.groups || [];
+  _setText('accSub', `${fmt(d.total)} ${pluralize(d.total,'заказ','заказа','заказов')}`
+    + (d.delivered ? ` · доставлено ${fmt(d.delivered)} на ${fmt(d.aed)} AED` : ''));
+
+  const chip = (k, val, t, n) => `<button class="ord-tab ${ORDF[k] === val ? 'on' : ''}"
+    onclick="ordsSet('${k}','${val}')">${escS(t)}${n != null ? `<i>${n}</i>` : ''}</button>`;
+
+  // Районы первым рядом: это главный вопрос экрана. Статусы вторым.
+  const head = `
+    <div class="ord-tabs">${
+      chip('district', '', 'Все районы', d.total)}${
+      (d.districts || []).map(x => chip('district', x.id, x.code || x.name,
+        (gs.find(g => g.id === x.id) || {}).orders || 0)).join('')}</div>
+    <div class="ord-tabs">${ORD_ST.map(([v, t]) => chip('status', v, t)).join('')}</div>
+    <div class="ord-find">
+      <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+      <input id="ordsQ" type="search" placeholder="Номер, адрес, клиент, водитель"
+             value="${escS(ORDF.q)}" oninput="ordsSearch(this.value)">
+      ${ORDF.q ? `<button class="ord-find-x" onclick="ordsSearch('');document.getElementById('ordsQ').value=''"
+        aria-label="Очистить">✕</button>` : ''}
+    </div>`;
+
+  const body = !gs.length
+    ? `<div class="exp-empty">${ORDF.q ? 'Ничего не нашлось' : 'За этот период заказов не было'}</div>`
+    : gs.map(g => `
+      <div class="ck-h"><span>${escS(g.code || g.name)}</span>
+        <i class="ck-hs">${escS(g.name)} · ${fmt(g.orders)} ${
+          pluralize(g.orders,'заказ','заказа','заказов')}${
+          g.aed ? ` · ${fmt(g.aed)} AED` : ''}</i></div>
+      <div class="ck-g">${g.rows.map(ordsRow).join('')}</div>`).join('')
+      + (d.shown < d.total ? `<div class="ord-more">Показано ${fmt(d.shown)} из ${
+          fmt(d.total)} — уточните период или район</div>` : '');
+
+  document.getElementById('accMid').innerHTML = head + body;
+  if(ORDF.q){ const el = document.getElementById('ordsQ');
+              if(el && document.activeElement !== el){ el.focus(); el.selectionStart = el.value.length; } }
+}
+
+// Классы те же, что у статуса заявки: зелёный — сделано, жёлтый — идёт или
+// ждёт, красный — не случилось. Второго набора цветов в приложении быть не
+// должно, иначе одно и то же состояние выглядит по-разному в двух местах.
+const ORDS_ST = {delivered:['доставлен','done'], approved:['в пути','live'],
+                 pending:['новый','wait'], cancelled:['отменён','no'],
+                 declined:['отклонён','no']};
+
+function ordsRow(o){
+  const [st, cls] = ORDS_ST[o.status] || [o.status, ''];
+  const who = [o.driver, o.name].filter(Boolean).join(' · ');
+  return `<button class="ck-i ords" data-detail="order:${escS(o.id)}">
+    <span class="ck-t">
+      <b>${escS(o.address && o.address !== '—' ? o.address : 'адрес не указан')}</b>
+      <i>${fmtHM(o.ts)} · #${escS(o.id)}${who ? ' · ' + escS(who) : ''}</i></span>
+    <span class="ords-r">
+      <span class="ords-v">${fmt(o.total)}</span>
+      <span class="pstat-c ${cls}">${escS(st)}</span></span>
+  </button>`;
+}
+
 // ── Чек-лист смены ─────────────────────────────────────────────────────────
 // У старшего и у смены разные часы: смена идёт с полудня до шести утра, а он
 // работает с шести утра до часу ночи. Поэтому список делится на три блока —
@@ -9658,6 +9815,7 @@ function accOpen(id){
   if(id === 'norms')    accNorms();
   if(id === 'shifts')   accShifts();
   if(id === 'checklist') accChecklist();
+  if(id === 'orders')   { accOrders(_ordsWant === null ? '' : _ordsWant); _ordsWant = null; }
 }
 
 // Стрелка в шапке раздела ведёт на шаг назад, а не сразу наружу: у QR-кодов

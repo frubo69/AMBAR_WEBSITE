@@ -3381,6 +3381,106 @@ async def handle_checklist_mark(request):
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 
+# ── История заказов ────────────────────────────────────────────────────────
+# Заказы до сих пор жили кусками: пятнадцать последних в карточке района,
+# четыре списка по статусам в шите «Заказы», три строки в карточке клиента.
+# На вопрос «что и куда сегодня ехало» ни один из них не отвечал: в общем
+# списке не видно района, а в районе видно только хвост.
+#
+# Здесь один список на всё окно, с разбивкой по районам и фильтрами. Разбивка
+# и есть ответ: сначала район со своим итогом, под ним его заказы.
+
+ORD_STATUS = {
+    "delivered": ("delivered",),
+    "route":     ("approved",),
+    "new":       ("pending",),
+    "cancelled": ("cancelled", "declined"),
+}
+
+
+@require_owner
+async def handle_orders(request):
+    """GET /api/owner/orders — все заказы окна, сгруппированные по районам.
+
+    Параметры те же, что у района: period, day_offset, from/to. Плюс свои:
+    district (id или пусто — все), status (см. ORD_STATUS), q (поиск по номеру,
+    адресу, имени клиента, водителю), limit."""
+    await _staff_fresh()
+    period = request.query.get("period", "today")
+    if period not in VALID_PERIODS:
+        period = "today"
+    try:
+        day_offset = max(0, min(365, int(request.query.get("day_offset", "0") or 0)))
+    except ValueError:
+        day_offset = 0
+    frm = (request.query.get("from") or "").strip()
+    to = (request.query.get("to") or "").strip()
+    custom = None
+    if frm and to:
+        try:
+            custom = _range_window(frm, to)
+        except ValueError:
+            custom = None
+
+    district = (request.query.get("district") or "").strip()
+    status = (request.query.get("status") or "").strip()
+    q = (request.query.get("q") or "").strip().lower().lstrip("#")
+    try:
+        limit = max(20, min(600, int(request.query.get("limit", "300") or 300)))
+    except ValueError:
+        limit = 300
+
+    all_orders = await db.get_all_orders()
+    ref = (_now_dubai() - timedelta(days=day_offset)) if day_offset else None
+    start, end, _ps, _pe = custom or _period_window(period, ref)
+    pairs = _all_orders_in_window(all_orders, start, end)
+
+    want = ORD_STATUS.get(status)
+    rows = []
+    for dt, o in sorted(pairs, key=lambda p: p[0], reverse=True):
+        oid = o.get("office_id") or ""
+        if district and oid != district:
+            continue
+        if want and o.get("status") not in want:
+            continue
+        if q:
+            hay = " ".join(str(x or "").lower() for x in (
+                o.get("order_id"), o.get("address"), o.get("customer_name"),
+                o.get("driver"), o.get("phone")))
+            if q not in hay:
+                continue
+        rows.append((oid, _order_summary(o)))
+
+    # Итог по каждому району считаем по всем найденным строкам, а не по
+    # показанным: обрезка списка не должна менять сумму под заголовком.
+    by = {}
+    for oid, r in rows:
+        g = by.setdefault(oid, {"id": oid, "code": OFFICE_CODES.get(oid, ""),
+                                "name": OFFICE_NAMES.get(oid, "Без района"),
+                                "orders": 0, "delivered": 0, "aed": 0, "rows": []})
+        g["orders"] += 1
+        if r["status"] == "delivered":
+            g["delivered"] += 1
+            g["aed"] += int(r["total"] or 0)
+    for oid, r in rows[:limit]:
+        by[oid]["rows"].append(r)
+
+    order_of = {o: i for i, o in enumerate(OFFICE_IDS)}
+    groups = sorted(by.values(), key=lambda g: order_of.get(g["id"], 99))
+
+    return web.json_response({
+        "window": {"date": start.strftime("%Y-%m-%d"), "period": period,
+                   "day_offset": day_offset,
+                   "today": _biz_day_start(_now_dubai()).strftime("%Y-%m-%d")},
+        "districts": [{"id": o, "code": OFFICE_CODES.get(o, ""),
+                       "name": OFFICE_NAMES.get(o, o)} for o in OFFICE_IDS],
+        "total": len(rows), "shown": min(len(rows), limit),
+        "delivered": sum(g["delivered"] for g in groups),
+        "aed": sum(g["aed"] for g in groups),
+        "groups": groups,
+    }, headers=CORS_HEADERS)
+
+
 def setup(app):
     """Wire owner routes into the aiohttp app. Called from api_server.main()."""
     app.on_startup.append(lambda _: _backfill_delivery_times())
@@ -3426,6 +3526,8 @@ def setup(app):
     app.router.add_route("OPTIONS", "/api/owner/notifications", handle_notifications)
     app.router.add_get(             "/api/owner/notifications", handle_notifications)
     app.router.add_route("OPTIONS", "/api/owner/checklist", handle_checklist)
+    app.router.add_route("OPTIONS", "/api/owner/orders", handle_orders)
+    app.router.add_get(             "/api/owner/orders", handle_orders)
     app.router.add_get(             "/api/owner/checklist", handle_checklist)
     app.router.add_route("OPTIONS", "/api/owner/checklist/mark", handle_checklist_mark)
     app.router.add_post(            "/api/owner/checklist/mark", handle_checklist_mark)

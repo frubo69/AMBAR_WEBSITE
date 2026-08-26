@@ -5257,8 +5257,8 @@ button.pill:active{opacity:.6}
    Кегль задан на всём столбце, а подпись и число — долями от него: тогда
    столбец можно сузить одним числом, когда годовые суммы не влезают. */
 .hero-side{display:grid;grid-template-columns:auto auto;column-gap:8px;row-gap:1px;
-  align-content:center;justify-content:end;margin-left:auto;
-  flex:0 0 auto;font-size:12px}
+  align-content:center;align-items:baseline;justify-content:end;margin-left:auto;
+  flex:0 0 auto;font-size:12px;position:relative;top:10px}
 /* Строка отдаёт свои две части сетке: подписи встают в один столбец, числа в
    другой. Оба столбца выключены вправо — так их и сравнивают глазом, по
    последней цифре. Без сетки пара «подпись + число» выключалась целиком, и
@@ -5277,7 +5277,7 @@ button.pill:active{opacity:.6}
 .hero-side-r b.warn{color:var(--warn-t)}
 /* Сжатая карточка: числа мельче, дата теряет подпись и кнопку возврата —
    всё, что объясняет, уступает место тому, что отвечает. */
-.hero.tight .hero-side{row-gap:0;column-gap:6px;font-size:10px}
+.hero.tight .hero-side{row-gap:0;column-gap:6px;font-size:10px;top:0}
 /* Крайний случай: даже на самом мелком кегле втроём не помещаются. Тогда
    уходят подписи — числа различимы по цвету, а место остаётся. */
 .hero-side.bare i{display:none}

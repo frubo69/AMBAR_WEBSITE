@@ -1149,9 +1149,37 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .chk-big-go{display:flex;align-items:center;color:var(--muted);flex:none}
 /* Группа — одна подложка на две плитки: связь показана поверхностью, а не
    подписью, и вложенных рамок не возникает. */
-.acc-group{display:grid;grid-template-columns:1fr 1fr;margin-bottom:9px;
+/* Панель учёта занимает экран целиком: под ней не должно оставаться пустого
+   поля, а плитки не должны за него вылезать. Высота считается от окна, и
+   группы делят между собой то, что осталось после чек-листа. */
+/* Высота считается от окна: сверху шапка с переключателем периода (122px),
+   снизу нижняя полоса (68px) и 12px воздуха над ней. Заодно снимаем нижний
+   отступ страницы и лишнее поле под ней — иначе экран, который «ровно
+   помещается», всё равно прокручивается на полсотни пикселей. */
+#pg-money{padding-bottom:0;margin-bottom:calc(-40px + var(--safe-bottom))}
+#accHome{display:flex;flex-direction:column;gap:9px;
+  min-height:calc(100dvh - 202px - var(--safe-top) - var(--safe-bottom))}
+.acc-group{display:grid;grid-template-columns:1fr 1fr;margin:0;flex:1 1 auto;
   border-radius:16px;overflow:hidden;background:var(--card);
   border:1px solid var(--border2)}
+/* Вход в чек-лист. Ростом и посадкой — как строка «Кто на каком районе» на
+   районах: то же обещание «одно нажатие — и ты в работе». */
+.chk-entry{display:flex;align-items:center;gap:13px;width:100%;flex:0 0 auto;
+  height:76px;padding:0 16px;border-radius:16px;cursor:pointer;text-align:left;
+  font-family:inherit;color:var(--text);
+  background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
+  border:1px solid rgba(201,169,110,.28)}
+.chk-entry:active{transform:scale(.995)}
+.chk-e-ico{flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+  width:42px;height:42px;border-radius:13px;color:var(--gold2);
+  background:var(--gold-soft);border:1px solid rgba(201,169,110,.22)}
+.chk-e-b{flex:1;min-width:0}
+.chk-e-b b{display:block;font-size:15px;font-weight:700;line-height:1.2}
+.chk-e-b i{display:block;font-style:normal;font-size:12px;color:var(--muted);
+  margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chk-e-go{display:flex;align-items:center;color:var(--muted);flex-shrink:0}
+
+}
 .acc-cell{display:flex;flex-direction:column;align-items:flex-start;gap:0;
   padding:14px;cursor:pointer;text-align:left;color:var(--text);
   background:none;border:none;transition:.16s var(--e1);min-height:126px}
@@ -1323,11 +1351,44 @@ button.path:active{transform:scale(.995)}
    стояли отдельными плитками ниже: одно и то же читалось в три приёма. */
 .qb svg{width:19px;height:19px;flex:0 0 auto}
 .qb-ico svg{width:20px;height:20px}
-.pbox{margin:0 0 12px;border-radius:16px;overflow:hidden;background:var(--card);
+/* Экран занят целиком, но ни одна карточка для этого не раздувается: числа
+   пути получают щедрое поле по замыслу, а весь остаток высоты уходит в одну
+   полосу над историей — она и садится на нижний край. Раздутая карточка с
+   тремя числами посреди пустоты выглядела бы ошибкой вёрстки. */
+.ohub{display:flex;flex-direction:column;gap:12px;min-height:100%}
+.ohub > *{margin-bottom:0}
+.ohub .pbox{flex:0 0 auto;display:flex;flex-direction:column}
+.ohub .pbox .path{padding:26px 14px 24px}
+.ohub > :last-child{margin-top:auto}
+.pbox{margin:0 0 12px;border-radius:18px;overflow:hidden;background:var(--card);
   border:1px solid var(--border2)}
-.pbox .path{margin:0;border:0;border-radius:0;background:
-  linear-gradient(160deg,rgba(201,169,110,.07),transparent 62%)}
-.pnav{border-top:1px solid var(--border2)}
+.pbox .path{margin:0;border:0;border-radius:0;padding:20px 14px 18px;
+  border-top:1px solid var(--border2);border-bottom:1px solid var(--border2);
+  background:linear-gradient(160deg,rgba(201,169,110,.07),transparent 62%)}
+/* Вход в заявку — самая крупная строка карточки: с неё начинается закуп, и
+   именно её открывают чаще всего. */
+.pnav-r.pbig{padding:18px 16px}
+.pnav-i.big{width:46px;height:46px;border-radius:15px}
+.pnav-i.big svg{width:22px;height:22px}
+.pnav-r.pbig .pnav-b b{font-size:18px;letter-spacing:-.3px}
+.pnav-r.pbig .pnav-b i{font-size:12.5px;margin-top:4px}
+/* Состояние приёмки словом и цветом: жёлтое — ждёт или идёт, зелёное —
+   закончено. Идущий приём ещё и дышит: это единственное, что меняется само. */
+.pnav-r.pstat{padding:15px 16px}
+.pstat-c{flex-shrink:0;padding:5px 11px;border-radius:999px;font-size:11px;
+  font-weight:700;letter-spacing:.2px;color:var(--muted);background:var(--card2);
+  border:1px solid var(--border2)}
+.pstat-c.wait{color:var(--warn-t);background:rgba(243,180,74,.12);
+  border-color:rgba(243,180,74,.35)}
+.pstat-c.live{color:var(--warn-t);background:rgba(243,180,74,.14);
+  border-color:rgba(243,180,74,.45);animation:pstatPulse 1.9s ease-in-out infinite}
+.pstat-c.done{color:var(--up);background:rgba(76,175,125,.12);
+  border-color:rgba(76,175,125,.35)}
+@keyframes pstatPulse{
+  0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(243,180,74,.28)}
+  50%{opacity:.72;box-shadow:0 0 0 5px rgba(243,180,74,0)}
+}
+@media (prefers-reduced-motion: reduce){.pstat-c.live{animation:none}}
 .pnav-r{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;
   cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
   background:none;border:0}
@@ -5114,6 +5175,24 @@ button.pill:active{opacity:.6}
 @media (hover:hover) and (pointer:fine){
 .preset-nav:hover{color:var(--gold2)}
 }
+/* Низкий экран: плиткам незачем держать рост, от которого страница начинает
+   прокручиваться ради одного ряда. */
+@media (max-height:740px){
+  .acc-cell{min-height:96px;padding:12px}
+  .acc-t{margin-top:8px}
+  .acc-n{padding-top:6px;font-size:19px}
+  .acc-s{min-height:0;-webkit-line-clamp:1}
+  .acc-3 .acc-cell:nth-child(3){padding:12px}
+  .acc-3 .acc-cell:nth-child(3) .acc-ico{width:44px;height:44px;border-radius:14px}
+  .acc-3 .acc-cell:nth-child(3) .acc-ico svg{width:23px;height:23px}
+  .acc-3 .acc-cell:nth-child(3) .acc-t{margin-top:9px}
+  .chk-entry{height:66px}
+}
+@media (max-height:640px){
+  .acc-cell{min-height:88px}
+  .acc-s{display:none}
+  .chk-entry{height:60px}
+
 </style>
 
 <!-- ============ TAB BAR ============ -->
@@ -9138,8 +9217,24 @@ function accRender(){
   // что подтвердили и кто везёт → что легло на полку. Третья занимает ряд
   // целиком: одинокая половинка читается как незаполненная ячейка.
   box.innerHTML = `
+    <button class="chk-entry" onclick="chkSoon()">
+      <span class="chk-e-ico"><svg viewBox="0 0 24 24" width="21" height="21" fill="none"
+        stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 5h10M9 12h10M9 19h10"/><path d="M3.5 5l1.4 1.4L7.5 3.8"/>
+        <path d="M3.5 12l1.4 1.4L7.5 10.8"/><path d="M3.5 19l1.4 1.4L7.5 17.8"/></svg></span>
+      <span class="chk-e-b"><b>Чек-лист смены</b>
+        <i>согласования и проверки</i></span>
+      <span class="chk-e-go"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+        stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span>
+    </button>
     <div class="acc-group">${pick(['expenses','order'])}</div>
     <div class="acc-group acc-3">${pick(['stock','qr','check'])}</div>`;
+}
+
+// Пасхалка до тех пор, пока список задач не собран по-настоящему.
+function chkSoon(){
+  _toast('Это пока в разработке — создатель :)');
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
 }
 
 // Подпись плитки проверок: сколько за месяц и есть ли флажки.
@@ -9519,46 +9614,48 @@ function pathInner(){
   const d = ORD.d || {};
   const st = supStage(), sup = st.sup;
   const step = !sup ? 1 : (sup.status === 'open' ? 2 : 3);
+  const pct = sup && sup.total_qty ? Math.round(st.took / sup.total_qty * 100) : 0;
+  // Третий шаг меряется в процентах, а не в бутылках: «179» рядом с «469» надо
+  // делить в уме, а «38%» отвечает сразу. Сами бутылки — на экране приёмки.
   const vals = [
     fmt(sup ? (sup.asked_qty || 0) : (d.total_qty || 0)),
     sup ? fmt(sup.total_qty || 0) : '—',
-    sup ? fmt(st.took) : '—',
+    sup ? pct + '%' : '—',
   ];
   const m = (sup && sup.money) || null;
   const money = m ? [m.asked, m.confirmed, m.took] : [d.total_aed, null, null];
   return pathSteps(vals, money, step);
 }
 
-// Два входа в работу прямо в карточке пути — под теми же числами, к которым
-// они относятся. Раньше под цифрами лежала строка мелкого текста, а входы
-// стояли отдельными плитками ниже: читать приходилось в три приёма.
+// Карточка пути — одно целое, разделённое на кнопки: сверху вход в заявку,
+// посередине три числа, снизу состояние. Так весь закуп читается сверху вниз
+// одним взглядом, и каждая строка — либо ответ, либо дверь.
 function pathNav(){
   const d = ORD.d || {};
   const st = supStage();
   const pos = (d.rows || []).length;
-  const sub = st.k === 'none'
-    ? `${fmt(d.total_qty || 0)} ${pluralize(d.total_qty||0,'бутылка','бутылки','бутылок')}
-       · ${pos} ${pluralize(pos,'позиция','позиции','позиций')}`
-    : `просили ${fmt((st.sup||{}).asked_qty || 0)} · ${pos} ${
-       pluralize(pos,'позиция','позиции','позиций')}`;
+  const qty = st.sup ? (st.sup.asked_qty || 0) : (d.total_qty || 0);
   const ed = d.edited_count || 0;
-  const KIND = {none:'', wait:'warn', live:'live', done:'ok'};
-  return `<div class="pnav">
-    <button class="pnav-r" onclick="accOrderList()">
-      <span class="pnav-i">${ICO_LIST}</span>
-      <span class="pnav-b"><b>Заявка</b><i>${sub}</i></span>
+  const CHIP = {none:'', wait:'wait', live:'live', done:'done'};
+  return `<button class="pnav-r pbig" onclick="accOrderList()">
+      <span class="pnav-i big">${ICO_LIST}</span>
+      <span class="pnav-b"><b>Заявка</b>
+        <i>${fmt(qty)} ${pluralize(qty,'бутылка','бутылки','бутылок')}
+          · ${pos} ${pluralize(pos,'позиция','позиции','позиций')}</i></span>
       ${ed ? `<span class="pnav-tag">правок ${ed}</span>` : ''}
       <span class="pnav-go">${ICO_CHEV}</span>
-    </button>
-    <button class="pnav-r ${st.k === 'none' ? 'off' : ''}" ${
+    </button>`;
+}
+
+function pathStatus(){
+  const st = supStage();
+  const CHIP = {none:'', wait:'wait', live:'live', done:'done'};
+  return `<button class="pnav-r pstat ${st.k === 'none' ? 'off' : ''}" ${
       st.k === 'none' ? 'disabled' : `onclick="accSupply('who')"`}>
-      <span class="pnav-i ${KIND[st.k]}">${ICO_TRUCK}</span>
-      <span class="pnav-b"><b>${st.t}</b><i>${st.s}</i></span>
-      ${st.k === 'none' ? '' : `<span class="pnav-v">${fmt(st.took)}<u>из ${
-        fmt((st.sup||{}).total_qty || 0)}</u></span>`}
+      <span class="pnav-b"><b>Статус заявки</b><i>${st.s}</i></span>
+      <span class="pstat-c ${CHIP[st.k]}">${st.k === 'none' ? 'ждём магазин' : st.t.toLowerCase()}</span>
       <span class="pnav-go">${st.k === 'none' ? '' : ICO_CHEV}</span>
-    </button>
-  </div>`;
+    </button>`;
 }
 
 const ICO_CHEV  = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg>';
@@ -9605,9 +9702,12 @@ function ordHub(){
   const st = supStage();
   // Путь и два входа — одна карточка, а не две встык: это одно и то же место,
   // просто сверху числа, снизу двери.
-  document.getElementById('accMid').innerHTML =
-    `<div class="pbox"><div class="path">${pathInner()}</div>${pathNav()}</div>` +
-    pathGap() + supHistLine();
+  // Хаб занимает экран целиком: свободное место отдаём числам пути, а не
+  // пустому полю под карточками. Ничего нового на экране от этого не
+  // появляется — только воздух вокруг того, ради чего сюда заходят.
+  document.getElementById('accMid').innerHTML = `<div class="ohub">
+    <div class="pbox">${pathNav()}<div class="path">${pathInner()}</div>${pathStatus()}</div>
+    ${pathGap()}${supHistLine()}</div>`;
 
   // Подвал хаба — ровно один шаг, тот, который сейчас ждут. Пока ответа
   // магазина нет, это он; пока идёт приёмка — не ждут ничего, и подвала нет.

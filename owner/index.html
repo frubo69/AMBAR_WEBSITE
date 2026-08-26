@@ -164,11 +164,6 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    выручки, стоящую вплотную, и карточка выглядела грязной сверху. */
 .period-bar{display:flex;gap:8px;margin:0;align-items:stretch;position:fixed;top:calc(66px + var(--safe-top));left:0;right:0;z-index:35;background:var(--bg);padding:4px 14px 8px;pointer-events:none}
 .period-bar>*{pointer-events:auto}
-/* Полоса периодов кончается, а карточка выручки прилипает на восемь точек
-   ниже — и в этот зазор пролезал прокручиваемый контент: над карточкой
-   ползли обрезанные плитки. Закрашиваем зазор той же подложкой. */
-.period-bar::after{content:'';position:absolute;left:0;right:0;top:100%;height:10px;
-  background:var(--bg);pointer-events:none}
 .period-bar .periods{flex:1;margin:0}
 .cal-btn{width:40px;height:auto;padding:0;border-radius:11px;background:var(--card);border:1px solid var(--border2);color:var(--sub);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s var(--e1);flex-shrink:0}
 .cal-btn:active{transform:scale(.92);color:var(--gold2);border-color:rgba(201,169,110,.35)}
@@ -245,7 +240,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Hero day browser — swipe the card or tap the arrows to walk back through days.
    Completely independent of the period pills (they reset it to 0). */
 /* one cohesive stepper pill — not three boxes */
-.day-nav{margin-left:auto;display:flex;align-items:center;gap:0;padding:2px;border-radius:12px;
+.day-nav{margin-left:auto;display:flex;align-items:center;gap:0;padding:2px;border-radius:999px;
   background:rgba(201,169,110,.07);border:1px solid rgba(201,169,110,.16);
   letter-spacing:0;text-transform:none}
 /* На карточке выручки стрелки лежат абсолютно: при сжатии их надо опускать к
@@ -255,14 +250,14 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Тут когда-то жили правила для класса tight. Класс только снимался и нигде
    не ставился, поэтому правила не срабатывали ни разу, а искали причину
    несовпадения именно в них. Сжатое состояние считает скрипт. */
-.dn-b{width:26px;height:24px;padding:0;border:none;background:none;border-radius:999px;color:var(--gold2);
+.dn-b{width:22px;height:24px;padding:0;border:none;background:none;border-radius:999px;color:var(--gold2);
   display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s var(--e1)}
 .dn-b svg{width:13px;height:13px;display:block}
 .dn-b:active{background:rgba(201,169,110,.2);transform:scale(.9)}
 .dn-b[disabled]{opacity:.25;pointer-events:none}
 /* Дата двумя строками: число сверху, «сегодня/вчера/27 июля» под ним — чтобы не
    гадать, какой это день, особенно при сутках от полудня. */
-.dn-d{min-width:58px;height:33px;padding:0 7px;border:none;background:none;border-radius:9px;
+.dn-d{min-width:52px;height:33px;padding:0 2px;border:none;background:none;border-radius:9px;
   font-family:'DM Sans',sans-serif;color:var(--gold2);
   display:flex;flex-direction:column;align-items:center;justify-content:center;gap:0;transition:.15s var(--e1)}
 .dn-d[disabled]{cursor:default}
@@ -273,7 +268,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    Появляется только когда действительно есть куда возвращаться. */
 /* Значком, а не словом: «Назад» занимало полкарточки, и рядом с датой уже
    ничему не оставалось места. Смысл тот же, ширина втрое меньше. */
-.dn-home{width:24px;height:24px;padding:0;margin-left:3px;border:none;border-radius:999px;
+.dn-home{width:24px;height:24px;padding:0;margin-left:2px;border:none;border-radius:999px;
   display:flex;align-items:center;justify-content:center;
   background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;
   cursor:pointer;transition:.15s var(--e1);box-shadow:0 2px 10px rgba(201,169,110,.3)}
@@ -5259,8 +5254,8 @@ button.pill:active{opacity:.6}
    один их ряд, и переживает сжатие карточки. */
 /* Кегль задан на всей строке, а подпись и число — долями от него: тогда
    строку можно сузить одним числом, когда годовые суммы не влезают. */
-.hero-side{display:flex;align-items:baseline;flex-wrap:nowrap;gap:11px;margin-top:8px;
-  overflow:hidden;font-size:12px}
+.hero-side{display:flex;justify-content:flex-end;align-items:baseline;flex-wrap:nowrap;
+  gap:11px;margin-top:3px;overflow:hidden;font-size:12px}
 .hero-side-r{display:inline-flex;align-items:baseline;gap:5px;white-space:nowrap;flex:0 0 auto}
 .hero-side-r i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:.75em;
   font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);opacity:.8}
@@ -5271,10 +5266,13 @@ button.pill:active{opacity:.6}
 .hero-side-r b.warn{color:var(--warn-t)}
 /* Сжатая карточка: числа мельче, дата теряет подпись и кнопку возврата —
    всё, что объясняет, уступает место тому, что отвечает. */
-.hero.tight .hero-side{gap:9px;margin-top:5px;font-size:10.5px}
-.hero.tight .dn-rel,.hero.tight .dn-home{display:none}
-.hero.tight .dn-d{min-width:44px;height:24px}
-.hero.tight .dn-b{width:22px}
+.hero.tight .hero-side{gap:9px;margin-top:2px;font-size:10.5px}
+/* Кнопку возврата не прячем: без неё из вчерашнего дня некуда вернуться, а
+   место берём из отступов вокруг даты — их и было слишком много. */
+.hero.tight .dn-rel{display:none}
+.hero.tight .dn-d{min-width:40px;height:24px}
+.hero.tight .dn-b{width:19px}
+.hero.tight .dn-home{width:21px;height:21px}
 /* Узкие телефоны (320 точек): в развёрнутом виде четвёртое число упиралось в
    край и «долг» срезало. Тем же мелким кеглем, что и в сжатом, влезают все. */
 @media (max-width:360px){
@@ -5717,8 +5715,11 @@ window.addEventListener('resize', heroSideFit);
     if(!bottoms.length) return;
     // На корне, а не на самой карточке: под тем же переключателем прилипает и
     // свёрнутая карточка на странице районов, а высота у них общая.
+    // Вплотную к полосе, без зазора: в зазор пролезал прокручиваемый контент,
+    // а закрашивать его полосой значило срезать верх карточек на других
+    // страницах. У полосы свои восемь точек отступа снизу — их и видно.
     document.documentElement.style.setProperty('--hero-top',
-      Math.round(Math.max(...bottoms) + 8) + 'px');
+      Math.round(Math.max(...bottoms)) + 'px');
   };
 
   // Момент прилипания не вычисляем, а ловим по факту: арифметика по отступам
@@ -5827,6 +5828,11 @@ window.addEventListener('resize', heroSideFit);
   // переснять, иначе сжатие посчитается от старой.
   document.querySelectorAll('.tb, .periods button').forEach(b =>
     b.addEventListener('click', () => setTimeout(() => { place(); apply(); }, 60)));
+  // Период сменили — страницу наверх. Прокрутка оставалась от прошлого
+  // периода, и новый открывался с середины: верхняя карточка наполовину под
+  // липкой шапкой, будто её срезали.
+  document.querySelectorAll('.periods button').forEach(b =>
+    b.addEventListener('click', () => window.scrollTo({top: 0})));
 })();
 
 // ===== Date range picker =====

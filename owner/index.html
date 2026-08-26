@@ -5257,13 +5257,14 @@ button.pill:active{opacity:.6}
    Кегль задан на всём столбце, а подпись и число — долями от него: тогда
    столбец можно сузить одним числом, когда годовые суммы не влезают. */
 .hero-side{display:grid;grid-template-columns:auto auto;column-gap:8px;row-gap:1px;
-  align-content:center;justify-content:start;margin-left:auto;padding-right:12px;
+  align-content:center;justify-content:end;margin-left:auto;
   flex:0 0 auto;font-size:12px}
 /* Строка отдаёт свои две части сетке: подписи встают в один столбец, числа в
-   другой, и всё выравнивается по левому краю. Выключкой по правому числа
-   ложились лесенкой, а подписи расходились. */
+   другой. Оба столбца выключены вправо — так их и сравнивают глазом, по
+   последней цифре. Без сетки пара «подпись + число» выключалась целиком, и
+   подписи расходились лесенкой. */
 .hero-side-r{display:contents}
-.hero-side i,.hero-side b{white-space:nowrap;line-height:1.3;justify-self:start}
+.hero-side i,.hero-side b{white-space:nowrap;line-height:1.3;justify-self:end}
 /* У подписи два написания: полное и короткое. Короткое включается там, где
    полному не хватает ширины, — лучше «вал», чем ничего. */
 .hero-side .w2{display:none}
@@ -5292,7 +5293,7 @@ button.pill:active{opacity:.6}
 /* Узкие телефоны (320 точек): в развёрнутом виде четвёртое число упиралось в
    край и «долг» срезало. Тем же мелким кеглем, что и в сжатом, влезают все. */
 @media (max-width:360px){
-  .hero-side{font-size:10.5px;column-gap:5px;padding-right:4px}
+  .hero-side{font-size:10.5px;column-gap:5px}
   /* Сжатая карточка на узком телефоне: подписи переходят на короткие. */
   .hero.tight .hero-side .w{display:none}
   .hero.tight .hero-side .w2{display:inline}

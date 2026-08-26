@@ -3106,10 +3106,10 @@ button.path:active{transform:scale(.995)}
            «в руках» без «вала, чая, расхода и долга» ничего не говорит.
            Строкой, а не столбиком: столбик не помещался рядом с датой. -->
       <div class="hero-side" id="heroSide" style="display:none">
-        <span class="hero-side-r"><i>вал</i><b id="heroGross" data-aed="">—</b></span>
-        <span class="hero-side-r"><i>чай</i><b class="gold" id="heroTips" data-aed="">—</b></span>
-        <span class="hero-side-r"><i>расх</i><b class="dn" id="heroSpend" data-aed="">—</b></span>
-        <span class="hero-side-r"><i>долг</i><b class="warn" id="heroDebt" data-aed="">—</b></span>
+        <span class="hero-side-r"><i><span class="w">валовая</span><span class="w2">вал</span></i><b id="heroGross" data-aed="">—</b></span>
+        <span class="hero-side-r"><i><span class="w">чаевые</span><span class="w2">чай</span></i><b class="gold" id="heroTips" data-aed="">—</b></span>
+        <span class="hero-side-r"><i><span class="w">расход</span><span class="w2">расх</span></i><b class="dn" id="heroSpend" data-aed="">—</b></span>
+        <span class="hero-side-r"><i><span class="w">долг</span><span class="w2">долг</span></i><b class="warn" id="heroDebt" data-aed="">—</b></span>
       </div>
     </div>
     <div class="hero-row">
@@ -5256,10 +5256,17 @@ button.pill:active{opacity:.6}
    по нему их и сравнивают между собой.
    Кегль задан на всём столбце, а подпись и число — долями от него: тогда
    столбец можно сузить одним числом, когда годовые суммы не влезают. */
-.hero-side{display:flex;flex-direction:column;align-items:flex-end;gap:1px;
-  margin-left:auto;flex:0 0 auto;font-size:12px}
-.hero-side-r{display:inline-flex;align-items:baseline;justify-content:flex-end;gap:6px;
-  white-space:nowrap;line-height:1.25}
+.hero-side{display:grid;grid-template-columns:auto auto;column-gap:8px;row-gap:1px;
+  align-content:center;justify-content:start;margin-left:auto;padding-right:12px;
+  flex:0 0 auto;font-size:12px}
+/* Строка отдаёт свои две части сетке: подписи встают в один столбец, числа в
+   другой, и всё выравнивается по левому краю. Выключкой по правому числа
+   ложились лесенкой, а подписи расходились. */
+.hero-side-r{display:contents}
+.hero-side i,.hero-side b{white-space:nowrap;line-height:1.3;justify-self:start}
+/* У подписи два написания: полное и короткое. Короткое включается там, где
+   полному не хватает ширины, — лучше «вал», чем ничего. */
+.hero-side .w2{display:none}
 .hero-side-r i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:.75em;
   font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);opacity:.8}
 .hero-side-r b{font-family:'Space Grotesk',sans-serif;font-size:1.04em;font-weight:700;
@@ -5269,22 +5276,29 @@ button.pill:active{opacity:.6}
 .hero-side-r b.warn{color:var(--warn-t)}
 /* Сжатая карточка: числа мельче, дата теряет подпись и кнопку возврата —
    всё, что объясняет, уступает место тому, что отвечает. */
-.hero.tight .hero-side{gap:0;font-size:10px}
+.hero.tight .hero-side{row-gap:0;column-gap:6px;font-size:10px}
+/* Крайний случай: даже на самом мелком кегле втроём не помещаются. Тогда
+   уходят подписи — числа различимы по цвету, а место остаётся. */
+.hero-side.bare i{display:none}
 /* Кнопку возврата не прячем: без неё из вчерашнего дня некуда вернуться, а
    место берём из отступов вокруг даты — их и было слишком много. */
 .hero.tight .dn-rel{display:none}
+/* В сжатом виде валюта уходит: она одна на всё приложение, а её место нужно
+   разбору суммы. */
+.hero.tight .hero-unit{display:none}
 .hero.tight .dn-d{min-width:40px;height:24px}
 .hero.tight .dn-b{width:19px}
 .hero.tight .dn-home{width:21px;height:21px}
 /* Узкие телефоны (320 точек): в развёрнутом виде четвёртое число упиралось в
    край и «долг» срезало. Тем же мелким кеглем, что и в сжатом, влезают все. */
 @media (max-width:360px){
-  .hero-side{font-size:10.5px}
-  .hero-side-r{gap:4px}
-  /* Узкий телефон, сжатая карточка: втроём — сумма, столбец и дата — в 320
-     точек они помещаются только так. «AED» уходит (валюта одна), число
-     мельчает. important — потому что кегль числа ставит скрипт. */
-  .hero.tight .hero-unit{display:none}
+  .hero-side{font-size:10.5px;column-gap:5px;padding-right:4px}
+  /* Сжатая карточка на узком телефоне: подписи переходят на короткие. */
+  .hero.tight .hero-side .w{display:none}
+  .hero.tight .hero-side .w2{display:inline}
+  /* Узкий телефон: втроём — сумма, столбец и дата — в 320 точек они
+     помещаются только с числом помельче. important — потому что кегль
+     числа ставит скрипт. */
   .hero.tight .hero-amt{font-size:22px !important}
 }
 
@@ -5697,13 +5711,17 @@ function heroSideFit(){
   const gap  = parseFloat(cs.columnGap) || 0;
   const free = () => box.clientWidth - (parseFloat(cs.paddingRight) || 0)
                      - row.offsetWidth - gap - side.offsetWidth;
+  side.classList.remove('bare');
   side.style.fontSize = '';
   for(let k = 0; k < 10; k++){
     if(free() >= -1) return;
     const now = parseFloat(getComputedStyle(side).fontSize);
-    if(now <= 8) return;                         // мельче уже не читается
+    if(now <= 8) break;                          // мельче уже не читается
     side.style.fontSize = (now - .5) + 'px';
   }
+  // Кегль кончился, места всё равно нет — снимаем подписи. Лучше четыре
+  // числа без слов, чем числа поверх даты.
+  if(free() < -1) side.classList.add('bare');
 }
 window.addEventListener('resize', heroSideFit);
 
@@ -5792,20 +5810,22 @@ window.addEventListener('resize', heroSideFit);
     // Со второй половины пути карточка переходит в сжатый вид: дата теряет
     // подпись и кнопку «назад», числа мельчают. Класс ставится здесь, и это
     // единственное место, где он ставится.
+    // Число доходит до сжатого кегля к той же точке, где включается сжатый вид.
+    // Иначе на переломе оно ещё крупное, места столбцу будто нет — и подбор
+    // ширины срабатывал по несуществующей тесноте, снимая подписи.
+    const f = F_FULL - (F_FULL - F_MIN) * Math.min(1, p / .55);
+    if(amt) amt.style.fontSize = f + 'px';
     const wasTight = hero.classList.contains('tight');
     hero.classList.toggle('tight', p > .55);
     // В сжатом виде столбец уходит из-под даты и встаёт между нею и суммой:
     // место под дату освобождаем отступом по её же измеренной ширине.
     if(amtRow) amtRow.style.paddingRight =
-      (hero.classList.contains('tight') && nav && nav.offsetWidth ? nav.offsetWidth + 14 : 0) + 'px';
+      (hero.classList.contains('tight') && nav && nav.offsetWidth ? nav.offsetWidth + 12 : 0) + 'px';
     // Кегль столбца подбираем только на переломе: считать его каждый кадр —
     // это принудительный пересчёт вёрстки на каждую точку прокрутки.
     if(hero.classList.contains('tight') !== wasTight) heroSideFit();
     if(spark){ spark.style.opacity = fade; spark.style.transform = `translateY(${18*p}px)`; }
     if(row)   row.style.opacity = fade;
-
-    const f = F_FULL - (F_FULL - F_MIN) * p;
-    if(amt) amt.style.fontSize = f + 'px';
     // Число и стрелки сходятся к вертикальной середине сжатой карточки.
     // Исходные отступы берём измерением, а не константой: они сами меняются
     // вместе с padding карточки, и на глаз подобранные числа расходились —
@@ -7342,7 +7362,12 @@ function _syncDayNav(p, w){
   const chip = document.getElementById('dnDate');
   if(chip) chip.disabled = DAY_OFFSET <= 0;
   const home = document.getElementById('dnHome');
-  if(home) home.style.display = DAY_OFFSET > 0 ? 'block' : 'none';
+  // Показываем снятием инлайнового display, а не подстановкой block: block
+  // выключал флексбокс кнопки, и значок внутри кружка прижимался влево.
+  if(home){
+    if(DAY_OFFSET > 0) home.style.removeProperty('display');
+    else home.style.display = 'none';
+  }
   // The header must never contradict the date chip.
   const hl = document.getElementById('heroLbl');
   if(hl && DAY_OFFSET) hl.textContent = 'Выручка';
@@ -7676,7 +7701,9 @@ function _paintHero(p, f){
   const spend = +((f.spend_out || {}).total) || 0;
   _setAed('heroRev', f.revenue.current - tips - spend);
   const side = document.getElementById('heroSide');
-  if(side) side.style.display = 'flex';
+  // Снимаем инлайновый display, а не назначаем свой: раскладку столбца задаёт
+  // таблица стилей, и inline-flex её молча перебивал.
+  if(side) side.style.removeProperty('display');
   _setAed('heroGross', f.revenue.current);
   _setAed('heroTips',  tips);
   _setAed('heroSpend', spend);

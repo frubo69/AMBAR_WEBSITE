@@ -268,10 +268,10 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    Появляется только когда действительно есть куда возвращаться. */
 /* Значком, а не словом: «Назад» занимало полкарточки, и рядом с датой уже
    ничему не оставалось места. Смысл тот же, ширина втрое меньше. */
-.dn-home{width:24px;height:24px;padding:0;margin-left:2px;border:none;border-radius:999px;
+.dn-home{width:24px;height:24px;padding:0;margin-left:2px;margin-right:3px;border:none;border-radius:999px;
   display:flex;align-items:center;justify-content:center;
   background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;
-  cursor:pointer;transition:.15s var(--e1);box-shadow:0 2px 10px rgba(201,169,110,.3)}
+  cursor:pointer;transition:.15s var(--e1)}
 .dn-home svg{width:13px;height:13px;display:block}
 .dn-home:active{transform:scale(.92)}
 /* Horizontal swipes on the hero are OURS — the page must not scroll under them.
@@ -5245,18 +5245,21 @@ button.pill:active{opacity:.6}
    Так карточка сохраняет прежнюю высоту и график никуда не уезжает.
    Строке суммы нужен flex: без него боковой блок падает под число и карточка
    вырастает ровно на ту высоту, которую мы пытались сэкономить. */
-.hero-amt-row{display:flex;align-items:baseline}
+.hero-amt-row{display:flex;align-items:baseline;flex:0 0 auto}
+/* Сумма и её разбор стоят рядом: число слева, четыре строки справа. */
+.hero-main{display:flex;align-items:center;gap:14px}
 /* Сдвинуты вниз относительным смещением, а не отступом: отступ раздвинул бы
    строку с числом, карточка бы выросла, и график снова уехал бы за нижний
    край. relative/top двигает только картинку, вёрстка остаётся прежней. */
-/* Четыре числа одной строкой под суммой. Столбиком справа они не помещались
-   рядом с датой ни на одном телефоне: строка занимает ту же высоту, что и
-   один их ряд, и переживает сжатие карточки. */
-/* Кегль задан на всей строке, а подпись и число — долями от него: тогда
-   строку можно сузить одним числом, когда годовые суммы не влезают. */
-.hero-side{display:flex;justify-content:flex-end;align-items:baseline;flex-wrap:nowrap;
-  gap:11px;margin-top:3px;overflow:hidden;font-size:12px}
-.hero-side-r{display:inline-flex;align-items:baseline;gap:5px;white-space:nowrap;flex:0 0 auto}
+/* Четыре числа столбиком справа от суммы: они объясняют, из чего она вышла,
+   и читаются сверху вниз одним взглядом. Числа выровнены по правому краю —
+   по нему их и сравнивают между собой.
+   Кегль задан на всём столбце, а подпись и число — долями от него: тогда
+   столбец можно сузить одним числом, когда годовые суммы не влезают. */
+.hero-side{display:flex;flex-direction:column;align-items:flex-end;gap:1px;
+  margin-left:auto;flex:0 0 auto;font-size:12px}
+.hero-side-r{display:inline-flex;align-items:baseline;justify-content:flex-end;gap:6px;
+  white-space:nowrap;line-height:1.25}
 .hero-side-r i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:.75em;
   font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);opacity:.8}
 .hero-side-r b{font-family:'Space Grotesk',sans-serif;font-size:1.04em;font-weight:700;
@@ -5266,7 +5269,7 @@ button.pill:active{opacity:.6}
 .hero-side-r b.warn{color:var(--warn-t)}
 /* Сжатая карточка: числа мельче, дата теряет подпись и кнопку возврата —
    всё, что объясняет, уступает место тому, что отвечает. */
-.hero.tight .hero-side{gap:9px;margin-top:2px;font-size:10.5px}
+.hero.tight .hero-side{gap:0;font-size:10px}
 /* Кнопку возврата не прячем: без неё из вчерашнего дня некуда вернуться, а
    место берём из отступов вокруг даты — их и было слишком много. */
 .hero.tight .dn-rel{display:none}
@@ -5276,8 +5279,13 @@ button.pill:active{opacity:.6}
 /* Узкие телефоны (320 точек): в развёрнутом виде четвёртое число упиралось в
    край и «долг» срезало. Тем же мелким кеглем, что и в сжатом, влезают все. */
 @media (max-width:360px){
-  .hero-side{gap:8px;font-size:10.5px}
+  .hero-side{font-size:10.5px}
   .hero-side-r{gap:4px}
+  /* Узкий телефон, сжатая карточка: втроём — сумма, столбец и дата — в 320
+     точек они помещаются только так. «AED» уходит (валюта одна), число
+     мельчает. important — потому что кегль числа ставит скрипт. */
+  .hero.tight .hero-unit{display:none}
+  .hero.tight .hero-amt{font-size:22px !important}
 }
 
 /* ── Широкий экран: планшет и компьютер ─────────────────────────────────────
@@ -5678,14 +5686,22 @@ try{
 // восьми десятых: ниже цифры уже не читаются, и лучше честный обрез.
 function heroSideFit(){
   const side = document.getElementById('heroSide');
-  if(!side || !side.clientWidth) return;
-  // Кегль, а не масштаб: строка сама себе обрезчик, и transform уменьшил бы
-  // уже обрезанную картинку — «долг» так и остался бы за краем.
+  const box  = side && side.parentElement;
+  if(!box || !box.clientWidth) return;
+  // Считаем место руками. scrollWidth тут врёт: в сжатом виде под дату
+  // отведён правый отступ, столбец залезает в него — и переполнения по
+  // scrollWidth не возникает, хотя цифры уже лежат поверх даты.
+  const row = box.firstElementChild;
+  if(!row) return;
+  const cs   = getComputedStyle(box);
+  const gap  = parseFloat(cs.columnGap) || 0;
+  const free = () => box.clientWidth - (parseFloat(cs.paddingRight) || 0)
+                     - row.offsetWidth - gap - side.offsetWidth;
   side.style.fontSize = '';
-  for(let k = 0; k < 8; k++){
-    if(side.scrollWidth <= side.clientWidth + 1) return;
+  for(let k = 0; k < 10; k++){
+    if(free() >= -1) return;
     const now = parseFloat(getComputedStyle(side).fontSize);
-    if(now <= 8.5) return;                       // мельче уже не читается
+    if(now <= 8) return;                         // мельче уже не читается
     side.style.fontSize = (now - .5) + 'px';
   }
 }
@@ -5778,7 +5794,11 @@ window.addEventListener('resize', heroSideFit);
     // единственное место, где он ставится.
     const wasTight = hero.classList.contains('tight');
     hero.classList.toggle('tight', p > .55);
-    // Кегль строки подбираем только на переломе: считать его каждый кадр —
+    // В сжатом виде столбец уходит из-под даты и встаёт между нею и суммой:
+    // место под дату освобождаем отступом по её же измеренной ширине.
+    if(amtRow) amtRow.style.paddingRight =
+      (hero.classList.contains('tight') && nav && nav.offsetWidth ? nav.offsetWidth + 14 : 0) + 'px';
+    // Кегль столбца подбираем только на переломе: считать его каждый кадр —
     // это принудительный пересчёт вёрстки на каждую точку прокрутки.
     if(hero.classList.contains('tight') !== wasTight) heroSideFit();
     if(spark){ spark.style.opacity = fade; spark.style.transform = `translateY(${18*p}px)`; }

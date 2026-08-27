@@ -1191,16 +1191,44 @@ async def handle_cancel(request):
     sup["cancelled_by"] = str(body.get("as") or "")[:60]
     # Задачи освобождаем: водитель не должен увидеть в списке отменённое, а
     # если он держал её взятой — она просто исчезнет, и это правильно.
+    told = []
     for t in (sup.get("tasks") or {}).values():
         if not t.get("done_at"):
+            if t.get("driver"):
+                told.append(t["driver"])
             t.pop("driver", None)
             t.pop("claimed_at", None)
     await db.supply_save(sup)
+    # Задача, исчезнувшая из приложения без слова, — это повод приехать в
+    # магазин и не понять, что происходит. Кто держал её взятой, узнаёт первым.
+    await _cancel_tell(told)
     log.info(f"[supply] {sid}: заявка отменена ({sup['cancelled_by'] or '—'}), "
              f"принято до отмены: {took}")
     return web.json_response({"ok": True, "supply_id": sid,
                               "status": "cancelled", "took": took},
                              headers=CORS_HEADERS)
+
+
+async def _cancel_tell(drivers: list):
+    """Сказать водителям, что заявку отменили."""
+    if not drivers:
+        return
+    try:
+        import os as _os
+        import config_staff as _staff
+        from api_server import tg_send
+        token = _os.getenv("DRIVER_BOT_TOKEN", "")
+        if not token:
+            return
+        for name in sorted(set(drivers)):
+            tid = _staff.DRIVER_IDS.get(name)
+            if tid:
+                await tg_send(token, tid,
+                              "Заявка на сегодня отменена — в магазин не едем.\n"
+                              "Задача пропала из приложения, это не сбой.",
+                              parse_mode=None)
+    except Exception as e:
+        log.warning(f"[supply] про отмену водителям не ушло: {e}")
 
 
 @require_owner

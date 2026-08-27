@@ -12273,44 +12273,9 @@ async function supCancel(){
   await accSupply();
 }
 
-async function supShare(){
-  const b = document.getElementById('supShare'); if(!b || b.disabled) return;
-  const html = b.innerHTML; b.disabled = true; b.innerHTML = 'Собираю файл…';
-  try{
-    const file = await _supFile();
-    if(navigator.canShare && navigator.canShare({files:[file]})){
-      await navigator.share({files:[file], title:'AMBAR — заказать на доп. складах'});
-      b.innerHTML = 'Отправлено';
-      try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    }else{
-      const u = URL.createObjectURL(file);
-      const a = document.createElement('a');
-      a.href = u; a.download = file.name; document.body.appendChild(a); a.click(); a.remove();
-      setTimeout(()=>URL.revokeObjectURL(u), 4000);
-      b.innerHTML = 'Файл сохранён';
-    }
-  }catch(e){
-    if(e && (e.name === 'AbortError' || e.name === 'NotAllowedError')){
-      b.innerHTML = html; b.disabled = false; return;
-    }
-    b.innerHTML = 'Не вышло — шлём в телеграм';
-    try{ await ownerApi.ownerFetch(`/api/owner/supply/${SUP_ID}/shortfall/send`, {method:'POST'});
-         b.innerHTML = 'Готово — файл в чате с ботом'; }
-    catch(e2){ b.innerHTML = 'Не отправилось'; }
-  }
-  setTimeout(()=>{ b.innerHTML = html; b.disabled = false; }, 2600);
-}
-
-async function supSend(){
-  const b = document.getElementById('supSend'); if(!b || b.disabled) return;
-  b.disabled = true; b.style.opacity = '.5';
-  try{
-    await ownerApi.ownerFetch(`/api/owner/supply/${SUP_ID}/shortfall/send`, {method:'POST'});
-    _toast('Файл в чате с ботом');
-    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-  }catch(e){ _toast('Не отправилось'); }
-  b.disabled = false; b.style.opacity = '';
-}
+// Выгрузка списка недобора убрана вместе с кнопками, которые её звали:
+// экран приёмки больше ничего не отдаёт наружу. Серверные ручки остались —
+// они безобидны и пригодятся, если список понадобится снова.
 
 // ─── Акции ──────────────────────────────────────────────────────────────────
 // Вопрос раздела один: окупается ли подарок. Поэтому рядом с числом бутылок

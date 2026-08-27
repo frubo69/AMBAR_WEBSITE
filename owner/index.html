@@ -2656,10 +2656,35 @@ button.path:active{transform:scale(.995)}
 .sh-t:active{transform:scale(.97)}
 /* Счётчик ждущих решения — на самой вкладке: иначе о том, что в «Бое» третий
    день висит заявка, узнаёшь, только если туда заглянуть. */
-.sh-n{display:none;min-width:17px;height:17px;padding:0 5px;border-radius:999px;
-  align-items:center;justify-content:center;background:var(--warn);color:#1a1408;
-  font-style:normal;font-size:10px;font-weight:800;line-height:1}
+.sh-n{display:none;min-width:17px;height:17px;margin-left:7px;padding:0 5px;
+  border-radius:999px;align-items:center;justify-content:center;
+  background:var(--warn);color:#1a1408;
+  font-style:normal;font-size:10px;font-weight:800;line-height:1;vertical-align:1px}
 .sh-n.has{display:inline-flex}
+/* Число за месяц на чипе вида — тише счётчика ждущих: одно говорит «есть
+   работа», другое просто «столько было». */
+.sh-c{margin-left:6px;font-style:normal;font-size:11px;font-weight:700;opacity:.55}
+
+/* ── Пустая страница ──────────────────────────────────────────────────────
+   Строчка серым посреди чёрного поля не отвечает ни на что: пусто — это
+   хорошая новость или сломалось? Знак, заголовок ответом и строка о том,
+   откуда записи вообще берутся. */
+.sh-empty{display:flex;flex-direction:column;align-items:center;text-align:center;
+  padding:34px 22px 30px;margin-top:6px;border-radius:var(--r);
+  background:var(--card);border:1px solid var(--border2)}
+.sh-empty-i{width:52px;height:52px;border-radius:18px;display:flex;align-items:center;
+  justify-content:center;margin-bottom:15px;
+  color:var(--up);background:rgba(76,175,125,.1);border:1px solid rgba(76,175,125,.22)}
+.sh-empty.err .sh-empty-i{color:var(--dn);background:rgba(224,85,85,.1);
+  border-color:rgba(224,85,85,.24)}
+.sh-empty-t{font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700}
+.sh-empty-s{font-size:13px;color:var(--sub);margin-top:6px;line-height:1.5;max-width:290px}
+.sh-empty-h{font-size:11.5px;color:var(--muted);line-height:1.6;margin-top:16px;
+  padding-top:14px;border-top:1px solid var(--border2);max-width:320px;width:100%}
+.sh-empty-b{margin-top:18px;height:44px;padding:0 26px;border-radius:13px;border:0;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;
+  font-family:inherit;font-size:14px;font-weight:700;cursor:pointer}
+.sh-empty-b:active{transform:scale(.97)}
 
 /* Удержания в «Расходах»: блок отдельный, потому что это не трата, а возврат.
    Свёрнут по умолчанию — сумма отвечает «сколько», строки внутри «за что». */
@@ -10331,51 +10356,48 @@ let EXP_TAB = 'day';
 // Вкладки — по виду, а не по сроку: «сколько боя за месяц» и «сколько питания
 // сегодня» это разные вопросы, и переключатель дня живёт внутри той вкладки,
 // где он имеет смысл.
-const SH_TABS = [
-  {id:'exp',       t:'Расходы'},
-  {id:'брак',      t:'Брак'},
-  {id:'бой',       t:'Бой'},
-  {id:'потеря',    t:'Утеря'},
-  {id:'просрочка', t:'Просрочка'},
-];
-let SH_TAB = 'exp';
+// Две половины: люди и товар. Расходы на людей и товар, не доехавший до
+// кассы, — это два разных разговора, и каждый со своим сроком: питание
+// смотрят за день, бой за месяц.
+let SH_TAB = 'exp';            // exp | wo
+let WO_KIND = '';              // '' — все виды
 
 async function accExpenses(){
   _setText('accTitle', 'Расходы смены');
   _setText('accSub', 'загрузка…');
   document.getElementById('accMid').innerHTML = `
-    <div class="sh-tabs" id="shTabs">${SH_TABS.map(x => `
-      <button class="sh-t ${SH_TAB === x.id ? 'on' : ''}" data-t="${x.id}"
-              onclick="shTab('${x.id}')">${x.t}<i class="sh-n" data-n="${x.id}"></i></button>`).join('')}</div>
+    <div class="periods" id="shTabs" style="margin:2px 0 12px">
+      <div class="period-pill"></div>
+      <button class="${SH_TAB === 'exp' ? 'on' : ''}" onclick="shTab('exp')">Водители</button>
+      <button class="${SH_TAB === 'wo' ? 'on' : ''}" onclick="shTab('wo')">Брак / бой / утеря<i class="sh-n"></i></button>
+    </div>
     <div id="expBody"><div class="exp-empty">Загрузка…</div></div>`;
-  // Счётчики ждущих решения — на самих вкладках: иначе о том, что в «Бое»
-  // третий день висит заявка, узнаёшь, только если туда заглянуть.
+  const g = document.getElementById('shTabs'); if(g) requestAnimationFrame(()=>movePill(g));
+  // Счётчик ждущих решения — на самой вкладке: иначе о заявке, висящей третий
+  // день, узнаёшь, только если туда заглянуть.
   shCounts();
   await shTab(SH_TAB, true);
 }
 
-// Сколько ждёт решения по каждому виду. Данные берём из того же ответа, что и
-// сам список: отдельный запрос ради пяти чисел — лишний круг.
 async function shCounts(){
   try{
     if(!ACC_WO) ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs', {params:{days:30}});
   }catch(e){ return; }
-  const n = {};
-  (ACC_WO.pending || []).forEach(r => { n[r.kind] = (n[r.kind] || 0) + 1; });
+  const n = (ACC_WO.pending || []).length;
   document.querySelectorAll('#shTabs .sh-n').forEach(e => {
-    const v = n[e.dataset.n] || 0;
-    e.textContent = v || '';
-    e.classList.toggle('has', !!v);
+    e.textContent = n || '';
+    e.classList.toggle('has', !!n);
   });
 }
 
 async function shTab(t, first){
   SH_TAB = t;
-  document.querySelectorAll('#shTabs .sh-t').forEach(b =>
-    b.classList.toggle('on', b.dataset.t === t));
+  document.querySelectorAll('#shTabs button').forEach((b,i)=>
+    b.classList.toggle('on', (i === 0) === (t === 'exp')));
+  const g = document.getElementById('shTabs'); if(g) movePill(g);
   if(!first) try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   if(t === 'exp'){ await accExpShell(); return; }
-  await accWoKind(t);
+  await accWoAll();
 }
 
 // Внутри «Расходов» переключатель дня остаётся: это единственная вкладка, где
@@ -15798,34 +15820,50 @@ function woHome(){
 // общему списку не читался: бой, брак и просрочка лежали вперемешку, и чтобы
 // понять, чего именно много, приходилось считать строки глазами.
 const SH_KIND_T = {'брак':'Брак', 'бой':'Бой', 'потеря':'Утеря', 'просрочка':'Просрочка'};
+const SH_KINDS = ['брак', 'бой', 'потеря', 'просрочка'];
 
-async function accWoKind(kind){
+async function accWoAll(){
   const body = document.getElementById('expBody'); if(!body) return;
   body.innerHTML = '<div class="exp-empty">Загрузка…</div>';
   try{
     if(!ACC_WO) ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs', {params:{days:30}});
   }catch(e){
-    body.innerHTML = '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+    body.innerHTML = shEmpty('err');
     return;
   }
-  woKindBody(kind);
+  woKindBody();
 }
 
-function woKindBody(kind){
+// Вид — фильтром внутри, а не отдельной вкладкой: сначала отвечают на вопрос
+// «что ждёт решения», и он общий для всех видов. Разделять их сразу значило бы
+// заставить обойти четыре экрана, чтобы понять, есть ли работа.
+function woKind(k){
+  WO_KIND = WO_KIND === k ? '' : k;
+  woKindBody();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
+function woKindBody(){
   const body = document.getElementById('expBody'); if(!body) return;
   const w = ACC_WO || {rows: [], pending: []};
-  const pend = (w.pending || []).filter(r => r.kind === kind);
-  const rows = (w.rows || []).filter(r => r.kind === kind);
+  const fit = r => !WO_KIND || r.kind === WO_KIND;
+  const pend = (w.pending || []).filter(fit);
+  const rows = (w.rows || []).filter(fit);
   const ok   = rows.filter(r => r.state !== 'no');
   const qty  = ok.reduce((a, r) => a + (r.qty || 0), 0);
   const aed  = ok.reduce((a, r) => a + (r.aed || 0), 0);
   const held = ok.reduce((a, r) => a + ((r.comp || {}).amount || 0), 0);
   _setText('accSub', pend.length
     ? `${pend.length} ${pluralize(pend.length,'ждёт','ждут','ждут')} решения`
-    : `${SH_KIND_T[kind] || kind} · 30 дней`);
+    : (WO_KIND ? `${SH_KIND_T[WO_KIND]} · 30 дней` : 'за 30 дней'));
+  // Чипы видов со своими числами: сколько чего за месяц видно, не открывая.
+  const cnt = k => (w.pending || []).filter(r => r.kind === k).length
+                 + (w.rows || []).filter(r => r.kind === k && r.state !== 'no').length;
+  const chips = `<div class="sh-tabs">${SH_KINDS.map(k => `
+    <button class="sh-t ${WO_KIND === k ? 'on' : ''}" onclick="woKind('${k}')">${
+      SH_KIND_T[k]}${cnt(k) ? `<i class="sh-c">${cnt(k)}</i>` : ''}</button>`).join('')}</div>`;
   if(!pend.length && !rows.length){
-    body.innerHTML = `<div class="exp-empty">За 30 дней ничего.<br>
-      Водитель записывает это в своём приложении — с фотографией.</div>`;
+    body.innerHTML = chips + shEmpty(WO_KIND ? 'kind' : 'all');
     return;
   }
   // Очередь — выше всего: пока решения нет, эти бутылки числятся на полке,
@@ -15837,14 +15875,14 @@ function woKindBody(kind){
       <span class="wo-q-aed"><b>${fmt(Math.round(pend.reduce((a,r)=>a+(r.aed||0),0)))}</b>AED по прайсу</span>
     </div>
     <div class="wo-rows">${pend.map(woRow).join('')}</div>` : '';
-  body.innerHTML = queue + `
+  body.innerHTML = chips + queue + `
     <div class="wo-sum">
       <div class="wo-sum-l">
         <div class="wo-sum-n">${fmt(Math.round(aed))}<i>AED</i></div>
         <div class="wo-sum-s">по прайсу, за 30 дней</div>
       </div>
       <div class="wo-ks">
-        <div class="wo-k"><span class="wo-k-n" style="color:${WO_TINT[kind] || 'var(--sub)'}">${fmt(qty)}</span>
+        <div class="wo-k"><span class="wo-k-n" style="color:${WO_TINT[WO_KIND] || 'var(--sub)'}">${fmt(qty)}</span>
           <span class="wo-k-t">${pluralize(qty,'штука','штуки','штук')}</span></div>
         <div class="wo-k"><span class="wo-k-n" style="color:${held ? 'var(--warn-t)' : 'var(--muted)'}">${fmt(held)}</span>
           <span class="wo-k-t">удержано</span></div>
@@ -15852,6 +15890,32 @@ function woKindBody(kind){
     </div>
     ${pend.length ? '<div class="exp-grp">История</div>' : ''}
     <div class="wo-rows">${rows.map(woRow).join('')}</div>`;
+}
+
+// Пустая страница — тоже страница. Строчка серым посреди чёрного поля не
+// говорит ни что случилось, ни что делать: пусто это хорошая новость или
+// сломалось? Поэтому знак, заголовок ответом и строка о том, откуда записи
+// вообще берутся.
+function shEmpty(kind){
+  const V = {
+    all: ['<path d="M20 6 9 17l-5-5"/>', 'Ничего не списывали',
+          'За тридцать дней ни боя, ни брака, ни утери.', 'ok'],
+    kind: ['<path d="M20 6 9 17l-5-5"/>', `${SH_KIND_T[WO_KIND] || ''} — ни одного`,
+           'За тридцать дней по этому виду записей нет.', 'ok'],
+    err: ['<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0"/>',
+          'Не удалось загрузить', 'Связь пропала или сервер не ответил.', 'err'],
+  }[kind] || [];
+  return `<div class="sh-empty ${V[3] || ''}">
+    <span class="sh-empty-i"><svg viewBox="0 0 24 24" width="24" height="24" fill="none"
+      stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
+      stroke-linejoin="round">${V[0] || ''}</svg></span>
+    <div class="sh-empty-t">${V[1] || ''}</div>
+    <div class="sh-empty-s">${V[2] || ''}</div>
+    ${kind === 'err'
+      ? '<button class="sh-empty-b" onclick="ACC_WO=null;shTab(SH_TAB)">Ещё раз</button>'
+      : `<div class="sh-empty-h">Записывает водитель в своём приложении — с фотографией.
+         Она и отличает списание от способа закрыть недостачу.</div>`}
+  </div>`;
 }
 
 // ── Удержание ──────────────────────────────────────────────────────────────
@@ -15947,7 +16011,7 @@ async function woCompSave(on){
   woCompClose();
   try{ ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs', {params:{days:30}}); }
   catch(e){}
-  if(SH_TAB && SH_TAB !== 'exp') woKindBody(SH_TAB); else woHome();
+  if(SH_TAB === 'wo') woKindBody(); else woHome();
   shCounts();
 }
 
@@ -15982,7 +16046,7 @@ async function woDecide(ev, id, ok){
   // Решение принимают из двух мест: со вкладки вида в «Расходах смены» и со
   // старого общего списка. Перерисовываем то, что открыто, — иначе с одного
   // из них строка исчезает, а с другого нет.
-  if(document.getElementById('shTabs') && SH_TAB !== 'exp'){ woKindBody(SH_TAB); shCounts(); }
+  if(document.getElementById('shTabs') && SH_TAB === 'wo'){ woKindBody(); shCounts(); }
   else woHome();
 }
 

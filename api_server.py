@@ -2656,6 +2656,14 @@ def _clean_addr(a) -> dict | None:
             f = 0.0
         out[k] = round(f, 6) if -90 <= f <= 180 else 0.0
     out["isGps"] = bool(a.get("isGps") or a.get("is_gps"))
+    # Старые записи книги — строка вида «📍 GPS: 25.10, 55.16» и никаких
+    # координат рядом. Достаём их оттуда, иначе адрес из истории приедет в
+    # сохранённые без точки на карте.
+    if not (out["lat"] and out["lon"]):
+        m = re.search(r"(-?\d{1,2}\.\d{3,})\s*,\s*(-?\d{1,3}\.\d{3,})", out.get("address", ""))
+        if m:
+            out["lat"], out["lon"] = round(float(m.group(1)), 6), round(float(m.group(2)), 6)
+            out["isGps"] = True
     return out
 
 

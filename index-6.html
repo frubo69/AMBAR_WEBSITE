@@ -4788,7 +4788,7 @@ function renderAddrHist(){
       <div class="hist-ico">${pin}</div>
       <div class="hist-info">
         <div class="hist-addr">${_esc(a.label&&a.label!==a.address?a.label+' · '+a.address:(a.address||a.label))}</div>
-        <div class="hist-meta">${_esc(bits.join(' · '))}</div>
+        ${bits.length?`<div class="hist-meta">${_esc(bits.join(' · '))}</div>`:''}
       </div>
       <button class="hist-add" onclick="histAdd(${i})">${lang==='ru'?'Сохранить':'Save'}</button>
     </div>`;

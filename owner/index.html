@@ -778,7 +778,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .pin-pop .pin-s{display:block;font-size:10.5px;font-weight:500;color:var(--muted);margin-top:2px}
 /* На «Районах» число чуть мельче, а валюта — тише и ближе: в строке с ним
    стоят ещё разбор и дата, и каждая точка ширины на счету. */
-.ohero .hero-amt{font-size:23px}
+.ohero .hero-amt{font-size:22px}
 .ohero .hero-unit{font-size:10.5px;margin-left:6px;letter-spacing:.8px}
 /* И сама пилюля с датой здесь плотнее: отыгранные у неё точки уходят в
    промежуток между суммой и разбором, где воздух виден. */
@@ -792,7 +792,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Число слева, разбор прижат к дате, весь запас ширины — в промежутке между
    ними: разбор объясняет день, и стоять он должен рядом с днём. */
 .ohero-top{display:flex;align-items:center;gap:0;height:78px}
-.ohero-top .day-nav{margin-left:18px}
+.ohero-top .day-nav{margin-left:24px}
 /* Остаётся на месте и когда карточка прижата: заказы, средний чек и время
    нужны всё время, пока листаешь районы, — ради них на карточку и смотрят. */
 .ohero-stats{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:8px}
@@ -828,6 +828,11 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .off-head{display:flex;align-items:center;gap:9px;margin-bottom:11px}
 .off-dot{width:8px;height:8px;border-radius:50%;background:var(--tone);flex-shrink:0;box-shadow:0 0 10px var(--tone)}
 .off-name{font-size:15px;font-weight:600;letter-spacing:.1px}
+/* Сколько водителей — словом рядом с названием, а не значком в строке команды:
+   кружок с цифрой посреди имён читался как счётчик непрочитанного. */
+.off-drv{font-size:11.5px;font-weight:500;color:var(--muted);white-space:nowrap;margin-left:-4px}
+.off-drv::before{content:'('}
+.off-drv::after{content:')'}
 .off-live{margin-left:auto;font-size:10.5px;font-weight:600;color:var(--info);
   background:rgba(91,141,239,.12);border:1px solid rgba(91,141,239,.25);border-radius:999px;padding:3px 9px}
 .off-rev-row{display:flex;align-items:baseline;gap:8px}
@@ -844,12 +849,6 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    и идут с вопросом по району. */
 .off-team .drv{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .off-team .sep{opacity:.35;flex:0 0 auto}
-/* Число водителей стоит перед именами: «сколько их сегодня» спрашивают чаще,
-   чем «как зовут», а считать имена глазами — работа, которой можно не быть. */
-.off-team .drvn{flex:0 0 auto;min-width:17px;height:17px;padding:0 5px;border-radius:999px;
-  display:inline-flex;align-items:center;justify-content:center;font-size:10px;
-  font-weight:700;color:var(--sub);background:var(--card2);border:1px solid var(--border2);
-  font-variant-numeric:tabular-nums}
 .off-team .drv.none{color:var(--warn-t)}
 .off-meta{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)}
 .off-meta b{color:var(--sub);font-weight:600}
@@ -5941,7 +5940,7 @@ window.addEventListener('resize', () => {
     // В сжатом виде столбец уходит из-под даты и встаёт между нею и суммой:
     // место под дату освобождаем отступом по её же измеренной ширине.
     if(amtRow) amtRow.style.paddingRight =
-      (hero.classList.contains('tight') && nav && nav.offsetWidth ? nav.offsetWidth + 18 : 0) + 'px';
+      (hero.classList.contains('tight') && nav && nav.offsetWidth ? nav.offsetWidth + 24 : 0) + 'px';
     // Кегль столбца подбираем только на переломе: считать его каждый кадр —
     // это принудительный пересчёт вёрстки на каждую точку прокрутки.
     if(hero.classList.contains('tight') !== wasTight) heroSideFit();
@@ -12568,7 +12567,7 @@ function renderOffices(rows){
     const team = (r.operator || drv || !r.legacy) ? `<div class="off-team">
       ${ICO_OP}${r.operator ? `<b>${escS(r.operator)}</b>` : '<span>оператор не назначен</span>'}
       <span class="sep">·</span>${ICO_CAR}${drv
-        ? `<b class="drvn">${drv}</b><span class="drv">${escS(r.drivers.join(', '))}</span>`
+        ? `<span class="drv">${escS(r.drivers.join(', '))}</span>`
         : '<span class="drv none">нет водителей</span>'}
     </div>` : '';
     // Телефон точки. Ссылка tel: — тап открывает набор номера; клик по ней
@@ -12585,6 +12584,7 @@ function renderOffices(rows){
       <div class="off-head">
         ${r.code ? `<span class="off-code">${escS(r.code)}</span>` : '<span class="off-dot"></span>'}
         <span class="off-name">${escS(r.name)}</span>
+        ${drv ? `<span class="off-drv">${drv} ${pluralize(drv,'водитель','водителя','водителей')}</span>` : ''}
         ${r.legacy ? '<span class="off-live" style="color:var(--muted);background:rgba(255,255,255,.04);border-color:var(--border2)">без района</span>'
                    : (r.active ? `<span class="off-live">${r.active} в работе</span>` : '')}
         <span class="off-day">${escS(_offDayLabel())}</span>

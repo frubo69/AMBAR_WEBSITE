@@ -1669,7 +1669,15 @@ try{
   // True fullscreen (no Telegram chrome/frame). No version guard — just try; on iPad
   // the request can be ignored if it fires too early in the load, so retry a few
   // times until isFullscreen flips (or the client reports it unsupported).
-  const wantFS=()=>{ try{ if(tg.requestFullscreen && !tg.isFullscreen) tg.requestFullscreen(); }catch(e){} };
+  // Только на телефоне. На компьютере телеграм в полноэкранном режиме отводит
+  // под свои кнопки полосу во всю ширину окна, а рисует их в правом углу —
+  // сверху остаётся пустая чёрная лента, и панель уезжает вниз. В обычном окне
+  // отступ равен нулю, а шапку рисует сам телеграм.
+  const wide = () => window.innerWidth >= 900;
+  const wantFS=()=>{ try{
+    if(wide()){ if(tg.exitFullscreen && tg.isFullscreen) tg.exitFullscreen(); return; }
+    if(tg.requestFullscreen && !tg.isFullscreen) tg.requestFullscreen();
+  }catch(e){} };
   wantFS(); setTimeout(wantFS,300); setTimeout(wantFS,1000); setTimeout(wantFS,2500);
   tg.onEvent && tg.onEvent('fullscreenFailed', e=>console.warn('fullscreen failed:', e && e.error));
   tg.setHeaderColor('#000006'); tg.setBackgroundColor('#000006');

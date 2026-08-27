@@ -1066,25 +1066,50 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    Снят с телефонного эталона: имя и звание вверху, пустая середина, кнопки у
    нижнего края и по краям экрана. Так рука находит нужную кнопку не глядя, а
    между «отклонить» и «ответить» — вся ширина экрана, промахнуться трудно. */
+/* ── Видеозвонок: раскладка FaceTime ─────────────────────────────────────────
+   Собеседник во весь экран, своя камера маленьким окном, имя плашкой сверху
+   слева, кнопки вертикальным столбцом справа и красный отбой внизу. Столбец
+   справа, а не внизу, потому что телефон держат одной рукой и большой палец
+   ходит по этой дуге. */
 .cs-remote{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
   background:#05050c;display:none;z-index:0}
 .call-scr.video .cs-remote{display:block}
-/* Своя камера — маленьким окном сверху справа, зеркально: человек привык
-   видеть себя как в зеркале, незеркальная картинка сбивает. */
+/* Своя камера зеркально: человек привык видеть себя как в зеркале. Задняя
+   камера не зеркалится — на ней читают вывески и номера. */
 .cs-local{position:absolute;top:calc(14px + var(--safe-top));right:14px;width:104px;height:139px;
-  object-fit:cover;border-radius:14px;background:#0b0b16;display:none;z-index:3;
-  border:1px solid rgba(255,255,255,.14);box-shadow:0 8px 26px rgba(0,0,0,.5);
+  object-fit:cover;border-radius:16px;background:#0b0b16;display:none;z-index:4;
+  border:1px solid rgba(255,255,255,.16);box-shadow:0 8px 26px rgba(0,0,0,.55);
   transform:scaleX(-1)}
 .call-scr.video.cam-on .cs-local{display:block}
 .call-scr.video.cam-back .cs-local{transform:none}
-/* Видеозвонок — тоже во весь экран: шапка убирается, поля ленты снимаются,
-   иначе картинка оказывается за краями вставки и выглядит поломанной. */
-.call-scr.video .call-top{display:none}
-.call-scr.video .call-mid{padding:calc(10px + var(--safe-top)) 0 0}
-/* Поверх видео текст нужен читаемым при любой картинке: затемнение сверху и
-   снизу, прозрачная середина — там лицо собеседника. */
-.call-scr.video .cs{background:linear-gradient(180deg,rgba(0,0,6,.72) 0%,rgba(0,0,6,.12) 30%,
-  rgba(0,0,6,.12) 52%,rgba(0,0,6,.82) 100%);position:relative;z-index:2}
+/* Имя плашкой, как в фейстайме: поверх картинки читаемо при любом фоне. */
+.cs-pill{position:absolute;top:calc(14px + var(--safe-top));left:14px;z-index:4;display:none;
+  align-items:center;gap:8px;padding:8px 14px 8px 10px;border-radius:999px;
+  background:rgba(20,20,30,.62);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.call-scr.video .cs-pill{display:flex}
+.cs-pill-a{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:12px;font-weight:700;color:var(--gold2);
+  background:rgba(201,169,110,.18)}
+.cs-pill-n{font-size:15px;font-weight:600}
+.cs-pill-t{font-size:12px;color:var(--sub);font-variant-numeric:tabular-nums}
+/* Столбец кнопок справа и отбой снизу — точки как в фейстайме. */
+.cs-side{position:absolute;right:18px;bottom:calc(46px + var(--safe-bottom));z-index:4;
+  display:none;flex-direction:column;align-items:center;gap:14px}
+.call-scr.video .cs-side{display:flex}
+.cs-rb{width:52px;height:52px;border-radius:50%;border:0;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;background:rgba(255,255,255,.22);color:#fff;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);
+  -webkit-tap-highlight-color:transparent;transition:transform .12s}
+.cs-rb:active{transform:scale(.9)}
+.cs-rb.on{background:#fff;color:#111}
+.cs-rb.drop{background:#E05555;color:#fff}
+.cs-flip{position:absolute;left:18px;bottom:calc(46px + var(--safe-bottom));z-index:4;
+  width:46px;height:46px;border-radius:50%;border:0;cursor:pointer;display:none;
+  align-items:center;justify-content:center;background:rgba(255,255,255,.18);color:#fff;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.call-scr.video.cam-on .cs-flip{display:flex}
+/* Текстовый слой во время видео не нужен: имя и время ушли в плашку. */
+.call-scr.video .cs{display:none}
 .cs{display:flex;flex-direction:column;height:100%;text-align:center}
 .cs-top{padding:44px 24px 0}
 .cs-role{font-size:16px;color:var(--sub);font-weight:500}
@@ -1687,6 +1712,32 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
        экран выглядит ровно как голосовой. -->
   <video class="cs-remote" id="csRemote" playsinline autoplay></video>
   <video class="cs-local" id="csLocal" playsinline autoplay muted></video>
+  <div class="cs-pill">
+    <span class="cs-pill-a" id="csPillA">—</span>
+    <span class="cs-pill-n" id="csPillN">—</span>
+    <span class="cs-pill-t" id="csPillT">00:00</span>
+  </div>
+  <button class="cs-flip" onclick="callFlip()" aria-label="Другая камера">
+    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+      stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h13a4 4 0 0 1 4 4v1"/><path
+      d="M6 5L3 8l3 3"/><path d="M21 16H8a4 4 0 0 1-4-4v-1"/><path d="M18 19l3-3-3-3"/></svg>
+  </button>
+  <div class="cs-side">
+    <button class="cs-rb" id="csCam" onclick="callCam()" aria-label="Камера">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
+        stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
+        d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/></svg>
+    </button>
+    <button class="cs-rb" id="csMic" onclick="callMute()" aria-label="Микрофон">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
+        stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
+        d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>
+    </button>
+    <button class="cs-rb drop" onclick="callHangup()" aria-label="Завершить">
+      <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
+        stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </button>
+  </div>
   <div class="call-top">
     <button class="sup-back" onclick="callClose()" aria-label="Закрыть">
       <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
@@ -2056,7 +2107,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=4"></script>
+<script src="/vendor/ambar-call.js?v=5"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -6065,12 +6116,15 @@ function callBuzz(on){
 }
 
 function callTick(){
+  const p = cel('csPillT');
+  if(CALL_ST !== 'live') return;
   const e = cel('callState');
-  if(!e || CALL_ST !== 'live') return;
+  if(!e && !p) return;
   const s = Math.max(0, Math.round((Date.now() - CALL_T0) / 1000));
   const txt = String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
-  e.textContent = txt;
+  if(e) e.textContent = txt;
   const b = cel('callBarS'); if(b) b.textContent = txt;
+  if(p) p.textContent = txt;
 }
 
 function callPaintQuality(){
@@ -6141,8 +6195,15 @@ function callFlip(){
 // Классы экрана: есть ли видео вообще и включена ли своя камера.
 function callVideoPaint(){
   const sc = cel('callScr'); if(!sc) return;
-  sc.classList.toggle('video', CALL_VIDEO && CALL_ST !== 'idle');
+  // Видео показываем только в самом разговоре: пока звонят, экран остаётся
+  // обычным — имя, звание и две кнопки.
+  sc.classList.toggle('video', CALL_VIDEO && CALL_ST === 'live');
   sc.classList.toggle('cam-on', CALL_CAM);
+  const a = cel('csPillA'), n = cel('csPillN');
+  if(a) a.textContent = _ini(CALL_WHO);
+  if(n) n.textContent = CALL_WHO || '—';
+  cel('csCam')?.classList.toggle('on', !CALL_CAM);
+  cel('csMic')?.classList.toggle('on', _callMuted);
 }
 function callAccept(){ CALL && CALL.accept().catch(() => {}); }
 function callHangup(){ CALL && CALL.hangup(); }

@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=4"></script>
+<script src="/vendor/ambar-call.js?v=5"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -768,6 +768,38 @@ a.oc-row:active{background:var(--card2)}
 /* Экран разговора занимает всё приложение целиком: во время звонка ни списки,
    ни нижняя панель не нужны. */
 .ca-body.live{display:flex;align-items:center;justify-content:center}
+/* ── Видеозвонок в панели: та же раскладка FaceTime ──────────────────────────
+   Слой накрывает приложение целиком: собеседник фоном, своя камера окном,
+   имя плашкой слева сверху, кнопки столбцом справа. */
+.cv{position:absolute;inset:0;z-index:6;display:none;background:#05050c}
+.cv.on{display:block}
+.cv-rem{width:100%;height:100%;object-fit:cover;display:block;background:#05050c}
+.cv-loc{position:absolute;top:14px;right:14px;width:92px;height:123px;object-fit:cover;
+  border-radius:14px;background:#0b0b16;border:1px solid rgba(255,255,255,.16);
+  box-shadow:0 8px 24px rgba(0,0,0,.5);transform:scaleX(-1);display:none}
+.cv.cam-on .cv-loc{display:block}
+.cv.cam-back .cv-loc{transform:none}
+.cv-pill{position:absolute;top:14px;left:14px;display:flex;align-items:center;gap:8px;
+  padding:7px 13px 7px 9px;border-radius:999px;background:rgba(20,20,30,.62);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.cv-pill-a{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:11px;font-weight:700;color:var(--gold2);
+  background:rgba(201,169,110,.18)}
+.cv-pill-n{font-size:14px;font-weight:600;color:#fff}
+.cv-pill-t{font-size:12px;color:rgba(255,255,255,.65);font-variant-numeric:tabular-nums}
+.cv-side{position:absolute;right:16px;bottom:20px;display:flex;flex-direction:column;
+  align-items:center;gap:13px}
+.cv-rb{width:48px;height:48px;border-radius:50%;border:0;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;background:rgba(255,255,255,.22);color:#fff;
+  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:transform .12s}
+.cv-rb:active{transform:scale(.9)}
+.cv-rb.on{background:#fff;color:#111}
+.cv-rb.drop{background:var(--dn);color:#fff}
+.cv-flip{position:absolute;left:16px;bottom:20px;width:42px;height:42px;border-radius:50%;
+  border:0;cursor:pointer;display:none;align-items:center;justify-content:center;
+  background:rgba(255,255,255,.18);color:#fff;backdrop-filter:blur(10px)}
+.cv.cam-on .cv-flip{display:flex}
+
 /* Видео. Собеседник во весь блок разговора, своя камера окном в углу. */
 .ca-video{position:relative;width:100%;aspect-ratio:3/4;max-height:52vh;border-radius:16px;
   overflow:hidden;background:#05050c;margin-bottom:14px;display:none}
@@ -1869,6 +1901,40 @@ a.oc-row:active{background:var(--card2)}
           stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
       </button>
       <div class="ca-body" id="callBody"></div>
+      <!-- Слой видеозвонка живёт ОТДЕЛЬНО от перерисовываемого тела: раньше он
+           лежал внутри него, и каждая перерисовка пересоздавала элементы —
+           поток отваливался, и было видно то себя, то собеседника. -->
+      <div class="cv" id="callVid">
+        <video class="cv-rem" id="caRem" playsinline autoplay></video>
+        <video class="cv-loc" id="caLoc" playsinline autoplay muted></video>
+        <div class="cv-pill">
+          <span class="cv-pill-a" id="cvA">—</span>
+          <span class="cv-pill-n" id="cvN">—</span>
+          <span class="cv-pill-t" id="cvT">00:00</span>
+        </div>
+        <button class="cv-flip" onclick="callFlip()" aria-label="Другая камера">
+          <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h13a4 4 0 0 1 4 4v1"/><path
+            d="M6 5L3 8l3 3"/><path d="M21 16H8a4 4 0 0 1-4-4v-1"/><path d="M18 19l3-3-3-3"/></svg>
+        </button>
+        <div class="cv-side">
+          <button class="cv-rb" id="cvCam" onclick="callCam()" aria-label="Камера">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+              stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
+              d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/></svg>
+          </button>
+          <button class="cv-rb" id="cvMic" onclick="callMute()" aria-label="Микрофон">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+              stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
+              d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>
+          </button>
+          <button class="cv-rb drop" onclick="callHangup()" aria-label="Завершить">
+            <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+              stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+          </button>
+        </div>
+      </div>
+
       <nav class="ca-nav" id="callNav">
         <button class="ca-tab" data-p="calls" onclick="callPage('calls')">
           <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor"
@@ -4788,24 +4854,28 @@ function callEvent(t, d){
     case 'talking':
       CALL_ST = 'live'; CALL_T0 = Date.now(); CALL_Q = ''; _callMuted = false;
       clearInterval(_callTick); _callTick = setInterval(callTimer, 1000);
+      callVidPaint();
       callPaint(); callTimer();
       return;
     case 'quality':
       CALL_Q = d.quality; callQuality();
       return;
     case 'cam':
-      CALL_CAM = !!d.on; callPaint();
+      CALL_CAM = !!d.on;
       if(d.on && d.stream){ const v = document.getElementById('caLoc'); if(v) v.srcObject = d.stream; }
-      callVidPaint(); return;
+      callPaint(); callVidPaint(); return;
     case 'stream':
       if(d.kind === 'video'){
-        CALL_VIDEO = true; callPaint();
+        CALL_VIDEO = true;
         const v = document.getElementById('caRem');
         if(v){ v.srcObject = d.stream; v.play().catch(()=>{}); }
+        callPaint(); callVidPaint();
       }
       return;
     case 'novideo':
-      CALL_VIDEO = false; CALL_CAM = false; callPaint(); return;
+      CALL_VIDEO = false; CALL_CAM = false;
+      callVidPaint();
+      ['caRem','caLoc'].forEach(id => { const v = document.getElementById(id); if(v) v.srcObject = null; }); callPaint(); return;
     case 'ended':
     case 'failed': {
       clearInterval(_callTick); _callTick = null;
@@ -4841,6 +4911,7 @@ function callTimer(){
   const txt = String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
   const a = $('callLiveS'); if(a) a.textContent = txt;
   const b = $('callBarS'); if(b) b.textContent = txt;
+  const c = document.getElementById('cvT'); if(c) c.textContent = txt;
 }
 function callQuality(){
   const e = $('callQ'); if(!e) return;
@@ -4867,13 +4938,19 @@ function callBadge(){
 }
 
 function callOpen(){ callInit(); showOv('callOv'); callPaint(); }
-function callClose(){ hideOv('callOv'); if(CALL_ST === 'in') CALL && CALL.reject(); }
+function callClose(){ setTimeout(callPaint, 0); hideOv('callOv'); if(CALL_ST === 'in') CALL && CALL.reject(); }
 function callVideo(key){ callDial(key, true); }
-// Зеркалить надо только переднюю камеру: заднюю зеркальной делать нельзя,
-// на ней читают вывески и номера.
+// Слой видео живёт вне перерисовки, поэтому обновляем его отдельно и руками.
 function callVidPaint(){
-  const v = document.getElementById('caLoc');
-  if(v && CALL) v.classList.toggle('back', CALL.facing === 'environment');
+  const l = document.getElementById('callVid'); if(!l) return;
+  l.classList.toggle('on', CALL_VIDEO && CALL_ST === 'live');
+  l.classList.toggle('cam-on', CALL_CAM);
+  l.classList.toggle('cam-back', !!(CALL && CALL.facing === 'environment'));
+  const a = document.getElementById('cvA'), n = document.getElementById('cvN');
+  if(a) a.textContent = _cIni(CALL_WHO);
+  if(n) n.textContent = CALL_WHO || '—';
+  document.getElementById('cvCam')?.classList.toggle('on', !CALL_CAM);
+  document.getElementById('cvMic')?.classList.toggle('on', _callMuted);
 }
 
 function callCam(){ if(CALL) CALL.camera(!CALL_CAM); }
@@ -5026,7 +5103,10 @@ function _callPaint(){
   const bar = $('callBar');
 
   if(bar){
-    bar.classList.toggle('on', CALL_ST === 'live');
+    // Полоса разговора нужна, только когда окно связи закрыто: поверх самого
+    // окна она перекрывает кнопки видеозвонка и дублирует их.
+    const opened = document.getElementById('callOv')?.classList.contains('show');
+    bar.classList.toggle('on', CALL_ST === 'live' && !opened);
     if(CALL_ST === 'live'){
       $('callBarAv').textContent = _cIni(CALL_WHO);
       $('callBarN').textContent = CALL_WHO;
@@ -5071,10 +5151,6 @@ function _callPaint(){
           viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>` : '';
 
-  const vid = `<div class="ca-video${CALL_VIDEO ? ' on' : ''}">
-      <video class="rem" id="caRem" playsinline autoplay></video>
-      <video class="loc${CALL_CAM ? '' : ' off'}" id="caLoc" playsinline autoplay muted></video>
-    </div>`;
   const camRow = (CALL_ST === 'live' && CALL_VIDEO) ? `
       <div class="call-live-acts row2">
         <button class="call-cbtn mute${CALL_CAM ? '' : ' on'}" onclick="callCam()" aria-label="Камера"><svg
@@ -5086,7 +5162,7 @@ function _callPaint(){
           d="M6 5L3 8l3 3"/><path d="M21 16H8a4 4 0 0 1-4-4v-1"/><path d="M18 19l3-3-3-3"/></svg></button>` : ''}
       </div>` : '';
 
-  body.innerHTML = vid + `<div class="call-live">
+  body.innerHTML = `<div class="call-live">
       <div class="call-live-av${CALL_ST === 'live' ? '' : ' ring'}">${_cIni(CALL_WHO)}</div>
       <div class="call-live-n">${CALL_WHO || '—'}</div>
       <div class="call-live-s" id="callLiveS">${

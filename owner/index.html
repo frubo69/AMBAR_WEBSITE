@@ -2666,6 +2666,11 @@ button.path:active{transform:scale(.995)}
 .ord-pr-s{flex:0 0 auto;min-width:62px;text-align:right;font-family:'DM Sans',sans-serif;
   font-size:14px;font-weight:700;color:var(--gold2);font-variant-numeric:tabular-nums}
 .ord-pr-f{font-size:11px;color:var(--muted);line-height:1.55;margin-top:12px}
+/* Номер в списке недобора — тем же приёмом, что и в заявке: по нему сверяют
+   позицию, не читая название целиком. */
+.sup-sr-i{flex:0 0 auto;width:24px;font-family:'DM Sans',sans-serif;font-size:11px;
+  font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right;
+  padding-right:8px}
 
 /* Действие раздела в шапке справа. Красным — потому что отменяют редко и это
    не то, что нажимают мимоходом. */
@@ -10657,6 +10662,21 @@ const ICO_UP    = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" s
 const ICO_SHARE = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M8 7l4-4 4 4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>';
 const ICO_TG    = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>';
 
+// Недобор — единственное на хабе, что требует действия сегодня и снаружи: за
+// этим товаром едут на другой склад, пока он открыт. Поэтому строка не прячется
+// внутрь приёмки, а стоит на пути отдельным шагом.
+function pathShort(){
+  const st = supStage();
+  const gap = st.sup && st.sup.status === 'open' ? (st.sup.gap_qty || 0) : 0;
+  if(!gap) return '';
+  return `<button class="pnav-r" onclick="accShort()">
+    <span class="pnav-b"><b>Докупить на доп. складах</b>
+      <i>магазин не дал ${fmt(gap)} ${pluralize(gap,'бутылку','бутылки','бутылок')}</i></span>
+    <span class="pstat-c no">${fmt(gap)}</span>
+    <span class="pnav-go">${ICO_CHEV}</span>
+  </button>`;
+}
+
 // Прошлые закупки. Одна отвечает «как прошло сегодня»; несколько подряд —
 // на вопрос поинтереснее: сколько магазин обычно не даёт и во что это встаёт.
 function supHistLine(){
@@ -10685,7 +10705,7 @@ function ordHub(){
   // появляется — только воздух вокруг того, ради чего сюда заходят.
   document.getElementById('accMid').innerHTML = `<div class="ohub">
     <div class="pbox">${pathNav()}<div class="path">${pathInner()}</div>${pathStatus()}</div>
-    ${supHistLine()}</div>`;
+    ${pathShort()}${supHistLine()}</div>`;
 
   // Подвал хаба — ровно один шаг, тот, который сейчас ждут. Пока ответа
   // магазина нет, это он; пока идёт приёмка — не ждут ничего, и подвала нет.
@@ -10862,13 +10882,14 @@ function ordPrices(){
       <div class="wo-c-t">Цена по позициям</div>
       <div class="wo-c-s">${fmt(d.total_qty || 0)} ${
         pluralize(d.total_qty || 0,'бутылка','бутылки','бутылок')} ·
-        ${fmt(d.total_aed || 0)} AED по прайсу</div>
+        ${fmt(d.total_aed || 0)} AED по прайсу<br>
+        <i style="font-style:normal;opacity:.75">цена за бутылку · сумма по позиции</i></div>
     </div>
     <div class="ord-pr">${rows.length ? rows.map((r, i) => `
       <div class="ord-pr-r">
         <span class="ord-pr-i">${i + 1}</span>
         <span class="ord-pr-n">${escS(r.name)}</span>
-        <span class="ord-pr-q">${fmt(r.need_total)} × ${fmt(r.price)}</span>
+        <span class="ord-pr-q">${fmt(r.price)}</span>
         <span class="ord-pr-s">${fmt(r.sum)}</span>
       </div>`).join('') : '<div class="wo-c-none">В заявке пока пусто</div>'}</div>
     <div class="ord-pr-f">Цена продажная, по прайсу. Закупочной в системе нет —
@@ -11935,6 +11956,114 @@ async function accSupply(goto){
   const cur = list.find(x => x.status === 'open') || list[0];
   if(!cur){ supEmpty(); return; }
   await supLoad(cur.supply_id);
+}
+
+// ─── Докупить на доп. складах ───────────────────────────────────────────────
+// То, чего магазин не дал, — отдельный экран, а не хвост приёмки. Это другое
+// дело и другой день: приёмка про «как идёт», а здесь про «куда ехать ещё,
+// пока склады открыты». Списком внизу и уезжают — файлом в чат или наружу.
+async function accShort(){
+  ACC_BACK = accOrder;
+  _setText('accTitle', 'Докупить на доп. складах');
+  _setText('accSub', 'загрузка…');
+  document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  document.getElementById('accFoot').innerHTML = '';
+  let list = ACC_SUP && ACC_SUP.list;
+  if(!list){
+    try{ list = ((await ownerApi.ownerFetch('/api/owner/supply')).supplies) || []; }
+    catch(e){ list = []; }
+    ACC_SUP = {list, open: list.find(x => x.status === 'open') || null};
+  }
+  const cur = list.find(x => x.status === 'open') || list[0];
+  if(!cur){ shortBody(null); return; }
+  if(!SUP_D || SUP_D.supply_id !== cur.supply_id){
+    SUP_ID = cur.supply_id;
+    try{ SUP_D = await ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(cur.supply_id)); }
+    catch(e){ SUP_D = null; }
+  }
+  shortBody(SUP_D);
+}
+
+function shortBody(d){
+  const mid = document.getElementById('accMid');
+  const short = (d && d.shortfall) || {qty: 0, rows: []};
+  const rows = short.rows || [];
+  const D = {};
+  ((d && d.tasks) || []).forEach(t => { D[t.district] = {code: t.district_code}; });
+  if(!rows.length){
+    _setText('accSub', 'ничего не нужно');
+    mid.innerHTML = `<div class="sh-empty">
+      <span class="sh-empty-i"><svg viewBox="0 0 24 24" width="24" height="24" fill="none"
+        stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
+        stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>
+      <div class="sh-empty-t">Магазин дал всё</div>
+      <div class="sh-empty-s">Докупать нечего — по этой заявке недобора нет.</div>
+      <div class="sh-empty-h">Здесь появляется то, что магазин урезал, отказал
+        или не выдал при отгрузке. С этим списком едут на доп. склад.</div>
+    </div>`;
+    document.getElementById('accFoot').innerHTML = '';
+    return;
+  }
+  _setText('accSub', `${fmt(short.qty)} ${
+    pluralize(short.qty,'бутылка','бутылки','бутылок')} · заявка ${String(d.day || '').slice(0,10)}`);
+  const why = {dropped:'магазин отказал', short:'урезал', gap:'не выдал при отгрузке'};
+  mid.innerHTML = `
+    <div class="wo-q-head">
+      <span class="wo-q-v">${fmt(short.qty)}</span>
+      <span class="wo-q-u">${pluralize(short.qty,'бутылка','бутылки','бутылок')}<br>не доехало</span>
+      <span class="wo-q-aed"><b>${rows.length}</b>${
+        pluralize(rows.length,'позиция','позиции','позиций')}</span>
+    </div>
+    <div class="sup-short">
+      ${rows.map((r, i) => `<div class="sup-sr">
+        <span class="sup-sr-i">${i + 1}</span>
+        <span class="sup-sr-b">
+          <span class="sup-sr-n">${escS(r.name)}</span>
+          <span class="sup-sr-s">${escS(why[r.why] || '')}${
+            Object.keys(r.by_district || {}).length ? ' · ' + Object.entries(r.by_district)
+              .map(([o, n]) => `${(D[o]||{}).code || o} ${n}`).join(' · ') : ''}</span>
+        </span>
+        <span class="sup-sr-v">${r.gap}</span></div>`).join('')}
+    </div>`;
+  document.getElementById('accFoot').innerHTML = `
+    <div class="qb-wrap qb-row">
+      <button class="qb" id="supShare" onclick="supShare()">${ICO_SHARE}Список для доп. склада</button>
+      <button class="qb qb-ico" id="supSend" onclick="supSend()"
+              aria-label="Прислать файл в чат с ботом" title="В телеграм">${ICO_TG}</button>
+    </div>`;
+}
+
+// Список того, чего магазин не дал: файлом наружу или в чат с ботом. Обе
+// кнопки живут на этом экране — бумага рождается там, где на неё смотрят.
+async function supShare(){
+  const b = document.getElementById('supShare'); if(!b || b.disabled) return;
+  const html = b.innerHTML; b.disabled = true; b.innerHTML = 'Готовлю файл…';
+  try{
+    const url = (ownerApi.AMBAR_API || '') +
+      `/api/owner/supply/${encodeURIComponent(SUP_ID)}/shortfall`;
+    const res = await fetch(url, {headers:{'Authorization':'tma ' +
+      ((Telegram.WebApp && Telegram.WebApp.initData) || '')}});
+    if(!res.ok) throw new Error('export ' + res.status);
+    const blob = await res.blob();
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `dokupit-${String((SUP_D || {}).day || '').slice(0,10)}.xlsx`;
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 4000);
+    b.innerHTML = 'Готово';
+  }catch(e){ _toast('Не удалось выгрузить'); b.innerHTML = html; }
+  setTimeout(()=>{ b.innerHTML = html; b.disabled = false; }, 2600);
+}
+
+async function supSend(){
+  const b = document.getElementById('supSend'); if(!b || b.disabled) return;
+  b.disabled = true; b.style.opacity = '.5';
+  try{
+    await ownerApi.ownerFetch(`/api/owner/supply/${SUP_ID}/shortfall/send`, {method:'POST'});
+    _toast('Файл в чате с ботом');
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  }catch(e){ _toast('Не отправилось'); }
+  b.disabled = false; b.style.opacity = '';
 }
 
 // Поставки ещё не было — экран не пустой, а объясняющий: сюда приходят, когда

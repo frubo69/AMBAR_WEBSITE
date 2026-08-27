@@ -507,6 +507,7 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 .saved-cards-wrap.few::after{display:none}
 .saved-cards-wrap.few::before{display:none}
 #saved-cards{max-height:220px;overflow-y:scroll;scrollbar-width:none;display:flex;flex-direction:column;gap:8px}
+#saved-cards.beta{max-height:none;overflow:visible}
 #saved-cards::-webkit-scrollbar{display:none}
 .saved-card{padding:13px 14px;cursor:pointer;transition:background .15s,border-color .15s;display:flex;align-items:center;gap:12px;border-radius:14px;border:1.5px solid var(--border2);background:var(--card)}
 .saved-card:active{background:rgba(255,255,255,.03)}
@@ -528,6 +529,49 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 .sc-del-btn{color:var(--sub)}
 .sc-edit-btn:active{background:rgba(201,169,110,.15);border-color:rgba(201,169,110,.3)}
 .sc-del-btn:active{background:rgba(224,85,85,.1);border-color:rgba(224,85,85,.25);color:var(--red)}
+/* ── Адресная книга (бета) ─────────────────────────────────────────────────
+   Карточка адреса перестаёт быть строкой в картотеке: панорама входа, чтобы
+   человек узнал своё парадное; этаж и квартира, потому что водителю мы не
+   даём телефон; и кнопка заказа, чтобы со страницы был выход вперёд, а не
+   только назад. */
+.saved-card.sc-beta{flex-direction:column;align-items:stretch;gap:0;padding:0;overflow:hidden}
+.sc-top{display:flex;align-items:center;gap:11px;padding:12px 13px}
+.sc-thumb-box{position:relative;width:46px;height:46px;border-radius:11px;flex-shrink:0;
+  background:rgba(201,169,110,.08);border:1px solid rgba(201,169,110,.14);color:var(--gold);
+  display:flex;align-items:center;justify-content:center;overflow:hidden}
+.sc-sv{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+.sc-chips{display:flex;flex-wrap:wrap;gap:4px;margin-top:5px}
+.sc-chip{font-size:10px;line-height:1;padding:4px 7px;border-radius:6px;background:var(--card2);
+  border:1px solid var(--border2);color:var(--sub);white-space:nowrap}
+.sc-chip b{color:var(--text);font-weight:600}
+.sc-chip.add{background:rgba(201,169,110,.09);border-color:rgba(201,169,110,.28);color:var(--gold2);cursor:pointer}
+.sc-foot{display:flex;align-items:center;gap:8px;padding:8px 13px 9px;border-top:1px solid var(--border2);
+  background:rgba(255,255,255,.012)}
+.sc-eta{font-size:11px;color:var(--sub);display:flex;align-items:center;gap:5px;flex-shrink:0}
+.sc-eta b{color:var(--gold2);font-weight:600}
+.sc-order-btn{margin-left:auto;flex-shrink:0;font-family:'DM Sans',sans-serif;font-size:11.5px;font-weight:600;
+  color:var(--gold);background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.3);
+  border-radius:9px;padding:7px 12px;cursor:pointer;-webkit-tap-highlight-color:transparent;
+  display:flex;align-items:center;gap:5px;transition:.15s}
+.sc-order-btn:active{background:rgba(201,169,110,.2)}
+/* История: адреса, на которые мы уже ездили, — их клиент не сохранял, но они
+   его. Одним касанием переезжают наверх, в сохранённые. */
+#addr-hist-wrap{padding:0 16px}
+.hist-card{display:flex;align-items:center;gap:11px;padding:11px 13px;border-radius:14px;
+  border:1px dashed var(--border);background:var(--card);margin-bottom:8px}
+.hist-ico{width:34px;height:34px;border-radius:10px;background:var(--card2);border:1px solid var(--border2);
+  display:flex;align-items:center;justify-content:center;color:var(--sub);flex-shrink:0}
+.hist-info{flex:1;min-width:0}
+.hist-addr{font-size:12.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hist-meta{font-size:10.5px;color:var(--muted);margin-top:3px}
+.hist-add{flex-shrink:0;font-family:'DM Sans',sans-serif;font-size:11.5px;font-weight:600;color:var(--gold);
+  background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.3);border-radius:9px;padding:7px 11px;
+  cursor:pointer;-webkit-tap-highlight-color:transparent;transition:.15s}
+.hist-add:active{background:rgba(201,169,110,.2)}
+/* Детали для курьера в форме адреса */
+.addr-det-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.addr-det-grid .finput{margin:0}
+.addr-det-hint{font-size:10.5px;color:var(--muted);line-height:1.45;margin-top:8px}
 
 /* (legacy .confirm-overlay removed — see .confirm-ov below for the active confirm system) */
 
@@ -1950,6 +1994,12 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
       <div class="addr-empty-sub" id="addr-empty-sub-txt">Добавьте первый адрес доставки</div>
     </div>
 
+    <!-- Адреса из прошлых заказов (бета): сервер помнит то, чего нет в телефоне -->
+    <div id="addr-hist-wrap" style="display:none">
+      <div class="addr-add-label" id="addr-hist-label-txt">Вы заказывали сюда</div>
+      <div id="addr-hist"></div>
+    </div>
+
     <!-- Add address methods -->
     <div class="addr-add-label" id="addr-add-label-txt">Добавить адрес</div>
     <div class="addr-methods-row">
@@ -2739,6 +2789,16 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
     </div>
     <label class="flabel" id="addr-save-name-lbl">НАЗВАНИЕ АДРЕСА</label>
     <input class="finput" id="addr-name-in" type="text" enterkeyhint="next" placeholder="Дом / Офис / JVC..." onkeydown="if(event.key==='Enter'){event.preventDefault();el('addr-comment-in')?.focus();}">
+    <div id="addr-det-wrap" style="display:none">
+      <label class="flabel" style="margin-top:16px" id="addr-det-lbl">ДЕТАЛИ ДЛЯ КУРЬЕРА</label>
+      <div class="addr-det-grid">
+        <input class="finput" id="addr-entrance-in" type="text" maxlength="40" placeholder="Вход / подъезд">
+        <input class="finput" id="addr-floor-in" type="text" maxlength="20" placeholder="Этаж">
+        <input class="finput" id="addr-apt-in" type="text" maxlength="20" placeholder="Квартира / офис">
+        <input class="finput" id="addr-intercom-in" type="text" maxlength="40" placeholder="Домофон">
+      </div>
+      <div class="addr-det-hint" id="addr-det-hint-txt">Водитель видит эти поля в заказе — так он найдёт вас, не отвлекая звонком.</div>
+    </div>
     <label class="flabel" style="margin-top:16px" id="addr-save-comment-lbl">КОММЕНТАРИЙ ДЛЯ КУРЬЕРА</label>
     <textarea class="finput" id="addr-comment-in" rows="3" enterkeyhint="done" style="resize:none;height:80px;padding-top:11px" placeholder="Необязательно" onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur();}"></textarea>
     <div class="addr-save-err" id="addr-form-err"></div>
@@ -3337,6 +3397,14 @@ let CRYPTO_ENABLED = localStorage.getItem('ambar_crypto_enabled')==='1';
 // Display-only — POST /api/order re-checks the whitelist server-side.
 let DEBT_ENABLED = localStorage.getItem('ambar_debt_enabled')==='1';
 let DEBT_BALANCE = parseFloat(localStorage.getItem('ambar_debt_balance')||'0')||0;
+// ── Адресная книга (бета) ─────────────────────────────────────────────────────
+// Тот же приём, что с криптой: сервер решает, кому показывать новую страницу
+// адресов. Всё, что она делает — читает и пишет книгу адресов по подписанному
+// initData, так что флаг влияет только на вид.
+let BETA_ADDR = localStorage.getItem('ambar_beta_addr')==='1';
+let _ADDR_ETA = {};            // office_id → минуты, приходит с сервера
+let _addrHist = [];            // адреса из прошлых заказов, которых нет в сохранённых
+let _addrPushT = null;         // отложенная синхронизация книги
 // Client-side demo flow. Auto-disabled by /api/me (crypto_real_mode) once the
 // server has a real receive wallet + on-chain watcher — see initMe(). Defaults
 // to demo so nothing can half-activate before the backend is truly live.
@@ -3468,6 +3536,9 @@ async function checkBanStatus(){
       // В ДОЛГ gate + balance (display only — server re-checks on /api/order)
       if(d.debt_allowed){localStorage.setItem('ambar_debt_enabled','1');DEBT_ENABLED=true;}
       else{localStorage.removeItem('ambar_debt_enabled');DEBT_ENABLED=false;}
+      // Новая страница адресов — пока по одному аккаунту.
+      if(d.beta_addr){localStorage.setItem('ambar_beta_addr','1');BETA_ADDR=true;addrPull();}
+      else{localStorage.removeItem('ambar_beta_addr');BETA_ADDR=false;}
       DEBT_BALANCE=+d.debt||0;
       localStorage.setItem('ambar_debt_balance',String(DEBT_BALANCE));
       // Real on-chain flow once the server has a wallet+watcher; demo otherwise.
@@ -4018,6 +4089,16 @@ function applyLang(){
   el('addr-name-in').placeholder=lang==='ru'?'Дом / Офис / JVC...':'Home / Office / JVC...';
   set('lbl-addr-comment',lang==='ru'?'КОММЕНТАРИЙ ДЛЯ КУРЬЕРА':'COMMENT FOR COURIER');
   el('addr-comment-in').placeholder = lang==='ru' ? 'Например: проедьте чуть дальше шлагбаума, я встречу вас там...' : 'For example: drive a bit past the barrier, I will meet you there...';
+  // Детали для курьера + история адресов (бета)
+  set('addr-det-lbl',lang==='ru'?'ДЕТАЛИ ДЛЯ КУРЬЕРА':'DETAILS FOR THE DRIVER');
+  set('addr-det-hint-txt',lang==='ru'
+      ?'Водитель видит эти поля в заказе — так он найдёт вас, не отвлекая звонком.'
+      :'The driver sees these in the order — so he finds you without calling.');
+  set('addr-hist-label-txt',lang==='ru'?'Вы заказывали сюда':'You have ordered here');
+  const _dph=lang==='ru'?['Вход / подъезд','Этаж','Квартира / офис','Домофон']
+                        :['Entrance','Floor','Apartment / office','Intercom'];
+  ['addr-entrance-in','addr-floor-in','addr-apt-in','addr-intercom-in']
+    .forEach((id,i)=>{const e=el(id);if(e)e.placeholder=_dph[i];});
   set('sum-title',t('sumTitle'));set('sum-tip-lbl',t('tipLbl'));set('sum-tot-lbl',t('totLbl'));
   set('place-btn-text',t('placeBtn'));set('tip-lbl',t('tip'));set('co-addr-title',t('coAddrTitle'));
   // Payment method step
@@ -4544,7 +4625,7 @@ function go(p){
   requestAnimationFrame(()=>setTimeout(()=>{
     if(p==='cart'){renderCart();updateCartAddrBar();}
     if(p==='orders'){syncOrders();checkActiveOrder();initPullToRefresh();}
-    if(p==='address'){renderSavedCards();buildAreaChips();buildTypeChips('man');}
+    if(p==='address'){renderSavedCards();buildAreaChips();buildTypeChips('man');addrPull();}
     if(p==='profile'){buildProfile();syncOrders();checkActiveOrder();}
     if(p==='checkout'){buildSummary();refreshPayMethodUI();}
   },0));
@@ -4552,7 +4633,7 @@ function go(p){
 
 // ── SAVED ADDRESSES ───────────────────────────────────────────────────────────
 function getSaved(){return JSON.parse(localStorage.getItem('ambar_saved')||'[]');}
-function setSaved(a){localStorage.setItem('ambar_saved',JSON.stringify(a.slice(0,10)));}
+function setSaved(a){localStorage.setItem('ambar_saved',JSON.stringify(a.slice(0,10)));addrPush();}
 function setActiveAddr(idx){
   activeAddrIdx=idx;
   if(idx===null)localStorage.removeItem('ambar_active_addr');
@@ -4593,6 +4674,146 @@ function updateCartAddrBar(){
   }
 }
 
+// ── АДРЕСНАЯ КНИГА (бета) ─────────────────────────────────────────────────────
+// Сохранённые адреса всегда жили только здесь, в памяти телефона. Телеграм на
+// десктопе иногда чистит хранилище между сессиями — и у человека, который
+// заказывал двадцать раз, страница открывалась пустой. При этом в его профиле
+// на сервере лежал каждый адрес, куда мы к нему ездили. Теперь список
+// синхронизируется с профилем, а история подсказывает то, что он не сохранял.
+const ADDR_KEY=a=>String(a?.address||a?.label||'').trim().toLowerCase();
+
+async function addrPull(){
+  if(!BETA_ADDR)return;
+  try{
+    const r=await fetch(`${AMBAR_API}/api/addresses`,{headers:{'Authorization':'tma '+(tg?.initData||'')}});
+    if(!r.ok)return;
+    const d=await r.json();
+    _ADDR_ETA=d.eta||{};
+    // Локальный список — источник правды на устройстве. Серверную копию берём
+    // только когда брать больше нечего: иначе удалённый адрес воскресал бы при
+    // каждом запуске.
+    if(!getSaved().length && (d.saved||[]).length){
+      localStorage.setItem('ambar_saved',JSON.stringify(d.saved.slice(0,10)));
+      if(getSaved().length) setActiveAddr(0);
+    }
+    const have=new Set(getSaved().map(ADDR_KEY));
+    _addrHist=(d.history||[]).filter(a=>!have.has(ADDR_KEY(a)));
+    renderSavedCards();
+  }catch(e){}
+}
+
+function addrPush(){
+  if(!BETA_ADDR)return;
+  clearTimeout(_addrPushT);
+  // Пачкой: правка адреса — это несколько setSaved подряд, слать каждый смысла нет.
+  _addrPushT=setTimeout(()=>{
+    fetch(`${AMBAR_API}/api/addresses/save`,{method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'tma '+(tg?.initData||'')},
+      body:JSON.stringify({saved:getSaved()})}).catch(()=>{});
+  },900);
+}
+
+// Панорама входа. Статичный Street View сам отвечает 404, если панорамы рядом
+// нет, — на этом и держится проверка: не загрузилось, значит показываем пин.
+function _svUrl(a){
+  const lat=Number(a?.lat||0),lon=Number(a?.lon||0);
+  if(!lat||!lon)return '';
+  return 'https://maps.googleapis.com/maps/api/streetview?size=112x112&fov=80&return_error_code=true&location='
+    +lat.toFixed(6)+','+lon.toFixed(6)+'&key='+GOOGLE_SV_KEY;
+}
+function _etaFor(a){ return Number(_ADDR_ETA[a?.office_id||'']||_ADDR_ETA._all||0)||0; }
+
+// Детали, ради которых всё затевалось: телефон клиента водителю не уходит, и
+// найти квартиру он должен по адресу, а не по звонку.
+function _detChips(a,i){
+  const ru=lang==='ru';
+  const parts=[];
+  if(a.entrance)parts.push((ru?'вход ':'entrance ')+'<b>'+_esc(a.entrance)+'</b>');
+  if(a.floor)parts.push((ru?'этаж ':'floor ')+'<b>'+_esc(a.floor)+'</b>');
+  if(a.apt)parts.push((ru?'кв. ':'apt ')+'<b>'+_esc(a.apt)+'</b>');
+  if(a.intercom)parts.push((ru?'домофон ':'intercom ')+'<b>'+_esc(a.intercom)+'</b>');
+  if(parts.length)return '<div class="sc-chips">'+parts.map(p=>'<span class="sc-chip">'+p+'</span>').join('')+'</div>';
+  return '<div class="sc-chips"><span class="sc-chip add" onclick="event.stopPropagation();editAddr('+i+')">'
+    +(ru?'+ этаж и квартира для курьера':'+ floor and apartment for the driver')+'</span></div>';
+}
+
+function _esc(v){return String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+
+// Со страницы адресов должен быть выход вперёд, а не только назад.
+// Та же строка, что видит водитель в заказе.
+function _detLine(a){
+  if(!a)return '';
+  const ru=lang==='ru';
+  return [a.entrance&&((ru?'вход ':'entrance ')+a.entrance),
+          a.floor&&((ru?'этаж ':'floor ')+a.floor),
+          a.apt&&((ru?'кв. ':'apt ')+a.apt),
+          a.intercom&&((ru?'домофон ':'intercom ')+a.intercom)].filter(Boolean).join(', ');
+}
+
+function orderHere(i){
+  setActiveAddr(i);
+  renderSavedCards();
+  haptic.light();
+  go(Object.keys(cart).length?'cart':'catalog');
+}
+
+const _MON_RU=['января','февраля','марта','апреля','мая','июня','июля','августа','сентября','октября','ноября','декабря'];
+function _addrWhen(iso){
+  if(!iso)return '';
+  const d=new Date(iso);
+  if(isNaN(d))return '';
+  return lang==='ru' ? d.getDate()+' '+_MON_RU[d.getMonth()]
+                     : d.toLocaleDateString('en-GB',{day:'numeric',month:'long'});
+}
+function _plOrders(n){
+  if(lang!=='ru')return n+(n===1?' order':' orders');
+  const t=n%10,h=n%100;
+  if(t===1&&h!==11)return n+' заказ';
+  if(t>=2&&t<=4&&(h<10||h>=20))return n+' заказа';
+  return n+' заказов';
+}
+
+function renderAddrHist(){
+  const wrap=el('addr-hist-wrap'),box=el('addr-hist');
+  if(!wrap||!box)return;
+  if(!BETA_ADDR||!_addrHist.length){wrap.style.display='none';box.innerHTML='';return;}
+  wrap.style.display='block';
+  const pin='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="15" height="15"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>';
+  box.innerHTML=_addrHist.map((a,i)=>{
+    const bits=[];
+    if(a.orders)bits.push(_plOrders(a.orders));
+    const w=_addrWhen(a.used_at);
+    if(w)bits.push((lang==='ru'?'последний ':'last ')+w);
+    return `<div class="hist-card">
+      <div class="hist-ico">${pin}</div>
+      <div class="hist-info">
+        <div class="hist-addr">${_esc(a.label&&a.label!==a.address?a.label+' · '+a.address:(a.address||a.label))}</div>
+        <div class="hist-meta">${_esc(bits.join(' · '))}</div>
+      </div>
+      <button class="hist-add" onclick="histAdd(${i})">${lang==='ru'?'Сохранить':'Save'}</button>
+    </div>`;
+  }).join('');
+}
+
+function histAdd(i){
+  const a=_addrHist[i];if(!a)return;
+  const arr=getSaved();
+  if(arr.length>=10){showToast(lang==='ru'?'Больше 10 адресов не сохранить':'Up to 10 addresses','err');return;}
+  arr.unshift({
+    label:a.label||a.address,address:a.address||a.label,street:'',
+    streetPart:'',buildingPart:'',areaIdx:null,typeId:null,typeIcon:'📍',
+    lat:Number(a.lat||0),lon:Number(a.lon||0),isGps:!!a.isGps,
+    gmap_link:a.gmap_link||'',office_id:a.office_id||'',
+    office_name:a.office_name||OFFICES[0].name,comment:a.comment||'',
+    entrance:a.entrance||'',floor:a.floor||'',apt:a.apt||'',intercom:a.intercom||'',
+  });
+  setSaved(arr);setActiveAddr(0);
+  _addrHist.splice(i,1);
+  renderSavedCards();renderModalAddrList();
+  haptic.light();
+  showToast(lang==='ru'?'Адрес сохранён':'Address saved','ok');
+}
+
 function renderSavedCards(){
   const arr=getSaved();
   const wrap=el('saved-cards');if(!wrap)return;
@@ -4600,33 +4821,50 @@ function renderSavedCards(){
   const listWrap=el('addr-list-wrap');
   const emptyState=el('addr-empty-state');
   if(listWrap)listWrap.style.display=arr.length?'block':'none';
-  if(emptyState)emptyState.style.display=arr.length?'none':'';
+  if(emptyState)emptyState.style.display=(arr.length||(BETA_ADDR&&_addrHist.length))?'none':'';
   if(wrapOuter) wrapOuter.classList.toggle('few', arr.length<=3);
-  if(!arr.length){wrap.innerHTML='';return;}
+  wrap.classList.toggle('beta', !!BETA_ADDR);
+  if(!arr.length){wrap.innerHTML='';renderAddrHist();return;}
   const pinSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="15" height="15"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>`;
   const editSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>`;
   const trashSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="14" height="14"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>`;
   const commentSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" width="11" height="11" style="flex-shrink:0;opacity:.5"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>`;
+  const clockSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="11" height="11" style="flex-shrink:0;opacity:.6"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>`;
+  const arrowSvg=`<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" width="11" height="11" style="flex-shrink:0"><path d="M5 12h13M13 6l6 6-6 6"/></svg>`;
   wrap.innerHTML=arr.map((a,i)=>{
     const isActive=i===activeAddrIdx;
     const commentHtml=a.comment?`<div class="sc-comment">${commentSvg}<span>${a.comment}</span></div>`:'';
     const addrShort=a.label&&a.label!==a.address?a.address:'';
-    return`<div class="saved-card${isActive?' active-addr':''}" onclick="selectAddr(${i})">
-      <div class="sc-radio"><div class="sc-radio-dot"></div></div>
-      <div class="sc-pin-icon">${pinSvg}</div>
+    const head=`<div class="sc-radio"><div class="sc-radio-dot"></div></div>
+      ${BETA_ADDR&&_svUrl(a)
+        ?`<div class="sc-thumb-box">${pinSvg}<img class="sc-sv" src="${_svUrl(a)}" alt="" loading="lazy" onerror="this.remove()"></div>`
+        :`<div class="sc-pin-icon">${pinSvg}</div>`}
       <div class="sc-info">
         <div class="sc-row1">
           <span class="sc-label">${a.label||a.address}</span>
           ${addrShort?`<span class="sc-sep">·</span><span class="sc-addr">${addrShort}</span>`:''}
         </div>
         ${commentHtml}
+        ${BETA_ADDR?_detChips(a,i):''}
       </div>
       <div class="sc-actions">
         <button class="sc-edit-btn" onclick="event.stopPropagation();editAddr(${i})">${editSvg}</button>
         <button class="sc-del-btn" onclick="event.stopPropagation();deleteAddr(${i})">${trashSvg}</button>
+      </div>`;
+    if(!BETA_ADDR)
+      return`<div class="saved-card${isActive?' active-addr':''}" onclick="selectAddr(${i})">${head}</div>`;
+    // Время доставки показываем, только если сервер его посчитал: пять поездок
+    // по району — минимум, ниже которого цифра врёт.
+    const eta=_etaFor(a);
+    return`<div class="saved-card sc-beta${isActive?' active-addr':''}" onclick="selectAddr(${i})">
+      <div class="sc-top">${head}</div>
+      <div class="sc-foot">
+        ${eta?`<span class="sc-eta">${clockSvg}${lang==='ru'?'обычно':'usually'} <b>~${eta} ${lang==='ru'?'мин':'min'}</b></span>`:''}
+        <button class="sc-order-btn" onclick="event.stopPropagation();orderHere(${i})">${lang==='ru'?'Заказать сюда':'Order here'} ${arrowSvg}</button>
       </div>
     </div>`;
   }).join('');
+  renderAddrHist();
   updateScThumb();
 }
 function updateScThumb(){
@@ -4669,6 +4907,7 @@ function editAddr(i){
   _mapGeoResult=null;
   const nameIn=el('addr-name-in');if(nameIn)nameIn.value=a.label||'';
   const commentIn=el('addr-comment-in');if(commentIn)commentIn.value=a.comment||'';
+  _detFill(a);
   const previewEl=el('addr-save-preview');if(previewEl)previewEl.textContent=a.address||a.label||'';
   const editMapBtn=el('addr-save-edit-map-btn');
   if(editMapBtn)editMapBtn.style.display=(!a.isGps&&a.lat)?'flex':'none';
@@ -5263,6 +5502,7 @@ function saveNewAddress(){
     office_id:locInfo?.office_id||'',
     office_name:locInfo?.office_name||OFFICES[0].name,
     comment,
+    ..._detRead(),
   };
 
   const arr=getSaved();
@@ -5304,6 +5544,19 @@ function saveNewAddress(){
   }
 }
 
+// Детали для курьера живут в форме только в бете; в обычной версии блок скрыт,
+// а поля остаются пустыми и в адрес не попадают.
+const _DET_IN={entrance:'addr-entrance-in',floor:'addr-floor-in',apt:'addr-apt-in',intercom:'addr-intercom-in'};
+function _detFill(a){
+  const wrap=el('addr-det-wrap');if(wrap)wrap.style.display=BETA_ADDR?'block':'none';
+  for(const k in _DET_IN){const i=el(_DET_IN[k]);if(i)i.value=(a&&a[k])||'';}
+}
+function _detRead(){
+  const out={};
+  for(const k in _DET_IN){const i=el(_DET_IN[k]);out[k]=BETA_ADDR&&i?i.value.trim().slice(0,40):'';}
+  return out;
+}
+
 function resetAddrForm(){
   curMethod='gps';selTypeGps=null;selTypeMan=null;selArea=null;locInfo=null;editingAddrIdx=null;
   _mapGeoResult=null;
@@ -5312,6 +5565,7 @@ function resetAddrForm(){
   const gpsStatus=el('gps-status');if(gpsStatus)gpsStatus.className='gps-status';
   const nameIn=el('addr-name-in');if(nameIn)nameIn.value='';
   const commentIn=el('addr-comment-in');if(commentIn)commentIn.value='';
+  _detFill(null);
   const ae=el('addr-form-err');if(ae){ae.classList.remove('on');ae.textContent='';}
   const saveBtn=el('addr-save-btn-el');if(saveBtn)saveBtn.textContent=lang==='ru'?'Сохранить адрес':'Save address';
   const saveTitle=el('addr-save-title-txt');if(saveTitle)saveTitle.textContent=t('saveSheetTitle');
@@ -5403,8 +5657,11 @@ function showAddrSaveSheet(){
     const commentIn=el('addr-comment-in');if(commentIn)commentIn.value='';
     const saveBtn=el('addr-save-btn-el');if(saveBtn)saveBtn.textContent=lang==='ru'?'Сохранить адрес':'Save address';
     const saveTitle=el('addr-save-title-txt');if(saveTitle)saveTitle.textContent=t('saveSheetTitle');
+    _detFill(null);           // новый адрес — поля пустые
   }
   _sheetFromMapEdit=false;
+  // Возврат с карты значения не трогает, но блок должен быть на месте в любом случае.
+  const _dw=el('addr-det-wrap');if(_dw)_dw.style.display=BETA_ADDR?'block':'none';
   const ae=el('addr-form-err');if(ae){ae.classList.remove('on');ae.textContent='';}
   el('addr-save-overlay').classList.add('show');
   setTimeout(()=>el('addr-name-in')?.focus(),400);
@@ -6860,7 +7117,11 @@ function placeOrder(){
     action:'order',order_id:oid,items,subtotal:sub,tip,total,currency:'AED',
     phone:'+'+digits,phone_extra:(el('phone-extra-in')?.value||'').replace(/\D/g,''),
     address:addr.address,address_label:addr.label,
-    comment:[addr.comment,localStorage.getItem('ambar_delivery_note')].filter(Boolean).join(' | ')||'',
+    // Детали для курьера идут и отдельными полями, и строкой в комментарии:
+    // оператор с водителем читают именно комментарий, и ждать, пока их панели
+    // научатся новым полям, значит выкатить адрес, который они не увидят.
+    addr_details:{entrance:addr.entrance||'',floor:addr.floor||'',apt:addr.apt||'',intercom:addr.intercom||''},
+    comment:[_detLine(addr),addr.comment,localStorage.getItem('ambar_delivery_note')].filter(Boolean).join(' | ')||'',
     gmap_link:addr.gmap_link||'',is_gps:addr.isGps||false,
     location:{lat:addr.lat||0,lon:addr.lon||0},
     office_id:addr.office_id||'',

@@ -70,6 +70,19 @@ def _crypto_enabled_for(uid: int) -> bool:
         return True
     return uid in _CRYPTO_ALLOWLIST or uid == _FOUNDER_ID
 
+# ── Адресная книга: бета-доступ ───────────────────────────────────────────────
+# Новая страница адресов (история с сервера, детали для курьера, «заказать
+# сюда») выкатывается по одному аккаунту, а не всем сразу: страница живёт на
+# пути к заказу, и ошибка здесь стоит дороже, чем в любом другом месте.
+# Как и крипта, это ДИСПЛЕЙНЫЙ флаг — сами ручки адресов проверяют подпись
+# initData и никогда не верят этому полю.
+_BETA_ADDR_IDS = _parse_id_set("AMBAR_BETA_IDS")
+BETA_ADDRESSES_FOR_ALL = os.getenv("BETA_ADDRESSES_FOR_ALL", "").strip().lower() in ("1", "true", "yes", "on")
+
+
+def _beta_addr_for(uid: int) -> bool:
+    return BETA_ADDRESSES_FOR_ALL or uid in _BETA_ADDR_IDS
+
 logging.basicConfig(format="%(asctime)s | %(levelname)s | %(message)s", level=logging.INFO)
 log = logging.getLogger(__name__)
 
@@ -704,12 +717,18 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
         # Адрес заказа — в книгу адресов клиента. Раньше он жил только в памяти
         # его телефона: сменил устройство — и адресов будто не было никогда.
         try:
+            _det = src.get("addr_details") or {}
             await db.save_address(uid, {
                 "address": address,
                 "label": (src.get("address_label") or "").strip()[:80],
                 "gmap_link": gmap_link, "is_gps": is_gps,
                 "lat": (loc or {}).get("lat", 0), "lon": (loc or {}).get("lon", 0),
                 "office_id": office_id, "office_name": office_nm,
+                # Вход, этаж, квартира, домофон — вместе с адресом: если человек
+                # потеряет книгу адресов вместе с телефоном, восстановится и это.
+                **{k: str(_det.get(k) or "").strip()[:40]
+                   for k in ("entrance", "floor", "apt", "intercom")
+                   if isinstance(_det, dict) and str(_det.get(k) or "").strip()},
             })
         except Exception as e:
             log.warning(f"[order] адрес не сохранён в профиль {uid}: {e}")
@@ -1720,6 +1739,8 @@ async def handle_me(request: web.Request) -> web.Response:
         "verify_pending": verify_pending,
         # Staged-rollout display gate for crypto payments (see _crypto_enabled_for).
         "crypto_enabled": _crypto_enabled_for(uid),
+        # Новая страница адресов — по одному аккаунту (см. _beta_addr_for).
+        "beta_addr": _beta_addr_for(uid),
         # Whether the server has a real receive wallet + watcher (address+key set).
         # The frontend uses this to switch off its client-side demo automatically,
         # so there is no way to half-activate (demo stays on until real mode is on).
@@ -2590,6 +2611,182 @@ async def handle_points_history(request: web.Request) -> web.Response:
     return web.json_response({"items": items}, headers=CORS_HEADERS)
 
 
+
+# ── Адресная книга клиента ────────────────────────────────────────────────────
+# Сохранённые адреса до сих пор жили только в памяти телефона. Телеграм-десктоп
+# иногда чистит хранилище между сессиями — и у постоянного клиента страница
+# открывалась пустой, хотя в его профиле лежали все адреса, на которые мы к
+# нему ездили. Здесь две половины наконец соединяются: список синхронизируется
+# с профилем, а история заказов подсказывает то, что человек не сохранял.
+#
+# Личность — всегда из подписанного initData. Ни один адрес не читается и не
+# пишется по uid из запроса: чужая адресная книга — это домашний адрес чужого
+# человека, и цена ошибки здесь не «неверная цифра на экране».
+
+# Строковые поля адреса и их потолки. Всё, чего нет в списке, до базы не
+# доезжает: клиент шлёт свой объект целиком, и складывать в профиль что попало
+# мы не будем.
+_ADDR_FIELDS = {
+    "label": 80, "address": 200, "comment": 300, "street": 200,
+    "gmap_link": 300, "office_id": 40, "office_name": 80,
+    # Детали для курьера. Телефон клиента водителю не передаётся принципиально,
+    # поэтому адрес обязан быть самодостаточным: вход, этаж, квартира, домофон.
+    "entrance": 40, "floor": 20, "apt": 20, "intercom": 40, "howto": 40,
+}
+
+
+def _clean_addr(a) -> dict | None:
+    """Один адрес от клиента → безопасная запись для профиля."""
+    if not isinstance(a, dict):
+        return None
+    out = {}
+    for k, cap in _ADDR_FIELDS.items():
+        v = a.get(k)
+        if v is None:
+            continue
+        v = str(v).strip()[:cap]
+        if v:
+            out[k] = v
+    if not (out.get("address") or out.get("label")):
+        return None
+    for k in ("lat", "lon"):
+        try:
+            f = float(a.get(k) or 0)
+        except (TypeError, ValueError):
+            f = 0.0
+        out[k] = round(f, 6) if -90 <= f <= 180 else 0.0
+    out["isGps"] = bool(a.get("isGps") or a.get("is_gps"))
+    return out
+
+
+# Среднее время доставки по офисам. Считаем раз в десять минут и держим в
+# памяти: цифра меняется медленно, а страницу адресов открывают часто.
+_ETA_CACHE: dict = {"at": 0.0, "val": {}}
+_ETA_TTL = 600.0
+
+
+async def _delivery_eta() -> dict:
+    """{office_id: минуты} по доставленным заказам за 30 дней.
+
+    Медиана, а не среднее: один заказ, забытый в статусе «в пути» до утра,
+    иначе утащил бы за собой всю цифру. Меньше пяти поездок — цифры нет: врать
+    человеку про время доставки хуже, чем промолчать."""
+    now = time.time()
+    if now - _ETA_CACHE["at"] < _ETA_TTL:
+        return _ETA_CACHE["val"]
+    out: dict = {}
+    try:
+        dbx = db._db_or_none()
+        if dbx is not None:
+            since = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+            buckets: dict = {}
+            cur = dbx.orders.find(
+                {"status": "delivered", "timestamp": {"$gte": since},
+                 "delivered_at": {"$exists": True}, "test": {"$ne": True}},
+                {"_id": 0, "timestamp": 1, "delivered_at": 1, "office_id": 1})
+            async for o in cur:
+                try:
+                    t0 = datetime.fromisoformat(str(o["timestamp"]).replace("Z", "+00:00"))
+                    t1 = datetime.fromisoformat(str(o["delivered_at"]).replace("Z", "+00:00"))
+                except Exception:
+                    continue
+                mins = (t1 - t0).total_seconds() / 60.0
+                if not (5 <= mins <= 240):        # ночная забытая карточка — не время доставки
+                    continue
+                for key in ("_all", str(o.get("office_id") or "")):
+                    if key:
+                        buckets.setdefault(key, []).append(mins)
+            for key, arr in buckets.items():
+                if len(arr) < 5:
+                    continue
+                arr.sort()
+                med = arr[len(arr) // 2] if len(arr) % 2 else (arr[len(arr) // 2 - 1] + arr[len(arr) // 2]) / 2
+                out[key] = int(round(med / 5.0) * 5)     # до пяти минут — точнее незачем
+    except Exception as e:
+        log.warning(f"[addr] eta failed: {e}")
+    _ETA_CACHE["at"], _ETA_CACHE["val"] = now, out
+    return out
+
+
+def _addr_key(a: dict) -> str:
+    return (a.get("address") or a.get("label") or "").strip().lower()
+
+
+async def handle_addresses(request: web.Request) -> web.Response:
+    """Адресная книга: сохранённые адреса, история заказов и время доставки."""
+    if request.method == "OPTIONS":
+        return web.Response(status=200, headers=CORS_HEADERS)
+    auth = request.headers.get("Authorization", "")
+    user = validate_init_data(auth[4:]) if auth.startswith("tma ") else None
+    if not user or not user.get("id"):
+        return web.json_response({"error": "unauthorized"}, status=401, headers=CORS_HEADERS)
+    uid = int(user["id"])
+
+    try:
+        u = await db.get_user(uid) or {}
+    except Exception as e:
+        log.warning(f"[addr] get_user {uid}: {e}")
+        u = {}
+
+    saved = [x for x in (_clean_addr(a) for a in (u.get("saved_addresses") or [])) if x]
+    seen = {_addr_key(a) for a in saved}
+
+    # История: адреса, на которые мы реально ездили. Показываем только то, чего
+    # в сохранённых ещё нет, — иначе человек видит один и тот же адрес дважды.
+    history = []
+    for a in (u.get("addresses") or []):
+        row = _clean_addr(a)
+        if not row or _addr_key(row) in seen:
+            continue
+        seen.add(_addr_key(row))
+        row["orders"] = int(a.get("orders") or 0)
+        row["used_at"] = str(a.get("used_at") or "")
+        row["first_at"] = str(a.get("first_at") or "")
+        history.append(row)
+
+    return web.json_response({"saved": saved, "history": history,
+                              "eta": await _delivery_eta()},
+                             headers=CORS_HEADERS)
+
+
+async def handle_addresses_save(request: web.Request) -> web.Response:
+    """Сохранённые адреса телефона → в профиль.
+
+    Клиент присылает список целиком: он и есть источник правды на устройстве,
+    а сервер держит копию, чтобы она пережила смену телефона. Ответ отдаёт
+    почищенный список — приложение кладёт себе ровно то, что легло в базу."""
+    if request.method == "OPTIONS":
+        return web.Response(status=200, headers=CORS_HEADERS)
+    auth = request.headers.get("Authorization", "")
+    user = validate_init_data(auth[4:]) if auth.startswith("tma ") else None
+    if not user or not user.get("id"):
+        return web.json_response({"error": "unauthorized"}, status=401, headers=CORS_HEADERS)
+    uid = int(user["id"])
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    raw = body.get("saved")
+    if not isinstance(raw, list):
+        return web.json_response({"error": "bad_request"}, status=400, headers=CORS_HEADERS)
+    saved, seen = [], set()
+    for a in raw[:10]:
+        row = _clean_addr(a)
+        if not row:
+            continue
+        k = _addr_key(row)
+        if k in seen:
+            continue
+        seen.add(k)
+        saved.append(row)
+    try:
+        await db.set_user_field(uid, saved_addresses=saved)
+    except Exception as e:
+        log.error(f"[addr] сохранение книги {uid}: {e}")
+        return web.json_response({"error": "save_failed"}, status=500, headers=CORS_HEADERS)
+    log.info(f"[addr] {uid}: книга адресов синхронизирована ({len(saved)})")
+    return web.json_response({"ok": True, "saved": saved}, headers=CORS_HEADERS)
+
 # ── Static file handler ───────────────────────────────────────────────────────
 # STATIC_DIR is the repo root — the same directory that holds .env, .git and
 # every .py module. A traversal check alone is NOT enough here: it only stops
@@ -2723,6 +2920,10 @@ def main():
     app.router.add_route("OPTIONS", "/api/support/messages",   handle_support_messages)
     app.router.add_get(            "/api/support/messages",    handle_support_messages)
     app.router.add_route("OPTIONS", "/api/points-history",     handle_points_history)
+    app.router.add_route("OPTIONS", "/api/addresses",          handle_addresses)
+    app.router.add_get(            "/api/addresses",          handle_addresses)
+    app.router.add_route("OPTIONS", "/api/addresses/save",     handle_addresses_save)
+    app.router.add_post(           "/api/addresses/save",     handle_addresses_save)
     app.router.add_get(            "/api/points-history",      handle_points_history)
     # Owner dashboard routes (/api/owner/*). Kept in a separate module so the
     # surface is easy to find and extend without touching customer routes.

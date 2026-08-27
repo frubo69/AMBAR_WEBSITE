@@ -27,7 +27,10 @@ for VAR in DRIVER_WEBAPP_URL OPERATOR_WEBAPP_URL OWNER_WEBAPP_URL; do
   HOST=$(echo "$URL" | sed -E 's#^https?://([^/]+).*#\1#')
   echo "── $VAR → $HOST ──"
 
-  CODE=$(curl -s -o /dev/null -w "%{http_code}" \
+  # --http1.1 обязателен: по HTTP/2 механизма апгрейда не существует вовсе,
+  # и curl получит 400 при полностью исправном сервере. Телефон открывает
+  # вебсокет по 1.1, поэтому и проверять надо по 1.1.
+  CODE=$(curl -s --http1.1 -o /dev/null -w "%{http_code}" \
     -H "Connection: Upgrade" -H "Upgrade: websocket" \
     -H "Sec-WebSocket-Version: 13" -H "Sec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==" \
     --resolve "$HOST:443:127.0.0.1" "https://$HOST/api/call/ws" 2>/dev/null)

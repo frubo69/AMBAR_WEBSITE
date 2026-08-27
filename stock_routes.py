@@ -1390,6 +1390,12 @@ def _wo_row(r: dict, cat: dict) -> dict:
         "decided_at": _iso_of(r.get("decided_at")) if r.get("decided_at") else "",
         "decided_by_name": r.get("decided_by_name", ""),
         "decided_note": r.get("decided_note", ""),
+        # Удержание: с кого и сколько. Пусто — списали за счёт компании.
+        "comp": ({"who": (r.get("comp") or {}).get("who", ""),
+                  "amount": int((r.get("comp") or {}).get("amount") or 0),
+                  "note": (r.get("comp") or {}).get("note", ""),
+                  "by_name": (r.get("comp") or {}).get("by_name", "")}
+                 if (r.get("comp") or {}).get("amount") else None),
     }
 
 
@@ -1410,7 +1416,7 @@ async def handle_writeoffs(request):
     rows = await db.writeoff_list(since=since, limit=400)
     cat = _catalog()
     pend = [_wo_row(r, cat) for r in await db.writeoff_pending(limit=200)]
-    out, by_kind, by_driver = [], {}, {}
+    out, by_kind, by_driver, by_person = [], {}, {}, {}
     for r in rows:
         if (r.get("state") or "ok") == "pending":
             continue        # висит в очереди сверху, второй раз не показываем
@@ -1427,6 +1433,12 @@ async def handle_writeoffs(request):
         d = by_driver.setdefault(v["by"] or "—", {"driver": v["by"] or "—",
                                                   "qty": 0, "aed": 0.0, "n": 0})
         d["qty"] += qty; d["aed"] = round(d["aed"] + aed, 2); d["n"] += 1
+        # Удержания считаем по тому, С КОГО удержали, а не по тому, кто списал:
+        # разбить может один, а отвечать за это — другой.
+        c = v.get("comp")
+        if c:
+            h = by_person.setdefault(c["who"], {"who": c["who"], "amount": 0, "n": 0})
+            h["amount"] += int(c["amount"] or 0); h["n"] += 1
     ok_rows = [x for x in out if x["state"] != "no"]
     return web.json_response({
         "days": days, "rows": out, "pending": pend,
@@ -1436,6 +1448,8 @@ async def handle_writeoffs(request):
         "total_aed": round(sum(x["aed"] for x in ok_rows), 2),
         "by_kind": sorted(by_kind.values(), key=lambda x: -x["qty"]),
         "by_driver": sorted(by_driver.values(), key=lambda x: -x["qty"]),
+        "by_person": sorted(by_person.values(), key=lambda x: -x["amount"]),
+        "comp_total": sum(v["amount"] for v in by_person.values()),
     }, headers=CORS_HEADERS)
 
 
@@ -1479,6 +1493,86 @@ async def handle_writeoff_decide(request):
     await _writeoff_after(doc, ok, who)
     return web.json_response({"ok": True, "id": wid, "state": doc.get("state")},
                              headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_writeoff_compensate(request):
+    """Удержать сумму списания с виновного — или снять удержание.
+
+    body: {who: str, amount: int, note?: str, as?: str}. Пустой who или нулевая
+    сумма снимают удержание.
+
+    Отдельным действием, а не частью согласования: решение «списываем» и
+    решение «кто платит» принимают в разное время и иногда разные люди.
+    Владелец жмёт «согласовать» в боте под фотографией, ещё не зная, чья это
+    смена; виноватого выясняют позже. Свяжи их в один шаг — и согласование
+    встанет до выяснения, а бутылки всё это время будут числиться на полке.
+
+    Со склада удержание не меняет ничего: бутылка разбита в любом случае. Оно
+    меняет только то, кто за неё заплатит."""
+    wid = (request.match_info.get("wid") or "").strip()
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    who = str(body.get("who") or "").strip()[:60]
+    note = str(body.get("note") or "").strip()[:200]
+    by_name = str(body.get("as") or "").strip()[:60]
+    try:
+        amount = max(0, int(round(float(body.get("amount") or 0))))
+    except (TypeError, ValueError):
+        amount = 0
+    doc = await db.writeoff_compensate(wid, who, amount, note,
+                                       request.get("owner_id") or 0, by_name)
+    if not doc:
+        cur = await db.writeoff_get(wid)
+        if not cur:
+            return web.json_response({"error": "not_found"}, status=404,
+                                     headers=CORS_HEADERS)
+        # Удерживать по несогласованному нечего — и это не ошибка вызывающего,
+        # а состояние, которое он мог не видеть: решение мог принять второй
+        # владелец секунду назад.
+        return web.json_response({"error": "not_approved",
+                                  "state": cur.get("state") or "ok"},
+                                 status=409, headers=CORS_HEADERS)
+    log.info(f"[writeoff] {wid}: удержание "
+             f"{amount} с {who or '—'} ({by_name or request.get('owner_id')})")
+    try:
+        await _writeoff_comp_tell(doc)
+    except Exception as e:
+        log.warning(f"[writeoff] про удержание не сообщили: {e}")
+    return web.json_response({"ok": True, "id": wid,
+                              "comp": doc.get("comp") or None},
+                             headers=CORS_HEADERS)
+
+
+async def _writeoff_comp_tell(doc: dict):
+    """Сказать водителю, что с него удержали — или что удержание сняли.
+
+    Молча вычесть из зарплаты значит дать человеку узнать о решении в день
+    выплаты и поспорить тогда, когда доказывать уже нечем. Сообщение приходит
+    в тот же день и тем же путём, что и решение по списанию."""
+    import os as _os
+    import config_staff as _staff
+    from api_server import tg_send
+    comp = doc.get("comp") or {}
+    # Снятое удержание адресуем тому, с кого его снимали, — имени в документе
+    # больше нет, поэтому берём водителя, который списывал.
+    who = (comp.get("who") or doc.get("by") or "").strip()
+    tid = _staff.DRIVER_IDS.get(who)
+    token = _os.getenv("DRIVER_BOT_TOKEN", "")
+    if not tid or not token:
+        return
+    name = doc.get("name") or doc.get("item") or "товар"
+    qty = int(doc.get("qty") or 0)
+    kind = doc.get("kind") or "списание"
+    if comp.get("amount"):
+        text = (f"С вас удержано {int(comp['amount'])} AED\n"
+                f"{name} × {qty} · {kind}"
+                + (f"\n{comp.get('note')}" if comp.get("note") else ""))
+    else:
+        text = f"Удержание снято\n{name} × {qty} · {kind}"
+    await tg_send(token, tid, text, parse_mode=None)
 
 
 async def _writeoff_after(doc: dict, ok: bool, by_name: str = ""):
@@ -1559,6 +1653,7 @@ def setup(app):
         ("/api/owner/stock/writeoffs",  handle_writeoffs, "GET"),
         ("/api/owner/stock/shifts",     handle_shift_log, "GET"),
         ("/api/owner/stock/writeoff/{wid}/photo", handle_writeoff_photo, "GET"),
+        ("/api/owner/stock/writeoff/{wid}/compensate", handle_writeoff_compensate, "POST"),
         ("/api/owner/stock/writeoff/{wid}/decide", handle_writeoff_decide, "POST"),
         ("/api/owner/stock/transfer/{tid}", handle_transfer_delete, "DELETE"),
     )

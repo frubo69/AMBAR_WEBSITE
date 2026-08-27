@@ -2293,6 +2293,37 @@ async def writeoff_decide(wid: str, ok: bool, by: int, by_name: str = "",
         projection={"img": 0}, return_document=ReturnDocument.AFTER)
 
 
+async def writeoff_compensate(wid: str, who: str, amount: int, note: str,
+                              by: int, by_name: str = "") -> dict | None:
+    """Назначить удержание по списанию — или снять его.
+
+    Удержание живёт на самом списании, а не отдельной записью: иначе одно и то
+    же событие пришлось бы держать в двух местах и следить, чтобы они не
+    разошлись. Отсюда же берётся и сумма удержаний по человеку — складыванием.
+
+    Удерживать можно только по согласованному: у ждущего решения ещё нет факта,
+    а отклонённое и так остаётся недостачей на том, у кого пропало — списывать
+    с него второй раз значит взять дважды за одно.
+
+    Пустой человек или ноль — это снятие удержания: передумать владелец имеет
+    право, и отдельная кнопка для этого не нужна."""
+    db = _db_or_none()
+    if db is None or not wid: return None
+    from pymongo import ReturnDocument
+    amount = max(0, int(amount or 0))
+    who = str(who or "").strip()[:60]
+    if not who or not amount:
+        upd = {"$unset": {"comp": ""}}
+    else:
+        upd = {"$set": {"comp": {
+            "who": who, "amount": amount, "note": str(note or "")[:200],
+            "at": datetime.now(timezone.utc),
+            "by": int(by or 0), "by_name": str(by_name or "")[:60]}}}
+    return await db.writeoffs.find_one_and_update(
+        {"_id": wid, "state": "ok"}, upd,
+        projection={"img": 0}, return_document=ReturnDocument.AFTER)
+
+
 async def writeoff_pending(limit: int = 100) -> list:
     """Списания, ждущие решения — старые сверху: первым разбирают то, что
     висит дольше всех."""

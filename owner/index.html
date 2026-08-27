@@ -2640,6 +2640,101 @@ button.path:active{transform:scale(.995)}
   font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
 .nm-row.fix .nm-v{color:var(--gold2)}
 
+/* ── Расходы смены: вкладки по видам ──────────────────────────────────────
+   Пять вкладок в ряд: «Расходы» отвечает за людей, остальные — за товар,
+   который не доехал до кассы. Ряд прокручивается: на узком телефоне пятое
+   слово всё равно не поместится, а резать его многоточием хуже, чем дать
+   дотянуться пальцем. */
+.sh-tabs{display:flex;gap:6px;overflow-x:auto;margin:2px 0 12px;padding-bottom:2px;
+  scrollbar-width:none}
+.sh-tabs::-webkit-scrollbar{display:none}
+.sh-t{flex-shrink:0;display:inline-flex;align-items:center;gap:6px;padding:8px 14px;
+  border-radius:999px;border:1px solid var(--border2);background:var(--card);
+  color:var(--muted);font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:600;
+  cursor:pointer;transition:.15s var(--e1);white-space:nowrap}
+.sh-t.on{background:var(--gold-soft);border-color:rgba(201,169,110,.4);color:var(--gold2)}
+.sh-t:active{transform:scale(.97)}
+/* Счётчик ждущих решения — на самой вкладке: иначе о том, что в «Бое» третий
+   день висит заявка, узнаёшь, только если туда заглянуть. */
+.sh-n{display:none;min-width:17px;height:17px;padding:0 5px;border-radius:999px;
+  align-items:center;justify-content:center;background:var(--warn);color:#1a1408;
+  font-style:normal;font-size:10px;font-weight:800;line-height:1}
+.sh-n.has{display:inline-flex}
+
+/* Удержания в «Расходах»: блок отдельный, потому что это не трата, а возврат.
+   Свёрнут по умолчанию — сумма отвечает «сколько», строки внутри «за что». */
+.exp-held{margin:12px 0 4px;padding:13px 14px;border-radius:15px;
+  background:rgba(243,180,74,.06);border:1px solid rgba(243,180,74,.22)}
+.exp-held-h{display:flex;align-items:baseline;gap:10px;margin-bottom:9px}
+.exp-held-t{flex:1;font-size:10px;font-weight:700;letter-spacing:1.1px;
+  text-transform:uppercase;color:var(--warn-t)}
+.exp-held-v{font-family:'DM Sans',sans-serif;font-size:19px;font-weight:700;
+  color:var(--warn-t);font-variant-numeric:tabular-nums}
+.exp-held-v i{font-style:normal;font-size:10px;margin-left:4px;opacity:.7}
+.exp-held-r{display:flex;align-items:baseline;gap:9px;padding:7px 0;cursor:pointer;
+  border-top:1px solid rgba(243,180,74,.14)}
+.exp-held-n{font-size:13.5px;font-weight:600}
+.exp-held-s{flex:1;font-size:11px;color:var(--muted)}
+.exp-held-a{font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;
+  color:var(--warn-t);font-variant-numeric:tabular-nums}
+.exp-held-d{display:none;padding:2px 0 6px}
+.exp-held-d.open{display:block}
+.exp-held-i{display:flex;align-items:baseline;gap:8px;font-size:11.5px;
+  color:var(--sub);padding:3px 0}
+.exp-held-i span{flex:1;min-width:0}
+.exp-held-i b{font-variant-numeric:tabular-nums;color:var(--warn-t)}
+.exp-held-f{font-size:10.5px;color:var(--muted);line-height:1.5;margin-top:8px;
+  padding-top:8px;border-top:1px solid rgba(243,180,74,.14)}
+
+/* ── Удержание ────────────────────────────────────────────────────────────
+   Три ответа в одном окне: с кого, сколько и за что. Меньше нельзя — сумма
+   без человека это удержание из воздуха, а человек без суммы ничего не
+   значит. */
+.wo-c-ov{position:fixed;inset:0;z-index:160;display:none;align-items:flex-end;
+  justify-content:center;background:rgba(0,0,6,.66);backdrop-filter:blur(3px)}
+.wo-c-ov.show{display:flex}
+.wo-c-sheet{width:100%;max-width:520px;max-height:88vh;overflow-y:auto;
+  padding:18px 18px calc(18px + var(--safe-bottom));
+  border-radius:22px 22px 0 0;background:var(--bg2);border:1px solid var(--border2);
+  border-bottom:0;animation:woCIn .2s var(--e1)}
+@keyframes woCIn{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
+.wo-c-h{margin-bottom:14px}
+.wo-c-t{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700}
+.wo-c-s{font-size:12px;color:var(--muted);margin-top:4px;line-height:1.45}
+.wo-c-l{font-size:10px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;
+  color:var(--muted);margin:14px 0 7px}
+.wo-c-l i{font-style:normal;letter-spacing:.4px;text-transform:none;opacity:.7}
+.wo-c-who{display:flex;flex-wrap:wrap;gap:6px}
+.wo-c-p{padding:8px 13px;border-radius:11px;border:1px solid var(--border2);
+  background:var(--card);color:var(--sub);font-family:inherit;font-size:13px;
+  font-weight:600;cursor:pointer;transition:.14s var(--e1)}
+.wo-c-p.on{background:var(--gold-soft);border-color:rgba(201,169,110,.45);color:var(--gold2)}
+.wo-c-p:active{transform:scale(.97)}
+.wo-c-none{font-size:12.5px;color:var(--muted)}
+.wo-c-amt{display:flex;align-items:center;gap:9px}
+.wo-c-amt input{flex:1;min-width:0;height:46px;padding:0 14px;border-radius:13px;
+  border:1px solid var(--border2);background:var(--card);color:var(--text);
+  font-family:'DM Sans',sans-serif;font-size:20px;font-weight:700;
+  font-variant-numeric:tabular-nums}
+.wo-c-amt span{font-size:12px;font-weight:600;color:var(--muted);letter-spacing:1px}
+.wo-c-note{width:100%;height:44px;padding:0 14px;border-radius:13px;
+  border:1px solid var(--border2);background:var(--card);color:var(--text);
+  font-family:inherit;font-size:13.5px}
+.wo-c-acts{display:flex;gap:8px;margin-top:20px}
+.wo-c-acts button{flex:1;height:48px;border-radius:14px;border:1px solid var(--border2);
+  background:var(--card);color:var(--sub);font-family:inherit;font-size:14px;
+  font-weight:700;cursor:pointer}
+.wo-c-acts .wo-c-go{flex:1.4;border:0;background:linear-gradient(135deg,var(--gold),var(--gold2));
+  color:#1a1408}
+.wo-c-acts .wo-c-off{color:var(--dn);border-color:rgba(224,85,85,.3)}
+.wo-c-acts button:active{transform:scale(.98)}
+.wo-c-acts button:disabled{opacity:.5}
+/* Строка удержания в списке — жёлтым: это не убыток компании, а долг человека,
+   и цветом он отличается от того и от другого. */
+.wo-st.held{color:var(--warn-t);background:rgba(243,180,74,.1);
+  border:1px solid rgba(243,180,74,.28);cursor:pointer}
+.wo-act.hold{color:var(--warn-t);border-color:rgba(243,180,74,.3)}
+
 /* ── Списания ────────────────────────────────────────────────────────────
    Сверху деньги и причины — ответ на «много ли». Ниже строки со снимками —
    ответ на «что именно». */
@@ -4971,6 +5066,11 @@ button.path:active{transform:scale(.995)}
 </style>
 
 <!-- ============ DATE RANGE PICKER ============ -->
+<!-- Удержание за списание: кто платит за разбитое. Отдельным окном, а не
+     строкой в списке, потому что решение денежное и требует трёх ответов —
+     с кого, сколько и за что. -->
+<div class="wo-c-ov" id="woCompOv" onclick="if(event.target===this)woCompClose()"></div>
+
 <div class="cmd-overlay" id="dateOverlay">
   <div class="cmd-sheet dp-sheet">
     <!-- Зона 1. Что выбрано. Это и есть заголовок окна — отдельная строка
@@ -9588,7 +9688,7 @@ function stkResult(res){
 // короткой сводкой по каждому, а работа — внутри раздела.
 
 const ACC = [
-  {id:'expenses', t:'Расходы водителей', s:'питание и разовые траты',
+  {id:'expenses', t:'Расходы смены',     s:'питание, разовые, бой и брак',
    ico:'<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'},
   {id:'stock',    t:'Ревизия',           s:'пересчёт, перемещения, история',
    ico:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>'},
@@ -10223,16 +10323,72 @@ function _accClose(){
 // разной длины окно. Переключатель наверху, а не отдельная плитка на панели.
 let EXP_TAB = 'day';
 
+// Расходы смены — всё, что смена стоила сверх товара: питание и разовые
+// траты водителей плюс то, что не доехало до кассы, — бой, брак, утеря,
+// просрочка. Раньше это лежало в двух разных разделах, и вопрос «во сколько
+// обошёлся день» приходилось складывать в голове из двух экранов.
+//
+// Вкладки — по виду, а не по сроку: «сколько боя за месяц» и «сколько питания
+// сегодня» это разные вопросы, и переключатель дня живёт внутри той вкладки,
+// где он имеет смысл.
+const SH_TABS = [
+  {id:'exp',       t:'Расходы'},
+  {id:'брак',      t:'Брак'},
+  {id:'бой',       t:'Бой'},
+  {id:'потеря',    t:'Утеря'},
+  {id:'просрочка', t:'Просрочка'},
+];
+let SH_TAB = 'exp';
+
 async function accExpenses(){
-  _setText('accTitle', 'Расходы водителей');
+  _setText('accTitle', 'Расходы смены');
   _setText('accSub', 'загрузка…');
   document.getElementById('accMid').innerHTML = `
+    <div class="sh-tabs" id="shTabs">${SH_TABS.map(x => `
+      <button class="sh-t ${SH_TAB === x.id ? 'on' : ''}" data-t="${x.id}"
+              onclick="shTab('${x.id}')">${x.t}<i class="sh-n" data-n="${x.id}"></i></button>`).join('')}</div>
+    <div id="expBody"><div class="exp-empty">Загрузка…</div></div>`;
+  // Счётчики ждущих решения — на самих вкладках: иначе о том, что в «Бое»
+  // третий день висит заявка, узнаёшь, только если туда заглянуть.
+  shCounts();
+  await shTab(SH_TAB, true);
+}
+
+// Сколько ждёт решения по каждому виду. Данные берём из того же ответа, что и
+// сам список: отдельный запрос ради пяти чисел — лишний круг.
+async function shCounts(){
+  try{
+    if(!ACC_WO) ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs', {params:{days:30}});
+  }catch(e){ return; }
+  const n = {};
+  (ACC_WO.pending || []).forEach(r => { n[r.kind] = (n[r.kind] || 0) + 1; });
+  document.querySelectorAll('#shTabs .sh-n').forEach(e => {
+    const v = n[e.dataset.n] || 0;
+    e.textContent = v || '';
+    e.classList.toggle('has', !!v);
+  });
+}
+
+async function shTab(t, first){
+  SH_TAB = t;
+  document.querySelectorAll('#shTabs .sh-t').forEach(b =>
+    b.classList.toggle('on', b.dataset.t === t));
+  if(!first) try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  if(t === 'exp'){ await accExpShell(); return; }
+  await accWoKind(t);
+}
+
+// Внутри «Расходов» переключатель дня остаётся: это единственная вкладка, где
+// «сегодня» и «за месяц» отвечают на разные вопросы.
+async function accExpShell(){
+  const body = document.getElementById('expBody'); if(!body) return;
+  body.innerHTML = `
     <div class="periods" id="expTabs" style="margin:2px 0 12px">
       <div class="period-pill"></div>
       <button class="${EXP_TAB === 'day' ? 'on' : ''}" onclick="expTab('day')">День</button>
       <button class="${EXP_TAB === 'period' ? 'on' : ''}" onclick="expTab('period')">30 дней</button>
     </div>
-    <div id="expBody"><div class="exp-empty">Загрузка…</div></div>`;
+    <div id="expInner"><div class="exp-empty">Загрузка…</div></div>`;
   const g = document.getElementById('expTabs'); if(g) requestAnimationFrame(()=>movePill(g));
   await (EXP_TAB === 'day' ? accExpDay() : accExpPeriod());
 }
@@ -10248,7 +10404,7 @@ function expTab(t){
 
 async function accExpDay(){
   await loadExpenses(EXP.day);
-  const d = EXP.data, body = document.getElementById('expBody');
+  const d = EXP.data, body = document.getElementById('expInner');
   if(!body) return;
   if(!d){ body.innerHTML = '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
   _setText('accSub', d.day === d.today ? `сегодня · ${d.day}` : d.day);
@@ -10257,7 +10413,7 @@ async function accExpDay(){
 }
 
 async function accExpPeriod(){
-  const body = document.getElementById('expBody'); if(!body) return;
+  const body = document.getElementById('expInner'); if(!body) return;
   let d;
   try{ d = await ownerApi.ownerFetch('/api/owner/expenses/period', {params:{days:30}}); }
   catch(e){ body.innerHTML =
@@ -10276,6 +10432,7 @@ async function accExpPeriod(){
         </span>
       </div>
     </div>
+    ${expHeld(d)}
     ${d.by_driver.length ? '<div class="exp-grp">По людям</div>' +
       d.by_driver.map(p => `<div class="acc-line">
         <span class="acc-line-n">${escS(p.driver)}</span>
@@ -12319,6 +12476,38 @@ async function loadExpenses(day){
   renderExpenses();
 }
 
+// Удержания — отдельным блоком, а не строкой в сумме расходов. Удержание это
+// не расход компании, а его противоположность: деньги вернутся из зарплаты.
+// Сложи их в одну цифру — и бой будет уменьшать расход, которого он не
+// уменьшал, а просто переложил с компании на человека.
+function expHeld(d){
+  const held = (d || {}).held || [];
+  if(!held.length) return '';
+  return `<div class="exp-held">
+    <div class="exp-held-h">
+      <span class="exp-held-t">Удержано с людей</span>
+      <span class="exp-held-v">${fmt(d.held_total || 0)}<i>AED</i></span>
+    </div>
+    ${held.map(h => `<div class="exp-held-r" onclick="expHeldOpen('${escS(h.who)}')">
+      <span class="exp-held-n">${escS(h.who)}</span>
+      <span class="exp-held-s">${h.n} ${pluralize(h.n,'списание','списания','списаний')}</span>
+      <span class="exp-held-a">${fmt(h.amount)}</span>
+    </div>
+    <div class="exp-held-d" id="held-${escS(h.who)}">${(h.items || []).map(i => `
+      <div class="exp-held-i"><span>${escS(i.name)} × ${fmt(i.qty)} · ${escS(i.kind)}${
+        i.note ? ' · ' + escS(i.note) : ''}</span><b>${fmt(i.amount)}</b></div>`).join('')}</div>`).join('')}
+    <div class="exp-held-f">Из зарплаты. В сумму расходов не входит — это возврат, а не трата.</div>
+  </div>`;
+}
+
+// Раскрыть, за что именно удержали: сумма без причины через неделю
+// неотличима от ошибки.
+function expHeldOpen(who){
+  const el = document.getElementById('held-' + who);
+  if(el) el.classList.toggle('open');
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
 function renderExpenses(){
   const d = EXP.data; if(!d) return;
   const t = d.totals;
@@ -12342,7 +12531,8 @@ function renderExpenses(){
       <div class="exp-mark-bar"><div class="exp-mark-fill" style="width:${
         t.total_drivers ? t.marked / t.total_drivers * 100 : 0}%"></div></div>
       <span>${t.working} на смене · ${t.off} дома</span>
-    </div>`;
+    </div>
+    ${expHeld(d)}`;
 
   // Водители сгруппированы по районам — тем же порядком B1…B5, что и везде.
   const list = document.getElementById('expList');
@@ -15603,6 +15793,164 @@ function woHome(){
     <div class="wo-rows">${w.rows.map(woRow).join('')}</div>`;
 }
 
+// ── Вкладка одного вида: брак, бой, утеря, просрочка ───────────────────────
+// Один вид на экране — это ответ на вопрос «сколько мы бьём», который по
+// общему списку не читался: бой, брак и просрочка лежали вперемешку, и чтобы
+// понять, чего именно много, приходилось считать строки глазами.
+const SH_KIND_T = {'брак':'Брак', 'бой':'Бой', 'потеря':'Утеря', 'просрочка':'Просрочка'};
+
+async function accWoKind(kind){
+  const body = document.getElementById('expBody'); if(!body) return;
+  body.innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  try{
+    if(!ACC_WO) ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs', {params:{days:30}});
+  }catch(e){
+    body.innerHTML = '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+    return;
+  }
+  woKindBody(kind);
+}
+
+function woKindBody(kind){
+  const body = document.getElementById('expBody'); if(!body) return;
+  const w = ACC_WO || {rows: [], pending: []};
+  const pend = (w.pending || []).filter(r => r.kind === kind);
+  const rows = (w.rows || []).filter(r => r.kind === kind);
+  const ok   = rows.filter(r => r.state !== 'no');
+  const qty  = ok.reduce((a, r) => a + (r.qty || 0), 0);
+  const aed  = ok.reduce((a, r) => a + (r.aed || 0), 0);
+  const held = ok.reduce((a, r) => a + ((r.comp || {}).amount || 0), 0);
+  _setText('accSub', pend.length
+    ? `${pend.length} ${pluralize(pend.length,'ждёт','ждут','ждут')} решения`
+    : `${SH_KIND_T[kind] || kind} · 30 дней`);
+  if(!pend.length && !rows.length){
+    body.innerHTML = `<div class="exp-empty">За 30 дней ничего.<br>
+      Водитель записывает это в своём приложении — с фотографией.</div>`;
+    return;
+  }
+  // Очередь — выше всего: пока решения нет, эти бутылки числятся на полке,
+  // заявка их не заказывает, а ревизия ищет глазами.
+  const queue = pend.length ? `
+    <div class="wo-q-head">
+      <span class="wo-q-v">${pend.length}</span>
+      <span class="wo-q-u">${pluralize(pend.length,'ждёт','ждут','ждут')}<br>решения</span>
+      <span class="wo-q-aed"><b>${fmt(Math.round(pend.reduce((a,r)=>a+(r.aed||0),0)))}</b>AED по прайсу</span>
+    </div>
+    <div class="wo-rows">${pend.map(woRow).join('')}</div>` : '';
+  body.innerHTML = queue + `
+    <div class="wo-sum">
+      <div class="wo-sum-l">
+        <div class="wo-sum-n">${fmt(Math.round(aed))}<i>AED</i></div>
+        <div class="wo-sum-s">по прайсу, за 30 дней</div>
+      </div>
+      <div class="wo-ks">
+        <div class="wo-k"><span class="wo-k-n" style="color:${WO_TINT[kind] || 'var(--sub)'}">${fmt(qty)}</span>
+          <span class="wo-k-t">${pluralize(qty,'штука','штуки','штук')}</span></div>
+        <div class="wo-k"><span class="wo-k-n" style="color:${held ? 'var(--warn-t)' : 'var(--muted)'}">${fmt(held)}</span>
+          <span class="wo-k-t">удержано</span></div>
+      </div>
+    </div>
+    ${pend.length ? '<div class="exp-grp">История</div>' : ''}
+    <div class="wo-rows">${rows.map(woRow).join('')}</div>`;
+}
+
+// ── Удержание ──────────────────────────────────────────────────────────────
+// Списание отвечает на вопрос «бутылки больше нет». Удержание — на другой:
+// «кто за неё платит». Это разные решения, и принимают их в разное время:
+// согласовать можно сразу по фотографии, а чья была смена и виноват ли
+// человек — выясняют потом. Поэтому удержание живёт отдельной кнопкой на уже
+// согласованной строке, а не шагом внутри согласования.
+let WO_COMP = null;            // {id, name, qty, kind, aed, by, district, comp}
+
+async function woCompOpen(ev, id){
+  ev && ev.stopPropagation();
+  const all = [...((ACC_WO || {}).rows || []), ...((ACC_WO || {}).pending || [])];
+  const r = all.find(x => x.id === id);
+  if(!r) return;
+  WO_COMP = r;
+  // Список людей — из штатного расписания: удержать можно и не с того, кто
+  // списывал. Разбить может один, а отвечать за это — другой.
+  if(!CREW) try{ CREW = await ownerApi.ownerFetch('/api/owner/staff'); }catch(e){ CREW = null; }
+  const mine = [], rest = [];
+  ((CREW || {}).districts || []).forEach(d => {
+    (d.drivers || []).forEach(n => {
+      const nm = typeof n === 'string' ? n : (n && n.name) || '';
+      if(!nm) return;
+      (d.id === r.district || d.code === r.district_code ? mine : rest).push(nm);
+    });
+  });
+  const who = (r.comp || {}).who || r.by || '';
+  const list = [...new Set([...(r.by ? [r.by] : []), ...mine, ...rest])];
+  const amount = (r.comp || {}).amount || Math.round(r.aed || 0);
+  document.getElementById('woCompOv').innerHTML = `
+    <div class="wo-c-sheet">
+      <div class="wo-c-h">
+        <div class="wo-c-t">Удержать за списание</div>
+        <div class="wo-c-s">${escS(r.name)} × ${fmt(r.qty)} · ${escS(r.kind)} ·
+          ${fmt(Math.round(r.aed || 0))} AED по прайсу</div>
+      </div>
+      <div class="wo-c-l">С кого</div>
+      <div class="wo-c-who" id="woCompWho">${list.map(n => `
+        <button class="wo-c-p ${n === who ? 'on' : ''}" data-n="${escS(n)}"
+                onclick="woCompPick(this)">${escS(n)}</button>`).join('')
+        || '<span class="wo-c-none">Некого выбрать — список смены пуст</span>'}</div>
+      <div class="wo-c-l">Сумма</div>
+      <div class="wo-c-amt">
+        <input id="woCompAmt" type="text" inputmode="numeric" value="${amount}">
+        <span>AED</span>
+      </div>
+      <div class="wo-c-l">За что <i>необязательно</i></div>
+      <input class="wo-c-note" id="woCompNote" type="text" maxlength="120"
+             placeholder="уронил при разгрузке" value="${escS((r.comp || {}).note || '')}">
+      <div class="wo-c-acts">
+        ${r.comp ? '<button class="wo-c-off" onclick="woCompSave(0)">Снять удержание</button>' : ''}
+        <button class="wo-c-no" onclick="woCompClose()">Отмена</button>
+        <button class="wo-c-go" id="woCompGo" onclick="woCompSave(1)">Удержать</button>
+      </div>
+    </div>`;
+  document.getElementById('woCompOv').classList.add('show');
+}
+
+function woCompPick(b){
+  document.querySelectorAll('#woCompWho .wo-c-p').forEach(e => e.classList.remove('on'));
+  b.classList.add('on');
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
+function woCompClose(){
+  document.getElementById('woCompOv').classList.remove('show');
+  WO_COMP = null;
+}
+
+async function woCompSave(on){
+  const r = WO_COMP; if(!r) return;
+  const who = on ? (document.querySelector('#woCompWho .wo-c-p.on') || {}).dataset?.n || '' : '';
+  const amount = on ? parseInt((document.getElementById('woCompAmt').value || '')
+                                 .replace(/\D/g, ''), 10) || 0 : 0;
+  const note = on ? (document.getElementById('woCompNote').value || '').trim() : '';
+  // Сумма без человека — это удержание из воздуха, а человек без суммы ничего
+  // не значит. Говорим об этом до отправки, а не после.
+  if(on && (!who || !amount)){ _toast(!who ? 'Выберите, с кого' : 'Впишите сумму'); return; }
+  const go = document.getElementById('woCompGo'); if(go) go.disabled = true;
+  try{
+    await ownerApi.ownerFetch('/api/owner/stock/writeoff/' + encodeURIComponent(r.id) + '/compensate',
+      {method:'POST', body:{who, amount, note, as: _meName()}});
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    _toast(on ? `Удержано ${fmt(amount)} AED · ${who}` : 'Удержание снято');
+  }catch(e){
+    const p = (e || {}).payload || {};
+    _toast(p.error === 'not_approved' ? 'Сначала согласуйте списание'
+                                      : 'Не удалось — попробуйте ещё раз');
+    if(go) go.disabled = false;
+    return;
+  }
+  woCompClose();
+  try{ ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs', {params:{days:30}}); }
+  catch(e){}
+  if(SH_TAB && SH_TAB !== 'exp') woKindBody(SH_TAB); else woHome();
+  shCounts();
+}
+
 // Решение принимается здесь же, в строке: уводить ради двух кнопок на
 // отдельный экран незачем — всё, на чём оно основано, уже видно.
 //
@@ -15631,7 +15979,11 @@ async function woDecide(ev, id, ok){
   }
   try{ ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs', {params:{days:30}}); }
   catch(e){}
-  woHome();
+  // Решение принимают из двух мест: со вкладки вида в «Расходах смены» и со
+  // старого общего списка. Перерисовываем то, что открыто, — иначе с одного
+  // из них строка исчезает, а с другого нет.
+  if(document.getElementById('shTabs') && SH_TAB !== 'exp'){ woKindBody(SH_TAB); shCounts(); }
+  else woHome();
 }
 
 function woRow(r){
@@ -15652,12 +16004,18 @@ function woRow(r){
       ${wait ? '<span class="wo-st wait">не вычтено со склада</span>' : ''}
       ${no ? `<span class="wo-st no">отклонено${
         r.decided_by_name ? ' · ' + escS(r.decided_by_name) : ''}</span>` : ''}
+      ${r.comp ? `<span class="wo-st held" onclick="woCompOpen(event,'${escS(r.id)}')">удержано
+        ${fmt(r.comp.amount)} AED · ${escS(r.comp.who)}${
+          r.comp.note ? ' · ' + escS(r.comp.note) : ''}</span>` : ''}
     </div>
     <div class="wo-aed" ${no ? 'style="text-decoration:line-through;opacity:.55"' : ''}>${
       fmt(r.aed)}<i>AED</i></div>
     ${wait ? `<div class="wo-acts">
       <button class="wo-act no" onclick="woDecide(event,'${escS(r.id)}',false)">Отклонить</button>
       <button class="wo-act ok" onclick="woDecide(event,'${escS(r.id)}',true)">Согласовать</button>
+    </div>` : ''}
+    ${(!wait && !no && !r.comp) ? `<div class="wo-acts">
+      <button class="wo-act hold" onclick="woCompOpen(event,'${escS(r.id)}')">Удержать с виновного</button>
     </div>` : ''}
   </div>`;
 }

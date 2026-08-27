@@ -101,18 +101,54 @@ def _totals(rows: list) -> dict:
     }
 
 
+async def _held(day_from: str, day_to: str = "") -> list:
+    """Удержания за период: с кого, сколько и за что.
+
+    Удержание — это не расход компании, а его противоположность: деньги
+    вернутся из зарплаты. Поэтому в сумму расходов оно не идёт и стоит
+    отдельной строкой — иначе один и тот же бой уменьшал бы расход, которого
+    он не уменьшал, а просто перекладывал с компании на человека.
+
+    Днём считаем день самого списания, а не день решения: разбили в среду,
+    решили в пятницу — это среда, и в отчёте за среду оно и должно стоять."""
+    rows = await db.writeoff_list(limit=1000)
+    out = {}
+    for r in rows:
+        c = r.get("comp") or {}
+        amount = int(c.get("amount") or 0)
+        if not amount or (r.get("state") or "ok") != "ok":
+            continue
+        d = str(r.get("day") or "")
+        if d < day_from or (day_to and d > day_to):
+            continue
+        who = c.get("who") or ""
+        h = out.setdefault(who, {"who": who, "amount": 0, "n": 0, "items": []})
+        h["amount"] += amount
+        h["n"] += 1
+        if len(h["items"]) < 12:
+            h["items"].append({
+                "id": r.get("_id"), "day": d, "amount": amount,
+                "name": r.get("name", "") or r.get("item", ""),
+                "qty": int(r.get("qty") or 0), "kind": r.get("kind", ""),
+                "note": c.get("note", ""), "by": r.get("by", "")})
+    return sorted(out.values(), key=lambda x: -x["amount"])
+
+
 @require_owner
 async def handle_day(request):
     """GET /api/owner/expenses?day= — расходы за день по каждому водителю."""
     day = (request.query.get("day") or "").strip() or _biz_day()
     saved = {r.get("driver"): r for r in await db.get_driver_days(day)}
     rows = [_day_row(d, saved.get(d["name"])) for d in staff.drivers()]
+    held = await _held(day, day)
     return web.json_response({
         "day": day,
         "today": _biz_day(),
         "rates": {"working": staff.MEAL_WORKING, "off": staff.MEAL_OFF},
         "drivers": rows,
         "totals": _totals(rows),
+        "held": held,
+        "held_total": sum(h["amount"] for h in held),
     }, headers=CORS_HEADERS)
 
 
@@ -266,9 +302,12 @@ async def handle_period(request):
 
     days_list = sorted(by_day.values(), key=lambda x: x["day"], reverse=True)
     people = sorted(by_driver.values(), key=lambda x: -(x["meal"] + x["extra"]))
+    held = await _held(start, today)
     return web.json_response({
         "from": start, "to": today, "days": days,
         "by_day": days_list, "by_driver": people,
+        "held": held,
+        "held_total": sum(h["amount"] for h in held),
         "total_meal": sum(d["meal"] for d in days_list),
         "total_extra": sum(d["extra"] for d in days_list),
         "total": sum(d["meal"] + d["extra"] for d in days_list),

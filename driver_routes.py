@@ -613,6 +613,11 @@ async def handle_writeoffs(request):
         # конце смены поздно.
         "state": r.get("state") or "ok",
         "decided_note": r.get("decided_note", ""),
+        # Удержание — то, что водителя касается напрямую: узнать о нём в день
+        # выплаты значит поспорить тогда, когда доказывать уже нечем.
+        "comp": (int((r.get("comp") or {}).get("amount") or 0)
+                 if (r.get("comp") or {}).get("amount") else 0),
+        "comp_note": (r.get("comp") or {}).get("note", ""),
         # isoformat, а не str(): у str разделитель — пробел, и сафари такую
         # дату не разбирает вовсе.
         "note": r.get("note", ""), "at": _iso(r.get("at")),

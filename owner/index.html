@@ -56,6 +56,15 @@ html.hid-boot #gameApp *{visibility:visible}
   --safe-top:calc(var(--tg-safe-area-inset-top,0px) + var(--tg-content-safe-area-inset-top,0px));
   --safe-bottom:calc(var(--tg-safe-area-inset-bottom,0px) + env(safe-area-inset-bottom,0px));
 }
+/* На компьютере телеграм рисует свою шапку НАД окном приложения, но всё равно
+   сообщает её высоту как отступ для контента. Мы этот отступ добавляли — и под
+   шапкой оставалась пустая чёрная лента высотой с неё же. На широком экране
+   берём только отступ устройства (там он ноль), а телеграмовский отбрасываем:
+   его шапка и так снаружи. Вырезов и статус-баров на компьютере не бывает. */
+@media (min-width:900px){
+  :root{--safe-top:var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px))}
+}
+
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
 html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100%;overflow-x:clip;font-size:14px;line-height:1.4;font-variant-numeric:lining-nums tabular-nums}
 body{padding-bottom:calc(120px + var(--safe-bottom));min-height:100vh;  /* tabbar is ~67px + safe-bottom; +53px clearance so the last card has obvious space above the nav on every phone */
@@ -747,10 +756,11 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Своя высота прилипания, на четыре точки выше общей: карточка здесь всегда
    свёрнута, и место, отданное сверху, лучше уходит вниз — под ней стоят
    плитки, а не воздух. */
-/* Прячем верх на несколько точек под полосу периодов: она непрозрачная и
-   лежит выше, а запас страхует от промаха в замере — иначе в щель между ними
-   видно проезжающий список. */
-.ohero{position:sticky;top:calc(var(--hero-top,124px) - 7px);z-index:30;
+/* Верх карточки встаёт ровно на нижний край полосы периодов. Запас «на всякий
+   случай» отсюда убран: он прятал под полосу скруглённые углы, и прижатая
+   карточка выглядела обрезанной сверху. Точка прилипания теперь считается
+   надёжно — прятать нечего. */
+.ohero{position:sticky;top:var(--hero-top,124px);z-index:30;
   padding:0 20px 14px;
   border-radius:var(--r);margin-bottom:16px;
   background:
@@ -789,10 +799,10 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    что зазор слева от разбора равен зазору справа: он оказывается ровно
    посередине между числом и датой, чего не давали авто-поля — их было три,
    и свободное место делилось на три части вместо двух. */
-/* Число слева, разбор прижат к дате, весь запас ширины — в промежутке между
-   ними: разбор объясняет день, и стоять он должен рядом с днём. */
-.ohero-top{display:flex;align-items:center;gap:0;height:78px}
-.ohero-top .day-nav{margin-left:24px}
+/* Три предмета в строке — число, разбор, дата. space-between разводит их так,
+   что зазор слева от разбора равен зазору справа. */
+.ohero-top{display:flex;align-items:center;justify-content:space-between;gap:0;height:78px}
+.ohero-top .day-nav{margin:0}
 /* Остаётся на месте и когда карточка прижата: заказы, средний чек и время
    нужны всё время, пока листаешь районы, — ради них на карточку и смотрят. */
 .ohero-stats{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:8px}
@@ -801,7 +811,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Отступ слева, а не просто «пусть будет зазор»: он входит в ширину столбца,
    и подбор кегля видит его как занятое место. Иначе на узком экране цифры
    вставали вплотную к «AED», а расчёт считал, что всё поместилось. */
-.ohero-top .hero-side{top:0;margin:0 0 0 auto;padding-left:14px}
+.ohero-top .hero-side{top:0;margin:0;padding:0 7px}
 /* Внутри карточки цифрам не нужны свои рамки: коробки в коробке — это и был
    шум. Три столбца, разделённые волоском. */
 .ohero-stats .off-tot-c{background:none;border:0;border-radius:0;
@@ -5346,10 +5356,12 @@ button.pill:active{opacity:.6}
 .hero-side-r b.warn{color:var(--warn-t)}
 /* Сжатая карточка: числа мельче, дата теряет подпись и кнопку возврата —
    всё, что объясняет, уступает место тому, что отвечает. */
-/* В сжатой карточке столбец стоит вплотную к дате, а весь запас ширины — в
-   промежутке между ним и числом. Отступ слева настоящий, а не «пусть будет
-   зазор»: он входит в ширину и учитывается при подборе кегля. */
-.hero.tight .hero-side{row-gap:0;column-gap:6px;font-size:10px;top:0;padding-left:14px}
+/* Столбец стоит ровно посередине между числом и датой: свободное место делят
+   поровну два авто-поля, а собственные отступы у него одинаковые с обеих
+   сторон. Они же входят в ширину, поэтому подбор кегля их учитывает — и даже
+   когда свободного места не остаётся, зазоры слева и справа равны. */
+.hero.tight .hero-side{row-gap:0;column-gap:6px;font-size:10px;top:0;
+  margin:0 auto;padding:0 7px}
 /* Зазор между числом и разбором теперь держит отступ самого разбора, поэтому
    промежуток строки убираем — иначе он считается дважды и ворует ширину у
    подписей. */
@@ -5940,7 +5952,7 @@ window.addEventListener('resize', () => {
     // В сжатом виде столбец уходит из-под даты и встаёт между нею и суммой:
     // место под дату освобождаем отступом по её же измеренной ширине.
     if(amtRow) amtRow.style.paddingRight =
-      (hero.classList.contains('tight') && nav && nav.offsetWidth ? nav.offsetWidth + 24 : 0) + 'px';
+      (hero.classList.contains('tight') && nav && nav.offsetWidth ? nav.offsetWidth : 0) + 'px';
     // Кегль столбца подбираем только на переломе: считать его каждый кадр —
     // это принудительный пересчёт вёрстки на каждую точку прокрутки.
     if(hero.classList.contains('tight') !== wasTight) heroSideFit();

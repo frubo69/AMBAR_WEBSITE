@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=6"></script>
+<script src="/vendor/ambar-call.js?v=7"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -5731,8 +5731,20 @@ button.pill:active{opacity:.6}
           <div class="cvo-acts" id="cvoActs"></div>
         </div>
       <div class="cv" id="callVid">
-        <video class="cv-rem" id="caRem" playsinline autoplay></video>
-        <video class="cv-loc" id="caLoc" playsinline autoplay muted></video>
+        <div class="cv-slot" id="cvSlotRem">
+          <video id="caRem" playsinline autoplay></video>
+          <div class="cv-off"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path
+            d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/><path
+            d="M2 2l20 20"/></svg></div>
+        </div>
+        <div class="cv-slot" id="cvSlotLoc">
+          <video id="caLoc" playsinline autoplay muted></video>
+          <div class="cv-off"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path
+            d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/><path
+            d="M2 2l20 20"/></svg></div>
+        </div>
         <div class="cv-pill">
           <span class="cv-pill-a" id="cvA">—</span>
           <span class="cv-pill-n" id="cvN">—</span>
@@ -5871,6 +5883,28 @@ button.pill:active{opacity:.6}
   justify-content:center;color:var(--gold2);background:var(--bg2);border:5px solid var(--card);
   box-shadow:0 0 0 1px var(--border2),0 8px 24px rgba(0,0,0,.5)}
 .ca-body.live{display:flex;align-items:center;justify-content:center}
+/* Окна участников: одинаковые, разница только в классе. Геометрия в переходе,
+   поэтому переезд из полного экрана в угол — движение, а не скачок. */
+.cv-slot{position:absolute;overflow:hidden;background:#0b0b16;display:none;
+  transition:top .38s var(--e1),left .38s var(--e1),width .38s var(--e1),
+    height .38s var(--e1),border-radius .38s var(--e1)}
+.cv-slot video{width:100%;height:100%;object-fit:cover;display:block}
+.cv.on .cv-slot.full,.cv.on .cv-slot.pip{display:block}
+.cv-slot.full{top:0;left:0;width:100%;height:100%;border-radius:0;z-index:1}
+.cv-slot.pip{width:92px;height:123px;border-radius:14px;z-index:5;cursor:grab;
+  border:1px solid rgba(255,255,255,.16);box-shadow:0 8px 24px rgba(0,0,0,.5)}
+.cv-slot.pip.drag{cursor:grabbing;transition:none}
+#cvSlotLoc video{transform:scaleX(-1)}
+.cv.cam-back #cvSlotLoc video{transform:none}
+/* Камера выключена — серая плашка с перечёркнутой камерой вместо замершего
+   кадра. Её видят оба: и тот, кто выключил, и тот, кому перестали показывать. */
+.cv-off{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
+  background:rgba(120,120,135,.22);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  color:rgba(255,255,255,.5)}
+.cv-slot.off .cv-off{display:flex}
+.cv-slot.off video{visibility:hidden}
+.cv-slot.pip .cv-off svg{width:30px;height:30px}
+.cv-slot.full .cv-off svg{width:64px;height:64px}
 /* Голосовой разговор — тот же вид, что у водителя: звание, имя, таймер и
    кнопки у нижнего края. Один разговор — один экран во всех приложениях. */
 .cvo{position:absolute;inset:0;z-index:5;display:none;flex-direction:column;text-align:center;
@@ -5899,13 +5933,7 @@ button.pill:active{opacity:.6}
    имя плашкой слева сверху, кнопки столбцом справа. */
 .cv{position:absolute;inset:0;z-index:6;display:none;background:#05050c}
 .cv.on{display:block}
-.cv-rem{width:100%;height:100%;object-fit:cover;display:block;background:#05050c}
-.cv-loc{position:absolute;top:14px;right:14px;width:92px;height:123px;object-fit:cover;
-  border-radius:14px;background:#0b0b16;border:1px solid rgba(255,255,255,.16);
-  box-shadow:0 8px 24px rgba(0,0,0,.5);transform:scaleX(-1);display:none}
-.cv.cam-on .cv-loc{display:block}
-.cv.cam-back .cv-loc{transform:none}
-.cv-pill{position:absolute;top:14px;left:14px;display:flex;align-items:center;gap:8px;
+.cv.cam-on .cv.cam-back .cv-pill{position:absolute;top:14px;left:14px;display:flex;align-items:center;gap:8px;
   padding:7px 13px 7px 9px;border-radius:999px;background:rgba(20,20,30,.62);
   backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 .cv-pill-a{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;
@@ -19753,14 +19781,69 @@ function callVoicePaint(){
 }
 
 // Слой видео живёт вне перерисовки, поэтому обновляем его отдельно и руками.
+// Кто в каком окне и где стоит маленькое. Положение живёт между звонками.
+let CALL_SWAP = false, PIP_X = null, PIP_Y = null;
+const PIP_W = 92, PIP_H = 123, PIP_PAD = 12;
+
+function pipBox(){ return document.getElementById('callVid'); }
+function pipEl(){ return document.querySelector('#callVid .cv-slot.pip'); }
+function pipPlace(){
+  const el = pipEl(), box = pipBox(); if(!el || !box) return;
+  const W = box.clientWidth, H = box.clientHeight;
+  if(PIP_X === null){ PIP_X = W - PIP_W - PIP_PAD; PIP_Y = PIP_PAD; }
+  PIP_X = Math.max(PIP_PAD, Math.min(PIP_X, W - PIP_W - PIP_PAD));
+  PIP_Y = Math.max(PIP_PAD, Math.min(PIP_Y, H - PIP_H - PIP_PAD));
+  el.style.left = PIP_X + 'px'; el.style.top = PIP_Y + 'px';
+}
+
+// Нажали — поменялись местами; повели — окно едет за курсором.
+(function(){
+  let el = null, sx = 0, sy = 0, ox = 0, oy = 0, moved = false;
+  const move = e => {
+    if(!el) return;
+    const dx = e.clientX - sx, dy = e.clientY - sy;
+    if(Math.abs(dx) > 5 || Math.abs(dy) > 5) moved = true;
+    PIP_X = ox + dx; PIP_Y = oy + dy; pipPlace(); e.preventDefault();
+  };
+  const end = () => {
+    document.removeEventListener('pointermove', move);
+    if(!el) return;
+    el.classList.remove('drag');
+    if(!moved){ CALL_SWAP = !CALL_SWAP; callVidPaint(); } else pipPlace();
+    el = null;
+  };
+  document.addEventListener('pointerdown', e => {
+    const t = e.target.closest && e.target.closest('#callVid .cv-slot.pip');
+    if(!t) return;
+    el = t; moved = false; sx = e.clientX; sy = e.clientY; ox = PIP_X; oy = PIP_Y;
+    el.classList.add('drag');
+    document.addEventListener('pointermove', move, {passive:false});
+    document.addEventListener('pointerup', end, {once:true});
+  });
+})();
+
 function callVidPaint(){
   callVoicePaint();
   const l = document.getElementById('callVid'); if(!l) return;
   // Видеослой поднимается, только если картинка есть хоть у кого-то. Обе
   // камеры выключены — показывать нечего, и разговор возвращается к
   // голосовому виду, а не висит чёрным кадром.
-  l.classList.toggle('on', CALL_VIDEO && CALL_ST === 'live' && (CALL_CAM || CALL_RCAM));
+  const live = CALL_VIDEO && CALL_ST === 'live' && (CALL_CAM || CALL_RCAM);
+  const dial = CALL_VIDEO && CALL_ST === 'out';
+  l.classList.toggle('on', live || dial);
   l.classList.toggle('cam-on', CALL_CAM);
+  const loc = document.getElementById('cvSlotLoc'), rem = document.getElementById('cvSlotRem');
+  if(loc && rem){
+    loc.className = 'cv-slot' + (CALL_CAM ? '' : ' off');
+    rem.className = 'cv-slot' + (CALL_RCAM ? '' : ' off');
+    // Координаты живут только на маленьком окне: инлайновые left и top от
+    // прошлого раза перебили бы стиль полноэкранного.
+    const set = (el, cls) => { el.classList.add(cls);
+      if(cls !== 'pip'){ el.style.left = ''; el.style.top = ''; } };
+    // На вызове человек видит себя во весь экран, как в фейстайме.
+    if(dial) set(loc, 'full');
+    else if(live){ set(CALL_SWAP ? rem : loc, 'pip'); set(CALL_SWAP ? loc : rem, 'full'); pipPlace(); }
+  }
   l.classList.toggle('cam-back', !!(CALL && CALL.facing === 'environment'));
   const a = document.getElementById('cvA'), n = document.getElementById('cvN');
   if(a) a.textContent = _cIni(CALL_WHO);

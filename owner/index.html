@@ -5347,18 +5347,23 @@ button.pill:active{opacity:.6}
 .hero-side-r b.warn{color:var(--warn-t)}
 /* Сжатая карточка: числа мельче, дата теряет подпись и кнопку возврата —
    всё, что объясняет, уступает место тому, что отвечает. */
-/* В сжатой карточке столбец не жмётся к дате, а встаёт ровно посередине
-   между нею и суммой: свободное место делится поровну двумя авто-полями. */
-.hero.tight .hero-side{row-gap:0;column-gap:6px;font-size:10px;top:0;margin-right:auto}
+/* В сжатой карточке столбец стоит вплотную к дате, а весь запас ширины — в
+   промежутке между ним и числом. Отступ слева настоящий, а не «пусть будет
+   зазор»: он входит в ширину и учитывается при подборе кегля. */
+.hero.tight .hero-side{row-gap:0;column-gap:6px;font-size:10px;top:0;padding-left:14px}
+/* Зазор между числом и разбором теперь держит отступ самого разбора, поэтому
+   промежуток строки убираем — иначе он считается дважды и ворует ширину у
+   подписей. */
+.hero.tight .hero-main{column-gap:0}
 /* Крайний случай: даже на самом мелком кегле втроём не помещаются. Тогда
    уходят подписи — числа различимы по цвету, а место остаётся. */
 .hero-side.bare i{display:none}
 /* Кнопку возврата не прячем: без неё из вчерашнего дня некуда вернуться, а
    место берём из отступов вокруг даты — их и было слишком много. */
 .hero.tight .dn-rel{display:none}
-/* В сжатом виде валюта уходит: она одна на всё приложение, а её место нужно
-   разбору суммы. */
-.hero.tight .hero-unit{display:none}
+/* В сжатом виде валюта остаётся, но становится тише и ближе к числу: место
+   в строке делят ещё разбор и дата. */
+.hero.tight .hero-unit{font-size:10.5px;margin-left:6px;letter-spacing:.8px}
 .hero.tight .dn-d{min-width:40px;height:24px}
 .hero.tight .dn-b{width:19px}
 .hero.tight .dn-home{width:21px;height:21px}
@@ -5373,6 +5378,7 @@ button.pill:active{opacity:.6}
   /* Валюта на узком телефоне уходит: в строке она третья по важности после
      самого числа и разбора, а места ровно на двоих. */
   .ohero .hero-unit{display:none}
+  .hero.tight .hero-unit{display:none}
   .ohero .dn-rel{display:none}
   .ohero .dn-d{min-width:40px;height:26px}
   .ohero .dn-b{width:19px}
@@ -5840,7 +5846,7 @@ window.addEventListener('resize', () => {
   const nav   = hero.querySelector('.day-nav');
 
   const FULL = 226, MIN = 78;              // высоты карточки (см. .hero в стилях)
-  const F_FULL = 44, F_MIN = 26;           // размер числа
+  const F_FULL = 44, F_MIN = 23;           // размер числа
 
   let placeTry = 0;
   const place = () => {
@@ -5935,7 +5941,7 @@ window.addEventListener('resize', () => {
     // В сжатом виде столбец уходит из-под даты и встаёт между нею и суммой:
     // место под дату освобождаем отступом по её же измеренной ширине.
     if(amtRow) amtRow.style.paddingRight =
-      (hero.classList.contains('tight') && nav && nav.offsetWidth ? nav.offsetWidth + 12 : 0) + 'px';
+      (hero.classList.contains('tight') && nav && nav.offsetWidth ? nav.offsetWidth + 18 : 0) + 'px';
     // Кегль столбца подбираем только на переломе: считать его каждый кадр —
     // это принудительный пересчёт вёрстки на каждую точку прокрутки.
     if(hero.classList.contains('tight') !== wasTight) heroSideFit();

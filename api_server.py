@@ -2676,7 +2676,9 @@ async def handle_static(request: web.Request) -> web.Response:
     # держал его сутки: разметка приезжала новая, код оставался старый, и экран
     # молча оставался пустым. Картинки и шрифты пусть лежат в кэше, а код —
     # только с перепроверкой: ETag есть, ответ будет пустой 304.
-    is_code = str(filepath).endswith((".js", ".css")) and "/vendor/" in str(filepath).replace("\\", "/")
+    # Только наши файлы: чужие библиотеки (leaflet, telegram-web-app) не меняются
+    # и пусть спокойно лежат в кэше сутки.
+    is_code = filepath.name.startswith("ambar-") and filepath.suffix in (".js", ".css")
     cache_header = ("no-store, no-cache, must-revalidate, max-age=0" if is_html
                     else "no-cache" if is_code
                     else "public, max-age=86400")

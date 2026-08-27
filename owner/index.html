@@ -776,20 +776,32 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .pin-pop svg{width:15px;height:15px;flex:0 0 auto;fill:none;stroke:currentColor;
   stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round;opacity:.75}
 .pin-pop .pin-s{display:block;font-size:10.5px;font-weight:500;color:var(--muted);margin-top:2px}
-.ohero .hero-amt{font-size:26px}
+/* На «Районах» число чуть мельче, а валюта — тише и ближе: в строке с ним
+   стоят ещё разбор и дата, и каждая точка ширины на счету. */
+.ohero .hero-amt{font-size:23px}
+.ohero .hero-unit{font-size:10.5px;margin-left:6px;letter-spacing:.8px}
+/* И сама пилюля с датой здесь плотнее: отыгранные у неё точки уходят в
+   промежуток между суммой и разбором, где воздух виден. */
+.ohero .dn-d{min-width:44px;padding:0 1px}
+.ohero .dn-b{width:20px}
 .ohero .day-nav{margin-left:auto;position:static}
 /* Три предмета в строке — число, разбор, дата. space-between разводит их так,
    что зазор слева от разбора равен зазору справа: он оказывается ровно
    посередине между числом и датой, чего не давали авто-поля — их было три,
    и свободное место делилось на три части вместо двух. */
-.ohero-top{display:flex;align-items:center;justify-content:space-between;gap:10px;height:78px}
-.ohero-top .day-nav{margin:0}
+/* Число слева, разбор прижат к дате, весь запас ширины — в промежутке между
+   ними: разбор объясняет день, и стоять он должен рядом с днём. */
+.ohero-top{display:flex;align-items:center;gap:0;height:78px}
+.ohero-top .day-nav{margin-left:18px}
 /* Остаётся на месте и когда карточка прижата: заказы, средний чек и время
    нужны всё время, пока листаешь районы, — ради них на карточку и смотрят. */
 .ohero-stats{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:8px}
 /* Разбор стоит в одной строке с суммой и датой — как в свёрнутой шапке
    «Обзора». Смещения вниз, как у развёрнутой, здесь не нужно: строка одна. */
-.ohero-top .hero-side{top:0;margin:0}
+/* Отступ слева, а не просто «пусть будет зазор»: он входит в ширину столбца,
+   и подбор кегля видит его как занятое место. Иначе на узком экране цифры
+   вставали вплотную к «AED», а расчёт считал, что всё поместилось. */
+.ohero-top .hero-side{top:0;margin:0 0 0 auto;padding-left:14px}
 /* Внутри карточки цифрам не нужны свои рамки: коробки в коробке — это и был
    шум. Три столбца, разделённые волоском. */
 .ohero-stats .off-tot-c{background:none;border:0;border-radius:0;
@@ -3140,7 +3152,7 @@ button.path:active{transform:scale(.995)}
         <span class="hero-side-r"><i><span class="w">валовая</span><span class="w2">вал</span></i><b id="heroGross" data-aed="">—</b></span>
         <span class="hero-side-r"><i><span class="w">чаевые</span><span class="w2">чай</span></i><b class="gold" id="heroTips" data-aed="">—</b></span>
         <span class="hero-side-r"><i><span class="w">расход</span><span class="w2">расх</span></i><b class="dn" id="heroSpend" data-aed="">—</b></span>
-        <span class="hero-side-r"><i><span class="w">долг</span><span class="w2">долг</span></i><b class="warn" id="heroDebt" data-aed="">—</b></span>
+        <span class="hero-side-r"><i><span class="w">в долг</span><span class="w2">долг</span></i><b class="warn" id="heroDebt" data-aed="">—</b></span>
       </div>
     </div>
     <div class="hero-row">
@@ -3394,14 +3406,14 @@ button.path:active{transform:scale(.995)}
        списка. Долгое нажатие открепляет. -->
   <div class="ohero" id="offHero" data-detail="kpi:revenue">
    <div class="ohero-top">
-    <div class="hero-amt-row"><span class="hero-amt mono" id="offHeroRev" data-aed="">—</span></div>
+    <div class="hero-amt-row"><span class="hero-amt mono" id="offHeroRev" data-aed="">—</span><span class="hero-unit cur-unit">AED</span></div>
     <!-- Разбор на том же месте, что в шапке «Обзора»: между суммой и датой.
          Валовой здесь нет — крупное число слева и есть она, из него
          складываются карточки районов. Остаются три вычета. -->
     <div class="hero-side" id="offSide">
       <span class="hero-side-r"><i><span class="w">чаевые</span><span class="w2">чай</span></i><b class="gold" id="offTips" data-aed="">—</b></span>
       <span class="hero-side-r"><i><span class="w">расход</span><span class="w2">расх</span></i><b class="dn" id="offSpend" data-aed="">—</b></span>
-      <span class="hero-side-r"><i><span class="w">долг</span><span class="w2">долг</span></i><b class="warn" id="offDebt" data-aed="">—</b></span>
+      <span class="hero-side-r"><i><span class="w">в долг</span><span class="w2">долг</span></i><b class="warn" id="offDebt" data-aed="">—</b></span>
     </div>
     <span class="day-nav" id="offHeroNav">
       <button class="dn-b" aria-label="Предыдущий день"
@@ -5358,6 +5370,9 @@ button.pill:active{opacity:.6}
      и втроём они помещаются только так — число мельче, у даты остаётся одно
      слово, стрелки уже. Иначе разбор оставался без подписей. */
   .ohero .hero-amt{font-size:20px}
+  /* Валюта на узком телефоне уходит: в строке она третья по важности после
+     самого числа и разбора, а места ровно на двоих. */
+  .ohero .hero-unit{display:none}
   .ohero .dn-rel{display:none}
   .ohero .dn-d{min-width:40px;height:26px}
   .ohero .dn-b{width:19px}
@@ -5783,7 +5798,13 @@ function heroSideFit(side){
   const cs    = getComputedStyle(box);
   const kids  = [...box.children];
   const gaps  = (parseFloat(cs.columnGap) || 0) * Math.max(0, kids.length - 1);
-  const taken = kids.filter(e => e !== side).reduce((a, e) => a + e.offsetWidth, 0);
+  // С полями, а не только по ширине: у даты своё поле слева, и без него
+  // расчёт показывал запас там, где строка уже вылезала за карточку.
+  const outer = e => {
+    const m = getComputedStyle(e);
+    return e.offsetWidth + (parseFloat(m.marginLeft) || 0) + (parseFloat(m.marginRight) || 0);
+  };
+  const taken = kids.filter(e => e !== side).reduce((a, e) => a + outer(e), 0);
   const free  = () => box.clientWidth - (parseFloat(cs.paddingRight) || 0)
                       - taken - gaps - side.offsetWidth;
   side.classList.remove('bare');

@@ -3080,6 +3080,13 @@ button.path:active{transform:scale(.995)}
 
 /* List row */
 .list{display:flex;flex-direction:column;gap:6px}
+/* Тот же список внутри окна настроек: рамка там ни к чему — окно само рамка,
+   — а отступы должны совпасть с соседними строками «Отображения». */
+.set-list{gap:0;margin-top:6px}
+.set-list .lrow{background:none;border:0;border-radius:0;padding:12px;
+  border-top:1px solid var(--border2)}
+.set-list .lrow:first-child{border-top:0}
+.set-list .lrow:active{background:rgba(255,255,255,.03)}
 .lrow{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:var(--r3);background:var(--card);border:1px solid var(--border2);transition:.15s var(--e1)}
 .lrow:active{background:var(--card2)}
 /* Ensure the entire lrow is one consistent tap target on iOS — without
@@ -3803,37 +3810,6 @@ button.path:active{transform:scale(.995)}
        а подпись «рассылки · отчёты · настройки» повторяла то, что написано на
        самих разделах. Девяносто пикселей на повтор — дорого. -->
 
-  <!-- Доступ к боту стоит первым: это единственное здесь, что решает, кто
-       вообще войдёт в программу, и единственное, где бывают запросы, ждущие
-       ответа. Остальное — отчёты и настройки, они подождут.
-       (owner-only — display toggled in initAccessBlock) -->
-  <div class="cat-block" id="accBlock" style="display:none">
-    <div class="cat-block-hdr" id="accBlockHdr">
-      <div class="card-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a5 5 0 0 1 5-5h6a5 5 0 0 1 5 5v2"/></svg></div>
-      <div class="cat-block-title">
-        <div class="cat-block-n">Доступ к боту</div>
-        <div class="cat-block-sub" id="accBlockSub">Загрузка…</div>
-      </div>
-      <svg class="cat-block-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
-    </div>
-    <!-- Числа кликаются: каждое ведёт к своему списку внутри управления
-         доступом. Число, на которое нельзя нажать, заставляет искать тот же
-         список руками — а он в двух шагах отсюда. -->
-    <div class="cat-block-kpis">
-      <div class="cat-kpi go" onclick="event.stopPropagation();mgrJump('own')"><div class="cat-kpi-v" id="accKpiOwn">—</div><div class="cat-kpi-l">Владельцы</div></div>
-      <div class="cat-kpi go" onclick="event.stopPropagation();mgrJump('mgr')"><div class="cat-kpi-v" id="accKpiMgr">—</div><div class="cat-kpi-l">Менеджеры</div></div>
-      <div class="cat-kpi go" onclick="event.stopPropagation();mgrJump('req')"><div class="cat-kpi-v" id="accKpiBlk">—</div><div class="cat-kpi-l" id="accKpiBlkLbl">Заблокировано</div></div>
-    </div>
-    <div class="cat-block-expand">
-      <div class="cat-block-sect-t">Владельцы и менеджеры</div>
-      <div id="accBlockUsers"></div>
-      <div class="cat-block-sect-t" id="accBlockExtraT" style="display:none">Запросы на доступ</div>
-      <div id="accBlockExtra"></div>
-      <button class="cat-block-open" onclick="event.stopPropagation();openMgr()">Управлять доступом →</button>
-    </div>
-  </div>
-
-
   <!-- Broadcast composer entry -->
   <div class="sect"><div class="sect-t">Маркетинг</div></div>
   <button class="all-clients-btn plain" onclick="openBroadcast()">
@@ -3924,15 +3900,37 @@ button.path:active{transform:scale(.995)}
   </div>
 
   <div class="sect"><div class="sect-t">Настройки</div></div>
-  <!-- Settings — functional -->
-  <div class="list">
-    <div class="lrow lrow-tog" data-tog="notif"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div><div class="lrow-body"><div class="lrow-name">Telegram-оповещения</div><div class="lrow-sub">заказы &gt; 1000 AED · опоздания</div></div><span class="tog on" id="togNotif"></span></div>
-    <div class="lrow lrow-tog" data-tog="sound"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg></div><div class="lrow-body"><div class="lrow-name">Звук уведомлений</div><div class="lrow-sub">только важные события</div></div><span class="tog on" id="togSound"></span></div>
-    <div class="lrow lrow-tog" data-tog="quiet"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8"/></svg></div><div class="lrow-body"><div class="lrow-name">Тихие часы</div><div class="lrow-sub">23:00 → 09:00 · только критичные</div></div><span class="tog" id="togQuiet"></span></div>
-    <div class="lrow" onclick="arcOpen()"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M2 3h20v4H2z"/><path d="M10 12h4"/></svg></div><div class="lrow-body"><div class="lrow-name">Архив событий</div><div class="lrow-sub">важное — списания, заявки, доступы</div></div><span style="color:var(--muted)">›</span></div>
-    <div class="lrow" onclick="qaExport()"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg></div><div class="lrow-body"><div class="lrow-name">Экспорт CSV / XLSX</div><div class="lrow-sub">данные за выбранный период</div></div><span style="color:var(--muted)">›</span></div>
-    <div class="lrow" onclick="openNotif()"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v2.2M12 19.8V22M22 12h-2.2M4.2 12H2M19.1 4.9l-1.6 1.6M6.5 17.5l-1.6 1.6M19.1 19.1l-1.6-1.6M6.5 6.5 4.9 4.9"/></svg></div><div class="lrow-body"><div class="lrow-name">Тонкая настройка алертов</div><div class="lrow-sub">пресеты · пороги · каналы</div></div><span style="color:var(--muted)">›</span></div>
+  <!-- Доступ к боту — в настройках, а не наверху: сюда заходят решать, кого
+       пускать, а не смотреть цифры. Наверху он оттеснял то, ради чего на эту
+       страницу приходят каждый день.
+       (owner-only — display toggled in initAccessBlock) -->
+  <div class="cat-block" id="accBlock" style="display:none">
+    <div class="cat-block-hdr" id="accBlockHdr">
+      <div class="card-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a5 5 0 0 1 5-5h6a5 5 0 0 1 5 5v2"/></svg></div>
+      <div class="cat-block-title">
+        <div class="cat-block-n">Доступ к боту</div>
+        <div class="cat-block-sub" id="accBlockSub">Загрузка…</div>
+      </div>
+      <svg class="cat-block-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <!-- Числа кликаются: каждое ведёт к своему списку внутри управления
+         доступом. Число, на которое нельзя нажать, заставляет искать тот же
+         список руками — а он в двух шагах отсюда. -->
+    <div class="cat-block-kpis">
+      <div class="cat-kpi go" onclick="event.stopPropagation();mgrJump('own')"><div class="cat-kpi-v" id="accKpiOwn">—</div><div class="cat-kpi-l">Владельцы</div></div>
+      <div class="cat-kpi go" onclick="event.stopPropagation();mgrJump('mgr')"><div class="cat-kpi-v" id="accKpiMgr">—</div><div class="cat-kpi-l">Менеджеры</div></div>
+      <div class="cat-kpi go" onclick="event.stopPropagation();mgrJump('req')"><div class="cat-kpi-v" id="accKpiBlk">—</div><div class="cat-kpi-l" id="accKpiBlkLbl">Заблокировано</div></div>
+    </div>
+    <div class="cat-block-expand">
+      <div class="cat-block-sect-t">Владельцы и менеджеры</div>
+      <div id="accBlockUsers"></div>
+      <div class="cat-block-sect-t" id="accBlockExtraT" style="display:none">Запросы на доступ</div>
+      <div id="accBlockExtra"></div>
+      <button class="cat-block-open" onclick="event.stopPropagation();openMgr()">Управлять доступом →</button>
+    </div>
   </div>
+
+
 
   <div class="foot">AMBAR Owner · build 2026.05</div>
 </div>
@@ -4048,7 +4046,14 @@ button.path:active{transform:scale(.995)}
       <button class="cmd-close" onclick="closeSet()" aria-label="Закрыть"><span class="txt">ESC</span><span class="x">✕</span></button>
     </div>
     <div class="cmd-body" style="padding:8px 10px 14px">
-      <div class="cmd-grp-t" style="padding:10px 12px 6px">Уведомления</div>
+      <!-- Отображение первым: валюта и язык меняют то, как читается вообще
+           всё в приложении, а уведомления — только то, что приходит в бот. -->
+      <div class="cmd-grp-t" style="padding:10px 12px 6px">Отображение</div>
+      <div class="set-row" onclick="toggleCurrency()" style="cursor:pointer"><span>Валюта</span><span style="display:inline-flex;align-items:center;gap:8px"><span id="setCurLbl" style="color:var(--gold2);font-weight:600">AED</span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted)"><path d="M3 7h13l-3-3M21 17H8l3 3"/></svg></span></div>
+      <div class="set-row"><span>Язык</span><span style="color:var(--text);font-weight:600">Русский</span></div>
+      <div class="set-row"><span>Таймзона</span><span style="color:var(--text);font-weight:600">Asia/Dubai (UTC+4)</span></div>
+
+      <div class="cmd-grp-t" style="padding:14px 12px 6px">Уведомления</div>
       <div class="set-group">
         <button class="set-cta" onclick="openNotif()">
           <span class="set-cta-ico"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
@@ -4063,18 +4068,15 @@ button.path:active{transform:scale(.995)}
         <div class="set-group-row"><span>Telegram-бот · @ambar_manage_bot</span><span style="color:var(--up);font-weight:600;font-size:12px">подключён</span></div>
       </div>
 
-      <div class="cmd-grp-t" style="padding:14px 12px 6px">Отображение</div>
-      <div class="set-row" onclick="toggleCurrency()" style="cursor:pointer"><span>Валюта</span><span style="display:inline-flex;align-items:center;gap:8px"><span id="setCurLbl" style="color:var(--gold2);font-weight:600">AED</span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted)"><path d="M3 7h13l-3-3M21 17H8l3 3"/></svg></span></div>
-      <div class="set-row"><span>Язык</span><span style="color:var(--text);font-weight:600">Русский</span></div>
-      <div class="set-row"><span>Таймзона</span><span style="color:var(--text);font-weight:600">Asia/Dubai (UTC+4)</span></div>
-
-      <div class="cmd-grp-t" style="padding:14px 12px 6px">Доступ</div>
-      <div class="set-row"><span>Менеджеры</span><span style="color:var(--muted)">2 пользователя ›</span></div>
-      <div class="set-row"><span>История действий</span><span style="color:var(--muted)">›</span></div>
-
-      <div class="cmd-grp-t" style="padding:14px 12px 6px">Экспорт</div>
-      <div class="set-row"><span>Выгрузить CSV · сегодня</span><span style="color:var(--gold2)">скачать ›</span></div>
-      <div class="set-row"><span>Выгрузить XLSX · месяц</span><span style="color:var(--gold2)">скачать ›</span></div>
+      <!-- Переключатели переехали сюда со страницы «Ещё»: настройки должны
+           лежать в настройках, а не отдельным списком под разделами. -->
+      <div class="list set-list">
+        <div class="lrow lrow-tog" data-tog="notif"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div><div class="lrow-body"><div class="lrow-name">Telegram-оповещения</div><div class="lrow-sub">заказы &gt; 1000 AED · опоздания</div></div><span class="tog on" id="togNotif"></span></div>
+        <div class="lrow lrow-tog" data-tog="sound"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg></div><div class="lrow-body"><div class="lrow-name">Звук уведомлений</div><div class="lrow-sub">только важные события</div></div><span class="tog on" id="togSound"></span></div>
+        <div class="lrow lrow-tog" data-tog="quiet"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8"/></svg></div><div class="lrow-body"><div class="lrow-name">Тихие часы</div><div class="lrow-sub">23:00 → 09:00 · только критичные</div></div><span class="tog" id="togQuiet"></span></div>
+        <div class="lrow" onclick="arcOpen()"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M2 3h20v4H2z"/><path d="M10 12h4"/></svg></div><div class="lrow-body"><div class="lrow-name">Архив событий</div><div class="lrow-sub">важное — списания, заявки, доступы</div></div><span style="color:var(--muted)">›</span></div>
+        <div class="lrow" onclick="qaExport()"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg></div><div class="lrow-body"><div class="lrow-name">Экспорт CSV / XLSX</div><div class="lrow-sub">данные за выбранный период</div></div><span style="color:var(--muted)">›</span></div>
+      </div>
     </div>
   </div>
 </div>
@@ -14647,37 +14649,6 @@ function _renderMgr(){
 
   let html = '';
 
-  // ── Pending access requests (outsiders who tried to open the bot) ──
-  // Owner-only; managers don't see who else tried to get in.
-  if(canManage && pendingReqs.length){
-    const open = _mgrSectionOpen.pending;
-    html += `<div class="mgr-grp collapsible${open?' open':''}" id="mgrGrpReq" data-sect="pending">
-      <div class="mgr-grp-t">
-        <svg class="mgr-grp-chev" viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
-        <span>Запросы на доступ</span>
-        <span class="mgr-grp-cnt">${pendingReqs.length}</span>
-        <span class="mgr-grp-hint">требуют решения</span>
-      </div>
-      <div class="mgr-grp-rows">`;
-    pendingReqs.forEach(a => {
-      const fullName = ((a.first_name||'')+' '+(a.last_name||'')).trim() || ('User '+a.telegram_id);
-      html += `<div class="mgr-row is-pending">
-        <div class="mgr-av">${_initials(fullName, a.telegram_id)}</div>
-        <div class="mgr-body-info">
-          <div class="mgr-name">${fullName}<span class="mgr-tag attempt">попытка</span>${a.is_premium?'<span class="mgr-tag pending">★ premium</span>':''}</div>
-          <div class="mgr-sub">${_fmtAccessSub(a)}</div>
-        </div>
-        <div class="mgr-actions" style="flex-direction:column;gap:4px">
-          <button class="mgr-block danger" data-access-block="${a.telegram_id}" aria-label="Заблокировать">
-            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M5 5l14 14"/></svg>
-            <span>Блок</span>
-          </button>
-        </div>
-      </div>`;
-    });
-    html += '</div></div>';
-  }
-
   // ── Owners ──
   html += '<div class="mgr-grp"><div class="mgr-grp-rows">';
   html += `<div class="mgr-grp-t" id="mgrGrpOwn" style="padding-left:0;padding-top:10px"><span>Владельцы</span><span class="mgr-grp-cnt">${owners.length}</span><span class="mgr-grp-hint">read-only</span></div>`;
@@ -14725,6 +14696,40 @@ function _renderMgr(){
     });
   }
   html += '</div></div>';
+
+  // ── Pending access requests (outsiders who tried to open the bot) ──
+  // Ниже своих: список читают сверху вниз как ответ на «кто у нас есть», и
+  // только потом «кто просится». Раньше запросы стояли первыми и заслоняли
+  // собственную команду семью чужими именами.
+  // Owner-only; managers don't see who else tried to get in.
+  if(canManage && pendingReqs.length){
+    const open = _mgrSectionOpen.pending;
+    html += `<div class="mgr-grp collapsible${open?' open':''}" id="mgrGrpReq" data-sect="pending">
+      <div class="mgr-grp-t">
+        <svg class="mgr-grp-chev" viewBox="0 0 24 24"><polyline points="9 6 15 12 9 18"/></svg>
+        <span>Запросы на доступ</span>
+        <span class="mgr-grp-cnt">${pendingReqs.length}</span>
+        <span class="mgr-grp-hint">требуют решения</span>
+      </div>
+      <div class="mgr-grp-rows">`;
+    pendingReqs.forEach(a => {
+      const fullName = ((a.first_name||'')+' '+(a.last_name||'')).trim() || ('User '+a.telegram_id);
+      html += `<div class="mgr-row is-pending">
+        <div class="mgr-av">${_initials(fullName, a.telegram_id)}</div>
+        <div class="mgr-body-info">
+          <div class="mgr-name">${fullName}<span class="mgr-tag attempt">попытка</span>${a.is_premium?'<span class="mgr-tag pending">★ premium</span>':''}</div>
+          <div class="mgr-sub">${_fmtAccessSub(a)}</div>
+        </div>
+        <div class="mgr-actions" style="flex-direction:column;gap:4px">
+          <button class="mgr-block danger" data-access-block="${a.telegram_id}" aria-label="Заблокировать">
+            <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M5 5l14 14"/></svg>
+            <span>Блок</span>
+          </button>
+        </div>
+      </div>`;
+    });
+    html += '</div></div>';
+  }
 
   // ── Blocked (managers + outsiders combined) ──
   if(canManage && totalBlocked){

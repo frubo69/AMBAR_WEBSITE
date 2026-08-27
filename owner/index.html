@@ -778,18 +778,25 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .pin-pop .pin-s{display:block;font-size:10.5px;font-weight:500;color:var(--muted);margin-top:2px}
 .ohero .hero-amt{font-size:26px}
 .ohero .day-nav{margin-left:auto;position:static}
-.ohero-top{display:flex;align-items:center;gap:8px;height:78px}
+/* Три предмета в строке — число, разбор, дата. space-between разводит их так,
+   что зазор слева от разбора равен зазору справа: он оказывается ровно
+   посередине между числом и датой, чего не давали авто-поля — их было три,
+   и свободное место делилось на три части вместо двух. */
+.ohero-top{display:flex;align-items:center;justify-content:space-between;gap:10px;height:78px}
+.ohero-top .day-nav{margin:0}
 /* Остаётся на месте и когда карточка прижата: заказы, средний чек и время
    нужны всё время, пока листаешь районы, — ради них на карточку и смотрят. */
 .ohero-stats{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:8px}
 /* Разбор стоит в одной строке с суммой и датой — как в свёрнутой шапке
    «Обзора». Смещения вниз, как у развёрнутой, здесь не нужно: строка одна. */
-.ohero-top .hero-side{top:0;margin-right:auto}
+.ohero-top .hero-side{top:0;margin:0}
 /* Внутри карточки цифрам не нужны свои рамки: коробки в коробке — это и был
    шум. Три столбца, разделённые волоском. */
 .ohero-stats .off-tot-c{background:none;border:0;border-radius:0;
   padding:2px 0 2px 13px;border-left:1px solid var(--border2)}
-.ohero-stats .off-tot-c:first-child{padding-left:2px;border-left:0}
+/* Первый столбец без отступа: его подпись должна начинаться ровно от того же
+   края, что и крупное число строкой выше. Две точки разницы видно. */
+.ohero-stats .off-tot-c:first-child{padding-left:0;border-left:0}
 .ohero-stats .off-tot-f{height:44px;align-self:center}
 .off-card{position:relative;background:var(--card);border:1px solid var(--border2);border-radius:var(--r);
   padding:15px 16px 14px;overflow:hidden;transition:.16s var(--e1)}
@@ -3388,11 +3395,10 @@ button.path:active{transform:scale(.995)}
   <div class="ohero" id="offHero" data-detail="kpi:revenue">
    <div class="ohero-top">
     <div class="hero-amt-row"><span class="hero-amt mono" id="offHeroRev" data-aed="">—</span></div>
-    <!-- Тот же разбор и на том же месте, что в шапке «Обзора»: между суммой и
-         датой. Одни и те же четыре числа не должны выглядеть на двух экранах
-         по-разному. -->
+    <!-- Разбор на том же месте, что в шапке «Обзора»: между суммой и датой.
+         Валовой здесь нет — крупное число слева и есть она, из него
+         складываются карточки районов. Остаются три вычета. -->
     <div class="hero-side" id="offSide">
-      <span class="hero-side-r"><i><span class="w">валовая</span><span class="w2">вал</span></i><b id="offGross" data-aed="">—</b></span>
       <span class="hero-side-r"><i><span class="w">чаевые</span><span class="w2">чай</span></i><b class="gold" id="offTips" data-aed="">—</b></span>
       <span class="hero-side-r"><i><span class="w">расход</span><span class="w2">расх</span></i><b class="dn" id="offSpend" data-aed="">—</b></span>
       <span class="hero-side-r"><i><span class="w">долг</span><span class="w2">долг</span></i><b class="warn" id="offDebt" data-aed="">—</b></span>
@@ -7861,7 +7867,6 @@ function _paintHero(p, f){
   heroSideFit();
   // Те же четыре числа на карточке «Районов». Считает их одно место — иначе на
   // двух экранах за один и тот же день оказались бы разные суммы.
-  _setAed('offGross', f.revenue.current);
   _setAed('offTips',  tips);
   _setAed('offSpend', spend);
   _setAed('offDebt',  ((f.by_method || {}).debt || {}).aed || 0);

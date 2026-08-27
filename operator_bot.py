@@ -2298,10 +2298,29 @@ async def post_init(app: Application):
         log.warning(f"POS menu button setup failed: {e}")
 
 
+# ── временно: проверка микрофона ───────────────────────────────────────────
+# Панель живёт внутри телеграма, значит и микрофон у неё телеграмный — со
+# всеми теми же неизвестными, что были на телефоне водителя. Ссылкой не
+# проверить: ссылка открывается во встроенном браузере, а это другое вебвью
+# с другими правами. Уходит вместе с ответом на вопрос.
+MIC_TEST_URL = "https://ambar-delivery.com/driver/mic.html"
+
+
+async def cmd_mic(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    if not is_operator(update.effective_user.id):
+        await update.effective_message.reply_text("⛔ Нет доступа."); return
+    await update.effective_message.reply_text(
+        "Проверка микрофона. Откройте и скажите что-нибудь вслух.",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("Открыть проверку", web_app=WebAppInfo(url=MIC_TEST_URL))]]))
+    log.info(f"[mic] пробник открыт: {update.effective_user.id}")
+
+
 def main():
     if not OPERATOR_BOT_TOKEN: print("❌ OPERATOR_BOT_TOKEN missing"); return
     app = Application.builder().token(OPERATOR_BOT_TOKEN).post_init(post_init).build()
     app.add_handler(CommandHandler("start", cmd_start))
+    app.add_handler(CommandHandler("mic", cmd_mic))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_menu))
     app.add_handler(CallbackQueryHandler(cb))
     app.add_error_handler(on_error)

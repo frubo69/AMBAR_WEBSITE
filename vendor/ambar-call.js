@@ -362,7 +362,35 @@
   // ── микрофон ─────────────────────────────────────────────────────────────
   // Отдельная кнопка «разрешить» на экране связи зовёт сюда же: разрешение
   // спрашивается в спокойный момент, а не когда телефон уже звонит.
-  AmbarCall.prototype.warmMic = function () { return this._mic(); };
+  // Спрашиваем СРАЗУ и микрофон, и камеру — одним окном. Раньше микрофон
+  // просили здесь, а камеру потом, при первом видеозвонке: человек видел два
+  // разных окна в разное время и справедливо считал, что его переспрашивают.
+  // Видеодорожку тут же гасим — камера между звонками гореть не должна, но
+  // разрешение на неё в этом сеансе уже получено и больше не спросится.
+  AmbarCall.prototype.warmMic = function () {
+    var self = this;
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      this._emit('nomic', {why: 'unsupported'});
+      return Promise.reject(new Error('no getUserMedia'));
+    }
+    return navigator.mediaDevices.getUserMedia({
+      audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true},
+      video: {facingMode: 'user'}
+    }).then(function (s) {
+      s.getVideoTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
+      var only = new MediaStream(s.getAudioTracks());
+      self.stream = only;
+      self._prepAudio();
+      try { localStorage.setItem('ambar_mic_ok', '1'); } catch (e) {}
+      try { localStorage.setItem('ambar_cam_ok', '1'); } catch (e) {}
+      self._emit('mic', {ok: true});
+      return only;
+    }).catch(function () {
+      // Камеру могли не дать, а микрофон дать — это рабочий случай, звонок
+      // голосом должен состояться.
+      return self._mic();
+    });
+  };
 
   AmbarCall.prototype._mic = function () {
     var self = this;
@@ -379,17 +407,7 @@
     }).then(function (s) {
       self.stream = s;
       try { localStorage.setItem('ambar_mic_ok', '1'); } catch (e) {}
-      // Элемент воспроизведения создаём тоже в жесте: айфон разрешает звук
-      // только у того элемента, чей play() случился по касанию.
-      if (!self.audio) {
-        var a = document.createElement('audio');
-        a.autoplay = true; a.playsInline = true;
-        a.setAttribute('playsinline', '');
-        a.style.display = 'none';
-        document.body.appendChild(a);
-        self.audio = a;
-      }
-      try { self.audio.play().catch(function () {}); } catch (e) {}
+      self._prepAudio();
       self._emit('mic', {ok: true});
       return s;
     }).catch(function (err) {
@@ -473,6 +491,20 @@
         s.setParameters(p);
       } catch (e) {}
     });
+  };
+
+  // Элемент воспроизведения создаём внутри касания: айфон пускает звук только
+  // у того элемента, чей play() случился по жесту человека.
+  AmbarCall.prototype._prepAudio = function () {
+    if (!this.audio) {
+      var a = document.createElement('audio');
+      a.autoplay = true; a.playsInline = true;
+      a.setAttribute('playsinline', '');
+      a.style.display = 'none';
+      document.body.appendChild(a);
+      this.audio = a;
+    }
+    try { this.audio.play().catch(function () {}); } catch (e) {}
   };
 
   AmbarCall.prototype._freeMic = function () {

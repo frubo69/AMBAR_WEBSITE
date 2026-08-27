@@ -2779,6 +2779,14 @@ def main():
     except Exception as e:
         log.error(f"operator routes setup failed: {e}")
 
+    # Голосовая связь водителя с оператором. Ставим до статики: вебсокет живёт
+    # на своём пути, а «/{path:.+}» ниже забирает всё подряд.
+    try:
+        import call_routes
+        call_routes.setup(app)
+    except Exception as e:
+        log.error(f"call routes setup failed: {e}")
+
     app.router.add_get("/",          handle_static)
     app.router.add_get("/{path:.+}", handle_static)
 

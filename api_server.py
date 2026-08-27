@@ -2663,14 +2663,21 @@ def _clean_addr(a) -> dict | None:
 # памяти: цифра меняется медленно, а страницу адресов открывают часто.
 _ETA_CACHE: dict = {"at": 0.0, "val": {}}
 _ETA_TTL = 600.0
+# Ниже этого медиана означает не быструю доставку, а формальную отметку.
+_ETA_MIN_PLAUSIBLE = 15.0
 
 
 async def _delivery_eta() -> dict:
     """{office_id: минуты} по доставленным заказам за 30 дней.
 
     Медиана, а не среднее: один заказ, забытый в статусе «в пути» до утра,
-    иначе утащил бы за собой всю цифру. Меньше пяти поездок — цифры нет: врать
-    человеку про время доставки хуже, чем промолчать."""
+    иначе утащил бы за собой всю цифру.
+
+    Молчим охотнее, чем говорим. Время доставки считается по отметке оператора
+    «доставлен», и пока её ставят не глядя — медиана выходит в минуту-две.
+    Такую цифру показывать клиенту нельзя, поэтому мало поездок или
+    неправдоподобно быстрая медиана означают: цифры нет. Как только отметки
+    станут настоящими, она появится сама."""
     now = time.time()
     if now - _ETA_CACHE["at"] < _ETA_TTL:
         return _ETA_CACHE["val"]
@@ -2697,10 +2704,12 @@ async def _delivery_eta() -> dict:
                     if key:
                         buckets.setdefault(key, []).append(mins)
             for key, arr in buckets.items():
-                if len(arr) < 5:
+                if len(arr) < 8:
                     continue
                 arr.sort()
                 med = arr[len(arr) // 2] if len(arr) % 2 else (arr[len(arr) // 2 - 1] + arr[len(arr) // 2]) / 2
+                if med < _ETA_MIN_PLAUSIBLE:
+                    continue
                 out[key] = int(round(med / 5.0) * 5)     # до пяти минут — точнее незачем
     except Exception as e:
         log.warning(f"[addr] eta failed: {e}")

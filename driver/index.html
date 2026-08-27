@@ -6032,9 +6032,20 @@ function callBar(){
   if(on) cel('callBarN').textContent = CALL_WHO;
 }
 
+// Пропущенные считаются только те, что человек ещё не видел. Иначе цифра на
+// кнопке висит вечно: список открыли, всё прочли, а она всё равно горит.
+function callSeenAt(){ try{ return localStorage.getItem('ambar_call_seen') || ''; }catch(e){ return ''; } }
+function callMarkSeen(){
+  try{ localStorage.setItem('ambar_call_seen', new Date().toISOString()); }catch(e){}
+}
+function callMissed(){
+  const seen = callSeenAt();
+  return ((CALL && CALL.recent) || []).filter(r => r.missed && (!seen || r.at > seen));
+}
+
 // Пропущенные — цифрой на кнопке в шапке, как везде.
 function callBadge(){
-  const n = ((CALL && CALL.recent) || []).filter(r => r.missed).length;
+  const n = callMissed().length;
   const e = cel('hdrCallN');
   if(!e) return;
   e.textContent = n > 9 ? '9+' : String(n);
@@ -6161,6 +6172,9 @@ function _callRender(){
     const rows = (CALL && CALL.roster) || [];
     const rec = callGroup((CALL && CALL.recent) || []);
     const shown = CALL_TAB === 'missed' ? rec.filter(r => r.missed) : rec;
+    // Список на экране — значит пропущенные увидены. Цифра гаснет сразу,
+    // а сами строки остаются: история никуда не девается.
+    callMarkSeen(); setTimeout(callBadge, 0);
     let html = `<div class="call-h1">Звонки</div>
       <div class="call-tabs">
         <button class="${CALL_TAB === 'all' ? 'on' : ''}" onclick="callTab('all')">Все</button>

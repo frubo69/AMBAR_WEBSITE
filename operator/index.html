@@ -4808,8 +4808,19 @@ function callQuality(){
   e.textContent = CALL_Q === 'bad' ? 'связь плохая'
                 : CALL_Q === 'weak' ? 'связь неустойчива' : '';
 }
+// Пропущенные считаются только те, что человек ещё не видел. Иначе цифра на
+// кнопке висит вечно: список открыли, всё прочли, а она всё равно горит.
+function callSeenAt(){ try{ return localStorage.getItem('ambar_call_seen') || ''; }catch(e){ return ''; } }
+function callMarkSeen(){
+  try{ localStorage.setItem('ambar_call_seen', new Date().toISOString()); }catch(e){}
+}
+function callMissed(){
+  const seen = callSeenAt();
+  return ((CALL && CALL.recent) || []).filter(r => r.missed && (!seen || r.at > seen));
+}
+
 function callBadge(){
-  const n = ((CALL && CALL.recent) || []).filter(r => r.missed).length;
+  const n = callMissed().length;
   const e = $('callLbl'); if(!e) return;
   e.textContent = n ? 'Связь · ' + n : 'Связь';
   $('callBtn')?.classList.toggle('has-missed', !!n);
@@ -4892,6 +4903,7 @@ function caPerson(r){
 function caCalls(){
   const rec = callGroup((CALL && CALL.recent) || []).filter(r => _caMatch(r.who));
   const shown = CALL_TAB === 'missed' ? rec.filter(r => r.missed) : rec;
+  callMarkSeen(); setTimeout(callBadge, 0);
   let h = `<div class="ca-h1">Звонки</div>` + CA_SEARCH;
   const micOk = !CALL || typeof CALL.micGranted !== 'function' || CALL.micGranted();
   if(!micOk) h += caWarm();

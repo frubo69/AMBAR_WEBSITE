@@ -19532,8 +19532,19 @@ function callQuality(){
   e.className = 'call-q' + (CALL_Q ? ' ' + CALL_Q : '');
   e.textContent = CALL_Q === 'bad' ? 'связь плохая' : CALL_Q === 'weak' ? 'связь неустойчива' : '';
 }
+// Пропущенные считаются только те, что человек ещё не видел. Иначе цифра на
+// кнопке висит вечно: список открыли, всё прочли, а она всё равно горит.
+function callSeenAt(){ try{ return localStorage.getItem('ambar_call_seen') || ''; }catch(e){ return ''; } }
+function callMarkSeen(){
+  try{ localStorage.setItem('ambar_call_seen', new Date().toISOString()); }catch(e){}
+}
+function callMissed(){
+  const seen = callSeenAt();
+  return ((CALL && CALL.recent) || []).filter(r => r.missed && (!seen || r.at > seen));
+}
+
 function callBadge(){
-  const n = ((CALL && CALL.recent) || []).filter(r => r.missed).length;
+  const n = callMissed().length;
   const e = _cq('callBtnBadge'); if(!e) return;
   e.textContent = n > 9 ? '9+' : String(n);
   e.style.display = n ? 'flex' : 'none';
@@ -19594,6 +19605,7 @@ function caFavRow(){
 function caCalls(){
   const rec = callGroup((CALL && CALL.recent) || []).filter(r => _caMatch(r.who));
   const shown = CALL_TAB === 'missed' ? rec.filter(r => r.missed) : rec;
+  callMarkSeen(); setTimeout(callBadge, 0);
   let h = `<div class="ca-h1">Звонки</div>` + CA_SEARCH + caWarm();
   if(CALL_TAB === 'all' && !CALL_Q_TXT) h += caFavRow();
   h += `<div class="ca-seg">

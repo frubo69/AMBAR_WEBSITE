@@ -4043,14 +4043,7 @@ button.path:active{transform:scale(.995)}
       <button class="cmd-close" onclick="closeSet()" aria-label="Закрыть"><span class="txt">ESC</span><span class="x">✕</span></button>
     </div>
     <div class="cmd-body" style="padding:8px 10px 14px">
-      <!-- Отображение первым: валюта и язык меняют то, как читается вообще
-           всё в приложении, а уведомления — только то, что приходит в бот. -->
-      <div class="cmd-grp-t" style="padding:10px 12px 6px">Отображение</div>
-      <div class="set-row" onclick="toggleCurrency()" style="cursor:pointer"><span>Валюта</span><span style="display:inline-flex;align-items:center;gap:8px"><span id="setCurLbl" style="color:var(--gold2);font-weight:600">AED</span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted)"><path d="M3 7h13l-3-3M21 17H8l3 3"/></svg></span></div>
-      <div class="set-row"><span>Язык</span><span style="color:var(--text);font-weight:600">Русский</span></div>
-      <div class="set-row"><span>Таймзона</span><span style="color:var(--text);font-weight:600">Asia/Dubai (UTC+4)</span></div>
-
-      <div class="cmd-grp-t" style="padding:14px 12px 6px">Уведомления</div>
+      <div class="cmd-grp-t" style="padding:10px 12px 6px">Уведомления</div>
       <div class="set-group">
         <button class="set-cta" onclick="openNotif()">
           <span class="set-cta-ico"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
@@ -4067,6 +4060,7 @@ button.path:active{transform:scale(.995)}
 
       <!-- Переключатели переехали сюда со страницы «Ещё»: настройки должны
            лежать в настройках, а не отдельным списком под разделами. -->
+      <div class="cmd-grp-t" style="padding:14px 12px 6px">Все настройки</div>
       <div class="list set-list">
         <div class="lrow lrow-tog" data-tog="notif"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div><div class="lrow-body"><div class="lrow-name">Telegram-оповещения</div><div class="lrow-sub">заказы &gt; 1000 AED · опоздания</div></div><span class="tog on" id="togNotif"></span></div>
         <div class="lrow lrow-tog" data-tog="sound"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg></div><div class="lrow-body"><div class="lrow-name">Звук уведомлений</div><div class="lrow-sub">только важные события</div></div><span class="tog on" id="togSound"></span></div>
@@ -4074,6 +4068,11 @@ button.path:active{transform:scale(.995)}
         <div class="lrow" onclick="arcOpen()"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M2 3h20v4H2z"/><path d="M10 12h4"/></svg></div><div class="lrow-body"><div class="lrow-name">Архив событий</div><div class="lrow-sub">важное — списания, заявки, доступы</div></div><span style="color:var(--muted)">›</span></div>
         <div class="lrow" onclick="qaExport()"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg></div><div class="lrow-body"><div class="lrow-name">Экспорт CSV / XLSX</div><div class="lrow-sub">данные за выбранный период</div></div><span style="color:var(--muted)">›</span></div>
       </div>
+
+      <div class="cmd-grp-t" style="padding:14px 12px 6px">Отображение</div>
+      <div class="set-row" onclick="toggleCurrency()" style="cursor:pointer"><span>Валюта</span><span style="display:inline-flex;align-items:center;gap:8px"><span id="setCurLbl" style="color:var(--gold2);font-weight:600">AED</span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted)"><path d="M3 7h13l-3-3M21 17H8l3 3"/></svg></span></div>
+      <div class="set-row"><span>Язык</span><span style="color:var(--text);font-weight:600">Русский</span></div>
+      <div class="set-row"><span>Таймзона</span><span style="color:var(--text);font-weight:600">Asia/Dubai (UTC+4)</span></div>
     </div>
   </div>
 </div>

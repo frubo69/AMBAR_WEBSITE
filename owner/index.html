@@ -453,11 +453,6 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    там же, где палец, а не в шапке страницы */
 .off-day{margin-left:auto;font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:700;
   letter-spacing:.3px;color:var(--muted);font-variant-numeric:tabular-nums;flex-shrink:0}
-.off-back{display:flex;align-items:center;gap:8px;margin:0 0 10px}
-.off-back-t{flex:1;padding:8px 12px;border-radius:10px;cursor:pointer;
-  border:1px solid rgba(201,169,110,.3);background:var(--gold-soft);color:var(--gold2);
-  font-family:inherit;font-size:12px;font-weight:600}
-.off-back-t:active{transform:scale(.98)}
 
 /* валовая и чаевые справа от выручки района — как на главной карточке */
 .off-side{margin-left:auto;display:flex;flex-direction:column;gap:1px;text-align:right;
@@ -784,19 +779,26 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .ohero .hero-amt{font-size:26px}
 .ohero .day-nav{margin-left:auto;position:static}
 .ohero-top{display:flex;align-items:center;gap:8px;height:78px}
-/* Складывается вместе с прилипанием: max-height, а не display, чтобы это была
-   одна плавная строка, а не рывок. */
-.ohero-stats{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:8px;
-  max-height:90px;overflow:hidden;
-  transition:max-height .2s var(--e1),opacity .16s var(--e1)}
+/* Остаётся на месте и когда карточка прижата: заказы, средний чек и время
+   нужны всё время, пока листаешь районы, — ради них на карточку и смотрят. */
+.ohero-stats{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:8px}
+/* Разбор суммы — вторая строка, отделённая волоском, кеглем помельче: это
+   пояснение к числу наверху, а не самостоятельные показатели. */
+.ohero-money{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
+  margin-top:11px;padding-top:11px;border-top:1px solid var(--border2)}
+.ohero-money .off-tot-c{background:none;border:0;border-radius:0;
+  padding:0 0 0 13px;border-left:1px solid var(--border2)}
+.ohero-money .off-tot-c:first-child{padding-left:2px;border-left:0}
+.off-tot-v.sm{font-size:14px}
+.off-tot-v.gold{color:var(--gold2)}
+.off-tot-v.dn{color:var(--dn)}
+.off-tot-v.warn{color:var(--warn-t)}
 /* Внутри карточки цифрам не нужны свои рамки: коробки в коробке — это и был
    шум. Три столбца, разделённые волоском. */
 .ohero-stats .off-tot-c{background:none;border:0;border-radius:0;
   padding:2px 0 2px 13px;border-left:1px solid var(--border2)}
 .ohero-stats .off-tot-c:first-child{padding-left:2px;border-left:0}
 .ohero-stats .off-tot-f{height:44px;align-self:center}
-.ohero.tight{padding-bottom:0}
-.ohero.tight .ohero-stats{max-height:0;opacity:0}
 .off-card{position:relative;background:var(--card);border:1px solid var(--border2);border-radius:var(--r);
   padding:15px 16px 14px;overflow:hidden;transition:.16s var(--e1)}
 .off-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--tone);opacity:.85}
@@ -3401,6 +3403,11 @@ button.path:active{transform:scale(.995)}
         onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayReset()"><span class="dn-num" id="odnDateNum">—</span><span class="dn-rel" id="odnDateTxt"></span></button>
       <button class="dn-b" id="odnNext" aria-label="Следующий день" disabled
         onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayStep(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+      <button class="dn-home" id="odnHome" style="display:none" aria-label="Вернуться к сегодня"
+        title="Вернуться к сегодня"
+        onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayReset()"><svg
+        viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4"
+        stroke-linecap="round" stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v4h4"/></svg></button>
     </span>
    </div>
    <!-- Заказы, средний чек и время — не отдельный ряд плиток под карточкой, а
@@ -3420,6 +3427,17 @@ button.path:active{transform:scale(.995)}
         <path d="M4 6h16M7 12h10M10 18h4"/></svg>
     </button>
    </div>
+   <!-- Разбор суммы — тот же, что в шапке «Обзора», и цифры туда кладёт тот же
+        код: иначе на двух экранах за один день оказались бы разные числа.
+        Первым стоит «в руках», а не «валовая»: валовая здесь и есть крупное
+        число наверху — из него складываются карточки районов, — и повторять
+        её строкой ниже значило бы занять место ничем. -->
+   <div class="ohero-money">
+    <div class="off-tot-c"><div class="off-tot-l">В руках</div><div class="off-tot-v sm" id="offNet" data-aed="">—</div></div>
+    <div class="off-tot-c"><div class="off-tot-l">Чаевые</div><div class="off-tot-v sm gold" id="offTips" data-aed="">—</div></div>
+    <div class="off-tot-c"><div class="off-tot-l">Расход</div><div class="off-tot-v sm dn" id="offSpend" data-aed="">—</div></div>
+    <div class="off-tot-c"><div class="off-tot-l">Долг</div><div class="off-tot-v sm warn" id="offDebt" data-aed="">—</div></div>
+   </div>
   </div>
 
 
@@ -3427,13 +3445,6 @@ button.path:active{transform:scale(.995)}
        человек. Вход стоит сразу под цифрами района: там и возникает вопрос,
        кто за них отвечает. -->
   <div class="sect" style="margin-top:16px"><div class="sect-t">Районы</div><div class="sect-s" id="offSub">—</div></div>
-  <div class="off-back" id="offDayNav" style="display:none">
-    <button class="dn-b" onclick="dayStep(1)" aria-label="Предыдущий день">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
-    <button class="off-back-t" onclick="dayReset()">Вернуться к сегодня</button>
-    <button class="dn-b" id="offDnNext" onclick="dayStep(-1)" aria-label="Следующий день">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
-  </div>
   <div style="display:flex;flex-direction:column;gap:9px" id="offCards">
     <div class="off-empty">Загрузка…</div>
   </div>
@@ -5965,38 +5976,26 @@ window.addEventListener('resize', heroSideFit);
     b.addEventListener('click', () => window.scrollTo({top: 0})));
 })();
 
-// Карточка выручки на «Районах». Прилипла — вторая строка складывается: над
-// списком районов нужно общее число и перелистывание дней, а разбор читают
-// один раз, в начале. Место, которое строка освобождает, возвращаем отступом,
-// иначе страница укоротится ровно на неё и список дёрнется вверх.
-(function offHeroFold(){
+// Карточка выручки на «Районах» остаётся целой и в прижатом виде: заказы,
+// средний чек и время нужны всё время, пока листаешь список. Скрипту здесь
+// остаётся одно — вести под её кромкой ту же растворяющую полоску, что и на
+// «Обзоре», чтобы карточки районов уходили под неё без резаного края.
+(function offHeroVeil(){
   const card  = document.getElementById('offHero');
   const stats = document.getElementById('offTotals');
   if(!card || !stats) return;
-  const BASE = 16;                      // margin-bottom из стилей
-  let raf = null, fold = 0;
+  let raf = null;
 
   const apply = () => {
     raf = null;
     const pg = document.getElementById('pg-offices');
     if(!pg || !pg.classList.contains('active')) return;
-    // Откреплённая карточка едет со страницей — складывать нечего.
-    if(!PIN.off || stats.style.display === 'none'){
-      card.classList.remove('tight');
-      card.style.marginBottom = '';
+    if(!PIN.off){                        // открепили — карточка едет со страницей
       if(window.HERO_VEIL) HERO_VEIL(null);
       return;
     }
     const top   = parseFloat(getComputedStyle(card).top) || 0;
     const stuck = card.getBoundingClientRect().top <= top + .5;
-    // Высоту строки снимаем в тот момент, когда она ещё развёрнута: у сложенной
-    // она ноль, и компенсировать было бы нечем.
-    if(stuck && !card.classList.contains('tight')) fold = stats.offsetHeight;
-    card.classList.toggle('tight', stuck);
-    card.style.marginBottom = stuck ? (BASE + fold) + 'px' : '';
-    // Под нижней кромкой — та же растворяющая полоска, что и на «Обзоре»:
-    // карточки районов уходят под карточку выручки, и резаный край читался бы
-    // как сломанная вёрстка.
     if(window.HERO_VEIL) HERO_VEIL(stuck ? card.getBoundingClientRect().bottom : null);
   };
 
@@ -7532,9 +7531,14 @@ function _syncOffDayNav(p, w){
   // На карточке и «Сегодня», и число: одно отвечает «какой это день»,
   // другое — «какое именно число», и в отчёте нужны оба.
   _OFF_DAY_LBL = lbl.sub ? `${lbl.top} · ${lbl.sub}` : lbl.top;
-  const nav = document.getElementById('offDayNav');
-  if(nav) nav.style.display = (_dayNavOn(p) && DAY_OFFSET > 0) ? 'flex' : 'none';
-  const nx = document.getElementById('offDnNext'); if(nx) nx.disabled = DAY_OFFSET <= 0;
+  // Возврат к сегодня — значком в самой пилюле, как на «Обзоре». Отдельная
+  // широкая полоса под заголовком «Районы» занимала строку ради одного
+  // действия и повторяла то, что уже написано на карточке.
+  const home = document.getElementById('odnHome');
+  if(home){
+    if(_dayNavOn(p) && DAY_OFFSET > 0) home.style.removeProperty('display');
+    else home.style.display = 'none';
+  }
   // Те же стрелки на прилипшей карточке выручки. Для недели, месяца и года
   // листать нечего — тогда остаётся только число.
   const hn = document.getElementById('offHeroNav');
@@ -7844,6 +7848,12 @@ function _paintHero(p, f){
   // что реально в руках.
   _setAed('heroDebt', ((f.by_method || {}).debt || {}).aed || 0);
   heroSideFit();
+  // Те же четыре числа на карточке «Районов». Считает их одно место — иначе на
+  // двух экранах за один и тот же день оказались бы разные суммы.
+  _setAed('offNet',   f.revenue.current - tips - spend);
+  _setAed('offTips',  tips);
+  _setAed('offSpend', spend);
+  _setAed('offDebt',  ((f.by_method || {}).debt || {}).aed || 0);
   _setAed('heroPrev', f.revenue.previous);
   _setText('heroDelta', f.revenue.delta_label);
   const hd = document.getElementById('heroDelta');

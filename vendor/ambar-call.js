@@ -98,6 +98,11 @@
         this._emit('ready', m);
         break;
 
+      case 'roster':                                // кто-то вошёл или вышел
+        this.roster = m.roster || [];
+        this._emit('roster', {roster: this.roster});
+        break;
+
       case 'denied':
         this._emit('denied');
         break;

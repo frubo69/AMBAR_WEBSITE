@@ -172,6 +172,16 @@ def _unbind(p: Peer):
             _BY_KEY.pop(p.key, None)
 
 
+async def _broadcast_roster():
+    """Разослать всем свежие списки.
+
+    Зелёная точка «в приложении» должна гаснуть и загораться сама: иначе
+    оператор видит водителя доступным через полчаса после того, как тот закрыл
+    приложение, и звонит в пустоту, думая, что звонит в трубку."""
+    for p in list(_PEERS.values()):
+        await p.send(t="roster", roster=_roster(p))
+
+
 def _sessions(key: str) -> list:
     return [_PEERS[s] for s in _BY_KEY.get(key, set()) if s in _PEERS]
 
@@ -463,6 +473,7 @@ async def handle_ws(request: web.Request):
             "ice": ice_servers(),
         })
         log.info(f"[call] на связи: {peer.label} ({peer.kind})")
+        await _broadcast_roster()
 
         # Водителя мог поднять пинок — тогда его ждёт входящий.
         pend = _PENDING.get(peer.key)
@@ -488,6 +499,7 @@ async def handle_ws(request: web.Request):
                 await _end(peer.call, "hangup", quiet_sid=peer.sid)
             _unbind(peer)
             log.info(f"[call] отключился: {peer.label}")
+            await _broadcast_roster()
     return ws
 
 

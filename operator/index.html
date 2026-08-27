@@ -19,6 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
+<script src="/vendor/ambar-call.js"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -622,6 +623,59 @@ a.oc-row:active{background:var(--card2)}
   text-transform:uppercase;color:var(--muted);margin-top:5px}
 .wh-sum span.ok b{color:#3ddc84}
 .wh-sum span.dim b{color:var(--dim)}
+/* ── Связь ─────────────────────────────────────────────────────────────────
+   Список — в обычном листе, а разговор живёт полосой внизу: оператор во время
+   звонка продолжает работать с заказом, и закрытый лист не должен означать
+   «звонок кончился». */
+.call-row{display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:12px;
+  border:1px solid var(--border3);background:var(--bg2);margin-bottom:8px;cursor:pointer;
+  transition:background .13s}
+.call-row:hover{background:var(--bg4,var(--bg2));border-color:var(--gold-dim,var(--border3))}
+.call-row-av{width:36px;height:36px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:13px;font-weight:700;color:var(--gold);
+  background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.22)}
+.call-row-b{flex:1;min-width:0}
+.call-row-n{font-size:14px;font-weight:600}
+.call-row-s{font-size:11px;color:var(--muted);margin-top:2px;display:flex;align-items:center;gap:5px}
+.call-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);opacity:.45;flex-shrink:0}
+.call-dot.on{background:#4CAF7D;opacity:1}
+.call-grp{font-size:10px;letter-spacing:1.6px;text-transform:uppercase;color:var(--muted);
+  font-weight:600;margin:14px 0 8px}
+.call-grp:first-child{margin-top:0}
+.call-live{text-align:center;padding:10px 0 4px}
+.call-live-av{width:84px;height:84px;margin:0 auto 14px;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;font-size:30px;font-weight:700;color:var(--gold);
+  background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.28)}
+.call-live-av.ring{animation:callPulse 1.1s ease-out infinite}
+@keyframes callPulse{0%{box-shadow:0 0 0 0 rgba(201,169,110,.4)}
+  100%{box-shadow:0 0 0 24px rgba(201,169,110,0)}}
+.call-live-n{font-size:21px;font-weight:700}
+.call-live-s{font-size:13px;color:var(--sub);margin-top:6px;min-height:18px}
+.call-live-acts{display:flex;justify-content:center;gap:16px;margin-top:24px}
+.call-cbtn{width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;color:#fff;transition:transform .12s}
+.call-cbtn:active{transform:scale(.92)}
+.call-cbtn.take{background:#4CAF7D}
+.call-cbtn.drop{background:#E05555}
+.call-cbtn .ic{width:24px;height:24px;stroke-width:2}
+.call-bar{position:fixed;left:16px;bottom:16px;z-index:150;display:none;align-items:center;gap:11px;
+  padding:9px 11px;border-radius:15px;background:var(--bg3);border:1px solid var(--border3);
+  box-shadow:0 12px 40px rgba(0,0,0,.55)}
+.call-bar.on{display:flex}
+.call-bar-av{width:34px;height:34px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:13px;font-weight:700;color:var(--gold);
+  background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.22)}
+.call-bar-b{min-width:96px}
+.call-bar-n{font-size:13.5px;font-weight:600;line-height:1.2}
+.call-bar-s{font-size:11px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+.call-bar-btn{width:34px;height:34px;border-radius:10px;border:1px solid var(--border3);
+  background:var(--bg2);color:var(--sub);cursor:pointer;display:flex;align-items:center;
+  justify-content:center}
+.call-bar-btn .ic{width:16px;height:16px}
+.call-bar-btn.on{color:var(--gold);border-color:rgba(201,169,110,.4);background:rgba(201,169,110,.1)}
+.call-bar-btn.drop{background:#E05555;border-color:#E05555;color:#fff}
+.pill.ringing{border-color:rgba(224,85,85,.55);color:#E05555;animation:callBlink 1s steps(2) infinite}
+@keyframes callBlink{50%{opacity:.45}}
 .sheet{background:var(--bg3);border:1px solid var(--border3);border-radius:20px;padding:22px;
   width:min(420px,92vw);box-shadow:0 24px 80px rgba(0,0,0,.7);margin:auto;flex-shrink:0}
 .sheet .t{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;margin-bottom:6px}
@@ -1331,6 +1385,9 @@ a.oc-row:active{background:var(--card2)}
         <button class="pill" id="shiftBtn" onclick="shiftOpen()"><svg class="ic" viewBox="0 0 24 24"
           aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg><span
           id="shiftLbl">Смена</span></button>
+        <button class="pill" id="callBtn" onclick="callOpen()" aria-label="Связь"><svg class="ic"
+          viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.8.6a2 2 0 0 1 1.7 2z"/></svg><span
+          id="callLbl">Связь</span></button>
       </div>
       <button class="pill pill-ico" id="themeBtn" onclick="toggleTheme()" aria-label="Тема"><svg
         class="ic" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.6v2.2M12 19.2v2.2M2.6 12h2.2M19.2 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M18.7 5.3l-1.6 1.6M6.9 17.1l-1.6 1.6"/></svg></button>
@@ -1669,6 +1726,29 @@ a.oc-row:active{background:var(--card2)}
   </div>
 </div>
 
+<!-- Связь. Список — обычным листом, входящий — поверх всего: заказ подождёт,
+     звонок нет. Полоса разговора остаётся внизу и после закрытия листа, иначе
+     оператор, вернувшись к заказу, теряет из виду, что он всё ещё говорит. -->
+<div class="ov" id="callOv" onclick="if(event.target===this)hideOv('callOv')">
+  <div class="sheet" style="width:min(460px,94vw)">
+    <div class="t" id="callT">Связь</div>
+    <div class="s" id="callS">Кому позвонить</div>
+    <div id="callBody"></div>
+  </div>
+</div>
+
+<div class="call-bar" id="callBar">
+  <span class="call-bar-av" id="callBarAv">—</span>
+  <div class="call-bar-b">
+    <div class="call-bar-n" id="callBarN">—</div>
+    <div class="call-bar-s" id="callBarS">—</div>
+  </div>
+  <button class="call-bar-btn" id="callBarMute" onclick="callMute()" aria-label="Микрофон"><svg
+    class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg></button>
+  <button class="call-bar-btn drop" onclick="callHangup()" aria-label="Завершить"><svg
+    class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+</div>
+
 <div class="toast" id="toast"></div>
 
 <script>
@@ -1792,6 +1872,9 @@ async function boot(){
     setInterval(()=>{ if(!document.hidden && !$('supOv').classList.contains('show')) loadSup(); }, 25000);
     setInterval(()=>{ if(!document.hidden && !$('fdOv').classList.contains('show')) loadFeed(); }, 15000);
     if(!curOp) showOv('opOv');
+    // Связь держим открытой всю смену: входящий должен доходить и тогда, когда
+    // окно связи закрыто, а оператор занят заказом.
+    try{ callInit(); }catch(e){}
     // Смена — первое, что оператор делает за день, и последнее, о чём он сам
     // вспомнит. Проверяем молча; открываем экран, только если открывать нечем.
     shiftCheck();
@@ -1870,6 +1953,9 @@ function pickOp(op){
   curOp=op; try{ localStorage.setItem('pos_op',op); }catch(e){}
   curDist=''; curDriver='';
   renderDispatch(); hideOv('opOv'); haptic('sel');
+  // Связь привязана к имени, а не к устройству: встали за другого — и звонки
+  // его водителей теперь приходят сюда.
+  try{ callInit(); }catch(e){}
 }
 function pickDist(id){
   if(curDist!==id){
@@ -4503,6 +4589,174 @@ boot();
   // осмысленные — тремя по логотипу открывается скрытый режим. Первый
   // вариант этой защиты как раз его и сломал.
 })();
+
+// ── СВЯЗЬ ───────────────────────────────────────────────────────────────────
+// Оператор звонит своим водителям и принимает входящие. Кто он такой для
+// связи — то же имя, под которым он сидит за панелью: районного оператора как
+// аккаунта не существует, за него встают за общим устройством. Поэтому при
+// смене имени связь переподключается: звонить должны тому, кто сейчас за него.
+let CALL = null, CALL_ST = 'idle', CALL_WHO = '', CALL_T0 = 0;
+let _callTick = null, _callRing = null, _callMuted = false, _callAs = '';
+
+function callInit(){
+  if(!window.AmbarCall || !curOp) return;
+  if(CALL && _callAs === curOp) return;
+  if(CALL){ CALL.close(); CALL = null; }
+  _callAs = curOp;
+  CALL = new AmbarCall({
+    api: opApi.AMBAR_API,
+    initData: (tg && tg.initData) || '',
+    as: curOp,
+    on: callEvent,
+  });
+  CALL.connect();
+}
+
+function callEvent(t, d){
+  if(t === 'ring'){
+    CALL_ST = 'in'; CALL_WHO = d.peer;
+    showOv('callOv'); callRing(true); callPaint();
+    $('callBtn')?.classList.add('ringing');
+    return;
+  }
+  if(t === 'calling'){ CALL_ST = 'out'; CALL_WHO = d.peer; callPaint(); return; }
+  if(t === 'talking'){
+    CALL_ST = 'live'; CALL_T0 = Date.now(); _callMuted = false;
+    callRing(false);
+    clearInterval(_callTick); _callTick = setInterval(callTimer, 1000);
+    callPaint(); callTimer();
+    return;
+  }
+  if(t === 'ended' || t === 'failed'){
+    callRing(false);
+    clearInterval(_callTick); _callTick = null;
+    const why = d.why || '';
+    CALL_ST = 'idle'; CALL_WHO = '';
+    $('callBtn')?.classList.remove('ringing');
+    callPaint();
+    if(t === 'failed')
+      toast(why === 'offline' ? 'Не в сети' :
+            why === 'busy' ? 'Вы уже в разговоре' :
+            why === 'not_allowed' ? 'Этому человеку звонить нельзя' :
+            'Звонок не прошёл', 'err');
+    else if(why === 'no_answer') toast('Не ответили', 'err');
+    else if(why === 'rejected')  toast('Отклонён', 'err');
+    return;
+  }
+  if(t === 'nomic'){
+    toast(d.why === 'NotAllowedError'
+      ? 'Браузеру не разрешён микрофон' : 'Микрофон недоступен', 'err');
+    return;
+  }
+  if(t === 'ready' || t === 'roster') callPaint();
+}
+
+// Входящий должен быть слышен, даже когда оператор смотрит в другое окно.
+function callRing(on){
+  if(!on){ if(_callRing){ clearInterval(_callRing); _callRing = null; } return; }
+  if(_callRing) return;
+  const beep = () => {
+    try{
+      const ac = window._posAc || (window._posAc = new (window.AudioContext||window.webkitAudioContext)());
+      if(ac.state === 'suspended') ac.resume();
+      [0, .22].forEach(off => {
+        const o = ac.createOscillator(), g = ac.createGain();
+        o.type='sine'; o.frequency.value = 620;
+        g.gain.setValueAtTime(0, ac.currentTime + off);
+        g.gain.linearRampToValueAtTime(.2, ac.currentTime + off + .03);
+        g.gain.linearRampToValueAtTime(0, ac.currentTime + off + .19);
+        o.connect(g); g.connect(ac.destination);
+        o.start(ac.currentTime + off); o.stop(ac.currentTime + off + .2);
+      });
+    }catch(e){}
+  };
+  beep(); _callRing = setInterval(beep, 2000);
+}
+
+function callTimer(){
+  if(CALL_ST !== 'live') return;
+  const s = Math.max(0, Math.round((Date.now() - CALL_T0) / 1000));
+  const txt = String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+  const a = $('callLiveS'); if(a) a.textContent = txt;
+  const b = $('callBarS'); if(b) b.textContent = txt;
+}
+
+function callOpen(){ callInit(); showOv('callOv'); callPaint(); }
+function callDial(key){
+  callInit();
+  if(!CALL){ toast('Связь недоступна','err'); return; }
+  CALL.dial(key || '').catch(()=>{});
+}
+function callAccept(){ CALL && CALL.accept().catch(()=>{}); }
+function callReject(){ CALL && CALL.reject(); }
+function callHangup(){ CALL && CALL.hangup(); }
+function callMute(){
+  if(!CALL) return;
+  _callMuted = CALL.mute(!_callMuted);
+  $('callBarMute')?.classList.toggle('on', _callMuted);
+  callPaint();
+}
+
+const _cIni = n => (n||'?').trim().charAt(0).toUpperCase();
+
+function callPaint(){
+  const body = $('callBody'); if(!body) return;
+  const bar = $('callBar');
+
+  // Полоса внизу живёт только во время разговора и переживает закрытие листа.
+  if(bar){
+    bar.classList.toggle('on', CALL_ST === 'live');
+    if(CALL_ST === 'live'){
+      $('callBarAv').textContent = _cIni(CALL_WHO);
+      $('callBarN').textContent = CALL_WHO;
+    }
+  }
+
+  if(CALL_ST === 'idle'){
+    $('callT').textContent = 'Связь';
+    $('callS').textContent = 'Кому позвонить';
+    const rows = (CALL && CALL.roster) || [];
+    if(!rows.length){
+      body.innerHTML = `<div class="call-row-s" style="justify-content:center;padding:18px 0">
+        ${curOp ? 'За вами сейчас нет водителей' : 'Сначала выберите оператора'}</div>`;
+      return;
+    }
+    let html = '', last = '';
+    rows.forEach(r => {
+      if(r.role !== last){ last = r.role;
+        html += `<div class="call-grp">${r.role === 'водитель' ? 'Водители' : r.role}</div>`; }
+      html += `<div class="call-row" onclick="callDial('${r.key}')">
+        <div class="call-row-av">${_cIni(r.name)}</div>
+        <div class="call-row-b">
+          <div class="call-row-n">${r.name}</div>
+          <div class="call-row-s"><span class="call-dot${r.online?' on':''}"></span>
+            ${r.online ? 'в приложении' : 'позвоним в телеграм'}</div>
+        </div>
+      </div>`;
+    });
+    body.innerHTML = html;
+    return;
+  }
+
+  $('callT').textContent = CALL_ST === 'live' ? 'Разговор' : 'Звонок';
+  $('callS').textContent = '';
+  const acts = CALL_ST === 'in' ? `
+      <button class="call-cbtn drop" onclick="callReject()" aria-label="Отклонить"><svg class="ic"
+        viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <button class="call-cbtn take" onclick="callAccept()" aria-label="Ответить"><svg class="ic"
+        viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.8.6a2 2 0 0 1 1.7 2z"/></svg></button>`
+    : `<button class="call-cbtn drop" onclick="callHangup()" aria-label="Завершить"><svg class="ic"
+        viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
+
+  body.innerHTML = `<div class="call-live">
+      <div class="call-live-av${CALL_ST === 'live' ? '' : ' ring'}">${_cIni(CALL_WHO)}</div>
+      <div class="call-live-n">${CALL_WHO || '—'}</div>
+      <div class="call-live-s" id="callLiveS">${
+        CALL_ST === 'in' ? 'Входящий звонок' : CALL_ST === 'out' ? 'Звоним…' : '00:00'}</div>
+      <div class="call-live-acts">${acts}</div>
+    </div>`;
+}
+
 </script>
 </body>
 </html>

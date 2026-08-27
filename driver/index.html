@@ -1082,6 +1082,56 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .call-row-go{width:38px;height:38px;flex-shrink:0;border-radius:50%;background:var(--up);
   display:flex;align-items:center;justify-content:center;color:#fff}
 .call-hint{font-size:11.5px;color:var(--muted);line-height:1.5;margin-top:16px;text-align:center}
+.hdr-call-n{position:absolute;top:-5px;right:-5px;min-width:17px;height:17px;padding:0 4px;
+  border-radius:9px;background:var(--dn);color:#fff;font-size:10px;font-weight:700;
+  display:flex;align-items:center;justify-content:center;border:2px solid var(--bg2)}
+/* Разрешение на микрофон: объясняем до того, как система покажет своё окно. */
+.call-warm{padding:14px;border-radius:15px;margin-bottom:14px;
+  background:rgba(243,180,74,.07);border:1px solid rgba(243,180,74,.28)}
+.call-warm-t{font-size:14.5px;font-weight:700;color:var(--warn)}
+.call-warm-s{font-size:12px;color:var(--sub);line-height:1.5;margin-top:5px}
+.call-warm-b{margin-top:11px;width:100%;padding:11px;border-radius:12px;border:0;cursor:pointer;
+  font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;color:#1a1408;
+  background:linear-gradient(180deg,var(--gold2),var(--gold))}
+.call-warm-b:active{opacity:.85}
+/* Недавние звонки — как в телефоне: направление, имя, длительность, время. */
+.call-cap{font-size:9px;letter-spacing:2.2px;text-transform:uppercase;color:var(--muted);
+  font-weight:600;padding:20px 2px 9px}
+.call-rec{display:flex;align-items:center;gap:9px;padding:11px 12px;border-radius:12px;
+  background:var(--card);border:1px solid var(--border2);margin-bottom:6px;cursor:pointer}
+.call-rec:active{background:var(--card2)}
+.call-rec-i{flex-shrink:0;color:var(--muted);display:flex}
+.call-rec.missed .call-rec-i{color:var(--dn)}
+.call-rec-n{flex:1;min-width:0;font-size:13.5px;font-weight:600;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.call-rec.missed .call-rec-n{color:var(--dn)}
+.call-rec-m{font-size:11px;color:var(--muted);flex-shrink:0}
+.call-rec-t{font-size:11px;color:var(--dim);flex-shrink:0;min-width:42px;text-align:right}
+/* Качество связи. Молчащая трубка и плохая связь — разные вещи, и человек
+   должен видеть какая именно. */
+.call-q{font-size:11.5px;margin-top:4px;min-height:16px;color:transparent}
+.call-q.weak{color:var(--warn)}
+.call-q.bad{color:var(--dn)}
+/* Ответить словом вместо разговора: за рулём не печатают. */
+.call-says{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin-top:22px}
+.call-says button{font-family:'DM Sans',sans-serif;font-size:12px;color:var(--sub);
+  background:var(--card2);border:1px solid var(--border3);border-radius:999px;
+  padding:8px 14px;cursor:pointer}
+.call-says button:active{background:var(--card3)}
+/* Полоса идущего разговора */
+.call-bar{position:fixed;left:0;right:0;top:calc(58px + var(--safe-top));z-index:60;
+  display:none;align-items:center;gap:9px;padding:9px 14px;cursor:pointer;
+  background:rgba(76,175,125,.14);border-bottom:1px solid rgba(76,175,125,.3);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+.call-bar.on{display:flex}
+.call-bar-live{width:8px;height:8px;border-radius:50%;background:var(--up);flex-shrink:0;
+  animation:callLive 1.4s ease-in-out infinite}
+@keyframes callLive{50%{opacity:.25}}
+.call-bar-n{flex:1;min-width:0;font-size:13.5px;font-weight:700;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.call-bar-s{font-size:12.5px;color:var(--up);font-weight:600;font-variant-numeric:tabular-nums}
+.call-bar-go{font-size:11px;color:var(--muted)}
+body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .sup-scr.show{display:flex}
 .sup-top{display:flex;align-items:center;gap:11px;flex-shrink:0;
   padding:calc(10px + var(--safe-top)) 13px 11px;
@@ -1467,12 +1517,22 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
       stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
       d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.8.6a2 2 0 0 1 1.7 2z"/></svg>
     <span class="hdr-call-dot" id="hdrCallDot"></span>
+    <span class="hdr-call-n" id="hdrCallN" style="display:none">0</span>
   </button>
   <div class="hdr-me">
     <div class="hdr-av" id="dAv">—</div>
     <div class="hdr-n" id="dName">Загрузка…</div>
   </div>
 </header>
+
+<!-- Идёт разговор. Окно связи можно закрыть и посмотреть адрес — но забыть,
+     что ты в разговоре, нельзя: полоса остаётся под шапкой и возвращает назад. -->
+<div class="call-bar" id="callBarWrap" onclick="callOpen()">
+  <span class="call-bar-live"></span>
+  <span class="call-bar-n" id="callBarN">—</span>
+  <span class="call-bar-s" id="callBarS">00:00</span>
+  <span class="call-bar-go">к звонку</span>
+</div>
 
 <div id="body"><div class="empty">Загрузка…</div></div>
 
@@ -5783,7 +5843,9 @@ let CALL = null;            // клиент сигналинга
 let CALL_ST = 'idle';       // idle | out | in | live
 let CALL_WHO = '';          // с кем сейчас дело
 let CALL_T0 = 0;            // когда сняли трубку — для счётчика
-let _callTick = null, _callRing = null, _callMuted = false;
+let CALL_NOTE = '';         // подсказка на экране исходящего
+let CALL_Q = '';            // качество связи
+let _callTick = null, _callMuted = false, _callWanted = false;
 
 function callInit(){
   if(CALL || !window.AmbarCall) return;
@@ -5796,128 +5858,203 @@ function callInit(){
 }
 
 function callEvent(t, d){
-  if(t === 'ready'){
-    cel('hdrCall')?.classList.add('on');
-    if(CALL_ST === 'idle') callRender();
-    // Подняли по звонку из бота — сразу показываем экран, не заставляя искать.
-    if(_callWanted){ _callWanted = false; callOpen(); }
-    return;
-  }
-  if(t === 'offline'){ cel('hdrCall')?.classList.remove('on'); return; }
-  if(t === 'roster'){ if(CALL_ST === 'idle') callRender(); return; }
-
-  if(t === 'ring'){
-    CALL_ST = 'in'; CALL_WHO = d.peer; callOpen(); callRing(true); callRender();
-    return;
-  }
-  if(t === 'calling'){
-    CALL_ST = 'out'; CALL_WHO = d.peer; CALL_NOTE = d.note || ''; callRender();
-    return;
-  }
-  if(t === 'talking'){
-    CALL_ST = 'live'; CALL_T0 = Date.now(); callRing(false);
-    _callMuted = false;
-    clearInterval(_callTick);
-    _callTick = setInterval(callTimer, 1000);
-    callRender(); callTimer();
-    return;
-  }
-  if(t === 'ended' || t === 'failed'){
-    callRing(false);
-    clearInterval(_callTick); _callTick = null;
-    const why = d.why || '';
-    CALL_ST = 'idle'; CALL_WHO = ''; CALL_NOTE = '';
-    callRender();
-    if(t === 'failed'){
-      toast(why === 'offline' ? 'Не в сети' :
-            why === 'busy' ? 'Вы уже в разговоре' :
-            why === 'not_allowed' ? 'Этому человеку звонить нельзя' :
-            'Звонок не прошёл', 'err');
-    }else if(why === 'no_answer') toast('Не ответили', 'err');
-    else if(why === 'rejected')  toast('Отклонён', 'err');
-    return;
-  }
-  if(t === 'nomic'){
-    toast(d.why === 'NotAllowedError'
-      ? 'Телеграму не разрешён микрофон' : 'Микрофон недоступен', 'err');
-    return;
+  switch(t){
+    case 'ready':
+      cel('hdrCall')?.classList.add('on');
+      callBadge();
+      if(CALL_ST === 'idle') callRender();
+      // Подняли по звонку из бота — сразу показываем экран, не заставляя искать.
+      if(_callWanted){ _callWanted = false; callOpen(); }
+      return;
+    case 'offline':
+      cel('hdrCall')?.classList.remove('on');
+      return;
+    case 'roster':
+      if(CALL_ST === 'idle') callRender();
+      return;
+    case 'recent':
+      callBadge();
+      if(CALL_ST === 'idle') callRender();
+      return;
+    case 'mic':
+      if(CALL_ST === 'idle') callRender();
+      return;
+    case 'ring':
+      CALL_ST = 'in'; CALL_WHO = d.peer;
+      callOpen(); callBuzz(); callRender();
+      return;
+    case 'calling':
+      CALL_ST = 'out'; CALL_WHO = d.peer; CALL_NOTE = d.note || '';
+      callOpen(); callRender();
+      return;
+    case 'talking':
+      CALL_ST = 'live'; CALL_T0 = Date.now(); CALL_Q = '';
+      _callMuted = false; callBuzz(false);
+      try{ tg.HapticFeedback.impactOccurred('medium'); }catch(e){}
+      clearInterval(_callTick); _callTick = setInterval(callTick, 1000);
+      callRender(); callTick();
+      return;
+    case 'quality':
+      CALL_Q = d.quality;
+      callPaintQuality();
+      return;
+    case 'ended':
+    case 'failed': {
+      callBuzz(false);
+      clearInterval(_callTick); _callTick = null;
+      const why = d.why || '', prev = CALL_ST, who = CALL_WHO;
+      CALL_ST = 'idle'; CALL_WHO = ''; CALL_NOTE = ''; CALL_Q = '';
+      callRender(); callBar();
+      if(t === 'failed'){
+        toast(why === 'busy_them' ? (d.peer || 'Он') + ' сейчас говорит'
+            : why === 'offline'   ? 'Не в сети'
+            : why === 'busy'      ? 'Вы уже в разговоре'
+            : why === 'not_allowed' ? 'Этому человеку звонить нельзя'
+            : 'Звонок не прошёл', 'err');
+      }else if(d.say)                   toast(who + ': ' + d.say, 'err');
+      else if(why === 'no_answer')      toast('Не ответили', 'err');
+      else if(why === 'rejected')       toast('Отклонён', 'err');
+      else if(why === 'link' && prev === 'live') toast('Связь оборвалась', 'err');
+      return;
+    }
+    case 'nomic':
+      toast(d.why === 'NotAllowedError'
+        ? 'Микрофон запрещён — включите его для Телеграма в настройках телефона'
+        : 'Микрофон недоступен', 'err');
+      if(CALL_ST === 'idle') callRender();
+      return;
   }
 }
-let CALL_NOTE = '';
 
-// ── звук входящего ──────────────────────────────────────────────────────────
-// Свой сигнал, не тот же, что у нового заказа: звонок и заказ требуют разного,
-// и различать их надо ухом, не глядя на экран.
-function callRing(on){
-  if(!on){
-    if(_callRing){ clearInterval(_callRing); _callRing = null; }
-    return;
-  }
-  if(_callRing) return;
-  const beep = () => {
-    try{ navigator.vibrate && navigator.vibrate([420, 220]); }catch(e){}
+// Дрожь на входящий. Звук ведёт библиотека — она одна на оба приложения и
+// знает, когда звонок начался и кончился.
+let _buzzT = null;
+function callBuzz(on){
+  if(on === false){ clearInterval(_buzzT); _buzzT = null; return; }
+  if(_buzzT) return;
+  const z = () => {
+    try{ navigator.vibrate && navigator.vibrate([420, 220, 420]); }catch(e){}
     try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
-    _acUnlock();
-    if(!_ac || _ac.state !== 'running') return;
-    [0, .22].forEach(off => {
-      const o = _ac.createOscillator(), g = _ac.createGain();
-      o.type = 'sine'; o.frequency.value = 620;
-      g.gain.setValueAtTime(0, _ac.currentTime + off);
-      g.gain.linearRampToValueAtTime(.22, _ac.currentTime + off + .03);
-      g.gain.linearRampToValueAtTime(0, _ac.currentTime + off + .19);
-      o.connect(g); g.connect(_ac.destination);
-      o.start(_ac.currentTime + off); o.stop(_ac.currentTime + off + .2);
-    });
   };
-  beep();
-  _callRing = setInterval(beep, 2000);
+  z(); _buzzT = setInterval(z, 2200);
 }
 
-function callTimer(){
+function callTick(){
   const e = cel('callState');
   if(!e || CALL_ST !== 'live') return;
   const s = Math.max(0, Math.round((Date.now() - CALL_T0) / 1000));
-  e.textContent = String(Math.floor(s / 60)).padStart(2, '0') + ':' +
-                  String(s % 60).padStart(2, '0');
+  const txt = String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+  e.textContent = txt;
+  const b = cel('callBarS'); if(b) b.textContent = txt;
+}
+
+function callPaintQuality(){
+  const e = cel('callQ');
+  if(!e) return;
+  e.className = 'call-q' + (CALL_Q ? ' ' + CALL_Q : '');
+  e.textContent = CALL_Q === 'bad' ? 'связь плохая'
+                : CALL_Q === 'weak' ? 'связь неустойчива' : '';
+}
+
+// Полоса «идёт разговор» под шапкой: окно связи можно закрыть и смотреть
+// адрес, но забыть, что ты в разговоре, нельзя.
+function callBar(){
+  const b = cel('callBarWrap');
+  if(!b) return;
+  const on = CALL_ST === 'live' && !cel('callScr').classList.contains('show');
+  b.classList.toggle('on', on);
+  document.body.classList.toggle('callbar-on', on);
+  if(on) cel('callBarN').textContent = CALL_WHO;
+}
+
+// Пропущенные — цифрой на кнопке в шапке, как везде.
+function callBadge(){
+  const n = ((CALL && CALL.recent) || []).filter(r => r.missed).length;
+  const e = cel('hdrCallN');
+  if(!e) return;
+  e.textContent = n > 9 ? '9+' : String(n);
+  e.style.display = n ? 'flex' : 'none';
 }
 
 // ── экран ───────────────────────────────────────────────────────────────────
 function callOpen(){
   callInit();
   cel('callScr')?.classList.add('show');
-  callRender();
+  callRender(); callBar();
 }
 function callClose(){
-  // Идёт разговор — окно просто уходит, звонок продолжается: водителю бывает
-  // нужно посмотреть адрес, не прерывая оператора.
   cel('callScr')?.classList.remove('show');
-  if(CALL_ST === 'in'){ CALL && CALL.reject(); }
+  if(CALL_ST === 'in') CALL && CALL.reject();
+  callBar();
 }
-
 function callDial(key){
   callInit();
   if(!CALL){ toast('Связь недоступна', 'err'); return; }
+  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
   CALL.dial(key || '').catch(() => {});
 }
 function callAccept(){ CALL && CALL.accept().catch(() => {}); }
 function callHangup(){ CALL && CALL.hangup(); }
-function callReject(){ CALL && CALL.reject(); }
+function callReject(say){ CALL && CALL.reject(say || ''); }
 function callMute(){
   if(!CALL) return;
   _callMuted = CALL.mute(!_callMuted);
-  callRender(); callTimer();
+  callRender(); callTick(); callPaintQuality();
+}
+// Микрофон спрашиваем в спокойный момент и один раз за сеанс — не когда
+// телефон уже звонит.
+function callWarm(){
+  callInit();
+  if(CALL) CALL.warmMic().then(() => callRender()).catch(() => {});
 }
 
 const _ini = n => (n || '?').trim().charAt(0).toUpperCase();
+const _mm = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
+
+function _callWhen(iso){
+  if(!iso) return '';
+  const d = new Date(iso), now = new Date();
+  if(isNaN(d)) return '';
+  const hh = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  const sameDay = d.toDateString() === now.toDateString();
+  if(sameDay) return hh;
+  const y = new Date(now); y.setDate(y.getDate() - 1);
+  if(d.toDateString() === y.toDateString()) return 'вчера ' + hh;
+  return d.getDate() + '.' + String(d.getMonth() + 1).padStart(2, '0');
+}
+
+const ICO_CALL = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+  stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
+  d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.8.6a2 2 0 0 1 1.7 2z"/></svg>`;
+const ICO_X = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
+  stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+
+// Быстрые ответы вместо разговора. Заготовлены заранее: за рулём не печатают.
+const CALL_SAYS = ['Перезвоню', 'За рулём', 'Я на адресе'];
 
 function callRender(){
   const box = cel('callMid'); if(!box) return;
   const title = cel('callTopT');
+  callBar();
 
   if(CALL_ST === 'idle'){
     if(title) title.textContent = 'Связь';
     const rows = (CALL && CALL.roster) || [];
-    box.innerHTML = rows.length ? rows.map(r => `
+    const rec = (CALL && CALL.recent) || [];
+    let html = '';
+
+    // Разрешение спрашиваем один раз и объясняем зачем — до того, как
+    // система покажет своё окно.
+    if(CALL && !CALL.micGranted()){
+      html += `<div class="call-warm">
+        <div class="call-warm-t">Разрешите микрофон</div>
+        <div class="call-warm-s">Один раз за установку. Без этого звонок не будет
+          слышно — ни ваш голос оператору, ни его вам.</div>
+        <button class="call-warm-b" onclick="callWarm()">Разрешить</button>
+      </div>`;
+    }
+
+    html += rows.length ? rows.map(r => `
       <div class="call-row" onclick="callDial('${r.key}')">
         <div class="call-row-av">${_ini(r.name)}</div>
         <div class="call-row-b">
@@ -5925,38 +6062,45 @@ function callRender(){
           <div class="call-row-s"><span class="call-dot${r.online ? ' on' : ''}"></span>
             ${r.online ? 'в приложении' : 'позвоним в телеграм'}</div>
         </div>
-        <div class="call-row-go"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
-          stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
-          d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.8.6a2 2 0 0 1 1.7 2z"/></svg></div>
-      </div>`).join('') + `<div class="call-hint">Зелёная точка — снимет сразу.
-        Иначе телефон зазвонит в телеграме, и звонок будет ждать полторы минуты.</div>`
-      : `<div class="call-hint" style="margin-top:40px">Связи пока нет.<br>
+        <div class="call-row-go">${ICO_CALL}</div>
+      </div>`).join('')
+      : `<div class="call-hint" style="margin-top:34px">Связи пока нет.<br>
          Если это не пройдёт само — скажите старшему.</div>`;
+
+    if(rec.length){
+      html += `<div class="call-cap">Недавние</div>` + rec.map(r => `
+        <div class="call-rec${r.missed ? ' missed' : ''}" onclick="callDial('${r.key}')">
+          <span class="call-rec-i">${r.dir === 'out'
+            ? '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg>'
+            : '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 7L7 17M15 17H7V9"/></svg>'}</span>
+          <span class="call-rec-n">${r.who}</span>
+          <span class="call-rec-m">${r.missed ? 'пропущен'
+            : r.talk ? _mm(r.talk) : 'без ответа'}</span>
+          <span class="call-rec-t">${_callWhen(r.at)}</span>
+        </div>`).join('');
+    }
+
+    if(rows.length) html += `<div class="call-hint">Зелёная точка — снимет сразу.
+      Иначе телефон зазвонит в телеграме, и звонок будет ждать полторы минуты.</div>`;
+    box.innerHTML = html;
     return;
   }
 
-  const st = CALL_ST === 'in' ? 'Входящий звонок'
-           : CALL_ST === 'out' ? 'Звоним…' : '';
   if(title) title.textContent = CALL_ST === 'live' ? 'Разговор' : 'Звонок';
+  const st = CALL_ST === 'in' ? 'Входящий звонок' : CALL_ST === 'out' ? 'Звоним…' : '00:00';
 
   const acts = CALL_ST === 'in' ? `
       <div class="call-act">
-        <button class="call-btn drop" onclick="callReject()" aria-label="Отклонить">
-          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
-            stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <button class="call-btn drop" onclick="callReject()" aria-label="Отклонить">${ICO_X}</button>
         <div class="call-btn-lbl">Отклонить</div>
       </div>
       <div class="call-act">
-        <button class="call-btn take" onclick="callAccept()" aria-label="Ответить">
-          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
-            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
-            d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.8.6a2 2 0 0 1 1.7 2z"/></svg></button>
+        <button class="call-btn take" onclick="callAccept()" aria-label="Ответить">${ICO_CALL.replace('17" height="17', '26" height="26')}</button>
         <div class="call-btn-lbl">Ответить</div>
       </div>`
     : CALL_ST === 'live' ? `
       <div class="call-act">
-        <button class="call-btn small${_callMuted ? ' on' : ''}" onclick="callMute()"
-          aria-label="Микрофон">
+        <button class="call-btn small${_callMuted ? ' on' : ''}" onclick="callMute()" aria-label="Микрофон">
           <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor"
             stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
@@ -5965,16 +6109,12 @@ function callRender(){
         <div class="call-btn-lbl">${_callMuted ? 'Включить' : 'Выключить'}</div>
       </div>
       <div class="call-act">
-        <button class="call-btn drop" onclick="callHangup()" aria-label="Завершить">
-          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
-            stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <button class="call-btn drop" onclick="callHangup()" aria-label="Завершить">${ICO_X}</button>
         <div class="call-btn-lbl">Завершить</div>
       </div>`
     : `
       <div class="call-act">
-        <button class="call-btn drop" onclick="callHangup()" aria-label="Отменить">
-          <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
-            stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+        <button class="call-btn drop" onclick="callHangup()" aria-label="Отменить">${ICO_X}</button>
         <div class="call-btn-lbl">Отменить</div>
       </div>`;
 
@@ -5983,14 +6123,17 @@ function callRender(){
       <div class="call-av${CALL_ST === 'live' ? '' : ' ring'}">${_ini(CALL_WHO)}</div>
       <div class="call-who">${CALL_WHO || '—'}</div>
       <div class="call-state" id="callState">${st}</div>
+      <div class="call-q" id="callQ"></div>
       ${CALL_NOTE ? `<div class="call-note">${CALL_NOTE}</div>` : ''}
       <div class="call-acts">${acts}</div>
+      ${CALL_ST === 'in' ? `<div class="call-says">${CALL_SAYS.map(s =>
+        `<button onclick="callReject('${s}')">${s}</button>`).join('')}</div>` : ''}
     </div>`;
+  callPaintQuality();
 }
 
 // Открыли приложение кнопкой «взять звонок» из бота — экран должен встретить
 // сам, без поисков: человек уже согласился ответить, нажав кнопку.
-let _callWanted = false;
 try{
   const _p = new URLSearchParams(location.search).get('call')
           || (tg && tg.initDataUnsafe && tg.initDataUnsafe.start_param) || '';

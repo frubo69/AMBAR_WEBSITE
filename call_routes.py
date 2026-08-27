@@ -217,6 +217,49 @@ def ice_servers() -> list:
 
 
 # ── журнал ──────────────────────────────────────────────────────────────────
+async def _recent(peer, limit: int = 12) -> list:
+    """Последние звонки этого человека — и свои, и чужие к нему.
+
+    Список недавних есть в любом телефоне, и не ради красоты: пропущенный
+    звонок иначе исчезает бесследно, а перезвонить надо именно тому, кто
+    звонил. Отсюда же и повторный набор одним касанием."""
+    out = []
+    try:
+        x = db._db_or_none()
+        if x is None:
+            return out
+        me_kind, _, me_name = peer.key.partition(":")
+        cur = x.calls.find(
+            {"$or": [{"from": peer.label, "from_kind": me_kind},
+                     {"to": me_name, "to_kind": me_kind}]},
+            {"_id": 0}).sort("at", -1).limit(limit)
+        async for c in cur:
+            mine = c.get("from") == peer.label and c.get("from_kind") == me_kind
+            other = c.get("to") if mine else c.get("from")
+            other_kind = c.get("to_kind") if mine else c.get("from_kind")
+            out.append({
+                "who": other, "key": f"{other_kind}:{other}",
+                "dir": "out" if mine else "in",
+                "at": c.get("at", ""),
+                "talk": int(c.get("talk_sec") or 0),
+                # Пропущенный — только входящий, на который не ответили. Свой
+                # неотвеченный звонок пропущенным называть незачем.
+                "missed": (not mine) and c.get("outcome") in ("no_answer", "rejected"),
+                "outcome": c.get("outcome", ""),
+            })
+    except Exception as e:
+        log.warning(f"[call] недавние не прочитаны: {e}")
+    return out
+
+
+async def _push_recent(*peers):
+    """Разослать обновлённый список тем, кого звонок касался."""
+    for p in peers:
+        if p and p.sid in _PEERS:
+            await p.send(t="recent", recent=await _recent(p))
+
+
+
 async def _log_call(call: Call, outcome: str):
     """Звонок в отличие от переписки не оставляет следа сам по себе. Раз он
     заменяет собой сообщение по заказу, след обязан остаться здесь."""
@@ -239,8 +282,11 @@ async def _log_call(call: Call, outcome: str):
         log.warning(f"[call] журнал не записан: {e}")
 
 
-async def _end(call: Call, outcome: str, quiet_sid: str = ""):
-    """Свернуть звонок с обеих сторон. quiet_sid — тот, кто и так знает."""
+async def _end(call: Call, outcome: str, quiet_sid: str = "", say: str = ""):
+    """Свернуть звонок с обеих сторон. quiet_sid — тот, кто и так знает.
+
+    say — короткий ответ вместо разговора («перезвоню», «занят»). За рулём
+    набирать нечего, а звонящему важно услышать не «отклонён», а причину."""
     _CALLS.pop(call.cid, None)
     if call.ring_task:
         call.ring_task.cancel()
@@ -248,12 +294,13 @@ async def _end(call: Call, outcome: str, quiet_sid: str = ""):
         if p and p.call and p.call.cid == call.cid:
             p.call = None
             if p.sid != quiet_sid:
-                await p.send(t="end", call=call.cid, why=outcome)
+                await p.send(t="end", call=call.cid, why=outcome, say=say)
     # Звонок мог ждать водителя, поднятого пинком, — снимаем и это.
     pend = _PENDING.get(call.callee_key)
     if pend and pend[0] == call.cid:
         _PENDING.pop(call.callee_key, None)
     await _log_call(call, outcome)
+    await _push_recent(call.caller, call.callee)
 
 
 # ── рингтон в боте водителя ─────────────────────────────────────────────────
@@ -382,6 +429,14 @@ async def _start_call(caller: Peer, to_key: str, order: str):
     caller.call = call
     _CALLS[cid] = call
 
+    # Все на месте, но в разговоре — это не «недоступен», а «занят», и человеку
+    # разница важна: занятого ждут, недоступного ищут другим путём.
+    if not targets and _sessions(to_key):
+        caller.call = None
+        _CALLS.pop(cid, None)
+        await caller.send(t="failed", why="busy_them", peer=name)
+        return
+
     if not targets and kind == "drv":
         # Приложение закрыто: держим звонок и звоним ему в бот.
         if not staff.DRIVER_IDS.get(name) or not _drv_token():
@@ -487,6 +542,7 @@ async def handle_ws(request: web.Request):
             "t": "ready", "me": peer.label, "kind": peer.kind,
             "peer": _default_target(peer),
             "roster": _roster(peer),
+            "recent": await _recent(peer),
             "ice": ice_servers(),
         })
         log.info(f"[call] на связи: {peer.label} ({peer.kind})")
@@ -551,7 +607,8 @@ async def _on_message(peer: Peer, m: dict):
             for p in _sessions(call.callee_key):
                 if p.sid != peer.sid:
                     await p.send(t="cancel", call=call.cid)
-            await _end(call, "rejected", quiet_sid=peer.sid)
+            await _end(call, "rejected", quiet_sid=peer.sid,
+                       say=str(m.get("say") or "")[:60])
         else:
             await _end(call, "hangup" if call.answered else "cancelled",
                        quiet_sid=peer.sid)

@@ -30,6 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
+<script src="/vendor/ambar-call.js?v=2"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -3238,6 +3239,12 @@ button.path:active{transform:scale(.995)}
     <div class="live-dot" id="liveDot" title="API status">Online</div>
   </div>
   <div class="hdr-r">
+    <!-- Связь. Отсюда можно позвонить любому оператору и любому водителю —
+         это верхний уровень иерархии, и звонить ему может быть кому угодно. -->
+    <button class="icon-btn" id="callBtn" aria-label="Связь" onclick="callOpen()">
+      <svg viewBox="0 0 24 24"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.8.6a2 2 0 0 1 1.7 2z"/></svg>
+      <span class="alerts-btn-badge" id="callBtnBadge" style="display:none">0</span>
+    </button>
     <button class="icon-btn alerts-btn" id="alertsBtn" aria-label="Уведомления" onclick="openAlerts()">
       <svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg>
       <span class="alerts-btn-badge" id="alertsBtnBadge" style="display:none">0</span>
@@ -5695,6 +5702,117 @@ button.pill:active{opacity:.6}
 </style>
 
 <!-- ============ TAB BAR ============ -->
+
+<!-- ═══ СВЯЗЬ ═══
+     Верхний уровень: отсюда звонят любому оператору и любому водителю, а
+     сюда — никто. Избранное только здесь: у водителя один контакт, у
+     оператора свои водители, а тут список на полтора десятка человек, и
+     нужных из них каждый день два-три. -->
+<div class="cmd-overlay" id="callOv" onclick="if(event.target===this)callClose()">
+  <div class="cmd-sheet" style="max-width:460px">
+    <div class="cmd-hdr" style="padding:16px 18px 12px">
+      <div style="flex:1">
+        <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:var(--text)" id="callT">Связь</div>
+        <div style="font-size:11px;color:var(--muted);letter-spacing:.3px;margin-top:2px" id="callS">Кому позвонить</div>
+      </div>
+      <button class="cmd-close" onclick="callClose()" aria-label="Закрыть"><span class="txt">ESC</span><span class="x">✕</span></button>
+    </div>
+    <div class="cmd-body" style="padding:8px 12px 16px" id="callBody"></div>
+  </div>
+</div>
+
+<div class="call-bar" id="callBar">
+  <span class="call-bar-av" id="callBarAv">—</span>
+  <div class="call-bar-b">
+    <div class="call-bar-n" id="callBarN">—</div>
+    <div class="call-bar-s" id="callBarS">00:00</div>
+  </div>
+  <button class="call-bar-btn" id="callBarMute" onclick="callMute()" aria-label="Микрофон"><svg
+    viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9"
+    stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg></button>
+  <button class="call-bar-btn drop" onclick="callHangup()" aria-label="Завершить"><svg
+    viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+    stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+</div>
+
+<style>
+/* ── Связь ─────────────────────────────────────────────────────────────────
+   Та же страница звонков, что у водителя и оператора: переключатель, избранное,
+   контакты, история. Знакомый вид важнее оригинального. */
+.call-tabs{display:flex;gap:8px;margin:0 0 14px}
+.call-tabs button{flex:1;padding:8px;border-radius:10px;cursor:pointer;
+  font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--muted);
+  background:var(--card2);border:1px solid var(--border2)}
+.call-tabs button.on{color:var(--gold2);background:rgba(201,169,110,.12);border-color:rgba(201,169,110,.4)}
+.call-grp{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);
+  font-weight:600;margin:16px 0 8px}
+.call-grp:first-child{margin-top:2px}
+.call-item{display:flex;align-items:center;gap:12px;padding:9px 2px}
+.call-item+.call-item{border-top:1px solid var(--border2)}
+.call-ava{width:40px;height:40px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:14px;font-weight:700;color:var(--gold2);
+  background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.2)}
+.call-item-b{flex:1;min-width:0;cursor:pointer}
+.call-item-n{font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.call-item.missed .call-item-n,.call-item.missed .call-item-s{color:var(--dn)}
+.call-item-s{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:2px}
+.call-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);opacity:.4;flex-shrink:0}
+.call-dot.on{background:var(--up);opacity:1}
+.call-star{width:32px;height:32px;flex-shrink:0;border-radius:50%;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;color:var(--dim);background:transparent;border:0}
+.call-star.on{color:var(--gold2)}
+.call-item-go{width:36px;height:36px;flex-shrink:0;border-radius:50%;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;color:var(--up);
+  background:rgba(76,175,125,.12);border:1px solid rgba(76,175,125,.28)}
+.call-item-go:hover{background:rgba(76,175,125,.22)}
+.call-empty{text-align:center;color:var(--muted);font-size:13px;padding:30px 12px;line-height:1.55}
+.call-warm{padding:13px;border-radius:13px;margin-bottom:14px;
+  background:rgba(243,180,74,.07);border:1px solid rgba(243,180,74,.3)}
+.call-warm-t{font-size:14px;font-weight:700;color:var(--warn)}
+.call-warm-s{font-size:12px;color:var(--sub);line-height:1.5;margin-top:5px}
+.call-warm-b{margin-top:11px;width:100%;padding:10px;border-radius:11px;border:0;cursor:pointer;
+  font-family:'Space Grotesk',sans-serif;font-size:13.5px;font-weight:700;color:#1a1408;background:var(--gold)}
+.call-live{text-align:center;padding:8px 0 4px}
+.call-live-av{width:84px;height:84px;margin:0 auto 14px;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;font-size:30px;font-weight:700;color:var(--gold2);
+  background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.28)}
+.call-live-av.ring{animation:callPulse 1.1s ease-out infinite}
+@keyframes callPulse{0%{box-shadow:0 0 0 0 rgba(201,169,110,.4)}100%{box-shadow:0 0 0 24px rgba(201,169,110,0)}}
+.call-live-n{font-size:21px;font-weight:700}
+.call-live-s{font-size:13px;color:var(--sub);margin-top:6px;min-height:18px}
+.call-q{font-size:11.5px;margin-top:4px;min-height:16px;color:transparent}
+.call-q.weak{color:var(--warn)}
+.call-q.bad{color:var(--dn)}
+.call-live-acts{display:flex;justify-content:center;gap:16px;margin-top:22px}
+.call-live-acts.row2{margin-top:16px}
+.call-cbtn{width:58px;height:58px;border-radius:50%;border:0;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;color:#fff;transition:transform .12s}
+.call-cbtn:active{transform:scale(.92)}
+.call-cbtn.take{background:var(--up)}
+.call-cbtn.drop{background:var(--dn)}
+.call-cbtn.mute{background:var(--card2);border:1px solid var(--border2);color:var(--sub)}
+.call-cbtn.mute.on{background:rgba(201,169,110,.15);border-color:rgba(201,169,110,.45);color:var(--gold2)}
+.call-says{display:flex;flex-wrap:wrap;justify-content:center;gap:7px;margin-top:18px}
+.call-says button{font-family:'DM Sans',sans-serif;font-size:12px;color:var(--sub);
+  background:var(--card2);border:1px solid var(--border2);border-radius:999px;padding:7px 13px;cursor:pointer}
+.call-bar{position:fixed;left:16px;bottom:calc(88px + var(--safe-bottom));z-index:150;display:none;
+  align-items:center;gap:11px;padding:9px 11px;border-radius:15px;background:var(--card);
+  border:1px solid var(--border2);box-shadow:0 12px 40px rgba(0,0,0,.55)}
+.call-bar.on{display:flex}
+.call-bar-av{width:34px;height:34px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:13px;font-weight:700;color:var(--gold2);
+  background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.22)}
+.call-bar-b{min-width:92px}
+.call-bar-n{font-size:13.5px;font-weight:600;line-height:1.2}
+.call-bar-s{font-size:11px;color:var(--muted);margin-top:2px;font-variant-numeric:tabular-nums}
+.call-bar-btn{width:34px;height:34px;border-radius:10px;border:1px solid var(--border2);
+  background:var(--card2);color:var(--sub);cursor:pointer;display:flex;align-items:center;justify-content:center}
+.call-bar-btn.on{color:var(--gold2);border-color:rgba(201,169,110,.4);background:rgba(201,169,110,.1)}
+.call-bar-btn.drop{background:var(--dn);border-color:var(--dn);color:#fff}
+#callBtn.ringing{color:var(--dn);animation:callBlink 1s steps(2) infinite}
+@keyframes callBlink{50%{opacity:.4}}
+</style>
+
 <nav class="tabbar">
   <button class="tb on" data-pg="overview">
     <svg viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="9" rx="2"/><rect x="14" y="3" width="7" height="5" rx="2"/><rect x="14" y="12" width="7" height="9" rx="2"/><rect x="3" y="16" width="7" height="5" rx="2"/></svg>
@@ -19250,6 +19368,273 @@ function renderHours(h){
   // осмысленные — тремя по логотипу открывается скрытый режим. Первый
   // вариант этой защиты как раз его и сломал.
 })();
+
+// ── СВЯЗЬ ───────────────────────────────────────────────────────────────────
+// Верхний уровень иерархии: отсюда звонят любому оператору и любому водителю,
+// а сюда не звонит никто. Избранное живёт только здесь — у водителя один
+// контакт, у оператора свои водители, а тут полтора десятка человек, из
+// которых каждый день нужны два-три.
+let CALL = null, CALL_ST = 'idle', CALL_WHO = '', CALL_T0 = 0, CALL_Q = '';
+let CALL_TAB = 'all', _callTick = null, _callMuted = false;
+const CALL_SAYS = ['Перезвоню', 'Занят'];
+
+const _cq = id => document.getElementById(id);
+const _cIni = n => (n || '?').trim().charAt(0).toUpperCase();
+const _cMm = s => String(Math.floor(s/60)).padStart(2,'0') + ':' + String(s%60).padStart(2,'0');
+const _CDOW = ['вс','пн','вт','ср','чт','пт','сб'];
+function _cWhen(iso){
+  if(!iso) return '';
+  const d = new Date(iso), now = new Date(); if(isNaN(d)) return '';
+  const hh = String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
+  if(d.toDateString() === now.toDateString()) return 'сегодня · ' + hh;
+  const y = new Date(now); y.setDate(y.getDate() - 1);
+  if(d.toDateString() === y.toDateString()) return 'вчера · ' + hh;
+  if(now - d < 6*864e5) return _CDOW[d.getDay()] + ' · ' + hh;
+  return d.getDate() + '.' + String(d.getMonth()+1).padStart(2,'0') + ' · ' + hh;
+}
+
+// Избранное — на устройстве: это личная привычка владельца, а не общая
+// настройка. У каждого свои двое-трое.
+function callFav(){ try{ return JSON.parse(localStorage.getItem('ambar_call_fav') || '[]'); }catch(e){ return []; } }
+function callFavToggle(key, ev){
+  if(ev) ev.stopPropagation();
+  const f = callFav(), i = f.indexOf(key);
+  if(i < 0) f.push(key); else f.splice(i, 1);
+  try{ localStorage.setItem('ambar_call_fav', JSON.stringify(f)); }catch(e){}
+  callPaint();
+}
+
+function callGroup(list){
+  const out = [];
+  list.forEach(r => {
+    const l = out[out.length - 1];
+    if(l && l.key === r.key && l.dir === r.dir && l.missed === r.missed){ l.n++; l.talk = l.talk || r.talk; return; }
+    out.push(Object.assign({n: 1}, r));
+  });
+  return out;
+}
+const ICO_PHONE = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+  stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.8.6a2 2 0 0 1 1.7 2z"/></svg>`;
+const ICO_STAR = `<svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" stroke="currentColor"
+  stroke-width="1.4" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/></svg>`;
+const ICO_STAR_O = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+  stroke-width="1.7" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/></svg>`;
+function _dirIco(r){
+  const p = r.dir === 'out' && !r.missed ? 'M7 17L17 7M9 7h8v8' : 'M17 7L7 17M15 17H7V9';
+  return `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+    stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="${p}"/></svg>`;
+}
+
+function callInit(){
+  if(CALL || !window.AmbarCall) return;
+  CALL = new AmbarCall({
+    api: ownerApi.AMBAR_API,
+    initData: (window.Telegram && Telegram.WebApp && Telegram.WebApp.initData) || '',
+    on: callEvent,
+  });
+  CALL.connect();
+}
+
+function callEvent(t, d){
+  switch(t){
+    case 'ready': case 'roster': case 'recent': case 'mic':
+      callBadge(); callPaint(); return;
+    case 'ring':
+      CALL_ST = 'in'; CALL_WHO = d.peer;
+      _cq('callOv').classList.add('show'); _cq('callBtn')?.classList.add('ringing');
+      callPaint(); return;
+    case 'calling':
+      CALL_ST = 'out'; CALL_WHO = d.peer;
+      _cq('callOv').classList.add('show'); callPaint(); return;
+    case 'talking':
+      CALL_ST = 'live'; CALL_T0 = Date.now(); CALL_Q = ''; _callMuted = false;
+      clearInterval(_callTick); _callTick = setInterval(callTimer, 1000);
+      callPaint(); callTimer(); return;
+    case 'quality':
+      CALL_Q = d.quality; callQuality(); return;
+    case 'ended': case 'failed': {
+      clearInterval(_callTick); _callTick = null;
+      const why = d.why || '', who = CALL_WHO;
+      CALL_ST = 'idle'; CALL_WHO = ''; CALL_Q = '';
+      _cq('callBtn')?.classList.remove('ringing');
+      callPaint();
+      if(t === 'failed')
+        _toast(why === 'busy_them' ? (d.peer || 'Он') + ' сейчас говорит'
+             : why === 'offline' ? 'Не в сети'
+             : why === 'not_allowed' ? 'Этому человеку звонить нельзя'
+             : 'Звонок не прошёл');
+      else if(d.say)               _toast(who + ': ' + d.say);
+      else if(why === 'no_answer') _toast('Не ответили');
+      else if(why === 'rejected')  _toast('Отклонён');
+      return;
+    }
+    case 'nomic':
+      _toast(d.why === 'NotAllowedError'
+        ? 'Микрофон запрещён — разрешите его в настройках' : 'Микрофон недоступен');
+      callPaint(); return;
+  }
+}
+
+function callTimer(){
+  if(CALL_ST !== 'live') return;
+  const txt = _cMm(Math.max(0, Math.round((Date.now() - CALL_T0)/1000)));
+  const a = _cq('callLiveS'); if(a) a.textContent = txt;
+  const b = _cq('callBarS'); if(b) b.textContent = txt;
+}
+function callQuality(){
+  const e = _cq('callQ'); if(!e) return;
+  e.className = 'call-q' + (CALL_Q ? ' ' + CALL_Q : '');
+  e.textContent = CALL_Q === 'bad' ? 'связь плохая' : CALL_Q === 'weak' ? 'связь неустойчива' : '';
+}
+function callBadge(){
+  const n = ((CALL && CALL.recent) || []).filter(r => r.missed).length;
+  const e = _cq('callBtnBadge'); if(!e) return;
+  e.textContent = n > 9 ? '9+' : String(n);
+  e.style.display = n ? 'flex' : 'none';
+}
+
+function callOpen(){ callInit(); _cq('callOv').classList.add('show'); callPaint(); }
+function callClose(){ _cq('callOv').classList.remove('show'); if(CALL_ST === 'in') CALL && CALL.reject(); }
+function callTab(t){ CALL_TAB = t; callPaint(); }
+function callDial(key){
+  callInit();
+  if(!CALL){ _toast('Связь недоступна'); return; }
+  CALL.dial(key || '').catch(()=>{});
+}
+function callAccept(){ CALL && CALL.accept().catch(()=>{}); }
+function callReject(say){ CALL && CALL.reject(say || ''); }
+function callHangup(){ CALL && CALL.hangup(); }
+function callWarm(){ callInit(); if(CALL) CALL.warmMic().then(callPaint).catch(()=>{}); }
+function callMute(){
+  if(!CALL) return;
+  _callMuted = CALL.mute(!_callMuted);
+  _cq('callBarMute')?.classList.toggle('on', _callMuted);
+  callPaint();
+}
+
+function callPaint(){
+  try{ _callPaint(); }
+  catch(e){
+    console.error('[call] экран не собрался', e);
+    const b = _cq('callBody');
+    if(b) b.innerHTML = '<div class="call-empty">Не удалось показать список — перезагрузите приложение</div>';
+  }
+}
+
+function _callPaint(){
+  const body = _cq('callBody'); if(!body) return;
+  const bar = _cq('callBar');
+  if(bar){
+    bar.classList.toggle('on', CALL_ST === 'live');
+    if(CALL_ST === 'live'){
+      _cq('callBarAv').textContent = _cIni(CALL_WHO);
+      _cq('callBarN').textContent = CALL_WHO;
+    }
+  }
+
+  if(CALL_ST === 'idle'){
+    _cq('callT').textContent = 'Связь';
+    _cq('callS').textContent = 'Кому позвонить';
+    const rows = (CALL && CALL.roster) || [];
+    const rec = callGroup((CALL && CALL.recent) || []);
+    const shown = CALL_TAB === 'missed' ? rec.filter(r => r.missed) : rec;
+    const fav = callFav();
+    let html = `<div class="call-tabs">
+        <button class="${CALL_TAB === 'all' ? 'on' : ''}" onclick="callTab('all')">Все</button>
+        <button class="${CALL_TAB === 'missed' ? 'on' : ''}" onclick="callTab('missed')">Пропущенные</button>
+      </div>`;
+
+    const micOk = !CALL || typeof CALL.micGranted !== 'function' || CALL.micGranted();
+    if(!micOk){
+      html += `<div class="call-warm">
+        <div class="call-warm-t">Разрешите микрофон</div>
+        <div class="call-warm-s">Один раз на это устройство. Без него звонок не будет слышно.</div>
+        <button class="call-warm-b" onclick="callWarm()">Разрешить</button>
+      </div>`;
+    }
+
+    const person = r => `<div class="call-item">
+        <div class="call-ava">${_cIni(r.name)}</div>
+        <div class="call-item-b" onclick="callDial('${r.key}')">
+          <div class="call-item-n">${r.name}</div>
+          <div class="call-item-s"><span class="call-dot${r.online ? ' on' : ''}"></span>
+            ${r.role}${r.online ? ' · в приложении' : ''}</div>
+        </div>
+        <button class="call-star${fav.indexOf(r.key) >= 0 ? ' on' : ''}"
+          onclick="callFavToggle('${r.key}', event)" aria-label="В избранное">${
+          fav.indexOf(r.key) >= 0 ? ICO_STAR : ICO_STAR_O}</button>
+        <div class="call-item-go" onclick="callDial('${r.key}')">${ICO_PHONE}</div>
+      </div>`;
+
+    if(CALL_TAB === 'all'){
+      const favRows = rows.filter(r => fav.indexOf(r.key) >= 0);
+      if(favRows.length) html += `<div class="call-grp">Избранные</div>` + favRows.map(person).join('');
+      const rest = rows.filter(r => fav.indexOf(r.key) < 0);
+      let last = '';
+      rest.forEach(r => {
+        if(r.role !== last){ last = r.role;
+          html += `<div class="call-grp">${r.role === 'водитель' ? 'Водители'
+            : r.role === 'оператор' ? 'Операторы' : r.role}</div>`; }
+        html += person(r);
+      });
+      if(!rows.length) html += `<div class="call-empty">Список пуст</div>`;
+    }
+
+    if(shown.length){
+      if(CALL_TAB === 'all') html += `<div class="call-grp">Недавние</div>`;
+      html += shown.map(r => `
+        <div class="call-item${r.missed ? ' missed' : ''}">
+          <div class="call-ava">${_cIni(r.who)}</div>
+          <div class="call-item-b" onclick="callDial('${r.key}')">
+            <div class="call-item-n">${r.who}${r.n > 1 ? ' <span style="color:var(--muted);font-weight:400">(' + r.n + ')</span>' : ''}</div>
+            <div class="call-item-s">${_dirIco(r)}<span>${_cWhen(r.at)}</span>${
+              r.talk ? '<span>· ' + _cMm(r.talk) + '</span>' : ''}</div>
+          </div>
+          <div class="call-item-go" onclick="callDial('${r.key}')">${ICO_PHONE}</div>
+        </div>`).join('');
+    }else if(CALL_TAB === 'missed'){
+      html += `<div class="call-empty">Пропущенных нет</div>`;
+    }
+    body.innerHTML = html;
+    return;
+  }
+
+  _cq('callT').textContent = CALL_ST === 'live' ? 'Разговор' : 'Звонок';
+  _cq('callS').textContent = '';
+  const acts = CALL_ST === 'in' ? `
+      <button class="call-cbtn drop" onclick="callReject()" aria-label="Отклонить"><svg viewBox="0 0 24 24"
+        width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <button class="call-cbtn take" onclick="callAccept()" aria-label="Ответить">${ICO_PHONE.replace('17" height="17','24" height="24')}</button>`
+    : CALL_ST === 'live' ? `
+      <button class="call-cbtn mute${_callMuted ? ' on' : ''}" onclick="callMute()" aria-label="Микрофон"><svg
+        viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9"
+        stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/>${
+        _callMuted ? '<path d="M3 3l18 18"/>' : ''}</svg></button>`
+    : '';
+  const drop = (CALL_ST === 'live' || CALL_ST === 'out') ? `
+      <div class="call-live-acts row2">
+        <button class="call-cbtn drop" onclick="callHangup()" aria-label="Завершить"><svg viewBox="0 0 24 24"
+          width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      </div>` : '';
+
+  body.innerHTML = `<div class="call-live">
+      <div class="call-live-av${CALL_ST === 'live' ? '' : ' ring'}">${_cIni(CALL_WHO)}</div>
+      <div class="call-live-n">${CALL_WHO || '—'}</div>
+      <div class="call-live-s" id="callLiveS">${
+        CALL_ST === 'in' ? 'Входящий звонок' : CALL_ST === 'out' ? 'Звоним…' : '00:00'}</div>
+      <div class="call-q" id="callQ"></div>
+      ${acts ? `<div class="call-live-acts">${acts}</div>` : ''}
+      ${drop}
+      ${CALL_ST === 'in' ? `<div class="call-says">${CALL_SAYS.map(x =>
+        `<button onclick="callReject('${x}')">${x}</button>`).join('')}</div>` : ''}
+    </div>`;
+  callQuality();
+}
+
+// Связь держим открытой всё время, пока открыто приложение: входящий должен
+// доходить и когда окно связи закрыто.
+try{ setTimeout(callInit, 1500); }catch(e){}
+
 </script>
 </body>
 </html>

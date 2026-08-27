@@ -1056,7 +1056,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .call-role{font-size:12px;color:var(--muted)}
 .call-state{font-size:13.5px;color:var(--sub);margin-top:9px;min-height:19px}
 .call-note{font-size:11.5px;color:var(--warn);margin-top:5px;max-width:270px;line-height:1.45}
-.call-acts{display:flex;align-items:center;justify-content:center;gap:18px;margin-top:32px}
+/* Раскладка как в телефоне: сверху ряд действий, отбой — отдельно и ниже,
+   крупнее остальных. Промахнуться по нему нельзя, а случайно попасть — трудно. */
+.call-acts{display:flex;align-items:center;justify-content:center;gap:26px;margin-top:34px}
+.call-acts.row2{margin-top:22px}
 .call-btn{width:66px;height:66px;border-radius:50%;border:0;cursor:pointer;display:flex;
   align-items:center;justify-content:center;color:#fff;transition:transform .12s var(--e1)}
 .call-btn:active{transform:scale(.9)}
@@ -1097,6 +1100,34 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 /* Недавние звонки — как в телефоне: направление, имя, длительность, время. */
 .call-cap{font-size:9px;letter-spacing:2.2px;text-transform:uppercase;color:var(--muted);
   font-weight:600;padding:20px 2px 9px}
+/* ── Страница звонков ────────────────────────────────────────────────────────
+   Сделана по образцу телефонного приложения: заголовок, переключатель «все /
+   пропущенные», строки с крупным кружком, именем, стрелкой направления и
+   временем, справа — трубка. Так эту страницу не надо изучать: она уже знакома
+   всем, и водителю в том числе. */
+.call-h1{font-family:'Space Grotesk',sans-serif;font-size:27px;font-weight:700;
+  padding:2px 2px 14px}
+.call-tabs{display:flex;gap:8px;margin-bottom:16px}
+.call-tabs button{flex:1;padding:9px;border-radius:11px;cursor:pointer;
+  font-family:'DM Sans',sans-serif;font-size:13.5px;font-weight:600;color:var(--muted);
+  background:var(--card);border:1px solid var(--border2)}
+.call-tabs button.on{color:var(--gold2);background:var(--gold-soft);border-color:rgba(201,169,110,.35)}
+.call-item{display:flex;align-items:center;gap:13px;padding:10px 2px}
+.call-item+.call-item{border-top:1px solid var(--border2)}
+.call-ava{width:46px;height:46px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:16px;font-weight:700;color:var(--gold2);
+  background:var(--gold-soft);border:1px solid rgba(201,169,110,.2)}
+.call-item-b{flex:1;min-width:0;cursor:pointer}
+.call-item-n{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.call-item.missed .call-item-n{color:var(--dn)}
+.call-item-s{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);margin-top:3px}
+.call-item-s svg{flex-shrink:0}
+.call-item.missed .call-item-s{color:var(--dn)}
+.call-item-go{width:40px;height:40px;flex-shrink:0;border-radius:50%;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;color:var(--up);
+  background:rgba(76,175,125,.12);border:1px solid rgba(76,175,125,.25)}
+.call-item-go:active{background:rgba(76,175,125,.24)}
+.call-empty{text-align:center;color:var(--muted);font-size:13px;padding:44px 12px;line-height:1.55}
 .call-rec{display:flex;align-items:center;gap:9px;padding:11px 12px;border-radius:12px;
   background:var(--card);border:1px solid var(--border2);margin-bottom:6px;cursor:pointer}
 .call-rec:active{background:var(--card2)}
@@ -6008,19 +6039,48 @@ function callWarm(){
   if(CALL) CALL.warmMic().then(() => callRender()).catch(() => {});
 }
 
+let CALL_TAB = 'all';
+function callTab(t){ CALL_TAB = t; callRender(); }
+
+// Подряд идущие звонки одному человеку в одну сторону — одна строка со
+// счётчиком, как в телефоне. Иначе пять неудачных попыток занимают весь экран.
+function callGroup(list){
+  const out = [];
+  list.forEach(r => {
+    const last = out[out.length - 1];
+    if(last && last.key === r.key && last.dir === r.dir && last.missed === r.missed){
+      last.n++; last.talk = last.talk || r.talk;
+      return;
+    }
+    out.push(Object.assign({n: 1}, r));
+  });
+  return out;
+}
+
+// Стрелка направления: входящий, исходящий, пропущенный — разными значками,
+// как везде. Цвет добавляет строка целиком.
+function _dirIco(r){
+  return r.missed
+    ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 7L7 17M15 17H7V9"/></svg>'
+    : r.dir === 'out'
+    ? '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg>'
+    : '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 7L7 17M15 17H7V9"/></svg>';
+}
+
 const _ini = n => (n || '?').trim().charAt(0).toUpperCase();
 const _mm = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
 
+const _DOW = ['вс','пн','вт','ср','чт','пт','сб'];
 function _callWhen(iso){
   if(!iso) return '';
   const d = new Date(iso), now = new Date();
   if(isNaN(d)) return '';
   const hh = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-  const sameDay = d.toDateString() === now.toDateString();
-  if(sameDay) return hh;
+  if(d.toDateString() === now.toDateString()) return 'сегодня · ' + hh;
   const y = new Date(now); y.setDate(y.getDate() - 1);
-  if(d.toDateString() === y.toDateString()) return 'вчера ' + hh;
-  return d.getDate() + '.' + String(d.getMonth() + 1).padStart(2, '0');
+  if(d.toDateString() === y.toDateString()) return 'вчера · ' + hh;
+  if(now - d < 6 * 864e5) return _DOW[d.getDay()] + ' · ' + hh;
+  return d.getDate() + '.' + String(d.getMonth() + 1).padStart(2, '0') + ' · ' + hh;
 }
 
 const ICO_CALL = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
@@ -6051,13 +6111,16 @@ function _callRender(){
   if(CALL_ST === 'idle'){
     if(title) title.textContent = 'Связь';
     const rows = (CALL && CALL.roster) || [];
-    const rec = (CALL && CALL.recent) || [];
-    let html = '';
+    const rec = callGroup((CALL && CALL.recent) || []);
+    const shown = CALL_TAB === 'missed' ? rec.filter(r => r.missed) : rec;
+    let html = `<div class="call-h1">Звонки</div>
+      <div class="call-tabs">
+        <button class="${CALL_TAB === 'all' ? 'on' : ''}" onclick="callTab('all')">Все</button>
+        <button class="${CALL_TAB === 'missed' ? 'on' : ''}" onclick="callTab('missed')">Пропущенные</button>
+      </div>`;
 
-    // Разрешение спрашиваем один раз и объясняем зачем — до того, как
-    // система покажет своё окно.
-    // Библиотека могла остаться в кэше телефона старой версии. Спрашивать у неё
-    // то, чего в ней нет, нельзя: одна ошибка здесь — и экран пустой целиком.
+    // Разрешение спрашиваем один раз и объясняем зачем — до того, как система
+    // покажет своё окно.
     const micOk = !CALL || typeof CALL.micGranted !== 'function' || CALL.micGranted();
     if(!micOk){
       html += `<div class="call-warm">
@@ -6068,34 +6131,41 @@ function _callRender(){
       </div>`;
     }
 
-    html += rows.length ? rows.map(r => `
-      <div class="call-row" onclick="callDial('${r.key}')">
-        <div class="call-row-av">${_ini(r.name)}</div>
-        <div class="call-row-b">
-          <div class="call-row-n">${r.name}</div>
-          <div class="call-row-s"><span class="call-dot${r.online ? ' on' : ''}"></span>
-            ${r.online ? 'в приложении' : 'позвоним в телеграм'}</div>
-        </div>
-        <div class="call-row-go">${ICO_CALL}</div>
-      </div>`).join('')
-      : `<div class="call-hint" style="margin-top:34px">Связи пока нет.<br>
-         Если это не пройдёт само — скажите старшему.</div>`;
-
-    if(rec.length){
-      html += `<div class="call-cap">Недавние</div>` + rec.map(r => `
-        <div class="call-rec${r.missed ? ' missed' : ''}" onclick="callDial('${r.key}')">
-          <span class="call-rec-i">${r.dir === 'out'
-            ? '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 17L17 7M9 7h8v8"/></svg>'
-            : '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 7L7 17M15 17H7V9"/></svg>'}</span>
-          <span class="call-rec-n">${r.who}</span>
-          <span class="call-rec-m">${r.missed ? 'пропущен'
-            : r.talk ? _mm(r.talk) : 'без ответа'}</span>
-          <span class="call-rec-t">${_callWhen(r.at)}</span>
+    // Свой оператор — всегда сверху и всегда один. Списка контактов у водителя
+    // нет намеренно: звонить ему больше некому, и выбирать не из чего.
+    if(CALL_TAB === 'all' && rows.length){
+      html += `<div class="call-cap">Ваш оператор</div>` + rows.map(r => `
+        <div class="call-item">
+          <div class="call-ava">${_ini(r.name)}</div>
+          <div class="call-item-b" onclick="callDial('${r.key}')">
+            <div class="call-item-n">${r.name}</div>
+            <div class="call-item-s"><span class="call-dot${r.online ? ' on' : ''}"></span>
+              ${r.online ? 'в приложении' : 'позвоним в телеграм'}</div>
+          </div>
+          <div class="call-item-go" onclick="callDial('${r.key}')">${ICO_CALL}</div>
         </div>`).join('');
     }
 
-    if(rows.length) html += `<div class="call-hint">Зелёная точка — снимет сразу.
-      Иначе телефон зазвонит в телеграме, и звонок будет ждать полторы минуты.</div>`;
+    if(shown.length){
+      if(CALL_TAB === 'all') html += `<div class="call-cap">Недавние</div>`;
+      html += shown.map(r => `
+        <div class="call-item${r.missed ? ' missed' : ''}">
+          <div class="call-ava">${_ini(r.who)}</div>
+          <div class="call-item-b" onclick="callDial('${r.key}')">
+            <div class="call-item-n">${r.who}${r.n > 1 ? ' <span style="color:var(--muted);font-weight:400">(' + r.n + ')</span>' : ''}</div>
+            <div class="call-item-s">${_dirIco(r)}<span>${_callWhen(r.at)}</span>${
+              r.talk ? '<span>· ' + _mm(r.talk) + '</span>' : ''}</div>
+          </div>
+          <div class="call-item-go" onclick="callDial('${r.key}')">${ICO_CALL}</div>
+        </div>`).join('');
+    }else if(CALL_TAB === 'missed'){
+      html += `<div class="call-empty">Пропущенных нет</div>`;
+    }else if(!rows.length){
+      html += `<div class="call-empty">Связи пока нет.<br>
+        Если это не пройдёт само — скажите старшему.</div>`;
+    }else{
+      html += `<div class="call-empty">Звонков ещё не было</div>`;
+    }
     box.innerHTML = html;
     return;
   }
@@ -6120,17 +6190,19 @@ function _callRender(){
             <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
             <path d="M19 11a7 7 0 0 1-14 0M12 18v3"/>
             ${_callMuted ? '<path d="M3 3l18 18"/>' : ''}</svg></button>
-        <div class="call-btn-lbl">${_callMuted ? 'Включить' : 'Выключить'}</div>
-      </div>
-      <div class="call-act">
-        <button class="call-btn drop" onclick="callHangup()" aria-label="Завершить">${ICO_X}</button>
-        <div class="call-btn-lbl">Завершить</div>
+        <div class="call-btn-lbl">${_callMuted ? 'Включить' : 'Без звука'}</div>
       </div>`
-    : `
-      <div class="call-act">
-        <button class="call-btn drop" onclick="callHangup()" aria-label="Отменить">${ICO_X}</button>
-        <div class="call-btn-lbl">Отменить</div>
-      </div>`;
+    : '';
+
+  // Отбой всегда отдельной строкой и всегда на одном месте — как в телефоне.
+  const drop = (CALL_ST === 'live' || CALL_ST === 'out') ? `
+      <div class="call-acts row2">
+        <div class="call-act">
+          <button class="call-btn drop" onclick="callHangup()"
+            aria-label="${CALL_ST === 'live' ? 'Завершить' : 'Отменить'}">${ICO_X}</button>
+          <div class="call-btn-lbl">${CALL_ST === 'live' ? 'Завершить' : 'Отменить'}</div>
+        </div>
+      </div>` : '';
 
   box.innerHTML = `
     <div class="call-live">
@@ -6139,7 +6211,8 @@ function _callRender(){
       <div class="call-state" id="callState">${st}</div>
       <div class="call-q" id="callQ"></div>
       ${CALL_NOTE ? `<div class="call-note">${CALL_NOTE}</div>` : ''}
-      <div class="call-acts">${acts}</div>
+      ${acts ? `<div class="call-acts">${acts}</div>` : ''}
+      ${drop}
       ${CALL_ST === 'in' ? `<div class="call-says">${CALL_SAYS.map(s =>
         `<button onclick="callReject('${s}')">${s}</button>`).join('')}</div>` : ''}
     </div>`;

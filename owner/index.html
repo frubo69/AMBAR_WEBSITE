@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=5"></script>
+<script src="/vendor/ambar-call.js?v=6"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -5718,6 +5718,18 @@ button.pill:active{opacity:.6}
       <!-- Слой видеозвонка живёт ОТДЕЛЬНО от перерисовываемого тела: раньше он
            лежал внутри него, и каждая перерисовка пересоздавала элементы —
            поток отваливался, и было видно то себя, то собеседника. -->
+        <!-- Голосовой разговор выглядит так же, как в приложении водителя:
+             звание, имя, таймер и две кнопки внизу. Один вид на все три
+             приложения — разговор везде один и тот же. -->
+        <div class="cvo" id="callVoice">
+          <div class="cvo-top">
+            <div class="cvo-role" id="cvoRole"></div>
+            <div class="cvo-name" id="cvoName">—</div>
+            <div class="cvo-state" id="cvoState">00:00</div>
+            <div class="call-q" id="callQ"></div>
+          </div>
+          <div class="cvo-acts" id="cvoActs"></div>
+        </div>
       <div class="cv" id="callVid">
         <video class="cv-rem" id="caRem" playsinline autoplay></video>
         <video class="cv-loc" id="caLoc" playsinline autoplay muted></video>
@@ -5859,6 +5871,29 @@ button.pill:active{opacity:.6}
   justify-content:center;color:var(--gold2);background:var(--bg2);border:5px solid var(--card);
   box-shadow:0 0 0 1px var(--border2),0 8px 24px rgba(0,0,0,.5)}
 .ca-body.live{display:flex;align-items:center;justify-content:center}
+/* Голосовой разговор — тот же вид, что у водителя: звание, имя, таймер и
+   кнопки у нижнего края. Один разговор — один экран во всех приложениях. */
+.cvo{position:absolute;inset:0;z-index:5;display:none;flex-direction:column;text-align:center;
+  background:var(--bg2)}
+.cvo.on{display:flex}
+.cvo-top{padding:52px 24px 0}
+.cvo-role{font-size:15px;color:var(--sub)}
+.cvo-name{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;
+  line-height:1.15;margin-top:4px;word-break:break-word;color:var(--text)}
+.cvo-state{font-size:15px;color:var(--muted);margin-top:12px;min-height:20px;
+  font-variant-numeric:tabular-nums}
+.cvo-acts{margin-top:auto;display:flex;justify-content:space-between;padding:0 44px 40px}
+.cvo-acts.one{justify-content:center}
+.cvo-act{display:flex;flex-direction:column;align-items:center}
+.cvo-btn{width:70px;height:70px;border-radius:50%;border:0;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;color:#fff;transition:transform .12s}
+.cvo-btn:active{transform:scale(.92)}
+.cvo-btn.take{background:#2CB34A}
+.cvo-btn.drop{background:var(--dn)}
+.cvo-btn.mute{background:var(--card2);color:var(--text)}
+.cvo-btn.mute.on{background:#fff;color:#111}
+.cvo-btn.vid{background:var(--card2);color:var(--text)}
+.cvo-lbl{font-size:13.5px;color:var(--sub);margin-top:10px}
 /* ── Видеозвонок в панели: та же раскладка FaceTime ──────────────────────────
    Слой накрывает приложение целиком: собеседник фоном, своя камера окном,
    имя плашкой слева сверху, кнопки столбцом справа. */
@@ -19511,7 +19546,7 @@ function renderHours(h){
 // контакт, у оператора свои водители, а тут полтора десятка человек, из
 // которых каждый день нужны два-три.
 let CALL = null, CALL_ST = 'idle', CALL_WHO = '', CALL_T0 = 0, CALL_Q = '';
-let CALL_VIDEO = false, CALL_CAM = false;
+let CALL_VIDEO = false, CALL_CAM = false, CALL_RCAM = false;
 let CALL_TAB = 'all', _callTick = null, _callMuted = false;
 const CALL_SAYS = ['Перезвоню', 'Занят'];
 
@@ -19605,8 +19640,10 @@ function callEvent(t, d){
         callPaint(); callVidPaint();
       }
       return;
+    case 'remotecam':
+      CALL_RCAM = !!d.on; callVidPaint(); return;
     case 'novideo':
-      CALL_VIDEO = false; CALL_CAM = false;
+      CALL_VIDEO = false; CALL_CAM = false; CALL_RCAM = false;
       callVidPaint();
       ['caRem','caLoc'].forEach(id => { const v = document.getElementById(id); if(v) v.srcObject = null; }); callPaint(); return;
     case 'ended': case 'failed': {
@@ -19636,7 +19673,7 @@ function callEvent(t, d){
 function callTimer(){
   if(CALL_ST !== 'live') return;
   const txt = _cMm(Math.max(0, Math.round((Date.now() - CALL_T0)/1000)));
-  const a = _cq('callLiveS'); if(a) a.textContent = txt;
+  const a = document.getElementById('cvoState'); if(a && CALL_ST === 'live') a.textContent = txt;
   const b = _cq('callBarS'); if(b) b.textContent = txt;
   const c = document.getElementById('cvT'); if(c) c.textContent = txt;
 }
@@ -19667,10 +19704,62 @@ function callOpen(){ callInit(); _cq('callOv').classList.add('show'); callPaint(
 function callClose(){ setTimeout(callPaint, 0); _cq('callOv').classList.remove('show'); if(CALL_ST === 'in') CALL && CALL.reject(); }
 function callTab(t){ CALL_TAB = t; callPaint(); }
 function callVideo(key){ callDial(key, true); }
+// Экран разговора — один на все состояния и на все приложения: звание, имя,
+// таймер, кнопки внизу. Живёт вне перерисовки списков, поэтому обновляется
+// отдельной функцией.
+function callVoicePaint(){
+  const l = document.getElementById('callVoice'); if(!l) return;
+  const видео = CALL_VIDEO && CALL_ST === 'live' && (CALL_CAM || CALL_RCAM);
+  l.classList.toggle('on', CALL_ST !== 'idle' && !видео);
+  if(CALL_ST === 'idle') return;
+  const r = ((CALL && CALL.roster) || []).find(x => x.name === CALL_WHO);
+  document.getElementById('cvoRole').textContent = r ? r.role : '';
+  document.getElementById('cvoName').textContent = CALL_WHO || '—';
+  const st = CALL_ST === 'in' ? 'Входящий звонок'
+           : CALL_ST === 'out' ? 'Звоним…' : '';
+  const e = document.getElementById('cvoState');
+  if(CALL_ST !== 'live') e.textContent = st + (CALL_VIDEO ? ' · видео' : '');
+
+  const X = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor"
+    stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+  const P = `<svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor"
+    stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
+    d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.8.6a2 2 0 0 1 1.7 2z"/></svg>`;
+  const M = on => `<svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor"
+    stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
+    d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/>${
+    on ? '<path d="M3 3l18 18"/>' : ''}</svg>`;
+  const V = `<svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor"
+    stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
+    d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/></svg>`;
+
+  const acts = document.getElementById('cvoActs');
+  acts.classList.toggle('one', CALL_ST === 'out');
+  acts.innerHTML = CALL_ST === 'in' ? `
+      <div class="cvo-act"><button class="cvo-btn drop" onclick="callReject()">${X}</button>
+        <div class="cvo-lbl">Отклонить</div></div>
+      <div class="cvo-act"><button class="cvo-btn take" onclick="callAccept()">${P}</button>
+        <div class="cvo-lbl">Ответить</div></div>`
+    : CALL_ST === 'live' ? `
+      <div class="cvo-act"><button class="cvo-btn mute${_callMuted ? ' on' : ''}"
+        onclick="callMute()">${M(_callMuted)}</button>
+        <div class="cvo-lbl">${_callMuted ? 'Включить' : 'Без звука'}</div></div>
+      ${CALL_VIDEO ? `<div class="cvo-act"><button class="cvo-btn vid" onclick="callCam()">${V}</button>
+        <div class="cvo-lbl">Камера</div></div>` : ''}
+      <div class="cvo-act"><button class="cvo-btn drop" onclick="callHangup()">${X}</button>
+        <div class="cvo-lbl">Завершить</div></div>`
+    : `<div class="cvo-act"><button class="cvo-btn drop" onclick="callHangup()">${X}</button>
+        <div class="cvo-lbl">Отменить</div></div>`;
+}
+
 // Слой видео живёт вне перерисовки, поэтому обновляем его отдельно и руками.
 function callVidPaint(){
+  callVoicePaint();
   const l = document.getElementById('callVid'); if(!l) return;
-  l.classList.toggle('on', CALL_VIDEO && CALL_ST === 'live');
+  // Видеослой поднимается, только если картинка есть хоть у кого-то. Обе
+  // камеры выключены — показывать нечего, и разговор возвращается к
+  // голосовому виду, а не висит чёрным кадром.
+  l.classList.toggle('on', CALL_VIDEO && CALL_ST === 'live' && (CALL_CAM || CALL_RCAM));
   l.classList.toggle('cam-on', CALL_CAM);
   l.classList.toggle('cam-back', !!(CALL && CALL.facing === 'environment'));
   const a = document.getElementById('cvA'), n = document.getElementById('cvN');
@@ -19827,49 +19916,12 @@ function _callPaint(){
   if(nav) nav.style.display = 'none';
   body.classList.add('live');
 
-  const acts = CALL_ST === 'in' ? `
-      <button class="call-cbtn drop" onclick="callReject()" aria-label="Отклонить"><svg viewBox="0 0 24 24"
-        width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-      <button class="call-cbtn take" onclick="callAccept()" aria-label="Ответить">${ICO_PHONE.replace('17" height="17','24" height="24')}</button>`
-    : CALL_ST === 'live' ? `
-      <button class="call-cbtn mute${_callMuted ? ' on' : ''}" onclick="callMute()" aria-label="Микрофон"><svg
-        viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9"
-        stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/>${
-        _callMuted ? '<path d="M3 3l18 18"/>' : ''}</svg></button>`
-    : '';
-  const drop = (CALL_ST === 'live' || CALL_ST === 'out') ? `
-      <div class="call-live-acts row2">
-        <button class="call-cbtn drop" onclick="callHangup()" aria-label="Завершить"><svg viewBox="0 0 24 24"
-          width="24" height="24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-      </div>` : '';
-
-  const camRow = (CALL_ST === 'live' && CALL_VIDEO) ? `
-      <div class="call-live-acts row2">
-        <button class="call-cbtn mute${CALL_CAM ? '' : ' on'}" onclick="callCam()" aria-label="Камера"><svg
-          viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9"
-          stroke-linecap="round" stroke-linejoin="round"><path
-          d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/>${
-          CALL_CAM ? '' : '<path d="M2 2l20 20"/>'}</svg></button>
-        ${CALL_CAM ? `<button class="call-cbtn mute" onclick="callFlip()" aria-label="Другая камера"><svg
-          viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.9"
-          stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h13a4 4 0 0 1 4 4v1"/><path
-          d="M6 5L3 8l3 3"/><path d="M21 16H8a4 4 0 0 1-4-4v-1"/><path d="M18 19l3-3-3-3"/></svg></button>` : ''}
-      </div>` : '';
-
-  body.innerHTML = `<div class="call-live">
-      <div class="call-live-av${CALL_ST === 'live' ? '' : ' ring'}">${_cIni(CALL_WHO)}</div>
-      <div class="call-live-n">${CALL_WHO || '—'}</div>
-      <div class="call-live-s" id="callLiveS">${
-        CALL_ST === 'in' ? 'Входящий звонок' : CALL_ST === 'out' ? 'Звоним…' : '00:00'}</div>
-      <div class="call-q" id="callQ"></div>
-      ${acts ? `<div class="call-live-acts">${acts}</div>` : ''}
-      ${camRow}
-      ${drop}
-      ${CALL_ST === 'in' ? `<div class="call-says">${CALL_SAYS.map(x =>
-        `<button onclick="callReject('${x}')">${x}</button>`).join('')}</div>` : ''}
-    </div>`;
-  callQuality();
+  // Сам разговор рисуют слои поверх приложения (голос и видео), тело при
+  // этом остаётся пустым — иначе списки просвечивали бы сквозь звонок.
+  body.innerHTML = '';
+  callVidPaint();
 }
+
 
 // Связь держим открытой всё время, пока открыто приложение: входящий должен
 // доходить и когда окно связи закрыто.

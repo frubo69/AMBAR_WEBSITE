@@ -101,6 +101,17 @@
     if (this.timer) { clearInterval(this.timer); this.timer = null; }
     this.kind = '';
   };
+  // Во время разговора аудиоконтекст надо не просто замолчать, а закрыть.
+  // Пока он жив, телефон держит звуковую сессию под веб-аудио — со своей
+  // частотой дискретизации и своим размером буфера, — а поверх неё играет
+  // WebRTC. На айфоне это слышно хрипом и потрескиванием. Тоны нужны только
+  // до ответа, поэтому контекст создаётся заново, когда снова понадобится.
+  Tones.prototype.release = function () {
+    this.stop();
+    var ac = this.ac;
+    this.ac = null;
+    if (ac) { try { ac.close(); } catch (e) {} }
+  };
 
   // ── клиент ───────────────────────────────────────────────────────────────
   function AmbarCall(opts) {
@@ -251,7 +262,7 @@
 
       case 'accepted':                              // нашу трубку сняли
         if (!this.call || this.call.id !== m.call) break;
-        this.tones.stop();
+        this.tones.release();
         this.call.peer = m.by || this.call.peer;
         this._emit('talking', this.call);
         this._startMedia(true);
@@ -259,7 +270,7 @@
 
       case 'joined':                                // мы сняли трубку
         if (!this.call || this.call.id !== m.call) break;
-        this.tones.stop();
+        this.tones.release();
         this._emit('talking', this.call);
         this._startMedia(false);
         break;
@@ -485,7 +496,16 @@
         self.audio.srcObject = st;
         try { self.audio.play().catch(function () {}); } catch (err) {}
       }
-      if (e.track.kind === 'video') self.video = true;
+      if (e.track.kind === 'video') {
+        self.video = true;
+        // Собеседник может выключить камеру посреди разговора — дорожка при
+        // этом не исчезает, она «замолкает». Ловим это, чтобы вернуть
+        // голосовой вид, а не показывать замерший кадр.
+        var t = e.track;
+        var say = function () { self._emit('remotecam', {on: !t.muted && t.readyState === 'live'}); };
+        t.onmute = say; t.onunmute = say; t.onended = say;
+        setTimeout(say, 300);
+      }
       self._emit('stream', {stream: st, kind: e.track.kind});
     };
     pc.onicecandidate = function (e) {
@@ -617,6 +637,10 @@
   AmbarCall.prototype._teardown = function (why) {
     this.tones.stop();
     if (why === 'hangup' || why === 'end') this.tones.bye();
+    // Прощальный тон короткий — контекст закрываем следом, чтобы он не висел
+    // между звонками и не мешал звуку следующего.
+    var tn = this.tones;
+    setTimeout(function () { tn.release(); }, 900);
     clearInterval(this._statsT); this._statsT = null;
     clearTimeout(this._iceRestartT);
     this._keepAwake(false);

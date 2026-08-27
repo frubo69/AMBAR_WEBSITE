@@ -2107,7 +2107,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=5"></script>
+<script src="/vendor/ambar-call.js?v=6"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -5997,6 +5997,7 @@ let CALL_NOTE = '';         // подсказка на экране исходя
 let CALL_ROLE = '';         // кто звонит: звание под именем
 let CALL_VIDEO = false;     // это видеозвонок
 let CALL_CAM = false;       // своя камера включена
+let CALL_RCAM = false;      // камера собеседника включена
 let CALL_Q = '';            // качество связи
 let _callTick = null, _callMuted = false, _callWanted = false;
 
@@ -6034,7 +6035,7 @@ function callEvent(t, d){
       return;
     case 'ring':
       CALL_ST = 'in'; CALL_WHO = d.peer; CALL_ROLE = callRole(d.kind, d.peer);
-      CALL_VIDEO = !!d.video; CALL_CAM = false;
+      CALL_VIDEO = !!d.video; CALL_CAM = false; CALL_RCAM = false;
       callOpen(); callBuzz(); callRender();
       return;
     case 'calling':
@@ -6043,6 +6044,10 @@ function callEvent(t, d){
       callOpen(); callRender();
       return;
     case 'talking':
+      // Сирена нового заказа держит свой аудиоконтекст. Пока он жив, телефон
+      // отдаёт звуковую сессию веб-аудио, и разговор поверх неё хрипит.
+      // На время звонка усыпляем; после отбоя он проснётся сам от касания.
+      try{ if(_ac && _ac.state === 'running') _ac.suspend(); }catch(e){}
       CALL_ST = 'live'; CALL_T0 = Date.now(); CALL_Q = '';
       _callMuted = false; callBuzz(false);
       try{ tg.HapticFeedback.impactOccurred('medium'); }catch(e){}
@@ -6067,6 +6072,10 @@ function callEvent(t, d){
         callVideoPaint(); callRender();
       }
       return;
+    case 'remotecam':
+      CALL_RCAM = !!d.on;
+      callVideoPaint(); callRender();
+      return;
     case 'novideo':
       CALL_VIDEO = false; CALL_CAM = false;
       toast('Камера недоступна — говорим голосом', 'err');
@@ -6075,10 +6084,11 @@ function callEvent(t, d){
     case 'ended':
     case 'failed': {
       callBuzz(false);
+      try{ if(_ac && _ac.state === 'suspended') _ac.resume(); }catch(e){}
       clearInterval(_callTick); _callTick = null;
       const why = d.why || '', prev = CALL_ST, who = CALL_WHO;
       CALL_ST = 'idle'; CALL_WHO = ''; CALL_NOTE = ''; CALL_Q = '';
-      CALL_VIDEO = false; CALL_CAM = false; callVideoPaint();
+      CALL_VIDEO = false; CALL_CAM = false; CALL_RCAM = false; callVideoPaint();
       ['csRemote','csLocal'].forEach(id => { const v = cel(id); if(v) v.srcObject = null; });
       callRender(); callBar();
       if(t === 'failed'){
@@ -6197,7 +6207,9 @@ function callVideoPaint(){
   const sc = cel('callScr'); if(!sc) return;
   // Видео показываем только в самом разговоре: пока звонят, экран остаётся
   // обычным — имя, звание и две кнопки.
-  sc.classList.toggle('video', CALL_VIDEO && CALL_ST === 'live');
+  // Обе камеры выключены — показывать нечего, и экран возвращается к обычному
+  // голосовому виду. Замерший чёрный кадр вместо лица хуже, чем имя и таймер.
+  sc.classList.toggle('video', CALL_VIDEO && CALL_ST === 'live' && (CALL_CAM || CALL_RCAM));
   sc.classList.toggle('cam-on', CALL_CAM);
   const a = cel('csPillA'), n = cel('csPillN');
   if(a) a.textContent = _ini(CALL_WHO);

@@ -752,8 +752,11 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Своя высота прилипания, на четыре точки выше общей: карточка здесь всегда
    свёрнута, и место, отданное сверху, лучше уходит вниз — под ней стоят
    плитки, а не воздух. */
-.ohero{position:sticky;top:calc(var(--hero-top,124px) - 4px);z-index:30;height:78px;
-  display:flex;align-items:center;gap:8px;padding:0 20px;
+/* Прячем верх на несколько точек под полосу периодов: она непрозрачная и
+   лежит выше, а запас страхует от промаха в замере — иначе в щель между ними
+   видно проезжающий список. */
+.ohero{position:sticky;top:calc(var(--hero-top,124px) - 7px);z-index:30;
+  padding:0 20px 14px;
   border-radius:var(--r);margin-bottom:16px;
   background:
     radial-gradient(ellipse 90% 60% at 15% 0%, rgba(201,169,110,.18), transparent 60%),
@@ -780,6 +783,20 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .pin-pop .pin-s{display:block;font-size:10.5px;font-weight:500;color:var(--muted);margin-top:2px}
 .ohero .hero-amt{font-size:26px}
 .ohero .day-nav{margin-left:auto;position:static}
+.ohero-top{display:flex;align-items:center;gap:8px;height:78px}
+/* Складывается вместе с прилипанием: max-height, а не display, чтобы это была
+   одна плавная строка, а не рывок. */
+.ohero-stats{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:8px;
+  max-height:90px;overflow:hidden;
+  transition:max-height .2s var(--e1),opacity .16s var(--e1)}
+/* Внутри карточки цифрам не нужны свои рамки: коробки в коробке — это и был
+   шум. Три столбца, разделённые волоском. */
+.ohero-stats .off-tot-c{background:none;border:0;border-radius:0;
+  padding:2px 0 2px 13px;border-left:1px solid var(--border2)}
+.ohero-stats .off-tot-c:first-child{padding-left:2px;border-left:0}
+.ohero-stats .off-tot-f{height:44px;align-self:center}
+.ohero.tight{padding-bottom:0}
+.ohero.tight .ohero-stats{max-height:0;opacity:0}
 .off-card{position:relative;background:var(--card);border:1px solid var(--border2);border-radius:var(--r);
   padding:15px 16px 14px;overflow:hidden;transition:.16s var(--e1)}
 .off-card::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--tone);opacity:.85}
@@ -1941,24 +1958,30 @@ button.path:active{transform:scale(.995)}
    рост, такой же радиус, такая же посадка — два соседа одного веса. Заметной
    её делает не цвет, а размер и иконка в золотой плашке: кричать цветом здесь
    нечему, перестановка это рутина, а не тревога. */
-.crew-entry{display:flex;align-items:center;gap:13px;width:100%;height:78px;
-  margin:0 0 10px;padding:0 16px;
+/* Два входа наверху страницы — не строки списка, а кнопки, и выглядеть должны
+   кнопками: тёплая подложка, золотая рамка, значок сплошным золотом — тот же
+   цвет, что у возврата к сегодняшнему дню. На тёмной подложке они терялись
+   среди карточек районов, хотя нажимают на них чаще всего остального.
+   Ростом чуть ниже прежнего: два блока по 78 точек съедали пол-экрана. */
+.crew-entry{display:flex;align-items:center;gap:13px;width:100%;height:68px;
+  margin:0 0 9px;padding:0 15px;
   border-radius:var(--r);cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
-  background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
-  border:1px solid var(--border)}
+  background:linear-gradient(180deg,rgba(201,169,110,.13) 0%,rgba(201,169,110,.045) 100%),
+             linear-gradient(180deg,#161629 0%,#0F0F20 100%);
+  border:1px solid rgba(201,169,110,.3)}
 /* Прилипает теперь не она, а выручка под ней: смотреть на общее число, листая
    список районов, нужно постоянно, а переставляют людей раз в день. */
 .crew-entry:active{transform:scale(.99)}
 /* Иконка в плашке — то, что делает строку карточкой: у неё появляется левый
    якорь, и глаз цепляется за него раньше, чем начинает читать. */
 .crew-e-ico{flex:0 0 auto;display:flex;align-items:center;justify-content:center;
-  width:42px;height:42px;border-radius:13px;color:var(--gold2);
-  background:var(--gold-soft);border:1px solid rgba(201,169,110,.22)}
+  width:40px;height:40px;border-radius:13px;color:#1a1408;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .crew-e-b{flex:1;min-width:0}
-.crew-e-b b{display:block;font-size:15px;font-weight:700;line-height:1.2}
-.crew-e-b i{display:block;font-style:normal;font-size:12px;color:var(--muted);
-  margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.crew-e-go{display:flex;align-items:center;color:var(--muted);flex-shrink:0}
+.crew-e-b b{display:block;font-size:15px;font-weight:700;line-height:1.2;color:var(--gold3)}
+.crew-e-b i{display:block;font-style:normal;font-size:11.5px;color:var(--sub);
+  margin-top:2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.crew-e-go{display:flex;align-items:center;color:var(--gold2);flex-shrink:0}
 .crew-d{display:flex;align-items:center;gap:11px;padding:13px;margin-bottom:7px;border-radius:13px;
   background:var(--card);border:1px solid var(--border2)}
 .crew-d.moved{border-color:rgba(201,169,110,.32)}
@@ -3369,6 +3392,7 @@ button.path:active{transform:scale(.995)}
        периода: и общее число, и перелистывание дней нужны с любого места
        списка. Долгое нажатие открепляет. -->
   <div class="ohero" id="offHero" data-detail="kpi:revenue">
+   <div class="ohero-top">
     <span class="hero-amt mono" id="offHeroRev" data-aed="">—</span><span class="hero-unit cur-unit">AED</span>
     <span class="day-nav" id="offHeroNav">
       <button class="dn-b" aria-label="Предыдущий день"
@@ -3378,9 +3402,13 @@ button.path:active{transform:scale(.995)}
       <button class="dn-b" id="odnNext" aria-label="Следующий день" disabled
         onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayStep(-1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
     </span>
-  </div>
-
-  <div class="off-tot" id="offTotals" style="display:none">
+   </div>
+   <!-- Заказы, средний чек и время — не отдельный ряд плиток под карточкой, а
+        её вторая строка: это разложение той же выручки, и читается оно вместе
+        с ней. Отдельным рядом на экране получалось четыре разных прямоугольника
+        подряд, и глазу не за что было зацепиться. Когда карточка прилипает,
+        строка складывается: наверху нужно число, а не его разбор. -->
+   <div class="ohero-stats" id="offTotals" style="display:none">
     <div class="off-tot-c"><div class="off-tot-l">Заказы</div><div class="off-tot-v" id="offTotOrd">—</div></div>
     <div class="off-tot-c"><div class="off-tot-l">Ср. чек</div><div class="off-tot-v" id="offTotAvg" data-aed="">—</div></div>
     <div class="off-tot-c"><div class="off-tot-l">Ср. время</div><div class="off-tot-v" id="offTotMin">—</div></div>
@@ -3391,6 +3419,7 @@ button.path:active{transform:scale(.995)}
            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
         <path d="M4 6h16M7 12h10M10 18h4"/></svg>
     </button>
+   </div>
   </div>
 
 
@@ -5619,6 +5648,7 @@ function pinApply(k){
   // «Обзор» ещё и сжимается по мере прокрутки — открепили, значит сжимать
   // нечего: карточка едет со страницей в полный рост.
   if(k === 'over' && typeof HERO_APPLY === 'function') HERO_APPLY();
+  if(k === 'off'  && typeof OFF_HERO_APPLY === 'function') OFF_HERO_APPLY();
 }
 function pinApplyAll(){ Object.keys(PIN).forEach(pinApply); }
 
@@ -5902,6 +5932,14 @@ window.addEventListener('resize', heroSideFit);
   place(); init();
   window.HERO_PLACE = place;
   window.HERO_APPLY = apply;
+  // Полоска одна на всё приложение: её ставит та страница, чья карточка сейчас
+  // прижата. Порядок обработчиков это и обеспечивает — «Районы» подписаны
+  // позже и решают последними.
+  window.HERO_VEIL = (y) => {
+    if(y == null){ veil.classList.remove('on'); return; }
+    veil.style.top = y + 'px';
+    veil.classList.add('on');
+  };
   pinApplyAll();
   pinLongPress('over'); pinLongPress('off');
   window.addEventListener('scroll', onScroll, {passive:true});
@@ -5909,13 +5947,64 @@ window.addEventListener('resize', heroSideFit);
   if(window.visualViewport) visualViewport.addEventListener('resize', place);
   // Смена вкладки или периода перестраивает страницу — родную позицию надо
   // переснять, иначе сжатие посчитается от старой.
+  // Через кадр, а не через таймер: страница успевает разложиться ровно к
+   // следующей отрисовке, а таймер на 60 мс то опережал её, то приходил после —
+   // и точка прилипания оставалась от прошлой страницы, где полоса другой
+   // высоты. Разница видна: карточка вставала на пару точек ниже полосы, и в
+   // щель просвечивал контент.
+  const replace = () => { place(); apply(); };
   document.querySelectorAll('.tb, .periods button').forEach(b =>
-    b.addEventListener('click', () => setTimeout(() => { place(); apply(); }, 60)));
+    b.addEventListener('click', () => {
+      requestAnimationFrame(() => requestAnimationFrame(replace));
+      setTimeout(replace, 140);      // подстраховка: кадры бывают заморожены
+    }));
   // Период сменили — страницу наверх. Прокрутка оставалась от прошлого
   // периода, и новый открывался с середины: верхняя карточка наполовину под
   // липкой шапкой, будто её срезали.
   document.querySelectorAll('.periods button').forEach(b =>
     b.addEventListener('click', () => window.scrollTo({top: 0})));
+})();
+
+// Карточка выручки на «Районах». Прилипла — вторая строка складывается: над
+// списком районов нужно общее число и перелистывание дней, а разбор читают
+// один раз, в начале. Место, которое строка освобождает, возвращаем отступом,
+// иначе страница укоротится ровно на неё и список дёрнется вверх.
+(function offHeroFold(){
+  const card  = document.getElementById('offHero');
+  const stats = document.getElementById('offTotals');
+  if(!card || !stats) return;
+  const BASE = 16;                      // margin-bottom из стилей
+  let raf = null, fold = 0;
+
+  const apply = () => {
+    raf = null;
+    const pg = document.getElementById('pg-offices');
+    if(!pg || !pg.classList.contains('active')) return;
+    // Откреплённая карточка едет со страницей — складывать нечего.
+    if(!PIN.off || stats.style.display === 'none'){
+      card.classList.remove('tight');
+      card.style.marginBottom = '';
+      if(window.HERO_VEIL) HERO_VEIL(null);
+      return;
+    }
+    const top   = parseFloat(getComputedStyle(card).top) || 0;
+    const stuck = card.getBoundingClientRect().top <= top + .5;
+    // Высоту строки снимаем в тот момент, когда она ещё развёрнута: у сложенной
+    // она ноль, и компенсировать было бы нечем.
+    if(stuck && !card.classList.contains('tight')) fold = stats.offsetHeight;
+    card.classList.toggle('tight', stuck);
+    card.style.marginBottom = stuck ? (BASE + fold) + 'px' : '';
+    // Под нижней кромкой — та же растворяющая полоска, что и на «Обзоре»:
+    // карточки районов уходят под карточку выручки, и резаный край читался бы
+    // как сломанная вёрстка.
+    if(window.HERO_VEIL) HERO_VEIL(stuck ? card.getBoundingClientRect().bottom : null);
+  };
+
+  window.OFF_HERO_APPLY = apply;
+  window.addEventListener('scroll', () => { if(!raf) raf = requestAnimationFrame(apply); },
+    {passive:true});
+  window.addEventListener('resize', apply);
+  apply();
 })();
 
 // ===== Date range picker =====
@@ -12385,7 +12474,9 @@ function renderOffices(rows){
     const ord = list.reduce((a,r)=>a+(r.orders||0),0);
     const dl  = list.reduce((a,r)=>a+(r.delivered||0),0);
     const mins = live.filter(r=>r.avg_sample);
-    tot.style.display = 'grid';
+    tot.style.removeProperty('display');
+    if(window.HERO_PLACE) HERO_PLACE();
+    if(window.OFF_HERO_APPLY) OFF_HERO_APPLY();
     _setAed('offHeroRev', total);
     _setText('offTotOrd', ord);
     _setAed('offTotAvg', dl ? Math.round(total/dl) : 0);

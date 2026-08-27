@@ -1957,7 +1957,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js"></script>
+<script src="/vendor/ambar-call.js?v=2"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -6033,6 +6033,17 @@ const ICO_X = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" strok
 const CALL_SAYS = ['Перезвоню', 'За рулём', 'Я на адресе'];
 
 function callRender(){
+  try{ _callRender(); }
+  catch(e){
+    // Пустой экран — худшее, что можно показать: человек не понимает, сломано
+    // оно или просто никого нет. Лучше честная строка и след в консоли.
+    console.error('[call] экран не собрался', e);
+    const b = cel('callMid');
+    if(b) b.innerHTML = '<div class="call-hint" style="margin-top:34px">' +
+      'Не удалось показать список.<br>Закройте и откройте приложение.</div>';
+  }
+}
+function _callRender(){
   const box = cel('callMid'); if(!box) return;
   const title = cel('callTopT');
   callBar();
@@ -6045,7 +6056,10 @@ function callRender(){
 
     // Разрешение спрашиваем один раз и объясняем зачем — до того, как
     // система покажет своё окно.
-    if(CALL && !CALL.micGranted()){
+    // Библиотека могла остаться в кэше телефона старой версии. Спрашивать у неё
+    // то, чего в ней нет, нельзя: одна ошибка здесь — и экран пустой целиком.
+    const micOk = !CALL || typeof CALL.micGranted !== 'function' || CALL.micGranted();
+    if(!micOk){
       html += `<div class="call-warm">
         <div class="call-warm-t">Разрешите микрофон</div>
         <div class="call-warm-s">Один раз за установку. Без этого звонок не будет

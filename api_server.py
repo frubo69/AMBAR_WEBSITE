@@ -2672,7 +2672,14 @@ async def handle_static(request: web.Request) -> web.Response:
     mime, _ = mimetypes.guess_type(str(filepath))
     # For HTML files use no-store to prevent Telegram WebView from caching stale versions
     is_html = str(filepath).endswith(".html")
-    cache_header = "no-store, no-cache, must-revalidate, max-age=0" if is_html else "public, max-age=86400"
+    # Наш собственный скрипт меняется вместе с приложением, а вебвью телеграма
+    # держал его сутки: разметка приезжала новая, код оставался старый, и экран
+    # молча оставался пустым. Картинки и шрифты пусть лежат в кэше, а код —
+    # только с перепроверкой: ETag есть, ответ будет пустой 304.
+    is_code = str(filepath).endswith((".js", ".css")) and "/vendor/" in str(filepath).replace("\\", "/")
+    cache_header = ("no-store, no-cache, must-revalidate, max-age=0" if is_html
+                    else "no-cache" if is_code
+                    else "public, max-age=86400")
     headers = {
         "Content-Type": mime or "application/octet-stream",
         "Cache-Control": cache_header,

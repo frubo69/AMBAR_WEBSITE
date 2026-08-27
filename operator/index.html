@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js"></script>
+<script src="/vendor/ambar-call.js?v=2"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -4744,6 +4744,15 @@ function _cWhen(iso){
 }
 
 function callPaint(){
+  try{ _callPaint(); }
+  catch(e){
+    console.error('[call] экран не собрался', e);
+    const b = $('callBody');
+    if(b) b.innerHTML = '<div class="call-row-s" style="justify-content:center;padding:18px 0">' +
+      'Не удалось показать список — перезагрузите панель</div>';
+  }
+}
+function _callPaint(){
   const body = $('callBody'); if(!body) return;
   const bar = $('callBar');
 
@@ -4762,7 +4771,8 @@ function callPaint(){
     const rec = (CALL && CALL.recent) || [];
     let html = '';
 
-    if(CALL && !CALL.micGranted()){
+    const micOk = !CALL || typeof CALL.micGranted !== 'function' || CALL.micGranted();
+    if(!micOk){
       html += `<div class="call-warm">
         <div class="call-warm-t">Разрешите микрофон</div>
         <div class="call-warm-s">Один раз на это устройство. Без него звонок не

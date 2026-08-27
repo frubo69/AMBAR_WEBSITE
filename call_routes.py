@@ -618,6 +618,16 @@ async def _on_message(peer: Peer, m: dict):
                        quiet_sid=peer.sid)
         return
 
+    # Состояние камеры — такой же служебный пакет: перекладываем собеседнику.
+    # Полагаться на «замолкание» дорожки нельзя, оно приходит не везде.
+    if t == "camstate":
+        call = peer.call
+        if call:
+            other = call.callee if call.caller.sid == peer.sid else call.caller
+            if other:
+                await other.send(t="camstate", on=bool(m.get("on")))
+        return
+
     # Сигнальные пакеты просто перекладываем другой стороне: сервер в
     # содержимое не смотрит и ключей не знает — голос идёт мимо него.
     if t in ("sdp", "ice"):

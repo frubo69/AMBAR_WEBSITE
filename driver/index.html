@@ -2137,7 +2137,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=7"></script>
+<script src="/vendor/ambar-call.js?v=8"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -6307,8 +6307,12 @@ function _safeTop(){
     const p = e.touches ? e.touches[0] : e;
     sx = p.clientX; sy = p.clientY; ox = PIP_X; oy = PIP_Y;
     el.classList.add('drag');
+    // Захватываем указатель: без этого события перестают приходить, как только
+    // палец съезжает с окошка, и оно замирает на полпути.
+    try{ el.setPointerCapture(e.pointerId); }catch(err){}
     document.addEventListener('pointermove', move, {passive:false});
     document.addEventListener('pointerup', end, {once:true});
+    document.addEventListener('pointercancel', end, {once:true});
   };
   const move = e => {
     if(!el) return;
@@ -6319,9 +6323,10 @@ function _safeTop(){
     pipPlace();
     e.preventDefault();
   };
-  const end = () => {
+  const end = e => {
     document.removeEventListener('pointermove', move);
     if(!el) return;
+    try{ if(e && e.pointerId != null) el.releasePointerCapture(e.pointerId); }catch(err){}
     el.classList.remove('drag');
     if(!moved){
       // Нажатие без движения — обмен местами: собеседник в окно, я на экран.

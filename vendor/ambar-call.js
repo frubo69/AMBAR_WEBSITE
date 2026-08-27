@@ -293,6 +293,10 @@
         }
         break;
 
+      case 'camstate':                              // собеседник включил или выключил камеру
+        this._emit('remotecam', {on: !!m.on});
+        break;
+
       case 'sdp':
         this._onSdp(m.data);
         break;
@@ -416,6 +420,7 @@
       if (sender) sender.replaceTrack(track);
       else if (self.pc) { self.pc.addTrack(track, self.stream || s); self._capVideo(); }
       self._emit('cam', {on: true, facing: self.facing, stream: s});
+      self._send({t: 'camstate', on: true});
       return s;
     });
   };
@@ -428,6 +433,10 @@
       return x.track && x.track.kind === 'video';
     });
     if (sender) { try { sender.replaceTrack(null); } catch (e) {} }
+    // Говорим собеседнику словами. На замолкание дорожки полагаться нельзя:
+    // после replaceTrack(null) у него просто перестают идти кадры, событие
+    // приходит не во всех браузерах, и на экране висит замерший кадр.
+    this._send({t: 'camstate', on: false});
     this._emit('cam', {on: false});
   };
 
@@ -533,6 +542,9 @@
 
     this._watchQuality();
     this._keepAwake(true);
+    // Сразу сообщаем, есть ли у нас картинка: собеседник должен знать это с
+    // первой секунды, а не после первого переключения.
+    this._send({t: 'camstate', on: !!this.cam});
 
     this._capVideo();
 

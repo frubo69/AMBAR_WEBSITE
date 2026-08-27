@@ -194,6 +194,22 @@ async def cmd_id(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         await _remember(sent)
 
 
+# ── временно: проверка микрофона ───────────────────────────────────────────
+# Открывать пробник ссылкой бесполезно: ссылка в телеграме открывается во
+# встроенном браузере, а это другое вебвью с другими правами. Проверять надо
+# ровно ту среду, в которой живёт приложение водителя, — то есть кнопкой
+# web_app. Команда и сама страница уходят вместе с ответом на вопрос.
+MIC_TEST_URL = DRIVER_WEBAPP_URL.rstrip("/") + "/mic.html"
+
+
+async def cmd_mic(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
+    await update.message.reply_text(
+        "Проверка микрофона. Откройте и скажите что-нибудь вслух.",
+        reply_markup=InlineKeyboardMarkup([[
+            InlineKeyboardButton("Открыть проверку", web_app=WebAppInfo(url=MIC_TEST_URL))]]))
+    log.info(f"[mic] пробник открыт: {update.effective_user.id}")
+
+
 def main():
     if not DRIVER_BOT_TOKEN:
         print("❌ DRIVER_BOT_TOKEN missing")
@@ -202,6 +218,7 @@ def main():
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CommandHandler("id", cmd_id))
     app.add_handler(CommandHandler("where", cmd_where))
+    app.add_handler(CommandHandler("mic", cmd_mic))
     # И первое сообщение с точкой, и каждая правка живой трансляции.
     app.add_handler(MessageHandler(filters.LOCATION, on_location))
     app.add_handler(MessageHandler(

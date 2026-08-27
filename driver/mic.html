@@ -1,0 +1,200 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>AMBAR · проверка микрофона</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<!--
+  Временный пробник. Отвечает на один вопрос: даёт ли вебвью телеграма доступ
+  к микрофону на этом телефоне. От ответа зависит, возможен ли звонок внутри
+  мини-аппов вообще, — поэтому проверяем до того, как поднимать TURN и писать
+  сигналинг, а не после. Заодно смотрим, собираются ли ICE-кандидаты: если
+  наружу не пробивается даже STUN, ретранслятор понадобится всегда.
+
+  Страница ничего никуда не отправляет и ничего не пишет — только показывает.
+  Удаляется вместе с командой /mic в боте водителя.
+-->
+<style>
+  :root{--bg:#0b0b12;--card:#13131d;--card2:#191926;--border:#26263a;
+        --text:#f2f2f7;--sub:#9a9ab0;--muted:#6a6a80;--gold:#c9a96e;--gold2:#e0c88f;
+        --ok:#4ec97e;--dn:#e05555}
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--text);
+       font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+       padding:22px 16px calc(28px + env(safe-area-inset-bottom));
+       padding-top:calc(22px + var(--tg-content-safe-area-inset-top,0px))}
+  h1{font-size:19px;font-weight:700;margin:0 0 6px}
+  .lead{font-size:13px;color:var(--sub);line-height:1.5;margin:0 0 20px}
+  button{width:100%;font-family:inherit;font-size:15px;font-weight:600;color:#1a1408;
+         background:linear-gradient(180deg,var(--gold2),var(--gold));border:0;
+         border-radius:14px;padding:16px;cursor:pointer}
+  button:active{opacity:.85}
+  button.ghost{background:var(--card2);border:1px solid var(--border);color:var(--sub);
+               font-weight:500;font-size:13px;padding:13px;margin-top:10px}
+  .verdict{margin:20px 0 0;padding:16px;border-radius:14px;border:1px solid var(--border);
+           background:var(--card);display:none}
+  .verdict.on{display:block}
+  .verdict.ok{border-color:rgba(78,201,126,.45);background:rgba(78,201,126,.07)}
+  .verdict.no{border-color:rgba(224,85,85,.45);background:rgba(224,85,85,.07)}
+  .v-t{font-size:16px;font-weight:700;margin-bottom:5px}
+  .verdict.ok .v-t{color:var(--ok)}
+  .verdict.no .v-t{color:var(--dn)}
+  .v-s{font-size:12.5px;color:var(--sub);line-height:1.5}
+  /* Полоска уровня: разрешение можно получить и на мёртвый микрофон, поэтому
+     верим не флагу, а звуку — пока полоска не дёрнулась, проверка не пройдена. */
+  .meter{height:12px;border-radius:6px;background:var(--card2);border:1px solid var(--border);
+         overflow:hidden;margin-top:14px;display:none}
+  .meter.on{display:block}
+  .meter i{display:block;height:100%;width:0;
+           background:linear-gradient(90deg,var(--gold),var(--ok));transition:width .07s}
+  .peak{font-size:12px;color:var(--muted);margin-top:7px;display:none}
+  .peak.on{display:block}
+  table{width:100%;border-collapse:collapse;margin-top:22px;font-size:12px}
+  td{padding:9px 0;border-bottom:1px solid var(--border);vertical-align:top}
+  td:first-child{color:var(--muted);width:44%}
+  td:last-child{color:var(--text);text-align:right;word-break:break-word}
+  .cap{font-size:9px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);
+       font-weight:600;margin-top:26px}
+</style>
+
+<h1>Проверка микрофона</h1>
+<p class="lead">Нажмите кнопку и скажите что-нибудь вслух. Если полоска задвигается —
+звонок внутри приложения на этом телефоне возможен.</p>
+
+<button id="go">Проверить микрофон</button>
+<div class="meter" id="meter"><i id="bar"></i></div>
+<div class="peak" id="peak"></div>
+
+<div class="verdict" id="verdict">
+  <div class="v-t" id="vt"></div>
+  <div class="v-s" id="vs"></div>
+</div>
+
+<div class="cap">Что увидел браузер</div>
+<table id="diag"></table>
+<button class="ghost" id="copy">Скопировать для отправки</button>
+
+<script>
+const tg = window.Telegram?.WebApp || null;
+try{ tg?.ready(); tg?.expand(); }catch(e){}
+
+const el = id => document.getElementById(id);
+const D = {};                       // всё, что узнали, — одним объектом
+
+function row(k, v){ D[k] = v;
+  el('diag').innerHTML = Object.entries(D)
+    .map(([a,b]) => `<tr><td>${a}</td><td>${b}</td></tr>`).join(''); }
+
+function verdict(ok, title, sub){
+  const v = el('verdict');
+  v.className = 'verdict on ' + (ok ? 'ok' : 'no');
+  el('vt').textContent = title; el('vs').textContent = sub;
+}
+
+// ── что известно до всякого разрешения ──────────────────────────────────────
+row('Телеграм', tg ? ('версия ' + (tg.version || '?') + ', ' + (tg.platform || '?')) : 'страница открыта не из бота');
+row('Защищённое соединение', window.isSecureContext ? 'да' : 'нет — микрофон не дадут в любом случае');
+row('mediaDevices', navigator.mediaDevices ? 'есть' : 'нет в этом вебвью');
+row('getUserMedia', navigator.mediaDevices?.getUserMedia ? 'есть' : 'нет в этом вебвью');
+row('WebRTC', window.RTCPeerConnection ? 'есть' : 'нет в этом вебвью');
+row('Устройство', navigator.userAgent);
+
+// ── микрофон ────────────────────────────────────────────────────────────────
+let stream = null, raf = 0, peak = 0;
+
+el('go').onclick = async () => {
+  el('go').textContent = 'Спрашиваем разрешение…';
+  if(!navigator.mediaDevices?.getUserMedia){
+    el('go').textContent = 'Проверить микрофон';
+    row('Итог', 'getUserMedia отсутствует');
+    verdict(false, 'Микрофона тут нет',
+      'Вебвью телеграма на этом телефоне вообще не умеет отдавать микрофон. Звонок внутри приложения не заработает.');
+    return;
+  }
+  try{
+    stream = await navigator.mediaDevices.getUserMedia({audio:true});
+  }catch(err){
+    el('go').textContent = 'Проверить микрофон';
+    row('Ошибка', err.name + ': ' + (err.message || ''));
+    row('Итог', 'разрешение не получено');
+    // Отказ пользователя и отказ системы — разные вещи, и лечатся по-разному.
+    verdict(false, 'Микрофон не дали',
+      err.name === 'NotAllowedError'
+        ? 'Либо вы нажали «запретить», либо у самого телеграма нет доступа к микрофону в настройках телефона. Проверьте настройки и попробуйте ещё раз.'
+        : err.name === 'NotFoundError'
+        ? 'Телефон не нашёл ни одного микрофона.'
+        : 'Вебвью отказало: ' + err.name + '. Звонок внутри приложения на этом телефоне не заработает.');
+    return;
+  }
+
+  row('Разрешение', 'выдано');
+  const t = stream.getAudioTracks()[0];
+  row('Дорожка', t ? (t.label || 'без названия') + ', готова: ' + (t.readyState === 'live' ? 'да' : 'нет') : 'нет');
+  el('go').textContent = 'Говорите — смотрите на полоску';
+  el('meter').classList.add('on');
+  el('peak').classList.add('on');
+
+  // Уровень звука. Разрешение могли дать, а звук не идти — тогда это тоже «нет».
+  const ac = new (window.AudioContext || window.webkitAudioContext)();
+  try{ await ac.resume(); }catch(e){}
+  row('Аудиодвижок', ac.state + ', ' + ac.sampleRate + ' Гц');
+  const an = ac.createAnalyser(); an.fftSize = 1024;
+  ac.createMediaStreamSource(stream).connect(an);
+  const buf = new Uint8Array(an.fftSize);
+
+  (function tick(){
+    an.getByteTimeDomainData(buf);
+    let m = 0;
+    for(let i = 0; i < buf.length; i++) m = Math.max(m, Math.abs(buf[i] - 128));
+    const lvl = Math.min(1, m / 60);
+    el('bar').style.width = (lvl * 100).toFixed(0) + '%';
+    if(lvl > peak){
+      peak = lvl;
+      el('peak').textContent = 'Максимум за проверку: ' + (peak * 100).toFixed(0) + '%';
+      if(peak > .12){
+        row('Звук идёт', 'да');
+        row('Итог', 'микрофон работает');
+        verdict(true, 'Микрофон работает',
+          'Вебвью отдаёт живой звук. Звонок между приложением водителя и панелью оператора на этом телефоне сделать можно.');
+      }
+    }
+    raf = requestAnimationFrame(tick);
+  })();
+
+  setTimeout(() => {
+    if(peak <= .12){
+      row('Звук идёт', 'нет — полоска не дёрнулась');
+      row('Итог', 'разрешение есть, звука нет');
+      verdict(false, 'Разрешение есть, а звука нет',
+        'Микрофон отдали, но в него ничего не приходит. Скажите что-нибудь громче; если полоска так и стоит — вебвью отдаёт пустую дорожку.');
+    }
+  }, 12000);
+
+};
+
+// ── пробьётся ли голос наружу ───────────────────────────────────────────────
+// Считаем кандидатов: host — только своя сеть, srflx — виден внешний адрес и
+// есть шанс на прямое соединение. Если наружу не пробивается ничего, голос
+// придётся гнать через свой ретранслятор всегда, а не в крайнем случае.
+async function iceProbe(){
+  if(!window.RTCPeerConnection){ row('Сеть наружу', 'WebRTC недоступен'); return; }
+  try{
+    const pc = new RTCPeerConnection({iceServers:[{urls:'stun:stun.l.google.com:19302'}]});
+    const seen = new Set();
+    pc.onicecandidate = e => { if(e.candidate) seen.add(e.candidate.type || '?'); };
+    pc.createDataChannel('probe');
+    await pc.setLocalDescription(await pc.createOffer());
+    setTimeout(() => {
+      row('Сеть наружу', seen.size ? [...seen].join(', ') : 'кандидатов нет');
+      row('Прямое соединение', seen.has('srflx') ? 'вероятно' : 'только через ретранслятор');
+      pc.close();
+    }, 5000);
+  }catch(e){ row('Сеть наружу', 'ошибка: ' + e.name); }
+}
+
+iceProbe();          // сеть меряем сразу: она не зависит от микрофона
+
+el('copy').onclick = () => {
+  const txt = Object.entries(D).map(([a,b]) => a + ': ' + b).join('\n');
+  try{ navigator.clipboard.writeText(txt); el('copy').textContent = 'Скопировано'; }
+  catch(e){ el('copy').textContent = 'Не скопировалось — снимите экран'; }
+};
+</script>

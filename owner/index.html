@@ -2732,7 +2732,10 @@ button.path:active{transform:scale(.995)}
 .sh-t:active{transform:scale(.97)}
 /* Счётчик ждущих решения — на самой вкладке: иначе о том, что в «Бое» третий
    день висит заявка, узнаёшь, только если туда заглянуть. */
-.sh-n{display:none;min-width:17px;height:17px;margin-left:7px;padding:0 5px;
+/* Обе вкладки в одну строку: «Брак / бой / утеря» со счётчиком переносился
+   на вторую, и пилюля становилась вдвое выше соседней. */
+#shTabs button{white-space:nowrap;font-size:13px;padding-left:6px;padding-right:6px}
+.sh-n{display:none;min-width:16px;height:16px;margin-left:6px;padding:0 4px;
   border-radius:999px;align-items:center;justify-content:center;
   background:var(--warn);color:#1a1408;
   font-style:normal;font-size:10px;font-weight:800;line-height:1;vertical-align:1px}
@@ -2835,6 +2838,8 @@ button.path:active{transform:scale(.995)}
 .wo-st.held{color:var(--warn-t);background:rgba(243,180,74,.1);
   border:1px solid rgba(243,180,74,.28);cursor:pointer}
 .wo-act.hold{color:var(--warn-t);border-color:rgba(243,180,74,.3)}
+/* Одна кнопка — на всю ширину: половинка рядом с пустотой выглядит обрубком. */
+.wo-acts.one{grid-template-columns:1fr}
 
 /* ── Списания ────────────────────────────────────────────────────────────
    Сверху деньги и причины — ответ на «много ли». Ниже строки со снимками —
@@ -2889,6 +2894,10 @@ button.path:active{transform:scale(.995)}
 .wo-q-aed b{display:block;font-family:'Space Grotesk',sans-serif;font-size:16px;
   font-weight:700;color:var(--sub)}
 .wo-row.pend{border-color:rgba(243,180,74,.34);flex-wrap:wrap}
+/* Кнопка удержания живёт на согласованной строке — значит переносить строку
+   надо и там. Без этого она вставала четвёртым предметом в ряд и выдавливала
+   название за край: у строки оставались миниатюра, сумма и кнопка. */
+.wo-row.hold{flex-wrap:wrap}
 .wo-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;margin-top:11px;
   padding-top:11px;border-top:1px solid var(--border2)}
 .wo-act{padding:11px 10px;border-radius:12px;font-family:inherit;font-size:13px;
@@ -10388,7 +10397,6 @@ function _accClose(){
 
 // День и период — один раздел, а не два: это одни и те же деньги, просто
 // разной длины окно. Переключатель наверху, а не отдельная плитка на панели.
-let EXP_TAB = 'day';
 
 // Расходы смены — всё, что смена стоила сверх товара: питание и разовые
 // траты водителей плюс то, что не доехало до кассы, — бой, брак, утеря,
@@ -10402,7 +10410,6 @@ let EXP_TAB = 'day';
 // кассы, — это два разных разговора, и каждый со своим сроком: питание
 // смотрят за день, бой за месяц.
 let SH_TAB = 'exp';            // exp | wo
-let WO_KIND = '';              // '' — все виды
 
 async function accExpenses(){
   _setText('accTitle', 'Расходы смены');
@@ -10442,28 +10449,12 @@ async function shTab(t, first){
   await accWoAll();
 }
 
-// Внутри «Расходов» переключатель дня остаётся: это единственная вкладка, где
-// «сегодня» и «за месяц» отвечают на разные вопросы.
+// Никакого выбора срока: расходы людей смотрят за смену, и второй
+// переключатель поверх первого только заставлял выбирать там, где выбора нет.
 async function accExpShell(){
   const body = document.getElementById('expBody'); if(!body) return;
-  body.innerHTML = `
-    <div class="periods" id="expTabs" style="margin:2px 0 12px">
-      <div class="period-pill"></div>
-      <button class="${EXP_TAB === 'day' ? 'on' : ''}" onclick="expTab('day')">День</button>
-      <button class="${EXP_TAB === 'period' ? 'on' : ''}" onclick="expTab('period')">30 дней</button>
-    </div>
-    <div id="expInner"><div class="exp-empty">Загрузка…</div></div>`;
-  const g = document.getElementById('expTabs'); if(g) requestAnimationFrame(()=>movePill(g));
-  await (EXP_TAB === 'day' ? accExpDay() : accExpPeriod());
-}
-
-function expTab(t){
-  EXP_TAB = t;
-  document.querySelectorAll('#expTabs button').forEach((b,i)=>
-    b.classList.toggle('on', (i === 0) === (t === 'day')));
-  const g = document.getElementById('expTabs'); if(g) movePill(g);
-  (t === 'day' ? accExpDay() : accExpPeriod());
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  body.innerHTML = '<div id="expInner"><div class="exp-empty">Загрузка…</div></div>';
+  await accExpDay();
 }
 
 async function accExpDay(){
@@ -10476,62 +10467,10 @@ async function accExpDay(){
   renderExpenses();
 }
 
-async function accExpPeriod(){
-  const body = document.getElementById('expInner'); if(!body) return;
-  let d;
-  try{ d = await ownerApi.ownerFetch('/api/owner/expenses/period', {params:{days:30}}); }
-  catch(e){ body.innerHTML =
-    '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
-  ACC_PERIOD = d;
-  _setText('accSub', `${d.from} → ${d.to}`);
-  const maxD = Math.max(1, ...d.by_day.map(x => x.meal + x.extra));
-  body.innerHTML = `
-    <div class="exp-sum">
-      <div class="exp-tot">
-        <span class="exp-tot-v">${fmt(d.total)}</span>
-        <span class="exp-tot-u">AED<br>за ${d.days} дней</span>
-        <span class="exp-tot-r">
-          <span>питание<b>${fmt(d.total_meal)}</b></span>
-          <span>разовые<b>${fmt(d.total_extra)}</b></span>
-        </span>
-      </div>
-    </div>
-    ${expHeld(d)}
-    ${d.by_driver.length ? '<div class="exp-grp">По людям</div>' +
-      d.by_driver.map(p => `<div class="acc-line">
-        <span class="acc-line-n">${escS(p.driver)}</span>
-        <span class="acc-line-s">${p.shifts} ${pluralize(p.shifts,'смена','смены','смен')}${
-          p.items ? ` · ${p.items} ${pluralize(p.items,'расход','расхода','расходов')}` : ''}</span>
-        <span class="acc-line-v">${fmt(p.meal + p.extra)}</span>
-      </div>`).join('') : '<div class="exp-empty">За период ничего не отмечали</div>'}
-    ${d.by_day.length ? '<div class="exp-grp">По дням</div>' +
-      d.by_day.map(x => {
-        const sum = x.meal + x.extra;
-        return `<div class="acc-line">
-          <span class="acc-line-n">${escS(x.day)}</span>
-          <span class="acc-line-bar"><i style="width:${Math.round(sum/maxD*100)}%"></i></span>
-          <span class="acc-line-v">${fmt(sum)}</span>
-        </div>`;
-      }).join('') : ''}`;
-}
+// Сводка за месяц отсюда убрана вместе с переключателем срока: подпись на
+// плитке «Учёта» её по-прежнему показывает, а внутри раздела спрашивают про
+// смену, а не про месяц.
 
-// ─── Закуп ──────────────────────────────────────────────────────────────────
-// Расчёт по норме — предложение, а не приговор: владелец видит полку своими
-// глазами и знает то, чего не знает программа. Поэтому любое число правится
-// руками, правка отмечается, а рядом остаётся то, что считала программа —
-// иначе через день не вспомнить, от чего отступили и зачем.
-//
-// Правится клетка «позиция × точка», а не итог: развозить всё равно по точкам,
-// и «дай на десять меньше» без указания, где именно меньше, заявкой не станет.
-let ORD = {d:null, open:null, q:'', tab:'need', busy:false, pend:{}, timer:null};
-
-// Заявка и поставка — не два раздела, а один путь: посчитали, чего не хватает →
-// отправили в магазин → он ответил → водители забрали → приняли на полку.
-// Раньше первая половина пути жила в одной плитке, вторая в другой, и связь
-// между ними надо было держать в голове.
-//
-// Теперь всё в «Заявке», а наверху полоса шагов: она отвечает на единственный
-// вопрос, с которым сюда заходят, — «мы сейчас где».
 async function accOrder(){
   ACC_BACK = null;
   _setText('accTitle', 'Закупка');
@@ -15990,8 +15929,6 @@ function woHome(){
 // Один вид на экране — это ответ на вопрос «сколько мы бьём», который по
 // общему списку не читался: бой, брак и просрочка лежали вперемешку, и чтобы
 // понять, чего именно много, приходилось считать строки глазами.
-const SH_KIND_T = {'брак':'Брак', 'бой':'Бой', 'потеря':'Утеря', 'просрочка':'Просрочка'};
-const SH_KINDS = ['брак', 'бой', 'потеря', 'просрочка'];
 
 async function accWoAll(){
   const body = document.getElementById('expBody'); if(!body) return;
@@ -16005,36 +15942,22 @@ async function accWoAll(){
   woKindBody();
 }
 
-// Вид — фильтром внутри, а не отдельной вкладкой: сначала отвечают на вопрос
-// «что ждёт решения», и он общий для всех видов. Разделять их сразу значило бы
-// заставить обойти четыре экрана, чтобы понять, есть ли работа.
-function woKind(k){
-  WO_KIND = WO_KIND === k ? '' : k;
-  woKindBody();
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-}
-
 function woKindBody(){
   const body = document.getElementById('expBody'); if(!body) return;
+  // Всё вместе, без деления по видам: вопрос один — что ждёт решения, — и он
+  // общий для боя, брака, утери и просрочки. Вид написан в самой строке.
   const w = ACC_WO || {rows: [], pending: []};
-  const fit = r => !WO_KIND || r.kind === WO_KIND;
-  const pend = (w.pending || []).filter(fit);
-  const rows = (w.rows || []).filter(fit);
+  const pend = w.pending || [];
+  const rows = w.rows || [];
   const ok   = rows.filter(r => r.state !== 'no');
   const qty  = ok.reduce((a, r) => a + (r.qty || 0), 0);
   const aed  = ok.reduce((a, r) => a + (r.aed || 0), 0);
   const held = ok.reduce((a, r) => a + ((r.comp || {}).amount || 0), 0);
   _setText('accSub', pend.length
     ? `${pend.length} ${pluralize(pend.length,'ждёт','ждут','ждут')} решения`
-    : (WO_KIND ? `${SH_KIND_T[WO_KIND]} · 30 дней` : 'за 30 дней'));
-  // Чипы видов со своими числами: сколько чего за месяц видно, не открывая.
-  const cnt = k => (w.pending || []).filter(r => r.kind === k).length
-                 + (w.rows || []).filter(r => r.kind === k && r.state !== 'no').length;
-  const chips = `<div class="sh-tabs">${SH_KINDS.map(k => `
-    <button class="sh-t ${WO_KIND === k ? 'on' : ''}" onclick="woKind('${k}')">${
-      SH_KIND_T[k]}${cnt(k) ? `<i class="sh-c">${cnt(k)}</i>` : ''}</button>`).join('')}</div>`;
+    : 'всё разобрано');
   if(!pend.length && !rows.length){
-    body.innerHTML = chips + shEmpty(WO_KIND ? 'kind' : 'all');
+    body.innerHTML = shEmpty('all');
     return;
   }
   // Очередь — выше всего: пока решения нет, эти бутылки числятся на полке,
@@ -16046,14 +15969,14 @@ function woKindBody(){
       <span class="wo-q-aed"><b>${fmt(Math.round(pend.reduce((a,r)=>a+(r.aed||0),0)))}</b>AED по прайсу</span>
     </div>
     <div class="wo-rows">${pend.map(woRow).join('')}</div>` : '';
-  body.innerHTML = chips + queue + `
+  body.innerHTML = queue + `
     <div class="wo-sum">
       <div class="wo-sum-l">
         <div class="wo-sum-n">${fmt(Math.round(aed))}<i>AED</i></div>
-        <div class="wo-sum-s">по прайсу, за 30 дней</div>
+        <div class="wo-sum-s">по прайсу</div>
       </div>
       <div class="wo-ks">
-        <div class="wo-k"><span class="wo-k-n" style="color:${WO_TINT[WO_KIND] || 'var(--sub)'}">${fmt(qty)}</span>
+        <div class="wo-k"><span class="wo-k-n" style="color:var(--sub)">${fmt(qty)}</span>
           <span class="wo-k-t">${pluralize(qty,'штука','штуки','штук')}</span></div>
         <div class="wo-k"><span class="wo-k-n" style="color:${held ? 'var(--warn-t)' : 'var(--muted)'}">${fmt(held)}</span>
           <span class="wo-k-t">удержано</span></div>
@@ -16070,9 +15993,7 @@ function woKindBody(){
 function shEmpty(kind){
   const V = {
     all: ['<path d="M20 6 9 17l-5-5"/>', 'Ничего не списывали',
-          'За тридцать дней ни боя, ни брака, ни утери.', 'ok'],
-    kind: ['<path d="M20 6 9 17l-5-5"/>', `${SH_KIND_T[WO_KIND] || ''} — ни одного`,
-           'За тридцать дней по этому виду записей нет.', 'ok'],
+          'Ни боя, ни брака, ни утери.', 'ok'],
     err: ['<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0"/>',
           'Не удалось загрузить', 'Связь пропала или сервер не ответил.', 'err'],
   }[kind] || [];
@@ -16226,7 +16147,8 @@ function woRow(r){
   const when = isNaN(d) ? (r.day || '') : d.toLocaleString('ru-RU',
     {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Dubai'});
   const wait = r.state === 'pending', no = r.state === 'no';
-  return `<div class="wo-row ${wait ? 'pend' : ''}" id="wo-${escS(r.id)}"
+  return `<div class="wo-row ${wait ? 'pend' : ''}${
+       (!wait && !no && !r.comp) ? ' hold' : ''}" id="wo-${escS(r.id)}"
        onclick="woShot('${escS(r.id)}','${escS(r.name)}')">
     <div class="wo-th" id="woth-${escS(r.id)}">${
       r.thumb ? `<img src="${escS(r.thumb)}" alt="">` : ''}</div>
@@ -16249,7 +16171,7 @@ function woRow(r){
       <button class="wo-act no" onclick="woDecide(event,'${escS(r.id)}',false)">Отклонить</button>
       <button class="wo-act ok" onclick="woDecide(event,'${escS(r.id)}',true)">Согласовать</button>
     </div>` : ''}
-    ${(!wait && !no && !r.comp) ? `<div class="wo-acts">
+    ${(!wait && !no && !r.comp) ? `<div class="wo-acts one">
       <button class="wo-act hold" onclick="woCompOpen(event,'${escS(r.id)}')">Удержать с виновного</button>
     </div>` : ''}
   </div>`;

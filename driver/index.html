@@ -1081,8 +1081,16 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .call-scr.video .cs-slot.full,.call-scr.video .cs-slot.pip{display:block}
 .cs-slot.full{top:0;left:0;width:100%;height:100%;border-radius:0;z-index:1}
 .cs-slot.pip{width:104px;height:139px;border-radius:16px;z-index:5;cursor:grab;
-  border:1px solid rgba(255,255,255,.16);box-shadow:0 8px 26px rgba(0,0,0,.55)}
-.cs-slot.pip.drag{cursor:grabbing;transition:none;box-shadow:0 14px 40px rgba(0,0,0,.7)}
+  border:1px solid rgba(255,255,255,.16);box-shadow:0 8px 26px rgba(0,0,0,.55);
+  /* Без этого браузер через несколько пикселей забирает жест себе под прокрутку
+     и обрывает перетаскивание — окно дёргалось и замирало. */
+  touch-action:none;user-select:none;-webkit-user-select:none}
+.cs-slot.pip.drag{cursor:grabbing;transition:none;box-shadow:0 14px 40px rgba(0,0,0,.7);
+  transform:scale(1.04)}
+/* Примагничивание к углу: своя кривая, короткий разгон и мягкая остановка —
+   так это ощущается броском, а не переездом. */
+.cs-slot.pip.snap{transition:top .42s cubic-bezier(.32,.72,0,1),
+  left .42s cubic-bezier(.32,.72,0,1),transform .42s cubic-bezier(.32,.72,0,1)}
 /* Своё видео зеркалим — привычка смотреть на себя как в зеркало. Заднюю
    камеру не зеркалим: на ней читают вывески и номера. */
 #slotLocal video{transform:scaleX(-1)}
@@ -6280,8 +6288,23 @@ function callVideoPaint(){
   const a = cel('csPillA'), n = cel('csPillN');
   if(a) a.textContent = _ini(CALL_WHO);
   if(n) n.textContent = CALL_WHO || '—';
-  cel('csCam')?.classList.toggle('on', !CALL_CAM);
-  cel('csMic')?.classList.toggle('on', _callMuted);
+  // Выключенное состояние обязано читаться значком, а не только фоном: фон
+  // говорит «нажато», а перечёркнутая камера — «камеры нет».
+  const cam = cel('csCam'), mic = cel('csMic');
+  if(cam){
+    cam.classList.toggle('on', !CALL_CAM);
+    cam.innerHTML = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none"
+      stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
+      d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/>${
+      CALL_CAM ? '' : '<path d="M2 2l20 20"/>'}</svg>`;
+  }
+  if(mic){
+    mic.classList.toggle('on', _callMuted);
+    mic.innerHTML = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none"
+      stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
+      d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/>${
+      _callMuted ? '<path d="M3 3l18 18"/>' : ''}</svg>`;
+  }
 }
 
 // ── маленькое окно: двигается пальцем, меняется местами по нажатию ──────────
@@ -6307,48 +6330,109 @@ function _safeTop(){
   return el ? el.offsetHeight : 0;
 }
 
-// Нажали — поменялись местами; повели — окно едет за пальцем. Различаем по
-// пройденному расстоянию: короткое касание это нажатие, а не неудачный перенос.
+// Докуда можно опустить окно у левого и правого края: до верха кнопок,
+// которые там стоят.
+function pipFloor(toLeft, H){
+  const el = document.querySelector(toLeft ? '.call-scr .cs-flip' : '.call-scr .cs-side');
+  const bottom = H - PIP_H - PIP_PAD;
+  if(!el) return bottom;
+  const r = el.getBoundingClientRect();
+  if(!r.height) return bottom;
+  return Math.min(bottom, r.top - PIP_H - 12);
+}
+
+// ── перетаскивание маленького окна ──────────────────────────────────────────
+// Три вещи делают это похожим на эппловское, и каждая обязательна.
+//
+// Первая: во время движения меняем transform, а не top и left. Позиция через
+// top/left заставляет браузер пересчитывать раскладку на каждый кадр, и окно
+// с живым видео внутри отстаёт от пальца. Сдвиг — работа видеокарты, он не
+// отстаёт никогда.
+//
+// Вторая: жест забираем себе целиком — touch-action:none в стилях и захват
+// указателя здесь. Без этого браузер через несколько пикселей решает, что
+// человек прокручивает страницу, и обрывает перетаскивание.
+//
+// Третья: отпустили — окно летит в ближайший угол, и «ближайший» считается с
+// учётом броска. Кинули к правому краю — окно улетит вправо, даже если в
+// момент отпускания оно ещё слева от середины. Так это и ощущается броском.
 (function pipDrag(){
-  let el = null, sx = 0, sy = 0, ox = 0, oy = 0, moved = false;
+  const SNAP_MS = 420;          // столько длится полёт в угол
+  const FLICK = 0.12;           // насколько далеко продолжаем бросок
+  let el = null, sx = 0, sy = 0, ox = 0, oy = 0, dx = 0, dy = 0, moved = false;
+  let vx = 0, vy = 0, lastT = 0, lastX = 0, lastY = 0, snapT = null;
+
   const start = e => {
-    const t = e.target.closest && e.target.closest('.cs-slot.pip');
+    const t = e.target.closest && e.target.closest('.call-scr .cs-slot.pip');
     if(!t) return;
-    el = t; moved = false;
-    const p = e.touches ? e.touches[0] : e;
-    sx = p.clientX; sy = p.clientY; ox = PIP_X; oy = PIP_Y;
+    el = t; moved = false; dx = dy = vx = vy = 0;
+    sx = lastX = e.clientX; sy = lastY = e.clientY;
+    ox = PIP_X; oy = PIP_Y; lastT = e.timeStamp || Date.now();
+    clearTimeout(snapT);
+    el.classList.remove('snap');
     el.classList.add('drag');
-    // Захватываем указатель: без этого события перестают приходить, как только
-    // палец съезжает с окошка, и оно замирает на полпути.
     try{ el.setPointerCapture(e.pointerId); }catch(err){}
     document.addEventListener('pointermove', move, {passive:false});
     document.addEventListener('pointerup', end, {once:true});
     document.addEventListener('pointercancel', end, {once:true});
   };
+
   const move = e => {
     if(!el) return;
-    const p = e.touches ? e.touches[0] : e;
-    const dx = p.clientX - sx, dy = p.clientY - sy;
-    if(Math.abs(dx) > 5 || Math.abs(dy) > 5) moved = true;
-    PIP_X = ox + dx; PIP_Y = oy + dy;
-    pipPlace();
     e.preventDefault();
+    dx = e.clientX - sx; dy = e.clientY - sy;
+    if(Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+    // Скорость считаем по последнему отрезку — она и решает, куда бросок.
+    const t = e.timeStamp || Date.now(), dt = Math.max(1, t - lastT);
+    vx = (e.clientX - lastX) / dt; vy = (e.clientY - lastY) / dt;
+    lastT = t; lastX = e.clientX; lastY = e.clientY;
+    el.style.transform = 'translate3d(' + dx + 'px,' + dy + 'px,0) scale(1.04)';
   };
+
   const end = e => {
     document.removeEventListener('pointermove', move);
     if(!el) return;
-    try{ if(e && e.pointerId != null) el.releasePointerCapture(e.pointerId); }catch(err){}
-    el.classList.remove('drag');
+    const node = el; el = null;
+    try{ if(e && e.pointerId != null) node.releasePointerCapture(e.pointerId); }catch(err){}
+    node.classList.remove('drag');
+
     if(!moved){
       // Нажатие без движения — обмен местами: собеседник в окно, я на экран.
+      node.style.transform = '';
       CALL_SWAP = !CALL_SWAP;
-      try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+      try{ tg.HapticFeedback.impactOccurred('light'); }catch(err){}
       callVideoPaint();
-    }else{
-      pipPlace();
+      return;
     }
-    el = null;
+
+    // Переносим сдвиг из transform в координаты, не двигая картинку: сначала
+    // без перехода, иначе окно прыгнет в старое место и поедет оттуда.
+    const W = window.innerWidth, H = window.innerHeight;
+    node.style.transition = 'none';
+    node.style.transform = '';
+    PIP_X = ox + dx; PIP_Y = oy + dy;
+    node.style.left = PIP_X + 'px'; node.style.top = PIP_Y + 'px';
+    void node.offsetWidth;
+    node.style.transition = '';
+
+    // Куда лететь: к ближайшему углу с поправкой на бросок.
+    const top = _safeTop() + PIP_PAD;
+    const px = PIP_X + vx * FLICK * SNAP_MS, py = PIP_Y + vy * FLICK * SNAP_MS;
+    const left = PIP_PAD, right = W - PIP_W - PIP_PAD;
+    const toLeft = (px + PIP_W / 2) < W / 2;
+    // Нижняя граница у каждого края своя: справа стоит столбец кнопок, слева
+    // только поворот камеры. Окно не должно садиться на них сверху — у эппла
+    // картинка тоже никогда не перекрывает управление.
+    const up = top;
+    const down = pipFloor(toLeft, H);
+    PIP_X = toLeft ? left : right;
+    PIP_Y = (py + PIP_H / 2) < (up + down) / 2 ? up : down;
+    node.classList.add('snap');
+    pipPlace();
+    try{ tg.HapticFeedback.impactOccurred('soft'); }catch(err){}
+    snapT = setTimeout(() => node.classList.remove('snap'), SNAP_MS + 40);
   };
+
   document.addEventListener('pointerdown', start);
 })();
 function callAccept(){ CALL && CALL.accept().catch(() => {}); }

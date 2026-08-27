@@ -777,8 +777,14 @@ a.oc-row:active{background:var(--card2)}
 .cv.on .cv-slot.full,.cv.on .cv-slot.pip{display:block}
 .cv-slot.full{top:0;left:0;width:100%;height:100%;border-radius:0;z-index:1}
 .cv-slot.pip{width:92px;height:123px;border-radius:14px;z-index:5;cursor:grab;
-  border:1px solid rgba(255,255,255,.16);box-shadow:0 8px 24px rgba(0,0,0,.5)}
-.cv-slot.pip.drag{cursor:grabbing;transition:none}
+  border:1px solid rgba(255,255,255,.16);box-shadow:0 8px 24px rgba(0,0,0,.5);
+  /* Иначе браузер забирает жест себе под прокрутку и обрывает перенос. */
+  touch-action:none;user-select:none;-webkit-user-select:none}
+.cv-slot.pip.drag{cursor:grabbing;transition:none;transform:scale(1.04);
+  box-shadow:0 14px 36px rgba(0,0,0,.65)}
+/* Примагничивание к углу — своя кривая: короткий разгон, мягкая остановка. */
+.cv-slot.pip.snap{transition:top .42s cubic-bezier(.32,.72,0,1),
+  left .42s cubic-bezier(.32,.72,0,1),transform .42s cubic-bezier(.32,.72,0,1)}
 #cvSlotLoc video{transform:scaleX(-1)}
 .cv.cam-back #cvSlotLoc video{transform:none}
 /* Камера выключена — серая плашка с перечёркнутой камерой вместо замершего
@@ -5075,6 +5081,16 @@ function _safeTop(){
   const el = document.getElementById('safeProbe');
   return el ? el.offsetHeight : 0;
 }
+// Докуда можно опустить окно у каждого края: до верха стоящих там кнопок.
+function pipFloor(toLeft, H){
+  const el = document.querySelector(toLeft ? '#callVid .cv-flip' : '#callVid .cv-side');
+  const bottom = H - PIP_H - PIP_PAD;
+  if(!el) return bottom;
+  const r = el.getBoundingClientRect(), box = pipBox();
+  if(!r.height || !box) return bottom;
+  return Math.min(bottom, r.top - box.getBoundingClientRect().top - PIP_H - 12);
+}
+
 function pipPlace(){
   const el = pipEl(), box = pipBox(); if(!el || !box) return;
   const W = box.clientWidth, H = box.clientHeight;
@@ -5085,29 +5101,67 @@ function pipPlace(){
   el.style.left = PIP_X + 'px'; el.style.top = PIP_Y + 'px';
 }
 
-// Нажали — поменялись местами; повели — окно едет за курсором.
+// ── перетаскивание маленького окна ──────────────────────────────────────────
+// Во время движения меняем transform, а не координаты: пересчёт раскладки на
+// каждый кадр заставляет окно с живым видео отставать от курсора. Жест
+// забираем себе целиком (touch-action и захват указателя), иначе браузер через
+// несколько пикселей решает, что это прокрутка, и обрывает перенос. Отпустили —
+// окно летит в ближайший угол с учётом броска.
 (function(){
-  let el = null, sx = 0, sy = 0, ox = 0, oy = 0, moved = false;
+  const SNAP_MS = 420, FLICK = 0.12;
+  let el = null, sx = 0, sy = 0, ox = 0, oy = 0, dx = 0, dy = 0, moved = false;
+  let vx = 0, vy = 0, lastT = 0, lastX = 0, lastY = 0, snapT = null;
+
   const move = e => {
     if(!el) return;
-    const dx = e.clientX - sx, dy = e.clientY - sy;
-    if(Math.abs(dx) > 5 || Math.abs(dy) > 5) moved = true;
-    PIP_X = ox + dx; PIP_Y = oy + dy; pipPlace(); e.preventDefault();
+    e.preventDefault();
+    dx = e.clientX - sx; dy = e.clientY - sy;
+    if(Math.abs(dx) > 4 || Math.abs(dy) > 4) moved = true;
+    const t = e.timeStamp || Date.now(), dt = Math.max(1, t - lastT);
+    vx = (e.clientX - lastX) / dt; vy = (e.clientY - lastY) / dt;
+    lastT = t; lastX = e.clientX; lastY = e.clientY;
+    el.style.transform = 'translate3d(' + dx + 'px,' + dy + 'px,0) scale(1.04)';
   };
+
   const end = e => {
     document.removeEventListener('pointermove', move);
     if(!el) return;
-    try{ if(e && e.pointerId != null) el.releasePointerCapture(e.pointerId); }catch(err){}
-    el.classList.remove('drag');
-    if(!moved){ CALL_SWAP = !CALL_SWAP; callVidPaint(); } else pipPlace();
-    el = null;
+    const node = el; el = null;
+    try{ if(e && e.pointerId != null) node.releasePointerCapture(e.pointerId); }catch(err){}
+    node.classList.remove('drag');
+    if(!moved){ node.style.transform = ''; CALL_SWAP = !CALL_SWAP; callVidPaint(); return; }
+
+    const box = pipBox(); if(!box) return;
+    const W = box.clientWidth, H = box.clientHeight;
+    node.style.transition = 'none';
+    node.style.transform = '';
+    PIP_X = ox + dx; PIP_Y = oy + dy;
+    node.style.left = PIP_X + 'px'; node.style.top = PIP_Y + 'px';
+    void node.offsetWidth;
+    node.style.transition = '';
+
+    const top = _safeTop() + PIP_PAD;
+    const px = PIP_X + vx * FLICK * SNAP_MS, py = PIP_Y + vy * FLICK * SNAP_MS;
+    const toLeft = (px + PIP_W / 2) < W / 2;
+    // Нижняя граница у каждого края своя: справа столбец кнопок, слева поворот
+    // камеры. Окно не садится на управление сверху.
+    const up = top, down = pipFloor(toLeft, H);
+    PIP_X = toLeft ? PIP_PAD : W - PIP_W - PIP_PAD;
+    PIP_Y = (py + PIP_H / 2) < (up + down) / 2 ? up : down;
+    node.classList.add('snap');
+    pipPlace();
+    snapT = setTimeout(() => node.classList.remove('snap'), SNAP_MS + 40);
   };
+
   document.addEventListener('pointerdown', e => {
     const t = e.target.closest && e.target.closest('#callVid .cv-slot.pip');
     if(!t) return;
-    el = t; moved = false; sx = e.clientX; sy = e.clientY; ox = PIP_X; oy = PIP_Y;
+    el = t; moved = false; dx = dy = vx = vy = 0;
+    sx = lastX = e.clientX; sy = lastY = e.clientY;
+    ox = PIP_X; oy = PIP_Y; lastT = e.timeStamp || Date.now();
+    clearTimeout(snapT);
+    el.classList.remove('snap');
     el.classList.add('drag');
-    // Захват указателя: иначе движение теряется, стоит курсору съехать с окна.
     try{ el.setPointerCapture(e.pointerId); }catch(err){}
     document.addEventListener('pointermove', move, {passive:false});
     document.addEventListener('pointerup', end, {once:true});
@@ -5141,8 +5195,23 @@ function callVidPaint(){
   const a = document.getElementById('cvA'), n = document.getElementById('cvN');
   if(a) a.textContent = _cIni(CALL_WHO);
   if(n) n.textContent = CALL_WHO || '—';
-  document.getElementById('cvCam')?.classList.toggle('on', !CALL_CAM);
-  document.getElementById('cvMic')?.classList.toggle('on', _callMuted);
+  // Значок обязан говорить сам: фон значит «нажато», а перечёркнутая камера —
+  // «камеры нет».
+  const cam = document.getElementById('cvCam'), mic = document.getElementById('cvMic');
+  if(cam){
+    cam.classList.toggle('on', !CALL_CAM);
+    cam.innerHTML = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+      stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
+      d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/>${
+      CALL_CAM ? '' : '<path d="M2 2l20 20"/>'}</svg>`;
+  }
+  if(mic){
+    mic.classList.toggle('on', _callMuted);
+    mic.innerHTML = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+      stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
+      d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/>${
+      _callMuted ? '<path d="M3 3l18 18"/>' : ''}</svg>`;
+  }
 }
 
 function callCam(){ if(CALL) CALL.camera(!CALL_CAM); }

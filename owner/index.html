@@ -1288,35 +1288,68 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   background:rgba(243,180,74,.07);border-top:1px solid var(--border2)}
 .ck-c.lock .ck-i{pointer-events:none}
 
-/* Пункты одной группы — одной подложкой: список дел, а не россыпь карточек. */
-.ck-g{border-top:1px solid var(--border2)}
-.ck-i{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;
-  cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
-  background:none;border:0}
-.ck-i + .ck-i{border-top:1px solid var(--border2)}
-.ck-i:active{background:rgba(255,255,255,.03)}
-/* Кружок: пустой — не сделано, галочка — сделано. Ручной обведён золотом,
-   потому что он единственный, по которому надо нажать. */
-.ck-b{flex:0 0 auto;width:24px;height:24px;border-radius:50%;display:flex;
-  align-items:center;justify-content:center;color:transparent;
-  border:1.5px solid var(--border3);background:var(--card2)}
-.ck-b.on{color:#1a1408;background:linear-gradient(135deg,var(--gold2),var(--gold));
-  border-color:transparent}
-.ck-b.hand{border-color:rgba(201,169,110,.5);border-style:dashed}
-.ck-b.hand.on{border-style:solid}
-.ck-b.hand:active{transform:scale(.9)}
-.ck-t{flex:1;min-width:0}
-.ck-t b{display:block;font-size:13.5px;font-weight:600;line-height:1.3}
-.ck-t i{display:block;font-style:normal;font-size:11px;color:var(--muted);
-  margin-top:3px;line-height:1.35}
-.ck-i.done .ck-t b{color:var(--sub);font-weight:500}
-.ck-i.warn .ck-t b{color:var(--warn-t)}
-.ck-n{flex-shrink:0;min-width:22px;height:22px;padding:0 7px;border-radius:999px;
-  display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;
-  color:var(--dn);background:rgba(224,85,85,.12);border:1px solid rgba(224,85,85,.28);
+/* ── Пульт смены ──────────────────────────────────────────────────────────
+   Расписание суток, а не список галочек. Цвет отвечает на один вопрос: где мы
+   относительно срока. Красное мигает — но медленно и мягко: мигалка, от
+   которой устают глаза, перестаёт работать через день. */
+.ck-top{display:flex;align-items:center;gap:14px;padding:16px 17px;
+  border-radius:var(--r);margin-bottom:12px;
+  background:var(--card);border:1px solid var(--border2)}
+.ck-top.late{background:rgba(224,85,85,.07);border-color:rgba(224,85,85,.3)}
+.ck-top.now{background:rgba(243,180,74,.07);border-color:rgba(243,180,74,.28)}
+.ck-top.ok{background:rgba(76,175,125,.07);border-color:rgba(76,175,125,.26)}
+.ck-top-v{flex:0 0 auto;min-width:52px;height:52px;padding:0 10px;border-radius:17px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;
   font-variant-numeric:tabular-nums}
-.ck-i.warn .ck-n{color:var(--warn-t);background:rgba(243,180,74,.12);
+.ck-top.late .ck-top-v{color:var(--dn);background:rgba(224,85,85,.12)}
+.ck-top.now .ck-top-v{color:var(--warn-t);background:rgba(243,180,74,.12)}
+.ck-top.ok .ck-top-v{color:var(--up);background:rgba(76,175,125,.12);font-size:22px}
+.ck-top-b{min-width:0}
+.ck-top-b b{display:block;font-family:'Space Grotesk',sans-serif;font-size:16px;
+  font-weight:700;line-height:1.25}
+.ck-top-b i{display:block;font-style:normal;font-size:12px;color:var(--muted);
+  margin-top:4px}
+
+.ck-list{display:flex;flex-direction:column;gap:8px}
+.ck-r{display:flex;align-items:center;gap:12px;width:100%;padding:14px 15px;
+  border-radius:15px;cursor:pointer;text-align:left;font-family:inherit;
+  color:var(--text);background:var(--card);border:1px solid var(--border2);
+  transition:.15s var(--e1)}
+.ck-r:active{transform:scale(.99)}
+/* Точка слева — весь светофор. Ей не нужен текст: цвет и так читается быстрее
+   любого слова, а слово рядом с ним просто занимает строку. */
+.ck-dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;background:var(--muted)}
+.ck-r.late{border-color:rgba(224,85,85,.34);background:rgba(224,85,85,.06)}
+.ck-r.late .ck-dot{background:var(--dn);animation:ckPulse 1.6s ease-in-out infinite}
+.ck-r.now{border-color:rgba(243,180,74,.3);background:rgba(243,180,74,.05)}
+.ck-r.now .ck-dot{background:var(--warn)}
+.ck-r.done .ck-dot{background:var(--up)}
+.ck-r.done{opacity:.62}
+.ck-r.soon .ck-dot{background:var(--border3)}
+@keyframes ckPulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(224,85,85,.5)}
+  50%{opacity:.45;box-shadow:0 0 0 6px rgba(224,85,85,0)}}
+@media (prefers-reduced-motion: reduce){.ck-r.late .ck-dot{animation:none}}
+.ck-b{flex:1;min-width:0}
+.ck-t{display:block;font-size:14px;font-weight:600;line-height:1.25;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ck-r.done .ck-t{font-weight:500;color:var(--sub)}
+.ck-s{display:block;font-size:11.5px;color:var(--muted);margin-top:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ck-r-r{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.ck-n{min-width:22px;height:22px;padding:0 7px;border-radius:999px;
+  display:flex;align-items:center;justify-content:center;font-size:11px;
+  font-weight:800;font-variant-numeric:tabular-nums;
+  color:var(--dn);background:rgba(224,85,85,.12);border:1px solid rgba(224,85,85,.28)}
+.ck-r.now .ck-n{color:var(--warn-t);background:rgba(243,180,74,.12);
   border-color:rgba(243,180,74,.3)}
+.ck-r.soon .ck-n,.ck-r.done .ck-n{color:var(--muted);background:var(--card2);
+  border-color:var(--border2)}
+.ck-due{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;
+  white-space:nowrap}
+.ck-r.late .ck-due{color:var(--dn)}
+.ck-go{flex:0 0 auto;color:var(--muted);display:flex;align-items:center}
+.ck-note{font-size:11px;color:var(--muted);line-height:1.6;margin:14px 2px 0}
 
 /* Вход в чек-лист. Ростом и посадкой — как строка «Кто на каком районе» на
    районах: то же обещание «одно нажатие — и ты в работе». */
@@ -9885,7 +9918,7 @@ function accRender(){
         <path d="M9 5h10M9 12h10M9 19h10"/><path d="M3.5 5l1.4 1.4L7.5 3.8"/>
         <path d="M3.5 12l1.4 1.4L7.5 10.8"/><path d="M3.5 19l1.4 1.4L7.5 17.8"/></svg></span>
       <span class="chk-e-b"><b>Чек-лист смены</b>
-        <i>согласования и проверки</i></span>
+        <i>что просрочено и что делать сейчас</i></span>
       <span class="chk-e-go"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
         stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span>
     </button>
@@ -10048,123 +10081,88 @@ async function accChecklist(){
   chkRender();
 }
 
-// Порядок блоков — это порядок работы: сначала закрыть ушедшую смену, потом
-// открыть новую. Пока закрытие не доделано, открытие серое и не нажимается:
-// открывать новую смену, не закрыв прошлую, — это и есть та ошибка, ради
-// которой список написан. Как только закрытие сходится, оно сворачивается в
-// одну зелёную строку и уезжает вниз, а открытие поднимается на его место.
-let CKL_OPEN = {};        // какие завершённые блоки человек раскрыл руками
-
-function chkGroups(){
-  const gs = (CKL || {}).groups || [];
-  const by = {}; gs.forEach(g => by[g.id] = g);
-  const close = by.close, open = by.open, night = by.night;
-  const closeDone = close ? close.items.every(i => i.done) : true;
-  const out = [];
-  if(close && !closeDone) out.push({...close, lock:false});
-  if(open)  out.push({...open,  lock: !closeDone});
-  if(night) out.push({...night, lock:false});
-  if(close && closeDone) out.push({...close, lock:false, folded:true});
-  return out;
-}
+// Пульт смены. Не галочки, а расписание: у каждого дела свой час, и цвет
+// говорит, где мы относительно него. Красное опаздывает и мигает, жёлтое пора
+// делать сейчас, серое ещё впереди, зелёное сделано и уезжает вниз.
+//
+// Деления на «закрыть смену» и «открыть смену» больше нет: оно заставляло
+// держать в голове, в какой мы фазе, хотя вопрос всегда один — что просрочено
+// и что делать сейчас.
+const CK_ST = {
+  late: {t:'опаздывает', c:'late'},
+  now:  {t:'пора',       c:'now'},
+  soon: {t:'впереди',    c:'soon'},
+  done: {t:'сделано',    c:'done'},
+};
 
 function chkRender(){
-  const d = CKL; if(!d) return;
-  const groups = chkGroups();
-  // В счёт идёт только то, что сейчас можно сделать: запертые пункты — это не
-  // невыполненная работа, а работа, до которой ещё не дошла очередь.
-  const live = groups.filter(g => !g.lock);
-  const all = live.reduce((a, g) => a + g.items.length, 0);
-  const done = live.reduce((a, g) => a + g.items.filter(i => i.done).length, 0);
-  const left = live.flatMap(g => g.items.filter(i => !i.done));
-  _setText('accSub', CKL_PHASE[d.phase] || '');
-
-  const pct = all ? Math.round(done / all * 100) : 100;
-  const head = `<div class="ck-sum ${done >= all ? 'ok' : ''}">
-    <div class="ck-sum-h">
-      <span class="ck-sum-n">${done}<u>из ${all}</u></span>
-      <span class="ck-sum-p">${pct}%</span>
+  const d = CKL || {};
+  const rows = d.rows || [];
+  const c = d.counts || {};
+  _setText('accSub', d.time ? `сейчас ${d.time}` : '');
+  // Шапка отвечает одним взглядом: горит или нет. Число впереди — то, за чем
+  // сюда и заходят.
+  const head = `<div class="ck-top ${c.late ? 'late' : (c.now ? 'now' : 'ok')}">
+    <div class="ck-top-v">${c.late || c.now || '✓'}</div>
+    <div class="ck-top-b">
+      <b>${c.late ? `${c.late} ${pluralize(c.late,'дело опаздывает','дела опаздывают','дел опаздывают')}`
+         : (c.now ? `${c.now} ${pluralize(c.now,'дело ждёт','дела ждут','дел ждут')}`
+                  : 'всё по расписанию')}</b>
+      <i>${c.done || 0} из ${rows.length} сделано${
+        c.soon ? ` · ${c.soon} впереди` : ''}</i>
     </div>
-    <div class="ck-bar"><i style="width:${pct}%"></i></div>
-    <div class="ck-sum-s">${left.length
-      ? 'осталось: ' + left.slice(0, 3).map(i => escS(i.t.toLowerCase())).join(', ')
-        + (left.length > 3 ? ` и ещё ${left.length - 3}` : '')
-      : 'всё разобрано'}</div>
   </div>`;
-
-  document.getElementById('accMid').innerHTML = head + groups.map(chkCard).join('');
+  document.getElementById('accMid').innerHTML = head +
+    `<div class="ck-list">${rows.map(chkRow).join('')}</div>` +
+    `<div class="ck-note">Часы у каждого дела свои. Красное значит, что срок
+      уже прошёл — не «плохо», а «займитесь этим первым».</div>`;
 }
 
-const ICO_LOCK = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="10.5" width="16" height="10" rx="2.5"/><path d="M8 10.5V7a4 4 0 0 1 8 0v3.5"/></svg>';
-const ICO_DONE = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>';
-
-function chkCard(g){
-  const n = g.items.length, ok = g.items.filter(i => i.done).length;
-  const full = ok >= n;
-  const shown = !g.folded || CKL_OPEN[g.id];
-  const cls = [full ? 'ok' : '', g.lock ? 'lock' : '', shown ? '' : 'fold'].join(' ');
-  return `<div class="ck-c ${cls}">
-    <button class="ck-ch" ${g.folded ? `onclick="chkFold('${g.id}')"` : ''}>
-      <span class="ck-ci">${g.lock ? ICO_LOCK : (full ? ICO_DONE : '')}</span>
-      <span class="ck-cb"><b>${escS(g.t)}</b><i>${escS(g.s)}${
-        g.debt && !full ? ' · долг' : ''}</i></span>
-      <span class="ck-cn">${ok}<u>/${n}</u></span>
-      ${g.folded ? `<span class="pnav-go">${ICO_CHEV}</span>` : ''}
-    </button>
-    ${g.lock ? '<div class="ck-lock">сначала закройте прошлую смену</div>' : ''}
-    <div class="ck-g">${g.items.map(i => chkRow(g, i)).join('')}</div>
-  </div>`;
-}
-
-function chkFold(id){
-  CKL_OPEN[id] = !CKL_OPEN[id];
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  chkRender();
-}
-
-function chkRow(g, i){
-  // Автоматическая галочка — это ответ, а не действие: нажатие ведёт туда, где
-  // пункт закрывается. Ручную ставит человек, и кружок у неё нажимается сам.
-  const box = i.manual && !g.lock
-    ? `<span class="ck-b hand ${i.done ? 'on' : ''}" onclick="event.stopPropagation();chkMark('${
-        g.day}','${i.id}',${i.done ? 'false' : 'true'})">${i.done ? ICO_TICK : ''}</span>`
-    : `<span class="ck-b ${i.done ? 'on' : ''}">${i.done ? ICO_TICK : ''}</span>`;
-  const act = (i.go && !g.lock) ? `onclick="chkGo('${i.go}')"` : '';
-  return `<button class="ck-i ${i.done ? 'done' : (i.warn ? 'warn' : '')}" ${act}>
-    ${box}
-    <span class="ck-t"><b>${escS(i.t)}</b><i>${escS(i.s)}</i></span>
-    ${i.n && !i.done ? `<span class="ck-n">${fmt(i.n)}</span>` : ''}
-    ${i.go && !g.lock ? `<span class="pnav-go">${ICO_CHEV}</span>` : ''}
+function chkRow(r){
+  const st = CK_ST[r.state] || CK_ST.soon;
+  // Опоздание словами: «просрочено на три часа» и «на минуту» требуют разной
+  // реакции, а одно и то же красное — нет.
+  const late = r.state === 'late' && r.late_min
+    ? (r.late_min < 60 ? `${r.late_min} мин` : `${Math.floor(r.late_min / 60)} ч`)
+    : '';
+  return `<button class="ck-r ${st.c}" onclick="chkGo('${escS(r.go)}')">
+    <span class="ck-dot"></span>
+    <span class="ck-b">
+      <span class="ck-t">${escS(r.t)}</span>
+      <span class="ck-s">${escS(r.s)}</span>
+    </span>
+    <span class="ck-r-r">
+      ${r.n ? `<span class="ck-n">${fmt(r.n)}</span>` : ''}
+      <span class="ck-due">${r.state === 'late' ? 'к ' + r.due + (late ? ` · +${late}` : '')
+                           : (r.state === 'done' ? 'готово' : 'к ' + r.due)}</span>
+    </span>
+    <span class="ck-go">${ICO_CHEV}</span>
   </button>`;
 }
 
-// Из чек-листа уходят в раздел и возвращаются обратно в чек-лист, а не наружу:
-// человек пришёл оттуда и придёт туда же с ответом.
+// Каждая строка ведёт туда, где дело делают, — и возвращает обратно в пульт.
+// Метаться по приложению, вспоминая, где именно согласуют расход, старший не
+// должен: он нажал на строку и уже там.
 let CKL_RETURN = false;
+const CK_GO = {
+  shifts:    () => accOpen('shifts'),
+  order:     () => accOpen('order'),
+  supply:    () => accOpen('supply'),
+  short:     () => { ACC_VIEW = 'short'; accShort(); },
+  expenses:  () => { SH_TAB = 'exp'; accOpen('expenses'); },
+  writeoffs: () => { SH_TAB = 'wo';  accOpen('expenses'); },
+};
+
 function chkGo(id){
+  const fn = CK_GO[id];
+  if(!fn) return;
   CKL_RETURN = true;
-  accOpen(id);
+  fn();
 }
 
-const ICO_TICK = '<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M4 12.5l5 5L20 6.5"/></svg>';
-
-async function chkMark(day, item, done){
-  if(CKL_BUSY) return;
-  CKL_BUSY = true;
-  // Ставим сразу, сервер догоняет: галочка не должна ждать сети.
-  (CKL.groups || []).forEach(g => (g.items || []).forEach(i => {
-    if(g.day === day && i.id === item) i.done = done;
-  }));
-  chkRender();
-  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
-  try{
-    await ownerApi.ownerFetch('/api/owner/checklist/mark',
-      {method:'POST', body:{day, item, done}});
-  }catch(e){
-    _toast('Не сохранилось');
-    try{ CKL = await ownerApi.ownerFetch('/api/owner/checklist'); chkRender(); }catch(e2){}
-  }finally{ CKL_BUSY = false; }
-}
+// Ручных галочек в пульте нет: всё, что он показывает, выводится из данных.
+// Галочка, которую ставят руками, ставится и не глядя — а список, которому
+// нельзя верить, хуже отсутствующего.
 
 // Подпись плитки проверок: сколько за месяц и есть ли флажки.
 function chkSub(c){

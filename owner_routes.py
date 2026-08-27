@@ -3212,107 +3212,62 @@ async def _chk_supply(day: str):
             "done": (sup.get("status") or "open") != "open", "total": len(tasks)}
 
 
-async def _chk_group_close(day: str, marks: dict):
-    """Закрыть уходящие сутки. Всё, что случилось за смену, уже окончательно —
-    остаётся решить то, что требует человека."""
-    sh = await _chk_shift(day)
-    start = datetime.strptime(day, "%Y-%m-%d").replace(
-        hour=SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
-    orders = await _chk_orders(start, start + timedelta(days=1))
-    exp = await _chk_expenses(day)
-    try:
-        wo = len(await db.writeoff_pending(limit=200))
-    except Exception:
-        wo = 0
-    # Ревизии в списке нет намеренно: её делают не каждую смену, а держать в
-    # чек-листе пункт, который штатно остаётся невыполненным, — значит научить
-    # человека не верить всему списку. Пересчёт живёт своей плиткой в «Учёте».
-    sup = await _chk_supply(day)
-
-    items = [
-        _chk_item("shift_closed", "Смены закрыты по всем районам",
-                  f"закрыто {sh['closed']} из {sh['total']}",
-                  sh["closed"] >= sh["total"], go="shifts",
-                  n=sh["total"] - sh["closed"]),
-        _chk_item("no_route", "Нет заказов, зависших в пути",
-                  "заказ в пути после смены — бутылка едет, а смена закрыта",
-                  orders["route"] == 0, go="shifts", n=orders["route"], warn=True),
-        _chk_item("expenses", "Согласовать расходы водителей",
-                  f"{exp} ждут решения" if exp else "все разобраны",
-                  exp == 0, go="expenses", n=exp),
-        _chk_item("writeoffs", "Согласовать списания",
-                  f"{wo} ждут решения" if wo else "бой, брак, просрочка разобраны",
-                  wo == 0, go="writeoff", n=wo),
-        _chk_item("cash", "Деньги за смену приняты",
-                  "наличные по доставленным заказам", bool(marks.get("cash")),
-                  manual=True),
-        _chk_item("order_sent", "Заявка отправлена в магазин",
-                  "магазин уже ответил" if sup["exists"]
-                  else "расчёт по остаткам на полке",
-                  sup["exists"] or bool(marks.get("order_sent")),
-                  go="order", manual=not sup["exists"]),
-    ]
-    sub = _day_human(day)
-    if sh["closed_at"]:
-        sub += " · закрыта " + sh["closed_at"][11:16]
-    return {"id": "close", "t": "Закрыть смену", "s": sub, "day": day, "items": items}
+# Пульт смены. Не список галочек, а расписание суток: у каждого дела свой час,
+# и цвет говорит, где мы относительно него.
+#
+#   зелёный  — сделано;
+#   жёлтый   — пора, время пришло;
+#   красный  — опаздывает, срок прошёл;
+#   серый    — ещё рано, срок впереди.
+#
+# Серый нужен ровно за тем же, за чем и остальные: без него всё, что впереди,
+# горело бы жёлтым с полудня, и список перестал бы что-либо значить уже к обеду.
+#
+# Деления на «закрыть смену» и «открыть смену» больше нет. Оно заставляло
+# держать в голове, в какой мы фазе, хотя вопрос всегда один: что просрочено,
+# что пора делать сейчас. Одни сутки, один список, порядок по времени.
+CHK_PLAN = [
+    # id,           час «пора»,  час «поздно», +1 сутки к сроку
+    ("shift_open",  11.5, 12.5, False),
+    ("order_sent",  12.0, 15.0, False),
+    ("supply_in",   12.0, 21.0, False),
+    ("shortfall",   12.0, 21.0, False),
+    ("expenses",    12.0, 23.0, False),
+    ("writeoffs",   12.0, 23.0, False),
+    ("shift_close",  5.0,  6.0, True),
+]
 
 
-async def _chk_group_open(day: str, marks: dict):
-    """Открыть сутки: люди на местах и товар в пути."""
-    sh = await _chk_shift(day)
-    sup = await _chk_supply(day)
-    items = [
-        _chk_item("shift_open", "Все районы открыли смену",
-                  f"открыто {sh['open']} из {sh['total']}",
-                  sh["open"] >= sh["total"], go="shifts",
-                  n=sh["total"] - sh["open"]),
-        _chk_item("crew", "Назначены операторы и водители",
-                  f"с бригадой {sh['crew']} из {sh['total']}",
-                  sh["crew"] >= sh["total"], go="shifts",
-                  n=sh["total"] - sh["crew"]),
-        _chk_item("supply_in", "Ответ магазина загружен, приёмка роздана",
-                  ("ждём ответ магазина" if not sup["exists"]
-                   else (f"{sup['free']} районов без водителя" if sup["free"]
-                         else "все районы разобраны")),
-                  sup["exists"] and not sup["free"], go="order", n=sup["free"]),
-        _chk_item("norms", "Нормы поправлены",
-                  "если вчера чего-то не хватило", bool(marks.get("norms")),
-                  go="norms", manual=True),
-    ]
-    return {"id": "open", "t": "Открыть смену", "s": _day_human(day),
-            "day": day, "items": items}
+def _chk_at(day: str, hour: float, next_day: bool = False) -> datetime:
+    """Момент срока в дубайском времени. Час дробный: 12.5 — это 12:30."""
+    d = datetime.strptime(day, "%Y-%m-%d")
+    if next_day:
+        d += timedelta(days=1)
+    return d.replace(hour=int(hour), minute=int(round((hour % 1) * 60)),
+                     tzinfo=DUBAI_TZ)
 
 
-async def _chk_group_night(day: str, marks: dict):
-    """Перед уходом. С двух до шести смена работает без старшего: всё, что
-    требует его решения, до утра зависнет."""
-    sup = await _chk_supply(day)
-    start = datetime.strptime(day, "%Y-%m-%d").replace(
-        hour=SHIFT_START_HOUR, tzinfo=DUBAI_TZ)
-    orders = await _chk_orders(start, start + timedelta(days=1))
-    sos = await _chk_support()
-    items = [
-        _chk_item("support", "Поддержка разобрана",
-                  f"{sos} ждут ответа" if sos else "никто не ждёт ответа",
-                  sos == 0, n=sos),
-        _chk_item("drv_req", "На просьбы водителей отвечено",
-                  f"{orders['req']} без решения" if orders["req"] else "решений не ждут",
-                  orders["req"] == 0, go="shifts", n=orders["req"], warn=True),
-        _chk_item("receiving", "Приёмка закрыта или роздана",
-                  ("поставки нет" if not sup["exists"]
-                   else ("закрыта" if sup["done"]
-                         else (f"{sup['free']} районов без водителя" if sup["free"]
-                               else "у каждого района есть водитель"))),
-                  (not sup["exists"]) or sup["done"] or not sup["free"],
-                  go="order", n=sup["free"]),
-        _chk_item("shortfall", "Недобор выписан на доп. склад",
-                  f"{sup['gap']} бутылок не дал магазин" if sup["gap"] else "магазин дал всё",
-                  sup["gap"] == 0 or bool(marks.get("shortfall")),
-                  go="order", n=sup["gap"], manual=bool(sup["gap"])),
-    ]
-    return {"id": "night", "t": "Перед уходом", "s": "смена останется без вас",
-            "day": day, "items": items}
+def _chk_state(done: bool, now: datetime, since: datetime, due: datetime) -> str:
+    """Цвет одного дела. Сделанное зелёное всегда — даже если сделали поздно:
+    вопрос «успели ли» относится к прошлому, а список отвечает на «что сейчас»."""
+    if done:      return "done"
+    if now >= due:  return "late"
+    if now >= since: return "now"
+    return "soon"
+
+
+def _chk_row(iid, title, hint, done, now, day, plan, *, go="", n=0):
+    conf = next((p for p in plan if p[0] == iid), None)
+    since = _chk_at(day, conf[1], conf[3]) if conf else now
+    due = _chk_at(day, conf[2], conf[3]) if conf else now
+    return {"id": iid, "t": title, "s": hint, "n": int(n or 0), "go": go,
+            "state": _chk_state(done, now, since, due),
+            "due": due.strftime("%H:%M"),
+            "due_at": due.isoformat(),
+            # Насколько опоздали — в минутах: «просрочено на 3 часа» и
+            # «просрочено на минуту» требуют разной реакции.
+            "late_min": max(0, int((now - due).total_seconds() // 60)),
+    }
 
 
 _MONTHS = ["января", "февраля", "марта", "апреля", "мая", "июня", "июля",
@@ -3329,35 +3284,69 @@ def _day_human(day: str) -> str:
 
 @require_owner
 async def handle_checklist(request):
-    """Чек-лист старшего: что проверить и согласовать по каждой смене."""
-    now = datetime.now(DUBAI_TZ)
-    cur = _biz_day_start(now).date().isoformat()
-    prev = (datetime.strptime(cur, "%Y-%m-%d") - timedelta(days=1)).date().isoformat()
-    # Граница здесь не полдень, а шесть утра: до шести смена ещё идёт, хотя
-    # рабочие сутки уже помечены вчерашним числом. С шести до полудня смены
-    # нет вовсе — это и есть окно, в котором старший её закрывает.
-    shift_over = SHIFT_END_HOUR <= now.hour < SHIFT_START_HOUR
-    close_day = cur if shift_over else prev
-    open_day = None if shift_over else cur
+    """Пульт смены: что просрочено, что пора и что ещё впереди.
 
-    marks_close = await db.checklist_get(close_day)
-    groups = [await _chk_group_close(close_day, marks_close)]
-    if open_day:
-        marks_open = await db.checklist_get(open_day)
-        groups.append(await _chk_group_open(open_day, marks_open))
-        # Ночной блок — только когда до ухода уже близко: днём он был бы
-        # списком того, что и так впереди.
-        if now.hour >= CHK_NIGHT_HOUR or now.hour < SHIFT_END_HOUR:
-            groups.append(await _chk_group_night(open_day, marks_open))
-    phase = ("morning" if shift_over else
-             ("night" if (now.hour >= CHK_NIGHT_HOUR or now.hour < SHIFT_END_HOUR)
-              else "day"))
-    # Долг — незакрытые пункты уходящих суток, когда новые уже идут.
-    if open_day:
-        groups[0]["debt"] = any(not i["done"] for i in groups[0]["items"])
-    return web.json_response({"now": now.isoformat(), "phase": phase,
-                              "close_day": close_day, "open_day": open_day,
-                              "groups": groups}, headers=CORS_HEADERS)
+    Считаем по одним рабочим суткам — тем, что идут прямо сейчас. Закрытие
+    смены относится к этим же суткам, просто его срок наступает следующим
+    утром: сутки идут с полудня до полудня, и шесть утра — их часть, а не
+    начало новых.
+    """
+    now = datetime.now(DUBAI_TZ)
+    day = _biz_day_start(now).date().isoformat()
+    plan = CHK_PLAN
+
+    sh = await _chk_shift(day)
+    sup = await _chk_supply(day)
+    exp = await _chk_expenses(day)
+    try:
+        wo = len(await db.writeoff_pending(limit=200))
+    except Exception:
+        wo = 0
+
+    total = sh["total"]
+    rows = [
+        _chk_row("shift_open", "Смены открыты",
+                 (f"открыто {sh['open']} из {total}" if sh["open"] < total
+                  else f"все {total} районов на смене"),
+                 sh["open"] >= total, now, day, plan,
+                 go="shifts", n=total - sh["open"]),
+        _chk_row("order_sent", "Заявка в магазин",
+                 ("магазин уже ответил" if sup["exists"] else "магазин ещё не отвечал"),
+                 sup["exists"], now, day, plan, go="order"),
+        _chk_row("supply_in", "Поставка принята",
+                 ("ответа магазина нет" if not sup["exists"]
+                  else ("приём закрыт" if sup["done"]
+                        else (f"{sup['free']} районов без водителя" if sup["free"]
+                              else "везут, ни один район не закрыт"))),
+                 sup["exists"] and sup["done"], now, day, plan,
+                 go="supply", n=sup["free"]),
+        _chk_row("expenses", "Расходы водителей",
+                 (f"{exp} ждут решения" if exp else "все разобраны"),
+                 exp == 0, now, day, plan, go="expenses", n=exp),
+        _chk_row("writeoffs", "Бой, брак и утеря",
+                 (f"{wo} ждут решения" if wo else "разобрано"),
+                 wo == 0, now, day, plan, go="writeoffs", n=wo),
+        _chk_row("shift_close", "Смены закрыты",
+                 (f"закрыто {sh['closed']} из {total}" if sh["closed"] < total
+                  else f"все {total} районов закрылись"),
+                 sh["closed"] >= total, now, day, plan,
+                 go="shifts", n=total - sh["closed"]),
+    ]
+    # Недобор появляется в списке только когда он есть: пункт, который штатно
+    # выполнен, каждый день занимал бы строку и приучал не читать список.
+    if sup["gap"]:
+        rows.append(_chk_row("shortfall", "Докупить на доп. складах",
+                             f"магазин не дал {sup['gap']} бутылок",
+                             False, now, day, plan, go="short", n=sup["gap"]))
+
+    order = {"late": 0, "now": 1, "soon": 2, "done": 3}
+    rows.sort(key=lambda r: (order.get(r["state"], 9), r["due_at"]))
+    counts = {k: sum(1 for r in rows if r["state"] == k)
+              for k in ("late", "now", "soon", "done")}
+    return web.json_response({
+        "now": now.isoformat(), "time": now.strftime("%H:%M"), "day": day,
+        "rows": rows, "counts": counts,
+    }, headers=CORS_HEADERS)
 
 
 @require_owner

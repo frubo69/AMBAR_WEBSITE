@@ -2640,6 +2640,44 @@ button.path:active{transform:scale(.995)}
   font-size:19px;font-weight:700;font-variant-numeric:tabular-nums}
 .nm-row.fix .nm-v{color:var(--gold2)}
 
+/* ── Заявка: номер строки, нулевые позиции, цена по нажатию ───────────────
+   Номер тот же, что в файле для магазина: по нему сверяют позицию голосом и
+   пальцем, не читая название целиком. */
+.ord-r-i{flex:0 0 auto;width:26px;font-family:'DM Sans',sans-serif;font-size:11px;
+  font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right;
+  padding-right:9px}
+/* Позиция, которой в заявке нет: она в списке ради дозаказа, но не должна
+   спорить за внимание с тем, что действительно везут. */
+.ord-r.zero .ord-r-n{color:var(--sub)}
+.ord-r.zero .ord-r-v{color:var(--muted);opacity:.6}
+/* Сумма по прайсу — золотом и по нажатию: за ней прячется разбор по позициям,
+   и цвет единственное, что об этом говорит. */
+.ord-sum-c.gold{cursor:pointer}
+.ord-sum-c.gold b{color:var(--gold2)}
+.ord-sum-c.gold:active{transform:scale(.98)}
+.ord-pr{max-height:52vh;overflow-y:auto;margin-top:4px}
+.ord-pr-r{display:flex;align-items:baseline;gap:9px;padding:8px 0;
+  border-bottom:1px solid var(--border2)}
+.ord-pr-i{flex:0 0 auto;width:22px;font-size:11px;font-weight:700;color:var(--muted);
+  font-variant-numeric:tabular-nums;text-align:right}
+.ord-pr-n{flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.ord-pr-q{flex:0 0 auto;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.ord-pr-s{flex:0 0 auto;min-width:62px;text-align:right;font-family:'DM Sans',sans-serif;
+  font-size:14px;font-weight:700;color:var(--gold2);font-variant-numeric:tabular-nums}
+.ord-pr-f{font-size:11px;color:var(--muted);line-height:1.55;margin-top:12px}
+
+/* Действие раздела в шапке справа. Красным — потому что отменяют редко и это
+   не то, что нажимают мимоходом. */
+.stk-top-a{margin-left:auto;flex:0 0 auto}
+.acc-act{height:34px;padding:0 14px;border-radius:11px;cursor:pointer;
+  font-family:inherit;font-size:12.5px;font-weight:700;white-space:nowrap;
+  border:1px solid var(--border2);background:var(--card);color:var(--sub)}
+.acc-act.dn{color:var(--dn);border-color:rgba(224,85,85,.35);
+  background:rgba(224,85,85,.08)}
+.acc-act:active{transform:scale(.96)}
+.acc-act:disabled{opacity:.5}
+
 /* ── Расходы смены: вкладки по видам ──────────────────────────────────────
    Пять вкладок в ряд: «Расходы» отвечает за людей, остальные — за товар,
    который не доехал до кассы. Ряд прокручивается: на узком телефоне пятое
@@ -10302,6 +10340,7 @@ function accOpen(id){
   ACC_VIEW = id;
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
   document.getElementById('accFoot').innerHTML = '';   // подвал у каждого свой
+  document.getElementById('accAct').innerHTML = '';    // и действие в шапке тоже
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
   if(id === 'expenses') accExpenses();
   if(id === 'order')    accOrder();
@@ -10534,6 +10573,11 @@ function supStage(){
   const busy = tasks.filter(t => t.driver && !t.done_at).length;
   const took = tasks.reduce((a, t) => a + (t.scanned || 0), 0);
   const base = {sup, all, done, took, free: all - done - busy};
+  // Отменённая заявка — не «приём закончен». Это разные новости: одна значит
+  // «всё привезли», другая «сегодня не везём», и путать их нельзя.
+  if(sup.status === 'cancelled')
+    return {...base, k:'cancelled', t:'Заявка отменена',
+            s: took ? `успели принять ${fmt(took)}` : 'сегодня не везём'};
   if(sup.status !== 'open')
     return {...base, k:'done', t:'Приём закончен',
             s:`принято ${fmt(took)} из ${fmt(sup.total_qty || 0)}`};
@@ -10558,7 +10602,10 @@ function pathSteps(vals, money, step){
 function pathInner(){
   const d = ORD.d || {};
   const st = supStage(), sup = st.sup;
-  const step = !sup ? 1 : (sup.status === 'open' ? 2 : 3);
+  // Отменённая заявка возвращает путь на первый шаг: везти сегодня нечего,
+  // и следующий разумный ход — собрать новую.
+  const step = !sup ? 1 : (sup.status === 'cancelled' ? 1
+                        : (sup.status === 'open' ? 2 : 3));
   const pct = sup && sup.total_qty ? Math.round(st.took / sup.total_qty * 100) : 0;
   // Третий шаг меряется в процентах, а не в бутылках: «179» рядом с «469» надо
   // делить в уме, а «38%» отвечает сразу. Сами бутылки — на экране приёмки.
@@ -10581,7 +10628,7 @@ function pathNav(){
   const pos = (d.rows || []).length;
   const qty = st.sup ? (st.sup.asked_qty || 0) : (d.total_qty || 0);
   const ed = d.edited_count || 0;
-  const CHIP = {none:'', wait:'wait', live:'live', done:'done'};
+  const CHIP = {none:'', wait:'wait', live:'live', done:'done', cancelled:'no'};
   return `<button class="pnav-r pbig" onclick="accOrderList()">
       <span class="pnav-i big">${ICO_LIST}</span>
       <span class="pnav-b"><b>Заявка</b>
@@ -10594,7 +10641,7 @@ function pathNav(){
 
 function pathStatus(){
   const st = supStage();
-  const CHIP = {none:'', wait:'wait', live:'live', done:'done'};
+  const CHIP = {none:'', wait:'wait', live:'live', done:'done', cancelled:'no'};
   return `<button class="pnav-r pstat ${st.k === 'none' ? 'off' : ''}" ${
       st.k === 'none' ? 'disabled' : `onclick="accSupply('who')"`}>
       <span class="pnav-b"><b>Статус заявки</b><i>${st.s}</i></span>
@@ -10609,20 +10656,6 @@ const ICO_TRUCK = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" s
 const ICO_UP    = '<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M12 11v6M9.5 14.5L12 17l2.5-2.5"/></svg>';
 const ICO_SHARE = '<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v13M8 7l4-4 4 4"/><path d="M5 13v6a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-6"/></svg>';
 const ICO_TG    = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12M7 10l5 5 5-5M5 21h14"/></svg>';
-
-// Недобор — единственное на хабе, что требует действия прямо сейчас, поэтому
-// он и выглядит как требование, а не как строка статистики.
-function pathGap(){
-  const st = supStage();
-  const gap = st.sup && st.sup.status === 'open' ? (st.sup.gap_qty || 0) : 0;
-  if(!gap) return '';
-  return `<button class="pgap" onclick="accSupply('short')">
-    <span class="pgap-v">${fmt(gap)}</span>
-    <span class="pgap-b"><b>Докупить в другом месте</b>
-      <i>магазин не дал ${fmt(gap)} ${pluralize(gap,'бутылку','бутылки','бутылок')}</i></span>
-    <span class="pnav-go">${ICO_CHEV}</span>
-  </button>`;
-}
 
 // Прошлые закупки. Одна отвечает «как прошло сегодня»; несколько подряд —
 // на вопрос поинтереснее: сколько магазин обычно не даёт и во что это встаёт.
@@ -10652,7 +10685,7 @@ function ordHub(){
   // появляется — только воздух вокруг того, ради чего сюда заходят.
   document.getElementById('accMid').innerHTML = `<div class="ohub">
     <div class="pbox">${pathNav()}<div class="path">${pathInner()}</div>${pathStatus()}</div>
-    ${pathGap()}${supHistLine()}</div>`;
+    ${supHistLine()}</div>`;
 
   // Подвал хаба — ровно один шаг, тот, который сейчас ждут. Пока ответа
   // магазина нет, это он; пока идёт приёмка — не ждут ничего, и подвала нет.
@@ -10712,18 +10745,16 @@ function accOrderList(){
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 
-// Строки, которые сейчас показываем. По умолчанию — только то, что надо
-// довезти; «весь каталог» открывает всё, потому что дозаказать можно и то,
-// чего расчёт не просил. Поиск идёт по каталогу всегда — искать в отфильтрованном
-// списке значит не находить.
+// Список всегда полный. Вкладок «что довезти / весь каталог» больше нет:
+// разделение отвечало на вопрос, которого не было. Позиция с нулём в заявку
+// магазину и так не попадает — её отбрасывает расчёт, — но на экране она
+// нужна: чтобы дозаказать то, чего расчёт не попросил, её надо сначала найти,
+// а в отфильтрованном списке её не было.
 function ordList(){
   const d = ORD.d || {};
   const all = d.all_rows || d.rows || [];
   const q = ORD.q.trim().toLowerCase();
-  if(q) return all.filter(r => r.name.toLowerCase().includes(q));
-  if(ORD.tab === 'edited') return all.filter(r => r.edited);
-  if(ORD.tab === 'all')    return all;
-  return all.filter(r => r.need_total > 0 || r.edited);
+  return q ? all.filter(r => r.name.toLowerCase().includes(q)) : all;
 }
 
 // Итог заявки одной строкой: сколько бутылок, на сколько денег, из скольких
@@ -10733,14 +10764,9 @@ function ordSumInner(){
   const d = ORD.d || {};
   const pos = (d.rows || []).length;
   return `<span class="ord-sum-c"><b>${fmt(d.total_qty || 0)}</b><i>бутылок</i></span>
-    <span class="ord-sum-c"><b>${fmt(d.total_aed || 0)}</b><i>AED по прайсу</i></span>
+    <span class="ord-sum-c gold" onclick="ordPrices()" role="button"
+          title="Цена по позициям"><b>${fmt(d.total_aed || 0)}</b><i>AED по прайсу</i></span>
     <span class="ord-sum-c"><b>${pos}</b><i>позиций</i></span>`;
-}
-
-function ordTab(t){
-  ORD.tab = t; ORD.q = '';
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  ordRender();
 }
 
 function ordRender(){
@@ -10752,9 +10778,6 @@ function ordRender(){
   _setText('accSub', `${_dayName(d.day)} · норма на ${d.cover_days} ${
     pluralize(d.cover_days,'день','дня','дней')}`);
 
-  const tab = (k, t, n) => `<button class="ord-tab ${!q && ORD.tab === k ? 'on' : ''}"
-    onclick="ordTab('${k}')">${t}${n != null ? `<i>${n}</i>` : ''}</button>`;
-
   document.getElementById('accMid').innerHTML = `
     <div class="ord-sum">${ordSumInner()}</div>
 
@@ -10765,17 +10788,11 @@ function ordRender(){
       ${q ? `<button class="ord-find-x" onclick="ordSearch('')" aria-label="Очистить">✕</button>` : ''}
     </div>
 
-    <div class="ord-tabs">
-      ${tab('need', 'Что довезти', (d.rows || []).length)}
-      ${ed ? tab('edited', 'Правки', ed) : ''}
-      ${tab('all', 'Весь каталог')}
-    </div>
-
     ${d.frozen_aed ? `<div class="ord-hint">Норма выше спроса — на полке лишнего
       на <b>${fmt(d.frozen_aed)} AED</b></div>` : ''}
 
     <div class="exp-grp">${q ? `Найдено · ${list.length}` : `Позиции · ${list.length}`}</div>
-    <div id="ordRows">${list.length ? list.map(r => ordRow(r, dist)).join('')
+    <div id="ordRows">${list.length ? list.map((r, i) => ordRow(r, dist, i + 1)).join('')
       : '<div class="exp-empty">' + (q ? 'Ничего не нашлось'
           : 'Довозить нечего — остатков хватает') + '</div>'}</div>
     ${ordSeparate(d, dist)}`;
@@ -10794,11 +10811,15 @@ function ordRender(){
 
 // Строка позиции. Свёрнутая — что и сколько; раскрытая — по точкам, каждая
 // со своим счётчиком, потому что править приходится именно точку.
-function ordRow(r, dist){
+function ordRow(r, dist, num){
   const open = ORD.open === r.id;
   const cells = dist.map(x => ({x, c: r.cells[x.id] || {}}));
-  return `<div class="ord-r${open ? ' open' : ''}${r.edited ? ' fixed' : ''}" data-id="${r.id}">
+  // Номер строки — тот же, что в файле для магазина: по нему сверяют позицию
+  // голосом и пальцем, не читая название целиком.
+  return `<div class="ord-r${open ? ' open' : ''}${r.edited ? ' fixed' : ''}${
+      r.need_total ? '' : ' zero'}" data-id="${r.id}">
     <button class="ord-r-h" onclick="ordOpen('${r.id}')">
+      <span class="ord-r-i">${num || ''}</span>
       <span class="ord-r-n">${escS(r.name)}</span>
       <span class="ord-r-d">${cells.filter(o => o.c.need)
           .map(o => `${o.x.code}·${o.c.need}`).join(' ') || 'не нужно'}</span>
@@ -10821,6 +10842,43 @@ function ordRow(r, dist){
         Вернуть расчёт · <b>${r.calc_total}</b></button>
     </div>` : ''}
   </div>`;
+}
+
+// Цена по позициям. Сумма в шапке отвечает «сколько всего», но не «из чего»:
+// одна дорогая позиция и сто дешёвых дают одно и то же число. Список
+// показывает, куда именно уходят деньги, — сверху самые дорогие строки.
+//
+// Цена здесь продажная, по прайсу. Закупочной у системы нет: её негде взять —
+// ни каталог, ни ответ магазина её не содержат. Написать об этом честно
+// лучше, чем выдать за закупку то, что ею не является.
+function ordPrices(){
+  const d = ORD.d || {};
+  const rows = (d.rows || []).filter(r => r.need_total > 0)
+    .map(r => ({...r, sum: (r.need_total || 0) * (r.price || 0)}))
+    .sort((a, b) => b.sum - a.sum);
+  const ov = document.getElementById('woCompOv');
+  ov.innerHTML = `<div class="wo-c-sheet">
+    <div class="wo-c-h">
+      <div class="wo-c-t">Цена по позициям</div>
+      <div class="wo-c-s">${fmt(d.total_qty || 0)} ${
+        pluralize(d.total_qty || 0,'бутылка','бутылки','бутылок')} ·
+        ${fmt(d.total_aed || 0)} AED по прайсу</div>
+    </div>
+    <div class="ord-pr">${rows.length ? rows.map((r, i) => `
+      <div class="ord-pr-r">
+        <span class="ord-pr-i">${i + 1}</span>
+        <span class="ord-pr-n">${escS(r.name)}</span>
+        <span class="ord-pr-q">${fmt(r.need_total)} × ${fmt(r.price)}</span>
+        <span class="ord-pr-s">${fmt(r.sum)}</span>
+      </div>`).join('') : '<div class="wo-c-none">В заявке пока пусто</div>'}</div>
+    <div class="ord-pr-f">Цена продажная, по прайсу. Закупочной в системе нет —
+      её не содержит ни каталог, ни ответ магазина.</div>
+    <div class="wo-c-acts">
+      <button class="wo-c-no" onclick="woCompClose()">Закрыть</button>
+    </div>
+  </div>`;
+  ov.classList.add('show');
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 
 function ordSearch(v){
@@ -12003,36 +12061,20 @@ function supRender(){
     </div>`;
   }).join('');
 
-  // Недобор — то, что придётся купить в другом месте. Ниже водителей: сначала
-  // «как идёт приём», потом «что с ним не так».
-  const why = {dropped:'магазин отказал', short:'урезал', gap:'не выдал при отгрузке'};
-  const shortBlock = short.rows.length ? `
-    <div class="exp-grp" id="supShort">Докупить в другом месте · ${fmt(short.qty)}</div>
-    <div class="sup-short">
-      ${short.rows.slice(0, 40).map(r => `<div class="sup-sr">
-        <span class="sup-sr-b">
-          <span class="sup-sr-n">${escS(r.name)}</span>
-          <span class="sup-sr-s">${escS(why[r.why] || '')} · ${
-            Object.entries(r.by_district).map(([o, n]) => `${(D[o]||{}).code || o} ${n}`).join(' · ')}</span>
-        </span>
-        <span class="sup-sr-v">${r.gap}</span></div>`).join('')}
-      ${short.rows.length > 40 ? `<div class="sup-sr-more">…и ещё ${short.rows.length - 40}</div>` : ''}
-    </div>` : '';
-
-  const extra = (d.extra || []).length ? `
-    <div class="exp-grp">Магазин предложил сверх заказа</div>
-    <div class="sup-short">${d.extra.slice(0, 20).map(r => `<div class="sup-sr">
-      <span class="sup-sr-b"><span class="sup-sr-n">${escS(r.name)}</span>
-        <span class="sup-sr-s">${Object.entries(r.by_district)
-          .map(([o, n]) => `${(D[o]||{}).code || o} ${n}`).join(' · ')}</span></span>
-      <span class="sup-sr-v up">+${r.qty}</span></div>`).join('')}</div>` : '';
-
+  // Недобора и «сверх заказа» здесь больше нет. Экран отвечает на один вопрос —
+  // как идёт приём, — а два списка внизу отвечали на другой: что докупить и что
+  // магазин подсунул. Они уводили от дела и жили только ради файла, который
+  // отсюда же и уходил; файл ушёл вместе с ними.
   document.getElementById('accMid').innerHTML = head + umBlock +
     `<div class="exp-grp" id="supWho">Кто везёт · ${done} из ${all}</div>${
-      cards || '<div class="exp-empty">Районов нет</div>'}` +
-    shortBlock + extra;
+      cards || '<div class="exp-empty">Районов нет</div>'}`;
+  // Отмена — только пока заявка открыта. У закрытой отменять нечего, у уже
+  // отменённой второе нажатие ничего не меняет.
+  document.getElementById('accAct').innerHTML =
+    (d.status === 'open')
+      ? `<button class="acc-act dn" onclick="supCancel()">Отменить заявку</button>` : '';
   supFoot();
-  const goto = SUP_GOTO === 'short' ? 'supShort' : SUP_GOTO === 'who' ? 'supWho' : '';
+  const goto = SUP_GOTO === 'who' ? 'supWho' : '';
   SUP_GOTO = '';
   if(goto){
     const el = document.getElementById(goto);
@@ -12130,16 +12172,9 @@ const _hm = iso => {
 // содержимого, а не экрана, и на длинном списке висела посреди строк, накрыв
 // их полосой в цвет фона.
 function supFoot(){
-  const short = ((SUP_D || {}).shortfall || {}).rows || [];
-  // Единственная бумага, которая рождается на этом экране, — список того, чего
-  // магазин не дал: с ним едут на доп. склад. Ответ магазина грузят на хабе,
-  // тут его ждать неоткуда.
-  document.getElementById('accFoot').innerHTML = short.length ? `
-    <div class="qb-wrap qb-row">
-      <button class="qb" id="supShare" onclick="supShare()">${ICO_SHARE}Список для доп. склада</button>
-      <button class="qb qb-ico" id="supSend" onclick="supSend()"
-              aria-label="Прислать файл в чат с ботом" title="В телеграм">${ICO_TG}</button>
-    </div>` : '';
+  // Пусто. Экран приёмки ничего не отдаёт наружу: списком для доп. склада
+  // отсюда не пользовались, а кнопка занимала нижнюю полосу на каждом заходе.
+  document.getElementById('accFoot').innerHTML = '';
 }
 
 async function supImport(inp, btnId){
@@ -12192,6 +12227,50 @@ async function _supFile(){
   const blob = await res.blob();
   return new File([blob], `AMBAR-shortfall-${(SUP_D && SUP_D.day) || SUP_ID}.xlsx`,
     {type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+}
+
+// Отмена заявки. Бывает: магазин не привёз, поехали в другой, передумали.
+//
+// Ничего не удаляет и ничего не отматывает: снимает задачи с водителей и
+// оставляет запись в истории. Принятое остаётся принятым — бутылка, которую
+// уже отсканировали, стоит на полке, и снимать её задним числом значит
+// создать недостачу там, где всё в порядке. Поэтому если что-то успели
+// принять, спрашиваем второй раз и говорим сколько.
+async function supCancel(){
+  const d = SUP_D || {};
+  if(!d.supply_id) return;
+  if(!confirm('Отменить заявку на сегодня?\n\nЗадачи исчезнут у водителей. '
+            + 'Принятое останется на складе.')) return;
+  const btn = document.querySelector('#accAct .acc-act');
+  if(btn){ btn.disabled = true; btn.textContent = 'Отменяю…'; }
+  const send = force => ownerApi.ownerFetch(
+    '/api/owner/supply/' + encodeURIComponent(d.supply_id) + '/cancel',
+    {method:'POST', body:{force: !!force, as: _meName()}});
+  try{
+    await send(false);
+  }catch(e){
+    const p = (e || {}).payload || {};
+    if(p.error === 'already_taken'){
+      if(!confirm(`По заявке уже приняли ${fmt(p.took)} `
+                + `${pluralize(p.took,'бутылку','бутылки','бутылок')}.\n\n`
+                + 'Принятое останется на складе. Всё равно отменить?')){
+        if(btn){ btn.disabled = false; btn.textContent = 'Отменить заявку'; }
+        return;
+      }
+      try{ await send(true); }
+      catch(e2){ _toast('Не удалось отменить'); if(btn){ btn.disabled = false;
+        btn.textContent = 'Отменить заявку'; } return; }
+    }else{
+      _toast(p.error === 'not_open' ? 'Заявка уже закрыта' : 'Не удалось отменить');
+      if(btn){ btn.disabled = false; btn.textContent = 'Отменить заявку'; }
+      return;
+    }
+  }
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  _toast('Заявка отменена');
+  // Перечитываем всё, от чего зависит статус: хаб, список закупов и сам экран.
+  ACC_SUP = null;
+  await accSupply();
 }
 
 async function supShare(){
@@ -19055,6 +19134,9 @@ function renderHours(h){
         <div class="stk-ttl-t" id="accTitle">Раздел</div>
         <div class="stk-ttl-s" id="accSub">—</div>
       </div>
+      <!-- Действие раздела — в шапке справа. Внизу оно спорило бы с главной
+           кнопкой, а такие действия и не главные: их делают редко и осознанно. -->
+      <div class="stk-top-a" id="accAct"></div>
     </div>
   </div>
   <div id="accRail"></div>

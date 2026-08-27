@@ -1077,6 +1077,7 @@ def _sup_brief(sup: dict) -> dict:
         "supply_id": sup.get("_id") or sup.get("supply_id") or "",
         "at": str(sup.get("at") or ""), "day": sup.get("day") or "",
         "status": sup.get("status") or "open",
+        "cancelled_at": str(sup.get("cancelled_at") or ""),
         "asked_qty": int(sup.get("asked_qty") or 0),
         "total_qty": int(sup.get("total_qty") or 0),
         "gap_qty": int(sup.get("gap_qty") or 0),
@@ -1111,6 +1112,8 @@ async def _supply_view(sup: dict) -> dict:
         "unmarked": await _unmarked(sup, short),
         "status": sup.get("status") or "open",
         "closed_at": str(sup.get("closed_at") or ""),
+        "cancelled_at": str(sup.get("cancelled_at") or ""),
+        "cancelled_by": sup.get("cancelled_by") or "",
         "positions": len(sup.get("items") or []),
         "money": _money(sup),
         "total_qty": sup.get("total_qty", 0), "asked_qty": sup.get("asked_qty", 0),
@@ -1148,6 +1151,56 @@ async def handle_release(request):
     if ok:
         log.info(f"[supply] {sid}/{oid}: задача снята владельцем")
     return web.json_response({"ok": ok}, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_cancel(request):
+    """Отменить заявку: магазин не привёз, поехали в другой, передумали.
+
+    Отмена не удаляет поставку и ничего не отматывает назад. Она снимает её с
+    водителей — задачи из отменённой заявки в приложении не показываются, — и
+    оставляет запись в истории: «была, отменили тогда-то». Удалять было бы
+    удобнее ровно один раз, а через месяц на вопрос «куда делся тот день»
+    ответить стало бы нечем.
+
+    Принятое остаётся принятым. Бутылка, которую водитель уже отсканировал,
+    физически стоит на полке, и снимать её с остатка задним числом значит
+    создать недостачу там, где всё в порядке. Поэтому если по заявке уже
+    что-то приняли, отмена требует подтверждения: body {force: true}."""
+    sid = request.match_info.get("sid") or ""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    sup = await db.supply_get(sid)
+    if not sup:
+        return web.json_response({"error": "not_found"}, status=404,
+                                 headers=CORS_HEADERS)
+    st = sup.get("status") or "open"
+    if st != "open":
+        # Уже закрыта или уже отменена — второе нажатие ничего не меняет.
+        return web.json_response({"error": "not_open", "status": st},
+                                 status=409, headers=CORS_HEADERS)
+    took = sum(sum(int(v or 0) for v in (it.get("got") or {}).values())
+               for it in (sup.get("items") or []))
+    if took and not body.get("force"):
+        return web.json_response({"error": "already_taken", "took": took},
+                                 status=409, headers=CORS_HEADERS)
+    sup["status"] = "cancelled"
+    sup["cancelled_at"] = datetime.now(timezone.utc).isoformat()
+    sup["cancelled_by"] = str(body.get("as") or "")[:60]
+    # Задачи освобождаем: водитель не должен увидеть в списке отменённое, а
+    # если он держал её взятой — она просто исчезнет, и это правильно.
+    for t in (sup.get("tasks") or {}).values():
+        if not t.get("done_at"):
+            t.pop("driver", None)
+            t.pop("claimed_at", None)
+    await db.supply_save(sup)
+    log.info(f"[supply] {sid}: заявка отменена ({sup['cancelled_by'] or '—'}), "
+             f"принято до отмены: {took}")
+    return web.json_response({"ok": True, "supply_id": sid,
+                              "status": "cancelled", "took": took},
+                             headers=CORS_HEADERS)
 
 
 @require_owner
@@ -1227,6 +1280,7 @@ def setup(app):
         ("/api/owner/supply",        handle_list,   "GET"),
         ("/api/owner/supply/{sid}",                 handle_one,          "GET"),
         ("/api/owner/supply/{sid}/release",         handle_release,      "POST"),
+        ("/api/owner/supply/{sid}/cancel",          handle_cancel,       "POST"),
         ("/api/owner/supply/{sid}/shortfall",       handle_short_export, "GET"),
         ("/api/owner/supply/{sid}/shortfall/send",  handle_short_send,   "POST"),
     ):

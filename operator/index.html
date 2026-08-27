@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=3"></script>
+<script src="/vendor/ambar-call.js?v=4"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -768,6 +768,20 @@ a.oc-row:active{background:var(--card2)}
 /* Экран разговора занимает всё приложение целиком: во время звонка ни списки,
    ни нижняя панель не нужны. */
 .ca-body.live{display:flex;align-items:center;justify-content:center}
+/* Видео. Собеседник во весь блок разговора, своя камера окном в углу. */
+.ca-video{position:relative;width:100%;aspect-ratio:3/4;max-height:52vh;border-radius:16px;
+  overflow:hidden;background:#05050c;margin-bottom:14px;display:none}
+.ca-video.on{display:block}
+.ca-video video.rem{width:100%;height:100%;object-fit:cover;display:block}
+.ca-video video.loc{position:absolute;top:10px;right:10px;width:78px;height:104px;object-fit:cover;
+  border-radius:11px;background:#0b0b16;border:1px solid rgba(255,255,255,.15);transform:scaleX(-1)}
+.ca-video video.loc.back{transform:none}
+.ca-video video.loc.off{display:none}
+.ca-vid{width:40px;height:40px;flex-shrink:0;border-radius:50%;cursor:pointer;display:flex;
+  align-items:center;justify-content:center}
+.ca-vid svg{margin:0}
+.ca-vid{background:var(--bg2);border:1px solid var(--border3);color:var(--sub)}
+
 /* Недавние звонки *//* Недавние звонки */
 .call-rec{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:11px;
   background:var(--bg2);border:1px solid var(--border3);margin-bottom:6px;cursor:pointer}
@@ -4737,6 +4751,7 @@ boot();
 // аккаунта не существует, за него встают за общим устройством. Поэтому при
 // смене имени связь переподключается: звонить должны тому, кто сейчас за него.
 let CALL = null, CALL_ST = 'idle', CALL_WHO = '', CALL_T0 = 0, CALL_Q = '';
+let CALL_VIDEO = false, CALL_CAM = false;
 let _callTick = null, _callMuted = false, _callAs = '';
 const CALL_SAYS = ['Перезвоню', 'Занят', 'Пишите в заказ'];
 
@@ -4763,12 +4778,12 @@ function callEvent(t, d){
       callBadge(); callPaint();
       return;
     case 'ring':
-      CALL_ST = 'in'; CALL_WHO = d.peer;
+      CALL_ST = 'in'; CALL_WHO = d.peer; CALL_VIDEO = !!d.video; CALL_CAM = false;
       showOv('callOv'); callPaint();
       $('callBtn')?.classList.add('ringing');
       return;
     case 'calling':
-      CALL_ST = 'out'; CALL_WHO = d.peer; showOv('callOv'); callPaint();
+      CALL_ST = 'out'; CALL_WHO = d.peer; CALL_VIDEO = !!d.video; showOv('callOv'); callPaint();
       return;
     case 'talking':
       CALL_ST = 'live'; CALL_T0 = Date.now(); CALL_Q = ''; _callMuted = false;
@@ -4778,11 +4793,25 @@ function callEvent(t, d){
     case 'quality':
       CALL_Q = d.quality; callQuality();
       return;
+    case 'cam':
+      CALL_CAM = !!d.on; callPaint();
+      if(d.on && d.stream){ const v = document.getElementById('caLoc'); if(v) v.srcObject = d.stream; }
+      callVidPaint(); return;
+    case 'stream':
+      if(d.kind === 'video'){
+        CALL_VIDEO = true; callPaint();
+        const v = document.getElementById('caRem');
+        if(v){ v.srcObject = d.stream; v.play().catch(()=>{}); }
+      }
+      return;
+    case 'novideo':
+      CALL_VIDEO = false; CALL_CAM = false; callPaint(); return;
     case 'ended':
     case 'failed': {
       clearInterval(_callTick); _callTick = null;
       const why = d.why || '', who = CALL_WHO;
       CALL_ST = 'idle'; CALL_WHO = ''; CALL_Q = '';
+      CALL_VIDEO = false; CALL_CAM = false;
       $('callBtn')?.classList.remove('ringing');
       callPaint();
       if(t === 'failed')
@@ -4839,10 +4868,20 @@ function callBadge(){
 
 function callOpen(){ callInit(); showOv('callOv'); callPaint(); }
 function callClose(){ hideOv('callOv'); if(CALL_ST === 'in') CALL && CALL.reject(); }
-function callDial(key){
+function callVideo(key){ callDial(key, true); }
+// Зеркалить надо только переднюю камеру: заднюю зеркальной делать нельзя,
+// на ней читают вывески и номера.
+function callVidPaint(){
+  const v = document.getElementById('caLoc');
+  if(v && CALL) v.classList.toggle('back', CALL.facing === 'environment');
+}
+
+function callCam(){ if(CALL) CALL.camera(!CALL_CAM); }
+function callFlip(){ if(CALL) CALL.flip().then(callVidPaint); }
+function callDial(key, video){
   callInit();
   if(!CALL){ toast('Связь недоступна','err'); return; }
-  CALL.dial(key || '').catch(()=>{});
+  CALL.dial(key || '', '', !!video).catch(()=>{});
 }
 function callAccept(){ CALL && CALL.accept().catch(()=>{}); }
 function callReject(say){ CALL && CALL.reject(say || ''); }
@@ -4869,6 +4908,9 @@ function callGroup(list){
   });
   return out;
 }
+const ICO_VID = `<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+  stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path
+  d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/></svg>`;
 const ICO_PHONE = `<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.8.6a2 2 0 0 1 1.7 2z"/></svg>`;
 function _dirIco(r){
   const p = r.dir === 'out' && !r.missed ? 'M7 17L17 7M9 7h8v8' : 'M17 7L7 17M15 17H7V9';
@@ -4935,6 +4977,7 @@ function caCalls(){
         <div class="ca-rs">${_dirIco(r)}<span>${_cWhen(r.at)}</span>${
           r.talk ? '<span>· ' + _cMm(r.talk) + '</span>' : ''}</div>
       </div>
+      <div class="ca-vid" onclick="callVideo('${r.key}')">${ICO_VID}</div>
       <div class="ca-go" onclick="callDial('${r.key}')">${ICO_PHONE}</div>
     </div>`).join('');
   return h;
@@ -5028,13 +5071,29 @@ function _callPaint(){
           viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>` : '';
 
-  body.innerHTML = `<div class="call-live">
+  const vid = `<div class="ca-video${CALL_VIDEO ? ' on' : ''}">
+      <video class="rem" id="caRem" playsinline autoplay></video>
+      <video class="loc${CALL_CAM ? '' : ' off'}" id="caLoc" playsinline autoplay muted></video>
+    </div>`;
+  const camRow = (CALL_ST === 'live' && CALL_VIDEO) ? `
+      <div class="call-live-acts row2">
+        <button class="call-cbtn mute${CALL_CAM ? '' : ' on'}" onclick="callCam()" aria-label="Камера"><svg
+          class="ic" viewBox="0 0 24 24" aria-hidden="true"><path
+          d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/>${
+          CALL_CAM ? '' : '<path d="M2 2l20 20"/>'}</svg></button>
+        ${CALL_CAM ? `<button class="call-cbtn mute" onclick="callFlip()" aria-label="Другая камера"><svg
+          class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M3 8h13a4 4 0 0 1 4 4v1"/><path
+          d="M6 5L3 8l3 3"/><path d="M21 16H8a4 4 0 0 1-4-4v-1"/><path d="M18 19l3-3-3-3"/></svg></button>` : ''}
+      </div>` : '';
+
+  body.innerHTML = vid + `<div class="call-live">
       <div class="call-live-av${CALL_ST === 'live' ? '' : ' ring'}">${_cIni(CALL_WHO)}</div>
       <div class="call-live-n">${CALL_WHO || '—'}</div>
       <div class="call-live-s" id="callLiveS">${
         CALL_ST === 'in' ? 'Входящий звонок' : CALL_ST === 'out' ? 'Звоним…' : '00:00'}</div>
       <div class="call-q" id="callQ"></div>
       ${acts ? `<div class="call-live-acts">${acts}</div>` : ''}
+      ${camRow}
       ${drop}
       ${CALL_ST === 'in' ? `<div class="call-says">${CALL_SAYS.map(s =>
         `<button onclick="callReject('${s}')">${s}</button>`).join('')}</div>` : ''}

@@ -149,15 +149,16 @@ class Peer:
 
 class Call:
     __slots__ = ("cid", "caller", "callee_key", "callee", "order", "started",
-                 "answered", "ring_task")
+                 "answered", "ring_task", "video")
 
-    def __init__(self, cid, caller, callee_key, order):
+    def __init__(self, cid, caller, callee_key, order, video=False):
         self.cid, self.caller, self.callee_key = cid, caller, callee_key
         self.callee = None
         self.order = order
         self.started = time.time()
         self.answered = 0.0
         self.ring_task = None
+        self.video = bool(video)   # видеозвонок решается в момент вызова
 
 
 _PEERS: dict = {}        # sid  → Peer
@@ -274,6 +275,7 @@ async def _log_call(call: Call, outcome: str):
             "to_kind": call.callee_key.split(":", 1)[0],
             "order_id": call.order or "",
             "outcome": outcome,
+            "video": bool(getattr(call, "video", False)),
             "at": datetime.now(timezone.utc).isoformat(),
             "wait_sec": round((call.answered or now) - call.started, 1),
             "talk_sec": round(now - call.answered, 1) if call.answered else 0,
@@ -415,7 +417,7 @@ async def _ring_driver(call: Call, name: str):
 
 
 # ── сам звонок ──────────────────────────────────────────────────────────────
-async def _start_call(caller: Peer, to_key: str, order: str):
+async def _start_call(caller: Peer, to_key: str, order: str, video: bool = False):
     if caller.call:
         await caller.send(t="failed", why="busy")
         return
@@ -425,7 +427,7 @@ async def _start_call(caller: Peer, to_key: str, order: str):
     targets = [p for p in _free_sessions(to_key) if p.key != caller.key]
 
     cid = secrets.token_hex(8)
-    call = Call(cid, caller, to_key, order)
+    call = Call(cid, caller, to_key, order, video)
     caller.call = call
     _CALLS[cid] = call
 
@@ -458,7 +460,7 @@ async def _start_call(caller: Peer, to_key: str, order: str):
 
     for p in targets:
         await p.send(t="ring", call=cid, frm=caller.label, kind=caller.kind,
-                     order=order)
+                     order=order, video=call.video)
     await caller.send(t="calling", call=cid, to=to_key.split(":", 1)[-1])
     call.ring_task = asyncio.create_task(_ring_timeout(call, RING_TTL))
 
@@ -554,7 +556,8 @@ async def handle_ws(request: web.Request):
             call = _CALLS.get(pend[0])
             if call and not call.answered:
                 await peer.send(t="ring", call=call.cid, frm=call.caller.label,
-                                kind=call.caller.kind, order=call.order)
+                                kind=call.caller.kind, order=call.order,
+                                video=call.video)
 
         async for msg in ws:
             if msg.type != WSMsgType.TEXT:
@@ -592,7 +595,8 @@ async def _on_message(peer: Peer, m: dict):
         if not _may_call(peer, to):
             await peer.send(t="failed", why="not_allowed")
             return
-        await _start_call(peer, to, str(m.get("order") or "")[:32])
+        await _start_call(peer, to, str(m.get("order") or "")[:32],
+                          video=bool(m.get("video")))
         return
 
     if t == "accept":

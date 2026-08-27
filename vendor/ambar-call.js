@@ -25,6 +25,16 @@
  * называет в нём адрес приложения. Поэтому важно, чтобы окно всплывало один раз
  * и в понятный момент, а не посреди входящего звонка.
  *
+ * Видео
+ * -----
+ * Та же дорожка в том же соединении — отдельного канала не нужно. Камера
+ * решается в момент вызова: голосовой звонок остаётся голосовым, видео просят
+ * явно. Внутри разговора камеру можно выключить и переключить на заднюю, и
+ * то и другое без пересборки соединения — меняется только дорожка.
+ *
+ * Битрейт видео ограничен намеренно: водитель на 4G, и картинка, которая ест
+ * весь канал, забирает его у голоса. Голос важнее картинки всегда.
+ *
  * Порядок предложения важен: оффер всегда делает звонящий и только после того,
  * как трубку сняли. Если делать раньше, вторая сторона получит его до того, как
  * разрешит микрофон, и ответит соединением без звука.
@@ -32,9 +42,15 @@
 (function () {
   'use strict';
 
-  var MIC_FREE_AFTER = 30000;    // свернули дольше — отпускаем микрофон
+  // Свернули дольше — отпускаем микрофон. Полминуты оказалось мало: AMBAR STAR
+  // сворачивают и разворачивают десятки раз за вечер, и каждый раз система
+  // спрашивала разрешение заново. Три минуты закрывают обычное переключение
+  // между приложениями; за это время индикатор записи горит, но дорожка
+  // выключена и в неё ничего не пишется.
+  var MIC_FREE_AFTER = 180000;
   var STATS_EVERY = 3000;        // как часто смотрим на качество связи
   var ICE_RESTART_AFTER = 4000;  // столько ждём, прежде чем пересобирать связь
+  var VIDEO_MAX_KBPS = 600;      // потолок картинки: голос важнее её всегда
 
   // ── тоны ─────────────────────────────────────────────────────────────────
   // Гудки звонящему и звонок принимающему. Человек должен слышать, что связь
@@ -96,6 +112,10 @@
     this.ws = null;
     this.pc = null;
     this.stream = null;      // микрофон, живёт между звонками
+    this.cam = null;         // камера — только на время видеозвонка
+    this.remote = null;      // что пришло от собеседника
+    this.facing = 'user';    // какая камера включена
+    this.video = false;      // это видеозвонок
     this.audio = null;       // куда играет собеседник
     this.call = null;        // {id, peer, dir, order, note, say}
     this.roster = [];
@@ -217,13 +237,14 @@
 
       case 'ring':                                  // нам звонят
         this.call = {id: m.call, peer: m.frm, dir: 'in', order: m.order || '',
-                     kind: m.kind || ''};
+                     kind: m.kind || '', video: !!m.video};
         this.tones.ring();
         this._emit('ring', this.call);
         break;
 
       case 'calling':                               // звоним мы
-        this.call = {id: m.call, peer: m.to, dir: 'out', order: '', note: m.note || ''};
+        this.call = {id: m.call, peer: m.to, dir: 'out', order: '', note: m.note || '',
+                     video: this.video};
         this.tones.ringback();
         this._emit('calling', this.call);
         break;
@@ -272,17 +293,30 @@
   };
 
   // ── действия ─────────────────────────────────────────────────────────────
-  AmbarCall.prototype.dial = function (toKey, order) {
+  AmbarCall.prototype.dial = function (toKey, order, video) {
     var self = this;
+    this.video = !!video;
     return this._mic().then(function () {
-      self._send({t: 'call', to: toKey || self.defaultTarget || '', order: order || ''});
+      return self.video ? self._camOn() : null;
+    }).then(function () {
+      self._send({t: 'call', to: toKey || self.defaultTarget || '',
+                  order: order || '', video: self.video});
     });
   };
 
   AmbarCall.prototype.accept = function () {
     if (!this.call) return Promise.resolve();
     var self = this, id = this.call.id;
-    return this._mic().then(function () { self._send({t: 'accept', call: id}); });
+    this.video = !!this.call.video;
+    return this._mic().then(function () {
+      return self.video ? self._camOn() : null;
+    }).then(function () { self._send({t: 'accept', call: id}); })
+      .catch(function (e) {
+        // Камеры может не быть или её могут не дать — звонок от этого умирать
+        // не должен: продолжаем голосом.
+        if (self.video) { self.video = false; self._emit('novideo', {}); }
+        self._send({t: 'accept', call: id});
+      });
   };
 
   // Отклонить можно молча или словом. Слово короткое и заранее заготовленное:
@@ -351,6 +385,76 @@
     });
   };
 
+  // Камера живёт только на время разговора — в отличие от микрофона её держать
+  // между звонками нельзя: горящий глазок весь день пугает не зря.
+  AmbarCall.prototype._camOn = function (facing) {
+    var self = this;
+    this.facing = facing || this.facing || 'user';
+    return navigator.mediaDevices.getUserMedia({
+      video: {facingMode: this.facing, width: {ideal: 640}, height: {ideal: 480},
+              frameRate: {ideal: 20, max: 24}}
+    }).then(function (s) {
+      var track = s.getVideoTracks()[0];
+      if (!track) throw new Error('no camera');
+      self.cam = s;
+      self.video = true;
+      // Соединение уже собрано — просто подменяем дорожку, без пересборки.
+      var sender = self.pc && self.pc.getSenders().find(function (x) {
+        return x.track && x.track.kind === 'video';
+      });
+      if (sender) sender.replaceTrack(track);
+      else if (self.pc) { self.pc.addTrack(track, self.stream || s); self._capVideo(); }
+      self._emit('cam', {on: true, facing: self.facing, stream: s});
+      return s;
+    });
+  };
+
+  AmbarCall.prototype._camOff = function () {
+    if (!this.cam) return;
+    this.cam.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
+    this.cam = null;
+    var sender = this.pc && this.pc.getSenders().find(function (x) {
+      return x.track && x.track.kind === 'video';
+    });
+    if (sender) { try { sender.replaceTrack(null); } catch (e) {} }
+    this._emit('cam', {on: false});
+  };
+
+  // Выключить и включить свою камеру посреди разговора.
+  AmbarCall.prototype.camera = function (on) {
+    if (on) return this._camOn().catch(function () {});
+    this._camOff();
+    return Promise.resolve();
+  };
+
+  // Переднюю на заднюю и обратно: показать полку или подъезд удобнее задней.
+  AmbarCall.prototype.flip = function () {
+    var next = this.facing === 'user' ? 'environment' : 'user';
+    var old = this.cam;
+    var self = this;
+    return this._camOn(next).then(function (s) {
+      if (old && old !== s) old.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
+      return s;
+    }).catch(function () { self.facing = self.facing === 'user' ? 'environment' : 'user'; });
+  };
+
+  // Потолок битрейта картинки. Без него видео на 4G съедает канал и первым
+  // страдает голос — а голос в работе важнее.
+  AmbarCall.prototype._capVideo = function () {
+    var pc = this.pc;
+    if (!pc) return;
+    pc.getSenders().forEach(function (s) {
+      if (!s.track || s.track.kind !== 'video' || !s.getParameters) return;
+      try {
+        var p = s.getParameters();
+        p.encodings = p.encodings && p.encodings.length ? p.encodings : [{}];
+        p.encodings[0].maxBitrate = VIDEO_MAX_KBPS * 1000;
+        p.encodings[0].maxFramerate = 24;
+        s.setParameters(p);
+      } catch (e) {}
+    });
+  };
+
   AmbarCall.prototype._freeMic = function () {
     if (!this.stream) return;
     this.stream.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
@@ -370,12 +474,19 @@
       t.enabled = true;
       pc.addTrack(t, self.stream);
     });
+    if (this.cam) this.cam.getVideoTracks().forEach(function (t) { pc.addTrack(t, self.cam); });
 
     pc.ontrack = function (e) {
-      if (self.audio && e.streams && e.streams[0]) {
-        self.audio.srcObject = e.streams[0];
+      var st = e.streams && e.streams[0];
+      if (!st) return;
+      self.remote = st;
+      // Звук всегда в свой элемент: видео может быть выключено, а слышать надо.
+      if (self.audio && e.track.kind === 'audio') {
+        self.audio.srcObject = st;
         try { self.audio.play().catch(function () {}); } catch (err) {}
       }
+      if (e.track.kind === 'video') self.video = true;
+      self._emit('stream', {stream: st, kind: e.track.kind});
     };
     pc.onicecandidate = function (e) {
       if (e.candidate) self._send({t: 'ice', data: e.candidate});
@@ -402,6 +513,8 @@
 
     this._watchQuality();
     this._keepAwake(true);
+
+    this._capVideo();
 
     if (isCaller) {
       pc.createOffer().then(function (o) { return pc.setLocalDescription(o); })
@@ -514,6 +627,11 @@
       this.stream.getAudioTracks().forEach(function (t) { t.enabled = false; });
     }
     if (this.audio) { try { this.audio.srcObject = null; } catch (e) {} }
+    // Камеру гасим всегда: в отличие от микрофона её нельзя оставлять включённой
+    // между звонками — горящий глазок пугает и правильно делает.
+    this._camOff();
+    this.remote = null;
+    this.video = false;
     var say = this.call && this.call.say;
     this.call = null;
     this._pendingIce = [];

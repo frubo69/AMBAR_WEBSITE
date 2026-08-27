@@ -1066,6 +1066,25 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    Снят с телефонного эталона: имя и звание вверху, пустая середина, кнопки у
    нижнего края и по краям экрана. Так рука находит нужную кнопку не глядя, а
    между «отклонить» и «ответить» — вся ширина экрана, промахнуться трудно. */
+.cs-remote{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  background:#05050c;display:none;z-index:0}
+.call-scr.video .cs-remote{display:block}
+/* Своя камера — маленьким окном сверху справа, зеркально: человек привык
+   видеть себя как в зеркале, незеркальная картинка сбивает. */
+.cs-local{position:absolute;top:calc(14px + var(--safe-top));right:14px;width:104px;height:139px;
+  object-fit:cover;border-radius:14px;background:#0b0b16;display:none;z-index:3;
+  border:1px solid rgba(255,255,255,.14);box-shadow:0 8px 26px rgba(0,0,0,.5);
+  transform:scaleX(-1)}
+.call-scr.video.cam-on .cs-local{display:block}
+.call-scr.video.cam-back .cs-local{transform:none}
+/* Видеозвонок — тоже во весь экран: шапка убирается, поля ленты снимаются,
+   иначе картинка оказывается за краями вставки и выглядит поломанной. */
+.call-scr.video .call-top{display:none}
+.call-scr.video .call-mid{padding:calc(10px + var(--safe-top)) 0 0}
+/* Поверх видео текст нужен читаемым при любой картинке: затемнение сверху и
+   снизу, прозрачная середина — там лицо собеседника. */
+.call-scr.video .cs{background:linear-gradient(180deg,rgba(0,0,6,.72) 0%,rgba(0,0,6,.12) 30%,
+  rgba(0,0,6,.12) 52%,rgba(0,0,6,.82) 100%);position:relative;z-index:2}
 .cs{display:flex;flex-direction:column;height:100%;text-align:center}
 .cs-top{padding:44px 24px 0}
 .cs-role{font-size:16px;color:var(--sub);font-weight:500}
@@ -1088,6 +1107,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .cs-btn.mute{background:rgba(255,255,255,.13);color:var(--text)}
 .cs-btn.mute.on{background:#fff;color:#111}
 .cs-lbl{font-size:14px;color:var(--sub);margin-top:11px}
+/* Второй ряд — камера и её поворот. Стоит над основными кнопками, меньше их
+   размером: это настройки разговора, а не сам разговор. */
+.cs-row2{display:flex;justify-content:center;gap:26px;padding:0 39px 22px}
+.cs-sm{width:56px;height:56px;border-radius:50%;border:0;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;background:rgba(255,255,255,.13);color:var(--text);
+  -webkit-tap-highlight-color:transparent}
+.cs-sm:active{transform:scale(.92)}
+.cs-sm.off{background:#fff;color:#111}
 /* Раскладка как в телефоне: сверху ряд действий, отбой — отдельно и ниже,
    крупнее остальных. Промахнуться по нему нельзя, а случайно попасть — трудно. */
 .call-acts{display:flex;align-items:center;justify-content:center;gap:26px;margin-top:34px}
@@ -1155,6 +1182,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .call-item-s{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);margin-top:3px}
 .call-item-s svg{flex-shrink:0}
 .call-item.missed .call-item-s{color:var(--dn)}
+.call-item-vid{width:40px;height:40px;flex-shrink:0;border-radius:50%;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;color:var(--sub);
+  background:var(--card2);border:1px solid var(--border3)}
+.call-item-vid:active{background:var(--card3)}
 .call-item-go{width:40px;height:40px;flex-shrink:0;border-radius:50%;cursor:pointer;
   display:flex;align-items:center;justify-content:center;color:var(--up);
   background:rgba(76,175,125,.12);border:1px solid rgba(76,175,125,.25)}
@@ -1651,6 +1682,11 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
      разговор — это один и тот же экран с разной серединой. Отдельными окнами
      они мигали бы друг через друга на каждом переходе. -->
 <div class="call-scr" id="callScr">
+  <!-- Видео лежит под интерфейсом звонка: собеседник во весь экран, своя
+       камера маленьким окном в углу. Когда видео нет, оба элемента скрыты и
+       экран выглядит ровно как голосовой. -->
+  <video class="cs-remote" id="csRemote" playsinline autoplay></video>
+  <video class="cs-local" id="csLocal" playsinline autoplay muted></video>
   <div class="call-top">
     <button class="sup-back" onclick="callClose()" aria-label="Закрыть">
       <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
@@ -2020,7 +2056,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=3"></script>
+<script src="/vendor/ambar-call.js?v=4"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -5908,6 +5944,8 @@ let CALL_WHO = '';          // с кем сейчас дело
 let CALL_T0 = 0;            // когда сняли трубку — для счётчика
 let CALL_NOTE = '';         // подсказка на экране исходящего
 let CALL_ROLE = '';         // кто звонит: звание под именем
+let CALL_VIDEO = false;     // это видеозвонок
+let CALL_CAM = false;       // своя камера включена
 let CALL_Q = '';            // качество связи
 let _callTick = null, _callMuted = false, _callWanted = false;
 
@@ -5945,11 +5983,12 @@ function callEvent(t, d){
       return;
     case 'ring':
       CALL_ST = 'in'; CALL_WHO = d.peer; CALL_ROLE = callRole(d.kind, d.peer);
+      CALL_VIDEO = !!d.video; CALL_CAM = false;
       callOpen(); callBuzz(); callRender();
       return;
     case 'calling':
       CALL_ST = 'out'; CALL_WHO = d.peer; CALL_NOTE = d.note || '';
-      CALL_ROLE = callRole('op', d.peer);
+      CALL_ROLE = callRole('op', d.peer); CALL_VIDEO = !!d.video;
       callOpen(); callRender();
       return;
     case 'talking':
@@ -5963,12 +6002,33 @@ function callEvent(t, d){
       CALL_Q = d.quality;
       callPaintQuality();
       return;
+    case 'cam':
+      CALL_CAM = !!d.on;
+      if(d.on && d.stream){ const v = cel('csLocal'); if(v) v.srcObject = d.stream; }
+      callVideoPaint(); callRender();
+      return;
+    case 'stream':
+      // Картинка собеседника приходит отдельной дорожкой и может опоздать
+      // относительно звука — поэтому вешаем её тогда, когда пришла.
+      if(d.kind === 'video'){
+        CALL_VIDEO = true;
+        const v = cel('csRemote'); if(v){ v.srcObject = d.stream; v.play().catch(()=>{}); }
+        callVideoPaint(); callRender();
+      }
+      return;
+    case 'novideo':
+      CALL_VIDEO = false; CALL_CAM = false;
+      toast('Камера недоступна — говорим голосом', 'err');
+      callVideoPaint(); callRender();
+      return;
     case 'ended':
     case 'failed': {
       callBuzz(false);
       clearInterval(_callTick); _callTick = null;
       const why = d.why || '', prev = CALL_ST, who = CALL_WHO;
       CALL_ST = 'idle'; CALL_WHO = ''; CALL_NOTE = ''; CALL_Q = '';
+      CALL_VIDEO = false; CALL_CAM = false; callVideoPaint();
+      ['csRemote','csLocal'].forEach(id => { const v = cel(id); if(v) v.srcObject = null; });
       callRender(); callBar();
       if(t === 'failed'){
         toast(why === 'busy_them' ? (d.peer || 'Он') + ' сейчас говорит'
@@ -6063,11 +6123,26 @@ function callClose(){
   if(CALL_ST === 'in') CALL && CALL.reject();
   callBar();
 }
-function callDial(key){
+function callDial(key, video){
   callInit();
   if(!CALL){ toast('Связь недоступна', 'err'); return; }
   try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
-  CALL.dial(key || '').catch(() => {});
+  CALL.dial(key || '', '', !!video).catch(() => {});
+}
+function callVideo(key){ callDial(key, true); }
+function callCam(){ if(CALL) CALL.camera(!CALL_CAM); }
+function callFlip(){
+  if(!CALL) return;
+  CALL.flip().then(() => {
+    cel('callScr')?.classList.toggle('cam-back', CALL.facing === 'environment');
+  });
+}
+
+// Классы экрана: есть ли видео вообще и включена ли своя камера.
+function callVideoPaint(){
+  const sc = cel('callScr'); if(!sc) return;
+  sc.classList.toggle('video', CALL_VIDEO && CALL_ST !== 'idle');
+  sc.classList.toggle('cam-on', CALL_CAM);
 }
 function callAccept(){ CALL && CALL.accept().catch(() => {}); }
 function callHangup(){ CALL && CALL.hangup(); }
@@ -6141,6 +6216,9 @@ const ICO_CALL = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" st
   d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.8.6a2 2 0 0 1 1.7 2z"/></svg>`;
 const ICO_X = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
   stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+const ICO_VID = `<svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+  stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path
+  d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/></svg>`;
 const ICO_X_BIG = `<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor"
   stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
 const ICO_PHONE_BIG = `<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor"
@@ -6152,6 +6230,7 @@ const CALL_SAYS = ['Перезвоню', 'За рулём', 'Я на адрес�
 
 function callRender(){
   cel('callScr')?.classList.toggle('ringing', CALL_ST === 'in');
+  callVideoPaint();
   try{ _callRender(); }
   catch(e){
     // Пустой экран — худшее, что можно показать: человек не понимает, сломано
@@ -6204,6 +6283,7 @@ function _callRender(){
             <div class="call-item-s"><span class="call-dot${r.online ? ' on' : ''}"></span>
               ${r.online ? 'в приложении' : 'позвоним в телеграм'}</div>
           </div>
+          <div class="call-item-vid" onclick="callVideo('${r.key}')">${ICO_VID}</div>
           <div class="call-item-go" onclick="callDial('${r.key}')">${ICO_CALL}</div>
         </div>`).join('');
     }
@@ -6218,6 +6298,7 @@ function _callRender(){
             <div class="call-item-s">${_dirIco(r)}<span>${_callWhen(r.at)}</span>${
               r.talk ? '<span>· ' + _mm(r.talk) + '</span>' : ''}</div>
           </div>
+          <div class="call-item-vid" onclick="callVideo('${r.key}')">${ICO_VID}</div>
           <div class="call-item-go" onclick="callDial('${r.key}')">${ICO_CALL}</div>
         </div>`).join('');
     }else if(CALL_TAB === 'missed'){
@@ -6266,15 +6347,32 @@ function _callRender(){
         <div class="cs-lbl">Отменить</div>
       </div>`;
 
+  // Камера и её поворот — только в разговоре и только если звонок видео.
+  const row2 = (CALL_ST === 'live' && CALL_VIDEO) ? `
+      <div class="cs-row2">
+        <button class="cs-sm${CALL_CAM ? '' : ' off'}" onclick="callCam()" aria-label="Камера">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
+            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/>
+            ${CALL_CAM ? '' : '<path d="M2 2l20 20"/>'}</svg></button>
+        ${CALL_CAM ? `<button class="cs-sm" onclick="callFlip()" aria-label="Другая камера">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
+            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 8h13a4 4 0 0 1 4 4v1"/><path d="M6 5L3 8l3 3"/>
+            <path d="M21 16H8a4 4 0 0 1-4-4v-1"/><path d="M18 19l3-3-3-3"/></svg></button>` : ''}
+      </div>` : '';
+
   box.innerHTML = `
     <div class="cs">
       <div class="cs-top">
         <div class="cs-role">${CALL_ROLE || ''}</div>
         <div class="cs-name">${CALL_WHO || '—'}</div>
-        <div class="cs-state" id="callState">${st}</div>
+        <div class="cs-state" id="callState">${st}${
+          CALL_VIDEO && CALL_ST !== 'live' ? ' · видео' : ''}</div>
         <div class="call-q" id="callQ"></div>
         ${CALL_NOTE ? `<div class="call-note">${CALL_NOTE}</div>` : ''}
       </div>
+      ${row2}
       <div class="cs-acts${CALL_ST === 'out' ? ' one' : ''}">${pair}</div>
     </div>`;
   callPaintQuality();

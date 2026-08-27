@@ -5710,6 +5710,10 @@ button.pill:active{opacity:.6}
 <div class="cmd-overlay" id="callOv" onclick="if(event.target===this)callClose()">
   <div class="ca-app">
     <div class="ca">
+      <button class="ca-close" onclick="callClose()" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+          stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
       <div class="ca-body" id="callBody"></div>
       <nav class="ca-nav" id="callNav">
         <button class="ca-tab" data-p="calls" onclick="callPage('calls')">
@@ -5759,6 +5763,13 @@ button.pill:active{opacity:.6}
   border:1px solid var(--border2);border-radius:24px;overflow:hidden;margin:auto;
   box-shadow:0 24px 80px rgba(0,0,0,.7);flex-shrink:0}
 .ca{display:flex;flex-direction:column;height:100%;min-height:0}
+/* Выход из приложения звонков. В телефоне его нет — там это и есть телефон, а
+   у нас приложение внутри приложения, и вернуться назад обязано быть чем. */
+.ca-close{position:absolute;top:16px;right:16px;z-index:2;width:38px;height:38px;border-radius:12px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center}
+.ca{position:relative}
+.ca-close{color:var(--sub);background:var(--card);border:1px solid var(--border2)}
+.ca-close:active{background:var(--card2)}
 .ca-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 18px 12px}
 .ca-h1{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;color:var(--text);padding:0 0 14px}
 .ca-search{display:flex;align-items:center;gap:9px;padding:11px 13px;border-radius:13px;

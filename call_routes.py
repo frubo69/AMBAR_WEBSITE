@@ -738,7 +738,26 @@ async def handle_ice(request: web.Request):
     return web.json_response({"ice": ice_servers()}, headers=CORS_HEADERS)
 
 
+async def on_shutdown(app):
+    """Закрыть все сокеты связи при остановке сервиса.
+
+    Без этого aiohttp честно ждёт, пока живые вебсокеты разойдутся сами, и
+    перезапуск растягивается на полминуты — всё это время приложения получают
+    502. Сокеты и так переподключаются сами, поэтому рвать их при остановке
+    правильно: разговор всё равно не переживёт перезапуск, а простой переживать
+    нечего."""
+    peers = list(_PEERS.values())
+    for p in peers:
+        try:
+            await p.ws.close(code=1012, message=b"restart")
+        except Exception:
+            pass
+    if peers:
+        log.info(f"[call] при остановке закрыто сокетов: {len(peers)}")
+
+
 def setup(app):
+    app.on_shutdown.append(on_shutdown)
     app.router.add_get("/api/call/ws", handle_ws)
     app.router.add_route("OPTIONS", "/api/call/ice", handle_ice)
     app.router.add_get("/api/call/ice", handle_ice)

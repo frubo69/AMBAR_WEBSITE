@@ -2804,7 +2804,9 @@ def main():
     # 0.0.0.0 only added a second door on the public IP that skips TLS, the
     # Cloudflare edge and every nginx rule. Override with WEBAPP_HOST if the
     # server ever needs to answer directly.
-    web.run_app(app, host=HOST, port=PORT, access_log=None)
+    # Ждать расходящихся клиентов дольше пары секунд незачем: за это время
+    # перезапуск превращается в полминуты ошибок 502 у всех, кто в приложении.
+    web.run_app(app, host=HOST, port=PORT, access_log=None, shutdown_timeout=2)
 
 
 if __name__ == "__main__":

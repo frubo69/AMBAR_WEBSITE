@@ -473,6 +473,10 @@ async def handle_ws(request: web.Request):
         await refresh_staff()
         peer = await _identify(hello)
         if not peer:
+            # Отказ обязан быть виден в логах. Молчаливый отказ выглядит с
+            # телефона ровно как «связи нет», и искать причину потом не по чему.
+            log.warning(f"[call] не пустили: as={hello.get('as')!r}, "
+                        f"подпись {'есть' if hello.get('tma') else 'ПУСТАЯ'}")
             await ws.send_json({"t": "denied"})
             await ws.close(code=4403, message=b"forbidden")
             return ws

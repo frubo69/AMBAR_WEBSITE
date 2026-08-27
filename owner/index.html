@@ -782,17 +782,9 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Остаётся на месте и когда карточка прижата: заказы, средний чек и время
    нужны всё время, пока листаешь районы, — ради них на карточку и смотрят. */
 .ohero-stats{display:grid;grid-template-columns:repeat(3,1fr) auto;gap:8px}
-/* Разбор суммы — вторая строка, отделённая волоском, кеглем помельче: это
-   пояснение к числу наверху, а не самостоятельные показатели. */
-.ohero-money{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;
-  margin-top:11px;padding-top:11px;border-top:1px solid var(--border2)}
-.ohero-money .off-tot-c{background:none;border:0;border-radius:0;
-  padding:0 0 0 13px;border-left:1px solid var(--border2)}
-.ohero-money .off-tot-c:first-child{padding-left:2px;border-left:0}
-.off-tot-v.sm{font-size:14px}
-.off-tot-v.gold{color:var(--gold2)}
-.off-tot-v.dn{color:var(--dn)}
-.off-tot-v.warn{color:var(--warn-t)}
+/* Разбор стоит в одной строке с суммой и датой — как в свёрнутой шапке
+   «Обзора». Смещения вниз, как у развёрнутой, здесь не нужно: строка одна. */
+.ohero-top .hero-side{top:0;margin-right:auto}
 /* Внутри карточки цифрам не нужны свои рамки: коробки в коробке — это и был
    шум. Три столбца, разделённые волоском. */
 .ohero-stats .off-tot-c{background:none;border:0;border-radius:0;
@@ -3395,7 +3387,16 @@ button.path:active{transform:scale(.995)}
        списка. Долгое нажатие открепляет. -->
   <div class="ohero" id="offHero" data-detail="kpi:revenue">
    <div class="ohero-top">
-    <span class="hero-amt mono" id="offHeroRev" data-aed="">—</span><span class="hero-unit cur-unit">AED</span>
+    <div class="hero-amt-row"><span class="hero-amt mono" id="offHeroRev" data-aed="">—</span></div>
+    <!-- Тот же разбор и на том же месте, что в шапке «Обзора»: между суммой и
+         датой. Одни и те же четыре числа не должны выглядеть на двух экранах
+         по-разному. -->
+    <div class="hero-side" id="offSide">
+      <span class="hero-side-r"><i><span class="w">валовая</span><span class="w2">вал</span></i><b id="offGross" data-aed="">—</b></span>
+      <span class="hero-side-r"><i><span class="w">чаевые</span><span class="w2">чай</span></i><b class="gold" id="offTips" data-aed="">—</b></span>
+      <span class="hero-side-r"><i><span class="w">расход</span><span class="w2">расх</span></i><b class="dn" id="offSpend" data-aed="">—</b></span>
+      <span class="hero-side-r"><i><span class="w">долг</span><span class="w2">долг</span></i><b class="warn" id="offDebt" data-aed="">—</b></span>
+    </div>
     <span class="day-nav" id="offHeroNav">
       <button class="dn-b" aria-label="Предыдущий день"
         onpointerdown="event.stopPropagation()" onclick="event.stopPropagation();dayStep(1)"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
@@ -3426,17 +3427,6 @@ button.path:active{transform:scale(.995)}
            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
         <path d="M4 6h16M7 12h10M10 18h4"/></svg>
     </button>
-   </div>
-   <!-- Разбор суммы — тот же, что в шапке «Обзора», и цифры туда кладёт тот же
-        код: иначе на двух экранах за один день оказались бы разные числа.
-        Первым стоит «в руках», а не «валовая»: валовая здесь и есть крупное
-        число наверху — из него складываются карточки районов, — и повторять
-        её строкой ниже значило бы занять место ничем. -->
-   <div class="ohero-money">
-    <div class="off-tot-c"><div class="off-tot-l">В руках</div><div class="off-tot-v sm" id="offNet" data-aed="">—</div></div>
-    <div class="off-tot-c"><div class="off-tot-l">Чаевые</div><div class="off-tot-v sm gold" id="offTips" data-aed="">—</div></div>
-    <div class="off-tot-c"><div class="off-tot-l">Расход</div><div class="off-tot-v sm dn" id="offSpend" data-aed="">—</div></div>
-    <div class="off-tot-c"><div class="off-tot-l">Долг</div><div class="off-tot-v sm warn" id="offDebt" data-aed="">—</div></div>
    </div>
   </div>
 
@@ -5328,6 +5318,8 @@ button.pill:active{opacity:.6}
 /* У подписи два написания: полное и короткое. Короткое включается там, где
    полному не хватает ширины, — лучше «вал», чем ничего. */
 .hero-side .w2{display:none}
+.hero-side.short .w{display:none}
+.hero-side.short .w2{display:inline}
 .hero-side-r i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:.75em;
   font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);opacity:.8}
 .hero-side-r b{font-family:'Space Grotesk',sans-serif;font-size:1.04em;font-weight:700;
@@ -5356,9 +5348,17 @@ button.pill:active{opacity:.6}
    край и «долг» срезало. Тем же мелким кеглем, что и в сжатом, влезают все. */
 @media (max-width:360px){
   .hero-side{font-size:10.5px;column-gap:5px}
-  /* Сжатая карточка на узком телефоне: подписи переходят на короткие. */
-  .hero.tight .hero-side .w{display:none}
-  .hero.tight .hero-side .w2{display:inline}
+  /* Карточка «Районов» на узком телефоне: в строке стоят сумма, разбор и дата,
+     и втроём они помещаются только так — число мельче, у даты остаётся одно
+     слово, стрелки уже. Иначе разбор оставался без подписей. */
+  .ohero .hero-amt{font-size:20px}
+  .ohero .dn-rel{display:none}
+  .ohero .dn-d{min-width:40px;height:26px}
+  .ohero .dn-b{width:19px}
+  .ohero .dn-home{width:21px;height:21px}
+  .ohero-stats{gap:6px}
+  .ohero-stats .off-tot-v{font-size:15px}
+  .ohero-stats .off-tot-c{padding-left:9px}
   /* Узкий телефон: втроём — сумма, столбец и дата — в 320 точек они
      помещаются только с числом помельче. important — потому что кегль
      числа ставит скрипт. */
@@ -5762,32 +5762,43 @@ try{
 // строка обрезана по краю: первым пропадал «долг» — молча, без единого знака.
 // Сжимаем строку ровно настолько, насколько не хватило места, и не мельче
 // восьми десятых: ниже цифры уже не читаются, и лучше честный обрез.
-function heroSideFit(){
-  const side = document.getElementById('heroSide');
-  const box  = side && side.parentElement;
+// Разбор суммы ужимается под то место, что осталось между числом и датой.
+// Уступает по очереди: полные подписи → мельче кегль → короткие подписи →
+// снова мельче → совсем без подписей. Так на широком экране стоит «валовая»,
+// на узком «вал», и только в безвыходном случае одни цифры.
+//
+// Место считаем руками. scrollWidth тут врёт: под дату отведён правый отступ
+// (или она стоит соседом), столбец залезает в него — и переполнения по
+// scrollWidth не возникает, хотя цифры уже лежат поверх даты.
+function heroSideFit(side){
+  side = side || document.getElementById('heroSide');
+  const box = side && side.parentElement;
   if(!box || !box.clientWidth) return;
-  // Считаем место руками. scrollWidth тут врёт: в сжатом виде под дату
-  // отведён правый отступ, столбец залезает в него — и переполнения по
-  // scrollWidth не возникает, хотя цифры уже лежат поверх даты.
-  const row = box.firstElementChild;
-  if(!row) return;
-  const cs   = getComputedStyle(box);
-  const gap  = parseFloat(cs.columnGap) || 0;
-  const free = () => box.clientWidth - (parseFloat(cs.paddingRight) || 0)
-                     - row.offsetWidth - gap - side.offsetWidth;
+  const cs    = getComputedStyle(box);
+  const kids  = [...box.children];
+  const gaps  = (parseFloat(cs.columnGap) || 0) * Math.max(0, kids.length - 1);
+  const taken = kids.filter(e => e !== side).reduce((a, e) => a + e.offsetWidth, 0);
+  const free  = () => box.clientWidth - (parseFloat(cs.paddingRight) || 0)
+                      - taken - gaps - side.offsetWidth;
   side.classList.remove('bare');
-  side.style.fontSize = '';
-  for(let k = 0; k < 10; k++){
-    if(free() >= -1) return;
-    const now = parseFloat(getComputedStyle(side).fontSize);
-    if(now <= 8) break;                          // мельче уже не читается
-    side.style.fontSize = (now - .5) + 'px';
+  for(const short of [false, true]){
+    side.classList.toggle('short', short);
+    side.style.fontSize = '';
+    for(let k = 0; k < 10; k++){
+      if(free() >= -1) return;
+      const now = parseFloat(getComputedStyle(side).fontSize);
+      if(now <= 8) break;                        // мельче уже не читается
+      side.style.fontSize = (now - .5) + 'px';
+    }
   }
-  // Кегль кончился, места всё равно нет — снимаем подписи. Лучше четыре
-  // числа без слов, чем числа поверх даты.
+  // Кончились и подписи, и кегль — оставляем одни числа. Лучше четыре цифры
+  // без слов, чем цифры поверх даты.
   if(free() < -1) side.classList.add('bare');
 }
-window.addEventListener('resize', heroSideFit);
+window.addEventListener('resize', () => {
+  heroSideFit();
+  heroSideFit(document.getElementById('offSide'));
+});
 
 (function heroShrink(){
   const hero = document.querySelector('#pg-overview .hero');
@@ -7850,10 +7861,11 @@ function _paintHero(p, f){
   heroSideFit();
   // Те же четыре числа на карточке «Районов». Считает их одно место — иначе на
   // двух экранах за один и тот же день оказались бы разные суммы.
-  _setAed('offNet',   f.revenue.current - tips - spend);
+  _setAed('offGross', f.revenue.current);
   _setAed('offTips',  tips);
   _setAed('offSpend', spend);
   _setAed('offDebt',  ((f.by_method || {}).debt || {}).aed || 0);
+  heroSideFit(document.getElementById('offSide'));
   _setAed('heroPrev', f.revenue.previous);
   _setText('heroDelta', f.revenue.delta_label);
   const hd = document.getElementById('heroDelta');

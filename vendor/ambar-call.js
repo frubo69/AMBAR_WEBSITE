@@ -216,7 +216,8 @@
         break;
 
       case 'ring':                                  // нам звонят
-        this.call = {id: m.call, peer: m.frm, dir: 'in', order: m.order || ''};
+        this.call = {id: m.call, peer: m.frm, dir: 'in', order: m.order || '',
+                     kind: m.kind || ''};
         this.tones.ring();
         this._emit('ring', this.call);
         break;

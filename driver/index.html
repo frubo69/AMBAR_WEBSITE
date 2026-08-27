@@ -1038,6 +1038,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .call-scr{position:fixed;inset:0;z-index:120;display:none;flex-direction:column;
   background:linear-gradient(180deg,#0B0B18,#000006)}
 .call-scr.show{display:flex}
+/* Входящий занимает экран целиком: закрывать его нечем — на него либо
+   отвечают, либо сбрасывают, и лишняя крестик-кнопка тут только мешает. */
+.call-scr.ringing .call-top{display:none}
+/* Боковые поля экрана звонка задаёт он сам: кнопки должны стоять там же, где
+   в телефоне, а общий отступ ленты сдвигал их к центру на 14 пикселей. */
+.call-scr.ringing .call-mid{padding:calc(10px + var(--safe-top)) 0 0}
 .call-top{display:flex;align-items:center;gap:11px;flex-shrink:0;
   padding:calc(10px + var(--safe-top)) 13px 11px}
 .call-top-t{flex:1;font-size:15px;font-weight:700}
@@ -1056,6 +1062,32 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .call-role{font-size:12px;color:var(--muted)}
 .call-state{font-size:13.5px;color:var(--sub);margin-top:9px;min-height:19px}
 .call-note{font-size:11.5px;color:var(--warn);margin-top:5px;max-width:270px;line-height:1.45}
+/* ── Экран звонка ────────────────────────────────────────────────────────────
+   Снят с телефонного эталона: имя и звание вверху, пустая середина, кнопки у
+   нижнего края и по краям экрана. Так рука находит нужную кнопку не глядя, а
+   между «отклонить» и «ответить» — вся ширина экрана, промахнуться трудно. */
+.cs{display:flex;flex-direction:column;height:100%;text-align:center}
+.cs-top{padding:44px 24px 0}
+.cs-role{font-size:16px;color:var(--sub);font-weight:500}
+.cs-name{font-family:'Space Grotesk',sans-serif;font-size:38px;font-weight:700;
+  line-height:1.15;margin-top:4px;word-break:break-word}
+.cs-state{font-size:15px;color:var(--muted);margin-top:14px;min-height:20px;
+  font-variant-numeric:tabular-nums}
+.cs-acts{margin-top:auto;display:flex;justify-content:space-between;
+/* На телефоне снизу ещё полоса home-индикатора — она и добирает те самые
+   семьдесят четыре пикселя от края, что в эталоне. */
+  padding:0 39px calc(10px + var(--safe-bottom))}
+.cs-acts.one{justify-content:center}
+.cs-act{display:flex;flex-direction:column;align-items:center}
+.cs-btn{width:74px;height:74px;border-radius:50%;border:0;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;color:#fff;transition:transform .12s var(--e1);
+  -webkit-tap-highlight-color:transparent}
+.cs-btn:active{transform:scale(.92)}
+.cs-btn.take{background:#2CB34A}
+.cs-btn.drop{background:#E05555}
+.cs-btn.mute{background:rgba(255,255,255,.13);color:var(--text)}
+.cs-btn.mute.on{background:#fff;color:#111}
+.cs-lbl{font-size:14px;color:var(--sub);margin-top:11px}
 /* Раскладка как в телефоне: сверху ряд действий, отбой — отдельно и ниже,
    крупнее остальных. Промахнуться по нему нельзя, а случайно попасть — трудно. */
 .call-acts{display:flex;align-items:center;justify-content:center;gap:26px;margin-top:34px}
@@ -1988,7 +2020,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=2"></script>
+<script src="/vendor/ambar-call.js?v=3"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -5875,6 +5907,7 @@ let CALL_ST = 'idle';       // idle | out | in | live
 let CALL_WHO = '';          // с кем сейчас дело
 let CALL_T0 = 0;            // когда сняли трубку — для счётчика
 let CALL_NOTE = '';         // подсказка на экране исходящего
+let CALL_ROLE = '';         // кто звонит: звание под именем
 let CALL_Q = '';            // качество связи
 let _callTick = null, _callMuted = false, _callWanted = false;
 
@@ -5911,11 +5944,12 @@ function callEvent(t, d){
       if(CALL_ST === 'idle') callRender();
       return;
     case 'ring':
-      CALL_ST = 'in'; CALL_WHO = d.peer;
+      CALL_ST = 'in'; CALL_WHO = d.peer; CALL_ROLE = callRole(d.kind, d.peer);
       callOpen(); callBuzz(); callRender();
       return;
     case 'calling':
       CALL_ST = 'out'; CALL_WHO = d.peer; CALL_NOTE = d.note || '';
+      CALL_ROLE = callRole('op', d.peer);
       callOpen(); callRender();
       return;
     case 'talking':
@@ -6067,6 +6101,14 @@ function _dirIco(r){
     : '<svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 7L7 17M15 17H7V9"/></svg>';
 }
 
+// Звание под именем: «Умар» без пояснения — просто слово, а «свой оператор»
+// сразу говорит, кто это и почему берут трубку.
+function callRole(kind, name){
+  const r = ((CALL && CALL.roster) || []).find(x => x.name === name);
+  if(r && r.role) return r.role;
+  return kind === 'star' ? 'AMBAR STAR' : kind === 'drv' ? 'водитель' : 'оператор';
+}
+
 const _ini = n => (n || '?').trim().charAt(0).toUpperCase();
 const _mm = s => String(Math.floor(s / 60)).padStart(2, '0') + ':' + String(s % 60).padStart(2, '0');
 
@@ -6088,11 +6130,17 @@ const ICO_CALL = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" st
   d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.8.6a2 2 0 0 1 1.7 2z"/></svg>`;
 const ICO_X = `<svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
   stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+const ICO_X_BIG = `<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor"
+  stroke-width="2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`;
+const ICO_PHONE_BIG = `<svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor"
+  stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
+  d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.8.6a2 2 0 0 1 1.7 2z"/></svg>`;
 
 // Быстрые ответы вместо разговора. Заготовлены заранее: за рулём не печатают.
 const CALL_SAYS = ['Перезвоню', 'За рулём', 'Я на адресе'];
 
 function callRender(){
+  cel('callScr')?.classList.toggle('ringing', CALL_ST === 'in');
   try{ _callRender(); }
   catch(e){
     // Пустой экран — худшее, что можно показать: человек не понимает, сломано
@@ -6173,48 +6221,47 @@ function _callRender(){
   if(title) title.textContent = CALL_ST === 'live' ? 'Разговор' : 'Звонок';
   const st = CALL_ST === 'in' ? 'Входящий звонок' : CALL_ST === 'out' ? 'Звоним…' : '00:00';
 
-  const acts = CALL_ST === 'in' ? `
-      <div class="call-act">
-        <button class="call-btn drop" onclick="callReject()" aria-label="Отклонить">${ICO_X}</button>
-        <div class="call-btn-lbl">Отклонить</div>
+  // Кнопки внизу и по краям, как в телефоне: отклонить слева, ответить справа.
+  // Во время разговора справа завершение, слева — микрофон.
+  const pair = CALL_ST === 'in' ? `
+      <div class="cs-act">
+        <button class="cs-btn drop" onclick="callReject()" aria-label="Отклонить">${ICO_X_BIG}</button>
+        <div class="cs-lbl">Отклонить</div>
       </div>
-      <div class="call-act">
-        <button class="call-btn take" onclick="callAccept()" aria-label="Ответить">${ICO_CALL.replace('17" height="17', '26" height="26')}</button>
-        <div class="call-btn-lbl">Ответить</div>
+      <div class="cs-act">
+        <button class="cs-btn take" onclick="callAccept()" aria-label="Ответить">${ICO_PHONE_BIG}</button>
+        <div class="cs-lbl">Ответить</div>
       </div>`
     : CALL_ST === 'live' ? `
-      <div class="call-act">
-        <button class="call-btn small${_callMuted ? ' on' : ''}" onclick="callMute()" aria-label="Микрофон">
-          <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor"
-            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <div class="cs-act">
+        <button class="cs-btn mute${_callMuted ? ' on' : ''}" onclick="callMute()" aria-label="Микрофон">
+          <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor"
+            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
             <path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
             <path d="M19 11a7 7 0 0 1-14 0M12 18v3"/>
             ${_callMuted ? '<path d="M3 3l18 18"/>' : ''}</svg></button>
-        <div class="call-btn-lbl">${_callMuted ? 'Включить' : 'Без звука'}</div>
+        <div class="cs-lbl">${_callMuted ? 'Включить' : 'Без звука'}</div>
+      </div>
+      <div class="cs-act">
+        <button class="cs-btn drop" onclick="callHangup()" aria-label="Завершить">${ICO_X_BIG}</button>
+        <div class="cs-lbl">Завершить</div>
       </div>`
-    : '';
-
-  // Отбой всегда отдельной строкой и всегда на одном месте — как в телефоне.
-  const drop = (CALL_ST === 'live' || CALL_ST === 'out') ? `
-      <div class="call-acts row2">
-        <div class="call-act">
-          <button class="call-btn drop" onclick="callHangup()"
-            aria-label="${CALL_ST === 'live' ? 'Завершить' : 'Отменить'}">${ICO_X}</button>
-          <div class="call-btn-lbl">${CALL_ST === 'live' ? 'Завершить' : 'Отменить'}</div>
-        </div>
-      </div>` : '';
+    : `
+      <div class="cs-act cs-one">
+        <button class="cs-btn drop" onclick="callHangup()" aria-label="Отменить">${ICO_X_BIG}</button>
+        <div class="cs-lbl">Отменить</div>
+      </div>`;
 
   box.innerHTML = `
-    <div class="call-live">
-      <div class="call-av${CALL_ST === 'live' ? '' : ' ring'}">${_ini(CALL_WHO)}</div>
-      <div class="call-who">${CALL_WHO || '—'}</div>
-      <div class="call-state" id="callState">${st}</div>
-      <div class="call-q" id="callQ"></div>
-      ${CALL_NOTE ? `<div class="call-note">${CALL_NOTE}</div>` : ''}
-      ${acts ? `<div class="call-acts">${acts}</div>` : ''}
-      ${drop}
-      ${CALL_ST === 'in' ? `<div class="call-says">${CALL_SAYS.map(s =>
-        `<button onclick="callReject('${s}')">${s}</button>`).join('')}</div>` : ''}
+    <div class="cs">
+      <div class="cs-top">
+        <div class="cs-role">${CALL_ROLE || ''}</div>
+        <div class="cs-name">${CALL_WHO || '—'}</div>
+        <div class="cs-state" id="callState">${st}</div>
+        <div class="call-q" id="callQ"></div>
+        ${CALL_NOTE ? `<div class="call-note">${CALL_NOTE}</div>` : ''}
+      </div>
+      <div class="cs-acts${CALL_ST === 'out' ? ' one' : ''}">${pair}</div>
     </div>`;
   callPaintQuality();
 }

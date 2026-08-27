@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=2"></script>
+<script src="/vendor/ambar-call.js?v=3"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -687,34 +687,81 @@ a.oc-row:active{background:var(--card2)}
 .call-warm-b{margin-top:11px;width:100%;padding:10px;border-radius:11px;border:0;cursor:pointer;
   font-family:'Space Grotesk',sans-serif;font-size:13.5px;font-weight:700;color:#1a1408;
   background:var(--gold)}
-/* ── Страница звонков ────────────────────────────────────────────────────────
-   По образцу телефонного приложения: переключатель «все / пропущенные»,
-   контакты и ниже история строками с кружком, именем, стрелкой и временем. */
-.call-h1{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;margin-bottom:12px}
-.call-tabs{display:flex;gap:8px;margin-bottom:14px}
-.call-tabs button{flex:1;padding:8px;border-radius:10px;cursor:pointer;
-  font-family:'DM Sans',sans-serif;font-size:13px;font-weight:600;color:var(--muted);
+/* ── Приложение звонков ──────────────────────────────────────────────────────
+   Не окошко со списком, а отдельное приложение внутри панели: свои страницы,
+   свой поиск, своя нижняя панель. Раскладка снята с телефонного приложения
+   намеренно — большой заголовок, поиск, переключатель «все / пропущенные»,
+   список строками, внизу «звонки — новый — контакты». Учить нечему. */
+.ca-app{width:min(430px,94vw);height:min(760px,88vh);background:var(--bg3);
+  border:1px solid var(--border3);border-radius:24px;overflow:hidden;margin:auto;
+  box-shadow:0 24px 80px rgba(0,0,0,.7);flex-shrink:0}
+.ca{display:flex;flex-direction:column;height:100%;min-height:0}
+.ca-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 18px 12px}
+.ca-h1{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;color:var(--text);
+  padding:0 0 14px}
+.ca-search{display:flex;align-items:center;gap:9px;padding:11px 13px;border-radius:13px;
+  margin-bottom:18px;background:var(--bg2);border:1px solid var(--border3);color:var(--muted)}
+.ca-search svg{flex-shrink:0;opacity:.7}
+/* В панели у полей ввода свои отступы — внутри строки поиска они лишние:
+   рамку рисует контейнер, и двойные отступы раздували её до 67px. */
+.ca-search input{flex:1;min-width:0;border:0;background:transparent;outline:none;color:var(--text);
+  font-family:'DM Sans',sans-serif;font-size:14.5px;padding:0;height:auto;line-height:1.35}
+.ca-search input::placeholder{color:var(--muted)}
+.ca-cap{font-size:14px;font-weight:600;color:var(--text);margin:0 0 12px}
+.ca-favs{display:flex;gap:15px;overflow-x:auto;scrollbar-width:none;padding:0 0 20px}
+.ca-favs::-webkit-scrollbar{display:none}
+.ca-fav{flex-shrink:0;width:64px;text-align:center;cursor:pointer;border:0;background:transparent;
+  font-family:'DM Sans',sans-serif;padding:0}
+.ca-fav-c{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:19px;font-weight:700;margin:0 auto 7px;color:var(--gold);
+  background:rgba(201,169,110,.12);border:1px solid rgba(201,169,110,.25)}
+.ca-fav-add .ca-fav-c{border:2px dashed var(--border3);background:transparent;color:var(--sub)}
+.ca-fav-n{font-size:11.5px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ca-seg{display:flex;gap:9px;margin-bottom:4px}
+.ca-seg button{flex:1;padding:10px;border-radius:11px;cursor:pointer;color:var(--muted);
+  font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;
   background:var(--bg2);border:1px solid var(--border3)}
-.call-tabs button.on{color:var(--gold);background:rgba(201,169,110,.12);
-  border-color:rgba(201,169,110,.4)}
-.call-item{display:flex;align-items:center;gap:12px;padding:9px 2px}
-.call-item+.call-item{border-top:1px solid var(--border3)}
-.call-ava{width:40px;height:40px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;
-  justify-content:center;font-size:14px;font-weight:700;color:var(--gold);
-  background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.2)}
-.call-item-b{flex:1;min-width:0;cursor:pointer}
-.call-item-n{font-size:14.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.call-item.missed .call-item-n,.call-item.missed .call-item-s{color:#E05555}
-.call-item-s{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--muted);margin-top:2px}
-.call-item-go{width:36px;height:36px;flex-shrink:0;border-radius:50%;cursor:pointer;
-  display:flex;align-items:center;justify-content:center;color:#4CAF7D;
-  background:rgba(76,175,125,.12);border:1px solid rgba(76,175,125,.28)}
-.call-item-go:hover{background:rgba(76,175,125,.22)}
-.call-item-go .ic{margin:0;width:17px;height:17px}
-.call-empty{text-align:center;color:var(--muted);font-size:13px;padding:34px 12px;line-height:1.55}
-/* Отбой отдельной строкой и всегда на одном месте — как в телефоне. */
-.call-live-acts.row2{margin-top:16px}
-/* Недавние звонки */
+.ca-seg button.on{color:var(--gold);background:rgba(201,169,110,.13);border-color:rgba(201,169,110,.4)}
+.ca-row{display:flex;align-items:center;gap:13px;padding:11px 0}
+.ca-row+.ca-row{border-top:1px solid var(--border2)}
+.ca-ava{width:46px;height:46px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:15px;font-weight:700;color:var(--gold);
+  background:rgba(201,169,110,.11);border:1px solid rgba(201,169,110,.2)}
+.ca-rb{flex:1;min-width:0;cursor:pointer}
+.ca-rn{font-size:15.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;
+  text-overflow:ellipsis}
+.ca-row.missed .ca-rn,.ca-row.missed .ca-rs{color:var(--dn)}
+.ca-rs{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);margin-top:3px}
+.ca-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);opacity:.5;flex-shrink:0}
+.ca-dot.on{background:var(--up);opacity:1}
+.ca-go{width:40px;height:40px;flex-shrink:0;border-radius:50%;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;color:var(--up);background:rgba(76,175,125,.12);
+  border:1px solid rgba(76,175,125,.28)}
+.ca-go:hover{background:rgba(76,175,125,.22)}
+.ca-go svg{margin:0}
+.ca-sec{font-size:12px;font-weight:600;color:var(--sub);padding:7px 11px;border-radius:8px;
+  background:var(--bg2);margin:18px 0 4px}
+.ca-empty{text-align:center;font-size:13.5px;color:var(--muted);padding:44px 14px;line-height:1.55}
+.ca-nav{position:relative;display:flex;align-items:flex-end;justify-content:space-around;
+  flex-shrink:0;padding:12px 26px 12px;border-top:1px solid var(--border2);background:var(--bg2)}
+.ca-tab{width:84px;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;
+  border:0;background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;
+  font-size:11px;font-weight:600;padding:4px 0}
+.ca-tab.on{color:var(--gold)}
+/* Главное действие приподнято над панелью, как и положено: его ищут пальцем
+   не глядя, и оно должно выступать из ряда. */
+/* Кнопка вынута из потока: только так она выступает над панелью, а не
+   раздвигает её. Ряд при этом остаётся из двух ровных половин. */
+.ca-new{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);
+  width:62px;height:62px;border-radius:50%;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;color:var(--gold);
+  background:var(--bg3);border:5px solid var(--bg2);box-shadow:0 0 0 1px var(--border3),
+  0 8px 24px rgba(0,0,0,.5)}
+.ca-new:hover{color:var(--gold2)}
+/* Экран разговора занимает всё приложение целиком: во время звонка ни списки,
+   ни нижняя панель не нужны. */
+.ca-body.live{display:flex;align-items:center;justify-content:center}
+/* Недавние звонки *//* Недавние звонки */
 .call-rec{display:flex;align-items:center;gap:9px;padding:9px 11px;border-radius:11px;
   background:var(--bg2);border:1px solid var(--border3);margin-bottom:6px;cursor:pointer}
 .call-rec:hover{background:var(--bg3)}
@@ -1790,11 +1837,33 @@ a.oc-row:active{background:var(--card2)}
 <!-- Связь. Список — обычным листом, входящий — поверх всего: заказ подождёт,
      звонок нет. Полоса разговора остаётся внизу и после закрытия листа, иначе
      оператор, вернувшись к заказу, теряет из виду, что он всё ещё говорит. -->
+<!-- Приложение звонков внутри панели: свои страницы, свой поиск, своя нижняя
+     панель. Раскладка снята с телефонного приложения намеренно — её не надо
+     изучать. -->
 <div class="ov" id="callOv" onclick="if(event.target===this)hideOv('callOv')">
-  <div class="sheet" style="width:min(460px,94vw)">
-    <div class="t" id="callT">Связь</div>
-    <div class="s" id="callS">Кому позвонить</div>
-    <div id="callBody"></div>
+  <div class="ca-app">
+    <div class="ca">
+      <div class="ca-body" id="callBody"></div>
+      <nav class="ca-nav" id="callNav">
+        <button class="ca-tab" data-p="calls" onclick="callPage('calls')">
+          <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor"
+            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path
+            d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.8.6a2 2 0 0 1 1.7 2z"/></svg>
+          <span>Звонки</span>
+        </button>
+        <button class="ca-new" onclick="callPage('contacts')" aria-label="Новый звонок">
+          <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
+            stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
+        </button>
+        <button class="ca-tab" data-p="contacts" onclick="callPage('contacts')">
+          <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor"
+            stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="2.5"
+            width="16" height="19" rx="2.5"/><circle cx="12" cy="10" r="2.6"/><path
+            d="M8 17.5c.9-1.7 2.3-2.5 4-2.5s3.1.8 4 2.5"/></svg>
+          <span>Контакты</span>
+        </button>
+      </nav>
+    </div>
   </div>
 </div>
 
@@ -4798,6 +4867,84 @@ function _cWhen(iso){
   return d.getDate() + '.' + String(d.getMonth()+1).padStart(2,'0') + ' · ' + hh;
 }
 
+// Поиск и страница живут снаружи отрисовки: она вызывается из событий связи
+// и не должна их сбрасывать.
+let CALL_PAGE = 'calls', CALL_Q_TXT = '';
+function callPage(p){ CALL_PAGE = p; callPaint(); }
+function _caMatch(n){ return !CALL_Q_TXT || n.toLowerCase().includes(CALL_Q_TXT.toLowerCase()); }
+
+const CA_SEARCH = `<div class="ca-search"><svg viewBox="0 0 24 24" width="17" height="17"
+  fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path
+  d="m20 20-3.5-3.5"/></svg><input id="caQ" type="text" placeholder="Поиск" autocomplete="off"></div>`;
+
+function caPerson(r){
+  return `<div class="ca-row">
+    <div class="ca-ava">${_cIni(r.name)}</div>
+    <div class="ca-rb" onclick="callDial('${r.key}')">
+      <div class="ca-rn">${r.name}</div>
+      <div class="ca-rs"><span class="ca-dot${r.online ? ' on' : ''}"></span>
+        ${r.online ? 'в приложении' : 'позвоним в телеграм'}</div>
+    </div>
+    <div class="ca-go" onclick="callDial('${r.key}')">${ICO_PHONE}</div>
+  </div>`;
+}
+
+function caCalls(){
+  const rec = callGroup((CALL && CALL.recent) || []).filter(r => _caMatch(r.who));
+  const shown = CALL_TAB === 'missed' ? rec.filter(r => r.missed) : rec;
+  let h = `<div class="ca-h1">Звонки</div>` + CA_SEARCH;
+  const micOk = !CALL || typeof CALL.micGranted !== 'function' || CALL.micGranted();
+  if(!micOk) h += caWarm();
+  h += `<div class="ca-seg">
+      <button class="${CALL_TAB === 'all' ? 'on' : ''}" onclick="callTab('all')">Все</button>
+      <button class="${CALL_TAB === 'missed' ? 'on' : ''}" onclick="callTab('missed')">Пропущенные</button>
+    </div>`;
+  if(!shown.length){
+    h += `<div class="ca-empty">${CALL_TAB === 'missed' ? 'Пропущенных нет'
+      : CALL_Q_TXT ? 'Ничего не найдено' : 'Звонков ещё не было'}</div>`;
+    return h;
+  }
+  h += shown.map(r => `<div class="ca-row${r.missed ? ' missed' : ''}">
+      <div class="ca-ava">${_cIni(r.who)}</div>
+      <div class="ca-rb" onclick="callDial('${r.key}')">
+        <div class="ca-rn">${r.who}${r.n > 1 ? ' <span style="color:var(--muted);font-weight:400">(' + r.n + ')</span>' : ''}</div>
+        <div class="ca-rs">${_dirIco(r)}<span>${_cWhen(r.at)}</span>${
+          r.talk ? '<span>· ' + _cMm(r.talk) + '</span>' : ''}</div>
+      </div>
+      <div class="ca-go" onclick="callDial('${r.key}')">${ICO_PHONE}</div>
+    </div>`).join('');
+  return h;
+}
+
+function caContacts(){
+  const rows = ((CALL && CALL.roster) || []).filter(r => _caMatch(r.name));
+  let h = `<div class="ca-h1">Контакты</div>` + CA_SEARCH;
+  const micOk = !CALL || typeof CALL.micGranted !== 'function' || CALL.micGranted();
+  if(!micOk) h += caWarm();
+  if(!rows.length){
+    h += `<div class="ca-empty">${CALL_Q_TXT ? 'Ничего не найдено'
+      : curOp ? 'За вами сейчас нет водителей' : 'Сначала выберите оператора'}</div>`;
+    return h;
+  }
+  let last = '';
+  rows.forEach(r => {
+    if(r.role !== last){ last = r.role;
+      h += `<div class="ca-sec">${r.role === 'водитель' ? 'Водители'
+        : r.role === 'оператор' ? 'Операторы' : r.role}</div>`; }
+    h += caPerson(r);
+  });
+  return h;
+}
+
+function caWarm(){
+  return `<div class="call-warm">
+    <div class="call-warm-t">Разрешите микрофон</div>
+    <div class="call-warm-s">Один раз на это устройство. Без него звонок не будет
+      слышно ни вам, ни водителю.</div>
+    <button class="call-warm-b" onclick="callWarm()">Разрешить</button>
+  </div>`;
+}
+
 function callPaint(){
   try{ _callPaint(); }
   catch(e){
@@ -4819,71 +4966,26 @@ function _callPaint(){
     }
   }
 
+  const nav = $('callNav');
   if(CALL_ST === 'idle'){
-    $('callT').textContent = 'Связь';
-    $('callS').textContent = curOp ? 'Вы за ' + curOp : '';
-    const rows = (CALL && CALL.roster) || [];
-    const rec = callGroup((CALL && CALL.recent) || []);
-    const shown = CALL_TAB === 'missed' ? rec.filter(r => r.missed) : rec;
-    let html = `<div class="call-tabs">
-        <button class="${CALL_TAB === 'all' ? 'on' : ''}" onclick="callTab('all')">Все</button>
-        <button class="${CALL_TAB === 'missed' ? 'on' : ''}" onclick="callTab('missed')">Пропущенные</button>
-      </div>`;
-
-    const micOk = !CALL || typeof CALL.micGranted !== 'function' || CALL.micGranted();
-    if(!micOk){
-      html += `<div class="call-warm">
-        <div class="call-warm-t">Разрешите микрофон</div>
-        <div class="call-warm-s">Один раз на это устройство. Без него звонок не
-          будет слышно ни вам, ни водителю.</div>
-        <button class="call-warm-b" onclick="callWarm()">Разрешить</button>
-      </div>`;
+    // Во время разговора списки не нужны, а нижняя панель мешает: экран
+    // разговора занимает приложение целиком.
+    if(nav) nav.style.display = 'flex';
+    body.classList.remove('live');
+    body.innerHTML = CALL_PAGE === 'contacts' ? caContacts() : caCalls();
+    document.querySelectorAll('#callNav .ca-tab').forEach(b =>
+      b.classList.toggle('on', b.dataset.p === CALL_PAGE));
+    const inp = $('caQ');
+    if(inp){
+      inp.value = CALL_Q_TXT;
+      inp.oninput = () => { CALL_Q_TXT = inp.value; callPaint();
+        const n = $('caQ'); if(n){ n.focus(); n.setSelectionRange(n.value.length, n.value.length); } };
     }
-
-    if(CALL_TAB === 'all'){
-      if(!rows.length){
-        html += `<div class="call-empty">${curOp ? 'За вами сейчас нет водителей'
-          : 'Сначала выберите оператора'}</div>`;
-      }else{
-        let last = '';
-        rows.forEach(r => {
-          if(r.role !== last){ last = r.role;
-            html += `<div class="call-grp">${r.role === 'водитель' ? 'Водители'
-              : r.role === 'оператор' ? 'Операторы' : r.role}</div>`; }
-          html += `<div class="call-item">
-            <div class="call-ava">${_cIni(r.name)}</div>
-            <div class="call-item-b" onclick="callDial('${r.key}')">
-              <div class="call-item-n">${r.name}</div>
-              <div class="call-item-s"><span class="call-dot${r.online ? ' on' : ''}"></span>
-                ${r.online ? 'в приложении' : 'позвоним в телеграм'}</div>
-            </div>
-            <div class="call-item-go" onclick="callDial('${r.key}')">${ICO_PHONE}</div>
-          </div>`;
-        });
-      }
-    }
-
-    if(shown.length){
-      if(CALL_TAB === 'all') html += `<div class="call-grp">Недавние</div>`;
-      html += shown.map(r => `
-        <div class="call-item${r.missed ? ' missed' : ''}">
-          <div class="call-ava">${_cIni(r.who)}</div>
-          <div class="call-item-b" onclick="callDial('${r.key}')">
-            <div class="call-item-n">${r.who}${r.n > 1 ? ' <span style="color:var(--muted);font-weight:400">(' + r.n + ')</span>' : ''}</div>
-            <div class="call-item-s">${_dirIco(r)}<span>${_cWhen(r.at)}</span>${
-              r.talk ? '<span>· ' + _cMm(r.talk) + '</span>' : ''}</div>
-          </div>
-          <div class="call-item-go" onclick="callDial('${r.key}')">${ICO_PHONE}</div>
-        </div>`).join('');
-    }else if(CALL_TAB === 'missed'){
-      html += `<div class="call-empty">Пропущенных нет</div>`;
-    }
-    body.innerHTML = html;
     return;
   }
+  if(nav) nav.style.display = 'none';
+  body.classList.add('live');
 
-  $('callT').textContent = CALL_ST === 'live' ? 'Разговор' : 'Звонок';
-  $('callS').textContent = '';
   const acts = CALL_ST === 'in' ? `
       <button class="call-cbtn drop" onclick="callReject()" aria-label="Отклонить"><svg class="ic"
         viewBox="0 0 24 24" aria-hidden="true"><path d="M6 6l12 12M18 6L6 18"/></svg></button>

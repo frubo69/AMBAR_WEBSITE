@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=8"></script>
+<script src="/vendor/ambar-call.js?v=9"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -3217,6 +3217,9 @@ button.path:active{transform:scale(.995)}
 </style>
 </head>
 <body>
+<div id="safeProbe" aria-hidden="true"
+  style="position:fixed;top:0;left:-9999px;width:1px;height:var(--safe-top);pointer-events:none"></div>
+
 
 <!-- Hard access-denied overlay. Populated + shown by the boot ping when
      /api/owner/ping returns 401/403. No dismiss affordance by design.
@@ -5913,7 +5916,7 @@ button.pill:active{opacity:.6}
 .cvo{position:fixed;inset:0;z-index:399;display:none;flex-direction:column;text-align:center;
   background:var(--bg2)}
 .cvo.on{display:flex}
-.cvo-top{padding:52px 24px 0}
+.cvo-top{padding:calc(44px + var(--safe-top)) 24px 0}
 .cvo-role{font-size:15px;color:var(--sub)}
 .cvo-name{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;
   line-height:1.15;margin-top:4px;word-break:break-word;color:var(--text)}
@@ -5938,7 +5941,8 @@ button.pill:active{opacity:.6}
 .cv.on{display:block}
 /* Поверх окон: у полноэкранного окна свой слой, и без явного номера
    плашка с кнопками уходила под него. */
-.cv-pill{position:absolute;top:14px;left:14px;z-index:7;display:flex;align-items:center;gap:8px;
+/* Ниже кнопок телеграма: они рисуются поверх приложения. */
+.cv-pill{position:absolute;top:calc(14px + var(--safe-top));left:14px;z-index:7;display:flex;align-items:center;gap:8px;
   padding:7px 13px 7px 9px;border-radius:999px;background:rgba(20,20,30,.62);
   backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
 .cv-pill-a{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;
@@ -19792,12 +19796,19 @@ const PIP_W = 92, PIP_H = 123, PIP_PAD = 12;
 
 function pipBox(){ return document.getElementById('callVid'); }
 function pipEl(){ return document.querySelector('#callVid .cv-slot.pip'); }
+// Сколько сверху занято вырезом и кнопками телеграма. Через --safe-top не
+// прочитать: свойство возвращает выражение, а не число.
+function _safeTop(){
+  const el = document.getElementById('safeProbe');
+  return el ? el.offsetHeight : 0;
+}
 function pipPlace(){
   const el = pipEl(), box = pipBox(); if(!el || !box) return;
   const W = box.clientWidth, H = box.clientHeight;
-  if(PIP_X === null){ PIP_X = W - PIP_W - PIP_PAD; PIP_Y = PIP_PAD; }
+  const top = _safeTop() + PIP_PAD;
+  if(PIP_X === null){ PIP_X = W - PIP_W - PIP_PAD; PIP_Y = top; }
   PIP_X = Math.max(PIP_PAD, Math.min(PIP_X, W - PIP_W - PIP_PAD));
-  PIP_Y = Math.max(PIP_PAD, Math.min(PIP_Y, H - PIP_H - PIP_PAD));
+  PIP_Y = Math.max(top, Math.min(PIP_Y, H - PIP_H - PIP_PAD));
   el.style.left = PIP_X + 'px'; el.style.top = PIP_Y + 'px';
 }
 

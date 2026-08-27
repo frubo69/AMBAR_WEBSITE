@@ -1098,6 +1098,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .cs-slot.pip .cs-off svg{width:34px;height:34px}
 .cs-slot.full .cs-off svg{width:74px;height:74px}
 /* Имя плашкой, как в фейстайме: поверх картинки читаемо при любом фоне. */
+/* Плашка ниже кнопок телеграма: они рисуются поверх приложения, и без этого
+   отступа имя уезжает под «Закрыть». */
 .cs-pill{position:absolute;top:calc(14px + var(--safe-top));left:14px;z-index:4;display:none;
   align-items:center;gap:8px;padding:8px 14px 8px 10px;border-radius:999px;
   background:rgba(20,20,30,.62);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
@@ -1632,6 +1634,9 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </style>
 </head>
 <body>
+<div id="safeProbe" aria-hidden="true"
+  style="position:fixed;top:0;left:-9999px;width:1px;height:var(--safe-top);pointer-events:none"></div>
+
 
 <!-- Шапка приложения: марка слева, кто на смене справа. Всегда на виду и
      всегда одна и та же — цифры переехали в свои вкладки, потому что в шапке
@@ -2137,7 +2142,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=8"></script>
+<script src="/vendor/ambar-call.js?v=9"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -6285,15 +6290,21 @@ function pipEl(){ return document.querySelector('.call-scr .cs-slot.pip'); }
 function pipPlace(){
   const el = pipEl(); if(!el) return;
   const W = window.innerWidth, H = window.innerHeight;
-  if(PIP_X === null){ PIP_X = W - PIP_W - PIP_PAD; PIP_Y = 14 + _safeTop(); }
+  // Верхняя граница — под кнопками телеграма, а не под краем экрана: выше
+  // окно всё равно не увидеть, оно уедет под «Закрыть» и «…».
+  const top = _safeTop() + PIP_PAD;
+  if(PIP_X === null){ PIP_X = W - PIP_W - PIP_PAD; PIP_Y = top; }
   PIP_X = Math.max(PIP_PAD, Math.min(PIP_X, W - PIP_W - PIP_PAD));
-  PIP_Y = Math.max(PIP_PAD, Math.min(PIP_Y, H - PIP_H - PIP_PAD));
+  PIP_Y = Math.max(top, Math.min(PIP_Y, H - PIP_H - PIP_PAD));
   el.style.left = PIP_X + 'px';
   el.style.top = PIP_Y + 'px';
 }
+// Сколько сверху занято вырезом телефона и кнопками телеграма. Читать
+// --safe-top напрямую нельзя: свойство возвращает выражение max(...), а не
+// число, и parseFloat давал ноль — плашка и окошко уезжали под «Закрыть».
 function _safeTop(){
-  const v = getComputedStyle(document.documentElement).getPropertyValue('--safe-top');
-  const n = parseFloat(v); return isNaN(n) ? 0 : n;
+  const el = document.getElementById('safeProbe');
+  return el ? el.offsetHeight : 0;
 }
 
 // Нажали — поменялись местами; повели — окно едет за пальцем. Различаем по

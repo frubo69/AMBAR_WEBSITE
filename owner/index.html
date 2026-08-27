@@ -3332,9 +3332,23 @@ button.path:active{transform:scale(.995)}
   </div>
   <div class="range-chip" id="rangeChip-officePeriod" style="display:none"><span class="rc-icon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span><span class="rc-text"></span><button class="rc-x" onclick="clearRange('officePeriod')">✕</button></div>
 
-  <!-- Перестановка людей — то, ради чего сюда заходят между делом. Стоит
-       первой, но больше не прилипает: сверху при прокрутке остаётся выручка,
-       от неё читаются все пять карточек ниже. -->
+  <!-- Локатор — живая карта смены. Стоит первым: вопрос «где сейчас водитель»
+       возникает раньше, чем «кого куда переставить», и жил он в настройках,
+       куда за ним никто не ходил. -->
+  <button class="crew-entry" id="locEntry" onclick="whereOpen()">
+    <span class="crew-e-ico">
+      <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor"
+           stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="2.6"/></svg>
+    </span>
+    <span class="crew-e-b"><b>Локатор</b>
+      <i>живая карта смены</i></span>
+    <span class="crew-e-go"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span>
+  </button>
+
+  <!-- Перестановка людей — то, ради чего сюда заходят между делом. Больше не
+       прилипает: сверху при прокрутке остаётся выручка, от неё читаются все
+       пять карточек ниже. -->
   <button class="crew-entry" id="crewEntry" onclick="crewOpen()">
     <span class="crew-e-ico">
       <svg viewBox="0 0 24 24" width="21" height="21" fill="none" stroke="currentColor"
@@ -3646,7 +3660,6 @@ button.path:active{transform:scale(.995)}
     <div class="lrow lrow-tog" data-tog="notif"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div><div class="lrow-body"><div class="lrow-name">Telegram-оповещения</div><div class="lrow-sub">заказы &gt; 1000 AED · опоздания</div></div><span class="tog on" id="togNotif"></span></div>
     <div class="lrow lrow-tog" data-tog="sound"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg></div><div class="lrow-body"><div class="lrow-name">Звук уведомлений</div><div class="lrow-sub">только важные события</div></div><span class="tog on" id="togSound"></span></div>
     <div class="lrow lrow-tog" data-tog="quiet"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8"/></svg></div><div class="lrow-body"><div class="lrow-name">Тихие часы</div><div class="lrow-sub">23:00 → 09:00 · только критичные</div></div><span class="tog" id="togQuiet"></span></div>
-    <div class="lrow" onclick="whereOpen()"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="2.6"/></svg></div><div class="lrow-body"><div class="lrow-name">Где водители</div><div class="lrow-sub">живая карта смены</div></div><span style="color:var(--muted)">›</span></div>
     <div class="lrow" onclick="arcOpen()"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M2 3h20v4H2z"/><path d="M10 12h4"/></svg></div><div class="lrow-body"><div class="lrow-name">Архив событий</div><div class="lrow-sub">важное — списания, заявки, доступы</div></div><span style="color:var(--muted)">›</span></div>
     <div class="lrow" onclick="qaExport()"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg></div><div class="lrow-body"><div class="lrow-name">Экспорт CSV / XLSX</div><div class="lrow-sub">данные за выбранный период</div></div><span style="color:var(--muted)">›</span></div>
     <div class="lrow" onclick="openNotif()"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v2.2M12 19.8V22M22 12h-2.2M4.2 12H2M19.1 4.9l-1.6 1.6M6.5 17.5l-1.6 1.6M19.1 19.1l-1.6-1.6M6.5 6.5 4.9 4.9"/></svg></div><div class="lrow-body"><div class="lrow-name">Тонкая настройка алертов</div><div class="lrow-sub">пресеты · пороги · каналы</div></div><span style="color:var(--muted)">›</span></div>
@@ -4752,7 +4765,7 @@ button.path:active{transform:scale(.995)}
             <path d="M15 5l-7 7 7 7"/></svg>
         </button>
         <div style="flex:1;min-width:0">
-          <div class="wh-ttl" id="whTtl">Где водители</div>
+          <div class="wh-ttl" id="whTtl">Локатор</div>
           <div class="wh-sub" id="whSub">—</div>
         </div>
       </div>
@@ -6476,7 +6489,7 @@ function whPaint(){
   if(WH.view === 'card') return whCard();
   // Вернулись к списку — вернулся и заголовок: иначе в шапке остаётся имя
   // человека, которого на экране уже нет.
-  _setText('whTtl', 'Где водители');
+  _setText('whTtl', 'Локатор');
   const rows = d.drivers || [];
   const live = rows.filter(r => whState(r) === 'stream').length;
   const snap = rows.filter(r => whState(r) === 'snap').length;

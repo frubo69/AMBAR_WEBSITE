@@ -670,12 +670,23 @@
       // Своя дорожка про это честно сообщает (mute/unmute), в отличие от
       // чужой, на которую полагаться нельзя. Поэтому слушаем свою и говорим
       // собеседнику словами — теми же словами, что и при нажатии кнопки.
+      //
+      // Говорит только ТЕКУЩАЯ дорожка. Поворот камеры берёт новую и
+      // останавливает старую — а остановка это тоже «съёмка кончилась». Без
+      // проверки старая дорожка успевала доложить «камеру выключили», уже
+      // после того как новая заработала: картинка у собеседника пропадала, а
+      // камеру приходилось включать заново руками.
+      var своя = function () {
+        return !!(self.cam && self.cam.getVideoTracks().indexOf(track) >= 0);
+      };
       track.onmute = track.onunmute = function () {
+        if (!своя()) return;
         var live = track.readyState === 'live' && !track.muted;
         self._send({t: 'camstate', on: live});
         self._emit('cam', {on: live, facing: self.facing});
       };
       track.onended = function () {
+        if (!своя()) return;
         self._send({t: 'camstate', on: false});
         self._emit('cam', {on: false, facing: self.facing});
       };

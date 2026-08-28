@@ -154,6 +154,12 @@
   // функцией не ради красоты: её надо звать и при выключении звонка, и при
   // выходе из приложения, и забыть хоть один вызов — значит оставить весь
   // звук приложения в трубке у уха.
+  // Есть ли у этого браузера системная звуковая сессия.
+  function _hasSession() {
+    try { return !!(navigator.audioSession && 'type' in navigator.audioSession); }
+    catch (e) { return false; }
+  }
+
   function _type() {
     try { return (navigator.audioSession && navigator.audioSession.type) || '—'; }
     catch (e) { return '—'; }
@@ -277,10 +283,15 @@
       return Promise.resolve('');
     }
     return navigator.mediaDevices.enumerateDevices().then(function (list) {
-      var ear = list.filter(function (d) {
-        return d.kind === 'audiooutput' && /earpiece|receiver|handset|трубк|ушн/i.test(d.label || '');
+      var выходы = list.filter(function (d) { return d.kind === 'audiooutput'; });
+      var ear = выходы.filter(function (d) {
+        return /earpiece|receiver|handset|трубк|ушн/i.test(d.label || '');
       })[0];
       self._earSink = ear ? ear.deviceId : '';
+      // Список выходов — в лог. Если системная сессия не переключает, второй
+      // рычаг это выбор выхода по имени, и решать, есть ли он, надо по факту.
+      self._diag('выходы(' + выходы.length + '): ' +
+        выходы.map(function (d) { return (d.label || 'без имени'); }).join(', ').slice(0, 120));
       return self._earSink;
     }).catch(function () { return ''; });
   };
@@ -302,20 +313,24 @@
   //
   // Поэтому: до первого звука сессию не трогаем вовсе, а трубку включаем
   // всегда переходом — сначала обычная, следом разговорная.
-  // Переключаем ТОЛЬКО на паузе, и это оказалось главным.
+  // Маршрут переключается ТОЛЬКО поверх играющего звука.
   //
-  // Менять маршрут под играющим звуком нельзя: система не переводит живой
-  // выход, а заводит рядом второй — старый при этом продолжает играть. Отсюда
-  // «слышно и в ухе, и в динамике одновременно». Поэтому порядок телефонный:
-  // замолчали, переложили трубку, заговорили снова.
+  // Это стоило трёх попыток и телеметрии с самого телефона. Она показала, что
+  // всё задуманное стоит правильно — «тип=play-and-record, элемент=AUDIO,
+  // играет», — а звук всё равно в громком динамике. Значит ломает не значение,
+  // а порядок: система настраивает выход заново каждый раз, когда элемент
+  // НАЧИНАЕТ играть, и своей настройкой перебивает нашу. Поэтому в прошлый раз
+  // и вышло хуже: я останавливал звук, менял сессию и запускал заново — запуск
+  // всё и отменял.
   //
-  // Пауза между значениями тоже обязательна: два присвоения подряд система
-  // склеивает в одно и изменения не видит, а переключает она именно изменение.
+  // Отсюда правило: звук не трогаем вовсе. Меняем сессию под играющим — тогда
+  // менять её больше некому.
   AmbarCall.prototype._applyRoute = function (why) {
     var self = this, ear = this.route === 'ear', a = this.audio;
     clearTimeout(this._routeT); this._routeT = null;
+    this._routedAt = Date.now();
 
-    if (!_session('auto')) {                       // системной сессии нет
+    if (!_hasSession()) {                          // системной сессии нет
       try {
         if (this._earSink && a && a.setSinkId) {
           a.setSinkId(ear ? this._earSink : '').catch(function () {});
@@ -325,31 +340,30 @@
       return;
     }
 
-    // Своя пауза: обработчик паузы не должен принять её за системный перерыв
-    // и запустить звук раньше времени — иначе переключать снова нечего.
-    //
-    // Поток на это время ОТСОЕДИНЯЕМ. Паузы мало: пока поток висит на
-    // элементе, у системы остаётся живой выход, и новый она заводит рядом со
-    // старым. Отсоединили — старому играть нечем, и второго голоса взяться
-    // неоткуда.
-    this._switching = true;
-    var поток = a && a.srcObject;
-    try { if (a) { a.pause(); a.srcObject = null; } } catch (e) {}
+    var скажем = function () {
+      self._diag('канал: ' + (self.route === 'ear' ? 'ухо' : 'динамик') +
+                 ' · ' + (why || '') + ' · тип=' + _type() +
+                 ' · элемент=' + (self.audio ? self.audio.tagName : 'нет') +
+                 '/' + (self.audio && self.audio.paused ? 'пауза' : 'играет'));
+    };
 
-    this._routeT = setTimeout(function () {
-      self._routeT = null;
-      if (!self.call) { self._switching = false; return; }
-      if (self.route === 'ear') _session('play-and-record');
-      setTimeout(function () {
-        self._switching = false;
-        try { if (self.audio && поток) self.audio.srcObject = поток; } catch (e) {}
-        self._resume();
-        self._diag('канал: ' + (self.route === 'ear' ? 'ухо' : 'динамик') +
-                   ' · ' + (why || '') + ' · тип=' + _type() +
-                   ' · элемент=' + (self.audio ? self.audio.tagName : 'нет') +
-                   '/' + (self.audio && self.audio.paused ? 'пауза' : 'играет'));
-      }, 140);
-    }, 260);
+    if (!ear) { _session('auto'); скажем(); return; }
+
+    // Переключает изменение, а не значение: если разговорная сессия уже стоит,
+    // сначала сходим в обычную — и с паузой, иначе система склеит два
+    // присвоения в одно и никакого изменения не увидит.
+    if (_type() === 'play-and-record') {
+      _session('auto');
+      this._routeT = setTimeout(function () {
+        self._routeT = null;
+        if (self.route !== 'ear' || !self.call) return;
+        _session('play-and-record');
+        скажем();
+      }, 250);
+      return;
+    }
+    _session('play-and-record');
+    скажем();
   };
 
   AmbarCall.prototype.audioTo = function (where, тихо) {
@@ -377,6 +391,9 @@
     var self = this, a = this.audio;
     // Пока звука собеседника нет, играть нечего и судить не о чем.
     if (!a || !a.srcObject) return;
+    // Играющий элемент не трогаем: каждый запуск заставляет систему настроить
+    // выход заново и перебивает выбранный канал.
+    if (!a.paused) return;
     try {
       var p = a.play();
       if (p && p.catch) p.catch(function () {});
@@ -873,10 +890,15 @@
       // Один раз за разговор. Элемент возвращается к игре после каждого
       // системного перерыва, и переключать канал на каждом возврате — то же
       // самое кружение: полсекунды в громкой связи всякий раз.
+      // Каждый запуск звука система сопровождает своей настройкой выхода —
+      // значит после каждого перерыва канал надо ставить заново. Но не чаще
+      // раза в две секунды: иначе на возвратах получается кружение, а в нём
+      // разговор то и дело оказывается в громкой связи.
       a.addEventListener('playing', function () {
-        if (!self.call || self._routed) return;
-        self._routed = true;
-        self._applyRoute('пошёл звук');
+        if (!self.call) return;
+        var t = Date.now();
+        if (self._routedAt && t - self._routedAt < 2000) return;
+        self._applyRoute(self._routedAt ? 'звук вернулся' : 'пошёл звук');
       });
       // Система прерывает воспроизведение сама: смена звуковой сессии, входящий
       // системный звук, переключение выхода. Элемент после этого остаётся на
@@ -888,9 +910,9 @@
       // при этом всегда начиналось с «обычной» сессии, поэтому разговор и
       // оставался в громкой связи, сколько на кнопку ни жми.
       a.addEventListener('pause', function () {
-        if (!self.call || !a.srcObject || self._switching) return;
+        if (!self.call || !a.srcObject) return;
         setTimeout(function () {
-          if (self.call && a.srcObject && a.paused && !self._switching) self._resume();
+          if (self.call && a.srcObject && a.paused) self._resume();
         }, 120);
       });
       document.body.appendChild(a);
@@ -986,7 +1008,7 @@
     // Выбор запоминаем сразу, чтобы кнопка с первой секунды показывала правду,
     // а вот саму сессию не трогаем: до первого звука переключать нечего, и
     // тронутая заранее, она потом не даёт сделать настоящий переход.
-    this._routed = false;
+    this._routedAt = 0;
     this.route = this.route || (this.isPhone() && !this.video ? 'ear' : 'speaker');
     this._keepAwake(this.video || this.route === 'speaker');
     this._emit('route', {to: this.route, real: this.canRoute()});
@@ -1102,7 +1124,7 @@
 
   AmbarCall.prototype._teardown = function (why) {
     clearTimeout(this._routeT); this._routeT = null;
-    this._routed = false; this._switching = false;
+    this._routedAt = 0;
     this.tones.stop();
     // Конец разговора и несостоявшийся звонок звучат по-разному — как в
     // телефоне: короткий тон в конце разговора и отбойный, когда соединения

@@ -53,6 +53,28 @@
   var ICE_RESTART_AFTER = 4000;  // столько ждём, прежде чем пересобирать связь
   var VIDEO_MAX_KBPS = 600;      // потолок картинки: голос важнее её всегда
 
+  // ── тип звуковой сессии ──────────────────────────────────────────────────
+  //
+  // Объявлять его нужно ДО того, как попросить микрофон, и это единственный
+  // порядок, при котором система его слышит: выход она настраивает в момент
+  // начала записи, а не когда мы передумали. Так и написано в примере MDN —
+  // сначала тип, потом getUserMedia. Все прошлые попытки ставили его после
+  // запроса, и система честно отвечала «принято», ничего не переключая.
+  //
+  // «play-and-record» — сессия разговора: система ведёт её в ушной динамик,
+  // как обычный телефонный звонок. «auto» — обычное воспроизведение, громкий
+  // динамик; в него возвращаемся после разговора, иначе туда же, в ухо, уйдёт
+  // и сирена нового заказа.
+  function _session(type) {
+    try {
+      if (navigator.audioSession && 'type' in navigator.audioSession) {
+        navigator.audioSession.type = type;
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
   // ── тоны ─────────────────────────────────────────────────────────────────
   // Гудки звонящему и звонок принимающему. Человек должен слышать, что связь
   // идёт: молчащий экран «Звоним…» неотличим от сломанного.
@@ -463,6 +485,7 @@
 
   AmbarCall.prototype.close = function () {
     this._closing = true;
+    _session('auto');
     this.hangup();
     this._freeMic();
     if (this.ws) { try { this.ws.close(); } catch (e) {} }
@@ -654,6 +677,7 @@
       this._emit('nomic', {why: 'unsupported'});
       return Promise.reject(new Error('no getUserMedia'));
     }
+    _session('play-and-record');            // до запроса, иначе не услышат
     return navigator.mediaDevices.getUserMedia({
       audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true},
       video: {facingMode: 'user'}
@@ -683,6 +707,7 @@
       this._emit('nomic', {why: 'unsupported'});
       return Promise.reject(new Error('no getUserMedia'));
     }
+    _session('play-and-record');            // до запроса, иначе не услышат
     return navigator.mediaDevices.getUserMedia({
       audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true}
     }).then(function (s) {
@@ -1142,6 +1167,9 @@
     this.remote = null;
     this.video = false;
     this.route = '';
+    // Разговорную сессию за собой убираем: иначе в ушной динамик уйдёт и
+    // сирена нового заказа, а её слышно должно быть через всю машину.
+    _session('auto');
     // Тип звуковой сессии — один на всю страницу и переживает звонок. Оставить
     // его разговорным значит увести в трубку у уха ВЕСЬ звук приложения:
     // сирену нового заказа, вызов следующего звонка, любое уведомление.

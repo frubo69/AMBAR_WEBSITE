@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=11"></script>
+<script src="/vendor/ambar-call.js?v=12"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -19681,8 +19681,12 @@ function callEvent(t, d){
     case 'stream':
       if(d.kind === 'video'){
         CALL_VIDEO = true;
+        // Кладём в окно ТОЛЬКО картинку. В потоке собеседника едет и звук,
+        // и если отдать окну поток целиком, тот же голос заиграет второй раз —
+        // окном и своим элементом сразу, вразнобой. Отсюда и хрип.
         const v = document.getElementById('caRem');
-        if(v){ v.srcObject = d.stream; v.play().catch(()=>{}); }
+        if(v){ v.srcObject = new MediaStream(d.stream.getVideoTracks());
+               v.play().catch(()=>{}); }
         callPaint(); callVidPaint();
       }
       return;
@@ -19712,6 +19716,7 @@ function callEvent(t, d){
       else if(d.say)               _toast(who + ': ' + d.say);
       else if(why === 'no_answer') _toast('Не ответили');
       else if(why === 'rejected')  _toast('Отклонён');
+      else if(why === 'link')      _toast('Связь оборвалась');
       return;
     }
     case 'nomic':

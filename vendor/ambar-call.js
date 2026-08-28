@@ -162,6 +162,13 @@
         // заново: иначе экран гаснет прямо во время звонка, а вместе с ним на
         // телефоне засыпает и сам разговор.
         self._keepAwake(true);
+        // Съёмку после возвращения система иногда будит сама, а иногда
+        // закрывает дорожку насовсем — тогда собеседник больше не увидит
+        // ничего, сколько ни жди. Закрыли — берём камеру заново.
+        var vt = self.cam && self.cam.getVideoTracks()[0];
+        if (self.cam && (!vt || vt.readyState !== 'live')) {
+          self._camOn().catch(function () {});
+        }
       }
     });
   }
@@ -452,6 +459,23 @@
       if (!track) throw new Error('no camera');
       self.cam = s;
       self.video = true;
+      // Уход из телеграма в другое приложение разговор не рвёт — звук идёт
+      // дальше, — но съёмку система останавливает, и делает это молча.
+      // Собеседник в этот момент видит, как картинка просто пропала: ни
+      // замершего кадра, ни перечёркнутой камеры, ничего.
+      //
+      // Своя дорожка про это честно сообщает (mute/unmute), в отличие от
+      // чужой, на которую полагаться нельзя. Поэтому слушаем свою и говорим
+      // собеседнику словами — теми же словами, что и при нажатии кнопки.
+      track.onmute = track.onunmute = function () {
+        var live = track.readyState === 'live' && !track.muted;
+        self._send({t: 'camstate', on: live});
+        self._emit('cam', {on: live, facing: self.facing});
+      };
+      track.onended = function () {
+        self._send({t: 'camstate', on: false});
+        self._emit('cam', {on: false, facing: self.facing});
+      };
       // Соединение уже собрано — просто подменяем дорожку, без пересборки.
       var sender = self.pc && self.pc.getSenders().find(function (x) {
         return x.track && x.track.kind === 'video';
@@ -518,10 +542,20 @@
   // у того элемента, чей play() случился по жесту человека.
   AmbarCall.prototype._prepAudio = function () {
     if (!this.audio) {
-      var a = document.createElement('audio');
-      a.autoplay = true; a.playsInline = true;
+      // Голос собеседника играет ровно в одном месте — здесь. Видеоокно берёт
+      // из потока только картинку, иначе тот же голос звучал бы дважды.
+      //
+      // Элемент именно video и именно видимый, пусть в один пиксель. Разница
+      // не косметическая: голосовой разговор обрывался при уходе из телеграма,
+      // а видеозвонок — нет, и единственное, чем они отличались, — что при
+      // видео звук вело настоящее видеоокно, а при голосе спрятанный display:none
+      // элемент. Спрятанному система фонового звука не даёт.
+      var a = document.createElement('video');
+      a.autoplay = true; a.playsInline = true; a.muted = false; a.volume = 1;
       a.setAttribute('playsinline', '');
-      a.style.display = 'none';
+      a.setAttribute('webkit-playsinline', '');
+      a.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;' +
+                        'opacity:.01;pointer-events:none;z-index:-1';
       document.body.appendChild(a);
       this.audio = a;
     }

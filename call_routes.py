@@ -580,10 +580,15 @@ async def handle_ws(request: web.Request):
         log.warning(f"[call] сокет оборвался: {e}")
     finally:
         if peer:
+            # Пропавший сокет — это обрыв, а не положенная трубка, и называть
+            # его надо своим именем. Пока он писался как «hangup», разговор,
+            # убитый уснувшим приложением, выглядел в журнале ровно как
+            # законченный по-человечески — и отличить одно от другого было не
+            # по чему.
             if peer.call:
-                await _end(peer.call, "hangup", quiet_sid=peer.sid)
+                await _end(peer.call, "link", quiet_sid=peer.sid)
             _unbind(peer)
-            log.info(f"[call] отключился: {peer.label}")
+            log.info(f"[call] отключился: {peer.label}, код {ws.close_code}")
             await _broadcast_roster()
     return ws
 

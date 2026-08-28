@@ -6138,6 +6138,24 @@ try{ if(window.Telegram && Telegram.WebApp){
   var tg=Telegram.WebApp;
   tg.ready(); tg.expand();
   if(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0') && tg.requestFullscreen) tg.requestFullscreen();
+
+  // Открылись вертикально на телефоне — там и остаёмся. Экран звонка, списки и
+  // карточки собраны под вертикальную раскладку, альбомной у них нет вовсе:
+  // телефон в руке поворачивается сам, и приложение уезжает набок на ровном
+  // месте. Планшет и компьютер не трогаем — там альбомная как раз нормальная.
+  //
+  // Просим дважды: телеграмный способ, если клиент до него дорос, и браузерный
+  // как запасной. Ни один не обещан, поэтому ни на один не рассчитываем.
+  try{
+    const телефон = matchMedia('(pointer: coarse)').matches
+                 && Math.min(screen.width, screen.height) <= 500;
+    const вертикально = innerHeight >= innerWidth;
+    if(телефон && вертикально){
+      if(typeof tg.lockOrientation === 'function') tg.lockOrientation();
+      else if(screen.orientation && screen.orientation.lock)
+        screen.orientation.lock('portrait').catch(() => {});
+    }
+  }catch(e){}
   tg.setHeaderColor && tg.setHeaderColor('#000006');
   tg.setBackgroundColor && tg.setBackgroundColor('#000006');
   tg.enableClosingConfirmation && tg.enableClosingConfirmation();

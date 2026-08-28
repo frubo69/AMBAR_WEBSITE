@@ -300,7 +300,10 @@
       e.wake = !!navigator.wakeLock;
       e.touch = matchMedia('(pointer: coarse)').matches;
       e.w = Math.min(screen.width, screen.height);
-      e.tg = (window.Telegram && Telegram.WebApp && Telegram.WebApp.platform) || '';
+      var w = window.Telegram && Telegram.WebApp;
+      e.tg = (w && w.platform) || '';
+      e.ver = (w && w.version) || '';
+      e.rot = !!(w && typeof w.lockOrientation === 'function');
     } catch (err) {}
     return e;
   };

@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=40"></script>
+<script src="/vendor/ambar-call.js?v=41"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -5749,16 +5749,19 @@ button.pill:active{opacity:.6}
 <!-- Голосовой разговор выглядит так же, как в приложении водителя:
      звание, имя, таймер и две кнопки внизу. Один вид на все три
      приложения — разговор везде один и тот же. -->
-<!-- Четыре смайлика — сверка ключей. По центру между кнопками телеграма. -->
-<button class="cs-safe" id="csSafe" onclick="safeOpen()" aria-label="Защита звонка"></button>
-<div class="cs-safe-card" id="csSafeCard" onclick="safeClose(event)">
-  <div class="cs-safe-in" onclick="event.stopPropagation()">
-    <div class="cs-safe-big" id="csSafeBig"></div>
+<!-- Четыре смайлика — сверка ключей. Одна карточка на оба состояния:
+     свёрнутая это плашка между кнопками телеграма, развёрнутая — то же
+     самое, только выросшее. Двух карточек тут быть не должно. -->
+<div class="cs-safe-scrim" id="csSafeScrim" onclick="safeToggle(false)"></div>
+<div class="cs-safe" id="csSafe" onclick="safeToggle()" role="button">
+  <div class="cs-safe-big" id="csSafeBig"></div>
+  <div class="cs-safe-txt">
     <div class="cs-safe-t">Этот звонок защищён сквозным шифрованием</div>
     <div class="cs-safe-s">Если <b id="csSafeWho">собеседник</b> видит на экране
       те же смайлики, этот звонок защищён на 100%.</div>
   </div>
 </div>
+
 <div class="cvo" id="callVoice">
   <div class="cvo-top">
     <div class="cvo-role" id="cvoRole"></div>
@@ -5950,62 +5953,49 @@ button.pill:active{opacity:.6}
 .cv-slot.pip .cv-off-n,.cv-slot.pip .cv-off-s{display:none}
 /* Голосовой разговор — тот же вид, что у водителя: звание, имя, таймер и
    кнопки у нижнего края. Один разговор — один экран во всех приложениях. */
-/* Сверка ключей четырьмя смайликами. Место — ровно между кнопками телеграма,
-   поэтому отступ считается от выреза телефона, а не от нашей безопасной зоны:
-   кнопки телеграма живут как раз в этой полосе. */
+/* Сверка ключей. Одна карточка на два состояния: свёрнутая — плашка по центру
+   между кнопками телеграма, развёрнутая — она же, выросшая вниз. Геометрию
+   ведут ключевые кадры (см. safeToggle): между «по содержимому» и заданной
+   высотой перехода не бывает, и половина свойств прыгала бы. */
 .cs-safe{position:fixed;left:50%;transform:translateX(-50%);
   top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 7px);
-  z-index:521;display:none;align-items:center;gap:3px;height:33px;padding:0 12px;
-  border:0;border-radius:17px;cursor:pointer;font-size:16.5px;line-height:1;
-  letter-spacing:2px;color:#fff;
+  z-index:521;display:none;flex-direction:column;align-items:center;
+  overflow:hidden;box-sizing:border-box;cursor:pointer;
+  padding:0 12px;height:33px;border-radius:17px;color:#fff;
   background:linear-gradient(160deg,rgba(58,58,78,.44),rgba(20,20,32,.38));
   backdrop-filter:blur(22px) saturate(190%);
   -webkit-backdrop-filter:blur(22px) saturate(190%);
-  box-shadow:0 6px 20px rgba(0,0,0,.34),
-             inset 0 1px 0 rgba(255,255,255,.28),
-             inset 0 -1px 0 rgba(255,255,255,.05);
-  -webkit-tap-highlight-color:transparent;transition:transform .12s}
-.cs-safe:active{transform:translateX(-50%) scale(.94)}
+  box-shadow:0 6px 20px rgba(0,0,0,.34);
+  -webkit-tap-highlight-color:transparent}
 .cs-safe.on{display:flex}
 
-/* Раскрытие: карточка вырастает из самой плашки — оттого и начало сверху по
-   центру. Затемнение приходит вместе с ней, чтобы разговор не пропадал резко. */
-.cs-safe-card{position:fixed;inset:0;z-index:520;display:flex;align-items:flex-start;
-  justify-content:center;background:rgba(0,0,6,0);
-  padding:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 50px) 24px 24px;
-  visibility:hidden;transition:background .34s ease,visibility 0s .34s}
-/* Затемнение лёгкое: стекло тем и хорошо, что сквозь него видно разговор.
-   Глухая подложка съедала бы весь эффект. */
-.cs-safe-card.on{visibility:visible;background:rgba(0,0,6,.26);transition-delay:0s}
-/* Стекло. Преломление, каким его делает эппл, живой странице на айфоне
-   недоступно: оно требует svg-фильтра в backdrop-filter, а это умеет только
-   хром — сафари молча откатывается на обычное размытие. Поэтому собираем то,
-   что сафари действительно умеет, слой за слоем:
+/* Свёрнутая: ряд смайликов и ничего больше. */
+.cs-safe-big{display:flex;justify-content:center;align-items:center;gap:6px;
+  font-size:16.5px;line-height:1;height:33px;flex:none;
+  transition:font-size .42s cubic-bezier(.32,.72,0,1),gap .42s cubic-bezier(.32,.72,0,1),
+    height .42s cubic-bezier(.32,.72,0,1)}
+/* Свёрнутая карточка не должна знать про текст вовсе: даже невидимый, он
+   занимал бы место, и плашка мерилась бы как большая карточка. */
+.cs-safe-txt{display:none}
 
-     1. сильное размытие фона и подъём насыщенности — материал эппла всегда
-        подкрашивает то, что за ним, а не просто мылит;
-     2. лёгкая подложка, сквозь которую фон читается, а не глушится;
-     3. блик по краю — тонкая светлая линия, яркая сверху и гаснущая книзу.
-        Это и есть подпись стекла: без неё выходит матовый пластик;
-     4. внутренняя подсветка сверху, дающая ощущение толщины;
-     5. мягкая тень наружу, чтобы карточка отделялась от разговора. */
-.cs-safe-in{position:relative;width:100%;max-width:320px;border-radius:22px;
-  padding:20px 22px 21px;text-align:center;
+/* Развёрнутая: те же смайлики крупно и текст под ними. */
+.cs-safe.open{width:min(320px,calc(100vw - 48px));height:auto;
+  top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 50px);
+  padding:20px 22px 21px;border-radius:22px;
   background:linear-gradient(160deg,rgba(58,58,78,.46),rgba(20,20,32,.40));
   backdrop-filter:blur(34px) saturate(190%);
   -webkit-backdrop-filter:blur(34px) saturate(190%);
-  box-shadow:0 26px 64px rgba(0,0,0,.42);
-  transform:scale(.55) translateY(-90px);opacity:0;transform-origin:50% 0%;
-  transition:transform .38s cubic-bezier(.32,.72,0,1),opacity .26s ease}
-.cs-safe-in > *{position:relative;z-index:1}
-.cs-safe-card.on .cs-safe-in{transform:none;opacity:1}
-/* Смайлики рядом с равными промежутками — межбуквенный интервал давал
-   неровные щели, потому что смайлики разной ширины. */
-.cs-safe-big{display:flex;justify-content:center;align-items:center;gap:20px;
-  font-size:42px;line-height:1;margin-bottom:15px}
+  box-shadow:0 26px 64px rgba(0,0,0,.42);cursor:default}
+.cs-safe.open .cs-safe-big{font-size:42px;gap:20px;height:52px;margin-bottom:15px}
+.cs-safe.open .cs-safe-txt{display:block}
 .cs-safe-t{font-size:15.5px;font-weight:700;margin-bottom:6px;color:#fff;
-  letter-spacing:-.1px}
-.cs-safe-s{font-size:13.5px;color:rgba(255,255,255,.72);line-height:1.4}
+  letter-spacing:-.1px;text-align:center}
+.cs-safe-s{font-size:13.5px;color:rgba(255,255,255,.72);line-height:1.4;text-align:center}
+
+/* Затемнение лёгкое: стекло тем и хорошо, что сквозь него виден разговор. */
+.cs-safe-scrim{position:fixed;inset:0;z-index:520;background:rgba(0,0,6,.26);
+  opacity:0;visibility:hidden;transition:opacity .34s ease,visibility 0s .34s}
+.cs-safe-scrim.on{opacity:1;visibility:visible;transition-delay:0s}
 
 .cvo{position:fixed;inset:0;z-index:399;display:none;flex-direction:column;text-align:center;
   background:var(--bg2)}
@@ -19898,26 +19888,62 @@ function callVideo(key){ callDial(key, true); }
 // у собеседника — между вами никого нет. Показываем только в разговоре: до
 // ответа ключей ещё нет, сверять нечего.
 let CALL_SAFE = null;
+const SAFE_MS = 420;
+
 function safePaint(){
   const b = document.getElementById('csSafe'); if(!b) return;
   const есть = CALL_ST === 'live' && CALL_SAFE && CALL_SAFE.length === 4;
   b.classList.toggle('on', !!есть);
   if(есть){
-    b.textContent = CALL_SAFE.join('');
     const big = document.getElementById('csSafeBig');
     if(big) big.innerHTML = CALL_SAFE.map(e => '<span>' + e + '</span>').join('');
     // Имя ставим подлежащим: «Если Худоба видит…». Так фраза остаётся верной
     // для любого прозвища — склонять их наугад нельзя.
-    const кто = document.getElementById('csSafeWho');
-    if(кто) кто.textContent = CALL_WHO || 'собеседник';
-  } else safeClose();
+    const кто = document.getElementById('csSafeWho'); if(кто) кто.textContent = CALL_WHO || 'собеседник';
+  } else {
+    // Звонок кончился — сворачиваем без анимации: анимировать нечего, экран
+    // всё равно уходит. И главное, снимаем затемнение: свернуть через
+    // safeToggle тут нельзя, к этому моменту карточка уже скрыта, и он выйдет
+    // сразу, оставив затемнение висеть поверх приложения.
+    b.classList.remove('open');
+    document.getElementById('csSafeScrim')?.classList.remove('on');
+  }
 }
-function safeOpen(){
-  if(CALL_SAFE && CALL_SAFE.length) document.getElementById('csSafeCard')?.classList.add('on');
-}
-function safeClose(e){
-  if(e && e.target && e.currentTarget !== e.target) return;
-  document.getElementById('csSafeCard')?.classList.remove('on');
+
+// Разворот и сворачивание — одной карточкой.
+//
+// Геометрию ведут ключевые кадры, а не переход: свёрнутая карточка высотой по
+// содержимому, развёрнутая — тоже, и между «по содержимому» и «по содержимому»
+// браузер перехода не строит. Поэтому меряем, каким размер был и каким стал, и
+// проигрываем между ними. Ровно так же сделан обмен окнами в видеозвонке.
+function safeToggle(открыть){
+  const b = document.getElementById('csSafe'); if(!b || !b.classList.contains('on')) return;
+  const надо = (открыть === undefined) ? !b.classList.contains('open') : !!открыть;
+  if(надо === b.classList.contains('open')) return;
+
+  const было = {ш: b.offsetWidth, в: b.offsetHeight, т: b.offsetTop,
+                р: getComputedStyle(b).borderRadius};
+  b.classList.toggle('open', надо);
+  document.getElementById('csSafeScrim')?.classList.toggle('on', надо);
+  const стало = {ш: b.offsetWidth, в: b.offsetHeight, т: b.offsetTop,
+                 р: getComputedStyle(b).borderRadius};
+  try{
+    b.animate([
+      {width: было.ш + 'px', height: было.в + 'px', top: было.т + 'px', borderRadius: было.р},
+      {width: стало.ш + 'px', height: стало.в + 'px', top: стало.т + 'px', borderRadius: стало.р}
+    ], {duration: SAFE_MS, easing: 'cubic-bezier(.32,.72,0,1)'});
+  }catch(e){}
+  // Текст проявляется отдельно и чуть позже: он появляется вместе с display,
+  // а на смену display переход не строится — только своей анимацией.
+  const txt = b.querySelector('.cs-safe-txt');
+  if(надо && txt){
+    try{
+      txt.animate([{opacity:0, transform:'translateY(10px)'},
+                   {opacity:1, transform:'none'}],
+                  {duration: 260, delay: 130, easing:'cubic-bezier(.32,.72,0,1)',
+                   fill:'backwards'});
+    }catch(e){}
+  }
 }
 
 function callVoicePaint(){

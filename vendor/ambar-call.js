@@ -114,6 +114,20 @@
   };
 
   // ── клиент ───────────────────────────────────────────────────────────────
+  // Единственное место, где трогается системная звуковая сессия. Отдельной
+  // функцией не ради красоты: её надо звать и при выключении звонка, и при
+  // выходе из приложения, и забыть хоть один вызов — значит оставить весь
+  // звук приложения в трубке у уха.
+  function _session(type) {
+    try {
+      if (navigator.audioSession && 'type' in navigator.audioSession) {
+        navigator.audioSession.type = type;
+        return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
   function AmbarCall(opts) {
     this.api = (opts.api || location.origin).replace(/\/$/, '');
     this.initData = opts.initData || '';
@@ -223,20 +237,57 @@
   };
 
   AmbarCall.prototype.audioTo = function (where) {
-    var ear = where !== 'speaker';
+    var self = this, ear = where !== 'speaker';
+    this._fell = false;
     this.route = ear ? 'ear' : 'speaker';
-    try {
-      if (navigator.audioSession && 'type' in navigator.audioSession) {
-        navigator.audioSession.type = ear ? 'play-and-record' : 'auto';
-      } else if (this._earSink && this.audio && this.audio.setSinkId) {
-        this.audio.setSinkId(ear ? this._earSink : '').catch(function () {});
-      }
-    } catch (e) {}
+    if (!_session(ear ? 'play-and-record' : 'auto')) {
+      try {
+        if (this._earSink && this.audio && this.audio.setSinkId) {
+          this.audio.setSinkId(ear ? this._earSink : '').catch(function () {});
+        }
+      } catch (e) {}
+    }
+    // Смена сессии перезапускает звук на уровне системы, и элемент после неё
+    // остаётся на паузе. Молча: ни ошибки, ни события — просто тишина в ухе.
+    // Поэтому не «переключили и надеемся», а переключили и убедились.
+    this._resume();
+    setTimeout(function () { self._resume(); }, 350);
     // Экран нужен глазам только там, где на него смотрят. В голосовом разговоре
     // у уха он обязан гаснуть сам — так щекой ничего и не нажать.
     this._keepAwake(this.video || !ear);
     this._emit('route', {to: this.route, real: this.canRoute()});
     return this.route;
+  };
+
+  // Вернуть звук после смены сессии и убедиться, что он правда идёт. Не пошёл
+  // в трубку — уходим в громкую связь: слышный разговор важнее выбранного
+  // канала, а молчащая трубка — это оборванный разговор.
+  AmbarCall.prototype._resume = function () {
+    var self = this, a = this.audio;
+    // Пока звука собеседника нет, играть нечего и судить не о чем: элемент
+    // честно стоит на паузе, и принять это за поломку — значит сбрасывать
+    // канал на каждом звонке ещё до первого слова.
+    if (!a || !a.srcObject) return;
+    try {
+      var p = a.play();
+      if (p && p.catch) p.catch(function () { self._fallback(); });
+    } catch (e) { self._fallback(); }
+    // Проверяем не сразу: play() отвечает не мгновенно, и «на паузе» через
+    // миллисекунду после запуска — это не ответ.
+    clearTimeout(this._resumeT);
+    this._resumeT = setTimeout(function () {
+      if (self.audio && self.audio.srcObject && self.audio.paused) self._fallback();
+    }, 700);
+  };
+
+  AmbarCall.prototype._fallback = function () {
+    if (this.route !== 'ear' || this._fell) return;
+    this._fell = true;
+    _session('auto');
+    var a = this.audio;
+    if (a) { try { a.play().catch(function () {}); } catch (e) {} }
+    this.route = 'speaker';
+    this._emit('route', {to: 'speaker', real: this.canRoute(), forced: true});
   };
 
   // Что этот телефон вообще умеет. Уходит один раз при входе и попадает в лог
@@ -323,6 +374,7 @@
 
   AmbarCall.prototype.close = function () {
     this._closing = true;
+    _session('auto');
     this.hangup();
     this._freeMic();
     if (this.ws) { try { this.ws.close(); } catch (e) {} }
@@ -731,7 +783,7 @@
       // Звук всегда в свой элемент: видео может быть выключено, а слышать надо.
       if (self.audio && e.track.kind === 'audio') {
         self.audio.srcObject = st;
-        try { self.audio.play().catch(function () {}); } catch (err) {}
+        self._resume();
       }
       if (e.track.kind === 'video') {
         self.video = true;
@@ -895,6 +947,7 @@
     setTimeout(function () { tn.release(); }, 900);
     clearInterval(this._statsT); this._statsT = null;
     clearTimeout(this._iceRestartT);
+    clearTimeout(this._resumeT);
     this._keepAwake(false);
     if (this.pc) { try { this.pc.close(); } catch (e) {} this.pc = null; }
     // Микрофон НЕ останавливаем — только глушим. Следующий звонок не должен
@@ -909,6 +962,12 @@
     this.remote = null;
     this.video = false;
     this.route = '';
+    // Тип звуковой сессии — один на всю страницу и переживает звонок. Оставить
+    // его разговорным значит увести в трубку у уха ВЕСЬ звук приложения:
+    // сирену нового заказа, вызов следующего звонка, любое уведомление.
+    // Снаружи это выглядит как «звук пропал совсем» — телефон звучит, но
+    // только если приложить его к уху. Возвращаем как было.
+    _session('auto');
     var say = this.call && this.call.say;
     this.call = null;
     this._pendingIce = [];

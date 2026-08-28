@@ -2246,7 +2246,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=15"></script>
+<script src="/vendor/ambar-call.js?v=16"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -6187,6 +6187,9 @@ function callEvent(t, d){
       callOpen(); callRender();
       return;
     case 'route':
+      // Молча сменившийся канал выглядит как «оно само»: подпись под кнопкой
+      // другая, а почему — неизвестно. Говорим.
+      if(d.forced) toast('Звук в трубку не пошёл — включена громкая связь', 'err');
       callRender(); guardArm(); return;
     case 'talking':
       // Сирена нового заказа держит свой аудиоконтекст. Пока он жив, телефон

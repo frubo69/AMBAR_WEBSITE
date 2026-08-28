@@ -326,14 +326,16 @@
     clearTimeout(this._routeT); this._routeT = null;
     this._routedAt = Date.now();
 
+    // Дёргаем ОБА рычага сразу, и это не перестраховка. Они про разное: выбор
+    // выхода называет устройство, тип сессии говорит системе, что идёт
+    // разговор, а не воспроизведение. Порознь каждый может ничего не решить —
+    // выбор выхода отвечает «готово», а звук остаётся в громком динамике.
     if (this._earSink && a && typeof a.setSinkId === 'function') {
       a.setSinkId(ear ? this._earSink : '').then(function () {
         self._sayRoute(why, 'выход назван');
       }).catch(function (e) {
         self._sayRoute(why, 'выход не выбрался: ' + ((e && e.name) || '?'));
-        self._applyBySession(why);          // не вышло — пробуем сессией
       });
-      return;
     }
     this._applyBySession(why);
   };
@@ -1010,12 +1012,17 @@
     this._watchQuality();
     // Ищем трубку у уха заранее: к моменту, когда человек нажмёт «динамик»,
     // ответ уже должен быть.
-    this._findEar().then(function () {
-      self._emit('route', {to: self.route, real: self.canRoute()});
-      // Поиск мог закончиться уже после начала разговора — тогда канал ставим
-      // заново, теперь уже прямым выбором выхода.
-      if (self.call && self._earSink) self._applyRoute('нашли выход');
-    });
+    // Второй раз список не перебираем: он уже собран, когда брали микрофон.
+    if (this._earSink) {
+      this._emit('route', {to: this.route, real: this.canRoute()});
+    } else {
+      this._findEar().then(function () {
+        self._emit('route', {to: self.route, real: self.canRoute()});
+        // Поиск мог закончиться уже после начала разговора — тогда канал
+        // ставим заново, теперь уже прямым выбором выхода.
+        if (self.call && self._earSink) self._applyRoute('нашли выход');
+      });
+    }
     // Голос в трубку у уха — экран не нужен, пусть гаснет сам: это и есть
     // защита от случайного нажатия щекой, и никакая накладка её не заменит.
     // Выбор запоминаем сразу, чтобы кнопка с первой секунды показывала правду,

@@ -277,14 +277,33 @@
   // маршрутизировать системе нечего, и разговор начинается в громкой связи,
   // сколько бы раз мы ни просили трубку заранее. Отсюда и «первое нажатие
   // ничего не меняет»: состояние уже «трубка», а звук всё ещё в динамике.
+  // Канал переключает ПЕРЕХОД, а не значение — вот что стоило понять сразу.
+  //
+  // Система меняет выход, когда тип звуковой сессии МЕНЯЕТСЯ у живого звука.
+  // Записать туда то же самое, что уже стоит, — не переход: изменения нет,
+  // переключать нечего. Отсюда всё поведение, которое видел человек: трубка,
+  // выставленная до первого звука, не включалась никогда, а нажатие кнопки
+  // включало — потому что нажатие и было единственным настоящим переходом.
+  // Когда я начал выставлять трубку заранее, я убил и его: к моменту нажатия
+  // там уже стояло то же значение.
+  //
+  // Поэтому: до первого звука сессию не трогаем вовсе, а трубку включаем
+  // всегда переходом — сначала обычная, следом разговорная.
   AmbarCall.prototype._applyRoute = function () {
-    var ear = this.route === 'ear';
-    if (_session(ear ? 'play-and-record' : 'auto')) return;
-    try {
-      if (this._earSink && this.audio && this.audio.setSinkId) {
-        this.audio.setSinkId(ear ? this._earSink : '').catch(function () {});
-      }
-    } catch (e) {}
+    var self = this, ear = this.route === 'ear';
+    clearTimeout(this._routeT);
+    if (!_session('auto')) {
+      try {
+        if (this._earSink && this.audio && this.audio.setSinkId) {
+          this.audio.setSinkId(ear ? this._earSink : '').catch(function () {});
+        }
+      } catch (e) {}
+      return;
+    }
+    if (!ear) return;
+    this._routeT = setTimeout(function () {
+      if (self.route === 'ear' && self.call) _session('play-and-record');
+    }, 80);
   };
 
   AmbarCall.prototype.audioTo = function (where, тихо) {
@@ -293,10 +312,10 @@
     this.route = ear ? 'ear' : 'speaker';
     this._applyRoute();
     // Смена сессии перезапускает звук на уровне системы, и элемент после неё
-    // остаётся на паузе. Молча: ни ошибки, ни события — просто тишина в ухе.
-    // Поэтому не «переключили и надеемся», а переключили и убедились.
+    // остаётся на паузе — молча, ни ошибки, ни события. Возвращаем звук; сам
+    // канал при этом не трогаем, переход уже идёт.
     this._resume();
-    setTimeout(function () { self._applyRoute(); self._resume(); }, 350);
+    setTimeout(function () { self._resume(); }, 400);
     if (тихо && !менялось) return this.route;
     // Экран нужен глазам только там, где на него смотрят. В голосовом разговоре
     // у уха он обязан гаснуть сам — так щекой ничего и не нажать.
@@ -803,7 +822,11 @@
       a.addEventListener('pause', function () {
         if (!self.call || !a.srcObject) return;
         setTimeout(function () {
-          if (self.call && a.srcObject && a.paused) self._resume();
+          if (!self.call || !a.srcObject || !a.paused) return;
+          self._resume();
+          // Запуск заново мог увести выход обратно в динамик — подтверждаем
+          // выбор тем же переходом, иначе разговор тихо переезжает сам.
+          if (self.route === 'ear') self._applyRoute();
         }, 120);
       });
       document.body.appendChild(a);
@@ -896,8 +919,12 @@
     this._findEar().then(function () { self._emit('route', {to: self.route, real: self.canRoute()}); });
     // Голос в трубку у уха — экран не нужен, пусть гаснет сам: это и есть
     // защита от случайного нажатия щекой, и никакая накладка её не заменит.
+    // Выбор запоминаем сразу, чтобы кнопка с первой секунды показывала правду,
+    // а вот саму сессию не трогаем: до первого звука переключать нечего, и
+    // тронутая заранее, она потом не даёт сделать настоящий переход.
     this.route = this.route || (this.isPhone() && !this.video ? 'ear' : 'speaker');
-    this.audioTo(this.route);
+    this._keepAwake(this.video || this.route === 'speaker');
+    this._emit('route', {to: this.route, real: this.canRoute()});
     // Сразу сообщаем, есть ли у нас картинка: собеседник должен знать это с
     // первой секунды, а не после первого переключения.
     this._send({t: 'camstate', on: !!this.cam});
@@ -1009,6 +1036,7 @@
   };
 
   AmbarCall.prototype._teardown = function (why) {
+    clearTimeout(this._routeT);
     this.tones.stop();
     // Конец разговора и несостоявшийся звонок звучат по-разному — как в
     // телефоне: короткий тон в конце разговора и отбойный, когда соединения

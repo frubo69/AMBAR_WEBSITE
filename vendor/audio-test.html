@@ -1,0 +1,209 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Куда идёт звук</title>
+<!--
+  Страница для одного вопроса: каким способом на этом телефоне звук уходит в
+  трубку у уха.
+
+  Оба документированных рычага — выбор устройства вывода и тип звуковой
+  сессии — на айфоне отвечают «готово» и не переключают ничего. Дальше гадать
+  нельзя, поэтому здесь они разложены по кнопкам и добавлены два, которых в
+  приложении нет: воспроизведение через веб-аудио и выбор выхода у самого
+  веб-аудио. Человек нажимает и слышит; страница ничего не решает за него.
+
+  Открывать её надо дважды — в телеграме и в сафари. Если в сафари трубка
+  включается, а в телеграме нет, значит звуковой сессией распоряжается сам
+  телеграм и упираться в неё бессмысленно.
+-->
+<style>
+  :root{ --bg:#08080f; --card:#14141f; --line:rgba(255,255,255,.10);
+         --text:#EDEDF2; --sub:rgba(237,237,242,.55); --gold:#C9A96E; --gold2:#E8C98A; }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 -apple-system,
+       BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+       padding:calc(18px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom))}
+  h1{font-size:19px;margin:0 0 4px}
+  .sub{color:var(--sub);font-size:13px;margin-bottom:18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+        padding:13px 14px;margin-bottom:12px}
+  .card h2{font-size:13px;font-weight:700;color:var(--gold2);margin:0 0 8px;
+           letter-spacing:.3px;text-transform:uppercase}
+  button{width:100%;padding:15px 14px;margin-bottom:9px;border:0;border-radius:12px;
+         background:#23233a;color:var(--text);font-size:15.5px;font-weight:600;
+         cursor:pointer;text-align:left;font-family:inherit}
+  button:active{transform:scale(.985)}
+  button.main{background:var(--gold);color:#151009}
+  button.stop{background:#E05555;color:#fff}
+  button small{display:block;font-weight:400;color:rgba(255,255,255,.5);
+               font-size:12.5px;margin-top:3px}
+  button.main small{color:rgba(21,16,9,.6)}
+  button:disabled{opacity:.4}
+  pre{margin:0;white-space:pre-wrap;word-break:break-word;font-size:12.5px;
+      color:var(--sub);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .ok{color:#5BC98A} .bad{color:#E88}
+</style>
+
+<h1>Куда идёт звук</h1>
+<div class="sub">Нажимайте по очереди и слушайте, из какого динамика играет тон.
+  Откройте эту же страницу ещё раз в сафари и сравните.</div>
+
+<div class="card">
+  <h2>1 · Начать</h2>
+  <button class="main" id="go">Разрешить микрофон и пустить тон
+    <small>без микрофона система не считает это разговором, и трубка не включится</small></button>
+  <button class="stop" id="stop" disabled>Тишина</button>
+</div>
+
+<div class="card">
+  <h2>2 · Способы</h2>
+  <button data-m="sink" disabled>Трубка: назвать устройство
+    <small>setSinkId на найденный Receiver</small></button>
+  <button data-m="sess" disabled>Трубка: тип сессии
+    <small>audioSession.type = play-and-record</small></button>
+  <button data-m="both" disabled>Трубка: и то и другое
+    <small>так сейчас сделано в приложении</small></button>
+  <button data-m="wa" disabled>Трубка: через веб-аудио
+    <small>звук идёт мимо элемента, своим движком</small></button>
+  <button data-m="wasink" disabled>Трубка: веб-аудио + устройство
+    <small>setSinkId у самого веб-аудио</small></button>
+  <button data-m="spk" disabled>Обратно в громкий динамик</button>
+</div>
+
+<div class="card">
+  <h2>3 · Что видно</h2>
+  <pre id="out">—</pre>
+</div>
+
+<script>
+(function () {
+  var out = document.getElementById('out');
+  var строки = [];
+  function лог(t, кл) {
+    строки.unshift((кл ? (кл === 'ok' ? '✓ ' : '✗ ') : '· ') + t);
+    out.innerHTML = строки.slice(0, 14).map(function (s) {
+      var c = s[0] === '✓' ? 'ok' : s[0] === '✗' ? 'bad' : '';
+      return '<span class="' + c + '">' + s.replace(/[<>&]/g, '') + '</span>';
+    }).join('\n');
+  }
+  function тип() {
+    try { return (navigator.audioSession && navigator.audioSession.type) || 'нет'; }
+    catch (e) { return 'нет'; }
+  }
+  function сессия(v) {
+    try {
+      if (navigator.audioSession && 'type' in navigator.audioSession) {
+        navigator.audioSession.type = v; return true;
+      }
+    } catch (e) {}
+    return false;
+  }
+
+  var ac = null, поток = null, узел = null, эл = null, ухо = '';
+
+  document.getElementById('go').onclick = function () {
+    navigator.mediaDevices.getUserMedia({audio: true}).then(function (s) {
+      поток = s;
+      лог('микрофон есть', 'ok');
+      лог('сессия в браузере: ' + (('audioSession' in navigator) ? 'есть' : 'НЕТ'));
+      return navigator.mediaDevices.enumerateDevices();
+    }).then(function (list) {
+      var вых = list.filter(function (d) { return d.kind === 'audiooutput'; });
+      лог('выходы: ' + (вых.map(function (d) { return d.label || 'без имени'; }).join(', ') || 'нет'));
+      var r = вых.filter(function (d) { return /receiver|earpiece|handset/i.test(d.label || ''); })[0];
+      ухо = r ? r.deviceId : '';
+      лог(ухо ? 'трубка в списке есть' : 'трубки в списке НЕТ', ухо ? 'ok' : 'bad');
+
+      // Ровный тон 440 Гц — его хорошо слышно и в трубке, и в динамике.
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      var o = ac.createOscillator(), g = ac.createGain(), d = ac.createMediaStreamDestination();
+      o.frequency.value = 440; g.gain.value = 0.12;
+      o.connect(g); g.connect(d); o.start();
+      узел = {ac: ac, gain: g, dest: d};
+
+      эл = document.createElement('audio');
+      эл.autoplay = true; эл.setAttribute('playsinline', '');
+      эл.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:.01';
+      document.body.appendChild(эл);
+      эл.srcObject = d.stream;
+      return эл.play();
+    }).then(function () {
+      лог('тон играет через элемент', 'ok');
+      document.querySelectorAll('button[data-m]').forEach(function (b) { b.disabled = false; });
+      document.getElementById('stop').disabled = false;
+      document.getElementById('go').disabled = true;
+    }).catch(function (e) {
+      лог('не вышло: ' + ((e && e.name) || e), 'bad');
+    });
+  };
+
+  document.getElementById('stop').onclick = function () {
+    try { if (эл) { эл.pause(); эл.srcObject = null; } } catch (e) {}
+    try { if (узел) узел.gain.gain.value = 0; } catch (e) {}
+    try { if (ac) ac.close(); } catch (e) {}
+    try { if (поток) поток.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+    сессия('auto');
+    document.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
+    лог('всё остановлено, сессия возвращена', 'ok');
+  };
+
+  // Звук через веб-аудио: минуя элемент, своим движком.
+  function вебАудио(вкл) {
+    if (!узел) return;
+    try {
+      if (вкл) {
+        if (!узел.прямо) { узел.прямо = узел.ac.createGain(); узел.прямо.gain.value = 0.12;
+                           узел.gain.connect(узел.прямо); узел.прямо.connect(узел.ac.destination); }
+        if (эл) эл.pause();
+      } else {
+        if (узел.прямо) { try { узел.прямо.disconnect(); } catch (e) {} узел.прямо = null; }
+        if (эл) эл.play().catch(function () {});
+      }
+    } catch (e) {}
+  }
+
+  document.querySelectorAll('button[data-m]').forEach(function (b) {
+    b.onclick = function () {
+      var m = b.dataset.m;
+      if (m === 'spk') {
+        вебАудио(false);
+        if (эл && эл.setSinkId) эл.setSinkId('').catch(function () {});
+        сессия('auto');
+        лог('громкий динамик · тип=' + тип());
+        return;
+      }
+      if (m === 'sink' || m === 'both') {
+        вебАудио(false);
+        if (!ухо) { лог('устройства трубки нет — этот способ недоступен', 'bad'); }
+        else if (эл && эл.setSinkId) {
+          эл.setSinkId(ухо).then(function () { лог('устройство названо', 'ok'); })
+            .catch(function (e) { лог('устройство не выбралось: ' + e.name, 'bad'); });
+        } else лог('выбор выхода недоступен', 'bad');
+      }
+      if (m === 'sess' || m === 'both') {
+        вебАудио(false);
+        // Переключает изменение, а не значение.
+        сессия('auto');
+        setTimeout(function () {
+          лог(сессия('play-and-record') ? 'сессия разговорная · тип=' + тип()
+                                        : 'сессии в этом браузере нет', 'ok');
+        }, 250);
+      }
+      if (m === 'wa' || m === 'wasink') {
+        вебАудио(true);
+        сессия('auto');
+        setTimeout(function () { сессия('play-and-record'); }, 250);
+        лог('звук идёт через веб-аудио');
+        if (m === 'wasink') {
+          try {
+            if (узел.ac.setSinkId && ухо) {
+              узел.ac.setSinkId(ухо).then(function () { лог('веб-аудио: устройство названо', 'ok'); })
+                .catch(function (e) { лог('веб-аудио не принял устройство: ' + e.name, 'bad'); });
+            } else лог('у веб-аудио выбора выхода нет', 'bad');
+          } catch (e) { лог('у веб-аудио выбора выхода нет', 'bad'); }
+        }
+      }
+    };
+  });
+})();
+</script>

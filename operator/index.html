@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=27"></script>
+<script src="/vendor/ambar-call.js?v=28"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -3585,6 +3585,15 @@ function askAct(oid, act){
 // загрузиться. Браузер не даёт звучать до первого касания, поэтому контекст
 // поднимаем на первом же нажатии оператора.
 let _ac=null, _alarmT=null, _seenNew=null;
+// Куда выводить звук приложения. Через общий выход из библиотеки звонка, а не
+// напрямую: прямой выход веб-аудио система уводит в громкий динамик и держит
+// там весь звук страницы до конца сеанса — после него трубка у уха у звонка
+// уже недостижима. Библиотека может не загрузиться; сигнал о заказе важнее
+// чистоты выхода, поэтому есть запасной путь.
+const _вых = ac => {
+  try{ if(window.AmbarAudio) return window.AmbarAudio.out(ac) || ac.destination; }catch(e){}
+  return ac.destination;
+};
 function _acUnlock(){
   try{
     if(!_ac) _ac = new (window.AudioContext||window.webkitAudioContext)();
@@ -3604,7 +3613,7 @@ function _chime(){
   // Громкость у потолка без перегруза: измерено, пик 0.97 при пределе 1.0.
   const master=_ac.createGain(); master.gain.value=1.0;
   const lp=_ac.createBiquadFilter(); lp.type='lowpass'; lp.frequency.value=4000;
-  master.connect(lp).connect(_ac.destination);
+  master.connect(lp).connect(_вых(_ac));
   [[1318, 0, 0.10], [1760, 0.16, 0.12]].forEach(([hz, at, dur])=>{
     const o=_ac.createOscillator(), g=_ac.createGain();
     o.type='square'; o.frequency.setValueAtTime(hz, t0+at);

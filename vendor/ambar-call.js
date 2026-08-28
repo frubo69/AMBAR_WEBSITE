@@ -42,6 +42,55 @@
 (function () {
   'use strict';
 
+  // ── общий выход для всего звука приложения ───────────────────────────────
+  //
+  // Правило одно и без исключений: НИЧТО не подключается к ac.destination.
+  //
+  // Прямой выход веб-аудио система считает обычным воспроизведением, уводит
+  // его в громкий динамик — и, уведя, оставляет там весь звук страницы до
+  // конца сеанса, включая голос собеседника. Достаточно одного beep'а, одного
+  // разблокирующего отрезка тишины на первом касании — и трубка у уха больше
+  // недостижима, сколько её потом ни выбирай.
+  //
+  // Это и было настоящей причиной: в водительском приложении такой отрезок
+  // играет на первое же касание, задолго до любого звонка. Через элемент выход
+  // остаётся управляемым — ему можно назвать устройство.
+  //
+  // Элемент один на контекст, заводится в момент касания и играет тишину
+  // дальше: так его не приходится запускать заново, когда звук понадобится
+  // без жеста — например, на входящем заказе.
+  window.AmbarAudio = window.AmbarAudio || {
+    out: function (ac) {
+      if (!ac) return null;
+      if (!ac.__ambarOut) {
+        try {
+          var d = ac.createMediaStreamDestination();
+          var a = document.createElement('audio');
+          a.autoplay = true;
+          a.setAttribute('playsinline', '');
+          a.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;' +
+                            'opacity:.01;pointer-events:none;z-index:-1';
+          document.body.appendChild(a);
+          a.srcObject = d.stream;
+          try { a.play().catch(function () {}); } catch (e) {}
+          ac.__ambarOut = d; ac.__ambarEl = a;
+        } catch (e) { return null; }
+      }
+      // Системный перерыв мог остановить элемент — возвращаем к игре, иначе
+      // сигнал о заказе беззвучно пропадёт.
+      try {
+        if (ac.__ambarEl && ac.__ambarEl.paused) ac.__ambarEl.play().catch(function () {});
+      } catch (e) {}
+      return ac.__ambarOut;
+    },
+    // Убрать выход вместе с контекстом.
+    drop: function (ac) {
+      if (!ac || !ac.__ambarEl) return;
+      try { ac.__ambarEl.pause(); ac.__ambarEl.srcObject = null; ac.__ambarEl.remove(); } catch (e) {}
+      ac.__ambarEl = null; ac.__ambarOut = null;
+    }
+  };
+
   // Свернули дольше — отпускаем микрофон. Полминуты оказалось мало: AMBAR STAR
   // сворачивают и разворачивают десятки раз за вечер, и каждый раз система
   // спрашивала разрешение заново. Три минуты закрывают обычное переключение
@@ -59,6 +108,8 @@
     this.ac = null;
     this.timer = null;
     this.kind = '';
+    this._until = 0;        // до какого времени звучит текущий гудок
+    this._pending = false;  // ждём пробуждения контекста
   }
   Tones.prototype._ctx = function () {
     try {
@@ -74,45 +125,25 @@
   Tones.prototype._beep = function (freq, dur, gain) {
     var ac = this._ctx(), self = this;
     if (!ac) return;
+    // Пока предыдущий гудок звучит, второй не начинаем. Без этого гудки
+    // накладывались друг на друга: контекст просыпается не сразу, а отложенные
+    // попытки копились и срабатывали все разом.
+    var now = Date.now();
+    if (now < this._until) return;
+    this._until = now + dur * 1000;
     if (ac.state === 'running') { this._play(ac, freq, dur, gain); return; }
+    if (this._pending) return;                  // одна отложенная попытка, не больше
+    this._pending = true;
     try {
-      ac.resume().then(function () { self._play(ac, freq, dur, gain); })
-                 .catch(function () {});
-    } catch (e) {}
+      ac.resume().then(function () {
+        self._pending = false;
+        self._play(ac, freq, dur, gain);
+      }).catch(function () { self._pending = false; });
+    } catch (e) { this._pending = false; }
   };
-  // Выход тонов — через элемент, а не напрямую в ac.destination.
-  //
-  // Это оказалось причиной всего. Прямой выход веб-аудио система считает
-  // обычным воспроизведением и уводит в громкий динамик — а уведя, оставляет
-  // там ВЕСЬ звук страницы до конца сеанса, включая голос собеседника. Замер
-  // это и показал: на стенде, где тон шёл в элемент, трубка включалась; в
-  // приложении, где гудки идут напрямую, — нет, и первый же гудок закрывал
-  // вопрос ещё до соединения.
-  //
-  // Через элемент у нас есть выбор устройства: гудкам называем громкий динамик
-  // явно, разговору — трубку. Ни того ни другого система за нас не решает.
-  Tones.prototype._out = function () {
-    var ac = this._ctx();
-    if (!ac) return null;
-    if (!this.dest) {
-      this.dest = ac.createMediaStreamDestination();
-      var a = document.createElement('audio');
-      a.autoplay = true; a.setAttribute('playsinline', '');
-      a.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;' +
-                        'opacity:.01;pointer-events:none;z-index:-1';
-      document.body.appendChild(a);
-      if (typeof a.setSinkId === 'function') {
-        try { a.setSinkId(''); } catch (e) {}      // громкий динамик, явно
-      }
-      a.srcObject = this.dest.stream;
-      try { a.play().catch(function () {}); } catch (e) {}
-      this.el = a;
-    }
-    return this.dest;
-  };
-
+  // Тоны звучат через тот же общий выход, что и всё остальное.
   Tones.prototype._play = function (ac, freq, dur, gain) {
-    var вых = this._out();
+    var вых = window.AmbarAudio.out(ac);
     if (!вых) return;
     var o = ac.createOscillator(), g = ac.createGain(), t0 = ac.currentTime;
     var v = gain == null ? 0.16 : gain;
@@ -169,6 +200,8 @@
   Tones.prototype.stop = function () {
     if (this.timer) { clearInterval(this.timer); this.timer = null; }
     this.kind = '';
+    this._until = 0;
+    this._pending = false;
   };
   // Во время разговора аудиоконтекст надо не просто замолчать, а закрыть.
   // Пока он жив, телефон держит звуковую сессию под веб-аудио — со своей
@@ -177,11 +210,9 @@
   // до ответа, поэтому контекст создаётся заново, когда снова понадобится.
   Tones.prototype.release = function () {
     this.stop();
-    var el = this.el;
-    this.el = null; this.dest = null;
-    if (el) { try { el.pause(); el.srcObject = null; el.remove(); } catch (e) {} }
     var ac = this.ac;
     this.ac = null;
+    window.AmbarAudio.drop(ac);
     if (ac) { try { ac.close(); } catch (e) {} }
   };
 

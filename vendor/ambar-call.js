@@ -53,27 +53,6 @@
   var ICE_RESTART_AFTER = 4000;  // столько ждём, прежде чем пересобирать связь
   var VIDEO_MAX_KBPS = 600;      // потолок картинки: голос важнее её всегда
 
-  // ── тип звуковой сессии ──────────────────────────────────────────────────
-  //
-  // Объявлять его нужно ДО того, как попросить микрофон, и это единственный
-  // порядок, при котором система его слышит: выход она настраивает в момент
-  // начала записи, а не когда мы передумали. Так и написано в примере MDN —
-  // сначала тип, потом getUserMedia. Все прошлые попытки ставили его после
-  // запроса, и система честно отвечала «принято», ничего не переключая.
-  //
-  // «play-and-record» — сессия разговора: система ведёт её в ушной динамик,
-  // как обычный телефонный звонок. «auto» — обычное воспроизведение, громкий
-  // динамик; в него возвращаемся после разговора, иначе туда же, в ухо, уйдёт
-  // и сирена нового заказа.
-  function _session(type) {
-    try {
-      if (navigator.audioSession && 'type' in navigator.audioSession) {
-        navigator.audioSession.type = type;
-        return true;
-      }
-    } catch (e) {}
-    return false;
-  }
 
   // ── тоны ─────────────────────────────────────────────────────────────────
   // Гудки звонящему и звонок принимающему. Человек должен слышать, что связь
@@ -213,7 +192,6 @@
     this.kind = '';
     this.defaultTarget = '';
     this.quality = '';       // '', 'good', 'weak', 'bad'
-    this.route = '';         // 'ear' | 'speaker' — куда идёт голос
     this.tones = new Tones();
 
     this._retry = 0;
@@ -290,28 +268,23 @@
   // Пока трубка не доказана на живом телефоне, кнопки нет: мёртвая кнопка хуже
   // отсутствующей, а половина работающей функции хуже честного её отсутствия.
   // Проверяется отдельной страницей, не трогая приложение: vendor/audio-test.html
+  // Переключения канала нет, и это доказано, а не сдача.
+  //
+  // Вывести голос в трубку у уха из веб-страницы на этом айфоне нельзя. Тип
+  // звуковой сессии (единственный документированный рычаг) объявляли и до
+  // запроса микрофона, и с перезапуском записи — система принимает и не
+  // переключает. Выбор устройства вывода отвечает «готово» с тем же итогом,
+  // хотя устройство Receiver в списке есть. Проверено и в телеграме, и в
+  // сафари — значит дело не в телеграме, а в самом вебките.
+  //
+  // Поэтому кнопки нет: мёртвая кнопка хуже отсутствующей.
   AmbarCall.prototype.canRoute = function () {
-    try { return !!(navigator.audioSession && 'type' in navigator.audioSession); }
-    catch (e) { return false; }
+    return false;
   };
 
 
 
 
-  // Переключение канала — это перезапуск записи, а не смена настройки.
-  // Другого способа нет: система смотрит на тип сессии ровно в тот момент,
-  // когда запись начинается.
-  AmbarCall.prototype.audioTo = function (where) {
-    var self = this, ear = where !== 'speaker';
-    this.route = ear ? 'ear' : 'speaker';
-    // Экран нужен глазам только там, где на него смотрят. В разговоре у уха он
-    // гаснет сам — так щекой ничего и не нажать.
-    this._keepAwake(this.video || !ear);
-    this._emit('route', {to: this.route, real: this.canRoute()});
-    return this._reMic(ear ? 'play-and-record' : 'auto').then(function () {
-      return self.route;
-    });
-  };
 
   // Что этот телефон вообще умеет. Уходит один раз при входе и попадает в лог
   // сервера: гадать о чужом устройстве по памяти — то, за что уже досталось.
@@ -400,7 +373,6 @@
 
   AmbarCall.prototype.close = function () {
     this._closing = true;
-    _session('auto');
     this.hangup();
     this._freeMic();
     if (this.ws) { try { this.ws.close(); } catch (e) {} }
@@ -456,14 +428,14 @@
         this.tones.release();
         this.call.peer = m.by || this.call.peer;
         this._emit('talking', this.call);
-        this._медиаСвежая(true);
+        this._startMedia(true);
         break;
 
       case 'joined':                                // мы сняли трубку
         if (!this.call || this.call.id !== m.call) break;
         this.tones.release();
         this._emit('talking', this.call);
-        this._медиаСвежая(false);
+        this._startMedia(false);
         break;
 
       case 'cancel':                                // взяли на другом устройстве
@@ -517,17 +489,13 @@
   AmbarCall.prototype.dial = function (toKey, order, video) {
     var self = this;
     this.video = !!video;
-    // Сессию разговора ставим ДО гудков — тогда в трубку у уха идёт всё сразу,
-    // и гудки, и голос, как в обычном телефоне. Запись при этом начинается
-    // заново: только в этот момент система смотрит на тип сессии.
-    var ухо = this.isPhone() && !this.video;
-    this.route = ухо ? 'ear' : 'speaker';
-    // Гудки — сразу, как только запись началась. Ждать ответа сервера нельзя:
-    // между нажатием и ответом целый оборот, и человек успевает решить, что
+    // Гудок — сразу по нажатию, а не после ответа сервера. Между нажатием и
+    // ответом лежит запрос микрофона с камерой и полный оборот до сервера:
+    // секунда, а то и две тишины, в которую человек успевает решить, что
     // ничего не работает. Не прошло — тишину сменит короткий отбойный тон.
-    return this._reMic(ухо ? 'play-and-record' : 'auto').then(function () {
-      self.tones.prime();
-      self.tones.ringback();
+    this.tones.prime();
+    this.tones.ringback();
+    return this._mic().then(function () {
       return self.video ? self._camOn() : null;
     }).then(function () {
       self._send({t: 'call', to: toKey || self.defaultTarget || '',
@@ -542,12 +510,9 @@
   AmbarCall.prototype.accept = function () {
     if (!this.call) return Promise.resolve();
     var self = this, id = this.call.id;
+    this.tones.prime();
     this.video = !!this.call.video;
-    // Снимаем трубку — тем же способом: сначала сессия разговора, следом
-    // запись. Иначе система выхода не пересмотрит.
-    var ухо = this.isPhone() && !this.video;
-    this.route = ухо ? 'ear' : 'speaker';
-    return this._reMic(ухо ? 'play-and-record' : 'auto').then(function () {
+    return this._mic().then(function () {
       return self.video ? self._camOn() : null;
     }).then(function () { self._send({t: 'accept', call: id}); })
       .catch(function (e) {
@@ -599,7 +564,6 @@
       this._emit('nomic', {why: 'unsupported'});
       return Promise.reject(new Error('no getUserMedia'));
     }
-    _session('play-and-record');            // до запроса, иначе не услышат
     return navigator.mediaDevices.getUserMedia({
       audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true},
       video: {facingMode: 'user'}
@@ -629,7 +593,6 @@
       this._emit('nomic', {why: 'unsupported'});
       return Promise.reject(new Error('no getUserMedia'));
     }
-    _session('play-and-record');            // до запроса, иначе не услышат
     return navigator.mediaDevices.getUserMedia({
       audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true}
     }).then(function (s) {
@@ -815,56 +778,7 @@
     this._emit('mic', {ok: false});
   };
 
-  // ── соединение ───────────────────────────────────────────────────────────
-  // Разговор начинаем со свежей записи: гудки к этому моменту смолкли и их
-  // контекст закрыт, так что система увидит разговорную сессию чистой.
-  AmbarCall.prototype._медиаСвежая = function (isCaller) {
-    var self = this;
-    var ухо = this.isPhone() && !this.video;
-    this.route = ухо ? 'ear' : 'speaker';
-    this._reMic(ухо ? 'play-and-record' : 'auto').then(function () {
-      if (self.call) self._startMedia(isCaller);
-    });
-  };
 
-  // Начать запись заново — и только так система пересматривает выход.
-  //
-  // Выход настраивается в момент НАЧАЛА записи. Микрофон у нас берётся при
-  // входе в приложение, а гудки играют позже — и веб-аудио гудков успевает
-  // увести звук в громкий динамик. Объявить тип после этого мало: система
-  // принимает объявление и ничего не меняет, потому что запись давно идёт.
-  //
-  // Поэтому перед разговором запись начинается заново: сначала объявляем тип,
-  // потом просим микрофон. Старую дорожку отпускаем уже после того, как новая
-  // на руках, — иначе телефон переспросит разрешение.
-  AmbarCall.prototype._reMic = function (type) {
-    var self = this, старый = this.stream;
-    var ст = старый && старый.getAudioTracks()[0];
-    var былоБезЗвука = !!(ст && !ст.enabled);
-    _session(type);
-    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-      return Promise.resolve(старый);
-    }
-    return navigator.mediaDevices.getUserMedia({
-      audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true}
-    }).then(function (s) {
-      self.stream = s;
-      self._prepAudio();
-      var t = s.getAudioTracks()[0];
-      if (t) t.enabled = !былоБезЗвука;      // «без звука» переносим на новую
-      var sender = self.pc && self.pc.getSenders().find(function (x) {
-        return x.track && x.track.kind === 'audio';
-      });
-      if (sender && t) { try { sender.replaceTrack(t); } catch (e) {} }
-      if (старый && старый !== s) {
-        старый.getAudioTracks().forEach(function (x) { try { x.stop(); } catch (e) {} });
-      }
-      return s;
-    }).catch(function () {
-      // Не дали — разговор важнее канала, идём со старой дорожкой.
-      return старый;
-    });
-  };
 
   AmbarCall.prototype._startMedia = function (isCaller) {
     var self = this;
@@ -937,17 +851,9 @@
     };
 
     this._watchQuality();
-    // Ищем трубку у уха заранее: к моменту, когда человек нажмёт «динамик»,
-    // ответ уже должен быть.
-    this._emit('route', {to: this.route, real: this.canRoute()});
-    // Голос в трубку у уха — экран не нужен, пусть гаснет сам: это и есть
-    // защита от случайного нажатия щекой, и никакая накладка её не заменит.
-    // Выбор запоминаем сразу, чтобы кнопка с первой секунды показывала правду,
-    // а вот саму сессию не трогаем: до первого звука переключать нечего, и
-    // тронутая заранее, она потом не даёт сделать настоящий переход.
-    this.route = this.route || (this.isPhone() && !this.video ? 'ear' : 'speaker');
-    this._keepAwake(this.video || this.route === 'speaker');
-    this._emit('route', {to: this.route, real: this.canRoute()});
+    // Экран держим включённым только там, где на него смотрят: в видеозвонке.
+    // В голосовом он гаснет сам, как и положено телефону.
+    this._keepAwake(!!this.video);
     // Сразу сообщаем, есть ли у нас картинка: собеседник должен знать это с
     // первой секунды, а не после первого переключения.
     this._send({t: 'camstate', on: !!this.cam});
@@ -1084,10 +990,8 @@
     this._camOff();
     this.remote = null;
     this.video = false;
-    this.route = '';
     // Разговорную сессию за собой убираем: иначе в ушной динамик уйдёт и
     // сирена нового заказа, а её слышно должно быть через всю машину.
-    _session('auto');
     // Тип звуковой сессии — один на всю страницу и переживает звонок. Оставить
     // его разговорным значит увести в трубку у уха ВЕСЬ звук приложения:
     // сирену нового заказа, вызов следующего звонка, любое уведомление.

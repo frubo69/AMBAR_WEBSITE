@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=41"></script>
+<script src="/vendor/ambar-call.js?v=42"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -5954,40 +5954,52 @@ button.pill:active{opacity:.6}
 /* Голосовой разговор — тот же вид, что у водителя: звание, имя, таймер и
    кнопки у нижнего края. Один разговор — один экран во всех приложениях. */
 /* Сверка ключей. Одна карточка на два состояния: свёрнутая — плашка по центру
-   между кнопками телеграма, развёрнутая — она же, выросшая вниз. Геометрию
-   ведут ключевые кадры (см. safeToggle): между «по содержимому» и заданной
-   высотой перехода не бывает, и половина свойств прыгала бы. */
-.cs-safe{position:fixed;left:50%;transform:translateX(-50%);
+   между кнопками телеграма, развёрнутая — она же, выросшая вниз.
+
+   Главное здесь — что НЕ меняется по ходу. Размытие, тень, фон, поля и размер
+   шрифта постоянны: цветные смайлики иначе растрируются заново на каждом
+   кадре, а размытие пересчитывается с новым радиусом поверх живого видео —
+   вдвоём они и рвали движение. Двигается только коробка; смайлики и текст
+   едут трансформацией, то есть на видеокарте. Ширина текста своя, не от
+   карточки, поэтому переносы посчитаны один раз и он не «плывёт».
+
+   Размеры обоих состояний заданы явно — оттого переход ведёт сам CSS, одной
+   кривой для коробки и начинки. Две меры приходят из safeMeasure. */
+.cs-safe{--cs-ease:cubic-bezier(.32,.72,0,1);
+  --cs-drop:43px;                 /* насколько развёрнутая ниже плашки */
+  --cs-pill-w:116px; --cs-card-h:193px;   /* обе ставит safeMeasure по факту */
+  position:fixed;left:50%;
   top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 7px);
-  z-index:521;display:none;flex-direction:column;align-items:center;
-  overflow:hidden;box-sizing:border-box;cursor:pointer;
-  padding:0 12px;height:33px;border-radius:17px;color:#fff;
-  background:linear-gradient(160deg,rgba(58,58,78,.44),rgba(20,20,32,.38));
-  backdrop-filter:blur(22px) saturate(190%);
-  -webkit-backdrop-filter:blur(22px) saturate(190%);
-  box-shadow:0 6px 20px rgba(0,0,0,.34);
-  -webkit-tap-highlight-color:transparent}
-.cs-safe.on{display:flex}
+  transform:translate(-50%,0);
+  z-index:521;display:none;overflow:hidden;box-sizing:border-box;cursor:pointer;
+  width:var(--cs-pill-w);height:33px;border-radius:17px;color:#fff;
+  background:linear-gradient(160deg,rgba(58,58,78,.45),rgba(20,20,32,.39));
+  backdrop-filter:blur(28px) saturate(190%);
+  -webkit-backdrop-filter:blur(28px) saturate(190%);
+  box-shadow:0 12px 34px rgba(0,0,0,.38);
+  -webkit-tap-highlight-color:transparent;
+  transition:width .42s var(--cs-ease),height .42s var(--cs-ease),
+    border-radius .42s var(--cs-ease),transform .42s var(--cs-ease)}
+.cs-safe.on{display:block}
 
-/* Свёрнутая: ряд смайликов и ничего больше. */
-.cs-safe-big{display:flex;justify-content:center;align-items:center;gap:6px;
-  font-size:16.5px;line-height:1;height:33px;flex:none;
-  transition:font-size .42s cubic-bezier(.32,.72,0,1),gap .42s cubic-bezier(.32,.72,0,1),
-    height .42s cubic-bezier(.32,.72,0,1)}
-/* Свёрнутая карточка не должна знать про текст вовсе: даже невидимый, он
-   занимал бы место, и плашка мерилась бы как большая карточка. */
-.cs-safe-txt{display:none}
+.cs-safe.open{width:min(320px,calc(100vw - 48px));height:var(--cs-card-h);
+  border-radius:22px;transform:translate(-50%,var(--cs-drop));cursor:default}
 
-/* Развёрнутая: те же смайлики крупно и текст под ними. */
-.cs-safe.open{width:min(320px,calc(100vw - 48px));height:auto;
-  top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 50px);
-  padding:20px 22px 21px;border-radius:22px;
-  background:linear-gradient(160deg,rgba(58,58,78,.46),rgba(20,20,32,.40));
-  backdrop-filter:blur(34px) saturate(190%);
-  -webkit-backdrop-filter:blur(34px) saturate(190%);
-  box-shadow:0 26px 64px rgba(0,0,0,.42);cursor:default}
-.cs-safe.open .cs-safe-big{font-size:42px;gap:20px;height:52px;margin-bottom:15px}
-.cs-safe.open .cs-safe-txt{display:block}
+/* Смайлики всегда крупные: растрируются один раз, плашке достаются
+   уменьшенными. Уменьшение делает видеокарта, и оно выходит чётким. */
+.cs-safe-big{position:absolute;left:50%;top:0;
+  display:flex;align-items:center;gap:20px;height:52px;
+  font-size:42px;line-height:1;white-space:nowrap;
+  transform-origin:50% 0;transform:translate(-50%,6px) scale(.4);
+  transition:transform .42s var(--cs-ease)}
+.cs-safe.open .cs-safe-big{transform:translate(-50%,20px) scale(1)}
+
+.cs-safe-txt{position:absolute;top:87px;left:50%;
+  width:min(276px,calc(100vw - 92px));
+  opacity:0;transform:translate(-50%,10px);pointer-events:none;
+  transition:opacity .16s ease,transform .42s var(--cs-ease)}
+.cs-safe.open .cs-safe-txt{opacity:1;transform:translate(-50%,0);
+  transition:opacity .26s ease .12s,transform .42s var(--cs-ease)}
 .cs-safe-t{font-size:15.5px;font-weight:700;margin-bottom:6px;color:#fff;
   letter-spacing:-.1px;text-align:center}
 .cs-safe-s{font-size:13.5px;color:rgba(255,255,255,.72);line-height:1.4;text-align:center}
@@ -19888,7 +19900,6 @@ function callVideo(key){ callDial(key, true); }
 // у собеседника — между вами никого нет. Показываем только в разговоре: до
 // ответа ключей ещё нет, сверять нечего.
 let CALL_SAFE = null;
-const SAFE_MS = 420;
 
 function safePaint(){
   const b = document.getElementById('csSafe'); if(!b) return;
@@ -19900,6 +19911,7 @@ function safePaint(){
     // Имя ставим подлежащим: «Если Худоба видит…». Так фраза остаётся верной
     // для любого прозвища — склонять их наугад нельзя.
     const кто = document.getElementById('csSafeWho'); if(кто) кто.textContent = CALL_WHO || 'собеседник';
+    safeMeasure();
   } else {
     // Звонок кончился — сворачиваем без анимации: анимировать нечего, экран
     // всё равно уходит. И главное, снимаем затемнение: свернуть через
@@ -19910,40 +19922,41 @@ function safePaint(){
   }
 }
 
-// Разворот и сворачивание — одной карточкой.
+// Две меры карточка не может взять из CSS: ширина плашки зависит от того,
+// какие смайлики выпали, а высота развёрнутой — от того, на сколько строк лёг
+// текст с именем. Берём их один раз, когда смайлики и имя уже на месте, и
+// кладём в переменные. Мерить в движении нельзя: это и есть тот самый
+// пересчёт раскладки в каждом кадре, от которого карточку рвало.
+function safeMeasure(){
+  const b = document.getElementById('csSafe'); if(!b) return;
+  const big = document.getElementById('csSafeBig'), txt = b.querySelector('.cs-safe-txt');
+  if(!big || !txt) return;
+  // Пока экран звонка не показан, мерить нечего: всё внутри display:none и
+  // отдаёт нули. Записать их — значит получить плашку в 24 пикселя. Молча
+  // уходим: safeToggle позовёт ещё раз, и уже по отрисованному.
+  if(!big.offsetWidth) return;
+  // offsetWidth — ширина до уменьшения, потому и годится: плашка это тот же
+  // ряд смайликов, ужатый до 0.4 (см. .cs-safe-big), плюс поля по краям.
+  b.style.setProperty('--cs-pill-w', Math.round(big.offsetWidth * .4 + 24) + 'px');
+  // 20 сверху + 52 ряд смайликов + 15 отступ + текст + 21 снизу.
+  b.style.setProperty('--cs-card-h', (20 + 52 + 15 + txt.offsetHeight + 21) + 'px');
+}
+
+// Разворот и сворачивание — одной карточкой, и всё движение ведёт CSS.
 //
-// Геометрию ведут ключевые кадры, а не переход: свёрнутая карточка высотой по
-// содержимому, развёрнутая — тоже, и между «по содержимому» и «по содержимому»
-// браузер перехода не строит. Поэтому меряем, каким размер был и каким стал, и
-// проигрываем между ними. Ровно так же сделан обмен окнами в видеозвонке.
+// Раньше здесь мерили «было» и «стало» и проигрывали между ними ключевыми
+// кадрами: иначе браузер не строил перехода между высотой по содержимому и
+// высотой по содержимому. Теперь у обоих состояний размеры заданы явно, и
+// нужда в этом отпала. Выигрыш не в краткости: коробка и начинка трогаются с
+// места в одном кадре и по одной кривой, а не двумя разными механизмами,
+// которые под нагрузкой разъезжаются.
 function safeToggle(открыть){
   const b = document.getElementById('csSafe'); if(!b || !b.classList.contains('on')) return;
   const надо = (открыть === undefined) ? !b.classList.contains('open') : !!открыть;
   if(надо === b.classList.contains('open')) return;
-
-  const было = {ш: b.offsetWidth, в: b.offsetHeight, т: b.offsetTop,
-                р: getComputedStyle(b).borderRadius};
+  safeMeasure();          // на случай, если при отрисовке мерить было нечего
   b.classList.toggle('open', надо);
   document.getElementById('csSafeScrim')?.classList.toggle('on', надо);
-  const стало = {ш: b.offsetWidth, в: b.offsetHeight, т: b.offsetTop,
-                 р: getComputedStyle(b).borderRadius};
-  try{
-    b.animate([
-      {width: было.ш + 'px', height: было.в + 'px', top: было.т + 'px', borderRadius: было.р},
-      {width: стало.ш + 'px', height: стало.в + 'px', top: стало.т + 'px', borderRadius: стало.р}
-    ], {duration: SAFE_MS, easing: 'cubic-bezier(.32,.72,0,1)'});
-  }catch(e){}
-  // Текст проявляется отдельно и чуть позже: он появляется вместе с display,
-  // а на смену display переход не строится — только своей анимацией.
-  const txt = b.querySelector('.cs-safe-txt');
-  if(надо && txt){
-    try{
-      txt.animate([{opacity:0, transform:'translateY(10px)'},
-                   {opacity:1, transform:'none'}],
-                  {duration: 260, delay: 130, easing:'cubic-bezier(.32,.72,0,1)',
-                   fill:'backwards'});
-    }catch(e){}
-  }
 }
 
 function callVoicePaint(){

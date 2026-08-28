@@ -291,111 +291,27 @@
   // отсутствующей, а половина работающей функции хуже честного её отсутствия.
   // Проверяется отдельной страницей, не трогая приложение: vendor/audio-test.html
   AmbarCall.prototype.canRoute = function () {
-    return false;
+    try { return !!(navigator.audioSession && 'type' in navigator.audioSession); }
+    catch (e) { return false; }
   };
 
-  // Ищем среди выходов тот, что у уха. Имена системные и разноязыкие, поэтому
-  // смотрим по нескольким корням сразу.
-  AmbarCall.prototype._findEar = function () {
-    var self = this;
-    var a = document.createElement('audio');
-    if (typeof a.setSinkId !== 'function' ||
-        !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
-      return Promise.resolve('');
-    }
-    return navigator.mediaDevices.enumerateDevices().then(function (list) {
-      var выходы = list.filter(function (d) { return d.kind === 'audiooutput'; });
-      var ear = выходы.filter(function (d) {
-        return /earpiece|receiver|handset|трубк|ушн/i.test(d.label || '');
-      })[0];
-      self._earSink = ear ? ear.deviceId : '';
-      return self._earSink;
-    }).catch(function () { return ''; });
-  };
 
-  // Применить канал к системе. Отдельно от audioTo, потому что звать это надо
-  // не только по нажатию: выставленный до первого звука канал НЕ применяется —
-  // маршрутизировать системе нечего, и разговор начинается в громкой связи,
-  // сколько бы раз мы ни просили трубку заранее. Отсюда и «первое нажатие
-  // ничего не меняет»: состояние уже «трубка», а звук всё ещё в динамике.
-  // Канал переключает ПЕРЕХОД, а не значение — вот что стоило понять сразу.
-  //
-  // Система меняет выход, когда тип звуковой сессии МЕНЯЕТСЯ у живого звука.
-  // Записать туда то же самое, что уже стоит, — не переход: изменения нет,
-  // переключать нечего. Отсюда всё поведение, которое видел человек: трубка,
-  // выставленная до первого звука, не включалась никогда, а нажатие кнопки
-  // включало — потому что нажатие и было единственным настоящим переходом.
-  // Когда я начал выставлять трубку заранее, я убил и его: к моменту нажатия
-  // там уже стояло то же значение.
-  //
-  // Поэтому: до первого звука сессию не трогаем вовсе, а трубку включаем
-  // всегда переходом — сначала обычная, следом разговорная.
-  // Куда идёт голос: в трубку у уха или в громкий динамик.
-  //
-  // Рычаг ровно один — выбор устройства вывода. Тип звуковой сессии отсюда
-  // убран совсем: он не переключал ничего ни разу, зато сам уводил звук в
-  // громкий динамик, а уведя — оставлял там всё до конца сеанса.
-  //
-  // Устройство называется НОВОМУ элементу, ещё ничего не игравшему: игравший
-  // отвечает «готово» и не переключает. И только потом в него переезжает голос.
-  AmbarCall.prototype._applyRoute = function (why) {
-    var self = this;
-    if (!this.canRoute() || !this._earSink) return;
-    this._routedAt = Date.now();
-    this._swapSink(this.route === 'ear' ? this._earSink : '').then(function (ok) {
-      self._sayRoute(why, ok ? 'устройство названо' : 'устройство не принято');
-    });
-  };
 
-  AmbarCall.prototype._sayRoute = function (why, как) {
-    this._diag('канал: ' + (this.route === 'ear' ? 'ухо' : 'динамик') +
-               ' · ' + (why || '') + ' · ' + как +
-               ' · элемент=' + (this.audio ? this.audio.tagName : 'нет') +
-               '/' + (this.audio && this.audio.paused ? 'пауза' : 'играет'));
-  };
 
-  AmbarCall.prototype.audioTo = function (where, тихо) {
+  // Переключение канала — это перезапуск записи, а не смена настройки.
+  // Другого способа нет: система смотрит на тип сессии ровно в тот момент,
+  // когда запись начинается.
+  AmbarCall.prototype.audioTo = function (where) {
     var self = this, ear = where !== 'speaker';
-    var менялось = this.route !== (ear ? 'ear' : 'speaker');
     this.route = ear ? 'ear' : 'speaker';
-    this._applyRoute('нажали');
-    // Смена сессии перезапускает звук на уровне системы, и элемент после неё
-    // остаётся на паузе — молча, ни ошибки, ни события. Возвращаем звук; сам
-    // канал при этом не трогаем, переход уже идёт.
-    this._resume();
-    setTimeout(function () { self._resume(); }, 400);
-    if (тихо && !менялось) return this.route;
-    // Экран нужен глазам только там, где на него смотрят. В голосовом разговоре
-    // у уха он обязан гаснуть сам — так щекой ничего и не нажать.
+    // Экран нужен глазам только там, где на него смотрят. В разговоре у уха он
+    // гаснет сам — так щекой ничего и не нажать.
     this._keepAwake(this.video || !ear);
     this._emit('route', {to: this.route, real: this.canRoute()});
-    return this.route;
+    return this._reMic(ear ? 'play-and-record' : 'auto').then(function () {
+      return self.route;
+    });
   };
-
-  // Вернуть звук после того, как система его прервала: смена сессии, чужой
-  // системный звук, переключение выхода. Просто просим играть дальше — судить
-  // о том, получилось ли, тут нельзя, для этого есть отдельный счётчик отказов.
-  AmbarCall.prototype._resume = function () {
-    var self = this, a = this.audio;
-    // Пока звука собеседника нет, играть нечего и судить не о чем.
-    if (!a || !a.srcObject) return;
-    // Играющий элемент не трогаем: каждый запуск заставляет систему настроить
-    // выход заново и перебивает выбранный канал.
-    if (!a.paused) return;
-    try {
-      var p = a.play();
-      if (p && p.catch) p.catch(function () {});
-    } catch (e) {}
-  };
-
-  // Автоматического «а давайте вернём громкую связь» здесь больше нет, и это
-  // осознанно. Признака «в трубку не пошло» у страницы не существует: смена
-  // звуковой сессии сама на мгновение ставит элемент на паузу, а прямой отказ
-  // системы приходит и на обычном переключении. Обе догадки уже были и обе
-  // сделали хуже — сначала разговор уходил в громкую сам, потом на трубку
-  // нельзя было переключиться вовсе, потому что каждое нажатие тут же
-  // отменялось. Не слышно в трубке — человек нажмёт кнопку сам, это одно
-  // касание; отменять его выбор за него нельзя.
 
   // Что этот телефон вообще умеет. Уходит один раз при входе и попадает в лог
   // сервера: гадать о чужом устройстве по памяти — то, за что уже досталось.
@@ -403,7 +319,6 @@
     var e = {};
     try {
       e.aus = !!(navigator.audioSession && 'type' in navigator.audioSession);
-      e.ear = !!this._earSink;
       e.sink = typeof (document.createElement('audio').setSinkId) === 'function';
       e.wake = !!navigator.wakeLock;
       e.touch = matchMedia('(pointer: coarse)').matches;
@@ -541,14 +456,14 @@
         this.tones.release();
         this.call.peer = m.by || this.call.peer;
         this._emit('talking', this.call);
-        this._startMedia(true);
+        this._медиаСвежая(true);
         break;
 
       case 'joined':                                // мы сняли трубку
         if (!this.call || this.call.id !== m.call) break;
         this.tones.release();
         this._emit('talking', this.call);
-        this._startMedia(false);
+        this._медиаСвежая(false);
         break;
 
       case 'cancel':                                // взяли на другом устройстве
@@ -602,13 +517,17 @@
   AmbarCall.prototype.dial = function (toKey, order, video) {
     var self = this;
     this.video = !!video;
-    // Гудок — сразу по нажатию, а не после ответа сервера. Между нажатием и
-    // ответом лежит запрос микрофона с камерой и полный оборот до сервера:
-    // секунда, а то и две полной тишины, в которую человек успевает решить,
-    // что ничего не работает. Не прошло — тишину сменит короткий отбойный тон.
-    this.tones.prime();
-    this.tones.ringback();
-    return this._mic().then(function () {
+    // Сессию разговора ставим ДО гудков — тогда в трубку у уха идёт всё сразу,
+    // и гудки, и голос, как в обычном телефоне. Запись при этом начинается
+    // заново: только в этот момент система смотрит на тип сессии.
+    var ухо = this.isPhone() && !this.video;
+    this.route = ухо ? 'ear' : 'speaker';
+    // Гудки — сразу, как только запись началась. Ждать ответа сервера нельзя:
+    // между нажатием и ответом целый оборот, и человек успевает решить, что
+    // ничего не работает. Не прошло — тишину сменит короткий отбойный тон.
+    return this._reMic(ухо ? 'play-and-record' : 'auto').then(function () {
+      self.tones.prime();
+      self.tones.ringback();
       return self.video ? self._camOn() : null;
     }).then(function () {
       self._send({t: 'call', to: toKey || self.defaultTarget || '',
@@ -623,9 +542,12 @@
   AmbarCall.prototype.accept = function () {
     if (!this.call) return Promise.resolve();
     var self = this, id = this.call.id;
-    this.tones.prime();
     this.video = !!this.call.video;
-    return this._mic().then(function () {
+    // Снимаем трубку — тем же способом: сначала сессия разговора, следом
+    // запись. Иначе система выхода не пересмотрит.
+    var ухо = this.isPhone() && !this.video;
+    this.route = ухо ? 'ear' : 'speaker';
+    return this._reMic(ухо ? 'play-and-record' : 'auto').then(function () {
       return self.video ? self._camOn() : null;
     }).then(function () { self._send({t: 'accept', call: id}); })
       .catch(function (e) {
@@ -716,7 +638,6 @@
       self._prepAudio();
       // Имена устройств вывода видны только после разрешения микрофона —
       // значит искать трубку надо здесь, задолго до первого звонка.
-      self._findEar();
       self._emit('mic', {ok: true});
       return s;
     }).catch(function (err) {
@@ -868,15 +789,6 @@
     a.setAttribute('playsinline', '');
     a.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;' +
                       'opacity:.01;pointer-events:none;z-index:-1';
-    // Каждый запуск звука система сопровождает своей настройкой выхода, значит
-    // после перерыва канал надо ставить заново. Но не чаще раза в две секунды,
-    // иначе на возвратах получается кружение.
-    a.addEventListener('playing', function () {
-      if (!self.call || self.audio !== a) return;
-      var t = Date.now();
-      if (self._routedAt && t - self._routedAt < 2000) return;
-      self._applyRoute(self._routedAt ? 'звук вернулся' : 'пошёл звук');
-    });
     // Система прерывает воспроизведение сама: чужой сигнал, смена выхода,
     // перерыв. Элемент после этого сам не возвращается — возвращаем мы, иначе
     // разговор беззвучно умирает на ровном месте. Канал отсюда не трогаем.
@@ -895,38 +807,6 @@
     try { this.audio.play().catch(function () {}); } catch (e) {}
   };
 
-  // Смена выхода — на НОВОМ элементе, и это главное открытие всей истории.
-  //
-  // Замер на самом телефоне показал: выбор устройства работает и звук
-  // действительно уходит в трубку — но только пока элемент ещё ничего не
-  // играл. Стоит перезагрузить страницу, и тот же вызов уже ничего не
-  // переключает, отвечая при этом «готово». Обновление помогало не всегда, а
-  // помогал заново открытый адрес — то есть свежий, ничего не игравший вывод.
-  //
-  // Отсюда и «первые два звонка работали, потом перестало»: элемент у нас
-  // один на весь сеанс, и после первого разговора он переставал слушаться.
-  //
-  // Поэтому теперь на каждое переключение делается новый элемент: сначала ему
-  // называется устройство — молчащему, ещё без потока, — и только потом в него
-  // кладётся голос.
-  AmbarCall.prototype._swapSink = function (deviceId) {
-    var self = this, старый = this.audio;
-    var поток = старый && старый.srcObject;
-    if (!поток) return Promise.resolve(false);      // играть нечего — менять нечего
-    var a = this._makeAudio();
-    var назвать = (typeof a.setSinkId === 'function')
-      ? a.setSinkId(deviceId || '') : Promise.resolve();
-    return назвать.then(function () { return true; })
-      .catch(function (e) { self._sayRoute('', 'устройство не принято: ' + ((e && e.name) || '?')); return false; })
-      .then(function (ok) {
-        self.audio = a;
-        a.srcObject = поток;
-        if (старый) {
-          try { старый.pause(); старый.srcObject = null; старый.remove(); } catch (e) {}
-        }
-        return a.play().then(function () { return ok; }).catch(function () { return ok; });
-      });
-  };
 
   AmbarCall.prototype._freeMic = function () {
     if (!this.stream) return;
@@ -936,6 +816,56 @@
   };
 
   // ── соединение ───────────────────────────────────────────────────────────
+  // Разговор начинаем со свежей записи: гудки к этому моменту смолкли и их
+  // контекст закрыт, так что система увидит разговорную сессию чистой.
+  AmbarCall.prototype._медиаСвежая = function (isCaller) {
+    var self = this;
+    var ухо = this.isPhone() && !this.video;
+    this.route = ухо ? 'ear' : 'speaker';
+    this._reMic(ухо ? 'play-and-record' : 'auto').then(function () {
+      if (self.call) self._startMedia(isCaller);
+    });
+  };
+
+  // Начать запись заново — и только так система пересматривает выход.
+  //
+  // Выход настраивается в момент НАЧАЛА записи. Микрофон у нас берётся при
+  // входе в приложение, а гудки играют позже — и веб-аудио гудков успевает
+  // увести звук в громкий динамик. Объявить тип после этого мало: система
+  // принимает объявление и ничего не меняет, потому что запись давно идёт.
+  //
+  // Поэтому перед разговором запись начинается заново: сначала объявляем тип,
+  // потом просим микрофон. Старую дорожку отпускаем уже после того, как новая
+  // на руках, — иначе телефон переспросит разрешение.
+  AmbarCall.prototype._reMic = function (type) {
+    var self = this, старый = this.stream;
+    var ст = старый && старый.getAudioTracks()[0];
+    var былоБезЗвука = !!(ст && !ст.enabled);
+    _session(type);
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      return Promise.resolve(старый);
+    }
+    return navigator.mediaDevices.getUserMedia({
+      audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true}
+    }).then(function (s) {
+      self.stream = s;
+      self._prepAudio();
+      var t = s.getAudioTracks()[0];
+      if (t) t.enabled = !былоБезЗвука;      // «без звука» переносим на новую
+      var sender = self.pc && self.pc.getSenders().find(function (x) {
+        return x.track && x.track.kind === 'audio';
+      });
+      if (sender && t) { try { sender.replaceTrack(t); } catch (e) {} }
+      if (старый && старый !== s) {
+        старый.getAudioTracks().forEach(function (x) { try { x.stop(); } catch (e) {} });
+      }
+      return s;
+    }).catch(function () {
+      // Не дали — разговор важнее канала, идём со старой дорожкой.
+      return старый;
+    });
+  };
+
   AmbarCall.prototype._startMedia = function (isCaller) {
     var self = this;
     var pc = new RTCPeerConnection({iceServers: this.ice});
@@ -1009,23 +939,12 @@
     this._watchQuality();
     // Ищем трубку у уха заранее: к моменту, когда человек нажмёт «динамик»,
     // ответ уже должен быть.
-    // Второй раз список не перебираем: он уже собран, когда брали микрофон.
-    if (this._earSink) {
-      this._emit('route', {to: this.route, real: this.canRoute()});
-    } else {
-      this._findEar().then(function () {
-        self._emit('route', {to: self.route, real: self.canRoute()});
-        // Поиск мог закончиться уже после начала разговора — тогда канал
-        // ставим заново, теперь уже прямым выбором выхода.
-        if (self.call && self._earSink) self._applyRoute('нашли выход');
-      });
-    }
+    this._emit('route', {to: this.route, real: this.canRoute()});
     // Голос в трубку у уха — экран не нужен, пусть гаснет сам: это и есть
     // защита от случайного нажатия щекой, и никакая накладка её не заменит.
     // Выбор запоминаем сразу, чтобы кнопка с первой секунды показывала правду,
     // а вот саму сессию не трогаем: до первого звука переключать нечего, и
     // тронутая заранее, она потом не даёт сделать настоящий переход.
-    this._routedAt = 0;
     this.route = this.route || (this.isPhone() && !this.video ? 'ear' : 'speaker');
     this._keepAwake(this.video || this.route === 'speaker');
     this._emit('route', {to: this.route, real: this.canRoute()});
@@ -1140,7 +1059,6 @@
   };
 
   AmbarCall.prototype._teardown = function (why) {
-    this._routedAt = 0;
     this.tones.stop();
     // Конец разговора и несостоявшийся звонок звучат по-разному — как в
     // телефоне: короткий тон в конце разговора и отбойный, когда соединения

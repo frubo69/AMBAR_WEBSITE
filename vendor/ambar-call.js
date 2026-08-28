@@ -331,6 +331,10 @@
   // включает её раньше, чем сервер отвечает «звоним», и экран, который в этот
   // момент выставляет своё представление о камере, затирает уже случившееся.
   AmbarCall.prototype.camLive = function () {
+    // Поворот камеры — не выключение: на айфоне старая гаснет раньше, чем
+    // откроется новая, и в этот зазор честный ответ «нет» был бы враньём
+    // по смыслу.
+    if (this._flipping) return true;
     return !!(this.cam && this.cam.getVideoTracks().some(function (t) {
       return t.readyState === 'live' && !t.muted;
     }));
@@ -708,6 +712,12 @@
   AmbarCall.prototype._wireCam = function (track) {
     var self = this;
     var своя = function () {
+      // Во время поворота камеры молчим. Айфон держит включённой одну камеру
+      // за раз: когда просят вторую, первая гаснет — и гаснет ДО того, как
+      // придёт новая, пока self.cam ещё указывает на старый поток. Проверки
+      // «моя ли дорожка» тут мало, она отвечает «моя», и наружу уходило
+      // «камера выключена» — при том, что человек её всего лишь повернул.
+      if (self._flipping) return false;
       return !!(self.cam && self.cam.getVideoTracks().indexOf(track) >= 0);
     };
     track.onmute = track.onunmute = function () {
@@ -792,10 +802,24 @@
     var next = this.facing === 'user' ? 'environment' : 'user';
     var old = this.cam;
     var self = this;
+    this._flipping = true;
     return this._camOn(next).then(function (s) {
+      self._flipping = false;
       if (old && old !== s) old.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
       return s;
-    }).catch(function () { self.facing = self.facing === 'user' ? 'environment' : 'user'; });
+    }).catch(function () {
+      self._flipping = false;
+      self.facing = self.facing === 'user' ? 'environment' : 'user';
+      // Повернуть не вышло — а старую камеру система уже могла погасить.
+      // Молчали мы только на время поворота; если камеры теперь и правда нет,
+      // сказать об этом надо честно и сейчас.
+      var t = self.cam && self.cam.getVideoTracks()[0];
+      if (!(t && t.readyState === 'live' && !t.muted)) {
+        self.video = false;
+        self._send({t: 'camstate', on: false});
+        self._emit('cam', {on: false, facing: self.facing});
+      }
+    });
   };
 
   // Потолок битрейта картинки. Без него видео на 4G съедает канал и первым

@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=44"></script>
+<script src="/vendor/ambar-call.js?v=45"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -5802,12 +5802,12 @@ button.pill:active{opacity:.6}
   <button class="cv-rb" id="cvCam" onclick="callCam()" aria-label="Камера">
     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
       stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
-      d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/></svg>
+      d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/><path class="cvx" d="M2 2l20 20"/></svg>
   </button>
   <button class="cv-rb" id="cvMic" onclick="callMute()" aria-label="Микрофон">
     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
       stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
-      d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg>
+      d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/><path class="cvx" d="M3 3l18 18"/></svg>
   </button>
   <button class="cv-rb drop" onclick="callHangup()" aria-label="Завершить">
     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
@@ -6052,6 +6052,11 @@ button.pill:active{opacity:.6}
 .cvo-btn{width:70px;height:70px;border-radius:50%;border:0;cursor:pointer;display:flex;
   align-items:center;justify-content:center;color:#fff;transition:transform .12s}
 .cvo-btn:active{transform:scale(.92)}
+/* Перечёркивание микрофона на голосовом экране рисуется так же, как на
+   видео: путь лежит всегда, меняется только длина штриха. */
+.cvo-btn .cvx{stroke-dasharray:30;stroke-dashoffset:30;opacity:0;
+  transition:stroke-dashoffset .3s cubic-bezier(.32,.72,0,1),opacity .1s ease}
+.cvo-btn.on .cvx{stroke-dashoffset:0;opacity:1}
 .cvo-btn.take{background:#2CB34A}
 .cvo-btn.drop{background:var(--dn)}
 .cvo-btn.mute{background:var(--card2);color:var(--text)}
@@ -6080,18 +6085,66 @@ button.pill:active{opacity:.6}
   background:rgba(201,169,110,.18)}
 .cv-pill-n{font-size:14px;font-weight:600;color:#fff}
 .cv-pill-t{font-size:12px;color:rgba(255,255,255,.65);font-variant-numeric:tabular-nums}
-.cv-side{position:absolute;right:16px;bottom:20px;z-index:7;display:flex;flex-direction:column;
-  align-items:center;gap:13px}
-.cv-rb{width:48px;height:48px;border-radius:50%;border:0;cursor:pointer;display:flex;
-  align-items:center;justify-content:center;background:rgba(255,255,255,.22);color:#fff;
-  backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px);transition:transform .12s}
-.cv-rb:active{transform:scale(.9)}
-.cv-rb.on{background:#fff;color:#111}
-.cv-rb.drop{background:var(--dn);color:#fff}
-.cv-flip{position:absolute;left:16px;bottom:20px;z-index:7;width:42px;height:42px;border-radius:50%;
-  border:0;cursor:pointer;display:none;align-items:center;justify-content:center;
-  background:rgba(255,255,255,.18);color:#fff;backdrop-filter:blur(10px)}
+/* Кнопки видеозвонка.
+
+   Размер долей экрана, а не числом: 48 пикселей на большом телефоне выглядят
+   маркой, а на маленьком в них попадают через раз. clamp держит их в разумных
+   пределах на всём — от SE до планшета. Низ считается от безопасной зоны:
+   иначе на телефонах с полоской жеста кнопка стоит прямо на ней.
+
+   Стекло то же, что у карточки сверки и плашки имени: одна плоскость поверх
+   видео — один рецепт. */
+.cv-side{position:absolute;right:clamp(12px,4vw,20px);
+  bottom:calc(clamp(20px,5.5vw,34px) + var(--safe-bottom));z-index:7;
+  display:none;flex-direction:column;align-items:center;gap:clamp(12px,3.4vw,18px)}
+.cv.on .cv-side{display:flex}
+.cv-rb{--d:clamp(54px,15.5vw,66px);width:var(--d);height:var(--d);
+  border-radius:50%;border:0;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;color:#fff;
+  background:linear-gradient(160deg,rgba(255,255,255,.22),rgba(255,255,255,.10));
+  backdrop-filter:blur(24px) saturate(180%);
+  -webkit-backdrop-filter:blur(24px) saturate(180%);
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.24),0 8px 24px rgba(0,0,0,.30);
+  -webkit-tap-highlight-color:transparent;
+  transition:background .22s ease,color .22s ease,box-shadow .22s ease,
+    transform .2s cubic-bezier(.32,.72,0,1)}
+.cv-rb svg{width:46%;height:46%}
+.cv-rb:active{transform:scale(.88)}
+.cv-rb.on{background:#fff;color:#0d0d12;
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.5),0 10px 26px rgba(0,0,0,.34)}
+.cv-rb.drop{background:linear-gradient(160deg,#E8615F,#D0413F);color:#fff;
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.28),0 10px 28px rgba(176,48,48,.36)}
+
+/* Перечёркивание рисуется, а не возникает: линию проводят от начала к концу.
+   Путь лежит в разметке всегда и только меняет длину штриха — пересоздавать
+   значок нельзя, у нового узла переходить нечему, и раньше именно поэтому
+   перечёркивание просто выскакивало. */
+.cv-rb .cvx{stroke-dasharray:30;stroke-dashoffset:30;opacity:0;
+  transition:stroke-dashoffset .3s cubic-bezier(.32,.72,0,1),opacity .1s ease}
+.cv-rb.on .cvx{stroke-dashoffset:0;opacity:1}
+
+.cv-flip{position:absolute;left:clamp(12px,4vw,20px);
+  bottom:calc(clamp(20px,5.5vw,34px) + var(--safe-bottom));z-index:7;
+  --d:clamp(44px,12vw,54px);width:var(--d);height:var(--d);border-radius:50%;
+  border:0;cursor:pointer;display:none;align-items:center;justify-content:center;color:#fff;
+  background:linear-gradient(160deg,rgba(255,255,255,.18),rgba(255,255,255,.08));
+  backdrop-filter:blur(24px) saturate(180%);
+  -webkit-backdrop-filter:blur(24px) saturate(180%);
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.2),0 6px 20px rgba(0,0,0,.26);
+  -webkit-tap-highlight-color:transparent;
+  transition:transform .2s cubic-bezier(.32,.72,0,1)}
+.cv-flip svg{width:44%;height:44%}
+.cv-flip:active{transform:scale(.88)}
+/* Поворот отзывается самой кнопкой: значок делает пол-оборота, ровно столько,
+   сколько система открывает вторую камеру. */
+.cv-flip.spin svg{animation:cvflip .52s cubic-bezier(.32,.72,0,1)}
+@keyframes cvflip{from{transform:rotate(0)}to{transform:rotate(180deg)}}
+/* Пока камера поворачивается, кадр замирает — так и должно быть. Показываем
+   это размытием, чтобы замерший кадр читался как задумка, а не как подвисание. */
+..cv-slot.flipping video{filter:blur(9px) saturate(1.06);transform:scale(1.06)}
+..cv-slot video{transition:filter .22s ease,transform .22s ease}
 .cv.cam-on .cv-flip{display:flex}
+
 
 /* Видео. Собеседник во весь блок разговора, своя камера окном в углу. */
 .ca-video{position:relative;width:100%;aspect-ratio:3/4;max-height:52vh;border-radius:16px;
@@ -20073,8 +20126,8 @@ function callVoicePaint(){
     d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.8.6a2 2 0 0 1 1.7 2z"/></svg>`;
   const M = on => `<svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor"
     stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
-    d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/>${
-    on ? '<path d="M3 3l18 18"/>' : ''}</svg>`;
+    d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/><path
+    class="cvx" d="M3 3l18 18"/></svg>`;
   const V = `<svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor"
     stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
     d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/></svg>`;
@@ -20102,7 +20155,16 @@ function callVoicePaint(){
 // Слой видео живёт вне перерисовки, поэтому обновляем его отдельно и руками.
 // Кто в каком окне и где стоит маленькое. Положение живёт между звонками.
 let CALL_SWAP = false, PIP_X = null, PIP_Y = null;
-const PIP_W = 92, PIP_H = 123, PIP_PAD = 12;
+// Окно своей камеры — доля экрана, а не число: 92 пикселя на большом телефоне
+// выглядят маркой, на маленьком занимают четверть кадра.
+let PIP_W = 92, PIP_H = 123;
+const PIP_PAD = 12;
+function pipMeasure(){
+  const box = pipBox();
+  const W = (box && box.clientWidth) || window.innerWidth || 390;
+  PIP_W = Math.round(Math.min(132, Math.max(92, W * .27)));
+  PIP_H = Math.round(PIP_W * 4 / 3);
+}
 
 function pipBox(){ return document.getElementById('callVid'); }
 function pipEl(){ return document.querySelector('#callVid .cv-slot.pip'); }
@@ -20254,6 +20316,7 @@ function pipSwap(){
 function callVidPaint(){
   callVoicePaint();
   const l = document.getElementById('callVid'); if(!l) return;
+  pipMeasure();
   // Видеослой поднимается, только если картинка есть хоть у кого-то. Обе
   // камеры выключены — показывать нечего, и разговор возвращается к
   // голосовому виду, а не висит чёрным кадром.
@@ -20269,15 +20332,20 @@ function callVidPaint(){
   if(loc && rem){
     // Снимок «откуда» — до смены классов, иначе снимем уже новое место.
     const откуда = new Map([[loc, _геом(loc)], [rem, _геом(rem)]]);
-    loc.className = 'cv-slot' + (CALL_CAM ? '' : ' off');
-    rem.className = 'cv-slot' + (CALL_RCAM ? '' : ' off');
+    // Только те классы, что и правда меняются. Раньше className переписывался
+    // целиком, и оба окна на миг теряли full и pip — то есть схлопывались в
+    // ноль, — а следом в этом же обработчике мерилась раскладка. Отсюда и
+    // моргание на каждое нажатие микрофона.
+    loc.classList.toggle('off', !CALL_CAM);
+    rem.classList.toggle('off', !CALL_RCAM);
     const box = pipBox();
     // Свёрнутое окно браузера меряется нулём. Ноль записывать нельзя: окно
     // схлопнется и останется схлопнутым до следующей перерисовки.
     const BW = (box && box.clientWidth) || window.innerWidth || 0;
     const BH = (box && box.clientHeight) || window.innerHeight || 0;
     const set = (el, cls) => {
-      el.classList.add(cls);
+      el.classList.toggle('full', cls === 'full');
+      el.classList.toggle('pip', cls === 'pip');
       if(cls === 'full'){
         el.style.left = '0px'; el.style.top = '0px';
         el.style.width = BW + 'px';
@@ -20287,8 +20355,9 @@ function callVidPaint(){
       }
     };
     // На вызове человек видит себя во весь экран, как в фейстайме.
-    if(dial) set(loc, 'full');
+    if(dial){ set(loc, 'full'); set(rem, ''); }
     else if(live){ set(CALL_SWAP ? rem : loc, 'pip'); set(CALL_SWAP ? loc : rem, 'full'); pipPlace(); }
+    else { set(loc, ''); set(rem, ''); }        // видео нет — окон нет
     _летим(loc, откуда.get(loc)); _летим(rem, откуда.get(rem));
   }
   l.classList.toggle('cam-back', !!(CALL && CALL.facing === 'environment'));
@@ -20305,39 +20374,67 @@ function callVidPaint(){
   подпись('cvOffLocA', 'cvOffLocN', (CALL && CALL.me) || '');
   // Значок обязан говорить сам: фон значит «нажато», а перечёркнутая камера —
   // «камеры нет».
-  const cam = document.getElementById('cvCam'), mic = document.getElementById('cvMic');
-  if(cam){
-    cam.classList.toggle('on', !CALL_CAM);
-    cam.innerHTML = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none"
-      stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
-      d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/>${
-      CALL_CAM ? '' : '<path d="M2 2l20 20"/>'}</svg>`;
-  }
-  if(mic){
-    mic.classList.toggle('on', _callMuted);
-    mic.innerHTML = `<svg viewBox="0 0 24 24" width="22" height="22" fill="none"
-      stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
-      d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/>${
-      _callMuted ? '<path d="M3 3l18 18"/>' : ''}</svg>`;
-  }
+  // Значок не пересоздаём: перечёркивание лежит в разметке всегда и только
+  // дорисовывается. Новый узел лишён перехода, ради которого всё и затевалось.
+  document.getElementById('cvCam')?.classList.toggle('on', !CALL_CAM);
+  document.getElementById('cvMic')?.classList.toggle('on', _callMuted);
 }
 
-function callCam(){ if(CALL) CALL.camera(!CALL_CAM); }
-function callFlip(){ if(CALL) CALL.flip().then(callVidPaint); }
+// Отдача. Короткая на переключателях, ощутимее на завершении звонка: рука
+// должна отличать «поставил на паузу микрофон» от «положил трубку», не глядя
+// на экран. Зовём только из обработчиков нажатия — на перерисовке телефон
+// вибрировать не должен.
+function _hap(вид){
+  try{
+    const h = tg.HapticFeedback;
+    if(вид === 'sel') h.selectionChanged();
+    else if(вид === 'ok' || вид === 'err') h.notificationOccurred(вид === 'ok' ? 'success' : 'error');
+    else h.impactOccurred(вид || 'light');
+  }catch(e){}
+}
+function callCam(){
+  if(!CALL) return;
+  _hap('light');
+  CALL.camera(!CALL_CAM);
+}
+// Поворот камеры. Система гасит одну камеру раньше, чем откроет вторую, и кадр
+// на это время замирает — так устроен телефон. Но замерший кадр должен
+// читаться как задумка: размываем его и поворачиваем значок на кнопке. Раньше
+// вместо этого выскакивало «камера выключена» — то есть неправда; молчать об
+// этом библиотеку научили отдельно.
+function callFlip(){
+  if(!CALL) return;
+  _hap('light');
+  const кн = document.querySelector('.cv-flip'), loc = document.getElementById('cvSlotLoc');
+  кн?.classList.remove('spin'); void кн?.offsetWidth; кн?.classList.add('spin');
+  loc?.classList.add('flipping');
+  const вернуть = () => { loc?.classList.remove('flipping'); callVidPaint(); };
+  CALL.flip().then(вернуть).catch(вернуть);
+}
 function callDial(key, video){
   callInit();
   if(!CALL){ _toast('Связь недоступна'); return; }
   CALL.dial(key || '', '', !!video).catch(()=>{});
 }
-function callAccept(){ CALL && CALL.accept().catch(()=>{}); }
-function callReject(say){ CALL && CALL.reject(say || ''); }
-function callHangup(){ CALL && CALL.hangup(); }
+function callAccept(){ if(!CALL) return; _hap('medium'); CALL.accept().catch(()=>{}); }
+function callReject(say){ if(!CALL) return; _hap('medium'); CALL.reject(say || ''); }
+function callHangup(){ if(!CALL) return; _hap('medium'); CALL.hangup(); }
 function callWarm(){ callInit(); if(CALL) CALL.warmMic().then(callPaint).catch(()=>{}); }
 function callMute(){
   if(!CALL) return;
   _callMuted = CALL.mute(!_callMuted);
+  _hap('light');
   _cq('callBarMute')?.classList.toggle('on', _callMuted);
-  callPaint();
+  // Точечно, без пересборки экрана: callPaint() перебирает всю разметку
+  // разговора заново, вместе с окнами видео, — от этого экран и моргал на
+  // каждое нажатие. Меняется одна кнопка, её и меняем.
+  document.getElementById('cvMic')?.classList.toggle('on', _callMuted);
+  const кн = document.querySelector('.cvo-btn.mute');
+  if(кн){
+    кн.classList.toggle('on', _callMuted);
+    const п = кн.parentNode.querySelector('.cvo-lbl');
+    if(п) п.textContent = _callMuted ? 'Включить' : 'Без звука';
+  }
 }
 
 let CALL_PAGE = 'calls', CALL_Q_TXT = '';

@@ -103,6 +103,22 @@ def _star_name(uid: int) -> str:
     return STAR_NAMES.get(uid) or _STAR_SEEN.get(uid) or "AMBAR STAR"
 
 
+def _имя_ключа(key: str) -> str:
+    """Как назвать человека на экране, зная только его адрес.
+
+    Ключ — это адрес, а не имя. У водителя и оператора он совпадает с именем,
+    а у AMBAR STAR это номер телеграма, и показывать его нельзя нигде: ни в
+    строке «звоним», ни в списке звонков, ни в кружке с первой буквой. Номер
+    ничего не говорит тому, кто смотрит, и знать его посторонним незачем.
+
+    Имя, уже записанное словом, оставляем как есть — так же читаются и старые
+    записи журнала, сделанные до этой правки."""
+    kind, _, ident = key.partition(":")
+    if kind == "star" and str(ident).isdigit():
+        return _star_name(int(ident))
+    return ident or "—"
+
+
 
 # ── кто есть кто ────────────────────────────────────────────────────────────
 # Кто на каком районе — меняется в течение дня: старший переставляет водителя,
@@ -260,8 +276,11 @@ async def _recent(peer, limit: int = 12) -> list:
             mine = c.get("from") == peer.label and c.get("from_kind") == me_kind
             other = c.get("to") if mine else c.get("from")
             other_kind = c.get("to_kind") if mine else c.get("from_kind")
+            ключ = f"{other_kind}:{other}"
             out.append({
-                "who": other, "key": f"{other_kind}:{other}",
+                # Показываем словом, а звоним по ключу: в журнале у AMBAR STAR
+                # записан номер, и раньше он же и показывался.
+                "who": _имя_ключа(ключ), "key": ключ,
                 "dir": "out" if mine else "in",
                 "at": c.get("at", ""),
                 "talk": int(c.get("talk_sec") or 0),
@@ -486,7 +505,7 @@ async def _start_call(caller: Peer, to_key: str, order: str, video: bool = False
     # «Занят» — не то же, что «недоступен», и человеку разница важна:
     # занятого ждут, недоступного ищут другим путём.
     if busy:
-        await caller.send(t="failed", why="busy_them", peer=name)
+        await caller.send(t="failed", why="busy_them", peer=_имя_ключа(to_key))
         return
 
     cid = secrets.token_hex(8)
@@ -501,8 +520,7 @@ async def _start_call(caller: Peer, to_key: str, order: str, video: bool = False
         if token and chat and url:
             _PENDING[to_key] = (cid, time.time() + RING_TTL)
             call.ring_task = asyncio.create_task(_ring_both(call, name))
-            await caller.send(t="calling", call=cid,
-                              to=_star_name(int(name)) if kind == "star" else name,
+            await caller.send(t="calling", call=cid, to=_имя_ключа(to_key),
                               note="приложение закрыто — звоним в телеграм")
             return
 
@@ -514,7 +532,9 @@ async def _start_call(caller: Peer, to_key: str, order: str, video: bool = False
     for p in targets:
         await p.send(t="ring", call=cid, frm=caller.label, kind=caller.kind,
                      order=order, video=call.video)
-    await caller.send(t="calling", call=cid, to=to_key.split(":", 1)[-1])
+    # Не хвост ключа: у AMBAR STAR это номер телеграма, и он попадал прямо на
+    # экран звонящего, а оттуда в журнал и в список недавних.
+    await caller.send(t="calling", call=cid, to=_имя_ключа(to_key))
     call.ring_task = asyncio.create_task(_ring_timeout(call, RING_TTL))
 
 

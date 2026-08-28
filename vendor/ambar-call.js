@@ -187,6 +187,14 @@
   AmbarCall.prototype.camGranted = function () {
     try { return localStorage.getItem('ambar_cam_ok') === '1'; } catch (e) { return false; }
   };
+  // Горит ли своя камера прямо сейчас. Единственный источник правды: набор
+  // включает её раньше, чем сервер отвечает «звоним», и экран, который в этот
+  // момент выставляет своё представление о камере, затирает уже случившееся.
+  AmbarCall.prototype.camLive = function () {
+    return !!(this.cam && this.cam.getVideoTracks().some(function (t) {
+      return t.readyState === 'live' && !t.muted;
+    }));
+  };
   AmbarCall.prototype.micLive = function () {
     return !!(this.stream && this.stream.getAudioTracks().some(
       function (t) { return t.readyState === 'live'; }));

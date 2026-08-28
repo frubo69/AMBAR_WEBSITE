@@ -2196,7 +2196,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=13"></script>
+<script src="/vendor/ambar-call.js?v=14"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -6124,7 +6124,7 @@ function callEvent(t, d){
       return;
     case 'ring':
       CALL_ST = 'in'; CALL_WHO = d.peer; CALL_ROLE = callRole(d.kind, d.peer);
-      CALL_VIDEO = !!d.video; CALL_CAM = false; CALL_RCAM = false;
+      CALL_VIDEO = !!d.video; CALL_CAM = !!(CALL && CALL.camLive && CALL.camLive()); CALL_RCAM = false;
       callOpen(); callBuzz(); callRender();
       // Видеозвонок — сразу показываем человеку его самого, как в фейстайме.
       // Наружу ничего не уходит: соединения до ответа не существует, картинку

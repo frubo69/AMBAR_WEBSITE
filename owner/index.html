@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=13"></script>
+<script src="/vendor/ambar-call.js?v=14"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -19692,14 +19692,18 @@ function callEvent(t, d){
     case 'ready': case 'roster': case 'recent': case 'mic':
       callBadge(); callPaint(); return;
     case 'ring':
-      CALL_ST = 'in'; CALL_WHO = d.peer; CALL_VIDEO = !!d.video; CALL_CAM = false; CALL_RCAM = false;
+      CALL_ST = 'in'; CALL_WHO = d.peer; CALL_VIDEO = !!d.video; CALL_CAM = !!(CALL && CALL.camLive && CALL.camLive()); CALL_RCAM = false;
       // Видеозвонок — сразу показываем человеку его самого. Наружу ничего не
       // уходит: соединения до ответа нет, картинку видит только он.
       if(d.video && CALL && CALL.camGranted && CALL.camGranted()) CALL.camera(true);
       _cq('callOv').classList.add('show'); _cq('callBtn')?.classList.add('ringing');
       callPaint(); return;
     case 'calling':
-      CALL_ST = 'out'; CALL_WHO = d.peer; CALL_VIDEO = !!d.video; CALL_CAM = false; CALL_RCAM = false;
+      // Своё состояние камеры не выдумываем: набор включает её ДО того, как
+      // сервер ответит «звоним», и выставленное здесь «выключена» затирало уже
+      // включённую камеру — на экране заглушка, а камера горит и уходит
+      // собеседнику. Чужая камера до ответа правда неизвестна.
+      CALL_ST = 'out'; CALL_WHO = d.peer; CALL_VIDEO = !!d.video; CALL_CAM = !!(CALL && CALL.camLive && CALL.camLive()); CALL_RCAM = false;
       _cq('callOv').classList.add('show'); callPaint(); return;
     case 'talking':
       CALL_ST = 'live'; CALL_T0 = Date.now(); CALL_Q = ''; _callMuted = false;

@@ -345,9 +345,14 @@ async def _end(call: Call, outcome: str, quiet_sid: str = "", say: str = ""):
 # новую, стёрли предыдущую. Телефон звенит раз в секунду, а в чате висит один
 # живой вызов со счётчиком и кнопкой «взять».
 #
-# Порядок именно такой — сначала отправить, потом стереть старое. Наоборот
-# получилась бы дыра, в которую попадает взгляд: карточки нет ни на экране
-# блокировки, ни в чате.
+# Порядок: сначала СТЕРЕТЬ старую, потом отправить новую. Сначала было
+# наоборот — казалось, что так в чате не будет дыры между карточками. Но
+# удаление сообщения телеграм снимает и его уведомление, а снимает он его у
+# всего чата разом: свежая карточка успевала прийти и тут же гасла вместе со
+# стёртой. На заблокированном экране от звонка не оставалось ничего.
+#
+# Дыра между карточками длится доли секунды и видна только в открытом чате.
+# Уведомление на заблокированном экране важнее.
 def _drv_token() -> str:
     return os.getenv("DRIVER_BOT_TOKEN", "").strip()
 
@@ -426,14 +431,14 @@ async def _ring_driver(call: Call, name: str):
             if _CALLS.get(call.cid) is not call or call.answered:
                 break
             left = int(RING_TTL - (time.time() - started))
+            if prev:
+                await _tg_delete(token, tg_id, prev)
+                prev = 0
             r = await _tg_ring(token, tg_id,
                                f"Входящий звонок · {call.caller.label}\n"
                                f"Осталось {left} сек", kb)
             if (r or {}).get("ok"):
-                mid_new = ((r.get("result") or {}).get("message_id")) or 0
-                if prev:
-                    await _tg_delete(token, tg_id, prev)
-                prev = mid_new
+                prev = ((r.get("result") or {}).get("message_id")) or 0
                 step = RING_STEP
             elif (r or {}).get("error_code") == 403:
                 # Бот заблокирован — звонить некуда, и девяносто попыток этого

@@ -71,7 +71,16 @@
 </div>
 
 <div class="card">
-  <h2>3 · Что видно</h2>
+  <h2>3 · Как в приложении</h2>
+  <button id="rtc" disabled>Пустить тон через соединение
+    <small>тот же тон, но пройдя через webrtc — как голос собеседника</small></button>
+  <div class="sub" style="margin:0">После этого нажмите способы выше ещё раз.
+    Если через соединение трубка не включается ни одним способом, а без него
+    включается — значит дело в webrtc, и вопрос закрыт.</div>
+</div>
+
+<div class="card">
+  <h2>4 · Что видно</h2>
   <pre id="out">—</pre>
 </div>
 
@@ -130,6 +139,7 @@
     }).then(function () {
       лог('тон играет через элемент', 'ok');
       document.querySelectorAll('button[data-m]').forEach(function (b) { b.disabled = false; });
+      document.getElementById('rtc').disabled = false;
       document.getElementById('stop').disabled = false;
       document.getElementById('go').disabled = true;
     }).catch(function (e) {
@@ -145,6 +155,36 @@
     сессия('auto');
     document.querySelectorAll('button').forEach(function (b) { b.disabled = true; });
     лог('всё остановлено, сессия возвращена', 'ok');
+  };
+
+  // Тот же тон, но пройдя через настоящее соединение — ровно так приходит
+  // голос собеседника. Единственное, чем стенд отличался от приложения, и
+  // единственное, что осталось непроверенным.
+  document.getElementById('rtc').onclick = function () {
+    if (!узел) { лог('сначала пустите тон', 'bad'); return; }
+    var A = new RTCPeerConnection(), B = new RTCPeerConnection();
+    A.onicecandidate = function (e) { if (e.candidate) B.addIceCandidate(e.candidate); };
+    B.onicecandidate = function (e) { if (e.candidate) A.addIceCandidate(e.candidate); };
+    B.ontrack = function (e) {
+      var st = (e.streams && e.streams[0]) || new MediaStream([e.track]);
+      лог('голос пришёл через соединение', 'ok');
+      var старый = эл;
+      эл = document.createElement('audio');
+      эл.autoplay = true; эл.setAttribute('playsinline', '');
+      эл.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:.01';
+      document.body.appendChild(эл);
+      эл.srcObject = st;
+      эл.play().catch(function () {});
+      try { старый.pause(); старый.srcObject = null; старый.remove(); } catch (err) {}
+    };
+    узел.dest.stream.getAudioTracks().forEach(function (t) { A.addTrack(t, узел.dest.stream); });
+    A.createOffer().then(function (o) { return A.setLocalDescription(o); })
+     .then(function () { return B.setRemoteDescription(A.localDescription); })
+     .then(function () { return B.createAnswer(); })
+     .then(function (an) { return B.setLocalDescription(an); })
+     .then(function () { return A.setRemoteDescription(B.localDescription); })
+     .then(function () { лог('соединение собрано'); })
+     .catch(function (e) { лог('соединение не собралось: ' + e.name, 'bad'); });
   };
 
   // Устройство называем НОВОМУ элементу, ещё ничего не игравшему. Игравший

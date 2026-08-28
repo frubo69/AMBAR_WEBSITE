@@ -136,6 +136,7 @@
     this.kind = '';
     this.defaultTarget = '';
     this.quality = '';       // '', 'good', 'weak', 'bad'
+    this.route = '';         // 'ear' | 'speaker' — куда идёт голос
     this.tones = new Tones();
 
     this._retry = 0;
@@ -157,11 +158,12 @@
           if (!self.call) self._freeMic();
         }, MIC_FREE_AFTER);
       } else if (self.call) {
+        // Замок берём заново только если экран вообще нужен.
+        if (self.video || self.route === 'speaker') self._keepAwake(true);
         // Замок экрана система снимает сама, как только страницу спрятали, и
         // обратно не ставит. Вернулись в приложение посреди разговора — берём
         // заново: иначе экран гаснет прямо во время звонка, а вместе с ним на
         // телефоне засыпает и сам разговор.
-        self._keepAwake(true);
         // Съёмку после возвращения система иногда будит сама, а иногда
         // закрывает дорожку насовсем — тогда собеседник больше не увидит
         // ничего, сколько ни жди. Закрыли — берём камеру заново.
@@ -181,6 +183,89 @@
   AmbarCall.prototype.micGranted = function () {
     try { return localStorage.getItem('ambar_mic_ok') === '1'; } catch (e) { return false; }
   };
+  // ── куда идёт голос: в трубку у уха или в громкую связь ─────────────────
+  //
+  // Из страницы этим управляет ровно одна вещь — тип звуковой сессии. Где его
+  // нет, переключать нечего: браузер решает сам и решает в пользу громкой
+  // связи. Поэтому кнопку «динамик» показываем только там, где она правда
+  // работает: мёртвая кнопка хуже отсутствующей.
+  //
+  // «Трубка» — сессия разговора: система на айфоне ведёт такую в динамик у уха
+  // и сама гасит экран, когда телефон подносят к лицу. «Громкая» — обычное
+  // поведение по умолчанию, то самое, что было до этой правки.
+  AmbarCall.prototype.canRoute = function () {
+    try {
+      if (navigator.audioSession && 'type' in navigator.audioSession) return true;
+    } catch (e) {}
+    // Второй путь: выбрать выход по имени устройства. Работает не везде и не
+    // всегда находит трубку у уха — поэтому и спрашиваем «нашли ли», а не
+    // «умеет ли браузер»: обещать переключение, которого не будет, нельзя.
+    return !!this._earSink;
+  };
+
+  // Ищем среди выходов тот, что у уха. Имена системные и разноязыкие, поэтому
+  // смотрим по нескольким корням сразу.
+  AmbarCall.prototype._findEar = function () {
+    var self = this;
+    this._earSink = '';
+    var a = document.createElement('audio');
+    if (typeof a.setSinkId !== 'function' ||
+        !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
+      return Promise.resolve('');
+    }
+    return navigator.mediaDevices.enumerateDevices().then(function (list) {
+      var ear = list.filter(function (d) {
+        return d.kind === 'audiooutput' && /earpiece|receiver|handset|трубк|ушн/i.test(d.label || '');
+      })[0];
+      self._earSink = ear ? ear.deviceId : '';
+      return self._earSink;
+    }).catch(function () { return ''; });
+  };
+
+  AmbarCall.prototype.audioTo = function (where) {
+    var ear = where !== 'speaker';
+    this.route = ear ? 'ear' : 'speaker';
+    try {
+      if (navigator.audioSession && 'type' in navigator.audioSession) {
+        navigator.audioSession.type = ear ? 'play-and-record' : 'auto';
+      } else if (this._earSink && this.audio && this.audio.setSinkId) {
+        this.audio.setSinkId(ear ? this._earSink : '').catch(function () {});
+      }
+    } catch (e) {}
+    // Экран нужен глазам только там, где на него смотрят. В голосовом разговоре
+    // у уха он обязан гаснуть сам — так щекой ничего и не нажать.
+    this._keepAwake(this.video || !ear);
+    this._emit('route', {to: this.route, real: this.canRoute()});
+    return this.route;
+  };
+
+  // Что этот телефон вообще умеет. Уходит один раз при входе и попадает в лог
+  // сервера: гадать о чужом устройстве по памяти — то, за что уже досталось.
+  AmbarCall.prototype._env = function () {
+    var e = {};
+    try {
+      e.aus = this.canRoute();
+      e.sink = typeof (document.createElement('audio').setSinkId) === 'function';
+      e.wake = !!navigator.wakeLock;
+      e.touch = matchMedia('(pointer: coarse)').matches;
+      e.w = Math.min(screen.width, screen.height);
+      e.tg = (window.Telegram && Telegram.WebApp && Telegram.WebApp.platform) || '';
+    } catch (err) {}
+    return e;
+  };
+
+  // Телефон это или планшет с компьютером. У трубки есть динамик у уха, у них
+  // нет — и по умолчанию там громкая связь.
+  AmbarCall.prototype.isPhone = function () {
+    try {
+      var узкий = Math.min(screen.width, screen.height) <= 500;
+      var пальцем = matchMedia('(pointer: coarse)').matches;
+      var tg = (window.Telegram && Telegram.WebApp && Telegram.WebApp.platform) || '';
+      if (tg === 'tdesktop' || tg === 'macos' || tg === 'web') return false;
+      return пальцем && узкий;
+    } catch (e) { return false; }
+  };
+
   // Камеру на входящем включаем, только если разрешение уже давали. Иначе
   // системное окно выскочит поверх звенящего звонка — ровно тогда, когда
   // человеку надо нажать «ответить», а не читать вопросы.
@@ -211,7 +296,8 @@
     this.ws = ws;
 
     ws.onopen = function () {
-      ws.send(JSON.stringify({t: 'auth', tma: self.initData, as: self.as}));
+      ws.send(JSON.stringify({t: 'auth', tma: self.initData, as: self.as,
+                              env: self._env()}));
     };
     ws.onmessage = function (ev) {
       var m;
@@ -683,7 +769,13 @@
     };
 
     this._watchQuality();
-    this._keepAwake(true);
+    // Ищем трубку у уха заранее: к моменту, когда человек нажмёт «динамик»,
+    // ответ уже должен быть.
+    this._findEar().then(function () { self._emit('route', {to: self.route, real: self.canRoute()}); });
+    // Голос в трубку у уха — экран не нужен, пусть гаснет сам: это и есть
+    // защита от случайного нажатия щекой, и никакая накладка её не заменит.
+    this.route = this.route || (this.isPhone() && !this.video ? 'ear' : 'speaker');
+    this.audioTo(this.route);
     // Сразу сообщаем, есть ли у нас картинка: собеседник должен знать это с
     // первой секунды, а не после первого переключения.
     this._send({t: 'camstate', on: !!this.cam});
@@ -816,6 +908,7 @@
     this._camOff();
     this.remote = null;
     this.video = false;
+    this.route = '';
     var say = this.call && this.call.say;
     this.call = null;
     this._pendingIce = [];

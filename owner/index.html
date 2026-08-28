@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=14"></script>
+<script src="/vendor/ambar-call.js?v=15"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -5749,6 +5749,21 @@ button.pill:active{opacity:.6}
 <!-- Голосовой разговор выглядит так же, как в приложении водителя:
      звание, имя, таймер и две кнопки внизу. Один вид на все три
      приложения — разговор везде один и тот же. -->
+<!-- Экран у уха. Разговор идёт в трубку — на экран не смотрят, зато его
+     касается щека. Затемняем и перестаём принимать нажатия; вернуть экран
+     можно только осознанным движением вверх. -->
+<div class="cg" id="callGuard">
+  <div class="cg-in">
+    <div class="cg-av" id="cgA">—</div>
+    <div class="cg-n" id="cgN">—</div>
+    <div class="cg-t" id="cgT">00:00</div>
+  </div>
+  <div class="cg-hint">
+    <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 15l-6-6-6 6"/></svg>
+    Проведите вверх
+  </div>
+</div>
 <div class="cvo" id="callVoice">
   <div class="cvo-top">
     <div class="cvo-role" id="cvoRole"></div>
@@ -5940,6 +5955,31 @@ button.pill:active{opacity:.6}
 .cv-slot.pip .cv-off-n,.cv-slot.pip .cv-off-s{display:none}
 /* Голосовой разговор — тот же вид, что у водителя: звание, имя, таймер и
    кнопки у нижнего края. Один разговор — один экран во всех приложениях. */
+/* ── Экран у уха ─────────────────────────────────────────────────────────────
+   Глухая подложка, а не полупрозрачная: сквозь просвечивающую читается весь
+   экран разговора и имя с таймером двоятся. Имя и время живут дальше, просто
+   приглушённые до предела — видно, что звонок идёт, а не оборвался. */
+.cg{position:fixed;inset:0;z-index:500;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;
+  background:radial-gradient(78% 46% at 50% 42%,#08080e 0%,#000 72%);
+  visibility:hidden;opacity:0;pointer-events:none;
+  transition:opacity .5s cubic-bezier(.32,.72,0,1),visibility 0s .5s;
+  touch-action:none;user-select:none;-webkit-user-select:none;
+  -webkit-tap-highlight-color:transparent}
+.cg.on{visibility:visible;opacity:1;pointer-events:auto;transition-delay:0s}
+.cg-in{display:flex;flex-direction:column;align-items:center;opacity:.23}
+.cg-av{width:74px;height:74px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:27px;font-weight:700;color:var(--gold2);
+  background:rgba(201,169,110,.16)}
+.cg-n{font-size:17px;font-weight:700;margin-top:15px;color:#fff}
+.cg-t{font-size:13.5px;margin-top:5px;color:rgba(255,255,255,.6);
+  font-variant-numeric:tabular-nums}
+.cg-hint{position:absolute;left:0;right:0;bottom:calc(30px + var(--safe-bottom));
+  display:flex;align-items:center;justify-content:center;gap:6px;
+  font-size:12.5px;color:rgba(255,255,255,.24);opacity:0;
+  animation:cgHint 3.4s ease-in-out 1.1s infinite}
+@keyframes cgHint{0%,100%{opacity:0;transform:translateY(3px)}
+  30%,60%{opacity:1;transform:translateY(0)}}
 .cvo{position:fixed;inset:0;z-index:399;display:none;flex-direction:column;text-align:center;
   background:var(--bg2)}
 .cvo.on{display:flex}
@@ -19705,9 +19745,12 @@ function callEvent(t, d){
       // собеседнику. Чужая камера до ответа правда неизвестна.
       CALL_ST = 'out'; CALL_WHO = d.peer; CALL_VIDEO = !!d.video; CALL_CAM = !!(CALL && CALL.camLive && CALL.camLive()); CALL_RCAM = false;
       _cq('callOv').classList.add('show'); callPaint(); return;
+    case 'route':
+      callPaint(); guardArm(); return;
     case 'talking':
       CALL_ST = 'live'; CALL_T0 = Date.now(); CALL_Q = ''; _callMuted = false;
       clearInterval(_callTick); _callTick = setInterval(callTimer, 1000);
+      guardArm();
       callVidPaint();
       callPaint(); callTimer(); return;
     case 'quality':
@@ -19738,6 +19781,7 @@ function callEvent(t, d){
       clearInterval(_callTick); _callTick = null;
       const why = d.why || '', who = CALL_WHO;
       // «Занят» о собственном наборе во время разговора — не конец звонка.
+      guardOff();
       if(t === 'failed' && d.keep){ _toast('Вы уже в разговоре'); return; }
       CALL_ST = 'idle'; CALL_WHO = ''; CALL_Q = '';
       CALL_VIDEO = false; CALL_CAM = false; CALL_RCAM = false;
@@ -19770,6 +19814,7 @@ function callTimer(){
   const a = document.getElementById('cvoState'); if(a && CALL_ST === 'live') a.textContent = txt;
   const b = _cq('callBarS'); if(b) b.textContent = txt;
   const c = document.getElementById('cvT'); if(c) c.textContent = txt;
+  const d = document.getElementById('cgT'); if(d) d.textContent = txt;
 }
 function callQuality(){
   const e = _cq('callQ'); if(!e) return;
@@ -19801,6 +19846,57 @@ function callVideo(key){ callDial(key, true); }
 // Экран разговора — один на все состояния и на все приложения: звание, имя,
 // таймер, кнопки внизу. Живёт вне перерисовки списков, поэтому обновляется
 // отдельной функцией.
+// Динамик. Переключает не громкость, а куда идёт голос: в трубку у уха или
+// наружу. С трубкой экран гаснет сам — тогда же включается защита от щеки.
+function callSpeaker(){
+  if(!CALL) return;
+  CALL.audioTo(CALL.route === 'speaker' ? 'ear' : 'speaker');
+  callPaint(); guardArm();
+}
+
+// ── экран у уха ────────────────────────────────────────────────────────────
+// Ставится сам, когда голос идёт в трубку и экрана давно не касались: это и
+// есть момент, когда телефон уже у щеки. Снимается только движением вверх —
+// касание щекой ничем не отличается от касания пальцем.
+const GUARD_IDLE = 7000;
+let _guardT = null;
+function guardOk(){
+  return !!(CALL && CALL_ST === 'live' && !CALL_VIDEO
+         && CALL.isPhone && CALL.isPhone() && CALL.canRoute && CALL.canRoute()
+         && CALL.route === 'ear');
+}
+function guardArm(){
+  clearTimeout(_guardT);
+  if(!guardOk()){ guardOff(); return; }
+  _guardT = setTimeout(guardOn, GUARD_IDLE);
+}
+function guardOn(){
+  if(!guardOk()) return;
+  const g = document.getElementById('callGuard'); if(!g) return;
+  document.getElementById('cgA').textContent = _cIni(CALL_WHO);
+  document.getElementById('cgN').textContent = CALL_WHO || '—';
+  g.classList.add('on');
+}
+function guardOff(){
+  clearTimeout(_guardT);
+  document.getElementById('callGuard')?.classList.remove('on');
+}
+(function guardGestures(){
+  const g = document.getElementById('callGuard'); if(!g) return;
+  let y0 = null;
+  g.addEventListener('pointerdown', e => { y0 = e.clientY; e.preventDefault(); });
+  g.addEventListener('pointermove', e => {
+    if(y0 === null) return;
+    if(y0 - e.clientY > 90){ y0 = null; guardOff(); guardArm(); }   // щекой так не выйдет
+  });
+  const сброс = () => { y0 = null; };
+  g.addEventListener('pointerup', сброс);
+  g.addEventListener('pointercancel', сброс);
+  document.addEventListener('pointerdown', () => {
+    if(!g.classList.contains('on')) guardArm();
+  }, true);
+})();
+
 function callVoicePaint(){
   const l = document.getElementById('callVoice'); if(!l) return;
   const видео = CALL_VIDEO && CALL_ST === 'live' && (CALL_CAM || CALL_RCAM);
@@ -19830,6 +19926,11 @@ function callVoicePaint(){
     stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
     d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/></svg>`;
 
+  const S = гром => `<svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor"
+    stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5L6 9H3v6h3l5 4z"/>${
+    гром ? '<path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/>'
+         : '<path d="M15.5 8.5a5 5 0 0 1 0 7"/>'}</svg>`;
+
   const acts = document.getElementById('cvoActs');
   acts.classList.toggle('one', CALL_ST === 'out');
   acts.innerHTML = CALL_ST === 'in' ? `
@@ -19843,6 +19944,10 @@ function callVoicePaint(){
         <div class="cvo-lbl">${_callMuted ? 'Включить' : 'Без звука'}</div></div>
       ${CALL_VIDEO ? `<div class="cvo-act"><button class="cvo-btn vid" onclick="callCam()">${V}</button>
         <div class="cvo-lbl">Камера</div></div>` : ''}
+      ${!CALL_VIDEO && CALL && CALL.canRoute && CALL.canRoute() ? `
+        <div class="cvo-act"><button class="cvo-btn mute${CALL.route === 'speaker' ? ' on' : ''}"
+          onclick="callSpeaker()">${S(CALL.route === 'speaker')}</button>
+          <div class="cvo-lbl">${CALL.route === 'speaker' ? 'Динамик' : 'Трубка'}</div></div>` : ''}
       <div class="cvo-act"><button class="cvo-btn drop" onclick="callHangup()">${X}</button>
         <div class="cvo-lbl">Завершить</div></div>`
     : `<div class="cvo-act"><button class="cvo-btn drop" onclick="callHangup()">${X}</button>

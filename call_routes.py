@@ -556,7 +556,17 @@ async def handle_ws(request: web.Request):
             "recent": await _recent(peer),
             "ice": ice_servers(),
         })
-        log.info(f"[call] на связи: {peer.label} ({peer.kind})")
+        # Что умеет это устройство — в лог, один раз при входе. Догадки о чужом
+        # телефоне по памяти уже дорого обошлись; пусть будет запись.
+        env = hello.get("env") or {}
+        if isinstance(env, dict) and env:
+            log.info(f"[call] на связи: {peer.label} ({peer.kind}), устройство: "
+                     f"телеграм={env.get('tg') or '?'} экран={env.get('w') or '?'} "
+                     f"пальцем={bool(env.get('touch'))} "
+                     f"сессия_звука={bool(env.get('aus'))} "
+                     f"выбор_выхода={bool(env.get('sink'))} замок={bool(env.get('wake'))}")
+        else:
+            log.info(f"[call] на связи: {peer.label} ({peer.kind})")
         await _broadcast_roster()
 
         # Водителя мог поднять пинок — тогда его ждёт входящий.

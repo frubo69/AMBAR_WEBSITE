@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=42"></script>
+<script src="/vendor/ambar-call.js?v=43"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -5988,11 +5988,26 @@ button.pill:active{opacity:.6}
 /* Смайлики всегда крупные: растрируются один раз, плашке достаются
    уменьшенными. Уменьшение делает видеокарта, и оно выходит чётким. */
 .cs-safe-big{position:absolute;left:50%;top:0;
-  display:flex;align-items:center;gap:20px;height:52px;
+  display:flex;align-items:center;gap:14px;height:52px;
   font-size:42px;line-height:1;white-space:nowrap;
   transform-origin:50% 0;transform:translate(-50%,6px) scale(.4);
   transition:transform .42s var(--cs-ease)}
 .cs-safe.open .cs-safe-big{transform:translate(-50%,20px) scale(1)}
+
+/* Барабан. Каждый смайлик — окошко ростом в строку, за которым едет лента:
+   случайные кандидаты, потом настоящий смайлик, и ещё один за ним — чтобы на
+   доводке было чему выглянуть снизу. Лента едет трансформацией, размытие
+   висит на окошке отдельной дорожкой: смешать их в одной значило бы утащить
+   всю прокрутку с видеокарты на процессор. Размывается окошко, а не лента, —
+   лента в шестнадцать ячеек ростом, и размывать её целиком незачем. */
+.cs-sl{display:block;width:var(--cs-cell,44px);height:52px;overflow:hidden}
+.cs-sl-in{display:block}
+.cs-sl-in b{display:flex;align-items:center;justify-content:center;
+  height:52px;font-weight:400}
+/* Края окошка тают, только пока крутится: в покое они срезали бы смайлик. */
+.cs-safe-big.spin .cs-sl{
+  -webkit-mask-image:linear-gradient(to bottom,transparent,#000 26%,#000 74%,transparent);
+  mask-image:linear-gradient(to bottom,transparent,#000 26%,#000 74%,transparent)}
 
 .cs-safe-txt{position:absolute;top:87px;left:50%;
   width:min(276px,calc(100vw - 92px));
@@ -19900,14 +19915,17 @@ function callVideo(key){ callDial(key, true); }
 // у собеседника — между вами никого нет. Показываем только в разговоре: до
 // ответа ключей ещё нет, сверять нечего.
 let CALL_SAFE = null;
+let SAFE_ПОКАЗАНЫ = null;   // что уже прокрутили
 
 function safePaint(){
   const b = document.getElementById('csSafe'); if(!b) return;
   const есть = CALL_ST === 'live' && CALL_SAFE && CALL_SAFE.length === 4;
   b.classList.toggle('on', !!есть);
   if(есть){
-    const big = document.getElementById('csSafeBig');
-    if(big) big.innerHTML = CALL_SAFE.map(e => '<span>' + e + '</span>').join('');
+    // Крутим только когда смайлики впервые пришли: safePaint зовут на каждой
+    // перерисовке, и без этой памяти барабан срывался бы каждую секунду.
+    const ключ = CALL_SAFE.join('');
+    if(SAFE_ПОКАЗАНЫ !== ключ){ SAFE_ПОКАЗАНЫ = ключ; safeSpin(); }
     // Имя ставим подлежащим: «Если Худоба видит…». Так фраза остаётся верной
     // для любого прозвища — склонять их наугад нельзя.
     const кто = document.getElementById('csSafeWho'); if(кто) кто.textContent = CALL_WHO || 'собеседник';
@@ -19917,9 +19935,76 @@ function safePaint(){
     // всё равно уходит. И главное, снимаем затемнение: свернуть через
     // safeToggle тут нельзя, к этому моменту карточка уже скрыта, и он выйдет
     // сразу, оставив затемнение висеть поверх приложения.
+    SAFE_ПОКАЗАНЫ = null;
     b.classList.remove('open');
     document.getElementById('csSafeScrim')?.classList.remove('on');
   }
+}
+
+// Барабан. Смайлики не появляются готовыми: все четыре прокручиваются мимо и
+// останавливаются по очереди, с доводкой в конце. Мимо глаз идут не любые
+// картинки, а тот же алфавит, из которого считается сверка, — проходит только
+// то, что действительно могло выпасть.
+const SAFE_ЛЕНТА = 14;        // сколько чужих смайликов пролетает мимо
+const SAFE_ЯЧЕЙКА = 52;       // рост окошка, он же шаг ленты
+
+// Ширину окошка меряем, а не назначаем: у эмодзи она на разных системах
+// разная, и заданная на глаз либо срежет смайлик, либо оставит дыру.
+function safeCell(){
+  const big = document.getElementById('csSafeBig'); if(!big || !CALL_SAFE) return 44;
+  const p = document.createElement('span');
+  p.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;line-height:1';
+  p.innerHTML = CALL_SAFE.map(e =>
+    '<i style="font-style:normal;display:inline-block">' + e + '</i>').join('');
+  big.appendChild(p);
+  // Только offsetWidth: ряд смайликов в свёрнутой карточке уменьшен, и
+  // getBoundingClientRect отдал бы ширину уже ужатой — окошко вышло бы втрое
+  // уже смайлика и срезало бы его.
+  let w = 0;
+  for(const i of p.children) w = Math.max(w, i.offsetWidth);
+  p.remove();
+  return w ? Math.ceil(w) + 2 : 44;
+}
+
+function safeSpin(){
+  const big = document.getElementById('csSafeBig'); if(!big || !CALL_SAFE) return;
+  const алфавит = (window.AmbarCall && AmbarCall.EMOJI) || CALL_SAFE;
+  const чужой = () => алфавит[(Math.random() * алфавит.length) | 0];
+  big.style.setProperty('--cs-cell', safeCell() + 'px');
+  big.innerHTML = CALL_SAFE.map(e => {
+    let л = '';
+    for(let k = 0; k < SAFE_ЛЕНТА; k++) л += '<b>' + чужой() + '</b>';
+    return '<span class="cs-sl"><i class="cs-sl-in">' + л +
+           '<b>' + e + '</b><b>' + чужой() + '</b></i></span>';
+  }).join('');
+
+  const путь = SAFE_ЛЕНТА * SAFE_ЯЧЕЙКА;
+  const ленты = big.querySelectorAll('.cs-sl-in');
+  // Просили меньше движения — значит меньше движения: ставим сразу на место.
+  const тихо = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  ленты.forEach((л, i) => {
+    л.style.transform = 'translateY(-' + путь + 'px)';   // покой — на своём смайлике
+    if(тихо) return;
+    const мс = 640 + i * 120;                            // останавливаются по очереди
+    try{
+      л.animate([
+        {transform: 'translateY(0)', easing: 'cubic-bezier(.2,.5,.3,1)'},
+        {transform: 'translateY(-' + (путь + 9) + 'px)', offset: .86,
+         easing: 'cubic-bezier(.4,0,.2,1)'},
+        {transform: 'translateY(-' + путь + 'px)'}
+      ], {duration: мс});
+      л.parentNode.animate([
+        {filter: 'blur(0px)'}, {filter: 'blur(3.6px)', offset: .12},
+        {filter: 'blur(2.8px)', offset: .58}, {filter: 'blur(0px)', offset: .9},
+        {filter: 'blur(0px)'}
+      ], {duration: мс});
+    }catch(e){}
+  });
+  if(тихо) return;
+  big.classList.add('spin');
+  clearTimeout(safeSpin._t);
+  safeSpin._t = setTimeout(() => big.classList.remove('spin'),
+                           640 + (ленты.length - 1) * 120 + 80);
 }
 
 // Две меры карточка не может взять из CSS: ширина плашки зависит от того,

@@ -156,6 +156,12 @@
         self._hideT = setTimeout(function () {
           if (!self.call) self._freeMic();
         }, MIC_FREE_AFTER);
+      } else if (self.call) {
+        // Замок экрана система снимает сама, как только страницу спрятали, и
+        // обратно не ставит. Вернулись в приложение посреди разговора — берём
+        // заново: иначе экран гаснет прямо во время звонка, а вместе с ним на
+        // телефоне засыпает и сам разговор.
+        self._keepAwake(true);
       }
     });
   }
@@ -690,8 +696,14 @@
     if (on) {
       try {
         if (navigator.wakeLock && !this._wake) {
-          navigator.wakeLock.request('screen').then(function (w) { self._wake = w; })
-            .catch(function () {});
+          navigator.wakeLock.request('screen').then(function (w) {
+            self._wake = w;
+            // Систему просить дважды нельзя, а снимает она молча — поэтому
+            // отпущенный замок сразу забываем, чтобы взять новый было можно.
+            w.addEventListener('release', function () {
+              if (self._wake === w) self._wake = null;
+            });
+          }).catch(function () {});
         }
       } catch (e) {}
     } else if (this._wake) {

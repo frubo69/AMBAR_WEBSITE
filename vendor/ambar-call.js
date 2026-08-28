@@ -302,30 +302,54 @@
   //
   // Поэтому: до первого звука сессию не трогаем вовсе, а трубку включаем
   // всегда переходом — сначала обычная, следом разговорная.
+  // Переключаем ТОЛЬКО на паузе, и это оказалось главным.
+  //
+  // Менять маршрут под играющим звуком нельзя: система не переводит живой
+  // выход, а заводит рядом второй — старый при этом продолжает играть. Отсюда
+  // «слышно и в ухе, и в динамике одновременно». Поэтому порядок телефонный:
+  // замолчали, переложили трубку, заговорили снова.
+  //
+  // Пауза между значениями тоже обязательна: два присвоения подряд система
+  // склеивает в одно и изменения не видит, а переключает она именно изменение.
   AmbarCall.prototype._applyRoute = function (why) {
-    var self = this, ear = this.route === 'ear';
+    var self = this, ear = this.route === 'ear', a = this.audio;
     clearTimeout(this._routeT); this._routeT = null;
-    if (!_session('auto')) {
+
+    if (!_session('auto')) {                       // системной сессии нет
       try {
-        if (this._earSink && this.audio && this.audio.setSinkId) {
-          this.audio.setSinkId(ear ? this._earSink : '').catch(function () {});
+        if (this._earSink && a && a.setSinkId) {
+          a.setSinkId(ear ? this._earSink : '').catch(function () {});
           this._diag('канал через выход устройства: ' + (ear ? 'ухо' : 'динамик'));
         }
       } catch (e) {}
       return;
     }
-    if (!ear) { this._diag('канал: динамик · ' + (why || '')); return; }
-    // Пауза между значениями обязательна: два присвоения подряд система
-    // склеивает в одно и никакого изменения не видит, а переключает она
-    // именно изменение.
+
+    // Своя пауза: обработчик паузы не должен принять её за системный перерыв
+    // и запустить звук раньше времени — иначе переключать снова нечего.
+    //
+    // Поток на это время ОТСОЕДИНЯЕМ. Паузы мало: пока поток висит на
+    // элементе, у системы остаётся живой выход, и новый она заводит рядом со
+    // старым. Отсоединили — старому играть нечем, и второго голоса взяться
+    // неоткуда.
+    this._switching = true;
+    var поток = a && a.srcObject;
+    try { if (a) { a.pause(); a.srcObject = null; } } catch (e) {}
+
     this._routeT = setTimeout(function () {
       self._routeT = null;
-      if (self.route !== 'ear' || !self.call) return;
-      _session('play-and-record');
-      self._diag('канал: ухо · ' + (why || '') + ' · тип=' + _type() +
-                 ' · элемент=' + (self.audio ? self.audio.tagName : 'нет') +
-                 '/' + (self.audio && self.audio.paused ? 'пауза' : 'играет'));
-    }, 300);
+      if (!self.call) { self._switching = false; return; }
+      if (self.route === 'ear') _session('play-and-record');
+      setTimeout(function () {
+        self._switching = false;
+        try { if (self.audio && поток) self.audio.srcObject = поток; } catch (e) {}
+        self._resume();
+        self._diag('канал: ' + (self.route === 'ear' ? 'ухо' : 'динамик') +
+                   ' · ' + (why || '') + ' · тип=' + _type() +
+                   ' · элемент=' + (self.audio ? self.audio.tagName : 'нет') +
+                   '/' + (self.audio && self.audio.paused ? 'пауза' : 'играет'));
+      }, 140);
+    }, 260);
   };
 
   AmbarCall.prototype.audioTo = function (where, тихо) {
@@ -864,9 +888,9 @@
       // при этом всегда начиналось с «обычной» сессии, поэтому разговор и
       // оставался в громкой связи, сколько на кнопку ни жми.
       a.addEventListener('pause', function () {
-        if (!self.call || !a.srcObject) return;
+        if (!self.call || !a.srcObject || self._switching) return;
         setTimeout(function () {
-          if (self.call && a.srcObject && a.paused) self._resume();
+          if (self.call && a.srcObject && a.paused && !self._switching) self._resume();
         }, 120);
       });
       document.body.appendChild(a);
@@ -1077,7 +1101,8 @@
   };
 
   AmbarCall.prototype._teardown = function (why) {
-    clearTimeout(this._routeT); this._routeT = null; this._routed = false;
+    clearTimeout(this._routeT); this._routeT = null;
+    this._routed = false; this._switching = false;
     this.tones.stop();
     // Конец разговора и несостоявшийся звонок звучат по-разному — как в
     // телефоне: короткий тон в конце разговора и отбойный, когда соединения

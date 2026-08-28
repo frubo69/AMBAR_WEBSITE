@@ -154,6 +154,11 @@
   // функцией не ради красоты: её надо звать и при выключении звонка, и при
   // выходе из приложения, и забыть хоть один вызов — значит оставить весь
   // звук приложения в трубке у уха.
+  function _type() {
+    try { return (navigator.audioSession && navigator.audioSession.type) || '—'; }
+    catch (e) { return '—'; }
+  }
+
   function _session(type) {
     try {
       if (navigator.audioSession && 'type' in navigator.audioSession) {
@@ -225,6 +230,14 @@
     });
   }
 
+  // Несколько строк с устройства в лог сервера. Не логи ради логов: звук
+  // ведёт себя по-разному на каждом телефоне, а увидеть его отсюда нельзя —
+  // и трижды подряд это кончалось починкой вслепую.
+  AmbarCall.prototype._diag = function (text) {
+    if ((this._diagN = (this._diagN || 0) + 1) > 8) return;
+    this._send({t: 'diag', text: String(text).slice(0, 200)});
+  };
+
   AmbarCall.prototype._emit = function (t, d) {
     try { this.on(t, d || {}); } catch (e) { console.warn('[call]', e); }
   };
@@ -289,21 +302,29 @@
   //
   // Поэтому: до первого звука сессию не трогаем вовсе, а трубку включаем
   // всегда переходом — сначала обычная, следом разговорная.
-  AmbarCall.prototype._applyRoute = function () {
+  AmbarCall.prototype._applyRoute = function (why) {
     var self = this, ear = this.route === 'ear';
     clearTimeout(this._routeT);
     if (!_session('auto')) {
       try {
         if (this._earSink && this.audio && this.audio.setSinkId) {
           this.audio.setSinkId(ear ? this._earSink : '').catch(function () {});
+          this._diag('канал через выход устройства: ' + (ear ? 'ухо' : 'динамик'));
         }
       } catch (e) {}
       return;
     }
-    if (!ear) return;
+    if (!ear) { this._diag('канал: динамик · ' + (why || '')); return; }
+    // Пауза между значениями обязательна: два присвоения подряд система
+    // склеивает в одно и никакого изменения не видит, а переключает она
+    // именно изменение.
     this._routeT = setTimeout(function () {
-      if (self.route === 'ear' && self.call) _session('play-and-record');
-    }, 80);
+      if (self.route !== 'ear' || !self.call) return;
+      _session('play-and-record');
+      self._diag('канал: ухо · ' + (why || '') + ' · тип=' + _type() +
+                 ' · элемент=' + (self.audio ? self.audio.tagName : 'нет') +
+                 '/' + (self.audio && self.audio.paused ? 'пауза' : 'играет'));
+    }, 300);
   };
 
   AmbarCall.prototype.audioTo = function (where, тихо) {
@@ -471,6 +492,7 @@
         break;
 
       case 'ring':                                  // нам звонят
+        _session('auto');                           // трель — в громкий динамик
         this.call = {id: m.call, peer: m.frm, dir: 'in', order: m.order || '',
                      kind: m.kind || '', video: !!m.video};
         this.tones.ring();
@@ -555,6 +577,10 @@
     // секунда, а то и две полной тишины, в которую человек успевает решить,
     // что ничего не работает. Не прошло — тишину сменит короткий отбойный тон.
     this.tones.prime();
+    // Гудки — в громкий динамик, телефон в этот момент в руке. Заодно это
+    // ставит сессию в обычное состояние, и переход в разговорную, когда
+    // разговор начнётся, оказывается настоящим переходом.
+    _session('auto');
     this.tones.ringback();
     return this._mic().then(function () {
       return self.video ? self._camOn() : null;
@@ -803,22 +829,29 @@
       // Голос собеседника играет ровно в одном месте — здесь. Видеоокно берёт
       // из потока только картинку, иначе тот же голос звучал бы дважды.
       //
-      // Элемент именно video и именно видимый, пусть в один пиксель. Разница
-      // не косметическая: голосовой разговор обрывался при уходе из телеграма,
-      // а видеозвонок — нет, и единственное, чем они отличались, — что при
-      // видео звук вело настоящее видеоокно, а при голосе спрятанный display:none
-      // элемент. Спрятанному система фонового звука не даёт.
-      var a = document.createElement('video');
-      a.autoplay = true; a.playsInline = true; a.muted = false; a.volume = 1;
+      // Элемент именно audio. Здесь был video — я поставил его, когда искал
+      // причину обрыва разговора при уходе из телеграма, и это оказалось
+      // дорогой ошибкой: айфон считает видео обычным воспроизведением и ведёт
+      // его в громкий динамик, а ушной оставляет разговорному звуку. Сколько
+      // ни переключай сессию, звук из видеоэлемента в ухо не пойдёт.
+      //
+      // Элемент остаётся в разметке и видимым в один пиксель: спрятанному
+      // display:none система фонового звука не даёт.
+      var a = document.createElement('audio');
+      a.autoplay = true; a.muted = false; a.volume = 1;
       a.setAttribute('playsinline', '');
-      a.setAttribute('webkit-playsinline', '');
       a.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;' +
                         'opacity:.01;pointer-events:none;z-index:-1';
+      // Канал включаем не когда решили, а когда звук ПОШЁЛ. До первой
+      // проигранной секунды переключать системе нечего — она и не переключает.
+      var self = this;
+      a.addEventListener('playing', function () {
+        if (self.call) self._applyRoute('пошёл звук');
+      });
       // Система прерывает воспроизведение сама: смена звуковой сессии, входящий
       // системный звук, переключение выхода. Элемент после этого остаётся на
       // паузе и сам не возвращается — возвращаем мы, иначе разговор беззвучно
       // умирает на ровном месте.
-      var self = this;
       a.addEventListener('pause', function () {
         if (!self.call || !a.srcObject) return;
         setTimeout(function () {
@@ -873,10 +906,10 @@
       // Звук всегда в свой элемент: видео может быть выключено, а слышать надо.
       if (self.audio && e.track.kind === 'audio') {
         self.audio.srcObject = st;
-        // Голос пошёл — только теперь системе есть что маршрутизировать.
-        // Повторяем выбор канала здесь, иначе разговор начнётся в громкой
-        // связи, что бы ни было выставлено до этого.
-        self.audioTo(self.route || 'speaker', true);
+        // Только запускаем. Канал переключит событие «пошёл звук» — приход
+        // дорожки ещё не значит, что её слышно, а переключать системе нечего,
+        // пока звук не идёт на самом деле.
+        self._resume();
       }
       if (e.track.kind === 'video') {
         self.video = true;

@@ -43,12 +43,19 @@
   'use strict';
 
 
-  // Свернули дольше — отпускаем микрофон. Полминуты оказалось мало: AMBAR STAR
-  // сворачивают и разворачивают десятки раз за вечер, и каждый раз система
-  // спрашивала разрешение заново. Три минуты закрывают обычное переключение
-  // между приложениями; за это время индикатор записи горит, но дорожка
-  // выключена и в неё ничего не пишется.
-  var MIC_FREE_AFTER = 180000;
+  // Микрофон держим всё время, пока открыто приложение, и отпускаем только
+  // когда его закрывают.
+  //
+  // Постоянное разрешение выдаёт не страница, а приложение-хозяин: в вебките
+  // это решение WKWebView, у мини-аппов телеграма такого API нет вовсе. Со
+  // стороны страницы работает ровно один приём — не отпускать поток: пока он
+  // живой, система не спрашивает заново. Отпустили на три минуты — и следующий
+  // звонок снова упирается в системное окно, а сворачивают приложение за вечер
+  // десятки раз.
+  //
+  // Плата за это — индикатор записи горит, пока приложение открыто. Дорожка
+  // при этом ВЫКЛЮЧЕНА между звонками (enabled = false), и в неё ничего не
+  // пишется: индикатор говорит «микрофон занят», а не «вас слушают».
   var STATS_EVERY = 3000;        // как часто смотрим на качество связи
   var ICE_RESTART_AFTER = 4000;  // столько ждём, прежде чем пересобирать связь
   var VIDEO_MAX_KBPS = 600;      // потолок картинки: голос важнее её всегда
@@ -204,17 +211,10 @@
     this._wake = null;
 
     var self = this;
-    // Свернули приложение — отпускаем микрофон, но не сразу: короткое
-    // переключение на карты не должно стоить нового окна с разрешением.
     document.addEventListener('visibilitychange', function () {
-      clearTimeout(self._hideT);
-      if (document.hidden) {
-        self._hideT = setTimeout(function () {
-          if (!self.call) self._freeMic();
-        }, MIC_FREE_AFTER);
-      } else if (self.call) {
+      if (!document.hidden && self.call) {
         // Замок берём заново только если экран вообще нужен.
-        if (self.video || self.route === 'speaker') self._keepAwake(true);
+        if (self.video) self._keepAwake(true);
         // Замок экрана система снимает сама, как только страницу спрятали, и
         // обратно не ставит. Вернулись в приложение посреди разговора — берём
         // заново: иначе экран гаснет прямо во время звонка, а вместе с ним на
@@ -500,9 +500,7 @@
     // ничего не работает. Не прошло — тишину сменит короткий отбойный тон.
     this.tones.prime();
     this.tones.ringback();
-    return this._mic().then(function () {
-      return self.video ? self._camOn() : null;
-    }).then(function () {
+    return (this.video ? this._micCam() : this._mic()).then(function () {
       self._send({t: 'call', to: toKey || self.defaultTarget || '',
                   order: order || '', video: self.video});
     }).catch(function (e) {
@@ -517,9 +515,8 @@
     var self = this, id = this.call.id;
     this.tones.prime();
     this.video = !!this.call.video;
-    return this._mic().then(function () {
-      return self.video ? self._camOn() : null;
-    }).then(function () { self._send({t: 'accept', call: id}); })
+    return (this.video ? this._micCam() : this._mic())
+      .then(function () { self._send({t: 'accept', call: id}); })
       .catch(function (e) {
         // Камеры может не быть или её могут не дать — звонок от этого умирать
         // не должен: продолжаем голосом.
@@ -588,6 +585,66 @@
     });
   };
 
+  // Микрофон и камера — ОДНИМ запросом.
+  //
+  // Раньше видеозвонок просил их по очереди: сначала микрофон, потом камеру.
+  // Для системы это два разных запроса, и человек видел два окна подряд —
+  // ровно то, что бесит. Просить сразу оба — единственный способ обойтись
+  // одним окном, и по той же причине их надо просить как можно реже: чем
+  // меньше запросов, тем меньше окон.
+  AmbarCall.prototype._micCam = function () {
+    var self = this;
+    var камЖива = !!(this.cam && this.cam.getVideoTracks().some(function (t) {
+      return t.readyState === 'live';
+    }));
+    // Просим ровно то, чего не хватает. Лишний запрос — это лишнее окно, даже
+    // когда разрешение уже дано: система показывает его на каждый вызов.
+    if (this.micLive() && камЖива) return Promise.resolve(this.stream);
+    if (this.micLive()) {
+      return this._camOn().then(function () { return self.stream; })
+                          .catch(function () {
+                            self._emit('novideo', {});
+                            self.video = false;
+                            return self.stream;
+                          });
+    }
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      this._emit('nomic', {why: 'unsupported'});
+      return Promise.reject(new Error('no getUserMedia'));
+    }
+    this.facing = this.facing || 'user';
+    return navigator.mediaDevices.getUserMedia({
+      audio: {echoCancellation: true, noiseSuppression: true, autoGainControl: true},
+      video: {facingMode: this.facing, width: {ideal: 640}, height: {ideal: 480},
+              frameRate: {ideal: 20, max: 24}}
+    }).then(function (s) {
+      var зв = s.getAudioTracks(), кар = s.getVideoTracks();
+      if (self.stream && self.stream !== s) {
+        self.stream.getAudioTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
+      }
+      self.stream = new MediaStream(зв);
+      self._prepAudio();
+      try { localStorage.setItem('ambar_mic_ok', '1'); } catch (e) {}
+      try { localStorage.setItem('ambar_cam_ok', '1'); } catch (e) {}
+      self._emit('mic', {ok: true});
+      if (кар.length) {
+        self.cam = new MediaStream(кар);
+        self.video = true;
+        self._wireCam(кар[0]);
+        var sn = self._vsender();
+        if (sn) { sn.replaceTrack(кар[0]); self._capVideo(); }
+        self._emit('cam', {on: true, facing: self.facing, stream: self.cam});
+        self._send({t: 'camstate', on: true});
+      }
+      return self.stream;
+    }).catch(function (err) {
+      // Камеру могли не дать, а микрофон дать — звонок голосом должен состояться.
+      self._emit('novideo', {});
+      self.video = false;
+      return self._mic();
+    });
+  };
+
   AmbarCall.prototype._mic = function () {
     var self = this;
     if (this.micLive()) {                      // уже есть — просто включаем
@@ -642,6 +699,30 @@
     }) || null;
   };
 
+  // Дорожка камеры сама рассказывает о себе: система останавливает съёмку
+  // молча, и без этого у собеседника оставался бы замерший кадр.
+  //
+  // Говорит только ТЕКУЩАЯ дорожка. Поворот берёт новую и останавливает
+  // старую — остановка это тоже «съёмка кончилась», и без проверки старая
+  // успевала доложить «камеру выключили» уже после того, как новая заработала.
+  AmbarCall.prototype._wireCam = function (track) {
+    var self = this;
+    var своя = function () {
+      return !!(self.cam && self.cam.getVideoTracks().indexOf(track) >= 0);
+    };
+    track.onmute = track.onunmute = function () {
+      if (!своя()) return;
+      var live = track.readyState === 'live' && !track.muted;
+      self._send({t: 'camstate', on: live});
+      self._emit('cam', {on: live, facing: self.facing});
+    };
+    track.onended = function () {
+      if (!своя()) return;
+      self._send({t: 'camstate', on: false});
+      self._emit('cam', {on: false, facing: self.facing});
+    };
+  };
+
   // Камера живёт только на время разговора — в отличие от микрофона её держать
   // между звонками нельзя: горящий глазок весь день пугает не зря.
   AmbarCall.prototype._camOn = function (facing) {
@@ -675,26 +756,7 @@
       // Своя дорожка про это честно сообщает (mute/unmute), в отличие от
       // чужой, на которую полагаться нельзя. Поэтому слушаем свою и говорим
       // собеседнику словами — теми же словами, что и при нажатии кнопки.
-      //
-      // Говорит только ТЕКУЩАЯ дорожка. Поворот камеры берёт новую и
-      // останавливает старую — а остановка это тоже «съёмка кончилась». Без
-      // проверки старая дорожка успевала доложить «камеру выключили», уже
-      // после того как новая заработала: картинка у собеседника пропадала, а
-      // камеру приходилось включать заново руками.
-      var своя = function () {
-        return !!(self.cam && self.cam.getVideoTracks().indexOf(track) >= 0);
-      };
-      track.onmute = track.onunmute = function () {
-        if (!своя()) return;
-        var live = track.readyState === 'live' && !track.muted;
-        self._send({t: 'camstate', on: live});
-        self._emit('cam', {on: live, facing: self.facing});
-      };
-      track.onended = function () {
-        if (!своя()) return;
-        self._send({t: 'camstate', on: false});
-        self._emit('cam', {on: false, facing: self.facing});
-      };
+      self._wireCam(track);
       // Соединение уже собрано — просто подменяем дорожку, без пересборки.
       var sender = self._vsender();
       if (sender) { sender.replaceTrack(track); self._capVideo(); }

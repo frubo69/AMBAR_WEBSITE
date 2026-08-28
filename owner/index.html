@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=46"></script>
+<script src="/vendor/ambar-call.js?v=47"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -6165,11 +6165,12 @@ button.pill:active{opacity:.6}
    нужен настоящий фонарик, и он у неё есть. */
 .cv-glow{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0;
   transition:opacity .3s ease;
-  background:
-    linear-gradient(to right,#fff4e2 0,#fff4e2 3.5%,rgba(255,244,226,0) 30%),
-    linear-gradient(to left,#fff4e2 0,#fff4e2 3.5%,rgba(255,244,226,0) 30%),
-    linear-gradient(to bottom,#fff4e2 0,#fff4e2 2.5%,rgba(255,244,226,0) 22%),
-    linear-gradient(to top,#fff4e2 0,#fff4e2 2.5%,rgba(255,244,226,0) 22%)}
+  /* Одной внутренней тенью, а не четырьмя градиентами: градиенты по углам
+     складывались друг с другом и давали грязные пятна, а тень идёт по
+     периметру непрерывно — ровным кольцом и без стыков. Полоса узкая
+     намеренно: широкая доходила до плашки с именем и засвечивала её. */
+  box-shadow:inset 0 0 42px 13px #fff4e2,
+             inset 0 0 96px 0 rgba(255,244,226,.42)}
 .cv.lamp .cv-glow{opacity:1}
 
 /* Лучи у фонарика дорисовываются, когда он горит, — тем же приёмом, что и

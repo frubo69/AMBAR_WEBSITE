@@ -290,7 +290,6 @@
   AmbarCall.prototype.audioTo = function (where, тихо) {
     var self = this, ear = where !== 'speaker';
     var менялось = this.route !== (ear ? 'ear' : 'speaker');
-    this._fell = false;
     this.route = ear ? 'ear' : 'speaker';
     this._applyRoute();
     // Смена сессии перезапускает звук на уровне системы, и элемент после неё
@@ -306,36 +305,27 @@
     return this.route;
   };
 
-  // Вернуть звук после смены сессии и убедиться, что он правда идёт. Не пошёл
-  // в трубку — уходим в громкую связь: слышный разговор важнее выбранного
-  // канала, а молчащая трубка — это оборванный разговор.
+  // Вернуть звук после того, как система его прервала: смена сессии, чужой
+  // системный звук, переключение выхода. Просто просим играть дальше — судить
+  // о том, получилось ли, тут нельзя, для этого есть отдельный счётчик отказов.
   AmbarCall.prototype._resume = function () {
     var self = this, a = this.audio;
-    // Пока звука собеседника нет, играть нечего и судить не о чем: элемент
-    // честно стоит на паузе, и принять это за поломку — значит сбрасывать
-    // канал на каждом звонке ещё до первого слова.
+    // Пока звука собеседника нет, играть нечего и судить не о чем.
     if (!a || !a.srcObject) return;
     try {
       var p = a.play();
-      if (p && p.catch) p.catch(function () { self._fallback(); });
-    } catch (e) { self._fallback(); }
-    // Проверяем не сразу: play() отвечает не мгновенно, и «на паузе» через
-    // миллисекунду после запуска — это не ответ.
-    clearTimeout(this._resumeT);
-    this._resumeT = setTimeout(function () {
-      if (self.audio && self.audio.srcObject && self.audio.paused) self._fallback();
-    }, 700);
+      if (p && p.catch) p.catch(function () {});
+    } catch (e) {}
   };
 
-  AmbarCall.prototype._fallback = function () {
-    if (this.route !== 'ear' || this._fell) return;
-    this._fell = true;
-    _session('auto');
-    var a = this.audio;
-    if (a) { try { a.play().catch(function () {}); } catch (e) {} }
-    this.route = 'speaker';
-    this._emit('route', {to: 'speaker', real: this.canRoute(), forced: true});
-  };
+  // Автоматического «а давайте вернём громкую связь» здесь больше нет, и это
+  // осознанно. Признака «в трубку не пошло» у страницы не существует: смена
+  // звуковой сессии сама на мгновение ставит элемент на паузу, а прямой отказ
+  // системы приходит и на обычном переключении. Обе догадки уже были и обе
+  // сделали хуже — сначала разговор уходил в громкую сам, потом на трубку
+  // нельзя было переключиться вовсе, потому что каждое нажатие тут же
+  // отменялось. Не слышно в трубке — человек нажмёт кнопку сам, это одно
+  // касание; отменять его выбор за него нельзя.
 
   // Что этот телефон вообще умеет. Уходит один раз при входе и попадает в лог
   // сервера: гадать о чужом устройстве по памяти — то, за что уже досталось.
@@ -805,6 +795,17 @@
       a.setAttribute('webkit-playsinline', '');
       a.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;' +
                         'opacity:.01;pointer-events:none;z-index:-1';
+      // Система прерывает воспроизведение сама: смена звуковой сессии, входящий
+      // системный звук, переключение выхода. Элемент после этого остаётся на
+      // паузе и сам не возвращается — возвращаем мы, иначе разговор беззвучно
+      // умирает на ровном месте.
+      var self = this;
+      a.addEventListener('pause', function () {
+        if (!self.call || !a.srcObject) return;
+        setTimeout(function () {
+          if (self.call && a.srcObject && a.paused) self._resume();
+        }, 120);
+      });
       document.body.appendChild(a);
       this.audio = a;
     }
@@ -1020,7 +1021,6 @@
     setTimeout(function () { tn.release(); }, 900);
     clearInterval(this._statsT); this._statsT = null;
     clearTimeout(this._iceRestartT);
-    clearTimeout(this._resumeT);
     this._keepAwake(false);
     if (this.pc) { try { this.pc.close(); } catch (e) {} this.pc = null; }
     // Микрофон НЕ останавливаем — только глушим. Следующий звонок не должен

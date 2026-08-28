@@ -1,0 +1,165 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Телеграм или вебкит</title>
+<!--
+  Один вопрос, и он последний: разрешает ли телеграм менять звуковую сессию.
+  Никаких гудков и лишнего звука — только голос, чтобы ничто его не заглушало.
+  Делается ровно то же, что делает приложение, и в том же порядке:
+
+      navigator.audioSession.type = 'play-and-record'   ← до записи
+      getUserMedia()                                     ← запись
+      голос через настоящее соединение в элемент
+
+  Открывается дважды: в телеграме и в сафари.
+
+  · в сафари ухо, в телеграме динамик → сессией распоряжается телеграм, и из
+    мини-аппа её не перебить ничем. Ответ окончательный;
+  · нигде не ухо → дело в вебките, и рычаг тут не тот;
+  · везде ухо → дело в приложении, и я знаю, где искать дальше.
+-->
+<style>
+  :root{ --bg:#08080f; --card:#14141f; --line:rgba(255,255,255,.10);
+         --text:#EDEDF2; --sub:rgba(237,237,242,.55); --gold:#C9A96E; --gold2:#E8C98A; }
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.5 -apple-system,
+       BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+       padding:calc(18px + env(safe-area-inset-top)) 16px calc(28px + env(safe-area-inset-bottom))}
+  h1{font-size:19px;margin:0 0 4px}
+  .sub{color:var(--sub);font-size:13px;margin-bottom:18px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;
+        padding:13px 14px;margin-bottom:12px}
+  .card h2{font-size:13px;font-weight:700;color:var(--gold2);margin:0 0 8px;
+           letter-spacing:.3px;text-transform:uppercase}
+  button{width:100%;padding:16px 14px;margin-bottom:9px;border:0;border-radius:12px;
+         background:#23233a;color:var(--text);font-size:16px;font-weight:600;
+         cursor:pointer;text-align:left;font-family:inherit}
+  button:active{transform:scale(.985)}
+  button.main{background:var(--gold);color:#151009}
+  button.stop{background:#E05555;color:#fff}
+  button small{display:block;font-weight:400;color:rgba(255,255,255,.5);
+               font-size:12.5px;margin-top:3px}
+  button.main small{color:rgba(21,16,9,.6)}
+  button:disabled{opacity:.35}
+  .где{font-size:13px;color:var(--gold2);font-weight:700;margin-bottom:10px}
+  pre{margin:0;white-space:pre-wrap;word-break:break-word;font-size:12.5px;
+      color:var(--sub);font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+  .ok{color:#5BC98A} .bad{color:#E88}
+</style>
+
+<h1>Телеграм или вебкит</h1>
+<div class="sub">Только голос, без гудков — чтобы ничто его не заглушало.
+  Откройте эту страницу <b>дважды</b>: в телеграме и в сафари, и сравните.</div>
+
+<div class="card">
+  <div class="где" id="где">—</div>
+  <button class="main" id="go">Пустить голос в ухо
+    <small>сессия разговора → микрофон → голос через соединение</small></button>
+  <button id="spk" disabled>Переключить в громкий динамик</button>
+  <button id="ear" disabled>Вернуть в ухо</button>
+  <button class="stop" id="end" disabled>Стоп</button>
+</div>
+
+<div class="card">
+  <h2>Что видно</h2>
+  <pre id="out">—</pre>
+</div>
+
+<script>
+(function () {
+  var out = document.getElementById('out'), строки = [];
+  function лог(t, кл) {
+    строки.unshift((кл ? (кл === 'ok' ? '✓ ' : '✗ ') : '· ') + t);
+    out.innerHTML = строки.slice(0, 12).map(function (s) {
+      var c = s[0] === '✓' ? 'ok' : s[0] === '✗' ? 'bad' : '';
+      return '<span class="' + c + '">' + s.replace(/[<>&]/g, '') + '</span>';
+    }).join('\n');
+  }
+  function кнопка(id, вкл) { document.getElementById(id).disabled = !вкл; }
+
+  var вТелеграме = !!(window.Telegram && window.Telegram.WebApp && window.Telegram.WebApp.platform);
+  document.getElementById('где').textContent = вТелеграме ? 'Открыто В ТЕЛЕГРАМЕ' : 'Открыто В БРАУЗЕРЕ';
+
+  var ac = null, мик = null, эл = null, A = null, B = null, тон = null;
+
+  function сессия(v) {
+    try {
+      if (navigator.audioSession && 'type' in navigator.audioSession) {
+        navigator.audioSession.type = v;
+        лог('сессия = ' + v + ' (читается как «' + navigator.audioSession.type + '»)', 'ok');
+        return true;
+      }
+    } catch (e) {}
+    лог('звуковой сессии в этом браузере нет', 'bad');
+    return false;
+  }
+
+  // Начать запись заново — только в этот момент система смотрит на тип сессии.
+  function запись(тип) {
+    сессия(тип);
+    var старый = мик;
+    return navigator.mediaDevices.getUserMedia({audio: true}).then(function (s) {
+      мик = s;
+      лог('запись началась заново', 'ok');
+      if (старый && старый !== s) {
+        старый.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
+      }
+      return s;
+    });
+  }
+
+  document.getElementById('go').onclick = function () {
+    запись('play-and-record').then(function () {
+      // Голос собеседника: ровный тон через настоящее соединение — как в звонке.
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      tonСоздать();
+      кнопка('go', false); кнопка('spk', true); кнопка('ear', true); кнопка('end', true);
+    }).catch(function (e) { лог('не вышло: ' + ((e && e.name) || e), 'bad'); });
+  };
+
+  function tonСоздать() {
+    тон = ac.createOscillator();
+    var g = ac.createGain(), d = ac.createMediaStreamDestination();
+    тон.frequency.value = 480; g.gain.value = 0.12;
+    тон.connect(g); g.connect(d); тон.start();
+
+    A = new RTCPeerConnection(); B = new RTCPeerConnection();
+    A.onicecandidate = function (e) { if (e.candidate) B.addIceCandidate(e.candidate); };
+    B.onicecandidate = function (e) { if (e.candidate) A.addIceCandidate(e.candidate); };
+    B.ontrack = function (e) {
+      var st = (e.streams && e.streams[0]) || new MediaStream([e.track]);
+      эл = document.createElement('audio');
+      эл.autoplay = true; эл.setAttribute('playsinline', '');
+      эл.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:.01';
+      document.body.appendChild(эл);
+      эл.srcObject = st;
+      эл.play().then(function () { лог('ГОЛОС ПОШЁЛ — слушайте, откуда', 'ok'); })
+               .catch(function (er) { лог('голос не пошёл: ' + er.name, 'bad'); });
+    };
+    d.stream.getAudioTracks().forEach(function (t) { A.addTrack(t, d.stream); });
+    A.createOffer().then(function (o) { return A.setLocalDescription(o); })
+     .then(function () { return B.setRemoteDescription(A.localDescription); })
+     .then(function () { return B.createAnswer(); })
+     .then(function (an) { return B.setLocalDescription(an); })
+     .then(function () { return A.setRemoteDescription(B.localDescription); })
+     .catch(function (e) { лог('соединение не собралось: ' + e.name, 'bad'); });
+  }
+
+  // Переключение — тем же способом: тип, затем запись заново.
+  document.getElementById('spk').onclick = function () { запись('auto').catch(function () {}); };
+  document.getElementById('ear').onclick = function () { запись('play-and-record').catch(function () {}); };
+
+  document.getElementById('end').onclick = function () {
+    try { if (тон) тон.stop(); } catch (e) {}
+    if (эл) { try { эл.pause(); эл.srcObject = null; эл.remove(); } catch (e) {} }
+    эл = null;
+    try { if (A) A.close(); if (B) B.close(); } catch (e) {}
+    try { if (мик) мик.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
+    try { if (ac) ac.close(); } catch (e) {}
+    ac = null;
+    сессия('auto');
+    ['go', 'spk', 'ear', 'end'].forEach(function (id) { кнопка(id, false); });
+    лог('остановлено', 'ok');
+  };
+})();
+</script>

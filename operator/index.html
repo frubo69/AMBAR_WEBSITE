@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=45"></script>
+<script src="/vendor/ambar-call.js?v=46"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -903,7 +903,7 @@ a.oc-row:active{background:var(--card2)}
 .cvo.selfie .cvo-state{color:rgba(255,255,255,.88)}
 .cvo.selfie .cvo-role{color:rgba(255,255,255,.72)}
 .cvo.selfie .cvo-lbl{color:rgba(255,255,255,.9)}
-.cv.on.selfie .cv-pill,.cv.on.selfie .cv-side,.cv.on.selfie .cv-flip{display:none}
+.cv.on.selfie .cv-pill,.cv.on.selfie .cv-side,.cv.on.selfie .cv-left{display:none}
 .cvo-top{padding:calc(44px + var(--safe-top)) 24px 0}
 .cvo-role{font-size:15px;color:var(--sub)}
 .cvo-name{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;
@@ -987,9 +987,7 @@ a.oc-row:active{background:var(--card2)}
   transition:stroke-dashoffset .3s cubic-bezier(.32,.72,0,1),opacity .1s ease}
 .cv-rb.on .cvx{stroke-dashoffset:0;opacity:1}
 
-.cv-flip{position:absolute;left:clamp(12px,4vw,20px);
-  bottom:calc(clamp(20px,5.5vw,34px) + var(--safe-bottom));z-index:7;
-  --d:clamp(44px,12vw,54px);width:var(--d);height:var(--d);border-radius:50%;
+.cv-flip,.cv-lamp{--d:clamp(44px,12vw,54px);width:var(--d);height:var(--d);border-radius:50%;
   border:0;cursor:pointer;display:none;align-items:center;justify-content:center;color:#fff;
   background:linear-gradient(160deg,rgba(255,255,255,.18),rgba(255,255,255,.08));
   backdrop-filter:blur(24px) saturate(180%);
@@ -997,17 +995,44 @@ a.oc-row:active{background:var(--card2)}
   box-shadow:inset 0 0 0 .5px rgba(255,255,255,.2),0 6px 20px rgba(0,0,0,.26);
   -webkit-tap-highlight-color:transparent;
   transition:transform .2s cubic-bezier(.32,.72,0,1)}
-.cv-flip svg{width:44%;height:44%}
-.cv-flip:active{transform:scale(.88)}
+.cv-flip svg,.cv-lamp svg{width:46%;height:46%}
+.cv-flip:active,.cv-lamp:active{transform:scale(.88)}
 /* Поворот отзывается самой кнопкой: значок делает пол-оборота, ровно столько,
    сколько система открывает вторую камеру. */
+.cv-lamp.on{background:#fff;color:#0d0d12;
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.5),0 10px 26px rgba(0,0,0,.34)}
 .cv-flip.spin svg{animation:cvflip .52s cubic-bezier(.32,.72,0,1)}
 @keyframes cvflip{from{transform:rotate(0)}to{transform:rotate(180deg)}}
+
+/* Фонарик и поворот — левым столбцом, теми же мерами, что и правый. */
+.cv-left{position:absolute;left:clamp(12px,4vw,20px);
+  bottom:calc(clamp(20px,5.5vw,34px) + var(--safe-bottom));z-index:7;
+  display:flex;flex-direction:column;align-items:center;gap:clamp(12px,3.4vw,18px)}
+
+/* Кольцевой свет. Настоящей вспышки у фронтальной камеры нет ни у одного
+   телефона — светят экраном. По краям кадра зажигается широкая тёплая рамка:
+   середина остаётся чистой, чтобы лицо было видно, а свет падает на него с
+   четырёх сторон, как от кольцевой лампы. Задняя камера так не светит: ей
+   нужен настоящий фонарик, и он у неё есть. */
+.cv-glow{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0;
+  transition:opacity .3s ease;
+  background:
+    linear-gradient(to right,#fff4e2 0,#fff4e2 3.5%,rgba(255,244,226,0) 30%),
+    linear-gradient(to left,#fff4e2 0,#fff4e2 3.5%,rgba(255,244,226,0) 30%),
+    linear-gradient(to bottom,#fff4e2 0,#fff4e2 2.5%,rgba(255,244,226,0) 22%),
+    linear-gradient(to top,#fff4e2 0,#fff4e2 2.5%,rgba(255,244,226,0) 22%)}
+.cv.lamp .cv-glow{opacity:1}
+
+/* Лучи у фонарика дорисовываются, когда он горит, — тем же приёмом, что и
+   перечёркивание микрофона. */
+.cv-lamp .cvray{stroke-dasharray:14;stroke-dashoffset:14;opacity:0;
+  transition:stroke-dashoffset .28s cubic-bezier(.32,.72,0,1),opacity .1s ease}
+.cv-lamp.on .cvray{stroke-dashoffset:0;opacity:1}
 /* Пока камера поворачивается, кадр замирает — так и должно быть. Показываем
    это размытием, чтобы замерший кадр читался как задумка, а не как подвисание. */
 ..cv-slot.flipping video{filter:blur(9px) saturate(1.06);transform:scale(1.06)}
 ..cv-slot video{transition:filter .22s ease,transform .22s ease}
-.cv.cam-on .cv-flip{display:flex}
+.cv.cam-on .cv-flip,.cv.cam-on .cv-lamp{display:flex}
 
 
 /* Видео. Собеседник во весь блок разговора, своя камера окном в углу. */
@@ -2189,11 +2214,24 @@ a.oc-row:active{background:var(--card2)}
   <span class="cv-pill-n" id="cvN">—</span>
   <span class="cv-pill-t" id="cvT">00:00</span>
 </div>
-<button class="cv-flip" onclick="callFlip()" aria-label="Другая камера">
+<!-- Левый столбец: фонарик и поворот камеры. Оба нужны только когда камера
+     включена, поэтому и живут вместе. -->
+<div class="cv-left">
+  <button class="cv-lamp" id="cvLamp" onclick="callLamp()" aria-label="Фонарик">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+      stroke-linecap="round" stroke-linejoin="round">
+      <path d="M8.2 2.6h7.6v3.1a2 2 0 0 1-.36 1.15l-.84 1.2v12.35a1 1 0 0 1-1 1h-3.2a1 1 0 0 1-1-1V8.05l-.84-1.2A2 2 0 0 1 8.2 5.7z"/>
+      <path d="M10.4 12.4h3.2"/>
+      <path class="cvray" d="M5.1 5.4L3.2 4.3M18.9 5.4l1.9-1.1M4.3 9.6H2.1M19.7 9.6h2.2"/></svg>
+  </button>
+  <button class="cv-flip" onclick="callFlip()" aria-label="Другая камера">
   <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
     stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h13a4 4 0 0 1 4 4v1"/><path
     d="M6 5L3 8l3 3"/><path d="M21 16H8a4 4 0 0 1-4-4v-1"/><path d="M18 19l3-3-3-3"/></svg>
 </button>
+</div>
+<!-- Свет экраном для фронтальной камеры: настоящей вспышки у неё нет. -->
+<div class="cv-glow" id="cvGlow"></div>
 <div class="cv-side">
   <button class="cv-rb" id="cvCam" onclick="callCam()" aria-label="Камера">
     <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
@@ -5582,6 +5620,13 @@ function callVidPaint(){
   // На входящем поверх своей камеры лежат имя и кнопки — им нужна подложка.
   l.classList.toggle('selfie', CALL_VIDEO && CALL_ST === 'in');
   l.classList.toggle('cam-on', CALL_CAM);
+  // Камеру выключили или звонок кончился — свету неоткуда взяться. Гасим и
+  // вспышку: оставить её гореть после звонка нельзя ни при каких условиях.
+  if(CALL_LAMP && !CALL_CAM){
+    CALL_LAMP = false;
+    if(CALL && CALL.torch) CALL.torch(false).catch(() => {});
+  }
+  lampPaint();
   const loc = document.getElementById('cvSlotLoc'), rem = document.getElementById('cvSlotRem');
   if(loc && rem){
     // Снимок «откуда» — до смены классов, иначе снимем уже новое место.
@@ -5646,6 +5691,51 @@ function _hap(вид){
     else h.impactOccurred(вид || 'light');
   }catch(e){}
 }
+// ── фонарик ────────────────────────────────────────────────────────────────
+// Одна кнопка на две камеры, потому что человеку нужен свет, а не устройство.
+// У задней камеры это настоящая вспышка. У фронтальной вспышки нет ни на одном
+// телефоне — светим экраном: по краям кадра зажигается широкая тёплая рамка,
+// как от кольцевой лампы, а середина остаётся чистой, чтобы лицо было видно.
+let CALL_LAMP = false;
+
+function lampPaint(){
+  const сзади = !!(CALL && CALL.facing === 'environment');
+  // Экраном светим только вперёд: назад он не светит никуда.
+  document.getElementById('callVid')?.classList.toggle('lamp', CALL_LAMP && !сзади);
+  document.getElementById('cvLamp')?.classList.toggle('on', CALL_LAMP);
+}
+
+function callLamp(){
+  if(!CALL) return;
+  const сзади = CALL.facing === 'environment';
+  if(!CALL_LAMP && сзади && !(CALL.torchOk && CALL.torchOk())){
+    // Не притворяемся: вспышки тут нет, и сказать об этом честнее, чем
+    // включить экранный свет, который назад всё равно не светит.
+    toast('На этой камере вспышки нет');
+    return;
+  }
+  _hap('light');
+  CALL_LAMP = !CALL_LAMP;
+  lampPaint();
+  if(сзади && CALL.torch){
+    CALL.torch(CALL_LAMP).catch(() => { CALL_LAMP = false; lampPaint(); });
+  }
+}
+
+// Свет переживает поворот камеры: спереди он экранный, сзади — вспышка. Если
+// сзади вспышки не оказалось, гасим и говорим — молча оставлять кнопку
+// горящей при погашенном свете нельзя.
+function lampAfterFlip(){
+  if(!CALL) return;
+  const сзади = CALL.facing === 'environment';
+  if(CALL_LAMP && сзади && !(CALL.torchOk && CALL.torchOk())){
+    CALL_LAMP = false;
+    toast('На этой камере вспышки нет');
+  }
+  lampPaint();
+  if(CALL.torch) CALL.torch(CALL_LAMP && сзади).catch(() => {});
+}
+
 function callCam(){
   if(!CALL) return;
   _hap('light');
@@ -5662,7 +5752,7 @@ function callFlip(){
   const кн = document.querySelector('.cv-flip'), loc = document.getElementById('cvSlotLoc');
   кн?.classList.remove('spin'); void кн?.offsetWidth; кн?.classList.add('spin');
   loc?.classList.add('flipping');
-  const вернуть = () => { loc?.classList.remove('flipping'); callVidPaint(); };
+  const вернуть = () => { loc?.classList.remove('flipping'); lampAfterFlip(); callVidPaint(); };
   CALL.flip().then(вернуть).catch(вернуть);
 }
 function callDial(key, video){

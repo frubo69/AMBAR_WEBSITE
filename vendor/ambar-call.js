@@ -305,6 +305,7 @@
       e.app = sc ? ((sc.getAttribute('src') || '').split('v=')[1] || '?') : '?';
       e.ver = (w && w.version) || '';
       e.rot = !!(w && typeof w.lockOrientation === 'function');
+      e.torch = this.torchOk ? this.torchOk() : false;
     } catch (err) {}
     return e;
   };
@@ -798,6 +799,29 @@
   };
 
   // Переднюю на заднюю и обратно: показать полку или подъезд удобнее задней.
+  // ── фонарик ──────────────────────────────────────────────────────────────
+  // Настоящая вспышка есть только у задней камеры: у фронтальной её нет ни на
+  // одном телефоне, и там светят экраном — это делает уже сам экран звонка.
+  // Айфон пускает к вспышке из веба начиная с iOS 17.4, но верить на слово
+  // нельзя: в вебвью телеграма может быть иначе. Поэтому спрашиваем у самой
+  // дорожки, а не у списка версий.
+  AmbarCall.prototype.torchOk = function () {
+    try {
+      var t = this.cam && this.cam.getVideoTracks()[0];
+      if (!t || !t.getCapabilities) return false;
+      var c = t.getCapabilities();
+      return !!(c && c.torch);
+    } catch (e) { return false; }
+  };
+
+  AmbarCall.prototype.torch = function (on) {
+    var t = this.cam && this.cam.getVideoTracks()[0];
+    if (!t || !t.applyConstraints) return Promise.reject(new Error('нет дорожки'));
+    // Гасить можно всегда: погасить то, чего нет, — не ошибка.
+    if (on && !this.torchOk()) return Promise.reject(new Error('нет вспышки'));
+    return t.applyConstraints({advanced: [{torch: !!on}]}).then(function () { return !!on; });
+  };
+
   AmbarCall.prototype.flip = function () {
     var next = this.facing === 'user' ? 'environment' : 'user';
     var old = this.cam;

@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=28"></script>
+<script src="/vendor/ambar-call.js?v=29"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -11437,15 +11437,6 @@ async function ordReset(id){
 
 // Ответ правки несёт всю строку и новые итоги — перечитывать заявку целиком
 // ради одного числа незачем, на плохой связи это секунда на каждый шаг.
-// Куда выводить звук приложения. Через общий выход из библиотеки звонка, а не
-// напрямую: прямой выход веб-аудио система уводит в громкий динамик и держит
-// там весь звук страницы до конца сеанса — после него трубка у уха у звонка
-// уже недостижима. Библиотека может не загрузиться; сигнал о заказе важнее
-// чистоты выхода, поэтому есть запасной путь.
-const _вых = ac => {
-  try{ if(window.AmbarAudio) return window.AmbarAudio.out(ac) || ac.destination; }catch(e){}
-  return ac.destination;
-};
 function ordApply(res){
   if(!res || !res.row) return;
   const d = ORD.d;
@@ -11553,7 +11544,7 @@ const SFX = {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
     g.gain.exponentialRampToValueAtTime(0.0001, t + ms/1000);
-    o.connect(g); g.connect(_вых(ac));
+    o.connect(g); g.connect(ac.destination);
     o.start(t); o.stop(t + ms/1000 + 0.02);
   },
   ok(){   if(this.on) this._tone(760, 80, 0.07, 0, 1010); },   // короткий подъём

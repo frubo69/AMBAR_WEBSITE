@@ -42,54 +42,6 @@
 (function () {
   'use strict';
 
-  // ── общий выход для всего звука приложения ───────────────────────────────
-  //
-  // Правило одно и без исключений: НИЧТО не подключается к ac.destination.
-  //
-  // Прямой выход веб-аудио система считает обычным воспроизведением, уводит
-  // его в громкий динамик — и, уведя, оставляет там весь звук страницы до
-  // конца сеанса, включая голос собеседника. Достаточно одного beep'а, одного
-  // разблокирующего отрезка тишины на первом касании — и трубка у уха больше
-  // недостижима, сколько её потом ни выбирай.
-  //
-  // Это и было настоящей причиной: в водительском приложении такой отрезок
-  // играет на первое же касание, задолго до любого звонка. Через элемент выход
-  // остаётся управляемым — ему можно назвать устройство.
-  //
-  // Элемент один на контекст, заводится в момент касания и играет тишину
-  // дальше: так его не приходится запускать заново, когда звук понадобится
-  // без жеста — например, на входящем заказе.
-  window.AmbarAudio = window.AmbarAudio || {
-    out: function (ac) {
-      if (!ac) return null;
-      if (!ac.__ambarOut) {
-        try {
-          var d = ac.createMediaStreamDestination();
-          var a = document.createElement('audio');
-          a.autoplay = true;
-          a.setAttribute('playsinline', '');
-          a.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;' +
-                            'opacity:.01;pointer-events:none;z-index:-1';
-          document.body.appendChild(a);
-          a.srcObject = d.stream;
-          try { a.play().catch(function () {}); } catch (e) {}
-          ac.__ambarOut = d; ac.__ambarEl = a;
-        } catch (e) { return null; }
-      }
-      // Системный перерыв мог остановить элемент — возвращаем к игре, иначе
-      // сигнал о заказе беззвучно пропадёт.
-      try {
-        if (ac.__ambarEl && ac.__ambarEl.paused) ac.__ambarEl.play().catch(function () {});
-      } catch (e) {}
-      return ac.__ambarOut;
-    },
-    // Убрать выход вместе с контекстом.
-    drop: function (ac) {
-      if (!ac || !ac.__ambarEl) return;
-      try { ac.__ambarEl.pause(); ac.__ambarEl.srcObject = null; ac.__ambarEl.remove(); } catch (e) {}
-      ac.__ambarEl = null; ac.__ambarOut = null;
-    }
-  };
 
   // Свернули дольше — отпускаем микрофон. Полминуты оказалось мало: AMBAR STAR
   // сворачивают и разворачивают десятки раз за вечер, и каждый раз система
@@ -141,10 +93,7 @@
       }).catch(function () { self._pending = false; });
     } catch (e) { this._pending = false; }
   };
-  // Тоны звучат через тот же общий выход, что и всё остальное.
   Tones.prototype._play = function (ac, freq, dur, gain) {
-    var вых = window.AmbarAudio.out(ac);
-    if (!вых) return;
     var o = ac.createOscillator(), g = ac.createGain(), t0 = ac.currentTime;
     var v = gain == null ? 0.16 : gain;
     o.type = 'sine';
@@ -155,9 +104,10 @@
     g.gain.linearRampToValueAtTime(v, t0 + 0.018);
     g.gain.setValueAtTime(v, t0 + Math.max(0.05, dur - 0.035));
     g.gain.linearRampToValueAtTime(0, t0 + dur);
-    o.connect(g); g.connect(вых);
+    o.connect(g); g.connect(ac.destination);
     o.start(t0); o.stop(t0 + dur + 0.02);
   };
+
   // Разбудить заранее, внутри касания. Контекст, созданный не в жесте, айфон
   // держит спящим — и первый же гудок оказывается в пустоту.
   Tones.prototype.prime = function () { this._ctx(); };
@@ -212,7 +162,6 @@
     this.stop();
     var ac = this.ac;
     this.ac = null;
-    window.AmbarAudio.drop(ac);
     if (ac) { try { ac.close(); } catch (e) {} }
   };
 
@@ -307,11 +256,20 @@
   // «Трубка» — сессия разговора: система на айфоне ведёт такую в динамик у уха
   // и сама гасит экран, когда телефон подносят к лицу. «Громкая» — обычное
   // поведение по умолчанию, то самое, что было до этой правки.
-  // Переключать можно там, где трубка нашлась отдельным устройством вывода.
-  // Спрашиваем «нашли ли», а не «умеет ли браузер»: обещать переключение,
-  // которого не будет, нельзя, а мёртвая кнопка хуже отсутствующей.
+  // Выбор канала выключен, и это осознанно.
+  //
+  // На айфоне трубка у уха недостижима: ни выбором устройства вывода, ни типом
+  // звуковой сессии — оба отвечают «готово» и не переключают ничего. Причина
+  // глубже кода звонка: любой прямой выход веб-аудио в приложении — писк
+  // сканера, сирена заказа, разблокировка звука на первом касании — уводит весь
+  // звук страницы в громкий динамик до конца сеанса. Убрать их все я пробовал:
+  // звук начинает захлёбываться, и это хуже, чем громкая связь.
+  //
+  // Пока трубка не доказана на живом телефоне, кнопки нет: мёртвая кнопка хуже
+  // отсутствующей, а половина работающей функции хуже честного её отсутствия.
+  // Проверяется отдельной страницей, не трогая приложение: vendor/audio-test.html
   AmbarCall.prototype.canRoute = function () {
-    return !!this._earSink;
+    return false;
   };
 
   // Ищем среди выходов тот, что у уха. Имена системные и разноязыкие, поэтому
@@ -364,7 +322,7 @@
   // отвечает «готово» и не переключает. И только потом в него переезжает голос.
   AmbarCall.prototype._applyRoute = function (why) {
     var self = this;
-    if (!this._earSink) return;
+    if (!this.canRoute() || !this._earSink) return;
     this._routedAt = Date.now();
     this._swapSink(this.route === 'ear' ? this._earSink : '').then(function (ok) {
       self._sayRoute(why, ok ? 'устройство названо' : 'устройство не принято');

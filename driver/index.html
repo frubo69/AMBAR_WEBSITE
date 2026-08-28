@@ -2246,7 +2246,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=28"></script>
+<script src="/vendor/ambar-call.js?v=29"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -4094,15 +4094,6 @@ document.addEventListener('pointerdown', e => {
 let INC = null, _incT = null, _incW = null, _wake = null, _ac = null, _lastRing = 0;
 let _rangFor = '', _rangOk = false, _incN = 0, _tries = 0;   // по какому заказу звонили
 
-// Куда выводить звук приложения. Через общий выход из библиотеки звонка, а не
-// напрямую: прямой выход веб-аудио система уводит в громкий динамик и держит
-// там весь звук страницы до конца сеанса — после него трубка у уха у звонка
-// уже недостижима. Библиотека может не загрузиться; сигнал о заказе важнее
-// чистоты выхода, поэтому есть запасной путь.
-const _вых = ac => {
-  try{ if(window.AmbarAudio) return window.AmbarAudio.out(ac) || ac.destination; }catch(e){}
-  return ac.destination;
-};
 function _acUnlock(){
   try{
     if(!_ac) _ac = new (window.AudioContext||window.webkitAudioContext)();
@@ -4127,7 +4118,7 @@ function _sndUnlock(){
     if(_ac){
       const s = _ac.createBufferSource();
       s.buffer = _ac.createBuffer(1, 1, 22050);
-      s.connect(_вых(_ac)); s.start(0);
+      s.connect(_ac.destination); s.start(0);
     }
   }catch(e){}
 }
@@ -4185,7 +4176,7 @@ function _siren(force){
     if(!buf || !_ac || _ac.state !== 'running') return _fallback();
     const src = _ac.createBufferSource();
     src.buffer = buf;
-    src.connect(_вых(_ac));
+    src.connect(_ac.destination);
     try{ src.start(); _rangOk = true; }catch(e){}
   };
   // Контекст мог не успеть проснуться: браузер запускает звук только после
@@ -4618,7 +4609,7 @@ const SFX = {
     g.gain.setValueAtTime(0.0001, t);
     g.gain.exponentialRampToValueAtTime(vol, t + 0.012);
     g.gain.exponentialRampToValueAtTime(0.0001, t + ms/1000);
-    o.connect(g); g.connect(_вых(ac));
+    o.connect(g); g.connect(ac.destination);
     o.start(t); o.stop(t + ms/1000 + 0.02);
   },
   ok(){   if(this.on) this._tone(760, 80, 0.07, 0, 1010); },   // короткий подъём

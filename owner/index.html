@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=35"></script>
+<script src="/vendor/ambar-call.js?v=36"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -20183,7 +20183,8 @@ function caContacts(){
       <div class="ca-rb" onclick="callDial('${r.key}')">
         <div class="ca-rn">${r.name}</div>
         <div class="ca-rs"><span class="ca-dot${r.online ? ' on' : ''}"></span>
-          ${r.online ? 'в приложении' : 'позвоним в телеграм'}</div>
+          ${r.online ? 'в приложении'
+            : /^(drv|star):/.test(r.key) ? 'позвоним в телеграм' : 'не в сети'}</div>
       </div>
       <button class="ca-star${fav.indexOf(r.key) >= 0 ? ' on' : ''}"
         onclick="callFavToggle('${r.key}', event)" aria-label="В избранное">${

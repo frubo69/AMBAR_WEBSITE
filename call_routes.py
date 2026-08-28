@@ -81,6 +81,28 @@ STAR_NAMES = {
     7865205960: "AMBAR",
 }
 
+# Имена тех, кто вошёл, но в списке выше не назван: телеграм сообщает их сам
+# при входе. Держим, чтобы собеседник видел человека, а не номер.
+_STAR_SEEN: dict = {}
+
+
+def _star_ids() -> set:
+    """Кто вообще относится к верхнему уровню."""
+    try:
+        from config import OWNER_IDS, MANAGER_IDS
+        return set(OWNER_IDS) | set(MANAGER_IDS) | set(STAR_NAMES)
+    except Exception:
+        return set(STAR_NAMES)
+
+
+def imya_ok(s: str) -> bool:
+    return bool(s) and len(s) <= 24
+
+
+def _star_name(uid: int) -> str:
+    return STAR_NAMES.get(uid) or _STAR_SEEN.get(uid) or "AMBAR STAR"
+
+
 
 # ── кто есть кто ────────────────────────────────────────────────────────────
 # Кто на каком районе — меняется в течение дня: старший переставляет водителя,
@@ -334,6 +356,21 @@ def _drv_app_url() -> str:
     return os.getenv("DRIVER_WEBAPP_URL", "https://ambar-delivery.com/driver/").rstrip("/")
 
 
+def _ring_to(kind: str, name: str):
+    """Кому и чем звонить в телеграм, когда приложение закрыто.
+
+    Водителю — его ботом, старшему — своим. Оператору звонить некуда и не
+    надо: районный оператор не аккаунт, а имя за общей панелью, личного чата
+    у него нет вовсе."""
+    if kind == "drv":
+        return (_drv_token(), staff.DRIVER_IDS.get(name) or 0, _drv_app_url())
+    if kind == "star":
+        uid = int(name) if str(name).isdigit() else 0
+        url = os.getenv("OWNER_WEBAPP_URL", "").strip().rstrip("/")
+        return (os.getenv("AMBAR_OWNER_BOT_TOKEN", "").strip(), uid, url)
+    return ("", 0, "")
+
+
 async def _tg_ring(token: str, chat_id: int, text: str, kb: dict):
     """Тик рингтона отправляем напрямую, мимо общей tg_send.
 
@@ -367,17 +404,20 @@ async def _tg_delete(token: str, chat_id: int, mid: int):
 
 
 async def _ring_driver(call: Call, name: str):
-    """Звоним водителю сообщениями, пока не возьмёт или пока не выйдет время."""
-    tg_id = staff.DRIVER_IDS.get(name)
-    token = _drv_token()
-    if not tg_id or not token:
-        log.warning(f"[call] некому звонить: {name} не в списке или нет токена")
+    """Звоним сообщениями, пока не возьмёт или пока не выйдет время.
+
+    Кому именно — решает вид собеседника: водителю его ботом, старшему своим.
+    Ссылка в кнопке ведёт в то приложение, которым человек и пользуется."""
+    kind = call.callee_key.partition(":")[0]
+    token, tg_id, app_url = _ring_to(kind, name)
+    if not tg_id or not token or not app_url:
+        log.warning(f"[call] некому звонить: {call.callee_key} — нет id, токена или адреса")
         return
     from api_server import tg_send
 
     kb = {"inline_keyboard": [[
         {"text": "Взять звонок",
-         "web_app": {"url": _drv_app_url() + "/?call=" + call.cid}}]]}
+         "web_app": {"url": app_url + "/?call=" + call.cid}}]]}
     prev = 0
     step = RING_STEP
     started = time.time()
@@ -450,20 +490,18 @@ async def _start_call(caller: Peer, to_key: str, order: str, video: bool = False
     caller.call = call
     _CALLS[cid] = call
 
-    if not targets and kind == "drv":
-        # Приложение закрыто: держим звонок и звоним ему в бот.
-        if not staff.DRIVER_IDS.get(name) or not _drv_token():
-            caller.call = None
-            _CALLS.pop(cid, None)
-            await caller.send(t="failed", why="offline")
-            return
-        _PENDING[to_key] = (cid, time.time() + RING_TTL)
-        call.ring_task = asyncio.create_task(_ring_both(call, name))
-        await caller.send(t="calling", call=cid, to=name,
-                          note="приложение закрыто — звоним в телеграм")
-        return
-
     if not targets:
+        # Приложение закрыто. Если человеку есть куда позвонить телеграмом —
+        # держим звонок и звоним; если нет — говорим правду сразу.
+        token, chat, url = _ring_to(kind, name)
+        if token and chat and url:
+            _PENDING[to_key] = (cid, time.time() + RING_TTL)
+            call.ring_task = asyncio.create_task(_ring_both(call, name))
+            await caller.send(t="calling", call=cid,
+                              to=_star_name(int(name)) if kind == "star" else name,
+                              note="приложение закрыто — звоним в телеграм")
+            return
+
         caller.call = None
         _CALLS.pop(cid, None)
         await caller.send(t="failed", why="offline")
@@ -713,7 +751,10 @@ async def _identify(hello: dict):
         u = validate_owner_init_data(tma)
         uid = int((u or {}).get("id") or 0)
         if uid and (uid in OWNER_IDS or uid in MANAGER_IDS or await db.is_manager(uid)):
-            name = STAR_NAMES.get(uid) or (u.get("first_name") or str(uid))
+            имя = (u.get("first_name") or "").strip()
+            if imya_ok(имя):
+                _STAR_SEEN[uid] = имя
+            name = _star_name(uid)
             return Peer(sid, None, "star", f"star:{uid}", name)
     except Exception as e:
         log.warning(f"[call] проверка AMBAR STAR: {e}")
@@ -758,6 +799,13 @@ def _roster(peer: Peer) -> list:
         return rows
 
     if peer.kind == "star":
+        # Верхний уровень звонит друг другу: между собой они ровня, и запрет
+        # «снизу вверх» их не касается — выше них никого нет.
+        me = peer.key.partition(":")[2]
+        for uid in sorted(_star_ids()):
+            if str(uid) == me:
+                continue
+            add(f"star:{uid}", _star_name(uid), "AMBAR STAR")
         for n in sorted(_operator_names()):
             add(f"op:{n}", n, "оператор")
         for n in _all_drivers():

@@ -2198,7 +2198,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=35"></script>
+<script src="/vendor/ambar-call.js?v=36"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -6737,7 +6737,8 @@ function _callRender(){
           <div class="call-item-b" onclick="callDial('${r.key}')">
             <div class="call-item-n">${r.name}</div>
             <div class="call-item-s"><span class="call-dot${r.online ? ' on' : ''}"></span>
-              ${r.online ? 'в приложении' : 'позвоним в телеграм'}</div>
+              ${r.online ? 'в приложении'
+                : /^(drv|star):/.test(r.key) ? 'позвоним в телеграм' : 'не в сети'}</div>
           </div>
           <div class="call-item-vid" onclick="callVideo('${r.key}')">${ICO_VID}</div>
           <div class="call-item-go" onclick="callDial('${r.key}')">${ICO_CALL}</div>

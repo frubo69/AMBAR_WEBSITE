@@ -147,6 +147,26 @@
     лог('всё остановлено, сессия возвращена', 'ok');
   };
 
+  // Устройство называем НОВОМУ элементу, ещё ничего не игравшему. Игравший
+  // отвечает «готово» и не переключает ничего — это и выяснилось замером:
+  // звук уходил в трубку только на свежей странице.
+  function новыйЭлемент(id) {
+    var старый = эл, поток = старый && старый.srcObject;
+    if (!поток) { лог('играть нечего', 'bad'); return; }
+    var a = document.createElement('audio');
+    a.autoplay = true; a.setAttribute('playsinline', '');
+    a.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:.01';
+    document.body.appendChild(a);
+    var шаг = (typeof a.setSinkId === 'function') ? a.setSinkId(id || '') : Promise.resolve();
+    шаг.then(function () { лог(id ? 'устройство названо молчащему элементу' : 'выход по умолчанию', 'ok'); })
+       .catch(function (e) { лог('устройство не принято: ' + e.name, 'bad'); })
+       .then(function () {
+         эл = a; a.srcObject = поток;
+         try { старый.pause(); старый.srcObject = null; старый.remove(); } catch (e) {}
+         return a.play().catch(function () {});
+       });
+  }
+
   // Звук через веб-аудио: минуя элемент, своим движком.
   function вебАудио(вкл) {
     if (!узел) return;
@@ -167,7 +187,7 @@
       var m = b.dataset.m;
       if (m === 'spk') {
         вебАудио(false);
-        if (эл && эл.setSinkId) эл.setSinkId('').catch(function () {});
+        новыйЭлемент('');
         сессия('auto');
         лог('громкий динамик · тип=' + тип());
         return;
@@ -175,10 +195,7 @@
       if (m === 'sink' || m === 'both') {
         вебАудио(false);
         if (!ухо) { лог('устройства трубки нет — этот способ недоступен', 'bad'); }
-        else if (эл && эл.setSinkId) {
-          эл.setSinkId(ухо).then(function () { лог('устройство названо', 'ok'); })
-            .catch(function (e) { лог('устройство не выбралось: ' + e.name, 'bad'); });
-        } else лог('выбор выхода недоступен', 'bad');
+        else новыйЭлемент(ухо);
       }
       if (m === 'sess' || m === 'both') {
         вебАудио(false);

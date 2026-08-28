@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=37"></script>
+<script src="/vendor/ambar-call.js?v=38"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -817,6 +817,36 @@ a.oc-row:active{background:var(--card2)}
 .cv-slot.pip .cv-off-n,.cv-slot.pip .cv-off-s{display:none}
 /* Голосовой разговор — тот же вид, что у водителя: звание, имя, таймер и
    кнопки у нижнего края. Один разговор — один экран во всех приложениях. */
+/* Сверка ключей четырьмя смайликами. Место — между кнопками телеграма, поэтому
+   отступ считается от выреза телефона: кнопки живут как раз в этой полосе.
+   Плашка поверх обоих слоёв разговора — она нужна и в голосовом, и в видео. */
+.cs-safe{position:fixed;left:50%;transform:translateX(-50%);
+  top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 7px);
+  z-index:521;display:none;align-items:center;gap:3px;height:33px;padding:0 12px;
+  border:0;border-radius:17px;cursor:pointer;font-size:16.5px;line-height:1;
+  letter-spacing:2px;background:rgba(20,20,32,.62);color:#fff;
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  -webkit-tap-highlight-color:transparent;transition:transform .12s}
+.cs-safe:active{transform:translateX(-50%) scale(.94)}
+.cs-safe.on{display:flex}
+/* Раскрытие: карточка вырастает из самой плашки — оттого начало сверху по центру. */
+.cs-safe-card{position:fixed;inset:0;z-index:520;display:flex;align-items:flex-start;
+  justify-content:center;background:rgba(0,0,6,0);
+  padding:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 50px) 24px 24px;
+  visibility:hidden;transition:background .34s ease,visibility 0s .34s}
+.cs-safe-card.on{visibility:visible;background:rgba(0,0,6,.72);transition-delay:0s}
+.cs-safe-in{width:100%;max-width:330px;border-radius:22px;padding:22px 20px 18px;
+  text-align:center;background:rgba(26,26,40,.96);
+  border:1px solid rgba(255,255,255,.09);box-shadow:0 24px 60px rgba(0,0,0,.5);
+  transform:scale(.55) translateY(-90px);opacity:0;transform-origin:50% 0%;
+  transition:transform .38s cubic-bezier(.32,.72,0,1),opacity .26s ease}
+.cs-safe-card.on .cs-safe-in{transform:none;opacity:1}
+.cs-safe-big{font-size:38px;letter-spacing:6px;line-height:1.1;margin-bottom:16px}
+.cs-safe-t{font-size:16px;font-weight:700;margin-bottom:7px;color:var(--text)}
+.cs-safe-s{font-size:13.5px;color:var(--sub);line-height:1.5}
+.cs-safe-ok{margin-top:17px;width:100%;height:44px;border:0;border-radius:12px;
+  background:rgba(255,255,255,.1);color:var(--text);font-size:15px;font-weight:600;
+  font-family:inherit;cursor:pointer}
 .cvo{position:fixed;inset:0;z-index:399;display:none;flex-direction:column;text-align:center;
   background:var(--bg2)}
 .cvo.on{display:flex}
@@ -2015,6 +2045,17 @@ a.oc-row:active{background:var(--card2)}
 <!-- Голосовой разговор выглядит так же, как в приложении водителя:
      звание, имя, таймер и две кнопки внизу. Один вид на все три
      приложения — разговор везде один и тот же. -->
+<!-- Четыре смайлика — сверка ключей. По центру между кнопками телеграма. -->
+<button class="cs-safe" id="csSafe" onclick="safeOpen()" aria-label="Защита звонка"></button>
+<div class="cs-safe-card" id="csSafeCard" onclick="safeClose(event)">
+  <div class="cs-safe-in" onclick="event.stopPropagation()">
+    <div class="cs-safe-big" id="csSafeBig"></div>
+    <div class="cs-safe-t">Звонок защищён сквозным шифрованием</div>
+    <div class="cs-safe-s">Если у собеседника на экране те же смайлики —
+      разговор никто не слушает и не подменяет.</div>
+    <button class="cs-safe-ok" onclick="safeClose()">Понятно</button>
+  </div>
+</div>
 <div class="cvo" id="callVoice">
   <div class="cvo-top">
     <div class="cvo-role" id="cvoRole"></div>
@@ -4970,9 +5011,12 @@ function callEvent(t, d){
       // собеседнику. Чужая камера до ответа правда неизвестна.
       CALL_ST = 'out'; CALL_WHO = d.peer; CALL_VIDEO = !!d.video; CALL_CAM = !!(CALL && CALL.camLive && CALL.camLive()); CALL_RCAM = false; showOv('callOv'); callPaint();
       return;
+    case 'safety':
+      CALL_SAFE = d.emoji; safePaint(); return;
     case 'talking':
       CALL_ST = 'live'; CALL_T0 = Date.now(); CALL_Q = ''; _callMuted = false;
       clearInterval(_callTick); _callTick = setInterval(callTimer, 1000);
+      safePaint();
       callVidPaint();
       callPaint(); callTimer();
       return;
@@ -5006,6 +5050,7 @@ function callEvent(t, d){
       clearInterval(_callTick); _callTick = null;
       const why = d.why || '', who = CALL_WHO;
       // «Занят» о собственном наборе во время разговора — не конец звонка.
+      CALL_SAFE = null; safePaint();
       if(t === 'failed' && d.keep){ toast('Вы уже в разговоре', 'err'); return; }
       CALL_ST = 'idle'; CALL_WHO = ''; CALL_Q = '';
       CALL_VIDEO = false; CALL_CAM = false; CALL_RCAM = false;
@@ -5075,6 +5120,29 @@ function callVideo(key){ callDial(key, true); }
 // таймер, кнопки внизу. Живёт вне перерисовки списков, поэтому обновляется
 // отдельной функцией.
 
+
+// ── сверка ключей ─────────────────────────────────────────────────────────
+// Четыре смайлика считаются из отпечатков ключей обеих сторон. Совпали у вас и
+// у собеседника — между вами никого нет. Показываем только в разговоре: до
+// ответа ключей ещё нет, сверять нечего.
+let CALL_SAFE = null;
+function safePaint(){
+  const b = document.getElementById('csSafe'); if(!b) return;
+  const есть = CALL_ST === 'live' && CALL_SAFE && CALL_SAFE.length === 4;
+  b.classList.toggle('on', !!есть);
+  if(есть){
+    b.textContent = CALL_SAFE.join('');
+    const big = document.getElementById('csSafeBig');
+    if(big) big.textContent = CALL_SAFE.join('');
+  } else safeClose();
+}
+function safeOpen(){
+  if(CALL_SAFE && CALL_SAFE.length) document.getElementById('csSafeCard')?.classList.add('on');
+}
+function safeClose(e){
+  if(e && e.target && e.currentTarget !== e.target) return;
+  document.getElementById('csSafeCard')?.classList.remove('on');
+}
 
 function callVoicePaint(){
   const l = document.getElementById('callVoice'); if(!l) return;

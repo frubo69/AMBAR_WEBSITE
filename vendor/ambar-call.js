@@ -858,6 +858,49 @@
 
 
 
+  // ── четыре смайлика ──────────────────────────────────────────────────────
+  //
+  // Голос и картинка шифруются всегда — иначе вебртc соединение не соберёт.
+  // Но ключами телефоны меняются ЧЕРЕЗ наш сервер, и тот, у кого есть доступ к
+  // серверу, теоретически может подменить их и встать посередине. От этого
+  // шифрование само по себе не спасает — спасает сверка.
+  //
+  // Считаем отпечатки обоих ключей, складываем в одном и том же порядке (иначе
+  // у сторон вышло бы разное) и превращаем в четыре смайлика. Подменили ключи —
+  // отпечатки другие, и смайлики у собеседников разойдутся. Совпали — между
+  // вами никого нет, и это уже не зависит от сервера вовсе.
+  var СМАЙЛЫ = ('\u{1F600}\u{1F605}\u{1F602}\u{1F923}\u{1F60A}\u{1F60D}\u{1F929}\u{1F60E}' +
+                '\u{1F914}\u{1F92F}\u{1F634}\u{1F973}\u{1F607}\u{1F920}\u{1F978}\u{1F63A}' +
+                '\u{1F436}\u{1F431}\u{1F98A}\u{1F43B}\u{1F43C}\u{1F428}\u{1F42F}\u{1F981}' +
+                '\u{1F42E}\u{1F437}\u{1F438}\u{1F435}\u{1F414}\u{1F427}\u{1F989}\u{1F984}' +
+                '\u{1F41D}\u{1F98B}\u{1F422}\u{1F419}\u{1F980}\u{1F42C}\u{1F433}\u{1F988}' +
+                '\u{1F335}\u{1F332}\u{1F340}\u{1F338}\u{1F33B}\u{1F308}\u{2B50}\u{1F525}' +
+                '\u{1F4A7}\u{1F34E}\u{1F34C}\u{1F347}\u{1F353}\u{1F352}\u{1F351}\u{1F355}' +
+                '\u{1F354}\u{1F32E}\u{1F366}\u{1F369}\u{1F36A}\u{2615}\u{26BD}\u{1F3B8}'
+                ).match(/./gu) || [];
+
+  function _fp(sdp) {
+    var m = /a=fingerprint:sha-256 ([0-9A-Fa-f:]+)/.exec(sdp || '');
+    return m ? m[1].toUpperCase() : '';
+  }
+
+  AmbarCall.prototype._safety = function () {
+    var self = this, pc = this.pc;
+    if (!pc || !window.crypto || !crypto.subtle) return;
+    var свой = _fp(pc.currentLocalDescription && pc.currentLocalDescription.sdp);
+    var чужой = _fp(pc.currentRemoteDescription && pc.currentRemoteDescription.sdp);
+    if (!свой || !чужой) return;
+    // Порядок один и тот же у обеих сторон — иначе смайлики разошлись бы даже
+    // без злоумышленника.
+    var строка = [свой, чужой].sort().join('|');
+    crypto.subtle.digest('SHA-256', new TextEncoder().encode(строка)).then(function (b) {
+      var байты = new Uint8Array(b), из = [];
+      for (var i = 0; i < 4; i++) из.push(СМАЙЛЫ[байты[i] % СМАЙЛЫ.length]);
+      self.safety = из;
+      self._emit('safety', {emoji: из});
+    }).catch(function () {});
+  };
+
   AmbarCall.prototype._startMedia = function (isCaller) {
     var self = this;
     var pc = new RTCPeerConnection({iceServers: this.ice});
@@ -913,6 +956,7 @@
       self._emit('net', {state: st});
       if (st === 'connected') {
         clearTimeout(self._iceRestartT);
+        self._safety();          // ключи сверены — можно показать смайлики
         self._quality('good');
       }
       // Разрыв в тоннеле или в лифте — не повод класть трубку. Даём связи
@@ -1068,6 +1112,7 @@
     this._camOff();
     this.remote = null;
     this.video = false;
+    this.safety = null;
     // Разговорную сессию за собой убираем: иначе в ушной динамик уйдёт и
     // сирена нового заказа, а её слышно должно быть через всю машину.
     // Тип звуковой сессии — один на всю страницу и переживает звонок. Оставить

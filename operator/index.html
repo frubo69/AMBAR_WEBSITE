@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=39"></script>
+<script src="/vendor/ambar-call.js?v=40"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -856,39 +856,23 @@ a.oc-row:active{background:var(--card2)}
         Это и есть подпись стекла: без неё выходит матовый пластик;
      4. внутренняя подсветка сверху, дающая ощущение толщины;
      5. мягкая тень наружу, чтобы карточка отделялась от разговора. */
-.cs-safe-in{position:relative;width:100%;max-width:330px;border-radius:26px;
-  padding:22px 20px 18px;text-align:center;
+.cs-safe-in{position:relative;width:100%;max-width:320px;border-radius:22px;
+  padding:20px 22px 21px;text-align:center;
   background:linear-gradient(160deg,rgba(58,58,78,.46),rgba(20,20,32,.40));
   backdrop-filter:blur(34px) saturate(190%);
   -webkit-backdrop-filter:blur(34px) saturate(190%);
-  box-shadow:0 26px 64px rgba(0,0,0,.5),
-             inset 0 1px 0 rgba(255,255,255,.30),
-             inset 0 -1px 0 rgba(255,255,255,.05);
+  box-shadow:0 26px 64px rgba(0,0,0,.42);
   transform:scale(.55) translateY(-90px);opacity:0;transform-origin:50% 0%;
   transition:transform .38s cubic-bezier(.32,.72,0,1),opacity .26s ease}
-/* Блик по краю: рамка-градиент, вырезанная маской. Обычной border такой не
-   бывает — он одноцветный по всему периметру. */
-.cs-safe-in::before{content:'';position:absolute;inset:0;border-radius:inherit;
-  padding:1px;pointer-events:none;
-  background:linear-gradient(150deg,rgba(255,255,255,.6),rgba(255,255,255,.10) 34%,
-    rgba(255,255,255,0) 62%,rgba(255,255,255,.20));
-  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
-  -webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
-  mask-composite:exclude}
-/* Мягкий отсвет сверху — толщина стекла. */
-.cs-safe-in::after{content:'';position:absolute;inset:0;border-radius:inherit;
-  pointer-events:none;
-  background:radial-gradient(120% 70% at 50% -18%,rgba(255,255,255,.16),transparent 62%)}
 .cs-safe-in > *{position:relative;z-index:1}
 .cs-safe-card.on .cs-safe-in{transform:none;opacity:1}
-.cs-safe-big{font-size:38px;letter-spacing:6px;line-height:1.1;margin-bottom:16px}
-.cs-safe-t{font-size:16px;font-weight:700;margin-bottom:7px}
-.cs-safe-s{font-size:13.5px;color:var(--sub);line-height:1.5}
-.cs-safe-ok{margin-top:17px;width:100%;height:46px;border:0;border-radius:14px;
-  background:rgba(255,255,255,.14);color:#fff;font-size:15px;font-weight:600;
-  font-family:inherit;cursor:pointer;
-  box-shadow:inset 0 1px 0 rgba(255,255,255,.24)}
-.cs-safe-ok:active{background:rgba(255,255,255,.2)}
+/* Смайлики рядом с равными промежутками — межбуквенный интервал давал
+   неровные щели, потому что смайлики разной ширины. */
+.cs-safe-big{display:flex;justify-content:center;align-items:center;gap:20px;
+  font-size:42px;line-height:1;margin-bottom:15px}
+.cs-safe-t{font-size:15.5px;font-weight:700;margin-bottom:6px;color:#fff;
+  letter-spacing:-.1px}
+.cs-safe-s{font-size:13.5px;color:rgba(255,255,255,.72);line-height:1.4}
 
 .cvo{position:fixed;inset:0;z-index:399;display:none;flex-direction:column;text-align:center;
   background:var(--bg2)}
@@ -2096,7 +2080,6 @@ a.oc-row:active{background:var(--card2)}
     <div class="cs-safe-t">Этот звонок защищён сквозным шифрованием</div>
     <div class="cs-safe-s">Если <b id="csSafeWho">собеседник</b> видит на экране
       те же смайлики, этот звонок защищён на 100%.</div>
-    <button class="cs-safe-ok" onclick="safeClose()">Понятно</button>
   </div>
 </div>
 <div class="cvo" id="callVoice">
@@ -5176,7 +5159,7 @@ function safePaint(){
   if(есть){
     b.textContent = CALL_SAFE.join('');
     const big = document.getElementById('csSafeBig');
-    if(big) big.textContent = CALL_SAFE.join('');
+    if(big) big.innerHTML = CALL_SAFE.map(e => '<span>' + e + '</span>').join('');
     // Имя ставим подлежащим: «Если Худоба видит…». Так фраза остаётся верной
     // для любого прозвища — склонять их наугад нельзя.
     const кто = document.getElementById('csSafeWho');

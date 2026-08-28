@@ -67,28 +67,64 @@
     } catch (e) { this.ac = null; }
     return this.ac;
   };
+  // Контекст создаётся спящим, а будится не мгновенно. Раньше гудок, попавший
+  // в этот промежуток, просто выбрасывался — и первый гудок вызова человек не
+  // слышал никогда: тишина, а первый звук приходил только со второго круга,
+  // через несколько секунд. Отсюда и ощущение, что гудки запаздывают.
   Tones.prototype._beep = function (freq, dur, gain) {
-    var ac = this._ctx();
-    if (!ac || ac.state !== 'running') return;
-    var o = ac.createOscillator(), g = ac.createGain();
+    var ac = this._ctx(), self = this;
+    if (!ac) return;
+    if (ac.state === 'running') { this._play(ac, freq, dur, gain); return; }
+    try {
+      ac.resume().then(function () { self._play(ac, freq, dur, gain); })
+                 .catch(function () {});
+    } catch (e) {}
+  };
+  Tones.prototype._play = function (ac, freq, dur, gain) {
+    var o = ac.createOscillator(), g = ac.createGain(), t0 = ac.currentTime;
+    var v = gain == null ? 0.16 : gain;
     o.type = 'sine';
     o.frequency.value = freq;
-    g.gain.setValueAtTime(0, ac.currentTime);
-    g.gain.linearRampToValueAtTime(gain == null ? 0.16 : gain, ac.currentTime + 0.03);
-    g.gain.linearRampToValueAtTime(0, ac.currentTime + dur);
+    // Ровный тон с короткими краями. Плавное затухание во всю длину звучало
+    // умирающим гудком: в телефоне гудок ровный и обрывается сразу.
+    g.gain.setValueAtTime(0, t0);
+    g.gain.linearRampToValueAtTime(v, t0 + 0.018);
+    g.gain.setValueAtTime(v, t0 + Math.max(0.05, dur - 0.035));
+    g.gain.linearRampToValueAtTime(0, t0 + dur);
     o.connect(g); g.connect(ac.destination);
-    o.start(); o.stop(ac.currentTime + dur + 0.02);
+    o.start(t0); o.stop(t0 + dur + 0.02);
   };
-  // Гудок вызова: длинный тон раз в четыре секунды, как в телефоне.
-  Tones.prototype.ringback = function () { this._loop('ringback', 4000, function (t) {
+  // Разбудить заранее, внутри касания. Контекст, созданный не в жесте, айфон
+  // держит спящим — и первый же гудок оказывается в пустоту.
+  Tones.prototype.prime = function () { this._ctx(); };
+
+  // Вызов: секунда тона и четыре паузы, 425 Гц — то же, что слышно в трубке
+  // обычного телефона. Рисунок узнаваемый, и по нему слышно, что вызов идёт.
+  Tones.prototype.ringback = function () { this._loop('ringback', 5000, function (t) {
     t._beep(425, 1.0, 0.10); }); };
-  // Звонок: две короткие трели, чтобы отличать от гудка и от нового заказа.
-  Tones.prototype.ring = function () { this._loop('ring', 2200, function (t) {
-    t._beep(620, 0.2, 0.22); setTimeout(function () { t._beep(620, 0.2, 0.22); }, 260); }); };
-  // Занято и обрыв — по одному разу, зацикливать нечего.
-  Tones.prototype.busy = function () { this.stop(); this._beep(480, 0.25, 0.16);
-    var t = this; setTimeout(function () { t._beep(480, 0.25, 0.16); }, 400); };
-  Tones.prototype.bye = function () { this.stop(); this._beep(330, 0.28, 0.13); };
+  // Входящий: двойная трель аппарата — её ни с гудком, ни с сиреной заказа не
+  // спутать.
+  Tones.prototype.ring = function () { this._loop('ring', 3000, function (t) {
+    t._beep(620, 0.34, 0.2); setTimeout(function () { t._beep(620, 0.34, 0.2); }, 540); }); };
+  // Занято: короткий тон вдвое чаще вызова, три круга — дальше человек понял.
+  Tones.prototype.busy = function () {
+    this.stop();
+    var t = this, n = 0;
+    (function круг() {
+      t._beep(425, 0.35, 0.13);
+      if (++n < 3) setTimeout(круг, 700);
+    })();
+  };
+  // Не прошло: не взяли, недоступен, нельзя. Два тона вниз — в телефоне это
+  // звучит именно так и означает «соединения не будет».
+  Tones.prototype.fail = function () {
+    this.stop();
+    var t = this;
+    t._beep(480, 0.2, 0.12);
+    setTimeout(function () { t._beep(360, 0.34, 0.12); }, 240);
+  };
+  // Конец разговора — один мягкий тон, и всё.
+  Tones.prototype.bye = function () { this.stop(); this._beep(330, 0.26, 0.11); };
   Tones.prototype._loop = function (kind, every, fn) {
     if (this.kind === kind) return;
     this.stop();
@@ -236,22 +272,33 @@
     }).catch(function () { return ''; });
   };
 
-  AmbarCall.prototype.audioTo = function (where) {
+  // Применить канал к системе. Отдельно от audioTo, потому что звать это надо
+  // не только по нажатию: выставленный до первого звука канал НЕ применяется —
+  // маршрутизировать системе нечего, и разговор начинается в громкой связи,
+  // сколько бы раз мы ни просили трубку заранее. Отсюда и «первое нажатие
+  // ничего не меняет»: состояние уже «трубка», а звук всё ещё в динамике.
+  AmbarCall.prototype._applyRoute = function () {
+    var ear = this.route === 'ear';
+    if (_session(ear ? 'play-and-record' : 'auto')) return;
+    try {
+      if (this._earSink && this.audio && this.audio.setSinkId) {
+        this.audio.setSinkId(ear ? this._earSink : '').catch(function () {});
+      }
+    } catch (e) {}
+  };
+
+  AmbarCall.prototype.audioTo = function (where, тихо) {
     var self = this, ear = where !== 'speaker';
+    var менялось = this.route !== (ear ? 'ear' : 'speaker');
     this._fell = false;
     this.route = ear ? 'ear' : 'speaker';
-    if (!_session(ear ? 'play-and-record' : 'auto')) {
-      try {
-        if (this._earSink && this.audio && this.audio.setSinkId) {
-          this.audio.setSinkId(ear ? this._earSink : '').catch(function () {});
-        }
-      } catch (e) {}
-    }
+    this._applyRoute();
     // Смена сессии перезапускает звук на уровне системы, и элемент после неё
     // остаётся на паузе. Молча: ни ошибки, ни события — просто тишина в ухе.
     // Поэтому не «переключили и надеемся», а переключили и убедились.
     this._resume();
-    setTimeout(function () { self._resume(); }, 350);
+    setTimeout(function () { self._applyRoute(); self._resume(); }, 350);
+    if (тихо && !менялось) return this.route;
     // Экран нужен глазам только там, где на него смотрят. В голосовом разговоре
     // у уха он обязан гаснуть сам — так щекой ничего и не нажать.
     this._keepAwake(this.video || !ear);
@@ -465,7 +512,7 @@
         if (this.stream) {
           this.stream.getAudioTracks().forEach(function (t) { t.enabled = false; });
         }
-        if (m.why === 'busy_them') this.tones.busy();
+        if (m.why === 'busy_them') this.tones.busy(); else this.tones.fail();
         this._emit('failed', {why: m.why, peer: m.peer || ''});
         break;
 
@@ -494,17 +541,28 @@
   AmbarCall.prototype.dial = function (toKey, order, video) {
     var self = this;
     this.video = !!video;
+    // Гудок — сразу по нажатию, а не после ответа сервера. Между нажатием и
+    // ответом лежит запрос микрофона с камерой и полный оборот до сервера:
+    // секунда, а то и две полной тишины, в которую человек успевает решить,
+    // что ничего не работает. Не прошло — тишину сменит короткий отбойный тон.
+    this.tones.prime();
+    this.tones.ringback();
     return this._mic().then(function () {
       return self.video ? self._camOn() : null;
     }).then(function () {
       self._send({t: 'call', to: toKey || self.defaultTarget || '',
                   order: order || '', video: self.video});
+    }).catch(function (e) {
+      // Не дали микрофон — звонка не будет, и гудеть в пустоту нельзя.
+      self.tones.stop();
+      throw e;
     });
   };
 
   AmbarCall.prototype.accept = function () {
     if (!this.call) return Promise.resolve();
     var self = this, id = this.call.id;
+    this.tones.prime();
     this.video = !!this.call.video;
     return this._mic().then(function () {
       return self.video ? self._camOn() : null;
@@ -522,7 +580,9 @@
   AmbarCall.prototype.reject = function (say) {
     if (!this.call) return;
     this._send({t: 'reject', call: this.call.id, say: say || ''});
-    this._teardown('rejected');
+    // Своё «отклонить» — не «вам отказали»: ни отбойного тона, ни всплывающей
+    // строки «Отклонён» человеку, который сам только что нажал отбой.
+    this._teardown('declined');
   };
 
   AmbarCall.prototype.hangup = function () {
@@ -780,13 +840,19 @@
     if (this.cam) this.cam.getVideoTracks().forEach(function (t) { pc.addTrack(t, self.cam); });
 
     pc.ontrack = function (e) {
-      var st = e.streams && e.streams[0];
+      // Дорожку могут прислать и без потока — тогда собираем поток сами.
+      // Раньше такой звонок молча оставался без звука: выходили отсюда сразу,
+      // и голос собеседника было некуда положить.
+      var st = (e.streams && e.streams[0]) || new MediaStream([e.track]);
       if (!st) return;
       self.remote = st;
       // Звук всегда в свой элемент: видео может быть выключено, а слышать надо.
       if (self.audio && e.track.kind === 'audio') {
         self.audio.srcObject = st;
-        self._resume();
+        // Голос пошёл — только теперь системе есть что маршрутизировать.
+        // Повторяем выбор канала здесь, иначе разговор начнётся в громкой
+        // связи, что бы ни было выставлено до этого.
+        self.audioTo(self.route || 'speaker', true);
       }
       if (e.track.kind === 'video') {
         self.video = true;
@@ -943,7 +1009,11 @@
 
   AmbarCall.prototype._teardown = function (why) {
     this.tones.stop();
+    // Конец разговора и несостоявшийся звонок звучат по-разному — как в
+    // телефоне: короткий тон в конце разговора и отбойный, когда соединения
+    // не вышло. Обрыв связи и отмена — молча, там и без тона всё сказано.
     if (why === 'hangup' || why === 'end') this.tones.bye();
+    else if (why === 'no_answer' || why === 'rejected') this.tones.fail();
     // Прощальный тон короткий — контекст закрываем следом, чтобы он не висел
     // между звонками и не мешал звуку следующего.
     var tn = this.tones;

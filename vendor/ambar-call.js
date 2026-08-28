@@ -181,6 +181,12 @@
   AmbarCall.prototype.micGranted = function () {
     try { return localStorage.getItem('ambar_mic_ok') === '1'; } catch (e) { return false; }
   };
+  // Камеру на входящем включаем, только если разрешение уже давали. Иначе
+  // системное окно выскочит поверх звенящего звонка — ровно тогда, когда
+  // человеку надо нажать «ответить», а не читать вопросы.
+  AmbarCall.prototype.camGranted = function () {
+    try { return localStorage.getItem('ambar_cam_ok') === '1'; } catch (e) { return false; }
+  };
   AmbarCall.prototype.micLive = function () {
     return !!(this.stream && this.stream.getAudioTracks().some(
       function (t) { return t.readyState === 'live'; }));
@@ -446,10 +452,48 @@
     });
   };
 
+  // Кто в соединении отправляет картинку.
+  //
+  // Искать его по своей дорожке нельзя, и это была не мелочь: выключение
+  // камеры ставит отправителю пустую дорожку, поиск после этого не находит
+  // ничего, и включение добавляло в соединение ВТОРУЮ картинку вместо
+  // возврата первой. Соединение при этом надо пересобирать, а пересобирать
+  // его некому — камера загоралась на своём экране и больше никогда не
+  // доходила до собеседника. Насмерть, до конца разговора.
+  //
+  // Место для картинки в соединении одно и никуда не девается, даже когда
+  // дорожки в нём нет. По нему и ищем.
+  AmbarCall.prototype._vsender = function () {
+    var pc = this.pc;
+    if (!pc) return null;
+    if (pc.getTransceivers) {
+      var t = pc.getTransceivers().find(function (x) {
+        return (x.sender && x.sender.track && x.sender.track.kind === 'video')
+            || (x.receiver && x.receiver.track && x.receiver.track.kind === 'video');
+      });
+      if (t && t.sender) return t.sender;
+    }
+    return pc.getSenders().find(function (x) {
+      return x.track && x.track.kind === 'video';
+    }) || null;
+  };
+
   // Камера живёт только на время разговора — в отличие от микрофона её держать
   // между звонками нельзя: горящий глазок весь день пугает не зря.
   AmbarCall.prototype._camOn = function (facing) {
     var self = this;
+    // Камера уже горит — второй раз её просить нельзя: у системы это новый
+    // поток, старый при этом останется гореть навсегда. Так бывает, когда на
+    // входящем показали себя, а потом сняли трубку: включение идёт дважды.
+    var cur = !facing && this.cam && this.cam.getVideoTracks()[0];
+    if (cur && cur.readyState === 'live') {
+      var sn = this._vsender();
+      if (sn && sn.track !== cur) { sn.replaceTrack(cur); this._capVideo(); }
+      this.video = true;
+      this._emit('cam', {on: true, facing: this.facing, stream: this.cam});
+      this._send({t: 'camstate', on: true});
+      return Promise.resolve(this.cam);
+    }
     this.facing = facing || this.facing || 'user';
     return navigator.mediaDevices.getUserMedia({
       video: {facingMode: this.facing, width: {ideal: 640}, height: {ideal: 480},
@@ -477,10 +521,8 @@
         self._emit('cam', {on: false, facing: self.facing});
       };
       // Соединение уже собрано — просто подменяем дорожку, без пересборки.
-      var sender = self.pc && self.pc.getSenders().find(function (x) {
-        return x.track && x.track.kind === 'video';
-      });
-      if (sender) sender.replaceTrack(track);
+      var sender = self._vsender();
+      if (sender) { sender.replaceTrack(track); self._capVideo(); }
       else if (self.pc) { self.pc.addTrack(track, self.stream || s); self._capVideo(); }
       self._emit('cam', {on: true, facing: self.facing, stream: s});
       self._send({t: 'camstate', on: true});
@@ -492,9 +534,7 @@
     if (!this.cam) return;
     this.cam.getTracks().forEach(function (t) { try { t.stop(); } catch (e) {} });
     this.cam = null;
-    var sender = this.pc && this.pc.getSenders().find(function (x) {
-      return x.track && x.track.kind === 'video';
-    });
+    var sender = this._vsender();
     if (sender) { try { sender.replaceTrack(null); } catch (e) {} }
     // Говорим собеседнику словами. На замолкание дорожки полагаться нельзя:
     // после replaceTrack(null) у него просто перестают идти кадры, событие

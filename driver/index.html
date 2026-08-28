@@ -1102,13 +1102,31 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 /* Камера выключена — вместо замершего кадра серая плашка с перечёркнутой
    камерой. Её видят оба: и тот, кто выключил, и тот, кому перестали
    показывать. */
-.cs-off{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
-  background:rgba(120,120,135,.22);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-  color:rgba(255,255,255,.5)}
+/* Камера выключена. Показываем человека, а не перечёркнутый значок: значок
+   сообщает поломку, а выключенная камера не поломка — собеседник на месте, его
+   просто не видно. Кружок с буквой имени — тот же язык, что и на входящем
+   экране, и то же, что делают в фейстайме и телеграме. */
+.cs-off{position:absolute;inset:0;display:none;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;padding:0 14px;
+  background:radial-gradient(118% 76% at 50% 34%,#1c1c29 0%,#12121d 55%,#0a0a12 100%)}
 .cs-slot.off .cs-off{display:flex}
 .cs-slot.off video{visibility:hidden}
-.cs-slot.pip .cs-off svg{width:34px;height:34px}
-.cs-slot.full .cs-off svg{width:74px;height:74px}
+.cs-off-av{border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-weight:700;color:var(--gold2);line-height:1;
+  background:linear-gradient(158deg,rgba(201,169,110,.26),rgba(201,169,110,.08));
+  box-shadow:inset 0 0 0 1px rgba(201,169,110,.24);
+  /* Размер зависит от того, окно это или весь экран, а меняются они местами
+     плавно — значит и кружок обязан ехать вместе с рамкой, а не прыгать. */
+  transition:width .42s cubic-bezier(.32,.72,0,1),height .42s cubic-bezier(.32,.72,0,1),
+    font-size .42s cubic-bezier(.32,.72,0,1)}
+.cs-off-n{font-weight:700;color:#fff;line-height:1.2;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.cs-off-s{color:rgba(255,255,255,.4)}
+.cs-slot.full .cs-off-av{width:112px;height:112px;font-size:41px}
+.cs-slot.full .cs-off-n{margin-top:19px;font-size:19px}
+.cs-slot.full .cs-off-s{margin-top:6px;font-size:13.5px}
+.cs-slot.pip .cs-off-av{width:44px;height:44px;font-size:17px}
+.cs-slot.pip .cs-off-n,.cs-slot.pip .cs-off-s{display:none}
 /* Имя плашкой, как в фейстайме: поверх картинки читаемо при любом фоне. */
 /* Плашка ниже кнопок телеграма: они рисуются поверх приложения, и без этого
    отступа имя уезжает под «Закрыть». */
@@ -1139,6 +1157,28 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .call-scr.video.cam-on .cs-flip{display:flex}
 /* Текстовый слой во время видео не нужен: имя и время ушли в плашку. */
 .call-scr.video .cs{display:none}
+/* Входящий видеозвонок: своя камера во весь экран, имя и кнопки поверх неё.
+   Экран отвечающего должен быть тем же, что у звонящего, — иначе разговор
+   начинается с двух разных приложений. Подложка обязательна: белый текст на
+   живой картинке читается ровно до первого светлого кадра. */
+.call-scr.video.selfie .cs{display:flex}
+/* Подложка тянется до самого низа имени, а не гаснет сразу под ним: светлый
+   кадр из камеры съедает серую строку состояния целиком. Тень под буквами —
+   вторая страховка, на случай совсем белого кадра. */
+.call-scr.video.selfie .call-mid{position:relative;z-index:8;
+  background:linear-gradient(180deg,rgba(6,6,14,.86) 0%,rgba(6,6,14,.64) 18%,
+    rgba(6,6,14,.30) 34%,rgba(6,6,14,.16) 48%,rgba(6,6,14,.34) 72%,
+    rgba(6,6,14,.92) 100%)}
+.call-scr.video.selfie .cs-role,
+.call-scr.video.selfie .cs-name,
+.call-scr.video.selfie .cs-state,
+.call-scr.video.selfie .cs-lbl{text-shadow:0 1px 14px rgba(0,0,6,.7),0 1px 3px rgba(0,0,6,.5)}
+.call-scr.video.selfie .cs-state{color:rgba(255,255,255,.88)}
+.call-scr.video.selfie .cs-role{color:rgba(255,255,255,.72)}
+.call-scr.video.selfie .cs-lbl{color:rgba(255,255,255,.9)}
+.call-scr.video.selfie .cs-pill,
+.call-scr.video.selfie .cs-side,
+.call-scr.video.selfie .cs-flip{display:none}
 .cs{display:flex;flex-direction:column;height:100%;text-align:center}
 .cs-top{padding:44px 24px 0}
 .cs-role{font-size:16px;color:var(--sub);font-weight:500}
@@ -1747,17 +1787,19 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
        анимируется, поэтому окна не пересоздаются, а переезжают. -->
   <div class="cs-slot" id="slotRemote">
     <video id="csRemote" playsinline autoplay></video>
-    <div class="cs-off"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path
-      d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/><path
-      d="M2 2l20 20"/></svg></div>
+    <div class="cs-off">
+      <div class="cs-off-av" id="csOffRemA">—</div>
+      <div class="cs-off-n" id="csOffRemN">—</div>
+      <div class="cs-off-s">Камера выключена</div>
+    </div>
   </div>
   <div class="cs-slot" id="slotLocal">
     <video id="csLocal" playsinline autoplay muted></video>
-    <div class="cs-off"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path
-      d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/><path
-      d="M2 2l20 20"/></svg></div>
+    <div class="cs-off">
+      <div class="cs-off-av" id="csOffLocA">—</div>
+      <div class="cs-off-n" id="csOffLocN">—</div>
+      <div class="cs-off-s">Камера выключена</div>
+    </div>
   </div>
   <div class="cs-pill">
     <span class="cs-pill-a" id="csPillA">—</span>
@@ -2154,7 +2196,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=12"></script>
+<script src="/vendor/ambar-call.js?v=13"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -6084,6 +6126,10 @@ function callEvent(t, d){
       CALL_ST = 'in'; CALL_WHO = d.peer; CALL_ROLE = callRole(d.kind, d.peer);
       CALL_VIDEO = !!d.video; CALL_CAM = false; CALL_RCAM = false;
       callOpen(); callBuzz(); callRender();
+      // Видеозвонок — сразу показываем человеку его самого, как в фейстайме.
+      // Наружу ничего не уходит: соединения до ответа не существует, картинку
+      // видит только он сам. Не дали камеру — экран останется обычным.
+      if(d.video && CALL && CALL.camGranted && CALL.camGranted()) CALL.camera(true);
       return;
     case 'calling':
       CALL_ST = 'out'; CALL_WHO = d.peer; CALL_NOTE = d.note || '';
@@ -6270,12 +6316,27 @@ function callVideoPaint(){
   // Видео показываем, только если картинка есть хоть у кого-то. Обе камеры
   // выключены — экран возвращается к обычному голосовому виду.
   const live = CALL_VIDEO && CALL_ST === 'live' && (CALL_CAM || CALL_RCAM);
-  // На вызове человек видит себя во весь экран, как в фейстайме: собеседника
-  // ещё нет, показывать нечего, а свою камеру проверить полезно.
-  const dial = CALL_VIDEO && CALL_ST === 'out';
+  // Своё лицо во весь экран человек видит и когда звонит, и когда звонят ему:
+  // собеседника ещё нет, показывать нечего, а себя проверить полезно — ровно
+  // как в фейстайме. Наружу при этом ничего не идёт: соединения до ответа не
+  // существует.
+  const dial = CALL_VIDEO && (CALL_ST === 'out' || CALL_ST === 'in');
   sc.classList.toggle('video', live || dial);
+  // На входящем поверх своей камеры лежат имя и кнопки — им нужна подложка.
+  sc.classList.toggle('selfie', CALL_VIDEO && CALL_ST === 'in');
   sc.classList.toggle('cam-on', CALL_CAM);
   sc.classList.toggle('cam-back', !!(CALL && CALL.facing === 'environment'));
+
+  // Кто в каком окне, когда камеры нет. Своё имя знает библиотека, чужое —
+  // экран звонка.
+  const я = (CALL && CALL.me) || '';
+  const подпись = (av, nm, имя) => {
+    const a = cel(av), n = cel(nm);
+    if(a) a.textContent = _ini(имя) || '—';
+    if(n) n.textContent = имя || '—';
+  };
+  подпись('csOffRemA', 'csOffRemN', CALL_WHO);
+  подпись('csOffLocA', 'csOffLocN', я);
 
   if(loc && rem){
     // Обмен местами обязан быть переходом, а не рывком, и оба окна обязаны

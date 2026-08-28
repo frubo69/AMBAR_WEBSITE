@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=12"></script>
+<script src="/vendor/ambar-call.js?v=13"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -792,18 +792,47 @@ a.oc-row:active{background:var(--card2)}
 .cv.cam-back #cvSlotLoc video{transform:none}
 /* Камера выключена — серая плашка с перечёркнутой камерой вместо замершего
    кадра. Её видят оба: и тот, кто выключил, и тот, кому перестали показывать. */
-.cv-off{position:absolute;inset:0;display:none;align-items:center;justify-content:center;
-  background:rgba(120,120,135,.22);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
-  color:rgba(255,255,255,.5)}
+/* Камера выключена. Показываем человека, а не перечёркнутый значок: значок
+   сообщает поломку, а выключенная камера не поломка — собеседник на месте, его
+   просто не видно. Кружок с буквой имени — тот же язык, что на входящем. */
+.cv-off{position:absolute;inset:0;display:none;flex-direction:column;
+  align-items:center;justify-content:center;text-align:center;padding:0 12px;
+  background:radial-gradient(118% 76% at 50% 34%,#1c1c29 0%,#12121d 55%,#0a0a12 100%)}
 .cv-slot.off .cv-off{display:flex}
 .cv-slot.off video{visibility:hidden}
-.cv-slot.pip .cv-off svg{width:30px;height:30px}
-.cv-slot.full .cv-off svg{width:64px;height:64px}
+.cv-off-av{border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-weight:700;color:var(--gold2);line-height:1;
+  background:linear-gradient(158deg,rgba(201,169,110,.26),rgba(201,169,110,.08));
+  box-shadow:inset 0 0 0 1px rgba(201,169,110,.24);
+  /* Кружок едет вместе с рамкой при обмене местами, а не прыгает. */
+  transition:width .42s cubic-bezier(.32,.72,0,1),height .42s cubic-bezier(.32,.72,0,1),
+    font-size .42s cubic-bezier(.32,.72,0,1)}
+.cv-off-n{font-weight:700;color:#fff;line-height:1.2;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:100%}
+.cv-off-s{color:rgba(255,255,255,.4)}
+.cv-slot.full .cv-off-av{width:104px;height:104px;font-size:38px}
+.cv-slot.full .cv-off-n{margin-top:18px;font-size:18px}
+.cv-slot.full .cv-off-s{margin-top:6px;font-size:13px}
+.cv-slot.pip .cv-off-av{width:40px;height:40px;font-size:16px}
+.cv-slot.pip .cv-off-n,.cv-slot.pip .cv-off-s{display:none}
 /* Голосовой разговор — тот же вид, что у водителя: звание, имя, таймер и
    кнопки у нижнего края. Один разговор — один экран во всех приложениях. */
 .cvo{position:fixed;inset:0;z-index:399;display:none;flex-direction:column;text-align:center;
   background:var(--bg2)}
 .cvo.on{display:flex}
+/* Входящий видеозвонок: имя и кнопки лежат поверх своей камеры. Подложка
+   тянется до низа имени, иначе светлый кадр съедает серую строку состояния,
+   а тень под буквами — вторая страховка на совсем белом кадре. */
+.cvo.selfie{z-index:401;background:linear-gradient(180deg,rgba(6,6,14,.86) 0%,
+  rgba(6,6,14,.64) 18%,rgba(6,6,14,.30) 34%,rgba(6,6,14,.16) 48%,
+  rgba(6,6,14,.34) 72%,rgba(6,6,14,.92) 100%)}
+.cvo.selfie .cvo-role,.cvo.selfie .cvo-name,.cvo.selfie .cvo-state,
+.cvo.selfie .cvo-lbl{text-shadow:0 1px 14px rgba(0,0,6,.7),0 1px 3px rgba(0,0,6,.5)}
+.cvo.selfie .cvo-name{color:#fff}
+.cvo.selfie .cvo-state{color:rgba(255,255,255,.88)}
+.cvo.selfie .cvo-role{color:rgba(255,255,255,.72)}
+.cvo.selfie .cvo-lbl{color:rgba(255,255,255,.9)}
+.cv.on.selfie .cv-pill,.cv.on.selfie .cv-side,.cv.on.selfie .cv-flip{display:none}
 .cvo-top{padding:calc(44px + var(--safe-top)) 24px 0}
 .cvo-role{font-size:15px;color:var(--sub)}
 .cvo-name{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;
@@ -1998,17 +2027,19 @@ a.oc-row:active{background:var(--card2)}
       <div class="cv" id="callVid">
 <div class="cv-slot" id="cvSlotRem">
   <video id="caRem" playsinline autoplay></video>
-  <div class="cv-off"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-    stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path
-    d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/><path
-    d="M2 2l20 20"/></svg></div>
+  <div class="cv-off">
+    <div class="cv-off-av" id="cvOffRemA">—</div>
+    <div class="cv-off-n" id="cvOffRemN">—</div>
+    <div class="cv-off-s">Камера выключена</div>
+  </div>
 </div>
 <div class="cv-slot" id="cvSlotLoc">
   <video id="caLoc" playsinline autoplay muted></video>
-  <div class="cv-off"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-    stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path
-    d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/><path
-    d="M2 2l20 20"/></svg></div>
+  <div class="cv-off">
+    <div class="cv-off-av" id="cvOffLocA">—</div>
+    <div class="cv-off-n" id="cvOffLocN">—</div>
+    <div class="cv-off-s">Камера выключена</div>
+  </div>
 </div>
 <div class="cv-pill">
   <span class="cv-pill-a" id="cvA">—</span>
@@ -4926,6 +4957,9 @@ function callEvent(t, d){
       return;
     case 'ring':
       CALL_ST = 'in'; CALL_WHO = d.peer; CALL_VIDEO = !!d.video; CALL_CAM = false; CALL_RCAM = false;
+      // Видеозвонок — сразу показываем человеку его самого. Наружу ничего не
+      // уходит: соединения до ответа нет, картинку видит только он.
+      if(d.video && CALL && CALL.camGranted && CALL.camGranted()) CALL.camera(true);
       showOv('callOv'); callPaint();
       $('callBtn')?.classList.add('ringing');
       return;
@@ -5039,6 +5073,9 @@ function callVoicePaint(){
   const l = document.getElementById('callVoice'); if(!l) return;
   const видео = CALL_VIDEO && CALL_ST === 'live' && (CALL_CAM || CALL_RCAM);
   l.classList.toggle('on', CALL_ST !== 'idle' && !видео);
+  // Входящий видеозвонок: экран занимает своя камера, а имя и кнопки ложатся
+  // поверх неё. Слой при этом обязан подняться над видео и стать прозрачным.
+  l.classList.toggle('selfie', CALL_VIDEO && CALL_ST === 'in');
   if(CALL_ST === 'idle') return;
   const r = ((CALL && CALL.roster) || []).find(x => x.name === CALL_WHO);
   document.getElementById('cvoRole').textContent = r ? r.role : '';
@@ -5239,8 +5276,12 @@ function callVidPaint(){
   // камеры выключены — показывать нечего, и разговор возвращается к
   // голосовому виду, а не висит чёрным кадром.
   const live = CALL_VIDEO && CALL_ST === 'live' && (CALL_CAM || CALL_RCAM);
-  const dial = CALL_VIDEO && CALL_ST === 'out';
+  // Своё лицо во весь экран человек видит и когда звонит, и когда звонят ему —
+  // ровно как в фейстайме. Наружу до ответа ничего не идёт: соединения ещё нет.
+  const dial = CALL_VIDEO && (CALL_ST === 'out' || CALL_ST === 'in');
   l.classList.toggle('on', live || dial);
+  // На входящем поверх своей камеры лежат имя и кнопки — им нужна подложка.
+  l.classList.toggle('selfie', CALL_VIDEO && CALL_ST === 'in');
   l.classList.toggle('cam-on', CALL_CAM);
   const loc = document.getElementById('cvSlotLoc'), rem = document.getElementById('cvSlotRem');
   if(loc && rem){
@@ -5272,6 +5313,14 @@ function callVidPaint(){
   const a = document.getElementById('cvA'), n = document.getElementById('cvN');
   if(a) a.textContent = _cIni(CALL_WHO);
   if(n) n.textContent = CALL_WHO || '—';
+  // Кто в каком окне, когда камеры нет. Своё имя знает библиотека.
+  const подпись = (av, nm, имя) => {
+    const e = document.getElementById(av), t = document.getElementById(nm);
+    if(e) e.textContent = _cIni(имя);
+    if(t) t.textContent = имя || '—';
+  };
+  подпись('cvOffRemA', 'cvOffRemN', CALL_WHO);
+  подпись('cvOffLocA', 'cvOffLocN', (CALL && CALL.me) || '');
   // Значок обязан говорить сам: фон значит «нажато», а перечёркнутая камера —
   // «камеры нет».
   const cam = document.getElementById('cvCam'), mic = document.getElementById('cvMic');

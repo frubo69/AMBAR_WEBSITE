@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=38"></script>
+<script src="/vendor/ambar-call.js?v=39"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -5754,9 +5754,9 @@ button.pill:active{opacity:.6}
 <div class="cs-safe-card" id="csSafeCard" onclick="safeClose(event)">
   <div class="cs-safe-in" onclick="event.stopPropagation()">
     <div class="cs-safe-big" id="csSafeBig"></div>
-    <div class="cs-safe-t">Звонок защищён сквозным шифрованием</div>
-    <div class="cs-safe-s">Если у собеседника на экране те же смайлики —
-      разговор никто не слушает и не подменяет.</div>
+    <div class="cs-safe-t">Этот звонок защищён сквозным шифрованием</div>
+    <div class="cs-safe-s">Если <b id="csSafeWho">собеседник</b> видит на экране
+      те же смайлики, этот звонок защищён на 100%.</div>
     <button class="cs-safe-ok" onclick="safeClose()">Понятно</button>
   </div>
 </div>
@@ -5951,36 +5951,79 @@ button.pill:active{opacity:.6}
 .cv-slot.pip .cv-off-n,.cv-slot.pip .cv-off-s{display:none}
 /* Голосовой разговор — тот же вид, что у водителя: звание, имя, таймер и
    кнопки у нижнего края. Один разговор — один экран во всех приложениях. */
-/* Сверка ключей четырьмя смайликами. Место — между кнопками телеграма, поэтому
-   отступ считается от выреза телефона: кнопки живут как раз в этой полосе.
-   Плашка поверх обоих слоёв разговора — она нужна и в голосовом, и в видео. */
+/* Сверка ключей четырьмя смайликами. Место — ровно между кнопками телеграма,
+   поэтому отступ считается от выреза телефона, а не от нашей безопасной зоны:
+   кнопки телеграма живут как раз в этой полосе. */
 .cs-safe{position:fixed;left:50%;transform:translateX(-50%);
   top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 7px);
   z-index:521;display:none;align-items:center;gap:3px;height:33px;padding:0 12px;
   border:0;border-radius:17px;cursor:pointer;font-size:16.5px;line-height:1;
-  letter-spacing:2px;background:rgba(20,20,32,.62);color:#fff;
-  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  letter-spacing:2px;color:#fff;
+  background:linear-gradient(160deg,rgba(58,58,78,.44),rgba(20,20,32,.38));
+  backdrop-filter:blur(22px) saturate(190%);
+  -webkit-backdrop-filter:blur(22px) saturate(190%);
+  box-shadow:0 6px 20px rgba(0,0,0,.34),
+             inset 0 1px 0 rgba(255,255,255,.28),
+             inset 0 -1px 0 rgba(255,255,255,.05);
   -webkit-tap-highlight-color:transparent;transition:transform .12s}
 .cs-safe:active{transform:translateX(-50%) scale(.94)}
 .cs-safe.on{display:flex}
-/* Раскрытие: карточка вырастает из самой плашки — оттого начало сверху по центру. */
+
+/* Раскрытие: карточка вырастает из самой плашки — оттого и начало сверху по
+   центру. Затемнение приходит вместе с ней, чтобы разговор не пропадал резко. */
 .cs-safe-card{position:fixed;inset:0;z-index:520;display:flex;align-items:flex-start;
   justify-content:center;background:rgba(0,0,6,0);
   padding:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 50px) 24px 24px;
   visibility:hidden;transition:background .34s ease,visibility 0s .34s}
-.cs-safe-card.on{visibility:visible;background:rgba(0,0,6,.72);transition-delay:0s}
-.cs-safe-in{width:100%;max-width:330px;border-radius:22px;padding:22px 20px 18px;
-  text-align:center;background:rgba(26,26,40,.96);
-  border:1px solid rgba(255,255,255,.09);box-shadow:0 24px 60px rgba(0,0,0,.5);
+/* Затемнение лёгкое: стекло тем и хорошо, что сквозь него видно разговор.
+   Глухая подложка съедала бы весь эффект. */
+.cs-safe-card.on{visibility:visible;background:rgba(0,0,6,.26);transition-delay:0s}
+/* Стекло. Преломление, каким его делает эппл, живой странице на айфоне
+   недоступно: оно требует svg-фильтра в backdrop-filter, а это умеет только
+   хром — сафари молча откатывается на обычное размытие. Поэтому собираем то,
+   что сафари действительно умеет, слой за слоем:
+
+     1. сильное размытие фона и подъём насыщенности — материал эппла всегда
+        подкрашивает то, что за ним, а не просто мылит;
+     2. лёгкая подложка, сквозь которую фон читается, а не глушится;
+     3. блик по краю — тонкая светлая линия, яркая сверху и гаснущая книзу.
+        Это и есть подпись стекла: без неё выходит матовый пластик;
+     4. внутренняя подсветка сверху, дающая ощущение толщины;
+     5. мягкая тень наружу, чтобы карточка отделялась от разговора. */
+.cs-safe-in{position:relative;width:100%;max-width:330px;border-radius:26px;
+  padding:22px 20px 18px;text-align:center;
+  background:linear-gradient(160deg,rgba(58,58,78,.46),rgba(20,20,32,.40));
+  backdrop-filter:blur(34px) saturate(190%);
+  -webkit-backdrop-filter:blur(34px) saturate(190%);
+  box-shadow:0 26px 64px rgba(0,0,0,.5),
+             inset 0 1px 0 rgba(255,255,255,.30),
+             inset 0 -1px 0 rgba(255,255,255,.05);
   transform:scale(.55) translateY(-90px);opacity:0;transform-origin:50% 0%;
   transition:transform .38s cubic-bezier(.32,.72,0,1),opacity .26s ease}
+/* Блик по краю: рамка-градиент, вырезанная маской. Обычной border такой не
+   бывает — он одноцветный по всему периметру. */
+.cs-safe-in::before{content:'';position:absolute;inset:0;border-radius:inherit;
+  padding:1px;pointer-events:none;
+  background:linear-gradient(150deg,rgba(255,255,255,.6),rgba(255,255,255,.10) 34%,
+    rgba(255,255,255,0) 62%,rgba(255,255,255,.20));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  -webkit-mask-composite:xor;mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);
+  mask-composite:exclude}
+/* Мягкий отсвет сверху — толщина стекла. */
+.cs-safe-in::after{content:'';position:absolute;inset:0;border-radius:inherit;
+  pointer-events:none;
+  background:radial-gradient(120% 70% at 50% -18%,rgba(255,255,255,.16),transparent 62%)}
+.cs-safe-in > *{position:relative;z-index:1}
 .cs-safe-card.on .cs-safe-in{transform:none;opacity:1}
 .cs-safe-big{font-size:38px;letter-spacing:6px;line-height:1.1;margin-bottom:16px}
-.cs-safe-t{font-size:16px;font-weight:700;margin-bottom:7px;color:var(--text)}
+.cs-safe-t{font-size:16px;font-weight:700;margin-bottom:7px}
 .cs-safe-s{font-size:13.5px;color:var(--sub);line-height:1.5}
-.cs-safe-ok{margin-top:17px;width:100%;height:44px;border:0;border-radius:12px;
-  background:rgba(255,255,255,.1);color:var(--text);font-size:15px;font-weight:600;
-  font-family:inherit;cursor:pointer}
+.cs-safe-ok{margin-top:17px;width:100%;height:46px;border:0;border-radius:14px;
+  background:rgba(255,255,255,.14);color:#fff;font-size:15px;font-weight:600;
+  font-family:inherit;cursor:pointer;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.24)}
+.cs-safe-ok:active{background:rgba(255,255,255,.2)}
+
 .cvo{position:fixed;inset:0;z-index:399;display:none;flex-direction:column;text-align:center;
   background:var(--bg2)}
 .cvo.on{display:flex}
@@ -19880,6 +19923,10 @@ function safePaint(){
     b.textContent = CALL_SAFE.join('');
     const big = document.getElementById('csSafeBig');
     if(big) big.textContent = CALL_SAFE.join('');
+    // Имя ставим подлежащим: «Если Худоба видит…». Так фраза остаётся верной
+    // для любого прозвища — склонять их наугад нельзя.
+    const кто = document.getElementById('csSafeWho');
+    if(кто) кто.textContent = CALL_WHO || 'собеседник';
   } else safeClose();
 }
 function safeOpen(){

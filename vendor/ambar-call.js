@@ -287,10 +287,6 @@
         return /earpiece|receiver|handset|трубк|ушн/i.test(d.label || '');
       })[0];
       self._earSink = ear ? ear.deviceId : '';
-      // Список выходов — в лог. Если системная сессия не переключает, второй
-      // рычаг это выбор выхода по имени, и решать, есть ли он, надо по факту.
-      self._diag('выходы(' + выходы.length + '): ' +
-        выходы.map(function (d) { return (d.label || 'без имени'); }).join(', ').slice(0, 120));
       return self._earSink;
     }).catch(function () { return ''; });
   };

@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=43"></script>
+<script src="/vendor/ambar-call.js?v=44"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -930,9 +930,15 @@ a.oc-row:active{background:var(--card2)}
 /* Поверх окон: у полноэкранного окна свой слой, и без явного номера
    плашка с кнопками уходила под него. */
 /* Ниже кнопок телеграма: они рисуются поверх приложения. */
+/* Стекло тут то же, что у карточки сверки: одна плоскость поверх видео —
+   один рецепт. Числа не «похожие», а те же самые, иначе две плашки на одном
+   экране начинают выглядеть как из разных приложений. */
 .cv-pill{position:absolute;top:calc(14px + var(--safe-top));left:14px;z-index:7;display:flex;align-items:center;gap:8px;
-  padding:7px 13px 7px 9px;border-radius:999px;background:rgba(20,20,30,.62);
-  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+  padding:7px 13px 7px 9px;border-radius:999px;
+  background:linear-gradient(160deg,rgba(58,58,78,.45),rgba(20,20,32,.39));
+  backdrop-filter:blur(28px) saturate(190%);
+  -webkit-backdrop-filter:blur(28px) saturate(190%);
+  box-shadow:0 10px 28px rgba(0,0,0,.34)}
 .cv-pill-a{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;
   justify-content:center;font-size:11px;font-weight:700;color:var(--gold2);
   background:rgba(201,169,110,.18)}

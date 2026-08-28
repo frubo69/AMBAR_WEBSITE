@@ -297,12 +297,20 @@ async def _end(call: Call, outcome: str, quiet_sid: str = "", say: str = ""):
             p.call = None
             if p.sid != quiet_sid:
                 await p.send(t="end", call=call.cid, why=outcome, say=say)
+    # Пока трубку не сняли, callee ещё никто: звонок звенит сразу на всех
+    # устройствах этого имени, и ни одно из них в call не записано. Если их
+    # тут не позвать, они будут звенеть в пустоту после того, как звонящий уже
+    # передумал, — телефон звонит, а на том конце давно никого.
+    ringing = _sessions(call.callee_key) if call.callee is None else []
+    for p in ringing:
+        if p.sid != quiet_sid:
+            await p.send(t="cancel", call=call.cid)
     # Звонок мог ждать водителя, поднятого пинком, — снимаем и это.
     pend = _PENDING.get(call.callee_key)
     if pend and pend[0] == call.cid:
         _PENDING.pop(call.callee_key, None)
     await _log_call(call, outcome)
-    await _push_recent(call.caller, call.callee)
+    await _push_recent(call.caller, call.callee, *ringing)
 
 
 # ── рингтон в боте водителя ─────────────────────────────────────────────────
@@ -424,20 +432,23 @@ async def _start_call(caller: Peer, to_key: str, order: str, video: bool = False
 
     kind, _, name = to_key.partition(":")
     # Свои же сессии из целей вон: звонок самому себе — петля, а не связь.
-    targets = [p for p in _free_sessions(to_key) if p.key != caller.key]
+    sess = [p for p in _sessions(to_key) if p.key != caller.key]
+    # Занят не аппарат, а человек. Оператор может держать панель открытой на
+    # планшете и на компьютере разом; если он говорит с одного, звонить во
+    # второй нельзя — телефон зазвонит у того, кто уже с трубкой у уха.
+    busy = any(p.call for p in sess)
+    targets = [p for p in sess if not p.call]
+
+    # «Занят» — не то же, что «недоступен», и человеку разница важна:
+    # занятого ждут, недоступного ищут другим путём.
+    if busy:
+        await caller.send(t="failed", why="busy_them", peer=name)
+        return
 
     cid = secrets.token_hex(8)
     call = Call(cid, caller, to_key, order, video)
     caller.call = call
     _CALLS[cid] = call
-
-    # Все на месте, но в разговоре — это не «недоступен», а «занят», и человеку
-    # разница важна: занятого ждут, недоступного ищут другим путём.
-    if not targets and _sessions(to_key):
-        caller.call = None
-        _CALLS.pop(cid, None)
-        await caller.send(t="failed", why="busy_them", peer=name)
-        return
 
     if not targets and kind == "drv":
         # Приложение закрыто: держим звонок и звоним ему в бот.
@@ -480,8 +491,6 @@ async def _ring_timeout(call: Call, ttl: float):
     except asyncio.CancelledError:
         return
     if _CALLS.get(call.cid) is call and not call.answered:
-        for p in _sessions(call.callee_key):
-            await p.send(t="cancel", call=call.cid)
         await _end(call, "no_answer")
 
 
@@ -607,10 +616,11 @@ async def _on_message(peer: Peer, m: dict):
         call = _CALLS.get(str(m.get("call") or "")) or peer.call
         if not call:
             return
-        if t == "reject" and not call.answered:
-            for p in _sessions(call.callee_key):
-                if p.sid != peer.sid:
-                    await p.send(t="cancel", call=call.cid)
+        # Отклонить может только тот, кому звонят. «Отклонение» от самого
+        # звонящего — это отмена набора, и в журнале она обязана называться
+        # своим именем, иначе у собеседника в пропущенных висит несуществующий
+        # отказ.
+        if t == "reject" and not call.answered and peer.sid != call.caller.sid:
             await _end(call, "rejected", quiet_sid=peer.sid,
                        say=str(m.get("say") or "")[:60])
         else:

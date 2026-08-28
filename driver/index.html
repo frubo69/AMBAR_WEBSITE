@@ -1074,9 +1074,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 /* Окно участника. Одно и то же для обоих: разница только в том, какой класс
    на нём висит. Геометрия в переходе — поэтому переезд из полного экрана в
    угол выглядит как в фейстайме, а не как скачок. */
+/* Геометрию окон ведут ключевые кадры из callVideoPaint, а не переход. Через
+   переход браузер строил движение как придётся: полный экран задан процентами,
+   маленькое окно — пикселями, и между ними перехода не бывает вовсе. Половина
+   свойств ехала, половина прыгала — отсюда и рваный обмен местами. */
 .cs-slot{position:absolute;overflow:hidden;background:#0b0b16;display:none;
-  transition:top .38s var(--e1),left .38s var(--e1),width .38s var(--e1),
-    height .38s var(--e1),border-radius .38s var(--e1);will-change:top,left,width,height}
+  transition:box-shadow .42s cubic-bezier(.32,.72,0,1),
+    border-color .42s cubic-bezier(.32,.72,0,1);will-change:top,left,width,height}
 .cs-slot video{width:100%;height:100%;object-fit:cover;display:block}
 .call-scr.video .cs-slot.full,.call-scr.video .cs-slot.pip{display:block}
 .cs-slot.full{top:0;left:0;width:100%;height:100%;border-radius:0;z-index:1}
@@ -2150,7 +2154,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=9"></script>
+<script src="/vendor/ambar-call.js?v=10"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -6130,6 +6134,8 @@ function callEvent(t, d){
       try{ if(_ac && _ac.state === 'suspended') _ac.resume(); }catch(e){}
       clearInterval(_callTick); _callTick = null;
       const why = d.why || '', prev = CALL_ST, who = CALL_WHO;
+      // «Занят» о собственном наборе во время разговора — не конец звонка.
+      if(t === 'failed' && d.keep){ toast('Вы уже в разговоре', 'err'); return; }
       CALL_ST = 'idle'; CALL_WHO = ''; CALL_NOTE = ''; CALL_Q = '';
       CALL_VIDEO = false; CALL_CAM = false; CALL_RCAM = false; callVideoPaint();
       ['csRemote','csLocal'].forEach(id => { const v = cel(id); if(v) v.srcObject = null; });
@@ -6267,14 +6273,26 @@ function callVideoPaint(){
   sc.classList.toggle('cam-back', !!(CALL && CALL.facing === 'environment'));
 
   if(loc && rem){
+    // Обмен местами обязан быть переходом, а не рывком, и оба окна обязаны
+    // ехать одинаково. Браузер строит переход только между числами: пока
+    // полный экран был задан процентами, размер менялся мгновенно, и от всей
+    // анимации оставался переезд по диагонали — отсюда и рваный обмен.
+    //
+    // Поэтому обе точки задаём числом. Сначала без перехода закрепляем, откуда
+    // летим (снимок делаем до смены классов, иначе снимем уже новое место),
+    // потом возвращаем переход и задаём, куда.
+    const откуда = new Map([[loc, _геом(loc)], [rem, _геом(rem)]]);
     loc.className = 'cs-slot' + (CALL_CAM ? '' : ' off');
     rem.className = 'cs-slot' + (CALL_RCAM ? '' : ' off');
-    // Координаты живут только на маленьком окне. Полноэкранное обязано их
-    // потерять: инлайновый left от прошлого раза перебивает стиль и окно
-    // остаётся стоять там, где было маленьким.
     const setSlot = (el, cls) => {
       el.classList.add(cls);
-      if(cls !== 'pip'){ el.style.left = ''; el.style.top = ''; }
+      if(cls === 'full'){
+        el.style.left = '0px'; el.style.top = '0px';
+        el.style.width = window.innerWidth + 'px';
+        el.style.height = window.innerHeight + 'px';
+      }else{
+        el.style.width = PIP_W + 'px'; el.style.height = PIP_H + 'px';
+      }
     };
     if(dial){
       setSlot(loc, 'full');               // на вызове — только я, во весь экран
@@ -6283,6 +6301,7 @@ function callVideoPaint(){
       setSlot(CALL_SWAP ? loc : rem, 'full');
       pipPlace();
     }
+    _летим(loc, откуда.get(loc)); _летим(rem, откуда.get(rem));
   }
 
   const a = cel('csPillA'), n = cel('csPillN');
@@ -6339,6 +6358,64 @@ function pipFloor(toLeft, H){
   const r = el.getBoundingClientRect();
   if(!r.height) return bottom;
   return Math.min(bottom, r.top - PIP_H - 12);
+}
+
+// Где окно стоит сейчас — в тех же координатах, в которых задаются left и top.
+function _геом(el){
+  return {left: el.offsetLeft, top: el.offsetTop,
+          width: el.offsetWidth, height: el.offsetHeight,
+          radius: getComputedStyle(el).borderRadius};
+}
+// Перелёт из старого положения в новое. Ключевыми кадрами, а не переходом:
+// переход строится браузером по своим правилам и между процентами и пикселями
+// не строится вовсе. Здесь обе точки заданы числом, поэтому едут все четыре
+// стороны сразу и оба окна одинаково.
+function _летим(el, было){
+  if(!было || !было.width) return;            // раньше был спрятан — показываем сразу
+  const стало = _геом(el);
+  if(!стало.width) return;
+  const тоже = Math.abs(стало.left - было.left) < 1 && Math.abs(стало.top - было.top) < 1
+            && Math.abs(стало.width - было.width) < 1 && Math.abs(стало.height - было.height) < 1;
+  if(тоже) return;
+  try{
+    el.animate([
+      {left: было.left + 'px', top: было.top + 'px', width: было.width + 'px',
+       height: было.height + 'px', borderRadius: было.radius},
+      {left: стало.left + 'px', top: стало.top + 'px', width: стало.width + 'px',
+       height: стало.height + 'px', borderRadius: стало.radius}
+    ], {duration: SWAP_MS, easing: 'cubic-bezier(.32,.72,0,1)'});
+  }catch(e){}
+}
+
+// Размер экрана меняется на повороте и когда телеграм двигает свои панели.
+// Полный экран у нас теперь в пикселях, а значит обязан пересчитываться.
+window.addEventListener('resize', () => { if(CALL_ST !== 'idle') callVideoPaint(); });
+
+// ── обмен местами ──────────────────────────────────────────────────────────
+// Оба окна едут по одной диагонали навстречу друг другу и посередине
+// неизбежно пересекаются. Раньше в этот момент получалась каша: тот, кто
+// уезжал в угол, мгновенно проваливался под собеседника (у угла порядок слоёв
+// ниже) и остаток пути шёл сквозь него.
+//
+// Поэтому уезжающий на время перелёта поднимается наверх — движение читается
+// как «карточку положили в угол», — а тот, кто разворачивается на весь экран,
+// на том же перелёте проявляется. Две правки, а разница как между «мигнуло» и
+// «переложили».
+const SWAP_MS = 420;
+function pipSwap(){
+  const loc = cel('slotLocal'), rem = cel('slotRemote');
+  if(!loc || !rem){ CALL_SWAP = !CALL_SWAP; callVideoPaint(); return; }
+  const вугол = loc.classList.contains('full') ? loc : rem;
+  const наэкран = вугол === loc ? rem : loc;
+  CALL_SWAP = !CALL_SWAP;
+  callVideoPaint();
+  вугол.style.zIndex = 9;
+  clearTimeout(вугол._swapT);
+  вугол._swapT = setTimeout(() => { вугол.style.zIndex = ''; }, SWAP_MS + 40);
+  try{
+    наэкран.animate([{opacity:.62},{opacity:1}],
+      {duration: SWAP_MS, easing:'cubic-bezier(.32,.72,0,1)'});
+  }catch(e){}
 }
 
 // ── перетаскивание маленького окна ──────────────────────────────────────────
@@ -6399,9 +6476,8 @@ function pipFloor(toLeft, H){
     if(!moved){
       // Нажатие без движения — обмен местами: собеседник в окно, я на экран.
       node.style.transform = '';
-      CALL_SWAP = !CALL_SWAP;
       try{ tg.HapticFeedback.impactOccurred('light'); }catch(err){}
-      callVideoPaint();
+      pipSwap();
       return;
     }
 

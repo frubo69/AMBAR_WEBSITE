@@ -280,8 +280,23 @@
         break;
 
       case 'failed':
+        // «Занят» приходит в ответ на попытку набрать во время разговора, и
+        // разговор при этом жив. Обнулить call здесь значит потерять трубку:
+        // класть будет нечего, а голос продолжит идти.
+        if (m.why === 'busy' && this.call) {
+          this._emit('failed', {why: m.why, peer: m.peer || '', keep: true});
+          break;
+        }
         this.call = null;
         this.tones.stop();
+        // Набор успел включить камеру и микрофон до того, как выяснилось, что
+        // звонок не пройдёт. Гасим: иначе после «занято» глазок камеры горит
+        // дальше, хотя никакого звонка нет.
+        this._camOff();
+        this.video = false;
+        if (this.stream) {
+          this.stream.getAudioTracks().forEach(function (t) { t.enabled = false; });
+        }
         if (m.why === 'busy_them') this.tones.busy();
         this._emit('failed', {why: m.why, peer: m.peer || ''});
         break;
@@ -522,10 +537,17 @@
     this._pendingIce = [];
     this._isCaller = isCaller;
 
-    this.stream.getAudioTracks().forEach(function (t) {
-      t.enabled = true;
-      pc.addTrack(t, self.stream);
-    });
+    if (this.stream) {
+      this.stream.getAudioTracks().forEach(function (t) {
+        t.enabled = true;
+        pc.addTrack(t, self.stream);
+      });
+    } else {
+      // Микрофон не дали, но слышать собеседника человек всё равно должен, и
+      // соединение обязано собраться. Без этого разговор просто рвался бы на
+      // ровном месте: своей дорожки нет, добавлять нечего, дальше исключение.
+      try { pc.addTransceiver('audio', {direction: 'recvonly'}); } catch (e) {}
+    }
     if (this.cam) this.cam.getVideoTracks().forEach(function (t) { pc.addTrack(t, self.cam); });
 
     pc.ontrack = function (e) {

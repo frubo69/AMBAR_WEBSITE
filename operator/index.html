@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=9"></script>
+<script src="/vendor/ambar-call.js?v=10"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -770,9 +770,12 @@ a.oc-row:active{background:var(--card2)}
 .ca-body.live{display:flex;align-items:center;justify-content:center}
 /* Окна участников: одинаковые, разница только в классе. Геометрия в переходе,
    поэтому переезд из полного экрана в угол — движение, а не скачок. */
+/* Геометрию окон ведут ключевые кадры из callVidPaint, а не переход: полный
+   экран задан процентами, маленькое окно пикселями, и перехода между ними
+   браузер не строит вовсе — половина свойств ехала, половина прыгала. */
 .cv-slot{position:absolute;overflow:hidden;background:#0b0b16;display:none;
-  transition:top .38s var(--e1),left .38s var(--e1),width .38s var(--e1),
-    height .38s var(--e1),border-radius .38s var(--e1)}
+  transition:box-shadow .42s cubic-bezier(.32,.72,0,1),
+    border-color .42s cubic-bezier(.32,.72,0,1)}
 .cv-slot video{width:100%;height:100%;object-fit:cover;display:block}
 .cv.on .cv-slot.full,.cv.on .cv-slot.pip{display:block}
 .cv-slot.full{top:0;left:0;width:100%;height:100%;border-radius:0;z-index:1}
@@ -4922,12 +4925,12 @@ function callEvent(t, d){
       callBadge(); callPaint();
       return;
     case 'ring':
-      CALL_ST = 'in'; CALL_WHO = d.peer; CALL_VIDEO = !!d.video; CALL_CAM = false;
+      CALL_ST = 'in'; CALL_WHO = d.peer; CALL_VIDEO = !!d.video; CALL_CAM = false; CALL_RCAM = false;
       showOv('callOv'); callPaint();
       $('callBtn')?.classList.add('ringing');
       return;
     case 'calling':
-      CALL_ST = 'out'; CALL_WHO = d.peer; CALL_VIDEO = !!d.video; showOv('callOv'); callPaint();
+      CALL_ST = 'out'; CALL_WHO = d.peer; CALL_VIDEO = !!d.video; CALL_CAM = false; CALL_RCAM = false; showOv('callOv'); callPaint();
       return;
     case 'talking':
       CALL_ST = 'live'; CALL_T0 = Date.now(); CALL_Q = ''; _callMuted = false;
@@ -4960,8 +4963,13 @@ function callEvent(t, d){
     case 'failed': {
       clearInterval(_callTick); _callTick = null;
       const why = d.why || '', who = CALL_WHO;
+      // «Занят» о собственном наборе во время разговора — не конец звонка.
+      if(t === 'failed' && d.keep){ toast('Вы уже в разговоре', 'err'); return; }
       CALL_ST = 'idle'; CALL_WHO = ''; CALL_Q = '';
-      CALL_VIDEO = false; CALL_CAM = false;
+      CALL_VIDEO = false; CALL_CAM = false; CALL_RCAM = false;
+      // Кадр в элементе живёт сам по себе: не обнулить — и следующий звонок
+      // начнётся с замершего лица из прошлого.
+      ['caRem','caLoc'].forEach(id => { const v = document.getElementById(id); if(v) v.srcObject = null; });
       $('callBtn')?.classList.remove('ringing');
       callPaint();
       if(t === 'failed')
@@ -5101,6 +5109,57 @@ function pipPlace(){
   el.style.left = PIP_X + 'px'; el.style.top = PIP_Y + 'px';
 }
 
+// Где окно стоит сейчас — в тех же координатах, в которых задаются left и top.
+function _геом(el){
+  return {left: el.offsetLeft, top: el.offsetTop,
+          width: el.offsetWidth, height: el.offsetHeight,
+          radius: getComputedStyle(el).borderRadius};
+}
+// Перелёт из старого положения в новое — ключевыми кадрами, обе точки числом:
+// тогда едут все четыре стороны сразу и оба окна одинаково.
+function _летим(el, было){
+  if(!было || !было.width) return;            // раньше был спрятан — показываем сразу
+  const стало = _геом(el);
+  if(!стало.width) return;
+  if(Math.abs(стало.left - было.left) < 1 && Math.abs(стало.top - было.top) < 1
+     && Math.abs(стало.width - было.width) < 1 && Math.abs(стало.height - было.height) < 1) return;
+  try{
+    el.animate([
+      {left: было.left + 'px', top: было.top + 'px', width: было.width + 'px',
+       height: было.height + 'px', borderRadius: было.radius},
+      {left: стало.left + 'px', top: стало.top + 'px', width: стало.width + 'px',
+       height: стало.height + 'px', borderRadius: стало.radius}
+    ], {duration: SWAP_MS, easing: 'cubic-bezier(.32,.72,0,1)'});
+  }catch(e){}
+}
+
+// Панель меняет размер вместе с окном браузера, а полный экран у нас теперь
+// в пикселях — значит обязан пересчитываться.
+window.addEventListener('resize', () => { if(CALL_ST !== 'idle') callVidPaint(); });
+
+// ── обмен местами ──────────────────────────────────────────────────────────
+// Оба окна едут по одной диагонали навстречу друг другу и посередине
+// пересекаются. Раньше в этот момент получалась каша: уезжающий в угол сразу
+// проваливался под собеседника — у угла порядок слоёв ниже — и остаток пути
+// шёл сквозь него. Теперь уезжающий на время перелёта идёт поверх, а тот, кто
+// разворачивается на весь экран, на том же перелёте проявляется.
+const SWAP_MS = 420;
+function pipSwap(){
+  const loc = document.getElementById('cvSlotLoc'), rem = document.getElementById('cvSlotRem');
+  if(!loc || !rem){ CALL_SWAP = !CALL_SWAP; callVidPaint(); return; }
+  const вугол = loc.classList.contains('full') ? loc : rem;
+  const наэкран = вугол === loc ? rem : loc;
+  CALL_SWAP = !CALL_SWAP;
+  callVidPaint();
+  вугол.style.zIndex = 9;
+  clearTimeout(вугол._swapT);
+  вугол._swapT = setTimeout(() => { вугол.style.zIndex = ''; }, SWAP_MS + 40);
+  try{
+    наэкран.animate([{opacity:.62},{opacity:1}],
+      {duration: SWAP_MS, easing:'cubic-bezier(.32,.72,0,1)'});
+  }catch(e){}
+}
+
 // ── перетаскивание маленького окна ──────────────────────────────────────────
 // Во время движения меняем transform, а не координаты: пересчёт раскладки на
 // каждый кадр заставляет окно с живым видео отставать от курсора. Жест
@@ -5129,7 +5188,7 @@ function pipPlace(){
     const node = el; el = null;
     try{ if(e && e.pointerId != null) node.releasePointerCapture(e.pointerId); }catch(err){}
     node.classList.remove('drag');
-    if(!moved){ node.style.transform = ''; CALL_SWAP = !CALL_SWAP; callVidPaint(); return; }
+    if(!moved){ node.style.transform = ''; pipSwap(); return; }
 
     const box = pipBox(); if(!box) return;
     const W = box.clientWidth, H = box.clientHeight;
@@ -5181,15 +5240,29 @@ function callVidPaint(){
   l.classList.toggle('cam-on', CALL_CAM);
   const loc = document.getElementById('cvSlotLoc'), rem = document.getElementById('cvSlotRem');
   if(loc && rem){
+    // Снимок «откуда» — до смены классов, иначе снимем уже новое место.
+    const откуда = new Map([[loc, _геом(loc)], [rem, _геом(rem)]]);
     loc.className = 'cv-slot' + (CALL_CAM ? '' : ' off');
     rem.className = 'cv-slot' + (CALL_RCAM ? '' : ' off');
-    // Координаты живут только на маленьком окне: инлайновые left и top от
-    // прошлого раза перебили бы стиль полноэкранного.
-    const set = (el, cls) => { el.classList.add(cls);
-      if(cls !== 'pip'){ el.style.left = ''; el.style.top = ''; } };
+    const box = pipBox();
+    // Свёрнутое окно браузера меряется нулём. Ноль записывать нельзя: окно
+    // схлопнется и останется схлопнутым до следующей перерисовки.
+    const BW = (box && box.clientWidth) || window.innerWidth || 0;
+    const BH = (box && box.clientHeight) || window.innerHeight || 0;
+    const set = (el, cls) => {
+      el.classList.add(cls);
+      if(cls === 'full'){
+        el.style.left = '0px'; el.style.top = '0px';
+        el.style.width = BW + 'px';
+        el.style.height = BH + 'px';
+      }else{
+        el.style.width = PIP_W + 'px'; el.style.height = PIP_H + 'px';
+      }
+    };
     // На вызове человек видит себя во весь экран, как в фейстайме.
     if(dial) set(loc, 'full');
     else if(live){ set(CALL_SWAP ? rem : loc, 'pip'); set(CALL_SWAP ? loc : rem, 'full'); pipPlace(); }
+    _летим(loc, откуда.get(loc)); _летим(rem, откуда.get(rem));
   }
   l.classList.toggle('cam-back', !!(CALL && CALL.facing === 'environment'));
   const a = document.getElementById('cvA'), n = document.getElementById('cvN');
@@ -5378,6 +5451,11 @@ function _callPaint(){
   if(CALL_ST === 'idle'){
     // Во время разговора списки не нужны, а нижняя панель мешает: экран
     // разговора занимает приложение целиком.
+    // Экран разговора рисуют отдельные слои поверх приложения, и сами они не
+    // гаснут. Раньше эта ветка уходила в return раньше, чем до них доходило
+    // дело: звонок кончился — а на экране остался последний кадр с кнопками,
+    // и так после любого исхода, не только после отклонения.
+    callVidPaint();
     if(nav) nav.style.display = 'flex';
     body.classList.remove('live');
     body.innerHTML = CALL_PAGE === 'contacts' ? caContacts() : caCalls();

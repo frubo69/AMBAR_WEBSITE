@@ -563,7 +563,7 @@ async def handle_ws(request: web.Request):
             log.info(f"[call] на связи: {peer.label} ({peer.kind}), устройство: "
                      f"телеграм={env.get('tg') or '?'} экран={env.get('w') or '?'} "
                      f"пальцем={bool(env.get('touch'))} "
-                     f"сессия_звука={bool(env.get('aus'))} трубка={bool(env.get('ear'))} "
+                     f"сборка={env.get('app') or '?'} "
                      f"выбор_выхода={bool(env.get('sink'))} замок={bool(env.get('wake'))} "
                      f"версия={env.get('ver') or '?'} поворот={bool(env.get('rot'))}")
         else:

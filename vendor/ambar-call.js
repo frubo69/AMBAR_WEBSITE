@@ -298,6 +298,11 @@
       e.w = Math.min(screen.width, screen.height);
       var w = window.Telegram && Telegram.WebApp;
       e.tg = (w && w.platform) || '';
+      // Какая версия приложения в руках. Без этого каждый раз приходится
+      // гадать, дошла ли до телефона свежая сборка, а страница живёт открытой
+      // сутками и обновляется не тогда, когда мы выкатили.
+      var sc = document.querySelector('script[src*="ambar-call.js"]');
+      e.app = sc ? ((sc.getAttribute('src') || '').split('v=')[1] || '?') : '?';
       e.ver = (w && w.version) || '';
       e.rot = !!(w && typeof w.lockOrientation === 'function');
     } catch (err) {}

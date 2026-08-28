@@ -276,7 +276,6 @@
   // смотрим по нескольким корням сразу.
   AmbarCall.prototype._findEar = function () {
     var self = this;
-    this._earSink = '';
     var a = document.createElement('audio');
     if (typeof a.setSinkId !== 'function' ||
         !navigator.mediaDevices || !navigator.mediaDevices.enumerateDevices) {
@@ -313,57 +312,63 @@
   //
   // Поэтому: до первого звука сессию не трогаем вовсе, а трубку включаем
   // всегда переходом — сначала обычная, следом разговорная.
-  // Маршрут переключается ТОЛЬКО поверх играющего звука.
+  // Куда идёт голос.
   //
-  // Это стоило трёх попыток и телеметрии с самого телефона. Она показала, что
-  // всё задуманное стоит правильно — «тип=play-and-record, элемент=AUDIO,
-  // играет», — а звук всё равно в громком динамике. Значит ломает не значение,
-  // а порядок: система настраивает выход заново каждый раз, когда элемент
-  // НАЧИНАЕТ играть, и своей настройкой перебивает нашу. Поэтому в прошлый раз
-  // и вышло хуже: я останавливал звук, менял сессию и запускал заново — запуск
-  // всё и отменял.
+  // Правильный рычаг оказался не тот, которым я бился пять раз. Телефон
+  // показывает трубку у уха ОТДЕЛЬНЫМ устройством вывода — «Receiver» рядом со
+  // «Speaker», — и его можно просто назвать. Это прямой выбор выхода: мы не
+  // намекаем системе типом сессии, а говорим, в какое устройство играть.
   //
-  // Отсюда правило: звук не трогаем вовсе. Меняем сессию под играющим — тогда
-  // менять её больше некому.
+  // Тип сессии остаётся запасным путём — для телефонов, где отдельного
+  // устройства нет.
   AmbarCall.prototype._applyRoute = function (why) {
     var self = this, ear = this.route === 'ear', a = this.audio;
     clearTimeout(this._routeT); this._routeT = null;
     this._routedAt = Date.now();
 
-    if (!_hasSession()) {                          // системной сессии нет
-      try {
-        if (this._earSink && a && a.setSinkId) {
-          a.setSinkId(ear ? this._earSink : '').catch(function () {});
-          this._diag('канал через выход устройства: ' + (ear ? 'ухо' : 'динамик'));
-        }
-      } catch (e) {}
+    if (this._earSink && a && typeof a.setSinkId === 'function') {
+      a.setSinkId(ear ? this._earSink : '').then(function () {
+        self._sayRoute(why, 'выход назван');
+      }).catch(function (e) {
+        self._sayRoute(why, 'выход не выбрался: ' + ((e && e.name) || '?'));
+        self._applyBySession(why);          // не вышло — пробуем сессией
+      });
       return;
     }
+    this._applyBySession(why);
+  };
 
-    var скажем = function () {
-      self._diag('канал: ' + (self.route === 'ear' ? 'ухо' : 'динамик') +
-                 ' · ' + (why || '') + ' · тип=' + _type() +
-                 ' · элемент=' + (self.audio ? self.audio.tagName : 'нет') +
-                 '/' + (self.audio && self.audio.paused ? 'пауза' : 'играет'));
-    };
+  AmbarCall.prototype._sayRoute = function (why, как) {
+    this._diag('канал: ' + (this.route === 'ear' ? 'ухо' : 'динамик') +
+               ' · ' + (why || '') + ' · ' + как + ' · тип=' + _type() +
+               ' · элемент=' + (this.audio ? this.audio.tagName : 'нет') +
+               '/' + (this.audio && this.audio.paused ? 'пауза' : 'играет'));
+  };
 
-    if (!ear) { _session('auto'); скажем(); return; }
-
-    // Переключает изменение, а не значение: если разговорная сессия уже стоит,
-    // сначала сходим в обычную — и с паузой, иначе система склеит два
-    // присвоения в одно и никакого изменения не увидит.
+  // Запасной путь: тип звуковой сессии.
+  //
+  // Здесь важен порядок, а не значение. Систему настраивает начало
+  // воспроизведения: каждый запуск звука она сопровождает своей настройкой
+  // выхода. Поэтому звук не трогаем вовсе — меняем сессию поверх играющего.
+  // И переключает изменение, а не значение: если разговорная сессия уже стоит,
+  // сначала сходим в обычную, с паузой, иначе два присвоения склеятся в одно.
+  AmbarCall.prototype._applyBySession = function (why) {
+    var self = this, ear = this.route === 'ear';
+    if (!_hasSession()) return;
+    if (!ear) { _session('auto'); this._sayRoute(why, 'сессией'); return; }
     if (_type() === 'play-and-record') {
       _session('auto');
+      clearTimeout(this._routeT);
       this._routeT = setTimeout(function () {
         self._routeT = null;
         if (self.route !== 'ear' || !self.call) return;
         _session('play-and-record');
-        скажем();
+        self._sayRoute(why, 'сессией');
       }, 250);
       return;
     }
     _session('play-and-record');
-    скажем();
+    this._sayRoute(why, 'сессией');
   };
 
   AmbarCall.prototype.audioTo = function (where, тихо) {
@@ -728,6 +733,9 @@
       self.stream = s;
       try { localStorage.setItem('ambar_mic_ok', '1'); } catch (e) {}
       self._prepAudio();
+      // Имена устройств вывода видны только после разрешения микрофона —
+      // значит искать трубку надо здесь, задолго до первого звонка.
+      self._findEar();
       self._emit('mic', {ok: true});
       return s;
     }).catch(function (err) {
@@ -1002,7 +1010,12 @@
     this._watchQuality();
     // Ищем трубку у уха заранее: к моменту, когда человек нажмёт «динамик»,
     // ответ уже должен быть.
-    this._findEar().then(function () { self._emit('route', {to: self.route, real: self.canRoute()}); });
+    this._findEar().then(function () {
+      self._emit('route', {to: self.route, real: self.canRoute()});
+      // Поиск мог закончиться уже после начала разговора — тогда канал ставим
+      // заново, теперь уже прямым выбором выхода.
+      if (self.call && self._earSink) self._applyRoute('нашли выход');
+    });
     // Голос в трубку у уха — экран не нужен, пусть гаснет сам: это и есть
     // защита от случайного нажатия щекой, и никакая накладка её не заменит.
     // Выбор запоминаем сразу, чтобы кнопка с первой секунды показывала правду,

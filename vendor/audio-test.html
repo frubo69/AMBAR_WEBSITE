@@ -1,25 +1,24 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<title>Звонок целиком</title>
+<title>Последняя проверка</title>
 <!--
-  Страница повторяет звонок целиком: гудки, ответ, голос — и даёт переключать
-  трубку у уха. Приложение при этом не трогается: пока связка не докажет себя
-  здесь, в приложении её нет.
+  Последняя проверка, и она про одну-единственную связку — ту, которую
+  приложение может себе позволить.
 
-  Что проверяется двумя ушами сразу:
+  Что уже выяснено замерами на этом телефоне:
 
-  1. Ровность. Прошлая попытка увела весь звук через поток в элемент, и гудки
-     захлебнулись. Подозрение конкретное: элемент создавался лениво, для каждого
-     контекста свой, и пересоздавался между звонками. Здесь наоборот — один
-     контекст и один элемент на всё, заведённые в момент касания и живущие
-     дальше без пересоздания.
+  · гудки через поток в элемент рвутся — путь закрыт, гудки обязаны идти
+    прямым выходом веб-аудио, как и идут сегодня;
+  · выбор устройства вывода на СВЕЖЕЙ странице голос в ухо уводил.
 
-  2. Трубка. Прямой выход веб-аудио уводит весь звук страницы в громкий динамик
-     до конца сеанса; поэтому здесь его нет вовсе, и выход всегда можно назвать.
+  Непроверенным остался ровно один случай: гудки прямым выходом (то есть как в
+  приложении), а голос из соединения — в элементе, которому устройство
+  называется, пока он ИГРАЕТ. Раньше я называл его молчащему, и это была
+  догадка, выведенная из перезагрузки страницы, а не из сравнения.
 
-  Открывать заново адресом, не обновлением: маршрут звука живёт в вебвью и
-  переживает перезагрузку страницы.
+  Если голос уйдёт в ухо — связка найдена и переносится в приложение как есть.
+  Если нет — трубка у уха в мини-аппе невозможна, и разговор об этом закрыт.
 -->
 <style>
   :root{ --bg:#08080f; --card:#14141f; --line:rgba(255,255,255,.10);
@@ -49,30 +48,27 @@
   .ok{color:#5BC98A} .bad{color:#E88}
 </style>
 
-<h1>Звонок целиком</h1>
-<div class="sub">Нажимайте по порядку. Слушайте две вещи: <b>ровный ли звук</b>
-  и <b>из какого динамика</b>. Открывать заново адресом, не обновлением.</div>
+<h1>Последняя проверка</h1>
+<div class="sub">Гудки — как в приложении, прямым выходом: они должны быть
+  <b>ровные</b>. Голос — из соединения, и ему называется ушной динамик, пока он
+  играет. Открывать заново адресом, не обновлением.</div>
 
 <div class="card">
-  <h2>Шаг 1 · вызов</h2>
+  <h2>1 · вызов</h2>
   <button class="main" id="go">Позвонить
-    <small>микрофон и гудки — секунда тона, четыре паузы, как в телефоне</small></button>
-  <div class="sub" style="margin:0">Гудки должны быть <b>ровные</b> и из
-    <b>громкого</b> динамика.</div>
+    <small>микрофон и гудки прямым выходом — ровные, из громкого динамика</small></button>
 </div>
 
 <div class="card">
-  <h2>Шаг 2 · ответили</h2>
+  <h2>2 · ответили</h2>
   <button id="ans" disabled>Сняли трубку
-    <small>гудки смолкают, голос идёт через настоящее соединение — в ухо</small></button>
-  <div class="sub" style="margin:0">Голос должен быть <b>ровный</b> и из
-    <b>ушного</b> динамика.</div>
+    <small>голос через соединение; ушной динамик назовём через секунду после начала</small></button>
 </div>
 
 <div class="card">
-  <h2>Шаг 3 · переключение</h2>
-  <button id="spk" disabled>Громкая связь</button>
+  <h2>3 · переключение</h2>
   <button id="ear" disabled>Трубка у уха</button>
+  <button id="spk" disabled>Громкая связь</button>
   <button class="stop" id="end" disabled>Отбой</button>
 </div>
 
@@ -93,108 +89,80 @@
   }
   function кнопка(id, вкл) { document.getElementById(id).disabled = !вкл; }
 
-  // ── один контекст и один выход на всё ────────────────────────────────────
-  // Ни одного подключения к ac.destination: прямой выход система считает
-  // обычным воспроизведением, уводит в громкий динамик и оставляет там весь
-  // звук страницы до конца сеанса.
-  //
-  // Элемент заводится один раз, в касании, и живёт дальше. Прошлый раз он
-  // создавался лениво и пересоздавался — на это и было похоже захлёбывание.
-  var ac = null, вых = null, элТон = null;   // тоны
-  var мик = null, ухо = '', гудки = null;
-  var элГолос = null, A = null, B = null, голосТон = null;
+  var ac = null, мик = null, ухо = '', гудки = null;
+  var эл = null, A = null, B = null, голос = null;
 
-  function завести() {
-    ac = new (window.AudioContext || window.webkitAudioContext)();
-    вых = ac.createMediaStreamDestination();
-    элТон = элемент();
-    элТон.srcObject = вых.stream;
-    элТон.play().catch(function () {});
-  }
-  function элемент() {
-    var a = document.createElement('audio');
-    a.autoplay = true; a.setAttribute('playsinline', '');
-    a.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:.01';
-    document.body.appendChild(a);
-    return a;
-  }
-  // Ровный тон с короткими краями — как гудок в телефоне.
-  function тон(freq, dur, gain) {
+  // Гудки — прямым выходом, ровно как в приложении сегодня. Через поток в
+  // элемент они на этом телефоне рвутся, это уже проверено.
+  function тон() {
     if (!ac || ac.state !== 'running') return;
-    var o = ac.createOscillator(), g = ac.createGain(), t0 = ac.currentTime;
-    o.type = 'sine'; o.frequency.value = freq;
+    var o = ac.createOscillator(), g = ac.createGain(), t0 = ac.currentTime, v = 0.10;
+    o.type = 'sine'; o.frequency.value = 425;
     g.gain.setValueAtTime(0, t0);
-    g.gain.linearRampToValueAtTime(gain, t0 + 0.018);
-    g.gain.setValueAtTime(gain, t0 + dur - 0.035);
-    g.gain.linearRampToValueAtTime(0, t0 + dur);
-    o.connect(g); g.connect(вых);
-    o.start(t0); o.stop(t0 + dur + 0.02);
+    g.gain.linearRampToValueAtTime(v, t0 + 0.018);
+    g.gain.setValueAtTime(v, t0 + 0.965);
+    g.gain.linearRampToValueAtTime(0, t0 + 1.0);
+    o.connect(g); g.connect(ac.destination);
+    o.start(t0); o.stop(t0 + 1.02);
   }
-  function назвать(эл, id, кто) {
-    if (!эл || typeof эл.setSinkId !== 'function') { лог('выбор выхода недоступен', 'bad'); return; }
+
+  function назвать(id) {
+    if (!эл) { лог('голоса ещё нет', 'bad'); return; }
+    if (typeof эл.setSinkId !== 'function') { лог('выбор выхода недоступен', 'bad'); return; }
+    лог('называю выход · элемент ' + (эл.paused ? 'молчит' : 'ИГРАЕТ'));
     эл.setSinkId(id || '')
-      .then(function () { лог(кто + ' → ' + (id ? 'трубка' : 'громкий динамик'), 'ok'); })
-      .catch(function (e) { лог(кто + ': выход не принят — ' + e.name, 'bad'); });
+      .then(function () { лог((id ? 'ушной динамик' : 'громкий динамик') + ' принят', 'ok'); })
+      .catch(function (e) { лог('выход не принят — ' + e.name, 'bad'); });
   }
 
-  // ── шаг 1: вызов ─────────────────────────────────────────────────────────
   document.getElementById('go').onclick = function () {
-    навигаторМик().then(function () {
-      завести();
-      return ac.resume();
-    }).then(function () {
-      лог('гудки пошли — слушайте ровность', 'ok');
-      тон(425, 1.0, 0.10);
-      гудки = setInterval(function () { тон(425, 1.0, 0.10); }, 5000);
-      кнопка('go', false); кнопка('ans', true); кнопка('end', true);
-    }).catch(function (e) { лог('не вышло: ' + ((e && e.name) || e), 'bad'); });
-  };
-
-  function навигаторМик() {
-    return navigator.mediaDevices.getUserMedia({audio: true}).then(function (s) {
+    navigator.mediaDevices.getUserMedia({audio: true}).then(function (s) {
       мик = s;
       лог('микрофон есть', 'ok');
       return navigator.mediaDevices.enumerateDevices();
     }).then(function (list) {
-      var вх = list.filter(function (d) { return d.kind === 'audiooutput'; });
-      var r = вх.filter(function (d) { return /receiver|earpiece|handset/i.test(d.label || ''); })[0];
+      var вых = list.filter(function (d) { return d.kind === 'audiooutput'; });
+      var r = вых.filter(function (d) { return /receiver|earpiece|handset/i.test(d.label || ''); })[0];
       ухо = r ? r.deviceId : '';
-      лог('выходы: ' + вх.map(function (d) { return d.label || '?'; }).join(', '));
+      лог('выходы: ' + вых.map(function (d) { return d.label || '?'; }).join(', '));
       лог(ухо ? 'трубка в списке есть' : 'трубки в списке НЕТ', ухо ? 'ok' : 'bad');
-    });
-  }
+      ac = new (window.AudioContext || window.webkitAudioContext)();
+      return ac.resume();
+    }).then(function () {
+      лог('гудки пошли — они должны быть ровные', 'ok');
+      тон(); гудки = setInterval(тон, 5000);
+      кнопка('go', false); кнопка('ans', true); кнопка('end', true);
+    }).catch(function (e) { лог('не вышло: ' + ((e && e.name) || e), 'bad'); });
+  };
 
-  // ── шаг 2: ответили ──────────────────────────────────────────────────────
   document.getElementById('ans').onclick = function () {
     clearInterval(гудки); гудки = null;
     лог('гудки смолкли');
-    // Голос собеседника: ровный тон, пройденный через настоящее соединение.
-    голосТон = ac.createOscillator();
+    // Голос собеседника: ровный тон через настоящее соединение.
+    голос = ac.createOscillator();
     var g = ac.createGain(), d = ac.createMediaStreamDestination();
-    голосТон.frequency.value = 660; g.gain.value = 0.11;
-    голосТон.connect(g); g.connect(d); голосТон.start();
+    голос.frequency.value = 660; g.gain.value = 0.11;
+    голос.connect(g); g.connect(d); голос.start();
 
     A = new RTCPeerConnection(); B = new RTCPeerConnection();
     A.onicecandidate = function (e) { if (e.candidate) B.addIceCandidate(e.candidate); };
     B.onicecandidate = function (e) { if (e.candidate) A.addIceCandidate(e.candidate); };
     B.ontrack = function (e) {
       var st = (e.streams && e.streams[0]) || new MediaStream([e.track]);
-      // Элемент для голоса — свой, и устройство ему называется, пока он молчит.
-      элГолос = элемент();
-      var шаг = (typeof элГолос.setSinkId === 'function' && ухо)
-        ? элГолос.setSinkId(ухо) : Promise.resolve();
-      шаг.then(function () { лог('голосу назван ушной динамик', 'ok'); })
-         .catch(function (er) { лог('голос: выход не принят — ' + er.name, 'bad'); })
-         .then(function () {
-           элГолос.srcObject = st;
-           return элГолос.play().catch(function () {});
-         }).then(function () {
-           лог('голос пошёл — слушайте ровность и динамик', 'ok');
-           // Тоновый выход тоже переводим: два выхода в разные стороны — это
-           // как раз то, из-за чего звук слышно сразу отовсюду.
-           назвать(элТон, ухо, 'тоны');
-           кнопка('spk', true); кнопка('ear', true);
-         });
+      эл = document.createElement('audio');
+      эл.autoplay = true; эл.setAttribute('playsinline', '');
+      эл.style.cssText = 'position:fixed;left:0;bottom:0;width:1px;height:1px;opacity:.01';
+      document.body.appendChild(эл);
+      эл.srcObject = st;
+      эл.play().then(function () {
+        лог('голос пошёл — сначала слушайте, ровный ли он', 'ok');
+        // Именно так: даём голосу зазвучать и только потом называем устройство.
+        setTimeout(function () {
+          лог('через секунду называю ушной динамик');
+          назвать(ухо);
+          кнопка('ear', true); кнопка('spk', true);
+        }, 1000);
+      }).catch(function (er) { лог('голос не пошёл: ' + er.name, 'bad'); });
     };
     d.stream.getAudioTracks().forEach(function (t) { A.addTrack(t, d.stream); });
     A.createOffer().then(function (o) { return A.setLocalDescription(o); })
@@ -206,28 +174,19 @@
     кнопка('ans', false);
   };
 
-  // ── шаг 3: переключение ──────────────────────────────────────────────────
-  document.getElementById('spk').onclick = function () {
-    назвать(элГолос, '', 'голос'); назвать(элТон, '', 'тоны');
-  };
-  document.getElementById('ear').onclick = function () {
-    if (!ухо) { лог('трубки в списке нет — переключать нечем', 'bad'); return; }
-    назвать(элГолос, ухо, 'голос'); назвать(элТон, ухо, 'тоны');
-  };
+  document.getElementById('ear').onclick = function () { назвать(ухо); };
+  document.getElementById('spk').onclick = function () { назвать(''); };
 
   document.getElementById('end').onclick = function () {
     clearInterval(гудки); гудки = null;
-    try { if (голосТон) голосТон.stop(); } catch (e) {}
-    [элТон, элГолос].forEach(function (el) {
-      if (!el) return;
-      try { el.pause(); el.srcObject = null; el.remove(); } catch (e) {}
-    });
-    элТон = элГолос = null;
+    try { if (голос) голос.stop(); } catch (e) {}
+    if (эл) { try { эл.pause(); эл.srcObject = null; эл.remove(); } catch (e) {} }
+    эл = null;
     try { if (A) A.close(); if (B) B.close(); } catch (e) {}
     try { if (мик) мик.getTracks().forEach(function (t) { t.stop(); }); } catch (e) {}
     try { if (ac) ac.close(); } catch (e) {}
     ac = null;
-    ['go', 'ans', 'spk', 'ear', 'end'].forEach(function (id) { кнопка(id, false); });
+    ['go', 'ans', 'ear', 'spk', 'end'].forEach(function (id) { кнопка(id, false); });
     лог('отбой, всё остановлено', 'ok');
   };
 })();

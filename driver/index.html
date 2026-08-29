@@ -2623,7 +2623,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=72"></script>
+<script src="/vendor/ambar-call.js?v=73"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -6656,6 +6656,10 @@ function callEvent(t, d){
       if(t === 'failed' && d.keep){ toast('Вы уже в разговоре', 'err'); return; }
       CALL_SAFE = null; safePaint();
       CALL_ST = 'idle'; CALL_WHO = ''; CALL_NOTE = ''; CALL_Q = '';
+      // Звонок кончился — полоскам связи наверху делать нечего: класс им
+      // ставит только перекраска качества, а её после конца никто не зовёт.
+      document.body.classList.remove('call-live');
+      var _st = document.getElementById('sigTop'); if(_st) _st.innerHTML = '';
       CALL_VIDEO = false; CALL_CAM = false; CALL_RCAM = false; callVideoPaint();
       ['csRemote','csLocal'].forEach(id => { const v = cel(id); if(v) v.srcObject = null; });
       callRender(); callBar();

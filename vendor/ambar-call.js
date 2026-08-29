@@ -717,8 +717,15 @@
     if (!pc) return null;
     if (pc.getTransceivers) {
       var t = pc.getTransceivers().find(function (x) {
-        return (x.sender && x.sender.track && x.sender.track.kind === 'video')
-            || (x.receiver && x.receiver.track && x.receiver.track.kind === 'video');
+        // Свой отправитель с картинкой — он и нужен.
+        if (x.sender && x.sender.track && x.sender.track.kind === 'video') return true;
+        // Чужая картинка тоже создаёт трансивер, но если он заведён под
+        // чужую камеру, он работает только на приём. Положить в него свою
+        // дорожку можно — доедет она при этом до собеседника или нет, никого
+        // уже не волнует: направление осталось «только слушаю». Такой не берём,
+        // пусть дорожка заводит себе отправляющий.
+        return x.receiver && x.receiver.track && x.receiver.track.kind === 'video'
+            && x.direction !== 'recvonly' && x.direction !== 'inactive';
       });
       if (t && t.sender) return t.sender;
     }
@@ -794,7 +801,14 @@
       // Соединение уже собрано — просто подменяем дорожку, без пересборки.
       var sender = self._vsender();
       if (sender) { sender.replaceTrack(track); self._capVideo(); }
-      else if (self.pc) { self.pc.addTrack(track, self.stream || s); self._capVideo(); }
+      else if (self.pc) {
+        // Новой дорожке места в соединении ещё нет — значит, надо
+        // договариваться заново, иначе собеседник её не увидит. Именно здесь,
+        // а не по общему событию о переговорах: то срабатывает и посреди
+        // первого соединения, и вебкит на этом кладёт весь звонок.
+        self.pc.addTrack(track, self.stream || s); self._capVideo();
+        self._negotiate();
+      }
       self._emit('cam', {on: true, facing: self.facing, stream: s});
       self._send({t: 'camstate', on: true});
       return s;
@@ -1043,18 +1057,6 @@
     pc.onicecandidate = function (e) {
       if (e.candidate) self._send({t: 'ice', data: e.candidate});
     };
-    // Дорожку добавили посреди разговора — например, включили камеру в
-    // голосовом звонке. Об этом надо договориться заново: дорожка есть, а
-    // собеседник о ней не знает, и картинки у него не будет. Раньше этого
-    // обработчика не было вовсе — оттого камера включалась «в никуда».
-    pc.onnegotiationneeded = function () {
-      // Первый круг ведёт звонящий сам, и лезть туда нельзя: обе стороны
-      // добавляют свои дорожки на старте, и оба предложения столкнутся лбами.
-      // Пока чужого описания нет — молчим.
-      if (!pc.remoteDescription) return;
-      self._negotiate();
-    };
-
     pc.onconnectionstatechange = function () {
       var st = pc.connectionState;
       self._emit('net', {state: st});
@@ -1114,7 +1116,8 @@
   // дорожки в звонке.
   AmbarCall.prototype._negotiate = function () {
     var pc = this.pc, self = this;
-    if (!pc || pc.signalingState !== 'stable') return;
+    // Пока первый обмен не закончен, лезть со вторым нельзя.
+    if (!pc || pc.signalingState !== 'stable' || !pc.remoteDescription) return;
     this._making = true;
     pc.createOffer()
       .then(function (o) { return pc.setLocalDescription(o); })

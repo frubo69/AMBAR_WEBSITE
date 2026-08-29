@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=58"></script>
+<script src="/vendor/ambar-call.js?v=59"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -664,6 +664,14 @@ a.oc-row:active{background:var(--card2)}
 .call-bar{position:fixed;left:16px;bottom:16px;z-index:150;display:none;align-items:center;gap:11px;
   padding:9px 11px;border-radius:15px;background:var(--bg3);border:1px solid var(--border3);
   box-shadow:0 12px 40px rgba(0,0,0,.55)}
+/* Свёрнутый звонок — это одно маленькое окно и ничего больше. Остальные слои
+   разговора рисуются отдельно и сами по себе не уменьшаются, поэтому на время
+   свёрнутости их не должно быть видно вовсе. */
+body.call-mini #callVoice,
+body.call-mini #callOv,
+body.call-mini .cs-safe,
+body.call-mini .cs-safe-scrim{display:none}
+
 /* Шторка звонка. Идёт от самого верха и кончается там же, где кнопки
    телеграма, — слегка их подхватывая, как остров у динамика. Имя посередине,
    между «закрыть» и «ещё»: там единственное свободное место в этой полосе.
@@ -676,7 +684,12 @@ a.oc-row:active{background:var(--card2)}
   position:fixed;left:0;right:0;top:0;bottom:auto;z-index:150;
   display:none;align-items:center;justify-content:center;gap:9px;
   border:0;border-radius:0;
-  padding:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 9px) 76px 11px;
+  /* Ростом ровно до нижнего края кнопок телеграма: сверху отступ на вырез,
+     а высота — вся безопасная зона плюс немного, чтобы кнопки оказались
+     внутри шторки, а не над ней. Имя при этом стоит посередине полосы. */
+  box-sizing:border-box;
+  min-height:calc(var(--safe-top) + 7px);
+  padding:var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) 76px 4px;
   background:var(--barbg);color:#fff;box-shadow:none;cursor:pointer;
   transition:background .32s ease}
 .call-bar.on{display:flex}
@@ -5725,7 +5738,15 @@ function callMini(свернуть){
 // Свайп вниз по разговору — свернуть. Тянуть можно за что угодно, кроме самих
 // кнопок и маленького окна: у них своя работа.
 function callSwipe(){
-  const э = document.getElementById('callVid'); if(!э || э._свайп) return;
+  // Ставим на оба слоя разговора: видео сворачивается в окошко, голос просто
+  // уходит с глаз. Свайп должен ловиться и там, и там — иначе голосовой
+  // звонок свернуть нечем вовсе.
+  [document.getElementById('callVid'), document.getElementById('callVoice')]
+    .forEach(_свайпНа);
+}
+
+function _свайпНа(э){
+  if(!э || э._свайп) return;
   э._свайп = true;
   let y0 = null, x0 = 0, тянем = false, свои = false;
   const своё = t => !!(t.closest && (t.closest('.cv-bar') || t.closest('.cv-head') ||
@@ -5751,7 +5772,15 @@ function callSwipe(){
       тянем = true; свои = true;
       // Видео сворачивается в окошко, голос просто уходит с глаз: смотреть в
       // голосовом звонке не на что, а полоса сверху и так всё скажет.
-      if(document.getElementById('callVid')?.classList.contains('on')) callMini(true); else callClose();
+      if(document.getElementById('callVid')?.classList.contains('on')){ callMini(true); }
+      else {
+        // Голосовой звонок сворачивать некуда — он просто уходит с глаз. Но
+        // слой голоса живёт отдельно от окна разговора, и закрыть окно мало:
+        // без этой метки он остаётся висеть поверх приложения.
+        callClose();
+        document.body.classList.add('call-mini');
+        _hap('light');
+      }
     }
     return свои;
   };

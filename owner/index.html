@@ -2032,9 +2032,13 @@ button.path:active{transform:scale(.995)}
 .crew-entry{display:flex;align-items:center;gap:13px;width:100%;height:68px;
   margin:0 0 9px;padding:0 15px;
   border-radius:var(--r);cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
-  background:linear-gradient(180deg,rgba(201,169,110,.07) 0%,rgba(201,169,110,.02) 100%),
-             linear-gradient(180deg,#141426 0%,#0E0E1D 100%);
-  border:1px solid rgba(201,169,110,.18)}
+  /* Не крашеная плитка, а тёмное золотое стекло: прозрачная золотая заливка
+     поверх фона страницы, размытие и тонкая кайма. Плотный градиент делал из
+     кнопки коричневый прямоугольник. */
+  background:rgba(201,169,110,.055);
+  backdrop-filter:blur(14px) saturate(150%);
+  -webkit-backdrop-filter:blur(14px) saturate(150%);
+  border:1px solid rgba(201,169,110,.16)}
 /* Прилипает теперь не она, а выручка под ней: смотреть на общее число, листая
    список районов, нужно постоянно, а переставляют людей раз в день. */
 .crew-entry:active{transform:scale(.99)}
@@ -2042,8 +2046,8 @@ button.path:active{transform:scale(.995)}
    якорь, и глаз цепляется за него раньше, чем начинает читать. */
 .crew-e-ico{flex:0 0 auto;display:flex;align-items:center;justify-content:center;
   width:40px;height:40px;border-radius:13px;color:var(--gold2);
-  background:radial-gradient(120% 120% at 30% 18%,rgba(201,169,110,.24),rgba(201,169,110,.05));
-  box-shadow:inset 0 0 0 1px rgba(201,169,110,.22)}
+  background:rgba(201,169,110,.10);
+  box-shadow:inset 0 0 0 1px rgba(201,169,110,.26)}
 .crew-e-b{flex:1;min-width:0}
 .crew-e-b b{display:block;font-size:15px;font-weight:700;line-height:1.2;color:var(--gold2)}
 .crew-e-b i{display:block;font-style:normal;font-size:11.5px;color:var(--sub);

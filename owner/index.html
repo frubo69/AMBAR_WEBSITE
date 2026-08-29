@@ -21649,23 +21649,19 @@ function _caВид(r){
 // «В сети» или когда его видели в последний раз. Отметку об уходе ставит сам
 // сервер связи — он единственный, кто про это точно знает. Без неё говорим
 // просто «не в сети»: соврать хуже, чем промолчать.
-//
-// Пишем без «был(а)»: половина списка — женские имена, а скобки посреди
-// карточки выглядят как недоделанный шаблон.
 function _caПрисут(r){
   if(!r) return '';
   if(r.online) return 'В сети';
   if(!r.seen) return 'Не в сети';
   const с = Math.max(0, Math.floor(Date.now() / 1000 - r.seen));
-  if(с < 90)    return 'Не в сети · только что';
-  if(с < 3600)  return 'Не в сети · ' + Math.round(с / 60) + ' мин назад';
-  if(с < 86400) return 'Не в сети · ' + Math.round(с / 3600) + ' ч назад';
-  const d = new Date(r.seen * 1000), сейчас = new Date();
+  if(с < 90)    return 'Был только что';
+  if(с < 3600)  return 'Был ' + Math.round(с / 60) + ' мин назад';
+  if(с < 86400) return 'Был ' + Math.round(с / 3600) + ' ч назад';
+  const d = new Date(r.seen * 1000);
   const чч = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
-  const в = new Date(сейчас); в.setDate(в.getDate() - 1);
-  if(d.toDateString() === в.toDateString()) return 'Не в сети · вчера в ' + чч;
-  return 'Не в сети · ' + d.getDate() + '.' + String(d.getMonth() + 1).padStart(2, '0') +
-         ' в ' + чч;
+  const в = new Date(); в.setDate(в.getDate() - 1);
+  if(d.toDateString() === в.toDateString()) return 'Был вчера в ' + чч;
+  return 'Был ' + d.getDate() + '.' + String(d.getMonth() + 1).padStart(2, '0') + ' в ' + чч;
 }
 
 // ── Избранные ───────────────────────────────────────────────────────────────

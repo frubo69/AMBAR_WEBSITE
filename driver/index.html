@@ -1584,8 +1584,17 @@ body.call-mini .cs-safe-scrim{display:none}
 /* Кружок с именем стоит по центру экрана, а состояние и связь — сверху: взгляд
    падает на собеседника, а служебное остаётся служебным. */
 .cs-hero{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center}
-.cs-hero .hero-top{display:flex;flex-direction:column;align-items:center;gap:5px}
-.cs-hero .hero-mid{margin:auto 0;display:flex;flex-direction:column;align-items:center}
+/* Состояние и связь живут в полосе телеграма, между «закрыть» и «ещё»: там
+   единственное свободное место наверху, и взгляд не спотыкается о них по
+   дороге к имени. */
+.cs-hero .hero-top{position:absolute;left:76px;right:76px;
+  top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 12px);
+  display:flex;flex-direction:column;align-items:center;gap:4px;z-index:5}
+/* Кружок с именем — по центру экрана, а не по центру остатка: остаток внизу
+   занимают кнопки, и середина смещалась вверх. */
+.cs-hero .hero-mid{position:absolute;left:0;right:0;top:50%;
+  transform:translateY(-50%);
+  display:flex;flex-direction:column;align-items:center}
 .cs-ava{width:clamp(84px,24vw,104px);height:clamp(84px,24vw,104px);border-radius:50%;
   display:flex;align-items:center;justify-content:center;margin-bottom:18px;
   color:var(--gold2,#E8C98A);
@@ -2582,7 +2591,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=66"></script>
+<script src="/vendor/ambar-call.js?v=67"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -6670,8 +6679,10 @@ function sigHtml(q){
 function callPaintQuality(){
   const e = cel('callQ');
   if(!e) return;
+  // Полоски стоят всегда: пустое место на их месте читается как поломка, а
+  // серые чёрточки — как «связь ещё не измерена».
   e.className = 'call-q';
-  e.innerHTML = CALL_Q ? sigHtml(CALL_Q) : '';
+  e.innerHTML = sigHtml(CALL_Q || '');
 }
 
 // Полоса «идёт разговор» под шапкой: окно связи можно закрыть и смотреть

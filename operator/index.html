@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=66"></script>
+<script src="/vendor/ambar-call.js?v=67"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -694,8 +694,17 @@ body.call-mini .cs-safe-scrim{display:none}
 /* Кружок с именем стоит по центру экрана, а состояние и связь — сверху: взгляд
    падает на собеседника, а служебное остаётся служебным. */
 .cvo-hero{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center}
-.cvo-hero .hero-top{display:flex;flex-direction:column;align-items:center;gap:5px}
-.cvo-hero .hero-mid{margin:auto 0;display:flex;flex-direction:column;align-items:center}
+/* Состояние и связь живут в полосе телеграма, между «закрыть» и «ещё»: там
+   единственное свободное место наверху, и взгляд не спотыкается о них по
+   дороге к имени. */
+.cvo-hero .hero-top{position:absolute;left:76px;right:76px;
+  top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 12px);
+  display:flex;flex-direction:column;align-items:center;gap:4px;z-index:5}
+/* Кружок с именем — по центру экрана, а не по центру остатка: остаток внизу
+   занимают кнопки, и середина смещалась вверх. */
+.cvo-hero .hero-mid{position:absolute;left:0;right:0;top:50%;
+  transform:translateY(-50%);
+  display:flex;flex-direction:column;align-items:center}
 .cvo-ava{width:clamp(84px,24vw,104px);height:clamp(84px,24vw,104px);border-radius:50%;
   display:flex;align-items:center;justify-content:center;margin-bottom:18px;
   color:var(--gold2,#E8C98A);
@@ -5462,8 +5471,10 @@ function sigHtml(q){
 // четыре чёрточки понятны без чтения вовсе.
 function callQuality(){
   const e = $('callQ'); if(!e) return;
+  // Полоски стоят всегда: пустое место на их месте читается как поломка, а
+  // серые чёрточки — как «связь ещё не измерена».
   e.className = 'call-q';
-  e.innerHTML = CALL_Q ? sigHtml(CALL_Q) : '';
+  e.innerHTML = sigHtml(CALL_Q || '');
 }
 
 // Пропущенные считаются только те, что человек ещё не видел. Иначе цифра на
@@ -5679,6 +5690,10 @@ function callVoicePaint(){
     stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
     d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/></svg>`;
 
+
+  // Полоски связи рисуем на каждой отрисовке, а не только по событию: иначе
+  // до первого замера на их месте пусто, и экран выглядит недоделанным.
+  callQuality();
 
   const acts = document.getElementById('cvoActs');
   acts.classList.toggle('one', CALL_ST === 'out');

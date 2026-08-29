@@ -5742,6 +5742,17 @@ button.pill:active{opacity:.6}
       </nav>
     </div>
   </div>
+  <!-- Выбор избранных. Живёт рядом со списком, а не внутри него: список
+       перерисовывается на каждую отметку, и шторка исчезала бы из-под пальца. -->
+  <div class="fav-scrim" id="favScrim" onclick="favSheet(false)"></div>
+  <div class="fav-sheet" id="favSheet" role="dialog" aria-label="Избранные">
+    <div class="fav-grab"></div>
+    <div class="fav-t">Избранные</div>
+    <div class="fav-s">Отметьте, кого держать под рукой. Они встанут наверху
+      экрана звонков — нажатие сразу набирает.</div>
+    <div class="fav-list" id="favList"></div>
+    <button class="fav-done" onclick="favSheet(false)">Готово</button>
+  </div>
 </div>
 
 <!-- Слои разговора живут вне окна связи: внутри него они были бы
@@ -5956,9 +5967,48 @@ button.pill:active{opacity:.6}
 .ca-rs{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);margin-top:3px}
 .ca-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);opacity:.5;flex-shrink:0}
 .ca-dot.on{background:var(--up);opacity:1}
-.ca-star{width:34px;height:34px;flex-shrink:0;border-radius:50%;cursor:pointer;border:0;
-  background:transparent;color:var(--dim);display:flex;align-items:center;justify-content:center}
-.ca-star.on{color:var(--gold2)}
+/* Шторка выбора избранных. Поднимается снизу поверх списка: человек остаётся
+   на своей странице и видит, как избранные появляются за ней. */
+.fav-scrim{position:absolute;inset:0;z-index:8;background:rgba(0,0,6,.62);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
+  opacity:0;pointer-events:none;transition:opacity .26s var(--e1)}
+.fav-scrim.on{opacity:1;pointer-events:auto}
+.fav-sheet{position:absolute;left:0;right:0;bottom:0;z-index:9;
+  display:flex;flex-direction:column;max-height:82%;
+  padding:0 18px calc(14px + var(--safe-bottom));
+  border-radius:24px 24px 0 0;background:#0d0d19;
+  box-shadow:0 -1px 0 rgba(255,255,255,.07),0 -24px 60px rgba(0,0,0,.6);
+  transform:translateY(101%);transition:transform .34s cubic-bezier(.22,.72,.2,1)}
+.fav-sheet.on{transform:none}
+/* Полоска сверху — та же, что у любой шторки в телефоне: по ней видно, что
+   это слой поверх, а не новая страница. */
+.fav-grab{width:38px;height:4px;border-radius:2px;background:rgba(255,255,255,.16);
+  margin:10px auto 14px;flex-shrink:0}
+.fav-t{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;
+  color:var(--text);flex-shrink:0}
+.fav-s{font-size:12.5px;line-height:1.5;color:var(--muted);margin:6px 0 10px;flex-shrink:0}
+.fav-list{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  margin:0 -4px;padding:0 4px}
+.fav-row{position:relative;display:flex;align-items:center;gap:13px;width:100%;
+  padding:9px 0;border:0;background:transparent;cursor:pointer;text-align:left;
+  font-family:'DM Sans',sans-serif}
+.fav-row+.fav-row::before{content:'';position:absolute;left:59px;right:0;top:0;height:1px;
+  background:var(--border2)}
+.fav-rb{flex:1;min-width:0;display:block}
+.fav-rb .ca-rn{display:block}
+.fav-rb .ca-rs{display:block}
+/* Пустой кружок вместо галочки: отмеченное и неотмеченное должны отличаться
+   заливкой, а не наличием значка — иначе строка без отметки выглядит короче
+   остальных и список рябит. */
+.fav-ck{width:26px;height:26px;flex-shrink:0;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;color:transparent;
+  box-shadow:inset 0 0 0 1.5px var(--border);transition:.18s var(--e1)}
+.fav-row.on .fav-ck{color:#14131c;background:var(--gold2);box-shadow:none}
+.fav-row:active{opacity:.6}
+.fav-done{flex-shrink:0;margin-top:12px;padding:14px;border-radius:14px;border:0;
+  cursor:pointer;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;
+  color:var(--gold2);background:rgba(201,169,110,.14)}
+.fav-done:active{background:rgba(201,169,110,.22)}
 /* Кнопки строки без обводок: рамка вокруг каждой превращала список в частокол.
    Зелёная — главная, серая — второстепенная, и видно это по заливке. */
 .ca-vid,.ca-go{width:40px;height:40px;flex-shrink:0;border-radius:50%;cursor:pointer;
@@ -20179,10 +20229,6 @@ const ICO_VID = `<svg viewBox="0 0 24 24" width="19" height="19" fill="none" str
   d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/></svg>`;
 const ICO_PHONE = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
   stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.8.6a2 2 0 0 1 1.7 2z"/></svg>`;
-const ICO_STAR = `<svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" stroke="currentColor"
-  stroke-width="1.4" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/></svg>`;
-const ICO_STAR_O = `<svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-  stroke-width="1.7" stroke-linejoin="round"><path d="M12 3.5l2.6 5.3 5.9.9-4.3 4.1 1 5.8-5.2-2.7-5.2 2.7 1-5.8L3.5 9.7l5.9-.9z"/></svg>`;
 function _dirIco(r){
   const p = r.dir === 'out' && !r.missed ? 'M7 17L17 7M9 7h8v8' : 'M17 7L7 17M15 17H7V9';
   return `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
@@ -21384,6 +21430,61 @@ function callMute(){
 
 let CALL_PAGE = 'calls', CALL_Q_TXT = '';
 function callPage(p){ CALL_PAGE = p; callPaint(); }
+
+// Название раздела человеческими словами. Роли приходят с сервера в
+// единственном числе — заголовку списка нужно множественное.
+function _caRole(role){
+  return role === 'водитель' ? 'Водители'
+       : role === 'оператор' || role === 'свой оператор' ? 'Операторы'
+       : role;
+}
+
+// ── Избранные ───────────────────────────────────────────────────────────────
+// Набираются в одном месте: нажали «Добавить» — поднялась шторка со всеми,
+// отметили нужных, закрыли. Отдельной страницы под это не нужно: людей
+// полтора десятка, и выбор занимает пять секунд. Звёздочек у строк больше
+// нет — они стояли в списке, куда человек приходит звонить, а не наводить
+// порядок, и попадали под палец мимо трубки.
+//
+// Отметка ставится и снимается там же, поэтому «убрать из избранных» не
+// приходится искать отдельно: это то же самое действие, что и «добавить».
+// Сохраняется сразу, без «готово»: отменять нечего, и список за шторкой
+// меняется на глазах.
+const ICO_CHECK = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none"
+  stroke="currentColor" stroke-width="2.6" stroke-linecap="round"
+  stroke-linejoin="round"><path d="m5 12.5 4.6 4.5L19 7.5"/></svg>`;
+
+function favSheet(открыть){
+  const ш = _cq('favSheet'), з = _cq('favScrim');
+  if(!ш || !з) return;
+  if(открыть){ favPaint(); з.classList.add('on'); ш.classList.add('on'); _hap('light'); }
+  else { з.classList.remove('on'); ш.classList.remove('on'); }
+}
+
+function favPaint(){
+  const box = _cq('favList'); if(!box) return;
+  const fav = callFav();
+  const rows = (CALL && CALL.roster) || [];
+  if(!rows.length){ box.innerHTML = '<div class="ca-empty">Звонить пока некому</div>'; return; }
+  let h = '', last = '';
+  rows.forEach(r => {
+    if(r.role !== last){ last = r.role; h += `<div class="ca-sec">${_caRole(r.role)}</div>`; }
+    h += `<button class="fav-row${fav.indexOf(r.key) >= 0 ? ' on' : ''}"
+        onclick="favPick('${r.key}')">
+        <span class="ca-ava">${_cIni(r.name)}</span>
+        <span class="fav-rb"><span class="ca-rn">${r.name}</span>
+          <span class="ca-rs">${r.online ? 'в приложении'
+            : /^(drv|star):/.test(r.key) ? 'позвоним в телеграм' : 'не в сети'}</span></span>
+        <span class="fav-ck">${ICO_CHECK}</span></button>`;
+  });
+  box.innerHTML = h;
+}
+
+function favPick(key){
+  callFavToggle(key);   // сохраняет и перерисовывает страницу за шторкой
+  favPaint();
+  _hap('light');
+}
 function _caMatch(n){ return !CALL_Q_TXT || n.toLowerCase().includes(CALL_Q_TXT.toLowerCase()); }
 
 const CA_SEARCH = `<div class="ca-search"><svg viewBox="0 0 24 24" width="17" height="17"
@@ -21402,13 +21503,20 @@ function caWarm(){
 
 // Избранные кружками, первым — пунктирный «добавить». Он открывает контакты:
 // звёздочка стоит у каждой строки, и добавлять больше неоткуда.
+// Плюс, пока избранных нет, и карандаш, когда есть: в шторке не только
+// добавляют, но и убирают, и плюс над словом «Изменить» обещал бы не то.
+const ICO_PEN = `<svg viewBox="0 0 24 24" width="20" height="20" fill="none"
+  stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path
+  d="M4 20h4L19 9a2.1 2.1 0 0 0-3-3L5 17z"/><path d="M14.5 7.5 16.5 9.5"/></svg>`;
+
 function caFavRow(){
   const fav = callFav();
   const rows = ((CALL && CALL.roster) || []).filter(r => fav.indexOf(r.key) >= 0);
   return `<div class="ca-cap">Избранные</div>
     <div class="ca-favs">
-      <button class="ca-fav ca-fav-add" onclick="callPage('contacts')">
-        <span class="ca-fav-c">+</span><span class="ca-fav-n">Добавить</span>
+      <button class="ca-fav ca-fav-add" onclick="favSheet(true)">
+        <span class="ca-fav-c">${rows.length ? ICO_PEN : '+'}</span>
+        <span class="ca-fav-n">${rows.length ? 'Изменить' : 'Добавить'}</span>
       </button>
       ${rows.map(r => `<button class="ca-fav" onclick="callDial('${r.key}')">
         <span class="ca-fav-c">${_cIni(r.name)}</span>
@@ -21443,7 +21551,6 @@ function caCalls(){
 }
 
 function caContacts(){
-  const fav = callFav();
   const rows = ((CALL && CALL.roster) || []).filter(r => _caMatch(r.name));
   let h = `<div class="ca-h1">Контакты</div>` + CA_SEARCH + caWarm();
   if(!CALL_Q_TXT) h += caFavRow();
@@ -21456,17 +21563,12 @@ function caContacts(){
           ${r.online ? 'в приложении'
             : /^(drv|star):/.test(r.key) ? 'позвоним в телеграм' : 'не в сети'}</div>
       </div>
-      <button class="ca-star${fav.indexOf(r.key) >= 0 ? ' on' : ''}"
-        onclick="callFavToggle('${r.key}', event)" aria-label="В избранное">${
-        fav.indexOf(r.key) >= 0 ? ICO_STAR : ICO_STAR_O}</button>
       <div class="ca-vid" onclick="callVideo('${r.key}')">${ICO_VID}</div>
       <div class="ca-go" onclick="callDial('${r.key}')">${ICO_PHONE}</div>
     </div>`;
   let last = '';
   rows.forEach(r => {
-    if(r.role !== last){ last = r.role;
-      h += `<div class="ca-sec">${r.role === 'водитель' ? 'Водители'
-        : r.role === 'оператор' ? 'Операторы' : r.role}</div>`; }
+    if(r.role !== last){ last = r.role; h += `<div class="ca-sec">${_caRole(r.role)}</div>`; }
     h += person(r);
   });
   return h;

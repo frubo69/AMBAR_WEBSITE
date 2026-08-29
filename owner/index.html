@@ -5857,7 +5857,7 @@ button.pill:active{opacity:.6}
     <div class="call-bar-n" id="callBarN">—</div>
     <div class="call-bar-s" id="callBarS">00:00</div>
   </div>
-  <span class="call-bar-w" id="callBarW"><svg viewBox="0 0 240 20" preserveAspectRatio="none"><path class="w1" d="M0 10 Q 15 2 30 10 T 60 10 T 90 10 T 120 10 T 150 10 T 180 10 T 210 10 T 240 10 V20 H0 Z"/><path class="w2" d="M0 12 Q 20 5 40 12 T 80 12 T 120 12 T 160 12 T 200 12 T 240 12 V20 H0 Z"/></svg></span>
+  <span class="call-bar-w" id="callBarW"><svg viewBox="0 0 240 20" preserveAspectRatio="none"><path class="w1" d="M0 8 Q 15 1 30 8 T 60 8 T 90 8 T 120 8 T 150 8 T 180 8 T 210 8 T 240 8 V20 H0 Z"/><path class="w2" d="M0 11 Q 20 4 40 11 T 80 11 T 120 11 T 160 11 T 200 11 T 240 11 V20 H0 Z"/></svg></span>
 </div>
 
 <style>
@@ -6308,38 +6308,35 @@ button.pill:active{opacity:.6}
 .call-bar{position:fixed;left:16px;bottom:calc(88px + var(--safe-bottom));z-index:150;display:none;
   align-items:center;gap:11px;padding:9px 11px;border-radius:15px;background:var(--card);
   border:1px solid var(--border2);box-shadow:0 12px 40px rgba(0,0,0,.55)}
-/* Шторка звонка — сверху, во всю ширину, без единой кнопки: на неё просто
-   нажимают и возвращаются в звонок. Пока не ответили, она серая; ответили —
-   зелёная. Понизу колышется вода: две залитые волны идут с разной скоростью,
-   от этого движение выглядит живым, а не качанием одной линии. Высота гребня
-   бежит за громкостью — своей и собеседника, что громче.
+/* Шторка звонка. Идёт от самого верха и кончается там же, где кнопки
+   телеграма, — слегка их подхватывая, как остров у динамика. Имя посередине,
+   между «закрыть» и «ещё»: там единственное свободное место в этой полосе.
+   Цвет плотный, а не полупрозрачный: сквозь шторку смотреть незачем.
 
-   Волна нарисована один раз и только тянется по высоте, а плывёт сдвигом:
-   обе части движения лежат на видеокарте. */
-/* Свёрнутый звонок — это одно маленькое окно и ничего больше. Остальные слои
-   разговора рисуются отдельно и сами по себе не уменьшаются, поэтому на время
-   свёрнутости их не должно быть видно вовсе. */
-body.call-mini #callVoice,
-body.call-mini #callOv,
-body.call-mini .cs-safe,
-body.call-mini .cs-safe-scrim{display:none}
-.call-bar{position:fixed;left:0;right:0;top:0;bottom:auto;z-index:150;
-  display:none;align-items:center;gap:10px;border:0;border-radius:0;
-  padding:calc(var(--safe-top) + 7px) 16px 15px;
-  background:rgba(126,126,140,.20);color:rgba(255,255,255,.62);
-  backdrop-filter:blur(20px) saturate(160%);
-  -webkit-backdrop-filter:blur(20px) saturate(160%);
-  box-shadow:0 8px 26px rgba(0,0,0,.30);cursor:pointer;overflow:hidden;
-  transition:background .3s ease,color .3s ease}
+   Понизу колышется вода того же цвета, что и сама шторка, — это её нижний
+   край, а не отдельная полоска. На голос он вспухает вниз и опадает обратно;
+   гребень при этом медленно плывёт, иначе вода выглядит нарисованной. */
+.call-bar{--barbg:#3f434c;
+  position:fixed;left:0;right:0;top:0;bottom:auto;z-index:150;
+  display:none;align-items:center;justify-content:center;gap:9px;
+  border:0;border-radius:0;
+  padding:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 9px) 76px 11px;
+  background:var(--barbg);color:#fff;box-shadow:none;cursor:pointer;
+  transition:background .32s ease}
 .call-bar.on{display:flex}
-.call-bar.live{background:rgba(56,150,105,.26);color:var(--up,#4CAF7D)}
-.call-bar-w{position:absolute;left:0;right:0;bottom:0;height:20px;
-  pointer-events:none}
-.call-bar-w svg{position:absolute;left:0;bottom:0;width:200%;height:100%}
-.call-bar-w path{fill:currentColor;transform-origin:50% 100%;
-  transform:scaleY(var(--amp,.35));transition:transform .16s ease}
-.call-bar-w .w1{opacity:.5;animation:barDrift 7s linear infinite}
-.call-bar-w .w2{opacity:.28;animation:barDrift 11s linear infinite reverse}
+.call-bar.live{--barbg:#2c8f62}
+.call-bar-n{flex:0 1 auto;min-width:0;font-size:14px;font-weight:700;color:#fff;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.call-bar-s{flex:none;font-size:13px;font-weight:600;color:rgba(255,255,255,.72);
+  font-variant-numeric:tabular-nums}
+.call-bar-av,.call-bar-live,.call-bar-go,.call-bar-b{display:none}
+.call-bar-w{position:absolute;left:0;right:0;top:100%;height:22px;
+  pointer-events:none;transform-origin:50% 0;
+  transform:scaleY(var(--amp,.32));transition:transform .16s ease}
+.call-bar-w svg{position:absolute;left:0;top:0;width:200%;height:100%}
+.call-bar-w path{fill:var(--barbg)}
+.call-bar-w .w1{animation:barDrift 9s linear infinite}
+.call-bar-w .w2{animation:barDrift 14s linear infinite reverse}
 @keyframes barDrift{to{transform:translateX(-50%)}}
 .call-bar.on{display:flex}
 .call-bar-av{width:34px;height:34px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;

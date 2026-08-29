@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=63"></script>
+<script src="/vendor/ambar-call.js?v=64"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -6177,14 +6177,13 @@ button.pill:active{opacity:.6}
 .cv.on .cv-note.on{display:flex}
 .cv-note-i{flex:none;width:19px;height:19px;display:flex}
 .cv-note-i svg{width:19px;height:19px}
-/* Текст проступает сам, с задержкой в переходе. Раньше его включал таймер,
-   и любая перерисовка в эти 380 мс таймер сбрасывала — на ноутбуке, где
-   перерисовок больше, строка так и оставалась пустой. */
-.cv-note-t{opacity:0;transition:opacity .18s ease}
-.cv-note.on .cv-note-t{opacity:1;transition:opacity .26s ease .22s}
-/* На уходе текст гаснет первым и сразу: пока он виден, сужающаяся строка
-   режет его по букве — на широком экране это особенно заметно. */
-.cv-note.uh .cv-note-t{opacity:0;transition:opacity .14s ease}
+/* Текстом правит анимация, а не переход. Через переход не выходит: он берёт
+   начальное значение из того, что было на экране, и первая буква успевала
+   мелькнуть в узкой строке до того, как та раздвинется. Анимация же начинает
+   ровно с нуля и держит его первые сорок процентов пути. */
+.cv-note-t{opacity:0}
+.cv-note.on .cv-note-t{opacity:1}
+.cv-note.uh .cv-note-t{opacity:0}
 
 /* Имя и фонарик — одной строкой сверху. */
 .cv-head{--pillh:42px;position:absolute;top:calc(14px + var(--safe-top));left:14px;z-index:7;
@@ -20928,6 +20927,7 @@ function noteMute(текст){
   if(!текст){
     if(!n.classList.contains('on')) return;
     n.classList.add('uh');          // текст гаснет раньше, чем поедет ширина
+    try{ т?.animate([{opacity: 1}, {opacity: 0}], {duration: 150}); }catch(e){}
     // Складываем по частям и не спеша: текст, потом ширина, потом сама строка.
     const полная = n.offsetWidth;
     try{
@@ -20967,6 +20967,11 @@ function noteMute(текст){
   try{
     знак?.animate([{opacity: 0, transform: 'scale(.4)'}, {opacity: 1, transform: 'none'}],
                   {duration: 240, easing: 'cubic-bezier(.32,.72,0,1)'});
+    // Текст молчит, пока строка не раздвинулась, и только потом проступает.
+    // Задержкой, а не средним кадром: средний кадр с тем же значением браузер
+    // истолковал по-своему, и буква всё равно проступала раньше времени.
+    т?.animate([{opacity: 0}, {opacity: 1}],
+               {duration: 300, delay: 250, easing: 'ease', fill: 'backwards'});
     n.animate([{opacity: 0}, {opacity: 1}], {duration: 180});
     n.animate([{width: узкая + 'px'}, {width: полная + 'px'}],
               {duration: 320, delay: 200, fill: 'backwards',

@@ -5755,8 +5755,6 @@ button.pill:active{opacity:.6}
   <div class="ca-sheet" id="favSheet" role="dialog" aria-label="Избранные">
     <div class="ca-grab"></div>
     <div class="ca-sh-t">Избранные</div>
-    <div class="ca-sh-s">Отметьте, кого держать под рукой. Они встанут наверху
-      экрана звонков — нажатие сразу набирает, долгое нажатие звонит с камерой.</div>
     <div class="ca-sh-list" id="favList"></div>
     <button class="ca-sh-done" onclick="caSheet(null)">Готово</button>
   </div>
@@ -5765,8 +5763,6 @@ button.pill:active{opacity:.6}
   <div class="ca-sheet" id="quickSheet" role="dialog" aria-label="Быстрый вызов">
     <div class="ca-grab"></div>
     <div class="ca-sh-t">Быстрый вызов</div>
-    <div class="ca-sh-s">Кого набирать одним нажатием кнопки в середине панели.
-      Он там один — на то вызов и быстрый; нажмите на отмеченного, чтобы убрать.</div>
     <div class="ca-sh-list" id="quickList"></div>
   </div>
 
@@ -6019,8 +6015,7 @@ button.pill:active{opacity:.6}
 .ca-grab{width:38px;height:4px;border-radius:2px;background:rgba(255,255,255,.16);
   margin:10px auto 14px;flex-shrink:0}
 .ca-sh-t{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;
-  color:var(--text);flex-shrink:0}
-.ca-sh-s{font-size:12.5px;line-height:1.5;color:var(--muted);margin:6px 0 10px;flex-shrink:0}
+  color:var(--text);flex-shrink:0;margin-bottom:12px}
 .ca-sh-list{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
   margin:0 -4px;padding:0 4px}
 .fav-row{position:relative;display:flex;align-items:center;gap:13px;width:100%;
@@ -6043,9 +6038,6 @@ button.pill:active{opacity:.6}
   cursor:pointer;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;
   color:var(--gold2);background:rgba(201,169,110,.14)}
 .ca-sh-done:active{background:rgba(201,169,110,.22)}
-/* Подсказка про долгое нажатие: сам жест не виден, а показывать его нечем —
-   значка на кружке быть не должно, кружок и так занят лицом. */
-.ca-hint{font-size:11.5px;color:var(--dim);margin:-8px 0 16px}
 /* Счётчик пропущенных на переключателе: цифра рядом со словом, а не поверх
    него — это не уведомление, а часть подписи. */
 .ca-seg .n{margin-left:6px;font-size:12px;font-weight:700;color:var(--dn)}
@@ -21896,7 +21888,7 @@ function caFavRow(){
       ${rows.map(r => `<button class="ca-fav" data-key="${r.key}">
         <span class="ca-fav-c">${_cIni(r.name)}</span>
         <span class="ca-fav-n">${r.name}</span></button>`).join('')}
-    </div>${rows.length ? '<div class="ca-hint">Долгое нажатие — звонок с камерой</div>' : ''}`;
+    </div>`;
 }
 
 // День строкой-заголовком, а не словом «сегодня» в каждой строке: одно и то же

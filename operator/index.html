@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=51"></script>
+<script src="/vendor/ambar-call.js?v=52"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -903,7 +903,7 @@ a.oc-row:active{background:var(--card2)}
 .cvo.selfie .cvo-state{color:rgba(255,255,255,.88)}
 .cvo.selfie .cvo-role{color:rgba(255,255,255,.72)}
 .cvo.selfie .cvo-lbl{color:rgba(255,255,255,.9)}
-.cv.on.selfie .cv-pill,.cv.on.selfie .cv-side,.cv.on.selfie .cv-left{display:none}
+.cv.on.selfie .cv-head,.cv.on.selfie .cv-bar,.cv.on.selfie .cv-note{display:none}
 .cvo-top{padding:calc(44px + var(--safe-top)) 24px 0}
 .cvo-role{font-size:15px;color:var(--sub)}
 .cvo-name{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;
@@ -938,7 +938,7 @@ a.oc-row:active{background:var(--card2)}
 /* Стекло тут то же, что у карточки сверки: одна плоскость поверх видео —
    один рецепт. Числа не «похожие», а те же самые, иначе две плашки на одном
    экране начинают выглядеть как из разных приложений. */
-.cv-pill{position:absolute;top:calc(14px + var(--safe-top));left:14px;z-index:7;display:flex;align-items:center;gap:8px;
+.cv-pill{display:flex;align-items:center;gap:8px;
   padding:7px 13px 7px 9px;border-radius:999px;
   background:linear-gradient(160deg,rgba(58,58,78,.45),rgba(20,20,32,.39));
   backdrop-filter:blur(28px) saturate(190%);
@@ -949,88 +949,95 @@ a.oc-row:active{background:var(--card2)}
   background:rgba(201,169,110,.18)}
 .cv-pill-n{font-size:14px;font-weight:600;color:#fff}
 .cv-pill-t{font-size:12px;color:rgba(255,255,255,.65);font-variant-numeric:tabular-nums}
-/* Кнопки видеозвонка.
+/* Кнопки разговора — рядом внизу, с подписями, как в телефоне.
 
-   Размер долей экрана, а не числом: 48 пикселей на большом телефоне выглядят
-   маркой, а на маленьком в них попадают через раз. clamp держит их в разумных
-   пределах на всём — от SE до планшета. Низ считается от безопасной зоны:
-   иначе на телефонах с полоской жеста кнопка стоит прямо на ней.
+   Размер долей экрана, а не числом: одно и то же число на маленьком телефоне
+   велико, на большом мелко. Низ считается от безопасной зоны, иначе кнопка
+   встаёт на полоску жеста. */
+.cv-bar{position:absolute;left:0;right:0;
+  bottom:calc(clamp(14px,4vw,26px) + var(--safe-bottom));z-index:7;
+  display:none;justify-content:center;align-items:flex-start;
+  gap:clamp(12px,5.5vw,28px);padding:0 clamp(8px,3vw,20px)}
+.cv.on .cv-bar{display:flex}
+.cv-cell{display:flex;flex-direction:column;align-items:center;gap:9px}
+.cv-cell.flip{display:none}
+.cv.cam-on .cv-cell.flip{display:flex}
+.cv-cap{font-size:13px;line-height:1;color:rgba(255,255,255,.92);white-space:nowrap}
 
-   Стекло то же, что у карточки сверки и плашки имени: одна плоскость поверх
-   видео — один рецепт. */
-.cv-side{position:absolute;right:clamp(12px,4vw,20px);
-  bottom:calc(clamp(20px,5.5vw,34px) + var(--safe-bottom));z-index:7;
-  display:none;flex-direction:column;align-items:center;gap:clamp(12px,3.4vw,18px)}
-.cv.on .cv-side{display:flex}
+/* Нажатая кнопка не перекрашивается разом: белое приходит от краёв к центру и
+   переворачивает цвета. Растёт внутренняя обводка — она и есть эта заливка. */
 .cv-rb{--d:clamp(54px,15.5vw,66px);width:var(--d);height:var(--d);
   border-radius:50%;border:0;cursor:pointer;display:flex;
   align-items:center;justify-content:center;color:#fff;
   background:linear-gradient(160deg,rgba(255,255,255,.22),rgba(255,255,255,.10));
   backdrop-filter:blur(24px) saturate(180%);
   -webkit-backdrop-filter:blur(24px) saturate(180%);
-  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.24),0 8px 24px rgba(0,0,0,.30);
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.24),0 8px 24px rgba(0,0,0,.30),
+             inset 0 0 0 0 #fff;
   -webkit-tap-highlight-color:transparent;
-  transition:background .22s ease,color .22s ease,box-shadow .22s ease,
+  transition:box-shadow .3s cubic-bezier(.32,.72,0,1),color .16s ease .09s,
     transform .2s cubic-bezier(.32,.72,0,1)}
 .cv-rb svg{width:46%;height:46%}
 .cv-rb:active{transform:scale(.88)}
-.cv-rb.on{background:#fff;color:#0d0d12;
-  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.5),0 10px 26px rgba(0,0,0,.34)}
+.cv-rb.on{color:#0d0d12;
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.5),0 10px 26px rgba(0,0,0,.34),
+             inset 0 0 0 40px #fff}
 .cv-rb.drop{background:linear-gradient(160deg,#E8615F,#D0413F);color:#fff;
   box-shadow:inset 0 0 0 .5px rgba(255,255,255,.28),0 10px 28px rgba(176,48,48,.36)}
-
-/* Перечёркивание рисуется, а не возникает: линию проводят от начала к концу.
-   Путь лежит в разметке всегда и только меняет длину штриха — пересоздавать
-   значок нельзя, у нового узла переходить нечему, и раньше именно поэтому
-   перечёркивание просто выскакивало. */
-.cv-rb .cvx{stroke-dasharray:30;stroke-dashoffset:30;opacity:0;
-  transition:stroke-dashoffset .3s cubic-bezier(.32,.72,0,1),opacity .1s ease}
-.cv-rb.on .cvx{stroke-dashoffset:0;opacity:1}
-
-.cv-flip,.cv-lamp{--d:clamp(44px,12vw,54px);width:var(--d);height:var(--d);border-radius:50%;
-  border:0;cursor:pointer;display:none;align-items:center;justify-content:center;color:#fff;
-  background:linear-gradient(160deg,rgba(255,255,255,.18),rgba(255,255,255,.08));
-  backdrop-filter:blur(24px) saturate(180%);
-  -webkit-backdrop-filter:blur(24px) saturate(180%);
-  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.2),0 6px 20px rgba(0,0,0,.26);
-  -webkit-tap-highlight-color:transparent;
-  transition:transform .2s cubic-bezier(.32,.72,0,1)}
-.cv-flip svg,.cv-lamp svg{width:46%;height:46%}
-/* Палец, ведущий по кнопке фонарика, меняет яркость, а не листает страницу.
-   Без этого айфон считает вертикальное движение прокруткой: справа выезжает
-   полоса, обработчику приходит отмена, и линейка не показывается вовсе. */
-.cv-lamp{touch-action:none;user-select:none;-webkit-user-select:none;
-  -webkit-touch-callout:none}
-.cv-flip:active,.cv-lamp:active{transform:scale(.88)}
-/* Поворот отзывается самой кнопкой: значок делает пол-оборота, ровно столько,
-   сколько система открывает вторую камеру. */
-.cv-lamp.on{background:#fff;color:#0d0d12;
-  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.5),0 10px 26px rgba(0,0,0,.34)}
+/* Перечёркивание не рисуется по ходу: оно просто есть у выключенного, а
+   движение берёт на себя заливка. */
+.cv-rb .cvx{opacity:0;transition:opacity .12s ease}
+.cv-rb.on .cvx{opacity:1}
+/* Поворот отзывается сам: значок делает пол-оборота. */
 .cv-flip.spin svg{animation:cvflip .52s cubic-bezier(.32,.72,0,1)}
 @keyframes cvflip{from{transform:rotate(0)}to{transform:rotate(180deg)}}
 
-/* Фонарик и поворот — левым столбцом, теми же мерами, что и правый. */
-.cv-left{position:absolute;left:clamp(12px,4vw,20px);
-  bottom:calc(clamp(20px,5.5vw,34px) + var(--safe-bottom));z-index:7;
-  display:flex;flex-direction:column;align-items:center;gap:clamp(12px,3.4vw,18px)}
+/* Строка о выключенном микрофоне — над кнопками. Сначала появляется значок,
+   потом строка раздвигается и проступает текст: ширину ведёт noteMute. */
+.cv-note{position:absolute;left:50%;transform:translateX(-50%);z-index:7;
+  bottom:calc(clamp(14px,4vw,26px) + var(--safe-bottom) + clamp(54px,15.5vw,66px) + 44px);
+  display:none;align-items:center;gap:8px;height:38px;padding:0 13px;
+  border-radius:19px;overflow:hidden;white-space:nowrap;box-sizing:border-box;
+  background:linear-gradient(160deg,rgba(255,255,255,.22),rgba(255,255,255,.10));
+  backdrop-filter:blur(24px) saturate(180%);
+  -webkit-backdrop-filter:blur(24px) saturate(180%);
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.24),0 8px 24px rgba(0,0,0,.28);
+  color:#fff;font-size:14.5px;letter-spacing:.1px}
+.cv.on .cv-note.on{display:flex}
+.cv-note-i{flex:none;width:19px;height:19px;display:flex}
+.cv-note-i svg{width:19px;height:19px}
+.cv-note-t{opacity:0;transition:opacity .2s ease}
+.cv-note.wide .cv-note-t{opacity:1}
 
-/* Кольцевой свет. Настоящей вспышки у фронтальной камеры нет ни у одного
-   телефона — светят экраном. По краям кадра зажигается широкая тёплая рамка:
-   середина остаётся чистой, чтобы лицо было видно, а свет падает на него с
-   четырёх сторон, как от кольцевой лампы. Задняя камера так не светит: ей
-   нужен настоящий фонарик, и он у неё есть. */
+/* Имя и фонарик — одной строкой сверху. */
+.cv-head{position:absolute;top:calc(14px + var(--safe-top));left:14px;z-index:7;
+  display:none;align-items:center;gap:9px}
+.cv.on .cv-head{display:flex}
+.cv-lampbox{position:relative;display:none}
+.cv.cam-on .cv-lampbox{display:block}
+.cv-lamp{--d:clamp(40px,11vw,48px);width:var(--d);height:var(--d);border-radius:50%;
+  border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;
+  background:linear-gradient(160deg,rgba(255,255,255,.20),rgba(255,255,255,.09));
+  backdrop-filter:blur(24px) saturate(180%);
+  -webkit-backdrop-filter:blur(24px) saturate(180%);
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.22),0 8px 22px rgba(0,0,0,.28),
+             inset 0 0 0 0 #fff;
+  touch-action:none;user-select:none;-webkit-user-select:none;
+  -webkit-touch-callout:none;-webkit-tap-highlight-color:transparent;
+  transition:box-shadow .3s cubic-bezier(.32,.72,0,1),color .16s ease .09s,
+    transform .2s cubic-bezier(.32,.72,0,1)}
+.cv-lamp svg{width:48%;height:48%}
+.cv-lamp:active{transform:scale(.88)}
+.cv-lamp.on{color:#0d0d12;
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.5),0 10px 24px rgba(0,0,0,.32),
+             inset 0 0 0 30px #fff}
+.cv-lamp .cvray{opacity:0;transition:opacity .12s ease}
+.cv-lamp.on .cvray{opacity:1}
 
-/* Линейка яркости. Короткие штрихи столбиком: их видно только пока держишь
-   палец, текущая отметка длиннее и ярче, соседние чуть длиннее остальных —
-   так глаз находит своё место, не глядя на цифры. Ступени намеренно
-   ощутимые: на каждой телефон отзывается щелчком, и яркость набирается
-   пальцем вслепую, как зум в камере. */
-.cv-dial{position:absolute;left:8px;bottom:100%;margin-bottom:10px;
-  display:flex;flex-direction:column-reverse;align-items:flex-start;
+/* Линейка яркости висит под фонариком и места в строке не занимает. */
+.cv-dial{position:absolute;left:50%;margin-left:-13px;top:100%;margin-top:10px;
+  display:flex;flex-direction:column;align-items:flex-start;
   gap:9px;pointer-events:none;
-  /* Скрываем прозрачностью, а не видимостью с отложенным переходом: нажатий
-     линейка всё равно не ловит, а состояние с задержкой ловится хуже — и
-     проверить его труднее, и застрять оно может незаметно. */
   opacity:0;transition:opacity .18s ease}
 .cv-dial.on{opacity:1}
 .cv-dial i{display:block;height:2px;width:11px;border-radius:2px;
@@ -1039,11 +1046,6 @@ a.oc-row:active{background:var(--card2)}
 .cv-dial i.near{width:17px;background:rgba(255,255,255,.7)}
 .cv-dial i.now{width:27px;background:#fff;box-shadow:0 0 10px rgba(255,244,226,.85)}
 
-/* Пока на экране видеозвонок, страница листаться не должна: разговор занимает
-   всё и стоит на месте. Полоса прокрутки справа выезжала от движения пальцем
-   по кнопкам и только мешала — запертой странице её взять неоткуда. */
-html.call-lock,body.call-lock{overflow:hidden;overscroll-behavior:none}
-html.call-lock::-webkit-scrollbar,body.call-lock::-webkit-scrollbar{width:0;height:0}
 .cv-glow{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0;
   /* Одной внутренней тенью, а не четырьмя градиентами: градиенты по углам
      складывались друг с другом и давали грязные пятна, а тень идёт по
@@ -2243,45 +2245,67 @@ html.call-lock::-webkit-scrollbar,body.call-lock::-webkit-scrollbar{width:0;heig
     <div class="cv-off-s">Камера выключена</div>
   </div>
 </div>
-<div class="cv-pill">
-  <span class="cv-pill-a" id="cvA">—</span>
-  <span class="cv-pill-n" id="cvN">—</span>
-  <span class="cv-pill-t" id="cvT">00:00</span>
-</div>
-<!-- Левый столбец: фонарик и поворот камеры. Оба нужны только когда камера
-     включена, поэтому и живут вместе. -->
-<div class="cv-left">
-  <div class="cv-dial" id="cvDial" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
-  <button class="cv-lamp" id="cvLamp" aria-label="Фонарик">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
-      stroke-linecap="round" stroke-linejoin="round">
-      <path d="M8.2 2.6h7.6v3.1a2 2 0 0 1-.36 1.15l-.84 1.2v12.35a1 1 0 0 1-1 1h-3.2a1 1 0 0 1-1-1V8.05l-.84-1.2A2 2 0 0 1 8.2 5.7z"/>
-      <path d="M10.4 12.4h3.2"/>
-      <path class="cvray" d="M5.1 5.4L3.2 4.3M18.9 5.4l1.9-1.1M4.3 9.6H2.1M19.7 9.6h2.2"/></svg>
-  </button>
-  <button class="cv-flip" onclick="callFlip()" aria-label="Другая камера">
-  <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
-    stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h13a4 4 0 0 1 4 4v1"/><path
-    d="M6 5L3 8l3 3"/><path d="M21 16H8a4 4 0 0 1-4-4v-1"/><path d="M18 19l3-3-3-3"/></svg>
-</button>
+<!-- Имя и фонарик рядом: свет нужен под рукой, но в нижнем ряду ему не место —
+     там кнопки самого разговора. -->
+<div class="cv-head">
+  <div class="cv-pill">
+    <span class="cv-pill-a" id="cvA">—</span>
+    <span class="cv-pill-n" id="cvN">—</span>
+    <span class="cv-pill-t" id="cvT">00:00</span>
+  </div>
+  <div class="cv-lampbox">
+    <button class="cv-lamp" id="cvLamp" aria-label="Фонарик">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M8.2 2.6h7.6v3.1a2 2 0 0 1-.36 1.15l-.84 1.2v12.35a1 1 0 0 1-1 1h-3.2a1 1 0 0 1-1-1V8.05l-.84-1.2A2 2 0 0 1 8.2 5.7z"/>
+        <path d="M10.4 12.4h3.2"/>
+        <path class="cvray" d="M5.1 5.4L3.2 4.3M18.9 5.4l1.9-1.1M4.3 9.6H2.1M19.7 9.6h2.2"/></svg></button>
+    <div class="cv-dial" id="cvDial" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  </div>
 </div>
 <!-- Свет экраном для фронтальной камеры: настоящей вспышки у неё нет. -->
 <div class="cv-glow" id="cvGlow"></div>
-<div class="cv-side">
-  <button class="cv-rb" id="cvCam" onclick="callCam()" aria-label="Камера">
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
-      stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
-      d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/><path class="cvx" d="M2 2l20 20"/></svg>
-  </button>
-  <button class="cv-rb" id="cvMic" onclick="callMute()" aria-label="Микрофон">
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
-      stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
-      d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/><path class="cvx" d="M3 3l18 18"/></svg>
-  </button>
-  <button class="cv-rb drop" onclick="callHangup()" aria-label="Завершить">
-    <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
-      stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
-  </button>
+
+<!-- Строка о выключенном микрофоне: сначала значок, потом раздвигается. -->
+<div class="cv-note" id="cvNote">
+  <span class="cv-note-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+      stroke-linecap="round" stroke-linejoin="round"><path
+      d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path
+      d="M19 11a7 7 0 0 1-14 0M12 18v3"/><path d="M3 3l18 18"/></svg></span>
+  <span class="cv-note-t">Ваш микрофон выключен</span>
+</div>
+
+<!-- Кнопки разговора — рядом внизу, с подписями, как в телефоне. -->
+<div class="cv-bar">
+  <div class="cv-cell flip">
+    <button class="cv-rb cv-flip" onclick="callFlip()" aria-label="Другая камера">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h13a4 4 0 0 1 4 4v1"/><path
+        d="M6 5L3 8l3 3"/><path d="M21 16H8a4 4 0 0 1-4-4v-1"/><path d="M18 19l3-3-3-3"/></svg></button>
+    <span class="cv-cap">поворот</span>
+  </div>
+  <div class="cv-cell">
+    <button class="cv-rb" id="cvCam" onclick="callCam()" aria-label="Камера">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
+        d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/><path
+        class="cvx" d="M2 2l20 20"/></svg></button>
+    <span class="cv-cap">камера</span>
+  </div>
+  <div class="cv-cell">
+    <button class="cv-rb" id="cvMic" onclick="callMute()" aria-label="Микрофон">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
+        d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/><path
+        class="cvx" d="M3 3l18 18"/></svg></button>
+    <span class="cv-cap">микрофон</span>
+  </div>
+  <div class="cv-cell">
+    <button class="cv-rb drop" onclick="callHangup()" aria-label="Завершить">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    <span class="cv-cap">завершить</span>
+  </div>
 </div>
       </div>
 
@@ -5503,7 +5527,9 @@ function _safeTop(){
 }
 // Докуда можно опустить окно у каждого края: до верха стоящих там кнопок.
 function pipFloor(toLeft, H){
-  const el = document.querySelector(toLeft ? '#callVid .cv-flip' : '#callVid .cv-side');
+  // Кнопки теперь одним рядом во всю ширину, поэтому предел у обоих краёв
+  // общий; toLeft остаётся ради вызывающих.
+  const el = document.querySelector('#callVid .cv-bar');
   const bottom = H - PIP_H - PIP_PAD;
   if(!el) return bottom;
   const r = el.getBoundingClientRect(), box = pipBox();
@@ -5716,6 +5742,7 @@ function callVidPaint(){
   // дорисовывается. Новый узел лишён перехода, ради которого всё и затевалось.
   document.getElementById('cvCam')?.classList.toggle('on', !CALL_CAM);
   document.getElementById('cvMic')?.classList.toggle('on', _callMuted);
+  noteMute(_callMuted && CALL_VIDEO && CALL_ST === 'live');
 }
 
 // Отдача. Короткая на переключателях, ощутимее на завершении звонка: рука
@@ -5845,6 +5872,49 @@ function lampDrag(){
   кн.addEventListener('click', () => { if(!кн._ptr) callLamp(); });
 }
 
+// Строка «ваш микрофон выключен» над кнопками. Сначала появляется значок,
+// потом строка раздвигается и проступает текст — как в телефоне. Ширину ведём
+// числом: между «по содержимому» и «по содержимому» перехода не бывает.
+function noteMute(показать){
+  const n = document.getElementById('cvNote'); if(!n) return;
+  clearTimeout(noteMute._t1);
+  const узкая = 45;                       // только значок и поля
+  if(показать){
+    if(n.classList.contains('on')) return;   // уже висит — не мигаем заново
+    n.classList.add('on'); n.classList.remove('wide');
+    n.style.width = 'auto';
+    const полная = Math.ceil(n.offsetWidth);
+    n.style.width = узкая + 'px';
+    const знак = n.querySelector('.cv-note-i');
+    try{
+      знак?.animate([{opacity: 0, transform: 'scale(.4)'}, {opacity: 1, transform: 'none'}],
+                    {duration: 220, easing: 'cubic-bezier(.32,.72,0,1)'});
+      n.animate([{opacity: 0}, {opacity: 1}], {duration: 160});
+    }catch(e){}
+    noteMute._t1 = setTimeout(() => {
+      try{ n.animate([{width: узкая + 'px'}, {width: полная + 'px'}],
+                     {duration: 300, easing: 'cubic-bezier(.32,.72,0,1)'}); }catch(e){}
+      n.style.width = полная + 'px';
+      n.classList.add('wide');
+    }, 170);
+    return;
+  }
+  if(!n.classList.contains('on')) return;
+  n.classList.remove('wide');
+  const полная = n.offsetWidth;
+  // Уходит одной анимацией и по одному таймеру. Цепочка из двух таймеров тут
+  // была ошибкой: в фоновой вкладке вложенные душатся, и строка застревала
+  // наполовину сложенной.
+  try{
+    n.animate([{width: полная + 'px', opacity: 1},
+               {width: узкая + 'px', opacity: 1, offset: .62},
+               {width: узкая + 'px', opacity: 0}],
+              {duration: 380, easing: 'cubic-bezier(.32,.72,0,1)'});
+  }catch(e){}
+  n.style.width = узкая + 'px';
+  noteMute._t1 = setTimeout(() => { n.classList.remove('on'); n.style.width = ''; }, 380);
+}
+
 // ── фонарик ────────────────────────────────────────────────────────────────
 // Одна кнопка на две камеры, потому что человеку нужен свет, а не устройство.
 // У задней камеры это настоящая вспышка. У фронтальной вспышки нет ни на одном
@@ -5928,6 +5998,7 @@ function callMute(){
   // разговора заново, вместе с окнами видео, — от этого экран и моргал на
   // каждое нажатие. Меняется одна кнопка, её и меняем.
   document.getElementById('cvMic')?.classList.toggle('on', _callMuted);
+  noteMute(_callMuted && CALL_VIDEO && CALL_ST === 'live');
   const кн = document.querySelector('.cvo-btn.mute');
   if(кн){
     кн.classList.toggle('on', _callMuted);

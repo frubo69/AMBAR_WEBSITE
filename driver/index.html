@@ -1271,7 +1271,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    перечёркивание и есть состояние. */
 .cs-rb .cvx{opacity:0;transition:opacity .12s ease}
 .cs-rb.on .cvx{opacity:1}
-#csMic .cvx{opacity:1}
+/* Любая кнопка микрофона перечёркнута всегда: значок говорит, что сделает
+   нажатие. Без линии остаётся одна прорезь от маски, и значок выглядит
+   выкушенным — это и было видно на экране вызова. */
+#csMic .cvx,.cs-rb.mic .cvx{opacity:1}
 /* Поворот отзывается сам: значок делает пол-оборота. */
 .cs-flip.spin svg{animation:cvflip .52s cubic-bezier(.32,.72,0,1)}
 @keyframes cvflip{from{transform:rotate(0)}to{transform:rotate(180deg)}}
@@ -1578,7 +1581,11 @@ body.call-mini .cs-safe-scrim{display:none}
 .cs-row4{display:flex;justify-content:center;align-items:flex-start;
   gap:clamp(12px,5.5vw,28px);width:100%}
 .cs-cell.dim{opacity:.32;pointer-events:none}
-.cs-hero{display:flex;flex-direction:column;align-items:center}
+/* Кружок с именем стоит по центру экрана, а состояние и связь — сверху: взгляд
+   падает на собеседника, а служебное остаётся служебным. */
+.cs-hero{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center}
+.cs-hero .hero-top{display:flex;flex-direction:column;align-items:center;gap:5px}
+.cs-hero .hero-mid{margin:auto 0;display:flex;flex-direction:column;align-items:center}
 .cs-ava{width:clamp(84px,24vw,104px);height:clamp(84px,24vw,104px);border-radius:50%;
   display:flex;align-items:center;justify-content:center;margin-bottom:18px;
   color:var(--gold2,#E8C98A);
@@ -2575,7 +2582,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=65"></script>
+<script src="/vendor/ambar-call.js?v=66"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -7914,7 +7921,7 @@ function _callRender(){
           <span class="cs-cap">камера</span>
         </div>
         <div class="cs-cell">
-          <button class="cs-rb${_callMuted ? ' on' : ''}" onclick="callMute()"
+          <button class="cs-rb mic${_callMuted ? ' on' : ''}" onclick="callMute()"
             aria-label="Микрофон"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><defs><mask id="micCut3"><rect width="24" height="24" fill="#fff"/><path d="M4.6 4.6l14.8 14.8" stroke="#000" stroke-width="4.4" stroke-linecap="round"/></mask></defs><g mask="url(#micCut3)"><path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></g><path class="cvx" d="M4.6 4.6l14.8 14.8"/></svg></button>
           <span class="cs-cap">микрофон</span>
         </div>
@@ -7943,11 +7950,15 @@ function _callRender(){
   box.innerHTML = `
     <div class="cs">
       <div class="cs-top cs-hero">
-        ${heroHtml()}
-        <div class="cs-name">${CALL_WHO || '—'}</div>
-        <div class="cs-state" id="callState">${st}${
-          CALL_VIDEO && CALL_ST !== 'live' ? ' · видео' : ''}</div>
-        <div class="call-q" id="callQ"></div>
+        <div class="hero-top">
+          <div class="cs-state" id="callState">${st}${
+            CALL_VIDEO && CALL_ST !== 'live' ? ' · видео' : ''}</div>
+          <div class="call-q" id="callQ"></div>
+        </div>
+        <div class="hero-mid">
+          ${heroHtml()}
+          <div class="cs-name">${CALL_WHO || '—'}</div>
+        </div>
         ${CALL_NOTE ? `<div class="call-note">${CALL_NOTE}</div>` : ''}
       </div>
       ${row2}

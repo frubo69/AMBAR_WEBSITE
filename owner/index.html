@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=65"></script>
+<script src="/vendor/ambar-call.js?v=66"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -5764,10 +5764,14 @@ button.pill:active{opacity:.6}
 
 <div class="cvo" id="callVoice">
   <div class="cvo-top cvo-hero">
-    <div class="cvo-ava" id="cvoAva"></div>
-    <div class="cvo-name" id="cvoName">—</div>
-    <div class="cvo-state" id="cvoState">00:00</div>
-    <div class="call-q" id="callQ"></div>
+    <div class="hero-top">
+      <div class="cvo-state" id="cvoState">00:00</div>
+      <div class="call-q" id="callQ"></div>
+    </div>
+    <div class="hero-mid">
+      <div class="cvo-ava" id="cvoAva"></div>
+      <div class="cvo-name" id="cvoName">—</div>
+    </div>
   </div>
   <div class="cvo-acts" id="cvoActs"></div>
 </div>
@@ -6165,7 +6169,10 @@ button.pill:active{opacity:.6}
    перечёркивание и есть состояние. */
 .cv-rb .cvx{opacity:0;transition:opacity .12s ease}
 .cv-rb.on .cvx{opacity:1}
-#cvMic .cvx{opacity:1}
+/* Любая кнопка микрофона перечёркнута всегда: значок говорит, что сделает
+   нажатие. Без линии остаётся одна прорезь от маски, и значок выглядит
+   выкушенным — это и было видно на экране вызова. */
+#cvMic .cvx,.cv-rb.mic .cvx{opacity:1}
 /* Поворот отзывается сам: значок делает пол-оборота. */
 .cv-flip.spin svg{animation:cvflip .52s cubic-bezier(.32,.72,0,1)}
 @keyframes cvflip{from{transform:rotate(0)}to{transform:rotate(180deg)}}
@@ -6353,7 +6360,11 @@ body.call-mini .cs-safe-scrim{display:none}
 .cvo-row4{display:flex;justify-content:center;align-items:flex-start;
   gap:clamp(12px,5.5vw,28px);width:100%}
 .cvo-row4 .cv-cell.dim{opacity:.32;pointer-events:none}
-.cvo-hero{display:flex;flex-direction:column;align-items:center}
+/* Кружок с именем стоит по центру экрана, а состояние и связь — сверху: взгляд
+   падает на собеседника, а служебное остаётся служебным. */
+.cvo-hero{flex:1;min-height:0;display:flex;flex-direction:column;align-items:center}
+.cvo-hero .hero-top{display:flex;flex-direction:column;align-items:center;gap:5px}
+.cvo-hero .hero-mid{margin:auto 0;display:flex;flex-direction:column;align-items:center}
 .cvo-ava{width:clamp(84px,24vw,104px);height:clamp(84px,24vw,104px);border-radius:50%;
   display:flex;align-items:center;justify-content:center;margin-bottom:18px;
   color:var(--gold2,#E8C98A);
@@ -20426,7 +20437,7 @@ function callVoicePaint(){
           <span class="cv-cap">поворот</span></div>
         <div class="cv-cell dim"><button class="cv-rb" aria-label="Камера">${V}</button>
           <span class="cv-cap">камера</span></div>
-        <div class="cv-cell"><button class="cv-rb${_callMuted ? ' on' : ''}" onclick="callMute()"
+        <div class="cv-cell"><button class="cv-rb mic${_callMuted ? ' on' : ''}" onclick="callMute()"
           aria-label="Микрофон">${M(_callMuted)}</button>
           <span class="cv-cap">микрофон</span></div>
         <div class="cv-cell"><button class="cv-rb drop" onclick="callHangup()"

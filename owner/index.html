@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=47"></script>
+<script src="/vendor/ambar-call.js?v=48"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -5796,7 +5796,8 @@ button.pill:active{opacity:.6}
 <!-- Левый столбец: фонарик и поворот камеры. Оба нужны только когда камера
      включена, поэтому и живут вместе. -->
 <div class="cv-left">
-  <button class="cv-lamp" id="cvLamp" onclick="callLamp()" aria-label="Фонарик">
+  <div class="cv-dial" id="cvDial" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+  <button class="cv-lamp" id="cvLamp" aria-label="Фонарик">
     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
       stroke-linecap="round" stroke-linejoin="round">
       <path d="M8.2 2.6h7.6v3.1a2 2 0 0 1-.36 1.15l-.84 1.2v12.35a1 1 0 0 1-1 1h-3.2a1 1 0 0 1-1-1V8.05l-.84-1.2A2 2 0 0 1 8.2 5.7z"/>
@@ -6163,14 +6164,31 @@ button.pill:active{opacity:.6}
    середина остаётся чистой, чтобы лицо было видно, а свет падает на него с
    четырёх сторон, как от кольцевой лампы. Задняя камера так не светит: ей
    нужен настоящий фонарик, и он у неё есть. */
+
+/* Линейка яркости. Короткие штрихи столбиком: их видно только пока держишь
+   палец, текущая отметка длиннее и ярче, соседние чуть длиннее остальных —
+   так глаз находит своё место, не глядя на цифры. Ступени намеренно
+   ощутимые: на каждой телефон отзывается щелчком, и яркость набирается
+   пальцем вслепую, как зум в камере. */
+.cv-dial{display:none;flex-direction:column-reverse;align-items:flex-start;
+  gap:9px;margin-bottom:8px;padding-left:6px;pointer-events:none}
+.cv-dial.on{display:flex}
+.cv-dial i{display:block;height:2px;width:11px;border-radius:2px;
+  background:rgba(255,255,255,.45);
+  transition:width .16s cubic-bezier(.32,.72,0,1),background .16s ease}
+.cv-dial i.near{width:17px;background:rgba(255,255,255,.7)}
+.cv-dial i.now{width:27px;background:#fff;box-shadow:0 0 10px rgba(255,244,226,.85)}
 .cv-glow{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0;
-  transition:opacity .3s ease;
   /* Одной внутренней тенью, а не четырьмя градиентами: градиенты по углам
      складывались друг с другом и давали грязные пятна, а тень идёт по
-     периметру непрерывно — ровным кольцом и без стыков. Полоса узкая
-     намеренно: широкая доходила до плашки с именем и засвечивала её. */
-  box-shadow:inset 0 0 42px 13px #fff4e2,
-             inset 0 0 96px 0 rgba(255,244,226,.42)}
+     периметру непрерывно — ровным кольцом и без стыков.
+
+     Ширину ведут переменные: их ставит линейка яркости. Первая ступень —
+     самая узкая, та, что не достаёт до плашки с именем. */
+  --w:13px; --b:42px; --a:.42;
+  box-shadow:inset 0 0 var(--b) var(--w) #fff4e2,
+             inset 0 0 96px 0 rgba(255,244,226,var(--a));
+  transition:opacity .3s ease,box-shadow .16s ease}
 .cv.lamp .cv-glow{opacity:1}
 
 /* Лучи у фонарика дорисовываются, когда он горит, — тем же приёмом, что и
@@ -20438,6 +20456,89 @@ function _hap(вид){
     else h.impactOccurred(вид || 'light');
   }catch(e){}
 }
+// Яркость экранного света — восемь ступеней. Первая та самая узкая полоса,
+// дальше кольцо шире и плотнее. У задней камеры ступеней нет: вспышкой браузер
+// умеет только «гореть» и «не гореть», и притворяться тут нечем.
+const LAMP_W = [13, 19, 26, 33, 41, 49, 57, 66];      // плотная часть, px
+const LAMP_B = [42, 50, 58, 68, 78, 88, 98, 110];     // затухание, px
+const LAMP_A = [.42, .47, .52, .57, .62, .68, .74, .80];
+let CALL_LAMP_LVL = 1;
+
+function lampGlowSet(){
+  const g = document.getElementById('cvGlow');
+  if(!g) return;
+  const i = Math.max(0, Math.min(LAMP_W.length - 1, CALL_LAMP_LVL - 1));
+  g.style.setProperty('--w', LAMP_W[i] + 'px');
+  g.style.setProperty('--b', LAMP_B[i] + 'px');
+  g.style.setProperty('--a', LAMP_A[i]);
+}
+
+function lampDialPaint(){
+  const d = document.getElementById('cvDial');
+  if(!d) return;
+  [...d.children].forEach((штрих, k) => {
+    const далеко = Math.abs(k + 1 - CALL_LAMP_LVL);
+    штрих.className = далеко === 0 ? 'now' : далеко === 1 ? 'near' : '';
+  });
+}
+
+function lampDial(показать){
+  document.getElementById('cvDial')?.classList.toggle('on', !!показать);
+  if(показать) lampDialPaint();
+}
+
+function lampLevel(n){
+  const было = CALL_LAMP_LVL;
+  CALL_LAMP_LVL = Math.max(1, Math.min(LAMP_W.length, n));
+  if(CALL_LAMP_LVL === было) return;
+  _hap('sel');                    // щелчок на каждой ступени, как у зума
+  lampGlowSet(); lampDialPaint();
+}
+
+// Тянем по кнопке фонарика: вверх — ярче, вниз — тусклее. Короткое нажатие
+// без движения остаётся обычным включением.
+function lampDrag(){
+  const кн = document.getElementById('cvLamp');
+  if(!кн || кн._тянем) return;
+  кн._тянем = true;
+  let y0 = null, было = 1, поехали = false;
+  const сзади = () => !!(CALL && CALL.facing === 'environment');
+  кн.addEventListener('pointerdown', e => {
+    кн._ptr = true;
+    if(сзади()) return;                       // у вспышки яркости нет
+    y0 = e.clientY; было = CALL_LAMP_LVL; поехали = false;
+    if(CALL_LAMP) lampDial(true);             // горит — сразу показываем линейку
+    try{ кн.setPointerCapture(e.pointerId); }catch(x){}
+  });
+  кн.addEventListener('pointermove', e => {
+    if(y0 === null) return;
+    const d = y0 - e.clientY;
+    if(!поехали){
+      if(Math.abs(d) < 8) return;             // это ещё нажатие, а не движение
+      поехали = true;
+      if(!CALL_LAMP){ CALL_LAMP = true; lampPaint(); }
+      lampDial(true);
+    }
+    lampLevel(было + Math.round(d / 22));
+  });
+  const конец = () => {
+    if(y0 === null) return;
+    const тянули = поехали;
+    y0 = null; поехали = false;
+    lampDial(false);
+    if(!тянули) callLamp();                   // нажали, а не потянули
+  };
+  кн.addEventListener('pointerup', конец);
+  кн.addEventListener('pointercancel', конец);
+  // Колесо — для проверки на настольном браузере, на телефоне его нет.
+  кн.addEventListener('wheel', e => {
+    if(!CALL_LAMP || сзади()) return;
+    lampLevel(CALL_LAMP_LVL + (e.deltaY < 0 ? 1 : -1));
+  }, {passive: true});
+  // Если указателей в браузере нет вовсе, кнопка обязана работать по-старому.
+  кн.addEventListener('click', () => { if(!кн._ptr) callLamp(); });
+}
+
 // ── фонарик ────────────────────────────────────────────────────────────────
 // Одна кнопка на две камеры, потому что человеку нужен свет, а не устройство.
 // У задней камеры это настоящая вспышка. У фронтальной вспышки нет ни на одном
@@ -20446,6 +20547,7 @@ function _hap(вид){
 let CALL_LAMP = false;
 
 function lampPaint(){
+  lampDrag(); lampGlowSet();
   const сзади = !!(CALL && CALL.facing === 'environment');
   // Экраном светим только вперёд: назад он не светит никуда.
   document.getElementById('callVid')?.classList.toggle('lamp', CALL_LAMP && !сзади);

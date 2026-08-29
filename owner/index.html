@@ -5752,7 +5752,10 @@ button.pill:active{opacity:.6}
 <!-- Четыре смайлика — сверка ключей. Одна карточка на оба состояния:
      свёрнутая это плашка между кнопками телеграма, развёрнутая — то же
      самое, только выросшее. Двух карточек тут быть не должно. -->
-<div class="sig-top" id="sigTop"></div>
+<div class="cvo-hdr" id="cvoHdr">
+  <span class="ct-line">Разговор<span class="ct-sig" id="sigTop"></span></span>
+  <span class="ct-time" id="cvoTime"></span>
+</div>
 <div class="cs-safe-scrim" id="csSafeScrim" onclick="safeToggle(false)"></div>
 <div class="cs-safe" id="csSafe" onclick="safeToggle()" role="button">
   <div class="cs-safe-big" id="csSafeBig"></div>
@@ -5799,6 +5802,7 @@ button.pill:active{opacity:.6}
     <span class="cv-pill-a" id="cvA">—</span>
     <span class="cv-pill-n" id="cvN">—</span>
     <span class="cv-pill-t" id="cvT">00:00</span>
+    <span class="cv-pill-q" id="sigPill"></span>
   </div>
   <div class="cv-lampbox">
     <button class="cv-lamp" id="cvLamp" aria-label="Фонарик">
@@ -6114,7 +6118,7 @@ button.pill:active{opacity:.6}
 /* Стекло тут то же, что у карточки сверки: одна плоскость поверх видео —
    один рецепт. Числа не «похожие», а те же самые, иначе две плашки на одном
    экране начинают выглядеть как из разных приложений. */
-.cv-pill{height:var(--pillh,42px);box-sizing:border-box;display:flex;align-items:center;gap:8px;
+.cv-pill{height:var(--pillh,42px);box-sizing:border-box;display:flex;align-items:center;min-width:0;gap:8px;
   padding:7px 13px 7px 9px;border-radius:999px;
   background:linear-gradient(160deg,rgba(58,58,78,.45),rgba(20,20,32,.39));
   backdrop-filter:blur(28px) saturate(190%);
@@ -6123,8 +6127,12 @@ button.pill:active{opacity:.6}
 .cv-pill-a{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;
   justify-content:center;font-size:11px;font-weight:700;color:var(--gold2);
   background:rgba(201,169,110,.18)}
-.cv-pill-n{font-size:14px;font-weight:600;color:#fff}
+.cv-pill-n{font-size:14px;font-weight:600;color:#fff;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Ширину держим числом: иначе плашка дышит на каждой секунде. */
+/* В видео шапку разговора закрывает сама картинка, и полоскам связи там
+   пришлось бы висеть в пустоте. Их место — в плашке с именем, сразу за
+   временем: туда и так смотрят. */
+.cv-pill-q{display:inline-flex;line-height:0;margin-left:2px}
 .cv-pill-t{display:inline-block;min-width:40px;text-align:right;font-size:12px;color:rgba(255,255,255,.65);font-variant-numeric:tabular-nums}
 /* Кнопки разговора — рядом внизу, с подписями, как в телефоне.
 
@@ -6201,7 +6209,10 @@ button.pill:active{opacity:.6}
 .cv-note.uh .cv-note-t{opacity:0}
 
 /* Имя и фонарик — одной строкой сверху. */
-.cv-head{--pillh:42px;position:absolute;top:calc(14px + var(--safe-top));left:14px;z-index:7;
+/* Плашка не должна доезжать до окошка своей камеры: с длинным именем она
+   раньше уходила прямо под него вместе с фонариком. Имя в ней ужимается
+   многоточием — оно и так подписано крупно на самом экране. */
+.cv-head{--pillh:42px;position:absolute;top:calc(14px + var(--safe-top));left:14px;max-width:calc(100% - 128px);z-index:7;
   display:none;align-items:center;gap:9px}
 .cv.on .cv-head{display:flex}
 .cv-lampbox{position:relative;display:none}
@@ -6377,35 +6388,43 @@ body.call-mini .cs-safe-scrim{display:none}
   top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 12px);
   display:flex;flex-direction:row;align-items:center;justify-content:center;
   gap:9px;z-index:5}
-/* В разговоре полосу занимают смайлики сверки. Полоски связи встают справа
-   от них — отступ считается от ширины самой плашки, — а время сразу под
-   ними. Когда карточку сверки разворачивают, оба уходят: развёрнутая карточка
-   занимает всё место, и спорить с ней им незачем. */
-.cvo-hero.live .hero-top{position:static;left:auto;right:auto;top:auto;
-  margin-top:10px;z-index:auto;display:contents}
-/* Полоски связи стоят рядом со смайликами сверки и не принадлежат ни
-   голосовому экрану, ни видео: они нужны в обоих. Поэтому это отдельный
-   значок поверх всего, а отступ считается от ширины плашки смайликов.
-   Развернули карточку сверки — уходит: там ему тесно. */
-.sig-top{position:fixed;z-index:522;display:none;
-  top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 16px);
-  left:calc(50% + var(--cs-pill-w,116px) / 2 + 10px);
+/* Шапка разговора — одна на голосовой экран и на видео: слово ровно посреди
+   экрана, под плашкой смайликов, полоски связи сразу за ним, время строкой
+   ниже. Пока не соединились, её нет вовсе: объявлять нечего. Развернули
+   карточку сверки — уходит, там ей тесно. */
+.cvo-hdr{position:fixed;left:0;right:0;z-index:521;display:none;
+  top:calc(10px + var(--safe-top));text-align:center;pointer-events:none;
+  color:var(--text);font-size:15px;font-weight:700;line-height:1.25;
   transition:opacity .22s ease}
-body.call-live .sig-top{display:block}
-body.safe-open .sig-top{opacity:0}
-/* А время в голосовом звонке — под именем, там его и ищут. */
-.cvo-hero.live .call-q{display:none}
-.cvo-hero.live .hero-mid{position:static;transform:none;margin:0}
-.cvo-hero.live{justify-content:center}
-/* Порядок в разговоре: имя, под ним состояние. В разметке они наоборот —
-   там первым идёт то, что стоит в полосе телеграма. */
-.cvo-hero.live .hero-top{order:2}
-.cvo-hero.live .hero-mid{order:1}
+.cvo-hdr.live{display:block}
+body.safe-open .cvo-hdr{opacity:0}
+/* Слово, полоски и время — одна шапка разговора на все три приложения. */
+/* Слово стоит ровно под плашкой смайликов, а полоски висят за ним и в
+   центровку не вмешиваются: будь они внутри строки, слово уехало бы влево
+   ровно на их ширину — под плашкой оказалась бы пустота между словом и
+   полосками, а не само слово. */
+.ct-line{position:relative;display:inline-flex;align-items:center}
+.ct-sig{position:absolute;left:100%;margin-left:7px;line-height:0}
+.ct-time{display:block;margin-top:3px;font-size:12.5px;font-weight:600;
+  letter-spacing:.2px;color:var(--muted);font-variant-numeric:tabular-nums}
+/* В разговоре наверху стоит своя шапка: слово, полоски связи и время. Здесь
+   не остаётся ничего служебного — только собеседник. */
+.cvo-hero.live .hero-top{display:none}
+/* Кружок с именем — по центру свободного места, между шапкой и кнопками.
+   Сверху ровно столько, сколько занимает шапка, снизу чуть больше половины
+   этого: под кнопками тяжелее, чем над словом, и ровная середина читается
+   как «низко». */
+/* Кружок с именем — по центру свободного места, между шапкой и кнопками, и на
+   вызове, и в разговоре одинаково: иначе в момент ответа он прыгает. Верхний
+   отступ ленты тут лишний, он сдвигал пару вниз. Нижний, наоборот, нужен и
+   небольшой: под кнопками тяжелее, чем над словом, и ровная середина читается
+   как «низко». */
+.cvo-hero{justify-content:center;
+  padding-top:calc(var(--safe-top) + 52px);
+  padding-bottom:clamp(16px,4.5vh,40px)}
 /* Кружок с именем — по центру экрана, а не по центру остатка: остаток внизу
    занимают кнопки, и середина смещалась вверх. */
-.cvo-hero .hero-mid{position:absolute;left:0;right:0;top:50%;
-  transform:translateY(-50%);
-  display:flex;flex-direction:column;align-items:center}
+.cvo-hero .hero-mid{display:flex;flex-direction:column;align-items:center}
 .cvo-ava{width:clamp(84px,24vw,104px);height:clamp(84px,24vw,104px);border-radius:50%;
   display:flex;align-items:center;justify-content:center;margin-bottom:18px;
   color:var(--gold2,#E8C98A);
@@ -20202,10 +20221,12 @@ function callEvent(t, d){
       CALL_SAFE = null; safePaint();
       if(t === 'failed' && d.keep){ _toast('Вы уже в разговоре'); return; }
       CALL_ST = 'idle'; CALL_WHO = ''; CALL_Q = '';
-      // Звонок кончился — полоскам связи наверху делать нечего: класс им
-      // ставит только перекраска качества, а её после конца никто не зовёт.
-      document.body.classList.remove('call-live');
-      var _st = document.getElementById('sigTop'); if(_st) _st.innerHTML = '';
+      // Звонок кончился — шапка возвращается к обычному виду. Сама она этого
+      // не сделает: и полоски, и время ставит перекраска, а её после конца
+      // никто не зовёт.
+      document.getElementById('cvoHdr')?.classList.remove('live');
+      const _sg = document.getElementById('sigTop'); if(_sg) _sg.innerHTML = '';
+      const _tm = document.getElementById('cvoTime'); if(_tm) _tm.textContent = '';
       CALL_VIDEO = false; CALL_CAM = false; CALL_RCAM = false;
       // Кадр в элементе живёт сам по себе: не обнулить — и следующий звонок
       // начнётся с замершего лица из прошлого.
@@ -20235,6 +20256,7 @@ function callTimer(){
   const txt = _cMm(Math.max(0, Math.round((Date.now() - CALL_T0)/1000)));
   const a = document.getElementById('cvoState'); if(a && CALL_ST === 'live') a.textContent = txt;
   const b = _cq('callBarS'); if(b) b.textContent = txt;
+  const h = document.getElementById('cvoTime'); if(h) h.textContent = txt;
   const c = document.getElementById('cvT'); if(c) c.textContent = txt;
   const d = document.getElementById('cgT'); if(d) d.textContent = txt;
 }
@@ -20252,7 +20274,9 @@ function callQuality(){
   // Тот же значок рядом со смайликами — он один на голосовой экран и на видео.
   const t = document.getElementById('sigTop');
   if(t) t.innerHTML = sigHtml(CALL_Q || '');
-  document.body.classList.toggle('call-live', CALL_ST === 'live');
+  // И в плашке с именем — это видеорежим, шапку там закрывает картинка.
+  const pq = document.getElementById('sigPill');
+  if(pq) pq.innerHTML = CALL_ST === 'live' ? sigHtml(CALL_Q || '') : '';
 }
 
 // Пропущенные считаются только те, что человек ещё не видел. Иначе цифра на
@@ -20452,6 +20476,7 @@ function callVoicePaint(){
   // В разговоре полосу телеграма занимают смайлики сверки: состояние со связью
   // уходит под имя.
   document.getElementById('cvoHero')?.classList.toggle('live', CALL_ST === 'live');
+  document.getElementById('cvoHdr')?.classList.toggle('live', CALL_ST === 'live');
   const точки = '<span class="dots"><i></i><i></i><i></i></span>';
   const st = CALL_REJOIN ? 'Связь пропала, собираем заново' + точки
            : CALL_ST === 'in' ? 'Входящий звонок'

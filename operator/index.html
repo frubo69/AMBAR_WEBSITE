@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=54"></script>
+<script src="/vendor/ambar-call.js?v=55"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -957,7 +957,7 @@ a.oc-row:active{background:var(--card2)}
 /* Стекло тут то же, что у карточки сверки: одна плоскость поверх видео —
    один рецепт. Числа не «похожие», а те же самые, иначе две плашки на одном
    экране начинают выглядеть как из разных приложений. */
-.cv-pill{display:flex;align-items:center;gap:8px;
+.cv-pill{height:var(--pillh,42px);box-sizing:border-box;display:flex;align-items:center;gap:8px;
   padding:7px 13px 7px 9px;border-radius:999px;
   background:linear-gradient(160deg,rgba(58,58,78,.45),rgba(20,20,32,.39));
   backdrop-filter:blur(28px) saturate(190%);
@@ -1007,9 +1007,9 @@ a.oc-row:active{background:var(--card2)}
    У микрофона оно вообще не мигает: значок говорит, что сделает нажатие, а
    состояние показывает залитая белым карточка. У камеры иначе: там
    перечёркивание и есть состояние. */
-.cv-rb .cvx{{opacity:0;transition:opacity .12s ease}}
-.cv-rb.on .cvx{{opacity:1}}
-#cvMic .cvx{{opacity:1}}
+.cv-rb .cvx{opacity:0;transition:opacity .12s ease}
+.cv-rb.on .cvx{opacity:1}
+#cvMic .cvx{opacity:1}
 /* Поворот отзывается сам: значок делает пол-оборота. */
 .cv-flip.spin svg{animation:cvflip .52s cubic-bezier(.32,.72,0,1)}
 @keyframes cvflip{from{transform:rotate(0)}to{transform:rotate(180deg)}}
@@ -1032,14 +1032,15 @@ a.oc-row:active{background:var(--card2)}
 .cv-note.wide .cv-note-t{opacity:1}
 
 /* Имя и фонарик — одной строкой сверху. */
-.cv-head{position:absolute;top:calc(14px + var(--safe-top));left:14px;z-index:7;
+.cv-head{--pillh:42px;position:absolute;top:calc(14px + var(--safe-top));left:14px;z-index:7;
   display:none;align-items:center;gap:9px}
 .cv.on .cv-head{display:flex}
-.cv-lampbox{position:relative;display:none;align-self:stretch}
+.cv-lampbox{position:relative;display:none}
 .cv.cam-on .cv-lampbox{display:block}
-/* Рост берём у плашки с именем: две вещи в одной строке обязаны быть одного
-   роста, иначе строка выглядит собранной наспех. */
-.cv-lamp{height:100%;aspect-ratio:1;border-radius:50%;
+/* Ростом ровно с плашку имени, и число одно на двоих. Через height:100% это
+   не работает: строка меряется по самому высокому, сам фонарик и есть самый
+   высокий, и он раздувался на пол-экрана. */
+.cv-lamp{width:var(--pillh);height:var(--pillh);border-radius:50%;
   border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;
   background:linear-gradient(160deg,rgba(255,255,255,.20),rgba(255,255,255,.09));
   backdrop-filter:blur(24px) saturate(180%);

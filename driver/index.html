@@ -1206,7 +1206,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 /* Стекло тут то же, что у карточки сверки: одна плоскость поверх видео —
    один рецепт. Числа не «похожие», а те же самые, иначе две плашки на одном
    экране начинают выглядеть как из разных приложений. */
-.cs-pill{display:flex;align-items:center;gap:8px;padding:8px 14px 8px 10px;border-radius:999px;
+.cs-pill{height:var(--pillh,42px);box-sizing:border-box;display:flex;align-items:center;gap:8px;padding:8px 14px 8px 10px;border-radius:999px;
   background:linear-gradient(160deg,rgba(58,58,78,.45),rgba(20,20,32,.39));
   backdrop-filter:blur(28px) saturate(190%);
   -webkit-backdrop-filter:blur(28px) saturate(190%);
@@ -1258,9 +1258,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    У микрофона оно вообще не мигает: значок говорит, что сделает нажатие, а
    состояние показывает залитая белым карточка. У камеры иначе: там
    перечёркивание и есть состояние. */
-.cs-rb .cvx{{opacity:0;transition:opacity .12s ease}}
-.cs-rb.on .cvx{{opacity:1}}
-#csMic .cvx{{opacity:1}}
+.cs-rb .cvx{opacity:0;transition:opacity .12s ease}
+.cs-rb.on .cvx{opacity:1}
+#csMic .cvx{opacity:1}
 /* Поворот отзывается сам: значок делает пол-оборота. */
 .cs-flip.spin svg{animation:cvflip .52s cubic-bezier(.32,.72,0,1)}
 @keyframes cvflip{from{transform:rotate(0)}to{transform:rotate(180deg)}}
@@ -1283,14 +1283,15 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .cs-note.wide .cs-note-t{opacity:1}
 
 /* Имя и фонарик — одной строкой сверху. */
-.cs-head{position:absolute;top:calc(14px + var(--safe-top));left:14px;z-index:4;
+.cs-head{--pillh:42px;position:absolute;top:calc(14px + var(--safe-top));left:14px;z-index:4;
   display:none;align-items:center;gap:9px}
 .call-scr.video .cs-head{display:flex}
-.cs-lampbox{position:relative;display:none;align-self:stretch}
+.cs-lampbox{position:relative;display:none}
 .call-scr.video.cam-on .cs-lampbox{display:block}
-/* Рост берём у плашки с именем: две вещи в одной строке обязаны быть одного
-   роста, иначе строка выглядит собранной наспех. */
-.cs-lamp{height:100%;aspect-ratio:1;border-radius:50%;
+/* Ростом ровно с плашку имени, и число одно на двоих. Через height:100% это
+   не работает: строка меряется по самому высокому, сам фонарик и есть самый
+   высокий, и он раздувался на пол-экрана. */
+.cs-lamp{width:var(--pillh);height:var(--pillh);border-radius:50%;
   border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;
   background:linear-gradient(160deg,rgba(255,255,255,.20),rgba(255,255,255,.09));
   backdrop-filter:blur(24px) saturate(180%);
@@ -2483,7 +2484,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=54"></script>
+<script src="/vendor/ambar-call.js?v=55"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{

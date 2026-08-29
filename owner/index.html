@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=49"></script>
+<script src="/vendor/ambar-call.js?v=50"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -6178,8 +6178,11 @@ button.pill:active{opacity:.6}
 .cv-dial{position:absolute;left:8px;bottom:100%;margin-bottom:10px;
   display:flex;flex-direction:column-reverse;align-items:flex-start;
   gap:9px;pointer-events:none;
-  opacity:0;visibility:hidden;transition:opacity .18s ease,visibility 0s .18s}
-.cv-dial.on{opacity:1;visibility:visible;transition:opacity .18s ease,visibility 0s}
+  /* Скрываем прозрачностью, а не видимостью с отложенным переходом: нажатий
+     линейка всё равно не ловит, а состояние с задержкой ловится хуже — и
+     проверить его труднее, и застрять оно может незаметно. */
+  opacity:0;transition:opacity .18s ease}
+.cv-dial.on{opacity:1}
 .cv-dial i{display:block;height:2px;width:11px;border-radius:2px;
   background:rgba(255,255,255,.45);
   transition:width .16s cubic-bezier(.32,.72,0,1),background .16s ease}
@@ -6192,7 +6195,7 @@ button.pill:active{opacity:.6}
 
      Ширину ведут переменные: их ставит линейка яркости. Первая ступень —
      самая узкая, та, что не достаёт до плашки с именем. */
-  --w:13px; --b:42px; --a:.42;
+  --w:26px; --b:58px; --a:.5;
   box-shadow:inset 0 0 var(--b) var(--w) #fff4e2,
              inset 0 0 96px 0 rgba(255,244,226,var(--a));
   transition:opacity .3s ease,box-shadow .16s ease}
@@ -20466,9 +20469,9 @@ function _hap(вид){
 // Яркость экранного света — восемь ступеней. Первая та самая узкая полоса,
 // дальше кольцо шире и плотнее. У задней камеры ступеней нет: вспышкой браузер
 // умеет только «гореть» и «не гореть», и притворяться тут нечем.
-const LAMP_W = [13, 19, 26, 33, 41, 49, 57, 66];      // плотная часть, px
-const LAMP_B = [42, 50, 58, 68, 78, 88, 98, 110];     // затухание, px
-const LAMP_A = [.42, .47, .52, .57, .62, .68, .74, .80];
+const LAMP_W = [26, 34, 43, 52, 62, 73, 85, 98];      // плотная часть, px
+const LAMP_B = [58, 68, 78, 88, 100, 112, 124, 138];  // затухание, px
+const LAMP_A = [.50, .55, .60, .65, .70, .75, .80, .85];
 let CALL_LAMP_LVL = 1;
 
 function lampGlowSet(){
@@ -20523,16 +20526,15 @@ function lampDrag(){
   кн._тянем = true;
   let y0 = null, было = 1, поехали = false;
   const сзади = () => !!(CALL && CALL.facing === 'environment');
-  кн.addEventListener('pointerdown', e => {
+  const начало = y => {
     кн._ptr = true;
     if(сзади()) return;                       // у вспышки яркости нет
-    y0 = e.clientY; было = CALL_LAMP_LVL; поехали = false;
+    y0 = y; было = CALL_LAMP_LVL; поехали = false;
     lampDial(true);        // палец лёг — линейка выехала, ещё до движения
-    try{ кн.setPointerCapture(e.pointerId); }catch(x){}
-  });
-  кн.addEventListener('pointermove', e => {
+  };
+  const ход = y => {
     if(y0 === null) return;
-    const d = y0 - e.clientY;
+    const d = y0 - y;
     if(!поехали){
       if(Math.abs(d) < 8) return;             // это ещё нажатие, а не движение
       поехали = true;
@@ -20540,7 +20542,7 @@ function lampDrag(){
       lampDial(true);
     }
     lampLevel(было + Math.round(d / 22));
-  });
+  };
   const конец = () => {
     if(y0 === null) return;
     const тянули = поехали;
@@ -20548,8 +20550,28 @@ function lampDrag(){
     lampDial(false);
     if(!тянули) callLamp();                   // нажали, а не потянули
   };
-  кн.addEventListener('pointerup', конец);
-  кн.addEventListener('pointercancel', конец);
+
+  // На телефоне ведём по настоящим касаниям и сами отменяем прокрутку.
+  // Одного touch-action мало: телеграм и айфон в мини-аппе решают судьбу
+  // вертикального движения раньше, чем оно дойдёт до указателей, — палец
+  // уезжал в прокрутку страницы, а обработчик получал отмену.
+  if('ontouchstart' in window){
+    кн.addEventListener('touchstart', e => начало(e.touches[0].clientY), {passive: true});
+    кн.addEventListener('touchmove', e => {
+      if(y0 !== null) e.preventDefault();
+      ход(e.touches[0].clientY);
+    }, {passive: false});
+    кн.addEventListener('touchend', конец);
+    кн.addEventListener('touchcancel', конец);
+  }else{
+    кн.addEventListener('pointerdown', e => {
+      начало(e.clientY);
+      try{ кн.setPointerCapture(e.pointerId); }catch(x){}
+    });
+    кн.addEventListener('pointermove', e => ход(e.clientY));
+    кн.addEventListener('pointerup', конец);
+    кн.addEventListener('pointercancel', конец);
+  }
   // Колесо — для проверки на настольном браузере, на телефоне его нет.
   кн.addEventListener('wheel', e => {
     if(!CALL_LAMP || сзади()) return;

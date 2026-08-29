@@ -6071,8 +6071,17 @@ button.pill:active{opacity:.6}
    ни занятия, ни того, когда с ним говорили в последний раз. */
 .cd-top{display:flex;flex-direction:column;align-items:center;text-align:center;
   padding:10px 0 26px}
+/* Занятие — значком в углу аватара, как отметка на пропуске: слово «оператор»
+   под именем занимало целую строку и спорило с самим именем. */
+.cd-ava-w{position:relative;margin-bottom:14px}
+.cd-role{position:absolute;right:-2px;bottom:-2px;width:34px;height:34px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;color:var(--gold2);
+  background:#0d0d19;box-shadow:inset 0 0 0 1px rgba(201,169,110,.28)}
+.cd-role svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.7;
+  stroke-linecap:round;stroke-linejoin:round}
+.cd-note{font-size:12px;color:var(--dim);margin-top:7px;line-height:1.45}
 .cd-ava{width:96px;height:96px;border-radius:50%;display:flex;align-items:center;
-  justify-content:center;font-size:34px;font-weight:700;color:var(--gold2);margin-bottom:14px;
+  justify-content:center;font-size:34px;font-weight:700;color:var(--gold2);
   background:radial-gradient(120% 120% at 30% 18%,rgba(201,169,110,.26),rgba(201,169,110,.06));
   box-shadow:inset 0 0 0 1px rgba(201,169,110,.22)}
 .cd-n{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;
@@ -21631,6 +21640,35 @@ function _caГде(r){
 }
 function _caКто(key){ return ((CALL && CALL.roster) || []).find(r => r.key === key); }
 
+// Занятие человека — значком, а не словом: «оператор» под именем читается как
+// подпись к картине, хотя это всего лишь кто он у нас.
+function _caВид(r){
+  const роль = ((r && r.role) || '').toLowerCase();
+  return /водител/.test(роль) ? 'drv' : /star|ambar/.test(роль) ? 'star' : 'op';
+}
+
+// «В сети» или когда его видели в последний раз. Отметку об уходе ставит сам
+// сервер связи — он единственный, кто про это точно знает. Без неё говорим
+// просто «не в сети»: соврать хуже, чем промолчать.
+//
+// Пишем без «был(а)»: половина списка — женские имена, а скобки посреди
+// карточки выглядят как недоделанный шаблон.
+function _caПрисут(r){
+  if(!r) return '';
+  if(r.online) return 'В сети';
+  if(!r.seen) return 'Не в сети';
+  const с = Math.max(0, Math.floor(Date.now() / 1000 - r.seen));
+  if(с < 90)    return 'Не в сети · только что';
+  if(с < 3600)  return 'Не в сети · ' + Math.round(с / 60) + ' мин назад';
+  if(с < 86400) return 'Не в сети · ' + Math.round(с / 3600) + ' ч назад';
+  const d = new Date(r.seen * 1000), сейчас = new Date();
+  const чч = String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  const в = new Date(сейчас); в.setDate(в.getDate() - 1);
+  if(d.toDateString() === в.toDateString()) return 'Не в сети · вчера в ' + чч;
+  return 'Не в сети · ' + d.getDate() + '.' + String(d.getMonth() + 1).padStart(2, '0') +
+         ' в ' + чч;
+}
+
 // ── Избранные ───────────────────────────────────────────────────────────────
 // Набираются в одном месте: нажали «Добавить» — поднялась шторка со всеми,
 // отметили нужных, закрыли. Отдельной страницы под это не нужно: людей
@@ -21783,10 +21821,14 @@ function cardPaint(key){
   const ист = ((CALL && CALL.recent) || []).filter(x => x.key === key).slice(0, 10);
   box.innerHTML = `
     <div class="cd-top">
-      <div class="cd-ava">${_cIni(r.name)}</div>
+      <div class="cd-ava-w">
+        <div class="cd-ava">${_cIni(r.name)}</div>
+        <div class="cd-role"><svg viewBox="0 0 24 24">${ICO_ROLE[_caВид(r)]}</svg></div>
+      </div>
       <div class="cd-n">${r.name}</div>
-      <div class="cd-r"><span class="ca-dot${r.online ? ' on' : ''}"></span>${
-        r.role ? r.role + ' · ' : ''}${_caГде(r)}</div>
+      <div class="cd-r"><span class="ca-dot${r.online ? ' on' : ''}"></span>${_caПрисут(r)}</div>
+      ${!r.online && /^(drv|star):/.test(key)
+        ? '<div class="cd-note">Позвоним в телеграм — трубку он всё равно увидит</div>' : ''}
     </div>
     <div class="cd-acts">
       <button class="cd-a call" onclick="cardClose();callDial('${key}')" aria-label="Позвонить">

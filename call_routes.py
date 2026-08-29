@@ -210,6 +210,13 @@ def _bind(p: Peer):
     _BY_KEY.setdefault(p.key, set()).add(p.sid)
 
 
+# Когда человека видели в последний раз. Нужно ровно затем, чтобы вместо
+# глухого «не в сети» сказать, давно ли он ушёл: звонить тому, кто вышел минуту
+# назад, и тому, кто не заходил третий день, — решения разные. Живёт в памяти:
+# после перезапуска отметок нет, и тогда честнее промолчать, чем соврать.
+_LAST_SEEN: dict = {}
+
+
 def _unbind(p: Peer):
     _PEERS.pop(p.sid, None)
     s = _BY_KEY.get(p.key)
@@ -217,6 +224,7 @@ def _unbind(p: Peer):
         s.discard(p.sid)
         if not s:
             _BY_KEY.pop(p.key, None)
+            _LAST_SEEN[p.key] = time.time()   # ушёл последний сокет — значит ушёл сам
 
 
 async def _broadcast_roster():
@@ -814,9 +822,13 @@ def _roster(peer: Peer) -> list:
     rows = []
 
     def add(key, name, role):
-        if not any(r["key"] == key for r in rows):
-            rows.append({"key": key, "name": name, "role": role,
-                         "online": bool(_sessions(key))})
+        if any(r["key"] == key for r in rows):
+            return
+        row = {"key": key, "name": name, "role": role,
+               "online": bool(_sessions(key))}
+        if not row["online"] and _LAST_SEEN.get(key):
+            row["seen"] = int(_LAST_SEEN[key])
+        rows.append(row)
 
     if peer.kind == "drv":
         if peer.own_op:

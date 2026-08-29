@@ -5728,7 +5728,7 @@ button.pill:active{opacity:.6}
             d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6A19.8 19.8 0 0 1 2.1 4.2 2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 1.9.6 2.8a2 2 0 0 1-.5 2.1L8 9.8a16 16 0 0 0 6 6l1.2-1.2a2 2 0 0 1 2.1-.5c.9.3 1.8.5 2.8.6a2 2 0 0 1 1.7 2z"/></svg>
           <span>Звонки</span>
         </button>
-        <button class="ca-new" onclick="callPage('contacts')" aria-label="Новый звонок">
+        <button class="ca-new" onclick="dialOpen()" aria-label="Новый звонок">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"
             stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>
         </button>
@@ -5742,16 +5742,36 @@ button.pill:active{opacity:.6}
       </nav>
     </div>
   </div>
-  <!-- Выбор избранных. Живёт рядом со списком, а не внутри него: список
-       перерисовывается на каждую отметку, и шторка исчезала бы из-под пальца. -->
-  <div class="fav-scrim" id="favScrim" onclick="favSheet(false)"></div>
-  <div class="fav-sheet" id="favSheet" role="dialog" aria-label="Избранные">
-    <div class="fav-grab"></div>
-    <div class="fav-t">Избранные</div>
-    <div class="fav-s">Отметьте, кого держать под рукой. Они встанут наверху
-      экрана звонков — нажатие сразу набирает.</div>
-    <div class="fav-list" id="favList"></div>
-    <button class="fav-done" onclick="favSheet(false)">Готово</button>
+  <!-- Шторки живут рядом со списком, а не внутри него: список перерисовывается
+       на каждое действие, и шторка исчезала бы прямо из-под пальца. -->
+  <div class="ca-scrim" id="caScrim" onclick="caSheet(null)"></div>
+
+  <!-- Выбор избранных -->
+  <div class="ca-sheet" id="favSheet" role="dialog" aria-label="Избранные">
+    <div class="ca-grab"></div>
+    <div class="ca-sh-t">Избранные</div>
+    <div class="ca-sh-s">Отметьте, кого держать под рукой. Они встанут наверху
+      экрана звонков — нажатие сразу набирает, долгое нажатие звонит с камерой.</div>
+    <div class="ca-sh-list" id="favList"></div>
+    <button class="ca-sh-done" onclick="caSheet(null)">Готово</button>
+  </div>
+
+  <!-- Набор именем. То, чем в телефоне занята клавиатура: там набирают цифры,
+       здесь — буквы имени, потому что номеров у нас нет вовсе. -->
+  <div class="ca-sheet" id="dialSheet" role="dialog" aria-label="Новый звонок">
+    <div class="ca-grab"></div>
+    <div class="ca-sh-t">Кому звоним</div>
+    <div class="ca-search dial-q"><svg viewBox="0 0 24 24" width="17" height="17"
+      fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle
+      cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="dialQ" type="text"
+      placeholder="Имя" autocomplete="off"></div>
+    <div class="ca-sh-list" id="dialList"></div>
+  </div>
+
+  <!-- Карточка человека -->
+  <div class="ca-sheet" id="cardSheet" role="dialog" aria-label="Контакт">
+    <div class="ca-grab"></div>
+    <div class="ca-sh-list" id="cardBody"></div>
   </div>
 </div>
 
@@ -5967,48 +5987,92 @@ button.pill:active{opacity:.6}
 .ca-rs{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);margin-top:3px}
 .ca-dot{width:7px;height:7px;border-radius:50%;background:var(--muted);opacity:.5;flex-shrink:0}
 .ca-dot.on{background:var(--up);opacity:1}
-/* Шторка выбора избранных. Поднимается снизу поверх списка: человек остаётся
-   на своей странице и видит, как избранные появляются за ней. */
-.fav-scrim{position:absolute;inset:0;z-index:8;background:rgba(0,0,6,.62);
+/* Шторки. Поднимаются снизу поверх страницы: человек остаётся у себя и видит,
+   как за шторкой меняется его же список. Их три — избранные, набор именем и
+   карточка человека, — и открыта всегда не больше одной. */
+.ca-scrim{position:absolute;inset:0;z-index:8;background:rgba(0,0,6,.62);
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);
   opacity:0;pointer-events:none;transition:opacity .26s var(--e1)}
-.fav-scrim.on{opacity:1;pointer-events:auto}
-.fav-sheet{position:absolute;left:0;right:0;bottom:0;z-index:9;
-  display:flex;flex-direction:column;max-height:82%;
+.ca-scrim.on{opacity:1;pointer-events:auto}
+.ca-sheet{position:absolute;left:0;right:0;bottom:0;z-index:9;
+  display:flex;flex-direction:column;max-height:86%;
   padding:0 18px calc(14px + var(--safe-bottom));
   border-radius:24px 24px 0 0;background:#0d0d19;
   box-shadow:0 -1px 0 rgba(255,255,255,.07),0 -24px 60px rgba(0,0,0,.6);
   transform:translateY(101%);transition:transform .34s cubic-bezier(.22,.72,.2,1)}
-.fav-sheet.on{transform:none}
+.ca-sheet.on{transform:none}
 /* Полоска сверху — та же, что у любой шторки в телефоне: по ней видно, что
    это слой поверх, а не новая страница. */
-.fav-grab{width:38px;height:4px;border-radius:2px;background:rgba(255,255,255,.16);
+.ca-grab{width:38px;height:4px;border-radius:2px;background:rgba(255,255,255,.16);
   margin:10px auto 14px;flex-shrink:0}
-.fav-t{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;
+.ca-sh-t{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;
   color:var(--text);flex-shrink:0}
-.fav-s{font-size:12.5px;line-height:1.5;color:var(--muted);margin:6px 0 10px;flex-shrink:0}
-.fav-list{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+.ca-sh-s{font-size:12.5px;line-height:1.5;color:var(--muted);margin:6px 0 10px;flex-shrink:0}
+.ca-sh-list{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
   margin:0 -4px;padding:0 4px}
+.dial-q{margin:12px 0 6px;flex-shrink:0}
 .fav-row{position:relative;display:flex;align-items:center;gap:13px;width:100%;
   padding:9px 0;border:0;background:transparent;cursor:pointer;text-align:left;
   font-family:'DM Sans',sans-serif}
 .fav-row+.fav-row::before{content:'';position:absolute;left:59px;right:0;top:0;height:1px;
   background:var(--border2)}
 .fav-rb{flex:1;min-width:0;display:block}
-.fav-rb .ca-rn{display:block}
-.fav-rb .ca-rs{display:block}
+.fav-rb .ca-rn,.fav-rb .ca-rs{display:block}
 /* Пустой кружок вместо галочки: отмеченное и неотмеченное должны отличаться
    заливкой, а не наличием значка — иначе строка без отметки выглядит короче
    остальных и список рябит. */
 .fav-ck{width:26px;height:26px;flex-shrink:0;border-radius:50%;display:flex;
   align-items:center;justify-content:center;color:transparent;
   box-shadow:inset 0 0 0 1.5px var(--border);transition:.18s var(--e1)}
-.fav-row.on .fav-ck{color:#14131c;background:var(--gold2);box-shadow:none}
+.fav-row.on .fav-ck,
+.fav-ck.on{color:#14131c;background:var(--gold2);box-shadow:none}
 .fav-row:active{opacity:.6}
-.fav-done{flex-shrink:0;margin-top:12px;padding:14px;border-radius:14px;border:0;
+.ca-sh-done{flex-shrink:0;margin-top:12px;padding:14px;border-radius:14px;border:0;
   cursor:pointer;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:600;
   color:var(--gold2);background:rgba(201,169,110,.14)}
-.fav-done:active{background:rgba(201,169,110,.22)}
+.ca-sh-done:active{background:rgba(201,169,110,.22)}
+/* Подсказка про долгое нажатие: сам жест не виден, а показывать его нечем —
+   значка на кружке быть не должно, кружок и так занят лицом. */
+.ca-hint{font-size:11.5px;color:var(--dim);margin:-8px 0 16px}
+/* Счётчик пропущенных на переключателе: цифра рядом со словом, а не поверх
+   него — это не уведомление, а часть подписи. */
+.ca-seg .n{margin-left:6px;font-size:12px;font-weight:700;color:var(--dn)}
+/* Точка на вкладке: есть неотвеченное, а внутрь ещё не заходили. */
+.ca-tab{position:relative}
+.ca-tab .dot{position:absolute;top:2px;right:22px;width:7px;height:7px;border-radius:50%;
+  background:var(--dn)}
+/* ── Карточка человека ─────────────────────────────────────────────────────
+   Нажатие на имя раньше сразу набирало, и посмотреть на человека было негде:
+   ни занятия, ни того, когда с ним говорили в последний раз. */
+.cd-top{display:flex;flex-direction:column;align-items:center;text-align:center;
+  padding:4px 0 18px}
+.cd-ava{width:76px;height:76px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:27px;font-weight:700;color:var(--gold2);margin-bottom:12px;
+  background:radial-gradient(120% 120% at 30% 18%,rgba(201,169,110,.26),rgba(201,169,110,.06));
+  box-shadow:inset 0 0 0 1px rgba(201,169,110,.22)}
+.cd-n{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;color:var(--text)}
+.cd-r{font-size:12.5px;color:var(--muted);margin-top:4px;display:flex;align-items:center;gap:6px}
+.cd-acts{display:flex;gap:10px}
+.cd-b{flex:1;display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:14px;border-radius:15px;border:0;cursor:pointer;
+  font-family:'DM Sans',sans-serif;font-size:14.5px;font-weight:600}
+.cd-b:active{transform:scale(.97)}
+.cd-b.call{color:var(--up);background:rgba(76,175,125,.15)}
+.cd-b.vid{color:var(--sub);background:rgba(255,255,255,.06)}
+.cd-favrow{display:flex;align-items:center;gap:12px;width:100%;margin-top:14px;
+  padding:13px 15px;border-radius:14px;border:0;cursor:pointer;text-align:left;
+  font-family:'DM Sans',sans-serif;font-size:14.5px;font-weight:600;color:var(--text);
+  background:rgba(255,255,255,.045)}
+.cd-favrow span:first-child{flex:1}
+.cd-favrow:active{background:rgba(255,255,255,.09)}
+.cd-hist{padding-bottom:6px}
+.cd-h{position:relative;display:flex;align-items:center;gap:10px;padding:10px 0;
+  font-size:13px;color:var(--sub)}
+.cd-h+.cd-h::before{content:'';position:absolute;left:0;right:0;top:0;height:1px;
+  background:var(--border2)}
+.cd-h.missed{color:var(--dn)}
+.cd-h .t{flex:1;min-width:0}
+.cd-h .d{color:var(--muted);font-variant-numeric:tabular-nums}
 /* Кнопки строки без обводок: рамка вокруг каждой превращала список в частокол.
    Зелёная — главная, серая — второстепенная, и видно это по заливке. */
 .ca-vid,.ca-go{width:40px;height:40px;flex-shrink:0;border-radius:50%;cursor:pointer;
@@ -21431,6 +21495,43 @@ function callMute(){
 let CALL_PAGE = 'calls', CALL_Q_TXT = '';
 function callPage(p){ CALL_PAGE = p; callPaint(); }
 
+// Что нельзя выразить разметкой: долгое нажатие на избранном и точка на
+// вкладке. Вызывается после каждой перерисовки — список пересобирается
+// целиком, и обработчики вместе с ним.
+function caWire(){
+  // Точка горит, пока есть неотвеченное, куда ещё не заглядывали. Заглянули на
+  // «Звонки» — она гаснет сама: там их уже видно.
+  const есть = callMissed().length > 0;
+  document.querySelectorAll('#callNav .ca-tab').forEach(b => {
+    const своя = b.dataset.p === 'calls' && есть;
+    let т = b.querySelector('.dot');
+    if(своя && !т){ т = document.createElement('i'); т.className = 'dot'; b.appendChild(т); }
+    if(!своя && т) т.remove();
+  });
+
+  // Кружок избранного: нажатие набирает, долгое — звонит с камерой. Отдельной
+  // кнопки на кружке быть не должно: он занят лицом, и вторая цель в тех же
+  // шестидесяти пикселях — это промах через раз.
+  document.querySelectorAll('#callBody .ca-fav[data-key]').forEach(b => {
+    let т = null, долго = false;
+    const старт = () => {
+      долго = false;
+      т = setTimeout(() => { долго = true; _hap('medium'); callVideo(b.dataset.key); }, 480);
+    };
+    const стоп = () => { clearTimeout(т); };
+    b.addEventListener('touchstart', старт, {passive: true});
+    ['touchend','touchmove','touchcancel','mouseup','mouseleave'].forEach(e =>
+      b.addEventListener(e, стоп));
+    b.addEventListener('mousedown', старт);
+    b.addEventListener('click', e => {
+      // Долгое нажатие уже сработало — обычный клик после него был бы вторым
+      // звонком тому же человеку, только голосовым.
+      if(долго){ долго = false; e.preventDefault(); e.stopPropagation(); return; }
+      callDial(b.dataset.key);
+    });
+  });
+}
+
 // Название раздела человеческими словами. Роли приходят с сервера в
 // единственном числе — заголовку списка нужно множественное.
 function _caRole(role){
@@ -21438,6 +21539,28 @@ function _caRole(role){
        : role === 'оператор' || role === 'свой оператор' ? 'Операторы'
        : role;
 }
+
+// ── Шторки ──────────────────────────────────────────────────────────────────
+// Их три — избранные, набор именем и карточка человека, — и открыта всегда не
+// больше одной. Затемнение общее: два наложенных друг на друга выглядят грязно.
+const CA_ШТОРКИ = ['favSheet', 'dialSheet', 'cardSheet'];
+function caSheet(id){
+  const з = _cq('caScrim'); if(з) з.classList.toggle('on', !!id);
+  CA_ШТОРКИ.forEach(n => { const э = _cq(n); if(э) э.classList.toggle('on', n === id); });
+  if(id) _hap('light');
+}
+
+const ICO_CHECK = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none"
+  stroke="currentColor" stroke-width="2.6" stroke-linecap="round"
+  stroke-linejoin="round"><path d="m5 12.5 4.6 4.5L19 7.5"/></svg>`;
+
+// Как человек подписан под именем: в приложении, не в сети, или дозвонимся
+// через телеграм. Одно и то же нужно в списке, в шторках и в карточке.
+function _caГде(r){
+  return r.online ? 'в приложении'
+       : /^(drv|star):/.test(r.key) ? 'позвоним в телеграм' : 'не в сети';
+}
+function _caКто(key){ return ((CALL && CALL.roster) || []).find(r => r.key === key); }
 
 // ── Избранные ───────────────────────────────────────────────────────────────
 // Набираются в одном месте: нажали «Добавить» — поднялась шторка со всеми,
@@ -21450,16 +21573,7 @@ function _caRole(role){
 // приходится искать отдельно: это то же самое действие, что и «добавить».
 // Сохраняется сразу, без «готово»: отменять нечего, и список за шторкой
 // меняется на глазах.
-const ICO_CHECK = `<svg viewBox="0 0 24 24" width="15" height="15" fill="none"
-  stroke="currentColor" stroke-width="2.6" stroke-linecap="round"
-  stroke-linejoin="round"><path d="m5 12.5 4.6 4.5L19 7.5"/></svg>`;
-
-function favSheet(открыть){
-  const ш = _cq('favSheet'), з = _cq('favScrim');
-  if(!ш || !з) return;
-  if(открыть){ favPaint(); з.classList.add('on'); ш.classList.add('on'); _hap('light'); }
-  else { з.classList.remove('on'); ш.classList.remove('on'); }
-}
+function favOpen(){ favPaint(); caSheet('favSheet'); }
 
 function favPaint(){
   const box = _cq('favList'); if(!box) return;
@@ -21473,8 +21587,7 @@ function favPaint(){
         onclick="favPick('${r.key}')">
         <span class="ca-ava">${_cIni(r.name)}</span>
         <span class="fav-rb"><span class="ca-rn">${r.name}</span>
-          <span class="ca-rs">${r.online ? 'в приложении'
-            : /^(drv|star):/.test(r.key) ? 'позвоним в телеграм' : 'не в сети'}</span></span>
+          <span class="ca-rs">${_caГде(r)}</span></span>
         <span class="fav-ck">${ICO_CHECK}</span></button>`;
   });
   box.innerHTML = h;
@@ -21483,6 +21596,94 @@ function favPaint(){
 function favPick(key){
   callFavToggle(key);   // сохраняет и перерисовывает страницу за шторкой
   favPaint();
+  _hap('light');
+}
+
+// ── Набор именем ────────────────────────────────────────────────────────────
+// То, чем в телефоне занята клавиатура под большим пальцем: там набирают
+// цифры, здесь — буквы имени, потому что номеров у нас нет вовсе. Список тот
+// же, но порядок другой: сверху те, кому звонят чаще, — и поле ввода уже под
+// курсором. Две буквы и трубка, не уходя с экрана звонков.
+let DIAL_Q = '';
+function dialOpen(){
+  DIAL_Q = '';
+  const i = _cq('dialQ');
+  if(i){ i.value = ''; i.oninput = () => { DIAL_Q = i.value; dialPaint(); }; }
+  dialPaint();
+  caSheet('dialSheet');
+  // Клавиатуру поднимаем тем же касанием, что открыло шторку: отложенный
+  // фокус iOS уже не считает жестом и молча его не даёт.
+  if(i) try{ i.focus(); }catch(e){}
+}
+
+// Кому звонят чаще. Считаем по истории — она и так лежит рядом, и это
+// честнее любого ручного порядка.
+function _caЧасто(){
+  const c = {};
+  ((CALL && CALL.recent) || []).forEach(r => { c[r.key] = (c[r.key] || 0) + 1; });
+  return c;
+}
+
+function dialPaint(){
+  const box = _cq('dialList'); if(!box) return;
+  const ч = _caЧасто();
+  const q = DIAL_Q.trim().toLowerCase();
+  const rows = ((CALL && CALL.roster) || [])
+    .filter(r => !q || r.name.toLowerCase().includes(q))
+    .slice()
+    .sort((a, b) => (ч[b.key] || 0) - (ч[a.key] || 0) || a.name.localeCompare(b.name));
+  if(!rows.length){ box.innerHTML = '<div class="ca-empty">Никого с таким именем</div>'; return; }
+  box.innerHTML = rows.map(r => `<div class="ca-row">
+      <div class="ca-ava">${_cIni(r.name)}</div>
+      <div class="ca-rb" onclick="cardOpen('${r.key}')">
+        <div class="ca-rn">${r.name}</div>
+        <div class="ca-rs"><span class="ca-dot${r.online ? ' on' : ''}"></span>${_caГде(r)}</div>
+      </div>
+      <div class="ca-vid" onclick="caSheet(null);callVideo('${r.key}')">${ICO_VID}</div>
+      <div class="ca-go" onclick="caSheet(null);callDial('${r.key}')">${ICO_PHONE}</div>
+    </div>`).join('');
+}
+
+// ── Карточка человека ───────────────────────────────────────────────────────
+// Нажатие на имя раньше сразу набирало, и посмотреть на человека было негде.
+// Здесь всё про него разом: занятие, в сети ли, история разговоров именно с
+// ним и переключатель избранного — тот же, что в шторке выбора.
+function cardOpen(key){ cardPaint(key); caSheet('cardSheet'); }
+
+function cardPaint(key){
+  const box = _cq('cardBody'); if(!box) return;
+  const r = _caКто(key) || {key: key, name: key.split(':').pop(), role: '', online: false};
+  const fav = callFav().indexOf(key) >= 0;
+  // Здесь звонки не склеиваем: в списке подряд идущие сливаются в одну строку
+  // со счётчиком, и это правильно — там важен человек. В карточке важен каждый
+  // разговор со своим временем, иначе вчерашний и позавчерашний становятся
+  // «двумя подряд».
+  const ист = ((CALL && CALL.recent) || []).filter(x => x.key === key).slice(0, 10);
+  box.innerHTML = `
+    <div class="cd-top">
+      <div class="cd-ava">${_cIni(r.name)}</div>
+      <div class="cd-n">${r.name}</div>
+      <div class="cd-r"><span class="ca-dot${r.online ? ' on' : ''}"></span>${
+        r.role ? r.role + ' · ' : ''}${_caГде(r)}</div>
+    </div>
+    <div class="cd-acts">
+      <button class="cd-b call" onclick="caSheet(null);callDial('${key}')">${ICO_PHONE}Позвонить</button>
+      <button class="cd-b vid" onclick="caSheet(null);callVideo('${key}')">${ICO_VID}Видео</button>
+    </div>
+    <button class="cd-favrow" onclick="cardFav('${key}')">
+      <span>В избранных</span>
+      <span class="fav-ck${fav ? ' on' : ''}">${ICO_CHECK}</span>
+    </button>
+    <div class="ca-sec">История</div>
+    <div class="cd-hist">${ист.length ? ист.map(x => `<div class="cd-h${
+        x.missed ? ' missed' : ''}">${_dirIco(x)}<span class="t">${_cWhen(x.at)}</span><span class="d">${
+        x.missed ? 'пропущен' : x.talk ? _cMm(x.talk) : ''}</span></div>`).join('')
+      : '<div class="ca-empty" style="padding:22px 0">Ещё не созванивались</div>'}</div>`;
+}
+
+function cardFav(key){
+  callFavToggle(key);   // сохраняет и перерисовывает страницу за шторкой
+  cardPaint(key);
   _hap('light');
 }
 function _caMatch(n){ return !CALL_Q_TXT || n.toLowerCase().includes(CALL_Q_TXT.toLowerCase()); }
@@ -21514,40 +21715,66 @@ function caFavRow(){
   const rows = ((CALL && CALL.roster) || []).filter(r => fav.indexOf(r.key) >= 0);
   return `<div class="ca-cap">Избранные</div>
     <div class="ca-favs">
-      <button class="ca-fav ca-fav-add" onclick="favSheet(true)">
+      <button class="ca-fav ca-fav-add" onclick="favOpen()">
         <span class="ca-fav-c">${rows.length ? ICO_PEN : '+'}</span>
         <span class="ca-fav-n">${rows.length ? 'Изменить' : 'Добавить'}</span>
       </button>
-      ${rows.map(r => `<button class="ca-fav" onclick="callDial('${r.key}')">
+      ${rows.map(r => `<button class="ca-fav" data-key="${r.key}">
         <span class="ca-fav-c">${_cIni(r.name)}</span>
         <span class="ca-fav-n">${r.name}</span></button>`).join('')}
-    </div>`;
+    </div>${rows.length ? '<div class="ca-hint">Долгое нажатие — звонок с камерой</div>' : ''}`;
+}
+
+// День строкой-заголовком, а не словом «сегодня» в каждой строке: одно и то же
+// слово, повторённое десять раз подряд, читать невозможно — глаз его просто
+// перестаёт видеть, а вместе с ним и время.
+function _caДень(iso){
+  const d = new Date(iso), now = new Date();
+  if(isNaN(d)) return '';
+  if(d.toDateString() === now.toDateString()) return 'Сегодня';
+  const y = new Date(now); y.setDate(y.getDate() - 1);
+  if(d.toDateString() === y.toDateString()) return 'Вчера';
+  const дн = _CDOW[d.getDay()];
+  return дн + ' ' + d.getDate() + '.' + String(d.getMonth() + 1).padStart(2, '0');
+}
+function _caЧас(iso){
+  const d = new Date(iso);
+  return isNaN(d) ? '' : String(d.getHours()).padStart(2, '0') + ':' +
+    String(d.getMinutes()).padStart(2, '0');
 }
 
 function caCalls(){
   const rec = callGroup((CALL && CALL.recent) || []).filter(r => _caMatch(r.who));
   const shown = CALL_TAB === 'missed' ? rec.filter(r => r.missed) : rec;
+  const проп = rec.filter(r => r.missed).length;
   callMarkSeen(); setTimeout(callBadge, 0);
   let h = `<div class="ca-h1">Звонки</div>` + CA_SEARCH + caWarm();
   if(CALL_TAB === 'all' && !CALL_Q_TXT) h += caFavRow();
   h += `<div class="ca-seg">
       <button class="${CALL_TAB === 'all' ? 'on' : ''}" onclick="callTab('all')">Все</button>
-      <button class="${CALL_TAB === 'missed' ? 'on' : ''}" onclick="callTab('missed')">Пропущенные</button>
+      <button class="${CALL_TAB === 'missed' ? 'on' : ''}" onclick="callTab('missed')">Пропущенные${
+        проп ? '<span class="n">' + проп + '</span>' : ''}</button>
     </div>`;
   if(!shown.length){
     return h + `<div class="ca-empty">${CALL_TAB === 'missed' ? 'Пропущенных нет'
       : CALL_Q_TXT ? 'Ничего не найдено' : 'Звонков ещё не было'}</div>`;
   }
-  return h + shown.map(r => `<div class="ca-row${r.missed ? ' missed' : ''}">
+  let день = '';
+  shown.forEach(r => {
+    const д = _caДень(r.at);
+    if(д !== день){ день = д; h += `<div class="ca-sec">${д}</div>`; }
+    h += `<div class="ca-row${r.missed ? ' missed' : ''}">
       <div class="ca-ava">${_cIni(r.who)}</div>
-      <div class="ca-rb" onclick="callDial('${r.key}')">
+      <div class="ca-rb" onclick="cardOpen('${r.key}')">
         <div class="ca-rn">${r.who}${r.n > 1 ? ' <span style="color:var(--muted);font-weight:400">(' + r.n + ')</span>' : ''}</div>
-        <div class="ca-rs">${_dirIco(r)}<span>${_cWhen(r.at)}</span>${
+        <div class="ca-rs">${_dirIco(r)}<span>${_caЧас(r.at)}</span>${
           r.talk ? '<span>· ' + _cMm(r.talk) + '</span>' : ''}</div>
       </div>
       <div class="ca-vid" onclick="callVideo('${r.key}')">${ICO_VID}</div>
       <div class="ca-go" onclick="callDial('${r.key}')">${ICO_PHONE}</div>
-    </div>`).join('');
+    </div>`;
+  });
+  return h;
 }
 
 function caContacts(){
@@ -21557,11 +21784,9 @@ function caContacts(){
   if(!rows.length) return h + `<div class="ca-empty">${CALL_Q_TXT ? 'Ничего не найдено' : 'Список пуст'}</div>`;
   const person = r => `<div class="ca-row">
       <div class="ca-ava">${_cIni(r.name)}</div>
-      <div class="ca-rb" onclick="callDial('${r.key}')">
+      <div class="ca-rb" onclick="cardOpen('${r.key}')">
         <div class="ca-rn">${r.name}</div>
-        <div class="ca-rs"><span class="ca-dot${r.online ? ' on' : ''}"></span>
-          ${r.online ? 'в приложении'
-            : /^(drv|star):/.test(r.key) ? 'позвоним в телеграм' : 'не в сети'}</div>
+        <div class="ca-rs"><span class="ca-dot${r.online ? ' on' : ''}"></span>${_caГде(r)}</div>
       </div>
       <div class="ca-vid" onclick="callVideo('${r.key}')">${ICO_VID}</div>
       <div class="ca-go" onclick="callDial('${r.key}')">${ICO_PHONE}</div>
@@ -21671,6 +21896,7 @@ function _callPaint(){
       inp.oninput = () => { CALL_Q_TXT = inp.value; callPaint();
         const n = _cq('caQ'); if(n){ n.focus(); n.setSelectionRange(n.value.length, n.value.length); } };
     }
+    caWire();
     return;
   }
   if(nav) nav.style.display = 'none';

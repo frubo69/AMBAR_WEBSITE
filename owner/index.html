@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=57"></script>
+<script src="/vendor/ambar-call.js?v=58"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -5851,19 +5851,13 @@ button.pill:active{opacity:.6}
       </div>
 
 
-<div class="call-bar" id="callBar">
+<div class="call-bar" id="callBar" onclick="callOpen()">
   <span class="call-bar-av" id="callBarAv">—</span>
   <div class="call-bar-b">
     <div class="call-bar-n" id="callBarN">—</div>
     <div class="call-bar-s" id="callBarS">00:00</div>
   </div>
-  <button class="call-bar-btn" id="callBarMute" onclick="callMute()" aria-label="Микрофон"><svg
-    viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9"
-    stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/><path d="M19 11a7 7 0 0 1-14 0M12 18v3"/></svg></button>
-  <button class="call-bar-btn drop" onclick="callHangup()" aria-label="Завершить"><svg
-    viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
-    stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
-  <span class="call-bar-w" id="callBarW"><svg viewBox="0 0 240 14" preserveAspectRatio="none"><path d="M0 7 Q 5 1.6 10 7 T 20 7 T 30 7 T 40 7 T 50 7 T 60 7 T 70 7 T 80 7 T 90 7 T 100 7 T 110 7 T 120 7 T 130 7 T 140 7 T 150 7 T 160 7 T 170 7 T 180 7 T 190 7 T 200 7 T 210 7 T 220 7 T 230 7 T 240 7"/></svg></span>
+  <span class="call-bar-w" id="callBarW"><svg viewBox="0 0 240 20" preserveAspectRatio="none"><path class="w1" d="M0 10 Q 15 2 30 10 T 60 10 T 90 10 T 120 10 T 150 10 T 180 10 T 210 10 T 240 10 V20 H0 Z"/><path class="w2" d="M0 12 Q 20 5 40 12 T 80 12 T 120 12 T 160 12 T 200 12 T 240 12 V20 H0 Z"/></svg></span>
 </div>
 
 <style>
@@ -6314,24 +6308,38 @@ button.pill:active{opacity:.6}
 .call-bar{position:fixed;left:16px;bottom:calc(88px + var(--safe-bottom));z-index:150;display:none;
   align-items:center;gap:11px;padding:9px 11px;border-radius:15px;background:var(--card);
   border:1px solid var(--border2);box-shadow:0 12px 40px rgba(0,0,0,.55)}
-/* Шторка звонка. Пока не ответили — серая, в разговоре зелёная. По нижнему
-   краю идёт волна: её высота бежит за громкостью — своей и собеседника, что
-   громче. Волна нарисована один раз и только тянется по высоте, а плывёт
-   сдвигом, поэтому обе части движения лежат на видеокарте, а не считаются
-   заново. Уровень приходит скачками, поэтому он сглажен: дёргающаяся волна
-   выглядела бы тревожно, а она должна быть незаметной. */
-/* Положение у шторки своё в каждом приложении — здесь его не трогаем, иначе
-   она выпадает из своего слоя. Добавляем только обрезку под волну и цвет. */
-.call-bar{overflow:hidden;color:rgba(255,255,255,.5);
-  transition:background .3s ease,border-color .3s ease,color .3s ease}
-.call-bar.live{color:var(--up)}
-.call-bar-w{position:absolute;left:0;right:0;bottom:0;height:14px;
-  pointer-events:none;opacity:.8}
-.call-bar-w svg{position:absolute;left:0;bottom:0;width:200%;height:100%;
-  animation:barDrift 6s linear infinite}
-.call-bar-w path{fill:none;stroke:currentColor;stroke-width:1.5;
-  vector-effect:non-scaling-stroke;transform-origin:50% 50%;
-  transform:scaleY(var(--amp,.16));transition:transform .13s ease}
+/* Шторка звонка — сверху, во всю ширину, без единой кнопки: на неё просто
+   нажимают и возвращаются в звонок. Пока не ответили, она серая; ответили —
+   зелёная. Понизу колышется вода: две залитые волны идут с разной скоростью,
+   от этого движение выглядит живым, а не качанием одной линии. Высота гребня
+   бежит за громкостью — своей и собеседника, что громче.
+
+   Волна нарисована один раз и только тянется по высоте, а плывёт сдвигом:
+   обе части движения лежат на видеокарте. */
+/* Свёрнутый звонок — это одно маленькое окно и ничего больше. Остальные слои
+   разговора рисуются отдельно и сами по себе не уменьшаются, поэтому на время
+   свёрнутости их не должно быть видно вовсе. */
+body.call-mini #callVoice,
+body.call-mini #callOv,
+body.call-mini .cs-safe,
+body.call-mini .cs-safe-scrim{display:none}
+.call-bar{position:fixed;left:0;right:0;top:0;bottom:auto;z-index:150;
+  display:none;align-items:center;gap:10px;border:0;border-radius:0;
+  padding:calc(var(--safe-top) + 7px) 16px 15px;
+  background:rgba(126,126,140,.20);color:rgba(255,255,255,.62);
+  backdrop-filter:blur(20px) saturate(160%);
+  -webkit-backdrop-filter:blur(20px) saturate(160%);
+  box-shadow:0 8px 26px rgba(0,0,0,.30);cursor:pointer;overflow:hidden;
+  transition:background .3s ease,color .3s ease}
+.call-bar.on{display:flex}
+.call-bar.live{background:rgba(56,150,105,.26);color:var(--up,#4CAF7D)}
+.call-bar-w{position:absolute;left:0;right:0;bottom:0;height:20px;
+  pointer-events:none}
+.call-bar-w svg{position:absolute;left:0;bottom:0;width:200%;height:100%}
+.call-bar-w path{fill:currentColor;transform-origin:50% 100%;
+  transform:scaleY(var(--amp,.35));transition:transform .16s ease}
+.call-bar-w .w1{opacity:.5;animation:barDrift 7s linear infinite}
+.call-bar-w .w2{opacity:.28;animation:barDrift 11s linear infinite reverse}
 @keyframes barDrift{to{transform:translateX(-50%)}}
 .call-bar.on{display:flex}
 .call-bar-av{width:34px;height:34px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;
@@ -19997,6 +20005,7 @@ function callEvent(t, d){
     case 'ready': case 'roster': case 'recent': case 'mic':
       callBadge(); callPaint(); return;
     case 'ring':
+      miniOff();
       CALL_ST = 'in'; CALL_WHO = d.peer; CALL_VIDEO = !!d.video; CALL_CAM = !!(CALL && CALL.camLive && CALL.camLive()); CALL_RCAM = false;
       // Видеозвонок — сразу показываем человеку его самого. Наружу ничего не
       // уходит: соединения до ответа нет, картинку видит только он.
@@ -20008,6 +20017,7 @@ function callEvent(t, d){
       // сервер ответит «звоним», и выставленное здесь «выключена» затирало уже
       // включённую камеру — на экране заглушка, а камера горит и уходит
       // собеседнику. Чужая камера до ответа правда неизвестна.
+      miniOff();
       CALL_ST = 'out'; CALL_WHO = d.peer; CALL_VIDEO = !!d.video; CALL_CAM = !!(CALL && CALL.camLive && CALL.camLive()); CALL_RCAM = false;
       _cq('callOv').classList.add('show'); callPaint(); return;
     case 'safety':
@@ -20110,7 +20120,7 @@ function callBadge(){
   e.style.display = n ? 'flex' : 'none';
 }
 
-function callOpen(){ callInit(); _cq('callOv').classList.add('show'); callPaint(); }
+function callOpen(){ callInit(); miniOff(); _cq('callOv').classList.add('show'); callPaint(); }
 function callClose(){ setTimeout(callPaint, 0); _cq('callOv').classList.remove('show'); if(CALL_ST === 'in') CALL && CALL.reject(); }
 function callTab(t){ CALL_TAB = t; callPaint(); }
 function callVideo(key){ callDial(key, true); }
@@ -20399,7 +20409,10 @@ function miniPlace(анимировать){
   const э = document.getElementById('callVid'); if(!э) return;
   const {k, ш, в} = miniSize();
   const W = window.innerWidth || 390, H = window.innerHeight || 800;
-  const верх = MINI_PAD + (parseFloat(getComputedStyle(document.documentElement)
+  // Под шторкой окошку не место: она сверху и во всю ширину.
+  const шт = document.getElementById('callBar') || document.getElementById('callBarWrap');
+  const подШторкой = шт && шт.classList.contains('on') ? шт.getBoundingClientRect().height : 0;
+  const верх = MINI_PAD + подШторкой + (parseFloat(getComputedStyle(document.documentElement)
                 .getPropertyValue('--safe-top')) || 0);
   if(MINI_X === null){ MINI_X = W - ш - MINI_PAD; MINI_Y = верх; }
   MINI_X = Math.max(MINI_PAD, Math.min(MINI_X, W - ш - MINI_PAD));
@@ -20415,18 +20428,33 @@ function miniPlace(анимировать){
   }
 }
 
+// Развернуть без анимации: новый звонок или открытое окно не должны
+// начинаться с окошка в углу, оставшегося от прошлого раза.
+function miniOff(){
+  const э = document.getElementById('callVid');
+  CALL_MINI = false;
+  document.body.classList.remove('call-mini');
+  if(э){ э.classList.remove('mini'); э.style.transform = ''; }
+}
+
 function callMini(свернуть){
   const э = document.getElementById('callVid'); if(!э) return;
   if(!!свернуть === CALL_MINI) return;
   CALL_MINI = !!свернуть;
   _hap('light');
+  document.body.classList.toggle('call-mini', CALL_MINI);
   if(CALL_MINI){
     э.classList.add('mini');
     miniPlace(true);
+    // Окно разговора уходит вместе с ним: свёрнутый звонок не должен
+    // оставлять за собой ни чёрной карточки, ни голосового слоя, ни смайликов
+    // сверки — они рисуются отдельно и сами по себе не уменьшаются.
+    _cq('callOv')?.classList.remove('show');
   }else{
     const было = getComputedStyle(э).transform;
     э.classList.remove('mini');
     э.style.transform = '';
+    _cq('callOv')?.classList.add('show');
     try{ э.animate([{transform: было}, {transform: 'translate(0,0) scale(1)'}],
                    {duration: MINI_MS, easing: MINI_ЛЕГЧЕ}); }catch(e){}
   }
@@ -20493,7 +20521,10 @@ function callSwipe(){
 function miniSnap(){
   const {ш, в} = miniSize();
   const W = window.innerWidth || 390, H = window.innerHeight || 800;
-  const верх = MINI_PAD + (parseFloat(getComputedStyle(document.documentElement)
+  // Под шторкой окошку не место: она сверху и во всю ширину.
+  const шт = document.getElementById('callBar') || document.getElementById('callBarWrap');
+  const подШторкой = шт && шт.classList.contains('on') ? шт.getBoundingClientRect().height : 0;
+  const верх = MINI_PAD + подШторкой + (parseFloat(getComputedStyle(document.documentElement)
                 .getPropertyValue('--safe-top')) || 0);
   MINI_X = (MINI_X + ш / 2) < W / 2 ? MINI_PAD : W - ш - MINI_PAD;
   MINI_Y = (MINI_Y + в / 2) < H / 2 ? верх : H - в - MINI_PAD;

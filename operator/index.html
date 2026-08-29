@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=68"></script>
+<script src="/vendor/ambar-call.js?v=69"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -667,6 +667,9 @@ a.oc-row:active{background:var(--card2)}
 /* Свёрнутый звонок — это одно маленькое окно и ничего больше. Остальные слои
    разговора рисуются отдельно и сами по себе не уменьшаются, поэтому на время
    свёрнутости их не должно быть видно вовсе. */
+/* На время протяжки чёрную подложку окна прячем: за уезжающей карточкой
+   должно быть видно приложение. */
+body.call-drag #callOv{display:none}
 body.call-mini #callVoice,
 body.call-mini #callOv,
 body.call-mini .cs-safe,
@@ -736,9 +739,9 @@ body.call-mini .cs-safe-scrim{display:none}
 @keyframes dotWave{30%{opacity:1;transform:translateY(-2px)}}
 
 /* Связь — полосками, как в телефоне: цифры и слова тут читать некогда. */
-.sig{display:inline-flex;align-items:flex-end;gap:2px;height:13px;margin-left:7px;
-  vertical-align:-2px}
-.sig i{width:3px;border-radius:1px;background:currentColor;opacity:.22;
+.sig{display:inline-flex;align-items:flex-end;gap:2px;height:13px;
+  vertical-align:-2px;color:rgba(255,255,255,.8)}
+.sig i{width:3px;border-radius:1px;background:currentColor;opacity:.34;
   transition:opacity .3s ease,background .3s ease}
 .sig i:nth-child(1){height:4px}
 .sig i:nth-child(2){height:7px}
@@ -5398,6 +5401,8 @@ function callEvent(t, d){
       return;
     case 'cam':
       CALL_CAM = !!d.on;
+      // Включили камеру в голосовом звонке — он тем самым стал видеозвонком.
+      if(d.on) CALL_VIDEO = true;
       if(d.on && d.stream){ const v = document.getElementById('caLoc'); if(v) v.srcObject = d.stream; }
       callPaint(); callVidPaint(); return;
     case 'stream':
@@ -5945,6 +5950,9 @@ function _свайпНа(э){
       if(y - y0 < 12) return false;    // вниз и заметно, иначе это не свайп
       тянем = true; свои = true;
       _hap('light');
+      // Чёрная подложка окна разговора на время протяжки уходит: за уезжающей
+      // карточкой должно быть видно приложение, а не пустой прямоугольник.
+      document.body.classList.add('call-drag');
     }
     // Карточка едет за пальцем и слегка уменьшается — решение принимается на
     // отпускании, а не в первый же миг. Ход с сопротивлением: пальцу видно,
@@ -5970,10 +5978,27 @@ function _свайпНа(э){
     const далеко = СВАЙП_D > (window.innerHeight || 800) * .25;
     const откуда = getComputedStyle(э).transform;
     const радиус = getComputedStyle(э).borderRadius;
+    const H = window.innerHeight || 800;
     э.style.transform = ''; э.style.borderRadius = '';
     СВАЙП_D = 0;
+    if(!далеко) document.body.classList.remove('call-drag');
     if(далеко){
-      if(document.getElementById('callVid')?.classList.contains('on')) callMini(true); else { callClose(); document.body.classList.add('call-mini'); _hap('light'); }
+      if(document.getElementById('callVid')?.classList.contains('on')){ callMini(true); document.body.classList.remove('call-drag'); return; }
+      // Голосовой звонок уезжает вниз и только потом прячется: исчезать на
+      // месте — самое дешёвое и самое некрасивое, что можно тут сделать.
+      _hap('light');
+      try{
+        э.animate([{transform: откуда, borderRadius: радиус, opacity: 1},
+                   {transform: 'translateY(' + H + 'px) scale(.92)',
+                    borderRadius: '26px', opacity: .35}],
+                  {duration: 300, easing: 'cubic-bezier(.4,0,.85,.6)', fill: 'forwards'});
+      }catch(e){}
+      setTimeout(() => {
+        try{ э.getAnimations().forEach(a => a.cancel()); }catch(e){}
+        callClose();
+        document.body.classList.add('call-mini');
+        document.body.classList.remove('call-drag');
+      }, 290);
       return;
     }
     try{

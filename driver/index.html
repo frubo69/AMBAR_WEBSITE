@@ -1283,8 +1283,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .call-scr.video .cs-note.on{display:flex}
 .cs-note-i{flex:none;width:19px;height:19px;display:flex}
 .cs-note-i svg{width:19px;height:19px}
-.cs-note-t{opacity:0;transition:opacity .2s ease}
-.cs-note.wide .cs-note-t{opacity:1}
+/* Текст проступает сам, с задержкой в переходе. Раньше его включал таймер,
+   и любая перерисовка в эти 380 мс таймер сбрасывала — на ноутбуке, где
+   перерисовок больше, строка так и оставалась пустой. */
+.cs-note-t{opacity:0;transition:opacity .18s ease}
+.cs-note.on .cs-note-t{opacity:1;transition:opacity .26s ease .22s}
 
 /* Имя и фонарик — одной строкой сверху. */
 .cs-head{--pillh:42px;position:absolute;top:calc(14px + var(--safe-top));left:14px;z-index:4;
@@ -2515,7 +2518,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=61"></script>
+<script src="/vendor/ambar-call.js?v=62"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -6998,7 +7001,6 @@ function noteMute(текст){
   if(!текст){
     if(!n.classList.contains('on')) return;
     // Складываем по частям и не спеша: текст, потом ширина, потом сама строка.
-    n.classList.remove('wide');
     const полная = n.offsetWidth;
     try{
       n.animate([{width: полная + 'px'}, {width: узкая + 'px'}],
@@ -7027,7 +7029,7 @@ function noteMute(текст){
   }
 
   if(т) т.textContent = текст;
-  n.classList.add('on'); n.classList.remove('wide');
+  n.classList.add('on');
   n.style.opacity = '';
   n.style.width = 'auto';
   const полная = Math.ceil(n.offsetWidth);
@@ -7042,7 +7044,6 @@ function noteMute(текст){
                easing: 'cubic-bezier(.32,.72,0,1)'});
   }catch(e){}
   n.style.width = полная + 'px';
-  noteMute._t = setTimeout(() => n.classList.add('wide'), 380);
 }
 
 // ── фонарик ────────────────────────────────────────────────────────────────

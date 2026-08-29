@@ -68,7 +68,11 @@ html.hid-boot #gameApp *{visibility:visible}
 
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
 html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100%;overflow-x:clip;font-size:14px;line-height:1.4;font-variant-numeric:lining-nums tabular-nums}
-body{padding-bottom:calc(120px + var(--safe-bottom));min-height:100vh;  /* tabbar is ~67px + safe-bottom; +53px clearance so the last card has obvious space above the nav on every phone */
+/* Под нижней панелью ровно столько места, сколько она занимает: сама она 68
+   пикселей плюс домашняя полоса, и ещё восемь сверху. Было сто двадцать — и
+   полсотни пустоты внизу заставляли страницу листаться там, где смотреть уже
+   не на что. Свой зазор до панели каждая страница добавляет сама. */
+body{padding-bottom:calc(76px + var(--safe-bottom));min-height:100vh;
   background:
     radial-gradient(ellipse 120% 60% at 50% -10%, rgba(201,169,110,.05), transparent 60%),
     radial-gradient(ellipse 80% 40% at 100% 10%, rgba(91,141,239,.04), transparent 60%),

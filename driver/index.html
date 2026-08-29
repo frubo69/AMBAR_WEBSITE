@@ -1036,7 +1036,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   background:var(--up);border:2px solid var(--bg2);display:none}
 .hdr-call.on .hdr-call-dot{display:block}
 
-.call-scr{position:fixed;inset:0;z-index:120;display:none;flex-direction:column;
+/* Пока экран едет за пальцем, углы у него скруглены — но их закрывало само
+   видео: оно лежит отдельным слоем во весь экран и рисует свои, прямые.
+   Обрезаем содержимое по форме экрана; в свёрнутом окошке так и было. */
+.call-scr{position:fixed;inset:0;z-index:120;display:none;flex-direction:column;overflow:hidden;
   background:linear-gradient(180deg,#0B0B18,#000006)}
 /* Фон — мягкий градиент, как под выключенной камерой: пустой чёрный экран
    выглядит сломанным, а не спокойным. */

@@ -6061,7 +6061,7 @@ button.pill:active{opacity:.6}
   opacity:0;visibility:hidden;transition:opacity .34s ease,visibility 0s .34s}
 .cs-safe-scrim.on{opacity:1;visibility:visible;transition-delay:0s}
 
-.cvo{position:fixed;inset:0;z-index:399;display:none;flex-direction:column;text-align:center;
+.cvo{position:fixed;inset:0;z-index:399;display:none;flex-direction:column;text-align:center;overflow:hidden;
   background:var(--bg2)}
 /* Фон — мягкий градиент, как под выключенной камерой: пустой чёрный экран
    выглядит сломанным, а не спокойным. */
@@ -6110,7 +6110,10 @@ button.pill:active{opacity:.6}
 /* ── Видеозвонок в панели: та же раскладка FaceTime ──────────────────────────
    Слой накрывает приложение целиком: собеседник фоном, своя камера окном,
    имя плашкой слева сверху, кнопки столбцом справа. */
-.cv{position:fixed;inset:0;z-index:400;display:none;background:#05050c}
+/* Пока экран едет за пальцем, углы у него скруглены — но их закрывало само
+   видео: оно лежит отдельным слоем во весь экран и рисует свои, прямые.
+   Обрезаем содержимое по форме экрана; в свёрнутом окошке так и было. */
+.cv{position:fixed;inset:0;z-index:400;display:none;background:#05050c;overflow:hidden}
 .cv.on{display:block}
 /* Поверх окон: у полноэкранного окна свой слой, и без явного номера
    плашка с кнопками уходила под него. */

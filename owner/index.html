@@ -2526,8 +2526,11 @@ button.path:active{transform:scale(.995)}
    стеклом поверх кадра, а не полосой над ним. */
 .stk-ov.scan-live{background:#000}
 .stk-ov.scan-live .stk-top{position:absolute;top:0;left:0;right:0;z-index:5;
-  border-bottom:0;padding-bottom:26px;
-  background:linear-gradient(180deg,rgba(0,0,4,.78) 0%,rgba(0,0,4,.40) 58%,transparent 100%)}
+  border-bottom:0;padding-bottom:20px;background:none}
+/* Название читается прямо по кадру — на тени, а не на полосе: полоса съедала
+   верх экрана, ради которого камеру и разворачивали во весь рост. */
+.stk-ov.scan-live .stk-ttl-t,
+.stk-ov.scan-live .stk-ttl-s{text-shadow:0 1px 10px rgba(0,0,4,.9),0 1px 3px rgba(0,0,4,.8)}
 .stk-ov.scan-live .stk-x{color:#fff;background:rgba(255,255,255,.10);
   border-color:rgba(255,255,255,.14);
   backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
@@ -2549,23 +2552,11 @@ button.path:active{transform:scale(.995)}
 /* Рамка стоит выше середины: под ней стекло со списком, и по центру экрана
    она смотрела бы человеку в панель, а не в бутылку. */
 .scan-frame{position:absolute;top:38%;left:50%;transform:translate(-50%,-50%);
-  width:min(70vw,300px);aspect-ratio:1;border-radius:16px;pointer-events:none;
-  transition:box-shadow .18s var(--e1),background .18s var(--e1)}
-/* Пока код обведён по-настоящему, углы-подсказка уходят: две рамки на экране
-   спорят, какая из них главная. Подпись остаётся — она про найденный код. */
-.scan-frame.away .c{opacity:0}
-/* Обводка найденного кода. Читает распознавание, рисуем ровно то, что оно
-   нашло: видно, какую именно крышку засчитали, и промах по соседней бутылке
-   больше не выглядит как «не сработало». */
-.scan-track{position:absolute;inset:0;z-index:3;pointer-events:none;
-  opacity:0;transition:opacity .16s var(--e1)}
-.scan-track.on{opacity:1}
-.scan-track polygon{fill:rgba(255,255,255,.10);stroke:#fff;stroke-width:2.5;
-  stroke-linejoin:round;vector-effect:non-scaling-stroke}
-.scan-frame.ok ~ .scan-track polygon{fill:rgba(76,175,125,.18);stroke:#4CAF7D}
-.scan-frame.dup ~ .scan-track polygon,
-.scan-frame.again ~ .scan-track polygon,
-.scan-frame.err ~ .scan-track polygon{fill:rgba(224,85,85,.18);stroke:#E05555}
+  width:min(70vw,300px);aspect-ratio:1;pointer-events:none}
+/* Найден код — рамка едет на него и обнимает его углами. Стороны у неё
+   произвольные: код в кадре редко квадратный. */
+.scan-frame.lock{transform:none;aspect-ratio:auto;
+  transition:left .1s linear,top .1s linear,width .1s linear,height .1s linear}
 .scan-frame .c{position:absolute;width:26px;height:26px;border:3px solid rgba(255,255,255,.9);
   transition:border-color .18s var(--e1),opacity .2s var(--e1)}
 .scan-frame .tl{top:-2px;left:-2px;border-right:none;border-bottom:none;border-radius:14px 0 0 0}
@@ -2580,10 +2571,8 @@ button.path:active{transform:scale(.995)}
   font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;
   white-space:nowrap;opacity:0;transition:opacity .16s var(--e1);
   text-shadow:0 1px 6px rgba(0,0,0,.9)}
-.scan-frame.ok    {background:rgba(76,175,125,.07);box-shadow:0 0 0 1px rgba(76,175,125,.4) inset}
-.scan-frame.dup,
-.scan-frame.again {background:rgba(224,85,85,.08);box-shadow:0 0 0 1px rgba(224,85,85,.45) inset}
-.scan-frame.err   {background:rgba(224,85,85,.08);box-shadow:0 0 0 1px rgba(224,85,85,.45) inset}
+/* Ни заливки, ни рамки по периметру: зелёным становятся сами углы. Пятно во
+   весь квадрат закрывало код, ради которого человек и наводил камеру. */
 .scan-frame.ok .c {border-color:#4CAF7D}
 .scan-frame.dup .c,.scan-frame.again .c,.scan-frame.err .c{border-color:var(--dn)}
 .scan-frame.ok .scan-badge {opacity:1;color:#6FD79E}
@@ -10308,10 +10297,7 @@ async function stkScan(){
       <video id="qrVideo" playsinline muted autoplay></video>
       <div class="scan-mask"></div>
       <div class="scan-bar">
-        <div class="scan-bar-l">
-          <div class="scan-prod">Ревизия · весь район</div>
-          <div class="scan-dist" id="audPos">позиций закрыто 0</div>
-        </div>
+        <div class="scan-bar-l"><div class="scan-dist" id="audPos">позиций закрыто 0</div></div>
         <button class="scan-torch" id="qrTorch" onclick="qrTorch(this)" style="display:none">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
             stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -10322,7 +10308,6 @@ async function stkScan(){
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
         <div class="scan-badge" id="qrBadge"></div>
       </div>
-      <svg class="scan-track" viewBox="0 0 100 100" preserveAspectRatio="none"><polygon points=""/></svg>
     </div>
     <div class="scan-sheet">
       <div class="scan-foot">
@@ -12302,21 +12287,27 @@ const SFX = {
 //     из-за камеры, а из-за того, что кадр не досчитан;
 //   • сеть моргает. Скан, не дошедший до сервера, должен уйти позже, а не
 //     пропасть: бутылку в руках уже отложили как посчитанную.
-// Обводка найденного кода. Элемент на экране один — тот, что сейчас виден;
-// искать его по имени экрана незачем, сканер всегда работает в одиночку.
+// Рамка садится на найденный код: те же четыре угла, только теперь они
+// огибают саму крышку, а не висят посреди экрана. Отдельной заливки нет —
+// зелёным становятся углы, и видно, какую именно бутылку засчитали.
 function scanTrack(четыре){
-  const т = document.querySelector('.scan-cam .scan-track');
-  if(!т) return;
-  const рамка = т.parentElement.querySelector('.scan-frame');
+  const ф = document.querySelector('.scan-cam .scan-frame');
+  if(!ф) return;
   if(!четыре){
-    т.classList.remove('on');
-    if(рамка) рамка.classList.remove('away');
+    ф.classList.remove('lock');
+    ф.style.left = ''; ф.style.top = ''; ф.style.width = ''; ф.style.height = '';
     return;
   }
-  т.firstElementChild.setAttribute('points',
-    четыре.map(t => t[0].toFixed(2) + ',' + t[1].toFixed(2)).join(' '));
-  т.classList.add('on');
-  if(рамка) рамка.classList.add('away');
+  const x = четыре.map(t => t[0]), y = четыре.map(t => t[1]);
+  const l = Math.min.apply(null, x), r = Math.max.apply(null, x);
+  const t = Math.min.apply(null, y), b = Math.max.apply(null, y);
+  // Небольшой запас: углы должны обнимать код, а не резать его по краю.
+  const зx = (r - l) * .08, зy = (b - t) * .08;
+  ф.classList.add('lock');
+  ф.style.left   = Math.max(0, l - зx).toFixed(2) + '%';
+  ф.style.top    = Math.max(0, t - зy).toFixed(2) + '%';
+  ф.style.width  = Math.min(100, (r - l) + зx * 2).toFixed(2) + '%';
+  ф.style.height = Math.min(100, (b - t) + зy * 2).toFixed(2) + '%';
 }
 
 // Экран сканера занимает всё: камера во весь экран, шапка раздела стеклом
@@ -12363,7 +12354,7 @@ const SCAN = {
   },
 
   async start(videoEl, onCode, onIdle, onRepeat, onHold){
-    this.stop();
+    this.stop(true);          // свой же перезапуск, экран остаётся сканером
     this.video = videoEl; this.onCode = onCode; this.onIdle = onIdle;
     this.onRepeat = onRepeat; this.onHold = onHold;
     this.seen = new Set(); this.seenAt = new Map();
@@ -12396,11 +12387,15 @@ const SCAN = {
     return true;
   },
 
-  stop(){
+  // Своим перезапуском (start зовёт stop первым делом) экран сканера не
+  // кончается — иначе камера включалась и в ту же секунду переставала быть
+  // полноэкранной, а шапка возвращала себе полосу.
+  stop(свой){
     if(this.raf){ cancelAnimationFrame(this.raf); this.raf = null; }
     if(this.stream){ this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
     if(this.video) this.video.srcObject = null;
     scanTrack(null);
+    if(свой) return;
     // Сканер ушёл — раздел снова обычный экран со своей шапкой и фоном.
     document.querySelectorAll('.stk-ov.scan-live')
       .forEach(o => o.classList.remove('scan-live'));
@@ -12822,10 +12817,9 @@ function qrScreen(){
       <div class="scan-mask"></div>
 
       <div class="scan-bar">
-        <div class="scan-bar-l">
-          <div class="scan-prod">${escS(QR_PROD.name)}</div>
-          <div class="scan-dist">${escS(d.code || '')} ${escS(d.name || '')}</div>
-        </div>
+        <!-- Название товара и точка стоят в шапке экрана; второй раз поверх
+             кадра они только закрывают бутылку. -->
+        <div class="scan-bar-l"></div>
         <button class="scan-torch" id="qrSound" onclick="qrSound(this)">
           <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
             stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -12843,7 +12837,6 @@ function qrScreen(){
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
         <div class="scan-badge" id="qrBadge"></div>
       </div>
-      <svg class="scan-track" viewBox="0 0 100 100" preserveAspectRatio="none"><polygon points=""/></svg>
     </div>
 
     <div class="scan-sheet">
@@ -17585,7 +17578,6 @@ function chkScreen(){
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
         <div class="scan-badge" id="chkBadge"></div>
       </div>
-      <svg class="scan-track" viewBox="0 0 100 100" preserveAspectRatio="none"><polygon points=""/></svg>
       <!-- Отказ камеры — это не подпись под кадром, а состояние всего экрана:
            без камеры проверять нечем. Поэтому он закрывает кадр целиком и
            говорит, что делать. -->

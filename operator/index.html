@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=55"></script>
+<script src="/vendor/ambar-call.js?v=56"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -6000,13 +6000,16 @@ function lampDrag(){
   const сзади = () => !!(CALL && CALL.facing === 'environment');
   const начало = y => {
     кн._ptr = true;
-    if(сзади()) return;                       // у вспышки яркости нет
     y0 = y; было = CALL_LAMP_LVL; поехали = false;
-    lampDial(true);        // палец лёг — линейка выехала, ещё до движения
+    // У вспышки яркости нет — значит нет и линейки. Но само нажатие обязано
+    // дойти: раньше здесь стоял выход, и на задней камере кнопка не делала
+    // вообще ничего — ни света, ни честного отказа.
+    if(!сзади()) lampDial(true);
   };
   const ход = y => {
     if(y0 === null) return;
     const d = y0 - y;
+    if(сзади()) return;                       // яркость есть только у экрана
     if(!поехали){
       if(Math.abs(d) < 8) return;             // это ещё нажатие, а не движение
       поехали = true;
@@ -6200,7 +6203,10 @@ function callHangup(){ if(!CALL) return; _hap('medium'); CALL.hangup(); }
 function callWarm(){ callInit(); if(CALL) CALL.warmMic().then(callPaint).catch(()=>{}); }
 function callMute(){
   if(!CALL) return;
-  _callMuted = CALL.mute(!_callMuted);
+  // Состояние меняем даже если отправить весть собеседнику не вышло: связь
+  // может моргнуть, а кнопка обязана отзываться всегда.
+  try{ _callMuted = CALL.mute(!_callMuted); }
+  catch(e){ _callMuted = !_callMuted; console.warn('[call] микрофон:', e); }
   _hap('light');
   $('callBarMute')?.classList.toggle('on', _callMuted);
   // Точечно, без пересборки экрана: callPaint() перебирает всю разметку

@@ -306,6 +306,8 @@
       e.ver = (w && w.version) || '';
       e.rot = !!(w && typeof w.lockOrientation === 'function');
       e.torch = this.torchOk ? this.torchOk() : false;
+      e.facing = this.facing || '';
+      e.lamp = !!this._flipping;
     } catch (err) {}
     return e;
   };

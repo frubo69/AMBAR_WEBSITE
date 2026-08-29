@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=69"></script>
+<script src="/vendor/ambar-call.js?v=70"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -706,8 +706,21 @@ body.call-mini .cs-safe-scrim{display:none}
 .cvo-hero .hero-top{position:absolute;left:76px;right:76px;
   top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 12px);
   display:flex;flex-direction:column;align-items:center;gap:4px;z-index:5}
+/* В разговоре полосу занимают смайлики сверки. Полоски связи встают справа
+   от них — отступ считается от ширины самой плашки, — а время сразу под
+   ними. Когда карточку сверки разворачивают, оба уходят: развёрнутая карточка
+   занимает всё место, и спорить с ней им незачем. */
 .cvo-hero.live .hero-top{position:static;left:auto;right:auto;top:auto;
-  margin-top:10px;z-index:auto}
+  margin-top:10px;z-index:auto;display:contents}
+.cvo-hero.live .call-q{position:absolute;z-index:6;
+  top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 16px);
+  left:calc(50% + var(--cs-pill-w,116px) / 2 + 10px);
+  transition:opacity .22s ease}
+.cvo-hero.live .cvo-state{position:absolute;left:0;right:0;z-index:5;margin:0;
+  top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 48px);
+  transition:opacity .22s ease}
+body.safe-open .cvo-hero.live .call-q,
+body.safe-open .cvo-hero.live .cvo-state{opacity:0}
 .cvo-hero.live .hero-mid{position:static;transform:none;margin:0}
 .cvo-hero.live{justify-content:center}
 /* Порядок в разговоре: имя, под ним состояние. В разметке они наоборот —
@@ -5546,6 +5559,7 @@ function safePaint(){
     // сразу, оставив затемнение висеть поверх приложения.
     SAFE_ПОКАЗАНЫ = null;
     b.classList.remove('open');
+    document.body.classList.remove('safe-open');
     document.getElementById('csSafeScrim')?.classList.remove('on');
   }
 }
@@ -5631,7 +5645,10 @@ function safeMeasure(){
   if(!big.offsetWidth) return;
   // offsetWidth — ширина до уменьшения, потому и годится: плашка это тот же
   // ряд смайликов, ужатый до 0.4 (см. .cs-safe-big), плюс поля по краям.
-  b.style.setProperty('--cs-pill-w', Math.round(big.offsetWidth * .4 + 24) + 'px');
+  const ширина = Math.round(big.offsetWidth * .4 + 24) + 'px';
+  b.style.setProperty('--cs-pill-w', ширина);
+  // Ту же меру кладём на корень: по ней полоски связи встают справа от плашки.
+  document.documentElement.style.setProperty('--cs-pill-w', ширина);
   // 20 сверху + 52 ряд смайликов + 15 отступ + текст + 21 снизу.
   b.style.setProperty('--cs-card-h', (20 + 52 + 15 + txt.offsetHeight + 21) + 'px');
 }
@@ -5650,6 +5667,9 @@ function safeToggle(открыть){
   if(надо === b.classList.contains('open')) return;
   safeMeasure();          // на случай, если при отрисовке мерить было нечего
   b.classList.toggle('open', надо);
+  // По этой отметке прячутся соседи по полосе: развёрнутая карточка занимает
+  // всё место, и полоски со временем ей мешать не должны.
+  document.body.classList.toggle('safe-open', надо);
   document.getElementById('csSafeScrim')?.classList.toggle('on', надо);
 }
 

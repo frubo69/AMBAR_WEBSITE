@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=62"></script>
+<script src="/vendor/ambar-call.js?v=63"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -1067,6 +1067,9 @@ body.call-mini .cs-safe-scrim{display:none}
    перерисовок больше, строка так и оставалась пустой. */
 .cv-note-t{opacity:0;transition:opacity .18s ease}
 .cv-note.on .cv-note-t{opacity:1;transition:opacity .26s ease .22s}
+/* На уходе текст гаснет первым и сразу: пока он виден, сужающаяся строка
+   режет его по букве — на широком экране это особенно заметно. */
+.cv-note.uh .cv-note-t{opacity:0;transition:opacity .14s ease}
 
 /* Имя и фонарик — одной строкой сверху. */
 .cv-head{--pillh:42px;position:absolute;top:calc(14px + var(--safe-top));left:14px;z-index:7;
@@ -1119,8 +1122,9 @@ body.call-mini .cs-safe-scrim{display:none}
    выглядеть они должны как задумано. */
 .cv.mini{--mk:.28;transform-origin:0 0;cursor:pointer;touch-action:none;
   overflow:hidden;border-radius:calc(22px / var(--mk));
-  box-shadow:0 calc(14px / var(--mk)) calc(40px / var(--mk)) rgba(0,0,0,.55),
-             inset 0 0 0 calc(1px / var(--mk)) rgba(255,255,255,.12)}
+  /* Рамки нет намеренно: её толщину пришлось бы делить на масштаб, и на
+     краях она выходит рваной. Форму держит одна тень. */
+  box-shadow:0 calc(14px / var(--mk)) calc(40px / var(--mk)) rgba(0,0,0,.55)}
 .cv.mini .cv-bar,
 .cv.mini .cv-head,
 .cv.mini .cv-note,
@@ -1134,7 +1138,7 @@ body.call-mini .cs-safe-scrim{display:none}
 
      Ширину ведут переменные: их ставит линейка яркости. Первая ступень —
      самая узкая, та, что не достаёт до плашки с именем. */
-  --w:26px; --b:58px; --a:.5;
+  --w:38px; --b:70px; --a:.54;
   box-shadow:inset 0 0 var(--b) var(--w) #fff4e2,
              inset 0 0 96px 0 rgba(255,244,226,var(--a));
   transition:opacity .3s ease,box-shadow .16s ease}
@@ -1145,10 +1149,16 @@ body.call-mini .cs-safe-scrim{display:none}
 .cv-lamp .cvray{stroke-dasharray:14;stroke-dashoffset:14;opacity:0;
   transition:stroke-dashoffset .28s cubic-bezier(.32,.72,0,1),opacity .1s ease}
 .cv-lamp.on .cvray{stroke-dashoffset:0;opacity:1}
-/* Пока камера поворачивается, кадр замирает — так и должно быть. Показываем
-   это размытием, чтобы замерший кадр читался как задумка, а не как подвисание. */
-..cv-slot.flipping video{filter:blur(9px) saturate(1.06);transform:scale(1.06)}
-..cv-slot video{transition:filter .22s ease,transform .22s ease}
+/* Пока камера поворачивается, показываем снятый последний кадр, а не само
+   видео: дорожки в этот миг уже нет, и на её месте проступает фон окна —
+   тот самый синий проблеск. Кадр замирает по-настоящему и слегка размывается,
+   чтобы пауза читалась как задумка. */
+.cv-freeze{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;
+  display:none;z-index:2;transform:scaleX(-1);
+  filter:blur(9px) saturate(1.06);transform-origin:50% 50%}
+.cv-slot.flipping .cv-freeze{display:block}
+.cv-slot.flipping video{visibility:hidden}
+.cv-slot video{transition:filter .22s ease,transform .22s ease}
 .cv.cam-on .cv-flip,.cv.cam-on .cv-lamp{display:flex}
 
 
@@ -2315,15 +2325,14 @@ body.call-mini .cs-safe-scrim{display:none}
   <div class="cv-off">
     <div class="cv-off-av" id="cvOffRemA">—</div>
     <div class="cv-off-n" id="cvOffRemN">—</div>
-    <div class="cv-off-s">Камера выключена</div>
   </div>
 </div>
 <div class="cv-slot" id="cvSlotLoc">
   <video id="caLoc" playsinline autoplay muted></video>
+  <canvas class="cv-freeze"></canvas>
   <div class="cv-off">
     <div class="cv-off-av" id="cvOffLocA">—</div>
     <div class="cv-off-n" id="cvOffLocN">—</div>
-    <div class="cv-off-s">Камера выключена</div>
   </div>
 </div>
 <!-- Имя и фонарик рядом: свет нужен под рукой, но в нижнем ряду ему не место —
@@ -5688,7 +5697,7 @@ function miniSize(){
   return {k, ш: Math.round((window.innerWidth || 390) * k),
              в: Math.round((window.innerHeight || 800) * k)};
 }
-function miniPlace(анимировать){
+function miniPlace(анимировать, было){
   const э = document.getElementById('callVid'); if(!э) return;
   const {k, ш, в} = miniSize();
   const W = window.innerWidth || 390, H = window.innerHeight || 800;
@@ -5701,13 +5710,18 @@ function miniPlace(анимировать){
   MINI_X = Math.max(MINI_PAD, Math.min(MINI_X, W - ш - MINI_PAD));
   MINI_Y = Math.max(верх, Math.min(MINI_Y, H - в - MINI_PAD));
   э.style.setProperty('--mk', k);
-  const было = getComputedStyle(э).transform;
+  const откуда = было || {т: getComputedStyle(э).transform,
+                          r: getComputedStyle(э).borderRadius};
   const стало = 'translate(' + MINI_X + 'px,' + MINI_Y + 'px) scale(' + k + ')';
   э.style.transform = стало;
   if(анимировать){
-    try{ э.animate([{transform: было === 'none' ? 'translate(0,0) scale(1)' : было},
-                    {transform: стало}],
-                   {duration: MINI_MS, easing: MINI_ЛЕГЧЕ}); }catch(e){}
+    const r2 = getComputedStyle(э).borderRadius;
+    try{
+      э.animate([{transform: откуда.т === 'none' ? 'translate(0,0) scale(1)' : откуда.т,
+                  borderRadius: откуда.r},
+                 {transform: стало, borderRadius: r2}],
+                {duration: MINI_MS, easing: 'cubic-bezier(.3,.72,.15,1)'});
+    }catch(e){}
   }
 }
 
@@ -5725,21 +5739,32 @@ function callMini(свернуть){
   if(!!свернуть === CALL_MINI) return;
   CALL_MINI = !!свернуть;
   _hap('light');
+  // Снимок «откуда»: скругление меняется вместе с размером, и без него угол
+  // щёлкал в начале движения — самое заметное место всей анимации.
+  const было = {т: getComputedStyle(э).transform, r: getComputedStyle(э).borderRadius};
   document.body.classList.toggle('call-mini', CALL_MINI);
   if(CALL_MINI){
     э.classList.add('mini');
-    miniPlace(true);
+    miniPlace(true, было);
     // Окно разговора уходит вместе с ним: свёрнутый звонок не должен
     // оставлять за собой ни чёрной карточки, ни голосового слоя, ни смайликов
     // сверки — они рисуются отдельно и сами по себе не уменьшаются.
     $('callOv')?.classList.remove('show');
   }else{
-    const было = getComputedStyle(э).transform;
     э.classList.remove('mini');
     э.style.transform = '';
     showOv('callOv');
-    try{ э.animate([{transform: было}, {transform: 'translate(0,0) scale(1)'}],
-                   {duration: MINI_MS, easing: MINI_ЛЕГЧЕ}); }catch(e){}
+    const стало = getComputedStyle(э).borderRadius;
+    // Разворот с крошечным перелётом: экран будто выдыхает на месте. Без него
+    // движение упирается в край и кажется рубленым.
+    try{
+      э.animate([
+        {transform: было.т, borderRadius: было.r, easing: 'cubic-bezier(.22,.7,.2,1)'},
+        {transform: 'translate(0,0) scale(1.012)', borderRadius: стало, offset: .72,
+         easing: 'cubic-bezier(.35,0,.25,1)'},
+        {transform: 'translate(0,0) scale(1)', borderRadius: стало}
+      ], {duration: MINI_MS + 90});
+    }catch(e){}
   }
   callPaint();
 }
@@ -6022,8 +6047,8 @@ function _hap(вид){
 // Яркость экранного света — восемь ступеней. Первая та самая узкая полоса,
 // дальше кольцо шире и плотнее. У задней камеры ступеней нет: вспышкой браузер
 // умеет только «гореть» и «не гореть», и притворяться тут нечем.
-const LAMP_W = [26, 34, 43, 52, 62, 73, 85, 98];      // плотная часть, px
-const LAMP_B = [58, 68, 78, 88, 100, 112, 124, 138];  // затухание, px
+const LAMP_W = [38, 48, 59, 70, 82, 95, 109, 124];    // плотная часть, px
+const LAMP_B = [70, 82, 94, 106, 120, 134, 148, 164];  // затухание, px
 const LAMP_A = [.50, .55, .60, .65, .70, .75, .80, .85];
 let CALL_LAMP_LVL = 1;
 
@@ -6166,6 +6191,7 @@ function noteMute(текст){
 
   if(!текст){
     if(!n.classList.contains('on')) return;
+    n.classList.add('uh');          // текст гаснет раньше, чем поедет ширина
     // Складываем по частям и не спеша: текст, потом ширина, потом сама строка.
     const полная = n.offsetWidth;
     try{
@@ -6177,7 +6203,8 @@ function noteMute(текст){
     n.style.width = узкая + 'px';
     noteMute._t = setTimeout(() => {
       try{ n.getAnimations().forEach(a => a.cancel()); }catch(e){}
-      n.classList.remove('on'); n.style.width = ''; n.style.opacity = '';
+      n.classList.remove('on'); n.classList.remove('uh');
+      n.style.width = ''; n.style.opacity = '';
     }, 700);
     return;
   }
@@ -6195,7 +6222,7 @@ function noteMute(текст){
   }
 
   if(т) т.textContent = текст;
-  n.classList.add('on');
+  n.classList.remove('uh'); n.classList.add('on');
   n.style.opacity = '';
   n.style.width = 'auto';
   const полная = Math.ceil(n.offsetWidth);
@@ -6273,6 +6300,15 @@ function callFlip(){
   _hap('light');
   const кн = document.querySelector('.cv-flip'), loc = document.getElementById('cvSlotLoc');
   кн?.classList.remove('spin'); void кн?.offsetWidth; кн?.classList.add('spin');
+  // Снимаем последний кадр до того, как система погасит камеру.
+  try{
+    const v = loc && loc.querySelector('video');
+    const c = loc && loc.querySelector('.cv-freeze');
+    if(v && c && v.videoWidth){
+      c.width = v.videoWidth; c.height = v.videoHeight;
+      c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
+    }
+  }catch(e){}
   loc?.classList.add('flipping');
   const вернуть = () => { loc?.classList.remove('flipping'); lampAfterFlip(); callVidPaint(); };
   CALL.flip().then(вернуть).catch(вернуть);
@@ -6497,6 +6533,12 @@ function _callPaint(){
     if(CALL_ST === 'live'){
       $('callBarAv').textContent = _cIni(CALL_WHO);
       $('callBarN').textContent = CALL_WHO;
+    }else if(CALL_ST !== 'idle'){
+      // До ответа времени ещё нет. Оставить прошлое — значит показать число,
+      // которое ничего не значит: человек читает его как длительность.
+      $('callBarN').textContent = CALL_WHO;
+      const t = $('callBarS');
+      if(t) t.textContent = CALL_ST === 'in' ? 'входящий' : 'звоним…';
     }
   }
 

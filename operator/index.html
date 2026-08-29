@@ -5739,7 +5739,10 @@ function callVoicePaint(){
   // В разговоре полосу телеграма занимают смайлики сверки: состояние со связью
   // уходит под имя.
   document.getElementById('cvoHero')?.classList.toggle('live', CALL_ST === 'live');
-  document.getElementById('cvoHdr')?.classList.toggle('live', CALL_ST === 'live');
+  // В видеозвонке шапки нет: имя, время и связь стоят в плашке над картинкой,
+  // и второй раз то же самое поверх кнопок — просто мусор на экране.
+  document.getElementById('cvoHdr')?.classList.toggle('live',
+    CALL_ST === 'live' && !CALL_VIDEO);
   const точки = '<span class="dots"><i></i><i></i><i></i></span>';
   const st = CALL_REJOIN ? 'Связь пропала, собираем заново' + точки
            : CALL_ST === 'in' ? 'Входящий звонок'

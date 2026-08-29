@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=71"></script>
+<script src="/vendor/ambar-call.js?v=72"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -713,15 +713,18 @@ body.call-mini .cs-safe-scrim{display:none}
    занимает всё место, и спорить с ней им незачем. */
 .cvo-hero.live .hero-top{position:static;left:auto;right:auto;top:auto;
   margin-top:10px;z-index:auto;display:contents}
-.cvo-hero.live .call-q{position:absolute;z-index:6;
+/* Полоски связи стоят рядом со смайликами сверки и не принадлежат ни
+   голосовому экрану, ни видео: они нужны в обоих. Поэтому это отдельный
+   значок поверх всего, а отступ считается от ширины плашки смайликов.
+   Развернули карточку сверки — уходит: там ему тесно. */
+.sig-top{position:fixed;z-index:522;display:none;
   top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 16px);
   left:calc(50% + var(--cs-pill-w,116px) / 2 + 10px);
   transition:opacity .22s ease}
-.cvo-hero.live .cvo-state{position:absolute;left:0;right:0;z-index:5;margin:0;
-  top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 48px);
-  transition:opacity .22s ease}
-body.safe-open .cvo-hero.live .call-q,
-body.safe-open .cvo-hero.live .cvo-state{opacity:0}
+body.call-live .sig-top{display:block}
+body.safe-open .sig-top{opacity:0}
+/* А время в голосовом звонке — под именем, там его и ищут. */
+.cvo-hero.live .call-q{display:none}
 .cvo-hero.live .hero-mid{position:static;transform:none;margin:0}
 .cvo-hero.live{justify-content:center}
 /* Порядок в разговоре: имя, под ним состояние. В разметке они наоборот —
@@ -2392,6 +2395,7 @@ body.safe-open .cvo-hero.live .cvo-state{opacity:0}
 <!-- Четыре смайлика — сверка ключей. Одна карточка на оба состояния:
      свёрнутая это плашка между кнопками телеграма, развёрнутая — то же
      самое, только выросшее. Двух карточек тут быть не должно. -->
+<div class="sig-top" id="sigTop"></div>
 <div class="cs-safe-scrim" id="csSafeScrim" onclick="safeToggle(false)"></div>
 <div class="cs-safe" id="csSafe" onclick="safeToggle()" role="button">
   <div class="cs-safe-big" id="csSafeBig"></div>
@@ -5505,6 +5509,10 @@ function callQuality(){
   // серые чёрточки — как «связь ещё не измерена».
   e.className = 'call-q';
   e.innerHTML = sigHtml(CALL_Q || '');
+  // Тот же значок рядом со смайликами — он один на голосовой экран и на видео.
+  const t = document.getElementById('sigTop');
+  if(t) t.innerHTML = sigHtml(CALL_Q || '');
+  document.body.classList.toggle('call-live', CALL_ST === 'live');
 }
 
 // Пропущенные считаются только те, что человек ещё не видел. Иначе цифра на

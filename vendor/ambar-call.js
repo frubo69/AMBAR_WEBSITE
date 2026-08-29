@@ -1043,6 +1043,18 @@
     pc.onicecandidate = function (e) {
       if (e.candidate) self._send({t: 'ice', data: e.candidate});
     };
+    // Дорожку добавили посреди разговора — например, включили камеру в
+    // голосовом звонке. Об этом надо договориться заново: дорожка есть, а
+    // собеседник о ней не знает, и картинки у него не будет. Раньше этого
+    // обработчика не было вовсе — оттого камера включалась «в никуда».
+    pc.onnegotiationneeded = function () {
+      // Первый круг ведёт звонящий сам, и лезть туда нельзя: обе стороны
+      // добавляют свои дорожки на старте, и оба предложения столкнутся лбами.
+      // Пока чужого описания нет — молчим.
+      if (!pc.remoteDescription) return;
+      self._negotiate();
+    };
+
     pc.onconnectionstatechange = function () {
       var st = pc.connectionState;
       self._emit('net', {state: st});
@@ -1097,10 +1109,34 @@
     } catch (e) {}
   };
 
+  // Договориться заново. Кто звонил — тот и предлагает; если предложения
+  // столкнулись, уступает отвечающий. Так делают все, кто дожил до второй
+  // дорожки в звонке.
+  AmbarCall.prototype._negotiate = function () {
+    var pc = this.pc, self = this;
+    if (!pc || pc.signalingState !== 'stable') return;
+    this._making = true;
+    pc.createOffer()
+      .then(function (o) { return pc.setLocalDescription(o); })
+      .then(function () { self._send({t: 'sdp', data: pc.localDescription}); })
+      .catch(function (e) { console.warn('[call] переговоры', e); })
+      .then(function () { self._making = false; });
+  };
+
   AmbarCall.prototype._onSdp = function (sdp) {
     if (!this.pc || !sdp) return;
-    var self = this;
-    this.pc.setRemoteDescription(sdp).then(function () {
+    var self = this, pc = this.pc;
+    // Столкновение предложений: оба заговорили разом. Звонящий стоит на своём,
+    // отвечающий откатывает своё и слушает — иначе связь встаёт колом.
+    var вежливый = !this._isCaller;
+    var столкновение = sdp.type === 'offer' &&
+                       (this._making || pc.signalingState !== 'stable');
+    if (столкновение && !вежливый) return;
+    var готово = столкновение
+      ? Promise.all([pc.setLocalDescription({type: 'rollback'}),
+                     pc.setRemoteDescription(sdp)])
+      : pc.setRemoteDescription(sdp);
+    готово.then(function () {
       // Кандидаты умеют обгонять описание — те, что пришли раньше, ждали здесь.
       self._pendingIce.forEach(function (c) {
         self.pc.addIceCandidate(c).catch(function () {});

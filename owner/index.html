@@ -1218,8 +1218,10 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    отступ страницы и лишнее поле под ней — иначе экран, который «ровно
    помещается», всё равно прокручивается на полсотни пикселей. */
 #pg-money{padding-bottom:0;margin-bottom:calc(-40px + var(--safe-bottom))}
-#accHome{display:flex;flex-direction:column;gap:9px;
-  min-height:calc(100dvh - 202px - var(--safe-top) - var(--safe-bottom))}
+/* Высоту задаёт accFit() по факту, а не формулой: 100dvh в телеграме не равен
+   видимой высоте, и плитки вылезали за экран — а значит, ездили под пальцем.
+   Здесь остаётся только запас на первую отрисовку, пока не посчитали. */
+#accHome{display:flex;flex-direction:column;gap:9px;min-height:320px}
 .acc-group{display:grid;grid-template-columns:1fr 1fr;margin:0;flex:1 1 auto;
   border-radius:16px;overflow:hidden;background:var(--card);
   border:1px solid var(--border2)}
@@ -6934,6 +6936,7 @@ document.querySelectorAll('.tb').forEach(btn=>{
     if(pg === 'offices' && !OPS.data && !OPS.loading && window.ownerApi) loadOperators();
     if(pg === 'money' && window.ownerApi){
       accRender();
+      accFit();
       if(!EXP.data) loadExpenses().then(accRender);
       if(!ACC_PERIOD) accLoadSummaries();
     }
@@ -10899,6 +10902,23 @@ function ordTileSub(){
   return ACC_ORDER.total_qty ? `на ${fmt(ACC_ORDER.total_aed)} AED` : 'остатков хватает';
 }
 
+// Плитки учёта занимают ровно то, что осталось между шапкой и нижней панелью,
+// и ни пикселем больше: лишний пиксель — это ход под пальцем, а двигать тут
+// нечего, страница из одних кнопок.
+function accFit(){
+  const box = document.getElementById('accHome'); if(!box) return;
+  const стр = document.getElementById('pg-money');
+  if(!стр || !стр.classList.contains('active')) return;
+  box.style.minHeight = '0px';                       // сначала отпускаем, потом меряем
+  const прокрутка = (document.scrollingElement || {}).scrollTop || 0;
+  const верх = box.getBoundingClientRect().top + прокрутка;
+  const пан = document.querySelector('.tabbar');
+  const низ = пан ? пан.getBoundingClientRect().height : 68;
+  const место = Math.max(240, Math.round(window.innerHeight - верх - низ - 12));
+  box.style.minHeight = место + 'px';
+}
+addEventListener('resize', () => { try{ accFit(); }catch(e){} });
+
 function accRender(){
   const box = document.getElementById('accHome'); if(!box) return;
   const t = (EXP.data || {}).totals;
@@ -10998,6 +11018,7 @@ function accRender(){
     </button>
     <div class="acc-group">${pick(['expenses','order'])}</div>
     <div class="acc-group acc-3">${pick(['stock','qr','check'])}</div>`;
+  accFit();
 }
 
 // ── История заказов ────────────────────────────────────────────────────────

@@ -722,6 +722,9 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    вниз; плитки читаются как карта точек. Шестая клетка — вход в историю: она
    и место занимает с пользой, и стоит там, где взгляд заканчивает обход. */
 .dgrid{display:grid;grid-template-columns:1fr 1fr;gap:9px}
+/* В ревизии — по одному в ряд: районов пять, их читают сверху вниз списком, а
+   не разбирают сетку глазами. Высота плитки та же. */
+.dgrid.one{grid-template-columns:1fr}
 .dtile{display:flex;flex-direction:column;justify-content:space-between;gap:14px;
   min-height:112px;padding:13px;border-radius:16px;cursor:pointer;text-align:left;
   font-family:inherit;color:var(--text);background:var(--card);
@@ -9649,10 +9652,10 @@ function distMoreTile(onclick, label){
 function openStock(){
   document.getElementById('stkOv').classList.add('show');
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
-  // Открываемся там, где работали в прошлый раз. Экран выбора остаётся, но по
-  // требованию, а не по умолчанию: район меняют реже, чем заходят.
-  const last = distSaved('stk');
-  if(last) stkGo(last); else stkPicker();
+  // Всегда со списка районов. Открываться на последнем выбранном казалось
+  // удобным, но ревизию ведут по всем пяти, и первый вопрос тут не «что в
+  // этом районе», а «где ещё не считали».
+  stkPicker();
 }
 
 // Тап по названию района в шапке. Второй тап закрывает — кнопка, которая
@@ -9765,7 +9768,7 @@ async function stkPicker(){
     scls:  d.done && !d.short_aed ? 'ok' : (d.done ? 'dn' : ''),
   })).join('');
   document.getElementById('stkMid').innerHTML =
-    `<div class="dgrid">${cards}${distMoreTile('stkAudits()', 'История ревизий')}</div>` +
+    `<div class="dgrid one">${cards}${distMoreTile('stkAudits()', 'История ревизий')}</div>` +
     '<div class="stk-grp">Перемещения между районами</div>' +
     '<div id="stkMoves"><div class="stk-empty" style="padding:14px">Загрузка…</div></div>';
   stkLoadMoves();

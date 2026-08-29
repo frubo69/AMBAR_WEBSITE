@@ -5934,9 +5934,14 @@ button.pill:active{opacity:.6}
 .ca-body{flex:1;min-height:0;display:flex;flex-direction:column;overflow:hidden;
   padding:calc(var(--safe-top) + 10px) 18px 0}
 .ca-head{flex-shrink:0}
+/* Пока звонилка открыта, страница под ней стоит. Просто overflow:hidden тут не
+   держит: палец всё равно уводит панель, и, закрыв звонилку, человек находит
+   её уехавшей. Держит только фиксация — поэтому запоминаем, где он
+   остановился, и возвращаем ровно туда же. */
+body.ca-lock{position:fixed;left:0;right:0;width:100%;overflow:hidden}
 /* Снизу запас под приподнятую кнопку быстрого вызова: она висит над панелью и
    без запаса накрывала бы последнюю строку списка. */
-.ca-list{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+.ca-list{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
   padding-bottom:46px;
   /* Уезжающие строки не обрубаются о край шапки, а тают под ней: рубленый
      край выдаёт, что это два разных куска, а он тут один. */
@@ -6016,7 +6021,7 @@ button.pill:active{opacity:.6}
   margin:10px auto 14px;flex-shrink:0}
 .ca-sh-t{font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;
   color:var(--text);flex-shrink:0;margin-bottom:12px}
-.ca-sh-list{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+.ca-sh-list{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
   margin:0 -4px;padding:0 4px}
 .fav-row{position:relative;display:flex;align-items:center;gap:13px;width:100%;
   padding:9px 0;border:0;background:transparent;cursor:pointer;text-align:left;
@@ -6062,7 +6067,7 @@ button.pill:active{opacity:.6}
   background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);
   backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 .ca-back:active{background:rgba(255,255,255,.12)}
-.ca-page-in{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+.ca-page-in{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain;
   padding:calc(var(--safe-top) + 64px) 18px calc(18px + var(--safe-bottom))}
 
 /* ── Карточка человека ─────────────────────────────────────────────────────
@@ -20509,8 +20514,31 @@ function callBadge(){
   e.style.display = n ? 'flex' : 'none';
 }
 
-function callOpen(){ callInit(); miniOff(); _cq('callOv').classList.add('show'); callPaint(); }
-function callClose(){ setTimeout(callPaint, 0); _cq('callOv').classList.remove('show'); if(CALL_ST === 'in') CALL && CALL.reject(); }
+// Страница под звонилкой и под самим разговором стоять должна, а после
+// закрытия оказаться там же, где её оставили.
+let CA_SCROLL = 0;
+function caLock(надо){
+  const b = document.body;
+  if(надо === b.classList.contains('ca-lock')) return;
+  if(надо){
+    CA_SCROLL = (document.scrollingElement || {}).scrollTop || 0;
+    b.style.top = -CA_SCROLL + 'px';
+    b.classList.add('ca-lock');
+  }else{
+    b.classList.remove('ca-lock');
+    b.style.top = '';
+    if(document.scrollingElement) document.scrollingElement.scrollTop = CA_SCROLL;
+  }
+}
+// Запираем ровно на то время, пока открыта сама звонилка. Свёрнутый разговор
+// её закрывает — и панель отпускает: сворачивают ровно затем, чтобы ей
+// пользоваться.
+function caLockSync(){
+  caLock(!!(_cq('callOv') && _cq('callOv').classList.contains('show')));
+}
+
+function callOpen(){ callInit(); miniOff(); _cq('callOv').classList.add('show'); callPaint(); caLockSync(); }
+function callClose(){ setTimeout(callPaint, 0); _cq('callOv').classList.remove('show'); if(CALL_ST === 'in') CALL && CALL.reject(); caLockSync(); }
 function callTab(t){ CALL_TAB = t; callPaint(); }
 function callVideo(key){ callDial(key, true); }
 // Экран разговора — один на все состояния и на все приложения: звание, имя,
@@ -20887,6 +20915,7 @@ function miniOff(){
   CALL_MINI = false;
   document.body.classList.remove('call-mini');
   if(э){ э.classList.remove('mini'); э.style.transform = ''; }
+  try{ caLockSync(); }catch(e){}
 }
 
 function callMini(свернуть){
@@ -21971,6 +22000,7 @@ function caContacts(){
 }
 
 function callPaint(){
+  try{ caLockSync(); }catch(e){}
   try{ _callPaint(); }
   catch(e){
     console.error('[call] экран не собрался', e);

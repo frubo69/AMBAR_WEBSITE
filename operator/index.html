@@ -19,7 +19,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=67"></script>
+<script src="/vendor/ambar-call.js?v=68"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -697,9 +697,20 @@ body.call-mini .cs-safe-scrim{display:none}
 /* Состояние и связь живут в полосе телеграма, между «закрыть» и «ещё»: там
    единственное свободное место наверху, и взгляд не спотыкается о них по
    дороге к имени. */
+/* Пока звоним, состояние и связь стоят в полосе телеграма — там пусто. А в
+   разговоре эту полосу занимают смайлики сверки, и лезть под них нельзя:
+   тогда состояние с полосками уходит под имя, где им и место. */
 .cvo-hero .hero-top{position:absolute;left:76px;right:76px;
   top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + 12px);
   display:flex;flex-direction:column;align-items:center;gap:4px;z-index:5}
+.cvo-hero.live .hero-top{position:static;left:auto;right:auto;top:auto;
+  margin-top:10px;z-index:auto}
+.cvo-hero.live .hero-mid{position:static;transform:none;margin:0}
+.cvo-hero.live{justify-content:center}
+/* Порядок в разговоре: имя, под ним состояние. В разметке они наоборот —
+   там первым идёт то, что стоит в полосе телеграма. */
+.cvo-hero.live .hero-top{order:2}
+.cvo-hero.live .hero-mid{order:1}
 /* Кружок с именем — по центру экрана, а не по центру остатка: остаток внизу
    занимают кнопки, и середина смещалась вверх. */
 .cvo-hero .hero-mid{position:absolute;left:0;right:0;top:50%;
@@ -1029,9 +1040,9 @@ body.call-mini .cs-safe-scrim{display:none}
 .cvo-btn:active{transform:scale(.92)}
 /* Перечёркивание микрофона на голосовом экране рисуется так же, как на
    видео: путь лежит всегда, меняется только длина штриха. */
-.cvo-btn .cvx{stroke-dasharray:30;stroke-dashoffset:30;opacity:0;
-  transition:stroke-dashoffset .3s cubic-bezier(.32,.72,0,1),opacity .1s ease}
-.cvo-btn.on .cvx{stroke-dashoffset:0;opacity:1}
+/* Линия у микрофона видна всегда: маска режет значок в любом случае, и без
+   линии от него остаётся выкушенный кусок. */
+.cvo-btn .cvx{opacity:1}
 .cvo-btn.take{background:#2CB34A}
 .cvo-btn.drop{background:var(--dn)}
 .cvo-btn.mute{background:var(--card2);color:var(--text)}
@@ -2375,7 +2386,7 @@ body.call-mini .cs-safe-scrim{display:none}
 </div>
 
 <div class="cvo" id="callVoice">
-  <div class="cvo-top cvo-hero">
+  <div class="cvo-top cvo-hero" id="cvoHero">
     <div class="hero-top">
       <div class="cvo-state" id="cvoState">00:00</div>
       <div class="call-q" id="callQ"></div>
@@ -5663,6 +5674,9 @@ function callVoicePaint(){
     ава.innerHTML = '<svg viewBox="0 0 24 24">' + ICO_ROLE[вид] + '</svg>';
   }
   document.getElementById('cvoName').textContent = CALL_WHO || '—';
+  // В разговоре полосу телеграма занимают смайлики сверки: состояние со связью
+  // уходит под имя.
+  document.getElementById('cvoHero')?.classList.toggle('live', CALL_ST === 'live');
   const точки = '<span class="dots"><i></i><i></i><i></i></span>';
   const st = CALL_REJOIN ? 'Связь пропала, собираем заново' + точки
            : CALL_ST === 'in' ? 'Входящий звонок'
@@ -5688,7 +5702,8 @@ function callVoicePaint(){
     d="M6 5L3 8l3 3"/><path d="M21 16H8a4 4 0 0 1-4-4v-1"/><path d="M18 19l3-3-3-3"/></svg>`;
   const V = `<svg viewBox="0 0 24 24" width="27" height="27" fill="none" stroke="currentColor"
     stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
-    d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/></svg>`;
+    d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/><path
+    class="cvx" d="M2 2l20 20"/></svg>`;
 
 
   // Полоски связи рисуем на каждой отрисовке, а не только по событию: иначе
@@ -5703,13 +5718,21 @@ function callVoicePaint(){
       <div class="cvo-act"><button class="cvo-btn take" onclick="callAccept()">${P}</button>
         <div class="cvo-lbl">Ответить</div></div>`
     : CALL_ST === 'live' ? `
-      <div class="cvo-act"><button class="cvo-btn mute${_callMuted ? ' on' : ''}"
-        onclick="callMute()">${M(_callMuted)}</button>
-        <div class="cvo-lbl">${_callMuted ? 'Включить' : 'Без звука'}</div></div>
-      ${CALL_VIDEO ? `<div class="cvo-act"><button class="cvo-btn vid" onclick="callCam()">${V}</button>
-        <div class="cvo-lbl">Камера</div></div>` : ''}
-      <div class="cvo-act"><button class="cvo-btn drop" onclick="callHangup()">${X}</button>
-        <div class="cvo-lbl">Завершить</div></div>`
+      <div class="cvo-row4">
+        <div class="cv-cell${CALL_CAM ? '' : ' dim'}">
+          <button class="cv-rb cv-flip" onclick="callFlip()" aria-label="Другая камера">${F}</button>
+          <span class="cv-cap">поворот</span></div>
+        <div class="cv-cell">
+          <button class="cv-rb${CALL_CAM ? '' : ' on'}" onclick="callCam()" aria-label="Камера">${V}</button>
+          <span class="cv-cap">камера</span></div>
+        <div class="cv-cell">
+          <button class="cv-rb mic${_callMuted ? ' on' : ''}" onclick="callMute()"
+            aria-label="Микрофон">${M(_callMuted)}</button>
+          <span class="cv-cap">микрофон</span></div>
+        <div class="cv-cell">
+          <button class="cv-rb drop" onclick="callHangup()" aria-label="Завершить">${X}</button>
+          <span class="cv-cap">завершить</span></div>
+      </div>`
     : `<div class="cvo-row4">
         <div class="cv-cell dim"><button class="cv-rb" aria-label="Другая камера">${F}</button>
           <span class="cv-cap">поворот</span></div>
@@ -5801,7 +5824,7 @@ window.addEventListener('resize', () => { if(CALL_ST !== 'idle') callVidPaint();
 // в окошко, которое можно двигать пальцем; нажатие разворачивает обратно.
 // Экран при этом не перестраивается — он уменьшается целиком, вместе с обоими
 // собеседниками, поэтому и возвращается без перескока.
-let CALL_MINI = false, MINI_X = null, MINI_Y = null;
+let CALL_MINI = false, MINI_X = null, MINI_Y = null, СВАЙП_D = 0;
 const MINI_PAD = 12, MINI_MS = 380, MINI_ЛЕГЧЕ = 'cubic-bezier(.32,.72,0,1)';
 
 function miniK(){
@@ -5919,20 +5942,19 @@ function _свайпНа(э){
       return true;
     }
     if(!тянем){
-      if(y - y0 < 26) return false;    // вниз и заметно, иначе это не свайп
+      if(y - y0 < 12) return false;    // вниз и заметно, иначе это не свайп
       тянем = true; свои = true;
-      // Видео сворачивается в окошко, голос просто уходит с глаз: смотреть в
-      // голосовом звонке не на что, а полоса сверху и так всё скажет.
-      if(document.getElementById('callVid')?.classList.contains('on')){ callMini(true); }
-      else {
-        // Голосовой звонок сворачивать некуда — он просто уходит с глаз. Но
-        // слой голоса живёт отдельно от окна разговора, и закрыть окно мало:
-        // без этой метки он остаётся висеть поверх приложения.
-        callClose();
-        document.body.classList.add('call-mini');
-        _hap('light');
-      }
+      _hap('light');
     }
+    // Карточка едет за пальцем и слегка уменьшается — решение принимается на
+    // отпускании, а не в первый же миг. Ход с сопротивлением: пальцу видно,
+    // что экран поддаётся, но не улетает.
+    const d = Math.max(0, y - y0);
+    СВАЙП_D = d;
+    const H = window.innerHeight || 800;
+    const k = 1 - Math.min(.12, d / (H * 3));
+    э.style.transform = 'translateY(' + (d * .55).toFixed(1) + 'px) scale(' + k.toFixed(4) + ')';
+    э.style.borderRadius = Math.min(26, d * .12).toFixed(1) + 'px';
     return свои;
   };
   const конец = () => {
@@ -5940,7 +5962,25 @@ function _свайпНа(э){
     const тянули = тянем;
     y0 = null; тянем = false;
     if(CALL_MINI && !тянули){ callMini(false); return; }   // нажали на окошко
-    if(CALL_MINI) miniSnap();
+    if(CALL_MINI){ miniSnap(); return; }
+    if(!тянули) return;
+    // Чуть сдвинул — экран возвращается на место; протянул больше четверти —
+    // уезжает в окошко. Порог намеренно крупный: случайное движение пальцем
+    // не должно сворачивать разговор.
+    const далеко = СВАЙП_D > (window.innerHeight || 800) * .25;
+    const откуда = getComputedStyle(э).transform;
+    const радиус = getComputedStyle(э).borderRadius;
+    э.style.transform = ''; э.style.borderRadius = '';
+    СВАЙП_D = 0;
+    if(далеко){
+      if(document.getElementById('callVid')?.classList.contains('on')) callMini(true); else { callClose(); document.body.classList.add('call-mini'); _hap('light'); }
+      return;
+    }
+    try{
+      э.animate([{transform: откуда, borderRadius: радиус},
+                 {transform: 'none', borderRadius: '0px'}],
+                {duration: 320, easing: 'cubic-bezier(.22,.72,.2,1)'});
+    }catch(e){}
   };
   if('ontouchstart' in window){
     э.addEventListener('touchstart', e => начало(e.touches[0].clientX, e.touches[0].clientY,

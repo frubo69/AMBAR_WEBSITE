@@ -5875,45 +5875,81 @@ button.pill:active{opacity:.6}
    приложения намеренно — её не надо изучать. Избранное живёт только здесь:
    у водителя один контакт, у оператора свои водители, а тут полтора десятка
    человек, из которых каждый день нужны двое-трое. */
-.ca-app{width:min(430px,94vw);height:min(760px,86vh);background:var(--bg2);
-  border:1px solid var(--border2);border-radius:24px;overflow:hidden;margin:auto;
-  box-shadow:0 24px 80px rgba(0,0,0,.7);flex-shrink:0}
-.ca{display:flex;flex-direction:column;height:100%;min-height:0}
-/* Выход из приложения звонков. В телефоне его нет — там это и есть телефон, а
-   у нас приложение внутри приложения, и вернуться назад обязано быть чем. */
-.ca-close{position:absolute;top:16px;right:16px;z-index:2;width:38px;height:38px;border-radius:12px;
-  cursor:pointer;display:flex;align-items:center;justify-content:center}
-.ca{position:relative}
-.ca-close{color:var(--sub);background:var(--card);border:1px solid var(--border2)}
-.ca-close:active{background:var(--card2)}
-.ca-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;padding:20px 18px 12px}
-.ca-h1{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;color:var(--text);padding:0 0 14px}
-.ca-search{display:flex;align-items:center;gap:9px;padding:11px 13px;border-radius:13px;
-  margin-bottom:18px;background:var(--card);border:1px solid var(--border2);color:var(--muted)}
+/* Не окошко поверх панели, а отдельная страница во весь экран: заголовок,
+   поиск, избранные, список и нижняя панель. Окошко всегда читалось как
+   «диалог», из которого сейчас выкинет, а звонилка — это место, где живут. */
+#callOv{background:none;backdrop-filter:none;-webkit-backdrop-filter:none;
+  padding:0;display:block}
+.ca-app{width:100%;height:100%;margin:0;border:0;border-radius:0;box-shadow:none;
+  /* Тот же мягкий свет, что на экране разговора: сверху тёплый, снизу
+     холодный. Ровный чёрный прямоугольник выглядит сломанным, а не спокойным,
+     и разговор с ним не выглядит одним приложением. */
+  background:
+    radial-gradient(122% 74% at 50% 2%,rgba(201,169,110,.13),transparent 62%),
+    radial-gradient(100% 58% at 50% 102%,rgba(120,124,190,.10),transparent 64%),
+    var(--bg2,#07070f)}
+.ca{display:flex;flex-direction:column;height:100%;min-height:0;position:relative}
+/* Выход со страницы. В телефоне его нет — там звонилка и есть телефон, а у нас
+   она внутри панели, и вернуться обязано быть чем. Стоит вровень с заголовком:
+   выше начинается полоса телеграма со своими кнопками. */
+.ca-close{position:absolute;top:calc(var(--safe-top) + 13px);right:16px;z-index:4;
+  width:38px;height:38px;border-radius:50%;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;color:var(--sub);
+  background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.08);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.ca-close:active{background:rgba(255,255,255,.12)}
+.ca-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  /* Снизу запас под приподнятую кнопку «новый звонок»: она висит над панелью
+     и без запаса накрывала бы последнюю строку списка. */
+  padding:calc(var(--safe-top) + 10px) 18px 46px}
+/* Крупный заголовок — единственное большое пятно на странице. Справа от него
+   стоит крестик, поэтому строка держит для него место. */
+.ca-h1{font-family:'Space Grotesk',sans-serif;font-size:clamp(28px,8vw,34px);
+  font-weight:700;letter-spacing:-.02em;color:var(--text);
+  padding:0 54px 16px 0;line-height:1.1}
+.ca-search{display:flex;align-items:center;gap:9px;padding:12px 14px;border-radius:14px;
+  margin-bottom:22px;color:var(--muted);
+  background:rgba(255,255,255,.05);border:1px solid var(--border2)}
 .ca-search svg{flex-shrink:0;opacity:.7}
 .ca-search input{flex:1;min-width:0;border:0;background:transparent;outline:none;color:var(--text);
-  font-family:'DM Sans',sans-serif;font-size:14.5px;padding:0;height:auto;line-height:1.35}
+  font-family:'DM Sans',sans-serif;font-size:15px;padding:0;height:auto;line-height:1.35}
 .ca-search input::placeholder{color:var(--muted)}
-.ca-cap{font-size:14px;font-weight:600;color:var(--text);margin:0 0 12px}
-.ca-favs{display:flex;gap:15px;overflow-x:auto;scrollbar-width:none;padding:0 0 20px}
+/* Подписи разделов — мелкие капителью, а не плашками: плашка спорит со
+   строками списка за внимание, а её дело — молча их разделить. */
+.ca-cap,.ca-sec{font-size:11px;font-weight:700;letter-spacing:.09em;
+  text-transform:uppercase;color:var(--muted);background:none}
+.ca-cap{margin:0 0 13px}
+.ca-sec{padding:17px 0 9px;margin:0;border-radius:0}
+.ca-favs{display:flex;gap:16px;overflow-x:auto;scrollbar-width:none;padding:0 0 14px}
 .ca-favs::-webkit-scrollbar{display:none}
-.ca-fav{flex-shrink:0;width:64px;text-align:center;cursor:pointer;border:0;background:transparent;
+.ca-fav{flex-shrink:0;width:66px;text-align:center;cursor:pointer;border:0;background:transparent;
   font-family:'DM Sans',sans-serif;padding:0}
-.ca-fav-c{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;
-  justify-content:center;font-size:19px;font-weight:700;margin:0 auto 7px;color:var(--gold2);
-  background:rgba(201,169,110,.12);border:1px solid rgba(201,169,110,.25)}
-.ca-fav-add .ca-fav-c{border:2px dashed var(--border);background:transparent;color:var(--sub)}
+.ca-fav:active .ca-fav-c{transform:scale(.94)}
+.ca-fav-c{width:60px;height:60px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:20px;font-weight:700;margin:0 auto 8px;color:var(--gold2);
+  transition:transform .14s var(--e1);
+  background:radial-gradient(120% 120% at 30% 18%,rgba(201,169,110,.26),rgba(201,169,110,.06));
+  box-shadow:inset 0 0 0 1px rgba(201,169,110,.22)}
+.ca-fav-add .ca-fav-c{background:none;color:var(--muted);
+  box-shadow:inset 0 0 0 1.5px var(--border2)}
 .ca-fav-n{font-size:11.5px;color:var(--sub);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.ca-seg{display:flex;gap:9px;margin-bottom:4px}
-.ca-seg button{flex:1;padding:10px;border-radius:11px;cursor:pointer;color:var(--muted);
-  font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;
-  background:var(--card);border:1px solid var(--border2)}
-.ca-seg button.on{color:var(--gold2);background:rgba(201,169,110,.13);border-color:rgba(201,169,110,.4)}
-.ca-row{display:flex;align-items:center;gap:13px;padding:11px 0}
-.ca-row+.ca-row{border-top:1px solid var(--border2)}
+/* Переключатель одной дорожкой, как в телефоне: две отдельные кнопки читались
+   как два действия, а это один выбор из двух. */
+.ca-seg{display:flex;gap:4px;padding:4px;border-radius:15px;margin:5px 0 4px;
+  background:rgba(255,255,255,.045);border:1px solid var(--border2)}
+.ca-seg button{flex:1;padding:9px 10px;border-radius:11px;cursor:pointer;color:var(--muted);
+  font-family:'DM Sans',sans-serif;font-size:13.5px;font-weight:600;
+  background:transparent;border:0;transition:color .18s var(--e1),background .18s var(--e1)}
+.ca-seg button.on{color:var(--gold2);background:rgba(201,169,110,.15)}
+/* Разделитель начинается от имени, а не от края: так список читается столбцом
+   строк, а не сеткой ячеек. */
+.ca-row{position:relative;display:flex;align-items:center;gap:13px;padding:11px 0}
+.ca-row+.ca-row::before{content:'';position:absolute;left:59px;right:0;top:0;height:1px;
+  background:var(--border2)}
 .ca-ava{width:46px;height:46px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;
-  justify-content:center;font-size:15px;font-weight:700;color:var(--gold2);
-  background:rgba(201,169,110,.11);border:1px solid rgba(201,169,110,.2)}
+  justify-content:center;font-size:16px;font-weight:700;color:var(--gold2);
+  background:radial-gradient(120% 120% at 30% 18%,rgba(201,169,110,.24),rgba(201,169,110,.05));
+  box-shadow:inset 0 0 0 1px rgba(201,169,110,.18)}
 .ca-rb{flex:1;min-width:0;cursor:pointer}
 .ca-rn{font-size:15.5px;font-weight:600;color:var(--text);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .ca-row.missed .ca-rn,.ca-row.missed .ca-rs{color:var(--dn)}
@@ -5923,23 +5959,36 @@ button.pill:active{opacity:.6}
 .ca-star{width:34px;height:34px;flex-shrink:0;border-radius:50%;cursor:pointer;border:0;
   background:transparent;color:var(--dim);display:flex;align-items:center;justify-content:center}
 .ca-star.on{color:var(--gold2)}
-.ca-go{width:40px;height:40px;flex-shrink:0;border-radius:50%;cursor:pointer;display:flex;
-  align-items:center;justify-content:center;color:var(--up);background:rgba(76,175,125,.12);
-  border:1px solid rgba(76,175,125,.28)}
-.ca-sec{font-size:12px;font-weight:600;color:var(--sub);padding:7px 11px;border-radius:8px;
-  background:var(--card);margin:18px 0 4px}
-.ca-empty{text-align:center;font-size:13.5px;color:var(--muted);padding:44px 14px;line-height:1.55}
+/* Кнопки строки без обводок: рамка вокруг каждой превращала список в частокол.
+   Зелёная — главная, серая — второстепенная, и видно это по заливке. */
+.ca-vid,.ca-go{width:40px;height:40px;flex-shrink:0;border-radius:50%;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;border:0;
+  transition:transform .14s var(--e1)}
+.ca-vid:active,.ca-go:active{transform:scale(.9)}
+.ca-vid{color:var(--sub);background:rgba(255,255,255,.06)}
+.ca-go{color:var(--up);background:rgba(76,175,125,.15)}
+.ca-empty{text-align:center;font-size:13.5px;color:var(--muted);padding:52px 14px;line-height:1.55}
+/* Нижняя панель полупрозрачная: под ней видно, что список продолжается, а не
+   обрывается. И она держит домашнюю полосу телефона своим отступом. */
 .ca-nav{position:relative;display:flex;align-items:flex-end;justify-content:space-around;
-  flex-shrink:0;padding:12px 26px;border-top:1px solid var(--border2);background:var(--card)}
+  flex-shrink:0;padding:11px 26px calc(11px + var(--safe-bottom));
+  border-top:1px solid var(--border2);background:rgba(9,9,17,.72);
+  backdrop-filter:blur(22px) saturate(160%);-webkit-backdrop-filter:blur(22px) saturate(160%)}
 .ca-tab{width:84px;display:flex;flex-direction:column;align-items:center;gap:5px;cursor:pointer;
   border:0;background:transparent;color:var(--muted);font-family:'DM Sans',sans-serif;
   font-size:11px;font-weight:600;padding:4px 0}
 .ca-tab.on{color:var(--gold2)}
 /* Главное действие приподнято над панелью: его ищут не глядя. */
-.ca-new{position:absolute;left:50%;bottom:22px;transform:translateX(-50%);
+.ca-new{position:absolute;left:50%;bottom:calc(21px + var(--safe-bottom));transform:translateX(-50%);
   width:62px;height:62px;border-radius:50%;cursor:pointer;display:flex;align-items:center;
-  justify-content:center;color:var(--gold2);background:var(--bg2);border:5px solid var(--card);
-  box-shadow:0 0 0 1px var(--border2),0 8px 24px rgba(0,0,0,.5)}
+  justify-content:center;color:var(--gold3,#F5E0B0);border:0;
+  /* Тёмное стекло с золотой каймой, а не золотой круг: залитый золотом он
+     спорит с зелёной трубкой в каждой строке, а мутно-коричневый — просто
+     пятно. Внешнее кольцо цвета панели вырезает кнопку из неё. */
+  background:linear-gradient(160deg,rgba(201,169,110,.13),rgba(201,169,110,.03)),#0c0c17;
+  box-shadow:0 0 0 6px rgba(9,9,17,.92),inset 0 0 0 1px rgba(201,169,110,.34),
+    0 10px 26px rgba(0,0,0,.55)}
+.ca-new:active{transform:translateX(-50%) scale(.94)}
 .ca-body.live{display:flex;align-items:center;justify-content:center}
 /* Окна участников: одинаковые, разница только в классе. Геометрия в переходе,
    поэтому переезд из полного экрана в угол — движение, а не скачок. */

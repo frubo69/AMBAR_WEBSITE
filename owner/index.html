@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=48"></script>
+<script src="/vendor/ambar-call.js?v=49"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -6146,6 +6146,11 @@ button.pill:active{opacity:.6}
   -webkit-tap-highlight-color:transparent;
   transition:transform .2s cubic-bezier(.32,.72,0,1)}
 .cv-flip svg,.cv-lamp svg{width:46%;height:46%}
+/* Палец, ведущий по кнопке фонарика, меняет яркость, а не листает страницу.
+   Без этого айфон считает вертикальное движение прокруткой: справа выезжает
+   полоса, обработчику приходит отмена, и линейка не показывается вовсе. */
+.cv-lamp{touch-action:none;user-select:none;-webkit-user-select:none;
+  -webkit-touch-callout:none}
 .cv-flip:active,.cv-lamp:active{transform:scale(.88)}
 /* Поворот отзывается самой кнопкой: значок делает пол-оборота, ровно столько,
    сколько система открывает вторую камеру. */
@@ -6170,9 +6175,11 @@ button.pill:active{opacity:.6}
    так глаз находит своё место, не глядя на цифры. Ступени намеренно
    ощутимые: на каждой телефон отзывается щелчком, и яркость набирается
    пальцем вслепую, как зум в камере. */
-.cv-dial{display:none;flex-direction:column-reverse;align-items:flex-start;
-  gap:9px;margin-bottom:8px;padding-left:6px;pointer-events:none}
-.cv-dial.on{display:flex}
+.cv-dial{position:absolute;left:8px;bottom:100%;margin-bottom:10px;
+  display:flex;flex-direction:column-reverse;align-items:flex-start;
+  gap:9px;pointer-events:none;
+  opacity:0;visibility:hidden;transition:opacity .18s ease,visibility 0s .18s}
+.cv-dial.on{opacity:1;visibility:visible;transition:opacity .18s ease,visibility 0s}
 .cv-dial i{display:block;height:2px;width:11px;border-radius:2px;
   background:rgba(255,255,255,.45);
   transition:width .16s cubic-bezier(.32,.72,0,1),background .16s ease}
@@ -20483,8 +20490,21 @@ function lampDialPaint(){
 }
 
 function lampDial(показать){
-  document.getElementById('cvDial')?.classList.toggle('on', !!показать);
-  if(показать) lampDialPaint();
+  const d = document.getElementById('cvDial');
+  if(!d) return;
+  d.classList.toggle('on', !!показать);
+  if(!показать) return;
+  lampDialPaint();
+  // Штрихи выезжают из-под кнопки снизу вверх, друг за другом: линейка не
+  // возникает целиком, а разворачивается — так видно, откуда она взялась.
+  [...d.children].forEach((штрих, k) => {
+    try{
+      штрих.animate([{transform: 'translateX(-14px)', opacity: 0},
+                     {transform: 'none', opacity: 1}],
+                    {duration: 240, delay: k * 22, fill: 'backwards',
+                     easing: 'cubic-bezier(.32,.72,0,1)'});
+    }catch(e){}
+  });
 }
 
 function lampLevel(n){
@@ -20507,7 +20527,7 @@ function lampDrag(){
     кн._ptr = true;
     if(сзади()) return;                       // у вспышки яркости нет
     y0 = e.clientY; было = CALL_LAMP_LVL; поехали = false;
-    if(CALL_LAMP) lampDial(true);             // горит — сразу показываем линейку
+    lampDial(true);        // палец лёг — линейка выехала, ещё до движения
     try{ кн.setPointerCapture(e.pointerId); }catch(x){}
   });
   кн.addEventListener('pointermove', e => {

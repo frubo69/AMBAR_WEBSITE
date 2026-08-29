@@ -1268,6 +1268,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   -webkit-tap-highlight-color:transparent;
   transition:transform .2s cubic-bezier(.32,.72,0,1)}
 .cs-flip svg,.cs-lamp svg{width:46%;height:46%}
+/* Палец, ведущий по кнопке фонарика, меняет яркость, а не листает страницу.
+   Без этого айфон считает вертикальное движение прокруткой: справа выезжает
+   полоса, обработчику приходит отмена, и линейка не показывается вовсе. */
+.cs-lamp{touch-action:none;user-select:none;-webkit-user-select:none;
+  -webkit-touch-callout:none}
 .cs-flip:active,.cs-lamp:active{transform:scale(.88)}
 /* Поворот отзывается самой кнопкой: значок делает пол-оборота, ровно столько,
    сколько система открывает вторую камеру. */
@@ -1292,9 +1297,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    так глаз находит своё место, не глядя на цифры. Ступени намеренно
    ощутимые: на каждой телефон отзывается щелчком, и яркость набирается
    пальцем вслепую, как зум в камере. */
-.cs-dial{display:none;flex-direction:column-reverse;align-items:flex-start;
-  gap:9px;margin-bottom:8px;padding-left:6px;pointer-events:none}
-.cs-dial.on{display:flex}
+.cs-dial{position:absolute;left:8px;bottom:100%;margin-bottom:10px;
+  display:flex;flex-direction:column-reverse;align-items:flex-start;
+  gap:9px;pointer-events:none;
+  opacity:0;visibility:hidden;transition:opacity .18s ease,visibility 0s .18s}
+.cs-dial.on{opacity:1;visibility:visible;transition:opacity .18s ease,visibility 0s}
 .cs-dial i{display:block;height:2px;width:11px;border-radius:2px;
   background:rgba(255,255,255,.45);
   transition:width .16s cubic-bezier(.32,.72,0,1),background .16s ease}
@@ -2399,7 +2406,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=48"></script>
+<script src="/vendor/ambar-call.js?v=49"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -6687,8 +6694,21 @@ function lampDialPaint(){
 }
 
 function lampDial(показать){
-  cel('csDial')?.classList.toggle('on', !!показать);
-  if(показать) lampDialPaint();
+  const d = cel('csDial');
+  if(!d) return;
+  d.classList.toggle('on', !!показать);
+  if(!показать) return;
+  lampDialPaint();
+  // Штрихи выезжают из-под кнопки снизу вверх, друг за другом: линейка не
+  // возникает целиком, а разворачивается — так видно, откуда она взялась.
+  [...d.children].forEach((штрих, k) => {
+    try{
+      штрих.animate([{transform: 'translateX(-14px)', opacity: 0},
+                     {transform: 'none', opacity: 1}],
+                    {duration: 240, delay: k * 22, fill: 'backwards',
+                     easing: 'cubic-bezier(.32,.72,0,1)'});
+    }catch(e){}
+  });
 }
 
 function lampLevel(n){
@@ -6711,7 +6731,7 @@ function lampDrag(){
     кн._ptr = true;
     if(сзади()) return;                       // у вспышки яркости нет
     y0 = e.clientY; было = CALL_LAMP_LVL; поехали = false;
-    if(CALL_LAMP) lampDial(true);             // горит — сразу показываем линейку
+    lampDial(true);        // палец лёг — линейка выехала, ещё до движения
     try{ кн.setPointerCapture(e.pointerId); }catch(x){}
   });
   кн.addEventListener('pointermove', e => {

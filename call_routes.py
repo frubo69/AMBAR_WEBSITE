@@ -712,14 +712,15 @@ async def _on_message(peer: Peer, m: dict):
         log.info(f"[call] {peer.label}: {str(m.get('text') or '')[:200]}")
         return
 
-    # Состояние камеры — такой же служебный пакет: перекладываем собеседнику.
-    # Полагаться на «замолкание» дорожки нельзя, оно приходит не везде.
-    if t == "camstate":
+    # Состояние камеры и микрофона — служебные пакеты: перекладываем
+    # собеседнику. Полагаться на «замолкание» дорожки нельзя, оно приходит не
+    # везде, а человек должен видеть, почему его не слышно.
+    if t in ("camstate", "micstate"):
         call = peer.call
         if call:
             other = call.callee if call.caller.sid == peer.sid else call.caller
             if other:
-                await other.send(t="camstate", on=bool(m.get("on")))
+                await other.send(t=t, on=bool(m.get("on")))
         return
 
     # Сигнальные пакеты просто перекладываем другой стороне: сервер в

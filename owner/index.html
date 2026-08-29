@@ -6079,13 +6079,12 @@ button.pill:active{opacity:.6}
   letter-spacing:-.01em;color:var(--text)}
 .cd-r{font-size:12.5px;color:var(--muted);margin-top:4px;display:flex;align-items:center;gap:6px}
 /* Три круглые кнопки в ряд — так эти же три действия стоят в телефонной
-   карточке, и рука тянется к ним не читая. Звёздочка здесь же: избранное это
-   такое же действие над человеком, как позвонить, и отдельной строкой внизу
-   она стояла не на своём месте. */
-.cd-acts{display:flex;justify-content:center;gap:clamp(18px,7vw,34px);padding:2px 0 24px}
-.cd-a{display:flex;flex-direction:column;align-items:center;gap:9px;border:0;
-  background:transparent;cursor:pointer;padding:0;font-family:'DM Sans',sans-serif;
-  font-size:11.5px;font-weight:600;color:var(--muted)}
+   карточке, и рука тянется к ним не читая. Подписей под ними нет: трубку,
+   камеру и звезду читать не надо, а три слова в ряд только шумят. Звёздочка
+   здесь же: избранное это такое же действие над человеком, как позвонить, и
+   отдельной строкой внизу она стояла не на своём месте. */
+.cd-acts{display:flex;justify-content:center;gap:clamp(18px,7vw,34px);padding:2px 0 26px}
+.cd-a{display:flex;border:0;background:transparent;cursor:pointer;padding:0}
 .cd-a-c{width:62px;height:62px;border-radius:50%;display:flex;align-items:center;
   justify-content:center;color:var(--sub);background:rgba(255,255,255,.07);
   box-shadow:inset 0 0 0 1px rgba(255,255,255,.07);transition:.18s var(--e1)}
@@ -6094,7 +6093,6 @@ button.pill:active{opacity:.6}
   box-shadow:inset 0 0 0 1px rgba(76,175,125,.26)}
 .cd-a.fav.on .cd-a-c{color:var(--gold2);background:rgba(201,169,110,.15);
   box-shadow:inset 0 0 0 1px rgba(201,169,110,.30)}
-.cd-a.fav.on .cd-a-n{color:var(--gold2)}
 .cd-favrow{display:flex;align-items:center;gap:12px;width:100%;margin-top:14px;
   padding:13px 15px;border-radius:14px;border:0;cursor:pointer;text-align:left;
   font-family:'DM Sans',sans-serif;font-size:14.5px;font-weight:600;color:var(--text);
@@ -21791,13 +21789,12 @@ function cardPaint(key){
         r.role ? r.role + ' · ' : ''}${_caГде(r)}</div>
     </div>
     <div class="cd-acts">
-      <button class="cd-a call" onclick="cardClose();callDial('${key}')">
-        <span class="cd-a-c">${ICO_PH_F}</span><span class="cd-a-n">позвонить</span></button>
-      <button class="cd-a vid" onclick="cardClose();callVideo('${key}')">
-        <span class="cd-a-c">${ICO_VID_F}</span><span class="cd-a-n">видео</span></button>
-      <button class="cd-a fav${fav ? ' on' : ''}" onclick="cardFav('${key}')">
-        <span class="cd-a-c">${fav ? ICO_STAR_F : ICO_STAR_O}</span>
-        <span class="cd-a-n">избранное</span></button>
+      <button class="cd-a call" onclick="cardClose();callDial('${key}')" aria-label="Позвонить">
+        <span class="cd-a-c">${ICO_PH_F}</span></button>
+      <button class="cd-a vid" onclick="cardClose();callVideo('${key}')" aria-label="Видеозвонок">
+        <span class="cd-a-c">${ICO_VID_F}</span></button>
+      <button class="cd-a fav${fav ? ' on' : ''}" onclick="cardFav('${key}')" aria-label="В избранные">
+        <span class="cd-a-c">${fav ? ICO_STAR_F : ICO_STAR_O}</span></button>
     </div>
     <button class="cd-favrow" onclick="cardQuick('${key}')">
       <span>Быстрый вызов</span>

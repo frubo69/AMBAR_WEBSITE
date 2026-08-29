@@ -1316,6 +1316,25 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .cs-dial i.near{width:17px;background:rgba(255,255,255,.7)}
 .cs-dial i.now{width:27px;background:#fff;box-shadow:0 0 10px rgba(255,244,226,.85)}
 
+
+/* Свёрнутый звонок. Экран не перестраивается — он целиком уменьшается: то же
+   изображение, те же окна, только маленькое. Так свёрнутый звонок остаётся
+   тем же самым звонком, а не другим экраном, и разворачивается обратно без
+   перескока. Кнопки на это время убираются: в окошке размером с ноготь по ним
+   всё равно не попасть.
+
+   Скругление и тень делим на масштаб: их тоже уменьшает трансформация, а
+   выглядеть они должны как задумано. */
+.call-scr.mini{--mk:.28;transform-origin:0 0;cursor:pointer;touch-action:none;
+  overflow:hidden;border-radius:calc(22px / var(--mk));
+  box-shadow:0 calc(14px / var(--mk)) calc(40px / var(--mk)) rgba(0,0,0,.55),
+             inset 0 0 0 calc(1px / var(--mk)) rgba(255,255,255,.12)}
+.call-scr.mini .cs-bar,
+.call-scr.mini .cs-head,
+.call-scr.mini .cs-note,
+.call-scr.mini .cs-safe,
+.call-scr.mini .cs-safe-scrim,
+.call-scr.mini .call-top{display:none}
 .cs-glow{position:absolute;inset:0;z-index:3;pointer-events:none;opacity:0;
   /* Одной внутренней тенью, а не четырьмя градиентами: градиенты по углам
      складывались друг с другом и давали грязные пятна, а тень идёт по
@@ -2439,7 +2458,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=52"></script>
+<script src="/vendor/ambar-call.js?v=53"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -6612,7 +6631,7 @@ function pipMeasure(){
 
 function callVideoPaint(){
   const sc = cel('callScr'); if(!sc) return;
-  pipMeasure();
+  pipMeasure(); callSwipe();
   const loc = cel('slotLocal'), rem = cel('slotRemote');
   // Видео показываем, только если картинка есть хоть у кого-то. Обе камеры
   // выключены — экран возвращается к обычному голосовому виду.
@@ -6637,6 +6656,13 @@ function callVideoPaint(){
     if(CALL && CALL.torch) CALL.torch(false).catch(() => {});
   }
   lampPaint();
+  // Видео кончилось — свёрнутого окна быть не должно: оно висело бы поверх
+  // приложения само по себе.
+  if(CALL_MINI && !(live || dial)){
+    CALL_MINI = false;
+    const э = cel('callScr');
+    if(э){ э.classList.remove('mini'); э.style.transform = ''; }
+  }
   sc.classList.toggle('cam-back', !!(CALL && CALL.facing === 'environment'));
 
   // Кто в каком окне, когда камеры нет. Своё имя знает библиотека, чужое —
@@ -6907,6 +6933,129 @@ function lampAfterFlip(){
   }
   lampPaint();
   if(CALL.torch) CALL.torch(CALL_LAMP && сзади).catch(() => {});
+}
+
+// ── свернуть звонок ────────────────────────────────────────────────────────
+// Свайп вниз убирает разговор с глаз, но не прерывает его. Видео сворачивается
+// в окошко, которое можно двигать пальцем; нажатие разворачивает обратно.
+// Экран при этом не перестраивается — он уменьшается целиком, вместе с обоими
+// собеседниками, поэтому и возвращается без перескока.
+let CALL_MINI = false, MINI_X = null, MINI_Y = null;
+const MINI_PAD = 12, MINI_MS = 380, MINI_ЛЕГЧЕ = 'cubic-bezier(.32,.72,0,1)';
+
+function miniK(){
+  const W = window.innerWidth || 390;
+  const ш = Math.round(Math.min(132, Math.max(96, W * .27)));
+  return ш / W;                       // во сколько раз ужимаем весь экран
+}
+function miniSize(){
+  const k = miniK();
+  return {k, ш: Math.round((window.innerWidth || 390) * k),
+             в: Math.round((window.innerHeight || 800) * k)};
+}
+function miniPlace(анимировать){
+  const э = cel('callScr'); if(!э) return;
+  const {k, ш, в} = miniSize();
+  const W = window.innerWidth || 390, H = window.innerHeight || 800;
+  const верх = MINI_PAD + (parseFloat(getComputedStyle(document.documentElement)
+                .getPropertyValue('--safe-top')) || 0);
+  if(MINI_X === null){ MINI_X = W - ш - MINI_PAD; MINI_Y = верх; }
+  MINI_X = Math.max(MINI_PAD, Math.min(MINI_X, W - ш - MINI_PAD));
+  MINI_Y = Math.max(верх, Math.min(MINI_Y, H - в - MINI_PAD));
+  э.style.setProperty('--mk', k);
+  const было = getComputedStyle(э).transform;
+  const стало = 'translate(' + MINI_X + 'px,' + MINI_Y + 'px) scale(' + k + ')';
+  э.style.transform = стало;
+  if(анимировать){
+    try{ э.animate([{transform: было === 'none' ? 'translate(0,0) scale(1)' : было},
+                    {transform: стало}],
+                   {duration: MINI_MS, easing: MINI_ЛЕГЧЕ}); }catch(e){}
+  }
+}
+
+function callMini(свернуть){
+  const э = cel('callScr'); if(!э) return;
+  if(!!свернуть === CALL_MINI) return;
+  CALL_MINI = !!свернуть;
+  _hap('light');
+  if(CALL_MINI){
+    э.classList.add('mini');
+    miniPlace(true);
+  }else{
+    const было = getComputedStyle(э).transform;
+    э.classList.remove('mini');
+    э.style.transform = '';
+    try{ э.animate([{transform: было}, {transform: 'translate(0,0) scale(1)'}],
+                   {duration: MINI_MS, easing: MINI_ЛЕГЧЕ}); }catch(e){}
+  }
+  callRender();
+}
+
+// Свайп вниз по разговору — свернуть. Тянуть можно за что угодно, кроме самих
+// кнопок и маленького окна: у них своя работа.
+function callSwipe(){
+  const э = cel('callScr'); if(!э || э._свайп) return;
+  э._свайп = true;
+  let y0 = null, x0 = 0, тянем = false, свои = false;
+  const своё = t => !!(t.closest && (t.closest('.cs-bar') || t.closest('.cs-head') ||
+                                     t.closest('.cs-slot.pip') || t.closest('.cs-safe')));
+  const начало = (x, y, цель) => {
+    if(CALL_MINI){ y0 = y; x0 = x; тянем = false; свои = false; return; }
+    if(своё(цель)){ y0 = null; return; }
+    y0 = y; x0 = x; тянем = false; свои = false;
+  };
+  const ход = (x, y) => {
+    if(y0 === null) return false;
+    if(CALL_MINI){
+      // свёрнутое окно просто носим за собой
+      if(!тянем && Math.abs(y - y0) + Math.abs(x - x0) < 6) return false;
+      тянем = true;
+      const {ш, в} = miniSize();
+      MINI_X += x - x0; MINI_Y += y - y0; x0 = x; y0 = y;
+      miniPlace(false);
+      return true;
+    }
+    if(!тянем){
+      if(y - y0 < 26) return false;    // вниз и заметно, иначе это не свайп
+      тянем = true; свои = true;
+      // Видео сворачивается в окошко, голос просто уходит с глаз: смотреть в
+      // голосовом звонке не на что, а полоса сверху и так всё скажет.
+      if(cel('callScr')?.classList.contains('video')) callMini(true); else callClose();
+    }
+    return свои;
+  };
+  const конец = () => {
+    if(y0 === null) return;
+    const тянули = тянем;
+    y0 = null; тянем = false;
+    if(CALL_MINI && !тянули){ callMini(false); return; }   // нажали на окошко
+    if(CALL_MINI) miniSnap();
+  };
+  if('ontouchstart' in window){
+    э.addEventListener('touchstart', e => начало(e.touches[0].clientX, e.touches[0].clientY,
+                                                 e.target), {passive: true});
+    э.addEventListener('touchmove', e => {
+      if(ход(e.touches[0].clientX, e.touches[0].clientY)) e.preventDefault();
+    }, {passive: false});
+    э.addEventListener('touchend', конец);
+    э.addEventListener('touchcancel', конец);
+  }else{
+    э.addEventListener('pointerdown', e => начало(e.clientX, e.clientY, e.target));
+    э.addEventListener('pointermove', e => ход(e.clientX, e.clientY));
+    э.addEventListener('pointerup', конец);
+    э.addEventListener('pointercancel', конец);
+  }
+}
+
+// Отпустили — окно само уходит в ближний угол, как маленькое окно камеры.
+function miniSnap(){
+  const {ш, в} = miniSize();
+  const W = window.innerWidth || 390, H = window.innerHeight || 800;
+  const верх = MINI_PAD + (parseFloat(getComputedStyle(document.documentElement)
+                .getPropertyValue('--safe-top')) || 0);
+  MINI_X = (MINI_X + ш / 2) < W / 2 ? MINI_PAD : W - ш - MINI_PAD;
+  MINI_Y = (MINI_Y + в / 2) < H / 2 ? верх : H - в - MINI_PAD;
+  miniPlace(true);
 }
 
 // ── маленькое окно: двигается пальцем, меняется местами по нажатию ──────────

@@ -128,6 +128,19 @@
   // спутать.
   Tones.prototype.ring = function () { this._loop('ring', 3000, function (t) {
     t._beep(620, 0.34, 0.2); setTimeout(function () { t._beep(620, 0.34, 0.2); }, 540); }); };
+  // Связь пропала и собирается заново: тихая двойная нота вниз, раз в две
+  // секунды. Беспокоить она должна ровно настолько, чтобы человек понял: молчит
+  // не собеседник, а связь.
+  Tones.prototype.rejoin = function () { this._loop('rejoin', 2000, function (t) {
+    t._beep(392, 0.16, 0.08);
+    setTimeout(function () { t._beep(311, 0.16, 0.08); }, 230); }); };
+  // Связь вернулась: две ноты вверх, коротко и один раз.
+  Tones.prototype.back = function () {
+    this.stop();
+    var t = this;
+    t._beep(523, 0.12, 0.11);
+    setTimeout(function () { t._beep(698, 0.16, 0.11); }, 140);
+  };
   // Занято: короткий тон вдвое чаще вызова, три круга — дальше человек понял.
   Tones.prototype.busy = function () {
     this.stop();
@@ -199,6 +212,7 @@
     this.kind = '';
     this.defaultTarget = '';
     this.quality = '';       // '', 'good', 'weak', 'bad'
+    this._rejoin = false;    // связь потерялась и собирается заново
     this.tones = new Tones();
 
     this._retry = 0;
@@ -505,13 +519,13 @@
   AmbarCall.prototype.dial = function (toKey, order, video) {
     var self = this;
     this.video = !!video;
-    // Гудок — сразу по нажатию, а не после ответа сервера. Между нажатием и
-    // ответом лежит запрос микрофона с камерой и полный оборот до сервера:
-    // секунда, а то и две тишины, в которую человек успевает решить, что
-    // ничего не работает. Не прошло — тишину сменит короткий отбойный тон.
+    // Звук будим внутри касания — иначе айфон не даст его вовсе, — но гудеть
+    // начинаем только когда звонок и правда пошёл. Раньше гудок стартовал по
+    // нажатию, и человек слышал его ещё стоя перед окном «разрешить
+    // микрофон»: выходило, что телефон гудит, никуда не звоня.
     this.tones.prime();
-    this.tones.ringback();
     return (this.video ? this._micCam() : this._mic()).then(function () {
+      self.tones.ringback();
       self._send({t: 'call', to: toKey || self.defaultTarget || '',
                   order: order || '', video: self.video});
     }).catch(function (e) {
@@ -1036,16 +1050,19 @@
         clearTimeout(self._iceRestartT);
         self._safety();          // ключи сверены — можно показать смайлики
         self._quality('good');
+        self._rejoining(false);  // если собирались заново — собрались
       }
       // Разрыв в тоннеле или в лифте — не повод класть трубку. Даём связи
       // собраться заново и только потом сдаёмся.
       if (st === 'disconnected') {
         self._quality('bad');
+        self._rejoining(true);
         clearTimeout(self._iceRestartT);
         self._iceRestartT = setTimeout(function () { self._restartIce(); }, ICE_RESTART_AFTER);
       }
       if (st === 'failed') {
         self._quality('bad');
+        self._rejoining(true);
         self._restartIce();
       }
     };
@@ -1136,6 +1153,19 @@
     }, STATS_EVERY);
   };
 
+  // Потерянная связь — ещё не конец разговора. Пока она собирается заново,
+  // человек слышит тихую ноту и видит это на экране; вернулась — короткий
+  // подъём вверх, и разговор продолжается. Класть трубку сразу нельзя: в
+  // лифте и в тоннеле связь пропадает на секунды.
+  AmbarCall.prototype._rejoining = function (on) {
+    on = !!on;
+    if (on === !!this._rejoin) return;
+    this._rejoin = on;
+    if (on) this.tones.rejoin();
+    else this.tones.back();
+    this._emit('rejoining', {on: on});
+  };
+
   AmbarCall.prototype._quality = function (q) {
     if (this.quality === q) return;
     this.quality = q;
@@ -1203,6 +1233,7 @@
     this.call = null;
     this._pendingIce = [];
     this.quality = '';
+    this._rejoin = false;
     this._emit('ended', {why: why, say: say || ''});
   };
 

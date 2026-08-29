@@ -1310,6 +1310,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   transition:width .16s cubic-bezier(.32,.72,0,1),background .16s ease}
 .cs-dial i.near{width:17px;background:rgba(255,255,255,.7)}
 .cs-dial i.now{width:27px;background:#fff;box-shadow:0 0 10px rgba(255,244,226,.85)}
+
+/* Пока на экране видеозвонок, страница листаться не должна: разговор занимает
+   всё и стоит на месте. Полоса прокрутки справа выезжала от движения пальцем
+   по кнопкам и только мешала — запертой странице её взять неоткуда. */
+html.call-lock,body.call-lock{overflow:hidden;overscroll-behavior:none}
+html.call-lock::-webkit-scrollbar,body.call-lock::-webkit-scrollbar{width:0;height:0}
 .cs-glow{position:absolute;inset:0;z-index:3;pointer-events:none;opacity:0;
   /* Одной внутренней тенью, а не четырьмя градиентами: градиенты по углам
      складывались друг с другом и давали грязные пятна, а тень идёт по
@@ -2409,7 +2415,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=50"></script>
+<script src="/vendor/ambar-call.js?v=51"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -6593,6 +6599,10 @@ function callVideoPaint(){
   // существует.
   const dial = CALL_VIDEO && (CALL_ST === 'out' || CALL_ST === 'in');
   sc.classList.toggle('video', live || dial);
+  // Экран занят разговором — страницу под ним запираем: листать нечего, а
+  // полоса прокрутки справа только лезла в глаза.
+  document.documentElement.classList.toggle('call-lock', live || dial);
+  document.body.classList.toggle('call-lock', live || dial);
   // На входящем поверх своей камеры лежат имя и кнопки — им нужна подложка.
   sc.classList.toggle('selfie', CALL_VIDEO && CALL_ST === 'in');
   sc.classList.toggle('cam-on', CALL_CAM);

@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=50"></script>
+<script src="/vendor/ambar-call.js?v=51"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -6188,6 +6188,12 @@ button.pill:active{opacity:.6}
   transition:width .16s cubic-bezier(.32,.72,0,1),background .16s ease}
 .cv-dial i.near{width:17px;background:rgba(255,255,255,.7)}
 .cv-dial i.now{width:27px;background:#fff;box-shadow:0 0 10px rgba(255,244,226,.85)}
+
+/* Пока на экране видеозвонок, страница листаться не должна: разговор занимает
+   всё и стоит на месте. Полоса прокрутки справа выезжала от движения пальцем
+   по кнопкам и только мешала — запертой странице её взять неоткуда. */
+html.call-lock,body.call-lock{overflow:hidden;overscroll-behavior:none}
+html.call-lock::-webkit-scrollbar,body.call-lock::-webkit-scrollbar{width:0;height:0}
 .cv-glow{position:absolute;inset:0;z-index:4;pointer-events:none;opacity:0;
   /* Одной внутренней тенью, а не четырьмя градиентами: градиенты по углам
      складывались друг с другом и давали грязные пятна, а тень идёт по
@@ -20392,6 +20398,10 @@ function callVidPaint(){
   // ровно как в фейстайме. Наружу до ответа ничего не идёт: соединения ещё нет.
   const dial = CALL_VIDEO && (CALL_ST === 'out' || CALL_ST === 'in');
   l.classList.toggle('on', live || dial);
+  // Экран занят разговором — страницу под ним запираем: листать нечего, а
+  // полоса прокрутки справа только лезла в глаза.
+  document.documentElement.classList.toggle('call-lock', live || dial);
+  document.body.classList.toggle('call-lock', live || dial);
   // На входящем поверх своей камеры лежат имя и кнопки — им нужна подложка.
   l.classList.toggle('selfie', CALL_VIDEO && CALL_ST === 'in');
   l.classList.toggle('cam-on', CALL_CAM);

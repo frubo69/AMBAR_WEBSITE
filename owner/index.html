@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=59"></script>
+<script src="/vendor/ambar-call.js?v=60"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -5857,7 +5857,7 @@ button.pill:active{opacity:.6}
     <div class="call-bar-n" id="callBarN">—</div>
     <div class="call-bar-s" id="callBarS">00:00</div>
   </div>
-  <span class="call-bar-w" id="callBarW"><svg viewBox="0 0 240 20" preserveAspectRatio="none"><path class="w1" d="M0 8 Q 15 1 30 8 T 60 8 T 90 8 T 120 8 T 150 8 T 180 8 T 210 8 T 240 8 V20 H0 Z"/><path class="w2" d="M0 11 Q 20 4 40 11 T 80 11 T 120 11 T 160 11 T 200 11 T 240 11 V20 H0 Z"/></svg></span>
+  <span class="call-bar-w" id="callBarW"><svg viewBox="0 0 240 20" preserveAspectRatio="none"><path class="w1" d="M0 0 H240 V11 Q 230 4 220 11 T 200 11 T 180 11 T 160 11 T 140 11 T 120 11 T 100 11 T 80 11 T 60 11 T 40 11 T 20 11 T 0 11 Z"/><path class="w2" d="M0 0 H240 V8 Q 220 15 200 8 T 160 8 T 120 8 T 80 8 T 40 8 T 0 8 Z"/></svg></span>
 </div>
 
 <style>
@@ -6322,8 +6322,10 @@ body.call-mini .cs-safe-scrim{display:none}
    Цвет плотный, а не полупрозрачный: сквозь шторку смотреть незачем.
 
    Понизу колышется вода того же цвета, что и сама шторка, — это её нижний
-   край, а не отдельная полоска. На голос он вспухает вниз и опадает обратно;
-   гребень при этом медленно плывёт, иначе вода выглядит нарисованной. */
+   край, а не отдельная полоска. Плоской стороной она прилегает к шторке, а
+   волнистой смотрит вниз: наоборот между ними оставалась щель. На голос край
+   вспухает вниз и опадает обратно, гребень при этом медленно плывёт —
+   неподвижная вода выглядит нарисованной. */
 .call-bar{--barbg:#3f434c;
   position:fixed;left:0;right:0;top:0;bottom:auto;z-index:150;
   display:none;align-items:center;justify-content:center;gap:9px;
@@ -6332,7 +6334,7 @@ body.call-mini .cs-safe-scrim{display:none}
      а высота — вся безопасная зона плюс немного, чтобы кнопки оказались
      внутри шторки, а не над ней. Имя при этом стоит посередине полосы. */
   box-sizing:border-box;
-  min-height:calc(var(--safe-top) + 7px);
+  min-height:calc(var(--safe-top) - 6px);
   padding:var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) 76px 4px;
   background:var(--barbg);color:#fff;box-shadow:none;cursor:pointer;
   transition:background .32s ease}
@@ -6342,7 +6344,14 @@ body.call-mini .cs-safe-scrim{display:none}
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .call-bar-s{flex:none;font-size:13px;font-weight:600;color:rgba(255,255,255,.72);
   font-variant-numeric:tabular-nums}
-.call-bar-av,.call-bar-live,.call-bar-go,.call-bar-b{display:none}
+/* Кружок, точка и подпись «к звонку» в шторке лишние: там место только имени.
+   Селектор с двумя классами намеренно — у кружка ниже есть своё правило, и по
+   одному классу оно бы его перебило. А вот обёртку с именем и временем прятать
+   нельзя: имя лежит именно в ней. */
+.call-bar .call-bar-av,
+.call-bar .call-bar-live,
+.call-bar .call-bar-go{display:none}
+.call-bar .call-bar-b{display:flex;align-items:center;gap:9px;min-width:0;flex:0 1 auto}
 .call-bar-w{position:absolute;left:0;right:0;top:100%;height:22px;
   pointer-events:none;transform-origin:50% 0;
   transform:scaleY(var(--amp,.32));transition:transform .16s ease}

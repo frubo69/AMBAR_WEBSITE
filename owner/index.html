@@ -2556,7 +2556,7 @@ button.path:active{transform:scale(.995)}
 /* Найден код — рамка едет на него и обнимает его углами. Стороны у неё
    произвольные: код в кадре редко квадратный. */
 .scan-frame.lock{transform:none;aspect-ratio:auto;
-  transition:left .1s linear,top .1s linear,width .1s linear,height .1s linear}
+  transition:left .12s ease-out,top .12s ease-out,width .12s ease-out,height .12s ease-out}
 .scan-frame .c{position:absolute;width:26px;height:26px;border:3px solid rgba(255,255,255,.9);
   transition:border-color .18s var(--e1),opacity .2s var(--e1)}
 .scan-frame .tl{top:-2px;left:-2px;border-right:none;border-bottom:none;border-radius:14px 0 0 0}
@@ -12290,24 +12290,51 @@ const SFX = {
 // Рамка садится на найденный код: те же четыре угла, только теперь они
 // огибают саму крышку, а не висят посреди экрана. Отдельной заливки нет —
 // зелёным становятся углы, и видно, какую именно бутылку засчитали.
-function scanTrack(четыре){
+//
+// Держится она за код, а не за отдельный удачный кадр. Распознавание мигает:
+// из десяти кадров в секунду код читается в пяти, в остальных теряется на
+// блике, наклоне или дрожании руки. Если верить каждому кадру, рамка скачет
+// туда-сюда — ровно это и было видно. Поэтому: попадание подтягивает рамку
+// плавно, пропуски она пережидает на месте, и уходит только когда код не
+// показывался по-настоящему долго. Другой код — прыжок сразу: это уже другая
+// бутылка, и тянуться к ней плавно было бы враньём.
+const ТРЕК_ДЕРЖИМ = 1500;   // мс без единого попадания, после которых отпускаем
+const ТРЕК_ТЯГА   = 0.35;   // насколько подтягиваемся к новому месту за кадр
+let _трек = {код: '', где: null, когда: 0};
+
+function scanTrackReset(){
+  _трек = {код: '', где: null, когда: 0};
+  const ф = document.querySelector('.scan-cam .scan-frame');
+  if(!ф) return;
+  ф.classList.remove('lock');
+  ф.style.left = ''; ф.style.top = ''; ф.style.width = ''; ф.style.height = '';
+}
+
+function scanTrack(четыре, код){
   const ф = document.querySelector('.scan-cam .scan-frame');
   if(!ф) return;
   if(!четыре){
-    ф.classList.remove('lock');
-    ф.style.left = ''; ф.style.top = ''; ф.style.width = ''; ф.style.height = '';
+    if(_трек.где && Date.now() - _трек.когда < ТРЕК_ДЕРЖИМ) return;  // пережидаем
+    if(_трек.где) scanTrackReset();
     return;
   }
   const x = четыре.map(t => t[0]), y = четыре.map(t => t[1]);
-  const l = Math.min.apply(null, x), r = Math.max.apply(null, x);
-  const t = Math.min.apply(null, y), b = Math.max.apply(null, y);
+  const л = Math.min.apply(null, x), п = Math.max.apply(null, x);
+  const в = Math.min.apply(null, y), н = Math.max.apply(null, y);
   // Небольшой запас: углы должны обнимать код, а не резать его по краю.
-  const зx = (r - l) * .08, зy = (b - t) * .08;
+  const зx = (п - л) * .08, зy = (н - в) * .08;
+  let к = {л: л - зx, в: в - зy, ш: (п - л) + зx * 2, вы: (н - в) + зy * 2};
+  if(_трек.где && _трек.код === (код || '')){
+    const p = _трек.где, a = ТРЕК_ТЯГА;
+    к = {л: p.л + (к.л - p.л) * a, в: p.в + (к.в - p.в) * a,
+         ш: p.ш + (к.ш - p.ш) * a, вы: p.вы + (к.вы - p.вы) * a};
+  }
+  _трек = {код: код || '', где: к, когда: Date.now()};
   ф.classList.add('lock');
-  ф.style.left   = Math.max(0, l - зx).toFixed(2) + '%';
-  ф.style.top    = Math.max(0, t - зy).toFixed(2) + '%';
-  ф.style.width  = Math.min(100, (r - l) + зx * 2).toFixed(2) + '%';
-  ф.style.height = Math.min(100, (b - t) + зy * 2).toFixed(2) + '%';
+  ф.style.left   = Math.max(0, к.л).toFixed(2) + '%';
+  ф.style.top    = Math.max(0, к.в).toFixed(2) + '%';
+  ф.style.width  = Math.min(100, к.ш).toFixed(2) + '%';
+  ф.style.height = Math.min(100, к.вы).toFixed(2) + '%';
 }
 
 // Экран сканера занимает всё: камера во весь экран, шапка раздела стеклом
@@ -12394,7 +12421,7 @@ const SCAN = {
     if(this.raf){ cancelAnimationFrame(this.raf); this.raf = null; }
     if(this.stream){ this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
     if(this.video) this.video.srcObject = null;
-    scanTrack(null);
+    scanTrackReset();
     if(свой) return;
     // Сканер ушёл — раздел снова обычный экран со своей шапкой и фоном.
     document.querySelectorAll('.stk-ov.scan-live')
@@ -12458,7 +12485,7 @@ const SCAN = {
                   ((vy - v.videoHeight / 2) * scale + ch / 2) / ch * 100];
         };
         scanTrack([точка(L.topLeftCorner), точка(L.topRightCorner),
-                   точка(L.bottomRightCorner), точка(L.bottomLeftCorner)]);
+                   точка(L.bottomRightCorner), точка(L.bottomLeftCorner)], code);
       }catch(e){}
       this.lastHit = Date.now();
       const now = Date.now();
@@ -12479,9 +12506,7 @@ const SCAN = {
       if(this.onCode) this.onCode(code);
       return;
     }
-    // Код ушёл из кадра — снимаем обводку. Не сразу: между двумя удачными
-    // кадрами бывает промах, и обводка мигала бы на каждом.
-    if(Date.now() - this.lastHit > 350) scanTrack(null);
+    scanTrack(null);   // держать или отпустить — решает сама обводка
     if(this.onIdle) this.onIdle(Date.now() - this.lastHit, this.frames,
                                 Math.round(this.frames / Math.max(1,(Date.now()-this.t0)/1000)));
   },

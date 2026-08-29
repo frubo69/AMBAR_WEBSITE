@@ -485,6 +485,10 @@
         this._emit('remotecam', {on: !!m.on});
         break;
 
+      case 'micstate':                              // и микрофон тоже
+        this._emit('remotemic', {on: !!m.on});
+        break;
+
       case 'sdp':
         this._onSdp(m.data);
         break;
@@ -549,6 +553,9 @@
   AmbarCall.prototype.mute = function (on) {
     if (!this.stream) return false;
     this.stream.getAudioTracks().forEach(function (t) { t.enabled = !on; });
+    // Собеседник обязан знать, что его не слышат: иначе он говорит в пустоту и
+    // винит связь. Говорим теми же словами, что и про камеру.
+    this._send({t: 'micstate', on: !on});
     return !!on;
   };
 
@@ -799,6 +806,27 @@
   };
 
   // Переднюю на заднюю и обратно: показать полку или подъезд удобнее задней.
+  // ── громкость ────────────────────────────────────────────────────────────
+  // Насколько громко говорят — своя дорожка и чужая. Берём из статистики
+  // соединения, а не из веб-аудио: на айфоне чужой поток веб-аудио отдаёт
+  // тишиной, я это уже проверял на ушном динамике. Здесь же цифра приходит от
+  // самого соединения и одинаково работает везде, где оно вообще есть.
+  AmbarCall.prototype.levels = function () {
+    var pc = this.pc;
+    if (!pc || !pc.getStats) return Promise.resolve({me: 0, peer: 0});
+    return pc.getStats().then(function (rep) {
+      var me = 0, peer = 0;
+      rep.forEach(function (o) {
+        if (typeof o.audioLevel !== 'number') return;
+        if (o.type === 'media-source' && o.kind === 'audio') me = o.audioLevel;
+        else if (o.type === 'inbound-rtp' && o.kind === 'audio') peer = o.audioLevel;
+        else if (o.type === 'track' && o.remoteSource === false) me = o.audioLevel;
+        else if (o.type === 'track' && o.remoteSource === true) peer = o.audioLevel;
+      });
+      return {me: me, peer: peer};
+    }).catch(function () { return {me: 0, peer: 0}; });
+  };
+
   // ── фонарик ──────────────────────────────────────────────────────────────
   // Настоящая вспышка есть только у задней камеры: у фронтальной её нет ни на
   // одном телефоне, и там светят экраном — это делает уже сам экран звонка.
@@ -1027,6 +1055,7 @@
     // Сразу сообщаем, есть ли у нас картинка: собеседник должен знать это с
     // первой секунды, а не после первого переключения.
     this._send({t: 'camstate', on: !!this.cam});
+    this._send({t: 'micstate', on: !this.muted()});
 
     this._capVideo();
 

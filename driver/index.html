@@ -1254,10 +1254,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
              inset 0 0 0 40px #fff}
 .cs-rb.drop{background:linear-gradient(160deg,#E8615F,#D0413F);color:#fff;
   box-shadow:inset 0 0 0 .5px rgba(255,255,255,.28),0 10px 28px rgba(176,48,48,.36)}
-/* Перечёркивание не рисуется по ходу: оно просто есть у выключенного, а
-   движение берёт на себя заливка. */
-.cs-rb .cvx{opacity:0;transition:opacity .12s ease}
-.cs-rb.on .cvx{opacity:1}
+/* Перечёркивание не рисуется по ходу — движение берёт на себя заливка.
+   У микрофона оно вообще не мигает: значок говорит, что сделает нажатие, а
+   состояние показывает залитая белым карточка. У камеры иначе: там
+   перечёркивание и есть состояние. */
+.cs-rb .cvx{{opacity:0;transition:opacity .12s ease}}
+.cs-rb.on .cvx{{opacity:1}}
+#csMic .cvx{{opacity:1}}
 /* Поворот отзывается сам: значок делает пол-оборота. */
 .cs-flip.spin svg{animation:cvflip .52s cubic-bezier(.32,.72,0,1)}
 @keyframes cvflip{from{transform:rotate(0)}to{transform:rotate(180deg)}}
@@ -1283,9 +1286,11 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .cs-head{position:absolute;top:calc(14px + var(--safe-top));left:14px;z-index:4;
   display:none;align-items:center;gap:9px}
 .call-scr.video .cs-head{display:flex}
-.cs-lampbox{position:relative;display:none}
+.cs-lampbox{position:relative;display:none;align-self:stretch}
 .call-scr.video.cam-on .cs-lampbox{display:block}
-.cs-lamp{--d:clamp(40px,11vw,48px);width:var(--d);height:var(--d);border-radius:50%;
+/* Рост берём у плашки с именем: две вещи в одной строке обязаны быть одного
+   роста, иначе строка выглядит собранной наспех. */
+.cs-lamp{height:100%;aspect-ratio:1;border-radius:50%;
   border:0;cursor:pointer;display:flex;align-items:center;justify-content:center;color:#fff;
   background:linear-gradient(160deg,rgba(255,255,255,.20),rgba(255,255,255,.09));
   backdrop-filter:blur(24px) saturate(180%);
@@ -1522,6 +1527,25 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   display:none;align-items:center;gap:9px;padding:9px 14px;cursor:pointer;
   background:rgba(76,175,125,.14);border-bottom:1px solid rgba(76,175,125,.3);
   backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px)}
+/* Шторка звонка. Пока не ответили — серая, в разговоре зелёная. По нижнему
+   краю идёт волна: её высота бежит за громкостью — своей и собеседника, что
+   громче. Волна нарисована один раз и только тянется по высоте, а плывёт
+   сдвигом, поэтому обе части движения лежат на видеокарте, а не считаются
+   заново. Уровень приходит скачками, поэтому он сглажен: дёргающаяся волна
+   выглядела бы тревожно, а она должна быть незаметной. */
+/* Положение у шторки своё в каждом приложении — здесь его не трогаем, иначе
+   она выпадает из своего слоя. Добавляем только обрезку под волну и цвет. */
+.call-bar{overflow:hidden;color:rgba(255,255,255,.5);
+  transition:background .3s ease,border-color .3s ease,color .3s ease}
+.call-bar.live{color:var(--up)}
+.call-bar-w{position:absolute;left:0;right:0;bottom:0;height:14px;
+  pointer-events:none;opacity:.8}
+.call-bar-w svg{position:absolute;left:0;bottom:0;width:200%;height:100%;
+  animation:barDrift 6s linear infinite}
+.call-bar-w path{fill:none;stroke:currentColor;stroke-width:1.5;
+  vector-effect:non-scaling-stroke;transform-origin:50% 50%;
+  transform:scaleY(var(--amp,.16));transition:transform .13s ease}
+@keyframes barDrift{to{transform:translateX(-50%)}}
 .call-bar.on{display:flex}
 .call-bar-live{width:8px;height:8px;border-radius:50%;background:var(--up);flex-shrink:0;
   animation:callLive 1.4s ease-in-out infinite}
@@ -1934,6 +1958,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
   <span class="call-bar-n" id="callBarN">—</span>
   <span class="call-bar-s" id="callBarS">00:00</span>
   <span class="call-bar-go">к звонку</span>
+  <span class="call-bar-w" id="callBarW"><svg viewBox="0 0 240 14" preserveAspectRatio="none"><path d="M0 7 Q 5 1.6 10 7 T 20 7 T 30 7 T 40 7 T 50 7 T 60 7 T 70 7 T 80 7 T 90 7 T 100 7 T 110 7 T 120 7 T 130 7 T 140 7 T 150 7 T 160 7 T 170 7 T 180 7 T 190 7 T 200 7 T 210 7 T 220 7 T 230 7 T 240 7"/></svg></span>
 </div>
 
 <div id="body"><div class="empty">Загрузка…</div></div>
@@ -2458,7 +2483,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=53"></script>
+<script src="/vendor/ambar-call.js?v=54"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -6405,6 +6430,7 @@ function callEvent(t, d){
     case 'ring':
       CALL_ST = 'in'; CALL_WHO = d.peer; CALL_ROLE = callRole(d.kind, d.peer);
       CALL_VIDEO = !!d.video; CALL_CAM = !!(CALL && CALL.camLive && CALL.camLive()); CALL_RCAM = false;
+      CALL_RMIC = true;
       callOpen(); callBuzz(); callRender();
       // Видеозвонок — сразу показываем человеку его самого, как в фейстайме.
       // Наружу ничего не уходит: соединения до ответа не существует, картинку
@@ -6451,6 +6477,12 @@ function callEvent(t, d){
                v.play().catch(()=>{}); }
         callVideoPaint(); callRender();
       }
+      return;
+    case 'remotemic':
+      // Собеседник сказал, слышно его или нет. Молчание в трубке должно иметь
+      // объяснение на экране, иначе человек винит связь.
+      CALL_RMIC = !!d.on;
+      callVideoPaint(); callRender();
       return;
     case 'remotecam':
       CALL_RCAM = !!d.on;
@@ -6531,13 +6563,37 @@ function callPaintQuality(){
 
 // Полоса «идёт разговор» под шапкой: окно связи можно закрыть и смотреть
 // адрес, но забыть, что ты в разговоре, нельзя.
+// Громкость для волны в шторке. Спрашиваем соединение восемь раз в секунду —
+// это дёшево, — и сглаживаем: уровень приходит скачками, а волна должна
+// дышать, а не дёргаться.
+let BAR_T = null, BAR_A = .16;
+function barWave(вкл){
+  const w = cel('callBarW');
+  if(BAR_T){ clearInterval(BAR_T); BAR_T = null; }
+  if(!w) return;
+  if(!вкл){ BAR_A = .16; w.style.setProperty('--amp', BAR_A); return; }
+  BAR_T = setInterval(() => {
+    if(!CALL || !CALL.levels) return;
+    CALL.levels().then(l => {
+      const пик = Math.max(l.me || 0, l.peer || 0);
+      const цель = Math.min(1, .16 + пик * 3.4);
+      BAR_A += (цель - BAR_A) * .45;
+      w.style.setProperty('--amp', BAR_A.toFixed(3));
+    }).catch(() => {});
+  }, 125);
+}
+
 function callBar(){
   const b = cel('callBarWrap');
   if(!b) return;
-  const on = CALL_ST === 'live' && !cel('callScr').classList.contains('show');
+  // Шторка висит и пока не ответили: звонок уже идёт, и человек должен видеть
+  // его, даже уйдя с экрана. Серая — ещё звоним, зелёная — говорим.
+  const on = CALL_ST !== 'idle' && !cel('callScr').classList.contains('show');
   b.classList.toggle('on', on);
+  b.classList.toggle('live', CALL_ST === 'live');
   document.body.classList.toggle('callbar-on', on);
   if(on) cel('callBarN').textContent = CALL_WHO;
+  barWave(on && CALL_ST === 'live');
 }
 
 // Пропущенные считаются только те, что человек ещё не видел. Иначе цифра на
@@ -6728,7 +6784,7 @@ function callVideoPaint(){
   // которого всё и затевалось.
   cel('csCam')?.classList.toggle('on', !CALL_CAM);
   cel('csMic')?.classList.toggle('on', _callMuted);
-  noteMute(_callMuted && CALL_VIDEO && CALL_ST === 'live');
+  noteMute(CALL_VIDEO && CALL_ST === 'live' ? noteWhat() : '');
 }
 
 // Яркость экранного света — восемь ступеней. Первая та самая узкая полоса,
@@ -6846,47 +6902,75 @@ function lampDrag(){
   кн.addEventListener('click', () => { if(!кн._ptr) callLamp(); });
 }
 
-// Строка «ваш микрофон выключен» над кнопками. Сначала появляется значок,
-// потом строка раздвигается и проступает текст — как в телефоне. Ширину ведём
-// числом: между «по содержимому» и «по содержимому» перехода не бывает.
-function noteMute(показать){
-  const n = cel('csNote'); if(!n) return;
-  clearTimeout(noteMute._t1);
-  const узкая = 45;                       // только значок и поля
-  if(показать){
-    if(n.classList.contains('on')) return;   // уже висит — не мигаем заново
-    n.classList.add('on'); n.classList.remove('wide');
-    n.style.width = 'auto';
-    const полная = Math.ceil(n.offsetWidth);
-    n.style.width = узкая + 'px';
-    const знак = n.querySelector('.cs-note-i');
+// Строка о выключенном микрофоне — над кнопками. Появляется значком, потом
+// раздвигается и проступает текст; уходит обратным порядком: сначала гаснет
+// текст, потом строка складывается до значка, и только потом исчезает сам
+// значок. Раньше всё это шло одним движением, и складывание выглядело рывком.
+//
+// Строка одна на два случая: молчу я, молчит собеседник или молчим оба.
+let CALL_RMIC = true;              // слышно ли собеседника (он сам сказал)
+
+function noteWhat(){
+  const я = !!_callMuted, он = CALL_RMIC === false;
+  if(я && он) return 'Микрофоны выключены у обоих';
+  if(я) return 'Ваш микрофон выключен';
+  if(он) return (CALL_WHO || 'Собеседник') + ' выключил звук';
+  return '';
+}
+
+function noteMute(текст){
+  const n = cel('csNote') || cel('cvNote'); if(!n) return;
+  const т = n.querySelector('.cs-note-t') || n.querySelector('.cv-note-t');
+  const узкая = 45;
+  clearTimeout(noteMute._t); clearTimeout(noteMute._t2);
+
+  if(!текст){
+    if(!n.classList.contains('on')) return;
+    // Складываем по частям и не спеша: текст, потом ширина, потом сама строка.
+    n.classList.remove('wide');
+    const полная = n.offsetWidth;
     try{
-      знак?.animate([{opacity: 0, transform: 'scale(.4)'}, {opacity: 1, transform: 'none'}],
-                    {duration: 220, easing: 'cubic-bezier(.32,.72,0,1)'});
-      n.animate([{opacity: 0}, {opacity: 1}], {duration: 160});
+      n.animate([{width: полная + 'px'}, {width: узкая + 'px'}],
+                {duration: 340, delay: 170, fill: 'backwards',
+                 easing: 'cubic-bezier(.32,.72,0,1)'});
+      n.animate([{opacity: 1}, {opacity: 0}], {duration: 180, delay: 520, fill: 'forwards'});
     }catch(e){}
-    noteMute._t1 = setTimeout(() => {
-      try{ n.animate([{width: узкая + 'px'}, {width: полная + 'px'}],
-                     {duration: 300, easing: 'cubic-bezier(.32,.72,0,1)'}); }catch(e){}
-      n.style.width = полная + 'px';
-      n.classList.add('wide');
-    }, 170);
+    n.style.width = узкая + 'px';
+    noteMute._t = setTimeout(() => {
+      n.classList.remove('on'); n.style.width = ''; n.style.opacity = '';
+    }, 700);
     return;
   }
-  if(!n.classList.contains('on')) return;
-  n.classList.remove('wide');
-  const полная = n.offsetWidth;
-  // Уходит одной анимацией и по одному таймеру. Цепочка из двух таймеров тут
-  // была ошибкой: в фоновой вкладке вложенные душатся, и строка застревала
-  // наполовину сложенной.
-  try{
-    n.animate([{width: полная + 'px', opacity: 1},
-               {width: узкая + 'px', opacity: 1, offset: .62},
-               {width: узкая + 'px', opacity: 0}],
-              {duration: 380, easing: 'cubic-bezier(.32,.72,0,1)'});
-  }catch(e){}
+
+  if(n.classList.contains('on')){
+    if(т && т.textContent === текст) return;          // то же самое — не дёргаем
+    if(т) т.textContent = текст;                      // сменился повод
+    const было = n.offsetWidth;
+    n.style.width = 'auto';
+    const стало = Math.ceil(n.offsetWidth);
+    n.style.width = стало + 'px';
+    try{ n.animate([{width: было + 'px'}, {width: стало + 'px'}],
+                   {duration: 300, easing: 'cubic-bezier(.32,.72,0,1)'}); }catch(e){}
+    return;
+  }
+
+  if(т) т.textContent = текст;
+  n.classList.add('on'); n.classList.remove('wide');
+  n.style.opacity = '';
+  n.style.width = 'auto';
+  const полная = Math.ceil(n.offsetWidth);
   n.style.width = узкая + 'px';
-  noteMute._t1 = setTimeout(() => { n.classList.remove('on'); n.style.width = ''; }, 380);
+  const знак = n.querySelector('.cs-note-i') || n.querySelector('.cv-note-i');
+  try{
+    знак?.animate([{opacity: 0, transform: 'scale(.4)'}, {opacity: 1, transform: 'none'}],
+                  {duration: 240, easing: 'cubic-bezier(.32,.72,0,1)'});
+    n.animate([{opacity: 0}, {opacity: 1}], {duration: 180});
+    n.animate([{width: узкая + 'px'}, {width: полная + 'px'}],
+              {duration: 320, delay: 200, fill: 'backwards',
+               easing: 'cubic-bezier(.32,.72,0,1)'});
+  }catch(e){}
+  n.style.width = полная + 'px';
+  noteMute._t = setTimeout(() => n.classList.add('wide'), 380);
 }
 
 // ── фонарик ────────────────────────────────────────────────────────────────
@@ -7393,7 +7477,7 @@ function callMute(){
   // разговора заново — вместе с кнопками и окнами видео, — и от этого экран
   // моргал на каждое нажатие. Меняется одна кнопка, её и меняем.
   cel('csMic')?.classList.toggle('on', _callMuted);
-  noteMute(_callMuted && CALL_VIDEO && CALL_ST === 'live');
+  noteMute(CALL_VIDEO && CALL_ST === 'live' ? noteWhat() : '');
   const кн = document.querySelector('.cs-btn.mute');
   if(кн){
     кн.classList.toggle('on', _callMuted);

@@ -72,6 +72,9 @@ html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-seri
    пикселей плюс домашняя полоса, и ещё восемь сверху. Было сто двадцать — и
    полсотни пустоты внизу заставляли страницу листаться там, где смотреть уже
    не на что. Свой зазор до панели каждая страница добавляет сама. */
+/* Оттягивание за край гасим везде: страница отъезжает и пружинит обратно даже
+   там, где листать нечего, и это читается как «всё поехало». */
+html,body{overscroll-behavior:none}
 body{padding-bottom:calc(76px + var(--safe-bottom));min-height:100vh;
   background:
     radial-gradient(ellipse 120% 60% at 50% -10%, rgba(201,169,110,.05), transparent 60%),
@@ -10918,6 +10921,24 @@ function accFit(){
   box.style.minHeight = место + 'px';
 }
 addEventListener('resize', () => { try{ accFit(); }catch(e){} });
+
+// Учёт — страница из одних кнопок, двигать на ней нечего. Одного совпадения
+// высот мало: вебкит всё равно оттягивает страницу под пальцем и отпускает
+// обратно, и кнопки плавают. Поэтому пока листать нечего — гасим само
+// движение. Появилось что листать (открыли раздел внутри) — не мешаем.
+// Вешаем сразу: разметка страницы стоит выше этого кода, а событие загрузки к
+// этому моменту уже прошло бы — и обработчика не случилось бы вовсе.
+(function(){
+  const стр = document.getElementById('pg-money'); if(!стр) return;
+  стр.addEventListener('touchmove', e => {
+    const ск = document.scrollingElement;
+    if(ск && ск.scrollHeight > ск.clientHeight + 1) return;
+    const свой = e.target && e.target.closest &&
+                 e.target.closest('[data-scroll],.stk-scroll,.ca-list');
+    if(свой && свой.scrollHeight > свой.clientHeight + 1) return;
+    e.preventDefault();
+  }, {passive: false});
+})();
 
 function accRender(){
   const box = document.getElementById('accHome'); if(!box) return;

@@ -3120,6 +3120,7 @@ button.path:active{transform:scale(.995)}
 .wo-a-ph span{flex:1;font-size:12.5px;font-weight:600;color:var(--up)}
 .wo-a-ph b{cursor:pointer;color:var(--muted);padding:0 4px}
 .wo-c-l i{font-style:normal;text-transform:none;letter-spacing:0;opacity:.7}
+.wo-a-hint{margin-top:14px;font-size:11.5px;line-height:1.55;color:var(--muted)}
 
 /* ── Удержание ────────────────────────────────────────────────────────────
    Три ответа в одном окне: с кого, сколько и за что. Меньше нельзя — сумма
@@ -17993,16 +17994,22 @@ function woAddQty(d){ if(!WOA) return; WOA.qty = Math.max(1, Math.min(240, WOA.q
 function woAddPaint(){
   const w = WOA; if(!w) return;
   const box = document.getElementById('woAddBody'); if(!box) return;
+  const утеря = w.kind === 'потеря';
   const cat = (ORD.d && (ORD.d.all_rows || ORD.d.rows)) || [];
   const q = (w.q || '').toLowerCase().trim();
   const list = q ? cat.filter(r => (r.name||'').toLowerCase().includes(q)).slice(0, 8) : [];
-  const нужноФото = w.kind !== 'потеря';
+  // Бутылку в руках не надо описывать словами: код с крышки знает и позицию,
+  // и точку, и что это ровно одна бутылка. Поэтому у боя, брака и просрочки
+  // весь ввод — вид, снимок и камера.
+  //
+  // Утеря — другой случай: бутылки нет, сканировать нечего, и остаётся
+  // единственный путь — сказать руками, что именно пропало и сколько.
   box.innerHTML = `
     <div class="wo-c-l">Что случилось</div>
     <div class="wo-c-who">${WO_KINDS.map(k => `
       <button class="wo-c-p ${w.kind===k?'on':''}" onclick="woAddSet('kind','${k}')">${k}</button>`).join('')}</div>
-
-    <div class="wo-c-l">Позиция</div>
+    ` + (утеря ? `
+    <div class="wo-c-l">Что пропало</div>
     ${w.item ? `<button class="wo-a-item" onclick="woAddSet('item','')">
         <span>${escS(w.name)}</span><b>✕</b></button>`
       : `<input class="wo-c-note" id="woAddQ" placeholder="Начните вводить название"
@@ -18025,7 +18032,11 @@ function woAddPaint(){
       <button class="wo-c-p ${w.district===d.id?'on':''}"
               onclick="woAddSet('district','${d.id}')">${escS(d.code||'')}</button>`).join('')}</div>
 
-    <div class="wo-c-l">Фото${нужноФото ? '' : ' <i>для утери не нужно</i>'}</div>
+    <div class="wo-c-l">Комментарий</div>
+    <input class="wo-c-note" placeholder="что произошло"
+           value="${escS(w.note||'')}" oninput="WOA.note=this.value">
+    ` : `
+    <div class="wo-c-l">Снимок <i>один на всё, что списываете сейчас</i></div>
     ${w.thumb ? `<div class="wo-a-ph"><img src="${w.thumb}" alt="">
         <span>снимок готов</span><b onclick="WOA.photo='';WOA.thumb='';woAddPaint()">✕</b></div>`
       : `<div class="wo-a-ph-b">
@@ -18034,10 +18045,16 @@ function woAddPaint(){
         </div>`}
 
     <div class="wo-c-l">Комментарий</div>
-    <input class="wo-c-note" placeholder="что именно случилось"
-           value="${escS(w.note||'')}" oninput="WOA.note=this.value">`;
+    <input class="wo-c-note" placeholder="что произошло"
+           value="${escS(w.note||'')}" oninput="WOA.note=this.value">
+
+    <div class="wo-a-hint">Дальше — камера: сканируйте крышки. Одна крышка —
+      одна бутылка, позиция и точка возьмутся из кода.</div>`);
   const go = document.getElementById('woAddGo');
-  if(go) go.disabled = !(w.item && w.qty > 0 && w.district && (w.photo || !нужноФото));
+  if(go){
+    go.textContent = утеря ? 'Списать' : 'Сканировать крышки';
+    go.disabled = утеря ? !(w.item && w.qty > 0 && w.district) : !w.photo;
+  }
 }
 
 // Снимок ужимаем на телефоне: с камеры приходит четыре мегабайта, а нужен
@@ -18069,7 +18086,9 @@ function woShot(inp){
 }
 
 async function woAddSave(){
-  const w = WOA; if(!w || !w.item) return;
+  const w = WOA; if(!w) return;
+  if(w.kind !== 'потеря'){ woScanStart(); return; }
+  if(!w.item) return;
   const go = document.getElementById('woAddGo');
   if(go){ go.disabled = true; go.textContent = 'Записываю…'; }
   try{
@@ -18089,6 +18108,140 @@ async function woAddSave(){
   ACC_WO = null;
   shTab('wo');
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+}
+
+// ── списание сканом ─────────────────────────────────────────────────────────
+// Крышка в руке отвечает на всё, что раньше спрашивала форма: что за позиция,
+// на какой точке лежит и сколько её списывают. Одна крышка — одна бутылка.
+// Снимок один на проход: коробка разбитых бутылок — это одно событие, а не
+// восемь фотографий одного и того же.
+let WOS = {rows: [], total: 0, kind: '', note: '', photo: '', thumb: ''};
+let WOSQ = null;
+function wosQ(){
+  if(!WOSQ) WOSQ = Object.assign({}, SCANQ, {items: [], busy: false, onDone: wosDone});
+  return WOSQ;
+}
+const WOS_V = {
+  ok:      ['ok',    'списана',        'var(--up)'],
+  already: ['dup',   'уже списана',    'var(--warn)'],
+  sold:    ['dup',   'ушла с заказом', 'var(--warn)'],
+  unknown: ['err',   'нет в реестре',  'var(--dn)'],
+  no_item: ['err',   'нет в каталоге', 'var(--dn)'],
+  nohome:  ['err',   'офис не указан', 'var(--dn)'],
+};
+
+async function woScanStart(){
+  const w = WOA; if(!w || !w.photo) return;
+  WOS = {rows: [], total: 0, kind: w.kind, note: w.note || '',
+         photo: w.photo, thumb: w.thumb};
+  woAddClose();
+  _setText('accTitle', 'Списание · ' + WOS.kind);
+  _setText('accSub', 'сканируйте крышки');
+  _setRail('accRail', '');
+  ACC_BACK = woScanDone;
+  document.getElementById('accFoot').innerHTML = '';
+  document.getElementById('accMid').innerHTML = `
+    <div class="qwrap">
+    <div class="scan-cam" id="qrCam">
+      <video id="qrVideo" playsinline muted autoplay></video>
+      <div class="scan-frame" id="qrFrame">
+        <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+        <div class="scan-badge" id="qrBadge"></div>
+      </div>
+      <div class="scan-hud">
+        <div class="scan-hud-top">
+          <div class="scan-pill"><b id="wosN">0</b><span>списано</span></div>
+          <div class="scan-tools">
+            <button class="scan-tool" id="qrTorch" onclick="qrTorch(this)" style="display:none">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+                stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 2h6l-1 7h4l-8 13 2-9H8z"/></svg></button>
+          </div>
+        </div>
+        <div class="scan-tip" id="qrHint">Наведите на код крышки</div>
+        <div class="scan-hud-bot">
+          <div class="scan-strip" id="wosFeed"></div>
+          <div class="scan-dockbar">
+            <button class="scan-go" onclick="woScanDone()">Готово</button>
+          </div>
+        </div>
+      </div>
+    </div></div>`;
+  scanLive('accOv');
+  wosPaint();
+  try{
+    await SCAN.start(document.getElementById('qrVideo'), wosSave, qrIdle,
+                     () => qrFlash('again', 'уже списана'), qrHold);
+  }catch(e){
+    _setText('qrHint', 'Камера недоступна, включаю сканер Telegram');
+    const tg = window.Telegram && Telegram.WebApp;
+    if(tg && tg.showScanQrPopup) tg.showScanQrPopup({text:'Списание'}, t => { wosSave(t); return false; });
+    else _toast('Сканер недоступен');
+    return;
+  }
+  const t = document.getElementById('qrTorch');
+  if(t) t.style.display = SCAN.hasTorch() ? '' : 'none';
+}
+
+function wosSave(code){
+  code = String(code || '').trim(); if(!code) return;
+  WOS.rows.unshift({code, state:'sending', name:'', label:''});
+  wosPaint();
+  qrFlash('ok', 'списана');
+  wosQ().push({path:'/api/owner/stock/writeoff/scan', code, body:{
+    code, kind: WOS.kind, note: WOS.note, photo: WOS.photo, thumb: WOS.thumb,
+    day: accDay(), as: _meName()}});
+}
+
+function wosDone(err, r, job){
+  const row = WOS.rows.find(x => x.code === job.code && x.state === 'sending');
+  if(err){
+    if(row) row.state = 'fail';
+    SCAN.seen.delete(job.code); SCAN.seenAt.delete(job.code);
+    qrFlash('err', 'не сохранилось'); wosPaint(); return;
+  }
+  const [flash, say, color] = WOS_V[r.verdict] || WOS_V.ok;
+  if(row){
+    row.state = r.ok ? 'new' : 'dup';
+    row.verdict = r.verdict; row.name = r.name || ''; row.label = r.label || '';
+    row.where = r.district_code || ''; row.color = color;
+  }
+  if(r.ok) WOS.total++;
+  else qrFlash(flash, r.say || say);
+  wosPaint();
+}
+
+function wosPaint(){
+  scanRoll('wosN', WOS.total);
+  const feed = document.getElementById('wosFeed'); if(!feed) return;
+  feed.innerHTML = WOS.rows.slice(0, 40).map((r, i) => {
+    const [, say, color] = WOS_V[r.verdict] || ['', 'отправляю…', 'var(--muted)'];
+    const txt = r.state === 'sending' ? 'отправляю…'
+              : r.state === 'fail'    ? 'не сохранилось'
+              : r.state === 'new'     ? (r.where ? 'списана · ' + r.where : 'списана')
+              : say;
+    const col = r.state === 'sending' ? 'var(--muted)'
+              : r.state === 'fail' ? 'var(--dn)' : color;
+    const raw = r.code.length > 26 ? r.code.slice(0, 24) + '…' : r.code;
+    return `<div class="scan-row ${r.state}">
+      <span class="scan-dot" style="background:${col}"></span>
+      <span class="scan-b">
+        <span class="scan-code">${escS(r.name || r.label || '…')}</span>
+        <span class="scan-raw">${escS(raw)}</span>
+      </span>
+      <span class="scan-state" style="color:${col}">${escS(txt)}</span></div>`;
+  }).join('');
+}
+
+async function woScanDone(){
+  try{ SCAN.stop(); }catch(e){}
+  ACC_BACK = null;
+  const n = WOS.total;
+  WOS = {rows: [], total: 0, kind: '', note: '', photo: '', thumb: ''};
+  ACC_WO = null;
+  await accExpenses();
+  await shTab('wo');
+  if(n) _toast(`Списано ${n} ${pluralize(n,'бутылка','бутылки','бутылок')}`);
 }
 
 // ── Удержание ──────────────────────────────────────────────────────────────

@@ -201,7 +201,10 @@ async def _registry_was(district: str, day: str) -> dict:
             if pid in out and q:
                 out[pid] -= q / _unit(cat.get(pid) or {})
     try:
-        for pid, n in ((await db.writeoff_since({district: since})).get(district) or {}).items():
+        # skip_coded: считаем ОТ РЕЕСТРА, а списанная сканом бутылка из него
+        # уже вышла — вычитать её ещё раз значит потерять её дважды.
+        for pid, n in ((await db.writeoff_since({district: since}, skip_coded=True))
+                       .get(district) or {}).items():
             if pid in out:
                 out[pid] -= n / _unit(cat.get(pid) or {})
     except Exception as e:
@@ -1668,6 +1671,103 @@ async def handle_writeoff_add(request):
 
 
 @require_owner
+async def handle_writeoff_scan(request):
+    """Списать бутылку по коду с крышки. body: {code, kind, photo, note?, day?, as?}
+
+    Позицию, район и количество спрашивать не у кого: код знает, что это за
+    бутылка и где она числится, а одна крышка — это одна бутылка. Человеку
+    остаётся сказать, что с ней случилось, и показать это.
+
+    Утеря сюда не ходит: чтобы отсканировать бутылку, надо держать её в руках,
+    а потерянную не держат. Для неё есть запись руками."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    code = str(body.get("code") or "").strip()
+    kind = str(body.get("kind") or "").strip()
+    if not code:
+        return web.json_response({"error": "no_code"}, status=400, headers=CORS_HEADERS)
+    if kind not in db.WRITEOFF_KINDS or kind == "потеря":
+        return web.json_response({"error": "bad_kind"}, status=400, headers=CORS_HEADERS)
+
+    doc = await db.qr_get(code)
+    if not doc:
+        return _wo_say("unknown", code=code)
+    st = (doc.get("status") or "active").strip()
+    if st == "written":
+        return _wo_say("already", code=code, name=doc.get("product_name") or "")
+    if st == "sold":
+        return _wo_say("sold", code=code, name=doc.get("product_name") or "")
+    pid = str(doc.get("product_id") or "")
+    p = _catalog().get(pid)
+    if not p:
+        return _wo_say("no_item", code=code, name=doc.get("product_name") or "")
+    district = (doc.get("district") or "").strip()
+    if district not in OFFICE_IDS:
+        return _wo_say("nohome", code=code, name=p.get("name", ""))
+
+    raw = str(body.get("photo") or "")
+    if "," in raw[:64]:
+        raw = raw.split(",", 1)[1]
+    if len(raw) > WO_MAX_PHOTO:
+        return web.json_response({"error": "photo_big"}, status=400, headers=CORS_HEADERS)
+    try:
+        import base64
+        photo = base64.b64decode(raw, validate=True) if raw else b""
+    except Exception:
+        photo = b""
+    if len(photo) < 2000 or photo[:2] not in (b"\xff\xd8", b"\x89P"):
+        return web.json_response({"error": "no_photo"}, status=400, headers=CORS_HEADERS)
+    thumb = str(body.get("thumb") or "")
+    if not thumb.startswith("data:image/") or len(thumb) > WO_MAX_THUMB:
+        thumb = ""
+
+    who = str(body.get("as") or "").strip()[:60] or "владелец"
+    day = str(body.get("day") or "").strip() or _biz_day()
+    now = datetime.now(timezone.utc)
+    wid = await db.writeoff_add({
+        "at": now, "day": day, "item": pid, "thumb": thumb,
+        "name": p.get("name", ""), "qty": 1, "kind": kind,
+        "note": str(body.get("note") or "").strip()[:200],
+        "district": district, "district_code": OFFICE_CODES.get(district, ""),
+        "by": who, "by_id": int(request["owner_id"] or 0),
+        "own": True, "code": code, "label": doc.get("label") or "",
+        "state": "ok", "decided_at": now,
+        "decided_by": int(request["owner_id"] or 0), "decided_by_name": who,
+    }, photo)
+    if not await db.qr_write_off(code, wid):
+        # Между чтением и записью бутылку успели списать или продать — запись
+        # оставлять нельзя, иначе она вычтет со склада вторую такую же.
+        await db.writeoff_del(wid)
+        return _wo_say("already", code=code, name=p.get("name", ""))
+    try: await db.writeoff_none_clear(day)
+    except Exception: pass
+    base_drop()
+    log.info(f"[writeoff] сканом: {kind} · {p.get('name','')} · {district} · {day}")
+    await backdate.notify(day, who, "списание сканом",
+                          f"{kind} · {p.get('name','')} · {OFFICE_CODES.get(district, district)}")
+    return _wo_say("ok", code=code, id=wid, name=p.get("name", ""),
+                   label=doc.get("label") or "",
+                   district=district, district_code=OFFICE_CODES.get(district, ""))
+
+
+WO_SAY = {
+    "unknown": "нет в реестре",
+    "already": "уже списана",
+    "sold":    "ушла с заказом",
+    "no_item": "нет в каталоге",
+    "nohome":  "офис не указан",
+}
+
+
+def _wo_say(verdict: str, **extra):
+    return web.json_response({"ok": verdict == "ok", "verdict": verdict,
+                              "say": WO_SAY.get(verdict, ""), **extra},
+                             headers=CORS_HEADERS)
+
+
+@require_owner
 async def handle_writeoff_none(request):
     """POST /api/owner/stock/writeoff/none — «за этот день списаний не было».
 
@@ -1957,6 +2057,7 @@ def setup(app):
         ("/api/owner/stock/writeoffs",  handle_writeoffs, "GET"),
         ("/api/owner/stock/writeoff",       handle_writeoff_add,  "POST"),
         ("/api/owner/stock/writeoff/none",  handle_writeoff_none, "POST"),
+        ("/api/owner/stock/writeoff/scan",  handle_writeoff_scan, "POST"),
         ("/api/owner/stock/shifts",     handle_shift_log, "GET"),
         ("/api/owner/stock/writeoff/{wid}/photo", handle_writeoff_photo, "GET"),
         ("/api/owner/stock/writeoff/{wid}/compensate", handle_writeoff_compensate, "POST"),

@@ -2324,6 +2324,19 @@ async def writeoff_none_get(day: str) -> dict | None:
     return d
 
 
+async def writeoff_del(wid: str) -> bool:
+    """Убрать запись списания вместе с её снимком.
+
+    Нужна ровно в одном месте: когда бутылку успели списать между чтением кода
+    и записью. Оставлять такую запись нельзя — она вычтет со склада вторую
+    такую же бутылку, которой нет."""
+    db = _db_or_none()
+    if db is None or not wid: return False
+    await db.writeoff_photos.delete_one({"_id": wid})
+    r = await db.writeoffs.delete_one({"_id": wid})
+    return r.deleted_count > 0
+
+
 async def writeoff_get(wid: str) -> dict | None:
     db = _db_or_none()
     if db is None or not wid: return None
@@ -2421,7 +2434,7 @@ async def writeoff_list(since=None, district: str = "", by: str = "",
     return await cur.to_list(length=int(limit))
 
 
-async def writeoff_since(since: dict) -> dict:
+async def writeoff_since(since: dict, skip_coded: bool = False) -> dict:
     """Сколько бутылок списано после пересчёта: {район: {позиция: шт}}.
 
     Тому же расчёту, что учитывает приход и продажи: разбитая бутылка ушла со
@@ -2433,7 +2446,12 @@ async def writeoff_since(since: dict) -> dict:
     for district, dt in (since or {}).items():
         if not dt: continue
         cur = db.writeoffs.aggregate([
-            {"$match": {"district": district, "at": {"$gt": dt}, **WRITEOFF_COUNTED}},
+            {"$match": {"district": district, "at": {"$gt": dt}, **WRITEOFF_COUNTED,
+                        # Списанное сканом уже вышло из реестра: у той бутылки
+                        # статус сменился, и она не считается активной. Тому,
+                        # кто считает ОТ РЕЕСТРА, вычитать её второй раз нельзя;
+                        # тому, кто считает от ручного пересчёта, — обязательно.
+                        **({"code": {"$in": [None, ""]}} if skip_coded else {})}},
             {"$group": {"_id": "$item", "n": {"$sum": "$qty"}}},
         ])
         got = {d["_id"]: int(d["n"] or 0) for d in await cur.to_list(length=500) if d["_id"]}
@@ -2750,6 +2768,31 @@ async def qr_add(code: str, product_id: str, product_name: str, district,
         return False
 
 
+async def qr_write_off(code: str, wid: str) -> bool:
+    """Пометить конкретную бутылку списанной. False — её уже списали или продали.
+
+    Условие по статусу стоит в самом запросе, а не проверкой перед ним: два
+    человека могут поднести к камере одну и ту же разбитую бутылку, и вторая
+    попытка должна не пройти, а не списать её дважды."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.qr_codes.update_one(
+        {"_id": code, "status": "active"},
+        {"$set": {"status": "written", "writeoff": wid,
+                  "written_at": datetime.now(timezone.utc).isoformat()}})
+    return r.matched_count > 0
+
+
+async def qr_write_off_undo(code: str) -> bool:
+    """Вернуть бутылку в остаток — когда списание по коду отменяют."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.qr_codes.update_one(
+        {"_id": code, "status": "written"},
+        {"$set": {"status": "active"}, "$unset": {"writeoff": "", "written_at": ""}})
+    return r.matched_count > 0
+
+
 async def qr_marked_since(since, districts: list = None) -> dict:
     """Сколько бутылок внесли в базу руками после указанного момента.
 
@@ -2832,7 +2875,10 @@ async def qr_consumed(since: dict) -> dict:
         out[oid]["sold"] += sum(int(i.get("qty") or 0) for i in (o.get("items") or []))
     for district, dt in since.items():
         cur = db.writeoffs.aggregate([
-            {"$match": {"district": district, "at": {"$gte": dt}, **WRITEOFF_COUNTED}},
+            # Списанное сканом здесь не считаем: та бутылка уже вышла из
+            # реестра сменой статуса, и второй раз её вычитать нельзя.
+            {"$match": {"district": district, "at": {"$gte": dt}, **WRITEOFF_COUNTED,
+                        "code": {"$in": [None, ""]}}},
             {"$group": {"_id": None, "n": {"$sum": "$qty"}}}])
         rows = await cur.to_list(length=1)
         out[district]["written"] = int((rows[0]["n"] if rows else 0) or 0)

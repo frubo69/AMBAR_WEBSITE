@@ -579,6 +579,67 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .stk-qty::-webkit-outer-spin-button,.stk-qty::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
 .stk-qty:focus{border-color:rgba(201,169,110,.5);background:var(--card)}
 .stk-empty{padding:34px 16px;text-align:center;color:var(--muted);font-size:13px;line-height:1.6}
+/* ── Склад: всё в один экран ────────────────────────────────────────────────
+   Итог, районы и перемещения помещаются целиком, без прокрутки. Поэтому итог
+   — полосой в две строки, а не карточкой с крупной цифрой, а район — строкой,
+   а не плиткой во всю ширину: пять плиток занимали экран, и до перемещений
+   человек добирался прокруткой. Плотнее — но не теснее: у каждой строки свой
+   ритм, свои поля и одна мысль. */
+.stk-have{display:flex;align-items:center;gap:12px;padding:11px 14px;
+  border-radius:14px;background:var(--card);border:1px solid var(--border2)}
+.sh-l{flex:0 0 auto;display:flex;flex-direction:column;gap:1px}
+.sh-l b{font-family:'DM Sans',sans-serif;font-size:26px;font-weight:700;line-height:1;
+  color:var(--gold2);font-variant-numeric:tabular-nums}
+.sh-l span{font-size:9.5px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--muted)}
+.sh-r{flex:1;min-width:0;display:flex;justify-content:flex-end;gap:14px}
+.sh-r span{display:flex;flex-direction:column;align-items:flex-end;gap:1px;
+  font-size:9px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;
+  color:var(--muted)}
+.sh-r i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;
+  color:var(--sub);font-variant-numeric:tabular-nums;letter-spacing:0}
+.stk-have-f{font-size:10px;color:var(--dim);margin:5px 2px 0}
+/* Заголовок раздела с действием справа: «История ревизий» — не строка списка,
+   а выход в сторону, и место ей у названия, а не отдельной плиткой. */
+.stk-grp2{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
+  margin:14px 2px 7px}
+.stk-grp2 > span{font-size:10px;font-weight:600;letter-spacing:1.4px;
+  text-transform:uppercase;color:var(--muted)}
+.stk-lnk{border:0;background:none;padding:0;cursor:pointer;font-family:inherit;
+  font-size:11.5px;font-weight:600;color:var(--gold2)}
+.stk-lnk:active{opacity:.6}
+.stk-drs{display:flex;flex-direction:column;gap:6px}
+.stk-dr{display:flex;align-items:center;gap:11px;width:100%;padding:9px 12px;
+  border-radius:13px;cursor:pointer;font-family:inherit;text-align:left;
+  color:var(--text);background:var(--card);border:1px solid var(--border2)}
+.stk-dr:active{transform:scale(.99)}
+.stk-dr-c{flex:0 0 auto;width:32px;height:32px;border-radius:9px;display:flex;
+  align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;
+  font-size:11px;font-weight:700;color:var(--gold2);
+  background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.2)}
+.stk-dr-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.stk-dr-n{font-size:13.5px;font-weight:600;line-height:1.2;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.stk-dr-s{font-size:10.5px;color:var(--muted);line-height:1.2}
+.stk-dr-s.ok{color:var(--up)} .stk-dr-s.dn{color:var(--dn)}
+.stk-dr-v{flex:0 0 auto;font-family:'DM Sans',sans-serif;font-size:15px;font-weight:700;
+  color:var(--gold2);font-variant-numeric:tabular-nums}
+.stk-dr-v.dim{color:var(--dim)}
+.stk-dr-v i{font-style:normal;font-size:9px;font-weight:600;color:var(--muted);
+  margin-left:3px;letter-spacing:.3px}
+.stk-dr-go{flex:0 0 auto;color:var(--muted);font-size:15px}
+/* Перемещения — тем же ритмом, но тише: это журнал, а не действие. */
+.stk-mvr{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:12px;
+  background:var(--card);border:1px solid var(--border2);margin-bottom:6px}
+.stk-mvr-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.stk-mvr-n{font-size:12.5px;font-weight:600;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.stk-mvr-s{font-size:10.5px;color:var(--muted)}
+.stk-mvr-x{flex:0 0 auto;width:28px;height:28px;border-radius:8px;cursor:pointer;
+  border:1px solid var(--border3);background:var(--card2);color:var(--muted);font-size:12px}
+.stk-mvr-x:active{transform:scale(.9);color:var(--dn)}
+.stk-mvr-more{font-size:11px;color:var(--muted);padding:2px 4px}
+
 /* Пустое место — карточкой, а не строкой: на этом экране всё карточками, и
    одинокий текст посреди чёрного выглядит недогруженным. */
 .stk-none{padding:22px 16px;border-radius:16px;text-align:center;
@@ -10149,18 +10210,14 @@ async function stkPicker(){
   // Плитками, а не строками: пять строк во всю ширину оставляли под собой
   // полэкрана пустоты. Число на плитке — то, ради чего сюда заходят: недостача
   // в деньгах там, где считали, и прочерк там, где ещё нет.
-  const cards = st.districts.map(d => distTile(d, 'stkGo', {
-    cls:   d.done ? '' : 'busy',
-    value: d.done ? (d.short_aed ? fmt(d.short_aed) : '✓') : '—',
-    vcls:  d.done ? (d.short_aed ? 'dn' : 'ok') : 'dim',
-    sub:   d.done ? (d.short_aed ? 'AED не хватает' : 'всё сошлось') : 'ещё не считали',
-    scls:  d.done && !d.short_aed ? 'ok' : (d.done ? 'dn' : ''),
-  })).join('');
+  const left = (reg && reg.left_by_district) || {};
   document.getElementById('stkMid').innerHTML =
-    stkHave(reg, st.districts) +
-    `<div class="dgrid one">${cards}${distMoreTile('stkAudits()', 'История ревизий')}</div>` +
-    '<div class="stk-grp">Перемещения между районами</div>' +
-    '<div id="stkMoves"><div class="stk-empty" style="padding:14px">Загрузка…</div></div>';
+    stkHave(reg) +
+    `<div class="stk-grp2"><span>Районы</span>
+       <button class="stk-lnk" onclick="stkAudits()">История ревизий ›</button></div>
+     <div class="stk-drs">${(st.districts || []).map(d => stkDistRow(d, left)).join('')}</div>
+     <div class="stk-grp2"><span>Перемещения за день</span></div>
+     <div id="stkMoves"><div class="stk-none">Загрузка…</div></div>`;
   stkLoadMoves();
 }
 
@@ -10173,28 +10230,40 @@ async function stkPicker(){
 // код при продаже из базы НЕ исчезает — иначе проверка бутылки однажды скажет
 // «не наша» про бутылку, которая всё это время стояла на полке. Реестр помнит
 // все коды, а счёт ведётся числами.
-function stkHave(reg, districts){
+//
+// Всё это — одной полосой в две строки: экран склада должен помещаться целиком,
+// вместе с районами и перемещениями, и место здесь дороже крупной цифры.
+function stkHave(reg){
   if(!reg || !reg.totals) return '';
-  const t = reg.totals, left = reg.left_by_district || {};
-  const по = (districts || []).map(d => `
-    <div class="qd">
-      <span class="qd-code">${escS(d.code || '')}</span>
-      <span class="qd-n">${left[d.id] ? fmt(left[d.id]) : '—'}</span>
-      <span class="qd-s">${escS(d.name || '')}</span>
-    </div>`).join('');
-  return `<div class="qh" style="margin-bottom:10px">
-      <div class="qh-v">${fmt(t.left)}</div>
-      <div class="qh-l">бутылок на складе сейчас</div>
-      <div class="qh-row">
+  const t = reg.totals;
+  return `<div class="stk-have">
+      <span class="sh-l"><b>${fmt(t.left)}</b><span>бутылок на складе</span></span>
+      <span class="sh-r">
         <span><i>${fmt(t.active)}</i>внесено</span>
         <span><i>${fmt(t.sold)}</i>продано</span>
         <span><i>${fmt(t.written)}</i>списано</span>
-      </div>
+      </span>
     </div>
-    ${по ? `<div class="qd-grid" style="margin-bottom:12px">${по}</div>` : ''}
-    <div class="stk-note" style="margin-bottom:12px">Считаем по кодам с крышек:
-      внесённые бутылки минус проданные и списанные. Позиции, которые кодами не
-      заводили, сюда не входят — их видно в пересчёте района.</div>`;
+    <div class="stk-have-f">по кодам с крышек · позиции без кодов сюда не входят</div>`;
+}
+
+// Район строкой, а не плиткой: плитки на всю ширину съедали по экрану на пять
+// районов, и до перемещений человек доходил прокруткой. В строке помещается
+// то же самое — код, название, сколько бутылок лежит и чем кончился пересчёт.
+function stkDistRow(d, left){
+  const n = left[d.id] || 0;
+  const [sub, cls] = d.done
+    ? (d.short_aed ? [`не хватает ${fmt(d.short_aed)} AED`, 'dn'] : ['всё сошлось', 'ok'])
+    : ['ещё не считали', ''];
+  return `<button class="stk-dr" onclick="stkGo('${d.id}')">
+    <span class="stk-dr-c">${escS(d.code || '')}</span>
+    <span class="stk-dr-b">
+      <span class="stk-dr-n">${escS(d.name || '')}</span>
+      <span class="stk-dr-s ${cls}">${sub}</span>
+    </span>
+    <span class="stk-dr-v ${n ? '' : 'dim'}">${n ? fmt(n) : '—'}${n ? '<i>бут</i>' : ''}</span>
+    <span class="stk-dr-go">›</span>
+  </button>`;
 }
 
 // ── перемещения ─────────────────────────────────────────────────────────────
@@ -10210,16 +10279,22 @@ async function stkLoadMoves(){
   STK.moves = res.transfers || [];
   // Переезды сканом сервер сводит в одну строку на позицию: тридцать
   // одинаковых «B1 → B3» — это «перевезли тридцать бутылок», и читать надо так.
-  const rows = STK.moves.map((m, i)=>`
-    <div class="stk-item" style="box-shadow:none">
-      <div class="stk-i-body">
-        <div class="stk-i-n">${escS(m.product_name || m.product_id)}</div>
-        <div class="stk-i-s">${escS(m.from_name)} → ${escS(m.to_name)} · ${m.bottles
-          ? m.bottles + ' ' + pluralize(m.bottles,'бутылка','бутылки','бутылок') + ' сканом'
-          : m.qty + ' шт'}</div>
-      </div>
-      <div class="stk-sb" title="Убрать" onclick="stkMoveDel(${i})">✕</div>
-    </div>`).join('');
+  // Показываем три, остальные — числом: экран склада должен помещаться целиком,
+  // а список переездов за день бывает длинным.
+  const ПОКАЗ = 3;
+  const rows = STK.moves.slice(0, ПОКАЗ).map((m, i)=>`
+    <div class="stk-mvr">
+      <span class="stk-mvr-b">
+        <span class="stk-mvr-n">${escS(m.product_name || m.product_id)}</span>
+        <span class="stk-mvr-s">${escS(m.from_name)} → ${escS(m.to_name)} · ${m.bottles
+          ? m.bottles + ' ' + pluralize(m.bottles,'бутылка','бутылки','бутылок')
+          : m.qty + ' шт'}</span>
+      </span>
+      <button class="stk-mvr-x" title="Убрать" onclick="stkMoveDel(${i})">✕</button>
+    </div>`).join('')
+    + (STK.moves.length > ПОКАЗ ? `<div class="stk-mvr-more">и ещё ${
+        STK.moves.length - ПОКАЗ} ${pluralize(STK.moves.length - ПОКАЗ,
+        'перемещение','перемещения','перемещений')}</div>` : '');
   // Пусто — тоже карточка, как всё остальное на экране: голая строка посреди
   // чёрного поля читается как обрыв, будто не догрузилось.
   box.innerHTML = rows ||
@@ -13160,6 +13235,11 @@ const SCANQ = {
 // привязываем к позиции. Сначала район, потом позиция, потом камера.
 let QR_PROD = null, QR_DIST = null, QR_SESSION = 0, QR_LAST = null, QR_CAT = null;
 
+// Сводки на этом экране больше нет: то же самое — сколько бутылок лежит и
+// сколько продано — теперь говорит «Склад», а два экрана про один склад не
+// должны спорить числами. Сюда приходят с одной целью: завести бутылки в
+// реестр, — поэтому открывается сразу список позиций той точки, где считали
+// в прошлый раз. Точка меняется по названию в шапке.
 async function accQR(){
   ACC_BACK = null;
   _setRail('accRail', '');
@@ -13170,164 +13250,11 @@ async function accQR(){
   catch(e){ document.getElementById('accMid').innerHTML =
     '<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
   ACC_QR = d;
-  // Точки нужны прямо здесь, а не только в выборе: без них плитки B1–B5 пусты,
-  // и раздел выглядит так, будто данных нет вовсе.
   if(!STK.districts){
     try{ STK.districts = (await ownerApi.ownerFetch('/api/owner/stock/status')).districts; }
     catch(e){ STK.districts = []; }
   }
-  const t = d.totals, dist = STK.districts || [];
-  // «Внесено» и «лежит сейчас» — разные числа: между ними продажи. На экране
-  // отвечаем на второй вопрос, первый остаётся строкой ниже.
-  const byD = d.by_district || {}, leftD = d.left_by_district || byD;
-  _setText('accSub', t.active
-    ? `${fmt(t.left)} ${pluralize(t.left,'бутылка','бутылки','бутылок')} на складе · ${
-        d.by_product.length} ${pluralize(d.by_product.length,'позиция','позиции','позиций')}`
-    : 'реестр пуст');
-
-  // Считающие сейчас — первым делом: это единственное, что меняется без нас и
-  // на что можно наткнуться, зайдя в позицию.
-  const busy = {};
-  (d.locks || []).forEach(l => {
-    const dd = String(l.key || '').split(':')[0];
-    (busy[dd] = busy[dd] || []).push(l.name || 'сотрудник');
-  });
-
-  document.getElementById('accMid').innerHTML = `
-    <div class="qwrap">
-    <div class="qh">
-      <div class="qh-v">${fmt(t.left)}</div>
-      <div class="qh-l">бутылок на складе сейчас</div>
-      <div class="qh-row">
-        <span><i>${fmt(t.active)}</i>внесено</span>
-        <span><i>${fmt(t.sold)}</i>продано</span>
-        <span><i>${fmt(t.written)}</i>списано</span>
-      </div>
-    </div>
-
-    <div class="scan-sect"><span>Сейчас по точкам</span></div>
-    <div class="qd-grid">${dist.map(x => `
-      <div class="qd ${busy[x.id] ? 'busy' : ''}">
-        <span class="qd-code">${escS(x.code)}</span>
-        <span class="qd-n">${leftD[x.id] ? fmt(leftD[x.id]) : '—'}</span>
-        <span class="qd-s">${busy[x.id] ? 'считают' : escS(x.name)}</span>
-      </div>`).join('') || '<div class="scan-empty">Точки не загрузились</div>'}</div>
-
-    ${d.by_product.length ? `<div class="scan-sect"><span>Позиции</span><i>${
-      d.by_product.length}</i></div>` +
-      d.by_product.map(r => `<div class="qp">
-        <span class="qp-no">${r.no || ''}</span>
-        <span class="qp-b">
-          <span class="qp-n">${escS(r.name)}</span>
-          <span class="qp-s">${escS((d.slugs || {})[r.product_id] || '')} · ${
-            escS(String(r.last).slice(0,10))}</span>
-        </span>
-        <span class="qp-v">${fmt(r.count)}</span>
-      </div>`).join('')
-    : `<div class="qz">
-        <div class="qz-t">Реестр пуст</div>
-        <div class="qz-s">Выберите точку и позицию, наведите камеру на код
-          с крышки — бутылка появится здесь</div>
-      </div>`}
-
-    </div>`;
-  // Кнопка — в подвале экрана, а не в конце списка позиций: список длинный, и
-  // липкая кнопка внутри него вставала посреди строк.
-  document.getElementById('accFoot').innerHTML = `
-    <div class="qb-wrap">
-      <button class="qb" onclick="qrDistrict()">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 7V5a2 2 0 0 1 2-2h2M17 3h2a2 2 0 0 1 2 2v2M21 17v2a2 2 0 0 1-2 2h-2M7 21H5a2 2 0 0 1-2-2v-2"/>
-          <path d="M7 12h10"/></svg>
-        Сканировать бутылки
-      </button>
-    </div>`;
-}
-
-// Шапка у раздела одна — та, что сверху панели. Подэкраны только меняют в ней
-// текст и то, куда ведёт стрелка.
-function _qrHead(title, sub, back){
-  _setText('accTitle', title);
-  _setText('accSub', sub);
-  _setRail('accRail', '');
-  const box = document.querySelector('#accOv .stk-ttl');
-  if(box){ box.classList.remove('pick', 'open'); box.onclick = null; }
-  // Подвал принадлежит экрану, а не разделу: «Сканировать бутылки» имеет смысл
-  // только на первом, и таскать её за собой по выбору точки незачем.
-  document.getElementById('accFoot').innerHTML = '';
-  ACC_BACK = back;
-  return '';
-}
-
-// Кто я — чтобы отличить свою бронь от чужой. Своя не должна выглядеть занятой:
-// человек вышел из сканирования и вернулся, а позиция как будто у кого-то ещё.
-function _meId(){
-  try{ return Telegram.WebApp.initDataUnsafe.user.id; }catch(e){ return 0; }
-}
-function _lockOn(district, product_id){
-  const me = _meId();
-  for(const l of (ACC_QR?.locks || [])){
-    const [d, pid] = String(l.key || '').split(':');
-    if(d === district && pid === product_id)
-      return {mine: String(l.by) === String(me), name: l.name || 'другой сотрудник'};
-  }
-  return null;
-}
-
-// Точка первой: одна и та же бутылка на разных точках — разные бутылки, и без
-// точки запись бессмысленна.
-// Переключение точки внутри раздела: пустой id — обзор всех точек.
-function qrGo(id){
-  distMenuClose();
-  if(!id){ distRemember('qr', ''); qrDistrict(true); return; }
-  if(id === QR_DIST) return;
-  distRemember('qr', id);
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  qrPick(id);
-}
-
-function qrDistTap(){
-  const box = document.querySelector('#accOv .stk-ttl');
-  if(box && box.classList.contains('open')){ distMenuClose(); return; }
-  const have = (ACC_QR && ACC_QR.by_district) || {};
-  const info = {};
-  (STK.districts || []).forEach(d => {
-    info[d.id] = have[d.id]
-      ? {sub: 'бутылок в реестре', value: fmt(have[d.id])}
-      : {sub: 'ещё не заводили'};
-  });
-  _setRail('accRail', distMenu(QR_DIST, 'qrGo', info));
-  if(box) box.classList.add('open');
-  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
-}
-
-async function qrDistrict(force){
-  if(!STK.districts){
-    try{ STK.districts = (await ownerApi.ownerFetch('/api/owner/stock/status')).districts; }
-    catch(e){ STK.districts = []; }
-  }
-  // Считают всегда на одной точке и подряд. Спрашивать её на каждом входе —
-  // брать плату за то, что и так известно.
-  const last = distSaved('qr');
-  if(!force && last && (STK.districts || []).some(d => d.id === last)){ qrPick(last); return; }
-  const have = (ACC_QR && ACC_QR.by_district) || {};
-  const busy = {};
-  (ACC_QR?.locks || []).forEach(l => {
-    const d = String(l.key || '').split(':')[0];
-    busy[d] = (busy[d] || 0) + 1;
-  });
-  const head = _qrHead('Где считаем', 'выберите точку хранения', accQR);
-  _setRail('accRail', '');
-  document.getElementById('accMid').innerHTML = head +
-    `<div class="dgrid">` + ((STK.districts || []).map(d => distTile(d, 'qrGo', {
-        cls:   busy[d.id] ? 'busy' : '',
-        value: have[d.id] ? fmt(have[d.id]) : '—',
-        vcls:  have[d.id] ? '' : 'dim',
-        sub:   busy[d.id]
-                 ? `считают ${busy[d.id]} ${pluralize(busy[d.id],'позицию','позиции','позиций')}`
-                 : (have[d.id] ? 'бутылок в реестре' : 'ещё не заводили'),
-      })).join('') || '<div class="scan-empty">Точки не загрузились</div>') + `</div>`;
+  qrDistrict();
 }
 
 let QR_CATF = 'all';
@@ -13338,7 +13265,8 @@ function qrPick(district){
   // Точка хранения — в заголовке и по ней же выбор: тот же приём, что в
   // ревизии. Название точки крупнее «что сканируем» не случайно — на этом
   // экране первым делом отвечают именно на вопрос «где я».
-  const head = _qrHead(`${d.code || ''} ${d.name || ''}`.trim() || 'Точка', 'выберите позицию', accQR);
+  const head = _qrHead(`${d.code || ''} ${d.name || ''}`.trim() || 'Точка', 'выберите позицию',
+                       () => qrDistrict(true));
   const box = document.querySelector('#accOv .stk-ttl');
   if(box){
     document.getElementById('accTitle').innerHTML =

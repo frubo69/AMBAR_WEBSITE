@@ -432,6 +432,13 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* экран пересчёта */
 .stk-ov{position:fixed;inset:0;z-index:120;background:var(--bg);display:none;flex-direction:column}
 .stk-ov.show{display:flex}
+/* Страница поверх страницы. Наезжает справа и оставляет тень на левом крае —
+   так глаз понимает, что предыдущий экран никуда не делся и лежит под ней. */
+.pg-ov{position:fixed;inset:0;z-index:150;background:var(--bg);display:none;
+  flex-direction:column;transform:translateX(100%);
+  transition:transform .26s var(--e1);box-shadow:-20px 0 44px rgba(0,0,4,.6)}
+.pg-ov.show{display:flex}
+.pg-ov.in{transform:none}
 .stk-top{flex-shrink:0;padding:calc(10px + var(--safe-top)) 14px 10px;border-bottom:1px solid var(--border2);
   background:var(--bg2)}
 .stk-top-r{display:flex;align-items:center;gap:10px}
@@ -2851,17 +2858,34 @@ button.path:active{transform:scale(.995)}
 .ord-sum-c.gold{cursor:pointer}
 .ord-sum-c.gold b{color:var(--gold2)}
 .ord-sum-c.gold:active{transform:scale(.98)}
-.ord-pr{max-height:52vh;overflow-y:auto;margin-top:4px}
-.ord-pr-r{display:flex;align-items:baseline;gap:9px;padding:8px 0;
-  border-bottom:1px solid var(--border2)}
-.ord-pr-i{flex:0 0 auto;width:22px;font-size:11px;font-weight:700;color:var(--muted);
-  font-variant-numeric:tabular-nums;text-align:right}
-.ord-pr-n{flex:1;min-width:0;font-size:13.5px;overflow:hidden;text-overflow:ellipsis;
-  white-space:nowrap}
-.ord-pr-q{flex:0 0 auto;font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums}
-.ord-pr-s{flex:0 0 auto;min-width:62px;text-align:right;font-family:'DM Sans',sans-serif;
-  font-size:14px;font-weight:700;color:var(--gold2);font-variant-numeric:tabular-nums}
-.ord-pr-f{font-size:11px;color:var(--muted);line-height:1.55;margin-top:12px}
+/* Цена по позициям: два столбца и ничего лишнего — название и цена одной
+   бутылки. Числа в колонку, названия в колонку: так двести строк читаются
+   сверху вниз, а не разбираются по одной. */
+.opr-hd{display:flex;align-items:baseline;gap:10px;padding:0 2px 8px;
+  font-size:9.5px;font-weight:700;letter-spacing:.55px;text-transform:uppercase;
+  color:var(--dim);white-space:nowrap}
+.opr-hd span:first-child{flex:1;min-width:0}
+.opr-hd span:last-child{width:86px;text-align:right}
+.opr-r{display:flex;align-items:center;gap:10px;padding:11px 2px;
+  border-top:1px solid var(--border2)}
+.opr-i{flex:0 0 auto;width:26px;text-align:right;font-family:'DM Sans',sans-serif;
+  font-size:11.5px;font-weight:700;color:var(--dim);font-variant-numeric:tabular-nums}
+.opr-n{flex:1;min-width:0;font-size:13.5px;font-weight:600;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.opr-p{flex:0 0 auto;width:86px;text-align:right;font-family:'DM Sans',sans-serif;
+  font-size:15px;font-weight:700;color:var(--gold2);font-variant-numeric:tabular-nums}
+/* Итог прижат к низу экрана и не участвует в прокрутке: это ответ на вопрос,
+   с которым сюда нажали, и он должен быть виден всегда. */
+.opr-foot{flex-shrink:0;display:flex;align-items:baseline;justify-content:space-between;
+  gap:12px;padding:12px 16px calc(12px + var(--safe-bottom));
+  background:var(--bg2);border-top:1px solid var(--border2);
+  font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  color:var(--muted)}
+.opr-foot b{font-family:'DM Sans',sans-serif;font-size:20px;letter-spacing:0;
+  color:var(--gold2);font-variant-numeric:tabular-nums}
+.opr-foot b i{font-style:normal;font-size:10px;font-weight:600;margin-left:5px;
+  color:var(--muted)}
+.opr-none{padding:34px 16px;text-align:center;color:var(--muted);font-size:13px}
 /* Номер в списке недобора — тем же приёмом, что и в заявке: по нему сверяют
    позицию, не читая название целиком. */
 .sup-sr-i{flex:0 0 auto;width:24px;font-family:'DM Sans',sans-serif;font-size:11px;
@@ -12353,42 +12377,59 @@ function ordRow(r, dist, num){
   </div>`;
 }
 
-// Цена по позициям. Сумма в шапке отвечает «сколько всего», но не «из чего»:
-// одна дорогая позиция и сто дешёвых дают одно и то же число. Список
-// показывает, куда именно уходят деньги, — сверху самые дорогие строки.
+// Цена по позициям — отдельной страницей, а не шторкой снизу.
 //
-// Цена здесь продажная, по прайсу. Закупочной у системы нет: её негде взять —
-// ни каталог, ни ответ магазина её не содержат. Написать об этом честно
-// лучше, чем выдать за закупку то, что ею не является.
+// Шторка держала список в половине экрана и прокручивала его внутри себя:
+// сорок позиций читались в окошко на девять строк. Здесь это полноценная
+// страница: наезжает справа, как переход внутри телефона, и уезжает обратно.
+//
+// На странице только два столбца: позиция и цена одной бутылки. Ни количеств,
+// ни умножений, ни сумм по строке — это прайс, а не расчёт. Считать здесь
+// нечего: сюда приходят посмотреть, сколько стоит бутылка.
+//
+// Список — весь каталог, а не только то, что попало в заявку: цену смотрят и
+// у того, чего сегодня не заказывали. Порядок и номера те же, что на экране
+// заявки: по номеру позицию называют голосом и ищут в файле для магазина.
+//
+// Цена продажная, по прайсу. Закупочной у системы нет: её негде взять — ни
+// каталог, ни ответ магазина её не содержат.
+//
+// У пива прайс идёт за ящик, поэтому он поделён на бутылки: страница обещает
+// цену бутылки и обязана её показывать, а не цену двадцати четырёх.
+function _perBottle(price, unit){
+  const n = conv(price) / Math.max(1, unit || 1);
+  const r = Math.round(n * 10) / 10;
+  return Number.isInteger(r) ? r.toLocaleString('ru-RU').replace(/,/g,' ')
+                             : r.toFixed(1).replace('.', ',');
+}
+
 function ordPrices(){
   const d = ORD.d || {};
-  const rows = (d.rows || []).filter(r => r.need_total > 0)
-    .map(r => ({...r, sum: (r.need_total || 0) * (r.price || 0)}))
-    .sort((a, b) => b.sum - a.sum);
-  const ov = document.getElementById('woCompOv');
-  ov.innerHTML = `<div class="wo-c-sheet">
-    <div class="wo-c-h">
-      <div class="wo-c-t">Цена по позициям</div>
-      <div class="wo-c-s">${fmt(d.total_qty || 0)} ${
-        pluralize(d.total_qty || 0,'бутылка','бутылки','бутылок')} ·
-        ${fmt(d.total_aed || 0)} AED по прайсу<br>
-        <i style="font-style:normal;opacity:.75">цена за бутылку · сумма по позиции</i></div>
-    </div>
-    <div class="ord-pr">${rows.length ? rows.map((r, i) => `
-      <div class="ord-pr-r">
-        <span class="ord-pr-i">${i + 1}</span>
-        <span class="ord-pr-n">${escS(r.name)}</span>
-        <span class="ord-pr-q">${fmt(r.price)}</span>
-        <span class="ord-pr-s">${fmt(r.sum)}</span>
-      </div>`).join('') : '<div class="wo-c-none">В заявке пока пусто</div>'}</div>
-    <div class="ord-pr-f">Цена продажная, по прайсу. Закупочной в системе нет —
-      её не содержит ни каталог, ни ответ магазина.</div>
-    <div class="wo-c-acts">
-      <button class="wo-c-no" onclick="woCompClose()">Закрыть</button>
-    </div>
-  </div>`;
+  const rows = d.all_rows || d.rows || [];
+  _setText('oprSub', `${rows.length} ${pluralize(rows.length,'позиция','позиции','позиций')}
+    · продажный прайс`);
+  document.getElementById('oprMid').innerHTML = rows.length ? `
+    <div class="opr-hd"><span></span><span>за бутылку</span></div>
+    ${rows.map((r, i) => `<div class="opr-r">
+      <span class="opr-i">${i + 1}</span>
+      <span class="opr-n">${escS(r.name)}</span>
+      <span class="opr-p">${_perBottle(r.price, r.unit || 1)}</span>
+    </div>`).join('')}`
+    : '<div class="opr-none">Каталог пуст</div>';
+  // Итог — не в конце списка, а внизу экрана: он отвечает на вопрос, с которым
+  // сюда нажали, и не должен уезжать вверх вместе с прокруткой.
+  document.getElementById('oprFoot').innerHTML = `
+    <span>Заявка по прайсу</span><b>${fmt(d.total_aed || 0)}<i>AED</i></b>`;
+  const ov = document.getElementById('oprOv');
   ov.classList.add('show');
+  requestAnimationFrame(() => ov.classList.add('in'));
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+
+function ordPricesClose(){
+  const ov = document.getElementById('oprOv');
+  ov.classList.remove('in');
+  setTimeout(() => ov.classList.remove('show'), 260);
 }
 
 function ordSearch(v){
@@ -14309,7 +14350,7 @@ function expRow(r){
   </div>`;
 }
 
-// Полоса разовых. Стоит у каждого водителя всегда, даже когда разовых нет, —
+// Полоса доп. расходов. Стоит у каждого водителя всегда, даже когда их нет, —
 // и это главное в ней.
 //
 // Раньше про них говорил безымянный «плюс» в углу: увидеть по строке, что
@@ -14332,7 +14373,7 @@ function expDop(r, open){
     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
          stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
       ${open ? '<path d="M18 6 6 18M6 6l12 12"/>' : '<path d="M12 5v14M5 12h14"/>'}</svg>
-    <span class="exp-dop-t">Разовые</span>
+    <span class="exp-dop-t">Доп. расходы</span>
     <span class="exp-dop-v">${val}</span>
   </button>`;
 }
@@ -20693,6 +20734,25 @@ function renderHours(h){
 
 <!-- Пересчёт склада. Список, а не опрос: все позиции на виду, править можно
      в любом порядке и сколько угодно раз, сохранение — одной кнопкой. -->
+<!-- Цена по позициям: страница, а не шторка. Наезжает справа поверх заявки и
+     уезжает обратно — тот же жест, что переход вглубь в любом телефоне. -->
+<div class="pg-ov" id="oprOv">
+  <div class="stk-top">
+    <div class="stk-top-r">
+      <button class="stk-x" onclick="ordPricesClose()" aria-label="Назад">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="stk-ttl">
+        <div class="stk-ttl-t">Цена по позициям</div>
+        <div class="stk-ttl-s" id="oprSub">—</div>
+      </div>
+    </div>
+  </div>
+  <div class="stk-mid" id="oprMid"></div>
+  <div class="opr-foot" id="oprFoot"></div>
+</div>
+
 <div class="stk-ov" id="stkOv">
   <div class="stk-top">
     <div class="stk-top-r">

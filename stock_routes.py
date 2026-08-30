@@ -1063,7 +1063,12 @@ async def order_rows(day: str = "") -> dict:
             total_qty += item_total
             total_aed += item_total * price
         rows.append({"id": pid, "name": p.get("name", ""), "cat": p.get("cat", ""),
-                     "price": price, "need_total": item_total, "cells": cells,
+                     # Цена — за учётную единицу, а у пива это ящик. Сколько в
+                     # нём бутылок, приложение само не знает, поэтому единицу
+                     # отдаём рядом с ценой: иначе «цена за бутылку» на экране
+                     # оказывается ценой за двадцать четыре.
+                     "price": price, "unit": _unit(p), "unit_name": "ящик" if _unit(p) > 1 else "бутылка",
+                     "need_total": item_total, "cells": cells,
                      "calc_total": sum(c["calc"] for c in cells.values()),
                      "edited": row_edited})
 

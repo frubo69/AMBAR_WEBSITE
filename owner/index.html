@@ -182,24 +182,44 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .period-bar{display:flex;gap:8px;margin:0;align-items:stretch;position:fixed;top:calc(66px + var(--safe-top));left:0;right:0;z-index:35;background:var(--bg);padding:4px 14px 8px;pointer-events:none}
 .period-bar>*{pointer-events:auto}
 .period-bar .periods{flex:1;margin:0}
-/* Окошко дня. Одна ячейка, две стрелки и подпись: сегодня, вчера, позавчера,
-   дальше — число. День в прошлом подсвечен золотом — экран, на котором можно
-   изменить закрытую смену, не должен выглядеть как обычный. */
-.dayslide{flex:1;display:flex;align-items:center;gap:4px;padding:3px;
+/* Окошко дня. Слева стрелки, посередине сам день словами и полной датой,
+   справа — возврат к сегодня, который появляется только когда есть куда
+   возвращаться. Дата пишется целиком («29 августа, суббота»), потому что
+   «29.08» на широкой полосе смотрится как заготовка, а не как ответ. */
+.dayslide{flex:1;display:flex;align-items:center;gap:2px;padding:3px 4px;
   background:var(--card);border:1px solid var(--border2);border-radius:11px;
-  overflow:hidden}
+  overflow:hidden;transition:border-color .2s var(--e1),background .2s var(--e1)}
 .dayslide.back{border-color:rgba(201,169,110,.45);background:var(--gold-soft)}
-.ds-arw{flex:0 0 auto;width:34px;height:34px;border:0;border-radius:9px;cursor:pointer;
-  background:none;color:var(--sub);display:flex;align-items:center;justify-content:center}
-.ds-arw:disabled{opacity:.25;pointer-events:none}
-.ds-arw:active{transform:scale(.9)}
-.ds-win{flex:1;min-width:0;border:0;background:none;cursor:pointer;font-family:inherit;
-  display:flex;flex-direction:column;align-items:center;gap:1px;padding:2px 0;
-  color:var(--text);will-change:transform}
-.ds-win b{font-size:13px;font-weight:700;line-height:1.15}
-.ds-win i{font-style:normal;font-size:9.5px;font-weight:600;letter-spacing:.2px;
-  color:var(--muted);font-variant-numeric:tabular-nums;line-height:1}
-.dayslide.back .ds-win b{color:var(--gold2)}
+.ds-arw{flex:0 0 auto;width:32px;height:36px;border:0;border-radius:9px;cursor:pointer;
+  background:none;color:var(--sub);display:flex;align-items:center;justify-content:center;
+  transition:opacity .18s,transform .12s}
+.ds-arw:disabled{opacity:.2;pointer-events:none}
+.ds-arw:active{transform:scale(.86)}
+.dayslide.back .ds-arw{color:var(--gold2)}
+.ds-win{flex:1;min-width:0;display:flex;align-items:center;gap:8px;
+  padding:1px 2px;will-change:transform}
+/* Смена дня — не подмена текста, а движение: новый день въезжает с той
+   стороны, в которую листнули. Без этого непонятно, поменялось что-то или
+   просто моргнуло. */
+.ds-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;overflow:hidden}
+.ds-txt b{font-size:14px;font-weight:700;line-height:1.15;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.ds-txt i{font-style:normal;font-size:10.5px;font-weight:600;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.2}
+.dayslide.back .ds-txt b{color:var(--gold2)}
+.ds-txt.go-back{animation:dsBack .22s var(--e1)}
+.ds-txt.go-fwd{animation:dsFwd .22s var(--e1)}
+@keyframes dsBack{from{opacity:0;transform:translateX(-16px)}to{opacity:1;transform:none}}
+@keyframes dsFwd {from{opacity:0;transform:translateX(16px)} to{opacity:1;transform:none}}
+/* Возврат к сегодня — отдельной кнопкой, а не тайным тапом по окошку: из
+   позавчера надо уметь выйти, не листая обратно и не догадываясь. */
+.ds-home{flex:0 0 auto;display:none;padding:6px 11px;border-radius:9px;cursor:pointer;
+  font-family:inherit;font-size:11.5px;font-weight:700;color:#1a1408;border:0;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));
+  animation:dsHome .2s var(--e1)}
+.ds-home:active{transform:scale(.94)}
+.dayslide.back .ds-home{display:block}
+@keyframes dsHome{from{opacity:0;transform:scale(.86)}to{opacity:1;transform:none}}
 .cal-btn{width:40px;height:auto;padding:0;border-radius:11px;background:var(--card);border:1px solid var(--border2);color:var(--sub);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s var(--e1);flex-shrink:0}
 .cal-btn:active{transform:scale(.92);color:var(--gold2);border-color:rgba(201,169,110,.35)}
 .cal-btn.on{color:var(--gold2);border-color:rgba(201,169,110,.45);background:linear-gradient(135deg,rgba(201,169,110,.14),rgba(201,169,110,.04))}
@@ -2027,6 +2047,10 @@ button.path:active{transform:scale(.995)}
    районе» она не нужна: туда заходят за человеком, а не за районом. */
 .chk-c .crw-c-h{background:var(--gold-soft);border-bottom-color:rgba(201,169,110,.28)}
 .chk-c .crw-c-n{color:var(--gold2)}
+/* Сколько тут людей — словом, а не числом в скобках: «(2)» надо расшифровать,
+   «2 водителя» читается сразу. */
+.crw-c-x{flex:0 0 auto;font-size:11px;font-weight:600;color:var(--muted)}
+.chk-c .crw-c-x{color:rgba(201,169,110,.72)}
 .chk-c .crew-code{color:#1a1408;border-color:transparent;
   background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .crw-c-h{display:flex;align-items:center;gap:10px;padding:11px 12px;
@@ -3795,8 +3819,10 @@ button.path:active{transform:scale(.995)}
       <button class="ds-arw" onclick="accDayStep(1)" aria-label="День назад">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
              stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
-      <button class="ds-win" id="moneyDayWin" onclick="accDayHome()">
-        <b id="mdName">Сегодня</b><i id="mdDate">—</i></button>
+      <div class="ds-win" id="moneyDayWin">
+        <span class="ds-txt" id="mdTxt"><b id="mdName">Сегодня</b><i id="mdDate">—</i></span>
+        <button class="ds-home" id="mdHome" onclick="accDayHome()">Сегодня</button>
+      </div>
       <button class="ds-arw" id="mdNext" onclick="accDayStep(-1)" aria-label="День вперёд" disabled>
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
              stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
@@ -11470,23 +11496,38 @@ const ACC_WD = ['вс','пн','вт','ср','чт','пт','сб'];
 function accDay(){ return _dayIsoFor(DAY_OFFSET); }
 function accIsBack(){ return DAY_OFFSET > 0; }   // смотрим прошедший день
 
-function accDayPaint(){
+// Дни недели и месяцы целиком: на широкой полосе «29.08, сб» выглядит
+// заготовкой, а «29 августа, суббота» — ответом.
+const ACC_WDF = ['воскресенье','понедельник','вторник','среда','четверг',
+                 'пятница','суббота'];
+function accDayPaint(dir){
   const el = document.getElementById('moneyDay'); if(!el) return;
   const d = _bizToday(); d.setDate(d.getDate() - DAY_OFFSET);
-  const дд = String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0');
-  _setText('mdName', DAY_OFFSET === 0 ? 'Сегодня' : DAY_OFFSET === 1 ? 'Вчера'
-                   : DAY_OFFSET === 2 ? 'Позавчера' : дд);
-  _setText('mdDate', DAY_OFFSET > 2 ? `${ACC_WD[d.getDay()]} · ${d.getFullYear()}`
-                                    : `${дд}, ${ACC_WD[d.getDay()]}`);
+  const имя = DAY_OFFSET === 0 ? 'Сегодня' : DAY_OFFSET === 1 ? 'Вчера'
+            : DAY_OFFSET === 2 ? 'Позавчера'
+            : `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
+  _setText('mdName', имя);
+  _setText('mdDate', DAY_OFFSET > 2
+    ? `${ACC_WDF[d.getDay()]} · ${d.getFullYear()}`
+    : `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}, ${ACC_WDF[d.getDay()]}`);
   const nx = document.getElementById('mdNext'); if(nx) nx.disabled = DAY_OFFSET <= 0;
   el.classList.toggle('back', DAY_OFFSET > 0);
+  // Новый день въезжает с той стороны, в которую листнули: иначе текст просто
+  // моргает, и непонятно, сменился день или экран мигнул.
+  const t = document.getElementById('mdTxt');
+  if(t && dir){
+    t.classList.remove('go-back','go-fwd');
+    void t.offsetWidth;                       // перезапуск анимации
+    t.classList.add(dir > 0 ? 'go-back' : 'go-fwd');
+  }
 }
 
 function accDaySet(off){
   off = Math.max(0, Math.min(365, off | 0));
   if(off === DAY_OFFSET) return;
+  const dir = off > DAY_OFFSET ? 1 : -1;      // назад во времени или вперёд
   DAY_OFFSET = off;
-  accDayPaint();
+  accDayPaint(dir);
   // Цифры на плитках — за выбранный день, иначе окошко говорит одно, а панель
   // показывает другое.
   accLoadSummaries();
@@ -12102,6 +12143,11 @@ function accOpen(id){
 // внутри три экрана, и своя вторая стрелка рядом с первой выглядела ошибкой.
 let ACC_BACK = null;
 function accBack(){
+  // Стрелка назад уводит с экрана камеры — значит камера кончилась. Раньше её
+  // гасил только выход из раздела и «Готово», а стрелка оставляла её работать:
+  // полноэкранный режим сканера висел поверх обычного списка, шапка ложилась
+  // на карточки, и страница переставала слушаться пальца.
+  try{ SCAN.stop(); }catch(e){}
   // Пришли из чек-листа — туда и возвращаемся, что бы ни поставил раздел.
   if(CKL_RETURN){ CKL_RETURN = false; ACC_BACK = null; accChecklist(); return; }
   if(ACC_BACK){ const f = ACC_BACK; ACC_BACK = null; f(); return; }
@@ -12965,7 +13011,10 @@ const SCAN = {
     if(this.video) this.video.srcObject = null;
     if(свой) return;
     // Сканер ушёл — раздел снова обычный экран со своей шапкой и фоном.
-    document.querySelectorAll('.stk-ov.scan-live')
+    // Снимаем со всего, что помечено: камера живёт на трёх экранах, и правило
+    // «только у склада» однажды оставило режим сканера висеть на проверке
+    // бутылок — страница выглядела сломанной и не отзывалась на нажатия.
+    document.querySelectorAll('.scan-live')
       .forEach(o => o.classList.remove('scan-live'));
   },
 
@@ -18041,6 +18090,7 @@ async function accCheck(){
 }
 
 function chkHome(){
+  try{ SCAN.stop(); }catch(e){}
   const flags = {};
   (ACC_CHK.drivers || []).forEach(d => flags[d.driver] = d);
   const t = ACC_CHK.totals || {};
@@ -18077,7 +18127,9 @@ function chkHome(){
     return `<div class="crw-c chk-c">
       <div class="crw-c-h">
         <span class="crew-code">${escS(d.code)}</span>
-        <span class="crw-c-n">${escS(d.name)}${n ? ` (${n})` : ''}</span>
+        <span class="crw-c-n">${escS(d.name)}</span>
+        ${n ? `<span class="crw-c-x">${n} ${
+          pluralize(n,'водитель','водителя','водителей')}</span>` : ''}
       </div>
       <div class="crw-c-b">${chips}</div>
     </div>`;

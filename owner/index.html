@@ -2667,7 +2667,10 @@ button.path:active{transform:scale(.995)}
 .scan-tool.muted .s-on{display:none}
 .scan-tool.muted .s-off{display:block}
 /* Подсказка «наведите на код» — тонкой строкой над лентой, пока не начали. */
-.scan-tip{position:absolute;left:0;right:0;bottom:calc(var(--safe-bottom) + 130px);
+/* Подсказку держим под самой рамкой, а не у нижнего края: человек смотрит в
+   кадр, туда и слово. Под словом-итогом (badge), чтобы они не налезали. */
+.scan-tip{position:absolute;left:0;right:0;bottom:auto;
+  top:calc(46% + min(64vw,264px) / 2 + 54px);
   text-align:center;font-size:12.5px;color:rgba(255,255,255,.6);
   text-shadow:0 1px 8px rgba(0,0,4,.9);pointer-events:none}
 .scan-tip.warn{color:#F3CE6A}
@@ -2701,14 +2704,21 @@ button.path:active{transform:scale(.995)}
 .scan-strip .scan-empty{flex:1;text-align:center;font-size:12px;
   color:rgba(255,255,255,.5);padding:14px 8px}
 /* Кнопки — плавающими пилюлями, без подложки-панели. */
-.scan-dockbar{display:flex;align-items:center;gap:10px;padding:0 14px}
-.scan-undo{flex-shrink:0;padding:12px 16px;border-radius:14px;cursor:pointer;
-  font-family:inherit;font-size:13px;font-weight:600;color:rgba(255,255,255,.8);
+/* Сколько добавлено в этой сессии — тонкой строкой над лентой, справа. Число
+   золотым, слово мелким: цифра важна, подпись нет. Пусто — нет и строки. */
+.scan-added{padding:0 16px 8px;text-align:right;font-size:11px;letter-spacing:.4px;
+  text-transform:uppercase;color:rgba(255,255,255,.45);min-height:19px}
+.scan-added b{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;
+  color:var(--gold2);margin-right:5px}
+.scan-dockbar{display:flex;align-items:stretch;gap:10px;padding:0 14px}
+.scan-undo{flex-shrink:0;padding:0 20px;border-radius:15px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;
+  font-family:inherit;font-size:14px;font-weight:600;color:rgba(255,255,255,.8);
   background:rgba(16,16,24,.55);border:1px solid rgba(255,255,255,.12);
   backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 .scan-undo:disabled{opacity:.4;pointer-events:none}
 .scan-undo:active{transform:scale(.97)}
-.scan-go{flex:1;padding:15px;border-radius:15px;border:0;cursor:pointer;
+.scan-go{flex:1;height:52px;border-radius:15px;border:0;cursor:pointer;
   font-family:inherit;font-size:15px;font-weight:700;color:#1a1408;
   background:linear-gradient(135deg,var(--gold),var(--gold2));
   box-shadow:0 6px 20px rgba(201,169,110,.3)}
@@ -12959,7 +12969,7 @@ function qrScreen(){
       </div>
       <div class="scan-hud">
         <div class="scan-hud-top">
-          <div class="scan-pill"><b id="qrN">0</b><span>на точке</span><em id="qrAdded"></em></div>
+          <div class="scan-pill"><b id="qrN">0</b><span>на офисе</span></div>
           <div class="scan-tools">
             <button class="scan-tool" id="qrSound" onclick="qrSound(this)">
               <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
@@ -12974,6 +12984,7 @@ function qrScreen(){
         </div>
         <div class="scan-tip" id="qrHint">Наведите на код</div>
         <div class="scan-hud-bot">
+          <div class="scan-added" id="qrAdded"></div>
           <div class="scan-strip" id="qrFeed"></div>
           <div class="scan-dockbar">
             <button class="scan-undo" id="qrUndo" onclick="qrUndo()" disabled>Отменить</button>
@@ -13122,7 +13133,7 @@ function qrRenderFeed(){
   QR_SESSION = QR_ROWS.filter(r => r.state === 'new' || r.state === 'sending').length;
   scanRoll('qrN', total);
   const s = document.getElementById('qrAdded');
-  if(s) s.textContent = QR_SESSION ? `+${QR_SESSION} сейчас` : '';
+  if(s) s.innerHTML = QR_SESSION ? `<b>${QR_SESSION}</b> добавлено` : '';
   const feed = document.getElementById('qrFeed'); if(!feed) return;
   const cnt = document.getElementById('qrCount');
   if(cnt) cnt.textContent = total ? total + '' : '';

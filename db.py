@@ -1300,8 +1300,11 @@ async def get_all_customers() -> list:
     """Return all user documents, newest-first."""
     db = _db_or_none()
     if db is None: return []
+    # Потолок высокий не для красоты: по этому списку идёт рассылка, и клиент,
+    # не попавший в выборку, молча её не получит. База растёт сотнями в месяц,
+    # и прежние 2000 однажды отрезали бы хвост без единого следа в счётчиках.
     cursor = db.users.find({}, {"_id": 0}).sort("first_seen", -1)
-    return await cursor.to_list(length=2000)
+    return await cursor.to_list(length=100000)
 
 
 async def award_referral_points(referrer_id: int, referred_id: int, points: int):
@@ -1359,6 +1362,32 @@ async def get_recent_notifications(owner_id: int = 0, limit: int = 30) -> list:
 
 
 # ── Broadcasts (owner self-serve promo sender) ───────────────────────────────
+async def mark_user_unreachable(telegram_id: int, reason: str) -> None:
+    """Телеграм отказался доставлять этому человеку — запомнить почему.
+
+    Пишем только при смене состояния: рассылка идёт по всей базе, и слепой
+    апдейт на каждого — это лишняя тысяча записей за проход."""
+    db = _db_or_none()
+    if db is None or not telegram_id: return
+    await db.users.update_one(
+        {"telegram_id": int(telegram_id), "unreachable": {"$ne": reason}},
+        {"$set": {"unreachable": reason,
+                  "unreachable_at": datetime.now(timezone.utc).isoformat()}})
+
+
+async def clear_user_unreachable(telegram_id: int) -> None:
+    """Дошло — значит человек снова доступен, и метка обязана уйти.
+
+    Заблокировавший бота может его разблокировать, и узнать об этом можно
+    только удавшейся отправкой. Метка, пережившая своё основание, вечно
+    занижала бы аудиторию."""
+    db = _db_or_none()
+    if db is None or not telegram_id: return
+    await db.users.update_one(
+        {"telegram_id": int(telegram_id), "unreachable": {"$exists": True}},
+        {"$unset": {"unreachable": "", "unreachable_at": ""}})
+
+
 async def save_broadcast(doc: dict) -> None:
     """Upsert a broadcast job by job_id — live counters + final stats/history."""
     db = _db_or_none()

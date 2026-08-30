@@ -124,8 +124,43 @@ async def _tg_photo_file(sess, chat_id, path: Path, caption: str, kb: dict) -> d
             return await r.json()
 
 
-async def _send_one(sess, chat_id, text: str, img_url: str, file_ids: dict, bucket: str) -> bool:
-    """Send one promo. Reuses a file_id per bucket after the first upload."""
+# Почему не дошло. Телеграм отвечает словами, и эти слова — единственный
+# источник правды о том, что случилось: «заблокировал бота» и «упала сеть» для
+# счётчика одинаковы, а для владельца это разные новости. Раньше ответ
+# выбрасывался, и число «не дошло 215» ничего не объясняло.
+FAIL_SAY = {
+    "blocked":     "заблокировали бота",
+    "deactivated": "аккаунт удалён",
+    "not_found":   "чат не найден",
+    "no_start":    "не начинал диалог",
+    "forbidden":   "закрыт для бота",
+    "flood":       "лимит телеграма",
+    "network":     "сеть не дала",
+    "other":       "другое",
+}
+# Отказы, которые сами не пройдут: человек снова станет доступен, только если
+# сам разблокирует бота. Их отмечаем в карточке — на них считается реальная
+# аудитория. Временные (лимит, сеть) не отмечаем: завтра всё уйдёт.
+FAIL_PERMANENT = ("blocked", "deactivated", "not_found", "no_start", "forbidden")
+
+
+def _fail_reason(r: dict) -> str:
+    code = r.get("error_code") or 0
+    desc = (r.get("description") or "").lower()
+    if "blocked by the user" in desc:               return "blocked"
+    if "user is deactivated" in desc:               return "deactivated"
+    if "chat not found" in desc:                    return "not_found"
+    if "bot can't initiate conversation" in desc:   return "no_start"
+    if code == 429 or "too many requests" in desc:  return "flood"
+    if code == 403:                                 return "forbidden"
+    return "other"
+
+
+async def _send_one(sess, chat_id, text: str, img_url: str, file_ids: dict, bucket: str):
+    """Send one promo. Reuses a file_id per bucket after the first upload.
+
+    Возвращает (дошло, причина, что ответил телеграм) — причина нужна там, где
+    считают итог рассылки."""
     kb = _btn(bucket)
     if img_url:
         fid = file_ids.get(bucket)
@@ -143,18 +178,21 @@ async def _send_one(sess, chat_id, text: str, img_url: str, file_ids: dict, buck
             photos = (r.get("result") or {}).get("photo")
             if photos:
                 file_ids[bucket] = photos[-1]["file_id"]
-            return True
-        return False
+            return True, "", ""
+        return False, _fail_reason(r), (r.get("description") or "")[:120]
     else:
         r = await _tg(sess, "sendMessage", {"chat_id": chat_id, "text": text or "AMBAR",
                                             "reply_markup": kb, "disable_web_page_preview": True})
-        return bool(r.get("ok"))
+        if r.get("ok"):
+            return True, "", ""
+        return False, _fail_reason(r), (r.get("description") or "")[:120]
 
 
 # ── background blast ────────────────────────────────────────────────────────
 async def _persist(job: dict):
     keep = ("job_id", "target", "created_by", "created_at", "state", "total", "reach",
             "sent", "skipped_banned", "skipped_filter", "failed", "by_ru", "by_en",
+            "fail_by", "fail_said",
             "done_at", "ru_text", "en_text", "ru_image", "en_image")
     try:
         await db.save_broadcast({k: job.get(k) for k in keep})
@@ -205,16 +243,26 @@ async def _run_job(job_id: str):
                 img  = (job["ru_image"] if bucket == "ru" else job["en_image"]) \
                     or job["en_image"] or job["ru_image"]
                 try:
-                    ok = await _send_one(sess, tid, text, img, file_ids, bucket)
+                    ok, why, said = await _send_one(sess, tid, text, img, file_ids, bucket)
                 except Exception as e:
-                    ok = False
-                    log.debug(f"[broadcast] send {tid} error: {e}")
+                    ok, why, said = False, "network", str(e)[:120]
+                    log.debug(f"[broadcast] send error: {e}")
                 if ok:
                     job["sent"] += 1
                     job["by_ru" if bucket == "ru" else "by_en"] += 1
                     job["sent_set"].add(tid)
+                    # Разблокировал — снова доступен. Метка не должна пережить
+                    # своё основание, иначе аудитория будет вечно занижена.
+                    try: await db.clear_user_unreachable(tid)
+                    except Exception: pass
                 else:
                     job["failed"] += 1
+                    job["fail_by"][why] = job["fail_by"].get(why, 0) + 1
+                    if why == "other" and said and len(job["fail_said"]) < 3:
+                        job["fail_said"].append(said)
+                    if why in FAIL_PERMANENT:
+                        try: await db.mark_user_unreachable(tid, why)
+                        except Exception: pass
                 if (job["sent"] + job["failed"]) % 20 == 0:
                     await _persist(job)
                 await asyncio.sleep(0.05)   # ~20/s, under Telegram's broadcast limit
@@ -233,7 +281,7 @@ async def _run_job(job_id: str):
 async def handle_bcast_audience(request):
     users = await db.get_all_customers()
     c = {"total": len(users), "all": 0, "ru": 0, "en": 0, "nolang": 0, "vip": 0,
-         "banned": 0, "nochat": 0}
+         "banned": 0, "nochat": 0, "unreachable": 0}
     for u in users:
         if not u.get("telegram_id"):
             c["nochat"] += 1
@@ -242,6 +290,11 @@ async def handle_bcast_audience(request):
             c["banned"] += 1
             continue
         c["all"] += 1
+        # Известно недоступные остаются в аудитории — человек мог разблокировать
+        # бота, и узнать об этом можно только попыткой. Но владелец должен
+        # видеть, сколько из числа сверху почти наверняка не дойдёт.
+        if u.get("unreachable"):
+            c["unreachable"] += 1
         b = _bucket(u)
         c["ru" if b == "ru" else "en"] += 1
         if not (u.get("language_code") or "").strip():
@@ -291,8 +344,9 @@ async def handle_bcast_test(request):
         return web.json_response({"error": "nothing to send in this language"},
                                  status=400, headers=CORS_HEADERS)
     async with aiohttp.ClientSession() as sess:
-        ok = await _send_one(sess, owner_id, text, img, {}, bucket)
-    return web.json_response({"ok": bool(ok)}, headers=CORS_HEADERS)
+        ok, why, said = await _send_one(sess, owner_id, text, img, {}, bucket)
+    return web.json_response({"ok": bool(ok), "why": FAIL_SAY.get(why, why), "said": said},
+                             headers=CORS_HEADERS)
 
 
 @require_owner
@@ -331,6 +385,9 @@ async def handle_bcast_send(request):
         "state": "sending", "total": 0, "reach": 0,
         "sent": 0, "skipped_banned": 0, "skipped_filter": 0, "failed": 0,
         "by_ru": 0, "by_en": 0, "done_at": "",
+        # Из чего сложилось «не дошло» и что телеграм сказал в непонятных
+        # случаях: без этого число остаётся загадкой до следующей рассылки.
+        "fail_by": {}, "fail_said": [],
         "sent_set": set(),
     }
     _JOBS[job_id] = job

@@ -5316,6 +5316,19 @@ button.path:active{transform:scale(.995)}
 .bcast-seg button.on{background:linear-gradient(135deg,#E8C98A,#C9A96E);color:#1a1408}
 .bcast-reach{margin-top:10px;font-size:13px;color:var(--gold2)}
 .bcast-reach b{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700}
+.bcast-reach-bad{margin-top:4px;font-size:11.5px;color:var(--muted);line-height:1.4}
+/* Разбор «не дошло»: строкой под карточками, мелко — это ответ на вопрос,
+   который задают один раз после рассылки, а не то, за чем сюда приходят. */
+.bcast-why{grid-column:1/-1;display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;
+  padding-top:9px;border-top:1px solid var(--border2)}
+.bcast-why span{display:inline-flex;align-items:baseline;gap:6px;padding:5px 10px;
+  border-radius:999px;background:var(--card2);border:1px solid var(--border2);
+  font-size:11.5px;color:var(--muted)}
+.bcast-why i{font-style:normal}
+.bcast-why b{font-family:'DM Sans',sans-serif;font-size:12.5px;font-weight:700;
+  color:var(--sub);font-variant-numeric:tabular-nums}
+.bcast-why-raw{flex-basis:100%;background:none;border:0;padding:4px 2px;
+  font-size:10.5px;color:var(--dim);word-break:break-word}
 .bcast-ta{width:100%;box-sizing:border-box;background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:11px 13px;color:var(--text);font-size:14px;font-family:inherit;line-height:1.5;resize:vertical;min-height:66px}
 .bcast-ta:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .bcast-img{margin-top:8px}
@@ -16804,7 +16817,13 @@ function bcastRenderReach(){
   const a=_bcast.audience; if(!a){ el.textContent='…'; return; }
   const n=bcastReachFor(_bcast.target);
   const extra = _bcast.target==='all' ? ` <span style="color:var(--muted)">· RU ${a.ru} · EN ${a.en}</span>` : '';
-  el.innerHTML=`≈ <b>${n.toLocaleString('ru-RU')}</b> получат${extra}`;
+  // Сколько из них почти наверняка не дойдёт: эти люди заблокировали бота на
+  // прошлых рассылках. Попытка всё равно будет — разблокировать могли, — но
+  // ждать доставки всем из числа сверху не стоит.
+  const bad = a.unreachable || 0;
+  el.innerHTML=`≈ <b>${n.toLocaleString('ru-RU')}</b> получат${extra}`
+    + (bad ? `<div class="bcast-reach-bad">из них ${bad.toLocaleString('ru-RU')} ${
+        pluralize(bad,'закрыл','закрыли','закрыли')} бота — им, скорее всего, не дойдёт</div>` : '');
 }
 document.querySelectorAll('#bcastSeg button').forEach(b=>{
   b.addEventListener('click',()=>{
@@ -16917,7 +16936,27 @@ function bcastRenderStatus(s){
   const head=s.state==='sending'?`Идёт рассылка… ${pct}%`:s.state==='error'?IC('warn',14)+' Ошибка рассылки':IC('check',14)+' Рассылка завершена';
   const el=document.getElementById('bcastStats'); if(!el) return;
   el.innerHTML=`<div style="grid-column:1/-1;font-size:12px;color:var(--muted);text-align:center;margin-bottom:2px">${head} · цель ${reach.toLocaleString('ru-RU')}</div>`+
-    stat(s.sent,'Доставлено','var(--up)')+stat(s.failed,'Не дошло','var(--dn)')+stat(s.skipped_banned,'Баны','var(--muted)');
+    stat(s.sent,'Доставлено','var(--up)')+stat(s.failed,'Не дошло','var(--dn)')+stat(s.skipped_banned,'Баны','var(--muted)')
+    + bcastWhy(s);
+}
+
+// Из чего сложилось «не дошло». Голое число ничего не объясняет: заблокировали
+// бота, удалили аккаунт и моргнула сеть — это три разные новости, и только
+// первая означает, что человек ушёл насовсем.
+const BCAST_WHY = {
+  blocked:'заблокировали бота', deactivated:'аккаунт удалён', not_found:'чат не найден',
+  no_start:'не начинал диалог', forbidden:'закрыт для бота', flood:'лимит телеграма',
+  network:'сеть не дала', other:'другое',
+};
+function bcastWhy(s){
+  const by = s.fail_by || {};
+  const rows = Object.entries(by).filter(([,n]) => n > 0)
+    .sort((a,b) => b[1] - a[1]);
+  if(!rows.length) return '';
+  return `<div class="bcast-why">${rows.map(([k,n]) =>
+      `<span><i>${(BCAST_WHY[k] || k)}</i><b>${n.toLocaleString('ru-RU')}</b></span>`).join('')}
+    ${(s.fail_said || []).length ? `<span class="bcast-why-raw">${
+      (s.fail_said || []).map(x => escS(x)).join(' · ')}</span>` : ''}</div>`;
 }
 
 let _acActiveFilter = null;

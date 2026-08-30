@@ -2527,8 +2527,7 @@ button.path:active{transform:scale(.995)}
    красным — чужая. Свечение уходит наружу ореолом, сам код внутри открыт. */
 .scan-frame{position:absolute;top:46%;left:50%;transform:translate(-50%,-50%);
   width:min(64vw,264px);aspect-ratio:1;border-radius:26px;pointer-events:none;z-index:3;
-  box-shadow:0 0 0 1px rgba(255,255,255,.14) inset;
-  transition:box-shadow .22s var(--e1)}
+  transition:box-shadow .24s var(--e1)}
 .scan-frame .c{position:absolute;width:30px;height:30px;border:3px solid rgba(255,255,255,.92);
   transition:border-color .2s var(--e1)}
 .scan-frame .tl{top:-2px;left:-2px;border-right:none;border-bottom:none;border-radius:16px 0 0 0}
@@ -2536,10 +2535,12 @@ button.path:active{transform:scale(.995)}
 .scan-frame .bl{bottom:-2px;left:-2px;border-right:none;border-top:none;border-radius:0 0 0 16px}
 .scan-frame .br{bottom:-2px;right:-2px;border-left:none;border-top:none;border-radius:0 0 16px 0}
 /* Свечение: тонкая цветная кайма плюс мягкий ореол вокруг. */
-.scan-frame.ok    {box-shadow:0 0 0 2px rgba(76,175,125,.7) inset,0 0 34px 4px rgba(76,175,125,.5)}
+/* Свечение — только мягким внешним ореолом, без второй линии по контуру:
+   рамка это четыре угла, а не квадрат. */
+.scan-frame.ok    {box-shadow:0 0 42px 7px rgba(76,175,125,.42)}
 .scan-frame.dup,
-.scan-frame.again {box-shadow:0 0 0 2px rgba(232,180,70,.75) inset,0 0 34px 4px rgba(232,180,70,.48)}
-.scan-frame.err   {box-shadow:0 0 0 2px rgba(224,85,85,.8) inset,0 0 34px 4px rgba(224,85,85,.5)}
+.scan-frame.again {box-shadow:0 0 42px 7px rgba(232,180,70,.4)}
+.scan-frame.err   {box-shadow:0 0 42px 7px rgba(224,85,85,.42)}
 .scan-frame.ok    .c{border-color:#5FD79E}
 .scan-frame.dup   .c,.scan-frame.again .c{border-color:#F0C24A}
 .scan-frame.err   .c{border-color:#FF7A7A}
@@ -2565,6 +2566,47 @@ button.path:active{transform:scale(.995)}
 /* Счётчик выезжает столбиком — прокрутка живёт в JS (scanRoll), а тут только
    обрезаем хвост цифры, чтобы её уход был чистым. */
 .scan-pill b{display:inline-block;overflow:hidden}
+
+/* Карточка бутылки по тапу на плашку. Стеклянная шторка снизу — та же манера,
+   что у экрана звонка: поднимается над камерой, не уводя с неё. */
+.scan-info-scrim{position:fixed;inset:0;z-index:600;background:rgba(0,0,6,.5);
+  opacity:0;pointer-events:none;transition:opacity .24s var(--e1)}
+.scan-info-scrim.on{opacity:1;pointer-events:auto}
+.scan-info{position:fixed;left:0;right:0;bottom:0;z-index:601;
+  padding:0 18px calc(18px + var(--safe-bottom));border-radius:24px 24px 0 0;
+  background:rgba(14,14,22,.72);
+  backdrop-filter:blur(28px) saturate(160%);-webkit-backdrop-filter:blur(28px) saturate(160%);
+  box-shadow:0 -1px 0 rgba(255,255,255,.08),0 -22px 50px rgba(0,0,0,.6);
+  transform:translateY(101%);transition:transform .32s cubic-bezier(.22,.72,.2,1)}
+.scan-info.on{transform:none}
+.scan-info-grab{width:38px;height:4px;border-radius:2px;background:rgba(255,255,255,.16);
+  margin:10px auto 16px}
+.si-top{display:flex;align-items:flex-start;gap:12px;margin-bottom:16px}
+.si-ava{width:46px;height:46px;flex-shrink:0;border-radius:13px;display:flex;
+  align-items:center;justify-content:center;
+  background:radial-gradient(120% 120% at 30% 18%,rgba(201,169,110,.22),rgba(201,169,110,.05));
+  box-shadow:inset 0 0 0 1px rgba(201,169,110,.2)}
+.si-ava svg{width:24px;height:24px;fill:none;stroke:var(--gold2);stroke-width:1.6;
+  stroke-linecap:round;stroke-linejoin:round}
+.si-h{flex:1;min-width:0}
+.si-name{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;
+  color:#fff;line-height:1.2}
+.si-tag{display:inline-flex;align-items:center;gap:6px;margin-top:7px;padding:5px 11px;
+  border-radius:9px;font-size:12px;font-weight:700}
+.si-tag.ok  {color:#6FD79E;background:rgba(76,175,125,.15)}
+.si-tag.warn{color:#F3CE6A;background:rgba(232,180,70,.15)}
+.si-tag.bad {color:#FF8A8A;background:rgba(224,85,85,.15)}
+.si-tag::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor}
+.si-rows{display:flex;flex-direction:column;gap:1px;border-radius:14px;overflow:hidden;
+  background:rgba(255,255,255,.04)}
+.si-row{display:flex;align-items:center;justify-content:space-between;gap:14px;
+  padding:12px 14px;background:rgba(255,255,255,.02)}
+.si-row .k{font-size:12.5px;color:rgba(255,255,255,.5)}
+.si-row .v{font-size:13.5px;font-weight:600;color:#fff;text-align:right;min-width:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.si-row .v.mono{font-family:'Space Grotesk',sans-serif;letter-spacing:.3px;
+  font-size:12.5px;color:rgba(255,255,255,.8)}
+.si-big{font-family:'Space Grotesk',sans-serif;font-weight:700;color:var(--gold2)}
 
 /* Базовые стили списка — для не-камерных экранов (сводка ревизии, посадка
    проверки): в ленте сканера они переопределены выше. */
@@ -2625,9 +2667,10 @@ button.path:active{transform:scale(.995)}
 .scan-tool.muted .s-on{display:none}
 .scan-tool.muted .s-off{display:block}
 /* Подсказка «наведите на код» — тонкой строкой над лентой, пока не начали. */
-.scan-tip{position:absolute;left:0;right:0;bottom:calc(var(--safe-bottom) + 128px);
-  text-align:center;font-size:12.5px;color:rgba(255,255,255,.66);
-  text-shadow:0 1px 8px rgba(0,0,4,.9);transition:opacity .2s var(--e1)}
+.scan-tip{position:absolute;left:0;right:0;bottom:calc(var(--safe-bottom) + 130px);
+  text-align:center;font-size:12.5px;color:rgba(255,255,255,.6);
+  text-shadow:0 1px 8px rgba(0,0,4,.9);pointer-events:none}
+.scan-tip.warn{color:#F3CE6A}
 
 /* Низ: лента отсканированных — их листают, чтобы просмотреть, — и кнопки. */
 .scan-hud-bot{position:absolute;left:0;right:0;bottom:0;
@@ -2637,10 +2680,12 @@ button.path:active{transform:scale(.995)}
 .scan-strip::-webkit-scrollbar{display:none}
 /* Каждая бутылка — компактная стеклянная плашка с цветной каймой по итогу. */
 .scan-strip .scan-row,.scan-strip .chk-item{flex:0 0 auto;width:auto;max-width:58vw;
-  margin:0;padding:9px 12px;border-radius:13px;align-items:center;
+  margin:0;padding:9px 12px;border-radius:13px;align-items:center;cursor:pointer;
   background:rgba(16,16,24,.52);border:1px solid rgba(255,255,255,.10);
   border-left:3px solid rgba(255,255,255,.22);
-  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+  transition:transform .12s var(--e1)}
+.scan-strip .scan-row:active,.scan-strip .chk-item:active{transform:scale(.96)}
 .scan-strip .scan-raw,.scan-strip .scan-state,.scan-strip .chk-item-s{display:none}
 .scan-strip .scan-code,.scan-strip .chk-item-t b{font-size:13px;color:#fff}
 .scan-strip .chk-item-t{gap:0}
@@ -8670,6 +8715,83 @@ function _setText(id, txt){ const el = document.getElementById(id); if(el) el.te
 // старая цифра уезжает вверх, новая приходит снизу. Тот же приём, что у
 // смайликов сверки в звонке, только на цифрах — и экран не выглядит статичным
 // табло. Меняется только при росте: убыль (отмена) просто ставим тихо.
+// Район человеческим именем, а не внутренним id: b1 → «B1 JVC».
+function _distName(id){
+  const d = ((typeof STK!=='undefined' && STK.districts) || []).find(x => x.id === id);
+  return d ? `${d.code || ''} ${d.name || ''}`.trim() : (id || '');
+}
+
+// ── Карточка бутылки по тапу на плашку ──────────────────────────────────────
+// Одна шторка на все три экрана. Строки показываем ТОЛЬКО те, по которым есть
+// данные: пустых «—» на экране быть не должно, это и есть лишний текст.
+const _SI_ICON = '<svg viewBox="0 0 24 24"><path d="M9 2h6M10 2v3.2a3 3 0 0 1-.5 1.6L8 9v11a2 2 0 0 0 2 2h4a2 2 0 0 0 2-2V9l-1.5-2.2a3 3 0 0 1-.5-1.6V2"/><path d="M8.5 12h7"/></svg>';
+function _siRow(k, v, cls){
+  if(v === undefined || v === null || v === '') return '';
+  return `<div class="si-row"><span class="k">${k}</span><span class="v ${cls||''}">${v}</span></div>`;
+}
+function scanInfo(name, tagText, tagCls, rows){
+  const b = document.getElementById('scanInfoBody'); if(!b) return;
+  b.innerHTML = `<div class="si-top">
+      <span class="si-ava">${_SI_ICON}</span>
+      <span class="si-h"><div class="si-name">${escS(name || 'Без метки')}</div>
+        ${tagText ? `<span class="si-tag ${tagCls||'ok'}">${escS(tagText)}</span>` : ''}</span>
+    </div>
+    <div class="si-rows">${rows.join('')}</div>`;
+  document.getElementById('scanInfoScrim').classList.add('on');
+  document.getElementById('scanInfo').classList.add('on');
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+function scanInfoHide(){
+  document.getElementById('scanInfoScrim').classList.remove('on');
+  document.getElementById('scanInfo').classList.remove('on');
+}
+
+// Внести товар: позиция одна на всю сессию (QR_PROD), поэтому крупно — сколько
+// её уже на этой точке, и когда именно эту бутылку записали.
+function qrRowInfo(i){
+  const r = (QR_ROWS || [])[i]; if(!r) return;
+  const st = {new:['записана','ok'], sending:['отправляю…','warn'],
+              dup:['уже в реестре','warn'], fail:['не сохранилось','bad'],
+              old:['в реестре','ok']}[r.state] || ['',''];
+  const всего = (QR_ROWS||[]).filter(x => ['new','sending','old'].includes(x.state)).length;
+  scanInfo((QR_PROD && QR_PROD.name) || r.label, st[0], st[1], [
+    _siRow('На точке', всего + ' шт', 'big'),
+    _siRow('Район', escS(_distName(QR_DIST))),
+    _siRow('Записана', r.state === 'new' ? 'сейчас' : (r.at ? escS(r.at) : '')),
+    _siRow('Код', escS(r.code), 'mono'),
+  ]);
+}
+
+// Проверка: у каждой бутылки свой вердикт и своя позиция. Плюс сколько таких
+// же уже прошло в этой проверке — считаем по названию прямо в сессии.
+function chkRowInfo(i){
+  const x = (CHK_FEED || [])[i]; if(!x) return;
+  const v = CHK_V[x.verdict] || CHK_V.ok;
+  const кл = v.c === 'ok' ? 'ok' : v.c === 'bad' ? 'bad' : 'warn';
+  const таких = x.product_name
+    ? (CHK_FEED||[]).filter(y => y.product_name === x.product_name).length : 0;
+  scanInfo(x.product_name || x.label, v.t, кл, [
+    _siRow('В этой проверке', таких > 1 ? таких + ' шт' : '', 'big'),
+    _siRow('Заведена', x.added_at ? escS(_when(x.added_at)) : ''),
+    _siRow('Район', escS(x.district || '')),
+    _siRow('Метка', escS(x.label || ''), 'mono'),
+    _siRow('Код', escS(String(x.code || '')), 'mono'),
+  ]);
+}
+
+// Ревизия проходом: где бутылка числится и с каким итогом прошла.
+function audRowInfo(i){
+  const r = (AUD.rows || [])[i]; if(!r) return;
+  const st = r.state === 'fail' ? ['не сохранилось','bad']
+           : r.state === 'dup' ? ['уже посчитана','warn']
+           : (r.verdict === 'other' && r.home_code) ? [`числится на ${r.home_code}`,'warn']
+           : ['посчитана','ok'];
+  scanInfo(r.name || r.label, st[0], st[1], [
+    _siRow('Метка', escS(r.label || ''), 'mono'),
+    _siRow('Код', escS(String(r.code || '')), 'mono'),
+  ]);
+}
+
 function scanRoll(id, value){
   const el = document.getElementById(id); if(!el) return;
   const было = el.getAttribute('data-v');
@@ -10369,7 +10491,7 @@ async function stkScan(){
         </div>
         <div class="scan-tip" id="qrHint">Наведите на код</div>
         <div class="scan-hud-bot">
-          <div class="scan-strip" id="audFeed"><div class="scan-empty">Загрузка…</div></div>
+          <div class="scan-strip" id="audFeed"></div>
           <div class="scan-dockbar">
             <button class="scan-undo" id="audUndo" onclick="audUndo()" disabled>Отменить</button>
             <button class="scan-go" onclick="stkScanDone()">Готово</button>
@@ -10457,16 +10579,16 @@ function audPaint(){
     const col = r.state === 'sending' ? 'var(--muted)'
               : r.state === 'fail' ? 'var(--dn)' : color;
     const del = r.state === 'new'
-      ? `<button class="scan-del" onclick="audDrop(${i})" aria-label="Убрать">✕</button>` : '';
+      ? `<button class="scan-del" onclick="event.stopPropagation();audDrop(${i})" aria-label="Убрать">✕</button>` : '';
     const raw = r.code.length > 26 ? r.code.slice(0, 24) + '…' : r.code;
-    return `<div class="scan-row ${r.state}">
+    return `<div class="scan-row ${r.state}" onclick="audRowInfo(${i})">
       <span class="scan-dot" style="background:${col}"></span>
       <span class="scan-b">
         <span class="scan-code">${escS(r.name || r.label || '…')}</span>
         <span class="scan-raw">${escS(r.label ? r.label + ' · ' + raw : raw)}</span>
       </span>
       <span class="scan-state" style="color:${col}">${escS(txt)}</span>${del}</div>`;
-  }).join('') || '<div class="scan-empty">Наведите камеру на код с крышки</div>';
+  }).join('');
   const u = document.getElementById('audUndo');
   if(u) u.disabled = !AUD.rows.some(r => r.state === 'new');
 }
@@ -12852,7 +12974,7 @@ function qrScreen(){
         </div>
         <div class="scan-tip" id="qrHint">Наведите на код</div>
         <div class="scan-hud-bot">
-          <div class="scan-strip" id="qrFeed"><div class="scan-empty">Загрузка…</div></div>
+          <div class="scan-strip" id="qrFeed"></div>
           <div class="scan-dockbar">
             <button class="scan-undo" id="qrUndo" onclick="qrUndo()" disabled>Отменить</button>
             <button class="scan-go" onclick="qrDone()">Готово</button>
@@ -12943,17 +13065,13 @@ function qrIdle(sinceMs, frames, fps){
   // прочитать: ответ сервера мог прийти, когда камеру уже отвели.
   if(_flashOn && Date.now() - _holdAt > 350 && Date.now() - _flashAt > 700) qrFlashClear();
   const h = document.getElementById('qrHint'); if(!h) return;
-  if(sinceMs < 2500){ h.textContent = 'Наведите на код'; h.className = 'scan-hint'; return; }
-  if(!fps || fps < 4){ h.textContent = 'Телефон не успевает — уберите лишние приложения'; }
-  else if(sinceMs > 8000){
-    // Совет «включите фонарик», когда он уже горит, — худшее, что можно
-    // сказать: чаще всего именно фонарик и мешает, давая блик на глянце.
-    h.textContent = SCAN.torchOn
-      ? 'Не вижу код: похоже на блик — выключите фонарик или наклоните телефон'
-      : 'Не вижу код: ближе, ровнее, включите фонарик';
-  }
-  else{ h.textContent = 'Ищу код…'; }
-  h.className = 'scan-hint warn';
+  // Текста на экране минимум: пока сканируется — пусто, вмешиваемся только
+  // когда код не читается несколько секунд, и то в два-три слова.
+  let t = '', warn = false;
+  if(sinceMs > 7000){ t = SCAN.torchOn ? 'Блик — выключите фонарик' : 'Не вижу код'; warn = true; }
+  else if(sinceMs > 3500){ t = 'Ищу код…'; }
+  h.textContent = t;
+  h.className = 'scan-tip' + (warn ? ' warn' : '');
 }
 
 // Лента сессии — состояние, а не разметка: любую строку можно убрать, и
@@ -13014,11 +13132,11 @@ function qrRenderFeed(){
     // чужая запись, сделанная раньше; стирать её отсюда нельзя, иначе одним
     // касанием пропадёт бутылка, посчитанная на прошлой неделе.
     const del = (r.state === 'new' || r.state === 'fail')
-      ? `<button class="scan-del" onclick="qrDrop(${i})" aria-label="Убрать">✕</button>` : '';
+      ? `<button class="scan-del" onclick="event.stopPropagation();qrDrop(${i})" aria-label="Убрать">✕</button>` : '';
     // Крупно — наша метка, мелко — то, что реально лежит в коде. Второе нужно
     // редко, но без него не понять, что «бутылка» оказалась ссылкой с экрана.
     const raw = r.code.length > 26 ? r.code.slice(0, 24) + '…' : r.code;
-    return `<div class="scan-row ${r.state}">
+    return `<div class="scan-row ${r.state}" onclick="qrRowInfo(${i})">
       <span class="scan-dot" style="background:${color}"></span>
       <span class="scan-b">
         <span class="scan-code">${escS(r.label || '…')}</span>
@@ -13026,7 +13144,7 @@ function qrRenderFeed(){
       </span>
       <span class="scan-state" style="color:${color}">${escS(txt)}${
         r.at ? ' · ' + escS(r.at) : ''}</span>${del}</div>`;
-  }).join('') || '<div class="scan-empty">Этой позиции здесь ещё нет — наведите на первую бутылку</div>';
+  }).join('');
   const u = document.getElementById('qrUndo');
   if(u) u.disabled = !QR_ROWS.some(r => r.state === 'new');
 }
@@ -17588,7 +17706,7 @@ function chkScreen(){
         </div>
         <div class="scan-tip" id="chkHint">Наведите на код</div>
         <div class="scan-hud-bot">
-          <div class="scan-strip" id="chkFeed"><div class="scan-empty">Пока ни одной</div></div>
+          <div class="scan-strip" id="chkFeed"></div>
           <div class="scan-dockbar"><button class="scan-go" onclick="chkDone()">Готово</button></div>
         </div>
       </div>
@@ -17635,9 +17753,9 @@ function chkFeed(){
   if(b){ b.textContent = bad ? `не наших ${bad}` : ''; b.className = bad ? 'bad' : ''; }
   _setText('chkCount', CHK_FEED.length ? CHK_FEED.length + '' : '');
   document.getElementById('chkFeed').innerHTML = CHK_FEED.length
-    ? CHK_FEED.map(x => {
+    ? CHK_FEED.map((x, i) => {
         const v = CHK_V[x.verdict] || CHK_V.ok;
-        return `<div class="chk-item ${v.c}">
+        return `<div class="chk-item ${v.c}" onclick="chkRowInfo(${i})">
           <div class="chk-item-t"><b>${escS(x.label || 'без метки')}</b>
             <span>${escS(v.t)}</span></div>
           <div class="chk-item-s">${x.product_name
@@ -17645,7 +17763,7 @@ function chkFeed(){
               + (x.district ? ' · ' + escS(x.district) : '')
             : escS(String(x.code || '').slice(0, 34))}</div>
         </div>`; }).join('')
-    : '<div class="scan-empty">Пока ни одной</div>';
+    : '';
 }
 
 // Ответ даём на самой камере: человек смотрит в рамку, а не в список под ней.
@@ -20389,6 +20507,14 @@ function renderHours(h){
        по нижнему краю его содержимого, а не экрана, и на длинном списке
        оказывалась посреди него. -->
   <div class="stk-foot" id="accFoot"></div>
+</div>
+
+<!-- Карточка бутылки: по нажатию на плашку в ленте сканера. Одна на все три
+     экрана — данные кладёт тот, кто её вызвал. -->
+<div class="scan-info-scrim" id="scanInfoScrim" onclick="scanInfoHide()"></div>
+<div class="scan-info" id="scanInfo" role="dialog" aria-label="Бутылка">
+  <div class="scan-info-grab"></div>
+  <div id="scanInfoBody"></div>
 </div>
 
 

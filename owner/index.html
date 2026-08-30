@@ -10049,7 +10049,7 @@ function _setRail(id, html){
 async function stkPicker(){
   STK.view = 'pick'; STK.sheet = null; STK.vals = {};
   _setRail('stkRail', '');            // обзор — это и есть «все районы»
-  _stkHead('Ревизия', 'загрузка…', false);
+  _stkHead('Склад', 'загрузка…', false);
   document.getElementById('stkMid').innerHTML =
     '<div class="stk-empty">Загрузка…</div>';
   let st;
@@ -10060,7 +10060,7 @@ async function stkPicker(){
     return;
   }
   STK.districts = st.districts;
-  _stkHead('Ревизия', `${st.done} из ${st.total} районов · ${_dayName(st.day)}`, false);
+  _stkHead('Склад', `${st.done} из ${st.total} районов · ${_dayName(st.day)}`, false);
   // Плитками, а не строками: пять строк во всю ширину оставляли под собой
   // полэкрана пустоты. Число на плитке — то, ради чего сюда заходят: недостача
   // в деньгах там, где считали, и прочерк там, где ещё нет.
@@ -11353,7 +11353,7 @@ function stkResult(res){
 const ACC = [
   {id:'expenses', t:'Расходы смены',     s:'питание, разовые, бой и брак',
    ico:'<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'},
-  {id:'stock',    t:'Ревизия',           s:'пересчёт, перемещения, история',
+  {id:'stock',    t:'Склад',             s:'ревизия, перемещения, учёт',
    ico:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>'},
   {id:'order',    t:'Закупка',           s:'сколько довезти до нормы',
    ico:'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/>'},

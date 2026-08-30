@@ -2498,37 +2498,21 @@ button.path:active{transform:scale(.995)}
 .pk-busy{color:var(--dn);background:var(--dn-soft);border:1px solid rgba(224,85,85,.28)}
 .pk-mine{color:var(--up);background:var(--up-soft);border:1px solid rgba(76,175,125,.3)}
 
-/* Экран сканирования. Камера — герой, служебное лежит на ней стеклом. */
-.scan-bar{position:absolute;top:calc(var(--safe-top) + 60px);left:0;right:0;
-  display:flex;align-items:center;gap:10px;padding:0 14px}
-.scan-bar-l{flex:1;min-width:0}
-.scan-prod{font-size:15px;font-weight:700;line-height:1.2;color:#fff;
-  text-shadow:0 1px 8px rgba(0,0,0,.7)}
-.scan-dist{font-size:11px;color:rgba(255,255,255,.62);margin-top:2px;letter-spacing:.3px}
-.scan-foot{display:flex;align-items:center;gap:12px;padding:0 2px 12px}
-.scan-count{flex-shrink:0;display:flex;align-items:baseline;gap:6px;
-  padding:7px 13px;border-radius:13px;background:rgba(255,255,255,.1);
-  border:1px solid rgba(255,255,255,.16);backdrop-filter:blur(14px)}
-.scan-count span{font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;
-  color:var(--gold2);font-variant-numeric:tabular-nums;line-height:1}
-.scan-count i{font-style:normal;font-size:10px;letter-spacing:.6px;
-  color:rgba(255,255,255,.6);text-transform:uppercase}
-.scan-count b{font-size:11px;font-weight:700;color:#6FD79E;margin-left:2px}
-.scan-row.old{opacity:.62}
-/* Камера во весь экран. Была окошком в 44% высоты: телефон приходилось
-   подносить к бутылке вплотную, чтобы код попал в маленький кадр, а под
-   окошком всё равно пустовало больше места, чем занимал список. Теперь кадр —
-   весь экран, а служебное лежит на нём стеклом. */
-.scan-cam{position:fixed;inset:0;z-index:1;background:#000;overflow:hidden;
-  border:0;border-radius:0}
+/* ── Сканер: камера во весь экран, поверх — плавающие виджеты ──────────────
+   Никакого стекла-панели внизу: под ним пряталась половина кадра. Всё
+   служебное — маленькими окошками поверх камеры, а сам кадр открыт целиком. */
+.scan-cam{position:fixed;inset:0;z-index:1;background:#000;overflow:hidden;border:0;border-radius:0}
 .scan-cam video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
-/* Шапка раздела остаётся на месте — она и есть «назад» — но становится
-   стеклом поверх кадра, а не полосой над ним. */
+/* Лёгкое затемнение сверху и снизу — чтобы белый текст читался по любому кадру,
+   но середина, где бутылка, остаётся чистой. */
+.scan-cam::after{content:'';position:absolute;inset:0;z-index:2;pointer-events:none;
+  background:linear-gradient(180deg,rgba(0,0,4,.55) 0%,transparent 22%,
+    transparent 62%,rgba(0,0,6,.66) 100%)}
+
+/* Шапка раздела — стеклом поверх кадра, она же «назад». */
 .stk-ov.scan-live{background:#000}
-.stk-ov.scan-live .stk-top{position:absolute;top:0;left:0;right:0;z-index:5;
+.stk-ov.scan-live .stk-top{position:absolute;top:0;left:0;right:0;z-index:6;
   border-bottom:0;padding-bottom:20px;background:none}
-/* Название читается прямо по кадру — на тени, а не на полосе: полоса съедала
-   верх экрана, ради которого камеру и разворачивали во весь рост. */
 .stk-ov.scan-live .stk-ttl-t,
 .stk-ov.scan-live .stk-ttl-s{text-shadow:0 1px 10px rgba(0,0,4,.9),0 1px 3px rgba(0,0,4,.8)}
 .stk-ov.scan-live .stk-x{color:#fff;background:rgba(255,255,255,.10);
@@ -2537,76 +2521,61 @@ button.path:active{transform:scale(.995)}
 .stk-ov.scan-live .stk-ttl-t{color:#fff}
 .stk-ov.scan-live .stk-ttl-s{color:rgba(255,255,255,.62)}
 .stk-ov.scan-live .stk-mid{overflow:hidden;padding:0}
-/* Нижнее стекло: счётчик, список и кнопки. Оно и есть вторая половина экрана,
-   поэтому и выглядит панелью, а не хвостом страницы. */
-.scan-sheet{position:fixed;left:0;right:0;bottom:0;z-index:4;
-  padding:14px 14px calc(12px + var(--safe-bottom));
-  border-radius:22px 22px 0 0;
-  background:rgba(10,10,18,.60);
-  backdrop-filter:blur(26px) saturate(160%);-webkit-backdrop-filter:blur(26px) saturate(160%);
-  box-shadow:0 -1px 0 rgba(255,255,255,.08),0 -22px 50px rgba(0,0,0,.55)}
-.scan-mask{position:absolute;inset:0;pointer-events:none;
-  background:radial-gradient(circle at 50% 50%,transparent 34%,rgba(0,0,0,.45) 72%)}
-/* Рамка = ровно та область, которую читает распознавание. Раньше человек
-   целился в один квадрат, а читался другой. */
-/* Рамка стоит выше середины: под ней стекло со списком, и по центру экрана
-   она смотрела бы человеку в панель, а не в бутылку. */
-.scan-frame{position:absolute;top:38%;left:50%;transform:translate(-50%,-50%);
-  width:min(70vw,300px);aspect-ratio:1;pointer-events:none}
-/* Найден код — рамка едет на него и обнимает его углами. Стороны у неё
-   произвольные: код в кадре редко квадратный. */
-.scan-frame.lock{transform:none;aspect-ratio:auto;
-  transition:left .12s ease-out,top .12s ease-out,width .12s ease-out,height .12s ease-out}
-.scan-frame .c{position:absolute;width:26px;height:26px;border:3px solid rgba(255,255,255,.9);
-  transition:border-color .18s var(--e1),opacity .2s var(--e1)}
-.scan-frame .tl{top:-2px;left:-2px;border-right:none;border-bottom:none;border-radius:14px 0 0 0}
-.scan-frame .tr{top:-2px;right:-2px;border-left:none;border-bottom:none;border-radius:0 14px 0 0}
-.scan-frame .bl{bottom:-2px;left:-2px;border-right:none;border-top:none;border-radius:0 0 0 14px}
-.scan-frame .br{bottom:-2px;right:-2px;border-left:none;border-top:none;border-radius:0 0 14px 0}
-/* Подсветка приглушённая: рамка — служебный элемент, а не светофор. Цвет
-   уходит в углы и в тонкую заливку, подпись висит под рамкой мелким шрифтом.
-   Яркая вспышка во весь кадр каждые две секунды выглядит дёшево и мешает
-   смотреть на бутылки. */
-.scan-badge{position:absolute;left:50%;bottom:-30px;transform:translateX(-50%);
-  font-size:11px;font-weight:600;letter-spacing:1.4px;text-transform:uppercase;
-  white-space:nowrap;opacity:0;transition:opacity .16s var(--e1);
-  text-shadow:0 1px 6px rgba(0,0,0,.9)}
-/* Ни заливки, ни рамки по периметру: зелёным становятся сами углы. Пятно во
-   весь квадрат закрывало код, ради которого человек и наводил камеру. */
-.scan-frame.ok .c {border-color:#4CAF7D}
-.scan-frame.dup .c,.scan-frame.again .c,.scan-frame.err .c{border-color:var(--dn)}
-.scan-frame.ok .scan-badge {opacity:1;color:#6FD79E}
-.scan-frame.dup .scan-badge,
-.scan-frame.again .scan-badge,
-.scan-frame.err .scan-badge{opacity:1;color:#FF8A8A}
-.scan-torch{flex-shrink:0;width:38px;height:38px;border-radius:12px;
-  display:flex;align-items:center;justify-content:center;cursor:pointer;
-  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.18);color:#fff;
-  backdrop-filter:blur(14px)}
-.scan-torch.on{background:var(--gold);color:#1a1408;border-color:var(--gold)}
-.scan-torch .s-off{display:none}
-.scan-torch.muted{color:rgba(255,255,255,.45)}
-.scan-torch.muted .s-on{display:none}
-.scan-torch.muted .s-off{display:block}
-.scan-hint{flex:1;min-width:0;text-align:right;font-size:12px;line-height:1.35;
-  color:rgba(255,255,255,.72);text-align:right}
-.scan-hint.warn{color:var(--warn)}
 
+/* Рамка по центру, фиксированная. Не оборачивает код и не ездит — стоит на
+   месте и светится по результату: зелёным — записана, жёлтым — уже была,
+   красным — чужая. Свечение уходит наружу ореолом, сам код внутри открыт. */
+.scan-frame{position:absolute;top:46%;left:50%;transform:translate(-50%,-50%);
+  width:min(64vw,264px);aspect-ratio:1;border-radius:26px;pointer-events:none;z-index:3;
+  box-shadow:0 0 0 1px rgba(255,255,255,.14) inset;
+  transition:box-shadow .22s var(--e1)}
+.scan-frame .c{position:absolute;width:30px;height:30px;border:3px solid rgba(255,255,255,.92);
+  transition:border-color .2s var(--e1)}
+.scan-frame .tl{top:-2px;left:-2px;border-right:none;border-bottom:none;border-radius:16px 0 0 0}
+.scan-frame .tr{top:-2px;right:-2px;border-left:none;border-bottom:none;border-radius:0 16px 0 0}
+.scan-frame .bl{bottom:-2px;left:-2px;border-right:none;border-top:none;border-radius:0 0 0 16px}
+.scan-frame .br{bottom:-2px;right:-2px;border-left:none;border-top:none;border-radius:0 0 16px 0}
+/* Свечение: тонкая цветная кайма плюс мягкий ореол вокруг. */
+.scan-frame.ok    {box-shadow:0 0 0 2px rgba(76,175,125,.7) inset,0 0 34px 4px rgba(76,175,125,.5)}
+.scan-frame.dup,
+.scan-frame.again {box-shadow:0 0 0 2px rgba(232,180,70,.75) inset,0 0 34px 4px rgba(232,180,70,.48)}
+.scan-frame.err   {box-shadow:0 0 0 2px rgba(224,85,85,.8) inset,0 0 34px 4px rgba(224,85,85,.5)}
+.scan-frame.ok    .c{border-color:#5FD79E}
+.scan-frame.dup   .c,.scan-frame.again .c{border-color:#F0C24A}
+.scan-frame.err   .c{border-color:#FF7A7A}
+/* Моушн. В покое уголки рамки едва заметно дышат — экран живой, а не замер.
+   На результат рамка коротко «клюёт» вперёд и вспыхивает ореолом; резкой
+   вспышки во весь кадр нет, оттого и не выглядит дёшево. Слово-итог всплывает
+   снизу. Свежая плашка в ленте прилетает слева с лёгким наездом. */
+@keyframes scanBreath{50%{opacity:.6}}
+@keyframes scanPop{0%{transform:translate(-50%,-50%) scale(1)}
+  38%{transform:translate(-50%,-50%) scale(1.055)}
+  100%{transform:translate(-50%,-50%) scale(1)}}
+@keyframes badgeUp{from{opacity:0;transform:translateX(-50%) translateY(6px)}
+  to{opacity:1;transform:translateX(-50%) translateY(0)}}
+@keyframes chipIn{from{opacity:0;transform:translateX(-14px) scale(.94)}
+  to{opacity:1;transform:none}}
+.scan-frame .c{animation:scanBreath 2.6s ease-in-out infinite}
+.scan-frame.ok,.scan-frame.dup,.scan-frame.again,.scan-frame.err{
+  animation:scanPop .42s cubic-bezier(.22,.9,.25,1)}
+.scan-frame.ok .c,.scan-frame.dup .c,.scan-frame.again .c,.scan-frame.err .c{animation:none}
+.scan-frame.ok .scan-badge,.scan-frame.dup .scan-badge,
+.scan-frame.again .scan-badge,.scan-frame.err .scan-badge{animation:badgeUp .24s ease-out}
+.scan-strip>*:first-child{animation:chipIn .28s cubic-bezier(.2,.9,.25,1)}
+/* Счётчик выезжает столбиком — прокрутка живёт в JS (scanRoll), а тут только
+   обрезаем хвост цифры, чтобы её уход был чистым. */
+.scan-pill b{display:inline-block;overflow:hidden}
+
+/* Базовые стили списка — для не-камерных экранов (сводка ревизии, посадка
+   проверки): в ленте сканера они переопределены выше. */
 .scan-sect{display:flex;align-items:baseline;gap:8px;padding:16px 2px 8px;
   font-size:10px;letter-spacing:1.2px;text-transform:uppercase;color:var(--muted)}
 .scan-sect i{margin-left:auto;font-style:normal;font-family:'DM Sans',sans-serif;
   font-size:11px;font-weight:700;color:var(--gold2);letter-spacing:0}
-.scan-feed{max-height:24dvh;overflow-y:auto;-webkit-overflow-scrolling:touch;
-  overscroll-behavior:contain}
+.scan-feed{overflow-y:auto;-webkit-overflow-scrolling:touch;overscroll-behavior:contain}
 .scan-empty{padding:18px 12px;text-align:center;font-size:12.5px;color:var(--muted)}
 .scan-row{display:flex;align-items:center;gap:10px;padding:11px 13px;margin-bottom:6px;
   border-radius:12px;background:var(--card);border:1px solid var(--border2)}
-/* Внутри стекла — своё: сплошная карточка на нём выглядит наклейкой, а
-   верхний отступ у подписи не нужен, его держит само стекло. Эти же классы
-   живут и на экранах без камеры, поэтому правки только здесь. */
-.scan-sheet .scan-sect{padding-top:0}
-.scan-sheet .scan-row{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.06)}
-.scan-sheet .scan-empty{color:rgba(255,255,255,.42)}
 .scan-row.sending{opacity:.6}
 .scan-dot{width:7px;height:7px;border-radius:50%;flex-shrink:0}
 .scan-b{flex:1;min-width:0}
@@ -2619,13 +2588,89 @@ button.path:active{transform:scale(.995)}
   border:1px solid var(--border3);background:var(--card2);color:var(--muted);
   font-size:12px;line-height:1;cursor:pointer}
 .scan-del:active{background:var(--dn-soft);color:var(--dn)}
+/* Слово под рамкой — результат последнего скана. */
+.scan-badge{position:absolute;left:50%;bottom:-32px;transform:translateX(-50%);
+  font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;
+  white-space:nowrap;opacity:0;transition:opacity .16s var(--e1);
+  text-shadow:0 1px 8px rgba(0,0,4,.95)}
+.scan-frame.ok    .scan-badge{opacity:1;color:#6FD79E}
+.scan-frame.dup   .scan-badge,
+.scan-frame.again .scan-badge{opacity:1;color:#F3CE6A}
+.scan-frame.err   .scan-badge{opacity:1;color:#FF8A8A}
 
-/* Кнопки прилипают к низу: список бутылок растёт по мере счёта и утаскивал их
-   за пределы экрана — «Готово» становилось недоступным ровно тогда, когда его
-   пора нажимать. */
-/* Отказ камеры закрывает кадр целиком: без неё экран не работает, и делать
-   вид, что работает, — врать. */
-.scan-deny{position:absolute;inset:0;z-index:3;display:none;flex-direction:column;
+/* Плавающий слой поверх камеры: сам не ловит касания, ловят его дети. */
+.scan-hud{position:absolute;inset:0;z-index:4;pointer-events:none}
+.scan-hud>*{pointer-events:auto}
+/* Верх: счётчик слева, инструменты справа — под шапкой раздела. */
+.scan-hud-top{position:absolute;left:14px;right:14px;
+  top:calc(var(--safe-top) + 58px);display:flex;align-items:flex-start;
+  justify-content:space-between;gap:10px}
+.scan-pill{display:inline-flex;align-items:baseline;gap:7px;padding:8px 14px;
+  border-radius:15px;background:rgba(14,14,22,.5);border:1px solid rgba(255,255,255,.12);
+  backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%)}
+.scan-pill b{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;
+  color:var(--gold2);font-variant-numeric:tabular-nums;line-height:1}
+.scan-pill span{font-size:10px;letter-spacing:.6px;text-transform:uppercase;
+  color:rgba(255,255,255,.6)}
+.scan-pill em{font-style:normal;font-size:11px;font-weight:700;color:#FF8A8A}
+.scan-tools{display:flex;gap:8px;flex-shrink:0}
+.scan-tool{width:44px;height:44px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;cursor:pointer;color:#fff;
+  background:rgba(14,14,22,.5);border:1px solid rgba(255,255,255,.14);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px)}
+.scan-tool:active{transform:scale(.92)}
+.scan-tool.on{background:var(--gold);color:#1a1408;border-color:var(--gold)}
+.scan-tool .s-off{display:none}
+.scan-tool.muted{color:rgba(255,255,255,.5)}
+.scan-tool.muted .s-on{display:none}
+.scan-tool.muted .s-off{display:block}
+/* Подсказка «наведите на код» — тонкой строкой над лентой, пока не начали. */
+.scan-tip{position:absolute;left:0;right:0;bottom:calc(var(--safe-bottom) + 128px);
+  text-align:center;font-size:12.5px;color:rgba(255,255,255,.66);
+  text-shadow:0 1px 8px rgba(0,0,4,.9);transition:opacity .2s var(--e1)}
+
+/* Низ: лента отсканированных — их листают, чтобы просмотреть, — и кнопки. */
+.scan-hud-bot{position:absolute;left:0;right:0;bottom:0;
+  padding-bottom:calc(var(--safe-bottom) + 12px)}
+.scan-strip{display:flex;gap:8px;overflow-x:auto;overflow-y:hidden;
+  padding:0 14px 10px;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+.scan-strip::-webkit-scrollbar{display:none}
+/* Каждая бутылка — компактная стеклянная плашка с цветной каймой по итогу. */
+.scan-strip .scan-row,.scan-strip .chk-item{flex:0 0 auto;width:auto;max-width:58vw;
+  margin:0;padding:9px 12px;border-radius:13px;align-items:center;
+  background:rgba(16,16,24,.52);border:1px solid rgba(255,255,255,.10);
+  border-left:3px solid rgba(255,255,255,.22);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.scan-strip .scan-raw,.scan-strip .scan-state,.scan-strip .chk-item-s{display:none}
+.scan-strip .scan-code,.scan-strip .chk-item-t b{font-size:13px;color:#fff}
+.scan-strip .chk-item-t{gap:0}
+.scan-strip .chk-item-t span{display:none}
+.scan-strip .scan-b{min-width:0}
+.scan-strip .scan-del{width:22px;height:22px;border-radius:7px;margin-left:8px;
+  background:rgba(255,255,255,.08);border-color:rgba(255,255,255,.12);color:#fff}
+.scan-strip .scan-row.ok,.scan-strip .chk-item.ok{border-left-color:#4CAF7D}
+.scan-strip .scan-row.dup,.scan-strip .scan-row.again,
+.scan-strip .chk-item.dup{border-left-color:#E8B446}
+.scan-strip .scan-row.err,.scan-strip .chk-item.alien,
+.scan-strip .chk-item.err{border-left-color:#E05555}
+.scan-strip .scan-empty{flex:1;text-align:center;font-size:12px;
+  color:rgba(255,255,255,.5);padding:14px 8px}
+/* Кнопки — плавающими пилюлями, без подложки-панели. */
+.scan-dockbar{display:flex;align-items:center;gap:10px;padding:0 14px}
+.scan-undo{flex-shrink:0;padding:12px 16px;border-radius:14px;cursor:pointer;
+  font-family:inherit;font-size:13px;font-weight:600;color:rgba(255,255,255,.8);
+  background:rgba(16,16,24,.55);border:1px solid rgba(255,255,255,.12);
+  backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.scan-undo:disabled{opacity:.4;pointer-events:none}
+.scan-undo:active{transform:scale(.97)}
+.scan-go{flex:1;padding:15px;border-radius:15px;border:0;cursor:pointer;
+  font-family:inherit;font-size:15px;font-weight:700;color:#1a1408;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));
+  box-shadow:0 6px 20px rgba(201,169,110,.3)}
+.scan-go:active{transform:scale(.98)}
+
+/* Отказ камеры закрывает кадр целиком: без неё сканировать нечем. */
+.scan-deny{position:absolute;inset:0;z-index:7;display:none;flex-direction:column;
   align-items:center;justify-content:center;gap:9px;padding:24px;text-align:center;
   background:rgba(6,6,12,.94);color:var(--muted)}
 .scan-deny.show{display:flex}
@@ -2634,15 +2679,7 @@ button.path:active{transform:scale(.995)}
 .scan-deny button{margin-top:6px;padding:11px 20px;border-radius:12px;cursor:pointer;
   font-family:inherit;font-size:13px;font-weight:700;color:#1a1408;border:none;
   background:linear-gradient(135deg,var(--gold),var(--gold2))}
-.scan-acts.one{grid-template-columns:1fr}
-.scan-acts{display:grid;grid-template-columns:1fr 1fr;gap:9px;padding:12px 0 0}
-.scan-btn{padding:15px;border-radius:14px;border:none;cursor:pointer;font-family:inherit;
-  font-size:14px;font-weight:700;transition:.15s var(--e1)}
-.scan-btn:active{transform:scale(.98)}
-.scan-btn.ghost{background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.09);
-  color:rgba(255,255,255,.72)}
-.scan-btn.ghost:disabled{opacity:.4}
-.scan-btn.gold{background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408}
+
 .pr-line[data-detail]{cursor:pointer;-webkit-tap-highlight-color:transparent}
 .pr-line[data-detail]:active{background:var(--card2)}
 .acc-line-bar{flex:1.2;height:5px;border-radius:3px;background:var(--card2);overflow:hidden}
@@ -8628,6 +8665,27 @@ function gmPaint(){
 if(HIDE) paintHide();
 
 function _setText(id, txt){ const el = document.getElementById(id); if(el) el.textContent = txt; }
+
+// Число в счётчике сканера меняется не подменой, а прокруткой — как барабан:
+// старая цифра уезжает вверх, новая приходит снизу. Тот же приём, что у
+// смайликов сверки в звонке, только на цифрах — и экран не выглядит статичным
+// табло. Меняется только при росте: убыль (отмена) просто ставим тихо.
+function scanRoll(id, value){
+  const el = document.getElementById(id); if(!el) return;
+  const было = el.getAttribute('data-v');
+  const стало = String(value);
+  el.setAttribute('data-v', стало);
+  if(было === null || было === стало || !el.animate){ el.textContent = стало; return; }
+  const рост = (parseFloat(стало) || 0) > (parseFloat(было) || 0);
+  el.textContent = стало;
+  try{
+    el.animate(
+      рост
+        ? [{transform:'translateY(60%)', opacity:0}, {transform:'translateY(0)', opacity:1}]
+        : [{transform:'translateY(-40%)', opacity:0}, {transform:'translateY(0)', opacity:1}],
+      {duration: 260, easing: 'cubic-bezier(.2,.9,.25,1)'});
+  }catch(e){}
+}
 // ── Date helpers ──────────────────────────────────────────────────────────
 // Server timestamps are UTC ISO — some carry an offset (+00:00), some don't.
 // Naive `new Date(ts+'Z')` on an offset-carrying string yields Invalid Date.
@@ -10295,30 +10353,28 @@ async function stkScan(){
   document.getElementById('stkMid').innerHTML = `
     <div class="scan-cam" id="qrCam">
       <video id="qrVideo" playsinline muted autoplay></video>
-      <div class="scan-mask"></div>
-      <div class="scan-bar">
-        <div class="scan-bar-l"><div class="scan-dist" id="audPos">позиций закрыто 0</div></div>
-        <button class="scan-torch" id="qrTorch" onclick="qrTorch(this)" style="display:none">
-          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 2h6l-1 7h4l-8 13 2-9H8z"/></svg>
-        </button>
-      </div>
       <div class="scan-frame" id="qrFrame">
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
         <div class="scan-badge" id="qrBadge"></div>
       </div>
-    </div>
-    <div class="scan-sheet">
-      <div class="scan-foot">
-        <div class="scan-count"><span id="audN">0</span><i>бутылок</i></div>
-        <div class="scan-hint" id="qrHint">Наведите на код</div>
-      </div>
-      <div class="scan-sect"><span>Проход</span><i id="audCnt"></i></div>
-      <div id="audFeed" class="scan-feed"><div class="scan-empty">Загрузка…</div></div>
-      <div class="scan-acts">
-        <button class="scan-btn ghost" id="audUndo" onclick="audUndo()" disabled>Отменить последнюю</button>
-        <button class="scan-btn gold" onclick="stkScanDone()">Готово</button>
+      <div class="scan-hud">
+        <div class="scan-hud-top">
+          <div class="scan-pill"><b id="audN">0</b><span>бутылок</span></div>
+          <div class="scan-tools">
+            <button class="scan-tool" id="qrTorch" onclick="qrTorch(this)" style="display:none">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+                stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 2h6l-1 7h4l-8 13 2-9H8z"/></svg></button>
+          </div>
+        </div>
+        <div class="scan-tip" id="qrHint">Наведите на код</div>
+        <div class="scan-hud-bot">
+          <div class="scan-strip" id="audFeed"><div class="scan-empty">Загрузка…</div></div>
+          <div class="scan-dockbar">
+            <button class="scan-undo" id="audUndo" onclick="audUndo()" disabled>Отменить</button>
+            <button class="scan-go" onclick="stkScanDone()">Готово</button>
+          </div>
+        </div>
       </div>
     </div>`;
   scanLive('stkOv');
@@ -10387,7 +10443,7 @@ function audDone(err, r, job){
 }
 
 function audPaint(){
-  _setText('audN', String(AUD.total));
+  scanRoll('audN', AUD.total);
   _setText('audPos', `позиций закрыто ${AUD.positions}`);
   const cnt = document.getElementById('audCnt');
   if(cnt) cnt.textContent = AUD.total ? String(AUD.total) : '';
@@ -12287,58 +12343,8 @@ const SFX = {
 //     из-за камеры, а из-за того, что кадр не досчитан;
 //   • сеть моргает. Скан, не дошедший до сервера, должен уйти позже, а не
 //     пропасть: бутылку в руках уже отложили как посчитанную.
-// Рамка садится на найденный код: те же четыре угла, только теперь они
-// огибают саму крышку, а не висят посреди экрана. Отдельной заливки нет —
-// зелёным становятся углы, и видно, какую именно бутылку засчитали.
-//
-// Держится она за код, а не за отдельный удачный кадр. Распознавание мигает:
-// из десяти кадров в секунду код читается в пяти, в остальных теряется на
-// блике, наклоне или дрожании руки. Если верить каждому кадру, рамка скачет
-// туда-сюда — ровно это и было видно. Поэтому: попадание подтягивает рамку
-// плавно, пропуски она пережидает на месте, и уходит только когда код не
-// показывался по-настоящему долго. Другой код — прыжок сразу: это уже другая
-// бутылка, и тянуться к ней плавно было бы враньём.
-const ТРЕК_ДЕРЖИМ = 1500;   // мс без единого попадания, после которых отпускаем
-const ТРЕК_ТЯГА   = 0.35;   // насколько подтягиваемся к новому месту за кадр
-let _трек = {код: '', где: null, когда: 0};
-
-function scanTrackReset(){
-  _трек = {код: '', где: null, когда: 0};
-  const ф = document.querySelector('.scan-cam .scan-frame');
-  if(!ф) return;
-  ф.classList.remove('lock');
-  ф.style.left = ''; ф.style.top = ''; ф.style.width = ''; ф.style.height = '';
-}
-
-function scanTrack(четыре, код){
-  const ф = document.querySelector('.scan-cam .scan-frame');
-  if(!ф) return;
-  if(!четыре){
-    if(_трек.где && Date.now() - _трек.когда < ТРЕК_ДЕРЖИМ) return;  // пережидаем
-    if(_трек.где) scanTrackReset();
-    return;
-  }
-  const x = четыре.map(t => t[0]), y = четыре.map(t => t[1]);
-  const л = Math.min.apply(null, x), п = Math.max.apply(null, x);
-  const в = Math.min.apply(null, y), н = Math.max.apply(null, y);
-  // Небольшой запас: углы должны обнимать код, а не резать его по краю.
-  const зx = (п - л) * .08, зy = (н - в) * .08;
-  let к = {л: л - зx, в: в - зy, ш: (п - л) + зx * 2, вы: (н - в) + зy * 2};
-  if(_трек.где && _трек.код === (код || '')){
-    const p = _трек.где, a = ТРЕК_ТЯГА;
-    к = {л: p.л + (к.л - p.л) * a, в: p.в + (к.в - p.в) * a,
-         ш: p.ш + (к.ш - p.ш) * a, вы: p.вы + (к.вы - p.вы) * a};
-  }
-  _трек = {код: код || '', где: к, когда: Date.now()};
-  ф.classList.add('lock');
-  ф.style.left   = Math.max(0, к.л).toFixed(2) + '%';
-  ф.style.top    = Math.max(0, к.в).toFixed(2) + '%';
-  ф.style.width  = Math.min(100, к.ш).toFixed(2) + '%';
-  ф.style.height = Math.min(100, к.вы).toFixed(2) + '%';
-}
-
-// Экран сканера занимает всё: камера во весь экран, шапка раздела стеклом
-// поверх неё. Ставится при отрисовке, снимается в SCAN.stop().
+// Экран сканера занимает всё: камера во весь экран, поверх — плавающие
+// виджеты. Ставится при отрисовке, снимается в SCAN.stop().
 function scanLive(id){
   const о = document.getElementById(id);
   if(о) о.classList.add('scan-live');
@@ -12421,7 +12427,6 @@ const SCAN = {
     if(this.raf){ cancelAnimationFrame(this.raf); this.raf = null; }
     if(this.stream){ this.stream.getTracks().forEach(t => t.stop()); this.stream = null; }
     if(this.video) this.video.srcObject = null;
-    scanTrackReset();
     if(свой) return;
     // Сканер ушёл — раздел снова обычный экран со своей шапкой и фоном.
     document.querySelectorAll('.stk-ov.scan-live')
@@ -12474,19 +12479,6 @@ const SCAN = {
     const hit = jsQR(img.data, px, px, {inversionAttempts:'attemptBoth'});
     if(hit && hit.data){
       const code = String(hit.data).trim();
-      // Где код лежит на экране. Распознавание отдаёт углы в координатах того
-      // куска, который читало; переводим их обратно — сначала в кадр, потом в
-      // то, что видно на экране с его обрезкой по краям.
-      try{
-        const L = hit.location, k = side / px;
-        const точка = (t) => {
-          const vx = sx + t.x * k, vy = sy + t.y * k;
-          return [((vx - v.videoWidth / 2) * scale + cw / 2) / cw * 100,
-                  ((vy - v.videoHeight / 2) * scale + ch / 2) / ch * 100];
-        };
-        scanTrack([точка(L.topLeftCorner), точка(L.topRightCorner),
-                   точка(L.bottomRightCorner), точка(L.bottomLeftCorner)], code);
-      }catch(e){}
       this.lastHit = Date.now();
       const now = Date.now();
       if(this.seen.has(code)){
@@ -12506,7 +12498,6 @@ const SCAN = {
       if(this.onCode) this.onCode(code);
       return;
     }
-    scanTrack(null);   // держать или отпустить — решает сама обводка
     if(this.onIdle) this.onIdle(Date.now() - this.lastHit, this.frames,
                                 Math.round(this.frames / Math.max(1,(Date.now()-this.t0)/1000)));
   },
@@ -12839,44 +12830,35 @@ function qrScreen(){
     <div class="qwrap">
     <div class="scan-cam" id="qrCam">
       <video id="qrVideo" playsinline muted autoplay></video>
-      <div class="scan-mask"></div>
-
-      <div class="scan-bar">
-        <!-- Название товара и точка стоят в шапке экрана; второй раз поверх
-             кадра они только закрывают бутылку. -->
-        <div class="scan-bar-l"></div>
-        <button class="scan-torch" id="qrSound" onclick="qrSound(this)">
-          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M11 5 6 9H2v6h4l5 4z"/><path class="s-on" d="M15.5 8.5a5 5 0 0 1 0 7"/>
-            <path class="s-off" d="M22 9l-6 6M16 9l6 6"/></svg>
-        </button>
-        <button class="scan-torch" id="qrTorch" onclick="qrTorch(this)" style="display:none">
-          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 2h6l-1 7h4l-8 13 2-9H8z"/></svg>
-        </button>
-      </div>
 
       <div class="scan-frame" id="qrFrame">
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
         <div class="scan-badge" id="qrBadge"></div>
       </div>
-    </div>
-
-    <div class="scan-sheet">
-      <div class="scan-foot">
-        <div class="scan-count"><span id="qrN">0</span><i>на точке</i>
-          <b id="qrAdded"></b></div>
-        <div class="scan-hint" id="qrHint">Наведите на код</div>
+      <div class="scan-hud">
+        <div class="scan-hud-top">
+          <div class="scan-pill"><b id="qrN">0</b><span>на точке</span><em id="qrAdded"></em></div>
+          <div class="scan-tools">
+            <button class="scan-tool" id="qrSound" onclick="qrSound(this)">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+                stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 5 6 9H2v6h4l5 4z"/><path class="s-on" d="M15.5 8.5a5 5 0 0 1 0 7"/>
+                <path class="s-off" d="M22 9l-6 6M16 9l6 6"/></svg></button>
+            <button class="scan-tool" id="qrTorch" onclick="qrTorch(this)" style="display:none">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+                stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 2h6l-1 7h4l-8 13 2-9H8z"/></svg></button>
+          </div>
+        </div>
+        <div class="scan-tip" id="qrHint">Наведите на код</div>
+        <div class="scan-hud-bot">
+          <div class="scan-strip" id="qrFeed"><div class="scan-empty">Загрузка…</div></div>
+          <div class="scan-dockbar">
+            <button class="scan-undo" id="qrUndo" onclick="qrUndo()" disabled>Отменить</button>
+            <button class="scan-go" onclick="qrDone()">Готово</button>
+          </div>
+        </div>
       </div>
-      <div class="scan-sect"><span>Бутылки</span><i id="qrCount"></i></div>
-      <div id="qrFeed" class="scan-feed"><div class="scan-empty">Загрузка…</div></div>
-      <div class="scan-acts">
-        <button class="scan-btn ghost" id="qrUndo" onclick="qrUndo()" disabled>Отменить последнюю</button>
-        <button class="scan-btn gold" onclick="qrDone()">Готово</button>
-      </div>
-    </div>
     </div>`;
   scanLive('accOv');
 }
@@ -13020,7 +13002,7 @@ function qrRenderFeed(){
   // «сколько у нас Absolut на B1», ради которого всё считается.
   const total = QR_ROWS.filter(r => ['new','sending','old'].includes(r.state)).length;
   QR_SESSION = QR_ROWS.filter(r => r.state === 'new' || r.state === 'sending').length;
-  _setText('qrN', String(total));
+  scanRoll('qrN', total);
   const s = document.getElementById('qrAdded');
   if(s) s.textContent = QR_SESSION ? `+${QR_SESSION} сейчас` : '';
   const feed = document.getElementById('qrFeed'); if(!feed) return;
@@ -17588,20 +17570,27 @@ function chkScreen(){
     <div class="qwrap">
     <div class="scan-cam" id="chkCam">
       <video id="chkVideo" playsinline muted autoplay></video>
-      <div class="scan-mask"></div>
       <!-- Имя проверяемого стоит в шапке экрана — второй раз поверх камеры оно
            только закрывает кадр. Здесь остаётся то, что нужно во время съёмки. -->
-      <div class="scan-bar">
-        <div class="scan-bar-l"></div>
-        <button class="scan-torch" id="chkTorch" onclick="chkTorch(this)" style="display:none">
-          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-            <path d="M9 2h6l-1 7h4l-8 13 2-9H8z"/></svg>
-        </button>
-      </div>
       <div class="scan-frame" id="chkFrame">
         <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
         <div class="scan-badge" id="chkBadge"></div>
+      </div>
+      <div class="scan-hud">
+        <div class="scan-hud-top">
+          <div class="scan-pill"><b id="chkN">0</b><span>проверено</span><em id="chkBad"></em></div>
+          <div class="scan-tools">
+            <button class="scan-tool" id="chkTorch" onclick="chkTorch(this)" style="display:none">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+                stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 2h6l-1 7h4l-8 13 2-9H8z"/></svg></button>
+          </div>
+        </div>
+        <div class="scan-tip" id="chkHint">Наведите на код</div>
+        <div class="scan-hud-bot">
+          <div class="scan-strip" id="chkFeed"><div class="scan-empty">Пока ни одной</div></div>
+          <div class="scan-dockbar"><button class="scan-go" onclick="chkDone()">Готово</button></div>
+        </div>
       </div>
       <!-- Отказ камеры — это не подпись под кадром, а состояние всего экрана:
            без камеры проверять нечем. Поэтому он закрывает кадр целиком и
@@ -17617,17 +17606,6 @@ function chkScreen(){
       </div>
     </div>
 
-    <div class="scan-sheet">
-      <div class="scan-foot">
-        <div class="scan-count"><span id="chkN">0</span><i>проверено</i><b id="chkBad"></b></div>
-        <div class="scan-hint" id="chkHint">Наведите на код</div>
-      </div>
-      <div class="scan-sect"><span>Бутылки</span><i id="chkCount"></i></div>
-      <div id="chkFeed" class="scan-feed"><div class="scan-empty">Пока ни одной</div></div>
-      <div class="scan-acts one">
-        <button class="scan-btn gold" onclick="chkDone()">Готово</button>
-      </div>
-    </div>
     </div>`;
   scanLive('accOv');
 }
@@ -17652,7 +17630,7 @@ async function chkScan(code){
 
 function chkFeed(){
   const bad = CHK_FEED.filter(x => x.verdict === 'alien').length;
-  _setText('chkN', CHK_FEED.length);
+  scanRoll('chkN', CHK_FEED.length);
   const b = document.getElementById('chkBad');
   if(b){ b.textContent = bad ? `не наших ${bad}` : ''; b.className = bad ? 'bad' : ''; }
   _setText('chkCount', CHK_FEED.length ? CHK_FEED.length + '' : '');

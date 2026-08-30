@@ -1576,6 +1576,125 @@ def _wo_row(r: dict, cat: dict) -> dict:
     }
 
 
+# ── списание руками владельца ────────────────────────────────────────────────
+# Водитель записывает бой у себя, но не всё бьётся при водителе: коробку роняют
+# на приёмке, бутылку находят разбитой на полке утром, просрочку замечают при
+# пересчёте. Раньше такое было некуда записать, и оно уходило в недостачу —
+# то есть выглядело воровством.
+#
+# Фотография обязательна ровно там, где она что-то доказывает: разбитую бутылку
+# видно, брак видно, просрочку видно. Утеря — это как раз отсутствие предмета,
+# и требовать снимок «того, чего нет» значит требовать пустой кадр.
+#
+# Своё списание владелец не согласовывает сам с собой: он и есть тот, чьё
+# решение требуется, поэтому запись сразу учтённая.
+WO_MAX_PHOTO = 3_000_000        # база64 с телефона; больше — это не фото, а ошибка
+WO_MAX_THUMB = 40_000
+
+
+@require_owner
+async def handle_writeoff_add(request):
+    """POST /api/owner/stock/writeoff — списать самому.
+
+    body: {item, qty, kind, district, note?, day?, photo?, thumb?, as?}"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    cat = _catalog()
+    pid = str(body.get("item") or "").strip()
+    if pid not in cat:
+        return web.json_response({"error": "no_item"}, status=400, headers=CORS_HEADERS)
+    try:
+        qty = int(body.get("qty") or 0)
+    except (TypeError, ValueError):
+        qty = 0
+    if not (1 <= qty <= 240):
+        return web.json_response({"error": "bad_qty"}, status=400, headers=CORS_HEADERS)
+    kind = str(body.get("kind") or "").strip()
+    if kind not in db.WRITEOFF_KINDS:
+        return web.json_response({"error": "bad_kind"}, status=400, headers=CORS_HEADERS)
+    district = str(body.get("district") or "").strip()
+    if district not in OFFICE_IDS:
+        return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+
+    raw = str(body.get("photo") or "")
+    if "," in raw[:64]:
+        raw = raw.split(",", 1)[1]
+    if len(raw) > WO_MAX_PHOTO:
+        return web.json_response({"error": "photo_big"}, status=400, headers=CORS_HEADERS)
+    photo = b""
+    if raw:
+        try:
+            import base64
+            photo = base64.b64decode(raw, validate=True)
+        except Exception:
+            photo = b""
+        # Проверяем начало файла, а не длину строки: битая картинка ничего не
+        # доказывает, а в истории выглядит так же, как настоящая.
+        if len(photo) < 2000 or photo[:2] not in (b"\xff\xd8", b"\x89P"):
+            return web.json_response({"error": "bad_photo"}, status=400, headers=CORS_HEADERS)
+    if not photo and kind != "потеря":
+        return web.json_response({"error": "no_photo"}, status=400, headers=CORS_HEADERS)
+
+    thumb = str(body.get("thumb") or "")
+    if not thumb.startswith("data:image/") or len(thumb) > WO_MAX_THUMB:
+        thumb = ""
+
+    who = str(body.get("as") or "").strip()[:60] or "владелец"
+    day = str(body.get("day") or "").strip() or _biz_day()
+    now = datetime.now(timezone.utc)
+    wid = await db.writeoff_add({
+        "at": now, "day": day, "item": pid, "thumb": thumb,
+        "name": cat[pid].get("name", ""), "qty": qty, "kind": kind,
+        "note": str(body.get("note") or "").strip()[:200],
+        "district": district, "district_code": OFFICE_CODES.get(district, ""),
+        "by": who, "by_id": int(request["owner_id"] or 0),
+        "own": True,                       # записал владелец, а не водитель
+        "state": "ok",                     # своё решение принимать не у кого
+        "decided_at": now, "decided_by": int(request["owner_id"] or 0),
+        "decided_by_name": who,
+    }, photo)
+    # Отметка «ничего не списывали» с этим днём больше не совместима.
+    try: await db.writeoff_none_clear(day)
+    except Exception: pass
+    base_drop()                            # заявка должна узнать сразу
+    log.info(f"[writeoff] владелец списал: {kind} · {cat[pid].get('name','')} × {qty} "
+             f"· {district} · {day}")
+    await backdate.notify(day, who, "списание", 
+                          f"{kind} · {cat[pid].get('name','')} × {qty} · "
+                          f"{OFFICE_CODES.get(district, district)}")
+    return web.json_response({"ok": True, "id": wid}, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_writeoff_none(request):
+    """POST /api/owner/stock/writeoff/none — «за этот день списаний не было».
+
+    body: {day?, on: bool, as?}"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    day = str(body.get("day") or "").strip() or _biz_day()
+    who = str(body.get("as") or "").strip()[:60] or "владелец"
+    if body.get("on"):
+        # Сказать «ничего не было» поверх записанного нельзя: это не отметка, а
+        # спор с фактом. Сначала разберитесь со строками, потом отмечайте.
+        rows = await db.writeoff_list(day=day, limit=1)
+        if rows:
+            return web.json_response({"error": "has_rows"}, status=409, headers=CORS_HEADERS)
+        await db.writeoff_none_set(day, request["owner_id"], who)
+        log.info(f"[writeoff] {day}: отмечено «списаний не было» · {who}")
+        await backdate.notify(day, who, "отметка «списаний не было»")
+    else:
+        await db.writeoff_none_clear(day)
+        log.info(f"[writeoff] {day}: отметка «списаний не было» снята · {who}")
+    return web.json_response({"ok": True, "none": await db.writeoff_none_get(day)},
+                             headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
 @require_owner
 async def handle_writeoffs(request):
     """История боя и брака. Фотографии — отдельными запросами: тридцать
@@ -1590,6 +1709,7 @@ async def handle_writeoffs(request):
     except ValueError:
         days = 30
     since = datetime.now(timezone.utc) - timedelta(days=days)
+    day = (request.query.get("day") or "").strip() or _biz_day()
     rows = await db.writeoff_list(since=since, limit=400)
     cat = _catalog()
     pend = [_wo_row(r, cat) for r in await db.writeoff_pending(limit=200)]
@@ -1627,7 +1747,12 @@ async def handle_writeoffs(request):
         "by_driver": sorted(by_driver.values(), key=lambda x: -x["qty"]),
         "by_person": sorted(by_person.values(), key=lambda x: -x["amount"]),
         "comp_total": sum(v["amount"] for v in by_person.values()),
-    }, headers=CORS_HEADERS)
+        # Отметка «за этот день ничего не списывали» — про конкретный день, а не
+        # про тридцать: пустой список за месяц ничего не утверждает.
+        "day": day,
+        "none": await db.writeoff_none_get(day),
+    }, headers=CORS_HEADERS,
+       dumps=lambda o: __import__("json").dumps(o, default=str))
 
 
 @require_owner
@@ -1830,6 +1955,8 @@ def setup(app):
         ("/api/owner/stock/norms",      handle_norms,     "GET"),
         ("/api/owner/stock/norm/reset", handle_norm_reset, "POST"),
         ("/api/owner/stock/writeoffs",  handle_writeoffs, "GET"),
+        ("/api/owner/stock/writeoff",       handle_writeoff_add,  "POST"),
+        ("/api/owner/stock/writeoff/none",  handle_writeoff_none, "POST"),
         ("/api/owner/stock/shifts",     handle_shift_log, "GET"),
         ("/api/owner/stock/writeoff/{wid}/photo", handle_writeoff_photo, "GET"),
         ("/api/owner/stock/writeoff/{wid}/compensate", handle_writeoff_compensate, "POST"),

@@ -2295,6 +2295,35 @@ async def writeoff_add(doc: dict, photo: bytes = b"") -> str:
 WRITEOFF_COUNTED = {"state": {"$nin": ["pending", "no"]}}
 
 
+# «Списывать нечего» — тоже запись, а не пустой экран.
+#
+# Пустой список отвечает сразу на два вопроса и ни на один честно: то ли за
+# день ничего не разбили, то ли забыли записать. Отметка отвечает на первый,
+# и у неё есть автор и время: сказать «ничего не было» — это утверждение,
+# и оно должно быть чьим-то.
+async def writeoff_none_set(day: str, by: int, by_name: str) -> None:
+    db = _db_or_none()
+    if db is None or not day: return
+    await db.writeoff_none.update_one(
+        {"_id": day},
+        {"$set": {"by": int(by or 0), "by_name": str(by_name or "")[:60],
+                  "at": datetime.now(timezone.utc).isoformat()}}, upsert=True)
+
+
+async def writeoff_none_clear(day: str) -> None:
+    db = _db_or_none()
+    if db is None or not day: return
+    await db.writeoff_none.delete_one({"_id": day})
+
+
+async def writeoff_none_get(day: str) -> dict | None:
+    db = _db_or_none()
+    if db is None or not day: return None
+    d = await db.writeoff_none.find_one({"_id": day})
+    if d: d["day"] = d.pop("_id")
+    return d
+
+
 async def writeoff_get(wid: str) -> dict | None:
     db = _db_or_none()
     if db is None or not wid: return None
@@ -2378,11 +2407,12 @@ async def writeoff_photo(wid: str) -> bytes:
 
 
 async def writeoff_list(since=None, district: str = "", by: str = "",
-                        state: str = "", limit: int = 300) -> list:
+                        state: str = "", day: str = "", limit: int = 300) -> list:
     """История списаний, новые сверху. Без фотографий — их берут по одной."""
     db = _db_or_none()
     if db is None: return []
     q = {}
+    if day:     q["day"] = day
     if since:   q["at"] = {"$gte": since}
     if district: q["district"] = district
     if by:       q["by"] = by

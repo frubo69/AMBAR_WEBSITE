@@ -3080,6 +3080,47 @@ button.path:active{transform:scale(.995)}
 .exp-held-f{font-size:10.5px;color:var(--muted);line-height:1.5;margin-top:8px;
   padding-top:8px;border-top:1px solid rgba(243,180,74,.14)}
 
+/* Своё списание и отметка «ничего не было». Форма живёт в той же шторке, что
+   удержание: это тот же разговор — что случилось, сколько и почему. */
+.wo-none{width:100%;padding-top:14px;margin-top:14px;border-top:1px solid var(--border2)}
+.wo-none.on{border-top:0;margin-top:0;padding-top:0;display:flex;flex-direction:column;
+  align-items:center;gap:3px}
+.wo-none-t{font-size:13px;font-weight:600;color:var(--up)}
+.wo-none-s{font-size:11px;color:var(--muted)}
+.wo-none-b{width:100%;padding:12px;border-radius:13px;cursor:pointer;font-family:inherit;
+  font-size:13.5px;font-weight:700;color:var(--sub);background:var(--card2);
+  border:1px solid var(--border2)}
+.wo-none-b:active{transform:scale(.98)}
+.wo-none-x{margin-top:8px;padding:8px 14px;border-radius:10px;cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:600;color:var(--muted);
+  background:none;border:1px solid var(--border2)}
+.wo-a-item{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  width:100%;padding:11px 13px;border-radius:12px;cursor:pointer;font-family:inherit;
+  font-size:13.5px;font-weight:600;color:var(--gold2);background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.35)}
+.wo-a-item b{opacity:.6}
+.wo-a-list{display:flex;flex-direction:column;gap:4px;margin-top:6px;max-height:200px;
+  overflow-y:auto}
+.wo-a-row{padding:10px 12px;border-radius:11px;cursor:pointer;font-family:inherit;
+  font-size:13px;text-align:left;color:var(--text);background:var(--card);
+  border:1px solid var(--border2)}
+.wo-a-row:active{border-color:var(--gold2)}
+.wo-a-sb{width:44px;height:46px;flex-shrink:0;border-radius:12px;cursor:pointer;
+  border:1px solid var(--border3);background:var(--card2);color:var(--gold2);
+  font-size:20px;font-weight:700}
+.wo-a-sb:active{transform:scale(.9)}
+.wo-a-ph-b{display:flex;gap:8px}
+.wo-a-ph-b button{flex:1;padding:12px;border-radius:12px;cursor:pointer;font-family:inherit;
+  font-size:13px;font-weight:600;color:var(--sub);background:var(--card);
+  border:1px dashed var(--border3)}
+.wo-a-ph-b button:active{border-color:var(--gold2);color:var(--gold2)}
+.wo-a-ph{display:flex;align-items:center;gap:10px;padding:8px 12px;border-radius:12px;
+  background:var(--card);border:1px solid rgba(76,175,125,.35)}
+.wo-a-ph img{width:38px;height:38px;border-radius:9px;object-fit:cover}
+.wo-a-ph span{flex:1;font-size:12.5px;font-weight:600;color:var(--up)}
+.wo-a-ph b{cursor:pointer;color:var(--muted);padding:0 4px}
+.wo-c-l i{font-style:normal;text-transform:none;letter-spacing:0;opacity:.7}
+
 /* ── Удержание ────────────────────────────────────────────────────────────
    Три ответа в одном окне: с кого, сколько и за что. Меньше нельзя — сумма
    без человека это удержание из воздуха, а человек без суммы ничего не
@@ -3122,6 +3163,7 @@ button.path:active{transform:scale(.995)}
   color:#1a1408}
 .wo-c-acts .wo-c-off{color:var(--dn);border-color:rgba(224,85,85,.3)}
 .wo-c-acts button:active{transform:scale(.98)}
+.wo-c-acts button:disabled{opacity:.4;pointer-events:none}
 .wo-c-acts button:disabled{opacity:.5}
 /* Строка удержания в списке — жёлтым: это не убыток компании, а долг человека,
    и цветом он отличается от того и от другого. */
@@ -11612,6 +11654,16 @@ addEventListener('resize', () => { try{ accFit(); }catch(e){} });
 const ACC_WD = ['вс','пн','вт','ср','чт','пт','сб'];
 function accDay(){ return _dayIsoFor(DAY_OFFSET); }
 function accIsBack(){ return DAY_OFFSET > 0; }   // смотрим прошедший день
+// Как назвать выбранный день в подписи под цифрой. Плитки говорили «сегодня»
+// всегда, чем бы ни листали, — и на позавчерашних числах это выглядело так,
+// будто панель не обновилась.
+function accDayWord(){
+  if(DAY_OFFSET === 0) return 'сегодня';
+  if(DAY_OFFSET === 1) return 'вчера';
+  if(DAY_OFFSET === 2) return 'позавчера';
+  const d = _bizToday(); d.setDate(d.getDate() - DAY_OFFSET);
+  return `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
+}
 
 // Дни недели и месяцы целиком: на широкой полосе «29.08, сб» выглядит
 // заготовкой, а «29 августа, суббота» — ответом.
@@ -11755,7 +11807,7 @@ function accRender(){
   // null вместо числа — значит ответ ещё не пришёл. Прочерк на его месте
   // читается как «данных нет», хотя они просто едут; шиммер честнее.
   const num = {
-    expenses: [t ? fmt(t.all) : null, 'AED сегодня'],
+    expenses: [t ? fmt(t.all) : null, 'AED · ' + accDayWord()],
     stock:    [ACC_STOCK ? `${ACC_STOCK.done}/${ACC_STOCK.total}` : null,
                ACC_STOCK ? pluralize(ACC_STOCK.total,'район','района','районов') : 'районов'],
     order:    (() => {
@@ -12323,7 +12375,8 @@ async function accExpenses(){
 
 async function shCounts(){
   try{
-    if(!ACC_WO) ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs', {params:{days:30}});
+    if(!ACC_WO) ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs',
+      {params:{days:30, day: accDay()}});
   }catch(e){ return; }
   const n = (ACC_WO.pending || []).length;
   document.querySelectorAll('#shTabs .sh-n').forEach(e => {
@@ -12338,6 +12391,14 @@ async function shTab(t, first){
     b.classList.toggle('on', (i === 0) === (t === 'exp')));
   const g = document.getElementById('shTabs'); if(g) movePill(g);
   if(!first) try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  // Кнопка живёт во вкладке, а не в разделе: списывать руками имеет смысл
+  // только здесь, и таскать её к списку водителей незачем.
+  document.getElementById('accFoot').innerHTML = t === 'wo' ? `
+    <div class="qb-wrap"><button class="qb" onclick="woAddOpen()">
+      <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor"
+           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M4 7h16M9 7V4.5h6V7"/><path d="M6.5 7l1 12.5h9L17.5 7"/></svg>
+      Списать самому</button></div>` : '';
   if(t === 'exp'){ await accExpShell(); return; }
   await accWoAll();
 }
@@ -17720,7 +17781,8 @@ async function accWriteoffs(){
   _setText('accSub', 'загрузка…');
   document.getElementById('accFoot').innerHTML = '';
   try{
-    ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs', {params:{days:30}});
+    ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs',
+      {params:{days:30, day: accDay()}});
   }catch(e){
     document.getElementById('accMid').innerHTML =
       '<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>';
@@ -17783,7 +17845,8 @@ async function accWoAll(){
   const body = document.getElementById('expBody'); if(!body) return;
   body.innerHTML = '<div class="exp-empty">Загрузка…</div>';
   try{
-    if(!ACC_WO) ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs', {params:{days:30}});
+    if(!ACC_WO) ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs',
+      {params:{days:30, day: accDay()}});
   }catch(e){
     body.innerHTML = shEmpty('err');
     return;
@@ -17854,9 +17917,178 @@ function shEmpty(kind){
     <div class="sh-empty-s">${V[2] || ''}</div>
     ${kind === 'err'
       ? '<button class="sh-empty-b" onclick="ACC_WO=null;shTab(SH_TAB)">Ещё раз</button>'
-      : `<div class="sh-empty-h">Записывает водитель в своём приложении — с фотографией.
-         Она и отличает списание от способа закрыть недостачу.</div>`}
+      : woNoneBlock()}
   </div>`;
+}
+
+// «Ничего не списывали» — отметка, а не пустота.
+//
+// Пустой список отвечает сразу на два вопроса и ни на один честно: то ли за
+// день ничего не разбили, то ли забыли записать. Отметка отвечает на первый,
+// и у неё есть автор: сказать «ничего не было» — утверждение, и оно должно
+// быть чьим-то. Поэтому кнопка, а не молчание.
+function woNoneBlock(){
+  const n = (ACC_WO || {}).none;
+  if(n) return `<div class="wo-none on">
+      <span class="wo-none-t">Отмечено: за ${escS(accDayWord())} списаний не было</span>
+      <span class="wo-none-s">${escS(n.by_name || '—')}${
+        n.at ? ' · ' + escS(_when(n.at)) : ''}</span>
+      <button class="wo-none-x" onclick="woNoneSet(false)">Снять отметку</button>
+    </div>`;
+  return `<div class="wo-none">
+      <div class="sh-empty-h" style="margin:0 0 12px;padding:0;border:0">Списание
+        записывает водитель в своём приложении — с фотографией. Она и отличает
+        списание от способа закрыть недостачу. Но бьётся не только при водителе:
+        своё списание вносите здесь.</div>
+      <button class="wo-none-b" onclick="woNoneSet(true)">Ничего не списывали за ${
+        escS(accDayWord())}</button>
+    </div>`;
+}
+
+async function woNoneSet(on){
+  if(on && !confirm(`Отметить, что за ${accDayWord()} ничего не списывали?`)) return;
+  if(!accAskBack('Отметка «списаний не было»')) return;
+  try{
+    await ownerApi.ownerFetch('/api/owner/stock/writeoff/none',
+      {method:'POST', body:{day: accDay(), on: !!on, as:_meName()}});
+  }catch(e){
+    _toast((e && e.payload && e.payload.error) === 'has_rows'
+      ? 'За этот день уже есть списания — отметка не нужна'
+      : 'Не удалось отметить');
+    return;
+  }
+  ACC_WO = null;
+  shTab('wo');
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+}
+
+// ── своё списание ───────────────────────────────────────────────────────────
+// Водитель записывает бой у себя, но не всё бьётся при водителе: коробку
+// роняют на приёмке, разбитую бутылку находят утром на полке, просрочку
+// замечают при пересчёте. Раньше такому не было места, и оно уходило в
+// недостачу — то есть выглядело воровством.
+//
+// Фотография обязательна там, где что-то доказывает: бой, брак и просрочку
+// видно. Утеря — это отсутствие предмета, и требовать снимок «того, чего
+// нет» бессмысленно.
+let WOA = null;      // {kind, item, name, qty, note, photo, thumb, district}
+
+function woAddOpen(){
+  if(!accAskBack('Списание')) return;
+  WOA = {kind:'бой', item:'', name:'', qty:1, note:'', photo:'', thumb:'',
+         district: (STK.districts && STK.districts[0] && STK.districts[0].id) || '', q:''};
+  woAddPaint();
+  document.getElementById('woAddOv').classList.add('show');
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+function woAddClose(){
+  document.getElementById('woAddOv').classList.remove('show');
+  WOA = null;
+}
+
+const WO_KINDS = ['бой','брак','просрочка','потеря'];
+function woAddSet(k, v){ if(!WOA) return; WOA[k] = v; woAddPaint(); }
+function woAddQty(d){ if(!WOA) return; WOA.qty = Math.max(1, Math.min(240, WOA.qty + d)); woAddPaint(); }
+
+function woAddPaint(){
+  const w = WOA; if(!w) return;
+  const box = document.getElementById('woAddBody'); if(!box) return;
+  const cat = (ORD.d && (ORD.d.all_rows || ORD.d.rows)) || [];
+  const q = (w.q || '').toLowerCase().trim();
+  const list = q ? cat.filter(r => (r.name||'').toLowerCase().includes(q)).slice(0, 8) : [];
+  const нужноФото = w.kind !== 'потеря';
+  box.innerHTML = `
+    <div class="wo-c-l">Что случилось</div>
+    <div class="wo-c-who">${WO_KINDS.map(k => `
+      <button class="wo-c-p ${w.kind===k?'on':''}" onclick="woAddSet('kind','${k}')">${k}</button>`).join('')}</div>
+
+    <div class="wo-c-l">Позиция</div>
+    ${w.item ? `<button class="wo-a-item" onclick="woAddSet('item','')">
+        <span>${escS(w.name)}</span><b>✕</b></button>`
+      : `<input class="wo-c-note" id="woAddQ" placeholder="Начните вводить название"
+              value="${escS(w.q||'')}" oninput="WOA.q=this.value;woAddPaint();
+              setTimeout(()=>{const i=document.getElementById('woAddQ');if(i){i.focus();i.selectionStart=i.value.length;}},0)">
+         ${list.length ? `<div class="wo-a-list">${list.map(r => `
+            <button class="wo-a-row" onclick="WOA.item='${r.id}';WOA.name='${escS(r.name).replace(/'/g,"&#39;")}';WOA.q='';woAddPaint()">
+              ${escS(r.name)}</button>`).join('')}</div>` : ''}`}
+
+    <div class="wo-c-l">Сколько бутылок</div>
+    <div class="wo-c-amt">
+      <button class="wo-a-sb" onclick="woAddQty(-1)">−</button>
+      <input value="${w.qty}" inputmode="numeric"
+             oninput="WOA.qty=Math.max(1,Math.min(240,parseInt(this.value,10)||1))">
+      <button class="wo-a-sb" onclick="woAddQty(1)">+</button>
+    </div>
+
+    <div class="wo-c-l">Где</div>
+    <div class="wo-c-who">${(STK.districts||[]).map(d => `
+      <button class="wo-c-p ${w.district===d.id?'on':''}"
+              onclick="woAddSet('district','${d.id}')">${escS(d.code||'')}</button>`).join('')}</div>
+
+    <div class="wo-c-l">Фото${нужноФото ? '' : ' <i>для утери не нужно</i>'}</div>
+    ${w.thumb ? `<div class="wo-a-ph"><img src="${w.thumb}" alt="">
+        <span>снимок готов</span><b onclick="WOA.photo='';WOA.thumb='';woAddPaint()">✕</b></div>`
+      : `<div class="wo-a-ph-b">
+          <button onclick="document.getElementById('woCam').click()">Снять камерой</button>
+          <button onclick="document.getElementById('woGal').click()">Из галереи</button>
+        </div>`}
+
+    <div class="wo-c-l">Комментарий</div>
+    <input class="wo-c-note" placeholder="что именно случилось"
+           value="${escS(w.note||'')}" oninput="WOA.note=this.value">`;
+  const go = document.getElementById('woAddGo');
+  if(go) go.disabled = !(w.item && w.qty > 0 && w.district && (w.photo || !нужноФото));
+}
+
+// Снимок ужимаем на телефоне: с камеры приходит четыре мегабайта, а нужен
+// узнаваемый кадр. Заодно это единственное, что делает отправку по мобильной
+// сети быстрой настолько, чтобы её дождались.
+function woShot(inp){
+  const f = inp.files && inp.files[0]; inp.value = '';
+  if(!f || !WOA) return;
+  const img = new Image(), fr = new FileReader();
+  fr.onload = () => { img.src = fr.result; };
+  img.onload = () => {
+    const k = Math.min(1, 1280 / Math.max(img.width, img.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    WOA.photo = c.toDataURL('image/jpeg', 0.72);
+    // Крошечная копия едет внутри самой записи: список списаний должен
+    // открываться с картинками, а не с пустыми рамками.
+    const t = document.createElement('canvas');
+    const tk = Math.min(1, 96 / Math.max(img.width, img.height));
+    t.width = Math.round(img.width * tk); t.height = Math.round(img.height * tk);
+    t.getContext('2d').drawImage(img, 0, 0, t.width, t.height);
+    WOA.thumb = t.toDataURL('image/jpeg', 0.5);
+    woAddPaint();
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  };
+  img.onerror = () => _toast('Не смогли прочитать снимок');
+  fr.readAsDataURL(f);
+}
+
+async function woAddSave(){
+  const w = WOA; if(!w || !w.item) return;
+  const go = document.getElementById('woAddGo');
+  if(go){ go.disabled = true; go.textContent = 'Записываю…'; }
+  try{
+    await ownerApi.ownerFetch('/api/owner/stock/writeoff', {method:'POST', body:{
+      item: w.item, qty: w.qty, kind: w.kind, district: w.district,
+      note: w.note, day: accDay(), photo: w.photo, thumb: w.thumb, as: _meName()}});
+  }catch(e){
+    if(go){ go.disabled = false; go.textContent = 'Списать'; }
+    const why = (e && e.payload && e.payload.error) || '';
+    _toast(why === 'no_photo'   ? 'Для боя, брака и просрочки нужен снимок'
+         : why === 'bad_photo'  ? 'Снимок не прочитался — сделайте ещё раз'
+         : why === 'photo_big'  ? 'Снимок слишком большой'
+         : 'Не удалось записать');
+    return;
+  }
+  woAddClose();
+  ACC_WO = null;
+  shTab('wo');
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
 }
 
 // ── Удержание ──────────────────────────────────────────────────────────────
@@ -20965,6 +21197,29 @@ function renderHours(h){
   <div class="stk-mid" id="oprMid"></div>
   <div class="opr-foot" id="oprFoot"></div>
 </div>
+
+<!-- Своё списание: то, что разбилось не при водителе. Фото обязательно везде,
+     кроме утери — снимок отсутствующей бутылки ничего не доказывает. -->
+<div class="wo-c-ov" id="woAddOv" onclick="if(event.target===this)woAddClose()">
+  <div class="wo-c-sheet">
+    <div class="wo-c-h">
+      <div class="wo-c-t">Списать самому</div>
+      <div class="wo-c-s">Бой, брак, просрочка и утеря, которые заметили не на
+        доставке. Запись сразу учтённая — согласовывать её не у кого.</div>
+    </div>
+    <div id="woAddBody"></div>
+    <div class="wo-c-acts">
+      <button class="wo-c-no" onclick="woAddClose()">Отмена</button>
+      <button class="wo-c-go" id="woAddGo" onclick="woAddSave()" disabled>Списать</button>
+    </div>
+  </div>
+</div>
+<input type="file" id="woCam" accept="image/*" capture="environment"
+  style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"
+  onchange="woShot(this)">
+<input type="file" id="woGal" accept="image/*"
+  style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"
+  onchange="woShot(this)">
 
 <div class="stk-ov" id="stkOv">
   <div class="stk-top">

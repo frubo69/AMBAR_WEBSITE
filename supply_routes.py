@@ -153,6 +153,14 @@ async def handle_send(request):
         log.error(f"[supply] телеграм отказал: {res.get('description')}")
         return web.json_response({"error": "telegram", "detail": res.get("description")},
                                  status=502, headers=CORS_HEADERS)
+    # В реестр переписки владельца: файл-заявка — такое же сообщение бота, как
+    # любое другое, и по тревоге («тетрис») должен уходить вместе со всеми.
+    # Без этой строки заявка на закупку переживала штору и палила работу.
+    try:
+        from api_server import _remember_owner_msg
+        await _remember_owner_msg(OWNER_BOT_TOKEN, request.get("owner_id") or 0, res)
+    except Exception as e:
+        log.debug(f"[supply] реестр заявки: {e}")
     return web.json_response({"ok": True, "file": name}, headers=CORS_HEADERS)
 
 
@@ -1290,6 +1298,13 @@ async def _send_doc(chat_id: int, raw: bytes, name: str, caption: str):
     if not res.get("ok"):
         log.error(f"[supply] телеграм отказал: {res.get('description')}")
         return False, "telegram"
+    # Тот же реестр: файл лёг владельцу в переписку — значит, штора должна его
+    # убрать. Иначе документ с заявкой оставался бы в чате после «тетриса».
+    try:
+        from api_server import _remember_owner_msg
+        await _remember_owner_msg(OWNER_BOT_TOKEN, chat_id, res)
+    except Exception as e:
+        log.debug(f"[supply] реестр файла: {e}")
     return True, ""
 
 

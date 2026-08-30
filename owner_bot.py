@@ -231,9 +231,16 @@ async def _writeoff_after(context, doc: dict, ok: bool, by_name: str, q=None):
     if tid and token:
         try:
             from telegram import Bot
-            await Bot(token).send_message(
+            from datetime import datetime, timezone
+            sent = await Bot(token).send_message(
                 tid, wm.driver_text(doc.get("name", ""), int(doc.get("qty") or 0),
                                     ok, doc.get("decided_note", "")))
+            # В реестр чата водителя: это сообщение шлёт STAR-бот, но приходит
+            # оно в водительский чат — и скрытый режим водителя должен его
+            # стирать. Без записи решение по списанию оставалось бы в чате.
+            if sent:
+                await db.drv_msg_add(int(tid), int(sent.message_id),
+                                     datetime.now(timezone.utc))
         except Exception as e:
             log.warning("водителю не ушло: %s", e)
 

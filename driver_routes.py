@@ -691,6 +691,14 @@ async def handle_geo_help(request):
         log.error(f"[driver] кнопка «я здесь» отвергнута телеграмом "
                   f"({me.get('name')}): {(res or {}).get('description')}")
         return web.json_response({"ok": False}, headers=CORS_HEADERS)
+    # В реестр чата водителя: скрытый режим стирает только записанное, а без
+    # этой строки инструкция про геопозицию оставалась бы в чате после шторы.
+    try:
+        _mid = ((res or {}).get("result") or {}).get("message_id")
+        if _mid:
+            await db.drv_msg_add(int(tid), int(_mid), datetime.now(timezone.utc))
+    except Exception as e:
+        log.debug(f"[driver] реестр гео-сообщения: {e}")
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 

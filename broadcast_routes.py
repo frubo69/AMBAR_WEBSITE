@@ -42,8 +42,29 @@ _JOBS: dict = {}
 
 
 # ── language + targeting ────────────────────────────────────────────────────
-def _bucket(language_code) -> str:
-    lc = (language_code or "").strip().lower()
+# Язык телеграма — догадка, а не факт. Человек может сидеть в английском
+# интерфейсе и читать по-русски: такому английская рассылка приходит как
+# «не моё», хотя он наш постоянный клиент.
+#
+# Поэтому есть список тех, кому всегда идёт русский, чем бы ни был подписан их
+# телеграм. Он живёт в .env (BROADCAST_RU_IDS, id через запятую), а не в коде:
+# репозиторий открытый, и telegram id клиента в нём лежать не должен.
+FORCE_RU_IDS = {int(x.strip()) for x in os.getenv("BROADCAST_RU_IDS", "").split(",")
+                if x.strip().isdigit()}
+
+
+def _bucket(u: dict) -> str:
+    """Русский или английский для этого получателя.
+
+    Берёт пользователя целиком, а не один language_code: решение зависит и от
+    того, кто это. Список исключений сильнее языка телеграма — он и заведён
+    ровно для случаев, когда телеграм говорит одно, а человек читает другое."""
+    try:
+        if int(u.get("telegram_id") or 0) in FORCE_RU_IDS:
+            return "ru"
+    except (TypeError, ValueError):
+        pass
+    lc = (u.get("language_code") or "").strip().lower()
     return "ru" if lc.startswith("ru") else "en"   # everyone else → English
 
 
@@ -154,7 +175,7 @@ async def _run_job(job_id: str):
         reach = 0
         for u in users:
             if u.get("telegram_id") and not u.get("is_banned") and \
-               _match_target(u, _bucket(u.get("language_code")), job["target"]):
+               _match_target(u, _bucket(u), job["target"]):
                 reach += 1
         job["reach"] = reach
         await _persist(job)
@@ -170,13 +191,17 @@ async def _run_job(job_id: str):
                 if u.get("is_banned"):
                     job["skipped_banned"] += 1
                     continue
-                bucket = _bucket(u.get("language_code"))
+                bucket = _bucket(u)
                 if not _match_target(u, bucket, job["target"]):
                     job["skipped_filter"] += 1
                     continue
                 if tid in job["sent_set"]:
                     continue
                 text = job["ru_text"] if bucket == "ru" else job["en_text"]
+                # Русский из списка исключений может попасть в рассылку, где
+                # русский текст не заполняли вовсе (цель «en» или «без языка»).
+                # Отправить ему пустоту хуже, чем отправить на другом языке.
+                text = text or job["en_text"] or job["ru_text"]
                 img  = (job["ru_image"] if bucket == "ru" else job["en_image"]) \
                     or job["en_image"] or job["ru_image"]
                 try:
@@ -217,7 +242,7 @@ async def handle_bcast_audience(request):
             c["banned"] += 1
             continue
         c["all"] += 1
-        b = _bucket(u.get("language_code"))
+        b = _bucket(u)
         c["ru" if b == "ru" else "en"] += 1
         if not (u.get("language_code") or "").strip():
             c["nolang"] += 1

@@ -13319,6 +13319,92 @@ async function accQR(){
   qrDistrict();
 }
 
+function _qrHead(title, sub, back){
+  _setText('accTitle', title);
+  _setText('accSub', sub);
+  _setRail('accRail', '');
+  const box = document.querySelector('#accOv .stk-ttl');
+  if(box){ box.classList.remove('pick', 'open'); box.onclick = null; }
+  // Подвал принадлежит экрану, а не разделу: «Сканировать бутылки» имеет смысл
+  // только на первом, и таскать её за собой по выбору точки незачем.
+  document.getElementById('accFoot').innerHTML = '';
+  ACC_BACK = back;
+  return '';
+}
+
+// Кто я — чтобы отличить свою бронь от чужой. Своя не должна выглядеть занятой:
+// человек вышел из сканирования и вернулся, а позиция как будто у кого-то ещё.
+function _meId(){
+  try{ return Telegram.WebApp.initDataUnsafe.user.id; }catch(e){ return 0; }
+}
+function _lockOn(district, product_id){
+  const me = _meId();
+  for(const l of (ACC_QR?.locks || [])){
+    const [d, pid] = String(l.key || '').split(':');
+    if(d === district && pid === product_id)
+      return {mine: String(l.by) === String(me), name: l.name || 'другой сотрудник'};
+  }
+  return null;
+}
+
+// Точка первой: одна и та же бутылка на разных точках — разные бутылки, и без
+// точки запись бессмысленна.
+// Переключение точки внутри раздела: пустой id — обзор всех точек.
+function qrGo(id){
+  distMenuClose();
+  if(!id){ distRemember('qr', ''); qrDistrict(true); return; }
+  if(id === QR_DIST) return;
+  distRemember('qr', id);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  qrPick(id);
+}
+
+function qrDistTap(){
+  const box = document.querySelector('#accOv .stk-ttl');
+  if(box && box.classList.contains('open')){ distMenuClose(); return; }
+  const have = (ACC_QR && ACC_QR.by_district) || {};
+  const info = {};
+  (STK.districts || []).forEach(d => {
+    info[d.id] = have[d.id]
+      ? {sub: 'бутылок в реестре', value: fmt(have[d.id])}
+      : {sub: 'ещё не заводили'};
+  });
+  _setRail('accRail', distMenu(QR_DIST, 'qrGo', info));
+  if(box) box.classList.add('open');
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+
+async function qrDistrict(force){
+  if(!STK.districts){
+    try{ STK.districts = (await ownerApi.ownerFetch('/api/owner/stock/status')).districts; }
+    catch(e){ STK.districts = []; }
+  }
+  // Считают всегда на одной точке и подряд. Спрашивать её на каждом входе —
+  // брать плату за то, что и так известно.
+  const last = distSaved('qr');
+  if(!force && last && (STK.districts || []).some(d => d.id === last)){ qrPick(last); return; }
+  const have = (ACC_QR && ACC_QR.by_district) || {};
+  const busy = {};
+  (ACC_QR?.locks || []).forEach(l => {
+    const d = String(l.key || '').split(':')[0];
+    busy[d] = (busy[d] || 0) + 1;
+  });
+  // Сводки, в которую раньше вела стрелка назад, больше нет: выбор точки — и
+  // есть первый экран раздела, а назад из него ведёт наружу.
+  const head = _qrHead('Где считаем', 'выберите точку хранения', null);
+  _setRail('accRail', '');
+  document.getElementById('accMid').innerHTML = head +
+    `<div class="dgrid">` + ((STK.districts || []).map(d => distTile(d, 'qrGo', {
+        cls:   busy[d.id] ? 'busy' : '',
+        value: have[d.id] ? fmt(have[d.id]) : '—',
+        vcls:  have[d.id] ? '' : 'dim',
+        sub:   busy[d.id]
+                 ? `считают ${busy[d.id]} ${pluralize(busy[d.id],'позицию','позиции','позиций')}`
+                 : (have[d.id] ? 'бутылок в реестре' : 'ещё не заводили'),
+      })).join('') || '<div class="scan-empty">Точки не загрузились</div>') + `</div>`;
+}
+
+
 let QR_CATF = 'all';
 function qrPick(district){
   QR_DIST = district; QR_CATF = 'all';

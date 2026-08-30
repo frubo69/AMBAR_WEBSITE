@@ -1997,6 +1997,13 @@ button.path:active{transform:scale(.995)}
 .crw-c{margin-bottom:9px;border-radius:15px;background:var(--card);
   border:1px solid var(--border2);overflow:hidden}
 .crw-c.moved{border-color:rgba(201,169,110,.4)}
+/* Проверка бутылок: шапка района золотом. Там список читают глазами сверху
+   вниз и ищут не имя, а точку — золото и есть эта засечка. На «Кто на каком
+   районе» она не нужна: туда заходят за человеком, а не за районом. */
+.chk-c .crw-c-h{background:var(--gold-soft);border-bottom-color:rgba(201,169,110,.28)}
+.chk-c .crw-c-n{color:var(--gold2)}
+.chk-c .crew-code{color:#1a1408;border-color:transparent;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .crw-c-h{display:flex;align-items:center;gap:10px;padding:11px 12px;
   background:var(--card2);border-bottom:1px solid var(--border2)}
 .crw-c-n{flex:1;min-width:0;font-size:14px;font-weight:700;overflow:hidden;
@@ -3118,6 +3125,26 @@ button.path:active{transform:scale(.995)}
 /* Записанный расход выглядит как заполненная форма: та же сетка, те же поля.
    Каждый следующий встаёт строкой ниже — список читается сверху вниз, а не
    растекается облаком пилюль. */
+/* Полоса разовых: подпись слева, число справа, разделитель сверху — она
+   читается как строка итога, а не как ещё одна кнопка в ряду. */
+.exp-dop{display:flex;align-items:center;gap:8px;width:100%;margin-top:9px;
+  padding:8px 0 0;border:0;border-top:1px solid var(--border2);background:none;
+  cursor:pointer;font-family:inherit;color:var(--muted);text-align:left}
+.exp-dop:active{opacity:.7}
+.exp-dop-t{flex:1;min-width:0;font-size:11.5px;font-weight:600;letter-spacing:.2px}
+.exp-dop-v{flex-shrink:0;display:flex;align-items:baseline;gap:4px;
+  font-family:'DM Sans',sans-serif;font-size:13.5px;font-weight:700;
+  font-variant-numeric:tabular-nums}
+.exp-dop-v i{font-style:normal;font-size:9.5px;font-weight:600;letter-spacing:.6px;
+  color:var(--muted)}
+.exp-dop-v u{text-decoration:none;font-size:10.5px;font-weight:700;color:var(--warn)}
+.exp-dop-v .dim{font-size:12px;font-weight:600;color:var(--dim)}
+.exp-dop.has{color:var(--gold2)}
+.exp-dop.has .exp-dop-v{color:var(--gold2)}
+.exp-dop.wait{color:var(--warn)}
+.exp-dop.open{color:var(--sub)}
+/* Полоса уже провела черту — второй под ней не надо. */
+.exp-dop + .exp-items,.exp-dop + .exp-form{border-top:0;padding-top:0;margin-top:8px}
 .exp-items{display:flex;flex-direction:column;gap:6px;margin-top:10px;padding-top:10px;
   border-top:1px solid var(--border2)}
 .exp-item{display:flex;align-items:center;gap:6px}
@@ -14215,18 +14242,18 @@ function expRow(r){
   const w = r.working;
   const open = EXP.open === r.name;
   const extras = r.extras || [];
-  const state = (w === null ? 'не отмечен'
+  // Строка состояния — только про смену: вышел или дома и сколько за это
+  // питания. Всё про разовые ушло на свою полосу ниже, иначе одно и то же
+  // сказано дважды и в разных словах.
+  const state = w === null ? 'не отмечен'
               : w ? `на смене · питание ${r.meal}`
-                  : `дома · питание ${r.meal}`)
-              + (r.pending_count ? ` · ${r.pending_count} ждёт решения` : '');
+                  : `дома · питание ${r.meal}`;
   // Действия — тремя квадратами справа: во всю ширину они съедали карточку,
   // а нажимают их раз в день. Что именно выбрано, говорит подпись под именем —
   // иконка отвечает за действие, слово за состояние.
   const ICO = {
     work: '<path d="M20 6 9 17l-5-5"/>',
     home: '<path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
-    add:  '<path d="M12 5v14M5 12h14"/>',
-    cls:  '<path d="M18 6 6 18M6 6l12 12"/>',
   };
   const sq = (kind, on, title, onclick) => `
     <button class="exp-sq ${on ? 'on-' + kind : ''}" title="${title}" aria-label="${title}"
@@ -14239,7 +14266,7 @@ function expRow(r){
     <div class="exp-head">
       <span class="exp-who">
         <span class="exp-name">${escS(r.name)}</span>
-        <span class="exp-state ${r.pending_count ? 'wait' : (w === null ? 'off' : (w ? 'work' : 'home'))}">${state}</span>
+        <span class="exp-state ${w === null ? 'off' : (w ? 'work' : 'home')}">${state}</span>
       </span>
       <span class="exp-right">
         <span class="exp-val ${r.total ? '' : 'zero'}">${r.total || '—'}<i>AED</i></span>
@@ -14248,11 +14275,11 @@ function expRow(r){
                `expSetWork('${escS(r.name)}', ${w === true ? 'null' : 'true'})`)}
           ${sq('home', w === false, 'Дома',
                `expSetWork('${escS(r.name)}', ${w === false ? 'null' : 'false'})`)}
-          ${sq(open ? 'cls' : 'add', false, open ? 'Отмена' : 'Разовый расход',
-               `expToggleForm('${escS(r.name)}')`)}
         </span>
       </span>
     </div>
+
+    ${expDop(r, open)}
 
     ${extras.length ? `<div class="exp-items">${extras.map(e => {
       const st = e.status || 'approved';
@@ -14280,6 +14307,34 @@ function expRow(r){
       <button onclick="expAddExtra('${escS(r.name)}')">Готово</button>
     </div>` : ''}
   </div>`;
+}
+
+// Полоса разовых. Стоит у каждого водителя всегда, даже когда разовых нет, —
+// и это главное в ней.
+//
+// Раньше про них говорил безымянный «плюс» в углу: увидеть по строке, что
+// человек сегодня ничего не тратил сверх питания, было нельзя — пустое место
+// одинаково значило и «ничего не было», и «забыли внести». Теперь пусто
+// сказано словом, а сумма стоит там же, где потом встанет число, — и разница
+// между «нет» и «120» видна не глядя.
+//
+// Полоса же и открывает форму: подписанная строка во всю ширину объясняет
+// себя и попадает под палец лучше, чем квадрат в 36 пикселей.
+function expDop(r, open){
+  const appr = r.extra_sum || 0;
+  const wait = r.pending_count || 0;
+  const val = open ? '<span class="dim">свернуть</span>'
+            : appr ? `${fmt(appr)}<i>AED</i>${wait ? `<u>+${wait} ждёт</u>` : ''}`
+            : wait ? `<u>${wait} ${pluralize(wait,'ждёт','ждут','ждут')} решения</u>`
+                   : '<span class="dim">нет</span>';
+  return `<button class="exp-dop ${appr ? 'has' : ''} ${wait ? 'wait' : ''} ${open ? 'open' : ''}"
+      onclick="expToggleForm('${escS(r.name)}')">
+    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+         stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+      ${open ? '<path d="M18 6 6 18M6 6l12 12"/>' : '<path d="M12 5v14M5 12h14"/>'}</svg>
+    <span class="exp-dop-t">Разовые</span>
+    <span class="exp-dop-v">${val}</span>
+  </button>`;
 }
 
 // Повторный тап по той же кнопке снимает отметку: ошибиться утром легко, а
@@ -17790,10 +17845,14 @@ function chkHome(){
         </span>
       </button>`;
     }).join('') || '<span class="crw-none">водителей нет</span>';
-    return `<div class="crw-c">
+    // Район золотом и со счётом людей: проверка идёт по точкам, и глаз должен
+    // цеплять, где кончилась одна и началась другая. Число в скобках отвечает
+    // на первый вопрос — скольких тут вообще проверять.
+    const n = (d.drivers || []).length;
+    return `<div class="crw-c chk-c">
       <div class="crw-c-h">
         <span class="crew-code">${escS(d.code)}</span>
-        <span class="crw-c-n">${escS(d.name)}</span>
+        <span class="crw-c-n">${escS(d.name)}${n ? ` (${n})` : ''}</span>
       </div>
       <div class="crw-c-b">${chips}</div>
     </div>`;

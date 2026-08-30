@@ -29,6 +29,7 @@ from datetime import datetime, timedelta, timezone
 from aiohttp import web
 
 import db
+import backdate
 import config_staff as staff
 from owner_auth import require_owner, CORS_HEADERS
 
@@ -174,6 +175,9 @@ async def handle_working(request):
         "marked_at": datetime.now(timezone.utc).isoformat(),
     })
     log.info(f"[expenses] {day} {driver}: работает={working}")
+    await backdate.notify(day, str(body.get("as") or ""), "отметка водителя",
+                          f"{driver} — " + ("вышел" if working is True
+                                            else "дома" if working is False else "отметка снята"))
     saved = await db.get_driver_day(day, driver)
     base = next(d for d in staff.drivers() if d["name"] == driver)
     return web.json_response({"ok": True, "driver": _day_row(base, saved)},
@@ -205,6 +209,8 @@ async def handle_extra_add(request):
             "at": datetime.now(timezone.utc).isoformat()}
     await db.add_driver_expense(day, driver, item)
     log.info(f"[expenses] {day} {driver}: +{amount} AED — {comment}")
+    await backdate.notify(day, str(body.get("as") or ""), "доп. расход добавлен",
+                          f"{driver} — {amount} AED, {comment}")
     saved = await db.get_driver_day(day, driver)
     base = next(d for d in staff.drivers() if d["name"] == driver)
     return web.json_response({"ok": True, "item": item, "driver": _day_row(base, saved)},
@@ -220,6 +226,8 @@ async def handle_extra_del(request):
     ok = await db.del_driver_expense(day, driver, item_id)
     if not ok:
         return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    await backdate.notify(day, (request.query.get("as") or ""),
+                          "доп. расход убран", driver)
     saved = await db.get_driver_day(day, driver)
     base = next((d for d in staff.drivers() if d["name"] == driver), None)
     return web.json_response(
@@ -251,6 +259,9 @@ async def handle_extra_decide(request):
     if not ok:
         return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
     log.info(f"[expenses] {day} {driver}: расход {item_id} — {action}")
+    await backdate.notify(day, str(body.get("as") or ""),
+                          "решение по расходу водителя",
+                          f"{driver} — " + ("принят" if action == "approve" else "отклонён"))
 
     saved = await db.get_driver_day(day, driver)
     base = next((d for d in staff.drivers() if d["name"] == driver), None)

@@ -33,6 +33,7 @@ from datetime import datetime, timedelta, timezone
 from aiohttp import web
 
 import db
+import backdate
 from owner_auth import require_owner, CORS_HEADERS
 from config_offices import OFFICE_IDS, OFFICE_NAMES, OFFICE_CODES
 from config_stock_order import order_key      # порядок обхода полок, как в таблице
@@ -715,6 +716,10 @@ async def handle_save(request):
     base_drop()                      # остатки изменились — заявку считать заново
     log.info(f"[stock] {district} {day}: {len(lines)} позиций, "
              f"недостача {short_qty} шт / {short_aed} AED")
+    await backdate.notify(day, str(body.get("as") or ""),
+                          "ревизия" if is_audit else "пересчёт склада",
+                          f"{OFFICE_CODES.get(district, district)} — {len(lines)} позиций"
+                          + (f", недостача {short_aed} AED" if short_aed else ""))
     return web.json_response(
         {"ok": True, "day": day, "first_time": first_time,
          "short_qty": _num(short_qty), "short_aed": round(short_aed),
@@ -756,6 +761,9 @@ async def handle_transfer(request):
            "at": datetime.now(timezone.utc).isoformat()}
     await db.add_stock_transfer(doc)
     log.info(f"[stock] перемещение {qty}×{pid}: {src} → {dst} ({day})")
+    await backdate.notify(day, str(body.get("as") or ""), "перемещение между офисами",
+                          f"{_catalog()[pid].get('name','')} · {qty} шт · "
+                          f"{OFFICE_CODES.get(src, src)} → {OFFICE_CODES.get(dst, dst)}")
     return web.json_response({"ok": True, **doc}, headers=CORS_HEADERS)
 
 

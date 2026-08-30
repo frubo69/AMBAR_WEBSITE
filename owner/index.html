@@ -182,6 +182,24 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .period-bar{display:flex;gap:8px;margin:0;align-items:stretch;position:fixed;top:calc(66px + var(--safe-top));left:0;right:0;z-index:35;background:var(--bg);padding:4px 14px 8px;pointer-events:none}
 .period-bar>*{pointer-events:auto}
 .period-bar .periods{flex:1;margin:0}
+/* Окошко дня. Одна ячейка, две стрелки и подпись: сегодня, вчера, позавчера,
+   дальше — число. День в прошлом подсвечен золотом — экран, на котором можно
+   изменить закрытую смену, не должен выглядеть как обычный. */
+.dayslide{flex:1;display:flex;align-items:center;gap:4px;padding:3px;
+  background:var(--card);border:1px solid var(--border2);border-radius:11px;
+  overflow:hidden}
+.dayslide.back{border-color:rgba(201,169,110,.45);background:var(--gold-soft)}
+.ds-arw{flex:0 0 auto;width:34px;height:34px;border:0;border-radius:9px;cursor:pointer;
+  background:none;color:var(--sub);display:flex;align-items:center;justify-content:center}
+.ds-arw:disabled{opacity:.25;pointer-events:none}
+.ds-arw:active{transform:scale(.9)}
+.ds-win{flex:1;min-width:0;border:0;background:none;cursor:pointer;font-family:inherit;
+  display:flex;flex-direction:column;align-items:center;gap:1px;padding:2px 0;
+  color:var(--text);will-change:transform}
+.ds-win b{font-size:13px;font-weight:700;line-height:1.15}
+.ds-win i{font-style:normal;font-size:9.5px;font-weight:600;letter-spacing:.2px;
+  color:var(--muted);font-variant-numeric:tabular-nums;line-height:1}
+.dayslide.back .ds-win b{color:var(--gold2)}
 .cal-btn{width:40px;height:auto;padding:0;border-radius:11px;background:var(--card);border:1px solid var(--border2);color:var(--sub);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s var(--e1);flex-shrink:0}
 .cal-btn:active{transform:scale(.92);color:var(--gold2);border-color:rgba(201,169,110,.35)}
 .cal-btn.on{color:var(--gold2);border-color:rgba(201,169,110,.45);background:linear-gradient(135deg,rgba(201,169,110,.14),rgba(201,169,110,.04))}
@@ -3768,19 +3786,26 @@ button.path:active{transform:scale(.995)}
 
 <!-- ============ MONEY ============ -->
 <div class="page" id="pg-money">
+  <!-- Учёт живёт днями, а не неделями: расходы смены, пересчёт склада, заявка —
+       всё это записи одного дня. Неделя и месяц отвечали на вопрос, которого
+       здесь не задают, поэтому вместо них окошко с днём: листается свайпом и
+       стрелками, календарь рядом — для дальнего дня. -->
   <div class="period-bar">
-    <div class="periods" id="moneyPeriod">
-      <div class="period-pill"></div>
-      <button class="on" data-p="today"><span>Сегодня</span><span class="p-date"></span></button>
-      <button data-p="week">Неделя</button>
-      <button data-p="month">Месяц</button>
-      <button data-p="year">Год</button>
+    <div class="dayslide" id="moneyDay">
+      <button class="ds-arw" onclick="accDayStep(1)" aria-label="День назад">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+             stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <button class="ds-win" id="moneyDayWin" onclick="accDayHome()">
+        <b id="mdName">Сегодня</b><i id="mdDate">—</i></button>
+      <button class="ds-arw" id="mdNext" onclick="accDayStep(-1)" aria-label="День вперёд" disabled>
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+             stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
     </div>
-    <button class="cal-btn" onclick="openDate('moneyPeriod')" aria-label="Свой период">
+    <button class="cal-btn" onclick="openDate('moneyDay')" aria-label="Выбрать день">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
     </button>
   </div>
-  <div class="range-chip" id="rangeChip-moneyPeriod" style="display:none"><span class="rc-icon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span><span class="rc-text"></span><button class="rc-x" onclick="clearRange('moneyPeriod')">✕</button></div>
+  <div class="range-chip" id="rangeChip-moneyDay" style="display:none"><span class="rc-icon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span><span class="rc-text"></span><button class="rc-x" onclick="accDayHome()">✕</button></div>
 
   <!-- Панель учёта: от общего к частному. Здесь только вход в разделы и
        короткая сводка по каждому — вся работа внутри, чтобы страница не
@@ -7148,10 +7173,18 @@ document.querySelectorAll('.tb').forEach(btn=>{
     // Команда живёт на странице районов — тянем её при первом заходе туда.
     if(pg === 'offices' && !OPS.data && !OPS.loading && window.ownerApi) loadOperators();
     if(pg === 'money' && window.ownerApi){
+      accDayPaint();
       accRender();
       accFit();
-      if(!EXP.data) loadExpenses().then(accRender);
-      if(!ACC_PERIOD) accLoadSummaries();
+      // День мог смениться на «Обзоре» — свайпом по выручке. Панель учёта
+      // обязана показывать тот же день, а не тот, что загрузили в прошлый раз.
+      if(!ACC_PERIOD || ACC_LOADED_DAY !== accDay()) accLoadSummaries();
+    }
+    // И обратно: день перевели в учёте — «Обзор» должен догнать, а не сидеть
+    // с числами того дня, на котором его оставили.
+    if(pg === 'overview' && window.ownerApi && _ovOff !== DAY_OFFSET
+       && typeof _paintDay === 'function'){
+      _paintDay(document.querySelector('#periodPicker button.on')?.dataset?.p || 'today');
     }
     if(pg === 'more' && window.ownerApi){
       mktRender(); promoBlockRender(); giftBlockRender(); bcastAudience();
@@ -7719,6 +7752,19 @@ function dpApply(){
     _setText('heroPrevLbl', days === 1 ? 'пред. день'
                                        : `пред. ${days} ${pluralize(days,'день','дня','дней')}`);
     _paintDay('month');
+  }
+  // Учёт живёт одним днём, а не отрезком: из выбранного берём начало и просто
+  // встаём на этот день. Календарь здесь — способ уйти дальше, чем удобно
+  // листать пальцем, а не выбрать неделю.
+  if(dpTarget === 'moneyDay'){
+    const т = _bizToday(), в = new Date(dpFrom.getFullYear(), dpFrom.getMonth(), dpFrom.getDate());
+    const off = Math.round((т - в) / 86400000);
+    const chip = document.getElementById('rangeChip-moneyDay');
+    if(chip) chip.style.display = 'none';
+    const cal = document.querySelector('.cal-btn[onclick*="moneyDay"]');
+    if(cal) cal.classList.remove('on');
+    accDaySet(Math.max(0, off));
+    accDayPaint();
   }
   closeDate();
   try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(e){}
@@ -9251,9 +9297,14 @@ function _prefetchDay(p, off){
 
 // Рисуем день: из кэша — сразу, иначе показываем прошлые цифры приглушёнными и
 // подставляем настоящие, когда ответ придёт. Свайп к этому моменту уже прошёл.
+// Какой день сейчас нарисован на «Обзоре». День в приложении общий, и сменить
+// его можно с другой страницы — из учёта; тогда «Обзор» надо перерисовать при
+// возвращении, иначе он останется с числами позавчерашней смены.
+let _ovOff = 0;
 function _paintDay(p){
   const hero = document.querySelector('#pg-overview .hero');
   const stamp = _fkey(p, DAY_OFFSET);
+  _ovOff = DAY_OFFSET;
   const cached = _dayCached(p);
   // Отрисовку страхуем: неполный ответ не должен обрывать остальное — иначе
   // исключение тонет в .then(), прогрев не запускается, а карточка навсегда
@@ -10053,7 +10104,7 @@ async function stkPicker(){
   document.getElementById('stkMid').innerHTML =
     '<div class="stk-empty">Загрузка…</div>';
   let st;
-  try{ st = await ownerApi.ownerFetch('/api/owner/stock/status'); }
+  try{ st = await ownerApi.ownerFetch('/api/owner/stock/status', {params:{day: accDay()}}); }
   catch(e){
     document.getElementById('stkMid').innerHTML =
       '<div class="stk-empty" style="color:var(--dn)">Не удалось загрузить</div>';
@@ -10085,7 +10136,8 @@ async function stkPicker(){
 async function stkLoadMoves(){
   const box = document.getElementById('stkMoves'); if(!box) return;
   let res;
-  try{ res = await ownerApi.ownerFetch('/api/owner/stock/transfers'); }
+  try{ res = await ownerApi.ownerFetch('/api/owner/stock/transfers',
+        {params:{day: accDay()}}); }
   catch(e){ box.innerHTML = '<div class="stk-empty" style="padding:14px">—</div>'; return; }
   STK.moves = res.transfers || [];
   // Переезды сканом сервер сводит в одну строку на позицию: тридцать
@@ -10218,7 +10270,8 @@ async function stkOpen(district){
   let sh;
   // Перемещения листу больше не нужны: их поправка уже посчитана на сервере и
   // стоит в строках, а список переездов живёт на экране районов.
-  try{ sh = await ownerApi.ownerFetch('/api/owner/stock/sheet', {params:{district}}); }
+  try{ sh = await ownerApi.ownerFetch('/api/owner/stock/sheet',
+        {params:{district, day: accDay()}}); }
   catch(e){ return stkPicker(); }
   STK.sheet = sh; STK.view = 'sheet'; STK.showAll = sh.first_time; STK.q = '';
   // Ревизию можно прервать и вернуться: отметки лежат на сервере.
@@ -10857,6 +10910,7 @@ const MOV_V = {
 };
 
 function stkMoveStart(){
+  if(!accAskBack('Перемещение')) return;
   MOV = {to:'', rows:[], total:0};
   stkMovePick();
 }
@@ -10955,7 +11009,7 @@ function movSave(code){
   // бутылке. Возразит — цвет сменится, но это редкий случай.
   qrFlash('ok', 'переехала');
   movQ().push({path:'/api/owner/stock/transfer/scan',
-               body:{code, to: MOV.to, day: (STK.sheet||{}).day || ''}, code});
+               body:{code, to: MOV.to, day: (STK.sheet||{}).day || '', as:_meName()}, code});
 }
 
 function movDone(err, r, job){
@@ -11063,7 +11117,8 @@ async function stkReload(){
   const keep = {};
   (STK.typedIds || []).forEach(id => { keep[id] = STK.vals[id]; });
   let sh;
-  try{ sh = await ownerApi.ownerFetch('/api/owner/stock/sheet', {params:{district:STK.district}}); }
+  try{ sh = await ownerApi.ownerFetch('/api/owner/stock/sheet',
+        {params:{district:STK.district, day: accDay()}}); }
   catch(e){ return; }
   STK.sheet = sh;
   STK.vals = {};
@@ -11226,6 +11281,7 @@ function stkFilter(){ STK.q = document.getElementById('stkSearch').value || ''; 
 
 // ── сохранение ──────────────────────────────────────────────────────────────
 async function stkSubmit(){
+  if(!accAskBack(STK.audit ? 'Ревизия' : 'Пересчёт склада')) return;
   const btn = document.getElementById('stkSaveBtn');
   btn.disabled = true; btn.textContent = 'Сохраняю…';
   // Сохраняем весь район целиком, иначе завтра сравнивать будет не с чем: остаток
@@ -11242,7 +11298,7 @@ async function stkSubmit(){
   let res;
   try{
     res = await ownerApi.ownerFetch('/api/owner/stock/count', {method:'POST',
-      body:{district:STK.district, day:STK.sheet.day, lines,
+      body:{district:STK.district, day:STK.sheet.day, lines, as:_meName(),
             audit: STK.audit, finish: !!STK._finishing}});
   }catch(e){
     btn.disabled = false; btn.textContent = 'Сохранить';
@@ -11403,6 +11459,83 @@ function accFit(){
   box.style.minHeight = место + 'px';
 }
 addEventListener('resize', () => { try{ accFit(); }catch(e){} });
+
+// ── день учёта ──────────────────────────────────────────────────────────────
+// Один день на всё приложение (DAY_OFFSET) — тот же, что листается свайпом по
+// карточке выручки на «Обзоре». Здесь он выбирается окошком, и все разделы
+// учёта открываются именно за него: расходы смены, пересчёт склада,
+// перемещения. Иначе выходило бы, что человек листает на вчера, заходит в
+// расходы и правит сегодняшнюю смену, не заметив этого.
+const ACC_WD = ['вс','пн','вт','ср','чт','пт','сб'];
+function accDay(){ return _dayIsoFor(DAY_OFFSET); }
+function accIsBack(){ return DAY_OFFSET > 0; }   // смотрим прошедший день
+
+function accDayPaint(){
+  const el = document.getElementById('moneyDay'); if(!el) return;
+  const d = _bizToday(); d.setDate(d.getDate() - DAY_OFFSET);
+  const дд = String(d.getDate()).padStart(2,'0') + '.' + String(d.getMonth()+1).padStart(2,'0');
+  _setText('mdName', DAY_OFFSET === 0 ? 'Сегодня' : DAY_OFFSET === 1 ? 'Вчера'
+                   : DAY_OFFSET === 2 ? 'Позавчера' : дд);
+  _setText('mdDate', DAY_OFFSET > 2 ? `${ACC_WD[d.getDay()]} · ${d.getFullYear()}`
+                                    : `${дд}, ${ACC_WD[d.getDay()]}`);
+  const nx = document.getElementById('mdNext'); if(nx) nx.disabled = DAY_OFFSET <= 0;
+  el.classList.toggle('back', DAY_OFFSET > 0);
+}
+
+function accDaySet(off){
+  off = Math.max(0, Math.min(365, off | 0));
+  if(off === DAY_OFFSET) return;
+  DAY_OFFSET = off;
+  accDayPaint();
+  // Цифры на плитках — за выбранный день, иначе окошко говорит одно, а панель
+  // показывает другое.
+  accLoadSummaries();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+function accDayStep(delta){ accDaySet(DAY_OFFSET + delta); }
+// Тап по окошку — сразу на сегодня, с какого бы дня ни зашли.
+function accDayHome(){ if(DAY_OFFSET) accDaySet(0); }
+
+// Свайп по окошку: слева направо — назад во времени, обратно — к сегодня. Тот
+// же жест, что на карточке выручки; двум разным способам листать день учиться
+// незачем.
+(function(){
+  const el = document.getElementById('moneyDay'); if(!el) return;
+  let x0 = null, dx = 0;
+  const win = () => document.getElementById('moneyDayWin');
+  el.addEventListener('touchstart', e => {
+    if(e.touches.length !== 1) return;
+    x0 = e.touches[0].clientX; dx = 0;
+    const w = win(); if(w) w.style.transition = '';
+  }, {passive:true});
+  el.addEventListener('touchmove', e => {
+    if(x0 === null) return;
+    dx = e.touches[0].clientX - x0;
+    // Вперёд из сегодня хода нет — палец упирается в резину, а не уезжает.
+    const d = (dx < 0 && DAY_OFFSET <= 0) ? dx * 0.22 : dx;
+    const w = win(); if(w) w.style.transform = `translateX(${Math.max(-70, Math.min(70, d))}px)`;
+  }, {passive:true});
+  const end = () => {
+    const w = win();
+    if(w){ w.style.transition = 'transform .18s var(--e1)'; w.style.transform = ''; }
+    if(x0 !== null && Math.abs(dx) > 34) accDayStep(dx > 0 ? 1 : -1);
+    x0 = null; dx = 0;
+  };
+  el.addEventListener('touchend', end);
+  el.addEventListener('touchcancel', end);
+})();
+
+// Правка задним числом — всегда с вопросом. Закрытый день уже кто-то видел и
+// по нему считали; изменить его молча, случайным тапом, нельзя. Владельцу об
+// этом уходит сообщение в бот — это делает сервер, здесь только предупреждаем,
+// что оно уйдёт.
+function accAskBack(что){
+  if(!accIsBack()) return true;
+  const d = _bizToday(); d.setDate(d.getDate() - DAY_OFFSET);
+  const дата = `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
+  return confirm(`${что} за ${дата} — это прошедший день, не сегодня.\n\n`
+    + 'Записать? Владельцу уйдёт уведомление о правке.');
+}
 
 // Учёт — страница из одних кнопок, двигать на ней нечего. Одного совпадения
 // высот мало: вебкит всё равно оттягивает страницу под пальцем и отпускает
@@ -11914,12 +12047,15 @@ function promoBlockRender(){
 
 // Сводки для входов тянем разом при открытии вкладки: «загрузка…» на четырёх
 // карточках сразу выглядит хуже, чем секунда ожидания.
+let ACC_LOADED_DAY = null;
 async function accLoadSummaries(){
   const get = (p, params) => ownerApi.ownerFetch(p, params ? {params} : undefined).catch(()=>null);
-  const [per, st, ord, pr, gf, qr, chk, sup] = await Promise.all([
+  const день = accDay();
+  ACC_LOADED_DAY = день;
+  const [per, st, ord, pr, gf, qr, chk, sup, exp] = await Promise.all([
     get('/api/owner/expenses/period', {days:30}),
-    get('/api/owner/stock/status'),
-    get('/api/owner/stock/order'),
+    get('/api/owner/stock/status', {day: день}),
+    get('/api/owner/stock/order', {day: день}),
     get('/api/owner/promo'),
     get('/api/owner/promotions', {days:30}),
     get('/api/owner/qr'),
@@ -11927,7 +12063,11 @@ async function accLoadSummaries(){
     // с первого открытия, а не после того, как человек туда зайдёт.
     get('/api/owner/qr/checks', {days: 30}),
     get('/api/owner/supply'),
+    // Расходы смены тянем прямо сюда: цифра на плитке должна быть за
+    // выбранный день, а не за сегодня, и раздел откроется уже загруженным.
+    get('/api/owner/expenses', {day: день}),
   ]);
+  if(exp){ EXP.data = exp; EXP.day = exp.day; }
   ACC_PERIOD = per; ACC_STOCK = st; ACC_ORDER = ord; ACC_PROMO = pr; ACC_GIFT = gf; ACC_QR = qr;
   if(chk) ACC_CHK = chk;
   if(sup) ACC_SUP = {list: sup.supplies || [],
@@ -12048,7 +12188,7 @@ async function accExpShell(){
 }
 
 async function accExpDay(){
-  await loadExpenses(EXP.day);
+  await loadExpenses(accDay());
   const d = EXP.data, body = document.getElementById('expInner');
   if(!body) return;
   if(!d){ body.innerHTML = '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
@@ -12068,7 +12208,7 @@ async function accOrder(){
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
   document.getElementById('accFoot').innerHTML = '';
   let d;
-  try{ d = await ownerApi.ownerFetch('/api/owner/stock/order'); }
+  try{ d = await ownerApi.ownerFetch('/api/owner/stock/order', {params:{day: accDay()}}); }
   catch(e){ document.getElementById('accMid').innerHTML =
     '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
   ACC_ORDER = d;
@@ -14395,9 +14535,10 @@ function expDop(r, open){
 // Повторный тап по той же кнопке снимает отметку: ошибиться утром легко, а
 // «Вышел» и «Дома» — разные деньги, поэтому откат должен быть в один жест.
 async function expSetWork(driver, working){
+  if(!accAskBack(`Отметка «${driver}»`)) return;
   try{
     const r = await ownerApi.ownerFetch('/api/owner/expenses/working',
-      {method:'POST', body:{day:EXP.day, driver, working}});
+      {method:'POST', body:{day:EXP.day, driver, working, as:_meName()}});
     _expReplace(r.driver);
   }catch(e){ _toast('Не удалось отметить'); }
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
@@ -14410,6 +14551,7 @@ function expToggleForm(driver){
 }
 
 async function expAddExtra(driver){
+  if(!accAskBack('Доп. расход')) return;
   const amount = parseInt((document.getElementById('expAmt')?.value || '').replace(/\D/g,''), 10);
   const comment = (document.getElementById('expCmt')?.value || '').trim();
   // Расход без объяснения через неделю не отличить от опечатки — поэтому
@@ -14417,7 +14559,7 @@ async function expAddExtra(driver){
   if(!amount || !comment){ _toast(!amount ? 'Впишите сумму' : 'Впишите, за что'); return; }
   try{
     const r = await ownerApi.ownerFetch('/api/owner/expenses/extra',
-      {method:'POST', body:{day:EXP.day, driver, amount, comment}});
+      {method:'POST', body:{day:EXP.day, driver, amount, comment, as:_meName()}});
     EXP.open = null;
     _expReplace(r.driver);
     _toast(`${driver}: +${amount} AED`);
@@ -14427,10 +14569,11 @@ async function expAddExtra(driver){
 // Решение по трате водителя. Отклонённая не исчезает: водитель должен видеть,
 // что её рассмотрели, иначе пришлёт ту же ещё раз.
 async function expDecide(driver, id, action){
+  if(!accAskBack('Решение по расходу')) return;
   try{
     const r = await ownerApi.ownerFetch(
       `/api/owner/expenses/extra/${encodeURIComponent(id)}/${action}`,
-      {method:'POST', body:{day:EXP.day, driver}});
+      {method:'POST', body:{day:EXP.day, driver, as:_meName()}});
     _expReplace(r.driver);
     _toast(action === 'approve' ? 'Расход принят' : 'Расход отклонён');
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred(
@@ -14439,10 +14582,11 @@ async function expDecide(driver, id, action){
 }
 
 async function expDelExtra(driver, id){
+  if(!accAskBack('Удаление расхода')) return;
   try{
     const r = await ownerApi.ownerFetch(
       `/api/owner/expenses/extra/${encodeURIComponent(id)}`,
-      {method:'DELETE', params:{day:EXP.day, driver}});
+      {method:'DELETE', params:{day:EXP.day, driver, as:_meName()}});
     _expReplace(r.driver);
   }catch(e){ _toast('Не удалось убрать'); }
 }

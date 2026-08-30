@@ -10129,8 +10129,16 @@ async function stkPicker(){
   _stkHead('Склад', 'загрузка…', false);
   document.getElementById('stkMid').innerHTML =
     '<div class="stk-empty">Загрузка…</div>';
-  let st;
-  try{ st = await ownerApi.ownerFetch('/api/owner/stock/status', {params:{day: accDay()}}); }
+  let st, reg;
+  try{
+    // Реестр кодов — вторым запросом рядом: он отвечает на первый вопрос
+    // склада («сколько бутылок сейчас лежит»), а пересчёт — на второй
+    // («сходится ли»). Ждать их по очереди значит удваивать паузу.
+    [st, reg] = await Promise.all([
+      ownerApi.ownerFetch('/api/owner/stock/status', {params:{day: accDay()}}),
+      ownerApi.ownerFetch('/api/owner/qr').catch(() => null),
+    ]);
+  }
   catch(e){
     document.getElementById('stkMid').innerHTML =
       '<div class="stk-empty" style="color:var(--dn)">Не удалось загрузить</div>';
@@ -10149,10 +10157,44 @@ async function stkPicker(){
     scls:  d.done && !d.short_aed ? 'ok' : (d.done ? 'dn' : ''),
   })).join('');
   document.getElementById('stkMid').innerHTML =
+    stkHave(reg, st.districts) +
     `<div class="dgrid one">${cards}${distMoreTile('stkAudits()', 'История ревизий')}</div>` +
     '<div class="stk-grp">Перемещения между районами</div>' +
     '<div id="stkMoves"><div class="stk-empty" style="padding:14px">Загрузка…</div></div>';
   stkLoadMoves();
+}
+
+// Сколько бутылок лежит на складе прямо сейчас — первое, что должен отвечать
+// раздел. Считаем по реестру кодов: каждая бутылка внесена поштучно, значит
+// известно и сколько их завели, и сколько с тех пор ушло.
+//
+// Ушедшее берём не из кодов, а из доставленных заказов и журнала списаний: на
+// доставке крышки никто не сканирует, и ждать этого от водителя нельзя. Сам
+// код при продаже из базы НЕ исчезает — иначе проверка бутылки однажды скажет
+// «не наша» про бутылку, которая всё это время стояла на полке. Реестр помнит
+// все коды, а счёт ведётся числами.
+function stkHave(reg, districts){
+  if(!reg || !reg.totals) return '';
+  const t = reg.totals, left = reg.left_by_district || {};
+  const по = (districts || []).map(d => `
+    <div class="qd">
+      <span class="qd-code">${escS(d.code || '')}</span>
+      <span class="qd-n">${left[d.id] ? fmt(left[d.id]) : '—'}</span>
+      <span class="qd-s">${escS(d.name || '')}</span>
+    </div>`).join('');
+  return `<div class="qh" style="margin-bottom:10px">
+      <div class="qh-v">${fmt(t.left)}</div>
+      <div class="qh-l">бутылок на складе сейчас</div>
+      <div class="qh-row">
+        <span><i>${fmt(t.active)}</i>внесено</span>
+        <span><i>${fmt(t.sold)}</i>продано</span>
+        <span><i>${fmt(t.written)}</i>списано</span>
+      </div>
+    </div>
+    ${по ? `<div class="qd-grid" style="margin-bottom:12px">${по}</div>` : ''}
+    <div class="stk-note" style="margin-bottom:12px">Считаем по кодам с крышек:
+      внесённые бутылки минус проданные и списанные. Позиции, которые кодами не
+      заводили, сюда не входят — их видно в пересчёте района.</div>`;
 }
 
 // ── перемещения ─────────────────────────────────────────────────────────────
@@ -13135,9 +13177,11 @@ async function accQR(){
     catch(e){ STK.districts = []; }
   }
   const t = d.totals, dist = STK.districts || [];
-  const byD = d.by_district || {};
+  // «Внесено» и «лежит сейчас» — разные числа: между ними продажи. На экране
+  // отвечаем на второй вопрос, первый остаётся строкой ниже.
+  const byD = d.by_district || {}, leftD = d.left_by_district || byD;
   _setText('accSub', t.active
-    ? `${fmt(t.active)} ${pluralize(t.active,'бутылка','бутылки','бутылок')} · ${
+    ? `${fmt(t.left)} ${pluralize(t.left,'бутылка','бутылки','бутылок')} на складе · ${
         d.by_product.length} ${pluralize(d.by_product.length,'позиция','позиции','позиций')}`
     : 'реестр пуст');
 
@@ -13152,20 +13196,20 @@ async function accQR(){
   document.getElementById('accMid').innerHTML = `
     <div class="qwrap">
     <div class="qh">
-      <div class="qh-v">${fmt(t.active)}</div>
-      <div class="qh-l">бутылок в реестре</div>
+      <div class="qh-v">${fmt(t.left)}</div>
+      <div class="qh-l">бутылок на складе сейчас</div>
       <div class="qh-row">
-        <span><i>${d.by_product.length}</i>позиций</span>
+        <span><i>${fmt(t.active)}</i>внесено</span>
         <span><i>${fmt(t.sold)}</i>продано</span>
         <span><i>${fmt(t.written)}</i>списано</span>
       </div>
     </div>
 
-    <div class="scan-sect"><span>По точкам</span></div>
+    <div class="scan-sect"><span>Сейчас по точкам</span></div>
     <div class="qd-grid">${dist.map(x => `
       <div class="qd ${busy[x.id] ? 'busy' : ''}">
         <span class="qd-code">${escS(x.code)}</span>
-        <span class="qd-n">${byD[x.id] ? fmt(byD[x.id]) : '—'}</span>
+        <span class="qd-n">${leftD[x.id] ? fmt(leftD[x.id]) : '—'}</span>
         <span class="qd-s">${busy[x.id] ? 'считают' : escS(x.name)}</span>
       </div>`).join('') || '<div class="scan-empty">Точки не загрузились</div>'}</div>
 
@@ -13565,7 +13609,12 @@ SCANQ.onDone = (err, r, job) => {
     // попасть не должна: иначе остаток вырастет на пустом месте.
     row.state = 'dup'; row.at = String(r.at || '').slice(0,10);
     row.label = r.label || '';
-    qrFlash('dup');
+    row.was = r.product_name || '';
+    // Говорим не только «уже есть», но и чем она записана: бутылку могли
+    // завести под другой позицией, и тогда это не лишний скан, а ошибка,
+    // которую надо увидеть сразу.
+    qrFlash('dup', r.product_name && QR_PROD && r.product_name !== QR_PROD.name
+      ? `уже в реестре: ${r.product_name}` : 'уже в реестре');
   }
   qrRenderFeed();
 };

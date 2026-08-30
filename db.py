@@ -3029,6 +3029,47 @@ async def qr_get(code: str) -> dict | None:
     return d
 
 
+async def qr_move(code: str, frm: str, to: str, tid: str, by: int, at) -> bool:
+    """Переставить бутылку на другой офис. False — её там уже нет.
+
+    Реестр знает каждую бутылку поштучно, и «переехала» для него — это смена
+    офиса у той же записи, а не новая: иначе одна бутылка считалась бы дважды,
+    на старом месте и на новом.
+
+    Офис отправителя стоит в условии, а не только в записи: два человека могут
+    сканировать одну полку одновременно, и вторая попытка перевезти ту же
+    бутылку должна не пройти, а не увезти её со следующего места."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.qr_codes.update_one(
+        {"_id": code, "district": frm},
+        {"$set": {"district": to},
+         "$push": {"moves": {"from": frm, "to": to, "at": at, "by": by,
+                             "transfer": tid}}})
+    return r.matched_count > 0
+
+
+async def qr_move_undo(code: str, tid: str = "") -> dict | None:
+    """Вернуть бутылку туда, откуда её только что перевезли.
+
+    Отменяем только последний переезд и только если бутылка всё ещё там, куда
+    он её поставил: иначе отмена перечеркнула бы чужой, более поздний. tid —
+    когда отменяют не «последнее», а конкретную запись перемещения: если
+    последний переезд бутылки уже другой, отменять нечего."""
+    db = _db_or_none()
+    if db is None: return None
+    d = await db.qr_codes.find_one({"_id": code}, {"moves": 1, "district": 1})
+    last = ((d or {}).get("moves") or [])[-1:]
+    if not last: return None
+    last = last[0]
+    if (d.get("district") or "") != (last.get("to") or ""): return None
+    if tid and str(last.get("transfer") or "") != str(tid): return None
+    await db.qr_codes.update_one(
+        {"_id": code}, {"$set": {"district": last.get("from") or ""},
+                        "$pop": {"moves": 1}})
+    return last
+
+
 async def biz_greeted(telegram_id: int) -> bool:
     """Здоровались ли уже с этим человеком от имени бизнес-аккаунта.
 
@@ -3203,10 +3244,12 @@ async def get_stock_counts_for_day(day: str) -> list:
     return await db.stock_counts.find({"day": day}, {"_id": 0, "lines": 0}).to_list(length=50)
 
 
-async def add_stock_transfer(doc: dict):
+async def add_stock_transfer(doc: dict) -> str:
+    """Записать перемещение. Возвращает id — по нему его потом отменяют."""
     db = _db_or_none()
-    if db is None: return
-    await db.stock_transfers.insert_one(dict(doc))
+    if db is None: return ""
+    r = await db.stock_transfers.insert_one(dict(doc))
+    return str(r.inserted_id)
 
 
 async def delete_stock_transfer(tid: str) -> bool:
@@ -3223,9 +3266,22 @@ async def delete_stock_transfer(tid: str) -> bool:
 
 
 async def get_stock_transfers(day: str) -> list:
+    # Потолок высокий не для красоты: перемещение сканом — это строка на каждую
+    # бутылку, и день большого переезда легко даёт их сотни. Недобранные строки
+    # тихо испортили бы пересчёт обоим районам.
     db = _db_or_none()
     if db is None: return []
-    return await db.stock_transfers.find({"day": day}).to_list(length=500)
+    return await db.stock_transfers.find({"day": day}).to_list(length=5000)
+
+
+async def get_stock_transfer(tid: str) -> dict | None:
+    from bson import ObjectId
+    db = _db_or_none()
+    if db is None: return None
+    try:
+        return await db.stock_transfers.find_one({"_id": ObjectId(tid)})
+    except Exception:
+        return None
 
 
 async def get_stock_norms() -> dict:

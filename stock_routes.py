@@ -67,6 +67,26 @@ def _days_between(day_a: str, day_b: str):
     return max(0, (b - a).days)
 
 
+def _moves_by_pid(moves: list, district: str) -> dict:
+    """{product_id: сколько прибавилось району за день перемещениями}.
+
+    Складываем сырые количества и округляем один раз в конце: перемещение
+    сканом идёт по бутылке, а у пива в единице учёта их двадцать четыре, и
+    построчное округление стёрло бы каждую в ноль."""
+    raw = {}
+    for m in moves:
+        pid = m.get("product_id")
+        try:
+            q = float(m.get("qty") or 0)
+        except (TypeError, ValueError):
+            continue
+        if not pid or not q:
+            continue
+        if m.get("from") == district: raw[pid] = raw.get(pid, 0) - q
+        if m.get("to")   == district: raw[pid] = raw.get(pid, 0) + q
+    return {pid: _round_step(v) for pid, v in raw.items() if _round_step(v)}
+
+
 async def _last_checked(district: str, day: str) -> dict:
     """{product_id: дата последней РУЧНОЙ проверки}.
 
@@ -185,6 +205,21 @@ async def _registry_was(district: str, day: str) -> dict:
                 out[pid] -= n / _unit(cat.get(pid) or {})
     except Exception as e:
         log.warning(f"[stock] списания в реестре не учтены ({district}): {e}")
+    # Переезды сканом реестр показывает сразу: бутылка уже числится на новом
+    # офисе. Но лист прибавит их ещё раз, отдельной строкой «перемещения», —
+    # поэтому сегодняшние из отправной точки вычитаем. Вчерашние оставляем:
+    # они и есть часть того, что лежит на полке к началу суток.
+    try:
+        for m in await db.get_stock_transfers(day):
+            if (m.get("src") or "") != "qr":
+                continue
+            pid, q = m.get("product_id"), float(m.get("qty") or 0)
+            if not pid or not q:
+                continue
+            if m.get("to")   == district: out[pid] = out.get(pid, 0) - q
+            if m.get("from") == district: out[pid] = out.get(pid, 0) + q
+    except Exception as e:
+        log.warning(f"[stock] переезды сканом в реестре не учтены ({district}): {e}")
     return {pid: max(0, _round_step(v)) for pid, v in out.items() if v > 0}
 
 
@@ -504,15 +539,11 @@ async def handle_sheet(request):
     last_checked = await _last_checked(district, day)
 
     # Перемещения: ушедшее из района вычитаем, пришедшее прибавляем.
-    move_by_pid = {}
-    for m in moves:
-        pid, q = m.get("product_id"), _round_step(m.get("qty") or 0)
-        if not pid or not q:
-            continue
-        if m.get("from") == district:
-            move_by_pid[pid] = move_by_pid.get(pid, 0) - q
-        if m.get("to") == district:
-            move_by_pid[pid] = move_by_pid.get(pid, 0) + q
+    #
+    # Округляем сумму, а не каждую строку: бутылку пива возят по одной, а
+    # считают ящиками — двадцать четыре отдельных переезда по 1/24 ящика при
+    # построчном округлении дали бы двадцать четыре нуля вместо ящика.
+    move_by_pid = _moves_by_pid(moves, district)
 
     rows = []
     for pid, p in cat.items():
@@ -604,13 +635,7 @@ async def handle_save(request):
     moves = await db.get_stock_transfers(day)
     cat = _catalog()
 
-    mv_by = {}
-    for m in moves:
-        pid, q = m.get("product_id"), _round_step(m.get("qty") or 0)
-        if not pid or not q:
-            continue
-        if m.get("from") == district: mv_by[pid] = mv_by.get(pid, 0) - q
-        if m.get("to")   == district: mv_by[pid] = mv_by.get(pid, 0) + q
+    mv_by = _moves_by_pid(moves, district)
 
     is_audit = bool(body.get("audit"))
     finish = bool(body.get("finish"))
@@ -734,23 +759,162 @@ async def handle_transfer(request):
     return web.json_response({"ok": True, **doc}, headers=CORS_HEADERS)
 
 
+# ── перемещение сканом ───────────────────────────────────────────────────────
+# Бутылку возят по одной, и в руках у человека не список позиций, а сама
+# бутылка. Поэтому позицию не выбирают: код на крышке уже знает, что это за
+# товар и на каком офисе он числится, — остаётся сказать, куда переезжает.
+# Один скан = одна бутылка.
+#
+# Пишем в две книги сразу, и обе обязательны:
+#   • реестр кодов — там бутылка меняет офис, иначе ревизия на новом месте
+#     скажет «числится на B2», а на старом будет вечно её ждать;
+#   • перемещения — оттуда пересчёт берёт поправку к ожидаемому остатку,
+#     иначе переезд выглядел бы недостачей у одного и излишком у другого.
+MOVE_SAY = {
+    "unknown":  "нет в реестре",
+    "written":  "была списана",
+    "sold":     "ушла с заказом",
+    "same":     "уже здесь",
+    "nohome":   "офис не указан",
+    "no_item":  "нет в каталоге",
+    "busy":     "её уже перевезли",
+}
+
+
+def _move_reply(verdict: str, **extra):
+    return web.json_response({"ok": verdict == "ok", "verdict": verdict,
+                              "say": MOVE_SAY.get(verdict, ""), **extra},
+                             headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_transfer_scan(request):
+    """Перевезти одну бутылку по коду с крышки. body: {code, to, day?}
+
+    Отказ — не ошибка запроса, а ответ про бутылку: списанную и уже уехавшую
+    камера ловит так же легко, как обычную, и человеку надо сказать словами,
+    что с ней не так, а не показать красный сбой."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    code = str(body.get("code") or "").strip()
+    dst = str(body.get("to") or "").strip()
+    if not code:
+        return web.json_response({"error": "no_code"}, status=400, headers=CORS_HEADERS)
+    if dst not in OFFICE_IDS:
+        return web.json_response({"error": "bad_districts"}, status=400, headers=CORS_HEADERS)
+
+    doc = await db.qr_get(code)
+    if not doc:
+        return _move_reply("unknown", code=code)
+    name = doc.get("product_name") or ""
+    label = doc.get("label") or ""
+    st = (doc.get("status") or "active").strip()
+    if st in ("written", "sold"):
+        return _move_reply(st, code=code, name=name, label=label)
+    src = (doc.get("district") or "").strip()
+    if src == dst:
+        return _move_reply("same", code=code, name=name, label=label,
+                           **{"from": src, "from_code": OFFICE_CODES.get(src, "")})
+    if src not in OFFICE_IDS:
+        return _move_reply("nohome", code=code, name=name, label=label)
+    pid = str(doc.get("product_id") or "")
+    p = _catalog().get(pid)
+    if not p:
+        return _move_reply("no_item", code=code, name=name, label=label)
+
+    # Количество — в учётных единицах позиции: бутылка крепкого это единица, а
+    # бутылка пива — двадцать четвёртая часть ящика. Не округляем: округлит
+    # лист, сложив все переезды позиции за день.
+    qty = 1 / _unit(p)
+    day = str(body.get("day") or "").strip() or _biz_day()
+    at = datetime.now(timezone.utc).isoformat()
+    tid = await db.add_stock_transfer(
+        {"day": day, "from": src, "to": dst, "product_id": pid,
+         "product_name": p.get("name", ""), "qty": qty, "src": "qr", "code": code,
+         "by": request["owner_id"], "at": at})
+    if not await db.qr_move(code, src, dst, tid, request["owner_id"], at):
+        # Бутылку успели перевезти между чтением и записью — поправку к остатку
+        # оставлять нельзя, иначе она уедет дважды.
+        await db.delete_stock_transfer(tid)
+        return _move_reply("busy", code=code, name=name, label=label)
+    log.info(f"[stock] переезд по коду {code}: {src} → {dst} ({pid})")
+    return _move_reply("ok", code=code, name=p.get("name", "") or name, label=label,
+                       transfer_id=tid, bottles=1, to=dst,
+                       to_code=OFFICE_CODES.get(dst, ""),
+                       **{"from": src, "from_code": OFFICE_CODES.get(src, "")})
+
+
+@require_owner
+async def handle_transfer_scan_undo(request):
+    """Отменить последний переезд бутылки. body: {code}
+
+    Рука быстрее головы: не ту бутылку поднесли к камере — и это должно
+    отменяться там же, где случилось, а не поиском строки в списке."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    code = str(body.get("code") or "").strip()
+    if not code:
+        return web.json_response({"error": "no_code"}, status=400, headers=CORS_HEADERS)
+    last = await db.qr_move_undo(code)
+    if not last:
+        return web.json_response({"error": "not_moved"}, status=404, headers=CORS_HEADERS)
+    if last.get("transfer"):
+        await db.delete_stock_transfer(str(last["transfer"]))
+    log.info(f"[stock] переезд отменён {code}: назад на {last.get('from')}")
+    return web.json_response({"ok": True, "code": code,
+                              "to": last.get("from") or ""}, headers=CORS_HEADERS)
+
+
 @require_owner
 async def handle_transfer_delete(request):
-    """Убрать перемещение, введённое по ошибке."""
+    """Убрать перемещение, введённое по ошибке.
+
+    У переезда сканом две записи — поправка к остатку и офис бутылки в
+    реестре. Убирать одну и оставлять другую нельзя: бутылка так и осталась бы
+    числиться на новом месте, а ожидаемый остаток вернулся бы к старому."""
     tid = (request.match_info.get("tid") or "").strip()
+    doc = await db.get_stock_transfer(tid) or {}
+    if (doc.get("src") or "") == "qr" and doc.get("code"):
+        await db.qr_move_undo(str(doc["code"]), tid)
     ok = await db.delete_stock_transfer(tid)
     return web.json_response({"ok": ok}, status=200 if ok else 404, headers=CORS_HEADERS)
 
 
 @require_owner
 async def handle_transfers(request):
+    """Что сегодня перевозили. Переезды сканом — одной строкой на позицию.
+
+    Скан пишет строку на каждую бутылку: это правда учёта, но не то, что
+    человек хочет читать. Тридцать одинаковых строк «B1 → B3» — это «перевезли
+    тридцать бутылок», и показывать надо так."""
     day = (request.query.get("day") or "").strip() or _biz_day()
-    rows = await db.get_stock_transfers(day)
+    rows, groups, out = await db.get_stock_transfers(day), {}, []
     for r in rows:
         r["id"] = str(r.pop("_id", ""))
         r["from_name"] = OFFICE_NAMES.get(r.get("from"), r.get("from"))
         r["to_name"] = OFFICE_NAMES.get(r.get("to"), r.get("to"))
-    return web.json_response({"day": day, "transfers": rows}, headers=CORS_HEADERS)
+        if (r.get("src") or "") != "qr":
+            r["ids"] = [r["id"]]
+            r["bottles"] = 0
+            out.append(r)
+            continue
+        key = (r.get("from"), r.get("to"), r.get("product_id"))
+        g = groups.get(key)
+        if not g:
+            g = dict(r, ids=[], bottles=0, qty=0.0, id="")
+            groups[key] = g
+            out.append(g)
+        g["ids"].append(r["id"])
+        g["bottles"] += 1
+        g["qty"] = round(g["qty"] + float(r.get("qty") or 0), 4)
+    for g in out:
+        if g.get("bottles"):
+            g["qty"] = _num(g["qty"])
+    return web.json_response({"day": day, "transfers": out}, headers=CORS_HEADERS)
 
 
 # ── заявка ───────────────────────────────────────────────────────────────────
@@ -1647,6 +1811,8 @@ def setup(app):
         ("/api/owner/stock/audit/scan/reset", handle_audit_scan_reset, "POST"),
         ("/api/owner/stock/count",     handle_save,      "POST"),
         ("/api/owner/stock/transfer",  handle_transfer,  "POST"),
+        ("/api/owner/stock/transfer/scan",      handle_transfer_scan,      "POST"),
+        ("/api/owner/stock/transfer/scan/undo", handle_transfer_scan_undo, "POST"),
         ("/api/owner/stock/norm",      handle_set_norm,  "POST"),
         ("/api/owner/stock/norms",      handle_norms,     "GET"),
         ("/api/owner/stock/norm/reset", handle_norm_reset, "POST"),

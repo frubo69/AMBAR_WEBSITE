@@ -13958,7 +13958,7 @@ async function qrDelSave(code){
   qrDelRenderFeed();
   try{
     const r = await ownerApi.ownerFetch('/api/owner/qr/drop',
-      {method:'POST', body:{code}});
+      {method:'POST', body:{code, as: _meName()}});
     row.state = 'gone'; row.label = r.label || ''; row.name = r.product_name || '';
     row.district = r.district || ''; row.story = r.story || []; row.was = r.was || '';
     qrFlash('ok', 'убрана из реестра');

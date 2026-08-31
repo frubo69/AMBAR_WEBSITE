@@ -411,6 +411,87 @@ async def _story(doc: dict) -> list:
     return out
 
 
+# ── сообщение владельцу об убранных бутылках ────────────────────────────────
+# Бутылка, вычеркнутая из реестра, — это минус в остатке, сделанный руками и
+# без бумаги. Владелец должен об этом узнать, как и о правке закрытого дня.
+#
+# Но не по сообщению на каждый скан: полку чистят подряд, и десяток бутылок
+# превратился бы в десяток сообщений — а первое из них ушло бы раньше, чем
+# человек успел нажать крестик и вернуть бутылку назад. Поэтому копим и шлём
+# одним письмом через полминуты тишины; возврат за это время просто вынимает
+# строку из письма.
+DROP_QUIET = 25                       # секунд тишины до отправки
+_DROPS: dict = {}                     # кто убирал → накопленное
+
+
+def _plural(n, one, few, many) -> str:
+    n = abs(int(n or 0)) % 100
+    d = n % 10
+    if 10 < n < 20: return many
+    if 1 < d < 5:   return few
+    if d == 1:      return one
+    return many
+
+
+async def _drop_send(me: int) -> None:
+    try:
+        await asyncio.sleep(DROP_QUIET)
+    except asyncio.CancelledError:
+        return
+    st = _DROPS.pop(me, None)
+    if not st or not st["items"]:
+        return
+    try:
+        from owner_routes import notify_owners_force, _md
+    except Exception as e:                       # noqa: BLE001
+        log.error(f"[qr] сообщение об удалении не отправлено: {e}")
+        return
+    from config_offices import OFFICE_CODES, OFFICE_NAMES
+    n = len(st["items"])
+    строки = [
+        "*Убрано из реестра*",
+        f"{_md(st['who'])} убрал {n} "
+        + _plural(n, "бутылку", "бутылки", "бутылок"),
+        "",
+    ]
+    for it in st["items"][:30]:
+        d = it.get("district") or ""
+        где = f"{OFFICE_CODES.get(d, '')} {OFFICE_NAMES.get(d, '')}".strip() or d
+        часть = [it.get("product_name") or "позиция не указана"]
+        if it.get("label"): часть.append(it["label"])
+        if где: часть.append(где)
+        if it.get("was") == "written": часть.append("была списана")
+        строки.append("• " + _md(" · ".join(часть)))
+    if n > 30:
+        строки.append(f"…и ещё {n - 30}")
+    try:
+        await notify_owners_force("qr.dropped", "\n".join(строки))
+    except Exception as e:                       # noqa: BLE001
+        log.error(f"[qr] сообщение об удалении не ушло: {e}")
+
+
+def _drop_note(me: int, who: str, item: dict) -> None:
+    st = _DROPS.setdefault(me, {"who": "—", "items": [], "task": None})
+    if who:
+        st["who"] = who
+    st["items"].append(item)
+    if st["task"]:
+        st["task"].cancel()
+    st["task"] = asyncio.create_task(_drop_send(me))
+
+
+def _drop_forget(me: int, code: str) -> None:
+    """Бутылку вернули — вычёркиваем её из ещё не ушедшего письма."""
+    st = _DROPS.get(me)
+    if not st:
+        return
+    st["items"] = [x for x in st["items"] if x.get("code") != code]
+    if not st["items"]:
+        if st["task"]:
+            st["task"].cancel()
+        _DROPS.pop(me, None)
+
+
 @require_owner
 async def handle_drop(request):
     """Убрать бутылку из реестра по её коду.
@@ -432,6 +513,11 @@ async def handle_drop(request):
             {"error": "already_deleted" if old else "unknown_code", "code": code},
             status=404, headers=CORS_HEADERS)
     log.info(f"[qr] убрана из реестра {doc.get('label') or code}")
+    _drop_note(request.get("owner_id") or 0, str(body.get("as") or "").strip()[:40],
+               {"code": code, "label": doc.get("label") or "",
+                "product_name": doc.get("product_name") or "",
+                "district": doc.get("district") or "",
+                "was": doc.get("status") or ""})
     return web.json_response({
         "ok": True, "code": code,
         "label": doc.get("label") or "",
@@ -457,6 +543,7 @@ async def handle_drop_undo(request):
     ok = await db.qr_drop_undo(code)
     if ok:
         log.info(f"[qr] удаление отменено {code}")
+        _drop_forget(request.get("owner_id") or 0, code)
     return web.json_response({"ok": ok, "code": code}, headers=CORS_HEADERS)
 
 

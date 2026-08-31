@@ -437,7 +437,12 @@ a.oc-row:active{background:var(--card2)}
 .acc-x:active{transform:scale(.92)}
 .acc-sub{font-size:12.5px;font-weight:600;color:var(--muted);margin-top:2px}
 .acc-l{font-size:10px;font-weight:700;letter-spacing:1.3px;text-transform:uppercase;
-  color:var(--muted);margin:17px 0 8px}
+  color:var(--muted);margin:16px 0 8px}
+/* Поле даты — той же строкой, что дни над ним: раньше оно было голым инпутом
+   другой высоты и другого цвета. */
+#dayInput{width:100%;box-sizing:border-box;padding:13px 14px;border-radius:var(--r2);
+  font-family:inherit;font-size:14px;font-weight:600;color:var(--text);
+  background:var(--card2);border:1px solid var(--border2)}
 /* Водители строками по районам: код слева, имена справа. Свой район —
    первым и ярче. */
 .acc-row{display:flex;gap:9px;align-items:flex-start;margin-top:7px}
@@ -1312,12 +1317,26 @@ body.safe-open .cvo-hdr{opacity:0}
 .call-cbtn.mute{background:var(--bg2);border:1px solid var(--border3);color:var(--sub)}
 .call-cbtn.mute.on{background:rgba(201,169,110,.15);border-color:rgba(201,169,110,.45);color:var(--gold)}
 @keyframes callBlink{50%{opacity:.45}}
-.sheet{background:var(--bg3);border:1px solid var(--border3);border-radius:20px;padding:22px;
-  width:min(420px,92vw);box-shadow:0 24px 80px rgba(0,0,0,.7);margin:auto;flex-shrink:0}
-.sheet .t{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;margin-bottom:6px}
-.sheet .s{font-size:13px;color:var(--sub);line-height:1.5;margin-bottom:16px}
-.sheet .btns{display:flex;gap:10px}
-.sbtn{flex:1;padding:14px;border-radius:var(--r2);font-size:14px;font-weight:700;background:var(--card2);border:1px solid var(--border2)}
+/* ── Диалог ─────────────────────────────────────────────────────────────────
+   Одна сетка отступов на все окна: 20 по краям, 14 между заголовком и телом,
+   18 перед кнопками, 8 между строками списка. Раньше каждое окно набирало
+   поля само — 4 тут, 16 там, — и два соседних блока стояли на разной высоте
+   без всякой причины.
+   Окно не выше 88% экрана и прокручивается внутри себя: карточка, не
+   помещающаяся в телефон, обрезалась молча. */
+.sheet{background:var(--bg3);border:1px solid var(--border3);border-radius:20px;padding:20px;
+  width:min(420px,92vw);max-height:88vh;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  box-shadow:0 24px 80px rgba(0,0,0,.7);margin:auto;flex-shrink:0}
+.sheet .t{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;
+  letter-spacing:-.2px;margin:0 0 14px}
+/* Описание — только там, где оно что-то сообщает. Объяснять словами то, что
+   видно на экране, значит заставлять читать одно и то же каждый раз. */
+.sheet .s{font-size:12.5px;color:var(--sub);line-height:1.5;margin:-8px 0 16px}
+.sheet .btns{display:flex;gap:10px;margin-top:18px}
+.sbtn{flex:1;padding:13px;border-radius:var(--r2);font-size:14px;font-weight:700;
+  background:var(--card2);border:1px solid var(--border2);cursor:pointer;
+  font-family:inherit;color:var(--text);transition:.12s}
+.sbtn:active{transform:scale(.98)}
 
 /* Конец смены. Строка района — итог дня и одно действие. Закрытая гаснет:
    по ней уже нечего делать, а разбирать список глазами придётся ещё не раз. */
@@ -1461,10 +1480,19 @@ body.safe-open .cvo-hdr{opacity:0}
 .sh-ch.on{color:#0f2e1c;background:#3ddc84}
 .sh-ch.off{color:var(--text);background:var(--card3)}
 .sh-none{margin-top:10px;font-size:12px;color:var(--muted)}
-.sh-log-b{width:100%;margin-top:4px;padding:12px;border-radius:var(--r2);
-  font-family:inherit;font-size:12.5px;font-weight:700;cursor:pointer;color:var(--sub);
-  background:var(--card2);border:1px solid var(--border2)}
-.sh-log-b:active{transform:scale(.98)}
+/* Выбор дня: строка на день, подпись слева, день недели справа. Список ровный,
+   без чипов разной ширины и без дат, повторяющих сами себя. */
+.dsel{display:flex;flex-direction:column;gap:8px}
+.dsel-r{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  width:100%;padding:13px 14px;border-radius:var(--r2);cursor:pointer;
+  font-family:inherit;font-size:14px;font-weight:600;color:var(--text);
+  background:var(--card2);border:1px solid var(--border2);transition:.12s}
+.dsel-r:active{transform:scale(.99)}
+.dsel-r.on{color:var(--gold2);background:var(--gold-soft);
+  border-color:rgba(201,169,110,.42)}
+.dsel-r i{font-style:normal;font-size:11px;font-weight:600;color:var(--muted);
+  letter-spacing:.3px}
+.dsel-r.on i{color:var(--gold2);opacity:.75}
 /* Журнал: день — заголовок, событие — строка. */
 /* ── ЖУРНАЛ СМЕН ────────────────────────────────────────────────────────────
    Это лента событий, а не список карточек. Раньше каждая строка была отдельной
@@ -2149,14 +2177,15 @@ body.safe-open .cvo-hdr{opacity:0}
 <div class="ov" id="shiftOv">
   <div class="sheet">
     <div class="t">Смена</div>
-    <div class="s">Открывается и закрывается по району. Пока смена не открыта,
-      заказы обрабатывать нельзя — смотреть можно всё. После закрытия продажи
-      дня считаются окончательными, и по ним программа соберёт заявку.</div>
     <div id="shiftList"><div class="acc-sub">Загрузка…</div></div>
-    <button class="sh-log-b" onclick="shLogOpen()">История смен</button>
-    <!-- «Готово», а не «Закрыть»: рядом три кнопки «Закрыть смену», и четвёртая
-         с тем же словом означала бы совсем другое. -->
-    <div class="btns"><button class="sbtn" onclick="hideOv('shiftOv')">Готово</button></div>
+    <!-- «Готово», а не «Закрыть»: рядом кнопки «Закрыть смену», и четвёртая с
+         тем же словом означала бы совсем другое. Обе кнопки — одной строкой и
+         одного роста: раньше «История смен» висела отдельной плашкой на четыре
+         пикселя выше, и низ окна выглядел собранным из двух разных окон. -->
+    <div class="btns">
+      <button class="sbtn" onclick="shLogOpen()">История смен</button>
+      <button class="sbtn go" onclick="hideOv('shiftOv')">Готово</button>
+    </div>
   </div>
 </div>
 
@@ -2168,7 +2197,6 @@ body.safe-open .cvo-hdr{opacity:0}
 <div class="ov" id="shLogOv">
   <div class="sheet wide">
     <div class="t">История смен</div>
-    <div class="s">Кто открыл, кого отметил, кто закрыл и с каким итогом</div>
     <div id="shLogBody" style="max-height:62vh;overflow-y:auto"></div>
     <div class="btns" style="margin-top:14px">
       <button class="sbtn" onclick="hideOv('shLogOv')">Закрыть</button>
@@ -2191,16 +2219,13 @@ body.safe-open .cvo-hdr{opacity:0}
 <!-- заполнение смены задним числом -->
 <div class="ov" id="dayOv">
   <div class="sheet">
-    <div class="t">За какой день заполняем</div>
-    <div class="acc-sub">Заказ за прошедший день сразу числится доставленным —
-      принимать и назначать по нему нечего.</div>
-    <div class="acc-l">День</div>
-    <div id="dayList"></div>
+    <div class="t">За какой день</div>
+    <div id="dayList" class="dsel"></div>
     <div class="acc-l">Другая дата</div>
     <input type="date" id="dayInput" onchange="dayPick(this.value)">
-    <div class="btns" style="margin-top:14px">
+    <div class="btns">
       <button class="sbtn" onclick="hideOv('dayOv')">Отмена</button>
-      <button class="sbtn go" onclick="dayPick('')">Вернуться к сегодня</button>
+      <button class="sbtn go" onclick="dayPick('')">К сегодня</button>
     </div>
   </div>
 </div>
@@ -4665,9 +4690,13 @@ function dayOpen(){
   for(let i=0;i<10;i++){
     const iso=_isoDay(i);
     const lbl = i===0 ? 'Сегодня' : (i===1 ? 'Вчера' : _dayName(iso));
-    list.push(`<button class="dchip ${(!BACK_DAY&&i===0)||BACK_DAY===iso?'on':''}"
-      style="width:100%;justify-content:flex-start;margin-bottom:6px"
-      onclick="dayPick('${i===0?'':iso}')">${lbl}<i>${iso.slice(8)}.${iso.slice(5,7)}</i></button>`);
+    // Слева день, справа день недели. Раньше подпись и дата стояли встык
+    // («Сегодня31.08»), а у дальних дней дата повторялась дважды: «29 августа,
+    // Сб» и рядом «29.08».
+    const день = i < 2 ? lbl : _dayName(iso).replace(/,.*$/, '');
+    const wd = ['вс','пн','вт','ср','чт','пт','сб'][new Date(iso).getDay()];
+    list.push(`<button class="dsel-r ${(!BACK_DAY&&i===0)||BACK_DAY===iso?'on':''}"
+      onclick="dayPick('${i===0?'':iso}')"><span>${день}</span><i>${wd}</i></button>`);
   }
   $('dayList').innerHTML=list.join('');
   $('dayInput').max=_isoDay(0); $('dayInput').min=_isoDay(30);

@@ -103,6 +103,19 @@ def _star_name(uid: int) -> str:
     return STAR_NAMES.get(uid) or _STAR_SEEN.get(uid) or "AMBAR STAR"
 
 
+# Человек сменил имя, а журнал звонков остался на прежнем адресе: ключ — это
+# адрес, и переписывать его в записях нельзя, иначе «перезвонить» из истории
+# позвонит в пустоту. Поэтому меняем только то, что видно: старый ключ
+# показывается новым именем. Список живёт в окружении (CALL_KEY_ALIASES вида
+# «старое=новое,ещё=новое»), а не в коде: репозиторий открытый, и имена
+# сотрудников в нём лежать не обязаны.
+KEY_ALIASES = {}
+for _p in os.getenv("CALL_KEY_ALIASES", "").split(","):
+    _a, _, _b = _p.partition("=")
+    if _a.strip() and _b.strip():
+        KEY_ALIASES[_a.strip()] = _b.strip()
+
+
 def _имя_ключа(key: str) -> str:
     """Как назвать человека на экране, зная только его адрес.
 
@@ -116,7 +129,7 @@ def _имя_ключа(key: str) -> str:
     kind, _, ident = key.partition(":")
     if kind == "star" and str(ident).isdigit():
         return _star_name(int(ident))
-    return ident or "—"
+    return KEY_ALIASES.get(ident, ident) or "—"
 
 
 

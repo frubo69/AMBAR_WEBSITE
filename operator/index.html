@@ -507,6 +507,36 @@ a.oc-row:active{background:var(--card2)}
 .wh-x{margin-left:auto;width:34px;height:34px;flex:0 0 auto;border-radius:10px;
   background:var(--card2);border:1px solid var(--border2);font-size:15px;color:var(--sub)}
 .wh-list{flex:1;overflow-y:auto;padding:0 12px 12px}
+/* Карточка выбранного водителя и метка скрытого режима. Красное здесь одно
+   на весь экран и мигает: это единственное состояние, ради которого локатор
+   открывают срочно. */
+.wh-card{margin:8px 0 10px;padding:13px;border-radius:14px;background:var(--card);
+  border:1px solid var(--border2)}
+.wh-card.panic{border-color:rgba(224,85,85,.45);background:rgba(224,85,85,.06)}
+.wh-card-h{display:flex;align-items:center;gap:9px;margin-bottom:11px}
+.wh-card-n{font-size:15px;font-weight:700}
+.wh-card-sos{font-size:9.5px;font-weight:800;letter-spacing:.6px;text-transform:uppercase;
+  color:var(--dn);background:rgba(224,85,85,.14);border:1px solid rgba(224,85,85,.35);
+  border-radius:999px;padding:2px 8px}
+.wh-card-g{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.wh-card-g span{display:flex;flex-direction:column;gap:2px;min-width:0}
+.wh-card-g b{font-size:14px;font-weight:700;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.wh-card-g i{font-style:normal;font-size:9px;font-weight:600;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--muted)}
+.wh-card-s{margin-top:10px;font-size:11.5px;color:var(--muted)}
+.wh-card-go{width:100%;margin-top:11px;padding:11px;border-radius:11px;cursor:pointer;
+  font-family:inherit;font-size:13px;font-weight:700;color:#fff;
+  background:linear-gradient(135deg,#c94b4b,#e05555);border:none}
+.wh-card-go:active{transform:scale(.98)}
+.wh-card-go.off{color:var(--text);background:var(--card2);border:1px solid var(--border3)}
+.wh-r.panic{border-color:rgba(224,85,85,.4);background:rgba(224,85,85,.07)}
+.wh-r.panic .wh-n u{color:var(--dn)}
+.wh-sos{display:block;width:11px;height:11px;border-radius:50%;background:var(--dn);
+  animation:whSos 1.1s ease-in-out infinite}
+@keyframes whSos{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(224,85,85,.55)}
+  50%{opacity:.35;box-shadow:0 0 0 7px rgba(224,85,85,0)}}
+@media (prefers-reduced-motion: reduce){.wh-sos{animation:none}}
 .wh-note{padding:12px 18px 16px;font-size:11px;line-height:1.45;color:var(--dim);
   border-top:1px solid var(--border2)}
 .wh-map{flex:1;min-width:0;position:relative;background:#0b0e18}
@@ -4461,11 +4491,13 @@ function whRow(r, trackOn){
   else if(st === 'snap')   state = `<u>был здесь ${whAgo(r.age)}</u>`;
   else if(r.stream)        state = 'трансляция идёт, точки нет ' + whAgo(r.age).replace(' назад', '');
   else                     state = 'молчит ' + whAgo(r.age).replace(' назад', '');
-  return `<button class="wh-r ${cls}${WH.sel === r.driver ? ' on' : ''}"
+  return `<button class="wh-r ${cls}${WH.sel === r.driver ? ' on' : ''}${
+            r.panic ? ' panic' : ''}"
           onclick="whPick('${_esc(r.driver)}')">
-    <span class="wh-i">${st === 'stream' ? IC_LIVE : (st === 'snap' ? IC_SNAP : IC_OFF)}</span>
+    <span class="wh-i">${r.panic ? '<i class="wh-sos"></i>'
+      : (st === 'stream' ? IC_LIVE : (st === 'snap' ? IC_SNAP : IC_OFF))}</span>
     <span class="wh-b">
-      <span class="wh-n">${_esc(r.driver)}<u>${_esc(where)}</u></span>
+      <span class="wh-n">${_esc(r.driver)}<u>${r.panic ? 'скрытый режим' : _esc(where)}</u></span>
       <span class="wh-s">${state}${trackOn ? ' <i>· маршрут на карте</i>' : ''}</span>
     </span>
     <span class="wh-w">
@@ -4492,7 +4524,8 @@ function whPaint(){
       <span class="ok"><b>${live}</b><i>на связи</i></span>
       <span class="${snap ? '' : 'dim'}"><b>${snap}</b><i>недавно</i></span>
       <span class="${work ? '' : 'dim'}"><b>${work}</b><i>${plural(work,'заказ','заказа','заказов')} в пути</i></span>
-    </div>` + rows.map(r => whRow(r, WH.sel === r.driver && trackOn)).join('')
+    </div>` + whCard(rows.find(r => r.driver === WH.sel))
+    + rows.map(r => whRow(r, WH.sel === r.driver && trackOn)).join('')
     : '<div class="wh-note" style="border:0">Водителей нет</div>')
     + `<div class="wh-note">Точку присылает живая трансляция телеграма — водитель
        включает её сам. Её хватает на восемь часов, дальше бот напомнит. Маршрут
@@ -4578,6 +4611,64 @@ function whSmooth(pts){
     out = next;
   }
   return out;
+}
+
+// Карточка выбранного водителя. Локатор отвечает «где он», а тут — «что с
+// ним»: район и оператор, сколько везёт и сколько сдал, когда его видели в
+// последний раз. И одно действие, которого нет больше нигде: включить скрытый
+// режим за него.
+//
+// Водитель не всегда может нажать сам — телефон в чужих руках или он не
+// успел. Старший видит причину по карте и по звонку, и решение принимает он.
+// Снимает тоже он: у водителя на экране игра, и раз режим включили снаружи,
+// то и «опасность прошла» говорит тот, кто её видел.
+function whCard(r){
+  if(!r) return '';
+  const st = whState(r);
+  const когда = r.has ? (st === 'stream' ? 'на связи сейчас' : 'был ' + whAgo(r.age))
+                      : 'не транслирует';
+  const где = [r.code, r.name].filter(Boolean).join(' ');
+  return `<div class="wh-card${r.panic ? ' panic' : ''}">
+    <div class="wh-card-h">
+      <span class="wh-card-n">${_esc(r.driver)}</span>
+      ${r.panic ? '<span class="wh-card-sos">скрытый режим</span>' : ''}
+    </div>
+    <div class="wh-card-g">
+      <span><b>${_esc(где) || '—'}</b><i>район</i></span>
+      <span><b>${_esc(r.operator || '—')}</b><i>оператор</i></span>
+      <span><b>${r.orders || 0}</b><i>везёт</i></span>
+      <span><b>${r.done || 0}</b><i>сдал</i></span>
+    </div>
+    <div class="wh-card-s">${_esc(когда)}</div>
+    <button class="wh-card-go${r.panic ? ' off' : ''}"
+            onclick="whPanic('${_esc(r.driver)}', ${r.panic ? 'false' : 'true'})">
+      ${r.panic ? 'Снять скрытый режим' : 'Ввести в режим тетриса'}</button>
+  </div>`;
+}
+
+async function whPanic(name, on){
+  const ok = await askYesOp(on
+    ? `Включить скрытый режим у ${name}?\n\nЕго приложение станет игрой, переписка бота исчезнет. Писать ему в бот будет нельзя — только звонить.`
+    : `Снять скрытый режим у ${name}?`);
+  if(!ok) return;
+  try{
+    await opApi.opFetch('/api/operator/driver-panic',
+      {method:'POST', body:{driver: name, on}});
+  }catch(e){ toast('Не удалось', 'bad'); return; }
+  haptic(on ? 'heavy' : 'medium');
+  toast(on ? `${name} — скрытый режим включён` : `${name} — режим снят`, 'ok');
+  whereLoad();
+}
+
+// Тот же вопрос телеграмом, а не браузером: родной confirm внутри мини-аппа
+// показывается не везде.
+function askYesOp(текст){
+  return new Promise(готово => {
+    try{
+      if(tg && tg.showConfirm){ tg.showConfirm(текст, ok => готово(!!ok)); return; }
+    }catch(e){}
+    готово(confirm(текст));
+  });
 }
 
 function whPick(name){

@@ -2255,12 +2255,21 @@ async def drivers_live(names: list, day, want_track: str = "") -> dict:
         log.warning(f"[where] заказы водителей не прочитаны: {e}")
         work = {}
     now = datetime.now(timezone.utc)
+    # Кто сейчас в скрытом режиме. Локатор — единственное место, где это видно
+    # старшему: у водителя приложение притворяется игрой, и написать ему нельзя.
+    скрыты = set()
+    try:
+        for d in await db.panic_all():
+            if d.get("on"):
+                скрыты.add(str(d.get("_id") or d.get("driver") or ""))
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[where] скрытый режим не прочитан: {e}")
     out = []
     for name in names:
         w = work.get(name) or {}
         r = rows.get(name)
         if not r:
-            out.append({"driver": name, "has": False,
+            out.append({"driver": name, "has": False, "panic": name in скрыты,
                         "orders": w.get("live", 0), "done": w.get("done", 0)})
             continue
         at = _dt_utc(r.get("at"))
@@ -2286,6 +2295,7 @@ async def drivers_live(names: list, day, want_track: str = "") -> dict:
                     if (until and until > now) else 0,
             "day": r.get("day") or "",
             "orders": w.get("live", 0), "done": w.get("done", 0),
+            "panic": name in скрыты,
         })
     res = {"drivers": out, "day": day}
     if want_track:
@@ -2734,9 +2744,128 @@ async def handle_op_panic(request):
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 
+# ── скрытый режим водителю — с планшета ────────────────────────────────────
+# Водитель не всегда может нажать сам: телефон в чужих руках, или он вовсе не
+# успел. Старший видит это по локатору и включает штору за него — с тем же
+# следствием, что и у самого водителя: приложение притворяется игрой, переписка
+# бота исчезает, а в опустевшем чате остаётся приглашение в тетрис.
+#
+# Снимает её тоже старший. Сам водитель этого сделать не сможет — у него на
+# экране игра, и выход из неё есть, но раз режим включили снаружи, то и решение
+# «опасность прошла» принимает тот, кто видел причину.
+async def _drv_wipe(name: str) -> int:
+    from api_server import tg_delete
+    tid = _staff_mod.DRIVER_IDS.get((name or "").strip())
+    token = _os.getenv("DRIVER_BOT_TOKEN", "")
+    if not (tid and token):
+        return 0
+    gone = 0
+    for mid in await db.drv_msgs_take(int(tid)):
+        try:
+            res = await tg_delete(token, tid, mid)
+            if (res or {}).get("ok"):
+                gone += 1
+        except Exception:
+            pass
+    return gone
+
+
+async def _drv_cover(name: str, on: bool) -> None:
+    """Прикрытие в чате водителя: положить, когда прячем, и снять, когда вернули."""
+    from api_server import tg_send, tg_delete
+    from owner_routes import tg_send_photo_bytes
+    from pathlib import Path
+    tid = _staff_mod.DRIVER_IDS.get((name or "").strip())
+    token = _os.getenv("DRIVER_BOT_TOKEN", "")
+    if not (tid and token):
+        return
+    ключ = f"drv:{name}"
+    if not on:
+        doc = await db.panic_doc(ключ) or {}
+        if doc.get("cover_msg"):
+            try:
+                await tg_delete(token, tid, int(doc["cover_msg"]))
+            except Exception as e:               # noqa: BLE001
+                log.debug(f"[where] прикрытие не снято: {e}")
+        return
+    kb = {"inline_keyboard": [[{
+        "text": "\u25B6\uFE0F Играть",
+        "web_app": {"url": _os.getenv("DRIVER_WEBAPP_URL",
+                                      "https://driver.ambar-delivery.com/")},
+    }]]}
+    текст = ("\U0001F3AE *BLOCK DRIVE — классический тетрис*\n\n"
+             "Тот самый: фигуры падают, ряды исчезают, скорость растёт. "
+             "Без регистрации, без интернета, без рекламы.\n\n"
+             "Управление одной рукой, партия занимает пару минут — "
+             "как раз чтобы скоротать ожидание.\n\n"
+             "Рекорд сохраняется. Побейте свой.")
+    img = Path(__file__).parent / "cover_game_drive.jpg"
+    try:
+        if img.exists():
+            res = await tg_send_photo_bytes(token, tid, img.read_bytes(), текст,
+                                            parse_mode="Markdown", reply_markup=kb)
+        else:
+            res = await tg_send(token, tid, текст, parse_mode="Markdown", reply_markup=kb)
+        mid = ((res or {}).get("result") or {}).get("message_id")
+        if mid:
+            await db.panic_set(ключ, True, datetime.now(timezone.utc).isoformat(),
+                               {"cover_msg": int(mid), "driver": name})
+    except Exception as e:                       # noqa: BLE001
+        log.error(f"[where] прикрытие водителю не отправлено: {e}")
+
+
+@require_operator
+async def handle_drv_panic(request):
+    """Включить или снять скрытый режим водителя с планшета."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    name = str(body.get("driver") or "").strip()
+    if name not in set(_staff_mod.driver_names()):
+        return web.json_response({"error": "unknown_driver"}, status=400,
+                                 headers=CORS_HEADERS)
+    on = bool(body.get("on"))
+    now = datetime.now(timezone.utc)
+    кто = _op_name(request["op_user"])
+    d = _staff_mod.driver_by_tg(_staff_mod.DRIVER_IDS.get(name)) or {}
+    await db.panic_set(name, on, now.isoformat(),
+                       {"district": d.get("district", ""), "by": кто, "remote": True})
+    log.warning(f"[where] {кто}: скрытый режим {'ВКЛЮЧЁН' if on else 'снят'} у {name}")
+    if on:
+        try:
+            n = await _drv_wipe(name)
+            log.warning(f"[where] {name}: убрано сообщений {n}")
+        except Exception as e:                   # noqa: BLE001
+            log.error(f"[where] чат водителя не почищен: {e}")
+    try:
+        await _drv_cover(name, on)
+    except Exception as e:                       # noqa: BLE001
+        log.error(f"[where] прикрытие: {e}")
+    # Владельцу — как о тревоге: это не «отошёл», это за водителя решил другой
+    # человек, увидев причину.
+    try:
+        from owner_routes import notify_owners_force, _md
+        ч = datetime.now(DUBAI_TZ).strftime("%H:%M")
+        строки = ([f"\U0001F198 *Скрытый режим включён с планшета*",
+                   f"{_md(name)} · включил {_md(кто)} · {ч}", "",
+                   "*Не пишите водителю в приложение и в бот* — уведомление "
+                   "всплывёт у него на экране. Позвоните."]
+                  if on else
+                  [f"\U0001F7E2 *Скрытый режим снят*",
+                   f"{_md(name)} · снял {_md(кто)} · {ч}"])
+        await notify_owners_force("driver.panic", "\n".join(строки))
+    except Exception as e:                       # noqa: BLE001
+        log.error(f"[where] владельцу не сказали: {e}")
+    return web.json_response({"ok": True, "driver": name, "panic": on},
+                             headers=CORS_HEADERS)
+
+
 def setup(app):
     """Mount operator POS routes. Called from api_server.main()."""
     r = app.router
+    r.add_route("OPTIONS", "/api/operator/driver-panic", _opt)
+    r.add_post("/api/operator/driver-panic", handle_drv_panic)
     r.add_route("OPTIONS", "/api/operator/panic", _opt)
     r.add_post("/api/operator/panic", handle_op_panic)
     r.add_route("OPTIONS", "/api/operator/where", _opt)

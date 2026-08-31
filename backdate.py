@@ -74,7 +74,7 @@ async def notify(day: str, who: str, what: str, detail: str = "") -> None:
         return
     когда = _ago(day, today)
     строки = [
-        "*Правка задним числом*",
+        "🕰 *Правка задним числом*",
         f"{_md(who or '—')} изменил данные за *{_md(_human_day(day))}*"
         + (f" ({когда})" if когда else ""),
         "",

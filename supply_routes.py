@@ -852,7 +852,7 @@ async def _notify_done(sid: str, doc: dict, oid: str, me: str,
             mins = f" · {int((task['done_at'] - task['started_at']).total_seconds() // 60)} мин"
     except Exception:
         pass
-    head = f"*Приёмка — {_md(where)}*\n{_md(me)} · принято {took} из {need}{mins}"
+    head = f"📥 *Приёмка — {_md(where)}*\n{_md(me)} · принято {took} из {need}{mins}"
     if gaps:
         lst = "\n".join(f"• {_md(g['name'])} — {g['got']} из {g['need']}" for g in gaps[:8])
         more = f"\n…и ещё {len(gaps) - 8}" if len(gaps) > 8 else ""
@@ -879,7 +879,7 @@ async def _notify_done(sid: str, doc: dict, oid: str, me: str,
     if parts:
         await notify_owners_force(
             "supply.flag",
-            f"*Приёмка требует взгляда — {_md(where)}*\n{_md(me)}\n" + "\n".join(parts))
+            f"🔍 *Приёмка требует взгляда — {_md(where)}*\n{_md(me)}\n" + "\n".join(parts))
 
 
 # ── чего не хватает: то, что придётся брать не здесь ────────────────────────

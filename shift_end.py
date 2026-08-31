@@ -86,14 +86,14 @@ async def on_all_closed(day: str, state: dict) -> bool:
         for d in dd)
 
     if again:
-        head = (f"*Заявка уточнена — {day}*\n"
+        head = (f"📑 *Заявка уточнена — {day}*\n"
                 f"После первой сборки район открывали заново и добавили "
                 f"{again['orders']} {_plural(again['orders'], 'заказ', 'заказа', 'заказов')} "
                 f"на {_fmt(again['revenue'])} AED. Прежний файл неполный — "
                 f"пользуйтесь этим.\n\n"
                 f"{rows}\n\n*Итого: {orders} заказов · {_fmt(revenue)} AED*")
     else:
-        head = (f"*Смена закрыта — {day}*\n"
+        head = (f"🌙 *Смена закрыта — {day}*\n"
                 f"Закрылись все районы. Продажи дня окончательны.\n\n"
                 f"{rows}\n\n*Итого: {orders} заказов · {_fmt(revenue)} AED*")
     if hanging:

@@ -2433,7 +2433,7 @@ async def handle_catalog_update(request):
     if new_stock is False:
         try:
             await notify_owners("stock.out",
-                f"⚠️ *Товар закончился*\n{target.get('name', pid)}")
+                f"⛔ *Товар закончился*\n{target.get('name', pid)}")
         except Exception as e:
             log.error(f"[owner-notif] stock.out failed: {e}")
     return web.json_response({

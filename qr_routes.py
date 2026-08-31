@@ -449,7 +449,7 @@ async def _drop_send(me: int) -> None:
     from config_offices import OFFICE_CODES, OFFICE_NAMES
     n = len(st["items"])
     строки = [
-        "*Убрано из реестра*",
+        "✂️ *Убрано из реестра*",
         f"{_md(st['who'])} убрал {n} "
         + _plural(n, "бутылку", "бутылки", "бутылок"),
         "",
@@ -513,7 +513,12 @@ async def handle_drop(request):
             {"error": "already_deleted" if old else "unknown_code", "code": code},
             status=404, headers=CORS_HEADERS)
     log.info(f"[qr] убрана из реестра {doc.get('label') or code}")
-    _drop_note(request.get("owner_id") or 0, str(body.get("as") or "").strip()[:40],
+    # Имя приходит от приложения; если его нет — берём из базы. «—» вместо
+    # человека в таком сообщении обесценивает его целиком.
+    кто = str(body.get("as") or "").strip()[:40]
+    if not кто:
+        кто = await _who(request.get("owner_id") or 0)
+    _drop_note(request.get("owner_id") or 0, кто,
                {"code": code, "label": doc.get("label") or "",
                 "product_name": doc.get("product_name") or "",
                 "district": doc.get("district") or "",

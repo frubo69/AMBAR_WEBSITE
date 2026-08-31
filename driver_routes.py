@@ -588,7 +588,7 @@ async def _writeoff_tell(wid: str, me: dict, p: dict, qty: int, kind: str,
             from owner_routes import notify_owners
             await notify_owners(
                 "stock.writeoff",
-                f"Списание · {kind}\n{p.get('name','')} × {qty}"
+                f"🗑 Списание · {kind}\n{p.get('name','')} × {qty}"
                 f" · {aed} AED\n{me['name']} ({me.get('district_code') or '—'})"
                 + (f"\n{note}" if note else "")
                 + "\n\nЖдёт согласования в панели — со склада не вычтено.",
@@ -799,7 +799,7 @@ async def _notify_panic(me: dict, on: bool, now):
                 "*Не пишите ему в приложение и в бот* — уведомление всплывёт у него "
                 "на экране. Позвоните.")
     else:
-        text = (f"✅ *Скрытый режим снят*\n{me['name']} · "
+        text = (f"🟢 *Скрытый режим снят*\n{me['name']} · "
                 f"{me.get('district_code','')} {me.get('district_name','')} · {hhmm}")
 
     ids = list(staff.SENIOR_IDS) + [d["telegram_id"] for d in staff.DEVICES]
@@ -1262,7 +1262,7 @@ async def handle_expense_add(request):
         was = f" (было {prev.get('amount')})" if prev else ""
         await notify_owners(
             "expenses.request",
-            f"{'✏️ *Расход изменён*' if prev else '💸 *Расход на согласование*'}\n"
+            f"{'🧾 *Расход изменён*' if prev else '💸 *Расход на согласование*'}\n"
             f"{me['name']} ({me['district_code']}) — {amount} AED{was}\n"
             f"_{comment}_")
     except Exception as e:

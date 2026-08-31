@@ -220,7 +220,7 @@ async def handle_user_message(update: Update, context: ContextTypes.DEFAULT_TYPE
                         flags=_re.IGNORECASE,
                     )
                 await notify_owners("support.complaint",
-                    f"⚠️ *Жалоба — ключевые слова*\n"
+                    f"‼️ *Жалоба — ключевые слова*\n"
                     f"Клиент: {full_name} (@{uname})\n"
                     f"Канал: Telegram бот\n\n"
                     f"\"{highlighted}\"",

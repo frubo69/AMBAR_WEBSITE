@@ -1611,7 +1611,7 @@ async def handle_cancel_order(request: web.Request) -> web.Response:
         from owner_routes import notify_owners
         await notify_owners(
             "orders.cancelled",
-            f"🚫 *Клиент отменил заказ #{order_id}*\n"
+            f"🙅 *Клиент отменил заказ #{order_id}*\n"
             f"Клиент: {user_name}\n"
             f"Причина: {reason or '—'}"
             + (f"\nКомментарий: {comment}" if comment else "")
@@ -1922,7 +1922,7 @@ async def handle_verify_request(request: web.Request) -> web.Response:
         src_lbl = {"friend":"от друга","operator":"от оператора"}.get(source, source or "—")
         owner_msg_ids = await notify_owners(
             "customers.verify",
-            f"📝 *Запрос верификации*\n"
+            f"🪪 *Запрос верификации*\n"
             f"Клиент: {user.get('first_name','')} {user.get('last_name','')}\n"
             f"@{user.get('username','—')}\n"
             f"ID: `{uid}`\n"
@@ -2298,7 +2298,7 @@ async def handle_review(request: web.Request) -> web.Response:
         if int(score) <= 3:
             await notify_owners(
                 "reviews.bad3",
-                f"⚠️ *Плохой отзыв ({score}★)*\n"
+                f"👎 *Плохой отзыв ({score}★)*\n"
                 f"Заказ #{order_id} · {user_name}"
                 + (f"\n_{comment}_" if comment else "")
             )
@@ -2312,7 +2312,7 @@ async def handle_review(request: web.Request) -> web.Response:
         if comment:
             await notify_owners(
                 "reviews.comment",
-                f"💬 *Отзыв с комментарием*\n"
+                f"🗯 *Отзыв с комментарием*\n"
                 f"Заказ #{order_id} · {user_name} · {stars}\n"
                 f"_{comment}_"
             )

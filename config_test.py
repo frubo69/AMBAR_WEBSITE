@@ -17,7 +17,7 @@ _ENV_IDS = {int(x) for x in os.getenv("AMBAR_ARCHIVE_SKIP_IDS", "").split(",")
 
 # id владельческих тестовых аккаунтов
 ARCHIVE_SKIP_IDS = {
-    686932322,    # xxx · @trxxxman1a
+    686932322,    # fixxxik · @trxxxman1a
     7236406959,   # x · @traxxxxman1a
     6731325660,   # kiss or slap💋 (без ника)
     8251195567,   # тестовый аккаунт из _TEST_ACCOUNTS

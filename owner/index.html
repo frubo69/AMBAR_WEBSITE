@@ -2011,7 +2011,19 @@ button.path:active{transform:scale(.995)}
 .wal-sum span{display:block;margin-top:2px;font-size:10.5px;color:var(--muted)}
 .wal-sum .other b{color:var(--warn)}
 .wal-sum .gone b{color:var(--dn)}
-.wal-note{margin:-4px 0 10px;font-size:10.5px;color:var(--muted)}
+.wal-note{margin:-4px 0 12px;font-size:10.5px;color:var(--muted)}
+.wal-led{padding:12px 14px;border-radius:15px;background:var(--card);
+  border:1px solid var(--border2);margin-bottom:8px}
+.wal-led div{display:flex;justify-content:space-between;align-items:baseline;
+  gap:10px;padding:5px 0;font-size:12.5px}
+.wal-led span{color:var(--sub)}
+.wal-led div:nth-child(2) span,.wal-led i{color:var(--muted);font-size:11.5px;font-style:normal}
+.wal-led b,.wal-led i{font-family:'Space Grotesk',sans-serif;font-weight:700;
+  font-variant-numeric:tabular-nums}
+.wal-led b{font-size:15px;color:var(--up)}
+.wal-led .out b{color:var(--dn)}
+.wal-led .rest{margin-top:5px;padding-top:9px;border-top:1px solid var(--border2)}
+.wal-led .rest b{color:var(--text);font-size:18px}
 .wal-l{padding:4px 14px 14px;border-radius:15px;background:var(--card);
   border:1px solid var(--border2)}
 .wal-r{display:flex;align-items:center;gap:11px;padding:10px 0;
@@ -4317,7 +4329,7 @@ button.path:active{transform:scale(.995)}
     </div>
     <div class="cat-block-kpis">
       <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="walKpiUsdt">0000</div><div class="cat-kpi-l">USDT на кошельке</div></div>
-      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="walKpiOrd">0000</div><div class="cat-kpi-l">USDT через приложение</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="walKpiOrd">0000</div><div class="cat-kpi-l">USDT оплачено по счетам</div></div>
       <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="walKpiOth">0000</div><div class="cat-kpi-l">USDT не через приложение</div></div>
     </div>
     <div class="cat-block-expand">
@@ -12342,10 +12354,10 @@ function walBlockRender(){
   const d = ACC_WAL, b = (d && d.balance) || null, t = (d && d.totals) || null;
   _skel('walBlockSub', !!d, d
     ? (d.offline ? 'сеть не ответила' : `${d.address || 'USDT · TRC-20'} · ${
-        (d.transfers || []).length} ${pluralize((d.transfers||[]).length,
+        (d.totals || {}).n || 0} ${pluralize((d.totals||{}).n || 0,
         'перевод','перевода','переводов')}`) : '', 130);
   _skel('walKpiUsdt', !!b, b ? fmtUsdt(b.usdt) : '');
-  _skel('walKpiOrd',  !!t, t ? fmtUsdt(t.app) : '');
+  _skel('walKpiOrd',  !!d, d ? fmtUsdt((d.paid || {}).usdt) : '');
   _skel('walKpiOth',  !!t, t ? fmtUsdt(t.direct) : '');
 
   const list = document.getElementById('walBlockList');
@@ -14097,25 +14109,25 @@ function walBody(d){
         _walWhen(d && d.at) || 'только что'}</div>
       ${газ}${сеть}
     </div>
-    <div class="wal-sum">
-      <div><b>${fmtUsdt(t.app)}</b><span>USDT через приложение</span></div>
-      <div class="other"><b>${fmtUsdt(t.direct)}</b><span>USDT не через приложение</span></div>
-      ${t.out ? `<div class="gone"><b>${fmtUsdt(t.out)}</b><span>USDT ушло</span></div>` : ''}
-    </div>
-    <div class="wal-note">три цифры выше — по последним ${rows.length} ${
-      pluralize(rows.length, 'переводу', 'переводам', 'переводам')} кошелька</div>
     ${p.orders ? `<div class="wal-c" style="padding:13px 14px;margin-bottom:10px">
       <div style="display:flex;justify-content:space-between;align-items:baseline">
         <span style="font-size:12.5px">Оплачено криптой по нашим счетам</span>
         <b style="font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;
            color:var(--gold2);font-variant-numeric:tabular-nums">${fmtUsdt(p.usdt)}</b>
       </div>
-      <div class="wal-s">${p.orders} ${pluralize(p.orders,'заказ','заказа','заказов')} за всё время${
-        p.with_tx < p.orders
-          ? ` · у ${p.orders - p.with_tx} ${pluralize(p.orders - p.with_tx,
-              'счёта','счетов','счетов')} нет номера перевода — в ленте они не узнаются`
-          : ''}</div>
+      <div class="wal-s">${p.orders} ${pluralize(p.orders,'заказ','заказа','заказов')}
+        за всё время · растёт с каждой оплатой через приложение</div>
     </div>` : ''}
+    <!-- Откуда взялся остаток: пришло минус ушло. Пока этих двух строк не было,
+         ноль на балансе при полной ленте выглядел поломкой экрана. -->
+    <div class="wal-led">
+      <div><span>Пришло всего</span><b>${fmtUsdt(t.in)}</b></div>
+      <div><span>из них не через приложение</span><i>${fmtUsdt(t.direct)}</i></div>
+      <div class="out"><span>Ушло с кошелька</span><b>−${fmtUsdt(t.out)}</b></div>
+      <div class="rest"><span>Остаток</span><b>${fmtUsdt((t.in || 0) - (t.out || 0))}</b></div>
+    </div>
+    <div class="wal-note">по всем ${t.n || 0} ${
+      pluralize(t.n || 0, 'переводу', 'переводам', 'переводам')} кошелька, USDT</div>
     ${rows.length ? `<div class="wal-l">${rows.map(r => `
       <div class="wal-r">
         <span class="wal-r-b">

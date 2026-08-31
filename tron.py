@@ -136,7 +136,7 @@ async def get_balance(address: str) -> dict | None:
             "unknown": False}
 
 
-async def get_transfers(address: str, limit: int = 50,
+async def get_transfers(address: str, limit: int = 200, pages: int = 6,
                         min_ts: int = 0) -> list[dict] | None:
     """Переводы USDT по кошельку — и приход, и расход, новые сверху.
 
@@ -156,13 +156,31 @@ async def get_transfers(address: str, limit: int = 50,
     }
     if min_ts:
         params["min_timestamp"] = str(int(min_ts))
-    data = await _get(f"{TRONGRID_BASE_URL}/v1/accounts/{address}/transactions/trc20",
-                      params)
-    if data is None:
-        return None
+    # Страницами, а не одной выборкой: «пришло» и «ушло» имеют смысл только за
+    # всю жизнь кошелька. По последней сотне переводов остаток не сходится с
+    # балансом, и человек справедливо не понимает, где деньги.
+    url = f"{TRONGRID_BASE_URL}/v1/accounts/{address}/transactions/trc20"
+    raw, fingerprint = [], ""
+    for _ in range(max(1, int(pages or 1))):
+        if fingerprint:
+            params["fingerprint"] = fingerprint
+        data = await _get(url, params)
+        if data is None:
+            # Молчание на первой странице — это молчание сети. Оборвалось в
+            # середине — отдаём собранное: неполно, но честнее пустоты.
+            return None if not raw else _parse_transfers(raw, address)
+        page = (data or {}).get("data") or []
+        raw += page
+        fingerprint = ((data or {}).get("meta") or {}).get("fingerprint") or ""
+        if not fingerprint or len(page) < int(params["limit"]):
+            break
+    return _parse_transfers(raw, address)
+
+
+def _parse_transfers(raw: list, address: str) -> list[dict]:
     me = address.strip()
     out = []
-    for it in (data or {}).get("data", []):
+    for it in raw:
         try:
             if ((it.get("token_info") or {}).get("address") or "") != USDT_TRC20_CONTRACT:
                 continue

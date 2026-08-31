@@ -42,7 +42,7 @@ def _short(a: str) -> str:
 
 async def _build() -> dict:
     balance = await tron.get_balance(TRON_RECEIVE_ADDRESS)
-    transfers = await tron.get_transfers(TRON_RECEIVE_ADDRESS, limit=60)
+    transfers = await tron.get_transfers(TRON_RECEIVE_ADDRESS)
     # None и пустой список — разные ответы: первое значит «не дозвонились», и
     # говорить в этом случае «переводов нет» — врать.
     offline = transfers is None
@@ -89,11 +89,14 @@ async def _build() -> dict:
         "address": _short(TRON_RECEIVE_ADDRESS),
         "balance": balance or {"usdt": 0.0, "trx": 0.0, "unknown": True},
         "offline": offline or balance is None,
-        "transfers": rows,
+        # Лента на экран — последние полсотни: дальше её никто не листает, а
+        # считаем мы по всем.
+        "transfers": rows[:50],
         # «Ушло» тут не ради полноты: без него ноль на балансе выглядит
         # поломкой экрана, хотя это обычная жизнь кошелька — пришло и вывели.
         "totals": {"app": round(через, 2), "direct": round(напрямую, 2),
-                   "out": round(ушло, 2)},
+                   "in": round(через + напрямую, 2), "out": round(ушло, 2),
+                   "n": len(rows)},
         "at": int(_t.time() * 1000),
     }
 

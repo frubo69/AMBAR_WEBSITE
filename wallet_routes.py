@@ -74,7 +74,18 @@ async def _build() -> dict:
             "order_id": (inv or {}).get("order_id") or "",
         })
 
+    # Сколько всего оплачено криптой по нашим счетам. Отдельно от ленты и
+    # нарочно: лента — это последние переводы кошелька, а вопрос «сколько
+    # прошло через приложение» про всю историю, и ответ на него лежит у нас, а
+    # не в блокчейне.
+    paid = {}
+    try:
+        paid = await db.crypto_paid_totals()
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[wallet] итог по счетам не посчитан: {e}")
+
     return {
+        "paid": paid,
         "address": _short(TRON_RECEIVE_ADDRESS),
         "balance": balance or {"usdt": 0.0, "trx": 0.0, "unknown": True},
         "offline": offline or balance is None,

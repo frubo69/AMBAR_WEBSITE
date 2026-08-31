@@ -14079,7 +14079,7 @@ async function walRefresh(btn){
 
 function walBody(d){
   const mid = document.getElementById('accMid'); if(!mid) return;
-  const b = (d && d.balance) || {}, t = (d && d.totals) || {};
+  const b = (d && d.balance) || {}, t = (d && d.totals) || {}, p = (d && d.paid) || {};
   const rows = (d && d.transfers) || [];
   _setText('accSub', d && d.address ? d.address : 'USDT · TRC-20');
   // Не дозвонились до сети — это не «переводов нет». Показываем прямо, иначе
@@ -14102,8 +14102,20 @@ function walBody(d){
       <div class="other"><b>${fmtUsdt(t.direct)}</b><span>USDT не через приложение</span></div>
       ${t.out ? `<div class="gone"><b>${fmtUsdt(t.out)}</b><span>USDT ушло</span></div>` : ''}
     </div>
-    <div class="wal-note">по последним ${rows.length} ${
-      pluralize(rows.length, 'переводу', 'переводам', 'переводам')}</div>
+    <div class="wal-note">три цифры выше — по последним ${rows.length} ${
+      pluralize(rows.length, 'переводу', 'переводам', 'переводам')} кошелька</div>
+    ${p.orders ? `<div class="wal-c" style="padding:13px 14px;margin-bottom:10px">
+      <div style="display:flex;justify-content:space-between;align-items:baseline">
+        <span style="font-size:12.5px">Оплачено криптой по нашим счетам</span>
+        <b style="font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;
+           color:var(--gold2);font-variant-numeric:tabular-nums">${fmtUsdt(p.usdt)}</b>
+      </div>
+      <div class="wal-s">${p.orders} ${pluralize(p.orders,'заказ','заказа','заказов')} за всё время${
+        p.with_tx < p.orders
+          ? ` · у ${p.orders - p.with_tx} ${pluralize(p.orders - p.with_tx,
+              'счёта','счетов','счетов')} нет номера перевода — в ленте они не узнаются`
+          : ''}</div>
+    </div>` : ''}
     ${rows.length ? `<div class="wal-l">${rows.map(r => `
       <div class="wal-r">
         <span class="wal-r-b">

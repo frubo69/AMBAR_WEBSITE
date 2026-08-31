@@ -1479,6 +1479,31 @@ async def get_crypto_invoice(oid: str) -> dict | None:
     return await db.crypto_invoices.find_one({"order_id": oid}, {"_id": 0})
 
 
+async def crypto_paid_totals() -> dict:
+    """Сколько всего оплачено криптой по НАШИМ счетам — за всё время.
+
+    Это другой источник, чем лента кошелька, и потому он и нужен: лента
+    показывает последние переводы, а вопрос «сколько всего пришло по заказам»
+    про всю историю. Плюс видно, у скольких счетов есть txid: без него оплату
+    невозможно узнать в переводе, и на экране кошелька она уходит в «не через
+    приложение», хотя счёт был."""
+    db = _db_or_none()
+    if db is None: return {}
+    cur = db.crypto_invoices.aggregate([
+        {"$match": {"status": "confirmed"}},
+        {"$group": {"_id": None,
+                    "usdt": {"$sum": "$amount_usdt"},
+                    "orders": {"$sum": 1},
+                    "with_tx": {"$sum": {"$cond": [
+                        {"$eq": [{"$type": "$txid"}, "string"]}, 1, 0]}}}},
+    ])
+    rows = await cur.to_list(length=1)
+    r = rows[0] if rows else {}
+    return {"usdt": round(float(r.get("usdt") or 0), 2),
+            "orders": int(r.get("orders") or 0),
+            "with_tx": int(r.get("with_tx") or 0)}
+
+
 async def crypto_invoices_by_txids(txids: list) -> dict:
     """Счета, оплаченные этими переводами: {txid: счёт}.
 

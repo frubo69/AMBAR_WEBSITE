@@ -2257,21 +2257,20 @@ button.path:active{transform:scale(.995)}
 .crw-c{margin-bottom:9px;border-radius:15px;background:var(--card);
   border:1px solid var(--border2);overflow:hidden}
 .crw-c.moved{border-color:rgba(201,169,110,.4)}
-/* Проверка бутылок: шапка района золотом. Там список читают глазами сверху
-   вниз и ищут не имя, а точку — золото и есть эта засечка. На «Кто на каком
-   районе» она не нужна: туда заходят за человеком, а не за районом. */
-.chk-c .crw-c-h{background:var(--gold-soft);border-bottom-color:rgba(201,169,110,.28)}
-.chk-c .crw-c-n{color:var(--gold2)}
+/* Шапка района — золотом, на обоих экранах. Список читают сверху вниз и ищут
+   в нём точку: золото и есть та засечка, по которой видно, где кончился один
+   район и начался следующий. Серая шапка эту работу не делала — карточки
+   сливались в одну ленту. */
+
 /* Сколько тут людей — словом, а не числом в скобках: «(2)» надо расшифровать,
    «2 водителя» читается сразу. */
-.crw-c-x{flex:0 0 auto;font-size:11px;font-weight:600;color:var(--muted)}
-.chk-c .crw-c-x{color:rgba(201,169,110,.72)}
-.chk-c .crew-code{color:#1a1408;border-color:transparent;
+.crw-c-x{flex:0 0 auto;font-size:11px;font-weight:600;color:rgba(201,169,110,.72)}
+.crw-c-h .crew-code{color:#1a1408;border-color:transparent;
   background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .crw-c-h{display:flex;align-items:center;gap:10px;padding:11px 12px;
-  background:var(--card2);border-bottom:1px solid var(--border2)}
-.crw-c-n{flex:1;min-width:0;font-size:14px;font-weight:700;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap}
+  background:var(--gold-soft);border-bottom:1px solid rgba(201,169,110,.28)}
+.crw-c-n{flex:1;min-width:0;font-size:14px;font-weight:700;color:var(--gold2);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 /* Оператор — тоже фишка, только в шапке: он такой же человек на этом районе. */
 .crw-op{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:1px;
   padding:7px 12px;border-radius:10px;cursor:pointer;font-family:inherit;
@@ -3899,7 +3898,6 @@ button.path:active{transform:scale(.995)}
         <span class="hero-side-r"><i><span class="w">валовая</span><span class="w2">вал</span></i><b id="heroGross" data-aed="">—</b></span>
         <span class="hero-side-r"><i><span class="w">чаевые</span><span class="w2">чай</span></i><b class="gold" id="heroTips" data-aed="">—</b></span>
         <span class="hero-side-r"><i><span class="w">расход</span><span class="w2">расх</span></i><b class="dn" id="heroSpend" data-aed="">—</b></span>
-        <span class="hero-side-r"><i><span class="w">в долг</span><span class="w2">долг</span></i><b class="warn" id="heroDebt" data-aed="">—</b></span>
       </div>
     </div>
     <div class="hero-row">
@@ -4171,7 +4169,6 @@ button.path:active{transform:scale(.995)}
       <span class="hero-side-r"><i><span class="w">валовая</span><span class="w2">вал</span></i><b id="offGross" data-aed="">—</b></span>
       <span class="hero-side-r"><i><span class="w">чаевые</span><span class="w2">чай</span></i><b class="gold" id="offTips" data-aed="">—</b></span>
       <span class="hero-side-r"><i><span class="w">расход</span><span class="w2">расх</span></i><b class="dn" id="offSpend" data-aed="">—</b></span>
-      <span class="hero-side-r"><i><span class="w">в долг</span><span class="w2">долг</span></i><b class="warn" id="offDebt" data-aed="">—</b></span>
     </div>
     <span class="day-nav" id="offHeroNav">
       <button class="dn-b" aria-label="Предыдущий день"
@@ -9860,14 +9857,12 @@ function _paintHero(p, f){
   // Долг — не выручка в кассе, а товар, уехавший под слово. В шапке он стоит
   // рядом с расходом: и то и другое объясняет разницу между «валовой» и тем,
   // что реально в руках.
-  _setAed('heroDebt', ((f.by_method || {}).debt || {}).aed || 0);
   heroSideFit();
   // Те же четыре числа на карточке «Районов». Считает их одно место — иначе на
   // двух экранах за один и тот же день оказались бы разные суммы.
   _setAed('offGross', f.revenue.current);
   _setAed('offTips',  tips);
   _setAed('offSpend', spend);
-  _setAed('offDebt',  ((f.by_method || {}).debt || {}).aed || 0);
   // Крупное число на «Районах» — то же, что на «Обзоре»: валовая минус чаевые
   // и расход. Вычеты запоминаем: карточки районов считаются своим кодом и
   // позже, а два экрана за один день обязаны показывать одно и то же.

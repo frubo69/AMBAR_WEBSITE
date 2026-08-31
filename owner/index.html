@@ -1976,8 +1976,8 @@ button.path:active{transform:scale(.995)}
   background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.22)}
 /* Название раздела — крупным геометрическим шрифтом, тем же, что и цифры:
    плитку сначала находят по имени, а уже потом читают число. */
-.acc-t{font-family:'Space Grotesk',sans-serif;font-size:15.5px;font-weight:700;
-  letter-spacing:-.2px;line-height:1.2;margin-top:10px}
+.acc-t{font-family:'Space Grotesk',sans-serif;font-size:14.5px;font-weight:700;
+  letter-spacing:.6px;text-transform:uppercase;line-height:1.2;margin-top:10px}
 .acc-n{margin-top:auto;padding-top:8px;display:flex;align-items:baseline;gap:5px;
   font-family:'Space Grotesk',sans-serif;font-size:21px;font-weight:700;
   letter-spacing:-.5px;color:var(--gold2);font-variant-numeric:tabular-nums;line-height:1}
@@ -1992,7 +1992,7 @@ button.path:active{transform:scale(.995)}
 /* Оглавление раздела: три-четыре слова через косую, тише названия и цифры.
    Три строки запаса — у склада внутри четыре вещи, и обрывать их многоточием
    значит прятать ровно то, ради чего подпись и появилась. */
-.acc-s{font-size:10.5px;color:var(--dim);margin-top:4px;line-height:1.35;min-height:2.7em;
+.acc-s{font-size:11.5px;color:var(--sub);margin-top:5px;line-height:1.4;min-height:2.8em;
   overflow:hidden;display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical}
 /* Закупаем отдельно. Табак считается наравне со всем — норма, остаток,
    недостача, — но едет мимо магазина, и в заявке ему делать нечего. Отдельный
@@ -11601,9 +11601,9 @@ function stkResult(res){
 const ACC = [
   {id:'expenses', t:'Расходы смены',     s:'расходы водителей / брак / списания',
    ico:'<path d="M12 1v22M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'},
-  {id:'stock',    t:'Склад',             s:'остатки всего / по районам / ревизии / перемещения',
+  {id:'stock',    t:'Склад',             s:'остатки / ревизии / перемещения',
    ico:'<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4M12 11v10"/>'},
-  {id:'order',    t:'Закупка',           s:'заявка основная / доп заявка / приём товара',
+  {id:'order',    t:'Закупка',           s:'заявка основная / доп / приём товара',
    ico:'<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><path d="M3 6h18M16 10a4 4 0 0 1-8 0"/>'},
   {id:'shifts',   t:'Смены',             s:'кто открыл / кто вышел / кто закрыл',
    ico:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>'},
@@ -11613,7 +11613,7 @@ const ACC = [
    ico:'<path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6.5 7l1 12.5h9L17.5 7"/><path d="M10 11v5M14 11v5"/>'},
   {id:'qr',       t:'Внести товар',      s:'коды с крышек / реестр бутылок',
    ico:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/>'},
-  {id:'check',    t:'Проверка бутылки',  s:'что везёт водитель / чужие бутылки',
+  {id:'check',    t:'Проверка бутылки',  s:'',
    ico:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/>'},
 ];
 let ACC_PERIOD = null, ACC_STOCK = null, ACC_ORDER = null, ACC_VIEW = null,
@@ -11800,7 +11800,7 @@ function accRender(){
       <span class="acc-n">${v === null
         ? '<span class="acc-v is-skel">0000</span>'
         : `<span class="acc-v">${v}</span>`}<i>${escS(u)}</i></span>
-      <span class="acc-s">${escS(a.s)}</span>
+      ${a.s ? `<span class="acc-s">${escS(a.s)}</span>` : ''}
     </button>`;
   };
   // Два раздела вместо ровного ряда из четырёх: слева от заголовка сразу

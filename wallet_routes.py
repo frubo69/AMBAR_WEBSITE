@@ -219,6 +219,141 @@ async def handle_unlink(request):
     return web.json_response({"ok": ok}, headers=CORS_HEADERS)
 
 
+# ── сопоставление с заказами ────────────────────────────────────────────────
+# Прямое поступление можно узнать по сумме: заказ стоит N дирхам, а по нашему
+# курсу это ровно столько-то USDT. Совпало число и совпал день — почти наверняка
+# это он и есть.
+#
+# «Почти» здесь и есть вся суть, поэтому сопоставление НЕ привязывает молча. Оно
+# показывает, что нашло, и привязывает только то, у чего нет второго кандидата:
+# два заказа на одну сумму в один день — это не совпадение, а монетка, и решать
+# такое должен человек.
+MATCH_DAYS = 2            # на сколько дней вокруг перевода ищем заказ
+MATCH_TOL = 0.02          # допуск по сумме: 2 % или 1 USDT, что больше
+DEAD = ("cancelled", "declined", "canceled")
+
+
+def _usdt_of(total_aed) -> float:
+    from config import CRYPTO_AED_PER_USDT
+    rate = CRYPTO_AED_PER_USDT or 3.5
+    return round(float(total_aed or 0) / rate, 2)
+
+
+async def _match(apply: bool, who: str = "") -> dict:
+    """Свести прямые поступления с заказами по сумме и дню."""
+    from datetime import timedelta
+    transfers = await tron.get_transfers(TRON_RECEIVE_ADDRESS)
+    if transfers is None:
+        return {"error": "offline"}
+    ids = [t["txid"] for t in transfers if t.get("txid")]
+    byid = await db.crypto_invoices_by_txids(ids)
+    links = await db.wallet_links()
+    # Кандидаты — только безымянные приходы: у оплаты по счёту связь уже есть.
+    сироты = [t for t in transfers
+              if t.get("in") and t.get("txid")
+              and t["txid"] not in byid and t["txid"] not in links]
+    if not сироты:
+        return {"pairs": [], "orphans": 0, "taken": 0, "ambiguous": 0}
+
+    lo = min(t["ts"] for t in сироты) - MATCH_DAYS * 86400_000
+    hi = max(t["ts"] for t in сироты) + MATCH_DAYS * 86400_000
+    start = datetime.fromtimestamp(lo / 1000, timezone.utc).isoformat()
+    end = datetime.fromtimestamp(hi / 1000, timezone.utc).isoformat()
+    orders = await db.get_orders_in_range(
+        start, end, limit=None,
+        fields=["order_id", "timestamp", "total", "status", "customer_name",
+                "payment_method", "paid"])
+    # Заказ, за который уже заплатили криптой по счёту, второй раз не платят.
+    занятые = {(v or {}).get("order_id") for v in byid.values()}
+    занятые |= {(v or {}).get("order_id") for v in links.values()}
+    свободные = [o for o in orders
+                 if str(o.get("order_id") or "") not in занятые
+                 and (o.get("status") or "") not in DEAD
+                 and float(o.get("total") or 0) > 0]
+
+    pairs, взято, спорных = [], 0, 0
+    занято_сейчас = set()
+    for t in sorted(сироты, key=lambda x: x["ts"]):
+        нужно = t["amount"]
+        допуск = max(1.0, нужно * MATCH_TOL)
+        рядом = []
+        for o in свободные:
+            oid = str(o.get("order_id") or "")
+            if not oid or oid in занято_сейчас:
+                continue
+            try:
+                ts = datetime.fromisoformat(
+                    str(o.get("timestamp") or "").replace("Z", "+00:00"))
+            except ValueError:
+                continue
+            разрыв = abs((ts.timestamp() * 1000) - t["ts"]) / 3600_000
+            if разрыв > MATCH_DAYS * 24:
+                continue
+            ожидали = _usdt_of(o.get("total"))
+            расхождение = abs(ожидали - нужно)
+            if расхождение <= допуск:
+                рядом.append((расхождение, разрыв, oid, o, ожидали))
+        рядом.sort(key=lambda x: (round(x[0], 2), x[1]))
+        if not рядом:
+            continue
+        # Второй кандидат с той же суммой — это монетка, а не совпадение.
+        спорно = len(рядом) > 1 and round(рядом[1][0], 2) == round(рядом[0][0], 2)
+        расхождение, разрыв, oid, o, ожидали = рядом[0]
+        if спорно:
+            спорных += 1
+        pairs.append({
+            "txid": t["txid"], "amount": t["amount"], "ts": t["ts"],
+            "order_id": oid, "order_total": int(o.get("total") or 0),
+            "order_usdt": ожидали, "order_ts": str(o.get("timestamp") or ""),
+            "name": o.get("customer_name") or "",
+            "gap_h": round(разрыв, 1), "off": round(расхождение, 2),
+            "sure": not спорно,
+            "others": len(рядом) - 1,
+        })
+        if спорно:
+            continue
+        занято_сейчас.add(oid)
+        if apply:
+            await db.wallet_link_set(t["txid"], {
+                "order_id": oid, "amount": t["amount"],
+                "by": 0, "by_name": who or "сопоставление",
+                "auto": True, "at": datetime.now(timezone.utc)})
+            взято += 1
+    if apply:
+        _drop_cache()
+        log.info(f"[wallet] сопоставление: привязано {взято} из {len(сироты)}")
+    return {"pairs": pairs, "orphans": len(сироты), "taken": взято,
+            "ambiguous": спорных}
+
+
+@require_owner
+async def handle_match(request):
+    """GET — что нашлось, POST — привязать найденное без спорных."""
+    apply = request.method == "POST"
+    who = ""
+    if apply:
+        try:
+            who = str((await request.json()).get("as") or "").strip()[:40]
+        except Exception:
+            who = ""
+    out = await _match(apply, who)
+    if out.get("error") == "offline":
+        return web.json_response(out, status=503, headers=CORS_HEADERS)
+    if apply and out.get("taken"):
+        try:
+            from owner_routes import notify_owners_force, _md
+            await notify_owners_force(
+                "wallet.link",
+                "🔗 *Поступления сведены с заказами*\n"
+                + _md(who or "—") + "\n\n"
+                + f"• привязано {out['taken']} "
+                + ("· спорных оставлено " + str(out["ambiguous"])
+                   if out.get("ambiguous") else "· спорных нет"))
+        except Exception as e:                   # noqa: BLE001
+            log.error(f"[wallet] письмо о сопоставлении не ушло: {e}")
+    return web.json_response(out, headers=CORS_HEADERS)
+
+
 async def _opt(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
@@ -230,4 +365,7 @@ def setup(app):
     app.router.add_post("/api/owner/wallet/link", handle_link)
     app.router.add_route("OPTIONS", "/api/owner/wallet/unlink", _opt)
     app.router.add_post("/api/owner/wallet/unlink", handle_unlink)
+    app.router.add_route("OPTIONS", "/api/owner/wallet/match", _opt)
+    app.router.add_get("/api/owner/wallet/match", handle_match)
+    app.router.add_post("/api/owner/wallet/match", handle_match)
     log.info("[wallet] routes mounted")

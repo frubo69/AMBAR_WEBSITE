@@ -14201,7 +14201,78 @@ function walBody(d){
     : `<div class="scan-empty">${d && d.offline
         ? 'Сеть не ответила' : 'Переводов пока не было'}</div>`}`;
   document.getElementById('accFoot').innerHTML = `
-    <div class="qb-wrap"><button class="qb" onclick="walRefresh(this)">Обновить</button></div>`;
+    <div class="qb-wrap qb-row">
+      <button class="qb" onclick="walMatch(this)">Сверить с заказами</button>
+      <button class="qb qb-ico" onclick="walRefresh(this)" aria-label="Обновить"
+        title="Обновить"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+        stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
+        stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
+    </div>`;
+}
+
+// Сверка с заказами. Заказ стоит N дирхам, а по нашему курсу это ровно
+// столько-то USDT: совпала сумма и совпал день — почти наверняка это он.
+//
+// «Почти» тут главное слово, поэтому сверка ничего не привязывает сама.
+// Сначала показывает, что нашла, и только по нажатию привязывает бесспорное —
+// то, у чего нет второго кандидата с той же суммой в тот же день. Спорное
+// остаётся человеку: две одинаковые суммы за день это монетка, а не совпадение.
+let WAL_M = null;
+
+async function walMatch(btn){
+  if(btn){ btn.disabled = true; btn.textContent = 'Сверяю…'; }
+  try{ WAL_M = await ownerApi.ownerFetch('/api/owner/wallet/match'); }
+  catch(e){ _toast('Не удалось сверить'); if(btn){ btn.disabled = false;
+    btn.textContent = 'Сверить с заказами'; } return; }
+  _setText('accTitle', 'Сверка с заказами');
+  ACC_BACK = () => { WAL_M = null; accWallet(); };
+  walMatchBody();
+}
+
+function walMatchBody(){
+  const m = WAL_M || {}, pairs = m.pairs || [];
+  const точные = pairs.filter(p => p.sure), спорные = pairs.filter(p => !p.sure);
+  _setText('accSub', `${m.orphans || 0} ${pluralize(m.orphans || 0,
+    'поступление','поступления','поступлений')} без заказа`);
+  document.getElementById('accMid').innerHTML = `
+    <div class="wal-led" style="margin-bottom:10px">
+      <div><span>Нашлось совпадений</span><b>${точные.length}</b></div>
+      ${спорные.length ? `<div><span>спорных — две суммы совпали</span><i>${
+        спорные.length}</i></div>` : ''}
+      <div class="rest"><span>Осталось без пары</span><b>${
+        Math.max(0, (m.orphans || 0) - pairs.length)}</b></div>
+    </div>
+    ${pairs.length ? `<div class="wal-l">${pairs.map(p => `
+      <div class="wal-r">
+        <span class="wal-r-b">
+          <span class="wal-r-t">Заказ #${escS(String(p.order_id))}${
+            p.sure ? '' : '<span class="wal-tag">спорный</span>'}</span>
+          <span class="wal-r-s">${escS(_walWhen(p.ts))} · ${fmtUsdt(p.amount)} USDT
+            ≈ ${fmt(p.order_total)} AED${p.off ? ' · расхождение ' + fmtUsdt(p.off) : ''}
+            · ${p.gap_h < 1 ? 'в тот же час' : 'через ' + p.gap_h + ' ч'}${
+            p.name ? ' · ' + escS(p.name) : ''}</span>
+        </span>
+        ${p.sure ? '' : `<button class="wal-link go" onclick="walPick('${
+          escS(p.txid)}',${p.amount},${p.ts})">выбрать</button>`}
+      </div>`).join('')}</div>`
+      : `<div class="scan-empty">Ни одно поступление не сошлось с заказом по
+          сумме и дню</div>`}`;
+  document.getElementById('accFoot').innerHTML = точные.length ? `
+    <div class="qb-wrap"><button class="qb" onclick="walMatchApply(this)">Привязать ${
+      точные.length} ${pluralize(точные.length,'совпадение','совпадения','совпадений')}</button></div>`
+    : '';
+}
+
+async function walMatchApply(btn){
+  if(btn){ btn.disabled = true; btn.textContent = 'Привязываю…'; }
+  let r;
+  try{ r = await ownerApi.ownerFetch('/api/owner/wallet/match',
+    {method:'POST', body:{as: _meName()}}); }
+  catch(e){ _toast('Не удалось привязать'); if(btn) btn.disabled = false; return; }
+  _toast(`Привязано ${r.taken || 0}`);
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  WAL_M = null;
+  await walRefresh();
 }
 
 // Привязка поступления к заказу. Личный заказ оператор ведёт руками: скидывает

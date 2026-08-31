@@ -1476,8 +1476,17 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 
    Отдельной колонки с числами нет: «207» и так стоит в подписи под названием,
    и вторая цифра рядом с первой не добавляла ничего, кроме шума. */
-.ck-head{padding:20px 18px 18px;border-radius:var(--r);margin-bottom:12px;
-  background:var(--card);border:1px solid var(--border2)}
+/* Шапка — не задача, и выглядеть как задача не должна: она отвечает за весь
+   список сразу. Отличает её не рамка потолще, а тёмное золотое стекло — тот
+   же приём, что у входа «Кто на каком районе» и у карточек денег. */
+.ck-head{position:relative;padding:20px 18px 18px;border-radius:var(--r);
+  margin-bottom:12px;overflow:hidden;
+  background:linear-gradient(158deg,rgba(201,169,110,.11),rgba(201,169,110,.02) 60%),
+             var(--card);
+  border:1px solid rgba(201,169,110,.18)}
+/* Золотая нить по верхней кромке — как у карточек денег. */
+.ck-head::before{content:'';position:absolute;left:0;right:0;top:0;height:1px;
+  background:linear-gradient(90deg,transparent,rgba(201,169,110,.5),transparent)}
 .ck-h-n{display:flex;align-items:baseline;gap:10px}
 .ck-h-v{font-family:'Space Grotesk',sans-serif;font-size:36px;font-weight:700;
   letter-spacing:-1.6px;line-height:1;font-variant-numeric:tabular-nums}

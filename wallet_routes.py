@@ -16,9 +16,12 @@ AMBAR — кошелёк USDT: сколько лежит и что по нему
 напрямую, счёта нет и связать их не с чем. Оба вида законны, и на экране они
 так и называются: через приложение и не через приложение.
 """
+import io
 import logging
 import time as _t
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
+
+DUBAI = timezone(timedelta(hours=4))
 
 from aiohttp import web
 
@@ -354,6 +357,103 @@ async def handle_match(request):
     return web.json_response(out, headers=CORS_HEADERS)
 
 
+# ── файлом в чат ────────────────────────────────────────────────────────────
+# Список переводов на экране — чтобы посмотреть, а файл — чтобы работать: свести
+# с бухгалтерией, отправить дальше, оставить у себя. Скачать из мини-приложения
+# некуда, поэтому бот кладёт документ владельцу в переписку, как и заявку.
+
+
+def _book(data: dict, only_linked: bool = False):
+    from openpyxl import Workbook
+    from openpyxl.styles import Font, Alignment, PatternFill
+
+    rows = [r for r in (data.get("transfers") or [])
+            if not only_linked or r.get("order_id")]
+    wb = Workbook()
+    ws = wb.active
+    ws.title = "Переводы"
+    шапка = ["Дата", "Время", "Направление", "USDT", "Заказ", "Как связано",
+             "Вторая сторона", "Транзакция"]
+    ws.append(шапка)
+    for i, _ in enumerate(шапка, 1):
+        c = ws.cell(row=1, column=i)
+        c.font = Font(bold=True, color="FFFFFF")
+        c.fill = PatternFill("solid", fgColor="1A1A32")
+        c.alignment = Alignment(horizontal="center")
+    for r in rows:
+        д = datetime.fromtimestamp((r.get("ts") or 0) / 1000, timezone.utc)
+        д = д.astimezone(DUBAI)
+        связь = ("счёт из бота" if r.get("order_id") and not r.get("linked")
+                 else "сверка / вручную" if r.get("linked") else "")
+        ws.append([д.strftime("%d.%m.%Y"), д.strftime("%H:%M"),
+                   "приход" if r.get("in") else "расход",
+                   round(float(r.get("amount") or 0), 2),
+                   str(r.get("order_id") or ""), связь,
+                   str(r.get("peer") or ""), str(r.get("txid") or "")])
+    for кол, ширина in zip("ABCDEFGH", (12, 8, 13, 12, 16, 18, 20, 46)):
+        ws.column_dimensions[кол].width = ширина
+    ws.freeze_panes = "A2"
+
+    итог = data.get("totals") or {}
+    ws.append([])
+    ws.append(["Пришло всего", "", "", итог.get("in")])
+    ws.append(["Ушло с кошелька", "", "", итог.get("out")])
+    ws.append(["Остаток", "", "", round((итог.get("in") or 0) - (итог.get("out") or 0), 2)])
+    ws.append(["Оплачено по нашим счетам", "", "", (data.get("paid") or {}).get("usdt")])
+    for i in range(len(rows) + 3, len(rows) + 7):
+        ws.cell(row=i, column=1).font = Font(bold=True)
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return buf.getvalue(), len(rows)
+
+
+@require_owner
+async def handle_export(request):
+    """Прислать переводы файлом в чат с ботом."""
+    from api_server import _aiohttp
+    from owner_routes import OWNER_BOT_TOKEN
+    if not OWNER_BOT_TOKEN:
+        return web.json_response({"error": "no_bot"}, status=500, headers=CORS_HEADERS)
+    only = str(request.query.get("linked") or "") in ("1", "true")
+    data = _CACHE["data"] if _CACHE["data"] else await _build()
+    raw, n = _book(data, only)
+    имя = ("ambar-postupleniya" if only else "ambar-koshelek") + \
+          f"-{datetime.now(DUBAI).strftime('%Y%m%d')}.xlsx"
+    итог = data.get("totals") or {}
+    подпись = (f"Поступления, сведённые с заказами · {n}" if only else
+               f"Кошелёк USDT · {n} "
+               + ("перевод" if n % 10 == 1 and n % 100 != 11 else "переводов")
+               + f"\nПришло {итог.get('in')} · ушло {итог.get('out')} · "
+               + f"остаток {round((итог.get('in') or 0) - (итог.get('out') or 0), 2)}")
+    form = _aiohttp.FormData()
+    form.add_field("chat_id", str(request.get("owner_id") or 0))
+    form.add_field("caption", подпись)
+    form.add_field("document", raw, filename=имя,
+                   content_type="application/vnd.openxmlformats-officedocument."
+                                "spreadsheetml.sheet")
+    url = f"https://api.telegram.org/bot{OWNER_BOT_TOKEN}/sendDocument"
+    to = _aiohttp.ClientTimeout(total=30)
+    try:
+        async with _aiohttp.ClientSession(timeout=to) as sess:
+            async with sess.post(url, data=form) as r:
+                res = await r.json()
+    except Exception as e:                       # noqa: BLE001
+        log.error(f"[wallet] отправка файла: {e}")
+        return web.json_response({"error": "send_failed"}, status=502, headers=CORS_HEADERS)
+    if not res.get("ok"):
+        log.error(f"[wallet] телеграм отказал: {res.get('description')}")
+        return web.json_response({"error": "telegram"}, status=502, headers=CORS_HEADERS)
+    # В реестр переписки владельца: по тревоге файл должен уходить вместе со
+    # всеми — в нём номера транзакций и суммы.
+    try:
+        from api_server import _remember_owner_msg
+        await _remember_owner_msg(OWNER_BOT_TOKEN, request.get("owner_id") or 0, res)
+    except Exception as e:                       # noqa: BLE001
+        log.debug(f"[wallet] реестр файла: {e}")
+    return web.json_response({"ok": True, "rows": n}, headers=CORS_HEADERS)
+
+
 async def _opt(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
@@ -365,6 +465,8 @@ def setup(app):
     app.router.add_post("/api/owner/wallet/link", handle_link)
     app.router.add_route("OPTIONS", "/api/owner/wallet/unlink", _opt)
     app.router.add_post("/api/owner/wallet/unlink", handle_unlink)
+    app.router.add_route("OPTIONS", "/api/owner/wallet/export", _opt)
+    app.router.add_post("/api/owner/wallet/export", handle_export)
     app.router.add_route("OPTIONS", "/api/owner/wallet/match", _opt)
     app.router.add_get("/api/owner/wallet/match", handle_match)
     app.router.add_post("/api/owner/wallet/match", handle_match)

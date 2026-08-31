@@ -56,6 +56,25 @@ DISTRICT_STAFF = [
 import os as _os
 
 
+# ── как называть человека в учёте ──────────────────────────────────────────
+# Имя в телеграме — личное дело человека, и меняться оно может по любому
+# поводу. В подписях правок, в письмах бота и в истории нужно другое: как его
+# зовут в работе. Отсюда эта таблица — id из тех, что и так лежат в коде, и
+# рабочее имя.
+DISPLAY_NAMES = {
+    686932322: "fixxxik",
+}
+
+
+def display_name(telegram_id, fallback: str = "") -> str:
+    """Рабочее имя человека; нет в таблице — то, что дали, иначе прочерк."""
+    try:
+        имя = DISPLAY_NAMES.get(int(telegram_id or 0))
+    except (TypeError, ValueError):
+        имя = None
+    return имя or (fallback or "").strip() or "—"
+
+
 def _parse_driver_ids(raw: str) -> dict:
     out = {}
     for part in (raw or "").split(","):

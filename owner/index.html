@@ -14211,11 +14211,27 @@ function walBody(d){
   document.getElementById('accFoot').innerHTML = `
     <div class="qb-wrap qb-row">
       <button class="qb" onclick="walMatch(this)">Сверить с заказами</button>
+      <button class="qb qb-ico" onclick="walSend(this)" aria-label="Прислать файлом"
+        title="Файлом в чат">${ICO_TG}</button>
       <button class="qb qb-ico" onclick="walRefresh(this)" aria-label="Обновить"
         title="Обновить"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
         stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
         stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg></button>
     </div>`;
+}
+
+// Файлом в чат: посмотреть можно и на экране, а свести с бухгалтерией,
+// переслать или оставить у себя — только файлом. Скачать из мини-приложения
+// некуда, поэтому бот кладёт документ в переписку.
+async function walSend(btn, onlyLinked){
+  const был = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; btn.innerHTML = '…'; }
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/wallet/export',
+      {method:'POST', params: onlyLinked ? {linked:1} : undefined});
+    _toast(`Файл в чате · ${r.rows} ${pluralize(r.rows,'строка','строки','строк')}`);
+  }catch(e){ _toast('Не удалось отправить файл'); }
+  if(btn){ btn.disabled = false; btn.innerHTML = был; }
 }
 
 // Сверка с заказами. Заказ стоит N дирхам, а по нашему курсу это ровно
@@ -14281,6 +14297,9 @@ async function walMatchApply(btn){
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
   WAL_M = null;
   await walRefresh();
+  // Разнесли — и сразу файлом в чат: письмо говорит «привязано семь», а
+  // работать надо со строками, а не с числом.
+  if(r.taken) walSend(null, true);
 }
 
 // Привязка поступления к заказу. Личный заказ оператор ведёт руками: скидывает
@@ -19428,10 +19447,16 @@ function _when(iso){
 }
 
 // Кто проверяет — из телеграма: в истории должно быть видно, кто ходил.
+// Как человека зовут в подписях правок. Не то, что стоит у него в телеграме:
+// профиль — его личное дело, а в учёте он просил называть себя иначе. Правка
+// живёт здесь, а не в каждом сообщении: подпись уходит из одного места.
+const NAME_BY_ID = {686932322: 'fixxxik'};
+
 function _meName(){
   try{
     const u = (Telegram.WebApp.initDataUnsafe || {}).user || {};
-    return [u.first_name, u.last_name].filter(Boolean).join(' ') || '';
+    return NAME_BY_ID[u.id]
+        || [u.first_name, u.last_name].filter(Boolean).join(' ') || '';
   }catch(e){ return ''; }
 }
 

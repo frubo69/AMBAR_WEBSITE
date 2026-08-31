@@ -364,8 +364,11 @@ async def _who(uid) -> str:
         u = await db.get_user(int(uid or 0)) or {}
     except Exception:
         u = {}
-    return (u.get("full_name") or u.get("name")
-            or f"{u.get('first_name','')} {u.get('last_name','')}".strip() or "—")
+    имя = (u.get("full_name") or u.get("name")
+           or f"{u.get('first_name','')} {u.get('last_name','')}".strip())
+    # Рабочее имя старше того, что стоит в телеграме и в карточке клиента.
+    import config_staff as staff
+    return staff.display_name(uid, имя)
 
 
 async def _story(doc: dict) -> list:

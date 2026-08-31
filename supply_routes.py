@@ -1129,6 +1129,7 @@ async def _supply_view(sup: dict) -> dict:
         "dropped": sup.get("dropped") or [], "short": sup.get("short") or [],
         "extra": sup.get("extra") or [], "unknown": sup.get("unknown") or [],
         "shortfall": short, "tasks": tasks,
+        "buys": sup.get("buys") or {},
         "districts": {o: {"code": OFFICE_CODES.get(o, ""),
                           "name": OFFICE_NAMES.get(o, o)} for o in OFFICE_IDS},
     }
@@ -1140,6 +1141,136 @@ async def handle_one(request):
     if not sup:
         return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
     return web.json_response(await _supply_view(sup), headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
+# ── закупка на доп. складах ─────────────────────────────────────────────────
+# Магазин дал не всё, остальное добирают на стороне — и там своя цена, каждый
+# раз другая. Прайс тут не поможет: он про то, почём мы это обычно берём, а не
+# почём взяли сегодня в чужом складе на другом конце города.
+#
+# Поэтому цена записывается руками, по строке недобора, и правится в любой
+# момент: съездили, взяли дешевле, чем договаривались, — поправили. Каждая
+# такая запись уходит владельцу: это деньги, потраченные вне заявки.
+BUY_QUIET = 25                        # секунд тишины до письма
+_BUYS: dict = {}
+
+
+def _plural(n, one, few, many) -> str:
+    n = abs(int(n or 0)) % 100
+    d = n % 10
+    if 10 < n < 20: return many
+    if 1 < d < 5:   return few
+    if d == 1:      return one
+    return many
+
+
+async def _buy_send(key) -> None:
+    import asyncio
+    try:
+        await asyncio.sleep(BUY_QUIET)
+    except asyncio.CancelledError:
+        return
+    st = _BUYS.pop(key, None)
+    if not st or not st["items"]:
+        return
+    try:
+        from owner_routes import notify_owners_force
+    except Exception as e:                       # noqa: BLE001
+        log.error(f"[supply] письмо о закупке не отправлено: {e}")
+        return
+    import stock_routes as SR
+    день = st["day"]
+    когда = "" if день == SR._biz_day() else f" за {день}"
+    строки = [f"💵 *Закупка на доп. складе{_md(когда)}*", _md(st["who"]), ""]
+    for it in st["items"][:30]:
+        if it["price"] <= 0:
+            строки.append(f"• {_md(it['name'])} — цена убрана")
+            continue
+        сумма = round(it["price"] * max(1, it["qty"]))
+        строка = (f"• {_md(it['name'])} — {it['qty']} "
+                  f"{_plural(it['qty'], 'бутылка', 'бутылки', 'бутылок')}"
+                  f" × {_money_str(it['price'])} = {_money_str(сумма)} AED")
+        if it.get("was") is not None:
+            строка += f" (было {_money_str(it['was'])})"
+        строки.append(строка)
+    if len(st["items"]) > 30:
+        строки.append(f"…и ещё {len(st['items']) - 30}")
+    итого = sum(round(i["price"] * max(1, i["qty"])) for i in st["items"] if i["price"] > 0)
+    if итого:
+        строки += ["", f"*Итого {_money_str(итого)} AED*"]
+    try:
+        await notify_owners_force("supply.buy", "\n".join(строки))
+    except Exception as e:                       # noqa: BLE001
+        log.error(f"[supply] письмо о закупке не ушло: {e}")
+
+
+def _money_str(v) -> str:
+    v = float(v or 0)
+    return str(int(v)) if abs(v - int(v)) < 0.005 else f"{v:.2f}".rstrip("0").rstrip(".")
+
+
+def _buy_note(key, who: str, day: str, item: dict) -> None:
+    import asyncio
+    st = _BUYS.setdefault(key, {"who": who or "—", "day": day, "items": [], "task": None})
+    if who:
+        st["who"] = who
+    # Одну и ту же позицию правят по два раза подряд, подбирая число: в письме
+    # должна остаться последняя цена, а не обе.
+    st["items"] = [x for x in st["items"] if x["id"] != item["id"]] + [item]
+    if st["task"]:
+        st["task"].cancel()
+    st["task"] = asyncio.create_task(_buy_send(key))
+
+
+@require_owner
+async def handle_buy(request):
+    """Записать или поправить закупочную цену позиции, взятой на доп. складе.
+
+    Пустая цена стирает запись: человек ошибся строкой, и «ноль AED» — это не
+    то же самое, что «не покупали»."""
+    sid = request.match_info.get("sid") or ""
+    sup = await db.supply_get(sid)
+    if not sup:
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    pid = str(body.get("product_id") or "").strip()
+    short = _shortfall(sup)
+    row = next((r for r in short["rows"] if r["id"] == pid), None)
+    if not row:
+        return web.json_response({"error": "not_in_shortfall"}, status=400,
+                                 headers=CORS_HEADERS)
+    try:
+        price = round(float(body.get("price") or 0), 2)
+    except (TypeError, ValueError):
+        price = 0.0
+    try:
+        qty = int(body.get("qty") or 0)
+    except (TypeError, ValueError):
+        qty = 0
+    if price < 0 or qty < 0 or price > 100000 or qty > 100000:
+        return web.json_response({"error": "bad_number"}, status=400, headers=CORS_HEADERS)
+    if not qty:
+        qty = int(row.get("gap") or 0)          # взяли, сколько не хватало
+    было = ((sup.get("buys") or {}).get(pid) or {}).get("price")
+    who = str(body.get("as") or "").strip()[:40]
+    now = datetime.now(timezone.utc)
+    doc = None if price <= 0 else {
+        "price": price, "qty": qty, "name": row.get("name") or "",
+        "at": now, "by": int(request.get("owner_id") or 0), "by_name": who,
+    }
+    if not await db.supply_buy_set(sid, pid, doc):
+        return web.json_response({"error": "not_saved"}, status=500, headers=CORS_HEADERS)
+    log.info(f"[supply] закупка {pid}: {price} × {qty} ({sid})")
+    _buy_note((sid, int(request.get("owner_id") or 0)), who, sup.get("day") or "",
+              {"id": pid, "name": row.get("name") or "", "price": price, "qty": qty,
+               "was": было if (было is not None and было != price) else None})
+    sup = await db.supply_get(sid)
+    return web.json_response({"ok": True, "buys": (sup or {}).get("buys") or {}},
+                             headers=CORS_HEADERS,
                              dumps=lambda o: __import__("json").dumps(o, default=str))
 
 
@@ -1322,6 +1453,7 @@ def setup(app):
         ("/api/owner/supply/import", handle_import, "POST"),
         ("/api/owner/supply",        handle_list,   "GET"),
         ("/api/owner/supply/{sid}",                 handle_one,          "GET"),
+        ("/api/owner/supply/{sid}/buy",             handle_buy,          "POST"),
         ("/api/owner/supply/{sid}/release",         handle_release,      "POST"),
         ("/api/owner/supply/{sid}/cancel",          handle_cancel,       "POST"),
         ("/api/owner/supply/{sid}/shortfall",       handle_short_export, "GET"),

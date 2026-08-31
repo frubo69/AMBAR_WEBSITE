@@ -1972,6 +1972,26 @@ button.path:active{transform:scale(.995)}
   color:var(--dn);font-variant-numeric:tabular-nums}
 .sup-sr-v.up{color:var(--up)}
 .sup-sr-more{padding-top:8px;font-size:11.5px;color:var(--muted)}
+/* Закупка на стороне: цена и сколько взяли стоят прямо под строкой недобора.
+   Отдельным экраном это было бы хождение туда-обратно по списку из десятка
+   позиций, а цену называют, глядя на ту же строку. */
+.sup-srw{border-top:1px solid var(--border2)}
+.sup-srw:first-of-type{border-top:none}
+.sup-srw .sup-sr{border-top:none}
+.sup-buy{display:flex;align-items:center;gap:8px;padding:0 0 10px 29px}
+.sup-buy input{width:76px;padding:6px 8px;border-radius:9px;background:var(--card2);
+  border:1px solid var(--border2);color:var(--text);font-size:13px;font-weight:600;
+  font-variant-numeric:tabular-nums;text-align:center;outline:none}
+.sup-buy input:focus{border-color:var(--border3)}
+.sup-buy input.sup-bq{width:58px}
+.sup-bx{font-size:12px;color:var(--muted)}
+.sup-bs{font-size:12px;color:var(--muted);font-variant-numeric:tabular-nums}
+.sup-bs.on{color:var(--up)}
+.sup-bs.err{color:var(--dn)}
+.sup-btot{padding-top:10px;margin-top:6px;border-top:1px solid var(--border2);
+  display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px}
+.sup-btot b{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;
+  color:var(--gold2);font-variant-numeric:tabular-nums}
 .sup-allgood{padding:14px;margin-bottom:10px;border-radius:15px;font-size:13px;
   color:var(--up);background:var(--up-soft);border:1px solid rgba(76,175,125,.25)}
 
@@ -14129,6 +14149,9 @@ function shortBody(d){
   _setText('accSub', `${fmt(short.qty)} ${
     pluralize(short.qty,'бутылка','бутылки','бутылок')} · заявка ${String(d.day || '').slice(0,10)}`);
   const why = {dropped:'магазин отказал', short:'урезал', gap:'не выдал при отгрузке'};
+  // Цены докупа приходят с заявкой: они её часть, а не отдельная книга.
+  SUP_BUYS = (d && d.buys) || {};
+  if(d && d.supply_id) SUP_ID = d.supply_id;   // сохранять цену некуда без него
   mid.innerHTML = `
     <div class="wo-q-head">
       <span class="wo-q-v">${fmt(short.qty)}</span>
@@ -14137,7 +14160,9 @@ function shortBody(d){
         pluralize(rows.length,'позиция','позиции','позиций')}</span>
     </div>
     <div class="sup-short">
-      ${rows.map((r, i) => `<div class="sup-sr">
+      ${rows.map((r, i) => {
+        const b = SUP_BUYS[r.id] || {};
+        return `<div class="sup-srw"><div class="sup-sr">
         <span class="sup-sr-i">${i + 1}</span>
         <span class="sup-sr-b">
           <span class="sup-sr-n">${escS(r.name)}</span>
@@ -14145,7 +14170,22 @@ function shortBody(d){
             Object.keys(r.by_district || {}).length ? ' · ' + Object.entries(r.by_district)
               .map(([o, n]) => `${(D[o]||{}).code || o} ${n}`).join(' · ') : ''}</span>
         </span>
-        <span class="sup-sr-v">${r.gap}</span></div>`).join('')}
+        <span class="sup-sr-v">${r.gap}</span></div>
+        <div class="sup-buy">
+          <input class="sup-bp" inputmode="decimal" enterkeyhint="done" placeholder="цена"
+                 data-p="${escS(r.id)}" value="${b.price != null ? b.price : ''}"
+                 onfocus="this.select()" onchange="supBuySave('${escS(r.id)}')"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">
+          <span class="sup-bx">×</span>
+          <input class="sup-bq" inputmode="numeric" enterkeyhint="done"
+                 data-q="${escS(r.id)}" value="${b.qty != null ? b.qty : r.gap}"
+                 onfocus="this.select()" onchange="supBuySave('${escS(r.id)}')"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();this.blur()}">
+          <span class="sup-bs" id="supBS-${escS(r.id)}">${_supSum(b)}</span>
+        </div></div>`;
+      }).join('')}
+      <div class="sup-btot"><span>докупили на</span>
+        <b id="supBTot">${fmt(_supTotal())} AED</b></div>
     </div>`;
   document.getElementById('accFoot').innerHTML = `
     <div class="qb-wrap qb-row">
@@ -14153,6 +14193,49 @@ function shortBody(d){
       <button class="qb qb-ico" id="supSend" onclick="supSend()"
               aria-label="Прислать файл в чат с ботом" title="В телеграм">${ICO_TG}</button>
     </div>`;
+}
+
+// Цена, по которой позицию взяли на доп. складе. Прайс на это не отвечает: он
+// про то, почём мы берём обычно, а не почём взяли сегодня на чужом складе.
+// Поэтому число вводится руками и правится в любой момент — а владелец узнаёт
+// о каждой такой записи: это деньги мимо заявки.
+let SUP_BUYS = {};
+
+function _supSum(b){
+  const p = Number(b && b.price) || 0, q = Number(b && b.qty) || 0;
+  return p > 0 ? `= ${fmt(Math.round(p * Math.max(1, q)))} AED` : '';
+}
+
+function _supTotal(){
+  return Object.values(SUP_BUYS || {}).reduce((a, b) =>
+    a + Math.round((Number(b.price) || 0) * Math.max(1, Number(b.qty) || 0)), 0);
+}
+
+async function supBuySave(pid){
+  const pe = document.querySelector(`.sup-bp[data-p="${pid}"]`);
+  const qe = document.querySelector(`.sup-bq[data-q="${pid}"]`);
+  const out = document.getElementById('supBS-' + pid);
+  if(!pe) return;
+  const price = Number(String(pe.value).replace(',', '.').trim()) || 0;
+  const qty   = Number(String(qe && qe.value || '').trim()) || 0;
+  if(price < 0 || qty < 0){ if(out){ out.className = 'sup-bs err'; out.textContent = 'не число'; } return; }
+  if(out){ out.className = 'sup-bs'; out.textContent = 'сохраняю…'; }
+  try{
+    const r = await ownerApi.ownerFetch(
+      '/api/owner/supply/' + encodeURIComponent(SUP_ID) + '/buy',
+      {method:'POST', body:{product_id: pid, price, qty, as: _meName()}});
+    SUP_BUYS = r.buys || {};
+    if(SUP_D) SUP_D.buys = SUP_BUYS;
+    const b = SUP_BUYS[pid] || {};
+    if(qe && b.qty != null) qe.value = b.qty;
+    if(out){ out.className = 'sup-bs on'; out.textContent = _supSum(b) || 'убрано'; }
+    const t = document.getElementById('supBTot');
+    if(t) t.textContent = fmt(_supTotal()) + ' AED';
+    try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  }catch(e){
+    if(out){ out.className = 'sup-bs err'; out.textContent = 'не сохранилось'; }
+    _toast('Не удалось сохранить цену');
+  }
 }
 
 // Список того, чего магазин не дал: файлом наружу или в чат с ботом. Обе

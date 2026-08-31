@@ -2110,6 +2110,19 @@ async def supply_list(limit: int = 30, status: str = None) -> list:
     return rows
 
 
+async def supply_buy_set(sid: str, product_id: str, doc: dict | None) -> bool:
+    """Записать закупку позиции на доп. складе. doc=None — стереть запись.
+
+    Живёт в самой заявке, а не отдельной книгой: докупали именно по этому
+    недобору, и в отрыве от него цена ни о чём не говорит."""
+    db = _db_or_none()
+    if db is None or not sid or not product_id: return False
+    upd = ({"$unset": {f"buys.{product_id}": ""}} if doc is None
+           else {"$set": {f"buys.{product_id}": doc}})
+    r = await db.supplies.update_one({"_id": sid}, upd)
+    return bool(r.matched_count)
+
+
 async def supply_bump(sid: str, product_id: str, by: int) -> dict | None:
     """Отметить, что одна бутылка позиции забрана.
 

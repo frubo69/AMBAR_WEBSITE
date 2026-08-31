@@ -4047,10 +4047,12 @@ button.path:active{transform:scale(.995)}
   <div class="ohero" id="offHero" data-detail="kpi:revenue">
    <div class="ohero-top">
     <div class="hero-amt-row"><span class="hero-amt mono" id="offHeroRev" data-aed="">—</span><span class="hero-unit cur-unit">AED</span></div>
-    <!-- Разбор на том же месте, что в шапке «Обзора»: между суммой и датой.
-         Валовой здесь нет — крупное число слева и есть она, из него
-         складываются карточки районов. Остаются три вычета. -->
+    <!-- Разбор на том же месте и в том же составе, что в шапке «Обзора»:
+         валовая, чаевые, расход, долг. Крупное число слева — то, что осталось
+         в руках, а валовая ушла в столбец: из неё складываются карточки
+         районов, и сверять их теперь есть с чем именно там, где они лежат. -->
     <div class="hero-side" id="offSide">
+      <span class="hero-side-r"><i><span class="w">валовая</span><span class="w2">вал</span></i><b id="offGross" data-aed="">—</b></span>
       <span class="hero-side-r"><i><span class="w">чаевые</span><span class="w2">чай</span></i><b class="gold" id="offTips" data-aed="">—</b></span>
       <span class="hero-side-r"><i><span class="w">расход</span><span class="w2">расх</span></i><b class="dn" id="offSpend" data-aed="">—</b></span>
       <span class="hero-side-r"><i><span class="w">в долг</span><span class="w2">долг</span></i><b class="warn" id="offDebt" data-aed="">—</b></span>
@@ -7500,6 +7502,10 @@ try{
 // Место считаем руками. scrollWidth тут врёт: под дату отведён правый отступ
 // (или она стоит соседом), столбец залезает в него — и переполнения по
 // scrollWidth не возникает, хотя цифры уже лежат поверх даты.
+// Вычеты из валовой, посчитанные разбором финансов: чаевые и расход смены.
+// Держим рядом, чтобы карточка районов не пересчитывала их по-своему.
+let OFF_CUT = {tips: 0, spend: 0};
+
 function heroSideFit(side){
   side = side || document.getElementById('heroSide');
   const box = side && side.parentElement;
@@ -9713,9 +9719,15 @@ function _paintHero(p, f){
   heroSideFit();
   // Те же четыре числа на карточке «Районов». Считает их одно место — иначе на
   // двух экранах за один и тот же день оказались бы разные суммы.
+  _setAed('offGross', f.revenue.current);
   _setAed('offTips',  tips);
   _setAed('offSpend', spend);
   _setAed('offDebt',  ((f.by_method || {}).debt || {}).aed || 0);
+  // Крупное число на «Районах» — то же, что на «Обзоре»: валовая минус чаевые
+  // и расход. Вычеты запоминаем: карточки районов считаются своим кодом и
+  // позже, а два экрана за один день обязаны показывать одно и то же.
+  OFF_CUT = {tips, spend};
+  _setAed('offHeroRev', Math.max(0, f.revenue.current - tips - spend));
   heroSideFit(document.getElementById('offSide'));
   _setAed('heroPrev', f.revenue.previous);
   _setText('heroDelta', f.revenue.delta_label);
@@ -14920,7 +14932,10 @@ function renderOffices(rows){
     tot.style.removeProperty('display');
     if(window.HERO_PLACE) HERO_PLACE();
     if(window.OFF_HERO_APPLY) OFF_HERO_APPLY();
-    _setAed('offHeroRev', total);
+    // Валовая — сумма карточек: она и есть проверка, что доли складываются.
+    // Крупным числом стоит остаток в руках, как на «Обзоре».
+    _setAed('offGross', total);
+    _setAed('offHeroRev', Math.max(0, total - (OFF_CUT.tips || 0) - (OFF_CUT.spend || 0)));
     _setText('offTotOrd', ord);
     _setAed('offTotAvg', dl ? Math.round(total/dl) : 0);
     _setText('offTotMin', mins.length

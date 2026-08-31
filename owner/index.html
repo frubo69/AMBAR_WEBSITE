@@ -13460,7 +13460,10 @@ function qrCat(id){
 
 function qrRenderList(){
   const q = (document.getElementById('qrQ')?.value || '').trim().toLowerCase();
-  const have = {}; (ACC_QR?.by_product || []).forEach(r => have[r.product_id] = r.count);
+  // Число рядом со строкой — про ЭТУ точку. Раньше сюда шёл общий счёт по всем
+  // точкам, и на B3 стояли числа B4: человек видел «41 Absolut» там, где не
+  // заведено ни одной бутылки.
+  const have = ((ACC_QR && ACC_QR.by_product_district) || {})[QR_DIST] || {};
   const slugs = (ACC_QR && ACC_QR.slugs) || {};
   // Порядок — как в рабочей таблице и на бумажном листе: 1…123. Считают,
   // стоя у полки, и алфавит здесь означал бы прыгать по залу.

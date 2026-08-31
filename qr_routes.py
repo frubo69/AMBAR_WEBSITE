@@ -151,6 +151,9 @@ async def handle_stats(request):
     last = await db.qr_last(limit=20)
     locks = await db.qr_locks(datetime.now(timezone.utc))
     by_district = await db.qr_by_district()
+    # Сколько чего лежит на КАЖДОЙ точке: список позиций показывает число той
+    # точки, где стоит человек, а не сумму по всем.
+    by_prod_dist = await db.qr_by_product_district_all()
     # Реестр знает, что бутылку внесли, и не знает, что её увезли: на доставке
     # коды никто не сканирует. Поэтому «продано» и «списано» берём оттуда, где
     # это правда, — из доставленных заказов и журнала списаний, с того дня,
@@ -172,6 +175,7 @@ async def handle_stats(request):
     return web.json_response({
         "locks": locks,
         "by_district": by_district,
+        "by_product_district": by_prod_dist,
         "left_by_district": left,
         "slugs": slug_map(),
         "totals": {

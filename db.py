@@ -2973,6 +2973,26 @@ async def qr_by_product_district(district: str) -> dict:
     return {d["_id"]: int(d["n"] or 0) for d in await cur.to_list(length=500) if d["_id"]}
 
 
+async def qr_by_product_district_all() -> dict:
+    """{точка: {позиция: сколько бутылок}} — одним запросом по всем точкам.
+
+    Список позиций во «Внести товар» показывает число рядом с каждой строкой, и
+    это число про ТУ точку, на которой стоит человек. Общий счёт по всем точкам
+    в этом месте — не сводка, а ошибка: на B3 показывалось то, что лежит на B4."""
+    db = _db_or_none()
+    if db is None: return {}
+    cur = db.qr_codes.aggregate([
+        {"$match": {"status": "active"}},
+        {"$group": {"_id": {"d": "$district", "p": "$product_id"}, "n": {"$sum": 1}}},
+    ])
+    out = {}
+    for r in await cur.to_list(length=5000):
+        d, pid = (r["_id"] or {}).get("d"), (r["_id"] or {}).get("p")
+        if not d or not pid: continue
+        out.setdefault(d, {})[pid] = int(r["n"] or 0)
+    return out
+
+
 async def qr_by_district() -> dict:
     """Сколько бутылок записано на каждой точке — для выбора точки."""
     db = _db_or_none()

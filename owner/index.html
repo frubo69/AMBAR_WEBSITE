@@ -14191,11 +14191,14 @@ function walBody(d){
             r.peer ? ' · ' + escS(r.peer) : ''}${
             r.linked && r.linked_by ? ' · ' + escS(r.linked_by) : ''}</span>
         </span>
-        ${r.in && r.txid ? (r.linked
+        <!-- Привязывать руками из ленты больше нечем: разносит сверка, а
+             человек только разбирает спорное. Кнопка на каждой строке звала
+             перебирать сто с лишним поступлений глазами — работу, которую
+             система делает по сумме и дню. Снять привязку по-прежнему можно:
+             отменяемость решения важнее его способа. -->
+        ${r.in && r.txid && r.linked
           ? `<button class="wal-link" onclick="walUnlink('${escS(r.txid)}')">снять</button>`
-          : (!r.order_id
-            ? `<button class="wal-link go" onclick="walPick('${escS(r.txid)}',${
-                Number(r.amount) || 0},${Number(r.ts) || 0})">к заказу</button>` : '')) : ''}
+          : ''}
         <span class="wal-r-v ${r.in ? '' : 'out'}">${r.in ? '+' : '−'}${
           fmtUsdt(r.amount)}<u>USDT</u></span>
       </div>`).join('')}${rows.length > WAL_N

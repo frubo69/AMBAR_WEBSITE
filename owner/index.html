@@ -1992,6 +1992,36 @@ button.path:active{transform:scale(.995)}
   display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px}
 .sup-btot b{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;
   color:var(--gold2);font-variant-numeric:tabular-nums}
+
+/* Кошелёк. Крупно — остаток, потому что за ним и заходят; ниже лента, где
+   приход и расход отличаются знаком и цветом, а не подписью. */
+.wal-c{padding:16px;border-radius:15px;background:var(--card);
+  border:1px solid var(--border2);margin-bottom:10px}
+.wal-v{font-family:'Space Grotesk',sans-serif;font-size:36px;font-weight:700;
+  line-height:1;letter-spacing:-1.2px;color:var(--text);font-variant-numeric:tabular-nums}
+.wal-v u{font-size:14px;font-weight:600;text-decoration:none;color:var(--muted);
+  margin-left:6px;letter-spacing:0}
+.wal-s{margin-top:7px;font-size:11.5px;color:var(--muted)}
+.wal-warn{margin-top:9px;font-size:11.5px;color:var(--warn)}
+.wal-sum{display:flex;gap:9px;margin-bottom:10px}
+.wal-sum div{flex:1;padding:11px 12px;border-radius:13px;background:var(--card);
+  border:1px solid var(--border2)}
+.wal-sum b{display:block;font-family:'Space Grotesk',sans-serif;font-size:19px;
+  font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.4px}
+.wal-sum span{display:block;margin-top:2px;font-size:10.5px;color:var(--muted)}
+.wal-sum .other b{color:var(--warn)}
+.wal-l{padding:4px 14px 14px;border-radius:15px;background:var(--card);
+  border:1px solid var(--border2)}
+.wal-r{display:flex;align-items:center;gap:11px;padding:10px 0;
+  border-top:1px solid var(--border2)}
+.wal-r:first-of-type{border-top:none}
+.wal-r-b{flex:1;min-width:0}
+.wal-r-t{display:block;font-size:13px;font-weight:600}
+.wal-r-s{display:block;margin-top:1px;font-size:11px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wal-r-v{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:15.5px;
+  font-weight:700;color:var(--up);font-variant-numeric:tabular-nums}
+.wal-r-v.out{color:var(--dn)}
 .sup-allgood{padding:14px;margin-bottom:10px;border-radius:15px;font-size:13px;
   color:var(--up);background:var(--up-soft);border:1px solid rgba(76,175,125,.25)}
 
@@ -11735,11 +11765,14 @@ const ACC = [
    ico:'<path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6.5 7l1 12.5h9L17.5 7"/><path d="M10 11v5M14 11v5"/>'},
   {id:'qr',       t:'Внести товар',      s:'коды с крышек / реестр бутылок',
    ico:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/>'},
+  {id:'wallet',   t:'Кошелёк',          s:'баланс USDT / история поступлений',
+   ico:'<rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10h19"/><circle cx="17" cy="14.5" r="1.4"/>'},
   {id:'check',    t:'Проверка бутылки',  s:'',
    ico:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/>'},
 ];
 let ACC_PERIOD = null, ACC_STOCK = null, ACC_ORDER = null, ACC_VIEW = null,
-    ACC_PROMO = null, ACC_GIFT = null, ACC_QR = null, ACC_CHK = null, ACC_SUP = null;
+    ACC_PROMO = null, ACC_GIFT = null, ACC_QR = null, ACC_CHK = null, ACC_SUP = null,
+    ACC_WAL = null;
 
 // Плитки учёта занимают ровно то, что осталось между шапкой и нижней панелью,
 // и ни пикселем больше: лишний пиксель — это ход под пальцем, а двигать тут
@@ -11902,6 +11935,8 @@ function accRender(){
       return [ACC_ORDER ? fmt(ACC_ORDER.total_qty) : null,
               ACC_ORDER ? pluralize(ACC_ORDER.total_qty,'штука','штуки','штук') : 'штук'];
     })(),
+    wallet:   [ACC_WAL ? fmt(Math.round((ACC_WAL.balance || {}).usdt || 0)) : null,
+               'USDT на кошельке'],
     qr:       [ACC_QR    ? fmt(ACC_QR.totals.active) : null,
                ACC_QR ? pluralize(ACC_QR.totals.active,'бутылка','бутылки','бутылок') : 'бутылок'],
     supply:   [ACC_SUP ? (ACC_SUP.open ? fmt(ACC_SUP.open.total_qty) : '—') : null,
@@ -12354,7 +12389,7 @@ async function accLoadSummaries(){
   const get = (p, params) => ownerApi.ownerFetch(p, params ? {params} : undefined).catch(()=>null);
   const день = accDay();
   ACC_LOADED_DAY = день;
-  const [per, st, ord, pr, gf, qr, chk, sup, exp] = await Promise.all([
+  const [per, st, ord, pr, gf, qr, chk, sup, exp, wal] = await Promise.all([
     get('/api/owner/expenses/period', {days:30}),
     get('/api/owner/stock/status', {day: день}),
     get('/api/owner/stock/order', {day: день}),
@@ -12368,7 +12403,11 @@ async function accLoadSummaries(){
     // Расходы смены тянем прямо сюда: цифра на плитке должна быть за
     // выбранный день, а не за сегодня, и раздел откроется уже загруженным.
     get('/api/owner/expenses', {day: день}),
+    // Кошелёк отвечает из своего получасового кэша, а не ходит в сеть на
+    // каждое открытие панели: цифра на плитке того не стоит.
+    get('/api/owner/wallet'),
   ]);
+  if(wal) ACC_WAL = wal;
   if(exp){ EXP.data = exp; EXP.day = exp.day; }
   ACC_PERIOD = per; ACC_STOCK = st; ACC_ORDER = ord; ACC_PROMO = pr; ACC_GIFT = gf; ACC_QR = qr;
   if(chk) ACC_CHK = chk;
@@ -12391,6 +12430,7 @@ function accOpen(id){
   if(id === 'promo')    accPromo();
   if(id === 'gift')     accGift();
   if(id === 'qr')       accQR();
+  if(id === 'wallet')   accWallet();
   if(id === 'supply')   accSupply();
   if(id === 'check')    accCheck();
   if(id === 'writeoff') accWriteoffs();
@@ -13924,6 +13964,82 @@ async function qrDone(){
     qrPick(QR_DIST);
     try{ ACC_QR = await ownerApi.ownerFetch('/api/owner/qr'); qrRenderList(); }catch(e){}
   }else accQR();
+}
+
+// ─── Кошелёк ────────────────────────────────────────────────────────────────
+// Всё, что здесь показано, приходит из блокчейна и только читается: ключей от
+// кошелька у сервера нет, отправить отсюда ничего нельзя. Поэтому и кнопки
+// «перевести» на экране не будет — её отсутствие тут не недоделка.
+function _walWhen(ms){
+  if(!ms) return '';
+  try{ return _when(new Date(Number(ms)).toISOString()); }catch(e){ return ''; }
+}
+
+async function accWallet(){
+  ACC_BACK = null;
+  _setRail('accRail', '');
+  _setText('accTitle', 'Кошелёк');
+  _setText('accSub', 'загрузка…');
+  document.getElementById('accFoot').innerHTML = '';
+  if(ACC_WAL) walBody(ACC_WAL);
+  try{ ACC_WAL = await ownerApi.ownerFetch('/api/owner/wallet'); }
+  catch(e){
+    if(!ACC_WAL) document.getElementById('accMid').innerHTML =
+      `<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>`;
+    return;
+  }
+  if(ACC_VIEW === 'wallet') walBody(ACC_WAL);
+}
+
+// Обновить принудительно: сервер держит ответ полминуты, и после только что
+// пришедшего перевода человек хочет увидеть его сейчас, а не через полминуты.
+async function walRefresh(btn){
+  if(btn){ btn.disabled = true; btn.textContent = 'Смотрю…'; }
+  try{ ACC_WAL = await ownerApi.ownerFetch('/api/owner/wallet', {params:{fresh:1}}); }
+  catch(e){ _toast('Не удалось обновить'); }
+  if(ACC_VIEW === 'wallet') walBody(ACC_WAL);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
+function walBody(d){
+  const mid = document.getElementById('accMid'); if(!mid) return;
+  const b = (d && d.balance) || {}, t = (d && d.totals) || {};
+  const rows = (d && d.transfers) || [];
+  _setText('accSub', d && d.address ? d.address : 'USDT · TRC-20');
+  // Не дозвонились до сети — это не «переводов нет». Показываем прямо, иначе
+  // пустой экран читается как пустой кошелёк.
+  const сеть = d && d.offline
+    ? `<div class="wal-warn">Сеть не ответила — числа могут быть старыми</div>` : '';
+  // TRX — не деньги, а топливо: без него с кошелька нельзя отправить даже
+  // свои USDT. Говорим об этом только когда его почти не осталось.
+  const газ = (b.trx != null && b.trx < 5)
+    ? `<div class="wal-warn">TRX на комиссию: ${b.trx} — на отправку может не хватить</div>` : '';
+  mid.innerHTML = `
+    <div class="wal-c">
+      <div class="wal-v">${fmt(Math.round((b.usdt || 0) * 100) / 100)}<u>USDT</u></div>
+      <div class="wal-s">TRX ${b.trx != null ? b.trx : '—'} · обновлено ${
+        _walWhen(d && d.at) || 'только что'}</div>
+      ${газ}${сеть}
+    </div>
+    <div class="wal-sum">
+      <div><b>${fmt(t.orders || 0)}</b><span>по заказам</span></div>
+      <div class="other"><b>${fmt(t.other || 0)}</b><span>мимо заказов</span></div>
+    </div>
+    ${rows.length ? `<div class="wal-l">${rows.map(r => `
+      <div class="wal-r">
+        <span class="wal-r-b">
+          <span class="wal-r-t">${r.in ? (r.order_id
+            ? 'Заказ #' + escS(String(r.order_id)) : 'Поступление') : 'Отправлено'}</span>
+          <span class="wal-r-s">${escS(_walWhen(r.ts))}${
+            r.peer ? ' · ' + escS(r.peer) : ''}</span>
+        </span>
+        <span class="wal-r-v ${r.in ? '' : 'out'}">${r.in ? '+' : '−'}${
+          fmt(Math.round((r.amount || 0) * 100) / 100)}</span>
+      </div>`).join('')}</div>`
+    : `<div class="scan-empty">${d && d.offline
+        ? 'Сеть не ответила' : 'Переводов пока не было'}</div>`}`;
+  document.getElementById('accFoot').innerHTML = `
+    <div class="qb-wrap"><button class="qb" onclick="walRefresh(this)">Обновить</button></div>`;
 }
 
 // ─── Удалить товар ──────────────────────────────────────────────────────────

@@ -2768,6 +2768,12 @@ def main():
         qr_routes.setup(app)
     except Exception as e:
         log.error(f"qr routes setup failed: {e}")
+    # Кошелёк USDT: баланс и переводы, только чтение.
+    try:
+        import wallet_routes
+        wallet_routes.setup(app)
+    except Exception as e:
+        log.error(f"wallet routes setup failed: {e}")
     # Заявка в магазин: Excel туда, Excel обратно, поставка на забор.
     try:
         import supply_routes

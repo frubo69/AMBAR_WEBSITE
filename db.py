@@ -1479,6 +1479,21 @@ async def get_crypto_invoice(oid: str) -> dict | None:
     return await db.crypto_invoices.find_one({"order_id": oid}, {"_id": 0})
 
 
+async def crypto_invoices_by_txids(txids: list) -> dict:
+    """Счета, оплаченные этими переводами: {txid: счёт}.
+
+    Нужно экрану кошелька: приход, за которым стоит наш счёт, — это оплата
+    заказа, а приход без счёта — деньги, пришедшие мимо. Разделить их можно
+    только так: txid у счёта уникален."""
+    db = _db_or_none()
+    txids = [t for t in (txids or []) if t]
+    if db is None or not txids: return {}
+    cur = db.crypto_invoices.find(
+        {"txid": {"$in": txids}},
+        {"_id": 0, "txid": 1, "order_id": 1, "amount_usdt": 1, "status": 1})
+    return {d["txid"]: d for d in await cur.to_list(length=len(txids)) if d.get("txid")}
+
+
 async def update_crypto_invoice(oid: str, **kw):
     db = _db_or_none()
     if db is None: return

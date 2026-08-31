@@ -84,3 +84,92 @@ async def get_incoming_usdt(address: str, since_ms: int,
             log.debug(f"[tron] parse item skipped: {e}")
             continue
     return out
+
+
+# ── кошелёк целиком: сколько лежит и что по нему ходило ─────────────────────
+# Watcher выше спрашивает узко — «пришёл ли платёж по этому счёту». Владельцу
+# нужен другой вопрос: сколько на кошельке сейчас и что по нему вообще было,
+# включая переводы мимо заказов и уходящие. Тот же ключ, те же права: читаем.
+
+
+async def _get(url: str, params: dict | None = None):
+    headers = {"TRON-PRO-API-KEY": TRONGRID_API_KEY, "Accept": "application/json"}
+    async with aiohttp.ClientSession(headers=headers) as session:
+        async with session.get(url, params=params or {},
+                               timeout=aiohttp.ClientTimeout(total=15)) as r:
+            if r.status != 200:
+                log.warning(f"[tron] HTTP {r.status} на {url}")
+                return None
+            return await r.json()
+
+
+async def get_balance(address: str) -> dict | None:
+    """Сколько лежит на кошельке: USDT и TRX.
+
+    TRX здесь не деньги, а топливо: без него с кошелька нельзя отправить даже
+    свои USDT. Ноль на этой строке однажды окажется важнее баланса."""
+    if not address or not TRONGRID_API_KEY:
+        return None
+    data = await _get(f"{TRONGRID_BASE_URL}/v1/accounts/{address}")
+    if not data:
+        return None
+    row = ((data or {}).get("data") or [None])[0]
+    if not row:
+        # Кошелёк, на который ещё ничего не приходило, TRON не знает вовсе.
+        return {"usdt": 0.0, "trx": 0.0, "unknown": True}
+    usdt = 0.0
+    for t in row.get("trc20") or []:
+        for addr, raw in (t or {}).items():
+            if addr == USDT_TRC20_CONTRACT:
+                try:
+                    usdt = round(int(raw) / _USDT_UNIT, USDT_DECIMALS)
+                except (TypeError, ValueError):
+                    pass
+    return {"usdt": usdt,
+            "trx": round(int(row.get("balance") or 0) / 1_000_000, 6),
+            "unknown": False}
+
+
+async def get_transfers(address: str, limit: int = 50,
+                        min_ts: int = 0) -> list[dict] | None:
+    """Переводы USDT по кошельку — и приход, и расход, новые сверху.
+
+    Отличие от get_incoming_usdt одно, но важное: там стоит only_to и порог по
+    времени счёта, потому что вопрос был «оплатили ли заказ». Здесь вопросов
+    нет — показываем всё, что ходило, иначе перевод мимо заказа так и остаётся
+    невидимым.
+
+    None — значит не дозвонились: это не то же самое, что «переводов нет»."""
+    if not address or not TRONGRID_API_KEY:
+        return None
+    params = {
+        "only_confirmed": "true",
+        "contract_address": USDT_TRC20_CONTRACT,
+        "limit": str(max(1, min(200, int(limit or 50)))),
+        "order_by": "block_timestamp,desc",
+    }
+    if min_ts:
+        params["min_timestamp"] = str(int(min_ts))
+    data = await _get(f"{TRONGRID_BASE_URL}/v1/accounts/{address}/transactions/trc20",
+                      params)
+    if data is None:
+        return None
+    me = address.strip()
+    out = []
+    for it in (data or {}).get("data", []):
+        try:
+            if ((it.get("token_info") or {}).get("address") or "") != USDT_TRC20_CONTRACT:
+                continue
+            to, frm = (it.get("to") or "").strip(), (it.get("from") or "").strip()
+            вход = to == me
+            out.append({
+                "amount": round(int(it.get("value", "0")) / _USDT_UNIT, USDT_DECIMALS),
+                "txid": it.get("transaction_id") or it.get("txID") or "",
+                "ts": int(it.get("block_timestamp", 0)),
+                "in": вход,
+                "peer": frm if вход else to,
+            })
+        except Exception as e:
+            log.debug(f"[tron] перевод пропущен: {e}")
+            continue
+    return out

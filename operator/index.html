@@ -3,6 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<!-- Штора поднимается раньше, чем нарисуется тело: иначе на входе панель
+     успевает мелькнуть, и весь смысл маскировки пропадает. -->
+<script>try{ if(localStorage.getItem('ambar_op_panic') === '1')
+  document.documentElement.classList.add('hid-boot'); }catch(e){}</script>
 <title>AMBAR · Операторская панель</title>
 <meta name="theme-color" content="#000006">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2086,6 +2090,116 @@ body.safe-open .cvo-hdr{opacity:0}
   .cust .lbl{margin:7px 0 4px}
   .total-row .v{font-size:23px}
 }
+
+/* ── скрытый режим и игра ─────────────────────────────────────────────── */
+html.hid-boot{background:#0b0e18}
+html.hid-boot body{visibility:hidden}
+html.hid-boot #gameApp{display:flex!important;visibility:visible}
+html.hid-boot #gameApp *{visibility:visible}
+.pnc{position:fixed;inset:0;z-index:300;display:none;flex-direction:column;
+  align-items:center;
+  padding:calc(64px + var(--safe-top)) 22px calc(40px + var(--safe-bottom));
+  background:#0a0a0c;-webkit-backdrop-filter:blur(30px);backdrop-filter:blur(30px)}
+.pnc.show{display:flex}
+.pnc-top{text-align:center;max-width:300px}
+.pnc-ico{display:flex;width:58px;height:58px;margin:0 auto 20px;border-radius:50%;
+  align-items:center;justify-content:center;color:#E05555;
+  background:rgba(224,85,85,.14);border:1px solid rgba(224,85,85,.3)}
+.pnc-t{font-size:22px;font-weight:700;letter-spacing:-.4px;line-height:1.2}
+.pnc-s{margin-top:10px;font-size:14px;line-height:1.5;color:var(--sub)}
+/* Ползунок стоит в оптической середине оставшегося места, а не прибит к низу:
+   до него дотягиваются большим пальцем, не перехватывая телефон. */
+.pnc-slide{position:relative;width:100%;max-width:330px;height:68px;border-radius:999px;
+  overflow:hidden;background:rgba(255,255,255,.1);
+  border:1px solid rgba(255,255,255,.06);margin:auto 0;touch-action:pan-y}
+.pnc-fill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:999px;
+  background:rgba(224,85,85,.28)}
+/* Подпись выровнена по свободной части дорожки, а не по всей: иначе она
+   упирается в ручку и читается как её продолжение. */
+.pnc-track{position:absolute;inset:0 18px 0 68px;display:flex;align-items:center;
+  justify-content:center;font-size:15.5px;font-weight:600;pointer-events:none}
+/* Блик бежит по надписи, как на системном «выключить»: он говорит, что это не
+   картинка, а то, что нужно тянуть. */
+.pnc-track span{background:linear-gradient(100deg,
+    rgba(255,255,255,.32) 30%, rgba(255,255,255,.92) 48%, rgba(255,255,255,.32) 66%);
+  background-size:280% 100%;-webkit-background-clip:text;background-clip:text;
+  color:transparent;animation:pncShine 2.6s linear infinite;white-space:nowrap}
+@keyframes pncShine{from{background-position:180% 0}to{background-position:-120% 0}}
+@media (prefers-reduced-motion:reduce){
+  .pnc-track span{animation:none;color:rgba(255,255,255,.7)}
+}
+.pnc-knob{position:absolute;top:5px;left:5px;width:58px;height:58px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;color:#E05555;background:#fff;
+  box-shadow:0 3px 14px rgba(0,0,0,.5);transition:transform .22s var(--e1)}
+.pnc-slide.drag .pnc-knob{transition:none}
+.pnc-x{margin-top:auto;display:flex;flex-direction:column;align-items:center;gap:11px;border:none;
+  background:none;cursor:pointer;font-family:inherit;color:var(--text);padding:0}
+.pnc-x-c{width:66px;height:66px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;background:rgba(255,255,255,.14)}
+.pnc-x:active .pnc-x-c{background:rgba(255,255,255,.22)}
+.pnc-x-t{font-size:15px}
+
+/* ── Геопозиция ────────────────────────────────────────────────────────────
+   Строка появляется, только когда доступа нет: тогда она и объяснение, и
+   единственная дверь к разрешению. Когда всё в порядке — её нет вовсе, потому
+   что сказать нечего, а место на экране водителя дорого. */
+.geo-bar{display:flex;align-items:center;gap:11px;width:100%;margin-bottom:10px;
+  padding:12px 13px;border-radius:14px;text-align:left;cursor:pointer;
+  font-family:inherit;color:var(--text);
+  background:rgba(224,85,85,.08);border:1px solid rgba(224,85,85,.26)}
+.geo-bar:active{background:rgba(224,85,85,.14)}
+.geo-ic{display:flex;width:32px;height:32px;flex:0 0 auto;border-radius:11px;
+  align-items:center;justify-content:center;color:#E05555;
+  background:rgba(224,85,85,.12);border:1px solid rgba(224,85,85,.24)}
+.geo-b{flex:1;min-width:0}
+.geo-b b{display:block;font-size:13px;font-weight:600;line-height:1.25}
+.geo-b i{display:block;font-style:normal;font-size:11.5px;color:var(--sub);
+  margin-top:3px;line-height:1.35}
+.geo-go{flex:0 0 auto;color:var(--sub);font-size:17px}
+
+/* ── маскировка: игра ──────────────────────────────────────────────────────
+   Всё, что делает её похожей на настоящую: своё имя с логотипом, счёт-линии-
+   уровень в шапке, следующая фигура, кнопки под большой палец и конец игры с
+   рекордом. Каждая из этих мелочей по отдельности не важна, а вместе они и
+   отличают игру от «экрана, который кто-то нарисовал». */
+.gm{position:fixed;inset:0;z-index:400;display:none;flex-direction:column;
+  background:#0b0e18;color:#e8ecf5;
+  padding:calc(14px + var(--safe-top)) 14px calc(14px + var(--safe-bottom));
+  font-family:-apple-system,'SF Pro Display','Segoe UI',sans-serif;user-select:none}
+.gm.show{display:flex}
+.gm-top{flex:0 0 auto}
+.gm-logo{font-size:21px;font-weight:800;letter-spacing:3px;color:#5ad1ff;
+  text-align:center;text-shadow:0 0 18px rgba(90,209,255,.45);
+  /* Иначе долгое нажатие по тексту телефон принимает за выделение: показывает
+     лупу, а приложению присылает отмену касания. */
+  -webkit-touch-callout:none;-webkit-user-select:none;user-select:none;
+  touch-action:manipulation;padding:6px 0;transition:opacity .2s var(--e1)}
+.gm-logo.hold{opacity:.55}
+.gm-logo span{color:#ffd166}
+.gm-stats{display:flex;justify-content:space-between;gap:8px;margin:12px 0 10px;
+  padding:9px 14px;border-radius:12px;background:rgba(255,255,255,.05);
+  border:1px solid rgba(255,255,255,.07)}
+.gm-stats span{display:flex;flex-direction:column;align-items:center;gap:2px}
+.gm-stats i{font-style:normal;font-size:8.5px;letter-spacing:1.2px;color:#7d89a6}
+.gm-stats b{font-size:16px;font-weight:700;font-variant-numeric:tabular-nums}
+.gm-field{position:relative;flex:1;min-height:0;display:flex;align-items:center;
+  justify-content:center}
+#gmC{border-radius:10px;background:#070a12;box-shadow:0 0 0 1px rgba(255,255,255,.07),
+  inset 0 0 40px rgba(0,0,0,.6)}
+.gm-over{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;
+  justify-content:center;gap:9px;border-radius:10px;background:rgba(7,10,18,.9)}
+.gm-over.show{display:flex}
+.gm-over-t{font-size:20px;font-weight:800;letter-spacing:.4px}
+.gm-over-s{font-size:12.5px;color:#7d89a6}
+.gm-again{margin-top:8px;padding:12px 24px;border-radius:11px;border:none;cursor:pointer;
+  font-family:inherit;font-size:14px;font-weight:700;color:#06121c;
+  background:linear-gradient(135deg,#5ad1ff,#7ef0c8)}
+.gm-pad{flex:0 0 auto;display:grid;grid-template-columns:repeat(4,1fr);gap:9px;
+  margin-top:12px}
+.gm-b{height:58px;border-radius:14px;border:1px solid rgba(255,255,255,.09);
+  cursor:pointer;font-family:inherit;font-size:19px;color:#cfd8ea;
+  background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center}
+.gm-b:active{background:rgba(90,209,255,.22);color:#fff}
 </style>
 </head>
 <body>
@@ -2097,7 +2211,7 @@ body.safe-open .cvo-hdr{opacity:0}
 
 <div id="app">
   <div class="hdr">
-    <div><div class="hdr-logo">AMBAR</div><div class="hdr-sub">Панель оператора</div></div>
+    <div><div class="hdr-logo" onclick="pncTap()" style="cursor:default;-webkit-user-select:none;user-select:none">AMBAR</div><div class="hdr-sub">Панель оператора</div></div>
     <div class="office-seg" id="officeSeg" style="display:none"></div>
     <!-- Шапка сгруппирована по смыслу: сначала то, что зовёт (события и
          поддержка), потом контекст смены (кто за планшетом и за какой день),
@@ -2656,6 +2770,10 @@ body.safe-open .cvo-hdr{opacity:0}
 
 <script>
 const tg = window.Telegram && window.Telegram.WebApp;
+// Штора переживает перезапуск приложения: флаг лежит рядом, а состояние — на
+// сервере. Свернуть телеграм и открыть заново — не способ её снять.
+try{ if(localStorage.getItem('ambar_op_panic') === '1')
+  document.addEventListener('DOMContentLoaded', () => { try{ PANIC = true; paintPanic(); }catch(e){} }); }catch(e){}
 try{
   tg.ready(); tg.expand();
   // True fullscreen (no Telegram chrome/frame). No version guard — just try; on iPad
@@ -3259,6 +3377,9 @@ function openCatalog(){
 
 // ── очередь ──
 async function loadQueue(){
+  // В скрытом режиме приложение не ходит в сеть вовсе: ответ сервера может
+  // прийти вместе со звуком и всплывшей карточкой поверх игры.
+  if(PANIC) return;
   if(!curOp) { renderQueue(); return; }
   let r;
   // Стоим на прошлой смене — и «за день» показывает её же: иначе оператор
@@ -7024,6 +7145,406 @@ function _callPaint(){
   callVidPaint();
 }
 
+</script>
+
+<div class="pnc" id="pncOv">
+  <div class="pnc-top">
+    <span class="pnc-ico">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M12 3 3 19.5h18z"/><path d="M12 10v4M12 17h.01"/></svg>
+    </span>
+    <h2 class="pnc-t">Скрыть приложение</h2>
+    <p class="pnc-s">Панель спрячется под игру. Заказы ваших районов пока уйдут ближайшему оператору, владелец увидит, что вы отошли.</p>
+  </div>
+
+  <div class="pnc-slide" id="pncSlide">
+    <div class="pnc-fill" id="pncFill"></div>
+    <div class="pnc-track" id="pncTrack"><span>сдвиньте, чтобы скрыть</span></div>
+    <div class="pnc-knob" id="pncKnob">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
+        stroke-width="2.2" stroke-linecap="round"><path d="M12 3v9"/>
+        <path d="M18.4 6.6a9 9 0 1 1-12.8 0"/></svg>
+    </div>
+  </div>
+
+  <button class="pnc-x" onclick="pncClose()">
+    <span class="pnc-x-c">
+      <svg viewBox="0 0 24 24" width="26" height="26" fill="none" stroke="currentColor"
+        stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+    </span>
+    <span class="pnc-x-t">Отмена</span>
+  </button>
+</div>
+
+<!-- Маскировка. Обычная игра-падалка: она есть на любом телефоне, её не
+     разглядывают и в неё, чего доброго, начнут играть — поэтому она играется
+     по-настоящему. Пустая картинка выдала бы себя первым же касанием.
+     Выход — долгое нажатие на название. -->
+<div class="gm" id="gameApp">
+  <div class="gm-top">
+    <div class="gm-logo" id="gmLogo">BLOCK<span>OPER</span></div>
+    <div class="gm-stats">
+      <span><i>СЧЁТ</i><b id="gmScore">0</b></span>
+      <span><i>ЛИНИИ</i><b id="gmLines">0</b></span>
+      <span><i>УРОВЕНЬ</i><b id="gmLevel">1</b></span>
+    </div>
+  </div>
+  <div class="gm-field">
+    <canvas id="gmC"></canvas>
+    <div class="gm-over" id="gmOver">
+      <div class="gm-over-t">Игра окончена</div>
+      <div class="gm-over-s" id="gmBest"></div>
+      <button class="gm-again" onclick="gmStart()">Играть снова</button>
+    </div>
+  </div>
+  <div class="gm-pad">
+    <button class="gm-b" data-a="left">◀</button>
+    <button class="gm-b" data-a="rot">
+      <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+        stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M21 12a9 9 0 1 1-3-6.7"/><path d="M21 4v5h-5"/></svg>
+    </button>
+    <button class="gm-b" data-a="right">▶</button>
+    <button class="gm-b wide" data-a="drop">▼</button>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════════════════
+//  СКРЫТЫЙ РЕЖИМ
+// ══════════════════════════════════════════════════════════════════════════
+// Водитель может оказаться там, где в его телефон смотрит кто-то ещё. Тогда он
+// трижды касается своего имени в шапке и сдвигает ползунок — приложение
+// перестаёт быть приложением доставки.
+//
+// Три решения, на которых всё держится:
+//
+//   • маскировка — калькулятор. Он есть у всех, его никто не разглядывает, и
+//     он должен по-настоящему считать: человек, взявший телефон, скорее всего
+//     нажмёт пару кнопок. Пустая картинка выдаёт себя первым же нажатием;
+//   • после сдвига не появляется ничего. Ни тоста, ни галочки, ни «отправлено»:
+//     рядом кто-то есть, и подтверждение увидит он же. Экран просто становится
+//     другим;
+//   • режим живёт на сервере. Закрыть приложение, выгрузить его из памяти,
+//     открыть заново — маскировка на месте. Иначе достаточно было бы свернуть
+//     телеграм, чтобы всё слетело.
+//
+// Выход — код на калькуляторе и «=». Код лежит в коде приложения, и это не
+// тайна от того, кто умеет читать исходники, — но угроза здесь другая: чужой
+// человек рядом, а не программист.
+// Отклик пальцу. В приложении водителя это _tap, здесь haptic — имя другое,
+// а нужен тот же короткий толчок, поэтому переходник, а не правка всего кода.
+function _tap(k){
+  try{ haptic(k === 'ok' ? 'medium' : (k === 'soft' ? 'light' : (k || 'light'))); }
+  catch(e){}
+}
+
+let PANIC = false, _pncTaps = [];
+
+// Тройное касание по имени. Считаем только быстрые серии: касания, разнесённые
+// на секунды, — это обычные промахи по шапке.
+function pncTap(){
+  const now = Date.now();
+  _pncTaps = _pncTaps.filter(t => now - t < 1200);
+  _pncTaps.push(now);
+  if(_pncTaps.length >= 3){ _pncTaps = []; pncOpen(); }
+}
+
+function pncOpen(){
+  document.getElementById('pncOv').classList.add('show');
+  pncKnobReset();
+  _tap('light');
+}
+
+function pncClose(){
+  document.getElementById('pncOv').classList.remove('show');
+  pncKnobReset();
+}
+
+function pncKnobReset(){
+  const k = document.getElementById('pncKnob'), f = document.getElementById('pncFill');
+  const t = document.getElementById('pncTrack');
+  if(k) k.style.transform = 'translateX(0)';
+  if(f) f.style.width = '0px';
+  if(t){ t.style.opacity = '1'; t.style.filter = 'none'; }
+  document.getElementById('pncSlide').classList.remove('drag');
+}
+
+// Включение и выключение — одна дорога, разница только в направлении.
+async function panicSet(on){
+  PANIC = on;
+  try{ localStorage.setItem('ambar_op_panic', on ? '1' : '0'); }catch(e){}
+  paintPanic();
+  // Запрос уходит следом и молча: если сеть подведёт, маскировка всё равно уже
+  // на экране — она важнее записи в базе.
+  try{ await opApi.opFetch('/api/operator/panic', {method:'POST', body:{on}}); }
+  catch(e){}
+  // Выйдя из режима, поднимаем приложение заново. В скрытом режиме оно ничего
+  // не грузило и не опрашивало, и оживлять его по частям — верный способ
+  // забыть одну из частей.
+  if(!on) setTimeout(() => location.reload(), 120);
+}
+
+function paintPanic(){
+  // Класс, поднимающий штору до первой отрисовки, держим в согласии с флагом.
+  document.documentElement.classList.toggle('hid-boot', !!PANIC);
+  const c = document.getElementById('gameApp');
+  document.getElementById('pncOv').classList.remove('show');
+  c.classList.toggle('show', PANIC);
+  document.body.style.overflow = PANIC ? 'hidden' : '';
+  if(PANIC){
+    gmInit();
+    // Всё, что может выдать: опрос заказов, звук нового заказа, экран заказа.
+    // Всё, что может выдать: открытые окна, звук нового заказа, опрос очереди.
+    try{ document.querySelectorAll('.ov.show,.sheet.show,.fd-ov.show')
+           .forEach(el => el.classList.remove('show')); }catch(e){}
+    try{ alarmStop(); }catch(e){}
+  }
+}
+
+// ── игра ───────────────────────────────────────────────────────────────────
+// Настоящая падалка на семь фигур: вращение, ускорение, сгорание линий, рост
+// скорости, рекорд. Всё это здесь не ради игры, а ради правдоподобия: человек,
+// у которого в руках чужой телефон, скорее всего нажмёт пару кнопок — и они
+// должны отзываться так, как он ожидает.
+const GM_W = 10, GM_H = 20;
+const GM_PIECES = [
+  [[1,1,1,1]],                       // I
+  [[1,1],[1,1]],                     // O
+  [[0,1,0],[1,1,1]],                 // T
+  [[0,1,1],[1,1,0]],                 // S
+  [[1,1,0],[0,1,1]],                 // Z
+  [[1,0,0],[1,1,1]],                 // J
+  [[0,0,1],[1,1,1]],                 // L
+];
+const GM_COLORS = ['#5ad1ff','#ffd166','#c792ea','#7ef0c8','#ff8fa3','#8ab4ff','#ffb26b'];
+let GM = null, _gmRaf = null, _gmCell = 0;
+
+function gmInit(){
+  const c = document.getElementById('gmC');
+  if(!c.dataset.ready){
+    c.dataset.ready = '1';
+    document.querySelectorAll('.gm-b').forEach(b => {
+      const act = () => gmAct(b.dataset.a);
+      b.addEventListener('click', act);
+    });
+    // Долгое нажатие на название — выход. Чужой человек название не держит, а
+    // водитель делает это одной рукой, не глядя.
+    // Долгое нажатие пальцем по тексту телефон понимает по-своему: показывает
+    // лупу и меню «Скопировать», а нам присылает touchcancel — таймер сбрасывался,
+    // и выход не срабатывал ни разу. Поэтому у названия отключено выделение и
+    // системное меню, а само нажатие слушается через pointer-события: они
+    // приходят одинаково и от пальца, и от мыши.
+    const logo = document.getElementById('gmLogo');
+    let t = null, arm = null;
+    const stop = () => {
+      clearTimeout(t); clearTimeout(arm); t = arm = null;
+      logo.classList.remove('hold');
+    };
+    const down = e => {
+      if(t) return;
+      // На середине пути — короткий толчок: палец узнаёт, что удержание
+      // засчитывается, и его не убирают раньше времени.
+      arm = setTimeout(() => { _tap('light'); logo.classList.add('hold'); }, 900);
+      t = setTimeout(() => { stop(); _tap('ok'); panicSet(false); }, 1800);
+      if(e && e.preventDefault && e.cancelable) e.preventDefault();
+    };
+    logo.addEventListener('pointerdown', down);
+    ['pointerup','pointercancel','pointerleave'].forEach(e =>
+      logo.addEventListener(e, stop));
+    // Запасной путь для старых вебвью без pointer-событий.
+    logo.addEventListener('touchstart', down, {passive:false});
+    ['touchend','touchcancel'].forEach(e => logo.addEventListener(e, stop));
+    logo.addEventListener('contextmenu', e => e.preventDefault());
+  }
+  gmFit();
+  gmWatch();
+  if(!GM) gmStart(); else gmPaint();
+  window.addEventListener('resize', gmFit);
+}
+
+function gmFit(){
+  const c = document.getElementById('gmC');
+  if(!c) return;
+  const box = c.parentElement.getBoundingClientRect();
+  // Размер поля считаем и по своему боксу, и по экрану. При запуске телеграм
+  // какое-то время отдаёт вебвью высоту больше настоящей, и клетка получалась
+  // огромной: на экране оставался кусок поля в несколько клеток. Экран здесь —
+  // верхняя граница, ниже которой поле обязано поместиться целиком.
+  const vw = Math.min(box.width || innerWidth, innerWidth);
+  const vh = Math.min(box.height || innerHeight, innerHeight);
+  if(!vh || !vw) return;
+  const cell = Math.floor(Math.min(vw / GM_W, vh / GM_H));
+  if(cell < 4 || cell === _gmCell) { if(cell === _gmCell && GM) gmPaint(); return; }
+  _gmCell = cell;
+  const dpr = Math.min(3, window.devicePixelRatio || 1);
+  c.style.width = (_gmCell * GM_W) + 'px';
+  c.style.height = (_gmCell * GM_H) + 'px';
+  c.width = _gmCell * GM_W * dpr;
+  c.height = _gmCell * GM_H * dpr;
+  c.getContext('2d').setTransform(dpr, 0, 0, dpr, 0, 0);
+  if(GM) gmPaint();
+}
+
+// Поле пересобирается всякий раз, когда меняется его коробка: возврат в
+// приложение, поворот, появление клавиатуры, доезд анимации телеграма. Раньше
+// размер считался один раз при открытии — и оставался неверным до перезапуска.
+function gmWatch(){
+  const c = document.getElementById('gmC');
+  if(!c || gmWatch._on) return;
+  gmWatch._on = true;
+  try{
+    new ResizeObserver(() => gmFit()).observe(c.parentElement);
+  }catch(e){}
+  addEventListener('orientationchange', () => setTimeout(gmFit, 120));
+  document.addEventListener('visibilitychange', () => { if(!document.hidden) setTimeout(gmFit, 60); });
+  addEventListener('pageshow', () => setTimeout(gmFit, 60));
+  try{ Telegram.WebApp.onEvent('viewportChanged', () => setTimeout(gmFit, 60)); }catch(e){}
+}
+
+function gmStart(){
+  document.getElementById('gmOver').classList.remove('show');
+  GM = {grid: Array.from({length: GM_H}, () => Array(GM_W).fill(0)),
+        p: null, next: gmRand(), score: 0, lines: 0, level: 1,
+        drop: 0, speed: 800, over: false, last: 0};
+  gmSpawn();
+  gmStats();
+  if(_gmRaf) cancelAnimationFrame(_gmRaf);
+  GM.last = 0;
+  _gmRaf = requestAnimationFrame(gmLoop);
+}
+
+const gmRand = () => {
+  const i = Math.floor(Math.random() * GM_PIECES.length);
+  return {sh: GM_PIECES[i].map(r => r.slice()), c: i + 1};
+};
+
+function gmSpawn(){
+  const n = GM.next;
+  GM.next = gmRand();
+  GM.p = {sh: n.sh, c: n.c, x: Math.floor((GM_W - n.sh[0].length) / 2), y: 0};
+  if(gmHit(GM.p.sh, GM.p.x, GM.p.y)) gmEnd();
+}
+
+function gmHit(sh, x, y){
+  for(let r = 0; r < sh.length; r++)
+    for(let k = 0; k < sh[r].length; k++){
+      if(!sh[r][k]) continue;
+      const nx = x + k, ny = y + r;
+      if(nx < 0 || nx >= GM_W || ny >= GM_H) return true;
+      if(ny >= 0 && GM.grid[ny][nx]) return true;
+    }
+  return false;
+}
+
+function gmMerge(){
+  const p = GM.p;
+  p.sh.forEach((row, r) => row.forEach((v, k) => {
+    if(v && p.y + r >= 0) GM.grid[p.y + r][p.x + k] = p.c;
+  }));
+  // Сгоревшие линии: считаем разом, чтобы очки за четыре сразу были больше,
+  // чем за четыре по одной, — так в этой игре и принято.
+  let burned = 0;
+  for(let r = GM_H - 1; r >= 0; r--){
+    if(GM.grid[r].every(v => v)){
+      GM.grid.splice(r, 1);
+      GM.grid.unshift(Array(GM_W).fill(0));
+      burned++; r++;
+    }
+  }
+  if(burned){
+    GM.lines += burned;
+    GM.score += [0, 100, 300, 500, 800][burned] * GM.level;
+    GM.level = 1 + Math.floor(GM.lines / 10);
+    GM.speed = Math.max(90, 800 - (GM.level - 1) * 70);
+    _tap('light');
+    gmStats();
+  }
+  gmSpawn();
+}
+
+function gmStats(){
+  _setText('gmScore', String(GM.score));
+  _setText('gmLines', String(GM.lines));
+  _setText('gmLevel', String(GM.level));
+}
+
+function gmEnd(){
+  GM.over = true;
+  let best = 0;
+  try{ best = parseInt(localStorage.getItem('bf_best') || '0', 10) || 0; }catch(e){}
+  if(GM.score > best){
+    best = GM.score;
+    try{ localStorage.setItem('bf_best', String(best)); }catch(e){}
+  }
+  _setText('gmBest', `Счёт ${GM.score} · рекорд ${best}`);
+  document.getElementById('gmOver').classList.add('show');
+}
+
+function gmAct(a){
+  if(!GM || GM.over) return;
+  const p = GM.p;
+  if(a === 'left'  && !gmHit(p.sh, p.x - 1, p.y)) p.x--;
+  if(a === 'right' && !gmHit(p.sh, p.x + 1, p.y)) p.x++;
+  if(a === 'rot'){
+    const r = p.sh[0].map((_, i) => p.sh.map(row => row[i]).reverse());
+    // Пристенное вращение: у стены фигура сдвигается, а не отказывается
+    // крутиться. Без этого игра ощущается сломанной.
+    for(const dx of [0, -1, 1, -2, 2]){
+      if(!gmHit(r, p.x + dx, p.y)){ p.sh = r; p.x += dx; break; }
+    }
+  }
+  if(a === 'drop'){
+    while(!gmHit(p.sh, p.x, p.y + 1)) p.y++;
+    gmMerge();
+  }
+  _tap('sel');
+  gmPaint();
+}
+
+function gmLoop(ts){
+  _gmRaf = requestAnimationFrame(gmLoop);
+  if(!GM || GM.over) return;
+  if(!GM.last) GM.last = ts;
+  if(ts - GM.last >= GM.speed){
+    GM.last = ts;
+    if(!gmHit(GM.p.sh, GM.p.x, GM.p.y + 1)) GM.p.y++;
+    else gmMerge();
+  }
+  gmPaint();
+}
+
+function gmPaint(){
+  const c = document.getElementById('gmC');
+  if(!c || !_gmCell || !GM) return;
+  const g = c.getContext('2d'), s = _gmCell;
+  g.clearRect(0, 0, GM_W * s, GM_H * s);
+  // Сетка поля — чуть заметная: без неё пустое поле выглядит как заливка.
+  g.strokeStyle = 'rgba(255,255,255,.04)'; g.lineWidth = 1;
+  for(let x = 1; x < GM_W; x++){ g.beginPath(); g.moveTo(x*s, 0); g.lineTo(x*s, GM_H*s); g.stroke(); }
+  for(let y = 1; y < GM_H; y++){ g.beginPath(); g.moveTo(0, y*s); g.lineTo(GM_W*s, y*s); g.stroke(); }
+  const cell = (x, y, ci) => {
+    g.fillStyle = GM_COLORS[ci - 1] || '#5ad1ff';
+    g.fillRect(x*s + 1, y*s + 1, s - 2, s - 2);
+    g.fillStyle = 'rgba(255,255,255,.22)';
+    g.fillRect(x*s + 1, y*s + 1, s - 2, Math.max(2, s * .18));
+  };
+  GM.grid.forEach((row, y) => row.forEach((v, x) => { if(v) cell(x, y, v); }));
+  if(GM.p && !GM.over){
+    // Тень падения: видно, куда встанет фигура. Есть в любой современной
+    // падалке, и её отсутствие бросается в глаза быстрее всего.
+    let gy = GM.p.y;
+    while(!gmHit(GM.p.sh, GM.p.x, gy + 1)) gy++;
+    g.fillStyle = 'rgba(255,255,255,.09)';
+    GM.p.sh.forEach((row, r) => row.forEach((v, k) => {
+      if(v) g.fillRect((GM.p.x+k)*s + 1, (gy+r)*s + 1, s - 2, s - 2);
+    }));
+    GM.p.sh.forEach((row, r) => row.forEach((v, k) => {
+      if(v && GM.p.y + r >= 0) cell(GM.p.x + k, GM.p.y + r, GM.p.c);
+    }));
+  }
+}
 </script>
 </body>
 </html>

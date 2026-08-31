@@ -246,6 +246,13 @@ def require_operator(handler):
             return web.json_response({"error": "invalid initData"}, status=401, headers=CORS_HEADERS)
         uid = user.get("id")
         if uid not in OPERATOR_IDS:
+            # Кого не пустили — в журнал. Доступ выдаётся вписыванием id в
+            # настройки сервера, а взять этот id было неоткуда: человек видел
+            # отказ, а на сервере не оставалось даже следа, что он приходил.
+            имя = (f"{user.get('first_name','')} {user.get('last_name','')}".strip()
+                   or "без имени")
+            log.warning(f"[pos] не пустили: {uid} · {имя}"
+                        + (f" · @{user['username']}" if user.get("username") else ""))
             return web.json_response({"error": "not_operator"}, status=403, headers=CORS_HEADERS)
         request["op_id"] = uid
         request["op_user"] = user

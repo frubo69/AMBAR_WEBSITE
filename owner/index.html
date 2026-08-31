@@ -196,12 +196,16 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .ds-arw:disabled{opacity:.2;pointer-events:none}
 .ds-arw:active{transform:scale(.86)}
 .dayslide.back .ds-arw{color:var(--gold2)}
-.ds-win{flex:1;min-width:0;display:flex;align-items:center;gap:8px;
-  padding:1px 2px;will-change:transform}
+/* Содержимое строго по центру между стрелками: пилюля симметрична в любом
+   дне, и ничто в ней не прыгает. Возврат к сегодня вынесен наружу — внутри он
+   ломал бы эту симметрию ровно тогда, когда он появляется. */
+.ds-win{flex:1;min-width:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:1px;padding:2px;will-change:transform}
 /* Смена дня — не подмена текста, а движение: новый день въезжает с той
    стороны, в которую листнули. Без этого непонятно, поменялось что-то или
    просто моргнуло. */
-.ds-txt{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px;overflow:hidden}
+.ds-txt{max-width:100%;display:flex;flex-direction:column;align-items:center;gap:1px;
+  overflow:hidden;text-align:center}
 .ds-txt b{font-size:14px;font-weight:700;line-height:1.15;white-space:nowrap;
   overflow:hidden;text-overflow:ellipsis}
 .ds-txt i{font-style:normal;font-size:10.5px;font-weight:600;color:var(--muted);
@@ -213,12 +217,14 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 @keyframes dsFwd {from{opacity:0;transform:translateX(16px)} to{opacity:1;transform:none}}
 /* Возврат к сегодня — отдельной кнопкой, а не тайным тапом по окошку: из
    позавчера надо уметь выйти, не листая обратно и не догадываясь. */
-.ds-home{flex:0 0 auto;display:none;padding:6px 11px;border-radius:9px;cursor:pointer;
-  font-family:inherit;font-size:11.5px;font-weight:700;color:#1a1408;border:0;
+/* Возврат к сегодня — рядом с календарём, а не внутри пилюли: появляется,
+   только когда есть куда возвращаться, и не двигает дату при появлении. */
+.ds-home{flex:0 0 auto;height:44px;padding:0 13px;border-radius:12px;cursor:pointer;
+  font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;
+  letter-spacing:.3px;color:#1a1408;border:0;white-space:nowrap;
   background:linear-gradient(135deg,var(--gold),var(--gold2));
   animation:dsHome .2s var(--e1)}
 .ds-home:active{transform:scale(.94)}
-.dayslide.back .ds-home{display:block}
 @keyframes dsHome{from{opacity:0;transform:scale(.86)}to{opacity:1;transform:none}}
 .cal-btn{width:40px;height:auto;padding:0;border-radius:11px;background:var(--card);border:1px solid var(--border2);color:var(--sub);display:flex;align-items:center;justify-content:center;cursor:pointer;transition:.15s var(--e1);flex-shrink:0}
 .cal-btn:active{transform:scale(.92);color:var(--gold2);border-color:rgba(201,169,110,.35)}
@@ -592,13 +598,34 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   color:var(--gold2);font-variant-numeric:tabular-nums}
 .sh-l span{font-size:9.5px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;
   color:var(--muted)}
-.sh-r{flex:1;min-width:0;display:flex;justify-content:flex-end;gap:14px}
-.sh-r span{display:flex;flex-direction:column;align-items:flex-end;gap:1px;
-  font-size:9px;font-weight:600;letter-spacing:.5px;text-transform:uppercase;
-  color:var(--muted)}
-.sh-r i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;
-  color:var(--sub);font-variant-numeric:tabular-nums;letter-spacing:0}
-.stk-have-f{font-size:10px;color:var(--dim);margin:5px 2px 0}
+/* Справа теперь одна плашка, а не три колонки цифр: правила под «внесено /
+   продано / списано» удалены вместе с ними — иначе они перекрашивали её. */
+.sh-r{flex:1;min-width:0;display:flex;justify-content:flex-end}
+/* Справа — то, что требует работы. Жёлтым, потому что это не сводка, а долг:
+   бутылки без кодов не заведутся сами. Всё заведено — зелёная галочка, и
+   строка молчит. */
+.sh-warn,.sh-ok{display:inline-flex;align-items:center;gap:7px;padding:7px 12px;
+  border-radius:11px;font-size:10px;font-weight:700;letter-spacing:.5px;
+  text-transform:uppercase}
+.sh-warn{color:var(--warn);background:rgba(243,180,74,.12);
+  border:1px solid rgba(243,180,74,.35)}
+.sh-ok{color:var(--up);background:rgba(76,175,125,.1);
+  border:1px solid rgba(76,175,125,.28)}
+.sh-warn b,.sh-ok b{font-family:'DM Sans',sans-serif;font-size:16px;letter-spacing:0;
+  font-variant-numeric:tabular-nums}
+.stk-dr-s.warn{color:var(--warn)}
+/* Истории — двумя карточками внизу, каждая со своей страницей. */
+.stk-hist{display:flex;flex-direction:column;gap:7px;margin-top:16px}
+.stk-hc{display:flex;align-items:center;gap:11px;width:100%;padding:11px 12px;
+  border-radius:13px;cursor:pointer;font-family:inherit;text-align:left;
+  color:var(--text);background:var(--card);border:1px solid var(--border2)}
+.stk-hc:active{transform:scale(.99)}
+.stk-hc-i{width:32px;height:32px;flex:0 0 auto;border-radius:9px;display:flex;
+  align-items:center;justify-content:center;color:var(--gold2);
+  background:rgba(201,169,110,.1);border:1px solid rgba(201,169,110,.2)}
+.stk-hc-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.stk-hc-t{font-size:13.5px;font-weight:600}
+.stk-hc-s{font-size:10.5px;color:var(--muted)}
 /* Заголовок раздела с действием справа: «История ревизий» — не строка списка,
    а выход в сторону, и место ей у названия, а не отдельной плиткой. */
 .stk-grp2{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
@@ -988,7 +1015,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    и идут с вопросом по району. */
 .off-team .drv{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .off-team .sep{opacity:.35;flex:0 0 auto}
-.off-team .drv.none{color:var(--warn-t)}
+.off-team .drv.none{color:var(--warn)}
 .off-meta{display:flex;align-items:center;gap:7px;font-size:11.5px;color:var(--muted)}
 .off-meta b{color:var(--sub);font-weight:600}
 .off-meta .sep{opacity:.35}
@@ -1415,7 +1442,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Свёрнутый блок — одна строка: работа сделана, место она занимать не должна. */
 .ck-c.fold .ck-g{display:none}
 /* Запертый блок виден, но не нажимается: понятно, что он есть и почему ждёт. */
-.ck-lock{padding:9px 14px;font-size:11px;color:var(--warn-t);
+.ck-lock{padding:9px 14px;font-size:11px;color:var(--warn);
   background:rgba(243,180,74,.07);border-top:1px solid var(--border2)}
 .ck-c.lock .ck-i{pointer-events:none}
 
@@ -1434,7 +1461,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;
   font-variant-numeric:tabular-nums}
 .ck-top.late .ck-top-v{color:var(--dn);background:rgba(224,85,85,.12)}
-.ck-top.now .ck-top-v{color:var(--warn-t);background:rgba(243,180,74,.12)}
+.ck-top.now .ck-top-v{color:var(--warn);background:rgba(243,180,74,.12)}
 .ck-top.ok .ck-top-v{color:var(--up);background:rgba(76,175,125,.12);font-size:22px}
 .ck-top-b{min-width:0}
 .ck-top-b b{display:block;font-family:'Space Grotesk',sans-serif;font-size:16px;
@@ -1472,7 +1499,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   display:flex;align-items:center;justify-content:center;font-size:11px;
   font-weight:800;font-variant-numeric:tabular-nums;
   color:var(--dn);background:rgba(224,85,85,.12);border:1px solid rgba(224,85,85,.28)}
-.ck-r.now .ck-n{color:var(--warn-t);background:rgba(243,180,74,.12);
+.ck-r.now .ck-n{color:var(--warn);background:rgba(243,180,74,.12);
   border-color:rgba(243,180,74,.3)}
 .ck-r.soon .ck-n,.ck-r.done .ck-n{color:var(--muted);background:var(--card2);
   border-color:var(--border2)}
@@ -1696,9 +1723,9 @@ button.path:active{transform:scale(.995)}
 .pstat-c{flex-shrink:0;padding:5px 11px;border-radius:999px;font-size:11px;
   font-weight:700;letter-spacing:.2px;color:var(--muted);background:var(--card2);
   border:1px solid var(--border2)}
-.pstat-c.wait{color:var(--warn-t);background:rgba(243,180,74,.12);
+.pstat-c.wait{color:var(--warn);background:rgba(243,180,74,.12);
   border-color:rgba(243,180,74,.35)}
-.pstat-c.live{color:var(--warn-t);background:rgba(243,180,74,.14);
+.pstat-c.live{color:var(--warn);background:rgba(243,180,74,.14);
   border-color:rgba(243,180,74,.45);animation:pstatPulse 1.9s ease-in-out infinite}
 .pstat-c.done{color:var(--up);background:rgba(76,175,125,.12);
   border-color:rgba(76,175,125,.35)}
@@ -1717,7 +1744,7 @@ button.path:active{transform:scale(.995)}
   align-items:center;justify-content:center;color:var(--sub);
   background:var(--card2);border:1px solid var(--border2)}
 .pnav-i svg{width:18px;height:18px}
-.pnav-i.warn{color:var(--warn-t);background:rgba(243,180,74,.12);
+.pnav-i.warn{color:var(--warn);background:rgba(243,180,74,.12);
   border-color:rgba(243,180,74,.3)}
 .pnav-i.live{color:var(--gold2);background:var(--gold-soft);
   border-color:rgba(201,169,110,.32)}
@@ -1793,7 +1820,7 @@ button.path:active{transform:scale(.995)}
 .rcv-st{padding:4px 10px;border-radius:999px;font-size:10.5px;font-weight:700;
   letter-spacing:.4px;text-transform:uppercase;color:var(--muted);
   background:var(--card2);border:1px solid var(--border2)}
-.rcv-st.warn{color:var(--warn-t);background:rgba(243,180,74,.12);
+.rcv-st.warn{color:var(--warn);background:rgba(243,180,74,.12);
   border-color:rgba(243,180,74,.3)}
 .rcv-st.live{color:var(--gold2);background:var(--gold-soft);
   border-color:rgba(201,169,110,.35)}
@@ -1838,7 +1865,7 @@ button.path:active{transform:scale(.995)}
 .rt-st{flex-shrink:0;padding:3px 9px;border-radius:999px;font-size:10px;
   font-weight:700;letter-spacing:.3px;color:var(--muted);background:var(--card2);
   border:1px solid var(--border2)}
-.rt.free .rt-st{color:var(--warn-t);border-color:rgba(243,180,74,.3)}
+.rt.free .rt-st{color:var(--warn);border-color:rgba(243,180,74,.3)}
 .rt.live .rt-st{color:var(--gold2);border-color:rgba(201,169,110,.3)}
 .rt.ok .rt-st{color:var(--up);border-color:rgba(76,175,125,.28)}
 .rt.dn .rt-st{color:var(--dn);border-color:rgba(224,85,85,.3)}
@@ -1854,7 +1881,7 @@ button.path:active{transform:scale(.995)}
   transition:width .3s var(--e1)}
 .rt.ok .rt-bar i{background:var(--up)}
 .rt.dn .rt-bar i{background:var(--dn)}
-.rt-fl{margin-top:9px;font-size:10.5px;color:var(--warn-t)}
+.rt-fl{margin-top:9px;font-size:10.5px;color:var(--warn)}
 .rt-note{margin-top:9px;padding:8px 10px;border-radius:10px;font-size:11.5px;
   color:var(--sub);background:var(--card2);line-height:1.4}
 .rt-rel{margin-top:10px;padding:7px 12px;border-radius:9px;cursor:pointer;
@@ -3067,22 +3094,22 @@ button.path:active{transform:scale(.995)}
   background:rgba(243,180,74,.06);border:1px solid rgba(243,180,74,.22)}
 .exp-held-h{display:flex;align-items:baseline;gap:10px;margin-bottom:9px}
 .exp-held-t{flex:1;font-size:10px;font-weight:700;letter-spacing:1.1px;
-  text-transform:uppercase;color:var(--warn-t)}
+  text-transform:uppercase;color:var(--warn)}
 .exp-held-v{font-family:'DM Sans',sans-serif;font-size:19px;font-weight:700;
-  color:var(--warn-t);font-variant-numeric:tabular-nums}
+  color:var(--warn);font-variant-numeric:tabular-nums}
 .exp-held-v i{font-style:normal;font-size:10px;margin-left:4px;opacity:.7}
 .exp-held-r{display:flex;align-items:baseline;gap:9px;padding:7px 0;cursor:pointer;
   border-top:1px solid rgba(243,180,74,.14)}
 .exp-held-n{font-size:13.5px;font-weight:600}
 .exp-held-s{flex:1;font-size:11px;color:var(--muted)}
 .exp-held-a{font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;
-  color:var(--warn-t);font-variant-numeric:tabular-nums}
+  color:var(--warn);font-variant-numeric:tabular-nums}
 .exp-held-d{display:none;padding:2px 0 6px}
 .exp-held-d.open{display:block}
 .exp-held-i{display:flex;align-items:baseline;gap:8px;font-size:11.5px;
   color:var(--sub);padding:3px 0}
 .exp-held-i span{flex:1;min-width:0}
-.exp-held-i b{font-variant-numeric:tabular-nums;color:var(--warn-t)}
+.exp-held-i b{font-variant-numeric:tabular-nums;color:var(--warn)}
 .exp-held-f{font-size:10.5px;color:var(--muted);line-height:1.5;margin-top:8px;
   padding-top:8px;border-top:1px solid rgba(243,180,74,.14)}
 
@@ -3174,9 +3201,9 @@ button.path:active{transform:scale(.995)}
 .wo-c-acts button:disabled{opacity:.5}
 /* Строка удержания в списке — жёлтым: это не убыток компании, а долг человека,
    и цветом он отличается от того и от другого. */
-.wo-st.held{color:var(--warn-t);background:rgba(243,180,74,.1);
+.wo-st.held{color:var(--warn);background:rgba(243,180,74,.1);
   border:1px solid rgba(243,180,74,.28);cursor:pointer}
-.wo-act.hold{color:var(--warn-t);border-color:rgba(243,180,74,.3)}
+.wo-act.hold{color:var(--warn);border-color:rgba(243,180,74,.3)}
 /* Одна кнопка — на всю ширину: половинка рядом с пустотой выглядит обрубком. */
 .wo-acts.one{grid-template-columns:1fr}
 
@@ -3931,12 +3958,12 @@ button.path:active{transform:scale(.995)}
              stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
       <div class="ds-win" id="moneyDayWin">
         <span class="ds-txt" id="mdTxt"><b id="mdName">Сегодня</b><i id="mdDate">—</i></span>
-        <button class="ds-home" id="mdHome" onclick="accDayHome()">Сегодня</button>
       </div>
       <button class="ds-arw" id="mdNext" onclick="accDayStep(-1)" aria-label="День вперёд" disabled>
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
              stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
     </div>
+    <button class="ds-home" id="mdHome" onclick="accDayHome()" style="display:none">Сегодня</button>
     <button class="cal-btn" onclick="openDate('moneyDay')" aria-label="Выбрать день">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
     </button>
@@ -5966,7 +5993,7 @@ button.pill:active{opacity:.6}
   color:var(--sub);font-variant-numeric:tabular-nums}
 .hero-side-r b.dn{color:var(--dn)}
 .hero-side-r b.gold{color:var(--gold2)}
-.hero-side-r b.warn{color:var(--warn-t)}
+.hero-side-r b.warn{color:var(--warn)}
 /* Сжатая карточка: числа мельче, дата теряет подпись и кнопку возврата —
    всё, что объясняет, уступает место тому, что отвечает. */
 /* Столбец стоит ровно посередине между числом и датой: свободное место делят
@@ -10191,6 +10218,7 @@ function stkBack(){
   if(STK.view === 'move-scan'){ try{ SCAN.stop(); }catch(e){} stkMovePick(); return; }
   if(STK.view === 'move-pick'){ stkMoveDone(); return; }
   if(STK.view === 'audit-one'){ stkAudits(); return; }
+  if(STK.view === 'moves'){ stkPicker(); return; }
   if(STK.view === 'pick') closeStock(); else stkPicker();
 }
 function stkChanged(){
@@ -10260,13 +10288,20 @@ async function stkPicker(){
   // полэкрана пустоты. Число на плитке — то, ради чего сюда заходят: недостача
   // в деньгах там, где считали, и прочерк там, где ещё нет.
   const left = (reg && reg.left_by_district) || {};
+  const без = (reg && reg.unscanned) || {};
+  // Две истории — отдельными карточками внизу и своими страницами. На главном
+  // экране склада им делать нечего: сегодняшняя работа и вчерашние записи —
+  // разные вопросы, и список переездов посреди районов только рябил.
   document.getElementById('stkMid').innerHTML =
     stkHave(reg) +
-    `<div class="stk-grp2"><span>Районы</span>
-       <button class="stk-lnk" onclick="stkAudits()">История ревизий ›</button></div>
-     <div class="stk-drs">${(st.districts || []).map(d => stkDistRow(d, left)).join('')}</div>
-     <div class="stk-grp2"><span>Перемещения за день</span></div>
-     <div id="stkMoves"><div class="stk-none">Загрузка…</div></div>`;
+    `<div class="stk-grp2"><span>Районы</span></div>
+     <div class="stk-drs">${(st.districts || []).map(d => stkDistRow(d, left, без)).join('')}</div>
+     <div class="stk-hist">
+       ${stkHistCard('stkAudits()', 'История ревизий', 'кто считал и что сошлось',
+         '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 8v4l3 2"/>')}
+       ${stkHistCard('stkMovesPage()', 'История перемещений', 'что и куда возили',
+         '<path d="M4 8h14M15 5l3 3-3 3M20 16H6M9 13l-3 3 3 3"/>')}
+     </div>`;
   stkLoadMoves();
 }
 
@@ -10284,26 +10319,33 @@ async function stkPicker(){
 // вместе с районами и перемещениями, и место здесь дороже крупной цифры.
 function stkHave(reg){
   if(!reg || !reg.totals) return '';
-  const t = reg.totals;
+  const t = reg.totals, без = reg.unscanned_total || 0;
+  // Справа не сводка, а работа, которая осталась: сколько бутылок лежит на
+  // полке мимо реестра. Пока позиция не заведена кодами, камера её не видит,
+  // ревизия ищет её глазами, а проверка бутылки про неё ничего не скажет.
+  // «Внесено / продано / списано» отсюда убрано: это разложение числа слева,
+  // и оно не требует действий.
   return `<div class="stk-have">
-      <span class="sh-l"><b>${fmt(t.left)}</b><span>бутылок на складе</span></span>
-      <span class="sh-r">
-        <span><i>${fmt(t.active)}</i>внесено</span>
-        <span><i>${fmt(t.sold)}</i>продано</span>
-        <span><i>${fmt(t.written)}</i>списано</span>
-      </span>
-    </div>
-    <div class="stk-have-f">по кодам с крышек · позиции без кодов сюда не входят</div>`;
+      <span class="sh-l"><b>${fmt(t.left)}</b><span>остаток</span></span>
+      <span class="sh-r">${без
+        ? `<span class="sh-warn"><b>${fmt(без)}</b>не отсканировано</span>`
+        : `<span class="sh-ok"><b>✓</b>всё отсканировано</span>`}</span>
+    </div>`;
 }
 
 // Район строкой, а не плиткой: плитки на всю ширину съедали по экрану на пять
 // районов, и до перемещений человек доходил прокруткой. В строке помещается
 // то же самое — код, название, сколько бутылок лежит и чем кончился пересчёт.
-function stkDistRow(d, left){
+function stkDistRow(d, left, без){
   const n = left[d.id] || 0;
-  const [sub, cls] = d.done
-    ? (d.short_aed ? [`не хватает ${fmt(d.short_aed)} AED`, 'dn'] : ['всё сошлось', 'ok'])
-    : ['ещё не считали', ''];
+  const b = (без || {})[d.id] || 0;
+  // Непросканированное важнее итога пересчёта: пересчёт можно повторить
+  // завтра, а бутылки без кодов не заведутся сами.
+  const [sub, cls] = b
+    ? [`${fmt(b)} без кодов`, 'warn']
+    : (d.done
+        ? (d.short_aed ? [`не хватает ${fmt(d.short_aed)} AED`, 'dn'] : ['всё сошлось', 'ok'])
+        : ['ещё не считали', '']);
   return `<button class="stk-dr" onclick="stkGo('${d.id}')">
     <span class="stk-dr-c">${escS(d.code || '')}</span>
     <span class="stk-dr-b">
@@ -10315,10 +10357,54 @@ function stkDistRow(d, left){
   </button>`;
 }
 
+function stkHistCard(go, title, sub, ico){
+  return `<button class="stk-hc" onclick="${go}">
+    <span class="stk-hc-i"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+      stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
+      stroke-linejoin="round">${ico}</svg></span>
+    <span class="stk-hc-b"><span class="stk-hc-t">${title}</span>
+      <span class="stk-hc-s">${sub}</span></span>
+    <span class="stk-dr-go">›</span>
+  </button>`;
+}
+
 // ── перемещения ─────────────────────────────────────────────────────────────
 // Перемещение не меняет общий остаток, только чей он. В пересчёте оно
 // вычитается у отдающего и прибавляется принимающему — иначе переезд товара
 // выглядел бы недостачей в одном районе и излишком в другом.
+// Отдельная страница: сегодняшние переезды целиком, без обрезки в три строки.
+// На главном экране склада им места нет — там сегодняшняя работа, а это уже
+// записанное.
+async function stkMovesPage(){
+  STK.view = 'moves'; _setRail('stkRail', '');
+  _stkHead('Перемещения', 'загрузка…', false);
+  document.getElementById('stkMid').innerHTML = '<div class="stk-none">Загрузка…</div>';
+  let res;
+  try{ res = await ownerApi.ownerFetch('/api/owner/stock/transfers',
+        {params:{day: accDay()}}); }
+  catch(e){
+    document.getElementById('stkMid').innerHTML =
+      '<div class="stk-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+  STK.moves = res.transfers || [];
+  const бут = STK.moves.reduce((a, m) => a + (m.bottles || 0), 0);
+  _stkHead('Перемещения', STK.moves.length
+    ? `${STK.moves.length} ${pluralize(STK.moves.length,'строка','строки','строк')}${
+        бут ? ` · ${бут} ${pluralize(бут,'бутылка','бутылки','бутылок')} сканом` : ''}`
+    : _dayName(res.day || accDay()), false);
+  document.getElementById('stkMid').innerHTML = STK.moves.length
+    ? STK.moves.map((m, i) => `
+      <div class="stk-mvr">
+        <span class="stk-mvr-b">
+          <span class="stk-mvr-n">${escS(m.product_name || m.product_id)}</span>
+          <span class="stk-mvr-s">${escS(m.from_name)} → ${escS(m.to_name)} · ${m.bottles
+            ? m.bottles + ' ' + pluralize(m.bottles,'бутылка','бутылки','бутылок') + ' сканом'
+            : m.qty + ' шт'}</span>
+        </span>
+        <button class="stk-mvr-x" title="Убрать" onclick="stkMoveDel(${i})">✕</button>
+      </div>`).join('')
+    : '<div class="stk-none">За этот день ничего не перевозили</div>';
+}
+
 async function stkLoadMoves(){
   const box = document.getElementById('stkMoves'); if(!box) return;
   let res;
@@ -10363,7 +10449,7 @@ async function stkMoveDel(i){
     try{ await ownerApi.ownerFetch('/api/owner/stock/transfer/'+id, {method:'DELETE'}); }
     catch(e){}
   }
-  stkLoadMoves();
+  if(STK.view === 'moves') stkMovesPage(); else stkLoadMoves();
 }
 
 
@@ -10612,16 +10698,11 @@ function stkRenderList(){
 
 
   // Первый пересчёт: считать не от чего, приложение ещё не знает, что на полке.
+  // Объяснение отсюда убрано — оно занимало треть экрана над списком и читалось
+  // один раз в жизни точки. То же самое сказано подписью в шапке: «первый
+  // пересчёт · 126 позиций».
   if(sh.first_time){
-    const coded = (sh.rows || []).filter(r => r.coded > 0).length;
-    box.innerHTML = acts + `<div class="stk-note stk-note-hot">
-        <b>Первый пересчёт района.</b> Сравнивать пока не с чем — приложение не знает,
-        сколько товара лежит сейчас. Введите фактические остатки по всем позициям:
-        это отправная точка. Со следующей смены числа будут подставляться сами, и
-        проверять придётся только то, что продавалось.
-        ${coded ? `<br><br><b>${coded} ${pluralize(coded,'позиция заведена','позиции заведены','позиций заведены')} кодами</b>
-        — их можно не вбивать руками: включите «Ревизию» и пройдите полку камерой.` : ''}
-      </div>` + rows.map(r => stkItem(r)).join('');
+    box.innerHTML = acts + rows.map(r => stkItem(r)).join('');
     return;
   }
 
@@ -11671,6 +11752,8 @@ function accDayPaint(dir){
     ? `${ACC_WDF[d.getDay()]} · ${d.getFullYear()}`
     : `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}, ${ACC_WDF[d.getDay()]}`);
   const nx = document.getElementById('mdNext'); if(nx) nx.disabled = DAY_OFFSET <= 0;
+  const hm = document.getElementById('mdHome');
+  if(hm) hm.style.display = DAY_OFFSET > 0 ? '' : 'none';
   el.classList.toggle('back', DAY_OFFSET > 0);
   // Новый день въезжает с той стороны, в которую листнули: иначе текст просто
   // моргает, и непонятно, сменился день или экран мигнул.
@@ -17935,7 +18018,7 @@ function woKindBody(){
       <div class="wo-ks">
         <div class="wo-k"><span class="wo-k-n" style="color:var(--sub)">${fmt(qty)}</span>
           <span class="wo-k-t">${pluralize(qty,'штука','штуки','штук')}</span></div>
-        <div class="wo-k"><span class="wo-k-n" style="color:${held ? 'var(--warn-t)' : 'var(--muted)'}">${fmt(held)}</span>
+        <div class="wo-k"><span class="wo-k-n" style="color:${held ? 'var(--warn)' : 'var(--muted)'}">${fmt(held)}</span>
           <span class="wo-k-t">удержано</span></div>
       </div>
     </div>

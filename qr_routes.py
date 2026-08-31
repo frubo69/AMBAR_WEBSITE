@@ -172,8 +172,38 @@ async def handle_stats(request):
     except Exception as e:
         log.warning(f"[qr] расход по реестру не посчитан: {e}")
         left = dict(by_district)
+    # Сколько бутылок лежит на полке мимо реестра. Это и есть работа, которая
+    # осталась: пока позиция не заведена кодами, камера её не видит, ревизия
+    # ищет её глазами, а проверка бутылки на неё ответить не может.
+    #
+    # Ожидаемое берём из количественного учёта (последний пересчёт + приход −
+    # продажи), кодовое — из реестра, и переводим в бутылки: пиво в пересчёте
+    # ходит ящиками, а коды — поштучно. Где пересчёта не было вовсе, сравнивать
+    # не с чем: такую точку в число не считаем и говорим о ней отдельно.
+    unscanned, no_count = {}, []
+    try:
+        import stock_routes as SR
+        base = await SR._district_base(SR._biz_day())
+        cat = SR._catalog()
+        by_pd = await db.qr_by_product_district_all()
+        for oid in SR.OFFICE_IDS:
+            have = (base.get(oid) or {}).get("have") or {}
+            bottles = sum(round(float(q) * SR._unit(cat.get(pid) or {}))
+                          for pid, q in have.items() if pid in cat and q)
+            coded = sum((by_pd.get(oid) or {}).values())
+            if not bottles and not coded:
+                no_count.append(oid)
+                continue
+            unscanned[oid] = max(0, bottles - coded)
+    except Exception as e:
+        log.warning(f"[qr] не посчитано, сколько без кодов: {e}")
+        unscanned, no_count = {}, []
+
     return web.json_response({
         "locks": locks,
+        "unscanned": unscanned,
+        "unscanned_total": sum(unscanned.values()),
+        "no_count": no_count,
         "by_district": by_district,
         "by_product_district": by_prod_dist,
         "left_by_district": left,

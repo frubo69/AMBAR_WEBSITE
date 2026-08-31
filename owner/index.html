@@ -2059,6 +2059,11 @@ button.path:active{transform:scale(.995)}
 .wal-r-v{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:15.5px;
   font-weight:700;color:var(--up);font-variant-numeric:tabular-nums}
 .wal-r-v.out{color:var(--dn)}
+/* В сверке под строкой всё основание решения — сумма, курс, расхождение,
+   разрыв во времени и клиент. В одну строку это не влезает, а обрезка
+   многоточием прячет ровно то, по чему и принимают решение. */
+.wal-r.match{align-items:flex-start}
+.wal-r.match .wal-r-s{white-space:normal;line-height:1.45}
 .sup-allgood{padding:14px;margin-bottom:10px;border-radius:15px;font-size:13px;
   color:var(--up);background:var(--up-soft);border:1px solid rgba(76,175,125,.25)}
 
@@ -14243,7 +14248,7 @@ function walMatchBody(){
         Math.max(0, (m.orphans || 0) - pairs.length)}</b></div>
     </div>
     ${pairs.length ? `<div class="wal-l">${pairs.map(p => `
-      <div class="wal-r">
+      <div class="wal-r match">
         <span class="wal-r-b">
           <span class="wal-r-t">Заказ #${escS(String(p.order_id))}${
             p.sure ? '' : '<span class="wal-tag">спорный</span>'}</span>

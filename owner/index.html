@@ -14058,6 +14058,17 @@ function fmtUsdt(n){
   return др === '00' ? целое : `${целое},${др}`;
 }
 
+// Сколько строк ленты показано сейчас. История длиной в сотни переводов
+// рисуется не целиком: до нижних строк доходят редко, а разметку под них
+// телефон собирает всегда.
+let WAL_N = 60;
+
+function walMore(){
+  WAL_N += 200;
+  walBody(ACC_WAL);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
 function _walWhen(ms){
   if(!ms) return '';
   try{ return _when(new Date(Number(ms)).toISOString()); }catch(e){ return ''; }
@@ -14065,6 +14076,7 @@ function _walWhen(ms){
 
 async function accWallet(){
   ACC_BACK = null;
+  WAL_N = 60;
   _setRail('accRail', '');
   _setText('accTitle', 'Кошелёк');
   _setText('accSub', 'загрузка…');
@@ -14128,7 +14140,7 @@ function walBody(d){
     </div>
     <div class="wal-note">по всем ${t.n || 0} ${
       pluralize(t.n || 0, 'переводу', 'переводам', 'переводам')} кошелька, USDT</div>
-    ${rows.length ? `<div class="wal-l">${rows.map(r => `
+    ${rows.length ? `<div class="wal-l">${rows.slice(0, WAL_N).map(r => `
       <div class="wal-r">
         <span class="wal-r-b">
           <span class="wal-r-t">${r.in ? (r.order_id
@@ -14139,7 +14151,11 @@ function walBody(d){
         </span>
         <span class="wal-r-v ${r.in ? '' : 'out'}">${r.in ? '+' : '−'}${
           fmtUsdt(r.amount)}<u>USDT</u></span>
-      </div>`).join('')}</div>`
+      </div>`).join('')}${rows.length > WAL_N
+        ? `<button class="cat-block-open" onclick="walMore()">Показать ещё ${
+            Math.min(200, rows.length - WAL_N)} из ${rows.length - WAL_N} →</button>`
+        : (d && d.more ? `<div class="wal-note" style="margin:10px 0 0">показана
+            последняя тысяча переводов</div>` : '')}</div>`
     : `<div class="scan-empty">${d && d.offline
         ? 'Сеть не ответила' : 'Переводов пока не было'}</div>`}`;
   document.getElementById('accFoot').innerHTML = `

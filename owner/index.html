@@ -3547,13 +3547,23 @@ button.path:active{transform:scale(.995)}
 .team-fbtn.dirty .team-fdot{opacity:1}
 .op-ctrl-panel.open{max-height:260px}
 
-/* Группа водителей по району */
-.team-grp{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
-  margin:14px 2px 7px;font-size:10.5px;font-weight:700;letter-spacing:1.2px;
-  text-transform:uppercase;color:var(--muted)}
+/* Группа водителей по району. Была строчкой мелких прописных букв — они
+   читались как подпись, а не как начало новой группы, и список из одиннадцати
+   человек шёл сплошняком. Теперь шапка та же, что у «Кого проверяем»: код
+   района плашкой, название золотом, справа сколько людей и сколько привезли. */
+.team-grp{display:flex;align-items:center;gap:10px;margin:16px 0 8px;
+  padding:10px 12px;border-radius:13px;background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.22)}
 .list .team-grp:first-child{margin-top:2px}
-.team-grp-m{font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:700;
-  letter-spacing:.2px;text-transform:none;color:var(--gold2);white-space:nowrap;
+.team-grp-c{flex:0 0 auto;width:30px;height:30px;border-radius:9px;display:flex;
+  align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;
+  font-size:11px;font-weight:700;color:#1a1408;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.team-grp-n{flex:1;min-width:0;font-size:14px;font-weight:700;color:var(--gold2);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.team-grp-n u{text-decoration:none;font-weight:600;color:rgba(201,169,110,.72)}
+.team-grp-m{flex:0 0 auto;font-family:'DM Sans',sans-serif;font-size:12px;
+  font-weight:700;color:var(--gold2);white-space:nowrap;
   font-variant-numeric:tabular-nums}
 
 /* Шапка раздела «Клиенты» */
@@ -15437,7 +15447,7 @@ function renderExpenses(){
       <span class="exp-tot-u">AED<br>за день</span>
       <span class="exp-tot-r">
         <span>питание<b>${fmt(t.meal)}</b></span>
-        <span>разовые<b>${fmt(t.extra)}</b></span>
+        <span>доп. расходы<b>${fmt(t.extra)}</b></span>
       </span>
     </div>
     ${t.pending_count ? `<div class="exp-wait">
@@ -20033,8 +20043,11 @@ function opMetric(op, filter){
                      : (op.senior ? 'как водитель' : 'чаевые района'), color:'var(--gold2)'}
              : {html:'—', label:'нет чаевых', color:dim};
   }
+  // «0 заказов» справа при «1 заказ» в подписи слева читалось как рассинхрон,
+  // хотя это разные вопросы: слева сколько заказов вообще, справа — сколько
+  // доехало. Так и пишем.
   return {html:`${fmt(op.aed)}${_u('AED')}`,
-          label:`${op.delivered} ${pluralize(op.delivered,'заказ','заказа','заказов')}`, color:''};
+          label:`доставлено ${op.delivered}`, color:''};
 }
 
 function renderOperators(){
@@ -20155,8 +20168,10 @@ function renderOperators(){
       const aed = mine.reduce((s,d)=>s+d.aed, 0);
       const op = mine.find(d=>d.operator)?.operator || '';
       return `<div class="team-grp">
-          <span>${escS(g.code)} ${escS(g.name || '')}${op ? ' · ' + escS(op) : ''}</span>
-          <span class="team-grp-m">${mine.length} · ${fmt(aed)} AED</span>
+          <span class="team-grp-c">${escS(g.code)}</span>
+          <span class="team-grp-n">${escS(g.name || '')} <u>(${mine.length} ${
+            pluralize(mine.length,'водитель','водителя','водителей')})</u></span>
+          <span class="team-grp-m">${fmt(aed)} AED</span>
         </div>` + mine.map((d,i)=>row(d,i)).join('');
     }).join('');
   } else {
@@ -21576,8 +21591,9 @@ const DETAIL = {
     const period = document.querySelector('#periodPicker button.on')?.dataset?.p || 'today';
     const f = _dayCached(period) || {};
     const m = f.by_method || {};
-    const c = m.crypto || {}, k = m.cash || {}, d = m.debt || {}, inf = m.crypto_inflight || {};
-    const tot = (c.aed||0) + (k.aed||0) + (d.aed||0);
+    const c = m.crypto || {}, k = m.cash || {}, d = m.debt || {},
+          tr = m.transfer || {}, inf = m.crypto_inflight || {};
+    const tot = (c.aed||0) + (k.aed||0) + (d.aed||0) + (tr.aed||0);
     const pct = v => tot ? Math.round(v / tot * 100) : 0;
     const per = DAY_OFFSET
       ? (l => l.sub ? `${l.top} ${l.sub}` : l.top)(_dayLabel(f.window))
@@ -21604,6 +21620,7 @@ const DETAIL = {
       body:`
         <div class="dt-card">
           ${row('Наличные', k.aed||0, k.count||0, 'var(--gold2)')}
+          ${row('Перевод', tr.aed||0, tr.count||0, 'var(--info)')}
           ${row('Крипта', c.aed||0, c.count||0, '#26A17B',
                 c.usdt ? `${c.usdt} USDT` : '')}
           ${row('В долг', d.aed||0, d.count||0, 'var(--warn)')}
@@ -21707,13 +21724,13 @@ const DETAIL = {
              // с комментарием водителя, за что он их просил.
              const parts=[];
              if(+sp.meal>0)  parts.push('питание '+fmt(sp.meal));
-             if(+sp.extra>0) parts.push('разовые '+fmt(sp.extra));
+             if(+sp.extra>0) parts.push('доп. расходы '+fmt(sp.extra));
              const r=sp.meal_rates||{};
              if(sp.days_working||sp.days_off) parts.push(
                (sp.days_working||0)+' раб.'+((sp.days_off||0)?' · '+sp.days_off+' вых.':''));
              const men=(sp.by_driver||[]).map(d=>
                `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${escS(d.name)}</div>
-                 <div class="dt-row-s">${d.days} ${pluralize(d.days,'день','дня','дней')} · питание <span data-aed="${d.meal}">${fmt(d.meal)}</span>${d.extra?' · разовые <span data-aed="'+d.extra+'">'+fmt(d.extra)+'</span>':''}</div></div>
+                 <div class="dt-row-s">${d.days} ${pluralize(d.days,'день','дня','дней')} · питание <span data-aed="${d.meal}">${fmt(d.meal)}</span>${d.extra?' · доп. расходы <span data-aed="'+d.extra+'">'+fmt(d.extra)+'</span>':''}</div></div>
                  <div class="dt-row-r"><span data-aed="${d.total}">${fmt(d.total)}</span> AED</div></div>`).join('');
              const its=(sp.items||[]).map(i=>
                `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${escS(i.comment||'разовый расход')}</div>

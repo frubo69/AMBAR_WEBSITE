@@ -2024,6 +2024,29 @@ button.path:active{transform:scale(.995)}
 .wal-led .out b{color:var(--dn)}
 .wal-led .rest{margin-top:5px;padding-top:9px;border-top:1px solid var(--border2)}
 .wal-led .rest b{color:var(--text);font-size:18px}
+.wal-tag{margin-left:6px;padding:1px 6px;border-radius:6px;font-size:9.5px;
+  font-weight:600;letter-spacing:.3px;text-transform:uppercase;
+  color:var(--gold2);background:var(--gold-soft)}
+.wal-link{flex-shrink:0;padding:5px 9px;border-radius:9px;font-size:11px;
+  font-weight:600;font-family:inherit;cursor:pointer;background:none;
+  border:1px solid var(--border2);color:var(--sub)}
+.wal-link.go{border-color:rgba(201,169,110,.32);color:var(--gold2)}
+.wal-link:active{transform:scale(.97)}
+/* Выбор заказа: тот же список, что и везде, но одной колонкой и без фильтров —
+   вопрос здесь один, «какой это был заказ». */
+.wal-pick{padding:4px 14px 14px;border-radius:15px;background:var(--card);
+  border:1px solid var(--border2)}
+.wal-po{display:flex;align-items:center;gap:10px;width:100%;padding:10px 0;
+  border-top:1px solid var(--border2);background:none;border-left:none;
+  border-right:none;border-bottom:none;color:var(--text);font-family:inherit;
+  text-align:left;cursor:pointer}
+.wal-po:first-of-type{border-top:none}
+.wal-po-b{flex:1;min-width:0}
+.wal-po-t{display:block;font-size:13px;font-weight:600}
+.wal-po-s{display:block;margin-top:1px;font-size:11px;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wal-po-v{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:14px;
+  font-weight:700;color:var(--gold2);font-variant-numeric:tabular-nums}
 .wal-l{padding:4px 14px 14px;border-radius:15px;background:var(--card);
   border:1px solid var(--border2)}
 .wal-r{display:flex;align-items:center;gap:11px;padding:10px 0;
@@ -14069,9 +14092,15 @@ function walMore(){
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 
+// Дата в кошельке всегда с годом. «20.08 23:51» в ленте, где рядом лежат
+// переводы за разные годы, читается как «в этом году» — и обманывает.
 function _walWhen(ms){
   if(!ms) return '';
-  try{ return _when(new Date(Number(ms)).toISOString()); }catch(e){ return ''; }
+  const d = new Date(Number(ms));
+  if(isNaN(d)) return '';
+  const p = n => String(n).padStart(2, '0');
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} `
+       + `${p(d.getHours())}:${p(d.getMinutes())}`;
 }
 
 async function accWallet(){
@@ -14097,7 +14126,11 @@ async function walRefresh(btn){
   if(btn){ btn.disabled = true; btn.textContent = 'Смотрю…'; }
   try{ ACC_WAL = await ownerApi.ownerFetch('/api/owner/wallet', {params:{fresh:1}}); }
   catch(e){ _toast('Не удалось обновить'); }
-  if(ACC_VIEW === 'wallet') walBody(ACC_WAL);
+  if(ACC_VIEW === 'wallet'){
+    _setText('accTitle', 'Кошелёк');
+    ACC_BACK = null;
+    walBody(ACC_WAL);
+  }
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 
@@ -14135,6 +14168,8 @@ function walBody(d){
     <div class="wal-led">
       <div><span>Пришло всего</span><b>${fmtUsdt(t.in)}</b></div>
       <div><span>из них не через приложение</span><i>${fmtUsdt(t.direct)}</i></div>
+      ${t.linked ? `<div><span>из них привязано к заказам вручную</span><i>${
+        fmtUsdt(t.linked)}</i></div>` : ''}
       <div class="out"><span>Ушло с кошелька</span><b>−${fmtUsdt(t.out)}</b></div>
       <div class="rest"><span>Остаток</span><b>${fmtUsdt((t.in || 0) - (t.out || 0))}</b></div>
     </div>
@@ -14145,10 +14180,17 @@ function walBody(d){
         <span class="wal-r-b">
           <span class="wal-r-t">${r.in ? (r.order_id
             ? 'Заказ #' + escS(String(r.order_id))
-            : 'Не через приложение') : 'Отправлено'}</span>
+            : 'Не через приложение') : 'Отправлено'}${
+            r.linked ? '<span class="wal-tag">вручную</span>' : ''}</span>
           <span class="wal-r-s">${escS(_walWhen(r.ts))}${
-            r.peer ? ' · ' + escS(r.peer) : ''}</span>
+            r.peer ? ' · ' + escS(r.peer) : ''}${
+            r.linked && r.linked_by ? ' · ' + escS(r.linked_by) : ''}</span>
         </span>
+        ${r.in && r.txid ? (r.linked
+          ? `<button class="wal-link" onclick="walUnlink('${escS(r.txid)}')">снять</button>`
+          : (!r.order_id
+            ? `<button class="wal-link go" onclick="walPick('${escS(r.txid)}',${
+                Number(r.amount) || 0},${Number(r.ts) || 0})">к заказу</button>` : '')) : ''}
         <span class="wal-r-v ${r.in ? '' : 'out'}">${r.in ? '+' : '−'}${
           fmtUsdt(r.amount)}<u>USDT</u></span>
       </div>`).join('')}${rows.length > WAL_N
@@ -14160,6 +14202,86 @@ function walBody(d){
         ? 'Сеть не ответила' : 'Переводов пока не было'}</div>`}`;
   document.getElementById('accFoot').innerHTML = `
     <div class="qb-wrap"><button class="qb" onclick="walRefresh(this)">Обновить</button></div>`;
+}
+
+// Привязка поступления к заказу. Личный заказ оператор ведёт руками: скидывает
+// номер кошелька, деньги падают напрямую, счёта нет — и связать их автоматически
+// не с чем. Значит связывает человек: выбирает заказ того же дня, и деньги
+// перестают быть безымянными.
+let WAL_PICK = null;      // {txid, amount, ts}
+
+async function walPick(txid, amount, ts){
+  WAL_PICK = {txid, amount, ts};
+  const день = ts ? new Date(Number(ts)) : new Date();
+  const iso = `${день.getFullYear()}-${String(день.getMonth()+1).padStart(2,'0')}-${
+    String(день.getDate()).padStart(2,'0')}`;
+  _setText('accTitle', 'К какому заказу');
+  _setText('accSub', `${fmtUsdt(amount)} USDT · ${_walWhen(ts)}`);
+  ACC_BACK = () => { WAL_PICK = null; accWallet(); };
+  document.getElementById('accFoot').innerHTML = '';
+  document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  walPickLoad(iso, '');
+}
+
+async function walPickLoad(iso, q){
+  let r;
+  // День перевода — первым делом: личный заказ оплачивают в тот же день, и
+  // список из пяти строк отвечает быстрее любого поиска. Поиск рядом, на случай
+  // когда деньги пришли вперёд или задним числом.
+  try{ r = await ownerApi.ownerFetch('/api/owner/orders',
+    {params: q ? {period:'month', q} : {period:'month', from: iso, to: iso}}); }
+  catch(e){
+    document.getElementById('accMid').innerHTML =
+      '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+    return;
+  }
+  const rows = (r.groups || []).flatMap(g => g.rows || [])
+    .sort((a, b) => String(b.ts || '').localeCompare(String(a.ts || '')));
+  document.getElementById('accMid').innerHTML = `
+    <div class="pk-search">
+      <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+      <input id="walQ" placeholder="Номер заказа, имя или адрес" value="${escS(q)}"
+             enterkeyhint="search" onkeydown="if(event.key==='Enter'){event.preventDefault();
+               walPickLoad('${escS(iso)}', this.value.trim())}">
+    </div>
+    ${rows.length ? `<div class="wal-pick">${rows.slice(0, 60).map(o => `
+      <button class="wal-po" onclick="walLink('${escS(String(o.id))}')">
+        <span class="wal-po-b">
+          <span class="wal-po-t">#${escS(String(o.id))} · ${escS(o.name || '—')}</span>
+          <span class="wal-po-s">${escS(_when(o.ts) || '')}${
+            o.driver ? ' · ' + escS(o.driver) : ''}${
+            o.crypto ? ' · уже криптой' : ''}</span>
+        </span>
+        <span class="wal-po-v">${fmt(o.total || 0)}</span>
+      </button>`).join('')}</div>`
+      : `<div class="scan-empty">${q ? 'Ничего не нашлось'
+          : 'В этот день заказов нет — ищите по номеру'}</div>`}`;
+}
+
+async function walLink(oid){
+  if(!WAL_PICK) return;
+  try{
+    await ownerApi.ownerFetch('/api/owner/wallet/link', {method:'POST', body:{
+      txid: WAL_PICK.txid, order_id: oid, amount: WAL_PICK.amount, as: _meName()}});
+  }catch(e){
+    const p = (e || {}).payload || {};
+    _toast(p.error === 'already_paid_by_invoice' ? 'У этого перевода уже есть счёт'
+         : p.error === 'unknown_order' ? 'Такого заказа нет' : 'Не удалось привязать');
+    return;
+  }
+  _toast('Привязано к заказу #' + oid);
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  WAL_PICK = null;
+  await walRefresh();
+}
+
+async function walUnlink(txid){
+  if(!confirm('Снять привязку к заказу?\n\nПоступление снова станет безымянным.')) return;
+  try{ await ownerApi.ownerFetch('/api/owner/wallet/unlink',
+    {method:'POST', body:{txid, as: _meName()}}); }
+  catch(e){ _toast('Не удалось снять'); return; }
+  await walRefresh();
 }
 
 // ─── Удалить товар ──────────────────────────────────────────────────────────

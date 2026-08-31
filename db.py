@@ -1479,6 +1479,36 @@ async def get_crypto_invoice(oid: str) -> dict | None:
     return await db.crypto_invoices.find_one({"order_id": oid}, {"_id": 0})
 
 
+async def wallet_link_set(txid: str, doc: dict) -> bool:
+    """Связать поступление с заказом. Перевод — ключ: он приходит один раз.
+
+    Личный заказ оператор ведёт руками: скидывает номер кошелька, деньги падают
+    напрямую, счёта нет. Связать их автоматически не с чем — значит связывает
+    человек, и эта связь тоже запись, со своим автором и временем."""
+    db = _db_or_none()
+    if db is None or not txid: return False
+    await db.wallet_links.update_one({"_id": txid}, {"$set": doc}, upsert=True)
+    return True
+
+
+async def wallet_link_del(txid: str) -> bool:
+    db = _db_or_none()
+    if db is None or not txid: return False
+    r = await db.wallet_links.delete_one({"_id": txid})
+    return bool(r.deleted_count)
+
+
+async def wallet_links(txids: list = None) -> dict:
+    """{txid: связь} — по списку переводов или все сразу."""
+    db = _db_or_none()
+    if db is None: return {}
+    q = {"_id": {"$in": [t for t in txids if t]}} if txids else {}
+    out = {}
+    async for d in db.wallet_links.find(q):
+        out[d.pop("_id")] = d
+    return out
+
+
 async def crypto_paid_totals() -> dict:
     """Сколько всего оплачено криптой по НАШИМ счетам — за всё время.
 

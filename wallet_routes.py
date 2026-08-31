@@ -84,6 +84,13 @@ async def _build() -> dict:
     except Exception as e:                       # noqa: BLE001
         log.warning(f"[wallet] итог по счетам не посчитан: {e}")
 
+    # Строка в журнал: единственный способ проверить эти числа, не влезая в
+    # чужой экран. Сходится ли остаток с балансом — видно сразу.
+    log.info(f"[wallet] переводов {len(rows)} · пришло {round(через + напрямую, 2)} "
+             f"(через приложение {round(через, 2)}) · ушло {round(ушло, 2)} · "
+             f"остаток {round(через + напрямую - ушло, 2)} · "
+             f"баланс {(balance or {}).get('usdt')}")
+
     return {
         "paid": paid,
         "address": _short(TRON_RECEIVE_ADDRESS),

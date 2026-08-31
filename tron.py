@@ -178,10 +178,21 @@ async def get_transfers(address: str, limit: int = 200, pages: int = 6,
 
 
 def _parse_transfers(raw: list, address: str) -> list[dict]:
+    """Разобрать страницы в переводы, считая каждый ровно один раз.
+
+    Страницы берутся по «отпечатку» предыдущей, и если он не сдвинулся, та же
+    сотня переводов пришла бы дважды — а с ней удвоился бы и оборот. Ключ у
+    перевода составной: одна транзакция может нести несколько переводов."""
     me = address.strip()
-    out = []
+    out, seen = [], set()
     for it in raw:
         try:
+            ключ = (it.get("transaction_id") or it.get("txID") or "",
+                    it.get("from") or "", it.get("to") or "",
+                    str(it.get("value") or ""))
+            if ключ in seen:
+                continue
+            seen.add(ключ)
             if ((it.get("token_info") or {}).get("address") or "") != USDT_TRC20_CONTRACT:
                 continue
             to, frm = (it.get("to") or "").strip(), (it.get("from") or "").strip()

@@ -548,10 +548,14 @@ body:not(.aob-on):not(.cpb-on) #cart-foot::after{content:'';position:absolute;le
 /* payment method — animated segmented control with a sliding gold thumb */
 .pm-seg{position:relative;display:flex;gap:0;padding:5px;background:var(--bg3);border:1px solid var(--border2);border-radius:calc(var(--r2) + 4px)}
 .pm-thumb{position:absolute;top:5px;left:5px;width:calc(50% - 5px);height:calc(100% - 10px);border-radius:var(--r2);background:linear-gradient(160deg,rgba(201,169,110,.16),rgba(201,169,110,.05));border:1px solid var(--gold);box-shadow:0 0 0 1px var(--gold) inset,0 8px 22px rgba(201,169,110,.16);transform:translateX(0);transition:transform var(--dur-slow) cubic-bezier(.34,1.28,.5,1),opacity var(--dur-base);pointer-events:none;z-index:0}
-.pm-seg[data-sel="crypto"] .pm-thumb{transform:translateX(100%)}
-/* В ДОЛГ: third option, only rendered for whitelisted debt customers */
-.pm-seg.has-debt .pm-thumb{width:calc(33.333% - 3.4px)}
-.pm-seg[data-sel="debt"] .pm-thumb{transform:translateX(200%)}
+/* Способов три: наличные, перевод, крипта — и четвёртый, «в долг», у тех,
+   кому он открыт. Ширина бегунка считается от их числа, иначе он встаёт мимо
+   кнопки. */
+.pm-thumb{width:calc(33.333% - 3.4px)}
+.pm-seg[data-sel="transfer"] .pm-thumb{transform:translateX(100%)}
+.pm-seg[data-sel="crypto"] .pm-thumb{transform:translateX(200%)}
+.pm-seg.has-debt .pm-thumb{width:calc(25% - 3.75px)}
+.pm-seg[data-sel="debt"] .pm-thumb{transform:translateX(300%)}
 .pm-opt{position:relative;z-index:1;flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:7px;padding:13px 8px;min-height:80px;background:transparent;border:none;border-radius:var(--r2);cursor:pointer;color:var(--sub);outline:none;-webkit-tap-highlight-color:transparent;transition:color var(--dur-base),transform var(--dur-fast) var(--ease-standard)}
 .pm-opt:active{transform:scale(var(--press-card))}
 .pm-opt:focus-visible{box-shadow:0 0 0 2px var(--bg3),0 0 0 4px rgba(201,169,110,.7)}
@@ -2343,6 +2347,10 @@ body.aob-on.cpb-on .page{padding-bottom:calc(252px + var(--safe-bottom))}
           <button type="button" class="pm-opt on" id="pm-cash" aria-pressed="true" onclick="selectPayMethod('cash')">
             <span class="pm-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/><path d="M6 12h.01M18 12h.01"/></svg></span>
             <span class="pm-lbl" id="pm-cash-lbl">Наличными</span>
+          </button>
+          <button type="button" class="pm-opt" id="pm-transfer" aria-pressed="false" onclick="selectPayMethod('transfer')">
+            <span class="pm-ico"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h14l-3-3"/><path d="M21 16H7l3 3"/></svg></span>
+            <span class="pm-lbl" id="pm-transfer-lbl">Переводом</span>
           </button>
           <button type="button" class="pm-opt disabled" id="pm-crypto" aria-pressed="false" onclick="selectPayMethod('crypto')">
             <span class="pm-soon" id="pm-soon">Скоро</span>
@@ -6881,7 +6889,8 @@ function placeOrder(){
     startCryptoPayment(_ctx);
     return;
   }
-  payload.payment_method=(payMethod==='debt'&&DEBT_ENABLED)?'debt':'cash';
+  payload.payment_method = (payMethod === 'debt' && DEBT_ENABLED) ? 'debt'
+                         : (payMethod === 'transfer' ? 'transfer' : 'cash');
 
   orders.unshift({order_id:oid,items,total,address:addr.label||addr.address,status:'pending',timestamp:new Date().toISOString()});
   localStorage.setItem('ambar_orders',JSON.stringify(orders.slice(0,50)));
@@ -7007,19 +7016,26 @@ function _applyPayMethodVisuals(){
   const ru=lang==='ru';
   const cryptoSel=payMethod==='crypto'&&CRYPTO_ENABLED;
   const debtSel=payMethod==='debt'&&DEBT_ENABLED;
-  const cashOn=!cryptoSel&&!debtSel;
-  const cashBtn=el('pm-cash'), cryptoBtn=el('pm-crypto'), debtBtn=el('pm-debt'), seg=el('pm-seg');
+  const trSel=payMethod==='transfer';
+  const cashOn=!cryptoSel&&!debtSel&&!trSel;
+  const cashBtn=el('pm-cash'), cryptoBtn=el('pm-crypto'), debtBtn=el('pm-debt'),
+        trBtn=el('pm-transfer'), seg=el('pm-seg');
   cashBtn&&cashBtn.classList.toggle('on',cashOn);
   cryptoBtn&&cryptoBtn.classList.toggle('on',cryptoSel);
   debtBtn&&debtBtn.classList.toggle('on',debtSel);
+  trBtn&&trBtn.classList.toggle('on',trSel);
   cashBtn&&cashBtn.setAttribute('aria-pressed',cashOn?'true':'false');
   cryptoBtn&&cryptoBtn.setAttribute('aria-pressed',cryptoSel?'true':'false');
   debtBtn&&debtBtn.setAttribute('aria-pressed',debtSel?'true':'false');
+  trBtn&&trBtn.setAttribute('aria-pressed',trSel?'true':'false');
   // slide the gold thumb to the active option
-  seg&&seg.setAttribute('data-sel',cryptoSel?'crypto':(debtSel?'debt':'cash'));
+  seg&&seg.setAttribute('data-sel',cryptoSel?'crypto':(debtSel?'debt':(trSel?'transfer':'cash')));
   const hint=el('pm-hint');
   if(hint){
-    hint.innerHTML = cryptoSel
+    hint.innerHTML = trSel
+      ? (ru?'Оплата <b>переводом</b>. Реквизиты пришлёт оператор — заказ уедет, как только перевод придёт.'
+           :'Pay by <b>bank transfer</b>. The operator will send the details — the order ships once the transfer arrives.')
+      : cryptoSel
       ? (ru?'Оплата <b>USDT (TRC-20)</b> заранее. Как только сеть подтвердит перевод — заказ уйдёт оператору.'
            :'Pay <b>USDT (TRC-20)</b> upfront. As soon as the network confirms, your order goes to the operator.')
       : debtSel

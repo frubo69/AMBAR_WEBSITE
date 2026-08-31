@@ -691,6 +691,12 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
             order_doc["crypto_test"]    = True   # demo order — not a real payment
     elif debt:
         order_doc["payment_method"] = "debt"
+    elif data.get("payment_method") == "transfer":
+        # Перевод — деньги приходят на счёт, а не курьеру. Проверить их на месте
+        # заказа нечем, поэтому статус тут только один: способ расчёта записан,
+        # а пришли ли деньги — знает тот, кто смотрит счёт. Водителю важно
+        # другое, и это сказано прямо в карточке: наличные не брать.
+        order_doc["payment_method"] = "transfer"
     if uid not in _TEST_ACCOUNTS:
         await db.save_order(oid, order_doc)
         user_fields = dict(name=original_name, full_name=original_name, first_name=user.get("first_name",""),

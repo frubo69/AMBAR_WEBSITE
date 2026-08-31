@@ -3895,7 +3895,7 @@ function ordHead(active){
   if(!active.length) return '';
   // Оплачено онлайн или в долг — этих денег водитель не касается.
   const free = o => !!o.prepaid || o.payment_method === 'crypto'
-                 || o.payment_method === 'debt';
+                 || o.payment_method === 'debt' || o.payment_method === 'transfer';
   const cash = active.filter(o => !free(o)).reduce((a, o) => a + (o.total || 0), 0);
   const paid = active.filter(free).reduce((a, o) => a + (o.total || 0), 0);
   const units = active.reduce((a, o) =>
@@ -3908,8 +3908,14 @@ function ordHead(active){
   const pre = active.filter(o => o.prepaid || o.payment_method === 'crypto')
     .reduce((a, o) => a + (o.total || 0), 0);
   const debt = paid - pre;
-  if(!zero && paid) foot.push(`<span>${fmt(paid)} AED не берём: ${
-    pre && debt ? 'оплачено онлайн и в долг' : pre ? 'оплачено онлайн' : 'в долг'}</span>`);
+  // Перевод стоит рядом с оплаченным онлайн: денег в руках водителя нет и там
+  // и там, а разбираться, каким именно способом, ему незачем.
+  const tr = active.filter(o => o.payment_method === 'transfer')
+    .reduce((a, o) => a + (o.total || 0), 0);
+  const debtOnly = debt - tr;
+  const почему = [pre && 'оплачено онлайн', tr && 'переводом', debtOnly > 0 && 'в долг']
+    .filter(Boolean).join(' и ');
+  if(!zero && paid) foot.push(`<span>${fmt(paid)} AED не берём: ${почему}</span>`);
   if(late) foot.push(`<span class="warn">${late === 1
     ? 'один заказ просрочен' : late + ' заказа просрочено'}</span>`);
   return `<div class="hsum${late ? ' late' : ''}">

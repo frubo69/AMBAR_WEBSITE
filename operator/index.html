@@ -3499,7 +3499,7 @@ function _card(o, lane){
   const [stT,stC]=ST[o.status]||[o.status,''];
   const goods=(o.total||0)-(o.tip||0);
   const pay = o.prepaid ? 'Крипта · оплачено'
-            : (o.payment_method==='debt' ? 'В долг' : 'Наличные при получении');
+            : (o.payment_method==='debt' ? 'В долг' : (o.payment_method==='transfer' ? 'Перевод · наличные не брать' : 'Наличные при получении'));
   const when = lane==='new' ? `${_age(o.timestamp)} назад`
              : (o.deliver_by ? `до ${_esc(o.deliver_by)}` : '');
   const dist = [_distCode(o.office_id), _distName(o.office_id)||o.office_name]
@@ -3658,7 +3658,7 @@ function renderOrder(){
   const goods=(o.total||0)-(o.tip||0);
   const lines=(o.items||[]).length;
   const pay = o.prepaid ? 'Крипта · оплачено'
-            : (o.payment_method==='debt' ? 'В долг · наличные не брать' : 'Наличные при получении');
+            : (o.payment_method==='debt' ? 'В долг · наличные не брать' : (o.payment_method==='transfer' ? 'Перевод · наличные не брать' : 'Наличные при получении'));
   const src=(o.source||'app')==='manual';
 
   const when = o.status==='pending' ? `${_age(o.timestamp)} назад`
@@ -4138,7 +4138,7 @@ function chatRender(toBottom){
                              o.driver ? ('водитель ' + o.driver) : ''].filter(Boolean).join(' · ');
   // Сумма и способ оплаты — прямо здесь: у двери спрашивают именно их.
   $('ochAct').innerHTML = `<div class="och-sum">${_esc(o.total)}<small>AED</small>
-      <i>${o.prepaid ? 'оплачено' : (o.payment_method === 'debt' ? 'в долг' : 'наличными')}</i></div>`
+      <i>${o.prepaid ? 'оплачено' : (o.payment_method === 'debt' ? 'в долг' : (o.payment_method === 'transfer' ? 'переводом' : 'наличными'))}</i></div>`
     + (o.gmap_link
       ? `<a class="of-map" href="${_esc(o.gmap_link)}" target="_blank" rel="noopener"><svg
           viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s7-5.7 7-11a7 7 0 1 0-14 0c0 5.3 7 11 7 11z"/><circle

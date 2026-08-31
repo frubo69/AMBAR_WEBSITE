@@ -749,6 +749,11 @@ async def handle_finance(request):
             return 0.0
     debt_delivered = [o for _, o in curr_orders if o.get("payment_method") == "debt"]
     debt_aed = sum(int(o.get("total", 0) or 0) for o in debt_delivered)
+    # Перевод — свой способ расчёта: денег в кассе нет, как и при оплате
+    # криптой, но приходят они на счёт, а не на кошелёк.
+    transfer_delivered = [o for _, o in curr_orders
+                          if o.get("payment_method") == "transfer"]
+    transfer_aed = sum(int(o.get("total", 0) or 0) for o in transfer_delivered)
     crypto_delivered = [o for _, o in curr_orders if _is_crypto(o)]
     crypto_aed  = sum(o.get("total", 0) for o in crypto_delivered)
     crypto_usdt = round(sum(_usdt(o) for o in crypto_delivered), 2)
@@ -791,8 +796,10 @@ async def handle_finance(request):
             # «В долг» — это не наличные: товар уехал, денег в кассе нет. Пока
             # долг сидел в наличных, кассу показывало больше, чем в ней лежит.
             "debt":   {"aed": debt_aed, "count": len(debt_delivered)},
-            "cash":   {"aed": rev_curr - crypto_aed - debt_aed,
-                       "count": delivered_count - len(crypto_delivered) - len(debt_delivered)},
+            "transfer": {"aed": transfer_aed, "count": len(transfer_delivered)},
+            "cash":   {"aed": rev_curr - crypto_aed - debt_aed - transfer_aed,
+                       "count": delivered_count - len(crypto_delivered)
+                                - len(debt_delivered) - len(transfer_delivered)},
             "crypto_inflight": {
                 "aed":   sum(o.get("total", 0) for o in inflight),
                 "usdt":  round(sum(_usdt(o) for o in inflight), 2),
@@ -1705,6 +1712,8 @@ async def handle_office(request):
     _phone = [(dt, o) for dt, o in curr if o.get("source") == "manual"]
     _crypto = [(dt, o) for dt, o in curr if o.get("payment_method") == "crypto" and o.get("paid")]
     _crypto_aed = _sum_field(_crypto, "total")
+    _transfer = [(dt, o) for dt, o in curr if o.get("payment_method") == "transfer"]
+    _transfer_aed = _sum_field(_transfer, "total")
     _phone_aed = _sum_field(_phone, "total")
 
     # рейтинг
@@ -1755,7 +1764,9 @@ async def handle_office(request):
         "by_channel": {"app":   {"aed": rev - _phone_aed, "count": delivered - len(_phone)},
                        "phone": {"aed": _phone_aed, "count": len(_phone)}},
         "by_method":  {"crypto": {"aed": _crypto_aed, "count": len(_crypto)},
-                       "cash":   {"aed": rev - _crypto_aed, "count": delivered - len(_crypto)}},
+                       "transfer": {"aed": _transfer_aed, "count": len(_transfer)},
+                       "cash":   {"aed": rev - _crypto_aed - _transfer_aed,
+                                  "count": delivered - len(_crypto) - len(_transfer)}},
         "delivery": {"avg_min": ds["avg_min"], "sample": ds["sample"],
                      "late_count": ds["late_count"], "late_pct": ds["late_pct"],
                      "threshold": LATE_THRESHOLD_FALLBACK},

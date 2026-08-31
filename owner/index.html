@@ -3510,6 +3510,33 @@ button.path:active{transform:scale(.995)}
 .exp-wait{margin-top:11px;padding:9px 11px;border-radius:10px;font-size:11.5px;line-height:1.5;
   color:var(--sub);background:var(--warn-soft);border:1px solid rgba(243,180,74,.25)}
 .exp-wait b{color:var(--warn)}
+/* Список видов траты. Плитками в два столбца: их десяток, и колонкой они
+   растянули бы карточку на пол-экрана. */
+.exp-kinds{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:9px;
+  padding-top:9px;border-top:1px solid var(--border2)}
+.exp-kind{display:flex;align-items:center;justify-content:space-between;gap:6px;
+  padding:10px 11px;border-radius:11px;cursor:pointer;font-family:inherit;
+  text-align:left;color:var(--text);background:var(--card2);
+  border:1px solid var(--border2)}
+.exp-kind:active{transform:scale(.98);border-color:var(--gold2)}
+.exp-kind.plus{border-color:rgba(76,175,125,.3)}
+.exp-kind-t{font-size:12.5px;font-weight:600;line-height:1.2}
+.exp-kind-h{flex:0 0 auto;font-size:9px;font-weight:700;letter-spacing:.4px;
+  text-transform:uppercase;color:var(--warn)}
+.exp-kind-h.plus{color:var(--up)}
+/* Шапка выбранного вида: назад и название — чтобы человек видел, во что
+   вписывает сумму. */
+.exp-form-h{display:flex;align-items:center;gap:8px;margin-top:9px;padding-top:9px;
+  border-top:1px solid var(--border2)}
+.exp-back{width:24px;height:24px;flex:0 0 auto;border-radius:8px;border:1px solid var(--border2);
+  background:var(--card2);color:var(--sub);font-size:15px;line-height:1;cursor:pointer}
+.exp-form-t{font-size:12.5px;font-weight:700;color:var(--gold2)}
+.exp-shot{width:100%;margin-top:7px;padding:9px;border-radius:10px;cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:600;color:var(--warn);
+  background:rgba(243,180,74,.08);border:1px solid rgba(243,180,74,.3)}
+.exp-shot.on{color:var(--up);background:rgba(76,175,125,.08);
+  border-color:rgba(76,175,125,.3)}
+.exp-item-k{font-weight:700;color:var(--sub)}
 .exp-form{display:flex;gap:6px;margin-top:9px;padding-top:9px;border-top:1px solid var(--border2)}
 .exp-form input{min-width:0;padding:8px 10px;border-radius:9px;border:1px solid var(--border2);
   background:var(--bg3);color:var(--text);font-family:inherit;font-size:12.5px;outline:none}
@@ -15537,7 +15564,8 @@ function expRow(r){
       const st = e.status || 'approved';
       return `<div class="exp-item ${st}">
         <span class="exp-item-a">${e.amount}</span>
-        <span class="exp-item-c">${escS(e.comment)}${
+        <span class="exp-item-c">${e.kind_t && e.kind !== 'other'
+          ? `<b class="exp-item-k">${escS(e.kind_t)}</b> · ` : ''}${escS(e.comment)}${
           e.by_driver ? `<i class="exp-from">от водителя</i>` : ''}</span>
         ${st === 'pending' ? `
           <button class="exp-item-ok" title="Принять"
@@ -15551,14 +15579,94 @@ function expRow(r){
       </div>`;
     }).join('')}</div>` : ''}
 
-    ${open ? `<div class="exp-form">
+    ${open ? expKindBody(r) : ''}
+  </div>`;
+}
+
+// За что именно. «Доп. расход» одной строкой не отвечал ни на один вопрос,
+// который задают через неделю: заправка это или чей-то долг, вернули мы или
+// нам. Поэтому сначала спрашиваем вид, а сумму и слова — уже под него.
+//
+// Чек. Заправку, мойку и парковку оплачивают на стороне, и единственное
+// доказательство такой траты — снимок бумажки. Без него «Готово» не нажимается,
+// и сказано об этом сразу, а не после отправки.
+//
+// Знак. «Нам вернули» — деньги, пришедшие обратно: в расходе дня они стоят
+// минусом, иначе возврат раздувал бы расход наравне с тратой.
+const EXP_KINDS = [
+  {id:'fuel',    t:'Заправка',      receipt:true,  hint:'нужен чек'},
+  {id:'wash',    t:'Мойка',         receipt:true,  hint:'нужен чек'},
+  {id:'parking', t:'Парковка',      receipt:true,  hint:'нужен чек'},
+  {id:'kfc',     t:'KFC · премия'},
+  {id:'guard',   t:'Охрана'},
+  {id:'we_gave', t:'Мы вернули',    who:'кому вернули'},
+  {id:'we_got',  t:'Нам вернули',   who:'кто вернул', plus:true},
+  {id:'we_owe',  t:'Мы должны',     who:'кому должны'},
+  {id:'owed_us', t:'Нам должны',    who:'кто должен'},
+  {id:'other',   t:'Доп. расход',   hint:'что-то ещё'},
+];
+
+let EXP_KIND = null, EXP_SHOT = {photo:'', thumb:''};
+
+function expKind(id){ return EXP_KINDS.find(k => k.id === id) || null; }
+
+function expPickKind(id){
+  EXP_KIND = id || null;
+  EXP_SHOT = {photo:'', thumb:''};
+  renderExpenses();
+  if(EXP_KIND) setTimeout(()=>document.getElementById('expAmt')?.focus(), 60);
+}
+
+function expKindBody(r){
+  const k = expKind(EXP_KIND);
+  if(!k) return `<div class="exp-kinds">${EXP_KINDS.map(x => `
+    <button class="exp-kind${x.plus ? ' plus' : ''}" onclick="expPickKind('${x.id}')">
+      <span class="exp-kind-t">${escS(x.t)}</span>
+      ${x.receipt ? '<span class="exp-kind-h">чек</span>'
+        : (x.plus ? '<span class="exp-kind-h plus">плюсом</span>' : '')}
+    </button>`).join('')}</div>`;
+  const снимок = !k.receipt ? '' : (EXP_SHOT.photo
+    ? `<button class="exp-shot on" onclick="EXP_SHOT={photo:'',thumb:''};renderExpenses()">
+         снимок готов · убрать</button>`
+    : `<button class="exp-shot" onclick="document.getElementById('expCam').click()">
+         Снять чек</button>`);
+  return `<div class="exp-form-h">
+      <button class="exp-back" onclick="expPickKind('')" aria-label="Назад">‹</button>
+      <span class="exp-form-t">${escS(k.t)}${k.plus ? ' · плюсом' : ''}</span>
+    </div>
+    ${снимок}
+    <div class="exp-form">
       <input class="amt" id="expAmt" type="text" inputmode="numeric" placeholder="AED"
              onkeydown="if(event.key==='Enter')expAddExtra('${escS(r.name)}')">
-      <input class="cmt" id="expCmt" type="text" placeholder="за что — бензин, мойка, штраф"
+      <input class="cmt" id="expCmt" type="text" placeholder="${escS(k.who || k.hint || 'за что')}"
              onkeydown="if(event.key==='Enter')expAddExtra('${escS(r.name)}')">
       <button onclick="expAddExtra('${escS(r.name)}')">Готово</button>
-    </div>` : ''}
-  </div>`;
+    </div>`;
+}
+
+// Снимок чека тем же путём, что и снимок списания: уменьшаем на месте, чтобы
+// по сети не ехал мегабайт ради строки расхода.
+function expShot(inp){
+  const f = inp.files && inp.files[0]; inp.value = '';
+  if(!f) return;
+  const img = new Image(), fr = new FileReader();
+  fr.onload = () => { img.src = fr.result; };
+  img.onload = () => {
+    const k = Math.min(1, 1280 / Math.max(img.width, img.height));
+    const c = document.createElement('canvas');
+    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+    const t = document.createElement('canvas');
+    const tk = Math.min(1, 96 / Math.max(img.width, img.height));
+    t.width = Math.round(img.width * tk); t.height = Math.round(img.height * tk);
+    t.getContext('2d').drawImage(img, 0, 0, t.width, t.height);
+    EXP_SHOT = {photo: c.toDataURL('image/jpeg', 0.72),
+                thumb: t.toDataURL('image/jpeg', 0.5)};
+    renderExpenses();
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  };
+  img.onerror = () => _toast('Не смогли прочитать снимок');
+  fr.readAsDataURL(f);
 }
 
 // Полоса доп. расходов. Стоит у каждого водителя всегда, даже когда их нет, —
@@ -15603,24 +15711,35 @@ async function expSetWork(driver, working){
 
 function expToggleForm(driver){
   EXP.open = EXP.open === driver ? null : driver;
+  EXP_KIND = null; EXP_SHOT = {photo:'', thumb:''};
   renderExpenses();
   if(EXP.open) setTimeout(()=>document.getElementById('expAmt')?.focus(), 50);
 }
 
 async function expAddExtra(driver){
-  if(!await accAskBack('Доп. расход')) return;
+  const k = expKind(EXP_KIND) || expKind('other');
+  if(!await accAskBack(k.t)) return;
   const amount = parseInt((document.getElementById('expAmt')?.value || '').replace(/\D/g,''), 10);
   const comment = (document.getElementById('expCmt')?.value || '').trim();
-  // Расход без объяснения через неделю не отличить от опечатки — поэтому
-  // комментарий обязателен, и сказать об этом надо здесь, а не после отправки.
-  if(!amount || !comment){ _toast(!amount ? 'Впишите сумму' : 'Впишите, за что'); return; }
+  // Трата без объяснения через неделю не отличить от опечатки — поэтому слова
+  // обязательны, и сказать об этом надо здесь, а не после отправки.
+  if(!amount || !comment){
+    _toast(!amount ? 'Впишите сумму' : (k.who ? 'Впишите, кто' : 'Впишите, за что'));
+    return;
+  }
+  if(k.receipt && !EXP_SHOT.photo){ _toast('Нужен снимок чека'); return; }
   try{
     const r = await ownerApi.ownerFetch('/api/owner/expenses/extra',
-      {method:'POST', body:{day:EXP.day, driver, amount, comment, as:_meName()}});
-    EXP.open = null;
+      {method:'POST', body:{day:EXP.day, driver, amount, comment, kind:k.id,
+                            photo:EXP_SHOT.photo, thumb:EXP_SHOT.thumb, as:_meName()}});
+    EXP.open = null; EXP_KIND = null; EXP_SHOT = {photo:'', thumb:''};
     _expReplace(r.driver);
-    _toast(`${driver}: +${amount} AED`);
-  }catch(e){ _toast('Не удалось добавить'); }
+    _toast(`${driver}: ${k.plus ? '−' : '+'}${amount} AED · ${k.t}`);
+  }catch(e){
+    const why = ((e || {}).payload || {}).error;
+    _toast(why === 'no_photo' ? 'Без снимка чека такую трату не записать'
+                              : 'Не удалось добавить');
+  }
 }
 
 // Решение по трате водителя. Отклонённая не исчезает: водитель должен видеть,
@@ -22347,6 +22466,9 @@ function renderHours(h){
     </div>
   </div>
 </div>
+<input type="file" id="expCam" accept="image/*" capture="environment"
+  onchange="expShot(this)"
+  style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
 <input type="file" id="woCam" accept="image/*" capture="environment"
   style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"
   onchange="woShot(this)">

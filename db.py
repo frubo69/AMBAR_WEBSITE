@@ -3422,6 +3422,23 @@ async def set_driver_no_expense(day: str, driver: str, kind: str, none: bool):
                                         {"$unset": {key: ""}})
 
 
+async def expense_photo_set(item_id: str, photo: str, thumb: str = "") -> None:
+    """Снимок чека к разовой трате. Лежит отдельно от самой записи: строку
+    расхода читают каждый день, а картинку открывают раз."""
+    db = _db_or_none()
+    if db is None or not item_id: return
+    await db.expense_photos.replace_one(
+        {"_id": item_id},
+        {"_id": item_id, "img": photo, "thumb": thumb,
+         "at": datetime.now(timezone.utc)}, upsert=True)
+
+
+async def expense_photo_get(item_id: str) -> dict | None:
+    db = _db_or_none()
+    if db is None or not item_id: return None
+    return await db.expense_photos.find_one({"_id": item_id})
+
+
 async def add_driver_expense(day: str, driver: str, item: dict):
     """Разовый расход. Пишется через $push, чтобы две записи подряд с разных
     устройств не затирали друг друга."""

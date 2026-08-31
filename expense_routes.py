@@ -62,6 +62,42 @@ def _status(e: dict) -> str:
     return e.get("status") or "approved"
 
 
+# ── за что именно ──────────────────────────────────────────────────────────
+# «Доп. расход» одной строкой не отвечал ни на один вопрос, который задают
+# через неделю: заправка это или чей-то долг, вернули мы или нам. Поэтому у
+# траты есть вид, и каждый вид знает про себя две вещи.
+#
+# Чек. Заправку, мойку и парковку без снимка чека записать нельзя: это деньги,
+# отданные на стороне, и единственное их доказательство — бумажка в руках.
+# Остальные виды доказываются самим фактом: премию назначает владелец, охрану
+# видно на въезде.
+#
+# Знак. «Нам вернули» — деньги, пришедшие обратно, и в расходе дня они стоят
+# минусом. Иначе возврат увеличивал бы расход ровно так же, как трата.
+EXTRA_KINDS = {
+    "fuel":    {"t": "Заправка",     "receipt": True},
+    "wash":    {"t": "Мойка",        "receipt": True},
+    "parking": {"t": "Парковка",     "receipt": True},
+    "kfc":     {"t": "KFC · премия"},
+    "guard":   {"t": "Охрана"},
+    "we_gave": {"t": "Мы вернули"},
+    "we_got":  {"t": "Нам вернули",  "plus": True},
+    "we_owe":  {"t": "Мы должны"},
+    "owed_us": {"t": "Нам должны"},
+    "other":   {"t": "Доп. расход"},
+}
+
+
+def _kind(e: dict) -> dict:
+    return EXTRA_KINDS.get(str((e or {}).get("kind") or "other")) or EXTRA_KINDS["other"]
+
+
+def _signed(e: dict) -> int:
+    """Сумма траты со знаком: возврат уменьшает расход дня, а не увеличивает."""
+    a = _amount((e or {}).get("amount"))
+    return -a if _kind(e).get("plus") else a
+
+
 def _day_row(d: dict, saved: dict) -> dict:
     """Строка водителя за день: отметка, питание и разовые траты.
 
@@ -73,8 +109,8 @@ def _day_row(d: dict, saved: dict) -> dict:
     meal = 0
     if working is True:    meal = staff.MEAL_WORKING
     elif working is False: meal = staff.MEAL_OFF
-    extra_sum = sum(_amount(e.get("amount")) for e in extras if _status(e) == "approved")
-    pending = sum(_amount(e.get("amount")) for e in extras if _status(e) == "pending")
+    extra_sum = sum(_signed(e) for e in extras if _status(e) == "approved")
+    pending = sum(_signed(e) for e in extras if _status(e) == "pending")
     return {
         **d,
         "working": working,                 # None — ещё не отмечали
@@ -186,8 +222,8 @@ async def handle_working(request):
 
 @require_owner
 async def handle_extra_add(request):
-    """POST /api/owner/expenses/extra — разовый расход.
-    body: {day?, driver, amount, comment}"""
+    """POST /api/owner/expenses/extra — разовая трата.
+    body: {day?, driver, amount, comment, kind?, photo?}"""
     try:
         body = await request.json()
     except Exception:
@@ -204,13 +240,36 @@ async def handle_extra_add(request):
                                  status=400, headers=CORS_HEADERS)
     day = str(body.get("day") or "").strip() or _biz_day()
 
+    kid = str(body.get("kind") or "other").strip()
+    if kid not in EXTRA_KINDS:
+        kid = "other"
+    вид = EXTRA_KINDS[kid]
+    # Чек — не формальность: заправку, мойку и парковку оплачивают на стороне,
+    # и снимок бумажки — единственное, чем такая трата подтверждается. Без него
+    # запись не принимаем вовсе, а не «принимаем и помечаем».
+    photo = str(body.get("photo") or "")
+    if вид.get("receipt") and not photo.startswith("data:image"):
+        return web.json_response({"error": "no_photo", "kind": kid},
+                                 status=400, headers=CORS_HEADERS)
+
     item = {"id": secrets.token_hex(6), "amount": amount, "comment": comment,
+            "kind": kid, "kind_t": вид["t"], "plus": bool(вид.get("plus")),
             "by": request["owner_id"], "status": "approved",
             "at": datetime.now(timezone.utc).isoformat()}
+    if photo:
+        # Сам снимок лежит отдельно: строку расхода читают часто, а картинку
+        # смотрят раз, и таскать по сети мегабайт ради строки незачем.
+        try:
+            await db.expense_photo_set(item["id"], photo, str(body.get("thumb") or ""))
+            item["photo"] = True
+            item["thumb"] = str(body.get("thumb") or "")
+        except Exception as e:                   # noqa: BLE001
+            log.warning(f"[expenses] снимок чека не сохранён: {e}")
     await db.add_driver_expense(day, driver, item)
-    log.info(f"[expenses] {day} {driver}: +{amount} AED — {comment}")
+    знак = "−" if вид.get("plus") else "+"
+    log.info(f"[expenses] {day} {driver}: {знак}{amount} AED — {вид['t']}: {comment}")
     await backdate.notify(day, str(body.get("as") or ""), "доп. расход добавлен",
-                          f"{driver} — {amount} AED, {comment}")
+                          f"{driver} — {amount} AED, {вид['t']}: {comment}")
     saved = await db.get_driver_day(day, driver)
     base = next(d for d in staff.drivers() if d["name"] == driver)
     return web.json_response({"ok": True, "item": item, "driver": _day_row(base, saved)},

@@ -13457,17 +13457,39 @@ async function qrDistrict(force){
   });
   // Сводки, в которую раньше вела стрелка назад, больше нет: выбор точки — и
   // есть первый экран раздела, а назад из него ведёт наружу.
-  const head = _qrHead('Где считаем', 'выберите точку хранения', null);
+  // Строками, а не плитками. Точек пять — нечётное число, и в сетке по две
+  // последняя всегда оставалась рядом с пустой клеткой: экран выглядел
+  // недогруженным, а половина его пустовала. В строке помещается то же самое
+  // и читается сверху вниз одним движением.
+  const head = _qrHead('Куда вносим', 'выберите точку хранения', null);
   _setRail('accRail', '');
-  document.getElementById('accMid').innerHTML = head +
-    `<div class="dgrid">` + ((STK.districts || []).map(d => distTile(d, 'qrGo', {
-        cls:   busy[d.id] ? 'busy' : '',
-        value: have[d.id] ? fmt(have[d.id]) : '—',
-        vcls:  have[d.id] ? '' : 'dim',
-        sub:   busy[d.id]
-                 ? `считают ${busy[d.id]} ${pluralize(busy[d.id],'позицию','позиции','позиций')}`
-                 : (have[d.id] ? 'бутылок в реестре' : 'ещё не заводили'),
-      })).join('') || '<div class="scan-empty">Точки не загрузились</div>') + `</div>`;
+  // Сверху — зачем мы здесь: сколько бутылок уже в реестре и сколько ещё лежит
+  // мимо него. Второе число и есть работа, ради которой открывают этот экран.
+  const t = (ACC_QR && ACC_QR.totals) || {};
+  const без = (ACC_QR && ACC_QR.unscanned_total) || 0;
+  const шапка = t.active ? `<div class="stk-have" style="margin-bottom:12px">
+      <span class="sh-l"><b>${fmt(t.active)}</b><span>в реестре</span></span>
+      <span class="sh-r">${без
+        ? `<span class="sh-warn"><b>${fmt(без)}</b>не отсканировано</span>`
+        : `<span class="sh-ok"><b>✓</b>всё отсканировано</span>`}</span>
+    </div>` : '';
+  document.getElementById('accMid').innerHTML = head + шапка +
+    `<div class="stk-drs">` + ((STK.districts || []).map(d => {
+      const n = have[d.id] || 0;
+      const b = busy[d.id] || 0;
+      const [sub, cls] = b
+        ? [`считают ${b} ${pluralize(b,'позицию','позиции','позиций')}`, 'warn']
+        : (n ? ['бутылки в реестре', ''] : ['ещё не заводили', '']);
+      return `<button class="stk-dr" onclick="qrGo('${d.id}')">
+        <span class="stk-dr-c">${escS(d.code || '')}</span>
+        <span class="stk-dr-b">
+          <span class="stk-dr-n">${escS(d.name || '')}</span>
+          <span class="stk-dr-s ${cls}">${sub}</span>
+        </span>
+        <span class="stk-dr-v ${n ? '' : 'dim'}">${n ? fmt(n) : '—'}${n ? '<i>бут</i>' : ''}</span>
+        <span class="stk-dr-go">${ICO_CHEV}</span>
+      </button>`;
+    }).join('') || '<div class="scan-empty">Точки не загрузились</div>') + `</div>`;
 }
 
 

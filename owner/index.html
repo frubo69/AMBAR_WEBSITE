@@ -4315,8 +4315,8 @@ button.path:active{transform:scale(.995)}
     </div>
     <div class="cat-block-kpis">
       <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="walKpiUsdt">0000</div><div class="cat-kpi-l">USDT на кошельке</div></div>
-      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="walKpiOrd">0000</div><div class="cat-kpi-l">По заказам</div></div>
-      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="walKpiOth">0000</div><div class="cat-kpi-l">Мимо заказов</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="walKpiOrd">0000</div><div class="cat-kpi-l">USDT через приложение</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="walKpiOth">0000</div><div class="cat-kpi-l">USDT не через приложение</div></div>
     </div>
     <div class="cat-block-expand">
       <div class="cat-block-sect-t">История поступлений</div>
@@ -12342,9 +12342,9 @@ function walBlockRender(){
     ? (d.offline ? 'сеть не ответила' : `${d.address || 'USDT · TRC-20'} · ${
         (d.transfers || []).length} ${pluralize((d.transfers||[]).length,
         'перевод','перевода','переводов')}`) : '', 130);
-  _skel('walKpiUsdt', !!b, b ? fmt(Math.round((b.usdt || 0) * 100) / 100) : '');
-  _skel('walKpiOrd',  !!t, t ? fmt(t.orders || 0) : '');
-  _skel('walKpiOth',  !!t, t ? fmt(t.other || 0) : '');
+  _skel('walKpiUsdt', !!b, b ? fmtUsdt(b.usdt) : '');
+  _skel('walKpiOrd',  !!t, t ? fmtUsdt(t.app) : '');
+  _skel('walKpiOth',  !!t, t ? fmtUsdt(t.direct) : '');
 
   const list = document.getElementById('walBlockList');
   if(!list) return;
@@ -12355,12 +12355,12 @@ function walBlockRender(){
     <div class="cat-mini-row">
       <div class="cat-mini-body">
         <div class="cat-mini-n">${r.order_id
-          ? 'Заказ #' + escS(String(r.order_id)) : 'Мимо заказов'}</div>
+          ? 'Заказ #' + escS(String(r.order_id)) : 'Не через приложение'}</div>
         <div class="cat-mini-sub">${escS(_walWhen(r.ts))}${
           r.peer ? ' · ' + escS(r.peer) : ''}</div>
       </div>
       <div class="cat-mini-r" style="color:var(--up)">${
-        fmt(Math.round((r.amount || 0) * 100) / 100)}<span class="u">USDT</span></div>
+        fmtUsdt(r.amount)}<span class="u">USDT</span></div>
     </div>`).join('')
     : `<div class="cat-block-empty">${d && d.offline
         ? 'Сеть не ответила' : 'Поступлений пока не было'}</div>`;
@@ -14034,6 +14034,16 @@ async function qrDone(){
 // Всё, что здесь показано, приходит из блокчейна и только читается: ключей от
 // кошелька у сервера нет, отправить отсюда ничего нельзя. Поэтому и кнопки
 // «перевести» на экране не будет — её отсутствие тут не недоделка.
+// USDT — не дирхамы, и общий fmt() им не годится: он переводит число в валюту
+// приложения по курсу и вдобавок вычищает запятые, отчего «4 661,51» на экране
+// становилось «4 661 51» — суммой без валюты и без разделителя.
+function fmtUsdt(n){
+  const v = (Math.round((Number(n) || 0) * 100) / 100).toFixed(2);
+  const [ц, др] = v.split('.');
+  const целое = ц.replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+  return др === '00' ? целое : `${целое},${др}`;
+}
+
 function _walWhen(ms){
   if(!ms) return '';
   try{ return _when(new Date(Number(ms)).toISOString()); }catch(e){ return ''; }
@@ -14080,25 +14090,26 @@ function walBody(d){
     ? `<div class="wal-warn">TRX на комиссию: ${b.trx} — на отправку может не хватить</div>` : '';
   mid.innerHTML = `
     <div class="wal-c">
-      <div class="wal-v">${fmt(Math.round((b.usdt || 0) * 100) / 100)}<u>USDT</u></div>
+      <div class="wal-v">${fmtUsdt(b.usdt)}<u>USDT</u></div>
       <div class="wal-s">TRX ${b.trx != null ? b.trx : '—'} · обновлено ${
         _walWhen(d && d.at) || 'только что'}</div>
       ${газ}${сеть}
     </div>
     <div class="wal-sum">
-      <div><b>${fmt(t.orders || 0)}</b><span>по заказам</span></div>
-      <div class="other"><b>${fmt(t.other || 0)}</b><span>мимо заказов</span></div>
+      <div><b>${fmtUsdt(t.app)}</b><span>USDT через приложение</span></div>
+      <div class="other"><b>${fmtUsdt(t.direct)}</b><span>USDT не через приложение</span></div>
     </div>
     ${rows.length ? `<div class="wal-l">${rows.map(r => `
       <div class="wal-r">
         <span class="wal-r-b">
           <span class="wal-r-t">${r.in ? (r.order_id
-            ? 'Заказ #' + escS(String(r.order_id)) : 'Поступление') : 'Отправлено'}</span>
+            ? 'Заказ #' + escS(String(r.order_id))
+            : 'Не через приложение') : 'Отправлено'}</span>
           <span class="wal-r-s">${escS(_walWhen(r.ts))}${
             r.peer ? ' · ' + escS(r.peer) : ''}</span>
         </span>
         <span class="wal-r-v ${r.in ? '' : 'out'}">${r.in ? '+' : '−'}${
-          fmt(Math.round((r.amount || 0) * 100) / 100)}</span>
+          fmtUsdt(r.amount)}<u>USDT</u></span>
       </div>`).join('')}</div>`
     : `<div class="scan-empty">${d && d.offline
         ? 'Сеть не ответила' : 'Переводов пока не было'}</div>`}`;

@@ -10,8 +10,11 @@ AMBAR — кошелёк USDT: сколько лежит и что по нему
 сервера нет и не будет — отправить отсюда ничего нельзя, и кнопки такой не
 появится.
 
-Переводы сверяем со своими счетами по txid: приход, у которого счёт нашёлся, —
-это оплата заказа, а приход без счёта и есть то, ради чего экран и заводился.
+Поступления бывают двух видов, и это не про качество, а про путь. Заказ из
+клиентского бота выставляет счёт — такой приход приложение узнаёт по txid.
+А личный заказ оператор ведёт руками: скидывает номер кошелька, деньги падают
+напрямую, счёта нет и связать их не с чем. Оба вида законны, и на экране они
+так и называются: через приложение и не через приложение.
 """
 import logging
 import time as _t
@@ -45,23 +48,23 @@ async def _build() -> dict:
     offline = transfers is None
     transfers = transfers or []
 
-    # Чей это приход: свои счета знают txid.
+    # Через приложение или напрямую: счёт знает txid своего перевода.
     byid = {}
     try:
         byid = await db.crypto_invoices_by_txids([t["txid"] for t in transfers if t.get("txid")])
     except Exception as e:                       # noqa: BLE001
         log.warning(f"[wallet] счета к переводам не подшились: {e}")
 
-    свои = 0.0
-    чужие = 0.0
+    через = 0.0
+    напрямую = 0.0
     rows = []
     for t in transfers:
         inv = byid.get(t.get("txid") or "")
         if t.get("in"):
             if inv:
-                свои += t["amount"]
+                через += t["amount"]
             else:
-                чужие += t["amount"]
+                напрямую += t["amount"]
         rows.append({
             **t,
             "peer": _short(t.get("peer") or ""),
@@ -73,7 +76,7 @@ async def _build() -> dict:
         "balance": balance or {"usdt": 0.0, "trx": 0.0, "unknown": True},
         "offline": offline or balance is None,
         "transfers": rows,
-        "totals": {"orders": round(свои, 2), "other": round(чужие, 2)},
+        "totals": {"app": round(через, 2), "direct": round(напрямую, 2)},
         "at": int(_t.time() * 1000),
     }
 

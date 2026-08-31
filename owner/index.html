@@ -1503,11 +1503,16 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   color:var(--text);background:var(--card);border:1px solid var(--border2);
   transition:.15s var(--e1)}
 .ck-r:active{transform:scale(.995)}
-/* Просрочка сказана один раз — тонкой чертой у края и словом справа. Красный
-   значок рядом с красным числом и красной рамкой был третьим повтором одного
-   и того же. */
-.ck-r.late{border-color:rgba(224,85,85,.2);box-shadow:inset 2px 0 0 rgba(224,85,85,.55)}
-.ck-r.done{background:transparent}
+/* Все карточки одинаковые. Прозрачная у сделанного выглядела недоделанной —
+   будто её забыли залить, — а цветная рамка у просроченного спорила с
+   кружком. Состояние живёт в кружке слева, и больше нигде. */
+.ck-r.done{opacity:.7}
+/* Светофор. Три цвета и один размер: красный — просрочено, жёлтый — пора,
+   зелёный — сделано, серый — ещё впереди. */
+.ck-dot{flex:0 0 auto;width:9px;height:9px;border-radius:50%;background:var(--dim)}
+.ck-r.late .ck-dot{background:var(--dn)}
+.ck-r.now  .ck-dot{background:var(--warn)}
+.ck-r.done .ck-dot{background:var(--up)}
 .ck-b{flex:1;min-width:0}
 .ck-t{display:block;font-size:16px;font-weight:600;line-height:1.25;
   letter-spacing:-.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -1516,8 +1521,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ck-due{flex:0 0 auto;font-size:12px;color:var(--muted);white-space:nowrap;
   font-variant-numeric:tabular-nums}
-.ck-r.late .ck-due{color:var(--dn)}
-.ck-ok{flex:0 0 auto;color:var(--up);opacity:.65;display:flex}
+.ck-r.late .ck-due{color:var(--dn);opacity:.8}
 .ck-go{flex:0 0 auto;color:var(--dim);display:flex;align-items:center;opacity:.45}
 
 /* Вход в чек-лист. Ростом и посадкой — как строка «Кто на каком районе» на
@@ -12274,18 +12278,15 @@ function chkRow(r){
   const late = r.state === 'late' && r.late_min
     ? (r.late_min < 60 ? `${r.late_min} мин` : `${Math.floor(r.late_min / 60)} ч`)
     : '';
-  const справа = r.state === 'done'
-    ? `<span class="ck-ok"><svg viewBox="0 0 24 24" width="15" height="15" fill="none"
-         stroke="currentColor" stroke-width="2.4" stroke-linecap="round"
-         stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></span>`
-    : `<span class="ck-due">${r.state === 'late'
-        ? (late ? `+${late}` : 'просрочено') : 'к ' + r.due}</span>`;
+  const справа = r.state === 'done' ? 'готово'
+    : (r.state === 'late' ? (late ? `+${late}` : 'просрочено') : 'к ' + r.due);
   return `<button class="ck-r ${st.c}" onclick="chkGo('${escS(r.go)}')">
+    <span class="ck-dot"></span>
     <span class="ck-b">
       <span class="ck-t">${escS(r.t)}</span>
       <span class="ck-s">${escS(r.s)}</span>
     </span>
-    ${справа}
+    <span class="ck-due">${справа}</span>
     <span class="ck-go">${ICO_CHEV}</span>
   </button>`;
 }

@@ -92,6 +92,38 @@ DRIVER_IDS = _parse_driver_ids(_os.getenv("AMBAR_DRIVER_IDS", ""))
 DRIVER_BY_TG = {v: k for k, v in DRIVER_IDS.items()}
 
 
+# ── доступы операторов ──────────────────────────────────────────────────────
+# У районного оператора своего входа в телеграм долго не было: заказы принимал
+# старший со своего устройства, и «оператор района» существовал только как
+# подпись. Как только у него появляется id, он становится адресатом: заказ
+# своего района приходит ему, а не всем сразу.
+#
+#   AMBAR_OPERATOR_IDS="Умар:123456789,Джанабиль:987654321"
+#
+# Пусто — работает как раньше: всё уходит старшему и на планшет.
+OPERATOR_IDS_BY_NAME = _parse_driver_ids(_os.getenv("AMBAR_OPERATOR_IDS", ""))
+
+
+def operator_tg(name: str) -> int:
+    """Телеграм районного оператора; 0 — своего входа у него нет."""
+    return int(OPERATOR_IDS_BY_NAME.get((name or "").strip()) or 0)
+
+
+def operator_by_tg(telegram_id) -> str:
+    """Кто это по id: районный оператор или пусто."""
+    try:
+        tid = int(telegram_id or 0)
+    except (TypeError, ValueError):
+        return ""
+    for имя, i in OPERATOR_IDS_BY_NAME.items():
+        if int(i) == tid:
+            return имя
+    for s in SENIOR_OPERATORS:
+        if int(s.get("telegram_id") or 0) == tid:
+            return s["name"]
+    return ""
+
+
 def driver_by_tg(telegram_id) -> dict | None:
     """Кто это, если он вообще водитель. Возвращает запись из drivers()."""
     name = DRIVER_BY_TG.get(int(telegram_id or 0))

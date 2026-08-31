@@ -234,6 +234,14 @@ async def panic_get(driver: str) -> dict | None:
     return doc if (doc or {}).get("on") else None
 
 
+async def panic_doc(who: str) -> dict | None:
+    """Запись шторы целиком, включена она или уже снята: в ней лежит id
+    прикрытия, а снимать его приходится как раз после выключения."""
+    db = _db_or_none()
+    if db is None: return None
+    return await db.panic.find_one({"_id": who})
+
+
 async def panic_all() -> list:
     """Кто сейчас в скрытом режиме — для панели и для владельца."""
     db = _db_or_none()

@@ -893,18 +893,13 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
             [{"text": "👤 Клиент", "callback_data": f"client_{oid}_{uid}"}],
         ]
         op_kb = {"inline_keyboard": op_buttons}
-        op_msg_ids = {}
-        for op_id in OPERATOR_IDS:
-            try:
-                resp = await tg_send(OPERATOR_BOT_TOKEN, op_id, op_text, parse_mode="HTML", reply_markup=op_kb)
-                if resp and resp.get("ok") and resp.get("result"):
-                    op_msg_ids[str(op_id)] = resp["result"]["message_id"]
-                else:
-                    # ok:false (parse error / blocked / bad chat) was silently
-                    # swallowed before — the #1 way orders vanished for operators.
-                    log.error(f"Operator notify {op_id} REJECTED for #{oid}: {resp}")
-            except Exception as e:
-                log.error(f"Operator notify {op_id}: {e}")
+        # Кому именно уходит заказ, решает район: свой оператор, а если он в
+        # скрытом режиме — оператор ближайшего района, с пометкой, что заказ
+        # чужой. Старший и планшет получают всё и всегда. Пока операторам не
+        # выданы telegram-id, маршрут вырождается в прежнее «всем сразу».
+        import op_route
+        op_msg_ids = await op_route.send(op_text, district=office_id,
+                                         parse_mode="HTML", reply_markup=op_kb)
         if op_msg_ids:
             await db.update_order(oid, op_msg_ids=op_msg_ids)
         elif OPERATOR_IDS:

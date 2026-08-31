@@ -2561,9 +2561,184 @@ async def handle_shift_reopen(request):
     return web.json_response({"ok": ok}, headers=CORS_HEADERS)
 
 
+# ── скрытый режим оператора ────────────────────────────────────────────────
+# Оператор прячет приложение чаще всего не от беды: идёт между зданиями, едет в
+# лифте, стоит у стойки — и не хочет, чтобы с экрана читали адреса и суммы.
+# Поэтому здесь нет ни тревоги, ни сирены: это рабочий жест, а не ЧП.
+#
+# Пока он спрятан, ему не пишут вовсе — всплывшее уведомление выдало бы
+# маскировку, — а заказы его районов уходят оператору ближайшего (см. op_route).
+# Вышел — получает свои активные заказы одним списком: пока его не было, они
+# приходили не ему, и открывать панель, чтобы понять, что случилось, он не
+# должен.
+COVER_TEXT_OP = (
+    "\U0001F3AE *BLOCK OPER — классический тетрис*\n\n"
+    "Тот самый: фигуры падают, ряды исчезают, скорость растёт. "
+    "Без регистрации, без интернета, без рекламы.\n\n"
+    "Управление одной рукой, партия занимает пару минут — "
+    "как раз чтобы скоротать ожидание.\n\n"
+    "Рекорд сохраняется. Побейте свой."
+)
+
+
+def _op_person(user: dict) -> str:
+    """Кто спрятался: районный оператор по id, иначе — как он подписан."""
+    return _staff_mod.operator_by_tg(user.get("id")) or _op_name(user)
+
+
+async def _op_wipe(chat_id: int) -> int:
+    """Убрать переписку бота с этим чатом.
+
+    Стираются только те сообщения, что бот записал при отправке: чужого и
+    отправленного руками он не помнит, а читать историю чата боту нельзя. Всё,
+    что старше двух суток, телеграм удалить уже не даст."""
+    from api_server import tg_delete, OPERATOR_BOT_TOKEN
+    if not OPERATOR_BOT_TOKEN:
+        return 0
+    gone = 0
+    for mid in await db.drv_msgs_take(int(chat_id)):
+        try:
+            res = await tg_delete(OPERATOR_BOT_TOKEN, chat_id, mid)
+            if (res or {}).get("ok"):
+                gone += 1
+        except Exception:
+            pass
+    return gone
+
+
+async def _op_cover(chat_id: int) -> int:
+    """Положить в опустевший чат приглашение в игру. Возвращает id сообщения:
+    по нему прикрытие снимается, когда человек выходит."""
+    from api_server import OPERATOR_BOT_TOKEN, tg_send
+    from owner_routes import tg_send_photo_bytes
+    from pathlib import Path
+    if not OPERATOR_BOT_TOKEN:
+        return 0
+    kb = {"inline_keyboard": [[{
+        "text": "\u25B6\uFE0F Играть",
+        "web_app": {"url": _os.getenv("OPERATOR_WEBAPP_URL",
+                                      "https://operator.ambar-delivery.com/")},
+    }]]}
+    img = Path(__file__).parent / "cover_game_oper.jpg"
+
+    async def _try(markup):
+        if img.exists():
+            return await tg_send_photo_bytes(OPERATOR_BOT_TOKEN, chat_id,
+                                             img.read_bytes(), COVER_TEXT_OP,
+                                             parse_mode="Markdown", reply_markup=markup)
+        return await tg_send(OPERATOR_BOT_TOKEN, chat_id, COVER_TEXT_OP,
+                             parse_mode="Markdown", reply_markup=markup)
+    try:
+        res = await _try(kb)
+        if not (res or {}).get("ok"):
+            res = await _try(None)
+    except Exception as e:                       # noqa: BLE001
+        log.error(f"[pos] прикрытие не отправлено: {e}")
+        return 0
+    return int(((res or {}).get("result") or {}).get("message_id") or 0)
+
+
+async def _op_return(chat_id: int, orders: list) -> None:
+    """Вернуть человеку его активные заказы одним списком, а не карточками по
+    одной: их может накопиться десяток, и десять уведомлений подряд — это не
+    «вернулись заказы», это шум."""
+    from api_server import OPERATOR_BOT_TOKEN, tg_send
+    if not (OPERATOR_BOT_TOKEN and orders):
+        return
+    строки = ["\U0001F4CB <b>Ваши заказы</b>", ""]
+    for o in orders[:20]:
+        где = OFFICE_CODES.get(o.get("office_id") or "", "")
+        строки.append(f"#{o.get('order_id','')} · {где} · {o.get('total', 0)} AED"
+                      + (f" · {o.get('driver')}" if o.get("driver") else ""))
+    if len(orders) > 20:
+        строки.append(f"…и ещё {len(orders) - 20}")
+    res = await tg_send(OPERATOR_BOT_TOKEN, chat_id, "\n".join(строки), parse_mode="HTML")
+    mid = ((res or {}).get("result") or {}).get("message_id")
+    if mid:
+        try:
+            await db.drv_msg_add(int(chat_id), int(mid), datetime.now(timezone.utc))
+        except Exception:
+            pass
+
+
+async def _op_panic_note(name: str, on: bool, districts: list, back: list = None) -> None:
+    """Сказать владельцу. Спокойно: это рутина, а не тревога."""
+    from owner_routes import notify_owners_force, _md
+    где = ", ".join(f"{OFFICE_CODES.get(d, '')} {OFFICE_NAMES.get(d, d)}".strip()
+                    for d in districts) or "—"
+    ч = datetime.now(DUBAI_TZ).strftime("%H:%M")
+    if on:
+        строки = ["\U0001FAE5 *Оператор скрыл приложение*",
+                  f"{_md(name)} · {_md(где)} · {ч}", "",
+                  "Заказы его районов пока уходят оператору ближайшего района.",
+                  "_Не пишите ему в бот: уведомление всплывёт у него на экране._"]
+    else:
+        строки = ["\U0001FAE5 *Оператор снова на связи*",
+                  f"{_md(name)} · {_md(где)} · {ч}"]
+        if back:
+            строки += ["", f"Вернули ему заказов: {len(back)}"]
+    await notify_owners_force("operator.hidden", "\n".join(строки))
+
+
+@require_operator
+async def handle_op_panic(request):
+    """Спрятать приложение или вернуть его.
+
+    Ответ пустой и мгновенный: человек нажимает это, когда экран могут увидеть,
+    и никаких «готово» на нём появиться не должно."""
+    import op_route
+    user = request["op_user"]
+    chat = int(user.get("id") or 0)
+    name = _op_person(user)
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    on = bool(body.get("on"))
+    now = datetime.now(timezone.utc)
+    районы = [s["district"] for s in _staff_mod.DISTRICT_STAFF if s["operator"] == name]
+    мета = {"chat_id": chat, "districts": районы, "kind": "operator"}
+
+    await db.panic_set(op_route.panic_key(name), on, now.isoformat(), мета)
+    log.warning(f"[pos] {name}: скрытый режим {'ВКЛЮЧЁН' if on else 'снят'}")
+
+    вернули = []
+    if on:
+        try:
+            n = await _op_wipe(chat)
+            mid = await _op_cover(chat)
+            if mid:
+                await db.panic_set(op_route.panic_key(name), True, now.isoformat(),
+                                   {**мета, "cover_msg": mid})
+            log.warning(f"[pos] {name}: убрано сообщений {n}, прикрытие {mid or '—'}")
+        except Exception as e:                   # noqa: BLE001
+            log.error(f"[pos] штора: {e}")
+    else:
+        try:
+            doc = await db.panic_doc(op_route.panic_key(name)) or {}
+            from api_server import tg_delete, OPERATOR_BOT_TOKEN
+            if doc.get("cover_msg") and OPERATOR_BOT_TOKEN:
+                await tg_delete(OPERATOR_BOT_TOKEN, chat, int(doc["cover_msg"]))
+        except Exception as e:                   # noqa: BLE001
+            log.debug(f"[pos] прикрытие не снято: {e}")
+        try:
+            вернули = await op_route.missed(name)
+            await _op_return(chat, вернули)
+        except Exception as e:                   # noqa: BLE001
+            log.error(f"[pos] заказы не вернулись: {e}")
+
+    try:
+        await _op_panic_note(name, on, районы, вернули)
+    except Exception as e:                       # noqa: BLE001
+        log.error(f"[pos] владельцу не сказали: {e}")
+    return web.json_response({"ok": True}, headers=CORS_HEADERS)
+
+
 def setup(app):
     """Mount operator POS routes. Called from api_server.main()."""
     r = app.router
+    r.add_route("OPTIONS", "/api/operator/panic", _opt)
+    r.add_post("/api/operator/panic", handle_op_panic)
     r.add_route("OPTIONS", "/api/operator/where", _opt)
     r.add_get("/api/operator/where", handle_where)
     r.add_route("OPTIONS", "/api/operator/shift", _opt)

@@ -165,6 +165,24 @@ NAME_HINTS = {
 _COORD_RE = re.compile(r"(-?\d+\.\d+)[,\s]+(-?\d+\.\d+)")
 
 
+def nearest_offices(office_id: str) -> list:
+    """Районы по близости к заданному — от ближнего к дальнему, без него самого.
+
+    Нужно подмене: оператор скрылся, и его заказы должен подхватить тот, кому
+    ехать ближе всех. Без опорных точек (AMBAR_OFFICE_ANCHORS) расстояния взять
+    неоткуда — тогда отдаём порядок из настроек: он хотя бы постоянный, а не
+    случайный."""
+    здесь = OFFICE_ANCHORS.get(office_id)
+    прочие = [o for o in OFFICE_IDS if o != office_id]
+    if not здесь:
+        return прочие
+    с_гео = [o for o in прочие if o in OFFICE_ANCHORS]
+    без_гео = [o for o in прочие if o not in OFFICE_ANCHORS]
+    с_гео.sort(key=lambda o: _km(здесь[0], здесь[1],
+                                 OFFICE_ANCHORS[o][0], OFFICE_ANCHORS[o][1]))
+    return с_гео + без_гео
+
+
 def resolve_office(src: dict):
     """Определить район заказа. Возвращает (office_id, office_name, rule).
 

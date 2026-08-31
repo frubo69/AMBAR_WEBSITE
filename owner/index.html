@@ -12951,18 +12951,23 @@ function ordHub(){
     <div class="pbox">${pathNav()}<div class="path">${pathInner()}</div>${pathStatus()}</div>
     ${рядом ? `<div class="pbox">${рядом}</div>` : ''}</div>`;
 
-  // Подвал хаба — ровно один шаг, тот, который сейчас ждут. Пока ответа
-  // магазина нет, это он; пока идёт приёмка — не ждут ничего, и подвала нет.
-  document.getElementById('accFoot').innerHTML =
-    (st.k === 'none' || st.k === 'done') ? `
+  // Загрузка ответа магазина стоит внизу всегда. Раньше она пряталась во всех
+  // состояниях, кроме двух, — и исчезала ровно тогда, когда была нужнее всего:
+  // заявку отменили и собирают заново, или магазин прислал второй файл поверх
+  // первого. Кнопка, которой нет, — это не «шаг не ждут», это тупик.
+  //
+  // Главной она выглядит там, где это следующий шаг: ответа ещё нет. В
+  // остальных случаях остаётся тихой — доступна, но не зовёт.
+  const ждём = st.k === 'none';
+  document.getElementById('accFoot').innerHTML = `
       <div class="qb-wrap">
-        <button class="qb ${st.k === 'done' ? 'qb-ghost qb-wide' : ''}" id="ordUp"
+        <button class="qb ${ждём ? '' : 'qb-ghost qb-wide'}" id="ordUp"
                 onclick="document.getElementById('ordFile').click()">
           ${ICO_UP}Загрузить ответ магазина
         </button>
         <input type="file" id="ordFile" accept=".xlsx" style="display:none"
                onchange="supImport(this,'ordUp')">
-      </div>` : '';
+      </div>`;
 }
 
 // Перерисовать сводку — на хабе это путь, на странице заявки строка итогов.

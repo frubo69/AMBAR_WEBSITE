@@ -636,6 +636,17 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   font-size:11.5px;font-weight:600;color:var(--gold2)}
 .stk-lnk:active{opacity:.6}
 .stk-drs{display:flex;flex-direction:column;gap:6px}
+/* Выбор точки занимает экран целиком: точек всего пять, и список, кончающийся
+   на трети страницы, читается как обрубок. Строки делят свободную высоту
+   поровну — но не растут бесконечно: на планшете полоса в пол-экрана была бы
+   не «просторно», а «сломано». */
+/* Проценты от высоты не работают внутри flex-колонки с неопределённой
+   высотой — поэтому саму середину экрана делаем колонкой, когда в ней лежит
+   этот список. min-height оставлен запасным путём для старых движков. */
+.stk-mid:has(> .qd-page){display:flex;flex-direction:column}
+.qd-page{flex:1;display:flex;flex-direction:column;min-height:100%}
+.qd-page > .stk-drs{flex:1;justify-content:stretch}
+.qd-page > .stk-drs > .stk-dr{flex:1 1 0;min-height:58px;max-height:132px}
 .stk-dr{display:flex;align-items:center;gap:11px;width:100%;padding:9px 12px;
   border-radius:13px;cursor:pointer;font-family:inherit;text-align:left;
   color:var(--text);background:var(--card);border:1px solid var(--border2)}
@@ -13473,7 +13484,7 @@ async function qrDistrict(force){
         ? `<span class="sh-warn"><b>${fmt(без)}</b>не отсканировано</span>`
         : `<span class="sh-ok"><b>✓</b>всё отсканировано</span>`}</span>
     </div>` : '';
-  document.getElementById('accMid').innerHTML = head + шапка +
+  document.getElementById('accMid').innerHTML = head + `<div class="qd-page">` + шапка +
     `<div class="stk-drs">` + ((STK.districts || []).map(d => {
       const n = have[d.id] || 0;
       const b = busy[d.id] || 0;
@@ -13489,7 +13500,7 @@ async function qrDistrict(force){
         <span class="stk-dr-v ${n ? '' : 'dim'}">${n ? fmt(n) : '—'}${n ? '<i>бут</i>' : ''}</span>
         <span class="stk-dr-go">${ICO_CHEV}</span>
       </button>`;
-    }).join('') || '<div class="scan-empty">Точки не загрузились</div>') + `</div>`;
+    }).join('') || '<div class="scan-empty">Точки не загрузились</div>') + `</div></div>`;
 }
 
 

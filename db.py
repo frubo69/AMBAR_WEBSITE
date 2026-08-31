@@ -2765,7 +2765,16 @@ async def qr_add(code: str, product_id: str, product_name: str, district,
             "label": label, "by": by, "at": at, **(extra or {})})
         return True
     except DuplicateKeyError:
-        return False
+        # Убранная из реестра бутылка вернулась на полку: запись цела, но
+        # реестр её не считает. Заводим заново поверх старой — иначе камера
+        # отвечает «уже есть» на бутылку, которой в остатке нет.
+        r = await db.qr_codes.update_one(
+            {"_id": code, "status": "deleted"},
+            {"$set": {"status": "active", "product_id": product_id,
+                      "product_name": product_name, "district": district,
+                      "label": label, "by": by, "at": at, **(extra or {})},
+             "$unset": {"was": "", "del_at": "", "del_by": ""}})
+        return bool(r.modified_count)
 
 
 async def qr_write_off(code: str, wid: str) -> bool:
@@ -2814,6 +2823,65 @@ async def qr_remove(code: str) -> bool:
     if db is None: return False
     r = await db.qr_codes.delete_one({"_id": code})
     return r.deleted_count > 0
+
+
+async def qr_drop(code: str, by: int, at) -> dict | None:
+    """Убрать бутылку из реестра, не стирая её историю.
+
+    Стереть запись насовсем нельзя: тогда исчезает и то, что с этой бутылкой
+    было, — где стояла, кто её вносил, списывали ли её. Поэтому «удалить» —
+    это статус: в остатке её больше нет, а история цела и удаление отменяемо.
+    Прежний статус запоминаем в `was`, иначе возврат сделает активной бутылку,
+    которая была списана.
+
+    Возвращает запись ДО удаления или None, если такой в реестре нет."""
+    db = _db_or_none()
+    if db is None: return None
+    from pymongo import ReturnDocument
+    d = await db.qr_codes.find_one_and_update(
+        {"_id": code, "status": {"$ne": "deleted"}},
+        [{"$set": {"was": {"$ifNull": ["$was", "$status"]}, "status": "deleted",
+                   "del_at": at, "del_by": by}}],
+        return_document=ReturnDocument.BEFORE)
+    if d:
+        d["code"] = d.pop("_id")
+    return d
+
+
+async def qr_drop_undo(code: str) -> bool:
+    """Вернуть бутылку в реестр — тем статусом, с каким её убирали."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.qr_codes.update_one(
+        {"_id": code, "status": "deleted"},
+        [{"$set": {"status": {"$ifNull": ["$was", "active"]}}},
+         {"$unset": ["was", "del_at", "del_by"]}])
+    return bool(r.modified_count)
+
+
+async def qr_seen_in_checks(code: str, limit: int = 20) -> list:
+    """Где эта бутылка попадалась в проверках у водителей."""
+    db = _db_or_none()
+    if db is None: return []
+    out = []
+    cur = db.qr_checks.find({"items.code": code}, {"_id": 0, "at": 1, "driver": 1,
+                                                  "district": 1, "items": 1}
+                            ).sort("at", -1).limit(limit)
+    async for d in cur:
+        it = next((x for x in (d.get("items") or []) if x.get("code") == code), {})
+        out.append({"at": d.get("at"), "driver": d.get("driver") or "",
+                    "district": d.get("district") or "",
+                    "verdict": it.get("verdict") or ""})
+    return out
+
+
+async def qr_seen_in_audits(code: str, limit: int = 20) -> list:
+    """Где эта бутылка попадалась в ревизии проходом."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.audit_scans.find({"code": code}, {"_id": 0, "day": 1, "district": 1,
+                                               "at": 1}).sort("day", -1).limit(limit)
+    return await cur.to_list(length=limit)
 
 
 async def qr_stats() -> dict:

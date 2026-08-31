@@ -13421,6 +13421,12 @@ function _qrHead(title, sub, back){
   // Подвал принадлежит экрану, а не разделу: «Сканировать бутылки» имеет смысл
   // только на первом, и таскать её за собой по выбору точки незачем.
   document.getElementById('accFoot').innerHTML = '';
+  // Справа сверху — обратное действие раздела: убрать бутылку из реестра.
+  // Оно нужно на обоих экранах: бутылку приносят к столу, и до какой она
+  // позиции и точки — как раз и отвечает её код, а не человек.
+  const act = document.getElementById('accAct');
+  if(act) act.innerHTML =
+    '<button class="acc-act dn" onclick="qrDelStart()">Удалить товар</button>';
   ACC_BACK = back;
   return '';
 }
@@ -13643,10 +13649,14 @@ async function qrStart(pid){
   if(snd) snd.classList.toggle('muted', !SFX.on);
 }
 
-function qrScreen(){
+function qrScreen(mode){
+  const del = mode === 'del';
   const d = (STK.districts || []).find(x => x.id === QR_DIST) || {};
   // На камере переключать точку нечем и незачем: идёт счёт одной полки.
   _setRail('accRail', '');
+  // Кнопка «Удалить товар» осталась бы от прошлого экрана и звала бы туда,
+  // где мы уже стоим.
+  const act = document.getElementById('accAct'); if(act) act.innerHTML = '';
   // Камера — герой экрана, всё служебное лежит на ней стеклом: так остаётся
   // место под кадр, а глазу не приходится метаться между камерой и цифрами.
   document.getElementById('accMid').innerHTML = `
@@ -13660,7 +13670,7 @@ function qrScreen(){
       </div>
       <div class="scan-hud">
         <div class="scan-hud-top">
-          <div class="scan-pill"><b id="qrN">0</b><span>на офисе</span></div>
+          <div class="scan-pill"><b id="qrN">0</b><span>${del ? 'убрано' : 'на офисе'}</span></div>
           <div class="scan-tools">
             <button class="scan-tool" id="qrSound" onclick="qrSound(this)">
               <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
@@ -13678,8 +13688,9 @@ function qrScreen(){
           <div class="scan-added" id="qrAdded"></div>
           <div class="scan-strip" id="qrFeed"></div>
           <div class="scan-dockbar">
-            <button class="scan-undo" id="qrUndo" onclick="qrUndo()" disabled>Отменить</button>
-            <button class="scan-go" onclick="qrDone()">Готово</button>
+            <button class="scan-undo" id="qrUndo" onclick="${del ? 'qrDelUndo' : 'qrUndo'}()"
+              disabled>Отменить</button>
+            <button class="scan-go" onclick="${del ? 'qrDelDone' : 'qrDone'}()">Готово</button>
           </div>
         </div>
       </div>
@@ -13893,6 +13904,150 @@ async function qrDone(){
     qrPick(QR_DIST);
     try{ ACC_QR = await ownerApi.ownerFetch('/api/owner/qr'); qrRenderList(); }catch(e){}
   }else accQR();
+}
+
+// ─── Удалить товар ──────────────────────────────────────────────────────────
+// Обратное действие раздела и та же камера: бутылку опознаёт её собственный
+// код, поэтому ни точку, ни позицию спрашивать не надо — их знает сама запись.
+//
+// Запись при этом не стирается, у неё меняется статус: в остатке бутылки
+// больше нет, а история — где стояла, кто вносил, списывали ли — цела. Из
+// этого и следует главное: пока сессия открыта, каждую убранную бутылку
+// возвращает крестик в её строке, ровно как отменяется лишний скан на
+// «Внести товар».
+let QDEL_ROWS = [];
+
+const QDEL_STATE = {
+  sending: ['убираю…',       'var(--muted)'],
+  gone:    ['убрана',        'var(--dn)'],
+  none:    ['нет в реестре', 'var(--muted)'],
+  fail:    ['не получилось', 'var(--dn)'],
+};
+
+async function qrDelStart(){
+  QDEL_ROWS = [];
+  qrScreen('del');
+  _setText('accTitle', 'Удалить товар');
+  _setText('accSub', 'наведите на код бутылки');
+  ACC_BACK = qrDelDone;
+  qrDelRenderFeed();
+  const v = document.getElementById('qrVideo');
+  try{
+    await SCAN.start(v, qrDelSave, qrIdle, () => qrFlash('again'), qrHold);
+  }catch(e){
+    _setText('qrHint', 'Камера недоступна, включаю сканер Telegram');
+    const tg = window.Telegram && Telegram.WebApp;
+    if(tg && tg.showScanQrPopup){
+      tg.showScanQrPopup({text:'Удалить товар'}, t => { qrDelSave(t); return false; });
+    }else _toast('Сканер недоступен');
+    return;
+  }
+  const t = document.getElementById('qrTorch');
+  if(t) t.style.display = SCAN.hasTorch() ? '' : 'none';
+  const snd = document.getElementById('qrSound');
+  if(snd) snd.classList.toggle('muted', !SFX.on);
+}
+
+// Удаление ждёт ответа сервера, в отличие от записи: там очередь досылает
+// сама, потому что бутылок сотня подряд, — а здесь важнее знать про каждую,
+// что именно убрали, и показать это той же строкой.
+async function qrDelSave(code){
+  code = String(code || '').trim(); if(!code) return;
+  const row = {code, state:'sending', label:'', name:'', district:'', story:[]};
+  QDEL_ROWS.unshift(row);
+  qrDelRenderFeed();
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/qr/drop',
+      {method:'POST', body:{code}});
+    row.state = 'gone'; row.label = r.label || ''; row.name = r.product_name || '';
+    row.district = r.district || ''; row.story = r.story || []; row.was = r.was || '';
+    qrFlash('ok', 'убрана из реестра');
+  }catch(e){
+    const p = (e || {}).payload || {};
+    if(p.error === 'unknown_code'){ row.state = 'none'; qrFlash('dup', 'нет в реестре'); }
+    else if(p.error === 'already_deleted'){ row.state = 'none'; qrFlash('dup', 'уже убрана'); }
+    else { row.state = 'fail'; qrFlash('err'); }
+  }
+  qrDelRenderFeed();
+}
+
+function qrDelRenderFeed(){
+  const n = QDEL_ROWS.filter(r => r.state === 'gone').length;
+  scanRoll('qrN', n);
+  const s = document.getElementById('qrAdded');
+  if(s) s.innerHTML = n ? `<b>${n}</b> убрано` : '';
+  const feed = document.getElementById('qrFeed'); if(!feed) return;
+  feed.innerHTML = QDEL_ROWS.slice(0, 40).map((r, i) => {
+    const [txt, color] = QDEL_STATE[r.state] || QDEL_STATE.sending;
+    const undo = r.state === 'gone'
+      ? `<button class="scan-del" onclick="event.stopPropagation();qrDelDrop(${i})"
+           aria-label="Вернуть">✕</button>` : '';
+    const raw = r.code.length > 26 ? r.code.slice(0, 24) + '…' : r.code;
+    // Вторая строка — про бутылку, а не про код: что это было и где стояло.
+    // Пока сервер не ответил, показывать нечего, кроме самого кода.
+    const под = r.name
+      ? `${r.name}${r.district ? ' · ' + _distName(r.district) : ''}` : raw;
+    return `<div class="scan-row ${r.state === 'gone' ? 'new' : r.state}"
+        onclick="qrDelRowInfo(${i})">
+      <span class="scan-dot" style="background:${color}"></span>
+      <span class="scan-b">
+        <span class="scan-code">${escS(r.label || '…')}</span>
+        <span class="scan-raw">${escS(под)}</span>
+      </span>
+      <span class="scan-state" style="color:${color}">${escS(txt)}</span>${undo}</div>`;
+  }).join('');
+  const u = document.getElementById('qrUndo');
+  if(u) u.disabled = !QDEL_ROWS.some(r => r.state === 'gone');
+}
+
+// Вернуть бутылку в реестр. Код при этом забывается сканером — иначе камера
+// будет молчать на бутылку, которую только что вернули.
+async function qrDelDrop(i){
+  const row = QDEL_ROWS[i]; if(!row) return;
+  if(row.state === 'gone'){
+    try{ await ownerApi.ownerFetch('/api/owner/qr/drop/undo',
+      {method:'POST', body:{code: row.code}}); }
+    catch(e){ _toast('Не удалось вернуть'); return; }
+  }
+  SCAN.seen.delete(row.code); SCAN.seenAt.delete(row.code);
+  QDEL_ROWS.splice(i, 1);
+  qrDelRenderFeed();
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+
+async function qrDelUndo(){
+  const i = QDEL_ROWS.findIndex(r => r.state === 'gone');
+  if(i >= 0) await qrDelDrop(i);
+}
+
+async function qrDelDone(){
+  ACC_BACK = null;
+  SCAN.stop();
+  try{ Telegram.WebApp.closeScanQrPopup(); }catch(e){}
+  const n = QDEL_ROWS.filter(r => r.state === 'gone').length;
+  if(n) _toast(`Убрано ${n} ${pluralize(n, 'бутылка', 'бутылки', 'бутылок')}`);
+  try{ ACC_QR = await ownerApi.ownerFetch('/api/owner/qr'); }catch(e){}
+  if(QR_DIST){ qrPick(QR_DIST); qrRenderList(); } else qrDistrict();
+}
+
+// Что это за бутылка и что с ней было. История приходит с сервера вместе с
+// удалением: собрать её на телефоне не из чего — переезды, списание, проверки
+// и ревизия лежат в разных местах.
+function qrDelRowInfo(i){
+  const r = (QDEL_ROWS || [])[i]; if(!r) return;
+  const st = {sending:['убираю…','warn'], gone:['убрана','bad'],
+              none:['нет в реестре','warn'], fail:['не получилось','bad']}[r.state]
+           || ['', ''];
+  const rows = [
+    _siRow('Позиция', escS(r.name || '')),
+    _siRow('Район', escS(r.district ? _distName(r.district) : '')),
+    _siRow('Метка', escS(r.label || ''), 'mono'),
+    _siRow('Код', escS(r.code), 'mono'),
+  ];
+  (r.story || []).forEach(e => rows.push(_siRow(
+    escS(e.what || ''),
+    [_when(e.at), e.who, e.where].filter(Boolean).map(escS).join(' · '))));
+  scanInfo(r.name || r.label, st[0], st[1], rows);
 }
 
 // ─── Поставка ───────────────────────────────────────────────────────────────

@@ -358,6 +358,108 @@ async def handle_undo(request):
     return web.json_response({"ok": ok, "code": code}, headers=CORS_HEADERS)
 
 
+async def _who(uid) -> str:
+    """Имя человека по его записи в базе. Номера телеграма в ответе не бывает."""
+    try:
+        u = await db.get_user(int(uid or 0)) or {}
+    except Exception:
+        u = {}
+    return (u.get("full_name") or u.get("name")
+            or f"{u.get('first_name','')} {u.get('last_name','')}".strip() or "—")
+
+
+async def _story(doc: dict) -> list:
+    """Что было с этой бутылкой — от первой записи до последнего касания.
+
+    Собираем из четырёх мест сразу: сама запись реестра (когда завели, куда
+    переезжала, списывали ли), проверки у водителей и ревизия проходом. Порознь
+    ни одно из них не отвечает на вопрос «что с ней вообще происходило», а
+    спрашивают именно его — перед тем, как убрать бутылку из реестра."""
+    code = doc.get("code") or ""
+    out = []
+    if doc.get("at"):
+        out.append({"at": str(doc.get("at")), "what": "заведена",
+                    "who": await _who(doc.get("by")),
+                    "where": doc.get("district") or ""})
+    for m in (doc.get("moves") or []):
+        out.append({"at": str(m.get("at") or ""), "what": "переезд",
+                    "who": await _who(m.get("by")),
+                    "where": f"{m.get('from') or ''} → {m.get('to') or ''}"})
+    if doc.get("written_at"):
+        w = {}
+        try:
+            w = await db.writeoff_get(doc.get("writeoff") or "") or {}
+        except Exception:
+            w = {}
+        out.append({"at": str(doc.get("written_at")), "what": "списана",
+                    "who": w.get("by") or "",
+                    "where": " · ".join(x for x in (w.get("kind") or "",
+                                                    w.get("note") or "") if x)})
+    try:
+        for c in await db.qr_seen_in_checks(code):
+            out.append({"at": str(c.get("at") or ""), "what": "проверка у водителя",
+                        "who": c.get("driver") or "", "where": c.get("district") or ""})
+        for a in await db.qr_seen_in_audits(code):
+            out.append({"at": str(a.get("at") or a.get("day") or ""), "what": "ревизия",
+                        "who": "", "where": a.get("district") or ""})
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[qr] история кода собрана не вся: {e}")
+    if doc.get("del_at"):
+        out.append({"at": str(doc.get("del_at")), "what": "убрана из реестра",
+                    "who": await _who(doc.get("del_by")), "where": ""})
+    out.sort(key=lambda r: r["at"])
+    return out
+
+
+@require_owner
+async def handle_drop(request):
+    """Убрать бутылку из реестра по её коду.
+
+    Не стираем: запись остаётся со статусом «удалена», и потому решение
+    отменяемо, а история бутылки не пропадает вместе с ней."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    code = _clean(body.get("code"))
+    if not code:
+        return web.json_response({"error": "empty_code"}, status=400, headers=CORS_HEADERS)
+    doc = await db.qr_drop(code, request.get("owner_id") or 0,
+                           datetime.now(timezone.utc))
+    if not doc:
+        old = await db.qr_get(code)
+        return web.json_response(
+            {"error": "already_deleted" if old else "unknown_code", "code": code},
+            status=404, headers=CORS_HEADERS)
+    log.info(f"[qr] убрана из реестра {doc.get('label') or code}")
+    return web.json_response({
+        "ok": True, "code": code,
+        "label": doc.get("label") or "",
+        "product_name": doc.get("product_name") or "",
+        "district": doc.get("district") or "",
+        "was": doc.get("status") or "active",
+        "at": str(doc.get("at") or ""),
+        "story": await _story(doc),
+    }, headers=CORS_HEADERS,
+       dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
+@require_owner
+async def handle_drop_undo(request):
+    """Вернуть бутылку в реестр — тем же статусом, с каким её убирали."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    code = _clean(body.get("code"))
+    if not code:
+        return web.json_response({"error": "empty_code"}, status=400, headers=CORS_HEADERS)
+    ok = await db.qr_drop_undo(code)
+    if ok:
+        log.info(f"[qr] удаление отменено {code}")
+    return web.json_response({"ok": ok, "code": code}, headers=CORS_HEADERS)
+
+
 @require_owner
 async def handle_list(request):
     """Что уже записано по позиции на точке.
@@ -384,6 +486,7 @@ async def handle_lookup(request):
     if not doc:
         return web.json_response({"error": "unknown_code", "code": code},
                                  status=404, headers=CORS_HEADERS)
+    doc["story"] = await _story(doc)
     return web.json_response(doc, headers=CORS_HEADERS,
                              dumps=lambda o: __import__("json").dumps(o, default=str))
 
@@ -408,6 +511,9 @@ def _verdict(doc: dict, driver_district: str) -> str:
     if not doc:
         return "alien"
     st = (doc.get("status") or "active").strip()
+    # Убранная из реестра бутылка — для проверки та же чужая: в остатке её нет.
+    if st == "deleted":
+        return "alien"
     if st == "written":
         return "written"
     d = (doc.get("district") or "").strip()
@@ -601,6 +707,8 @@ def setup(app):
         ("/api/owner/qr/lock",        handle_lock,   "POST"),
         ("/api/owner/qr/unlock",      handle_unlock, "POST"),
         ("/api/owner/qr/undo",        handle_undo,   "POST"),
+        ("/api/owner/qr/drop",        handle_drop,   "POST"),
+        ("/api/owner/qr/drop/undo",   handle_drop_undo, "POST"),
         ("/api/owner/qr/code/{code}", handle_lookup, "GET"),
         ("/api/owner/qr/drivers",     handle_drivers, "GET"),
         ("/api/owner/qr/checks",      handle_checks,  "GET"),

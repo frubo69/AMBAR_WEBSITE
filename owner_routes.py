@@ -3161,6 +3161,44 @@ async def _chk_orders(day_start, day_end):
     return {"route": route, "req": req}
 
 
+async def _chk_cash(day_start, day_end):
+    """Сколько наличных за сутки прошло через руки водителей.
+
+    Считаем по доставленным заказам, где платили не онлайн и не в долг: только
+    эти деньги кто-то физически везёт и должен сдать. Сдал или нет — система
+    знать не может, это отмечает человек."""
+    try:
+        since = (day_start - timedelta(hours=1)).astimezone(timezone.utc)
+        orders = list((await db.orders_from(
+            since.isoformat().replace("+00:00", ""))).values())
+    except Exception as e:
+        log.warning(f"[chk] наличные за сутки: {e}")
+        return 0
+    total = 0
+    for o in orders:
+        if o.get("status") != "delivered":
+            continue
+        try:
+            ts = datetime.fromisoformat(o.get("timestamp", "")).replace(
+                tzinfo=timezone.utc).astimezone(DUBAI_TZ)
+        except (ValueError, TypeError):
+            continue
+        if not (day_start <= ts < day_end):
+            continue
+        if o.get("payment_method") == "debt" or _is_prepaid_order(o):
+            continue
+        total += int(o.get("total") or 0)
+    return total
+
+
+def _is_prepaid_order(o: dict) -> bool:
+    """Оплачено мимо водителя: крипта, карта, всё, что уже пришло на счёт."""
+    m = str(o.get("payment_method") or "").lower()
+    if m in ("crypto", "card", "online", "transfer"):
+        return True
+    return bool(o.get("paid") or o.get("prepaid") or o.get("crypto_paid"))
+
+
 async def _chk_expenses(day: str):
     """Разовые траты водителей, ждущие решения владельца."""
     try:
@@ -3226,16 +3264,25 @@ async def _chk_supply(day: str):
 # Деления на «закрыть смену» и «открыть смену» больше нет. Оно заставляло
 # держать в голове, в какой мы фазе, хотя вопрос всегда один: что просрочено,
 # что пора делать сейчас. Одни сутки, один список, порядок по времени.
+# Порядок здесь — порядок важности, а не времени: список читают сверху вниз и
+# первым делают то, что дороже. Сортировать по цвету («опоздавшее наверх») мы
+# перестали: тогда одна и та же задача каждый час оказывается в новом месте, и
+# найти её глазами нельзя — приходится читать весь список заново.
 CHK_PLAN = [
     # id,           час «пора»,  час «поздно», +1 сутки к сроку
-    ("shift_open",  11.5, 12.5, False),
-    ("order_sent",  12.0, 15.0, False),
-    ("supply_in",   12.0, 21.0, False),
-    ("shortfall",   12.0, 21.0, False),
+    ("shift",       11.5, 12.5, False),   # срок открытия; закрытие — CHK_SHIFT_CLOSE
     ("expenses",    12.0, 23.0, False),
     ("writeoffs",   12.0, 23.0, False),
-    ("shift_close",  5.0,  6.0, True),
+    ("order_sent",  12.0, 15.0, False),
+    ("supply_in",   12.0, 21.0, False),
+    ("cash",         5.0,  6.0, True),
+    ("shortfall",   12.0, 21.0, False),
 ]
+# Смена — одна задача с двумя половинами. Днём спрашивается «открыты ли», под
+# утро — «закрыты ли»: это одно и то же дело в разных концах суток, и держать
+# под него две строки значило заставлять человека помнить, в какой он фазе.
+# Какая половина сейчас, решает время, а не он.
+CHK_SHIFT_CLOSE = (5.0, 6.0, True)
 
 
 def _chk_at(day: str, hour: float, next_day: bool = False) -> datetime:
@@ -3303,13 +3350,41 @@ async def handle_checklist(request):
     except Exception:
         wo = 0
 
+    day_start = _chk_at(day, 12.0)
+    day_end = day_start + timedelta(days=1)
+    cash = await _chk_cash(day_start, day_end)
+    try:
+        marks = await db.checklist_get(day)
+    except Exception as e:
+        log.warning(f"[chk] отметки за {day}: {e}")
+        marks = {}
+
     total = sh["total"]
+    # Какая половина смены спрашивается сейчас: до пяти утра — «открыты ли»,
+    # после — «закрыты ли». Разделение видно внутри, на экране смен: там и
+    # написано, кто открылся, а кто закрылся.
+    close_since = _chk_at(day, CHK_SHIFT_CLOSE[0], CHK_SHIFT_CLOSE[2])
+    closing = now >= close_since
+    shift_row = _chk_row(
+        "shift", "Смена",
+        (f"закрыто {sh['closed']} из {total}" if sh["closed"] < total
+         else f"все {total} районов закрылись") if closing
+        else (f"открыто {sh['open']} из {total}" if sh["open"] < total
+              else f"все {total} районов на смене"),
+        (sh["closed"] >= total) if closing else (sh["open"] >= total),
+        now, day, plan, go="shifts",
+        n=(total - sh["closed"]) if closing else (total - sh["open"]))
+    if closing:
+        # У закрытия свой срок — раннее утро следующих суток, а не полдень.
+        since = _chk_at(day, CHK_SHIFT_CLOSE[0], CHK_SHIFT_CLOSE[2])
+        due = _chk_at(day, CHK_SHIFT_CLOSE[1], CHK_SHIFT_CLOSE[2])
+        shift_row.update({
+            "state": _chk_state(sh["closed"] >= total, now, since, due),
+            "due": due.strftime("%H:%M"), "due_at": due.isoformat(),
+            "late_min": max(0, int((now - due).total_seconds() // 60)),
+        })
     rows = [
-        _chk_row("shift_open", "Смены открыты",
-                 (f"открыто {sh['open']} из {total}" if sh["open"] < total
-                  else f"все {total} районов на смене"),
-                 sh["open"] >= total, now, day, plan,
-                 go="shifts", n=total - sh["open"]),
+        shift_row,
         _chk_row("order_sent", "Заявка в магазин",
                  ("магазин уже ответил" if sup["exists"] else "магазин ещё не отвечал"),
                  sup["exists"], now, day, plan, go="order"),
@@ -3326,11 +3401,14 @@ async def handle_checklist(request):
         _chk_row("writeoffs", "Бой, брак и утеря",
                  (f"{wo} ждут решения" if wo else "разобрано"),
                  wo == 0, now, day, plan, go="writeoffs", n=wo),
-        _chk_row("shift_close", "Смены закрыты",
-                 (f"закрыто {sh['closed']} из {total}" if sh["closed"] < total
-                  else f"все {total} районов закрылись"),
-                 sh["closed"] >= total, now, day, plan,
-                 go="shifts", n=total - sh["closed"]),
+        # Сдал ли водитель наличные, система знать не может: деньги переходят
+        # из рук в руки. Поэтому единственная отметка, которую ставит человек,
+        # — и сумма рядом, чтобы было с чем сверяться.
+        _chk_row("cash", "Деньги собраны",
+                 (f"наличными за смену {cash:,}".replace(",", " ") + " AED"
+                  if cash else "наличных за смену не было"),
+                 bool((marks.get("cash") or {}).get("done")) or not cash,
+                 now, day, plan, go="cash", n=0),
     ]
     # Недобор появляется в списке только когда он есть: пункт, который штатно
     # выполнен, каждый день занимал бы строку и приучал не читать список.
@@ -3339,8 +3417,10 @@ async def handle_checklist(request):
                              f"магазин не дал {sup['gap']} бутылок",
                              False, now, day, plan, go="short", n=sup["gap"]))
 
-    order = {"late": 0, "now": 1, "soon": 2, "done": 3}
-    rows.sort(key=lambda r: (order.get(r["state"], 9), r["due_at"]))
+    # Порядок задан планом и не пляшет по цвету: список должен читаться как
+    # один и тот же список, а не пересобираться каждый час.
+    rank = {p[0]: i for i, p in enumerate(plan)}
+    rows.sort(key=lambda r: rank.get(r["id"], 99))
     counts = {k: sum(1 for r in rows if r["state"] == k)
               for k in ("late", "now", "soon", "done")}
     return web.json_response({

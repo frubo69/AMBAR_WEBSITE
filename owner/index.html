@@ -12048,8 +12048,8 @@ function chkRender(){
   const head = `<div class="ck-top ${c.late ? 'late' : (c.now ? 'now' : 'ok')}">
     <div class="ck-top-v">${c.late || c.now || '✓'}</div>
     <div class="ck-top-b">
-      <b>${c.late ? `${c.late} ${pluralize(c.late,'дело опаздывает','дела опаздывают','дел опаздывают')}`
-         : (c.now ? `${c.now} ${pluralize(c.now,'дело ждёт','дела ждут','дел ждут')}`
+      <b>${c.late ? `${c.late} ${pluralize(c.late,'задача опаздывает','задачи опаздывают','задач опаздывают')}`
+         : (c.now ? `${c.now} ${pluralize(c.now,'задача ждёт','задачи ждут','задач ждут')}`
                   : 'всё по расписанию')}</b>
       <i>${c.done || 0} из ${rows.length} сделано${
         c.soon ? ` · ${c.soon} впереди` : ''}</i>
@@ -12057,8 +12057,10 @@ function chkRender(){
   </div>`;
   document.getElementById('accMid').innerHTML = head +
     `<div class="ck-list">${rows.map(chkRow).join('')}</div>` +
-    `<div class="ck-note">Часы у каждого дела свои. Красное значит, что срок
-      уже прошёл — не «плохо», а «займитесь этим первым».</div>`;
+    `<div class="ck-note">Задачи стоят по важности, сверху вниз. У каждой свой
+      час: красное значит, что срок уже прошёл — не «плохо», а «займитесь этим
+      первым». Смена — одна задача: днём спрашивается открытие, под утро
+      закрытие; кто именно открылся, видно внутри.</div>`;
 }
 
 function chkRow(r){
@@ -12094,7 +12096,23 @@ const CK_GO = {
   short:     () => { ACC_VIEW = 'short'; accShort(); },
   expenses:  () => { SH_TAB = 'exp'; accOpen('expenses'); },
   writeoffs: () => { SH_TAB = 'wo';  accOpen('expenses'); },
+  // Единственная задача, которую система знать не может: деньги переходят из
+  // рук в руки, и подтвердить это может только человек.
+  cash:      () => chkCash(),
 };
+
+async function chkCash(){
+  const r = (CKL && (CKL.rows || []).find(x => x.id === 'cash')) || {};
+  const было = r.state === 'done';
+  if(!confirm(было ? 'Снять отметку «деньги собраны»?'
+                   : 'Наличные за смену собраны?')) return;
+  try{
+    await ownerApi.ownerFetch('/api/owner/checklist/mark',
+      {method:'POST', body:{day: (CKL||{}).day, item:'cash', done: !было}});
+  }catch(e){ _toast('Не удалось отметить'); return; }
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  accChecklist();
+}
 
 function chkGo(id){
   const fn = CK_GO[id];

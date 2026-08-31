@@ -7274,6 +7274,66 @@ function pncKnobReset(){
   document.getElementById('pncSlide').classList.remove('drag');
 }
 
+// Ползунок тревоги — тот же механизм, что у приёма заказа: насечки под пальцем
+// всю дорогу и толчок в точке, после которой можно отпускать.
+(function initPanicSlide(){
+  const bar = document.getElementById('pncSlide');
+  const knob = document.getElementById('pncKnob');
+  const fill = document.getElementById('pncFill');
+  const track = document.getElementById('pncTrack');
+  if(!bar || !knob) return;
+  let dragging = false, x0 = 0, max = 0, step = 0, lastTick = 0, armed = false;
+  const NOTCH = 12, ARM = 0.85;
+  const paint = v => {
+    knob.style.transform = `translateX(${v}px)`;
+    const k = max ? v / max : 0;
+    fill.style.width = (v + knob.offsetWidth) + 'px';
+    track.style.opacity = String(Math.max(0, 1 - k * 1.6));
+    track.style.filter = `blur(${(k * 3).toFixed(1)}px)`;
+  };
+  const start = e => {
+    dragging = true; bar.classList.add('drag');
+    step = 0; lastTick = 0; armed = false;
+    x0 = (e.touches ? e.touches[0].clientX : e.clientX);
+    max = bar.offsetWidth - knob.offsetWidth - 10;
+    _tap('sel');
+  };
+  const move = e => {
+    if(!dragging) return;
+    const x = (e.touches ? e.touches[0].clientX : e.clientX) - x0;
+    const v = Math.max(0, Math.min(max, x));
+    paint(v);
+    const k = max ? v / max : 0;
+    const st = Math.floor(k * NOTCH), now = Date.now();
+    if(st !== step && now - lastTick > 40){
+      step = st; lastTick = now;
+      if(st > 0 && st < NOTCH) _tap('sel');
+    }
+    if(!armed && k >= ARM){ armed = true; _tap('light'); }
+    else if(armed && k < ARM) armed = false;
+    if(e.cancelable) e.preventDefault();
+  };
+  const end = () => {
+    if(!dragging) return;
+    dragging = false; bar.classList.remove('drag');
+    const v = parseFloat((knob.style.transform.match(/-?\d+\.?\d*/) || [0])[0]);
+    if(v >= max * 0.85){
+      // Ни вспышки, ни звука, ни тоста: рядом кто-то есть.
+      panicSet(true);
+    }else{
+      paint(0);
+      _tap('soft');
+    }
+  };
+  knob.addEventListener('mousedown', start);
+  knob.addEventListener('touchstart', start, {passive:true});
+  document.addEventListener('mousemove', move);
+  document.addEventListener('touchmove', move, {passive:false});
+  document.addEventListener('mouseup', end);
+  document.addEventListener('touchend', end);
+})();
+
+
 // Включение и выключение — одна дорога, разница только в направлении.
 async function panicSet(on){
   PANIC = on;

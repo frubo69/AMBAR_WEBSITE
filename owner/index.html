@@ -1461,63 +1461,88 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
    Расписание суток, а не список галочек. Цвет отвечает на один вопрос: где мы
    относительно срока. Красное мигает — но медленно и мягко: мигалка, от
    которой устают глаза, перестаёт работать через день. */
-.ck-top{display:flex;align-items:center;gap:14px;padding:16px 17px;
-  border-radius:var(--r);margin-bottom:12px;
-  background:var(--card);border:1px solid var(--border2)}
-.ck-top.late{background:rgba(224,85,85,.07);border-color:rgba(224,85,85,.3)}
-.ck-top.now{background:rgba(243,180,74,.07);border-color:rgba(243,180,74,.28)}
-.ck-top.ok{background:rgba(76,175,125,.07);border-color:rgba(76,175,125,.26)}
-.ck-top-v{flex:0 0 auto;min-width:52px;height:52px;padding:0 10px;border-radius:17px;
-  display:flex;align-items:center;justify-content:center;
-  font-family:'Space Grotesk',sans-serif;font-size:26px;font-weight:700;
-  font-variant-numeric:tabular-nums}
-.ck-top.late .ck-top-v{color:var(--dn);background:rgba(224,85,85,.12)}
-.ck-top.now .ck-top-v{color:var(--warn);background:rgba(243,180,74,.12)}
-.ck-top.ok .ck-top-v{color:var(--up);background:rgba(76,175,125,.12);font-size:22px}
-.ck-top-b{min-width:0}
-.ck-top-b b{display:block;font-family:'Space Grotesk',sans-serif;font-size:16px;
-  font-weight:700;line-height:1.25}
-.ck-top-b i{display:block;font-style:normal;font-size:12px;color:var(--muted);
-  margin-top:4px}
+/* ── Пульт смены ───────────────────────────────────────────────────────────
+   Экран, на который смотрят между делом, и цвет здесь — не украшение, а
+   единственная неотложная новость. Поэтому карточки одинаковые и спокойные,
+   а состояние сказано меткой слева и словом справа: раскрашенные во всю
+   ширину строки спорили друг с другом, и глазу не за что было зацепиться —
+   красным было почти всё.
 
-.ck-list{display:flex;flex-direction:column;gap:8px}
-.ck-r{display:flex;align-items:center;gap:12px;width:100%;padding:14px 15px;
+   Сверху шкала: сколько закрыто из скольких. Число опаздывающих ушло из
+   огромной цифры в строку под ней — оно важное, но не единственное. */
+.ck-head{padding:16px 17px 15px;border-radius:var(--r);margin-bottom:10px;
+  background:var(--card);border:1px solid var(--border2)}
+.ck-h-n{display:flex;align-items:baseline;gap:9px}
+.ck-h-v{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;
+  letter-spacing:-1.2px;line-height:1;font-variant-numeric:tabular-nums}
+.ck-h-v u{text-decoration:none;font-size:15px;color:var(--muted);margin-left:1px}
+.ck-h-l{font-size:11px;font-weight:600;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--muted)}
+.ck-bar2{display:flex;gap:3px;margin:13px 0 11px}
+.ck-bar2 i{flex:1;height:4px;border-radius:2px;background:rgba(255,255,255,.07);
+  transition:background .4s var(--e1)}
+.ck-bar2 i.on{background:linear-gradient(90deg,var(--gold),var(--gold2))}
+.ck-bar2 i.late{background:rgba(224,85,85,.55)}
+.ck-h-s{display:flex;align-items:baseline;justify-content:space-between;gap:12px;
+  font-size:11.5px;color:var(--muted)}
+.ck-h-s b{font-weight:600;color:var(--sub)}
+.ck-h-s .late{color:var(--dn)}
+
+.ck-list{display:flex;flex-direction:column;gap:7px}
+.ck-r{display:flex;align-items:center;gap:13px;width:100%;padding:15px;
   border-radius:15px;cursor:pointer;text-align:left;font-family:inherit;
   color:var(--text);background:var(--card);border:1px solid var(--border2);
   transition:.15s var(--e1)}
 .ck-r:active{transform:scale(.99)}
-/* Точка слева — весь светофор. Ей не нужен текст: цвет и так читается быстрее
-   любого слова, а слово рядом с ним просто занимает строку. */
-.ck-dot{flex:0 0 auto;width:10px;height:10px;border-radius:50%;background:var(--muted)}
-.ck-r.late{border-color:rgba(224,85,85,.34);background:rgba(224,85,85,.06)}
-.ck-r.late .ck-dot{background:var(--dn);animation:ckPulse 1.6s ease-in-out infinite}
-.ck-r.now{border-color:rgba(243,180,74,.3);background:rgba(243,180,74,.05)}
-.ck-r.now .ck-dot{background:var(--warn)}
-.ck-r.done .ck-dot{background:var(--up)}
-.ck-r.done{opacity:.62}
-.ck-r.soon .ck-dot{background:var(--border3)}
-@keyframes ckPulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(224,85,85,.5)}
-  50%{opacity:.45;box-shadow:0 0 0 6px rgba(224,85,85,0)}}
-@media (prefers-reduced-motion: reduce){.ck-r.late .ck-dot{animation:none}}
+/* Метка состояния — маленький квадрат слева. Один и тот же размер у всех
+   строк: прыгающая по высоте метка читается как разная важность. */
+.ck-m{flex:0 0 auto;width:22px;height:22px;border-radius:7px;display:grid;
+  place-items:center;border:1px solid var(--border3);color:var(--muted)}
+.ck-m i{width:6px;height:6px;border-radius:50%;background:currentColor;display:block}
+.ck-r.late .ck-m{border-color:rgba(224,85,85,.45);color:var(--dn);
+  background:rgba(224,85,85,.08)}
+.ck-r.now .ck-m{border-color:rgba(201,169,110,.4);color:var(--gold2);
+  background:var(--gold-soft)}
+.ck-r.done .ck-m{border-color:rgba(76,175,125,.3);color:var(--up);
+  background:rgba(76,175,125,.08)}
+.ck-r.done{background:transparent}
 .ck-b{flex:1;min-width:0}
 .ck-t{display:block;font-size:14px;font-weight:600;line-height:1.25;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ck-r.done .ck-t{font-weight:500;color:var(--sub)}
 .ck-s{display:block;font-size:11.5px;color:var(--muted);margin-top:3px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ck-r-r{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px}
-.ck-n{min-width:22px;height:22px;padding:0 7px;border-radius:999px;
-  display:flex;align-items:center;justify-content:center;font-size:11px;
-  font-weight:800;font-variant-numeric:tabular-nums;
-  color:var(--dn);background:rgba(224,85,85,.12);border:1px solid rgba(224,85,85,.28)}
-.ck-r.now .ck-n{color:var(--warn);background:rgba(243,180,74,.12);
-  border-color:rgba(243,180,74,.3)}
-.ck-r.soon .ck-n,.ck-r.done .ck-n{color:var(--muted);background:var(--card2);
-  border-color:var(--border2)}
+/* Справа — только время и, если есть, счёт работы. Плашки-пилюли вокруг числа
+   убраны: они спорили с меткой слева, а говорили то же самое. */
+.ck-r-r{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.ck-n{font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;
+  color:var(--sub);font-variant-numeric:tabular-nums;line-height:1.1}
+.ck-r.late .ck-n{color:var(--dn)}
 .ck-due{font-size:10.5px;color:var(--muted);font-variant-numeric:tabular-nums;
   white-space:nowrap}
-.ck-r.late .ck-due{color:var(--dn)}
-.ck-go{flex:0 0 auto;color:var(--muted);display:flex;align-items:center}
+.ck-r.late .ck-due{color:var(--dn);opacity:.85}
+.ck-go{flex:0 0 auto;color:var(--dim);display:flex;align-items:center;opacity:.6}
+
+/* Полоса суток. Одна линия, засечки сроков и штрих «сейчас» — ни цвета, ни
+   подписей сверх необходимого: это фон для списка, а не второй список. */
+.ck-line{margin-top:12px;padding:14px 15px 12px;border-radius:15px;
+  background:var(--card);border:1px solid var(--border2)}
+.ck-line-h{font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:13px}
+.ck-line-b{position:relative;height:3px;border-radius:2px;
+  background:rgba(255,255,255,.07)}
+.ck-line-b i{position:absolute;top:-3px;width:3px;height:9px;border-radius:2px;
+  margin-left:-1.5px;background:var(--border3)}
+.ck-line-b i.done{background:rgba(76,175,125,.5)}
+.ck-line-b i.now{background:var(--gold2)}
+.ck-line-b i.late{background:var(--dn)}
+.ck-line-b u{position:absolute;top:-9px;width:1px;height:21px;margin-left:-.5px;
+  background:var(--gold2);opacity:.85}
+.ck-line-b u::after{content:'';position:absolute;top:-3px;left:-2px;width:5px;height:5px;
+  border-radius:50%;background:var(--gold2)}
+.ck-line-f{display:flex;justify-content:space-between;margin-top:9px;
+  font-size:9.5px;letter-spacing:.6px;color:var(--dim);
+  font-variant-numeric:tabular-nums}
 
 /* Вход в чек-лист. Ростом и посадкой — как строка «Кто на каком районе» на
    районах: то же обещание «одно нажатие — и ты в работе». */
@@ -12225,20 +12250,58 @@ function chkRender(){
   _setText('accSub', d.time ? `сейчас ${d.time}` : '');
   // Шапка отвечает одним взглядом: горит или нет. Число впереди — то, за чем
   // сюда и заходят.
-  const head = `<div class="ck-top ${c.late ? 'late' : (c.now ? 'now' : 'ok')}">
-    <div class="ck-top-v">${c.late || c.now || '✓'}</div>
-    <div class="ck-top-b">
-      <b>${c.late ? `${c.late} ${pluralize(c.late,'задача опаздывает','задачи опаздывают','задач опаздывают')}`
-         : (c.now ? `${c.now} ${pluralize(c.now,'задача ждёт','задачи ждут','задач ждут')}`
-                  : 'всё по расписанию')}</b>
-      <i>${c.done || 0} из ${rows.length} сделано${
-        c.soon ? ` · ${c.soon} впереди` : ''}</i>
+  // Шкала по задачам, а не по процентам: клеток столько, сколько дел, и видно
+  // не «сорок три процента», а «три из семи, две горят».
+  const шкала = rows.map(r => `<i class="${
+    r.state === 'done' ? 'on' : (r.state === 'late' ? 'late' : '')}"></i>`).join('');
+  // Ближайший срок — единственное, чего в списке не видно с одного взгляда:
+  // строки идут по важности, а не по времени.
+  const впереди = rows.filter(r => r.state !== 'done' && r.due)
+    .sort((a, b) => String(a.due_at || '').localeCompare(String(b.due_at || '')))[0];
+  const head = `<div class="ck-head">
+    <div class="ck-h-n">
+      <span class="ck-h-v">${c.done || 0}<u>/${rows.length}</u></span>
+      <span class="ck-h-l">закрыто</span>
+    </div>
+    <div class="ck-bar2">${шкала}</div>
+    <div class="ck-h-s">
+      <span>${c.late ? `<b class="late">${c.late}</b> ${
+        pluralize(c.late,'опаздывает','опаздывают','опаздывают')}`
+        : (c.now ? `<b>${c.now}</b> ${pluralize(c.now,'ждёт','ждут','ждут')}`
+                 : 'всё по расписанию')}</span>
+      ${впереди ? `<span>дальше ${escS(впереди.t.toLowerCase())} · <b>${
+        escS(впереди.due)}</b></span>` : ''}
     </div>
   </div>`;
   // Пояснение под списком убрано: оно объясняло словами то, что видно
   // глазами — порядок строк, смысл красного, устройство задачи «смена».
   document.getElementById('accMid').innerHTML = head +
-    `<div class="ck-list">${rows.map(chkRow).join('')}</div>`;
+    `<div class="ck-list">${rows.map(chkRow).join('')}</div>` + chkLine(rows, d);
+}
+
+// Сутки одной полосой: где на них стоят сроки и где сейчас мы. Список отвечает
+// «что делать», полоса — «сколько осталось»: строки идут по важности, а не по
+// времени, и по ним не видно, что до закрытия смены осталось два часа.
+//
+// Рабочие сутки — с полудня до полудня, поэтому и полоса такая: слева
+// сегодняшний полдень, справа завтрашний.
+function chkLine(rows, d){
+  if(!d.day) return '';
+  const старт = new Date(d.day + 'T12:00:00+04:00').getTime();
+  const сутки = 86400000;
+  const где = t => {
+    const v = ((new Date(t).getTime() - старт) / сутки) * 100;
+    return Math.max(0, Math.min(100, v));
+  };
+  const метки = rows.filter(r => r.due_at).map(r =>
+    `<i class="${r.state}" style="left:${где(r.due_at).toFixed(2)}%"></i>`).join('');
+  const сейчас = d.now ? где(d.now) : null;
+  return `<div class="ck-line">
+    <div class="ck-line-h">Сроки смены</div>
+    <div class="ck-line-b">${метки}${
+      сейчас === null ? '' : `<u style="left:${сейчас.toFixed(2)}%"></u>`}</div>
+    <div class="ck-line-f"><span>12:00</span><span>00:00</span><span>12:00</span></div>
+  </div>`;
 }
 
 function chkRow(r){
@@ -12248,15 +12311,21 @@ function chkRow(r){
   const late = r.state === 'late' && r.late_min
     ? (r.late_min < 60 ? `${r.late_min} мин` : `${Math.floor(r.late_min / 60)} ч`)
     : '';
+  // Метка: галочка у сделанного, точка у остального. Разные значки на каждое
+  // состояние превратили бы список в азбуку, которую надо помнить.
+  const метка = r.state === 'done'
+    ? `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+         stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`
+    : '<i></i>';
   return `<button class="ck-r ${st.c}" onclick="chkGo('${escS(r.go)}')">
-    <span class="ck-dot"></span>
+    <span class="ck-m">${метка}</span>
     <span class="ck-b">
       <span class="ck-t">${escS(r.t)}</span>
       <span class="ck-s">${escS(r.s)}</span>
     </span>
     <span class="ck-r-r">
       ${r.n ? `<span class="ck-n">${fmt(r.n)}</span>` : ''}
-      <span class="ck-due">${r.state === 'late' ? 'к ' + r.due + (late ? ` · +${late}` : '')
+      <span class="ck-due">${r.state === 'late' ? (late ? `опоздание ${late}` : 'опаздывает')
                            : (r.state === 'done' ? 'готово' : 'к ' + r.due)}</span>
     </span>
     <span class="ck-go">${ICO_CHEV}</span>

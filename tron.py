@@ -125,6 +125,12 @@ async def get_balance(address: str) -> dict | None:
                     usdt = round(int(raw) / _USDT_UNIT, USDT_DECIMALS)
                 except (TypeError, ValueError):
                     pass
+    # Ноль на балансе двусмыслен: то ли кошелёк пуст, то ли мы не нашли в
+    # ответе свой контракт. Строка в журнале эту двусмысленность снимает —
+    # видно, сколько токенов на счету вообще и какой из них наш.
+    if not usdt:
+        log.info(f"[tron] баланс USDT = 0 · токенов на счету: "
+                 f"{len(row.get('trc20') or [])}")
     return {"usdt": usdt,
             "trx": round(int(row.get("balance") or 0) / 1_000_000, 6),
             "unknown": False}

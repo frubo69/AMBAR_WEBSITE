@@ -2010,6 +2010,8 @@ button.path:active{transform:scale(.995)}
   font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.4px}
 .wal-sum span{display:block;margin-top:2px;font-size:10.5px;color:var(--muted)}
 .wal-sum .other b{color:var(--warn)}
+.wal-sum .gone b{color:var(--dn)}
+.wal-note{margin:-4px 0 10px;font-size:10.5px;color:var(--muted)}
 .wal-l{padding:4px 14px 14px;border-radius:15px;background:var(--card);
   border:1px solid var(--border2)}
 .wal-r{display:flex;align-items:center;gap:11px;padding:10px 0;
@@ -14098,7 +14100,10 @@ function walBody(d){
     <div class="wal-sum">
       <div><b>${fmtUsdt(t.app)}</b><span>USDT через приложение</span></div>
       <div class="other"><b>${fmtUsdt(t.direct)}</b><span>USDT не через приложение</span></div>
+      ${t.out ? `<div class="gone"><b>${fmtUsdt(t.out)}</b><span>USDT ушло</span></div>` : ''}
     </div>
+    <div class="wal-note">по последним ${rows.length} ${
+      pluralize(rows.length, 'переводу', 'переводам', 'переводам')}</div>
     ${rows.length ? `<div class="wal-l">${rows.map(r => `
       <div class="wal-r">
         <span class="wal-r-b">

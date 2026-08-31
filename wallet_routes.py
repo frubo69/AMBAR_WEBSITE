@@ -57,6 +57,7 @@ async def _build() -> dict:
 
     через = 0.0
     напрямую = 0.0
+    ушло = 0.0
     rows = []
     for t in transfers:
         inv = byid.get(t.get("txid") or "")
@@ -65,6 +66,8 @@ async def _build() -> dict:
                 через += t["amount"]
             else:
                 напрямую += t["amount"]
+        else:
+            ушло += t["amount"]
         rows.append({
             **t,
             "peer": _short(t.get("peer") or ""),
@@ -76,7 +79,10 @@ async def _build() -> dict:
         "balance": balance or {"usdt": 0.0, "trx": 0.0, "unknown": True},
         "offline": offline or balance is None,
         "transfers": rows,
-        "totals": {"app": round(через, 2), "direct": round(напрямую, 2)},
+        # «Ушло» тут не ради полноты: без него ноль на балансе выглядит
+        # поломкой экрана, хотя это обычная жизнь кошелька — пришло и вывели.
+        "totals": {"app": round(через, 2), "direct": round(напрямую, 2),
+                   "out": round(ушло, 2)},
         "at": int(_t.time() * 1000),
     }
 

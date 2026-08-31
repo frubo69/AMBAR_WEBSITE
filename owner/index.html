@@ -1518,7 +1518,6 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   white-space:nowrap}
 .ck-r.late .ck-due{color:var(--dn)}
 .ck-go{flex:0 0 auto;color:var(--muted);display:flex;align-items:center}
-.ck-note{font-size:11px;color:var(--muted);line-height:1.6;margin:14px 2px 0}
 
 /* Вход в чек-лист. Ростом и посадкой — как строка «Кто на каком районе» на
    районах: то же обещание «одно нажатие — и ты в работе». */
@@ -12236,12 +12235,10 @@ function chkRender(){
         c.soon ? ` · ${c.soon} впереди` : ''}</i>
     </div>
   </div>`;
+  // Пояснение под списком убрано: оно объясняло словами то, что видно
+  // глазами — порядок строк, смысл красного, устройство задачи «смена».
   document.getElementById('accMid').innerHTML = head +
-    `<div class="ck-list">${rows.map(chkRow).join('')}</div>` +
-    `<div class="ck-note">Задачи стоят по важности, сверху вниз. У каждой свой
-      час: красное значит, что срок уже прошёл — не «плохо», а «займитесь этим
-      первым». Смена — одна задача: днём спрашивается открытие, под утро
-      закрытие; кто именно открылся, видно внутри.</div>`;
+    `<div class="ck-list">${rows.map(chkRow).join('')}</div>`;
 }
 
 function chkRow(r){
@@ -12275,6 +12272,7 @@ const CK_GO = {
   order:     () => accOpen('order'),
   supply:    () => accOpen('supply'),
   short:     () => { ACC_VIEW = 'short'; accShort(); },
+  qr:        () => accOpen('qr'),
   expenses:  () => { SH_TAB = 'exp'; accOpen('expenses'); },
   writeoffs: () => { SH_TAB = 'wo';  accOpen('expenses'); },
   // Единственная задача, которую система знать не может: деньги переходят из

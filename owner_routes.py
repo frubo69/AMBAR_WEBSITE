@@ -3275,6 +3275,7 @@ CHK_PLAN = [
     ("writeoffs",   12.0, 23.0, False),
     ("order_sent",  12.0, 15.0, False),
     ("supply_in",   12.0, 21.0, False),
+    ("unscanned",   12.0, 21.0, False),
     ("cash",         5.0,  6.0, True),
     ("shortfall",   12.0, 21.0, False),
 ]
@@ -3349,6 +3350,12 @@ async def handle_checklist(request):
         wo = len(await db.writeoff_pending(limit=200))
     except Exception:
         wo = 0
+    try:
+        import qr_routes as QR
+        без_кодов = sum((await QR.unscanned_by_district())[0].values())
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[chk] бутылки без кодов не посчитаны: {e}")
+        без_кодов = 0
 
     day_start = _chk_at(day, 12.0)
     day_end = day_start + timedelta(days=1)
@@ -3401,6 +3408,14 @@ async def handle_checklist(request):
         _chk_row("writeoffs", "Бой, брак и утеря",
                  (f"{wo} ждут решения" if wo else "разобрано"),
                  wo == 0, now, day, plan, go="writeoffs", n=wo),
+        # Пока бутылка не заведена кодом, для реестра её нет: ревизия ищет её
+        # глазами, а проверка у водителя называет чужой. Поэтому пункт горит,
+        # пока такие бутылки на полке есть, и гаснет сам — по мере того, как их
+        # заводят сканом.
+        _chk_row("unscanned", "Бутылки без кодов",
+                 (f"{без_кодов} на полке мимо реестра" if без_кодов
+                  else "все бутылки в реестре"),
+                 без_кодов == 0, now, day, plan, go="qr", n=без_кодов),
         # Сдал ли водитель наличные, система знать не может: деньги переходят
         # из рук в руки. Поэтому единственная отметка, которую ставит человек,
         # — и сумма рядом, чтобы было с чем сверяться.

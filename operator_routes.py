@@ -2935,4 +2935,8 @@ def setup(app):
     r.add_post("/api/operator/support/send", handle_support_send)
     r.add_route("OPTIONS", "/api/operator/support/customers", _opt)
     r.add_get("/api/operator/support/customers", handle_support_customers)
-    log.info("[pos] operator routes mounted")
+    # Сколько устройств закреплено за операторами. Без этой строки «почему на
+    # телефоне всё ещё спрашивают, кто я» проверяется только чужими руками.
+    n = len(_staff_mod.OPERATOR_BY_ID)
+    log.info(f"[pos] operator routes mounted · закреплённых устройств: {n}"
+             + (" · " + ", ".join(sorted(set(_staff_mod.OPERATOR_BY_ID.values()))) if n else ""))

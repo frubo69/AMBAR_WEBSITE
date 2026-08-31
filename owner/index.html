@@ -13389,16 +13389,27 @@ async function accQR(){
   _setRail('accRail', '');
   _setText('accTitle', 'Внести товар');
   _setText('accSub', 'загрузка…');
+  // Реестр уже пришёл вместе с разделом «Учёт» и лежит в памяти — открываем
+  // экран на нём, а свежий тянем следом. Сводка собирается на сервере не
+  // мгновенно, и ждать её второй раз, стоя у полки, незачем.
+  const было = !!(ACC_QR && ACC_QR.by_district);
+  if(было) qrDistrict();
   let d;
   try{ d = await ownerApi.ownerFetch('/api/owner/qr'); }
-  catch(e){ document.getElementById('accMid').innerHTML =
-    '<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+  catch(e){
+    if(!было) document.getElementById('accMid').innerHTML =
+      '<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+    return;
+  }
   ACC_QR = d;
   if(!STK.districts){
     try{ STK.districts = (await ownerApi.ownerFetch('/api/owner/stock/status')).districts; }
     catch(e){ STK.districts = []; }
   }
-  qrDistrict();
+  if(!было){ qrDistrict(); return; }
+  // Свежее пришло — числа и брони обновляем на месте. Перерисовывать экран
+  // целиком нельзя: человек уже листает список, и он уедет из-под пальца.
+  if(document.getElementById('qrList')) qrRenderList();
 }
 
 function _qrHead(title, sub, back){

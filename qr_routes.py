@@ -14,7 +14,7 @@
 выглядит точно так же, как настоящая. Поэтому код — это _id: вторая запись с
 тем же номером физически невозможна, а не «проверяется».
 """
-import logging, re
+import asyncio, logging, re, time as _t
 from datetime import datetime, timedelta, timezone
 
 from aiohttp import web
@@ -138,8 +138,18 @@ def _clean(code: str) -> str:
 @require_owner
 async def handle_stats(request):
     """Сводка реестра: сколько бутылок записано и по каким позициям."""
-    st = await db.qr_stats()
-    by_product = await db.qr_by_product()
+    _t0 = _t.monotonic()
+    # Шесть выборок по одному реестру — разом. По очереди они складывались в
+    # шесть задержек до базы подряд, а зависимости между ними нет.
+    st, by_product, last, locks, by_district, by_prod_dist = await asyncio.gather(
+        db.qr_stats(),
+        db.qr_by_product(),
+        db.qr_last(limit=20),
+        db.qr_locks(datetime.now(timezone.utc)),
+        db.qr_by_district(),
+        db.qr_by_product_district_all(),
+    )
+    _t_reg = _t.monotonic() - _t0
     # Позиции — в порядке рабочей таблицы, тем же номером от 1 до 123, что на
     # бумажном листе и в отчётах. Реестр заполняют, стоя у полки, и «по убыванию
     # количества» здесь означает прыгать по залу: ряд идёт как идёт, а глазами
@@ -148,12 +158,6 @@ async def handle_stats(request):
     for r in by_product:
         r["no"] = order_key(r.get("product_id") or "") + 1
     by_product.sort(key=lambda r: r["no"])
-    last = await db.qr_last(limit=20)
-    locks = await db.qr_locks(datetime.now(timezone.utc))
-    by_district = await db.qr_by_district()
-    # Сколько чего лежит на КАЖДОЙ точке: список позиций показывает число той
-    # точки, где стоит человек, а не сумму по всем.
-    by_prod_dist = await db.qr_by_product_district_all()
     # Реестр знает, что бутылку внесли, и не знает, что её увезли: на доставке
     # коды никто не сканирует. Поэтому «продано» и «списано» берём оттуда, где
     # это правда, — из доставленных заказов и журнала списаний, с того дня,
@@ -161,6 +165,7 @@ async def handle_stats(request):
     # которое было верным ровно один день.
     sold = written = 0
     left = {}
+    _t1 = _t.monotonic()
     try:
         since = await db.qr_since_by_district()
         used = await db.qr_consumed(since)
@@ -181,11 +186,12 @@ async def handle_stats(request):
     # ходит ящиками, а коды — поштучно. Где пересчёта не было вовсе, сравнивать
     # не с чем: такую точку в число не считаем и говорим о ней отдельно.
     unscanned, no_count = {}, []
+    _t2 = _t.monotonic()
     try:
         import stock_routes as SR
         base = await SR._district_base(SR._biz_day())
         cat = SR._catalog()
-        by_pd = await db.qr_by_product_district_all()
+        by_pd = by_prod_dist
         for oid in SR.OFFICE_IDS:
             have = (base.get(oid) or {}).get("have") or {}
             bottles = sum(round(float(q) * SR._unit(cat.get(pid) or {}))
@@ -198,6 +204,13 @@ async def handle_stats(request):
     except Exception as e:
         log.warning(f"[qr] не посчитано, сколько без кодов: {e}")
         unscanned, no_count = {}, []
+
+    # Экран открывают у полки, с телефона, и ждут его молча. Если сборка
+    # заняла больше секунды — пусть в журнале останется, на чём именно.
+    _all = _t.monotonic() - _t0
+    if _all > 1.0:
+        log.warning(f"[qr] сводка собиралась {_all:.1f} с: реестр {_t_reg:.1f}, "
+                    f"расход {_t2 - _t1:.1f}, без кодов {_t.monotonic() - _t2:.1f}")
 
     return web.json_response({
         "locks": locks,

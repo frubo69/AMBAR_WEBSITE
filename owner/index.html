@@ -1512,7 +1512,7 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Вход в чек-лист. Ростом и посадкой — как строка «Кто на каком районе» на
    районах: то же обещание «одно нажатие — и ты в работе». */
 .chk-entry{display:flex;align-items:center;gap:13px;width:100%;flex:0 0 auto;
-  height:76px;padding:0 16px;border-radius:16px;cursor:pointer;text-align:left;
+  height:66px;padding:0 16px;border-radius:16px;cursor:pointer;text-align:left;
   font-family:inherit;color:var(--text);
   background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
   border:1px solid rgba(201,169,110,.28)}
@@ -1521,9 +1521,11 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   width:42px;height:42px;border-radius:13px;color:var(--gold2);
   background:var(--gold-soft);border:1px solid rgba(201,169,110,.22)}
 .chk-e-b{flex:1;min-width:0}
-.chk-e-b b{display:block;font-size:15px;font-weight:700;line-height:1.2}
-.chk-e-b i{display:block;font-style:normal;font-size:12px;color:var(--muted);
-  margin-top:3px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Название тем же шрифтом и заглавными, что и разделы ниже: вход в чек-лист
+   стоит над ними и должен читаться как их старший брат, а не как чужая
+   карточка. Подписи нет — она пересказывала само слово «чек-лист». */
+.chk-e-b b{display:block;font-family:'Space Grotesk',sans-serif;font-size:15px;
+  font-weight:700;letter-spacing:.6px;text-transform:uppercase;line-height:1.2}
 .chk-e-go{display:flex;align-items:center;color:var(--muted);flex-shrink:0}
 .acc-cell{display:flex;flex-direction:column;align-items:flex-start;gap:0;
   padding:14px;cursor:pointer;text-align:left;color:var(--text);
@@ -6100,7 +6102,7 @@ button.pill:active{opacity:.6}
   .acc-3 .acc-cell:nth-child(3) .acc-ico{width:44px;height:44px;border-radius:14px}
   .acc-3 .acc-cell:nth-child(3) .acc-ico svg{width:23px;height:23px}
   .acc-3 .acc-cell:nth-child(3) .acc-t{margin-top:9px}
-  .chk-entry{height:66px}
+  .chk-entry{height:60px}
 }
 @media (max-height:640px){
   .acc-cell{min-height:88px}
@@ -11902,8 +11904,7 @@ function accRender(){
         stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
         <path d="M9 5h10M9 12h10M9 19h10"/><path d="M3.5 5l1.4 1.4L7.5 3.8"/>
         <path d="M3.5 12l1.4 1.4L7.5 10.8"/><path d="M3.5 19l1.4 1.4L7.5 17.8"/></svg></span>
-      <span class="chk-e-b"><b>Чек-лист смены</b>
-        <i>что просрочено и что делать сейчас</i></span>
+      <span class="chk-e-b"><b>Чек-лист смены</b></span>
       <span class="chk-e-go"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
         stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span>
     </button>

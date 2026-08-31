@@ -3412,15 +3412,22 @@ button.path:active{transform:scale(.995)}
   transition:width .3s var(--e1)}
 .exp-grp{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
   color:var(--muted);margin:16px 0 7px}
+/* Карточка водителя — из двух слоёв, и они про разное. Сверху человек и его
+   смена, снизу деньги: разовые расходы. Пока это была одна плоская плитка,
+   «доп. расходы» читались как продолжение имени, а не как отдельное дело.
+   Слои разведены не рамкой, а оттенком — золото сверху, синее снизу, оба
+   прозрачные по тёмному. */
 .exp-row{background:var(--card);border:1px solid var(--border2);border-radius:14px;
-  padding:13px 14px;margin-bottom:8px;transition:.15s var(--e1)}
+  padding:13px 14px;margin-bottom:8px;overflow:hidden;transition:.15s var(--e1)}
 .exp-row.todo{background:transparent;border-style:dashed;border-color:var(--border3)}
-.exp-head{display:flex;align-items:center;gap:12px}
+.exp-head{display:flex;align-items:center;gap:12px;
+  margin:-13px -14px 0;padding:13px 14px;
+  background:linear-gradient(180deg,rgba(201,169,110,.07),rgba(201,169,110,.015))}
 .exp-who{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .exp-name{font-size:14px;font-weight:600;line-height:1.2}
 .exp-state{font-size:11px;line-height:1.2;color:var(--muted)}
-.exp-state.work{color:var(--gold2)}
-.exp-state.home{color:var(--info)}
+.exp-state.work{color:var(--up)}
+.exp-state.home{color:var(--sub)}
 .exp-val{flex-shrink:0;display:flex;align-items:baseline;gap:4px;
   font-family:'DM Sans',sans-serif;font-size:19px;font-weight:700;
   font-variant-numeric:tabular-nums;line-height:1}
@@ -3430,34 +3437,25 @@ button.path:active{transform:scale(.995)}
 .exp-val.zero i{opacity:.5}
 .exp-right{display:flex;align-items:center;gap:12px;flex-shrink:0}
 .exp-sqs{display:flex;gap:5px;flex-shrink:0}
-/* Две кнопки у имени — смена и дом. Неотмеченными они были глухо-чёрными и
-   читались как выключенные: строка выглядела мёртвой, хотя как раз она и ждёт
-   нажатия. Теперь у каждой свой цвет с самого начала — золото у смены, синее
-   у дома, — но по тёмному, стеклом: это ещё не выбор, а приглашение. Выбор
-   говорит плотность, а не появление цвета.
-   Приём тот же, что у входа в «Кто на каком районе»: значок цветной по тёмной
-   подложке, кайма тоньше заливки. */
 .exp-sq{width:36px;height:36px;flex-shrink:0;border-radius:10px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   border:1px solid var(--border3);background:var(--card2);color:var(--muted);
   transition:.14s var(--e1)}
 .exp-sq:active{transform:scale(.9)}
-.exp-sq.work{color:var(--gold2);background:rgba(201,169,110,.07);
-  border-color:rgba(201,169,110,.2)}
-.exp-sq.home{color:var(--info);background:rgba(91,141,239,.07);
-  border-color:rgba(91,141,239,.2)}
-.exp-sq.on-work{background:rgba(201,169,110,.2);border-color:rgba(201,169,110,.55);
-  color:var(--gold3);box-shadow:0 3px 12px rgba(201,169,110,.18)}
-.exp-sq.on-home{background:rgba(91,141,239,.2);border-color:rgba(91,141,239,.55);
-  color:#9BB8F5;box-shadow:0 3px 12px rgba(91,141,239,.18)}
+.exp-sq.on-work{background:rgba(76,175,125,.18);border-color:rgba(76,175,125,.5);color:var(--up)}
+.exp-sq.on-home{background:rgba(243,180,74,.16);border-color:rgba(243,180,74,.45);color:var(--warn)}
 /* Записанный расход выглядит как заполненная форма: та же сетка, те же поля.
    Каждый следующий встаёт строкой ниже — список читается сверху вниз, а не
    растекается облаком пилюль. */
 /* Полоса разовых: подпись слева, число справа, разделитель сверху — она
    читается как строка итога, а не как ещё одна кнопка в ряду. */
-.exp-dop{display:flex;align-items:center;gap:8px;width:100%;margin-top:9px;
-  padding:8px 0 0;border:0;border-top:1px solid var(--border2);background:none;
+.exp-dop{display:flex;align-items:center;gap:8px;width:calc(100% + 28px);
+  margin:9px -14px -13px;padding:10px 14px 11px;
+  border:0;border-top:1px solid var(--border2);background:rgba(91,141,239,.055);
   cursor:pointer;font-family:inherit;color:var(--muted);text-align:left}
+/* Когда под полосой лежат записанные расходы, она уже не низ карточки —
+   и прижимать её к краю нельзя. */
+.exp-dop:not(:last-child){margin-bottom:9px}
 .exp-dop:active{opacity:.7}
 .exp-dop-t{flex:1;min-width:0;font-size:11.5px;font-weight:600;letter-spacing:.2px}
 .exp-dop-v{flex-shrink:0;display:flex;align-items:baseline;gap:4px;
@@ -15473,7 +15471,7 @@ function expRow(r){
     home: '<path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
   };
   const sq = (kind, on, title, onclick) => `
-    <button class="exp-sq ${kind} ${on ? 'on-' + kind : ''}" title="${title}" aria-label="${title}"
+    <button class="exp-sq ${on ? 'on-' + kind : ''}" title="${title}" aria-label="${title}"
             onclick="${onclick}">
       <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICO[kind]}</svg>

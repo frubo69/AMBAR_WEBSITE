@@ -3415,8 +3415,8 @@ button.path:active{transform:scale(.995)}
 .exp-who{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
 .exp-name{font-size:14px;font-weight:600;line-height:1.2}
 .exp-state{font-size:11px;line-height:1.2;color:var(--muted)}
-.exp-state.work{color:var(--up)}
-.exp-state.home{color:var(--sub)}
+.exp-state.work{color:var(--gold2)}
+.exp-state.home{color:var(--info)}
 .exp-val{flex-shrink:0;display:flex;align-items:baseline;gap:4px;
   font-family:'DM Sans',sans-serif;font-size:19px;font-weight:700;
   font-variant-numeric:tabular-nums;line-height:1}
@@ -3426,13 +3426,26 @@ button.path:active{transform:scale(.995)}
 .exp-val.zero i{opacity:.5}
 .exp-right{display:flex;align-items:center;gap:12px;flex-shrink:0}
 .exp-sqs{display:flex;gap:5px;flex-shrink:0}
+/* Две кнопки у имени — смена и дом. Неотмеченными они были глухо-чёрными и
+   читались как выключенные: строка выглядела мёртвой, хотя как раз она и ждёт
+   нажатия. Теперь у каждой свой цвет с самого начала — золото у смены, синее
+   у дома, — но по тёмному, стеклом: это ещё не выбор, а приглашение. Выбор
+   говорит плотность, а не появление цвета.
+   Приём тот же, что у входа в «Кто на каком районе»: значок цветной по тёмной
+   подложке, кайма тоньше заливки. */
 .exp-sq{width:36px;height:36px;flex-shrink:0;border-radius:10px;cursor:pointer;
   display:flex;align-items:center;justify-content:center;
   border:1px solid var(--border3);background:var(--card2);color:var(--muted);
   transition:.14s var(--e1)}
 .exp-sq:active{transform:scale(.9)}
-.exp-sq.on-work{background:rgba(76,175,125,.18);border-color:rgba(76,175,125,.5);color:var(--up)}
-.exp-sq.on-home{background:rgba(243,180,74,.16);border-color:rgba(243,180,74,.45);color:var(--warn)}
+.exp-sq.work{color:var(--gold2);background:rgba(201,169,110,.07);
+  border-color:rgba(201,169,110,.2)}
+.exp-sq.home{color:var(--info);background:rgba(91,141,239,.07);
+  border-color:rgba(91,141,239,.2)}
+.exp-sq.on-work{background:rgba(201,169,110,.2);border-color:rgba(201,169,110,.55);
+  color:var(--gold3);box-shadow:0 3px 12px rgba(201,169,110,.18)}
+.exp-sq.on-home{background:rgba(91,141,239,.2);border-color:rgba(91,141,239,.55);
+  color:#9BB8F5;box-shadow:0 3px 12px rgba(91,141,239,.18)}
 /* Записанный расход выглядит как заполненная форма: та же сетка, те же поля.
    Каждый следующий встаёт строкой ниже — список читается сверху вниз, а не
    растекается облаком пилюль. */
@@ -15459,7 +15472,7 @@ function expRow(r){
     home: '<path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
   };
   const sq = (kind, on, title, onclick) => `
-    <button class="exp-sq ${on ? 'on-' + kind : ''}" title="${title}" aria-label="${title}"
+    <button class="exp-sq ${kind} ${on ? 'on-' + kind : ''}" title="${title}" aria-label="${title}"
             onclick="${onclick}">
       <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
            stroke-width="2" stroke-linecap="round" stroke-linejoin="round">${ICO[kind]}</svg>

@@ -1940,21 +1940,6 @@ button.path:active{transform:scale(.995)}
 /* ── Поставка ───────────────────────────────────────────────────────────── */
 /* Те же три числа, что и в заявке, в том же порядке: экран поставки —
    продолжение пути, а не отдельная таблица. */
-/* Бутылки, купленные на доп. складах: они уже на полке, а в базе их нет — и до
-   тех пор их не видит ни заявка, ни ревизия. Это напоминание, а не тревога:
-   число тает само, пока коды заводят. Поэтому одна строка, а не карточка во
-   всю ширину рядом с недобором — иначе два блока спорят за внимание, и
-   проигрывает тот, что важнее. */
-.sup-nc{display:flex;align-items:flex-start;gap:10px;padding:11px 13px;
-  border-radius:13px;margin-bottom:10px;background:var(--card);
-  border:1px solid rgba(243,180,74,.28)}
-.sup-nc-d{flex-shrink:0;width:7px;height:7px;margin-top:5px;border-radius:50%;
-  background:var(--warn)}
-.sup-nc-b{flex:1;min-width:0}
-.sup-nc-t{display:block;font-size:12.5px;font-weight:600;line-height:1.35}
-.sup-nc-t b{color:var(--warn);font-weight:700}
-.sup-nc-s{display:block;font-size:11px;color:var(--muted);margin-top:3px;line-height:1.4}
-.sup-nc-s b{color:var(--sub);font-weight:600}
 /* История закупов. Строка отвечает на «когда и чем кончилось», а открывается
    в ту же карточку — это один и тот же экран, просто другой закуп. */
 .sh-row{display:flex;align-items:center;gap:12px;width:100%;padding:12px 13px;
@@ -11390,8 +11375,8 @@ const MOV_V = {
   no_item: ['err',   'нет в каталоге',   'var(--dn)'],
 };
 
-function stkMoveStart(){
-  if(!accAskBack('Перемещение')) return;
+async function stkMoveStart(){
+  if(!await accAskBack('Перемещение')) return;
   MOV = {to:'', rows:[], total:0};
   stkMovePick();
 }
@@ -11762,7 +11747,7 @@ function stkFilter(){ STK.q = document.getElementById('stkSearch').value || ''; 
 
 // ── сохранение ──────────────────────────────────────────────────────────────
 async function stkSubmit(){
-  if(!accAskBack(STK.audit ? 'Ревизия' : 'Пересчёт склада')) return;
+  if(!await accAskBack(STK.audit ? 'Ревизия' : 'Пересчёт склада')) return;
   const btn = document.getElementById('stkSaveBtn');
   btn.disabled = true; btn.textContent = 'Сохраняю…';
   // Сохраняем весь район целиком, иначе завтра сравнивать будет не с чем: остаток
@@ -12022,11 +12007,24 @@ function accDayHome(){ if(DAY_OFFSET) accDaySet(0); }
 // по нему считали; изменить его молча, случайным тапом, нельзя. Владельцу об
 // этом уходит сообщение в бот — это делает сервер, здесь только предупреждаем,
 // что оно уйдёт.
-function accAskBack(что){
+// Вопрос «да или нет» задаём телеграмом, а не браузером. Родной confirm()
+// внутри мини-аппа показывается не везде: часть клиентов его просто не рисует
+// и возвращает «нет» — кнопка выглядит сломанной, хотя нажатие дошло.
+function askYes(текст){
+  return new Promise(готово => {
+    try{
+      const tg = window.Telegram && Telegram.WebApp;
+      if(tg && tg.showConfirm){ tg.showConfirm(текст, ok => готово(!!ok)); return; }
+    }catch(e){}
+    готово(confirm(текст));
+  });
+}
+
+async function accAskBack(что){
   if(!accIsBack()) return true;
   const d = _bizToday(); d.setDate(d.getDate() - DAY_OFFSET);
   const дата = `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
-  return confirm(`${что} за ${дата} — это прошедший день, не сегодня.\n\n`
+  return await askYes(`${что} за ${дата} — это прошедший день, не сегодня.\n\n`
     + 'Записать? Владельцу уйдёт уведомление о правке.');
 }
 
@@ -14871,23 +14869,6 @@ function supRender(){
     </div>
   </div>`;
 
-  // Немаркированные: купленное на доп. складах уже стоит на полке, а в базе
-  // его ещё нет. Число тает само, пока коды заводят через «Внести товар».
-  const um = d.unmarked || {};
-  const umLeft = Object.values(um).reduce((a, x) => a + (x.left || 0), 0);
-  const umBlock = umLeft ? `
-    <div class="sup-nc">
-      <span class="sup-nc-d"></span>
-      <span class="sup-nc-b">
-        <span class="sup-nc-t"><b>${fmt(umLeft)} ${
-          pluralize(umLeft,'бутылка','бутылки','бутылок')}</b> на полке, но без кода в базе</span>
-        <span class="sup-nc-s">${Object.entries(um).filter(([, x]) => x.left)
-          .map(([o, x]) => `<b>${escS((D[o]||{}).code || o)}</b> ${fmt(x.left)}${
-            x.marked ? ` (внесли ${fmt(x.marked)} из ${fmt(x.need)})` : ''}`).join(' · ')}
-          — заводите через «Внести товар», число тает само</span>
-      </span>
-    </div>` : '';
-
   // Кто везёт. Ради этого списка сюда и заходят: водитель, район, сколько уже
   // принято и чем кончилось. Незанятые районы — первыми: это единственные
   // строки, по которым надо кому-то звонить.
@@ -14935,7 +14916,7 @@ function supRender(){
   // как идёт приём, — а два списка внизу отвечали на другой: что докупить и что
   // магазин подсунул. Они уводили от дела и жили только ради файла, который
   // отсюда же и уходил; файл ушёл вместе с ними.
-  document.getElementById('accMid').innerHTML = head + umBlock +
+  document.getElementById('accMid').innerHTML = head +
     `<div class="exp-grp" id="supWho">Кто везёт · ${done} из ${all}</div>${
       cards || '<div class="exp-empty">Районов нет</div>'}`;
   // Отмена — только пока заявка открыта и только сегодня. У закрытой отменять
@@ -15611,7 +15592,7 @@ function expDop(r, open){
 // Повторный тап по той же кнопке снимает отметку: ошибиться утром легко, а
 // «Вышел» и «Дома» — разные деньги, поэтому откат должен быть в один жест.
 async function expSetWork(driver, working){
-  if(!accAskBack(`Отметка «${driver}»`)) return;
+  if(!await accAskBack(`Отметка «${driver}»`)) return;
   try{
     const r = await ownerApi.ownerFetch('/api/owner/expenses/working',
       {method:'POST', body:{day:EXP.day, driver, working, as:_meName()}});
@@ -15627,7 +15608,7 @@ function expToggleForm(driver){
 }
 
 async function expAddExtra(driver){
-  if(!accAskBack('Доп. расход')) return;
+  if(!await accAskBack('Доп. расход')) return;
   const amount = parseInt((document.getElementById('expAmt')?.value || '').replace(/\D/g,''), 10);
   const comment = (document.getElementById('expCmt')?.value || '').trim();
   // Расход без объяснения через неделю не отличить от опечатки — поэтому
@@ -15645,7 +15626,7 @@ async function expAddExtra(driver){
 // Решение по трате водителя. Отклонённая не исчезает: водитель должен видеть,
 // что её рассмотрели, иначе пришлёт ту же ещё раз.
 async function expDecide(driver, id, action){
-  if(!accAskBack('Решение по расходу')) return;
+  if(!await accAskBack('Решение по расходу')) return;
   try{
     const r = await ownerApi.ownerFetch(
       `/api/owner/expenses/extra/${encodeURIComponent(id)}/${action}`,
@@ -15658,7 +15639,7 @@ async function expDecide(driver, id, action){
 }
 
 async function expDelExtra(driver, id){
-  if(!accAskBack('Удаление расхода')) return;
+  if(!await accAskBack('Удаление расхода')) return;
   try{
     const r = await ownerApi.ownerFetch(
       `/api/owner/expenses/extra/${encodeURIComponent(id)}`,
@@ -18939,7 +18920,7 @@ function woNoneBlock(){
 
 async function woNoneSet(on){
   if(on && !confirm(`Отметить, что за ${accDayWord()} ничего не списывали?`)) return;
-  if(!accAskBack('Отметка «списаний не было»')) return;
+  if(!await accAskBack('Отметка «списаний не было»')) return;
   try{
     await ownerApi.ownerFetch('/api/owner/stock/writeoff/none',
       {method:'POST', body:{day: accDay(), on: !!on, as:_meName()}});
@@ -18965,8 +18946,8 @@ async function woNoneSet(on){
 // нет» бессмысленно.
 let WOA = null;      // {kind, item, name, qty, note, photo, thumb, district}
 
-function woAddOpen(){
-  if(!accAskBack('Списание')) return;
+async function woAddOpen(){
+  if(!await accAskBack('Списание')) return;
   WOA = {kind:'бой', item:'', name:'', qty:1, note:'', photo:'', thumb:'',
          district: (STK.districts && STK.districts[0] && STK.districts[0].id) || '', q:''};
   woAddPaint();

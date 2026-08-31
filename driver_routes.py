@@ -845,6 +845,10 @@ async def handle_orders(request):
     return web.json_response({
         "day": day, "active": active, "done": done,
         "total_aed": sum(x["total"] for x in done),
+        # Скрытый режим едет вместе с заказами, а не только при запуске: его
+        # может включить старший с планшета, и ждать перезапуска приложения в
+        # такой момент нельзя. Опрос идёт каждые пять секунд — этого хватает.
+        "panic": bool(await db.panic_get(me["name"])),
     }, headers=CORS_HEADERS)
 
 

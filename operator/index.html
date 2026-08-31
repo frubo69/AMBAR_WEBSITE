@@ -507,6 +507,22 @@ a.oc-row:active{background:var(--card2)}
 .wh-x{margin-left:auto;width:34px;height:34px;flex:0 0 auto;border-radius:10px;
   background:var(--card2);border:1px solid var(--border2);font-size:15px;color:var(--sub)}
 .wh-list{flex:1;overflow-y:auto;padding:0 12px 12px}
+/* Кнопка профиля в строке локатора и само окно профиля. */
+.wh-prof{flex:0 0 auto;width:34px;height:34px;margin-left:6px;border-radius:11px;
+  display:flex;align-items:center;justify-content:center;color:var(--gold2);
+  background:rgba(201,169,110,.08);border:1px solid rgba(201,169,110,.22)}
+.wh-prof:active{transform:scale(.92)}
+.wh-prof-sheet{position:relative;padding:16px;width:min(400px,92vw)}
+.wh-prof-x{display:flex;justify-content:flex-end;margin-bottom:2px}
+.wh-prof-h{display:flex;align-items:center;gap:12px;margin-bottom:16px}
+.wh-prof-av{width:46px;height:46px;flex:0 0 auto;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;font-size:18px;font-weight:700;
+  color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.wh-prof-n{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.wh-prof-n b{font-size:17px;font-weight:700}
+.wh-prof-n i{font-style:normal;font-size:12px;color:var(--muted)}
+.wh-prof-s{margin-top:12px;font-size:12px;color:var(--muted)}
+
 /* Карточка выбранного водителя и метка скрытого режима. Красное здесь одно
    на весь экран и мигает: это единственное состояние, ради которого локатор
    открывают срочно. */
@@ -2436,6 +2452,18 @@ html.hid-boot #gameApp *{visibility:visible}
      список отвечал только на «вчера-позавчера», а всё, что дальше, уходило в
      системное поле даты — другой шрифт, другие правила, чужое окно. Календарь
      здесь тот же, что в панели владельца: одинаковые вещи выглядят одинаково. -->
+<!-- Профиль водителя из локатора. Отдельным окном, а не карточкой в списке:
+     список отвечает «где все», а профиль — «что с этим человеком», и мешать
+     два ответа в одной колонке значит не дать ни одного. -->
+<div class="ov" id="whProfOv" onclick="if(event.target===this)whProfClose()">
+  <div class="sheet wh-prof-sheet">
+    <div class="wh-prof-x"><button class="oc-x" onclick="whProfClose()" aria-label="Закрыть"><svg
+      viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+      stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button></div>
+    <div id="whProfBody"></div>
+  </div>
+</div>
+
 <div class="ov" id="dayOv">
   <div class="dp-sheet">
     <div class="dp-head">
@@ -4504,6 +4532,12 @@ function whRow(r, trackOn){
       <span class="wh-w-v${r.orders ? '' : ' zero'}">${r.orders || r.done || '—'}</span>
       <span class="wh-w-l">${r.orders ? 'в пути' : (r.done ? 'сдал' : 'пусто')}</span>
     </span>
+    <span class="wh-prof" onclick="event.stopPropagation();whProfile('${_esc(r.driver)}')"
+          role="button" aria-label="Профиль">
+      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+        stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="8.5" r="3.6"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>
+    </span>
   </button>`;
 }
 
@@ -4524,8 +4558,7 @@ function whPaint(){
       <span class="ok"><b>${live}</b><i>на связи</i></span>
       <span class="${snap ? '' : 'dim'}"><b>${snap}</b><i>недавно</i></span>
       <span class="${work ? '' : 'dim'}"><b>${work}</b><i>${plural(work,'заказ','заказа','заказов')} в пути</i></span>
-    </div>` + whCard(rows.find(r => r.driver === WH.sel))
-    + rows.map(r => whRow(r, WH.sel === r.driver && trackOn)).join('')
+    </div>` + rows.map(r => whRow(r, WH.sel === r.driver && trackOn)).join('')
     : '<div class="wh-note" style="border:0">Водителей нет</div>')
     + `<div class="wh-note">Точку присылает живая трансляция телеграма — водитель
        включает её сам. Её хватает на восемь часов, дальше бот напомнит. Маршрут
@@ -4622,15 +4655,35 @@ function whSmooth(pts){
 // успел. Старший видит причину по карте и по звонку, и решение принимает он.
 // Снимает тоже он: у водителя на экране игра, и раз режим включили снаружи,
 // то и «опасность прошла» говорит тот, кто её видел.
-function whCard(r){
-  if(!r) return '';
+let WH_PROF = null;
+
+function whProfile(name){
+  WH_PROF = name;
+  haptic('light');
+  whProfPaint();
+  $('whProfOv').classList.add('show');
+}
+
+function whProfClose(){
+  WH_PROF = null;
+  $('whProfOv').classList.remove('show');
+}
+
+function whProfPaint(){
+  const r = ((WH.data || {}).drivers || []).find(x => x.driver === WH_PROF);
+  const box = $('whProfBody'); if(!box) return;
+  if(!r){ box.innerHTML = '<div class="wh-note" style="border:0">Водитель не найден</div>'; return; }
   const st = whState(r);
   const когда = r.has ? (st === 'stream' ? 'на связи сейчас' : 'был ' + whAgo(r.age))
                       : 'не транслирует';
   const где = [r.code, r.name].filter(Boolean).join(' ');
-  return `<div class="wh-card${r.panic ? ' panic' : ''}">
-    <div class="wh-card-h">
-      <span class="wh-card-n">${_esc(r.driver)}</span>
+  box.innerHTML = `
+    <div class="wh-prof-h">
+      <span class="wh-prof-av">${_esc((r.driver || '?').trim().slice(0,1).toUpperCase())}</span>
+      <span class="wh-prof-n">
+        <b>${_esc(r.driver)}</b>
+        <i>${_esc(когда)}</i>
+      </span>
       ${r.panic ? '<span class="wh-card-sos">скрытый режим</span>' : ''}
     </div>
     <div class="wh-card-g">
@@ -4639,11 +4692,11 @@ function whCard(r){
       <span><b>${r.orders || 0}</b><i>везёт</i></span>
       <span><b>${r.done || 0}</b><i>сдал</i></span>
     </div>
-    <div class="wh-card-s">${_esc(когда)}</div>
+    ${r.stream ? `<div class="wh-prof-s">Трансляция ещё ${r.left < 60
+        ? r.left + ' мин' : Math.floor(r.left / 60) + ' ч'}</div>` : ''}
     <button class="wh-card-go${r.panic ? ' off' : ''}"
             onclick="whPanic('${_esc(r.driver)}', ${r.panic ? 'false' : 'true'})">
-      ${r.panic ? 'Снять скрытый режим' : 'Ввести в режим тетриса'}</button>
-  </div>`;
+      ${r.panic ? 'Снять скрытый режим' : 'Ввести в режим тетриса'}</button>`;
 }
 
 async function whPanic(name, on){
@@ -4657,7 +4710,8 @@ async function whPanic(name, on){
   }catch(e){ toast('Не удалось', 'bad'); return; }
   haptic(on ? 'heavy' : 'medium');
   toast(on ? `${name} — скрытый режим включён` : `${name} — режим снят`, 'ok');
-  whereLoad();
+  await whereLoad();
+  if(WH_PROF === name) whProfPaint();
 }
 
 // Тот же вопрос телеграмом, а не браузером: родной confirm внутри мини-аппа

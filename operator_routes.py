@@ -23,6 +23,7 @@ Mounted from api_server.main() like broadcast_routes. Heavy helpers
 lazy-imported inside handlers to avoid circular imports at module load.
 """
 import os, json, time, hmac, hashlib, logging, urllib.parse
+import os as _os        # исторически часть кода зовёт его так
 from pathlib import Path
 from datetime import datetime, timezone, timedelta
 from functools import wraps

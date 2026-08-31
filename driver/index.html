@@ -2790,6 +2790,7 @@ async function boot(){
   // Пять секунд, а не сорок пять: заказ должен появляться на экране почти сразу,
   // как его назначили. Спящую вкладку не опрашиваем — телефон в кармане.
   setInterval(()=>{ if(!document.hidden && !PANIC) load(); }, 5000);
+  setInterval(panicWatch, 10000);
   // Смена и трансляция — раз в полминуты: если трансляция погасла, экран
   // должен закрыться сам, а не ждать, пока водитель что-нибудь нажмёт.
   setInterval(()=>{ if(!document.hidden && !PANIC) shLoad(); }, 30000);
@@ -2959,6 +2960,10 @@ async function load(){
     ]);
     ORDERS = o; EXP = e;
     if(wantSup){ _supAt = Date.now(); if(s) SUP = s; }
+    // Штору мог опустить старший с планшета. Узнаём об этом здесь, а не только
+    // при запуске: между «включил» и «увидел» не должно быть перезапуска
+    // приложения — в такую минуту его никто не делает.
+    if(!!o.panic !== PANIC){ panicRemote(!!o.panic); return; }
   }catch(err){ return; }
   // Заказ, который назначили и который водитель ещё не подтвердил, показываем
   // поверх всего. Первый в очереди — тот, что ждёт дольше.
@@ -5823,6 +5828,28 @@ function pncKnobReset(){
   if(f) f.style.width = '0px';
   if(t){ t.style.opacity = '1'; t.style.filter = 'none'; }
   document.getElementById('pncSlide').classList.remove('drag');
+}
+
+// Режим включили или сняли снаружи — с планшета старшего. Своего запроса не
+// шлём: сервер и так знает, это он нам и сказал.
+function panicRemote(on){
+  PANIC = on;
+  try{ localStorage.setItem('ambar_panic', on ? '1' : '0'); }catch(e){}
+  paintPanic();
+  // Сняли — поднимаем приложение заново: пока шла игра, оно ничего не грузило,
+  // и оживлять его по частям — верный способ забыть одну из частей.
+  if(!on) setTimeout(() => location.reload(), 120);
+}
+
+// Пока штора опущена, приложение молчит — и не узнало бы, что её сняли. Один
+// тихий вопрос в десять секунд: он невидим на экране, а выйти из режима,
+// который включил другой человек, иначе нечем.
+async function panicWatch(){
+  if(!PANIC || document.hidden) return;
+  try{
+    const r = await drvApi.drvFetch('/api/driver/ping');
+    if(!r.panic) panicRemote(false);
+  }catch(e){}
 }
 
 // Включение и выключение — одна дорога, разница только в направлении.

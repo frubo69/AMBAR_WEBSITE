@@ -3383,8 +3383,11 @@ async def handle_checklist(request):
     # написано, кто открылся, а кто закрылся.
     close_since = _chk_at(day, CHK_SHIFT_CLOSE[0], CHK_SHIFT_CLOSE[2])
     closing = now >= close_since
+    # Название задачи — то состояние, которого от неё ждут, как у остальных:
+    # «Поставка принята», «Деньги собраны». Днём ждут открытия, под утро —
+    # закрытия, и одно слово «Смена» на обе половины не отвечало ни на одну.
     shift_row = _chk_row(
-        "shift", "Смена",
+        "shift", "Смена закрыта" if closing else "Смена открыта",
         (f"закрыто {sh['closed']} из {total}" if sh["closed"] < total
          else f"все {total} районов закрылись") if closing
         else (f"открыто {sh['open']} из {total}" if sh["open"] < total

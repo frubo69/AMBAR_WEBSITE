@@ -1479,11 +1479,21 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 /* Шапка — не задача, и выглядеть как задача не должна: она отвечает за весь
    список сразу. Отличает её не рамка потолще, а тёмное золотое стекло — тот
    же приём, что у входа «Кто на каком районе» и у карточек денег. */
-.ck-head{position:relative;padding:20px 18px 18px;border-radius:var(--r);
+.ck-head{position:relative;padding:17px 18px 18px;border-radius:var(--r);
   margin-bottom:12px;overflow:hidden;
   background:linear-gradient(158deg,rgba(201,169,110,.11),rgba(201,169,110,.02) 60%),
              var(--card);
   border:1px solid rgba(201,169,110,.18)}
+/* Всё сделано — карточка меняет облик: золото уступает зелёному, и это видно
+   раньше, чем прочитано число. День закрыт, а не «почти закрыт». */
+.ck-head.all{background:linear-gradient(158deg,rgba(76,175,125,.13),rgba(76,175,125,.02) 60%),
+             var(--card);border-color:rgba(76,175,125,.28)}
+.ck-head.all::before{background:linear-gradient(90deg,transparent,rgba(76,175,125,.5),transparent)}
+.ck-head.all .ck-h-v{color:var(--up)}
+.ck-head.all .ck-track i{background:linear-gradient(90deg,rgba(76,175,125,.7),var(--up))}
+.ck-head.all .ck-h-s{color:var(--up)}
+.ck-h-w{font-size:11px;font-weight:600;letter-spacing:1.1px;text-transform:uppercase;
+  color:var(--muted)}
 /* Золотая нить по верхней кромке — как у карточек денег. */
 .ck-head::before{content:'';position:absolute;left:0;right:0;top:0;height:1px;
   background:linear-gradient(90deg,transparent,rgba(201,169,110,.5),transparent)}
@@ -1492,8 +1502,11 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
   letter-spacing:-1.6px;line-height:1;font-variant-numeric:tabular-nums}
 .ck-h-v u{text-decoration:none;font-size:17px;font-weight:600;color:var(--dim);
   letter-spacing:-.5px}
-.ck-h-l{font-size:11px;font-weight:600;letter-spacing:1.1px;text-transform:uppercase;
-  color:var(--muted)}
+/* Имя карточки — над числом, а не рядом с ним: это заголовок ежедневника, а
+   не подпись к цифре. */
+.ck-h-l{font-size:10.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
+  color:rgba(201,169,110,.75);margin-bottom:11px}
+.ck-head.all .ck-h-l{color:rgba(76,175,125,.8)}
 /* Одна дорожка, одна заливка. Полоска из клеток читалась как леденец: семь
    кусков четырёх цветов вместо ответа «сколько сделано». */
 .ck-track{height:3px;border-radius:2px;margin:16px 0 12px;
@@ -1501,10 +1514,8 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .ck-track i{display:block;height:100%;border-radius:2px;
   background:linear-gradient(90deg,var(--gold),var(--gold2));
   transition:width .5s var(--e1)}
-.ck-h-s{display:flex;align-items:baseline;justify-content:space-between;gap:14px;
-  font-size:12px;color:var(--muted)}
-.ck-h-s b{font-weight:600;color:var(--text)}
-.ck-h-s .late{color:var(--dn)}
+.ck-h-s{font-size:12px;color:var(--muted)}
+.ck-h-s b{font-weight:700;color:var(--text)}
 
 .ck-list{display:flex;flex-direction:column;gap:8px}
 .ck-r{display:flex;align-items:center;gap:14px;width:100%;padding:17px 16px;
@@ -1518,10 +1529,18 @@ button{font-family:inherit;border:none;background:none;color:inherit;cursor:poin
 .ck-r.done{opacity:.7}
 /* Светофор. Три цвета и один размер: красный — просрочено, жёлтый — пора,
    зелёный — сделано, серый — ещё впереди. */
-.ck-dot{flex:0 0 auto;width:9px;height:9px;border-radius:50%;background:var(--dim)}
-.ck-r.late .ck-dot{background:var(--dn)}
-.ck-r.now  .ck-dot{background:var(--warn)}
-.ck-r.done .ck-dot{background:var(--up)}
+/* Кружок с галочкой или крестиком: сделано — зелёная галочка, не сделано —
+   крестик того цвета, каким задача горит. Точка без значка отвечала только
+   цветом, а «выполнено» и «не выполнено» — разные вещи, а не оттенки. */
+.ck-dot{flex:0 0 auto;width:22px;height:22px;border-radius:50%;display:grid;
+  place-items:center;color:var(--dim);background:rgba(255,255,255,.05);
+  box-shadow:inset 0 0 0 1px var(--border3)}
+.ck-r.late .ck-dot{color:var(--dn);background:rgba(224,85,85,.1);
+  box-shadow:inset 0 0 0 1px rgba(224,85,85,.4)}
+.ck-r.now  .ck-dot{color:var(--warn);background:rgba(243,180,74,.1);
+  box-shadow:inset 0 0 0 1px rgba(243,180,74,.38)}
+.ck-r.done .ck-dot{color:var(--up);background:rgba(76,175,125,.12);
+  box-shadow:inset 0 0 0 1px rgba(76,175,125,.35)}
 .ck-b{flex:1;min-width:0}
 .ck-t{display:block;font-size:16px;font-weight:600;line-height:1.25;
   letter-spacing:-.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -3551,10 +3570,16 @@ button.path:active{transform:scale(.995)}
    читались как подпись, а не как начало новой группы, и список из одиннадцати
    человек шёл сплошняком. Теперь шапка та же, что у «Кого проверяем»: код
    района плашкой, название золотом, справа сколько людей и сколько привезли. */
-.team-grp{display:flex;align-items:center;gap:10px;margin:16px 0 8px;
-  padding:10px 12px;border-radius:13px;background:var(--gold-soft);
-  border:1px solid rgba(201,169,110,.22)}
-.list .team-grp:first-child{margin-top:2px}
+.team-card{margin-bottom:10px;border-radius:16px;background:var(--card);
+  border:1px solid var(--border2);overflow:hidden}
+.team-grp{display:flex;align-items:center;gap:10px;padding:11px 13px;
+  background:var(--gold-soft);border-bottom:1px solid rgba(201,169,110,.22)}
+/* Строки внутри карточки — не плитки: своей заливки и рамки у них нет, их
+   делит тонкая черта. */
+.team-card .lrow{background:transparent;border:0;border-radius:0;
+  border-top:1px solid var(--border2)}
+.team-card .lrow:first-of-type{border-top:0}
+.team-card .lrow:active{background:var(--card2)}
 .team-grp-c{flex:0 0 auto;width:30px;height:30px;border-radius:9px;display:flex;
   align-items:center;justify-content:center;font-family:'DM Sans',sans-serif;
   font-size:11px;font-weight:700;color:#1a1408;
@@ -9691,6 +9716,8 @@ function dayStep(delta){
   DAY_OFFSET = next;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   _heroFlip(delta).then(()=>_paintDay(p));
+  // Команда считается за тот же день, что и выручка над ней.
+  if(typeof loadOperators === 'function' && window.ownerApi) loadOperators();
   return true;
 }
 
@@ -9701,6 +9728,7 @@ function dayReset(){
   DAY_OFFSET = 0;
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('medium'); }catch(e){}
   _heroFlip(-1).then(()=>_paintDay(p));
+  if(typeof loadOperators === 'function' && window.ownerApi) loadOperators();
 }
 
 // Свайп по карточке выручки: слева направо — предыдущий день, обратно — к сегодня.
@@ -12268,26 +12296,23 @@ function chkRender(){
   _setText('accSub', d.time ? `сейчас ${d.time}` : '');
   // Шапка отвечает одним взглядом: горит или нет. Число впереди — то, за чем
   // сюда и заходят.
-  // Одна дорожка: сколько закрыто из скольких. Ниже — то, чего в списке не
-  // видно с одного взгляда: сколько горит и что наступает следующим по
-  // времени, потому что строки идут по важности, а не по часам.
-  const впереди = rows.filter(r => r.state !== 'done' && r.due)
-    .sort((a, b) => String(a.due_at || '').localeCompare(String(b.due_at || '')))[0];
+  // Ежедневник, а не сводка: сверху одна большая задача — смена, — под ней
+  // подзадачи. Поэтому у карточки есть имя, счёт сделанного и полоса, и
+  // ничего сверх: срок ближайшей задачи стоял справа и спорил с числом слева.
+  const всё = rows.length && (c.done || 0) >= rows.length;
+  const осталось = Math.max(0, rows.length - (c.done || 0));
   const доля = rows.length ? Math.round((c.done || 0) / rows.length * 100) : 0;
-  const head = `<div class="ck-head">
+  const head = `<div class="ck-head${всё ? ' all' : ''}">
+    <div class="ck-h-l">Статус смены</div>
     <div class="ck-h-n">
       <span class="ck-h-v">${c.done || 0}<u>/${rows.length}</u></span>
-      <span class="ck-h-l">закрыто</span>
+      <span class="ck-h-w">${всё ? 'смена закрыта' : 'сделано'}</span>
     </div>
     <div class="ck-track"><i style="width:${доля}%"></i></div>
-    <div class="ck-h-s">
-      <span>${c.late ? `<b class="late">${c.late}</b> ${
-        pluralize(c.late,'опаздывает','опаздывают','опаздывают')}`
-        : (c.now ? `<b>${c.now}</b> ${pluralize(c.now,'ждёт','ждут','ждут')}`
-                 : 'всё по расписанию')}</span>
-      ${впереди ? `<span>${escS(впереди.t.toLowerCase())} · <b>${
-        escS(впереди.due)}</b></span>` : ''}
-    </div>
+    <div class="ck-h-s">${всё
+      ? 'все задачи выполнены'
+      : `<b>${осталось}</b> ${pluralize(осталось,'задача не выполнена',
+          'задачи не выполнены','задач не выполнено')}`}</div>
   </div>`;
 
   // Пояснение под списком убрано: оно объясняло словами то, что видно
@@ -12306,7 +12331,11 @@ function chkRow(r){
   const справа = r.state === 'done' ? 'готово'
     : (r.state === 'late' ? (late ? `+${late}` : 'просрочено') : 'к ' + r.due);
   return `<button class="ck-r ${st.c}" onclick="chkGo('${escS(r.go)}')">
-    <span class="ck-dot"></span>
+    <span class="ck-dot">${r.state === 'done'
+      ? `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"
+           stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`
+      : `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
+           stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`}</span>
     <span class="ck-b">
       <span class="ck-t">${escS(r.t)}</span>
       <span class="ck-s">${escS(r.s)}</span>
@@ -19991,9 +20020,13 @@ async function loadOperators(){
   OPS.loading = true; OPS.err = '';
   renderOperators();
   try{
-    OPS.data = await ownerApi.ownerFetch('/api/owner/operators', {params:{period:p}});
+    // День берём тот, что выбран на странице. Раньше сюда уходил только
+    // период — и, листая вчерашний день, человек видел нули у всех, хотя
+    // сверху стояли одиннадцать заказов: сервер отвечал про сегодня.
+    OPS.data = await ownerApi.ownerFetch('/api/owner/operators',
+      {params:{period:p, ...(DAY_OFFSET ? {day_offset: DAY_OFFSET} : {})}});
     if(!CREW) crewLoad();          // подпись «кто на каком районе» на входе
-    OPS.period = p;
+    OPS.period = p; OPS.day = DAY_OFFSET;
   }catch(e){ OPS.err = 'Не удалось загрузить'; }
   OPS.loading = false;
   renderOperators();
@@ -20167,12 +20200,18 @@ function renderOperators(){
       const mine = ops.filter(d => (d.districts.length ? d.districts.map(x=>x.id) : ['none']).includes(g.id));
       const aed = mine.reduce((s,d)=>s+d.aed, 0);
       const op = mine.find(d=>d.operator)?.operator || '';
-      return `<div class="team-grp">
+      // Район и его люди — одна карточка, а не заголовок и отдельные плитки
+      // под ним: это один список, и разрывать его белым полем между шапкой и
+      // первой строкой значит собирать его обратно глазами.
+      return `<div class="team-card">
+        <div class="team-grp">
           <span class="team-grp-c">${escS(g.code)}</span>
           <span class="team-grp-n">${escS(g.name || '')} <u>(${mine.length} ${
             pluralize(mine.length,'водитель','водителя','водителей')})</u></span>
           <span class="team-grp-m">${fmt(aed)} AED</span>
-        </div>` + mine.map((d,i)=>row(d,i)).join('');
+        </div>
+        ${mine.map((d,i)=>row(d,i)).join('')}
+      </div>`;
     }).join('');
   } else {
     list.innerHTML = ops.map((op,i)=>row(op,i)).join('');

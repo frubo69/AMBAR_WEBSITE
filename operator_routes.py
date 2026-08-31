@@ -627,6 +627,10 @@ async def handle_ping(request):
         # Кто может встать за планшет. Список решает и то, что человек увидит:
         # выбрал себя — видишь свои районы, выбрал старшего — все.
         "people": _people(_d),
+        # А если устройство принадлежит конкретному оператору — выбирать нечего:
+        # телефон у человека один и всегда его. Список остаётся для планшета,
+        # за который садятся по очереди.
+        "pinned": _staff_mod.operator_by_tg(request["op_user"].get("id")),
         "server_time": datetime.now(timezone.utc).isoformat(),
     }, headers=CORS_HEADERS)
 

@@ -2315,7 +2315,7 @@ html.hid-boot #gameApp *{visibility:visible}
           id="supCnt">Поддержка</span></button>
       </div>
       <div class="hdr-grp">
-        <button class="pill" id="dispatchBtn" onclick="showOv('opOv')"><svg class="ic"
+        <button class="pill" id="dispatchBtn"><svg class="ic"
           viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.4"/><path d="M5 20c1.2-3.6 4-5.4 7-5.4s5.8 1.8 7 5.4"/></svg><span>Оператор</span></button>
         <button class="pill" id="dayBtn" onclick="dayOpen()"><svg class="ic" viewBox="0 0 24 24"
           aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2.5"/><path d="M8 3v4M16 3v4M3.5 10h17"/></svg><span
@@ -2954,7 +2954,18 @@ const FALLBACK_DISTRICTS=[
   {id:'alguses', code:'B4', name:'Алгусес',    operator:'Фарух',     drivers:['Сунат','Даврон']},
   {id:'tecom',   code:'B5', name:'Тиком',      operator:'Умар',      drivers:['Файзуло','Алишер']},
 ];
-let DISTRICTS=[], curOp='', curDist='', curDriver='';
+let DISTRICTS=[], curOp='', curDist='', curDriver='', PINNED='';
+
+// Планшет или телефон. Не по ширине окна: планшет в вертикальной ориентации
+// уже телефона, а работают на нём именно как на планшете. Спрашиваем сам
+// телеграм, а если он молчит — судим по ширине.
+function _wideDevice(){
+  try{
+    const p = String((tg && tg.platform) || '');
+    if(p) return /tdesktop|macos|weba|webk|unigram|ipad/.test(p) || Math.min(screen.width, screen.height) >= 700;
+  }catch(e){}
+  return Math.min(window.innerWidth, window.innerHeight) >= 700;
+}
 // Водитель, который стоит в самом заказе. Он не всегда есть в списке своего
 // района: водителя могли перевести на другой район, район заказа могли
 // поменять, а бывает и просто «сегодня везёт он». Такого водителя всё равно
@@ -2993,8 +3004,17 @@ async function boot(){
     PEOPLE = r.people || DISTRICTS.map(d=>({name:d.operator,senior:false,districts:[d.id]}));
     // Имя оператора хранится на устройстве, а оно привязано к адресу: после
     // переезда панель открывалась пустой. Сервер имя знает — берём его.
-    try{ curOp = localStorage.getItem('pos_op') || r.operator || ''; }catch(e){ curOp = r.operator || ''; }
-    if(!PEOPLE.some(p=>p.name===curOp)) curOp='';
+    // Устройство закреплено за человеком — выбирать нечего: телефон у него
+    // один и всегда его. Планшет закреплённым не бывает: за него садятся по
+    // очереди, и там список остаётся.
+    PINNED = r.pinned || '';
+    if(PINNED && !_wideDevice()){
+      curOp = PINNED;
+      try{ localStorage.setItem('pos_op', curOp); }catch(e){}
+    }else{
+      try{ curOp = localStorage.getItem('pos_op') || r.operator || ''; }catch(e){ curOp = r.operator || ''; }
+    }
+    if(!PEOPLE.some(p=>p.name===curOp)) curOp = PINNED && !_wideDevice() ? PINNED : '';
     renderDispatch();
     dayPaint();
     $('gate').classList.add('hidden');
@@ -3013,7 +3033,7 @@ async function boot(){
     loadSup(); loadFeed();
     setInterval(()=>{ if(!document.hidden && !$('supOv').classList.contains('show')) loadSup(); }, 25000);
     setInterval(()=>{ if(!document.hidden && !$('fdOv').classList.contains('show')) loadFeed(); }, 15000);
-    if(!curOp) showOv('opOv');
+    if(!curOp && !PINNED) showOv('opOv');
     // Связь держим открытой всю смену: входящий должен доходить и тогда, когда
     // окно связи закрыто, а оператор занят заказом.
     try{ callInit(); }catch(e){}
@@ -3051,8 +3071,15 @@ function _dist(id){ return DISTRICTS.find(d=>d.id===id); }
 function renderDispatch(){
   // header chip
   const b=$('dispatchBtn');
-  if(b) b.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20a8 8 0 0 1 16 0"/><circle cx="12" cy="8" r="4"/></svg>'
-    + '<span>' + (curOp ? _esc(curOp) : 'Выберите оператора') + '</span>';
+  const закреплён = !!PINNED && !_wideDevice();
+  if(b){
+    b.innerHTML = '<svg class="ic" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 20a8 8 0 0 1 16 0"/><circle cx="12" cy="8" r="4"/></svg>'
+      + '<span>' + (curOp ? _esc(curOp) : 'Выберите оператора') + '</span>';
+    // На закреплённом устройстве кнопка остаётся подписью, а не выбором:
+    // нажимать её незачем, и открытый список только сбивал бы.
+    b.onclick = закреплён ? null : () => showOv('opOv');
+    b.style.opacity = закреплён ? '.75' : '';
+  }
   // operator sheet
   const ol=$('opList');
   if(ol && !_ops().length)

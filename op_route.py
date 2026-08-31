@@ -62,23 +62,29 @@ async def chats(district: str = "") -> list:
     out, взято = [], set()
 
     свой = staff.base_operator(district) if district else ""
-    свой_чат = staff.operator_tg(свой) if свой else 0
+    свои_чаты = staff.operator_chats(свой) if свой else []
 
-    if свой_чат and not await hidden(свой):
-        out.append({"chat_id": свой_чат, "prefix": ""})
-        взято.add(свой_чат)
-    elif свой_чат:
+    if свои_чаты and not await hidden(свой):
+        # Все устройства этого оператора: он мог сесть за любое из них, и
+        # угадывать, за каким он сейчас, — значит иногда не показать заказ.
+        for чат in свои_чаты:
+            out.append({"chat_id": чат, "prefix": ""})
+            взято.add(чат)
+    elif свои_чаты:
         # Свой спрятался — ищем ближайшего, кто на связи. Порядок задаёт
         # география, а не список: подменять должен сосед, а не дальний угол.
         for сосед in nearest_offices(district):
             имя = staff.base_operator(сосед)
-            чат = staff.operator_tg(имя) if имя else 0
-            if not чат or чат in взято or await hidden(имя):
+            чаты = staff.operator_chats(имя) if имя else []
+            if not чаты or await hidden(имя):
                 continue
             где = f"{OFFICE_CODES.get(district, '')} {OFFICE_NAMES.get(district, district)}".strip()
-            out.append({"chat_id": чат, "prefix":
-                        f"↪️ <b>Заказ района {где}</b> — его оператор сейчас недоступен\n"})
-            взято.add(чат)
+            for чат in чаты:
+                if чат in взято:
+                    continue
+                out.append({"chat_id": чат, "prefix":
+                            f"↪️ <b>Заказ района {где}</b> — его оператор сейчас недоступен\n"})
+                взято.add(чат)
             break
         else:
             log.warning(f"[route] {district}: подменить некому, заказ только старшему")

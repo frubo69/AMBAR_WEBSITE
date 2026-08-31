@@ -98,26 +98,49 @@ DRIVER_BY_TG = {v: k for k, v in DRIVER_IDS.items()}
 # подпись. Как только у него появляется id, он становится адресатом: заказ
 # своего района приходит ему, а не всем сразу.
 #
-#   AMBAR_OPERATOR_IDS="Умар:123456789,Джанабиль:987654321"
+#   AMBAR_OPERATOR_IDS="123456789:Умар,987654321:Джанабиль,555000111:Умар"
+#
+# Ключ — id, а не имя, и это не мелочь: один человек садится за разные
+# устройства (у B2 их два), а имя у него одно. Обратный порядок молча терял бы
+# второе устройство того же оператора.
 #
 # Пусто — работает как раньше: всё уходит старшему и на планшет.
-OPERATOR_IDS_BY_NAME = _parse_driver_ids(_os.getenv("AMBAR_OPERATOR_IDS", ""))
+def _parse_operator_ids(raw: str) -> dict:
+    out = {}
+    for part in (raw or "").split(","):
+        part = part.strip()
+        if not part or ":" not in part:
+            continue
+        tid, _, name = part.partition(":")
+        tid, name = tid.strip(), name.strip()
+        if tid.isdigit() and name:
+            out[int(tid)] = name
+    return out
+
+
+OPERATOR_BY_ID = _parse_operator_ids(_os.getenv("AMBAR_OPERATOR_IDS", ""))
+
+
+def operator_chats(name: str) -> list:
+    """Все устройства этого оператора. Пусто — своего входа у него нет."""
+    имя = (name or "").strip()
+    return [tid for tid, n in OPERATOR_BY_ID.items() if n == имя]
 
 
 def operator_tg(name: str) -> int:
-    """Телеграм районного оператора; 0 — своего входа у него нет."""
-    return int(OPERATOR_IDS_BY_NAME.get((name or "").strip()) or 0)
+    """Первое устройство оператора — там, где нужен один адресат."""
+    ч = operator_chats(name)
+    return ч[0] if ч else 0
 
 
 def operator_by_tg(telegram_id) -> str:
-    """Кто это по id: районный оператор или пусто."""
+    """Кто это по id: районный оператор, старший или пусто."""
     try:
         tid = int(telegram_id or 0)
     except (TypeError, ValueError):
         return ""
-    for имя, i in OPERATOR_IDS_BY_NAME.items():
-        if int(i) == tid:
-            return имя
+    if tid in OPERATOR_BY_ID:
+        return OPERATOR_BY_ID[tid]
     for s in SENIOR_OPERATORS:
         if int(s.get("telegram_id") or 0) == tid:
             return s["name"]

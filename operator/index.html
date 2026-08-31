@@ -4394,6 +4394,7 @@ function whereClose(){
 }
 
 async function whereLoad(){
+  if(PANIC) return;              // спрятаны — в сеть не ходим
   let d;
   try{
     d = await opApi.opFetch('/api/operator/where',
@@ -5147,6 +5148,7 @@ function fdBadge(){
   b.classList.toggle('has', n>0);
 }
 async function loadFeed(){
+  if(PANIC) return;              // спрятаны — в сеть не ходим
   if(!curOp) return;
   try{ FEED = await opApi.opFetch('/api/operator/feed',{params:{as:curOp}}); }catch(e){ return; }
   fdBadge();
@@ -5223,6 +5225,7 @@ function supCounts(){
 }
 
 async function loadSup(){
+  if(PANIC) return;              // спрятаны — в сеть не ходим
   try{ SUP = await opApi.opFetch('/api/operator/support'); }catch(e){ return; }
   supBadge();
   if($('supOv').classList.contains('show') && SUP_TAB==='clients') supList();

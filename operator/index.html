@@ -502,13 +502,16 @@ a.oc-row:active{background:var(--card2)}
 .wh{display:flex;width:min(1280px,96vw);height:min(820px,92vh);border-radius:20px;
   overflow:hidden;background:var(--bg3);border:1px solid var(--border3);
   box-shadow:0 24px 80px rgba(0,0,0,.7)}
-.wh-side{width:290px;flex:0 0 auto;display:flex;flex-direction:column;
+.wh-side{width:360px;flex:0 0 auto;display:flex;flex-direction:column;
   border-right:1px solid var(--border2)}
 .wh-hd{display:flex;align-items:flex-start;gap:10px;padding:18px 18px 12px}
 .wh-hd .t{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700}
 .wh-hd .s{font-size:12px;color:var(--sub);margin-top:3px}
 .wh-x{margin-left:auto;width:34px;height:34px;flex:0 0 auto;border-radius:10px;
-  background:var(--card2);border:1px solid var(--border2);font-size:15px;color:var(--sub)}
+  display:flex;align-items:center;justify-content:center;cursor:pointer;
+  background:var(--card2);border:1px solid var(--border2);color:var(--sub);
+  transition:transform .14s var(--e1),background-color .14s var(--e1),color .14s var(--e1)}
+.wh-x:active{transform:scale(.9);color:var(--text)}
 .wh-list{flex:1;overflow-y:auto;padding:0 12px 12px}
 /* Список «Ещё» на телефоне. */
 .more-sheet{width:min(400px,92vw)}
@@ -568,13 +571,28 @@ a.oc-row:active{background:var(--card2)}
 .wh-card-go.off{color:var(--text);background:var(--card2);border:1px solid var(--border3)}
 .wh-r.panic{border-color:rgba(224,85,85,.4);background:rgba(224,85,85,.07)}
 .wh-r.panic .wh-n u{color:var(--dn)}
-.wh-sos{display:block;width:11px;height:11px;border-radius:50%;background:var(--dn);
-  animation:whSos 1.1s ease-in-out infinite}
-@keyframes whSos{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(224,85,85,.55)}
-  50%{opacity:.35;box-shadow:0 0 0 7px rgba(224,85,85,0)}}
-@media (prefers-reduced-motion: reduce){.wh-sos{animation:none}}
+/* Мигает точка и расходится кольцо — то и другое двигает композитор.
+   Раньше кольцо рисовалось растущей тенью: каждый кадр перекрашивал полосу
+   списка целиком, и на телефоне это чувствовалось. */
+.wh-sos{position:relative;display:block;width:11px;height:11px;border-radius:50%;
+  background:var(--dn);animation:whSosD 1.1s var(--e1) infinite}
+.wh-sos::after{content:'';position:absolute;inset:0;border-radius:50%;
+  border:1.5px solid rgba(224,85,85,.6);animation:whSosR 1.6s var(--e1) infinite}
+@keyframes whSosD{0%,100%{opacity:1}50%{opacity:.42}}
+@keyframes whSosR{from{transform:scale(1);opacity:.6}to{transform:scale(2.6);opacity:0}}
+@media (prefers-reduced-motion: reduce){.wh-sos,.wh-sos::after{animation:none}}
 .wh-note{padding:12px 18px 16px;font-size:11px;line-height:1.45;color:var(--dim);
   border-top:1px solid var(--border2)}
+/* Вернуться к общему виду. Появилась, когда карта перестала подгоняться сама
+   каждые десять секунд: без неё уехавший вид не вернуть, не закрыв окно. */
+.wh-home{position:absolute;z-index:900;right:14px;top:calc(14px + var(--safe-top,0px));
+  width:40px;height:40px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;cursor:pointer;color:#fff;
+  background:rgba(16,17,24,.62);border:1px solid rgba(255,255,255,.13);
+  -webkit-backdrop-filter:blur(16px);backdrop-filter:blur(16px);
+  box-shadow:0 6px 18px rgba(0,0,0,.4);
+  transition:transform .14s var(--e1),background-color .14s var(--e1)}
+.wh-home:active{transform:scale(.9);background:rgba(16,17,24,.8)}
 .wh-map{flex:1;min-width:0;position:relative;background:#0b0e18}
 
 /* ── Карта на телефоне ───────────────────────────────────────────────────
@@ -589,32 +607,98 @@ a.oc-row:active{background:var(--card2)}
    возвращают. Выбрал водителя — шторка сама уходит на половину: значит,
    смотреть будут на карту.                                              */
 @media (max-width:760px){
-  #whereOv{align-items:stretch;justify-content:stretch;padding:0;backdrop-filter:none}
+  #whereOv{align-items:stretch;justify-content:stretch;padding:0;
+    background:#000;backdrop-filter:none}
   #whereOv .wh{display:block;position:relative;width:100vw;height:100dvh;
     border-radius:0;border:none;box-shadow:none}
   #whereOv .wh-map{position:absolute;inset:0;z-index:0}
+  /* Шторка — материал поверх карты, а не вторая половина экрана: карта сквозь
+     неё угадывается, и видно, что она никуда не делась. Перехода тут нет
+     намеренно — шторку двигает пружина покадрово, а переход с длительностью
+     нельзя поймать пальцем на лету. */
   #whereOv .wh-side{position:absolute;left:0;right:0;bottom:0;top:auto;z-index:6;
-    width:auto;height:86dvh;border-right:none;border-top:1px solid var(--border2);
-    border-radius:18px 18px 0 0;background:rgba(10,10,16,.92);
-    -webkit-backdrop-filter:blur(24px);backdrop-filter:blur(24px);
-    box-shadow:0 -12px 40px rgba(0,0,0,.55);
-    transform:translateY(0);transition:transform .34s cubic-bezier(.32,.72,0,1);
-    touch-action:none}
-  #whereOv .wh-side.drag{transition:none}
+    width:auto;height:88dvh;border-right:none;
+    border-top:1px solid rgba(255,255,255,.11);
+    border-radius:22px 22px 0 0;background:rgba(12,13,20,.72);
+    -webkit-backdrop-filter:blur(32px) saturate(170%);
+    backdrop-filter:blur(32px) saturate(170%);
+    box-shadow:0 -20px 55px rgba(0,0,0,.55);
+    transform:translate3d(0,0,0);will-change:transform;
+    touch-action:none;overscroll-behavior:contain}
   /* Шапка — она же ручка: за неё тянут, и она всегда на виду. */
-  #whereOv .wh-hd{padding:8px 16px 12px;cursor:grab;user-select:none;
-    -webkit-user-select:none;position:relative}
-  #whereOv .wh-hd::before{content:'';position:absolute;left:50%;top:5px;
-    width:38px;height:4px;margin-left:-19px;border-radius:2px;
-    background:rgba(255,255,255,.22)}
-  #whereOv .wh-hd > div:first-child{margin-top:6px}
-  #whereOv .wh-list{padding:0 12px calc(24px + var(--safe-bottom));touch-action:pan-y}
+  #whereOv .wh-hd{padding:15px 14px 11px;cursor:grab;user-select:none;
+    -webkit-user-select:none;position:relative;align-items:center;gap:10px}
+  #whereOv .wh-hd::before{content:'';position:absolute;left:50%;top:6px;
+    width:36px;height:5px;margin-left:-18px;border-radius:3px;
+    background:rgba(255,255,255,.26)}
+  #whereOv .wh-hd > div:first-child{margin-top:2px;min-width:0}
+  /* Крупный текст тем теснее, чем он крупнее: одна и та же разрядка на 20 и
+     на 10 пикселях всегда неправа в одном из двух мест. */
+  #whereOv .wh-hd .t{font-size:20px;letter-spacing:-.02em;line-height:1.1}
+  #whereOv .wh-hd .s{font-size:12.5px;letter-spacing:.005em;margin-top:4px;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  #whereOv .wh-x{width:40px;height:40px;border-radius:50%;color:#fff;
+    background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.11)}
+  #whereOv .wh-x:active{background:rgba(255,255,255,.17)}
+  /* Список уходит под шапку размытием, а не упирается в линейку: край
+     показывает, что там есть продолжение, и не режет экран пополам. */
+  #whereOv .wh-list{padding:2px 12px calc(24px + var(--safe-bottom));
+    touch-action:pan-y;overscroll-behavior:contain;
+    -webkit-mask-image:linear-gradient(to bottom,transparent 0,#000 14px);
+    mask-image:linear-gradient(to bottom,transparent 0,#000 14px)}
   /* Объяснение про трансляцию на телефоне уводим: место дороже, а правило
      то же самое написано у водителя в его приложении. */
   #whereOv .wh-side > .wh-note{display:none}
-  /* Кнопка «на весь экран» карте не нужна — она и так во весь экран. */
-  #whereOv .wh-x{width:38px;height:38px}
+  /* Свёрнута до ручки — список не мешает пальцу возить карту. */
+  #whereOv .wh-side.peek .wh-list{pointer-events:none}
+  /* Строки внутри стекла не делаем вторым стеклом: светлое на светлом
+     съедает текст. Заливка глухая, граница — волосок. */
+  #whereOv .wh-r{background:rgba(255,255,255,.05);border-color:rgba(255,255,255,.09)}
+  #whereOv .wh-r.off{background:rgba(255,255,255,.025)}
+  #whereOv .wh-sum span{background:rgba(255,255,255,.05);
+    border-color:rgba(255,255,255,.09)}
+  /* Строка на телефоне: имя, состояние, счёт и профиль — четыре колонки на
+     375 точек. Поэтому отступы уже, а обрезает многоточие, а не перенос. */
+  #whereOv .wh-r{gap:10px;padding:12px 11px}
+  #whereOv .wh-w{min-width:44px}
+  #whereOv .wh-prof{width:38px;height:38px;margin-left:2px}
+  /* Сквозь размытие серое по серому не читается: подписи тут контрастнее и
+     чуть тяжелее — это не украшение, а разборчивость. */
+  #whereOv .wh-s{color:rgba(255,255,255,.62)}
+  #whereOv .wh-n u,#whereOv .wh-w-l,#whereOv .wh-sum i{color:rgba(255,255,255,.55)}
+  /* Кто выбран — это видно и со свёрнутой шторкой: иначе на полной карте
+     маршрут есть, а чей он — нет. */
+  #whereOv .wh-selbar.on{display:flex}
 }
+/* Стекло держится на прозрачности; кому она мешает — тому глухой фон. */
+@media (max-width:760px) and (prefers-reduced-transparency: reduce){
+  #whereOv .wh-side{background:#0c0d14;
+    -webkit-backdrop-filter:none;backdrop-filter:none}
+}
+@media (max-width:760px) and (prefers-contrast: more){
+  #whereOv .wh-side{background:#08090e}
+  #whereOv .wh-r{border-color:rgba(255,255,255,.3)}
+}
+
+/* Полоса выбранного водителя. Живёт под шапкой и вместе с ней остаётся на
+   виду, когда шторку свернули: имя, состояние связи и крестик — снять выбор,
+   не разворачивая список. */
+.wh-selbar{display:none;align-items:center;gap:10px;margin:0 14px 11px;
+  padding:9px 9px 9px 12px;border-radius:15px;
+  background:rgba(201,169,110,.11);border:1px solid rgba(201,169,110,.26)}
+.wh-sel-d{width:9px;height:9px;flex:0 0 auto;border-radius:50%;background:var(--dim)}
+.wh-sel-d.stream{background:#3ddc84}
+.wh-sel-d.snap{background:var(--gold2)}
+.wh-sel-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px}
+.wh-sel-b b{font-size:13.5px;font-weight:600;letter-spacing:-.005em;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wh-sel-b i{font-style:normal;font-size:11px;color:rgba(255,255,255,.6);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wh-sel-x{width:34px;height:34px;flex:0 0 auto;border-radius:50%;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;color:var(--gold2);
+  background:rgba(201,169,110,.14);border:1px solid rgba(201,169,110,.22);
+  transition:transform .14s var(--e1),background-color .14s var(--e1)}
+.wh-sel-x:active{transform:scale(.9);background:rgba(201,169,110,.24)}
 #whMap{position:absolute;inset:0}
 /* Тайлы гасим тем же фильтром, что и в клиентском приложении: светлая карта
    посреди тёмной панели бьёт по глазам в ночную смену. */
@@ -631,8 +715,12 @@ a.oc-row:active{background:var(--card2)}
 .wh-r{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;
   margin-bottom:8px;border-radius:15px;text-align:left;cursor:pointer;
   font-family:inherit;color:var(--text);background:var(--card);
-  border:1px solid var(--border2);transition:border-color .18s var(--e1),
-  background .18s var(--e1)}
+  border:1px solid var(--border2);
+  transition:transform .16s var(--e1),border-color .18s var(--e1),
+  background-color .18s var(--e1)}
+/* Отклик на касании, а не на отпускании: пока палец держит строку, она уже
+   поддалась. Всё, что ждёт click, читается как задержка. */
+.wh-r:active{transform:scale(.985)}
 .wh-r.on{border-color:rgba(201,169,110,.5);
   background:linear-gradient(160deg,rgba(201,169,110,.09),transparent 60%),var(--card2)}
 .wh-r.off{background:var(--bg3)}
@@ -656,11 +744,18 @@ a.oc-row:active{background:var(--card2)}
 @media (prefers-reduced-motion:reduce){.wh-r.live .wh-i::after{animation:none}}
 .wh-b{flex:1;min-width:0}
 .wh-n{display:flex;align-items:baseline;gap:7px;font-size:14.5px;font-weight:600;
-  line-height:1.2}
-.wh-n u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;
-  font-weight:700;letter-spacing:.6px;color:var(--muted)}
-.wh-s{display:flex;align-items:center;gap:5px;font-size:11.5px;color:var(--muted);
-  margin-top:4px;line-height:1.25}
+  line-height:1.2;letter-spacing:-.005em}
+/* Строка должна оставаться одной строкой, иначе список перестаёт читаться
+   столбцами. Когда места не хватает, первым сжимается район: «B1 Mar…» ещё
+   узнаётся, «Фа…» вместо имени — уже нет. */
+.wh-nm{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.wh-n u{flex:0 1 auto;min-width:0;flex-shrink:6;text-decoration:none;
+  font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;
+  letter-spacing:.6px;color:var(--muted);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wh-s{display:block;font-size:11.5px;color:var(--muted);margin-top:4px;
+  line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wh-s b{color:#3ddc84;font-weight:600}
 .wh-s i{font-style:normal;color:var(--dim)}
 /* Сколько заказов на руках — то, ради чего в этот список и смотрят перед тем,
@@ -2438,15 +2533,24 @@ html.hid-boot #gameApp *{visibility:visible}
           <div class="t">Где водители</div>
           <div class="s" id="whSub">—</div>
         </div>
-        <button class="wh-x" onclick="whereClose()" aria-label="Закрыть">✕</button>
+        <button class="wh-x" onclick="whereClose()" aria-label="Закрыть"><svg
+          viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+          stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
       </div>
+      <div class="wh-selbar" id="whSelBar"></div>
       <div class="wh-list" id="whList"></div>
       <div class="wh-note">
         Точка приходит живой трансляцией: водитель включает её сам и видит у
         себя в чате. Маршрут за смену стирается при её закрытии.
       </div>
     </div>
-    <div class="wh-map"><div id="whMap"></div></div>
+    <div class="wh-map"><div id="whMap"></div>
+      <button class="wh-home" onclick="whHome()" aria-label="Показать всех"><svg
+        viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+        stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="12" r="3.2"/><circle cx="12" cy="12" r="7.6"/>
+        <path d="M12 1.6v2.6M12 19.8v2.6M1.6 12h2.6M19.8 12h2.6"/></svg></button>
+    </div>
   </div>
 </div>
 
@@ -4509,10 +4613,11 @@ const WH_MS = 10000;
 async function whereOpen(){
   showOv('whereOv'); haptic('light');
   whDragInit();
+  WH._open = (WH._open || 0) + 1;
   // Открываем на половине: сразу видно и кто на связи, и где они. Список
   // целиком — на один жест вверх, карта целиком — на один вниз.
   if(_whPhone()) requestAnimationFrame(() => whSnap('half'));
-  $('whList').innerHTML = '<div class="wh-note" style="border:0">Загрузка…</div>';
+  whSet('<div class="wh-note" style="border:0">Загрузка…</div>');
   await whereLoad();
   clearInterval(WH.timer);
   WH.timer = setInterval(() => { if(!document.hidden) whereLoad(); }, WH_MS);
@@ -4521,6 +4626,12 @@ async function whereOpen(){
 function whereClose(){
   hideOv('whereOv');
   clearInterval(WH.timer); WH.timer = null;
+  // Шторку возвращаем в исходное: смещение хранится в стиле, и с ним окно
+  // откроется в следующий раз наполовину свёрнутым.
+  cancelAnimationFrame(WH_SH.raf); WH_SH.raf = 0; WH_SH.v = 0; WH_SH.y = 0;
+  const {sh} = _whEls();
+  if(sh){ sh.style.transform = ''; sh.classList.remove('peek'); }
+  _whY = 'full';
 }
 
 async function whereLoad(){
@@ -4530,11 +4641,21 @@ async function whereLoad(){
     d = await opApi.opFetch('/api/operator/where',
       {params: {as: curOp, ...(WH.sel ? {track: WH.sel} : {})}});
   }catch(e){
-    $('whList').innerHTML = '<div class="wh-note" style="border:0">Не удалось загрузить</div>';
+    whSet('<div class="wh-note" style="border:0">Не удалось загрузить</div>');
     return;
   }
   WH.data = d;
   whPaint();
+}
+
+// Список обновляется раз в десять секунд, и замена разметки под пальцем
+// сбрасывает прокрутку вместе с нажатием, которое человек как раз держит.
+// Поэтому трогаем её, только когда она действительно изменилась, — и пишем
+// только отсюда, чтобы «Загрузка…» не считалась предыдущим состоянием списка.
+function whSet(html){
+  const box = $('whList'); if(!box || box._h === html) return;
+  const y = box.scrollTop;
+  box.innerHTML = html; box.scrollTop = y; box._h = html;
 }
 
 function whAgo(sec){
@@ -4597,7 +4718,8 @@ function whRow(r, trackOn){
     <span class="wh-i">${r.panic ? '<i class="wh-sos"></i>'
       : (st === 'stream' ? IC_LIVE : (st === 'snap' ? IC_SNAP : IC_OFF))}</span>
     <span class="wh-b">
-      <span class="wh-n">${_esc(r.driver)}<u>${r.panic ? 'скрытый режим' : _esc(where)}</u></span>
+      <span class="wh-n"><span class="wh-nm">${_esc(r.driver)}</span><u>${
+        r.panic ? 'скрытый режим' : _esc(where)}</u></span>
       <span class="wh-s">${state}${trackOn ? ' <i>· маршрут на карте</i>' : ''}</span>
     </span>
     <span class="wh-w">
@@ -4625,7 +4747,7 @@ function whPaint(){
                          + (snap ? ` · ${live} на связи` : '')
                          : (rows.length ? 'никого не видно' : 'водителей нет');
   const trackOn = (d.track || []).length > 1;
-  $('whList').innerHTML = (rows.length ? `
+  const разметка = (rows.length ? `
     <div class="wh-sum">
       <span class="ok"><b>${live}</b><i>на связи</i></span>
       <span class="${snap ? '' : 'dim'}"><b>${snap}</b><i>недавно</i></span>
@@ -4635,7 +4757,37 @@ function whPaint(){
     + `<div class="wh-note">Точку присылает живая трансляция телеграма — водитель
        включает её сам. Её хватает на восемь часов, дальше бот напомнит. Маршрут
        за смену стирается при её закрытии.</div>`;
+  // Список обновляется раз в десять секунд, и замена разметки под пальцем
+  // сбрасывает прокрутку вместе с нажатием, которое человек как раз держит.
+  // Поэтому трогаем её, только когда она действительно изменилась.
+  whSet(разметка);
+  whSelBar();
   whMapPaint();
+}
+
+// Полоса выбранного водителя под шапкой. Она существует ради свёрнутой
+// шторки: карта на весь экран, маршрут нарисован — а чей он, сказать нечем.
+function whSelBar(){
+  const el = $('whSelBar'); if(!el) return;
+  const r = ((WH.data || {}).drivers || []).find(x => x.driver === WH.sel);
+  const был = el.classList.contains('on');
+  if(!WH.sel || !r){ el.classList.remove('on'); el.innerHTML = ''; }
+  else{
+    const st = whState(r);
+    const что = ((WH.data || {}).track || []).length > 1 ? 'маршрут за смену на карте'
+      : (st === 'stream' ? 'на связи сейчас'
+      : (r.has ? 'был ' + whAgo(r.age) : 'не транслирует'));
+    el.innerHTML = `<span class="wh-sel-d ${st}"></span>
+      <span class="wh-sel-b"><b>${_esc(r.driver)}</b><i>${что}</i></span>
+      <button class="wh-sel-x" onclick="whPick('${_esc(r.driver)}')"
+              aria-label="Снять выбор"><svg viewBox="0 0 24 24" width="14" height="14"
+        fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round">
+        <path d="M6 6l12 12M18 6L6 18"/></svg></button>`;
+    el.classList.add('on');
+  }
+  // Ручка стала выше или ниже — свёрнутая шторка должна встать заново, иначе
+  // полоса окажется за краем экрана.
+  if(был !== el.classList.contains('on') && _whY === 'peek') whSnap('peek', true);
 }
 
 function whMapPaint(){
@@ -4687,14 +4839,18 @@ function whMapPaint(){
         iconAnchor:[6,6], html:'<div class="wh-dotp"></div>'})}),
     ]).addTo(WH.map);
     WH.line.getBounds = () => L.latLngBounds(pth);
-    // Потолок приближения: короткий маршрут иначе растягивается на весь экран,
-    // и вместо «где ездил» видно две улицы крупным планом.
-    WH.map.fitBounds(L.latLngBounds(pth).pad(0.25), {maxZoom: 15});
-  }else if(WH.sel){
-    const me = (d.drivers || []).find(r => r.driver === WH.sel && r.has);
-    if(me) WH.map.setView([me.lat, me.lon], 15);
-  }else if(pts.length){
-    WH.map.fitBounds(L.latLngBounds(pts).pad(0.3), {maxZoom: 15});
+  }
+
+  // Вид подгоняем не на каждой перерисовке, а когда меняется то, ради чего его
+  // подгоняют: открыли окно или выбрали другого водителя. Иначе карта раз в
+  // десять секунд отматывается обратно из-под пальца, и рассмотреть соседний
+  // квартал невозможно. Потолок приближения — чтобы короткий маршрут не
+  // растягивался на весь экран двумя улицами крупным планом.
+  const ключ = (WH.sel || '') + '|' + (WH._open || 0);
+  if(WH._fit !== ключ){
+    WH._fit = ключ;
+    if(WH.sel) whFocusSel();
+    else if(pts.length) whFit(L.latLngBounds(pts).pad(0.3), 15);
   }
 }
 
@@ -4839,74 +4995,227 @@ function whPick(name){
 
 /* ── Шторка карты на телефоне ─────────────────────────────────────────────
    Три высоты вместо двух состояний «открыто/закрыто»: список, список плюс
-   карта, и карта целиком. Промежуточное положение — рабочее, поэтому оно
-   достижимо и пальцем, и само собой при выборе водителя.
+   карта, и карта целиком — от шторки остаётся ручка. Промежуточное положение
+   рабочее, поэтому оно достижимо и пальцем, и само собой при выборе водителя.
 
-   Тянут за шапку, а не за весь лист: внутри списка вертикальный жест должен
-   листать список, иначе шторка уезжает при попытке прокрутить.           */
-const WH_SNAP = {full: 0.14, half: 0.55, peek: 0.82};   // доля высоты экрана
+   Двигает шторку пружина, а не переход с длительностью, и разница здесь не
+   косметическая. Переход нельзя перехватить: палец, опущенный на летящую
+   шторку, ждёт, пока она долетит, — а ждать её никто не собирается. Пружина
+   считает от того места, где шторка сейчас, поэтому её ловят в любом кадре и
+   уводят обратно; скорость пальца при отпускании продолжается движением, и
+   шва между жестом и анимацией не остаётся.
+
+   Тянут не только за шапку: из списка шторка забирает жест, когда список уже
+   наверху и палец идёт вниз, — так же, как в картах. Иначе, чтобы свернуть
+   лист, приходится сначала целиться в полоску шириной в палец.            */
 let _whY = 'full';
+const WH_SH = {y: 0, v: 0, raf: 0};
 
 function _whPhone(){ return window.matchMedia('(max-width:760px)').matches; }
+const _whCalm = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
 
-function _whOff(pos, h){
-  // Смещение считаем от высоты самой шторки: она 86dvh, а верх при «full»
-  // стоит на 14% экрана — значит нулевое смещение это и есть «full».
-  return Math.round(h * (WH_SNAP[pos] - WH_SNAP.full) / (1 - WH_SNAP.full));
+const _whEls = () => ({
+  sh: document.querySelector('#whereOv .wh-side'),
+  hd: document.querySelector('#whereOv .wh-hd'),
+  sb: document.getElementById('whSelBar'),
+});
+
+// Куда шторка встаёт. Считаем в пикселях от её собственной высоты, а «свёрнута»
+// — это когда снизу осталась ровно ручка с шапкой, а не заранее угаданная доля
+// экрана: шапка на разных телефонах разной высоты, и полоса выбранного
+// водителя её ещё и удлиняет.
+// Высота домашней полоски. Из стиля её не прочитать — там calc с env, —
+// поэтому измеряем пробником и запоминаем до следующего поворота экрана.
+let _whSafeV = null, _whSafeK = -1;
+function _whSafe(){
+  if(_whSafeK === window.innerHeight && _whSafeV != null) return _whSafeV;
+  const p = document.createElement('i');
+  p.style.cssText = 'position:absolute;left:-9999px;top:0;width:1px;height:var(--safe-bottom)';
+  document.body.appendChild(p);
+  _whSafeV = p.offsetHeight; _whSafeK = window.innerHeight;
+  p.remove();
+  return _whSafeV;
+}
+
+function whStops(){
+  const {sh, hd, sb} = _whEls();
+  if(!sh) return {full: 0, half: 0, peek: 0};
+  const h = sh.offsetHeight, vh = window.innerHeight;
+  const ручка = (hd ? hd.offsetHeight : 60) + _whSafe()
+              + (sb && sb.classList.contains('on') ? sb.offsetHeight + 11 : 0);
+  return {full: 0,
+          half: Math.max(0, Math.round(h - vh * 0.48)),
+          peek: Math.max(0, Math.round(h - ручка))};
+}
+
+function whApply(y){
+  const {sh} = _whEls(); if(!sh) return;
+  WH_SH.y = y;
+  sh.style.transform = `translate3d(0,${y}px,0)`;
+}
+
+// Отклик 0.32 с и лёгкий недобор затухания — то же, что у листов в iOS: бросок
+// должен чуть перелетать, иначе он читается как удар в стену. Считаем
+// подшагами, чтобы просевший кадр не разогнал пружину.
+function whSpring(to, v0){
+  cancelAnimationFrame(WH_SH.raf); WH_SH.raf = 0;
+  const {sh} = _whEls(); if(!sh) return;
+  if(_whCalm()){ whApply(to); WH_SH.v = 0; whRest(); return; }
+  const w = 2 * Math.PI / 0.32, z = 0.86;
+  WH_SH.v = v0 || 0;
+  let было = performance.now();
+  const шаг = сейчас => {
+    const dt = Math.min(0.032, (сейчас - было) / 1000); было = сейчас;
+    const n = Math.max(1, Math.ceil(dt / 0.006)), h = dt / n;
+    for(let i = 0; i < n; i++){
+      const a = -w * w * (WH_SH.y - to) - 2 * z * w * WH_SH.v;
+      WH_SH.v += a * h; WH_SH.y += WH_SH.v * h;
+    }
+    whApply(WH_SH.y);
+    if(Math.abs(WH_SH.y - to) < 0.4 && Math.abs(WH_SH.v) < 25){
+      WH_SH.v = 0; whApply(to); WH_SH.raf = 0; whRest(); return;
+    }
+    WH_SH.raf = requestAnimationFrame(шаг);
+  };
+  WH_SH.raf = requestAnimationFrame(шаг);
 }
 
 function whSnap(pos, smooth){
-  const sh = document.querySelector('#whereOv .wh-side');
+  const {sh} = _whEls();
   if(!sh || !_whPhone()) return;
   _whY = pos;
-  sh.classList.toggle('drag', !smooth);
-  sh.style.transform = `translateY(${_whOff(pos, sh.offsetHeight)}px)`;
-  if(!smooth) requestAnimationFrame(() => sh.classList.remove('drag'));
-  try{ WH.map && setTimeout(() => WH.map.invalidateSize(), 360); }catch(e){}
+  sh.classList.toggle('peek', pos === 'peek');
+  const to = whStops()[pos] || 0;
+  if(smooth) whSpring(to, WH_SH.v);
+  else{ cancelAnimationFrame(WH_SH.raf); WH_SH.raf = 0; WH_SH.v = 0; whApply(to); whRest(); }
 }
 
+// Шторка встала — карта смотрит в ту часть экрана, которая осталась свободной.
+// Водитель под шторкой — это то же «не видно», что и вовсе без карты.
+function whRest(){ if(WH.sel) whFocusSel(); }
+
+// Скорость берём по последним кадрам, а не по всему жесту: важно, чем жест
+// закончился, а не как он начинался.
+function _whVel(ист){
+  if(ист.length < 2) return 0;
+  const b = ист[ист.length - 1];
+  let a = ист[0];
+  for(let i = ист.length - 2; i >= 0; i--){ a = ист[i]; if(b.t - a.t > 55) break; }
+  const dt = (b.t - a.t) / 1000;
+  return dt > 0 ? (b.y - a.y) / dt : 0;
+}
+// Тормозной путь броска — тот же расчёт, по которому останавливается прокрутка.
+// Целимся туда, куда жест доехал бы сам: иначе короткий резкий бросок «не
+// долетает» и шторка возвращается, хотя её явно кинули.
+const _whProject = (v, d = 0.998) => (v / 1000) * d / (1 - d);
+// Резинка на краях: жёсткий упор читается как «залипло», сопротивление — как
+// «дальше ничего нет».
+const _whBand = (over, dim, k = 0.55) => (over * dim * k) / (dim + k * Math.abs(over));
+
 function whDragInit(){
-  const sh = document.querySelector('#whereOv .wh-side');
-  const hd = document.querySelector('#whereOv .wh-hd');
-  if(!sh || !hd || hd._wh) return;
-  hd._wh = true;
-  let y0 = 0, base = 0, on = false;
-  const cur = () => _whOff(_whY, sh.offsetHeight);
-  hd.addEventListener('pointerdown', e => {
-    if(!_whPhone() || e.target.closest('.wh-x')) return;
-    on = true; y0 = e.clientY; base = cur();
-    sh.classList.add('drag');
-    hd.setPointerCapture(e.pointerId);
+  const {sh} = _whEls();
+  if(!sh || sh._wh) return;
+  sh._wh = true;
+  let id = null, y0 = 0, база = 0, ход = 0, взял = false, ист = [];
+  const список = () => document.getElementById('whList');
+
+  sh.addEventListener('pointerdown', e => {
+    // Счётчик хода обнуляем на каждом касании: иначе следующий тап проглотит
+    // сторож, оставшийся от прошлого перетаскивания.
+    ход = 0;
+    if(!_whPhone()) return;
+    if(e.target.closest('.wh-x, .wh-prof, .wh-sel-x')) return;
+    // Внутри списка жест сначала принадлежит списку: шторку он забирает только
+    // с самого верха и только вниз.
+    const свой = !e.target.closest('.wh-list');
+    if(!свой && (список() ? список().scrollTop : 0) > 1) return;
+    id = e.pointerId; y0 = e.clientY; база = WH_SH.y; ход = 0; взял = свой;
+    ист = [{y: e.clientY, t: performance.now()}];
+    // Летящую шторку перехватываем с того места, где она сейчас: пружина
+    // остановлена, но скорость её остаётся жесту.
+    cancelAnimationFrame(WH_SH.raf); WH_SH.raf = 0; WH_SH.v = 0;
+    if(взял) sh.setPointerCapture(id);
   });
-  hd.addEventListener('pointermove', e => {
-    if(!on) return;
-    const max = _whOff('peek', sh.offsetHeight);
-    // За края не пускаем: резинка тут не нужна, а уехавшая за экран шторка
-    // выглядит как поломка.
-    const v = Math.max(0, Math.min(max, base + (e.clientY - y0)));
-    sh.style.transform = `translateY(${v}px)`;
-  });
-  const up = e => {
-    if(!on) return;
-    on = false; sh.classList.remove('drag');
-    const h = sh.offsetHeight;
-    const v = base + (e.clientY - y0);
-    // Ближайшая из трёх — но быстрый бросок засчитываем как переход к
-    // соседней: так шторка слушается запястья, а не только пальца.
-    const fast = Math.abs(e.clientY - y0) > 60 ? Math.sign(e.clientY - y0) : 0;
-    const order = ['full', 'half', 'peek'];
-    let pos;
-    if(fast){
-      pos = order[Math.max(0, Math.min(2, order.indexOf(_whY) + fast))];
-    }else{
-      pos = order.reduce((a, p) =>
-        Math.abs(_whOff(p, h) - v) < Math.abs(_whOff(a, h) - v) ? p : a, 'full');
+
+  sh.addEventListener('pointermove', e => {
+    if(id === null || e.pointerId !== id) return;
+    const d = e.clientY - y0;
+    ход = Math.max(ход, Math.abs(d));
+    ист.push({y: e.clientY, t: performance.now()});
+    if(ист.length > 6) ист.shift();
+    if(!взял){
+      if(d < 8) return;                 // вверх и мелочь — это прокрутка списка
+      взял = true; база = WH_SH.y; y0 = e.clientY;
+      try{ sh.setPointerCapture(id); }catch(err){}
     }
-    whSnap(pos, true);
-    haptic('sel');
+    const st = whStops();
+    let v = база + (e.clientY - y0);
+    if(v < st.full) v = st.full - _whBand(st.full - v, sh.offsetHeight);
+    if(v > st.peek) v = st.peek + _whBand(v - st.peek, sh.offsetHeight);
+    whApply(v);
+  });
+
+  const пусти = e => {
+    if(id === null || (e.pointerId != null && e.pointerId !== id)) return;
+    const был = взял; id = null;
+    if(!был) return;
+    взял = false;
+    const st = whStops(), прежняя = _whY, v = _whVel(ист);
+    const цель = WH_SH.y + _whProject(v);
+    const pos = ['full', 'half', 'peek'].reduce((a, x) =>
+      Math.abs(st[x] - цель) < Math.abs(st[a] - цель) ? x : a, 'full');
+    _whY = pos;
+    _whEls().sh.classList.toggle('peek', pos === 'peek');
+    whSpring(st[pos], v);
+    // Отдача — только когда высота действительно сменилась. Дрожь на каждое
+    // отпускание учит не замечать её вовсе.
+    if(pos !== прежняя) haptic('sel');
   };
-  hd.addEventListener('pointerup', up);
-  hd.addEventListener('pointercancel', up);
+  sh.addEventListener('pointerup', пусти);
+  sh.addEventListener('pointercancel', пусти);
+  // Жест не должен заканчиваться нажатием: палец уехал на полсантиметра —
+  // значит, тянули шторку, а не выбирали водителя.
+  sh.addEventListener('click', e => {
+    if(ход > 8){ e.stopPropagation(); e.preventDefault(); ход = 0; }
+  }, true);
+}
+
+// Сколько карты закрыто шторкой прямо сейчас, в пикселях снизу.
+function whCover(){
+  const {sh} = _whEls();
+  if(!sh || !_whPhone()) return 0;
+  return Math.max(0, sh.offsetHeight - WH_SH.y);
+}
+
+// Подгонка вида с оглядкой на шторку: свободная часть карты сверху, туда и
+// целимся. Без этого выбранный водитель на телефоне уезжает под список.
+function whFit(b, maxZoom){
+  if(!WH.map || !window.L) return;
+  const низ = Math.min(whCover() + 18, Math.round(window.innerHeight * 0.55));
+  try{
+    WH.map.fitBounds(b, {paddingTopLeft: [24, 24],
+                         paddingBottomRight: [24, низ + 24], maxZoom});
+  }catch(e){ try{ WH.map.fitBounds(b, {maxZoom}); }catch(err){} }
+}
+
+// Карта больше не отматывается сама, и это правильно — но значит, что из
+// уехавшего вида надо чем-то возвращаться. Одна кнопка: показать всех, а если
+// кто-то выбран — его.
+function whHome(){
+  if(!WH.map || !window.L) return;
+  haptic('light');
+  if(WH.sel){ whFocusSel(); return; }
+  const pts = ((WH.data || {}).drivers || [])
+    .filter(r => r.has && r.lat != null).map(r => [r.lat, r.lon]);
+  if(pts.length) whFit(L.latLngBounds(pts).pad(0.3), 15);
+}
+
+function whFocusSel(){
+  if(!WH.map || !window.L || !WH.sel) return;
+  const tr = (WH.data || {}).track || [];
+  if(tr.length > 1){ whFit(L.latLngBounds(tr.map(t => [t.lat, t.lon])).pad(0.25), 15); return; }
+  const r = ((WH.data || {}).drivers || []).find(x => x.driver === WH.sel && x.has);
+  if(r) whFit(L.latLngBounds([[r.lat, r.lon], [r.lat, r.lon]]), 15);
 }
 
 let SHIFT = null, SHIFT_BUSY = false;

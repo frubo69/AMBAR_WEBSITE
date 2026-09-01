@@ -4616,22 +4616,61 @@ async function whereOpen(){
   WH._open = (WH._open || 0) + 1;
   // Открываем на половине: сразу видно и кто на связи, и где они. Список
   // целиком — на один жест вверх, карта целиком — на один вниз.
-  if(_whPhone()) requestAnimationFrame(() => whSnap('half'));
+  //
+  // Раньше окно просто включалось, и лист в восемьдесят восемь процентов
+  // экрана оказывался на месте в первом же кадре — плашка, вылезшая снизу.
+  // Теперь он выезжает: начальное положение ставим до первого кадра (в том
+  // же кадре, что и display), поэтому промежуточного состояния не видно.
+  whOpenRise();
   whSet('<div class="wh-note" style="border:0">Загрузка…</div>');
   await whereLoad();
   clearInterval(WH.timer);
   WH.timer = setInterval(() => { if(!document.hidden) whereLoad(); }, WH_MS);
 }
 
-function whereClose(){
-  hideOv('whereOv');
-  clearInterval(WH.timer); WH.timer = null;
-  // Шторку возвращаем в исходное: смещение хранится в стиле, и с ним окно
-  // откроется в следующий раз наполовину свёрнутым.
-  cancelAnimationFrame(WH_SH.raf); WH_SH.raf = 0; WH_SH.v = 0; WH_SH.y = 0;
+// Появление листа. Стартовое смещение выставляем синхронно, до возврата в
+// браузер: если отложить его на кадр, этот кадр покажет лист на месте.
+function whOpenRise(){
   const {sh} = _whEls();
-  if(sh){ sh.style.transform = ''; sh.classList.remove('peek'); }
-  _whY = 'full';
+  const ov = document.getElementById('whereOv');
+  if(!sh || !ov) return;
+  ov.classList.remove('fall');
+  if(!_whPhone()){ sh.style.transform = ''; return; }
+  _whY = 'half';
+  sh.classList.remove('peek');
+  cancelAnimationFrame(WH_SH.raf); WH_SH.raf = 0; WH_SH.v = 0;
+  ov.classList.add('rise');
+  whApply(sh.offsetHeight + 24);            // за нижним краем экрана
+  requestAnimationFrame(() => {
+    ov.classList.remove('rise');            // карта проявляется, лист едет
+    whSpring(whStops().half, 0);
+  });
+}
+
+function whereClose(){
+  clearInterval(WH.timer); WH.timer = null;
+  const {sh} = _whEls();
+  const ov = document.getElementById('whereOv');
+  // Убрано — значит уехало туда же, откуда приехало. Исчезновение на месте
+  // читается как сбой, а не как закрытие.
+  let убрано = false;
+  const убрать = () => {
+    if(убрано) return;
+    убрано = true; WH_SH.closing = false;
+    hideOv('whereOv');
+    cancelAnimationFrame(WH_SH.raf); WH_SH.raf = 0; WH_SH.v = 0; WH_SH.y = 0;
+    if(sh){ sh.style.transform = ''; sh.classList.remove('peek'); }
+    if(ov) ov.classList.remove('rise', 'fall');
+    _whY = 'full';
+  };
+  if(!sh || !ov || !_whPhone() || _whCalm()){ убрать(); return; }
+  WH_SH.closing = true;
+  ov.classList.add('fall');
+  whSpring(sh.offsetHeight + 24, WH_SH.v, убрать);
+  // Подстраховка. Кадры может не быть вовсе — приложение свернули посреди
+  // закрытия, — и тогда окно осталось бы висеть открытым. Закрытие обязано
+  // произойти, даже если анимации не случилось.
+  setTimeout(убрать, 600);
 }
 
 async function whereLoad(){
@@ -5009,7 +5048,7 @@ function whPick(name){
    наверху и палец идёт вниз, — так же, как в картах. Иначе, чтобы свернуть
    лист, приходится сначала целиться в полоску шириной в палец.            */
 let _whY = 'full';
-const WH_SH = {y: 0, v: 0, raf: 0};
+const WH_SH = {y: 0, v: 0, raf: 0, closing: false};
 
 function _whPhone(){ return window.matchMedia('(max-width:760px)').matches; }
 const _whCalm = () => window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -5057,10 +5096,10 @@ function whApply(y){
 // Отклик 0.32 с и лёгкий недобор затухания — то же, что у листов в iOS: бросок
 // должен чуть перелетать, иначе он читается как удар в стену. Считаем
 // подшагами, чтобы просевший кадр не разогнал пружину.
-function whSpring(to, v0){
+function whSpring(to, v0, конец){
   cancelAnimationFrame(WH_SH.raf); WH_SH.raf = 0;
   const {sh} = _whEls(); if(!sh) return;
-  if(_whCalm()){ whApply(to); WH_SH.v = 0; whRest(); return; }
+  if(_whCalm()){ whApply(to); WH_SH.v = 0; (конец || whRest)(); return; }
   const w = 2 * Math.PI / 0.32, z = 0.86;
   WH_SH.v = v0 || 0;
   let было = performance.now();
@@ -5073,7 +5112,7 @@ function whSpring(to, v0){
     }
     whApply(WH_SH.y);
     if(Math.abs(WH_SH.y - to) < 0.4 && Math.abs(WH_SH.v) < 25){
-      WH_SH.v = 0; whApply(to); WH_SH.raf = 0; whRest(); return;
+      WH_SH.v = 0; whApply(to); WH_SH.raf = 0; (конец || whRest)(); return;
     }
     WH_SH.raf = requestAnimationFrame(шаг);
   };
@@ -5123,7 +5162,7 @@ function whDragInit(){
     // Счётчик хода обнуляем на каждом касании: иначе следующий тап проглотит
     // сторож, оставшийся от прошлого перетаскивания.
     ход = 0;
-    if(!_whPhone()) return;
+    if(!_whPhone() || WH_SH.closing) return;   // уезжающий лист не ловим
     if(e.target.closest('.wh-x, .wh-prof, .wh-sel-x')) return;
     // Внутри списка жест сначала принадлежит списку: шторку он забирает только
     // с самого верха и только вниз.
@@ -5162,6 +5201,10 @@ function whDragInit(){
     взял = false;
     const st = whStops(), прежняя = _whY, v = _whVel(ист);
     const цель = WH_SH.y + _whProject(v);
+    // Утянули лист заметно ниже свёрнутого — значит убирают окно, а не ставят
+    // его на нижнюю ступень. Порог большой намеренно: закрыться случайно
+    // неприятнее, чем не закрыться с первого раза.
+    if(цель > st.peek + 150){ haptic('light'); whereClose(); return; }
     const pos = ['full', 'half', 'peek'].reduce((a, x) =>
       Math.abs(st[x] - цель) < Math.abs(st[a] - цель) ? x : a, 'full');
     _whY = pos;

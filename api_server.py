@@ -2775,6 +2775,14 @@ def main():
         wallet_routes.setup(app)
     except Exception as e:
         log.error(f"wallet routes setup failed: {e}")
+    # Курс валют: рыночный по всем и курс наличных обменника там, где он есть.
+    # Зарплаты равняются на доллар, а водители привозят наличные — старшему
+    # нужно видеть, по какой цене эти деньги на самом деле поменяются.
+    try:
+        import rates
+        rates.setup(app)
+    except Exception as e:
+        log.error(f"rates routes setup failed: {e}")
     # Заявка в магазин: Excel туда, Excel обратно, поставка на забор.
     try:
         import supply_routes

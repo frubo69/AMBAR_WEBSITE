@@ -3760,6 +3760,29 @@ button.path:active{transform:scale(.995)}
   font-weight:700;color:var(--gold2);white-space:nowrap;
   font-variant-numeric:tabular-nums}
 
+/* ── Курс валют ───────────────────────────────────────────────────────────
+   Две цены в одной строке и они про разное: рыночная — сколько деньги стоят,
+   обменника — сколько за них дадут в кассе. Вторая есть не у всех валют, и
+   там, где её нет, врать нечем: стоит только первая. */
+.fx-q{width:100%;height:40px;margin:2px 0 10px;padding:0 13px;border-radius:12px;
+  border:1px solid var(--border2);background:var(--card2);color:var(--text);
+  font-family:inherit;font-size:13px}
+.fx-q:focus{outline:none;border-color:rgba(201,169,110,.45)}
+.fx-r{display:flex;align-items:center;gap:10px;padding:9px 2px;
+  border-top:1px solid var(--border2)}
+.fx-r:first-child{border-top:0}
+.fx-c{flex:0 0 42px;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:800;
+  letter-spacing:.4px;color:var(--gold2)}
+.fx-n{flex:1;min-width:0;font-size:12.5px;color:var(--sub);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.fx-v{flex:0 0 auto;text-align:right;font-family:'DM Sans',sans-serif;
+  font-variant-numeric:tabular-nums}
+.fx-v b{display:block;font-size:14px;font-weight:700;line-height:1.15}
+.fx-v i{display:block;font-style:normal;font-size:10.5px;font-weight:600;
+  color:var(--up);line-height:1.25;margin-top:2px}
+.fx-v i.none{color:var(--dim);font-weight:500}
+.fx-note{margin-top:12px;font-size:11px;line-height:1.55;color:var(--dim)}
+
 /* Шапка раздела «Клиенты» */
 .cust-hero{margin:6px 0 4px;padding:16px 16px 14px;border-radius:16px;cursor:pointer;
   background:linear-gradient(150deg,rgba(201,169,110,.09),rgba(201,169,110,.02) 60%);
@@ -4592,6 +4615,33 @@ button.path:active{transform:scale(.995)}
       <div class="cat-block-sect-t">История поступлений</div>
       <div id="walBlockList"></div>
       <button class="cat-block-open" onclick="event.stopPropagation();accOpen('wallet')">Открыть кошелёк →</button>
+    </div>
+  </div>
+
+  <!-- Курс валют. Рядом с кошельком, потому что это тоже про деньги: по
+       этому числу считают зарплату и по нему же принимают наличные, которые
+       водители привозят не в дирхамах. -->
+  <div class="cat-block" id="fxBlock">
+    <div class="cat-block-hdr" id="fxBlockHdr">
+      <div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17"
+        fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+        stroke-linejoin="round"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg></div>
+      <div class="cat-block-title">
+        <div class="cat-block-n">Курс валют</div>
+        <div class="cat-block-sub is-skel" id="fxSub" style="min-width:150px">0000</div>
+      </div>
+      <svg class="cat-block-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <div class="cat-block-kpis">
+      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="fxUsd">0000</div><div class="cat-kpi-l">Доллар</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="fxEur">0000</div><div class="cat-kpi-l">Евро</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="fxRub">0000</div><div class="cat-kpi-l">Рубль</div></div>
+    </div>
+    <div class="cat-block-expand">
+      <input class="fx-q" id="fxQ" placeholder="Поиск валюты" autocomplete="off"
+             oninput="fxRender()">
+      <div id="fxList"></div>
+      <div class="fx-note" id="fxNote"></div>
     </div>
   </div>
 
@@ -7728,6 +7778,7 @@ document.querySelectorAll('.tb').forEach(btn=>{
     }
     if(pg === 'more' && window.ownerApi){
       mktRender(); promoBlockRender(); giftBlockRender(); walBlockRender(); bcastAudience();
+      if(!FX) fxLoad();
       if(!ACC_PERIOD) accLoadSummaries();
     }
     try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
@@ -12803,6 +12854,93 @@ function walBlockRender(){
     : `<div class="cat-block-empty">${d && d.offline
         ? 'Сеть не ответила' : 'Поступлений пока не было'}</div>`;
 }
+
+// ── Курс валют ────────────────────────────────────────────────────────────
+// Две цены и они про разное. Рыночная говорит, сколько деньги стоят: по ней
+// считается зарплата, привязанная к доллару. Цена обменника говорит, сколько
+// за эти деньги дадут в кассе, — по ней водитель меняет привезённые наличные.
+//
+// Курс наличных есть не у каждой валюты: обменники обновляют его выборочно,
+// и на проверке свежим он был у одиннадцати из ста шестидесяти пяти. Там, где
+// его нет, вторая строка не рисуется вовсе — устаревшее число хуже, чем его
+// отсутствие: рубль недельной давности ошибался на восемнадцать процентов.
+let FX = null;
+
+async function fxLoad(){
+  if(!window.ownerApi) return;
+  try{ FX = await ownerApi.ownerFetch('/api/owner/rates'); }
+  catch(e){ FX = null; }
+  fxRender();
+}
+
+function _fxWhen(ms){
+  if(!ms) return '';
+  const d = new Date(ms), n = new Date();
+  const hh = d.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit'});
+  return d.toDateString() === n.toDateString() ? `сегодня в ${hh}`
+       : `${d.toLocaleDateString('ru-RU', {day:'2-digit', month:'long'})}, ${hh}`;
+}
+
+// Дирхам за единицу: у дорогих валют два знака, у дешёвых четыре — иначе
+// рубль и сум превращаются в ноль.
+function _fxN(v){ return v >= 1 ? v.toFixed(2) : v.toFixed(4); }
+
+function fxRender(){
+  const box = document.getElementById('fxList'); if(!box) return;
+  const rows = (FX && FX.rates) || [];
+  const val = c => {
+    const r = rows.find(x => x.code === c);
+    return r ? (r.cash_aed || r.aed) : null;
+  };
+  const put = (id, c) => {
+    const el = document.getElementById(id); if(!el) return;
+    const v = val(c);
+    el.classList.remove('is-skel');
+    el.textContent = v == null ? '—' : _fxN(v);
+  };
+  put('fxUsd','USD'); put('fxEur','EUR'); put('fxRub','RUB');
+  // Подпись отвечает на единственный вопрос, который к ней есть: насколько
+  // это свежо. Молчащий источник тоже говорится словом.
+  const sub = document.getElementById('fxSub');
+  if(sub) sub.classList.remove('is-skel');
+  _setText('fxSub', !FX ? 'не удалось загрузить'
+    : (FX.silent ? `источник молчит · последнее ${_fxWhen(FX.fetched_at)}`
+                 : `обновлено ${_fxWhen(FX.fetched_at)}`));
+  const q = (document.getElementById('fxQ')?.value || '').trim().toLowerCase();
+  const shown = q ? rows.filter(r => r.code.toLowerCase().includes(q)
+                                  || (r.name || '').toLowerCase().includes(q))
+                  : rows.filter(r => (FX.main || []).includes(r.code) || r.cash_aed);
+  box.innerHTML = shown.length ? shown.map(r => `
+    <div class="fx-r">
+      <span class="fx-c">${escS(r.code)}</span>
+      <span class="fx-n">${escS(r.name || r.code)}</span>
+      <span class="fx-v">
+        <b>${_fxN(r.cash_aed || r.aed)} AED</b>
+        ${r.cash_aed
+          ? `<i>обменник · рынок ${_fxN(r.aed)}</i>`
+          : '<i class="none">рыночный · обменник молчит</i>'}
+      </span>
+    </div>`).join('')
+    : '<div class="cat-block-empty">Ничего не нашлось</div>';
+  _setText('fxNote', !FX ? '' :
+    `Крупное число — дирхамы за единицу валюты: там, где обменник обновляет курс, `
+    + `это его цена наличными, и рыночная стоит ниже для сравнения. Свежий курс `
+    + `наличных сегодня есть у ${FX.cash_n || 0} `
+    + `${pluralize(FX.cash_n || 0,'валюты','валют','валют')} из ${rows.length} — `
+    + `у остальных показан рыночный, потому что устаревший курс обменника врёт `
+    + `сильнее, чем рынок. Наличные — ${escS(FX.source||'')}.`);
+}
+
+(function initFxBlock(){
+  const block = document.getElementById('fxBlock');
+  const hdr = document.getElementById('fxBlockHdr');
+  if(!block || !hdr) return;
+  hdr.addEventListener('click', e => {
+    if(e.target && e.target.id === 'fxQ') return;
+    block.classList.toggle('open');
+    try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
+  });
+})();
 
 (function initWalBlock(){
   const block = document.getElementById('walBlock');

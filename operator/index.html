@@ -39,17 +39,31 @@ html{touch-action:manipulation}
      светел и предупреждения на нём переставали читаться. */
   --warn-t:#F3B44A;
   --r:18px;--r2:14px;--r3:10px;--e1:cubic-bezier(.25,.8,.25,1);
-  --safe-top:calc(var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px)) + var(--tg-content-safe-area-inset-top,0px));
-  --safe-bottom:calc(var(--tg-safe-area-inset-bottom,0px) + env(safe-area-inset-bottom,0px));
+  /* Сколько сверху и снизу занято не нами: вырез устройства плюс собственные
+     кнопки телеграма — в полном экране «закрыть» слева и меню справа висят
+     ПОВЕРХ приложения. Клиент сообщает своё в --tg-*, система — в env().
+     Берём наибольшее, а не сумму: на телефоне это одна и та же полоса, и
+     сложение отнимало её дважды. Формула та же, что у водителя. */
+  --tg-chrome-top:var(--tg-content-safe-area-inset-top,0px);
+  --safe-top:max(env(safe-area-inset-top,0px),
+    calc(var(--tg-safe-area-inset-top,0px) + var(--tg-chrome-top)));
+  --safe-bottom:max(env(safe-area-inset-bottom,0px),
+    calc(var(--tg-safe-area-inset-bottom,0px) + var(--tg-content-safe-area-inset-bottom,0px)));
 }
-/* На компьютере телеграм рисует свою шапку НАД окном приложения, но всё равно
-   сообщает её высоту как отступ для контента. Мы этот отступ добавляли — и под
-   шапкой оставалась пустая чёрная лента высотой с неё же. На широком экране
-   берём только отступ устройства (там он ноль), а телеграмовский отбрасываем:
-   его шапка и так снаружи. Вырезов и статус-баров на компьютере не бывает. */
-@media (min-width:900px){
-  :root{--safe-top:var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px))}
-}
+/* Полный экран: кнопки телеграма висят над приложением, и не всякий клиент
+   честно сообщает их высоту — на планшете приходил ноль, и шапка вставала
+   ровно под «закрыть» с «меню»: логотип, «Смена» и «Связь» переставали
+   нажиматься. Поэтому в полном экране держим пол в 44px; сообщил больше —
+   берём его. */
+html.tg-fs{--tg-chrome-top:max(var(--tg-content-safe-area-inset-top,0px),44px)}
+
+/* На компьютере телеграм рисует свою шапку СНАРУЖИ окна приложения, но всё
+   равно сообщает её высоту как отступ для контента. Мы этот отступ добавляли —
+   и под шапкой оставалась пустая чёрная лента высотой с неё же. Отбрасываем.
+   Компьютер узнаём по клиенту телеграма (класс ставит скрипт), а НЕ по ширине
+   окна: планшет в альбомной ориентации тоже шире 900, а там этот отступ как
+   раз нужен — именно на нём кнопки телеграма и наезжали на шапку. */
+html.tg-desk{--tg-chrome-top:0px}
 
 /* Light theme — same layout, white surfaces, darker gold for text contrast.
    Toggled by the / header button, persisted in localStorage (pos_theme). */
@@ -102,7 +116,7 @@ input:focus,textarea:focus{outline:none;border-color:rgba(201,169,110,.4)}
 .cat-btn{display:flex;align-items:center;gap:8px;width:100%;padding:13px 12px;border-radius:var(--r2);font-size:14px;font-weight:600;color:var(--sub);transition:.14s;text-align:left;margin-bottom:4px}
 .cat-btn .cnt{margin-left:auto;font-size:11px;color:var(--muted);font-weight:500}
 .cat-btn.on{background:var(--gold-soft);color:var(--gold2);box-shadow:inset 3px 0 0 rgba(201,169,110,.55)}
-.rail-foot{padding:10px 8px;border-top:1px solid var(--border2)}
+.rail-foot{flex-shrink:0;padding:10px 8px calc(10px + var(--safe-bottom));border-top:1px solid var(--border2)}
 .orders-btn{display:flex;align-items:center;gap:9px;width:100%;padding:14px 12px;border-radius:var(--r2);font-size:14px;font-weight:700;color:var(--text);background:var(--card2);border:1px solid var(--border2);transition:.14s;position:relative}
 .orders-btn.on{background:var(--gold-soft);border-color:rgba(201,169,110,.35);color:var(--gold2)}
 .orders-btn .badge{position:absolute;right:10px;min-width:22px;height:22px;padding:0 6px;border-radius:11px;background:var(--gold);color:#1a1408;font-size:12px;font-weight:800;display:flex;align-items:center;justify-content:center}
@@ -3009,9 +3023,17 @@ try{
     if(p) return /tdesktop|macos|weba|webk|unigram/.test(p);
     return window.innerWidth >= 1200;      // клиент не назвался — судим по окну
   };
+  // Что за клиент и развернуты ли мы — решает CSS-отступ сверху, поэтому
+  // состояние живёт классами на <html>, а не медиазапросом по ширине.
+  const markChrome=()=>{ try{
+    const c = document.documentElement.classList;
+    c.toggle('tg-desk', wide());
+    c.toggle('tg-fs', !!tg.isFullscreen);
+  }catch(e){} };
   const wantFS=()=>{ try{
-    if(wide()){ if(tg.exitFullscreen && tg.isFullscreen) tg.exitFullscreen(); return; }
+    if(wide()){ if(tg.exitFullscreen && tg.isFullscreen) tg.exitFullscreen(); markChrome(); return; }
     if(tg.requestFullscreen && !tg.isFullscreen) tg.requestFullscreen();
+    markChrome();
   }catch(e){} };
   wantFS(); setTimeout(wantFS,300); setTimeout(wantFS,1000); setTimeout(wantFS,2500);
   tg.onEvent && tg.onEvent('fullscreenFailed', e=>console.warn('fullscreen failed:', e && e.error));
@@ -3021,17 +3043,21 @@ try{
   tg.setBottomBarColor && tg.setBottomBarColor('#000006');
   tg.enableClosingConfirmation && tg.enableClosingConfirmation();
   tg.disableVerticalSwipes && tg.disableVerticalSwipes();
-  // Высота окна. При первом открытии телеграм сообщает её ДО того, как развернёт
-  // приложение и уберёт свою шапку: панель верстается по короткому экрану, и
-  // половина каталога с концом чека остаются за краем. После обновления
-  // страницы высота уже правильная — оттуда и разница, которую видно глазами.
+  // Высота каркаса. При первом открытии телеграм сообщает свою высоту ДО того,
+  // как развернёт приложение и уберёт шапку: панель верстается по короткому
+  // экрану, и половина каталога с концом чека остаются за краем. Лечили это
+  // тем, что брали наибольшее из его чисел и окна, — и получили обратную
+  // болезнь: на планшете в полном экране клиент называет высоту БОЛЬШЕ окна,
+  // каркас становится выше видимого, и низ обеих колонок («Заказы» слева,
+  // «Создать заказ» справа) уходит за нижний край экрана.
   //
-  // Поэтому берём наибольшее из того, что знаем, и перемеряем ещё несколько раз
-  // после старта: разворачивание анимированное, и точное число приходит позже
-  // самого события.
+  // Поэтому главное здесь окно вебвью: ниже него не видно ничего физически, и
+  // к концу разворачивания оно уже верное. Числа телеграма остаются запасом на
+  // случай, когда окно ещё не назвалось. Перемеряем несколько раз после старта:
+  // разворачивание анимированное, и точное число приходит позже события.
   const updVph=()=>{
-    const h = Math.max(tg.viewportHeight||0, tg.viewportStableHeight||0,
-                       window.innerHeight||0);
+    const h = window.innerHeight
+           || Math.max(tg.viewportStableHeight||0, tg.viewportHeight||0);
     if(h) document.documentElement.style.setProperty('--tg-h', h+'px');
   };
   updVph();
@@ -3039,7 +3065,27 @@ try{
   window.addEventListener('resize',updVph);
   window.addEventListener('orientationchange',()=>setTimeout(updVph,250));
   tg.onEvent && tg.onEvent('viewportChanged',updVph);
-  tg.onEvent && tg.onEvent('fullscreenChanged',()=>setTimeout(updVph,250));
+  tg.onEvent && tg.onEvent('fullscreenChanged',()=>{ markChrome(); setTimeout(()=>{markChrome();updVph();},250); });
+  tg.onEvent && tg.onEvent('safeAreaChanged',markChrome);
+  tg.onEvent && tg.onEvent('contentSafeAreaChanged',markChrome);
+  // Замер по требованию: ?vp=1 показывает числа, которыми верстается экран.
+  // Операторы адрес руками не набирают, так что в работе этого нет.
+  window.vpInfo=()=>{ const c=getComputedStyle(document.documentElement); return {
+    platform:(tg&&tg.platform)||'—', fullscreen:!!(tg&&tg.isFullscreen),
+    innerH:window.innerHeight, tgH:(tg&&tg.viewportHeight)||0,
+    tgStable:(tg&&tg.viewportStableHeight)||0,
+    frame:c.getPropertyValue('--tg-h').trim(),
+    top:c.getPropertyValue('--safe-top').trim(),
+    bottom:c.getPropertyValue('--safe-bottom').trim() }; };
+  try{ if(new URLSearchParams(location.search).get('vp')){
+    const b=document.createElement('div');
+    b.style.cssText='position:fixed;z-index:99999;left:8px;bottom:8px;max-width:60vw;'
+      +'padding:6px 8px;border-radius:8px;background:rgba(0,0,0,.82);color:#8f8;'
+      +'font:11px/1.35 monospace;white-space:pre-wrap;pointer-events:none';
+    const paint=()=>{ b.textContent=JSON.stringify(window.vpInfo(),null,1); };
+    document.addEventListener('DOMContentLoaded',()=>{document.body.appendChild(b);paint();});
+    setInterval(paint,700);
+  } }catch(e){}
 }catch(e){}
 
 // ── state ──

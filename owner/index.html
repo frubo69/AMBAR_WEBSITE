@@ -19272,18 +19272,16 @@ function shEmpty(kind){
 function woNoneBlock(){
   const n = (ACC_WO || {}).none;
   if(n) return `<div class="wo-none on">
-      <span class="wo-none-t">Отмечено: за ${escS(accDayWord())} списаний не было</span>
+      <span class="wo-none-t">Отмечено: списаний не было</span>
       <span class="wo-none-s">${escS(n.by_name || '—')}${
         n.at ? ' · ' + escS(_when(n.at)) : ''}</span>
       <button class="wo-none-x" onclick="woNoneSet(false)">Снять отметку</button>
     </div>`;
+  // Абзац про то, откуда берутся списания, отсюда убран: он повторял то, что
+  // и так стоит кнопкой внизу экрана, а заголовок повторял сам себя ещё и в
+  // подписи на кнопке. Осталось одно утверждение и одно действие.
   return `<div class="wo-none">
-      <div class="sh-empty-h" style="margin:0 0 12px;padding:0;border:0">Списание
-        записывает водитель в своём приложении — с фотографией. Она и отличает
-        списание от способа закрыть недостачу. Но бьётся не только при водителе:
-        своё списание вносите здесь.</div>
-      <button class="wo-none-b" onclick="woNoneSet(true)">Ничего не списывали за ${
-        escS(accDayWord())}</button>
+      <button class="wo-none-b" onclick="woNoneSet(true)">Отметить, что не было</button>
     </div>`;
 }
 
@@ -19315,13 +19313,48 @@ async function woNoneSet(on){
 // нет» бессмысленно.
 let WOA = null;      // {kind, item, name, qty, note, photo, thumb, district}
 
+// Кнопка «Списать самому» не открывала ничего, и молча: форма читала районы
+// из «Склада», а каталог — из «Закупки», и рассчитывала, что в этих разделах
+// уже кто-то побывал. Придёшь в «Расходы смены» напрямую — переменной
+// «Закупки» не существует вовсе, чтение падает с ReferenceError ещё до того,
+// как окно успевает показаться, и палец нажимает в пустоту.
+//
+// Поэтому форма больше ничего не берёт из чужих разделов: и районы, и каталог
+// живут в ней самой, а если их нет — она их запрашивает. Окно при этом
+// открывается сразу, не дожидаясь сети: ждать ответа сервера, глядя в
+// нажатую кнопку, — то же самое, что не открыться.
 async function woAddOpen(){
   if(!await accAskBack('Списание')) return;
   WOA = {kind:'бой', item:'', name:'', qty:1, note:'', photo:'', thumb:'',
-         district: (STK.districts && STK.districts[0] && STK.districts[0].id) || '', q:''};
+         district: '', q:'', districts: (STK.districts || []), cat: [], busy: true};
+  WOA.district = (WOA.districts[0] || {}).id || '';
   woAddPaint();
   document.getElementById('woAddOv').classList.add('show');
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  const [районы, каталог] = await Promise.all([_woDistricts(), _woCatalog()]);
+  if(!WOA) return;                       // окно успели закрыть
+  WOA.districts = районы; WOA.cat = каталог; WOA.busy = false;
+  if(!WOA.district) WOA.district = (районы[0] || {}).id || '';
+  woAddPaint();
+}
+
+// Районы. Держим их там же, где и раньше, — чтобы «Склад» не спрашивал второй
+// раз, — но больше не надеемся, что кто-то их туда положил.
+async function _woDistricts(){
+  if(STK.districts && STK.districts.length) return STK.districts;
+  try{ STK.districts = (await ownerApi.ownerFetch('/api/owner/stock/status')).districts || []; }
+  catch(e){ STK.districts = []; }
+  return STK.districts;
+}
+
+// Каталог нужен только утере: у боя и брака позицию приносит код с крышки.
+async function _woCatalog(){
+  const строки = o => (o && (o.all_rows || o.rows)) || [];
+  if(строки(ACC_ORDER).length) return строки(ACC_ORDER);
+  try{ ACC_ORDER = await ownerApi.ownerFetch('/api/owner/stock/order',
+                                             {params:{day: accDay()}}); }
+  catch(e){ return []; }
+  return строки(ACC_ORDER);
 }
 function woAddClose(){
   document.getElementById('woAddOv').classList.remove('show');
@@ -19336,7 +19369,7 @@ function woAddPaint(){
   const w = WOA; if(!w) return;
   const box = document.getElementById('woAddBody'); if(!box) return;
   const утеря = w.kind === 'потеря';
-  const cat = (ORD.d && (ORD.d.all_rows || ORD.d.rows)) || [];
+  const cat = w.cat || [];
   const q = (w.q || '').toLowerCase().trim();
   const list = q ? cat.filter(r => (r.name||'').toLowerCase().includes(q)).slice(0, 8) : [];
   // Бутылку в руках не надо описывать словами: код с крышки знает и позицию,
@@ -19369,7 +19402,7 @@ function woAddPaint(){
     </div>
 
     <div class="wo-c-l">Где</div>
-    <div class="wo-c-who">${(STK.districts||[]).map(d => `
+    <div class="wo-c-who">${(w.districts||[]).map(d => `
       <button class="wo-c-p ${w.district===d.id?'on':''}"
               onclick="woAddSet('district','${d.id}')">${escS(d.code||'')}</button>`).join('')}</div>
 

@@ -59,17 +59,25 @@ html.hid-boot #gameApp *{visibility:visible}
      drop-shadow и цвет обводки, и браузер перерисовывал их каждый кадр.
      Список закрыт нарочно: сюда попадает только дешёвое. */
   --tp: transform,background-color,border-color,color,opacity;
-  --safe-top:calc(var(--tg-safe-area-inset-top,0px) + var(--tg-content-safe-area-inset-top,0px));
-  --safe-bottom:calc(var(--tg-safe-area-inset-bottom,0px) + env(safe-area-inset-bottom,0px));
+  /* Сколько сверху и снизу занято не нами: вырез устройства плюс собственные
+     кнопки телеграма — в полном экране «закрыть» слева и меню справа висят
+     ПОВЕРХ приложения. Клиент сообщает своё в --tg-*, система — в env().
+     Наибольшее, а не сумма: на телефоне это одна и та же полоса, и сложение
+     отнимало её дважды — снизу это съедало почти сантиметр. */
+  --tg-chrome-top:var(--tg-content-safe-area-inset-top,0px);
+  --safe-top:max(env(safe-area-inset-top,0px),
+    calc(var(--tg-safe-area-inset-top,0px) + var(--tg-chrome-top)));
+  --safe-bottom:max(env(safe-area-inset-bottom,0px),
+    calc(var(--tg-safe-area-inset-bottom,0px) + var(--tg-content-safe-area-inset-bottom,0px)));
 }
-/* На компьютере телеграм рисует свою шапку НАД окном приложения, но всё равно
-   сообщает её высоту как отступ для контента. Мы этот отступ добавляли — и под
-   шапкой оставалась пустая чёрная лента высотой с неё же. На широком экране
-   берём только отступ устройства (там он ноль), а телеграмовский отбрасываем:
-   его шапка и так снаружи. Вырезов и статус-баров на компьютере не бывает. */
-@media (min-width:900px){
-  :root{--safe-top:var(--tg-safe-area-inset-top,env(safe-area-inset-top,0px))}
-}
+/* Полный экран: кнопки телеграма висят над приложением, и не всякий клиент
+   честно сообщает их высоту. Держим пол в 44px; сообщил больше — берём его. */
+html.tg-fs{--tg-chrome-top:max(var(--tg-content-safe-area-inset-top,0px),44px)}
+/* На компьютере телеграм рисует свою шапку СНАРУЖИ окна приложения, но всё
+   равно сообщает её высоту как отступ для контента — под шапкой оставалась
+   пустая чёрная лента. Отбрасываем. Клиент узнаём по имени, а не по ширине
+   окна: планшет в альбомной тоже шире 900, а там отступ как раз нужен. */
+html.tg-desk{--tg-chrome-top:0px}
 
 *{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
 html,body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100%;overflow-x:clip;font-size:14px;line-height:1.4;font-variant-numeric:lining-nums tabular-nums}
@@ -2468,51 +2476,80 @@ button.path:active{transform:scale(.995)}
   display:flex;align-items:center;justify-content:center;color:var(--text);
   background:var(--card2);border:1px solid var(--border2)}
 
-/* Плавающий остров, как в Find My: карта видна со всех сторон, и по её краю
-   можно вести пальцем, не задевая шторку. Отсюда отступы по бокам и снизу,
-   скругление со всех углов и настоящее стекло вместо тёмной плашки.
-   Высота фиксированная: положение задаётся сдвигом, а не пересчётом высоты —
-   так анимация идёт на композиторе и не дёргает раскладку списка. */
-.wh-sheet{position:absolute;left:8px;right:8px;z-index:6;
-  /* Над панелью управления, а не поверх неё: 56 — её высота с отступами. */
-  bottom:calc(64px + var(--safe-bottom));
-  height:calc(100% - 118px - var(--safe-top) - var(--safe-bottom));
+/* Шторка как в Find My: во всю ширину, низ ПРИЖАТ к нижнему краю экрана,
+   двигается только верхняя граница. Это не косметика — прежде шторка была
+   плавающим островом и ездила целиком, и на средней высоте её низ вместе с
+   двумя последними строками списка оказывался за краем экрана. Теперь за
+   край уходит только пустой хвост коробки, а всё содержимое лежит выше.
+
+   Положение по-прежнему задаётся сдвигом, а не высотой: сдвиг живёт на
+   композиторе и не пересобирает раскладку списка каждый кадр. */
+.wh-sheet{position:absolute;left:0;right:0;z-index:6;
+  top:calc(var(--safe-top) + 6px); bottom:0;
   display:flex;flex-direction:column;
-  border-radius:22px;background:rgba(16,16,24,.72);
-  -webkit-backdrop-filter:blur(30px) saturate(180%);
-  backdrop-filter:blur(30px) saturate(180%);
-  border:1px solid rgba(255,255,255,.09);
-  box-shadow:0 18px 50px rgba(0,0,0,.55), 0 2px 8px rgba(0,0,0,.4);
+  border-radius:26px 26px 0 0;
+  /* Стекло функционального слоя: крупная поверхность держится плотнее, иначе
+     карта под ней съедает текст. Насыщение вытягивает цвет из карты — это и
+     отличает стекло от простой тёмной плашки. */
+  background:rgba(13,13,20,.76);
+  -webkit-backdrop-filter:blur(36px) saturate(190%);
+  backdrop-filter:blur(36px) saturate(190%);
+  border-top:1px solid rgba(255,255,255,.11);
+  box-shadow:0 -14px 44px rgba(0,0,0,.5);
   transform:translateY(0);
-  /* Кривая близка к системной: быстрый старт, мягкая посадка, без отскока. */
-  transition:transform .42s cubic-bezier(.32,.72,0,1);
-  overflow:hidden;touch-action:none}
-.wh-sheet.drag{transition:none}
-.wh-hd{flex:0 0 auto;padding:7px 18px 11px;cursor:grab;user-select:none;
-  -webkit-user-select:none}
+  /* Кривая системной шторки: быстрый старт, мягкая посадка, без отскока. */
+  transition:transform .46s cubic-bezier(.32,.72,0,1);
+  overflow:hidden;touch-action:none;will-change:transform}
+.wh-sheet.drag,.wh-sheet.drag .wh-tabs{transition:none}
+.wh-hd{position:relative;z-index:2;flex:0 0 auto;padding:7px 18px 11px;cursor:grab;
+  user-select:none;-webkit-user-select:none}
+/* Тающий край сверху — тот же приём, что у панели снизу. Без него первая
+   строка обрубалась о шапку ровной линией, и это читалось как сбой отрисовки,
+   а не как «список продолжается выше». */
+.wh-hd::after{content:'';position:absolute;left:0;right:0;top:100%;height:24px;
+  pointer-events:none;
+  background:linear-gradient(rgba(13,13,20,.85), rgba(13,13,20,0));
+  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
+  -webkit-mask-image:linear-gradient(#000 30%, transparent);
+  mask-image:linear-gradient(#000 30%, transparent)}
 .wh-grab{display:block;width:36px;height:5px;margin:0 auto 11px;border-radius:3px;
   background:rgba(255,255,255,.28)}
 .wh-ttl{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;
   letter-spacing:-.3px}
 .wh-sub{font-size:12px;color:var(--muted);margin-top:3px}
-.wh-body{flex:1;overflow-y:auto;-webkit-overflow-scrolling:touch;
-  padding:6px 12px 12px;touch-action:pan-y;overscroll-behavior:contain}
+.wh-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  /* Снизу ровно столько, сколько закрыто панелью и ушло за край экрана.
+     Число пересчитывается на каждой посадке шторки — оттого последняя
+     строка всегда доступна прокруткой, а не прячется под фильтром. */
+  padding:4px 14px var(--wh-pad-b,96px);
+  touch-action:pan-y;overscroll-behavior:contain}
 /* В сложенном виде список не листается: палец на нём поднимает шторку, а не
    прокручивает содержимое, которого всё равно не видно. */
 .wh-sheet.peek .wh-body{overflow:hidden}
 
-/* Панель управления внизу шторки — как таб-бар в Find My. Видна всегда, в том
-   числе в сложенном виде: это то, чем шторкой управляют. */
-.wh-fade{position:absolute;left:8px;right:8px;height:26px;z-index:6;pointer-events:none;
-  bottom:calc(64px + var(--safe-bottom));border-radius:0 0 22px 22px;
-  background:linear-gradient(rgba(16,16,24,0), rgba(16,16,24,.8))}
-.wh-tabs{position:absolute;left:8px;right:8px;bottom:calc(8px + var(--safe-bottom));
-  z-index:7;display:flex;align-items:center;gap:8px;padding:7px;
-  border-radius:18px;background:rgba(16,16,24,.72);
-  -webkit-backdrop-filter:blur(30px) saturate(180%);
-  backdrop-filter:blur(30px) saturate(180%);
-  border:1px solid rgba(255,255,255,.09);
-  box-shadow:0 12px 32px rgba(0,0,0,.5)}
+/* Панель управления — подвал шторки. Стоит у нижнего края экрана всегда, в
+   том числе когда шторка сложена: сдвиг шторки она гасит своим встречным.
+   Собственного стекла у неё нет — она лежит на стекле шторки, и второй слой
+   размытия здесь только стоил бы кадров. */
+.wh-tabs{position:absolute;left:0;right:0;bottom:0;z-index:3;
+  display:flex;align-items:center;gap:8px;
+  padding:8px 12px calc(8px + var(--safe-bottom));
+  background:rgba(16,16,24,.94);
+  -webkit-backdrop-filter:blur(20px) saturate(140%);
+  backdrop-filter:blur(20px) saturate(140%);
+  border-top:1px solid rgba(255,255,255,.07);
+  transform:translateY(0);
+  transition:transform .46s cubic-bezier(.32,.72,0,1);
+  will-change:transform}
+/* Тающий край: у Apple содержимое не обрывается о панель, а уходит под неё
+   размываясь. Маска даёт настоящий градиент размытия, заливка снизу — запас
+   для тех, кто маску не умеет. */
+.wh-tabs::before{content:'';position:absolute;left:0;right:0;bottom:100%;
+  height:42px;pointer-events:none;
+  background:linear-gradient(to top, rgba(13,13,20,.92), rgba(13,13,20,0));
+  -webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px);
+  -webkit-mask-image:linear-gradient(to top, #000 25%, transparent);
+  mask-image:linear-gradient(to top, #000 25%, transparent)}
 .wh-seg{flex:1;display:flex;padding:3px;border-radius:12px;
   background:rgba(255,255,255,.06)}
 .wh-seg button{flex:1;padding:7px 4px;border:none;border-radius:9px;background:none;
@@ -2569,14 +2606,19 @@ button.path:active{transform:scale(.995)}
    Отвечает не на «как его зовут» — это и так известно, — а на «кому отдать
    следующий заказ». Поэтому слева состояние связи, справа сколько у человека
    уже на руках, а под именем район и до какого часа хватит трансляции. */
-.wh-r{display:flex;align-items:center;gap:12px;width:100%;padding:12px 13px;
-  margin-bottom:8px;border-radius:15px;text-align:left;cursor:pointer;
-  font-family:inherit;color:var(--text);background:rgba(255,255,255,.045);
-  border:1px solid var(--border2);transition:border-color .18s var(--e1),
-  background .18s var(--e1)}
+/* Стекло — только у функционального слоя (шторка, панель, кнопки карты).
+   Строке списка оно не положено: слой содержимого поверх стекла даёт кашу из
+   полупрозрачностей, в которой перестаёт читаться главное. Отсюда плоская
+   заливка, разделитель вместо рамки и отклик нажатия сжатием. */
+.wh-r{display:flex;align-items:center;gap:12px;width:100%;padding:13px 12px;
+  border-radius:16px;text-align:left;cursor:pointer;
+  font-family:inherit;color:var(--text);background:transparent;border:none;
+  transition:transform .2s var(--e1), background-color .2s var(--e1)}
+.wh-r + .wh-r{box-shadow:0 -1px 0 rgba(255,255,255,.055)}
+.wh-r:active{transform:scale(.975);background:rgba(255,255,255,.05)}
 .wh-r.on{border-color:rgba(201,169,110,.5);background:rgba(201,169,110,.1)}
-.wh-r.off{background:rgba(255,255,255,.02)}
 .wh-r.off .wh-n{color:var(--sub)}
+.wh-r.off .wh-i{opacity:.6}
 /* Огонёк связи. Живой пульсирует — глаз ловит движение раньше, чем читает
    подпись; свежая точка без трансляции золотая и без пульса; погасший тускл. */
 .wh-i{position:relative;width:34px;height:34px;flex:0 0 auto;border-radius:12px;
@@ -2618,6 +2660,18 @@ button.path:active{transform:scale(.995)}
 .wh-pin.snap{background:#C9A96E;color:#1a1408}
 .wh-pin.stale{background:#7d879c;color:#0b0e18}
 .wh-pin.sel{transform:scale(1.14)}
+/* Метка выбранного вырастает, а не подменяется: движение показывает связь
+   между строкой, по которой нажали, и точкой на карте. */
+.wh-pin.pop{animation:whPinPop .5s cubic-bezier(.34,1.3,.5,1) both}
+@keyframes whPinPop{0%{transform:scale(.2);opacity:0}
+  60%{transform:scale(1.26);opacity:1}100%{transform:scale(1.14);opacity:1}}
+/* Содержимое шторки при переходе список↔карточка. Одно движение вместе с
+   высотой шторки и полётом карты — не три отдельных. */
+@keyframes whSwapIn{from{opacity:0;transform:translateY(18px) scale(.99)}
+  to{opacity:1;transform:none}}
+.wh-body.swap{animation:whSwapIn .42s cubic-bezier(.32,.72,0,1)}
+@media (prefers-reduced-motion:reduce){
+  .wh-body.swap{animation:none}.wh-pin.pop{animation:none}}
 .wh-dotp{width:12px;height:12px;border-radius:50%;background:var(--gold2);
   border:2px solid #0b0e18;box-shadow:0 0 0 1px rgba(201,169,110,.6)}
 .wh-note{padding:14px 4px 4px;font-size:11px;line-height:1.5;color:var(--dim)}
@@ -5658,22 +5712,6 @@ button.path:active{transform:scale(.995)}
         <path d="M3 17.5 12 22l9-4.5"/></svg>
     </button>
   </div>
-  <!-- Панель управления: собственный плавающий бар у нижнего края. Он не
-     ездит вместе со шторкой — в Find My нижняя панель тоже всегда на
-     месте, и именно она даёт опору всему экрану. -->
-  <div class="wh-tabs" id="whTabs">
-    <div class="wh-seg" id="whSeg">
-      <button data-f="all"  class="on" onclick="whFilter('all')">Все<b id="whCntAll"></b></button>
-      <button data-f="live"          onclick="whFilter('live')">На связи<b id="whCntLive"></b></button>
-      <button data-f="route"         onclick="whFilter('route')">В пути<b id="whCntRoute"></b></button>
-    </div>
-    <button class="wh-tab-fab" onclick="whFitAll()" aria-label="Показать всех на карте">
-      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/></svg>
-    </button>
-  </div>
-  <div class="wh-fade"></div>
   <div class="wh-sheet" id="whSheet">
     <div class="wh-hd" id="whGrab">
       <span class="wh-grab"></span>
@@ -5691,6 +5729,23 @@ button.path:active{transform:scale(.995)}
       </div>
     </div>
     <div class="wh-body" id="whList"></div>
+    <!-- Панель управления — подвал шторки, а не отдельная плашка над ней.
+         Так она физически не может наехать на карточку: список кончается
+         там, где она начинается. Сама панель при этом стоит на месте —
+         шторка уезжает вниз, панель поднимается на столько же и остаётся
+         у нижнего края экрана, как таб-бар в Find My. -->
+    <div class="wh-tabs" id="whTabs">
+      <div class="wh-seg" id="whSeg">
+        <button data-f="all"  class="on" onclick="whFilter('all')">Все<b id="whCntAll"></b></button>
+        <button data-f="live"          onclick="whFilter('live')">На связи<b id="whCntLive"></b></button>
+        <button data-f="route"         onclick="whFilter('route')">В пути<b id="whCntRoute"></b></button>
+      </div>
+      <button class="wh-tab-fab" onclick="whFitAll()" aria-label="Показать всех на карте">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/></svg>
+      </button>
+    </div>
   </div>
 </div>
 
@@ -7409,6 +7464,17 @@ try{ if(window.Telegram && Telegram.WebApp){
   var tg=Telegram.WebApp;
   tg.ready(); tg.expand();
   if(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0') && tg.requestFullscreen) tg.requestFullscreen();
+  // Отступ сверху зависит от того, рисует ли телеграм свои кнопки поверх нас.
+  // Состояние держим классами на <html>: медиазапрос по ширине здесь врёт —
+  // планшет в альбомной шире компьютерного окна.
+  function markChrome(){ try{
+    const c = document.documentElement.classList;
+    const p = String(tg.platform || '');
+    c.toggle('tg-desk', /tdesktop|macos|weba|webk|unigram/.test(p));
+    c.toggle('tg-fs', !!tg.isFullscreen);
+  }catch(e){} }
+  markChrome();
+  [120,400,1200,2600].forEach(t=>setTimeout(markChrome,t));
 
   // Открылись вертикально на телефоне — там и остаёмся. Экран звонка, списки и
   // карточки собраны под вертикальную раскладку, альбомной у них нет вовсе:
@@ -7431,12 +7497,14 @@ try{ if(window.Telegram && Telegram.WebApp){
   tg.setBackgroundColor && tg.setBackgroundColor('#000006');
   tg.enableClosingConfirmation && tg.enableClosingConfirmation();
   tg.disableVerticalSwipes && tg.disableVerticalSwipes();
-  // Та же беда, что была в панели оператора: при первом открытии телеграм
-  // сообщает высоту ДО того, как развернёт приложение. Берём наибольшее из
-  // известного и перемеряем ещё несколько раз — разворачивание анимированное.
+  // Высота каркаса. При первом открытии телеграм сообщает свою высоту ДО того,
+  // как развернёт приложение, — панель верстается по короткому экрану. Лечили
+  // это тем, что брали наибольшее из его чисел и окна, и получили обратную
+  // болезнь: когда клиент называет высоту БОЛЬШЕ окна, низ экрана уезжает за
+  // край. Главное здесь окно вебвью — ниже него не видно ничего физически.
   function updVph(){
-    const h = Math.max(tg.viewportHeight||0, tg.viewportStableHeight||0,
-                       window.innerHeight||0);
+    const h = window.innerHeight
+           || Math.max(tg.viewportStableHeight||0, tg.viewportHeight||0);
     if(h) document.documentElement.style.setProperty('--tg-h', h+'px');
   }
   updVph();
@@ -7444,7 +7512,9 @@ try{ if(window.Telegram && Telegram.WebApp){
   window.addEventListener('resize',updVph);
   window.addEventListener('orientationchange',()=>setTimeout(updVph,250));
   tg.onEvent('viewportChanged',updVph);
-  tg.onEvent('fullscreenChanged',()=>setTimeout(updVph,250));
+  tg.onEvent('fullscreenChanged',()=>{ markChrome(); setTimeout(()=>{markChrome();updVph();},250); });
+  tg.onEvent('safeAreaChanged',markChrome);
+  tg.onEvent('contentSafeAreaChanged',markChrome);
 } }catch(e){}
 
 // ===== API liveness / auth probe =====
@@ -8327,14 +8397,41 @@ let _whY = 'half', _whDrag = null, _whFilter = 'all';
 
 function _whSheet(){ return document.getElementById('whSheet'); }
 
+function _whFoot(){ return document.getElementById('whTabs'); }
+
 function whDetents(){
   const sh = _whSheet();
   const h = sh ? sh.offsetHeight : innerHeight * 0.8;
   const hd = document.getElementById('whGrab');
-  // Сложенная шторка показывает ровно шапку — ни обрезанной строки списка,
-  // ни половины карточки. Панель управления от неё не зависит: она отдельная.
-  const peek = Math.max(0, h - (hd ? hd.offsetHeight : 64));
-  return {full: 0, half: Math.round(h * 0.46), peek: Math.round(peek)};
+  const tb = _whFoot();
+  const hdH = hd ? hd.offsetHeight : 64;
+  const tbH = tb ? tb.offsetHeight : 60;
+  // Сложенная показывает шапку и панель управления — и ни одной обрезанной
+  // строки. Панель считается здесь же: она подвал шторки, а не отдельная
+  // плашка, и её высота — часть арифметики, а не помеха ей.
+  const peek = Math.max(0, h - hdH - tbH);
+  return {full: 0, half: Math.round(h * 0.46), peek: Math.round(peek),
+          card: whCardStop(h, hdH, tbH, peek)};
+}
+
+// Карточка получает ровно свою высоту, как отдельная высота у системной
+// шторки: не половина экрана наугад, а столько, сколько занял её текст.
+function whCardStop(h, hdH, tbH, peek){
+  const body = document.getElementById('whList');
+  const card = body && body.firstElementChild;
+  if(!card) return Math.round(h * 0.46);
+  const need = hdH + tbH + card.offsetHeight + 18;
+  return Math.max(0, Math.min(peek, Math.round(h - need)));
+}
+
+// Шторка едет вниз — панель управления ровно на столько же вверх, и потому
+// стоит у нижнего края экрана в любом положении. Оба сдвига идут одним
+// кадром и целиком на композиторе.
+function _whPut(dy){
+  const sh = _whSheet(), tb = _whFoot();
+  if(sh) sh.style.transform = `translateY(${dy}px)`;
+  if(tb) tb.style.transform = `translateY(${-dy}px)`;
+  whToolsFade(dy);
 }
 
 function whSnap(pos, smooth){
@@ -8344,13 +8441,18 @@ function whSnap(pos, smooth){
   _whY = pos;
   sh.classList.toggle('drag', !smooth);
   sh.classList.toggle('peek', pos === 'peek');
-  sh.style.transform = `translateY(${d[pos]}px)`;
-  whToolsFade(d[pos]);
+  _whPut(d[pos]);
+  // Снизу у списка ровно то, что закрыто панелью и ушло за край экрана.
+  // Пересчитываем на посадке, а не каждый кадр: во время движения пальцем
+  // строки и должны уезжать под панель, как у Apple.
+  const tb = _whFoot();
+  sh.style.setProperty('--wh-pad-b',
+    ((tb ? tb.offsetHeight : 60) + d[pos] + 14) + 'px');
   if(smooth) requestAnimationFrame(() => sh.classList.remove('drag'));
   // Карта живёт в оставшейся части экрана: её центр сдвигается вместе со
   // шторкой, иначе метки уезжают под неё.
   clearTimeout(whSnap._t);
-  whSnap._t = setTimeout(() => { try{ WH.map && WH.map.invalidateSize(); }catch(e){} }, 430);
+  whSnap._t = setTimeout(() => { try{ WH.map && WH.map.invalidateSize(); }catch(e){} }, 470);
 }
 
 // Кнопки карты не ездят — они гаснут. Двигать их вместе со шторкой значит
@@ -8405,8 +8507,7 @@ function whDragInit(){
     _whDrag.moved = y - _whDrag.y0;
     // Тянут вверх из списка, который уже вверху, — это прокрутка, не шторка.
     if(_whDrag.fromList && _whDrag.moved < 0 && _whY === 'full'){ _whDrag = null; return; }
-    sh.style.transform = `translateY(${clamp(_whDrag.base + _whDrag.moved, _whDrag.d)}px)`;
-    whToolsFade(clamp(_whDrag.base + _whDrag.moved, _whDrag.d));
+    _whPut(clamp(_whDrag.base + _whDrag.moved, _whDrag.d));
     if(e.cancelable) e.preventDefault();
   };
 
@@ -8419,8 +8520,11 @@ function whDragInit(){
     let target;
     if(Math.abs(v) > FLICK){
       // Бросок: уезжаем на одно положение в сторону движения, независимо от
-      // того, сколько успел пройти палец.
-      const i = order.indexOf(_whY);
+      // того, сколько успел пройти палец. Откуда едем — считаем по пикселям:
+      // у карточки своя высота, и в списке трёх имён её нет.
+      const from = order.reduce((best, k) =>
+        Math.abs(d[k] - base) < Math.abs(d[best] - base) ? k : best, 'half');
+      const i = order.indexOf(from);
       target = order[Math.max(0, Math.min(order.length - 1, i + (v > 0 ? 1 : -1)))];
     } else {
       // Спокойное движение: садимся в ближайшее положение.
@@ -8578,8 +8682,10 @@ function whRow(r, trackOn){
 // оператор получает не подсветку строки, а его экран — с состоянием, фактами
 // и действиями, — и карта под ним работает на этот экран.
 function whBack(){
-  WH.sel = null; WH.view = 'list';
+  WH.sel = null; WH.view = 'list'; WH.pop = false;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  // Возвращаемся так же немедленно, как и уходили.
+  if(WH.data){ whPaint(); _whSwap(); whSnap('half', true); }
   whereLoad();
 }
 
@@ -8652,12 +8758,16 @@ function whMapPaint(){
     const mk = L.marker([r.lat, r.lon], {icon: L.divIcon({
         className:'', iconSize:[30,30], iconAnchor:[15,30],
         html:`<div class="wh-pin${st === 'stream' ? '' : (st === 'snap' ? ' snap' : ' stale')}${
-          WH.sel === r.driver ? ' sel' : ''}"><span>${
+          WH.sel === r.driver ? ' sel' : ''}${
+          WH.pop && WH.sel === r.driver ? ' pop' : ''}"><span>${
           escS(r.code || '')}</span></div>`})})
      .addTo(WH.group);
     // Метка — не картинка: нажатие открывает карточку того же человека.
     mk.on('click', () => whPick(r.driver));
   });
+  // Вырастает один раз — на выборе. Обновление списка каждые десять секунд
+  // пересоздаёт метки, и без этого выбранная дёргалась бы всю смену.
+  WH.pop = false;
 
   const tr = (WH.sel && WH.track) ? (d.track || []) : [];
   if(tr.length > 1){
@@ -8680,7 +8790,7 @@ function whMapPaint(){
     WH.map.fitBounds(L.latLngBounds(pth).pad(0.25), {maxZoom: 15});
   }else if(WH.sel && WH.pan){
     const me = (d.drivers || []).find(r => r.driver === WH.sel && r.has);
-    if(me) whCenter(me.lat, me.lon, 15);
+    if(me) whCenter(me.lat, me.lon, 15, true);
     WH.pan = false;
   }else if(WH.fit && pts.length){
     WH.fit = false;
@@ -8773,13 +8883,25 @@ function whFocus(){
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 
-function whCenter(lat, lon, zoom){
+// Смещение и масштаб — одним движением. Прежде это были два: setView, а
+// следом panBy, и карта сначала приезжала, а потом дёргалась вниз. Цель
+// сдвигаем заранее, в координатах, и летим сразу в неё.
+function whCenter(lat, lon, zoom, fly){
   if(!WH.map) return;
   const sh = document.getElementById('whSheet');
+  // Метка должна встать в середину ВИДИМОЙ карты, а не экрана: под шторкой
+  // её никто не увидит.
   const hide = sh ? Math.max(0, innerHeight - sh.getBoundingClientRect().top) : 0;
-  WH.map.setView([lat, lon], zoom || WH.map.getZoom(), {animate:true});
-  // Сдвигаем на половину закрытой части: метка встаёт в середину видимого.
-  if(hide > 40) WH.map.panBy([0, hide / 2], {animate:true});
+  const z = zoom || WH.map.getZoom();
+  let ll = L.latLng(lat, lon);
+  if(hide > 40){
+    try{ ll = WH.map.unproject(WH.map.project(ll, z).add([0, hide / 2]), z); }
+    catch(e){}
+  }
+  // Полёт длиной со шторку: два движения читаются как одно, только если
+  // кончаются вместе.
+  if(fly && WH.map.flyTo) WH.map.flyTo(ll, z, {duration: .72, easeLinearity: .3});
+  else WH.map.setView(ll, z, {animate:true});
 }
 
 function whTrack(){
@@ -8812,14 +8934,30 @@ function whLayer(){
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 
+// Нажали на человека — и три вещи трогаются с места в одном кадре: шторка
+// садится на высоту карточки, её содержимое сменяется, карта летит к метке.
+// Раньше здесь стоял запрос к серверу, и всё это начиналось после ответа:
+// касание отзывалось через полсекунды, а движения выходили раздельными —
+// сперва прыжок шторки, потом текст, потом карта. Данные для карточки уже
+// лежат в памяти, ждать их незачем; свежие приедут следом и заменят молча.
 function whPick(name){
   const same = WH.sel === name;
-  WH.sel = name; WH.view = 'card'; WH.pan = true;
+  WH.sel = name; WH.view = 'card'; WH.pan = true; WH.pop = !same;
   if(!same) WH.track = false;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  // Карточке хватает половины экрана, а карта под ней должна остаться рабочей.
-  if(_whY === 'full') whSnap('half', true);
+  if(WH.data){
+    whPaint();          // содержимое карточки + полёт карты
+    _whSwap();          // его появление
+    whSnap('card', true);
+  }
   whereLoad();
+}
+
+// Появление содержимого шторки. Перезапуск нужен явный: класс уже висит с
+// прошлого перехода, и без сброса анимация второй раз не играет.
+function _whSwap(){
+  const b = document.getElementById('whList'); if(!b) return;
+  b.classList.remove('swap'); void b.offsetWidth; b.classList.add('swap');
 }
 
 // ══════════════════════════════════════════════════════════════════════════

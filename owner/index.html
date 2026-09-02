@@ -3409,6 +3409,80 @@ button.path:active{transform:scale(.995)}
 .wo-c-note{width:100%;height:44px;padding:0 14px;border-radius:13px;
   border:1px solid var(--border2);background:var(--card);color:var(--text);
   font-family:inherit;font-size:13.5px}
+/* ── Окно «Списать самому» ────────────────────────────────────────────────
+   Было полтора десятка ярусов подряд: заголовок, два абзаца пояснений, над
+   каждым полем своя мелкая заглавная подпись, две одинаковые кнопки снимка,
+   ещё абзац внизу и две кнопки в подвале. Формально всё на месте, а глазу
+   не за что зацепиться — форма без единой опоры.
+
+   Здесь другое устройство: выбор вида — сегментами с той же едущей золотой
+   пилюлей, что и вкладки раздела; снимок — одной крупной плиткой, которая
+   сама превращается в предпросмотр; полей ровно столько, сколько нужно
+   выбранному виду; одно главное действие, приклеенное к низу. */
+.wo-add{padding:0 0 calc(10px + var(--safe-bottom));display:flex;flex-direction:column}
+.wo-add-hd{display:flex;align-items:flex-start;gap:12px;padding:18px 18px 12px}
+.wo-add-hd > div{flex:1;min-width:0}
+.wo-add-s{font-size:11.5px;color:var(--muted);margin-top:3px}
+.wo-add-x{flex:0 0 auto;width:32px;height:32px;border-radius:11px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;color:var(--sub);
+  background:var(--card);border:1px solid var(--border2)}
+.wo-add-x:active{transform:scale(.9)}
+.wo-add #woAddBody{padding:0 18px}
+/* Сегменты вида — тот же компонент, что вкладки: одна пилюля едет между
+   словами, а не четыре кнопки загораются по очереди. */
+.wo-add .periods{margin:0 0 16px;--count:4}
+.wo-add .wo-c-l{margin:16px 0 8px}
+/* Снимок. Одна плитка вместо двух ровных кнопок: снять камерой — главное
+   действие, галерея — запасной путь, и по весу это должно быть видно. */
+.wo-add-shot{display:flex;flex-direction:column;align-items:center;gap:10px;
+  padding:22px 16px;border-radius:16px;cursor:pointer;text-align:center;
+  border:1px dashed var(--border3);background:var(--card);
+  transition-property:var(--tp);transition-duration:.16s;transition-timing-function:var(--e1)}
+.wo-add-shot:active{transform:scale(.99);border-color:var(--gold2)}
+.wo-add-shot .ic{width:38px;height:38px;border-radius:13px;display:flex;
+  align-items:center;justify-content:center;color:var(--gold2);
+  background:var(--gold-soft);border:1px solid rgba(201,169,110,.28)}
+.wo-add-shot b{font-size:13.5px;font-weight:700}
+.wo-add-shot span{font-size:11.5px;color:var(--muted)}
+.wo-add-gal{margin-top:2px;padding:7px 14px;border-radius:10px;cursor:pointer;
+  font-family:inherit;font-size:11.5px;font-weight:600;color:var(--sub);
+  background:var(--card2);border:1px solid var(--border2)}
+/* Снимок сделан — плитка становится им самим. */
+.wo-add-done{position:relative;border-radius:16px;overflow:hidden;
+  border:1px solid rgba(76,175,125,.35);background:var(--card)}
+.wo-add-done img{display:block;width:100%;height:132px;object-fit:cover}
+.wo-add-done .lbl{position:absolute;left:0;right:0;bottom:0;display:flex;
+  align-items:center;gap:8px;padding:9px 12px;font-size:12px;font-weight:700;
+  color:#dff3e6;background:linear-gradient(rgba(0,0,6,0),rgba(0,0,6,.85))}
+.wo-add-done .lbl b{flex:1}
+.wo-add-done .lbl u{text-decoration:none;cursor:pointer;padding:4px 9px;border-radius:8px;
+  background:rgba(0,0,6,.5);color:#fff;font-weight:600}
+/* Счётчик бутылок: число крупно и по центру, кнопки по краям. */
+.wo-add .wo-c-amt input{height:52px;font-size:24px;text-align:center}
+.wo-add .wo-a-sb{width:52px;height:52px;border-radius:14px}
+.wo-add .wo-c-note{height:48px;border-radius:14px}
+.wo-add .wo-c-p{padding:9px 14px;border-radius:12px}
+/* Найденное — одной панелью под полем, а не стопкой одинаковых плашек:
+   иначе строки поиска неотличимы от самого поля, и непонятно, где ввод, а
+   где ответ. */
+.wo-add .wo-a-list{margin-top:6px;padding:5px;border-radius:14px;
+  background:var(--card2);border:1px solid var(--border2)}
+.wo-add .wo-a-row{width:100%;text-align:left;background:none;border:0;
+  border-radius:10px;padding:11px 11px}
+.wo-add .wo-a-row:active{background:var(--gold-soft);color:var(--gold2)}
+.wo-add .wo-a-item{border-radius:14px}
+/* Подсказка — одной строкой и только там, где она объясняет следующий шаг. */
+.wo-add-tip{margin:14px 0 0;font-size:11.5px;line-height:1.5;color:var(--dim)}
+/* Кнопка приклеена к низу: тело окна прокручивается под ней, а не уезжает
+   вместе с ней за край. */
+.wo-add-foot{position:sticky;bottom:0;z-index:2;margin-top:18px;padding:12px 18px 0;
+  background:linear-gradient(rgba(7,7,14,0),var(--bg2) 34%)}
+.wo-add-foot .wo-c-go{width:100%;height:52px;border:0;border-radius:15px;cursor:pointer;
+  font-family:inherit;font-size:15px;font-weight:800;color:#1a1408;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.wo-add-foot .wo-c-go:active{transform:scale(.985)}
+.wo-add-foot .wo-c-go:disabled{opacity:.4;pointer-events:none}
+
 .wo-c-acts{display:flex;gap:8px;margin-top:20px}
 .wo-c-acts button{flex:1;height:48px;border-radius:14px;border:1px solid var(--border2);
   background:var(--card);color:var(--sub);font-family:inherit;font-size:14px;
@@ -19372,21 +19446,43 @@ function woAddPaint(){
   const cat = w.cat || [];
   const q = (w.q || '').toLowerCase().trim();
   const list = q ? cat.filter(r => (r.name||'').toLowerCase().includes(q)).slice(0, 8) : [];
+
+  // Вид — сегментами. Четыре отдельные кнопки, загорающиеся по очереди, не
+  // показывают, что выбор здесь один; едущая пилюля показывает.
+  const виды = `<div class="periods" id="woKinds">
+      <div class="period-pill"></div>
+      ${WO_KINDS.map(k => `<button class="${w.kind === k ? 'on' : ''}"
+        onclick="woAddSet('kind','${k}')">${k}</button>`).join('')}
+    </div>`;
+
+  // Снимок. Пока его нет — плитка, которая сама и есть кнопка камеры; галерея
+  // внутри неё вторым, более тихим ходом. Появился — плитка становится им.
+  const снимок = w.thumb
+    ? `<div class="wo-add-done">
+         <img src="${w.thumb}" alt="">
+         <span class="lbl"><b>Снимок готов</b>
+           <u onclick="WOA.photo='';WOA.thumb='';woAddPaint()">заменить</u></span>
+       </div>`
+    : `<div class="wo-add-shot" onclick="document.getElementById('woCam').click()">
+         <span class="ic"><svg viewBox="0 0 24 24" width="19" height="19" fill="none"
+           stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+           stroke-linejoin="round"><path d="M4 8h3l1.5-2.5h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.6"/></svg></span>
+         <b>Снимок обязателен</b>
+         <span>одна фотография на всё, что списываете сейчас</span>
+         <button class="wo-add-gal" onclick="event.stopPropagation();
+                 document.getElementById('woGal').click()">Выбрать из галереи</button>
+       </div>`;
+
   // Бутылку в руках не надо описывать словами: код с крышки знает и позицию,
   // и точку, и что это ровно одна бутылка. Поэтому у боя, брака и просрочки
-  // весь ввод — вид, снимок и камера.
+  // весь ввод — вид, снимок и комментарий.
   //
   // Утеря — другой случай: бутылки нет, сканировать нечего, и остаётся
   // единственный путь — сказать руками, что именно пропало и сколько.
-  box.innerHTML = `
-    <div class="wo-c-l">Что случилось</div>
-    <div class="wo-c-who">${WO_KINDS.map(k => `
-      <button class="wo-c-p ${w.kind===k?'on':''}" onclick="woAddSet('kind','${k}')">${k}</button>`).join('')}</div>
-    ` + (утеря ? `
-    <div class="wo-c-l">Что пропало</div>
+  box.innerHTML = виды + (утеря ? `
     ${w.item ? `<button class="wo-a-item" onclick="woAddSet('item','')">
         <span>${escS(w.name)}</span><b>✕</b></button>`
-      : `<input class="wo-c-note" id="woAddQ" placeholder="Начните вводить название"
+      : `<input class="wo-c-note" id="woAddQ" placeholder="Что пропало — начните вводить"
               value="${escS(w.q||'')}" oninput="WOA.q=this.value;woAddPaint();
               setTimeout(()=>{const i=document.getElementById('woAddQ');if(i){i.focus();i.selectionStart=i.value.length;}},0)">
          ${list.length ? `<div class="wo-a-list">${list.map(r => `
@@ -19406,57 +19502,21 @@ function woAddPaint(){
       <button class="wo-c-p ${w.district===d.id?'on':''}"
               onclick="woAddSet('district','${d.id}')">${escS(d.code||'')}</button>`).join('')}</div>
 
-    <div class="wo-c-l">Комментарий</div>
-    <input class="wo-c-note" placeholder="что произошло"
+    <input class="wo-c-note" style="margin-top:14px" placeholder="Комментарий — что произошло"
            value="${escS(w.note||'')}" oninput="WOA.note=this.value">
     ` : `
-    <div class="wo-c-l">Снимок <i>один на всё, что списываете сейчас</i></div>
-    ${w.thumb ? `<div class="wo-a-ph"><img src="${w.thumb}" alt="">
-        <span>снимок готов</span><b onclick="WOA.photo='';WOA.thumb='';woAddPaint()">✕</b></div>`
-      : `<div class="wo-a-ph-b">
-          <button onclick="document.getElementById('woCam').click()">Снять камерой</button>
-          <button onclick="document.getElementById('woGal').click()">Из галереи</button>
-        </div>`}
-
-    <div class="wo-c-l">Комментарий</div>
-    <input class="wo-c-note" placeholder="что произошло"
+    ${снимок}
+    <input class="wo-c-note" style="margin-top:12px" placeholder="Комментарий — что произошло"
            value="${escS(w.note||'')}" oninput="WOA.note=this.value">
+    <div class="wo-add-tip">Дальше камера: одна крышка — одна бутылка, позиция и
+      точка возьмутся из кода.</div>`);
 
-    <div class="wo-a-hint">Дальше — камера: сканируйте крышки. Одна крышка —
-      одна бутылка, позиция и точка возьмутся из кода.</div>`);
+  const g = document.getElementById('woKinds'); if(g) movePill(g);
   const go = document.getElementById('woAddGo');
   if(go){
     go.textContent = утеря ? 'Списать' : 'Сканировать крышки';
     go.disabled = утеря ? !(w.item && w.qty > 0 && w.district) : !w.photo;
   }
-}
-
-// Снимок ужимаем на телефоне: с камеры приходит четыре мегабайта, а нужен
-// узнаваемый кадр. Заодно это единственное, что делает отправку по мобильной
-// сети быстрой настолько, чтобы её дождались.
-function woShot(inp){
-  const f = inp.files && inp.files[0]; inp.value = '';
-  if(!f || !WOA) return;
-  const img = new Image(), fr = new FileReader();
-  fr.onload = () => { img.src = fr.result; };
-  img.onload = () => {
-    const k = Math.min(1, 1280 / Math.max(img.width, img.height));
-    const c = document.createElement('canvas');
-    c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
-    c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
-    WOA.photo = c.toDataURL('image/jpeg', 0.72);
-    // Крошечная копия едет внутри самой записи: список списаний должен
-    // открываться с картинками, а не с пустыми рамками.
-    const t = document.createElement('canvas');
-    const tk = Math.min(1, 96 / Math.max(img.width, img.height));
-    t.width = Math.round(img.width * tk); t.height = Math.round(img.height * tk);
-    t.getContext('2d').drawImage(img, 0, 0, t.width, t.height);
-    WOA.thumb = t.toDataURL('image/jpeg', 0.5);
-    woAddPaint();
-    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-  };
-  img.onerror = () => _toast('Не смогли прочитать снимок');
-  fr.readAsDataURL(f);
 }
 
 async function woAddSave(){
@@ -22736,15 +22796,23 @@ function renderHours(h){
 <!-- Своё списание: то, что разбилось не при водителе. Фото обязательно везде,
      кроме утери — снимок отсутствующей бутылки ничего не доказывает. -->
 <div class="wo-c-ov" id="woAddOv" onclick="if(event.target===this)woAddClose()">
-  <div class="wo-c-sheet">
-    <div class="wo-c-h">
-      <div class="wo-c-t">Списать самому</div>
-      <div class="wo-c-s">Бой, брак, просрочка и утеря, которые заметили не на
-        доставке. Запись сразу учтённая — согласовывать её не у кого.</div>
+  <!-- Окно списания: шапка с крестиком, тело и одна кнопка, приклеенная к
+       низу. «Отмена» рядом с главным действием отсюда убрана — две кнопки
+       одинакового веса заставляют выбирать там, где выбора нет: уйти можно
+       крестиком и касанием по затемнению. -->
+  <div class="wo-c-sheet wo-add">
+    <div class="wo-add-hd">
+      <div>
+        <div class="wo-c-t">Списать самому</div>
+        <div class="wo-add-s">учитывается сразу, согласовывать не у кого</div>
+      </div>
+      <button class="wo-add-x" onclick="woAddClose()" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
     </div>
     <div id="woAddBody"></div>
-    <div class="wo-c-acts">
-      <button class="wo-c-no" onclick="woAddClose()">Отмена</button>
+    <div class="wo-add-foot">
       <button class="wo-c-go" id="woAddGo" onclick="woAddSave()" disabled>Списать</button>
     </div>
   </div>

@@ -14511,11 +14511,11 @@ function walBody(d){
     <!-- Откуда взялся остаток: пришло минус ушло. Пока этих двух строк не было,
          ноль на балансе при полной ленте выглядел поломкой экрана. -->
     <div class="wal-led">
-      <div><span>Пришло всего</span><b>${fmtUsdt(t.in)}</b></div>
+      <div><span>Входящие</span><b>${fmtUsdt(t.in)}</b></div>
       <div><span>из них не через приложение</span><i>${fmtUsdt(t.direct)}</i></div>
       ${t.linked ? `<div><span>из них привязано к заказам вручную</span><i>${
         fmtUsdt(t.linked)}</i></div>` : ''}
-      <div class="out"><span>Ушло с кошелька</span><b>−${fmtUsdt(t.out)}</b></div>
+      <div class="out"><span>Исходящие</span><b>−${fmtUsdt(t.out)}</b></div>
       <div class="rest"><span>Остаток</span><b>${fmtUsdt((t.in || 0) - (t.out || 0))}</b></div>
     </div>
     <div class="wal-note">по всем ${t.n || 0} ${

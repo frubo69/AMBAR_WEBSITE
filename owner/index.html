@@ -3518,8 +3518,17 @@ button.path:active{transform:scale(.995)}
 .exp-mark-bar{flex:1;height:5px;border-radius:3px;background:var(--card2);overflow:hidden}
 .exp-mark-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--gold),var(--gold2));
   transition:width .3s var(--e1)}
-.exp-grp{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
-  color:var(--muted);margin:16px 0 7px}
+/* Район и его люди — одна карточка, та же самая, что в «Команде»: та же
+   золотая шапка с кодом, названием и итогом. Раньше здесь была бледная
+   подпись над отдельными плитками, и связь «этот водитель из этого района»
+   держалась на одном отступе. */
+.exp-card{margin-bottom:10px}
+.exp-card .exp-row{background:transparent;border:0;border-radius:0;margin:0;
+  padding:0;border-top:1px solid var(--border2)}
+.exp-card .exp-row:first-of-type{border-top:0}
+.exp-card .exp-row.todo{background:rgba(255,255,255,.02);border-style:solid}
+.exp-card .exp-head{margin:0;padding:12px 13px;background:none}
+.exp-card .exp-items{margin:0 13px 10px;padding-top:0;border-top:0}
 /* Карточка водителя — из двух слоёв, и они про разное. Сверху человек и его
    смена, снизу деньги: разовые расходы. Пока это была одна плоская плитка,
    «доп. расходы» читались как продолжение имени, а не как отдельное дело.
@@ -3557,28 +3566,9 @@ button.path:active{transform:scale(.995)}
    растекается облаком пилюль. */
 /* Полоса разовых: подпись слева, число справа, разделитель сверху — она
    читается как строка итога, а не как ещё одна кнопка в ряду. */
-.exp-dop{display:flex;align-items:center;gap:8px;width:calc(100% + 28px);
-  margin:9px -14px -13px;padding:10px 14px 11px;
-  border:0;border-top:1px solid var(--border2);background:rgba(91,141,239,.055);
-  cursor:pointer;font-family:inherit;color:var(--muted);text-align:left}
 /* Когда под полосой лежат записанные расходы, она уже не низ карточки —
    и прижимать её к краю нельзя. */
-.exp-dop:not(:last-child){margin-bottom:9px}
-.exp-dop:active{opacity:.7}
-.exp-dop-t{flex:1;min-width:0;font-size:11.5px;font-weight:600;letter-spacing:.2px}
-.exp-dop-v{flex-shrink:0;display:flex;align-items:baseline;gap:4px;
-  font-family:'DM Sans',sans-serif;font-size:13.5px;font-weight:700;
-  font-variant-numeric:tabular-nums}
-.exp-dop-v i{font-style:normal;font-size:9.5px;font-weight:600;letter-spacing:.6px;
-  color:var(--muted)}
-.exp-dop-v u{text-decoration:none;font-size:10.5px;font-weight:700;color:var(--warn)}
-.exp-dop-v .dim{font-size:12px;font-weight:600;color:var(--dim)}
-.exp-dop.has{color:var(--gold2)}
-.exp-dop.has .exp-dop-v{color:var(--gold2)}
-.exp-dop.wait{color:var(--warn)}
-.exp-dop.open{color:var(--sub)}
 /* Полоса уже провела черту — второй под ней не надо. */
-.exp-dop + .exp-items,.exp-dop + .exp-form{border-top:0;padding-top:0;margin-top:8px}
 .exp-items{display:flex;flex-direction:column;gap:6px;margin-top:10px;padding-top:10px;
   border-top:1px solid var(--border2)}
 .exp-item{display:flex;align-items:center;gap:6px}
@@ -3608,40 +3598,37 @@ button.path:active{transform:scale(.995)}
 .exp-wait b{color:var(--warn)}
 /* Список видов траты. Плитками в два столбца: их десяток, и колонкой они
    растянули бы карточку на пол-экрана. */
-.exp-kinds{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin-top:9px;
-  padding-top:9px;border-top:1px solid var(--border2)}
-.exp-kind{display:flex;align-items:center;justify-content:space-between;gap:6px;
-  padding:10px 11px;border-radius:11px;cursor:pointer;font-family:inherit;
-  text-align:left;color:var(--text);background:var(--card2);
-  border:1px solid var(--border2)}
-.exp-kind:active{transform:scale(.98);border-color:var(--gold2)}
-.exp-kind.plus{border-color:rgba(76,175,125,.3)}
-.exp-kind-t{font-size:12.5px;font-weight:600;line-height:1.2}
-.exp-kind-h{flex:0 0 auto;font-size:9px;font-weight:700;letter-spacing:.4px;
-  text-transform:uppercase;color:var(--warn)}
-.exp-kind-h.plus{color:var(--up)}
+/* Перечень разовых — раскрытым списком прямо в строке водителя. Прежде
+   вместо него всплывала панелька: сперва выбери вид, потом откроются поля,
+   потом назад, если ошибся. Три шага там, где дело на один: у каждого вида
+   свои поля стоят открытыми, и вписать можно сразу в тот, который нужен. */
+.exp-add{padding:0 13px 11px}
+.exp-add-r{display:flex;align-items:center;gap:6px;padding:6px 0}
+.exp-add-r + .exp-add-r{border-top:1px solid rgba(255,255,255,.05)}
+.exp-add-t{flex:0 0 92px;min-width:0;font-size:11.5px;font-weight:600;line-height:1.15}
+.exp-add-t i{display:block;font-style:normal;font-size:8.5px;font-weight:700;
+  letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.exp-add-r.plus .exp-add-t{color:var(--up)}
+.exp-add-r input{min-width:0;padding:7px 9px;border-radius:8px;border:1px solid var(--border2);
+  background:var(--bg2);color:var(--text);font-family:inherit;font-size:12.5px}
+.exp-add-r input:focus{outline:none;border-color:rgba(201,169,110,.5)}
+.exp-add-r .amt{flex:0 0 62px;width:62px;text-align:center;font-weight:700}
+.exp-add-r .cmt{flex:1}
+.exp-add-r .ok{flex:0 0 auto;width:30px;height:30px;border:none;border-radius:8px;
+  cursor:pointer;background:var(--card3);color:var(--muted);
+  font-weight:800;font-size:14px;line-height:1;
+  transition-property:var(--tp);transition-duration:.16s;transition-timing-function:var(--e1)}
+.exp-add-r:has(.amt:not(:placeholder-shown)) .ok{
+  background:linear-gradient(135deg,#E8C98A,#C9A96E);color:#1a1408}
+.exp-add-r .ok:active{transform:scale(.9)}
+.exp-add-r .shot{flex:0 0 auto;padding:0 9px;height:30px;border:1px solid var(--border2);
+  border-radius:8px;cursor:pointer;background:var(--card2);color:var(--muted);
+  font-family:inherit;font-size:10.5px;font-weight:700}
+.exp-add-r .shot.on{color:var(--up);background:rgba(76,175,125,.12);
+  border-color:rgba(76,175,125,.4)}
 /* Шапка выбранного вида: назад и название — чтобы человек видел, во что
    вписывает сумму. */
-.exp-form-h{display:flex;align-items:center;gap:8px;margin-top:9px;padding-top:9px;
-  border-top:1px solid var(--border2)}
-.exp-back{width:24px;height:24px;flex:0 0 auto;border-radius:8px;border:1px solid var(--border2);
-  background:var(--card2);color:var(--sub);font-size:15px;line-height:1;cursor:pointer}
-.exp-form-t{font-size:12.5px;font-weight:700;color:var(--gold2)}
-.exp-shot{width:100%;margin-top:7px;padding:9px;border-radius:10px;cursor:pointer;
-  font-family:inherit;font-size:12px;font-weight:600;color:var(--warn);
-  background:rgba(243,180,74,.08);border:1px solid rgba(243,180,74,.3)}
-.exp-shot.on{color:var(--up);background:rgba(76,175,125,.08);
-  border-color:rgba(76,175,125,.3)}
 .exp-item-k{font-weight:700;color:var(--sub)}
-.exp-form{display:flex;gap:6px;margin-top:9px;padding-top:9px;border-top:1px solid var(--border2)}
-.exp-form input{min-width:0;padding:8px 10px;border-radius:9px;border:1px solid var(--border2);
-  background:var(--bg3);color:var(--text);font-family:inherit;font-size:12.5px;outline:none}
-.exp-form input:focus{border-color:rgba(201,169,110,.5)}
-.exp-form .amt{width:74px;text-align:center;font-weight:700}
-.exp-form .cmt{flex:1}
-.exp-form button{padding:8px 12px;border:none;border-radius:9px;cursor:pointer;flex-shrink:0;
-  background:linear-gradient(135deg,var(--gold),var(--gold2));color:#1a1408;
-  font-family:'DM Sans',sans-serif;font-size:12px;font-weight:700}
 
 /* Панель сортировки */
 .team-panel{overflow:hidden;max-height:0;opacity:0;padding:0 14px;margin:0 -14px;
@@ -15744,9 +15731,22 @@ function renderExpenses(){
                  operator:r.operator, rows:[]}; groups.push(g); }
     g.rows.push(r);
   });
-  list.innerHTML = groups.map(g => `
-    <div class="exp-grp">${escS(g.code)} ${escS(g.name)}${g.operator ? ' · ' + escS(g.operator) : ''}</div>
-    ${g.rows.map(r => expRow(r)).join('')}`).join('');
+  // Шапка та же, что у района в «Команде»: код, название, сколько людей и
+  // сколько район стоил за день. Итог здесь считается по строкам района, а не
+  // приходит с сервера, — сумма ровно тех людей, что под ней и стоят.
+  list.innerHTML = groups.map(g => {
+    const aed = g.rows.reduce((a, r) => a + (r.total || 0), 0);
+    return `<div class="team-card exp-card">
+      <div class="team-grp">
+        <span class="team-grp-c">${escS(g.code)}</span>
+        <span class="team-grp-n">${escS(g.name)} <u>(${g.rows.length} ${
+          pluralize(g.rows.length,'водитель','водителя','водителей')}${
+          g.operator ? ' · ' + escS(g.operator) : ''})</u></span>
+        <span class="team-grp-m">${fmt(aed)} AED</span>
+      </div>
+      ${g.rows.map(r => expRow(r)).join('')}
+    </div>`;
+  }).join('');
 }
 
 // Строка читается сверху вниз: кто → сколько → отметка → на что ушло.
@@ -15759,15 +15759,25 @@ function expRow(r){
   // Строка состояния — только про смену: вышел или дома и сколько за это
   // питания. Всё про разовые ушло на свою полосу ниже, иначе одно и то же
   // сказано дважды и в разных словах.
-  const state = w === null ? 'не отмечен'
-              : w ? `на смене · питание ${r.meal}`
-                  : `дома · питание ${r.meal}`;
+  // Разовые ушли в эту же строку: полоса «Доп. расходы» во всю ширину
+  // занимала целый уровень карточки ради одного слова «нет». Сумма и
+  // ожидающие решения читаются здесь же, рядом с питанием.
+  const appr = r.extra_sum || 0, wait = r.pending_count || 0;
+  const хвост = (appr ? ` · доп. ${fmt(appr)}` : '')
+              + (wait ? ` · ${wait} ${pluralize(wait,'ждёт','ждут','ждут')}` : '');
+  const state = w === null ? 'не отмечен' + хвост
+              : (w ? `на смене · питание ${r.meal}` : `дома · питание ${r.meal}`) + хвост;
   // Действия — тремя квадратами справа: во всю ширину они съедали карточку,
   // а нажимают их раз в день. Что именно выбрано, говорит подпись под именем —
   // иконка отвечает за действие, слово за состояние.
   const ICO = {
     work: '<path d="M20 6 9 17l-5-5"/>',
     home: '<path d="m3 10 9-7 9 7v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/>',
+    // Третий квадрат — разовые. Тем же размером и в том же ряду, что отметки:
+    // это тоже действие раз в день, и место ему рядом с ними, а не полосой
+    // через всю карточку.
+    add:  '<path d="M12 5v14M5 12h14"/>',
+    less: '<path d="M18 6 6 18M6 6l12 12"/>',
   };
   const sq = (kind, on, title, onclick) => `
     <button class="exp-sq ${on ? 'on-' + kind : ''}" title="${title}" aria-label="${title}"
@@ -15789,11 +15799,12 @@ function expRow(r){
                `expSetWork('${escS(r.name)}', ${w === true ? 'null' : 'true'})`)}
           ${sq('home', w === false, 'Дома',
                `expSetWork('${escS(r.name)}', ${w === false ? 'null' : 'false'})`)}
+          ${sq(open ? 'less' : 'add', false,
+               open ? 'Свернуть разовые' : 'Разовые расходы',
+               `expToggleForm('${escS(r.name)}')`)}
         </span>
       </span>
     </div>
-
-    ${expDop(r, open)}
 
     ${extras.length ? `<div class="exp-items">${extras.map(e => {
       const st = e.status || 'approved';
@@ -15814,7 +15825,7 @@ function expRow(r){
       </div>`;
     }).join('')}</div>` : ''}
 
-    ${open ? expKindBody(r) : ''}
+    ${open ? expAddList(r) : ''}
   </div>`;
 }
 
@@ -15841,42 +15852,59 @@ const EXP_KINDS = [
   {id:'other',   t:'Доп. расход',   hint:'что-то ещё'},
 ];
 
-let EXP_KIND = null, EXP_SHOT = {photo:'', thumb:''};
+let EXP_SHOT = {kind:'', photo:'', thumb:''};
 
 function expKind(id){ return EXP_KINDS.find(k => k.id === id) || null; }
 
-function expPickKind(id){
-  EXP_KIND = id || null;
-  EXP_SHOT = {photo:'', thumb:''};
-  renderExpenses();
-  if(EXP_KIND) setTimeout(()=>document.getElementById('expAmt')?.focus(), 60);
+// Весь перечень разовых сразу, у каждого вида свои поля открытыми.
+//
+// Было иначе: полоса «Доп. расходы» открывала сетку из десяти кнопок, нажатие
+// на кнопку заменяло сетку формой, а ошибся видом — жми «назад» и начинай
+// сначала. Три шага и два разных экрана ради одной строки в день. Теперь
+// список стоит целиком, и трата вписывается прямо в ту строку, к которой
+// относится: вид не выбирают, в него сразу пишут.
+//
+// Полей ровно два, как и раньше: сколько и за что. Третье — чек — только у
+// тех видов, где без бумажки трату не примут.
+function expAddList(r){
+  const n = escS(r.name);
+  return `<div class="exp-add">${EXP_KINDS.map(k => {
+    const снят = EXP_SHOT.kind === k.id && !!EXP_SHOT.photo;
+    return `<div class="exp-add-r${k.plus ? ' plus' : ''}">
+      <span class="exp-add-t">${escS(k.t)}${
+        k.receipt ? '<i>нужен чек</i>' : (k.plus ? '<i>плюсом</i>' : '')}</span>
+      <input class="amt" id="amt-${k.id}" type="text" inputmode="numeric" placeholder="AED"
+             onkeydown="if(event.key==='Enter')expAddExtra('${n}','${k.id}')">
+      <input class="cmt" id="cmt-${k.id}" type="text"
+             placeholder="${escS(k.who || (k.receipt ? 'за что' : (k.hint || 'за что')))}"
+             onkeydown="if(event.key==='Enter')expAddExtra('${n}','${k.id}')">
+      ${k.receipt ? `<button class="shot${снят ? ' on' : ''}" id="shot-${k.id}"
+             onclick="expShotFor('${k.id}')">${снят ? 'есть' : 'чек'}</button>` : ''}
+      <button class="ok" onclick="expAddExtra('${n}','${k.id}')"
+              aria-label="Записать ${escS(k.t)}">✓</button>
+    </div>`;
+  }).join('')}</div>`;
 }
 
-function expKindBody(r){
-  const k = expKind(EXP_KIND);
-  if(!k) return `<div class="exp-kinds">${EXP_KINDS.map(x => `
-    <button class="exp-kind${x.plus ? ' plus' : ''}" onclick="expPickKind('${x.id}')">
-      <span class="exp-kind-t">${escS(x.t)}</span>
-      ${x.receipt ? '<span class="exp-kind-h">чек</span>'
-        : (x.plus ? '<span class="exp-kind-h plus">плюсом</span>' : '')}
-    </button>`).join('')}</div>`;
-  const снимок = !k.receipt ? '' : (EXP_SHOT.photo
-    ? `<button class="exp-shot on" onclick="EXP_SHOT={photo:'',thumb:''};renderExpenses()">
-         снимок готов · убрать</button>`
-    : `<button class="exp-shot" onclick="document.getElementById('expCam').click()">
-         Снять чек</button>`);
-  return `<div class="exp-form-h">
-      <button class="exp-back" onclick="expPickKind('')" aria-label="Назад">‹</button>
-      <span class="exp-form-t">${escS(k.t)}${k.plus ? ' · плюсом' : ''}</span>
-    </div>
-    ${снимок}
-    <div class="exp-form">
-      <input class="amt" id="expAmt" type="text" inputmode="numeric" placeholder="AED"
-             onkeydown="if(event.key==='Enter')expAddExtra('${escS(r.name)}')">
-      <input class="cmt" id="expCmt" type="text" placeholder="${escS(k.who || k.hint || 'за что')}"
-             onkeydown="if(event.key==='Enter')expAddExtra('${escS(r.name)}')">
-      <button onclick="expAddExtra('${escS(r.name)}')">Готово</button>
-    </div>`;
+// Какой строке принадлежит снимок. Один аппарат камеры на весь список,
+// поэтому вид запоминаем в момент нажатия.
+function expShotFor(kind){
+  EXP_SHOT = {kind, photo:'', thumb:''};
+  document.getElementById('expCam').click();
+}
+
+// Что уже набрано в полях. Отправка одной строки перерисовывает список, и без
+// этого соседняя, наполовину заполненная, обнулялась бы вместе с ней.
+function _expTyped(){
+  const o = {};
+  document.querySelectorAll('.exp-add input').forEach(i => { if(i.value) o[i.id] = i.value; });
+  return o;
+}
+function _expTypedBack(o, кроме){
+  Object.keys(o).forEach(id => {
+    if(кроме && (id === 'amt-' + кроме || id === 'cmt-' + кроме)) return;
+    const e = document.getElementById(id); if(e) e.value = o[id];
+  });
 }
 
 // Снимок чека тем же путём, что и снимок списания: уменьшаем на месте, чтобы
@@ -15895,41 +15923,18 @@ function expShot(inp){
     const tk = Math.min(1, 96 / Math.max(img.width, img.height));
     t.width = Math.round(img.width * tk); t.height = Math.round(img.height * tk);
     t.getContext('2d').drawImage(img, 0, 0, t.width, t.height);
-    EXP_SHOT = {photo: c.toDataURL('image/jpeg', 0.72),
+    EXP_SHOT = {kind: EXP_SHOT.kind,
+                photo: c.toDataURL('image/jpeg', 0.72),
                 thumb: t.toDataURL('image/jpeg', 0.5)};
-    renderExpenses();
+    // Перерисовать здесь список нельзя: человек уже вписал сумму, и она
+    // пропала бы вместе с ним. Помечаем ровно ту кнопку, ради которой
+    // камеру и открывали.
+    const b = document.getElementById('shot-' + EXP_SHOT.kind);
+    if(b){ b.classList.add('on'); b.textContent = 'есть'; }
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
   };
   img.onerror = () => _toast('Не смогли прочитать снимок');
   fr.readAsDataURL(f);
-}
-
-// Полоса доп. расходов. Стоит у каждого водителя всегда, даже когда их нет, —
-// и это главное в ней.
-//
-// Раньше про них говорил безымянный «плюс» в углу: увидеть по строке, что
-// человек сегодня ничего не тратил сверх питания, было нельзя — пустое место
-// одинаково значило и «ничего не было», и «забыли внести». Теперь пусто
-// сказано словом, а сумма стоит там же, где потом встанет число, — и разница
-// между «нет» и «120» видна не глядя.
-//
-// Полоса же и открывает форму: подписанная строка во всю ширину объясняет
-// себя и попадает под палец лучше, чем квадрат в 36 пикселей.
-function expDop(r, open){
-  const appr = r.extra_sum || 0;
-  const wait = r.pending_count || 0;
-  const val = open ? '<span class="dim">свернуть</span>'
-            : appr ? `${fmt(appr)}<i>AED</i>${wait ? `<u>+${wait} ждёт</u>` : ''}`
-            : wait ? `<u>${wait} ${pluralize(wait,'ждёт','ждут','ждут')} решения</u>`
-                   : '<span class="dim">нет</span>';
-  return `<button class="exp-dop ${appr ? 'has' : ''} ${wait ? 'wait' : ''} ${open ? 'open' : ''}"
-      onclick="expToggleForm('${escS(r.name)}')">
-    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
-         stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-      ${open ? '<path d="M18 6 6 18M6 6l12 12"/>' : '<path d="M12 5v14M5 12h14"/>'}</svg>
-    <span class="exp-dop-t">Доп. расходы</span>
-    <span class="exp-dop-v">${val}</span>
-  </button>`;
 }
 
 // Повторный тап по той же кнопке снимает отметку: ошибиться утром легко, а
@@ -15944,31 +15949,41 @@ async function expSetWork(driver, working){
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 
+// Разовые разворачиваются и сворачиваются у каждого водителя отдельно.
+// Открыт всегда один: десять строк с полями у одиннадцати человек — это
+// экран, по которому нельзя проскроллить до нужного.
 function expToggleForm(driver){
   EXP.open = EXP.open === driver ? null : driver;
-  EXP_KIND = null; EXP_SHOT = {photo:'', thumb:''};
+  EXP_SHOT = {kind:'', photo:'', thumb:''};
   renderExpenses();
-  if(EXP.open) setTimeout(()=>document.getElementById('expAmt')?.focus(), 50);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 
-async function expAddExtra(driver){
-  const k = expKind(EXP_KIND) || expKind('other');
+async function expAddExtra(driver, kindId){
+  const k = expKind(kindId) || expKind('other');
   if(!await accAskBack(k.t)) return;
-  const amount = parseInt((document.getElementById('expAmt')?.value || '').replace(/\D/g,''), 10);
-  const comment = (document.getElementById('expCmt')?.value || '').trim();
+  const amount = parseInt((document.getElementById('amt-' + k.id)?.value || '').replace(/\D/g,''), 10);
+  const comment = (document.getElementById('cmt-' + k.id)?.value || '').trim();
   // Трата без объяснения через неделю не отличить от опечатки — поэтому слова
   // обязательны, и сказать об этом надо здесь, а не после отправки.
   if(!amount || !comment){
     _toast(!amount ? 'Впишите сумму' : (k.who ? 'Впишите, кто' : 'Впишите, за что'));
     return;
   }
-  if(k.receipt && !EXP_SHOT.photo){ _toast('Нужен снимок чека'); return; }
+  // Снимок засчитывается только своей строке: чек от заправки не должен
+  // молча уехать вместе с мойкой.
+  const снимок = EXP_SHOT.kind === k.id ? EXP_SHOT : {photo:'', thumb:''};
+  if(k.receipt && !снимок.photo){ _toast('Нужен снимок чека'); return; }
+  const набрано = _expTyped();
   try{
     const r = await ownerApi.ownerFetch('/api/owner/expenses/extra',
       {method:'POST', body:{day:EXP.day, driver, amount, comment, kind:k.id,
-                            photo:EXP_SHOT.photo, thumb:EXP_SHOT.thumb, as:_meName()}});
-    EXP.open = null; EXP_KIND = null; EXP_SHOT = {photo:'', thumb:''};
+                            photo:снимок.photo, thumb:снимок.thumb, as:_meName()}});
+    EXP_SHOT = {kind:'', photo:'', thumb:''};
+    // Список остаётся раскрытым: за смену на человека приходится не одна
+    // трата, и закрывать его после каждой значит открывать заново.
     _expReplace(r.driver);
+    _expTypedBack(набрано, k.id);
     _toast(`${driver}: ${k.plus ? '−' : '+'}${amount} AED · ${k.t}`);
   }catch(e){
     const why = ((e || {}).payload || {}).error;

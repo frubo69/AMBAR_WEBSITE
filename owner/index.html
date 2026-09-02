@@ -2466,8 +2466,7 @@ button.path:active{transform:scale(.995)}
 .wh-fab:active{background:rgba(30,30,40,.85)}
 .wh-back{position:absolute;top:calc(12px + var(--safe-top));left:12px;z-index:5}
 .wh-tools{position:absolute;top:calc(12px + var(--safe-top));right:12px;z-index:5;
-  transition:opacity .3s var(--e1), transform .3s var(--e1);transform-origin:100% 0;
-  display:flex;flex-direction:column;gap:8px}
+  transform-origin:100% 0;display:flex;flex-direction:column;gap:8px}
 
 /* Шапка шторки. В карточке слева появляется стрелка «к списку» — как в Find My,
    где шторка ведёт себя стопкой экранов, а не одной страницей. */
@@ -2497,21 +2496,23 @@ button.path:active{transform:scale(.995)}
   border-top:1px solid rgba(255,255,255,.11);
   box-shadow:0 -14px 44px rgba(0,0,0,.5);
   transform:translateY(0);
-  /* Кривая системной шторки: быстрый старт, мягкая посадка, без отскока. */
-  transition:transform .46s cubic-bezier(.32,.72,0,1);
+  /* Переходов здесь нет намеренно: CSS-переход нельзя перехватить пальцем на
+     лету — он доигрывает и только потом отдаёт управление. Движение считает
+     пружина покадрово, ровно как в панели оператора. */
   overflow:hidden;touch-action:none;will-change:transform}
-.wh-sheet.drag,.wh-sheet.drag .wh-tabs{transition:none}
 .wh-hd{position:relative;z-index:2;flex:0 0 auto;padding:7px 18px 11px;cursor:grab;
   user-select:none;-webkit-user-select:none}
 /* Тающий край сверху — тот же приём, что у панели снизу. Без него первая
    строка обрубалась о шапку ровной линией, и это читалось как сбой отрисовки,
-   а не как «список продолжается выше». */
-.wh-hd::after{content:'';position:absolute;left:0;right:0;top:100%;height:24px;
+   а не как «список продолжается выше».
+
+   Размытия здесь нет намеренно. Вложенное в стекло шторки, оно берёт задний
+   план не у неё, а у страницы, и на тёмной карте выдавало светлую полосу
+   поперёк первой строки. На тёмной теме градиент делает ровно то же, что и
+   размытие, и без артефактов. */
+.wh-hd::after{content:'';position:absolute;left:0;right:0;top:100%;height:26px;
   pointer-events:none;
-  background:linear-gradient(rgba(13,13,20,.85), rgba(13,13,20,0));
-  -webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);
-  -webkit-mask-image:linear-gradient(#000 30%, transparent);
-  mask-image:linear-gradient(#000 30%, transparent)}
+  background:linear-gradient(rgba(13,13,20,.92), rgba(13,13,20,0))}
 .wh-grab{display:block;width:36px;height:5px;margin:0 auto 11px;border-radius:3px;
   background:rgba(255,255,255,.28)}
 .wh-ttl{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;
@@ -2539,17 +2540,12 @@ button.path:active{transform:scale(.995)}
   backdrop-filter:blur(20px) saturate(140%);
   border-top:1px solid rgba(255,255,255,.07);
   transform:translateY(0);
-  transition:transform .46s cubic-bezier(.32,.72,0,1);
   will-change:transform}
-/* Тающий край: у Apple содержимое не обрывается о панель, а уходит под неё
-   размываясь. Маска даёт настоящий градиент размытия, заливка снизу — запас
-   для тех, кто маску не умеет. */
+/* Тающий край снизу: содержимое не обрывается о панель, а уходит под неё,
+   растворяясь. Размытия нет по той же причине, что и сверху. */
 .wh-tabs::before{content:'';position:absolute;left:0;right:0;bottom:100%;
-  height:42px;pointer-events:none;
-  background:linear-gradient(to top, rgba(13,13,20,.92), rgba(13,13,20,0));
-  -webkit-backdrop-filter:blur(7px);backdrop-filter:blur(7px);
-  -webkit-mask-image:linear-gradient(to top, #000 25%, transparent);
-  mask-image:linear-gradient(to top, #000 25%, transparent)}
+  height:44px;pointer-events:none;
+  background:linear-gradient(to top, rgba(14,14,22,.96), rgba(14,14,22,0))}
 .wh-seg{flex:1;display:flex;padding:3px;border-radius:12px;
   background:rgba(255,255,255,.06)}
 .wh-seg button{flex:1;padding:7px 4px;border:none;border-radius:9px;background:none;
@@ -8427,11 +8423,72 @@ function whCardStop(h, hdH, tbH, peek){
 // Шторка едет вниз — панель управления ровно на столько же вверх, и потому
 // стоит у нижнего края экрана в любом положении. Оба сдвига идут одним
 // кадром и целиком на композиторе.
+const WH_SH = {y: 0, v: 0, raf: 0};
+
 function _whPut(dy){
   const sh = _whSheet(), tb = _whFoot();
+  WH_SH.y = dy;
   if(sh) sh.style.transform = `translateY(${dy}px)`;
   if(tb) tb.style.transform = `translateY(${-dy}px)`;
   whToolsFade(dy);
+}
+
+const _whCalm = () => matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+// Отклик 0.32 с и лёгкий недобор затухания — то же, что у листов в iOS:
+// бросок должен чуть перелетать, иначе он читается как удар в стену. Считаем
+// подшагами, чтобы просевший кадр не разогнал пружину. Тот же расчёт, что в
+// панели оператора: разъезжаться двум шторкам нельзя.
+function whSpring(to, v0, конец){
+  cancelAnimationFrame(WH_SH.raf); WH_SH.raf = 0;
+  if(!_whSheet()) return;
+  if(_whCalm()){ _whPut(to); WH_SH.v = 0; (конец || whRest)(); return; }
+  const w = 2 * Math.PI / 0.32, z = 0.86;
+  WH_SH.v = v0 || 0;
+  let было = performance.now();
+  const шаг = сейчас => {
+    const dt = Math.min(0.032, (сейчас - было) / 1000); было = сейчас;
+    const n = Math.max(1, Math.ceil(dt / 0.006)), h = dt / n;
+    let y = WH_SH.y;
+    for(let i = 0; i < n; i++){
+      const a = -w * w * (y - to) - 2 * z * w * WH_SH.v;
+      WH_SH.v += a * h; y += WH_SH.v * h;
+    }
+    _whPut(y);
+    if(Math.abs(y - to) < 0.4 && Math.abs(WH_SH.v) < 25){
+      WH_SH.v = 0; _whPut(to); WH_SH.raf = 0; (конец || whRest)(); return;
+    }
+    WH_SH.raf = requestAnimationFrame(шаг);
+  };
+  WH_SH.raf = requestAnimationFrame(шаг);
+}
+
+// Шторка встала — считаем, сколько списку оставить снизу, и отдаём карте её
+// новый размер. На каждом кадре этого делать нельзя: и то и другое требует
+// пересчёта раскладки.
+function whRest(){
+  const sh = _whSheet(), tb = _whFoot(); if(!sh) return;
+  sh.style.setProperty('--wh-pad-b',
+    ((tb ? tb.offsetHeight : 60) + Math.round(WH_SH.y) + 14) + 'px');
+  try{ WH.map && WH.map.invalidateSize(); }catch(e){}
+}
+
+// Тормозной путь броска — тот же расчёт, по которому останавливается
+// прокрутка. Целимся туда, куда жест доехал бы сам: иначе короткий резкий
+// бросок «не долетает» и шторка возвращается, хотя её явно кинули.
+const _whProject = (v, d = 0.998) => (v / 1000) * d / (1 - d);
+// Резинка на краях: жёсткий упор читается как «залипло», сопротивление — как
+// «дальше ничего нет».
+const _whBand = (over, dim, k = 0.55) => (over * dim * k) / (dim + k * Math.abs(over));
+// Скорость берём по последним кадрам, а не по всему жесту: важно, чем жест
+// закончился, а не как он начинался.
+function _whVel(ист){
+  if(ист.length < 2) return 0;
+  const b = ист[ист.length - 1];
+  let a = ист[0];
+  for(let i = ист.length - 2; i >= 0; i--){ a = ист[i]; if(b.t - a.t > 55) break; }
+  const dt = (b.t - a.t) / 1000;
+  return dt > 0 ? (b.y - a.y) / dt : 0;
 }
 
 function whSnap(pos, smooth){
@@ -8439,20 +8496,12 @@ function whSnap(pos, smooth){
   const d = whDetents();
   if(!(pos in d)) pos = 'half';
   _whY = pos;
-  sh.classList.toggle('drag', !smooth);
   sh.classList.toggle('peek', pos === 'peek');
-  _whPut(d[pos]);
-  // Снизу у списка ровно то, что закрыто панелью и ушло за край экрана.
-  // Пересчитываем на посадке, а не каждый кадр: во время движения пальцем
-  // строки и должны уезжать под панель, как у Apple.
-  const tb = _whFoot();
-  sh.style.setProperty('--wh-pad-b',
-    ((tb ? tb.offsetHeight : 60) + d[pos] + 14) + 'px');
-  if(smooth) requestAnimationFrame(() => sh.classList.remove('drag'));
-  // Карта живёт в оставшейся части экрана: её центр сдвигается вместе со
-  // шторкой, иначе метки уезжают под неё.
-  clearTimeout(whSnap._t);
-  whSnap._t = setTimeout(() => { try{ WH.map && WH.map.invalidateSize(); }catch(e){} }, 470);
+  if(smooth) whSpring(d[pos], WH_SH.v);
+  else{
+    cancelAnimationFrame(WH_SH.raf); WH_SH.raf = 0; WH_SH.v = 0;
+    _whPut(d[pos]); whRest();
+  }
 }
 
 // Кнопки карты не ездят — они гаснут. Двигать их вместе со шторкой значит
@@ -8477,33 +8526,27 @@ function whDragInit(){
   if(!sh || !hd || hd.dataset.on) return;
   hd.dataset.on = '1';
 
-  const RESIST = 0.35;          // сопротивление за границами, как у резинки
-  const FLICK = 0.55;           // px/мс — с какой скорости это уже бросок
-
   const clamp = (v, d) => {
-    if(v < d.full) return d.full + (v - d.full) * RESIST;
-    if(v > d.peek) return d.peek + (v - d.peek) * RESIST;
+    if(v < d.full) return d.full - _whBand(d.full - v, innerHeight);
+    if(v > d.peek) return d.peek + _whBand(v - d.peek, innerHeight);
     return v;
   };
 
   const start = (e, fromList) => {
     if(_whDrag) return;
+    // Пружину перехватываем на лету: шторка уже едет, а палец опустился —
+    // она должна пойти за ним с того места, где была, а не доигрывать.
+    cancelAnimationFrame(WH_SH.raf); WH_SH.raf = 0;
     const y = e.touches ? e.touches[0].clientY : e.clientY;
-    const d = whDetents();
-    _whDrag = {y0: y, last: y, lastT: performance.now(), v: 0,
-               base: d[_whY], d, fromList: !!fromList, moved: 0};
-    sh.classList.add('drag');
+    _whDrag = {y0: y, base: WH_SH.y, d: whDetents(), fromList: !!fromList,
+               moved: 0, ист: [{y, t: performance.now()}]};
   };
 
   const move = e => {
     if(!_whDrag) return;
     const y = e.touches ? e.touches[0].clientY : e.clientY;
-    const now = performance.now();
-    const dt = Math.max(1, now - _whDrag.lastT);
-    // Скорость считаем по последнему отрезку и сглаживаем: одиночный рывок
-    // пальца не должен решать, куда поедет шторка.
-    _whDrag.v = 0.7 * ((y - _whDrag.last) / dt) + 0.3 * _whDrag.v;
-    _whDrag.last = y; _whDrag.lastT = now;
+    _whDrag.ист.push({y, t: performance.now()});
+    if(_whDrag.ист.length > 8) _whDrag.ист.shift();
     _whDrag.moved = y - _whDrag.y0;
     // Тянут вверх из списка, который уже вверху, — это прокрутка, не шторка.
     if(_whDrag.fromList && _whDrag.moved < 0 && _whY === 'full'){ _whDrag = null; return; }
@@ -8513,24 +8556,18 @@ function whDragInit(){
 
   const end = () => {
     if(!_whDrag) return;
-    const {v, base, moved, d} = _whDrag;
+    const {d, ист} = _whDrag;
     _whDrag = null;
+    const v = _whVel(ист);
+    // Куда жест доехал бы сам — туда и целимся. Порога «это уже бросок» нет
+    // вовсе: медленное движение даёт короткий тормозной путь и садится в
+    // ближайшее, резкое — улетает через положение, и оба случая считаются
+    // одной формулой, а не двумя ветками с разным характером.
+    const цель = WH_SH.y + _whProject(v);
     const order = ['full', 'half', 'peek'];
-    const pos = base + moved;
-    let target;
-    if(Math.abs(v) > FLICK){
-      // Бросок: уезжаем на одно положение в сторону движения, независимо от
-      // того, сколько успел пройти палец. Откуда едем — считаем по пикселям:
-      // у карточки своя высота, и в списке трёх имён её нет.
-      const from = order.reduce((best, k) =>
-        Math.abs(d[k] - base) < Math.abs(d[best] - base) ? k : best, 'half');
-      const i = order.indexOf(from);
-      target = order[Math.max(0, Math.min(order.length - 1, i + (v > 0 ? 1 : -1)))];
-    } else {
-      // Спокойное движение: садимся в ближайшее положение.
-      target = order.reduce((best, k) =>
-        Math.abs(d[k] - pos) < Math.abs(d[best] - pos) ? k : best, 'half');
-    }
+    const target = order.reduce((best, k) =>
+      Math.abs(d[k] - цель) < Math.abs(d[best] - цель) ? k : best, 'half');
+    WH_SH.v = v;
     whSnap(target, true);
     try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   };

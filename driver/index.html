@@ -1915,6 +1915,21 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
   color:var(--gold3);letter-spacing:-1px;line-height:1}
 .exp-bar-v i{font-style:normal;font-size:11px;color:var(--muted);margin-left:6px;letter-spacing:0}
 
+/* Чек. Полоса во всю ширину под суммой — там же, где её вписывают, и до того,
+   как нажали «Отправить»: узнать о недостающем снимке после отправки означает
+   вернуться к колонке, где водителя уже нет. Пустая — пунктиром, снятая —
+   миниатюрой: доказательство должно быть видно, а не подразумеваться. */
+.exp-rcp{width:100%;margin-top:7px;display:flex;align-items:center;gap:10px;padding:8px 12px;
+  border-radius:12px;cursor:pointer;font-family:inherit;text-align:left;
+  background:none;border:1px dashed var(--border3);color:var(--sub)}
+.exp-rcp:active{transform:scale(.99)}
+.exp-rcp.set{border-style:solid;border-color:rgba(201,169,110,.4);background:var(--gold-soft);
+  color:var(--text)}
+.exp-rcp img{width:34px;height:34px;flex-shrink:0;border-radius:8px;object-fit:cover}
+.exp-rcp-t{flex:1;min-width:0;font-size:13px;font-weight:600}
+.exp-rcp-t i{display:block;font-style:normal;font-size:11px;font-weight:400;color:var(--muted);
+  margin-top:2px}
+
 .exp-add{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;
   padding:13px;border-radius:14px;cursor:pointer;font-family:inherit;font-size:13.5px;
   font-weight:600;color:var(--sub);background:none;border:1px dashed var(--border3)}
@@ -2344,6 +2359,9 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 <input type="file" id="woFile" accept="image/*" capture="environment"
   style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"
   onchange="woShot(this)">
+<input type="file" id="expFile" accept="image/*" capture="environment"
+  style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"
+  onchange="expShot(this)">
 
 <div class="sheet" id="mapSheet" onclick="if(event.target===this)this.classList.remove('show')">
   <div class="sheet-in">
@@ -4267,7 +4285,61 @@ function expBox(kind, title, ico){
       <button class="btn ${sent ? 'btn-sec' : 'btn-gh'} exp-go" id="b_${kind}"
         onclick="expTap(this,'${kind}')">${sent ? 'Изменить' : 'не было'}</button>
     </div>
+    ${expRcp(kind, sent)}
   </div>`;
+}
+
+// Полоса чека. Показываем её только там, где деньги отдают на стороне: у
+// бензина и мойки. Уже снятый чек виден миниатюрой — и тот, что водитель снял
+// минуту назад, и тот, что уехал вместе с записью вчера.
+const EXP_RECEIPT = ['fuel', 'wash'];
+function expRcp(kind, sent){
+  if(!EXP_RECEIPT.includes(kind)) return '';
+  const свой = EXP_SHOT.kind === kind && EXP_SHOT.thumb;
+  const был  = sent && sent.thumb;
+  const мини = свой || был || '';
+  return `<button class="exp-rcp ${мини ? 'set' : ''}" id="rcp-${kind}"
+     onclick="expShotFor('${kind}')">
+    ${мини ? `<img src="${мини}" alt="">` : svg(ICO.cam, 22)}
+    <span class="exp-rcp-t">${мини ? 'Чек снят' : 'Снять чек'}
+      <i>${мини ? 'нажмите, чтобы переснять' : 'без него трату не примут'}</i></span>
+  </button>`;
+}
+
+// Камера для чека. Ужимаем тем же способом, что и снимок списания, и тем же
+// правилом: с камеры приходит четыре мегабайта, а нужен читаемый кадр.
+let EXP_SHOT = {kind: '', photo: '', thumb: ''};
+function expShotFor(kind){
+  EXP_SHOT = {kind, photo: '', thumb: ''};
+  document.getElementById('expFile').click();
+}
+function expShot(inp){
+  const f = inp.files && inp.files[0]; inp.value = '';
+  if(!f || !EXP_SHOT.kind) return;
+  const img = new Image(), fr = new FileReader();
+  fr.onload = () => { img.src = fr.result; };
+  img.onload = () => {
+    const снять = (край, q) => {
+      const k = Math.min(1, край / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      return c.toDataURL('image/jpeg', q);
+    };
+    EXP_SHOT = {kind: EXP_SHOT.kind, photo: снять(1280, 0.72), thumb: снять(96, 0.5)};
+    // Перерисовать здесь весь список нельзя: человек уже вписал сумму, и она
+    // пропала бы вместе с ним. Меняем ровно ту полосу, ради которой открывали
+    // камеру.
+    const b = document.getElementById('rcp-' + EXP_SHOT.kind);
+    if(b){
+      b.classList.add('set');
+      b.innerHTML = `<img src="${EXP_SHOT.thumb}" alt="">
+        <span class="exp-rcp-t">Чек снят<i>нажмите, чтобы переснять</i></span>`;
+    }
+    try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  };
+  img.onerror = () => toast('Не смогли прочитать снимок', 'err');
+  fr.readAsDataURL(f);
 }
 
 // Кнопка следует за полем: пусто — «не было» серым, есть цифра — «Отправить»
@@ -6500,19 +6572,35 @@ async function sendExpense(btn, kind){
     : (kind === 'other' ? ((document.getElementById('e_other_c') || {}).value || '').trim() : '');
   if(!amount){ toast('Впишите сумму'); return; }
   if((kind === 'other' || id) && !comment){ toast('Впишите, за что'); return; }
+  // Чек нужен там, где деньги отдали на стороне. Спрашиваем до отправки: узнать
+  // о нём от сервера — значит узнать уже отъехав от колонки.
+  const свой = EXP_SHOT.kind === kind ? EXP_SHOT : null;
+  const был  = (EXP.extras || []).find(x => x.kind === kind && x.photo);
+  if(EXP_RECEIPT.includes(kind) && !(свой && свой.photo) && !был){
+    toast('Сначала снимите чек', 'err'); return;
+  }
   btn.disabled = true;
   try{
     await drvApi.drvFetch('/api/driver/expenses', {method:'POST',
-      body:{amount, comment, kind: id ? 'other' : kind, ...(id ? {id} : {})}});
+      body:{amount, comment, kind: id ? 'other' : kind, ...(id ? {id} : {}),
+            ...(свой && свой.photo ? {photo: свой.photo, thumb: свой.thumb} : {})}});
     toast('Отправлено на согласование');
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    EXP_MORE = false; EXP_EDIT = null;
+    EXP_MORE = false; EXP_EDIT = null; EXP_SHOT = {kind:'', photo:'', thumb:''};
     try{ btn.blur(); document.activeElement.blur(); }catch(e){}
     await shLoad();
     await load();
-  }catch(e){ toast('Не отправилось'); }
+  }catch(e){ toast(EXP_ERR[(e.payload || {}).error] || 'Не отправилось', 'err'); }
   btn.disabled = false;
 }
+
+// Чем именно не понравилась запись. Одно «не отправилось» на все случаи учило
+// водителя жать кнопку второй раз вместо того, чтобы переснять кадр.
+const EXP_ERR = {
+  no_photo:  'Нужен снимок чека',
+  photo_big: 'Снимок слишком тяжёлый, снимите ещё раз',
+  bad_photo: 'Снимок не открылся, снимите ещё раз',
+  amount_and_comment_required: 'Впишите сумму и за что'};
 
 document.getElementById('editSheet').addEventListener('click', e => {
   if(e.target.id === 'editSheet') closeEdit();

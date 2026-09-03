@@ -3422,21 +3422,36 @@ async def set_driver_no_expense(day: str, driver: str, kind: str, none: bool):
                                         {"$unset": {key: ""}})
 
 
-async def expense_photo_set(item_id: str, photo: str, thumb: str = "") -> None:
+async def expense_photo_set(item_id: str, photo: bytes, thumb: str = "") -> None:
     """Снимок чека к разовой трате. Лежит отдельно от самой записи: строку
-    расхода читают каждый день, а картинку открывают раз."""
+    расхода читают каждый день, а картинку открывают раз.
+
+    Кадр кладём байтами, как и у списаний. Строкой base64 он занимал на треть
+    больше места и на выдаче всё равно требовал обратного разбора."""
     db = _db_or_none()
-    if db is None or not item_id: return
+    if db is None or not item_id or not photo: return
+    from bson.binary import Binary
     await db.expense_photos.replace_one(
         {"_id": item_id},
-        {"_id": item_id, "img": photo, "thumb": thumb,
+        {"_id": item_id, "img": Binary(photo), "thumb": thumb,
          "at": datetime.now(timezone.utc)}, upsert=True)
 
 
-async def expense_photo_get(item_id: str) -> dict | None:
+async def expense_photo_del(item_id: str) -> None:
+    """Расход убрали — чек уходит с ним. Снимок без строки не доказывает ничего
+    и найтись уже не сможет: искать его не по чему."""
     db = _db_or_none()
-    if db is None or not item_id: return None
-    return await db.expense_photos.find_one({"_id": item_id})
+    if db is None or not item_id: return
+    await db.expense_photos.delete_one({"_id": item_id})
+
+
+async def expense_photo(item_id: str) -> bytes:
+    """Сам чек. Ради него всё и затевалось: строка расхода доказывает только
+    то, что кто-то её написал."""
+    db = _db_or_none()
+    if db is None or not item_id: return b""
+    d = await db.expense_photos.find_one({"_id": item_id}, {"_id": 0, "img": 1})
+    return bytes((d or {}).get("img") or b"")
 
 
 async def add_driver_expense(day: str, driver: str, item: dict):
@@ -3452,18 +3467,26 @@ async def add_driver_expense(day: str, driver: str, item: dict):
 
 
 async def update_driver_expense(day: str, driver: str, item_id: str,
-                                amount: int, comment: str) -> bool:
+                                amount: int, comment: str,
+                                thumb: str | None = None) -> bool:
     """Водитель поправил свою же трату. Решение менеджера при этом сбрасывается:
-    утверждали одну сумму, а стала другая — значит, смотреть надо заново."""
+    утверждали одну сумму, а стала другая — значит, смотреть надо заново.
+
+    Миниатюру трогаем, только если чек переснят: сам кадр лежит по тому же id и
+    заменяется вместе с ним, а строка должна показывать новый, а не прежний."""
     db = _db_or_none()
     if db is None: return False
     now = datetime.now(timezone.utc).isoformat()
+    поля = {"extras.$.amount": amount,
+            "extras.$.comment": comment,
+            "extras.$.status": "pending",
+            "extras.$.edited_at": now}
+    if thumb is not None:
+        поля["extras.$.photo"] = True
+        поля["extras.$.thumb"] = thumb
     r = await db.driver_days.update_one(
         {"day": day, "driver": driver, "extras.id": item_id},
-        {"$set": {"extras.$.amount": amount,
-                  "extras.$.comment": comment,
-                  "extras.$.status": "pending",
-                  "extras.$.edited_at": now},
+        {"$set": поля,
          "$unset": {"extras.$.decided_by": "", "extras.$.decided_at": ""}},
     )
     return bool(r.matched_count)

@@ -2698,7 +2698,12 @@ def main():
     if not BOT_TOKEN:
         log.warning("⚠️  BOT_TOKEN not set — initData validation will always fail!")
 
-    app = web.Application()
+    # Предел тела запроса. По умолчанию aiohttp режет на мегабайте, и снимок
+    # чека или боя с телефона в него не всегда влезал: вместо нашей подсказки
+    # «фотография слишком тяжёлая» приходил 413, а приложение ждало json и
+    # показывало невнятный сбой. Держим потолок выше photos.MAX_PHOTO, чтобы
+    # решение принимали мы, а не транспорт.
+    app = web.Application(client_max_size=4 * 1024 * 1024)
     app.on_startup.append(on_startup)
     app.on_cleanup.append(on_cleanup)
 

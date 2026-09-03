@@ -33,6 +33,7 @@ from datetime import datetime, timedelta, timezone
 from aiohttp import web
 
 import db
+import photos
 import backdate
 from owner_auth import require_owner, CORS_HEADERS
 from config_offices import OFFICE_IDS, OFFICE_NAMES, OFFICE_CODES
@@ -1591,8 +1592,10 @@ def _wo_row(r: dict, cat: dict) -> dict:
 #
 # Своё списание владелец не согласовывает сам с собой: он и есть тот, чьё
 # решение требуется, поэтому запись сразу учтённая.
-WO_MAX_PHOTO = 3_000_000        # база64 с телефона; больше — это не фото, а ошибка
-WO_MAX_THUMB = 40_000
+# Пределы общие с чеками: см. photos. Прежние три мегабайта были недостижимы —
+# тело запроса резалось раньше, и проверка ниже никогда не срабатывала.
+WO_MAX_PHOTO = photos.MAX_PHOTO
+WO_MAX_THUMB = photos.MAX_THUMB
 
 
 @require_owner

@@ -41,6 +41,7 @@ from urllib.parse import parse_qsl
 from aiohttp import web
 
 import db
+import photos
 import config_staff as staff
 from owner_auth import CORS_HEADERS
 
@@ -471,8 +472,10 @@ def _iso(v) -> str:
     return v.isoformat() if hasattr(v, "isoformat") else str(v or "")
 
 
-WO_MAX_PHOTO = 900_000          # больше — не фотография, а недосжатая картинка
-WO_MAX_THUMB = 30_000           # превью в самой записи: список должен открываться
+# Пределы общие с чеками: см. photos. Держать их порознь было нечем — снимок
+# с той же камеры, а разойдясь, они означали бы, что бой можно снять, а чек нет.
+WO_MAX_PHOTO = photos.MAX_PHOTO
+WO_MAX_THUMB = photos.MAX_THUMB  # превью в самой записи: список должен открываться
 WO_MAX_QTY = 240                # ящик пива это 24; больше похоже на опечатку
 
 
@@ -1183,6 +1186,13 @@ EXPENSE_KINDS = {"fuel": "Бензин", "wash": "Мойка", "other": ""}
 # через неделю, когда вспомнить её уже нельзя.
 MUST_ANSWER = ("fuel", "wash")
 
+# А про эти два ещё и нужен чек: их оплачивают на стороне, и снимок бумажки —
+# единственное, чем трата подтверждается. Требуем его при первой записи; когда
+# водитель правит сумму у той же траты, старый чек остаётся в силе, пока он не
+# переснял его сам. Гонять человека к колонке из-за исправленной цифры — способ
+# отучить его записывать вовсе.
+MUST_RECEIPT = ("fuel", "wash")
+
 
 def _kind_of(x: dict) -> str:
     """Вид расхода. У записей до разделения по видам его нет — узнаём по
@@ -1229,6 +1239,9 @@ async def handle_expense_add(request):
     if amount <= 0 or not comment:
         return web.json_response({"error": "amount_and_comment_required"},
                                  status=400, headers=CORS_HEADERS)
+    photo, беда = photos.decode(body.get("photo"))
+    if беда:
+        return web.json_response({"error": беда}, status=400, headers=CORS_HEADERS)
     now_iso = datetime.now(timezone.utc).isoformat()
 
     # Бензин и мойка — одна запись за смену, водитель правит её же. Заправился
@@ -1245,17 +1258,33 @@ async def handle_expense_add(request):
         if ent_id and prev is None:
             return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
 
+    if kind in MUST_RECEIPT and not photo and not (prev or {}).get("photo"):
+        return web.json_response({"error": "no_photo", "kind": kind},
+                                 status=400, headers=CORS_HEADERS)
+    thumb = photos.thumb(body.get("thumb")) if photo else ""
+
     if prev:
-        await db.update_driver_expense(day, me["name"], prev["id"], amount, comment)
+        await db.update_driver_expense(day, me["name"], prev["id"], amount, comment,
+                                       thumb if photo else None)
         item = {**prev, "amount": amount, "comment": comment, "kind": kind,
                 "status": "pending", "edited_at": now_iso}
+        if photo: item.update({"photo": True, "thumb": thumb})
         log.info(f"[driver] {me['name']} поправил {comment}: "
-                 f"{prev.get('amount')} → {amount} AED")
+                 f"{prev.get('amount')} → {amount} AED"
+                 + (" (чек переснят)" if photo else ""))
     else:
         item = {"id": secrets.token_hex(6), "amount": amount, "comment": comment,
                 "kind": kind, "by_driver": me["name"], "status": "pending",
                 "at": now_iso}
+        if photo: item.update({"photo": True, "thumb": thumb})
         await db.add_driver_expense(day, me["name"], item)
+    # Снимок кладём после самой записи: строка без чека — это повод переспросить,
+    # а чек без строки не значит ничего и найтись уже не сможет.
+    if photo:
+        try:
+            await db.expense_photo_set(item["id"], photo, thumb)
+        except Exception as e:                              # noqa: BLE001
+            log.warning(f"[driver] чек не сохранён: {e}")
     # Вписал сумму после «не было» — ответ снимается сам: два взаимоисключающих
     # ответа на один вопрос хуже, чем ни одного.
     if kind in MUST_ANSWER:

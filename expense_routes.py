@@ -30,6 +30,7 @@ from aiohttp import web
 
 import db
 import backdate
+import photos
 import config_staff as staff
 from owner_auth import require_owner, CORS_HEADERS
 
@@ -247,8 +248,14 @@ async def handle_extra_add(request):
     # Чек — не формальность: заправку, мойку и парковку оплачивают на стороне,
     # и снимок бумажки — единственное, чем такая трата подтверждается. Без него
     # запись не принимаем вовсе, а не «принимаем и помечаем».
-    photo = str(body.get("photo") or "")
-    if вид.get("receipt") and not photo.startswith("data:image"):
+    # Чек — не формальность, но и не повод потерять запись: сначала разбираем
+    # кадр, и если он битый или тяжёлый — говорим об этом отдельно от «нет чека
+    # вовсе». Две разные беды с одним словом лечат по-разному.
+    photo, беда = photos.decode(body.get("photo"))
+    if беда:
+        return web.json_response({"error": беда, "kind": kid},
+                                 status=400, headers=CORS_HEADERS)
+    if вид.get("receipt") and not photo:
         return web.json_response({"error": "no_photo", "kind": kid},
                                  status=400, headers=CORS_HEADERS)
 
@@ -259,10 +266,11 @@ async def handle_extra_add(request):
     if photo:
         # Сам снимок лежит отдельно: строку расхода читают часто, а картинку
         # смотрят раз, и таскать по сети мегабайт ради строки незачем.
+        thumb = photos.thumb(body.get("thumb"))
         try:
-            await db.expense_photo_set(item["id"], photo, str(body.get("thumb") or ""))
+            await db.expense_photo_set(item["id"], photo, thumb)
             item["photo"] = True
-            item["thumb"] = str(body.get("thumb") or "")
+            item["thumb"] = thumb
         except Exception as e:                   # noqa: BLE001
             log.warning(f"[expenses] снимок чека не сохранён: {e}")
     await db.add_driver_expense(day, driver, item)
@@ -285,6 +293,7 @@ async def handle_extra_del(request):
     ok = await db.del_driver_expense(day, driver, item_id)
     if not ok:
         return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    await db.expense_photo_del(item_id)
     await backdate.notify(day, (request.query.get("as") or ""),
                           "доп. расход убран", driver)
     saved = await db.get_driver_day(day, driver)
@@ -384,6 +393,20 @@ async def handle_period(request):
     }, headers=CORS_HEADERS)
 
 
+@require_owner
+async def handle_extra_photo(request):
+    """GET /api/owner/expenses/photo/{item_id} — сам чек.
+
+    Без этого маршрута снимок был письмом в никуда: его требовали при записи,
+    сохраняли — и никто уже не мог на него взглянуть, а расход утверждали
+    вслепую."""
+    img = await db.expense_photo((request.match_info.get("item_id") or "").strip())
+    if not img:
+        return web.json_response({"error": "no_photo"}, status=404, headers=CORS_HEADERS)
+    return web.Response(body=img, content_type="image/jpeg",
+                        headers={**CORS_HEADERS, "Cache-Control": "private, max-age=86400"})
+
+
 async def _opt(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
@@ -395,6 +418,7 @@ def setup(app):
         ("/api/owner/expenses/period",     handle_period,    "GET"),
         ("/api/owner/expenses/working",    handle_working,   "POST"),
         ("/api/owner/expenses/extra",      handle_extra_add, "POST"),
+        ("/api/owner/expenses/photo/{item_id}", handle_extra_photo, "GET"),
         ("/api/owner/expenses/extra/{item_id}", handle_extra_del, "DELETE"),
         ("/api/owner/expenses/extra/{item_id}/{action}", handle_extra_decide, "POST"),
     )

@@ -3699,6 +3699,14 @@ button.path:active{transform:scale(.995)}
 .exp-item-c{flex:1;min-width:0;padding:8px 10px;border-radius:9px;
   border:1px solid var(--border3);background:var(--card2);font-size:12.5px;color:var(--sub);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Чек. Ровно той же высоты, что сумма рядом: доказательство — часть строки, а
+   не значок при ней. Пустая рамка вместо снимка значит, что кадр есть, но ещё
+   не приехал, — нажатие его и приносит. */
+.exp-item-ph{width:32px;height:32px;flex-shrink:0;padding:0;overflow:hidden;cursor:pointer;
+  border-radius:9px;border:1px solid var(--border3);background:var(--card2)}
+.exp-item-ph img{width:100%;height:100%;object-fit:cover;display:block}
+.exp-item-ph:active{transform:scale(.92)}
+
 .exp-item-x,.exp-item-ok,.exp-item-no{width:32px;height:32px;flex-shrink:0;border-radius:9px;
   cursor:pointer;border:1px solid var(--border3);background:transparent;color:var(--muted);
   font-size:13px;line-height:1;transition:.14s}
@@ -16739,6 +16747,7 @@ function expRow(r){
     ${extras.length ? `<div class="exp-items">${extras.map(e => {
       const st = e.status || 'approved';
       return `<div class="exp-item ${st}">
+        ${expShotBtn(e)}
         <span class="exp-item-a">${e.amount}</span>
         <span class="exp-item-c">${e.kind_t && e.kind !== 'other'
           ? `<b class="exp-item-k">${escS(e.kind_t)}</b> · ` : ''}${escS(e.comment)}${
@@ -16757,6 +16766,37 @@ function expRow(r){
 
     ${open ? expAddList(r) : ''}
   </div>`;
+}
+
+// Чек в строке. Решение по расходу принимают, глядя на эту строку, — значит
+// и доказательство должно быть здесь, а не «где-то в базе». Миниатюра приезжает
+// вместе со строкой, полный кадр — по нажатию и только один раз.
+function expShotBtn(e){
+  if(!e.photo && !e.thumb) return '';
+  return `<button class="exp-item-ph" id="expth-${escS(e.id)}"
+     title="Чек" aria-label="Показать чек"
+     onclick="event.stopPropagation();expShotOpen('${escS(e.id)}','${escS(e.comment || '')}')">
+    ${e.thumb ? `<img src="${escS(e.thumb)}" alt="">` : ''}</button>`;
+}
+
+const _expImg = {};
+async function expShotOpen(id, name){
+  let url = _expImg[id];
+  try{
+    if(!url){ url = _expImg[id] = await ownerApi.ownerBlob(
+      '/api/owner/expenses/photo/' + encodeURIComponent(id)); }
+  }catch(e){ _toast('Чека не нашлось'); return; }
+  const th = document.getElementById('expth-' + id);
+  if(th && !th.firstChild) th.innerHTML = `<img src="${url}" alt="">`;
+  let ov = document.getElementById('woFull');
+  if(!ov){
+    ov = document.createElement('div'); ov.id = 'woFull'; ov.className = 'wo-full';
+    ov.onclick = () => ov.classList.remove('show');
+    document.body.appendChild(ov);
+  }
+  ov.innerHTML = `<img src="${url}" alt="Чек"><span>${escS(name || '')}</span>`;
+  ov.classList.add('show');
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 
 // За что именно. «Доп. расход» одной строкой не отвечал ни на один вопрос,
@@ -16917,8 +16957,10 @@ async function expAddExtra(driver, kindId){
     _toast(`${driver}: ${k.plus ? '−' : '+'}${amount} AED · ${k.t}`);
   }catch(e){
     const why = ((e || {}).payload || {}).error;
-    _toast(why === 'no_photo' ? 'Без снимка чека такую трату не записать'
-                              : 'Не удалось добавить');
+    _toast(why === 'no_photo'  ? 'Без снимка чека такую трату не записать'
+         : why === 'photo_big' ? 'Снимок слишком тяжёлый, снимите ещё раз'
+         : why === 'bad_photo' ? 'Снимок не открылся, снимите ещё раз'
+                               : 'Не удалось добавить');
   }
 }
 

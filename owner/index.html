@@ -3784,39 +3784,35 @@ button.path:active{transform:scale(.995)}
 .fx-note{margin-top:12px;font-size:11px;line-height:1.55;color:var(--dim)}
 
 /* ── Склад: сколько лежит и сколько это стоит ─────────────────────────────
-   Три равные величины — три равные трети карточки. Ширина по содержимому
-   собирала их в комок у левого края, и правая половина пустовала: числа
-   выглядели сдвинутыми, а не расставленными.
+   Три величины — три зоны. У каждой своя подложка, свои поля и своя треть
+   ширины: место цифры видно глазом, а не выводится из выравнивания. Так
+   границы между величинами держит форма, и ни заголовок над рядом, ни
+   пояснения под ним больше не нужны — ряд объясняет себя сам.
 
-   Подпись — сверху и полная: «по количеству», «в закупке», «продажа». Снизу
-   и в одно слово она заставляла сначала прочесть число, а потом искать, что
-   это было. Сверху — наоборот: сначала знаешь, что смотришь.
-
-   Оговорки собраны в одну тихую строку под рядом. Тремя столбиками под
-   каждым числом они втрое утяжеляли карточку, а сказать им нужно немного. */
+   Заголовок «Склад стоит» убран: карточка стоит первой на экране склада, и
+   называть её вслух незачем. Строка оговорок под рядом убрана вместе с ним;
+   единственное, что из неё стоило сохранить, — доля полок с известной
+   закупкой, и она переехала в подпись своей зоны. */
 .stkv{margin:2px 0 12px;border-radius:20px;background:var(--card);
   border:1px solid var(--border2);overflow:hidden}
-.stkv-h{display:flex;align-items:center;gap:10px;padding:15px 18px 0}
-.stkv-h b{font-size:12.5px;font-weight:600;color:var(--muted);letter-spacing:.1px}
-.stkv-g{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;
-  padding:14px 18px 0}
-.stkv-c{min-width:0}
-.stkv-l{font-size:9.5px;font-weight:700;letter-spacing:.9px;text-transform:uppercase;
-  color:var(--muted);margin-bottom:9px;white-space:nowrap;overflow:hidden;
+.stkv-g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:14px}
+.stkv-c{min-width:0;padding:12px 12px 13px;border-radius:14px;
+  background:var(--card2);border:1px solid var(--border2)}
+.stkv-c.gold{background:var(--gold-soft);border-color:rgba(201,169,110,.22)}
+.stkv-l{font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:10px;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis}
+.stkv-l em{font-style:normal;color:var(--warn)}
+.stkv-c.gold .stkv-l{color:rgba(201,169,110,.72)}
 /* Число и единица на общей базовой линии; отрицательный трекинг обязателен,
    иначе на этом кегле «50 500» рассыпается на знаки. */
 .stkv-v{display:flex;align-items:baseline;gap:4px;
-  font-family:'DM Sans',sans-serif;font-size:22px;font-weight:700;line-height:1;
+  font-family:'DM Sans',sans-serif;font-size:21px;font-weight:700;line-height:1;
   letter-spacing:-.8px;font-variant-numeric:tabular-nums;color:var(--text)}
 .stkv-v u{text-decoration:none;font-size:10px;font-weight:600;letter-spacing:.3px;
   color:var(--muted)}
 .stkv-c.gold .stkv-v{color:var(--gold2)}
 .stkv-c.gold .stkv-v u{color:rgba(201,169,110,.55)}
-/* Одна строка на все оговорки: короткая, тихая, под рядом. */
-.stkv-note{padding:12px 18px 16px;font-size:10.5px;line-height:1.5;color:var(--dim);
-  font-variant-numeric:tabular-nums}
-.stkv-note em{font-style:normal;color:var(--warn)}
 .stkv-go{display:flex;align-items:center;gap:12px;width:100%;padding:13px 18px;
   border:0;border-top:1px solid var(--border2);background:transparent;
   color:var(--text);font-family:inherit;font-size:13.5px;font-weight:600;
@@ -11045,14 +11041,14 @@ function stkValueCard(reg){
   const без = (reg && reg.unscanned_total) || 0;
   const cover = v ? (v.cost_cover || 0) : 0;
   return `<div class="stkv">
-    <div class="stkv-h"><b>Склад стоит</b></div>
     <div class="stkv-g">
       <div class="stkv-c">
         <div class="stkv-l">По количеству</div>
         <div class="stkv-v">${fmt(bottles)}<u>бут</u></div>
       </div>
       <div class="stkv-c">
-        <div class="stkv-l">В закупке</div>
+        <div class="stkv-l">В закупке${t && cover < 100
+          ? ` · <em>${cover}%</em>` : ''}</div>
         <div class="stkv-v">${t ? fmt(Math.round(t.cost)) : '—'}<u>AED</u></div>
       </div>
       <div class="stkv-c gold">
@@ -11060,11 +11056,6 @@ function stkValueCard(reg){
         <div class="stkv-v">${t ? fmt(Math.round(t.list)) : '—'}<u>AED</u></div>
       </div>
     </div>
-    <div class="stkv-note">${[
-      без ? `<em>${fmt(без)} без кодов</em>` : '',
-      t && cover < 100 ? `закупка <em>по ${cover}% полок</em>` : '',
-      t ? `в приложении ${fmt(Math.round(t.app))}` : '',
-    ].filter(Boolean).join(' · ')}</div>
     <button class="stkv-go" onclick="stkByDistrict()">
       <span>Показать по районам</span>
       <em><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"

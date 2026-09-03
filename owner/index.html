@@ -21316,30 +21316,19 @@ function renderOperators(){
     list.innerHTML = ops.map((op,i)=>row(op,i)).join('');
   }
 
-  // Заказы с устройств, которых нет в списке людей. Это либо забытый оператор,
-  // либо чужой доступ — в обоих случаях владелец должен об этом знать.
+  // Под списком остаётся только то, что требует решения. Список чужих
+  // устройств отсюда убран: он показывал telegram id колонкой моноширинных
+  // цифр — сигнал, на который всё равно нельзя нажать, и который на экране
+  // районов оказывался посреди разговора про выручку. Сами данные сервер
+  // по-прежнему отдаёт, вернуть строку — одна правка.
   const box = document.getElementById('opExtra');
   if(box && opTeamCur === 'drivers'){ box.innerHTML = ''; }
   else if(box){
-    const unk = OPS.data.unknown_devices || [];
-    const un  = OPS.data.tips_unassigned || 0;
-    // Список своих устройств отсюда убран: планшет операторов и так известен, а
-    // строка с ним ничего не меняла. Чужие устройства остались — это не
-    // справка, а сигнал: заказы с id, которого нет в списке людей.
-    box.innerHTML =
-      (unk.length ? `<div class="sect"><div class="sect-t">Чужие устройства</div></div>
-        <div class="list">${unk.map(u=>`
-          <div class="lrow">
-            <div class="lrow-av" style="color:var(--warn)">?</div>
-            <div class="lrow-body">
-              <div class="lrow-name mono" style="font-family:'JetBrains Mono',monospace;font-size:12.5px">${u.telegram_id}</div>
-              <div class="lrow-sub">принял ${u.accepted} · завёл ${u.created} — этого id нет в списке людей</div>
-            </div>
-          </div>`).join('')}</div>` : '')
-    + (un ? `<div class="stk-note" style="margin:14px 2px 0">
+    const un = OPS.data.tips_unassigned || 0;
+    box.innerHTML = un ? `<div class="stk-note" style="margin:14px 2px 0">
           <b>${fmt(un)} AED чаевых без водителя.</b> Это заказы из приложения: водителя
           им никто не назначал, поэтому распределить их автоматически нельзя.
-        </div>` : '');
+        </div>` : '';
   }
 }
 

@@ -3795,24 +3795,29 @@ button.path:active{transform:scale(.995)}
    закупкой, и она переехала в подпись своей зоны. */
 .stkv{margin:2px 0 12px;border-radius:20px;background:var(--card);
   border:1px solid var(--border2);overflow:hidden}
-.stkv-g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;padding:14px}
-.stkv-c{min-width:0;padding:12px 12px 13px;border-radius:14px;
+.stkv-g{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:13px}
+.stkv-c{position:relative;min-width:0;padding:11px 10px 13px;border-radius:14px;
   background:var(--card2);border:1px solid var(--border2)}
-.stkv-c.gold{background:var(--gold-soft);border-color:rgba(201,169,110,.22)}
-.stkv-l{font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
-  color:var(--muted);margin-bottom:10px;white-space:nowrap;overflow:hidden;
+/* Доля полок с известной закупкой — в угол зоны, а не в подпись: в строке она
+   съедала место и обрезалась ровно на себе, то есть исчезала именно та часть,
+   ради которой стояла. */
+.stkv-cov{position:absolute;top:9px;right:9px;font-size:8.5px;font-weight:700;
+  letter-spacing:.3px;color:var(--warn);font-variant-numeric:tabular-nums}
+/* Единица уехала в подпись: на строке с числом она отъедала место, из-за
+   которого число и не могло вырасти. Здесь она стоит один раз и не мешает.
+   Цветом величины не различаются — все три равны, и разный цвет делал бы
+   вид, что одна из них главная. Выделяет их размер, и только он. */
+.stkv-l{font-size:8.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:11px;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis}
-.stkv-l em{font-style:normal;color:var(--warn)}
-.stkv-c.gold .stkv-l{color:rgba(201,169,110,.72)}
-/* Число и единица на общей базовой линии; отрицательный трекинг обязателен,
-   иначе на этом кегле «50 500» рассыпается на знаки. */
-.stkv-v{display:flex;align-items:baseline;gap:4px;
-  font-family:'DM Sans',sans-serif;font-size:21px;font-weight:700;line-height:1;
-  letter-spacing:-.8px;font-variant-numeric:tabular-nums;color:var(--text)}
-.stkv-v u{text-decoration:none;font-size:10px;font-weight:600;letter-spacing:.3px;
-  color:var(--muted)}
-.stkv-c.gold .stkv-v{color:var(--gold2)}
-.stkv-c.gold .stkv-v u{color:rgba(201,169,110,.55)}
+/* Место под угловую метку освобождает только та зона, у которой метка есть.
+   Отступ, поставленный всем трём, обрезал подписи в остальных двух. */
+.stkv-c:has(.stkv-cov) .stkv-l{padding-right:26px}
+/* Отрицательный трекинг обязателен: на этом кегле «50 500» иначе рассыпается
+   на отдельные знаки. */
+.stkv-v{font-family:'DM Sans',sans-serif;font-size:28px;font-weight:700;
+  line-height:1;letter-spacing:-1.4px;font-variant-numeric:tabular-nums;
+  color:var(--text)}
 .stkv-go{display:flex;align-items:center;gap:12px;width:100%;padding:13px 18px;
   border:0;border-top:1px solid var(--border2);background:transparent;
   color:var(--text);font-family:inherit;font-size:13.5px;font-weight:600;
@@ -11043,17 +11048,17 @@ function stkValueCard(reg){
   return `<div class="stkv">
     <div class="stkv-g">
       <div class="stkv-c">
-        <div class="stkv-l">По количеству</div>
-        <div class="stkv-v">${fmt(bottles)}<u>бут</u></div>
+        <div class="stkv-l">Количество</div>
+        <div class="stkv-v">${fmt(bottles)}</div>
       </div>
       <div class="stkv-c">
-        <div class="stkv-l">В закупке${t && cover < 100
-          ? ` · <em>${cover}%</em>` : ''}</div>
-        <div class="stkv-v">${t ? fmt(Math.round(t.cost)) : '—'}<u>AED</u></div>
+        ${t && cover < 100 ? `<span class="stkv-cov">${cover}%</span>` : ''}
+        <div class="stkv-l">Закупка, AED</div>
+        <div class="stkv-v">${t ? fmt(Math.round(t.cost)) : '—'}</div>
       </div>
-      <div class="stkv-c gold">
-        <div class="stkv-l">Продажа</div>
-        <div class="stkv-v">${t ? fmt(Math.round(t.list)) : '—'}<u>AED</u></div>
+      <div class="stkv-c">
+        <div class="stkv-l">Продажа, AED</div>
+        <div class="stkv-v">${t ? fmt(Math.round(t.list)) : '—'}</div>
       </div>
     </div>
     <button class="stkv-go" onclick="stkByDistrict()">

@@ -3849,16 +3849,20 @@ button.path:active{transform:scale(.995)}
 .stkh-b{padding:4px 4px 6px}
 .stkh-e{padding:22px 16px;text-align:center;font-size:12.5px;color:var(--dim)}
 
-/* Полоса районов: код, бутылки, деньги — три яруса в колонке, пять колонок в
-   ряд одинаковой ширины. */
+/* Переключатель величины: он же и заголовок экрана. Три кнопки решают, что
+   считают все числа ниже, — поэтому стоит первым и во всю ширину. */
+.periods.stkby{margin:2px 0 16px;--count:3}
+/* Полоса районов: код и одно число — то, которое выбрано наверху. Второго
+   числа здесь нет намеренно: две величины в маленькой плитке спорят, и
+   непонятно, какая из них ответ. */
 .stkbd-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:14px}
-.stkbd-d{display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 4px;
+.stkbd-d{display:flex;flex-direction:column;align-items:center;gap:5px;padding:11px 4px;
   border-radius:13px;background:var(--card);border:1px solid var(--border2)}
+.stkbd-d.z{opacity:.45}
 .stkbd-c{font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:800;
   letter-spacing:.5px;color:var(--gold2)}
 .stkbd-n{font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700;
-  font-variant-numeric:tabular-nums;line-height:1}
-.stkbd-m{font-size:9.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+  font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-.3px}
 /* Таблица едет вбок, название стоит на месте: пять районов и итог в ширину
    телефона не влезают, а без названия числа не значат ничего. */
 .stkbd-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:16px;
@@ -3877,7 +3881,8 @@ button.path:active{transform:scale(.995)}
   white-space:normal}
 .stkbd td.nm i{display:block;font-style:normal;font-size:10px;color:var(--muted);
   margin-top:2px}
-.stkbd td.tot,.stkbd th.tot{color:var(--gold2);font-weight:700}
+.stkbd td.tot,.stkbd th.tot{color:var(--gold2);font-weight:700;padding-right:14px}
+.stkbd td.tot.z{color:var(--muted);opacity:.5}
 
 /* ── Цены по позициям ─────────────────────────────────────────────────────
    Три цены в строке, и они про разное: во сколько встала бутылка, за сколько
@@ -11220,63 +11225,102 @@ async function stkMoveDel(i){
 // Таблица прокручивается вбок, а колонка с названием стоит на месте: пять
 // районов и итог в ширину телефона не влезают, а без названия числа не значат
 // ничего.
-function stkByDistrict(){
+// Экран отвечает на один вопрос за раз: сколько, за сколько куплено или за
+// сколько продадим. Раньше сверху висела карточка с теми же тремя числами,
+// что и на предыдущем экране, — она ничего не добавляла, а место занимала.
+// Вместо неё переключатель: выбранная величина считается сразу везде — и в
+// полосе районов, и в каждой ячейке каталога, и в итоге в шапке.
+const STK_BY = {
+  qty:  {t:'Количество', тотал: r => r.bottles,
+         ячейка: (r, h) => h,
+         сумма: r => r.bottles, деньги: false},
+  cost: {t:'Закупка',    тотал: r => (r.cost || 0) * r.bottles / Math.max(1, r.unit),
+         ячейка: (r, h) => r.cost ? h * r.cost : null,
+         сумма: r => r.cost ? r.cost * _stkUnits(r) : null, деньги: true},
+  sell: {t:'Продажа',    тотал: r => (r.price_list || 0) * r.bottles / Math.max(1, r.unit),
+         ячейка: (r, h) => h * (r.price_list || 0),
+         сумма: r => (r.price_list || 0) * _stkUnits(r), деньги: true},
+};
+
+function _stkUnits(r){
+  return Object.values(r.have || {}).reduce((a, v) => a + (+v || 0), 0);
+}
+
+function stkByMode(m){
+  STK.by = STK_BY[m] ? m : 'qty';
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  stkByDistrict(true);
+}
+
+function stkByDistrict(тихо){
   STK.view = 'bydist';
+  STK.by = STK_BY[STK.by] ? STK.by : 'qty';
   _setRail('stkRail', '');
   const v = STK.val;
-  if(!v){ _stkHead('По районам', 'нет данных', false); 
+  if(!v){ _stkHead('По районам', 'нет данных', false);
     document.getElementById('stkMid').innerHTML =
       '<div class="stk-empty">Стоимость не посчиталась</div>'; return; }
-  const t = v.totals || {}, ds = v.districts || [];
-  // Ни кнопки сохранения, ни поиска по позициям: это витрина, а не пересчёт.
-  // Оба остались бы от экрана района и делали бы вид, что здесь что-то правят.
-  _stkHead('По районам', `${(v.items || []).length} ${
-    pluralize((v.items||[]).length,'позиция','позиции','позиций')} · ${
-    fmt(t.bottles || 0)} ${pluralize(t.bottles||0,'бутылка','бутылки','бутылок')}`, false);
-  const кол = d => (v.by_district || {})[d.id] || {};
+  const режим = STK_BY[STK.by], ds = v.districts || [], t = v.totals || {};
+  const items = v.items || [];
+  // Итог в шапке — того же вида, что и выбранная величина: второй раз те же
+  // три числа показывать незачем, а одно нужное — как раз здесь.
+  const итог = STK.by === 'qty' ? `${fmt(t.bottles || 0)} ${
+      pluralize(t.bottles || 0,'бутылка','бутылки','бутылок')}`
+    : `${fmt(Math.round(STK.by === 'cost' ? (t.cost || 0) : (t.list || 0)))} AED`;
+  _stkHead('По районам', `${items.length} ${
+    pluralize(items.length,'позиция','позиции','позиций')} · ${итог}`, false);
+  const колонка = d => (v.by_district || {})[d.id] || {};
+  const числоРайона = c => STK.by === 'qty' ? fmt(c.bottles || 0)
+    : fmt(Math.round(STK.by === 'cost' ? (c.cost || 0) : (c.list || 0)));
   document.getElementById('stkMid').innerHTML = `
-    <div class="stkv" style="margin-bottom:12px">
-      <div class="stkv-h"><b>Всего по складу</b></div>
-      <div class="stkv-g">
-        <div class="stkv-c"><div class="stkv-v">${fmt(t.bottles||0)}</div>
-          <div class="stkv-l">бутылок</div></div>
-        <div class="stkv-c"><div class="stkv-v">${fmt(Math.round(t.cost||0))}</div>
-          <div class="stkv-l">закупка</div>
-          <div class="stkv-s ${(v.cost_cover||0) < 90 ? 'warn' : ''}">по ${
-            v.cost_cover||0}% полок</div></div>
-        <div class="stkv-c gold"><div class="stkv-v">${fmt(Math.round(t.list||0))}</div>
-          <div class="stkv-l">продажа</div>
-          <div class="stkv-s">${fmt(Math.round(t.app||0))} в приложении</div></div>
-      </div>
+    <div class="periods stkby" id="stkByTabs">
+      <div class="period-pill"></div>
+      ${Object.keys(STK_BY).map(k => `<button class="${STK.by === k ? 'on' : ''}"
+        onclick="stkByMode('${k}')">${STK_BY[k].t}</button>`).join('')}
     </div>
     <div class="stk-grp2"><span>Районы</span></div>
     <div class="stkbd-strip">${ds.map(d => {
-      const c = кол(d);
-      return `<div class="stkbd-d">
-        <span class="stkbd-c">${escS(d.code||'')}</span>
-        <span class="stkbd-n">${fmt(c.bottles||0)}</span>
-        <span class="stkbd-m">${fmt(Math.round(c.list||0))}</span>
+      const c = колонка(d);
+      return `<div class="stkbd-d ${(STK.by === 'qty' ? c.bottles : (STK.by === 'cost'
+        ? c.cost : c.list)) ? '' : 'z'}">
+        <span class="stkbd-c">${escS(d.code || '')}</span>
+        <span class="stkbd-n">${числоРайона(c)}</span>
       </div>`;
     }).join('')}</div>
     <div class="stk-grp2"><span>Каталог</span></div>
     <div class="stkbd-wrap"><table class="stkbd">
       <thead><tr><th class="nm">Позиция</th>${
-        ds.map(d => `<th>${escS(d.code||'')}</th>`).join('')}<th class="tot">Всего</th></tr></thead>
-      <tbody>${(v.items || []).map(r => `
-        <tr>
+        ds.map(d => `<th>${escS(d.code || '')}</th>`).join('')}<th class="tot">Всего</th></tr></thead>
+      <tbody>${items.map(r => {
+        const сумма = режим.сумма(r);
+        return `<tr>
           <td class="nm"><b>${escS(r.name)}</b><i>${r.cost
             ? fmt(Math.round(r.cost)) + ' → ' + fmt(Math.round(r.price_list))
             : 'закупка неизвестна'}</i></td>
           ${ds.map(d => {
             const h = (r.have || {})[d.id] || 0;
-            return `<td class="${h ? '' : 'z'}">${h ? fmt(h) : '·'}</td>`;
+            if(!h) return '<td class="z">·</td>';
+            const val = режим.ячейка(r, h);
+            return val == null ? '<td class="z">—</td>'
+              : `<td>${режим.деньги ? fmt(Math.round(val)) : fmt(val)}</td>`;
           }).join('')}
-          <td class="tot">${fmt(r.bottles)}</td>
-        </tr>`).join('')}</tbody>
+          <td class="tot ${сумма == null ? 'z' : ''}">${сумма == null ? '—'
+            : (режим.деньги ? fmt(Math.round(сумма)) : fmt(r.bottles))}</td>
+        </tr>`;
+      }).join('')}</tbody>
     </table></div>
-    <div class="stk-note" style="margin:12px 2px 0">Числа в колонках районов — в
-      учётных единицах: у крепкого это бутылки, у пива ящики. «Всего» приведено
-      к бутылкам. Под названием — закупка и цена по прайсу за единицу.</div>`;
+    <div class="stk-note" style="margin:12px 2px 0">${
+      STK.by === 'qty'
+        ? `Числа в колонках районов — в учётных единицах: у крепкого это бутылки,
+           у пива ящики. «Всего» приведено к бутылкам.`
+      : STK.by === 'cost'
+        ? `Числа — во сколько обошлось то, что лежит в районе. Прочерк там, где
+           закупочная цена неизвестна: такие позиции в сумму не входят, оттого
+           под закупкой на складе и стоит доля покрытия.`
+        : `Числа — сколько выручим по прайсу за то, что лежит в районе. Цена
+           приложения ниже: её итог виден на карточке склада.`}</div>`;
+  const g = document.getElementById('stkByTabs');
+  if(g) (тихо ? movePill(g) : requestAnimationFrame(() => movePill(g)));
 }
 
 // ── История: одна карточка, два взгляда ───────────────────────────────────

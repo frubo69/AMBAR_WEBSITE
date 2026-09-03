@@ -3865,6 +3865,52 @@ button.path:active{transform:scale(.995)}
   margin-top:2px}
 .stkbd td.tot,.stkbd th.tot{color:var(--gold2);font-weight:700}
 
+/* ── Цены по позициям ─────────────────────────────────────────────────────
+   Три цены в строке, и они про разное: во сколько встала бутылка, за сколько
+   уходит по прайсу и за сколько в приложении. Закупка стоит первой и она же
+   единственная, которую правят руками, — поэтому у неё рамка поля, а у
+   остальных её нет: видно, что можно трогать, а что справка. */
+.oprx-r{padding:11px 14px;border-top:1px solid var(--border2)}
+.oprx-r:first-of-type{border-top:0}
+.oprx-h{display:flex;align-items:baseline;gap:9px}
+.oprx-i{flex:0 0 26px;font-size:11px;font-weight:700;color:var(--muted);
+  font-variant-numeric:tabular-nums}
+.oprx-n{flex:1;min-width:0;font-size:13.5px;font-weight:600;line-height:1.25}
+.oprx-u{flex:0 0 auto;font-size:9.5px;font-weight:700;letter-spacing:.5px;
+  text-transform:uppercase;color:var(--muted)}
+.oprx-g{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin:9px 0 0 35px}
+.oprx-c{min-width:0}
+.oprx-l{font-size:9px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:4px}
+.oprx-v{font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;
+  font-variant-numeric:tabular-nums;color:var(--sub)}
+.oprx-c.sell .oprx-v{color:var(--gold2)}
+/* Поле закупки: выглядит полем всегда, даже пустым, — так видно, что цену
+   можно вписать, и не надо гадать, кликается ли число. */
+.oprx-in{width:100%;height:34px;padding:0 9px;border-radius:10px;
+  border:1px solid var(--border2);background:var(--bg2);color:var(--text);
+  font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;
+  font-variant-numeric:tabular-nums;text-align:left}
+.oprx-in:focus{outline:none;border-color:rgba(201,169,110,.55);background:var(--card)}
+.oprx-in.empty{color:var(--dim)}
+.oprx-in.saved{border-color:rgba(76,175,125,.55)}
+.oprx-src{font-size:9px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
+  color:var(--muted);margin-top:4px;height:11px}
+.oprx-src.hand{color:var(--gold2)}
+/* Полоса поиска и фильтра — липкая: список длинный, а искать по нему нужно с
+   любого места. */
+.oprx-bar{position:sticky;top:0;z-index:3;display:flex;gap:8px;padding:10px 0 12px;
+  background:linear-gradient(var(--bg) 72%,rgba(0,0,6,0))}
+.oprx-q{flex:1;height:40px;padding:0 13px;border-radius:12px;border:1px solid var(--border2);
+  background:var(--card);color:var(--text);font-family:inherit;font-size:13px}
+.oprx-q:focus{outline:none;border-color:rgba(201,169,110,.45)}
+.oprx-f{flex:0 0 auto;padding:0 13px;height:40px;border-radius:12px;cursor:pointer;
+  border:1px solid var(--border2);background:var(--card);color:var(--sub);
+  font-family:inherit;font-size:12px;font-weight:700}
+.oprx-f.on{color:var(--gold2);border-color:rgba(201,169,110,.45);background:var(--gold-soft)}
+.oprx-list{border-radius:16px;background:var(--card);border:1px solid var(--border2);
+  overflow:hidden}
+
 /* Шапка раздела «Клиенты» */
 .cust-hero{margin:6px 0 4px;padding:16px 16px 14px;border-radius:16px;cursor:pointer;
   background:linear-gradient(150deg,rgba(201,169,110,.09),rgba(201,169,110,.02) 60%);
@@ -13840,27 +13886,140 @@ function _perBottle(price, unit){
                              : r.toFixed(1).replace('.', ',');
 }
 
-function ordPrices(){
-  const d = ORD.d || {};
-  const rows = d.all_rows || d.rows || [];
-  _setText('oprSub', `${rows.length} ${pluralize(rows.length,'позиция','позиции','позиций')}
-    · продажный прайс`);
-  document.getElementById('oprMid').innerHTML = rows.length ? `
-    <div class="opr-hd"><span></span><span>за бутылку</span></div>
-    ${rows.map((r, i) => `<div class="opr-r">
-      <span class="opr-i">${i + 1}</span>
-      <span class="opr-n">${escS(r.name)}</span>
-      <span class="opr-p">${_perBottle(r.price, r.unit || 1)}</span>
-    </div>`).join('')}`
-    : '<div class="opr-none">Каталог пуст</div>';
-  // Итог — не в конце списка, а внизу экрана: он отвечает на вопрос, с которым
-  // сюда нажали, и не должен уезжать вверх вместе с прокруткой.
-  document.getElementById('oprFoot').innerHTML = `
-    <span>Заявка по прайсу</span><b>${fmt(d.total_aed || 0)}<i>AED</i></b>`;
+// Три цены в строке, и правится из них одна.
+//
+// Прежде страница показывала только продажную цену и была витриной, которую
+// нечем было исправить: цена менялась в магазине, а в приложении оставалась
+// прежней до следующей выкладки. Теперь закупка — поле: вписал число, ушёл с
+// поля, оно сохранилось. Правка ложится поверх прайса из файла, живёт в базе
+// с автором и временем и переживает выкладку.
+//
+// Пустое поле — не ноль, а «цену не знаем»: такая позиция выпадает из оценки
+// склада, и это видно по доле покрытия внизу. Стереть число — то же самое,
+// что снять правку и вернуться к прайсу.
+let OPR = {rows: [], q: '', only: false, busy: false};
+
+async function ordPrices(){
   const ov = document.getElementById('oprOv');
   ov.classList.add('show');
   requestAnimationFrame(() => ov.classList.add('in'));
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  _setText('oprSub', 'загрузка…');
+  document.getElementById('oprMid').innerHTML = '<div class="opr-none">Загрузка…</div>';
+  document.getElementById('oprFoot').innerHTML = '';
+  let d;
+  try{ d = await ownerApi.ownerFetch('/api/owner/stock/prices'); }
+  catch(e){
+    document.getElementById('oprMid').innerHTML =
+      '<div class="opr-none" style="color:var(--dn)">Не удалось загрузить</div>';
+    return;
+  }
+  OPR.rows = d.rows || []; OPR.d = d;
+  oprPaint();
+}
+
+function oprFilter(v){ OPR.q = v || ''; oprPaint(true); }
+function oprOnly(){ OPR.only = !OPR.only; oprPaint(); }
+
+function oprPaint(keepFocus){
+  const d = OPR.d || {}, all = OPR.rows;
+  const q = (OPR.q || '').trim().toLowerCase();
+  const rows = all.filter(r =>
+    (!OPR.only || !r.cost) &&
+    (!q || (r.name || '').toLowerCase().includes(q) || String(r.no).includes(q)));
+  _setText('oprSub', `${all.length} ${pluralize(all.length,'позиция','позиции','позиций')}
+    · закупка у ${d.cost_known || 0}`);
+  document.getElementById('oprMid').innerHTML = `
+    <div class="oprx-bar">
+      <input class="oprx-q" id="oprQ" placeholder="Найти позицию"
+             value="${escS(OPR.q)}" oninput="oprFilter(this.value)">
+      <button class="oprx-f ${OPR.only ? 'on' : ''}" onclick="oprOnly()">Без цены</button>
+    </div>
+    ${rows.length ? `<div class="oprx-list">${rows.map(r => oprRow(r)).join('')}</div>`
+      : '<div class="opr-none">Ничего не нашлось</div>'}`;
+  if(keepFocus){
+    const i = document.getElementById('oprQ');
+    if(i){ i.focus(); i.selectionStart = i.value.length; }
+  }
+  // Внизу — то, ради чего сюда заходят с экрана склада: насколько прайс полон.
+  const cover = d.cost_cover || 0;
+  document.getElementById('oprFoot').innerHTML =
+    `<span>Закупка известна</span><b>${cover}<i>% позиций</i></b>`;
+}
+
+function oprRow(r){
+  const ед = r.unit > 1 ? 'за ящик' : 'за бутылку';
+  const рука = r.cost_src === 'вручную';
+  return `<div class="oprx-r" id="opr-${escS(r.id)}">
+    <div class="oprx-h">
+      <span class="oprx-i">${r.no}</span>
+      <span class="oprx-n">${escS(r.name)}</span>
+      <span class="oprx-u">${ед}</span>
+    </div>
+    <div class="oprx-g">
+      <div class="oprx-c">
+        <div class="oprx-l">закупка</div>
+        <input class="oprx-in ${r.cost ? '' : 'empty'}" inputmode="decimal"
+               placeholder="—" value="${r.cost ? fmt(Math.round(r.cost)) : ''}"
+               onfocus="this.select()"
+               onkeydown="if(event.key==='Enter'){this.blur()}"
+               onblur="oprSave('${escS(r.id)}', this)">
+        <div class="oprx-src ${рука ? 'hand' : ''}">${escS(r.cost_src || '')}</div>
+      </div>
+      <div class="oprx-c">
+        <div class="oprx-l">прайс</div>
+        <div class="oprx-v">${fmt(r.price_list || 0)}</div>
+        <div class="oprx-src"></div>
+      </div>
+      <div class="oprx-c sell">
+        <div class="oprx-l">в приложении</div>
+        <div class="oprx-v">${fmt(r.price_app || 0)}</div>
+        <div class="oprx-src"></div>
+      </div>
+    </div>
+  </div>`;
+}
+
+// Сохраняем на уходе с поля, а не по кнопке: кнопка у каждой из ста двадцати
+// строк — это сто двадцать кнопок, и ни одна из них не нужна. Не изменилось —
+// в сеть не ходим вовсе.
+async function oprSave(id, input){
+  const r = (OPR.rows || []).find(x => x.id === id); if(!r) return;
+  const было = r.cost ? Math.round(r.cost) : 0;
+  const стало = parseFloat(String(input.value).replace(/[^\d.,]/g, '').replace(',', '.')) || 0;
+  if(Math.round(стало) === было){
+    input.value = было ? fmt(было) : '';
+    return;
+  }
+  if(!await accAskBack('Цена закупки')){
+    input.value = было ? fmt(было) : '';
+    return;
+  }
+  try{
+    const res = await ownerApi.ownerFetch('/api/owner/stock/cost',
+      {method:'POST', body:{id, price: стало, as:_meName()}});
+    r.cost = res.cost || null;
+    r.cost_src = res.cost_src || '';
+    input.value = r.cost ? fmt(Math.round(r.cost)) : '';
+    input.classList.toggle('empty', !r.cost);
+    input.classList.add('saved');
+    setTimeout(() => input.classList.remove('saved'), 900);
+    const src = input.parentElement.querySelector('.oprx-src');
+    if(src){ src.textContent = r.cost_src || ''; src.classList.toggle('hand', r.cost_src === 'вручную'); }
+    // Доля покрытия меняется вместе с ценой — пересчитываем на месте.
+    const known = (OPR.rows || []).filter(x => x.cost).length;
+    OPR.d.cost_known = known;
+    OPR.d.cost_cover = OPR.rows.length ? Math.round(known / OPR.rows.length * 100) : 0;
+    document.getElementById('oprFoot').innerHTML =
+      `<span>Закупка известна</span><b>${OPR.d.cost_cover}<i>% позиций</i></b>`;
+    _setText('oprSub', `${OPR.rows.length} ${
+      pluralize(OPR.rows.length,'позиция','позиции','позиций')} · закупка у ${known}`);
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    STK.val = null;                 // склад пересчитает стоимость заново
+  }catch(e){
+    input.value = было ? fmt(было) : '';
+    _toast('Не удалось сохранить цену');
+  }
 }
 
 function ordPricesClose(){

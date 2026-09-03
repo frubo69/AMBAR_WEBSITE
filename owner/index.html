@@ -2460,9 +2460,10 @@ button.path:active{transform:scale(.995)}
    занимает карта, и отнимать у неё полосу ради трёх иконок жалко. */
 .wh-fab{width:40px;height:40px;flex:0 0 auto;border-radius:50%;display:flex;
   align-items:center;justify-content:center;color:var(--text);
-  background:rgba(10,10,14,.72);border:1px solid var(--border2);
-  -webkit-backdrop-filter:blur(14px);backdrop-filter:blur(14px);
-  box-shadow:0 4px 16px rgba(0,0,0,.45)}
+  background:rgba(10,10,16,.6);border:1px solid rgba(255,255,255,.08);
+  -webkit-backdrop-filter:blur(20px) saturate(140%);
+  backdrop-filter:blur(20px) saturate(140%);
+  box-shadow:0 2px 10px rgba(0,0,0,.28)}
 .wh-fab:active{background:rgba(30,30,40,.85)}
 .wh-back{position:absolute;top:calc(12px + var(--safe-top));left:12px;z-index:5}
 .wh-tools{position:absolute;top:calc(12px + var(--safe-top));right:12px;z-index:5;
@@ -2490,11 +2491,13 @@ button.path:active{transform:scale(.995)}
   /* Стекло функционального слоя: крупная поверхность держится плотнее, иначе
      карта под ней съедает текст. Насыщение вытягивает цвет из карты — это и
      отличает стекло от простой тёмной плашки. */
-  background:rgba(13,13,20,.76);
-  -webkit-backdrop-filter:blur(36px) saturate(190%);
-  backdrop-filter:blur(36px) saturate(190%);
-  border-top:1px solid rgba(255,255,255,.11);
-  box-shadow:0 -14px 44px rgba(0,0,0,.5);
+  background:rgba(12,12,19,.72);
+  -webkit-backdrop-filter:blur(30px) saturate(140%);
+  backdrop-filter:blur(30px) saturate(140%);
+  border-top:1px solid rgba(255,255,255,.08);
+  /* Одна мягкая тень, и только чтобы лист отделился от карты. Слоями здесь
+     разделяет материал, а не тени: их у стекла быть не должно. */
+  box-shadow:0 -1px 24px rgba(0,0,0,.35);
   transform:translateY(0);
   /* Переходов здесь нет намеренно: CSS-переход нельзя перехватить пальцем на
      лету — он доигрывает и только потом отдаёт управление. Движение считает
@@ -2512,7 +2515,7 @@ button.path:active{transform:scale(.995)}
    размытие, и без артефактов. */
 .wh-hd::after{content:'';position:absolute;left:0;right:0;top:100%;height:26px;
   pointer-events:none;
-  background:linear-gradient(rgba(13,13,20,.92), rgba(13,13,20,0))}
+  background:linear-gradient(rgba(12,12,19,.94), rgba(12,12,19,0))}
 .wh-grab{display:block;width:36px;height:5px;margin:0 auto 11px;border-radius:3px;
   background:rgba(255,255,255,.28)}
 .wh-ttl{font-family:'Space Grotesk',sans-serif;font-size:19px;font-weight:700;
@@ -2534,39 +2537,46 @@ button.path:active{transform:scale(.995)}
    размытия здесь только стоил бы кадров. */
 .wh-tabs{position:absolute;left:0;right:0;bottom:0;z-index:3;
   display:flex;align-items:center;gap:8px;
-  padding:8px 12px calc(8px + var(--safe-bottom));
-  background:rgba(16,16,24,.94);
-  -webkit-backdrop-filter:blur(20px) saturate(140%);
-  backdrop-filter:blur(20px) saturate(140%);
-  border-top:1px solid rgba(255,255,255,.07);
+  padding:10px 14px calc(10px + var(--safe-bottom));
+  /* Стекла здесь нет намеренно. Панель лежит НА стекле листа, и собственное
+     размытие делало из неё второй материал поверх первого — руководство прямо
+     не советует складывать стёкла. Поэтому просто плотная зона того же листа:
+     материал один, а границу держит волосок и тающий край. */
+  /* Непрозрачно, без вариантов: на девяноста двух процентах сквозь панель
+     всё ещё читались имена, и «Все 11» ложилось поверх чужой строки. */
+  background:#0b0b12;
+  border-top:1px solid rgba(255,255,255,.06);
   transform:translateY(0);
   will-change:transform}
 /* Тающий край снизу: содержимое не обрывается о панель, а уходит под неё,
    растворяясь. Размытия нет по той же причине, что и сверху. */
 .wh-tabs::before{content:'';position:absolute;left:0;right:0;bottom:100%;
   height:44px;pointer-events:none;
-  background:linear-gradient(to top, rgba(14,14,22,.96), rgba(14,14,22,0))}
-.wh-seg{flex:1;display:flex;padding:3px;border-radius:12px;
-  background:rgba(255,255,255,.06)}
-.wh-seg button{flex:1;padding:7px 4px;border:none;border-radius:9px;background:none;
-  color:var(--sub);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;
+  background:linear-gradient(to top, #0b0b12, rgba(11,11,18,0))}
+/* Дорожка под сегментами убрана: это была третья полупрозрачность подряд —
+   стекло листа, плотная зона панели и ещё плашка под кнопками. Выбранное
+   называет себя заливкой, остальные — просто текст. */
+.wh-seg{flex:1;display:flex;gap:2px}
+.wh-seg button{flex:1;padding:8px 4px;border:none;border-radius:10px;background:none;
+  color:var(--muted);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;
   transition-property:var(--tp);transition-duration:.18s;transition-timing-function:var(--e1);white-space:nowrap}
-.wh-seg button.on{background:rgba(255,255,255,.12);color:var(--text);
-  box-shadow:0 1px 3px rgba(0,0,0,.3)}
+.wh-seg button.on{background:rgba(255,255,255,.10);color:var(--text)}
 .wh-seg button b{font-variant-numeric:tabular-nums;margin-left:4px;color:var(--muted)}
 .wh-seg button.on b{color:var(--gold2)}
-.wh-tab-fab{width:36px;height:36px;flex:0 0 auto;border-radius:12px;border:none;
-  background:rgba(255,255,255,.08);color:var(--text);display:grid;place-items:center;
-  cursor:pointer}
-.wh-tab-fab:active{background:rgba(255,255,255,.14)}
+/* Кнопка «показать всех» из панели убрана: ровно та же кнопка стоит над
+   картой справа, и вторая её копия делала из панели набор разнородных
+   элементов вместо одного переключателя. Сегменты забрали её место. */
 .wh-body::-webkit-scrollbar{display:none}
 
 /* Заголовок района в списке. Код золотым квадратом, название рядом, справа —
    что в районе происходит: сколько на связи и сколько заказов в пути. Липкий:
    список длиннее экрана, и, прокручивая, надо видеть, чей это ряд. */
 .wh-grp{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:9px;
-  margin:14px 0 7px;padding:6px 2px;
-  background:linear-gradient(var(--bg2) 72%,rgba(0,0,6,0))}
+  margin:16px 0 4px;padding:7px 2px 8px;
+  /* Липкая шапка обязана быть непрозрачной, иначе под ней просвечивают
+     уезжающие строки. Цвет тот же, что у листа, — это не отдельный тон, а
+     тот же материал без прозрачности. */
+  background:rgba(12,12,19,.94)}
 .wh-grp:first-child{margin-top:2px}
 .wh-grp-c{flex:0 0 auto;min-width:26px;height:20px;padding:0 6px;border-radius:7px;
   display:flex;align-items:center;justify-content:center;
@@ -2575,10 +2585,12 @@ button.path:active{transform:scale(.995)}
 .wh-grp-n{flex:0 0 auto;font-size:12.5px;font-weight:700;color:var(--gold2)}
 .wh-grp-s{flex:1;min-width:0;text-align:right;font-size:10.5px;color:var(--muted);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* Строки района — одной плитой: между группами воздух, внутри группы черта. */
-.wh-grp-b{border-radius:15px;background:rgba(255,255,255,.03);overflow:hidden}
-.wh-grp-b .wh-r{border-radius:0;margin:0;background:transparent}
-.wh-grp-b .wh-r + .wh-r{box-shadow:0 -1px 0 rgba(255,255,255,.05)}
+/* Под строками нет подложки: группу отделяет заголовок и воздух между
+   группами, а не ещё один полупрозрачный прямоугольник поверх стекла.
+   Внутри группы строки делит волосок. */
+.wh-grp-b .wh-r{border-radius:0;margin:0;background:transparent;border:0}
+.wh-grp-b .wh-r + .wh-r{box-shadow:0 -1px 0 rgba(255,255,255,.055)}
+.wh-grp-b .wh-r:active{background:rgba(255,255,255,.05)}
 
 /* Карточка водителя — то же место, что и список: шторка ведёт себя стопкой
    экранов. Наверху крупно состояние, ниже факты, внизу действия. */
@@ -2636,18 +2648,19 @@ button.path:active{transform:scale(.995)}
 .wh-r.off .wh-i{opacity:.6}
 /* Огонёк связи. Живой пульсирует — глаз ловит движение раньше, чем читает
    подпись; свежая точка без трансляции золотая и без пульса; погасший тускл. */
-.wh-i{position:relative;width:34px;height:34px;flex:0 0 auto;border-radius:12px;
-  display:flex;align-items:center;justify-content:center;background:var(--bg3);
-  border:1px solid var(--border2);color:var(--dim)}
-.wh-r.live .wh-i{background:rgba(61,220,132,.1);border-color:rgba(61,220,132,.32);
-  color:#3ddc84}
-.wh-r.live .wh-i::after{content:'';position:absolute;inset:-1px;border-radius:12px;
-  border:1px solid rgba(61,220,132,.55);animation:whPulse 2.2s ease-out infinite}
-@keyframes whPulse{0%{transform:scale(1);opacity:.75}70%{transform:scale(1.28);opacity:0}
+/* Значок связи без плашки и рамки: каждая строка носила свой прямоугольник
+   с обводкой и заливкой — одиннадцать маленьких карточек внутри списка,
+   который сам лежит на стекле. Остался знак, а состояние называет цвет, и
+   только там, где он что-то значит: зелёный — человека видно сейчас. */
+.wh-i{position:relative;width:26px;height:26px;flex:0 0 auto;
+  display:flex;align-items:center;justify-content:center;color:var(--dim)}
+.wh-r.live .wh-i{color:#3ddc84}
+.wh-r.live .wh-i::after{content:'';position:absolute;inset:-4px;border-radius:50%;
+  border:1px solid rgba(61,220,132,.5);animation:whPulse 2.2s ease-out infinite}
+@keyframes whPulse{0%{transform:scale(.85);opacity:.7}70%{transform:scale(1.25);opacity:0}
   100%{opacity:0}}
 @media (prefers-reduced-motion:reduce){.wh-r.live .wh-i::after{animation:none}}
-.wh-r.snap .wh-i{background:var(--gold-soft);border-color:rgba(201,169,110,.35);
-  color:var(--gold2)}
+.wh-r.snap .wh-i{color:var(--gold2)}
 .wh-r.snap .wh-s u{text-decoration:none;color:var(--gold2);font-weight:600}
 .wh-b{flex:1;min-width:0}
 .wh-n{display:flex;align-items:baseline;gap:7px;font-size:14.5px;font-weight:600;
@@ -6025,11 +6038,6 @@ button.path:active{transform:scale(.995)}
         <button data-f="live"          onclick="whFilter('live')">На связи<b id="whCntLive"></b></button>
         <button data-f="route"         onclick="whFilter('route')">В пути<b id="whCntRoute"></b></button>
       </div>
-      <button class="wh-tab-fab" onclick="whFitAll()" aria-label="Показать всех на карте">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 9V5.5A1.5 1.5 0 0 1 5.5 4H9M15 4h3.5A1.5 1.5 0 0 1 20 5.5V9M20 15v3.5a1.5 1.5 0 0 1-1.5 1.5H15M9 20H5.5A1.5 1.5 0 0 1 4 18.5V15"/></svg>
-      </button>
     </div>
   </div>
 </div>

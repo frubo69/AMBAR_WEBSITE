@@ -2491,9 +2491,12 @@ button.path:active{transform:scale(.995)}
   /* Стекло функционального слоя: крупная поверхность держится плотнее, иначе
      карта под ней съедает текст. Насыщение вытягивает цвет из карты — это и
      отличает стекло от простой тёмной плашки. */
-  background:rgba(12,12,19,.72);
-  -webkit-backdrop-filter:blur(30px) saturate(140%);
-  backdrop-filter:blur(30px) saturate(140%);
+  /* Светлее прежнего: почти чёрное стекло над тёмной картой читалось как
+     дыра в экране, а не как материал. Проступающая карта и есть то, что
+     отличает стекло от плашки, — значит его нельзя топить в чёрном. */
+  background:rgba(30,30,44,.68);
+  -webkit-backdrop-filter:blur(34px) saturate(170%);
+  backdrop-filter:blur(34px) saturate(170%);
   border-top:1px solid rgba(255,255,255,.08);
   /* Одна мягкая тень, и только чтобы лист отделился от карты. Слоями здесь
      разделяет материал, а не тени: их у стекла быть не должно. */
@@ -2553,14 +2556,20 @@ button.path:active{transform:scale(.995)}
 .wh-tabs::before{content:'';position:absolute;left:0;right:0;bottom:100%;
   height:44px;pointer-events:none;
   background:linear-gradient(to top, #0b0b12, rgba(11,11,18,0))}
-/* Дорожка под сегментами убрана: это была третья полупрозрачность подряд —
-   стекло листа, плотная зона панели и ещё плашка под кнопками. Выбранное
-   называет себя заливкой, остальные — просто текст. */
-.wh-seg{flex:1;display:flex;gap:2px}
-.wh-seg button{flex:1;padding:8px 4px;border:none;border-radius:10px;background:none;
-  color:var(--muted);font-family:inherit;font-size:12px;font-weight:600;cursor:pointer;
-  transition-property:var(--tp);transition-duration:.18s;transition-timing-function:var(--e1);white-space:nowrap}
-.wh-seg button.on{background:rgba(255,255,255,.10);color:var(--text)}
+/* Выбранное — не заливка кнопки, а отдельная таблетка под ними. Так её можно
+   взять пальцем и повести: она идёт за рукой, а на отпускании притягивается к
+   ближайшему делению пружиной — тем же расчётом, что и шторка. Переключать
+   касанием это не мешает: таблетка едет туда же, только сама. */
+.wh-seg{position:relative;flex:1;display:flex;touch-action:pan-y}
+.wh-seg-pill{position:absolute;top:0;bottom:0;left:0;width:33.333%;
+  border-radius:11px;background:rgba(255,255,255,.11);
+  will-change:transform;pointer-events:none}
+.wh-seg.grab .wh-seg-pill{background:rgba(255,255,255,.17)}
+.wh-seg button{position:relative;z-index:1;flex:1;padding:8px 4px;border:none;
+  border-radius:11px;background:none;color:var(--muted);font-family:inherit;
+  font-size:12px;font-weight:600;cursor:pointer;white-space:nowrap;
+  transition:color .18s var(--e1)}
+.wh-seg button.on{color:var(--text)}
 .wh-seg button b{font-variant-numeric:tabular-nums;margin-left:4px;color:var(--muted)}
 .wh-seg button.on b{color:var(--gold2)}
 /* Кнопка «показать всех» из панели убрана: ровно та же кнопка стоит над
@@ -2571,25 +2580,30 @@ button.path:active{transform:scale(.995)}
 /* Заголовок района в списке. Код золотым квадратом, название рядом, справа —
    что в районе происходит: сколько на связи и сколько заказов в пути. Липкий:
    список длиннее экрана, и, прокручивая, надо видеть, чей это ряд. */
-.wh-grp{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:9px;
-  margin:16px 0 4px;padding:7px 2px 8px;
-  /* Липкая шапка обязана быть непрозрачной, иначе под ней просвечивают
-     уезжающие строки. Цвет тот же, что у листа, — это не отдельный тон, а
-     тот же материал без прозрачности. */
-  background:rgba(12,12,19,.94)}
-.wh-grp:first-child{margin-top:2px}
+/* Район — карточка со своими полями и скруглением, а не полоса от края до
+   края. Полоса читалась как случайный квадрат на фоне: у неё не было ни
+   границ, ни поводов быть именно такой ширины. Карточка отвечает на это
+   формой — видно, где район начинается и где кончается. */
+.wh-grp{display:flex;align-items:center;gap:9px;padding:10px 13px 9px}
+
 .wh-grp-c{flex:0 0 auto;min-width:26px;height:20px;padding:0 6px;border-radius:7px;
   display:flex;align-items:center;justify-content:center;
   font-family:'DM Sans',sans-serif;font-size:10px;font-weight:800;color:#1a1408;
   background:linear-gradient(135deg,var(--gold),var(--gold2))}
-.wh-grp-n{flex:0 0 auto;font-size:12.5px;font-weight:700;color:var(--gold2)}
+.wh-grp-n{flex:0 0 auto;font-size:13px;font-weight:700;color:var(--gold2)}
+/* Шапку от строк отделяет волосок, а не смена фона: два тона внутри одной
+   карточки — это снова слой поверх слоя. */
+.wh-grp{border-bottom:1px solid rgba(255,255,255,.06)}
 .wh-grp-s{flex:1;min-width:0;text-align:right;font-size:10.5px;color:var(--muted);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* Под строками нет подложки: группу отделяет заголовок и воздух между
-   группами, а не ещё один полупрозрачный прямоугольник поверх стекла.
-   Внутри группы строки делит волосок. */
-.wh-grp-b .wh-r{border-radius:0;margin:0;background:transparent;border:0}
-.wh-grp-b .wh-r + .wh-r{box-shadow:0 -1px 0 rgba(255,255,255,.055)}
+/* Карточка района: одна тихая поверхность содержимого поверх стекла. Правило
+   «не класть стекло на стекло» она не нарушает — это обычный материал слоя
+   содержимого, которым и положено строить структуру под функциональным. */
+.wh-card-d{margin:0 2px 10px;border-radius:18px;overflow:hidden;
+  background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.06)}
+.wh-grp-b .wh-r{border-radius:0;margin:0;background:transparent;border:0;
+  padding:11px 13px}
+.wh-grp-b .wh-r + .wh-r{box-shadow:0 -1px 0 rgba(255,255,255,.06)}
 .wh-grp-b .wh-r:active{background:rgba(255,255,255,.05)}
 
 /* Карточка водителя — то же место, что и список: шторка ведёт себя стопкой
@@ -6034,6 +6048,7 @@ button.path:active{transform:scale(.995)}
          у нижнего края экрана, как таб-бар в Find My. -->
     <div class="wh-tabs" id="whTabs">
       <div class="wh-seg" id="whSeg">
+        <span class="wh-seg-pill" id="whSegPill"></span>
         <button data-f="all"  class="on" onclick="whFilter('all')">Все<b id="whCntAll"></b></button>
         <button data-f="live"          onclick="whFilter('live')">На связи<b id="whCntLive"></b></button>
         <button data-f="route"         onclick="whFilter('route')">В пути<b id="whCntRoute"></b></button>
@@ -8917,12 +8932,115 @@ function whDragInit(){
   addEventListener('resize', () => whSnap(_whY, false));
 }
 
+// ── Таблетка фильтра ──────────────────────────────────────────────────────
+// Её можно взять и повести пальцем. Пока ведут — она под рукой один в один;
+// отпустили — притягивается к ближайшему делению пружиной, той же, что двигает
+// шторку: отклик 0.32 с, лёгкий недобор затухания. Куда притянуться, решает не
+// только палец, но и скорость: короткий резкий сдвиг доводит до следующего
+// деления, даже если пальцем прошли половину.
+const WH_SEG = {x: 0, v: 0, raf: 0, drag: null};
+const WH_FILTERS = ['all', 'live', 'route'];
+
+function _whSegEls(){
+  return {seg: document.getElementById('whSeg'), pill: document.getElementById('whSegPill')};
+}
+function _whSegStep(){
+  const {seg} = _whSegEls();
+  return seg ? seg.clientWidth / WH_FILTERS.length : 0;
+}
+function _whSegPut(x){
+  const {pill} = _whSegEls(); if(!pill) return;
+  WH_SEG.x = x;
+  pill.style.transform = `translateX(${x}px)`;
+}
+function whSegSpring(to, v0, конец){
+  cancelAnimationFrame(WH_SEG.raf); WH_SEG.raf = 0;
+  if(!_whSegEls().pill) return;
+  if(_whCalm()){ _whSegPut(to); WH_SEG.v = 0; конец && конец(); return; }
+  const w = 2 * Math.PI / 0.32, z = 0.86;
+  WH_SEG.v = v0 || 0;
+  let было = performance.now();
+  const шаг = сейчас => {
+    const dt = Math.min(0.032, (сейчас - было) / 1000); было = сейчас;
+    const n = Math.max(1, Math.ceil(dt / 0.006)), h = dt / n;
+    let x = WH_SEG.x;
+    for(let i = 0; i < n; i++){
+      const a = -w * w * (x - to) - 2 * z * w * WH_SEG.v;
+      WH_SEG.v += a * h; x += WH_SEG.v * h;
+    }
+    _whSegPut(x);
+    if(Math.abs(x - to) < 0.4 && Math.abs(WH_SEG.v) < 20){
+      WH_SEG.v = 0; _whSegPut(to); WH_SEG.raf = 0; конец && конец(); return;
+    }
+    WH_SEG.raf = requestAnimationFrame(шаг);
+  };
+  WH_SEG.raf = requestAnimationFrame(шаг);
+}
+// Поставить таблетку на выбранное деление. Без движения — когда список только
+// открыли и ехать неоткуда.
+function whSegSync(smooth){
+  const i = Math.max(0, WH_FILTERS.indexOf(_whFilter));
+  const to = i * _whSegStep();
+  if(smooth) whSegSpring(to, WH_SEG.v);
+  else { cancelAnimationFrame(WH_SEG.raf); WH_SEG.raf = 0; WH_SEG.v = 0; _whSegPut(to); }
+}
+
+function whSegInit(){
+  const {seg} = _whSegEls();
+  if(!seg || seg.dataset.on) return;
+  seg.dataset.on = '1';
+  const шаг = () => _whSegStep();
+  const start = e => {
+    if(WH_SEG.drag) return;
+    cancelAnimationFrame(WH_SEG.raf); WH_SEG.raf = 0;
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    WH_SEG.drag = {x0: x, base: WH_SEG.x, moved: 0,
+                   ист: [{y: x, t: performance.now()}]};
+    seg.classList.add('grab');
+  };
+  const move = e => {
+    if(!WH_SEG.drag) return;
+    const x = e.touches ? e.touches[0].clientX : e.clientX;
+    WH_SEG.drag.ист.push({y: x, t: performance.now()});
+    if(WH_SEG.drag.ист.length > 8) WH_SEG.drag.ист.shift();
+    WH_SEG.drag.moved = x - WH_SEG.drag.x0;
+    // За края не пускаем совсем: делений три, и четвёртого нет.
+    const max = (WH_FILTERS.length - 1) * шаг();
+    _whSegPut(Math.max(0, Math.min(max, WH_SEG.drag.base + WH_SEG.drag.moved)));
+    if(Math.abs(WH_SEG.drag.moved) > 4 && e.cancelable) e.preventDefault();
+  };
+  const end = () => {
+    if(!WH_SEG.drag) return;
+    const {moved, ист} = WH_SEG.drag;
+    WH_SEG.drag = null;
+    seg.classList.remove('grab');
+    if(Math.abs(moved) < 4){ whSegSync(true); return; }   // это было касание
+    const v = _whVel(ист);                    // тот же расчёт, что у шторки
+    const цель = WH_SEG.x + Math.max(-шаг(), Math.min(шаг(), _whProject(v) / 6));
+    const i = Math.max(0, Math.min(WH_FILTERS.length - 1,
+      Math.round(цель / Math.max(1, шаг()))));
+    WH_SEG.v = v;
+    const f = WH_FILTERS[i];
+    if(f !== _whFilter) whFilter(f, true);
+    else whSegSync(true);
+  };
+  seg.addEventListener('mousedown', start);
+  seg.addEventListener('touchstart', start, {passive:true});
+  document.addEventListener('mousemove', move);
+  document.addEventListener('touchmove', move, {passive:false});
+  document.addEventListener('mouseup', end);
+  document.addEventListener('touchend', end);
+  addEventListener('resize', () => whSegSync(false));
+}
+
 // Фильтр списка. Тот же смысл, что у вкладок в Find My: сузить список до
 // тех, кем сейчас занимаешься, не теряя остальных с карты.
-function whFilter(f){
+function whFilter(f, изЖеста){
   _whFilter = f;
   document.querySelectorAll('#whSeg button').forEach(b =>
     b.classList.toggle('on', b.dataset.f === f));
+  whSegSync(true);
+  if(изЖеста) try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   if(_whY === 'peek') whSnap('half', true);
   whPaint();
 }
@@ -8931,7 +9049,9 @@ async function whereOpen(){
   const ov = document.getElementById('whOv');
   ov.classList.add('show');
   whDragInit();
+  whSegInit();
   whSnap('half', false);
+  requestAnimationFrame(() => whSegSync(false));
   WH.view = 'list'; WH.sel = null; WH.track = false; WH.fit = true;
   document.getElementById('whList').innerHTML =
     '<div class="exp-empty">Загрузка…</div>';
@@ -9097,15 +9217,17 @@ function whPaint(){
     ? группы.map(g => {
         const живых = g.rows.filter(r => whState(r) === 'stream').length;
         const заказы = g.rows.reduce((a, r) => a + (r.orders || 0), 0);
-        return `<div class="wh-grp">
-          <span class="wh-grp-c">${escS(g.code || '')}</span>
-          <span class="wh-grp-n">${escS(g.name || '')}</span>
-          <span class="wh-grp-s">${живых ? `${живых} на связи`
-            : `${g.rows.length} ${pluralize(g.rows.length,'водитель','водителя','водителей')}`}${
-            заказы ? ` · ${заказы} в пути` : ''}</span>
-        </div>
-        <div class="wh-grp-b">${g.rows.map(r =>
-          whRow(r, WH.sel === r.driver && trackOn)).join('')}</div>`;
+        return `<div class="wh-card-d">
+          <div class="wh-grp">
+            <span class="wh-grp-c">${escS(g.code || '')}</span>
+            <span class="wh-grp-n">${escS(g.name || '')}</span>
+            <span class="wh-grp-s">${живых ? `${живых} на связи`
+              : `${g.rows.length} ${pluralize(g.rows.length,'водитель','водителя','водителей')}`}${
+              заказы ? ` · ${заказы} в пути` : ''}</span>
+          </div>
+          <div class="wh-grp-b">${g.rows.map(r =>
+            whRow(r, WH.sel === r.driver && trackOn)).join('')}</div>
+        </div>`;
       }).join('')
     : `<div class="exp-empty">${emptyTxt}</div>`)
     + `<div class="wh-note">Точку присылает живая трансляция телеграма — водитель

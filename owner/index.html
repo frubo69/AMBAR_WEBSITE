@@ -3783,6 +3783,88 @@ button.path:active{transform:scale(.995)}
 .fx-v i.none{color:var(--dim);font-weight:500}
 .fx-note{margin-top:12px;font-size:11px;line-height:1.55;color:var(--dim)}
 
+/* ── Склад: сколько лежит и сколько это стоит ─────────────────────────────
+   Три числа в ряд, каждое в своей колонке одинаковой ширины, разделённые
+   волосками, — сетка, а не набор плиток разной величины. Числа выровнены по
+   левому краю своей колонки: цифры разной длины, и по центру они плясали бы
+   относительно подписей. */
+.stkv{margin:2px 0 12px;border-radius:18px;background:var(--card);
+  border:1px solid var(--border2);overflow:hidden}
+.stkv-h{display:flex;align-items:baseline;gap:8px;padding:13px 16px 0}
+.stkv-h b{flex:1;font-size:10px;font-weight:700;letter-spacing:1.4px;
+  text-transform:uppercase;color:var(--muted)}
+.stkv-h i{font-style:normal;font-size:10.5px;color:var(--dim)}
+.stkv-g{display:grid;grid-template-columns:repeat(3,1fr);padding:8px 0 14px}
+.stkv-c{padding:0 12px;border-left:1px solid var(--border2);min-width:0}
+.stkv-c:first-child{border-left:0}
+.stkv-v{font-family:'DM Sans',sans-serif;font-size:21px;font-weight:700;
+  line-height:1.1;font-variant-numeric:tabular-nums;color:var(--text)}
+.stkv-c.gold .stkv-v{color:var(--gold2)}
+.stkv-l{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+  color:var(--muted);margin-top:5px}
+/* Пояснение под числом — одной строкой: перенос рвал его на «47 990 в» и
+   «приложении», и колонка переставала читаться как одно целое. */
+.stkv-s{font-size:9.5px;color:var(--dim);margin-top:3px;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.stkv-s.warn{color:var(--warn)}
+/* Кнопка внутри карточки, а не под ней: она про эти же числа, только в
+   разрезе районов, и отрывать её от них нечем. */
+.stkv-go{display:flex;align-items:center;gap:9px;width:100%;padding:12px 16px;
+  border:0;border-top:1px solid var(--border2);background:var(--card2);
+  color:var(--gold2);font-family:inherit;font-size:13px;font-weight:700;
+  cursor:pointer}
+.stkv-go:active{background:var(--card3)}
+.stkv-go span{flex:1;text-align:left}
+.stkv-go u{text-decoration:none;color:var(--muted);font-weight:600}
+
+/* Районы — одной карточкой со строками внутри, как в «Команде» и «Расходах».
+   Пять отдельных плиток с полями между ними читались как пять разных дел. */
+.stkd{margin-bottom:12px;border-radius:16px;background:var(--card);
+  border:1px solid var(--border2);overflow:hidden}
+.stkd .stk-dr{background:transparent;border:0;border-radius:0;margin:0;
+  border-top:1px solid var(--border2);width:100%}
+.stkd .stk-dr:first-child{border-top:0}
+.stkd .stk-dr:active{background:var(--card2)}
+
+/* История одной карточкой с переключателем: две кнопки рядом занимали два
+   яруса и спрашивали, чем ревизия отличается от перемещения, ещё до того, как
+   человек решил, что ему нужно. */
+.stkh{border-radius:16px;background:var(--card);border:1px solid var(--border2);
+  overflow:hidden}
+.stkh .periods{margin:12px 12px 0;--count:2}
+.stkh-b{padding:4px 4px 6px}
+.stkh-e{padding:22px 16px;text-align:center;font-size:12.5px;color:var(--dim)}
+
+/* Полоса районов: код, бутылки, деньги — три яруса в колонке, пять колонок в
+   ряд одинаковой ширины. */
+.stkbd-strip{display:grid;grid-template-columns:repeat(5,1fr);gap:6px;margin-bottom:14px}
+.stkbd-d{display:flex;flex-direction:column;align-items:center;gap:3px;padding:10px 4px;
+  border-radius:13px;background:var(--card);border:1px solid var(--border2)}
+.stkbd-c{font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:800;
+  letter-spacing:.5px;color:var(--gold2)}
+.stkbd-n{font-family:'DM Sans',sans-serif;font-size:16px;font-weight:700;
+  font-variant-numeric:tabular-nums;line-height:1}
+.stkbd-m{font-size:9.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+/* Таблица едет вбок, название стоит на месте: пять районов и итог в ширину
+   телефона не влезают, а без названия числа не значат ничего. */
+.stkbd-wrap{overflow-x:auto;-webkit-overflow-scrolling:touch;border-radius:16px;
+  background:var(--card);border:1px solid var(--border2)}
+.stkbd{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums}
+.stkbd th{position:sticky;top:0;padding:9px 6px;font-size:9.5px;font-weight:700;
+  letter-spacing:.6px;text-transform:uppercase;color:var(--muted);
+  background:var(--card2);text-align:center;white-space:nowrap}
+.stkbd th.nm,.stkbd td.nm{position:sticky;left:0;z-index:1;text-align:left;
+  min-width:158px;background:var(--card)}
+.stkbd th.nm{background:var(--card2)}
+.stkbd td{padding:9px 6px;text-align:center;font-size:13px;font-weight:600;
+  border-top:1px solid var(--border2);white-space:nowrap}
+.stkbd td.z{color:var(--muted);opacity:.45}
+.stkbd td.nm b{display:block;font-size:12.5px;font-weight:600;line-height:1.25;
+  white-space:normal}
+.stkbd td.nm i{display:block;font-style:normal;font-size:10px;color:var(--muted);
+  margin-top:2px}
+.stkbd td.tot,.stkbd th.tot{color:var(--gold2);font-weight:700}
+
 /* Шапка раздела «Клиенты» */
 .cust-hero{margin:6px 0 4px;padding:16px 16px 14px;border-radius:16px;cursor:pointer;
   background:linear-gradient(150deg,rgba(201,169,110,.09),rgba(201,169,110,.02) 60%);
@@ -10834,9 +10916,11 @@ async function stkPicker(){
     // Реестр кодов — вторым запросом рядом: он отвечает на первый вопрос
     // склада («сколько бутылок сейчас лежит»), а пересчёт — на второй
     // («сходится ли»). Ждать их по очереди значит удваивать паузу.
-    [st, reg] = await Promise.all([
+    [st, reg, STK.val] = await Promise.all([
       ownerApi.ownerFetch('/api/owner/stock/status', {params:{day: accDay()}}),
       ownerApi.ownerFetch('/api/owner/qr').catch(() => null),
+      ownerApi.ownerFetch('/api/owner/stock/value', {params:{day: accDay()}})
+        .catch(() => null),
     ]);
   }
   catch(e){
@@ -10855,15 +10939,21 @@ async function stkPicker(){
   // экране склада им делать нечего: сегодняшняя работа и вчерашние записи —
   // разные вопросы, и список переездов посреди районов только рябил.
   document.getElementById('stkMid').innerHTML =
-    stkHave(reg) +
+    stkValueCard(reg) +
     `<div class="stk-grp2"><span>Районы</span></div>
-     <div class="stk-drs">${(st.districts || []).map(d => stkDistRow(d, left, без)).join('')}</div>
-     <div class="stk-hist">
-       ${stkHistCard('stkAudits()', 'История ревизий', 'кто считал и что сошлось',
-         '<path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 8v4l3 2"/>')}
-       ${stkHistCard('stkMovesPage()', 'История перемещений', 'что и куда возили',
-         '<path d="M4 8h14M15 5l3 3-3 3M20 16H6M9 13l-3 3 3 3"/>')}
+     <div class="stkd">${(st.districts || []).map(d => stkDistRow(d, left, без)).join('')}</div>
+     <div class="stkh">
+       <div class="periods" id="stkHistTabs">
+         <div class="period-pill"></div>
+         <button class="${STK.hist !== 'moves' ? 'on' : ''}"
+                 onclick="stkHistTab('audits')">Ревизии</button>
+         <button class="${STK.hist === 'moves' ? 'on' : ''}"
+                 onclick="stkHistTab('moves')">Перемещения</button>
+       </div>
+       <div class="stkh-b" id="stkHistBody"><div class="stkh-e">Загрузка…</div></div>
      </div>`;
+  const g = document.getElementById('stkHistTabs'); if(g) requestAnimationFrame(()=>movePill(g));
+  stkHistPaint();
   stkLoadMoves();
 }
 
@@ -10879,6 +10969,48 @@ async function stkPicker(){
 //
 // Всё это — одной полосой в две строки: экран склада должен помещаться целиком,
 // вместе с районами и перемещениями, и место здесь дороже крупной цифры.
+// Три числа, ради которых сюда заходят: сколько лежит, во сколько обошлось и
+// сколько за это выручим. Продажа двойная — цена приложения и цена по прайсу:
+// это разные деньги, и какая из них случится, решает не склад.
+//
+// Закупка бывает известна не по всем полкам: цену части позиций мы просто не
+// знаем, и рядом с суммой стоит, какую долю она покрывает. Сумма без этой
+// оговорки выглядела бы полной, будучи посчитанной по половине склада.
+function stkValueCard(reg){
+  const v = STK.val, t = (v && v.totals) || null;
+  const bottles = t ? t.bottles : ((reg && reg.totals && reg.totals.left) || 0);
+  const без = (reg && reg.unscanned_total) || 0;
+  const cover = v ? (v.cost_cover || 0) : 0;
+  return `<div class="stkv">
+    <div class="stkv-h"><b>Склад стоит</b>${без
+      ? `<i>${fmt(без)} без кодов</i>` : ''}</div>
+    <div class="stkv-g">
+      <div class="stkv-c">
+        <div class="stkv-v">${fmt(bottles)}</div>
+        <div class="stkv-l">бутылок</div>
+      </div>
+      <div class="stkv-c">
+        <div class="stkv-v">${t ? fmt(Math.round(t.cost)) : '—'}</div>
+        <div class="stkv-l">закупка</div>
+        ${t ? `<div class="stkv-s ${cover < 90 ? 'warn' : ''}">${
+          cover >= 100 ? 'по всем полкам' : `по ${cover}% полок`}</div>` : ''}
+      </div>
+      <div class="stkv-c gold">
+        <div class="stkv-v">${t ? fmt(Math.round(t.list)) : '—'}</div>
+        <div class="stkv-l">продажа</div>
+        ${t ? `<div class="stkv-s">${fmt(Math.round(t.app))} в приложении</div>` : ''}
+      </div>
+    </div>
+    <button class="stkv-go" onclick="stkByDistrict()">
+      <span>Показать по районам</span><u>всё, что лежит</u>
+      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+           stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+  </div>`;
+}
+
+// Прежняя полоса остатка. Оставлена для экрана района, где стоимость не
+// считается: там вопрос другой — сходится ли пересчёт.
 function stkHave(reg){
   if(!reg || !reg.totals) return '';
   const t = reg.totals, без = reg.unscanned_total || 0;
@@ -11020,6 +11152,145 @@ async function stkMoveDel(i){
 // Одна закрытая ревизия отвечает «сходится ли сейчас». Несколько подряд
 // отвечают на вопрос поинтереснее: у кого сходится всегда, а у кого каждый раз
 // не хватает — и на сколько.
+// ── Весь склад по районам ─────────────────────────────────────────────────
+// Один экран отвечает сразу на два вопроса: сколько всего и где именно.
+// Сверху те же три числа, что и на главной, — чтобы не гадать, от чего доля;
+// ниже полоса районов, и под ней каталог, где у каждой позиции пять колонок.
+//
+// Таблица прокручивается вбок, а колонка с названием стоит на месте: пять
+// районов и итог в ширину телефона не влезают, а без названия числа не значат
+// ничего.
+function stkByDistrict(){
+  STK.view = 'bydist';
+  _setRail('stkRail', '');
+  const v = STK.val;
+  if(!v){ _stkHead('По районам', 'нет данных', false); 
+    document.getElementById('stkMid').innerHTML =
+      '<div class="stk-empty">Стоимость не посчиталась</div>'; return; }
+  const t = v.totals || {}, ds = v.districts || [];
+  // Ни кнопки сохранения, ни поиска по позициям: это витрина, а не пересчёт.
+  // Оба остались бы от экрана района и делали бы вид, что здесь что-то правят.
+  _stkHead('По районам', `${(v.items || []).length} ${
+    pluralize((v.items||[]).length,'позиция','позиции','позиций')} · ${
+    fmt(t.bottles || 0)} ${pluralize(t.bottles||0,'бутылка','бутылки','бутылок')}`, false);
+  const кол = d => (v.by_district || {})[d.id] || {};
+  document.getElementById('stkMid').innerHTML = `
+    <div class="stkv" style="margin-bottom:12px">
+      <div class="stkv-h"><b>Всего по складу</b></div>
+      <div class="stkv-g">
+        <div class="stkv-c"><div class="stkv-v">${fmt(t.bottles||0)}</div>
+          <div class="stkv-l">бутылок</div></div>
+        <div class="stkv-c"><div class="stkv-v">${fmt(Math.round(t.cost||0))}</div>
+          <div class="stkv-l">закупка</div>
+          <div class="stkv-s ${(v.cost_cover||0) < 90 ? 'warn' : ''}">по ${
+            v.cost_cover||0}% полок</div></div>
+        <div class="stkv-c gold"><div class="stkv-v">${fmt(Math.round(t.list||0))}</div>
+          <div class="stkv-l">продажа</div>
+          <div class="stkv-s">${fmt(Math.round(t.app||0))} в приложении</div></div>
+      </div>
+    </div>
+    <div class="stk-grp2"><span>Районы</span></div>
+    <div class="stkbd-strip">${ds.map(d => {
+      const c = кол(d);
+      return `<div class="stkbd-d">
+        <span class="stkbd-c">${escS(d.code||'')}</span>
+        <span class="stkbd-n">${fmt(c.bottles||0)}</span>
+        <span class="stkbd-m">${fmt(Math.round(c.list||0))}</span>
+      </div>`;
+    }).join('')}</div>
+    <div class="stk-grp2"><span>Каталог</span></div>
+    <div class="stkbd-wrap"><table class="stkbd">
+      <thead><tr><th class="nm">Позиция</th>${
+        ds.map(d => `<th>${escS(d.code||'')}</th>`).join('')}<th class="tot">Всего</th></tr></thead>
+      <tbody>${(v.items || []).map(r => `
+        <tr>
+          <td class="nm"><b>${escS(r.name)}</b><i>${r.cost
+            ? fmt(Math.round(r.cost)) + ' → ' + fmt(Math.round(r.price_list))
+            : 'закупка неизвестна'}</i></td>
+          ${ds.map(d => {
+            const h = (r.have || {})[d.id] || 0;
+            return `<td class="${h ? '' : 'z'}">${h ? fmt(h) : '·'}</td>`;
+          }).join('')}
+          <td class="tot">${fmt(r.bottles)}</td>
+        </tr>`).join('')}</tbody>
+    </table></div>
+    <div class="stk-note" style="margin:12px 2px 0">Числа в колонках районов — в
+      учётных единицах: у крепкого это бутылки, у пива ящики. «Всего» приведено
+      к бутылкам. Под названием — закупка и цена по прайсу за единицу.</div>`;
+}
+
+// ── История: одна карточка, два взгляда ───────────────────────────────────
+// Ревизии и перемещения — это две записи об одном и том же складе, и держать
+// их двумя кнопками значило спрашивать, чем они отличаются, ещё до того, как
+// человек решил, что ему нужно. Теперь это переключатель: список меняется на
+// месте, а карточка остаётся одна.
+function stkHistTab(t){
+  STK.hist = t;
+  document.querySelectorAll('#stkHistTabs button').forEach((b, i) =>
+    b.classList.toggle('on', (i === 1) === (t === 'moves')));
+  const g = document.getElementById('stkHistTabs'); if(g) movePill(g);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  stkHistPaint();
+}
+
+async function stkHistPaint(){
+  const box = document.getElementById('stkHistBody'); if(!box) return;
+  // Приводим к одному из двух значений до запроса: сторож ниже сравнивает
+  // с ним, и на первом показе, когда вкладка ещё не выбрана, он отбрасывал
+  // собственный ответ и список навсегда оставался «Загрузка…».
+  STK.hist = STK.hist === 'moves' ? 'moves' : 'audits';
+  const свой = STK.hist;
+  box.innerHTML = '<div class="stkh-e">Загрузка…</div>';
+  let res;
+  try{
+    res = свой === 'moves'
+      ? await ownerApi.ownerFetch('/api/owner/stock/transfers', {params:{day: accDay()}})
+      : await ownerApi.ownerFetch('/api/owner/stock/audits');
+  }catch(e){
+    box.innerHTML = '<div class="stkh-e" style="color:var(--dn)">Не удалось загрузить</div>';
+    return;
+  }
+  if(STK.hist !== свой) return;            // успели переключить — не мешаем
+  const ПОКАЗ = 4;
+  if(свой === 'moves'){
+    STK.moves = res.transfers || [];
+    box.innerHTML = STK.moves.length ? STK.moves.slice(0, ПОКАЗ).map((m, i) => `
+      <button class="stk-dr" onclick="stkMovesPage()">
+        <span class="stk-dr-b">
+          <span class="stk-dr-n">${escS(m.product_name || m.product_id || '')}</span>
+          <span class="stk-dr-s">${escS(m.from_name || '')} → ${escS(m.to_name || '')}</span>
+        </span>
+        <span class="stk-dr-v">${m.bottles || m.qty || 0}<i>бут</i></span>
+        <span class="stk-dr-go">›</span>
+      </button>`).join('')
+      + stkHistMore(STK.moves.length - ПОКАЗ, 'stkMovesPage()', 'Все перемещения')
+      : '<div class="stkh-e">Сегодня ничего не перевозили</div>';
+    return;
+  }
+  const list = res.audits || [];
+  STK.audits = list;
+  box.innerHTML = list.length ? list.slice(0, ПОКАЗ).map((a, i) => `
+    <button class="stk-dr" onclick="stkAuditOpen(${i})">
+      <span class="stk-dr-c">${escS(a.district_code || '')}</span>
+      <span class="stk-dr-b">
+        <span class="stk-dr-n">${escS(a.district_name || '')}</span>
+        <span class="stk-dr-s ${a.mismatched ? 'dn' : 'ok'}">${escS(a.day || '')} · ${
+          a.mismatched ? `не хватает ${fmt(a.short_aed || 0)} AED` : 'всё сошлось'}</span>
+      </span>
+      <span class="stk-dr-go">›</span>
+    </button>`).join('')
+    + stkHistMore(list.length - ПОКАЗ, 'stkAudits()', 'Все ревизии')
+    : '<div class="stkh-e">Ни одной закрытой ревизии</div>';
+}
+
+function stkHistMore(n, go, label){
+  if(n <= 0) return '';
+  return `<button class="stk-dr" onclick="${go}">
+    <span class="stk-dr-b"><span class="stk-dr-n" style="color:var(--gold2)">${label}</span>
+      <span class="stk-dr-s">и ещё ${fmt(n)}</span></span>
+    <span class="stk-dr-go">›</span></button>`;
+}
+
 async function stkAudits(){
   STK.view = 'audits'; _setRail('stkRail', '');
   _stkHead('История ревизий', 'загрузка…', false);

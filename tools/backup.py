@@ -16,9 +16,15 @@
     python3 tools/backup.py --list             # что уже есть
     python3 tools/backup.py --restore ФАЙЛ --into ambar_test   # проверить копию
     python3 tools/backup.py --restore ФАЙЛ --into ambar --yes  # вернуть в бой
+    python3 tools/backup.py --restore ФАЙЛ --into ambar --yes --photos  # вместе со снимками
 
 Хранение: 14 последних ежедневных и 8 воскресных. Место не жмёт — копия
 весит килобайты, — но бесконечная свалка мешает найти нужную.
+
+Снимки (чеки и кадры списаний) в эту копию не входят: они не меняются и весят
+на три порядка больше остального, а копия снимается каждый час. Они зеркалятся
+рядом, в backups/photos, по файлу на кадр, и только новые. Поэтому полное
+восстановление — это два шага, и второй легко забыть: --photos.
 """
 import argparse
 import asyncio
@@ -39,6 +45,14 @@ DIR = os.getenv("AMBAR_BACKUP_DIR", "/opt/ambar/backups")
 KEEP_HOURS = 48                                 # последние двое суток — все копии
 KEEP_DAILY, KEEP_WEEKLY = 14, 8
 SKIP = {"qr_locks"}                             # живёт минуты, восстанавливать нечего
+# Снимки в почасовую копию не идут. Копия снимается раз в час и хранится
+# шестьюдесятью файлами: каждая фотография попадала бы в каждую из них заново,
+# в Extended JSON — ещё и на треть тяжелее, чем есть. Год работы превратил бы
+# двадцать шесть мегабайт копий в десятки гигабайт. Снимки лежат рядом,
+# отдельным зеркалом, и туда попадает только то, чего там ещё нет.
+PHOTOS = ("expense_photos", "writeoff_photos")
+SKIP |= set(PHOTOS)
+PHOTO_DIR = os.path.join(DIR, "photos")
 
 
 def _env(name: str) -> str:
@@ -90,8 +104,55 @@ async def dump():
             print(f"  {name:<26} {n:>6}")
     size = os.path.getsize(path)
     print(f"\nкопия: {path} · {size/1024:.0f} КБ · {total} документов")
+    await mirror_photos(db)
     _rotate()
     return path
+
+
+async def mirror_photos(db, standby=None):
+    """Зеркало снимков: файл на диск и, если есть, документ в запасную базу.
+
+    Только новое. Уже лежащий кадр не переписывается: он не меняется — снимок
+    либо есть, либо его никогда не делали. Удалённое из базы отсюда не убираем:
+    копия, которая забывает вслед за боевой, копией не является."""
+    было = новых = 0
+    for name in PHOTOS:
+        d = os.path.join(PHOTO_DIR, name)
+        os.makedirs(d, exist_ok=True)
+        есть = {f.rsplit(".", 1)[0] for f in os.listdir(d)}
+        было += len(есть)
+        # Читаем только те _id, которых на диске нет: тянуть все картинки из
+        # базы ради сверки — ровно та работа, от которой мы и уходим.
+        async for doc in db[name].find({"_id": {"$nin": list(есть)}} if есть else {}):
+            img = bytes(doc.get("img") or b"")
+            if not img:
+                continue
+            with open(os.path.join(d, f"{doc['_id']}.jpg"), "wb") as f:
+                f.write(img)
+            новых += 1
+            if standby is not None:
+                await standby[name].replace_one({"_id": doc["_id"]}, doc, upsert=True)
+    print(f"снимки: было {было}, добавлено {новых}")
+
+
+async def restore_photos(db):
+    """Вернуть снимки из зеркала в базу. Нужно после восстановления из jsonl:
+    там их нет, и без этого шага история списаний останется без доказательств."""
+    from bson.binary import Binary
+    n = 0
+    for name in PHOTOS:
+        d = os.path.join(PHOTO_DIR, name)
+        if not os.path.isdir(d):
+            continue
+        for f in sorted(os.listdir(d)):
+            wid = f.rsplit(".", 1)[0]
+            if await db[name].find_one({"_id": wid}, {"_id": 1}):
+                continue
+            with open(os.path.join(d, f), "rb") as fh:
+                await db[name].replace_one(
+                    {"_id": wid}, {"_id": wid, "img": Binary(fh.read())}, upsert=True)
+            n += 1
+    print(f"снимков возвращено: {n}")
 
 
 def _stamp(path):
@@ -165,6 +226,29 @@ def show():
     print(f"\nвсего {len(files)} копий · {sum(os.path.getsize(p) for p in files)/1024:.0f} КБ")
 
 
+async def _photos_to_standby(uri):
+    cli = motor.motor_asyncio.AsyncIOMotorClient(uri, serverSelectionTimeoutMS=20000)
+    db = cli[_db_name(uri)]
+    n = 0
+    for name in PHOTOS:
+        d = os.path.join(PHOTO_DIR, name)
+        if not os.path.isdir(d):
+            continue
+        есть = set()
+        async for x in db[name].find({}, {"_id": 1}):
+            есть.add(x["_id"])
+        from bson.binary import Binary
+        for f in sorted(os.listdir(d)):
+            wid = f.rsplit(".", 1)[0]
+            if wid in есть:
+                continue
+            with open(os.path.join(d, f), "rb") as fh:
+                await db[name].replace_one(
+                    {"_id": wid}, {"_id": wid, "img": Binary(fh.read())}, upsert=True)
+            n += 1
+    print(f"  снимков донесено в запасную: {n}")
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--list", action="store_true")
@@ -172,13 +256,23 @@ def main():
     ap.add_argument("--into", default="ambar_restore_test")
     ap.add_argument("--uri", default="", help="куда восстанавливать (по умолчанию — боевой кластер)")
     ap.add_argument("--yes", action="store_true")
+    ap.add_argument("--photos", action="store_true",
+                    help="вернуть снимки из зеркала в базу (после --restore)")
     ap.add_argument("--mirror", action="store_true",
                     help="после копии залить её в запасную базу (MONGO_URI_STANDBY)")
     a = ap.parse_args()
     if a.list:
         show()
+    elif a.photos and not a.restore:
+        uri = a.uri or _uri()
+        cli = motor.motor_asyncio.AsyncIOMotorClient(uri, serverSelectionTimeoutMS=20000)
+        asyncio.run(restore_photos(cli[a.into if a.into != "ambar_restore_test" else _db_name(uri)]))
     elif a.restore:
         asyncio.run(restore(a.restore, a.into, a.yes, a.uri))
+        if a.photos:
+            uri = a.uri or _uri()
+            cli = motor.motor_asyncio.AsyncIOMotorClient(uri, serverSelectionTimeoutMS=20000)
+            asyncio.run(restore_photos(cli[a.into]))
     else:
         path = asyncio.run(dump())
         if a.mirror:
@@ -192,6 +286,9 @@ def main():
             else:
                 print("\nзеркалим в запасную базу…")
                 asyncio.run(restore(path, _db_name(tgt), yes=True, uri=tgt))
+                # Снимков в дампе нет — доносим их отдельно. Иначе переключение
+                # на запасную базу означало бы историю без единой фотографии.
+                asyncio.run(_photos_to_standby(tgt))
 
 
 if __name__ == "__main__":

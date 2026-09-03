@@ -3784,41 +3784,39 @@ button.path:active{transform:scale(.995)}
 .fx-note{margin-top:12px;font-size:11px;line-height:1.55;color:var(--dim)}
 
 /* ── Склад: сколько лежит и сколько это стоит ─────────────────────────────
-   Было три колонки во всю ширину, разделённые вертикальными линейками, с
-   заглавными подписями под каждым числом. На телефоне это ещё держалось, а на
-   широком экране разъезжалось: числа расходились по углам и висели в пустоте,
-   связанные только линейками — то есть ничем.
+   Три величины равнозначны, и размер у них одинаковый. Неряшливым ряд делал
+   не размер, а разное устройство ячеек: у одной была третья строка, у другой
+   нет, у одной единица, у другой нет — и нижний край ряда получался рваным.
 
-   Здесь наоборот. Группирует пространство, а не линии: три величины стоят
-   рядом по левому краю и не растягиваются, сколько бы места ни дали. Ширина
-   колонки — по содержимому, поэтому «175» не занимает столько же, сколько
-   «50 500», и ряд читается как строка, а не как таблица.
+   Здесь все три устроены одинаково: число с единицей, название, пояснение.
+   Пояснение есть всегда, даже когда сказать нечего («все с кодами»), — иначе
+   колонка проваливается и ряд снова разъезжается.
 
-   Подписи строчные и тихие: заглавные микронадписи под каждым числом кричали
-   ровно в тех местах, где смотреть не надо. */
+   Ширина колонки по содержимому: «175» не должно занимать столько же места,
+   сколько «50 500». Между ними зазор, а не линейка — связывает пространство.
+   На широком экране ряд остаётся группой слева и не расходится по углам. */
 .stkv{margin:2px 0 12px;border-radius:20px;background:var(--card);
   border:1px solid var(--border2);overflow:hidden}
-.stkv-h{display:flex;align-items:center;gap:10px;padding:14px 18px 0}
-.stkv-h b{font-size:13px;font-weight:700;letter-spacing:-.2px;color:var(--text)}
-/* Непросканированное — не второй заголовок, а пометка к остатку: тихая
-   плашка, а не строка того же веса, что и название карточки. */
-.stkv-h i{margin-left:auto;font-style:normal;font-size:10.5px;font-weight:600;
-  padding:3px 9px;border-radius:999px;color:var(--warn);
-  background:rgba(243,180,74,.1);border:1px solid rgba(243,180,74,.2)}
+.stkv-h{display:flex;align-items:center;gap:10px;padding:15px 18px 0}
+.stkv-h b{font-size:12.5px;font-weight:600;color:var(--muted);letter-spacing:.1px}
 .stkv-g{display:grid;grid-template-columns:repeat(3,max-content);
-  gap:4px 34px;padding:14px 18px 18px}
+  gap:4px 30px;padding:13px 18px 18px;align-items:start}
 .stkv-c{min-width:0}
-.stkv-v{font-family:'DM Sans',sans-serif;font-size:23px;font-weight:700;
-  line-height:1;letter-spacing:-.6px;font-variant-numeric:tabular-nums;
-  color:var(--text)}
+/* Число и единица на одной базовой линии: единица мельче и тише, но живёт с
+   числом, а не отдельной строкой. */
+.stkv-v{display:flex;align-items:baseline;gap:5px;
+  font-family:'DM Sans',sans-serif;font-size:22px;font-weight:700;line-height:1;
+  letter-spacing:-.8px;font-variant-numeric:tabular-nums;color:var(--text)}
+.stkv-v u{text-decoration:none;font-size:10.5px;font-weight:600;letter-spacing:.3px;
+  color:var(--muted)}
 .stkv-c.gold .stkv-v{color:var(--gold2)}
-.stkv-l{font-size:11px;font-weight:500;color:var(--muted);margin-top:7px}
-.stkv-s{font-size:11px;color:var(--dim);margin-top:3px;white-space:nowrap;
-  font-variant-numeric:tabular-nums}
+.stkv-c.gold .stkv-v u{color:rgba(201,169,110,.55)}
+.stkv-l{font-size:11.5px;font-weight:500;color:var(--sub);margin-top:8px}
+/* Третья строка — пояснение. Одна высота у всех трёх, чтобы низ ряда был
+   ровным даже когда текст короче. */
+.stkv-s{font-size:10.5px;color:var(--dim);margin-top:4px;min-height:13px;
+  white-space:nowrap;font-variant-numeric:tabular-nums}
 .stkv-s.warn{color:var(--warn)}
-/* Переход к разрезу по районам — строка, а не панель: одно слово слева и
-   стрелка в кружке справа, между ними ничего. Приписка «всё, что лежит»
-   отсюда убрана: она ничего не добавляла к «по районам». */
 .stkv-go{display:flex;align-items:center;gap:12px;width:100%;padding:13px 18px;
   border:0;border-top:1px solid var(--border2);background:transparent;
   color:var(--text);font-family:inherit;font-size:13.5px;font-weight:600;
@@ -11047,23 +11045,24 @@ function stkValueCard(reg){
   const без = (reg && reg.unscanned_total) || 0;
   const cover = v ? (v.cost_cover || 0) : 0;
   return `<div class="stkv">
-    <div class="stkv-h"><b>Склад стоит</b>${без
-      ? `<i>${fmt(без)} без кодов</i>` : ''}</div>
+    <div class="stkv-h"><b>Склад стоит</b></div>
     <div class="stkv-g">
       <div class="stkv-c">
-        <div class="stkv-v">${fmt(bottles)}</div>
-        <div class="stkv-l">бутылок</div>
+        <div class="stkv-v">${fmt(bottles)}<u>бут</u></div>
+        <div class="stkv-l">остаток</div>
+        <div class="stkv-s ${без ? 'warn' : ''}">${без
+          ? `${fmt(без)} без кодов` : 'все с кодами'}</div>
       </div>
       <div class="stkv-c">
-        <div class="stkv-v">${t ? fmt(Math.round(t.cost)) : '—'}</div>
+        <div class="stkv-v">${t ? fmt(Math.round(t.cost)) : '—'}<u>AED</u></div>
         <div class="stkv-l">закупка</div>
-        ${t ? `<div class="stkv-s ${cover < 90 ? 'warn' : ''}">${
-          cover >= 100 ? 'по всем полкам' : `по ${cover}% полок`}</div>` : ''}
+        <div class="stkv-s ${t && cover < 90 ? 'warn' : ''}">${t
+          ? (cover >= 100 ? 'по всем полкам' : `по ${cover}% полок`) : ''}</div>
       </div>
       <div class="stkv-c gold">
-        <div class="stkv-v">${t ? fmt(Math.round(t.list)) : '—'}</div>
+        <div class="stkv-v">${t ? fmt(Math.round(t.list)) : '—'}<u>AED</u></div>
         <div class="stkv-l">продажа</div>
-        ${t ? `<div class="stkv-s">${fmt(Math.round(t.app))} в приложении</div>` : ''}
+        <div class="stkv-s">${t ? `${fmt(Math.round(t.app))} в приложении` : ''}</div>
       </div>
     </div>
     <button class="stkv-go" onclick="stkByDistrict()">

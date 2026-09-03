@@ -3759,3 +3759,47 @@ async def shift_day_snapshot(day: str, snap: dict = None):
                                    {"$set": {"snap": snap, "day": day, "district": "*"}},
                                    upsert=True)
     return snap
+
+
+# ── Закупочные цены, поправленные рукой ──────────────────────────────────────
+# Прайс магазина живёт в файле, но цены меняются чаще, чем выкладывается код, и
+# лист не всегда под рукой. Поэтому владелец может поправить цену прямо в
+# приложении — правка ложится поверх файла и переживает выкладку.
+#
+# Храним с автором и временем: цена без автора через месяц неотличима от
+# опечатки, а по ней считается стоимость всего склада.
+async def cost_overrides() -> dict:
+    """Все ручные цены: {product_id: {price, by_name, at}}."""
+    d = _db_or_none()
+    if d is None:
+        return {}
+    out = {}
+    async for doc in d.cost_prices.find({}):
+        pid = str(doc.get("_id") or "")
+        if pid:
+            out[pid] = {"price": doc.get("price"), "by_name": doc.get("by_name", ""),
+                        "at": doc.get("at")}
+    return out
+
+
+async def cost_override_set(product_id: str, price, by_name: str = "") -> bool:
+    """Поставить или снять ручную цену. price <= 0 или None — снять."""
+    d = _db_or_none()
+    if d is None:
+        return False
+    pid = str(product_id or "").strip()
+    if not pid:
+        return False
+    try:
+        p = float(price or 0)
+    except (TypeError, ValueError):
+        p = 0.0
+    if p <= 0:
+        await d.cost_prices.delete_one({"_id": pid})
+        return True
+    await d.cost_prices.update_one(
+        {"_id": pid},
+        {"$set": {"price": round(p, 2), "by_name": str(by_name or "")[:40],
+                  "at": datetime.now(timezone.utc)}},
+        upsert=True)
+    return True

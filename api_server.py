@@ -2775,6 +2775,12 @@ def main():
         wallet_routes.setup(app)
     except Exception as e:
         log.error(f"wallet routes setup failed: {e}")
+    # Сколько склад стоит: бутылки, закупка и выручка по двум ценам.
+    try:
+        import stock_value
+        stock_value.setup(app)
+    except Exception as e:
+        log.error(f"stock value routes setup failed: {e}")
     # Курс валют: рыночный по всем и курс наличных обменника там, где он есть.
     # Зарплаты равняются на доллар, а водители привозят наличные — старшему
     # нужно видеть, по какой цене эти деньги на самом деле поменяются.

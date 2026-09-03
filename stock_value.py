@@ -120,6 +120,7 @@ def _app_unit_price(p: dict, unit: int) -> int:
 
 
 async def build(day: str = "") -> dict:
+    from config_stock_order import order_key
     d = await stock_routes.order_rows(day)
     cat = stock_routes._catalog()
     cost = await cost_map()
@@ -144,6 +145,9 @@ async def build(day: str = "") -> dict:
         row = {"id": pid, "name": r.get("name", ""), "cat": r.get("cat", ""),
                "unit": unit, "price_app": app_u, "price_list": list_u,
                "cost": cost_u or None, "cost_src": src.get(pid, ""),
+               # Номер рабочей таблицы — тот же, что в заявке, на бумажном
+               # листе и в отчётах. По нему позицию называют голосом.
+               "no": order_key(pid) + 1,
                "have": {}, "bottles": 0.0}
         for oid, c in cells.items():
             have = float((c or {}).get("have") or 0)
@@ -165,7 +169,10 @@ async def build(day: str = "") -> dict:
         if row["bottles"] > 0:
             items.append(row)
 
-    items.sort(key=lambda r: -r["bottles"])
+    # Порядок как в заявке: ряд на полке идёт как идёт, и «по убыванию
+    # остатка» здесь означает прыгать по залу глазами. Человек сверяется со
+    # строкой листа, а строка на листе стоит на своём номере.
+    items.sort(key=lambda r: r["no"])
     rnd = lambda x: round(x, 2)
     fix = lambda s: {k: (round(v) if k == "bottles" or k == "cost_bottles" else rnd(v))
                      for k, v in s.items()}

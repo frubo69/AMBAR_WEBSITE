@@ -3818,6 +3818,10 @@ button.path:active{transform:scale(.995)}
 .stkv-v{font-family:'DM Sans',sans-serif;font-size:28px;font-weight:700;
   line-height:1;letter-spacing:-1.4px;font-variant-numeric:tabular-nums;
   color:var(--text)}
+/* Золото — только на самой цифре продажи. Подложка зоны остаётся общей: цвет
+   красит число, а не выделяет зону, иначе снова получится, что одна из трёх
+   величин важнее двух других. */
+.stkv-c.gold .stkv-v{color:var(--gold2)}
 .stkv-go{display:flex;align-items:center;gap:12px;width:100%;padding:13px 18px;
   border:0;border-top:1px solid var(--border2);background:transparent;
   color:var(--text);font-family:inherit;font-size:13.5px;font-weight:600;
@@ -3878,6 +3882,12 @@ button.path:active{transform:scale(.995)}
 .stkbd td.z{color:var(--muted);opacity:.45}
 .stkbd td.nm b{display:block;font-size:12.5px;font-weight:600;line-height:1.25;
   white-space:normal}
+/* Номер позиции — тот же, что в заявке и на бумажном листе: по нему её
+   называют голосом и ищут в файле для магазина. Стоит перед названием и
+   тише его, чтобы не спорить с ним за внимание. */
+.stkbd td.nm b s{text-decoration:none;display:inline-block;min-width:22px;
+  font-size:10.5px;font-weight:700;color:var(--muted);
+  font-variant-numeric:tabular-nums}
 .stkbd td.nm i{display:block;font-style:normal;font-size:10px;color:var(--muted);
   margin-top:2px}
 .stkbd td.tot,.stkbd th.tot{color:var(--gold2);font-weight:700;padding-right:14px}
@@ -11056,7 +11066,7 @@ function stkValueCard(reg){
         <div class="stkv-l">Закупка, AED</div>
         <div class="stkv-v">${t ? fmt(Math.round(t.cost)) : '—'}</div>
       </div>
-      <div class="stkv-c">
+      <div class="stkv-c gold">
         <div class="stkv-l">Продажа, AED</div>
         <div class="stkv-v">${t ? fmt(Math.round(t.list)) : '—'}</div>
       </div>
@@ -11284,12 +11294,12 @@ function stkByDistrict(тихо){
     }).join('')}</div>
     <div class="stk-grp2"><span>Каталог</span></div>
     <div class="stkbd-wrap"><table class="stkbd">
-      <thead><tr><th class="nm">Позиция</th>${
+      <thead><tr><th class="nm">№ и позиция</th>${
         ds.map(d => `<th>${escS(d.code || '')}</th>`).join('')}<th class="tot">Всего</th></tr></thead>
       <tbody>${items.map(r => {
         const сумма = режим.сумма(r);
         return `<tr>
-          <td class="nm"><b>${escS(r.name)}</b><i>${r.cost
+          <td class="nm"><b><s>${r.no || ''}</s>${escS(r.name)}</b><i>${r.cost
             ? fmt(Math.round(r.cost)) + ' → ' + fmt(Math.round(r.price_list))
             : 'закупка неизвестна'}</i></td>
           ${ds.map(d => {

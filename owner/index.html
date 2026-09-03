@@ -2561,6 +2561,25 @@ button.path:active{transform:scale(.995)}
 .wh-tab-fab:active{background:rgba(255,255,255,.14)}
 .wh-body::-webkit-scrollbar{display:none}
 
+/* Заголовок района в списке. Код золотым квадратом, название рядом, справа —
+   что в районе происходит: сколько на связи и сколько заказов в пути. Липкий:
+   список длиннее экрана, и, прокручивая, надо видеть, чей это ряд. */
+.wh-grp{position:sticky;top:0;z-index:2;display:flex;align-items:center;gap:9px;
+  margin:14px 0 7px;padding:6px 2px;
+  background:linear-gradient(var(--bg2) 72%,rgba(0,0,6,0))}
+.wh-grp:first-child{margin-top:2px}
+.wh-grp-c{flex:0 0 auto;min-width:26px;height:20px;padding:0 6px;border-radius:7px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'DM Sans',sans-serif;font-size:10px;font-weight:800;color:#1a1408;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.wh-grp-n{flex:0 0 auto;font-size:12.5px;font-weight:700;color:var(--gold2)}
+.wh-grp-s{flex:1;min-width:0;text-align:right;font-size:10.5px;color:var(--muted);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Строки района — одной плитой: между группами воздух, внутри группы черта. */
+.wh-grp-b{border-radius:15px;background:rgba(255,255,255,.03);overflow:hidden}
+.wh-grp-b .wh-r{border-radius:0;margin:0;background:transparent}
+.wh-grp-b .wh-r + .wh-r{box-shadow:0 -1px 0 rgba(255,255,255,.05)}
+
 /* Карточка водителя — то же место, что и список: шторка ведёт себя стопкой
    экранов. Наверху крупно состояние, ниже факты, внизу действия. */
 .wh-card{padding:2px 2px 4px}
@@ -8809,8 +8828,15 @@ function whDragInit(){
     // она должна пойти за ним с того места, где была, а не доигрывать.
     cancelAnimationFrame(WH_SH.raf); WH_SH.raf = 0;
     const y = e.touches ? e.touches[0].clientY : e.clientY;
-    _whDrag = {y0: y, base: WH_SH.y, d: whDetents(), fromList: !!fromList,
-               moved: 0, ист: [{y, t: performance.now()}]};
+    const d0 = whDetents();
+    // Откуда начали — запоминаем СРАЗУ. Считать это в конце жеста нельзя:
+    // к тому моменту палец уже утащил шторку, ближайшим оказывается соседнее
+    // положение, и «шаг на одно» отсчитывается от него — бросок из сложенной
+    // перепрыгивал середину и улетал в раскрытую.
+    const откуда0 = ['full', 'half', 'peek'].reduce((b, k) =>
+      Math.abs(d0[k] - WH_SH.y) < Math.abs(d0[b] - WH_SH.y) ? k : b, 'half');
+    _whDrag = {y0: y, base: WH_SH.y, d: d0, fromList: !!fromList,
+               откуда: откуда0, moved: 0, ист: [{y, t: performance.now()}]};
   };
 
   const move = e => {
@@ -8825,19 +8851,37 @@ function whDragInit(){
     if(e.cancelable) e.preventDefault();
   };
 
+  // Куда шторка поедет, когда палец отпустили.
+  //
+  // Прежде решал один тормозной путь по формуле прокрутки, и он врал: у неё
+  // затухание рассчитано на длинный полёт списка, и даже спокойный подъём
+  // снизу проецировался на пол-экрана вперёд. Оттого шторка из сложенной
+  // всегда улетала в раскрытую, минуя середину, — то самое «тяну снизу, а оно
+  // сразу наверх».
+  //
+  // Теперь два сигнала, и каждый отвечает за своё. Скорость говорит НАПРАВЛЕНИЕ
+  // и НАМЕРЕНИЕ: бросили — едем на соседнее положение в ту сторону, а не туда,
+  // куда попал палец. Положение отвечает, когда броска не было: отпустили
+  // спокойно — садимся в ближайшее. Через положение перепрыгиваем только на
+  // очень сильном броске, и это отдельный, заведомо редкий случай.
+  const БРОСОК = 300;        // px/с — с этого начинается намерение, а не сдвиг
+  const ПОЛЁТ  = 1900;       // px/с — с этого позволено перепрыгнуть положение
+
   const end = () => {
     if(!_whDrag) return;
-    const {d, ист} = _whDrag;
+    const {d, ист, откуда} = _whDrag;
     _whDrag = null;
     const v = _whVel(ист);
-    // Куда жест доехал бы сам — туда и целимся. Порога «это уже бросок» нет
-    // вовсе: медленное движение даёт короткий тормозной путь и садится в
-    // ближайшее, резкое — улетает через положение, и оба случая считаются
-    // одной формулой, а не двумя ветками с разным характером.
-    const цель = WH_SH.y + _whProject(v);
     const order = ['full', 'half', 'peek'];
-    const target = order.reduce((best, k) =>
-      Math.abs(d[k] - цель) < Math.abs(d[best] - цель) ? k : best, 'half');
+    let target;
+    if(Math.abs(v) >= БРОСОК){
+      const шаг = (Math.abs(v) >= ПОЛЁТ ? 2 : 1) * (v > 0 ? 1 : -1);
+      const i = order.indexOf(откуда);
+      target = order[Math.max(0, Math.min(order.length - 1, i + шаг))];
+    } else {
+      target = order.reduce((best, k) =>
+        Math.abs(d[k] - WH_SH.y) < Math.abs(d[best] - WH_SH.y) ? k : best, 'half');
+    }
     WH_SH.v = v;
     whSnap(target, true);
     try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
@@ -8961,7 +9005,8 @@ function _whLeft(min){
 function whRow(r, trackOn){
   const st = whState(r);
   const cls = st === 'stream' ? 'live' : (st === 'snap' ? 'snap' : (r.has ? '' : 'off'));
-  const where = [r.code, r.name].filter(Boolean).join(' ');
+  // Район теперь стоит заголовком группы, и в строке его нет: повторённый у
+  // каждого имени, он занимал место и ничего не добавлял.
   // Два разных вопроса, и на оба надо ответить одной строкой: видно ли его
   // сейчас — и будет ли видно, когда он уберёт телефон в карман. Трансляция
   // отвечает на второй, точка из приложения — только на первый.
@@ -8975,7 +9020,7 @@ function whRow(r, trackOn){
           onclick="whPick('${escS(r.driver)}')">
     <span class="wh-i">${st === 'stream' ? IC_LIVE : (st === 'snap' ? IC_SNAP : IC_OFF)}</span>
     <span class="wh-b">
-      <span class="wh-n">${escS(r.driver)}<u>${escS(where)}</u></span>
+      <span class="wh-n">${escS(r.driver)}</span>
       <span class="wh-s">${state}${trackOn ? ' <i>· маршрут на карте</i>' : ''}</span>
     </span>
     <span class="wh-w">
@@ -9027,8 +9072,33 @@ function whPaint(){
   const emptyTxt = !rows.length ? 'Водителей нет'
                  : _whFilter === 'live' ? 'Сейчас никто не транслирует'
                  : 'Ни у кого нет заказов в пути';
+  // По районам, а не сплошным списком. Одиннадцать имён подряд читаются как
+  // одна куча, и «кто из Бизнес Бей» приходится собирать глазами по подписям
+  // у каждого имени. Заголовок района отвечает на это один раз на группу, и
+  // код из строки водителя тогда уходит: он там повторял заголовок.
+  const группы = [];
+  shown.forEach(r => {
+    // Ключ группы — id района, а нет его — код: без запасного ключа все
+    // одиннадцать схлопывались в одну группу с чужим названием.
+    const ключ = r.district || r.code || '—';
+    let g = группы.find(x => x.id === ключ);
+    if(!g){ g = {id: ключ, code: r.code, name: r.name, rows: []}; группы.push(g); }
+    g.rows.push(r);
+  });
   document.getElementById('whList').innerHTML = (shown.length
-    ? shown.map(r => whRow(r, WH.sel === r.driver && trackOn)).join('')
+    ? группы.map(g => {
+        const живых = g.rows.filter(r => whState(r) === 'stream').length;
+        const заказы = g.rows.reduce((a, r) => a + (r.orders || 0), 0);
+        return `<div class="wh-grp">
+          <span class="wh-grp-c">${escS(g.code || '')}</span>
+          <span class="wh-grp-n">${escS(g.name || '')}</span>
+          <span class="wh-grp-s">${живых ? `${живых} на связи`
+            : `${g.rows.length} ${pluralize(g.rows.length,'водитель','водителя','водителей')}`}${
+            заказы ? ` · ${заказы} в пути` : ''}</span>
+        </div>
+        <div class="wh-grp-b">${g.rows.map(r =>
+          whRow(r, WH.sel === r.driver && trackOn)).join('')}</div>`;
+      }).join('')
     : `<div class="exp-empty">${emptyTxt}</div>`)
     + `<div class="wh-note">Точку присылает живая трансляция телеграма — водитель
        включает её сам. Её хватает на восемь часов, дальше бот напомнит. Маршрут

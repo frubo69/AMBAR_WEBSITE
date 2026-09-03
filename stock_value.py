@@ -7,9 +7,12 @@
 
 Откуда что берётся
 ------------------
-Остаток по позициям и районам — из той же рабочей таблицы, по которой
-собирается заявка в магазин (`order_rows`). Это единственное место, где
-известно, сколько чего лежит В КАЖДОМ районе, а не всего.
+Остаток по позициям и районам — из основы рабочей таблицы, по которой
+собирается заявка в магазин (`_district_base`): последний пересчёт плюс приход
+и минус то, что с тех пор продали и разбили. Это единственное место, где
+известно, сколько чего лежит В КАЖДОМ районе, а не всего. Берём именно основу,
+а не готовые строки заявки: в них позиция без потребности не попадает, а
+каталог нужен целиком.
 
 Цены — из каталога, и их там по две на каждую учётную единицу: `price*` берёт
 приложение, `price*_full` стоит по прайсу. У пива единица — ящик, поэтому
@@ -120,67 +123,84 @@ def _app_unit_price(p: dict, unit: int) -> int:
 
 
 async def build(day: str = "") -> dict:
+    """Весь каталог с остатком по районам и деньгами.
+
+    Каталог отдаётся целиком, а не только то, что лежит: пустая полка — тоже
+    ответ, и он нужен ровно так же, как непустая. Но «нет» бывает двух родов, и
+    путать их нельзя:
+
+      0   — позицию в этом районе считали, и её там нет;
+      —   — её туда ни разу не вносили, то есть мы про неё ничего не знаем.
+
+    Отличить одно от другого можно только по листу пересчёта: если позиции нет
+    в его строках, значит её и не считали. Район, который не считали вовсе,
+    даёт прочерк по всем позициям сразу.
+    """
     from config_stock_order import order_key
-    d = await stock_routes.order_rows(day)
+    # День обязателен строкой: расчёт нормы разбирает его через strptime и на
+    # пустой строке падает. Раньше это делала заявка, у которой мы брали
+    # строки; теперь основу спрашиваем сами — значит и день готовим сами.
+    day = (day or "").strip() or stock_routes._biz_day()
     cat = stock_routes._catalog()
+    base = await stock_routes._district_base(day)
     cost = await cost_map()
     src = _COST.get("src") or {}
 
-    districts = [{"id": x["id"], "code": x.get("code", ""), "name": x.get("name", "")}
-                 for x in (d.get("districts") or [])]
+    ids = list(stock_routes.OFFICE_IDS)
+    districts = [{"id": o, "code": stock_routes.OFFICE_CODES.get(o, ""),
+                  "name": stock_routes.OFFICE_NAMES.get(o, o)} for o in ids]
     zero = lambda: {"bottles": 0.0, "app": 0.0, "list": 0.0, "cost": 0.0,
                     "cost_bottles": 0.0}
-    per = {x["id"]: zero() for x in districts}
+    per = {o: zero() for o in ids}
     total = zero()
     items = []
 
-    for r in d.get("all_rows") or []:
-        pid = r.get("id") or ""
-        p = cat.get(pid) or {}
-        unit = int(r.get("unit") or 1)
-        list_u = float(r.get("price") or 0)          # по прайсу, за единицу
+    for pid, p in cat.items():
+        unit = stock_routes._unit(p)
+        list_u = float(stock_routes._price(p))
         app_u = float(_app_unit_price(p, unit))
         cost_u = float(cost.get(pid) or 0)
-        cells = r.get("cells") or {}
-        row = {"id": pid, "name": r.get("name", ""), "cat": r.get("cat", ""),
+        row = {"id": pid, "name": p.get("name", ""), "cat": p.get("cat", ""),
                "unit": unit, "price_app": app_u, "price_list": list_u,
                "cost": cost_u or None, "cost_src": src.get(pid, ""),
-               # Номер рабочей таблицы — тот же, что в заявке, на бумажном
-               # листе и в отчётах. По нему позицию называют голосом.
                "no": order_key(pid) + 1,
-               "have": {}, "bottles": 0.0}
-        for oid, c in cells.items():
-            have = float((c or {}).get("have") or 0)
+               "have": {}, "bottles": 0.0, "known": False}
+        for oid in ids:
+            b = base.get(oid) or {}
+            имеет = b.get("have") or {}
+            # Район не считали вовсе или позиции не было в его листе — про неё
+            # здесь ничего не известно, и это не ноль.
+            if not b.get("counted") or pid not in имеет:
+                row["have"][oid] = None
+                continue
+            row["known"] = True
+            have = float(имеет.get(pid) or 0)
+            row["have"][oid] = have
             if have <= 0:
                 continue
-            b = have * unit
-            row["have"][oid] = have
-            row["bottles"] += b
-            slot = per.get(oid)
-            if slot is None:
-                per[oid] = slot = zero()
-            for box, val in ((slot, None), (total, None)):
-                box["bottles"] += b
+            b_ = have * unit
+            row["bottles"] += b_
+            slot = per[oid]
+            for box in (slot, total):
+                box["bottles"] += b_
                 box["app"] += have * app_u
                 box["list"] += have * list_u
                 if cost_u:
                     box["cost"] += have * cost_u
-                    box["cost_bottles"] += b
-        if row["bottles"] > 0:
-            items.append(row)
+                    box["cost_bottles"] += b_
+        items.append(row)
 
     # Порядок как в заявке: ряд на полке идёт как идёт, и «по убыванию
     # остатка» здесь означает прыгать по залу глазами. Человек сверяется со
     # строкой листа, а строка на листе стоит на своём номере.
     items.sort(key=lambda r: r["no"])
     rnd = lambda x: round(x, 2)
-    fix = lambda s: {k: (round(v) if k == "bottles" or k == "cost_bottles" else rnd(v))
+    fix = lambda s: {k: (round(v) if k in ("bottles", "cost_bottles") else rnd(v))
                      for k, v in s.items()}
-    # Какая доля склада вообще имеет известную закупку. Без этой цифры сумма
-    # закупки выглядит полной, хотя посчитана по части полок.
     covered = (total["cost_bottles"] / total["bottles"] * 100) if total["bottles"] else 0
+    с_остатком = sum(1 for r in items if r["bottles"] > 0)
     out = {
-        "day": d.get("day", ""),
+        "day": day,
         "districts": districts,
         "totals": fix(total),
         "by_district": {k: fix(v) for k, v in per.items()},
@@ -188,8 +208,10 @@ async def build(day: str = "") -> dict:
         "cost_cover": round(covered),
         "cost_known": sum(1 for r in items if r.get("cost")),
         "items_total": len(items),
+        "items_with_stock": с_остатком,
     }
-    log.info(f"[value] бутылок {out['totals']['bottles']} · "
+    log.info(f"[value] позиций {len(items)} (с остатком {с_остатком}) · "
+             f"бутылок {out['totals']['bottles']} · "
              f"прайс {out['totals']['list']:.0f} · приложение {out['totals']['app']:.0f} · "
              f"закупка {out['totals']['cost']:.0f} (покрытие {out['cost_cover']}%)")
     return out

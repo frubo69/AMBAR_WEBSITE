@@ -3843,14 +3843,14 @@ button.path:active{transform:scale(.995)}
 .stkd .stk-dr:first-child{border-top:0}
 .stkd .stk-dr:active{background:var(--card2)}
 
-/* История одной карточкой с переключателем: две кнопки рядом занимали два
-   яруса и спрашивали, чем ревизия отличается от перемещения, ещё до того, как
-   человек решил, что ему нужно. */
-.stkh{border-radius:16px;background:var(--card);border:1px solid var(--border2);
-  overflow:hidden}
-.stkh .periods{margin:12px 12px 0;--count:2}
-.stkh-b{padding:4px 4px 6px}
-.stkh-e{padding:22px 16px;text-align:center;font-size:12.5px;color:var(--dim)}
+/* Строка «История» на панели склада — самостоятельная карточка, а не подвал
+   чужой: списки уехали на свою страницу, и здесь остался только вход. */
+.stk-hist-go{border-radius:16px;border:1px solid var(--border2);
+  background:var(--card);padding:15px 16px}
+.stk-hist-go u{text-decoration:none;flex:0 0 auto;font-size:11.5px;
+  font-weight:500;color:var(--muted)}
+.stk-hist-go:active{background:var(--card2)}
+.stkh-e{padding:26px 16px;text-align:center;font-size:12.5px;color:var(--dim)}
 
 /* Переключатель величины: он же и заголовок экрана. Три кнопки решают, что
    считают все числа ниже, — поэтому стоит первым и во всю ширину. */
@@ -11016,19 +11016,11 @@ async function stkPicker(){
     stkValueCard(reg) +
     `<div class="stk-grp2"><span>Районы</span></div>
      <div class="stkd">${(st.districts || []).map(d => stkDistRow(d, left, без)).join('')}</div>
-     <div class="stkh">
-       <div class="periods" id="stkHistTabs">
-         <div class="period-pill"></div>
-         <button class="${STK.hist !== 'moves' ? 'on' : ''}"
-                 onclick="stkHistTab('audits')">Ревизии</button>
-         <button class="${STK.hist === 'moves' ? 'on' : ''}"
-                 onclick="stkHistTab('moves')">Перемещения</button>
-       </div>
-       <div class="stkh-b" id="stkHistBody"><div class="stkh-e">Загрузка…</div></div>
-     </div>`;
-  const g = document.getElementById('stkHistTabs'); if(g) requestAnimationFrame(()=>movePill(g));
-  stkHistPaint();
-  stkLoadMoves();
+     <button class="stkv-go stk-hist-go" onclick="stkHistory()">
+       <span>История</span><u>ревизии и перемещения</u>
+       <em><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+            stroke-width="2.6" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></em>
+     </button>`;
 }
 
 // Сколько бутылок лежит на складе прямо сейчас — первое, что должен отвечать
@@ -11213,7 +11205,11 @@ async function stkMoveDel(i){
     try{ await ownerApi.ownerFetch('/api/owner/stock/transfer/'+id, {method:'DELETE'}); }
     catch(e){}
   }
-  if(STK.view === 'moves') stkMovesPage(); else stkLoadMoves();
+  // Перерисовываем то, откуда удаляли: своя страница перемещений, страница
+  // истории или — если экран старый — прежний блок на панели.
+  if(STK.view === 'moves') stkMovesPage();
+  else if(STK.view === 'hist') stkHistPaint();
+  else stkLoadMoves();
 }
 
 
@@ -11328,7 +11324,34 @@ function stkByDistrict(тихо){
   if(g) (тихо ? movePill(g) : requestAnimationFrame(() => movePill(g)));
 }
 
-// ── История: одна карточка, два взгляда ───────────────────────────────────
+// ── История: отдельная страница ──────────────────────────────────────────
+// На панели склада её быть не должно. Панель отвечает на сегодняшний вопрос —
+// сколько лежит и сходится ли, — и обязана помещаться в экран целиком, без
+// прокрутки. История же длинная по природе: втиснутая под районы, она и сама
+// не помещалась, и панель заставляла листать.
+//
+// Поэтому здесь только строка «История», а списки — на своей странице, где
+// им не тесно и где переключатель делит весь экран, а не четыре строки.
+function stkHistory(){
+  STK.view = 'hist';
+  STK.hist = STK.hist === 'moves' ? 'moves' : 'audits';
+  _setRail('stkRail', '');
+  _stkHead('История', 'ревизии и перемещения', false);
+  document.getElementById('stkMid').innerHTML = `
+    <div class="periods" id="stkHistTabs" style="margin:2px 0 14px;--count:2">
+      <div class="period-pill"></div>
+      <button class="${STK.hist !== 'moves' ? 'on' : ''}"
+              onclick="stkHistTab('audits')">Ревизии</button>
+      <button class="${STK.hist === 'moves' ? 'on' : ''}"
+              onclick="stkHistTab('moves')">Перемещения</button>
+    </div>
+    <div id="stkHistBody"><div class="stkh-e">Загрузка…</div></div>`;
+  const g = document.getElementById('stkHistTabs');
+  if(g) requestAnimationFrame(() => movePill(g));
+  stkHistPaint();
+}
+
+// ── История: один список, два взгляда ─────────────────────────────────────
 // Ревизии и перемещения — это две записи об одном и том же складе, и держать
 // их двумя кнопками значило спрашивать, чем они отличаются, ещё до того, как
 // человек решил, что ему нужно. Теперь это переключатель: список меняется на
@@ -11360,10 +11383,9 @@ async function stkHistPaint(){
     return;
   }
   if(STK.hist !== свой) return;            // успели переключить — не мешаем
-  const ПОКАЗ = 4;
   if(свой === 'moves'){
     STK.moves = res.transfers || [];
-    box.innerHTML = STK.moves.length ? STK.moves.slice(0, ПОКАЗ).map((m, i) => `
+    box.innerHTML = STK.moves.length ? `<div class="stkd">` + STK.moves.map((m, i) => `
       <button class="stk-dr" onclick="stkMovesPage()">
         <span class="stk-dr-b">
           <span class="stk-dr-n">${escS(m.product_name || m.product_id || '')}</span>
@@ -11371,14 +11393,13 @@ async function stkHistPaint(){
         </span>
         <span class="stk-dr-v">${m.bottles || m.qty || 0}<i>бут</i></span>
         <span class="stk-dr-go">›</span>
-      </button>`).join('')
-      + stkHistMore(STK.moves.length - ПОКАЗ, 'stkMovesPage()', 'Все перемещения')
+      </button>`).join('') + '</div>'
       : '<div class="stkh-e">Сегодня ничего не перевозили</div>';
     return;
   }
   const list = res.audits || [];
   STK.audits = list;
-  box.innerHTML = list.length ? list.slice(0, ПОКАЗ).map((a, i) => `
+  box.innerHTML = list.length ? `<div class="stkd">` + list.map((a, i) => `
     <button class="stk-dr" onclick="stkAuditOpen(${i})">
       <span class="stk-dr-c">${escS(a.district_code || '')}</span>
       <span class="stk-dr-b">
@@ -11387,17 +11408,8 @@ async function stkHistPaint(){
           a.mismatched ? `не хватает ${fmt(a.short_aed || 0)} AED` : 'всё сошлось'}</span>
       </span>
       <span class="stk-dr-go">›</span>
-    </button>`).join('')
-    + stkHistMore(list.length - ПОКАЗ, 'stkAudits()', 'Все ревизии')
+    </button>`).join('') + '</div>'
     : '<div class="stkh-e">Ни одной закрытой ревизии</div>';
-}
-
-function stkHistMore(n, go, label){
-  if(n <= 0) return '';
-  return `<button class="stk-dr" onclick="${go}">
-    <span class="stk-dr-b"><span class="stk-dr-n" style="color:var(--gold2)">${label}</span>
-      <span class="stk-dr-s">и ещё ${fmt(n)}</span></span>
-    <span class="stk-dr-go">›</span></button>`;
 }
 
 async function stkAudits(){

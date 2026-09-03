@@ -3784,38 +3784,52 @@ button.path:active{transform:scale(.995)}
 .fx-note{margin-top:12px;font-size:11px;line-height:1.55;color:var(--dim)}
 
 /* ── Склад: сколько лежит и сколько это стоит ─────────────────────────────
-   Три числа в ряд, каждое в своей колонке одинаковой ширины, разделённые
-   волосками, — сетка, а не набор плиток разной величины. Числа выровнены по
-   левому краю своей колонки: цифры разной длины, и по центру они плясали бы
-   относительно подписей. */
-.stkv{margin:2px 0 12px;border-radius:18px;background:var(--card);
+   Было три колонки во всю ширину, разделённые вертикальными линейками, с
+   заглавными подписями под каждым числом. На телефоне это ещё держалось, а на
+   широком экране разъезжалось: числа расходились по углам и висели в пустоте,
+   связанные только линейками — то есть ничем.
+
+   Здесь наоборот. Группирует пространство, а не линии: три величины стоят
+   рядом по левому краю и не растягиваются, сколько бы места ни дали. Ширина
+   колонки — по содержимому, поэтому «175» не занимает столько же, сколько
+   «50 500», и ряд читается как строка, а не как таблица.
+
+   Подписи строчные и тихие: заглавные микронадписи под каждым числом кричали
+   ровно в тех местах, где смотреть не надо. */
+.stkv{margin:2px 0 12px;border-radius:20px;background:var(--card);
   border:1px solid var(--border2);overflow:hidden}
-.stkv-h{display:flex;align-items:baseline;gap:8px;padding:13px 16px 0}
-.stkv-h b{flex:1;font-size:10px;font-weight:700;letter-spacing:1.4px;
-  text-transform:uppercase;color:var(--muted)}
-.stkv-h i{font-style:normal;font-size:10.5px;color:var(--dim)}
-.stkv-g{display:grid;grid-template-columns:repeat(3,1fr);padding:8px 0 14px}
-.stkv-c{padding:0 12px;border-left:1px solid var(--border2);min-width:0}
-.stkv-c:first-child{border-left:0}
-.stkv-v{font-family:'DM Sans',sans-serif;font-size:21px;font-weight:700;
-  line-height:1.1;font-variant-numeric:tabular-nums;color:var(--text)}
+.stkv-h{display:flex;align-items:center;gap:10px;padding:14px 18px 0}
+.stkv-h b{font-size:13px;font-weight:700;letter-spacing:-.2px;color:var(--text)}
+/* Непросканированное — не второй заголовок, а пометка к остатку: тихая
+   плашка, а не строка того же веса, что и название карточки. */
+.stkv-h i{margin-left:auto;font-style:normal;font-size:10.5px;font-weight:600;
+  padding:3px 9px;border-radius:999px;color:var(--warn);
+  background:rgba(243,180,74,.1);border:1px solid rgba(243,180,74,.2)}
+.stkv-g{display:grid;grid-template-columns:repeat(3,max-content);
+  gap:4px 34px;padding:14px 18px 18px}
+.stkv-c{min-width:0}
+.stkv-v{font-family:'DM Sans',sans-serif;font-size:23px;font-weight:700;
+  line-height:1;letter-spacing:-.6px;font-variant-numeric:tabular-nums;
+  color:var(--text)}
 .stkv-c.gold .stkv-v{color:var(--gold2)}
-.stkv-l{font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
-  color:var(--muted);margin-top:5px}
-/* Пояснение под числом — одной строкой: перенос рвал его на «47 990 в» и
-   «приложении», и колонка переставала читаться как одно целое. */
-.stkv-s{font-size:9.5px;color:var(--dim);margin-top:3px;white-space:nowrap;
-  overflow:hidden;text-overflow:ellipsis;font-variant-numeric:tabular-nums}
+.stkv-l{font-size:11px;font-weight:500;color:var(--muted);margin-top:7px}
+.stkv-s{font-size:11px;color:var(--dim);margin-top:3px;white-space:nowrap;
+  font-variant-numeric:tabular-nums}
 .stkv-s.warn{color:var(--warn)}
-/* Кнопка внутри карточки, а не под ней: она про эти же числа, только в
-   разрезе районов, и отрывать её от них нечем. */
-.stkv-go{display:flex;align-items:center;gap:9px;width:100%;padding:12px 16px;
-  border:0;border-top:1px solid var(--border2);background:var(--card2);
-  color:var(--gold2);font-family:inherit;font-size:13px;font-weight:700;
-  cursor:pointer}
-.stkv-go:active{background:var(--card3)}
+/* Переход к разрезу по районам — строка, а не панель: одно слово слева и
+   стрелка в кружке справа, между ними ничего. Приписка «всё, что лежит»
+   отсюда убрана: она ничего не добавляла к «по районам». */
+.stkv-go{display:flex;align-items:center;gap:12px;width:100%;padding:13px 18px;
+  border:0;border-top:1px solid var(--border2);background:transparent;
+  color:var(--text);font-family:inherit;font-size:13.5px;font-weight:600;
+  cursor:pointer;transition-property:var(--tp);transition-duration:.16s;
+  transition-timing-function:var(--e1)}
 .stkv-go span{flex:1;text-align:left}
-.stkv-go u{text-decoration:none;color:var(--muted);font-weight:600}
+.stkv-go em{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;color:var(--gold2);
+  background:var(--gold-soft);font-style:normal}
+.stkv-go:active{background:var(--card2)}
+.stkv-go:active em{transform:translateX(2px)}
 
 /* Районы — одной карточкой со строками внутри, как в «Команде» и «Расходах».
    Пять отдельных плиток с полями между ними читались как пять разных дел. */
@@ -11048,9 +11062,9 @@ function stkValueCard(reg){
       </div>
     </div>
     <button class="stkv-go" onclick="stkByDistrict()">
-      <span>Показать по районам</span><u>всё, что лежит</u>
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
-           stroke-width="2.2" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg>
+      <span>Показать по районам</span>
+      <em><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+           stroke-width="2.6" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></em>
     </button>
   </div>`;
 }

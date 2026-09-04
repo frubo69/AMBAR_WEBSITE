@@ -2605,12 +2605,24 @@ async def drv_msgs_due(before, limit: int = 300) -> list:
     придётся тем же токеном, но в разные чаты."""
     db = _db_or_none()
     if db is None: return []
+    # Монга отдаёт даты без часового пояса — она хранит UTC и говорит об этом
+    # отдельно. Сравнивать их с датой, у которой пояс есть, питон отказывается,
+    # поэтому приводим обе стороны к одному виду, а не надеемся на удачу.
+    def _гол(x):
+        return x.replace(tzinfo=None) if getattr(x, "tzinfo", None) else x
+    край = _гол(before)
     out = []
     cur = db.driver_msgs.find({"msgs.at": {"$lt": before}}, {"msgs": 1})
     async for d in cur:
         for m in (d.get("msgs") or []):
             at = m.get("at")
-            if at is not None and at < before and m.get("m"):
+            if at is None or not m.get("m"):
+                continue
+            try:
+                стар = _гол(at) < край
+            except TypeError:
+                continue
+            if стар:
                 out.append((int(d["_id"]), int(m["m"])))
                 if len(out) >= limit:
                     return out

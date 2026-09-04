@@ -1221,6 +1221,7 @@ def _kind_of(x: dict) -> str:
 # в момент согласования, там же, где расход становится деньгами.
 GUARD_SAY = {"no_code": "код не прочитан", "unknown": "нет в реестре",
              "written": "уже списана", "sold": "ушла с заказом",
+             "deleted": "убрана из реестра",
              "no_item": "нет в каталоге", "taken": "эту уже записали"}
 
 
@@ -1231,8 +1232,11 @@ async def _guard_bottle(code) -> tuple[dict | None, str]:
     doc = await db.qr_get(code)
     if not doc:
         return None, "unknown"
+    # Годится только та, что в остатке. Перечислять негодные статусы нельзя:
+    # так уже промахнулись мимо «убрана из реестра», и следующий новый статус
+    # промахнулся бы точно так же. Разрешаем один, отказываем всем остальным.
     st = (doc.get("status") or "active").strip()
-    if st in ("written", "sold"):
+    if st != "active":
         return None, st
     from operator_routes import _load_catalog
     p = {x.get("id"): x for x in _load_catalog()}.get(str(doc.get("product_id") or ""))

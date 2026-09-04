@@ -790,6 +790,7 @@ MOVE_SAY = {
     "nohome":   "офис не указан",
     "no_item":  "нет в каталоге",
     "busy":     "её уже перевезли",
+    "deleted":  "убрана из реестра",
 }
 
 
@@ -822,8 +823,11 @@ async def handle_transfer_scan(request):
         return _move_reply("unknown", code=code)
     name = doc.get("product_name") or ""
     label = doc.get("label") or ""
+    # Везти можно только то, что числится в остатке. Список негодных статусов
+    # уже однажды отстал от жизни — мимо «убрана из реестра» промахнулись все
+    # сканеры сразу. Поэтому разрешаем один статус, а не запрещаем известные.
     st = (doc.get("status") or "active").strip()
-    if st in ("written", "sold"):
+    if st != "active":
         return _move_reply(st, code=code, name=name, label=label)
     src = (doc.get("district") or "").strip()
     if src == dst:
@@ -1268,6 +1272,10 @@ def _scan_verdict(doc: dict, district: str) -> str:
     if not doc:
         return "alien"
     st = (doc.get("status") or "active").strip()
+    # Убранная из реестра — для пересчёта та же чужая: в остатке её нет, и
+    # приписать её некуда. Так же на неё смотрит проверка бутылки у оператора.
+    if st == "deleted":
+        return "alien"
     if st == "written":
         return "written"
     if (doc.get("district") or "").strip() != district:
@@ -1700,8 +1708,11 @@ async def handle_writeoff_scan(request):
     st = (doc.get("status") or "active").strip()
     if st == "written":
         return _wo_say("already", code=code, name=doc.get("product_name") or "")
-    if st == "sold":
-        return _wo_say("sold", code=code, name=doc.get("product_name") or "")
+    # Всё, что не в остатке, списать нельзя: убранной из реестра бутылки для
+    # склада не существует, и вычитать её значит потерять одну настоящую.
+    if st != "active":
+        return _wo_say(st if st in WO_SAY else "gone",
+                       code=code, name=doc.get("product_name") or "")
     pid = str(doc.get("product_id") or "")
     p = _catalog().get(pid)
     if not p:
@@ -1761,6 +1772,8 @@ WO_SAY = {
     "sold":    "ушла с заказом",
     "no_item": "нет в каталоге",
     "nohome":  "офис не указан",
+    "deleted": "убрана из реестра",
+    "gone":    "её нет в остатке",
 }
 
 

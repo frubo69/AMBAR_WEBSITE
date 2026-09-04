@@ -624,6 +624,33 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .tb-mid.on .tb-mid-ic{color:#1a1408;border-color:transparent;
   background:linear-gradient(135deg,var(--gold),var(--gold2));
   box-shadow:0 3px 12px rgba(201,169,110,.28)}
+/* Просьба зайти в расходы: день района уже закрыт, а по бензину и мойке
+   ответа нет. Значок дышит — медленно и в своём же золоте. Мигание и красный
+   здесь были бы враньём: ничего не сломалось, человека просто зовут. Дыхание
+   заметно краем глаза и не тянет взгляд с дороги.
+
+   Три с половиной секунды на вдох и выдох — быстрее выглядит нервно, медленнее
+   не читается как движение. Плашка под значком мягко всплывает вместе с ним:
+   она и делает движение видимым на маленьком значке. */
+@keyframes tbAsk{
+  0%,100%{color:var(--muted)}
+  50%    {color:var(--gold2)}
+}
+@keyframes tbAskPlate{
+  0%,100%{background:transparent}
+  50%    {background:var(--gold-soft)}
+}
+.tb.ask{animation:tbAsk 3.4s var(--e1) infinite}
+.tb.ask .tb-ic{animation:tbAskPlate 3.4s var(--e1) infinite}
+/* Выбранная вкладка не дышит: человек уже здесь, звать его некуда. */
+.tb.ask.on{animation:none;color:var(--gold2)}
+.tb.ask.on .tb-ic{animation:none}
+/* Кому движение мешает — тому ровный золотой цвет, без анимации. */
+@media (prefers-reduced-motion:reduce){
+  .tb.ask,.tb.ask .tb-ic{animation:none}
+  .tb.ask{color:var(--gold2)}
+}
+
 /* Счётчик на углу значка. Кольцо цветом панели отрезает его от соседней
    вкладки: без него число сливалось с чужим значком. */
 .tb-badge{position:absolute;top:-2px;right:0;min-width:16px;height:16px;padding:0 4px;
@@ -3188,8 +3215,22 @@ async function load(){
   const be = document.getElementById('tbExp');
   const pend = (EXP.extras || []).filter(x => (x.status || 'approved') === 'pending').length;
   be.style.display = pend ? 'flex' : 'none'; be.textContent = pend;
+  expPulse();
   supBadge();
   render();
+}
+
+// Оператор закрыл день района, а водитель не ответил по бензину и мойке.
+//
+// Пока день идёт, неотвеченный расход — это «успею». После закрытия он держит
+// всех: смену не сдать, деньги не свести. Значок доллара начинает медленно
+// дышать — не мигает и не краснеет: тревоги тут нет, есть просьба зайти. Ровно
+// это и должно быть видно краем глаза, не отвлекая от дороги.
+function expPulse(){
+  const t = document.querySelector('.tb[data-tab="expenses"]');
+  if(!t) return;
+  const надо = !!(SH && SH.day_closed) && !!((EXP || {}).pending_answer || []).length;
+  t.classList.toggle('ask', надо);
 }
 
 function setTab(t){
@@ -3411,6 +3452,7 @@ const SH_ICO = {
 async function shLoad(loud){
   try{ SH = await drvApi.drvFetch('/api/driver/shift'); }
   catch(e){ if(loud) toast('Не удалось проверить', 'err'); return; }
+  expPulse();
   shPaint();
 }
 

@@ -273,8 +273,16 @@ async def _shift_view(me: dict) -> dict:
     must = _must_left(d)
     opened, closed = d.get("shift_open_at"), d.get("shift_close_at")
     route = await _in_route(me) if opened and not closed else []
+    # День района закрыт оператором — значит заказов сегодня больше не будет, и
+    # неотвеченные расходы превращаются из «успею» в «держу всех». Водителю про
+    # это надо сказать, а не ждать, пока он сам зайдёт на вкладку.
+    закрыт = False
+    try:
+        закрыт = bool((await db.shifts_for_day(day)).get(me.get("district") or ""))
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[driver] закрытие дня не прочиталось: {e}")
     return {
-        "day": day, "working": d.get("working"),
+        "day": day, "working": d.get("working"), "day_closed": закрыт,
         "opened": bool(opened), "opened_at": _iso_at(opened),
         "closed": bool(closed), "closed_at": _iso_at(closed),
         "geo": geo, "must": must,

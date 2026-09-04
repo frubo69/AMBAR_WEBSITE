@@ -235,66 +235,110 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   font-weight:700;letter-spacing:-1px;color:var(--warn);margin-bottom:6px}
 /* Списание. Окно ведёт по одному вопросу за раз: что, сколько, почему, фото —
    в том же порядке, в каком человек это видит. */
-.wo-pick{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;
-  border-radius:14px;cursor:pointer;text-align:left;
-  background:var(--card2);border:1px solid var(--border3)}
-.wo-pick:active{transform:scale(.99)}
-.wo-pick.set{border-color:rgba(201,169,110,.45);background:var(--gold-soft)}
-.wo-pick-b{flex:1;min-width:0}
-.wo-pick-l{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
-  color:var(--muted);margin-bottom:3px}
-.wo-pick-v{font-size:16px;font-weight:700;color:var(--text);overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap}
-.wo-pick.set .wo-pick-v{color:var(--gold2)}
-.wo-pick > svg{flex-shrink:0;color:var(--muted)}
+/* ── Окно списания ────────────────────────────────────────────────────────
+   Было так: заголовок, абзац пояснений, крупная кнопка выбора позиции, которая
+   уводила на отдельный экран поиска, счётчик, четыре одинаковых квадрата причин,
+   ещё одна подпись, плитка снимка, поле комментария и две равные кнопки внизу.
+   Ярусов много, опор нет: всё одного веса, и глазу не за что зацепиться.
 
-.wo-search{width:100%;padding:13px 15px;margin-bottom:10px;border-radius:13px;font-size:16px;
-  color:var(--text);background:var(--card2);border:1px solid var(--border3);outline:none}
-.wo-search:focus{border-color:rgba(201,169,110,.5)}
-.wo-list{max-height:min(52dvh,420px);overflow-y:auto;-webkit-overflow-scrolling:touch;
-  display:flex;flex-direction:column;gap:6px}
-.wo-item{display:block;width:100%;padding:13px 15px;border-radius:12px;cursor:pointer;
-  text-align:left;font-size:15px;color:var(--text);background:var(--card2);
-  border:1px solid var(--border3)}
-.wo-item:active{border-color:rgba(201,169,110,.5)}
-.wo-item i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:2px}
+   Здесь то же устройство, что у старшего. Причина — сегментами с едущей
+   пилюлей: выбор один, и это должно быть видно, а не угадываться по тому,
+   какой квадрат загорелся. Позиция ищется на месте, без ухода на второй экран.
+   Снимок — одной плиткой, которая сама им и становится. Действие одно и
+   приклеено к низу; «отмена» ушла в крестик, потому что это не выбор из двух
+   равных, а выход.                                                          */
+.wo-add{padding:0 0 calc(10px + var(--safe-bottom));display:flex;flex-direction:column}
+.wo-add-hd{display:flex;align-items:flex-start;gap:12px;padding:2px 0 14px}
+.wo-add-hd > div{flex:1;min-width:0}
+.wo-add-s{font-size:11.5px;color:var(--muted);margin-top:3px}
+.wo-add-x{flex:0 0 auto;width:32px;height:32px;border-radius:11px;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;color:var(--sub);
+  background:var(--card);border:1px solid var(--border2)}
+.wo-add-x:active{transform:scale(.9)}
+/* Сегменты причины: одна пилюля едет между словами. */
+.wo-seg{display:flex;padding:3px;background:var(--card);border:1px solid var(--border2);
+  border-radius:12px;position:relative;overflow:hidden;--active:0;--count:4}
+.wo-seg-pill{position:absolute;top:3px;bottom:3px;left:3px;
+  width:calc((100% - 6px) / var(--count));
+  transform:translateX(calc(var(--active) * 100%));opacity:var(--on,0);
+  border-radius:9px;background:linear-gradient(135deg,var(--gold),var(--gold2));
+  box-shadow:0 4px 18px rgba(201,169,110,.25);
+  transition:transform .34s cubic-bezier(.33,1.1,.5,1),opacity .2s var(--e1);
+  z-index:0;pointer-events:none}
+.wo-seg button{flex:1;min-height:38px;padding:7px 0;border:none;background:none;cursor:pointer;
+  font-family:inherit;font-size:13px;font-weight:600;color:var(--sub);border-radius:9px;
+  position:relative;z-index:1;transition:color .22s var(--e1)}
+.wo-seg button.on{color:#0a0a14}
+/* Что значит выбранное — одной строкой под сегментами, а не подписью в каждой
+   кнопке: читают её один раз, а место она занимала в четырёх местах сразу. */
+.wo-why{min-height:15px;margin:8px 2px 0;font-size:11.5px;color:var(--muted)}
 
-.wo-grid{display:grid;grid-template-columns:1fr auto;gap:10px;align-items:center;
-  margin-top:10px}
-.wo-qty{display:flex;align-items:center;gap:10px;padding:8px;border-radius:14px;
-  background:var(--card2);border:1px solid var(--border3)}
-.wo-qb{width:46px;height:46px;flex-shrink:0;border-radius:12px;cursor:pointer;font-size:22px;
-  font-weight:700;color:var(--gold2);background:var(--gold-soft);
-  border:1px solid rgba(201,169,110,.35);display:flex;align-items:center;justify-content:center}
-.wo-qb:active{transform:scale(.94)}
-.wo-qb[disabled]{opacity:.35;color:var(--muted);background:var(--card2);border-color:var(--border3)}
-.wo-qv{flex:1;text-align:center;font-family:'Space Grotesk',sans-serif;font-size:26px;
-  font-weight:700;font-variant-numeric:tabular-nums}
-.wo-qv i{font-style:normal;font-size:11px;color:var(--muted);margin-left:5px;
-  letter-spacing:1px;text-transform:uppercase}
+.wo-l2{font-size:10px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;
+  color:var(--muted);margin:18px 0 8px}
+/* Позиция: поле поиска здесь же. Отдельный экран ради одной строки — шаг,
+   который человек делает с бутылкой в руке. */
+.wo-q{width:100%;height:48px;padding:0 14px;border-radius:14px;border:1px solid var(--border2);
+  background:var(--card);color:var(--text);font-family:inherit;font-size:15px;outline:none}
+.wo-q:focus{border-color:rgba(201,169,110,.5)}
+.wo-found{margin-top:6px;padding:5px;border-radius:14px;background:var(--card2);
+  border:1px solid var(--border2);max-height:min(38dvh,300px);overflow-y:auto;
+  -webkit-overflow-scrolling:touch}
+.wo-found button{display:block;width:100%;text-align:left;padding:11px;border:0;
+  border-radius:10px;background:none;cursor:pointer;font-family:inherit;font-size:13.5px;
+  color:var(--text)}
+.wo-found button:active{background:var(--gold-soft);color:var(--gold2)}
+.wo-found button i{display:block;font-style:normal;font-size:11px;color:var(--muted);
+  margin-top:2px}
+.wo-chosen{display:flex;align-items:center;justify-content:space-between;gap:10px;width:100%;
+  padding:14px;border-radius:14px;cursor:pointer;font-family:inherit;font-size:15px;
+  font-weight:700;text-align:left;color:var(--gold2);background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.45)}
+.wo-chosen b{flex:0 0 auto;opacity:.6;font-weight:600}
+.wo-chosen:active{transform:scale(.99)}
+/* Счётчик: число крупно и по центру, кнопки по краям — как у старшего. */
+.wo-amt{display:flex;align-items:center;gap:9px}
+.wo-amt input{flex:1;min-width:0;height:52px;padding:0 14px;border-radius:14px;
+  border:1px solid var(--border2);background:var(--card);color:var(--text);text-align:center;
+  font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;
+  font-variant-numeric:tabular-nums;outline:none}
+.wo-sb{width:52px;height:52px;flex-shrink:0;border-radius:14px;cursor:pointer;font-size:22px;
+  color:var(--gold2);background:var(--card);border:1px solid var(--border2);
+  font-family:inherit;line-height:1}
+.wo-sb:active{transform:scale(.94)}
+.wo-sb[disabled]{opacity:.35;color:var(--muted)}
+/* Снимок: пока его нет — плитка-кнопка, появился — она же и есть снимок. */
+.wo-shot{display:flex;flex-direction:column;align-items:center;gap:10px;width:100%;
+  padding:22px 16px;border-radius:16px;cursor:pointer;text-align:center;
+  border:1px dashed var(--border3);background:var(--card);font-family:inherit}
+.wo-shot:active{transform:scale(.99);border-color:var(--gold2)}
+.wo-shot .ic{width:38px;height:38px;border-radius:13px;display:flex;align-items:center;
+  justify-content:center;color:var(--gold2);background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.28)}
+.wo-shot b{font-size:13.5px;font-weight:700;color:var(--text)}
+.wo-shot span{font-size:11.5px;color:var(--muted)}
+.wo-snap{position:relative;border-radius:16px;overflow:hidden;
+  border:1px solid rgba(76,175,125,.35);background:var(--card)}
+.wo-snap img{display:block;width:100%;height:132px;object-fit:cover}
+.wo-snap .lbl{position:absolute;left:0;right:0;bottom:0;display:flex;align-items:center;
+  gap:8px;padding:9px 12px;font-size:12px;font-weight:700;color:#dff3e6;
+  background:linear-gradient(rgba(0,0,6,0),rgba(0,0,6,.85))}
+.wo-snap .lbl b{flex:1}
+.wo-snap .lbl u{text-decoration:none;cursor:pointer;padding:4px 9px;border-radius:8px;
+  background:rgba(0,0,6,.5);color:#fff;font-weight:600}
+.wo-note2{width:100%;height:48px;margin-top:14px;padding:0 14px;border-radius:14px;
+  border:1px solid var(--border2);background:var(--card);color:var(--text);
+  font-family:inherit;font-size:13.5px;outline:none}
+.wo-note2:focus{border-color:rgba(201,169,110,.5)}
+/* Кнопка приклеена к низу: тело окна прокручивается под ней, а не уезжает
+   вместе с ней за край. */
+.wo-add-foot{position:sticky;bottom:0;z-index:2;margin-top:18px;padding:12px 0 0;
+  background:linear-gradient(rgba(7,7,14,0),var(--bg2) 34%)}
+.wo-go{width:100%;height:52px;border:0;border-radius:15px;cursor:pointer;font-family:inherit;
+  font-size:15px;font-weight:800;color:#1a1408;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.wo-go:active{transform:scale(.985)}
+.wo-go:disabled{opacity:.4;pointer-events:none}
 
-.wo-kinds{display:grid;grid-template-columns:repeat(2,1fr);gap:8px;margin-top:10px}
-.wo-kind{min-height:46px;padding:12px 10px;border-radius:12px;cursor:pointer;font-size:14px;
-  font-weight:700;color:var(--sub);background:var(--card2);border:1px solid var(--border3)}
-.wo-kind:active{transform:scale(.97)}
-.wo-kind.on{color:var(--gold2);background:var(--gold-soft);border-color:rgba(201,169,110,.5)}
-
-/* Фотография — не поле формы, а главное условие: без неё записи не будет,
-   и выглядеть она должна соответственно. */
-.wo-photo{display:flex;align-items:center;gap:14px;width:100%;margin-top:10px;padding:16px;
-  border-radius:14px;cursor:pointer;text-align:left;color:var(--sub);
-  background:var(--card2);border:1px dashed var(--border);min-height:88px}
-.wo-photo:active{transform:scale(.99)}
-.wo-photo.set{border-style:solid;border-color:rgba(201,169,110,.45);background:var(--gold-soft)}
-.wo-photo img{width:64px;height:64px;flex-shrink:0;border-radius:11px;object-fit:cover}
-.wo-photo-t{flex:1;min-width:0;font-size:14px;font-weight:700;color:var(--text)}
-.wo-photo-s{display:block;font-weight:400;font-size:12px;color:var(--muted);margin-top:3px;
-  line-height:1.4}
-.wo-note{width:100%;margin-top:10px;padding:13px 15px;border-radius:13px;font-size:15px;
-  color:var(--text);background:var(--card2);border:1px solid var(--border3);outline:none}
-.wo-note:focus{border-color:rgba(201,169,110,.5)}
-.wo-l{font-size:10px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;
-  color:var(--muted);margin:16px 0 0}
 
 /* Списанное за смену — короткой строкой, чтобы было видно, что запись прошла */
 .wo-done{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;
@@ -1913,6 +1957,9 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
   text-transform:none;color:var(--warn);margin-top:3px}
 .exp-bar-v{margin-left:auto;font-family:'Space Grotesk',sans-serif;font-size:32px;font-weight:700;
   color:var(--gold3);letter-spacing:-1px;line-height:1}
+/* Ноль — не достижение и не тревога: смена, в которую водитель ничего не
+   отдавал своих. Золотом он кричал бы о пустом месте. */
+.exp-bar-v.zero{color:var(--dim)}
 .exp-bar-v i{font-style:normal;font-size:11px;color:var(--muted);margin-left:6px;letter-spacing:0}
 
 /* Чек. Полоса во всю ширину под суммой — там же, где её вписывают, и до того,
@@ -1934,6 +1981,42 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
   padding:13px;border-radius:14px;cursor:pointer;font-family:inherit;font-size:13.5px;
   font-weight:600;color:var(--sub);background:none;border:1px dashed var(--border3)}
 .exp-add:active{transform:scale(.98)}
+
+/* Разовые расходы — тот же список, что у старшего, и в том же порядке.
+   Пока у водителя было одно поле «другой расход», всё, что не бензин и не
+   мойка, уезжало к старшему безымянной строчкой: он видел сумму и слова, а
+   вид угадывал. Здесь у каждого вида своя строка и своё место в ленте.
+
+   Поля открыты сразу. Панель, которую надо сначала вытащить, добавляет шаг
+   там, где человек уже знает, что хочет записать. */
+.exp-list{display:flex;flex-direction:column;gap:0}
+.exp-lr{display:flex;align-items:center;gap:6px;padding:9px 0}
+.exp-lr + .exp-lr{border-top:1px solid rgba(255,255,255,.05)}
+.exp-lt{flex:0 0 88px;min-width:0;font-size:12px;font-weight:600;line-height:1.15;
+  color:var(--text)}
+.exp-lt i{display:block;font-style:normal;font-size:8.5px;font-weight:700;
+  letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-top:2px}
+.exp-lr.plus .exp-lt{color:var(--up)}
+.exp-lr input{min-width:0;padding:9px;border-radius:9px;border:1px solid var(--border2);
+  background:var(--bg3);color:var(--text);font-family:inherit;font-size:13px;outline:none}
+.exp-lr input:focus{border-color:rgba(201,169,110,.5)}
+.exp-lr .amt{flex:0 0 64px;width:64px;text-align:center;font-weight:700}
+.exp-lr .cmt{flex:1}
+/* Чек и «записать» — одного роста с полями, чтобы строка читалась одной
+   линией, а не лесенкой. */
+.exp-lr .shot{flex:0 0 auto;padding:0 10px;height:34px;border-radius:9px;cursor:pointer;
+  border:1px solid var(--border2);background:var(--card2);color:var(--muted);
+  font-family:inherit;font-size:10.5px;font-weight:700}
+.exp-lr .shot.on{color:var(--up);background:rgba(76,175,125,.12);
+  border-color:rgba(76,175,125,.4)}
+.exp-lr .ok{flex:0 0 auto;width:34px;height:34px;border:none;border-radius:9px;
+  cursor:pointer;background:var(--card3);color:var(--muted);font-weight:800;font-size:15px;
+  line-height:1;transition:background .16s var(--e1),color .16s var(--e1)}
+/* Кнопка загорается сама, когда в строке появилась сумма: отдельного сигнала
+   «теперь можно» не нужно, он и есть цифра в поле. */
+.exp-lr:has(.amt:not(:placeholder-shown)) .ok{
+  background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1a1408}
+.exp-lr .ok:active{transform:scale(.9)}
 
 /* Экран приёма заказа.
    Порядок строк — порядок работы курьера: куда ехать, что везти, сколько взять,
@@ -2342,17 +2425,20 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 <!-- Списание: бой, брак, просрочка, потеря. Фотография обязательна — это
      единственное, что отличает списание от способа закрыть недостачу. -->
 <div class="sheet" id="woSheet" onclick="if(event.target===this)woClose()">
-  <div class="sheet-in">
-    <div class="sheet-hd">
-      <div style="flex:1;min-width:0">
-        <div class="sheet-t" id="woT">Списать товар</div>
-        <div class="sheet-s" id="woS"></div>
+  <div class="sheet-in wo-add">
+    <div class="wo-add-hd">
+      <div>
+        <div class="sheet-t">Списать товар</div>
+        <div class="wo-add-s">Только то, что физически исчезло</div>
       </div>
+      <button class="wo-add-x" onclick="woClose()" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
     </div>
     <div id="woBody"></div>
-    <div class="sheet-acts sheet-acts-2" id="woActs">
-      <button class="btn btn-gh" onclick="woClose()">Отмена</button>
-      <button class="btn btn-pri" id="woGo" onclick="woSend()">Списать</button>
+    <div class="wo-add-foot">
+      <button class="wo-go" id="woGo" onclick="woSend()">Списать</button>
     </div>
   </div>
 </div>
@@ -3496,7 +3582,7 @@ function shBlocked(e){
    недоверия к людям, а потому что рассказать можно всё, а показать разбитую
    бутылку — только разбив её. Сервер проверяет не длину поля, а начало файла:
    пустая картинка ничего не доказывает, а в истории выглядит так же.       */
-var WO = null;                       // {step, item, name, qty, kind, photo, note}
+var WO = null;                       // {item, name, q, qty, kind, photo, thumb, note}
 var WO_CAT = null;                   // каталог тянем один раз за запуск
 var WO_LOG = [];                     // списанное за смену — своё, для памяти
 
@@ -3508,7 +3594,7 @@ const WO_ERR = {no_item: 'Выберите позицию', bad_qty: 'Прове
   photo_big: 'Фотография слишком тяжёлая, снимите ещё раз'};
 
 async function woOpen(pid){
-  WO = {step: 'form', item: '', name: '', qty: 1, kind: '', photo: '', note: ''};
+  WO = {item: '', name: '', q: '', qty: 1, kind: '', photo: '', thumb: '', note: ''};
   document.getElementById('woSheet').classList.add('show');
   woPaint();
   try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
@@ -3517,6 +3603,7 @@ async function woOpen(pid){
       const r = await drvApi.drvFetch('/api/driver/catalog', {params: {all: 1}});
       WO_CAT = r.items || [];
     }catch(e){ WO_CAT = []; }
+    if(WO) woPaint();
   }
   if(pid){
     const it = (WO_CAT || []).find(x => x.id === pid);
@@ -3529,30 +3616,11 @@ function woClose(){
   WO = null;
 }
 
-// Выбор позиции — отдельным шагом: список длинный, и держать его открытым
-// рядом с фотографией и количеством значит не дать прочитать ни то, ни другое.
-function woStep(st){
-  if(!WO) return;
-  WO.step = st; woPaint();
-  if(st === 'item') setTimeout(()=>{ const f = document.getElementById('woQ'); f && f.focus(); }, 80);
-}
-
 function woPick(pid){
   const it = (WO_CAT || []).find(x => x.id === pid); if(!it || !WO) return;
-  WO.item = it.id; WO.name = it.name; WO.step = 'form'; woPaint();
+  WO.item = it.id; WO.name = it.name; WO.q = ''; woPaint();
   try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
-}
-
-function woFind(){
-  const q = (document.getElementById('woQ').value || '').trim().toLowerCase();
-  const box = document.getElementById('woList'); if(!box) return;
-  const all = WO_CAT || [];
-  const hit = q ? all.filter(x => (x.name || '').toLowerCase().includes(q)) : all;
-  box.innerHTML = hit.length
-    ? hit.slice(0, 60).map(x => `<button class="wo-item" onclick="woPick('${esc(x.id)}')">
-        ${esc(x.name)}<i>${esc(x.cat || '')}</i></button>`).join('')
-    : `<div style="padding:18px;text-align:center;color:var(--muted);font-size:13px">
-         Ничего не нашли</div>`;
+  try{ document.activeElement.blur(); }catch(e){}
 }
 
 function woQty(d){
@@ -3595,55 +3663,87 @@ function woShot(inp){
 
 function woPaint(){
   if(!WO) return;
-  const t = document.getElementById('woT'), sb = document.getElementById('woS');
-  const body = document.getElementById('woBody'), acts = document.getElementById('woActs');
-  if(WO.step === 'item'){
-    t.textContent = 'Что списываем';
-    sb.textContent = 'Начните вводить название';
-    acts.style.display = 'none';
-    body.innerHTML = `<input class="wo-search" id="woQ" placeholder="Поиск по названию"
-      autocomplete="off" oninput="woFind()">
-      <div class="wo-list" id="woList"></div>
-      <div class="sheet-acts"><button class="btn btn-gh" onclick="woStep('form')">Назад</button></div>`;
-    woFind();
-    return;
-  }
-  t.textContent = 'Списать товар';
-  sb.textContent = 'Только то, что физически исчезло. Фотография обязательна.';
-  acts.style.display = '';
-  body.innerHTML = `
-    <button class="wo-pick ${WO.item ? 'set' : ''}" onclick="woStep('item')">
-      <div class="wo-pick-b">
-        <div class="wo-pick-l">Позиция</div>
-        <div class="wo-pick-v">${WO.item ? esc(WO.name) : 'Выберите товар'}</div>
-      </div>${svg(ICO.chev, 18)}</button>
+  const box = document.getElementById('woBody'); if(!box) return;
+  const q = (WO.q || '').trim().toLowerCase();
+  const нашли = q ? (WO_CAT || []).filter(x => (x.name || '').toLowerCase().includes(q))
+                  : [];
 
-    <div class="wo-l">Сколько бутылок</div>
-    <div class="wo-qty">
-      <button class="wo-qb" onclick="woQty(-1)" ${WO.qty <= 1 ? 'disabled' : ''}
-        aria-label="Меньше">−</button>
-      <span class="wo-qv">${WO.qty}<i>шт</i></span>
-      <button class="wo-qb" onclick="woQty(1)" aria-label="Больше">+</button>
+  // Причина — первым делом: она решает, что человек вообще делает, и от неё
+  // читается всё остальное.
+  const причины = `<div class="wo-seg" id="woSeg">
+      <div class="wo-seg-pill"></div>
+      ${WO_KINDS.map(k => `<button class="${WO.kind === k ? 'on' : ''}"
+        onclick="woKind('${k}')">${k}</button>`).join('')}
     </div>
+    <div class="wo-why">${WO.kind ? esc(WO_WHY[WO.kind]) : 'Выберите, что случилось'}</div>`;
 
-    <div class="wo-l">Что случилось</div>
-    <div class="wo-kinds">${WO_KINDS.map(k =>
-      `<button class="wo-kind ${WO.kind === k ? 'on' : ''}" onclick="woKind('${k}')">
-         ${k}<span style="display:block;font-weight:400;font-size:11px;color:var(--muted);
-         margin-top:2px">${WO_WHY[k]}</span></button>`).join('')}</div>
+  const позиция = WO.item
+    ? `<button class="wo-chosen" onclick="woUnpick()">
+         <span>${esc(WO.name)}</span><b>сменить</b></button>`
+    : `<input class="wo-q" id="woQ" placeholder="Начните вводить название"
+              autocomplete="off" value="${esc(WO.q || '')}"
+              oninput="woType(this.value)">
+       ${нашли.length ? `<div class="wo-found">${нашли.slice(0, 30).map(x =>
+          `<button onclick="woPick('${esc(x.id)}')">${esc(x.name)}${
+            x.cat ? `<i>${esc(x.cat)}</i>` : ''}</button>`).join('')}</div>`
+        : (q ? `<div class="wo-why" style="margin-top:8px">Ничего не нашли</div>` : '')}`;
 
-    <div class="wo-l">Фотография</div>
-    <button class="wo-photo ${WO.photo ? 'set' : ''}" onclick="woFile.click()">
-      ${WO.photo ? `<img src="${WO.photo}" alt="Снимок списания">` : svg(ICO.cam, 30)}
-      <span class="wo-photo-t">${WO.photo ? 'Снимок сделан' : 'Сфотографировать'}
-        <span class="wo-photo-s">${WO.photo ? 'Нажмите, чтобы переснять'
-          : 'Видно товар и что с ним случилось'}</span></span>
-    </button>
+  const снимок = WO.thumb || WO.photo
+    ? `<div class="wo-snap">
+         <img src="${WO.thumb || WO.photo}" alt="">
+         <span class="lbl"><b>Снимок готов</b>
+           <u onclick="WO.photo='';WO.thumb='';woPaint()">заменить</u></span>
+       </div>`
+    : `<button class="wo-shot" onclick="woFile.click()">
+         <span class="ic"><svg viewBox="0 0 24 24" width="19" height="19" fill="none"
+           stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
+           stroke-linejoin="round"><path d="M4 8h3l1.5-2.5h7L17 8h3a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V9a1 1 0 0 1 1-1z"/><circle cx="12" cy="13" r="3.6"/></svg></span>
+         <b>Снимок обязателен</b>
+         <span>видно товар и что с ним случилось</span>
+       </button>`;
 
-    <input class="wo-note" maxlength="200" placeholder="Комментарий, если нужен"
-      value="${esc(WO.note || '')}" oninput="woNote(this.value)">`;
+  box.innerHTML = причины
+    + `<div class="wo-l2">Что списываем</div>` + позиция
+    + `<div class="wo-l2">Сколько бутылок</div>
+       <div class="wo-amt">
+         <button class="wo-sb" onclick="woQty(-1)" ${WO.qty <= 1 ? 'disabled' : ''}
+           aria-label="Меньше">−</button>
+         <input value="${WO.qty}" inputmode="numeric" aria-label="Количество"
+           oninput="WO.qty=Math.max(1,Math.min(240,parseInt(this.value,10)||1))">
+         <button class="wo-sb" onclick="woQty(1)" aria-label="Больше">+</button>
+       </div>
+       <div class="wo-l2">Фотография</div>` + снимок
+    + `<input class="wo-note2" maxlength="200" placeholder="Комментарий, если нужен"
+        value="${esc(WO.note || '')}" oninput="woNote(this.value)">`;
+
+  woSegPill();
   const go = document.getElementById('woGo');
-  go.disabled = !(WO.item && WO.kind && WO.photo);
+  if(go) go.disabled = !(WO.item && WO.kind && WO.photo);
+}
+
+// Пилюля встаёт под выбранным словом. Пока не выбрано ничего — её нет вовсе:
+// золото под первым словом читалось бы как «уже выбрано».
+function woSegPill(){
+  const g = document.getElementById('woSeg'); if(!g) return;
+  const btns = [...g.querySelectorAll('button')];
+  const i = btns.findIndex(b => b.classList.contains('on'));
+  g.style.setProperty('--count', btns.length);
+  g.style.setProperty('--active', i < 0 ? 0 : i);
+  g.style.setProperty('--on', i < 0 ? 0 : 1);
+}
+
+// Ввод в поиске: список перерисовывается, но фокус и каретка остаются на месте —
+// иначе после первой же буквы клавиатура закрывается.
+function woType(v){
+  if(!WO) return;
+  WO.q = v; woPaint();
+  const f = document.getElementById('woQ');
+  if(f){ f.focus(); try{ f.selectionStart = f.selectionEnd = f.value.length; }catch(e){} }
+}
+function woUnpick(){
+  if(!WO) return;
+  WO.item = ''; WO.name = ''; WO.q = ''; woPaint();
+  setTimeout(() => { const f = document.getElementById('woQ'); f && f.focus(); }, 60);
 }
 
 async function woSend(){
@@ -4229,8 +4329,8 @@ const expMark = x => `<span class="exp-mk ${EXP_ST(x)}" title="${EXP_LBL[EXP_ST(
 function otherBox(x){
   const k = 'o_' + x.id;
   return `<div class="card exp-card">
-    <div class="exp-hd">${svg(ICO.note, 17)}<span class="exp-t">Доп расход${
-      x.comment ? ` <i>${esc(x.comment)}</i>` : ''}</span>
+    <div class="exp-hd">${svg(ICO.note, 17)}<span class="exp-t">${
+      esc(x.kind_t || 'Доп расход')}${x.comment ? ` <i>${esc(x.comment)}</i>` : ''}</span>
       <span class="exp-sum">${fmt(x.amount)} AED</span></div>
     <div class="exp-row">
       <div class="exp-field sent">
@@ -4292,7 +4392,9 @@ function expBox(kind, title, ico){
 // Полоса чека. Показываем её только там, где деньги отдают на стороне: у
 // бензина и мойки. Уже снятый чек виден миниатюрой — и тот, что водитель снял
 // минуту назад, и тот, что уехал вместе с записью вчера.
-const EXP_RECEIPT = ['fuel', 'wash'];
+const EXP_RECEIPT = {
+  includes: id => ((EXP || {}).kinds || []).some(k => k.id === id && k.receipt)
+                  || (!((EXP || {}).kinds || []).length && (id === 'fuel' || id === 'wash'))};
 function expRcp(kind, sent){
   if(!EXP_RECEIPT.includes(kind)) return '';
   const свой = EXP_SHOT.kind === kind && EXP_SHOT.thumb;
@@ -4336,6 +4438,8 @@ function expShot(inp){
       b.innerHTML = `<img src="${EXP_SHOT.thumb}" alt="">
         <span class="exp-rcp-t">Чек снят<i>нажмите, чтобы переснять</i></span>`;
     }
+    const m = document.getElementById('kshot-' + EXP_SHOT.kind);
+    if(m){ m.classList.add('on'); m.textContent = 'есть'; }
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
   };
   img.onerror = () => toast('Не смогли прочитать снимок', 'err');
@@ -4357,17 +4461,71 @@ function expTyped(kind){
   btn.textContent = has ? 'Отправить' : (sent ? 'Отправить' : 'не было');
 }
 
-// У доп. расхода «не было» не бывает — его просто не заводят. Здесь кнопка
-// молчит, пока нет и суммы, и объяснения: без второго старший через неделю не
-// отличит трату от опечатки.
-function expOtherTyped(){
-  const a = document.getElementById('e_other'), c = document.getElementById('e_other_c');
-  const b = document.getElementById('b_other');
-  if(!a || !b) return;
-  const ok = !!String(a.value || '').replace(/\D/g, '') && !!String((c||{}).value || '').trim();
-  b.disabled = !ok;
-  b.classList.toggle('btn-pri', ok);
-  b.classList.toggle('btn-gh', !ok);
+// Разовые расходы — весь список видов, кроме бензина и мойки: те спрашивают
+// каждый день, и у них свои карточки выше. Подсказки в полях разные не для
+// красоты: «кому вернули» и «за что» — разные вопросы, и водитель отвечает на
+// тот, который ему задали.
+const EXP_HINT = {
+  we_gave: 'кому вернули', we_got: 'кто вернул',
+  we_owe:  'кому должны',  owed_us: 'кто должен'};
+
+function expKindList(){
+  const виды = ((EXP || {}).kinds || []).filter(k => k.id !== 'fuel' && k.id !== 'wash');
+  if(!виды.length) return '<div class="exp-none" style="padding:6px 2px">Загрузка…</div>';
+  return `<div class="exp-list">${виды.map(k => {
+    const снят = EXP_SHOT.kind === k.id && !!EXP_SHOT.photo;
+    return `<div class="exp-lr${k.plus ? ' plus' : ''}">
+      <span class="exp-lt">${esc(k.t)}${
+        k.receipt ? '<i>нужен чек</i>' : (k.plus ? '<i>плюсом</i>' : '')}</span>
+      <input class="amt" id="k_${k.id}" type="text" inputmode="numeric" placeholder="AED"
+             autocomplete="off"
+             onkeydown="if(event.key==='Enter')expSendKind('${k.id}')">
+      <input class="cmt" id="kc_${k.id}" type="text" autocomplete="off"
+             placeholder="${esc(EXP_HINT[k.id] || 'за что')}"
+             onkeydown="if(event.key==='Enter')expSendKind('${k.id}')">
+      ${k.receipt ? `<button class="shot${снят ? ' on' : ''}" id="kshot-${k.id}"
+             onclick="expShotFor('${k.id}')">${снят ? 'есть' : 'чек'}</button>` : ''}
+      <button class="ok" onclick="expSendKind('${k.id}')"
+              aria-label="Записать ${esc(k.t)}">✓</button>
+    </div>`;
+  }).join('')}</div>`;
+}
+
+// Что уже набрано в соседних строках. Отправка одной перерисовывает список, и
+// без этого наполовину заполненная соседняя обнулялась бы вместе с ней.
+function _expKindTyped(){
+  const o = {};
+  document.querySelectorAll('.exp-list input').forEach(i => { if(i.value) o[i.id] = i.value; });
+  return o;
+}
+function _expKindBack(o, кроме){
+  Object.keys(o).forEach(id => {
+    if(кроме && (id === 'k_' + кроме || id === 'kc_' + кроме)) return;
+    const e = document.getElementById(id); if(e) e.value = o[id];
+  });
+}
+
+async function expSendKind(kind){
+  const a = document.getElementById('k_' + kind);
+  const c = document.getElementById('kc_' + kind);
+  const amount = parseInt(String((a || {}).value || '').replace(/\D/g, ''), 10);
+  const comment = String((c || {}).value || '').trim();
+  if(!amount)  return toast('Впишите сумму', 'err');
+  if(!comment) return toast('Впишите, за что', 'err');
+  const свой = EXP_SHOT.kind === kind && EXP_SHOT.photo ? EXP_SHOT : null;
+  if(EXP_RECEIPT.includes(kind) && !свой) return toast('Сначала снимите чек', 'err');
+  const набрано = _expKindTyped();
+  try{
+    await drvApi.drvFetch('/api/driver/expenses', {method: 'POST', body: {
+      amount, comment, kind,
+      ...(свой ? {photo: свой.photo, thumb: свой.thumb} : {})}});
+    toast('Отправлено на согласование');
+    try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    if(свой) EXP_SHOT = {kind:'', photo:'', thumb:''};
+    await shLoad();
+    await load();
+    _expKindBack(набрано, kind);
+  }catch(e){ toast(EXP_ERR[(e.payload || {}).error] || 'Не отправилось', 'err'); }
 }
 
 // «Не было» уходит сразу, без второго нажатия: это ответ из одного слова, и
@@ -4463,7 +4621,10 @@ function renderShift(){
   // по которым с человеком считаются деньгами.
   const done = ((ORDERS || {}).done || []).length;
   const live = ((EXP || {}).extras || []).filter(x => EXP_ST(x) !== 'rejected');
-  const spent = ((EXP || {}).meal || 0) + live.reduce((a, x) => a + (x.amount || 0), 0);
+  // Питание сюда не идёт. Это не трата водителя, а то, что ему платят: считать
+  // его расходом — значит показывать человеку минус восемьдесят за то, что он
+  // вышел на работу. В счёте смены остаётся только то, что он отдал сам.
+  const spent = live.reduce((a, x) => a + (x.amount || 0), 0);
 
   const stat = on
     ? {t:`Смена идёт с ${hhmm(SH.opened_at)}`, s:'Заказы приходят, отметки принимаются.'}
@@ -4526,12 +4687,13 @@ function renderExpenses(){
   // вообще посмотреть, идёт ли она.
   const box = document.getElementById('body');
   if(!EXP){ box.innerHTML = '<div class="empty">Загрузка…</div>'; return; }
-  // Всего за смену — питание плюс всё, что не отклонили. Отклонённое в итог не
-  // идёт: это не деньги, а отказ.
+  // Всего за смену — то, что водитель потратил сам и что не отклонили.
+  // Отклонённое не идёт: это не деньги, а отказ. Питание не идёт тоже — его
+  // платят ему, а не он: «−80» в конце пустой смены читалось как долг.
   const live = (EXP.extras || []).filter(x => EXP_ST(x) !== 'rejected');
-  const total = (EXP.meal || 0) + live.reduce((a, x) => a + (x.amount || 0), 0);
+  const total = live.reduce((a, x) => a + (x.amount || 0), 0);
   const pend = live.filter(x => EXP_ST(x) === 'pending').reduce((a, x) => a + (x.amount || 0), 0);
-  const other = (EXP.extras || []).filter(x => x.kind === 'other');
+  const other = (EXP.extras || []).filter(x => x.kind !== 'fuel' && x.kind !== 'wash');
   box.innerHTML = `
     <div class="sect"><span class="sect-t">Каждый день</span>
       ${(EXP.pending_answer || []).length
@@ -4546,17 +4708,10 @@ function renderExpenses(){
     ${other.map(otherBox).join('')}
 
     ${EXP_MORE ? `<div class="card exp-card">
-        <div class="exp-hd">${svg(ICO.plus2, 17)}<span class="exp-t">Другой расход</span>
+        <div class="exp-hd">${svg(ICO.plus2, 17)}<span class="exp-t">Разовые</span>
           <button class="exp-x" onclick="EXP_MORE=false;render()"
             aria-label="Закрыть">${svg(ICO.close, 14)}</button></div>
-        <div class="exp-row">
-          <div class="exp-field"><input class="amt" id="e_other" type="text" inputmode="numeric"
-            placeholder="AED" autocomplete="off" oninput="expOtherTyped()"></div>
-          <div class="exp-field cmt"><input id="e_other_c" type="text" placeholder="за что"
-            autocomplete="off" oninput="expOtherTyped()"></div>
-        </div>
-        <button class="btn btn-gh" id="b_other" disabled style="width:100%;margin-top:8px"
-          onclick="sendExpense(this,'other')">Отправить на согласование</button>
+        ${expKindList()}
       </div>`
       : `<button class="exp-add" onclick="EXP_MORE=true;render()">
           ${svg(ICO.plus2, 15)} Ещё расход</button>`}
@@ -4564,7 +4719,7 @@ function renderExpenses(){
     <div class="exp-sp"></div>
     <div class="exp-bar"><div class="exp-bar-in">
       <div class="exp-bar-l">Всего за смену${pend ? `<i>ждут решения ${fmt(pend)} AED</i>` : ''}</div>
-      <div class="exp-bar-v">−${fmt(total)}<i>AED</i></div>
+      <div class="exp-bar-v ${total ? '' : 'zero'}">${total ? '−' + fmt(total) : '0'}<i>AED</i></div>
     </div></div>`;
 }
 
@@ -6581,8 +6736,11 @@ async function sendExpense(btn, kind){
   }
   btn.disabled = true;
   try{
+    // Правим запись — вид у неё уже есть, и менять его на «прочее» нельзя:
+    // исправленная сумма у парковки не превращает её в безымянную трату.
+    const прежний = id ? ((EXP.extras || []).find(x => x.id === id) || {}).kind : '';
     await drvApi.drvFetch('/api/driver/expenses', {method:'POST',
-      body:{amount, comment, kind: id ? 'other' : kind, ...(id ? {id} : {}),
+      body:{amount, comment, kind: id ? (прежний || 'other') : kind, ...(id ? {id} : {}),
             ...(свой && свой.photo ? {photo: свой.photo, thumb: свой.thumb} : {})}});
     toast('Отправлено на согласование');
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}

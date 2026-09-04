@@ -1179,6 +1179,13 @@ async def handle_edit_request(request):
 # Бензин и мойка — не «прочие расходы», а ежедневная работа машины: они
 # заводятся отдельными окнами, а не поиском в списке. Всё остальное — «ещё
 # расход» внизу, там комментарий обязателен.
+# Виды расходов — те же, что у старшего, и берём их оттуда же. Пока у водителя
+# был свой короткий список, всё, что не бензин и не мойка, приезжало к старшему
+# безымянным «доп. расходом»: он видел сумму и строчку словами, а к какому виду
+# она относится — угадывал. Два списка рядом расходятся в первую же неделю.
+from expense_routes import EXTRA_KINDS                  # noqa: E402
+
+# Названия для тех видов, о которых водителя спрашивают каждый день.
 EXPENSE_KINDS = {"fuel": "Бензин", "wash": "Мойка", "other": ""}
 
 # Про эти два водитель обязан ответить каждую смену — суммой или «не было».
@@ -1186,12 +1193,12 @@ EXPENSE_KINDS = {"fuel": "Бензин", "wash": "Мойка", "other": ""}
 # через неделю, когда вспомнить её уже нельзя.
 MUST_ANSWER = ("fuel", "wash")
 
-# А про эти два ещё и нужен чек: их оплачивают на стороне, и снимок бумажки —
-# единственное, чем трата подтверждается. Требуем его при первой записи; когда
-# водитель правит сумму у той же траты, старый чек остаётся в силе, пока он не
-# переснял его сам. Гонять человека к колонке из-за исправленной цифры — способ
-# отучить его записывать вовсе.
-MUST_RECEIPT = ("fuel", "wash")
+# А там, где деньги отдают на стороне, нужен ещё и чек: снимок бумажки —
+# единственное, чем такая трата подтверждается. Требуем его при первой записи;
+# когда водитель правит сумму у той же траты, старый чек остаётся в силе, пока
+# он не переснял его сам. Гонять человека к колонке из-за исправленной цифры —
+# способ отучить его записывать вовсе.
+MUST_RECEIPT = tuple(k for k, v in EXTRA_KINDS.items() if v.get("receipt"))
 
 
 def _kind_of(x: dict) -> str:
@@ -1199,7 +1206,7 @@ def _kind_of(x: dict) -> str:
     комментарию, иначе вчерашний бензин уедет в «прочее» и водитель заведёт
     второй."""
     k = x.get("kind")
-    if k in EXPENSE_KINDS:
+    if k in EXTRA_KINDS:
         return k
     c = (x.get("comment") or "").lower()
     if "бензин" in c or "топлив" in c or "fuel" in c: return "fuel"
@@ -1221,9 +1228,11 @@ async def handle_expense_add(request):
     except (TypeError, ValueError):
         amount = 0
     kind = str(body.get("kind") or "other").strip()
-    if kind not in EXPENSE_KINDS:
+    if kind not in EXTRA_KINDS:
         kind = "other"
-    comment = str(body.get("comment") or "").strip()[:200] or EXPENSE_KINDS[kind]
+    вид = EXTRA_KINDS[kind]
+    comment = (str(body.get("comment") or "").strip()[:200]
+               or EXPENSE_KINDS.get(kind) or вид["t"])
     day = _biz_day()
 
     # «Не было» — обязательный ответ, а не расход. Пока водитель молчит, нельзя
@@ -1265,8 +1274,11 @@ async def handle_expense_add(request):
 
     if prev:
         await db.update_driver_expense(day, me["name"], prev["id"], amount, comment,
-                                       thumb if photo else None)
+                                       thumb if photo else None,
+                                       kind=kind, kind_t=вид["t"],
+                                       plus=bool(вид.get("plus")))
         item = {**prev, "amount": amount, "comment": comment, "kind": kind,
+                "kind_t": вид["t"], "plus": bool(вид.get("plus")),
                 "status": "pending", "edited_at": now_iso}
         if photo: item.update({"photo": True, "thumb": thumb})
         log.info(f"[driver] {me['name']} поправил {comment}: "
@@ -1274,8 +1286,8 @@ async def handle_expense_add(request):
                  + (" (чек переснят)" if photo else ""))
     else:
         item = {"id": secrets.token_hex(6), "amount": amount, "comment": comment,
-                "kind": kind, "by_driver": me["name"], "status": "pending",
-                "at": now_iso}
+                "kind": kind, "kind_t": вид["t"], "plus": bool(вид.get("plus")),
+                "by_driver": me["name"], "status": "pending", "at": now_iso}
         if photo: item.update({"photo": True, "thumb": thumb})
         await db.add_driver_expense(day, me["name"], item)
     # Снимок кладём после самой записи: строка без чека — это повод переспросить,
@@ -1417,9 +1429,11 @@ async def handle_expenses(request):
         # итог, иначе каждый раз спрашивает, почему сегодня 40, а не 80.
         "meal_rates": {"working": staff.MEAL_WORKING, "off": staff.MEAL_OFF},
         "extras": extras,
+        "kinds": [{"id": k, "t": v["t"], "receipt": bool(v.get("receipt")),
+                   "plus": bool(v.get("plus"))} for k, v in EXTRA_KINDS.items()],
         "by_kind": {k: {"sum": sum(x.get("amount", 0) for x in live if x["kind"] == k),
                         "count": sum(1 for x in live if x["kind"] == k)}
-                    for k in EXPENSE_KINDS},
+                    for k in EXTRA_KINDS},
         "pending": sum(x.get("amount", 0) for x in extras if st(x) == "pending"),
         "approved": sum(x.get("amount", 0) for x in extras if st(x) == "approved"),
     }, headers=CORS_HEADERS)

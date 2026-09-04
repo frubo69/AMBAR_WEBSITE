@@ -3468,7 +3468,8 @@ async def add_driver_expense(day: str, driver: str, item: dict):
 
 async def update_driver_expense(day: str, driver: str, item_id: str,
                                 amount: int, comment: str,
-                                thumb: str | None = None) -> bool:
+                                thumb: str | None = None, kind: str = "",
+                                kind_t: str = "", plus: bool | None = None) -> bool:
     """Водитель поправил свою же трату. Решение менеджера при этом сбрасывается:
     утверждали одну сумму, а стала другая — значит, смотреть надо заново.
 
@@ -3481,6 +3482,10 @@ async def update_driver_expense(day: str, driver: str, item_id: str,
             "extras.$.comment": comment,
             "extras.$.status": "pending",
             "extras.$.edited_at": now}
+    if kind:
+        поля["extras.$.kind"] = kind
+        поля["extras.$.kind_t"] = kind_t
+        поля["extras.$.plus"] = bool(plus)
     if thumb is not None:
         поля["extras.$.photo"] = True
         поля["extras.$.thumb"] = thumb

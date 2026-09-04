@@ -3422,6 +3422,19 @@ async def set_driver_no_expense(day: str, driver: str, kind: str, none: bool):
                                         {"$unset": {key: ""}})
 
 
+async def expense_by_code(code: str) -> dict | None:
+    """Есть ли уже расход по этой бутылке. Отданную охране бутылку могут поднести
+    к камере второй раз — рукой того же водителя через час или чужой. Со склада
+    она уходит только при согласовании, поэтому до него реестр молчит, и
+    единственное, что помнит про неё, — сама запись расхода."""
+    db = _db_or_none()
+    if db is None or not code: return None
+    return await db.driver_days.find_one(
+        {"extras": {"$elemMatch": {"code": code,
+                                   "status": {"$ne": "rejected"}}}},
+        {"_id": 1})
+
+
 async def expense_photo_set(item_id: str, photo: bytes, thumb: str = "") -> None:
     """Снимок чека к разовой трате. Лежит отдельно от самой записи: строку
     расхода читают каждый день, а картинку открывают раз.

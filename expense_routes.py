@@ -332,6 +332,16 @@ async def handle_extra_decide(request):
                           f"{driver} — " + ("принят" if action == "approve" else "отклонён"))
 
     saved = await db.get_driver_day(day, driver)
+    # Бутылка охране уходит со склада здесь, а не в момент, когда её отдали:
+    # до решения владельца это заявление водителя, а не факт — то же правило,
+    # что у списаний. Пишем в две книги сразу: реестр кодов помечает бутылку
+    # ушедшей, журнал списаний вычитает её там, где счёт идёт от пересчёта.
+    # Одна книга без другой ломает остаток.
+    if action == "approve":
+        item = next((e for e in (saved or {}).get("extras", [])
+                     if e.get("id") == item_id), None)
+        await _guard_bottle_gone(item, day, driver, request["owner_id"])
+
     base = next((d for d in staff.drivers() if d["name"] == driver), None)
     # Водителю — короткий ответ в его бот: он ждёт решения, а не молчания.
     try:
@@ -391,6 +401,33 @@ async def handle_period(request):
         "total_extra": sum(d["extra"] for d in days_list),
         "total": sum(d["meal"] + d["extra"] for d in days_list),
     }, headers=CORS_HEADERS)
+
+
+async def _guard_bottle_gone(item: dict | None, day: str, driver: str, by: int) -> None:
+    """Списать бутылку, отданную охране. Молча ничего не делаем для всего
+    остального: код есть только у этого вида расхода."""
+    code = str((item or {}).get("code") or "").strip()
+    if not code:
+        return
+    now = datetime.now(timezone.utc)
+    wid = await db.writeoff_add({
+        # Позиция обязательна: журнал вычитает со склада по ней, и запись без
+        # неё честно лежит в истории, ничего при этом не вычитая.
+        "at": now, "day": day, "item": item.get("bottle_id") or "", "code": code,
+        "name": item.get("bottle") or "", "qty": 1, "kind": "охрана",
+        "note": (item.get("comment") or "")[:200],
+        "district": item.get("district") or "",
+        "by": driver, "by_id": 0, "label": item.get("label") or "",
+        "state": "ok", "decided_at": now, "decided_by": by,
+        "expense": item.get("id"),
+    })
+    if not await db.qr_write_off(code, wid):
+        # Между заявкой и решением бутылку успели списать или продать. Запись
+        # оставлять нельзя: она вычтет со склада вторую такую же.
+        await db.writeoff_del(wid)
+        log.warning(f"[expenses] бутылка {code} уже ушла — списание не записано")
+        return
+    log.info(f"[expenses] охране отдана {item.get('bottle','')} · {code} · {day}")
 
 
 @require_owner

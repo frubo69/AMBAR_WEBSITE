@@ -3702,6 +3702,7 @@ button.path:active{transform:scale(.995)}
 /* Чек. Значок при названии вида, а не квадрат в строке: строка узкая, и
    комментарий в ней — единственное, что отвечает «за что». Приподнят на
    полпикселя, чтобы сидеть на одной линии с прописными буквами рядом. */
+.exp-item .exp-bot{font-style:normal;color:var(--gold2);margin-left:6px}
 .exp-item-ph{display:inline-block;flex-shrink:0;padding:0 0 0 5px;margin:0;cursor:pointer;
   border:none;background:none;color:var(--gold2);vertical-align:-2px;line-height:0}
 .exp-item-ph:active{transform:scale(.86)}
@@ -16754,6 +16755,9 @@ function expRow(r){
         <span class="exp-item-c">${e.kind_t && e.kind !== 'other'
           ? `<b class="exp-item-k">${escS(e.kind_t)}</b>${expShotBtn(e)} · ` : expShotBtn(e)}${
           escS(e.comment)}${
+          // Что именно отдали. Без названия строка «Охрана · 45 AED» не говорит,
+          // за какую бутылку списывать со склада, — а решение здесь и об этом.
+          e.bottle ? `<i class="exp-bot">${escS(e.bottle)}</i>` : ''}${
           e.by_driver ? `<i class="exp-from">от водителя</i>` : ''}</span>
         ${st === 'pending' ? `
           <button class="exp-item-ok" title="Принять"

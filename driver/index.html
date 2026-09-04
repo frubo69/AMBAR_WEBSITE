@@ -1902,6 +1902,25 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .exp-t{font-size:14px;font-weight:700;color:var(--text)}
 .exp-sum{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--muted)}
 .exp-sum.plus{color:var(--up)}
+/* Охрана: вместо поля для суммы — скан. Кнопка ровно там же и того же роста,
+   что поле у соседей: строка не должна ломаться из-за того, что платят
+   бутылкой, а не деньгами. */
+.exp-scan{flex:1;min-width:0;display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:13px 10px;border-radius:11px;cursor:pointer;font-family:inherit;font-size:13px;
+  font-weight:600;color:var(--sub);background:var(--bg3);border:1px dashed var(--border3)}
+.exp-scan:active{transform:scale(.98);border-color:var(--gold2);color:var(--gold2)}
+/* Отсканированная бутылка: название и то, во что она обошлась. Цена не введена —
+   так и пишем, а не показываем ноль: ноль здесь читается как «бесплатно». */
+.exp-bot{flex:1;min-width:0;display:flex;align-items:baseline;gap:8px;padding:11px 12px;
+  border-radius:11px;cursor:pointer;text-align:left;font-family:inherit;
+  background:var(--gold-soft);border:1px solid rgba(201,169,110,.45)}
+.exp-bot-n{flex:1;min-width:0;font-size:13px;font-weight:700;color:var(--gold2);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.exp-bot-v{flex:0 0 auto;font-size:11px;font-weight:600;color:var(--muted)}
+.exp-bot i{flex:0 0 auto;font-style:normal;font-size:10px;font-weight:700;
+  letter-spacing:.4px;text-transform:uppercase;color:var(--dim)}
+/* Камера на один скан живёт в обычном листе, поэтому квадрат ей задаём тут. */
+#botSheet .cam{aspect-ratio:1/1;margin:2px 0 10px}
 
 .exp-row{display:flex;gap:7px}
 .exp-row input{min-width:0;padding:12px;border-radius:11px;border:1px solid var(--border2);
@@ -2411,6 +2430,32 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 <input type="file" id="woFile" accept="image/*" capture="environment"
   style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"
   onchange="woShot(this)">
+<!-- Скан бутылки для охраны. Отдельным листом, а не внутри карточки: камера
+     на четверть экрана бесполезна, а карточка с камерой перестаёт быть строкой
+     учёта. Один скан — и лист закрывается сам: бутылка отдаётся одна. -->
+<div class="sheet" id="botSheet" onclick="if(event.target===this)guardClose()">
+  <div class="sheet-in">
+    <div class="wo-add-hd">
+      <div>
+        <div class="sheet-t">Бутылка охране</div>
+        <div class="wo-add-s">Наведите на код с крышки</div>
+      </div>
+      <button class="wo-add-x" onclick="guardClose()" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="cam">
+      <video id="botV" playsinline muted autoplay></video>
+      <div class="cam-frame" id="botF">
+        <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+        <div class="cam-badge" id="botB"></div>
+      </div>
+    </div>
+    <div class="wo-why" id="botSay" style="margin:0 2px">Одна бутылка — один код</div>
+  </div>
+</div>
+
 <input type="file" id="expFile" accept="image/*" capture="environment"
   style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"
   onchange="expShot(this)">
@@ -4304,8 +4349,9 @@ const expMark = x => `<span class="exp-mk ${EXP_ST(x)}" title="${EXP_LBL[EXP_ST(
 function otherBox(x){
   const k = 'o_' + x.id;
   return `<div class="card exp-card">
-    <div class="exp-hd">${svg(ICO.note, 17)}<span class="exp-t">${
-      esc(x.kind_t || 'Доп расход')}${x.comment ? ` <i>${esc(x.comment)}</i>` : ''}</span>
+    <div class="exp-hd">${svg(ICO[EXP_KIND_ICO[x.kind]] || ICO.note, 17)}<span class="exp-t">${
+      esc(x.kind_t || 'Доп расход')}${
+      x.bottle ? ` <i>${esc(x.bottle)}</i>` : (x.comment ? ` <i>${esc(x.comment)}</i>` : '')}</span>
       <span class="exp-sum">${fmt(x.amount)} AED</span></div>
     <div class="exp-row">
       <div class="exp-field sent">
@@ -4460,14 +4506,26 @@ function expKindCards(){
   if(!виды.length) return '<div class="card exp-card"><div class="exp-none">Загрузка…</div></div>';
   return виды.map(k => {
     const ico = ICO[EXP_KIND_ICO[k.id]] || ICO.note;
+    // Охране платят не деньгами, а бутылкой, и сумму тут вводить нечего: код с
+    // крышки знает и что это за бутылка, и сколько за неё отдали при закупке.
+    // Поле для суммы на этом месте было бы приглашением придумать её.
+    const поле = k.id === 'guard'
+      ? (GUARD.code
+          ? `<button class="exp-bot" onclick="guardClear()">
+               <span class="exp-bot-n">${esc(GUARD.name)}</span>
+               <span class="exp-bot-v">${GUARD.cost ? fmt(GUARD.cost) + ' AED' : 'цена не заведена'}</span>
+               <i>сменить</i></button>`
+          : `<button class="exp-scan" onclick="guardScan()">
+               ${svg(ICO.cam, 17)} Сканировать бутылку</button>`)
+      : `<div class="exp-field">
+          <input class="amt" id="k_${k.id}" type="text" inputmode="numeric" placeholder="AED"
+            autocomplete="off" oninput="expKindTyped('${k.id}')">
+        </div>`;
     return `<div class="card exp-card">
       <div class="exp-hd">${svg(ico, 17)}<span class="exp-t">${esc(k.t)}</span>
         ${k.plus ? '<span class="exp-sum plus">приходом</span>' : ''}</div>
       <div class="exp-row">
-        <div class="exp-field">
-          <input class="amt" id="k_${k.id}" type="text" inputmode="numeric" placeholder="AED"
-            autocomplete="off" oninput="expKindTyped('${k.id}')">
-        </div>
+        ${поле}
         <button class="btn btn-gh exp-go" id="kb_${k.id}" disabled
           onclick="expSendKind('${k.id}')">Отправить</button>
       </div>
@@ -4481,15 +4539,71 @@ function expKindCards(){
   }).join('');
 }
 
+// Бутылка, отданная охране. Со склада она уйдёт не сейчас, а когда старший
+// согласует расход: до решения это заявление водителя, а не факт — то же
+// правило, что у списаний.
+let GUARD = {code:'', name:'', cost:0}, GUARD_BUSY = false;
+
+async function guardScan(){
+  document.getElementById('botSheet').classList.add('show');
+  _botSay('Одна бутылка — один код', '');
+  try{
+    await SCAN.start(document.getElementById('botV'), guardCode, null, null, null);
+  }catch(e){
+    toast('Нет доступа к камере', 'err');
+    guardClose();
+  }
+}
+function guardClose(){
+  SCAN.stop();
+  document.getElementById('botSheet').classList.remove('show');
+}
+function guardClear(){
+  GUARD = {code:'', name:'', cost:0};
+  render();
+}
+function _botSay(текст, вид){
+  const f = document.getElementById('botF'), b = document.getElementById('botSay');
+  if(b) b.textContent = текст;
+  if(f){ f.className = 'cam-frame' + (вид ? ' ' + вид : ''); }
+}
+
+// Что за бутылка — спрашиваем сразу у камеры, а не при отправке: «уже продана»
+// надо узнать, пока она в руке и её можно вернуть на полку.
+async function guardCode(code){
+  if(GUARD_BUSY) return;
+  GUARD_BUSY = true;
+  try{
+    const r = await drvApi.drvFetch('/api/driver/bottle/' + encodeURIComponent(code));
+    if(!r.ok){
+      _botSay(r.say || 'не наша бутылка', 'err');
+      try{ tg.HapticFeedback.notificationOccurred('error'); }catch(e){}
+      SFX.err && SFX.err();
+      return;
+    }
+    GUARD = {code, name: r.bottle || '', cost: r.cost || 0};
+    _botSay(GUARD.name, 'ok');
+    try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    setTimeout(() => { guardClose(); render(); }, 420);
+  }catch(e){
+    _botSay('не отправилось, поднесите ещё раз', 'err');
+  }finally{
+    // Одна и та же крышка читается каждый кадр: без паузы отказ мигал бы
+    // двенадцать раз в секунду.
+    setTimeout(() => { GUARD_BUSY = false; }, 700);
+  }
+}
+
 // Кнопка загорается сама, когда в карточке есть всё нужное: отдельной подсказки
 // «теперь можно» не нужно, ей и служит цифра в поле.
 function expKindTyped(kind){
   const a = document.getElementById('k_' + kind);
   const c = document.getElementById('kc_' + kind);
   const b = document.getElementById('kb_' + kind);
-  if(!a || !b) return;
-  const есть = !!String(a.value || '').replace(/\D/g, '')
-             && (!EXP_HINT[kind] || !!String((c || {}).value || '').trim());
+  if(!b) return;
+  const заполнено = kind === 'guard' ? !!GUARD.code
+                  : !!String((a || {}).value || '').replace(/\D/g, '');
+  const есть = заполнено && (!EXP_HINT[kind] || !!String((c || {}).value || '').trim());
   b.disabled = !есть;
   b.classList.toggle('btn-pri', есть);
   b.classList.toggle('btn-gh', !есть);
@@ -4517,7 +4631,9 @@ async function expSendKind(kind){
   const c = document.getElementById('kc_' + kind);
   const amount = parseInt(String((a || {}).value || '').replace(/\D/g, ''), 10);
   const comment = String((c || {}).value || '').trim();
-  if(!amount) return toast('Впишите сумму', 'err');
+  if(kind === 'guard'){
+    if(!GUARD.code) return toast('Сначала отсканируйте бутылку', 'err');
+  }else if(!amount) return toast('Впишите сумму', 'err');
   // Слова обязательны там, где вопрос про человека: «Мы должны 200» без имени
   // через неделю неотличимо от опечатки. Про парковку и охрану достаточно
   // названия вида — его сервер и подставит.
@@ -4529,10 +4645,12 @@ async function expSendKind(kind){
   try{
     await drvApi.drvFetch('/api/driver/expenses', {method: 'POST', body: {
       amount, comment, kind,
+      ...(kind === 'guard' ? {code: GUARD.code} : {}),
       ...(свой ? {photo: свой.photo, thumb: свой.thumb} : {})}});
     toast('Отправлено на согласование');
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(свой) EXP_SHOT = {kind:'', photo:'', thumb:''};
+    if(kind === 'guard') GUARD = {code:'', name:'', cost:0};
     await shLoad();
     await load();
     _expKindBack(набрано, kind);

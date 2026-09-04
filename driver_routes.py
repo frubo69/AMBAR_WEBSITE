@@ -1214,6 +1214,66 @@ def _kind_of(x: dict) -> str:
     return "other"
 
 
+# Что за бутылка под этим кодом и можно ли её отдать.
+#
+# Со склада она пока не уходит: пока владелец не согласовал расход, это
+# заявление водителя, а не факт — то же правило, что у списаний. Реестр меняется
+# в момент согласования, там же, где расход становится деньгами.
+GUARD_SAY = {"no_code": "код не прочитан", "unknown": "нет в реестре",
+             "written": "уже списана", "sold": "ушла с заказом",
+             "no_item": "нет в каталоге", "taken": "эту уже записали"}
+
+
+async def _guard_bottle(code) -> tuple[dict | None, str]:
+    code = str(code or "").strip()
+    if not code:
+        return None, "no_code"
+    doc = await db.qr_get(code)
+    if not doc:
+        return None, "unknown"
+    st = (doc.get("status") or "active").strip()
+    if st in ("written", "sold"):
+        return None, st
+    from operator_routes import _load_catalog
+    p = {x.get("id"): x for x in _load_catalog()}.get(str(doc.get("product_id") or ""))
+    if not p:
+        return None, "no_item"
+    # Ту же бутылку дважды не отдают. Проверяем среди ждущих решения: уже
+    # согласованная выйдет из реестра сама и споткнётся строчкой выше.
+    if await db.expense_by_code(code):
+        return None, "taken"
+
+    # Цена за бутылку, а не за учётную единицу: у пива единица — ящик из 24, и
+    # охраннику отдают одну банку, а не ящик.
+    цена = 0
+    try:
+        import stock_value, stock_routes
+        unit = max(1, int(stock_routes._unit(p) or 1))
+        цена = int(round(float((await stock_value.cost_map()).get(p["id"]) or 0) / unit))
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[driver] цена бутылки не посчиталась: {e}")
+    return {"cost": max(0, цена),
+            "item": {"code": code, "bottle": p.get("name", ""),
+                     "bottle_id": p["id"], "label": doc.get("label") or "",
+                     "district": (doc.get("district") or "").strip()}}, ""
+
+
+@require_driver
+async def handle_bottle_look(request):
+    """GET /api/driver/bottle/{code} — что за бутылка под этим кодом.
+
+    Отдельным запросом на скане, а не проверкой при отправке: узнать «эта уже
+    продана» надо у камеры, пока бутылка в руке и её можно вернуть на полку,
+    а не через минуту после того, как её отдали."""
+    б, беда = await _guard_bottle(request.match_info.get("code"))
+    if беда:
+        return web.json_response({"ok": False, "verdict": беда,
+                                  "say": GUARD_SAY.get(беда, "не наша бутылка")},
+                                 headers=CORS_HEADERS)
+    return web.json_response({"ok": True, "cost": б["cost"], **б["item"]},
+                             headers=CORS_HEADERS)
+
+
 @require_driver
 async def handle_expense_add(request):
     """Расход на согласование. Сразу в расходы дня он не попадает: иначе водитель
@@ -1245,7 +1305,20 @@ async def handle_expense_add(request):
         return web.json_response({"ok": True, "none": none, "kind": kind},
                                  headers=CORS_HEADERS)
 
-    if amount <= 0 or not comment:
+    # Охрана — единственный расход, где платят не деньгами, а бутылкой. Сумму
+    # тут спрашивать не у кого и незачем: код с крышки знает, что это за
+    # бутылка, где она числится и сколько за неё отдали при закупке. Водитель
+    # говорит только, кому отдал.
+    бутылка = None
+    if kind == "guard":
+        бутылка, беда = await _guard_bottle(body.get("code"))
+        if беда:
+            return web.json_response({"error": беда}, status=400, headers=CORS_HEADERS)
+        amount = бутылка["cost"]
+        if not comment:
+            return web.json_response({"error": "no_comment"},
+                                     status=400, headers=CORS_HEADERS)
+    elif amount <= 0 or not comment:
         return web.json_response({"error": "amount_and_comment_required"},
                                  status=400, headers=CORS_HEADERS)
     photo, беда = photos.decode(body.get("photo"))
@@ -1289,6 +1362,7 @@ async def handle_expense_add(request):
                 "kind": kind, "kind_t": вид["t"], "plus": bool(вид.get("plus")),
                 "by_driver": me["name"], "status": "pending", "at": now_iso}
         if photo: item.update({"photo": True, "thumb": thumb})
+        if бутылка: item.update(бутылка["item"])
         await db.add_driver_expense(day, me["name"], item)
     # Снимок кладём после самой записи: строка без чека — это повод переспросить,
     # а чек без строки не значит ничего и найтись уже не сможет.
@@ -1575,6 +1649,7 @@ def setup(app):
         ("/api/driver/catalog",                 handle_catalog,     "GET"),
         ("/api/driver/expenses",                handle_expenses,    "GET"),
         ("/api/driver/expenses",                handle_expense_add, "POST"),
+        ("/api/driver/bottle/{code}",           handle_bottle_look, "GET"),
         ("/api/driver/supply",                  handle_supply_list, "GET"),
         ("/api/driver/writeoff",                handle_writeoff_add, "POST"),
         ("/api/driver/writeoffs",               handle_writeoffs,   "GET"),

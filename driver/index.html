@@ -354,12 +354,22 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    читают его один раз, а занимает он три строки под каждой прокруткой экрана.
    То же самое сказано там, где это нужно: в самом окне списания и в строке
    записи, где стоит решение старшего. */
-.wo-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:9px;
-  padding:15px 12px;border-radius:14px;cursor:pointer;font-family:inherit;
-  font-size:14.5px;font-weight:700;color:var(--sub);
+/* Кнопка списания живёт у нижнего края и не уезжает со списком.
+   Бутылка бьётся не по расписанию: водитель тянется к этой кнопке с осколком
+   в руке, а не долистав экран до конца. Раньше она стояла в конце списка —
+   при одной задаче сразу под ней, при пяти где-то внизу, и место у неё было
+   каждый раз новое. Теперь оно одно и всегда под большим пальцем. */
+.wo-fix{position:fixed;left:0;right:0;bottom:var(--tabbar);z-index:39;
+  padding:0 13px 12px;
+  background:linear-gradient(180deg,rgba(4,4,10,0),var(--bg) 46%)}
+.wo-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:18px 12px;border-radius:16px;cursor:pointer;font-family:inherit;
+  font-size:15.5px;font-weight:700;color:var(--text);
   background:var(--card2);border:1px solid var(--border3)}
-.wo-btn:active{transform:scale(.98)}
-.wo-btn svg{flex:0 0 auto;color:var(--dn);opacity:.8}
+.wo-btn:active{transform:scale(.985)}
+.wo-btn svg{flex:0 0 auto;width:19px;height:19px;color:var(--dn);opacity:.85}
+/* Место под приклеенную кнопку, чтобы последняя запись не пряталась под ней. */
+.wo-sp{height:86px}
 
 /* Списанное за смену — короткой строкой, чтобы было видно, что запись прошла */
 .wo-done{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;
@@ -764,11 +774,23 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   font-family:inherit;font-size:12.5px;font-weight:700;color:var(--gold2);
   background:var(--gold-soft);border:1px solid rgba(201,169,110,.3)}
 .shx-go:active{transform:scale(.95)}
-.shbtn{margin-top:16px}
-.shx-alt{width:100%;margin-top:9px;padding:12px;border-radius:12px;cursor:pointer;
-  font-family:inherit;font-size:13px;font-weight:600;color:var(--muted);background:none;
+/* Кнопка смены — у нижнего края, как списание на «Товаре». Экран короткий, и
+   раньше она висела посреди пустоты сразу под списком условий: место у неё
+   менялось от того, сколько строк выше. */
+.shbtn{position:fixed;left:0;right:0;bottom:var(--tabbar);z-index:39;padding:0 13px 12px;
+  background:linear-gradient(180deg,rgba(4,4,10,0),var(--bg) 46%)}
+.shbtn .btn{width:100%;padding:18px 12px;border-radius:16px;font-size:15.5px}
+/* Заблокированная кнопка была золотом на сорока пяти процентах прозрачности —
+   грязная хаки-полоса, которую хочется оттереть. Пока нажать нельзя, она и
+   выглядит как «нельзя»: тихий контур, а не испачканное золото. */
+.shbtn .btn:disabled{opacity:1;background:none;color:var(--dim);
   border:1px solid var(--border3)}
-.shx-alt:active{transform:scale(.98);color:var(--gold2)}
+.shsp{height:96px}
+/* «Проверить ещё раз» — не действие наравне с закрытием смены, а способ
+   перечитать то же самое. Ссылкой, а не второй кнопкой такого же роста. */
+.shx-alt{display:block;margin:10px auto 0;padding:6px 10px;border:none;background:none;
+  cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;color:var(--muted)}
+.shx-alt:active{color:var(--gold2)}
 /* ── ИНСТРУКЦИЯ ПО ШАГАМ ────────────────────────────────────────────────────
    Строка шагов над кнопкой отвечает тому, кто уже включал и просто забыл
    порядок. Тому, кто видит это впервые, она не отвечает никак: он не знает,
@@ -4822,11 +4844,19 @@ function renderShift(){
   // вышел на работу. В счёте смены остаётся только то, что он отдал сам.
   const spent = live.reduce((a, x) => a + (x.amount || 0), 0);
 
+  // Подпись под заголовком отвечает на «что это значит», и отвечать ей надо
+  // коротко: фразу с точкой читают один раз, а место она занимает всегда.
   const stat = on
-    ? {t:`Смена идёт с ${hhmm(SH.opened_at)}`, s:'Заказы приходят, отметки принимаются.'}
+    ? {t:`Смена идёт с ${hhmm(SH.opened_at)}`, s:'заказы приходят'}
     : SH.closed
-      ? {t:`Смена закрыта в ${hhmm(SH.closed_at)}`, s:'Заказы больше не придут. Открыть снова можно.'}
-      : {t:'Смена не открыта', s:'Пока она закрыта, заказы не приходят.'};
+      ? {t:`Смена закрыта в ${hhmm(SH.closed_at)}`, s:'можно открыть снова'}
+      : {t:'Смена не открыта', s:'заказы не приходят'};
+
+  // Сколько идёт смена — число, и место ему среди чисел, а не в подписи.
+  const мин = on && SH.opened_at
+    ? Math.max(0, Math.round((Date.now() - new Date(SH.opened_at)) / 60000)) : 0;
+  const вСмене = мин >= 60 ? `${Math.floor(мин/60)} ч ${String(мин%60).padStart(2,'0')}`
+                           : `${мин} мин`;
 
   const row = (ok, t, sub, action) => `
     <div class="shx ${ok ? 'ok' : ''}">
@@ -4845,32 +4875,39 @@ function renderShift(){
     ${on ? `<div class="shsum">
       <div class="shsum-c"><b>${done}</b><i>доставлено</i></div>
       <div class="shsum-c"><b>${fmt(spent)}</b><i>расход, AED</i></div>
-      <div class="shsum-c"><b>${geo.stream ? 'да' : 'нет'}</b><i>трансляция</i></div>
-    </div>` : ''}
+      <div class="shsum-c"><b>${вСмене}</b><i>в смене</i></div>
+    </div>` : ''}`
+    /* «Трансляция: да» отсюда убрана. Про геопозицию сказано строкой ниже, в
+       списке условий, и сказано подробнее — держать тот же ответ ещё и здесь
+       значит спрашивать одно и то же дважды в трёх строках друг от друга. */ + `
 
     <div class="sect"><span class="sect-t">${on ? 'Чтобы закрыть' : 'Чтобы открыть'}</span></div>
     ${on
       ? row(!must.length, 'Расходы за день',
-            must.length ? `Не отвечено: ${esc(mustNames)}` : 'Всё заполнено.',
+            must.length ? `не отвечено: ${esc(mustNames.toLowerCase())}` : 'отвечено',
             must.length ? `<button class="shx-go" onclick="setTab('expenses')">Заполнить</button>` : '')
       : row(SH.working === true, 'Оператор отметил вас',
-            SH.working === true ? 'Отмечено.'
-              : SH.working === false ? 'Сегодня вы отмечены как выходной.'
-              : 'Оператор отмечает бригаду в начале смены.')}
-    ${row(!!geo.stream, 'Геопозиция транслируется',
-          geo.stream ? (geo.endless ? 'Идёт и не кончится сама.' : 'Идёт.')
-                     : 'Оператор не видит, где вы.',
+            SH.working === true ? 'отмечено'
+              : SH.working === false ? 'сегодня выходной'
+              : 'оператор отмечает бригаду в начале смены')}
+    ${row(!!geo.stream, 'Геопозиция',
+          geo.stream ? (geo.endless ? 'транслируется и не кончится сама' : 'транслируется')
+                     : 'оператор не видит, где вы',
           geo.stream ? '' : `<button class="shx-go" onclick="tutOpen()">Как включить</button>`)}
 
+    ${on && (SH.in_route||[]).length
+      ? row(false, 'Заказы в пути',
+            `${(SH.in_route||[]).length} ${plural((SH.in_route||[]).length,'заказ','заказа','заказов')}`
+            + ' — отметьте доставку',
+            `<button class="shx-go" onclick="setTab('orders')">Открыть</button>`) : ''}
+
+    <div class="shsp"></div>
     <div class="shbtn">
       ${on
-        ? `<button class="btn btn-pri" style="width:100%"
+        ? `<button class="btn btn-pri"
              ${(must.length || (SH.in_route||[]).length) ? 'disabled' : ''}
-             onclick="shClose()">Закрыть смену</button>
-           ${(SH.in_route||[]).length ? `<div class="shd" style="margin-top:8px">
-             ${(SH.in_route||[]).length} ${plural((SH.in_route||[]).length,'заказ','заказа','заказов')}
-             в пути — смена закроется, когда отметите доставку</div>` : ''}`
-        : `<button class="btn btn-pri" style="width:100%"
+             onclick="shClose()">Закрыть смену</button>`
+        : `<button class="btn btn-pri"
              ${(SH.working === true && geo.ok) ? '' : 'disabled'}
              onclick="shOpen()">${SH.closed ? 'Открыть смену снова' : 'Открыть смену'}</button>`}
       <button class="shx-alt" onclick="shLoad(true)">Проверить ещё раз</button>
@@ -5799,11 +5836,12 @@ function woFoot(){
     </span>
     <span class="wo-done-n">−${w.qty}</span>
   </div>`; }).join('');
-  return `<div class="sect" style="margin-top:26px"><span class="sect-t">Списание</span>
-      ${WO_LOG.length ? `<span class="sect-v">${WO_LOG.length}</span>` : ''}</div>
-    ${log}
-    <button class="wo-btn" onclick="woOpen()">
-      ${svg(ICO.trash, 17)}<span>Списать бой или брак</span></button>`;
+  return `${WO_LOG.length ? `<div class="sect" style="margin-top:26px">
+      <span class="sect-t">Списание</span>
+      <span class="sect-v">${WO_LOG.length}</span></div>${log}` : ''}
+    <div class="wo-sp"></div>
+    <div class="wo-fix"><button class="wo-btn" onclick="woOpen()">
+      ${svg(ICO.trash, 19)}<span>Списать бой или брак</span></button></div>`;
 }
 
 async function supClaim(sid, oid){

@@ -12028,7 +12028,7 @@ function stkScanTap(){
   const d = (STK.districts || []).find(x => x.id === STK.district) || {};
   if(!confirm(`На ${d.code || 'этой точке'} ещё нет ни одного кода — камере нечего узнавать.\n\n`
     + 'Бутылки сначала заводят в реестр: выбираете позицию и сканируете её бутылки. '
-    + 'Это разовая работа, дальше ревизия идёт камерой.\n\nОткрыть «Внести товар»?')) return;
+    + 'Это разовая работа, дальше ревизия идёт камерой.\n\nОткрыть «Внести / удалить товар»?')) return;
   distRemember('qr', STK.district);
   closeStock();
   accOpen('qr');
@@ -12871,7 +12871,7 @@ const ACC = [
    ico:'<path d="M3 20h18"/><path d="M6 20V10M11 20V4M16 20v-8M21 20v-5"/>'},
   {id:'writeoff', t:'Списания',          s:'бой / брак / просрочка',
    ico:'<path d="M4 7h16"/><path d="M9 7V4.5h6V7"/><path d="M6.5 7l1 12.5h9L17.5 7"/><path d="M10 11v5M14 11v5"/>'},
-  {id:'qr',       t:'Внести товар',      s:'коды с крышек / реестр бутылок',
+  {id:'qr',       t:'Внести / удалить товар', s:'коды с крышек / реестр бутылок',
    ico:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/>'},
   {id:'check',    t:'Проверка бутылки',  s:'',
    ico:'<path d="M3 3h7v7H3zM14 3h7v7h-7zM3 14h7v7H3z"/><path d="M14 14h3v3h-3zM18 18h3v3h-3zM18 14h3M14 18v3"/>'},
@@ -14822,7 +14822,7 @@ let QR_PROD = null, QR_DIST = null, QR_SESSION = 0, QR_LAST = null, QR_CAT = nul
 async function accQR(){
   ACC_BACK = null;
   _setRail('accRail', '');
-  _setText('accTitle', 'Внести товар');
+  _setText('accTitle', 'Внести / удалить товар');
   _setText('accSub', 'загрузка…');
   // Реестр уже пришёл вместе с разделом «Учёт» и лежит в памяти — открываем
   // экран на нём, а свежий тянем следом. Сводка собирается на сервере не

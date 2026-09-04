@@ -126,25 +126,68 @@ button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
 .rb .x{opacity:0}
 .rb.on .x{opacity:1}
 
-/* ── четыре смайлика: проверка от посредника ───────────────────────────── */
-.safe{display:flex;align-items:center;gap:8px;margin-top:9px;padding:7px 12px 7px 10px;
-  border-radius:999px;background:rgba(255,255,255,.1);
-  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
-  pointer-events:auto;cursor:pointer;opacity:0;transform:translateY(-6px);
-  transition:opacity .3s var(--e),transform .3s var(--e)}
-.safe.on{opacity:1;transform:none}
-.safe b{font-size:19px;line-height:1;letter-spacing:3px;font-weight:400}
-.safe span{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
-  color:#d8d8e6;opacity:.75}
-/* Пояснение — по нажатию, а не постоянной простынёй: читают один раз. */
-.why{position:fixed;inset:0;z-index:40;display:none;align-items:center;
-  justify-content:center;padding:28px;background:rgba(4,4,10,.86);
-  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
-.why.on{display:flex}
-.why-in{max-width:360px;padding:24px;border-radius:20px;background:var(--card);
-  border:1px solid var(--line);text-align:center;display:flex;flex-direction:column;
-  align-items:center;gap:14px}
-.why-e{font-size:34px;letter-spacing:6px}
+/* ── четыре смайлика: проверка от посредника ───────────────────────────────
+   Плашка и карточка — одна коробка. Двигается только она; смайлики и текст
+   едут трансформацией, то есть на видеокарте. Размеры обоих состояний заданы
+   явно, оттого переход ведёт сам CSS одной кривой. Две меры приходят из
+   safeMeasure: ширина плашки зависит от выпавших смайликов, высота
+   развёрнутой — от того, на сколько строк лёг текст. */
+.cs-safe{--cs-ease:cubic-bezier(.32,.72,0,1);
+  --cs-drop:43px;
+  --cs-pill-w:116px; --cs-card-h:193px;
+  position:absolute;left:50%;top:calc(var(--safe-t) + 62px);
+  transform:translate(-50%,0);
+  z-index:8;display:none;overflow:hidden;box-sizing:border-box;cursor:pointer;
+  width:var(--cs-pill-w);height:33px;border-radius:17px;color:#fff;
+  background:linear-gradient(160deg,rgba(58,58,78,.45),rgba(20,20,32,.39));
+  backdrop-filter:blur(28px) saturate(190%);
+  -webkit-backdrop-filter:blur(28px) saturate(190%);
+  box-shadow:0 12px 34px rgba(0,0,0,.38);
+  transition:width .42s var(--cs-ease),height .42s var(--cs-ease),
+    border-radius .42s var(--cs-ease),transform .42s var(--cs-ease)}
+.cs-safe.on{display:block}
+.cs-safe.open{width:min(320px,calc(100vw - 48px));height:var(--cs-card-h);
+  border-radius:22px;transform:translate(-50%,var(--cs-drop));cursor:default}
+
+/* Смайлики всегда крупные: растрируются один раз, плашке достаются
+   уменьшенными. Уменьшение делает видеокарта, и оно выходит чётким. */
+.cs-safe-big{position:absolute;left:50%;top:0;
+  display:flex;align-items:center;gap:14px;height:52px;
+  font-size:42px;line-height:1;white-space:nowrap;
+  transform-origin:50% 0;transform:translate(-50%,6px) scale(.4);
+  transition:transform .42s var(--cs-ease)}
+.cs-safe.open .cs-safe-big{transform:translate(-50%,20px) scale(1)}
+
+/* Барабан. Каждый смайлик — окошко ростом в строку, за которым едет лента:
+   случайные кандидаты, потом настоящий, и ещё один за ним — чтобы на доводке
+   было чему выглянуть снизу. Лента едет трансформацией, размытие висит на
+   окошке отдельной дорожкой: смешать их значило бы утащить всю прокрутку с
+   видеокарты на процессор. */
+.cs-sl{display:block;width:var(--cs-cell,44px);height:52px;overflow:hidden}
+.cs-sl-in{display:block}
+.cs-sl-in b{display:flex;align-items:center;justify-content:center;
+  height:52px;font-weight:400}
+/* Края окошка тают, только пока крутится: в покое они срезали бы смайлик. */
+.cs-safe-big.spin .cs-sl{
+  -webkit-mask-image:linear-gradient(to bottom,transparent,#000 26%,#000 74%,transparent);
+  mask-image:linear-gradient(to bottom,transparent,#000 26%,#000 74%,transparent)}
+
+.cs-safe-txt{position:absolute;top:87px;left:50%;
+  width:min(276px,calc(100vw - 92px));
+  opacity:0;transform:translate(-50%,10px);pointer-events:none;
+  transition:opacity .16s ease,transform .42s var(--cs-ease)}
+.cs-safe.open .cs-safe-txt{opacity:1;transform:translate(-50%,0);
+  transition:opacity .26s ease .12s,transform .42s var(--cs-ease)}
+.cs-safe-t{font-size:15.5px;font-weight:700;margin-bottom:6px;color:#fff;
+  letter-spacing:-.1px;text-align:center}
+.cs-safe-s{font-size:13.5px;color:rgba(255,255,255,.72);line-height:1.4;text-align:center}
+
+/* Затемнение лёгкое: стекло тем и хорошо, что сквозь него виден разговор. */
+.cs-safe-scrim{position:fixed;inset:0;z-index:7;background:rgba(0,0,6,.26);
+  opacity:0;visibility:hidden;transition:opacity .34s ease,visibility 0s .34s}
+.cs-safe-scrim.on{opacity:1;visibility:visible;transition-delay:0s}
+/* Развёрнутая карточка занимает всё место — соседи по полосе уходят. */
+body.safe-open .top .n,body.safe-open .top .t{opacity:0;transition:opacity .2s ease}
 
 /* ── входящий ──────────────────────────────────────────────────────────── */
 #in{position:fixed;inset:0;display:none;z-index:30;flex-direction:column;
@@ -218,9 +261,16 @@ button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
   </div>
   <video id="near" playsinline autoplay muted></video>
 
-  <div class="top"><div class="n" id="topN">—</div><div class="t" id="topT">соединяем…</div>
-    <button class="safe" id="safe" onclick="whyOpen()">
-      <b id="safeE"></b><span>сверьте</span></button>
+  <div class="top"><div class="n" id="topN">—</div><div class="t" id="topT">соединяем…</div></div>
+
+  <div class="cs-safe-scrim" id="safeScrim" onclick="safeToggle(false)"></div>
+  <div class="cs-safe" id="safeC" onclick="safeToggle()" role="button">
+    <div class="cs-safe-big" id="safeBig"></div>
+    <div class="cs-safe-txt">
+      <div class="cs-safe-t">Этот звонок защищён сквозным шифрованием</div>
+      <div class="cs-safe-s">Если <b id="safeWho">собеседник</b> видит на экране
+        те же смайлики, этот звонок защищён на 100%.</div>
+    </div>
   </div>
 
   <div class="bar">
@@ -250,21 +300,6 @@ button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
     <div class="act"><button class="rb take" onclick="answer()">
       <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg></button>
       <span>Ответить</span></div>
-  </div>
-</div>
-
-<!-- Зачем эти четыре смайлика. Объяснение по нажатию: читают его один раз, а
-     место оно занимало бы всегда. -->
-<div class="why" id="why" onclick="if(event.target===this)whyClose()">
-  <div class="why-in">
-    <div class="why-e" id="whyE"></div>
-    <div class="h1" style="font-size:19px">Проверка связи</div>
-    <div class="p">Голос и видео шифруются всегда. Но ключами браузеры меняются
-      через сервер, и тот, у кого есть к нему доступ, теоретически может встать
-      посередине.<br><br>Эти четыре смайлика посчитаны из самих ключей.
-      Назовите их вслух: <b>совпали — между вами никого нет</b>. Разошлись —
-      положите трубку.</div>
-    <button class="btn btn-gh" onclick="whyClose()">Понятно</button>
   </div>
 </div>
 
@@ -505,8 +540,7 @@ function stop(){
   $('far').srcObject = null; $('near').srcObject = null;
   $('near').classList.remove('on');
   $('call').classList.remove('on'); $('in').classList.remove('on');
-  $('why').classList.remove('on');
-  $('safe').classList.remove('on'); SAFE = null;
+  SAFE = null; safePaint();
   $('bMic').classList.remove('on'); $('bCam').classList.remove('on');
   $('bFlip').style.display = 'none';
   farCam(false);
@@ -606,7 +640,7 @@ const _fp = sdp => {
   return m ? m[1].toUpperCase() : '';
 };
 
-let SAFE = null;
+let SAFE = null, SAFE_ПОКАЗАНЫ = null;
 async function safety(){
   if(!PC || !window.crypto || !crypto.subtle) return;
   const свой  = _fp(PC.currentLocalDescription  && PC.currentLocalDescription.sdp);
@@ -619,14 +653,124 @@ async function safety(){
     const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(строка));
     const байты = new Uint8Array(b), из = [];
     for(let i = 0; i < 4; i++) из.push(СМАЙЛЫ[байты[i] % СМАЙЛЫ.length]);
-    SAFE = из.join('');
-    $('safeE').textContent = SAFE;
-    $('whyE').textContent = SAFE;
-    $('safe').classList.add('on');
+    SAFE = из;
+    safePaint();
   }catch(e){}
 }
-function whyOpen(){ if(SAFE) $('why').classList.add('on'); }
-function whyClose(){ $('why').classList.remove('on'); }
+
+function safePaint(){
+  const b = $('safeC'); if(!b) return;
+  const есть = ST === 'live' && SAFE && SAFE.length === 4;
+  b.classList.toggle('on', !!есть);
+  if(есть){
+    // Крутим только когда смайлики впервые пришли: без этой памяти барабан
+    // срывался бы на каждой перерисовке.
+    const ключ = SAFE.join('');
+    if(SAFE_ПОКАЗАНЫ !== ключ){ SAFE_ПОКАЗАНЫ = ключ; safeSpin(); }
+    // Имя подлежащим: «Если Миша видит…». Так фраза верна для любого
+    // прозвища — склонять их наугад нельзя.
+    $('safeWho').textContent = PEER || 'собеседник';
+    safeMeasure();
+  }else{
+    SAFE_ПОКАЗАНЫ = null;
+    b.classList.remove('open');
+    document.body.classList.remove('safe-open');
+    $('safeScrim').classList.remove('on');
+  }
+}
+
+// Барабан. Смайлики не появляются готовыми: все четыре прокручиваются мимо и
+// останавливаются по очереди, с доводкой в конце. Мимо глаз идут не любые
+// картинки, а тот же алфавит, из которого считается сверка, — проходит только
+// то, что действительно могло выпасть.
+const SAFE_ЛЕНТА = 14;        // сколько чужих смайликов пролетает мимо
+const SAFE_ЯЧЕЙКА = 52;       // рост окошка, он же шаг ленты
+
+// Ширину окошка меряем, а не назначаем: у эмодзи она на разных системах
+// разная, и заданная на глаз либо срежет смайлик, либо оставит дыру.
+function safeCell(){
+  const big = $('safeBig'); if(!big || !SAFE) return 44;
+  const p = document.createElement('span');
+  p.style.cssText = 'position:absolute;visibility:hidden;white-space:nowrap;line-height:1';
+  p.innerHTML = SAFE.map(e =>
+    '<i style="font-style:normal;display:inline-block">' + e + '</i>').join('');
+  big.appendChild(p);
+  // Только offsetWidth: ряд смайликов в свёрнутой карточке уменьшен, и
+  // getBoundingClientRect отдал бы ширину уже ужатой — окошко вышло бы втрое
+  // уже смайлика и срезало бы его.
+  let w = 0;
+  for(const i of p.children) w = Math.max(w, i.offsetWidth);
+  p.remove();
+  return w ? Math.ceil(w) + 2 : 44;
+}
+
+function safeSpin(){
+  const big = $('safeBig'); if(!big || !SAFE) return;
+  const чужой = () => СМАЙЛЫ[(Math.random() * СМАЙЛЫ.length) | 0];
+  big.style.setProperty('--cs-cell', safeCell() + 'px');
+  big.innerHTML = SAFE.map(e => {
+    let л = '';
+    for(let k = 0; k < SAFE_ЛЕНТА; k++) л += '<b>' + чужой() + '</b>';
+    return '<span class="cs-sl"><i class="cs-sl-in">' + л +
+           '<b>' + e + '</b><b>' + чужой() + '</b></i></span>';
+  }).join('');
+
+  const путь = SAFE_ЛЕНТА * SAFE_ЯЧЕЙКА;
+  const ленты = big.querySelectorAll('.cs-sl-in');
+  // Просили меньше движения — значит меньше движения: ставим сразу на место.
+  const тихо = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+  ленты.forEach((л, i) => {
+    л.style.transform = 'translateY(-' + путь + 'px)';   // покой — на своём смайлике
+    if(тихо) return;
+    const мс = 640 + i * 120;                            // останавливаются по очереди
+    try{
+      л.animate([
+        {transform: 'translateY(0)', easing: 'cubic-bezier(.2,.5,.3,1)'},
+        {transform: 'translateY(-' + (путь + 9) + 'px)', offset: .86,
+         easing: 'cubic-bezier(.4,0,.2,1)'},
+        {transform: 'translateY(-' + путь + 'px)'}
+      ], {duration: мс});
+      л.parentNode.animate([
+        {filter: 'blur(0px)'}, {filter: 'blur(3.6px)', offset: .12},
+        {filter: 'blur(2.8px)', offset: .58}, {filter: 'blur(0px)', offset: .9},
+        {filter: 'blur(0px)'}
+      ], {duration: мс});
+    }catch(e){}
+  });
+  if(тихо) return;
+  big.classList.add('spin');
+  clearTimeout(safeSpin._t);
+  safeSpin._t = setTimeout(() => big.classList.remove('spin'),
+                           640 + (ленты.length - 1) * 120 + 80);
+}
+
+// Две меры карточка не может взять из CSS: ширина плашки зависит от того,
+// какие смайлики выпали, а высота развёрнутой — от того, на сколько строк лёг
+// текст с именем. Берём их один раз, когда смайлики и имя уже на месте. Мерить
+// в движении нельзя: это и есть тот пересчёт раскладки в каждом кадре, от
+// которого карточку рвёт.
+function safeMeasure(){
+  const b = $('safeC'); if(!b) return;
+  const big = $('safeBig'), txt = b.querySelector('.cs-safe-txt');
+  if(!big || !txt || !big.offsetWidth) return;
+  // offsetWidth — ширина до уменьшения, потому и годится: плашка это тот же
+  // ряд смайликов, ужатый до 0.4, плюс поля по краям.
+  b.style.setProperty('--cs-pill-w', Math.round(big.offsetWidth * .4 + 24) + 'px');
+  // 20 сверху + 52 ряд смайликов + 15 отступ + текст + 21 снизу.
+  b.style.setProperty('--cs-card-h', (20 + 52 + 15 + txt.offsetHeight + 21) + 'px');
+}
+
+// Разворот и сворачивание — одной карточкой, и всё движение ведёт CSS.
+function safeToggle(открыть){
+  const b = $('safeC'); if(!b || !b.classList.contains('on')) return;
+  const надо = (открыть === undefined) ? !b.classList.contains('open') : !!открыть;
+  if(надо === b.classList.contains('open')) return;
+  safeMeasure();          // на случай, если при отрисовке мерить было нечего
+  b.classList.toggle('open', надо);
+  document.body.classList.toggle('safe-open', надо);
+  $('safeScrim').classList.toggle('on', надо);
+  try{ navigator.vibrate && navigator.vibrate(8); }catch(e){}
+}
 
 // ── звуки ─────────────────────────────────────────────────────────────────
 // Свои, а не файлами: два тона решают задачу, а файл надо грузить и он

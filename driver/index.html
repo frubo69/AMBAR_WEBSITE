@@ -1901,6 +1901,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .exp-hd{display:flex;align-items:center;gap:9px;margin-bottom:10px;color:var(--gold2)}
 .exp-t{font-size:14px;font-weight:700;color:var(--text)}
 .exp-sum{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--muted)}
+.exp-sum.plus{color:var(--up)}
 
 .exp-row{display:flex;gap:7px}
 .exp-row input{min-width:0;padding:12px;border-radius:11px;border:1px solid var(--border2);
@@ -1982,41 +1983,6 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
   font-weight:600;color:var(--sub);background:none;border:1px dashed var(--border3)}
 .exp-add:active{transform:scale(.98)}
 
-/* Разовые расходы — тот же список, что у старшего, и в том же порядке.
-   Пока у водителя было одно поле «другой расход», всё, что не бензин и не
-   мойка, уезжало к старшему безымянной строчкой: он видел сумму и слова, а
-   вид угадывал. Здесь у каждого вида своя строка и своё место в ленте.
-
-   Поля открыты сразу. Панель, которую надо сначала вытащить, добавляет шаг
-   там, где человек уже знает, что хочет записать. */
-.exp-list{display:flex;flex-direction:column;gap:0}
-.exp-lr{display:flex;align-items:center;gap:6px;padding:9px 0}
-.exp-lr + .exp-lr{border-top:1px solid rgba(255,255,255,.05)}
-.exp-lt{flex:0 0 88px;min-width:0;font-size:12px;font-weight:600;line-height:1.15;
-  color:var(--text)}
-.exp-lt i{display:block;font-style:normal;font-size:8.5px;font-weight:700;
-  letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-top:2px}
-.exp-lr.plus .exp-lt{color:var(--up)}
-.exp-lr input{min-width:0;padding:9px;border-radius:9px;border:1px solid var(--border2);
-  background:var(--bg3);color:var(--text);font-family:inherit;font-size:13px;outline:none}
-.exp-lr input:focus{border-color:rgba(201,169,110,.5)}
-.exp-lr .amt{flex:0 0 64px;width:64px;text-align:center;font-weight:700}
-.exp-lr .cmt{flex:1}
-/* Чек и «записать» — одного роста с полями, чтобы строка читалась одной
-   линией, а не лесенкой. */
-.exp-lr .shot{flex:0 0 auto;padding:0 10px;height:34px;border-radius:9px;cursor:pointer;
-  border:1px solid var(--border2);background:var(--card2);color:var(--muted);
-  font-family:inherit;font-size:10.5px;font-weight:700}
-.exp-lr .shot.on{color:var(--up);background:rgba(76,175,125,.12);
-  border-color:rgba(76,175,125,.4)}
-.exp-lr .ok{flex:0 0 auto;width:34px;height:34px;border:none;border-radius:9px;
-  cursor:pointer;background:var(--card3);color:var(--muted);font-weight:800;font-size:15px;
-  line-height:1;transition:background .16s var(--e1),color .16s var(--e1)}
-/* Кнопка загорается сама, когда в строке появилась сумма: отдельного сигнала
-   «теперь можно» не нужно, он и есть цифра в поле. */
-.exp-lr:has(.amt:not(:placeholder-shown)) .ok{
-  background:linear-gradient(135deg,var(--gold2),var(--gold));color:#1a1408}
-.exp-lr .ok:active{transform:scale(.9)}
 
 /* Экран приёма заказа.
    Порядок строк — порядок работы курьера: куда ехать, что везти, сколько взять,
@@ -2824,6 +2790,15 @@ const ICO = {
   close:'<path d="M6 6l12 12M18 6L6 18"/>',
   chat: '<path d="M20 14a2 2 0 0 1-2 2H8l-4 3.5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/>',
   chev: '<path d="M6 9l6 6 6-6"/>',
+  // Значки доп. расходов. Стрелка говорит направление денег, слово под ней —
+  // отдали уже или только должны: рисовать четыре разных значка ради оттенка,
+  // который и так написан буквами, значит сделать их неразличимыми.
+  park: '<rect x="3" y="3" width="18" height="18" rx="5"/><path d="M9.5 17V7h3a3 3 0 0 1 0 6h-3"/>',
+  gift: '<path d="M20 12v9H4v-9"/><path d="M2 7.5h20V12H2z"/><path d="M12 21V7.5"/>'
+      + '<path d="M12 7.5H8a2.5 2.5 0 0 1 0-5c3 0 4 5 4 5z"/><path d="M12 7.5h4a2.5 2.5 0 0 0 0-5c-3 0-4 5-4 5z"/>',
+  guard:'<path d="M12 21.5s7.5-3.8 7.5-9.5V5.2L12 2.5 4.5 5.2V12c0 5.7 7.5 9.5 7.5 9.5z"/>',
+  out:  '<path d="M7 17 17 7"/><path d="M9 7h8v8"/>',
+  into: '<path d="M17 7 7 17"/><path d="M15 17H7V9"/>',
   meal: '<path d="M7 3v5.4a2.3 2.3 0 0 0 4.6 0V3"/><path d="M9.3 8.7V21"/><path d="M17.6 3c-1.7 1.5-2.5 3.4-2.5 5.5 0 1.7.8 2.7 2.5 2.9V21"/>',
 };
 const svg = (d, w=19) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none"
@@ -4461,41 +4436,71 @@ function expTyped(kind){
   btn.textContent = has ? 'Отправить' : (sent ? 'Отправить' : 'не было');
 }
 
-// Разовые расходы — весь список видов, кроме бензина и мойки: те спрашивают
-// каждый день, и у них свои карточки выше. Подсказки в полях разные не для
-// красоты: «кому вернули» и «за что» — разные вопросы, и водитель отвечает на
-// тот, который ему задали.
+// Доп. расходы — весь список видов, кроме бензина и мойки: те спрашивают
+// каждый день, и у них свои карточки выше.
+//
+// Каждый вид — такая же карточка, как бензин и мойка, а не строка в общей
+// таблице. Одним окном со списком они читались как настройки, а не как то же
+// самое действие: вписать сумму и отправить. Разворачиваются все вместе по
+// «Ещё расход» и так же сворачиваются.
+//
+// Подсказки в поле разные не для красоты: «кому вернули» и «за что» — разные
+// вопросы, и водитель отвечает на тот, который ему задали. Там, где спрашивают
+// про человека, без ответа не отправляем: сумма без имени через неделю
+// неотличима от опечатки.
 const EXP_HINT = {
   we_gave: 'кому вернули', we_got: 'кто вернул',
   we_owe:  'кому должны',  owed_us: 'кто должен'};
+const EXP_KIND_ICO = {
+  parking: 'park', kfc: 'gift', guard: 'guard',
+  we_gave: 'out',  we_owe: 'out', we_got: 'into', owed_us: 'into'};
 
-function expKindList(){
+function expKindCards(){
   const виды = ((EXP || {}).kinds || []).filter(k => k.id !== 'fuel' && k.id !== 'wash');
-  if(!виды.length) return '<div class="exp-none" style="padding:6px 2px">Загрузка…</div>';
-  return `<div class="exp-list">${виды.map(k => {
-    const снят = EXP_SHOT.kind === k.id && !!EXP_SHOT.photo;
-    return `<div class="exp-lr${k.plus ? ' plus' : ''}">
-      <span class="exp-lt">${esc(k.t)}${
-        k.receipt ? '<i>нужен чек</i>' : (k.plus ? '<i>плюсом</i>' : '')}</span>
-      <input class="amt" id="k_${k.id}" type="text" inputmode="numeric" placeholder="AED"
-             autocomplete="off"
-             onkeydown="if(event.key==='Enter')expSendKind('${k.id}')">
-      <input class="cmt" id="kc_${k.id}" type="text" autocomplete="off"
-             placeholder="${esc(EXP_HINT[k.id] || 'за что')}"
-             onkeydown="if(event.key==='Enter')expSendKind('${k.id}')">
-      ${k.receipt ? `<button class="shot${снят ? ' on' : ''}" id="kshot-${k.id}"
-             onclick="expShotFor('${k.id}')">${снят ? 'есть' : 'чек'}</button>` : ''}
-      <button class="ok" onclick="expSendKind('${k.id}')"
-              aria-label="Записать ${esc(k.t)}">✓</button>
+  if(!виды.length) return '<div class="card exp-card"><div class="exp-none">Загрузка…</div></div>';
+  return виды.map(k => {
+    const ico = ICO[EXP_KIND_ICO[k.id]] || ICO.note;
+    return `<div class="card exp-card">
+      <div class="exp-hd">${svg(ico, 17)}<span class="exp-t">${esc(k.t)}</span>
+        ${k.plus ? '<span class="exp-sum plus">приходом</span>' : ''}</div>
+      <div class="exp-row">
+        <div class="exp-field">
+          <input class="amt" id="k_${k.id}" type="text" inputmode="numeric" placeholder="AED"
+            autocomplete="off" oninput="expKindTyped('${k.id}')">
+        </div>
+        <button class="btn btn-gh exp-go" id="kb_${k.id}" disabled
+          onclick="expSendKind('${k.id}')">Отправить</button>
+      </div>
+      <div class="exp-row exp-row-c">
+        <div class="exp-field cmt"><input id="kc_${k.id}" type="text"
+          placeholder="${esc(EXP_HINT[k.id] || 'за что')}" autocomplete="off"
+          oninput="expKindTyped('${k.id}')"></div>
+      </div>
+      ${expRcp(k.id, null)}
     </div>`;
-  }).join('')}</div>`;
+  }).join('');
 }
 
-// Что уже набрано в соседних строках. Отправка одной перерисовывает список, и
+// Кнопка загорается сама, когда в карточке есть всё нужное: отдельной подсказки
+// «теперь можно» не нужно, ей и служит цифра в поле.
+function expKindTyped(kind){
+  const a = document.getElementById('k_' + kind);
+  const c = document.getElementById('kc_' + kind);
+  const b = document.getElementById('kb_' + kind);
+  if(!a || !b) return;
+  const есть = !!String(a.value || '').replace(/\D/g, '')
+             && (!EXP_HINT[kind] || !!String((c || {}).value || '').trim());
+  b.disabled = !есть;
+  b.classList.toggle('btn-pri', есть);
+  b.classList.toggle('btn-gh', !есть);
+}
+
+// Что уже набрано в соседних карточках. Отправка одной перерисовывает экран, и
 // без этого наполовину заполненная соседняя обнулялась бы вместе с ней.
 function _expKindTyped(){
   const o = {};
-  document.querySelectorAll('.exp-list input').forEach(i => { if(i.value) o[i.id] = i.value; });
+  document.querySelectorAll('input[id^="k_"],input[id^="kc_"]')
+    .forEach(i => { if(i.value) o[i.id] = i.value; });
   return o;
 }
 function _expKindBack(o, кроме){
@@ -4503,6 +4508,8 @@ function _expKindBack(o, кроме){
     if(кроме && (id === 'k_' + кроме || id === 'kc_' + кроме)) return;
     const e = document.getElementById(id); if(e) e.value = o[id];
   });
+  Object.keys(EXP_HINT).concat(Object.keys(EXP_KIND_ICO))
+    .filter((v, i, a) => a.indexOf(v) === i).forEach(expKindTyped);
 }
 
 async function expSendKind(kind){
@@ -4510,8 +4517,12 @@ async function expSendKind(kind){
   const c = document.getElementById('kc_' + kind);
   const amount = parseInt(String((a || {}).value || '').replace(/\D/g, ''), 10);
   const comment = String((c || {}).value || '').trim();
-  if(!amount)  return toast('Впишите сумму', 'err');
-  if(!comment) return toast('Впишите, за что', 'err');
+  if(!amount) return toast('Впишите сумму', 'err');
+  // Слова обязательны там, где вопрос про человека: «Мы должны 200» без имени
+  // через неделю неотличимо от опечатки. Про парковку и охрану достаточно
+  // названия вида — его сервер и подставит.
+  if(EXP_HINT[kind] && !comment) return toast(EXP_HINT[kind][0].toUpperCase()
+      + EXP_HINT[kind].slice(1) + '?', 'err');
   const свой = EXP_SHOT.kind === kind && EXP_SHOT.photo ? EXP_SHOT : null;
   if(EXP_RECEIPT.includes(kind) && !свой) return toast('Сначала снимите чек', 'err');
   const набрано = _expKindTyped();
@@ -4707,12 +4718,11 @@ function renderExpenses(){
 
     ${other.map(otherBox).join('')}
 
-    ${EXP_MORE ? `<div class="card exp-card">
-        <div class="exp-hd">${svg(ICO.plus2, 17)}<span class="exp-t">Доп. расходы</span>
-          <button class="exp-x" onclick="EXP_MORE=false;render()"
-            aria-label="Закрыть">${svg(ICO.close, 14)}</button></div>
-        ${expKindList()}
-      </div>`
+    ${EXP_MORE ? `
+        <div class="sect"><span class="sect-t">Доп. расходы</span>
+          <button class="sect-i" onclick="EXP_MORE=false;render()"
+            aria-label="Свернуть">${svg(ICO.close, 14)}</button></div>
+        ${expKindCards()}`
       : `<button class="exp-add" onclick="EXP_MORE=true;render()">
           ${svg(ICO.plus2, 15)} Ещё расход</button>`}
 

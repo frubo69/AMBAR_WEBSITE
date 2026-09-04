@@ -4586,7 +4586,7 @@ async function guardCode(code){
   if(GUARD_BUSY) return;
   GUARD_BUSY = true;
   try{
-    const r = await drvApi.drvFetch('/api/driver/bottle/' + encodeURIComponent(code));
+    const r = await drvApi.drvFetch('/api/driver/bottle', {params: {code}});
     if(!r.ok){
       _botSay(r.say || 'не наша бутылка', 'err');
       try{ tg.HapticFeedback.notificationOccurred('error'); }catch(e){}

@@ -1264,12 +1264,17 @@ async def _guard_bottle(code) -> tuple[dict | None, str]:
 
 @require_driver
 async def handle_bottle_look(request):
-    """GET /api/driver/bottle/{code} — что за бутылка под этим кодом.
+    """GET /api/driver/bottle?code=… — что за бутылка под этим кодом.
 
     Отдельным запросом на скане, а не проверкой при отправке: узнать «эта уже
     продана» надо у камеры, пока бутылка в руке и её можно вернуть на полку,
-    а не через минуту после того, как её отдали."""
-    б, беда = await _guard_bottle(request.match_info.get("code"))
+    а не через минуту после того, как её отдали.
+
+    Код едет параметром, а не куском адреса. Коды мы не печатаем — берём те,
+    что уже стоят на бутылках, а там попадаются ссылки: в реестре лежит,
+    например, «http://en.m.wikipedia.org». В адресе такой код рвётся на части,
+    и запрос уходит в никуда вместо честного «не наша бутылка»."""
+    б, беда = await _guard_bottle(request.query.get("code"))
     if беда:
         return web.json_response({"ok": False, "verdict": беда,
                                   "say": GUARD_SAY.get(беда, "не наша бутылка")},
@@ -1653,7 +1658,7 @@ def setup(app):
         ("/api/driver/catalog",                 handle_catalog,     "GET"),
         ("/api/driver/expenses",                handle_expenses,    "GET"),
         ("/api/driver/expenses",                handle_expense_add, "POST"),
-        ("/api/driver/bottle/{code}",           handle_bottle_look, "GET"),
+        ("/api/driver/bottle",                  handle_bottle_look, "GET"),
         ("/api/driver/supply",                  handle_supply_list, "GET"),
         ("/api/driver/writeoff",                handle_writeoff_add, "POST"),
         ("/api/driver/writeoffs",               handle_writeoffs,   "GET"),

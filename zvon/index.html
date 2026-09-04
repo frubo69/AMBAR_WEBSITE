@@ -126,6 +126,42 @@ button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
 .rb .x{opacity:0}
 .rb.on .x{opacity:1}
 
+/* ── фонарик ───────────────────────────────────────────────────────────────
+   У задней камеры это настоящая вспышка, у передней её нет вовсе — там светим
+   экраном. Поэтому у экранного света восемь ступеней яркости, а у вспышки их
+   нет: браузер умеет с ней только «гореть» и «не гореть», и притворяться тут
+   нечем. */
+.lampbox{position:relative;display:none}
+.lampbox.on{display:block}
+.rb.lamp{transition:box-shadow .3s var(--cs-ease,cubic-bezier(.32,.72,0,1)),
+  color .16s ease .09s,transform .2s cubic-bezier(.32,.72,0,1);
+  touch-action:none;user-select:none;-webkit-user-select:none}
+.rb.lamp.on{color:#0d0d12;background:rgba(255,255,255,.14);
+  box-shadow:inset 0 0 0 .5px rgba(255,255,255,.5),0 10px 24px rgba(0,0,0,.32),
+             inset 0 0 0 32px #fff}
+.rb.lamp .ray{opacity:0;transition:opacity .12s ease}
+.rb.lamp.on .ray{opacity:1}
+/* Линейка яркости висит над фонариком и места в строке не занимает. Снизу
+   вверх — от тусклого к яркому, как и само движение пальца. */
+.dial{position:absolute;left:50%;margin-left:-13px;bottom:100%;margin-bottom:12px;
+  display:flex;flex-direction:column-reverse;align-items:flex-start;gap:9px;
+  pointer-events:none;opacity:0;transition:opacity .18s ease}
+.dial.on{opacity:1}
+.dial i{display:block;height:2px;width:11px;border-radius:2px;
+  background:rgba(255,255,255,.45);
+  transition:width .16s cubic-bezier(.32,.72,0,1),background .16s ease}
+.dial i.near{width:17px;background:rgba(255,255,255,.7)}
+.dial i.now{width:27px;background:#fff;box-shadow:0 0 10px rgba(255,244,226,.85)}
+/* Свет экраном. Одной внутренней тенью, а не четырьмя градиентами: градиенты
+   по углам складывались друг с другом и давали грязные пятна, а тень идёт по
+   периметру непрерывно — ровным кольцом и без стыков. */
+.glow{position:absolute;inset:0;z-index:2;pointer-events:none;opacity:0;
+  --w:38px; --b:70px; --a:.54;
+  box-shadow:inset 0 0 var(--b) var(--w) #fff4e2,
+             inset 0 0 96px 0 rgba(255,244,226,var(--a));
+  transition:opacity .3s ease,box-shadow .16s ease}
+#call.lamp .glow{opacity:1}
+
 /* ── четыре смайлика: проверка от посредника ───────────────────────────────
    Плашка и карточка — одна коробка. Двигается только она; смайлики и текст
    едут трансформацией, то есть на видеокарте. Размеры обоих состояний заданы
@@ -152,7 +188,7 @@ button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
 /* Смайлики всегда крупные: растрируются один раз, плашке достаются
    уменьшенными. Уменьшение делает видеокарта, и оно выходит чётким. */
 .cs-safe-big{position:absolute;left:50%;top:0;
-  display:flex;align-items:center;gap:14px;height:52px;
+  display:flex;align-items:center;gap:14px;height:60px;
   font-size:42px;line-height:1;white-space:nowrap;
   transform-origin:50% 0;transform:translate(-50%,6px) scale(.4);
   transition:transform .42s var(--cs-ease)}
@@ -163,16 +199,22 @@ button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
    было чему выглянуть снизу. Лента едет трансформацией, размытие висит на
    окошке отдельной дорожкой: смешать их значило бы утащить всю прокрутку с
    видеокарты на процессор. */
-.cs-sl{display:block;width:var(--cs-cell,44px);height:52px;overflow:hidden}
-.cs-sl-in{display:block}
+/* Рост окошка с запасом: коробка смайлика 42, но рисунок выходит за неё —
+   рог и уши торчат. Ровно по коробке они срезались бы. */
+.cs-sl{display:block;width:var(--cs-cell,44px);height:60px;overflow:hidden}
+/* Лента лежит в теге <i>, а он курсивный. Своего курсива у эмодзи нет, и
+   браузер подделывает его наклоном — смайлики стояли косо во всех четырёх
+   приложениях сразу. Отменяем прямо здесь, а не меняем тег: на нём висят
+   анимации, и трогать его ради этого дороже одной строки. */
+.cs-sl-in{display:block;font-style:normal}
 .cs-sl-in b{display:flex;align-items:center;justify-content:center;
-  height:52px;font-weight:400}
+  height:60px;font-weight:400}
 /* Края окошка тают, только пока крутится: в покое они срезали бы смайлик. */
 .cs-safe-big.spin .cs-sl{
   -webkit-mask-image:linear-gradient(to bottom,transparent,#000 26%,#000 74%,transparent);
   mask-image:linear-gradient(to bottom,transparent,#000 26%,#000 74%,transparent)}
 
-.cs-safe-txt{position:absolute;top:87px;left:50%;
+.cs-safe-txt{position:absolute;top:95px;left:50%;
   width:min(276px,calc(100vw - 92px));
   opacity:0;transform:translate(-50%,10px);pointer-events:none;
   transition:opacity .16s ease,transform .42s var(--cs-ease)}
@@ -260,6 +302,8 @@ body.safe-open .top .n,body.safe-open .top .t{opacity:0;transition:opacity .2s e
     <div class="face" id="farFace">?</div>
   </div>
   <video id="near" playsinline autoplay muted></video>
+  <!-- Свет экраном для фронтальной камеры: настоящей вспышки у неё нет. -->
+  <div class="glow"></div>
 
   <div class="top"><div class="n" id="topN">—</div><div class="t" id="topT">соединяем…</div></div>
 
@@ -283,6 +327,14 @@ body.safe-open .top .n,body.safe-open .top .t{opacity:0;transition:opacity .2s e
     <button class="rb" id="bFlip" onclick="flipCam()" aria-label="Другая камера" style="display:none">
       <svg viewBox="0 0 24 24"><path d="M3 8h13a4 4 0 0 1 4 4v1"/><path d="M6 5L3 8l3 3"/>
         <path d="M21 16H8a4 4 0 0 1-4-4v-1"/><path d="M18 19l3-3-3-3"/></svg></button>
+    <div class="lampbox" id="lampBox">
+      <button class="rb lamp" id="bLamp" aria-label="Фонарик">
+        <svg viewBox="0 0 24 24"><path d="M8.2 2.6h7.6v3.1a2 2 0 0 1-.36 1.15l-.84 1.2v12.35a1 1 0 0 1-1 1h-3.2a1 1 0 0 1-1-1V8.05l-.84-1.2A2 2 0 0 1 8.2 5.7z"/>
+          <path d="M10.4 12.4h3.2"/>
+          <path class="ray" d="M5.1 5.4L3.2 4.3M18.9 5.4l1.9-1.1M4.3 9.6H2.1M19.7 9.6h2.2"/></svg>
+      </button>
+      <div class="dial" id="dial" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></div>
+    </div>
     <button class="rb drop" onclick="hangup()" aria-label="Завершить">
       <svg viewBox="0 0 24 24" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
@@ -543,6 +595,7 @@ function stop(){
   SAFE = null; safePaint();
   $('bMic').classList.remove('on'); $('bCam').classList.remove('on');
   $('bFlip').style.display = 'none';
+  LAMP = false; LAMP_LVL = 1; lampPaint();
   farCam(false);
   ST = 'idle';
 }
@@ -569,6 +622,7 @@ async function toggleCam(){
   $('near').classList.toggle('back', FACING !== 'user');
   $('bCam').classList.add('on');
   $('bFlip').style.display = '';
+  lampPaint();
   const s = PC && PC.getSenders().find(x => x.track && x.track.kind === 'video');
   if(s){ s.replaceTrack(track); }
   else if(PC){
@@ -588,6 +642,9 @@ function camOff(){
   if(s) try{ s.replaceTrack(null); }catch(e){}
   $('near').classList.remove('on'); $('near').srcObject = null;
   $('bCam').classList.remove('on'); $('bFlip').style.display = 'none';
+  // Свет гаснет вместе с камерой: гореть ему больше не на чем, а экранный без
+  // камеры светит в пустоту.
+  LAMP = false; lampPaint();
   send({t:'camstate', on:false});
 }
 
@@ -605,6 +662,155 @@ async function flipCam(){
   $('near').classList.toggle('back', FACING !== 'user');
   const s = PC && PC.getSenders().find(x => x.track && x.track.kind === 'video');
   if(s) s.replaceTrack(track);
+  // Свет остался на прежней дорожке: у задней это вспышка, у передней экран, и
+  // при повороте одно должно смениться другим, а не погаснуть молча.
+  if(LAMP && FACING === 'environment' && !torchOk()){ LAMP = false; toast('На этой камере вспышки нет'); }
+  else if(LAMP && FACING === 'environment') torch(true).catch(() => { LAMP = false; lampPaint(); });
+  lampPaint();
+}
+
+// ── фонарик ───────────────────────────────────────────────────────────────
+//
+// Сзади — настоящая вспышка, спереди её нет: там светим экраном. Спрашиваем не
+// список версий, а саму дорожку: айфон пускает к вспышке из веба с iOS 17.4, но
+// верить на слово нельзя, в разных обёртках бывает по-разному.
+function torchOk(){
+  try{
+    const t = CAM && CAM.getVideoTracks()[0];
+    if(!t || !t.getCapabilities) return false;
+    const c = t.getCapabilities();
+    return !!(c && c.torch);
+  }catch(e){ return false; }
+}
+function torch(on){
+  const t = CAM && CAM.getVideoTracks()[0];
+  if(!t || !t.applyConstraints) return Promise.reject(new Error('нет дорожки'));
+  // Гасить можно всегда: погасить то, чего нет, — не ошибка.
+  if(on && !torchOk()) return Promise.reject(new Error('нет вспышки'));
+  return t.applyConstraints({advanced:[{torch: !!on}]}).then(() => !!on);
+}
+
+// Яркость экранного света — восемь ступеней. Первая та самая узкая полоса,
+// дальше кольцо шире и плотнее. У задней камеры ступеней нет.
+const LAMP_W = [38, 48, 59, 70, 82, 95, 109, 124];     // плотная часть, px
+const LAMP_B = [70, 82, 94, 106, 120, 134, 148, 164];  // затухание, px
+const LAMP_A = [.50, .55, .60, .65, .70, .75, .80, .85];
+let LAMP = false, LAMP_LVL = 1;
+const _vib = n => { try{ navigator.vibrate && navigator.vibrate(n); }catch(e){} };
+
+function lampGlowSet(){
+  const g = document.querySelector('.glow'); if(!g) return;
+  const i = Math.max(0, Math.min(LAMP_W.length - 1, LAMP_LVL - 1));
+  g.style.setProperty('--w', LAMP_W[i] + 'px');
+  g.style.setProperty('--b', LAMP_B[i] + 'px');
+  g.style.setProperty('--a', LAMP_A[i]);
+}
+function lampDialPaint(){
+  const d = $('dial'); if(!d) return;
+  [...d.children].forEach((штрих, k) => {
+    const далеко = Math.abs(k + 1 - LAMP_LVL);
+    штрих.className = далеко === 0 ? 'now' : далеко === 1 ? 'near' : '';
+  });
+}
+function lampDial(показать){
+  const d = $('dial'); if(!d) return;
+  d.classList.toggle('on', !!показать);
+  if(!показать) return;
+  lampDialPaint();
+  // Штрихи выезжают из-под кнопки друг за другом: линейка не возникает
+  // целиком, а разворачивается — так видно, откуда она взялась.
+  [...d.children].forEach((штрих, k) => {
+    try{
+      штрих.animate([{transform:'translateX(-14px)', opacity:0},
+                     {transform:'none', opacity:1}],
+                    {duration:240, delay:k*22, fill:'backwards',
+                     easing:'cubic-bezier(.32,.72,0,1)'});
+    }catch(e){}
+  });
+}
+function lampLevel(n){
+  const было = LAMP_LVL;
+  LAMP_LVL = Math.max(1, Math.min(LAMP_W.length, n));
+  if(LAMP_LVL === было) return;
+  _vib(6);                       // щелчок на каждой ступени
+  lampGlowSet(); lampDialPaint();
+}
+function lampPaint(){
+  lampDrag(); lampGlowSet();
+  const сзади = FACING === 'environment';
+  // Экраном светим только вперёд: назад он не светит никуда.
+  $('call').classList.toggle('lamp', LAMP && !сзади);
+  $('bLamp').classList.toggle('on', LAMP);
+  $('lampBox').classList.toggle('on', !!CAM);
+}
+function callLamp(){
+  const сзади = FACING === 'environment';
+  if(!LAMP && сзади && !torchOk()){
+    // Не притворяемся: вспышки тут нет, и сказать об этом честнее, чем
+    // включить экранный свет, который назад всё равно не светит.
+    toast('На этой камере вспышки нет'); return;
+  }
+  _vib(10);
+  LAMP = !LAMP;
+  lampPaint();
+  if(сзади) torch(LAMP).catch(() => { LAMP = false; lampPaint(); });
+}
+
+// Тянем по кнопке фонарика: вверх — ярче, вниз — тусклее. Короткое нажатие без
+// движения остаётся обычным включением.
+function lampDrag(){
+  const кн = $('bLamp'); if(!кн || кн._тянем) return;
+  кн._тянем = true;
+  let y0 = null, было = 1, поехали = false;
+  const сзади = () => FACING === 'environment';
+  const начало = y => {
+    кн._ptr = true; y0 = y; было = LAMP_LVL; поехали = false;
+    // У вспышки яркости нет — значит нет и линейки. Но само нажатие обязано
+    // дойти, иначе кнопка на задней камере не делает вообще ничего.
+    if(!сзади()) lampDial(true);
+  };
+  const ход = y => {
+    if(y0 === null || сзади()) return;
+    const d = y0 - y;
+    if(!поехали){
+      if(Math.abs(d) < 8) return;          // это ещё нажатие, а не движение
+      поехали = true;
+      if(!LAMP){ LAMP = true; lampPaint(); }
+      lampDial(true);
+    }
+    lampLevel(было + Math.round(d / 22));
+  };
+  const конец = () => {
+    if(y0 === null) return;
+    const тянули = поехали;
+    y0 = null; поехали = false;
+    lampDial(false);
+    if(!тянули) callLamp();                // нажали, а не потянули
+  };
+  if('ontouchstart' in window){
+    кн.addEventListener('touchstart', e => начало(e.touches[0].clientY), {passive:true});
+    кн.addEventListener('touchmove', e => {
+      if(y0 !== null) e.preventDefault();
+      ход(e.touches[0].clientY);
+    }, {passive:false});
+    кн.addEventListener('touchend', конец);
+    кн.addEventListener('touchcancel', конец);
+  }else{
+    кн.addEventListener('pointerdown', e => {
+      начало(e.clientY);
+      try{ кн.setPointerCapture(e.pointerId); }catch(x){}
+    });
+    кн.addEventListener('pointermove', e => ход(e.clientY));
+    кн.addEventListener('pointerup', конец);
+    кн.addEventListener('pointercancel', конец);
+  }
+  // Колесо — для проверки на настольном браузере, на телефоне его нет.
+  кн.addEventListener('wheel', e => {
+    if(!LAMP || сзади()) return;
+    lampLevel(LAMP_LVL + (e.deltaY < 0 ? 1 : -1));
+  }, {passive:true});
+  // Если указателей в браузере нет вовсе, кнопка обязана работать по-старому.
+  кн.addEventListener('click', () => { if(!кн._ptr) callLamp(); });
 }
 
 // Чужая камера. Полагаться на замолкание дорожки нельзя — событие приходит не
@@ -684,7 +890,7 @@ function safePaint(){
 // картинки, а тот же алфавит, из которого считается сверка, — проходит только
 // то, что действительно могло выпасть.
 const SAFE_ЛЕНТА = 14;        // сколько чужих смайликов пролетает мимо
-const SAFE_ЯЧЕЙКА = 52;       // рост окошка, он же шаг ленты
+const SAFE_ЯЧЕЙКА = 60;       // рост окошка, он же шаг ленты
 
 // Ширину окошка меряем, а не назначаем: у эмодзи она на разных системах
 // разная, и заданная на глаз либо срежет смайлик, либо оставит дыру.
@@ -756,8 +962,8 @@ function safeMeasure(){
   // offsetWidth — ширина до уменьшения, потому и годится: плашка это тот же
   // ряд смайликов, ужатый до 0.4, плюс поля по краям.
   b.style.setProperty('--cs-pill-w', Math.round(big.offsetWidth * .4 + 24) + 'px');
-  // 20 сверху + 52 ряд смайликов + 15 отступ + текст + 21 снизу.
-  b.style.setProperty('--cs-card-h', (20 + 52 + 15 + txt.offsetHeight + 21) + 'px');
+  // 20 сверху + 60 ряд смайликов + 15 отступ + текст + 21 снизу.
+  b.style.setProperty('--cs-card-h', (20 + 60 + 15 + txt.offsetHeight + 21) + 'px');
 }
 
 // Разворот и сворачивание — одной карточкой, и всё движение ведёт CSS.

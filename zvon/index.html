@@ -1,0 +1,619 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#08080f">
+<title>Звонок</title>
+<!--
+  Комната на двоих.
+
+  Открыл ссылку — видишь, на связи ли второй, и можешь позвонить. Никакой
+  регистрации: собеседник — это тот, кто открыл ту же ссылку. Голос и картинка
+  идут напрямую между двумя браузерами, сервер только перекладывает служебные
+  пакеты, пока связь поднимается.
+
+  Соединение поднимается по согласию, а не само при открытии ссылки: открывший
+  её ночью не должен от этого никому дозвониться.
+-->
+<style>
+:root{
+  --bg:#08080f; --bg2:#0e0e18; --card:#14141f; --line:#22222f;
+  --text:#f2f2f7; --sub:#a6a6bb; --muted:#6e6e85; --dim:#3c3c4e;
+  --up:#3ddc84; --dn:#ff5a5a; --gold:#c9a96e; --gold2:#e8c98a;
+  --e:cubic-bezier(.4,0,.2,1);
+  --safe-b:env(safe-area-inset-bottom,0px);
+  --safe-t:env(safe-area-inset-top,0px);
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%}
+body{background:var(--bg);color:var(--text);overflow:hidden;
+  font:15px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif}
+button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
+.wrap{height:100dvh;display:flex;flex-direction:column;
+  padding:calc(20px + var(--safe-t)) 18px calc(20px + var(--safe-b))}
+
+/* ── общий вид экранов ─────────────────────────────────────────────────── */
+.scr{display:none;flex:1;flex-direction:column}
+.scr.on{display:flex}
+.mid{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:18px;text-align:center}
+.h1{font-size:26px;font-weight:800;letter-spacing:-.5px}
+.p{font-size:14px;color:var(--sub);max-width:340px;line-height:1.5}
+.dim{color:var(--muted);font-size:12.5px}
+
+/* Круг с буквой — вместо картинки, пока камеры нет. */
+.face{width:104px;height:104px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:38px;font-weight:800;color:#1a1408;
+  background:linear-gradient(150deg,var(--gold2),var(--gold));
+  box-shadow:0 10px 40px rgba(201,169,110,.22)}
+.face.grey{background:var(--card);color:var(--muted);box-shadow:none;
+  border:1px solid var(--line)}
+/* Пульс вокруг лица — пока идёт вызов. */
+.face.ring{animation:facePulse 1.6s var(--e) infinite}
+@keyframes facePulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(201,169,110,.34)}
+  70%    {box-shadow:0 0 0 26px rgba(201,169,110,0)}
+}
+
+.btn{width:100%;max-width:340px;padding:17px 20px;border-radius:16px;font-size:15.5px;
+  font-weight:700;transition:transform .14s var(--e),opacity .14s var(--e)}
+.btn:active{transform:scale(.98)}
+.btn:disabled{opacity:.4;pointer-events:none}
+.btn-go{color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.btn-gh{color:var(--sub);background:var(--card);border:1px solid var(--line)}
+
+/* ── ссылка на комнату ─────────────────────────────────────────────────── */
+.link{width:100%;max-width:400px;display:flex;align-items:center;gap:10px;padding:13px 14px;
+  border-radius:14px;background:var(--card);border:1px solid var(--line)}
+.link input{flex:1;min-width:0;border:none;background:none;color:var(--sub);
+  font:13px/1.3 ui-monospace,SFMono-Regular,Menlo,monospace;outline:none;
+  text-overflow:ellipsis}
+.link button{flex:0 0 auto;padding:8px 13px;border-radius:10px;font-size:12.5px;
+  font-weight:700;color:var(--gold2);background:rgba(201,169,110,.12);
+  border:1px solid rgba(201,169,110,.3)}
+.link button:active{transform:scale(.95)}
+
+/* Кто в комнате. Точка слева — единственное, что тут меняется, и на неё смотрят. */
+.who{display:flex;align-items:center;gap:9px;padding:11px 14px;border-radius:13px;
+  background:var(--card);border:1px solid var(--line);font-size:13.5px}
+.dot{width:9px;height:9px;border-radius:50%;background:var(--dim);flex:0 0 auto;
+  transition:background .3s var(--e)}
+.dot.live{background:var(--up);box-shadow:0 0 0 4px rgba(61,220,132,.16)}
+
+/* ── имя ───────────────────────────────────────────────────────────────── */
+.nm{width:100%;max-width:340px;padding:14px;border-radius:14px;background:var(--card);
+  border:1px solid var(--line);color:var(--text);font:15px inherit;outline:none;
+  text-align:center}
+.nm:focus{border-color:rgba(201,169,110,.45)}
+
+/* ── экран разговора ───────────────────────────────────────────────────── */
+#call{position:fixed;inset:0;display:none;background:#000;z-index:20}
+#call.on{display:block}
+#far{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;background:#000}
+/* Пока картинки нет, вместо чёрного — лицо и имя: разговор идёт, и это должно
+   быть видно, а не додумываться по тишине. */
+.novid{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:16px;background:radial-gradient(120% 90% at 50% 30%,#161624,#08080f)}
+.novid.off{display:none}
+#near{position:absolute;right:14px;width:104px;height:150px;border-radius:16px;
+  object-fit:cover;background:#111;border:1px solid rgba(255,255,255,.14);
+  box-shadow:0 8px 30px rgba(0,0,0,.5);z-index:3;
+  top:calc(18px + var(--safe-t));transform:scaleX(-1);display:none}
+#near.on{display:block}
+#near.back{transform:none}          /* заднюю камеру не зеркалим: там читают вывески */
+
+.top{position:absolute;left:0;right:0;top:calc(14px + var(--safe-t));z-index:4;
+  display:flex;flex-direction:column;align-items:center;gap:4px;pointer-events:none;
+  text-shadow:0 2px 12px rgba(0,0,0,.6)}
+.top .n{font-size:17px;font-weight:700}
+.top .t{font-size:13px;color:#c9c9d8;font-variant-numeric:tabular-nums}
+
+.bar{position:absolute;left:0;right:0;bottom:calc(20px + var(--safe-b));z-index:4;
+  display:flex;align-items:center;justify-content:center;gap:14px}
+.rb{width:58px;height:58px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;color:#fff;background:rgba(255,255,255,.14);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  transition:transform .14s var(--e),background .18s var(--e)}
+.rb:active{transform:scale(.9)}
+/* Нажатая кнопка — светлая: так на телефоне показывают «выключено». */
+.rb.on{background:#fff;color:#111}
+.rb.drop{background:var(--dn)}
+.rb svg{width:24px;height:24px;fill:none;stroke:currentColor;stroke-width:1.9;
+  stroke-linecap:round;stroke-linejoin:round}
+.rb .x{opacity:0}
+.rb.on .x{opacity:1}
+
+/* ── смайлики ──────────────────────────────────────────────────────────── */
+.emo{position:absolute;left:0;right:0;bottom:calc(92px + var(--safe-b));z-index:5;
+  display:flex;justify-content:center;gap:8px;opacity:0;transform:translateY(10px);
+  pointer-events:none;transition:opacity .2s var(--e),transform .2s var(--e)}
+.emo.on{opacity:1;transform:none;pointer-events:auto}
+.emo button{width:46px;height:46px;border-radius:50%;font-size:23px;line-height:1;
+  background:rgba(255,255,255,.14);backdrop-filter:blur(14px);
+  -webkit-backdrop-filter:blur(14px)}
+.emo button:active{transform:scale(.86)}
+/* Улетающий смайлик. Своими руками, а не библиотекой: одна анимация. */
+.fly{position:absolute;bottom:calc(120px + var(--safe-b));z-index:6;font-size:34px;
+  pointer-events:none;animation:fly 2.4s ease-out forwards}
+@keyframes fly{
+  0%  {opacity:0;transform:translateY(0) scale(.6)}
+  12% {opacity:1;transform:translateY(-26px) scale(1.15)}
+  30% {transform:translateY(-90px) scale(1)}
+  100%{opacity:0;transform:translateY(-320px) scale(.9)}
+}
+
+/* ── входящий ──────────────────────────────────────────────────────────── */
+#in{position:fixed;inset:0;display:none;z-index:30;flex-direction:column;
+  align-items:center;justify-content:center;gap:22px;
+  padding:40px 24px calc(48px + var(--safe-b));
+  background:radial-gradient(120% 80% at 50% 25%,#1a1a2a,#08080f)}
+#in.on{display:flex}
+.acts{display:flex;gap:56px;margin-top:8px}
+.act{display:flex;flex-direction:column;align-items:center;gap:9px}
+.act .rb{width:70px;height:70px}
+.act span{font-size:12.5px;color:var(--sub)}
+.take{background:var(--up)!important;color:#06210f!important}
+
+.toast{position:fixed;left:50%;bottom:calc(26px + var(--safe-b));z-index:50;
+  transform:translate(-50%,12px);opacity:0;pointer-events:none;
+  padding:12px 18px;border-radius:13px;font-size:13.5px;font-weight:600;
+  background:rgba(20,20,31,.96);border:1px solid var(--line);
+  transition:opacity .22s var(--e),transform .22s var(--e)}
+.toast.on{opacity:1;transform:translate(-50%,0)}
+</style>
+
+<body>
+<div class="wrap">
+
+  <!-- ── ждём: ссылка и кто в комнате ───────────────────────────────── -->
+  <section class="scr on" id="scrRoom">
+    <div class="mid">
+      <div class="face grey" id="myFace">?</div>
+      <div>
+        <div class="h1" id="roomT">Комната готова</div>
+        <div class="p" id="roomS">Отправьте ссылку другу. Как только он её откроет,
+          здесь загорится зелёная точка — и можно звонить.</div>
+      </div>
+
+      <div class="link">
+        <input id="url" readonly>
+        <button onclick="copyLink()" id="copyB">Копировать</button>
+      </div>
+
+      <div class="who"><span class="dot" id="dot"></span>
+        <span id="whoT">Ждём второго</span></div>
+
+      <input class="nm" id="me" maxlength="24" placeholder="Ваше имя"
+             oninput="setName(this.value)">
+
+      <button class="btn btn-go" id="callB" onclick="ring()" disabled>Позвонить</button>
+      <div class="dim" id="hint">Микрофон спросят при звонке</div>
+    </div>
+  </section>
+
+  <!-- ── ссылки нет: сделать новую ──────────────────────────────────── -->
+  <section class="scr" id="scrNew">
+    <div class="mid">
+      <div class="face">З</div>
+      <div>
+        <div class="h1">Звонок по ссылке</div>
+        <div class="p">Создайте комнату и отправьте ссылку одному человеку.
+          Кто её откроет — тому и можно позвонить. Голос и видео идут напрямую
+          между вами.</div>
+      </div>
+      <button class="btn btn-go" onclick="newRoom()">Создать комнату</button>
+    </div>
+  </section>
+</div>
+
+<!-- ── разговор ─────────────────────────────────────────────────────── -->
+<div id="call">
+  <video id="far" playsinline autoplay></video>
+  <div class="novid" id="novid">
+    <div class="face" id="farFace">?</div>
+  </div>
+  <video id="near" playsinline autoplay muted></video>
+
+  <div class="top"><div class="n" id="topN">—</div><div class="t" id="topT">соединяем…</div></div>
+
+  <div class="emo" id="emoBar"></div>
+
+  <div class="bar">
+    <button class="rb" id="bMic" onclick="toggleMic()" aria-label="Микрофон">
+      <svg viewBox="0 0 24 24"><path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3z"/>
+        <path d="M19 11a7 7 0 0 1-14 0M12 18v3"/><path class="x" d="M4 4l16 16"/></svg></button>
+    <button class="rb" id="bCam" onclick="toggleCam()" aria-label="Камера">
+      <svg viewBox="0 0 24 24"><path d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/>
+        <path class="x" d="M2 2l20 20"/></svg></button>
+    <button class="rb" id="bFlip" onclick="flipCam()" aria-label="Другая камера" style="display:none">
+      <svg viewBox="0 0 24 24"><path d="M3 8h13a4 4 0 0 1 4 4v1"/><path d="M6 5L3 8l3 3"/>
+        <path d="M21 16H8a4 4 0 0 1-4-4v-1"/><path d="M18 19l3-3-3-3"/></svg></button>
+    <button class="rb" id="bEmo" onclick="toggleEmo()" aria-label="Смайлик">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/>
+        <path d="M9 9.5h.01M15 9.5h.01"/></svg></button>
+    <button class="rb drop" onclick="hangup()" aria-label="Завершить">
+      <svg viewBox="0 0 24 24" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+  </div>
+</div>
+
+<!-- ── входящий ─────────────────────────────────────────────────────── -->
+<div id="in">
+  <div class="face ring" id="inFace">?</div>
+  <div><div class="h1" id="inN">Вам звонят</div>
+    <div class="p" style="margin-top:6px">Звонок по вашей ссылке</div></div>
+  <div class="acts">
+    <div class="act"><button class="rb drop" onclick="decline()">
+      <svg viewBox="0 0 24 24" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+      <span>Отклонить</span></div>
+    <div class="act"><button class="rb take" onclick="answer()">
+      <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg></button>
+      <span>Ответить</span></div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+'use strict';
+// ── мелочи ────────────────────────────────────────────────────────────────
+const $ = id => document.getElementById(id);
+let _tt;
+function toast(t){ const e=$('toast'); e.textContent=t; e.classList.add('on');
+  clearTimeout(_tt); _tt=setTimeout(()=>e.classList.remove('on'), 2600); }
+const буква = s => (String(s||'?').trim()[0] || '?').toUpperCase();
+
+// Имя живёт в этом браузере: спрашивать его при каждом открытии ссылки —
+// лишний шаг там, где человек хочет просто позвонить.
+let NAME = '';
+try{ NAME = localStorage.getItem('zvon_name') || ''; }catch(e){}
+function setName(v){
+  NAME = String(v||'').slice(0,24);
+  try{ localStorage.setItem('zvon_name', NAME); }catch(e){}
+  $('myFace').textContent = буква(NAME);
+  send({t:'name', name:NAME});
+}
+
+// ── комната ───────────────────────────────────────────────────────────────
+// Имя комнаты в хэше, а не в пути: так страница отдаётся одна и та же любым
+// сервером, без единой строчки маршрутизации.
+function newId(){
+  const a = new Uint8Array(6); crypto.getRandomValues(a);
+  return [...a].map(x => 'abcdefghjkmnpqrstuvwxyz23456789'[x % 30]).join('');
+}
+let ROOM = (location.hash || '').replace(/^#/, '').replace(/[^a-z0-9]/gi, '').slice(0,40);
+
+function newRoom(){
+  location.hash = newId();
+  location.reload();
+}
+function copyLink(){
+  const u = location.href;
+  const ok = () => { $('copyB').textContent = 'Скопировано'; toast('Ссылка скопирована');
+                     setTimeout(()=>$('copyB').textContent='Копировать', 2000); };
+  if(navigator.clipboard) navigator.clipboard.writeText(u).then(ok).catch(руками);
+  else руками();
+  function руками(){ const i=$('url'); i.select(); i.setSelectionRange(0,99999);
+    try{ document.execCommand('copy'); ok(); }catch(e){ toast('Скопируйте ссылку вручную'); } }
+}
+
+// ── связь с сервером ──────────────────────────────────────────────────────
+let WS = null, FIRST = true, PEER = '', ЕСТЬ = false, _re = 0;
+
+function send(m){ try{ if(WS && WS.readyState === 1) WS.send(JSON.stringify(m)); }catch(e){} }
+
+function connect(){
+  const p = location.protocol === 'https:' ? 'wss' : 'ws';
+  WS = new WebSocket(`${p}://${location.host}/api/room/ws`
+    + `?room=${encodeURIComponent(ROOM)}&name=${encodeURIComponent(NAME || 'Гость')}`);
+  WS.onopen = () => { _re = 0; };
+  WS.onmessage = e => { let m; try{ m = JSON.parse(e.data); }catch(_){ return; } onMsg(m); };
+  WS.onclose = () => {
+    ЕСТЬ = false; paintWho();
+    // Связь рвётся у всех и всегда: телефон уснул, сеть моргнула. Возвращаемся
+    // сами, с растущей паузой — иначе при лежащем сервере вкладка молотит его
+    // без остановки.
+    _re = Math.min(_re + 1, 6);
+    setTimeout(connect, 400 * _re);
+  };
+}
+
+function onMsg(m){
+  switch(m.t){
+    case 'here':                       // мы вошли
+      FIRST = !!m.first; PEER = m.peer || '';
+      ЕСТЬ = !!m.peer; paintWho(); break;
+    case 'peer':                       // пришёл второй
+      PEER = m.name || 'Гость'; ЕСТЬ = true; paintWho();
+      toast(PEER + ' на связи'); break;
+    case 'name':
+      PEER = m.name || PEER; paintWho(); break;
+    case 'left':
+      ЕСТЬ = false; paintWho();
+      if(ST !== 'idle'){ toast('Собеседник вышел'); stop(); } break;
+    case 'full':
+      $('roomT').textContent = 'В комнате уже двое';
+      $('roomS').textContent = 'Эта ссылка занята другим разговором. Создайте новую.';
+      $('callB').style.display = 'none'; break;
+
+    case 'ring':   incoming(m.name || PEER); break;
+    case 'accept': if(ST === 'out') startMedia(true); break;
+    case 'reject': if(ST === 'out'){ toast('Не ответили'); stop(); } break;
+    case 'bye':    if(ST !== 'idle'){ toast('Разговор завершён'); stop(); } break;
+
+    case 'sdp':      onSdp(m.data); break;
+    case 'ice':      onIce(m.data); break;
+    case 'emoji':    fly(m.e, true); break;
+    case 'camstate': farCam(!!m.on); break;
+  }
+}
+
+function paintWho(){
+  $('dot').classList.toggle('live', ЕСТЬ);
+  $('whoT').textContent = ЕСТЬ ? ((PEER || 'Гость') + ' на связи') : 'Ждём второго';
+  $('callB').disabled = !ЕСТЬ;
+  $('hint').textContent = ЕСТЬ ? 'Микрофон спросят при звонке'
+                               : 'Ссылка работает, пока эта вкладка открыта';
+}
+
+// ── звонок ────────────────────────────────────────────────────────────────
+let ST = 'idle';                 // idle | out | in | live
+let PC = null, MIC = null, CAM = null, FACING = 'user';
+let ICE = [{urls:'stun:stun.l.google.com:19302'}];
+let _making = false, _t0 = 0, _tick = 0;
+
+fetch('/api/room/ice').then(r => r.json())
+  .then(d => { if(d && d.ice && d.ice.length) ICE = d.ice; }).catch(()=>{});
+
+function ring(){
+  if(!ЕСТЬ) return;
+  ST = 'out';
+  tones.ring();
+  send({t:'ring', name: NAME || 'Гость'});
+  показать('out');
+}
+
+function incoming(from){
+  if(ST === 'live'){ send({t:'reject'}); return; }   // уже говорим
+  ST = 'in'; PEER = from || PEER;
+  $('inN').textContent = (PEER || 'Гость') + ' звонит';
+  $('inFace').textContent = буква(PEER);
+  $('in').classList.add('on');
+  tones.ringtone();
+}
+
+function answer(){
+  $('in').classList.remove('on');
+  tones.stop();
+  send({t:'accept'});
+  startMedia(false);
+}
+function decline(){
+  $('in').classList.remove('on');
+  tones.stop();
+  send({t:'reject'});
+  ST = 'idle';
+}
+function hangup(){ send({t:'bye'}); stop(); }
+
+function показать(режим){
+  $('call').classList.add('on');
+  $('topN').textContent = PEER || 'Гость';
+  $('farFace').textContent = буква(PEER);
+  $('topT').textContent = режим === 'out' ? 'вызываем…' : 'соединяем…';
+}
+
+// Медиа поднимаем только после согласия — микрофон спрашивают тогда, когда
+// человек уже нажал, а не когда открыл ссылку.
+async function startMedia(звоню){
+  tones.stop();
+  показать('live');
+  try{
+    MIC = await navigator.mediaDevices.getUserMedia({
+      audio:{echoCancellation:true, noiseSuppression:true, autoGainControl:true},
+      video:false});
+  }catch(e){
+    toast('Нет доступа к микрофону'); stop(); return;
+  }
+  ST = 'live';
+  _t0 = Date.now();
+  clearInterval(_tick); _tick = setInterval(timer, 1000); timer();
+
+  PC = new RTCPeerConnection({iceServers: ICE, bundlePolicy:'max-bundle'});
+  MIC.getTracks().forEach(t => PC.addTrack(t, MIC));
+  PC.ontrack = e => {
+    const s = e.streams[0];
+    if(e.track.kind === 'audio'){ const a = $('far'); if(a.srcObject !== s) a.srcObject = s; }
+    else { $('far').srcObject = s; farCam(true); }
+  };
+  PC.onicecandidate = e => { if(e.candidate) send({t:'ice', data:e.candidate}); };
+  PC.onconnectionstatechange = () => {
+    if(!PC) return;
+    if(PC.connectionState === 'connected') $('topT').textContent = '00:00';
+    if(PC.connectionState === 'failed'){ toast('Связь не поднялась'); stop(); }
+  };
+  // Кто звонил, тот и предлагает. Второе предложение — это уже включение
+  // камеры, и его отправляет тот, кто камеру включил.
+  _isCaller = звоню;
+  if(звоню) negotiate();
+}
+let _isCaller = false;
+
+async function negotiate(){
+  if(!PC || PC.signalingState !== 'stable') return;
+  try{
+    _making = true;
+    await PC.setLocalDescription(await PC.createOffer());
+    send({t:'sdp', data: PC.localDescription});
+  }catch(e){ console.warn('offer', e); }
+  finally{ _making = false; }
+}
+
+async function onSdp(sdp){
+  if(!PC || !sdp) return;
+  // Столкновение предложений: оба заговорили разом. Звонивший стоит на своём,
+  // отвечавший откатывает и слушает — иначе связь встаёт колом.
+  const вежливый = !_isCaller;
+  const столкновение = sdp.type === 'offer' && (_making || PC.signalingState !== 'stable');
+  if(столкновение && !вежливый) return;
+  try{
+    if(столкновение) await Promise.all([
+      PC.setLocalDescription({type:'rollback'}), PC.setRemoteDescription(sdp)]);
+    else await PC.setRemoteDescription(sdp);
+    if(sdp.type === 'offer'){
+      await PC.setLocalDescription(await PC.createAnswer());
+      send({t:'sdp', data: PC.localDescription});
+    }
+  }catch(e){ console.warn('sdp', e); }
+}
+async function onIce(c){ try{ if(PC && c) await PC.addIceCandidate(c); }catch(e){} }
+
+function timer(){
+  if(ST !== 'live') return;
+  const s = Math.floor((Date.now() - _t0)/1000);
+  $('topT').textContent = String(Math.floor(s/60)).padStart(2,'0') + ':'
+                        + String(s%60).padStart(2,'0');
+}
+
+function stop(){
+  tones.stop();
+  clearInterval(_tick);
+  try{ if(PC) PC.close(); }catch(e){}
+  PC = null; _isCaller = false;
+  [MIC, CAM].forEach(s => { if(s) s.getTracks().forEach(t => { try{ t.stop(); }catch(e){} }); });
+  MIC = CAM = null;
+  $('far').srcObject = null; $('near').srcObject = null;
+  $('near').classList.remove('on');
+  $('call').classList.remove('on'); $('in').classList.remove('on');
+  $('emoBar').classList.remove('on');
+  $('bMic').classList.remove('on'); $('bCam').classList.remove('on');
+  $('bFlip').style.display = 'none';
+  farCam(false);
+  ST = 'idle';
+}
+
+// ── микрофон и камера ─────────────────────────────────────────────────────
+function toggleMic(){
+  if(!MIC) return;
+  const t = MIC.getAudioTracks()[0]; if(!t) return;
+  t.enabled = !t.enabled;
+  $('bMic').classList.toggle('on', !t.enabled);
+  send({t:'micstate', on:t.enabled});
+}
+
+async function toggleCam(){
+  if(ST !== 'live') return;
+  if(CAM){ camOff(); return; }
+  try{
+    CAM = await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:FACING, width:{ideal:1280}, height:{ideal:720}}, audio:false});
+  }catch(e){ toast('Нет доступа к камере'); return; }
+  const track = CAM.getVideoTracks()[0];
+  $('near').srcObject = CAM;
+  $('near').classList.add('on');
+  $('near').classList.toggle('back', FACING !== 'user');
+  $('bCam').classList.add('on');
+  $('bFlip').style.display = '';
+  const s = PC && PC.getSenders().find(x => x.track && x.track.kind === 'video');
+  if(s){ s.replaceTrack(track); }
+  else if(PC){
+    // Места видеодорожке в соединении ещё нет — договариваемся заново. Именно
+    // здесь, а не по общему событию: то срабатывает и посреди первого обмена.
+    PC.addTrack(track, CAM);
+    negotiate();
+  }
+  send({t:'camstate', on:true});
+}
+
+function camOff(){
+  if(!CAM) return;
+  CAM.getTracks().forEach(t => { try{ t.stop(); }catch(e){} });
+  CAM = null;
+  const s = PC && PC.getSenders().find(x => x.track && x.track.kind === 'video');
+  if(s) try{ s.replaceTrack(null); }catch(e){}
+  $('near').classList.remove('on'); $('near').srcObject = null;
+  $('bCam').classList.remove('on'); $('bFlip').style.display = 'none';
+  send({t:'camstate', on:false});
+}
+
+async function flipCam(){
+  if(!CAM) return;
+  FACING = FACING === 'user' ? 'environment' : 'user';
+  const было = CAM;
+  try{
+    CAM = await navigator.mediaDevices.getUserMedia({
+      video:{facingMode:FACING, width:{ideal:1280}, height:{ideal:720}}, audio:false});
+  }catch(e){ CAM = было; FACING = FACING === 'user' ? 'environment' : 'user'; return; }
+  было.getTracks().forEach(t => { try{ t.stop(); }catch(e){} });
+  const track = CAM.getVideoTracks()[0];
+  $('near').srcObject = CAM;
+  $('near').classList.toggle('back', FACING !== 'user');
+  const s = PC && PC.getSenders().find(x => x.track && x.track.kind === 'video');
+  if(s) s.replaceTrack(track);
+}
+
+// Чужая камера. Полагаться на замолкание дорожки нельзя — событие приходит не
+// везде, и на экране висел бы замерший кадр. Собеседник говорит словами.
+function farCam(on){ $('novid').classList.toggle('off', !!on); }
+
+// ── смайлики ──────────────────────────────────────────────────────────────
+const EMO = ['❤️','😂','👍','🔥','👏','😮'];
+$('emoBar').innerHTML = EMO.map(e =>
+  `<button onclick="sendEmo('${e}')">${e}</button>`).join('');
+function toggleEmo(){ $('emoBar').classList.toggle('on'); }
+function sendEmo(e){ fly(e, false); send({t:'emoji', e}); }
+function fly(e, чужой){
+  const d = document.createElement('div');
+  d.className = 'fly'; d.textContent = e;
+  d.style.left = (12 + Math.random()*70) + '%';
+  d.style.animationDelay = (Math.random()*.12) + 's';
+  $('call').appendChild(d);
+  setTimeout(() => d.remove(), 2600);
+  if(чужой) try{ navigator.vibrate && navigator.vibrate(12); }catch(_){}
+}
+
+// ── звуки ─────────────────────────────────────────────────────────────────
+// Свои, а не файлами: два тона решают задачу, а файл надо грузить и он
+// молчит, если не успел.
+const tones = (() => {
+  let ac = null, ноды = [], т = 0;
+  const дай = () => (ac = ac || new (window.AudioContext||window.webkitAudioContext)());
+  function тон(f, длит, гром){
+    const a = дай(), o = a.createOscillator(), g = a.createGain();
+    o.frequency.value = f; o.connect(g); g.connect(a.destination);
+    g.gain.setValueAtTime(0, a.currentTime);
+    g.gain.linearRampToValueAtTime(гром, a.currentTime + .02);
+    g.gain.linearRampToValueAtTime(0, a.currentTime + длит);
+    o.start(); o.stop(a.currentTime + длит + .02);
+    ноды.push(o);
+  }
+  return {
+    ring(){ this.stop(); const p = () => тон(440, .35, .05); p(); т = setInterval(p, 1600); },
+    ringtone(){ this.stop();
+      const p = () => { тон(660, .22, .09); setTimeout(()=>тон(880,.22,.09), 260); };
+      p(); т = setInterval(p, 1800); },
+    stop(){ clearInterval(т); т = 0;
+      ноды.forEach(o => { try{ o.stop(); }catch(e){} }); ноды = []; },
+  };
+})();
+
+// ── пуск ──────────────────────────────────────────────────────────────────
+(function boot(){
+  if(!ROOM){ $('scrRoom').classList.remove('on'); $('scrNew').classList.add('on'); return; }
+  $('url').value = location.href;
+  $('me').value = NAME;
+  $('myFace').textContent = буква(NAME);
+  paintWho();
+  connect();
+  // Экран не должен гаснуть посреди разговора: телефон лежит на столе, а
+  // собеседник продолжает говорить в темноту.
+  let wake = null;
+  setInterval(async () => {
+    try{
+      if(ST === 'live' && !wake && navigator.wakeLock)
+        wake = await navigator.wakeLock.request('screen');
+      if(ST !== 'live' && wake){ await wake.release(); wake = null; }
+    }catch(e){}
+  }, 3000);
+})();
+window.addEventListener('beforeunload', () => { if(ST !== 'idle') send({t:'bye'}); });
+</script>

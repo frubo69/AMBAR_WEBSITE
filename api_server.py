@@ -2626,7 +2626,7 @@ PUBLIC_ROOT_FILES = {
 # клиента целиком зависела от доступности чужого домена, и в ОАЭ плитки висели
 # пустыми. Теперь свои, сжатые в webp.
 PUBLIC_DIRS = ("owner/", "operator/", "driver/", "TEXTURES/", "fonts/", "LOGOS/",
-               "uploads/", "products/", "vendor/", "sounds/")
+               "uploads/", "products/", "vendor/", "sounds/", "zvon/")
 PUBLIC_EXTS = {
     ".html", ".js", ".css", ".json", ".map",
     ".png", ".jpg", ".jpeg", ".webp", ".svg", ".gif", ".ico",
@@ -2829,6 +2829,13 @@ def main():
         call_routes.setup(app)
     except Exception as e:
         log.error(f"call routes setup failed: {e}")
+
+    # Комната на двоих: своя ссылка, свой сокет, ничего амбаровского.
+    try:
+        import room_routes
+        room_routes.setup(app)
+    except Exception as e:
+        log.error(f"room routes setup failed: {e}")
 
     app.router.add_get("/",          handle_static)
     app.router.add_get("/{path:.+}", handle_static)

@@ -340,6 +340,21 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .wo-go:disabled{opacity:.4;pointer-events:none}
 
 
+/* Кнопка списания. Стояла на .btn с дописанными в атрибут justify-content и
+   gap — а .btn не флексовый, и оба свойства не работали: значок корзины липнул
+   к тексту без просвета. Здесь у неё свой класс, флекс и просвет.
+
+   Абзац под кнопкой убран. Он объяснял, что списание согласует старший, — но
+   читают его один раз, а занимает он три строки под каждой прокруткой экрана.
+   То же самое сказано там, где это нужно: в самом окне списания и в строке
+   записи, где стоит решение старшего. */
+.wo-btn{width:100%;display:flex;align-items:center;justify-content:center;gap:9px;
+  padding:15px 12px;border-radius:14px;cursor:pointer;font-family:inherit;
+  font-size:14.5px;font-weight:700;color:var(--sub);
+  background:var(--card2);border:1px solid var(--border3)}
+.wo-btn:active{transform:scale(.98)}
+.wo-btn svg{flex:0 0 auto;color:var(--dn);opacity:.8}
+
 /* Списанное за смену — короткой строкой, чтобы было видно, что запись прошла */
 .wo-done{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;
   background:var(--bg3);border:1px solid var(--border3);margin-bottom:8px}
@@ -5772,11 +5787,8 @@ function woFoot(){
   return `<div class="sect" style="margin-top:26px"><span class="sect-t">Списание</span>
       ${WO_LOG.length ? `<span class="sect-v">${WO_LOG.length}</span>` : ''}</div>
     ${log}
-    <button class="btn btn-gh" style="width:100%;justify-content:center;gap:9px"
-      onclick="woOpen()">${svg(ICO.trash, 17)}Списать бой или брак</button>
-    <div style="margin-top:9px;font-size:12px;line-height:1.5;color:var(--muted);
-      text-align:center;padding:0 14px">Разбилось, потекло, вышел срок — запишите
-      с фотографией. Старший согласует, и это перестанет быть недостачей</div>`;
+    <button class="wo-btn" onclick="woOpen()">
+      ${svg(ICO.trash, 17)}<span>Списать бой или брак</span></button>`;
 }
 
 async function supClaim(sid, oid){

@@ -50,7 +50,13 @@ html.hid-boot #gameApp *{visibility:visible}
     calc(var(--tg-safe-area-inset-top,0px) + var(--tg-content-safe-area-inset-top,0px)));
   --safe-bottom:max(env(safe-area-inset-bottom,0px),
     calc(var(--tg-safe-area-inset-bottom,0px) + var(--tg-content-safe-area-inset-bottom,0px)));
-  --tabbar:calc(62px + var(--safe-bottom));
+  /* Высота панели вкладок. Ею отмеряют нижний отступ страницы, положение
+     итоговой полосы и всплывающих сообщений — то есть всё, что не должно под
+     панель уезжать. Числу положено совпадать с настоящей высотой: стояло 62,
+     а панель занимала 67, и низ каждого экрана прятался под неё на пять
+     пикселей. Считается так: 8 сверху + 30 значок + 4 просвет + 14 подпись
+     + 8 снизу + 1 линия = 65, и 2 на внутренние отступы кнопки. */
+  --tabbar:calc(67px + var(--safe-bottom));
 }
 *{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,sans-serif;
@@ -579,32 +585,41 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   padding:8px 6px calc(8px + var(--safe-bottom));
   background:rgba(7,7,15,.92);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
   border-top:1px solid var(--border2)}
-.tb{flex:1;display:flex;flex-direction:column;align-items:center;gap:3px;padding:4px;
+/* Все пять вкладок на одной линии.
+   «Смена» была приподнятой кнопкой 46px с отрицательным отступом −16px: она
+   вылезала за верхний край панели, висела над содержимым на собственной тени,
+   а подпись под ней из-за её высоты уезжала на два с лишним десятка пикселей
+   ниже соседних. Панель читалась как сломанная, потому что и была сломана.
+
+   Выделять «Смену» всё равно надо — это рубильник дня, а не ещё один раздел.
+   Но выделять внутрь, а не наружу: под её значком лежит плашка размером ровно
+   в отведённое значку место. Ничего не торчит, линия подписей общая, а плашка
+   говорит то же, что говорила приподнятость. */
+.tb{flex:1;display:flex;flex-direction:column;align-items:center;gap:4px;padding:2px;
   border:none;background:none;color:var(--muted);font-family:inherit;font-size:10px;
-  font-weight:600;cursor:pointer;transition:.15s var(--e1)}
+  font-weight:600;letter-spacing:.1px;cursor:pointer;transition:color .16s var(--e1)}
 .tb.on{color:var(--gold2)}
-.tb svg{width:21px;height:21px;fill:none;stroke:currentColor;stroke-width:1.9;
+.tb svg{width:22px;height:22px;fill:none;stroke:currentColor;stroke-width:1.9;
   stroke-linecap:round;stroke-linejoin:round}
-/* Счётчик сидит на углу значка, а не под подписью: раньше он свисал вниз и
-   налезал на текст. */
-.tb-ic{position:relative;display:flex;align-items:center;justify-content:center}
-/* Центральная кнопка приподнята над панелью: она отвечает за состояние дня, а
-   не за экран, и должна быть отличима от соседей на ощупь, не только глазом.
-   Цветом она говорит то же, что и текст под ней: смена идёт — золото, смена
-   закрыта или не открыта — тихий контур. */
-.tb-mid{position:relative}
-.tb-mid-ic{width:46px;height:46px;margin-top:-16px;margin-bottom:1px;border-radius:16px;
-  background:var(--bg3);border:1px solid var(--border3);
-  box-shadow:0 6px 16px rgba(0,0,0,.45)}
-.tb-mid-ic svg{width:21px;height:21px}
-.tb-mid.on .tb-mid-ic{color:#1a1408;border-color:transparent;
-  background:linear-gradient(135deg,var(--gold),var(--gold2))}
+/* Коробка значка одна на всех — она и держит подписи на одной линии. */
+.tb-ic{position:relative;display:flex;align-items:center;justify-content:center;
+  width:44px;height:30px;border-radius:11px;transition:background .18s var(--e1),
+  border-color .18s var(--e1)}
+/* Плашка «Смены» внутри той же коробки: снаружи ничего не выступает. */
+.tb-mid-ic{border:1px solid var(--border3);background:var(--bg3)}
+/* Смена идёт — тихое золото; вкладка выбрана — залитая плашка. Одно про
+   состояние дня, другое про то, где ты сейчас, и путать их нельзя. */
 .tb-mid-ic.live{color:var(--gold2);border-color:rgba(201,169,110,.45);
   background:var(--gold-soft)}
-.tb-mid.on .tb-mid-ic.live{color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
-.tb-badge{position:absolute;top:-6px;right:-10px;min-width:17px;height:17px;padding:0 4px;
+.tb-mid.on .tb-mid-ic{color:#1a1408;border-color:transparent;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));
+  box-shadow:0 3px 12px rgba(201,169,110,.28)}
+/* Счётчик на углу значка. Кольцо цветом панели отрезает его от соседней
+   вкладки: без него число сливалось с чужим значком. */
+.tb-badge{position:absolute;top:-2px;right:0;min-width:16px;height:16px;padding:0 4px;
   border-radius:999px;background:var(--gold2);color:#1a1408;font-size:9px;font-weight:700;
-  display:flex;align-items:center;justify-content:center}
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 0 0 2px rgba(7,7,15,.92)}
 .tb-badge.hot{background:var(--dn);color:#fff}
 
 .deny{position:fixed;inset:0;z-index:100;display:none;flex-direction:column;align-items:center;

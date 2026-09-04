@@ -1556,6 +1556,40 @@ async def handle_shift_log(request):
 
 
 # ── Списания ────────────────────────────────────────────────────────────────
+# Закупочные цены держим тем же слоем, что и оценка склада: поставка → прайс →
+# рука владельца. Второй источник цены рядом с первым разошёлся бы молча.
+_LOSS_CACHE: dict = {}
+
+
+def _loss_of(pid: str, qty: int) -> int:
+    """Во что обошлась потеря: закупка за бутылку × количество, AED.
+
+    Цена в прайсе стоит за учётную единицу — у пива это ящик из двадцати
+    четырёх, а бьётся одна банка. Поэтому делим.
+
+    Цены нет — возвращаем ноль, и это честнее выдуманной: сумму тогда впишет
+    человек, а не программа наугад."""
+    try:
+        цена = float(_LOSS_CACHE.get(pid) or 0)
+        if not цена:
+            return 0
+        unit = max(1, _unit(_catalog().get(pid) or {}))
+        return int(round(цена / unit * max(0, int(qty or 0))))
+    except Exception:                                        # noqa: BLE001
+        return 0
+
+
+async def _loss_load():
+    """Подтянуть цены закупки. Зовётся перед выдачей списаний: строка сама
+    ходить в базу не может, а считать без цен — значит показать нули."""
+    global _LOSS_CACHE
+    try:
+        import stock_value
+        _LOSS_CACHE = await stock_value.cost_map()
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[writeoff] цены закупки не прочитаны: {e}")
+
+
 def _wo_row(r: dict, cat: dict) -> dict:
     """Одна строка списания для владельца — и в очереди, и в истории."""
     qty = int(r.get("qty") or 0)
@@ -1570,6 +1604,10 @@ def _wo_row(r: dict, cat: dict) -> dict:
         "id": r.get("_id"), "at": _iso_of(r.get("at")), "day": r.get("day", ""),
         "item": pid, "name": r.get("name", "") or p.get("name", ""),
         "qty": qty, "aed": round(_price(p) / max(1, _unit(p)) * qty, 2),
+        # Во что обошлась потеря НАМ — по закупке, а не по прайсу. С водителя
+        # удерживают убыток, а не упущенную выручку: он разбил бутылку, а не
+        # украл наценку.
+        "loss": _loss_of(pid, qty),
         "kind": r.get("kind", ""), "note": r.get("note", ""),
         "by": r.get("by", ""), "district": r.get("district", ""),
         "district_code": r.get("district_code", ""), "thumb": r.get("thumb", ""),
@@ -1678,7 +1716,46 @@ async def handle_writeoff_add(request):
     await backdate.notify(day, who, "списание", 
                           f"{kind} · {cat[pid].get('name','')} × {qty} · "
                           f"{OFFICE_CODES.get(district, district)}")
-    return web.json_response({"ok": True, "id": wid}, headers=CORS_HEADERS)
+    # Виновный, если владелец его назвал. Списание, записанное им самим, уже
+    # согласовано — значит и удержание ставится сразу, одним действием, а не
+    # вторым заходом в историю.
+    comp = await _blame_set(wid, body, request, who, note=str(body.get("note") or ""))
+    return web.json_response({"ok": True, "id": wid, "comp": comp},
+                             headers=CORS_HEADERS)
+
+
+async def _blame_set(wid: str, body: dict, request, by_name: str, note: str = ""):
+    """Поставить удержание на только что записанное списание.
+
+    Виновного называет человек: программа знает, чья бутылка и кто списывал, но
+    не знает, кто её уронил. Сумму она посчитать может — по закупке за бутылку —
+    и считает, если её не прислали. Присланная своя сильнее: бывает разбитая
+    коробка, где половину списывают на компанию.
+
+    Ноль или пустой виновный — удержания нет вовсе. Это не ошибка: списать за
+    счёт компании такое же решение, как удержать."""
+    кто = str(body.get("who") or "").strip()[:60]
+    if not кто:
+        return None
+    doc = await db.writeoff_get(wid)
+    if not doc:
+        return None
+    сумма = body.get("comp")
+    await _loss_load()
+    сколько = (int(сумма) if str(сумма or "").strip().lstrip("-").isdigit()
+               else _loss_of(doc.get("item") or "", int(doc.get("qty") or 0)))
+    if сколько <= 0:
+        return None
+    обновл = await db.writeoff_comp_set(wid, кто, сколько, note[:200],
+                                        request.get("owner_id") or 0, by_name)
+    if not обновл:
+        return None
+    log.info(f"[writeoff] {wid}: удержано {сколько} с {кто} ({by_name})")
+    try:
+        await _writeoff_comp_tell(обновл)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[writeoff] про удержание не сообщили: {e}")
+    return обновл.get("comp") or None
 
 
 @require_owner
@@ -1828,6 +1905,7 @@ async def handle_writeoffs(request):
     day = (request.query.get("day") or "").strip() or _biz_day()
     rows = await db.writeoff_list(since=since, limit=400)
     cat = _catalog()
+    await _loss_load()
     pend = [_wo_row(r, cat) for r in await db.writeoff_pending(limit=200)]
     out, by_kind, by_driver, by_person = [], {}, {}, {}
     for r in rows:
@@ -1892,6 +1970,15 @@ async def handle_writeoff_decide(request):
     ok = bool(body.get("ok"))
     note = str(body.get("note") or "").strip()[:200]
     who = str(body.get("as") or "").strip()[:60]
+    # Вина. Три разных ответа, и путать их нельзя:
+    #   blame отсутствует — вопрос не задавали, удержания нет;
+    #   blame=false       — не виноват, платит компания;
+    #   blame=true        — виноват, удерживаем.
+    # Сумму при вине можно прислать свою; не прислали — считаем по закупке.
+    # Считает сервер, а не страница: цена лежит здесь, и второй счёт на
+    # телефоне разошёлся бы с этим молча.
+    blame = body.get("blame")
+    сумма = body.get("comp")
     doc = await db.writeoff_decide(wid, ok, request.get("owner_id") or 0, who, note)
     if not doc:
         cur = await db.writeoff_get(wid)
@@ -1908,8 +1995,29 @@ async def handle_writeoff_decide(request):
         base_drop()          # остаток изменился — заявку считать заново
     log.info(f"[writeoff] {wid}: {'согласовано' if ok else 'отклонено'} "
              f"({who or request.get('owner_id')})")
+
+    # Удержание ставим только на согласованном: отклонённое списание не убыток
+    # компании, а недостача, и она вылезет пересчётом у того, у кого пропала.
+    if ok and blame is not None and bool(blame):
+        await _loss_load()
+        виновный = (str(body.get("who") or "").strip()[:60]
+                    or str(doc.get("by") or "").strip()[:60])
+        сколько = (int(сумма) if str(сумма or "").strip().lstrip("-").isdigit()
+                   else _loss_of(doc.get("item") or "", int(doc.get("qty") or 0)))
+        if виновный and сколько > 0:
+            обновл = await db.writeoff_comp_set(
+                wid, виновный, сколько, note, request.get("owner_id") or 0, who)
+            if обновл:
+                doc = обновл
+                log.info(f"[writeoff] {wid}: удержано {сколько} с {виновный}")
+                try:
+                    await _writeoff_comp_tell(doc)
+                except Exception as e:                       # noqa: BLE001
+                    log.warning(f"[writeoff] про удержание не сообщили: {e}")
+
     await _writeoff_after(doc, ok, who)
-    return web.json_response({"ok": True, "id": wid, "state": doc.get("state")},
+    return web.json_response({"ok": True, "id": wid, "state": doc.get("state"),
+                              "comp": doc.get("comp") or None},
                              headers=CORS_HEADERS)
 
 

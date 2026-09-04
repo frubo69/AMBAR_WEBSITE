@@ -1036,29 +1036,51 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    сколько ещё осталось. Крупное число на экране всегда отвечает именно на тот
    вопрос, который стоит сейчас, — у водителя заняты руки и он смотрит одним
    глазом. */
-.sup{background:var(--bg3);border:1px solid var(--border3);border-radius:20px;
-  margin-bottom:12px;overflow:hidden;box-shadow:0 6px 24px rgba(0,0,0,.35)}
-.sup.mine{border-color:rgba(201,169,110,.45)}
-.sup-hd{display:flex;align-items:center;gap:9px;padding:11px 14px;font-size:11.5px;
-  color:var(--muted);background:var(--card2);border-bottom:1px solid var(--border3)}
-.sup.mine .sup-hd{background:linear-gradient(90deg,rgba(201,169,110,.18),rgba(201,169,110,.05))}
-.sup-code{display:inline-flex;align-items:center;height:20px;padding:0 8px;border-radius:6px;
-  background:var(--card3);color:var(--gold2);font-size:10.5px;font-weight:800;letter-spacing:.6px}
-.sup-when{margin-left:auto;font-variant-numeric:tabular-nums}
-.sup-b{padding:14px 16px}
-.sup-n{font-size:22px;font-weight:800;line-height:1.15;letter-spacing:-.4px}
-.sup-s{font-size:12.5px;color:var(--muted);margin-top:3px}
-.sup-big{display:flex;align-items:baseline;gap:8px;margin-top:12px}
-.sup-big b{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;line-height:1;
-  letter-spacing:-1px;color:var(--gold3);font-variant-numeric:tabular-nums}
-.sup-big i{font-style:normal;font-size:12px;color:var(--muted)}
+/* Задача приёмки — строкой, а не плитой в треть экрана.
+   Плита была устроена как объявление: шапка с районом и датой, крупное число,
+   подпись и золотая кнопка во всю ширину. Пять точек — пять экранов прокрутки,
+   и чтобы понять, где что, приходилось листать. Здесь всё то же самое в одной
+   строке: код точки, название, сколько бутылок, и жест — по своей задаче
+   нажимается вся строка, у чужой отдельная кнопка «взять». Разница между
+   «продолжить своё» и «взять чужое» в том и состоит: первое безопасно, второе
+   обязывает, и случайным касанием на себя работу вешать нельзя. */
+.sup{display:flex;align-items:center;gap:11px;padding:12px 13px;margin-bottom:8px;
+  border-radius:16px;background:var(--bg3);border:1px solid var(--border3)}
+.sup.mine{border-color:rgba(201,169,110,.4);background:var(--card)}
+.sup.mine:active{transform:scale(.99)}
+.sup-code{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;
+  min-width:34px;height:34px;padding:0 7px;border-radius:11px;background:var(--card3);
+  color:var(--gold2);font-size:11.5px;font-weight:800;letter-spacing:.4px}
+.sup.mine .sup-code{background:var(--gold-soft);border:1px solid rgba(201,169,110,.35)}
+/* Название и подпись — двумя строками, а не в одну. В одну они слипались
+   («Силикон 77 позиций») и выглядели опечаткой, а у незаконченной задачи всё
+   равно переносились: строка то в один этаж, то в два. */
+.sup-b{flex:1;min-width:0;display:block}
+.sup-n{display:block;font-size:14px;font-weight:700;line-height:1.2;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.sup-s{display:block;font-size:11.5px;color:var(--muted);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Число справа — то, ради чего строку и читают: сколько нести. */
+.sup-v{flex:0 0 auto;text-align:right;font-family:'Space Grotesk',sans-serif;
+  font-size:19px;font-weight:700;line-height:1;letter-spacing:-.4px;color:var(--gold3);
+  font-variant-numeric:tabular-nums}
+.sup-v i{display:block;font-style:normal;font-family:'DM Sans',sans-serif;font-size:9.5px;
+  font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-top:3px}
+.sup-go{flex:0 0 auto;color:var(--gold2);opacity:.75}
+.sup-take{flex:0 0 auto;padding:0 13px;height:34px;border-radius:11px;cursor:pointer;
+  font-family:inherit;font-size:12.5px;font-weight:700;color:#1a1408;
+  background:linear-gradient(135deg,var(--gold),var(--gold2));border:0}
+.sup-take:active{transform:scale(.94)}
+/* Незаконченное с прошлой поставки. Оно остаётся только потому, что в него уже
+   приняли бутылки, — и должно этим отличаться, иначе читается как сегодняшнее. */
+.sup.stale{border-color:rgba(243,180,74,.35)}
+.sup-old{color:var(--warn);font-weight:600}
 /* Полоса прогресса — единственное, что водитель ищет глазами, вернувшись в
    приложение с ящиком в руках. */
-.sup-bar{height:5px;border-radius:99px;background:var(--card3);overflow:hidden;margin-top:12px}
+.sup-bar{display:block;height:4px;border-radius:99px;background:var(--card3);
+  overflow:hidden;margin-top:7px}
 .sup-bar i{display:block;height:100%;border-radius:99px;
   background:linear-gradient(90deg,var(--gold),var(--gold2));transition:width .3s var(--e1)}
-.sup-foot{padding:13px 16px;border-top:1px solid var(--border2)}
-.sup-foot .btn{width:100%}
 /* Взятое другим: видно, что задача не бесхозная, и не более того. */
 .sup-row{display:flex;align-items:center;gap:10px;padding:12px 14px;margin-bottom:7px;
   border-radius:13px;background:var(--card);border:1px solid var(--border2);opacity:.7}
@@ -2834,6 +2856,9 @@ const ICO = {
   close:'<path d="M6 6l12 12M18 6L6 18"/>',
   chat: '<path d="M20 14a2 2 0 0 1-2 2H8l-4 3.5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/>',
   chev: '<path d="M6 9l6 6 6-6"/>',
+  // Вправо — своей записью: chev объявлен дважды, и «вниз» перебивает «вправо».
+  // Разбираться в этом каждый раз дороже, чем завести отдельное имя.
+  chevR:'<path d="M9 6l6 6-6 6"/>',
   // Значки доп. расходов. Стрелка говорит направление денег, слово под ней —
   // отдали уже или только должны: рисовать четыре разных значка ради оттенка,
   // который и так написан буквами, значит сделать их неразличимыми.
@@ -5652,26 +5677,35 @@ function supWhen(t){
 // другим макетом значит заставлять искать глазами то же самое заново.
 function supCard(t){
   const pct = t.need ? Math.round(t.got / t.need * 100) : 0;
-  const started = t.mine && t.got > 0;
-  return `<div class="sup ${t.mine ? 'mine' : ''}">
-    <div class="sup-hd">
-      <span class="sup-code">${esc(t.district_code)}</span>
-      <span>${esc(t.district_name)}</span>
-      ${t.home && !t.mine ? '<span style="color:var(--gold2)">ваш район</span>' : ''}
-      <span class="sup-when">${esc(supWhen(t))}</span>
-    </div>
-    <div class="sup-b">
-      <div class="sup-n">${started ? 'Осталось ' + fmt(t.left) : fmt(t.need) + ' ' + plural(t.need, 'бутылка','бутылки','бутылок')}</div>
-      <div class="sup-s">${t.positions} ${plural(t.positions,'позиция','позиции','позиций')}${
-        started ? ` · принято ${fmt(t.got)} из ${fmt(t.need)}` : ''}</div>
-      ${started ? `<div class="sup-bar"><i style="width:${pct}%"></i></div>` : ''}
-    </div>
-    <div class="sup-foot">
-      ${t.mine
-        ? `<button class="btn btn-pri" onclick="supOpen('${t.supply_id}','${t.district}')">${
-             started ? 'Продолжить приём' : 'Начать приём'}</button>`
-        : `<button class="btn btn-pri" onclick="supClaim('${t.supply_id}','${t.district}')">Взять на себя</button>`}
-    </div>
+  const started = t.got > 0;
+  // Подпись под названием отвечает ровно на один вопрос за раз: пока не начали —
+  // сколько там позиций; начали — сколько уже принято. Всё сразу превращает
+  // строку в отчёт, который читать некогда.
+  // У незаконченной сначала числа, потом дата: «незакончено с 15.08 · принято…»
+  // обрывалось ровно там, где начиналось главное. Что задача старая, видно и
+  // так — по цвету строки.
+  const низ = t.stale
+    ? `принято ${fmt(t.got)} из ${fmt(t.need)} · <span class="sup-old">с ${
+         esc(supWhen(t).split(' · ')[0])}</span>`
+    : started
+      ? `принято ${fmt(t.got)} из ${fmt(t.need)}`
+      : `${t.positions} ${plural(t.positions,'позиция','позиции','позиций')}`;
+  const число = started
+    ? `${fmt(t.left)}<i>осталось</i>`
+    : `${fmt(t.need)}<i>бут.</i>`;
+  return `<div class="sup ${t.mine ? 'mine' : ''} ${t.stale ? 'stale' : ''}"
+       ${t.mine ? `onclick="supOpen('${t.supply_id}','${t.district}')"` : ''}>
+    <span class="sup-code">${esc(t.district_code)}</span>
+    <span class="sup-b">
+      <span class="sup-n">${esc(t.district_name)}</span>
+      <span class="sup-s">${низ}</span>
+      ${started ? `<span class="sup-bar"><i style="width:${pct}%"></i></span>` : ''}
+    </span>
+    <span class="sup-v">${число}</span>
+    ${t.mine
+      ? `<span class="sup-go">${svg(ICO.chevR, 18)}</span>`
+      : `<button class="sup-take"
+           onclick="event.stopPropagation();supClaim('${t.supply_id}','${t.district}')">Взять</button>`}
   </div>`;
 }
 

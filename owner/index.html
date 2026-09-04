@@ -20655,14 +20655,15 @@ async function woScanDone(){
 // согласовать можно сразу по фотографии, а чья была смена и виноват ли
 // человек — выясняют потом. Поэтому удержание живёт отдельной кнопкой на уже
 // согласованной строке, а не шагом внутри согласования.
-let WO_COMP = null;            // {id, name, qty, kind, aed, by, district, comp}
+let WO_COMP = null, WO_COMP_MODE = 'hold';            // {id, name, qty, kind, aed, by, district, comp}
 
-async function woCompOpen(ev, id){
+async function woCompOpen(ev, id, режим){
   ev && ev.stopPropagation();
   const all = [...((ACC_WO || {}).rows || []), ...((ACC_WO || {}).pending || [])];
   const r = all.find(x => x.id === id);
   if(!r) return;
   WO_COMP = r;
+  WO_COMP_MODE = режим || 'hold';
   // Список людей — из штатного расписания: удержать можно и не с того, кто
   // списывал. Разбить может один, а отвечать за это — другой.
   if(!CREW) try{ CREW = await ownerApi.ownerFetch('/api/owner/staff'); }catch(e){ CREW = null; }
@@ -20676,13 +20677,19 @@ async function woCompOpen(ev, id){
   });
   const who = (r.comp || {}).who || r.by || '';
   const list = [...new Set([...(r.by ? [r.by] : []), ...mine, ...rest])];
-  const amount = (r.comp || {}).amount || Math.round(r.aed || 0);
+  // Сумма по умолчанию — то, во что бутылка обошлась НАМ, а не то, за сколько
+  // она продавалась. С водителя удерживают убыток, а не упущенную выручку.
+  // Закупки нет — поле пустое: пусть впишет человек, чем программа наугад.
+  const amount = (r.comp || {}).amount || r.loss || '';
   document.getElementById('woCompOv').innerHTML = `
     <div class="wo-c-sheet">
       <div class="wo-c-h">
-        <div class="wo-c-t">Удержать за списание</div>
-        <div class="wo-c-s">${escS(r.name)} × ${fmt(r.qty)} · ${escS(r.kind)} ·
-          ${fmt(Math.round(r.aed || 0))} AED по прайсу</div>
+        <div class="wo-c-t">${WO_COMP_MODE === 'approve'
+          ? 'Согласовать: кто платит'
+          : 'Удержать за списание'}</div>
+        <div class="wo-c-s">${escS(r.name)} × ${fmt(r.qty)} · ${escS(r.kind)}${
+          r.loss ? ` · закупка ${fmt(r.loss)} AED`
+                 : ' · закупочной цены нет'}</div>
       </div>
       <div class="wo-c-l">С кого</div>
       <div class="wo-c-who" id="woCompWho">${list.map(n => `
@@ -20698,9 +20705,12 @@ async function woCompOpen(ev, id){
       <input class="wo-c-note" id="woCompNote" type="text" maxlength="120"
              placeholder="уронил при разгрузке" value="${escS((r.comp || {}).note || '')}">
       <div class="wo-c-acts">
-        ${r.comp ? '<button class="wo-c-off" onclick="woCompSave(0)">Снять удержание</button>' : ''}
+        ${WO_COMP_MODE === 'approve'
+          ? '<button class="wo-c-off" onclick="woCompSave(0)">На компанию</button>'
+          : (r.comp ? '<button class="wo-c-off" onclick="woCompSave(0)">Снять удержание</button>' : '')}
         <button class="wo-c-no" onclick="woCompClose()">Отмена</button>
-        <button class="wo-c-go" id="woCompGo" onclick="woCompSave(1)">Удержать</button>
+        <button class="wo-c-go" id="woCompGo" onclick="woCompSave(1)">${
+          WO_COMP_MODE === 'approve' ? 'Удержать' : 'Удержать'}</button>
       </div>
     </div>`;
   document.getElementById('woCompOv').classList.add('show');
@@ -20726,16 +20736,29 @@ async function woCompSave(on){
   // Сумма без человека — это удержание из воздуха, а человек без суммы ничего
   // не значит. Говорим об этом до отправки, а не после.
   if(on && (!who || !amount)){ _toast(!who ? 'Выберите, с кого' : 'Впишите сумму'); return; }
+  if(WO_COMP_MODE === 'approve' && !on
+     && !confirm('Согласовать и списать за счёт компании?')) return;
   const go = document.getElementById('woCompGo'); if(go) go.disabled = true;
+  // Согласование и удержание — одно действие, а не два подряд: разорванные,
+  // они дают окно, в котором списание уже согласовано, а виновного ещё нет, и
+  // второй владелец видит его как «списали на компанию».
+  const путь = WO_COMP_MODE === 'approve' ? '/decide' : '/compensate';
+  const тело = WO_COMP_MODE === 'approve'
+    ? {ok: true, blame: !!on, who, comp: amount, note, as: _meName()}
+    : {who, amount, note, as: _meName()};
   try{
-    await ownerApi.ownerFetch('/api/owner/stock/writeoff/' + encodeURIComponent(r.id) + '/compensate',
-      {method:'POST', body:{who, amount, note, as: _meName()}});
+    await ownerApi.ownerFetch('/api/owner/stock/writeoff/' + encodeURIComponent(r.id) + путь,
+      {method:'POST', body: тело});
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
-    _toast(on ? `Удержано ${fmt(amount)} AED · ${who}` : 'Удержание снято');
+    _toast(WO_COMP_MODE === 'approve'
+      ? (on ? `Согласовано · удержано ${fmt(amount)} AED с ${who}`
+            : 'Согласовано · списано на компанию')
+      : (on ? `Удержано ${fmt(amount)} AED · ${who}` : 'Удержание снято'));
   }catch(e){
     const p = (e || {}).payload || {};
-    _toast(p.error === 'not_approved' ? 'Сначала согласуйте списание'
-                                      : 'Не удалось — попробуйте ещё раз');
+    _toast(p.error === 'already_decided' ? 'Уже решено' + (p.by ? ' — ' + p.by : '')
+         : p.error === 'not_approved'    ? 'Сначала согласуйте списание'
+                                         : 'Не удалось — попробуйте ещё раз');
     if(go) go.disabled = false;
     return;
   }
@@ -20808,7 +20831,7 @@ function woRow(r){
       fmt(r.aed)}<i>AED</i></div>
     ${wait ? `<div class="wo-acts">
       <button class="wo-act no" onclick="woDecide(event,'${escS(r.id)}',false)">Отклонить</button>
-      <button class="wo-act ok" onclick="woDecide(event,'${escS(r.id)}',true)">Согласовать</button>
+      <button class="wo-act ok" onclick="woCompOpen(event,'${escS(r.id)}','approve')">Согласовать</button>
     </div>` : ''}
     ${(!wait && !no && !r.comp) ? `<div class="wo-acts one">
       <button class="wo-act hold" onclick="woCompOpen(event,'${escS(r.id)}')">Удержать с виновного</button>

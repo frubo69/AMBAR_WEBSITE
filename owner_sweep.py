@@ -120,7 +120,9 @@ async def loop(app=None):
         try:
             n = await sweep_once()
             if n:
-                log.info(f"[owner-sweep] убрано из чата владельца: {n}")
+                # Не «из чата владельца»: с тех пор проход накрывает три
+                # переписки, и подпись, оставшаяся от одной, врала бы в журнале.
+                log.info(f"[owner-sweep] убрано сообщений старше {TTL_HOURS} ч: {n}")
         except Exception as e:
             log.warning(f"[owner-sweep] сбой: {e}")
         await asyncio.sleep(EVERY_SEC)

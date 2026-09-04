@@ -58,7 +58,10 @@ button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
 .btn{width:100%;max-width:340px;padding:17px 20px;border-radius:16px;font-size:15.5px;
   font-weight:700;transition:transform .14s var(--e),opacity .14s var(--e)}
 .btn:active{transform:scale(.98)}
-.btn:disabled{opacity:.4;pointer-events:none}
+/* Запертая кнопка — тихий контур, а не золото на прозрачности: приглушённое
+   золото выглядит испачканным, а не выключенным. */
+.btn:disabled{pointer-events:none;background:none;color:var(--dim);
+  border:1px solid var(--line)}
 .btn-go{color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .btn-gh{color:var(--sub);background:var(--card);border:1px solid var(--line)}
 
@@ -422,8 +425,13 @@ async function startMedia(звоню){
   MIC.getTracks().forEach(t => PC.addTrack(t, MIC));
   PC.ontrack = e => {
     const s = e.streams[0];
-    if(e.track.kind === 'audio'){ const a = $('far'); if(a.srcObject !== s) a.srcObject = s; }
-    else { $('far').srcObject = s; farCam(true); }
+    const v = $('far');
+    if(v.srcObject !== s) v.srcObject = s;
+    if(e.track.kind === 'video') farCam(true);
+    // Сафари не начинает играть сам, даже когда разрешение уже есть: звук
+    // приходит, а тишина остаётся. Просим явно и молча глотаем отказ — там,
+    // где браузер играет сам, эта просьба ничего не меняет.
+    v.play && v.play().catch(() => {});
   };
   PC.onicecandidate = e => { if(e.candidate) send({t:'ice', data:e.candidate}); };
   PC.onconnectionstatechange = () => {

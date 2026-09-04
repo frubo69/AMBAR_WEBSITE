@@ -738,6 +738,17 @@ async def handle_panic(request):
                 log.warning(f"[driver] {me['name']}: убрано сообщений в чате {n}")
         except Exception as e:
             log.error(f"[driver] чат не почищен: {e}")
+    # Прикрытие. Пустой чат маскирует не хуже, чем полный палит: человек с
+    # телефоном в руках объясняет, почему у него в переписке с ботом пусто.
+    # Поэтому туда ложится приглашение в игру — то же самое, что кладёт
+    # оператор, когда прячет водителя со своего планшета. Зовём его же функцию,
+    # а не пишем вторую такую: две разошлись бы, и у одного из двух путей
+    # прикрытие однажды перестало бы сниматься.
+    try:
+        from operator_routes import _drv_cover
+        await _drv_cover(me["name"], on)
+    except Exception as e:                                   # noqa: BLE001
+        log.error(f"[driver] прикрытие: {e}")
     try:
         await _notify_panic(me, on, now)
     except Exception as e:

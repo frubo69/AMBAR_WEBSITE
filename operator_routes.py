@@ -2657,7 +2657,17 @@ async def _op_cover(chat_id: int) -> int:
     except Exception as e:                       # noqa: BLE001
         log.error(f"[pos] прикрытие не отправлено: {e}")
         return 0
-    return int(((res or {}).get("result") or {}).get("message_id") or 0)
+    mid = int(((res or {}).get("result") or {}).get("message_id") or 0)
+    # Из реестра убираем: прикрытие живёт по своим правилам — его снимает выход
+    # из режима, а не штора и не почасовой чистильщик. Записанное, оно исчезло
+    # бы через восемь часов, и вместо маскировки остался бы пустой чат — то
+    # есть ровно то, от чего прикрытие и защищает.
+    if mid:
+        try:
+            await db.drv_msg_drop(int(chat_id), mid)
+        except Exception:
+            pass
+    return mid
 
 
 async def _op_return(chat_id: int, orders: list) -> None:
@@ -2820,6 +2830,12 @@ async def _drv_cover(name: str, on: bool) -> None:
             res = await tg_send(token, tid, текст, parse_mode="Markdown", reply_markup=kb)
         mid = ((res or {}).get("result") or {}).get("message_id")
         if mid:
+            # Та же причина, что у операторского прикрытия: снимается выходом
+            # из режима, а не шторой и не чистильщиком.
+            try:
+                await db.drv_msg_drop(int(tid), int(mid))
+            except Exception:
+                pass
             await db.panic_set(ключ, True, datetime.now(timezone.utc).isoformat(),
                                {"cover_msg": int(mid), "driver": name})
     except Exception as e:                       # noqa: BLE001

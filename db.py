@@ -2597,6 +2597,40 @@ async def drv_msgs_take(chat_id: int) -> list:
     return [int(m["m"]) for m in ((doc or {}).get("msgs") or []) if m.get("m")]
 
 
+async def drv_msgs_due(before, limit: int = 300) -> list:
+    """Что пора стереть по возрасту: [(chat_id, message_id), …].
+
+    Реестр общий для водителей и операторов — ключ здесь чат, а не человек, и
+    боту всё равно, кто на том конце. Возвращаем парами, потому что удалять
+    придётся тем же токеном, но в разные чаты."""
+    db = _db_or_none()
+    if db is None: return []
+    out = []
+    cur = db.driver_msgs.find({"msgs.at": {"$lt": before}}, {"msgs": 1})
+    async for d in cur:
+        for m in (d.get("msgs") or []):
+            at = m.get("at")
+            if at is not None and at < before and m.get("m"):
+                out.append((int(d["_id"]), int(m["m"])))
+                if len(out) >= limit:
+                    return out
+    return out
+
+
+async def drv_msg_drop(chat_id: int, mid: int) -> None:
+    """Забыть один номер. Зовётся после попытки удаления — удалось или нет.
+
+    Не удалось — значит уже не удастся: телеграм отказывает по возрасту, и
+    очередь копилась бы вечно, пересчитывая одно и то же каждые пять минут."""
+    db = _db_or_none()
+    if db is None or not (chat_id and mid): return
+    try:
+        await db.driver_msgs.update_one(
+            {"_id": int(chat_id)}, {"$pull": {"msgs": {"m": int(mid)}}})
+    except Exception as e:
+        log.debug(f"drv_msg_drop {chat_id}/{mid}: {e}")
+
+
 # ── Где водители ────────────────────────────────────────────────────────────
 # Координаты приходят живой трансляцией телеграма: водитель сам включает её на
 # смену и сам видит её у себя в чате с таймером и кнопкой «остановить».

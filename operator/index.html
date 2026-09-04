@@ -23,7 +23,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=73"></script>
+<script src="/vendor/ambar-call.js?v=74"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -2964,13 +2964,18 @@ html.hid-boot #gameApp *{visibility:visible}
         d="M6 5L3 8l3 3"/><path d="M21 16H8a4 4 0 0 1-4-4v-1"/><path d="M18 19l3-3-3-3"/></svg></button>
     <span class="cv-cap">поворот</span>
   </div>
-  <div class="cv-cell">
-    <button class="cv-rb" id="cvCam" onclick="callCam()" aria-label="Камера">
+  <!-- Своей камеры у оператора нет и не будет: он не показывает лицо, он
+       смотрит. На её месте — разрешение водителю показать свою: нажал, и у
+       водителя ожила кнопка камеры. Само включение остаётся за водителем —
+       камера в кармане у него, и решать, когда её поднять, тоже ему. -->
+  <div class="cv-cell" id="cvGrantCell" style="display:none">
+    <button class="cv-rb" id="cvGrant" onclick="callGrantCam()"
+            aria-label="Разрешить камеру водителю">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
         stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path
         d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/><path
         class="cvx" d="M2 2l20 20"/></svg></button>
-    <span class="cv-cap">камера</span>
+    <span class="cv-cap" id="cvGrantCap">дать камеру</span>
   </div>
   <div class="cv-cell">
     <button class="cv-rb" id="cvMic" onclick="callMute()" aria-label="Микрофон">
@@ -6396,10 +6401,18 @@ function callEvent(t, d){
       CALL_SAFE = d.emoji; safePaint(); return;
     case 'talking':
       CALL_ST = 'live'; CALL_T0 = Date.now(); CALL_Q = ''; _callMuted = false;
+      CALL_GRANT = false; CALL_GAVE = false;   // права придут отдельным пакетом
       clearInterval(_callTick); _callTick = setInterval(callTimer, 1000);
       safePaint();
       callVidPaint();
       callPaint(); callTimer();
+      return;
+    // Сервер сказал, кому здесь что можно. Кнопку «дать камеру» показываем
+    // только если есть кому давать: в разговоре со старшим её нет вовсе.
+    case 'camallow':
+      CALL_GRANT = !!d.grant;
+      if(d.own !== undefined || d.grant !== undefined) CALL_GAVE = !!d.on && !!d.grant;
+      callPaintGrant();
       return;
     case 'quality':
       CALL_Q = d.quality; callQuality();
@@ -6756,9 +6769,10 @@ function callVoicePaint(){
         <div class="cv-cell${CALL_CAM ? '' : ' dim'}">
           <button class="cv-rb cv-flip" onclick="callFlip()" aria-label="Другая камера">${F}</button>
           <span class="cv-cap">поворот</span></div>
-        <div class="cv-cell">
-          <button class="cv-rb${CALL_CAM ? '' : ' on'}" onclick="callCam()" aria-label="Камера">${V}</button>
-          <span class="cv-cap">камера</span></div>
+        ${CALL_GRANT ? `<div class="cv-cell">
+          <button class="cv-rb${CALL_GAVE ? '' : ' on'}" onclick="callGrantCam()"
+            aria-label="Разрешить камеру водителю">${V}</button>
+          <span class="cv-cap">${CALL_GAVE ? 'забрать' : 'дать камеру'}</span></div>` : ''}
         <div class="cv-cell">
           <button class="cv-rb mic${_callMuted ? ' on' : ''}" onclick="callMute()"
             aria-label="Микрофон">${M(_callMuted)}</button>
@@ -7503,11 +7517,37 @@ function lampAfterFlip(){
   if(CALL.torch) CALL.torch(CALL_LAMP && сзади).catch(() => {});
 }
 
-function callCam(){
-  if(!CALL) return;
+// Оператор своей камерой не пользуется — он выдаёт её водителю.
+//
+// Не «включает камеру у водителя»: включить чужую камеру нельзя и не нужно.
+// Он снимает запрет, а поднимать телефон и что показывать — решает водитель.
+// Так это и подписано: «дать камеру», а не «включить».
+let CALL_GRANT = false;   // мне вообще есть кому давать (собеседник — водитель)
+let CALL_GAVE  = false;   // и дал ли я уже
+
+function callGrantCam(){
+  if(!CALL || !CALL_GRANT) return;
   _hap('light');
-  CALL.camera(!CALL_CAM);
+  CALL_GAVE = !CALL_GAVE;
+  CALL.allowCam(CALL_GAVE);
+  callPaintGrant();
+  toast(CALL_GAVE ? 'Водитель может включить камеру' : 'Камера у водителя убрана');
 }
+
+function callPaintGrant(){
+  const cell = document.getElementById('cvGrantCell');
+  if(cell) cell.style.display = CALL_GRANT ? '' : 'none';
+  const b = document.getElementById('cvGrant');
+  if(b) b.classList.toggle('on', !CALL_GAVE);
+  const c = document.getElementById('cvGrantCap');
+  if(c) c.textContent = CALL_GAVE ? 'забрать' : 'дать камеру';
+  if(typeof callPaint === 'function') callPaint();
+}
+
+// Своей камеры у оператора нет: кнопки, которая её включала, тоже. Функция
+// оставлена пустой намеренно — на неё могли остаться ссылки в старой разметке,
+// и молчаливое «ничего не произошло» здесь честнее ошибки в консоли.
+function callCam(){}
 // Поворот камеры. Система гасит одну камеру раньше, чем откроет вторую, и кадр
 // на это время замирает — так устроен телефон. Но замерший кадр должен
 // читаться как задумка: размываем его и поворачиваем значок на кнопке. Раньше

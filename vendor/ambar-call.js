@@ -203,6 +203,10 @@
     this.remote = null;      // что пришло от собеседника
     this.facing = 'user';    // какая камера включена
     this.video = false;      // это видеозвонок
+    // Разрешил ли оператор показать камеру. Спрашивают об этом только в
+    // разговоре с оператором; в остальных сервер разрешает сразу и сам.
+    this.camOk = false;
+    this.camGrant = false;   // могу ли я выдавать разрешение (панель оператора)
     this.audio = null;       // куда играет собеседник
     this.call = null;        // {id, peer, dir, order, note, say}
     this.roster = [];
@@ -438,6 +442,7 @@
       case 'ring':                                  // нам звонят
         this.call = {id: m.call, peer: m.frm, dir: 'in', order: m.order || '',
                      kind: m.kind || '', video: !!m.video};
+        this.camOk = false; this.camGrant = false;
         this.tones.ring();
         this._emit('ring', this.call);
         break;
@@ -445,6 +450,7 @@
       case 'calling':                               // звоним мы
         this.call = {id: m.call, peer: m.to, dir: 'out', order: '', note: m.note || '',
                      video: this.video};
+        this.camOk = false; this.camGrant = false;
         this.tones.ringback();
         this._emit('calling', this.call);
         break;
@@ -501,6 +507,26 @@
         this._emit('remotecam', {on: !!m.on});
         break;
 
+      // Оператор разрешил показать камеру — или забрал разрешение обратно.
+      // Забрал: гасим свою камеру сами, не дожидаясь, пока человек нажмёт.
+      // Сервер всё равно перестанет передавать картинку, и висящий глазок при
+      // погасшем экране собеседника — худшее из возможных состояний.
+      case 'camallow':
+        if (m.grant !== undefined) this.camGrant = !!m.grant;
+        if (!m.own) {
+          this.camOk = !!m.on;
+          if (!m.on) this._camOff();
+        }
+        this._emit('camallow', {on: !!m.on, own: !!m.own, grant: this.camGrant});
+        break;
+
+      // Предложение с камерой не пропустили. Такое доходит только до того, кто
+      // включил камеру мимо разрешения; гасим и говорим экрану.
+      case 'camdenied':
+        this._camOff();
+        this._emit('camallow', {on: false, denied: true});
+        break;
+
       case 'micstate':                              // и микрофон тоже
         this._emit('remotemic', {on: !!m.on});
         break;
@@ -516,6 +542,18 @@
   };
 
   // ── действия ─────────────────────────────────────────────────────────────
+  // Разрешить собеседнику показать камеру. Отправляет только панель оператора;
+  // у остальных сервер этот пакет не примет, и правильно сделает.
+  AmbarCall.prototype.allowCam = function (on) {
+    this._send({t: 'camallow', on: !!on});
+  };
+  // Можно ли мне сейчас включить камеру. Роль собеседника клиент не угадывает:
+  // как только трубку сняли, сервер каждой стороне присылает свой ответ, и
+  // здесь остаётся только его помнить. Одна правда, и она на сервере.
+  AmbarCall.prototype.camAllowed = function () { return !!this.camOk; };
+  // Может ли эта сторона выдавать разрешение (панель оператора).
+  AmbarCall.prototype.canGrantCam = function () { return !!this.camGrant; };
+
   AmbarCall.prototype.dial = function (toKey, order, video) {
     var self = this;
     this.video = !!video;
@@ -830,6 +868,10 @@
 
   // Выключить и включить свою камеру посреди разговора.
   AmbarCall.prototype.camera = function (on) {
+    if (on && !this.camAllowed()) {
+      this._emit('camallow', {on: false, need: true});
+      return Promise.resolve();
+    }
     if (on) return this._camOn().catch(function () {});
     this._camOff();
     return Promise.resolve();

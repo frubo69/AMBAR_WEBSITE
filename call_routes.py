@@ -200,7 +200,7 @@ class Peer:
 
 class Call:
     __slots__ = ("cid", "caller", "callee_key", "callee", "order", "started",
-                 "answered", "ring_task", "video")
+                 "answered", "ring_task", "video", "cam_ok")
 
     def __init__(self, cid, caller, callee_key, order, video=False):
         self.cid, self.caller, self.callee_key = cid, caller, callee_key
@@ -210,6 +210,16 @@ class Call:
         self.answered = 0.0
         self.ring_task = None
         self.video = bool(video)   # видеозвонок решается в момент вызова
+        # Кому в этом разговоре можно показывать картинку. Ключи, а не флаг:
+        # разрешение выдаётся стороне, а не звонку, и снимается так же.
+        #
+        # Спрашивают разрешения только там, где в разговоре есть оператор. У
+        # остальных всё как было: старший и водитель включают камеру сами, и
+        # отнимать это заодно было бы тихой поломкой не того, о чём просили.
+        self.cam_ok = set()
+        if not _audio_only(caller.key, callee_key):
+            self.cam_ok.add(caller.key)
+            self.cam_ok.add(callee_key)
 
 
 _PEERS: dict = {}        # sid  → Peer
@@ -514,6 +524,14 @@ async def _start_call(caller: Peer, to_key: str, order: str, video: bool = False
         await caller.send(t="failed", why="busy")
         return
 
+    # Запрет первый. Оператор не звонит по видео и ему по видео не звонят: в
+    # его разговоре бывает одна картинка — камера водителя, и та по отдельному
+    # разрешению уже внутри звонка. Флаг из пакета для такой пары не читаем
+    # вовсе, а не «не показываем кнопку»: кнопку можно дорисовать.
+    if video and _audio_only(caller.key, to_key):
+        log.info(f"[call] {caller.label} → {to_key}: видео снято, паре положен голос")
+        video = False
+
     kind, _, name = to_key.partition(":")
     # Свои же сессии из целей вон: звонок самому себе — петля, а не связь.
     sess = [p for p in _sessions(to_key) if p.key != caller.key]
@@ -594,7 +612,21 @@ async def _accept(p: Peer, cid: str):
             await other.send(t="cancel", call=cid)
     await call.caller.send(t="accepted", call=cid, by=p.label)
     await p.send(t="joined", call=cid, peer=call.caller.label)
+    # Сразу говорим каждой стороне, что ей можно с камерой. Роль собеседника
+    # клиент угадывать не должен: он живёт в трёх разных приложениях, а правило
+    # одно, и знает его сервер. Заодно панель оператора узнаёт, что кнопка
+    # «разрешить камеру» здесь вообще уместна.
+    await _cam_state(call)
     log.info(f"[call] {call.caller.label} → {call.callee_key} принят")
+
+
+async def _cam_state(call: "Call"):
+    """Разослать обеим сторонам их же права на камеру."""
+    for кто, другой in ((call.caller, call.callee), (call.callee, call.caller)):
+        if not кто:
+            continue
+        await кто.send(t="camallow", on=(кто.key in call.cam_ok),
+                       grant=bool(кто.kind == "op" and другой and другой.kind == "drv"))
 
 
 # ── вебсокет ────────────────────────────────────────────────────────────────
@@ -744,15 +776,50 @@ async def _on_message(peer: Peer, m: dict):
                 await other.send(t=t, on=bool(m.get("on")))
         return
 
+    # Запрет второй. Разрешить камеру может только оператор и только водителю.
+    # Проверяем обе роли, а не одну: «разрешил сам себе» — это ровно то, что
+    # переписанный клиент и попробует.
+    if t == "camallow":
+        call = peer.call
+        if not call or not call.answered:
+            return
+        other = call.callee if call.caller.sid == peer.sid else call.caller
+        if peer.kind != "op" or not other or other.kind != "drv":
+            await peer.send(t="failed", why="not_allowed")
+            log.warning(f"[call] {peer.label}: попытка выдать камеру не по чину")
+            return
+        on = bool(m.get("on"))
+        if on:
+            call.cam_ok.add(other.key)
+        else:
+            call.cam_ok.discard(other.key)
+        log.info(f"[call] {peer.label} {'разрешил' if on else 'забрал'} камеру: {other.label}")
+        await other.send(t="camallow", on=on)
+        await peer.send(t="camallow", on=on, own=True)
+        return
+
     # Сигнальные пакеты просто перекладываем другой стороне: сервер в
     # содержимое не смотрит и ключей не знает — голос идёт мимо него.
+    #
+    # Кроме одного: запрет третий. Предложение, в котором есть отправляющая
+    # видеодорожка, доходит до второй стороны только при разрешении. Это и есть
+    # настоящий замок — картинка идёт мимо сервера, но договориться о ней
+    # стороны могут только через него.
     if t in ("sdp", "ice"):
         call = peer.call
         if not call:
             return
+        data = m.get("data")
+        if (t == "sdp" and isinstance(data, dict)
+                and data.get("type") == "offer"
+                and peer.key not in call.cam_ok
+                and _sdp_sends_video(str(data.get("sdp") or ""))):
+            await peer.send(t="camdenied")
+            log.warning(f"[call] {peer.label}: камера без разрешения — предложение не передано")
+            return
         other = call.callee if call.caller.sid == peer.sid else call.caller
         if other:
-            await other.send(t=t, call=call.cid, data=m.get("data"))
+            await other.send(t=t, call=call.cid, data=data)
 
 
 # ── кто это и кому ему можно ────────────────────────────────────────────────
@@ -865,6 +932,58 @@ def _roster(peer: Peer) -> list:
     for n in _drivers_of_operator(peer.label):
         add(f"drv:{n}", n, "водитель")
     return rows
+
+
+# ── камера: кому её вообще можно ────────────────────────────────────────────
+#
+# Оператор не звонит по видео и не показывает своё лицо. Единственная картинка,
+# которая бывает в его разговоре, — камера водителя, и включается она с
+# разрешения оператора: водитель показывает полку, подъезд или разбитую
+# бутылку, а не наоборот.
+#
+# Держится это тремя запретами, и все три на сервере. Клиент можно переписать,
+# сервер — нет.
+#
+#   1. Звонок, где на любом конце оператор, всегда голосовой: video из пакета
+#      для такой пары не читается вовсе.
+#   2. Разрешение выдаёт только оператор и только водителю. Себе — нельзя.
+#   3. Предложение связи, в котором есть отправляющая видеодорожка, сервер
+#      перекладывает второй стороне только при наличии разрешения. Это и есть
+#      настоящий замок: картинка идёт мимо сервера, но договориться о ней
+#      стороны могут только через него, и неразрешённое предложение просто не
+#      доходит.
+def _kind_of_key(key: str) -> str:
+    return (key or "").partition(":")[0]
+
+
+def _audio_only(a_key: str, b_key: str) -> bool:
+    """Пара, которой видео не положено вовсе."""
+    return "op" in (_kind_of_key(a_key), _kind_of_key(b_key))
+
+
+def _sdp_sends_video(sdp: str) -> bool:
+    """Есть ли в предложении видеодорожка, которая ПЕРЕДАЁТ.
+
+    Смотрим на секции: описание делится строками «m=», и всё до следующей «m=»
+    относится к текущей дорожке. Направление ищем в самой секции; если его там
+    нет, по стандарту оно sendrecv — то есть передаёт.
+
+    Приём чужой картинки (recvonly) и выключенная дорожка (inactive) сюда не
+    попадают: запрещать надо показ, а не просмотр. Пересборка связи без видео
+    («перезапуск ICE») тоже проходит мимо — в её описании видеосекции нет."""
+    видео = False
+    напр = ""
+    for строка in (sdp or "").splitlines():
+        s = строка.strip()
+        if s.startswith("m="):
+            if видео and напр in ("", "sendrecv", "sendonly"):
+                return True
+            видео = s.startswith("m=video")
+            напр = ""
+        elif видео and s.startswith("a=") and s[2:] in (
+                "sendrecv", "sendonly", "recvonly", "inactive"):
+            напр = s[2:]
+    return видео and напр in ("", "sendrecv", "sendonly")
 
 
 def _may_call(peer: Peer, to_key: str) -> bool:

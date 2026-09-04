@@ -1279,6 +1279,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    камеру не зеркалим: на ней читают вывески и номера. */
 #slotLocal video{transform:scaleX(-1)}
 .call-scr.cam-back #slotLocal video{transform:none}
+/* Камера, которую пока не разрешили. Не прячем, а гасим: спрятанная кнопка не
+   объясняет, куда делась камера, а погасшая — объясняет, и человек знает, что
+   спросить у оператора. */
+.cs-rb.locked,.cv-rb.locked{opacity:.35}
+.cs-rb.locked:active,.cv-rb.locked:active{transform:none}
+
 /* Камера выключена — вместо замершего кадра серая плашка с перечёркнутой
    камерой. Её видят оба: и тот, кто выключил, и тот, кому перестали
    показывать. */
@@ -2851,7 +2857,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=73"></script>
+<script src="/vendor/ambar-call.js?v=74"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -7187,7 +7193,19 @@ function callEvent(t, d){
       _callMuted = false; callBuzz(false);
       try{ tg.HapticFeedback.impactOccurred('medium'); }catch(e){}
       clearInterval(_callTick); _callTick = setInterval(callTick, 1000);
+      CALL_CAMOK = false;              // права придут отдельным пакетом
       callRender(); callTick();
+      return;
+    // Оператор разрешил показать камеру — или забрал разрешение.
+    //
+    // В разговоре со старшим этот пакет приходит сразу разрешающим: спрашивают
+    // только там, где на другом конце оператор.
+    case 'camallow':
+      CALL_CAMOK = !!d.on;
+      if(d.need) { toast('Камеру разрешает оператор', 'err'); return; }
+      if(d.denied){ toast('Камеру убрали', 'err'); callPaintCam(); return; }
+      callPaintCam();
+      if(d.on) toast('Оператор разрешил показать камеру');
       return;
     case 'quality':
       CALL_Q = d.quality;
@@ -7446,10 +7464,29 @@ function _hap(вид){
     else h.impactOccurred(вид || 'light');
   }catch(e){}
 }
+// Камера водителя в разговоре с оператором включается только с его разрешения.
+// Кнопка при этом не прячется, а гаснет: спрятанная кнопка не объясняет, куда
+// делась камера, а погасшая с подписью — объясняет.
+let CALL_CAMOK = false;
+
 function callCam(){
   if(!CALL) return;
+  if(!CALL.camAllowed || !CALL.camAllowed()){
+    _hap('light');
+    toast('Камеру разрешает оператор', 'err');
+    return;
+  }
   _hap('light');
   CALL.camera(!CALL_CAM);
+}
+
+function callPaintCam(){
+  const можно = !CALL || !CALL.camAllowed || CALL.camAllowed();
+  ['csCam', 'cvCam'].forEach(id => {
+    const b = document.getElementById(id);
+    if(b) b.classList.toggle('locked', !можно);
+  });
+  if(typeof callRender === 'function') callRender();
 }
 // Поворот камеры. Система гасит одну камеру раньше, чем откроет вторую, и
 // кадр на это время замирает — так устроен телефон, спорить не с чем. Но

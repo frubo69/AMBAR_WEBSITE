@@ -1623,6 +1623,25 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
    карточка. Подписи нет — она пересказывала само слово «чек-лист». */
 .chk-e-b b{display:block;font-family:'Space Grotesk',sans-serif;font-size:15px;
   font-weight:700;letter-spacing:.6px;text-transform:uppercase;line-height:1.2}
+/* Точка состояния. Вопрос здесь двоичный — «надо ли зайти» — и ответ должен
+   быть двоичным: одна точка, без числа и без слова. Сколько именно дел, видно
+   внутри; снаружи важно только, стоит ли открывать.
+
+   Пока не спросили сервер, точки нет вовсе: мигнуть зелёным и тут же стать
+   красным хуже, чем секунду помолчать. */
+.chk-e-dot{flex:0 0 auto;width:8px;height:8px;margin-right:3px;border-radius:50%;
+  background:transparent;transition:background .3s var(--e1),box-shadow .3s var(--e1)}
+.chk-e-dot.ok{background:var(--up);box-shadow:0 0 0 3px rgba(76,175,125,.14)}
+.chk-e-dot.now{background:var(--gold2);box-shadow:0 0 0 3px rgba(201,169,110,.16)}
+/* Просроченное дышит — не мигает: мигание кричит, дыхание зовёт. */
+.chk-e-dot.late{background:var(--dn);animation:chkBreath 2.6s var(--e1) infinite}
+@keyframes chkBreath{
+  0%,100%{box-shadow:0 0 0 0 rgba(224,85,85,.42)}
+  70%    {box-shadow:0 0 0 9px rgba(224,85,85,0)}
+}
+@media (prefers-reduced-motion:reduce){
+  .chk-e-dot.late{animation:none;box-shadow:0 0 0 3px rgba(224,85,85,.2)}
+}
 .chk-e-go{display:flex;align-items:center;color:var(--muted);flex-shrink:0}
 .acc-cell{display:flex;flex-direction:column;align-items:flex-start;gap:0;
   padding:14px;cursor:pointer;text-align:left;color:var(--text);
@@ -13100,12 +13119,37 @@ function accRender(){
         <path d="M9 5h10M9 12h10M9 19h10"/><path d="M3.5 5l1.4 1.4L7.5 3.8"/>
         <path d="M3.5 12l1.4 1.4L7.5 10.8"/><path d="M3.5 19l1.4 1.4L7.5 17.8"/></svg></span>
       <span class="chk-e-b"><b>Чек-лист смены</b></span>
+      <span class="chk-e-dot" id="chkDot" aria-hidden="true"></span>
       <span class="chk-e-go"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
         stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></span>
     </button>
     <div class="acc-group">${pick(['expenses','order'])}</div>
     <div class="acc-group acc-3">${pick(['stock','qr','check'])}</div>`;
   accFit();
+  chkDot();
+}
+
+// Состояние чек-листа — одной точкой на входе в него.
+//
+// Спрашиваем сервер, а не считаем сами: список собирается там, по расписанию
+// смены и по данным, которых у страницы нет. Если уже спрашивали в этот заход,
+// берём готовое — открывать «Учёт» и каждый раз ждать сеть незачем.
+let CKL_CNT = null;
+async function chkDot(){
+  const пиши = c => {
+    const d = document.getElementById('chkDot');
+    if(!d || !c) return;
+    d.className = 'chk-e-dot ' + (c.late ? 'late' : c.now ? 'now' : 'ok');
+  };
+  if(CKL_CNT){ пиши(CKL_CNT); return; }
+  if(CKL && CKL.counts){ CKL_CNT = CKL.counts; пиши(CKL_CNT); return; }
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/checklist');
+    CKL = r; CKL_CNT = r.counts || null;
+    пиши(CKL_CNT);
+  }catch(e){
+    // Не спросили — точки нет. Молчание честнее зелёного наугад.
+  }
 }
 
 // ── История заказов ────────────────────────────────────────────────────────
@@ -13260,6 +13304,7 @@ async function accChecklist(){
       '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
     return;
   }
+  CKL_CNT = (CKL && CKL.counts) || null;
   chkRender();
 }
 

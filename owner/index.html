@@ -16741,7 +16741,7 @@ function expRow(r){
           ${sq('home', w === false, 'Дома',
                `expSetWork('${escS(r.name)}', ${w === false ? 'null' : 'false'})`)}
           ${sq(open ? 'less' : 'add', false,
-               open ? 'Свернуть разовые' : 'Разовые расходы',
+               open ? 'Свернуть доп. расходы' : 'Доп. расходы',
                `expToggleForm('${escS(r.name)}')`)}
         </span>
       </span>
@@ -23122,10 +23122,10 @@ const DETAIL = {
                  <div class="dt-row-s">${d.days} ${pluralize(d.days,'день','дня','дней')} · питание <span data-aed="${d.meal}">${fmt(d.meal)}</span>${d.extra?' · доп. расходы <span data-aed="'+d.extra+'">'+fmt(d.extra)+'</span>':''}</div></div>
                  <div class="dt-row-r"><span data-aed="${d.total}">${fmt(d.total)}</span> AED</div></div>`).join('');
              const its=(sp.items||[]).map(i=>
-               `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${escS(i.comment||'разовый расход')}</div>
+               `<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">${escS(i.comment||'доп. расход')}</div>
                  <div class="dt-row-s">${escS(i.driver)} · ${escS(String(i.day||'').slice(8,10))}.${escS(String(i.day||'').slice(5,7))}</div></div>
                  <div class="dt-row-r"><span data-aed="${i.amount}">${fmt(i.amount)}</span> AED</div></div>`).join('');
-             const note=`<div class="dt-row"><div class="dt-row-l"><div class="dt-row-s" style="line-height:1.5">Питание считается по ставке: ${fmt(r.working||0)} за рабочий день, ${fmt(r.off||0)} за выходной. Разовые попадают сюда только после вашего согласования — ожидающие не вычитаются.</div></div></div>`;
+             const note=`<div class="dt-row"><div class="dt-row-l"><div class="dt-row-s" style="line-height:1.5">Питание считается по ставке: ${fmt(r.working||0)} за рабочий день, ${fmt(r.off||0)} за выходной. Доп. расходы попадают сюда только после вашего согласования — ожидающие не вычитаются.</div></div></div>`;
              return `<div class="dt-row" style="cursor:pointer" onclick="var el=document.getElementById('_expandSpend'),a=this.querySelector('[data-arr]'),o=el.style.display==='none';el.style.display=o?'block':'none';_dtExpandState._spend=o;if(a)a.textContent=o?'⌃':'⌵'"><div class="dt-row-l"><div class="dt-row-t">Расход водителей</div><div class="dt-row-s">${parts.join(' · ')}</div></div><div class="dt-row-r dn">−<span data-aed="${sp.total}">${fmt(sp.total)}</span> AED</div><div class="dt-row-r" data-arr style="color:var(--muted);font-size:16px;margin-left:4px">${_dtExpandState._spend?'⌃':'⌵'}</div></div>
              <div id="_expandSpend" style="display:${_dtExpandState._spend?'block':'none'};margin:0 -14px;padding:4px 8px 4px 14px;background:rgba(0,0,0,.2);border-left:2px solid var(--dn)">${men}${its}${note}</div>`;
            })()}

@@ -3699,13 +3699,16 @@ button.path:active{transform:scale(.995)}
 .exp-item-c{flex:1;min-width:0;padding:8px 10px;border-radius:9px;
   border:1px solid var(--border3);background:var(--card2);font-size:12.5px;color:var(--sub);
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-/* Чек. Ровно той же высоты, что сумма рядом: доказательство — часть строки, а
-   не значок при ней. Пустая рамка вместо снимка значит, что кадр есть, но ещё
-   не приехал, — нажатие его и приносит. */
-.exp-item-ph{width:32px;height:32px;flex-shrink:0;padding:0;overflow:hidden;cursor:pointer;
-  border-radius:9px;border:1px solid var(--border3);background:var(--card2)}
-.exp-item-ph img{width:100%;height:100%;object-fit:cover;display:block}
-.exp-item-ph:active{transform:scale(.92)}
+/* Чек. Значок при названии вида, а не квадрат в строке: строка узкая, и
+   комментарий в ней — единственное, что отвечает «за что». Приподнят на
+   полпикселя, чтобы сидеть на одной линии с прописными буквами рядом. */
+.exp-item-ph{display:inline-block;flex-shrink:0;padding:0 0 0 5px;margin:0;cursor:pointer;
+  border:none;background:none;color:var(--gold2);vertical-align:-2px;line-height:0}
+.exp-item-ph:active{transform:scale(.86)}
+/* У отклонённой строки перечёркнута вся запись, значок вместе с ней. Вывести
+   его из-под линии нельзя: браузер ведёт её через всю строку, включая вложенные
+   блоки. Да и незачем — отклонили запись целиком, чек её часть. */
+.exp-item.rejected .exp-item-ph{color:var(--muted)}
 
 .exp-item-x,.exp-item-ok,.exp-item-no{width:32px;height:32px;flex-shrink:0;border-radius:9px;
   cursor:pointer;border:1px solid var(--border3);background:transparent;color:var(--muted);
@@ -16747,10 +16750,10 @@ function expRow(r){
     ${extras.length ? `<div class="exp-items">${extras.map(e => {
       const st = e.status || 'approved';
       return `<div class="exp-item ${st}">
-        ${expShotBtn(e)}
         <span class="exp-item-a">${e.amount}</span>
         <span class="exp-item-c">${e.kind_t && e.kind !== 'other'
-          ? `<b class="exp-item-k">${escS(e.kind_t)}</b> · ` : ''}${escS(e.comment)}${
+          ? `<b class="exp-item-k">${escS(e.kind_t)}</b>${expShotBtn(e)} · ` : expShotBtn(e)}${
+          escS(e.comment)}${
           e.by_driver ? `<i class="exp-from">от водителя</i>` : ''}</span>
         ${st === 'pending' ? `
           <button class="exp-item-ok" title="Принять"
@@ -16768,35 +16771,52 @@ function expRow(r){
   </div>`;
 }
 
-// Чек в строке. Решение по расходу принимают, глядя на эту строку, — значит
-// и доказательство должно быть здесь, а не «где-то в базе». Миниатюра приезжает
-// вместе со строкой, полный кадр — по нажатию и только один раз.
+// Чек в строке. Решение по расходу принимают, глядя на эту строку, — значит и
+// доказательство должно быть здесь, а не «где-то в базе».
+//
+// Значком, а не миниатюрой: квадрат 32px уносил у комментария почти сорок
+// пикселей, а комментарий — единственное, что отвечает «за что». Разглядеть
+// чек в квадрате всё равно нельзя, там серый прямоугольник; значок говорит ровно
+// то же самое — доказательство есть, нажми, — и стоит вчетверо дешевле.
+// Место у названия вида: туда и так смотрят первым делом.
 function expShotBtn(e){
   if(!e.photo && !e.thumb) return '';
-  return `<button class="exp-item-ph" id="expth-${escS(e.id)}"
-     title="Чек" aria-label="Показать чек"
-     onclick="event.stopPropagation();expShotOpen('${escS(e.id)}','${escS(e.comment || '')}')">
-    ${e.thumb ? `<img src="${escS(e.thumb)}" alt="">` : ''}</button>`;
+  return `<button class="exp-item-ph" title="Показать чек" aria-label="Показать чек"
+     onclick="event.stopPropagation();expShotOpen('${escS(e.id)}','${escS(e.comment || '')}',
+       '${escS(e.thumb || '')}')">
+    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M4 7.5h3.2l1.8-2.2h6l1.8 2.2H20v11H4z"/><circle cx="12" cy="13" r="3.4"/>
+    </svg></button>`;
 }
 
 const _expImg = {};
-async function expShotOpen(id, name){
-  let url = _expImg[id];
-  try{
-    if(!url){ url = _expImg[id] = await ownerApi.ownerBlob(
-      '/api/owner/expenses/photo/' + encodeURIComponent(id)); }
-  }catch(e){ _toast('Чека не нашлось'); return; }
-  const th = document.getElementById('expth-' + id);
-  if(th && !th.firstChild) th.innerHTML = `<img src="${url}" alt="">`;
+function _woFull(){
   let ov = document.getElementById('woFull');
   if(!ov){
     ov = document.createElement('div'); ov.id = 'woFull'; ov.className = 'wo-full';
     ov.onclick = () => ov.classList.remove('show');
     document.body.appendChild(ov);
   }
-  ov.innerHTML = `<img src="${url}" alt="Чек"><span>${escS(name || '')}</span>`;
+  return ov;
+}
+async function expShotOpen(id, name, thumb){
+  const ov = _woFull();
+  const кадр = url => `<img src="${url}" alt="Чек"><span>${escS(name || '')}</span>`;
+  // Сначала показываем то, что уже есть в строке: полный кадр едет по сети, и
+  // без этого экран после нажатия секунду стоит пустым. Размытая копия честнее
+  // пустоты — видно, что нажатие сработало и чек существует.
+  ov.innerHTML = кадр(_expImg[id] || thumb || '');
   ov.classList.add('show');
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  if(_expImg[id]) return;
+  try{
+    _expImg[id] = await ownerApi.ownerBlob(
+      '/api/owner/expenses/photo/' + encodeURIComponent(id));
+  }catch(e){
+    ov.classList.remove('show'); _toast('Чека не нашлось'); return;
+  }
+  if(ov.classList.contains('show')) ov.innerHTML = кадр(_expImg[id]);
 }
 
 // За что именно. «Доп. расход» одной строкой не отвечал ни на один вопрос,

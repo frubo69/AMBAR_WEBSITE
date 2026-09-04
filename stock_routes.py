@@ -1746,7 +1746,7 @@ async def _blame_set(wid: str, body: dict, request, by_name: str, note: str = ""
                else _loss_of(doc.get("item") or "", int(doc.get("qty") or 0)))
     if сколько <= 0:
         return None
-    обновл = await db.writeoff_comp_set(wid, кто, сколько, note[:200],
+    обновл = await db.writeoff_compensate(wid, кто, сколько, note[:200],
                                         request.get("owner_id") or 0, by_name)
     if not обновл:
         return None
@@ -1755,7 +1755,7 @@ async def _blame_set(wid: str, body: dict, request, by_name: str, note: str = ""
         await _writeoff_comp_tell(обновл)
     except Exception as e:                                   # noqa: BLE001
         log.warning(f"[writeoff] про удержание не сообщили: {e}")
-    return обновл.get("comp") or None
+    return _comp_view(обновл)
 
 
 @require_owner
@@ -2005,7 +2005,7 @@ async def handle_writeoff_decide(request):
         сколько = (int(сумма) if str(сумма or "").strip().lstrip("-").isdigit()
                    else _loss_of(doc.get("item") or "", int(doc.get("qty") or 0)))
         if виновный and сколько > 0:
-            обновл = await db.writeoff_comp_set(
+            обновл = await db.writeoff_compensate(
                 wid, виновный, сколько, note, request.get("owner_id") or 0, who)
             if обновл:
                 doc = обновл
@@ -2017,7 +2017,7 @@ async def handle_writeoff_decide(request):
 
     await _writeoff_after(doc, ok, who)
     return web.json_response({"ok": True, "id": wid, "state": doc.get("state"),
-                              "comp": doc.get("comp") or None},
+                              "comp": _comp_view(doc)},
                              headers=CORS_HEADERS)
 
 
@@ -2067,9 +2067,20 @@ async def handle_writeoff_compensate(request):
         await _writeoff_comp_tell(doc)
     except Exception as e:
         log.warning(f"[writeoff] про удержание не сообщили: {e}")
-    return web.json_response({"ok": True, "id": wid,
-                              "comp": doc.get("comp") or None},
+    return web.json_response({"ok": True, "id": wid, "comp": _comp_view(doc)},
                              headers=CORS_HEADERS)
+
+
+def _comp_view(doc: dict):
+    """Удержание для ответа страницей. Дату отдаём строкой: в самом документе
+    она объектом, и json на ней падает — падал уже после записи, так что
+    страница видела «не удалось» на удавшемся действии."""
+    c = (doc or {}).get("comp") or {}
+    if not c.get("amount"):
+        return None
+    return {"who": c.get("who", ""), "amount": int(c.get("amount") or 0),
+            "note": c.get("note", ""), "by_name": c.get("by_name", ""),
+            "at": _iso_of(c.get("at")) if c.get("at") else ""}
 
 
 async def _writeoff_comp_tell(doc: dict):

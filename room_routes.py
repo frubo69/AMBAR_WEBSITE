@@ -121,7 +121,7 @@ async def handle_ws(request):
             # что внутри sdp, сервер не знает и знать не должен — голос и
             # картинка идут мимо него.
             if t in ("sdp", "ice", "ring", "accept", "reject", "bye",
-                     "emoji", "camstate", "micstate", "name"):
+                     "camstate", "micstate", "name"):
                 await _tell_other(me, **{**m, "t": t})
     except Exception as e:                                   # noqa: BLE001
         log.debug(f"[room] {room}: {e}")

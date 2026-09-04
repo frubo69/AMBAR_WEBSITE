@@ -126,24 +126,25 @@ button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
 .rb .x{opacity:0}
 .rb.on .x{opacity:1}
 
-/* ── смайлики ──────────────────────────────────────────────────────────── */
-.emo{position:absolute;left:0;right:0;bottom:calc(92px + var(--safe-b));z-index:5;
-  display:flex;justify-content:center;gap:8px;opacity:0;transform:translateY(10px);
-  pointer-events:none;transition:opacity .2s var(--e),transform .2s var(--e)}
-.emo.on{opacity:1;transform:none;pointer-events:auto}
-.emo button{width:46px;height:46px;border-radius:50%;font-size:23px;line-height:1;
-  background:rgba(255,255,255,.14);backdrop-filter:blur(14px);
-  -webkit-backdrop-filter:blur(14px)}
-.emo button:active{transform:scale(.86)}
-/* Улетающий смайлик. Своими руками, а не библиотекой: одна анимация. */
-.fly{position:absolute;bottom:calc(120px + var(--safe-b));z-index:6;font-size:34px;
-  pointer-events:none;animation:fly 2.4s ease-out forwards}
-@keyframes fly{
-  0%  {opacity:0;transform:translateY(0) scale(.6)}
-  12% {opacity:1;transform:translateY(-26px) scale(1.15)}
-  30% {transform:translateY(-90px) scale(1)}
-  100%{opacity:0;transform:translateY(-320px) scale(.9)}
-}
+/* ── четыре смайлика: проверка от посредника ───────────────────────────── */
+.safe{display:flex;align-items:center;gap:8px;margin-top:9px;padding:7px 12px 7px 10px;
+  border-radius:999px;background:rgba(255,255,255,.1);
+  backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);
+  pointer-events:auto;cursor:pointer;opacity:0;transform:translateY(-6px);
+  transition:opacity .3s var(--e),transform .3s var(--e)}
+.safe.on{opacity:1;transform:none}
+.safe b{font-size:19px;line-height:1;letter-spacing:3px;font-weight:400}
+.safe span{font-size:11px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+  color:#d8d8e6;opacity:.75}
+/* Пояснение — по нажатию, а не постоянной простынёй: читают один раз. */
+.why{position:fixed;inset:0;z-index:40;display:none;align-items:center;
+  justify-content:center;padding:28px;background:rgba(4,4,10,.86);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.why.on{display:flex}
+.why-in{max-width:360px;padding:24px;border-radius:20px;background:var(--card);
+  border:1px solid var(--line);text-align:center;display:flex;flex-direction:column;
+  align-items:center;gap:14px}
+.why-e{font-size:34px;letter-spacing:6px}
 
 /* ── входящий ──────────────────────────────────────────────────────────── */
 #in{position:fixed;inset:0;display:none;z-index:30;flex-direction:column;
@@ -217,9 +218,10 @@ button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
   </div>
   <video id="near" playsinline autoplay muted></video>
 
-  <div class="top"><div class="n" id="topN">—</div><div class="t" id="topT">соединяем…</div></div>
-
-  <div class="emo" id="emoBar"></div>
+  <div class="top"><div class="n" id="topN">—</div><div class="t" id="topT">соединяем…</div>
+    <button class="safe" id="safe" onclick="whyOpen()">
+      <b id="safeE"></b><span>сверьте</span></button>
+  </div>
 
   <div class="bar">
     <button class="rb" id="bMic" onclick="toggleMic()" aria-label="Микрофон">
@@ -231,9 +233,6 @@ button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
     <button class="rb" id="bFlip" onclick="flipCam()" aria-label="Другая камера" style="display:none">
       <svg viewBox="0 0 24 24"><path d="M3 8h13a4 4 0 0 1 4 4v1"/><path d="M6 5L3 8l3 3"/>
         <path d="M21 16H8a4 4 0 0 1-4-4v-1"/><path d="M18 19l3-3-3-3"/></svg></button>
-    <button class="rb" id="bEmo" onclick="toggleEmo()" aria-label="Смайлик">
-      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8.5 14.5a4.5 4.5 0 0 0 7 0"/>
-        <path d="M9 9.5h.01M15 9.5h.01"/></svg></button>
     <button class="rb drop" onclick="hangup()" aria-label="Завершить">
       <svg viewBox="0 0 24 24" stroke-width="2.2"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
   </div>
@@ -251,6 +250,21 @@ button{font:inherit;color:inherit;border:none;background:none;cursor:pointer}
     <div class="act"><button class="rb take" onclick="answer()">
       <svg viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></svg></button>
       <span>Ответить</span></div>
+  </div>
+</div>
+
+<!-- Зачем эти четыре смайлика. Объяснение по нажатию: читают его один раз, а
+     место оно занимало бы всегда. -->
+<div class="why" id="why" onclick="if(event.target===this)whyClose()">
+  <div class="why-in">
+    <div class="why-e" id="whyE"></div>
+    <div class="h1" style="font-size:19px">Проверка связи</div>
+    <div class="p">Голос и видео шифруются всегда. Но ключами браузеры меняются
+      через сервер, и тот, у кого есть к нему доступ, теоретически может встать
+      посередине.<br><br>Эти четыре смайлика посчитаны из самих ключей.
+      Назовите их вслух: <b>совпали — между вами никого нет</b>. Разошлись —
+      положите трубку.</div>
+    <button class="btn btn-gh" onclick="whyClose()">Понятно</button>
   </div>
 </div>
 
@@ -345,7 +359,6 @@ function onMsg(m){
 
     case 'sdp':      onSdp(m.data); break;
     case 'ice':      onIce(m.data); break;
-    case 'emoji':    fly(m.e, true); break;
     case 'camstate': farCam(!!m.on); break;
   }
 }
@@ -436,7 +449,7 @@ async function startMedia(звоню){
   PC.onicecandidate = e => { if(e.candidate) send({t:'ice', data:e.candidate}); };
   PC.onconnectionstatechange = () => {
     if(!PC) return;
-    if(PC.connectionState === 'connected') $('topT').textContent = '00:00';
+    if(PC.connectionState === 'connected') safety();   // ключи сверены
     if(PC.connectionState === 'failed'){ toast('Связь не поднялась'); stop(); }
   };
   // Кто звонил, тот и предлагает. Второе предложение — это уже включение
@@ -492,7 +505,8 @@ function stop(){
   $('far').srcObject = null; $('near').srcObject = null;
   $('near').classList.remove('on');
   $('call').classList.remove('on'); $('in').classList.remove('on');
-  $('emoBar').classList.remove('on');
+  $('why').classList.remove('on');
+  $('safe').classList.remove('on'); SAFE = null;
   $('bMic').classList.remove('on'); $('bCam').classList.remove('on');
   $('bFlip').style.display = 'none';
   farCam(false);
@@ -563,21 +577,56 @@ async function flipCam(){
 // везде, и на экране висел бы замерший кадр. Собеседник говорит словами.
 function farCam(on){ $('novid').classList.toggle('off', !!on); }
 
-// ── смайлики ──────────────────────────────────────────────────────────────
-const EMO = ['❤️','😂','👍','🔥','👏','😮'];
-$('emoBar').innerHTML = EMO.map(e =>
-  `<button onclick="sendEmo('${e}')">${e}</button>`).join('');
-function toggleEmo(){ $('emoBar').classList.toggle('on'); }
-function sendEmo(e){ fly(e, false); send({t:'emoji', e}); }
-function fly(e, чужой){
-  const d = document.createElement('div');
-  d.className = 'fly'; d.textContent = e;
-  d.style.left = (12 + Math.random()*70) + '%';
-  d.style.animationDelay = (Math.random()*.12) + 's';
-  $('call').appendChild(d);
-  setTimeout(() => d.remove(), 2600);
-  if(чужой) try{ navigator.vibrate && navigator.vibrate(12); }catch(_){}
+// ── четыре смайлика: проверка от посредника ───────────────────────────────
+//
+// Голос и картинка шифруются всегда — иначе вебртс соединение не соберёт. Но
+// ключами браузеры меняются ЧЕРЕЗ наш сервер, и тот, у кого есть к нему доступ,
+// теоретически может подменить их и встать посередине. От этого шифрование само
+// по себе не спасает — спасает сверка голосом.
+//
+// Считаем отпечатки обоих ключей, складываем в одном и том же порядке (иначе у
+// сторон вышло бы разное) и превращаем в четыре смайлика. Подменили ключи —
+// отпечатки другие, и смайлики разойдутся. Совпали — между вами никого нет, и
+// это уже не зависит от сервера вовсе.
+//
+// Тот же алфавит и тот же счёт, что в связи водителя с оператором: две разные
+// реализации одной проверки однажды разойдутся, и разойдутся молча.
+const СМАЙЛЫ = ('\u{1F600}\u{1F605}\u{1F602}\u{1F923}\u{1F60A}\u{1F60D}\u{1F929}\u{1F60E}' +
+  '\u{1F914}\u{1F92F}\u{1F634}\u{1F973}\u{1F607}\u{1F920}\u{1F978}\u{1F63A}' +
+  '\u{1F436}\u{1F431}\u{1F98A}\u{1F43B}\u{1F43C}\u{1F428}\u{1F42F}\u{1F981}' +
+  '\u{1F42E}\u{1F437}\u{1F438}\u{1F435}\u{1F414}\u{1F427}\u{1F989}\u{1F984}' +
+  '\u{1F41D}\u{1F98B}\u{1F422}\u{1F419}\u{1F980}\u{1F42C}\u{1F433}\u{1F988}' +
+  '\u{1F335}\u{1F332}\u{1F340}\u{1F338}\u{1F33B}\u{1F308}\u{2B50}\u{1F525}' +
+  '\u{1F4A7}\u{1F34E}\u{1F34C}\u{1F347}\u{1F353}\u{1F352}\u{1F351}\u{1F355}' +
+  '\u{1F354}\u{1F32E}\u{1F366}\u{1F369}\u{1F36A}\u{2615}\u{26BD}\u{1F3B8}'
+  ).match(/./gu) || [];
+
+const _fp = sdp => {
+  const m = /a=fingerprint:sha-256 ([0-9A-Fa-f:]+)/.exec(sdp || '');
+  return m ? m[1].toUpperCase() : '';
+};
+
+let SAFE = null;
+async function safety(){
+  if(!PC || !window.crypto || !crypto.subtle) return;
+  const свой  = _fp(PC.currentLocalDescription  && PC.currentLocalDescription.sdp);
+  const чужой = _fp(PC.currentRemoteDescription && PC.currentRemoteDescription.sdp);
+  if(!свой || !чужой) return;
+  // Порядок один и тот же у обеих сторон — иначе смайлики разошлись бы даже
+  // без злоумышленника.
+  const строка = [свой, чужой].sort().join('|');
+  try{
+    const b = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(строка));
+    const байты = new Uint8Array(b), из = [];
+    for(let i = 0; i < 4; i++) из.push(СМАЙЛЫ[байты[i] % СМАЙЛЫ.length]);
+    SAFE = из.join('');
+    $('safeE').textContent = SAFE;
+    $('whyE').textContent = SAFE;
+    $('safe').classList.add('on');
+  }catch(e){}
 }
+function whyOpen(){ if(SAFE) $('why').classList.add('on'); }
+function whyClose(){ $('why').classList.remove('on'); }
 
 // ── звуки ─────────────────────────────────────────────────────────────────
 // Свои, а не файлами: два тона решают задачу, а файл надо грузить и он

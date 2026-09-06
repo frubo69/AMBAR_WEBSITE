@@ -1173,6 +1173,9 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    приняли бутылки, — и должно этим отличаться, иначе читается как сегодняшнее. */
 .sup.stale{border-color:rgba(243,180,74,.35)}
 .sup-old{color:var(--warn);font-weight:600}
+.sup-tag{display:inline-block;vertical-align:2px;margin-left:4px;padding:1px 6px;border-radius:6px;
+  font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;
+  color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.3)}
 /* Полоса прогресса — единственное, что водитель ищет глазами, вернувшись в
    приложение с ящиком в руках. */
 .sup-bar{display:block;height:4px;border-radius:99px;background:var(--card3);
@@ -5795,7 +5798,7 @@ function supBadge(){
   const b = document.getElementById('tbSup');
   if(!b) return;
   const mine = (SUP && SUP.mine || []).reduce((a, t) => a + t.left, 0);
-  const free = (SUP && SUP.free || []).length;
+  const free = (SUP && SUP.free || []).length + (SUP && SUP.extra || []).length;
   const n = mine || free;
   b.style.display = n ? 'flex' : 'none';
   b.textContent = n;
@@ -5853,7 +5856,7 @@ function supCard(t){
        ${t.mine ? `onclick="supOpen('${t.supply_id}','${t.district}')"` : ''}>
     <span class="sup-code">${esc(t.district_code)}</span>
     <span class="sup-b">
-      <span class="sup-n">${esc(t.district_name)}</span>
+      <span class="sup-n">${esc(t.district_name)}${t.extra ? ' <span class="sup-tag">доп</span>' : ''}</span>
       <span class="sup-s">${низ}</span>
       ${started ? `<span class="sup-bar"><i style="width:${pct}%"></i></span>` : ''}
     </span>
@@ -5872,8 +5875,9 @@ const plural = (n, a, b, c) => {
 
 function renderSupply(){
   const body = document.getElementById('body');
-  const S = SUP || {mine:[], free:[], taken:[]};
-  if(!S.mine.length && !S.free.length && !S.taken.length){
+  const S = SUP || {mine:[], free:[], extra:[], taken:[]};
+  S.extra = S.extra || [];
+  if(!S.mine.length && !S.free.length && !S.extra.length && !S.taken.length){
     body.innerHTML = blank('<path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4"/><path d="M12 11v10"/>',
       'Принимать нечего',
       'Как только старший загрузит ответ магазина, поставка появится здесь',
@@ -5885,10 +5889,18 @@ function renderSupply(){
     h += `<div class="sect"><span class="sect-t">Моя приёмка</span></div>`;
     h += S.mine.map(supCard).join('');
   }
+  // Основная заявка — то, что уходило в магазин на всю сеть. Доп. заявка —
+  // ответ другой базы, куда ездили добирать недобор: другая поездка, поэтому
+  // отдельным списком ниже, а не вперемешку.
   if(S.free.length){
-    h += `<div class="sect"><span class="sect-t">Свободные</span>
+    h += `<div class="sect"><span class="sect-t">Основная заявка</span>
             <span class="sect-v">${S.free.length}</span></div>`;
     h += S.free.map(supCard).join('');
+  }
+  if(S.extra.length){
+    h += `<div class="sect"><span class="sect-t">Доп. заявка</span>
+            <span class="sect-v">${S.extra.length}</span></div>`;
+    h += S.extra.map(supCard).join('');
   }
   if(S.taken.length){
     h += `<div class="sect"><span class="sect-t">Забрали другие</span></div>`;

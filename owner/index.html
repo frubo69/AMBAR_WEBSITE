@@ -2112,8 +2112,11 @@ button.path:active{transform:scale(.995)}
 .xs-chip.on i{color:var(--gold2);opacity:.7}
 /* Приёмка заявки на базу — те же карточки, что в итоге мастера. */
 .xs-top-b .pstat-c{display:inline-flex}
-.xs-top-b .xs-top-s{display:block;font-style:normal;font-size:12px;font-weight:500;letter-spacing:0;
-  text-transform:none;color:var(--muted);margin:8px 0 0}
+.xs-top-s{display:block;font-size:12.5px;font-weight:500;color:var(--muted);margin-top:9px}
+.xs-top.xs-card{align-items:center;flex-wrap:wrap;margin:2px 0 12px;padding:16px 18px 18px;
+  border-radius:16px;background:var(--card);border:1px solid var(--border2)}
+.xs-bar{flex:0 0 100%;height:6px;border-radius:3px;margin-top:14px;overflow:hidden;background:var(--card3)}
+.xs-bar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#C9A96E,#E8C98A)}
 .xs-dcard.live{border-color:rgba(201,169,110,.4)}
 .xs-dcard.done{opacity:.7}
 .xs-pl.ok .xs-pl-q{background:rgba(76,175,125,.18);color:var(--up)}
@@ -16278,10 +16281,11 @@ function xSupRender(d){
       ${rtActs(t, d)}
     </div>`;
   }).join('');
-  document.getElementById('accMid').innerHTML = `<div class="xs-top">
+  document.getElementById('accMid').innerHTML = `<div class="xs-top xs-card">
       <span class="xs-top-b"><span class="pstat-c ${st[1]}">${st[0]}</span>
-        <i class="xs-top-s">${done} из ${all} ${pluralize(all,'района','районов','районов')} приняли</i></span>
+        <span class="xs-top-s">${done} из ${all} ${pluralize(all,'района','районов','районов')} приняли</span></span>
       <span class="xs-top-n">${fmt(got)}<i>из ${fmt(need)} ${pluralize(need,'бутылки','бутылок','бутылок')}</i></span>
+      <span class="xs-bar"><i style="width:${need ? Math.min(100, Math.round(got / need * 100)) : 0}%"></i></span>
     </div>${cards || '<div class="exp-empty">Районов нет</div>'}`;
   supActShow();
   supFoot();

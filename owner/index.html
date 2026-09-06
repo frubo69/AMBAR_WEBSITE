@@ -13706,7 +13706,41 @@ const CK_GO = {
   // Единственная задача, которую система знать не может: деньги переходят из
   // рук в руки, и подтвердить это может только человек.
   cash:      () => chkCash(),
+  // Водитель без входа: замок сторожа геопозиции снимается здесь же, без
+  // похода в «Команду», — строка и есть решение.
+  geo_lock:  () => chkGeoUnlock(),
 };
+
+async function chkGeoUnlock(){
+  const r = (CKL && (CKL.rows || []).find(x => x.id === 'geo_lock')) || {};
+  const names = r.names || [];
+  if(!names.length) return;
+  for(const name of names){
+    if(!confirm(`Открыть доступ в приложение: ${name}?`)) continue;
+    if(!await geoUnlock(name)) return;
+  }
+  CKL_RETURN = false;
+  accChecklist();
+}
+
+// Снять замок. Одно место на панель: зовут и чек-лист, и карточка водителя.
+async function geoUnlock(name){
+  try{
+    await ownerApi.ownerFetch('/api/owner/geo-unlock', {method:'POST', body:{name}});
+  }catch(e){
+    const err = (e.payload || {}).error;
+    _toast(err === 'not_locked' ? 'Вход уже открыт' : 'Не удалось открыть');
+    return err === 'not_locked';
+  }
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  _toast(`Доступ открыт: ${name}`);
+  // Список людей помнит замок — обновляем, чтобы метка ушла сразу.
+  if(OPS.data && (OPS.data.drivers || []).some(d => d.name === name)){
+    OPS.data.drivers.forEach(d => { if(d.name === name) d.geo_locked = ''; });
+    try{ renderOperators(); }catch(e){}
+  }
+  return true;
+}
 
 async function chkCash(){
   const r = (CKL && (CKL.rows || []).find(x => x.id === 'cash')) || {};
@@ -22903,7 +22937,11 @@ function renderOperators(){
               // поэтому метка, а не красная строка на весь список.
               + (op.driver && op.qr_bad
                   ? `<span class="lrow-tag" style="background:var(--dn-soft);color:var(--dn)"
-                       title="Проверка бутылок">не наших ${op.qr_bad}</span>` : '');
+                       title="Проверка бутылок">не наших ${op.qr_bad}</span>` : '')
+              // Замок сторожа геопозиции: человек не может работать, пока
+              // старший не откроет, — это видно из списка, а снимается в карточке.
+              + (op.driver && op.geo_locked
+                  ? '<span class="lrow-tag" style="background:var(--dn-soft);color:var(--dn)">ВХОД ЗАКРЫТ</span>' : '');
     return `<div class="lrow" data-detail="${op.driver?'driver':'operator'}:${escS(op.id)}">
       <div class="lrow-idx">${i+1}</div>
       <div class="lrow-av"${op.senior?' style="background:linear-gradient(135deg,#c9a96e,#e8c98a);color:#0a0a14"':''}>${escS(_opInitials(op.name))}</div>
@@ -23754,10 +23792,19 @@ const DETAIL = {
     return {
       title:`<div class="dt-tit-av plain">${escS(_opInitials(d.name))}</div>
         <div><div class="dt-tit-name">${escS(d.name)}${d.known ? '' :
-          ' <span class="dt-badge" style="background:var(--warn-soft);color:var(--warn)">НЕ В СПИСКЕ</span>'}</div>
+          ' <span class="dt-badge" style="background:var(--warn-soft);color:var(--warn)">НЕ В СПИСКЕ</span>'}${
+          d.geo_locked ? ' <span class="dt-badge" style="background:var(--dn-soft);color:var(--dn)">ВХОД ЗАКРЫТ</span>' : ''}</div>
         <div class="dt-sub">${escS(where || 'района нет в списке')}${
           d.operator ? ' · оператор ' + escS(d.operator) : ''}</div></div>`,
       body:`
+        ${d.geo_locked ? `
+        <div class="dt-sect">Доступ</div>
+        <div class="dt-card">
+          <div class="dt-row">
+            <div class="dt-row-l"><div class="dt-row-t" style="color:var(--dn)">Вход в приложение закрыт</div>
+            <div class="dt-row-s">с ${escS(fmtWhen(d.geo_locked))} · геопозиция пропала на смене и не вернулась до её конца</div></div>
+          </div>
+        </div>` : ''}
         <div class="dt-stats">
           ${stat('Доставил', d.delivered, `${d.orders} назначено${d.cancelled?` · ${d.cancelled} отменено`:''}`)}
           ${stat('Выручка', fmt(d.aed)+'<span class="u">AED</span>', 'по его заказам')}
@@ -23795,7 +23842,9 @@ const DETAIL = {
           : '<div class="dt-row"><div class="dt-row-l"><div class="dt-row-t">Нет в списке людей</div><div class="dt-row-s">имя пришло из заказов, а в config_staff его нет</div></div></div>'}
         </div>
       `,
-      foot: ''
+      foot: d.geo_locked
+        ? `<button class="dt-btn pri" onclick="geoUnlockCard('${escS(d.name)}','${escS(d.id)}')">Открыть доступ</button>`
+        : ''
     };
   },
 
@@ -24750,6 +24799,18 @@ const DETAIL = {
 let _dtStack = [];
 let _dtCurrent = null;
 let _dtExpandState = {};
+
+// Из карточки водителя: сняли замок — карточка перерисовывается без него.
+async function geoUnlockCard(name, id){
+  if(!confirm(`Открыть доступ в приложение: ${name}?`)) return;
+  if(!await geoUnlock(name)) return;
+  const tpl = DETAIL.driver(id);
+  if(tpl && _dtCurrent === 'driver:' + id){
+    document.getElementById('dtTitle').innerHTML = tpl.title;
+    document.getElementById('dtBody').innerHTML = tpl.body;
+    document.getElementById('dtFoot').innerHTML = tpl.foot || '';
+  }
+}
 
 function openDetail(key){
   const [type, id] = key.split(':');

@@ -1601,6 +1601,16 @@ async def handle_operators(request):
             "rating_count": len(revs),
             "tips": tips, "tips_bottles": bottles,
         })
+    # Замок сторожа геопозиции: вход в приложение закрыт, пока старший не
+    # откроет. Старший смотрит на людей здесь — здесь и открывает.
+    try:
+        locks = {x["name"]: x for x in await db.geo_locks_all()}
+        for d in drivers:
+            lk = locks.get(d["name"])
+            d["geo_locked"] = (_geo_dt(lk["locked_at"]).isoformat()
+                               if lk and _geo_dt(lk["locked_at"]) else "")
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[team] замки не прочитаны: {e}")
     # Флажок с проверки бутылок: у этого водителя за месяц находили бутылки не
     # из реестра. Старший смотрит на людей здесь, значит и знать он должен
     # здесь — а не только внутри раздела проверок.
@@ -3282,6 +3292,7 @@ async def _chk_supply(day: str):
 CHK_PLAN = [
     # id,           час «пора»,  час «поздно», +1 сутки к сроку
     ("shift",       11.5, 12.5, False),   # срок открытия; закрытие — CHK_SHIFT_CLOSE
+    ("geo_lock",     6.0,  6.0, True),    # замок ставится к концу смены; ждать нечего
     ("expenses",    12.0, 23.0, False),
     ("writeoffs",   12.0, 23.0, False),
     ("order_sent",  12.0, 15.0, False),
@@ -3295,6 +3306,19 @@ CHK_PLAN = [
 # под него две строки значило заставлять человека помнить, в какой он фазе.
 # Какая половина сейчас, решает время, а не он.
 CHK_SHIFT_CLOSE = (5.0, 6.0, True)
+
+
+def _geo_dt(v):
+    """Момент замка из базы — всегда со смещением, иначе его не сравнить с now."""
+    if not v:
+        return None
+    if isinstance(v, datetime):
+        return v if v.tzinfo else v.replace(tzinfo=timezone.utc)
+    try:
+        d = datetime.fromisoformat(str(v).replace("Z", ""))
+        return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+    except (ValueError, TypeError):
+        return None
 
 
 def _chk_at(day: str, hour: float, next_day: bool = False) -> datetime:
@@ -3445,6 +3469,27 @@ async def handle_checklist(request):
         rows.append(_chk_row("shortfall", "Докупить на доп. складах",
                              f"магазин не дал {sup['gap']} бутылок",
                              False, now, day, plan, go="short", n=sup["gap"]))
+    # Водитель без входа: сторож геопозиции закрыл ему приложение, и открыть
+    # может только старший. Строка есть, пока есть хоть один замок, — и горит
+    # красным с той минуты, как он поставлен: человек не может работать.
+    try:
+        locks = await db.geo_locks_all()
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[chk] замки не прочитаны: {e}")
+        locks = []
+    if locks:
+        names = ", ".join(x["name"] for x in locks)
+        row = _chk_row("geo_lock", "Водители без входа",
+                       f"{names} · геопозиция пропала и не вернулась к концу смены",
+                       False, now, day, plan, go="geo_lock", n=len(locks))
+        first = min((_geo_dt(x["locked_at"]) for x in locks if _geo_dt(x.get("locked_at"))),
+                    default=None)
+        row.update({"state": "late",
+                    "due": first.astimezone(DUBAI_TZ).strftime("%H:%M") if first else "",
+                    "late_min": max(0, int((now - first.astimezone(DUBAI_TZ))
+                                           .total_seconds() // 60)) if first else 0,
+                    "names": [x["name"] for x in locks]})
+        rows.append(row)
 
     # Порядок задан планом и не пляшет по цвету: список должен читаться как
     # один и тот же список, а не пересобираться каждый час.
@@ -3456,6 +3501,38 @@ async def handle_checklist(request):
         "now": now.isoformat(), "time": now.strftime("%H:%M"), "day": day,
         "rows": rows, "counts": counts,
     }, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_geo_unlock(request):
+    """Открыть водителю вход, закрытый сторожем геопозиции.
+
+    То же, что кнопка под сообщением бота, но из панели: старший может
+    решать там, где смотрит. Водителю пишет бот; кнопка в чате владельца
+    остаётся, второе нажатие по ней замка не найдёт и только уберёт её."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    name = (body.get("name") or "").strip()
+    if not name:
+        return web.json_response({"error": "bad_args"}, status=400, headers=CORS_HEADERS)
+    u = request.get("owner_user") or {}
+    full = (u.get("full_name") or f'{u.get("first_name", "")} {u.get("last_name", "")}').strip()
+    who = staff.display_name(request.get("owner_id"), full)
+    now = datetime.now(timezone.utc)
+    if not await db.geo_lock_clear_name(name, who, now):
+        return web.json_response({"error": "not_locked"}, status=409, headers=CORS_HEADERS)
+    log.info(f"[team] замок снят из панели: {name} — {who}")
+    try:
+        import geo_watch
+        await geo_watch._driver(name, "✅ Доступ в приложение открыт. Включите "
+                                      "трансляцию геопозиции и откройте смену.")
+        await db.insert_notification("drivers.geo_on",
+                                     f"🔓 *{_md(name)}*: доступ открыт — {_md(who)}")
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[team] после снятия замка: {e}")
+    return web.json_response({"ok": True, "name": name}, headers=CORS_HEADERS)
 
 
 @require_owner
@@ -3623,6 +3700,8 @@ def setup(app):
     app.router.add_get(             "/api/owner/orders", handle_orders)
     app.router.add_get(             "/api/owner/checklist", handle_checklist)
     app.router.add_route("OPTIONS", "/api/owner/checklist/mark", handle_checklist_mark)
+    app.router.add_route("OPTIONS", "/api/owner/geo-unlock", handle_geo_unlock)
+    app.router.add_post(            "/api/owner/geo-unlock", handle_geo_unlock)
     app.router.add_post(            "/api/owner/checklist/mark", handle_checklist_mark)
     app.router.add_route("OPTIONS", "/api/owner/support-threads", handle_support_threads)
     app.router.add_get(             "/api/owner/support-threads", handle_support_threads)

@@ -2763,6 +2763,26 @@ async def geo_lock_get(name: str) -> dict | None:
     return d if d and d.get("locked_at") else None
 
 
+async def geo_locks_all() -> list:
+    """Кто сейчас без входа — для панели: чек-лист и «Команда»."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.driver_geo_watch.find({"locked_at": {"$ne": None}})
+    return [{"name": d["_id"], "locked_at": d.get("locked_at"),
+             "why": d.get("lock_why") or ""} async for d in cur if d.get("locked_at")]
+
+
+async def geo_lock_clear_name(name: str, by_name: str, at) -> bool:
+    """Открыть вход по имени — из панели. False — замка не было."""
+    db = _db_or_none()
+    if db is None or not name: return False
+    d = await db.driver_geo_watch.find_one_and_update(
+        {"_id": name, "locked_at": {"$ne": None}},
+        {"$set": {"locked_at": None, "unlocked_at": at, "unlocked_by": by_name},
+         "$unset": {"lock_id": ""}})
+    return bool(d and d.get("locked_at"))
+
+
 async def geo_lock_clear(lock_id: str, by_name: str, at) -> str | None:
     """Открыть вход по ключу. Возвращает имя водителя; None — такого замка
     нет или его уже открыли (второе нажатие ничего не меняет)."""

@@ -3683,6 +3683,14 @@ button.path:active{transform:scale(.995)}
 .wo-c-p.on{background:var(--gold-soft);border-color:rgba(201,169,110,.45);color:var(--gold2)}
 .wo-c-p:active{transform:scale(.97)}
 .wo-c-none{font-size:12.5px;color:var(--muted)}
+/* Люди в удержании — районами, как «Кто на каком районе»; выбранный золотом. */
+.wo-c-crew{margin:0 -2px}
+.wo-c-crew .crw-c{margin-bottom:7px}
+.wo-c-crew .crw-c-h{padding:9px 10px}
+.wo-c-crew .crw-c-b{padding:9px 10px}
+.wo-c-crew .crw-op.on{color:var(--gold2);border-color:rgba(201,169,110,.55);background:var(--gold-soft)}
+.wo-c-crew .crw-p.on{background:var(--gold-soft);border-color:rgba(201,169,110,.55);color:var(--gold2)}
+.wo-c-crew .crw-p.on .crw-p-a{color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .wo-c-amt{display:flex;align-items:center;gap:9px}
 .wo-c-amt input{flex:1;min-width:0;height:46px;padding:0 14px;border-radius:13px;
   border:1px solid var(--border2);background:var(--card);color:var(--text);
@@ -21747,16 +21755,34 @@ async function woCompOpen(ev, id, режим){
   // Список людей — из штатного расписания: удержать можно и не с того, кто
   // списывал. Разбить может один, а отвечать за это — другой.
   if(!CREW) try{ CREW = await ownerApi.ownerFetch('/api/owner/staff'); }catch(e){ CREW = null; }
-  const mine = [], rest = [];
-  ((CREW || {}).districts || []).forEach(d => {
-    (d.drivers || []).forEach(n => {
-      const nm = typeof n === 'string' ? n : (n && n.name) || '';
-      if(!nm) return;
-      (d.id === r.district || d.code === r.district_code ? mine : rest).push(nm);
-    });
-  });
   const who = (r.comp || {}).who || r.by || '';
-  const list = [...new Set([...(r.by ? [r.by] : []), ...mine, ...rest])];
+  // Виноват может быть и оператор, не только водитель. Люди — районами, теми
+  // же карточками, что «Кто на каком районе»: оператор в шапке, водители
+  // чипами; район списания — первым. Старшие — отдельной карточкой.
+  const dist = [...((CREW || {}).districts || [])]
+    .sort((a, b) => (b.id === r.district || b.code === r.district_code) - (a.id === r.district || a.code === r.district_code));
+  const nm = n => typeof n === 'string' ? n : (n && n.name) || '';
+  const chip = (n, ico) => `<button class="crw-p wo-who${n === who ? ' on' : ''}" data-n="${escS(n)}"
+      onclick="woCompPick(this)"><span class="crw-p-a">${IC(ico, 15)}</span>
+      <span class="crw-p-n">${escS(n)}</span></button>`;
+  const cards = dist.map(d => `<div class="crw-c">
+      <div class="crw-c-h">
+        <span class="crew-code">${escS(d.code || '')}</span>
+        <span class="crw-c-n">${escS(d.name || '')}</span>
+        ${d.operator ? `<button class="crw-op wo-who${d.operator === who ? ' on' : ''}" data-n="${escS(d.operator)}"
+            onclick="woCompPick(this)"><span class="crw-op-n">${IC('headset', 15)}${escS(d.operator)}</span></button>` : ''}
+      </div>
+      <div class="crw-c-b">${(d.drivers || []).map(nm).filter(Boolean).map(n => chip(n, 'car')).join('')
+        || '<span class="crw-none">никого нет</span>'}</div>
+    </div>`).join('');
+  const seniors = ((CREW || {}).seniors || []).filter(Boolean);
+  const known = new Set([...dist.flatMap(d => [d.operator, ...(d.drivers || []).map(nm)]), ...seniors]);
+  const extra = r.by && !known.has(r.by) ? [r.by] : [];
+  const tail = (seniors.length || extra.length) ? `<div class="crw-c">
+      <div class="crw-c-h"><span class="crw-c-n">Старшие</span></div>
+      <div class="crw-c-b">${[...seniors, ...extra].map(n => chip(n, 'headset')).join('')}</div>
+    </div>` : '';
+  const list = cards + tail;
   // Сумма по умолчанию — то, во что бутылка обошлась НАМ, а не то, за сколько
   // она продавалась. С водителя удерживают убыток, а не упущенную выручку.
   // Закупки нет — поле пустое: пусть впишет человек, чем программа наугад.
@@ -21772,16 +21798,14 @@ async function woCompOpen(ev, id, режим){
                  : ' · закупочной цены нет'}</div>
       </div>
       <div class="wo-c-l">С кого</div>
-      <div class="wo-c-who" id="woCompWho">${list.map(n => `
-        <button class="wo-c-p ${n === who ? 'on' : ''}" data-n="${escS(n)}"
-                onclick="woCompPick(this)">${escS(n)}</button>`).join('')
+      <div class="wo-c-crew" id="woCompWho">${list
         || '<span class="wo-c-none">Некого выбрать — список смены пуст</span>'}</div>
       <div class="wo-c-l">Сумма</div>
       <div class="wo-c-amt">
         <input id="woCompAmt" type="text" inputmode="numeric" value="${amount}">
         <span>AED</span>
       </div>
-      <div class="wo-c-l">За что <i>необязательно</i></div>
+      <div class="wo-c-l">Комментарий <i>необязательно</i></div>
       <input class="wo-c-note" id="woCompNote" type="text" maxlength="120"
              placeholder="уронил при разгрузке" value="${escS((r.comp || {}).note || '')}">
       <div class="wo-c-acts">
@@ -21797,7 +21821,7 @@ async function woCompOpen(ev, id, режим){
 }
 
 function woCompPick(b){
-  document.querySelectorAll('#woCompWho .wo-c-p').forEach(e => e.classList.remove('on'));
+  document.querySelectorAll('#woCompWho .wo-who').forEach(e => e.classList.remove('on'));
   b.classList.add('on');
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
@@ -21809,7 +21833,7 @@ function woCompClose(){
 
 async function woCompSave(on){
   const r = WO_COMP; if(!r) return;
-  const who = on ? (document.querySelector('#woCompWho .wo-c-p.on') || {}).dataset?.n || '' : '';
+  const who = on ? (document.querySelector('#woCompWho .wo-who.on') || {}).dataset?.n || '' : '';
   const amount = on ? parseInt((document.getElementById('woCompAmt').value || '')
                                  .replace(/\D/g, ''), 10) || 0 : 0;
   const note = on ? (document.getElementById('woCompNote').value || '').trim() : '';

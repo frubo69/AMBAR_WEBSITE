@@ -2119,6 +2119,7 @@ button.path:active{transform:scale(.995)}
 .xe-sum{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--muted)}
 .xe-sum.plus{color:var(--up)}
 .xe-card.plus .xe-t{color:var(--up)}
+.xe-pl{color:var(--up);font-weight:800}
 .xe-row{display:flex;gap:7px}
 .xe-row-c{padding-top:7px}
 .xe-field{flex:1;min-width:0;position:relative;display:flex;align-items:center;
@@ -17829,11 +17830,11 @@ const EXP_KINDS = [
   {id:'parking', t:'Парковка',      receipt:true,  hint:'нужен чек'},
   {id:'kfc',     t:'KFC · премия'},
   {id:'guard',   t:'Охрана',        scan:true,     hint:'кому отдали'},
-  {id:'we_gave', t:'Мы вернули',    who:'кому вернули'},
-  {id:'we_got',  t:'Нам вернули',   who:'кто вернул', plus:true},
-  {id:'we_owe',  t:'Мы должны',     who:'кому должны'},
-  {id:'owed_us', t:'Нам должны',    who:'кто должен'},
   {id:'other',   t:'Доп. расход',   hint:'что-то ещё'},
+  {id:'we_gave', t:'Мы вернули',    who:'кому вернули'},
+  {id:'owed_us', t:'Нам должны',    who:'кто должен'},
+  {id:'we_got',  t:'Нам вернули',   who:'кто вернул', plus:true},
+  {id:'we_owe',  t:'Мы должны',     who:'кому должны', plus:true},
 ];
 
 let EXP_SHOT = {kind:'', photo:'', thumb:''};
@@ -17898,7 +17899,8 @@ function expAddList(r){
                <span class="xe-rcp-t">Сканировать бутылку<i>код с крышки скажет, какая и почём</i></span></button>`)
         : '';
     return `<div class="xe-card${k.plus ? ' plus' : ''}">
-      <div class="xe-hd">${xsvg(ico, 17)}<span class="xe-t">${escS(k.t)}</span>${
+      <div class="xe-hd">${xsvg(ico, 17)}<span class="xe-t">${escS(k.t)}${
+        k.plus ? ' <b class="xe-pl">+</b>' : ''}</span>${
         k.plus ? '<span class="xe-sum plus">приходом</span>' : ''}</div>
       <div class="xe-row">${поле}
         <button class="xe-go" onclick="expAddExtra('${n}','${k.id}')">Записать</button></div>

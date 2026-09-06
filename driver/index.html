@@ -1208,6 +1208,27 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   font-weight:800;color:#1a1408;background:linear-gradient(135deg,#E8C98A,#C9A96E)}
 .dpl-q u{text-decoration:none;font-size:11px;font-weight:600;opacity:.7}
 .dpl.ok .dpl-q{background:rgba(61,220,132,.18);color:#3ddc84}
+/* Экран приёмки внутри — те же карточки: состояние со шкалой сверху, строки
+   с картинками ниже. Строка — кнопка в камеру. */
+.dtop{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:16px 18px 18px;
+  border-radius:16px;background:var(--card);border:1px solid var(--border2);margin-bottom:10px}
+.dtop-b{flex:1;min-width:0}
+.dchip{display:inline-flex;padding:5px 11px;border-radius:999px;font-size:11px;font-weight:700;
+  color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.35)}
+.dchip.ok{color:#3ddc84;background:rgba(61,220,132,.1);border-color:rgba(61,220,132,.3)}
+.dtop-s{display:block;font-size:12.5px;color:var(--muted);margin-top:9px}
+.dtop-n{flex-shrink:0;text-align:right;font-family:'Space Grotesk',sans-serif;font-size:34px;
+  font-weight:700;line-height:1;color:var(--gold2)}
+.dtop-n i{display:block;font-style:normal;font-family:'DM Sans',sans-serif;font-size:11px;
+  font-weight:500;color:var(--muted);margin-top:5px}
+.dtop .dbar{flex:0 0 100%;margin-top:2px;height:6px}
+.dlist{padding-top:2px;padding-bottom:2px}
+.dli{width:100%;border:0;background:none;cursor:pointer;font-family:inherit;text-align:left;
+  color:var(--text);padding:11px 0}
+.dli:first-child{border-top:0}
+.dli:active{background:var(--card2)}
+.dli.ok{opacity:.5;pointer-events:none}
+.dpl-n i{display:block;font-style:normal;font-size:11px;font-weight:500;color:var(--muted);margin-top:2px}
 .dc-btn{width:100%;margin-top:6px;padding:13px;border-radius:12px;border:0;cursor:pointer;
   font-family:inherit;font-size:14px;font-weight:700;color:#1a1408;
   background:linear-gradient(135deg,#E8C98A,#C9A96E)}
@@ -6041,24 +6062,33 @@ function supBack(){
 function supRenderTask(){
   const t = TASK;
   if(!t) return;
-  _setText('supT', `Приёмка · ${t.district_code} ${t.district_name}`);
-  _setText('supS', `${t.positions} ${plural(t.positions,'позиция','позиции','позиций')} · ${supWhen(t)}`);
+  _setText('supT', `${t.district_code} · ${t.district_name}`);
+  _setText('supS', t.extra ? (t.base || 'другая база') : supWhen(t));
   document.getElementById('supV').innerHTML = `${fmt(t.got)}<u> / ${fmt(t.need)}</u>`;
   // Добранное уезжает вниз — так же, как его отдаёт сервер. Иначе строка,
   // закрытая минуту назад, остаётся посреди списка и водитель каждый раз
   // перечитывает её, ища следующую.
   const lines = t.lines.slice().sort((a, b) =>
     (a.left === 0) - (b.left === 0) || a.name.localeCompare(b.name, 'ru'));
-  document.getElementById('supMid').innerHTML = lines.map(l => `
-    <button class="li ${l.left ? '' : 'done'}" onclick="supLineOpen('${l.id}')">
-      <span class="li-b">
-        <span class="li-n">${esc(l.name)}</span>
-        <span class="li-s">${l.left ? 'осталось ' + fmt(l.left) : 'взято полностью'}</span>
-      </span>
-      <span class="li-v"><b>${fmt(l.got)}</b><i>/${fmt(l.need)}</i></span>
-      <span class="li-go">${svg('<path d="M9 5l7 7-7 7"/>', 17)}</span>
-      <span class="li-ok">${svg(ICO.ok, 19)}</span>
-    </button>`).join('');
+  const pct = t.need ? Math.min(100, Math.round(t.got / t.need * 100)) : 0;
+  const doneN = lines.filter(l => !l.left).length;
+  // Тот же вид, что у карточек снаружи: сверху состояние и принятое со шкалой,
+  // ниже строки с картинкой и числом в бейдже. Строка — кнопка: тап открывает
+  // камеру на эту позицию; добранная гаснет и не нажимается.
+  document.getElementById('supMid').innerHTML = `<div class="dtop">
+      <span class="dtop-b"><span class="dchip ${t.left ? '' : 'ok'}">${
+          t.left ? (t.got ? 'идёт приёмка' : 'ждёт') : 'взято полностью'}</span>
+        <span class="dtop-s">${doneN} из ${lines.length} ${plural(lines.length,'позиции','позиций','позиций')} добрано</span></span>
+      <span class="dtop-n">${fmt(t.got)}<i>из ${fmt(t.need)} ${plural(t.need,'бутылки','бутылок','бутылок')}</i></span>
+      <span class="sup-bar dbar"><i style="width:${pct}%"></i></span>
+    </div>
+    <div class="dcard dlist">${lines.map(l => `
+      <button class="dpl dli ${l.left ? '' : 'ok'}" onclick="supLineOpen('${l.id}')">
+        <img class="dimg" src="/products/${esc(l.id)}.webp" alt="" loading="lazy"
+             onerror="this.style.visibility='hidden'">
+        <span class="dpl-n">${esc(l.name)}${l.left && l.got ? `<i>осталось ${fmt(l.left)}</i>` : ''}</span>
+        <span class="dpl-q">${l.got ? `${l.got}<u>/${l.need}</u>` : l.need}</span>
+      </button>`).join('')}</div>`;
   const all = t.left === 0;
   const none = t.got === 0;
   document.getElementById('supBot').innerHTML = `

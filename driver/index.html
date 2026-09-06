@@ -1560,7 +1560,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   -webkit-backdrop-filter:blur(24px) saturate(180%);
   box-shadow:inset 0 0 0 .5px rgba(255,255,255,.24),0 8px 24px rgba(0,0,0,.28);
   color:#fff;font-size:14.5px;letter-spacing:.1px}
-.call-scr.video .cs-note.on{display:flex}
+.call-scr .cs-note.on{display:flex}
 .cs-note-i{flex:none;width:19px;height:19px;display:flex}
 .cs-note-i svg{width:19px;height:19px}
 /* Текстом правит анимация, а не переход. Через переход не выходит: он берёт
@@ -7391,7 +7391,7 @@ function callEvent(t, d){
     // только там, где на другом конце оператор.
     case 'camallow':
       CALL_CAMOK = !!d.on;
-      if(d.need) { toast('Камеру разрешает оператор', 'err'); return; }
+      if(d.need) { toast('Оператор ещё не разрешил камеру', 'err'); return; }
       if(d.denied){ toast('Камеру убрали', 'err'); callPaintCam(); return; }
       callPaintCam();
       if(d.on) toast('Оператор разрешил показать камеру');
@@ -7434,6 +7434,7 @@ function callEvent(t, d){
       // объяснение на экране, иначе человек винит связь.
       CALL_RMIC = !!d.on;
       callVideoPaint(); callRender();
+      if(CALL_ST === 'live'){ _hap('light'); noteMute(noteWhat()); }
       return;
     case 'remotecam':
       CALL_RCAM = !!d.on;
@@ -7664,8 +7665,8 @@ let CALL_CAMOK = false;
 function callCam(){
   if(!CALL) return;
   if(!CALL.camAllowed || !CALL.camAllowed()){
-    _hap('light');
-    toast('Камеру разрешает оператор', 'err');
+    _hap('medium');
+    toast('Оператор ещё не разрешил камеру', 'err');
     return;
   }
   _hap('light');
@@ -7674,9 +7675,9 @@ function callCam(){
 
 function callPaintCam(){
   const можно = !CALL || !CALL.camAllowed || CALL.camAllowed();
-  ['csCam', 'cvCam'].forEach(id => {
-    const b = document.getElementById(id);
-    if(b) b.classList.toggle('locked', !можно);
+  document.querySelectorAll('.cs-rb.cam').forEach(b => {
+    b.classList.toggle('locked', !можно && !CALL_CAM);
+    if(!можно) b.classList.remove('on');
   });
   if(typeof callRender === 'function') callRender();
 }
@@ -7820,9 +7821,12 @@ function callVideoPaint(){
   // при этом не пересоздаём: перечёркивание лежит в разметке всегда и только
   // дорисовывается. Пересоздать узел — значит лишить его перехода, ради
   // которого всё и затевалось.
-  cel('csCam')?.classList.toggle('on', !CALL_CAM);
-  cel('csMic')?.classList.toggle('on', _callMuted);
-  noteMute(CALL_VIDEO && CALL_ST === 'live' ? noteWhat() : '');
+  document.querySelectorAll('.cs-rb.cam').forEach(b => {
+    b.classList.toggle('on', !CALL_CAM && CALL_CAMOK);
+    b.classList.toggle('locked', !CALL_CAM && !CALL_CAMOK);
+  });
+  document.querySelectorAll('.cs-rb.mic').forEach(b => b.classList.toggle('on', _callMuted));
+  noteMute(CALL_ST === 'live' ? noteWhat() : '');
 }
 
 // Яркость экранного света — восемь ступеней. Первая та самая узкая полоса,
@@ -8621,8 +8625,11 @@ function callMute(){
   // Точечно, без пересборки экрана. callRender() перебирает всю разметку
   // разговора заново — вместе с кнопками и окнами видео, — и от этого экран
   // моргал на каждое нажатие. Меняется одна кнопка, её и меняем.
-  cel('csMic')?.classList.toggle('on', _callMuted);
-  noteMute(CALL_VIDEO && CALL_ST === 'live' ? noteWhat() : '');
+  // По классу, а не по id: у нарисованной кнопки id нет, и по id она не
+  // находилась — микрофон нажимался, а кнопка не перекрашивалась.
+  document.querySelectorAll('.cs-rb.mic').forEach(b => b.classList.toggle('on', _callMuted));
+  // Плашка «микрофон выключен» — и в голосовом разговоре тоже.
+  noteMute(CALL_ST === 'live' ? noteWhat() : '');
   const кн = document.querySelector('.cs-btn.mute');
   if(кн){
     кн.classList.toggle('on', _callMuted);
@@ -8844,8 +8851,8 @@ function _callRender(){
           <button class="cs-rb cs-flip" onclick="callFlip()" aria-label="Другая камера"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8h13a4 4 0 0 1 4 4v1"/><path d="M6 5L3 8l3 3"/><path d="M21 16H8a4 4 0 0 1-4-4v-1"/><path d="M18 19l3-3-3-3"/></svg></button>
           <span class="cs-cap">поворот</span>
         </div>
-        <div class="cs-cell">
-          <button class="cs-rb${CALL_CAM ? '' : ' on'}" onclick="callCam()" aria-label="Камера"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/><path class="cvx" d="M2 2l20 20"/></svg></button>
+        <div class="cs-cell${CALL_CAM || CALL_CAMOK ? '' : ' dim'}">
+          <button class="cs-rb cam${CALL_CAM ? '' : (CALL_CAMOK ? ' on' : ' locked')}" onclick="callCam()" aria-label="Камера"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M15 10.5V7a1 1 0 0 0-1-1H3a1 1 0 0 0-1 1v10a1 1 0 0 0 1 1h11a1 1 0 0 0 1-1v-3.5l7 4v-11z"/><path class="cvx" d="M2 2l20 20"/></svg></button>
           <span class="cs-cap">камера</span>
         </div>
         <div class="cs-cell">
@@ -8880,8 +8887,10 @@ function _callRender(){
       </div>`;
 
 
-  // Камера и её поворот — только в разговоре и только если звонок видео.
-  const row2 = (CALL_ST === 'live' && CALL_VIDEO) ? `
+  // Второго ряда с камерой и поворотом больше нет: те же две кнопки стоят в
+  // нижнем ряду, и при включённом видео камера рисовалась дважды.
+  const row2 = '';
+  const row2_old = (CALL_ST === 'live' && CALL_VIDEO) ? `
       <div class="cs-row2">
         <button class="cs-sm${CALL_CAM ? '' : ' off'}" onclick="callCam()" aria-label="Камера">
           <svg viewBox="0 0 24 24" width="24" height="24" fill="none" stroke="currentColor"

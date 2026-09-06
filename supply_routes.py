@@ -1458,6 +1458,123 @@ async def _send_doc(chat_id: int, raw: bytes, name: str, caption: str):
     return True, ""
 
 
+# ── приёмка руками старшего ──────────────────────────────────────────────────
+#
+# Забрать заказ из магазина может не только водитель. Бывает, что везти некому:
+# смена не открыта, район без человека, или старший всё равно едет мимо. Раньше
+# этого пути не было вовсе — взять район, отсканировать и закрыть умел только
+# водитель, и всё это стояло за проверкой «ты водитель».
+#
+# Здесь тот же путь и та же работа: суть лежит в task_scan / task_undo /
+# task_finish, и им всё равно, чьё имя пришло. Разница только в том, кто
+# спрашивает. Второй реализации приёмки не появилось — появился второй вход.
+#
+# Водители видят такую задачу занятой, с именем старшего: иначе двое поедут за
+# одним ящиком.
+def _owner_name(request, body: dict) -> str:
+    """Кем подписан старший. Имя приходит с экрана — тем же полем «as», что и
+    во всех решениях владельца; без него человек в задаче остался бы безымянным
+    и водитель не понял бы, кто её забрал."""
+    return str((body or {}).get("as") or "").strip()[:60] or "старший"
+
+
+@require_owner
+async def handle_own_tasks(request):
+    """Все районы одной поставки глазами старшего: кто взял, сколько принято."""
+    sid = request.match_info.get("sid") or ""
+    sup = await db.supply_get(sid)
+    if not sup:
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    я = str(request.query.get("as") or "").strip()[:60] or "старший"
+    строки = [_task_view(sid, sup, oid, task, я)
+              for oid, task in (sup.get("tasks") or {}).items()]
+    строки.sort(key=lambda t: (bool(t.get("done_at")), t.get("district_code") or ""))
+    return web.json_response({"supply_id": sid, "status": sup.get("status") or "",
+                              "tasks": строки}, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_own_claim(request):
+    """Взять район на себя. Достаётся одному — кто нажал первым."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    sid = request.match_info.get("sid") or ""
+    oid = str(body.get("district") or "").strip()
+    я = _owner_name(request, body)
+    ok, task = await db.supply_task_claim(sid, oid, я,
+                                          int(request.get("owner_id") or 0),
+                                          datetime.now(timezone.utc))
+    if not ok:
+        return web.json_response({"ok": False, "error": "taken",
+                                  "driver": (task or {}).get("driver") or ""},
+                                 status=409, headers=CORS_HEADERS)
+    log.info(f"[supply] {я} взял приёмку {sid}/{oid} на себя")
+    sup = await db.supply_get(sid)
+    return web.json_response(
+        _task_view(sid, sup, oid, (sup.get("tasks") or {}).get(oid) or {}, я),
+        headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_own_release(request):
+    """Отдать район обратно: не еду."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    ok = await db.supply_task_release(request.match_info.get("sid") or "",
+                                      str(body.get("district") or "").strip(),
+                                      _owner_name(request, body))
+    return web.json_response({"ok": ok}, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_own_scan(request):
+    """Одна бутылка в приёмку."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    code = re.sub(r"\s+", "", str(body.get("code") or ""))[:120]
+    if not code:
+        return web.json_response({"error": "empty_code"}, status=400, headers=CORS_HEADERS)
+    res = await task_scan(request.match_info.get("sid") or "",
+                          str(body.get("district") or "").strip(),
+                          str(body.get("product_id") or "").strip(),
+                          code, _owner_name(request, body),
+                          int(request.get("owner_id") or 0),
+                          str(body.get("at_dev") or ""))
+    return web.json_response(res, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_own_undo(request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    res = await task_undo(request.match_info.get("sid") or "",
+                          str(body.get("district") or "").strip(),
+                          re.sub(r"\s+", "", str(body.get("code") or ""))[:120],
+                          _owner_name(request, body))
+    return web.json_response(res, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_own_finish(request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    res = await task_finish(request.match_info.get("sid") or "",
+                            str(body.get("district") or "").strip(),
+                            _owner_name(request, body),
+                            str(body.get("note") or ""))
+    return web.json_response(res, headers=CORS_HEADERS)
+
+
 async def _opt(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
@@ -1477,6 +1594,15 @@ def setup(app):
         ("/api/owner/supply/{sid}/cancel",          handle_cancel,       "POST"),
         ("/api/owner/supply/{sid}/shortfall",       handle_short_export, "GET"),
         ("/api/owner/supply/{sid}/shortfall/send",  handle_short_send,   "POST"),
+        # Приёмка руками старшего. Под своим «/task/», а не рядом: «/release»
+        # выше уже занят и означает совсем другое — освободить позицию, а не
+        # отдать район.
+        ("/api/owner/supply/{sid}/tasks",           handle_own_tasks,    "GET"),
+        ("/api/owner/supply/{sid}/task/claim",      handle_own_claim,    "POST"),
+        ("/api/owner/supply/{sid}/task/release",    handle_own_release,  "POST"),
+        ("/api/owner/supply/{sid}/task/scan",       handle_own_scan,     "POST"),
+        ("/api/owner/supply/{sid}/task/undo",       handle_own_undo,     "POST"),
+        ("/api/owner/supply/{sid}/task/finish",     handle_own_finish,   "POST"),
     ):
         r.add_route("OPTIONS", path, _opt)
         {"GET": r.add_get, "POST": r.add_post}[method](path, handler)

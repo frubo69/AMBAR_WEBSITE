@@ -585,6 +585,55 @@ a.oc-row:active{background:var(--card2)}
 .wh-card-go.off{color:var(--text);background:var(--card2);border:1px solid var(--border3)}
 .wh-r.panic{border-color:rgba(224,85,85,.4);background:rgba(224,85,85,.07)}
 .wh-r.panic .wh-n u{color:var(--dn)}
+/* ── По районам и карточка — как в панели владельца ─────────────────────── */
+.wh-hd-back{width:30px;height:30px;flex:0 0 auto;margin-top:2px;border-radius:10px;
+  display:flex;align-items:center;justify-content:center;color:var(--text);
+  background:var(--card2);border:1px solid var(--border2);cursor:pointer}
+.wh-card-d{margin:0 2px 10px;border-radius:18px;overflow:hidden;
+  background:rgba(255,255,255,.045);border:1px solid rgba(255,255,255,.06)}
+.wh-grp{display:flex;align-items:center;gap:9px;padding:10px 13px 9px;
+  border-bottom:1px solid rgba(255,255,255,.06)}
+.wh-grp-c{flex:0 0 auto;min-width:26px;height:20px;padding:0 6px;border-radius:7px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'DM Sans',sans-serif;font-size:10px;font-weight:800;color:#1a1408;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.wh-grp-n{flex:0 0 auto;font-size:13px;font-weight:700;color:var(--gold2)}
+.wh-grp-s{flex:1;min-width:0;text-align:right;font-size:10.5px;color:var(--muted);
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wh-grp-b .wh-r{border-radius:0;margin:0;background:transparent;border:0;padding:11px 13px}
+.wh-grp-b .wh-r + .wh-r{box-shadow:0 -1px 0 rgba(255,255,255,.06)}
+.wh-grp-b .wh-r:active{background:rgba(255,255,255,.05)}
+.wh-grp-b .wh-r.on{background:rgba(201,169,110,.1)}
+.wh-card{margin:2px 2px 4px;padding:2px 2px 4px;background:none;border:0}
+.wh-card-top{display:flex;align-items:center;gap:14px;padding:6px 4px 16px;margin:0}
+.wh-card-i{width:46px;height:46px;flex:0 0 auto;border-radius:16px;display:flex;
+  align-items:center;justify-content:center;background:var(--bg3);
+  border:1px solid var(--border2);color:var(--dim)}
+.wh-card-i svg{width:20px;height:20px}
+.wh-card.live .wh-card-i{background:rgba(61,220,132,.12);border-color:rgba(61,220,132,.35);color:#3ddc84}
+.wh-card.snap .wh-card-i{background:var(--gold-soft);border-color:rgba(201,169,110,.35);color:var(--gold2)}
+.wh-card.panic .wh-card-i{background:rgba(224,85,85,.1);border-color:rgba(224,85,85,.4)}
+.wh-card-b{flex:1;min-width:0}
+.wh-card-n{font-size:15px;font-weight:600;line-height:1.4}
+.wh-card-n b{color:#3ddc84;font-weight:700}
+.wh-card-n u{text-decoration:none;color:var(--gold2);font-weight:700}
+.wh-card.panic .wh-card-n u{color:var(--dn)}
+.wh-facts{display:flex;gap:7px;margin-bottom:10px}
+.wh-facts span{flex:1 1 0;min-width:0;padding:11px 10px;border-radius:12px;
+  background:rgba(255,255,255,.05);border:1px solid var(--border2);text-align:center}
+.wh-facts b{display:block;font-family:'Space Grotesk',sans-serif;font-size:18px;
+  font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.wh-facts b.zero{color:var(--dim)}
+.wh-facts i{display:block;font-style:normal;font-size:9.5px;letter-spacing:.5px;
+  text-transform:uppercase;color:var(--muted);margin-top:5px}
+.wh-act{display:flex;align-items:center;gap:10px;width:100%;padding:13px 14px;
+  margin-bottom:8px;border-radius:14px;cursor:pointer;font-family:inherit;
+  font-size:13.5px;font-weight:600;color:var(--text);
+  background:rgba(255,255,255,.05);border:1px solid var(--border2);text-align:left}
+.wh-act:active{background:rgba(255,255,255,.09)}
+.wh-act.on{color:var(--gold2);background:var(--gold-soft);border-color:rgba(201,169,110,.35)}
+.wh-act svg{flex:0 0 auto;opacity:.8}
+.wh-act i{margin-left:auto;font-style:normal;font-size:11.5px;color:var(--muted)}
 /* Мигает точка и расходится кольцо — то и другое двигает композитор.
    Раньше кольцо рисовалось растущей тенью: каждый кадр перекрашивал полосу
    списка целиком, и на телефоне это чувствовалось. */
@@ -2545,8 +2594,12 @@ html.hid-boot #gameApp *{visibility:visible}
   <div class="wh">
     <div class="wh-side">
       <div class="wh-hd">
-        <div>
-          <div class="t">Где водители</div>
+        <button class="wh-hd-back" id="whCardBack" onclick="whBack()" aria-label="Назад"
+                style="display:none"><svg viewBox="0 0 24 24" width="15" height="15" fill="none"
+          stroke="currentColor" stroke-width="2.2" stroke-linecap="round"
+          stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+        <div style="min-width:0">
+          <div class="t" id="whTtl">Где водители</div>
           <div class="s" id="whSub">—</div>
         </div>
         <button class="wh-x" onclick="whereClose()" aria-label="Закрыть"><svg
@@ -4657,7 +4710,8 @@ function _isoDay(shift){
 // Тонкость, ради которой всё и сделано так: точка, которой полчаса, — это не
 // «водитель здесь», а «телефон замолчал». Поэтому у каждого рядом время, а
 // зелёная метка только у тех, кто на связи прямо сейчас.
-let WH = {map:null, layer:null, line:null, sel:null, timer:null, data:null};
+let WH = {map:null, layer:null, line:null, sel:null, timer:null, data:null,
+          view:'list', track:false, pan:false};
 // Десять секунд, а не двадцать: водитель открыл приложение — оператор
 // должен увидеть его почти сразу, не перезагружая экран. Запрос лёгкий:
 // последние точки и заказы, всё из памяти.
@@ -4665,6 +4719,7 @@ const WH_MS = 10000;
 
 async function whereOpen(){
   showOv('whereOv'); haptic('light');
+  WH.sel = null; WH.view = 'list'; WH.track = false; WH.pan = false;
   whDragInit();
   WH._open = (WH._open || 0) + 1;
   // Открываем на половине: сразу видно и кто на связи, и где они. Список
@@ -4731,7 +4786,7 @@ async function whereLoad(){
   let d;
   try{
     d = await opApi.opFetch('/api/operator/where',
-      {params: {as: curOp, ...(WH.sel ? {track: WH.sel} : {})}});
+      {params: {as: curOp, ...((WH.sel && WH.track) ? {track: WH.sel} : {})}});
   }catch(e){
     whSet('<div class="wh-note" style="border:0">Не удалось загрузить</div>');
     return;
@@ -4792,7 +4847,6 @@ function whState(r){
 function whRow(r, trackOn){
   const st = whState(r);
   const cls = st === 'stream' ? 'live' : (st === 'snap' ? 'snap' : (r.has ? '' : 'off'));
-  const where = [r.code, r.name].filter(Boolean).join(' ');
   // Два разных вопроса, и на оба надо ответить одной строкой: видно ли его
   // сейчас — и будет ли видно, когда он уберёт телефон в карман. Трансляция
   // отвечает на второй, точка из приложения — только на первый.
@@ -4810,51 +4864,157 @@ function whRow(r, trackOn){
     <span class="wh-i">${r.panic ? '<i class="wh-sos"></i>'
       : (st === 'stream' ? IC_LIVE : (st === 'snap' ? IC_SNAP : IC_OFF))}</span>
     <span class="wh-b">
-      <span class="wh-n"><span class="wh-nm">${_esc(r.driver)}</span><u>${
-        r.panic ? 'скрытый режим' : _esc(where)}</u></span>
+      <span class="wh-n"><span class="wh-nm">${_esc(r.driver)}</span>${
+        r.panic ? '<u>скрытый режим</u>' : ''}</span>
       <span class="wh-s">${state}${trackOn ? ' <i>· маршрут на карте</i>' : ''}</span>
     </span>
     <span class="wh-w">
       <span class="wh-w-v${r.orders ? '' : ' zero'}">${r.orders || r.done || '—'}</span>
       <span class="wh-w-l">${r.orders ? 'в пути' : (r.done ? 'сдал' : 'пусто')}</span>
     </span>
-    <span class="wh-prof" onclick="event.stopPropagation();whProfile('${_esc(r.driver)}')"
-          role="button" aria-label="Профиль">
-      <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-        stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-        <circle cx="12" cy="8.5" r="3.6"/><path d="M4.5 20a7.5 7.5 0 0 1 15 0"/></svg>
-    </span>
   </button>`;
 }
 
+// Список — по районам, как в панели владельца: заголовок района отвечает
+// «чей это ряд» один раз на группу, и код из строки уходит. Выбрали человека —
+// на том же месте его карточка.
 function whPaint(){
   const d = WH.data; if(!d) return;
+  const back = $('whCardBack');
+  if(back) back.style.display = WH.view === 'card' ? 'flex' : 'none';
+  if(WH.view === 'card') return whCard();
+  $('whTtl').textContent = 'Где водители';
   const rows = d.drivers || [];
   const live = rows.filter(r => whState(r) === 'stream').length;
   const snap = rows.filter(r => whState(r) === 'snap').length;
   const work = rows.reduce((a, r) => a + (r.orders || 0), 0);
-  // Подзаголовок отвечает на вопрос «сколько машин видно», а видно —
-  // это и трансляции, и те, кто только что был в приложении.
   $('whSub').textContent = (live + snap) ? `${live + snap} из ${rows.length} видно`
                          + (snap ? ` · ${live} на связи` : '')
                          : (rows.length ? 'никого не видно' : 'водителей нет');
   const trackOn = (d.track || []).length > 1;
+  const группы = [];
+  rows.forEach(r => {
+    const ключ = r.district || r.code || '—';
+    let g = группы.find(x => x.id === ключ);
+    if(!g){ g = {id: ключ, code: r.code, name: r.name, rows: []}; группы.push(g); }
+    g.rows.push(r);
+  });
   const разметка = (rows.length ? `
     <div class="wh-sum">
       <span class="ok"><b>${live}</b><i>на связи</i></span>
       <span class="${snap ? '' : 'dim'}"><b>${snap}</b><i>недавно</i></span>
       <span class="${work ? '' : 'dim'}"><b>${work}</b><i>${plural(work,'заказ','заказа','заказов')} в пути</i></span>
-    </div>` + rows.map(r => whRow(r, WH.sel === r.driver && trackOn)).join('')
-    : '<div class="wh-note" style="border:0">Водителей нет</div>')
-    + `<div class="wh-note">Точку присылает живая трансляция телеграма — водитель
-       включает её сам. Её хватает на восемь часов, дальше бот напомнит. Маршрут
-       за смену стирается при её закрытии.</div>`;
-  // Список обновляется раз в десять секунд, и замена разметки под пальцем
-  // сбрасывает прокрутку вместе с нажатием, которое человек как раз держит.
-  // Поэтому трогаем её, только когда она действительно изменилась.
+    </div>` + группы.map(g => {
+      const живых = g.rows.filter(r => whState(r) === 'stream').length;
+      const заказы = g.rows.reduce((a, r) => a + (r.orders || 0), 0);
+      return `<div class="wh-card-d">
+        <div class="wh-grp">
+          <span class="wh-grp-c">${_esc(g.code || '')}</span>
+          <span class="wh-grp-n">${_esc(g.name || '')}</span>
+          <span class="wh-grp-s">${живых ? `${живых} на связи`
+            : `${g.rows.length} ${plural(g.rows.length,'водитель','водителя','водителей')}`}${
+            заказы ? ` · ${заказы} в пути` : ''}</span>
+        </div>
+        <div class="wh-grp-b">${g.rows.map(r =>
+          whRow(r, WH.sel === r.driver && trackOn)).join('')}</div>
+      </div>`;
+    }).join('')
+    : '<div class="wh-note" style="border:0">Водителей нет</div>');
   whSet(разметка);
   whSelBar();
   whMapPaint();
+}
+
+// Карточка водителя — на месте списка, как в панели владельца: крупно
+// состояние, факты, маршрут за смену, приблизить — и скрытый режим, который
+// включают за него. Водитель не всегда может нажать сам: телефон в чужих
+// руках или он не успел. Снимает тоже оператор.
+function whCard(){
+  const d = WH.data, r = (d.drivers || []).find(x => x.driver === WH.sel);
+  if(!r){ whBack(); return; }
+  const st = whState(r);
+  const track = (d.track || []).length > 1;
+  $('whTtl').textContent = r.driver;
+  $('whSub').textContent = [[r.code, r.name].filter(Boolean).join(' ') || 'водитель',
+                            r.operator ? 'оператор ' + r.operator : ''].filter(Boolean).join(' · ');
+  let state;
+  if(r.panic)           state = '<u>скрытый режим</u> · приложение стало игрой';
+  else if(st === 'stream') state = `<b>на связи</b> · трансляция ещё ${r.left < 60
+      ? r.left + ' мин' : Math.floor(r.left / 60) + ' ч'}`;
+  else if(st === 'snap') state = `<u>был здесь ${whAgo(r.age)}</u> · приложение закрыто`;
+  else if(r.has)        state = `молчит ${whAgo(r.age).replace(' назад','')} · последняя известная точка`;
+  else                  state = 'геопозицией не делится';
+  whSet(`
+    <div class="wh-card ${st === 'stream' ? 'live' : (st === 'snap' ? 'snap' : '')}${r.panic ? ' panic' : ''}">
+      <div class="wh-card-top">
+        <span class="wh-card-i">${r.panic ? '<i class="wh-sos"></i>'
+          : (st === 'stream' ? IC_LIVE : (st === 'snap' ? IC_SNAP : IC_OFF))}</span>
+        <span class="wh-card-b"><span class="wh-card-n">${state}</span></span>
+      </div>
+      <div class="wh-facts">
+        <span><b class="${r.orders ? '' : 'zero'}">${r.orders || '—'}</b><i>в пути</i></span>
+        <span><b>${r.done || '—'}</b><i>сдал за смену</i></span>
+        <span><b>${!r.has ? '—' : (r.age < 90 ? 'сейчас'
+          : (r.age < 3600 ? Math.round(r.age / 60) + ' мин'
+                          : Math.floor(r.age / 3600) + ' ч'))}</b><i>точка</i></span>
+      </div>
+      ${r.has ? `<button class="wh-act${track ? ' on' : ''}" onclick="whTrack()">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+             stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M4 19s3-9 8-9 8 9 8 9"/><circle cx="4" cy="19" r="2"/><circle cx="20" cy="19" r="2"/></svg>
+        Маршрут за смену<i>${track ? 'скрыть' : 'показать'}</i></button>
+      <button class="wh-act" onclick="whFocus()">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+             stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
+        Приблизить<i></i></button>` : ''}
+      <button class="wh-card-go${r.panic ? ' off' : ''}"
+              onclick="whPanic('${_esc(r.driver)}', ${r.panic ? 'false' : 'true'})">
+        ${r.panic ? 'Снять скрытый режим' : 'Ввести в режим тетриса'}</button>
+      <div class="wh-note" style="border:0;padding:12px 4px 4px">${st === 'stream'
+        ? 'Трансляция включена — водителя видно, даже когда телефон в кармане.'
+        : (st === 'snap'
+          ? 'Точка пришла из приложения. Следующая появится, когда водитель снова его откроет или включит трансляцию.'
+          : 'Чтобы видеть водителя постоянно, он включает трансляцию в чате с ботом. Бот напоминает об этом сам.')}</div>
+    </div>`);
+  whSelBar();
+  whMapPaint();
+}
+
+function whBack(){
+  WH.sel = null; WH.view = 'list'; WH.track = false; WH.pan = false;
+  haptic('sel');
+  if(WH.data){ whPaint(); if(_whPhone()) whSnap('half', true); }
+  whereLoad();
+}
+
+function whFocus(){
+  const r = ((WH.data || {}).drivers || []).find(x => x.driver === WH.sel);
+  if(!r || !r.has || !WH.map) return;
+  whCenter(r.lat, r.lon, 16);
+  haptic('light');
+}
+
+// Метка должна встать в середину ВИДИМОЙ карты, а не экрана: под шторкой её
+// никто не увидит. Смещение и масштаб — одним движением.
+function whCenter(lat, lon, zoom, fly){
+  if(!WH.map) return;
+  const {sh} = _whEls();
+  const hide = (sh && _whPhone()) ? Math.max(0, innerHeight - sh.getBoundingClientRect().top) : 0;
+  const z = zoom || WH.map.getZoom();
+  let ll = L.latLng(lat, lon);
+  if(hide > 40){
+    try{ ll = WH.map.unproject(WH.map.project(ll, z).add([0, hide / 2]), z); }
+    catch(e){}
+  }
+  if(fly && WH.map.flyTo) WH.map.flyTo(ll, z, {duration: .72, easeLinearity: .3});
+  else WH.map.setView(ll, z, {animate:true});
+}
+
+function whTrack(){
+  WH.track = !WH.track;
+  haptic('sel');
+  whereLoad();
 }
 
 // Полоса выбранного водителя под шапкой. Она существует ради свёрнутой
@@ -4914,8 +5074,8 @@ function whMapPaint(){
      .bindTooltip(`${_esc(r.driver)} · ${whAgo(r.age)}`, {direction:'top'});
   });
 
-  // Маршрут выбранного водителя — линией поверх меток.
-  const tr = d.track || [];
+  // Маршрут выбранного водителя — линией поверх меток, когда его попросили.
+  const tr = (WH.sel && WH.track) ? (d.track || []) : [];
   if(WH.sel && tr.length > 1){
     const pth = whSmooth(tr.map(p => [p.lat, p.lon]));
     // Линия в два слоя: широкая полупрозрачная снизу и узкая сверху. Так она
@@ -4938,11 +5098,18 @@ function whMapPaint(){
   // десять секунд отматывается обратно из-под пальца, и рассмотреть соседний
   // квартал невозможно. Потолок приближения — чтобы короткий маршрут не
   // растягивался на весь экран двумя улицами крупным планом.
-  const ключ = (WH.sel || '') + '|' + (WH._open || 0);
-  if(WH._fit !== ключ){
-    WH._fit = ключ;
-    if(WH.sel) whFocusSel();
-    else if(pts.length) whFit(L.latLngBounds(pts).pad(0.3), 15);
+  if(WH.sel && tr.length > 1){
+    if(WH._trk !== WH.sel){ WH._trk = WH.sel; whFit(L.latLngBounds(tr.map(t => [t.lat, t.lon])).pad(0.25), 15); }
+  }else if(WH.sel && WH.pan){
+    // Нажали на человека — карта летит к нему. Один раз на выбор, а не на
+    // каждое обновление: иначе она отматывается из-под пальца.
+    WH._trk = null;
+    const me = (d.drivers || []).find(r => r.driver === WH.sel && r.has);
+    if(me) whCenter(me.lat, me.lon, 15, true);
+    WH.pan = false;
+  }else if(!WH.sel){
+    const ключ = 'all|' + (WH._open || 0);
+    if(WH._fit !== ключ){ WH._fit = ключ; if(pts.length) whFit(L.latLngBounds(pts).pad(0.3), 15); }
   }
 }
 
@@ -5063,6 +5230,7 @@ async function whPanic(name, on){
   toast(on ? `${name} — скрытый режим включён` : `${name} — режим снят`, 'ok');
   await whereLoad();
   if(WH_PROF === name) whProfPaint();
+  if(WH.view === 'card') whPaint();
 }
 
 // Тот же вопрос телеграмом, а не браузером: родной confirm внутри мини-аппа
@@ -5077,11 +5245,14 @@ function askYesOp(текст){
 }
 
 function whPick(name){
-  WH.sel = WH.sel === name ? null : name;
+  const same = WH.sel === name;
+  WH.sel = name; WH.view = 'card'; WH.pan = true;
+  if(!same) WH.track = false;
   haptic('sel');
-  // Выбрал водителя — значит смотреть будет на карту: шторка уходит на
-  // половину и открывает её. Снял выбор — возвращаем список.
-  if(_whPhone()) whSnap(WH.sel ? 'half' : 'full', true);
+  // Данные для карточки уже в памяти — рисуем сразу, карта летит к метке, а
+  // шторка садится на половину, чтобы карту было видно. Свежие данные
+  // приедут следом и заменят молча.
+  if(WH.data){ whPaint(); if(_whPhone()) whSnap('half', true); }
   whereLoad();
 }
 

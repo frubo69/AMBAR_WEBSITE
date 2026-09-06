@@ -2330,11 +2330,13 @@ def _dt_utc(v):
 
 @require_operator
 async def handle_where(request):
+    """Где водители — все, по всем районам, любому оператору. Раньше каждый
+    видел только своих, а вопрос «кто ближе к адресу на границе районов»
+    задают именно чужому водителю."""
     districts = await _fresh_districts()
-    scope = _scope(_people(districts), (request.query.get("as") or "").strip(), districts)
     names = []
-    for oid in scope:
-        names += list(_staff_mod.DISTRICT_DRIVERS.get(oid) or [])
+    for d in districts:
+        names += list(_staff_mod.DISTRICT_DRIVERS.get(d["id"]) or [])
     data = await drivers_live(names, _biz_date(datetime.now(DUBAI_TZ)),
                               (request.query.get("track") or "").strip())
     # К каждому — район и оператор: на карте пять точек, и без подписи они

@@ -27,6 +27,18 @@
 Если в этот момент пропажа ещё длится — замок. Вернулась раньше — ничего,
 кроме короткой строки старшему, что вернулась.
 
+Два пути к старшему
+-------------------
+Мгновенный: телеграм сам присылает боту «трансляцию включили» и «выключили»
+— правкой того же сообщения, в ту же секунду. Бот водителя зовёт on_stream,
+и сообщение старшему уходит сразу, без ожидания прохода. Минутный проход
+(tick) остаётся для того, что по сигналу не поймать: трансляция числится
+включённой, а точек нет.
+
+Отправляем сами, без api_server: этот модуль живёт и в API, и в боте
+водителя, а бот тащить за собой весь сервер не должен. Номера сообщений
+кладём в реестры скрытого режима — и владельца, и водителя.
+
 Чего здесь нет
 --------------
 Повторов: одна пропажа — одно сообщение. Автоматического открытия: замок
@@ -94,8 +106,20 @@ def _dur(sec: float) -> str:
 # Имя — как зовут в работе, без телеграма и без номеров. Экранируем на случай
 # подчёркивания в имени: иначе телеграм отвергнет всё сообщение целиком.
 def _n(name: str) -> str:
-    from owner_routes import _md
-    return _md(name)
+    out = str(name or "")
+    for ch in ("_", "*", "`", "["):
+        out = out.replace(ch, "\\" + ch)
+    return out
+
+
+def text_stream_off(name: str, opened: bool) -> str:
+    tail = ("Если до конца смены не включит — вход в приложение закроется."
+            if opened else "Смена у него не открыта.")
+    return f"📍 *{_n(name)}*: выключил трансляцию геопозиции\n{tail}"
+
+
+def text_stream_on(name: str) -> str:
+    return f"📍 *{_n(name)}*: включил трансляцию геопозиции"
 
 
 def text_off(name: str, why: str, geo: dict) -> str:
@@ -130,15 +154,38 @@ def unlock_keyboard(key: str) -> dict:
 
 
 # ── отправка ─────────────────────────────────────────────────────────────────
+async def _post(token: str, chat_id: int, text: str, reply_markup: dict = None,
+                parse_mode: str = "Markdown") -> dict:
+    """Одно сообщение телеграму. Разметка не разобралась — шлём как есть:
+    промах в форматировании не должен стоить старшему сообщения."""
+    import json
+    import aiohttp
+    payload = {"chat_id": chat_id, "text": text}
+    if parse_mode:
+        payload["parse_mode"] = parse_mode
+    if reply_markup:
+        payload["reply_markup"] = json.dumps(reply_markup)
+    try:
+        async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as s:
+            async with s.post(f"https://api.telegram.org/bot{token}/sendMessage",
+                              json=payload) as r:
+                res = await r.json()
+    except Exception as e:
+        log.warning(f"[geo-watch] телеграм не ответил: {e}")
+        return {}
+    if not (res or {}).get("ok") and parse_mode:
+        return await _post(token, chat_id, text, reply_markup, parse_mode=None)
+    return res or {}
+
+
 async def _owners(text: str, event: str, reply_markup: dict = None) -> int:
     """Всем владельцам, мимо настроек и тихих часов: это правило, а не новость."""
-    from owner_routes import OWNER_BOT_TOKEN, _send_md
-    from api_server import tg_send
+    token = os.getenv("AMBAR_OWNER_BOT_TOKEN", "")
     try:
         await db.insert_notification(event, text)
     except Exception as e:
         log.error(f"[geo-watch] уведомление {event} не записано: {e}")
-    if not OWNER_BOT_TOKEN:
+    if not token:
         return 0
     try:
         ids = await db.get_all_manager_ids()
@@ -147,28 +194,78 @@ async def _owners(text: str, event: str, reply_markup: dict = None) -> int:
         return 0
     sent = 0
     for oid in ids:
+        res = await _post(token, oid, text, reply_markup)
+        mid = ((res or {}).get("result") or {}).get("message_id")
+        if not mid:
+            log.error(f"[geo-watch] {event} владельцу не ушло: {(res or {}).get('description')}")
+            continue
+        sent += 1
+        # Реестр AMBAR STAR: свипер и тревога стирают только записанное.
         try:
-            if reply_markup:
-                res = await tg_send(OWNER_BOT_TOKEN, oid, text, reply_markup=reply_markup)
-            else:
-                res = await _send_md(OWNER_BOT_TOKEN, oid, text)
-            sent += bool((res or {}).get("ok"))
+            await db.owner_msg_add(int(oid), int(mid), event)
         except Exception as e:
-            log.error(f"[geo-watch] {event} владельцу не ушло: {e}")
+            log.debug(f"[geo-watch] реестр владельца: {e}")
     return sent
 
 
 async def _driver(name: str, text: str) -> None:
-    """Водителю — его ботом. tg_send сам кладёт номер в реестр скрытого режима."""
-    from api_server import tg_send
+    """Водителю — его ботом; номер в реестр скрытого режима."""
     tid = staff.DRIVER_IDS.get(name)
     token = os.getenv("DRIVER_BOT_TOKEN", "")
     if not (tid and token):
         return
+    res = await _post(token, tid, text, parse_mode=None)
+    mid = ((res or {}).get("result") or {}).get("message_id")
+    if not mid:
+        log.warning(f"[geo-watch] {name}: сообщение не ушло: {(res or {}).get('description')}")
+        return
     try:
-        await tg_send(token, tid, text, parse_mode=None)
+        await db.drv_msg_add(int(tid), int(mid), datetime.now(timezone.utc))
     except Exception as e:
-        log.warning(f"[geo-watch] {name}: сообщение о замке не ушло: {e}")
+        log.debug(f"[geo-watch] реестр водителя: {e}")
+
+
+# ── мгновенный путь: сигнал телеграма ────────────────────────────────────────
+async def on_stream(name: str, on: bool, now: datetime = None) -> bool:
+    """Телеграм сказал: трансляцию включили (on) или выключили.
+
+    Зовёт бот водителя из обработчика точки — в ту же секунду, что и сигнал.
+    Отсрочки после старта здесь нет: это не догадка по свежести точек, а
+    прямое слово телеграма. Возвращает, ушло ли что-то старшему."""
+    utc = now or datetime.now(timezone.utc)
+    day = _biz_day(utc.astimezone(DUBAI_TZ))
+    d = await db.get_driver_day(day, name) or {}
+    if d.get("working") is not True:
+        return False                       # не на работе — его трансляция его дело
+    st = await db.geo_watch_get(name)
+    if st.get("locked_at"):
+        return False
+    opened = bool(d.get("shift_open_at")) and not d.get("shift_close_at")
+    off_since = _dt(st.get("off_since")) if st.get("day") == day else None
+
+    if on:
+        if off_since:
+            await db.geo_watch_set(name, {"day": day}, unset=["off_since", "off_why"])
+            await _owners(text_back(name, (utc - off_since).total_seconds()), EVENT_ON)
+        else:
+            await _owners(text_stream_on(name), EVENT_ON)
+        log.info(f"[geo-watch] {name}: включил трансляцию")
+        return True
+
+    # Выключил. После закрытой смены это нормально — молчим; на открытой
+    # запоминаем минуту: с неё считается «не вернулась до конца смены».
+    if d.get("shift_close_at"):
+        return False
+    if off_since and st.get("off_why") == "stream":
+        return False                       # уже сказали про это же
+    if opened:
+        fields = {"day": day, "off_why": "stream"}
+        if not off_since:
+            fields["off_since"] = utc
+        await db.geo_watch_set(name, fields)
+    await _owners(text_stream_off(name, opened), EVENT_OFF)
+    log.info(f"[geo-watch] {name}: выключил трансляцию")
+    return True
 
 
 # ── проход ───────────────────────────────────────────────────────────────────
@@ -218,6 +315,9 @@ async def tick(now: datetime = None) -> dict:
 
         if not ended:
             if not g["ok"] and not off_since:
+                # Выключение трансляции обычно уже ушло мгновенным путём
+                # (on_stream); здесь оно ловится, только если бот водителя
+                # в тот момент лежал.
                 why = "stream" if not g["stream"] else "stale"
                 await db.geo_watch_set(name, {"day": day, "off_since": utc, "off_why": why})
                 await _owners(text_off(name, why, g), EVENT_OFF)

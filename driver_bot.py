@@ -147,6 +147,16 @@ async def on_location(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
     except Exception as e:
         log.warning(f"точка {me['name']} не записана: {e}")
         return
+    # Включил или выключил трансляцию — старший узнаёт в ту же секунду. Не на
+    # каждую точку: включение — это новое сообщение со сроком, выключение —
+    # правка без срока; всё остальное — просто координаты.
+    started = bool(update.message and period)
+    if started or stop:
+        try:
+            import geo_watch
+            await geo_watch.on_stream(me["name"], on=started, now=now)
+        except Exception as e:
+            log.warning(f"старшему о трансляции {me['name']} не ушло: {e}")
     # Разовая точка — одно короткое подтверждение: без него человек не знает,
     # дошло ли, и жмёт ещё раз.
     if update.message and not period:

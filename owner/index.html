@@ -4463,8 +4463,8 @@ button.path:active{transform:scale(.995)}
       <div class="donut-leg">
         <div class="dleg"><span class="dleg-dot" style="background:#26A17B"></span><span class="dleg-name"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;opacity:.75"><path d="M12 3l7 5-7 13-7-13z"/><path d="M5 8h14M12 3v18"/></svg>Крипта</span><span class="dleg-val" id="payCryptoVal" data-aed="">—</span></div>
         <div class="dleg"><span class="dleg-dot" style="background:#C9A96E"></span><span class="dleg-name"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;opacity:.75"><rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="2.5"/></svg>Наличные</span><span class="dleg-val" id="payCashVal" data-aed="">—</span></div>
-        <div class="dleg" id="payTransferRow" style="display:none"><span class="dleg-dot" style="background:#5B8DEF"></span><span class="dleg-name"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;opacity:.75"><path d="M3 8h14l-3-3"/><path d="M21 16H7l3 3"/></svg>Перевод</span><span class="dleg-val" id="payTransferVal" data-aed="" style="color:var(--info)">—</span></div>
-        <div class="dleg" id="payDebtRow" style="display:none"><span class="dleg-dot" style="background:#F3B44A"></span><span class="dleg-name"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;opacity:.75"><path d="M4 7h16v12H4z"/><path d="M4 11h16M9 15h3"/></svg>В долг</span><span class="dleg-val" id="payDebtVal" data-aed="" style="color:var(--warn)">—</span></div>
+        <div class="dleg" id="payTransferRow"><span class="dleg-dot" style="background:#5B8DEF"></span><span class="dleg-name"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;opacity:.75"><path d="M3 8h14l-3-3"/><path d="M21 16H7l3 3"/></svg>Перевод</span><span class="dleg-val" id="payTransferVal" data-aed="" style="color:var(--info)">—</span></div>
+        <div class="dleg" id="payDebtRow"><span class="dleg-dot" style="background:#F3B44A"></span><span class="dleg-name"><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px;opacity:.75"><path d="M4 7h16v12H4z"/><path d="M4 11h16M9 15h3"/></svg>В долг</span><span class="dleg-val" id="payDebtVal" data-aed="" style="color:var(--warn)">—</span></div>
       </div>
     </div>
   </div>
@@ -10836,12 +10836,18 @@ function renderPaySplit(bm){
   _setAed('payCashVal',     kAed);
   _setAed('payDebtVal',     dAed);
   _setAed('payTransferVal', tAed);
+  // Все четыре способа стоят всегда, включая нулевые.
+  //
+  // Перевод раньше прятался при нуле — «строка с нулём учит не читать
+  // легенду». Это неверно: способ расчёта не исчезает оттого, что им сегодня не
+  // платили. Исчезающая строка отвечает не «сегодня переводов не было», а
+  // «перевода у нас нет», и в день, когда он понадобится, его будут искать.
+  // Ноль — это ответ, и он такой же, как любое другое число; у долга это было
+  // сделано правильно с самого начала.
   const dRow = document.getElementById('payDebtRow');
   if(dRow) dRow.style.display = '';
-  // Перевод показываем, только когда он был: строка с нулём каждый день учит
-  // не читать легенду.
   const tRow = document.getElementById('payTransferRow');
-  if(tRow) tRow.style.display = tAed ? '' : 'none';
+  if(tRow) tRow.style.display = '';
 }
 
 // Детальный разрез района: /api/owner/office за выбранный на странице период.

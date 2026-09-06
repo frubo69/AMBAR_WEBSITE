@@ -1846,8 +1846,32 @@ button.path:active{transform:scale(.995)}
 /* Хаб больше не растягивается на весь экран и не прижимает последнюю карточку
    к низу: содержимое лежит сверху вниз, зона к зоне. Пустое место под ними —
    это поля, а не дыра посреди страницы. */
-.ohub{display:flex;flex-direction:column;gap:12px}
+.stk-mid:has(> .ohub){display:flex;flex-direction:column}
+.ohub{display:flex;flex-direction:column;gap:12px;flex:1 0 auto}
 .ohub > *{margin-bottom:0}
+.ohub .pbox.tail{margin-top:auto}
+/* Плитки хаба — как везде: название заглавными, оглавление через косую,
+   число справа. */
+.pnav-r.ttl .pnav-b b{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
+  letter-spacing:.6px;text-transform:uppercase;line-height:1.2}
+.pnav-r.ttl .pnav-b i{font-size:11.5px;margin-top:4px}
+.pnav-r.pbig .pnav-v{font-size:19px;color:var(--gold2)}
+/* Приём по районам: заголовок с состоянием, под ним строка на район. */
+.pd{display:block;width:100%;padding:0;border:0;background:none;color:var(--text);
+  font-family:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pd.off{cursor:default}
+.pd:not(.off):active{background:rgba(255,255,255,.03)}
+.pd-h{display:flex;align-items:center;gap:10px;padding:13px 16px 9px}
+.pd-h b{flex:1;min-width:0;font-family:'Space Grotesk',sans-serif;font-size:11.5px;font-weight:700;
+  letter-spacing:.9px;text-transform:uppercase;color:var(--muted)}
+.pd-r{display:flex;align-items:center;gap:12px;padding:10px 16px;
+  border-top:1px solid rgba(255,255,255,.05)}
+.pd-r .shl-code{width:34px;height:34px;border-radius:10px;font-size:12px}
+.pd-r .pnav-b b{font-size:14px}
+.pd-r .pnav-b i{margin-top:2px}
+.pd-r.ok .pnav-b i{color:var(--up)}
+.pd-r.live .pnav-b i{color:var(--gold2)}
+.pd-r:last-child{padding-bottom:14px}
 .ohub .pbox{flex:0 0 auto;display:flex;flex-direction:column}
 .ohub .pbox .path{padding:26px 14px 24px}
 .pbox{margin:0 0 12px;border-radius:18px;overflow:hidden;background:var(--card);
@@ -14488,10 +14512,11 @@ function supStage(){
 // приёмки. Деньги идут под числом: «469 бутылок» не отвечает на вопрос
 // «дорого ли», а «469 · 68 354 AED» отвечает.
 function pathSteps(vals, money, step){
+  const under = v => typeof v === 'string' ? v : `${fmt(v)} AED`;
   return `<span class="path-r">${PATH_STEPS.map((t, i) => `
       <span class="path-s ${i < step ? 'done' : i === step ? 'now' : ''}">
         <i></i><b>${t}</b><u>${vals[i]}</u>${
-        money && money[i] != null ? `<em>${fmt(money[i])} AED</em>` : ''}
+        money && money[i] != null ? `<em>${under(money[i])}</em>` : ''}
       </span>`).join('')}</span>`;
 }
 
@@ -14511,7 +14536,11 @@ function pathInner(){
     sup ? pct + '%' : '—',
   ];
   const m = (sup && sup.money) || null;
-  const money = m ? [m.asked, m.confirmed, m.took] : [d.total_aed, null, null];
+  // Под «приняли» — бутылки, а не деньги: пока идёт приём, там всегда был
+  // ноль дирхамов, и он отвечал не на тот вопрос.
+  const money = m ? [m.asked, m.confirmed,
+                     sup ? `${fmt(st.took)} из ${fmt(sup.total_qty || 0)}` : null]
+                  : [d.total_aed, null, null];
   return pathSteps(vals, money, step);
 }
 
@@ -14525,14 +14554,52 @@ function pathNav(){
   const qty = st.sup ? (st.sup.asked_qty || 0) : (d.total_qty || 0);
   const ed = d.edited_count || 0;
   const CHIP = {none:'', wait:'wait', live:'live', done:'done', cancelled:'no'};
-  return `<button class="pnav-r pbig" onclick="accOrderList()">
+  return `<button class="pnav-r pbig ttl" onclick="accOrderList()">
       <span class="pnav-i big">${ICO_LIST}</span>
       <span class="pnav-b"><b>Заявка</b>
-        <i>${fmt(qty)} ${pluralize(qty,'бутылка','бутылки','бутылок')}
-          · ${pos} ${pluralize(pos,'позиция','позиции','позиций')}</i></span>
-      ${ed ? `<span class="pnav-tag">правок ${ed}</span>` : ''}
+        <i>${pos} ${pluralize(pos,'позиция','позиции','позиций')} / по районам / общая${ed ? ` / правок ${ed}` : ''}</i></span>
+      <span class="pnav-v">${fmt(qty)}<u>${pluralize(qty,'бутылка','бутылки','бутылок')}</u></span>
       <span class="pnav-go">${ICO_CHEV}</span>
     </button>`;
+}
+
+// Приём по районам — прямо на странице, а не за одной строкой «Статус
+// заявки». Это и есть суть закупки после отправки: кто принял, кто везёт, кто
+// ждёт. Пока магазин не ответил — сколько просим в каждый район.
+function pathDistricts(){
+  const d = ORD.d || {};
+  const st = supStage(), sup = st.sup;
+  const dist = d.districts || [];
+  const CHIP = {none:'', wait:'wait', live:'live', done:'done', cancelled:'no'};
+  const rows = dist.map(x => {
+    const t = sup && (sup.tasks || {})[x.id];
+    let cls = '', sub, right = '';
+    if(!sup){
+      const need = (d.rows || []).reduce((a, r) => a + ((r.cells[x.id] || {}).need || 0), 0);
+      sub = `просим ${fmt(need)} ${pluralize(need,'бутылку','бутылки','бутылок')}`;
+    }else if(!t){
+      sub = 'магазин ничего не дал';
+    }else if(t.done_at){
+      cls = 'ok';
+      sub = `принял ${fmt(t.scanned || 0)} из ${fmt(t.qty || 0)}${t.driver ? ' · ' + escS(t.driver) : ''}`;
+    }else if(t.driver){
+      cls = 'live';
+      sub = `везёт ${escS(t.driver)}${t.scanned ? ` · принято ${fmt(t.scanned)} из ${fmt(t.qty || 0)}` : ` · ${fmt(t.qty || 0)} ${pluralize(t.qty || 0,'бутылка','бутылки','бутылок')}`}`;
+    }else{
+      sub = `ждёт водителя · ${fmt(t.qty || 0)} ${pluralize(t.qty || 0,'бутылка','бутылки','бутылок')}`;
+    }
+    return `<div class="pd-r ${cls}">
+      <span class="shl-code">${escS(x.code || '')}</span>
+      <span class="pnav-b"><b>${escS(x.name || x.id)}</b><i>${sub}</i></span>
+    </div>`;
+  }).join('');
+  const go = st.k === 'none' ? '' : `onclick="accSupply('who')"`;
+  return `<button class="pd ${st.k === 'none' ? 'off' : ''}" ${go}>
+    <div class="pd-h"><b>Приём по районам</b>
+      <span class="pstat-c ${CHIP[st.k]}">${st.k === 'none' ? 'ждём магазин' : st.t.toLowerCase()}</span>
+      <span class="pnav-go">${st.k === 'none' ? '' : ICO_CHEV}</span></div>
+    ${rows}
+  </button>`;
 }
 
 function pathStatus(){
@@ -14578,14 +14645,13 @@ function supHistLine(){
   const list = (ACC_SUP && ACC_SUP.list) || [];
   if(list.length < 2) return '';
   const aed = list.reduce((a, x) => a + ((x.money || {}).took || 0), 0);
-  return `<button class="pnav-r" onclick="supHistory()">
-    <span class="pnav-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+  return `<button class="pnav-r pbig ttl" onclick="supHistory()">
+    <span class="pnav-i big"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
       stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
       <path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>
       <path d="M12 8v4l3 2"/></svg></span>
     <span class="pnav-b"><b>История закупок</b>
-      <i>${list.length} ${pluralize(list.length,'закупка','закупки','закупок')}
-        · приняли на ${fmt(aed)} AED по прайсу</i></span>
+      <i>${list.length} ${pluralize(list.length,'закупка','закупки','закупок')} / принято на ${fmt(aed)} AED</i></span>
     <span class="pnav-go">${ICO_CHEV}</span>
   </button>`;
 }
@@ -14603,10 +14669,12 @@ function ordHub(){
   // низу экрана, и между ними стояло поле пустоты в пол-экрана — оно читалось
   // как «здесь что-то не загрузилось», а не как воздух.
   const рядом = pathShort() + supHistLine();
+  // Страница занимает экран целиком: закуп сверху, «рядом» садится к нижней
+  // кнопке. Между ними воздух, а не дыра.
   document.getElementById('accMid').innerHTML = `<div class="ohub">
-    <div class="pbox">${pathNav()}<div class="path">${pathInner()}</div>${pathStatus()}</div>
+    <div class="pbox">${pathNav()}<div class="path">${pathInner()}</div>${pathDistricts()}</div>
     <div class="pbox xbox">${pathExtra()}</div>
-    ${рядом ? `<div class="pbox">${рядом}</div>` : ''}</div>`;
+    ${рядом ? `<div class="pbox tail">${рядом}</div>` : ''}</div>`;
 
   // Загрузка ответа магазина стоит внизу всегда. Раньше она пряталась во всех
   // состояниях, кроме двух, — и исчезала ровно тогда, когда была нужнее всего:
@@ -16674,11 +16742,11 @@ function _xState(x){
 function pathExtra(){
   const ex = _xList(), open = ex.filter(x => x.status === 'open');
   const st = open.length ? _xState(open[0]) : null;
-  return `<button class="pnav-r pbig" onclick="accExtra()">
+  return `<button class="pnav-r pbig ttl" onclick="accExtra()">
     <span class="pnav-i big live">${ICO_BASE}</span>
-    <span class="pnav-b"><b>Закупка на других базах</b>
-      ${open.length ? `<i>${escS(open.map(x => x.base).join(' · '))}</i>`
-        : (ex.length ? `<i>${ex.length} ${pluralize(ex.length,'заявка','заявки','заявок')}</i>` : '')}</span>
+    <span class="pnav-b"><b>Другие базы</b>
+      ${open.length ? `<i>${escS(open.map(x => x.base).join(' / '))}</i>`
+        : (ex.length ? `<i>${ex.length} ${pluralize(ex.length,'заявка','заявки','заявок')}</i>` : '<i>закупка мимо магазина</i>')}</span>
     ${st ? `<span class="pstat-c ${st[1]}">${open.length > 1 ? open.length + ' в работе' : st[0]}</span>` : ''}
     <span class="pnav-go">${ICO_CHEV}</span>
   </button>`;

@@ -2110,7 +2110,17 @@ button.path:active{transform:scale(.995)}
 .xs-cats .xs-chip{flex-shrink:0;white-space:nowrap}
 .xs-chip i{font-style:normal;font-size:11px;color:var(--muted);margin-left:2px}
 .xs-chip.on i{color:var(--gold2);opacity:.7}
-/* Приёмка заявки на базу — те же карточки, что в итоге мастера. */
+/* Приёмка — те же карточки, что в итоге мастера. У основной заявки позиции
+   свёрнуты под флажок: их сотня, и разворачивают их по одному району. */
+.xs-fold{display:flex;align-items:center;justify-content:space-between;width:100%;
+  padding:11px 2px;border:0;background:none;cursor:pointer;font-family:inherit;font-size:12.5px;
+  font-weight:600;color:var(--sub);text-align:left}
+.xs-fold svg{width:16px;height:16px;fill:none;stroke:var(--muted);stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform .18s var(--e1)}
+.xs-fold.on svg{transform:rotate(180deg)}
+.xs-fold.on{color:var(--gold2)}
+.xs-fold-b{margin-bottom:4px}
+.xs-fold-b .xs-pl:first-child{border-top:1px solid var(--border2)}
 .xs-top-b .pstat-c{display:inline-flex}
 .xs-top-s{display:block;font-size:12.5px;font-weight:500;color:var(--muted);margin-top:9px}
 .xs-top.xs-card{align-items:center;flex-wrap:wrap;margin:2px 0 12px;padding:16px 18px 18px;
@@ -16241,12 +16251,15 @@ async function xOpen(sid){
   ACC_BACK = accExtra;
 }
 
-// ── приёмка заявки на базу ──
-// Тот же документ и те же кнопки, что у основной приёмки, но экран собран
-// как итог мастера: статус и принятое сверху, карточка на район, внутри
-// товар с картинкой и числом. Старший видит, что ехало, что уже на полке
-// и кто везёт, — и берёт район на себя той же кнопкой.
+// ── приёмка ──
+// Один экран на обе заявки: статус и принятое сверху, карточка на район,
+// внутри товар с картинкой и числом, кнопки «Взять на себя» и прочие внизу
+// карточки. У заявки на базу позиций мало — они раскрыты сразу; у основной
+// их сотня, поэтому строки свёрнуты под флажок и раскрываются по району.
+let SUP_OPEN = new Set();   // районы с раскрытым списком (для основной)
+
 function xSupRender(d){
+  const extra = d.kind === 'extra';
   const D = d.districts || {};
   const tasks = d.tasks || [];
   const all = tasks.length;
@@ -16257,26 +16270,39 @@ function xSupRender(d){
   const st = d.status === 'cancelled' ? ['отменена', 'no']
            : d.status !== 'open' ? [got < need ? 'недобор' : 'принято', 'done']
            : (busy || done) ? ['в работе', 'live'] : ['ждёт', 'wait'];
-  _setText('accTitle', d.base || 'Другая база');
-  _setText('accSub', '');
+  _setText('accTitle', extra ? (d.base || 'Другая база') : 'Приёмка');
+  _setText('accSub', extra ? '' : _dayName(d.day || String(d.at || '').slice(0, 10)));
   const order = t => t.done_at ? 2 : (t.driver ? 1 : 0);
   const cards = [...tasks].sort((a, b) => order(a) - order(b)).map(t => {
     const x = D[t.district] || {};
     const who = t.done_at ? (t.got < t.need ? `недобор · закрыл ${_hm(t.done_at)}` : `принято · ${_hm(t.done_at)}`)
               : t.driver ? `${escS(t.driver)}${t.started_at ? ' · с ' + _hm(t.started_at) : ''}`
               : 'никто не взял';
+    const fl = t.flags || {};
+    const marks = [];
+    if(fl.fast)  marks.push(`${fl.fast} ${pluralize(fl.fast,'быстрый скан','быстрых скана','быстрых сканов')}`);
+    if(fl.shape) marks.push(`${fl.shape} ${pluralize(fl.shape,'странный код','странных кода','странных кодов')}`);
+    if(fl.undo)  marks.push(`${fl.undo} ${pluralize(fl.undo,'отмена','отмены','отмен')}`);
+    const lines = t.lines || [];
+    const open = extra || SUP_OPEN.has(t.district);
+    const list = lines.map(l => `<div class="xs-pl ${l.left ? '' : 'ok'}">
+        <img class="xr-img" src="/products/${escS(l.id)}.webp" alt="" loading="lazy"
+             onerror="this.style.visibility='hidden'">
+        <span class="xs-pl-n">${escS(l.name)}</span>
+        <span class="xs-pl-q">${l.got ? `${l.got}<u>/${l.need}</u>` : l.need}</span>
+      </div>`).join('');
     return `<div class="xs-dcard ${t.done_at ? 'done' : t.driver ? 'live' : ''}">
       <div class="xs-dcard-h">
         <span class="xs-dc">${escS(x.code || '')}</span>
         <span class="xs-dcard-b"><b>${escS(x.name || t.district)}</b><i>${who}</i></span>
         <span class="xs-dcard-n">${fmt(t.got)}<i>/ ${fmt(t.need)}</i></span>
       </div>
-      ${(t.lines || []).map(l => `<div class="xs-pl ${l.left ? '' : 'ok'}">
-        <img class="xr-img" src="/products/${escS(l.id)}.webp" alt="" loading="lazy"
-             onerror="this.style.visibility='hidden'">
-        <span class="xs-pl-n">${escS(l.name)}</span>
-        <span class="xs-pl-q">${l.got ? `${l.got}<u>/${l.need}</u>` : l.need}</span>
-      </div>`).join('')}
+      ${extra ? list : `<button class="xs-fold ${open ? 'on' : ''}" onclick="xSupToggle('${escS(t.district)}')">
+          <span>${lines.length} ${pluralize(lines.length,'позиция','позиции','позиций')}${
+            t.left && (t.driver || t.done_at) ? ` · ${t.done_at ? 'не хватает' : 'осталось'} ${fmt(t.left)}` : ''}</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+        </button>${open ? `<div class="xs-fold-b">${list}</div>` : ''}`}
+      ${marks.length ? `<div class="rt-fl">${escS(marks.join(' · '))}</div>` : ''}
       ${t.note ? `<div class="rt-note">${escS(t.note)}</div>` : ''}
       ${rtActs(t, d)}
     </div>`;
@@ -16286,9 +16312,21 @@ function xSupRender(d){
         <span class="xs-top-s">${done} из ${all} ${pluralize(all,'района','районов','районов')} приняли</span></span>
       <span class="xs-top-n">${fmt(got)}<i>из ${fmt(need)} ${pluralize(need,'бутылки','бутылок','бутылок')}</i></span>
       <span class="xs-bar"><i style="width:${need ? Math.min(100, Math.round(got / need * 100)) : 0}%"></i></span>
-    </div>${cards || '<div class="exp-empty">Районов нет</div>'}`;
+    </div><div id="supWho">${cards || '<div class="exp-empty">Районов нет</div>'}</div>`;
   supActShow();
   supFoot();
+  const goto = SUP_GOTO === 'who' ? 'supWho' : '';
+  SUP_GOTO = '';
+  if(goto){
+    const el = document.getElementById(goto);
+    if(el) requestAnimationFrame(() => el.scrollIntoView({block:'start', behavior:'smooth'}));
+  }
+}
+
+function xSupToggle(oid){
+  if(SUP_OPEN.has(oid)) SUP_OPEN.delete(oid); else SUP_OPEN.add(oid);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  supRender();
 }
 
 // ── мастер: куда → что → готово ──
@@ -16692,103 +16730,7 @@ let SUP_GOTO = '';
 
 function supRender(){
   const d = SUP_D; if(!d) return;
-  if(d.kind === 'extra'){ xSupRender(d); return; }
-  const short = d.shortfall || {rows:[], qty:0};
-  const D = d.districts || {};
-  const tasks = d.tasks || [];
-  const all = tasks.length;
-  const done = tasks.filter(t => t.done_at).length;
-  const free = tasks.filter(t => !t.driver && !t.done_at).length;
-  const busy = all - done - free;
-  const need = tasks.reduce((a, t) => a + (t.need || 0), 0);
-  const got  = tasks.reduce((a, t) => a + (t.got || 0), 0);
-  const pct  = need ? Math.round(got / need * 100) : 0;
-  const state = d.status !== 'open' ? ['Приём закончен','ok']
-              : (!busy && !done) ? ['Ожидает приёма','warn'] : ['Идёт приём','live'];
-  _setText('accTitle', d.kind === 'extra' ? (d.base || 'Другая база') : 'Приёмка');
-  _setText('accSub', `${d.kind === 'extra' ? 'другая база · ' : ''}${
-    _dayName(d.day || String(d.at||'').slice(0,10))} · ${
-    d.positions || 0} ${pluralize(d.positions||0,'позиция','позиции','позиций')}`);
-
-  // Главное число экрана — сколько бутылок уже на полке. Всё остальное здесь
-  // объясняет именно его: кто везёт, чего не хватает, где ещё никто не взял.
-  const m = d.money || {};
-  const head = `<div class="rcv">
-    <div class="rcv-h">
-      <span class="rcv-st ${state[1]}">${state[0]}</span>
-      ${d.closed_at ? `<span class="rcv-when">закрыта ${_hm(d.closed_at)}</span>` : ''}
-    </div>
-    <div class="rcv-n">
-      <span class="rcv-v">${fmt(got)}</span>
-      <span class="rcv-of">из ${fmt(need)}</span>
-      <span class="rcv-pct">${pct}%</span>
-    </div>
-    <div class="rcv-bar"><i style="width:${Math.min(100, pct)}%"></i></div>
-    <div class="rcv-f">
-      <span>${done} из ${all} ${pluralize(all,'района','районов','районов')} приняли</span>
-      ${m.took != null ? `<span class="rcv-aed">${fmt(m.took)} AED</span>` : ''}
-    </div>
-  </div>`;
-
-  // Кто везёт. Ради этого списка сюда и заходят: водитель, район, сколько уже
-  // принято и чем кончилось. Незанятые районы — первыми: это единственные
-  // строки, по которым надо кому-то звонить.
-  const order = t => t.done_at ? 2 : (t.driver ? 1 : 0);
-  const rows = [...tasks].sort((a, b) => order(a) - order(b));
-  const cards = rows.map(t => {
-    const p = t.need ? Math.round(t.got / t.need * 100) : 0;
-    const fl = t.flags || {};
-    const marks = [];
-    if(fl.fast)  marks.push(`${fl.fast} ${pluralize(fl.fast,'быстрый скан','быстрых скана','быстрых сканов')}`);
-    if(fl.shape) marks.push(`${fl.shape} ${pluralize(fl.shape,'странный код','странных кода','странных кодов')}`);
-    if(fl.undo)  marks.push(`${fl.undo} ${pluralize(fl.undo,'отмена','отмены','отмен')}`);
-    const cls = t.done_at ? (t.got < t.need ? 'dn' : 'ok') : t.driver ? 'live' : 'free';
-    const st  = t.done_at ? (t.got < t.need ? 'недобор' : 'принято')
-              : t.driver ? (t.got ? 'везёт' : 'взял') : 'никто не взял';
-    const when = t.done_at ? 'закрыл ' + _hm(t.done_at)
-               : t.started_at ? 'с ' + _hm(t.started_at)
-               : t.claimed_at ? 'взял ' + _hm(t.claimed_at) : '';
-    return `<div class="rt ${cls}">
-      <div class="rt-h">
-        <span class="rt-code">${escS((D[t.district]||{}).code || '')}</span>
-        <span class="rt-b">
-          <b>${escS(t.driver || 'Свободна')}</b>
-          <i>${escS((D[t.district]||{}).name || t.district)}${when ? ' · ' + when : ''}</i>
-        </span>
-        <span class="rt-st">${st}</span>
-      </div>
-      <div class="rt-n">
-        <span class="rt-v">${fmt(t.got)}<u>/${fmt(t.need)}</u></span>
-        <span class="rt-pos">${t.positions} ${
-          pluralize(t.positions,'позиция','позиции','позиций')}</span>
-        ${t.left && (t.driver || t.done_at)
-          ? `<span class="rt-left ${t.done_at ? 'dn' : ''}">${
-              t.done_at ? 'не хватает' : 'осталось'} ${fmt(t.left)}</span>` : ''}
-      </div>
-      <div class="rt-bar"><i style="width:${Math.min(100, p)}%"></i></div>
-      ${marks.length ? `<div class="rt-fl">${escS(marks.join(' · '))}</div>` : ''}
-      ${t.note ? `<div class="rt-note">${escS(t.note)}</div>` : ''}
-      ${rtActs(t, d)}
-    </div>`;
-  }).join('');
-
-  // Недобора и «сверх заказа» здесь больше нет. Экран отвечает на один вопрос —
-  // как идёт приём, — а два списка внизу отвечали на другой: что докупить и что
-  // магазин подсунул. Они уводили от дела и жили только ради файла, который
-  // отсюда же и уходил; файл ушёл вместе с ними.
-  document.getElementById('accMid').innerHTML = head +
-    `<div class="exp-grp" id="supWho">Кто везёт · ${done} из ${all}</div>${
-      cards || '<div class="exp-empty">Районов нет</div>'}`;
-  // Отмена — только пока заявка открыта и только сегодня. У закрытой отменять
-  // нечего, у уже отменённой второе нажатие ничего не меняет.
-  supActShow();
-  supFoot();
-  const goto = SUP_GOTO === 'who' ? 'supWho' : '';
-  SUP_GOTO = '';
-  if(goto){
-    const el = document.getElementById(goto);
-    if(el) requestAnimationFrame(() => el.scrollIntoView({block:'start', behavior:'smooth'}));
-  }
+  xSupRender(d);
 }
 
 // История закупов. Открывается в ту же карточку — это один и тот же экран,

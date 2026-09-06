@@ -2987,6 +2987,8 @@ button.path:active{transform:scale(.995)}
   box-shadow:0 4px 14px rgba(0,0,0,.55)}
 .wh-pin.snap{background:#C9A96E;color:#1a1408}
 .wh-pin.stale{background:#7d879c;color:#0b0e18}
+/* Старший — золотой ободок: на карте его надо отличать от машин с первого взгляда. */
+.wh-pin.senior{border-color:#C9A96E;box-shadow:0 0 0 3px rgba(201,169,110,.35),0 4px 14px rgba(0,0,0,.55)}
 .wh-pin.sel{transform:scale(1.14)}
 /* Метка выбранного вырастает, а не подменяется: движение показывает связь
    между строкой, по которой нажали, и точкой на карте. */
@@ -9540,10 +9542,10 @@ function whRow(r, trackOn){
       <span class="wh-n">${escS(r.driver)}</span>
       <span class="wh-s">${state}${trackOn ? ' <i>· маршрут на карте</i>' : ''}</span>
     </span>
-    <span class="wh-w">
+    ${r.senior ? '' : `<span class="wh-w">
       <span class="wh-w-v${r.orders ? '' : ' zero'}">${r.orders || r.done || '—'}</span>
       <span class="wh-w-l">${r.orders ? 'в пути' : (r.done ? 'сдал' : 'пусто')}</span>
-    </span>
+    </span>`}
   </button>`;
 }
 
@@ -9610,7 +9612,8 @@ function whPaint(){
           <div class="wh-grp">
             <span class="wh-grp-c">${escS(g.code || '')}</span>
             <span class="wh-grp-n">${escS(g.name || '')}</span>
-            <span class="wh-grp-s">${живых ? `${живых} на связи`
+            <span class="wh-grp-s">${g.id === 'senior' ? 'старший оператор'
+              : живых ? `${живых} на связи`
               : `${g.rows.length} ${pluralize(g.rows.length,'водитель','водителя','водителей')}`}${
               заказы ? ` · ${заказы} в пути` : ''}</span>
           </div>
@@ -9655,6 +9658,7 @@ function whMapPaint(){
     const mk = L.marker([r.lat, r.lon], {icon: L.divIcon({
         className:'', iconSize:[30,30], iconAnchor:[15,30],
         html:`<div class="wh-pin${st === 'stream' ? '' : (st === 'snap' ? ' snap' : ' stale')}${
+          r.senior ? ' senior' : ''}${
           WH.sel === r.driver ? ' sel' : ''}${
           WH.pop && WH.sel === r.driver ? ' pop' : ''}"><span>${
           escS(r.code || '')}</span></div>`})})
@@ -9728,7 +9732,8 @@ function whCard(){
   const st = whState(r);
   const track = (d.track || []).length > 1;
   _setText('whTtl', r.driver);
-  _setText('whSub', [r.code, r.name].filter(Boolean).join(' ') || 'водитель');
+  _setText('whSub', r.senior ? 'старший оператор'
+                    : ([r.code, r.name].filter(Boolean).join(' ') || 'водитель'));
   let state;
   if(st === 'stream') state = `<b>на связи</b> · трансляция ещё ${r.left < 60
       ? r.left + ' мин' : Math.floor(r.left / 60) + ' ч'}`;
@@ -9746,8 +9751,8 @@ function whCard(){
         </span>
       </div>
       <div class="wh-facts">
-        <span><b class="${r.orders ? '' : 'zero'}">${r.orders || '—'}</b><i>в пути</i></span>
-        <span><b>${r.done || '—'}</b><i>сдал за смену</i></span>
+        ${r.senior ? '' : `<span><b class="${r.orders ? '' : 'zero'}">${r.orders || '—'}</b><i>в пути</i></span>
+        <span><b>${r.done || '—'}</b><i>сдал за смену</i></span>`}
         <span><b>${!r.has ? '—' : (r.age < 90 ? 'сейчас'
           : (r.age < 3600 ? Math.round(r.age / 60) + ' мин'
                           : Math.floor(r.age / 3600) + ' ч'))}</b><i>точка</i></span>
@@ -9762,7 +9767,9 @@ function whCard(){
              stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
           <circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
         Приблизить<i></i></button>` : ''}
-      <div class="wh-note">${st === 'stream'
+      <div class="wh-note">${r.senior
+        ? 'Точку присылает панель, пока открыта, или трансляция геопозиции в чате с ботом панели. Пропала — владельцам приходит сообщение.'
+        : st === 'stream'
         ? 'Трансляция включена — водителя видно, даже когда телефон в кармане.'
         : (st === 'snap'
           ? 'Точка пришла из приложения. Пока трансляция не включена, следующая появится, только когда водитель снова его откроет.'
@@ -27182,6 +27189,61 @@ function _callPaint(){
 // доходить и когда окно связи закрыто.
 try{ setTimeout(callInit, 1500); }catch(e){}
 
+
+// ── Геопозиция старшего из панели ─────────────────────────────────────────
+// Панель спрашивает у телеграма, где телефон, и раз в минуту шлёт точку. Сервер
+// принимает её только от старшего; владельцам он отвечает «не старший», и
+// панель на этом замолкает до перезапуска. Спрашивает телеграм, не браузер:
+// окно с вопросом показывает имя приложения, а не адрес, и один раз.
+(function seniorGeo(){
+  const EVERY = 60000;
+  let stop = false, busy = false, denied = false;
+  function ready(){
+    return new Promise(resolve => {
+      const w = window.Telegram && Telegram.WebApp, lm = w && w.LocationManager;
+      if(!lm || typeof lm.getLocation !== 'function'
+         || !(w.isVersionAtLeast && w.isVersionAtLeast('8.0'))) return resolve(null);
+      if(lm.isInited) return resolve(lm.isLocationAvailable ? lm : null);
+      const guard = setTimeout(() => resolve(null), 5000);
+      try{ lm.init(() => { clearTimeout(guard); resolve(lm.isLocationAvailable ? lm : null); }); }
+      catch(e){ clearTimeout(guard); resolve(null); }
+    });
+  }
+  async function read(){
+    const lm = await ready();
+    if(!lm) return null;
+    if(lm.isAccessRequested && !lm.isAccessGranted){ denied = true; return null; }
+    return new Promise(resolve => {
+      let done = false;
+      const fin = v => { if(!done){ done = true; resolve(v); } };
+      const guard = setTimeout(() => fin(null), 7000);
+      try{
+        lm.getLocation(d => {
+          clearTimeout(guard);
+          if(d && typeof d.latitude === 'number')
+            return fin({lat: d.latitude, lon: d.longitude, acc: d.horizontal_accuracy || null});
+          denied = true; fin(null);
+        });
+      }catch(e){ clearTimeout(guard); fin(null); }
+    });
+  }
+  async function push(){
+    if(stop || busy || denied || document.hidden || !window.ownerApi) return;
+    busy = true;
+    try{
+      const pt = await read();
+      if(!pt) return;
+      await ownerApi.ownerFetch('/api/owner/pos', {method:'POST', body: pt});
+    }catch(e){
+      if(e && (e.status === 403 || e.status === 401)) stop = true;   // не старший
+    }finally{ busy = false; }
+  }
+  window.addEventListener('load', () => {
+    setTimeout(push, 4000);
+    setInterval(push, EVERY);
+    document.addEventListener('visibilitychange', () => { if(!document.hidden) push(); });
+  });
+})();
 </script>
 </body>
 </html>

@@ -132,6 +132,46 @@ async def on_any_update(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await _track(update.effective_message)
 
 
+async def on_location(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Точка старшего: разовая или из трансляции, которую он включил в этом
+    чате. Живые обновления приходят правкой того же сообщения. Владельцам
+    геопозицию не считаем — только старшему: его смотрят из панели."""
+    from datetime import datetime, timezone, timedelta
+    msg = update.effective_message
+    loc = getattr(msg, "location", None) if msg else None
+    if not loc or not update.effective_user:
+        return
+    try:
+        import config_staff as staff
+        import geo_watch
+        name = staff.senior_star_by_tg(update.effective_user.id)
+    except Exception as e:
+        log.warning("старший не определён: %s", e)
+        return
+    if not name:
+        return
+    now = datetime.now(timezone.utc)
+    period = getattr(loc, "live_period", None)
+    until = now + timedelta(seconds=int(period)) if period else None
+    stop = bool(update.edited_message and not period)
+    try:
+        await db.driver_pos_set(geo_watch.SENIOR_PREFIX + name, geo_watch._biz_day(),
+                                loc.latitude, loc.longitude, now, until=until,
+                                stop_live=stop,
+                                acc=getattr(loc, "horizontal_accuracy", None))
+    except Exception as e:
+        log.warning("точка старшего не записана: %s", e)
+        return
+    started = bool(update.message and period)
+    if started or stop:
+        try:
+            await geo_watch.on_senior_stream(name, on=started, now=now)
+        except Exception as e:
+            log.warning("владельцам о трансляции старшего не ушло: %s", e)
+    if update.message and not period:
+        await _track(await update.message.reply_text("Точка принята."))
+
+
 async def on_any_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     """Любое сообщение — снова кнопка. Чужому — те же два слова."""
     if not update.effective_user:
@@ -354,6 +394,10 @@ def main():
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CallbackQueryHandler(on_writeoff, pattern=r"^wo:(ok|no):"))
     app.add_handler(CallbackQueryHandler(on_geo_unlock, pattern=r"^geo:un:"))
+    # Геопозиция — раньше общего обработчика: иначе на каждую точку
+    # трансляции прилетала бы кнопка панели.
+    app.add_handler(MessageHandler(filters.LOCATION, on_location))
+    app.add_handler(MessageHandler(filters.UpdateType.EDITED_MESSAGE & filters.LOCATION, on_location))
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, on_any_message))
 
     log.info("🔐 AMBAR Owner Bot starting — miniapp: %s", OWNER_WEBAPP_URL)

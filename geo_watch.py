@@ -64,6 +64,11 @@ GRACE_MIN = 15                 # после старта не судим ник�
 EVENT_OFF = "drivers.geo_off"
 EVENT_ON = "drivers.geo_on"
 EVENT_LOCK = "drivers.geo_lock"
+EVENT_SENIOR = "drivers.senior_geo"
+
+# Точка старшего лежит там же, где точки водителей, но под своим ключом:
+# среди водителей бывает тёзка, и имя само по себе ключом быть не может.
+SENIOR_PREFIX = "op:"
 
 _STARTED = None
 
@@ -148,6 +153,21 @@ def text_lock_driver(since: datetime) -> str:
             "и не вернулась до конца смены. Открыть доступ может старший.")
 
 
+def text_senior_off(name: str, why: str, geo: dict) -> str:
+    n = _n(name)
+    if why == "stream":
+        return f"📍 *{n}* (старший): трансляция геопозиции выключена"
+    if why == "never":
+        return f"📍 *{n}* (старший): геопозиция не видна\nС начала смены не было ни одной точки."
+    mins = int((geo.get("age_sec") or 0) // 60)
+    return f"📍 *{n}* (старший): геопозиция не видна\nТочек нет уже {mins} мин."
+
+
+def text_senior_on(name: str, gone_sec: float = 0) -> str:
+    return (f"📍 *{_n(name)}* (старший): геопозиция снова видна"
+            + (f"\nНе было {_dur(gone_sec)}." if gone_sec else ""))
+
+
 def unlock_keyboard(key: str) -> dict:
     return {"inline_keyboard": [[{"text": "Открыть доступ",
                                   "callback_data": f"geo:un:{key}"}]]}
@@ -178,8 +198,11 @@ async def _post(token: str, chat_id: int, text: str, reply_markup: dict = None,
     return res or {}
 
 
-async def _owners(text: str, event: str, reply_markup: dict = None) -> int:
-    """Всем владельцам, мимо настроек и тихих часов: это правило, а не новость."""
+async def _owners(text: str, event: str, reply_markup: dict = None,
+                  exclude: set = None) -> int:
+    """Всем владельцам, мимо настроек и тихих часов: это правило, а не новость.
+
+    exclude — кому не слать: о пропаже старшего пишем владельцам, а не ему."""
     token = os.getenv("AMBAR_OWNER_BOT_TOKEN", "")
     try:
         await db.insert_notification(event, text)
@@ -188,7 +211,7 @@ async def _owners(text: str, event: str, reply_markup: dict = None) -> int:
     if not token:
         return 0
     try:
-        ids = await db.get_all_manager_ids()
+        ids = [i for i in await db.get_all_manager_ids() if i not in (exclude or set())]
     except Exception as e:
         log.error(f"[geo-watch] владельцы не прочитаны: {e}")
         return 0
@@ -268,6 +291,73 @@ async def on_stream(name: str, on: bool, now: datetime = None) -> bool:
     return True
 
 
+# ── старший ──────────────────────────────────────────────────────────────────
+# Правило другое, чем у водителей: замка нет, смены нет, трансляция не
+# обязательна — старший работает и без неё. Есть одно: владельцы должны
+# знать, когда его не видно. «Видно» — свежая точка любым путём: из панели,
+# пока она открыта, или из трансляции в чате STAR-бота.
+def _senior_ids() -> set:
+    return set(staff.SENIOR_STAR_IDS.values())
+
+
+async def _seniors_tick(now: datetime, utc: datetime, day: str, out: dict) -> None:
+    from driver_routes import _geo_state
+    if not _working_hours(now):
+        return
+    for name in list(staff.SENIOR_STAR_IDS):
+        key = SENIOR_PREFIX + name
+        g = await _geo_state(key)
+        st = await db.geo_watch_get(key)
+        off_since = _dt(st.get("off_since")) if st.get("day") == day else None
+        if not g["fresh"] and not off_since:
+            seen_today = st.get("day") == day and bool(st.get("seen"))
+            why = "stream" if st.get("stream_off") else ("stale" if seen_today else "never")
+            await db.geo_watch_set(key, {"day": day, "off_since": utc, "off_why": why},
+                                   unset=["stream_off"])
+            await _owners(text_senior_off(name, why, g), EVENT_SENIOR, exclude=_senior_ids())
+            log.info(f"[geo-watch] старший {name}: не виден ({why})")
+            out.setdefault("senior_off", []).append(name)
+        elif g["fresh"]:
+            fields = {"day": day, "seen": True}
+            if off_since:
+                await db.geo_watch_set(key, fields, unset=["off_since", "off_why"])
+                await _owners(text_senior_on(name, (utc - off_since).total_seconds()),
+                              EVENT_SENIOR, exclude=_senior_ids())
+                log.info(f"[geo-watch] старший {name}: снова виден")
+                out.setdefault("senior_on", []).append(name)
+            elif st.get("day") != day or not st.get("seen"):
+                await db.geo_watch_set(key, fields)
+
+
+async def on_senior_stream(name: str, on: bool, now: datetime = None) -> bool:
+    """Старший включил или выключил трансляцию в чате STAR-бота — владельцам
+    в ту же секунду. Выключение запоминаем: проход через четверть часа
+    иначе написал бы «точек нет», хотя причина известна."""
+    utc = now or datetime.now(timezone.utc)
+    day = _biz_day(utc.astimezone(DUBAI_TZ))
+    key = SENIOR_PREFIX + name
+    st = await db.geo_watch_get(key)
+    off_since = _dt(st.get("off_since")) if st.get("day") == day else None
+    if on:
+        if off_since:
+            await db.geo_watch_set(key, {"day": day, "seen": True},
+                                   unset=["off_since", "off_why", "stream_off"])
+            await _owners(text_senior_on(name, (utc - off_since).total_seconds()),
+                          EVENT_SENIOR, exclude=_senior_ids())
+        else:
+            await db.geo_watch_set(key, {"day": day, "seen": True}, unset=["stream_off"])
+            await _owners(f"📍 *{_n(name)}* (старший): включил трансляцию геопозиции",
+                          EVENT_SENIOR, exclude=_senior_ids())
+        return True
+    if off_since and st.get("off_why") == "stream":
+        return False
+    # Точка из панели могла прийти минуту назад — тогда «не виден» ещё рано,
+    # но о выключении сказать надо: следующий проход допишет остальное.
+    await db.geo_watch_set(key, {"day": day, "stream_off": True})
+    await _owners(text_senior_off(name, "stream", {}), EVENT_SENIOR, exclude=_senior_ids())
+    return True
+
+
 # ── проход ───────────────────────────────────────────────────────────────────
 async def tick(now: datetime = None) -> dict:
     """Один проход. Возвращает, что нашли — этим же пользуется проверка."""
@@ -283,6 +373,12 @@ async def tick(now: datetime = None) -> dict:
 
     from driver_routes import _geo_state
 
+    out = {"day": day}
+    try:
+        await _seniors_tick(now, utc, day, out)
+    except Exception as e:                       # noqa: BLE001
+        log.error(f"[geo-watch] старший: {e}")
+
     on_shift = []
     for d in await db.get_driver_days(day):
         if d.get("working") is not True or not d.get("shift_open_at"):
@@ -291,7 +387,8 @@ async def tick(now: datetime = None) -> dict:
         if name and name in staff.DRIVER_IDS:
             on_shift.append((name, d))
     if not on_shift:
-        return {"day": day, "on_shift": 0}
+        out["on_shift"] = 0
+        return out
 
     geos = {name: await _geo_state(name) for name, _ in on_shift}
 
@@ -301,10 +398,11 @@ async def tick(now: datetime = None) -> dict:
     live = [n for n, d in on_shift if not d.get("shift_close_at")]
     if len(live) > 1 and not any(geos[n]["fresh"] for n in live):
         log.warning("[geo-watch] точек нет ни у кого на смене — молчим, это похоже на нашу проблему")
-        return {"day": day, "on_shift": len(on_shift), "blind": True}
+        out.update({"on_shift": len(on_shift), "blind": True})
+        return out
 
     by_clock = not _working_hours(now)
-    out = {"day": day, "on_shift": len(on_shift), "off": [], "back": [], "locked": []}
+    out.update({"on_shift": len(on_shift), "off": [], "back": [], "locked": []})
     for name, d in on_shift:
         g = geos[name]
         st = await db.geo_watch_get(name)

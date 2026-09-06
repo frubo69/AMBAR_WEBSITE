@@ -1009,12 +1009,58 @@ async def handle_where(request):
             names.append(n)
             who[n] = {"district": oid, "code": OFFICE_CODES.get(oid, ""),
                       "name": OFFICE_NAMES.get(oid, oid)}
-    data = await pos.drivers_live(names, pos._biz_date(datetime.now(pos.DUBAI_TZ)),
-                                  (request.query.get("track") or "").strip())
+    day = pos._biz_date(datetime.now(pos.DUBAI_TZ))
+    want = (request.query.get("track") or "").strip()
+    seniors = list(staff.SENIOR_STAR_IDS)
+    data = await pos.drivers_live(names, day, want if want not in seniors else "")
     for r in data["drivers"]:
         r.update(who.get(r["driver"]) or {})
+    # Старший — той же строкой, что водители, но своей группой и без заказов:
+    # он не возит. Точка лежит под своим ключом, чтобы не спутать с тёзкой.
+    try:
+        import geo_watch
+        P = geo_watch.SENIOR_PREFIX
+        sen = await pos.drivers_live([P + n for n in seniors], day,
+                                     P + want if want in seniors else "")
+        rows = []
+        for r in sen["drivers"]:
+            r["driver"] = r["driver"][len(P):]
+            r.update({"senior": True, "district": "senior", "code": "СТ",
+                      "name": "Старший", "orders": 0, "done": 0})
+            rows.append(r)
+        data["drivers"] = rows + data["drivers"]
+        if want in seniors:
+            data["track"] = sen.get("track", [])
+            data["track_of"] = want
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[where] старший не прочитан: {e}")
     return web.json_response(data, headers=CORS_HEADERS,
                              dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
+@require_owner
+async def handle_pos(request):
+    """Точка старшего из панели. Панель спрашивает у телеграма, где телефон,
+    и присылает одну точку раз в минуту, пока открыта. Принимаем только от
+    старшего: у владельцев геопозицию никто не спрашивает."""
+    import operator_routes as pos
+    import geo_watch
+    name = staff.senior_star_by_tg(request.get("owner_id"))
+    if not name:
+        return web.json_response({"error": "not_senior"}, status=403, headers=CORS_HEADERS)
+    try:
+        body = await request.json()
+        lat, lon = float(body.get("lat")), float(body.get("lon"))
+    except Exception:
+        return web.json_response({"error": "bad_coords"}, status=400, headers=CORS_HEADERS)
+    if not (-90 <= lat <= 90 and -180 <= lon <= 180):
+        return web.json_response({"error": "bad_coords"}, status=400, headers=CORS_HEADERS)
+    acc = body.get("acc")
+    now = datetime.now(timezone.utc)
+    day = pos._biz_date(datetime.now(pos.DUBAI_TZ)).isoformat()
+    await db.driver_pos_set(geo_watch.SENIOR_PREFIX + name, day, lat, lon, now,
+                            acc=acc if isinstance(acc, (int, float)) else None)
+    return web.json_response({"ok": True, "at": now.isoformat()}, headers=CORS_HEADERS)
 
 
 @require_owner
@@ -3704,6 +3750,8 @@ def setup(app):
     app.router.add_route("OPTIONS", "/api/owner/checklist/mark", handle_checklist_mark)
     app.router.add_route("OPTIONS", "/api/owner/geo-unlock", handle_geo_unlock)
     app.router.add_post(            "/api/owner/geo-unlock", handle_geo_unlock)
+    app.router.add_route("OPTIONS", "/api/owner/pos", handle_pos)
+    app.router.add_post(            "/api/owner/pos", handle_pos)
     app.router.add_post(            "/api/owner/checklist/mark", handle_checklist_mark)
     app.router.add_route("OPTIONS", "/api/owner/support-threads", handle_support_threads)
     app.router.add_get(             "/api/owner/support-threads", handle_support_threads)

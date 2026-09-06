@@ -4788,7 +4788,9 @@ async function whereLoad(){
     d = await opApi.opFetch('/api/operator/where',
       {params: {as: curOp, ...((WH.sel && WH.track) ? {track: WH.sel} : {})}});
   }catch(e){
-    whSet('<div class="wh-note" style="border:0">Не удалось загрузить</div>');
+    // Есть что показывать — показываем: сорвавшееся обновление не повод
+    // стирать карточку под пальцем. Пусто — тогда и говорим, что не вышло.
+    if(!WH.data) whSet('<div class="wh-note" style="border:0">Не удалось загрузить</div>');
     return;
   }
   WH.data = d;
@@ -5023,7 +5025,8 @@ function whSelBar(){
   const el = $('whSelBar'); if(!el) return;
   const r = ((WH.data || {}).drivers || []).find(x => x.driver === WH.sel);
   const был = el.classList.contains('on');
-  if(!WH.sel || !r){ el.classList.remove('on'); el.innerHTML = ''; }
+  // В карточке имя и так в шапке — полоса под ней повторяла бы его дважды.
+  if(!WH.sel || !r || WH.view === 'card'){ el.classList.remove('on'); el.innerHTML = ''; }
   else{
     const st = whState(r);
     const что = ((WH.data || {}).track || []).length > 1 ? 'маршрут за смену на карте'

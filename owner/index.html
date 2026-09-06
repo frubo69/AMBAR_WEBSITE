@@ -2554,6 +2554,11 @@ button.path:active{transform:scale(.995)}
 /* Вход в общую заявку — плитка, как карточка района; строки общего списка
    вне карточки — на своей карточке каждая. */
 .ord-all{display:block;width:100%;margin:0 0 10px;padding:12px 16px}
+/* Заголовка «Позиции · N» над общим списком нет: число позиций уже стоит в
+   сводке сверху, а строка обычным текстом посреди плиток выглядела чужой.
+   Остаётся только счёт найденного при поиске — мелко и заглавными. */
+.ord-grp{font-size:9.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;
+  color:var(--muted);padding:2px 4px 8px}
 .ord-dists{border-radius:16px;overflow:hidden;
   background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
   border:1px solid rgba(201,169,110,.28)}
@@ -14704,7 +14709,7 @@ function ordRender(){
       на <b>${fmt(d.frozen_aed)} AED</b></div>` : ''}
 
     <div id="ordRows">${общий
-      ? `<div class="exp-grp">${q ? `Найдено · ${list.length}` : `Позиции · ${list.length}`}</div>`
+      ? (q ? `<div class="ord-grp">Найдено · ${list.length}</div>` : '')
         + (list.length ? list.map(r => ordRowAll(r, dist, num[r.id])).join('')
            : '<div class="exp-empty">' + (q ? 'Ничего не нашлось' : 'Довозить нечего — остатков хватает') + '</div>')
       : ordDistricts(list, dist, q)}</div>

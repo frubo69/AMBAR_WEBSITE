@@ -20845,6 +20845,40 @@ function woRow(r){
   </div>`;
 }
 
+// Снимок для окна списания.
+//
+// Раньше оба поля камеры вели на woShot — а это просмотрщик уже сохранённого
+// кадра, он ходит на сервер за фотографией по номеру записи. Ему передавали
+// само поле ввода, он делал из него адрес и получал отказ: отсюда и «снимка не
+// нашлось» в ответ на попытку сфотографировать. Кадр при этом никуда не
+// попадал, и списать бой у старшего было нельзя вовсе — сервер без фотографии
+// запись не принимает.
+//
+// Ужимаем на месте: с камеры приходит четыре мегабайта, а нужен читаемый кадр.
+// Заодно крошечная копия — она едет внутри самой записи, чтобы список
+// открывался с картинками, а не с пустыми рамками.
+function woAddShot(inp){
+  const f = inp.files && inp.files[0]; inp.value = '';
+  if(!f || !WOA) return;
+  const img = new Image(), fr = new FileReader();
+  fr.onload = () => { img.src = fr.result; };
+  img.onload = () => {
+    const снять = (край, q) => {
+      const k = Math.min(1, край / Math.max(img.width, img.height));
+      const c = document.createElement('canvas');
+      c.width = Math.round(img.width * k); c.height = Math.round(img.height * k);
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      return c.toDataURL('image/jpeg', q);
+    };
+    WOA.photo = снять(1280, 0.72);
+    WOA.thumb = снять(96, 0.5);
+    woAddPaint();
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  };
+  img.onerror = () => _toast('Не смогли прочитать снимок');
+  fr.readAsDataURL(f);
+}
+
 // Снимок во весь экран по нажатию на строку. Заодно кладём его в саму строку —
 // один раз загруженный кадр дальше виден списком, без второго запроса.
 const _woImg = {};
@@ -23811,10 +23845,10 @@ function renderHours(h){
   style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none">
 <input type="file" id="woCam" accept="image/*" capture="environment"
   style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"
-  onchange="woShot(this)">
+  onchange="woAddShot(this)">
 <input type="file" id="woGal" accept="image/*"
   style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"
-  onchange="woShot(this)">
+  onchange="woAddShot(this)">
 
 <div class="stk-ov" id="stkOv">
   <div class="stk-top">

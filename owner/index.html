@@ -3544,6 +3544,10 @@ button.path:active{transform:scale(.995)}
 /* Сумма по прайсу — золотом и по нажатию: за ней прячется разбор по позициям,
    и цвет единственное, что об этом говорит. */
 .ord-sum-c.gold{cursor:pointer}
+/* Валюта — при числе, мелко и тише, как у плиток учёта; подпись под ним
+   отвечает только «какая цена», без «AED по …». */
+.ord-sum-c b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:9.5px;
+  font-weight:600;letter-spacing:.4px;color:var(--muted);margin-left:4px;vertical-align:baseline}
 .ord-sum-c.gold b{color:var(--gold2)}
 .ord-sum-c.gold:active{transform:scale(.98)}
 /* Цена по позициям: два столбца и ничего лишнего — название и цена одной
@@ -14577,7 +14581,7 @@ function ordSumInner(){
   const pos = (d.rows || []).length;
   return `<span class="ord-sum-c"><b>${fmt(d.total_qty || 0)}</b><i>бутылок</i></span>
     <span class="ord-sum-c gold" onclick="ordPrices()" role="button"
-          title="Цена по позициям"><b>${fmt(d.total_aed || 0)}</b><i>AED по прайсу</i></span>
+          title="Цена по позициям"><b>${fmt(d.total_aed || 0)}<u>AED</u></b><i>прайс</i></span>
     <span class="ord-sum-c"><b>${pos}</b><i>позиций</i></span>`;
 }
 

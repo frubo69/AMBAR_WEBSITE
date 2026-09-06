@@ -1313,6 +1313,13 @@ body.safe-open .cvo-hdr{opacity:0}
 .cvo-role{font-size:15px;color:var(--sub)}
 .cvo-name{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;
   line-height:1.15;margin-top:4px;word-break:break-word;color:var(--text)}
+/* Чей микрофон выключен — строкой под состоянием, с появлением. */
+.cvo-note{margin-top:8px;min-height:18px;font-size:13px;color:var(--gold2);
+  opacity:0;transform:translateY(-4px);
+  transition:opacity .25s var(--e1),transform .25s var(--e1)}
+.cvo-note.on{opacity:1;transform:none}
+.cvo-note.pop{animation:cvoPop .42s var(--e1)}
+@keyframes cvoPop{0%{transform:scale(.92)}60%{transform:scale(1.04)}100%{transform:none}}
 .cvo-state{font-size:15px;color:var(--muted);margin-top:12px;min-height:20px;
   font-variant-numeric:tabular-nums}
 .cvo-acts{margin-top:auto;display:flex;justify-content:space-between;padding:0 44px 40px}
@@ -2971,6 +2978,7 @@ html.hid-boot #gameApp *{visibility:visible}
   <div class="cvo-top cvo-hero" id="cvoHero">
     <div class="hero-top">
       <div class="cvo-state" id="cvoState">00:00</div>
+      <div class="cvo-note" id="cvoNote"></div>
       <div class="call-q" id="callQ"></div>
     </div>
     <div class="hero-mid">
@@ -6631,7 +6639,8 @@ function callEvent(t, d){
       // Собеседник сказал, слышно его или нет. Молчание в трубке должно иметь
       // объяснение на экране, иначе человек винит связь.
       CALL_RMIC = !!d.on;
-      callVidPaint();
+      callVidPaint(); voiceNote();
+      if(CALL_ST === 'live') haptic('light');
       return;
     case 'remotecam':
       CALL_RCAM = !!d.on; callVidPaint(); return;
@@ -7439,8 +7448,11 @@ function callVidPaint(){
   // Значок не пересоздаём: перечёркивание лежит в разметке всегда и только
   // дорисовывается. Новый узел лишён перехода, ради которого всё и затевалось.
   document.getElementById('cvCam')?.classList.toggle('on', !CALL_CAM);
-  document.getElementById('cvMic')?.classList.toggle('on', _callMuted);
+  // По классу, а не по id: кнопка микрофона есть и в голосовом ряду, и в
+  // видеослое, а по id находилась только одна — вторая не перекрашивалась.
+  document.querySelectorAll('.cv-rb.mic').forEach(b => b.classList.toggle('on', _callMuted));
   noteMute(CALL_VIDEO && CALL_ST === 'live' ? noteWhat() : '');
+  voiceNote();
 }
 
 // Отдача. Короткая на переключателях, ощутимее на завершении звонка: рука
@@ -7581,6 +7593,22 @@ function lampDrag(){
 // Строка одна на два случая: молчу я, молчит собеседник или молчим оба.
 let CALL_RMIC = true;              // слышно ли собеседника (он сам сказал)
 let CALL_REJOIN = false;           // связь пропала и собирается заново
+
+
+// Строка под состоянием в голосовом разговоре: чей микрофон выключен. В видео
+// ту же роль играет плашка над кнопками, в голосе её нет — а молчание в
+// трубке должно иметь объяснение на экране.
+function voiceNote(){
+  const n = document.getElementById('cvoNote'); if(!n) return;
+  const t = CALL_ST === 'live' ? noteWhat() : '';
+  if(t){
+    if(n.textContent !== t){
+      n.textContent = t;
+      n.classList.remove('pop'); void n.offsetWidth; n.classList.add('pop');
+    }
+    n.classList.add('on');
+  }else n.classList.remove('on');
+}
 
 function noteWhat(){
   const я = !!_callMuted, он = CALL_RMIC === false;
@@ -7777,8 +7805,11 @@ function callMute(){
   // Точечно, без пересборки экрана: callPaint() перебирает всю разметку
   // разговора заново, вместе с окнами видео, — от этого экран и моргал на
   // каждое нажатие. Меняется одна кнопка, её и меняем.
-  document.getElementById('cvMic')?.classList.toggle('on', _callMuted);
+  // По классу, а не по id: кнопка микрофона есть и в голосовом ряду, и в
+  // видеослое, а по id находилась только одна — вторая не перекрашивалась.
+  document.querySelectorAll('.cv-rb.mic').forEach(b => b.classList.toggle('on', _callMuted));
   noteMute(CALL_VIDEO && CALL_ST === 'live' ? noteWhat() : '');
+  voiceNote();
   const кн = document.querySelector('.cvo-btn.mute');
   if(кн){
     кн.classList.toggle('on', _callMuted);

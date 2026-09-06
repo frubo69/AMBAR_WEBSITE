@@ -2144,6 +2144,11 @@ button.path:active{transform:scale(.995)}
 .stk-mid.xs-fix > *{flex:0 0 auto}
 .stk-mid.xs-fix .xg-wrap{flex:1 1 auto;min-height:0;overflow-y:auto;
   -webkit-overflow-scrolling:touch;margin:0 -14px;padding:2px 14px calc(24px + var(--safe-bottom))}
+/* Дата в квадрате — там, где в карточках стоит код района. */
+.xs-dc.xs-date{flex-direction:column;gap:0;line-height:1}
+.xs-dc.xs-date b{font-size:16px;font-weight:700}
+.xs-dc.xs-date i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:9px;font-weight:700;
+  letter-spacing:.6px;text-transform:uppercase;color:var(--muted);margin-top:2px}
 /* Пустой список баз — окошко посреди экрана, а не строка текста. */
 .xs-empty{min-height:62vh;display:flex;align-items:center;justify-content:center}
 .xs-ecard{width:100%;max-width:320px;margin:0;padding:34px 22px 30px}
@@ -16739,8 +16744,9 @@ function supRender(){
 async function supHistory(){
   ACC_BACK = accOrder;
   _setText('accTitle', 'История закупок');
-  _setText('accSub', 'загрузка…');
+  _setText('accSub', '');
   document.getElementById('accFoot').innerHTML = '';
+  document.getElementById('accAct').innerHTML = '';
   let list = (ACC_SUP && ACC_SUP.list) || null;
   if(!list){
     try{ list = ((await ownerApi.ownerFetch('/api/owner/supply')).supplies) || []; }
@@ -16749,21 +16755,27 @@ async function supHistory(){
   }
   const mid = document.getElementById('accMid');
   if(!list.length){
-    _setText('accSub', 'закупок ещё не было');
-    mid.innerHTML = `<div class="exp-empty" style="padding:30px 16px;line-height:1.6">
-      Ни одного ответа магазина ещё не загружали.</div>`;
+    mid.innerHTML = `<div class="xs-empty"><div class="sh-empty xs-ecard">
+        <span class="sh-empty-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/><path d="M12 8v4l3 2"/></svg></span>
+        <div class="sh-empty-t">Пока пусто</div>
+        <div class="sh-empty-s">Здесь будут все закупки — магазин и другие базы</div>
+      </div></div>`;
     return;
   }
   const aed = list.reduce((a, x) => a + ((x.money || {}).took || 0), 0);
+  const took = list.reduce((a, x) => a + (x.took || 0), 0);
   const gap = list.reduce((a, x) => a + (x.gap_qty || 0), 0);
-  _setText('accSub', `${list.length} ${pluralize(list.length,'закупка','закупки','закупок')} · ${
-    fmt(aed)} AED принято`);
-  mid.innerHTML = `
-    <div class="sup-sum">
-      <div class="sup-sum-c"><b>${list.length}</b><i>закупок</i></div>
-      <div class="sup-sum-c up"><b>${fmt(aed)}</b><i>AED принято</i></div>
-      <div class="sup-sum-c ${gap ? 'dn' : ''}"><b>${fmt(gap)}</b><i>не дал магазин</i></div>
-    </div>` + list.map(supHistRow).join('');
+  const open = list.filter(x => x.status === 'open'), past = list.filter(x => x.status !== 'open');
+  mid.innerHTML = `<div class="xs-top xs-card">
+      <span class="xs-top-b"><i>Закупок</i><b>${list.length}</b>
+        <span class="xs-top-s">приняли ${fmt(took)} ${pluralize(took,'бутылку','бутылки','бутылок')}${
+          gap ? ` · не дал магазин ${fmt(gap)}` : ''}</span></span>
+      <span class="xs-top-n">${fmt(aed)}<i>AED по прайсу</i></span>
+    </div>
+    ${open.length ? `<div class="exp-grp">В работе</div><div class="pbox">${open.map(supHistRow).join('')}</div>` : ''}
+    ${past.length ? `<div class="exp-grp">Закрытые</div><div class="pbox">${past.map(supHistRow).join('')}</div>` : ''}`;
 }
 
 function supHistRow(x){
@@ -16772,24 +16784,18 @@ function supHistRow(x){
   const day = d && !isNaN(d) ? String(d.getUTCDate()) : '—';
   const mon = d && !isNaN(d)
     ? d.toLocaleDateString('ru-RU', {month:'short', timeZone:'UTC'}).replace('.', '') : '';
-  // Чем кончилось — важнее, чем сколько было: закуп, где район остался без
-  // водителя, и закуп, принятый целиком, читаются по-разному.
-  const state = x.status === 'done'
-    ? (x.took < x.total_qty
-        ? `приняли ${fmt(x.took)} из ${fmt(x.total_qty)}`
-        : 'приняли всё')
-    : (x.free ? `${x.free} ${pluralize(x.free,'район','района','районов')} без водителя`
-              : `в работе · ${x.done} из ${x.districts} приняли`);
-  return `<button class="sh-row" onclick="supOpenOne('${escS(x.supply_id)}')">
-    <span class="sh-d"><b>${day}</b><i>${escS(mon)}</i></span>
-    <span class="sh-b">
-      <span class="sh-t">${x.kind === 'extra'
-        ? `${escS(x.base || 'Другая база')} · ${fmt(x.total_qty)} ${pluralize(x.total_qty,'бутылка','бутылки','бутылок')}`
-        : `${fmt(x.total_qty)} ${pluralize(x.total_qty,'бутылка','бутылки','бутылок')} из ${fmt(x.asked_qty)}`}</span>
-      <span class="sh-s">${escS(state)}${x.gap_qty
-        ? ` · не дал ${fmt(x.gap_qty)}` : ''}</span>
-    </span>
-    <span class="sh-v"><b>${fmt((x.money || {}).took || 0)}</b><i>AED</i></span>
+  const st = x.status === 'cancelled' ? ['отменена', 'no']
+           : x.status === 'done' ? [x.took < x.total_qty ? 'недобор' : 'принято', 'done']
+           : x.free === x.districts ? ['ждёт', 'wait'] : ['в работе', 'live'];
+  const extra = x.kind === 'extra';
+  return `<button class="pnav-r" onclick="supOpenOne('${escS(x.supply_id)}')">
+    <span class="xs-dc xs-date"><b>${day}</b><i>${escS(mon)}</i></span>
+    <span class="pnav-b"><b>${extra ? escS(x.base || 'Другая база') : 'Магазин'}</b>
+      <i>${fmt(x.took)} из ${fmt(x.total_qty)} ${pluralize(x.total_qty,'бутылки','бутылок','бутылок')}${
+        x.gap_qty ? ` · не дал ${fmt(x.gap_qty)}` : ''}${
+        x.status === 'open' && x.free ? ` · ${x.free} без водителя` : ''}</i></span>
+    <span class="pstat-c ${st[1]}">${st[0]}</span>
+    <span class="pnav-go">${ICO_CHEV}</span>
   </button>`;
 }
 

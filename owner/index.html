@@ -2551,6 +2551,14 @@ button.path:active{transform:scale(.995)}
 /* Строки внутри карточки района — не плитки: своей заливки и рамки у них
    нет, их делит тонкая золотая черта, как бригаду в журнале смен. */
 .ord-dl{margin-top:10px;padding-top:2px;border-top:1px solid rgba(201,169,110,.12)}
+/* Вход в общую заявку — плитка, как карточка района; строки общего списка
+   вне карточки — на своей карточке каждая. */
+.ord-all{display:block;width:100%;margin:0 0 10px;padding:12px 16px}
+.ord-all .shl-code{color:var(--gold2)}
+#ordRows > .ord-r{border-radius:16px;margin-bottom:8px;padding:0 14px;
+  background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
+  border:1px solid rgba(201,169,110,.28)}
+#ordRows > .ord-r.open{border-color:rgba(201,169,110,.5)}
 /* Шапка карточки района — кнопка: свёрнута по умолчанию, стрелка справа
    поворачивается на раскрытии. */
 .ord-dh{width:100%;border:0;background:none;color:var(--text);font-family:inherit;
@@ -14623,6 +14631,7 @@ function ordSeparate(d, dist){
 // смотреть, на каком мы шаге.
 function accOrderList(){
   ACC_BACK = accOrder;
+  ORD.view = 'districts'; ORD.q = ''; ORD.open = null;
   _setText('accTitle', 'Заявка');
   ordRender();
   supActShow();
@@ -14662,20 +14671,38 @@ function ordRender(){
   _setText('accSub', `${_dayName(d.day)} · норма на ${d.cover_days} ${
     pluralize(d.cover_days,'день','дня','дней')}`);
 
-  document.getElementById('accMid').innerHTML = `
-    <div class="ord-sum">${ordSumInner()}</div>
-
-    <div class="ord-find">
+  // Два вида одной заявки. По районам — карточки, как везде в панели. Общий
+  // список — старый вид: каждая позиция строкой с кодами всех районов, и
+  // поиск живёт там: искать позицию имеет смысл в списке, а не в карточках.
+  const общий = ORD.view === 'all';
+  const find = `<div class="ord-find">
       <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
       <input id="ordQ" type="search" placeholder="Найти позицию"
              value="${escS(ORD.q)}" oninput="ordSearch(this.value)">
       ${q ? `<button class="ord-find-x" onclick="ordSearch('')" aria-label="Очистить">✕</button>` : ''}
-    </div>
+    </div>`;
+  const num = {}; (d.all_rows || d.rows || []).forEach((r, i) => { num[r.id] = i + 1; });
+  document.getElementById('accMid').innerHTML = `
+    <div class="ord-sum">${ordSumInner()}</div>
+
+    ${общий ? find : `<button class="shl-card ord-dh ord-all" onclick="ordAll(true)">
+      <span class="shl-h">
+        <span class="shl-code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+          stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/></svg></span>
+        <span class="shl-b"><b>Общая заявка</b><i>все позиции / коды районов в строке / поиск</i></span>
+        <span class="ord-dh-go">${ICO_CHEV}</span>
+      </span>
+    </button>`}
 
     ${d.frozen_aed ? `<div class="ord-hint">Норма выше спроса — на полке лишнего
       на <b>${fmt(d.frozen_aed)} AED</b></div>` : ''}
 
-    <div id="ordRows">${ordDistricts(list, dist, q)}</div>
+    <div id="ordRows">${общий
+      ? `<div class="exp-grp">${q ? `Найдено · ${list.length}` : `Позиции · ${list.length}`}</div>`
+        + (list.length ? list.map(r => ordRowAll(r, dist, num[r.id])).join('')
+           : '<div class="exp-empty">' + (q ? 'Ничего не нашлось' : 'Довозить нечего — остатков хватает') + '</div>')
+      : ordDistricts(list, dist, q)}</div>
     ${ordSeparate(d, dist)}`;
 
   // Заявку отправляют не только себе: её шлют поставщику в ватсап или на почту.
@@ -14766,8 +14793,20 @@ function ordRow(r, x, num){
   </div>`;
 }
 
-// Старая строка на все районы разом — оставлена для страницы цен и поиска по
-// коду; в заявке больше не используется.
+// Общая заявка: старый вид списком. Вход с плитки, выход стрелкой назад —
+// обратно к районам. Поиск живёт здесь.
+function ordAll(on){
+  ORD.view = on ? 'all' : 'districts';
+  ORD.q = ''; ORD.open = null;
+  ACC_BACK = on ? () => ordAll(false) : accOrder;
+  _setText('accTitle', on ? 'Общая заявка' : 'Заявка');
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  ordRender();
+  window.scrollTo({top:0});
+}
+
+// Строка на все районы разом: свёрнутая — что, по каким районам и сколько;
+// раскрытая — счётчик каждого района. Картинка слева, номер остаётся.
 function ordRowAll(r, dist, num){
   const open = ORD.open === r.id;
   const cells = dist.map(x => ({x, c: r.cells[x.id] || {}}));
@@ -14777,6 +14816,8 @@ function ordRowAll(r, dist, num){
       r.need_total ? '' : ' zero'}" data-id="${r.id}">
     <button class="ord-r-h" onclick="ordOpen('${r.id}')">
       <span class="ord-r-i">${num || ''}</span>
+      <span class="ord-r-img"><img src="/products/${escS(r.id)}.webp" alt="" loading="lazy"
+        onerror="this.style.visibility='hidden'"></span>
       <span class="ord-r-n">${escS(r.name)}</span>
       <span class="ord-r-d">${cells.filter(o => o.c.need)
           .map(o => `${o.x.code}·${o.c.need}`).join(' ') || 'не нужно'}</span>

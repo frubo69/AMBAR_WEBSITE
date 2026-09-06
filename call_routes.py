@@ -907,18 +907,43 @@ def _roster(peer: Peer) -> list:
     """Кому этот человек может позвонить и кто из них сейчас доступен."""
     rows = []
 
-    def add(key, name, role):
-        if any(r["key"] == key for r in rows):
-            return
+    def add(key, name, role, **extra):
+        # Повтор ключа не создаёт строку, а только дописывает к первой то, чего
+        # в ней ещё нет: свой оператор попадает и как «свой», и как районный.
+        for r in rows:
+            if r["key"] == key:
+                for k, v in extra.items():
+                    r.setdefault(k, v)
+                return r
         row = {"key": key, "name": name, "role": role,
-               "online": bool(_sessions(key))}
+               "online": bool(_sessions(key)), **extra}
         if not row["online"] and _LAST_SEEN.get(key):
             row["seen"] = int(_LAST_SEEN[key])
         rows.append(row)
+        return row
 
     if peer.kind == "drv":
+        # Водителю видны все операторы районов и все водители, кроме него
+        # самого. Старшего оператора и владельца в списке нет намеренно: звонок
+        # снизу вверх через голову своего оператора не ходит. Своему оператору
+        # — первая строка, дальше остальные операторы, потом водители по
+        # районам; где кто, подписано кодом района.
+        from config_offices import OFFICE_CODES, OFFICE_NAMES
         if peer.own_op:
             add(f"op:{peer.own_op}", peer.own_op, "свой оператор")
+        senior = _senior_name()
+        ops: dict = {}
+        for d in staff.DISTRICT_STAFF:
+            n = (d.get("operator") or "").strip()
+            if n and n != senior:
+                ops.setdefault(n, []).append(OFFICE_CODES.get(d["district"], ""))
+        for n in sorted(ops):
+            add(f"op:{n}", n, "оператор", where=" · ".join(c for c in ops[n] if c))
+        for d in staff.drivers():
+            if d["name"] == peer.label:
+                continue
+            add(f"drv:{d['name']}", d["name"], "водитель",
+                where=d.get("district_code") or "", dname=d.get("district_name") or "")
         return rows
 
     if peer.kind == "star":

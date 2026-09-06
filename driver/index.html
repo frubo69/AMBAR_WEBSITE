@@ -1705,6 +1705,8 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .call-item-b{flex:1;min-width:0;cursor:pointer}
 .call-item-n{font-size:16px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .call-item.missed .call-item-n{color:var(--dn)}
+.call-where{font-size:10.5px;font-weight:700;letter-spacing:1px;color:var(--gold2);
+  vertical-align:2px;margin-left:4px}
 .call-item-s{display:flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);margin-top:3px}
 .call-item-s svg{flex-shrink:0}
 .call-item.missed .call-item-s{color:var(--dn)}
@@ -4925,9 +4927,10 @@ function renderShift(){
       <div class="shsum-c"><b>${fmt(spent)}</b><i>расход, AED</i></div>
       <div class="shsum-c"><b>${вСмене}</b><i>в смене</i></div>
     </div>` : ''}`
-    /* «Трансляция: да» отсюда убрана. Про геопозицию сказано строкой ниже, в
-       списке условий, и сказано подробнее — держать тот же ответ ещё и здесь
-       значит спрашивать одно и то же дважды в трёх строках друг от друга. */ + `
+    /* «Трансляция: да» отсюда убрана. Пока смена не открыта, про геопозицию
+       сказано строкой ниже, в списке условий: без неё смена не откроется. В
+       открытой смене этой строки нет вовсе — здесь только то, что мешает
+       закрыть день, а трансляция ему не мешает. */ + `
 
     <div class="sect"><span class="sect-t">${on ? 'Чтобы закрыть' : 'Чтобы открыть'}</span></div>
     ${on
@@ -4938,7 +4941,7 @@ function renderShift(){
             SH.working === true ? 'отмечено'
               : SH.working === false ? 'сегодня выходной'
               : 'оператор отмечает бригаду в начале смены')}
-    ${row(!!geo.stream, 'Геопозиция',
+    ${on ? '' : row(!!geo.stream, 'Геопозиция',
           geo.stream ? (geo.endless ? 'транслируется и не кончится сама' : 'транслируется')
                      : 'оператор не видит, где вы',
           geo.stream ? '' : `<button class="shx-go" onclick="tutOpen()">Как включить</button>`)}
@@ -8581,20 +8584,29 @@ function _callRender(){
       </div>`;
     }
 
-    // Свой оператор — всегда сверху и всегда один. Списка контактов у водителя
-    // нет намеренно: звонить ему больше некому, и выбирать не из чего.
-    if(CALL_TAB === 'all' && rows.length){
-      html += `<div class="call-cap">Ваш оператор</div>` + rows.map(r => `
+    // Контакты: свой оператор сверху, потом остальные операторы, потом
+    // водители по районам. Старшего и владельца в списке нет — их сюда не
+    // присылает сервер, и звонок им отсюда не пройдёт. Где кто, подписано
+    // кодом района из строки сервера.
+    const item = r => `
         <div class="call-item">
           <div class="call-ava">${_ini(r.name)}</div>
           <div class="call-item-b" onclick="callDial('${r.key}')">
-            <div class="call-item-n">${r.name}</div>
+            <div class="call-item-n">${r.name}${r.where
+              ? ` <span class="call-where">${esc(r.where)}</span>` : ''}</div>
             <div class="call-item-s"><span class="call-dot${r.online ? ' on' : ''}"></span>
               ${r.online ? 'в приложении'
                 : /^(drv|star):/.test(r.key) ? 'позвоним в телеграм' : 'не в сети'}</div>
           </div>
           <div class="call-item-go" onclick="callDial('${r.key}')">${ICO_CALL}</div>
-        </div>`).join('');
+        </div>`;
+    if(CALL_TAB === 'all' && rows.length){
+      const own = rows.filter(r => r.role === 'свой оператор');
+      const ops = rows.filter(r => r.role === 'оператор' && !own.includes(r));
+      const drv = rows.filter(r => /^drv:/.test(r.key));
+      if(own.length) html += `<div class="call-cap">Ваш оператор</div>` + own.map(item).join('');
+      if(ops.length) html += `<div class="call-cap">Операторы</div>` + ops.map(item).join('');
+      if(drv.length) html += `<div class="call-cap">Водители</div>` + drv.map(item).join('');
     }
 
     if(shown.length){

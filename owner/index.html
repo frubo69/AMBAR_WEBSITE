@@ -3460,28 +3460,46 @@ button.path:active{transform:scale(.995)}
 /* ── Журнал смен ─────────────────────────────────────────────────────────
    Два события в сутки на район: открыли и закрыли. Читаются подряд, поэтому
    день — заголовок, а событие — строка. */
-.shl-day{display:flex;align-items:baseline;gap:9px;margin:18px 4px 9px;flex-wrap:wrap}
+/* Журнал смен — те же плитки, что чек-лист и настройки. День — заголовок
+   заглавными и оглавление через косую; район — карточка: код в квадрате,
+   название, «открыл / закрыл» подписью, итог справа, бригада под ним. */
+.shl-day{display:flex;flex-direction:column;gap:3px;margin:20px 2px 10px}
 .shl-day:first-child{margin-top:2px}
-.shl-day-t{font-size:12px;font-weight:700;letter-spacing:.3px}
-.shl-day-s{font-size:11px;color:var(--muted)}
-.shl-r{display:flex;gap:11px;padding:12px 13px;border-radius:14px;margin-bottom:7px;
-  background:var(--card);border:1px solid var(--border)}
-.shl-i{flex-shrink:0;width:22px;height:22px;border-radius:7px;display:flex;
-  align-items:center;justify-content:center;font-size:9px;line-height:1}
-.shl-r.op .shl-i{color:#3ddc84;background:rgba(61,220,132,.12)}
-.shl-r.cl .shl-i{color:var(--muted);background:var(--bg2)}
+.shl-day b{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
+  letter-spacing:.6px;text-transform:uppercase;line-height:1.2}
+.shl-day i{font-style:normal;font-size:11.5px;color:var(--muted)}
+.shl-list{display:flex;flex-direction:column;gap:10px}
+.shl-card{padding:12px 16px;border-radius:16px;color:var(--text);
+  background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
+  border:1px solid rgba(201,169,110,.28)}
+.shl-card.done{opacity:.8}
+.shl-h{display:flex;align-items:center;gap:13px;min-height:42px}
+.shl-code{flex:0 0 auto;width:42px;height:42px;border-radius:13px;display:grid;place-items:center;
+  font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;letter-spacing:.3px;
+  color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.22)}
 .shl-b{flex:1;min-width:0}
-.shl-t{display:block;font-size:13px;line-height:1.35}
-.shl-t b{color:var(--gold2);font-weight:700;margin-right:3px}
-.shl-t i{font-style:normal;color:var(--muted);margin-left:5px;font-variant-numeric:tabular-nums}
-.shl-c{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}
+.shl-b b{display:block;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;
+  letter-spacing:.6px;text-transform:uppercase;line-height:1.2;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* Подпись переносится: «открыл … / закрыл …» в одну строку не влезает рядом
+   с итогом, а резать её многоточием значит прятать, кто закрыл. */
+.shl-b i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:3px;line-height:1.35}
+.shl-v{flex:0 0 auto;text-align:right}
+.shl-v b{display:block;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
+  letter-spacing:-.2px;color:var(--gold2);line-height:1;white-space:nowrap;font-variant-numeric:tabular-nums}
+.shl-v b.live{color:var(--up)}
+.shl-v b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:9px;font-weight:600;
+  letter-spacing:.4px;color:var(--muted);margin-left:4px}
+.shl-v i{display:block;font-style:normal;font-family:'DM Sans',sans-serif;font-size:9px;
+  font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-top:4px;white-space:nowrap}
+.shl-v i em{font-style:normal;color:var(--dn)}
+.shl-c{display:flex;flex-wrap:wrap;gap:6px;margin-top:10px;padding-top:10px;
+  border-top:1px solid rgba(201,169,110,.12)}
 /* Бригада: вышедшие подсвечены, оставшиеся дома — приглушены. Список тот же,
    потому что вопрос «кого сегодня не было» задают так же часто. */
-.shl-p{padding:4px 9px;border-radius:8px;font-size:11px;color:var(--muted);
-  background:var(--bg2);border:1px solid var(--border)}
-.shl-p.on{color:#3ddc84;background:rgba(61,220,132,.1);border-color:rgba(61,220,132,.28)}
-.shl-sum{font-size:11.5px;color:var(--muted)}
-.shl-sum b{color:var(--warn)}
+.shl-p{padding:5px 10px;border-radius:9px;font-size:11.5px;color:var(--muted);
+  background:rgba(255,255,255,.03);border:1px solid var(--border2)}
+.shl-p.on{color:var(--gold2);background:var(--gold-soft);border-color:rgba(201,169,110,.3)}
 .shl-none{font-size:11.5px;color:var(--muted)}
 
 /* ── Нормы ───────────────────────────────────────────────────────────────
@@ -21264,33 +21282,52 @@ function shLogPaint(){
   }
   mid.innerHTML = w.list.map(d => `
     <div class="shl-day">
-      <span class="shl-day-t">${_dayLbl(d.day)}</span>
-      <span class="shl-day-s">${d.opened} ${pluralize(d.opened,'открытие','открытия','открытий')}
-        · ${d.closed} ${pluralize(d.closed,'закрытие','закрытия','закрытий')}${
-        d.revenue ? ` · ${fmt(d.revenue)} AED` : ''}</span>
+      <b>${_dayLbl(d.day)}</b>
+      <i>открыто ${d.opened} / закрыто ${d.closed}${
+          d.revenue ? ` / ${fmt(d.revenue)} AED` : ''}</i>
     </div>
-    ${d.rows.map(shLogRow).join('')}`).join('');
+    <div class="shl-list">${shLogCards(d.rows).map(shLogCard).join('')}</div>`).join('');
 }
 
-function shLogRow(r){
-  const t = _hmDubai(r.at);
-  const open = r.kind === 'open';
-  // У открытия главное — бригада, у закрытия — итог. Одна строка на событие,
-  // и в ней ровно то, ради чего событие смотрят.
-  const body = open
-    ? (r.crew || []).length
-      ? (r.crew || []).map(c => `<span class="shl-p ${c.working ? 'on' : ''}">${escS(c.name)}</span>`).join('')
-      : '<span class="shl-none">водители не назначены</span>'
-    : `<span class="shl-sum">${fmt(r.orders)} ${pluralize(r.orders,'заказ','заказа','заказов')}
-       · ${fmt(r.revenue)} AED${r.open ? ` · <b>висело ${r.open}</b>` : ''}</span>`;
-  return `<div class="shl-r ${open ? 'op' : 'cl'}">
-    <span class="shl-i">${open ? '▲' : '▼'}</span>
-    <span class="shl-b">
-      <span class="shl-t"><b>${escS(r.code || r.district)}</b>
-        ${open ? 'смену открыл' : 'смену закрыл'} ${escS(r.by || r.operator || '—')}
-        <i>${t}</i></span>
-      <span class="shl-c">${body}</span>
-    </span>
+// Открытие и закрытие — одна смена, и карточка одна: район, кто открыл и во
+// сколько, кто закрыл и с чем. Открыли и не закрыли — карточка «идёт».
+// Закрыли без записи об открытии (так бывало до журнала) — карточка тоже
+// есть, просто без бригады.
+function shLogCards(rows){
+  const by = {}, order = [];
+  (rows || []).forEach(r => {
+    const k = r.district || r.code;
+    if(!by[k]){ by[k] = {code: r.code, name: r.name, district: r.district}; order.push(k); }
+    const c = by[k];
+    if(r.kind === 'open'){ if(!c.open) c.open = r; }
+    else c.close = r;
+  });
+  return order.map(k => by[k]);
+}
+
+function shLogCard(c){
+  const o = c.open, z = c.close;
+  const name = (c.name && c.name !== c.district) ? c.name : (c.code || c.district || '—');
+  const who = r => escS(r.by || r.operator || '—');
+  const sub = [
+    o ? `открыл ${who(o)} ${_hmDubai(o.at)}` : 'открытие не отмечено',
+    z ? `закрыл ${who(z)} ${_hmDubai(z.at)}` : 'идёт',
+  ].join(' / ');
+  const val = z
+    ? `<b>${fmt(z.revenue)}<u>AED</u></b><i>${fmt(z.orders)} ${pluralize(z.orders,'заказ','заказа','заказов')}${
+         z.open ? ` · <em>висело ${z.open}</em>` : ''}</i>`
+    : `<b class="live">идёт</b><i>${o ? 'с ' + _hmDubai(o.at) : ''}</i>`;
+  const crew = o ? (o.crew || []) : [];
+  const chips = crew.length
+    ? crew.map(x => `<span class="shl-p ${x.working ? 'on' : ''}">${escS(x.name)}</span>`).join('')
+    : (o ? '<span class="shl-none">водители не назначены</span>' : '');
+  return `<div class="shl-card ${z ? 'done' : 'live'}">
+    <div class="shl-h">
+      <span class="shl-code">${escS(c.code || '—')}</span>
+      <span class="shl-b"><b>${escS(name)}</b><i>${sub}</i></span>
+      <span class="shl-v">${val}</span>
+    </div>
+    ${chips ? `<div class="shl-c">${chips}</div>` : ''}
   </div>`;
 }
 

@@ -9488,7 +9488,9 @@ function whFilter(f, изЖеста){
   document.querySelectorAll('#whSeg button').forEach(b =>
     b.classList.toggle('on', b.dataset.f === f));
   whSegSync(true);
-  if(изЖеста) try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  // Отклик на любой переход — и по нажатию, и по жесту: без него нажатие на
+  // «На связи» читается как промах, пока список не перерисуется.
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   if(_whY === 'peek') whSnap('half', true);
   whPaint();
 }

@@ -245,6 +245,69 @@ async def _writeoff_after(context, doc: dict, ok: bool, by_name: str, q=None):
             log.warning("водителю не ушло: %s", e)
 
 
+async def on_geo_unlock(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Снять замок сторожа геопозиции — кнопкой под сообщением о нём.
+
+    Ключ в кнопке одноразовый: второе нажатие, чьё бы оно ни было, замка не
+    найдёт и только снимет кнопку. Кто открыл — записываем именем, как зовут в
+    работе, и дописываем в то же сообщение: остальные владельцы видят, что
+    вопрос закрыт и кем."""
+    from datetime import datetime, timezone
+    q = update.callback_query
+    key = (q.data or "")[len("geo:un:"):] if q else ""
+    uid = update.effective_user.id if update.effective_user else 0
+    if not key:
+        return
+    if not is_allowed(uid):
+        await q.answer("Нет доступа", show_alert=True)
+        return
+    await q.answer()
+    who = "старший"
+    try:
+        import config_staff as staff
+        who = staff.display_name(uid, update.effective_user.full_name or "")
+    except Exception as e:
+        log.warning("имя старшего не прочитано: %s", e)
+    try:
+        name = await db.geo_lock_clear(key, who, datetime.now(timezone.utc))
+    except Exception as e:
+        log.error("замок %s: база недоступна: %s", key, e)
+        await q.answer("База недоступна — попробуйте позже", show_alert=True)
+        return
+    if not name:
+        try:
+            await q.edit_message_reply_markup(reply_markup=None)
+        except Exception:
+            pass
+        return
+    try:
+        await q.edit_message_text((q.message.text or "") + f"\n\n✅ Доступ открыт — {who}",
+                                  reply_markup=None)
+    except Exception as e:
+        log.info("сообщение о замке не дописано: %s", str(e)[:80])
+    tid = None
+    try:
+        import config_staff as staff
+        tid = staff.DRIVER_IDS.get(name)
+    except Exception as e:
+        log.warning("список водителей не прочитан: %s", e)
+    token = os.getenv("DRIVER_BOT_TOKEN", "")
+    if tid and token:
+        try:
+            from telegram import Bot
+            sent = await Bot(token).send_message(
+                tid, "✅ Доступ в приложение открыт. Включите трансляцию геопозиции "
+                     "и откройте смену.")
+            # В реестр чата водителя: сообщение шлёт STAR-бот, а приходит оно
+            # в водительский чат, и скрытый режим водителя должен его стирать.
+            if sent:
+                await db.drv_msg_add(int(tid), int(sent.message_id),
+                                     datetime.now(timezone.utc))
+        except Exception as e:
+            log.warning("водителю не ушло: %s", e)
+    log.info("замок снят: %s — %s", name, who)
+
+
 async def post_init(application: Application):
     """Кнопка приложения — только у тех, кто в списке.
 
@@ -290,6 +353,7 @@ def main():
     app.add_handler(MessageHandler(filters.ALL, on_any_update), group=-1)
     app.add_handler(CommandHandler("start", cmd_start))
     app.add_handler(CallbackQueryHandler(on_writeoff, pattern=r"^wo:(ok|no):"))
+    app.add_handler(CallbackQueryHandler(on_geo_unlock, pattern=r"^geo:un:"))
     app.add_handler(MessageHandler(filters.ALL & ~filters.COMMAND, on_any_message))
 
     log.info("🔐 AMBAR Owner Bot starting — miniapp: %s", OWNER_WEBAPP_URL)

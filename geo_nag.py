@@ -91,7 +91,8 @@ async def tick(now: datetime = None) -> dict:
     # Спрашиваем только с тех, кого старший отметил вышедшими: у неотмеченного
     # мы не знаем даже, работает ли он сегодня.
     working = []
-    for d in await db.get_driver_days(day):
+    days = await db.get_driver_days(day)
+    for d in days:
         if d.get("working") is not True:
             continue
         name = (d.get("driver") or "").strip()
@@ -115,8 +116,13 @@ async def tick(now: datetime = None) -> dict:
         at = _dt((rows.get(name) or {}).get("at"))
         return bool(at and (utc - at).total_seconds() < STALE_MIN * 60)
 
-    if len(working) > 1 and not any(_fresh(n) for n in working):
-        log.warning("[geo] точек нет ни у кого — молчим, это похоже на нашу проблему")
+    # Считаем только тех, кто смену открыл: у них геопозиция точно была.
+    # Девять отмеченных, но не вышедших водителей ослепляли проверку на весь
+    # день — и единственный, кто работал, пропал без единого напоминания.
+    live = [d.get("driver") for d in days if d.get("shift_open_at")
+            and not d.get("shift_close_at") and d.get("driver") in working]
+    if len(live) > 1 and not any(_fresh(n) for n in live):
+        log.warning("[geo] точек нет ни у кого на смене — молчим, это похоже на нашу проблему")
         return {"day": day, "working": len(working), "sent": 0, "blind": True}
 
     for name in working:

@@ -663,6 +663,7 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   justify-content:center;gap:12px;padding:40px;text-align:center;background:var(--bg)}
 .deny.show{display:flex}
 .deny-t{font-size:17px;font-weight:700}
+.deny-s{font-size:13.5px;line-height:1.45;color:var(--muted);max-width:300px}
 /* Сообщение о том, что вышло, а что нет. Висит над панелью вкладок, но не
    на ней: серый брусок впритык к навигации читался как её часть. Значок
    слева отвечает на главный вопрос — получилось или нет — до чтения текста. */
@@ -2940,7 +2941,8 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <div class="deny" id="deny">
-  <div class="deny-t">Нет доступа</div>
+  <div class="deny-t" id="denyT">Нет доступа</div>
+  <div class="deny-s" id="denyS"></div>
 </div>
 
 <script src="api.js"></script>
@@ -2997,6 +2999,7 @@ try{
 }catch(e){}
 
 let ME = null, ORDERS = null, EXP = null, HIST = null;
+let LOCKED = false;        // вход закрыт сторожем геопозиции — не опрашиваем
 let TAB = 'orders', EDIT_OID = null, EDIT_TAGS = [];
 let OPEN_OID = '';   // какой из активных заказов раскрыт
 
@@ -3089,7 +3092,7 @@ async function boot(){
       lm: geoCan ? 'есть' : (tg.LocationManager ? 'клиент не умеет' : 'нет объекта')}});
     ME = r.driver;
   }
-  catch(e){ if(!PANIC) document.getElementById('deny').classList.add('show'); return; }
+  catch(e){ if(!PANIC) lockOut(e); return; }
   document.getElementById('dAv').textContent = ME.name.slice(0,2).toUpperCase();
   document.getElementById('dName').textContent = ME.name;
   // Связь поднимаем сразу и держим всю смену: входящий должен доходить,
@@ -3110,19 +3113,35 @@ async function boot(){
   geoPush(true);
   // Пять секунд, а не сорок пять: заказ должен появляться на экране почти сразу,
   // как его назначили. Спящую вкладку не опрашиваем — телефон в кармане.
-  setInterval(()=>{ if(!document.hidden && !PANIC) load(); }, 5000);
+  setInterval(()=>{ if(!document.hidden && !PANIC && !LOCKED) load(); }, 5000);
   setInterval(panicWatch, 10000);
   // Смена и трансляция — раз в полминуты: если трансляция погасла, экран
   // должен закрыться сам, а не ждать, пока водитель что-нибудь нажмёт.
-  setInterval(()=>{ if(!document.hidden && !PANIC) shLoad(); }, 30000);
+  setInterval(()=>{ if(!document.hidden && !PANIC && !LOCKED) shLoad(); }, 30000);
   // Точка — раз в минуту, пока приложение открыто: чаще незачем, а батарея у
   // водителя должна дожить до конца смены.
-  setInterval(()=>{ if(!document.hidden && !PANIC) geoPush(); }, GEO_EVERY_MS);
+  setInterval(()=>{ if(!document.hidden && !PANIC && !LOCKED) geoPush(); }, GEO_EVERY_MS);
   document.addEventListener('visibilitychange', ()=>{
-    if(document.hidden || PANIC) return;
+    if(document.hidden || PANIC || LOCKED) return;
     load(); geoPush();
   });
 }
+
+// За этим экраном ничего нет. Два случая, и различать их надо: «нет доступа» —
+// человека нет в списке водителей, и это вопрос к старшему; «вход закрыт» —
+// он в списке, но на смене пропала геопозиция и не вернулась до её конца.
+// Второе он должен прочитать сам, а не гадать, за что.
+function lockOut(e){
+  const locked = ((e && e.payload) || {}).error === 'geo_locked';
+  LOCKED = locked;
+  document.getElementById('denyT').textContent = locked ? 'Вход закрыт' : 'Нет доступа';
+  document.getElementById('denyS').textContent = locked
+    ? 'На смене пропала геопозиция и не вернулась до её конца. Открыть доступ может старший.'
+    : '';
+  document.getElementById('deny').classList.add('show');
+  try{ incHide(); }catch(err){}
+}
+function isLockOut(e){ return ((e && e.payload) || {}).error === 'geo_locked'; }
 
 // ══════════════════════════════════════════════════════════════════════════
 //  ГЕОПОЗИЦИЯ
@@ -3285,7 +3304,7 @@ async function load(){
     // при запуске: между «включил» и «увидел» не должно быть перезапуска
     // приложения — в такую минуту его никто не делает.
     if(!!o.panic !== PANIC){ panicRemote(!!o.panic); return; }
-  }catch(err){ return; }
+  }catch(err){ if(isLockOut(err) && !PANIC) lockOut(err); return; }
   // Заказ, который назначили и который водитель ещё не подтвердил, показываем
   // поверх всего. Первый в очереди — тот, что ждёт дольше.
   const fresh = (ORDERS.active || []).filter(o => !o.driver_ack_at);
@@ -3545,7 +3564,11 @@ const SH_ICO = {
 
 async function shLoad(loud){
   try{ SH = await drvApi.drvFetch('/api/driver/shift'); }
-  catch(e){ if(loud) toast('Не удалось проверить', 'err'); return; }
+  catch(e){
+    if(isLockOut(e) && !PANIC){ lockOut(e); return; }
+    if(loud) toast('Не удалось проверить', 'err');
+    return;
+  }
   expPulse();
   shPaint();
 }
@@ -3626,10 +3649,12 @@ function shPaint(){
   if(!SH || PANIC){ scr.classList.remove('show'); return; }
   const on = SH.opened && !SH.closed;
   const geo = SH.geo || {};
-  // Блокируем по «трансляция не идёт», а не по «точка устарела»: первое
-  // человек выключил сам и может включить, второе бывает от метро и туннеля,
-  // и запирать за это экран — наказывать за отсутствие связи.
-  const lost = on && !geo.stream;
+  // Запираем по «оператор не видит»: трансляция выключена — или включена, но
+  // точек нет дольше четверти часа. Раньше запирали только по первому, и
+  // водитель с трансляцией «пока не выключу», у которого час не было ни
+  // одной точки, спокойно работал невидимым. Правило владельца: на смене
+  // обязан быть виден; не вернулась до конца смены — вход закрывается.
+  const lost = on && !geo.ok;
   const blocked = !on || lost;
   // Кнопка смены в панели светится, пока смена идёт: состояние дня видно с
   // любого экрана, не заходя внутрь.
@@ -3643,13 +3668,26 @@ function shPaint(){
   const list = document.getElementById('shList');
   const go = document.getElementById('shGo');
 
-  // Трансляция пропала на открытой смене. Условие здесь одно, и кнопка одна.
+  // Геопозиция пропала на открытой смене. Два случая, и водителю говорим,
+  // который: «выключил» чинится в чате, «включена, но точек нет» — в телефоне.
   if(lost){
+    const stale = !!geo.stream;
+    const mins = Math.floor((geo.age_sec || 0) / 60);
     ico.innerHTML = svg(SH_ICO.geo, 30);
-    document.getElementById('shT').textContent = 'Геопозиция не транслируется';
-    document.getElementById('shS').textContent =
-      'Смена идёт, но оператор не видит, где вы. Заказы не придут, пока трансляция не вернётся.';
-    list.innerHTML = `
+    document.getElementById('shT').textContent = stale
+      ? 'Оператор не видит, где вы' : 'Геопозиция не транслируется';
+    document.getElementById('shS').textContent = stale
+      ? `Трансляция включена, но точек нет уже ${mins} мин. Заказы не придут, пока оператор вас не увидит. Не вернётся до конца смены — вход закроется.`
+      : 'Смена идёт, но оператор не видит, где вы. Заказы не придут, пока трансляция не вернётся. Не вернётся до конца смены — вход закроется.';
+    list.innerHTML = stale ? `
+      <div class="shc">
+        <span class="shc-i">${svg(SH_ICO.dot, 14)}</span>
+        <span class="shc-b">
+          <span class="shc-t">Проверьте геолокацию в телефоне</span>
+          <span class="shc-s">Телеграму нужен доступ к геопозиции «Всегда». Не помогло — выключите трансляцию в чате и включите заново.</span>
+          ${_geoWay()}
+        </span>
+      </div>` : `
       <div class="shc">
         <span class="shc-i">${svg(SH_ICO.dot, 14)}</span>
         <span class="shc-b">
@@ -4228,15 +4266,23 @@ function renderOrders(){
 // видно, — и это же единственное место, где он может дать разрешение, если
 // однажды отказал. Когда всё в порядке, строка молчит и не занимает места.
 function geoBar(){
-  if(GEO.state !== 'off') return '';
+  // Видно ли водителя, знает сервер: точка приходит либо из трансляции, либо
+  // из приложения, и обе ложатся в одно место. Пока сервер говорит «видно»,
+  // строка молчит — даже если само приложение точку взять не смогло. Раньше
+  // она в этом случае писала «оператор не видит», хотя трансляция шла.
+  const g = (SH || {}).geo;
+  if(g ? g.ok : GEO.state !== 'off') return '';
+  const mins = Math.floor(((g || {}).age_sec || 0) / 60);
+  const sub = g && g.stream
+    ? `Трансляция включена, но точек нет уже ${mins} мин. Проверьте геолокацию в телефоне`
+    : 'Нажмите — пришлём в чат, как включить трансляцию «Пока не выключу»';
   return `<button class="geo-bar" onclick="geoFix()">
     <span class="geo-ic"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
       stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
       stroke-linejoin="round">${ICO.pin}</svg></span>
     <span class="geo-b">
       <b>Оператор не видит, где вы</b>
-      <i>Нажмите — пришлём кнопку в чат. Чтобы видел всю смену, включите
-         в чате трансляцию геопозиции на 8 часов</i>
+      <i>${sub}</i>
     </span>
     <span class="geo-go">›</span>
   </button>`;

@@ -100,6 +100,19 @@ def require_driver(fn):
         if not me:
             log.warning(f"[driver] отказ: tg={user.get('id')} ({user.get('username')}) не в списке")
             return web.json_response({"error": "forbidden"}, status=403, headers=CORS_HEADERS)
+        # Вход закрыт сторожем геопозиции (geo_watch): пропала на смене и не
+        # вернулась до её конца. Открывает старший, кнопкой под сообщением
+        # бота. Проверяем на каждом запросе, а не при запуске: приложение
+        # могло быть открыто всю ночь.
+        try:
+            lock = await db.geo_lock_get(me["name"])
+        except Exception as e:
+            log.warning(f"[driver] замок не прочитан: {e}")
+            lock = None
+        if lock:
+            return web.json_response({"error": "geo_locked",
+                                      "since": _iso_at(lock.get("locked_at"))},
+                                     status=403, headers=CORS_HEADERS)
         request["driver"] = me
         request["tg"] = user
         return await fn(request)

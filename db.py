@@ -2716,6 +2716,65 @@ async def driver_track_clear(names: list) -> int:
     return res.modified_count
 
 
+# ── Геопозиция на смене: пропажи и запрет входа ─────────────────────────────
+# Водитель на смене обязан быть виден. Сторож (geo_watch) раз в минуту смотрит,
+# у кого из открывших смену геопозиция пропала, и запоминает здесь, с какой
+# минуты её нет: одно сообщение старшему на одну пропажу, а не на каждый проход.
+# Если к концу смены она так и не вернулась — вход в приложение закрывается,
+# и открыть его может только старший, кнопкой под сообщением бота.
+#
+# Одна запись на водителя. Замок живёт отдельно от пропажи: пропажа сбрасывается
+# с новыми сутками, замок — только рукой старшего.
+async def geo_watch_get(name: str) -> dict:
+    db = _db_or_none()
+    if db is None or not name: return {}
+    return await db.driver_geo_watch.find_one({"_id": name}) or {}
+
+
+async def geo_watch_set(name: str, fields: dict, unset: list = None) -> None:
+    db = _db_or_none()
+    if db is None or not name: return
+    doc = {"$set": {**fields}}
+    if unset:
+        doc["$unset"] = {k: "" for k in unset}
+    await db.driver_geo_watch.update_one({"_id": name}, doc, upsert=True)
+
+
+async def geo_lock_set(name: str, at, why: str = "") -> str:
+    """Закрыть вход. Возвращает короткий ключ замка — он идёт в кнопку бота,
+    а не имя: имя в кнопке телеграм режет по длине, ключ — нет."""
+    import secrets as _secrets
+    db = _db_or_none()
+    if db is None or not name: return ""
+    key = _secrets.token_hex(4)
+    await db.driver_geo_watch.update_one(
+        {"_id": name},
+        {"$set": {"locked_at": at, "lock_id": key, "lock_why": why},
+         "$unset": {"off_since": "", "off_why": "", "unlocked_at": "", "unlocked_by": ""}},
+        upsert=True)
+    return key
+
+
+async def geo_lock_get(name: str) -> dict | None:
+    """Замок, если он закрыт. Открытый — не замок."""
+    db = _db_or_none()
+    if db is None or not name: return None
+    d = await db.driver_geo_watch.find_one({"_id": name, "locked_at": {"$ne": None}})
+    return d if d and d.get("locked_at") else None
+
+
+async def geo_lock_clear(lock_id: str, by_name: str, at) -> str | None:
+    """Открыть вход по ключу. Возвращает имя водителя; None — такого замка
+    нет или его уже открыли (второе нажатие ничего не меняет)."""
+    db = _db_or_none()
+    if db is None or not lock_id: return None
+    d = await db.driver_geo_watch.find_one_and_update(
+        {"lock_id": lock_id, "locked_at": {"$ne": None}},
+        {"$set": {"locked_at": None, "unlocked_at": at, "unlocked_by": by_name},
+         "$unset": {"lock_id": ""}})
+    return d.get("_id") if d else None
+
+
 # ── Смена: день закрыт, продажи посчитаны ───────────────────────────────────
 # Смена закрывается по району: сутки считает не программа по часам, а человек,
 # который знает, что заказов больше не будет. Пока район не закрыт, продажи

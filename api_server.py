@@ -119,6 +119,13 @@ async def on_startup(app):
         app["geo_nag"] = asyncio.create_task(geo_nag.loop(app))
     except Exception as e:
         log.warning(f"[geo] не запустились: {e}")
+    # Сторож: пропала геопозиция на смене — старший узнаёт; не вернулась до
+    # конца смены — вход закрыт, пока старший не откроет.
+    try:
+        import geo_watch
+        app["geo_watch"] = asyncio.create_task(geo_watch.loop(app))
+    except Exception as e:
+        log.warning(f"[geo-watch] не запустились: {e}")
     # Переписка владельца с ботом живёт не дольше 47 часов: позже телеграм
     # запретит её удалять, и в тревожный момент она останется в телефоне.
     try:

@@ -531,6 +531,12 @@ async def _start_call(caller: Peer, to_key: str, order: str, video: bool = False
     if video and _audio_only(caller.key, to_key):
         log.info(f"[call] {caller.label} → {to_key}: видео снято, паре положен голос")
         video = False
+    # Водитель не звонит по видео никому — ни оператору, ни старшему. Видео по
+    # иерархии идёт только сверху вниз: старший набирает водителя с картинкой,
+    # оператор разрешает её внутри разговора. Снизу вверх — голос, и точка.
+    if video and caller.kind == "drv":
+        log.info(f"[call] {caller.label} → {to_key}: видео снято, водитель звонит голосом")
+        video = False
 
     kind, _, name = to_key.partition(":")
     # Свои же сессии из целей вон: звонок самому себе — петля, а не связь.

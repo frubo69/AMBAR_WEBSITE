@@ -2554,6 +2554,11 @@ button.path:active{transform:scale(.995)}
 /* Вход в общую заявку — плитка, как карточка района; строки общего списка
    вне карточки — на своей карточке каждая. */
 .ord-all{display:block;width:100%;margin:0 0 10px;padding:12px 16px}
+.ord-dists{border-radius:16px;overflow:hidden;
+  background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
+  border:1px solid rgba(201,169,110,.28)}
+.ord-dists .shl-card{margin:0;border-radius:0;border:0;background:transparent}
+.ord-dists .shl-card + .shl-card{border-top:1px solid rgba(201,169,110,.14)}
 .ord-all .shl-code{color:var(--gold2)}
 #ordRows > .ord-r{border-radius:16px;margin-bottom:8px;padding:0 14px;
   background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
@@ -14747,7 +14752,9 @@ function ordDistricts(list, dist, q){
   }).filter(Boolean);
   if(!cards.length) return '<div class="exp-empty">' + (q ? 'Ничего не нашлось'
       : 'Довозить нечего — остатков хватает') + '</div>';
-  return `<div class="shl-list">${cards.join('')}</div>`;
+  // Районы — одной слитной карточкой: пять плиток подряд читались как пять
+  // разных вещей, а это один список.
+  return `<div class="ord-dists">${cards.join('')}</div>`;
 }
 
 function ordFold(id){

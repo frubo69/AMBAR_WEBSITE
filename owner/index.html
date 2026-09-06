@@ -2073,6 +2073,33 @@ button.path:active{transform:scale(.995)}
 .sup-sum-c.dn b{color:var(--dn)}
 .sup-sum-c.up b{color:var(--up)}
 .sup-sum-c.warn b{color:var(--warn)}
+/* ── Закупка на других базах: заявка по шагам. Три полоски вместо подписей,
+   один вопрос на экран, и ничего лишнего вокруг. ── */
+.xs-steps{display:flex;gap:6px;margin:2px 0 18px}
+.xs-steps span{flex:1;height:3px;border-radius:2px;background:var(--card3)}
+.xs-steps span.on{background:var(--gold)}
+.xs-h{font-family:'Space Grotesk',sans-serif;font-size:23px;font-weight:700;letter-spacing:-.4px;
+  line-height:1.15;margin:4px 0 14px}
+.xs-in{width:100%;padding:16px;border-radius:15px;font-family:inherit;font-size:17px;font-weight:600;
+  color:var(--text);background:var(--card);border:1px solid var(--border3);outline:none}
+.xs-in:focus{border-color:rgba(201,169,110,.55)}
+.xs-chips{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+.xs-chip{padding:9px 14px;border-radius:999px;cursor:pointer;font-family:inherit;font-size:13px;
+  font-weight:600;color:var(--sub);background:var(--card);border:1px solid var(--border2)}
+.xs-chip.on{color:var(--gold2);background:var(--gold-soft);border-color:rgba(201,169,110,.4)}
+.xs-chip:active{transform:scale(.96)}
+.xs-hint{font-size:13px;color:var(--muted);text-align:center;padding:30px 16px;line-height:1.5}
+.xs-sum{padding:14px 16px;border-radius:16px;background:var(--card);border:1px solid var(--border2);
+  margin-bottom:10px}
+.xs-sum > b{display:block;font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;line-height:1}
+.xs-sum > i{display:block;font-style:normal;font-size:12px;color:var(--muted);margin-top:6px;line-height:1.4}
+.xs-l{display:flex;align-items:center;gap:10px;padding:10px 0;border-top:1px solid var(--border2);font-size:13px}
+.xs-l:first-child{border-top:0;padding-top:2px}
+.xs-l:last-child{padding-bottom:2px}
+.xs-l span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
+.xs-l i{font-style:normal;color:var(--muted);font-size:11px;white-space:nowrap}
+.xs-l b{font-family:'Space Grotesk',sans-serif;font-size:15px;min-width:28px;text-align:right}
+.qb:disabled{opacity:.35;box-shadow:none;transform:none}
 
 .sup-short{padding:14px;border-radius:15px;background:var(--card);
   border:1px solid var(--border2);margin-bottom:10px}
@@ -13915,8 +13942,7 @@ async function accOrder(){
   if(!ACC_SUP){
     try{
       const r = await ownerApi.ownerFetch('/api/owner/supply');
-      ACC_SUP = {list: r.supplies || [],
-                 open: (r.supplies || []).find(x => x.status === 'open') || null};
+      ACC_SUP = {list: r.supplies || [], open: _supMain(r.supplies || [])};
     }catch(e){ ACC_SUP = {list: [], open: null}; }
   }
   supActShow();          // кнопка отмены знает про заявку только теперь
@@ -13935,7 +13961,7 @@ const PATH_STEPS = ['Заявка', 'Магазин дал', 'Приняли'];
 // раньше «поставка идёт» писалось в трёх местах по трём разным правилам.
 function supStage(){
   const list = (ACC_SUP && ACC_SUP.list) || [];
-  const sup = (ACC_SUP && ACC_SUP.open) || list[0] || null;
+  const sup = (ACC_SUP && ACC_SUP.open) || list.find(x => x.kind !== 'extra') || null;
   if(!sup) return {k:'none', sup:null, all:0, done:0, took:0,
                    t:'Магазин ещё не ответил', s:'загрузите ответ — появятся задачи'};
   const tasks = Object.values(sup.tasks || {});
@@ -14077,7 +14103,7 @@ function ordHub(){
   // закупки. Раньше они висели голыми строками, а история была прижата к
   // низу экрана, и между ними стояло поле пустоты в пол-экрана — оно читалось
   // как «здесь что-то не загрузилось», а не как воздух.
-  const рядом = pathShort() + supHistLine();
+  const рядом = pathShort() + pathExtra() + supHistLine();
   document.getElementById('accMid').innerHTML = `<div class="ohub">
     <div class="pbox">${pathNav()}<div class="path">${pathInner()}</div>${pathStatus()}</div>
     ${рядом ? `<div class="pbox">${рядом}</div>` : ''}</div>`;
@@ -15896,6 +15922,12 @@ function qrDelRowInfo(i){
 // а вот дыра в ней требует решения, пока магазины открыты.
 let SUP_ID = null, SUP_D = null, SUP_BUSY = false;
 
+// Основная заявка — открытая и не на другую базу. Заявки на другие базы
+// (kind=extra) живут своим списком и путь закупки на хабе не двигают.
+function _supMain(list){
+  return (list || []).find(x => x.status === 'open' && x.kind !== 'extra') || null;
+}
+
 async function accSupply(goto){
   SUP_GOTO = goto || '';
   ACC_BACK = accOrder;              // поставка живёт внутри заявки
@@ -15906,9 +15938,9 @@ async function accSupply(goto){
   if(!list){
     try{ list = ((await ownerApi.ownerFetch('/api/owner/supply')).supplies) || []; }
     catch(e){ list = []; }
-    ACC_SUP = {list, open: list.find(x => x.status === 'open') || null};
+    ACC_SUP = {list, open: _supMain(list)};
   }
-  const cur = list.find(x => x.status === 'open') || list[0];
+  const cur = _supMain(list) || list.find(x => x.kind !== 'extra');
   if(!cur){ supEmpty(); return; }
   await supLoad(cur.supply_id);
 }
@@ -15928,9 +15960,9 @@ async function accShort(){
   if(!list){
     try{ list = ((await ownerApi.ownerFetch('/api/owner/supply')).supplies) || []; }
     catch(e){ list = []; }
-    ACC_SUP = {list, open: list.find(x => x.status === 'open') || null};
+    ACC_SUP = {list, open: _supMain(list)};
   }
-  const cur = list.find(x => x.status === 'open') || list[0];
+  const cur = _supMain(list) || list.find(x => x.kind !== 'extra');
   if(!cur){ shortBody(null); return; }
   if(!SUP_D || SUP_D.supply_id !== cur.supply_id){
     SUP_ID = cur.supply_id;
@@ -16007,6 +16039,292 @@ function shortBody(d){
       <button class="qb qb-ico" id="supSend" onclick="supSend()"
               aria-label="Прислать файл в чат с ботом" title="В телеграм">${ICO_TG}</button>
     </div>`;
+}
+
+// ─── Закупка на других базах ────────────────────────────────────────────────
+// Магазин дал не всё — за остальным едут на другую базу. Заявку туда старший
+// собирает сам, без файла: три шага — куда, что, готово. Дальше это обычная
+// поставка: районы берут водители или сам старший кнопкой «Взять на себя»,
+// бутылки принимают сканером, статус виден здесь же. Отдельно от основной —
+// это другая поездка, и смешивать их нельзя.
+const ICO_BASE = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l1.5-5h15L21 9"/><path d="M3 9h18v11H3z"/><path d="M9 20v-6h6v6"/></svg>';
+const ICO_XPLUS = '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>';
+
+function _xList(){ return ((ACC_SUP && ACC_SUP.list) || []).filter(x => x.kind === 'extra'); }
+
+// Состояние заявки одним словом и цветом. Слово короткое: оно стоит в чипе.
+function _xState(x){
+  if(x.status === 'cancelled') return ['отменена', 'no'];
+  if(x.status !== 'open') return [x.took < x.total_qty ? 'недобор' : 'принято', 'done'];
+  const busy = (x.districts || 0) - (x.done || 0) - (x.free || 0);
+  return (busy > 0 || x.done) ? ['в работе', 'live'] : ['ждёт', 'wait'];
+}
+
+function pathExtra(){
+  const ex = _xList(), open = ex.filter(x => x.status === 'open');
+  const st = open.length ? _xState(open[0]) : null;
+  return `<button class="pnav-r" onclick="accExtra()">
+    <span class="pnav-i ${open.length ? 'live' : ''}">${ICO_BASE}</span>
+    <span class="pnav-b"><b>Закупка на других базах</b>
+      <i>${open.length ? escS(open.map(x => x.base).join(' · '))
+          : (ex.length ? `${ex.length} ${pluralize(ex.length,'заявка','заявки','заявок')}`
+                       : 'собрать заявку руками')}</i></span>
+    ${st ? `<span class="pstat-c ${st[1]}">${open.length > 1 ? open.length + ' в работе' : st[0]}</span>` : ''}
+    <span class="pnav-go">${ICO_CHEV}</span>
+  </button>`;
+}
+
+async function accExtra(){
+  ACC_BACK = accOrder;
+  XS = null;
+  _setText('accTitle', 'Другие базы');
+  _setText('accSub', 'загрузка…');
+  document.getElementById('accAct').innerHTML = '';
+  const mid = document.getElementById('accMid');
+  mid.innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  document.getElementById('accFoot').innerHTML = '';
+  let list;
+  try{ list = ((await ownerApi.ownerFetch('/api/owner/supply')).supplies) || []; }
+  catch(e){ list = (ACC_SUP && ACC_SUP.list) || []; }
+  ACC_SUP = {list, open: _supMain(list)};
+  const ex = _xList();
+  const open = ex.filter(x => x.status === 'open'), past = ex.filter(x => x.status !== 'open');
+  _setText('accSub', open.length ? `${open.length} в работе`
+    : (ex.length ? `${ex.length} ${pluralize(ex.length,'заявка','заявки','заявок')}` : 'заявок ещё не было'));
+  const row = x => {
+    const st = _xState(x);
+    const dt = x.day || String(x.at || '').slice(0, 10);
+    return `<button class="pnav-r" onclick="xOpen('${escS(x.supply_id)}')">
+      <span class="pnav-i ${st[1] === 'live' ? 'live' : st[1] === 'done' ? 'ok' : ''}">${ICO_BASE}</span>
+      <span class="pnav-b"><b>${escS(x.base || 'База')}</b>
+        <i>${fmt(x.total_qty)} ${pluralize(x.total_qty,'бутылка','бутылки','бутылок')} · ${
+          x.positions} ${pluralize(x.positions,'позиция','позиции','позиций')} · ${_dayName(dt)}</i></span>
+      <span class="pstat-c ${st[1]}">${st[0]}</span>
+      <span class="pnav-go">${ICO_CHEV}</span>
+    </button>`;
+  };
+  mid.innerHTML = !ex.length
+    ? `<div class="xs-hint">Заявок на другие базы ещё не было</div>`
+    : (open.length ? `<div class="exp-grp">В работе</div><div class="pbox">${open.map(row).join('')}</div>` : '')
+      + (past.length ? `<div class="exp-grp">Закрытые</div><div class="pbox">${past.slice(0, 12).map(row).join('')}</div>` : '');
+  document.getElementById('accFoot').innerHTML = `<div class="qb-wrap">
+    <button class="qb" onclick="xNew()">${ICO_XPLUS}Новая заявка</button></div>`;
+}
+
+// Заявка на базу открывается в ту же приёмку, что и основная: тот же экран,
+// те же «Взять на себя» и «Отменить». Стрелка ведёт обратно в список баз.
+async function xOpen(sid){
+  _setText('accTitle', 'Приёмка');
+  _setText('accSub', 'загрузка…');
+  document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  await supLoad(sid);
+  ACC_BACK = accExtra;
+}
+
+// ── мастер: куда → что → готово ──
+let XS = null;
+
+async function xNew(){
+  XS = {step: 1, base: '', q: '', open: '', rows: {}, dist: null, all: null};
+  document.getElementById('accAct').innerHTML = '';
+  xRender();
+  xLoad();
+}
+
+// Каталог для поиска и недобор основной заявки грузятся в фоне: первый шаг
+// про базу, и ждать список ради него незачем.
+async function xLoad(){
+  let d = ACC_ORDER;
+  if(!d){
+    try{ d = await ownerApi.ownerFetch('/api/owner/stock/order', {params:{day: accDay()}}); ACC_ORDER = d; }
+    catch(e){ d = null; }
+  }
+  if(!XS) return;
+  XS.dist = (d && d.districts) || [];
+  XS.all = (d && (d.all_rows || d.rows)) || [];
+  // Недобор основной заявки — готовый список того, за чем едут. Подставляем
+  // его только в пустую заявку: чужие числа поверх своих не кладём.
+  const main = ACC_SUP && ACC_SUP.open;
+  if(main && main.gap_qty && !Object.keys(XS.rows).length){
+    try{
+      const sd = (SUP_D && SUP_D.supply_id === main.supply_id) ? SUP_D
+               : await ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(main.supply_id));
+      if(XS && !Object.keys(XS.rows).length)
+        (((sd || {}).shortfall || {}).rows || []).forEach(r => {
+          const by = {};
+          Object.entries(r.by_district || {}).forEach(([o, n]) => { if(n > 0) by[o] = n; });
+          if(Object.keys(by).length) XS.rows[r.id] = {name: r.name, by};
+        });
+    }catch(e){}
+  }
+  if(XS && XS.step === 2) xRender();
+}
+
+function xBack(){
+  if(!XS){ accExtra(); return; }
+  if(XS.step > 1){ XS.step--; XS.q = ''; XS.open = ''; xRender(); return; }
+  XS = null; accExtra();
+}
+
+const xQty = r => Object.values((r && r.by) || {}).reduce((a, n) => a + (n || 0), 0);
+function xTotal(){ return Object.values((XS && XS.rows) || {}).reduce((a, r) => a + xQty(r), 0); }
+function _xCode(o){ return ((XS && XS.dist) || []).find(x => x.id === o) || {code: o, name: o}; }
+
+function xRender(){
+  if(!XS) return;
+  ACC_BACK = xBack;
+  const s = XS.step;
+  _setText('accTitle', 'Новая заявка');
+  _setText('accSub', `шаг ${s} из 3`);
+  const steps = `<div class="xs-steps">${[1, 2, 3].map(i => `<span class="${i <= s ? 'on' : ''}"></span>`).join('')}</div>`;
+  const mid = document.getElementById('accMid');
+  if(s === 1){
+    const recent = [...new Set(_xList().map(x => x.base).filter(Boolean))].slice(0, 8);
+    mid.innerHTML = steps + `<div class="xs-h">Куда едем?</div>
+      <input class="xs-in" id="xsBase" placeholder="Название базы" value="${escS(XS.base)}"
+             autocomplete="off" enterkeyhint="next"
+             oninput="XS.base=this.value;xFoot()"
+             onkeydown="if(event.key==='Enter'){event.preventDefault();xNext()}">
+      ${recent.length ? `<div class="xs-chips">${recent.map(b =>
+        `<button class="xs-chip ${b === XS.base.trim() ? 'on' : ''}" onclick="xBase('${escS(b)}')">${escS(b)}</button>`).join('')}</div>` : ''}`;
+    setTimeout(() => { const e = document.getElementById('xsBase'); if(e && !XS.base) e.focus(); }, 80);
+  }else if(s === 2){
+    mid.innerHTML = steps + `<div class="xs-h">Что везём?</div>
+      <div class="ord-find">
+        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
+        <input id="xsQ" type="search" placeholder="Найти позицию" value="${escS(XS.q)}" oninput="xSearch(this.value)">
+        <button class="ord-find-x" id="xsQX" onclick="xSearch('')" aria-label="Очистить"
+                style="${XS.q.trim() ? '' : 'display:none'}">✕</button>
+      </div>
+      <div id="xsList">${xList()}</div>`;
+  }else{
+    const byD = {};
+    Object.values(XS.rows).forEach(r => Object.entries(r.by).forEach(([o, n]) => { if(n > 0) byD[o] = (byD[o] || 0) + n; }));
+    const rows = Object.values(XS.rows).filter(r => xQty(r) > 0);
+    const total = xTotal();
+    mid.innerHTML = steps + `<div class="xs-h">${escS(XS.base.trim())}</div>
+      <div class="xs-sum"><b>${fmt(total)}</b>
+        <i>${pluralize(total,'бутылка','бутылки','бутылок')} · ${rows.length} ${
+          pluralize(rows.length,'позиция','позиции','позиций')} · ${
+          Object.entries(byD).map(([o, n]) => `${_xCode(o).code} ${n}`).join(' · ')}</i></div>
+      <div class="xs-sum">${rows.map(r => `<div class="xs-l">
+        <span>${escS(r.name)}</span>
+        <i>${Object.entries(r.by).filter(([, n]) => n > 0).map(([o, n]) => `${_xCode(o).code}·${n}`).join(' ')}</i>
+        <b>${xQty(r)}</b></div>`).join('')}</div>`;
+  }
+  xFoot();
+}
+
+// Список второго шага. Пока ищут — найденное; иначе то, что уже в заявке.
+// Перерисовывается сам по себе, чтобы поле поиска не теряло курсор.
+function xList(){
+  const q = XS.q.trim().toLowerCase();
+  const inReq = Object.entries(XS.rows).filter(([, r]) => xQty(r) > 0);
+  if(q){
+    const found = (XS.all || []).filter(r => r.name.toLowerCase().includes(q)).slice(0, 30);
+    return `<div class="exp-grp">Найдено · ${found.length}</div>${found.length
+      ? found.map(r => xRow(r.id, r.name)).join('')
+      : '<div class="exp-empty">Ничего не нашлось</div>'}`;
+  }
+  if(inReq.length)
+    return `<div class="exp-grp">В заявке · ${inReq.length}</div>${inReq.map(([id, r]) => xRow(id, r.name)).join('')}`;
+  return `<div class="xs-hint">${XS.all ? 'Найдите позицию и отметьте, сколько и куда' : 'Загрузка…'}</div>`;
+}
+
+function xRow(id, name){
+  const r = XS.rows[id] || {name, by: {}};
+  const open = XS.open === id;
+  const dist = XS.dist || [];
+  const q = xQty(r);
+  return `<div class="ord-r${open ? ' open' : ''}${q ? '' : ' zero'}">
+    <button class="ord-r-h" onclick="xToggle('${escS(id)}')">
+      <span class="ord-r-n">${escS(name)}</span>
+      <span class="ord-r-d">${dist.filter(x => r.by[x.id]).map(x => `${x.code}·${r.by[x.id]}`).join(' ')}</span>
+      <span class="ord-r-v${q ? ' gold' : ''}">${q || ''}</span>
+      <span class="ord-r-go">${open ? '⌄' : '›'}</span>
+    </button>
+    ${open ? `<div class="ord-r-b">${dist.map(x => `<div class="ord-c">
+        <span class="ord-c-n"><b>${x.code}</b> ${escS(x.name)}</span>
+        <span class="ord-st">
+          <button onclick="xStep('${escS(id)}','${x.id}',-1)" aria-label="Меньше">−</button>
+          <input inputmode="numeric" value="${r.by[x.id] || 0}" onfocus="this.select()"
+                 onchange="xSet('${escS(id)}','${x.id}',this.value)">
+          <button onclick="xStep('${escS(id)}','${x.id}',1)" aria-label="Больше">+</button>
+        </span></div>`).join('')}</div>` : ''}
+  </div>`;
+}
+
+function xEnsure(id){
+  if(!XS.rows[id]){
+    const a = (XS.all || []).find(r => r.id === id);
+    XS.rows[id] = {name: a ? a.name : id, by: {}};
+  }
+  return XS.rows[id];
+}
+function xPaintList(){
+  const el = document.getElementById('xsList');
+  if(el) el.innerHTML = xList(); else xRender();
+  xFoot();
+}
+function xToggle(id){
+  XS.open = XS.open === id ? '' : id;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  xPaintList();
+}
+function xStep(id, oid, d){
+  const r = xEnsure(id);
+  r.by[oid] = Math.max(0, (r.by[oid] || 0) + d);
+  if(!r.by[oid]) delete r.by[oid];
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  xPaintList();
+}
+function xSet(id, oid, v){
+  const r = xEnsure(id);
+  const n = Math.max(0, parseInt(String(v).replace(/\D/g, ''), 10) || 0);
+  if(n) r.by[oid] = n; else delete r.by[oid];
+  xPaintList();
+}
+function xSearch(v){
+  XS.q = v || ''; XS.open = '';
+  const x = document.getElementById('xsQX'); if(x) x.style.display = XS.q.trim() ? '' : 'none';
+  const i = document.getElementById('xsQ'); if(i && i.value !== XS.q) i.value = XS.q;
+  xPaintList();
+}
+function xBase(b){ XS.base = b; xRender(); }
+function xNext(){
+  if(XS.step === 1 && !XS.base.trim()) return;
+  if(XS.step === 2 && !xTotal()) return;
+  XS.step++; XS.q = ''; XS.open = '';
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  xRender();
+}
+
+function xFoot(){
+  if(!XS) return;
+  const s = XS.step, total = xTotal();
+  const ok = s === 1 ? !!XS.base.trim() : total > 0;
+  document.getElementById('accFoot').innerHTML = `<div class="qb-wrap">
+    <button class="qb" id="xsGo" ${ok ? '' : 'disabled'} onclick="${s === 3 ? 'xCreate()' : 'xNext()'}">${
+      s === 3 ? 'Создать заявку' : (s === 2 && total ? `Дальше · ${fmt(total)}` : 'Дальше')}</button></div>`;
+}
+
+async function xCreate(){
+  const b = document.getElementById('xsGo'); if(!b || b.disabled) return;
+  b.disabled = true; b.textContent = 'Создаю…';
+  const items = Object.entries(XS.rows).map(([id, r]) => ({id,
+      by_district: Object.fromEntries(Object.entries(r.by).filter(([, n]) => n > 0))}))
+    .filter(x => Object.keys(x.by_district).length);
+  try{
+    await ownerApi.ownerFetch('/api/owner/supply/extra',
+      {method:'POST', body:{base: XS.base.trim(), items, as: _meName()}});
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    _toast('Заявка создана — водители её видят');
+    XS = null; ACC_SUP = null;
+    await accExtra();
+  }catch(e){
+    _toast('Не удалось создать');
+    b.disabled = false; b.textContent = 'Создать заявку';
+  }
 }
 
 // Цена, по которой позицию взяли на доп. складе. Прайс на это не отвечает: он
@@ -16125,8 +16443,9 @@ function supRender(){
   const pct  = need ? Math.round(got / need * 100) : 0;
   const state = d.status !== 'open' ? ['Приём закончен','ok']
               : (!busy && !done) ? ['Ожидает приёма','warn'] : ['Идёт приём','live'];
-  _setText('accTitle', 'Приёмка');
-  _setText('accSub', `${_dayName(d.day || String(d.at||'').slice(0,10))} · ${
+  _setText('accTitle', d.kind === 'extra' ? (d.base || 'Другая база') : 'Приёмка');
+  _setText('accSub', `${d.kind === 'extra' ? 'другая база · ' : ''}${
+    _dayName(d.day || String(d.at||'').slice(0,10))} · ${
     d.positions || 0} ${pluralize(d.positions||0,'позиция','позиции','позиций')}`);
 
   // Главное число экрана — сколько бутылок уже на полке. Всё остальное здесь
@@ -16222,7 +16541,7 @@ async function supHistory(){
   if(!list){
     try{ list = ((await ownerApi.ownerFetch('/api/owner/supply')).supplies) || []; }
     catch(e){ list = []; }
-    ACC_SUP = {list, open: list.find(x => x.status === 'open') || null};
+    ACC_SUP = {list, open: _supMain(list)};
   }
   const mid = document.getElementById('accMid');
   if(!list.length){
@@ -16260,8 +16579,9 @@ function supHistRow(x){
   return `<button class="sh-row" onclick="supOpenOne('${escS(x.supply_id)}')">
     <span class="sh-d"><b>${day}</b><i>${escS(mon)}</i></span>
     <span class="sh-b">
-      <span class="sh-t">${fmt(x.total_qty)} ${pluralize(x.total_qty,'бутылка','бутылки','бутылок')}
-        из ${fmt(x.asked_qty)}</span>
+      <span class="sh-t">${x.kind === 'extra'
+        ? `${escS(x.base || 'Другая база')} · ${fmt(x.total_qty)} ${pluralize(x.total_qty,'бутылка','бутылки','бутылок')}`
+        : `${fmt(x.total_qty)} ${pluralize(x.total_qty,'бутылка','бутылки','бутылок')} из ${fmt(x.asked_qty)}`}</span>
       <span class="sh-s">${escS(state)}${x.gap_qty
         ? ` · не дал ${fmt(x.gap_qty)}` : ''}</span>
     </span>
@@ -16324,7 +16644,7 @@ async function supImport(inp, btnId){
     await supLoad(j.supply_id);
     ACC_BACK = accOrder;
     try{ ACC_SUP = {list: (await ownerApi.ownerFetch('/api/owner/supply')).supplies || []};
-         ACC_SUP.open = ACC_SUP.list.find(x => x.status === 'open') || null; accRender(); }catch(e){}
+         ACC_SUP.open = _supMain(ACC_SUP.list); accRender(); }catch(e){}
   }catch(e){
     const E = {not_xlsx:'Это не .xlsx', no_code_column:'В файле нет колонки Code',
                no_district_columns:'Не нашёл колонки районов',
@@ -16761,8 +17081,9 @@ async function supCancel(sid){
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
   _toast('Заявка отменена');
   // Перечитываем всё, от чего зависит статус: хаб, список закупов и сам экран.
+  const extra = d.kind === 'extra';
   ACC_SUP = null;
-  await accSupply();
+  if(extra) await accExtra(); else await accSupply();
 }
 
 // Выгрузка списка недобора убрана вместе с кнопками, которые её звали:

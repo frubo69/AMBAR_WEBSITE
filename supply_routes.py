@@ -23,6 +23,7 @@ import logging
 import re
 import zipfile
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 
 from aiohttp import web
 
@@ -639,6 +640,8 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
         "district_name": OFFICE_NAMES.get(oid, oid),
         "driver": task.get("driver") or "",
         "mine": bool(me and task.get("driver") == me),
+        "extra": (sup.get("kind") or "main") == "extra",
+        "base": sup.get("base") or "",
         "claimed_at": str(task.get("claimed_at") or ""),
         "started_at": str(task.get("started_at") or ""),
         "done_at": str(task.get("done_at") or ""),
@@ -658,29 +661,25 @@ async def tasks_for_driver(me: str, district: str) -> dict:
     там, забрать заодно ящик для B3 дешевле второго рейса.
 
     Заявок бывает несколько разом. Основная — та, что уходила в магазин на
-    всю сеть; доп. — ответ другой базы, куда поехали добирать недобор. В
-    документе поставки этого не написано, поэтому основную узнаём по охвату:
-    самая свежая из тех, что накрывает больше всего районов. Всё остальное
-    открытое — доп. заявки, и водителю они показаны отдельным списком ниже:
-    это другая поездка на другую базу, и смешивать её с основной нельзя.
+    всю сеть, и она одна: самая свежая. Заявки на другие базы (kind=extra)
+    старший собирает руками, и каждая — своя поездка; водителю они показаны
+    отдельным списком, все открытые, с названием базы.
 
     Старьё старше основной по той же точке не показываем: заявку пересобирают
     от того, чего не хватает сейчас, и ехать за августовским заказом в
     сентябре некуда. Исключение одно: если в старую задачу уже приняли
     бутылки, она остаётся — те бутылки записаны в тот документ, и бросить его
     значит потерять приёмку на полпути. Закрыть её должен человек."""
-    sups = [s for s in await db.supplies_with_open_tasks(limit=8)
+    sups = [s for s in await db.supplies_with_open_tasks(limit=12)
             if any(not t.get("done_at") for t in (s.get("tasks") or {}).values())]
     if not sups:
         return {"mine": [], "free": [], "extra": [], "taken": []}
-    охват = lambda s: sum(1 for t in (s.get("tasks") or {}).values() if not t.get("done_at"))
-    лучший = max(охват(s) for s in sups)
-    main = next(s for s in sups if охват(s) == лучший)     # поставки идут от новых к старым
-    main_at = main.get("at")
+    is_extra = lambda s: (s.get("kind") or "main") == "extra"
+    main = next((s for s in sups if not is_extra(s)), None)   # идут от новых к старым
     mine, free, extra, other = [], [], [], []
     for sup in sups:
         sid = sup.get("_id")
-        свежее = sup is main or (sup.get("at") or main_at) >= main_at
+        свежее = is_extra(sup) or sup is main
         for oid, task in (sup.get("tasks") or {}).items():
             if task.get("done_at"):
                 continue
@@ -689,7 +688,6 @@ async def tasks_for_driver(me: str, district: str) -> dict:
                 continue
             v["home"] = (oid == district)
             v["stale"] = not свежее             # незакончено с прошлой поставки
-            v["extra"] = sup is not main        # доп. заявка / другая база
             if v["mine"]:
                 mine.append(v)
             elif v["driver"]:
@@ -882,7 +880,8 @@ async def _notify_done(sid: str, doc: dict, oid: str, me: str,
             mins = f" · {int((task['done_at'] - task['started_at']).total_seconds() // 60)} мин"
     except Exception:
         pass
-    head = f"📥 *Приёмка — {_md(where)}*\n{_md(me)} · принято {took} из {need}{mins}"
+    base = f" · {_md(doc.get('base'))}" if doc.get("kind") == "extra" and doc.get("base") else ""
+    head = f"📥 *Приёмка — {_md(where)}{base}*\n{_md(me)} · принято {took} из {need}{mins}"
     if gaps:
         lst = "\n".join(f"• {_md(g['name'])} — {g['got']} из {g['need']}" for g in gaps[:8])
         more = f"\n…и ещё {len(gaps) - 8}" if len(gaps) > 8 else ""
@@ -1115,6 +1114,8 @@ def _sup_brief(sup: dict) -> dict:
         "supply_id": sup.get("_id") or sup.get("supply_id") or "",
         "at": str(sup.get("at") or ""), "day": sup.get("day") or "",
         "status": sup.get("status") or "open",
+        "kind": sup.get("kind") or "main", "base": sup.get("base") or "",
+        "by_name": sup.get("by_name") or "",
         "cancelled_at": str(sup.get("cancelled_at") or ""),
         "asked_qty": int(sup.get("asked_qty") or 0),
         "total_qty": int(sup.get("total_qty") or 0),
@@ -1149,6 +1150,8 @@ async def _supply_view(sup: dict) -> dict:
         "supply_id": sid, "at": str(sup.get("at") or ""), "day": sup.get("day") or "",
         "unmarked": await _unmarked(sup, short),
         "status": sup.get("status") or "open",
+        "kind": sup.get("kind") or "main", "base": sup.get("base") or "",
+        "by_name": sup.get("by_name") or "",
         "closed_at": str(sup.get("closed_at") or ""),
         "cancelled_at": str(sup.get("cancelled_at") or ""),
         "cancelled_by": sup.get("cancelled_by") or "",
@@ -1586,6 +1589,82 @@ async def handle_own_finish(request):
     return web.json_response(res, headers=CORS_HEADERS)
 
 
+# ── закупка на других базах ─────────────────────────────────────────────────
+# Магазин дал не всё — за остальным едут на другую базу. Заявку туда старший
+# собирает сам, без файла: назвал базу, отметил, что и куда. Дальше это
+# обычная поставка с теми же задачами по районам: район берёт водитель или
+# сам старший, бутылки принимают сканером, недобор считается сам. Отличие
+# одно — kind=extra: водителю такая заявка показана отдельным списком, а
+# основной путь закупки на хабе её не считает своей.
+@require_owner
+async def handle_extra_create(request):
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    base = re.sub(r"\s+", " ", str(body.get("base") or "")).strip()[:60]
+    if not base:
+        return web.json_response({"error": "no_base"}, status=400, headers=CORS_HEADERS)
+    cat = _catalog_by_id()
+    items, tasks = [], {}
+    for row in body.get("items") or []:
+        if not isinstance(row, dict):
+            continue
+        pid = str(row.get("id") or "").strip()
+        p = cat.get(pid)
+        if not p or any(i["id"] == pid for i in items):
+            continue
+        by = {}
+        for oid, n in (row.get("by_district") or {}).items():
+            try:
+                n = int(n)
+            except (TypeError, ValueError):
+                n = 0
+            if oid in OFFICE_IDS and n > 0:
+                by[oid] = min(n, 9999)
+        if not by:
+            continue
+        qty = sum(by.values())
+        items.append({"id": pid, "name": p.get("name", ""),
+                      "asked": qty, "qty": qty, "scanned": 0,
+                      "by_district": by, "got": {o: 0 for o in by}})
+        for oid, n in by.items():
+            t = tasks.setdefault(oid, {"qty": 0, "positions": 0, "scanned": 0,
+                                       "driver": "", "driver_id": 0,
+                                       "claimed_at": None, "started_at": None,
+                                       "done_at": None, "last_at": None,
+                                       "undo": 0, "note": "", "gaps": [], "flags": []})
+            t["qty"] += n
+            t["positions"] += 1
+    if not items:
+        return web.json_response({"error": "nothing"}, status=400, headers=CORS_HEADERS)
+    now = datetime.now(timezone.utc)
+    sid = "X" + now.strftime("%y%m%d-%H%M%S")
+    who = _owner_name(request, body)
+    doc = {"_id": sid, "at": now, "status": "open",
+           "day": datetime.now(ZoneInfo("Asia/Dubai")).strftime("%Y-%m-%d"),
+           "kind": "extra", "base": base,
+           "by": request.get("owner_id") or 0, "by_name": who,
+           "items": items, "dropped": [], "short": [], "extra": [], "unknown": [],
+           "tasks": tasks,
+           "total_qty": sum(i["qty"] for i in items),
+           "asked_qty": sum(i["qty"] for i in items), "gap_qty": 0}
+    await db.supply_save(doc)
+    log.info(f"[supply] заявка на базу «{base}» {sid}: {who} · {len(items)} позиций, "
+             f"{doc['total_qty']} бутылок, районов {len(tasks)}")
+    # Это деньги мимо магазина — владелец узнаёт сразу, а не по итогу приёмки.
+    try:
+        from owner_routes import notify_owners
+        where = " · ".join(f"{OFFICE_CODES.get(o, o)} {t['qty']}" for o, t in tasks.items())
+        await notify_owners("supply.done",
+                            f"🏬 *Закупка на другой базе — {_md(base)}*\n{_md(who)} · "
+                            f"{doc['total_qty']} бутылок, {len(items)} позиций\n{_md(where)}")
+    except Exception as e:
+        log.error(f"[supply] уведомление о заявке на базу: {e}")
+    return web.json_response({"ok": True, **_sup_brief(doc)}, headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
 async def _opt(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
@@ -1598,6 +1677,7 @@ def setup(app):
         ("/api/owner/supply/export", handle_export, "GET"),
         ("/api/owner/supply/send",   handle_send,   "POST"),
         ("/api/owner/supply/import", handle_import, "POST"),
+        ("/api/owner/supply/extra",  handle_extra_create, "POST"),
         ("/api/owner/supply",        handle_list,   "GET"),
         ("/api/owner/supply/{sid}",                 handle_one,          "GET"),
         ("/api/owner/supply/{sid}/buy",             handle_buy,          "POST"),

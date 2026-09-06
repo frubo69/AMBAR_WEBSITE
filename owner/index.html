@@ -2530,12 +2530,15 @@ button.path:active{transform:scale(.995)}
 .ord-find-x{position:absolute;right:6px;width:26px;height:26px;border:0;border-radius:8px;
   background:none;color:var(--muted);font-size:13px;cursor:pointer}
 
-.ord-r{margin-bottom:6px;border-radius:12px;background:var(--card);
-  border:1px solid var(--border2);overflow:hidden}
-.ord-r.fixed{border-color:rgba(201,169,110,.32)}
-.ord-r-h{display:flex;align-items:center;gap:10px;width:100%;padding:12px 13px;
+/* Строки внутри карточки района — не плитки: своей заливки и рамки у них
+   нет, их делит тонкая золотая черта, как бригаду в журнале смен. */
+.ord-dl{margin-top:10px;padding-top:2px;border-top:1px solid rgba(201,169,110,.12)}
+.ord-r{border-radius:0;background:transparent;border:0;border-top:1px solid rgba(255,255,255,.05);overflow:hidden}
+.ord-r:first-child{border-top:0}
+.ord-r.fixed .ord-r-n{color:var(--gold2)}
+.ord-r-h{display:flex;align-items:center;gap:10px;width:100%;padding:11px 0;
   border:0;background:none;color:var(--text);font-family:inherit;cursor:pointer;text-align:left}
-.ord-r-h:active{background:var(--card2)}
+.ord-r-h:active{opacity:.7}
 .ord-r-n{flex:1;min-width:0;font-size:13px;font-weight:600;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
 .ord-r-d{font-size:11px;color:var(--muted);white-space:nowrap}
@@ -2543,7 +2546,7 @@ button.path:active{transform:scale(.995)}
   font-variant-numeric:tabular-nums;min-width:34px;text-align:right}
 .ord-r-v.gold{color:var(--gold2)}
 .ord-r-go{width:12px;text-align:center;color:var(--muted);font-size:14px;flex-shrink:0}
-.ord-r-b{padding:2px 13px 12px;border-top:1px solid var(--border2)}
+.ord-r-b{padding:2px 0 10px}
 .ord-c{display:flex;align-items:center;gap:10px;padding:9px 0}
 .ord-c + .ord-c{border-top:1px solid rgba(255,255,255,.04)}
 .ord-c-n{flex:1;min-width:0;font-size:12px;color:var(--sub);overflow:hidden;
@@ -14632,10 +14635,7 @@ function ordRender(){
     ${d.frozen_aed ? `<div class="ord-hint">Норма выше спроса — на полке лишнего
       на <b>${fmt(d.frozen_aed)} AED</b></div>` : ''}
 
-    <div class="exp-grp">${q ? `Найдено · ${list.length}` : `Позиции · ${list.length}`}</div>
-    <div id="ordRows">${list.length ? list.map((r, i) => ordRow(r, dist, i + 1)).join('')
-      : '<div class="exp-empty">' + (q ? 'Ничего не нашлось'
-          : 'Довозить нечего — остатков хватает') + '</div>'}</div>
+    <div id="ordRows">${ordDistricts(list, dist, q)}</div>
     ${ordSeparate(d, dist)}`;
 
   // Заявку отправляют не только себе: её шлют поставщику в ватсап или на почту.
@@ -14650,9 +14650,69 @@ function ordRender(){
     </div>`;
 }
 
-// Строка позиции. Свёрнутая — что и сколько; раскрытая — по точкам, каждая
-// со своим счётчиком, потому что править приходится именно точку.
-function ordRow(r, dist, num){
+// Заявка по районам — как везде в панели: карточка района с кодом, названием
+// и итогом, внутри строки позиций с количеством для этого района. Позиция с
+// нулём в карточке не стоит: она нужна только для дозаказа, и появляется,
+// когда её ищут. Номер строки — общий по заявке: тот же, что в файле для
+// магазина, по нему сверяют голосом.
+function ordDistricts(list, dist, q){
+  const num = {}; (ORD.d.all_rows || ORD.d.rows || []).forEach((r, i) => { num[r.id] = i + 1; });
+  const cards = dist.map(x => {
+    const rows = list.filter(r => q ? true : ((r.cells[x.id] || {}).need > 0));
+    const qty = rows.reduce((a, r) => a + ((r.cells[x.id] || {}).need || 0), 0);
+    const aed = rows.reduce((a, r) => a + ((r.cells[x.id] || {}).need || 0) * (r.price || 0), 0);
+    const pos = rows.filter(r => (r.cells[x.id] || {}).need > 0).length;
+    if(!rows.length) return '';
+    return `<div class="shl-card">
+      <div class="shl-h">
+        <span class="shl-code">${escS(x.code || '')}</span>
+        <span class="shl-b"><b>${escS(x.name || x.id)}</b>
+          <i>${pos} ${pluralize(pos,'позиция','позиции','позиций')} / ${fmt(qty)} ${pluralize(qty,'бутылка','бутылки','бутылок')}</i></span>
+        <span class="shl-v"><b>${fmt(Math.round(aed))}<u>AED</u></b><i>прайс</i></span>
+      </div>
+      <div class="ord-dl">${rows.map(r => ordRow(r, x, num[r.id])).join('')}</div>
+    </div>`;
+  }).filter(Boolean);
+  if(!cards.length) return '<div class="exp-empty">' + (q ? 'Ничего не нашлось'
+      : 'Довозить нечего — остатков хватает') + '</div>';
+  return `<div class="shl-list">${cards.join('')}</div>`;
+}
+
+// Строка позиции в карточке района. Свёрнутая — что и сколько; раскрытая —
+// счётчик этого района: править приходится именно точку.
+function ordRow(r, x, num){
+  const key = r.id + '|' + x.id;
+  const open = ORD.open === key;
+  const c = r.cells[x.id] || {};
+  return `<div class="ord-r${open ? ' open' : ''}${c.edited ? ' fixed' : ''}${
+      c.need ? '' : ' zero'}" data-id="${r.id}">
+    <button class="ord-r-h" onclick="ordOpen('${key}')">
+      <span class="ord-r-i">${num || ''}</span>
+      <span class="ord-r-n">${escS(r.name)}</span>
+      <span class="ord-r-d">${c.edited ? `расчёт ${c.calc}` : `на полке ${c.have||0}`}</span>
+      <span class="ord-r-v${c.edited ? ' gold' : ''}">${c.need || 0}</span>
+      <span class="ord-r-go">${open ? '⌄' : '›'}</span>
+    </button>
+    ${open ? `<div class="ord-r-b">
+      <div class="ord-c" data-d="${x.id}">
+        <span class="ord-c-n">на полке ${c.have||0}${c.edited ? ` · расчёт ${c.calc}` : ''}</span>
+        <span class="ord-st">
+          <button onclick="ordStep('${r.id}','${x.id}',-1)" aria-label="Меньше">−</button>
+          <input inputmode="numeric" value="${c.need||0}"
+                 onchange="ordSet('${r.id}','${x.id}',this.value)"
+                 class="${c.edited ? 'fixed' : ''}">
+          <button onclick="ordStep('${r.id}','${x.id}',1)" aria-label="Больше">+</button>
+        </span>
+      </div>
+      ${c.edited ? `<button class="ord-reset" onclick="ordSet('${r.id}','${x.id}','${c.calc||0}')">
+        Вернуть расчёт · <b>${c.calc||0}</b></button>` : ''}
+    </div>` : ''}
+  </div>`;
+}
+
+// Старая строка на все районы разом — оставлена для страницы цен и поиска по
+// коду; в заявке больше не используется.
+function ordRowAll(r, dist, num){
   const open = ORD.open === r.id;
   const cells = dist.map(x => ({x, c: r.cells[x.id] || {}}));
   // Номер строки — тот же, что в файле для магазина: по нему сверяют позицию

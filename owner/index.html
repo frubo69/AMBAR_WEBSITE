@@ -4336,11 +4336,6 @@ button.path:active{transform:scale(.995)}
 .list{display:flex;flex-direction:column;gap:6px}
 /* Тот же список внутри окна настроек: рамка там ни к чему — окно само рамка,
    — а отступы должны совпасть с соседними строками «Отображения». */
-.set-list{gap:0;margin-top:6px}
-.set-list .lrow{background:none;border:0;border-radius:0;padding:12px;
-  border-top:1px solid var(--border2)}
-.set-list .lrow:first-child{border-top:0}
-.set-list .lrow:active{background:rgba(255,255,255,.03)}
 .lrow{display:flex;align-items:center;gap:12px;padding:12px 14px;border-radius:var(--r3);background:var(--card);border:1px solid var(--border2);transition-property:var(--tp);transition-duration:.15s;transition-timing-function:var(--e1)}
 .lrow:active{background:var(--card2)}
 /* Ensure the entire lrow is one consistent tap target on iOS — without
@@ -5373,45 +5368,50 @@ button.path:active{transform:scale(.995)}
 
 <!-- ============ SETTINGS ============ -->
 <div class="cmd-overlay" id="setOverlay">
-  <div class="cmd-sheet" style="max-width:460px">
-    <div class="cmd-hdr" style="padding:16px 18px 14px">
-      <div style="flex:1">
-        <div style="font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:600;color:var(--text)">Настройки</div>
-        <div style="font-size:11px;color:var(--muted);letter-spacing:.3px;margin-top:2px">AMBAR Owner · v0.1</div>
-      </div>
-      <button class="cmd-close" onclick="closeSet()" aria-label="Закрыть"><span class="txt">ESC</span><span class="x">✕</span></button>
+  <!-- Настройки: плитки, как вход в чек-лист и разделы учёта. Название
+       заглавными, под ним оглавление через косую, справа — значение. Без
+       переключателей «звук / оповещения / тихие часы»: они ничего не
+       включали, только писали в память браузера, и никто их не читал. -->
+  <div class="cmd-sheet set-sheet">
+    <div class="set-hd">
+      <div class="set-ttl">Настройки</div>
+      <button class="dp-x" onclick="closeSet()" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
     </div>
-    <div class="cmd-body" style="padding:8px 10px 14px">
-      <div class="cmd-grp-t" style="padding:10px 12px 6px">Уведомления</div>
-      <div class="set-group">
-        <button class="set-cta" onclick="openNotif()">
-          <span class="set-cta-ico"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
-          <span class="set-cta-body">
-            <span class="set-cta-t">Настроить уведомления</span>
-            <span class="set-cta-s">Пресеты · пороги · районы · теги</span>
-          </span>
-          <span class="set-cta-arrow">→</span>
-        </button>
-        <div class="set-group-row"><span>Активно</span><span><b id="setActiveLbl" style="color:var(--text)">12 из 21</b> <span style="color:var(--muted)">типов</span></span></div>
-        <div class="set-group-row"><span>Тихий режим</span><b id="setQuietLbl" style="color:var(--gold2);font-weight:600">22:00 → 08:00</b></div>
-        <div class="set-group-row"><span>Telegram-бот · @ambar_manage_bot</span><span style="color:var(--up);font-weight:600;font-size:12px">подключён</span></div>
-      </div>
-
-      <!-- Переключатели переехали сюда со страницы «Ещё»: настройки должны
-           лежать в настройках, а не отдельным списком под разделами. -->
-      <div class="cmd-grp-t" style="padding:14px 12px 6px">Все настройки</div>
-      <div class="list set-list">
-        <div class="lrow lrow-tog" data-tog="notif"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></div><div class="lrow-body"><div class="lrow-name">Telegram-оповещения</div><div class="lrow-sub">заказы &gt; 1000 AED · опоздания</div></div><span class="tog on" id="togNotif"></span></div>
-        <div class="lrow lrow-tog" data-tog="sound"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M11 5 6 9H2v6h4l5 4z"/><path d="M15.5 8.5a5 5 0 0 1 0 7"/><path d="M18.5 5.5a9 9 0 0 1 0 13"/></svg></div><div class="lrow-body"><div class="lrow-name">Звук уведомлений</div><div class="lrow-sub">только важные события</div></div><span class="tog on" id="togSound"></span></div>
-        <div class="lrow lrow-tog" data-tog="quiet"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8"/></svg></div><div class="lrow-body"><div class="lrow-name">Тихие часы</div><div class="lrow-sub">23:00 → 09:00 · только критичные</div></div><span class="tog" id="togQuiet"></span></div>
-        <div class="lrow" onclick="arcOpen()"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M2 3h20v4H2z"/><path d="M10 12h4"/></svg></div><div class="lrow-body"><div class="lrow-name">Архив событий</div><div class="lrow-sub">важное — списания, заявки, доступы</div></div><span style="color:var(--muted)">›</span></div>
-        <div class="lrow" onclick="qaExport()"><div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg></div><div class="lrow-body"><div class="lrow-name">Экспорт CSV / XLSX</div><div class="lrow-sub">данные за выбранный период</div></div><span style="color:var(--muted)">›</span></div>
-      </div>
-
-      <div class="cmd-grp-t" style="padding:14px 12px 6px">Отображение</div>
-      <div class="set-row" onclick="toggleCurrency()" style="cursor:pointer"><span>Валюта</span><span style="display:inline-flex;align-items:center;gap:8px"><span id="setCurLbl" style="color:var(--gold2);font-weight:600">AED</span><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:var(--muted)"><path d="M3 7h13l-3-3M21 17H8l3 3"/></svg></span></div>
-      <div class="set-row"><span>Язык</span><span style="color:var(--text);font-weight:600">Русский</span></div>
-      <div class="set-row"><span>Таймзона</span><span style="color:var(--text);font-weight:600">Asia/Dubai (UTC+4)</span></div>
+    <div class="set-body">
+      <button class="set-tile" onclick="openNotif()">
+        <span class="set-ico"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8a6 6 0 1 0-12 0c0 7-3 8-3 8h18s-3-1-3-8"/><path d="M13.7 21a2 2 0 0 1-3.4 0"/></svg></span>
+        <span class="set-b"><b>Уведомления</b><i>пресеты / пороги / районы</i></span>
+        <span class="set-v"><b id="setActiveLbl">44 из 45</b><i>типов</i></span>
+        <span class="set-go"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+      </button>
+      <button class="set-tile" onclick="openNotif()">
+        <span class="set-ico"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8"/></svg></span>
+        <span class="set-b"><b>Тихий режим</b><i>только критичные</i></span>
+        <span class="set-v"><b id="setQuietLbl">22:00 → 08:00</b><i>с / до</i></span>
+        <span class="set-go"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+      </button>
+      <button class="set-tile" onclick="arcOpen()">
+        <span class="set-ico"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h18v13a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1z"/><path d="M2 3h20v4H2z"/><path d="M10 12h4"/></svg></span>
+        <span class="set-b"><b>Архив событий</b><i>списания / заявки / доступы</i></span>
+        
+        <span class="set-go"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+      </button>
+      <button class="set-tile" onclick="qaExport()">
+        <span class="set-ico"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3"/><path d="M8 7l4-4 4 4"/><path d="M4 15v4a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-4"/></svg></span>
+        <span class="set-b"><b>Экспорт</b><i>csv / xlsx / за период</i></span>
+        
+        <span class="set-go"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>
+      </button>
+      <button class="set-tile" onclick="toggleCurrency()">
+        <span class="set-ico"><svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="9" r="6"/><path d="M14.5 10.2a6 6 0 1 1-4.3 4.3"/></svg></span>
+        <span class="set-b"><b>Валюта</b><i>aed / usd</i></span>
+        <span class="set-v"><b id="setCurLbl">AED</b></span>
+        <span class="set-go"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7h13l-3-3M21 17H8l3 3"/></svg></span>
+      </button>
+      <div class="set-ft">AMBAR Owner v0.1 · Русский · Asia/Dubai UTC+4<br>@ambar_manage_bot <u>подключён</u></div>
     </div>
   </div>
 </div>
@@ -5460,27 +5460,51 @@ button.path:active{transform:scale(.995)}
 .cmd-group.hide{display:none}
 .cmd-item.hide{display:none}
 
-/* Settings toggle */
-.set-row{display:flex;align-items:center;justify-content:space-between;padding:10px 14px;border-radius:10px;font-size:13px;color:var(--text)}
-
-/* Grouped section card — ties CTA + info rows into one unit */
-.set-group{margin:2px 4px 6px;background:var(--card);border:1px solid var(--border2);border-radius:14px;overflow:hidden}
-.set-group .set-group-row{display:flex;align-items:center;justify-content:space-between;padding:11px 14px;font-size:13px;color:var(--text);border-top:1px solid var(--border2)}
-.set-group .set-group-row:first-child{border-top:none}
-
-/* CTA as the leading row of the group */
-.set-cta{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;cursor:pointer;
-  background:linear-gradient(90deg,rgba(201,169,110,.10),rgba(201,169,110,.03));
-  border:none;
-  color:var(--text);
-  border-bottom:1px solid rgba(201,169,110,.22);
-  transition-property:var(--tp);transition-duration:.18s;transition-timing-function:var(--e1);text-align:left}
-.set-cta:active{transform:scale(.995);background:linear-gradient(90deg,rgba(201,169,110,.2),rgba(201,169,110,.08))}
-.set-cta-ico{width:32px;height:32px;border-radius:9px;background:rgba(201,169,110,.18);display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
-.set-cta-body{flex:1;display:flex;flex-direction:column;gap:2px;min-width:0}
-.set-cta-t{font-size:13px;font-weight:600;color:var(--gold2);letter-spacing:.2px}
-.set-cta-s{font-size:11px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.set-cta-arrow{color:var(--gold2);font-size:16px;font-weight:600;flex-shrink:0}
+/* ── Настройки ── одна сетка: 16 по краям, 10 между плитками. Плитка —
+   та же, что вход в чек-лист: 66 ростом, скруглена на 16, золотая кромка.
+   Плитки растягиваются по высоте, чтобы окно было заполнено целиком, но не
+   выше 118: строка настроек не должна превращаться в баннер. */
+.set-sheet{max-width:420px;position:relative}
+.set-sheet::before{content:'';position:absolute;left:0;right:0;top:0;height:1px;z-index:2;
+  background:linear-gradient(90deg,transparent,rgba(201,169,110,.55),transparent)}
+.set-hd{position:relative;padding:18px 54px 16px 18px;border-bottom:1px solid var(--border2);
+  background:linear-gradient(160deg,rgba(201,169,110,.09),transparent 70%),var(--card)}
+.set-ttl{font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;
+  letter-spacing:.8px;text-transform:uppercase;line-height:1.2;color:var(--text)}
+.set-body{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:10px}
+.set-body::-webkit-scrollbar{display:none}
+.set-tile{display:flex;align-items:center;gap:13px;width:100%;flex:1 0 auto;
+  min-height:66px;max-height:118px;padding:0 16px;border-radius:16px;cursor:pointer;
+  text-align:left;font-family:inherit;color:var(--text);
+  background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
+  border:1px solid rgba(201,169,110,.28);-webkit-tap-highlight-color:transparent}
+.set-tile:active{transform:scale(.995)}
+.set-tile > *{pointer-events:none}
+.set-ico{flex:0 0 auto;display:flex;align-items:center;justify-content:center;
+  width:42px;height:42px;border-radius:13px;color:var(--gold2);
+  background:var(--gold-soft);border:1px solid rgba(201,169,110,.22)}
+.set-b{flex:1;min-width:0}
+.set-b b{display:block;font-family:'Space Grotesk',sans-serif;font-size:15px;
+  font-weight:700;letter-spacing:.6px;text-transform:uppercase;line-height:1.2;white-space:nowrap}
+.set-b i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.set-v{flex-shrink:0;text-align:right}
+.set-v b{display:block;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
+  letter-spacing:-.2px;color:var(--gold2);font-variant-numeric:tabular-nums;line-height:1;white-space:nowrap}
+.set-v i{display:block;font-style:normal;font-family:'DM Sans',sans-serif;font-size:9px;
+  font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-top:4px}
+.set-go{display:flex;flex-shrink:0;color:var(--muted)}
+.set-ft{margin-top:auto;padding-top:8px;text-align:center;font-size:11px;color:var(--muted);
+  letter-spacing:.2px;line-height:1.6}
+.set-ft u{text-decoration:none;color:var(--up);font-weight:600}
+/* На телефоне окно — во весь экран: половина пустого экрана под плитками
+   читается как «не загрузилось». */
+@media (max-width:520px){
+  #setOverlay{padding:0}
+  #setOverlay .set-sheet{max-width:none;max-height:none;height:100%;border-radius:0;border:0}
+  .set-hd{padding-top:calc(18px + var(--safe-top))}
+  .set-body{padding-bottom:calc(16px + env(safe-area-inset-bottom,0px))}
+}
 .tg{position:relative;width:34px;height:20px;flex-shrink:0;cursor:pointer}
 .tg input{opacity:0;width:100%;height:100%;position:absolute;cursor:pointer}
 .tg i{position:absolute;inset:0;background:var(--card3);border-radius:999px;transition-property:var(--tp);transition-duration:.2s;transition-timing-function:var(--e1)}
@@ -5495,8 +5519,6 @@ button.path:active{transform:scale(.995)}
    собраны из этого же файла и включаются только при настоящем указателе. */
 @media (hover:hover) and (pointer:fine){
 .cmd-item:hover,.cmd-item.sel{background:rgba(201,169,110,.08)}
-.set-row:hover{background:rgba(255,255,255,.02)}
-.set-cta:hover{background:linear-gradient(90deg,rgba(201,169,110,.16),rgba(201,169,110,.05))}
 }
 </style>
 
@@ -20009,26 +20031,6 @@ function qaExport(){
   alert('Экспорт CSV/XLSX скоро будет доступен');
 }
 
-// ==== Settings toggles ====
-(function initSettingsToggles(){
-  const KEY = 'ambar.settings';
-  let st = {};
-  try{ st = JSON.parse(localStorage.getItem(KEY)||'{}'); }catch(_){}
-  document.querySelectorAll('.lrow-tog[data-tog]').forEach(row=>{
-    const k = row.dataset.tog;
-    const tog = row.querySelector('.tog');
-    if(!tog) return;
-    if(typeof st[k] === 'boolean') tog.classList.toggle('on', st[k]);
-    row.addEventListener('click',(e)=>{
-      e.stopPropagation();
-      tog.classList.toggle('on');
-      st[k] = tog.classList.contains('on');
-      try{ localStorage.setItem(KEY, JSON.stringify(st)); }catch(_){}
-      try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(_){}
-    });
-  });
-})();
-
 // ==== Managers (access control) modal ====
 const mgrOv    = document.getElementById('mgrOverlay');
 const mgrAddOv = document.getElementById('mgrAddOverlay');
@@ -23611,7 +23613,7 @@ function toggleCurrency(){
     el.classList.add('cur-pulse');
   });
   // Swap icon rotation
-  const setIcon = document.querySelector('.set-row[onclick*=toggleCurrency] svg');
+  const setIcon = document.querySelector('.set-tile[onclick*=toggleCurrency] .set-go svg');
   if(setIcon){ setIcon.classList.remove('cur-spin'); void setIcon.offsetWidth; setIcon.classList.add('cur-spin'); }
 
   try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}

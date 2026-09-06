@@ -2110,6 +2110,36 @@ button.path:active{transform:scale(.995)}
 .xs-cats .xs-chip{flex-shrink:0;white-space:nowrap}
 .xs-chip i{font-style:normal;font-size:11px;color:var(--muted);margin-left:2px}
 .xs-chip.on i{color:var(--gold2);opacity:.7}
+/* Разовые расходы — карточки как у водителя: та же трата выглядит одинаково
+   с обеих сторон. Чек и бутылка — полосой под карточкой, а не кнопкой сбоку. */
+.xe-list{display:flex;flex-direction:column;gap:8px;padding:0 13px 12px}
+.xe-card{padding:13px;border-radius:15px;background:var(--card);border:1px solid var(--border2)}
+.xe-hd{display:flex;align-items:center;gap:9px;margin-bottom:10px;color:var(--gold2)}
+.xe-t{font-size:14px;font-weight:700;color:var(--text)}
+.xe-sum{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--muted)}
+.xe-sum.plus{color:var(--up)}
+.xe-card.plus .xe-t{color:var(--up)}
+.xe-row{display:flex;gap:7px}
+.xe-row-c{padding-top:7px}
+.xe-field{flex:1;min-width:0;position:relative;display:flex;align-items:center;
+  border-radius:11px;border:1px solid var(--border2);background:var(--bg3)}
+.xe-field:focus-within{border-color:rgba(201,169,110,.5)}
+.xe-field input{flex:1;min-width:0;width:100%;border:none;background:none;padding:12px;
+  color:var(--text);font-family:inherit;font-size:14px;outline:none}
+.xe-field input.amt{font-weight:700;font-size:16px}
+.xe-field.sent .xe-none{flex:1;padding:13px;font-size:14px;font-weight:600;color:var(--gold2)}
+.xe-go{flex:0 0 auto;padding:0 20px;border-radius:11px;border:0;cursor:pointer;font-family:inherit;
+  font-size:13.5px;font-weight:700;color:#1a1408;background:linear-gradient(135deg,#E8C98A,#C9A96E)}
+.xe-go:active{transform:scale(.96)}
+.xe-rcp{width:100%;margin-top:7px;display:flex;align-items:center;gap:10px;padding:8px 12px;
+  border-radius:12px;cursor:pointer;font-family:inherit;text-align:left;
+  background:none;border:1px dashed var(--border3);color:var(--sub)}
+.xe-rcp:active{transform:scale(.99)}
+.xe-rcp.set{border-style:solid;border-color:rgba(201,169,110,.4);background:var(--gold-soft);
+  color:var(--text)}
+.xe-rcp img{width:34px;height:34px;flex-shrink:0;border-radius:8px;object-fit:cover}
+.xe-rcp-t{flex:1;min-width:0;font-size:13px;font-weight:600}
+.xe-rcp-t i{display:block;font-style:normal;font-size:11px;font-weight:400;color:var(--muted);margin-top:2px}
 /* Приёмка — те же карточки, что в итоге мастера. У основной заявки позиции
    свёрнуты под флажок: их сотня, и разворачивают их по одному району. */
 .xs-fold{display:flex;align-items:center;justify-content:space-between;width:100%;
@@ -17820,30 +17850,71 @@ function expKind(id){ return EXP_KINDS.find(k => k.id === id) || null; }
 //
 // Полей ровно два, как и раньше: сколько и за что. Третье — чек — только у
 // тех видов, где без бумажки трату не примут.
+// Значки видов — те же, что у водителя: одна и та же трата должна выглядеть
+// одинаково с обеих сторон.
+const XE_ICO = {
+  fuel: '<path d="M4 20V5a2 2 0 0 1 2-2h5a2 2 0 0 1 2 2v15"/><path d="M3 20h12"/><path d="M13 9h3l2 2v6a2 2 0 0 0 2-2V8l-2.5-2.5"/>',
+  wash: '<path d="M4 13h16"/><path d="M6 13V8a3 3 0 0 1 3-3h6a3 3 0 0 1 3 3v5"/><circle cx="8" cy="17" r="2"/><circle cx="16" cy="17" r="2"/>',
+  park: '<rect x="3" y="3" width="18" height="18" rx="5"/><path d="M9.5 17V7h3a3 3 0 0 1 0 6h-3"/>',
+  gift: '<path d="M20 12v9H4v-9"/><path d="M2 7.5h20V12H2z"/><path d="M12 21V7.5"/>',
+  guard:'<path d="M12 21.5s7.5-3.8 7.5-9.5V5.2L12 2.5 4.5 5.2V12c0 5.7 7.5 9.5 7.5 9.5z"/>',
+  out:  '<path d="M7 17 17 7"/><path d="M9 7h8v8"/>',
+  into: '<path d="M17 7 7 17"/><path d="M15 17H7V9"/>',
+  note: '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><path d="M14 2v6h6M8 13h8M8 17h5"/>',
+  cam:  '<path d="M4 7.5h3.2l1.8-2.2h6l1.8 2.2H20v11H4z"/><circle cx="12" cy="13" r="3.4"/>',
+  box:  '<path d="M5 8h14l-1 12H6z"/><path d="M9 8V6a3 3 0 0 1 6 0v2"/>',
+};
+const XE_KIND_ICO = {fuel:'fuel', wash:'wash', parking:'park', kfc:'gift', guard:'guard',
+                     we_gave:'out', we_owe:'out', we_got:'into', owed_us:'into'};
+const xsvg = (d, w = 19) => `<svg viewBox="0 0 24 24" width="${w}" height="${w}" fill="none"
+  stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+
+// Форма — как у водителя: карточка на вид, в строке поле и «Записать», под
+// ней комментарий, а чек или бутылка — полосой во всю ширину под карточкой.
+// У охраны поля суммы нет вовсе: цену говорит код с крышки, и поле рядом
+// было бы приглашением придумать её.
 function expAddList(r){
   const n = escS(r.name);
-  return `<div class="exp-add">${EXP_KINDS.map(k => {
+  return `<div class="exp-add xe-list">${EXP_KINDS.map(k => {
+    const ico = XE_ICO[XE_KIND_ICO[k.id]] || XE_ICO.note;
+    const бут = k.scan && EXP_GUARD.driver === r.name && EXP_GUARD.code ? EXP_GUARD : null;
     const снят = EXP_SHOT.kind === k.id && !!EXP_SHOT.photo;
-    return `<div class="exp-add-r${k.plus ? ' plus' : ''}">
-      <span class="exp-add-t">${escS(k.t)}${
-        k.receipt ? '<i>нужен чек</i>' : (k.plus ? '<i>плюсом</i>' : '')}</span>
-      ${k.scan
-        ? `<input class="amt" id="amt-${k.id}" type="text" readonly placeholder="AED"
-             value="${EXP_GUARD.driver === r.name && EXP_GUARD.code && EXP_GUARD.cost ? EXP_GUARD.cost : ''}">`
-        : `<input class="amt" id="amt-${k.id}" type="text" inputmode="numeric" placeholder="AED"
-             onkeydown="if(event.key==='Enter')expAddExtra('${n}','${k.id}')">`}
-      <input class="cmt" id="cmt-${k.id}" type="text"
-             placeholder="${escS(k.who || (k.receipt ? 'комментарий' : (k.hint || 'комментарий')))}"
-             onkeydown="if(event.key==='Enter')expAddExtra('${n}','${k.id}')">
-      ${k.receipt ? `<button class="shot${снят ? ' on' : ''}" id="shot-${k.id}"
-             onclick="expShotFor('${k.id}')">${снят ? 'есть' : 'чек'}</button>` : ''}
-      ${k.scan ? `<button class="shot${EXP_GUARD.driver === r.name && EXP_GUARD.code ? ' on' : ''}"
-             id="scan-${k.id}" onclick="gdScan('${n}')">${
-             EXP_GUARD.driver === r.name && EXP_GUARD.code ? 'есть' : 'скан'}</button>` : ''}
-      <button class="ok" onclick="expAddExtra('${n}','${k.id}')"
-              aria-label="Записать ${escS(k.t)}">✓</button>
+    const поле = k.scan
+      ? `<div class="xe-field sent"><span class="xe-none">${
+          бут ? (бут.cost ? fmt(бут.cost) + ' AED' : 'цена не заведена') : 'по коду бутылки'}</span></div>`
+      : `<div class="xe-field"><input class="amt" id="amt-${k.id}" type="text" inputmode="numeric"
+           placeholder="AED" autocomplete="off"
+           onkeydown="if(event.key==='Enter')expAddExtra('${n}','${k.id}')"></div>`;
+    const полоса = k.receipt
+      ? `<button class="xe-rcp${снят ? ' set' : ''}" id="rcp-${k.id}" onclick="expShotFor('${k.id}')">
+           ${снят ? `<img src="${EXP_SHOT.thumb}" alt="">` : xsvg(XE_ICO.cam, 22)}
+           <span class="xe-rcp-t">${снят ? 'Чек снят' : 'Снять чек'}
+             <i>${снят ? 'нажмите, чтобы переснять' : 'без него трату не записать'}</i></span></button>`
+      : k.scan
+        ? (бут
+          ? `<button class="xe-rcp set" onclick="gdClear()">${xsvg(XE_ICO.box, 22)}
+               <span class="xe-rcp-t">${escS(бут.name || 'бутылка')}<i>нажмите, чтобы сменить</i></span></button>`
+          : `<button class="xe-rcp" onclick="gdScan('${n}')">${xsvg(XE_ICO.cam, 22)}
+               <span class="xe-rcp-t">Сканировать бутылку<i>код с крышки скажет, какая и почём</i></span></button>`)
+        : '';
+    return `<div class="xe-card${k.plus ? ' plus' : ''}">
+      <div class="xe-hd">${xsvg(ico, 17)}<span class="xe-t">${escS(k.t)}</span>${
+        k.plus ? '<span class="xe-sum plus">приходом</span>' : ''}</div>
+      <div class="xe-row">${поле}
+        <button class="xe-go" onclick="expAddExtra('${n}','${k.id}')">Записать</button></div>
+      <div class="xe-row xe-row-c"><div class="xe-field cmt"><input class="cmt" id="cmt-${k.id}" type="text"
+        placeholder="${escS(k.who || (k.receipt ? 'комментарий' : (k.hint || 'комментарий')))}" autocomplete="off"
+        onkeydown="if(event.key==='Enter')expAddExtra('${n}','${k.id}')"></div></div>
+      ${полоса}
     </div>`;
   }).join('')}</div>`;
+}
+
+function gdClear(){
+  EXP_GUARD = {driver:'', code:'', name:'', cost:0};
+  const набрано = _expTyped();
+  renderExpenses();
+  _expTypedBack(набрано);
 }
 
 // ── бутылка для охраны ──
@@ -17968,8 +18039,12 @@ function expShot(inp){
     // Перерисовать здесь список нельзя: человек уже вписал сумму, и она
     // пропала бы вместе с ним. Помечаем ровно ту кнопку, ради которой
     // камеру и открывали.
-    const b = document.getElementById('shot-' + EXP_SHOT.kind);
-    if(b){ b.classList.add('on'); b.textContent = 'есть'; }
+    const st = document.getElementById('rcp-' + EXP_SHOT.kind);
+    if(st){
+      st.classList.add('set');
+      st.innerHTML = `<img src="${EXP_SHOT.thumb}" alt="">
+        <span class="xe-rcp-t">Чек снят<i>нажмите, чтобы переснять</i></span>`;
+    }
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
   };
   img.onerror = () => _toast('Не смогли прочитать снимок');

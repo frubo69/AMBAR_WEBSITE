@@ -16169,7 +16169,7 @@ async function accExtra(){
   ACC_BACK = accOrder;
   XS = null;
   _setText('accTitle', 'Другие базы');
-  _setText('accSub', 'загрузка…');
+  _setText('accSub', '');
   document.getElementById('accAct').innerHTML = '';
   const mid = document.getElementById('accMid');
   mid.innerHTML = '<div class="exp-empty">Загрузка…</div>';
@@ -16180,8 +16180,7 @@ async function accExtra(){
   ACC_SUP = {list, open: _supMain(list)};
   const ex = _xList();
   const open = ex.filter(x => x.status === 'open'), past = ex.filter(x => x.status !== 'open');
-  _setText('accSub', open.length ? `${open.length} в работе`
-    : (ex.length ? `${ex.length} ${pluralize(ex.length,'заявка','заявки','заявок')}` : 'закупка вне магазина'));
+  _setText('accSub', '');
   const row = x => {
     const st = _xState(x);
     const dt = x.day || String(x.at || '').slice(0, 10);

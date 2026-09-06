@@ -2099,6 +2099,13 @@ button.path:active{transform:scale(.995)}
 .xs-l span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .xs-l i{font-style:normal;color:var(--muted);font-size:11px;white-space:nowrap}
 .xs-l b{font-family:'Space Grotesk',sans-serif;font-size:15px;min-width:28px;text-align:right}
+.xs-cats{display:flex;gap:6px;overflow-x:auto;margin:10px 0 4px;padding-bottom:4px;scrollbar-width:none}
+.xs-cats::-webkit-scrollbar{display:none}
+.xs-cats .xs-chip{flex-shrink:0;white-space:nowrap}
+.xs-chip i{font-style:normal;font-size:11px;color:var(--muted);margin-left:2px}
+.xs-chip.on i{color:var(--gold2);opacity:.7}
+.xr-img{width:36px;height:36px;border-radius:9px;object-fit:cover;flex-shrink:0;
+  background:var(--card2);margin:-4px 0}
 .qb:disabled{opacity:.35;box-shadow:none;transform:none}
 
 .sup-short{padding:14px;border-radius:15px;background:var(--card);
@@ -16125,7 +16132,7 @@ async function xOpen(sid){
 let XS = null;
 
 async function xNew(){
-  XS = {step: 1, base: '', q: '', open: '', rows: {}, dist: null, all: null};
+  XS = {step: 1, base: '', q: '', cat: '', open: '', rows: {}, dist: null, all: null, order: {}};
   document.getElementById('accAct').innerHTML = '';
   xRender();
   xLoad();
@@ -16142,6 +16149,14 @@ async function xLoad(){
   if(!XS) return;
   XS.dist = (d && d.districts) || [];
   XS.all = (d && (d.all_rows || d.rows)) || [];
+  // Порядок — как в каталоге у операторов: водка, виски и дальше по полкам.
+  // Строки заявки приходят отсортированными по потребности, а тут нужен
+  // каталог, который листают глазами.
+  try{ await loadCatalog(); }catch(e){}
+  if(!XS) return;
+  XS.order = {}; (PRODUCTS || []).forEach((p, i) => { XS.order[p.id] = i; });
+  const ord = r => XS.order[r.id] != null ? XS.order[r.id] : 9999;
+  XS.all = [...XS.all].sort((a, b) => ord(a) - ord(b) || a.name.localeCompare(b.name));
   // Недобор основной заявки — готовый список того, за чем едут. Подставляем
   // его только в пустую заявку: чужие числа поверх своих не кладём.
   const main = ACC_SUP && ACC_SUP.open;
@@ -16196,6 +16211,7 @@ function xRender(){
         <button class="ord-find-x" id="xsQX" onclick="xSearch('')" aria-label="Очистить"
                 style="${XS.q.trim() ? '' : 'display:none'}">✕</button>
       </div>
+      <div class="xs-cats" id="xsCats">${xCats()}</div>
       <div id="xsList">${xList()}</div>`;
   }else{
     const byD = {};
@@ -16215,20 +16231,44 @@ function xRender(){
   xFoot();
 }
 
-// Список второго шага. Пока ищут — найденное; иначе то, что уже в заявке.
-// Перерисовывается сам по себе, чтобы поле поиска не теряло курсор.
+// Категории — полосой, как у операторов: «Все», потом по полкам в порядке
+// каталога, у каждой число позиций.
+function xCats(){
+  const all = XS.all || [];
+  const cats = [];
+  all.forEach(r => { const c = r.cat || '—'; const k = cats.find(x => x.c === c);
+    if(k) k.n++; else cats.push({c, n: 1}); });
+  const chip = (c, n, on) => `<button class="xs-chip ${on ? 'on' : ''}" onclick="xCat('${escS(c)}')">${escS(c)} <i>${n}</i></button>`;
+  return chip('Все', all.length, !XS.cat) + cats.map(k => chip(k.c, k.n, XS.cat === k.c)).join('');
+}
+
+// Список второго шага — весь каталог, чтобы забивать заявку руками, как
+// заказ у операторов. Пока ищут — найденное; иначе сверху то, что уже в
+// заявке, ниже каталог выбранной полки. Перерисовывается сам по себе, чтобы
+// поле поиска не теряло курсор.
 function xList(){
   const q = XS.q.trim().toLowerCase();
+  const all = XS.all || [];
+  if(!XS.all) return `<div class="xs-hint">Загрузка…</div>`;
   const inReq = Object.entries(XS.rows).filter(([, r]) => xQty(r) > 0);
   if(q){
-    const found = (XS.all || []).filter(r => r.name.toLowerCase().includes(q)).slice(0, 30);
+    const found = all.filter(r => r.name.toLowerCase().includes(q)).slice(0, 40);
     return `<div class="exp-grp">Найдено · ${found.length}</div>${found.length
       ? found.map(r => xRow(r.id, r.name)).join('')
       : '<div class="exp-empty">Ничего не нашлось</div>'}`;
   }
-  if(inReq.length)
-    return `<div class="exp-grp">В заявке · ${inReq.length}</div>${inReq.map(([id, r]) => xRow(id, r.name)).join('')}`;
-  return `<div class="xs-hint">${XS.all ? 'Найдите позицию и отметьте, сколько и куда' : 'Загрузка…'}</div>`;
+  const list = XS.cat ? all.filter(r => (r.cat || '—') === XS.cat) : all;
+  return (inReq.length && !XS.cat
+      ? `<div class="exp-grp">В заявке · ${inReq.length}</div>${inReq.map(([id, r]) => xRow(id, r.name)).join('')}` : '')
+    + `<div class="exp-grp">${XS.cat ? escS(XS.cat) : 'Каталог'} · ${list.length}</div>`
+    + (list.length ? list.map(r => xRow(r.id, r.name)).join('') : '<div class="exp-empty">Пусто</div>');
+}
+
+function xCat(c){
+  XS.cat = c === 'Все' ? '' : c; XS.open = '';
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  const el = document.getElementById('xsCats'); if(el) el.innerHTML = xCats();
+  xPaintList();
 }
 
 function xRow(id, name){
@@ -16238,6 +16278,8 @@ function xRow(id, name){
   const q = xQty(r);
   return `<div class="ord-r${open ? ' open' : ''}${q ? '' : ' zero'}">
     <button class="ord-r-h" onclick="xToggle('${escS(id)}')">
+      <img class="xr-img" src="/products/${escS(id)}.webp" alt="" loading="lazy"
+           onerror="this.style.visibility='hidden'">
       <span class="ord-r-n">${escS(name)}</span>
       <span class="ord-r-d">${dist.filter(x => r.by[x.id]).map(x => `${x.code}·${r.by[x.id]}`).join(' ')}</span>
       <span class="ord-r-v${q ? ' gold' : ''}">${q || ''}</span>

@@ -4578,7 +4578,7 @@ function otherBox(x){
       <button class="btn btn-sec exp-go" onclick="expTap(this,'${k}')">Изменить</button>
     </div>
     <div class="exp-row exp-row-c" id="w_${k}" hidden>
-      <div class="exp-field cmt"><input id="c_${k}" type="text" placeholder="за что"
+      <div class="exp-field cmt"><input id="c_${k}" type="text" placeholder="комментарий"
         autocomplete="off" value="${esc(x.comment)}"></div>
     </div>
   </div>`;
@@ -4746,7 +4746,7 @@ function expKindCards(){
       </div>
       <div class="exp-row exp-row-c">
         <div class="exp-field cmt"><input id="kc_${k.id}" type="text"
-          placeholder="${esc(EXP_HINT[k.id] || 'за что')}" autocomplete="off"
+          placeholder="${esc(EXP_HINT[k.id] || 'комментарий')}" autocomplete="off"
           oninput="expKindTyped('${k.id}')"></div>
       </div>
       ${k.id === 'guard' ? guardStrip() : expRcp(k.id, null)}
@@ -7153,7 +7153,7 @@ async function sendExpense(btn, kind){
   const comment = id ? ((document.getElementById('c_' + kind) || {}).value || '').trim()
     : (kind === 'other' ? ((document.getElementById('e_other_c') || {}).value || '').trim() : '');
   if(!amount){ toast('Впишите сумму'); return; }
-  if((kind === 'other' || id) && !comment){ toast('Впишите, за что'); return; }
+  if((kind === 'other' || id) && !comment){ toast('Впишите комментарий'); return; }
   // Чек нужен там, где деньги отдали на стороне. Спрашиваем до отправки: узнать
   // о нём от сервера — значит узнать уже отъехав от колонки.
   const свой = EXP_SHOT.kind === kind ? EXP_SHOT : null;
@@ -7185,7 +7185,7 @@ const EXP_ERR = {
   no_photo:  'Нужен снимок чека',
   photo_big: 'Снимок слишком тяжёлый, снимите ещё раз',
   bad_photo: 'Снимок не открылся, снимите ещё раз',
-  amount_and_comment_required: 'Впишите сумму и за что'};
+  amount_and_comment_required: 'Впишите сумму и комментарий'};
 
 document.getElementById('editSheet').addEventListener('click', e => {
   if(e.target.id === 'editSheet') closeEdit();

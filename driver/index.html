@@ -775,12 +775,23 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    ответ на вопрос, ради которого сюда заходят. */
 .shd.live{border-color:rgba(201,169,110,.4);
   background:linear-gradient(160deg,var(--gold-soft),transparent 65%),var(--bg3)}
+.shd{display:flex;align-items:center;gap:12px}
+.shd-b{flex:1;min-width:0}
 .shd-t{display:block;font-size:18px;font-weight:800;letter-spacing:-.3px;line-height:1.2}
 .shd-s{display:block;font-size:13px;color:var(--muted);margin-top:6px;line-height:1.4}
+/* Закрытие смены живёт там же, где написано, что она идёт: справа в шапке.
+   Пока закрыть нельзя, кнопка тихая — контуром; можно — золотом. */
+.shd-close{flex-shrink:0;padding:11px 14px;border-radius:12px;cursor:pointer;
+  font-family:inherit;font-size:13px;font-weight:700;color:var(--dim);
+  background:none;border:1px solid var(--border3)}
+.shd-close.ok{color:#1a1408;border-color:transparent;
+  background:linear-gradient(135deg,#E8C98A,#C9A96E)}
+.shd-close:active{transform:scale(.96)}
 /* Счёт смены. Три числа в ряд и без украшений: их читают, а не любуются. */
 .shsum{display:grid;grid-template-columns:repeat(3,1fr);margin-bottom:10px;
   border-radius:16px;overflow:hidden;background:var(--bg3);border:1px solid var(--border3)}
-.shsum-c{padding:13px 8px;text-align:center}
+.shsum-c{padding:13px 8px;text-align:center;cursor:pointer}
+.shsum-c:active{background:var(--card2)}
 .shsum-c + .shsum-c{box-shadow:inset 1px 0 0 var(--border2)}
 .shsum-c b{display:block;font-family:'Space Grotesk',sans-serif;font-size:20px;
   font-weight:700;line-height:1;color:var(--text);font-variant-numeric:tabular-nums}
@@ -794,6 +805,12 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   align-items:center;justify-content:center;color:var(--muted);background:var(--card2)}
 .shx.ok .shx-i{color:#3ddc84;background:rgba(61,220,132,.12)}
 .shx.ok .shx-t,.shx.ok .shx-s{opacity:.55}
+.shx.ok .shx-t{color:#3ddc84}
+/* Условие, которое держит закрытие, — красным целиком: это не «ещё не», а
+   «нельзя, пока». Зелёное и красное различают не глядя на подпись. */
+.shx.no{border-color:rgba(224,85,85,.4)}
+.shx.no .shx-i{color:#E05555;background:rgba(224,85,85,.12)}
+.shx.no .shx-t{color:#E05555}
 .shx-b{flex:1;min-width:0}
 .shx-t{display:block;font-size:14px;font-weight:700;line-height:1.3}
 .shx-s{display:block;font-size:12.5px;line-height:1.45;color:var(--muted);margin-top:5px}
@@ -812,12 +829,14 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    выглядит как «нельзя»: тихий контур, а не испачканное золото. */
 .shbtn .btn:disabled{opacity:1;background:none;color:var(--dim);
   border:1px solid var(--border3)}
-.shsp{height:96px}
-/* «Проверить ещё раз» — не действие наравне с закрытием смены, а способ
-   перечитать то же самое. Ссылкой, а не второй кнопкой такого же роста. */
-.shx-alt{display:block;margin:10px auto 0;padding:6px 10px;border:none;background:none;
-  cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:600;color:var(--muted)}
-.shx-alt:active{color:var(--gold2)}
+/* «Обновить» — кнопка в полный рост, а не ссылка серым: оператор закрывает
+   день, водитель ждёт этого на экране и должен видеть, чем перечитать. */
+.shx-alt{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;
+  margin-top:8px;padding:14px 12px;border-radius:14px;cursor:pointer;font-family:inherit;
+  font-size:14px;font-weight:700;color:var(--gold2);background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.35)}
+.shx-alt:active{transform:scale(.98)}
+.shsp{height:156px}
 /* ── ИНСТРУКЦИЯ ПО ШАГАМ ────────────────────────────────────────────────────
    Строка шагов над кнопкой отвечает тому, кто уже включал и просто забыл
    порядок. Тому, кто видит это впервые, она не отвечает никак: он не знает,
@@ -2327,7 +2346,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
   <button class="tb" data-tab="supply" onclick="setTab('supply')">
     <span class="tb-ic"><svg viewBox="0 0 24 24"><path d="M3 7l9-4 9 4v10l-9 4-9-4z"/><path d="M3 7l9 4 9-4"/><path d="M12 11v10"/></svg>
       <span class="tb-badge" id="tbSup" style="display:none">0</span></span>
-    <span>Товар</span>
+    <span>Закупка</span>
   </button>
   <button class="tb" data-tab="history" onclick="setTab('history')">
     <span class="tb-ic"><svg viewBox="0 0 24 24"><path d="M3 3v5h5"/><path d="M3.5 8a9 9 0 1 0 2.2-3.4L3 8"/><path d="M12 7v5l3 2"/></svg></span>
@@ -2600,7 +2619,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
     <div class="shscr-s" id="shS">Пока смена закрыта, заказы не приходят</div>
     <div id="shList"></div>
     <button class="btn btn-pri shscr-go" id="shGo" onclick="shOpen()">Открыть смену</button>
-    <button class="shscr-alt" id="shAlt" onclick="shLoad(true)">Проверить ещё раз</button>
+    <button class="shscr-alt" id="shAlt" onclick="shLoad(true)">Обновить</button>
   </div>
 </div>
 
@@ -2941,6 +2960,7 @@ const ICO = {
   info: '<circle cx="12" cy="12" r="9"/><path d="M12 11.5v4.5M12 8h.01"/>',
   search:'<circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/>',
   close:'<path d="M6 6l12 12M18 6L6 18"/>',
+  refresh:'<path d="M3 3v5h5"/><path d="M3.5 8a9 9 0 1 0 2.2-3.4L3 8"/>',
   chat: '<path d="M20 14a2 2 0 0 1-2 2H8l-4 3.5V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2z"/>',
   chev: '<path d="M6 9l6 6 6-6"/>',
   // Вправо — своей записью: chev объявлен дважды, и «вниз» перебивает «вправо».
@@ -3685,6 +3705,11 @@ async function shClose(){
     try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
     return;
   }
+  if(!SH.day_closed){
+    toast('Оператор ещё не закрыл день — смену закрыть нельзя', 'err');
+    try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+    return;
+  }
   ASK = {t:'Закрыть смену?', s:'Заказы больше не придут, и отметить по ним ничего '
         + 'будет нельзя. Если закрыли по ошибке — откройте снова, пока идёт трансляция.',
         btn:'Закрыть смену', fn: shCloseGo};
@@ -3700,6 +3725,7 @@ async function shCloseGo(){
   }catch(e){
     const p = e.payload || {};
     const msg = p.error === 'expenses_left' ? 'Сначала ответьте по расходам'
+              : p.error === 'day_open' ? 'Оператор ещё не закрыл день — смену закрыть нельзя'
               : p.error === 'orders_in_route'
                 ? `У вас ${(p.ids||[]).length} ${plural((p.ids||[]).length,'заказ','заказа','заказов')} в пути — сначала отметьте доставку`
                 : 'Не получилось';
@@ -4908,23 +4934,32 @@ function renderShift(){
   const вСмене = мин >= 60 ? `${Math.floor(мин/60)} ч ${String(мин%60).padStart(2,'0')}`
                            : `${мин} мин`;
 
-  const row = (ok, t, sub, action) => `
-    <div class="shx ${ok ? 'ok' : ''}">
-      <span class="shx-i">${svg(ok ? ICO.ok : ICO.clock, 13)}</span>
+  // Строка условия. В открытой смене всё, что держит закрытие, — красным, а
+  // не серым «ещё не»: зелёное и красное различают не читая.
+  const row = (ok, t, sub, action, hard) => `
+    <div class="shx ${ok ? 'ok' : (hard ? 'no' : '')}">
+      <span class="shx-i">${svg(ok ? ICO.ok : (hard ? ICO.close : ICO.clock), 13)}</span>
       <span class="shx-b"><span class="shx-t">${t}</span>
         <span class="shx-s">${sub}</span></span>
       ${action || ''}
     </div>`;
 
+  // Закрыть можно, когда оператор закрыл день, расходы отвечены и ничего не
+  // едет. Кнопка нажимается всегда — shClose сам скажет, что мешает.
+  const canClose = on && !!SH.day_closed && !must.length && !(SH.in_route||[]).length;
+
   box.innerHTML = `
     <div class="shd ${on ? 'live' : ''}">
-      <span class="shd-t">${stat.t}</span>
-      <span class="shd-s">${stat.s}</span>
+      <span class="shd-b">
+        <span class="shd-t">${stat.t}</span>
+        <span class="shd-s">${stat.s}</span>
+      </span>
+      ${on ? `<button class="shd-close ${canClose ? 'ok' : ''}" onclick="shClose()">Закрыть смену</button>` : ''}
     </div>
 
     ${on ? `<div class="shsum">
-      <div class="shsum-c"><b>${done}</b><i>доставлено</i></div>
-      <div class="shsum-c"><b>${fmt(spent)}</b><i>расход, AED</i></div>
+      <div class="shsum-c" onclick="setTab('history')"><b>${done}</b><i>доставлено</i></div>
+      <div class="shsum-c" onclick="setTab('expenses')"><b>${fmt(spent)}</b><i>расход, AED</i></div>
       <div class="shsum-c"><b>${вСмене}</b><i>в смене</i></div>
     </div>` : ''}`
     /* «Трансляция: да» отсюда убрана. Пока смена не открыта, про геопозицию
@@ -4935,16 +4970,20 @@ function renderShift(){
     <div class="sect"><span class="sect-t">${on ? 'Чтобы закрыть' : 'Чтобы открыть'}</span></div>
     ${on
       ? row(!must.length, 'Расходы за день',
-            must.length ? `не отвечено: ${esc(mustNames.toLowerCase())}` : 'отвечено',
-            must.length ? `<button class="shx-go" onclick="setTab('expenses')">Заполнить</button>` : '')
+            must.length ? `не отвечено: ${esc(mustNames.toLowerCase())}` : 'заполнены',
+            must.length ? `<button class="shx-go" onclick="setTab('expenses')">Заполнить</button>` : '',
+            true)
+        + row(!!SH.day_closed, 'Оператор закрыл смену',
+            SH.day_closed ? 'день района закрыт' : 'пока оператор не закрыл день, смену не закрыть',
+            '', true)
       : row(SH.working === true, 'Оператор отметил вас',
             SH.working === true ? 'отмечено'
               : SH.working === false ? 'сегодня выходной'
-              : 'оператор отмечает бригаду в начале смены')}
-    ${on ? '' : row(!!geo.stream, 'Геопозиция',
-          geo.stream ? (geo.endless ? 'транслируется и не кончится сама' : 'транслируется')
-                     : 'оператор не видит, где вы',
-          geo.stream ? '' : `<button class="shx-go" onclick="tutOpen()">Как включить</button>`)}
+              : 'оператор отмечает бригаду в начале смены')
+        + row(!!geo.stream, 'Геопозиция',
+            geo.stream ? (geo.endless ? 'транслируется и не кончится сама' : 'транслируется')
+                       : 'оператор не видит, где вы',
+            geo.stream ? '' : `<button class="shx-go" onclick="tutOpen()">Как включить</button>`)}
 
     ${on && (SH.in_route||[]).length
       ? row(false, 'Заказы в пути',
@@ -4954,14 +4993,10 @@ function renderShift(){
 
     <div class="shsp"></div>
     <div class="shbtn">
-      ${on
-        ? `<button class="btn btn-pri"
-             ${(must.length || (SH.in_route||[]).length) ? 'disabled' : ''}
-             onclick="shClose()">Закрыть смену</button>`
-        : `<button class="btn btn-pri"
+      ${on ? '' : `<button class="btn btn-pri"
              ${(SH.working === true && geo.ok) ? '' : 'disabled'}
              onclick="shOpen()">${SH.closed ? 'Открыть смену снова' : 'Открыть смену'}</button>`}
-      <button class="shx-alt" onclick="shLoad(true)">Проверить ещё раз</button>
+      <button class="shx-alt" onclick="shLoad(true)">${svg(ICO.refresh, 15)} Обновить</button>
     </div>`;
 }
 
@@ -4998,6 +5033,9 @@ function renderExpenses(){
         ${expKindCards()}`
       : `<button class="exp-add" onclick="EXP_MORE=true;render()">
           ${svg(ICO.plus2, 15)} Ещё расход</button>`}
+    <!-- Бой и брак — тоже потеря за смену, и искать её на «Закупке» водитель
+         не должен: списание открывается отсюда тем же листом. -->
+    <button class="exp-add" onclick="woOpen()">${svg(ICO.trash, 15)} Списать бой или брак</button>
 
     <div class="exp-sp"></div>
     <div class="exp-bar"><div class="exp-bar-in">

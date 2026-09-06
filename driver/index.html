@@ -1173,6 +1173,45 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
    приняли бутылки, — и должно этим отличаться, иначе читается как сегодняшнее. */
 .sup.stale{border-color:rgba(243,180,74,.35)}
 .sup-old{color:var(--warn);font-weight:600}
+/* Карточка задачи в новом виде — та же, что у старшего в панели. */
+.dcard{border-radius:16px;background:var(--card);border:1px solid var(--border2);
+  padding:12px 14px 12px;margin-bottom:10px}
+.dcard.mine{border-color:rgba(201,169,110,.4)}
+.dcard.stale{border-color:rgba(243,180,74,.35)}
+.dcard-h{display:flex;align-items:center;gap:12px}
+.dcode{flex-shrink:0;width:44px;height:44px;border-radius:13px;display:flex;align-items:center;
+  justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
+  color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.3)}
+.dcard-b{flex:1;min-width:0}
+.dcard-b b{display:block;font-size:16px;font-weight:700;line-height:1.2;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.dcard-b i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:3px}
+.dcard-n{flex-shrink:0;text-align:right;font-family:'Space Grotesk',sans-serif;font-size:24px;
+  font-weight:700;line-height:1;color:var(--gold2)}
+.dcard-n i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;
+  color:var(--muted);margin-left:4px}
+.dbar{margin-top:12px}
+.dfold{display:flex;align-items:center;justify-content:space-between;width:100%;
+  padding:12px 2px 10px;border:0;background:none;cursor:pointer;font-family:inherit;font-size:12.5px;
+  font-weight:600;color:var(--sub);text-align:left}
+.dfold svg{width:16px;height:16px;fill:none;stroke:var(--muted);stroke-width:2.2;
+  stroke-linecap:round;stroke-linejoin:round;transition:transform .18s ease}
+.dfold.on svg{transform:rotate(180deg)}
+.dfold.on{color:var(--gold2)}
+.dfold-b{margin-bottom:6px}
+.dpl{display:flex;align-items:center;gap:12px;padding:9px 0;border-top:1px solid var(--border2)}
+.dimg{width:40px;height:40px;border-radius:10px;object-fit:cover;flex-shrink:0;background:var(--card2)}
+.dpl-n{flex:1;min-width:0;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.dpl-q{flex-shrink:0;min-width:34px;height:30px;padding:0 9px;border-radius:10px;display:flex;
+  align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:15px;
+  font-weight:800;color:#1a1408;background:linear-gradient(135deg,#E8C98A,#C9A96E)}
+.dpl-q u{text-decoration:none;font-size:11px;font-weight:600;opacity:.7}
+.dpl.ok .dpl-q{background:rgba(61,220,132,.18);color:#3ddc84}
+.dc-btn{width:100%;margin-top:6px;padding:13px;border-radius:12px;border:0;cursor:pointer;
+  font-family:inherit;font-size:14px;font-weight:700;color:#1a1408;
+  background:linear-gradient(135deg,#E8C98A,#C9A96E)}
+.dc-btn:active{transform:scale(.985)}
 .sup-tag{display:inline-block;vertical-align:2px;margin-left:4px;padding:1px 6px;border-radius:6px;
   font-size:9.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;max-width:110px;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
@@ -5835,37 +5874,54 @@ function supWhen(t){
 // Карточка задачи. Взятая мной и свободная — одна и та же карточка с разным
 // подвалом: это одна и та же работа на разных стадиях, и перерисовывать её
 // другим макетом значит заставлять искать глазами то же самое заново.
+// Карточка задачи — как в панели у старшего: код района в квадрате, название,
+// кто и сколько, золотое число справа. Позиции с картинками — под флажком:
+// в основной заявке их десятки, разворачивают по одной карточке; в заявке
+// на базу их мало, и они раскрыты сразу. Кнопка — внизу карточки во всю
+// ширину: «Взять» у свободной, «Продолжить приёмку» у своей.
+let SUP_FOLD = new Set();
+function supFold(k){
+  if(SUP_FOLD.has(k)) SUP_FOLD.delete(k); else SUP_FOLD.add(k);
+  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+  render();
+}
 function supCard(t){
   const pct = t.need ? Math.round(t.got / t.need * 100) : 0;
   const started = t.got > 0;
-  // Подпись под названием отвечает ровно на один вопрос за раз: пока не начали —
-  // сколько там позиций; начали — сколько уже принято. Всё сразу превращает
-  // строку в отчёт, который читать некогда.
-  // У незаконченной сначала числа, потом дата: «незакончено с 15.08 · принято…»
-  // обрывалось ровно там, где начиналось главное. Что задача старая, видно и
-  // так — по цвету строки.
-  const низ = t.stale
-    ? `принято ${fmt(t.got)} из ${fmt(t.need)} · <span class="sup-old">с ${
-         esc(supWhen(t).split(' · ')[0])}</span>`
-    : started
-      ? `принято ${fmt(t.got)} из ${fmt(t.need)}`
-      : `${t.positions} ${plural(t.positions,'позиция','позиции','позиций')}`;
+  const key = t.supply_id + '/' + t.district;
+  const open = t.extra ? !SUP_FOLD.has(key) : SUP_FOLD.has(key);
+  const lines = t.lines || [];
+  const sub = t.stale
+    ? `незакончено <span class="sup-old">с ${esc(supWhen(t).split(' · ')[0])}</span>`
+    : t.mine ? (started ? 'ваша приёмка идёт' : 'ваша приёмка')
+    : 'свободна';
   const число = started
-    ? `${fmt(t.left)}<i>осталось</i>`
+    ? `${fmt(t.got)}<i>/ ${fmt(t.need)}</i>`
     : `${fmt(t.need)}<i>бут.</i>`;
-  return `<div class="sup ${t.mine ? 'mine' : ''} ${t.stale ? 'stale' : ''}"
-       ${t.mine ? `onclick="supOpen('${t.supply_id}','${t.district}')"` : ''}>
-    <span class="sup-code">${esc(t.district_code)}</span>
-    <span class="sup-b">
-      <span class="sup-n">${esc(t.district_name)}${t.extra ? ` <span class="sup-tag">${esc(t.base || 'доп')}</span>` : ''}</span>
-      <span class="sup-s">${низ}</span>
-      ${started ? `<span class="sup-bar"><i style="width:${pct}%"></i></span>` : ''}
-    </span>
-    <span class="sup-v">${число}</span>
+  const list = lines.map(l => `<div class="dpl ${l.left ? '' : 'ok'}">
+      <img class="dimg" src="/products/${esc(l.id)}.webp" alt="" loading="lazy"
+           onerror="this.style.visibility='hidden'">
+      <span class="dpl-n">${esc(l.name)}</span>
+      <span class="dpl-q">${l.got ? `${l.got}<u>/${l.need}</u>` : l.need}</span>
+    </div>`).join('');
+  return `<div class="dcard ${t.mine ? 'mine' : ''} ${t.stale ? 'stale' : ''}">
+    <div class="dcard-h">
+      <span class="dcode">${esc(t.district_code)}</span>
+      <span class="dcard-b"><b>${esc(t.district_name)}${t.extra
+          ? ` <span class="sup-tag">${esc(t.base || 'доп')}</span>` : ''}</b><i>${sub}</i></span>
+      <span class="dcard-n">${число}</span>
+    </div>
+    ${started ? `<span class="sup-bar dbar"><i style="width:${pct}%"></i></span>` : ''}
+    <button class="dfold ${open ? 'on' : ''}" onclick="supFold('${esc(key)}')">
+      <span>${lines.length} ${plural(lines.length,'позиция','позиции','позиций')}${
+        started && t.left ? ` · осталось ${fmt(t.left)}` : ''}</span>
+      <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    ${open ? `<div class="dfold-b">${list}</div>` : ''}
     ${t.mine
-      ? `<span class="sup-go">${svg(ICO.chevR, 18)}</span>`
-      : `<button class="sup-take"
-           onclick="event.stopPropagation();supClaim('${t.supply_id}','${t.district}')">Взять</button>`}
+      ? `<button class="dc-btn" onclick="supOpen('${t.supply_id}','${t.district}')">${
+          started ? 'Продолжить приёмку' : 'Начать приёмку'}</button>`
+      : `<button class="dc-btn" onclick="supClaim('${t.supply_id}','${t.district}')">Взять</button>`}
   </div>`;
 }
 

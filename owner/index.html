@@ -2104,8 +2104,37 @@ button.path:active{transform:scale(.995)}
 .xs-cats .xs-chip{flex-shrink:0;white-space:nowrap}
 .xs-chip i{font-style:normal;font-size:11px;color:var(--muted);margin-left:2px}
 .xs-chip.on i{color:var(--gold2);opacity:.7}
-.xr-img{width:36px;height:36px;border-radius:9px;object-fit:cover;flex-shrink:0;
-  background:var(--card2);margin:-4px 0}
+/* Район — крупно, с кодом в квадрате слева: на каждом экране второго шага
+   первым делом видно, куда сейчас набирают. */
+.xs-dh{display:flex;align-items:center;gap:12px;margin:4px 0 12px}
+.xs-dh .xs-h{margin:0}
+.xs-dc{flex-shrink:0;width:44px;height:44px;border-radius:13px;display:flex;align-items:center;
+  justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
+  color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.3)}
+/* Плитки — как у операторов: картинка, название, цена; тап по картинке
+   кладёт одну, «−» и «+» встают по бокам от цены, число — в бейдже. */
+.xg{display:grid;grid-template-columns:repeat(2,1fr);gap:10px;padding-bottom:8px}
+.xt{position:relative;background:var(--card);border:1px solid var(--border2);border-radius:14px;
+  padding:0 0 11px;display:flex;flex-direction:column;overflow:hidden;text-align:left}
+.xt-img{width:100%;aspect-ratio:1.3;background:var(--card2);overflow:hidden;margin-bottom:8px;cursor:pointer}
+.xt-img img{width:100%;height:100%;object-fit:cover;display:block}
+.xt-img:active{opacity:.75}
+.xt-nm{font-size:13px;font-weight:600;line-height:1.3;padding:0 10px;display:-webkit-box;
+  -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.xt-bot{display:flex;align-items:center;gap:6px;padding:0 8px;margin-top:6px}
+.xt-info{flex:1;min-width:0}
+.xt-bot:has(.xt-b) .xt-info{text-align:center}
+.xt-bot:has(.xt-b) .xt-pr small{display:none}
+.xt-pr{font-size:15px;font-weight:700;color:var(--gold2);font-family:'Space Grotesk',sans-serif;
+  white-space:nowrap;padding-left:2px}
+.xt-pr small{font-size:10px;color:var(--muted);font-weight:500}
+.xt-b{width:33px;height:33px;border-radius:10px;background:var(--card2);border:1px solid var(--border3);
+  color:var(--gold2);font-size:18px;font-weight:700;display:flex;align-items:center;justify-content:center;
+  user-select:none;cursor:pointer;flex-shrink:0}
+.xt-b:active{transform:scale(.86);background:var(--gold-soft);border-color:rgba(201,169,110,.5)}
+.xt-q{position:absolute;top:6px;left:6px;z-index:2;min-width:26px;height:26px;padding:0 7px;
+  border-radius:13px;background:linear-gradient(135deg,#E8C98A,#C9A96E);color:#1a1408;font-size:13px;
+  font-weight:800;display:flex;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.5)}
 .qb:disabled{opacity:.35;box-shadow:none;transform:none}
 
 .sup-short{padding:14px;border-radius:15px;background:var(--card);
@@ -16132,7 +16161,7 @@ async function xOpen(sid){
 let XS = null;
 
 async function xNew(){
-  XS = {step: 1, base: '', q: '', cat: '', open: '', rows: {}, dist: null, all: null, order: {}};
+  XS = {step: 1, di: 0, base: '', q: '', cat: '', rows: {}, dist: null, all: null, order: {}};
   document.getElementById('accAct').innerHTML = '';
   xRender();
   xLoad();
@@ -16175,9 +16204,14 @@ async function xLoad(){
   if(XS && XS.step === 2) xRender();
 }
 
+// Назад идёт по тем же шагам, что и вперёд: с итога — на последний район,
+// с района — на предыдущий, с первого района — на базу.
 function xBack(){
   if(!XS){ accExtra(); return; }
-  if(XS.step > 1){ XS.step--; XS.q = ''; XS.open = ''; xRender(); return; }
+  XS.q = ''; XS.cat = '';
+  if(XS.step === 3){ XS.step = 2; XS.di = Math.max(0, (XS.dist || []).length - 1); xRender(); return; }
+  if(XS.step === 2 && XS.di > 0){ XS.di--; xRender(); return; }
+  if(XS.step === 2){ XS.step = 1; xRender(); return; }
   XS = null; accExtra();
 }
 
@@ -16189,9 +16223,14 @@ function xRender(){
   if(!XS) return;
   ACC_BACK = xBack;
   const s = XS.step;
+  const dist = XS.dist || [];
+  // Полоска на каждый шаг: база, по одной на район, итог.
+  const nSteps = 2 + Math.max(1, dist.length);
+  const cur = s === 1 ? 1 : s === 2 ? 2 + XS.di : nSteps;
   _setText('accTitle', 'Новая заявка');
-  _setText('accSub', `шаг ${s} из 3`);
-  const steps = `<div class="xs-steps">${[1, 2, 3].map(i => `<span class="${i <= s ? 'on' : ''}"></span>`).join('')}</div>`;
+  _setText('accSub', s === 2 && dist.length ? `район ${XS.di + 1} из ${dist.length}` : `шаг ${cur} из ${nSteps}`);
+  const steps = `<div class="xs-steps">${Array.from({length: nSteps}, (_, i) =>
+    `<span class="${i + 1 <= cur ? 'on' : ''}"></span>`).join('')}</div>`;
   const mid = document.getElementById('accMid');
   if(s === 1){
     const recent = [...new Set(_xList().map(x => x.base).filter(Boolean))].slice(0, 8);
@@ -16204,15 +16243,20 @@ function xRender(){
         `<button class="xs-chip ${b === XS.base.trim() ? 'on' : ''}" onclick="xBase('${escS(b)}')">${escS(b)}</button>`).join('')}</div>` : ''}`;
     setTimeout(() => { const e = document.getElementById('xsBase'); if(e && !XS.base) e.focus(); }, 80);
   }else if(s === 2){
-    mid.innerHTML = steps + `<div class="xs-h">Что везём?</div>
+    // Один район за раз: старший видит, куда сейчас набирает, а не держит
+    // пять колонок в голове. Плитки — как заказ у операторов: тап по
+    // картинке кладёт одну, «−» и «+» у цены правят число.
+    const d = dist[XS.di] || {code: '', name: ''};
+    mid.innerHTML = steps + `<div class="xs-dh"><span class="xs-dc">${escS(d.code)}</span>
+        <span class="xs-h">${escS(d.name)}</span></div>
       <div class="ord-find">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
-        <input id="xsQ" type="search" placeholder="Найти позицию" value="${escS(XS.q)}" oninput="xSearch(this.value)">
+        <input id="xsQ" type="search" placeholder="Поиск по названию…" value="${escS(XS.q)}" oninput="xSearch(this.value)">
         <button class="ord-find-x" id="xsQX" onclick="xSearch('')" aria-label="Очистить"
                 style="${XS.q.trim() ? '' : 'display:none'}">✕</button>
       </div>
       <div class="xs-cats" id="xsCats">${xCats()}</div>
-      <div id="xsList">${xList()}</div>`;
+      <div class="xg" id="xsGrid" onclick="xGridTap(event)">${xGrid()}</div>`;
   }else{
     const byD = {};
     Object.values(XS.rows).forEach(r => Object.entries(r.by).forEach(([o, n]) => { if(n > 0) byD[o] = (byD[o] || 0) + n; }));
@@ -16242,58 +16286,49 @@ function xCats(){
   return chip('Все', all.length, !XS.cat) + cats.map(k => chip(k.c, k.n, XS.cat === k.c)).join('');
 }
 
-// Список второго шага — весь каталог, чтобы забивать заявку руками, как
-// заказ у операторов. Пока ищут — найденное; иначе сверху то, что уже в
-// заявке, ниже каталог выбранной полки. Перерисовывается сам по себе, чтобы
-// поле поиска не теряло курсор.
-function xList(){
+// Сетка второго шага — весь каталог плитками, как заказ у операторов. Пока
+// ищут — найденное; иначе выбранная полка. Число на плитке — сколько уже
+// набрано в этот район.
+function xCur(){ return ((XS.dist || [])[XS.di] || {}).id || ''; }
+function xQtyAt(pid){ const r = XS.rows[pid]; return r ? (r.by[xCur()] || 0) : 0; }
+function xDistTotal(){ const o = xCur(); return Object.values(XS.rows).reduce((a, r) => a + (r.by[o] || 0), 0); }
+
+function xGrid(){
+  if(!XS.all) return `<div class="xs-hint" style="grid-column:1/-1">Загрузка…</div>`;
   const q = XS.q.trim().toLowerCase();
-  const all = XS.all || [];
-  if(!XS.all) return `<div class="xs-hint">Загрузка…</div>`;
-  const inReq = Object.entries(XS.rows).filter(([, r]) => xQty(r) > 0);
-  if(q){
-    const found = all.filter(r => r.name.toLowerCase().includes(q)).slice(0, 40);
-    return `<div class="exp-grp">Найдено · ${found.length}</div>${found.length
-      ? found.map(r => xRow(r.id, r.name)).join('')
-      : '<div class="exp-empty">Ничего не нашлось</div>'}`;
-  }
-  const list = XS.cat ? all.filter(r => (r.cat || '—') === XS.cat) : all;
-  return (inReq.length && !XS.cat
-      ? `<div class="exp-grp">В заявке · ${inReq.length}</div>${inReq.map(([id, r]) => xRow(id, r.name)).join('')}` : '')
-    + `<div class="exp-grp">${XS.cat ? escS(XS.cat) : 'Каталог'} · ${list.length}</div>`
-    + (list.length ? list.map(r => xRow(r.id, r.name)).join('') : '<div class="exp-empty">Пусто</div>');
+  const list = (XS.all || []).filter(r => (!XS.cat || (r.cat || '—') === XS.cat)
+                                       && (!q || r.name.toLowerCase().includes(q)));
+  return list.map(xTile).join('')
+    || `<div class="xs-hint" style="grid-column:1/-1">Ничего не найдено</div>`;
+}
+
+function xTile(r){
+  const n = xQtyAt(r.id);
+  const unit = r.unit > 1 ? `<small>/ ${escS(r.unit_name || 'ящик')}</small>` : '<small>AED</small>';
+  return `<div class="xt" data-pid="${escS(r.id)}">
+    ${n ? `<span class="xt-q">${n}</span>` : ''}
+    <div class="xt-img"><img src="/products/${escS(r.id)}.webp" alt="" loading="lazy"
+         onerror="this.style.visibility='hidden'"></div>
+    <div class="xt-nm">${escS(r.name)}</div>
+    <div class="xt-bot">${n ? '<span class="xt-b" data-d="-1">−</span>' : ''}
+      <div class="xt-info"><div class="xt-pr">${fmt(r.price || 0)} ${unit}</div></div>
+      ${n ? '<span class="xt-b" data-d="1">+</span>' : ''}</div>
+  </div>`;
+}
+
+// Один обработчик на сетку: «−»/«+» — шаг, картинка — плюс один.
+function xGridTap(e){
+  const b = e.target.closest && e.target.closest('.xt-b');
+  if(b){ const t = b.closest('.xt'); if(t) xStep(t.dataset.pid, +b.dataset.d); return; }
+  const img = e.target.closest && e.target.closest('.xt-img');
+  if(img){ const t = img.closest('.xt'); if(t) xStep(t.dataset.pid, 1); }
 }
 
 function xCat(c){
-  XS.cat = c === 'Все' ? '' : c; XS.open = '';
+  XS.cat = c === 'Все' ? '' : c;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   const el = document.getElementById('xsCats'); if(el) el.innerHTML = xCats();
-  xPaintList();
-}
-
-function xRow(id, name){
-  const r = XS.rows[id] || {name, by: {}};
-  const open = XS.open === id;
-  const dist = XS.dist || [];
-  const q = xQty(r);
-  return `<div class="ord-r${open ? ' open' : ''}${q ? '' : ' zero'}">
-    <button class="ord-r-h" onclick="xToggle('${escS(id)}')">
-      <img class="xr-img" src="/products/${escS(id)}.webp" alt="" loading="lazy"
-           onerror="this.style.visibility='hidden'">
-      <span class="ord-r-n">${escS(name)}</span>
-      <span class="ord-r-d">${dist.filter(x => r.by[x.id]).map(x => `${x.code}·${r.by[x.id]}`).join(' ')}</span>
-      <span class="ord-r-v${q ? ' gold' : ''}">${q || ''}</span>
-      <span class="ord-r-go">${open ? '⌄' : '›'}</span>
-    </button>
-    ${open ? `<div class="ord-r-b">${dist.map(x => `<div class="ord-c">
-        <span class="ord-c-n"><b>${x.code}</b> ${escS(x.name)}</span>
-        <span class="ord-st">
-          <button onclick="xStep('${escS(id)}','${x.id}',-1)" aria-label="Меньше">−</button>
-          <input inputmode="numeric" value="${r.by[x.id] || 0}" onfocus="this.select()"
-                 onchange="xSet('${escS(id)}','${x.id}',this.value)">
-          <button onclick="xStep('${escS(id)}','${x.id}',1)" aria-label="Больше">+</button>
-        </span></div>`).join('')}</div>` : ''}
-  </div>`;
+  xPaintGrid();
 }
 
 function xEnsure(id){
@@ -16303,51 +16338,65 @@ function xEnsure(id){
   }
   return XS.rows[id];
 }
-function xPaintList(){
-  const el = document.getElementById('xsList');
-  if(el) el.innerHTML = xList(); else xRender();
+function xPaintGrid(){
+  const el = document.getElementById('xsGrid');
+  if(el){ el.innerHTML = xGrid(); el.scrollIntoView && null; } else xRender();
   xFoot();
 }
-function xToggle(id){
-  XS.open = XS.open === id ? '' : id;
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  xPaintList();
-}
-function xStep(id, oid, d){
-  const r = xEnsure(id);
-  r.by[oid] = Math.max(0, (r.by[oid] || 0) + d);
-  if(!r.by[oid]) delete r.by[oid];
-  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
-  xPaintList();
-}
-function xSet(id, oid, v){
-  const r = xEnsure(id);
-  const n = Math.max(0, parseInt(String(v).replace(/\D/g, ''), 10) || 0);
-  if(n) r.by[oid] = n; else delete r.by[oid];
-  xPaintList();
+// Плюс-минус правит одну плитку на месте: перерисовка всей сетки
+// перезагружала бы каждую картинку на каждое нажатие.
+function xStep(id, d){
+  const r = xEnsure(id), o = xCur();
+  r.by[o] = Math.max(0, (r.by[o] || 0) + d);
+  if(!r.by[o]) delete r.by[o];
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+  const t = document.querySelector(`.xt[data-pid="${CSS.escape(id)}"]`);
+  const row = (XS.all || []).find(x => x.id === id);
+  if(t && row){ t.outerHTML = xTile(row); }
+  xFoot();
 }
 function xSearch(v){
-  XS.q = v || ''; XS.open = '';
+  XS.q = v || '';
   const x = document.getElementById('xsQX'); if(x) x.style.display = XS.q.trim() ? '' : 'none';
   const i = document.getElementById('xsQ'); if(i && i.value !== XS.q) i.value = XS.q;
-  xPaintList();
+  xPaintGrid();
+}
+// «На этот район ничего не надо»: район пропускается пустым и не держит путь.
+function xSkip(){
+  const o = xCur();
+  Object.values(XS.rows).forEach(r => { delete r.by[o]; });
+  xNext(true);
 }
 function xBase(b){ XS.base = b; xRender(); }
-function xNext(){
-  if(XS.step === 1 && !XS.base.trim()) return;
-  if(XS.step === 2 && !xTotal()) return;
-  XS.step++; XS.q = ''; XS.open = '';
+function xNext(skip){
+  if(XS.step === 1){ if(!XS.base.trim()) return; XS.step = 2; XS.di = 0; }
+  else if(XS.step === 2){
+    if(!skip && !xDistTotal()) return;
+    if(XS.di < (XS.dist || []).length - 1) XS.di++;
+    else { if(!xTotal()){ _toast('В заявке пусто — отметьте товар хотя бы на один район'); return; } XS.step = 3; }
+  }
+  XS.q = ''; XS.cat = '';
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
   xRender();
+  const m = document.getElementById('accMid'); if(m) m.scrollTop = 0;
 }
 
 function xFoot(){
   if(!XS) return;
-  const s = XS.step, total = xTotal();
-  const ok = s === 1 ? !!XS.base.trim() : total > 0;
+  const s = XS.step;
+  if(s === 2){
+    const n = xDistTotal();
+    const last = XS.di >= (XS.dist || []).length - 1;
+    const word = last ? 'К итогу' : 'Дальше';
+    document.getElementById('accFoot').innerHTML = `<div class="qb-wrap">
+      ${n ? `<button class="qb" id="xsGo" onclick="xNext()">${word} · ${fmt(n)} ${pluralize(n,'бутылка','бутылки','бутылок')}</button>`
+          : `<button class="qb qb-ghost qb-wide" id="xsGo" onclick="xSkip()">На этот район ничего не надо</button>`}</div>`;
+    return;
+  }
+  const ok = s === 1 ? !!XS.base.trim() : xTotal() > 0;
   document.getElementById('accFoot').innerHTML = `<div class="qb-wrap">
     <button class="qb" id="xsGo" ${ok ? '' : 'disabled'} onclick="${s === 3 ? 'xCreate()' : 'xNext()'}">${
-      s === 3 ? 'Создать заявку' : (s === 2 && total ? `Дальше · ${fmt(total)}` : 'Дальше')}</button></div>`;
+      s === 3 ? 'Создать заявку' : 'Дальше'}</button></div>`;
 }
 
 async function xCreate(){

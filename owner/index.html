@@ -2009,6 +2009,36 @@ button.path:active{transform:scale(.995)}
   font-family:inherit;font-size:11.5px;font-weight:600;color:var(--muted);
   background:var(--card2);border:1px solid var(--border2)}
 .rt-rel:active{color:var(--dn);border-color:rgba(224,85,85,.35)}
+/* Действие района. «Взять на себя» — золотом: это единственная кнопка на
+   экране, после которой человек садится в машину. «Отдать» рядом остаётся
+   служебной, поэтому веса ей не добавляем. */
+.rt-acts{display:flex;gap:7px;margin-top:10px}
+.rt-acts .rt-rel{margin-top:0}
+.rt-take{flex:1;padding:8px 12px;border-radius:9px;cursor:pointer;
+  font-family:inherit;font-size:11.5px;font-weight:700;color:#1a1408;border:0;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.rt-take:active{transform:scale(.985)}
+/* Строка приёмки: позиция, сколько взято и сколько надо. Добранная гаснет и
+   перестаёт нажиматься — сканировать по ней больше нечего. */
+.rl{display:flex;align-items:center;gap:12px;width:100%;padding:13px 14px;
+  margin-bottom:7px;border-radius:14px;cursor:pointer;font-family:inherit;
+  text-align:left;color:var(--text);background:var(--card);
+  border:1px solid var(--border2)}
+.rl:active{transform:scale(.995)}
+.rl.done{opacity:.45;pointer-events:none}
+.rl-b{flex:1;min-width:0}
+.rl-n{display:block;font-size:13.5px;font-weight:600;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.rl-s{display:block;font-size:11.5px;color:var(--muted);margin-top:3px}
+.rl-v{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:16px;
+  font-weight:700;color:var(--gold2)}
+.rl-v i{font-style:normal;font-size:12px;font-weight:600;color:var(--muted)}
+.rcv-gaps{margin-bottom:12px;padding:11px 13px;border-radius:13px;
+  background:var(--card2);border:1px solid var(--border2)}
+.rcv-gap{display:flex;align-items:center;justify-content:space-between;gap:10px;
+  font-size:12.5px;color:var(--sub);padding:4px 0}
+.rcv-gap b{font-weight:700;color:var(--dn);white-space:nowrap}
+.rcv-gap-more{font-size:11.5px;color:var(--muted);padding-top:4px}
 
 /* ── Поставка ───────────────────────────────────────────────────────────── */
 /* Те же три числа, что и в заявке, в том же порядке: экран поставки —
@@ -15295,6 +15325,10 @@ function qrSave(code){
 }
 
 SCANQ.onDone = (err, r, job) => {
+  // Очередь одна на приложение, а лент, куда ложится ответ, две: реестр
+  // кодов и приёмка. Развилка здесь, потому что перевешивать обработчик на
+  // входе в экран значило бы терять ответы, оставшиеся в пути от прошлого.
+  if(job.rcv) return rcvDone(err, r, job);
   const row = QR_ROWS.find(x => x.code === job.code && x.state === 'sending');
   if(!row) return;                       // строку успели удалить руками
   if(err){ row.state = 'fail'; qrFlash('err'); }
@@ -16153,8 +16187,7 @@ function supRender(){
       <div class="rt-bar"><i style="width:${Math.min(100, p)}%"></i></div>
       ${marks.length ? `<div class="rt-fl">${escS(marks.join(' · '))}</div>` : ''}
       ${t.note ? `<div class="rt-note">${escS(t.note)}</div>` : ''}
-      ${t.driver && !t.done_at ? `<button class="rt-rel"
-        onclick="supRelease('${t.district}')">Снять с водителя</button>` : ''}
+      ${rtActs(t, d)}
     </div>`;
   }).join('');
 
@@ -16303,6 +16336,21 @@ async function supImport(inp, btnId){
   b.disabled = false; b.innerHTML = html;
 }
 
+// Что можно сделать с районом прямо отсюда. Свободный старший может забрать
+// себе — тогда водители увидят его занятым и не поедут за тем же ящиком.
+// Свой — продолжить. Чужой — только снять с водителя, как и раньше.
+function rtActs(t, d){
+  if(d.status !== 'open' || t.done_at) return '';
+  const мой = t.driver && t.driver === _rcvMe();
+  if(мой) return `<div class="rt-acts">
+    <button class="rt-take" onclick="rcvOpen('${escS(t.district)}')">Продолжить приёмку</button>
+    <button class="rt-rel" onclick="supRelease('${escS(t.district)}')">Отдать</button></div>`;
+  if(t.driver) return `<button class="rt-rel"
+    onclick="supRelease('${escS(t.district)}')">Снять с водителя</button>`;
+  return `<div class="rt-acts">
+    <button class="rt-take" onclick="rcvClaim('${escS(t.district)}')">Взять на себя</button></div>`;
+}
+
 async function supRelease(oid){
   if(SUP_BUSY) return; SUP_BUSY = true;
   try{
@@ -16312,6 +16360,332 @@ async function supRelease(oid){
     await supLoad(SUP_ID);
   }catch(e){ _toast('Не вышло'); }
   finally{ SUP_BUSY = false; }
+}
+
+// ─── Приёмка руками старшего ────────────────────────────────────────────────
+// Второй вход в тот же путь, которым принимает водитель: взять район, отсканить
+// бутылки, закрыть с недобором или без. Ничего своего этот экран не считает —
+// сервер тот же, документ тот же, и район, взятый отсюда, водители видят
+// занятым. Иначе двое поехали бы за одним ящиком.
+let RCV = null, RCV_LINE = null, RCV_ROWS = [], RCV_BUSY = false;
+
+// Имя, которым подписан старший. Совпадать оно должно с тем, что уходит в
+// «as»: по нему сервер отличает мою задачу от чужой, и разные имена в claim и
+// в списке означали бы, что собственный район выглядит занятым.
+function _rcvMe(){ return _meName() || 'старший'; }
+
+async function rcvClaim(oid){
+  if(RCV_BUSY) return; RCV_BUSY = true;
+  try{
+    const t = await ownerApi.ownerFetch(
+      `/api/owner/supply/${encodeURIComponent(SUP_ID)}/task/claim`,
+      {method:'POST', body:{district: oid, as: _rcvMe()}});
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    RCV = t; RCV_LINE = null; RCV_ROWS = [];
+    rcvRender();
+  }catch(e){
+    // Район успел взять водитель — это не сбой, а обычный исход: карточка
+    // висит у всех сразу.
+    const who = ((e || {}).payload || {}).driver;
+    _toast(who ? `Уже взял ${who}` : 'Не удалось взять');
+    supLoad(SUP_ID);
+  }finally{ RCV_BUSY = false; }
+}
+
+async function rcvOpen(oid){
+  try{
+    const r = await ownerApi.ownerFetch(
+      `/api/owner/supply/${encodeURIComponent(SUP_ID)}/tasks`,
+      {params:{as: _rcvMe()}});
+    RCV = (r.tasks || []).find(t => t.district === oid) || null;
+  }catch(e){ RCV = null; }
+  if(!RCV) return _toast('Не удалось открыть');
+  RCV_LINE = null; RCV_ROWS = [];
+  rcvRender();
+}
+
+// Выход с экрана приёмки — обратно к списку районов той же поставки, а не в
+// начало раздела: за одну ходку закрывают несколько районов подряд.
+function rcvBack(){
+  SCAN.stop();
+  RCV = null; RCV_LINE = null; RCV_ROWS = [];
+  supLoad(SUP_ID);
+}
+
+function rcvRender(){
+  const t = RCV; if(!t) return;
+  SCAN.stop();
+  RCV_LINE = null;
+  ACC_BACK = rcvBack;
+  const act = document.getElementById('accAct'); if(act) act.innerHTML = '';
+  _setRail('accRail', '');
+  _setText('accTitle', `${t.district_code} ${t.district_name}`);
+  _setText('accSub', `Приёмка · ${t.positions} ${
+    pluralize(t.positions,'позиция','позиции','позиций')}`);
+
+  const pct = t.need ? Math.round(t.got / t.need * 100) : 0;
+  const head = `<div class="rcv">
+    <div class="rcv-h"><span class="rcv-st live">Принимаю сам</span></div>
+    <div class="rcv-n">
+      <span class="rcv-v">${fmt(t.got)}</span>
+      <span class="rcv-of">из ${fmt(t.need)}</span>
+      <span class="rcv-pct">${pct}%</span>
+    </div>
+    <div class="rcv-bar"><i style="width:${Math.min(100, pct)}%"></i></div>
+    <div class="rcv-f"><span>${t.left ? 'осталось ' + fmt(t.left) : 'взято полностью'}</span></div>
+  </div>`;
+
+  // Недобранное вверх: закрытые строки больше не нужны, а следующую бутылку
+  // среди них искали бы каждый раз.
+  const lines = (t.lines || []).slice().sort((a, b) =>
+    (a.left === 0) - (b.left === 0) || a.name.localeCompare(b.name, 'ru'));
+  const rows = lines.map(l => `
+    <button class="rl ${l.left ? '' : 'done'}" ${l.left ? '' : 'disabled'}
+      onclick="rcvLine('${escS(l.id)}')">
+      <span class="rl-b">
+        <span class="rl-n">${escS(l.name)}</span>
+        <span class="rl-s">${l.left ? 'осталось ' + fmt(l.left) : 'взято полностью'}</span>
+      </span>
+      <span class="rl-v"><b>${fmt(l.got)}</b><i>/${fmt(l.need)}</i></span>
+    </button>`).join('');
+
+  document.getElementById('accMid').innerHTML = head +
+    `<div class="exp-grp">Что забрать</div>` +
+    (rows || '<div class="exp-empty">Позиций нет</div>');
+  document.getElementById('accFoot').innerHTML = t.got === 0
+    ? `<button class="qb qb-ghost" onclick="rcvGiveBack()">Вернуть район</button>`
+    : `<button class="qb" onclick="rcvFinOpen()">${
+        t.left ? 'Завершить с недобором' : 'Завершить приём'}</button>`;
+}
+
+// ── камера ─────────────────────────────────────────────────────────────────
+async function rcvLine(pid){
+  const l = (RCV.lines || []).find(x => x.id === pid);
+  if(!l || !l.left) return;
+  RCV_LINE = {...l}; RCV_ROWS = [];
+  rcvCam();
+  try{
+    await SCAN.start(document.getElementById('rcvVideo'), rcvScan, rcvIdle,
+                     () => qrFlash('again'), qrHold);
+  }catch(e){
+    _toast('Нет доступа к камере');
+    return rcvLineClose();
+  }
+  const tb = document.getElementById('rcvTorch');
+  if(tb) tb.style.display = SCAN.hasTorch() ? '' : 'none';
+  const snd = document.getElementById('rcvSound');
+  if(snd) snd.classList.toggle('muted', !SFX.on);
+}
+
+function rcvLineClose(){
+  SCAN.stop();
+  RCV_LINE = null; RCV_ROWS = [];
+  rcvRender();
+}
+
+// Разметка сканера — та же, что у кодов: одна камера в приложении, и второй её
+// вид означал бы, что человек у полки читает два разных экрана.
+function rcvCam(){
+  const l = RCV_LINE;
+  ACC_BACK = rcvLineClose;
+  _setRail('accRail', '');
+  const act = document.getElementById('accAct'); if(act) act.innerHTML = '';
+  _setText('accTitle', l.name);
+  _setText('accSub', `${RCV.district_code} ${RCV.district_name} · приёмка`);
+  document.getElementById('accFoot').innerHTML = '';
+  document.getElementById('accMid').innerHTML = `
+    <div class="qwrap">
+    <div class="scan-cam" id="rcvCamBox">
+      <video id="rcvVideo" playsinline muted autoplay></video>
+      <div class="scan-frame" id="qrFrame">
+        <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+        <div class="scan-badge" id="qrBadge"></div>
+      </div>
+      <div class="scan-hud">
+        <div class="scan-hud-top">
+          <div class="scan-pill"><b id="rcvN">${fmt(l.left)}</b><span>осталось</span></div>
+          <div class="scan-tools">
+            <button class="scan-tool" id="rcvSound" onclick="qrSound(this)">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+                stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M11 5 6 9H2v6h4l5 4z"/><path class="s-on" d="M15.5 8.5a5 5 0 0 1 0 7"/>
+                <path class="s-off" d="M22 9l-6 6M16 9l6 6"/></svg></button>
+            <button class="scan-tool" id="rcvTorch" onclick="qrTorch(this)" style="display:none">
+              <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+                stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M9 2h6l-1 7h4l-8 13 2-9H8z"/></svg></button>
+          </div>
+        </div>
+        <div class="scan-tip" id="qrHint">Наведите на код</div>
+        <div class="scan-hud-bot">
+          <div class="scan-added" id="rcvAdded"></div>
+          <div class="scan-strip" id="rcvFeed"></div>
+          <div class="scan-dockbar">
+            <button class="scan-undo" id="rcvUndo" onclick="rcvUndo()" disabled>Отменить</button>
+            <button class="scan-go" onclick="rcvLineClose()">К списку</button>
+          </div>
+        </div>
+      </div>
+    </div></div>`;
+  scanLive('accOv');
+  rcvFeed();
+}
+
+function rcvIdle(sinceMs, frames, fps){ qrIdle(sinceMs, frames, fps); }
+
+// Скан не ждёт сервера: рука уже тянется к следующей бутылке. Зелёная вспышка
+// сразу, а возразит сервер — цвет сменится.
+function rcvScan(code){
+  if(!RCV_LINE) return;
+  RCV_ROWS.unshift({code, state:'sending', label:''});
+  qrFlash('ok');
+  rcvFeed();
+  SCANQ.push({path:`/api/owner/supply/${encodeURIComponent(RCV.supply_id)}/task/scan`,
+              body:{district: RCV.district, product_id: RCV_LINE.id, code,
+                    at_dev: new Date().toISOString(), as: _rcvMe()}, code, rcv:true});
+}
+
+const RCV_MSG = {
+  known:         'Эта бутылка уже в реестре',
+  full:          'По этой позиции уже всё',
+  not_mine:      'Район забрал другой',
+  closed:        'Приёмка уже закрыта',
+  not_in_supply: 'Этой позиции нет в поставке',
+  no_supply:     'Поставка закрыта',
+};
+
+function rcvDone(err, r, job){
+  const row = RCV_ROWS.find(x => x.code === job.code && x.state === 'sending');
+  if(err){ if(row){ row.state = 'fail'; qrFlash('err'); rcvFeed(); } return; }
+  if(r.ok){
+    if(row){ row.state = 'new'; row.label = r.label || ''; }
+    if(RCV_LINE){ RCV_LINE.got = r.got; RCV_LINE.left = r.left; }
+    rcvSync(r);
+    rcvFeed();
+    // Строка добрана — держать камеру включённой значит ждать лишнего действия.
+    if(r.left === 0){
+      qrFlash('ok', 'всё, ' + r.need);
+      setTimeout(() => { if(RCV_LINE){ rcvLineClose();
+        _toast(`${r.name} — взято полностью`); } }, 700);
+    }
+    return;
+  }
+  if(row){ row.state = r.verdict === 'known' ? 'dup' : 'fail'; row.label = r.label || ''; }
+  qrFlash(r.verdict === 'known' ? 'dup' : r.verdict === 'full' ? 'again' : 'err',
+          r.verdict === 'known' ? 'уже в реестре' : r.verdict === 'full' ? 'по этой всё' : null);
+  if(RCV_MSG[r.verdict] && r.verdict !== 'known') _toast(RCV_MSG[r.verdict]);
+  rcvFeed();
+}
+
+// Число на экране должно совпадать с базой, а не с нашим представлением о ней.
+function rcvSync(r){
+  if(!RCV) return;
+  const l = (RCV.lines || []).find(x => x.id === (RCV_LINE && RCV_LINE.id));
+  if(l){ l.got = r.got; l.left = r.left; }
+  RCV.got = (RCV.lines || []).reduce((a, x) => a + x.got, 0);
+  RCV.left = Math.max(0, RCV.need - RCV.got);
+  scanRoll('rcvN', r.left);
+}
+
+function rcvFeed(){
+  const взято = RCV_ROWS.filter(r => r.state === 'new' || r.state === 'sending').length;
+  const s = document.getElementById('rcvAdded');
+  if(s) s.innerHTML = взято ? `<b>${взято}</b> принято` : '';
+  const feed = document.getElementById('rcvFeed'); if(!feed) return;
+  feed.innerHTML = RCV_ROWS.slice(0, 40).map(r => {
+    const [txt, color] = QR_STATE[r.state === 'new' ? 'new' : r.state] || QR_STATE.sending;
+    const raw = r.code.length > 26 ? r.code.slice(0, 24) + '…' : r.code;
+    return `<div class="scan-row ${r.state}">
+      <span class="scan-dot" style="background:${color}"></span>
+      <span class="scan-b">
+        <span class="scan-code">${escS(r.label || '…')}</span>
+        <span class="scan-raw">${escS(raw)}</span>
+      </span>
+      <span class="scan-state" style="color:${color}">${escS(txt)}</span></div>`;
+  }).join('');
+  const u = document.getElementById('rcvUndo');
+  if(u) u.disabled = !RCV_ROWS.some(r => r.state === 'new');
+}
+
+// Отмена — только что записанной и только несколько раз за приёмку. Правило
+// стоит на сервере, здесь лишь показываем его ответ.
+async function rcvUndo(){
+  const row = RCV_ROWS.find(r => r.state === 'new');
+  if(!row) return;
+  let r;
+  try{ r = await ownerApi.ownerFetch(
+    `/api/owner/supply/${encodeURIComponent(RCV.supply_id)}/task/undo`,
+    {method:'POST', body:{district: RCV.district, code: row.code, as: _rcvMe()}}); }
+  catch(e){ return _toast('Не удалось отменить'); }
+  if(!r.ok){
+    const M = {undo_limit: `Отменить можно ${r.limit} раза за приёмку`,
+               too_late: 'Отменить можно сразу после скана',
+               not_ours: 'Эта бутылка не из приёмки'};
+    return _toast(M[r.verdict] || 'Не удалось отменить');
+  }
+  SCAN.seen.delete(row.code); SCAN.seenAt.delete(row.code);
+  RCV_ROWS.splice(RCV_ROWS.indexOf(row), 1);
+  if(RCV_LINE){
+    RCV_LINE.got--; RCV_LINE.left++;
+    rcvSync({got: RCV_LINE.got, left: RCV_LINE.left, need: RCV_LINE.need});
+  }
+  rcvFeed();
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+
+// ── возврат и закрытие ─────────────────────────────────────────────────────
+async function rcvGiveBack(){
+  if(!RCV || RCV_BUSY) return; RCV_BUSY = true;
+  try{
+    await ownerApi.ownerFetch(
+      `/api/owner/supply/${encodeURIComponent(RCV.supply_id)}/task/release`,
+      {method:'POST', body:{district: RCV.district, as: _rcvMe()}});
+    _toast('Район снова свободен');
+    rcvBack();
+  }catch(e){ _toast('Не вышло'); }
+  finally{ RCV_BUSY = false; }
+}
+
+// Недобор считает сервер по строкам. У человека спрашиваем только то, чего в
+// базе нет, — почему.
+function rcvFinOpen(){
+  const t = RCV; if(!t) return;
+  const gaps = (t.lines || []).filter(l => l.left > 0);
+  _setText('rcvFinT', gaps.length ? 'Недобор' : 'Завершить приём');
+  _setText('rcvFinS', gaps.length
+    ? `Не хватает ${fmt(t.left)} ${pluralize(t.left,'бутылки','бутылок','бутылок')}`
+    : `Принято ${fmt(t.got)} из ${fmt(t.need)}`);
+  document.getElementById('rcvFinBody').innerHTML =
+    (gaps.length ? `<div class="rcv-gaps">${gaps.slice(0, 8).map(l =>
+      `<div class="rcv-gap"><span>${escS(l.name)}</span><b>${l.got} из ${l.need}</b></div>`
+      ).join('')}${gaps.length > 8
+        ? `<div class="rcv-gap-more">…и ещё ${gaps.length - 8}</div>` : ''}</div>` : '') +
+    `<input class="wo-c-note" id="rcvFinNote" placeholder="${gaps.length
+      ? 'Почему не хватает: магазин не дал, бой, не было'
+      : 'Комментарий — если нужен'}">`;
+  document.getElementById('rcvFinGo').textContent = gaps.length ? 'Закрыть с недобором' : 'Завершить';
+  document.getElementById('rcvFinOv').classList.add('show');
+}
+
+function rcvFinClose(){ document.getElementById('rcvFinOv').classList.remove('show'); }
+
+async function rcvFinSend(){
+  const t = RCV; if(!t || RCV_BUSY) return;
+  const note = (document.getElementById('rcvFinNote') || {}).value || '';
+  if(t.left > 0 && !note.trim()) return _toast('Впишите, почему не хватает');
+  RCV_BUSY = true;
+  const b = document.getElementById('rcvFinGo'); b.disabled = true;
+  try{
+    const r = await ownerApi.ownerFetch(
+      `/api/owner/supply/${encodeURIComponent(t.supply_id)}/task/finish`,
+      {method:'POST', body:{district: t.district, note, as: _rcvMe()}});
+    if(!r.ok) throw new Error(r.verdict || 'fail');
+    rcvFinClose();
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    _toast('Приёмка закрыта');
+    rcvBack();
+  }catch(e){ _toast('Не удалось закрыть'); }
+  finally{ RCV_BUSY = false; b.disabled = false; }
 }
 
 async function _supFile(){
@@ -23837,6 +24211,24 @@ function renderHours(h){
     <div id="woAddBody"></div>
     <div class="wo-add-foot">
       <button class="wo-c-go" id="woAddGo" onclick="woAddSave()" disabled>Списать</button>
+    </div>
+  </div>
+</div>
+<div class="wo-c-ov" id="rcvFinOv" onclick="if(event.target===this)rcvFinClose()">
+  <div class="wo-c-sheet wo-add">
+    <div class="wo-add-hd">
+      <div>
+        <div class="wo-c-t" id="rcvFinT">Завершить приём</div>
+        <div class="wo-add-s" id="rcvFinS"></div>
+      </div>
+      <button class="wo-add-x" onclick="rcvFinClose()" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div id="rcvFinBody"></div>
+    <div class="wo-add-foot">
+      <button class="wo-c-go" id="rcvFinGo" onclick="rcvFinSend()">Завершить</button>
     </div>
   </div>
 </div>

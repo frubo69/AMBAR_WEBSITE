@@ -2104,6 +2104,38 @@ button.path:active{transform:scale(.995)}
 .xs-cats .xs-chip{flex-shrink:0;white-space:nowrap}
 .xs-chip i{font-style:normal;font-size:11px;color:var(--muted);margin-left:2px}
 .xs-chip.on i{color:var(--gold2);opacity:.7}
+/* Итог: база и общее число сверху, дальше карточка на район с товаром. */
+.xr-img{width:40px;height:40px;border-radius:10px;object-fit:cover;flex-shrink:0;
+  background:var(--card2)}
+.xs-top{display:flex;align-items:flex-end;gap:12px;margin:4px 0 16px}
+.xs-top-b{flex:1;min-width:0}
+.xs-top-b i{display:block;font-style:normal;font-size:10px;font-weight:700;letter-spacing:1.2px;
+  text-transform:uppercase;color:var(--muted);margin-bottom:4px}
+.xs-top-b b{display:block;font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;
+  letter-spacing:-.4px;line-height:1.1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xs-top-n{flex-shrink:0;text-align:right;font-family:'Space Grotesk',sans-serif;font-size:34px;
+  font-weight:700;line-height:1;color:var(--gold2)}
+.xs-top-n i{display:block;font-style:normal;font-family:'DM Sans',sans-serif;font-size:11px;
+  font-weight:500;color:var(--muted);margin-top:5px}
+.xs-dcard{border-radius:16px;background:var(--card);border:1px solid var(--border2);
+  padding:12px 14px 6px;margin-bottom:10px}
+.xs-dcard-h{display:flex;align-items:center;gap:12px;padding-bottom:10px;
+  border-bottom:1px solid var(--border2)}
+.xs-dcard-b{flex:1;min-width:0}
+.xs-dcard-b b{display:block;font-size:16px;font-weight:700;line-height:1.2}
+.xs-dcard-b i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:3px}
+.xs-dcard-n{flex-shrink:0;text-align:right;font-family:'Space Grotesk',sans-serif;font-size:24px;
+  font-weight:700;line-height:1;color:var(--gold2)}
+.xs-dcard-n i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:600;
+  color:var(--muted);margin-left:4px}
+.xs-pl{display:flex;align-items:center;gap:12px;padding:9px 0;border-top:1px solid var(--border2)}
+.xs-dcard-h + .xs-pl{border-top:0}
+.xs-pl-n{flex:1;min-width:0;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;
+  white-space:nowrap}
+.xs-pl-q{flex-shrink:0;min-width:34px;height:30px;padding:0 9px;border-radius:10px;display:flex;
+  align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:15px;
+  font-weight:800;color:#1a1408;background:linear-gradient(135deg,#E8C98A,#C9A96E)}
+.xs-skip{font-size:12.5px;color:var(--muted);text-align:center;padding:8px 12px 4px}
 /* Переключатель районов: пять кодов в ряд, текущий золотом, у набранных
    число. Это и карта пути, и кнопка «назад на район». */
 .xs-dtabs{display:flex;gap:6px;margin:0 0 14px}
@@ -16277,19 +16309,37 @@ function xRender(){
       <div class="xs-cats" id="xsCats">${xCats()}</div>
       <div class="xg" id="xsGrid" onclick="xGridTap(event)">${xGrid()}</div>`;
   }else{
-    const byD = {};
-    Object.values(XS.rows).forEach(r => Object.entries(r.by).forEach(([o, n]) => { if(n > 0) byD[o] = (byD[o] || 0) + n; }));
-    const rows = Object.values(XS.rows).filter(r => xQty(r) > 0);
+    // Итог — по районам, как и набирали: карточка на район, внутри товар с
+    // картинкой и числом. Пропущенные районы — одной тихой строкой.
     const total = xTotal();
-    mid.innerHTML = steps + `<div class="xs-h">${escS(XS.base.trim())}</div>
-      <div class="xs-sum"><b>${fmt(total)}</b>
-        <i>${pluralize(total,'бутылка','бутылки','бутылок')} · ${rows.length} ${
-          pluralize(rows.length,'позиция','позиции','позиций')} · ${
-          Object.entries(byD).map(([o, n]) => `${_xCode(o).code} ${n}`).join(' · ')}</i></div>
-      <div class="xs-sum">${rows.map(r => `<div class="xs-l">
-        <span>${escS(r.name)}</span>
-        <i>${Object.entries(r.by).filter(([, n]) => n > 0).map(([o, n]) => `${_xCode(o).code}·${n}`).join(' ')}</i>
-        <b>${xQty(r)}</b></div>`).join('')}</div>`;
+    const pos = Object.values(XS.rows).filter(r => xQty(r) > 0).length;
+    const cards = [], skipped = [];
+    dist.forEach(x => {
+      const lines = Object.entries(XS.rows).filter(([, r]) => (r.by[x.id] || 0) > 0);
+      if(!lines.length){ skipped.push(x.code); return; }
+      const n = lines.reduce((a, [, r]) => a + r.by[x.id], 0);
+      cards.push(`<div class="xs-dcard">
+        <div class="xs-dcard-h">
+          <span class="xs-dc">${escS(x.code)}</span>
+          <span class="xs-dcard-b"><b>${escS(x.name)}</b>
+            <i>${lines.length} ${pluralize(lines.length,'позиция','позиции','позиций')}</i></span>
+          <span class="xs-dcard-n">${fmt(n)}<i>${pluralize(n,'бут.','бут.','бут.')}</i></span>
+        </div>
+        ${lines.map(([id, r]) => `<div class="xs-pl">
+          <img class="xr-img" src="/products/${escS(id)}.webp" alt="" loading="lazy"
+               onerror="this.style.visibility='hidden'">
+          <span class="xs-pl-n">${escS(r.name)}</span>
+          <span class="xs-pl-q">${r.by[x.id]}</span>
+        </div>`).join('')}
+      </div>`);
+    });
+    mid.innerHTML = steps + `<div class="xs-top">
+        <span class="xs-top-b"><i>База</i><b>${escS(XS.base.trim())}</b></span>
+        <span class="xs-top-n">${fmt(total)}<i>${pluralize(total,'бутылка','бутылки','бутылок')} · ${
+          pos} ${pluralize(pos,'позиция','позиции','позиций')}</i></span>
+      </div>
+      ${cards.join('')}
+      ${skipped.length ? `<div class="xs-skip">${skipped.join(' · ')} — ничего не надо</div>` : ''}`;
   }
   xFoot();
 }

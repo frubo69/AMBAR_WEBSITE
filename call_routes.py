@@ -216,10 +216,7 @@ class Call:
         # Спрашивают разрешения только там, где в разговоре есть оператор. У
         # остальных всё как было: старший и водитель включают камеру сами, и
         # отнимать это заодно было бы тихой поломкой не того, о чём просили.
-        self.cam_ok = set()
-        if not _audio_only(caller.key, callee_key):
-            self.cam_ok.add(caller.key)
-            self.cam_ok.add(callee_key)
+        self.cam_ok = _cam_default(caller.key, callee_key)
 
 
 _PEERS: dict = {}        # sid  → Peer
@@ -632,7 +629,7 @@ async def _cam_state(call: "Call"):
         if not кто:
             continue
         await кто.send(t="camallow", on=(кто.key in call.cam_ok),
-                       grant=bool(кто.kind == "op" and другой and другой.kind == "drv"))
+                       grant=bool(кто.kind in ("op", "star") and другой and другой.kind == "drv"))
 
 
 # ── вебсокет ────────────────────────────────────────────────────────────────
@@ -782,25 +779,29 @@ async def _on_message(peer: Peer, m: dict):
                 await other.send(t=t, on=bool(m.get("on")))
         return
 
-    # Запрет второй. Разрешить камеру может только оператор и только водителю.
-    # Проверяем обе роли, а не одну: «разрешил сам себе» — это ровно то, что
-    # переписанный клиент и попробует.
+    # Запрет второй. Камеру водителя включает и выключает тот, кто выше:
+    # оператор или старший, и только водителю. Проверяем обе роли, а не одну:
+    # «разрешил сам себе» — это ровно то, что переписанный клиент и попробует.
+    # force — не «можно», а «включи»: телефон водителя включает камеру сам,
+    # без нажатия с его стороны.
     if t == "camallow":
         call = peer.call
         if not call or not call.answered:
             return
         other = call.callee if call.caller.sid == peer.sid else call.caller
-        if peer.kind != "op" or not other or other.kind != "drv":
+        if peer.kind not in ("op", "star") or not other or other.kind != "drv":
             await peer.send(t="failed", why="not_allowed")
             log.warning(f"[call] {peer.label}: попытка выдать камеру не по чину")
             return
         on = bool(m.get("on"))
+        force = bool(m.get("force"))
         if on:
             call.cam_ok.add(other.key)
         else:
             call.cam_ok.discard(other.key)
-        log.info(f"[call] {peer.label} {'разрешил' if on else 'забрал'} камеру: {other.label}")
-        await other.send(t="camallow", on=on)
+        log.info(f"[call] {peer.label} {'включил' if on else 'выключил'} камеру у {other.label}"
+                 + (" (сам)" if force else ""))
+        await other.send(t="camallow", on=on, force=force)
         await peer.send(t="camallow", on=on, own=True)
         return
 
@@ -988,8 +989,23 @@ def _kind_of_key(key: str) -> str:
 
 
 def _audio_only(a_key: str, b_key: str) -> bool:
-    """Пара, которой видео не положено вовсе."""
+    """Пара, которая НАБИРАЕТСЯ только голосом: с оператором на любом конце.
+    Камера внутри такого разговора всё равно возможна — см. _cam_default."""
     return "op" in (_kind_of_key(a_key), _kind_of_key(b_key))
+
+
+def _cam_default(a_key: str, b_key: str) -> set:
+    """Кому в разговоре можно показывать картинку с самого начала.
+
+    Старший и оператор — всегда: свою камеру они включают сами. Водитель —
+    только если на другом конце старший; с оператором его камеру включает и
+    выключает оператор (camallow), и до этого она заперта."""
+    out = set()
+    for me, other in ((a_key, b_key), (b_key, a_key)):
+        k = _kind_of_key(me)
+        if k != "drv" or _kind_of_key(other) == "star":
+            out.add(me)
+    return out
 
 
 def _sdp_sends_video(sdp: str) -> bool:

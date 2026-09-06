@@ -2946,7 +2946,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 </div>
 
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=74"></script>
+<script src="/vendor/ambar-call.js?v=75"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{
@@ -7389,13 +7389,19 @@ function callEvent(t, d){
     //
     // В разговоре со старшим этот пакет приходит сразу разрешающим: спрашивают
     // только там, где на другом конце оператор.
-    case 'camallow':
+    case 'camallow': {
+      const было = CALL_CAMOK;
       CALL_CAMOK = !!d.on;
       if(d.need) { toast('Оператор ещё не разрешил камеру', 'err'); return; }
       if(d.denied){ toast('Камеру убрали', 'err'); callPaintCam(); return; }
       callPaintCam();
-      if(d.on) toast('Оператор разрешил показать камеру');
+      // Кто включил — тот и назван: оператор или старший, смотря с кем говорим.
+      const кто = CALL_ROLE === 'star' ? 'Старший' : 'Оператор';
+      if(d.on && d.force){ _hap('medium'); toast(кто + ' включил вашу камеру'); }
+      else if(d.on && !было) toast(кто + ' разрешил показать камеру');
+      else if(!d.on && было){ _hap('light'); toast(кто + ' выключил вашу камеру'); }
       return;
+    }
     case 'quality':
       CALL_Q = d.quality;
       callPaintQuality();

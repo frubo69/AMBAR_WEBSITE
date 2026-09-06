@@ -30,7 +30,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=74"></script>
+<script src="/vendor/ambar-call.js?v=75"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>
@@ -25660,6 +25660,7 @@ function callEvent(t, d){
       CALL_SAFE = d.emoji; safePaint(); return;
     case 'talking':
       CALL_ST = 'live'; CALL_T0 = Date.now(); CALL_Q = ''; _callMuted = false;
+      CALL_GRANT = false; CALL_GAVE = false;   // права придут отдельным пакетом
       clearInterval(_callTick); _callTick = setInterval(callTimer, 1000);
       safePaint();
       callVidPaint();
@@ -25698,7 +25699,14 @@ function callEvent(t, d){
       if(CALL_ST === 'live') _hap('light');
       return;
     case 'remotecam':
-      CALL_RCAM = !!d.on; callVidPaint(); return;
+      CALL_RCAM = !!d.on; callVidPaint(); callPaint(); return;
+    // Сервер сказал, есть ли кому включать камеру: в разговоре с водителем
+    // старший включает и выключает её сам, как оператор.
+    case 'camallow':
+      CALL_GRANT = !!d.grant;
+      if(d.own !== undefined) CALL_GAVE = !!d.on;
+      callPaint();
+      return;
     case 'novideo':
       CALL_REJOIN = false;
       CALL_VIDEO = false; CALL_CAM = false; CALL_RCAM = false;
@@ -26041,6 +26049,10 @@ function callVoicePaint(){
         <div class="cv-cell">
           <button class="cv-rb${CALL_CAM ? '' : ' on'}" onclick="callCam()" aria-label="Камера">${V}</button>
           <span class="cv-cap">камера</span></div>
+        ${CALL_GRANT ? `<div class="cv-cell">
+          <button class="cv-rb${CALL_RCAM ? '' : ' on'}" onclick="callGrantCam()"
+            aria-label="Камера водителя">${V}</button>
+          <span class="cv-cap">у водителя</span></div>` : ''}
         <div class="cv-cell">
           <button class="cv-rb mic${_callMuted ? ' on' : ''}" onclick="callMute()"
             aria-label="Микрофон">${M(_callMuted)}</button>
@@ -26809,6 +26821,18 @@ function callCam(){
   if(!CALL) return;
   _hap('light');
   CALL.camera(!CALL_CAM);
+}
+// Камера водителя — включает и выключает старший, сам: у водителя телефон
+// поднимает камеру без его нажатия, выключение гасит её.
+let CALL_GRANT = false, CALL_GAVE = false;
+function callGrantCam(){
+  if(!CALL || !CALL_GRANT) return;
+  _hap('medium');
+  const on = !(CALL_GAVE && CALL_RCAM);
+  CALL_GAVE = on;
+  CALL.allowCam(on, true);
+  callPaint();
+  _toast(on ? 'Включаем камеру у водителя' : 'Камера у водителя выключена');
 }
 // Поворот камеры. Система гасит одну камеру раньше, чем откроет вторую, и кадр
 // на это время замирает — так устроен телефон. Но замерший кадр должен

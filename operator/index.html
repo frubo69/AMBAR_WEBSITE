@@ -23,7 +23,7 @@
 <script src="/vendor/telegram-web-app.js"></script>
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
-<script src="/vendor/ambar-call.js?v=74"></script>
+<script src="/vendor/ambar-call.js?v=75"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -6643,7 +6643,9 @@ function callEvent(t, d){
       if(CALL_ST === 'live') haptic('light');
       return;
     case 'remotecam':
-      CALL_RCAM = !!d.on; callVidPaint(); return;
+      // Камера водителя поднялась или погасла — кнопка «камера водителя»
+      // показывает факт, а не намерение.
+      CALL_RCAM = !!d.on; callVidPaint(); callPaint(); return;
     case 'novideo':
       CALL_REJOIN = false;
       CALL_VIDEO = false; CALL_CAM = false; CALL_RCAM = false;
@@ -6961,13 +6963,16 @@ function callVoicePaint(){
         <div class="cvo-lbl">Ответить</div></div>`
     : CALL_ST === 'live' ? `
       <div class="cvo-row4">
-        <div class="cv-cell${CALL_CAM ? '' : ' dim'}">
+        ${CALL_CAM ? `<div class="cv-cell">
           <button class="cv-rb cv-flip" onclick="callFlip()" aria-label="Другая камера">${F}</button>
-          <span class="cv-cap">поворот</span></div>
+          <span class="cv-cap">поворот</span></div>` : ''}
+        <div class="cv-cell">
+          <button class="cv-rb cam${CALL_CAM ? '' : ' on'}" onclick="callCam()" aria-label="Камера">${V}</button>
+          <span class="cv-cap">камера</span></div>
         ${CALL_GRANT ? `<div class="cv-cell">
-          <button class="cv-rb${CALL_GAVE ? '' : ' on'}" onclick="callGrantCam()"
-            aria-label="Разрешить камеру водителю">${V}</button>
-          <span class="cv-cap">${CALL_GAVE ? 'забрать' : 'дать камеру'}</span></div>` : ''}
+          <button class="cv-rb${CALL_RCAM ? '' : ' on'}" onclick="callGrantCam()"
+            aria-label="Камера водителя">${V}</button>
+          <span class="cv-cap">у водителя</span></div>` : ''}
         <div class="cv-cell">
           <button class="cv-rb mic${_callMuted ? ' on' : ''}" onclick="callMute()"
             aria-label="Микрофон">${M(_callMuted)}</button>
@@ -7739,29 +7744,30 @@ function lampAfterFlip(){
 let CALL_GRANT = false;   // мне вообще есть кому давать (собеседник — водитель)
 let CALL_GAVE  = false;   // и дал ли я уже
 
+// Камера водителя — включает и выключает оператор, сам. Не «разрешить и
+// ждать, пока водитель нажмёт»: за рулём и у полки нажимать некогда, а
+// картинка нужна оператору. Включил — у водителя камера поднялась сама;
+// выключил — погасла.
 function callGrantCam(){
   if(!CALL || !CALL_GRANT) return;
-  _hap('light');
-  CALL_GAVE = !CALL_GAVE;
-  CALL.allowCam(CALL_GAVE);
+  _hap('medium');
+  const on = !(CALL_GAVE && CALL_RCAM);
+  CALL_GAVE = on;
+  CALL.allowCam(on, true);
   callPaintGrant();
-  toast(CALL_GAVE ? 'Водитель может включить камеру' : 'Камера у водителя убрана');
+  toast(on ? 'Включаем камеру у водителя' : 'Камера у водителя выключена');
 }
 
 function callPaintGrant(){
-  const cell = document.getElementById('cvGrantCell');
-  if(cell) cell.style.display = CALL_GRANT ? '' : 'none';
-  const b = document.getElementById('cvGrant');
-  if(b) b.classList.toggle('on', !CALL_GAVE);
-  const c = document.getElementById('cvGrantCap');
-  if(c) c.textContent = CALL_GAVE ? 'забрать' : 'дать камеру';
   if(typeof callPaint === 'function') callPaint();
 }
 
-// Своей камеры у оператора нет: кнопки, которая её включала, тоже. Функция
-// оставлена пустой намеренно — на неё могли остаться ссылки в старой разметке,
-// и молчаливое «ничего не произошло» здесь честнее ошибки в консоли.
-function callCam(){}
+// Своя камера оператора: показать водителю полку, накладную, экран.
+function callCam(){
+  if(!CALL) return;
+  _hap('light');
+  CALL.camera(!CALL_CAM);
+}
 // Поворот камеры. Система гасит одну камеру раньше, чем откроет вторую, и кадр
 // на это время замирает — так устроен телефон. Но замерший кадр должен
 // читаться как задумка: размываем его и поворачиваем значок на кнопке. Раньше

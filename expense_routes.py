@@ -234,17 +234,27 @@ async def handle_extra_add(request):
         return web.json_response({"error": "unknown_driver"}, status=400, headers=CORS_HEADERS)
     amount = _amount(body.get("amount"))
     comment = str(body.get("comment") or "").strip()[:200]
-    # Без суммы записывать нечего, без комментария — незачем: через неделю такой
-    # расход не отличить от опечатки.
-    if amount <= 0 or not comment:
-        return web.json_response({"error": "amount_and_comment_required"},
-                                 status=400, headers=CORS_HEADERS)
     day = str(body.get("day") or "").strip() or _biz_day()
 
     kid = str(body.get("kind") or "other").strip()
     if kid not in EXTRA_KINDS:
         kid = "other"
     вид = EXTRA_KINDS[kid]
+    # Охрана — единственный расход, где платят не деньгами, а бутылкой. Сумму
+    # тут не спрашиваем ни у кого: код с крышки знает, что это за бутылка и
+    # сколько за неё отдали при закупке — тот же путь, что у водителя.
+    бутылка = None
+    if kid == "guard":
+        from driver_routes import _guard_bottle
+        бутылка, беда = await _guard_bottle(body.get("code"))
+        if беда:
+            return web.json_response({"error": беда}, status=400, headers=CORS_HEADERS)
+        amount = бутылка["cost"]
+    # Без суммы записывать нечего, без комментария — незачем: через неделю такой
+    # расход не отличить от опечатки.
+    if (amount <= 0 and kid != "guard") or not comment:
+        return web.json_response({"error": "amount_and_comment_required"},
+                                 status=400, headers=CORS_HEADERS)
     # Чек — не формальность: заправку, мойку и парковку оплачивают на стороне,
     # и снимок бумажки — единственное, чем такая трата подтверждается. Без него
     # запись не принимаем вовсе, а не «принимаем и помечаем».
@@ -263,6 +273,8 @@ async def handle_extra_add(request):
             "kind": kid, "kind_t": вид["t"], "plus": bool(вид.get("plus")),
             "by": request["owner_id"], "status": "approved",
             "at": datetime.now(timezone.utc).isoformat()}
+    if бутылка:
+        item.update(бутылка["item"])
     if photo:
         # Сам снимок лежит отдельно: строку расхода читают часто, а картинку
         # смотрят раз, и таскать по сети мегабайт ради строки незачем.
@@ -274,6 +286,10 @@ async def handle_extra_add(request):
         except Exception as e:                   # noqa: BLE001
             log.warning(f"[expenses] снимок чека не сохранён: {e}")
     await db.add_driver_expense(day, driver, item)
+    # Записал старший — расход уже согласован, и бутылка уходит со склада
+    # сразу, тем же списанием, что и при решении по заявке водителя.
+    if бутылка:
+        await _guard_bottle_gone(item, day, driver, request["owner_id"])
     знак = "−" if вид.get("plus") else "+"
     log.info(f"[expenses] {day} {driver}: {знак}{amount} AED — {вид['t']}: {comment}")
     await backdate.notify(day, str(body.get("as") or ""), "доп. расход добавлен",
@@ -281,6 +297,22 @@ async def handle_extra_add(request):
     saved = await db.get_driver_day(day, driver)
     base = next(d for d in staff.drivers() if d["name"] == driver)
     return web.json_response({"ok": True, "item": item, "driver": _day_row(base, saved)},
+                             headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_bottle_look(request):
+    """GET /api/owner/bottle?code=… — что за бутылка под кодом и почём.
+
+    Тот же ответ, что получает водитель у камеры: узнать «эта уже продана»
+    надо, пока бутылка в руке, а не после записи расхода."""
+    from driver_routes import _guard_bottle, GUARD_SAY
+    б, беда = await _guard_bottle(request.query.get("code"))
+    if беда:
+        return web.json_response({"ok": False, "verdict": беда,
+                                  "say": GUARD_SAY.get(беда, "не наша бутылка")},
+                                 headers=CORS_HEADERS)
+    return web.json_response({"ok": True, "cost": б["cost"], **б["item"]},
                              headers=CORS_HEADERS)
 
 
@@ -455,6 +487,7 @@ def setup(app):
         ("/api/owner/expenses/period",     handle_period,    "GET"),
         ("/api/owner/expenses/working",    handle_working,   "POST"),
         ("/api/owner/expenses/extra",      handle_extra_add, "POST"),
+        ("/api/owner/bottle",              handle_bottle_look, "GET"),
         ("/api/owner/expenses/photo/{item_id}", handle_extra_photo, "GET"),
         ("/api/owner/expenses/extra/{item_id}", handle_extra_del, "DELETE"),
         ("/api/owner/expenses/extra/{item_id}/{action}", handle_extra_decide, "POST"),

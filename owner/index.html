@@ -17798,7 +17798,7 @@ const EXP_KINDS = [
   {id:'wash',    t:'Мойка',         receipt:true,  hint:'нужен чек'},
   {id:'parking', t:'Парковка',      receipt:true,  hint:'нужен чек'},
   {id:'kfc',     t:'KFC · премия'},
-  {id:'guard',   t:'Охрана'},
+  {id:'guard',   t:'Охрана',        scan:true,     hint:'кому отдали'},
   {id:'we_gave', t:'Мы вернули',    who:'кому вернули'},
   {id:'we_got',  t:'Нам вернули',   who:'кто вернул', plus:true},
   {id:'we_owe',  t:'Мы должны',     who:'кому должны'},
@@ -17827,17 +17827,102 @@ function expAddList(r){
     return `<div class="exp-add-r${k.plus ? ' plus' : ''}">
       <span class="exp-add-t">${escS(k.t)}${
         k.receipt ? '<i>нужен чек</i>' : (k.plus ? '<i>плюсом</i>' : '')}</span>
-      <input class="amt" id="amt-${k.id}" type="text" inputmode="numeric" placeholder="AED"
-             onkeydown="if(event.key==='Enter')expAddExtra('${n}','${k.id}')">
+      ${k.scan
+        ? `<input class="amt" id="amt-${k.id}" type="text" readonly placeholder="AED"
+             value="${EXP_GUARD.driver === r.name && EXP_GUARD.code && EXP_GUARD.cost ? EXP_GUARD.cost : ''}">`
+        : `<input class="amt" id="amt-${k.id}" type="text" inputmode="numeric" placeholder="AED"
+             onkeydown="if(event.key==='Enter')expAddExtra('${n}','${k.id}')">`}
       <input class="cmt" id="cmt-${k.id}" type="text"
-             placeholder="${escS(k.who || (k.receipt ? 'за что' : (k.hint || 'за что')))}"
+             placeholder="${escS(k.who || (k.receipt ? 'комментарий' : (k.hint || 'комментарий')))}"
              onkeydown="if(event.key==='Enter')expAddExtra('${n}','${k.id}')">
       ${k.receipt ? `<button class="shot${снят ? ' on' : ''}" id="shot-${k.id}"
              onclick="expShotFor('${k.id}')">${снят ? 'есть' : 'чек'}</button>` : ''}
+      ${k.scan ? `<button class="shot${EXP_GUARD.driver === r.name && EXP_GUARD.code ? ' on' : ''}"
+             id="scan-${k.id}" onclick="gdScan('${n}')">${
+             EXP_GUARD.driver === r.name && EXP_GUARD.code ? 'есть' : 'скан'}</button>` : ''}
       <button class="ok" onclick="expAddExtra('${n}','${k.id}')"
               aria-label="Записать ${escS(k.t)}">✓</button>
     </div>`;
   }).join('')}</div>`;
+}
+
+// ── бутылка для охраны ──
+// Охране платят не деньгами, а бутылкой, и сумму тут вводить нечего: код с
+// крышки знает, что это за бутылка и сколько за неё отдали при закупке. Тот
+// же путь, что у водителя: камера, код, цена сама встаёт в строку.
+let EXP_GUARD = {driver:'', code:'', name:'', cost:0}, _gdBusy = false, _gdT = null;
+const GD_SAY = {no_code:'код не прочитан', unknown:'нет в реестре', written:'уже списана',
+                sold:'ушла с заказом', deleted:'убрана из реестра', no_item:'нет в каталоге',
+                taken:'эту уже записали'};
+
+async function gdScan(driver){
+  if(!await accAskBack('Охрана')) return;
+  EXP_GUARD = {driver, code:'', name:'', cost:0};
+  ACC_BACK = gdBack;
+  _setText('accTitle', 'Бутылка охране');
+  _setText('accSub', driver);
+  document.getElementById('accAct').innerHTML = '';
+  document.getElementById('accFoot').innerHTML = '';
+  document.getElementById('accMid').innerHTML = `<div class="qwrap">
+    <div class="scan-cam">
+      <video id="gdVideo" playsinline muted autoplay></video>
+      <div class="scan-frame" id="gdFrame">
+        <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+        <div class="scan-badge" id="gdBadge"></div>
+      </div>
+      <div class="scan-hud">
+        <div class="scan-hud-top"></div>
+        <div class="scan-tip">Одна бутылка — один код</div>
+        <div class="scan-hud-bot">
+          <div class="scan-dockbar"><button class="scan-go" onclick="gdBack()">Отмена</button></div>
+        </div>
+      </div>
+      <div class="scan-deny" id="gdDeny">
+        <b>Нет доступа к камере</b>
+        <i>Разрешите камеру в настройках телеграма — без неё код не прочитать</i>
+        <button onclick="gdCam()">Попробовать снова</button>
+      </div>
+    </div></div>`;
+  scanLive('accOv');
+  gdCam();
+}
+async function gdCam(){
+  const deny = document.getElementById('gdDeny');
+  try{
+    await SCAN.start(document.getElementById('gdVideo'), gdCode, null, null, null);
+    if(deny) deny.classList.remove('show');
+  }catch(e){ if(deny) deny.classList.add('show'); }
+}
+function gdBack(){
+  try{ SCAN.stop(); }catch(e){}
+  ACC_BACK = null;
+  accExpenses();
+}
+function gdFlash(txt, cls, hap){
+  const f = document.getElementById('gdFrame'), b = document.getElementById('gdBadge');
+  if(!f || !b) return;
+  f.classList.remove('ok','dup','err'); void f.offsetWidth; f.classList.add(cls);
+  b.textContent = txt;
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred(hap); }catch(e){}
+  clearTimeout(_gdT);
+  _gdT = setTimeout(() => { f.classList.remove('ok','dup','err'); b.textContent = ''; }, 1400);
+}
+// Что за бутылка — спрашиваем у камеры, а не при записи: «уже продана» надо
+// узнать, пока она в руке и её можно вернуть на полку.
+async function gdCode(code){
+  if(_gdBusy) return;
+  _gdBusy = true;
+  try{
+    const r = await ownerApi.ownerFetch('/api/owner/bottle', {params:{code}});
+    if(!r.ok){ gdFlash(r.say || 'не наша бутылка', 'err', 'error'); return; }
+    EXP_GUARD = {...EXP_GUARD, code, name: r.bottle || '', cost: r.cost || 0};
+    gdFlash(`${r.bottle || 'наша'}${r.cost ? ' · ' + fmt(r.cost) + ' AED' : ''}`, 'ok', 'success');
+    setTimeout(() => { try{ SCAN.stop(); }catch(e){} ACC_BACK = null; accExpenses(); }, 600);
+  }catch(e){
+    gdFlash('не отправилось', 'err', 'error');
+  }finally{
+    setTimeout(() => { _gdBusy = false; }, 700);
+  }
 }
 
 // Какой строке принадлежит снимок. Один аппарат камеры на весь список,
@@ -17916,12 +18001,16 @@ function expToggleForm(driver){
 async function expAddExtra(driver, kindId){
   const k = expKind(kindId) || expKind('other');
   if(!await accAskBack(k.t)) return;
-  const amount = parseInt((document.getElementById('amt-' + k.id)?.value || '').replace(/\D/g,''), 10);
+  // Охране платят бутылкой: сумму берём с кода, а не из поля.
+  const бут = k.scan ? (EXP_GUARD.driver === driver && EXP_GUARD.code ? EXP_GUARD : null) : null;
+  const amount = k.scan ? (бут ? бут.cost : 0)
+    : parseInt((document.getElementById('amt-' + k.id)?.value || '').replace(/\D/g,''), 10);
   const comment = (document.getElementById('cmt-' + k.id)?.value || '').trim();
+  if(k.scan && !бут){ _toast('Сканируйте бутылку'); return; }
   // Трата без объяснения через неделю не отличить от опечатки — поэтому слова
   // обязательны, и сказать об этом надо здесь, а не после отправки.
-  if(!amount || !comment){
-    _toast(!amount ? 'Впишите сумму' : (k.who ? 'Впишите, кто' : 'Впишите, за что'));
+  if((!amount && !k.scan) || !comment){
+    _toast(!comment ? (k.who ? 'Впишите, кто' : 'Впишите комментарий') : 'Впишите сумму');
     return;
   }
   // Снимок засчитывается только своей строке: чек от заправки не должен
@@ -17932,8 +18021,10 @@ async function expAddExtra(driver, kindId){
   try{
     const r = await ownerApi.ownerFetch('/api/owner/expenses/extra',
       {method:'POST', body:{day:EXP.day, driver, amount, comment, kind:k.id,
-                            photo:снимок.photo, thumb:снимок.thumb, as:_meName()}});
+                            photo:снимок.photo, thumb:снимок.thumb, as:_meName(),
+                            ...(бут ? {code: бут.code} : {})}});
     EXP_SHOT = {kind:'', photo:'', thumb:''};
+    if(бут) EXP_GUARD = {driver:'', code:'', name:'', cost:0};
     // Список остаётся раскрытым: за смену на человека приходится не одна
     // трата, и закрывать его после каждой значит открывать заново.
     _expReplace(r.driver);
@@ -17941,7 +18032,8 @@ async function expAddExtra(driver, kindId){
     _toast(`${driver}: ${k.plus ? '−' : '+'}${amount} AED · ${k.t}`);
   }catch(e){
     const why = ((e || {}).payload || {}).error;
-    _toast(why === 'no_photo'  ? 'Без снимка чека такую трату не записать'
+    _toast(GD_SAY[why] ? 'Бутылка: ' + GD_SAY[why]
+         : why === 'no_photo'  ? 'Без снимка чека такую трату не записать'
          : why === 'photo_big' ? 'Снимок слишком тяжёлый, снимите ещё раз'
          : why === 'bad_photo' ? 'Снимок не открылся, снимите ещё раз'
                                : 'Не удалось добавить');

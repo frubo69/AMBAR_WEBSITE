@@ -1039,6 +1039,15 @@ async def handle_where(request):
 
 
 @require_owner
+async def handle_pos_who(request):
+    """Спрашивать ли у этого человека геопозицию. Решает сервер, а не панель:
+    у владельцев её не спрашивают вовсе — окно с вопросом у них появлялось,
+    пока панель проверяла сама."""
+    name = staff.senior_star_by_tg(request.get("owner_id"))
+    return web.json_response({"senior": bool(name), "name": name}, headers=CORS_HEADERS)
+
+
+@require_owner
 async def handle_pos(request):
     """Точка старшего из панели. Панель спрашивает у телеграма, где телефон,
     и присылает одну точку раз в минуту, пока открыта. Принимаем только от
@@ -3752,6 +3761,7 @@ def setup(app):
     app.router.add_post(            "/api/owner/geo-unlock", handle_geo_unlock)
     app.router.add_route("OPTIONS", "/api/owner/pos", handle_pos)
     app.router.add_post(            "/api/owner/pos", handle_pos)
+    app.router.add_get(             "/api/owner/pos", handle_pos_who)
     app.router.add_post(            "/api/owner/checklist/mark", handle_checklist_mark)
     app.router.add_route("OPTIONS", "/api/owner/support-threads", handle_support_threads)
     app.router.add_get(             "/api/owner/support-threads", handle_support_threads)

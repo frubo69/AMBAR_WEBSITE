@@ -27338,11 +27338,18 @@ try{ setTimeout(callInit, 1500); }catch(e){}
       if(e && (e.status === 403 || e.status === 401)) stop = true;   // не старший
     }finally{ busy = false; }
   }
-  window.addEventListener('load', () => {
-    setTimeout(push, 4000);
+  // Сперва спрашиваем сервер, старший ли это. Пока не ответил «да», к
+  // телеграму за геопозицией не ходим: окно с вопросом у владельца — ошибка.
+  async function arm(){
+    try{
+      const r = await ownerApi.ownerFetch('/api/owner/pos');
+      if(!r || !r.senior){ stop = true; return; }
+    }catch(e){ stop = true; return; }
+    push();
     setInterval(push, EVERY);
     document.addEventListener('visibilitychange', () => { if(!document.hidden) push(); });
-  });
+  }
+  window.addEventListener('load', () => setTimeout(arm, 4000));
 })();
 </script>
 </body>

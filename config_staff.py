@@ -92,13 +92,13 @@ DRIVER_IDS = _parse_driver_ids(_os.getenv("AMBAR_DRIVER_IDS", ""))
 DRIVER_BY_TG = {v: k for k, v in DRIVER_IDS.items()}
 
 # ── старший в AMBAR STAR ─────────────────────────────────────────────────────
-# В панель владельца входят трое: владелец, второй владелец и старший. Его
-# геопозицию владельцы смотрят из панели, и о её пропаже им пишет сторож.
-# Кто из троих старший — строкой в .env, тем же видом, что у водителей:
-# AMBAR_SENIOR_STAR_IDS="Имя:telegram_id". Строки нет — берём старшего
-# из расписания выше.
-SENIOR_STAR_IDS = _parse_driver_ids(_os.getenv("AMBAR_SENIOR_STAR_IDS", "")) \
-    or {s["name"]: s["telegram_id"] for s in SENIOR_OPERATORS}
+# В панель владельца входят трое: владелец, второй владелец и старший —
+# менеджер, не оператор из расписания выше. Его геопозицию владельцы смотрят
+# из панели, и о её пропаже им пишет сторож. Кто из троих старший — только
+# строкой в .env, тем же видом, что у водителей: AMBAR_SENIOR_STAR_IDS=
+# "Имя:telegram_id". Строки нет — старшего нет, и панель ни у кого
+# геопозицию не спрашивает.
+SENIOR_STAR_IDS = _parse_driver_ids(_os.getenv("AMBAR_SENIOR_STAR_IDS", ""))
 
 
 def senior_star_by_tg(telegram_id) -> str:

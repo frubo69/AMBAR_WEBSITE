@@ -153,18 +153,22 @@ def text_lock_driver(since: datetime) -> str:
             "и не вернулась до конца смены. Открыть доступ может старший.")
 
 
+def _sn(name: str) -> str:
+    """Старший в сообщении: имя и роль, а если имени нет — одна роль."""
+    return f"*{_n(name)}* (старший)" if name.lower() != "старший" else "*Старший*"
+
+
 def text_senior_off(name: str, why: str, geo: dict) -> str:
-    n = _n(name)
     if why == "stream":
-        return f"📍 *{n}* (старший): трансляция геопозиции выключена"
+        return f"📍 {_sn(name)}: трансляция геопозиции выключена"
     if why == "never":
-        return f"📍 *{n}* (старший): геопозиция не видна\nС начала смены не было ни одной точки."
+        return f"📍 {_sn(name)}: геопозиция не видна\nС начала смены не было ни одной точки."
     mins = int((geo.get("age_sec") or 0) // 60)
-    return f"📍 *{n}* (старший): геопозиция не видна\nТочек нет уже {mins} мин."
+    return f"📍 {_sn(name)}: геопозиция не видна\nТочек нет уже {mins} мин."
 
 
 def text_senior_on(name: str, gone_sec: float = 0) -> str:
-    return (f"📍 *{_n(name)}* (старший): геопозиция снова видна"
+    return (f"📍 {_sn(name)}: геопозиция снова видна"
             + (f"\nНе было {_dur(gone_sec)}." if gone_sec else ""))
 
 
@@ -346,7 +350,7 @@ async def on_senior_stream(name: str, on: bool, now: datetime = None) -> bool:
                           EVENT_SENIOR, exclude=_senior_ids())
         else:
             await db.geo_watch_set(key, {"day": day, "seen": True}, unset=["stream_off"])
-            await _owners(f"📍 *{_n(name)}* (старший): включил трансляцию геопозиции",
+            await _owners(f"📍 {_sn(name)}: включил трансляцию геопозиции",
                           EVENT_SENIOR, exclude=_senior_ids())
         return True
     if off_since and st.get("off_why") == "stream":

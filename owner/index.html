@@ -2949,42 +2949,56 @@ button.path:active{transform:scale(.995)}
 .wh-grp-b .wh-r + .wh-r{box-shadow:0 -1px 0 rgba(255,255,255,.06)}
 .wh-grp-b .wh-r:active{background:rgba(255,255,255,.05)}
 
-/* Карточка водителя — то же место, что и список: шторка ведёт себя стопкой
-   экранов. Наверху крупно состояние, ниже факты, внизу действия. */
-.wh-card{padding:2px 2px 4px}
-.wh-card-top{display:flex;align-items:center;gap:14px;padding:6px 4px 16px}
-.wh-card-i{width:46px;height:46px;flex:0 0 auto;border-radius:16px;display:flex;
-  align-items:center;justify-content:center;background:var(--bg3);
-  border:1px solid var(--border2);color:var(--dim)}
-.wh-card-i svg{width:20px;height:20px}
-.wh-card.live .wh-card-i{background:rgba(61,220,132,.12);
-  border-color:rgba(61,220,132,.35);color:#3ddc84}
-.wh-card.snap .wh-card-i{background:var(--gold-soft);
-  border-color:rgba(201,169,110,.35);color:var(--gold2)}
+/* ── Карточка человека: стекло слоями, без описаний ─────────────────────
+   Наверху крупно состояние, ниже факты плитками, внизу два действия
+   плитками с иконками. Текста, объясняющего кнопки, нет: кнопка сама
+   говорит, что делает. Стекло — градиент с бликом по верхней кромке и мягкой
+   тенью, как у самой шторки. */
+.wh-card{padding:4px 2px 6px}
+.wh-card-top{display:flex;align-items:center;gap:14px;padding:4px 2px 16px;margin:0}
+.wh-card-i{width:54px;height:54px;flex:0 0 auto;border-radius:18px;display:flex;
+  align-items:center;justify-content:center;color:var(--muted);
+  background:linear-gradient(180deg,rgba(255,255,255,.10),rgba(255,255,255,.035));
+  border:1px solid rgba(255,255,255,.12);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.16),0 10px 26px rgba(0,0,0,.35)}
+.wh-card-i svg{width:22px;height:22px}
+.wh-card.live .wh-card-i{color:#3ddc84;border-color:rgba(61,220,132,.45);
+  background:linear-gradient(180deg,rgba(61,220,132,.24),rgba(61,220,132,.06));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 10px 26px rgba(61,220,132,.16)}
+.wh-card.snap .wh-card-i{color:var(--gold2);border-color:rgba(201,169,110,.45);
+  background:linear-gradient(180deg,rgba(201,169,110,.24),rgba(201,169,110,.06));
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.2),0 10px 26px rgba(201,169,110,.16)}
+.wh-card.panic .wh-card-i{border-color:rgba(224,85,85,.5);
+  background:linear-gradient(180deg,rgba(224,85,85,.22),rgba(224,85,85,.06))}
 .wh-card-b{flex:1;min-width:0}
-.wh-card-n{font-size:15px;font-weight:600;line-height:1.4}
-.wh-card-n b{color:#3ddc84;font-weight:700}
-.wh-card-n u{text-decoration:none;color:var(--gold2);font-weight:700}
-.wh-card-s{font-size:12.5px;color:var(--muted);margin-top:5px;line-height:1.35}
-.wh-card-s b{color:#3ddc84;font-weight:600}
-.wh-card-s u{text-decoration:none;color:var(--gold2);font-weight:600}
-/* Факты в ряд: то, что спрашивают про водителя чаще всего. */
-.wh-facts{display:flex;gap:7px;margin-bottom:10px}
-.wh-facts span{flex:1 1 0;min-width:0;padding:11px 10px;border-radius:12px;
-  background:rgba(255,255,255,.05);border:1px solid var(--border2);text-align:center}
-.wh-facts b{display:block;font-family:'Space Grotesk',sans-serif;font-size:18px;
-  font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
-.wh-facts i{display:block;font-style:normal;font-size:9.5px;letter-spacing:.5px;
-  text-transform:uppercase;color:var(--muted);margin-top:5px}
-.wh-act{display:flex;align-items:center;gap:10px;width:100%;padding:13px 14px;
-  margin-bottom:8px;border-radius:14px;cursor:pointer;font-family:inherit;
-  font-size:13.5px;font-weight:600;color:var(--text);
-  background:rgba(255,255,255,.05);border:1px solid var(--border2);text-align:left}
-.wh-act:active{background:rgba(255,255,255,.09)}
-.wh-act.on{color:var(--gold2);background:var(--gold-soft);
-  border-color:rgba(201,169,110,.35)}
-.wh-act svg{flex:0 0 auto;opacity:.8}
-.wh-act i{margin-left:auto;font-style:normal;font-size:11.5px;color:var(--muted)}
+.wh-card-n{display:block;font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;
+  letter-spacing:-.3px;line-height:1.15;color:var(--text)}
+.wh-card.live .wh-card-n{color:#3ddc84}
+.wh-card.snap .wh-card-n{color:var(--gold2)}
+.wh-card.panic .wh-card-n{color:var(--dn)}
+.wh-card-s{display:block;font-size:12px;color:var(--muted);margin-top:5px;line-height:1.35}
+.wh-facts{display:flex;gap:8px;margin-bottom:8px}
+.wh-facts span{flex:1 1 0;min-width:0;padding:14px 8px;border-radius:16px;text-align:center;
+  background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03));
+  border:1px solid rgba(255,255,255,.1);box-shadow:inset 0 1px 0 rgba(255,255,255,.12)}
+.wh-facts b{display:block;font-family:'Space Grotesk',sans-serif;font-size:20px;
+  font-weight:700;line-height:1;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.wh-facts b.zero{color:var(--dim)}
+.wh-facts i{display:block;font-style:normal;font-size:9px;letter-spacing:.7px;
+  text-transform:uppercase;color:var(--muted);margin-top:7px}
+.wh-acts{display:flex;gap:8px;margin-bottom:8px}
+.wh-act{flex:1 1 0;min-width:0;display:flex;flex-direction:column;align-items:center;gap:9px;
+  padding:15px 10px 13px;margin:0;border-radius:16px;cursor:pointer;font-family:inherit;
+  font-size:12.5px;font-weight:600;color:var(--text);text-align:center;
+  background:linear-gradient(180deg,rgba(255,255,255,.08),rgba(255,255,255,.03));
+  border:1px solid rgba(255,255,255,.1);box-shadow:inset 0 1px 0 rgba(255,255,255,.12);
+  transition:transform .15s var(--e1),background-color .15s var(--e1)}
+.wh-act:active{transform:scale(.97)}
+.wh-act svg{width:22px;height:22px;opacity:1;color:var(--sub)}
+.wh-act.on{color:var(--gold2);border-color:rgba(201,169,110,.45);
+  background:linear-gradient(180deg,rgba(201,169,110,.22),rgba(201,169,110,.06))}
+.wh-act.on svg{color:var(--gold2)}
+.wh-act i{display:none}
 
 /* Строка водителя.
    Отвечает не на «как его зовут» — это и так известно, — а на «кому отдать
@@ -9793,12 +9807,17 @@ function whCard(){
   _setText('whTtl', r.driver);
   _setText('whSub', r.senior ? 'старший · менеджер панели'
                     : ([r.code, r.name].filter(Boolean).join(' ') || 'водитель'));
-  let state;
-  if(st === 'stream') state = `<b>на связи</b> · трансляция ещё ${r.left < 60
-      ? r.left + ' мин' : Math.floor(r.left / 60) + ' ч'}`;
-  else if(st === 'snap') state = `<u>был здесь ${whAgo(r.age)}</u> · приложение закрыто`;
-  else if(r.has)        state = `молчит ${whAgo(r.age).replace(' назад','')} · последняя известная точка`;
-  else                  state = 'геопозицией не делится';
+  // Крупно — состояние, под ним одной строкой — почему. Бессрочная
+  // трансляция приходит сроком на десятки лет; «ещё 596523 ч» — не ответ.
+  const left = !r.left ? '' : r.left > 60 * 24 * 3 ? 'бессрочно'
+    : r.left < 60 ? `ещё ${r.left} мин` : `ещё ${Math.floor(r.left / 60)} ч`;
+  const когда = !r.has ? '' : (r.age < 90 ? 'сейчас'
+    : (r.age < 3600 ? Math.round(r.age / 60) + ' мин' : Math.floor(r.age / 3600) + ' ч'));
+  let head, sub;
+  if(st === 'stream'){ head = 'на связи'; sub = `трансляция ${left || 'идёт'} · точка ${когда}`; }
+  else if(st === 'snap'){ head = 'был здесь'; sub = `${whAgo(r.age)} · приложение закрыто`; }
+  else if(r.has){ head = 'молчит'; sub = `${whAgo(r.age).replace(' назад','')} · последняя известная точка`; }
+  else { head = 'не виден'; sub = 'геопозицией не делится'; }
 
   document.getElementById('whList').innerHTML = `
     <div class="wh-card ${st === 'stream' ? 'live' : (st === 'snap' ? 'snap' : '')}">
@@ -9806,33 +9825,19 @@ function whCard(){
         <span class="wh-card-i">${st === 'stream' ? IC_LIVE
           : (st === 'snap' ? IC_SNAP : IC_OFF)}</span>
         <span class="wh-card-b">
-          <span class="wh-card-n">${state}</span>
+          <span class="wh-card-n">${head}</span>
+          <span class="wh-card-s">${sub}</span>
         </span>
       </div>
       <div class="wh-facts">
         ${r.senior ? '' : `<span><b class="${r.orders ? '' : 'zero'}">${r.orders || '—'}</b><i>в пути</i></span>
-        <span><b>${r.done || '—'}</b><i>сдал за смену</i></span>`}
-        <span><b>${!r.has ? '—' : (r.age < 90 ? 'сейчас'
-          : (r.age < 3600 ? Math.round(r.age / 60) + ' мин'
-                          : Math.floor(r.age / 3600) + ' ч'))}</b><i>точка</i></span>
+        <span><b class="${r.done ? '' : 'zero'}">${r.done || '—'}</b><i>сдал</i></span>`}
+        <span><b class="${r.has ? '' : 'zero'}">${когда || '—'}</b><i>точка</i></span>
       </div>
-      ${r.has ? `<button class="wh-act${track ? ' on' : ''}" onclick="whTrack()">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-             stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M4 19s3-9 8-9 8 9 8 9"/><circle cx="4" cy="19" r="2"/><circle cx="20" cy="19" r="2"/></svg>
-        Маршрут за смену<i>${track ? 'скрыть' : 'показать'}</i></button>
-      <button class="wh-act" onclick="whFocus()">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-             stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="12" r="7"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3"/></svg>
-        Приблизить<i></i></button>` : ''}
-      <div class="wh-note">${r.senior
-        ? 'Точку присылает панель, пока открыта, или трансляция геопозиции в чате с ботом панели. Пропала — владельцам приходит сообщение.'
-        : st === 'stream'
-        ? 'Трансляция включена — водителя видно, даже когда телефон в кармане.'
-        : (st === 'snap'
-          ? 'Точка пришла из приложения. Пока трансляция не включена, следующая появится, только когда водитель снова его откроет.'
-          : 'Чтобы видеть водителя постоянно, он включает трансляцию в чате с ботом на 8 часов. Бот напоминает об этом сам.')}</div>
+      ${r.has ? `<div class="wh-acts">
+        <button class="wh-act${track ? ' on' : ''}" onclick="whTrack()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="5.5" r="2.5"/><path d="M7.6 16.4c2.2-2.6 3.4-5 6.6-6.8 1.2-.7 2-1.3 2.5-2" stroke-dasharray="1.2 3.4"/></svg>Маршрут</button>
+        <button class="wh-act" onclick="whFocus()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="5.5"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><path d="M12 2.5v3M12 18.5v3M2.5 12h3M18.5 12h3"/></svg>Приблизить</button>
+      </div>` : ''}
     </div>`;
   whMapPaint();
 }

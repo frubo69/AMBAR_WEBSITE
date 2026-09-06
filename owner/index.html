@@ -1455,6 +1455,11 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
    видимой высоте, и плитки вылезали за экран — а значит, ездили под пальцем.
    Здесь остаётся только запас на первую отрисовку, пока не посчитали. */
 #accHome{display:flex;flex-direction:column;gap:9px;min-height:320px}
+/* На узком экране название плитки в две строки съедает высоту всей строки
+   плиток — ужимаем шрифт, а не режем слова. */
+@media (max-width:380px){
+  .acc-t{font-size:13px;letter-spacing:.4px}
+}
 .acc-group{display:grid;grid-template-columns:1fr 1fr;margin:0;flex:1 1 auto;
   border-radius:16px;overflow:hidden;background:var(--card);
   border:1px solid var(--border2)}
@@ -13299,6 +13304,13 @@ function accFit(){
   const низ = пан ? пан.getBoundingClientRect().height : 68;
   const место = Math.max(240, Math.round(window.innerHeight - верх - низ - 12));
   box.style.minHeight = место + 'px';
+  // Плитки могут и не поместиться: на телефоне поуже названия ложатся в две
+  // строки, а без полного экрана телеграм забирает верх под свою шапку. Тогда
+  // страница обязана прокручиваться, а нижний отступ, который мы снимаем ради
+  // «ровно в экран», надо вернуть — иначе последняя плитка уезжает под
+  // нижнюю полосу, и до неё не добраться. Так было у старшего.
+  const надо = box.scrollHeight;
+  стр.style.marginBottom = надо > место + 4 ? '0px' : '';
 }
 addEventListener('resize', () => { try{ accFit(); }catch(e){} });
 

@@ -2533,10 +2533,12 @@ button.path:active{transform:scale(.995)}
    строки: так правка не заставляет перерисовывать раскрытую строку целиком. */
 .ord-r:not(.fixed) .ord-reset{display:none}
 .ord-edited[hidden]{display:none}
-.ord-hint{padding:2px 0 0;font-size:11.5px;line-height:1.4;color:var(--muted)}
+.ord-hint{padding:0 2px 10px;font-size:11.5px;line-height:1.4;color:var(--muted)}
 .ord-hint b{color:var(--gold2);font-weight:600}
 
-.ord-find{position:relative;display:flex;align-items:center;margin:12px 0 4px}
+/* Одна сетка: 10 между сводкой, поиском и первой карточкой — как между
+   карточками ниже. Было 12 сверху и 4 снизу, и поиск висел криво. */
+.ord-find{position:relative;display:flex;align-items:center;margin:0 0 10px}
 .ord-find svg{position:absolute;left:12px;width:15px;height:15px;fill:none;stroke:var(--muted);
   stroke-width:1.9;stroke-linecap:round;pointer-events:none}
 .ord-find input{width:100%;padding:11px 34px;border-radius:12px;background:var(--card);
@@ -14647,7 +14649,7 @@ function ordSumInner(){
   const pos = (d.rows || []).length;
   return `<span class="ord-sum-c"><b>${fmt(d.total_qty || 0)}</b><i>бутылок</i></span>
     <span class="ord-sum-c gold" onclick="ordPrices()" role="button"
-          title="Цена по позициям"><b>${fmt(d.total_aed || 0)}<u>AED</u></b><i>прайс</i></span>
+          aria-label="Цена по позициям"><b>${fmt(d.total_aed || 0)}<u>AED</u></b><i>прайс</i></span>
     <span class="ord-sum-c"><b>${pos}</b><i>позиций</i></span>`;
 }
 

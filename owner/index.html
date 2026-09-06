@@ -2110,6 +2110,15 @@ button.path:active{transform:scale(.995)}
 .xs-cats .xs-chip{flex-shrink:0;white-space:nowrap}
 .xs-chip i{font-style:normal;font-size:11px;color:var(--muted);margin-left:2px}
 .xs-chip.on i{color:var(--gold2);opacity:.7}
+/* Приёмка заявки на базу — те же карточки, что в итоге мастера. */
+.xs-top-b .pstat-c{display:inline-flex}
+.xs-top-b .xs-top-s{display:block;font-style:normal;font-size:12px;font-weight:500;letter-spacing:0;
+  text-transform:none;color:var(--muted);margin:8px 0 0}
+.xs-dcard.live{border-color:rgba(201,169,110,.4)}
+.xs-dcard.done{opacity:.7}
+.xs-pl.ok .xs-pl-q{background:rgba(76,175,125,.18);color:var(--up)}
+.xs-pl-q u{text-decoration:none;font-size:11px;font-weight:600;opacity:.7}
+.xs-dcard .rt-acts,.xs-dcard > .rt-take,.xs-dcard > .rt-rel{margin-top:10px}
 /* Закупка на других базах — своя карточка на хабе, золотом: это отдельная
    функция, а не строка среди прочих. */
 .xbox{border-color:rgba(201,169,110,.4);
@@ -16229,6 +16238,55 @@ async function xOpen(sid){
   ACC_BACK = accExtra;
 }
 
+// ── приёмка заявки на базу ──
+// Тот же документ и те же кнопки, что у основной приёмки, но экран собран
+// как итог мастера: статус и принятое сверху, карточка на район, внутри
+// товар с картинкой и числом. Старший видит, что ехало, что уже на полке
+// и кто везёт, — и берёт район на себя той же кнопкой.
+function xSupRender(d){
+  const D = d.districts || {};
+  const tasks = d.tasks || [];
+  const all = tasks.length;
+  const done = tasks.filter(t => t.done_at).length;
+  const busy = tasks.filter(t => t.driver && !t.done_at).length;
+  const need = tasks.reduce((a, t) => a + (t.need || 0), 0);
+  const got  = tasks.reduce((a, t) => a + (t.got || 0), 0);
+  const st = d.status === 'cancelled' ? ['отменена', 'no']
+           : d.status !== 'open' ? [got < need ? 'недобор' : 'принято', 'done']
+           : (busy || done) ? ['в работе', 'live'] : ['ждёт', 'wait'];
+  _setText('accTitle', d.base || 'Другая база');
+  _setText('accSub', '');
+  const order = t => t.done_at ? 2 : (t.driver ? 1 : 0);
+  const cards = [...tasks].sort((a, b) => order(a) - order(b)).map(t => {
+    const x = D[t.district] || {};
+    const who = t.done_at ? (t.got < t.need ? `недобор · закрыл ${_hm(t.done_at)}` : `принято · ${_hm(t.done_at)}`)
+              : t.driver ? `${escS(t.driver)}${t.started_at ? ' · с ' + _hm(t.started_at) : ''}`
+              : 'никто не взял';
+    return `<div class="xs-dcard ${t.done_at ? 'done' : t.driver ? 'live' : ''}">
+      <div class="xs-dcard-h">
+        <span class="xs-dc">${escS(x.code || '')}</span>
+        <span class="xs-dcard-b"><b>${escS(x.name || t.district)}</b><i>${who}</i></span>
+        <span class="xs-dcard-n">${fmt(t.got)}<i>/ ${fmt(t.need)}</i></span>
+      </div>
+      ${(t.lines || []).map(l => `<div class="xs-pl ${l.left ? '' : 'ok'}">
+        <img class="xr-img" src="/products/${escS(l.id)}.webp" alt="" loading="lazy"
+             onerror="this.style.visibility='hidden'">
+        <span class="xs-pl-n">${escS(l.name)}</span>
+        <span class="xs-pl-q">${l.got ? `${l.got}<u>/${l.need}</u>` : l.need}</span>
+      </div>`).join('')}
+      ${t.note ? `<div class="rt-note">${escS(t.note)}</div>` : ''}
+      ${rtActs(t, d)}
+    </div>`;
+  }).join('');
+  document.getElementById('accMid').innerHTML = `<div class="xs-top">
+      <span class="xs-top-b"><span class="pstat-c ${st[1]}">${st[0]}</span>
+        <i class="xs-top-s">${done} из ${all} ${pluralize(all,'района','районов','районов')} приняли</i></span>
+      <span class="xs-top-n">${fmt(got)}<i>из ${fmt(need)} ${pluralize(need,'бутылки','бутылок','бутылок')}</i></span>
+    </div>${cards || '<div class="exp-empty">Районов нет</div>'}`;
+  supActShow();
+  supFoot();
+}
+
 // ── мастер: куда → что → готово ──
 let XS = null;
 
@@ -16630,6 +16688,7 @@ let SUP_GOTO = '';
 
 function supRender(){
   const d = SUP_D; if(!d) return;
+  if(d.kind === 'extra'){ xSupRender(d); return; }
   const short = d.shortfall || {rows:[], qty:0};
   const D = d.districts || {};
   const tasks = d.tasks || [];

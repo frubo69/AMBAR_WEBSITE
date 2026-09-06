@@ -9191,7 +9191,10 @@ function whCardStop(h, hdH, tbH, peek){
   const body = document.getElementById('whList');
   const card = body && body.firstElementChild;
   if(!card) return Math.round(h * 0.46);
-  const need = hdH + tbH + card.offsetHeight + 18;
+  // Плюс отступ карточки от шапки (18) и воздух над панелью снизу (40):
+  // без них последняя плитка садилась впритык к панели, и карточку
+  // приходилось подтягивать рукой.
+  const need = hdH + tbH + card.offsetHeight + 18 + 18 + 40;
   return Math.max(0, Math.min(peek, Math.round(h - need)));
 }
 

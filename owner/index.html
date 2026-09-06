@@ -9632,7 +9632,7 @@ function whPaint(){
           <div class="wh-grp">
             <span class="wh-grp-c">${escS(g.code || '')}</span>
             <span class="wh-grp-n">${escS(g.name || '')}</span>
-            <span class="wh-grp-s">${g.id === 'senior' ? 'старший оператор'
+            <span class="wh-grp-s">${g.id === 'senior' ? 'старший · менеджер панели'
               : живых ? `${живых} на связи`
               : `${g.rows.length} ${pluralize(g.rows.length,'водитель','водителя','водителей')}`}${
               заказы ? ` · ${заказы} в пути` : ''}</span>
@@ -9752,7 +9752,7 @@ function whCard(){
   const st = whState(r);
   const track = (d.track || []).length > 1;
   _setText('whTtl', r.driver);
-  _setText('whSub', r.senior ? 'старший оператор'
+  _setText('whSub', r.senior ? 'старший · менеджер панели'
                     : ([r.code, r.name].filter(Boolean).join(' ') || 'водитель'));
   let state;
   if(st === 'stream') state = `<b>на связи</b> · трансляция ещё ${r.left < 60

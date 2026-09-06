@@ -2533,6 +2533,18 @@ button.path:active{transform:scale(.995)}
 /* Строки внутри карточки района — не плитки: своей заливки и рамки у них
    нет, их делит тонкая золотая черта, как бригаду в журнале смен. */
 .ord-dl{margin-top:10px;padding-top:2px;border-top:1px solid rgba(201,169,110,.12)}
+/* Шапка карточки района — кнопка: свёрнута по умолчанию, стрелка справа
+   поворачивается на раскрытии. */
+.ord-dh{width:100%;border:0;background:none;color:var(--text);font-family:inherit;
+  text-align:left;cursor:pointer;padding:0;-webkit-tap-highlight-color:transparent}
+.ord-dh > *{pointer-events:none}
+.ord-dh:active{opacity:.75}
+.ord-dh-go{flex:0 0 auto;display:flex;color:var(--muted);margin-left:-2px;
+  transition:transform .18s var(--e1)}
+.ord-dc.open .ord-dh-go{transform:rotate(90deg)}
+.ord-r-img{flex:0 0 auto;width:32px;height:32px;border-radius:9px;overflow:hidden;
+  background:var(--card2);border:1px solid var(--border2)}
+.ord-r-img img{width:100%;height:100%;object-fit:cover;display:block}
 .ord-r{border-radius:0;background:transparent;border:0;border-top:1px solid rgba(255,255,255,.05);overflow:hidden}
 .ord-r:first-child{border-top:0}
 .ord-r.fixed .ord-r-n{color:var(--gold2)}
@@ -3557,9 +3569,9 @@ button.path:active{transform:scale(.995)}
 /* ── Заявка: номер строки, нулевые позиции, цена по нажатию ───────────────
    Номер тот же, что в файле для магазина: по нему сверяют позицию голосом и
    пальцем, не читая название целиком. */
-.ord-r-i{flex:0 0 auto;width:26px;font-family:'DM Sans',sans-serif;font-size:11px;
+.ord-r-i{flex:0 0 auto;width:22px;font-family:'DM Sans',sans-serif;font-size:11px;
   font-weight:700;color:var(--muted);font-variant-numeric:tabular-nums;text-align:right;
-  padding-right:9px}
+  padding-right:4px}
 /* Позиция, которой в заявке нет: она в списке ради дозаказа, но не должна
    спорить за внимание с тем, что действительно везут. */
 .ord-r.zero .ord-r-n{color:var(--sub)}
@@ -14353,7 +14365,7 @@ async function accOrder(){
   catch(e){ document.getElementById('accMid').innerHTML =
     '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
   ACC_ORDER = d;
-  ORD = {d, open:null, q:'', tab:'need', busy:false, pend:{}, timer:null};
+  ORD = {d, open:null, q:'', tab:'need', busy:false, pend:{}, timer:null, fold:{}};
   // Поставку спрашиваем здесь же: без неё непонятно, на каком мы шаге.
   if(!ACC_SUP){
     try{
@@ -14663,14 +14675,19 @@ function ordDistricts(list, dist, q){
     const aed = rows.reduce((a, r) => a + ((r.cells[x.id] || {}).need || 0) * (r.price || 0), 0);
     const pos = rows.filter(r => (r.cells[x.id] || {}).need > 0).length;
     if(!rows.length) return '';
-    return `<div class="shl-card">
-      <div class="shl-h">
+    // Свёрнутая карточка отвечает на главный вопрос — сколько и на сколько —
+    // без ста строк под ней; список раскрывают, когда надо править. Поиск
+    // раскрывает все: искали позицию — её надо увидеть.
+    const open = !!q || !!(ORD.fold || {})[x.id];
+    return `<div class="shl-card ord-dc${open ? ' open' : ''}">
+      <button class="shl-h ord-dh" onclick="ordFold('${x.id}')">
         <span class="shl-code">${escS(x.code || '')}</span>
         <span class="shl-b"><b>${escS(x.name || x.id)}</b>
           <i>${pos} ${pluralize(pos,'позиция','позиции','позиций')} / ${fmt(qty)} ${pluralize(qty,'бутылка','бутылки','бутылок')}</i></span>
         <span class="shl-v"><b>${fmt(Math.round(aed))}<u>AED</u></b><i>прайс</i></span>
-      </div>
-      <div class="ord-dl">${rows.map(r => ordRow(r, x, num[r.id])).join('')}</div>
+        <span class="ord-dh-go">${ICO_CHEV}</span>
+      </button>
+      ${open ? `<div class="ord-dl">${rows.map(r => ordRow(r, x, num[r.id])).join('')}</div>` : ''}
     </div>`;
   }).filter(Boolean);
   if(!cards.length) return '<div class="exp-empty">' + (q ? 'Ничего не нашлось'
@@ -14678,8 +14695,17 @@ function ordDistricts(list, dist, q){
   return `<div class="shl-list">${cards.join('')}</div>`;
 }
 
+function ordFold(id){
+  if(!ORD.fold) ORD.fold = {};
+  ORD.fold[id] = !ORD.fold[id];
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  ordRender();
+}
+
 // Строка позиции в карточке района. Свёрнутая — что и сколько; раскрытая —
-// счётчик этого района: править приходится именно точку.
+// счётчик этого района: править приходится именно точку. Картинка слева —
+// бутылку узнают по этикетке быстрее, чем по названию; номер остаётся: по
+// нему сверяют с файлом магазина.
 function ordRow(r, x, num){
   const key = r.id + '|' + x.id;
   const open = ORD.open === key;
@@ -14688,6 +14714,8 @@ function ordRow(r, x, num){
       c.need ? '' : ' zero'}" data-id="${r.id}">
     <button class="ord-r-h" onclick="ordOpen('${key}')">
       <span class="ord-r-i">${num || ''}</span>
+      <span class="ord-r-img"><img src="/products/${escS(r.id)}.webp" alt="" loading="lazy"
+        onerror="this.style.visibility='hidden'"></span>
       <span class="ord-r-n">${escS(r.name)}</span>
       <span class="ord-r-d">${c.edited ? `расчёт ${c.calc}` : `на полке ${c.have||0}`}</span>
       <span class="ord-r-v${c.edited ? ' gold' : ''}">${c.need || 0}</span>

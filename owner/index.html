@@ -2557,6 +2557,9 @@ button.path:active{transform:scale(.995)}
 /* Заголовка «Позиции · N» над общим списком нет: число позиций уже стоит в
    сводке сверху, а строка обычным текстом посреди плиток выглядела чужой.
    Остаётся только счёт найденного при поиске — мелко и заглавными. */
+.stk-mid.xs-fix > #ordRows{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  margin:0 -14px;padding:0 14px calc(24px + var(--safe-bottom))}
+.stk-mid.xs-fix > #ordRows::-webkit-scrollbar{display:none}
 .ord-grp{font-size:9.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;
   color:var(--muted);padding:2px 4px 8px}
 .ord-dists{border-radius:16px;overflow:hidden;
@@ -14712,8 +14715,13 @@ function ordRender(){
       ? (q ? `<div class="ord-grp">Найдено · ${list.length}</div>` : '')
         + (list.length ? list.map(r => ordRowAll(r, dist, num[r.id])).join('')
            : '<div class="exp-empty">' + (q ? 'Ничего не нашлось' : 'Довозить нечего — остатков хватает') + '</div>')
+        + ordSeparate(d, dist)
       : ordDistricts(list, dist, q)}</div>
-    ${ordSeparate(d, dist)}`;
+    ${общий ? '' : ordSeparate(d, dist)}`;
+  // В общем списке листается только каталог: сводка и поиск стоят на месте,
+  // иначе, чтобы найти позицию в середине сотни строк, поиск приходится
+  // сначала домотать обратно наверх.
+  document.getElementById('accMid').classList.toggle('xs-fix', общий);
 
   // Заявку отправляют не только себе: её шлют поставщику в ватсап или на почту.
   // Поэтому главная кнопка отдаёт файл системе — оттуда он уходит куда угодно, —

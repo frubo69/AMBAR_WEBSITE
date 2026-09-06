@@ -1861,19 +1861,33 @@ button.path:active{transform:scale(.995)}
   font-family:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
 .pd.off{cursor:default}
 .pd:not(.off):active{background:rgba(255,255,255,.03)}
-.pd-h{display:flex;align-items:center;gap:10px;padding:13px 16px 9px}
+.pd-h{display:flex;align-items:center;gap:10px;padding:11px 16px 7px}
 .pd-h b{flex:1;min-width:0;font-family:'Space Grotesk',sans-serif;font-size:11.5px;font-weight:700;
   letter-spacing:.9px;text-transform:uppercase;color:var(--muted)}
-.pd-r{display:flex;align-items:center;gap:12px;padding:10px 16px;
+.pd-r{display:flex;align-items:center;gap:12px;padding:8px 16px;
   border-top:1px solid rgba(255,255,255,.05)}
-.pd-r .shl-code{width:34px;height:34px;border-radius:10px;font-size:12px}
-.pd-r .pnav-b b{font-size:14px}
+.pd-r .shl-code{width:32px;height:32px;border-radius:10px;font-size:12px}
+.pd-r .pnav-b b{font-size:13.5px}
 .pd-r .pnav-b i{margin-top:2px}
 .pd-r.ok .pnav-b i{color:var(--up)}
 .pd-r.live .pnav-b i{color:var(--gold2)}
 .pd-r:last-child{padding-bottom:14px}
 .ohub .pbox{flex:0 0 auto;display:flex;flex-direction:column}
-.ohub .pbox .path{padding:26px 14px 24px}
+.ohub .pbox .path{padding:16px 14px 14px}
+.ohub .pnav-r.pbig{padding:13px 16px}
+.ohub.tight{gap:6px}
+.ohub.tight .pbox .path{padding:9px 14px 8px}
+.ohub.tight .path-s em{display:none}
+.ohub.tight .pnav-r.pbig{padding:7px 14px}
+.ohub.tight .pnav-r.pbig .pnav-b b{font-size:14px}
+.ohub.tight .pnav-i.big{width:38px;height:38px;border-radius:12px}
+.ohub.tight .pd-h{padding:9px 14px 5px}
+.ohub.tight .pd-r{padding:4px 14px}
+.ohub.tight .pd-r .shl-code{width:28px;height:28px;font-size:11px}
+.ohub.tight .pd-r .pnav-b b{font-size:13px}
+.ohub.tight .pd-r .pnav-b i{font-size:11px;margin-top:1px}
+.ohub.tight .pd-r:last-child{padding-bottom:7px}
+.ohub.tight .path-s u{font-size:18px}
 .pbox{margin:0 0 12px;border-radius:18px;overflow:hidden;background:var(--card);
   border:1px solid var(--border2)}
 .pbox .path{margin:0;border:0;border-radius:0;padding:20px 14px 18px;
@@ -13395,7 +13409,7 @@ function accFit(){
   box.style.minHeight = место + 'px';
   стр.style.marginBottom = надо > место + 4 ? '0px' : '';
 }
-addEventListener('resize', () => { try{ accFit(); }catch(e){} });
+addEventListener('resize', () => { try{ accFit(); ohubFit(); }catch(e){} });
 
 // ── день учёта ──────────────────────────────────────────────────────────────
 // Один день на всё приложение (DAY_OFFSET) — тот же, что листается свайпом по
@@ -14675,6 +14689,7 @@ function ordHub(){
     <div class="pbox">${pathNav()}<div class="path">${pathInner()}</div>${pathDistricts()}</div>
     <div class="pbox xbox">${pathExtra()}</div>
     ${рядом ? `<div class="pbox tail">${рядом}</div>` : ''}</div>`;
+  ohubFit();
 
   // Загрузка ответа магазина стоит внизу всегда. Раньше она пряталась во всех
   // состояниях, кроме двух, — и исчезала ровно тогда, когда была нужнее всего:
@@ -14693,6 +14708,15 @@ function ordHub(){
         <input type="file" id="ordFile" accept=".xlsx" style="display:none"
                onchange="supImport(this,'ordUp')">
       </div>`;
+}
+
+// Хаб обязан помещаться в экран без прокрутки. Меряем по факту: не влезло —
+// ужимаем (меньше полей, ниже строки), как плитки учёта.
+function ohubFit(){
+  const mid = document.getElementById('accMid'), hub = mid && mid.querySelector('.ohub');
+  if(!hub) return;
+  hub.classList.remove('tight');
+  if(hub.scrollHeight > mid.clientHeight + 2) hub.classList.add('tight');
 }
 
 // Перерисовать сводку — на хабе это путь, на странице заявки строка итогов.
@@ -16744,9 +16768,9 @@ function pathExtra(){
   const st = open.length ? _xState(open[0]) : null;
   return `<button class="pnav-r pbig ttl" onclick="accExtra()">
     <span class="pnav-i big live">${ICO_BASE}</span>
-    <span class="pnav-b"><b>Другие базы</b>
-      ${open.length ? `<i>${escS(open.map(x => x.base).join(' / '))}</i>`
-        : (ex.length ? `<i>${ex.length} ${pluralize(ex.length,'заявка','заявки','заявок')}</i>` : '<i>закупка мимо магазина</i>')}</span>
+    <span class="pnav-b"><b>Доп. заявка</b>
+      <i>другие базы${open.length ? ' / ' + escS(open.map(x => x.base).join(' / '))
+        : (ex.length ? ` / ${ex.length} ${pluralize(ex.length,'заявка','заявки','заявок')}` : '')}</i></span>
     ${st ? `<span class="pstat-c ${st[1]}">${open.length > 1 ? open.length + ' в работе' : st[0]}</span>` : ''}
     <span class="pnav-go">${ICO_CHEV}</span>
   </button>`;

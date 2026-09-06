@@ -1455,6 +1455,17 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
    видимой высоте, и плитки вылезали за экран — а значит, ездили под пальцем.
    Здесь остаётся только запас на первую отрисовку, пока не посчитали. */
 #accHome{display:flex;flex-direction:column;gap:9px;min-height:320px}
+/* Ужатый вид — когда в экран не влезло: те же плитки, меньше воздуха.
+   Включает accFit по факту, а не по размеру экрана: у одного телефона шапка
+   телеграма, у другого крупный шрифт, и мерить надо результат. */
+#accHome.tight{gap:8px}
+#accHome.tight .chk-entry{height:56px}
+#accHome.tight .acc-cell{padding:11px 12px;min-height:0}
+#accHome.tight .acc-ico{width:30px;height:30px}
+#accHome.tight .acc-ico svg{width:16px;height:16px}
+#accHome.tight .acc-t{font-size:13px;margin-top:7px}
+#accHome.tight .acc-n{font-size:18px;padding-top:5px}
+#accHome.tight .acc-s{min-height:0;-webkit-line-clamp:2;margin-top:3px;font-size:11px}
 /* На узком экране название плитки в две строки съедает высоту всей строки
    плиток — ужимаем шрифт, а не режем слова. */
 @media (max-width:380px){
@@ -13298,18 +13309,21 @@ function accFit(){
   const стр = document.getElementById('pg-money');
   if(!стр || !стр.classList.contains('active')) return;
   box.style.minHeight = '0px';                       // сначала отпускаем, потом меряем
+  box.classList.remove('tight');
   const прокрутка = (document.scrollingElement || {}).scrollTop || 0;
   const верх = box.getBoundingClientRect().top + прокрутка;
   const пан = document.querySelector('.tabbar');
   const низ = пан ? пан.getBoundingClientRect().height : 68;
   const место = Math.max(240, Math.round(window.innerHeight - верх - низ - 12));
-  box.style.minHeight = место + 'px';
   // Плитки могут и не поместиться: на телефоне поуже названия ложатся в две
   // строки, а без полного экрана телеграм забирает верх под свою шапку. Тогда
-  // страница обязана прокручиваться, а нижний отступ, который мы снимаем ради
-  // «ровно в экран», надо вернуть — иначе последняя плитка уезжает под
-  // нижнюю полосу, и до неё не добраться. Так было у старшего.
-  const надо = box.scrollHeight;
+  // сперва ужимаем плитки — меньше поля, мельче шрифт, подпись в две строки —
+  // и только если не помогло, возвращаем нижний отступ и даём странице
+  // прокрутку: иначе последняя плитка уезжает под нижнюю полосу. Так было у
+  // старшего.
+  let надо = box.scrollHeight;
+  if(надо > место + 4){ box.classList.add('tight'); надо = box.scrollHeight; }
+  box.style.minHeight = место + 'px';
   стр.style.marginBottom = надо > место + 4 ? '0px' : '';
 }
 addEventListener('resize', () => { try{ accFit(); }catch(e){} });

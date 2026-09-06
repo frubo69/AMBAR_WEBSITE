@@ -3704,6 +3704,12 @@ button.path:active{transform:scale(.995)}
   color:var(--muted)}
 .opr-foot b{font-family:'DM Sans',sans-serif;font-size:20px;letter-spacing:0;
   color:var(--gold2);font-variant-numeric:tabular-nums}
+.opr-miss{display:inline-flex;align-items:baseline;gap:6px;padding:0;border:0;background:none;
+  font-family:inherit;font-size:11px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;
+  color:var(--warn);cursor:pointer}
+.opr-miss b{color:var(--warn)}
+.opr-miss.on{color:var(--gold2)}
+.opr-miss.on b{color:var(--gold2)}
 .opr-foot b i{font-style:normal;font-size:10px;font-weight:600;margin-left:5px;
   color:var(--muted)}
 .opr-none{padding:34px 16px;text-align:center;color:var(--muted);font-size:13px}
@@ -4297,7 +4303,13 @@ button.path:active{transform:scale(.995)}
   text-overflow:ellipsis}
 /* Место под угловую метку освобождает только та зона, у которой метка есть.
    Отступ, поставленный всем трём, обрезал подписи в остальных двух. */
-.stkv-c:has(.stkv-cov) .stkv-l{padding-right:26px}
+/* Сумма закупки — кнопка: за ней закупочные цены по позициям, там же видно,
+   у скольких позиций цены нет. Процент из угла ушёл туда. */
+.stkv-c.tap{cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
+  -webkit-tap-highlight-color:transparent;border-color:rgba(201,169,110,.3)}
+.stkv-c.tap:active{transform:scale(.98)}
+.stkv-c.tap::after{content:'';position:absolute;top:11px;right:10px;width:6px;height:6px;
+  border-right:1.8px solid var(--muted);border-top:1.8px solid var(--muted);transform:rotate(45deg)}
 /* Отрицательный трекинг обязателен: на этом кегле «50 500» иначе рассыпается
    на отдельные знаки. */
 .stkv-v{font-family:'DM Sans',sans-serif;font-size:28px;font-weight:700;
@@ -11772,11 +11784,10 @@ function stkValueCard(reg){
         <div class="stkv-l">Количество</div>
         <div class="stkv-v">${fmt(bottles)}</div>
       </div>
-      <div class="stkv-c">
-        ${t && cover < 100 ? `<span class="stkv-cov">${cover}%</span>` : ''}
+      <button class="stkv-c tap" onclick="ordPrices()" aria-label="Закупочные цены">
         <div class="stkv-l">Закупка, AED</div>
         <div class="stkv-v">${t ? fmt(Math.round(t.cost)) : '—'}</div>
-      </div>
+      </button>
       <div class="stkv-c gold">
         <div class="stkv-l">Продажа, AED</div>
         <div class="stkv-v">${t ? fmt(Math.round(t.list)) : '—'}</div>
@@ -15058,10 +15069,20 @@ function oprPaint(keepFocus){
     const i = document.getElementById('oprQ');
     if(i){ i.focus(); i.selectionStart = i.value.length; }
   }
-  // Внизу — то, ради чего сюда заходят с экрана склада: насколько прайс полон.
-  const cover = d.cost_cover || 0;
-  document.getElementById('oprFoot').innerHTML =
-    `<span>Закупка известна</span><b>${cover}<i>% позиций</i></b>`;
+  oprFootPaint();
+}
+
+// Внизу — то, ради чего сюда заходят с экрана склада: у скольких позиций
+// закупки нет. Число, а не процент: «3 позиции без цены» — это работа, которую
+// видно и можно сделать здесь же, нажатием показав только их.
+function oprFootPaint(){
+  const f = document.getElementById('oprFoot'); if(!f) return;
+  const all = OPR.rows || [], known = all.filter(x => x.cost).length, miss = all.length - known;
+  f.innerHTML = miss
+    ? `<span>Без закупочной цены</span>
+       <button class="opr-miss${OPR.only ? ' on' : ''}" onclick="oprOnly()"><b>${miss}</b>${
+         pluralize(miss,'позиция','позиции','позиций')} · ${OPR.only ? 'показать все' : 'показать'}</button>`
+    : `<span>Закупка известна</span><b>у всех<i>позиций</i></b>`;
 }
 
 function oprRow(r){
@@ -15127,8 +15148,7 @@ async function oprSave(id, input){
     const known = (OPR.rows || []).filter(x => x.cost).length;
     OPR.d.cost_known = known;
     OPR.d.cost_cover = OPR.rows.length ? Math.round(known / OPR.rows.length * 100) : 0;
-    document.getElementById('oprFoot').innerHTML =
-      `<span>Закупка известна</span><b>${OPR.d.cost_cover}<i>% позиций</i></b>`;
+    oprFootPaint();
     _setText('oprSub', `${OPR.rows.length} ${
       pluralize(OPR.rows.length,'позиция','позиции','позиций')} · закупка у ${known}`);
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}

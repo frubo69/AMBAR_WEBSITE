@@ -2141,6 +2141,52 @@ button.path:active{transform:scale(.995)}
 .xe-rcp img{width:34px;height:34px;flex-shrink:0;border-radius:8px;object-fit:cover}
 .xe-rcp-t{flex:1;min-width:0;font-size:13px;font-weight:600}
 .xe-rcp-t i{display:block;font-style:normal;font-size:11px;font-weight:400;color:var(--muted);margin-top:2px}
+/* ── Финансы ── */
+.fin-card{border-radius:16px;background:var(--card);border:1px solid var(--border2);
+  padding:14px 14px 8px;margin-bottom:12px}
+.fin-top{display:flex;align-items:flex-start;gap:12px;padding-bottom:12px;
+  border-bottom:1px solid var(--border2)}
+.fin-top-b{flex:1;min-width:0}
+.fin-top-b b{display:block;font-size:16px;font-weight:700;line-height:1.2}
+.fin-top-b i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:4px}
+.fin-top-n{display:flex;gap:14px;flex-shrink:0}
+.fin-k{text-align:right;font-family:'Space Grotesk',sans-serif;font-size:20px;font-weight:700;line-height:1}
+.fin-k i{display:block;font-style:normal;font-family:'DM Sans',sans-serif;font-size:9.5px;
+  font-weight:600;letter-spacing:.4px;text-transform:uppercase;color:var(--muted);margin-top:5px}
+.fin-k.up{color:var(--up)}
+.fin-k.dn{color:var(--dn)}
+.fin-grp{font-size:9.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
+  color:var(--muted);padding:12px 2px 4px}
+.fin-r{border-top:1px solid var(--border2)}
+.fin-r:first-of-type{border-top:0}
+.fin-h{display:flex;align-items:center;gap:11px;width:100%;padding:11px 2px;border:0;
+  background:none;cursor:pointer;font-family:inherit;color:var(--text);text-align:left}
+.fin-h:active{opacity:.75}
+.fin-a{width:32px;height:32px;flex-shrink:0;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;color:var(--gold2);background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.25)}
+.fin-b{flex:1;min-width:0}
+.fin-b b{display:block;font-size:14.5px;font-weight:700;line-height:1.2}
+.fin-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px}
+.fin-v{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;
+  color:var(--text)}
+.fin-v i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:600;
+  color:var(--muted);margin-left:4px}
+.fin-v.up{color:var(--up)}
+.fin-v.dn{color:var(--dn)}
+.fin-l{padding:0 2px 10px 43px}
+.fin-i{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--border2);
+  font-size:12.5px}
+.fin-i-d{flex-shrink:0;width:40px;font-family:'Space Grotesk',sans-serif;font-size:11.5px;
+  color:var(--muted)}
+.fin-i-b{flex:1;min-width:0}
+.fin-i-b b{display:block;font-weight:600}
+.fin-i-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:1px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fin-i-v{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-weight:700}
+.fin-i-v.up{color:var(--up)}
+.fin-i-v.dn{color:var(--dn)}
+.fin-none{font-size:13px;color:var(--muted);text-align:center;padding:22px 0 14px}
 /* Приёмка — те же карточки, что в итоге мастера. У основной заявки позиции
    свёрнуты под флажок: их сотня, и разворачивают их по одному району. */
 .xs-fold{display:flex;align-items:center;justify-content:space-between;width:100%;
@@ -5020,38 +5066,25 @@ button.path:active{transform:scale(.995)}
 </div>
 
 <!-- ============ MORE ============ -->
-<div class="page" id="pg-more">
-  <!-- Заголовка страницы здесь нет намеренно: вкладка внизу уже называет её,
-       а подпись «рассылки · отчёты · настройки» повторяла то, что написано на
-       самих разделах. Девяносто пикселей на повтор — дорого. -->
+<!-- Финансы: долги и удержания, прайс, курс, кошелёк. Всё карточками, без
+     подписей: каждая карточка называет себя сама. -->
+<div class="page" id="pg-finance">
+  <div id="finDebts"></div>
 
-  <!-- Доступ к боту — в настройках, а не наверху: сюда заходят решать, кого
-       пускать, а не смотреть цифры. Наверху он оттеснял то, ради чего на эту
-       страницу приходят каждый день.
-       (owner-only — display toggled in initAccessBlock) -->
-  <div class="cat-block" id="accBlock" style="display:none">
-    <div class="cat-block-hdr" id="accBlockHdr">
-      <div class="card-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a5 5 0 0 1 5-5h6a5 5 0 0 1 5 5v2"/></svg></div>
+  <div class="cat-block" id="prBlock">
+    <div class="cat-block-hdr" onclick="ordPrices()">
+      <div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+        stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg></div>
       <div class="cat-block-title">
-        <div class="cat-block-n">Доступ к боту</div>
-        <div class="cat-block-sub" id="accBlockSub">Загрузка…</div>
+        <div class="cat-block-n">Прайс</div>
+        <div class="cat-block-sub is-skel" id="prSub" style="min-width:150px">0000</div>
       </div>
-      <svg class="cat-block-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+      <svg class="cat-block-chev" viewBox="0 0 24 24" style="transform:rotate(-90deg)"><path d="M6 9l6 6 6-6"/></svg>
     </div>
-    <!-- Числа кликаются: каждое ведёт к своему списку внутри управления
-         доступом. Число, на которое нельзя нажать, заставляет искать тот же
-         список руками — а он в двух шагах отсюда. -->
     <div class="cat-block-kpis">
-      <div class="cat-kpi go" onclick="event.stopPropagation();mgrJump('own')"><div class="cat-kpi-v" id="accKpiOwn">—</div><div class="cat-kpi-l">Владельцы</div></div>
-      <div class="cat-kpi go" onclick="event.stopPropagation();mgrJump('mgr')"><div class="cat-kpi-v" id="accKpiMgr">—</div><div class="cat-kpi-l">Менеджеры</div></div>
-      <div class="cat-kpi go" onclick="event.stopPropagation();mgrJump('req')"><div class="cat-kpi-v" id="accKpiBlk">—</div><div class="cat-kpi-l" id="accKpiBlkLbl">Заблокировано</div></div>
-    </div>
-    <div class="cat-block-expand">
-      <div class="cat-block-sect-t">Владельцы и менеджеры</div>
-      <div id="accBlockUsers"></div>
-      <div class="cat-block-sect-t" id="accBlockExtraT" style="display:none">Запросы на доступ</div>
-      <div id="accBlockExtra"></div>
-      <button class="cat-block-open" onclick="event.stopPropagation();openMgr()">Управлять доступом →</button>
+      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="prKpiN">0000</div><div class="cat-kpi-l">Позиций</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="prKpiC">0000</div><div class="cat-kpi-l">Закупка известна</div></div>
+      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="prKpiM">0000</div><div class="cat-kpi-l">Наценка</div></div>
     </div>
   </div>
 
@@ -5104,6 +5137,43 @@ button.path:active{transform:scale(.995)}
              oninput="fxRender()">
       <div id="fxList"></div>
       <div class="fx-note" id="fxNote"></div>
+    </div>
+  </div>
+
+</div>
+
+<div class="page" id="pg-more">
+  <!-- Заголовка страницы здесь нет намеренно: вкладка внизу уже называет её,
+       а подпись «рассылки · отчёты · настройки» повторяла то, что написано на
+       самих разделах. Девяносто пикселей на повтор — дорого. -->
+
+  <!-- Доступ к боту — в настройках, а не наверху: сюда заходят решать, кого
+       пускать, а не смотреть цифры. Наверху он оттеснял то, ради чего на эту
+       страницу приходят каждый день.
+       (owner-only — display toggled in initAccessBlock) -->
+  <div class="cat-block" id="accBlock" style="display:none">
+    <div class="cat-block-hdr" id="accBlockHdr">
+      <div class="card-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"/><path d="M4 21v-2a5 5 0 0 1 5-5h6a5 5 0 0 1 5 5v2"/></svg></div>
+      <div class="cat-block-title">
+        <div class="cat-block-n">Доступ к боту</div>
+        <div class="cat-block-sub" id="accBlockSub">Загрузка…</div>
+      </div>
+      <svg class="cat-block-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+    </div>
+    <!-- Числа кликаются: каждое ведёт к своему списку внутри управления
+         доступом. Число, на которое нельзя нажать, заставляет искать тот же
+         список руками — а он в двух шагах отсюда. -->
+    <div class="cat-block-kpis">
+      <div class="cat-kpi go" onclick="event.stopPropagation();mgrJump('own')"><div class="cat-kpi-v" id="accKpiOwn">—</div><div class="cat-kpi-l">Владельцы</div></div>
+      <div class="cat-kpi go" onclick="event.stopPropagation();mgrJump('mgr')"><div class="cat-kpi-v" id="accKpiMgr">—</div><div class="cat-kpi-l">Менеджеры</div></div>
+      <div class="cat-kpi go" onclick="event.stopPropagation();mgrJump('req')"><div class="cat-kpi-v" id="accKpiBlk">—</div><div class="cat-kpi-l" id="accKpiBlkLbl">Заблокировано</div></div>
+    </div>
+    <div class="cat-block-expand">
+      <div class="cat-block-sect-t">Владельцы и менеджеры</div>
+      <div id="accBlockUsers"></div>
+      <div class="cat-block-sect-t" id="accBlockExtraT" style="display:none">Запросы на доступ</div>
+      <div id="accBlockExtra"></div>
+      <button class="cat-block-open" onclick="event.stopPropagation();openMgr()">Управлять доступом →</button>
     </div>
   </div>
 
@@ -8013,6 +8083,10 @@ body.safe-open .cvo-hdr{opacity:0}
     <svg viewBox="0 0 24 24"><circle cx="9" cy="8" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4a4 4 0 0 1 4 4v2"/><circle cx="17" cy="7" r="3"/><path d="M21 21v-1a3 3 0 0 0-3-3"/></svg>
     Клиенты
   </button>
+  <button class="tb" data-pg="finance">
+    <svg viewBox="0 0 24 24"><circle cx="9" cy="9" r="6"/><path d="M14.5 9.5a6 6 0 1 1-5 5"/><path d="M9 6v6l2 1.5"/></svg>
+    Финансы
+  </button>
   <button class="tb" data-pg="more">
     <svg viewBox="0 0 24 24"><circle cx="5" cy="12" r="1.5"/><circle cx="12" cy="12" r="1.5"/><circle cx="19" cy="12" r="1.5"/></svg>
     Ещё
@@ -8239,9 +8313,14 @@ document.querySelectorAll('.tb').forEach(btn=>{
       _paintDay(document.querySelector('#periodPicker button.on')?.dataset?.p || 'today');
     }
     if(pg === 'more' && window.ownerApi){
-      mktRender(); promoBlockRender(); giftBlockRender(); walBlockRender(); bcastAudience();
+      mktRender(); promoBlockRender(); giftBlockRender(); bcastAudience();
+      if(!ACC_PERIOD) accLoadSummaries();
+    }
+    if(pg === 'finance' && window.ownerApi){
+      walBlockRender();
       if(!FX) fxLoad();
       if(!ACC_PERIOD) accLoadSummaries();
+      finLoad(); prLoad();
     }
     try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   });
@@ -13781,7 +13860,7 @@ function _fxWhen(ms){
 
 // Дирхам за единицу: у дорогих валют два знака, у дешёвых четыре — иначе
 // рубль и сум превращаются в ноль.
-function _fxN(v){ return v >= 1 ? v.toFixed(2) : v.toFixed(4); }
+function _fxN(v){ return v >= 1 ? v.toFixed(3) : v.toFixed(4); }
 
 function fxRender(){
   const box = document.getElementById('fxList'); if(!box) return;
@@ -13839,6 +13918,78 @@ function fxRender(){
     try{Telegram.WebApp.HapticFeedback.selectionChanged()}catch(e){}
   });
 })();
+
+// ── Финансы: долги и удержания ──────────────────────────────────────────
+// Кто кому должен — считает сервер из записей расходов и удержаний по
+// списаниям. Люди — по ролям, у каждого своё число: зелёное — должны нам,
+// красное — должны мы. Тап по строке раскрывает, из чего сложилось.
+let FIN = null, FIN_OPEN = new Set();
+async function finLoad(){
+  try{ FIN = await ownerApi.ownerFetch('/api/owner/finance/debts'); }
+  catch(e){ FIN = null; }
+  finRender();
+}
+const FIN_ROLE = {senior:['Старшие','headset'], operator:['Операторы','headset'],
+                  driver:['Водители','car'], other:['Остальные','user']};
+function finRender(){
+  const box = document.getElementById('finDebts'); if(!box) return;
+  const d = FIN;
+  const rows = (d && d.people) || [];
+  const grp = k => rows.filter(r => r.role === k);
+  const list = ['senior','operator','driver','other'].map(k => {
+    const g = grp(k); if(!g.length) return '';
+    return `<div class="fin-grp">${FIN_ROLE[k][0]}</div>` + g.map(r => {
+      const open = FIN_OPEN.has(r.name);
+      const cls = r.net > 0 ? 'up' : r.net < 0 ? 'dn' : '';
+      return `<div class="fin-r ${open ? 'open' : ''}">
+        <button class="fin-h" onclick="finToggle('${escS(r.name)}')">
+          <span class="fin-a">${IC(FIN_ROLE[k][1], 15)}</span>
+          <span class="fin-b"><b>${escS(r.name)}</b>
+            <i>${r.net > 0 ? 'должен нам' : r.net < 0 ? 'должны мы' : 'в расчёте'} · ${
+              r.items.length} ${pluralize(r.items.length,'запись','записи','записей')}</i></span>
+          <span class="fin-v ${cls}">${fmt(Math.abs(r.net))}<i>AED</i></span>
+        </button>
+        ${open ? `<div class="fin-l">${r.items.map(x => `<div class="fin-i">
+            <span class="fin-i-d">${escS(String(x.day || '').slice(5).replace('-', '.'))}</span>
+            <span class="fin-i-b"><b>${escS(x.t)}</b>${x.comment ? `<i>${escS(x.comment)}</i>` : ''}</span>
+            <span class="fin-i-v ${x.kind === 'owed_us' || x.kind === 'comp' || x.kind === 'we_gave' ? 'up' : 'dn'}">${
+              fmt(x.amount)}</span></div>`).join('')}</div>` : ''}
+      </div>`;
+    }).join('');
+  }).join('');
+  box.innerHTML = `<div class="fin-card">
+    <div class="fin-top">
+      <span class="fin-top-b"><b>Долги и удержания</b>
+        <i>${d ? `${rows.length} ${pluralize(rows.length,'человек','человека','человек')}` : 'загрузка…'}</i></span>
+      <span class="fin-top-n"><span class="fin-k up">${d ? fmt(d.they) : '—'}<i>нам должны</i></span>
+        <span class="fin-k dn">${d ? fmt(d.we) : '—'}<i>должны мы</i></span></span>
+    </div>
+    ${rows.length ? list : (d ? '<div class="fin-none">Никто никому не должен</div>' : '')}
+  </div>`;
+}
+function finToggle(n){
+  if(FIN_OPEN.has(n)) FIN_OPEN.delete(n); else FIN_OPEN.add(n);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  finRender();
+}
+
+// Прайс: закупка и продажа. Сама таблица — на своём экране, здесь три числа.
+let PR_D = null;
+async function prLoad(){
+  if(PR_D) return prPaint();
+  try{ PR_D = await ownerApi.ownerFetch('/api/owner/stock/prices'); }catch(e){ PR_D = null; }
+  prPaint();
+}
+function prPaint(){
+  const d = PR_D, rows = (d && d.rows) || [];
+  const with_ = rows.filter(r => r.cost && r.price_app);
+  const mark = with_.length
+    ? Math.round(with_.reduce((a, r) => a + (r.price_app / r.cost - 1) * 100, 0) / with_.length) : 0;
+  _skel('prSub', !!d, d ? `закупка известна у ${d.cost_cover || 0}% позиций` : '', 150);
+  _skel('prKpiN', !!d, d ? fmt(d.total || rows.length) : '');
+  _skel('prKpiC', !!d, d ? fmt(d.cost_known || 0) : '');
+  _skel('prKpiM', !!d, d ? (with_.length ? '+' + mark + '%' : '—') : '');
+}
 
 (function initWalBlock(){
   const block = document.getElementById('walBlock');

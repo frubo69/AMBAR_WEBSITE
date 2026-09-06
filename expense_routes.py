@@ -302,6 +302,83 @@ async def handle_extra_add(request):
                              headers=CORS_HEADERS)
 
 
+# ── финансы: долги и удержания по людям ──────────────────────────────────
+# Кто кому должен — считается, а не ведётся: из согласованных записей
+# «нам должны / нам вернули / мы должны / мы вернули» по водителям и из
+# удержаний по списаниям, где виновным может быть и оператор. Роль человека
+# — из штатного расписания.
+@require_owner
+async def handle_debts(request):
+    people: dict = {}
+
+    def P(name: str) -> dict:
+        return people.setdefault(name, {"name": name, "they": 0, "we": 0, "items": []})
+
+    try:
+        days = await db.get_driver_days_range("2000-01-01", "2999-12-31")
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[finance] дни водителей не прочитались: {e}")
+        days = []
+    for d in days:
+        drv = str(d.get("driver") or "").strip()
+        if not drv:
+            continue
+        for e in d.get("extras") or []:
+            if _status(e) != "approved":
+                continue
+            k = str(e.get("kind") or "")
+            a = _amount(e.get("amount"))
+            if not a or k not in ("owed_us", "we_got", "we_owe", "we_gave"):
+                continue
+            row = P(drv)
+            if k == "owed_us":   row["they"] += a
+            elif k == "we_got":  row["they"] -= a
+            elif k == "we_owe":  row["we"] += a
+            else:                row["we"] -= a
+            row["items"].append({"day": d.get("day") or "", "kind": k,
+                                 "t": EXTRA_KINDS[k]["t"], "amount": a,
+                                 "comment": str(e.get("comment") or "")[:120]})
+    try:
+        wos = await db.writeoff_list(state="ok", limit=3000)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[finance] списания не прочитались: {e}")
+        wos = []
+    for w in wos:
+        c = w.get("comp") or {}
+        who = str(c.get("who") or "").strip()
+        a = _amount(c.get("amount"))
+        if not who or not a:
+            continue
+        row = P(who)
+        row["they"] += a
+        row["items"].append({"day": w.get("day") or "", "kind": "comp", "t": "Удержание",
+                             "amount": a,
+                             "comment": f"{w.get('name') or ''} × {w.get('qty') or 1}"
+                                        + (f" · {c.get('note')}" if c.get("note") else "")})
+
+    seniors = {x["name"] for x in (staff.SENIOR_OPERATORS or [])}
+    operators = {(d.get("operator") or "").strip() for d in staff.DISTRICT_STAFF} - seniors
+    drivers = set(staff.driver_names())
+    def role(n: str) -> str:
+        if n in seniors: return "senior"
+        if n in operators: return "operator"
+        if n in drivers: return "driver"
+        return "other"
+    rows = []
+    for r in people.values():
+        r["items"].sort(key=lambda x: x["day"], reverse=True)
+        r["net"] = r["they"] - r["we"]
+        r["role"] = role(r["name"])
+        if r["they"] or r["we"]:
+            rows.append(r)
+    rows.sort(key=lambda r: (-abs(r["net"]), r["name"]))
+    return web.json_response({
+        "people": rows,
+        "they": sum(max(0, r["net"]) for r in rows),
+        "we": sum(max(0, -r["net"]) for r in rows),
+    }, headers=CORS_HEADERS)
+
+
 @require_owner
 async def handle_bottle_look(request):
     """GET /api/owner/bottle?code=… — что за бутылка под кодом и почём.
@@ -490,6 +567,7 @@ def setup(app):
         ("/api/owner/expenses/working",    handle_working,   "POST"),
         ("/api/owner/expenses/extra",      handle_extra_add, "POST"),
         ("/api/owner/bottle",              handle_bottle_look, "GET"),
+        ("/api/owner/finance/debts",       handle_debts,     "GET"),
         ("/api/owner/expenses/photo/{item_id}", handle_extra_photo, "GET"),
         ("/api/owner/expenses/extra/{item_id}", handle_extra_del, "DELETE"),
         ("/api/owner/expenses/extra/{item_id}/{action}", handle_extra_decide, "POST"),

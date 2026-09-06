@@ -2110,6 +2110,18 @@ button.path:active{transform:scale(.995)}
 .xs-cats .xs-chip{flex-shrink:0;white-space:nowrap}
 .xs-chip i{font-style:normal;font-size:11px;color:var(--muted);margin-left:2px}
 .xs-chip.on i{color:var(--gold2);opacity:.7}
+/* Закупка на других базах — своя карточка на хабе, золотом: это отдельная
+   функция, а не строка среди прочих. */
+.xbox{border-color:rgba(201,169,110,.4);
+  background:linear-gradient(160deg,var(--gold-soft),transparent 65%),var(--card)}
+.xbox .pnav-r.pbig{padding:20px 16px}
+.xbox .pnav-b b{color:var(--gold2)}
+.xbox .pnav-go{color:var(--gold2)}
+/* Экран района: верх стоит, листается только сетка плиток. */
+.stk-mid.xs-fix{display:flex;flex-direction:column;overflow:hidden;padding-bottom:0}
+.stk-mid.xs-fix > *{flex:0 0 auto}
+.stk-mid.xs-fix .xg-wrap{flex:1 1 auto;min-height:0;overflow-y:auto;
+  -webkit-overflow-scrolling:touch;margin:0 -14px;padding:2px 14px calc(24px + var(--safe-bottom))}
 /* Пустой список баз — окошко посреди экрана, а не строка текста. */
 .xs-empty{min-height:62vh;display:flex;align-items:center;justify-content:center}
 .xs-ecard{width:100%;max-width:320px;margin:0;padding:34px 22px 30px}
@@ -13882,6 +13894,7 @@ function accOpen(id){
   document.getElementById('accOv').classList.add('show');
   ACC_VIEW = id;
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  document.getElementById('accMid').classList.remove('xs-fix');
   document.getElementById('accFoot').innerHTML = '';   // подвал у каждого свой
   document.getElementById('accAct').innerHTML = '';    // и действие в шапке тоже
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
@@ -14194,9 +14207,10 @@ function ordHub(){
   // закупки. Раньше они висели голыми строками, а история была прижата к
   // низу экрана, и между ними стояло поле пустоты в пол-экрана — оно читалось
   // как «здесь что-то не загрузилось», а не как воздух.
-  const рядом = pathShort() + pathExtra() + supHistLine();
+  const рядом = pathShort() + supHistLine();
   document.getElementById('accMid').innerHTML = `<div class="ohub">
     <div class="pbox">${pathNav()}<div class="path">${pathInner()}</div>${pathStatus()}</div>
+    <div class="pbox xbox">${pathExtra()}</div>
     ${рядом ? `<div class="pbox">${рядом}</div>` : ''}</div>`;
 
   // Загрузка ответа магазина стоит внизу всегда. Раньше она пряталась во всех
@@ -16154,12 +16168,11 @@ function _xState(x){
 function pathExtra(){
   const ex = _xList(), open = ex.filter(x => x.status === 'open');
   const st = open.length ? _xState(open[0]) : null;
-  return `<button class="pnav-r" onclick="accExtra()">
-    <span class="pnav-i ${open.length ? 'live' : ''}">${ICO_BASE}</span>
+  return `<button class="pnav-r pbig" onclick="accExtra()">
+    <span class="pnav-i big live">${ICO_BASE}</span>
     <span class="pnav-b"><b>Закупка на других базах</b>
-      <i>${open.length ? escS(open.map(x => x.base).join(' · '))
-          : (ex.length ? `${ex.length} ${pluralize(ex.length,'заявка','заявки','заявок')}`
-                       : 'собрать заявку руками')}</i></span>
+      ${open.length ? `<i>${escS(open.map(x => x.base).join(' · '))}</i>`
+        : (ex.length ? `<i>${ex.length} ${pluralize(ex.length,'заявка','заявки','заявок')}</i>` : '')}</span>
     ${st ? `<span class="pstat-c ${st[1]}">${open.length > 1 ? open.length + ' в работе' : st[0]}</span>` : ''}
     <span class="pnav-go">${ICO_CHEV}</span>
   </button>`;
@@ -16168,6 +16181,7 @@ function pathExtra(){
 async function accExtra(){
   ACC_BACK = accOrder;
   XS = null;
+  document.getElementById('accMid').classList.remove('xs-fix');
   _setText('accTitle', 'Другие базы');
   _setText('accSub', '');
   document.getElementById('accAct').innerHTML = '';
@@ -16290,6 +16304,8 @@ function xRender(){
   const steps = `<div class="xs-steps">${Array.from({length: nSteps}, (_, i) =>
     `<span class="${i + 1 <= cur ? 'on' : ''}"></span>`).join('')}</div>`;
   const mid = document.getElementById('accMid');
+  // На экране района листается только каталог: районы, поиск и полки стоят.
+  mid.classList.toggle('xs-fix', s === 2);
   if(s === 1){
     const recent = [...new Set(_xList().map(x => x.base).filter(Boolean))].slice(0, 8);
     mid.innerHTML = steps + `<div class="xs-h">Куда едем?</div>
@@ -16322,7 +16338,7 @@ function xRender(){
                 style="${XS.q.trim() ? '' : 'display:none'}">✕</button>
       </div>
       <div class="xs-cats" id="xsCats">${xCats()}</div>
-      <div class="xg" id="xsGrid" onclick="xGridTap(event)">${xGrid()}</div>`;
+      <div class="xg-wrap" id="xsScroll"><div class="xg" id="xsGrid" onclick="xGridTap(event)">${xGrid()}</div></div>`;
   }else{
     // Итог — по районам, как и набирали: карточка на район, внутри товар с
     // картинкой и числом. Пропущенные районы — одной тихой строкой.
@@ -16451,7 +16467,7 @@ function xGo(i){
   XS.di = i; XS.q = ''; XS.cat = '';
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   xRender();
-  const m = document.getElementById('accMid'); if(m) m.scrollTop = 0;
+  const m = document.getElementById('xsScroll') || document.getElementById('accMid'); if(m) m.scrollTop = 0;
 }
 // «На этот район ничего не надо»: район пропускается пустым и не держит путь.
 function xSkip(){
@@ -16470,7 +16486,7 @@ function xNext(skip){
   XS.q = ''; XS.cat = '';
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
   xRender();
-  const m = document.getElementById('accMid'); if(m) m.scrollTop = 0;
+  const m = document.getElementById('xsScroll') || document.getElementById('accMid'); if(m) m.scrollTop = 0;
 }
 
 function xFoot(){

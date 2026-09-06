@@ -9764,7 +9764,7 @@ function whMapPaint(){
     WH.map.fitBounds(L.latLngBounds(pth).pad(0.25), {maxZoom: 15});
   }else if(WH.sel && WH.pan){
     const me = (d.drivers || []).find(r => r.driver === WH.sel && r.has);
-    if(me) whCenter(me.lat, me.lon, 15, true);
+    if(me) whCenter(me.lat, me.lon, 15, true, whDetents().card);
     WH.pan = false;
   }else if(WH.fit && pts.length){
     WH.fit = false;
@@ -9854,12 +9854,16 @@ function whFocus(){
 // Смещение и масштаб — одним движением. Прежде это были два: setView, а
 // следом panBy, и карта сначала приезжала, а потом дёргалась вниз. Цель
 // сдвигаем заранее, в координатах, и летим сразу в неё.
-function whCenter(lat, lon, zoom, fly){
+function whCenter(lat, lon, zoom, fly, dyTarget){
   if(!WH.map) return;
   const sh = document.getElementById('whSheet');
   // Метка должна встать в середину ВИДИМОЙ карты, а не экрана: под шторкой
-  // её никто не увидит.
-  const hide = sh ? Math.max(0, innerHeight - sh.getBoundingClientRect().top) : 0;
+  // её никто не увидит. Считаем от того места, куда шторка ЕДЕТ, а не где
+  // стоит сейчас: при выборе человека она ещё на старой высоте, и по ней
+  // метка улетала за край экрана.
+  let top = sh ? sh.getBoundingClientRect().top : innerHeight;
+  if(sh && typeof dyTarget === 'number') top = top - WH_SH.y + dyTarget;
+  const hide = Math.max(0, innerHeight - top);
   const z = zoom || WH.map.getZoom();
   let ll = L.latLng(lat, lon);
   if(hide > 40){

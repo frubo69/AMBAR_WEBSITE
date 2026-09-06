@@ -2104,6 +2104,12 @@ button.path:active{transform:scale(.995)}
 .xs-cats .xs-chip{flex-shrink:0;white-space:nowrap}
 .xs-chip i{font-style:normal;font-size:11px;color:var(--muted);margin-left:2px}
 .xs-chip.on i{color:var(--gold2);opacity:.7}
+/* Пустой список баз — окошко посреди экрана, а не строка текста. */
+.xs-empty{min-height:62vh;display:flex;align-items:center;justify-content:center}
+.xs-ecard{width:100%;max-width:320px;margin:0;padding:34px 22px 30px}
+.xs-ecard .sh-empty-i{width:64px;height:64px;border-radius:22px;color:var(--gold2);
+  background:var(--gold-soft);border-color:rgba(201,169,110,.3)}
+.xs-ecard .sh-empty-i svg{width:28px;height:28px}
 /* Итог: база и общее число сверху, дальше карточка на район с товаром. */
 .xr-img{width:40px;height:40px;border-radius:10px;object-fit:cover;flex-shrink:0;
   background:var(--card2)}
@@ -16169,7 +16175,7 @@ async function accExtra(){
   const ex = _xList();
   const open = ex.filter(x => x.status === 'open'), past = ex.filter(x => x.status !== 'open');
   _setText('accSub', open.length ? `${open.length} в работе`
-    : (ex.length ? `${ex.length} ${pluralize(ex.length,'заявка','заявки','заявок')}` : 'заявок ещё не было'));
+    : (ex.length ? `${ex.length} ${pluralize(ex.length,'заявка','заявки','заявок')}` : 'закупка вне магазина'));
   const row = x => {
     const st = _xState(x);
     const dt = x.day || String(x.at || '').slice(0, 10);
@@ -16183,7 +16189,11 @@ async function accExtra(){
     </button>`;
   };
   mid.innerHTML = !ex.length
-    ? `<div class="xs-hint">Заявок на другие базы ещё не было</div>`
+    ? `<div class="xs-empty"><div class="sh-empty xs-ecard">
+        <span class="sh-empty-i">${ICO_BASE}</span>
+        <div class="sh-empty-t">Пока пусто</div>
+        <div class="sh-empty-s">Магазин дал не всё — соберите заявку на другую базу</div>
+      </div></div>`
     : (open.length ? `<div class="exp-grp">В работе</div><div class="pbox">${open.map(row).join('')}</div>` : '')
       + (past.length ? `<div class="exp-grp">Закрытые</div><div class="pbox">${past.slice(0, 12).map(row).join('')}</div>` : '');
   document.getElementById('accFoot').innerHTML = `<div class="qb-wrap">

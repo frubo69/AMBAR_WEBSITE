@@ -1577,40 +1577,43 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .ck-h-s{font-size:12px;color:var(--muted)}
 .ck-h-s b{font-weight:700;color:var(--text)}
 
-.ck-list{display:flex;flex-direction:column;gap:8px}
-.ck-r{display:flex;align-items:center;gap:14px;width:100%;padding:17px 16px;
+.ck-list{display:flex;flex-direction:column;gap:10px}
+/* Строка — та же плитка, что вход в чек-лист и настройки: 66 ростом,
+   скруглена на 16, золотая кромка, название заглавными, подпись под ним,
+   значение справа. Состояние живёт в квадрате слева — цветом и значком —
+   и больше нигде: цветная рамка спорила бы с ним. */
+.ck-r{display:flex;align-items:center;gap:13px;width:100%;min-height:66px;padding:0 16px;
   border-radius:16px;cursor:pointer;text-align:left;font-family:inherit;
-  color:var(--text);background:var(--card);border:1px solid var(--border2);
+  color:var(--text);background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
+  border:1px solid rgba(201,169,110,.28);-webkit-tap-highlight-color:transparent;
   transition-property:var(--tp);transition-duration:.15s;transition-timing-function:var(--e1)}
 .ck-r:active{transform:scale(.995)}
-/* Все карточки одинаковые. Прозрачная у сделанного выглядела недоделанной —
-   будто её забыли залить, — а цветная рамка у просроченного спорила с
-   кружком. Состояние живёт в кружке слева, и больше нигде. */
-.ck-r.done{opacity:.7}
-/* Светофор. Три цвета и один размер: красный — просрочено, жёлтый — пора,
-   зелёный — сделано, серый — ещё впереди. */
-/* Кружок с галочкой или крестиком: сделано — зелёная галочка, не сделано —
-   крестик того цвета, каким задача горит. Точка без значка отвечала только
-   цветом, а «выполнено» и «не выполнено» — разные вещи, а не оттенки. */
-.ck-dot{flex:0 0 auto;width:22px;height:22px;border-radius:50%;display:grid;
-  place-items:center;color:var(--dim);background:rgba(255,255,255,.05);
-  box-shadow:inset 0 0 0 1px var(--border3)}
-.ck-r.late .ck-dot{color:var(--dn);background:rgba(224,85,85,.1);
-  box-shadow:inset 0 0 0 1px rgba(224,85,85,.4)}
-.ck-r.now  .ck-dot{color:var(--warn);background:rgba(243,180,74,.1);
-  box-shadow:inset 0 0 0 1px rgba(243,180,74,.38)}
-.ck-r.done .ck-dot{color:var(--up);background:rgba(76,175,125,.12);
-  box-shadow:inset 0 0 0 1px rgba(76,175,125,.35)}
+.ck-r > *{pointer-events:none}
+.ck-r.done{opacity:.72}
+/* Светофор в квадрате: красный — просрочено, жёлтый — пора, зелёный —
+   сделано, серый — ещё впереди. Галочка у сделанного, крестик у остальных:
+   «выполнено» и «не выполнено» — разные вещи, а не оттенки. */
+.ck-dot{flex:0 0 auto;width:42px;height:42px;border-radius:13px;display:grid;
+  place-items:center;color:var(--dim);background:rgba(255,255,255,.04);
+  border:1px solid var(--border3)}
+.ck-dot svg{width:15px;height:15px}
+.ck-r.late .ck-dot{color:var(--dn);background:rgba(224,85,85,.1);border-color:rgba(224,85,85,.4)}
+.ck-r.now  .ck-dot{color:var(--gold2);background:var(--gold-soft);border-color:rgba(201,169,110,.32)}
+.ck-r.done .ck-dot{color:var(--up);background:rgba(76,175,125,.12);border-color:rgba(76,175,125,.35)}
 .ck-b{flex:1;min-width:0}
-.ck-t{display:block;font-size:16px;font-weight:600;line-height:1.25;
-  letter-spacing:-.2px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ck-r.done .ck-t{font-weight:500;color:var(--sub)}
-.ck-s{display:block;font-size:12.5px;color:var(--muted);margin-top:4px;
+.ck-t{display:block;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;
+  letter-spacing:.6px;text-transform:uppercase;line-height:1.2;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.ck-due{flex:0 0 auto;font-size:12px;color:var(--muted);white-space:nowrap;
+.ck-r.done .ck-t{color:var(--sub)}
+.ck-s{display:block;font-size:11.5px;color:var(--muted);margin-top:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ck-due{flex:0 0 auto;text-align:right;font-family:'Space Grotesk',sans-serif;font-size:14px;
+  font-weight:700;letter-spacing:-.2px;color:var(--muted);white-space:nowrap;
   font-variant-numeric:tabular-nums}
-.ck-r.late .ck-due{color:var(--dn);opacity:.8}
-.ck-go{flex:0 0 auto;color:var(--dim);display:flex;align-items:center;opacity:.45}
+.ck-r.now .ck-due{color:var(--gold2)}
+.ck-r.late .ck-due{color:var(--dn)}
+.ck-r.done .ck-due{color:var(--up)}
+.ck-go{flex:0 0 auto;color:var(--muted);display:flex;align-items:center}
 
 /* Вход в чек-лист. Ростом и посадкой — как строка «Кто на каком районе» на
    районах: то же обещание «одно нажатие — и ты в работе». */
@@ -13696,14 +13699,16 @@ function chkRow(r){
   const late = r.state === 'late' && r.late_min
     ? (r.late_min < 60 ? `${r.late_min} мин` : `${Math.floor(r.late_min / 60)} ч`)
     : '';
-  const справа = r.state === 'done' ? 'готово'
+  // У сделанного справа пусто: зелёная галочка слева уже ответила, а слово
+  // «готово» отнимало место у названия — «Смена открыта / закрыта» резалось.
+  const справа = r.state === 'done' ? ''
     : (r.state === 'late' ? (late ? `+${late}` : 'просрочено') : 'к ' + r.due);
   return `<button class="ck-r ${st.c}" onclick="chkGo('${escS(r.go)}')">
     <span class="ck-dot">${r.state === 'done'
-      ? `<svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"
-           stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`
-      : `<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor"
-           stroke-width="3" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`}</span>
+      ? `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>`
+      : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+           stroke-width="2.6" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>`}</span>
     <span class="ck-b">
       <span class="ck-t">${escS(r.t)}</span>
       <span class="ck-s">${escS(r.s)}</span>

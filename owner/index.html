@@ -2104,6 +2104,17 @@ button.path:active{transform:scale(.995)}
 .xs-cats .xs-chip{flex-shrink:0;white-space:nowrap}
 .xs-chip i{font-style:normal;font-size:11px;color:var(--muted);margin-left:2px}
 .xs-chip.on i{color:var(--gold2);opacity:.7}
+/* Переключатель районов: пять кодов в ряд, текущий золотом, у набранных
+   число. Это и карта пути, и кнопка «назад на район». */
+.xs-dtabs{display:flex;gap:6px;margin:0 0 14px}
+.xs-dt{flex:1;display:flex;align-items:center;justify-content:center;gap:5px;height:38px;
+  border-radius:11px;cursor:pointer;font-family:'Space Grotesk',sans-serif;font-size:13px;
+  font-weight:700;color:var(--muted);background:var(--card);border:1px solid var(--border2)}
+.xs-dt i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:11px;font-weight:700;
+  color:var(--gold2)}
+.xs-dt.has{color:var(--sub)}
+.xs-dt.on{color:var(--gold2);background:var(--gold-soft);border-color:rgba(201,169,110,.45)}
+.xs-dt:active{transform:scale(.95)}
 /* Район — крупно, с кодом в квадрате слева: на каждом экране второго шага
    первым делом видно, куда сейчас набирают. */
 .xs-dh{display:flex;align-items:center;gap:12px;margin:4px 0 12px}
@@ -16247,7 +16258,15 @@ function xRender(){
     // пять колонок в голове. Плитки — как заказ у операторов: тап по
     // картинке кладёт одну, «−» и «+» у цены правят число.
     const d = dist[XS.di] || {code: '', name: ''};
-    mid.innerHTML = steps + `<div class="xs-dh"><span class="xs-dc">${escS(d.code)}</span>
+    // Районы — рядом кнопками, а не только стрелкой в шапке: по ним видно, где
+    // стоишь и где уже набрано, и на любой можно вернуться одним тапом.
+    const tabs = dist.map((x, i) => {
+      const n = Object.values(XS.rows).reduce((a, r) => a + (r.by[x.id] || 0), 0);
+      return `<button class="xs-dt ${i === XS.di ? 'on' : ''} ${n ? 'has' : ''}" onclick="xGo(${i})">${
+        escS(x.code)}${n ? `<i>${n}</i>` : ''}</button>`;
+    }).join('');
+    mid.innerHTML = steps + `<div class="xs-dtabs">${tabs}</div>
+      <div class="xs-dh"><span class="xs-dc">${escS(d.code)}</span>
         <span class="xs-h">${escS(d.name)}</span></div>
       <div class="ord-find">
         <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="M20 20l-3.5-3.5"/></svg>
@@ -16360,6 +16379,14 @@ function xSearch(v){
   const x = document.getElementById('xsQX'); if(x) x.style.display = XS.q.trim() ? '' : 'none';
   const i = document.getElementById('xsQ'); if(i && i.value !== XS.q) i.value = XS.q;
   xPaintGrid();
+}
+// Перейти на любой район — назад или вперёд — одним тапом по его коду.
+function xGo(i){
+  if(!XS || XS.step !== 2 || i === XS.di) return;
+  XS.di = i; XS.q = ''; XS.cat = '';
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  xRender();
+  const m = document.getElementById('accMid'); if(m) m.scrollTop = 0;
 }
 // «На этот район ничего не надо»: район пропускается пустым и не держит путь.
 function xSkip(){

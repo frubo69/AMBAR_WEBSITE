@@ -2038,6 +2038,28 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .exp-rcp:disabled{opacity:.6;pointer-events:none}
 .exp-rcp-t i.bad{color:var(--dn)}
 .exp-rcp.bad{border-color:rgba(224,85,85,.4);background:var(--dn-soft)}
+/* Снимки — плитки-вложения. Пустая: пунктир, значок, подпись. Заполненная:
+   снимок, пин со значком в углу, подпись на тени. Отклонённая: красная рамка. */
+.exp-tiles{display:grid;gap:8px;margin-bottom:10px}
+.exp-tiles.two{grid-template-columns:1fr 1fr}
+.exp-tile{position:relative;overflow:hidden;padding:0;border-radius:14px;cursor:pointer;
+  font-family:inherit;color:var(--muted);background:none;border:1.5px dashed var(--border3);
+  aspect-ratio:4/3;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:9px}
+.exp-tiles:not(.two) .exp-tile{aspect-ratio:16/6}
+.exp-tile:active{transform:scale(.985)}
+.exp-tile-ico{display:flex;color:var(--gold2);opacity:.85}
+.exp-tile-c{font-size:10.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase}
+.exp-tile.set{border:1px solid rgba(201,169,110,.45);color:#fff}
+.exp-tile img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.exp-tile.set .exp-tile-c{position:absolute;left:0;right:0;bottom:0;padding:18px 10px 8px;text-align:left;
+  background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.62));text-shadow:0 1px 3px rgba(0,0,0,.6)}
+.exp-pin{position:absolute;left:8px;top:8px;width:28px;height:28px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;color:var(--gold2);
+  background:rgba(0,0,0,.55);border:1px solid rgba(201,169,110,.45);
+  backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+.exp-tile.bad{border:1.5px solid var(--dn)}
+.exp-tile.bad .exp-pin{color:#fff;background:var(--dn);border-color:transparent}
+.exp-tile.bad .exp-tile-c{color:#ff9a9a}
 /* Слово старшего — синим окошком в конце карточки: значок сообщения слева,
    подпись «Старший» и сама фраза. Синий здесь — «сообщение», не тревога. */
 .exp-why{margin-top:8px;display:flex;align-items:flex-start;gap:10px;padding:11px 13px 12px;
@@ -4852,6 +4874,7 @@ function expBox(kind, title, ico){
   return `<div class="card exp-card">
     <div class="exp-hd">${svg(ico, 17)}<span class="exp-t">${title}</span>
       ${sent && !отклонён ? `<span class="exp-sum">${fmt(k.sum)} AED</span>` : ''}</div>
+    ${expTiles(kind, _expKept(kind))}
     <div class="exp-row">
       <div class="exp-field${sent ? ' sent' : ''}">
         <input class="amt" id="e_${kind}" type="text" inputmode="numeric"
@@ -4866,9 +4889,39 @@ function expBox(kind, title, ico){
         : `<button class="btn ${sent ? 'btn-sec' : 'btn-gh'} exp-go" id="b_${kind}"
             onclick="expTap(this,'${kind}')">${sent ? 'Изменить' : 'не было'}</button>`}
     </div>
-    ${expRcp(kind, _expKept(kind))}
     ${отклонён ? expWhy(sent) : ''}
   </div>`;
+}
+
+// Снимки — прикреплённые плитки, а не полосы с миниатюрами. Пустая плитка —
+// пунктир и значок того, что сюда кладут; заполненная — сам снимок с пином
+// в углу. Отклонённая — красная рамка и «переснять». Тап — камера или
+// просмотр. У мойки две плитки (машина, чек), у остальных с чеком — одна.
+const ICO_RCP = '<path d="M6 3h12v18l-2-1.5L14 21l-2-1.5L10 21l-2-1.5L6 21z"/><path d="M9 8h6M9 12h6M9 16h4"/>';
+function expTiles(kind, sent){
+  if(!EXP_RECEIPT.includes(kind)) return '';
+  const tile = (what, ico, name) => {
+    const rcp = what === 'rcp';
+    const свой = rcp ? (EXP_SHOT.kind === kind && EXP_SHOT.photo ? EXP_SHOT : null)
+                     : (CAR_SHOT.photo ? CAR_SHOT : null);
+    const src = свой ? свой.photo : (sent ? (rcp ? (sent.photo && sent.thumb) : (sent.car_photo && sent.car_thumb)) : '');
+    const плохо = !свой && sent && (rcp ? (sent.photo && sent.photo_ok === 'no')
+                                       : (sent.car_photo && sent.car_ok === 'no'));
+    return `<button class="exp-tile ${src ? 'set' : ''} ${плохо ? 'bad' : ''}" id="tile-${what}-${kind}"
+       onclick="carTap('${kind}','${what}')" aria-label="${name}">
+      ${src ? `<img src="${src}" alt=""><span class="exp-pin">${svg(ico, 15)}</span>`
+            : `<span class="exp-tile-ico">${svg(ico, 30)}</span>`}
+      <span class="exp-tile-c">${плохо ? 'переснять' : name}</span>
+    </button>`;
+  };
+  const tiles = (kind === 'wash' ? [tile('car', ICO.wash, 'Машина')] : []).concat([tile('rcp', ICO_RCP, 'Чек')]);
+  return `<div class="exp-tiles ${tiles.length > 1 ? 'two' : ''}" id="tiles-${kind}">${tiles.join('')}</div>`;
+}
+// Перерисовать только плитки: сумму, которую человек уже вписал, терять нельзя.
+function expTilesRefresh(kind){
+  const box = document.getElementById('tiles-' + kind); if(!box) return;
+  const tmp = document.createElement('div'); tmp.innerHTML = expTiles(kind, _expKept(kind));
+  box.replaceWith(tmp.firstElementChild);
 }
 
 // Слово старшего — в конце карточки, синим окошком, человеческой фразой:
@@ -5013,14 +5066,7 @@ async function carDeleteDo(){
     try{ await drvApi.drvFetch('/api/driver/expenses', {method:'POST', body:{kind, car_del: true}}); }
     catch(e){ toast(EXP_ERR[(e.payload || {}).error] || 'Не удалось убрать', 'err'); return; }
     await load();
-  }else{
-    const b = document.getElementById('car-' + kind);
-    if(b){
-      b.classList.remove('set');
-      b.innerHTML = `${svg(ICO.wash, 22)}
-        <span class="exp-rcp-t">Снять машину на мойке<i>спереди, пока моется</i></span>`;
-    }
-  }
+  }else expTilesRefresh(kind);
   toast('Снимок убран');
   try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
@@ -5091,7 +5137,7 @@ function carShoot(){
     c.getContext('2d').drawImage(v, 0, 0, c.width, c.height);
     return c.toDataURL('image/jpeg', q);
   };
-  CAR.shot = снять(1280, 0.72); CAR.thumb = снять(96, 0.5);
+  CAR.shot = снять(1280, 0.72); CAR.thumb = снять(200, 0.6);
   const img = document.getElementById('carImg');
   img.src = CAR.shot; img.hidden = false; v.hidden = true;
   _carShotLook(CAR.shot);
@@ -5169,13 +5215,7 @@ async function carAccept(){
   // Первый снимок: полосу меняем на месте — сумму, если уже вписана, терять
   // нельзя. Дальше ничего само не открываем: следующий шаг человек делает
   // сам, а если забудет — «Отправить» откроет то, чего не хватает.
-  const b = document.getElementById((rcp ? 'rcp-' : 'car-') + kind);
-  if(b){
-    b.classList.add('set'); b.classList.remove('bad');
-    b.innerHTML = `<img src="${thumb}" alt="">
-      <span class="exp-rcp-t">${rcp ? 'Чек снят' : 'Машина на мойке снята'}<i>${
-        rcp ? 'нажмите, чтобы переснять' : 'нажмите — переснять или убрать'}</i></span>`;
-  }
+  expTilesRefresh(kind);
   try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
   const inp = document.getElementById('e_' + kind);
   if(inp && !inp.readOnly && !String(inp.value || '').replace(/\D/g, '')){

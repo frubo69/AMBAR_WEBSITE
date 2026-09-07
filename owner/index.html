@@ -492,11 +492,15 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .off-tot-f.on{color:var(--gold2);border-color:rgba(201,169,110,.4);
   background:rgba(201,169,110,.08)}
 .off-tot-c{background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:10px 10px;min-width:0}
-.off-tot-go{cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
+/* Кнопка ростом и посадкой как соседние плитки: у кнопки свои поля и
+   межстрочный, и без этого она сидела ниже. Название крупнее соседних. */
+.off-tot-go{display:block;cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
+  line-height:normal;margin:0;padding:10px 10px;
   border-color:rgba(201,169,110,.3);-webkit-tap-highlight-color:transparent}
 .off-tot-go:active{transform:scale(.97)}
-.off-tot-go .off-tot-v{color:var(--gold2)}
-.off-tot-of{font-size:11px;font-weight:600;color:var(--muted);margin-left:3px;letter-spacing:0}
+.off-tot-go .off-tot-l{font-size:10.5px;letter-spacing:1.2px}
+.off-tot-go .off-tot-v b{color:var(--gold2);font-weight:700}
+.off-tot-of{color:var(--text);margin-left:2px}
 .off-tot-l{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .off-tot-v{font-family:'DM Sans',sans-serif;font-size:17px;font-weight:700;letter-spacing:-.3px;margin-top:3px;
@@ -18822,9 +18826,8 @@ async function offShiftLoad(){
   catch(e){ return; }
   _offShiftAt = Date.now(); _offShiftDay = day;
   const closing = r.phase === 'closing';
-  _setText('offTotShiftL', closing ? 'Смена · закрыто' : 'Смена · открыто');
   const v = document.getElementById('offTotShiftV');
-  if(v) v.innerHTML = `${closing ? r.closed : r.open}<span class="off-tot-of">/ ${r.total}</span>`;
+  if(v) v.innerHTML = `<b>${closing ? r.closed : r.open}</b><span class="off-tot-of">/${r.total}</span>`;
 }
 
 function renderOffices(rows){

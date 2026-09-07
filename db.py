@@ -3672,6 +3672,22 @@ async def update_driver_expense(day: str, driver: str, item_id: str,
     return bool(r.matched_count)
 
 
+async def driver_expense_photo_clear(day: str, driver: str, item_id: str) -> bool:
+    """Водитель убрал снимок у своей траты — новый снимет, когда удобно.
+
+    Сам кадр стирается отдельно (expense_photo_del); здесь — строка: без
+    снимка и снова на решение, потому что менеджер смотрел на другую запись."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.driver_days.update_one(
+        {"day": day, "driver": driver, "extras.id": item_id},
+        {"$set": {"extras.$.photo": False, "extras.$.thumb": "",
+                  "extras.$.car_photo": False, "extras.$.status": "pending",
+                  "extras.$.edited_at": datetime.now(timezone.utc).isoformat()},
+         "$unset": {"extras.$.decided_by": "", "extras.$.decided_at": ""}})
+    return bool(r.matched_count)
+
+
 async def set_driver_expense_status(day: str, driver: str, item_id: str,
                                     status: str, by: int) -> bool:
     """Решение менеджера по трате. Позиционный $ обновляет ровно тот элемент

@@ -1356,6 +1356,25 @@ async def handle_expense_add(request):
         return web.json_response({"ok": True, "none": none, "kind": kind},
                                  headers=CORS_HEADERS)
 
+    # Убрать снимок машины у мойки: водитель снял не то и новый сделает позже.
+    # Запись остаётся, но без снимка и снова на решение; после закрытия смены
+    # трогать её уже нельзя — как и переснимать.
+    if body.get("photo_del") and kind == "wash":
+        d = await db.get_driver_day(day, me["name"]) or {}
+        prev = next((x for x in (d.get("extras") or []) if _kind_of(x) == kind), None)
+        if not prev:
+            return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+        if d.get("shift_close_at"):
+            return web.json_response({"error": "shift_closed"}, status=409,
+                                     headers=CORS_HEADERS)
+        await db.driver_expense_photo_clear(day, me["name"], prev["id"])
+        try:
+            await db.expense_photo_del(prev["id"])
+        except Exception as e:                              # noqa: BLE001
+            log.warning(f"[driver] снимок мойки не стёрт: {e}")
+        log.info(f"[driver] {me['name']} убрал снимок машины у мойки")
+        return web.json_response({"ok": True, "id": prev["id"]}, headers=CORS_HEADERS)
+
     # Охрана — единственный расход, где платят не деньгами, а бутылкой. Сумму
     # тут спрашивать не у кого и незачем: код с крышки знает, что это за
     # бутылка, где она числится и сколько за неё отдали при закупке. Водитель
@@ -1695,6 +1714,23 @@ async def handle_supply_finish(request):
 
 
 @require_driver
+async def handle_expense_photo(request):
+    """Свой снимок у своей траты за эту смену — посмотреть перед тем, как
+    переснять или убрать. Чужие записи отсюда не отдаются."""
+    me = request["driver"]
+    item_id = (request.match_info.get("item_id") or "").strip()
+    d = await db.get_driver_day(_biz_day(), me["name"]) or {}
+    if not any(x.get("id") == item_id for x in (d.get("extras") or [])):
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    img = await db.expense_photo(item_id)
+    if not img:
+        return web.json_response({"error": "no_photo"}, status=404, headers=CORS_HEADERS)
+    ctype = "image/png" if img[:2] == b"\x89P" else "image/jpeg"
+    return web.Response(body=img, content_type=ctype,
+                        headers={**CORS_HEADERS, "Cache-Control": "private, max-age=300"})
+
+
+@require_driver
 async def handle_supply_noscan(request):
     """Товар забрали, коды не читали. Задача остаётся открытой — досканировать."""
     import supply_routes
@@ -1723,6 +1759,7 @@ def setup(app):
         ("/api/driver/catalog",                 handle_catalog,     "GET"),
         ("/api/driver/expenses",                handle_expenses,    "GET"),
         ("/api/driver/expenses",                handle_expense_add, "POST"),
+        ("/api/driver/expenses/photo/{item_id}", handle_expense_photo, "GET"),
         ("/api/driver/bottle",                  handle_bottle_look, "GET"),
         ("/api/driver/supply",                  handle_supply_list, "GET"),
         ("/api/driver/writeoff",                handle_writeoff_add, "POST"),

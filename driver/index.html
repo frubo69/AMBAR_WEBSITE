@@ -1980,6 +1980,12 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .car-scr.show{display:block}
 .car-cam{position:absolute;inset:0;overflow:hidden;background:#000}
 .car-cam video,.car-cam img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
+/* display:block выше перебивал [hidden] — и при «переснять» прошлый кадр
+   оставался поверх живой камеры. */
+.car-cam video[hidden],.car-cam img[hidden]{display:none}
+.car-bot .btn-del{color:var(--dn)}
+/* Вопрос «удалить снимок?» задаётся с экрана камеры — он выше обычных шторок. */
+#askSheet{z-index:120}
 .car-mask{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
 .car-scr.shot .car-mask{display:none}
 .car-scr .sup-top{position:absolute;left:0;right:0;top:0;z-index:2;border-bottom:0;
@@ -4795,26 +4801,88 @@ function carStrip(sent){
   const мини = свой || был || '';
   const closed = !!(SH && SH.closed);
   return `<button class="exp-rcp ${мини ? 'set' : ''}" id="rcp-wash"
-     onclick="carOpen('wash')" ${closed && мини ? 'disabled' : ''}>
+     onclick="carTap('wash')">
     ${мини ? `<img src="${мини}" alt="">` : svg(ICO.wash, 22)}
     <span class="exp-rcp-t">${мини ? 'Машина на мойке снята' : 'Снять машину на мойке'}
-      <i>${closed && мини ? 'смена закрыта' : мини ? 'нажмите, чтобы переснять' : 'спереди, пока моется'}</i></span>
+      <i>${closed && мини ? 'смена закрыта' : мини ? 'нажмите — переснять или убрать' : 'спереди, пока моется'}</i></span>
   </button>`;
 }
 
-let CAR = {kind: '', stream: null, shot: '', thumb: ''};
+let CAR = {kind: '', stream: null, shot: '', thumb: '', id: ''};
+
+// Снимок уже есть — сначала показываем его: отсюда можно переснять или
+// убрать. Нет — сразу камера.
+function carTap(kind){
+  const свой = EXP_SHOT.kind === kind && EXP_SHOT.photo;
+  const sent = (EXP.extras || []).find(x => x.kind === kind && x.photo);
+  if(свой || sent) carView(kind); else carOpen(kind);
+}
+
+async function carView(kind){
+  carStop();
+  const sent = (EXP.extras || []).find(x => x.kind === kind && x.photo);
+  const свой = EXP_SHOT.kind === kind && EXP_SHOT.photo ? EXP_SHOT : null;
+  CAR = {kind, stream: null, shot: свой ? свой.photo : '', thumb: свой ? свой.thumb : '',
+         id: sent ? sent.id : ''};
+  const scr = document.getElementById('carScr');
+  scr.classList.add('show', 'shot');
+  document.getElementById('carV').hidden = true;
+  const img = document.getElementById('carImg');
+  img.hidden = false;
+  img.src = свой ? свой.photo : ((sent && sent.thumb) || '');
+  carBot('view');
+  // Отправленный кадр лежит на сервере: сперва миниатюра из строки, следом —
+  // сам снимок, если экран ещё открыт на нём.
+  if(!свой && sent){
+    try{
+      const res = await fetch(drvApi.AMBAR_API + '/api/driver/expenses/photo/'
+        + encodeURIComponent(sent.id),
+        {headers:{'Authorization': 'tma ' + ((tg && tg.initData) || '')}});
+      if(res.ok){
+        const b = await res.blob();
+        if(CAR.id === sent.id && scr.classList.contains('show')) img.src = URL.createObjectURL(b);
+      }
+    }catch(e){}
+  }
+}
+
+function carDelete(){
+  ASK = {t:'Удалить снимок?', s:'', btn:'Удалить', fn: carDeleteDo};
+  renderAsk();
+}
+
+async function carDeleteDo(){
+  const kind = CAR.kind;
+  carClose();
+  const sent = (EXP.extras || []).find(x => x.kind === kind && x.photo);
+  if(EXP_SHOT.kind === kind) EXP_SHOT = {kind:'', photo:'', thumb:''};
+  if(sent){
+    try{ await drvApi.drvFetch('/api/driver/expenses', {method:'POST', body:{kind, photo_del: true}}); }
+    catch(e){ toast(EXP_ERR[(e.payload || {}).error] || 'Не удалось убрать', 'err'); return; }
+    await load();
+  }else{
+    const b = document.getElementById('rcp-' + kind);
+    if(b){
+      b.classList.remove('set');
+      b.innerHTML = `${svg(ICO.wash, 22)}
+        <span class="exp-rcp-t">Снять машину на мойке<i>спереди, пока моется</i></span>`;
+    }
+  }
+  toast('Снимок убран');
+  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
 
 async function carOpen(kind){
   if(SH && SH.closed && (EXP.extras || []).some(x => x.kind === kind)){
     toast('Смена закрыта — переснять уже нельзя', 'err'); return;
   }
   carStop();
-  CAR = {kind, stream: null, shot: '', thumb: ''};
+  CAR = {kind, stream: null, shot: '', thumb: '', id: ''};
   const scr = document.getElementById('carScr');
   scr.classList.remove('shot'); scr.classList.add('show');
-  document.getElementById('carImg').hidden = true;
+  const img = document.getElementById('carImg'); img.hidden = true; img.removeAttribute('src');
   const v = document.getElementById('carV'); v.hidden = false;
-  carBot(false);
+  carBot('live');
   try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
   // Только камера. Галереи здесь нет намеренно: снимок доказывает мойку, только
   // если сделан на ней и сейчас.
@@ -4830,13 +4898,23 @@ async function carOpen(kind){
   }
 }
 
-function carBot(shot){
-  document.getElementById('carBot').innerHTML = shot
-    ? `<button class="btn btn-gh" onclick="carRetake()">Переснять</button>
-       <button class="btn btn-pri" onclick="carAccept()">Подходит</button>`
-    : `<button class="car-shot" onclick="carShoot()" aria-label="Снять"></button>`;
-  _setText('carHint', shot ? 'Видно, что машина моется?' : 'Поставьте машину в контур');
-  _setText('carS', shot ? 'снимок' : 'спереди, в контуре');
+// Три состояния экрана: live — камера и спуск; shot — только что снятый кадр,
+// переснять или подходит; view — уже принятый снимок, убрать или переснять.
+function carBot(mode){
+  const closed = !!(SH && SH.closed);
+  document.getElementById('carBot').innerHTML =
+    mode === 'live'
+      ? `<button class="car-shot" onclick="carShoot()" aria-label="Снять"></button>`
+    : mode === 'shot'
+      ? `<button class="btn btn-gh" onclick="carRetake()">Переснять</button>
+         <button class="btn btn-pri" onclick="carAccept()">Подходит</button>`
+    : closed ? ''
+      : `<button class="btn btn-gh btn-del" onclick="carDelete()">Удалить</button>
+         <button class="btn btn-pri" onclick="carRetake()">Переснять</button>`;
+  _setText('carHint', mode === 'live' ? 'Поставьте машину в контур'
+                    : mode === 'shot' ? 'Видно, что машина моется?'
+                    : closed ? 'Смена закрыта' : '');
+  _setText('carS', mode === 'live' ? 'спереди, в контуре' : 'снимок');
 }
 
 function carShoot(){
@@ -4856,7 +4934,7 @@ function carShoot(){
   img.src = CAR.shot; img.hidden = false; v.hidden = true;
   carStop();
   document.getElementById('carScr').classList.add('shot');
-  carBot(true);
+  carBot('shot');
   try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
 }
 
@@ -4898,7 +4976,7 @@ async function carAccept(){
   if(b){
     b.classList.add('set');
     b.innerHTML = `<img src="${thumb}" alt="">
-      <span class="exp-rcp-t">Машина на мойке снята<i>нажмите, чтобы переснять</i></span>`;
+      <span class="exp-rcp-t">Машина на мойке снята<i>нажмите — переснять или убрать</i></span>`;
   }
   const inp = document.getElementById('e_' + kind);
   if(inp && !inp.readOnly && !String(inp.value || '').replace(/\D/g, '')){

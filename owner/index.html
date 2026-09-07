@@ -15842,8 +15842,12 @@ async function accQR(){
   // Реестр уже пришёл вместе с разделом «Учёт» и лежит в памяти — открываем
   // экран на нём, а свежий тянем следом. Сводка собирается на сервере не
   // мгновенно, и ждать её второй раз, стоя у полки, незачем.
+  // Каждый вход — со списка районов, а не с того, где были в прошлый раз:
+  // человек у полки и сам скажет, куда вносит. Запомненный район остаётся
+  // подсказкой в списке, но экран на нём не открывается.
+  QR_DIST = null;
   const было = !!(ACC_QR && ACC_QR.by_district);
-  if(было) qrDistrict();
+  if(было) qrDistrict(true);
   let d;
   try{ d = await ownerApi.ownerFetch('/api/owner/qr'); }
   catch(e){
@@ -15856,10 +15860,11 @@ async function accQR(){
     try{ STK.districts = (await ownerApi.ownerFetch('/api/owner/stock/status')).districts; }
     catch(e){ STK.districts = []; }
   }
-  if(!было){ qrDistrict(); return; }
+  if(!было){ qrDistrict(true); return; }
   // Свежее пришло — числа и брони обновляем на месте. Перерисовывать экран
   // целиком нельзя: человек уже листает список, и он уедет из-под пальца.
   if(document.getElementById('qrList')) qrRenderList();
+  else if(!QR_DIST) qrDistrict(true);
 }
 
 function _qrHead(title, sub, back){

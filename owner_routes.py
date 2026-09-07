@@ -3331,6 +3331,17 @@ async def _chk_supply(day: str):
             "done": (sup.get("status") or "open") != "open", "total": len(tasks)}
 
 
+async def _chk_noscan() -> list:
+    """Что принято без кодов и ещё не отсканировано — по всем открытым
+    поставкам, не только за эти сутки: долг не гаснет с полуночью."""
+    try:
+        import supply_routes
+        return await supply_routes.noscan_tasks()
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[chk] приёмка без кодов не прочитана: {e}")
+        return []
+
+
 # Пульт смены. Не список галочек, а расписание суток: у каждого дела свой час,
 # и цвет говорит, где мы относительно него.
 #
@@ -3357,6 +3368,7 @@ CHK_PLAN = [
     ("writeoffs",   12.0, 23.0, False),
     ("order_sent",  12.0, 15.0, False),
     ("supply_in",   12.0, 21.0, False),
+    ("noscan",      12.0, 12.0, False),   # горит с минуты приёмки; срок — сама приёмка
     ("unscanned",   12.0, 21.0, False),
     ("cash",         5.0,  6.0, True),
     ("shortfall",   12.0, 21.0, False),
@@ -3557,6 +3569,34 @@ async def handle_checklist(request):
                     "late_min": max(0, int((now - first.astimezone(DUBAI_TZ))
                                            .total_seconds() // 60)) if first else 0,
                     "names": [x["name"] for x in locks]})
+        rows.append(row)
+    # Товар принят без кодов: он стоит на полке, а реестр о нём не знает.
+    # Строка есть, пока хоть один такой район не отсканирован до конца, и горит
+    # красным с минуты приёмки — приёмка не окончена, что бы ни говорил
+    # водитель. Нажатие ведёт прямо в этот район поставки.
+    noscan = await _chk_noscan()
+    if noscan:
+        бут = lambda n: ("бутылка" if n % 10 == 1 and n % 100 != 11
+                         else "бутылки" if 2 <= n % 10 <= 4 and not 12 <= n % 100 <= 14
+                         else "бутылок")
+        if len(noscan) == 1:
+            x = noscan[0]
+            hint = f"{x['code']} {x['name']} · {x['left']} {бут(x['left'])}" \
+                   + (f" · {x['by']}" if x.get("by") else "")
+        else:
+            hint = " · ".join(f"{x['code']} {x['left']}" for x in noscan)
+        # Коротко: заглавными длинное название режется у «+1 ч» справа.
+        row = _chk_row("noscan", "Приёмка без кодов", hint, False, now, day,
+                       plan, go="noscan", n=sum(x["left"] for x in noscan))
+        first = min((_geo_dt(x["at"]) for x in noscan if _geo_dt(x.get("at"))),
+                    default=None)
+        row.update({"state": "late",
+                    "due": first.astimezone(DUBAI_TZ).strftime("%H:%M") if first else "",
+                    "late_min": max(0, int((now - first.astimezone(DUBAI_TZ))
+                                           .total_seconds() // 60)) if first else 0,
+                    "tasks": [{"supply_id": x["supply_id"], "district": x["district"],
+                               "code": x["code"], "name": x["name"], "left": x["left"]}
+                              for x in noscan]})
         rows.append(row)
 
     # Порядок задан планом и не пляшет по цвету: список должен читаться как

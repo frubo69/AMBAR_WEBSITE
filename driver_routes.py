@@ -1687,6 +1687,22 @@ async def handle_supply_finish(request):
     return web.json_response(res, headers=CORS_HEADERS)
 
 
+@require_driver
+async def handle_supply_noscan(request):
+    """Товар забрали, коды не читали. Задача остаётся открытой — досканировать."""
+    import supply_routes
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    res = await supply_routes.task_noscan(
+        request.match_info.get("sid") or "",
+        str(body.get("district") or "").strip(), me["name"])
+    return web.json_response(res, headers=CORS_HEADERS,
+                             dumps=lambda o: json.dumps(o, default=str))
+
+
 async def _opt(request):
     return web.Response(status=200, headers=CORS_HEADERS)
 
@@ -1723,6 +1739,7 @@ def setup(app):
         ("/api/driver/supply/{sid}/scan",       handle_supply_scan,   "POST"),
         ("/api/driver/supply/{sid}/undo",       handle_supply_undo,   "POST"),
         ("/api/driver/supply/{sid}/finish",     handle_supply_finish, "POST"),
+        ("/api/driver/supply/{sid}/noscan",     handle_supply_noscan, "POST"),
     )
     seen = set()
     for path, handler, method in routes:

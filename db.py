@@ -2298,6 +2298,24 @@ async def supply_task_start(sid: str, district: str, now) -> None:
         {"$set": {f"tasks.{district}.started_at": now}})
 
 
+async def supply_task_noscan(sid: str, district: str, who: str, now) -> dict | None:
+    """Товар забрали, коды не читали. Задача остаётся открытой.
+
+    Это не закрытие, а долг: бутылки стоят на полке, а в реестре их нет. Пока
+    их не отсканируют, у задачи нет done_at, у поставки — статуса done, и
+    человек в приложении видит её как незаконченную. Второй раз отметить
+    нельзя — первая отметка и есть та, с которой считается срок."""
+    db = _db_or_none()
+    if db is None: return None
+    from pymongo import ReturnDocument
+    return await db.supplies.find_one_and_update(
+        {"_id": sid, "status": "open",
+         f"tasks.{district}.done_at": None, f"tasks.{district}.noscan_at": None},
+        {"$set": {f"tasks.{district}.noscan_at": now,
+                  f"tasks.{district}.noscan_by": who}},
+        return_document=ReturnDocument.AFTER)
+
+
 async def supply_task_finish(sid: str, district: str, gaps: list,
                              note: str, now) -> dict | None:
     """Закрыть задачу района. Возвращает поставку целиком."""

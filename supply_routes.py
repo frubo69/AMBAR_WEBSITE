@@ -547,7 +547,9 @@ async def handle_list(request):
         brief["tasks"] = {o: {"driver": t.get("driver", ""),
                               "scanned": int(t.get("scanned") or 0),
                               "qty": int(t.get("qty") or 0),
-                              "done_at": str(t.get("done_at") or "")}
+                              "done_at": str(t.get("done_at") or ""),
+                              "noscan_at": str(t.get("noscan_at") or ""),
+                              "noscan_by": t.get("noscan_by") or ""}
                           for o, t in (r.get("tasks") or {}).items()}
         out.append(brief)
     return web.json_response({"supplies": out}, headers=CORS_HEADERS,
@@ -645,6 +647,10 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
         "claimed_at": str(task.get("claimed_at") or ""),
         "started_at": str(task.get("started_at") or ""),
         "done_at": str(task.get("done_at") or ""),
+        # Товар забрали без кодов: задача открыта, но бутылки уже на полке.
+        # Пока left > 0, это долг — досканировать.
+        "noscan_at": str(task.get("noscan_at") or ""),
+        "noscan_by": task.get("noscan_by") or "",
         "note": task.get("note") or "",
         "gaps": task.get("gaps") or [],
         "need": need, "got": got, "left": max(0, need - got),
@@ -684,7 +690,9 @@ async def tasks_for_driver(me: str, district: str) -> dict:
             if task.get("done_at"):
                 continue
             v = _task_view(sid, sup, oid, task, me)
-            if not свежее and not v["got"]:
+            # Принятое без кодов держим и в старой поставке: товар на полке,
+            # и досканировать его надо в тот документ, куда он записан.
+            if not свежее and not v["got"] and not v["noscan_at"]:
                 continue
             v["home"] = (oid == district)
             v["stale"] = not свежее             # незакончено с прошлой поставки
@@ -703,8 +711,15 @@ async def tasks_for_driver(me: str, district: str) -> dict:
     return {"mine": mine, "free": free, "extra": extra, "taken": other}
 
 
+def _can_touch(task: dict, me: str, owner: bool) -> bool:
+    """Чья это задача. Своя — всегда. Чужая — только старшему и только если
+    товар уже принят без кодов: тогда сканировать осталось не в магазине, а на
+    полке, и делать это может любой, кто до неё дошёл."""
+    return task.get("driver") == me or bool(owner and task.get("noscan_at"))
+
+
 async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
-                    tg_id: int, at_dev: str = "") -> dict:
+                    tg_id: int, at_dev: str = "", owner: bool = False) -> dict:
     """Принять одну бутылку. Возвращает исход, а не «ок» — их несколько.
 
     Порядок важен: сначала занимаем место в задаче, потом пишем бутылку в
@@ -714,7 +729,7 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
     if not sup or sup.get("status") != "open":
         return {"ok": False, "verdict": "no_supply"}
     task = (sup.get("tasks") or {}).get(oid) or {}
-    if task.get("driver") != me:
+    if not _can_touch(task, me, owner):
         return {"ok": False, "verdict": "not_mine", "driver": task.get("driver") or ""}
     if task.get("done_at"):
         return {"ok": False, "verdict": "closed"}
@@ -792,7 +807,8 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
             "task_got": int(t.get("scanned") or 0)}
 
 
-async def task_undo(sid: str, oid: str, code: str, me: str) -> dict:
+async def task_undo(sid: str, oid: str, code: str, me: str,
+                    owner: bool = False) -> dict:
     """Убрать последнюю бутылку — навёл камеру не на ту.
 
     Только свежую и только несколько раз за задачу: отмена без ограничений
@@ -801,7 +817,7 @@ async def task_undo(sid: str, oid: str, code: str, me: str) -> dict:
     if not sup:
         return {"ok": False, "verdict": "no_supply"}
     task = (sup.get("tasks") or {}).get(oid) or {}
-    if task.get("driver") != me or task.get("done_at"):
+    if not _can_touch(task, me, owner) or task.get("done_at"):
         return {"ok": False, "verdict": "not_mine"}
     if int(task.get("undo") or 0) >= UNDO_MAX:
         return {"ok": False, "verdict": "undo_limit", "limit": UNDO_MAX}
@@ -823,7 +839,8 @@ async def task_undo(sid: str, oid: str, code: str, me: str) -> dict:
     return {"ok": True, "code": code}
 
 
-async def task_finish(sid: str, oid: str, me: str, note: str = "") -> dict:
+async def task_finish(sid: str, oid: str, me: str, note: str = "",
+                      owner: bool = False) -> dict:
     """Закрыть задачу района. Недобор считается сам — по строкам.
 
     Спрашивать «сколько не хватило» отдельно незачем: разницу между
@@ -833,7 +850,7 @@ async def task_finish(sid: str, oid: str, me: str, note: str = "") -> dict:
     if not sup:
         return {"ok": False, "verdict": "no_supply"}
     task = (sup.get("tasks") or {}).get(oid) or {}
-    if task.get("driver") != me:
+    if not _can_touch(task, me, owner):
         return {"ok": False, "verdict": "not_mine"}
     if task.get("done_at"):
         return {"ok": False, "verdict": "closed"}
@@ -862,6 +879,71 @@ async def task_finish(sid: str, oid: str, me: str, note: str = "") -> dict:
             "supply_done": doc.get("status") == "done"}
 
 
+# ── приёмка без сканирования ─────────────────────────────────────────────────
+# Бывает, что читать коды у машины некогда: ящики забрали, поехали. Раньше на
+# это был один ответ — «завершить с недобором», и он врал: бутылки есть, их
+# просто не отсканировали. Теперь есть честное состояние между «взял» и
+# «закрыл»: товар принят, коды не читали. Задача при этом НЕ закрывается —
+# ни у неё нет done_at, ни у поставки статуса done, — а старшему это висит в
+# чек-листе и раз в час приходит напоминанием, пока не досканируют всё.
+#
+# Досканировать может кто угодно: тот же водитель из своего списка или старший
+# из приёмки. Бутылка ставится в реестр тем же task_scan — второго пути нет.
+async def task_noscan(sid: str, oid: str, me: str, owner: bool = False) -> dict:
+    sup = await db.supply_get(sid)
+    if not sup or sup.get("status") != "open":
+        return {"ok": False, "verdict": "no_supply"}
+    task = (sup.get("tasks") or {}).get(oid) or {}
+    if task.get("driver") != me and not owner:
+        return {"ok": False, "verdict": "not_mine", "driver": task.get("driver") or ""}
+    if task.get("done_at"):
+        return {"ok": False, "verdict": "closed"}
+    if task.get("noscan_at"):
+        return {"ok": False, "verdict": "already"}
+    now = datetime.now(timezone.utc)
+    await db.supply_task_start(sid, oid, now)
+    doc = await db.supply_task_noscan(sid, oid, me, now)
+    if not doc:
+        return {"ok": False, "verdict": "closed"}
+    v = _task_view(sid, doc, oid, (doc.get("tasks") or {}).get(oid) or {}, me)
+    log.info(f"[supply] {sid}/{oid}: принято без сканирования · {me} · "
+             f"{v['left']} шт не отсканировано")
+    try:
+        from owner_routes import notify_owners_force
+        where = f"{OFFICE_CODES.get(oid,'')} {OFFICE_NAMES.get(oid, oid)}".strip()
+        base = f" · {_md(doc.get('base'))}" if doc.get("kind") == "extra" and doc.get("base") else ""
+        await notify_owners_force(
+            "supply.noscan",
+            f"📦 *Принято без сканирования — {_md(where)}{base}*\n"
+            f"{_md(me)} · {v['left']} {_plural(v['left'], 'бутылка', 'бутылки', 'бутылок')}"
+            f" · {v['positions']} {_plural(v['positions'], 'позиция', 'позиции', 'позиций')}")
+    except Exception as e:
+        log.error(f"[supply] уведомление о приёмке без кодов: {e}")
+    return {"ok": True, **v}
+
+
+async def noscan_tasks() -> list:
+    """Что принято без кодов и ещё не отсканировано — по всем открытым
+    поставкам. Этим живут чек-лист и почасовое напоминание."""
+    out = []
+    for sup in await db.supplies_with_open_tasks(limit=12):
+        sid = sup.get("_id")
+        for oid, t in (sup.get("tasks") or {}).items():
+            if not t.get("noscan_at") or t.get("done_at"):
+                continue
+            v = _task_view(sid, sup, oid, t)
+            if v["left"] <= 0:
+                continue
+            out.append({"supply_id": sid, "district": oid,
+                        "code": v["district_code"], "name": v["district_name"],
+                        "by": v["noscan_by"] or v["driver"], "at": t.get("noscan_at"),
+                        "left": v["left"], "need": v["need"], "got": v["got"],
+                        "positions": v["positions"],
+                        "extra": v["extra"], "base": v["base"]})
+    out.sort(key=lambda x: str(x["at"] or ""))
+    return out
+
+
 def _md(s: str) -> str:
     return str(s or "").replace("*", "").replace("_", "").replace("`", "")
 
@@ -882,6 +964,8 @@ async def _notify_done(sid: str, doc: dict, oid: str, me: str,
         pass
     base = f" · {_md(doc.get('base'))}" if doc.get("kind") == "extra" and doc.get("base") else ""
     head = f"📥 *Приёмка — {_md(where)}{base}*\n{_md(me)} · принято {took} из {need}{mins}"
+    if task.get("noscan_at"):
+        head += "\nБыло принято без сканирования — теперь коды на месте"
     if gaps:
         lst = "\n".join(f"• {_md(g['name'])} — {g['got']} из {g['need']}" for g in gaps[:8])
         more = f"\n…и ещё {len(gaps) - 8}" if len(gaps) > 8 else ""
@@ -1559,7 +1643,7 @@ async def handle_own_scan(request):
                           str(body.get("product_id") or "").strip(),
                           code, _owner_name(request, body),
                           int(request.get("owner_id") or 0),
-                          str(body.get("at_dev") or ""))
+                          str(body.get("at_dev") or ""), owner=True)
     return web.json_response(res, headers=CORS_HEADERS)
 
 
@@ -1572,7 +1656,7 @@ async def handle_own_undo(request):
     res = await task_undo(request.match_info.get("sid") or "",
                           str(body.get("district") or "").strip(),
                           re.sub(r"\s+", "", str(body.get("code") or ""))[:120],
-                          _owner_name(request, body))
+                          _owner_name(request, body), owner=True)
     return web.json_response(res, headers=CORS_HEADERS)
 
 
@@ -1585,8 +1669,22 @@ async def handle_own_finish(request):
     res = await task_finish(request.match_info.get("sid") or "",
                             str(body.get("district") or "").strip(),
                             _owner_name(request, body),
-                            str(body.get("note") or ""))
+                            str(body.get("note") or ""), owner=True)
     return web.json_response(res, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_own_noscan(request):
+    """Товар забрали, коды не читали — задача остаётся открытой."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    res = await task_noscan(request.match_info.get("sid") or "",
+                            str(body.get("district") or "").strip(),
+                            _owner_name(request, body), owner=True)
+    return web.json_response(res, headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
 
 
 # ── закупка на других базах ─────────────────────────────────────────────────
@@ -1694,6 +1792,7 @@ def setup(app):
         ("/api/owner/supply/{sid}/task/scan",       handle_own_scan,     "POST"),
         ("/api/owner/supply/{sid}/task/undo",       handle_own_undo,     "POST"),
         ("/api/owner/supply/{sid}/task/finish",     handle_own_finish,   "POST"),
+        ("/api/owner/supply/{sid}/task/noscan",     handle_own_noscan,   "POST"),
     ):
         r.add_route("OPTIONS", path, _opt)
         {"GET": r.add_get, "POST": r.add_post}[method](path, handler)

@@ -2298,6 +2298,14 @@ button.path:active{transform:scale(.995)}
 .xs-bar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,#C9A96E,#E8C98A)}
 .xs-dcard.live{border-color:rgba(201,169,110,.4)}
 .xs-dcard.done{opacity:.7}
+/* Принято без кодов: товар на полке, реестр о нём не знает. Жёлтым — это
+   долг, а не состояние; число справа тем же цветом. */
+.xs-dcard.noscan{border-color:rgba(243,180,74,.42)}
+.xs-dcard.noscan .xs-dcard-n,.xs-dcard.noscan .xs-dcard-b i{color:var(--warn)}
+.pd-r.warn .pnav-b i{color:var(--warn)}
+/* Подвал приёмки: главная кнопка — следующий шаг, под ней тихая — обходной. */
+.rcv-acts{display:flex;flex-direction:column;gap:8px}
+.rcv-acts .qb-ghost{flex:none;padding:15px}
 .xs-pl.ok .xs-pl-q{background:rgba(76,175,125,.18);color:var(--up)}
 .xs-pl-q u{text-decoration:none;font-size:11px;font-weight:600;opacity:.7}
 .xs-dcard .rt-acts,.xs-dcard > .rt-take,.xs-dcard > .rt-rel{margin-top:10px}
@@ -14061,7 +14069,19 @@ const CK_GO = {
   // Водитель без входа: замок сторожа геопозиции снимается здесь же, без
   // похода в «Команду», — строка и есть решение.
   geo_lock:  () => chkGeoUnlock(),
+  // Принято без кодов: строка ведёт прямо в район той поставки, где это
+  // случилось, — и там уже кнопка «Сканировать».
+  noscan:    () => chkNoscan(),
 };
+
+function chkNoscan(){
+  const r = (CKL && (CKL.rows || []).find(x => x.id === 'noscan')) || {};
+  const t = (r.tasks || [])[0];
+  if(!t){ accOpen('supply'); return; }
+  accOpen('supply-at');             // только раздел: поставку выбираем сами
+  ACC_VIEW = 'supply';
+  accSupply('who', t.district, t.supply_id);
+}
 
 async function chkGeoUnlock(){
   const r = (CKL && (CKL.rows || []).find(x => x.id === 'geo_lock')) || {};
@@ -14768,6 +14788,11 @@ function pathDistricts(){
     }else if(t.done_at){
       cls = 'ok';
       sub = `принял ${fmt(t.scanned || 0)} из ${fmt(t.qty || 0)}${t.driver ? ' · ' + escS(t.driver) : ''}`;
+    }else if(t.noscan_at){
+      cls = 'warn';
+      const left = Math.max(0, (t.qty || 0) - (t.scanned || 0));
+      sub = `без сканирования · ${fmt(left)} ${pluralize(left,'бутылка','бутылки','бутылок')}${
+        (t.noscan_by || t.driver) ? ' · ' + escS(t.noscan_by || t.driver) : ''}`;
     }else if(t.driver){
       cls = 'live';
       sub = `везёт ${escS(t.driver)}${t.scanned ? ` · принято ${fmt(t.scanned)} из ${fmt(t.qty || 0)}` : ` · ${fmt(t.qty || 0)} ${pluralize(t.qty || 0,'бутылка','бутылки','бутылок')}`}`;
@@ -16845,15 +16870,17 @@ function _supMain(list){
   return (list || []).find(x => x.status === 'open' && x.kind !== 'extra') || null;
 }
 
-async function accSupply(goto, district){
+async function accSupply(goto, district, sid){
   // Нажали на район в закупке — открываем поставку с ним раскрытым и
   // прокрученным к нему; нажали на заголовок — общая приёмка как есть.
+  // sid задан — конкретная поставка (из чек-листа), а не основная.
   SUP_GOTO = district ? 'd:' + district : (goto || '');
   if(district) SUP_OPEN.add(district);
   ACC_BACK = accOrder;              // поставка живёт внутри заявки
   _setText('accTitle', 'Поставка');
   supActShow();
   _setText('accSub', 'загрузка…');
+  if(sid){ await supLoad(sid); return; }
   let list = ACC_SUP && ACC_SUP.list;
   if(!list){
     try{ list = ((await ownerApi.ownerFetch('/api/owner/supply')).supplies) || []; }
@@ -17068,7 +17095,11 @@ function xSupRender(d){
   const order = t => t.done_at ? 2 : (t.driver ? 1 : 0);
   const cards = [...tasks].sort((a, b) => order(a) - order(b)).map(t => {
     const x = D[t.district] || {};
+    // Принято без кодов — своё состояние между «везёт» и «принято»: товар на
+    // полке, задача открыта, пока всё не отсканируют.
+    const ns = !t.done_at && !!t.noscan_at;
     const who = t.done_at ? (t.got < t.need ? `недобор · закрыл ${_hm(t.done_at)}` : `принято · ${_hm(t.done_at)}`)
+              : ns ? `без сканирования · ${escS(t.noscan_by || t.driver)} · ${_hm(t.noscan_at)}`
               : t.driver ? `${escS(t.driver)}${t.started_at ? ' · с ' + _hm(t.started_at) : ''}`
               : 'никто не взял';
     const fl = t.flags || {};
@@ -17084,7 +17115,7 @@ function xSupRender(d){
         <span class="xs-pl-n">${escS(l.name)}</span>
         <span class="xs-pl-q">${l.got ? `${l.got}<u>/${l.need}</u>` : l.need}</span>
       </div>`).join('');
-    return `<div class="xs-dcard ${t.done_at ? 'done' : t.driver ? 'live' : ''}" id="xsd-${escS(t.district)}">
+    return `<div class="xs-dcard ${t.done_at ? 'done' : ns ? 'noscan' : t.driver ? 'live' : ''}" id="xsd-${escS(t.district)}">
       <div class="xs-dcard-h">
         <span class="xs-dc">${escS(x.code || '')}</span>
         <span class="xs-dcard-b"><b>${escS(x.name || t.district)}</b><i>${who}</i></span>
@@ -17092,7 +17123,7 @@ function xSupRender(d){
       </div>
       ${extra ? list : `<button class="xs-fold ${open ? 'on' : ''}" onclick="xSupToggle('${escS(t.district)}')">
           <span>${lines.length} ${pluralize(lines.length,'позиция','позиции','позиций')}${
-            t.left && (t.driver || t.done_at) ? ` · ${t.done_at ? 'не хватает' : 'осталось'} ${fmt(t.left)}` : ''}</span>
+            t.left && (t.driver || t.done_at || ns) ? ` · ${t.done_at ? 'не хватает' : ns ? 'не отсканировано' : 'осталось'} ${fmt(t.left)}` : ''}</span>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
         </button>${open ? `<div class="xs-fold-b">${list}</div>` : ''}`}
       ${marks.length ? `<div class="rt-fl">${escS(marks.join(' · '))}</div>` : ''}
@@ -17661,6 +17692,11 @@ async function supImport(inp, btnId){
 function rtActs(t, d){
   if(d.status !== 'open' || t.done_at) return '';
   const мой = t.driver && t.driver === _rcvMe();
+  // Принято без кодов — досканировать может любой, кто дошёл до полки: и тот
+  // водитель из своего списка, и старший отсюда. Снимать с водителя нечего —
+  // товар уже у него на точке.
+  if(t.noscan_at) return `<div class="rt-acts">
+    <button class="rt-take" onclick="rcvOpen('${escS(t.district)}')">Сканировать</button></div>`;
   if(мой) return `<div class="rt-acts">
     <button class="rt-take" onclick="rcvOpen('${escS(t.district)}')">Продолжить приёмку</button>
     <button class="rt-rel" onclick="supRelease('${escS(t.district)}')">Отдать</button></div>`;
@@ -17736,22 +17772,33 @@ function rcvRender(){
   SCAN.stop();
   RCV_LINE = null;
   ACC_BACK = rcvBack;
-  const act = document.getElementById('accAct'); if(act) act.innerHTML = '';
   _setRail('accRail', '');
   _setText('accTitle', `${t.district_code} ${t.district_name}`);
   _setText('accSub', `Приёмка · ${t.positions} ${
     pluralize(t.positions,'позиция','позиции','позиций')}`);
+  const ns = !!t.noscan_at;
+  // Справа сверху — обходной путь, а не следующий шаг: пока ничего не принято,
+  // район можно вернуть; когда принято не всё — закрыть с недобором. Главная
+  // кнопка внизу всегда одна и говорит, что делать дальше.
+  const act = document.getElementById('accAct');
+  if(act) act.innerHTML = (t.got === 0 && !ns)
+    ? `<button class="acc-act" onclick="rcvGiveBack()">Вернуть район</button>`
+    : (t.left > 0 && t.got > 0)
+      ? `<button class="acc-act dn" onclick="rcvFinOpen()">Завершить с недобором</button>`
+      : '';
 
   const pct = t.need ? Math.round(t.got / t.need * 100) : 0;
   const head = `<div class="rcv">
-    <div class="rcv-h"><span class="rcv-st live">Принимаю сам</span></div>
+    <div class="rcv-h"><span class="rcv-st ${ns ? 'warn' : 'live'}">${
+      ns ? 'Принято без сканирования' : 'Принимаю сам'}</span></div>
     <div class="rcv-n">
       <span class="rcv-v">${fmt(t.got)}</span>
       <span class="rcv-of">из ${fmt(t.need)}</span>
       <span class="rcv-pct">${pct}%</span>
     </div>
     <div class="rcv-bar"><i style="width:${Math.min(100, pct)}%"></i></div>
-    <div class="rcv-f"><span>${t.left ? 'осталось ' + fmt(t.left) : 'взято полностью'}</span></div>
+    <div class="rcv-f"><span>${t.left ? (ns ? 'не отсканировано ' : 'осталось ') + fmt(t.left)
+                                      : 'всё отсканировано'}</span></div>
   </div>`;
 
   // Недобранное вверх: закрытые строки больше не нужны, а следующую бутылку
@@ -17769,12 +17816,55 @@ function rcvRender(){
     </button>`).join('');
 
   document.getElementById('accMid').innerHTML = head +
-    `<div class="exp-grp">Что забрать</div>` +
+    `<div class="exp-grp">${ns ? 'Что отсканировать' : 'Что забрать'}</div>` +
     (rows || '<div class="exp-empty">Позиций нет</div>');
-  document.getElementById('accFoot').innerHTML = t.got === 0
-    ? `<button class="qb qb-ghost" onclick="rcvGiveBack()">Вернуть район</button>`
-    : `<button class="qb" onclick="rcvFinOpen()">${
-        t.left ? 'Завершить с недобором' : 'Завершить приём'}</button>`;
+  // Одна главная кнопка — следующий шаг. Всё отсканировано — завершить;
+  // нет — сканировать дальше, и под ней тихая «без сканирования», пока этот
+  // путь ещё не выбран.
+  document.getElementById('accFoot').innerHTML = !t.left
+    ? `<button class="qb" onclick="rcvFinOpen()">Завершить приёмку</button>`
+    : `<div class="rcv-acts">
+        <button class="qb" onclick="rcvNext()">${t.got ? 'Продолжить сканирование' : 'Начать сканирование'}</button>
+        ${ns ? '' : `<button class="qb qb-ghost" onclick="rcvNoscanOpen()">Принять без сканирования</button>`}
+      </div>`;
+}
+
+// Следующая позиция, по которой ещё есть что сканировать, — та же, что первой
+// стоит в списке: человеку не приходится искать её глазами.
+function rcvNext(){
+  const l = (RCV && RCV.lines || []).filter(x => x.left > 0)
+    .sort((a, b) => a.name.localeCompare(b.name, 'ru'))[0];
+  if(l) rcvLine(l.id);
+}
+
+// Товар забрали, коды не читали. Задача при этом не закрывается: она висит у
+// старшего в чек-листе и раз в час напоминает о себе, пока всё не отсканируют.
+function rcvNoscanOpen(){
+  const t = RCV; if(!t) return;
+  _setText('rcvFinT', 'Принять без сканирования');
+  _setText('rcvFinS', `${t.district_code} ${t.district_name} · ${fmt(t.left)} ${
+    pluralize(t.left,'бутылка','бутылки','бутылок')} · ${t.positions} ${
+    pluralize(t.positions,'позиция','позиции','позиций')}`);
+  document.getElementById('rcvFinBody').innerHTML = '';
+  const b = document.getElementById('rcvFinGo');
+  b.textContent = 'Принять'; b.onclick = rcvNoscanSend;
+  document.getElementById('rcvFinOv').classList.add('show');
+}
+
+async function rcvNoscanSend(){
+  const t = RCV; if(!t || RCV_BUSY) return; RCV_BUSY = true;
+  const b = document.getElementById('rcvFinGo'); b.disabled = true;
+  try{
+    const r = await ownerApi.ownerFetch(
+      `/api/owner/supply/${encodeURIComponent(t.supply_id)}/task/noscan`,
+      {method:'POST', body:{district: t.district, as: _rcvMe()}});
+    if(!r.ok) throw new Error(r.verdict || 'fail');
+    rcvFinClose();
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    _toast('Принято без сканирования');
+    rcvBack();
+  }catch(e){ _toast('Не удалось'); }
+  finally{ RCV_BUSY = false; b.disabled = false; }
 }
 
 // ── камера ─────────────────────────────────────────────────────────────────
@@ -17970,10 +18060,11 @@ async function rcvGiveBack(){
 function rcvFinOpen(){
   const t = RCV; if(!t) return;
   const gaps = (t.lines || []).filter(l => l.left > 0);
-  _setText('rcvFinT', gaps.length ? 'Недобор' : 'Завершить приём');
+  _setText('rcvFinT', gaps.length ? 'Недобор' : 'Завершить приёмку');
   _setText('rcvFinS', gaps.length
     ? `Не хватает ${fmt(t.left)} ${pluralize(t.left,'бутылки','бутылок','бутылок')}`
     : `Принято ${fmt(t.got)} из ${fmt(t.need)}`);
+  document.getElementById('rcvFinGo').onclick = rcvFinSend;   // окно общее с «без сканирования»
   document.getElementById('rcvFinBody').innerHTML =
     (gaps.length ? `<div class="rcv-gaps">${gaps.slice(0, 8).map(l =>
       `<div class="rcv-gap"><span>${escS(l.name)}</span><b>${l.got} из ${l.need}</b></div>`
@@ -27821,6 +27912,13 @@ try{ setTimeout(callInit, 1500); }catch(e){}
   }
   window.addEventListener('load', () => setTimeout(arm, 4000));
 })();
+
+// Кнопка под напоминанием бота открывает приложение сразу на приёмке:
+// человек нажал «Открыть приёмку» — и он в ней, а не на главной.
+try{
+  if(new URLSearchParams(location.search).get('go') === 'supply')
+    window.addEventListener('load', () => setTimeout(() => accOpen('supply'), 700));
+}catch(e){}
 </script>
 </body>
 </html>

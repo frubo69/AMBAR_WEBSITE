@@ -1179,6 +1179,18 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   padding:12px 14px 12px;margin-bottom:10px}
 .dcard.mine{border-color:rgba(201,169,110,.4)}
 .dcard.stale{border-color:rgba(243,180,74,.35)}
+/* Принято без кодов: товар на полке, реестр о нём не знает. Жёлтым — это
+   долг, а не состояние; число справа тем же цветом. */
+.dcard.noscan{border-color:rgba(243,180,74,.42)}
+.dcard.noscan .dcard-b i,.dcard.noscan .dcard-n,.dtop-n.warn{color:var(--warn)}
+.dchip.warn{color:var(--warn);background:var(--warn-soft);border-color:rgba(243,180,74,.35)}
+/* Обходной путь — справа в шапке, а не среди кнопок внизу: внизу одна
+   главная кнопка, и она говорит, что делать дальше. */
+.sup-act{flex-shrink:0;height:34px;padding:0 12px;border-radius:11px;cursor:pointer;
+  font-family:inherit;font-size:12px;font-weight:700;white-space:nowrap;
+  border:1px solid var(--border3);background:var(--card2);color:var(--sub)}
+.sup-act.dn{color:var(--dn);border-color:rgba(224,85,85,.35);background:var(--dn-soft)}
+.sup-act:active{transform:scale(.96)}
 .dcard-h{display:flex;align-items:center;gap:12px}
 .dcode{flex-shrink:0;width:44px;height:44px;border-radius:13px;display:flex;align-items:center;
   justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
@@ -1958,6 +1970,9 @@ body.call-mini .cs-safe-scrim{display:none}
 .call-bar-go{font-size:11px;color:var(--muted)}
 body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .sup-scr.show{display:flex}
+/* Окно завершения зовут с экрана приёмки, а он стоит выше обычных шторок
+   (95 против 90): без этого окно открывалось ПОД списком и его не было видно. */
+#finSheet{z-index:120}
 .sup-top{display:flex;align-items:center;gap:11px;flex-shrink:0;
   padding:calc(10px + var(--safe-top)) 13px 11px;
   background:rgba(7,7,15,.94);backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
@@ -2434,6 +2449,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
       <div class="sup-top-s" id="supS"></div>
     </div>
     <div class="sup-top-v" id="supV"></div>
+    <button class="sup-act" id="supAct" style="display:none"></button>
   </div>
   <div class="sup-mid" id="supMid"></div>
   <div class="sup-bot" id="supBot"></div>
@@ -5957,11 +5973,15 @@ function supFold(k){
 }
 function supCard(t){
   const pct = t.need ? Math.round(t.got / t.need * 100) : 0;
-  const started = t.got > 0;
+  // Принято без кодов — своё состояние: товар уже на точке, задача открыта,
+  // пока всё не отсканируют. Карточка жёлтая, кнопка — «Сканировать».
+  const ns = !!t.noscan_at;
+  const started = t.got > 0 || ns;
   const key = t.supply_id + '/' + t.district;
   const open = t.extra ? !SUP_FOLD.has(key) : SUP_FOLD.has(key);
   const lines = t.lines || [];
-  const sub = t.stale
+  const sub = ns ? 'принято без сканирования'
+    : t.stale
     ? `незакончено <span class="sup-old">с ${esc(supWhen(t).split(' · ')[0])}</span>`
     : t.mine ? (started ? 'ваша приёмка идёт' : 'ваша приёмка')
     : 'свободна';
@@ -5974,7 +5994,7 @@ function supCard(t){
       <span class="dpl-n">${esc(l.name)}</span>
       <span class="dpl-q">${l.got ? `${l.got}<u>/${l.need}</u>` : l.need}</span>
     </div>`).join('');
-  return `<div class="dcard ${t.mine ? 'mine' : ''} ${t.stale ? 'stale' : ''}">
+  return `<div class="dcard ${t.mine ? 'mine' : ''} ${t.stale ? 'stale' : ''} ${ns ? 'noscan' : ''}">
     <div class="dcard-h">
       <span class="dcode">${esc(t.district_code)}</span>
       <span class="dcard-b"><b>${esc(t.district_name)}${t.extra
@@ -5984,13 +6004,13 @@ function supCard(t){
     ${started ? `<span class="sup-bar dbar"><i style="width:${pct}%"></i></span>` : ''}
     <button class="dfold ${open ? 'on' : ''}" onclick="supFold('${esc(key)}')">
       <span>${lines.length} ${plural(lines.length,'позиция','позиции','позиций')}${
-        started && t.left ? ` · осталось ${fmt(t.left)}` : ''}</span>
+        started && t.left ? ` · ${ns ? 'не отсканировано' : 'осталось'} ${fmt(t.left)}` : ''}</span>
       <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
     </button>
     ${open ? `<div class="dfold-b">${list}</div>` : ''}
     ${t.mine
       ? `<button class="dc-btn" onclick="supOpen('${t.supply_id}','${t.district}')">${
-          started ? 'Продолжить приёмку' : 'Начать приёмку'}</button>`
+          ns ? 'Сканировать' : started ? 'Продолжить приёмку' : 'Начать приёмку'}</button>`
       : `<button class="dc-btn" onclick="supClaim('${t.supply_id}','${t.district}')">Взять</button>`}
   </div>`;
 }
@@ -6111,9 +6131,21 @@ function supBack(){
 function supRenderTask(){
   const t = TASK;
   if(!t) return;
+  const ns = !!t.noscan_at;
   _setText('supT', `${t.district_code} · ${t.district_name}`);
   _setText('supS', t.extra ? (t.base || 'другая база') : supWhen(t));
-  document.getElementById('supV').innerHTML = `${fmt(t.got)}<u> / ${fmt(t.need)}</u>`;
+  // Число в шапке здесь лишнее — оно крупно стоит в карточке ниже. Вместо него
+  // справа обходной путь: пока ничего не принято, задачу можно вернуть; когда
+  // принято не всё — закрыть с недобором. Главная кнопка внизу всегда одна.
+  document.getElementById('supV').style.display = 'none';
+  const act = document.getElementById('supAct');
+  if(t.got === 0 && !ns){
+    act.textContent = 'Вернуть задачу'; act.className = 'sup-act';
+    act.onclick = supGiveBack; act.style.display = '';
+  }else if(t.left > 0 && t.got > 0){
+    act.textContent = 'Завершить с недобором'; act.className = 'sup-act dn';
+    act.onclick = finOpen; act.style.display = '';
+  }else act.style.display = 'none';
   // Добранное уезжает вниз — так же, как его отдаёт сервер. Иначе строка,
   // закрытая минуту назад, остаётся посреди списка и водитель каждый раз
   // перечитывает её, ища следующую.
@@ -6125,10 +6157,12 @@ function supRenderTask(){
   // ниже строки с картинкой и числом в бейдже. Строка — кнопка: тап открывает
   // камеру на эту позицию; добранная гаснет и не нажимается.
   document.getElementById('supMid').innerHTML = `<div class="dtop">
-      <span class="dtop-b"><span class="dchip ${t.left ? '' : 'ok'}">${
-          t.left ? (t.got ? 'идёт приёмка' : 'ждёт') : 'взято полностью'}</span>
-        <span class="dtop-s">${doneN} из ${lines.length} ${plural(lines.length,'позиции','позиций','позиций')} добрано</span></span>
-      <span class="dtop-n">${fmt(t.got)}<i>из ${fmt(t.need)} ${plural(t.need,'бутылки','бутылок','бутылок')}</i></span>
+      <span class="dtop-b"><span class="dchip ${t.left ? (ns ? 'warn' : '') : 'ok'}">${
+          t.left ? (ns ? 'без сканирования' : t.got ? 'идёт приёмка' : 'ждёт')
+                 : (ns ? 'всё отсканировано' : 'взято полностью')}</span>
+        <span class="dtop-s">${doneN} из ${lines.length} ${plural(lines.length,'позиции','позиций','позиций')} ${
+          ns ? 'отсканировано' : 'добрано'}</span></span>
+      <span class="dtop-n ${ns && t.left ? 'warn' : ''}">${fmt(t.got)}<i>из ${fmt(t.need)} ${plural(t.need,'бутылки','бутылок','бутылок')}</i></span>
       <span class="sup-bar dbar"><i style="width:${pct}%"></i></span>
     </div>
     <div class="dcard dlist">${lines.map(l => `
@@ -6139,16 +6173,60 @@ function supRenderTask(){
         <span class="dpl-q">${l.got ? `${l.got}<u>/${l.need}</u>` : l.need}</span>
       </button>`).join('')}</div>`;
   const all = t.left === 0;
-  const none = t.got === 0;
+  // Одна главная кнопка — следующий шаг. Всё отсканировано — завершить;
+  // нет — сканировать дальше, и под ней тихая «без сканирования», пока этот
+  // путь ещё не выбран.
   document.getElementById('supBot').innerHTML = `
     <div class="sup-tot">
-      <span class="sup-tot-l">${all ? 'Взято полностью' : 'Осталось забрать'}</span>
+      <span class="sup-tot-l">${all ? (ns ? 'Всё отсканировано' : 'Взято полностью')
+                                    : (ns ? 'Не отсканировано' : 'Осталось забрать')}</span>
       <span class="sup-tot-v">${all ? fmt(t.got) : fmt(t.left)}<u> ${all ? 'бут.' : 'из ' + fmt(t.need)}</u></span>
     </div>
-    ${none
-      ? `<button class="btn btn-gh" onclick="supGiveBack()">Вернуть задачу</button>`
-      : `<button class="btn ${all ? 'btn-pri' : 'btn-gh'}" onclick="finOpen()">${
-           all ? 'Завершить приём' : 'Завершить с недобором'}</button>`}`;
+    ${all
+      ? `<button class="btn btn-pri" onclick="finOpen()">Завершить приёмку</button>`
+      : `<button class="btn btn-pri" onclick="supNext()">${
+           t.got ? 'Продолжить сканирование' : 'Начать сканирование'}</button>${
+         ns ? '' : `<button class="btn btn-gh" onclick="noscanOpen()">Принять без сканирования</button>`}`}`;
+}
+
+// Следующая позиция, по которой ещё есть что сканировать, — та же, что первой
+// стоит в списке: искать её глазами не приходится.
+function supNext(){
+  const l = (TASK && TASK.lines || []).filter(x => x.left > 0)
+    .sort((a, b) => a.name.localeCompare(b.name, 'ru'))[0];
+  if(l) supLineOpen(l.id);
+}
+
+// Товар забрали, коды не читали. Задача при этом не закрывается: она остаётся
+// в «Моей приёмке» жёлтой, а у старшего висит в чек-листе, пока всё не
+// отсканируют — с полки, когда доедут.
+function noscanOpen(){
+  const t = TASK; if(!t) return;
+  _setText('finT', 'Принять без сканирования');
+  _setText('finS', `${t.district_code} ${t.district_name} · ${fmt(t.left)} ${
+    plural(t.left,'бутылка','бутылки','бутылок')} · ${t.positions} ${
+    plural(t.positions,'позиция','позиции','позиций')}`);
+  document.getElementById('finBody').innerHTML = '';
+  const b = document.getElementById('finGo');
+  b.textContent = 'Принять'; b.onclick = noscanSend;
+  document.getElementById('finSheet').classList.add('show');
+}
+
+async function noscanSend(){
+  const t = TASK; if(!t || SUP_BUSY) return; SUP_BUSY = true;
+  const btn = document.getElementById('finGo'); btn.disabled = true;
+  try{
+    const r = await drvApi.drvFetch(`/api/driver/supply/${t.supply_id}/noscan`,
+      {method:'POST', body:{district: t.district}});
+    if(!r.ok) throw new Error(r.verdict);
+    finClose();
+    document.getElementById('supScr').classList.remove('show');
+    TASK = null;
+    try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    toast('Принято без сканирования');
+    supLoad();
+  }catch(e){ toast('Не удалось', 'err'); }
+  finally{ SUP_BUSY = false; btn.disabled = false; }
 }
 
 const _setText = (id, v) => { const e = document.getElementById(id); if(e) e.textContent = v; };
@@ -6180,7 +6258,10 @@ function supRenderCam(){
   const l = LINE;
   _setText('supT', l.name);
   _setText('supS', 'Наводите на код каждой бутылки');
-  document.getElementById('supV').innerHTML = `${fmt(l.got)}<u> / ${fmt(l.need)}</u>`;
+  // На камере справа — счёт по этой позиции, обходного пути тут нет.
+  document.getElementById('supAct').style.display = 'none';
+  const v = document.getElementById('supV');
+  v.style.display = ''; v.innerHTML = `${fmt(l.got)}<u> / ${fmt(l.need)}</u>`;
   document.getElementById('supMid').innerHTML = `
     <div class="cam">
       <video id="camV" playsinline muted autoplay></video>
@@ -6369,10 +6450,11 @@ async function camUndo(){
 function finOpen(){
   const t = TASK; if(!t) return;
   const gaps = (t.lines || []).filter(l => l.left > 0);
-  _setText('finT', gaps.length ? 'Недобор' : 'Завершить приём');
+  _setText('finT', gaps.length ? 'Недобор' : 'Завершить приёмку');
   _setText('finS', gaps.length
-    ? `Не хватает ${fmt(t.left)} ${plural(t.left,'бутылки','бутылок','бутылок')}. Старший увидит это списком.`
-    : `Принято ${fmt(t.got)} из ${fmt(t.need)}. Задача закроется.`);
+    ? `Не хватает ${fmt(t.left)} ${plural(t.left,'бутылки','бутылок','бутылок')}`
+    : `Принято ${fmt(t.got)} из ${fmt(t.need)}`);
+  document.getElementById('finGo').onclick = finSend;    // окно общее с «без сканирования»
   document.getElementById('finBody').innerHTML =
     (gaps.length ? `<div class="card" style="margin-bottom:12px">${
       gaps.slice(0, 8).map(l => `<div class="ord-item" style="margin-bottom:7px">

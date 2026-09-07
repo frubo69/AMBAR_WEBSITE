@@ -1983,6 +1983,26 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 /* display:block выше перебивал [hidden] — и при «переснять» прошлый кадр
    оставался поверх живой камеры. */
 .car-cam video[hidden],.car-cam img[hidden]{display:none}
+/* Снятый кадр — результат, а не продолжение камеры: карточка с тенью на
+   размытом фоне из того же снимка, метка «Чек / Машина» и вопрос крупно. */
+#carBg{display:none;position:absolute;inset:-40px;width:auto;height:auto;object-fit:cover;
+  filter:blur(28px) brightness(.4) saturate(.8)}
+.car-scr.shot #carBg{display:block}
+.car-scr.shot #carImg{left:16px;top:calc(100px + var(--safe-top));
+  width:calc(100% - 32px);height:calc(100% - 278px - var(--safe-top) - var(--safe-bottom));
+  object-fit:contain;
+  border-radius:18px;border:1px solid rgba(255,255,255,.14);background:#000;
+  box-shadow:0 22px 56px rgba(0,0,0,.6)}
+.car-tag{display:none;position:absolute;left:28px;top:calc(112px + var(--safe-top));z-index:2;
+  padding:5px 11px;border-radius:999px;font-family:'Space Grotesk',sans-serif;font-size:10px;
+  font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:var(--gold2);
+  background:rgba(0,0,0,.55);border:1px solid rgba(201,169,110,.4);
+  backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.car-scr.shot .car-tag{display:block}
+.car-scr.shot .car-hint{bottom:calc(128px + var(--safe-bottom));
+  font-family:'Space Grotesk',sans-serif;font-size:18px;font-weight:700;letter-spacing:-.2px;
+  color:#fff}
+.car-scr.shot .car-bot{background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.55))}
 .car-bot .btn-del{color:var(--dn)}
 /* Вопрос «удалить снимок?» задаётся с экрана камеры — он выше обычных шторок. */
 #askSheet{z-index:120}
@@ -2713,8 +2733,10 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
     </div>
   </div>
   <div class="car-cam">
+    <img id="carBg" alt="" aria-hidden="true">
     <video id="carV" playsinline muted autoplay></video>
     <img id="carImg" alt="" hidden>
+    <span class="car-tag" id="carTag"></span>
     <!-- Контур подгоняется по ширине экрана (meet), а затемнение — прямоугольник
          с большим запасом за края: экран любой высоты закрыт целиком, и машина
          в контур помещается всегда, не обрезаясь по бокам. -->
@@ -4918,6 +4940,7 @@ async function carView(kind, what){
   const img = document.getElementById('carImg');
   img.hidden = false;
   img.src = свой ? свой.photo : ((sent && (rcp ? sent.thumb : sent.car_thumb)) || '');
+  _carShotLook(img.src);
   carBot('view');
   // Отправленный кадр лежит на сервере: сперва миниатюра из строки, следом —
   // сам снимок, если экран ещё открыт на нём.
@@ -4928,7 +4951,9 @@ async function carView(kind, what){
         {headers:{'Authorization': 'tma ' + ((tg && tg.initData) || '')}});
       if(res.ok){
         const b = await res.blob();
-        if(CAR.id === sent.id && scr.classList.contains('show')) img.src = URL.createObjectURL(b);
+        if(CAR.id === sent.id && scr.classList.contains('show')){
+          img.src = URL.createObjectURL(b); _carShotLook(img.src);
+        }
       }
     }catch(e){}
   }
@@ -4971,6 +4996,7 @@ async function carOpen(kind, what){
   const scr = document.getElementById('carScr');
   scr.classList.remove('shot'); scr.classList.add('show');
   const img = document.getElementById('carImg'); img.hidden = true; img.removeAttribute('src');
+  const bg = document.getElementById('carBg'); if(bg) bg.removeAttribute('src');
   const v = document.getElementById('carV'); v.hidden = false;
   carBot('live');
   try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
@@ -5026,6 +5052,7 @@ function carShoot(){
   CAR.shot = снять(1280, 0.72); CAR.thumb = снять(96, 0.5);
   const img = document.getElementById('carImg');
   img.src = CAR.shot; img.hidden = false; v.hidden = true;
+  _carShotLook(CAR.shot);
   carStop();
   document.getElementById('carScr').classList.add('shot');
   carBot('shot');
@@ -5033,6 +5060,12 @@ function carShoot(){
 }
 
 function carRetake(){ carOpen(CAR.kind, CAR.what); }
+
+// Оформление снятого кадра: тот же снимок размытым фоном и метка, что это.
+function _carShotLook(src){
+  const bg = document.getElementById('carBg'); if(bg) bg.src = src || '';
+  _setText('carTag', CAR.what === 'rcp' ? 'Чек' : 'Машина');
+}
 
 function carStop(){
   if(CAR.stream){ CAR.stream.getTracks().forEach(t => t.stop()); CAR.stream = null; }

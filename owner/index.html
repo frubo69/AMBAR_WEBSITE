@@ -18625,7 +18625,9 @@ function expRow(r){
 // Место у названия вида: туда и так смотрят первым делом.
 function expShotBtn(e){
   if(!e.photo && !e.thumb) return '';
-  return `<button class="exp-item-ph" title="Показать чек" aria-label="Показать чек"
+  // У мойки вместо чека — машина в процессе мойки, снятая водителем.
+  const что = e.car_photo ? 'Показать машину на мойке' : 'Показать чек';
+  return `<button class="exp-item-ph" title="${что}" aria-label="${что}"
      onclick="event.stopPropagation();expShotOpen('${escS(e.id)}','${escS(e.comment || '')}',
        '${escS(e.thumb || '')}')">
     <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"

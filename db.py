@@ -3642,7 +3642,8 @@ async def add_driver_expense(day: str, driver: str, item: dict):
 async def update_driver_expense(day: str, driver: str, item_id: str,
                                 amount: int, comment: str,
                                 thumb: str | None = None, kind: str = "",
-                                kind_t: str = "", plus: bool | None = None) -> bool:
+                                kind_t: str = "", plus: bool | None = None,
+                                car: bool = False) -> bool:
     """Водитель поправил свою же трату. Решение менеджера при этом сбрасывается:
     утверждали одну сумму, а стала другая — значит, смотреть надо заново.
 
@@ -3662,6 +3663,7 @@ async def update_driver_expense(day: str, driver: str, item_id: str,
     if thumb is not None:
         поля["extras.$.photo"] = True
         поля["extras.$.thumb"] = thumb
+        поля["extras.$.car_photo"] = bool(car)     # мойка: снимок машины, не чек
     r = await db.driver_days.update_one(
         {"day": day, "driver": driver, "extras.id": item_id},
         {"$set": поля,

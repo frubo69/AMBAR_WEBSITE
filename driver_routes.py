@@ -1394,25 +1394,32 @@ async def handle_expense_add(request):
     if kind in MUST_RECEIPT and not photo and not (prev or {}).get("photo"):
         return web.json_response({"error": "no_photo", "kind": kind},
                                  status=400, headers=CORS_HEADERS)
+    # Мойка подтверждается не чеком, а снимком машины в процессе мойки —
+    # спереди, в контуре, только с камеры. Переснять можно сколько угодно, но
+    # до конца смены: после закрытия кадр «с мойки» уже ничего не доказывает.
+    car = bool(body.get("car")) and bool(photo)
+    if kind == "wash" and photo and prev and (d or {}).get("shift_close_at"):
+        return web.json_response({"error": "shift_closed"}, status=409,
+                                 headers=CORS_HEADERS)
     thumb = photos.thumb(body.get("thumb")) if photo else ""
 
     if prev:
         await db.update_driver_expense(day, me["name"], prev["id"], amount, comment,
                                        thumb if photo else None,
                                        kind=kind, kind_t=вид["t"],
-                                       plus=bool(вид.get("plus")))
+                                       plus=bool(вид.get("plus")), car=car)
         item = {**prev, "amount": amount, "comment": comment, "kind": kind,
                 "kind_t": вид["t"], "plus": bool(вид.get("plus")),
                 "status": "pending", "edited_at": now_iso}
-        if photo: item.update({"photo": True, "thumb": thumb})
+        if photo: item.update({"photo": True, "thumb": thumb, "car_photo": car})
         log.info(f"[driver] {me['name']} поправил {comment}: "
                  f"{prev.get('amount')} → {amount} AED"
-                 + (" (чек переснят)" if photo else ""))
+                 + (" (машина переснята)" if car else " (чек переснят)" if photo else ""))
     else:
         item = {"id": secrets.token_hex(6), "amount": amount, "comment": comment,
                 "kind": kind, "kind_t": вид["t"], "plus": bool(вид.get("plus")),
                 "by_driver": me["name"], "status": "pending", "at": now_iso}
-        if photo: item.update({"photo": True, "thumb": thumb})
+        if photo: item.update({"photo": True, "thumb": thumb, "car_photo": car})
         if бутылка: item.update(бутылка["item"])
         await db.add_driver_expense(day, me["name"], item)
     # Снимок кладём после самой записи: строка без чека — это повод переспросить,

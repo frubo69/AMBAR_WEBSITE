@@ -336,13 +336,14 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 /* Обзор не влез в экран (телеграм не в полный экран, узкий телефон) —
    страница ставит класс tight: карточка ниже, плитки ниже, зазоры меньше.
    Решает измерение, а не размер экрана — как у плиток учёта. */
-#pg-overview.tight .hero{height:176px;padding:12px 18px 14px;margin-bottom:12px}
+#pg-overview .hero{height:var(--ov-hero,226px);margin-bottom:var(--ov-mb,20px)}
+#pg-overview .bento{gap:var(--ov-gap,8px)}
+#pg-overview .bento .card{height:var(--ov-card,116px)}
+#pg-overview.tight .hero{padding:12px 18px 14px}
 #pg-overview.tight .hero-spark{height:26px;margin-top:8px}
-#pg-overview.tight .hero-amt{font-size:34px}
+#pg-overview.tight .hero-amt{font-size:var(--ov-amt,34px)}
 #pg-overview.tight .hero-row{margin-top:6px}
-#pg-overview.tight .bento{gap:6px}
-#pg-overview.tight .bento .card{height:92px;padding:11px 12px}
-#pg-overview.tight .bento .card.wide{height:80px;padding-top:8px;padding-bottom:6px}
+#pg-overview.tight .bento .card{padding:11px 12px}
 #pg-overview.tight .card-lbl{margin-bottom:6px}
 #pg-overview.tight .card-val{font-size:21px}
 #pg-overview.tight .card-row{margin-top:5px}
@@ -8713,10 +8714,14 @@ window.addEventListener('resize', () => {
   // Высоты карточки (см. .hero в стилях). Не константы: на телефоне, где
   // обзор не влезает в экран, страница ставит себе класс tight, и карточка
   // развёрнутой становится ниже — сжатие при прокрутке считается от неё же.
-  const TIGHT = () => !!(document.getElementById('pg-overview') || {}).classList?.contains('tight');
-  const FULL_ = () => TIGHT() ? 176 : 226, MIN = 78;
-  const MB = () => TIGHT() ? 12 : 20;      // отступ под карточкой
-  const F_FULL_ = () => TIGHT() ? 34 : 44, F_MIN = 23;   // размер числа
+  // Не «полная или ужатая», а ровно столько, сколько отмерил ovFit(): он
+  // раздаёт недостающую высоту между карточкой, плитками и зазорами так,
+  // чтобы шесть плиток сели точно к нижней полосе — ни выше, ни ниже.
+  const _ovVar = (n, d) => parseFloat(getComputedStyle(document.documentElement)
+                                        .getPropertyValue(n)) || d;
+  const FULL_ = () => _ovVar('--ov-hero', 226), MIN = 78;
+  const MB = () => _ovVar('--ov-mb', 20);                 // отступ под карточкой
+  const F_FULL_ = () => 44 - Math.round((226 - FULL_()) * 0.2), F_MIN = 23;   // размер числа
 
   let placeTry = 0;
   const place = () => {
@@ -13449,18 +13454,35 @@ function ovFit(){
   const ov = document.getElementById('pg-overview'); if(!ov) return;
   const hero = ov.querySelector('.hero'), bento = ov.querySelector('.bento');
   if(!hero || !bento) return;
-  const было = ov.classList.contains('tight');
-  ov.classList.remove('tight');
+  const root = document.documentElement.style;
   const top = parseFloat(getComputedStyle(document.documentElement)
                 .getPropertyValue('--hero-top')) || 124;
   const tb = document.querySelector('.tabbar');
   const низ = tb ? tb.getBoundingClientRect().height : 76;
-  const место = innerHeight - top - низ - 8;
-  const надо = 226 + 20 + bento.offsetHeight;
-  const tight = надо > место;
-  ov.classList.toggle('tight', tight);
+  const место = innerHeight - top - низ - 10;
+  // Полный вид: карточка 226, отступ 20, три ряда плиток по 116 с зазором 8.
+  let hero = 226, mb = 20, card = 116, gap = 8;
+  let deficit = hero + mb + 3 * card + 2 * gap - место;
+  if(deficit <= 0){
+    ['--ov-hero','--ov-mb','--ov-card','--ov-gap','--ov-amt'].forEach(v => root.removeProperty(v));
+    ov.classList.remove('tight');
+  }else{
+    // Недостающее забираем по очереди: сначала у карточки (до 176), потом у
+    // плиток (до 88), потом у зазоров. Ровно столько, сколько не хватает —
+    // на телефоне старшего ужатый вид оставлял пустоту под плитками.
+    const h = Math.min(50, deficit); hero -= h; deficit -= h;
+    const c = Math.min(28, Math.ceil(deficit / 3)); card -= c; deficit -= c * 3;
+    const m = Math.min(8, deficit); mb -= m; deficit -= m;
+    const g = Math.min(2, Math.ceil(deficit / 2)); gap -= g;
+    root.setProperty('--ov-hero', hero + 'px');
+    root.setProperty('--ov-mb', mb + 'px');
+    root.setProperty('--ov-card', card + 'px');
+    root.setProperty('--ov-gap', gap + 'px');
+    root.setProperty('--ov-amt', (44 - Math.round((226 - hero) * 0.2)) + 'px');
+    ov.classList.toggle('tight', h >= 24 || c >= 12);
+  }
   // Высоту карточки держит скрипт сжатия — просим его пересчитать.
-  if(tight !== было || true) window.dispatchEvent(new Event('scroll'));
+  window.dispatchEvent(new Event('scroll'));
 }
 addEventListener('load', () => { setTimeout(ovFit, 500); setTimeout(ovFit, 1500); });
 try{ document.fonts && document.fonts.ready.then(() => setTimeout(ovFit, 50)); }catch(e){}

@@ -4144,6 +4144,29 @@ button.path:active{transform:scale(.995)}
 .exp-pend-acts .exp-pend-ok{color:#1a1408;border:0;
   background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .exp-pend-acts button:active{transform:scale(.97)}
+/* Решённый расход: та же строка, тише. */
+.exp-done{display:flex;align-items:center;gap:10px;padding:9px 10px;border-radius:12px;
+  background:var(--card2);border:1px solid var(--border2)}
+.exp-done.rejected{opacity:.55}
+.exp-done-ph{display:flex;gap:4px;flex-shrink:0}
+.exp-done-th{padding:0;border:0;background:none;cursor:pointer}
+.exp-done-th img{display:block;width:40px;height:40px;border-radius:9px;object-fit:cover;
+  background:var(--card);border:1px solid var(--border2)}
+.exp-done-th:active img{transform:scale(.95)}
+.exp-done-b{flex:1;min-width:0}
+.exp-done-b b{display:block;font-size:13.5px;font-weight:700;line-height:1.2;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.exp-done-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.exp-done-r{flex-shrink:0;text-align:right}
+.exp-done-r b{display:block;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
+  line-height:1;font-variant-numeric:tabular-nums}
+.exp-done-r b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:700;
+  color:var(--muted);margin-left:3px;letter-spacing:.5px}
+.exp-done-r i{display:block;font-style:normal;font-size:10px;font-weight:700;letter-spacing:.5px;
+  text-transform:uppercase;margin-top:4px;color:var(--up)}
+.exp-done.rejected .exp-done-r i{color:var(--dn)}
+.exp-done .exp-item-x{width:30px;height:30px}
 /* Сводка сверху — кнопка: нажал и уже у первого ожидающего. */
 button.exp-wait{display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit;
   border:1px solid rgba(243,180,74,.35);color:var(--text)}
@@ -18672,28 +18695,8 @@ function expRow(r){
     ${extras.filter(e => (e.status || 'approved') === 'pending')
             .map(e => expPendCard(r, e)).join('')}
     ${extras.some(e => (e.status || 'approved') !== 'pending') ? `<div class="exp-items">${
-      extras.filter(e => (e.status || 'approved') !== 'pending').map(e => {
-      const st = e.status || 'approved';
-      return `<div class="exp-item ${st}">
-        <span class="exp-item-a">${e.amount}</span>
-        <span class="exp-item-c">${e.kind_t && e.kind !== 'other'
-          ? `<b class="exp-item-k">${escS(e.kind_t)}</b>${expShotBtn(e)} · ` : expShotBtn(e)}${
-          escS(e.comment)}${
-          // Что именно отдали. Без названия строка «Охрана · 45 AED» не говорит,
-          // за какую бутылку списывать со склада, — а решение здесь и об этом.
-          e.bottle ? `<i class="exp-bot">${escS(e.bottle)}</i>` : ''}${
-          e.by_driver ? `<i class="exp-from">от водителя</i>` : ''}</span>
-        ${st === 'pending' ? `
-          <button class="exp-item-ok" title="Принять"
-                  onclick="expDecide('${escS(r.name)}','${escS(e.id)}','approve')">✓</button>
-          <button class="exp-item-no" title="Отклонить"
-                  onclick="expDecide('${escS(r.name)}','${escS(e.id)}','reject')">✕</button>`
-        : st === 'rejected'
-          ? `<span class="exp-item-st no">отклонён</span>`
-          : `<button class="exp-item-x" onclick="expDelExtra('${escS(r.name)}','${escS(e.id)}')"
-                     aria-label="Убрать">✕</button>`}
-      </div>`;
-    }).join('')}</div>` : ''}
+      extras.filter(e => (e.status || 'approved') !== 'pending')
+            .map(e => expDoneRow(r, e)).join('')}</div>` : ''}
 
     ${open ? expAddList(r) : ''}
   </div>`;
@@ -18737,6 +18740,29 @@ function expPendCard(r, e){
       <button class="exp-pend-no" onclick="expDecide('${escS(r.name)}','${escS(e.id)}','reject')">Отклонить</button>
       <button class="exp-pend-ok" onclick="expDecide('${escS(r.name)}','${escS(e.id)}','approve')">Принять</button>
     </div>
+  </div>`;
+}
+
+// Решённый расход — той же строкой, что и ожидающий, только тише: превью
+// снимков слева, вид и «за что» посередине, сумма и слово решения справа.
+// Зачёркиваний нет — отклонённое читается по слову и по приглушённости.
+function expDoneRow(r, e){
+  const st = e.status || 'approved';
+  const ph = expPhotos(e);
+  const что = [e.comment && e.comment !== e.kind_t ? e.comment : '',
+               e.bottle || '', e.by_driver ? 'от водителя' : ''].filter(Boolean).join(' · ');
+  return `<div class="exp-done ${st}">
+    ${ph.length ? `<span class="exp-done-ph">${ph.map((p, i) => `
+      <button class="exp-done-th" onclick="phvOpenExp('${escS(r.name)}','${escS(e.id)}',${i})"
+        aria-label="${escS(p.label)}"><img src="${p.thumb}" alt=""></button>`).join('')}</span>` : ''}
+    <span class="exp-done-b"><b>${escS(e.kind_t || e.comment || 'Расход')}</b>${
+      что ? `<i>${escS(что)}</i>` : ''}</span>
+    <span class="exp-done-r">
+      <b>${fmt(e.amount)}<u>AED</u></b>
+      <i>${st === 'rejected' ? 'отклонён' : 'принят'}</i>
+    </span>
+    ${st === 'approved' ? `<button class="exp-item-x" onclick="expDelExtra('${escS(r.name)}','${escS(e.id)}')"
+        aria-label="Убрать">✕</button>` : ''}
   </div>`;
 }
 

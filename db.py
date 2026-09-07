@@ -3277,6 +3277,23 @@ async def qr_by_product_district_all() -> dict:
     return out
 
 
+async def qr_added_since(since) -> dict:
+    """Сколько бутылок завели на каждой точке с этого момента — «за смену».
+
+    Считаем по времени записи, а не по статусу: снятая тем же днём бутылка
+    (отмена скана) из счёта уходит, потому что её стирают, а не помечают.
+    Время в базе бывает и датой, и строкой — спрашиваем обоими видами."""
+    db = _db_or_none()
+    if db is None: return {}
+    iso = since.isoformat() if hasattr(since, "isoformat") else str(since)
+    cur = db.qr_codes.aggregate([
+        {"$match": {"status": {"$ne": "deleted"},
+                    "$or": [{"at": {"$gte": since}}, {"at": {"$gte": iso}}]}},
+        {"$group": {"_id": "$district", "n": {"$sum": 1}}},
+    ])
+    return {d["_id"]: d["n"] for d in await cur.to_list(length=50) if d["_id"]}
+
+
 async def qr_by_district() -> dict:
     """Сколько бутылок записано на каждой точке — для выбора точки."""
     db = _db_or_none()

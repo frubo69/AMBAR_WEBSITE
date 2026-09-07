@@ -230,11 +230,25 @@ async def handle_stats(request):
         log.warning(f"[qr] сводка собиралась {_all:.1f} с: реестр {_t_reg:.1f}, "
                     f"расход {_t2 - _t1:.1f}, без кодов {_t.monotonic() - _t2:.1f}")
 
+    # Сколько внесли за текущую смену — по районам. Рабочие сутки начинаются
+    # в полдень по Дубаю, как во всей системе; с новой сменой счёт с нуля.
+    try:
+        _tz = timezone(timedelta(hours=4))
+        _now = datetime.now(_tz)
+        _start = _now.replace(hour=12, minute=0, second=0, microsecond=0)
+        if _now < _start:
+            _start -= timedelta(days=1)
+        added_shift = await db.qr_added_since(_start.astimezone(timezone.utc))
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[qr] внесённое за смену не посчиталось: {e}")
+        added_shift = {}
+
     return web.json_response({
         "locks": locks,
         "unscanned": unscanned,
         "unscanned_total": sum(unscanned.values()),
         "no_count": no_count,
+        "added_shift": added_shift,
         "by_district": by_district,
         "by_product_district": by_prod_dist,
         "left_by_district": left,

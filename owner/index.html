@@ -15963,18 +15963,21 @@ async function qrDistrict(force){
     </div>` : '';
   document.getElementById('accMid').innerHTML = head + `<div class="qd-page">` + шапка +
     `<div class="stk-drs">` + ((STK.districts || []).map(d => {
-      const n = have[d.id] || 0;
+      // Справа — что внесли на этой точке ЗА ЭТУ СМЕНУ, а не весь реестр:
+      // сюда приходят вносить, и число отвечает «сколько я уже занёс». Пока
+      // ничего — пусто, без прочерков; с новой сменой счёт с нуля.
+      const n = added[d.id] || 0;
       const b = busy[d.id] || 0;
       const [sub, cls] = b
         ? [`считают ${b} ${pluralize(b,'позицию','позиции','позиций')}`, 'warn']
-        : (n ? ['бутылки в реестре', ''] : ['ещё не заводили', '']);
+        : (n ? ['внесли за смену', ''] : ['', '']);
       return `<button class="stk-dr" onclick="qrGo('${d.id}')">
         <span class="stk-dr-c">${escS(d.code || '')}</span>
         <span class="stk-dr-b">
           <span class="stk-dr-n">${escS(d.name || '')}</span>
-          <span class="stk-dr-s ${cls}">${sub}</span>
+          ${sub ? `<span class="stk-dr-s ${cls}">${sub}</span>` : ''}
         </span>
-        <span class="stk-dr-v ${n ? '' : 'dim'}">${n ? fmt(n) : '—'}${n ? '<i>бут</i>' : ''}</span>
+        <span class="stk-dr-v">${n ? fmt(n) + '<i>бут</i>' : ''}</span>
         <span class="stk-dr-go">${ICO_CHEV}</span>
       </button>`;
     }).join('') || '<div class="scan-empty">Точки не загрузились</div>') + `</div></div>`;

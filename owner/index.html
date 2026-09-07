@@ -1871,10 +1871,11 @@ button.path:active{transform:scale(.995)}
 .pnav-r.ttl .pnav-b i{font-size:11.5px;margin-top:4px}
 .pnav-r.pbig .pnav-v{font-size:19px;color:var(--gold2)}
 /* Приём по районам: заголовок с состоянием, под ним строка на район. */
-.pd{display:block;width:100%;padding:0;border:0;background:none;color:var(--text);
-  font-family:inherit;text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.pd.off{cursor:default}
-.pd:not(.off):active{background:rgba(255,255,255,.03)}
+.pd{display:block;width:100%;padding:0}
+.pd-h,.pd-r{width:100%;border:0;background:none;color:var(--text);font-family:inherit;
+  text-align:left;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.pd.off .pd-h,.pd.off .pd-r{cursor:default}
+.pd:not(.off) .pd-h:active,.pd:not(.off) .pd-r:active{background:rgba(255,255,255,.03)}
 .pd-h{display:flex;align-items:center;gap:10px;padding:9px 16px 5px}
 .pd-h b{flex:1;min-width:0;font-family:'Space Grotesk',sans-serif;font-size:11.5px;font-weight:700;
   letter-spacing:.9px;text-transform:uppercase;color:var(--muted)}
@@ -14678,18 +14679,20 @@ function pathDistricts(){
     }else{
       sub = `ждёт водителя · ${fmt(t.qty || 0)} ${pluralize(t.qty || 0,'бутылка','бутылки','бутылок')}`;
     }
-    return `<div class="pd-r ${cls}">
+    const go = st.k === 'none' ? '' : `onclick="accSupply('who','${escS(x.id)}')"`;
+    return `<button class="pd-r ${cls}" ${go}>
       <span class="shl-code">${escS(x.code || '')}</span>
       <span class="pnav-b"><b>${escS(x.name || x.id)}</b><i>${sub}</i></span>
-    </div>`;
+      ${st.k === 'none' ? '' : `<span class="pnav-go">${ICO_CHEV}</span>`}
+    </button>`;
   }).join('');
   const go = st.k === 'none' ? '' : `onclick="accSupply('who')"`;
-  return `<button class="pd ${st.k === 'none' ? 'off' : ''}" ${go}>
-    <div class="pd-h"><b>Приём по районам</b>
+  return `<div class="pd ${st.k === 'none' ? 'off' : ''}">
+    <button class="pd-h" ${go}><b>Приём по районам</b>
       <span class="pstat-c ${CHIP[st.k]}">${st.k === 'none' ? 'ждём магазин' : st.t.toLowerCase()}</span>
-      <span class="pnav-go">${st.k === 'none' ? '' : ICO_CHEV}</span></div>
+      <span class="pnav-go">${st.k === 'none' ? '' : ICO_CHEV}</span></button>
     ${rows}
-  </button>`;
+  </div>`;
 }
 
 function pathStatus(){
@@ -16719,8 +16722,11 @@ function _supMain(list){
   return (list || []).find(x => x.status === 'open' && x.kind !== 'extra') || null;
 }
 
-async function accSupply(goto){
-  SUP_GOTO = goto || '';
+async function accSupply(goto, district){
+  // Нажали на район в закупке — открываем поставку с ним раскрытым и
+  // прокрученным к нему; нажали на заголовок — общая приёмка как есть.
+  SUP_GOTO = district ? 'd:' + district : (goto || '');
+  if(district) SUP_OPEN.add(district);
   ACC_BACK = accOrder;              // поставка живёт внутри заявки
   _setText('accTitle', 'Поставка');
   supActShow();
@@ -16955,7 +16961,7 @@ function xSupRender(d){
         <span class="xs-pl-n">${escS(l.name)}</span>
         <span class="xs-pl-q">${l.got ? `${l.got}<u>/${l.need}</u>` : l.need}</span>
       </div>`).join('');
-    return `<div class="xs-dcard ${t.done_at ? 'done' : t.driver ? 'live' : ''}">
+    return `<div class="xs-dcard ${t.done_at ? 'done' : t.driver ? 'live' : ''}" id="xsd-${escS(t.district)}">
       <div class="xs-dcard-h">
         <span class="xs-dc">${escS(x.code || '')}</span>
         <span class="xs-dcard-b"><b>${escS(x.name || t.district)}</b><i>${who}</i></span>
@@ -16979,7 +16985,8 @@ function xSupRender(d){
     </div><div id="supWho">${cards || '<div class="exp-empty">Районов нет</div>'}</div>`;
   supActShow();
   supFoot();
-  const goto = SUP_GOTO === 'who' ? 'supWho' : '';
+  const goto = SUP_GOTO === 'who' ? 'supWho'
+             : SUP_GOTO.startsWith('d:') ? 'xsd-' + SUP_GOTO.slice(2) : '';
   SUP_GOTO = '';
   if(goto){
     const el = document.getElementById(goto);

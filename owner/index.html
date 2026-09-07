@@ -13471,9 +13471,9 @@ function ovFit(){
     // плиток (до 88), потом у зазоров. Ровно столько, сколько не хватает —
     // на телефоне старшего ужатый вид оставлял пустоту под плитками.
     const h = Math.min(50, deficit); hero -= h; deficit -= h;
-    const c = Math.min(28, Math.ceil(deficit / 3)); card -= c; deficit -= c * 3;
-    const m = Math.min(8, deficit); mb -= m; deficit -= m;
-    const g = Math.min(2, Math.ceil(deficit / 2)); gap -= g;
+    const c = Math.max(0, Math.min(28, Math.ceil(deficit / 3))); card -= c; deficit -= c * 3;
+    const m = Math.max(0, Math.min(8, deficit)); mb -= m; deficit -= m;
+    const g = Math.max(0, Math.min(2, Math.ceil(deficit / 2))); gap -= g;
     root.setProperty('--ov-hero', hero + 'px');
     root.setProperty('--ov-mb', mb + 'px');
     root.setProperty('--ov-card', card + 'px');

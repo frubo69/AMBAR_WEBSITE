@@ -1974,17 +1974,27 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
    Камера во весь экран, поверх неё маска: снаружи контура темнее, внутри —
    живой кадр. Контур один — машина спереди — и одна кнопка спуска. После
    снимка на том же месте сам кадр и два ответа: переснять или подходит. */
-.car-scr{position:fixed;inset:0;z-index:97;display:none;flex-direction:column;background:#000}
-.car-scr.show{display:flex}
-.car-cam{flex:1;position:relative;overflow:hidden;background:#000}
+/* Кадр — на весь экран, без полос сверху и снизу: шапка и кнопка спуска лежат
+   поверх него на тенях. Снимается ровно то, что видно. */
+.car-scr{position:fixed;inset:0;z-index:97;display:none;background:#000}
+.car-scr.show{display:block}
+.car-cam{position:absolute;inset:0;overflow:hidden;background:#000}
 .car-cam video,.car-cam img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;display:block}
-.car-mask{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.car-mask{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
 .car-scr.shot .car-mask{display:none}
-.car-hint{position:absolute;left:16px;right:16px;bottom:16px;text-align:center;
-  font-size:13.5px;font-weight:600;color:rgba(255,255,255,.88);text-shadow:0 1px 6px rgba(0,0,0,.7)}
-.car-bot{flex-shrink:0;display:flex;align-items:center;justify-content:center;gap:8px;
-  padding:14px 13px calc(14px + var(--safe-bottom));
-  background:rgba(7,7,15,.94);border-top:1px solid var(--border2)}
+.car-scr .sup-top{position:absolute;left:0;right:0;top:0;z-index:2;border-bottom:0;
+  background:linear-gradient(rgba(0,0,0,.62),rgba(0,0,0,0));
+  backdrop-filter:none;-webkit-backdrop-filter:none}
+.car-scr .sup-top-t{color:#fff}
+.car-scr .sup-top-s{color:rgba(255,255,255,.7)}
+.car-scr .sup-back{background:rgba(0,0,0,.45);border-color:rgba(255,255,255,.18);color:#fff}
+.car-hint{position:absolute;left:16px;right:16px;bottom:calc(122px + var(--safe-bottom));
+  z-index:2;text-align:center;font-size:13.5px;font-weight:600;color:rgba(255,255,255,.9);
+  text-shadow:0 1px 6px rgba(0,0,0,.8)}
+.car-bot{position:absolute;left:0;right:0;bottom:0;z-index:2;
+  display:flex;align-items:center;justify-content:center;gap:8px;
+  padding:26px 13px calc(18px + var(--safe-bottom));
+  background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.66))}
 .car-bot .btn{flex:1}
 .car-shot{width:74px;height:74px;border-radius:50%;padding:0;cursor:pointer;
   border:4px solid rgba(255,255,255,.92);
@@ -2695,17 +2705,20 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
   <div class="car-cam">
     <video id="carV" playsinline muted autoplay></video>
     <img id="carImg" alt="" hidden>
-    <svg class="car-mask" id="carMask" viewBox="0 0 390 560" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <!-- Контур подгоняется по ширине экрана (meet), а затемнение — прямоугольник
+         с большим запасом за края: экран любой высоты закрыт целиком, и машина
+         в контур помещается всегда, не обрезаясь по бокам. -->
+    <svg class="car-mask" id="carMask" viewBox="0 0 390 560" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
       <defs>
         <!-- Контур без своей заливки: у <use> она задаётся снаружи — в маске
              чёрным (вырез), на экране пустым с золотой обводкой. -->
         <path id="carShape" d="M120 190H270Q290 190 297 208L312 262H335Q345 262 345 272V280Q345 288 336 288H320Q335 302 340 340V380Q340 390 330 390H318V402Q318 412 308 412H268Q258 412 258 402V390H132V402Q132 412 122 412H82Q72 412 72 402V390H60Q50 390 50 380V340Q55 302 70 288H54Q45 288 45 280V272Q45 262 55 262H78L93 208Q100 190 120 190Z"/>
-        <mask id="carCut">
-          <rect width="390" height="560" fill="#fff"/>
+        <mask id="carCut" maskUnits="userSpaceOnUse" x="-2000" y="-2000" width="4390" height="4560">
+          <rect x="-2000" y="-2000" width="4390" height="4560" fill="#fff"/>
           <use href="#carShape" fill="#000"/>
         </mask>
       </defs>
-      <rect width="390" height="560" fill="rgba(0,0,0,.66)" mask="url(#carCut)"/>
+      <rect x="-2000" y="-2000" width="4390" height="4560" fill="rgba(0,0,0,.66)" mask="url(#carCut)"/>
       <use href="#carShape" fill="none" stroke="#E8C98A" stroke-width="2.5" stroke-linejoin="round"/>
       <g fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.6" stroke-linecap="round">
         <path d="M100 262H290"/>

@@ -1616,6 +1616,7 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .ck-h-s{font-size:12px;color:var(--muted)}
 .ck-h-s b{font-weight:700;color:var(--text)}
 
+.ck-daybar{display:flex;align-items:stretch;gap:8px;margin:0 0 12px}
 .ck-list{display:flex;flex-direction:column;gap:10px}
 /* Строка — та же плитка, что вход в чек-лист и настройки: 66 ростом,
    скруглена на 16, золотая кромка, название заглавными, подпись под ним,
@@ -9116,6 +9117,10 @@ function dpApply(){
   // Учёт живёт одним днём, а не отрезком: из выбранного берём начало и просто
   // встаём на этот день. Календарь здесь — способ уйти дальше, чем удобно
   // листать пальцем, а не выбрать неделю.
+  if(dpTarget === 'ckDay'){
+    const т = _bizToday(), в = new Date(dpFrom.getFullYear(), dpFrom.getMonth(), dpFrom.getDate());
+    ckDaySet(Math.max(0, Math.round((т - в) / 86400000)));
+  }
   if(dpTarget === 'moneyDay'){
     const т = _bizToday(), в = new Date(dpFrom.getFullYear(), dpFrom.getMonth(), dpFrom.getDate());
     const off = Math.round((т - в) / 86400000);
@@ -13872,13 +13877,19 @@ const CKL_PHASE = {
   night:   'скоро уходить',
 };
 
-async function accChecklist(){
+// День чек-листа — свой, не общий с учётом: сюда заходят «что сейчас», и
+// каждый вход начинается с сегодня. Листать назад можно внутри — узнать, что
+// вчера не сделали, — но выход всё сбрасывает.
+let CKL_OFF = 0;
+async function accChecklist(keepDay){
   ACC_BACK = null; CKL_RETURN = false;
+  if(!keepDay) CKL_OFF = 0;
   _setText('accTitle', 'Чек-лист смены');
   _setText('accSub', 'загрузка…');
   document.getElementById('accFoot').innerHTML = '';
-  document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
+  if(!keepDay) document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
   let _p = {};
+  if(CKL_OFF) _p.day = _dayIsoFor(CKL_OFF);
   try{ const c = new URLSearchParams(location.search).get('case'); if(c) _p.case = c; }catch(e){}
   try{ CKL = await ownerApi.ownerFetch('/api/owner/checklist', {params:_p}); }
   catch(e){
@@ -13908,7 +13919,8 @@ function chkRender(){
   const d = CKL || {};
   const rows = d.rows || [];
   const c = d.counts || {};
-  _setText('accSub', d.time ? `сейчас ${d.time}` : '');
+  _setText('accSub', CKL_OFF ? `за ${_dayName(d.day || _dayIsoFor(CKL_OFF))}`
+                             : (d.time ? `сейчас ${d.time}` : ''));
   // Шапка отвечает одним взглядом: горит или нет. Число впереди — то, за чем
   // сюда и заходят.
   // Ежедневник, а не сводка: сверху одна большая задача — смена, — под ней
@@ -13932,9 +13944,41 @@ function chkRender(){
 
   // Пояснение под списком убрано: оно объясняло словами то, что видно
   // глазами — порядок строк, смысл красного, устройство задачи «смена».
-  document.getElementById('accMid').innerHTML = head +
+  document.getElementById('accMid').innerHTML = ckDayBar() + head +
     `<div class="ck-list">${rows.map(chkRow).join('')}</div>`;
 }
+
+// Полоса дня внутри чек-листа: та же, что в учёте, — стрелки, окошко,
+// календарь справа, — но своя: день здесь ни на что снаружи не влияет.
+function ckDayBar(){
+  const d = _bizToday(); d.setDate(d.getDate() - CKL_OFF);
+  const имя = CKL_OFF === 0 ? 'Сегодня' : CKL_OFF === 1 ? 'Вчера'
+            : CKL_OFF === 2 ? 'Позавчера' : `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
+  const дата = CKL_OFF > 2 ? `${ACC_WDF[d.getDay()]} · ${d.getFullYear()}`
+             : `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}, ${ACC_WDF[d.getDay()]}`;
+  return `<div class="ck-daybar">
+    <div class="dayslide" id="ckDay">
+      <button class="ds-arw" onclick="ckDayStep(1)" aria-label="День назад">
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+             stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+      <div class="ds-win" onclick="ckDaySet(0)">
+        <span class="ds-txt"><b>${имя}</b><i>${дата}</i></span>
+      </div>
+      <button class="ds-arw" onclick="ckDayStep(-1)" aria-label="День вперёд" ${CKL_OFF ? '' : 'disabled'}>
+        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+             stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
+    </div>
+    <button class="cal-btn" onclick="openDate('ckDay')" aria-label="Выбрать день"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></button>
+  </div>`;
+}
+function ckDaySet(off){
+  off = Math.max(0, Math.min(365, off | 0));
+  if(off === CKL_OFF) return;
+  CKL_OFF = off;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  accChecklist(true);
+}
+function ckDayStep(delta){ ckDaySet(CKL_OFF + delta); }
 
 function chkRow(r){
   const st = CK_ST[r.state] || CK_ST.soon;

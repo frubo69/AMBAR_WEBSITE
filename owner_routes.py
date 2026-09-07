@@ -10,6 +10,7 @@ Register with:
     setup_owner_routes(app)
 """
 import time, json, asyncio
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -3435,6 +3436,12 @@ async def handle_checklist(request):
     """
     now = datetime.now(DUBAI_TZ)
     day = _biz_day_start(now).date().isoformat()
+    # День можно выбрать — чек-лист за вчера отвечает, что не сделали. Сроки
+    # считаются от того дня, «сейчас» остаётся настоящим: всё несделанное в
+    # прошлом дне — просрочено.
+    q = (request.query.get("day") or "").strip()
+    if re.fullmatch(r"\d{4}-\d{2}-\d{2}", q) and q <= day:
+        day = q
     plan = CHK_PLAN
 
     sh = await _chk_shift(day)

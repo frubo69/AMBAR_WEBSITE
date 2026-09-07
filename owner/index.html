@@ -15938,6 +15938,7 @@ async function qrDistrict(force){
   const last = distSaved('qr');
   if(!force && last && (STK.districts || []).some(d => d.id === last)){ qrPick(last); return; }
   const have = (ACC_QR && ACC_QR.by_district) || {};
+  const added = (ACC_QR && ACC_QR.added_shift) || {};
   const busy = {};
   (ACC_QR?.locks || []).forEach(l => {
     const d = String(l.key || '').split(':')[0];

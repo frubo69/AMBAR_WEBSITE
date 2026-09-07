@@ -2038,8 +2038,14 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .exp-rcp:disabled{opacity:.6;pointer-events:none}
 .exp-rcp-t i.bad{color:var(--dn)}
 .exp-rcp.bad{border-color:rgba(224,85,85,.4);background:var(--dn-soft)}
-/* Причина отказа старшего — под суммой, красным, одной строкой. */
-.exp-why{margin-top:8px;font-size:12px;color:var(--dn);line-height:1.4}
+/* Что не понравилось старшему — окошком в той же карточке. */
+.exp-why{margin-top:8px;padding:9px 12px 10px;border-radius:11px;
+  background:var(--dn-soft);border:1px solid rgba(224,85,85,.28)}
+.exp-why-l{display:block;font-size:9.5px;font-weight:700;letter-spacing:1.2px;
+  text-transform:uppercase;color:var(--dn);margin-bottom:4px}
+.exp-why-r{display:block;font-size:13px;line-height:1.4;color:var(--text)}
+.exp-why-r b{font-weight:700;margin-right:6px}
+.exp-why-r + .exp-why-r{margin-top:3px}
 /* Окно завершения зовут с экрана приёмки, а он стоит выше обычных шторок
    (95 против 90): без этого окно открывалось ПОД списком и его не было видно. */
 #finSheet{z-index:120}
@@ -4827,6 +4833,9 @@ function expBox(kind, title, ico){
   const k = (EXP.by_kind || {})[kind] || {sum:0, count:0};
   const sent = _expSent(kind);
   const отклонён = sent && EXP_ST(sent) === 'rejected';
+  // Отклонили один снимок — переснимают только его: сначала машину, потом чек.
+  const плохой = отклонён ? (sent.car_photo && sent.car_ok === 'no' ? 'car'
+                          : sent.photo && sent.photo_ok === 'no' ? 'rcp' : '') : '';
   const none = ((EXP.no_expense || {})[kind]) && !sent;
   if(none) return `<div class="card exp-card">
     <div class="exp-hd">${svg(ico, 17)}<span class="exp-t">${title}</span></div>
@@ -4849,12 +4858,29 @@ function expBox(kind, title, ico){
         ${sent ? expMark(sent) : ''}
       </div>
       ${отклонён
-        ? `<button class="btn btn-sec exp-go" id="b_${kind}" onclick="expRedo('${kind}')">Заполнить заново</button>`
+        ? (плохой
+          ? `<button class="btn btn-pri exp-go" id="b_${kind}" onclick="carOpen('${kind}','${плохой}')">Переснять</button>`
+          : `<button class="btn btn-sec exp-go" id="b_${kind}" onclick="expRedo('${kind}')">Заполнить заново</button>`)
         : `<button class="btn ${sent ? 'btn-sec' : 'btn-gh'} exp-go" id="b_${kind}"
             onclick="expTap(this,'${kind}')">${sent ? 'Изменить' : 'не было'}</button>`}
     </div>
-    ${отклонён && sent.decided_note ? `<div class="exp-why">${esc(sent.decided_note)}</div>` : ''}
+    ${отклонён ? expWhy(sent) : ''}
     ${expRcp(kind, _expKept(kind))}
+  </div>`;
+}
+
+// Что именно не понравилось старшему — окошком в той же карточке. Отклонён
+// снимок — какой и почему; отклонена запись целиком — её причина.
+function expWhy(sent){
+  const rows = [];
+  if(sent.car_photo && sent.car_ok === 'no') rows.push(['Машина', sent.car_note]);
+  if(sent.photo && sent.photo_ok === 'no') rows.push(['Чек', sent.photo_note]);
+  if(!rows.length && sent.decided_note) rows.push(['', sent.decided_note]);
+  if(!rows.length) rows.push(['', '']);
+  return `<div class="exp-why">
+    <span class="exp-why-l">Отклонено</span>
+    ${rows.map(([w, n]) => `<span class="exp-why-r">${w ? `<b>${esc(w)}</b>` : ''}${
+      n ? esc(n) : (w ? 'переснимите' : 'без причины')}</span>`).join('')}
   </div>`;
 }
 
@@ -5120,14 +5146,16 @@ async function carAccept(){
   if(rcp) EXP_SHOT = {kind, photo: shot, thumb}; else CAR_SHOT = {photo: shot, thumb};
   const sent = _expSent(kind);
   // Запись уже есть — кадр уходит сразу: заставлять второй раз нажимать
-  // «Отправить» ради того же числа незачем. Отклонённую так не обновляют —
-  // её заполняют заново.
-  if(sent && EXP_ST(sent) !== 'rejected'){
+  // «Отправить» ради того же числа незачем. У отклонённой — тоже сразу, если
+  // переснимали именно то, что отклонили; целиком отклонённую заполняют заново.
+  const переснял = sent && EXP_ST(sent) === 'rejected'
+    && (rcp ? sent.photo_ok === 'no' : sent.car_ok === 'no');
+  if(sent && (EXP_ST(sent) !== 'rejected' || переснял)){
     try{
       await drvApi.drvFetch('/api/driver/expenses', {method:'POST',
         body:{kind, amount: sent.amount, comment: sent.comment || '',
               ...(rcp ? {photo: shot, thumb} : {car_photo: shot, car_thumb: thumb})}});
-      toast('Снимок обновлён');
+      toast(переснял ? 'Снимок отправлен старшему' : 'Снимок обновлён');
       try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
       if(rcp) EXP_SHOT = {kind:'', photo:'', thumb:''}; else CAR_SHOT = {photo:'', thumb:''};
       await load();

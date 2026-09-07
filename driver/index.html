@@ -4738,9 +4738,27 @@ function otherBox(x){
 // она и подписана; появилась цифра — стала «Отправить» и загорелась. Двумя
 // кнопками рядом это выглядело как выбор из двух действий, хотя действие одно:
 // ответить. Заодно исчез вопрос, почему «не было» стоит раньше «Отправить».
+// Отклонённый расход не правят — заполняют заново: новая сумма и новые
+// снимки. Пока водитель заполняет, старая запись для карточки как будто
+// исчезла (EXP_REDO); отправка обновит ту же запись на сервере.
+let EXP_REDO = new Set();
+const _expSent = kind => EXP_REDO.has(kind) ? null
+  : ((EXP.extras || []).find(x => x.kind === kind) || null);
+
+function expRedo(kind){
+  EXP_REDO.add(kind);
+  if(EXP_SHOT.kind === kind) EXP_SHOT = {kind:'', photo:'', thumb:''};
+  if(kind === 'wash') CAR_SHOT = {photo:'', thumb:''};
+  render();
+  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+  // Первый шаг — сразу: у мойки камера на машину, у остальных чек.
+  if(kind === 'wash') carOpen('wash'); else expShotFor(kind);
+}
+
 function expBox(kind, title, ico){
   const k = (EXP.by_kind || {})[kind] || {sum:0, count:0};
-  const sent = (EXP.extras || []).find(x => x.kind === kind);
+  const sent = _expSent(kind);
+  const отклонён = sent && EXP_ST(sent) === 'rejected';
   const none = ((EXP.no_expense || {})[kind]) && !sent;
   if(none) return `<div class="card exp-card">
     <div class="exp-hd">${svg(ico, 17)}<span class="exp-t">${title}</span></div>
@@ -4754,7 +4772,7 @@ function expBox(kind, title, ico){
   </div>`;
   return `<div class="card exp-card">
     <div class="exp-hd">${svg(ico, 17)}<span class="exp-t">${title}</span>
-      ${sent ? `<span class="exp-sum">${fmt(k.sum)} AED</span>` : ''}</div>
+      ${sent && !отклонён ? `<span class="exp-sum">${fmt(k.sum)} AED</span>` : ''}</div>
     <div class="exp-row">
       <div class="exp-field${sent ? ' sent' : ''}">
         <input class="amt" id="e_${kind}" type="text" inputmode="numeric"
@@ -4762,8 +4780,10 @@ function expBox(kind, title, ico){
           value="${sent ? sent.amount : ''}"${sent ? ' readonly' : ''}>
         ${sent ? expMark(sent) : ''}
       </div>
-      <button class="btn ${sent ? 'btn-sec' : 'btn-gh'} exp-go" id="b_${kind}"
-        onclick="expTap(this,'${kind}')">${sent ? 'Изменить' : 'не было'}</button>
+      ${отклонён
+        ? `<button class="btn btn-sec exp-go" id="b_${kind}" onclick="expRedo('${kind}')">Заполнить заново</button>`
+        : `<button class="btn ${sent ? 'btn-sec' : 'btn-gh'} exp-go" id="b_${kind}"
+            onclick="expTap(this,'${kind}')">${sent ? 'Изменить' : 'не было'}</button>`}
     </div>
     ${expRcp(kind, sent)}
   </div>`;
@@ -4814,14 +4834,15 @@ let CAR = {kind: '', stream: null, shot: '', thumb: '', id: ''};
 
 // Снимок уже есть — сначала показываем его: отсюда можно переснять или
 // убрать. Нет — сразу камера.
+const _expSentCar = kind => { const s = _expSent(kind); return s && s.car_photo ? s : null; };
+
 function carTap(kind){
-  const sent = (EXP.extras || []).find(x => x.kind === kind && x.car_photo);
-  if(CAR_SHOT.photo || sent) carView(kind); else carOpen(kind);
+  if(CAR_SHOT.photo || _expSentCar(kind)) carView(kind); else carOpen(kind);
 }
 
 async function carView(kind){
   carStop();
-  const sent = (EXP.extras || []).find(x => x.kind === kind && x.car_photo);
+  const sent = _expSentCar(kind);
   const свой = CAR_SHOT.photo ? CAR_SHOT : null;
   CAR = {kind, stream: null, shot: свой ? свой.photo : '', thumb: свой ? свой.thumb : '',
          id: sent ? sent.id : ''};
@@ -4855,7 +4876,7 @@ function carDelete(){
 async function carDeleteDo(){
   const kind = CAR.kind;
   carClose();
-  const sent = (EXP.extras || []).find(x => x.kind === kind && x.car_photo);
+  const sent = _expSentCar(kind);
   CAR_SHOT = {photo:'', thumb:''};
   if(sent){
     try{ await drvApi.drvFetch('/api/driver/expenses', {method:'POST', body:{kind, car_del: true}}); }
@@ -4874,7 +4895,7 @@ async function carDeleteDo(){
 }
 
 async function carOpen(kind){
-  if(SH && SH.closed && (EXP.extras || []).some(x => x.kind === kind && x.car_photo)){
+  if(SH && SH.closed && _expSentCar(kind)){
     toast('Смена закрыта — переснять уже нельзя', 'err'); return;
   }
   carStop();
@@ -4956,10 +4977,11 @@ async function carAccept(){
   carClose();
   if(!shot) return;
   CAR_SHOT = {photo: shot, thumb};
-  const sent = (EXP.extras || []).find(x => x.kind === kind);
+  const sent = _expSent(kind);
   // Запись уже есть — кадр уходит сразу: заставлять второй раз нажимать
-  // «Отправить» ради того же числа незачем.
-  if(sent){
+  // «Отправить» ради того же числа незачем. Отклонённую так не обновляют —
+  // её заполняют заново целиком.
+  if(sent && EXP_ST(sent) !== 'rejected'){
     try{
       await drvApi.drvFetch('/api/driver/expenses', {method:'POST',
         body:{kind, amount: sent.amount, comment: sent.comment || '',
@@ -4981,8 +5003,7 @@ async function carAccept(){
       <span class="exp-rcp-t">Машина на мойке снята<i>нажмите — переснять или убрать</i></span>`;
   }
   try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
-  const чек = (EXP_SHOT.kind === kind && EXP_SHOT.photo)
-           || (EXP.extras || []).some(x => x.kind === kind && x.photo);
+  const чек = (EXP_SHOT.kind === kind && EXP_SHOT.photo) || !!(sent && sent.photo);
   if(!чек){ expShotFor(kind); return; }
   const inp = document.getElementById('e_' + kind);
   if(inp && !inp.readOnly && !String(inp.value || '').replace(/\D/g, '')){
@@ -5036,7 +5057,7 @@ function expTyped(kind){
   const btn = document.getElementById('b_' + kind);
   if(!inp || !btn) return;
   const has = !!String(inp.value || '').replace(/\D/g, '');
-  const sent = (EXP.extras || []).some(x => x.kind === kind);
+  const sent = !!_expSent(kind);
   btn.classList.toggle('btn-pri', has);
   btn.classList.toggle('btn-gh', !has);
   btn.disabled = !has && sent;
@@ -5262,8 +5283,7 @@ function expTap(btn, kind){
   // Пустое поле по бензину или мойке — это ответ «расхода не было», а не
   // забытая цифра: другого смысла у пустого обязательного поля нет.
   const empty = !String((inp || {}).value || '').replace(/\D/g, '');
-  if(empty && (kind === 'fuel' || kind === 'wash')
-     && !(EXP.extras || []).some(x => x.kind === kind)) return expNone(kind, true);
+  if(empty && (kind === 'fuel' || kind === 'wash') && !_expSent(kind)) return expNone(kind, true);
   sendExpense(btn, kind);
 }
 
@@ -7569,11 +7589,11 @@ async function sendExpense(btn, kind){
   // Чек нужен там, где деньги отдали на стороне. Спрашиваем до отправки: узнать
   // о нём от сервера — значит узнать уже отъехав от колонки.
   const свой = EXP_SHOT.kind === kind ? EXP_SHOT : null;
-  const был  = (EXP.extras || []).find(x => x.kind === kind && x.photo);
+  const прежняя = id ? null : _expSent(kind);
+  const был  = прежняя && прежняя.photo ? прежняя : null;
   // Мойка: сначала машина в процессе мойки, потом чек. Чего нет — то и
   // открываем, а не ругаемся: следующий шаг и есть снимок.
-  if(kind === 'wash' && !CAR_SHOT.photo
-     && !(EXP.extras || []).some(x => x.kind === kind && x.car_photo)){
+  if(kind === 'wash' && !CAR_SHOT.photo && !_expSentCar(kind)){
     carOpen('wash'); return;
   }
   if(EXP_RECEIPT.includes(kind) && !(свой && свой.photo) && !был){
@@ -7592,6 +7612,7 @@ async function sendExpense(btn, kind){
     toast('Отправлено на согласование');
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
     if(kind === 'wash') CAR_SHOT = {photo:'', thumb:''};
+    EXP_REDO.delete(kind);
     EXP_MORE = false; EXP_EDIT = null; EXP_SHOT = {kind:'', photo:'', thumb:''};
     try{ btn.blur(); document.activeElement.blur(); }catch(e){}
     await shLoad();

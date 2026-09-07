@@ -1410,7 +1410,10 @@ async def handle_expense_add(request):
         if ent_id and prev is None:
             return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
 
-    if kind in MUST_RECEIPT and not photo and not (prev or {}).get("photo"):
+    # Отклонённая запись заполняется заново: её снимки уже не доказательство,
+    # и старшему нельзя подсунуть тот же чек с другой суммой.
+    отклонён = bool(prev) and (prev.get("status") or "approved") == "rejected"
+    if kind in MUST_RECEIPT and not photo and not ((prev or {}).get("photo") and not отклонён):
         return web.json_response({"error": "no_photo", "kind": kind},
                                  status=400, headers=CORS_HEADERS)
     # Мойка подтверждается двумя снимками: чеком и машиной в процессе мойки —
@@ -1420,7 +1423,7 @@ async def handle_expense_add(request):
     car_photo, беда = photos.decode(body.get("car_photo")) if kind == "wash" else (b"", "")
     if беда:
         return web.json_response({"error": беда}, status=400, headers=CORS_HEADERS)
-    if kind == "wash" and not car_photo and not (prev or {}).get("car_photo"):
+    if kind == "wash" and not car_photo and not ((prev or {}).get("car_photo") and not отклонён):
         return web.json_response({"error": "no_car_photo", "kind": kind},
                                  status=400, headers=CORS_HEADERS)
     if kind == "wash" and (photo or car_photo) and prev and (d or {}).get("shift_close_at"):

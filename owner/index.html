@@ -9774,7 +9774,7 @@ function whPaint(){
           <div class="wh-grp">
             <span class="wh-grp-c">${escS(g.code || '')}</span>
             <span class="wh-grp-n">${escS(g.name || '')}</span>
-            <span class="wh-grp-s">${g.id === 'senior' ? 'старший · менеджер панели'
+            <span class="wh-grp-s">${g.id === 'senior' ? 'менеджер панели'
               : живых ? `${живых} на связи`
               : `${g.rows.length} ${pluralize(g.rows.length,'водитель','водителя','водителей')}`}${
               заказы ? ` · ${заказы} в пути` : ''}</span>
@@ -9891,7 +9891,7 @@ function whCard(){
   const st = whState(r);
   const track = (d.track || []).length > 1;
   _setText('whTtl', r.driver);
-  _setText('whSub', r.senior ? 'старший · менеджер панели'
+  _setText('whSub', r.senior ? 'менеджер панели'
                     : ([r.code, r.name].filter(Boolean).join(' ') || 'водитель'));
   // Крупно — состояние, под ним одной строкой — почему. Бессрочная
   // трансляция приходит сроком на десятки лет; «ещё 596523 ч» — не ответ.

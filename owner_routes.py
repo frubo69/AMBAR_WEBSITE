@@ -1012,6 +1012,10 @@ async def handle_where(request):
     day = pos._biz_date(datetime.now(pos.DUBAI_TZ))
     want = (request.query.get("track") or "").strip()
     seniors = list(staff.SENIOR_STAR_IDS)
+    # В локаторе старший подписан STAR — так его и называют; маршрут по нему
+    # просят тем же словом, а ключ точки остаётся по имени из .env.
+    if want == "STAR" and seniors:
+        want = seniors[0]
     data = await pos.drivers_live(names, day, want if want not in seniors else "")
     for r in data["drivers"]:
         r.update(who.get(r["driver"]) or {})
@@ -1024,14 +1028,14 @@ async def handle_where(request):
                                      P + want if want in seniors else "")
         rows = []
         for r in sen["drivers"]:
-            r["driver"] = r["driver"][len(P):]
-            r.update({"senior": True, "district": "senior", "code": "СТ",
-                      "name": "Старший", "orders": 0, "done": 0})
+            r["driver"] = "STAR"
+            r.update({"senior": True, "district": "senior", "code": "STAR",
+                      "name": "", "orders": 0, "done": 0})
             rows.append(r)
         data["drivers"] = rows + data["drivers"]
         if want in seniors:
             data["track"] = sen.get("track", [])
-            data["track_of"] = want
+            data["track_of"] = "STAR"
     except Exception as e:                       # noqa: BLE001
         log.warning(f"[where] старший не прочитан: {e}")
     return web.json_response(data, headers=CORS_HEADERS,

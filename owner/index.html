@@ -4234,6 +4234,18 @@ button.exp-wait:active{transform:scale(.99)}
 .phv-capv{flex:0 0 100%;text-align:center;margin-top:2px}
 .phv-capv.ok{color:var(--up)}
 .phv-capv.no{color:var(--dn)}
+/* Окно причины: миниатюра того, что отклоняем, быстрые причины, своя строка. */
+.phv-ask-hd{align-items:center}
+.phv-ask-th{flex:0 0 auto}
+.phv-ask-th img{display:block;width:56px;height:56px;border-radius:14px;object-fit:cover;
+  background:var(--card2);border:1px solid var(--border2)}
+.phv-ask-b{flex:1;min-width:0}
+.phv-chips{display:flex;flex-wrap:wrap;gap:7px;padding:2px 18px 14px}
+.phv-chip{padding:8px 13px;border-radius:999px;cursor:pointer;font-family:inherit;font-size:12.5px;
+  font-weight:600;color:var(--sub);background:var(--card2);border:1px solid var(--border2);
+  transition:.15s var(--e1)}
+.phv-chip.on{color:var(--gold2);border-color:rgba(201,169,110,.45);background:var(--gold-soft)}
+.phv-chip:active{transform:scale(.96)}
 .phv-bot{flex-shrink:0;padding:12px 16px calc(16px + env(safe-area-inset-bottom))}
 .phv-acts{display:flex;gap:8px}
 .phv-acts:empty{display:none}
@@ -18895,8 +18907,9 @@ function _phvEl(){
   ask.onclick = e => { if(e.target === ask) phvAskClose(); };
   ask.innerHTML = `
     <div class="wo-c-sheet wo-add">
-      <div class="wo-add-hd">
-        <div>
+      <div class="wo-add-hd phv-ask-hd">
+        <span class="phv-ask-th"><img id="phvAskImg" alt=""></span>
+        <div class="phv-ask-b">
           <div class="wo-c-t" id="phvAskT">Отклонить снимок</div>
           <div class="wo-add-s" id="phvAskS"></div>
         </div>
@@ -18905,9 +18918,10 @@ function _phvEl(){
                stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
         </button>
       </div>
+      <div class="phv-chips" id="phvAskChips"></div>
       <div style="padding:0 18px">
-        <input class="wo-c-note" id="phvAskIn" placeholder="Почему — если нужно" autocomplete="off"
-          onkeydown="if(event.key==='Enter')phvAskGo()">
+        <input class="wo-c-note" id="phvAskIn" placeholder="Своя причина" autocomplete="off"
+          oninput="phvChipSync()" onkeydown="if(event.key==='Enter')phvAskGo()">
       </div>
       <div class="wo-add-foot"><button class="wo-c-go" id="phvAskBtn" onclick="phvAskGo()">Отклонить</button></div>
     </div>`;
@@ -19043,14 +19057,42 @@ async function _phvLoad(k){
 let PHV_ASK = '';
 function phvRejectPhoto(){ phvAskOpen('photo'); }
 
+// Быстрые причины — по одному касанию. Свои у машины, у чека и у расхода
+// целиком; своя причина — строкой ниже.
+const PHV_WHY = {
+  car:     ['Не видно мойки', 'Не та машина', 'Размыто', 'Не сегодня'],
+  receipt: ['Не читается', 'Сумма не та', 'Не тот чек', 'Размыто'],
+  expense: ['Сумма не та', 'Нет снимков', 'Не сегодня', 'Не наш расход'],
+};
+function phvChip(t){
+  const inp = document.getElementById('phvAskIn');
+  const on = inp.value.trim() === t;
+  inp.value = on ? '' : t;
+  phvChipSync();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+function phvChipSync(){
+  const v = (document.getElementById('phvAskIn').value || '').trim();
+  document.querySelectorAll('#phvAskChips .phv-chip').forEach(b =>
+    b.classList.toggle('on', b.textContent === v));
+}
+
 function phvAskOpen(mode){
   const e = _phvE(), p = PHV.list[PHV.i]; if(!e || !p) return;
   PHV_ASK = mode;
   const note = mode === 'photo' ? (p.which === 'car' ? e.car_note : e.photo_note) : e.decided_note;
   _setText('phvAskT', mode === 'photo' ? 'Отклонить снимок' : 'Отклонить расход');
-  _setText('phvAskS', mode === 'photo' ? `${p.label} · ${PHV.ctx.driver}`
-                                       : `${e.kind_t || e.comment || ''} · ${fmt(e.amount)} AED`);
+  _setText('phvAskS', mode === 'photo' ? `${p.label} · ${PHV.ctx.driver} · ${fmt(e.amount)} AED`
+                                       : `${e.kind_t || e.comment || ''} · ${PHV.ctx.driver} · ${fmt(e.amount)} AED`);
+  // Миниатюра того, что отклоняем: полный кадр, если уже загружен, иначе превью.
+  const im = document.getElementById('phvAskImg');
+  im.src = PHV.cache[p.key] || p.thumb || '';
+  im.parentElement.style.display = im.src ? '' : 'none';
+  const why = PHV_WHY[mode === 'photo' ? p.which : 'expense'] || [];
+  document.getElementById('phvAskChips').innerHTML = why.map(t =>
+    `<button class="phv-chip" onclick="phvChip('${escS(t)}')">${escS(t)}</button>`).join('');
   const inp = document.getElementById('phvAskIn'); inp.value = note || '';
+  phvChipSync();
   document.getElementById('phvAsk').classList.add('show');
   setTimeout(() => { try{ inp.focus(); }catch(err){} }, 60);
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(err){}

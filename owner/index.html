@@ -4110,6 +4110,87 @@ button.path:active{transform:scale(.995)}
 .wo-st.wait{color:var(--warn);background:var(--warn-soft)}
 .wo-st.no{color:var(--dn);background:rgba(226,106,106,.12)}
 /* Снимок во весь экран: сам кадр и подпись, закрывается нажатием куда угодно. */
+/* ── Расход, который ждёт решения ──────────────────────────────────────────
+   Не строка среди принятых, а карточка: что и сколько, снимки крупно и два
+   ответа. Решение принимают, глядя на снимок, — значит он должен быть здесь
+   и открываться одним нажатием, а не значком в 13px посреди текста. */
+.exp-pend{margin-top:10px;padding:12px 12px 10px;border-radius:14px;
+  background:linear-gradient(180deg,rgba(243,180,74,.07),rgba(243,180,74,.02)),var(--card);
+  border:1px solid rgba(243,180,74,.38)}
+.exp-pend + .exp-pend{margin-top:8px}
+.exp-pend-h{display:flex;align-items:center;gap:10px}
+.exp-pend-b{flex:1;min-width:0}
+.exp-pend-b b{display:block;font-size:14.5px;font-weight:700;line-height:1.2;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.exp-pend-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.exp-pend-a{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;
+  line-height:1;color:var(--warn);font-variant-numeric:tabular-nums}
+.exp-pend-a u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;
+  color:var(--muted);margin-left:4px;letter-spacing:.6px}
+.exp-pend-ph{display:flex;gap:8px;margin-top:11px}
+.exp-ph{flex:0 0 auto;width:96px;padding:0;border:0;background:none;cursor:pointer;
+  font-family:inherit;text-align:left;color:var(--muted)}
+.exp-ph img{display:block;width:96px;height:72px;border-radius:10px;object-fit:cover;
+  background:var(--card2);border:1px solid var(--border2)}
+.exp-ph i{display:block;font-style:normal;font-size:9.5px;font-weight:700;letter-spacing:.8px;
+  text-transform:uppercase;margin-top:5px;padding-left:2px}
+.exp-ph:active img{transform:scale(.97)}
+.exp-pend-none{margin-top:10px;font-size:11.5px;color:var(--dn)}
+.exp-pend-acts{display:flex;gap:8px;margin-top:11px}
+.exp-pend-acts button{flex:1;height:40px;border-radius:11px;cursor:pointer;font-family:inherit;
+  font-size:13px;font-weight:700;border:1px solid var(--border2);background:var(--card2);color:var(--sub)}
+.exp-pend-acts .exp-pend-no{color:var(--dn);border-color:rgba(224,85,85,.3)}
+.exp-pend-acts .exp-pend-ok{color:#1a1408;border:0;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.exp-pend-acts button:active{transform:scale(.97)}
+/* Сводка сверху — кнопка: нажал и уже у первого ожидающего. */
+button.exp-wait{display:block;width:100%;text-align:left;cursor:pointer;font-family:inherit;
+  border:1px solid rgba(243,180,74,.35);color:var(--text)}
+button.exp-wait:active{transform:scale(.99)}
+
+/* ── Просмотр снимка ────────────────────────────────────────────────────────
+   Во весь экран, чёрный фон, снимок можно приблизить двумя пальцами или
+   двойным нажатием и таскать. Сверху — что это и чьё, снизу — переключение
+   между снимками одной записи и, если она ждёт, само решение. */
+.phv{position:fixed;inset:0;z-index:210;display:none;flex-direction:column;background:#000;
+  color:#fff;touch-action:none}
+.phv.show{display:flex}
+.phv-top{display:flex;align-items:center;gap:10px;flex-shrink:0;
+  padding:calc(10px + env(safe-area-inset-top)) 14px 10px;
+  background:linear-gradient(rgba(0,0,0,.7),rgba(0,0,0,0));position:relative;z-index:2}
+.phv-tt{flex:1;min-width:0}
+.phv-tt b{display:block;font-size:15px;font-weight:700;line-height:1.2;overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.phv-tt i{display:block;font-style:normal;font-size:11.5px;color:rgba(255,255,255,.65);margin-top:2px}
+.phv-x{flex-shrink:0;width:38px;height:38px;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.45);
+  color:#fff;cursor:pointer;padding:0}
+.phv-x:active{transform:scale(.94)}
+.phv-stage{position:absolute;inset:0;overflow:hidden;display:flex;align-items:center;
+  justify-content:center}
+.phv-stage img{max-width:100%;max-height:100%;object-fit:contain;transform-origin:center center;
+  will-change:transform;user-select:none;-webkit-user-select:none;-webkit-user-drag:none}
+.phv-bot{margin-top:auto;flex-shrink:0;position:relative;z-index:2;
+  padding:18px 14px calc(14px + env(safe-area-inset-bottom));
+  background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.72))}
+.phv-tabs{display:flex;justify-content:center;gap:6px;margin-bottom:12px}
+.phv-tabs:empty{display:none}
+.phv-tab{padding:7px 14px;border-radius:999px;font-family:inherit;font-size:11.5px;font-weight:700;
+  letter-spacing:.3px;cursor:pointer;color:rgba(255,255,255,.7);
+  border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.4)}
+.phv-tab.on{color:#1a1408;background:var(--gold2);border-color:transparent}
+.phv-acts{display:flex;gap:8px}
+.phv-acts:empty{display:none}
+.phv-acts button{flex:1;height:46px;border-radius:13px;cursor:pointer;font-family:inherit;
+  font-size:14px;font-weight:700;border:1px solid rgba(255,255,255,.18);
+  background:rgba(255,255,255,.08);color:#fff}
+.phv-acts .phv-no{color:#ff8a8a;border-color:rgba(224,85,85,.45)}
+.phv-acts .phv-ok{color:#1a1408;border:0;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.phv-acts button:active{transform:scale(.97)}
+.phv-hint{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;
+  font-size:13px;color:rgba(255,255,255,.55);pointer-events:none}
+
 .wo-full{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;
   align-items:center;justify-content:center;gap:14px;padding:22px;
   background:rgba(0,0,0,.92);backdrop-filter:blur(6px)}
@@ -18491,10 +18572,10 @@ function renderExpenses(){
         <span>доп. расходы<b>${fmt(t.extra)}</b></span>
       </span>
     </div>
-    ${t.pending_count ? `<div class="exp-wait">
+    ${t.pending_count ? `<button class="exp-wait" onclick="expPendGo()">
       <b>${t.pending_count} ${pluralize(t.pending_count,'расход ждёт','расхода ждут','расходов ждут')}
-      решения</b> на ${fmt(t.pending)} AED — в сумму дня они пока не входят
-    </div>` : ''}
+      решения</b> · ${fmt(t.pending)} AED
+    </button>` : ''}
     <div class="exp-mark">
       <span>${t.marked} из ${t.total_drivers}</span>
       <div class="exp-mark-bar"><div class="exp-mark-fill" style="width:${
@@ -18588,7 +18669,10 @@ function expRow(r){
       </span>
     </div>
 
-    ${extras.length ? `<div class="exp-items">${extras.map(e => {
+    ${extras.filter(e => (e.status || 'approved') === 'pending')
+            .map(e => expPendCard(r, e)).join('')}
+    ${extras.some(e => (e.status || 'approved') !== 'pending') ? `<div class="exp-items">${
+      extras.filter(e => (e.status || 'approved') !== 'pending').map(e => {
       const st = e.status || 'approved';
       return `<div class="exp-item ${st}">
         <span class="exp-item-a">${e.amount}</span>
@@ -18623,13 +18707,44 @@ function expRow(r){
 // чек в квадрате всё равно нельзя, там серый прямоугольник; значок говорит ровно
 // то же самое — доказательство есть, нажми, — и стоит вчетверо дешевле.
 // Место у названия вида: туда и так смотрят первым делом.
+// Снимки записи: у мойки их два — машина в процессе мойки и чек, у остальных
+// один чек. Порядок — машина первой: по ней решают, была ли мойка вообще.
+function expPhotos(e){
+  const out = [];
+  if(e.car_photo || e.car_thumb) out.push({key: e.id + ':car', thumb: e.car_thumb || '',
+    label: 'Машина', path: '/api/owner/expenses/photo/' + encodeURIComponent(e.id) + '?car=1'});
+  if(e.photo || e.thumb) out.push({key: e.id, thumb: e.thumb || '',
+    label: 'Чек', path: '/api/owner/expenses/photo/' + encodeURIComponent(e.id)});
+  return out;
+}
+
+// Ожидающий расход — карточкой: вид и сумма, снимки крупно, под ними решение.
+function expPendCard(r, e){
+  const ph = expPhotos(e);
+  const кто = [e.comment && e.comment !== e.kind_t ? e.comment : '',
+               e.bottle || '', e.by_driver ? 'от водителя' : ''].filter(Boolean).join(' · ');
+  return `<div class="exp-pend" id="pend-${escS(e.id)}">
+    <div class="exp-pend-h">
+      <span class="exp-pend-b"><b>${escS(e.kind_t || e.comment || 'Расход')}</b>${
+        кто ? `<i>${escS(кто)}</i>` : ''}</span>
+      <span class="exp-pend-a">${fmt(e.amount)}<u>AED</u></span>
+    </div>
+    ${ph.length ? `<div class="exp-pend-ph">${ph.map((p, i) => `
+      <button class="exp-ph" onclick="phvOpenExp('${escS(r.name)}','${escS(e.id)}',${i})">
+        <img src="${p.thumb}" alt=""><i>${p.label}</i></button>`).join('')}</div>`
+      : `<div class="exp-pend-none">без снимка</div>`}
+    <div class="exp-pend-acts">
+      <button class="exp-pend-no" onclick="expDecide('${escS(r.name)}','${escS(e.id)}','reject')">Отклонить</button>
+      <button class="exp-pend-ok" onclick="expDecide('${escS(r.name)}','${escS(e.id)}','approve')">Принять</button>
+    </div>
+  </div>`;
+}
+
 function expShotBtn(e){
-  if(!e.photo && !e.thumb) return '';
-  // У мойки вместо чека — машина в процессе мойки, снятая водителем.
-  const что = e.car_photo ? 'Показать машину на мойке' : 'Показать чек';
+  if(!e.photo && !e.thumb && !e.car_photo) return '';
+  const что = e.car_photo ? 'Показать снимки' : 'Показать чек';
   return `<button class="exp-item-ph" title="${что}" aria-label="${что}"
-     onclick="event.stopPropagation();expShotOpen('${escS(e.id)}','${escS(e.comment || '')}',
-       '${escS(e.thumb || '')}')">
+     onclick="event.stopPropagation();phvOpenExp('','${escS(e.id)}',0)">
     <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
       <path d="M4 7.5h3.2l1.8-2.2h6l1.8 2.2H20v11H4z"/><circle cx="12" cy="13" r="3.4"/>
@@ -18637,6 +18752,195 @@ function expShotBtn(e){
 }
 
 const _expImg = {};
+
+// ── Просмотр снимка ─────────────────────────────────────────────────────────
+// Снимок открывается во весь экран и живёт как фотография: приближается двумя
+// пальцами и двойным нажатием, таскается. У записи с двумя снимками внизу
+// переключатель; у той, что ждёт решения, — само решение, прямо отсюда.
+let PHV = {list: [], i: 0, ctx: null, s: 1, tx: 0, ty: 0, cache: {}};
+
+function _phvEl(){
+  let el = document.getElementById('phv');
+  if(el) return el;
+  el = document.createElement('div'); el.id = 'phv'; el.className = 'phv';
+  el.innerHTML = `
+    <div class="phv-stage" id="phvStage"><img id="phvImg" alt="" draggable="false"></div>
+    <div class="phv-top">
+      <span class="phv-tt"><b id="phvT"></b><i id="phvS"></i></span>
+      <button class="phv-x" onclick="phvClose()" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+          stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
+    </div>
+    <div class="phv-bot">
+      <div class="phv-tabs" id="phvTabs"></div>
+      <div class="phv-acts" id="phvActs"></div>
+    </div>`;
+  document.body.appendChild(el);
+  _phvGestures(el.querySelector('#phvStage'));
+  return el;
+}
+
+function phvOpenExp(driver, id, i){
+  // Запись ищем по всем водителям: значок у принятой строки имени не знает.
+  let row = null, e = null;
+  for(const r of ((EXP.data || {}).drivers || [])){
+    const x = (r.extras || []).find(y => y.id === id);
+    if(x && (!driver || r.name === driver)){ row = r; e = x; break; }
+  }
+  if(!e) return;
+  const list = expPhotos(e);
+  if(!list.length) return;
+  phvOpen(list, Math.min(i || 0, list.length - 1), {
+    driver: row.name, id: e.id,
+    pending: (e.status || 'approved') === 'pending',
+    title: e.kind_t || e.comment || 'Расход',
+    sub: `${row.name} · ${fmt(e.amount)} AED`,
+  });
+}
+
+function phvOpen(list, i, ctx){
+  const el = _phvEl();
+  PHV = {...PHV, list, i, ctx: ctx || null};
+  _setText('phvT', (ctx && ctx.title) || '');
+  _setText('phvS', (ctx && ctx.sub) || '');
+  document.getElementById('phvActs').innerHTML = ctx && ctx.pending ? `
+    <button class="phv-no" onclick="phvDecide('reject')">Отклонить</button>
+    <button class="phv-ok" onclick="phvDecide('approve')">Принять</button>` : '';
+  phvTabs();
+  el.classList.add('show');
+  phvShow(i);
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+
+function phvTabs(){
+  const box = document.getElementById('phvTabs');
+  box.innerHTML = PHV.list.length > 1 ? PHV.list.map((p, i) =>
+    `<button class="phv-tab ${i === PHV.i ? 'on' : ''}" onclick="phvShow(${i})">${escS(p.label)}</button>`
+  ).join('') : '';
+}
+
+async function phvShow(i){
+  PHV.i = i; phvTabs();
+  const p = PHV.list[i]; if(!p) return;
+  const img = document.getElementById('phvImg');
+  PHV.s = 1; PHV.tx = 0; PHV.ty = 0; _phvApply(false);
+  // Сначала миниатюра — она уже на экране, — следом сам кадр.
+  img.src = PHV.cache[p.key] || p.thumb || '';
+  if(PHV.cache[p.key]) return;
+  try{
+    const url = await ownerApi.ownerBlob(p.path);
+    PHV.cache[p.key] = url;
+    if(PHV.i === i && document.getElementById('phv').classList.contains('show')) img.src = url;
+  }catch(e){
+    if(!p.thumb) _toast('Снимка не нашлось');
+  }
+}
+
+function phvClose(){
+  const el = document.getElementById('phv'); if(el) el.classList.remove('show');
+}
+
+async function phvDecide(action){
+  const c = PHV.ctx; if(!c) return;
+  phvClose();
+  await expDecide(c.driver, c.id, action);
+}
+
+function _phvApply(anim){
+  const img = document.getElementById('phvImg'); if(!img) return;
+  img.style.transition = anim ? 'transform .18s ease-out' : 'none';
+  img.style.transform = `translate(${PHV.tx}px, ${PHV.ty}px) scale(${PHV.s})`;
+}
+
+// Не выпускать кадр за края: при масштабе 1 он стоит по центру, при большем
+// его можно двигать ровно настолько, насколько он вылез за экран.
+function _phvClamp(){
+  const img = document.getElementById('phvImg'), st = document.getElementById('phvStage');
+  if(!img || !st) return;
+  const r = img.getBoundingClientRect(), b = st.getBoundingClientRect();
+  const w = r.width / (PHV.s || 1), h = r.height / (PHV.s || 1);   // размер при масштабе 1
+  const mx = Math.max(0, (w * PHV.s - b.width) / 2), my = Math.max(0, (h * PHV.s - b.height) / 2);
+  PHV.tx = Math.max(-mx, Math.min(mx, PHV.tx));
+  PHV.ty = Math.max(-my, Math.min(my, PHV.ty));
+}
+
+function _phvZoomAt(cx, cy, s2){
+  const st = document.getElementById('phvStage').getBoundingClientRect();
+  const mx = cx - (st.left + st.width / 2), my = cy - (st.top + st.height / 2);
+  const s1 = PHV.s;
+  s2 = Math.max(1, Math.min(5, s2));
+  PHV.tx = mx - (mx - PHV.tx) * (s2 / s1);
+  PHV.ty = my - (my - PHV.ty) * (s2 / s1);
+  PHV.s = s2;
+  if(s2 <= 1.02){ PHV.s = 1; PHV.tx = 0; PHV.ty = 0; }
+}
+
+function _phvGestures(st){
+  let pinch = null, drag = null, lastTap = 0;
+  const dist = e => Math.hypot(e.touches[0].clientX - e.touches[1].clientX,
+                               e.touches[0].clientY - e.touches[1].clientY);
+  const mid = e => ({x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
+                     y: (e.touches[0].clientY + e.touches[1].clientY) / 2});
+  st.addEventListener('touchstart', e => {
+    if(e.touches.length === 2){
+      const m = mid(e);
+      pinch = {d: dist(e), s0: PHV.s, x: m.x, y: m.y, tx0: PHV.tx, ty0: PHV.ty};
+      drag = null;
+    }else if(e.touches.length === 1){
+      const t = e.touches[0];
+      drag = {x: t.clientX, y: t.clientY, tx0: PHV.tx, ty0: PHV.ty, moved: false};
+      const now = Date.now();
+      if(now - lastTap < 300){
+        // Двойное нажатие: приблизить туда, куда нажали, или вернуть как было.
+        e.preventDefault();
+        _phvZoomAt(t.clientX, t.clientY, PHV.s > 1 ? 1 : 2.5);
+        _phvClamp(); _phvApply(true); lastTap = 0; drag = null;
+      }else lastTap = now;
+    }
+  }, {passive: false});
+  st.addEventListener('touchmove', e => {
+    if(pinch && e.touches.length === 2){
+      e.preventDefault();
+      const stR = st.getBoundingClientRect();
+      const m = mid(e);
+      const s2 = Math.max(1, Math.min(5, pinch.s0 * dist(e) / pinch.d));
+      // Точка под пальцами остаётся под пальцами.
+      const mx = pinch.x - (stR.left + stR.width / 2), my = pinch.y - (stR.top + stR.height / 2);
+      const px = (mx - pinch.tx0) / pinch.s0, py = (my - pinch.ty0) / pinch.s0;
+      const nx = m.x - (stR.left + stR.width / 2), ny = m.y - (stR.top + stR.height / 2);
+      PHV.s = s2; PHV.tx = nx - px * s2; PHV.ty = ny - py * s2;
+      _phvApply(false);
+    }else if(drag && e.touches.length === 1 && PHV.s > 1){
+      e.preventDefault();
+      const t = e.touches[0];
+      PHV.tx = drag.tx0 + (t.clientX - drag.x); PHV.ty = drag.ty0 + (t.clientY - drag.y);
+      drag.moved = true;
+      _phvApply(false);
+    }
+  }, {passive: false});
+  st.addEventListener('touchend', e => {
+    if(e.touches.length < 2) pinch = null;
+    if(!e.touches.length){
+      drag = null;
+      if(PHV.s <= 1.02){ PHV.s = 1; PHV.tx = 0; PHV.ty = 0; }
+      _phvClamp(); _phvApply(true);
+    }
+  });
+  // Колесо — для проверки на компьютере; на телефоне его нет.
+  st.addEventListener('wheel', e => {
+    e.preventDefault();
+    _phvZoomAt(e.clientX, e.clientY, PHV.s * (e.deltaY < 0 ? 1.15 : 0.87));
+    _phvClamp(); _phvApply(false);
+  }, {passive: false});
+}
+
+// Сводка «ждут решения» — кнопка: везёт к первому ожидающему.
+function expPendGo(){
+  const el = document.querySelector('.exp-pend');
+  if(el) el.scrollIntoView({block: 'center', behavior: 'smooth'});
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
 function _woFull(){
   let ov = document.getElementById('woFull');
   if(!ov){

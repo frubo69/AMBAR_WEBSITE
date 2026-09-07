@@ -405,6 +405,7 @@ async def handle_extra_del(request):
     if not ok:
         return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
     await db.expense_photo_del(item_id)
+    await db.expense_photo_del(item_id + ":car")      # у мойки — и машина
     await backdate.notify(day, (request.query.get("as") or ""),
                           "доп. расход убран", driver)
     saved = await db.get_driver_day(day, driver)
@@ -548,7 +549,9 @@ async def handle_extra_photo(request):
     Без этого маршрута снимок был письмом в никуда: его требовали при записи,
     сохраняли — и никто уже не мог на него взглянуть, а расход утверждали
     вслепую."""
-    img = await db.expense_photo((request.match_info.get("item_id") or "").strip())
+    item_id = (request.match_info.get("item_id") or "").strip()
+    # ?car=1 — у мойки второй снимок: машина в процессе мойки, лежит под id+":car".
+    img = await db.expense_photo(item_id + (":car" if request.query.get("car") else ""))
     if not img:
         return web.json_response({"error": "no_photo"}, status=404, headers=CORS_HEADERS)
     return web.Response(body=img, content_type="image/jpeg",

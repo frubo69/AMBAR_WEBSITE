@@ -3643,7 +3643,7 @@ async def update_driver_expense(day: str, driver: str, item_id: str,
                                 amount: int, comment: str,
                                 thumb: str | None = None, kind: str = "",
                                 kind_t: str = "", plus: bool | None = None,
-                                car: bool = False) -> bool:
+                                car_thumb: str | None = None) -> bool:
     """Водитель поправил свою же трату. Решение менеджера при этом сбрасывается:
     утверждали одну сумму, а стала другая — значит, смотреть надо заново.
 
@@ -3663,7 +3663,10 @@ async def update_driver_expense(day: str, driver: str, item_id: str,
     if thumb is not None:
         поля["extras.$.photo"] = True
         поля["extras.$.thumb"] = thumb
-        поля["extras.$.car_photo"] = bool(car)     # мойка: снимок машины, не чек
+    # Мойка: второй снимок — машина в процессе мойки, отдельно от чека.
+    if car_thumb is not None:
+        поля["extras.$.car_photo"] = True
+        поля["extras.$.car_thumb"] = car_thumb
     r = await db.driver_days.update_one(
         {"day": day, "driver": driver, "extras.id": item_id},
         {"$set": поля,
@@ -3672,17 +3675,18 @@ async def update_driver_expense(day: str, driver: str, item_id: str,
     return bool(r.matched_count)
 
 
-async def driver_expense_photo_clear(day: str, driver: str, item_id: str) -> bool:
-    """Водитель убрал снимок у своей траты — новый снимет, когда удобно.
+async def driver_expense_car_clear(day: str, driver: str, item_id: str) -> bool:
+    """Водитель убрал снимок машины у мойки — новый снимет, когда удобно.
 
-    Сам кадр стирается отдельно (expense_photo_del); здесь — строка: без
-    снимка и снова на решение, потому что менеджер смотрел на другую запись."""
+    Сам кадр стирается отдельно (expense_photo_del по id+":car"); здесь —
+    строка: без снимка машины и снова на решение, потому что менеджер
+    смотрел на другую запись. Чек при этом остаётся."""
     db = _db_or_none()
     if db is None: return False
     r = await db.driver_days.update_one(
         {"day": day, "driver": driver, "extras.id": item_id},
-        {"$set": {"extras.$.photo": False, "extras.$.thumb": "",
-                  "extras.$.car_photo": False, "extras.$.status": "pending",
+        {"$set": {"extras.$.car_photo": False, "extras.$.car_thumb": "",
+                  "extras.$.status": "pending",
                   "extras.$.edited_at": datetime.now(timezone.utc).isoformat()},
          "$unset": {"extras.$.decided_by": "", "extras.$.decided_at": ""}})
     return bool(r.matched_count)

@@ -1359,7 +1359,7 @@ async def handle_expense_add(request):
     # Убрать снимок машины у мойки: водитель снял не то и новый сделает позже.
     # Запись остаётся, но без снимка и снова на решение; после закрытия смены
     # трогать её уже нельзя — как и переснимать.
-    if body.get("photo_del") and kind == "wash":
+    if body.get("car_del") and kind == "wash":
         d = await db.get_driver_day(day, me["name"]) or {}
         prev = next((x for x in (d.get("extras") or []) if _kind_of(x) == kind), None)
         if not prev:
@@ -1367,9 +1367,9 @@ async def handle_expense_add(request):
         if d.get("shift_close_at"):
             return web.json_response({"error": "shift_closed"}, status=409,
                                      headers=CORS_HEADERS)
-        await db.driver_expense_photo_clear(day, me["name"], prev["id"])
+        await db.driver_expense_car_clear(day, me["name"], prev["id"])
         try:
-            await db.expense_photo_del(prev["id"])
+            await db.expense_photo_del(prev["id"] + ":car")
         except Exception as e:                              # noqa: BLE001
             log.warning(f"[driver] снимок мойки не стёрт: {e}")
         log.info(f"[driver] {me['name']} убрал снимок машины у мойки")
@@ -1413,32 +1413,43 @@ async def handle_expense_add(request):
     if kind in MUST_RECEIPT and not photo and not (prev or {}).get("photo"):
         return web.json_response({"error": "no_photo", "kind": kind},
                                  status=400, headers=CORS_HEADERS)
-    # Мойка подтверждается не чеком, а снимком машины в процессе мойки —
-    # спереди, в контуре, только с камеры. Переснять можно сколько угодно, но
-    # до конца смены: после закрытия кадр «с мойки» уже ничего не доказывает.
-    car = bool(body.get("car")) and bool(photo)
-    if kind == "wash" and photo and prev and (d or {}).get("shift_close_at"):
+    # Мойка подтверждается двумя снимками: чеком и машиной в процессе мойки —
+    # спереди, в контуре, только с камеры. Второй лежит под id+":car".
+    # Переснять можно сколько угодно, но до конца смены: после закрытия кадр
+    # «с мойки» уже ничего не доказывает.
+    car_photo, беда = photos.decode(body.get("car_photo")) if kind == "wash" else (b"", "")
+    if беда:
+        return web.json_response({"error": беда}, status=400, headers=CORS_HEADERS)
+    if kind == "wash" and not car_photo and not (prev or {}).get("car_photo"):
+        return web.json_response({"error": "no_car_photo", "kind": kind},
+                                 status=400, headers=CORS_HEADERS)
+    if kind == "wash" and (photo or car_photo) and prev and (d or {}).get("shift_close_at"):
         return web.json_response({"error": "shift_closed"}, status=409,
                                  headers=CORS_HEADERS)
+    car_thumb = photos.thumb(body.get("car_thumb")) if car_photo else ""
     thumb = photos.thumb(body.get("thumb")) if photo else ""
 
     if prev:
         await db.update_driver_expense(day, me["name"], prev["id"], amount, comment,
                                        thumb if photo else None,
                                        kind=kind, kind_t=вид["t"],
-                                       plus=bool(вид.get("plus")), car=car)
+                                       plus=bool(вид.get("plus")),
+                                       car_thumb=car_thumb if car_photo else None)
         item = {**prev, "amount": amount, "comment": comment, "kind": kind,
                 "kind_t": вид["t"], "plus": bool(вид.get("plus")),
                 "status": "pending", "edited_at": now_iso}
-        if photo: item.update({"photo": True, "thumb": thumb, "car_photo": car})
+        if photo: item.update({"photo": True, "thumb": thumb})
+        if car_photo: item.update({"car_photo": True, "car_thumb": car_thumb})
         log.info(f"[driver] {me['name']} поправил {comment}: "
                  f"{prev.get('amount')} → {amount} AED"
-                 + (" (машина переснята)" if car else " (чек переснят)" if photo else ""))
+                 + (" (чек переснят)" if photo else "")
+                 + (" (машина переснята)" if car_photo else ""))
     else:
         item = {"id": secrets.token_hex(6), "amount": amount, "comment": comment,
                 "kind": kind, "kind_t": вид["t"], "plus": bool(вид.get("plus")),
                 "by_driver": me["name"], "status": "pending", "at": now_iso}
-        if photo: item.update({"photo": True, "thumb": thumb, "car_photo": car})
+        if photo: item.update({"photo": True, "thumb": thumb})
+        if car_photo: item.update({"car_photo": True, "car_thumb": car_thumb})
         if бутылка: item.update(бутылка["item"])
         await db.add_driver_expense(day, me["name"], item)
     # Снимок кладём после самой записи: строка без чека — это повод переспросить,
@@ -1448,6 +1459,11 @@ async def handle_expense_add(request):
             await db.expense_photo_set(item["id"], photo, thumb)
         except Exception as e:                              # noqa: BLE001
             log.warning(f"[driver] чек не сохранён: {e}")
+    if car_photo:
+        try:
+            await db.expense_photo_set(item["id"] + ":car", car_photo, car_thumb)
+        except Exception as e:                              # noqa: BLE001
+            log.warning(f"[driver] снимок машины не сохранён: {e}")
     # Вписал сумму после «не было» — ответ снимается сам: два взаимоисключающих
     # ответа на один вопрос хуже, чем ни одного.
     if kind in MUST_ANSWER:
@@ -1722,7 +1738,8 @@ async def handle_expense_photo(request):
     d = await db.get_driver_day(_biz_day(), me["name"]) or {}
     if not any(x.get("id") == item_id for x in (d.get("extras") or [])):
         return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
-    img = await db.expense_photo(item_id)
+    # ?car=1 — машина на мойке, второй снимок той же записи.
+    img = await db.expense_photo(item_id + (":car" if request.query.get("car") else ""))
     if not img:
         return web.json_response({"error": "no_photo"}, status=404, headers=CORS_HEADERS)
     ctype = "image/png" if img[:2] == b"\x89P" else "image/jpeg"

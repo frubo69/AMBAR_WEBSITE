@@ -3660,13 +3660,18 @@ async def update_driver_expense(day: str, driver: str, item_id: str,
         поля["extras.$.kind"] = kind
         поля["extras.$.kind_t"] = kind_t
         поля["extras.$.plus"] = bool(plus)
+    # Новый снимок — новый вопрос: прежний ответ старшего по нему снимается.
     if thumb is not None:
         поля["extras.$.photo"] = True
         поля["extras.$.thumb"] = thumb
+        поля["extras.$.photo_ok"] = None
+        поля["extras.$.photo_note"] = ""
     # Мойка: второй снимок — машина в процессе мойки, отдельно от чека.
     if car_thumb is not None:
         поля["extras.$.car_photo"] = True
         поля["extras.$.car_thumb"] = car_thumb
+        поля["extras.$.car_ok"] = None
+        поля["extras.$.car_note"] = ""
     r = await db.driver_days.update_one(
         {"day": day, "driver": driver, "extras.id": item_id},
         {"$set": поля,
@@ -3693,18 +3698,76 @@ async def driver_expense_car_clear(day: str, driver: str, item_id: str) -> bool:
 
 
 async def set_driver_expense_status(day: str, driver: str, item_id: str,
-                                    status: str, by: int) -> bool:
+                                    status: str, by: int, note: str = "") -> bool:
     """Решение менеджера по трате. Позиционный $ обновляет ровно тот элемент
-    массива, что попал в фильтр, — соседние записи не трогаются."""
+    массива, что попал в фильтр, — соседние записи не трогаются.
+
+    Решение по всей записи разом ставит и ответ по каждому снимку: принял —
+    оба снимка в порядке, отклонил — причина одна на запись (decided_note)."""
     db = _db_or_none()
     if db is None: return False
+    поля = {"extras.$.status": status,
+            "extras.$.decided_by": by,
+            "extras.$.decided_at": datetime.now(timezone.utc).isoformat(),
+            "extras.$.decided_note": str(note or "")[:200]}
+    if status == "approved":
+        поля["extras.$.photo_ok"] = "ok"
+        поля["extras.$.car_ok"] = "ok"
     r = await db.driver_days.update_one(
         {"day": day, "driver": driver, "extras.id": item_id},
-        {"$set": {"extras.$.status": status,
-                  "extras.$.decided_by": by,
-                  "extras.$.decided_at": datetime.now(timezone.utc).isoformat()}},
+        {"$set": поля},
     )
     return bool(r.matched_count)
+
+
+def expense_status_from_photos(item: dict) -> str:
+    """Статус записи по ответам на её снимки: хоть один отклонён — отклонена;
+    все, что есть, приняты — принята; иначе ждёт."""
+    verdicts = []
+    if item.get("photo"):
+        verdicts.append(item.get("photo_ok"))
+    if item.get("car_photo"):
+        verdicts.append(item.get("car_ok"))
+    if not verdicts:
+        return item.get("status") or "pending"
+    if any(v == "no" for v in verdicts):
+        return "rejected"
+    if all(v == "ok" for v in verdicts):
+        return "approved"
+    return "pending"
+
+
+async def set_driver_expense_photo_verdict(day: str, driver: str, item_id: str,
+                                           which: str, verdict: str, note: str,
+                                           by: int) -> dict | None:
+    """Ответ по одному снимку: машина (car) или чек (receipt), «ok» или «no»
+    с причиной. Статус записи пересчитывается от снимков. Возвращает запись."""
+    db = _db_or_none()
+    if db is None: return None
+    поле = "car" if which == "car" else "photo"
+    r = await db.driver_days.update_one(
+        {"day": day, "driver": driver, "extras.id": item_id},
+        {"$set": {f"extras.$.{поле}_ok": verdict,
+                  f"extras.$.{поле}_note": str(note or "")[:200]}})
+    if not r.matched_count:
+        return None
+    d = await db.driver_days.find_one({"day": day, "driver": driver}, {"extras": 1})
+    item = next((e for e in (d or {}).get("extras") or [] if e.get("id") == item_id), None)
+    if not item:
+        return None
+    status = expense_status_from_photos(item)
+    now = datetime.now(timezone.utc).isoformat()
+    upd = {"extras.$.status": status}
+    if status == "pending":
+        await db.driver_days.update_one(
+            {"day": day, "driver": driver, "extras.id": item_id},
+            {"$set": upd, "$unset": {"extras.$.decided_by": "", "extras.$.decided_at": ""}})
+    else:
+        upd.update({"extras.$.decided_by": by, "extras.$.decided_at": now})
+        await db.driver_days.update_one(
+            {"day": day, "driver": driver, "extras.id": item_id}, {"$set": upd})
+    item["status"] = status
+    return item
 
 
 async def del_driver_expense(day: str, driver: str, item_id: str) -> bool:

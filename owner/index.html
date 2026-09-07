@@ -4172,47 +4172,82 @@ button.exp-wait{display:block;width:100%;text-align:left;cursor:pointer;font-fam
   border:1px solid rgba(243,180,74,.35);color:var(--text)}
 button.exp-wait:active{transform:scale(.99)}
 
-/* ── Просмотр снимка ────────────────────────────────────────────────────────
-   Во весь экран, чёрный фон, снимок можно приблизить двумя пальцами или
-   двойным нажатием и таскать. Сверху — что это и чьё, снизу — переключение
-   между снимками одной записи и, если она ждёт, само решение. */
-.phv{position:fixed;inset:0;z-index:210;display:none;flex-direction:column;background:#000;
-  color:#fff;touch-action:none}
+/* ── Просмотр снимков ──────────────────────────────────────────────────────
+   Не «картинка на весь экран под кнопками», а карточка: снимок в своей рамке,
+   между снимками одной записи листают смахиванием, внутри рамки снимок
+   приближают двумя пальцами или двойным нажатием. Под рамкой — какой это
+   снимок, и решение по нему одному: принять или отклонить с причиной. */
+.phv{position:fixed;inset:0;z-index:210;display:none;flex-direction:column;background:var(--bg);
+  color:var(--text)}
 .phv.show{display:flex}
 .phv-top{display:flex;align-items:center;gap:10px;flex-shrink:0;
-  padding:calc(10px + env(safe-area-inset-top)) 14px 10px;
-  background:linear-gradient(rgba(0,0,0,.7),rgba(0,0,0,0));position:relative;z-index:2}
+  padding:calc(10px + env(safe-area-inset-top)) 16px 10px}
 .phv-tt{flex:1;min-width:0}
-.phv-tt b{display:block;font-size:15px;font-weight:700;line-height:1.2;overflow:hidden;
+.phv-tt b{display:block;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
+  letter-spacing:.3px;text-transform:uppercase;line-height:1.2;overflow:hidden;
   text-overflow:ellipsis;white-space:nowrap}
-.phv-tt i{display:block;font-style:normal;font-size:11.5px;color:rgba(255,255,255,.65);margin-top:2px}
+.phv-tt i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:3px}
 .phv-x{flex-shrink:0;width:38px;height:38px;border-radius:12px;display:flex;align-items:center;
-  justify-content:center;border:1px solid rgba(255,255,255,.18);background:rgba(0,0,0,.45);
-  color:#fff;cursor:pointer;padding:0}
+  justify-content:center;border:1px solid var(--border2);background:var(--card);
+  color:var(--sub);cursor:pointer;padding:0}
 .phv-x:active{transform:scale(.94)}
-.phv-stage{position:absolute;inset:0;overflow:hidden;display:flex;align-items:center;
-  justify-content:center}
-.phv-stage img{max-width:100%;max-height:100%;object-fit:contain;transform-origin:center center;
+.phv-frame{position:relative;flex:1 1 auto;min-height:0;margin:4px 16px 0;border-radius:18px;
+  overflow:hidden;background:#000;border:1px solid var(--border2);touch-action:none}
+.phv-track{display:flex;height:100%;will-change:transform}
+.phv-slide{flex:0 0 100%;height:100%;display:flex;align-items:center;justify-content:center;
+  overflow:hidden}
+.phv-slide img{max-width:100%;max-height:100%;object-fit:contain;transform-origin:center center;
   will-change:transform;user-select:none;-webkit-user-select:none;-webkit-user-drag:none}
-.phv-bot{margin-top:auto;flex-shrink:0;position:relative;z-index:2;
-  padding:18px 14px calc(14px + env(safe-area-inset-bottom));
-  background:linear-gradient(rgba(0,0,0,0),rgba(0,0,0,.72))}
-.phv-tabs{display:flex;justify-content:center;gap:6px;margin-bottom:12px}
-.phv-tabs:empty{display:none}
-.phv-tab{padding:7px 14px;border-radius:999px;font-family:inherit;font-size:11.5px;font-weight:700;
-  letter-spacing:.3px;cursor:pointer;color:rgba(255,255,255,.7);
-  border:1px solid rgba(255,255,255,.2);background:rgba(0,0,0,.4)}
-.phv-tab.on{color:#1a1408;background:var(--gold2);border-color:transparent}
+.phv-dots{display:flex;justify-content:center;align-items:center;gap:6px;padding:12px 16px 0;
+  flex-shrink:0}
+.phv-dots:empty{padding:0}
+.phv-dot{width:6px;height:6px;border-radius:3px;background:var(--border3);transition:.2s var(--e1)}
+.phv-dot.on{width:18px;background:var(--gold2)}
+.phv-cap{flex-shrink:0;text-align:center;font-size:10px;font-weight:700;letter-spacing:1.2px;
+  text-transform:uppercase;color:var(--muted);margin-top:8px}
+.phv-cap b{color:var(--up)}
+.phv-cap u{text-decoration:none;color:var(--dn)}
+.phv-bot{flex-shrink:0;padding:12px 16px calc(16px + env(safe-area-inset-bottom))}
 .phv-acts{display:flex;gap:8px}
 .phv-acts:empty{display:none}
 .phv-acts button{flex:1;height:46px;border-radius:13px;cursor:pointer;font-family:inherit;
-  font-size:14px;font-weight:700;border:1px solid rgba(255,255,255,.18);
-  background:rgba(255,255,255,.08);color:#fff}
-.phv-acts .phv-no{color:#ff8a8a;border-color:rgba(224,85,85,.45)}
-.phv-acts .phv-ok{color:#1a1408;border:0;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+  font-size:14px;font-weight:700;border:1px solid var(--border2);background:var(--card);
+  color:var(--sub);transition:.15s var(--e1)}
+.phv-acts .phv-no{color:var(--dn);border-color:rgba(224,85,85,.35)}
+.phv-acts .phv-no.on{background:rgba(224,85,85,.16);border-color:var(--dn)}
+.phv-acts .phv-ok{color:var(--up);border-color:rgba(76,175,125,.35)}
+.phv-acts .phv-ok.on{background:rgba(76,175,125,.16);border-color:var(--up)}
 .phv-acts button:active{transform:scale(.97)}
-.phv-hint{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;
-  font-size:13px;color:rgba(255,255,255,.55);pointer-events:none}
+/* Причина отказа — по желанию: строка и кнопка, ничего сверх. */
+.phv-note{display:flex;gap:8px;margin-bottom:8px}
+.phv-note input{flex:1;min-width:0;height:46px;padding:0 14px;border-radius:13px;
+  border:1px solid var(--border2);background:var(--card);color:var(--text);
+  font-family:inherit;font-size:14px;outline:none}
+.phv-note input:focus{border-color:rgba(224,85,85,.5)}
+.phv-note button{flex:0 0 auto;height:46px;padding:0 18px;border-radius:13px;cursor:pointer;
+  font-family:inherit;font-size:14px;font-weight:700;color:#fff;border:0;
+  background:linear-gradient(135deg,#E86A6A,#C94E4E)}
+.phv-st{text-align:center;font-size:11.5px;color:var(--muted);margin-top:10px;min-height:14px}
+.phv-st.ok{color:var(--up)}
+.phv-st.no{color:var(--dn)}
+/* Ответ по снимку — меткой на превью в списке. */
+.exp-ph,.exp-done-th{position:relative}
+.exp-ph-v{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:9px;
+  display:flex;align-items:center;justify-content:center;font-style:normal;font-size:11px;
+  font-weight:800;color:#fff;box-shadow:0 1px 4px rgba(0,0,0,.4)}
+.exp-done-th .exp-ph-v{top:-3px;right:-3px;width:15px;height:15px;font-size:9px}
+.exp-ph-v.ok{background:var(--up)}
+.exp-ph-v.no{background:var(--dn)}
+/* Причина у карточки — строкой под кнопками, когда нажали «Отклонить». */
+.exp-pend-note{display:flex;gap:8px;margin-top:11px}
+.exp-pend-note input{flex:1;min-width:0;height:40px;padding:0 12px;border-radius:11px;
+  border:1px solid var(--border2);background:var(--card2);color:var(--text);
+  font-family:inherit;font-size:13px;outline:none}
+.exp-pend-note input:focus{border-color:rgba(224,85,85,.5)}
+.exp-pend-note button{flex:0 0 auto;height:40px;padding:0 14px;border-radius:11px;cursor:pointer;
+  font-family:inherit;font-size:13px;font-weight:700;border:1px solid var(--border2);
+  background:var(--card2);color:var(--sub)}
+.exp-pend-note button.go{color:#fff;border:0;background:linear-gradient(135deg,#E86A6A,#C94E4E)}
 
 .wo-full{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;
   align-items:center;justify-content:center;gap:14px;padding:22px;
@@ -18714,10 +18749,12 @@ function expRow(r){
 // один чек. Порядок — машина первой: по ней решают, была ли мойка вообще.
 function expPhotos(e){
   const out = [];
-  if(e.car_photo || e.car_thumb) out.push({key: e.id + ':car', thumb: e.car_thumb || '',
-    label: 'Машина', path: '/api/owner/expenses/photo/' + encodeURIComponent(e.id) + '?car=1'});
-  if(e.photo || e.thumb) out.push({key: e.id, thumb: e.thumb || '',
-    label: 'Чек', path: '/api/owner/expenses/photo/' + encodeURIComponent(e.id)});
+  if(e.car_photo || e.car_thumb) out.push({key: e.id + ':car', which: 'car', thumb: e.car_thumb || '',
+    label: 'Машина', verdict: e.car_ok || null,
+    path: '/api/owner/expenses/photo/' + encodeURIComponent(e.id) + '?car=1'});
+  if(e.photo || e.thumb) out.push({key: e.id, which: 'receipt', thumb: e.thumb || '',
+    label: 'Чек', verdict: e.photo_ok || null,
+    path: '/api/owner/expenses/photo/' + encodeURIComponent(e.id)});
   return out;
 }
 
@@ -18734,13 +18771,29 @@ function expPendCard(r, e){
     </div>
     ${ph.length ? `<div class="exp-pend-ph">${ph.map((p, i) => `
       <button class="exp-ph" onclick="phvOpenExp('${escS(r.name)}','${escS(e.id)}',${i})">
-        <img src="${p.thumb}" alt=""><i>${p.label}</i></button>`).join('')}</div>`
+        <img src="${p.thumb}" alt="">${_phBadge(p.verdict)}<i>${p.label}</i></button>`).join('')}</div>`
       : `<div class="exp-pend-none">без снимка</div>`}
-    <div class="exp-pend-acts">
-      <button class="exp-pend-no" onclick="expDecide('${escS(r.name)}','${escS(e.id)}','reject')">Отклонить</button>
+    <div class="exp-pend-acts" id="pacts-${escS(e.id)}">
+      <button class="exp-pend-no" onclick="expRejectAsk('${escS(r.name)}','${escS(e.id)}')">Отклонить</button>
       <button class="exp-pend-ok" onclick="expDecide('${escS(r.name)}','${escS(e.id)}','approve')">Принять</button>
     </div>
   </div>`;
+}
+
+const _phBadge = v => v === 'ok' ? '<em class="exp-ph-v ok">✓</em>'
+                    : v === 'no' ? '<em class="exp-ph-v no">✕</em>' : '';
+
+// «Отклонить» на карточке: на месте кнопок — строка причины и сама кнопка.
+// Причина по желанию: пустую тоже отправляем.
+function expRejectAsk(driver, id){
+  const box = document.getElementById('pacts-' + id); if(!box) return;
+  box.className = 'exp-pend-note';
+  box.innerHTML = `<input id="prn-${escS(id)}" placeholder="Почему — если нужно" autocomplete="off"
+      onkeydown="if(event.key==='Enter')expDecide('${escS(driver)}','${escS(id)}','reject',this.value)">
+    <button onclick="renderExpenses()">Назад</button>
+    <button class="go" onclick="expDecide('${escS(driver)}','${escS(id)}','reject',
+      (document.getElementById('prn-${escS(id)}')||{}).value)">Отклонить</button>`;
+  try{ document.getElementById('prn-' + id).focus(); }catch(e){}
 }
 
 // Решённый расход — той же строкой, что и ожидающий, только тише: превью
@@ -18754,7 +18807,7 @@ function expDoneRow(r, e){
   return `<div class="exp-done ${st}">
     ${ph.length ? `<span class="exp-done-ph">${ph.map((p, i) => `
       <button class="exp-done-th" onclick="phvOpenExp('${escS(r.name)}','${escS(e.id)}',${i})"
-        aria-label="${escS(p.label)}"><img src="${p.thumb}" alt=""></button>`).join('')}</span>` : ''}
+        aria-label="${escS(p.label)}"><img src="${p.thumb}" alt="">${_phBadge(p.verdict)}</button>`).join('')}</span>` : ''}
     <span class="exp-done-b"><b>${escS(e.kind_t || e.comment || 'Расход')}</b>${
       что ? `<i>${escS(что)}</i>` : ''}</span>
     <span class="exp-done-r">
@@ -18790,109 +18843,167 @@ function _phvEl(){
   if(el) return el;
   el = document.createElement('div'); el.id = 'phv'; el.className = 'phv';
   el.innerHTML = `
-    <div class="phv-stage" id="phvStage"><img id="phvImg" alt="" draggable="false"></div>
     <div class="phv-top">
       <span class="phv-tt"><b id="phvT"></b><i id="phvS"></i></span>
       <button class="phv-x" onclick="phvClose()" aria-label="Закрыть">
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
           stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
+    <div class="phv-frame" id="phvFrame"><div class="phv-track" id="phvTrack"></div></div>
+    <div class="phv-dots" id="phvDots"></div>
+    <div class="phv-cap" id="phvCap"></div>
     <div class="phv-bot">
-      <div class="phv-tabs" id="phvTabs"></div>
+      <div class="phv-note" id="phvNote" hidden>
+        <input id="phvNoteIn" placeholder="Почему — если нужно" autocomplete="off"
+          onkeydown="if(event.key==='Enter')phvRejectGo()">
+        <button onclick="phvRejectGo()">Отклонить</button>
+      </div>
       <div class="phv-acts" id="phvActs"></div>
+      <div class="phv-st" id="phvSt"></div>
     </div>`;
   document.body.appendChild(el);
-  _phvGestures(el.querySelector('#phvStage'));
+  _phvGestures(el.querySelector('#phvFrame'));
   return el;
 }
 
-function phvOpenExp(driver, id, i){
-  // Запись ищем по всем водителям: значок у принятой строки имени не знает.
-  let row = null, e = null;
+// Запись по id — по всем водителям: значок у принятой строки имени не знает.
+function _expFind(driver, id){
   for(const r of ((EXP.data || {}).drivers || [])){
     const x = (r.extras || []).find(y => y.id === id);
-    if(x && (!driver || r.name === driver)){ row = r; e = x; break; }
+    if(x && (!driver || r.name === driver)) return {row: r, e: x};
   }
-  if(!e) return;
-  const list = expPhotos(e);
+  return null;
+}
+
+function phvOpenExp(driver, id, i){
+  const f = _expFind(driver, id); if(!f) return;
+  const list = expPhotos(f.e);
   if(!list.length) return;
-  phvOpen(list, Math.min(i || 0, list.length - 1), {
-    driver: row.name, id: e.id,
-    pending: (e.status || 'approved') === 'pending',
-    title: e.kind_t || e.comment || 'Расход',
-    sub: `${row.name} · ${fmt(e.amount)} AED`,
-  });
+  phvOpen(list, Math.min(i || 0, list.length - 1), {driver: f.row.name, id: f.e.id});
 }
 
 function phvOpen(list, i, ctx){
   const el = _phvEl();
-  PHV = {...PHV, list, i, ctx: ctx || null};
-  _setText('phvT', (ctx && ctx.title) || '');
-  _setText('phvS', (ctx && ctx.sub) || '');
-  document.getElementById('phvActs').innerHTML = ctx && ctx.pending ? `
-    <button class="phv-no" onclick="phvDecide('reject')">Отклонить</button>
-    <button class="phv-ok" onclick="phvDecide('approve')">Принять</button>` : '';
-  phvTabs();
+  PHV = {...PHV, list, i, ctx: ctx || null, s: 1, tx: 0, ty: 0};
+  document.getElementById('phvTrack').innerHTML = list.map(p =>
+    `<div class="phv-slide"><img src="${PHV.cache[p.key] || p.thumb || ''}" alt="" draggable="false"></div>`
+  ).join('');
+  document.getElementById('phvNote').hidden = true;
   el.classList.add('show');
-  phvShow(i);
+  phvGo(i, false);
+  list.forEach((p, k) => _phvLoad(k));
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
-}
-
-function phvTabs(){
-  const box = document.getElementById('phvTabs');
-  box.innerHTML = PHV.list.length > 1 ? PHV.list.map((p, i) =>
-    `<button class="phv-tab ${i === PHV.i ? 'on' : ''}" onclick="phvShow(${i})">${escS(p.label)}</button>`
-  ).join('') : '';
-}
-
-async function phvShow(i){
-  PHV.i = i; phvTabs();
-  const p = PHV.list[i]; if(!p) return;
-  const img = document.getElementById('phvImg');
-  PHV.s = 1; PHV.tx = 0; PHV.ty = 0; _phvApply(false);
-  // Сначала миниатюра — она уже на экране, — следом сам кадр.
-  img.src = PHV.cache[p.key] || p.thumb || '';
-  if(PHV.cache[p.key]) return;
-  try{
-    const url = await ownerApi.ownerBlob(p.path);
-    PHV.cache[p.key] = url;
-    if(PHV.i === i && document.getElementById('phv').classList.contains('show')) img.src = url;
-  }catch(e){
-    if(!p.thumb) _toast('Снимка не нашлось');
-  }
 }
 
 function phvClose(){
   const el = document.getElementById('phv'); if(el) el.classList.remove('show');
 }
 
-async function phvDecide(action){
-  const c = PHV.ctx; if(!c) return;
-  phvClose();
-  await expDecide(c.driver, c.id, action);
+// Живая запись — из данных страницы: после решения она уже другая.
+function _phvE(){
+  const c = PHV.ctx; if(!c) return null;
+  const f = _expFind(c.driver, c.id);
+  return f ? f.e : null;
 }
 
+function phvGo(i, anim){
+  PHV.i = i; PHV.s = 1; PHV.tx = 0; PHV.ty = 0;
+  const tr = document.getElementById('phvTrack');
+  tr.style.transition = anim ? 'transform .26s var(--e1)' : 'none';
+  tr.style.transform = `translateX(${-i * 100}%)`;
+  [...tr.children].forEach(sl => { const im = sl.querySelector('img'); if(im) im.style.transform = ''; });
+  document.getElementById('phvDots').innerHTML = PHV.list.length > 1
+    ? PHV.list.map((_, k) => `<i class="phv-dot ${k === i ? 'on' : ''}"></i>`).join('') : '';
+  document.getElementById('phvNote').hidden = true;
+  phvPaint();
+}
+
+function phvPaint(){
+  const e = _phvE(); const p = PHV.list[PHV.i]; if(!p) return;
+  _setText('phvT', (e && (e.kind_t || e.comment)) || 'Расход');
+  _setText('phvS', e ? `${PHV.ctx.driver} · ${fmt(e.amount)} AED` : '');
+  // Какой снимок и что по нему решено.
+  const v = e ? (p.which === 'car' ? e.car_ok : e.photo_ok) : null;
+  const note = e ? (p.which === 'car' ? e.car_note : e.photo_note) : '';
+  document.getElementById('phvCap').innerHTML = escS(p.label)
+    + (v === 'ok' ? ' · <b>принят</b>' : v === 'no' ? ` · <u>отклонён${note ? ' · ' + escS(note) : ''}</u>` : '');
+  document.getElementById('phvActs').innerHTML = e ? `
+    <button class="phv-no ${v === 'no' ? 'on' : ''}" onclick="phvVerdict('no')">Отклонить</button>
+    <button class="phv-ok ${v === 'ok' ? 'on' : ''}" onclick="phvVerdict('ok')">Принять</button>` : '';
+  const st = e ? (e.status || 'approved') : '';
+  const stEl = document.getElementById('phvSt');
+  stEl.className = 'phv-st ' + (st === 'approved' ? 'ok' : st === 'rejected' ? 'no' : '');
+  stEl.textContent = st === 'approved' ? 'Расход принят' : st === 'rejected'
+    ? 'Расход отклонён' + (e.decided_note ? ' · ' + e.decided_note : '')
+    : (e ? 'Расход ждёт решения' : '');
+}
+
+async function _phvLoad(k){
+  const p = PHV.list[k]; if(!p || PHV.cache[p.key]) return;
+  try{
+    const url = await ownerApi.ownerBlob(p.path);
+    PHV.cache[p.key] = url;
+    const sl = document.getElementById('phvTrack').children[k];
+    if(sl && PHV.list[k] === p) sl.querySelector('img').src = url;
+  }catch(e){ if(!p.thumb && k === PHV.i) _toast('Снимка не нашлось'); }
+}
+
+// Решение по одному снимку. Отказ — с причиной, если хочется; строка для неё
+// появляется на месте и уходит вместе с ответом.
+function phvVerdict(v){
+  const note = document.getElementById('phvNote');
+  if(v === 'no'){
+    note.hidden = false;
+    const inp = document.getElementById('phvNoteIn'); inp.value = '';
+    try{ inp.focus(); }catch(e){}
+    return;
+  }
+  note.hidden = true;
+  _phvSend('ok', '');
+}
+function phvRejectGo(){
+  const inp = document.getElementById('phvNoteIn');
+  document.getElementById('phvNote').hidden = true;
+  _phvSend('no', (inp.value || '').trim());
+}
+
+async function _phvSend(verdict, note){
+  const c = PHV.ctx, p = PHV.list[PHV.i]; if(!c || !p) return;
+  if(!await accAskBack('Решение по снимку')) return;
+  try{
+    const r = await ownerApi.ownerFetch(
+      `/api/owner/expenses/extra/${encodeURIComponent(c.id)}/photo`,
+      {method:'POST', body:{day: EXP.day, driver: c.driver, which: p.which, verdict, note,
+                            as: _meName()}});
+    _expReplace(r.driver);
+    phvPaint();
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred(verdict === 'ok' ? 'success' : 'warning'); }catch(e){}
+    _toast(verdict === 'ok' ? `${p.label}: принят` : `${p.label}: отклонён`);
+  }catch(e){ _toast('Не удалось'); }
+}
+
+// ── жесты: смахнуть между снимками, приблизить внутри ─────────────────────
+function _phvImg(){
+  const sl = document.getElementById('phvTrack').children[PHV.i];
+  return sl ? sl.querySelector('img') : null;
+}
 function _phvApply(anim){
-  const img = document.getElementById('phvImg'); if(!img) return;
+  const img = _phvImg(); if(!img) return;
   img.style.transition = anim ? 'transform .18s ease-out' : 'none';
   img.style.transform = `translate(${PHV.tx}px, ${PHV.ty}px) scale(${PHV.s})`;
 }
-
-// Не выпускать кадр за края: при масштабе 1 он стоит по центру, при большем
-// его можно двигать ровно настолько, насколько он вылез за экран.
 function _phvClamp(){
-  const img = document.getElementById('phvImg'), st = document.getElementById('phvStage');
-  if(!img || !st) return;
-  const r = img.getBoundingClientRect(), b = st.getBoundingClientRect();
-  const w = r.width / (PHV.s || 1), h = r.height / (PHV.s || 1);   // размер при масштабе 1
+  const img = _phvImg(), fr = document.getElementById('phvFrame');
+  if(!img || !fr) return;
+  const r = img.getBoundingClientRect(), b = fr.getBoundingClientRect();
+  const w = r.width / (PHV.s || 1), h = r.height / (PHV.s || 1);
   const mx = Math.max(0, (w * PHV.s - b.width) / 2), my = Math.max(0, (h * PHV.s - b.height) / 2);
   PHV.tx = Math.max(-mx, Math.min(mx, PHV.tx));
   PHV.ty = Math.max(-my, Math.min(my, PHV.ty));
 }
-
 function _phvZoomAt(cx, cy, s2){
-  const st = document.getElementById('phvStage').getBoundingClientRect();
-  const mx = cx - (st.left + st.width / 2), my = cy - (st.top + st.height / 2);
+  const fr = document.getElementById('phvFrame').getBoundingClientRect();
+  const mx = cx - (fr.left + fr.width / 2), my = cy - (fr.top + fr.height / 2);
   const s1 = PHV.s;
   s2 = Math.max(1, Math.min(5, s2));
   PHV.tx = mx - (mx - PHV.tx) * (s2 / s1);
@@ -18901,59 +19012,78 @@ function _phvZoomAt(cx, cy, s2){
   if(s2 <= 1.02){ PHV.s = 1; PHV.tx = 0; PHV.ty = 0; }
 }
 
-function _phvGestures(st){
-  let pinch = null, drag = null, lastTap = 0;
+function _phvGestures(fr){
+  let pinch = null, drag = null, swipe = null, lastTap = 0;
+  const tr = () => document.getElementById('phvTrack');
   const dist = e => Math.hypot(e.touches[0].clientX - e.touches[1].clientX,
                                e.touches[0].clientY - e.touches[1].clientY);
   const mid = e => ({x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
                      y: (e.touches[0].clientY + e.touches[1].clientY) / 2});
-  st.addEventListener('touchstart', e => {
+  fr.addEventListener('touchstart', e => {
     if(e.touches.length === 2){
       const m = mid(e);
       pinch = {d: dist(e), s0: PHV.s, x: m.x, y: m.y, tx0: PHV.tx, ty0: PHV.ty};
-      drag = null;
+      drag = null; swipe = null;
     }else if(e.touches.length === 1){
       const t = e.touches[0];
-      drag = {x: t.clientX, y: t.clientY, tx0: PHV.tx, ty0: PHV.ty, moved: false};
       const now = Date.now();
       if(now - lastTap < 300){
-        // Двойное нажатие: приблизить туда, куда нажали, или вернуть как было.
         e.preventDefault();
         _phvZoomAt(t.clientX, t.clientY, PHV.s > 1 ? 1 : 2.5);
-        _phvClamp(); _phvApply(true); lastTap = 0; drag = null;
-      }else lastTap = now;
+        _phvClamp(); _phvApply(true); lastTap = 0; drag = null; swipe = null;
+        return;
+      }
+      lastTap = now;
+      if(PHV.s > 1) drag = {x: t.clientX, y: t.clientY, tx0: PHV.tx, ty0: PHV.ty};
+      else swipe = {x: t.clientX, y: t.clientY, dx: 0, w: fr.getBoundingClientRect().width};
     }
   }, {passive: false});
-  st.addEventListener('touchmove', e => {
+  fr.addEventListener('touchmove', e => {
     if(pinch && e.touches.length === 2){
       e.preventDefault();
-      const stR = st.getBoundingClientRect();
+      const b = fr.getBoundingClientRect();
       const m = mid(e);
       const s2 = Math.max(1, Math.min(5, pinch.s0 * dist(e) / pinch.d));
-      // Точка под пальцами остаётся под пальцами.
-      const mx = pinch.x - (stR.left + stR.width / 2), my = pinch.y - (stR.top + stR.height / 2);
+      const mx = pinch.x - (b.left + b.width / 2), my = pinch.y - (b.top + b.height / 2);
       const px = (mx - pinch.tx0) / pinch.s0, py = (my - pinch.ty0) / pinch.s0;
-      const nx = m.x - (stR.left + stR.width / 2), ny = m.y - (stR.top + stR.height / 2);
+      const nx = m.x - (b.left + b.width / 2), ny = m.y - (b.top + b.height / 2);
       PHV.s = s2; PHV.tx = nx - px * s2; PHV.ty = ny - py * s2;
       _phvApply(false);
-    }else if(drag && e.touches.length === 1 && PHV.s > 1){
+    }else if(drag && e.touches.length === 1){
       e.preventDefault();
       const t = e.touches[0];
       PHV.tx = drag.tx0 + (t.clientX - drag.x); PHV.ty = drag.ty0 + (t.clientY - drag.y);
-      drag.moved = true;
       _phvApply(false);
+    }else if(swipe && e.touches.length === 1){
+      const t = e.touches[0];
+      swipe.dx = t.clientX - swipe.x;
+      // У края лента упирается: дальше первого и последнего снимка не тянется.
+      const край = (PHV.i === 0 && swipe.dx > 0) || (PHV.i === PHV.list.length - 1 && swipe.dx < 0);
+      const dx = край ? swipe.dx * .25 : swipe.dx;
+      if(Math.abs(swipe.dx) > 6) e.preventDefault();
+      const T = tr(); T.style.transition = 'none';
+      T.style.transform = `translateX(calc(${-PHV.i * 100}% + ${dx}px))`;
     }
   }, {passive: false});
-  st.addEventListener('touchend', e => {
+  fr.addEventListener('touchend', e => {
     if(e.touches.length < 2) pinch = null;
     if(!e.touches.length){
+      if(swipe){
+        const n = PHV.list.length;
+        let i = PHV.i;
+        if(swipe.dx < -swipe.w * .18 && i < n - 1) i++;
+        else if(swipe.dx > swipe.w * .18 && i > 0) i--;
+        phvGo(i, true);
+        try{ if(i !== PHV.i) Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(err){}
+        swipe = null;
+      }
       drag = null;
       if(PHV.s <= 1.02){ PHV.s = 1; PHV.tx = 0; PHV.ty = 0; }
       _phvClamp(); _phvApply(true);
     }
   });
   // Колесо — для проверки на компьютере; на телефоне его нет.
-  st.addEventListener('wheel', e => {
+  fr.addEventListener('wheel', e => {
     e.preventDefault();
     _phvZoomAt(e.clientX, e.clientY, PHV.s * (e.deltaY < 0 ? 1.15 : 0.87));
     _phvClamp(); _phvApply(false);
@@ -19300,12 +19430,13 @@ async function expAddExtra(driver, kindId){
 
 // Решение по трате водителя. Отклонённая не исчезает: водитель должен видеть,
 // что её рассмотрели, иначе пришлёт ту же ещё раз.
-async function expDecide(driver, id, action){
+async function expDecide(driver, id, action, note){
   if(!await accAskBack('Решение по расходу')) return;
   try{
     const r = await ownerApi.ownerFetch(
       `/api/owner/expenses/extra/${encodeURIComponent(id)}/${action}`,
-      {method:'POST', body:{day:EXP.day, driver, as:_meName()}});
+      {method:'POST', body:{day:EXP.day, driver, as:_meName(),
+                            ...(action === 'reject' && note ? {note: String(note).trim()} : {})}});
     _expReplace(r.driver);
     _toast(action === 'approve' ? 'Расход принят' : 'Расход отклонён');
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred(

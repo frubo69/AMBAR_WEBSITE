@@ -431,14 +431,17 @@ async def handle_extra_decide(request):
         body = {}
     day = str(body.get("day") or "").strip() or _biz_day()
     driver = str(body.get("driver") or "").strip()
+    # Причина отказа — по желанию: водитель увидит её у записи.
+    note = str(body.get("note") or "").strip()[:200] if action == "reject" else ""
 
     ok = await db.set_driver_expense_status(
         day, driver, item_id,
         "approved" if action == "approve" else "rejected",
-        request["owner_id"])
+        request["owner_id"], note)
     if not ok:
         return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
-    log.info(f"[expenses] {day} {driver}: расход {item_id} — {action}")
+    log.info(f"[expenses] {day} {driver}: расход {item_id} — {action}"
+             + (f" · {note}" if note else ""))
     await backdate.notify(day, str(body.get("as") or ""),
                           "решение по расходу водителя",
                           f"{driver} — " + ("принят" if action == "approve" else "отклонён"))
@@ -455,21 +458,74 @@ async def handle_extra_decide(request):
         await _guard_bottle_gone(item, day, driver, request["owner_id"])
 
     base = next((d for d in staff.drivers() if d["name"] == driver), None)
-    # Водителю — короткий ответ в его бот: он ждёт решения, а не молчания.
+    item = next((e for e in (saved or {}).get("extras", []) if e.get("id") == item_id), None)
+    await _tell_driver(driver, item, action == "approve", note)
+
+    return web.json_response(
+        {"ok": True, "driver": _day_row(base, saved) if base else None},
+        headers=CORS_HEADERS)
+
+
+async def _tell_driver(driver: str, item: dict | None, approved: bool, note: str = ""):
+    """Водителю — короткий ответ в его бот: он ждёт решения, а не молчания."""
     try:
-        item = next((e for e in (saved or {}).get("extras", []) if e.get("id") == item_id), None)
         tid = staff.DRIVER_IDS.get(driver)
         if item and tid:
             from api_server import tg_send
             import os as _os
-            verdict = "принят" if action == "approve" else "отклонён"
-            await tg_send(_os.getenv("DRIVER_BOT_TOKEN", ""), tid,
-                          f"Расход {item.get('amount')} AED ({item.get('comment','')}) — {verdict}.")
+            verdict = "принят" if approved else "отклонён"
+            text = f"Расход {item.get('amount')} AED ({item.get('comment','')}) — {verdict}."
+            if note and not approved:
+                text += f"\n{note}"
+            await tg_send(_os.getenv("DRIVER_BOT_TOKEN", ""), tid, text, parse_mode=None)
     except Exception as e:
         log.warning(f"[expenses] ответ водителю: {e}")
 
+
+@require_owner
+async def handle_extra_photo_verdict(request):
+    """POST /api/owner/expenses/extra/{item_id}/photo — ответ по одному снимку.
+
+    body {day, driver, which: car|receipt, verdict: ok|no, note?, as}
+
+    У мойки два снимка, и решают по каждому: машина может быть в порядке, а
+    чек — нет. Статус записи складывается из ответов: хоть один отклонён —
+    отклонена; все приняты — принята. Причина у отказа — по желанию."""
+    item_id = (request.match_info.get("item_id") or "").strip()
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    which = str(body.get("which") or "").strip()
+    verdict = str(body.get("verdict") or "").strip()
+    if which not in ("car", "receipt") or verdict not in ("ok", "no"):
+        return web.json_response({"error": "bad_args"}, status=400, headers=CORS_HEADERS)
+    day = str(body.get("day") or "").strip() or _biz_day()
+    driver = str(body.get("driver") or "").strip()
+    note = str(body.get("note") or "").strip()[:200] if verdict == "no" else ""
+    before = next((e for e in ((await db.get_driver_day(day, driver)) or {}).get("extras", [])
+                   if e.get("id") == item_id), None)
+    item = await db.set_driver_expense_photo_verdict(day, driver, item_id, which, verdict,
+                                                     note, request["owner_id"])
+    if not item:
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    log.info(f"[expenses] {day} {driver}: снимок {which} у {item_id} — {verdict}"
+             + (f" · {note}" if note else ""))
+    status = item.get("status")
+    was = (before or {}).get("status") or "pending"
+    if status != was and status in ("approved", "rejected"):
+        await backdate.notify(day, str(body.get("as") or ""),
+                              "решение по расходу водителя",
+                              f"{driver} — " + ("принят" if status == "approved" else "отклонён"))
+        saved = await db.get_driver_day(day, driver)
+        if status == "approved":
+            await _guard_bottle_gone(item, day, driver, request["owner_id"])
+        причины = " · ".join(x for x in (item.get("car_note"), item.get("photo_note")) if x)
+        await _tell_driver(driver, item, status == "approved", причины)
+    saved = await db.get_driver_day(day, driver)
+    base = next((d for d in staff.drivers() if d["name"] == driver), None)
     return web.json_response(
-        {"ok": True, "driver": _day_row(base, saved) if base else None},
+        {"ok": True, "status": status, "driver": _day_row(base, saved) if base else None},
         headers=CORS_HEADERS)
 
 
@@ -573,6 +629,8 @@ def setup(app):
         ("/api/owner/finance/debts",       handle_debts,     "GET"),
         ("/api/owner/expenses/photo/{item_id}", handle_extra_photo, "GET"),
         ("/api/owner/expenses/extra/{item_id}", handle_extra_del, "DELETE"),
+        # Раньше шаблонного «/{action}»: иначе «photo» ушёл бы в него.
+        ("/api/owner/expenses/extra/{item_id}/photo", handle_extra_photo_verdict, "POST"),
         ("/api/owner/expenses/extra/{item_id}/{action}", handle_extra_decide, "POST"),
     )
     seen = set()

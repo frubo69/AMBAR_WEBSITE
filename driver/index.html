@@ -2007,6 +2007,10 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
   background:radial-gradient(circle,#fff 0 26px,transparent 27px)}
 .car-shot:active{transform:scale(.92)}
 .exp-rcp:disabled{opacity:.6;pointer-events:none}
+.exp-rcp-t i.bad{color:var(--dn)}
+.exp-rcp.bad{border-color:rgba(224,85,85,.4);background:var(--dn-soft)}
+/* Причина отказа старшего — под суммой, красным, одной строкой. */
+.exp-why{margin-top:8px;font-size:12px;color:var(--dn);line-height:1.4}
 /* Окно завершения зовут с экрана приёмки, а он стоит выше обычных шторок
    (95 против 90): без этого окно открывалось ПОД списком и его не было видно. */
 #finSheet{z-index:120}
@@ -2704,7 +2708,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
         stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 18l-6-6 6-6"/></svg>
     </button>
     <div class="sup-top-b">
-      <div class="sup-top-t">Машина на мойке</div>
+      <div class="sup-top-t" id="carT">Машина на мойке</div>
       <div class="sup-top-s" id="carS">спереди, в контуре</div>
     </div>
   </div>
@@ -2719,14 +2723,16 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
         <!-- Контур без своей заливки: у <use> она задаётся снаружи — в маске
              чёрным (вырез), на экране пустым с золотой обводкой. -->
         <path id="carShape" d="M120 190H270Q290 190 297 208L312 262H335Q345 262 345 272V280Q345 288 336 288H320Q335 302 340 340V380Q340 390 330 390H318V402Q318 412 308 412H268Q258 412 258 402V390H132V402Q132 412 122 412H82Q72 412 72 402V390H60Q50 390 50 380V340Q55 302 70 288H54Q45 288 45 280V272Q45 262 55 262H78L93 208Q100 190 120 190Z"/>
+        <!-- Чек — рамка чуть выше, чем шире: чек в неё кладут целиком. -->
+        <path id="rcpShape" d="M62 120H328Q345 120 345 137V473Q345 490 328 490H62Q45 490 45 473V137Q45 120 62 120Z"/>
         <mask id="carCut" maskUnits="userSpaceOnUse" x="-2000" y="-2000" width="4390" height="4560">
           <rect x="-2000" y="-2000" width="4390" height="4560" fill="#fff"/>
-          <use href="#carShape" fill="#000"/>
+          <use id="carUseMask" href="#carShape" fill="#000"/>
         </mask>
       </defs>
       <rect x="-2000" y="-2000" width="4390" height="4560" fill="rgba(0,0,0,.66)" mask="url(#carCut)"/>
-      <use href="#carShape" fill="none" stroke="#E8C98A" stroke-width="2.5" stroke-linejoin="round"/>
-      <g fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.6" stroke-linecap="round">
+      <use id="carUseLine" href="#carShape" fill="none" stroke="#E8C98A" stroke-width="2.5" stroke-linejoin="round"/>
+      <g id="carLines" fill="none" stroke="rgba(255,255,255,.4)" stroke-width="1.6" stroke-linecap="round">
         <path d="M100 262H290"/>
         <path d="M70 320Q84 314 104 320M286 320Q306 314 320 320"/>
       </g>
@@ -4744,6 +4750,15 @@ function otherBox(x){
 let EXP_REDO = new Set();
 const _expSent = kind => EXP_REDO.has(kind) ? null
   : ((EXP.extras || []).find(x => x.kind === kind) || null);
+// Та же запись, но глазами снимков: при заполнении заново остаются только те
+// снимки, которые старший принял отдельно, — переснимают лишь отклонённое.
+function _expKept(kind){
+  const s = (EXP.extras || []).find(x => x.kind === kind) || null;
+  if(!s || !EXP_REDO.has(kind)) return s;
+  const чек = s.photo && s.photo_ok === 'ok', машина = s.car_photo && s.car_ok === 'ok';
+  return {...s, photo: !!чек, thumb: чек ? s.thumb : '',
+          car_photo: !!машина, car_thumb: машина ? s.car_thumb : ''};
+}
 
 function expRedo(kind){
   EXP_REDO.add(kind);
@@ -4751,8 +4766,11 @@ function expRedo(kind){
   if(kind === 'wash') CAR_SHOT = {photo:'', thumb:''};
   render();
   try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
-  // Первый шаг — сразу: у мойки камера на машину, у остальных чек.
-  if(kind === 'wash') carOpen('wash'); else expShotFor(kind);
+  // Первый недостающий шаг — сразу: у мойки машина, дальше чек, иначе сумма.
+  const k = _expKept(kind) || {};
+  if(kind === 'wash' && !k.car_photo) carOpen('wash', 'car');
+  else if(!k.photo) carOpen(kind, 'rcp');
+  else{ const inp = document.getElementById('e_' + kind); if(inp) try{ inp.focus(); }catch(e){} }
 }
 
 function expBox(kind, title, ico){
@@ -4785,7 +4803,8 @@ function expBox(kind, title, ico){
         : `<button class="btn ${sent ? 'btn-sec' : 'btn-gh'} exp-go" id="b_${kind}"
             onclick="expTap(this,'${kind}')">${sent ? 'Изменить' : 'не было'}</button>`}
     </div>
-    ${expRcp(kind, sent)}
+    ${отклонён && sent.decided_note ? `<div class="exp-why">${esc(sent.decided_note)}</div>` : ''}
+    ${expRcp(kind, _expKept(kind))}
   </div>`;
 }
 
@@ -4800,11 +4819,14 @@ function expRcp(kind, sent){
   const свой = EXP_SHOT.kind === kind && EXP_SHOT.thumb;
   const был  = sent && sent.thumb;
   const мини = свой || был || '';
-  const чек = `<button class="exp-rcp ${мини ? 'set' : ''}" id="rcp-${kind}"
+  // Ответ старшего по этому снимку — тут же, красным: что именно отклонили.
+  const плохо = !свой && sent && sent.photo && sent.photo_ok === 'no';
+  const чек = `<button class="exp-rcp ${мини ? 'set' : ''} ${плохо ? 'bad' : ''}" id="rcp-${kind}"
      onclick="expShotFor('${kind}')">
     ${мини ? `<img src="${мини}" alt="">` : svg(ICO.cam, 22)}
     <span class="exp-rcp-t">${мини ? 'Чек снят' : 'Снять чек'}
-      <i>${мини ? 'нажмите, чтобы переснять' : 'без него трату не примут'}</i></span>
+      ${плохо ? `<i class="bad">отклонён${sent.photo_note ? ' · ' + esc(sent.photo_note) : ''}</i>`
+              : `<i>${мини ? 'нажмите, чтобы переснять' : 'без него трату не примут'}</i>`}</span>
   </button>`;
   // Мойка — два доказательства: машина в процессе мойки и чек.
   return (kind === 'wash' ? carStrip(sent) : '') + чек;
@@ -4822,43 +4844,68 @@ let CAR_SHOT = {photo: '', thumb: ''};
 function carStrip(sent){
   const мини = CAR_SHOT.thumb || (sent && sent.car_thumb) || '';
   const closed = !!(SH && SH.closed);
-  return `<button class="exp-rcp ${мини ? 'set' : ''}" id="car-wash"
+  const плохо = !CAR_SHOT.thumb && sent && sent.car_photo && sent.car_ok === 'no';
+  return `<button class="exp-rcp ${мини ? 'set' : ''} ${плохо ? 'bad' : ''}" id="car-wash"
      onclick="carTap('wash')">
     ${мини ? `<img src="${мини}" alt="">` : svg(ICO.wash, 22)}
     <span class="exp-rcp-t">${мини ? 'Машина на мойке снята' : 'Снять машину на мойке'}
-      <i>${closed && мини ? 'смена закрыта' : мини ? 'нажмите — переснять или убрать' : 'спереди, пока моется'}</i></span>
+      ${плохо ? `<i class="bad">отклонено${sent.car_note ? ' · ' + esc(sent.car_note) : ''}</i>`
+              : `<i>${closed && мини ? 'смена закрыта' : мини ? 'нажмите — переснять или убрать' : 'спереди, пока моется'}</i>`}</span>
   </button>`;
 }
 
-let CAR = {kind: '', stream: null, shot: '', thumb: '', id: ''};
+// Один экран камеры на два снимка: what = 'car' — машина в контуре,
+// 'rcp' — чек в рамке. Отличаются только контур и слова.
+let CAR = {kind: '', what: 'car', stream: null, shot: '', thumb: '', id: ''};
+const CAR_TXT = {
+  car: {t: 'Машина на мойке', s: 'спереди, в контуре', hint: 'Поставьте машину в контур'},
+  rcp: {t: 'Фото чека',       s: 'целиком, в рамке',   hint: 'Поместите чек в рамку'},
+};
 
 // Снимок уже есть — сначала показываем его: отсюда можно переснять или
 // убрать. Нет — сразу камера.
-const _expSentCar = kind => { const s = _expSent(kind); return s && s.car_photo ? s : null; };
+const _expSentCar = kind => { const s = _expKept(kind); return s && s.car_photo ? s : null; };
+const _expKeptRcp = kind => { const s = _expKept(kind); return s && s.photo ? s : null; };
 
-function carTap(kind){
-  if(CAR_SHOT.photo || _expSentCar(kind)) carView(kind); else carOpen(kind);
+function carTap(kind, what){
+  what = what || 'car';
+  const есть = what === 'car' ? (CAR_SHOT.photo || _expSentCar(kind))
+             : ((EXP_SHOT.kind === kind && EXP_SHOT.photo) || _expKeptRcp(kind));
+  if(есть) carView(kind, what); else carOpen(kind, what);
 }
 
-async function carView(kind){
+function _carShape(what){
+  const id = what === 'rcp' ? '#rcpShape' : '#carShape';
+  ['carUseMask', 'carUseLine'].forEach(i => {
+    const u = document.getElementById(i); if(u) u.setAttribute('href', id);
+  });
+  const g = document.getElementById('carLines'); if(g) g.style.display = what === 'rcp' ? 'none' : '';
+  _setText('carT', CAR_TXT[what].t);
+}
+
+async function carView(kind, what){
+  what = what || 'car';
   carStop();
-  const sent = _expSentCar(kind);
-  const свой = CAR_SHOT.photo ? CAR_SHOT : null;
-  CAR = {kind, stream: null, shot: свой ? свой.photo : '', thumb: свой ? свой.thumb : '',
+  const rcp = what === 'rcp';
+  const sent = rcp ? _expKeptRcp(kind) : _expSentCar(kind);
+  const свой = rcp ? (EXP_SHOT.kind === kind && EXP_SHOT.photo ? EXP_SHOT : null)
+                   : (CAR_SHOT.photo ? CAR_SHOT : null);
+  CAR = {kind, what, stream: null, shot: свой ? свой.photo : '', thumb: свой ? свой.thumb : '',
          id: sent ? sent.id : ''};
+  _carShape(what);
   const scr = document.getElementById('carScr');
   scr.classList.add('show', 'shot');
   document.getElementById('carV').hidden = true;
   const img = document.getElementById('carImg');
   img.hidden = false;
-  img.src = свой ? свой.photo : ((sent && sent.car_thumb) || '');
+  img.src = свой ? свой.photo : ((sent && (rcp ? sent.thumb : sent.car_thumb)) || '');
   carBot('view');
   // Отправленный кадр лежит на сервере: сперва миниатюра из строки, следом —
   // сам снимок, если экран ещё открыт на нём.
   if(!свой && sent){
     try{
       const res = await fetch(drvApi.AMBAR_API + '/api/driver/expenses/photo/'
-        + encodeURIComponent(sent.id) + '?car=1',
+        + encodeURIComponent(sent.id) + (rcp ? '' : '?car=1'),
         {headers:{'Authorization': 'tma ' + ((tg && tg.initData) || '')}});
       if(res.ok){
         const b = await res.blob();
@@ -4894,12 +4941,14 @@ async function carDeleteDo(){
   try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 
-async function carOpen(kind){
-  if(SH && SH.closed && _expSentCar(kind)){
+async function carOpen(kind, what){
+  what = what || 'car';
+  if(what === 'car' && SH && SH.closed && _expSentCar(kind)){
     toast('Смена закрыта — переснять уже нельзя', 'err'); return;
   }
   carStop();
-  CAR = {kind, stream: null, shot: '', thumb: '', id: ''};
+  CAR = {kind, what, stream: null, shot: '', thumb: '', id: ''};
+  _carShape(what);
   const scr = document.getElementById('carScr');
   scr.classList.remove('shot'); scr.classList.add('show');
   const img = document.getElementById('carImg'); img.hidden = true; img.removeAttribute('src');
@@ -4923,7 +4972,8 @@ async function carOpen(kind){
 // Три состояния экрана: live — камера и спуск; shot — только что снятый кадр,
 // переснять или подходит; view — уже принятый снимок, убрать или переснять.
 function carBot(mode){
-  const closed = !!(SH && SH.closed);
+  const rcp = CAR.what === 'rcp';
+  const closed = !rcp && !!(SH && SH.closed);
   document.getElementById('carBot').innerHTML =
     mode === 'live'
       ? `<button class="car-shot" onclick="carShoot()" aria-label="Снять"></button>`
@@ -4931,12 +4981,15 @@ function carBot(mode){
       ? `<button class="btn btn-gh" onclick="carRetake()">Переснять</button>
          <button class="btn btn-pri" onclick="carAccept()">Подходит</button>`
     : closed ? ''
+    : rcp
+      ? `<button class="btn btn-pri" onclick="carRetake()">Переснять</button>`
       : `<button class="btn btn-gh btn-del" onclick="carDelete()">Удалить</button>
          <button class="btn btn-pri" onclick="carRetake()">Переснять</button>`;
-  _setText('carHint', mode === 'live' ? 'Поставьте машину в контур'
-                    : mode === 'shot' ? 'Видно, что машина моется?'
+  const T = CAR_TXT[CAR.what] || CAR_TXT.car;
+  _setText('carHint', mode === 'live' ? T.hint
+                    : mode === 'shot' ? (rcp ? 'Чек читается?' : 'Видно, что машина моется?')
                     : closed ? 'Смена закрыта' : '');
-  _setText('carS', mode === 'live' ? 'спереди, в контуре' : 'снимок');
+  _setText('carS', mode === 'live' ? T.s : 'снимок');
 }
 
 function carShoot(){
@@ -4960,7 +5013,7 @@ function carShoot(){
   try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
 }
 
-function carRetake(){ carOpen(CAR.kind); }
+function carRetake(){ carOpen(CAR.kind, CAR.what); }
 
 function carStop(){
   if(CAR.stream){ CAR.stream.getTracks().forEach(t => t.stop()); CAR.stream = null; }
@@ -4973,38 +5026,38 @@ function carClose(){
 }
 
 async function carAccept(){
-  const {kind, shot, thumb} = CAR;
+  const {kind, what, shot, thumb} = CAR;
   carClose();
   if(!shot) return;
-  CAR_SHOT = {photo: shot, thumb};
+  const rcp = what === 'rcp';
+  if(rcp) EXP_SHOT = {kind, photo: shot, thumb}; else CAR_SHOT = {photo: shot, thumb};
   const sent = _expSent(kind);
   // Запись уже есть — кадр уходит сразу: заставлять второй раз нажимать
   // «Отправить» ради того же числа незачем. Отклонённую так не обновляют —
-  // её заполняют заново целиком.
+  // её заполняют заново.
   if(sent && EXP_ST(sent) !== 'rejected'){
     try{
       await drvApi.drvFetch('/api/driver/expenses', {method:'POST',
         body:{kind, amount: sent.amount, comment: sent.comment || '',
-              car_photo: shot, car_thumb: thumb}});
+              ...(rcp ? {photo: shot, thumb} : {car_photo: shot, car_thumb: thumb})}});
       toast('Снимок обновлён');
       try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
-      CAR_SHOT = {photo:'', thumb:''};
+      if(rcp) EXP_SHOT = {kind:'', photo:'', thumb:''}; else CAR_SHOT = {photo:'', thumb:''};
       await load();
     }catch(e){ toast(EXP_ERR[(e.payload || {}).error] || 'Не отправилось', 'err'); }
     return;
   }
   // Первый снимок: полосу меняем на месте — сумму, если уже вписана, терять
-  // нельзя. Дальше ведём по шагам: нет чека — сразу камера на чек; есть —
-  // курсор в сумму.
-  const b = document.getElementById('car-' + kind);
+  // нельзя. Дальше ничего само не открываем: следующий шаг человек делает
+  // сам, а если забудет — «Отправить» откроет то, чего не хватает.
+  const b = document.getElementById((rcp ? 'rcp-' : 'car-') + kind);
   if(b){
-    b.classList.add('set');
+    b.classList.add('set'); b.classList.remove('bad');
     b.innerHTML = `<img src="${thumb}" alt="">
-      <span class="exp-rcp-t">Машина на мойке снята<i>нажмите — переснять или убрать</i></span>`;
+      <span class="exp-rcp-t">${rcp ? 'Чек снят' : 'Машина на мойке снята'}<i>${
+        rcp ? 'нажмите, чтобы переснять' : 'нажмите — переснять или убрать'}</i></span>`;
   }
   try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
-  const чек = (EXP_SHOT.kind === kind && EXP_SHOT.photo) || !!(sent && sent.photo);
-  if(!чек){ expShotFor(kind); return; }
   const inp = document.getElementById('e_' + kind);
   if(inp && !inp.readOnly && !String(inp.value || '').replace(/\D/g, '')){
     try{ inp.focus(); }catch(e){}
@@ -5014,9 +5067,11 @@ async function carAccept(){
 // Камера для чека. Ужимаем тем же способом, что и снимок списания, и тем же
 // правилом: с камеры приходит четыре мегабайта, а нужен читаемый кадр.
 let EXP_SHOT = {kind: '', photo: '', thumb: ''};
+// Чек — той же камерой во весь экран, что и машина, только с рамкой под чек.
+// Галереи нет: чек снимают там, где он в руках.
 function expShotFor(kind){
-  EXP_SHOT = {kind, photo: '', thumb: ''};
-  document.getElementById('expFile').click();
+  if(EXP_SHOT.kind !== kind) EXP_SHOT = {kind: '', photo: '', thumb: ''};
+  carTap(kind, 'rcp');
 }
 function expShot(inp){
   const f = inp.files && inp.files[0]; inp.value = '';
@@ -7589,15 +7644,14 @@ async function sendExpense(btn, kind){
   // Чек нужен там, где деньги отдали на стороне. Спрашиваем до отправки: узнать
   // о нём от сервера — значит узнать уже отъехав от колонки.
   const свой = EXP_SHOT.kind === kind ? EXP_SHOT : null;
-  const прежняя = id ? null : _expSent(kind);
-  const был  = прежняя && прежняя.photo ? прежняя : null;
+  const был  = id ? null : _expKeptRcp(kind);
   // Мойка: сначала машина в процессе мойки, потом чек. Чего нет — то и
   // открываем, а не ругаемся: следующий шаг и есть снимок.
   if(kind === 'wash' && !CAR_SHOT.photo && !_expSentCar(kind)){
-    carOpen('wash'); return;
+    carOpen('wash', 'car'); return;
   }
   if(EXP_RECEIPT.includes(kind) && !(свой && свой.photo) && !был){
-    toast('Снимите чек', 'err'); expShotFor(kind); return;
+    carOpen(kind, 'rcp'); return;
   }
   btn.disabled = true;
   try{

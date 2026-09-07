@@ -1412,8 +1412,12 @@ async def handle_expense_add(request):
 
     # Отклонённая запись заполняется заново: её снимки уже не доказательство,
     # и старшему нельзя подсунуть тот же чек с другой суммой.
+    # Снимок, который старший принял отдельно, остаётся в силе и у отклонённой
+    # записи: переснимать надо только то, что отклонили.
     отклонён = bool(prev) and (prev.get("status") or "approved") == "rejected"
-    if kind in MUST_RECEIPT and not photo and not ((prev or {}).get("photo") and not отклонён):
+    чек_ок = bool((prev or {}).get("photo")) and (not отклонён or prev.get("photo_ok") == "ok")
+    машина_ок = bool((prev or {}).get("car_photo")) and (not отклонён or prev.get("car_ok") == "ok")
+    if kind in MUST_RECEIPT and not photo and not чек_ок:
         return web.json_response({"error": "no_photo", "kind": kind},
                                  status=400, headers=CORS_HEADERS)
     # Мойка подтверждается двумя снимками: чеком и машиной в процессе мойки —
@@ -1423,7 +1427,7 @@ async def handle_expense_add(request):
     car_photo, беда = photos.decode(body.get("car_photo")) if kind == "wash" else (b"", "")
     if беда:
         return web.json_response({"error": беда}, status=400, headers=CORS_HEADERS)
-    if kind == "wash" and not car_photo and not ((prev or {}).get("car_photo") and not отклонён):
+    if kind == "wash" and not car_photo and not машина_ок:
         return web.json_response({"error": "no_car_photo", "kind": kind},
                                  status=400, headers=CORS_HEADERS)
     if kind == "wash" and (photo or car_photo) and prev and (d or {}).get("shift_close_at"):

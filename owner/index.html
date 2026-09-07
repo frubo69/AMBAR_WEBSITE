@@ -19099,25 +19099,31 @@ function phvAskOpen(mode){
 }
 function phvAskClose(){ document.getElementById('phvAsk').classList.remove('show'); }
 
+// Решение принято — окно закрывается само: человек возвращается к списку,
+// где запись уже в новом состоянии. Оставлять его в галерее после «Принять»
+// значит заставлять искать, что делать дальше.
 async function phvAskGo(){
   const note = (document.getElementById('phvAskIn').value || '').trim();
   const mode = PHV_ASK; phvAskClose();
-  if(mode === 'photo'){ await _phvSend('no', note); return; }
   const c = PHV.ctx; if(!c) return;
-  await expDecide(c.driver, c.id, 'reject', note);
-  phvPaint();
+  if(mode === 'photo'){
+    if(!await _phvSend('no', note)) return;
+  }else{
+    if(!await expDecide(c.driver, c.id, 'reject', note)) return;
+  }
+  phvClose();
 }
 
 // «Принять» внизу — вся запись: оба снимка в порядке.
 async function phvApprove(){
   const c = PHV.ctx; if(!c) return;
-  await expDecide(c.driver, c.id, 'approve');
-  phvPaint();
+  if(!await expDecide(c.driver, c.id, 'approve')) return;
+  phvClose();
 }
 
 async function _phvSend(verdict, note){
-  const c = PHV.ctx, p = PHV.list[PHV.i]; if(!c || !p) return;
-  if(!await accAskBack('Решение по снимку')) return;
+  const c = PHV.ctx, p = PHV.list[PHV.i]; if(!c || !p) return false;
+  if(!await accAskBack('Решение по снимку')) return false;
   try{
     const r = await ownerApi.ownerFetch(
       `/api/owner/expenses/extra/${encodeURIComponent(c.id)}/photo`,
@@ -19126,8 +19132,9 @@ async function _phvSend(verdict, note){
     _expReplace(r.driver);
     phvPaint();
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred(verdict === 'ok' ? 'success' : 'warning'); }catch(e){}
-    _toast(verdict === 'ok' ? `${p.label}: принят` : `${p.label}: отклонён`);
-  }catch(e){ _toast('Не удалось'); }
+    _toast(verdict === 'ok' ? `${p.label}: принят` : `${p.label}: отклонён — расход отклонён`);
+    return true;
+  }catch(e){ _toast('Не удалось'); return false; }
 }
 
 // ── жесты: смахнуть между снимками, приблизить внутри ─────────────────────
@@ -19587,7 +19594,7 @@ async function expAddExtra(driver, kindId){
 // Решение по трате водителя. Отклонённая не исчезает: водитель должен видеть,
 // что её рассмотрели, иначе пришлёт ту же ещё раз.
 async function expDecide(driver, id, action, note){
-  if(!await accAskBack('Решение по расходу')) return;
+  if(!await accAskBack('Решение по расходу')) return false;
   try{
     const r = await ownerApi.ownerFetch(
       `/api/owner/expenses/extra/${encodeURIComponent(id)}/${action}`,
@@ -19597,7 +19604,8 @@ async function expDecide(driver, id, action, note){
     _toast(action === 'approve' ? 'Расход принят' : 'Расход отклонён');
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred(
       action === 'approve' ? 'success' : 'warning'); }catch(e){}
-  }catch(e){ _toast('Не удалось'); }
+    return true;
+  }catch(e){ _toast('Не удалось'); return false; }
 }
 
 async function expDelExtra(driver, id){

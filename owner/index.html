@@ -333,6 +333,19 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 /* Прижатая карточка непрозрачная, и плитки уходят под неё резаным краем —
    выглядит так, будто им отрезали верх. Под нижней кромкой лежит полоска, в
    которой контент растворяется в фоне: край перестаёт быть разрезом. */
+/* Обзор не влез в экран (телеграм не в полный экран, узкий телефон) —
+   страница ставит класс tight: карточка ниже, плитки ниже, зазоры меньше.
+   Решает измерение, а не размер экрана — как у плиток учёта. */
+#pg-overview.tight .hero{height:176px;padding:12px 18px 14px;margin-bottom:12px}
+#pg-overview.tight .hero-spark{height:26px;margin-top:8px}
+#pg-overview.tight .hero-amt{font-size:34px}
+#pg-overview.tight .hero-row{margin-top:6px}
+#pg-overview.tight .bento{gap:6px}
+#pg-overview.tight .bento .card{height:92px;padding:11px 12px}
+#pg-overview.tight .bento .card.wide{height:80px;padding-top:8px;padding-bottom:6px}
+#pg-overview.tight .card-lbl{margin-bottom:6px}
+#pg-overview.tight .card-val{font-size:21px}
+#pg-overview.tight .card-row{margin-top:5px}
 .hero-veil{position:fixed;left:0;right:0;height:18px;z-index:29;pointer-events:none;
   opacity:0;transition:opacity .18s var(--e1);
   background:linear-gradient(180deg,var(--bg) 0%,rgba(10,10,20,0) 100%)}
@@ -8488,6 +8501,7 @@ document.querySelectorAll('.tb').forEach(btn=>{
     }
     // И обратно: день перевели в учёте — «Обзор» должен догнать, а не сидеть
     // с числами того дня, на котором его оставили.
+    if(pg === 'overview') setTimeout(() => { try{ ovFit(); }catch(e){} }, 30);
     if(pg === 'overview' && window.ownerApi && _ovOff !== DAY_OFFSET
        && typeof _paintDay === 'function'){
       _paintDay(document.querySelector('#periodPicker button.on')?.dataset?.p || 'today');
@@ -8696,8 +8710,13 @@ window.addEventListener('resize', () => {
   const row   = hero.querySelector('.hero-row');
   const nav   = hero.querySelector('.day-nav');
 
-  const FULL = 226, MIN = 78;              // высоты карточки (см. .hero в стилях)
-  const F_FULL = 44, F_MIN = 23;           // размер числа
+  // Высоты карточки (см. .hero в стилях). Не константы: на телефоне, где
+  // обзор не влезает в экран, страница ставит себе класс tight, и карточка
+  // развёрнутой становится ниже — сжатие при прокрутке считается от неё же.
+  const TIGHT = () => !!(document.getElementById('pg-overview') || {}).classList?.contains('tight');
+  const FULL_ = () => TIGHT() ? 176 : 226, MIN = 78;
+  const MB = () => TIGHT() ? 12 : 20;      // отступ под карточкой
+  const F_FULL_ = () => TIGHT() ? 34 : 44, F_MIN = 23;   // размер числа
 
   let placeTry = 0;
   const place = () => {
@@ -8732,7 +8751,7 @@ window.addEventListener('resize', () => {
   const reset = () => {
     veil.classList.remove('on');
     hero.classList.remove('tight');
-    hero.style.height = FULL + 'px';
+    hero.style.height = FULL_() + 'px';
     hero.style.paddingTop = ''; hero.style.paddingBottom = '';
     hero.style.marginBottom = ''; hero.style.boxShadow = '';
     [lbl, side, spark, row].forEach(e => { if(e){ e.style.opacity = ''; e.style.transform = ''; } });
@@ -8753,6 +8772,7 @@ window.addEventListener('resize', () => {
     // её место в потоке выше точки прилипания. Значит доля сжатия — это просто
     // прокрутка, и высота падает ровно на столько, на сколько поднялся контент.
     // Нижний край идёт вровень с плитками заказов, пока есть куда сжиматься.
+    const FULL = FULL_(), F_FULL = F_FULL_();
     const p = Math.max(0, Math.min(1, y / (FULL - MIN)));
 
     const h = FULL - (FULL - MIN) * p;
@@ -8763,7 +8783,7 @@ window.addEventListener('resize', () => {
     // сколько ни сжимай, они всё равно оказывались под карточкой. Теперь низ
     // страницы стоит на месте, а карточка сдавливается в зазоре между
     // переключателем периода и плитками.
-    hero.style.marginBottom = (20 + (FULL - h)) + 'px';
+    hero.style.marginBottom = (MB() + (FULL - h)) + 'px';
     hero.style.paddingTop = (20 - 10 * p) + 'px';
     hero.style.paddingBottom = (18 - 12 * p) + 'px';
     hero.style.boxShadow = p > .02 ? `0 ${10*p}px ${26*p}px rgba(0,0,0,${.5*p})` : '';
@@ -13420,7 +13440,30 @@ function accFit(){
   box.style.minHeight = место + 'px';
   стр.style.marginBottom = надо > место + 4 ? '0px' : '';
 }
-addEventListener('resize', () => { try{ accFit(); ohubFit(); }catch(e){} });
+addEventListener('resize', () => { try{ accFit(); ohubFit(); ovFit(); }catch(e){} });
+
+// Обзор обязан показывать карточку выручки и все шесть плиток без прокрутки.
+// Меряем по факту: развёрнутая карточка плюс плитки против места между
+// переключателем периода и нижней полосой. Не влезло — ужатый вид.
+function ovFit(){
+  const ov = document.getElementById('pg-overview'); if(!ov) return;
+  const hero = ov.querySelector('.hero'), bento = ov.querySelector('.bento');
+  if(!hero || !bento) return;
+  const было = ov.classList.contains('tight');
+  ov.classList.remove('tight');
+  const top = parseFloat(getComputedStyle(document.documentElement)
+                .getPropertyValue('--hero-top')) || 124;
+  const tb = document.querySelector('.tabbar');
+  const низ = tb ? tb.getBoundingClientRect().height : 76;
+  const место = innerHeight - top - низ - 8;
+  const надо = 226 + 20 + bento.offsetHeight;
+  const tight = надо > место;
+  ov.classList.toggle('tight', tight);
+  // Высоту карточки держит скрипт сжатия — просим его пересчитать.
+  if(tight !== было || true) window.dispatchEvent(new Event('scroll'));
+}
+addEventListener('load', () => { setTimeout(ovFit, 500); setTimeout(ovFit, 1500); });
+try{ document.fonts && document.fonts.ready.then(() => setTimeout(ovFit, 50)); }catch(e){}
 
 // ── день учёта ──────────────────────────────────────────────────────────────
 // Один день на всё приложение (DAY_OFFSET) — тот же, что листается свайпом по

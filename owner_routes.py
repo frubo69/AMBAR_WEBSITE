@@ -3597,6 +3597,22 @@ async def handle_geo_unlock(request):
 
 
 @require_owner
+async def handle_shift_state(request):
+    """Смена по районам одной строкой — для плитки на «Районах»: сколько
+    открыто или закрыто из скольких, и какая половина суток сейчас."""
+    day = (request.query.get("day") or "").strip()
+    now = datetime.now(DUBAI_TZ)
+    if not day:
+        day = _biz_day_start(now).date().isoformat()
+    sh = await _chk_shift(day)
+    closing = now >= _chk_at(day, CHK_SHIFT_CLOSE[0], CHK_SHIFT_CLOSE[2])
+    return web.json_response({"day": day, "total": sh["total"], "open": sh["open"],
+                              "closed": sh["closed"],
+                              "phase": "closing" if closing else "opening"},
+                             headers=CORS_HEADERS)
+
+
+@require_owner
 async def handle_checklist_mark(request):
     """Отметить пункт, который система знать не может."""
     try:
@@ -3760,6 +3776,8 @@ def setup(app):
     app.router.add_route("OPTIONS", "/api/owner/orders", handle_orders)
     app.router.add_get(             "/api/owner/orders", handle_orders)
     app.router.add_get(             "/api/owner/checklist", handle_checklist)
+    app.router.add_route("OPTIONS", "/api/owner/shift-state", handle_shift_state)
+    app.router.add_get(             "/api/owner/shift-state", handle_shift_state)
     app.router.add_route("OPTIONS", "/api/owner/checklist/mark", handle_checklist_mark)
     app.router.add_route("OPTIONS", "/api/owner/geo-unlock", handle_geo_unlock)
     app.router.add_post(            "/api/owner/geo-unlock", handle_geo_unlock)

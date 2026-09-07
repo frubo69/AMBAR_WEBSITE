@@ -492,6 +492,11 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .off-tot-f.on{color:var(--gold2);border-color:rgba(201,169,110,.4);
   background:rgba(201,169,110,.08)}
 .off-tot-c{background:var(--card);border:1px solid var(--border2);border-radius:12px;padding:10px 10px;min-width:0}
+.off-tot-go{cursor:pointer;text-align:left;font-family:inherit;color:var(--text);
+  border-color:rgba(201,169,110,.3);-webkit-tap-highlight-color:transparent}
+.off-tot-go:active{transform:scale(.97)}
+.off-tot-go .off-tot-v{color:var(--gold2)}
+.off-tot-of{font-size:11px;font-weight:600;color:var(--muted);margin-left:3px;letter-spacing:0}
 .off-tot-l{font-size:9px;font-weight:600;letter-spacing:1px;text-transform:uppercase;color:var(--muted);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .off-tot-v{font-family:'DM Sans',sans-serif;font-size:17px;font-weight:700;letter-spacing:-.3px;margin-top:3px;
@@ -5091,8 +5096,11 @@ button.path:active{transform:scale(.995)}
         строка складывается: наверху нужно число, а не его разбор. -->
    <div class="ohero-stats" id="offTotals" style="display:none">
     <div class="off-tot-c"><div class="off-tot-l">Заказы</div><div class="off-tot-v" id="offTotOrd">—</div></div>
-    <div class="off-tot-c"><div class="off-tot-l">Ср. чек</div><div class="off-tot-v" id="offTotAvg" data-aed="">—</div></div>
     <div class="off-tot-c"><div class="off-tot-l">Ср. время</div><div class="off-tot-v" id="offTotMin">—</div></div>
+    <!-- Смена по районам вместо среднего чека: сколько открыто или закрыто из
+         пяти. Нажатие ведёт в историю смен. -->
+    <button class="off-tot-c off-tot-go" id="offTotShift" onclick="accOpen('shifts')" aria-label="История смен">
+      <div class="off-tot-l" id="offTotShiftL">Смена</div><div class="off-tot-v" id="offTotShiftV">—</div></button>
     <!-- Порядок районов меняют редко, а пять чипов занимали ряд каждый раз.
          Кнопка на том же уровне, что и цифры; выбор — списком по касанию. -->
     <button class="off-tot-f" id="offSortBtn" onclick="offSortPop()" aria-label="Порядок районов">
@@ -18802,6 +18810,23 @@ function _expReplace(row){
   if(!ACC_VIEW) accRender();          // сводка на входе не должна отставать
 }
 
+// Плитка смены на «Районах»: открыто или закрыто из скольких — за тот день,
+// что выбран на странице. Спрашиваем сервер отдельно и не чаще раза в минуту
+// на день: строка меняется редко, а выручка перерисовывается часто.
+let _offShiftAt = 0, _offShiftDay = '';
+async function offShiftLoad(){
+  const day = (typeof accDay === 'function') ? accDay() : '';
+  if(_offShiftDay === day && Date.now() - _offShiftAt < 60000) return;
+  let r;
+  try{ r = await ownerApi.ownerFetch('/api/owner/shift-state', {params: day ? {day} : {}}); }
+  catch(e){ return; }
+  _offShiftAt = Date.now(); _offShiftDay = day;
+  const closing = r.phase === 'closing';
+  _setText('offTotShiftL', closing ? 'Смена · закрыто' : 'Смена · открыто');
+  const v = document.getElementById('offTotShiftV');
+  if(v) v.innerHTML = `${closing ? r.closed : r.open}<span class="off-tot-of">/ ${r.total}</span>`;
+}
+
 function renderOffices(rows){
   OFF_LAST = rows;
   const box = document.getElementById('offCards');
@@ -18839,7 +18864,7 @@ function renderOffices(rows){
     _setAed('offGross', total);
     _setAed('offHeroRev', Math.max(0, total - (OFF_CUT.tips || 0) - (OFF_CUT.spend || 0)));
     _setText('offTotOrd', ord);
-    _setAed('offTotAvg', dl ? Math.round(total/dl) : 0);
+    offShiftLoad();
     _setText('offTotMin', mins.length
       ? Math.round(mins.reduce((a,r)=>a+r.avg_min*r.avg_sample,0) / mins.reduce((a,r)=>a+r.avg_sample,0)) + ' мин'
       : '—');

@@ -24,6 +24,7 @@
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
 <script src="/vendor/ambar-call.js?v=75"></script>
+<script src="/vendor/ambar-kb.js?v=2"></script>
 <style>
 /* Двойной тап не должен масштабировать страницу: это приложение,
    а не документ. Одиночные и быстрые тапы при этом работают. */
@@ -2476,6 +2477,12 @@ html.hid-boot #gameApp *{visibility:visible}
   cursor:pointer;font-family:inherit;font-size:19px;color:#cfd8ea;
   background:rgba(255,255,255,.07);display:flex;align-items:center;justify-content:center}
 .gm-b:active{background:rgba(90,209,255,.22);color:#fff}
+
+/* ── Клавиатура (vendor/ambar-kb.js): пока в поле фокус, полоса итога прячется
+   и снизу подкладывается воздух — поле докручивается в центр экрана. Строки
+   чата и поддержки не прячутся: в них и стоит поле. ── */
+html.kb .tk-bar{display:none}
+html.kb body{padding-bottom:40vh}
 </style>
 </head>
 <body>

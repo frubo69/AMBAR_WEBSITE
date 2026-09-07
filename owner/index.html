@@ -17,6 +17,13 @@ html.hid-boot{background:#0b0e18}
 html.hid-boot body{visibility:hidden}
 html.hid-boot #gameApp{display:flex!important;visibility:visible}
 html.hid-boot #gameApp *{visibility:visible}
+
+/* ── Клавиатура (vendor/ambar-kb.js): пока в поле фокус, нижние полосы прячутся
+   и снизу подкладывается воздух — поле докручивается в центр экрана. Панель
+   пересчёта над клавиатурой (.stk-bar) остаётся: она и нужна при вводе. ── */
+html.kb .tabbar,html.kb .chk-dock,html.kb .stk-foot{display:none}
+html.kb body{padding-bottom:50vh}
+html.kb .stk-mid{padding-bottom:50vh}
 </style>
 
 <meta charset="UTF-8">
@@ -31,6 +38,7 @@ html.hid-boot #gameApp *{visibility:visible}
 <script>if(!window.Telegram||!window.Telegram.WebApp){document.write('<scr'+'ipt src="https://telegram.org/js/telegram-web-app.js"><\/scr'+'ipt>');}</script>
 <script src="api.js"></script>
 <script src="/vendor/ambar-call.js?v=75"></script>
+<script src="/vendor/ambar-kb.js?v=2"></script>
 <link rel="stylesheet" href="/vendor/leaflet.css">
 <script src="/vendor/leaflet.js"></script>
 <style>

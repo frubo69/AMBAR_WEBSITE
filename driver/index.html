@@ -17,6 +17,12 @@ html.hid-boot{background:#0b0e18}
 html.hid-boot body{visibility:hidden}
 html.hid-boot #gameApp{display:flex!important;visibility:visible}
 html.hid-boot #gameApp *{visibility:visible}
+
+/* ── Клавиатура (vendor/ambar-kb.js): пока в поле фокус, нижние полосы прячутся
+   и снизу подкладывается воздух — поле докручивается в центр экрана. Строка
+   чата в листе не прячется: в ней и стоит поле. ── */
+html.kb .tabbar,html.kb .exp-bar,html.kb .wo-fix,html.kb .shbtn{display:none}
+html.kb body{padding-bottom:50vh}
 </style>
 
 <meta charset="UTF-8">
@@ -3091,6 +3097,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 
 <script src="api.js"></script>
 <script src="/vendor/ambar-call.js?v=75"></script>
+<script src="/vendor/ambar-kb.js?v=2"></script>
 <script>
 const tg = window.Telegram?.WebApp;
 try{

@@ -711,6 +711,14 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .stk-hc-s{font-size:10.5px;color:var(--muted)}
 /* Заголовок раздела с действием справа: «История ревизий» — не строка списка,
    а выход в сторону, и место ей у названия, а не отдельной плиткой. */
+.stkbd-d{cursor:pointer;font-family:inherit;color:var(--text);text-align:center;
+  -webkit-tap-highlight-color:transparent}
+.stkbd-d:active{transform:scale(.96)}
+.stkbd-d.on{border-color:rgba(201,169,110,.55);background:var(--gold-soft)}
+.stkbd-d.on .stkbd-c,.stkbd-d.on .stkbd-n{color:var(--gold2)}
+.stkbd.one td:not(.nm),.stkbd.one th:not(.nm){text-align:right;font-size:14px;font-weight:700}
+.stk-grp2-a{margin-left:auto;font-size:10px;font-weight:700;letter-spacing:.6px;
+  text-transform:uppercase;color:var(--gold2);cursor:pointer}
 .stk-grp2{display:flex;align-items:baseline;justify-content:space-between;gap:10px;
   margin:14px 2px 7px}
 .stk-grp2 > span{font-size:10px;font-weight:600;letter-spacing:1.4px;
@@ -12056,6 +12064,8 @@ function stkByDistrict(тихо){
     pluralize(items.length,'позиция','позиции','позиций')}${
     v.items_with_stock != null ? `, с остатком ${v.items_with_stock}` : ''} · ${итог}`, false);
   const колонка = d => (v.by_district || {})[d.id] || {};
+  // Нажали на район — в таблице остаётся только его столбец, и он же итог.
+  const shown = STK.dsel ? ds.filter(d => d.id === STK.dsel) : ds;
   const числоРайона = c => STK.by === 'qty' ? fmt(c.bottles || 0)
     : fmt(Math.round(STK.by === 'cost' ? (c.cost || 0) : (c.list || 0)));
   document.getElementById('stkMid').innerHTML = `
@@ -12067,16 +12077,19 @@ function stkByDistrict(тихо){
     <div class="stk-grp2"><span>Районы</span></div>
     <div class="stkbd-strip">${ds.map(d => {
       const c = колонка(d);
-      return `<div class="stkbd-d ${(STK.by === 'qty' ? c.bottles : (STK.by === 'cost'
-        ? c.cost : c.list)) ? '' : 'z'}">
+      return `<button class="stkbd-d ${(STK.by === 'qty' ? c.bottles : (STK.by === 'cost'
+        ? c.cost : c.list)) ? '' : 'z'}${STK.dsel === d.id ? ' on' : ''}" onclick="stkByDist('${escS(d.id)}')">
         <span class="stkbd-c">${escS(d.code || '')}</span>
         <span class="stkbd-n">${числоРайона(c)}</span>
-      </div>`;
+      </button>`;
     }).join('')}</div>
-    <div class="stk-grp2"><span>Каталог</span></div>
-    <div class="stkbd-wrap"><table class="stkbd">
+    <div class="stk-grp2"><span>${STK.dsel
+      ? 'Каталог · ' + escS((ds.find(d => d.id === STK.dsel) || {}).code || '') : 'Каталог'}</span>${
+      STK.dsel ? '<span class="stk-grp2-a" onclick="stkByDist(null)">все районы</span>' : ''}</div>
+    <div class="stkbd-wrap"><table class="stkbd${STK.dsel ? ' one' : ''}">
       <thead><tr><th class="nm">№ и позиция</th>${
-        ds.map(d => `<th>${escS(d.code || '')}</th>`).join('')}<th class="tot">Всего</th></tr></thead>
+        shown.map(d => `<th>${escS(d.code || '')}</th>`).join('')}${
+        STK.dsel ? '' : '<th class="tot">Всего</th>'}</tr></thead>
       <tbody>${items.map(r => {
         const сумма = режим.сумма(r);
         // «Вносили ли вообще» присылает сервер, но полагаться на одно поле
@@ -12087,7 +12100,7 @@ function stkByDistrict(тихо){
           <td class="nm"><b><s>${r.no || ''}</s>${escS(r.name)}</b><i>${r.cost
             ? fmt(Math.round(r.cost)) + ' → ' + fmt(Math.round(r.price_list))
             : 'закупка неизвестна'}</i></td>
-          ${ds.map(d => {
+          ${shown.map(d => {
             const h = (r.have || {})[d.id];
             // Три разных ответа, и путать их нельзя: прочерк — «не вносили»,
             // ноль — «считали, и нет», число — сколько лежит.
@@ -12097,9 +12110,9 @@ function stkByDistrict(тихо){
             return val == null ? '<td class="z">—</td>'
               : `<td>${режим.деньги ? fmt(Math.round(val)) : fmt(val)}</td>`;
           }).join('')}
-          <td class="tot ${(сумма == null || !известна) ? 'z' : (r.bottles ? '' : 'nil')}">${
+          ${STK.dsel ? '' : `<td class="tot ${(сумма == null || !известна) ? 'z' : (r.bottles ? '' : 'nil')}">${
             !известна ? '—' : (сумма == null ? '—'
-              : (режим.деньги ? fmt(Math.round(сумма)) : fmt(r.bottles)))}</td>
+              : (режим.деньги ? fmt(Math.round(сумма)) : fmt(r.bottles)))}</td>`}
         </tr>`;
       }).join('')}</tbody>
     </table></div>
@@ -12116,6 +12129,14 @@ function stkByDistrict(тихо){
            приложения ниже: её итог виден на карточке склада.`}</div>`;
   const g = document.getElementById('stkByTabs');
   if(g) (тихо ? movePill(g) : requestAnimationFrame(() => movePill(g)));
+}
+
+// Выбор района на складе: цифры внизу — только по нему. Второе нажатие или
+// «все районы» возвращает всю таблицу.
+function stkByDist(id){
+  STK.dsel = (id && STK.dsel !== id) ? id : null;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  stkByDistrict(true);
 }
 
 // ── История: отдельная страница ──────────────────────────────────────────

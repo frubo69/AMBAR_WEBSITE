@@ -2646,6 +2646,9 @@ button.path:active{transform:scale(.995)}
 .ord-sumc .ord-sum{margin:0;border:0;border-radius:0;background:none}
 .ord-sumc .ord-sum-c{padding:13px 10px 14px}
 .ord-sumc .ord-sum-c + .ord-sum-c{box-shadow:inset 1px 0 0 rgba(201,169,110,.14)}
+.ord-sum-c.warn b{color:var(--warn)}
+.ord-sum-c.ok b{color:var(--up)}
+.shl-b i.warn{color:var(--warn)}
 .ord-grp{font-size:9.5px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;
   color:var(--muted);padding:2px 4px 8px}
 .ord-dists{border-radius:16px;overflow:hidden;
@@ -15956,14 +15959,18 @@ async function qrDistrict(force){
   // мимо него. Второе число и есть работа, ради которой открывают этот экран.
   const t = (ACC_QR && ACC_QR.totals) || {};
   const без = (ACC_QR && ACC_QR.unscanned_total) || 0;
-  const шапка = t.active ? `<div class="stk-have" style="margin-bottom:12px">
-      <span class="sh-l"><b>${fmt(t.active)}</b><span>в реестре</span></span>
-      <span class="sh-r">${без
-        ? `<span class="sh-warn"><b>${fmt(без)}</b>не отсканировано</span>`
-        : `<span class="sh-ok"><b>✓</b>всё отсканировано</span>`}</span>
+  // Сводка — карточкой с шапкой, как «Закупаем» в заявке: в реестре и сколько
+  // не отсканировано. Районы — одной слитной карточкой, как везде.
+  const шапка = t.active ? `<div class="ord-sumc">
+      <div class="ord-cap">Реестр</div>
+      <div class="ord-sum" style="grid-template-columns:1fr 1fr">
+        <span class="ord-sum-c"><b>${fmt(t.active)}</b><i>в реестре</i></span>
+        <span class="ord-sum-c ${без ? 'warn' : 'ok'}"><b>${без ? fmt(без) : '✓'}</b><i>${
+          без ? 'не отсканировано' : 'всё отсканировано'}</i></span>
+      </div>
     </div>` : '';
   document.getElementById('accMid').innerHTML = head + `<div class="qd-page">` + шапка +
-    `<div class="stk-drs">` + ((STK.districts || []).map(d => {
+    `<div class="ord-dists">` + ((STK.districts || []).map(d => {
       // Справа — что внесли на этой точке ЗА ЭТУ СМЕНУ, а не весь реестр:
       // сюда приходят вносить, и число отвечает «сколько я уже занёс». Пока
       // ничего — пусто, без прочерков; с новой сменой счёт с нуля.
@@ -15972,15 +15979,12 @@ async function qrDistrict(force){
       const [sub, cls] = b
         ? [`считают ${b} ${pluralize(b,'позицию','позиции','позиций')}`, 'warn']
         : (n ? ['внесли за смену', ''] : ['', '']);
-      return `<button class="stk-dr" onclick="qrGo('${d.id}')">
-        <span class="stk-dr-c">${escS(d.code || '')}</span>
-        <span class="stk-dr-b">
-          <span class="stk-dr-n">${escS(d.name || '')}</span>
-          ${sub ? `<span class="stk-dr-s ${cls}">${sub}</span>` : ''}
-        </span>
-        <span class="stk-dr-v">${n ? fmt(n) + '<i>бут</i>' : ''}</span>
-        <span class="stk-dr-go">${ICO_CHEV}</span>
-      </button>`;
+      return `<div class="shl-card"><button class="shl-h ord-dh" onclick="qrGo('${d.id}')">
+        <span class="shl-code">${escS(d.code || '')}</span>
+        <span class="shl-b"><b>${escS(d.name || '')}</b>${sub ? `<i class="${cls}">${sub}</i>` : ''}</span>
+        ${n ? `<span class="shl-v"><b>${fmt(n)}</b><i>${pluralize(n,'бутылка','бутылки','бутылок')}</i></span>` : ''}
+        <span class="ord-dh-go">${ICO_CHEV}</span>
+      </button></div>`;
     }).join('') || '<div class="scan-empty">Точки не загрузились</div>') + `</div></div>`;
 }
 

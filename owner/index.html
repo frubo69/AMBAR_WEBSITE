@@ -4225,8 +4225,15 @@ button.exp-wait:active{transform:scale(.99)}
 .phv-dot.on{width:18px;background:var(--gold2)}
 .phv-cap{flex-shrink:0;text-align:center;font-size:10px;font-weight:700;letter-spacing:1.2px;
   text-transform:uppercase;color:var(--muted);margin-top:8px}
-.phv-cap b{color:var(--up)}
-.phv-cap u{text-decoration:none;color:var(--dn)}
+.phv-cap{display:flex;align-items:center;justify-content:center;gap:10px;flex-wrap:wrap}
+.phv-capt{padding:4px 10px;border-radius:999px;border:1px solid transparent;background:none;
+  cursor:pointer;font-family:inherit;font-size:10px;font-weight:700;letter-spacing:1.2px;
+  text-transform:uppercase;color:var(--muted);transition:.18s var(--e1)}
+.phv-capt.on{color:var(--gold2);border-color:rgba(201,169,110,.35);background:var(--gold-soft)}
+.phv-capsep{width:4px;height:4px;border-radius:2px;background:var(--border3)}
+.phv-capv{flex:0 0 100%;text-align:center;margin-top:2px}
+.phv-capv.ok{color:var(--up)}
+.phv-capv.no{color:var(--dn)}
 .phv-bot{flex-shrink:0;padding:12px 16px calc(16px + env(safe-area-inset-bottom))}
 .phv-acts{display:flex;gap:8px}
 .phv-acts:empty{display:none}
@@ -18948,6 +18955,9 @@ function phvOpen(list, i, ctx){
   phvGo(i, false);
   [...document.getElementById('phvTrack').querySelectorAll('img')].forEach(im => { im.onload = _phvFit; });
   list.forEach((p, k) => _phvLoad(k));
+  // Снимков два — лента сама показывает, что её можно листать: чуть сдвигается
+  // к соседнему и возвращается. Один раз, при открытии.
+  if(list.length > 1 && i === 0) setTimeout(_phvPeek, 520);
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 
@@ -18974,6 +18984,18 @@ function phvGo(i, anim){
   _phvFit();
 }
 
+function _phvPeek(){
+  const tr = document.getElementById('phvTrack');
+  if(!tr || PHV.i !== 0 || PHV.list.length < 2) return;
+  tr.style.transition = 'transform .32s cubic-bezier(.4,0,.2,1)';
+  tr.style.transform = 'translateX(-14%)';
+  setTimeout(() => {
+    if(PHV.i !== 0) return;
+    tr.style.transition = 'transform .5s cubic-bezier(.22,1,.36,1)';
+    tr.style.transform = 'translateX(0%)';
+  }, 360);
+}
+
 function phvPaint(){
   const e = _phvE(); const p = PHV.list[PHV.i]; if(!p) return;
   _setText('phvT', (e && (e.kind_t || e.comment)) || 'Расход');
@@ -18981,8 +19003,13 @@ function phvPaint(){
   // Какой снимок и что по нему решено.
   const v = e ? (p.which === 'car' ? e.car_ok : e.photo_ok) : null;
   const note = e ? (p.which === 'car' ? e.car_note : e.photo_note) : '';
-  document.getElementById('phvCap').innerHTML = escS(p.label)
-    + (v === 'ok' ? ' · <b>принят</b>' : v === 'no' ? ` · <u>отклонён${note ? ' · ' + escS(note) : ''}</u>` : '');
+  // Подписи всех снимков, текущий — золотом: видно, что их два, и по ним
+  // можно перейти. У текущего рядом — ответ по нему.
+  document.getElementById('phvCap').innerHTML = PHV.list.map((q, k) =>
+    `<button class="phv-capt ${k === PHV.i ? 'on' : ''}" onclick="phvGo(${k}, true)">${escS(q.label)}</button>`
+  ).join('<i class="phv-capsep"></i>')
+    + (v === 'ok' ? '<span class="phv-capv ok">принят</span>'
+     : v === 'no' ? `<span class="phv-capv no">отклонён${note ? ' · ' + escS(note) : ''}</span>` : '');
   // На снимке — отказ по этому снимку; внизу — решение по записи целиком.
   const rej = document.getElementById('phvRej');
   rej.hidden = !e;
@@ -19099,6 +19126,9 @@ function _phvGestures(fr){
   const mid = e => ({x: (e.touches[0].clientX + e.touches[1].clientX) / 2,
                      y: (e.touches[0].clientY + e.touches[1].clientY) / 2});
   fr.addEventListener('touchstart', e => {
+    // Кнопка на снимке — не лента: её касание жестом не считаем, иначе
+    // перерисовка по touchend убивает клик.
+    if(e.target.closest && e.target.closest('.phv-rej')) return;
     if(e.touches.length === 2){
       const m = mid(e);
       pinch = {d: dist(e), s0: PHV.s, x: m.x, y: m.y, tx0: PHV.tx, ty0: PHV.ty};
@@ -19152,8 +19182,13 @@ function _phvGestures(fr){
         let i = PHV.i;
         if(swipe.dx < -swipe.w * .18 && i < n - 1) i++;
         else if(swipe.dx > swipe.w * .18 && i > 0) i--;
-        phvGo(i, true);
-        try{ if(i !== PHV.i) Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(err){}
+        // Просто тап — ленту не перерисовываем: кнопки на снимке должны
+        // дождаться своего клика.
+        if(Math.abs(swipe.dx) > 6){
+          const was = PHV.i;
+          phvGo(i, true);
+          try{ if(i !== was) Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(err){}
+        }
         swipe = null;
       }
       drag = null;

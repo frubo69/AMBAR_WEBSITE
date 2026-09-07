@@ -1988,12 +1988,15 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 #carBg{display:none;position:absolute;inset:-40px;width:auto;height:auto;object-fit:cover;
   filter:blur(28px) brightness(.4) saturate(.8)}
 .car-scr.shot #carBg{display:block}
+/* Размер и место рамки считает _carFit(): она обтягивает снимок, чёрных
+   полей по бокам нет. Здесь — только вид. */
 .car-scr.shot #carImg{left:16px;top:calc(100px + var(--safe-top));
   width:calc(100% - 32px);height:calc(100% - 278px - var(--safe-top) - var(--safe-bottom));
-  object-fit:contain;
+  object-fit:cover;
   border-radius:18px;border:1px solid rgba(255,255,255,.14);background:#000;
   box-shadow:0 22px 56px rgba(0,0,0,.6)}
 .car-tag{display:none;position:absolute;left:28px;top:calc(112px + var(--safe-top));z-index:2;
+  transition:none;
   padding:5px 11px;border-radius:999px;font-family:'Space Grotesk',sans-serif;font-size:10px;
   font-weight:700;letter-spacing:1.3px;text-transform:uppercase;color:var(--gold2);
   background:rgba(0,0,0,.55);border:1px solid rgba(201,169,110,.4);
@@ -4996,6 +4999,8 @@ async function carOpen(kind, what){
   const scr = document.getElementById('carScr');
   scr.classList.remove('shot'); scr.classList.add('show');
   const img = document.getElementById('carImg'); img.hidden = true; img.removeAttribute('src');
+  img.removeAttribute('style'); img.onload = null;
+  const tag = document.getElementById('carTag'); if(tag) tag.removeAttribute('style');
   const bg = document.getElementById('carBg'); if(bg) bg.removeAttribute('src');
   const v = document.getElementById('carV'); v.hidden = false;
   carBot('live');
@@ -5065,7 +5070,30 @@ function carRetake(){ carOpen(CAR.kind, CAR.what); }
 function _carShotLook(src){
   const bg = document.getElementById('carBg'); if(bg) bg.src = src || '';
   _setText('carTag', CAR.what === 'rcp' ? 'Чек' : 'Машина');
+  const img = document.getElementById('carImg');
+  img.onload = _carFit;
+  if(img.complete && img.naturalWidth) _carFit();
 }
+
+// Рамка по снимку, а не снимок в рамке: место между шапкой и вопросом
+// заполняется кадром в его пропорции, по центру. Иначе портретный кадр
+// в широкой рамке стоял с чёрными полями по бокам и читался как обрезанный.
+function _carFit(){
+  const img = document.getElementById('carImg'), scr = document.getElementById('carScr');
+  if(!img || !img.naturalWidth || !scr.classList.contains('shot')) return;
+  const cam = scr.querySelector('.car-cam').getBoundingClientRect();
+  const head = scr.querySelector('.sup-top').getBoundingClientRect();
+  const bot = document.getElementById('carBot').getBoundingClientRect();
+  const top = head.bottom - cam.top + 6, W = cam.width - 32;
+  const H = (bot.top - cam.top - 64) - top;
+  const k = Math.min(W / img.naturalWidth, H / img.naturalHeight);
+  const w = Math.round(img.naturalWidth * k), h = Math.round(img.naturalHeight * k);
+  const left = Math.round((cam.width - w) / 2), t = Math.round(top + (H - h) / 2);
+  Object.assign(img.style, {width: w + 'px', height: h + 'px', left: left + 'px', top: t + 'px'});
+  const tag = document.getElementById('carTag');
+  if(tag){ tag.style.left = (left + 12) + 'px'; tag.style.top = (t + 12) + 'px'; }
+}
+window.addEventListener('resize', () => { try{ _carFit(); }catch(e){} });
 
 function carStop(){
   if(CAR.stream){ CAR.stream.getTracks().forEach(t => t.stop()); CAR.stream = null; }

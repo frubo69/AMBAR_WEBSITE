@@ -4181,7 +4181,7 @@ button.exp-wait:active{transform:scale(.99)}
   color:var(--text)}
 .phv.show{display:flex}
 .phv-top{display:flex;align-items:center;gap:10px;flex-shrink:0;
-  padding:calc(10px + env(safe-area-inset-top)) 16px 10px}
+  padding:calc(10px + var(--safe-top)) 16px 10px}
 .phv-tt{flex:1;min-width:0}
 .phv-tt b{display:block;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
   letter-spacing:.3px;text-transform:uppercase;line-height:1.2;overflow:hidden;
@@ -4191,8 +4191,20 @@ button.exp-wait:active{transform:scale(.99)}
   justify-content:center;border:1px solid var(--border2);background:var(--card);
   color:var(--sub);cursor:pointer;padding:0}
 .phv-x:active{transform:scale(.94)}
-.phv-frame{position:relative;flex:1 1 auto;min-height:0;margin:4px 16px 0;border-radius:18px;
-  overflow:hidden;background:#000;border:1px solid var(--border2);touch-action:none}
+/* Рамка обтягивает снимок в его пропорции (_phvFit): чёрных полей нет. */
+.phv-mid{flex:1 1 auto;min-height:0;display:flex;align-items:center;justify-content:center;
+  padding:4px 16px 0}
+.phv-frame{position:relative;width:100%;height:100%;border-radius:18px;
+  overflow:hidden;background:#000;border:1px solid var(--border2);touch-action:none;
+  box-shadow:0 18px 44px rgba(0,0,0,.45)}
+/* «Отклонить фото» — прямо на снимке, справа сверху. Отклонённый — метка. */
+.phv-rej{position:absolute;top:10px;right:10px;z-index:3;display:flex;align-items:center;gap:6px;
+  height:32px;padding:0 12px 0 10px;border-radius:999px;cursor:pointer;font-family:inherit;
+  font-size:11.5px;font-weight:700;color:#fff;border:1px solid rgba(255,255,255,.22);
+  background:rgba(0,0,0,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
+.phv-rej svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round}
+.phv-rej.on{color:#fff;background:rgba(224,85,85,.85);border-color:transparent}
+.phv-rej:active{transform:scale(.96)}
 .phv-track{display:flex;height:100%;will-change:transform}
 .phv-slide{flex:0 0 100%;height:100%;display:flex;align-items:center;justify-content:center;
   overflow:hidden}
@@ -4213,10 +4225,9 @@ button.exp-wait:active{transform:scale(.99)}
 .phv-acts button{flex:1;height:46px;border-radius:13px;cursor:pointer;font-family:inherit;
   font-size:14px;font-weight:700;border:1px solid var(--border2);background:var(--card);
   color:var(--sub);transition:.15s var(--e1)}
-.phv-acts .phv-no{color:var(--dn);border-color:rgba(224,85,85,.35)}
-.phv-acts .phv-no.on{background:rgba(224,85,85,.16);border-color:var(--dn)}
-.phv-acts .phv-ok{color:var(--up);border-color:rgba(76,175,125,.35)}
-.phv-acts .phv-ok.on{background:rgba(76,175,125,.16);border-color:var(--up)}
+/* Решение по всей записи — в цветах приложения: тёмная и золотая. */
+.phv-acts .phv-no{color:var(--sub);background:var(--card2);border-color:var(--border3)}
+.phv-acts .phv-ok{color:#1a1408;border:0;background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .phv-acts button:active{transform:scale(.97)}
 /* Причина отказа — по желанию: строка и кнопка, ничего сверх. */
 .phv-note{display:flex;gap:8px;margin-bottom:8px}
@@ -18849,21 +18860,58 @@ function _phvEl(){
         <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
           stroke-width="2.2" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg></button>
     </div>
-    <div class="phv-frame" id="phvFrame"><div class="phv-track" id="phvTrack"></div></div>
+    <div class="phv-mid" id="phvMid">
+      <div class="phv-frame" id="phvFrame">
+        <div class="phv-track" id="phvTrack"></div>
+        <button class="phv-rej" id="phvRej" onclick="phvRejectPhoto()"></button>
+      </div>
+    </div>
     <div class="phv-dots" id="phvDots"></div>
     <div class="phv-cap" id="phvCap"></div>
     <div class="phv-bot">
-      <div class="phv-note" id="phvNote" hidden>
-        <input id="phvNoteIn" placeholder="Почему — если нужно" autocomplete="off"
-          onkeydown="if(event.key==='Enter')phvRejectGo()">
-        <button onclick="phvRejectGo()">Отклонить</button>
-      </div>
       <div class="phv-acts" id="phvActs"></div>
       <div class="phv-st" id="phvSt"></div>
     </div>`;
   document.body.appendChild(el);
   _phvGestures(el.querySelector('#phvFrame'));
+  // Окно причины — поверх просмотра. Причина по желанию: пустую тоже отправляем.
+  const ask = document.createElement('div');
+  ask.id = 'phvAsk'; ask.className = 'wo-c-ov'; ask.style.zIndex = '230';
+  ask.onclick = e => { if(e.target === ask) phvAskClose(); };
+  ask.innerHTML = `
+    <div class="wo-c-sheet wo-add">
+      <div class="wo-add-hd">
+        <div>
+          <div class="wo-c-t" id="phvAskT">Отклонить снимок</div>
+          <div class="wo-add-s" id="phvAskS"></div>
+        </div>
+        <button class="wo-add-x" onclick="phvAskClose()" aria-label="Закрыть">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor"
+               stroke-width="2.2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+        </button>
+      </div>
+      <div style="padding:0 18px">
+        <input class="wo-c-note" id="phvAskIn" placeholder="Почему — если нужно" autocomplete="off"
+          onkeydown="if(event.key==='Enter')phvAskGo()">
+      </div>
+      <div class="wo-add-foot"><button class="wo-c-go" id="phvAskBtn" onclick="phvAskGo()">Отклонить</button></div>
+    </div>`;
+  document.body.appendChild(ask);
+  window.addEventListener('resize', () => { try{ _phvFit(); }catch(e){} });
   return el;
+}
+
+// Рамка — по снимку: место между шапкой и точками заполняется кадром в его
+// пропорции, по центру. Портретный кадр в широкой рамке стоял с чёрными
+// полями по бокам и читался как обрезанный.
+function _phvFit(){
+  const el = document.getElementById('phv'); if(!el || !el.classList.contains('show')) return;
+  const mid = document.getElementById('phvMid'), fr = document.getElementById('phvFrame');
+  const img = _phvImg(); if(!mid || !fr || !img || !img.naturalWidth) return;
+  const W = mid.clientWidth - 32, H = mid.clientHeight - 4;
+  const k = Math.min(W / img.naturalWidth, H / img.naturalHeight);
+  fr.style.width = Math.round(img.naturalWidth * k) + 'px';
+  fr.style.height = Math.round(img.naturalHeight * k) + 'px';
 }
 
 // Запись по id — по всем водителям: значок у принятой строки имени не знает.
@@ -18888,9 +18936,9 @@ function phvOpen(list, i, ctx){
   document.getElementById('phvTrack').innerHTML = list.map(p =>
     `<div class="phv-slide"><img src="${PHV.cache[p.key] || p.thumb || ''}" alt="" draggable="false"></div>`
   ).join('');
-  document.getElementById('phvNote').hidden = true;
   el.classList.add('show');
   phvGo(i, false);
+  [...document.getElementById('phvTrack').querySelectorAll('img')].forEach(im => { im.onload = _phvFit; });
   list.forEach((p, k) => _phvLoad(k));
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
@@ -18914,8 +18962,8 @@ function phvGo(i, anim){
   [...tr.children].forEach(sl => { const im = sl.querySelector('img'); if(im) im.style.transform = ''; });
   document.getElementById('phvDots').innerHTML = PHV.list.length > 1
     ? PHV.list.map((_, k) => `<i class="phv-dot ${k === i ? 'on' : ''}"></i>`).join('') : '';
-  document.getElementById('phvNote').hidden = true;
   phvPaint();
+  _phvFit();
 }
 
 function phvPaint(){
@@ -18927,9 +18975,16 @@ function phvPaint(){
   const note = e ? (p.which === 'car' ? e.car_note : e.photo_note) : '';
   document.getElementById('phvCap').innerHTML = escS(p.label)
     + (v === 'ok' ? ' · <b>принят</b>' : v === 'no' ? ` · <u>отклонён${note ? ' · ' + escS(note) : ''}</u>` : '');
+  // На снимке — отказ по этому снимку; внизу — решение по записи целиком.
+  const rej = document.getElementById('phvRej');
+  rej.hidden = !e;
+  rej.className = 'phv-rej' + (v === 'no' ? ' on' : '');
+  rej.innerHTML = (v === 'no'
+    ? `<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>Отклонено`
+    : `<svg viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18"/></svg>Отклонить фото`);
   document.getElementById('phvActs').innerHTML = e ? `
-    <button class="phv-no ${v === 'no' ? 'on' : ''}" onclick="phvVerdict('no')">Отклонить</button>
-    <button class="phv-ok ${v === 'ok' ? 'on' : ''}" onclick="phvVerdict('ok')">Принять</button>` : '';
+    <button class="phv-no" onclick="phvAskOpen('expense')">Отклонить</button>
+    <button class="phv-ok" onclick="phvApprove()">Принять</button>` : '';
   const st = e ? (e.status || 'approved') : '';
   const stEl = document.getElementById('phvSt');
   stEl.className = 'phv-st ' + (st === 'approved' ? 'ok' : st === 'rejected' ? 'no' : '');
@@ -18948,23 +19003,39 @@ async function _phvLoad(k){
   }catch(e){ if(!p.thumb && k === PHV.i) _toast('Снимка не нашлось'); }
 }
 
-// Решение по одному снимку. Отказ — с причиной, если хочется; строка для неё
-// появляется на месте и уходит вместе с ответом.
-function phvVerdict(v){
-  const note = document.getElementById('phvNote');
-  if(v === 'no'){
-    note.hidden = false;
-    const inp = document.getElementById('phvNoteIn'); inp.value = '';
-    try{ inp.focus(); }catch(e){}
-    return;
-  }
-  note.hidden = true;
-  _phvSend('ok', '');
+// Отказ по снимку — кнопкой на самом снимке: всплывает окно причины.
+// Причину можно оставить, можно не оставлять.
+let PHV_ASK = '';
+function phvRejectPhoto(){ phvAskOpen('photo'); }
+
+function phvAskOpen(mode){
+  const e = _phvE(), p = PHV.list[PHV.i]; if(!e || !p) return;
+  PHV_ASK = mode;
+  const note = mode === 'photo' ? (p.which === 'car' ? e.car_note : e.photo_note) : e.decided_note;
+  _setText('phvAskT', mode === 'photo' ? 'Отклонить снимок' : 'Отклонить расход');
+  _setText('phvAskS', mode === 'photo' ? `${p.label} · ${PHV.ctx.driver}`
+                                       : `${e.kind_t || e.comment || ''} · ${fmt(e.amount)} AED`);
+  const inp = document.getElementById('phvAskIn'); inp.value = note || '';
+  document.getElementById('phvAsk').classList.add('show');
+  setTimeout(() => { try{ inp.focus(); }catch(err){} }, 60);
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(err){}
 }
-function phvRejectGo(){
-  const inp = document.getElementById('phvNoteIn');
-  document.getElementById('phvNote').hidden = true;
-  _phvSend('no', (inp.value || '').trim());
+function phvAskClose(){ document.getElementById('phvAsk').classList.remove('show'); }
+
+async function phvAskGo(){
+  const note = (document.getElementById('phvAskIn').value || '').trim();
+  const mode = PHV_ASK; phvAskClose();
+  if(mode === 'photo'){ await _phvSend('no', note); return; }
+  const c = PHV.ctx; if(!c) return;
+  await expDecide(c.driver, c.id, 'reject', note);
+  phvPaint();
+}
+
+// «Принять» внизу — вся запись: оба снимка в порядке.
+async function phvApprove(){
+  const c = PHV.ctx; if(!c) return;
+  await expDecide(c.driver, c.id, 'approve');
+  phvPaint();
 }
 
 async function _phvSend(verdict, note){

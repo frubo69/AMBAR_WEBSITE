@@ -3182,6 +3182,11 @@ button.path:active{transform:scale(.995)}
    спрашивают, остальному экрану полагается отойти. */
 .pin-back.ask{background:rgba(4,4,10,.45);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 .crw-ask-b.bad{background:rgba(226,106,106,.14);border-color:rgba(226,106,106,.5);color:var(--dn)}
+/* Уйти из окна ничего не сделав — синим: в вопросе про отмену золото занято
+   ответами, и «Не отменять» рядом с ними должно читаться как другой ход, а
+   не как ещё один вариант того же. */
+.crw-ask-b.no{background:rgba(91,141,239,.14);border-color:rgba(91,141,239,.5);
+  color:var(--info)}
 
 /* Заголовок группы водителей: чей это район и кто на нём принимает. */
 /* Район — одна карточка: кто ведёт в шапке, кто возит фишками под ней. Так
@@ -19968,8 +19973,8 @@ function askDialog(t, sub, okLabel, cancelLabel){
     box.className = 'pin-pop crw-ask';
     box.innerHTML = `<div class="crw-ask-t">${escS(t)}</div>
       ${sub ? `<div class="crw-ask-s">${escS(sub)}</div>` : ''}
-      <button class="crw-ask-b bad" id="askOk">${escS(okLabel || 'Да')}</button>
-      <button class="crw-ask-b" id="askNo">${escS(cancelLabel || 'Не надо')}</button>`;
+      <button class="crw-ask-b go" id="askOk">${escS(okLabel || 'Да')}</button>
+      <button class="crw-ask-b no" id="askNo">${escS(cancelLabel || 'Не надо')}</button>`;
     document.body.append(back, box);
     box.querySelector('#askOk').onclick = () => { closePinPop(); resolve(true); };
     box.querySelector('#askNo').onclick = () => { closePinPop(); resolve(false); };
@@ -19995,11 +20000,11 @@ function supCancelAsk(){
   const имена = all.map(x => _supName(x, true));
   box.innerHTML = `<div class="crw-ask-t">Какую заявку отменить?</div>
     <div class="crw-ask-s">Задачи исчезнут у водителей. Принятое останется на складе.</div>
-    ${all.map((x, i) => `<button class="crw-ask-b bad"
+    ${all.map((x, i) => `<button class="crw-ask-b go"
         onclick="closePinPop(); supCancel('${escS(x.supply_id)}', true)"
       >${escS(имена.filter(n => n === имена[i]).length > 1
               ? `${имена[i]} · ${_hm(x.at)}` : имена[i])}</button>`).join('')}
-    <button class="crw-ask-b" onclick="closePinPop()">Не отменять</button>`;
+    <button class="crw-ask-b no" onclick="closePinPop()">Не отменять</button>`;
   document.body.append(back, box);
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
 }

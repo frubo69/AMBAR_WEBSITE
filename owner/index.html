@@ -3813,6 +3813,8 @@ button.path:active{transform:scale(.995)}
   align-items:center;justify-content:center;gap:9px;padding:24px;text-align:center;
   background:rgba(6,6,12,.94);color:var(--muted)}
 .scan-deny.show{display:flex}
+.scan-deny-b{display:flex;gap:8px;margin-top:8px}
+.scan-deny button.ghost{background:var(--card2);color:var(--sub);border:1px solid var(--border3)}
 .scan-deny b{font-size:15px;color:var(--text)}
 .scan-deny i{font-style:normal;font-size:12px;line-height:1.5;max-width:250px}
 .scan-deny button{margin-top:6px;padding:11px 20px;border-radius:12px;cursor:pointer;
@@ -13276,12 +13278,7 @@ async function stkScan(){
     await SCAN.start(document.getElementById('qrVideo'), audSave, qrIdle,
                      () => qrFlash('again', 'уже посчитана'), qrHold);
   }catch(e){
-    // Камеры нет — не тупик: родной сканер телеграма работает всегда, просто
-    // без счётчика на экране.
-    _setText('qrHint', 'Камера недоступна, включаю сканер Telegram');
-    const tg = window.Telegram && Telegram.WebApp;
-    if(tg && tg.showScanQrPopup) tg.showScanQrPopup({text:'Ревизия'}, t => { audSave(t); return false; });
-    else _toast('Сканер недоступен');
+    scanDeny(() => stkScan(), () => stkScanDone());
     return;
   }
   const t = document.getElementById('qrTorch');
@@ -13614,10 +13611,7 @@ async function stkMoveCam(){
     await SCAN.start(document.getElementById('qrVideo'), movSave, qrIdle,
                      () => qrFlash('again', 'уже переехала'), qrHold);
   }catch(e){
-    _setText('qrHint', 'Камера недоступна, включаю сканер Telegram');
-    const tg = window.Telegram && Telegram.WebApp;
-    if(tg && tg.showScanQrPopup) tg.showScanQrPopup({text:'Перемещение'}, t => { movSave(t); return false; });
-    else _toast('Сканер недоступен');
+    scanDeny(() => stkMoveCam(), () => stkMoveDone());
     return;
   }
   const t = document.getElementById('qrTorch');
@@ -16861,19 +16855,45 @@ async function qrStart(pid){
   try{
     await SCAN.start(v, qrSave, qrIdle, () => qrFlash('again'), qrHold);
   }catch(e){
-    // Камеры нет — не тупик: родной сканер Telegram работает всегда, просто
-    // без счётчика на экране.
-    _setText('qrHint', 'Камера недоступна, включаю сканер Telegram');
-    const tg = window.Telegram && Telegram.WebApp;
-    if(tg && tg.showScanQrPopup){
-      tg.showScanQrPopup({text: QR_PROD.name}, t => { qrSave(t); return false; });
-    }else _toast('Сканер недоступен');
+    // Отмена уводит на «Учёт»: сессия по позиции закрывается, бронь снимается.
+    scanDeny(() => qrStart(pid), async () => { await qrDone(); _accClose(); });
     return;
   }
   const t = document.getElementById('qrTorch');
   if(t) t.style.display = SCAN.hasTorch() ? '' : 'none';
   const snd = document.getElementById('qrSound');
   if(snd) snd.classList.toggle('muted', !SFX.on);
+}
+
+// Камеру не дали — не подсовываем родной сканер телеграма: у него нет ни
+// счётчика, ни ленты, ни наших ответов по бутылке, и он ломает всё, что
+// вокруг камеры построено. Вместо него окно поверх камеры: попросить доступ
+// ещё раз, не выходя со страницы, или отменить и вернуться туда, откуда
+// пришли. Зашли снова — спросим снова, если телефон ещё не разрешил.
+let _scanDenyRetry = null, _scanDenyCancel = null;
+function scanDeny(retry, cancel){
+  _scanDenyRetry = retry; _scanDenyCancel = cancel;
+  const cam = document.getElementById('qrCam'); if(!cam) return;
+  let d = cam.querySelector('.scan-deny');
+  if(!d){ d = document.createElement('div'); d.className = 'scan-deny'; cam.appendChild(d); }
+  d.innerHTML = `<b>Разрешите доступ к камере</b>
+    <i>чтобы начать сканирование</i>
+    <div class="scan-deny-b">
+      <button onclick="scanDenyRetry()">Предоставить доступ</button>
+      <button class="ghost" onclick="scanDenyCancel()">Отмена</button>
+    </div>`;
+  d.classList.add('show');
+  _setText('qrHint', '');
+}
+function scanDenyRetry(){
+  const cam = document.getElementById('qrCam'), d = cam && cam.querySelector('.scan-deny');
+  if(d) d.classList.remove('show');
+  const f = _scanDenyRetry; if(f) f();
+}
+function scanDenyCancel(){
+  const f = _scanDenyCancel; _scanDenyRetry = _scanDenyCancel = null;
+  try{ SCAN.stop(); }catch(e){}
+  if(f) f();
 }
 
 function qrScreen(mode){
@@ -17495,11 +17515,7 @@ async function qrDelStart(){
   try{
     await SCAN.start(v, qrDelSave, qrIdle, () => qrFlash('again'), qrHold);
   }catch(e){
-    _setText('qrHint', 'Камера недоступна, включаю сканер Telegram');
-    const tg = window.Telegram && Telegram.WebApp;
-    if(tg && tg.showScanQrPopup){
-      tg.showScanQrPopup({text:'Удалить товар'}, t => { qrDelSave(t); return false; });
-    }else _toast('Сканер недоступен');
+    scanDeny(() => qrDelStart(), async () => { await qrDelDone(); _accClose(); });
     return;
   }
   const t = document.getElementById('qrTorch');
@@ -23819,10 +23835,7 @@ async function woScanStart(){
     await SCAN.start(document.getElementById('qrVideo'), wosSave, qrIdle,
                      () => qrFlash('again', 'уже списана'), qrHold);
   }catch(e){
-    _setText('qrHint', 'Камера недоступна, включаю сканер Telegram');
-    const tg = window.Telegram && Telegram.WebApp;
-    if(tg && tg.showScanQrPopup) tg.showScanQrPopup({text:'Списание'}, t => { wosSave(t); return false; });
-    else _toast('Сканер недоступен');
+    scanDeny(() => woScanStart(), () => woScanDone());
     return;
   }
   const t = document.getElementById('qrTorch');

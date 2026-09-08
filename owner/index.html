@@ -3212,6 +3212,14 @@ button.path:active{transform:scale(.995)}
   background:linear-gradient(135deg,rgba(201,169,110,.30),rgba(232,201,138,.17));
   border:1.5px solid rgba(201,169,110,.55)}
 .crw-ask .crw-ask-r:active{transform:scale(.98)}
+/* Группа — одна карточка, кнопки внутри. Двумя отдельными плитками доп.
+   заявки читались как два разных дела; на хабе группы тоже лежат в общей
+   рамке. Основная в такой же — иначе золотые блоки разъезжаются по ширине. */
+.crw-ask .crw-ask-box{margin-top:8px;padding:7px;border-radius:17px;
+  background:var(--card);border:1px solid var(--border2)}
+.crw-ask .crw-ask-box .crw-ask-r{margin-top:7px}
+.crw-ask .crw-ask-box .crw-ask-r:first-child{margin-top:0}
+.crw-ask .crw-ask-box + .crw-ask-b{margin-top:14px}
 .crw-ask .crw-ask-r.main{background:linear-gradient(135deg,var(--gold),var(--gold2));
   border-color:transparent;color:#1a1408}
 .crw-ask-i{flex:0 0 auto;width:32px;height:32px;border-radius:10px;display:flex;
@@ -3231,7 +3239,6 @@ button.path:active{transform:scale(.995)}
 .crw-ask-q u{display:block;text-decoration:none;font-family:'DM Sans',sans-serif;
   font-size:9px;font-weight:600;color:rgba(245,224,176,.52);margin-top:2px;letter-spacing:0}
 .crw-ask-r.main .crw-ask-q u{color:rgba(26,20,8,.55)}
-.crw-ask-r + .crw-ask-b{margin-top:14px}
 
 /* Заголовок группы водителей: чей это район и кто на нём принимает. */
 /* Район — одна карточка: кто ведёт в шапке, кто возит фишками под ней. Так
@@ -20059,10 +20066,10 @@ function supCancelAsk(){
   const доп = all.filter(x => x.kind === 'extra');
   box.innerHTML = `<div class="crw-ask-t">Какую заявку отменить?</div>
     <div class="crw-ask-s">Задачи исчезнут у водителей. Принятое останется на складе.</div>
-    ${осн.length ? `<div class="crw-ask-g">Основная</div>${
-      осн.map(x => row(x, true)).join('')}` : ''}
-    ${доп.length ? `<div class="crw-ask-g">Другие базы</div>${
-      доп.map(x => row(x, false)).join('')}` : ''}
+    ${осн.length ? `<div class="crw-ask-g">Основная</div>
+      <div class="crw-ask-box">${осн.map(x => row(x, true)).join('')}</div>` : ''}
+    ${доп.length ? `<div class="crw-ask-g">Другие базы</div>
+      <div class="crw-ask-box">${доп.map(x => row(x, false)).join('')}</div>` : ''}
     <button class="crw-ask-b no" onclick="closePinPop()">Не отменять</button>`;
   document.body.append(back, box);
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}

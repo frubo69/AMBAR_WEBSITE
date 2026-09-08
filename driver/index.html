@@ -4835,7 +4835,11 @@ const _expSent = kind => EXP_REDO.has(kind) ? null
 function _expKept(kind){
   const s = (EXP.extras || []).find(x => x.kind === kind) || null;
   if(!s || !EXP_REDO.has(kind)) return s;
-  const чек = s.photo && s.photo_ok === 'ok', машина = s.car_photo && s.car_ok === 'ok';
+  // То же правило, что на сервере: отклонён один снимок — второй годен, пока
+  // его не отклонили; отклонено целиком — заново оба.
+  const поСнимку = s.photo_ok === 'no' || s.car_ok === 'no';
+  const чек = s.photo && поСнимку && s.photo_ok !== 'no';
+  const машина = s.car_photo && поСнимку && s.car_ok !== 'no';
   return {...s, photo: !!чек, thumb: чек ? s.thumb : '',
           car_photo: !!машина, car_thumb: машина ? s.car_thumb : ''};
 }

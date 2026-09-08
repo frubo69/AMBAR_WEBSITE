@@ -1414,9 +1414,15 @@ async def handle_expense_add(request):
     # и старшему нельзя подсунуть тот же чек с другой суммой.
     # Снимок, который старший принял отдельно, остаётся в силе и у отклонённой
     # записи: переснимать надо только то, что отклонили.
+    # Отклонён один снимок — второй остаётся годным, пока его не отклонили;
+    # старший его мог и не трогать. Отклонена запись целиком (ни один снимок
+    # не отклонён отдельно) — заново нужны оба.
     отклонён = bool(prev) and (prev.get("status") or "approved") == "rejected"
-    чек_ок = bool((prev or {}).get("photo")) and (not отклонён or prev.get("photo_ok") == "ok")
-    машина_ок = bool((prev or {}).get("car_photo")) and (not отклонён or prev.get("car_ok") == "ok")
+    по_снимку = отклонён and ((prev or {}).get("photo_ok") == "no"
+                              or (prev or {}).get("car_ok") == "no")
+    целиком = отклонён and not по_снимку
+    чек_ок = bool((prev or {}).get("photo")) and not целиком and prev.get("photo_ok") != "no"
+    машина_ок = bool((prev or {}).get("car_photo")) and not целиком and prev.get("car_ok") != "no"
     if kind in MUST_RECEIPT and not photo and not чек_ок:
         return web.json_response({"error": "no_photo", "kind": kind},
                                  status=400, headers=CORS_HEADERS)

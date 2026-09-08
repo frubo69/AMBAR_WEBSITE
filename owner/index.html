@@ -3089,6 +3089,10 @@ button.path:active{transform:scale(.995)}
 .qb-second{padding-top:0!important;margin-top:-4px}
 .qb-ghost{background:var(--card2)!important;border:1px solid var(--border2)!important;
   color:var(--sub)!important;box-shadow:none!important;flex:0 0 40%}
+/* «На этот район ничего не надо» — заметная, золотой рамкой: это тоже ответ,
+   а не тихий пропуск, и его должно быть видно с первого взгляда. */
+.qb-skip{background:var(--card)!important;border:1.5px solid rgba(201,169,110,.6)!important;
+  color:var(--gold2)!important;box-shadow:none!important}
 .crw-ask{left:50%!important;top:50%!important;transform:translate(-50%,-50%);
   width:min(88vw,320px);padding:16px;text-align:center}
 .crw-ask-t{font-size:15px;font-weight:700;margin-bottom:4px}
@@ -18834,7 +18838,7 @@ function xFoot(){
     const word = last ? 'К итогу' : 'Дальше';
     document.getElementById('accFoot').innerHTML = `<div class="qb-wrap">
       ${n ? `<button class="qb" id="xsGo" onclick="xNext()">${word} · ${fmt(n)} ${pluralize(n,'бутылка','бутылки','бутылок')}</button>`
-          : `<button class="qb qb-ghost qb-wide" id="xsGo" onclick="xSkip()">На этот район ничего не надо</button>`}</div>`;
+          : `<button class="qb qb-skip qb-wide" id="xsGo" onclick="xSkip()">На этот район ничего не надо</button>`}</div>`;
     return;
   }
   const ok = s === 1 ? !!XS.base.trim() : xTotal() > 0;

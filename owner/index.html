@@ -782,12 +782,14 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .stk-tiles{margin-top:2px;flex:0 0 auto}
 /* Две колонки склада: главная плитка сверху, её история — половинкой снизу. */
 .stk-tiles2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:2px}
-.stk-col{display:flex;flex-direction:column;gap:8px;min-width:0}
-.stk-col .acc-cell{border-radius:16px;background:var(--card);border:1px solid var(--border2);
-  box-shadow:none;min-height:118px}
-.stk-sub{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:14px;
-  cursor:pointer;text-align:left;font-family:inherit;color:var(--sub);
-  background:var(--card);border:1px solid var(--border2);min-width:0}
+/* Колонка — одна карточка: главная плитка сверху, история приклеена снизу
+   через волосяной шов. Так видно, что история принадлежит именно ей. */
+.stk-col{display:flex;flex-direction:column;gap:0;min-width:0;border-radius:16px;
+  background:var(--card);border:1px solid var(--border2);overflow:hidden}
+.stk-col .acc-cell{border:0;border-radius:0;background:none;box-shadow:none;min-height:118px}
+.stk-sub{display:flex;align-items:center;gap:8px;padding:10px 12px;border:0;
+  border-top:1px solid var(--border2);border-radius:0;cursor:pointer;text-align:left;
+  font-family:inherit;color:var(--sub);background:rgba(255,255,255,.025);min-width:0}
 .stk-sub:active{transform:scale(.98)}
 .stk-sub-i{width:26px;height:26px;flex:0 0 auto;border-radius:8px;display:flex;
   align-items:center;justify-content:center;color:var(--gold2);background:var(--gold-soft);
@@ -4780,8 +4782,8 @@ button.exp-wait:active{transform:scale(.99)}
    закупкой, и она переехала в подпись своей зоны. */
 .stkv{margin:2px 0 12px;border-radius:20px;background:var(--card);
   border:1px solid var(--border2);overflow:hidden}
-.stkv-cap{padding:13px 16px 0;font-family:'Space Grotesk',sans-serif;font-size:12.5px;
-  font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text)}
+.stkv-cap{padding:16px 16px 0;font-family:'Space Grotesk',sans-serif;font-size:18px;
+  font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--text);line-height:1.15}
 .stkv-g{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:11px 13px 13px}
 .stkv-c{position:relative;min-width:0;padding:11px 10px 13px;border-radius:14px;
   background:var(--card2);border:1px solid var(--border2)}

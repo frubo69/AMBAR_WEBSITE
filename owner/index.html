@@ -18406,15 +18406,13 @@ function _xState(x){
   return (busy > 0 || x.done) ? ['в работе', 'live'] : ['ждёт', 'wait'];
 }
 
+// Только название и дверь, как у «Заявки». Перечисление баз с числом в работе
+// стояло подписью под заголовком: на хабе это дверь в раздел, а не сводка по
+// нему, и то же самое написано внутри — списком со статусом у каждой строки.
 function pathExtra(){
-  const ex = _xList(), open = ex.filter(x => x.status === 'open');
-  const st = open.length ? _xState(open[0]) : null;
   return `<button class="pnav-r pbig ttl" onclick="accExtra()">
     <span class="pnav-i big live">${ICO_BASE}</span>
-    <span class="pnav-b"><b>Доп. заявка / Другие базы</b>
-      ${open.length ? `<i>${escS(open.map(x => x.base).join(' / '))} · <u class="${st[1]}">${
-          open.length > 1 ? open.length + ' в работе' : st[0]}</u></i>`
-        : (ex.length ? `<i>${ex.length} ${pluralize(ex.length,'заявка','заявки','заявок')}</i>` : '')}</span>
+    <span class="pnav-b"><b>Доп. заявка / Другие базы</b></span>
     <span class="pnav-go">${ICO_CHEV}</span>
   </button>`;
 }

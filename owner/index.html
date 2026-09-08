@@ -2602,6 +2602,34 @@ button.path:active{transform:scale(.995)}
   align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:15px;
   font-weight:800;color:#1a1408;background:linear-gradient(135deg,#E8C98A,#C9A96E)}
 .xs-skip{font-size:12.5px;color:var(--muted);text-align:center;padding:8px 12px 4px}
+/* Правка строки до первого скана: − n + в размер золотой плашки. */
+.xs-step{flex-shrink:0;display:flex;align-items:center;height:32px;border-radius:10px;
+  background:var(--card3);border:1px solid var(--border2);overflow:hidden}
+.xs-step button{width:36px;height:100%;border:0;background:none;cursor:pointer;font-family:inherit;
+  font-size:20px;font-weight:600;line-height:1;color:var(--gold2)}
+.xs-step button:active{background:rgba(201,169,110,.18)}
+.xs-step b{min-width:30px;text-align:center;font-family:'Space Grotesk',sans-serif;font-size:15px;
+  font-weight:800;color:var(--text);border-left:1px solid var(--border2);border-right:1px solid var(--border2);
+  height:100%;display:flex;align-items:center;justify-content:center}
+.xs-lock{display:inline-flex;align-items:center;gap:5px;margin-top:5px;padding:3px 8px;border-radius:8px;
+  font-size:11px;font-weight:700;color:var(--warn);background:rgba(243,180,74,.12)}
+.xs-lock svg{width:12px;height:12px}
+.xs-add{padding:8px 0 4px;border-top:1px solid var(--border2)}
+.xs-add-i{display:flex;align-items:center;gap:8px;height:38px;padding:0 12px;border-radius:12px;
+  background:var(--card3);border:1px solid var(--border2);color:var(--muted)}
+.xs-add-i svg{flex-shrink:0}
+.xs-add-i input{flex:1;min-width:0;height:100%;border:0;background:none;outline:none;font-family:inherit;
+  font-size:14px;font-weight:600;color:var(--text)}
+.xs-add-i input::placeholder{color:var(--muted);font-weight:500}
+.xs-add-l{margin-top:4px}
+.xs-add-r{display:flex;align-items:center;gap:12px;width:100%;padding:8px 2px;border:0;background:none;
+  cursor:pointer;font-family:inherit;text-align:left;border-top:1px solid var(--border2)}
+.xs-add-r span{flex:1;min-width:0;font-size:14px;font-weight:600;color:var(--text);overflow:hidden;
+  text-overflow:ellipsis;white-space:nowrap}
+.xs-add-r b{flex-shrink:0;min-width:38px;height:30px;padding:0 9px;border-radius:10px;display:flex;
+  align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:14px;
+  font-weight:800;color:#1a1408;background:linear-gradient(135deg,#E8C98A,#C9A96E)}
+.xs-add-e{padding:8px 4px 2px;font-size:12.5px;color:var(--muted)}
 /* Переключатель районов: пять кодов в ряд, текущий золотом, у набранных
    число. Это и карта пути, и кнопка «назад на район». */
 .xs-dtabs{display:flex;gap:6px;margin:0 0 14px}
@@ -15405,6 +15433,7 @@ function _accClose(){
   ACC_BACK = null;
   CKL_RETURN = false;
   SCAN.stop();
+  supPollStop();
   document.getElementById('accOv').classList.remove('show');
   ACC_VIEW = null;
   _navSave();
@@ -18068,16 +18097,27 @@ function xSupRender(d){
     if(fl.undo)  marks.push(`${fl.undo} ${pluralize(fl.undo,'отмена','отмены','отмен')}`);
     const lines = t.lines || [];
     const open = extra || SUP_OPEN.has(t.district);
+    // Пока район не начали принимать, состав правится прямо тут: − n +.
+    // Первый скан (или «принято без сканирования») запирает район — замок в
+    // подписи, кнопки исчезают, а водитель у себя видит, что именно поменяли.
+    const edit = !extra && d.status === 'open' && !t.locked;
     const list = lines.map(l => `<div class="xs-pl ${l.left ? '' : 'ok'}">
         <img class="xr-img" src="/products/${escS(l.id)}.webp" alt="" loading="lazy"
              onerror="this.style.visibility='hidden'">
         <span class="xs-pl-n">${escS(l.name)}</span>
-        <span class="xs-pl-q">${l.got ? `${l.got}<u>/${l.need}</u>` : l.need}</span>
-      </div>`).join('');
+        ${edit ? `<span class="xs-step">
+            <button onclick="xsLine('${escS(t.district)}','${escS(l.id)}',${l.need - 1})" aria-label="меньше">−</button>
+            <b>${l.need}</b>
+            <button onclick="xsLine('${escS(t.district)}','${escS(l.id)}',${l.need + 1})" aria-label="больше">+</button>
+          </span>`
+        : `<span class="xs-pl-q">${l.got ? `${l.got}<u>/${l.need}</u>` : l.need}</span>`}
+      </div>`).join('') + (edit ? xsAddRow(t.district) : '');
+    const lock = t.locked && !t.done_at
+      ? `<span class="xs-lock">${IC('lock', 12)}правки закрыты${t.lock_at ? ' · с ' + _hm(t.lock_at) : ''}</span>` : '';
     return `<div class="xs-dcard ${t.done_at ? 'done' : ns ? 'noscan' : t.driver ? 'live' : ''}" id="xsd-${escS(t.district)}">
       <div class="xs-dcard-h">
         <span class="xs-dc">${escS(x.code || '')}</span>
-        <span class="xs-dcard-b"><b>${escS(x.name || t.district)}</b><i>${who}</i></span>
+        <span class="xs-dcard-b"><b>${escS(x.name || t.district)}</b><i>${who}</i>${lock}</span>
         <span class="xs-dcard-n">${fmt(t.got)}<i>/ ${fmt(t.need)}</i></span>
       </div>
       ${extra ? list : `<button class="xs-fold ${open ? 'on' : ''}" onclick="xSupToggle('${escS(t.district)}')">
@@ -18105,6 +18145,86 @@ function xSupRender(d){
     const el = document.getElementById(goto);
     if(el) requestAnimationFrame(() => el.scrollIntoView({block:'start', behavior:'smooth'}));
   }
+}
+
+// Правка строки района. Сервер — единственный судья: если район уже
+// принимают, вернётся 409 с настоящей задачей, и экран перерисуется по ней.
+let XS_BUSY = false;
+async function xsLine(oid, pid, qty){
+  if(!SUP_ID || XS_BUSY) return;
+  qty = Math.max(0, Math.min(999, qty | 0));
+  XS_BUSY = true;
+  try{
+    SUP_D = await ownerApi.ownerFetch(`/api/owner/supply/${encodeURIComponent(SUP_ID)}/task/line`,
+      {method:'POST', body:{district: oid, product_id: pid, qty, as: _meName()}});
+    try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+    supRender();
+  }catch(e){
+    if(e && e.status === 409){
+      _toast('Район уже принимают — правки закрыты');
+      try{ Telegram.WebApp.HapticFeedback.notificationOccurred('error'); }catch(_){}
+      await supLoad(SUP_ID);
+    } else _toast('Не удалось поправить');
+  }finally{ XS_BUSY = false; }
+}
+
+// Добавить позицию: строка поиска по каталогу под списком района. Нашли —
+// одна кнопка «+1», и строка становится обычной, со степпером.
+let XS_ADD = {oid: '', q: ''};
+function xsAddRow(oid){
+  const on = XS_ADD.oid === oid;
+  const q = on ? XS_ADD.q.trim().toLowerCase() : '';
+  const have = new Set(((SUP_D && SUP_D.tasks || []).find(t => t.district === oid) || {lines: []}).lines.map(l => l.id));
+  const hits = q.length >= 2
+    ? PRODUCTS.filter(p => !have.has(p.id) && (p.name || '').toLowerCase().includes(q)).slice(0, 6) : [];
+  return `<div class="xs-add ${on ? 'on' : ''}">
+      <label class="xs-add-i">${IC('search', 14)}
+        <input type="search" placeholder="Добавить позицию" value="${escS(on ? XS_ADD.q : '')}"
+               oninput="xsAddType('${escS(oid)}', this.value)" onfocus="xsAddType('${escS(oid)}', this.value)"
+               autocomplete="off" enterkeyhint="search"></label>
+      ${hits.length ? `<div class="xs-add-l">${hits.map(p => `<button class="xs-add-r" onclick="xsAddPick('${escS(oid)}','${escS(p.id)}')">
+            <img class="xr-img" src="/products/${escS(p.id)}.webp" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+            <span>${escS(p.name)}</span><b>+1</b></button>`).join('')}</div>`
+        : q.length >= 2 ? '<div class="xs-add-e">Ничего не нашлось</div>' : ''}
+    </div>`;
+}
+function xsAddType(oid, v){
+  XS_ADD = {oid, q: v};
+  if(!PRODUCTS.length && !catLoading) loadCatalog().then(() => xsAddPaint(oid));
+  xsAddPaint(oid);
+}
+function xsAddPaint(oid){
+  // Перерисовываем только список находок — иначе поле теряет фокус на каждой букве.
+  const card = document.getElementById('xsd-' + oid); if(!card) return;
+  const box = card.querySelector('.xs-add'); if(!box) return;
+  const tmp = document.createElement('div'); tmp.innerHTML = xsAddRow(oid);
+  const fresh = tmp.firstElementChild;
+  box.className = fresh.className;
+  box.querySelectorAll('.xs-add-l,.xs-add-e').forEach(el => el.remove());
+  fresh.querySelectorAll('.xs-add-l,.xs-add-e').forEach(el => box.appendChild(el));
+}
+async function xsAddPick(oid, pid){
+  XS_ADD = {oid: '', q: ''};
+  await xsLine(oid, pid, 1);
+}
+
+// Экран поставки живёт под опросом: раз в пять секунд — свежая картина, чтобы
+// замок и принятое появлялись сами, без «потяните вниз». Останавливается,
+// как только карточки района ушли с экрана.
+let _supPollT = null, _supPollBusy = false;
+function supPollStart(){ supPollStop(); _supPollT = setInterval(supPollTick, 5000); }
+function supPollStop(){ if(_supPollT){ clearInterval(_supPollT); _supPollT = null; } }
+async function supPollTick(){
+  if(!SUP_ID || document.hidden || _supPollBusy || XS_BUSY) return;
+  if(!document.getElementById('supWho')) return supPollStop();
+  if(document.activeElement && document.activeElement.closest && document.activeElement.closest('.xs-add')) return;
+  _supPollBusy = true;
+  try{
+    const d = await ownerApi.ownerFetch('/api/owner/supply/' + encodeURIComponent(SUP_ID));
+    const sig = x => JSON.stringify((x.tasks || []).map(t => [t.district, t.erev, t.locked, t.got, t.done_at, t.driver, t.noscan_at]) .concat([x.status]));
+    if(SUP_D && sig(d) !== sig(SUP_D)){ SUP_D = d; if(document.getElementById('supWho')) supRender(); }
+  }catch(e){}
+  finally{ _supPollBusy = false; }
 }
 
 function xSupToggle(oid){
@@ -18508,6 +18628,7 @@ async function supLoad(sid){
     return;
   }
   supRender();
+  supPollStart();
 }
 
 let SUP_GOTO = '';

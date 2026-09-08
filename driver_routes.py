@@ -1796,8 +1796,10 @@ async def handle_supply_scan(request):
         str(body.get("district") or "").strip(),
         str(body.get("product_id") or "").strip(),
         code, me["name"], request["tg"].get("id") or 0,
-        str(body.get("at_dev") or ""))
-    return web.json_response(res, headers=CORS_HEADERS)
+        str(body.get("at_dev") or ""),
+        erev=body.get("erev"))
+    return web.json_response(res, headers=CORS_HEADERS,
+                             dumps=lambda o: json.dumps(o, default=str))
 
 
 @require_driver

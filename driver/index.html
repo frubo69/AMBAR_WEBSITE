@@ -1236,6 +1236,20 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .dpl.ok .dpl-q{background:rgba(61,220,132,.18);color:#3ddc84}
 /* Экран приёмки внутри — те же карточки: состояние со шкалой сверху, строки
    с картинками ниже. Строка — кнопка в камеру. */
+/* Старший поправил задачу: карточка над списком — что было, что стало. */
+.dupd{margin-bottom:10px;padding:12px 14px;border-radius:16px;background:rgba(243,180,74,.1);
+  border:1px solid rgba(243,180,74,.45)}
+.dupd-h{display:flex;align-items:center;gap:8px;color:var(--warn)}
+.dupd-h b{flex:1;font-size:14px;font-weight:700;color:var(--text)}
+.dupd-h i{font-style:normal;font-size:11px;color:var(--muted)}
+.dupd-l{display:flex;flex-direction:column;gap:4px;margin-top:8px}
+.dupd-r{display:flex;justify-content:space-between;gap:10px;font-size:13px}
+.dupd-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.dupd-q{flex:0 0 auto;color:var(--muted);font-variant-numeric:tabular-nums}
+.dupd-q b{color:var(--warn)}
+.dupd-ok{width:100%;margin-top:10px;padding:10px;border-radius:12px;border:0;cursor:pointer;
+  font-family:inherit;font-size:13.5px;font-weight:700;color:#1a1408;
+  background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .dtop{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:16px 18px 18px;
   border-radius:16px;background:var(--card);border:1px solid var(--border2);margin-bottom:10px}
 .dtop-b{flex:1;min-width:0}
@@ -6798,7 +6812,7 @@ async function supClaim(sid, oid){
 
 // ── экран задачи ───────────────────────────────────────────────────────────
 async function supOpen(sid, oid, pre){
-  TASK = pre || null;
+  TASK = pre || null; TASK_UPD = null;
   document.getElementById('supScr').classList.add('show');
   supRenderTask();
   if(!pre){
@@ -6806,14 +6820,63 @@ async function supOpen(sid, oid, pre){
     catch(e){ toast('Не удалось открыть', 'err'); return supBack(); }
     supRenderTask();
   }
+  supPollStart();
 }
 
 function supBack(){
   if(LINE) return supLineClose();          // из камеры — к списку позиций
+  supPollStop();
   document.getElementById('supScr').classList.remove('show');
-  TASK = null;
+  TASK = null; TASK_UPD = null;
   supLoad();
 }
+
+// ── задача меняется под ногами ──
+// Пока район не начали принимать, старший может поправить состав. Экран
+// задачи опрашивает сервер раз в пять секунд и, увидев новую версию (erev),
+// перечитывает строки и показывает, что именно изменилось. Каждый скан несёт
+// свою версию: разошлась — сервер бутылку не примет и вернёт свежую задачу.
+var TASK_UPD = null, _supPollT = null, _supPollBusy = false;
+function supPollStart(){ supPollStop(); _supPollT = setInterval(supPollTick, 5000); }
+function supPollStop(){ if(_supPollT){ clearInterval(_supPollT); _supPollT = null; } }
+async function supPollTick(){
+  if(!TASK || document.hidden || _supPollBusy) return;
+  _supPollBusy = true;
+  try{
+    const r = await drvApi.drvFetch(`/api/driver/supply/${TASK.supply_id}`, {params:{district: TASK.district}});
+    if(TASK && r && r.erev !== TASK.erev) supTaskApply(r);
+  }catch(e){}
+  finally{ _supPollBusy = false; }
+}
+// Что изменилось — по строкам: было → стало, новые, убранные.
+function supTaskDiff(a, b){
+  const old = {}; (a.lines || []).forEach(l => { old[l.id] = l; });
+  const now = {}; (b.lines || []).forEach(l => { now[l.id] = l; });
+  const out = [];
+  Object.values(now).forEach(l => {
+    const o = old[l.id];
+    if(!o) out.push({name: l.name, was: 0, now: l.need});
+    else if(o.need !== l.need) out.push({name: l.name, was: o.need, now: l.need});
+  });
+  Object.values(old).forEach(o => { if(!now[o.id]) out.push({name: o.name, was: o.need, now: 0}); });
+  return out;
+}
+function supTaskApply(r){
+  const changes = supTaskDiff(TASK, r);
+  TASK = r;
+  if(changes.length) TASK_UPD = {at: new Date(), changes};
+  if(LINE){
+    const l = (r.lines || []).find(x => x.id === LINE.id);
+    if(!l || !l.need){ toast('Эту позицию из заявки убрали', 'err'); supLineClose(); }
+    else { LINE.need = l.need; LINE.got = l.got; LINE.left = l.left; _setText('camLeft', fmt(l.left)); }
+  }
+  if(!LINE) supRenderTask();
+  if(changes.length){
+    toast('Заявку обновили — проверьте список', 'err');
+    try{ tg.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+  }
+}
+function supUpdOk(){ TASK_UPD = null; supRenderTask(); }
 
 function supRenderTask(){
   const t = TASK;
@@ -6843,7 +6906,16 @@ function supRenderTask(){
   // Тот же вид, что у карточек снаружи: сверху состояние и принятое со шкалой,
   // ниже строки с картинкой и числом в бейдже. Строка — кнопка: тап открывает
   // камеру на эту позицию; добранная гаснет и не нажимается.
-  document.getElementById('supMid').innerHTML = `<div class="dtop">
+  // Что поменял старший — карточкой над списком, пока не нажали «Понятно».
+  const upd = TASK_UPD ? `<div class="dupd">
+      <div class="dupd-h">${svg('<path d="M12 9v4M12 17h.01"/><circle cx="12" cy="12" r="9"/>', 18)}
+        <b>Заявку обновили</b><i>${hhmm(TASK_UPD.at.toISOString())}</i></div>
+      <div class="dupd-l">${TASK_UPD.changes.map(c => `<span class="dupd-r">
+        <span class="dupd-n">${esc(c.name)}</span>
+        <span class="dupd-q">${c.was ? c.was : '—'} → <b>${c.now ? c.now : 'убрали'}</b></span></span>`).join('')}</div>
+      <button class="dupd-ok" onclick="supUpdOk()">Понятно</button>
+    </div>` : '';
+  document.getElementById('supMid').innerHTML = upd + `<div class="dtop">
       <span class="dtop-b"><span class="dchip ${t.left ? (ns ? 'warn' : '') : 'ok'}">${
           t.left ? (ns ? 'без сканирования' : t.got ? 'идёт приёмка' : 'ждёт')
                  : (ns ? 'всё отсканировано' : 'взято полностью')}</span>
@@ -7039,7 +7111,7 @@ function supScan(code){
   camFeed();
   SCANQ.push({path:`/api/driver/supply/${TASK.supply_id}/scan`,
               body:{district: TASK.district, product_id: LINE.id, code,
-                    at_dev: new Date().toISOString()}, code});
+                    at_dev: new Date().toISOString(), erev: TASK.erev}, code});
 }
 
 SCANQ.onDone = (err, r, job) => {
@@ -7057,6 +7129,16 @@ SCANQ.onDone = (err, r, job) => {
       setTimeout(() => { if(LINE){ supLineClose();
         toast(`${r.name} — взято полностью`); } }, 700);
     }
+    return;
+  }
+  // Задача изменилась, пока сканировали: бутылку не приняли. Показываем, что
+  // поменялось, и отпускаем код — после «Понятно» её сканируют заново.
+  if(r.verdict === 'outdated'){
+    if(row){ row.state = 'fail'; row.label = 'заявка обновлена'; }
+    SCAN.seen.delete(job.code); SCAN.seenAt.delete(job.code);
+    if(r.task) supTaskApply(r.task);
+    camFlash('err', 'заявку обновили');
+    camFeed();
     return;
   }
   if(row){ row.state = r.verdict === 'known' ? 'dup' : 'fail'; row.label = r.label || ''; }

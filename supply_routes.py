@@ -647,6 +647,12 @@ def _task_view(sid: str, sup: dict, oid: str, task: dict, me: str = "") -> dict:
         "claimed_at": str(task.get("claimed_at") or ""),
         "started_at": str(task.get("started_at") or ""),
         "done_at": str(task.get("done_at") or ""),
+        # Замок правок: район начали принимать (первый скан или «без
+        # сканирования») — состав задачи менять уже нельзя. erev растёт от
+        # каждой правки старшего; водитель шлёт его с каждым сканом.
+        "locked": bool(task.get("started_at") or task.get("noscan_at") or task.get("done_at")),
+        "lock_at": str(task.get("started_at") or task.get("noscan_at") or task.get("done_at") or ""),
+        "erev": int(task.get("erev") or 0),
         # Товар забрали без кодов: задача открыта, но бутылки уже на полке.
         # Пока left > 0, это долг — досканировать.
         "noscan_at": str(task.get("noscan_at") or ""),
@@ -719,7 +725,8 @@ def _can_touch(task: dict, me: str, owner: bool) -> bool:
 
 
 async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
-                    tg_id: int, at_dev: str = "", owner: bool = False) -> dict:
+                    tg_id: int, at_dev: str = "", owner: bool = False,
+                    erev=None) -> dict:
     """Принять одну бутылку. Возвращает исход, а не «ок» — их несколько.
 
     Порядок важен: сначала занимаем место в задаче, потом пишем бутылку в
@@ -733,6 +740,12 @@ async def task_scan(sid: str, oid: str, pid: str, code: str, me: str,
         return {"ok": False, "verdict": "not_mine", "driver": task.get("driver") or ""}
     if task.get("done_at"):
         return {"ok": False, "verdict": "closed"}
+    # Водитель сканирует по той версии задачи, которую видит. Старший успел
+    # поправить состав — бутылку не принимаем, отдаём свежую задачу: сначала
+    # человек видит, что изменилось, потом продолжает.
+    if erev is not None and str(erev) != "" and int(erev) != int(task.get("erev") or 0):
+        return {"ok": False, "verdict": "outdated",
+                "task": _task_view(sid, sup, oid, task, me)}
 
     item = next((i for i in (sup.get("items") or []) if i["id"] == pid), None)
     if not item:
@@ -1253,6 +1266,62 @@ async def _supply_view(sup: dict) -> dict:
 
 
 @require_owner
+@require_owner
+async def handle_own_line(request):
+    """Поправить строку района: {district, product_id, qty, as}.
+
+    До первого скана в районе состав можно менять: старший видит, что магазин
+    дал, и перекладывает между районами. Начали принимать — замок, и это
+    409 district_locked с текущей задачей, чтобы экран сразу показал правду."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    sid = request.match_info.get("sid") or ""
+    oid = str(body.get("district") or "").strip()
+    pid = str(body.get("product_id") or "").strip()
+    if oid not in OFFICE_IDS:
+        return web.json_response({"error": "bad_district"}, status=400, headers=CORS_HEADERS)
+    import stock_routes
+    cat = stock_routes._catalog()
+    if pid not in cat:
+        return web.json_response({"error": "no_item"}, status=400, headers=CORS_HEADERS)
+    try:
+        qty = max(0, min(999, int(body.get("qty") or 0)))
+    except (TypeError, ValueError):
+        return web.json_response({"error": "bad_qty"}, status=400, headers=CORS_HEADERS)
+    sup = await db.supply_get(sid)
+    if not sup:
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    task = (sup.get("tasks") or {}).get(oid)
+    if task is None:
+        return web.json_response({"error": "no_task"}, status=404, headers=CORS_HEADERS)
+    now = datetime.now(timezone.utc)
+    doc = await db.supply_line_set(sid, oid, pid, qty, cat[pid].get("name", ""), now)
+    if not doc:
+        cur = await db.supply_get(sid) or sup
+        t = (cur.get("tasks") or {}).get(oid) or task
+        return web.json_response({"error": "district_locked",
+                                  "task": _task_view(sid, cur, oid, t)},
+                                 status=409, headers=CORS_HEADERS,
+                                 dumps=lambda o: __import__("json").dumps(o, default=str))
+    who = str(body.get("as") or "").strip()[:60] or "старший"
+    log.info(f"[supply] {sid} {oid}: {who} поставил {cat[pid].get('name','')} = {qty}")
+    # Водитель уже взял район, но ещё не начал — скажем ему сразу, не дожидаясь
+    # опроса: задача у него на экране, и лучше пусть узнает от бота, чем от
+    # отказа на первом скане.
+    drv = (doc.get("tasks") or {}).get(oid, {}).get("driver")
+    if drv:
+        try:
+            from operator_routes import tell_driver
+            await tell_driver(drv, f"✏️ Заявку по {OFFICE_CODES.get(oid, oid)} обновили — "
+                                   f"откройте задачу и проверьте список перед сканированием.")
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[supply] водителю о правке не ушло: {e}")
+    return web.json_response(await _supply_view(doc), headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
 async def handle_one(request):
     sup = await db.supply_get(request.match_info.get("sid") or "")
     if not sup:
@@ -1793,6 +1862,7 @@ def setup(app):
         ("/api/owner/supply/{sid}/task/undo",       handle_own_undo,     "POST"),
         ("/api/owner/supply/{sid}/task/finish",     handle_own_finish,   "POST"),
         ("/api/owner/supply/{sid}/task/noscan",     handle_own_noscan,   "POST"),
+        ("/api/owner/supply/{sid}/task/line",       handle_own_line,     "POST"),
     ):
         r.add_route("OPTIONS", path, _opt)
         {"GET": r.add_get, "POST": r.add_post}[method](path, handler)

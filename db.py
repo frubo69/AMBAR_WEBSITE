@@ -2299,6 +2299,72 @@ async def supply_untake(sid: str, district: str, product_id: str) -> bool:
     return r.modified_count > 0
 
 
+async def supply_line_set(sid: str, district: str, product_id: str, qty: int,
+                          name: str, now) -> dict | None:
+    """Поправить строку задачи района: сколько этого товара везти в район.
+
+    Разрешено ровно до того, как район начали принимать: замок стоит в самом
+    запросе — started_at, noscan_at и done_at должны быть пусты. Первый скан
+    водителя ставит started_at тем же атомарным условием, поэтому правка и
+    первая бутылка не проходят одновременно: кто-то один из них проигрывает.
+    Каждая правка поднимает erev района — по нему водитель узнаёт, что
+    задача изменилась. None — замок или поставки нет."""
+    db = _db_or_none()
+    if db is None: return None
+    guard = {"_id": sid, "status": "open",
+             f"tasks.{district}.started_at": None,
+             f"tasks.{district}.noscan_at": None,
+             f"tasks.{district}.done_at": None}
+    qty = max(0, int(qty or 0))
+    # got.{district} = 0 ставим явно: приём считает «got < need» прямо в
+    # запросе, а сравнение с отсутствующим полем в Mongo не совпадает никогда —
+    # строка без ключа была бы «полной» с первой же бутылки. До первого скана
+    # (а замок в guard это и гарантирует) там нечего затирать.
+    # Сначала ключ, потом количество — двумя запросами, каждый под тем же
+    # замком: если между ними район успели начать, второй не пройдёт, а лишний
+    # got=0 у строки без количества ничего не значит.
+    await db.supplies.update_one(
+        {**guard, "items": {"$elemMatch": {"id": product_id,
+                                           f"got.{district}": {"$exists": False}}}},
+        {"$set": {f"items.$.got.{district}": 0}})
+    r = await db.supplies.update_one(
+        {**guard, "items.id": product_id},
+        {"$set": {f"items.$.by_district.{district}": qty, "updated_at": now},
+         "$inc": {f"tasks.{district}.erev": 1}})
+    if r.matched_count == 0:
+        if qty <= 0:
+            # Убирать нечего: строки нет. Но замок проверить надо честно.
+            return await db.supplies.find_one(guard)
+        r = await db.supplies.update_one(
+            guard,
+            {"$push": {"items": {"id": product_id, "name": name or product_id,
+                                 "asked": 0, "qty": qty, "scanned": 0,
+                                 "by_district": {district: qty}, "got": {district: 0}}},
+             "$set": {"updated_at": now},
+             "$inc": {f"tasks.{district}.erev": 1}})
+        if r.matched_count == 0:
+            return None
+    # Производные числа — заново: у позиции сумма по районам, у района сумма
+    # по позициям, у поставки общий итог.
+    doc = await db.supplies.find_one({"_id": sid})
+    if not doc:
+        return None
+    items = doc.get("items") or []
+    for it in items:
+        it["qty"] = sum(int(v or 0) for v in (it.get("by_district") or {}).values())
+    tq = sum(int((it.get("by_district") or {}).get(district) or 0) for it in items)
+    tp = sum(1 for it in items if int((it.get("by_district") or {}).get(district) or 0) > 0)
+    total = sum(int(it.get("qty") or 0) for it in items)
+    await db.supplies.update_one({"_id": sid}, {"$set": {
+        "items": items, f"tasks.{district}.qty": tq, f"tasks.{district}.positions": tp,
+        "total_qty": total}})
+    doc["items"] = items
+    doc["tasks"][district]["qty"] = tq
+    doc["tasks"][district]["positions"] = tp
+    doc["total_qty"] = total
+    return doc
+
+
 async def supply_task_start(sid: str, district: str, now) -> None:
     """Отметить начало приёмки — только первый раз.
 

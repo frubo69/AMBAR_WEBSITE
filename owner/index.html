@@ -16241,6 +16241,10 @@ async function qrDistrict(force){
   // брать плату за то, что и так известно.
   const last = distSaved('qr');
   if(!force && last && (STK.districts || []).some(d => d.id === last)){ qrPick(last); return; }
+  // На экране выбора точка не выбрана. Если оставить прошлую, qrGo примет
+  // нажатие на неё же за повторный выбор из меню и молча его проглотит:
+  // вышел из «Бизнес Бей» — и обратно в него не попасть.
+  QR_DIST = null;
   const have = (ACC_QR && ACC_QR.by_district) || {};
   const added = (ACC_QR && ACC_QR.added_shift) || {};
   const busy = {};

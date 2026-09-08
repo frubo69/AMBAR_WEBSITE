@@ -1918,9 +1918,24 @@ button.path:active{transform:scale(.995)}
    к низу: содержимое лежит сверху вниз, зона к зоне. Пустое место под ними —
    это поля, а не дыра посреди страницы. */
 .stk-mid:has(> .ohub){display:flex;flex-direction:column}
-.ohub{display:flex;flex-direction:column;gap:12px;flex:1 0 auto}
+/* Хаб закрывает экран целиком и без прокрутки: свободную высоту получают
+   строки районов (это главное на экране после отправки заявки) и карточка
+   других баз, а не пустота под историей. На высоком экране строки растут до
+   разумного предела, дальше воздух делится между карточками. */
+.ohub{display:flex;flex-direction:column;gap:10px;flex:1 0 auto;min-height:100%}
 .ohub > *{margin-bottom:0}
-.ohub .pbox.tail{margin-top:auto}
+.ohub .pbox.tail{margin-top:0}
+.ohub .pbox.grow{flex:1 1 auto}
+.ohub .pbox.grow .pd{flex:1;display:flex;flex-direction:column}
+.ohub .pbox.grow .pd-r{flex:1 1 0;min-height:50px;max-height:66px}
+.ohub .pbox.grow .pd-r:last-child{padding-bottom:9px}
+.ohub.tight .pbox.grow .pd-r{min-height:42px}
+.ohub.tight .pbox.xbase .pnav-r.pbig{padding:12px 16px}
+.ohub.tight .pbox .path{padding:11px 14px 10px}
+/* Другие базы — заметнее: та же анатомия, но выше и с крупным значком. */
+.ohub .pbox.xbase .pnav-r.pbig{padding:16px 16px}
+.ohub .pbox.xbase .pnav-i.big{width:50px;height:50px;border-radius:16px}
+.ohub .pbox.xbase .pnav-i.big svg{width:24px;height:24px}
 /* Плитки хаба — как везде: название заглавными, оглавление через косую,
    число справа. */
 .pnav-r.ttl .pnav-b b{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
@@ -1947,7 +1962,7 @@ button.path:active{transform:scale(.995)}
 .pd-r.live .pnav-b i{color:var(--gold2)}
 .pd-r:last-child{padding-bottom:12px}
 .ohub .pbox{flex:0 0 auto;display:flex;flex-direction:column}
-.ohub .pbox .path{padding:17px 14px 16px}
+.ohub .pbox .path{padding:14px 14px 13px}
 /* Шкала мельче, чем была: точки, подписи и числа на ступень меньше — в
    карточке появляется воздух, и она перестаёт упираться в свои границы. */
 .ohub .path-s{gap:6px}
@@ -15508,8 +15523,8 @@ function ordHub(){
   // история. В одной карточке они читались как один список без границ.
   document.getElementById('accMid').innerHTML = `<div class="ohub">
     <div class="pbox">${pathNav()}<div class="path">${pathInner()}</div></div>
-    <div class="pbox">${pathDistricts()}</div>
-    <div class="pbox">${pathExtra()}</div>
+    <div class="pbox grow">${pathDistricts()}</div>
+    <div class="pbox xbase">${pathExtra()}</div>
     ${рядом ? `<div class="pbox tail">${рядом}</div>` : ''}</div>`;
   ohubFit(); setTimeout(ohubFit, 350);
 
@@ -15538,7 +15553,11 @@ function ohubFit(){
   const mid = document.getElementById('accMid'), hub = mid && mid.querySelector('.ohub');
   if(!hub) return;
   hub.classList.remove('tight');
-  if(hub.scrollHeight > mid.clientHeight + 2) hub.classList.add('tight');
+  // Меряем против внутренней высоты, без полей середины: иначе хаб на
+  // десяток точек выше места считался влезшим, и страница чуть листалась.
+  const cs = getComputedStyle(mid);
+  const inner = mid.clientHeight - parseFloat(cs.paddingTop || 0) - parseFloat(cs.paddingBottom || 0);
+  if(hub.scrollHeight > inner + 2) hub.classList.add('tight');
 }
 // Шрифт заголовков догружается после первой отрисовки, и с ним страница
 // подрастает на две-три строки: меряем ещё раз, когда он встал.

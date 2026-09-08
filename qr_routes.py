@@ -863,5 +863,5 @@ def setup(app):
     for path, handler, method in routes:
         if path not in seen:
             r.add_route("OPTIONS", path, _opt); seen.add(path)
-        {"GET": r.add_get, "POST": r.add_post}[method](path, handler)
+        r.add_route(method, path, handler)   # любой метод: словарь из двух ронял петлю на DELETE
     log.info("[qr] routes mounted")

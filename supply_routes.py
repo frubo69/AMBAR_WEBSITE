@@ -1931,5 +1931,5 @@ def setup(app):
         ("/api/owner/supply/{sid}/task/lines",      handle_own_lines,    "POST"),
     ):
         r.add_route("OPTIONS", path, _opt)
-        {"GET": r.add_get, "POST": r.add_post}[method](path, handler)
+        r.add_route(method, path, handler)   # любой метод: словарь из двух ронял петлю на DELETE
     log.info("[supply] routes mounted")

@@ -3188,6 +3188,42 @@ button.path:active{transform:scale(.995)}
 .crw-ask-b.no{background:rgba(91,141,239,.14);border-color:rgba(91,141,239,.5);
   color:var(--info)}
 
+/* Выбор заявки в окне-вопросе. Тремя одинаковыми полосами он не отвечал на
+   вопрос: какую отменяем, видно было только из текста на кнопке, а чем они
+   друг от друга отличаются — ничем. Теперь строка той же анатомии, что
+   карточки на хабе: значок оттуда же, название заглавными, оглавление через
+   косую, справа сколько бутылок. Основная и доп. разведены дважды — подписью
+   группы и весом: основная одна и залита золотом, доп. стоят золотой рамкой
+   на тёмном, потому что их бывает несколько. */
+.crw-pick{width:min(92vw,344px)}
+.crw-ask-g{font-size:9.5px;font-weight:700;letter-spacing:1.2px;
+  text-transform:uppercase;color:var(--muted);text-align:left;padding:15px 2px 2px}
+.crw-ask-s + .crw-ask-g{padding-top:2px}
+.crw-ask-r{display:flex;align-items:center;gap:10px;width:100%;margin-top:8px;
+  padding:11px 12px;border-radius:13px;cursor:pointer;text-align:left;
+  font-family:inherit;background:var(--card2);color:var(--gold2);
+  border:1.5px solid rgba(201,169,110,.45)}
+.crw-ask-r:active{transform:scale(.98)}
+.crw-ask-r.main{background:linear-gradient(135deg,var(--gold),var(--gold2));
+  border-color:transparent;color:#1a1408}
+.crw-ask-i{flex:0 0 auto;width:32px;height:32px;border-radius:10px;display:flex;
+  align-items:center;justify-content:center;
+  background:var(--gold-soft);border:1px solid rgba(201,169,110,.3)}
+.crw-ask-i svg{width:17px;height:17px}
+.crw-ask-r.main .crw-ask-i{background:rgba(26,20,8,.13);border-color:rgba(26,20,8,.2)}
+.crw-ask-n{flex:1;min-width:0}
+.crw-ask-n b{display:block;font-family:'Space Grotesk',sans-serif;font-size:13.5px;
+  font-weight:700;letter-spacing:.2px;text-transform:uppercase;line-height:1.2}
+.crw-ask-n i{display:block;font-style:normal;font-size:10.5px;font-weight:600;
+  margin-top:3px;color:var(--muted)}
+.crw-ask-r.main .crw-ask-n i{color:rgba(26,20,8,.62)}
+.crw-ask-q{flex:0 0 auto;text-align:right;font-family:'Space Grotesk',sans-serif;
+  font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
+.crw-ask-q u{display:block;text-decoration:none;font-family:'DM Sans',sans-serif;
+  font-size:9px;font-weight:600;color:var(--muted);margin-top:2px;letter-spacing:0}
+.crw-ask-r.main .crw-ask-q u{color:rgba(26,20,8,.55)}
+.crw-ask-r + .crw-ask-b{margin-top:14px}
+
 /* Заголовок группы водителей: чей это район и кто на нём принимает. */
 /* Район — одна карточка: кто ведёт в шапке, кто возит фишками под ней. Так
    он читается целиком, а не собирается в голове из двух списков. */
@@ -19994,16 +20030,30 @@ function supCancelAsk(){
   back.className = 'pin-back ask';
   back.addEventListener('click', closePinPop);
   const box = document.createElement('div');
-  box.className = 'pin-pop crw-ask';
-  // Две доп. заявки на одну базу за смену — редкость, но кнопки назвались бы
-  // одинаково, и отменять пришлось бы наугад. Тогда разводим их временем.
-  const имена = all.map(x => _supName(x, true));
+  box.className = 'pin-pop crw-ask crw-pick';
+  // Строка заявки — карточка с хаба, ужатая до окна: тот же значок, название
+  // заглавными, оглавление через косую, справа сколько бутылок. Время в
+  // оглавлении заодно разводит две доп. заявки на одну базу: раньше их
+  // приходилось различать приписками к тексту кнопки.
+  const row = (x, main) => {
+    const рай = x.districts || 0, бут = x.total_qty || 0;
+    return `<button class="crw-ask-r${main ? ' main' : ''}"
+        onclick="closePinPop(); supCancel('${escS(x.supply_id)}', true)">
+      <span class="crw-ask-i">${main ? ICO_LIST : ICO_BASE}</span>
+      <span class="crw-ask-n"><b>${escS(main ? 'Заявка' : (x.base || 'База'))}</b>
+        <i>${рай} ${pluralize(рай,'район','района','районов')} / ${_hm(x.at)}</i></span>
+      <span class="crw-ask-q">${fmt(бут)}<u>${
+        pluralize(бут,'бутылка','бутылки','бутылок')}</u></span>
+    </button>`;
+  };
+  const осн = all.filter(x => x.kind !== 'extra');
+  const доп = all.filter(x => x.kind === 'extra');
   box.innerHTML = `<div class="crw-ask-t">Какую заявку отменить?</div>
     <div class="crw-ask-s">Задачи исчезнут у водителей. Принятое останется на складе.</div>
-    ${all.map((x, i) => `<button class="crw-ask-b go"
-        onclick="closePinPop(); supCancel('${escS(x.supply_id)}', true)"
-      >${escS(имена.filter(n => n === имена[i]).length > 1
-              ? `${имена[i]} · ${_hm(x.at)}` : имена[i])}</button>`).join('')}
+    ${осн.length ? `<div class="crw-ask-g">Основная</div>${
+      осн.map(x => row(x, true)).join('')}` : ''}
+    ${доп.length ? `<div class="crw-ask-g">Другие базы</div>${
+      доп.map(x => row(x, false)).join('')}` : ''}
     <button class="crw-ask-b no" onclick="closePinPop()">Не отменять</button>`;
   document.body.append(back, box);
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}

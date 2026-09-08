@@ -16085,8 +16085,7 @@ function supHistLine(){
 // он живёт на своей странице и не мешает увидеть, где мы сейчас.
 function ordHub(){
   const d = ORD.d; if(!d) return;
-  _setText('accSub', `${_dayName(d.day)} · норма на ${d.cover_days} ${
-    pluralize(d.cover_days,'день','дня','дней')}`);
+  _setText('accSub', '');
   const st = supStage();
   // Две зоны, а не четыре куска. Первая — сегодняшний закуп: вход в заявку,
   // путь и состояние приёмки. Вторая — то, что рядом: недобор и прошлые
@@ -18498,7 +18497,7 @@ function xSupRender(d){
       <span class="xs-top-n">${fmt(got)}<i>из ${fmt(need)} ${pluralize(need,'бутылки','бутылок','бутылок')}</i></span>
       <span class="xs-bar"><i style="width:${need ? Math.min(100, Math.round(got / need * 100)) : 0}%"></i></span>
     </div>${extra ? xFlowCard(d) : ''}<div id="supWho">${cards || '<div class="exp-empty">Районов нет</div>'}</div>`;
-  supActShow();
+  supActShow(d);
   supFoot();
   const goto = SUP_GOTO === 'who' ? 'supWho'
              : SUP_GOTO.startsWith('d:') ? 'xsd-' + SUP_GOTO.slice(2) : '';
@@ -19926,27 +19925,100 @@ async function _supFile(){
 // Задним числом кнопки нет вовсе. Заявка живёт одним днём: отменять вчерашнюю
 // нечего — её либо уже привезли, либо она давно закрыта, — а кнопка, которая
 // выглядит рабочей и ничего не делает, хуже её отсутствия.
-function supCancelBtn(){
+// Открытые заявки, которые можно отменить: основная и доп. на другие базы.
+// Основная первой: её отменяют чаще, и в вопросе ей стоять сверху.
+function _supOpenAll(){
+  const list = (ACC_SUP && ACC_SUP.list) || [];
+  const open = list.filter(x => x.status === 'open' && x.supply_id);
+  return open.filter(x => x.kind !== 'extra').concat(open.filter(x => x.kind === 'extra'));
+}
+
+// Кнопка должна знать, про какую заявку экран, и экран ей это говорит сам.
+// На поставке заявка одна — та, что открыта, её и отменяем. На хабе, в заявке
+// и в недоборе открытых бывает две — основная и доп. на другие базы, — и
+// какую человек имел в виду, знает только он: там кнопка спрашивает.
+function supCancelBtn(sup){
   if(DAY_OFFSET !== 0) return '';
-  const d = (SUP_D && SUP_D.status === 'open') ? SUP_D
-          : ((ACC_SUP && ACC_SUP.open) || null);
-  if(!d || !d.supply_id || d.status !== 'open') return '';
-  return `<button class="acc-act dn" onclick="supCancel('${escS(d.supply_id)}')"
-    >Отменить заявку</button>`;
+  // Экран назвал заявку — кнопка только про неё. В истории открыт закуп,
+  // который давно закрыт, и отменять там нечего: кнопки нет вовсе.
+  if(sup) return (sup.status === 'open' && sup.supply_id)
+    ? `<button class="acc-act dn" onclick="supCancel('${escS(sup.supply_id)}')"
+        >Отменить заявку</button>` : '';
+  if(!_supOpenAll().length) return '';
+  return `<button class="acc-act dn" onclick="supCancelAsk()">Отменить заявку</button>`;
 }
 
-function supActShow(){
+// Окно-вопрос с обещанием: «да» — true, всё остальное — false. Родной confirm
+// выглядел чужим окном системы посреди панели.
+function askDialog(t, sub, okLabel, cancelLabel){
+  return new Promise(resolve => {
+    closePinPop();
+    const back = document.createElement('div');
+    back.className = 'pin-back ask';
+    back.addEventListener('click', () => { closePinPop(); resolve(false); });
+    const box = document.createElement('div');
+    box.className = 'pin-pop crw-ask';
+    box.innerHTML = `<div class="crw-ask-t">${escS(t)}</div>
+      ${sub ? `<div class="crw-ask-s">${escS(sub)}</div>` : ''}
+      <button class="crw-ask-b bad" id="askOk">${escS(okLabel || 'Да')}</button>
+      <button class="crw-ask-b" id="askNo">${escS(cancelLabel || 'Не надо')}</button>`;
+    document.body.append(back, box);
+    box.querySelector('#askOk').onclick = () => { closePinPop(); resolve(true); };
+    box.querySelector('#askNo').onclick = () => { closePinPop(); resolve(false); };
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+  });
+}
+
+// Какую отменить: основную или доп. на другие базы. Их бывает две сразу, и
+// «Отменить заявку» без вопроса отменяло бы ту, о которой человек не думал.
+// Открытая одна — вопроса нет: спрашиваем только «точно ли», как раньше.
+function supCancelAsk(){
+  const all = _supOpenAll();
+  if(!all.length) return;
+  if(all.length === 1){ supCancel(all[0].supply_id); return; }
+  closePinPop();
+  const back = document.createElement('div');
+  back.className = 'pin-back ask';
+  back.addEventListener('click', closePinPop);
+  const box = document.createElement('div');
+  box.className = 'pin-pop crw-ask';
+  box.innerHTML = `<div class="crw-ask-t">Какую заявку отменить?</div>
+    <div class="crw-ask-s">Задачи исчезнут у водителей. Принятое останется на складе.</div>
+    ${all.map(x => `<button class="crw-ask-b bad"
+        onclick="closePinPop(); supCancel('${escS(x.supply_id)}', true)"
+      >${escS(_supName(x, true))}</button>`).join('')}
+    <button class="crw-ask-b" onclick="closePinPop()">Не отменять</button>`;
+  document.body.append(back, box);
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+}
+
+// Как заявка называется в вопросе. Доп. — с базой: их может быть несколько, и
+// «доп. заявка» без имени базы не отвечает, какую именно отменяют.
+function _supName(x, caps){
+  const base = (x || {}).base || '';
+  if((x || {}).kind !== 'extra') return caps ? 'Основную заявку' : 'основную заявку';
+  return (caps ? 'Доп. заявку' : 'доп. заявку') + (base ? ` · ${base}` : '');
+}
+
+function supActShow(sup){
   const el = document.getElementById('accAct');
-  if(el) el.innerHTML = supCancelBtn();
+  if(el) el.innerHTML = supCancelBtn(sup);
 }
 
-async function supCancel(sid){
+async function supCancel(sid, sure){
   const d = (SUP_D && SUP_D.supply_id) ? SUP_D
           : ((ACC_SUP && ACC_SUP.open) || {});
   const id = sid || d.supply_id;
   if(!id) return;
-  if(!confirm('Отменить заявку на сегодня?\n\nЗадачи исчезнут у водителей. '
-            + 'Принятое останется на складе.')) return;
+  // Что именно отменяем — по самой заявке, а не по той, что открыта на экране:
+  // с хаба отменяют доп., пока в SUP_D лежит основная.
+  const x = ((ACC_SUP && ACC_SUP.list) || []).find(y => y.supply_id === id)
+          || (SUP_D && SUP_D.supply_id === id ? SUP_D : null) || {};
+  const extra = x.kind === 'extra';
+  // Где мы стоим, надо запомнить до вопроса: после отмены экран перерисуется.
+  const onSup = !!document.getElementById('supWho');
+  if(!sure && !await askDialog(`Отменить ${_supName(x)}?`,
+      'Задачи исчезнут у водителей. Принятое останется на складе.', 'Отменить')) return;
   const btn = document.querySelector('#accAct .acc-act');
   if(btn){ btn.disabled = true; btn.textContent = 'Отменяю…'; }
   const send = force => ownerApi.ownerFetch(
@@ -19957,9 +20029,8 @@ async function supCancel(sid){
   }catch(e){
     const p = (e || {}).payload || {};
     if(p.error === 'already_taken'){
-      if(!confirm(`По заявке уже приняли ${fmt(p.took)} `
-                + `${pluralize(p.took,'бутылку','бутылки','бутылок')}.\n\n`
-                + 'Принятое останется на складе. Всё равно отменить?')){
+      if(!await askDialog(`По заявке уже приняли ${fmt(p.took)} ${pluralize(p.took,'бутылку','бутылки','бутылок')}`,
+                          'Принятое останется на складе. Всё равно отменить?', 'Всё равно отменить')){
         if(btn){ btn.disabled = false; btn.textContent = 'Отменить заявку'; }
         return;
       }
@@ -19975,9 +20046,13 @@ async function supCancel(sid){
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
   _toast('Заявка отменена');
   // Перечитываем всё, от чего зависит статус: хаб, список закупов и сам экран.
-  const extra = d.kind === 'extra';
+  // С экрана поставки возвращаемся на него же — перечитанным. С хаба, заявки
+  // и недобора — на хаб: там путь сам говорит «Заявка отменена», а список
+  // позиций после отмены отвечает уже не на тот вопрос.
   ACC_SUP = null;
-  if(extra) await accExtra(); else await accSupply();
+  if(!onSup) await accOrder();
+  else if(extra) await accExtra();
+  else await accSupply();
 }
 
 // Выгрузка списка недобора убрана вместе с кнопками, которые её звали:

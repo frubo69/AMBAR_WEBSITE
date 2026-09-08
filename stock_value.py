@@ -145,6 +145,17 @@ async def build(day: str = "") -> dict:
     base = await stock_routes._district_base(day)
     cost = await cost_map()
     src = _COST.get("src") or {}
+    # На складе — только то, что внесено кодами. Количественный пересчёт знает
+    # и бутылки, которые ещё никто не отсканировал; они на полке, но в учёт
+    # не попали. Из каждой позиции вычитаем ровно их — тем же счётом, что и
+    # красное «QR код не внесён», чтобы 296 + 129 сходилось в 425.
+    missing: dict = {}
+    try:
+        import qr_routes
+        await qr_routes.unscanned_by_district(None, missing)
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[value] невнесённые не вычтены: {e}")
+        missing = {}
 
     ids = list(stock_routes.OFFICE_IDS)
     districts = [{"id": o, "code": stock_routes.OFFICE_CODES.get(o, ""),
@@ -174,11 +185,12 @@ async def build(day: str = "") -> dict:
                 row["have"][oid] = None
                 continue
             row["known"] = True
-            have = float(имеет.get(pid) or 0)
+            b_ = float(имеет.get(pid) or 0) * unit
+            b_ = max(0.0, b_ - float((missing.get(oid) or {}).get(pid) or 0))
+            have = b_ / unit
             row["have"][oid] = have
             if have <= 0:
                 continue
-            b_ = have * unit
             row["bottles"] += b_
             slot = per[oid]
             for box in (slot, total):

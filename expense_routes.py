@@ -268,7 +268,12 @@ async def handle_extra_add(request):
     if беда:
         return web.json_response({"error": беда, "kind": kid},
                                  status=400, headers=CORS_HEADERS)
-    if вид.get("receipt") and not photo:
+    # Старший может записать трату без чека — осознанно, ответив в окне
+    # (force). Запись помечается «без чека», чтобы в истории это было видно.
+    # У водителя такого пути нет: его маршрут (driver_routes) без снимка не
+    # принимает.
+    force = bool(body.get("force"))
+    if вид.get("receipt") and not photo and not force:
         return web.json_response({"error": "no_photo", "kind": kid},
                                  status=400, headers=CORS_HEADERS)
 
@@ -276,6 +281,8 @@ async def handle_extra_add(request):
             "kind": kid, "kind_t": вид["t"], "plus": bool(вид.get("plus")),
             "by": request["owner_id"], "status": "approved",
             "at": datetime.now(timezone.utc).isoformat()}
+    if вид.get("receipt") and not photo:
+        item["no_receipt"] = True
     if бутылка:
         item.update(бутылка["item"])
     if photo:

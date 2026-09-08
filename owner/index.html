@@ -2414,7 +2414,11 @@ button.path:active{transform:scale(.995)}
 /* Разовые расходы — карточки как у водителя: та же трата выглядит одинаково
    с обеих сторон. Чек и бутылка — полосой под карточкой, а не кнопкой сбоку. */
 .xe-list{display:flex;flex-direction:column;gap:8px;padding:0 13px 12px}
-.xe-card{padding:13px;border-radius:15px;background:var(--card);border:1px solid var(--border2)}
+/* Карточки трат — золотой рамкой потолще: заправка и мойка одной анатомии,
+   и тонкая белая черта между ними глазу не за что зацепиться. */
+.xe-card{padding:13px;border-radius:15px;background:var(--card);
+  border:1.5px solid rgba(201,169,110,.45)}
+.xe-card + .xe-card{margin-top:10px}
 .xe-hd{display:flex;align-items:center;gap:9px;margin-bottom:10px;color:var(--gold2)}
 .xe-t{font-size:14px;font-weight:700;color:var(--text)}
 .xe-sum{margin-left:auto;font-size:11.5px;font-weight:600;color:var(--muted)}
@@ -3095,6 +3099,7 @@ button.path:active{transform:scale(.995)}
 .crw-ask-b.go{background:linear-gradient(135deg,var(--gold),var(--gold2));
   color:#1a1408;border-color:transparent}
 .crw-ask-b:active{transform:scale(.98)}
+.crw-ask-b.bad{background:rgba(226,106,106,.14);border-color:rgba(226,106,106,.5);color:var(--dn)}
 
 /* Заголовок группы водителей: чей это район и кто на нём принимает. */
 /* Район — одна карточка: кто ведёт в шапке, кто возит фишками под ней. Так
@@ -12649,7 +12654,7 @@ function stkValueCard(reg){
   return `<div class="stkv">
     <div class="stkv-cap">Всего на всех складах</div>
     <div class="stkv-g">
-      <div class="stkv-c">
+      <div class="stkv-c gold">
         <div class="stkv-l">Количество<small>шт</small></div>
         <div class="stkv-v">${fmt(bottles)}</div>
       </div>
@@ -20058,7 +20063,8 @@ function expDoneRow(r, e){
   const st = e.status || 'approved';
   const ph = expPhotos(e);
   const что = [e.comment && e.comment !== e.kind_t ? e.comment : '',
-               e.bottle || '', e.by_driver ? 'от водителя' : ''].filter(Boolean).join(' · ');
+               e.bottle || '', e.by_driver ? 'от водителя' : '',
+               e.no_receipt ? 'без чека' : ''].filter(Boolean).join(' · ');
   return `<div class="exp-done ${st}">
     ${ph.length ? `<span class="exp-done-ph">${ph.map((p, i) => `
       <button class="exp-done-th" onclick="phvOpenExp('${escS(r.name)}','${escS(e.id)}',${i})"
@@ -20815,12 +20821,21 @@ async function expAddExtra(driver, kindId){
   // Снимок засчитывается только своей строке: чек от заправки не должен
   // молча уехать вместе с мойкой.
   const снимок = EXP_SHOT.kind === k.id ? EXP_SHOT : {photo:'', thumb:''};
-  if(k.receipt && !снимок.photo){ _toast('Нужен снимок чека'); return; }
+  // Старший может записать трату и без чека — но не молча: окно спрашивает,
+  // и «всё равно отправить» стоит красным. У водителя такого пути нет.
+  let force = false;
+  if(k.receipt && !снимок.photo){
+    const ответ = await xeAskNoReceipt(k);
+    if(ответ === 'shot'){ expShotFor(k.id); return; }
+    if(ответ !== 'send') return;
+    force = true;
+  }
   const набрано = _expTyped();
   try{
     const r = await ownerApi.ownerFetch('/api/owner/expenses/extra',
       {method:'POST', body:{day:EXP.day, driver, amount, comment, kind:k.id,
                             photo:снимок.photo, thumb:снимок.thumb, as:_meName(),
+                            ...(force ? {force: true} : {}),
                             ...(бут ? {code: бут.code} : {})}});
     EXP_SHOT = {kind:'', photo:'', thumb:''};
     if(бут) EXP_GUARD = {driver:'', code:'', name:'', cost:0};
@@ -20837,6 +20852,28 @@ async function expAddExtra(driver, kindId){
          : why === 'bad_photo' ? 'Снимок не открылся, снимите ещё раз'
                                : 'Не удалось добавить');
   }
+}
+
+// Окно «без чека»: два ответа — отправить всё равно (красным) или снять чек.
+// Тап мимо окна — ничего не отправлять.
+function xeAskNoReceipt(k){
+  return new Promise(resolve => {
+    closePinPop();
+    const back = document.createElement('div');
+    back.className = 'pin-back';
+    back.addEventListener('click', () => { closePinPop(); resolve('cancel'); });
+    const box = document.createElement('div');
+    box.className = 'pin-pop crw-ask';
+    box.innerHTML = `
+      <div class="crw-ask-t">Отправить расход без чека?</div>
+      <div class="crw-ask-s">${escS(k.t)} обычно подтверждается снимком чека. Без него запись останется, но в списке будет помечена «без чека».</div>
+      <button class="crw-ask-b bad" id="xeNoRcpSend">Всё равно отправить</button>
+      <button class="crw-ask-b go" id="xeNoRcpShot">Загрузить чек</button>`;
+    document.body.append(back, box);
+    box.querySelector('#xeNoRcpSend').onclick = () => { closePinPop(); resolve('send'); };
+    box.querySelector('#xeNoRcpShot').onclick = () => { closePinPop(); resolve('shot'); };
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+  });
 }
 
 // Решение по трате водителя. Отклонённая не исчезает: водитель должен видеть,

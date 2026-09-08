@@ -18843,7 +18843,11 @@ function xRender(){
           <img class="xr-img" src="/products/${escS(id)}.webp" alt="" loading="lazy"
                onerror="this.style.visibility='hidden'">
           <span class="xs-pl-n">${escS(r.name)}</span>
-          <span class="xs-pl-q">${r.by[x.id]}</span>
+          <span class="xs-step">
+            <button onclick="xSumStep('${escS(x.id)}','${escS(id)}',-1)" aria-label="меньше">−</button>
+            <b>${r.by[x.id]}</b>
+            <button onclick="xSumStep('${escS(x.id)}','${escS(id)}',1)" aria-label="больше">+</button>
+          </span>
         </div>`).join('')}
       </div>`);
     });
@@ -18928,6 +18932,19 @@ function xPaintGrid(){
 }
 // Плюс-минус правит одну плитку на месте: перерисовка всей сетки
 // перезагружала бы каждую картинку на каждое нажатие.
+// Итог правится на месте: «−» до нуля убирает строку, район без строк уходит
+// в «ничего не надо». Возвращаться по районам ради одной цифры не нужно.
+function xSumStep(oid, id, d){
+  const r = XS.rows[id]; if(!r) return;
+  r.by[oid] = Math.max(0, (r.by[oid] || 0) + d);
+  if(!r.by[oid]) delete r.by[oid];
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  const y = (document.getElementById('xsScroll') || document.getElementById('accMid') || {}).scrollTop;
+  xRender();
+  const m = document.getElementById('xsScroll') || document.getElementById('accMid');
+  if(m && y) m.scrollTop = y;
+}
+
 function xStep(id, d){
   const r = xEnsure(id), o = xCur();
   r.by[o] = Math.max(0, (r.by[o] || 0) + d);

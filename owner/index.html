@@ -1660,8 +1660,9 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .ck-head.all .ck-h-v{color:var(--up)}
 .ck-head.all .ck-track i{background:linear-gradient(90deg,rgba(76,175,125,.7),var(--up))}
 .ck-head.all .ck-h-s{color:var(--up)}
-.ck-h-w{font-size:11px;font-weight:600;letter-spacing:1.1px;text-transform:uppercase;
-  color:var(--muted)}
+/* «Выполнено» и «/7» — ярче: серым на тёмном их не было видно вовсе. */
+.ck-h-w{font-size:12px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;
+  color:var(--sub)}
 /* Золотая нить по верхней кромке — как у карточек денег. */
 .ck-head::before{content:'';position:absolute;left:0;right:0;top:0;height:1px;
   background:linear-gradient(90deg,transparent,rgba(201,169,110,.5),transparent)}
@@ -1669,7 +1670,7 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .ck-h-v{font-family:'Space Grotesk',sans-serif;font-size:36px;font-weight:700;
   letter-spacing:-1.6px;line-height:1;font-variant-numeric:tabular-nums}
 /* «4/7» одним кеглем: дробь читается как счёт, а не как число с примечанием. */
-.ck-h-v u{text-decoration:none;font-size:36px;font-weight:700;color:var(--dim);
+.ck-h-v u{text-decoration:none;font-size:36px;font-weight:700;color:var(--sub);
   letter-spacing:-1.6px}
 /* Имя карточки — над числом, а не рядом с ним: это заголовок ежедневника, а
    не подпись к цифре. */
@@ -14614,7 +14615,7 @@ function chkRender(){
     <div class="ck-h-l">Статус смены</div>
     <div class="ck-h-n">
       <span class="ck-h-v">${c.done || 0}<u>/${rows.length}</u></span>
-      <span class="ck-h-w">${всё ? 'смена закрыта' : 'сделано'}</span>
+      <span class="ck-h-w">${всё ? 'смена закрыта' : 'выполнено'}</span>
     </div>
     <div class="ck-track"><i style="width:${доля}%"></i></div>
     <div class="ck-h-s">${всё

@@ -2066,12 +2066,24 @@ button.path:active{transform:scale(.995)}
 .ohub.tight .pbox.grow .pd-r{min-height:38px}
 /* История — последней строкой карточки районов, через черту, значок мельче:
    это тот же список, только вчерашний. */
-.ohub .pd-hist{border-top:1px solid var(--border2);padding:10px 16px 11px}
-.ohub .pd-hist .pnav-i{width:38px;height:38px;border-radius:12px}
-.ohub .pd-hist .pnav-i svg{width:18px;height:18px}
-.ohub .pd-hist .pnav-b b{font-size:13px}
-.ohub .pd-hist .pnav-b i{margin-top:2px;font-size:11px}
-.ohub.tight .pd-hist{padding:7px 14px 8px}
+/* История — своей полосой, а не ещё одной строкой района: тон карточки
+   темнее, черта над ней толще, заголовок тем же кеглем, что у остальных. */
+.ohub .pbox .pd-hist{border-top:2px solid rgba(201,169,110,.28);background:var(--card2);
+  padding:11px 16px 12px}
+/* Заголовки хаба — одной строкой; состояние доп. заявки живёт в подписи.
+   Самый длинный — «Доп. заявка / Другие базы»: на узком экране он чуть
+   ужимается по ширине окна, чтобы не лезть под стрелку, на обычном телефоне
+   стоит тем же кеглем, что «Заявка». */
+.ohub .pnav-r.ttl .pnav-b b{white-space:nowrap}
+/* Коды районов в строках — тише золотых значков заголовков: серым на своей
+   подложке, чтобы строки не спорили с заголовками карточек. */
+.ohub .pd-r .shl-code{color:var(--sub);background:var(--card3);border-color:var(--border2)}
+.ohub .xbase .pnav-r.ttl .pnav-b b{font-size:clamp(14.5px,3.95vw,18px);letter-spacing:.2px}
+.ohub .pnav-b i u{text-decoration:none;font-weight:700}
+.ohub .pnav-b i u.live{color:var(--gold2)} .ohub .pnav-b i u.wait{color:var(--warn)}
+.ohub .pnav-b i u.done{color:var(--up)} .ohub .pnav-b i u.no{color:var(--dn)}
+.ohub .pd-hist .pnav-i.big svg{width:22px;height:22px}
+.ohub.tight .pd-hist{padding:8px 14px 9px}
 /* Под хабом подвал с кнопкой: поля середины — по минимуму, высота уходит
    карточкам, а не чёрному над и под ними. */
 .stk-mid:has(> .ohub){padding-top:6px;padding-bottom:6px}
@@ -2080,8 +2092,7 @@ button.path:active{transform:scale(.995)}
 .ohub.tight .pbox .path{padding:9px 14px 8px}
 /* Другие базы — заметнее: та же анатомия, но выше и с крупным значком. */
 .ohub .pbox.xbase .pnav-r.pbig{padding:12px 16px}
-.ohub .pbox.xbase .pnav-i.big{width:50px;height:50px;border-radius:16px}
-.ohub .pbox.xbase .pnav-i.big svg{width:24px;height:24px}
+.ohub .pbox.xbase .pnav-i.big svg{width:22px;height:22px}
 /* Плитки хаба — как везде: название заглавными, оглавление через косую,
    число справа. */
 .pnav-r.ttl .pnav-b b{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
@@ -2128,7 +2139,7 @@ button.path:active{transform:scale(.995)}
 .ohub.tight .pd-r:last-child{padding-bottom:8px}
 /* Заголовок разбивки делит строку с состоянием: кегль чуть меньше, чем у
    «Заявки», чтобы название и пилюля встали в одну строку. */
-.pd .pnav-r.pbig .pnav-b b{font-size:14px;letter-spacing:0;white-space:nowrap}
+.pd .pnav-r.pbig .pnav-b b{white-space:nowrap}
 .pd .pnav-r.pbig .pnav-b i{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .pd .pnav-r.pbig .pstat-c{padding:4px 9px;font-size:10.5px}
 /* Четыре карточки должны сесть в экран: в ужатом виде заголовки ниже. */
@@ -15969,7 +15980,7 @@ function pathNav(){
   const ed = d.edited_count || 0;
   const CHIP = {none:'', wait:'wait', live:'live', done:'done', cancelled:'no'};
   return `<button class="pnav-r pbig ttl" onclick="accOrderList()">
-      <span class="pnav-i big">${ICO_LIST}</span>
+      <span class="pnav-i big live">${ICO_LIST}</span>
       <span class="pnav-b"><b>Заявка</b></span>
       <span class="pnav-v">${fmt(qty)}<u>${pluralize(qty,'бутылка','бутылки','бутылок')}</u></span>
       <span class="pnav-go">${ICO_CHEV}</span>
@@ -16005,7 +16016,7 @@ function pathDistricts(){
   // справа вместо числа общее состояние приёма.
   return `<div class="pd ${st.k === 'none' ? 'off' : ''}">
     <button class="pnav-r pbig ttl" ${go}>
-      <span class="pnav-i big">${ICO_MAP}</span>
+      <span class="pnav-i big live">${ICO_MAP}</span>
       <span class="pnav-b"><b>Приём товара</b></span>
       <span class="pstat-c ${CHIP[st.k]}">${
         {none:'ждём магазин', wait:'ждёт приёма', live:'идёт приём', done:'принято',
@@ -16059,8 +16070,8 @@ function supHistLine(){
   const list = (ACC_SUP && ACC_SUP.list) || [];
   if(list.length < 2) return '';
   const aed = list.reduce((a, x) => a + ((x.money || {}).took || 0), 0);
-  return `<button class="pnav-r ttl pd-hist" onclick="supHistory()">
-    <span class="pnav-i"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+  return `<button class="pnav-r pbig ttl pd-hist" onclick="supHistory()">
+    <span class="pnav-i big live"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
       stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
       <path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/>
       <path d="M12 8v4l3 2"/></svg></span>
@@ -18338,10 +18349,10 @@ function pathExtra(){
   const st = open.length ? _xState(open[0]) : null;
   return `<button class="pnav-r pbig ttl" onclick="accExtra()">
     <span class="pnav-i big live">${ICO_BASE}</span>
-    <span class="pnav-b"><b>Другие базы</b>
-      <i>доп. заявка${open.length ? ' / ' + escS(open.map(x => x.base).join(' / '))
-        : (ex.length ? ` / ${ex.length} ${pluralize(ex.length,'заявка','заявки','заявок')}` : '')}</i></span>
-    ${st ? `<span class="pstat-c ${st[1]}">${open.length > 1 ? open.length + ' в работе' : st[0]}</span>` : ''}
+    <span class="pnav-b"><b>Доп. заявка / Другие базы</b>
+      ${open.length ? `<i>${escS(open.map(x => x.base).join(' / '))} · <u class="${st[1]}">${
+          open.length > 1 ? open.length + ' в работе' : st[0]}</u></i>`
+        : (ex.length ? `<i>${ex.length} ${pluralize(ex.length,'заявка','заявки','заявок')}</i>` : '')}</span>
     <span class="pnav-go">${ICO_CHEV}</span>
   </button>`;
 }

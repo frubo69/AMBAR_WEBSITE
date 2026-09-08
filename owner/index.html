@@ -2287,6 +2287,70 @@ button.path:active{transform:scale(.995)}
 .fin-i-v.up{color:var(--up)}
 .fin-i-v.dn{color:var(--dn)}
 .fin-none{font-size:13px;color:var(--muted);text-align:center;padding:22px 0 14px}
+/* Финансы как бухгалтерия: одна анатомия у всех разделов — шапка с названием
+   заглавными, полоса чисел волосками, тело. Полутонов минимум: карточка,
+   волосок, золото; зелёное — нам, красное — мы. */
+.fin-hero{display:grid;grid-template-columns:1fr 1fr;gap:1px;margin-bottom:10px;border-radius:16px;
+  overflow:hidden;background:var(--border2);border:1px solid var(--border2)}
+.fin-hero-c{padding:16px 16px 14px;border:0;background:var(--card);cursor:pointer;font-family:inherit;
+  color:var(--text);text-align:left;-webkit-tap-highlight-color:transparent}
+.fin-hero-c:active{background:var(--card2)}
+.fin-hero-c b{display:block;font-family:'Space Grotesk',sans-serif;font-size:24px;font-weight:700;
+  line-height:1;letter-spacing:-.4px;color:var(--gold2);font-variant-numeric:tabular-nums}
+.fin-hero-c b.up{color:var(--up)}
+.fin-hero-c b.dn{color:var(--dn)}
+.fin-hero-c b .u{font-family:'DM Sans',sans-serif;font-size:10px;font-weight:700;color:var(--muted);
+  margin-left:4px;letter-spacing:.3px}
+.fin-hero-c i{display:block;font-style:normal;font-size:9.5px;font-weight:700;letter-spacing:1.1px;
+  text-transform:uppercase;color:var(--muted);margin-top:8px}
+.fin-sec{border-radius:16px;background:var(--card);border:1px solid var(--border2);margin-bottom:10px;
+  overflow:hidden;transition:border-color .2s var(--e1)}
+.fin-sec.open{border-color:rgba(201,169,110,.32)}
+.fin-sec-h{display:flex;align-items:center;gap:12px;width:100%;padding:14px 16px;border:0;
+  background:none;cursor:pointer;font-family:inherit;color:var(--text);text-align:left;
+  -webkit-tap-highlight-color:transparent}
+.fin-sec-h:active{background:rgba(255,255,255,.02)}
+.fin-sec-i{width:36px;height:36px;flex-shrink:0;border-radius:11px;display:flex;align-items:center;
+  justify-content:center;color:var(--gold2);background:var(--gold-soft);border:1px solid rgba(201,169,110,.25)}
+.fin-sec-b{flex:1;min-width:0}
+.fin-sec-b b{display:block;font-family:'Space Grotesk',sans-serif;font-size:13.5px;font-weight:700;
+  letter-spacing:.8px;text-transform:uppercase;line-height:1.2}
+.fin-sec-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:3px;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.fin-sec-go{flex-shrink:0;color:var(--muted);transition:transform .25s var(--e1)}
+.fin-sec.open .fin-sec-go:not(.arrow){transform:rotate(180deg);color:var(--gold2)}
+.fin-strip{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--border2)}
+.fin-strip.two{grid-template-columns:1fr 1fr}
+.fin-strip > div{padding:13px 8px 13px;text-align:center;min-width:0}
+.fin-strip > div + div{box-shadow:inset 1px 0 0 var(--border2)}
+.fin-strip b{display:block;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;
+  line-height:1;letter-spacing:-.2px;color:var(--gold2);font-variant-numeric:tabular-nums}
+.fin-strip b.up{color:var(--up)}
+.fin-strip b.dn{color:var(--dn)}
+.fin-strip b .u{font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:700;color:var(--muted);margin-left:2px}
+.fin-strip i{display:block;font-style:normal;font-size:9px;font-weight:700;letter-spacing:.7px;
+  text-transform:uppercase;color:var(--muted);margin-top:6px;line-height:1.25}
+.fin-bar{height:4px;border-radius:2px;background:var(--card3);margin:0 16px 14px;overflow:hidden}
+.fin-bar i{display:block;height:100%;border-radius:2px;background:linear-gradient(90deg,#C9A96E,#E8C98A);
+  transition:width .4s var(--e1)}
+.fin-x{max-height:0;opacity:0;overflow:hidden;padding:0 16px;
+  transition:max-height .35s var(--e1),opacity .2s var(--e1),padding .25s var(--e1)}
+.fin-sec.open .fin-x{max-height:900px;opacity:1;padding:0 16px 12px;border-top:1px solid var(--border2)}
+.fin-x-t{font-size:9px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted);
+  padding:12px 0 4px}
+.fin-x .fx-q{margin-top:12px}
+.fin-more{display:flex;align-items:center;justify-content:space-between;width:100%;padding:12px 2px 4px;
+  border:0;background:none;cursor:pointer;font-family:inherit;font-size:12.5px;font-weight:700;color:var(--gold2)}
+.fin-more:active{opacity:.7}
+/* Долги — бухгалтерской книгой: группы капсом, строка — инициалы, имя, роль,
+   число со знаком; раскрытие — строки-проводки с датой слева. */
+.fin-ledger{padding:0 16px 6px}
+.fin-ledger .fin-grp{padding:14px 0 4px}
+.fin-ledger .fin-h{padding:11px 0}
+.fin-ledger .fin-l{padding:0 0 10px 43px}
+.fin-a.ini{font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;letter-spacing:.3px}
+.fin-v.up::before{content:'+'}
+.fin-v.dn::before{content:'−'}
 /* Приёмка — те же карточки, что в итоге мастера. У основной заявки позиции
    свёрнуты под флажок: их сотня, и разворачивают их по одному району. */
 .xs-fold{display:flex;align-items:center;justify-content:space-between;width:100%;
@@ -5453,70 +5517,66 @@ button.exp-wait:active{transform:scale(.99)}
 <!-- Финансы: долги и удержания, прайс, курс, кошелёк. Всё карточками, без
      подписей: каждая карточка называет себя сама. -->
 <div class="page" id="pg-finance">
+  <!-- Сводка — четыре числа, ради которых сюда заходят; ячейка ведёт к своему
+       разделу. Ниже — разделы одной анатомии: шапка, полоса чисел, тело. -->
+  <div class="fin-hero" id="finHero">
+    <button class="fin-hero-c" onclick="finGo('finDebts')"><b class="up is-skel" id="finHeroThey">0000</b><i>нам должны</i></button>
+    <button class="fin-hero-c" onclick="finGo('finDebts')"><b class="dn is-skel" id="finHeroWe">0000</b><i>должны мы</i></button>
+    <button class="fin-hero-c" onclick="finGo('walBlock')"><b class="is-skel" id="finHeroUsdt">0000</b><i>USDT на кошельке</i></button>
+    <button class="fin-hero-c" onclick="finGo('prBlock')"><b class="is-skel" id="finHeroMark">0000</b><i>наценка</i></button>
+  </div>
+
   <div id="finDebts"></div>
 
-  <div class="cat-block" id="prBlock">
-    <div class="cat-block-hdr" onclick="ordPrices()">
-      <div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
-        stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg></div>
-      <div class="cat-block-title">
-        <div class="cat-block-n">Прайс</div>
-        <div class="cat-block-sub is-skel" id="prSub" style="min-width:150px">0000</div>
-      </div>
-      <svg class="cat-block-chev" viewBox="0 0 24 24" style="transform:rotate(-90deg)"><path d="M6 9l6 6 6-6"/></svg>
+  <div class="fin-sec" id="prBlock">
+    <button class="fin-sec-h" onclick="ordPrices()">
+      <span class="fin-sec-i"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+        stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.5"/></svg></span>
+      <span class="fin-sec-b"><b>Прайс</b><i class="is-skel" id="prSub" style="min-width:150px">0000</i></span>
+      <svg class="fin-sec-go arrow" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg>
+    </button>
+    <div class="fin-strip">
+      <div><b class="is-skel" id="prKpiN">0000</b><i>Позиций</i></div>
+      <div><b class="is-skel" id="prKpiC">0000</b><i>Закупка известна</i></div>
+      <div><b class="is-skel" id="prKpiM">0000</b><i>Наценка</i></div>
     </div>
-    <div class="cat-block-kpis">
-      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="prKpiN">0000</div><div class="cat-kpi-l">Позиций</div></div>
-      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="prKpiC">0000</div><div class="cat-kpi-l">Закупка известна</div></div>
-      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="prKpiM">0000</div><div class="cat-kpi-l">Наценка</div></div>
-    </div>
+    <div class="fin-bar"><i id="prBar" style="width:0"></i></div>
   </div>
 
-  <!-- Кошелёк: сколько лежит и что приходило. Карточка та же, что у акций и
-       каталога, — на «Ещё» их читают подряд. Выше маркетинга, потому что это
-       деньги, а не продвижение. -->
-  <div class="cat-block" id="walBlock">
-    <div class="cat-block-hdr" id="walBlockHdr">
-      <div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
-        stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10h19"/><circle cx="17" cy="14.5" r="1.3"/></svg></div>
-      <div class="cat-block-title">
-        <div class="cat-block-n">Кошелёк</div>
-        <div class="cat-block-sub is-skel" id="walBlockSub" style="min-width:130px">0000</div>
-      </div>
-      <svg class="cat-block-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+  <div class="fin-sec" id="walBlock">
+    <button class="fin-sec-h" id="walBlockHdr">
+      <span class="fin-sec-i"><svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+        stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2.5" y="6" width="19" height="13" rx="2.5"/><path d="M2.5 10h19"/><circle cx="17" cy="14.5" r="1.3"/></svg></span>
+      <span class="fin-sec-b"><b>Кошелёк</b><i class="is-skel" id="walBlockSub" style="min-width:130px">0000</i></span>
+      <svg class="fin-sec-go" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="fin-strip">
+      <div><b class="is-skel" id="walKpiUsdt">0000</b><i>USDT на кошельке</i></div>
+      <div><b class="is-skel" id="walKpiOrd">0000</b><i>Оплачено по счетам</i></div>
+      <div><b class="is-skel" id="walKpiOth">0000</b><i>Не через приложение</i></div>
     </div>
-    <div class="cat-block-kpis">
-      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="walKpiUsdt">0000</div><div class="cat-kpi-l">USDT на кошельке</div></div>
-      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="walKpiOrd">0000</div><div class="cat-kpi-l">USDT оплачено по счетам</div></div>
-      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="walKpiOth">0000</div><div class="cat-kpi-l">USDT не через приложение</div></div>
-    </div>
-    <div class="cat-block-expand">
-      <div class="cat-block-sect-t">История поступлений</div>
+    <div class="fin-x">
+      <div class="fin-x-t">История поступлений</div>
       <div id="walBlockList"></div>
-      <button class="cat-block-open" onclick="event.stopPropagation();accOpen('wallet')">Открыть кошелёк →</button>
+      <button class="fin-more" onclick="event.stopPropagation();accOpen('wallet')"><span>Открыть кошелёк</span>
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></button>
     </div>
   </div>
 
-  <!-- Курс валют. Рядом с кошельком, потому что это тоже про деньги: по
-       этому числу считают зарплату и по нему же принимают наличные, которые
-       водители привозят не в дирхамах. -->
-  <div class="cat-block" id="fxBlock">
-    <div class="cat-block-hdr" id="fxBlockHdr">
-      <div class="card-ico"><svg viewBox="0 0 24 24" width="17" height="17"
+  <div class="fin-sec" id="fxBlock">
+    <button class="fin-sec-h" id="fxBlockHdr">
+      <span class="fin-sec-i"><svg viewBox="0 0 24 24" width="17" height="17"
         fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"
-        stroke-linejoin="round"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg></div>
-      <div class="cat-block-title">
-        <div class="cat-block-n">Курс валют</div>
-        <div class="cat-block-sub is-skel" id="fxSub" style="min-width:150px">0000</div>
-      </div>
-      <svg class="cat-block-chev" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+        stroke-linejoin="round"><path d="M4 8h13l-3-3M20 16H7l3 3"/></svg></span>
+      <span class="fin-sec-b"><b>Курс валют</b><i class="is-skel" id="fxSub" style="min-width:150px">0000</i></span>
+      <svg class="fin-sec-go" viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg>
+    </button>
+    <div class="fin-strip">
+      <div><b class="is-skel" id="fxUsd">0000</b><i>Доллар</i></div>
+      <div><b class="is-skel" id="fxEur">0000</b><i>Евро</i></div>
+      <div><b class="is-skel" id="fxRub">0000</b><i>Рубль</i></div>
     </div>
-    <div class="cat-block-kpis">
-      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="fxUsd">0000</div><div class="cat-kpi-l">Доллар</div></div>
-      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="fxEur">0000</div><div class="cat-kpi-l">Евро</div></div>
-      <div class="cat-kpi"><div class="cat-kpi-v is-skel" id="fxRub">0000</div><div class="cat-kpi-l">Рубль</div></div>
-    </div>
-    <div class="cat-block-expand">
+    <div class="fin-x">
       <input class="fx-q" id="fxQ" placeholder="Поиск валюты" autocomplete="off"
              oninput="fxRender()">
       <div id="fxList"></div>
@@ -14398,6 +14458,7 @@ function walBlockRender(){
   _skel('walKpiUsdt', !!b, b ? fmtUsdt(b.usdt) : '');
   _skel('walKpiOrd',  !!d, d ? fmtUsdt((d.paid || {}).usdt) : '');
   _skel('walKpiOth',  !!t, t ? fmtUsdt(t.direct) : '');
+  finHeroPaint();
 
   const list = document.getElementById('walBlockList');
   if(!list) return;
@@ -14530,7 +14591,7 @@ function finRender(){
       const cls = r.net > 0 ? 'up' : r.net < 0 ? 'dn' : '';
       return `<div class="fin-r ${open ? 'open' : ''}">
         <button class="fin-h" onclick="finToggle('${escS(r.name)}')">
-          <span class="fin-a">${IC(FIN_ROLE[k][1], 15)}</span>
+          <span class="fin-a ini">${escS(String(r.name || '?').trim().slice(0, 2).toUpperCase())}</span>
           <span class="fin-b"><b>${escS(r.name)}</b>
             <i>${r.net > 0 ? 'должен нам' : r.net < 0 ? 'должны мы' : 'в расчёте'} · ${
               r.items.length} ${pluralize(r.items.length,'запись','записи','записей')}</i></span>
@@ -14544,15 +14605,35 @@ function finRender(){
       </div>`;
     }).join('');
   }).join('');
-  box.innerHTML = `<div class="fin-card">
-    <div class="fin-top">
-      <span class="fin-top-b"><b>Долги и удержания</b>
-        <i>${d ? `${rows.length} ${pluralize(rows.length,'человек','человека','человек')}` : 'загрузка…'}</i></span>
-      <span class="fin-top-n"><span class="fin-k up">${d ? fmt(d.they) : '—'}<i>нам должны</i></span>
-        <span class="fin-k dn">${d ? fmt(d.we) : '—'}<i>должны мы</i></span></span>
+  box.innerHTML = `<div class="fin-sec open" id="finDebtsSec">
+    <div class="fin-sec-h" style="cursor:default">
+      <span class="fin-sec-i">${IC('user', 16)}</span>
+      <span class="fin-sec-b"><b>Долги и удержания</b>
+        <i>${d ? (rows.length ? `${rows.length} ${pluralize(rows.length,'человек','человека','человек')}` : 'никто никому не должен') : 'загрузка…'}</i></span>
     </div>
-    ${rows.length ? list : (d ? '<div class="fin-none">Никто никому не должен</div>' : '')}
+    <div class="fin-strip two">
+      <div><b class="up">${d ? fmt(d.they) : '—'}<span class="u">AED</span></b><i>нам должны</i></div>
+      <div><b class="dn">${d ? fmt(d.we) : '—'}<span class="u">AED</span></b><i>должны мы</i></div>
+    </div>
+    ${rows.length ? `<div class="fin-ledger">${list}</div>` : ''}
   </div>`;
+  finHeroPaint();
+}
+
+// Сводка сверху: числа из разделов, как только они загрузились.
+function finHeroPaint(){
+  const d = FIN, w = ACC_WAL, b = w && w.balance;
+  _skel('finHeroThey', !!d, d ? fmt(d.they) : '');
+  _skel('finHeroWe',   !!d, d ? fmt(d.we) : '');
+  _skel('finHeroUsdt', !!b, b ? fmtUsdt(b.usdt) : '');
+  _skel('finHeroMark', PR_MARK !== null, PR_MARK !== null ? PR_MARK : '');
+}
+// Ячейка сводки ведёт к разделу — и раскрывает его, если он сворачивается.
+function finGo(id){
+  const el = document.getElementById(id); if(!el) return;
+  if(el.classList.contains('fin-sec') && el.querySelector('.fin-x')) el.classList.add('open');
+  el.scrollIntoView({block: 'start', behavior: 'smooth'});
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 function finToggle(n){
   if(FIN_OPEN.has(n)) FIN_OPEN.delete(n); else FIN_OPEN.add(n);
@@ -14567,6 +14648,7 @@ async function prLoad(){
   try{ PR_D = await ownerApi.ownerFetch('/api/owner/stock/prices'); }catch(e){ PR_D = null; }
   prPaint();
 }
+let PR_MARK = null;
 function prPaint(){
   const d = PR_D, rows = (d && d.rows) || [];
   const with_ = rows.filter(r => r.cost && r.price_app);
@@ -14576,6 +14658,10 @@ function prPaint(){
   _skel('prKpiN', !!d, d ? fmt(d.total || rows.length) : '');
   _skel('prKpiC', !!d, d ? fmt(d.cost_known || 0) : '');
   _skel('prKpiM', !!d, d ? (with_.length ? '+' + mark + '%' : '—') : '');
+  const bar = document.getElementById('prBar');
+  if(bar) bar.style.width = (d ? Math.max(0, Math.min(100, d.cost_cover || 0)) : 0) + '%';
+  PR_MARK = d ? (with_.length ? '+' + mark + '%' : '—') : null;
+  finHeroPaint();
 }
 
 (function initWalBlock(){

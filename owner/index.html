@@ -16648,7 +16648,7 @@ async function walRefresh(btn){
 // переключатель, ниже — выбранный. Итог «оплачено по счетам» — только у
 // текущего: он про заказы, а не про адрес.
 let WAL_SEL = -1;
-function walPick(i){
+function walSwitch(i){
   WAL_SEL = i;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   if(ACC_WAL) walBody(ACC_WAL);
@@ -16663,8 +16663,8 @@ function walBody(d){
   _setText('accSub', v && v.address ? v.address : 'USDT · TRC-20');
   const переключатель = old.length ? `<div class="periods wal-sw" id="walSw" style="--count:${1 + old.length}">
       <div class="period-pill"></div>
-      <button class="${WAL_SEL < 0 ? 'on' : ''}" onclick="walPick(-1)">Кошелёк</button>
-      ${old.map((w, i) => `<button class="${WAL_SEL === i ? 'on' : ''}" onclick="walPick(${i})">${
+      <button class="${WAL_SEL < 0 ? 'on' : ''}" onclick="walSwitch(-1)">Кошелёк</button>
+      ${old.map((w, i) => `<button class="${WAL_SEL === i ? 'on' : ''}" onclick="walSwitch(${i})">${
         old.length > 1 ? 'Старый ' + (i + 1) : 'Старый кошелёк'}</button>`).join('')}
     </div>` : '';
   // Не дозвонились до сети — это не «переводов нет». Показываем прямо, иначе

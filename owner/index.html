@@ -15909,7 +15909,7 @@ const PATH_STEPS = ['Заявка', 'Магазин дал', 'Приняли'];
 // раньше «поставка идёт» писалось в трёх местах по трём разным правилам.
 function supStage(){
   const list = (ACC_SUP && ACC_SUP.list) || [];
-  const sup = (ACC_SUP && ACC_SUP.open) || list.find(x => x.kind !== 'extra') || null;
+  const sup = (ACC_SUP && ACC_SUP.open) || _supNow(list).find(x => x.kind !== 'extra') || null;
   if(!sup) return {k:'none', sup:null, all:0, done:0, took:0,
                    t:'Магазин ещё не ответил', s:'загрузите ответ — появятся задачи'};
   const tasks = Object.values(sup.tasks || {});
@@ -18201,8 +18201,24 @@ let SUP_ID = null, SUP_D = null, SUP_BUSY = false;
 
 // Основная заявка — открытая и не на другую базу. Заявки на другие базы
 // (kind=extra) живут своим списком и путь закупки на хабе не двигают.
+// Заявки текущей смены. «Открыта» само по себе не значит «сегодняшняя»:
+// поставка закрывается, только когда закрыт последний район, — и заявка, у
+// которой один район так и не отметили, висит открытой месяцами. Их набралось
+// шесть штук из августа, и все шесть выходили в вопрос «какую отменить».
+//
+// Смена идёт с полудня, поэтому у закупа свой день: вечерняя заявка и её
+// ночная приёмка — одна смена, и это тот же день, что стоит в окошке дня.
+// Дня нет вовсе — заявка не сегодняшняя: он ставится при загрузке ответа
+// магазина, а пустым остался у самых старых.
+function _supNow(list){
+  const day = (ORD && ORD.d && ORD.d.day) || accDay();
+  return (list || []).filter(x => String(x.day || '') === day);
+}
+
+// Заявка смены — самая свежая: ответ магазина, загруженный второй раз, делает
+// новую поставку, и старая остаётся открытой, но говорить о ней уже нечего.
 function _supMain(list){
-  return (list || []).find(x => x.status === 'open' && x.kind !== 'extra') || null;
+  return _supNow(list).find(x => x.status === 'open' && x.kind !== 'extra') || null;
 }
 
 async function accSupply(goto, district, sid){
@@ -18223,7 +18239,7 @@ async function accSupply(goto, district, sid){
     catch(e){ list = []; }
     ACC_SUP = {list, open: _supMain(list)};
   }
-  const cur = _supMain(list) || list.find(x => x.kind !== 'extra');
+  const cur = _supMain(list) || _supNow(list).find(x => x.kind !== 'extra');
   if(!cur){ supEmpty(); return; }
   await supLoad(cur.supply_id);
 }
@@ -18245,7 +18261,7 @@ async function accShort(){
     catch(e){ list = []; }
     ACC_SUP = {list, open: _supMain(list)};
   }
-  const cur = _supMain(list) || list.find(x => x.kind !== 'extra');
+  const cur = _supMain(list) || _supNow(list).find(x => x.kind !== 'extra');
   if(!cur){ shortBody(null); return; }
   if(!SUP_D || SUP_D.supply_id !== cur.supply_id){
     SUP_ID = cur.supply_id;
@@ -18344,7 +18360,9 @@ function _xState(x){
 }
 
 function pathExtra(){
-  const ex = _xList(), open = ex.filter(x => x.status === 'open');
+  // В работе — только заявки этой смены. Позапрошлая, у которой не отметили
+  // последний район, остаётся открытой навсегда и «в работе» уже не значит.
+  const ex = _xList(), open = _supNow(ex).filter(x => x.status === 'open');
   const st = open.length ? _xState(open[0]) : null;
   return `<button class="pnav-r pbig ttl" onclick="accExtra()">
     <span class="pnav-i big live">${ICO_BASE}</span>
@@ -19925,12 +19943,14 @@ async function _supFile(){
 // Задним числом кнопки нет вовсе. Заявка живёт одним днём: отменять вчерашнюю
 // нечего — её либо уже привезли, либо она давно закрыта, — а кнопка, которая
 // выглядит рабочей и ничего не делает, хуже её отсутствия.
-// Открытые заявки, которые можно отменить: основная и доп. на другие базы.
-// Основная первой: её отменяют чаще, и в вопросе ей стоять сверху.
+// Что можно отменить: открытые заявки этой смены — основная и доп. на другие
+// базы. Основная одна и первой: заявок с прошлых смен в вопросе быть не
+// должно, их там набиралось по шесть, и отменить среди них было нечего.
 function _supOpenAll(){
-  const list = (ACC_SUP && ACC_SUP.list) || [];
-  const open = list.filter(x => x.status === 'open' && x.supply_id);
-  return open.filter(x => x.kind !== 'extra').concat(open.filter(x => x.kind === 'extra'));
+  const open = _supNow((ACC_SUP && ACC_SUP.list) || [])
+    .filter(x => x.status === 'open' && x.supply_id);
+  const main = open.filter(x => x.kind !== 'extra').slice(0, 1);
+  return main.concat(open.filter(x => x.kind === 'extra'));
 }
 
 // Кнопка должна знать, про какую заявку экран, и экран ей это говорит сам.
@@ -19982,11 +20002,15 @@ function supCancelAsk(){
   back.addEventListener('click', closePinPop);
   const box = document.createElement('div');
   box.className = 'pin-pop crw-ask';
+  // Две доп. заявки на одну базу за смену — редкость, но кнопки назвались бы
+  // одинаково, и отменять пришлось бы наугад. Тогда разводим их временем.
+  const имена = all.map(x => _supName(x, true));
   box.innerHTML = `<div class="crw-ask-t">Какую заявку отменить?</div>
     <div class="crw-ask-s">Задачи исчезнут у водителей. Принятое останется на складе.</div>
-    ${all.map(x => `<button class="crw-ask-b bad"
+    ${all.map((x, i) => `<button class="crw-ask-b bad"
         onclick="closePinPop(); supCancel('${escS(x.supply_id)}', true)"
-      >${escS(_supName(x, true))}</button>`).join('')}
+      >${escS(имена.filter(n => n === имена[i]).length > 1
+              ? `${имена[i]} · ${_hm(x.at)}` : имена[i])}</button>`).join('')}
     <button class="crw-ask-b" onclick="closePinPop()">Не отменять</button>`;
   document.body.append(back, box);
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}

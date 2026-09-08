@@ -23,7 +23,6 @@ import logging
 import re
 import zipfile
 from datetime import datetime, timezone
-from zoneinfo import ZoneInfo
 
 from aiohttp import web
 
@@ -1928,8 +1927,12 @@ async def handle_extra_create(request):
     # это подпись «из недобора магазина» рядом со временем и автором.
     source = "shortfall" if str(body.get("source") or "") == "shortfall" else "manual"
     from_supply = str(body.get("from_supply") or "").strip()[:40]
-    doc = {"_id": sid, "at": now, "status": "open",
-           "day": datetime.now(ZoneInfo("Asia/Dubai")).strftime("%Y-%m-%d"),
+    # День смены, а не календарный: смена идёт с полудня, и заявка, собранная
+    # ночью, относится к уходящей смене — как основная, у которой день берётся
+    # из снимка склада. По календарю она попадала в следующий день и пропадала
+    # с хаба той смены, в которую её собрали.
+    import stock_routes as SR
+    doc = {"_id": sid, "at": now, "status": "open", "day": SR._biz_day(),
            "kind": "extra", "base": base, "source": source, "from_supply": from_supply,
            "by": request.get("owner_id") or 0, "by_name": who,
            "items": items, "dropped": [], "short": [], "extra": [], "unknown": [],

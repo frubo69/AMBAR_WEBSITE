@@ -3874,6 +3874,15 @@ async def get_stock_transfers(day: str) -> list:
     return await db.stock_transfers.find({"day": day}).to_list(length=5000)
 
 
+async def get_stock_transfers_since(day_from: str) -> list:
+    """Перемещения с этого дня по сегодняшний — для истории. Потолок тот же:
+    сканом пишется строка на бутылку, и месяц переездов — это тысячи строк."""
+    db = _db_or_none()
+    if db is None: return []
+    return await db.stock_transfers.find({"day": {"$gte": day_from}}) \
+        .sort([("day", -1), ("at", -1)]).to_list(length=5000)
+
+
 async def get_stock_transfer(tid: str) -> dict | None:
     from bson import ObjectId
     db = _db_or_none()

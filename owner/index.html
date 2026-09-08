@@ -745,7 +745,35 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .stk-mid:has(> .qd-page){display:flex;flex-direction:column}
 .qd-page{flex:1;display:flex;flex-direction:column;min-height:100%}
 .qd-page > .stk-drs{flex:1;justify-content:stretch}
-.qd-page > .stk-drs > .stk-dr{flex:1 1 0;min-height:64px;max-height:108px}
+.qd-page > .stk-drs > .stk-dr{flex:1 1 0;min-height:64px;max-height:140px}
+/* «Внести / удалить товар»: точки той же карточкой, но занимают экран так же,
+   как плитки на «Учёте» — делят свободную высоту, не растягиваясь до полосы. */
+.qd-page > .ord-dists{flex:1;display:flex;flex-direction:column}
+.qd-page > .ord-dists > .shl-card{flex:1 1 0;display:flex;align-items:stretch;
+  min-height:64px;max-height:140px;padding-top:0;padding-bottom:0}
+.qd-page > .ord-dists > .shl-card > .shl-h{flex:1;min-height:0}
+/* Четыре плитки склада: два ряда по две. Швы — слева у правых и сверху у
+   нижних; общий шов «слева у каждой следующей» ставил черту и первой плитке
+   второго ряда. */
+.stk-tiles{margin-top:2px;flex:0 0 auto}
+.stk-tiles .acc-cell:nth-child(3){box-shadow:inset 0 1px 0 var(--border2)}
+.stk-tiles .acc-cell:nth-child(4){box-shadow:inset 1px 1px 0 var(--border2)}
+/* Выбор офиса поверх камеры перемещения: лист снизу, камера за ним темнеет. */
+.mov-sheet{position:absolute;inset:0;z-index:6;display:none;flex-direction:column;
+  justify-content:flex-end;padding:14px 14px calc(14px + var(--safe-bottom));
+  background:rgba(4,4,12,.78)}
+.mov-sheet.on{display:flex}
+.mov-sh{border-radius:20px;background:var(--bg2);border:1px solid var(--border2);
+  padding:16px 14px 12px;display:flex;flex-direction:column;gap:8px}
+.mov-sh-h{margin-bottom:4px}
+.mov-sh-h b{display:block;font-size:16px;font-weight:700;line-height:1.25}
+.mov-sh-h i{display:block;font-style:normal;font-size:12px;color:var(--muted);margin-top:4px}
+.mov-sh-t{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
+  color:var(--muted);margin:6px 0 2px}
+.mov-sh .stk-mv-pick{margin:0}
+.mov-sh-x{margin-top:6px;padding:13px;border-radius:14px;border:1px solid var(--border2);
+  background:none;color:var(--sub);font-family:inherit;font-size:14px;font-weight:600;cursor:pointer}
+.mov-sh-x:active{transform:scale(.98)}
 .stk-dr{display:flex;align-items:center;gap:13px;width:100%;padding:12px 14px;
   border-radius:14px;cursor:pointer;font-family:inherit;text-align:left;
   color:var(--text);background:var(--card);border:1px solid var(--border2)}
@@ -12018,10 +12046,12 @@ function stkBack(){
   if(STK.view === 'scan'){ stkScanDone(); return; }
   // Из камеры переезда — к выбору офиса, а не сразу в список: чаще всего назад
   // жмут именно чтобы сменить, куда везут.
-  if(STK.view === 'move-scan'){ try{ SCAN.stop(); }catch(e){} stkMovePick(); return; }
+  // Из камеры переезда — туда, откуда пришли: в список района или на склад.
+  if(STK.view === 'move-scan'){ movCancel(); stkMoveDone(); return; }
   if(STK.view === 'move-pick'){ stkMoveDone(); return; }
   if(STK.view === 'audit-one'){ stkAudits(); return; }
-  if(STK.view === 'moves'){ stkPicker(); return; }
+  if(STK.view === 'moves' || STK.view === 'moves-hist' || STK.view === 'audits'
+     || STK.view === 'audit-pick'){ stkPicker(); return; }
   if(STK.view === 'pick') closeStock(); else stkPicker();
 }
 function stkChanged(){
@@ -12078,12 +12108,21 @@ async function stkPicker(){
     // Реестр кодов — вторым запросом рядом: он отвечает на первый вопрос
     // склада («сколько бутылок сейчас лежит»), а пересчёт — на второй
     // («сходится ли»). Ждать их по очереди значит удваивать паузу.
-    [st, reg, STK.val] = await Promise.all([
+    // Истории — тем же залпом: их числа стоят на плитках, и ждать их после
+    // районов значило бы показывать плитки с пустыми цифрами.
+    let aud, tr;
+    [st, reg, STK.val, aud, tr] = await Promise.all([
       ownerApi.ownerFetch('/api/owner/stock/status', {params:{day: accDay()}}),
       ownerApi.ownerFetch('/api/owner/qr').catch(() => null),
       ownerApi.ownerFetch('/api/owner/stock/value', {params:{day: accDay()}})
         .catch(() => null),
+      ownerApi.ownerFetch('/api/owner/stock/audits').catch(() => null),
+      ownerApi.ownerFetch('/api/owner/stock/transfers', {params:{days: 30}})
+        .catch(() => null),
     ]);
+    STK.status = st; STK.reg = reg;
+    STK.audits = (aud && aud.audits) || [];
+    STK.moves30 = (tr && tr.transfers) || [];
   }
   catch(e){
     document.getElementById('stkMid').innerHTML =
@@ -12095,20 +12134,119 @@ async function stkPicker(){
   // Плитками, а не строками: пять строк во всю ширину оставляли под собой
   // полэкрана пустоты. Число на плитке — то, ради чего сюда заходят: недостача
   // в деньгах там, где считали, и прочерк там, где ещё нет.
-  const left = (reg && reg.left_by_district) || {};
-  const без = (reg && reg.unscanned) || {};
-  // Две истории — отдельными карточками внизу и своими страницами. На главном
-  // экране склада им делать нечего: сегодняшняя работа и вчерашние записи —
-  // разные вопросы, и список переездов посреди районов только рябил.
+  // Четыре плитки той же анатомии, что на «Учёте»: две работы и две истории.
+  // Районы с главной ушли: их спрашивает ревизия, когда до них доходит дело,
+  // а числа по районам открывает карточка стоимости.
+  const today = st.day || accDay();
+  const сегодня = (STK.moves30 || []).filter(m => m.day === today)
+    .reduce((a, m) => a + (m.bottles || m.qty || 0), 0);
+  const tile = (go, ico, t, v, u, sub) => `<button class="acc-cell" onclick="${go}">
+      <span class="acc-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+        stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ico}</svg></span>
+      <span class="acc-t">${t}</span>
+      <span class="acc-n"><span class="acc-v">${v}</span><i>${escS(u)}</i></span>
+      <span class="acc-s">${escS(sub)}</span>
+    </button>`;
+  const I_AUD = '<path d="M9 11l2 2 4-4"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>';
+  const I_MOV = '<path d="M4 8h14M15 5l3 3-3 3M20 16H6M9 13l-3 3 3 3"/>';
+  const I_HAUD = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
+  const I_HMOV = '<circle cx="12" cy="12" r="9"/><path d="M8 12h8M13 9l3 3-3 3"/>';
+  const nAud = (STK.audits || []).length, nMov = (STK.moves30 || []).length;
   document.getElementById('stkMid').innerHTML =
     stkValueCard(reg) +
-    `<div class="stk-grp2"><span>Районы</span></div>
-     <div class="stkd">${(st.districts || []).map(d => stkDistRow(d, left, без)).join('')}</div>
-     <button class="stkv-go stk-hist-go" onclick="stkHistory()">
-       <span>История</span><u>ревизии и перемещения</u>
-       <em><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
-            stroke-width="2.6" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></em>
-     </button>`;
+    `<div class="acc-group stk-tiles">
+      ${tile('stkAuditPick()', I_AUD, 'Ревизия', fmt(st.done || 0), `из ${st.total || 0}`,
+             'район / камера / список')}
+      ${tile('stkMoveStart()', I_MOV, 'Перемещение', fmt(сегодня), 'сегодня',
+             'скан / куда везём')}
+      ${tile('stkAudits()', I_HAUD, 'История ревизий', fmt(nAud),
+             pluralize(nAud, 'ревизия', 'ревизии', 'ревизий'), 'по районам / расхождения')}
+      ${tile('stkMovesHist()', I_HMOV, 'История перемещений', fmt(nMov), 'за 30 дней',
+             'по дням / откуда и куда')}
+    </div>`;
+}
+
+// ── Ревизия: сперва район ───────────────────────────────────────────────────
+// Список районов занимает экран целиком, той же анатомией, что выбор точки в
+// «Внести / удалить товар». Нажали район — открывается его лист, включается
+// ревизия и сразу камера; список для ручного досчёта ждёт под ней.
+async function stkAuditPick(){
+  STK.view = 'audit-pick'; STK.sheet = null;
+  _setRail('stkRail', '');
+  _stkHead('Ревизия', 'выберите район', false);
+  document.getElementById('stkTools').style.display = 'none';
+  const box = document.getElementById('stkMid');
+  if(!STK.status || !STK.districts){
+    box.innerHTML = '<div class="stk-empty">Загрузка…</div>';
+    try{
+      STK.status = await ownerApi.ownerFetch('/api/owner/stock/status', {params:{day: accDay()}});
+      STK.reg = await ownerApi.ownerFetch('/api/owner/qr').catch(() => null);
+      STK.districts = STK.status.districts;
+    }catch(e){
+      box.innerHTML = '<div class="stk-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+      return;
+    }
+  }
+  const left = (STK.reg && STK.reg.left_by_district) || {};
+  const без = (STK.reg && STK.reg.unscanned) || {};
+  box.innerHTML = `<div class="qd-page"><div class="stk-drs">${
+    (STK.status.districts || []).map(d => stkDistRow(d, left, без, 'stkAuditGo')).join('')
+  }</div></div>`;
+}
+
+async function stkAuditGo(id){
+  distRemember('stk', id);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  await stkOpen(id);
+  if(STK.view !== 'sheet' || STK.district !== id || !STK.sheet) return;
+  if(!STK.audit) stkAuditToggle();
+  // Камера узнаёт бутылки по кодам. Где кодов нет, ей нечего узнавать — сразу
+  // список, без вопроса про реестр: человек уже здесь ради пересчёта.
+  const coded = (STK.sheet.rows || []).filter(r => r.coded > 0).length;
+  if(coded) stkScan();
+  else _toast('Кодов на точке нет — считаем списком');
+}
+
+// ── История перемещений: своя страница, по дням ─────────────────────────────
+// Сегодняшние строки можно убрать крестиком — как и раньше в списке за день.
+// Вчерашние стоят как есть: это уже запись, а не работа.
+async function stkMovesHist(){
+  STK.view = 'moves-hist'; _setRail('stkRail', '');
+  _stkHead('История перемещений', 'загрузка…', false);
+  const box = document.getElementById('stkMid');
+  box.innerHTML = '<div class="stk-none">Загрузка…</div>';
+  let res;
+  try{ res = await ownerApi.ownerFetch('/api/owner/stock/transfers', {params:{days: 30}}); }
+  catch(e){
+    box.innerHTML = '<div class="stk-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+    return;
+  }
+  STK.moves = res.transfers || []; STK.moves30 = STK.moves;
+  const today = res.day || accDay();
+  const n = STK.moves.length;
+  _stkHead('История перемещений', n
+    ? `${n} ${pluralize(n, 'перемещение', 'перемещения', 'перемещений')} за 30 дней`
+    : 'за 30 дней', false);
+  const days = [], by = {};
+  STK.moves.forEach((m, i) => {
+    const d = m.day || '';
+    if(!by[d]){ by[d] = []; days.push(d); }
+    by[d].push(i);
+  });
+  box.innerHTML = days.length ? days.map(d => `
+    <div class="stk-grp2"><span>${escS(d === today ? 'Сегодня' : _dayName(d))}</span></div>
+    <div class="stkd">${by[d].map(i => { const m = STK.moves[i]; return `
+      <div class="stk-dr" style="cursor:default">
+        <span class="stk-dr-b">
+          <span class="stk-dr-n">${escS(m.product_name || m.product_id || '')}</span>
+          <span class="stk-dr-s">${escS(m.from_name || '')} → ${escS(m.to_name || '')}${
+            m.bottles ? ' · сканом' : ''}</span>
+        </span>
+        <span class="stk-dr-v">${m.bottles || m.qty || 0}<i>${m.bottles ? 'бут' : 'шт'}</i></span>
+        ${d === today
+          ? `<button class="stk-mvr-x" title="Убрать" onclick="stkMoveDel(${i})">✕</button>` : ''}
+      </div>`; }).join('')}</div>`).join('')
+    : '<div class="stk-empty">За 30 дней ничего не перевозили</div>';
 }
 
 // Сколько бутылок лежит на складе прямо сейчас — первое, что должен отвечать
@@ -12179,7 +12317,8 @@ function stkHave(reg){
 // Район строкой, а не плиткой: плитки на всю ширину съедали по экрану на пять
 // районов, и до перемещений человек доходил прокруткой. В строке помещается
 // то же самое — код, название, сколько бутылок лежит и чем кончился пересчёт.
-function stkDistRow(d, left, без){
+function stkDistRow(d, left, без, go){
+  go = go || 'stkGo';
   const n = left[d.id] || 0;
   const b = (без || {})[d.id] || 0;
   // Непросканированное важнее итога пересчёта: пересчёт можно повторить
@@ -12189,7 +12328,7 @@ function stkDistRow(d, left, без){
     : (d.done
         ? (d.short_aed ? [`не хватает ${fmt(d.short_aed)} AED`, 'dn'] : ['всё сошлось', 'ok'])
         : ['ещё не считали', '']);
-  return `<button class="stk-dr" onclick="stkGo('${d.id}')">
+  return `<button class="stk-dr" onclick="${go}('${d.id}')">
     <span class="stk-dr-c">${escS(d.code || '')}</span>
     <span class="stk-dr-b">
       <span class="stk-dr-n">${escS(d.name || '')}</span>
@@ -12295,6 +12434,7 @@ async function stkMoveDel(i){
   // Перерисовываем то, откуда удаляли: своя страница перемещений, страница
   // истории или — если экран старый — прежний блок на панели.
   if(STK.view === 'moves') stkMovesPage();
+  else if(STK.view === 'moves-hist') stkMovesHist();
   else if(STK.view === 'hist') stkHistPaint();
   else stkLoadMoves();
 }
@@ -12547,20 +12687,20 @@ async function stkAudits(){
       <div><span>Ревизий</span><b>${list.length}</b></div>
       <div><span>Расхождений всего</span><b style="color:${tMis?'var(--dn)':'var(--up)'}">${tMis}</b></div>
       <div><span>Не хватило на</span><b style="color:${tShort?'var(--dn)':'var(--up)'}">${fmt(tShort)} AED</b></div>
-    </div>` + list.map((a,i)=>`
-    <button class="stk-pick" onclick="stkAuditOpen(${i})" style="margin-bottom:7px">
-      <span class="stk-pick-c" style="color:${a.mismatched?'var(--dn)':'var(--up)'}">${escS(a.district_code)}</span>
-      <span class="stk-pick-b">
-        <span class="stk-pick-n">${escS(a.district_name)} · ${escS(a.day)}</span>
-        <span class="stk-pick-s">${a.mismatched
+    </div><div class="stkd">` + list.map((a,i)=>`
+    <button class="stk-dr" onclick="stkAuditOpen(${i})">
+      <span class="stk-dr-c">${escS(a.district_code)}</span>
+      <span class="stk-dr-b">
+        <span class="stk-dr-n">${escS(a.district_name)}</span>
+        <span class="stk-dr-s ${a.mismatched ? 'dn' : 'ok'}">${escS(_dayName(a.day))} · ${a.mismatched
           ? `${a.mismatched} ${pluralize(a.mismatched,'расхождение','расхождения','расхождений')} · не хватает ${fmt(a.short_aed)} AED`
           : `всё сошлось · ${a.total} ${pluralize(a.total,'позиция','позиции','позиций')}`}${
           // Чем проходили — часть итога: «сошлось» по камере и «сошлось» по
           // галочкам через месяц стоят разного.
           a.scan_qty ? ` · камерой ${fmt(a.scan_qty)}` : ''}</span>
       </span>
-      <span style="color:var(--muted);font-size:15px">›</span>
-    </button>`).join('');
+      <span class="stk-dr-go">›</span>
+    </button>`).join('') + '</div>';
 }
 
 async function stkAuditOpen(i){
@@ -12980,7 +13120,7 @@ async function stkScan(){
           <div class="scan-strip" id="audFeed"></div>
           <div class="scan-dockbar">
             <button class="scan-undo" id="audUndo" onclick="audUndo()" disabled>Отменить</button>
-            <button class="scan-go" onclick="stkScanDone()">Готово</button>
+            <button class="scan-go" onclick="stkScanDone()">Досчитать вручную</button>
           </div>
         </div>
       </div>
@@ -13224,7 +13364,7 @@ function stkItem(r){
 // меняет офис (иначе ревизия на новом месте скажет «числится на B2»), а в
 // перемещениях появляется поправка к ожидаемому остатку (иначе переезд
 // выглядел бы недостачей у одного района и излишком у другого).
-let MOV = {to:'', rows:[], total:0};
+let MOV = {to:'', rows:[], total:0, pending:null};
 
 // Своя очередь отправки: у прохода ревизии она занята своим обработчиком, и
 // общая означала бы, что ответ про переехавшую бутылку прилетает в чужой экран.
@@ -13249,8 +13389,9 @@ const MOV_V = {
 
 async function stkMoveStart(){
   if(!await accAskBack('Перемещение')) return;
-  MOV = {to:'', rows:[], total:0};
-  stkMovePick();
+  MOV = {to:'', rows:[], total:0, pending:null};
+  if(!STK.districts) await stkLoadContext();
+  stkMoveCam();
 }
 
 // Шаг первый и единственный до камеры: куда везём. Офис выбирается один раз на
@@ -13283,12 +13424,15 @@ async function stkMovePick(){
           pluralize(MOV.total,'бутылка','бутылки','бутылок')}.</div>` : '');
 }
 
-async function stkMoveCam(to){
-  MOV.to = to;
+// Камера — первый и единственный экран перемещения. Офис назначения
+// спрашивается после каждого скана: код сказал, что за бутылка и где она
+// числится, — остаётся ответить, куда её везут. Ответ пишется в две книги
+// сразу (остаток и реестр кодов с датой), это делает сервер.
+async function stkMoveCam(){
+  MOV.to = ''; MOV.pending = null;
   STK.view = 'move-scan';
   _setRail('stkRail', '');
-  const d = (STK.districts || []).find(x => x.id === to) || {};
-  _stkHead('Переместить', `на ${(d.code || '') + ' ' + (d.name || '')}`.trim(), false);
+  _stkHead('Переместить', 'сканируйте бутылку', false);
   document.getElementById('stkTools').style.display = 'none';
   const seg = document.getElementById('stkSeg'); if(seg) seg.style.display = 'none';
   document.getElementById('stkMid').innerHTML = `
@@ -13310,11 +13454,6 @@ async function stkMoveCam(to){
         </div>
         <div class="scan-tip" id="qrHint">Наведите на код крышки</div>
         <div class="scan-hud-bot">
-          <button class="scan-dest" onclick="stkMovePick()">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
-                 stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M4 12h14M14 7l5 5-5 5"/></svg>
-            ${escS(d.code || '')}<u>сменить</u></button>
           <div class="scan-strip" id="movFeed"></div>
           <div class="scan-dockbar">
             <button class="scan-undo" id="movUndo" onclick="movUndo()" disabled>Отменить</button>
@@ -13322,6 +13461,7 @@ async function stkMoveCam(to){
           </div>
         </div>
       </div>
+      <div class="mov-sheet" id="movSheet"></div>
     </div>`;
   scanLive('stkOv');
   movPaint();
@@ -13339,15 +13479,85 @@ async function stkMoveCam(to){
   if(t) t.style.display = SCAN.hasTorch() ? '' : 'none';
 }
 
-function movSave(code){
-  code = String(code || '').trim(); if(!code || !MOV.to) return;
-  MOV.rows.unshift({code, state:'sending', to: MOV.to, name:'', label:''});
+async function movSave(code){
+  code = String(code || '').trim(); if(!code) return;
+  // Пока открыт выбор офиса, камера ждёт: вторую бутылку не глотаем и не
+  // запоминаем — её поднесут ещё раз, когда с первой решат.
+  if(MOV.pending){ SCAN.seen.delete(code); SCAN.seenAt.delete(code); return; }
+  MOV.pending = code;
+  qrFlash('ok', 'смотрю…');
+  let doc = null, verdict = '';
+  try{ doc = await ownerApi.ownerFetch('/api/owner/qr/code/' + encodeURIComponent(code)); }
+  catch(e){ verdict = (e && e.status === 404) ? 'unknown' : 'fail'; }
+  if(MOV.pending !== code) return;                    // успели выйти из камеры
+  if(doc){
+    const st = doc.status || 'active';
+    if(st !== 'active') verdict = MOV_V[st] ? st : 'unknown';
+    else if(!(STK.districts || []).some(d => d.id === doc.district)) verdict = 'nohome';
+  }
+  if(verdict === 'fail'){
+    MOV.pending = null;
+    SCAN.seen.delete(code); SCAN.seenAt.delete(code);
+    qrFlash('err', 'не проверилась'); return;
+  }
+  if(verdict){
+    MOV.pending = null;
+    MOV.rows.unshift({code, state:'dup', verdict, name: doc?.product_name || '',
+                      label: doc?.label || ''});
+    const [flash, say] = MOV_V[verdict] || MOV_V.unknown;
+    qrFlash(flash, say); movPaint(); return;
+  }
+  movChoose(code, doc);
+}
+
+// Куда везём — спрашиваем на каждую бутылку, поверх камеры. Текущий офис в
+// списке не стоит: везти «сюда же» нельзя, и кнопка для этого не нужна.
+function movChoose(code, doc){
+  const sh = document.getElementById('movSheet');
+  if(!sh){ MOV.pending = null; return; }
+  const cur = doc.district || '';
+  const from = (STK.districts || []).find(d => d.id === cur) || {};
+  sh.innerHTML = `<div class="mov-sh">
+    <div class="mov-sh-h">
+      <b>${escS(doc.product_name || doc.label || code)}</b>
+      <i>${escS(doc.label ? doc.label + ' · ' : '')}сейчас на ${escS(
+        `${from.code || ''} ${from.name || ''}`.trim())}</i>
+    </div>
+    <div class="mov-sh-t">Куда везём</div>
+    ${(STK.districts || []).filter(d => d.id !== cur).map(d => `
+      <button class="stk-mv-pick" onclick="movPickTo('${d.id}')">
+        <span class="stk-mv-code">${escS(d.code || '')}</span>
+        <span class="stk-mv-pick-b"><span class="stk-mv-pick-n">${escS(d.name || '')}</span></span>
+      </button>`).join('')}
+    <button class="mov-sh-x" onclick="movCancel()">Не перевозить</button>
+  </div>`;
+  sh.classList.add('on');
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+
+function movPickTo(to){
+  const code = MOV.pending; if(!code) return;
+  const sh = document.getElementById('movSheet');
+  if(sh){ sh.classList.remove('on'); sh.innerHTML = ''; }
+  MOV.pending = null;
+  MOV.rows.unshift({code, state:'sending', to, name:'', label:''});
   movPaint();
   // Зелёная вспышка сразу, не дожидаясь сервера: рука уже тянется к следующей
   // бутылке. Возразит — цвет сменится, но это редкий случай.
   qrFlash('ok', 'переехала');
   movQ().push({path:'/api/owner/stock/transfer/scan',
-               body:{code, to: MOV.to, day: (STK.sheet||{}).day || '', as:_meName()}, code});
+               body:{code, to, day: (STK.sheet||{}).day || '', as:_meName()}, code});
+}
+
+// Передумали — бутылку забывает и сканер: иначе камера будет молчать на неё,
+// когда поднесут снова.
+function movCancel(){
+  const code = MOV.pending;
+  const sh = document.getElementById('movSheet');
+  if(sh){ sh.classList.remove('on'); sh.innerHTML = ''; }
+  MOV.pending = null;
+  if(code){ SCAN.seen.delete(code); SCAN.seenAt.delete(code); }
+  try{ qrFlashClear(); }catch(e){}
 }
 
 function movDone(err, r, job){
@@ -13437,7 +13647,7 @@ async function movUndo(){
 async function stkMoveDone(){
   try{ SCAN.stop(); }catch(e){}
   const moved = MOV.total;
-  MOV = {to:'', rows:[], total:0};
+  MOV = {to:'', rows:[], total:0, pending:null};
   if(!STK.district || !STK.sheet){ stkPicker(); return; }
   STK.view = 'sheet';
   if(moved){

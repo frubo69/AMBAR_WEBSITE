@@ -908,7 +908,18 @@ async def handle_transfers(request):
     человек хочет читать. Тридцать одинаковых строк «B1 → B3» — это «перевезли
     тридцать бутылок», и показывать надо так."""
     day = (request.query.get("day") or "").strip() or _biz_day()
-    rows, groups, out = await db.get_stock_transfers(day), {}, []
+    # История: ?days=N отдаёт последние N дней, сгруппированные так же, но с
+    # днём в ключе группы — переезд вторника и переезд среды не сливаются.
+    try:
+        days = int(request.query.get("days") or 0)
+    except ValueError:
+        days = 0
+    if days > 0:
+        since = (datetime.strptime(_biz_day(), "%Y-%m-%d") - timedelta(days=days - 1))
+        rows = await db.get_stock_transfers_since(since.strftime("%Y-%m-%d"))
+    else:
+        rows = await db.get_stock_transfers(day)
+    groups, out = {}, []
     for r in rows:
         r["id"] = str(r.pop("_id", ""))
         r["from_name"] = OFFICE_NAMES.get(r.get("from"), r.get("from"))
@@ -918,7 +929,7 @@ async def handle_transfers(request):
             r["bottles"] = 0
             out.append(r)
             continue
-        key = (r.get("from"), r.get("to"), r.get("product_id"))
+        key = (r.get("day"), r.get("from"), r.get("to"), r.get("product_id"))
         g = groups.get(key)
         if not g:
             g = dict(r, ids=[], bottles=0, qty=0.0, id="")
@@ -930,7 +941,11 @@ async def handle_transfers(request):
     for g in out:
         if g.get("bottles"):
             g["qty"] = _num(g["qty"])
-    return web.json_response({"day": day, "transfers": out}, headers=CORS_HEADERS)
+    if days > 0:
+        out.sort(key=lambda g: (str(g.get("day") or ""), str(g.get("at") or "")), reverse=True)
+    return web.json_response({"day": day, "days": days, "transfers": out},
+                             headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
 
 
 # ── заявка ───────────────────────────────────────────────────────────────────

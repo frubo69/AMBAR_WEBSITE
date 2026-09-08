@@ -2957,6 +2957,12 @@ button.path:active{transform:scale(.995)}
   color:var(--text);font-family:'DM Sans',sans-serif;font-size:14px;font-weight:700;
   font-variant-numeric:tabular-nums;outline:none;-webkit-appearance:none}
 .ord-st input.fixed{color:var(--gold2)}
+/* Раскрытая строка заявки: один крупный счётчик по центру, без подписей —
+   число и две кнопки, за которыми сюда и пришли. */
+.ord-c-big{justify-content:center;padding:8px 0 4px}
+.ord-c-big .ord-st{gap:14px}
+.ord-c-big .ord-st button{width:56px;height:52px;border-radius:15px;font-size:24px;font-weight:600}
+.ord-c-big .ord-st input{width:84px;height:52px;font-size:28px;letter-spacing:-.5px}
 .ord-reset{width:100%;margin-top:10px;padding:10px;border-radius:10px;cursor:pointer;
   font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--muted);
   background:var(--card2);border:1px solid var(--border2)}
@@ -15972,13 +15978,12 @@ function ordRow(r, x, num){
       <span class="ord-r-img"><img src="/products/${escS(r.id)}.webp" alt="" loading="lazy"
         onerror="this.style.visibility='hidden'"></span>
       <span class="ord-r-n">${escS(r.name)}</span>
-      <span class="ord-r-d">${c.edited ? `расчёт ${c.calc}` : `на полке ${c.have||0}`}</span>
+      <span class="ord-r-d">${c.edited ? `расчёт ${c.calc}` : ''}</span>
       <span class="ord-r-v${c.edited ? ' gold' : ''}">${c.need || 0}</span>
       <span class="ord-r-go">${open ? '⌄' : '›'}</span>
     </button>
     ${open ? `<div class="ord-r-b">
-      <div class="ord-c" data-d="${x.id}">
-        <span class="ord-c-n">на полке ${c.have||0}${c.edited ? ` · расчёт ${c.calc}` : ''}</span>
+      <div class="ord-c ord-c-big" data-d="${x.id}">
         <span class="ord-st">
           <button onclick="ordStep('${r.id}','${x.id}',-1)" aria-label="Меньше">−</button>
           <input inputmode="numeric" value="${c.need||0}"

@@ -22947,10 +22947,9 @@ function shLogCard(c){
   const o = c.open, z = c.close;
   const name = (c.name && c.name !== c.district) ? c.name : (c.code || c.district || '—');
   const who = r => escS(r.by || r.operator || '—');
-  const sub = z
-    ? `${fmt(z.revenue)} AED · ${fmt(z.orders)} ${pluralize(z.orders,'заказ','заказа','заказов')}${
-         z.open ? ` · <em>висело ${z.open}</em>` : ''}`
-    : (o ? '' : 'открытие не отмечено');
+  // Итог смены (выручка, заказы, зависшие) здесь не пишем: сумма за день
+  // стоит в заголовке дня, а карточка отвечает только «кто и когда».
+  const sub = o ? '' : 'открытие не отмечено';
   // Слово и время белым; цвет несёт стрелка: вверх зелёная — открыта, вниз
   // красная — закрыта.
   const ARR = d => `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"

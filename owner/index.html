@@ -1994,11 +1994,14 @@ button.path:active{transform:scale(.995)}
    строки районов (это главное на экране после отправки заявки) и карточка
    других баз, а не пустота под историей. На высоком экране строки растут до
    разумного предела, дальше воздух делится между карточками. */
-.ohub{display:flex;flex-direction:column;gap:8px;flex:1 0 auto;min-height:100%}
-.ohub > *{margin-bottom:0}
+.ohub{display:flex;flex-direction:column;gap:8px;flex:1 1 auto;min-height:100%}
+/* Обнулить именно .pbox: общее правило .pbox{margin-bottom:12px} стоит ниже
+   и при равной силе побеждало — между карточками выходило 20px, а под
+   последней чёрная полоса из трёх полей подряд. */
+.ohub > .pbox,.ohub > *{margin-bottom:0}
 .ohub .pbox.grow{flex:1 1 auto}
 .ohub .pbox.grow .pd{flex:1;display:flex;flex-direction:column}
-.ohub .pbox.grow .pd-r{flex:1 1 0;min-height:46px;max-height:66px}
+.ohub .pbox.grow .pd-r{flex:1 1 0;min-height:46px;max-height:80px}
 .ohub.tight .pbox.grow .pd-r{min-height:38px}
 /* История — последней строкой карточки районов, через черту, значок мельче:
    это тот же список, только вчерашний. */
@@ -2008,8 +2011,10 @@ button.path:active{transform:scale(.995)}
 .ohub .pd-hist .pnav-b b{font-size:13px}
 .ohub .pd-hist .pnav-b i{margin-top:2px;font-size:11px}
 .ohub.tight .pd-hist{padding:7px 14px 8px}
-/* Под хабом подвал с кнопкой: нижнее поле середины ему ни к чему. */
-.stk-mid:has(> .ohub){padding-bottom:10px}
+/* Под хабом подвал с кнопкой: поля середины — по минимуму, высота уходит
+   карточкам, а не чёрному над и под ними. */
+.stk-mid:has(> .ohub){padding-top:6px;padding-bottom:6px}
+.stk-mid:has(> .ohub) + .stk-foot .qb-wrap{padding-top:8px}
 .ohub.tight .pbox.xbase .pnav-r.pbig{padding:9px 16px}
 .ohub.tight .pbox .path{padding:9px 14px 8px}
 /* Другие базы — заметнее: та же анатомия, но выше и с крупным значком. */

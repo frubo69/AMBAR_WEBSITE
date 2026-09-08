@@ -1267,6 +1267,71 @@ async def _supply_view(sup: dict) -> dict:
 
 @require_owner
 @require_owner
+async def handle_own_lines(request):
+    """Сразу несколько строк одного района: {district, lines:[{product_id, qty}], as}.
+
+    Старший правит район как черновик и сохраняет одной кнопкой — водителю
+    уходит одно сообщение, а не по одному на каждую цифру. Строки ложатся по
+    очереди под тем же замком; район заперли посреди списка — 409 с задачей и
+    числом уже лёгших строк: дальше не идём, а что легло — легло честно."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    sid = request.match_info.get("sid") or ""
+    oid = str(body.get("district") or "").strip()
+    if oid not in OFFICE_IDS:
+        return web.json_response({"error": "bad_district"}, status=400, headers=CORS_HEADERS)
+    import stock_routes
+    cat = stock_routes._catalog()
+    lines = []
+    for raw in (body.get("lines") or [])[:200]:
+        pid = str((raw or {}).get("product_id") or "").strip()
+        if pid not in cat:
+            return web.json_response({"error": "no_item", "product_id": pid},
+                                     status=400, headers=CORS_HEADERS)
+        try:
+            qty = max(0, min(999, int((raw or {}).get("qty") or 0)))
+        except (TypeError, ValueError):
+            return web.json_response({"error": "bad_qty"}, status=400, headers=CORS_HEADERS)
+        lines.append((pid, qty))
+    if not lines:
+        return web.json_response({"error": "empty"}, status=400, headers=CORS_HEADERS)
+    sup = await db.supply_get(sid)
+    if not sup:
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    task = (sup.get("tasks") or {}).get(oid)
+    if task is None:
+        return web.json_response({"error": "no_task"}, status=404, headers=CORS_HEADERS)
+    who = str(body.get("as") or "").strip()[:60] or "старший"
+    now = datetime.now(timezone.utc)
+    doc, done = None, 0
+    for pid, qty in lines:
+        doc = await db.supply_line_set(sid, oid, pid, qty, cat[pid].get("name", ""), now)
+        if not doc:
+            break
+        done += 1
+        log.info(f"[supply] {sid} {oid}: {who} поставил {cat[pid].get('name','')} = {qty}")
+    if done < len(lines):
+        cur = await db.supply_get(sid) or sup
+        t = (cur.get("tasks") or {}).get(oid) or task
+        return web.json_response({"error": "district_locked", "applied": done,
+                                  "task": _task_view(sid, cur, oid, t)},
+                                 status=409, headers=CORS_HEADERS,
+                                 dumps=lambda o: __import__("json").dumps(o, default=str))
+    drv = (doc.get("tasks") or {}).get(oid, {}).get("driver")
+    if drv:
+        try:
+            from operator_routes import tell_driver
+            await tell_driver(drv, f"✏️ Заявку по {OFFICE_CODES.get(oid, oid)} обновили — "
+                                   f"откройте задачу и проверьте список перед сканированием.")
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[supply] водителю о правке не ушло: {e}")
+    return web.json_response(await _supply_view(doc), headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
+@require_owner
 async def handle_own_line(request):
     """Поправить строку района: {district, product_id, qty, as}.
 
@@ -1863,6 +1928,7 @@ def setup(app):
         ("/api/owner/supply/{sid}/task/finish",     handle_own_finish,   "POST"),
         ("/api/owner/supply/{sid}/task/noscan",     handle_own_noscan,   "POST"),
         ("/api/owner/supply/{sid}/task/line",       handle_own_line,     "POST"),
+        ("/api/owner/supply/{sid}/task/lines",      handle_own_lines,    "POST"),
     ):
         r.add_route("OPTIONS", path, _opt)
         {"GET": r.add_get, "POST": r.add_post}[method](path, handler)

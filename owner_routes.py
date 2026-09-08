@@ -3452,6 +3452,13 @@ def _chk_state(done: bool, now: datetime, since: datetime, due: datetime) -> str
     return "soon"
 
 
+def _pl_bottles(n: int) -> str:
+    n = abs(int(n)) % 100
+    if 11 <= n <= 19: return "бутылок"
+    n %= 10
+    return "бутылка" if n == 1 else "бутылки" if 2 <= n <= 4 else "бутылок"
+
+
 def _chk_row(iid, title, hint, done, now, day, plan, *, go="", n=0):
     conf = next((p for p in plan if p[0] == iid), None)
     since = _chk_at(day, conf[1], conf[3]) if conf else now
@@ -3571,8 +3578,8 @@ async def handle_checklist(request):
         # глазами, а проверка у водителя называет чужой. Поэтому пункт горит,
         # пока такие бутылки на полке есть, и гаснет сам — по мере того, как их
         # заводят сканом.
-        _chk_row("unscanned", "Бутылки без кодов",
-                 (f"{без_кодов} на полке мимо реестра" if без_кодов
+        _chk_row("unscanned", "QR код не внесён",
+                 (f"{без_кодов} {_pl_bottles(без_кодов)} на полке" if без_кодов
                   else "все бутылки в реестре"),
                  без_кодов == 0, now, day, plan, go="qr", n=без_кодов),
         # Сдал ли водитель наличные, система знать не может: деньги переходят

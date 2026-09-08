@@ -4891,10 +4891,22 @@ button.exp-wait:active{transform:scale(.99)}
 .stkv-v{font-family:'DM Sans',sans-serif;font-size:28px;font-weight:700;
   line-height:1;letter-spacing:-1.4px;font-variant-numeric:tabular-nums;
   color:var(--text)}
-/* Золото — только на самой цифре продажи. Подложка зоны остаётся общей: цвет
-   красит число, а не выделяет зону, иначе снова получится, что одна из трёх
-   величин важнее двух других. */
+/* Золото — на обеих ценах (закупка и продажа — деньги), количество белым.
+   Подложка зоны остаётся общей: цвет красит число, а не выделяет зону. */
 .stkv-c.gold .stkv-v{color:var(--gold2)}
+/* Невнесённые коды — строкой между числами и списком по районам: та же
+   анатомия, что у «Список с разбивкой», красным — это работа, а не справка. */
+.stkv-qr{display:flex;align-items:center;gap:12px;width:100%;padding:12px 18px;
+  border:0;border-top:1px solid var(--border2);background:transparent;cursor:pointer;
+  font-family:inherit;color:var(--dn);text-align:left}
+.stkv-qr span{flex:1;font-size:13px;font-weight:700;letter-spacing:.2px}
+.stkv-qr b{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;
+  line-height:1;font-variant-numeric:tabular-nums}
+.stkv-qr b i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:10.5px;font-weight:600;
+  margin-left:3px;opacity:.8}
+.stkv-qr em{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:flex;
+  align-items:center;justify-content:center;background:rgba(226,106,106,.14);color:var(--dn)}
+.stkv-qr:active{background:var(--card2)}
 .stkv-go{display:flex;align-items:center;gap:12px;width:100%;padding:13px 18px;
   border:0;border-top:1px solid var(--border2);background:transparent;
   color:var(--text);font-family:inherit;font-size:13.5px;font-weight:600;
@@ -12581,7 +12593,7 @@ function stkValueCard(reg){
         <div class="stkv-l">Количество<small>шт</small></div>
         <div class="stkv-v">${fmt(bottles)}</div>
       </div>
-      <button class="stkv-c tap" onclick="ordPrices()" aria-label="Закупочные цены">
+      <button class="stkv-c tap gold" onclick="ordPrices()" aria-label="Закупочные цены">
         <div class="stkv-l">Цена закупки<small>AED</small></div>
         <div class="stkv-v">${t ? fmt(Math.round(t.cost)) : '—'}</div>
       </button>
@@ -12590,6 +12602,12 @@ function stkValueCard(reg){
         <div class="stkv-v">${t ? fmt(Math.round(t.list)) : '—'}</div>
       </button>
     </div>
+    ${без ? `<button class="stkv-qr" onclick="accOpen('qr')" aria-label="Внести коды">
+      <span>QR код не внесён</span>
+      <b>${fmt(без)}<i>${pluralize(без,'бутылка','бутылки','бутылок')}</i></b>
+      <em><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+           stroke-width="2.6" stroke-linecap="round"><path d="M9 6l6 6-6 6"/></svg></em>
+    </button>` : ''}
     <button class="stkv-go" onclick="stkByDistrict()">
       <span>Список с разбивкой по районам</span>
       <em><svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
@@ -12611,7 +12629,7 @@ function stkHave(reg){
   return `<div class="stk-have">
       <span class="sh-l"><b>${fmt(t.left)}</b><span>остаток</span></span>
       <span class="sh-r">${без
-        ? `<span class="sh-warn"><b>${fmt(без)}</b>не отсканировано</span>`
+        ? `<span class="sh-warn"><b>${fmt(без)}</b>QR код не внесён</span>`
         : `<span class="sh-ok"><b>✓</b>всё отсканировано</span>`}</span>
     </div>`;
 }
@@ -12626,7 +12644,7 @@ function stkDistRow(d, left, без, go){
   // Непросканированное важнее итога пересчёта: пересчёт можно повторить
   // завтра, а бутылки без кодов не заведутся сами.
   const [sub, cls] = b
-    ? [`${fmt(b)} без кодов`, 'warn']
+    ? [`QR код не внесён · ${fmt(b)}`, 'warn']
     : (d.done
         ? (d.short_aed ? [`не хватает ${fmt(d.short_aed)} AED`, 'dn'] : ['всё сошлось', 'ok'])
         : ['ещё не считали', '']);
@@ -14575,7 +14593,7 @@ function accRender(){
     })(),
     // На плитке — не сколько внесено, а сколько ещё лежит мимо реестра: это
     // работа, а не справка.
-    qr:       [ACC_QR    ? fmt(ACC_QR.unscanned_total || 0) : null, 'не отсканировано'],
+    qr:       [ACC_QR    ? fmt(ACC_QR.unscanned_total || 0) : null, 'QR код не внесён'],
     supply:   [ACC_SUP ? (ACC_SUP.open ? fmt(ACC_SUP.open.total_qty) : '—') : null,
                ACC_SUP && ACC_SUP.open
                  ? pluralize(ACC_SUP.open.total_qty,'бутылка','бутылки','бутылок')
@@ -16974,7 +16992,7 @@ async function qrDistrict(force){
       return `<div class="shl-card"><button class="shl-h ord-dh" onclick="qrGo('${d.id}')">
         <span class="shl-code">${escS(d.code || '')}</span>
         <span class="shl-b"><b>${escS(d.name || '')}</b>${sub ? `<i class="warn">${sub}</i>` : ''}</span>
-        ${без ? `<span class="qd-bad"><b>${fmt(без)}</b><i>без кодов</i></span>` : ''}
+        ${без ? `<span class="qd-bad"><b>${fmt(без)}</b><i>QR код не внесён</i></span>` : ''}
         <span class="ord-dh-go">${ICO_CHEV}</span>
       </button></div>`;
     }).join('') || '<div class="scan-empty">Точки не загрузились</div>') + `</div></div>`;
@@ -17060,7 +17078,7 @@ function qrRenderList(){
     const n = need[p.id] || 0;
     const tag = busy ? `<span class="pk-busy">${escS(lock.name)}</span>`
               : lock ? `<span class="pk-mine">вы считаете</span>`
-              : n ? `<span class="pk-n dn">${fmt(n)}<i>без кодов</i></span>`
+              : n ? `<span class="pk-n dn">${fmt(n)}<i>QR код не внесён</i></span>`
               : `<span class="pk-n">${have[p.id] ? fmt(have[p.id]) : '—'}</span>`;
     return `<button class="pk-row ${busy ? 'off' : ''}${n ? ' need' : ''}" ${busy ? 'disabled' : ''}
         onclick="qrStart('${p.id}')">

@@ -8592,7 +8592,15 @@ try{ HIDE = localStorage.getItem('ambar_hide') === '1'; }catch(e){}
 try{ if(window.Telegram && Telegram.WebApp){
   var tg=Telegram.WebApp;
   tg.ready(); tg.expand();
-  if(tg.isVersionAtLeast && tg.isVersionAtLeast('8.0') && tg.requestFullscreen) tg.requestFullscreen();
+  // Полный экран, без рамки телеграма. Один запрос сразу при загрузке на
+  // айпаде теряется: окно так и оставалось листом с «Закрыть» и полями по
+  // краям. Как в операторском и водительском — повторяем, пока не развернёт.
+  const wantFS = () => { try{
+    if(tg.isVersionAtLeast && !tg.isVersionAtLeast('8.0')) return;
+    if(tg.requestFullscreen && !tg.isFullscreen) tg.requestFullscreen();
+  }catch(e){} };
+  wantFS(); setTimeout(wantFS, 300); setTimeout(wantFS, 1000); setTimeout(wantFS, 2500);
+  tg.onEvent && tg.onEvent('fullscreenFailed', e => console.warn('fullscreen failed:', e && e.error));
   // Отступ сверху зависит от того, рисует ли телеграм свои кнопки поверх нас.
   // Состояние держим классами на <html>: медиазапрос по ширине здесь врёт —
   // планшет в альбомной шире компьютерного окна.

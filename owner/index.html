@@ -23001,8 +23001,10 @@ function shLogCard(c){
 let SHL_CREW = {};
 function shDrvInfo(key){
   const x = SHL_CREW[key]; if(!x) return;
+  // Время — прямо в метке: за ним и открывают карточку.
   const tag = x.opened_at
-    ? (x.closed_at ? ['смена закрыта', 'warn'] : ['смена открыта', 'ok'])
+    ? (x.closed_at ? [`закрыта в ${_hmDubai(x.closed_at)}`, 'warn']
+                   : [`открыта в ${_hmDubai(x.opened_at)}`, 'ok'])
     : (x.working ? ['смену не открыл', 'bad'] : ['не отмечен на смену', 'bad']);
   scanInfo(x.name, tag[0], tag[1], [
     _siRow('Район', escS(`${x.district} ${x.dname}`.trim())),

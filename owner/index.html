@@ -1947,10 +1947,19 @@ button.path:active{transform:scale(.995)}
 .pd-r.live .pnav-b i{color:var(--gold2)}
 .pd-r:last-child{padding-bottom:12px}
 .ohub .pbox{flex:0 0 auto;display:flex;flex-direction:column}
-.ohub .pbox .path{padding:12px 14px 10px}
+.ohub .pbox .path{padding:17px 14px 16px}
+/* Шкала мельче, чем была: точки, подписи и числа на ступень меньше — в
+   карточке появляется воздух, и она перестаёт упираться в свои границы. */
+.ohub .path-s{gap:6px}
+.ohub .path-s i{width:9px;height:9px}
+.ohub .path-s::before{top:4px}
+.ohub .path-s b{font-size:8.5px}
+.ohub .path-s u{font-size:17px;letter-spacing:-.3px}
+.ohub.tight .path-s u{font-size:16px}
+.pd-who{flex:0 0 auto;max-width:40%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ohub .pnav-r.pbig{padding:11px 16px}
 .ohub.tight{gap:6px}
-.ohub.tight .pbox .path{padding:9px 14px 8px}
+.ohub.tight .pbox .path{padding:14px 14px 13px}
 .ohub.tight .path-s em{display:none}
 .ohub.tight .pnav-r.pbig{padding:7px 14px}
 .ohub.tight .pnav-r.pbig .pnav-b b{font-size:14px}
@@ -1961,7 +1970,6 @@ button.path:active{transform:scale(.995)}
 .ohub.tight .pd-r .pnav-b b{font-size:13px}
 .ohub.tight .pd-r .pnav-b i{font-size:11px;margin-top:1px}
 .ohub.tight .pd-r:last-child{padding-bottom:8px}
-.ohub.tight .path-s u{font-size:18px}
 /* Заголовок разбивки делит строку с состоянием: кегль чуть меньше, чем у
    «Заявки», чтобы название и пилюля встали в одну строку. */
 .pd .pnav-r.pbig .pnav-b b{font-size:14px;letter-spacing:0;white-space:nowrap}
@@ -1970,11 +1978,11 @@ button.path:active{transform:scale(.995)}
 .pd .pnav-r.pbig .pstat-c{padding:4px 9px;font-size:10.5px}
 /* Четыре карточки должны сесть в экран: в ужатом виде заголовки ниже. */
 .ohub.tight .pnav-r.pbig .pnav-b i{font-size:11.5px;margin-top:2px}
-.ohub.tight .pbox .path{padding:8px 14px 6px}
+.ohub.tight .pbox .path{padding:13px 14px 12px}
 .ohub.tight .pd .pnav-r.pbig{padding:9px 14px 6px}
 .pbox{margin:0 0 12px;border-radius:18px;overflow:hidden;background:var(--card);
   border:1px solid var(--border2)}
-.pbox .path{margin:0;border:0;border-radius:0;padding:20px 14px 18px;
+.pbox .path{margin:0;border:0;border-radius:0;padding:18px 14px 17px;
   border-top:1px solid var(--border2);border-bottom:1px solid var(--border2);
   background:linear-gradient(160deg,rgba(201,169,110,.07),transparent 62%)}
 /* Вход в заявку — самая крупная строка карточки: с неё начинается закуп, и
@@ -15371,8 +15379,7 @@ function pathNav(){
   const CHIP = {none:'', wait:'wait', live:'live', done:'done', cancelled:'no'};
   return `<button class="pnav-r pbig ttl" onclick="accOrderList()">
       <span class="pnav-i big">${ICO_LIST}</span>
-      <span class="pnav-b"><b>Заявка</b>
-        <i>${pos} ${pluralize(pos,'позиция','позиции','позиций')} / по районам / общая${ed ? ` / правок ${ed}` : ''}</i></span>
+      <span class="pnav-b"><b>Заявка общая</b></span>
       <span class="pnav-v">${fmt(qty)}<u>${pluralize(qty,'бутылка','бутылки','бутылок')}</u></span>
       <span class="pnav-go">${ICO_CHEV}</span>
     </button>`;
@@ -15386,32 +15393,19 @@ function pathDistricts(){
   const st = supStage(), sup = st.sup;
   const dist = d.districts || [];
   const CHIP = {none:'', wait:'wait', live:'live', done:'done', cancelled:'no'};
+  // Строка района — только название. Подписей про бутылки и ожидание нет:
+  // они повторяли то, что видно на приёмке. Взял водитель — справа его имя
+  // плашкой, той же, что у водителей в журнале смен. Цвет строки говорит,
+  // где район: везут, приняли, приняли без сканирования.
   const rows = dist.map(x => {
     const t = sup && (sup.tasks || {})[x.id];
-    let cls = '', sub, right = '';
-    if(!sup){
-      const need = (d.rows || []).reduce((a, r) => a + ((r.cells[x.id] || {}).need || 0), 0);
-      sub = `просим ${fmt(need)} ${pluralize(need,'бутылку','бутылки','бутылок')}`;
-    }else if(!t){
-      sub = 'магазин ничего не дал';
-    }else if(t.done_at){
-      cls = 'ok';
-      sub = `принял ${fmt(t.scanned || 0)} из ${fmt(t.qty || 0)}${t.driver ? ' · ' + escS(t.driver) : ''}`;
-    }else if(t.noscan_at){
-      cls = 'warn';
-      const left = Math.max(0, (t.qty || 0) - (t.scanned || 0));
-      sub = `без сканирования · ${fmt(left)} ${pluralize(left,'бутылка','бутылки','бутылок')}${
-        (t.noscan_by || t.driver) ? ' · ' + escS(t.noscan_by || t.driver) : ''}`;
-    }else if(t.driver){
-      cls = 'live';
-      sub = `везёт ${escS(t.driver)}${t.scanned ? ` · принято ${fmt(t.scanned)} из ${fmt(t.qty || 0)}` : ` · ${fmt(t.qty || 0)} ${pluralize(t.qty || 0,'бутылка','бутылки','бутылок')}`}`;
-    }else{
-      sub = `ждёт водителя · ${fmt(t.qty || 0)} ${pluralize(t.qty || 0,'бутылка','бутылки','бутылок')}`;
-    }
+    const cls = !t ? '' : t.done_at ? 'ok' : t.noscan_at ? 'warn' : t.driver ? 'live' : '';
+    const кто = t ? (t.driver || t.noscan_by || '') : '';
     const go = st.k === 'none' ? '' : `onclick="accSupply('who','${escS(x.id)}')"`;
     return `<button class="pd-r ${cls}" ${go}>
       <span class="shl-code">${escS(x.code || '')}</span>
-      <span class="pnav-b"><b>${escS(x.name || x.id)}</b><i>${sub}</i></span>
+      <span class="pnav-b"><b>${escS(x.name || x.id)}</b></span>
+      ${кто ? `<span class="shl-p on pd-who">${escS(кто)}</span>` : ''}
       ${st.k === 'none' ? '' : `<span class="pnav-go">${ICO_CHEV}</span>`}
     </button>`;
   }).join('');
@@ -15421,8 +15415,7 @@ function pathDistricts(){
   return `<div class="pd ${st.k === 'none' ? 'off' : ''}">
     <button class="pnav-r pbig ttl" ${go}>
       <span class="pnav-i big">${ICO_MAP}</span>
-      <span class="pnav-b"><b>Разбивка по районам</b>
-        <i>${dist.length} ${pluralize(dist.length,'район','района','районов')} / кто везёт / кто принял</i></span>
+      <span class="pnav-b"><b>Разбивка по районам</b></span>
       <span class="pstat-c ${CHIP[st.k]}">${
         {none:'ждём магазин', wait:'ждёт приёма', live:'идёт приём', done:'принято',
          cancelled:'отменена'}[st.k] || st.t.toLowerCase()}</span>

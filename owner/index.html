@@ -3202,6 +3202,7 @@ button.path:active{transform:scale(.995)}
 .crw-ask-g{font-size:9.5px;font-weight:700;letter-spacing:1.2px;
   text-transform:uppercase;color:var(--muted);text-align:left;padding:15px 2px 2px}
 .crw-ask-s + .crw-ask-g{padding-top:2px}
+.crw-ask-t + .crw-ask-g{padding-top:10px}
 /* Обе группы залиты золотом — иначе доп. читались просто текстом со значком:
    тонкая рамка рядом со сплошной кнопкой кнопкой не выглядит. Разница между
    ними в силе заливки, а не в её наличии: основная сплошная и с тёмным
@@ -20065,7 +20066,6 @@ function supCancelAsk(){
   const осн = all.filter(x => x.kind !== 'extra');
   const доп = all.filter(x => x.kind === 'extra');
   box.innerHTML = `<div class="crw-ask-t">Какую заявку отменить?</div>
-    <div class="crw-ask-s">Задачи исчезнут у водителей. Принятое останется на складе.</div>
     ${осн.length ? `<div class="crw-ask-g">Основная</div>
       <div class="crw-ask-box">${осн.map(x => row(x, true)).join('')}</div>` : ''}
     ${доп.length ? `<div class="crw-ask-g">Другие базы</div>

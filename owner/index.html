@@ -4598,9 +4598,15 @@ button.exp-wait:active{transform:scale(.99)}
    которого число и не могло вырасти. Здесь она стоит один раз и не мешает.
    Цветом величины не различаются — все три равны, и разный цвет делал бы
    вид, что одна из них главная. Выделяет их размер, и только он. */
-.stkv-l{font-size:8.5px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;
-  color:var(--muted);margin-bottom:11px;white-space:nowrap;overflow:hidden;
+.stkv-l{font-size:8.5px;font-weight:700;letter-spacing:.5px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:9px;line-height:1.25;white-space:nowrap;overflow:hidden;
   text-overflow:ellipsis}
+/* Подпись — «цена закупки», а не «закупка»: закупка на этом экране — заявка,
+   а здесь стоимость того, что лежит. Название длиннее, в треть ширины одной
+   строкой не входит, и единица ушла на вторую строку. У количества тоже своя
+   единица, чтобы три зоны остались одной высоты. */
+.stkv-l small{display:block;font-size:8px;font-weight:600;letter-spacing:.5px;
+  color:var(--dim);margin-top:2px}
 /* Место под угловую метку освобождает только та зона, у которой метка есть.
    Отступ, поставленный всем трём, обрезал подписи в остальных двух. */
 /* Сумма закупки — кнопка: за ней закупочные цены по позициям, там же видно,
@@ -12095,15 +12101,15 @@ function stkValueCard(reg){
   return `<div class="stkv">
     <div class="stkv-g">
       <div class="stkv-c">
-        <div class="stkv-l">Количество</div>
+        <div class="stkv-l">Количество<small>шт</small></div>
         <div class="stkv-v">${fmt(bottles)}</div>
       </div>
       <button class="stkv-c tap" onclick="ordPrices()" aria-label="Закупочные цены">
-        <div class="stkv-l">Закупка, AED</div>
+        <div class="stkv-l">Цена закупки<small>AED</small></div>
         <div class="stkv-v">${t ? fmt(Math.round(t.cost)) : '—'}</div>
       </button>
       <div class="stkv-c gold">
-        <div class="stkv-l">Продажа, AED</div>
+        <div class="stkv-l">Цена продажи<small>AED</small></div>
         <div class="stkv-v">${t ? fmt(Math.round(t.list)) : '—'}</div>
       </div>
     </div>
@@ -12279,10 +12285,10 @@ const STK_BY = {
   qty:  {t:'Количество', тотал: r => r.bottles,
          ячейка: (r, h) => h,
          сумма: r => r.bottles, деньги: false},
-  cost: {t:'Закупка',    тотал: r => (r.cost || 0) * r.bottles / Math.max(1, r.unit),
+  cost: {t:'Цена закупки', тотал: r => (r.cost || 0) * r.bottles / Math.max(1, r.unit),
          ячейка: (r, h) => r.cost ? h * r.cost : null,
          сумма: r => r.cost ? r.cost * _stkUnits(r) : null, деньги: true},
-  sell: {t:'Продажа',    тотал: r => (r.price_list || 0) * r.bottles / Math.max(1, r.unit),
+  sell: {t:'Цена продажи', тотал: r => (r.price_list || 0) * r.bottles / Math.max(1, r.unit),
          ячейка: (r, h) => h * (r.price_list || 0),
          сумма: r => (r.price_list || 0) * _stkUnits(r), деньги: true},
 };

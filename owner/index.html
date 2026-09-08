@@ -3761,8 +3761,11 @@ button.path:active{transform:scale(.995)}
 .shl-v b.live{color:var(--up)}
 /* Состояние смены: «открыта в …» зелёным, «закрыта в …» красным, одним
    кеглем с итогом — это и есть главное слово карточки. */
-.shl-v b.op{color:var(--up)}
-.shl-v b.cl{color:var(--dn);margin-top:5px}
+.shl-v b.op,.shl-v b.cl{color:var(--text);display:flex;align-items:center;
+  justify-content:flex-end;gap:5px}
+.shl-v b.cl{margin-top:5px}
+.shl-v b s{text-decoration:none;display:inline-flex;line-height:0}
+.shl-v b s.up{color:var(--up)} .shl-v b s.dn{color:var(--dn)}
 .shl-b i em{font-style:normal;color:var(--dn)}
 /* Кто открыл и кто закрыл — плашки в ряду бригады, со значком человека и
    ролью мелко: они из той же смены, что и водители. */
@@ -3770,6 +3773,9 @@ button.path:active{transform:scale(.995)}
   border-color:rgba(201,169,110,.3);background:rgba(201,169,110,.06)}
 .shl-p.who i{font-style:normal;font-size:9.5px;font-weight:600;letter-spacing:.3px;
   text-transform:uppercase;color:var(--muted)}
+.shl-p.who i.op{color:var(--up)} .shl-p.who i.cl{color:var(--dn)}
+/* Две строки под шапкой: у второй свой шов, но тоньше — она продолжение. */
+.shl-staff + .shl-c{margin-top:8px;padding-top:8px;border-top-color:rgba(201,169,110,.07)}
 .shl-v b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:9px;font-weight:600;
   letter-spacing:.4px;color:var(--muted);margin-left:4px}
 .shl-v i{display:block;font-style:normal;font-family:'DM Sans',sans-serif;font-size:9px;
@@ -3780,7 +3786,9 @@ button.path:active{transform:scale(.995)}
 /* Бригада: вышедшие подсвечены, оставшиеся дома — приглушены. Список тот же,
    потому что вопрос «кого сегодня не было» задают так же часто. */
 .shl-p{padding:5px 10px;border-radius:9px;font-size:11.5px;color:var(--muted);
-  background:rgba(255,255,255,.03);border:1px solid var(--border2)}
+  background:rgba(255,255,255,.03);border:1px solid var(--border2);
+  font-family:inherit;cursor:pointer;line-height:1.3}
+button.shl-p:active{transform:scale(.96)}
 .shl-p.on{color:var(--gold2);background:var(--gold-soft);border-color:rgba(201,169,110,.3)}
 .shl-none{font-size:11.5px;color:var(--muted)}
 
@@ -10838,10 +10846,10 @@ function _siRow(k, v, cls){
   if(v === undefined || v === null || v === '') return '';
   return `<div class="si-row"><span class="k">${k}</span><span class="v ${cls||''}">${v}</span></div>`;
 }
-function scanInfo(name, tagText, tagCls, rows){
+function scanInfo(name, tagText, tagCls, rows, icon){
   const b = document.getElementById('scanInfoBody'); if(!b) return;
   b.innerHTML = `<div class="si-top">
-      <span class="si-ava">${_SI_ICON}</span>
+      <span class="si-ava">${icon || _SI_ICON}</span>
       <span class="si-h"><div class="si-name">${escS(name || 'Без метки')}</div>
         ${tagText ? `<span class="si-tag ${tagCls||'ok'}">${escS(tagText)}</span>` : ''}</span>
     </div>
@@ -22943,29 +22951,68 @@ function shLogCard(c){
     ? `${fmt(z.revenue)} AED · ${fmt(z.orders)} ${pluralize(z.orders,'заказ','заказа','заказов')}${
          z.open ? ` · <em>висело ${z.open}</em>` : ''}`
     : (o ? '' : 'открытие не отмечено');
-  const val = (o ? `<b class="op">открыта в ${_hmDubai(o.at)}</b>` : '')
-            + (z ? `<b class="cl">закрыта в ${_hmDubai(z.at)}</b>` : '');
+  // Слово и время белым; цвет несёт стрелка: вверх зелёная — открыта, вниз
+  // красная — закрыта.
+  const ARR = d => `<svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor"
+    stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">${
+    d === 'up' ? '<path d="M12 19V5M5 12l7-7 7 7"/>' : '<path d="M12 5v14M5 12l7 7 7-7"/>'}</svg>`;
+  const val = (o ? `<b class="op"><s class="up">${ARR('up')}</s>открыта в ${_hmDubai(o.at)}</b>` : '')
+            + (z ? `<b class="cl"><s class="dn">${ARR('dn')}</s>закрыта в ${_hmDubai(z.at)}</b>` : '');
   const crew = o ? (o.crew || []) : [];
   const ICO_WHO = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" '
     + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
     + '<circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg>';
+  // Роль — цветом: «открыл» зелёным, «закрыл» красным.
   const staff = [];
-  if(o && z && who(o) === who(z)) staff.push(`<span class="shl-p who">${ICO_WHO}${who(o)}<i>открыл и закрыл</i></span>`);
+  if(o && z && who(o) === who(z))
+    staff.push(`<span class="shl-p who">${ICO_WHO}${who(o)}<i class="op">открыл</i><i class="cl">закрыл</i></span>`);
   else{
-    if(o) staff.push(`<span class="shl-p who">${ICO_WHO}${who(o)}<i>открыл</i></span>`);
-    if(z) staff.push(`<span class="shl-p who">${ICO_WHO}${who(z)}<i>закрыл</i></span>`);
+    if(o) staff.push(`<span class="shl-p who">${ICO_WHO}${who(o)}<i class="op">открыл</i></span>`);
+    if(z) staff.push(`<span class="shl-p who">${ICO_WHO}${who(z)}<i class="cl">закрыл</i></span>`);
   }
-  const chips = staff.join('') + (crew.length
-    ? crew.map(x => `<span class="shl-p ${x.working ? 'on' : ''}">${escS(x.name)}</span>`).join('')
-    : (o ? '<span class="shl-none">водители не назначены</span>' : ''));
+  // Золотым горит не тот, кого отметил оператор, а тот, кто САМ открыл
+  // смену в своём приложении: отметка — это «его ждут», открытие — «он
+  // вышел». Нажатие на плашку — карточка с временем открытия и закрытия.
+  const day = (o || z || {}).day || '';
+  // Кто открыл и закрыл — своей строкой, водители — своей: это разные
+  // вопросы, и в одном ряду они читались как одна бригада.
+  const chips = crew.length
+    ? crew.map(x => {
+        const key = `${day}|${c.district || c.code}|${x.name}`;
+        SHL_CREW[key] = {...x, day, district: c.code || '', dname: name,
+                         opener: o ? (o.by || o.operator || '') : ''};
+        return `<button class="shl-p ${x.opened_at ? 'on' : ''}"
+          onclick="shDrvInfo('${escS(key).replace(/'/g, '&#39;')}')">${escS(x.name)}</button>`;
+      }).join('')
+    : (o ? '<span class="shl-none">водители не назначены</span>' : '');
   return `<div class="shl-card ${z ? 'done' : 'live'}">
     <div class="shl-h">
       <span class="shl-code">${escS(c.code || '—')}</span>
       <span class="shl-b"><b>${escS(name)}</b>${sub ? `<i>${sub}</i>` : ''}</span>
       <span class="shl-v">${val}</span>
     </div>
+    ${staff.length ? `<div class="shl-c shl-staff">${staff.join('')}</div>` : ''}
     ${chips ? `<div class="shl-c">${chips}</div>` : ''}
   </div>`;
+}
+
+// Плашка водителя в журнале → его карточка: когда открыл смену сам, когда
+// закрыл, отмечен ли оператором. Хранится по ключу день|район|имя.
+let SHL_CREW = {};
+function shDrvInfo(key){
+  const x = SHL_CREW[key]; if(!x) return;
+  const tag = x.opened_at
+    ? (x.closed_at ? ['смена закрыта', 'warn'] : ['смена открыта', 'ok'])
+    : (x.working ? ['смену не открыл', 'bad'] : ['не отмечен на смену', 'bad']);
+  scanInfo(x.name, tag[0], tag[1], [
+    _siRow('Район', escS(`${x.district} ${x.dname}`.trim())),
+    _siRow('День', escS(_dayLbl(x.day))),
+    _siRow('Отметил на смену', x.working ? escS(x.opener || 'оператор') : 'нет'),
+    _siRow('Открыл смену', x.opened_at ? _hmDubai(x.opened_at) : 'не открывал', x.opened_at ? 'big' : ''),
+    _siRow('Закрыл смену', x.closed_at ? _hmDubai(x.closed_at) : (x.opened_at ? 'ещё на смене' : '')),
+  ], `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor"
+        stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+        <circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg>`);
 }
 
 // Время события — по Дубаю, а не по часам того, кто смотрит: смена начинается

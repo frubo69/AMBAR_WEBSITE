@@ -1528,18 +1528,28 @@ def _opt(request):
 # Открытие и закрытие лежат в разных коллекциях, потому что это разные события,
 # но читают их вместе: вопрос всегда один — что было со сменой. Кто открыл, во
 # сколько, кто вышел, кто закрыл и с каким итогом.
-def shift_log_rows(rows: list) -> list:
+def shift_log_rows(rows: list, days: dict = None) -> list:
+    """days — {(день, водитель): запись driver_days}: когда водитель САМ открыл
+    и закрыл смену в своём приложении. Отметка оператора («working») говорит
+    только, что его ждали; вышел ли он — отвечает его собственное открытие."""
     from config_offices import OFFICE_CODES as _C, OFFICE_NAMES as _N
+    days = days or {}
     out = []
     for r in rows:
         d = r.get("district") or ""
         crew = r.get("drivers") or {}
+        day = r.get("day", "")
+        def _crew(n, v):
+            dd = days.get((day, n)) or {}
+            return {"name": n, "working": bool(v),
+                    "opened_at": _iso_of(dd.get("shift_open_at")) if dd.get("shift_open_at") else "",
+                    "closed_at": _iso_of(dd.get("shift_close_at")) if dd.get("shift_close_at") else ""}
         out.append({
-            "kind": r.get("kind"), "day": r.get("day", ""), "district": d,
+            "kind": r.get("kind"), "day": day, "district": d,
             "code": _C.get(d, ""), "name": _N.get(d, d),
             "at": _iso_of(r.get("at")), "by": r.get("by_name") or "",
             "operator": r.get("operator") or "",
-            "crew": [{"name": n, "working": bool(v)} for n, v in sorted(crew.items())],
+            "crew": [_crew(n, v) for n, v in sorted(crew.items())],
             "orders": int(r.get("orders") or 0), "revenue": int(r.get("revenue") or 0),
             "open": int(r.get("open") or 0),
         })
@@ -1555,7 +1565,15 @@ async def handle_shift_log(request):
         days = 14
     today = _biz_day()
     d0 = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=days - 1)).strftime("%Y-%m-%d")
-    rows = shift_log_rows(await db.shift_journal(d0, today))
+    # Открытия смен самими водителями — вторым запросом за тот же отрезок:
+    # по ним видно, кто реально вышел, а не кого отметили.
+    try:
+        dd = {(x.get("day"), x.get("driver")): x
+              for x in await db.get_driver_days_range(d0, today)}
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[shifts] дни водителей не прочитаны: {e}")
+        dd = {}
+    rows = shift_log_rows(await db.shift_journal(d0, today), dd)
     # Группируем по суткам: смену смотрят днями, а не событиями подряд.
     by_day = {}
     for r in rows:

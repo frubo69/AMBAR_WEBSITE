@@ -2465,7 +2465,14 @@ async def handle_shift_log(request):
     today = _biz_date(datetime.now(DUBAI_TZ)).isoformat()
     d0 = (datetime.strptime(today, "%Y-%m-%d") - timedelta(days=days - 1)).strftime("%Y-%m-%d")
     import stock_routes
-    rows = stock_routes.shift_log_rows(await db.shift_journal(d0, today))
+    # Открытия смен самими водителями — те же, что видит владелец.
+    try:
+        dd = {(x.get("day"), x.get("driver")): x
+              for x in await db.get_driver_days_range(d0, today)}
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[shifts] дни водителей не прочитаны: {e}")
+        dd = {}
+    rows = stock_routes.shift_log_rows(await db.shift_journal(d0, today), dd)
     by_day = {}
     for r in rows:
         by_day.setdefault(r["day"], []).append(r)

@@ -5355,17 +5355,20 @@ function expKindCards(){
 const EXP_CMT = {parking: 'где парковались', guard: 'кому отдали', kfc: 'кому', other: 'за что'};
 
 // Бутылка охране — плиткой, как снимок: это вложение к записи. Пустая —
-// пунктир и значок; отсканированная — название и цена, тап меняет.
+// пунктир и значок QR-кода (бутылку сканируют, а не фотографируют);
+// отсканированная — название и цена, тап меняет.
+const ICO_QR = '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/>'
+             + '<rect x="3" y="14" width="7" height="7" rx="1.5"/><path d="M14 14h3v3h-3zM20 14h1M14 20h1M18 18h3v3"/>';
 function guardTile(){
   return `<div class="exp-tiles">${GUARD.code
     ? `<button class="exp-tile set txt" onclick="guardClear()" aria-label="Бутылка">
-         <span class="exp-pin">${svg(ICO.box, 15)}</span>
+         <span class="exp-pin">${svg(ICO_QR, 15)}</span>
          <span class="exp-tile-b"><b>${esc(GUARD.name || 'бутылка')}</b><i>${
            GUARD.cost ? fmt(GUARD.cost) + ' AED' : 'цена не заведена'}</i></span>
          <span class="exp-tile-c">Бутылка</span>
        </button>`
     : `<button class="exp-tile" onclick="guardScan()" aria-label="Бутылка">
-         <span class="exp-tile-ico">${svg(ICO.box, 30)}</span>
+         <span class="exp-tile-ico">${svg(ICO_QR, 30)}</span>
          <span class="exp-tile-c">Бутылка</span>
        </button>`}</div>`;
 }

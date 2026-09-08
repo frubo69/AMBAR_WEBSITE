@@ -2326,6 +2326,21 @@ async def handle_customer_debt(request):
 CATALOG_FILE = Path(__file__).parent / "catalog.json"
 _catalog_lock = asyncio.Lock()
 
+# Цены каталога. Прайс (*_full) и цена приложения — на бутылку, на 12 и на 24.
+PRICE_FIELDS = ("price", "price_full", "price_12", "price_12_full", "price_24", "price_24_full")
+# прайс → (цена приложения, зачёркнутая цена у клиента)
+PRICE_MIRROR = {"price_full": ("price", "oldPrice"),
+                "price_12_full": ("price_12", "oldPrice_12"),
+                "price_24_full": ("price_24", "oldPrice_24")}
+APP_DISCOUNT = 0.05
+
+
+def app_price_from_full(full: int) -> int:
+    """Цена в приложении от прайса: минус пять процентов, округление вверх до
+    дирхама — в нашу сторону. 100 → 95, 105 → 100, 199 → 190."""
+    import math
+    return int(math.ceil(round(int(full) * (1 - APP_DISCOUNT), 6)))
+
 
 def _read_catalog() -> list:
     try:
@@ -2486,18 +2501,27 @@ async def handle_catalog_update(request):
         return web.json_response({"error": "expected object"}, status=400, headers=CORS_HEADERS)
 
     new_stock = body.get("stock", None)
-    new_price = body.get("price", None)
-    if new_stock is None and new_price is None:
+    # Цены. Две на каждую единицу: прайс (*_full) и цена в приложении. Прайс
+    # правят руками; приложение считается от него само — минус пять
+    # процентов, округление вверх до дирхама, в нашу сторону. Цену приложения
+    # можно прислать и руками — тогда она главнее расчёта. oldPrice — то, что
+    # клиент видит зачёркнутым рядом с «−5%», и это всегда прайс.
+    prices = {}
+    for f in PRICE_FIELDS:
+        if body.get(f, None) is None:
+            continue
+        try:
+            v = int(body[f])
+        except (ValueError, TypeError):
+            return web.json_response({"error": "price must be integer"}, status=400, headers=CORS_HEADERS)
+        if v < 0 or v > 100000:
+            return web.json_response({"error": "price out of range"}, status=400, headers=CORS_HEADERS)
+        prices[f] = v
+    new_price = prices.get("price")
+    if new_stock is None and not prices:
         return web.json_response({"error": "no fields to update"}, status=400, headers=CORS_HEADERS)
     if new_stock is not None and not isinstance(new_stock, bool):
         return web.json_response({"error": "stock must be bool"}, status=400, headers=CORS_HEADERS)
-    if new_price is not None:
-        try:
-            new_price = int(new_price)
-        except (ValueError, TypeError):
-            return web.json_response({"error": "price must be integer"}, status=400, headers=CORS_HEADERS)
-        if new_price < 0 or new_price > 100000:
-            return web.json_response({"error": "price out of range"}, status=400, headers=CORS_HEADERS)
 
     async with _catalog_lock:
         catalog = await asyncio.to_thread(_read_catalog)
@@ -2506,23 +2530,29 @@ async def handle_catalog_update(request):
             return web.json_response({"error": "not found"}, status=404, headers=CORS_HEADERS)
         if new_stock is not None:
             target["stock"] = new_stock
-        if new_price is not None:
-            target["price"] = new_price
+        for f, v in prices.items():
+            target[f] = v
+        for full, (app, old) in PRICE_MIRROR.items():
+            if full in prices:
+                target[old] = prices[full]
+                if app not in prices:
+                    target[app] = app_price_from_full(prices[full])
         await asyncio.to_thread(_write_catalog, catalog)
 
-    log.info(f"[catalog] {request['owner_id']} updated {pid}: stock={new_stock} price={new_price}")
+    log.info(f"[catalog] {request['owner_id']} updated {pid}: stock={new_stock} "
+             + " ".join(f"{f}={v}" for f, v in prices.items()))
     if new_stock is False:
         try:
             await notify_owners("stock.out",
                 f"⛔ *Товар закончился*\n{target.get('name', pid)}")
         except Exception as e:
             log.error(f"[owner-notif] stock.out failed: {e}")
-    return web.json_response({
-        "ok": True,
-        "id": pid,
-        "stock": bool(target.get("stock", True)),
-        "price": int(target.get("price") or 0),
-    }, headers=CORS_HEADERS)
+    out = {"ok": True, "id": pid, "stock": bool(target.get("stock", True)),
+           "price": int(target.get("price") or 0)}
+    for f in PRICE_FIELDS:
+        if target.get(f) is not None:
+            out[f] = int(target.get(f) or 0)
+    return web.json_response(out, headers=CORS_HEADERS)
 
 
 @require_owner

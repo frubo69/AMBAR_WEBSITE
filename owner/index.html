@@ -751,7 +751,20 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .qd-page > .ord-dists{flex:1;display:flex;flex-direction:column}
 .qd-page > .ord-dists > .shl-card{flex:1 1 0;display:flex;align-items:stretch;
   min-height:64px;max-height:140px;padding-top:0;padding-bottom:0}
-.qd-page > .ord-dists > .shl-card > .shl-h{flex:1;min-height:0}
+.qd-page > .ord-dists > .shl-card > .shl-h{flex:1;min-height:0;gap:16px}
+/* Строки здесь высокие — и код, и название должны быть им под стать. */
+.qd-page > .ord-dists .shl-code{width:52px;height:52px;border-radius:15px;font-size:17px}
+.qd-page > .ord-dists .shl-b b{font-size:16.5px;letter-spacing:.6px;white-space:normal;line-height:1.2}
+.qd-page > .ord-dists .shl-b i{font-size:12.5px;margin-top:4px}
+/* «Без кодов» — плашкой, а не строкой: это работа, и её должно быть видно
+   с расстояния вытянутой руки. Красная подложка, крупное число. */
+.qd-bad{flex:0 0 auto;display:flex;flex-direction:column;align-items:center;
+  padding:8px 14px;border-radius:14px;color:var(--dn);background:var(--dn-soft);
+  border:1px solid rgba(224,85,85,.4);min-width:72px}
+.qd-bad b{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;line-height:1;
+  font-variant-numeric:tabular-nums}
+.qd-bad i{font-style:normal;font-size:9px;font-weight:700;letter-spacing:.8px;
+  text-transform:uppercase;margin-top:4px;white-space:nowrap}
 /* Четыре плитки склада: два ряда по две. Швы — слева у правых и сверху у
    нижних; общий шов «слева у каждой следующей» ставил черту и первой плитке
    второго ряда. */
@@ -16713,7 +16726,7 @@ async function qrDistrict(force){
       return `<div class="shl-card"><button class="shl-h ord-dh" onclick="qrGo('${d.id}')">
         <span class="shl-code">${escS(d.code || '')}</span>
         <span class="shl-b"><b>${escS(d.name || '')}</b>${sub ? `<i class="warn">${sub}</i>` : ''}</span>
-        ${без ? `<span class="shl-v"><b class="dn">${fmt(без)}</b><i>без кодов</i></span>` : ''}
+        ${без ? `<span class="qd-bad"><b>${fmt(без)}</b><i>без кодов</i></span>` : ''}
         <span class="ord-dh-go">${ICO_CHEV}</span>
       </button></div>`;
     }).join('') || '<div class="scan-empty">Точки не загрузились</div>') + `</div></div>`;

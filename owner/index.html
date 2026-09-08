@@ -2797,6 +2797,8 @@ button.path:active{transform:scale(.995)}
 .xt-nm{font-size:13px;font-weight:600;line-height:1.3;padding:0 10px;display:-webkit-box;
   -webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 .xt-bot{display:flex;align-items:center;gap:6px;padding:0 8px;margin-top:6px}
+/* Сколько набрано — крупно между «−» и «+», а не только кружком в углу. */
+.xt-n{display:block;font-size:20px;line-height:1;text-align:center;font-variant-numeric:tabular-nums}
 .xt-info{flex:1;min-width:0}
 .xt-bot:has(.xt-b) .xt-info{text-align:center}
 .xt-bot:has(.xt-b) .xt-pr small{display:none}
@@ -18892,7 +18894,7 @@ function xTile(r){
          onerror="this.style.visibility='hidden'"></div>
     <div class="xt-nm">${escS(r.name)}</div>
     <div class="xt-bot">${n ? '<span class="xt-b" data-d="-1">−</span>' : ''}
-      <div class="xt-info"><div class="xt-pr">${r.unit > 1 ? `<small>${escS(r.unit_name || 'ящик')}</small>` : ''}</div></div>
+      <div class="xt-info"><div class="xt-pr">${n ? `<b class="xt-n">${n}</b>` : ''}${r.unit > 1 ? `<small>${escS(r.unit_name || 'ящик')}</small>` : ''}</div></div>
       ${n ? '<span class="xt-b" data-d="1">+</span>' : ''}</div>
   </div>`;
 }

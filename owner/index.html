@@ -1726,6 +1726,66 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .ck-head.all .ck-h-l{color:rgba(76,175,125,.8)}
 /* Одна дорожка, одна заливка. Полоска из клеток читалась как леденец: семь
    кусков четырёх цветов вместо ответа «сколько сделано». */
+/* Сбор денег: шапка как у чек-листа, под полосой — четыре числа дня. */
+.cr-tot{display:flex;gap:14px;flex-wrap:wrap;margin-top:2px}
+.cr-tot span{display:flex;flex-direction:column;gap:3px}
+.cr-tot i{font-style:normal;font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+.cr-tot b{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.cr-tot b.dn{color:var(--dn)} .cr-tot b.gold{color:var(--gold2)}
+.cr-card{margin-top:10px;padding:14px 16px 14px;border-radius:18px;background:var(--card);
+  border:1px solid var(--border2)}
+.cr-card.done{border-color:rgba(76,175,125,.42)}
+.cr-card.empty{opacity:.55;padding:12px 16px}
+.cr-h{display:flex;align-items:center;gap:13px}
+.cr-hb{flex:1;min-width:0}
+.cr-hb b{display:block;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;line-height:1.2}
+.cr-hb i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cr-st{flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;padding:5px 9px;border-radius:9px;
+  font-size:11px;font-weight:700;color:var(--up);background:rgba(76,175,125,.14)}
+.cr-st svg{width:12px;height:12px}
+.cr-none{flex:0 0 auto;font-size:11.5px;color:var(--muted)}
+.cr-net{display:flex;align-items:baseline;gap:8px;margin-top:14px}
+.cr-net-l{flex:1;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:var(--muted)}
+.cr-net b{font-family:'Space Grotesk',sans-serif;font-size:34px;font-weight:700;line-height:1;
+  letter-spacing:-1px;font-variant-numeric:tabular-nums;color:var(--text)}
+.cr-net.minus b{color:var(--dn)}
+.cr-cur{font-size:12px;font-weight:600;color:var(--muted)}
+.cr-row3{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:12px;padding-top:12px;
+  border-top:1px solid var(--border2)}
+.cr-row3 span{display:flex;flex-direction:column;gap:3px;min-width:0}
+.cr-row3 i{font-style:normal;font-size:9.5px;font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--muted)}
+.cr-row3 b{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;line-height:1;font-variant-numeric:tabular-nums}
+.cr-row3 b.dn{color:var(--dn)} .cr-row3 b.gold{color:var(--gold2)}
+.cr-row3 u{text-decoration:none;font-size:10.5px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cr-row3 u.warn{color:var(--warn)}
+.cr-fold{display:flex;align-items:center;justify-content:space-between;width:100%;margin-top:10px;
+  padding:10px 2px 4px;border:0;border-top:1px solid var(--border2);background:none;cursor:pointer;
+  font-family:inherit;font-size:12.5px;font-weight:600;color:var(--sub);text-align:left}
+.cr-fold svg{width:16px;height:16px;fill:none;stroke:var(--muted);stroke-width:2.2;stroke-linecap:round;
+  stroke-linejoin:round;transition:transform .18s var(--e1)}
+.cr-fold.on svg{transform:rotate(180deg)} .cr-fold.on{color:var(--gold2)}
+.cr-noexp{margin-top:10px;padding:10px 2px 2px;border-top:1px solid var(--border2);font-size:12px;color:var(--muted)}
+.cr-items{margin-top:4px}
+.cr-it{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border2)}
+.cr-it:first-child{border-top:0}
+.cr-it-t{flex:0 0 40px;font-family:'Space Grotesk',sans-serif;font-size:12.5px;font-weight:700;color:var(--muted);
+  font-variant-numeric:tabular-nums}
+.cr-it-b{flex:1;min-width:0}
+.cr-it-b b{display:block;font-size:13.5px;font-weight:600}
+.cr-it-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.cr-it-a{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--dn);
+  font-variant-numeric:tabular-nums}
+.cr-it-a.up{color:var(--up)}
+.cr-it.pend .cr-it-a,.cr-it.rej .cr-it-a{color:var(--muted);text-decoration:line-through}
+.cr-it.pend .cr-it-b i{color:var(--warn)}
+.cr-ok{display:flex;align-items:center;justify-content:center;gap:8px;width:100%;margin-top:12px;
+  padding:14px;border-radius:14px;border:1px solid transparent;cursor:pointer;font-family:inherit;
+  font-size:14.5px;font-weight:700;color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2))}
+.cr-ok.on{background:rgba(76,175,125,.14);border-color:rgba(76,175,125,.45);color:var(--up)}
+.cr-ok svg{width:16px;height:16px}
+.cr-ok:active{transform:scale(.98)}
 .ck-track{height:3px;border-radius:2px;margin:16px 0 12px;
   background:rgba(255,255,255,.06);overflow:hidden}
 .ck-track i{display:block;height:100%;border-radius:2px;
@@ -14948,7 +15008,7 @@ const CK_GO = {
   writeoffs: () => { SH_TAB = 'wo';  accOpen('expenses'); },
   // Единственная задача, которую система знать не может: деньги переходят из
   // рук в руки, и подтвердить это может только человек.
-  cash:      () => chkCash(),
+  cash:      () => accOpen('cashround'),
   // Водитель без входа: замок сторожа геопозиции снимается здесь же, без
   // похода в «Команду», — строка и есть решение.
   geo_lock:  () => chkGeoUnlock(),
@@ -15008,6 +15068,132 @@ async function chkCash(){
   }catch(e){ _toast('Не удалось отметить'); return; }
   try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
   accChecklist();
+}
+
+// ── Сбор денег по районам ──────────────────────────────────────────────────
+// Задача «Деньги собраны» — не одна галочка на день, а по галочке на район:
+// деньги сдают по одному, и старший заходит сюда несколько раз за смену.
+// На карточке района одно главное число — «к сдаче» (наличные − расход), под
+// ним из чего оно сложилось, и список расходов за смену по времени. Собраны
+// все районы, где было что собирать, — задача в чек-листе гаснет сама.
+let CR = null, CR_OPEN = new Set(), CR_BUSY = false;
+
+async function accCashRound(){
+  _setText('accTitle', 'Сбор денег');
+  _setText('accSub', 'загрузка…');
+  const day = (CKL && CKL.day) || accDay();
+  try{ CR = await ownerApi.ownerFetch('/api/owner/cash-round', {params:{day}}); }
+  catch(e){
+    document.getElementById('accMid').innerHTML =
+      '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>';
+    return;
+  }
+  crRender();
+}
+
+function crRender(){
+  const d = CR; if(!d) return;
+  _setText('accSub', d.day === d.today ? 'сегодня' : _dayName(d.day));
+  const all = d.need > 0 && d.done >= d.need;
+  const list = [...d.districts].sort((a, b) => (a.empty - b.empty) || (a.done - b.done));
+  const доля = d.need ? Math.round(d.done / d.need * 100) : 0;
+  const head = `<div class="ck-head cr-head${all ? ' all' : ''}">
+    <div class="ck-h-l">Сбор денег</div>
+    <div class="ck-h-n">
+      <span class="ck-h-v">${d.done}<u>/${d.need}</u></span>
+      <span class="ck-h-w">${all ? 'все районы собраны' : d.need ? 'районов собрано' : 'собирать нечего'}</span>
+    </div>
+    <div class="ck-track"><i style="width:${доля}%"></i></div>
+    <div class="cr-tot">
+      <span><i>к сдаче всего</i><b>${fmt(d.net_total)}</b></span>
+      <span><i>наличные</i><b>${fmt(d.cash_total)}</b></span>
+      <span><i>расход</i><b class="dn">${fmt(d.spend_total)}</b></span>
+      <span><i>чай</i><b class="gold">${fmt(d.tips_total)}</b></span>
+    </div>
+  </div>`;
+  document.getElementById('accMid').innerHTML = head + list.map(crCard).join('');
+}
+
+function crCard(x){
+  const team = [x.operator, (x.drivers || []).join(', ')].filter(Boolean).join(' · ');
+  if(x.empty) return `<div class="cr-card empty" id="cr-${escS(x.id)}">
+    <div class="cr-h">
+      <span class="shl-code">${escS(x.code)}</span>
+      <span class="cr-hb"><b>${escS(x.name)}</b><i>${escS(team)}</i></span>
+      <span class="cr-none">нечего собирать</span>
+    </div>
+  </div>`;
+  const open = CR_OPEN.has(x.id);
+  const n = (x.items || []).length;
+  // Главное число отвечает на один вопрос: сколько водитель кладёт на стол.
+  // Ушёл в минус — значит потратил больше, чем собрал, и это ему доплата.
+  const net = x.net, minus = net < 0;
+  return `<div class="cr-card${x.done ? ' done' : ''}" id="cr-${escS(x.id)}">
+    <div class="cr-h">
+      <span class="shl-code">${escS(x.code)}</span>
+      <span class="cr-hb"><b>${escS(x.name)}</b><i>${escS(team)}</i></span>
+      ${x.done ? `<span class="cr-st">${IC('check', 12)}собрано${x.done_at ? ' · ' + _hm(x.done_at) : ''}</span>` : ''}
+    </div>
+    <div class="cr-net${minus ? ' minus' : ''}">
+      <span class="cr-net-l">${minus ? 'Доплатить водителю' : 'К сдаче'}</span>
+      <b>${fmt(Math.abs(net))}</b><span class="cr-cur">AED</span>
+    </div>
+    <div class="cr-row3">
+      <span><i>наличные</i><b>${fmt(x.cash)}</b><u>${x.orders} ${pluralize(x.orders,'заказ','заказа','заказов')}</u></span>
+      <span><i>расход</i><b class="dn">${fmt(x.spend)}</b>${x.spend_pending ? `<u class="warn">+${fmt(x.spend_pending)} ждёт</u>` : '<u>за смену</u>'}</span>
+      <span><i>чай</i><b class="gold">${fmt(x.tips)}</b><u>операторам</u></span>
+    </div>
+    ${n ? `<button class="cr-fold${open ? ' on' : ''}" onclick="crFold('${escS(x.id)}')">
+        <span>Расходы за смену · ${n}</span>
+        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
+      </button>${open ? `<div class="cr-items">${x.items.map(crItem).join('')}</div>` : ''}`
+      : '<div class="cr-noexp">Расходов за смену не было</div>'}
+    <button class="cr-ok${x.done ? ' on' : ''}" onclick="crToggle('${escS(x.id)}')">
+      ${x.done ? `${IC('check', 16)}Собрано · снять отметку` : 'Собрано'}
+    </button>
+  </div>`;
+}
+
+// Строка расхода: когда · что · кто · сколько. Ждущее решения — серым и без
+// счёта: старший ещё не согласился, и в «к сдаче» оно не входит.
+function crItem(e){
+  const pend = e.status === 'pending', rej = e.status === 'rejected';
+  const plus = e.amount < 0;
+  const кто = [e.who, e.note, e.photo ? 'чек' : ''].filter(Boolean).join(' · ');
+  return `<div class="cr-it${pend ? ' pend' : ''}${rej ? ' rej' : ''}">
+    <span class="cr-it-t">${e.at ? _hm(e.at) : '—'}</span>
+    <span class="cr-it-b"><b>${escS(e.kind_t || 'Расход')}</b><i>${escS(кто)}${
+      pend ? ' · ждёт решения' : rej ? ' · отклонён' : ''}</i></span>
+    <b class="cr-it-a${plus ? ' up' : ''}">${plus ? '+' : '−'}${fmt(Math.abs(e.amount))}</b>
+  </div>`;
+}
+
+function crFold(id){
+  if(CR_OPEN.has(id)) CR_OPEN.delete(id); else CR_OPEN.add(id);
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  crRender();
+}
+
+// Галочка ставится и снимается одним нажатием, без вопросов: действие
+// обратимо, а спрашивать «точно?» по пять раз за ночь — приучать не читать.
+async function crToggle(id){
+  if(!CR || CR_BUSY) return;
+  const x = (CR.districts || []).find(d => d.id === id); if(!x) return;
+  const wasAll = CR.need > 0 && CR.done >= CR.need;
+  CR_BUSY = true;
+  try{
+    await ownerApi.ownerFetch('/api/owner/checklist/mark',
+      {method:'POST', body:{day: CR.day, item: 'cash:' + id, done: !x.done}});
+    CR = await ownerApi.ownerFetch('/api/owner/cash-round', {params:{day: CR.day}});
+  }catch(e){ _toast('Не удалось отметить'); CR_BUSY = false; return; }
+  CR_BUSY = false;
+  crRender();
+  const all = CR.need > 0 && CR.done >= CR.need;
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred(all ? 'success' : 'warning'); }catch(e){}
+  if(all && !wasAll) _toast('Деньги собраны на всех районах');
+  // Чек-лист перечитается при возврате — строка «Деньги собраны» считается
+  // на сервере из этих же отметок.
+  CKL = null;
 }
 
 function chkGo(id){
@@ -15447,6 +15633,7 @@ function accOpen(id){
   if(id === 'norms')    accNorms();
   if(id === 'shifts')   accShifts();
   if(id === 'checklist') accChecklist();
+  if(id === 'cashround') accCashRound();
   if(id === 'orders')   { accOrders(_ordsWant === null ? '' : _ordsWant); _ordsWant = null; }
 }
 

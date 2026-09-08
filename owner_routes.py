@@ -3283,6 +3283,111 @@ async def _chk_orders(day_start, day_end):
     return {"route": route, "req": req}
 
 
+async def cash_round(day: str) -> dict:
+    """Сбор денег по районам за учётный день.
+
+    На каждый район — что водители везут в кассу наличными, чаевые его людей
+    и расход за смену (питание и согласованные разовые), отсюда «к сдаче» =
+    наличные − расход. Отметка «собрано» стоит на районе, а не на дне: деньги
+    сдают по одному, и старший заходит сюда несколько раз за смену. Задача в
+    чек-листе выполнена, когда собраны все районы, где было что собирать."""
+    import expense_routes as _exp
+    import config_staff as _staff
+    day_start = _chk_at(day, 12.0)
+    day_end = day_start + timedelta(days=1)
+    try:
+        since = (day_start - timedelta(hours=1)).astimezone(timezone.utc)
+        orders = list((await db.orders_from(
+            since.isoformat().replace("+00:00", ""))).values())
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[cash] заказы за день: {e}")
+        orders = []
+    by_o: dict = {o: [] for o in OFFICE_IDS}
+    for o in orders:
+        if o.get("status") != "delivered":
+            continue
+        try:
+            ts = datetime.fromisoformat(o.get("timestamp", "")).replace(
+                tzinfo=timezone.utc).astimezone(DUBAI_TZ)
+        except (ValueError, TypeError):
+            continue
+        if not (day_start <= ts < day_end):
+            continue
+        oid = o.get("office_id") or ""
+        if oid in by_o:
+            by_o[oid].append(o)
+    try:
+        saved = {r.get("driver"): r for r in await db.get_driver_days(day)}
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[cash] расходы за день: {e}")
+        saved = {}
+    marks = await db.checklist_get(day)
+    legacy = bool((marks.get("cash") or {}).get("done"))     # старая отметка на весь день
+    out, done_n, need_n, net_total = [], 0, 0, 0
+    for oid in OFFICE_IDS:
+        dl = by_o.get(oid, [])
+        cash = sum(int(o.get("total") or 0) for o in dl
+                   if o.get("payment_method") != "debt" and not _is_prepaid_order(o))
+        tips = _tips_for(dl)["total"]
+        team = [d for d in _staff.drivers() if d.get("district") == oid]
+        operator = (team[0].get("operator") if team else "") or ""
+        items, spend, pending = [], 0, 0
+        for d in team:
+            r = saved.get(d["name"]) or {}
+            w = r.get("working")
+            meal = _staff.MEAL_WORKING if w is True else (_staff.MEAL_OFF if w is False else 0)
+            if w is not None:
+                spend += meal
+                items.append({"id": "", "kind": "meal", "kind_t": "Питание", "who": d["name"],
+                              "amount": meal, "at": "", "status": "approved",
+                              "note": "на смене" if w else "дома", "photo": False})
+            for e in r.get("extras") or []:
+                st = str(e.get("status") or "approved")
+                amt = _exp._signed(e)
+                if st == "approved":
+                    spend += amt
+                elif st == "pending":
+                    pending += amt
+                items.append({"id": e.get("id") or "", "kind": e.get("kind") or "other",
+                              "kind_t": e.get("kind_t") or _exp._kind(e).get("t", "Доп. расход"),
+                              "who": d["name"], "amount": amt, "at": str(e.get("at") or ""),
+                              "status": st, "note": str(e.get("comment") or "")[:80],
+                              "photo": bool(e.get("photo") or e.get("thumb") or e.get("car_photo"))})
+        # Питание — первой строкой, без времени: это плата за день, а не событие;
+        # дальше траты по времени.
+        items.sort(key=lambda x: (x["at"] != "", x["at"]))
+        m = marks.get(f"cash:{oid}") or {}
+        done = bool(m.get("done")) or legacy
+        # Нечего собирать — ни наличных, ни расхода: район не ждёт, и в счёт
+        # «собрано из» не входит. Иначе пустой район вечно висел бы делом.
+        empty = not cash and not spend and not tips
+        if not empty:
+            need_n += 1
+            if done:
+                done_n += 1
+        net = cash - spend
+        net_total += net
+        out.append({"id": oid, "code": OFFICE_CODES.get(oid, ""), "name": OFFICE_NAMES.get(oid, oid),
+                    "operator": operator, "drivers": [d["name"] for d in team],
+                    "orders": len(dl), "cash": cash, "tips": tips, "spend": spend,
+                    "spend_pending": pending, "net": net, "items": items,
+                    "empty": empty, "done": done, "done_at": str(m.get("at") or "")})
+    return {"day": day, "today": _biz_date(_now_dubai()).isoformat(), "districts": out, "done": done_n,
+            "need": need_n, "all_done": need_n > 0 and done_n >= need_n,
+            "net_total": net_total,
+            "cash_total": sum(d["cash"] for d in out),
+            "spend_total": sum(d["spend"] for d in out),
+            "tips_total": sum(d["tips"] for d in out)}
+
+
+@require_owner
+async def handle_cash_round(request):
+    """GET /api/owner/cash-round?day= — сбор денег по районам."""
+    day = (request.query.get("day") or "").strip() or _biz_date(_now_dubai()).isoformat()
+    return web.json_response(await cash_round(day), headers=CORS_HEADERS,
+                             dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
 async def _chk_cash(day_start, day_end):
     """Сколько наличных за сутки прошло через руки водителей.
 
@@ -3522,6 +3627,11 @@ async def handle_checklist(request):
     day_end = day_start + timedelta(days=1)
     cash = await _chk_cash(day_start, day_end)
     try:
+        cr = await cash_round(day)
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[chk] сбор денег по районам: {e}")
+        cr = {"done": 0, "need": 1 if cash else 0, "all_done": False, "net_total": cash}
+    try:
         marks = await db.checklist_get(day)
     except Exception as e:
         log.warning(f"[chk] отметки за {day}: {e}")
@@ -3586,10 +3696,10 @@ async def handle_checklist(request):
         # из рук в руки. Поэтому единственная отметка, которую ставит человек,
         # — и сумма рядом, чтобы было с чем сверяться.
         _chk_row("cash", "Деньги собраны",
-                 (f"наличными за смену {cash:,}".replace(",", " ") + " AED"
-                  if cash else "наличных за смену не было"),
-                 bool((marks.get("cash") or {}).get("done")) or not cash,
-                 now, day, plan, go="cash", n=0),
+                 (f"собрано {cr['done']} из {cr['need']} · к сдаче {cr['net_total']:,}".replace(",", " ") + " AED"
+                  if cr["need"] else "наличных за смену не было"),
+                 cr["all_done"] or not cr["need"],
+                 now, day, plan, go="cash", n=max(0, cr["need"] - cr["done"])),
     ]
     # Недобор появляется в списке только когда он есть: пункт, который штатно
     # выполнен, каждый день занимал бы строку и приучал не читать список.
@@ -3716,7 +3826,9 @@ async def handle_checklist_mark(request):
         body = {}
     day = (body.get("day") or "").strip()
     item = (body.get("item") or "").strip()
-    if not day or item not in CHK_MANUAL | {"shortfall"}:
+    ok_item = item in CHK_MANUAL | {"shortfall"} or (
+        item.startswith("cash:") and item[5:] in OFFICE_IDS)
+    if not day or not ok_item:
         return web.json_response({"error": "bad_args"}, status=400, headers=CORS_HEADERS)
     who = str(request.get("owner_id") or "")
     await db.checklist_set(day, item, bool(body.get("done")), who)
@@ -3874,6 +3986,8 @@ def setup(app):
     app.router.add_route("OPTIONS", "/api/owner/shift-state", handle_shift_state)
     app.router.add_get(             "/api/owner/shift-state", handle_shift_state)
     app.router.add_route("OPTIONS", "/api/owner/checklist/mark", handle_checklist_mark)
+    app.router.add_route("OPTIONS", "/api/owner/cash-round", handle_cash_round)
+    app.router.add_get(             "/api/owner/cash-round", handle_cash_round)
     app.router.add_route("OPTIONS", "/api/owner/geo-unlock", handle_geo_unlock)
     app.router.add_post(            "/api/owner/geo-unlock", handle_geo_unlock)
     app.router.add_route("OPTIONS", "/api/owner/pos", handle_pos)

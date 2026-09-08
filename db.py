@@ -1557,6 +1557,19 @@ async def crypto_invoices_by_txids(txids: list) -> dict:
     return {d["txid"]: d for d in await cur.to_list(length=len(txids)) if d.get("txid")}
 
 
+async def crypto_invoice_addresses() -> list:
+    """Все адреса приёма, на которые когда-либо выставлялись счета. Кошелёк
+    сменили — старый должен остаться виден: там лежат деньги и история."""
+    db = _db_or_none()
+    if db is None: return []
+    try:
+        rows = await db.crypto_invoices.distinct("address")
+    except Exception as e:
+        log.warning(f"[crypto] адреса счетов не прочитаны: {e}")
+        return []
+    return [a for a in rows if a]
+
+
 async def update_crypto_invoice(oid: str, **kw):
     db = _db_or_none()
     if db is None: return

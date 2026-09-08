@@ -59,6 +59,12 @@ def _getenv_int(name: str, default: int) -> int:
         return default
 
 TRON_RECEIVE_ADDRESS = os.getenv("AMBAR_TRON_RECEIVE_ADDRESS", "").strip()
+# Прежние кошельки приёма. Новые счета выставляются только на TRON_RECEIVE_ADDRESS,
+# но старые деньги никуда не делись: их баланс и переводы показываются в
+# «Финансах» как «Старый кошелёк», а сверка и выгрузка берут переводы отовсюду.
+# Список дополняется сам адресами из уже выставленных счетов (см. wallet_routes).
+TRON_OLD_ADDRESSES = [a.strip() for a in os.getenv("AMBAR_TRON_OLD_ADDRESSES", "").split(",")
+                      if a.strip() and a.strip() != TRON_RECEIVE_ADDRESS]
 TRONGRID_API_KEY     = os.getenv("TRONGRID_API_KEY", "").strip()
 TRONGRID_BASE_URL    = os.getenv("TRONGRID_BASE_URL", "https://api.trongrid.io").rstrip("/")
 # USDT TRC-20 contract. Mainnet default; override for Nile/Shasta testnet.

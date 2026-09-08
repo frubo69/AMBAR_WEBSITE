@@ -1382,7 +1382,10 @@ async def handle_crypto_receipt_pdf(request: web.Request) -> web.Response:
         return web.Response(status=404, text="not found", headers=CORS_HEADERS)
     try:
         from crypto_receipt import build_receipt
-        pdf = build_receipt(order, to_address=TRON_RECEIVE_ADDRESS,
+        # Адрес — из счёта этого заказа: после смены кошелька старые заказы
+        # оплачивались на старый, и в чеке должен стоять он.
+        inv = await db.get_crypto_invoice(oid) or {}
+        pdf = build_receipt(order, to_address=inv.get("address") or TRON_RECEIVE_ADDRESS,
                             from_address=order.get("crypto_from") or "")
     except ImportError:
         log.warning("[receipt] fpdf2 not installed on this host — run: pip install fpdf2")
@@ -1487,19 +1490,25 @@ async def _crypto_watch_tick() -> None:
 
     # (c) Fetch confirmed incoming USDT since the oldest live invoice, then match
     #     by exact amount. only_confirmed=True ⇒ irreversible transfers only.
-    since_ms = min(int(i.get("created_at_ms", now_ms)) for i in live)
-    transfers = await get_incoming_usdt(TRON_RECEIVE_ADDRESS, since_ms, only_confirmed=True)
-    if not transfers:
-        return
-    by_amount = {round(float(i.get("amount_usdt", 0)), 6): i for i in live}
-    for tr in transfers:
-        try:
-            amt = round(float(tr.get("amount", 0)), 6)
-        except (TypeError, ValueError):
+    # Каждый счёт ждут на том адресе, на который он выставлен: после смены
+    # кошелька счёт, выставленный на старый, всё ещё может быть оплачен туда.
+    by_addr: dict = {}
+    for i in live:
+        by_addr.setdefault(i.get("address") or TRON_RECEIVE_ADDRESS, []).append(i)
+    for addr, group in by_addr.items():
+        since_ms = min(int(i.get("created_at_ms", now_ms)) for i in group)
+        transfers = await get_incoming_usdt(addr, since_ms, only_confirmed=True)
+        if not transfers:
             continue
-        inv = by_amount.get(amt)
-        if inv:
-            await _crypto_try_confirm(inv, tr)
+        by_amount = {round(float(i.get("amount_usdt", 0)), 6): i for i in group}
+        for tr in transfers:
+            try:
+                amt = round(float(tr.get("amount", 0)), 6)
+            except (TypeError, ValueError):
+                continue
+            inv = by_amount.get(amt)
+            if inv:
+                await _crypto_try_confirm(inv, tr)
 
 
 async def _crypto_watch_loop(app) -> None:

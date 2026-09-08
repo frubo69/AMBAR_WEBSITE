@@ -27,7 +27,7 @@ from aiohttp import web
 
 import db
 import tron
-from config import TRON_RECEIVE_ADDRESS
+from config import TRON_RECEIVE_ADDRESS, TRON_OLD_ADDRESSES
 from owner_auth import require_owner, CORS_HEADERS
 
 log = logging.getLogger("wallet")
@@ -44,9 +44,26 @@ def _short(a: str) -> str:
     return f"{a[:6]}…{a[-4:]}" if len(a) > 12 else a
 
 
-async def _build() -> dict:
-    balance = await tron.get_balance(TRON_RECEIVE_ADDRESS)
-    transfers = await tron.get_transfers(TRON_RECEIVE_ADDRESS)
+async def old_addresses() -> list:
+    """Прежние кошельки: из настроек и из уже выставленных счетов. Сменили
+    адрес — старый остаётся на экране «Старым кошельком», деньги там."""
+    seen, out = {TRON_RECEIVE_ADDRESS}, []
+    try:
+        известные = await db.crypto_invoice_addresses()
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[wallet] адреса счетов: {e}")
+        известные = []
+    for a in list(TRON_OLD_ADDRESSES) + list(известные):
+        a = str(a or "").strip()
+        if a and a not in seen:
+            seen.add(a); out.append(a)
+    return out
+
+
+async def _view(address: str) -> dict:
+    """Один кошелёк: баланс, переводы, кто за ними стоит, итоги."""
+    balance = await tron.get_balance(address)
+    transfers = await tron.get_transfers(address)
     # None и пустой список — разные ответы: первое значит «не дозвонились», и
     # говорить в этом случае «переводов нет» — врать.
     offline = transfers is None
@@ -93,26 +110,16 @@ async def _build() -> dict:
             "linked_by": (link or {}).get("by_name") or "",
         })
 
-    # Сколько всего оплачено криптой по нашим счетам. Отдельно от ленты и
-    # нарочно: лента — это последние переводы кошелька, а вопрос «сколько
-    # прошло через приложение» про всю историю, и ответ на него лежит у нас, а
-    # не в блокчейне.
-    paid = {}
-    try:
-        paid = await db.crypto_paid_totals()
-    except Exception as e:                       # noqa: BLE001
-        log.warning(f"[wallet] итог по счетам не посчитан: {e}")
-
     # Строка в журнал: единственный способ проверить эти числа, не влезая в
     # чужой экран. Сходится ли остаток с балансом — видно сразу.
-    log.info(f"[wallet] переводов {len(rows)} · пришло {round(через + напрямую, 2)} "
-             f"(через приложение {round(через, 2)}) · ушло {round(ушло, 2)} · "
-             f"остаток {round(через + напрямую - ушло, 2)} · "
+    log.info(f"[wallet] {_short(address)}: переводов {len(rows)} · пришло "
+             f"{round(через + напрямую, 2)} (через приложение {round(через, 2)}) · "
+             f"ушло {round(ушло, 2)} · остаток {round(через + напрямую - ушло, 2)} · "
              f"баланс {(balance or {}).get('usdt')}")
 
     return {
-        "paid": paid,
-        "address": _short(TRON_RECEIVE_ADDRESS),
+        "address": _short(address),
+        "address_full": address,
         "balance": balance or {"usdt": 0.0, "trx": 0.0, "unknown": True},
         "offline": offline or balance is None,
         # Лента отдаётся целиком: обрезка на полусотне превращала историю в
@@ -126,8 +133,41 @@ async def _build() -> dict:
                    "linked": round(привязано, 2),
                    "in": round(через + напрямую, 2), "out": round(ушло, 2),
                    "n": len(rows)},
-        "at": int(_t.time() * 1000),
     }
+
+
+async def _build() -> dict:
+    """Текущий кошелёк — как раньше, плюс прежние списком `old`. Экран
+    показывает первый, а старые — по переключателю, «Старый кошелёк»."""
+    main = await _view(TRON_RECEIVE_ADDRESS)
+    old = []
+    for a in await old_addresses():
+        v = await _view(a)
+        v["label"] = "Старый кошелёк"
+        old.append(v)
+    # Сколько всего оплачено криптой по нашим счетам. Отдельно от ленты и
+    # нарочно: лента — это последние переводы кошелька, а вопрос «сколько
+    # прошло через приложение» про всю историю, и ответ на него лежит у нас, а
+    # не в блокчейне — и не зависит от того, на какой адрес платили.
+    paid = {}
+    try:
+        paid = await db.crypto_paid_totals()
+    except Exception as e:                       # noqa: BLE001
+        log.warning(f"[wallet] итог по счетам не посчитан: {e}")
+    return {**main, "label": "Кошелёк", "paid": paid, "old": old,
+            "at": int(_t.time() * 1000)}
+
+
+async def _all_transfers() -> list | None:
+    """Переводы по всем кошелькам — для сверки и выгрузки. None — сеть молчит."""
+    out, any_ok = [], False
+    for a in [TRON_RECEIVE_ADDRESS] + await old_addresses():
+        t = await tron.get_transfers(a)
+        if t is None:
+            continue
+        any_ok = True
+        out += t
+    return out if any_ok else None
 
 
 @require_owner
@@ -245,7 +285,7 @@ def _usdt_of(total_aed) -> float:
 async def _match(apply: bool, who: str = "") -> dict:
     """Свести прямые поступления с заказами по сумме и дню."""
     from datetime import timedelta
-    transfers = await tron.get_transfers(TRON_RECEIVE_ADDRESS)
+    transfers = await _all_transfers()
     if transfers is None:
         return {"error": "offline"}
     ids = [t["txid"] for t in transfers if t.get("txid")]
@@ -367,13 +407,20 @@ def _book(data: dict, only_linked: bool = False):
     from openpyxl import Workbook
     from openpyxl.styles import Font, Alignment, PatternFill
 
-    rows = [r for r in (data.get("transfers") or [])
-            if not only_linked or r.get("order_id")]
+    # Переводы всех кошельков — текущего и прежних, с пометкой, чей перевод.
+    rows = []
+    for w in [data] + list(data.get("old") or []):
+        for r in (w.get("transfers") or []):
+            if only_linked and not r.get("order_id"):
+                continue
+            rows.append({**r, "wallet": w.get("label") or "Кошелёк",
+                         "waddr": w.get("address") or ""})
+    rows.sort(key=lambda r: -(r.get("ts") or 0))
     wb = Workbook()
     ws = wb.active
     ws.title = "Переводы"
     шапка = ["Дата", "Время", "Направление", "USDT", "Заказ", "Как связано",
-             "Вторая сторона", "Транзакция"]
+             "Вторая сторона", "Кошелёк", "Транзакция"]
     ws.append(шапка)
     for i, _ in enumerate(шапка, 1):
         c = ws.cell(row=1, column=i)
@@ -389,18 +436,26 @@ def _book(data: dict, only_linked: bool = False):
                    "приход" if r.get("in") else "расход",
                    round(float(r.get("amount") or 0), 2),
                    str(r.get("order_id") or ""), связь,
-                   str(r.get("peer") or ""), str(r.get("txid") or "")])
-    for кол, ширина in zip("ABCDEFGH", (12, 8, 13, 12, 16, 18, 20, 46)):
+                   str(r.get("peer") or ""),
+                   f"{r.get('wallet')} {r.get('waddr')}".strip(),
+                   str(r.get("txid") or "")])
+    for кол, ширина in zip("ABCDEFGHI", (12, 8, 13, 12, 16, 18, 20, 26, 46)):
         ws.column_dimensions[кол].width = ширина
     ws.freeze_panes = "A2"
 
-    итог = data.get("totals") or {}
     ws.append([])
-    ws.append(["Пришло всего", "", "", итог.get("in")])
-    ws.append(["Ушло с кошелька", "", "", итог.get("out")])
-    ws.append(["Остаток", "", "", round((итог.get("in") or 0) - (итог.get("out") or 0), 2)])
+    # Итоги — по каждому кошельку отдельно: складывать остатки двух адресов в
+    # одно число значило бы скрыть, где именно лежат деньги.
+    start = ws.max_row + 1
+    for w in [data] + list(data.get("old") or []):
+        итог = w.get("totals") or {}
+        имя = f"{w.get('label') or 'Кошелёк'} {w.get('address') or ''}".strip()
+        ws.append([f"{имя}: пришло", "", "", итог.get("in")])
+        ws.append([f"{имя}: ушло", "", "", итог.get("out")])
+        ws.append([f"{имя}: остаток", "", "",
+                   round((итог.get("in") or 0) - (итог.get("out") or 0), 2)])
     ws.append(["Оплачено по нашим счетам", "", "", (data.get("paid") or {}).get("usdt")])
-    for i in range(len(rows) + 3, len(rows) + 7):
+    for i in range(start, ws.max_row + 1):
         ws.cell(row=i, column=1).font = Font(bold=True)
 
     buf = io.BytesIO()
@@ -421,11 +476,13 @@ async def handle_export(request):
     имя = ("ambar-postupleniya" if only else "ambar-koshelek") + \
           f"-{datetime.now(DUBAI).strftime('%Y%m%d')}.xlsx"
     итог = data.get("totals") or {}
+    старые = sum((w.get("balance") or {}).get("usdt") or 0 for w in (data.get("old") or []))
     подпись = (f"Поступления, сведённые с заказами · {n}" if only else
                f"Кошелёк USDT · {n} "
                + ("перевод" if n % 10 == 1 and n % 100 != 11 else "переводов")
                + f"\nПришло {итог.get('in')} · ушло {итог.get('out')} · "
-               + f"остаток {round((итог.get('in') or 0) - (итог.get('out') or 0), 2)}")
+               + f"остаток {round((итог.get('in') or 0) - (итог.get('out') or 0), 2)}"
+               + (f"\nСтарый кошелёк: {round(старые, 2)} USDT" if data.get("old") else ""))
     form = _aiohttp.FormData()
     form.add_field("chat_id", str(request.get("owner_id") or 0))
     form.add_field("caption", подпись)

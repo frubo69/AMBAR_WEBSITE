@@ -14389,10 +14389,12 @@ function giftBlockRender(){
 function walBlockRender(){
   const block = document.getElementById('walBlock'); if(!block) return;
   const d = ACC_WAL, b = (d && d.balance) || null, t = (d && d.totals) || null;
+  const старые = (d && d.old || []).reduce((a, w) => a + (((w.balance || {}).usdt) || 0), 0);
   _skel('walBlockSub', !!d, d
     ? (d.offline ? 'сеть не ответила' : `${d.address || 'USDT · TRC-20'} · ${
         (d.totals || {}).n || 0} ${pluralize((d.totals||{}).n || 0,
-        'перевод','перевода','переводов')}`) : '', 130);
+        'перевод','перевода','переводов')}${
+        (d.old || []).length ? ` · старый ${fmtUsdt(старые)} USDT` : ''}`) : '', 130);
   _skel('walKpiUsdt', !!b, b ? fmtUsdt(b.usdt) : '');
   _skel('walKpiOrd',  !!d, d ? fmtUsdt((d.paid || {}).usdt) : '');
   _skel('walKpiOth',  !!t, t ? fmtUsdt(t.direct) : '');
@@ -16642,20 +16644,38 @@ async function walRefresh(btn){
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 
+// Кошельков может быть два: текущий и прежний («Старый кошелёк»). Сверху
+// переключатель, ниже — выбранный. Итог «оплачено по счетам» — только у
+// текущего: он про заказы, а не про адрес.
+let WAL_SEL = -1;
+function walPick(i){
+  WAL_SEL = i;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  if(ACC_WAL) walBody(ACC_WAL);
+}
 function walBody(d){
   const mid = document.getElementById('accMid'); if(!mid) return;
-  const b = (d && d.balance) || {}, t = (d && d.totals) || {}, p = (d && d.paid) || {};
-  const rows = (d && d.transfers) || [];
-  _setText('accSub', d && d.address ? d.address : 'USDT · TRC-20');
+  const old = (d && d.old) || [];
+  if(WAL_SEL >= old.length) WAL_SEL = -1;
+  const v = WAL_SEL < 0 ? (d || {}) : old[WAL_SEL];
+  const b = (v && v.balance) || {}, t = (v && v.totals) || {}, p = (WAL_SEL < 0 && d && d.paid) || {};
+  const rows = (v && v.transfers) || [];
+  _setText('accSub', v && v.address ? v.address : 'USDT · TRC-20');
+  const переключатель = old.length ? `<div class="periods wal-sw" id="walSw" style="--count:${1 + old.length}">
+      <div class="period-pill"></div>
+      <button class="${WAL_SEL < 0 ? 'on' : ''}" onclick="walPick(-1)">Кошелёк</button>
+      ${old.map((w, i) => `<button class="${WAL_SEL === i ? 'on' : ''}" onclick="walPick(${i})">${
+        old.length > 1 ? 'Старый ' + (i + 1) : 'Старый кошелёк'}</button>`).join('')}
+    </div>` : '';
   // Не дозвонились до сети — это не «переводов нет». Показываем прямо, иначе
   // пустой экран читается как пустой кошелёк.
-  const сеть = d && d.offline
+  const сеть = v && v.offline
     ? `<div class="wal-warn">Сеть не ответила — числа могут быть старыми</div>` : '';
   // TRX — не деньги, а топливо: без него с кошелька нельзя отправить даже
   // свои USDT. Говорим об этом только когда его почти не осталось.
   const газ = (b.trx != null && b.trx < 5)
     ? `<div class="wal-warn">TRX на комиссию: ${b.trx} — на отправку может не хватить</div>` : '';
-  mid.innerHTML = `
+  mid.innerHTML = переключатель + `
     <div class="wal-c">
       <div class="wal-v">${fmtUsdt(b.usdt)}<u>USDT</u></div>
       <div class="wal-s">TRX ${b.trx != null ? b.trx : '—'} · обновлено ${
@@ -16709,8 +16729,9 @@ function walBody(d){
             Math.min(200, rows.length - WAL_N)} из ${rows.length - WAL_N} →</button>`
         : (d && d.more ? `<div class="wal-note" style="margin:10px 0 0">показана
             последняя тысяча переводов</div>` : '')}</div>`
-    : `<div class="scan-empty">${d && d.offline
+    : `<div class="scan-empty">${v && v.offline
         ? 'Сеть не ответила' : 'Переводов пока не было'}</div>`}`;
+  const sw = document.getElementById('walSw'); if(sw) requestAnimationFrame(() => movePill(sw));
   document.getElementById('accFoot').innerHTML = `
     <div class="qb-wrap qb-row">
       <button class="qb" onclick="walMatch(this)">Сверить с заказами</button>

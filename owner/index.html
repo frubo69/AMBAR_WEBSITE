@@ -858,6 +858,8 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
    которой надо было догадаться. Оба действия равноправны и подписаны словами:
    их ищут глазами, а не вспоминают. */
 .stk-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+/* В подвале ряд стоит по нижнему краю экрана; поля — как у остальных подвалов. */
+.stk-foot .stk-acts{margin:0;padding:10px 14px calc(10px + var(--safe-bottom))}
 .stk-act{display:flex;align-items:center;justify-content:center;gap:9px;padding:14px 10px;
   border-radius:15px;cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;
   color:var(--sub);background:var(--card);border:1px solid var(--border2)}
@@ -12013,9 +12015,12 @@ function _stkHead(title, sub, save){
   }
   _setText('stkSub', sub);
   document.getElementById('stkSaveBtn').style.display = save ? '' : 'none';
-  // Иконка ревизии из шапки убрана: теперь это подписанная кнопка над списком.
+  // Иконка ревизии из шапки убрана: теперь это подписанная кнопка в подвале.
   const ab = document.getElementById('stkAudBtn');
   if(ab) ab.style.display = 'none';
+  // Подвал с действиями есть только у списка; любой другой экран его снимает.
+  const f = document.getElementById('stkFoot');
+  if(f) f.innerHTML = '';
   // Поиск и фильтры в ревизии не нужны: список и так весь, и прятать из него
   // строки — верный способ «потерять» непроверенную позицию.
   document.getElementById('stkTools').style.display   = (save && !STK.audit) ? 'flex' : 'none';
@@ -12663,12 +12668,12 @@ function stkRenderList(){
   const sh = STK.sheet, box = document.getElementById('stkMid');
   const rows = stkRows();
   const st = stkStats();
-  const acts = stkActs();
   _stkHead(`${sh.district_code} ${sh.district_name}`,
     sh.first_time
       ? `первый пересчёт · ${sh.total_count} позиций`
       : `${st.diffs ? st.diffs+' '+pluralize(st.diffs,'расхождение','расхождения','расхождений') : 'расхождений нет'}`
         + (st.short ? ` · не хватает ${fmt(st.short)} AED` : ''), true);
+  document.getElementById('stkFoot').innerHTML = stkActs();
 
   const seg = document.getElementById('stkSeg');
   if(seg){
@@ -12689,7 +12694,7 @@ function stkRenderList(){
     const coded = rows.filter(r => r.coded > 0);
     const lost  = coded.filter(r => r.scanned == null);
     const hand  = rows.filter(r => !r.coded);
-    box.innerHTML = acts + `
+    box.innerHTML = `
       <div class="stk-prog">
         <span class="stk-prog-n" id="stkProgNum">0 / ${total}</span>
         <div class="stk-prog-bar"><div class="stk-prog-fill" id="stkProgFill" style="width:0%"></div></div>
@@ -12729,14 +12734,14 @@ function stkRenderList(){
   // один раз в жизни точки. То же самое сказано подписью в шапке: «первый
   // пересчёт · 126 позиций».
   if(sh.first_time){
-    box.innerHTML = acts + rows.map(r => stkItem(r)).join('');
+    box.innerHTML = rows.map(r => stkItem(r)).join('');
     return;
   }
 
   // Числа пришли из реестра кодов, а не с прошлого пересчёта. Сказать об этом
   // надо прямо: человек должен понимать, с чем именно он сверяет полку.
   if(sh.from_registry){
-    box.innerHTML = acts + `<div class="stk-note">
+    box.innerHTML = `<div class="stk-note">
         <b>Считаем от реестра.</b> Пересчёта здесь ещё не было, но бутылки заводили
         кодами — приложение знает каждую поштучно. В строках стоит то, что внесли,
         минус проданное и списанное. Сверьте с полкой: расхождение и есть недостача.
@@ -26620,6 +26625,9 @@ function renderHours(h){
        где ты находишься, и уезжать вместе с содержимым не должна. -->
   <div id="stkRail"></div>
   <div class="stk-mid" id="stkMid"></div>
+  <!-- Подвал вне прокрутки: «Ревизия» и «Переместить» стоят по нижнему краю
+       экрана, а не уезжают вместе со списком. -->
+  <div class="stk-foot" id="stkFoot"></div>
   <div class="stk-bar" id="stkBar">
     <button class="stk-bar-b" id="stkBarPrev" onclick="stkNext(-1)" aria-label="Предыдущая">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"

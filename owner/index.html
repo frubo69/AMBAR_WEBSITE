@@ -2681,6 +2681,9 @@ button.path:active{transform:scale(.995)}
   font-weight:800;color:#1a1408;background:linear-gradient(135deg,#E8C98A,#C9A96E)}
 .xs-skip{font-size:12.5px;color:var(--muted);text-align:center;padding:8px 12px 4px}
 /* Поток доп. заявки: когда и откуда, четыре шага, подсказка, строка цен. */
+.xd-x{flex:0 0 auto;width:28px;height:28px;border-radius:8px;display:flex;align-items:center;
+  justify-content:center;color:var(--muted);font-size:13px;border:1px solid var(--border2)}
+.xd-x:active{color:var(--dn);transform:scale(.92)}
 .xf-card{margin:0 0 12px;padding:14px 16px;border-radius:16px;background:var(--card);border:1px solid var(--border2)}
 .xf-meta{font-size:11.5px;color:var(--muted)}
 .xf-steps{display:flex;align-items:center;margin-top:12px}
@@ -3135,8 +3138,13 @@ button.path:active{transform:scale(.995)}
    а не тихий пропуск, и его должно быть видно с первого взгляда. */
 .qb-skip{background:var(--card)!important;border:1.5px solid rgba(201,169,110,.6)!important;
   color:var(--gold2)!important;box-shadow:none!important}
+/* Общая анимация .pin-pop заканчивается transform:none и на время (а на
+   айфоне — и после) снимала центровку: окно вылезало правее и ниже центра.
+   У окна-вопроса своя анимация, в которой центровка стоит в обоих кадрах. */
 .crw-ask{left:50%!important;top:50%!important;transform:translate(-50%,-50%);
-  width:min(88vw,320px);padding:16px;text-align:center}
+  width:min(88vw,320px);padding:16px;text-align:center;animation:askIn .14s var(--e1)}
+@keyframes askIn{from{opacity:0;transform:translate(-50%,-50%) scale(.96)}
+                 to{opacity:1;transform:translate(-50%,-50%)}}
 .crw-ask-t{font-size:15px;font-weight:700;margin-bottom:4px}
 .crw-ask-s{font-size:12px;color:var(--muted);line-height:1.45;margin-bottom:14px}
 .crw-ask-b{display:block;width:100%;margin-top:8px;padding:12px;border-radius:11px;
@@ -18358,6 +18366,7 @@ async function accExtra(){
       </div></div>`
     : (open.length ? `<div class="exp-grp">В работе</div><div class="pbox">${open.map(row).join('')}</div>` : '')
       + (past.length ? `<div class="exp-grp">Закрытые</div><div class="pbox">${past.slice(0, 12).map(row).join('')}</div>` : '');
+  mid.innerHTML += xDraftRows();
   document.getElementById('accFoot').innerHTML = `<div class="qb-wrap">
     <button class="qb" onclick="xNew()">${ICO_XPLUS}Новая заявка</button></div>`;
 }
@@ -18671,10 +18680,13 @@ async function xLoad(){
 
 // Назад идёт по тем же шагам, что и вперёд: с итога — на последний район,
 // с района — на предыдущий, с первого района — на базу.
-// Стрелка ведёт на шаг назад (район за районом), а сюда — сразу к списку
-// баз. Набранное не выбрасываем молча: спрашиваем.
+// Стрелка ведёт на шаг назад (район за районом), а «Выйти» — сразу к списку
+// баз. Набранное не пропадает: заявка остаётся черновиком на том же шаге.
 function xLeave(){
-  if(!XS || !xTotal()){ XS = null; accExtra(); return; }
+  if(!XS || (!String(XS.base || '').trim() && !xTotal())){
+    if(XS && XS.did) xDraftDrop(XS.did);
+    XS = null; accExtra(); return;
+  }
   closePinPop();
   const back = document.createElement('div');
   back.className = 'pin-back';
@@ -18682,11 +18694,52 @@ function xLeave(){
   const box = document.createElement('div');
   box.className = 'pin-pop crw-ask';
   box.innerHTML = `
-    <div class="crw-ask-t">Уйти к другим базам?</div>
-    <div class="crw-ask-s">Набранная заявка пропадёт — она ещё не создана.</div>
-    <button class="crw-ask-b bad" onclick="closePinPop(); XS = null; accExtra()">Уйти</button>
-    <button class="crw-ask-b go" onclick="closePinPop()">Остаться</button>`;
+    <div class="crw-ask-t">Выйти из заявки?</div>
+    <div class="crw-ask-s">Черновик откроется на этом же шаге — в «Других базах», ниже списка.</div>
+    <button class="crw-ask-b go" onclick="closePinPop(); xDraftSave(); XS = null; accExtra()">Сохранить черновик и выйти</button>
+    <button class="crw-ask-b bad" onclick="closePinPop(); if(XS && XS.did) xDraftDrop(XS.did); XS = null; accExtra()">Всё равно уйти</button>`;
   document.body.append(back, box);
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('warning'); }catch(e){}
+}
+
+// ── Черновики мастера ──
+// Незаконченная заявка живёт в памяти телефона (localStorage): старший ушёл
+// с третьего района — вернётся на третий район. Черновик уходит, когда
+// заявка создана или его убрали руками. Пустой (ни базы, ни бутылок) не
+// сохраняем — иначе каждый заход в мастер плодил бы пустышку.
+const XS_DRAFTS_KEY = 'ambar_xs_drafts';
+function xDrafts(){ try{ return JSON.parse(localStorage.getItem(XS_DRAFTS_KEY) || '[]') || []; }catch(e){ return []; } }
+function xDraftsWrite(list){ try{ localStorage.setItem(XS_DRAFTS_KEY, JSON.stringify(list.slice(0, 10))); }catch(e){} }
+function xDraftSave(){
+  if(!XS) return;
+  if(!String(XS.base || '').trim() && !xTotal()) return;
+  XS.did = XS.did || String(Date.now());
+  const d = {id: XS.did, base: XS.base, step: XS.step, di: XS.di, rows: XS.rows,
+             src: XS.src, from: XS.from, at: new Date().toISOString()};
+  xDraftsWrite([d, ...xDrafts().filter(x => x.id !== XS.did)]);
+}
+function xDraftDrop(id){ xDraftsWrite(xDrafts().filter(x => x.id !== id)); }
+async function xDraftOpen(id){
+  const d = xDrafts().find(x => x.id === id); if(!d) return;
+  await xNew();
+  if(!XS) return;
+  Object.assign(XS, {did: d.id, base: d.base || '', rows: d.rows || {}, src: d.src || 'manual',
+                     from: d.from || '', step: d.step || 1, di: d.di || 0});
+  xRender();
+}
+function xDraftRows(){
+  const list = xDrafts(); if(!list.length) return '';
+  const qty = d => Object.values(d.rows || {}).reduce((a, r) => a + Object.values(r.by || {}).reduce((x, n) => x + (n || 0), 0), 0);
+  const pos = d => Object.values(d.rows || {}).filter(r => Object.values(r.by || {}).some(n => n > 0)).length;
+  const where = d => d.step === 1 ? 'куда едем' : d.step === 3 ? 'итог' : `район ${(d.di || 0) + 1}`;
+  return `<div class="exp-grp">Черновики</div><div class="pbox">${list.map(d => {
+    const n = qty(d), p = pos(d);
+    return `<button class="pnav-r xd-row" onclick="xDraftOpen('${escS(d.id)}')">
+      <span class="pnav-i">${IC('edit', 16)}</span>
+      <span class="pnav-b"><b>${escS(d.base || 'Без названия')}</b>
+        <i>${n ? `${fmt(n)} ${pluralize(n,'бутылка','бутылки','бутылок')} · ${p} ${pluralize(p,'позиция','позиции','позиций')} · ` : ''}${where(d)} · ${_hm(d.at)}</i></span>
+      <span class="xd-x" onclick="event.stopPropagation(); xDraftDrop('${escS(d.id)}'); accExtra()" aria-label="Убрать">✕</span>
+    </button>`; }).join('')}</div>`;
 }
 
 function xBack(){
@@ -18695,6 +18748,7 @@ function xBack(){
   if(XS.step === 3){ XS.step = 2; XS.di = Math.max(0, (XS.dist || []).length - 1); xRender(); return; }
   if(XS.step === 2 && XS.di > 0){ XS.di--; xRender(); return; }
   if(XS.step === 2){ XS.step = 1; xRender(); return; }
+  xDraftSave();
   XS = null; accExtra();
 }
 
@@ -18705,6 +18759,7 @@ function _xCode(o){ return ((XS && XS.dist) || []).find(x => x.id === o) || {cod
 function xRender(){
   if(!XS) return;
   ACC_BACK = xBack;
+  xDraftSave();
   const s = XS.step;
   const dist = XS.dist || [];
   // Полоска на каждый шаг: база, по одной на район, итог.
@@ -18715,7 +18770,7 @@ function xRender(){
   // Справа в шапке — выход к списку баз одним нажатием: стрелка идёт по
   // районам назад, а сюда попадают с любого шага.
   const act = document.getElementById('accAct');
-  if(act) act.innerHTML = `<button class="acc-act" onclick="xLeave()">Другие базы</button>`;
+  if(act) act.innerHTML = `<button class="acc-act dn" onclick="xLeave()">Выйти</button>`;
   const steps = `<div class="xs-steps">${Array.from({length: nSteps}, (_, i) =>
     `<span class="${i + 1 <= cur ? 'on' : ''}"></span>`).join('')}</div>`;
   const mid = document.getElementById('accMid');
@@ -18934,6 +18989,7 @@ async function xCreate(){
                             source: XS.src || 'manual', from_supply: XS.from || ''}});
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     _toast('Заявка создана — водители её видят');
+    if(XS && XS.did) xDraftDrop(XS.did);
     XS = null; ACC_SUP = null;
     await accExtra();
   }catch(e){

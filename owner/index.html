@@ -3759,6 +3759,17 @@ button.path:active{transform:scale(.995)}
 .shl-v b{display:block;font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
   letter-spacing:-.2px;color:var(--gold2);line-height:1;white-space:nowrap;font-variant-numeric:tabular-nums}
 .shl-v b.live{color:var(--up)}
+/* Состояние смены: «открыта в …» зелёным, «закрыта в …» красным, одним
+   кеглем с итогом — это и есть главное слово карточки. */
+.shl-v b.op{color:var(--up)}
+.shl-v b.cl{color:var(--dn);margin-top:5px}
+.shl-b i em{font-style:normal;color:var(--dn)}
+/* Кто открыл и кто закрыл — плашки в ряду бригады, со значком человека и
+   ролью мелко: они из той же смены, что и водители. */
+.shl-p.who{display:inline-flex;align-items:center;gap:5px;color:var(--text);
+  border-color:rgba(201,169,110,.3);background:rgba(201,169,110,.06)}
+.shl-p.who i{font-style:normal;font-size:9.5px;font-weight:600;letter-spacing:.3px;
+  text-transform:uppercase;color:var(--muted)}
 .shl-v b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:9px;font-weight:600;
   letter-spacing:.4px;color:var(--muted);margin-left:4px}
 .shl-v i{display:block;font-style:normal;font-family:'DM Sans',sans-serif;font-size:9px;
@@ -22918,26 +22929,39 @@ function shLogCards(rows){
   return order.map(k => by[k]);
 }
 
+// Справа — состояние смены словами и временем: «открыта в 12:02» зелёным,
+// пока идёт; закрыли — под ней «закрыта в 18:30» красным. Итог закрытой
+// смены (выручка, заказы, зависшие) — подписью под названием: место справа
+// занято состоянием, а подпись как раз освободилась. Кто открыл и кто
+// закрыл — плашками в ряду бригады: это тоже люди смены, и стоять им рядом
+// с водителями, а не строкой мелкого текста под названием.
 function shLogCard(c){
   const o = c.open, z = c.close;
   const name = (c.name && c.name !== c.district) ? c.name : (c.code || c.district || '—');
   const who = r => escS(r.by || r.operator || '—');
-  const sub = [
-    o ? `открыл ${who(o)} ${_hmDubai(o.at)}` : 'открытие не отмечено',
-    z ? `закрыл ${who(z)} ${_hmDubai(z.at)}` : 'идёт',
-  ].join(' / ');
-  const val = z
-    ? `<b>${fmt(z.revenue)}<u>AED</u></b><i>${fmt(z.orders)} ${pluralize(z.orders,'заказ','заказа','заказов')}${
-         z.open ? ` · <em>висело ${z.open}</em>` : ''}</i>`
-    : `<b class="live">идёт</b><i>${o ? 'с ' + _hmDubai(o.at) : ''}</i>`;
+  const sub = z
+    ? `${fmt(z.revenue)} AED · ${fmt(z.orders)} ${pluralize(z.orders,'заказ','заказа','заказов')}${
+         z.open ? ` · <em>висело ${z.open}</em>` : ''}`
+    : (o ? '' : 'открытие не отмечено');
+  const val = (o ? `<b class="op">открыта в ${_hmDubai(o.at)}</b>` : '')
+            + (z ? `<b class="cl">закрыта в ${_hmDubai(z.at)}</b>` : '');
   const crew = o ? (o.crew || []) : [];
-  const chips = crew.length
+  const ICO_WHO = '<svg viewBox="0 0 24 24" width="11" height="11" fill="none" stroke="currentColor" '
+    + 'stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+    + '<circle cx="12" cy="8" r="4"/><path d="M4 20a8 8 0 0 1 16 0"/></svg>';
+  const staff = [];
+  if(o && z && who(o) === who(z)) staff.push(`<span class="shl-p who">${ICO_WHO}${who(o)}<i>открыл и закрыл</i></span>`);
+  else{
+    if(o) staff.push(`<span class="shl-p who">${ICO_WHO}${who(o)}<i>открыл</i></span>`);
+    if(z) staff.push(`<span class="shl-p who">${ICO_WHO}${who(z)}<i>закрыл</i></span>`);
+  }
+  const chips = staff.join('') + (crew.length
     ? crew.map(x => `<span class="shl-p ${x.working ? 'on' : ''}">${escS(x.name)}</span>`).join('')
-    : (o ? '<span class="shl-none">водители не назначены</span>' : '');
+    : (o ? '<span class="shl-none">водители не назначены</span>' : ''));
   return `<div class="shl-card ${z ? 'done' : 'live'}">
     <div class="shl-h">
       <span class="shl-code">${escS(c.code || '—')}</span>
-      <span class="shl-b"><b>${escS(name)}</b><i>${sub}</i></span>
+      <span class="shl-b"><b>${escS(name)}</b>${sub ? `<i>${sub}</i>` : ''}</span>
       <span class="shl-v">${val}</span>
     </div>
     ${chips ? `<div class="shl-c">${chips}</div>` : ''}

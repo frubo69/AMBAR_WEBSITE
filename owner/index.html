@@ -858,7 +858,6 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
    которой надо было догадаться. Оба действия равноправны и подписаны словами:
    их ищут глазами, а не вспоминают. */
 .stk-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
-.stk-acts.one{grid-template-columns:1fr}
 .stk-act{display:flex;align-items:center;justify-content:center;gap:9px;padding:14px 10px;
   border-radius:15px;cursor:pointer;font-family:inherit;font-size:14px;font-weight:700;
   color:var(--sub);background:var(--card);border:1px solid var(--border2)}
@@ -867,9 +866,9 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .stk-act.on{color:#1a1408;border-color:transparent;
   background:linear-gradient(135deg,var(--gold),var(--gold2))}
 .stk-act.scan{color:var(--gold2);border-color:rgba(201,169,110,.42)}
-/* Перемещение — во всю ширину под режимами: это не режим списка, а отдельная
-   работа с камерой, и стоять вровень с «Ревизией» ей не по смыслу. */
-.stk-act.mv{grid-column:1/-1;color:var(--info);border-color:rgba(91,141,239,.3)}
+/* Перемещение стоит вровень с «Ревизией»: в ряду всегда ровно два действия —
+   вне ревизии «Ревизия» и «Переместить», в ревизии «Ревизия» и «Сканировать». */
+.stk-act.mv{color:var(--info);border-color:rgba(91,141,239,.3)}
 /* Кнопка есть всегда, даже когда сканировать пока нечего: спрятанная кнопка
    не объясняет, куда делась, — человек ищет её глазами и не находит. Тусклая
    объясняет: нажми, и скажу, чего не хватает. */
@@ -12643,7 +12642,7 @@ function stkActs(){
         <path d="M7 12h10"/></svg>
       ${sc.total ? 'Продолжить' : 'Сканировать'}${sc.total ? `<u>${fmt(sc.total)}</u>` : ''}
     </button>`;
-  return `<div class="stk-acts ${scan ? '' : 'one'}">
+  return `<div class="stk-acts">
     <button class="stk-act ${STK.audit ? 'on' : ''}" onclick="stkAuditToggle()">
       <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">

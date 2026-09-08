@@ -3171,9 +3171,12 @@ button.path:active{transform:scale(.995)}
                  to{opacity:1;transform:translate(-50%,-50%)}}
 .crw-ask-t{font-size:15px;font-weight:700;margin-bottom:4px}
 .crw-ask-s{font-size:12px;color:var(--muted);line-height:1.45;margin-bottom:14px}
-.crw-ask-b{display:block;width:100%;margin-top:8px;padding:12px;border-radius:11px;
-  cursor:pointer;font-family:inherit;font-size:13px;font-weight:700;
-  background:var(--card2);border:1px solid var(--border2);color:var(--sub)}
+/* Через класс контейнера, а не сам по себе: `.pin-pop button` выше по весу и
+   снимала фон, рамку и цвет — кнопка выходила плоским текстом. */
+.crw-ask .crw-ask-b{display:block;width:100%;margin-top:8px;padding:12px;
+  border-radius:11px;cursor:pointer;font-family:inherit;font-size:13px;
+  font-weight:700;background:var(--card2);border:1px solid var(--border2);
+  color:var(--sub)}
 .crw-ask-b.go{background:linear-gradient(135deg,var(--gold),var(--gold2));
   color:#1a1408;border-color:transparent}
 .crw-ask-b:active{transform:scale(.98)}
@@ -3199,28 +3202,34 @@ button.path:active{transform:scale(.995)}
 .crw-ask-g{font-size:9.5px;font-weight:700;letter-spacing:1.2px;
   text-transform:uppercase;color:var(--muted);text-align:left;padding:15px 2px 2px}
 .crw-ask-s + .crw-ask-g{padding-top:2px}
-.crw-ask-r{display:flex;align-items:center;gap:10px;width:100%;margin-top:8px;
+/* Обе группы залиты золотом — иначе доп. читались просто текстом со значком:
+   тонкая рамка рядом со сплошной кнопкой кнопкой не выглядит. Разница между
+   ними в силе заливки, а не в её наличии: основная сплошная и с тёмным
+   текстом, доп. — приглушённым золотом со светлым. */
+.crw-ask .crw-ask-r{display:flex;align-items:center;gap:10px;width:100%;margin-top:8px;
   padding:11px 12px;border-radius:13px;cursor:pointer;text-align:left;
-  font-family:inherit;background:var(--card2);color:var(--gold2);
-  border:1.5px solid rgba(201,169,110,.45)}
-.crw-ask-r:active{transform:scale(.98)}
-.crw-ask-r.main{background:linear-gradient(135deg,var(--gold),var(--gold2));
+  font-family:inherit;color:var(--gold3);
+  background:linear-gradient(135deg,rgba(201,169,110,.30),rgba(232,201,138,.17));
+  border:1.5px solid rgba(201,169,110,.55)}
+.crw-ask .crw-ask-r:active{transform:scale(.98)}
+.crw-ask .crw-ask-r.main{background:linear-gradient(135deg,var(--gold),var(--gold2));
   border-color:transparent;color:#1a1408}
 .crw-ask-i{flex:0 0 auto;width:32px;height:32px;border-radius:10px;display:flex;
-  align-items:center;justify-content:center;
-  background:var(--gold-soft);border:1px solid rgba(201,169,110,.3)}
-.crw-ask-i svg{width:17px;height:17px}
-.crw-ask-r.main .crw-ask-i{background:rgba(26,20,8,.13);border-color:rgba(26,20,8,.2)}
+  align-items:center;justify-content:center;color:var(--gold3);
+  background:rgba(16,12,6,.34);border:1px solid rgba(201,169,110,.28)}
+.crw-ask-i svg{width:17px;height:17px;opacity:1}
+.crw-ask-r.main .crw-ask-i{background:rgba(26,20,8,.13);border-color:rgba(26,20,8,.2);
+  color:#1a1408}
 .crw-ask-n{flex:1;min-width:0}
 .crw-ask-n b{display:block;font-family:'Space Grotesk',sans-serif;font-size:13.5px;
   font-weight:700;letter-spacing:.2px;text-transform:uppercase;line-height:1.2}
 .crw-ask-n i{display:block;font-style:normal;font-size:10.5px;font-weight:600;
-  margin-top:3px;color:var(--muted)}
+  margin-top:3px;color:rgba(245,224,176,.62)}
 .crw-ask-r.main .crw-ask-n i{color:rgba(26,20,8,.62)}
 .crw-ask-q{flex:0 0 auto;text-align:right;font-family:'Space Grotesk',sans-serif;
   font-size:16px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.3px}
 .crw-ask-q u{display:block;text-decoration:none;font-family:'DM Sans',sans-serif;
-  font-size:9px;font-weight:600;color:var(--muted);margin-top:2px;letter-spacing:0}
+  font-size:9px;font-weight:600;color:rgba(245,224,176,.52);margin-top:2px;letter-spacing:0}
 .crw-ask-r.main .crw-ask-q u{color:rgba(26,20,8,.55)}
 .crw-ask-r + .crw-ask-b{margin-top:14px}
 

@@ -156,22 +156,26 @@ async def _held(day_from: str, day_to: str = "") -> list:
     out = {}
     for r in rows:
         c = r.get("comp") or {}
-        amount = int(c.get("amount") or 0)
-        if not amount or (r.get("state") or "ok") != "ok":
+        if not int(c.get("amount") or 0) or (r.get("state") or "ok") != "ok":
             continue
         d = str(r.get("day") or "")
         if d < day_from or (day_to and d > day_to):
             continue
-        who = c.get("who") or ""
-        h = out.setdefault(who, {"who": who, "amount": 0, "n": 0, "items": []})
-        h["amount"] += amount
-        h["n"] += 1
-        if len(h["items"]) < 12:
-            h["items"].append({
-                "id": r.get("_id"), "day": d, "amount": amount,
-                "name": r.get("name", "") or r.get("item", ""),
-                "qty": int(r.get("qty") or 0), "kind": r.get("kind", ""),
-                "note": c.get("note", ""), "by": r.get("by", "")})
+        # Раскладка по людям, если виноватых несколько: каждому — его доля.
+        for part in (c.get("split") or [{"who": c.get("who") or "", "amount": c.get("amount")}]):
+            who = part.get("who") or ""
+            amount = int(part.get("amount") or 0)
+            if not amount:
+                continue
+            h = out.setdefault(who, {"who": who, "amount": 0, "n": 0, "items": []})
+            h["amount"] += amount
+            h["n"] += 1
+            if len(h["items"]) < 12:
+                h["items"].append({
+                    "id": r.get("_id"), "day": d, "amount": amount,
+                    "name": r.get("name", "") or r.get("item", ""),
+                    "qty": int(r.get("qty") or 0), "kind": r.get("kind", ""),
+                    "note": c.get("note", ""), "by": r.get("by", "")})
     return sorted(out.values(), key=lambda x: -x["amount"])
 
 
@@ -353,16 +357,20 @@ async def handle_debts(request):
         wos = []
     for w in wos:
         c = w.get("comp") or {}
-        who = str(c.get("who") or "").strip()
-        a = _amount(c.get("amount"))
-        if not who or not a:
+        if not c.get("amount"):
             continue
-        row = P(who)
-        row["they"] += a
-        row["items"].append({"day": w.get("day") or "", "kind": "comp", "t": "Удержание",
-                             "amount": a,
-                             "comment": f"{w.get('name') or ''} × {w.get('qty') or 1}"
-                                        + (f" · {c.get('note')}" if c.get("note") else "")})
+        # Виноватых несколько — долг у каждого свой, а не общий на всех.
+        for part in (c.get("split") or [{"who": c.get("who"), "amount": c.get("amount")}]):
+            who = str(part.get("who") or "").strip()
+            a = _amount(part.get("amount"))
+            if not who or not a:
+                continue
+            row = P(who)
+            row["they"] += a
+            row["items"].append({"day": w.get("day") or "", "kind": "comp", "t": "Удержание",
+                                 "amount": a,
+                                 "comment": f"{w.get('name') or ''} × {w.get('qty') or 1}"
+                                            + (f" · {c.get('note')}" if c.get("note") else "")})
 
     seniors = {x["name"] for x in (staff.SENIOR_OPERATORS or [])}
     operators = {(d.get("operator") or "").strip() for d in staff.DISTRICT_STAFF} - seniors

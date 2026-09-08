@@ -798,6 +798,15 @@ async def handle_moves(request):
         headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
 
 
+def _comp_share(comp: dict, name: str) -> int:
+    if not comp.get("amount"):
+        return 0
+    split = comp.get("split") or []
+    if split:
+        return next((int(x.get("amount") or 0) for x in split if (x.get("who") or "") == name), 0)
+    return int(comp.get("amount") or 0)
+
+
 @require_driver
 async def handle_writeoffs(request):
     """Мои списания за сегодня — чтобы видеть, что запись прошла."""
@@ -816,8 +825,8 @@ async def handle_writeoffs(request):
         "decided_note": r.get("decided_note", ""),
         # Удержание — то, что водителя касается напрямую: узнать о нём в день
         # выплаты значит поспорить тогда, когда доказывать уже нечем.
-        "comp": (int((r.get("comp") or {}).get("amount") or 0)
-                 if (r.get("comp") or {}).get("amount") else 0),
+        # Виноватых несколько — водителю показываем его долю, а не всё.
+        "comp": _comp_share(r.get("comp") or {}, me["name"]),
         "comp_note": (r.get("comp") or {}).get("note", ""),
         # isoformat, а не str(): у str разделитель — пробел, и сафари такую
         # дату не разбирает вовсе.

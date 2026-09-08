@@ -4313,8 +4313,10 @@ button.shl-p:active{transform:scale(.96)}
 .wo-c-ov{position:fixed;inset:0;z-index:160;display:none;align-items:flex-end;
   justify-content:center;background:rgba(0,0,6,.66);backdrop-filter:blur(3px)}
 .wo-c-ov.show{display:flex}
-.wo-c-sheet{width:100%;max-width:520px;max-height:88vh;overflow-y:auto;
-  padding:18px 18px calc(18px + var(--safe-bottom));
+/* Лист — колонкой: тело листается, кнопки внизу стоят на месте. Иначе при
+   пяти районах «Удержать» уезжал за экран, и его искали прокруткой. */
+.wo-c-sheet{width:100%;max-width:520px;max-height:88vh;display:flex;flex-direction:column;
+  overflow:hidden;padding:18px 18px calc(14px + var(--safe-bottom));
   border-radius:22px 22px 0 0;background:var(--bg2);border:1px solid var(--border2);
   border-bottom:0;animation:woCIn .2s var(--e1)}
 @keyframes woCIn{from{transform:translateY(24px);opacity:0}to{transform:none;opacity:1}}
@@ -4422,7 +4424,23 @@ button.shl-p:active{transform:scale(.96)}
 .wo-add-foot .wo-c-go:active{transform:scale(.985)}
 .wo-add-foot .wo-c-go:disabled{opacity:.4;pointer-events:none}
 
-.wo-c-acts{display:flex;gap:8px;margin-top:20px}
+.wo-c-body{flex:1;min-height:0;overflow-y:auto;-webkit-overflow-scrolling:touch;
+  margin:0 -4px;padding:0 4px 6px}
+.wo-c-acts{display:flex;gap:8px;flex:0 0 auto;margin-top:10px;padding-top:12px;
+  border-top:1px solid var(--border2)}
+/* Доли: имя, поле, валюта — строкой на человека. */
+.wo-sp-r{display:flex;align-items:center;gap:10px;padding:8px 0;border-top:1px solid var(--border2)}
+.wo-sp-r:first-of-type{border-top:0}
+.wo-sp-n{flex:1;min-width:0;display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.wo-sp-n svg{flex-shrink:0;color:var(--gold2)}
+.wo-sp-a{width:96px;height:44px;padding:0 12px;border-radius:12px;border:1px solid var(--border2);
+  background:var(--card);color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:18px;
+  font-weight:700;text-align:right;outline:none}
+.wo-sp-a:focus{border-color:rgba(201,169,110,.5)}
+.wo-sp-r i{flex:0 0 auto;font-style:normal;font-size:11px;font-weight:700;color:var(--muted)}
+.wo-sp-hint{margin-top:10px;font-size:12.5px;font-weight:600;color:var(--muted)}
+.wo-sp-hint.ok{color:var(--up)} .wo-sp-hint.bad{color:var(--dn)}
 .wo-c-acts button{flex:1;height:48px;border-radius:14px;border:1px solid var(--border2);
   background:var(--card);color:var(--sub);font-family:inherit;font-size:14px;
   font-weight:700;cursor:pointer}
@@ -24607,8 +24625,13 @@ async function woCompOpen(ev, id, режим){
   // она продавалась. С водителя удерживают убыток, а не упущенную выручку.
   // Закупки нет — поле пустое: пусть впишет человек, чем программа наугад.
   const amount = (r.comp || {}).amount || r.loss || '';
+  // Уже разложенное по людям удержание открывается с теми же людьми.
+  const split = (r.comp || {}).split || null;
+  const chosen = new Set(split ? split.map(x => x.who) : (who ? [who] : []));
+  WO_SPLIT = null;
   document.getElementById('woCompOv').innerHTML = `
     <div class="wo-c-sheet">
+      <div class="wo-c-body" id="woCompBody">
       <div class="wo-c-h">
         <div class="wo-c-t">${WO_COMP_MODE === 'approve'
           ? 'Согласовать: кто платит'
@@ -24617,7 +24640,7 @@ async function woCompOpen(ev, id, режим){
           r.loss ? ` · закупка ${fmt(r.loss)} AED`
                  : ' · закупочной цены нет'}</div>
       </div>
-      <div class="wo-c-l">С кого</div>
+      <div class="wo-c-l">С кого <i>можно нескольких</i></div>
       <div class="wo-c-crew" id="woCompWho">${list
         || '<span class="wo-c-none">Некого выбрать — список смены пуст</span>'}</div>
       <div class="wo-c-l">Сумма</div>
@@ -24628,22 +24651,130 @@ async function woCompOpen(ev, id, режим){
       <div class="wo-c-l">Комментарий <i>необязательно</i></div>
       <input class="wo-c-note" id="woCompNote" type="text" maxlength="120"
              placeholder="уронил при разгрузке" value="${escS((r.comp || {}).note || '')}">
-      <div class="wo-c-acts">
+      </div>
+      <div class="wo-c-acts" id="woCompActs">
         ${WO_COMP_MODE === 'approve'
-          ? '<button class="wo-c-off" onclick="woCompSave(0)">На компанию</button>'
+          ? '<button class="wo-c-off" onclick="woCompSave(0)">Без виновного</button>'
           : (r.comp ? '<button class="wo-c-off" onclick="woCompSave(0)">Снять удержание</button>' : '')}
         <button class="wo-c-no" onclick="woCompClose()">Отмена</button>
-        <button class="wo-c-go" id="woCompGo" onclick="woCompSave(1)">${
-          WO_COMP_MODE === 'approve' ? 'Удержать' : 'Удержать'}</button>
+        <button class="wo-c-go" id="woCompGo" onclick="woCompSave(1)">Удержать</button>
       </div>
     </div>`;
+  document.querySelectorAll('#woCompWho .wo-who').forEach(b => b.classList.toggle('on', chosen.has(b.dataset.n)));
   document.getElementById('woCompOv').classList.add('show');
 }
 
+// Виноватых может быть несколько: чипы включаются и выключаются по одному.
 function woCompPick(b){
-  document.querySelectorAll('#woCompWho .wo-who').forEach(e => e.classList.remove('on'));
-  b.classList.add('on');
+  b.classList.toggle('on');
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+function woCompNames(){
+  return [...document.querySelectorAll('#woCompWho .wo-who.on')].map(b => b.dataset.n).filter(Boolean);
+}
+
+// ── Несколько виноватых: кто сколько ──
+// Выбрали двоих — программа не гадает, а спрашивает: сумма делится поровну,
+// остаток первому, и каждую долю можно поправить. «Удержать» горит, только
+// когда доли сходятся в сумму: недобор и перебор видны словами.
+let WO_SPLIT = null;    // {names, total, note, parts:{имя: сумма}}
+function woSplitOpen(names, total, note){
+  const n = names.length, base = Math.floor(total / n), rest = total - base * n;
+  const parts = {};
+  names.forEach((nm, i) => { parts[nm] = base + (i === 0 ? rest : 0); });
+  WO_SPLIT = {names, total, note, parts};
+  const r = WO_COMP;
+  // Значок — по роли: оператор и старший с гарнитурой, водитель с машиной.
+  const ops = new Set([...((CREW || {}).districts || []).map(d => d.operator), ...((CREW || {}).seniors || [])].filter(Boolean));
+  const ico = nm => ops.has(nm) ? 'headset' : 'car';
+  document.getElementById('woCompBody').innerHTML = `
+      <div class="wo-c-h">
+        <div class="wo-c-t">Кто сколько платит</div>
+        <div class="wo-c-s">${fmt(total)} AED · ${escS(r.name)} × ${fmt(r.qty)} · ${escS(names.join(', '))}</div>
+      </div>
+      <div class="wo-c-l">Доли</div>
+      ${names.map(nm => `<div class="wo-sp-r">
+        <span class="wo-sp-n">${IC(ico(nm), 15)}${escS(nm)}</span>
+        <input class="wo-sp-a" type="text" inputmode="numeric" data-n="${escS(nm)}"
+               value="${parts[nm]}" oninput="woSplitTyped()" onfocus="this.select()">
+        <i>AED</i>
+      </div>`).join('')}
+      <div class="wo-sp-hint" id="woSplitHint"></div>`;
+  document.getElementById('woCompActs').innerHTML = `
+        <button class="wo-c-off" onclick="woSplitEven()">Поровну</button>
+        <button class="wo-c-no" onclick="woSplitBack()">Назад</button>
+        <button class="wo-c-go" id="woSplitGo" onclick="woSplitSave()">Удержать</button>`;
+  woSplitTyped();
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+function woSplitParts(){
+  const out = {};
+  document.querySelectorAll('.wo-sp-a').forEach(i => {
+    out[i.dataset.n] = parseInt((i.value || '').replace(/\D/g, ''), 10) || 0;
+  });
+  return out;
+}
+function woSplitTyped(){
+  if(!WO_SPLIT) return;
+  const parts = woSplitParts();
+  const sum = Object.values(parts).reduce((a, b) => a + b, 0);
+  const diff = WO_SPLIT.total - sum;
+  const h = document.getElementById('woSplitHint'), go = document.getElementById('woSplitGo');
+  if(h){
+    h.className = 'wo-sp-hint' + (diff ? ' bad' : ' ok');
+    h.textContent = diff === 0 ? `Сходится: ${fmt(sum)} из ${fmt(WO_SPLIT.total)} AED`
+      : diff > 0 ? `Осталось распределить ${fmt(diff)} AED`
+                 : `Лишние ${fmt(-diff)} AED — больше суммы удержания`;
+  }
+  if(go) go.disabled = diff !== 0 || Object.values(parts).some(v => v <= 0);
+}
+function woSplitEven(){
+  if(!WO_SPLIT) return;
+  const {names, total} = WO_SPLIT;
+  const base = Math.floor(total / names.length), rest = total - base * names.length;
+  document.querySelectorAll('.wo-sp-a').forEach((i, k) => { i.value = base + (k === 0 ? rest : 0); });
+  woSplitTyped();
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+}
+function woSplitBack(){
+  const r = WO_COMP; if(!r) return;
+  const names = WO_SPLIT ? WO_SPLIT.names : [];
+  const total = WO_SPLIT ? WO_SPLIT.total : 0, note = WO_SPLIT ? WO_SPLIT.note : '';
+  WO_SPLIT = null;
+  // Обратно к выбору людей — с теми же людьми, суммой и словами.
+  r.comp = {...(r.comp || {}), split: names.map(n => ({who: n, amount: 0})), amount: total, note};
+  woCompOpen(null, r.id, WO_COMP_MODE);
+}
+async function woSplitSave(){
+  const r = WO_COMP; if(!r || !WO_SPLIT) return;
+  const parts = woSplitParts();
+  const split = WO_SPLIT.names.map(n => ({who: n, amount: parts[n] || 0}));
+  const sum = split.reduce((a, x) => a + x.amount, 0);
+  if(sum !== WO_SPLIT.total || split.some(x => x.amount <= 0)){ woSplitTyped(); return; }
+  const go = document.getElementById('woSplitGo'); if(go) go.disabled = true;
+  const who = WO_SPLIT.names.join(', '), note = WO_SPLIT.note;
+  const путь = WO_COMP_MODE === 'approve' ? '/decide' : '/compensate';
+  const тело = WO_COMP_MODE === 'approve'
+    ? {ok: true, blame: true, who, comp: sum, note, split, as: _meName()}
+    : {who, amount: sum, note, split, as: _meName()};
+  try{
+    await ownerApi.ownerFetch('/api/owner/stock/writeoff/' + encodeURIComponent(r.id) + путь,
+      {method:'POST', body: тело});
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    _toast(`Удержано ${fmt(sum)} AED · ${split.map(x => `${x.who} ${fmt(x.amount)}`).join(', ')}`);
+  }catch(e){
+    const p = (e || {}).payload || {};
+    _toast(p.error === 'already_decided' ? 'Уже решено' + (p.by ? ' — ' + p.by : '')
+         : p.error === 'not_approved'    ? 'Сначала согласуйте списание'
+                                         : 'Не удалось — попробуйте ещё раз');
+    if(go) go.disabled = false;
+    return;
+  }
+  woCompClose();
+  try{ ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs', {params:{days:30}}); }
+  catch(e){}
+  if(SH_TAB === 'wo') woKindBody(); else woHome();
+  shCounts();
 }
 
 function woCompClose(){
@@ -24653,15 +24784,18 @@ function woCompClose(){
 
 async function woCompSave(on){
   const r = WO_COMP; if(!r) return;
-  const who = on ? (document.querySelector('#woCompWho .wo-who.on') || {}).dataset?.n || '' : '';
+  const names = on ? woCompNames() : [];
+  const who = names[0] || '';
   const amount = on ? parseInt((document.getElementById('woCompAmt').value || '')
                                  .replace(/\D/g, ''), 10) || 0 : 0;
   const note = on ? (document.getElementById('woCompNote').value || '').trim() : '';
   // Сумма без человека — это удержание из воздуха, а человек без суммы ничего
   // не значит. Говорим об этом до отправки, а не после.
   if(on && (!who || !amount)){ _toast(!who ? 'Выберите, с кого' : 'Впишите сумму'); return; }
+  // Виноватых несколько — сперва «кто сколько», отправка оттуда.
+  if(on && names.length > 1){ woSplitOpen(names, amount, note); return; }
   if(WO_COMP_MODE === 'approve' && !on
-     && !confirm('Согласовать и списать за счёт компании?')) return;
+     && !confirm('Согласовать и списать без виновного, за счёт компании?')) return;
   const go = document.getElementById('woCompGo'); if(go) go.disabled = true;
   // Согласование и удержание — одно действие, а не два подряд: разорванные,
   // они дают окно, в котором списание уже согласовано, а виновного ещё нет, и
@@ -24676,7 +24810,7 @@ async function woCompSave(on){
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     _toast(WO_COMP_MODE === 'approve'
       ? (on ? `Согласовано · удержано ${fmt(amount)} AED с ${who}`
-            : 'Согласовано · списано на компанию')
+            : 'Согласовано · списано без виновного')
       : (on ? `Удержано ${fmt(amount)} AED · ${who}` : 'Удержание снято'));
   }catch(e){
     const p = (e || {}).payload || {};
@@ -24748,7 +24882,9 @@ function woRow(r){
       ${no ? `<span class="wo-st no">отклонено${
         r.decided_by_name ? ' · ' + escS(r.decided_by_name) : ''}</span>` : ''}
       ${r.comp ? `<span class="wo-st held" onclick="woCompOpen(event,'${escS(r.id)}')">удержано
-        ${fmt(r.comp.amount)} AED · ${escS(r.comp.who)}${
+        ${fmt(r.comp.amount)} AED · ${r.comp.split
+          ? r.comp.split.map(x => `${escS(x.who)} ${fmt(x.amount)}`).join(', ')
+          : escS(r.comp.who)}${
           r.comp.note ? ' · ' + escS(r.comp.note) : ''}</span>` : ''}
     </div>
     <div class="wo-aed" ${no ? 'style="text-decoration:line-through;opacity:.55"' : ''}>${

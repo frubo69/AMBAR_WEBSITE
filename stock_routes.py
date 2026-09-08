@@ -1830,10 +1830,14 @@ async def _blame_set(wid: str, body: dict, request, by_name: str, note: str = ""
     await _loss_load()
     сколько = (int(сумма) if str(сумма or "").strip().lstrip("-").isdigit()
                else _loss_of(doc.get("item") or "", int(doc.get("qty") or 0)))
+    split = _split_parse(body)
+    if split:
+        кто = ", ".join(x["who"] for x in split)
+        сколько = sum(x["amount"] for x in split)
     if сколько <= 0:
         return None
     обновл = await db.writeoff_compensate(wid, кто, сколько, note[:200],
-                                        request.get("owner_id") or 0, by_name)
+                                        request.get("owner_id") or 0, by_name, split)
     if not обновл:
         return None
     log.info(f"[writeoff] {wid}: удержано {сколько} с {кто} ({by_name})")
@@ -2090,9 +2094,13 @@ async def handle_writeoff_decide(request):
                     or str(doc.get("by") or "").strip()[:60])
         сколько = (int(сумма) if str(сумма or "").strip().lstrip("-").isdigit()
                    else _loss_of(doc.get("item") or "", int(doc.get("qty") or 0)))
+        split = _split_parse(body)
+        if split:
+            виновный = ", ".join(x["who"] for x in split)
+            сколько = sum(x["amount"] for x in split)
         if виновный and сколько > 0:
             обновл = await db.writeoff_compensate(
-                wid, виновный, сколько, note, request.get("owner_id") or 0, who)
+                wid, виновный, сколько, note, request.get("owner_id") or 0, who, split)
             if обновл:
                 doc = обновл
                 log.info(f"[writeoff] {wid}: удержано {сколько} с {виновный}")
@@ -2134,8 +2142,13 @@ async def handle_writeoff_compensate(request):
         amount = max(0, int(round(float(body.get("amount") or 0))))
     except (TypeError, ValueError):
         amount = 0
+    # Несколько виноватых: имена и сумма — из раскладки, а не из полей.
+    split = _split_parse(body)
+    if split:
+        who = ", ".join(x["who"] for x in split)
+        amount = sum(x["amount"] for x in split)
     doc = await db.writeoff_compensate(wid, who, amount, note,
-                                       request.get("owner_id") or 0, by_name)
+                                       request.get("owner_id") or 0, by_name, split)
     if not doc:
         cur = await db.writeoff_get(wid)
         if not cur:
@@ -2157,6 +2170,29 @@ async def handle_writeoff_compensate(request):
                              headers=CORS_HEADERS)
 
 
+def _split_parse(body: dict) -> list | None:
+    """Раскладка удержания по нескольким людям из тела запроса:
+    split: [{who, amount}, …]. Пустые имена и нули выбрасываем; меньше двух
+    человек — раскладки нет, это обычное удержание."""
+    raw = body.get("split")
+    if not isinstance(raw, list):
+        return None
+    out, seen = [], set()
+    for x in raw:
+        if not isinstance(x, dict):
+            continue
+        who = str(x.get("who") or "").strip()[:60]
+        try:
+            amount = max(0, int(round(float(x.get("amount") or 0))))
+        except (TypeError, ValueError):
+            amount = 0
+        if not who or not amount or who in seen:
+            continue
+        seen.add(who)
+        out.append({"who": who, "amount": amount})
+    return out if len(out) > 1 else None
+
+
 def _comp_view(doc: dict):
     """Удержание для ответа страницей. Дату отдаём строкой: в самом документе
     она объектом, и json на ней падает — падал уже после записи, так что
@@ -2166,6 +2202,7 @@ def _comp_view(doc: dict):
         return None
     return {"who": c.get("who", ""), "amount": int(c.get("amount") or 0),
             "note": c.get("note", ""), "by_name": c.get("by_name", ""),
+            "split": c.get("split") or None,
             "at": _iso_of(c.get("at")) if c.get("at") else ""}
 
 
@@ -2179,23 +2216,30 @@ async def _writeoff_comp_tell(doc: dict):
     import config_staff as _staff
     from api_server import tg_send
     comp = doc.get("comp") or {}
-    # Снятое удержание адресуем тому, с кого его снимали, — имени в документе
-    # больше нет, поэтому берём водителя, который списывал.
-    who = (comp.get("who") or doc.get("by") or "").strip()
-    tid = _staff.DRIVER_IDS.get(who)
     token = _os.getenv("DRIVER_BOT_TOKEN", "")
-    if not tid or not token:
+    if not token:
         return
     name = doc.get("name") or doc.get("item") or "товар"
     qty = int(doc.get("qty") or 0)
     kind = doc.get("kind") or "списание"
-    if comp.get("amount"):
-        text = (f"С вас удержано {int(comp['amount'])} AED\n"
+    # Виноватых несколько — каждому его доля, а не общая сумма на всех.
+    parts = comp.get("split") or ([{"who": comp.get("who"), "amount": comp.get("amount")}]
+                                  if comp.get("amount") else [])
+    if not parts:
+        # Снятое удержание адресуем тому, с кого его снимали, — имени в
+        # документе больше нет, поэтому берём водителя, который списывал.
+        tid = _staff.DRIVER_IDS.get((doc.get("by") or "").strip())
+        if tid:
+            await tg_send(token, tid, f"Удержание снято\n{name} × {qty} · {kind}", parse_mode=None)
+        return
+    for part in parts:
+        tid = _staff.DRIVER_IDS.get((part.get("who") or "").strip())
+        if not tid:
+            continue
+        text = (f"С вас удержано {int(part.get('amount') or 0)} AED\n"
                 f"{name} × {qty} · {kind}"
                 + (f"\n{comp.get('note')}" if comp.get("note") else ""))
-    else:
-        text = f"Удержание снято\n{name} × {qty} · {kind}"
-    await tg_send(token, tid, text, parse_mode=None)
+        await tg_send(token, tid, text, parse_mode=None)
 
 
 async def _writeoff_after(doc: dict, ok: bool, by_name: str = ""):

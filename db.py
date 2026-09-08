@@ -2573,7 +2573,7 @@ async def writeoff_pending_by_code(code: str) -> dict | None:
 
 
 async def writeoff_compensate(wid: str, who: str, amount: int, note: str,
-                              by: int, by_name: str = "") -> dict | None:
+                              by: int, by_name: str = "", split: list = None) -> dict | None:
     """Назначить удержание по списанию — или снять его.
 
     Удержание живёт на самом списании, а не отдельной записью: иначе одно и то
@@ -2594,10 +2594,14 @@ async def writeoff_compensate(wid: str, who: str, amount: int, note: str,
     if not who or not amount:
         upd = {"$unset": {"comp": ""}}
     else:
-        upd = {"$set": {"comp": {
-            "who": who, "amount": amount, "note": str(note or "")[:200],
-            "at": datetime.now(timezone.utc),
-            "by": int(by or 0), "by_name": str(by_name or "")[:60]}}}
+        comp = {"who": who, "amount": amount, "note": str(note or "")[:200],
+                "at": datetime.now(timezone.utc),
+                "by": int(by or 0), "by_name": str(by_name or "")[:60]}
+        # Виноватых несколько — сумма разложена по людям. who и amount при этом
+        # остаются общими: всё, что читает удержание по-старому, видит целое.
+        if split and len(split) > 1:
+            comp["split"] = [{"who": str(x["who"])[:60], "amount": int(x["amount"])} for x in split]
+        upd = {"$set": {"comp": comp}}
     return await db.writeoffs.find_one_and_update(
         {"_id": wid, "state": "ok"}, upd,
         projection={"img": 0}, return_document=ReturnDocument.AFTER)

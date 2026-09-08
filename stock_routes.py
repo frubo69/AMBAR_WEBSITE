@@ -604,6 +604,8 @@ async def handle_sheet(request):
             "finished_at": (existing or {}).get("audit_finished_at", ""),
             "marked": sum(1 for r in rows if r["mark"]),
         },
+        # Когда последний раз сохраняли — карточка ревизии пишет это словами.
+        "counted_at": (existing or {}).get("counted_at", ""),
         "touched_count": sum(1 for r in rows if r["touched"]),
         "stale_count": sum(1 for r in rows if r["stale"] and not r["touched"]),
         "stale_days": STALE_DAYS,

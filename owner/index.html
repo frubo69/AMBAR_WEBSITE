@@ -931,6 +931,31 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
    шапки, а камера пряталась внутри режима ревизии — то есть за иконкой, о
    которой надо было догадаться. Оба действия равноправны и подписаны словами:
    их ищут глазами, а не вспоминают. */
+/* Живой отчёт ревизии сверху списка: имя и состояние, полоса, три числа,
+   действия. Красное — недостача и то, чего камера не нашла. */
+.stk-rep{margin:2px 0 12px;padding:14px 14px 12px;border-radius:18px;
+  background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);border:1px solid rgba(201,169,110,.28)}
+.stk-rep-h{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin-bottom:10px}
+.stk-rep-t{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;letter-spacing:.6px;
+  text-transform:uppercase}
+.stk-rep-s{font-size:11px;color:var(--muted)}
+.stk-rep .stk-prog{margin:0 0 12px}
+.stk-rep-g{display:grid;grid-template-columns:1fr 1fr 1fr;gap:7px}
+.stk-rep-c{padding:10px 10px 9px;border-radius:13px;background:var(--card2);border:1px solid var(--border2);min-width:0}
+.stk-rep-l{display:block;font-size:8.5px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;
+  color:var(--muted);margin-bottom:6px;line-height:1.25;min-height:2.5em}
+.stk-rep-c b{display:block;font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;
+  line-height:1;font-variant-numeric:tabular-nums;color:var(--text)}
+.stk-rep-c i{display:block;font-style:normal;font-size:9.5px;font-weight:600;color:var(--muted);
+  margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stk-rep-c.dn b{color:var(--dn)} .stk-rep-c.dn{border-color:rgba(224,85,85,.3)}
+.stk-rep-c.warn b{color:var(--warn)}
+.stk-rep-b{display:flex;gap:8px;margin-top:10px}
+.stk-rep-x{flex:1;padding:10px 12px;border-radius:12px;cursor:pointer;font-family:inherit;
+  font-size:12.5px;font-weight:700;color:var(--gold2);background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.35)}
+.stk-rep-x.dim{color:var(--muted);background:var(--card2);border-color:var(--border2)}
+.stk-rep-x:active{transform:scale(.98)}
 .stk-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
 /* В подвале ряд стоит по нижнему краю экрана; поля — как у остальных подвалов. */
 .stk-foot .stk-acts{margin:0;padding:10px 14px calc(10px + var(--safe-bottom))}
@@ -12431,12 +12456,9 @@ async function stkAuditGo(id){
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   await stkOpen(id);
   if(STK.view !== 'sheet' || STK.district !== id || !STK.sheet) return;
+  // Открываем список, а не камеру: камера — одна из двух дорог, и выбирает
+  // её человек кнопкой внизу. Сверху списка стоит живой отчёт ревизии.
   if(!STK.audit) stkAuditToggle();
-  // Камера узнаёт бутылки по кодам. Где кодов нет, ей нечего узнавать — сразу
-  // список, без вопроса про реестр: человек уже здесь ради пересчёта.
-  const coded = (STK.sheet.rows || []).filter(r => r.coded > 0).length;
-  if(coded) stkScan();
-  else _toast('Кодов на точке нет — считаем списком');
 }
 
 // ── История перемещений: своя страница, по дням ─────────────────────────────
@@ -13056,14 +13078,26 @@ function stkActs(){
         <path d="M7 12h10"/></svg>
       ${sc.total ? 'Продолжить' : 'Сканировать'}${sc.total ? `<u>${fmt(sc.total)}</u>` : ''}
     </button>`;
-  return `<div class="stk-acts">
-    <button class="stk-act ${STK.audit ? 'on' : ''}" onclick="stkAuditToggle()">
+  // В ревизии слева — «Сохранить»: она записывает промежуточный итог, и по
+  // нему тут же строится отчёт. «Идёт ревизия» тут не стоит: режим виден по
+  // карточке сверху, а кнопка-переключатель только путала.
+  const left = STK.audit
+    ? `<button class="stk-act on" id="stkSaveFoot" onclick="stkSubmit()">
+      <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
+           stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/>
+        <path d="M17 21v-8H7v8M7 3v5h8"/></svg>
+      Сохранить
+    </button>`
+    : `<button class="stk-act" onclick="stkAuditToggle()">
       <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
         <path d="M9 11l2 2 4-4"/>
         <path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/></svg>
-      ${STK.audit ? 'Идёт ревизия' : 'Ревизия'}
-    </button>${scan}${STK.audit ? '' : `
+      Ревизия
+    </button>`;
+  return `<div class="stk-acts">
+    ${left}${scan}${STK.audit ? '' : `
     <button class="stk-act mv" onclick="stkMoveStart()">
       <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
            stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -13081,7 +13115,7 @@ function stkRenderList(){
     sh.first_time
       ? `первый пересчёт · ${sh.total_count} позиций`
       : `${st.diffs ? st.diffs+' '+pluralize(st.diffs,'расхождение','расхождения','расхождений') : 'расхождений нет'}`
-        + (st.short ? ` · не хватает ${fmt(st.short)} AED` : ''), true);
+        + (st.short ? ` · не хватает ${fmt(st.short)} AED` : ''), !STK.audit);
   document.getElementById('stkFoot').innerHTML = stkActs();
 
   const seg = document.getElementById('stkSeg');
@@ -13100,29 +13134,7 @@ function stkRenderList(){
     // Что закрывается камерой, а что руками. Кодами заведена не вся полка, и
     // делать вид, что проход отвечает за всё, нельзя: непройденное глазами
     // должно остаться видимой работой, а не молча зачесться.
-    const coded = rows.filter(r => r.coded > 0);
-    const lost  = coded.filter(r => r.scanned == null);
-    const hand  = rows.filter(r => !r.coded);
-    box.innerHTML = `
-      <div class="stk-prog">
-        <span class="stk-prog-n" id="stkProgNum">0 / ${total}</span>
-        <div class="stk-prog-bar"><div class="stk-prog-fill" id="stkProgFill" style="width:0%"></div></div>
-      </div>
-      ${lost.length ? `<div class="stk-lost">
-        <div class="stk-lost-t"><b>Камера не нашла ${lost.length} ${
-          pluralize(lost.length,'позицию','позиции','позиций')}</b> из тех, что заведены
-          кодами. Пока проход не закончен — это просто «не дошли». Закончили —
-          значит их нет на полке.</div>
-        <button class="stk-lost-b" onclick="stkScanMissing()">Отметить недостачей</button>
-      </div>` : ''}
-      ${hand.length ? `<div class="stk-note">
-        <b>${hand.length} ${pluralize(hand.length,'позиция','позиции','позиций')} без кодов</b>
-        — сверяется глазами: сошлось, галочка; поправили число, крестик встанет сам.
-        Ревизия закроется, когда отмечены все ${total}.
-      </div>` : `<div class="stk-note">
-        Ревизия закроется, когда отмечены все ${total} ${
-          pluralize(total,'позиция','позиции','позиций')}.
-      </div>`}`
+    box.innerHTML = stkAuditCard(rows, sh)
       + rows.map(r => stkItem(r)).join('')
       + `<button class="stk-fin" id="stkFinBtn" onclick="stkFinishAudit()" disabled>Завершить ревизию</button>
          <div class="stk-fin-hint" id="stkFinHint"></div>`;
@@ -13262,7 +13274,83 @@ function _stkRedrawMark(id){
 
 function _stkMarked(){ return Object.values(STK.marks).filter(Boolean).length; }
 
+// Живой отчёт ревизии — сверху списка. Он пересчитывается от каждого числа
+// и каждой галочки и отвечает на три вопроса сразу: сколько не хватает (и
+// на сколько денег), сколько лишнего и сколько позиций камера не нашла.
+// Ревизию ведут по частям в течение смены: «Сохранить» записывает
+// промежуточный итог, «Отчёт» открывает его как страницу, «Завершить»
+// закрывает, когда отмечены все позиции.
+function stkTally(){
+  let shortQty = 0, shortAed = 0, overQty = 0, overAed = 0, diffs = 0;
+  (STK.sheet?.rows || []).forEach(r => {
+    if(r.expected == null) return;
+    const d = r.expected - (STK.vals[r.id] ?? 0);
+    if(!d) return;
+    diffs++;
+    if(d > 0){ shortQty += d; shortAed += d * (r.price || 0); }
+    else { overQty += -d; overAed += -d * (r.price || 0); }
+  });
+  return {shortQty, shortAed, overQty, overAed, diffs};
+}
+function stkAuditCard(rows, sh){
+  const all = STK.sheet?.rows || [];
+  const total = all.length;
+  const sc = sh.scan || {};
+  const coded = all.filter(r => r.coded > 0);
+  const lost  = coded.filter(r => r.scanned == null);
+  const когда = iso => iso ? String(iso).slice(11, 16) : '';
+  const a = sh.audit || {};
+  const state = sh.saved
+    ? `сохранена${sh.counted_at ? ' в ' + когда(sh.counted_at) : ''}`
+    : (a.started_at ? 'идёт с ' + когда(a.started_at) : 'не сохранена');
+  const scanned = sc.total || 0;
+  return `<div class="stk-rep">
+    <div class="stk-rep-h">
+      <span class="stk-rep-t">Ревизия</span>
+      <span class="stk-rep-s" id="stkRepState">${escS(state)}</span>
+    </div>
+    <div class="stk-prog">
+      <span class="stk-prog-n" id="stkProgNum">0 / ${total}</span>
+      <div class="stk-prog-bar"><div class="stk-prog-fill" id="stkProgFill" style="width:0%"></div></div>
+    </div>
+    <div class="stk-rep-g">
+      <div class="stk-rep-c dn"><span class="stk-rep-l">Не хватает</span>
+        <b id="stkRepShort">0</b><i id="stkRepShortAed"></i></div>
+      <div class="stk-rep-c warn"><span class="stk-rep-l">Излишек</span>
+        <b id="stkRepOver">0</b><i>бут</i></div>
+      <div class="stk-rep-c ${lost.length ? 'dn' : ''}" id="stkRepLostBox">
+        <span class="stk-rep-l">${scanned ? 'Камера не нашла' : 'Не отсканировано'}</span>
+        <b id="stkRepLost">${scanned ? lost.length : coded.length}</b>
+        <i>${pluralize(scanned ? lost.length : coded.length,'позиция','позиции','позиций')}</i></div>
+    </div>
+    <div class="stk-rep-b">
+      ${scanned && lost.length ? `<button class="stk-rep-x" onclick="stkScanMissing()">Отметить недостачей</button>` : ''}
+      <button class="stk-rep-x ${sh.saved ? '' : 'dim'}" onclick="stkAuditLive()">Отчёт</button>
+    </div>
+  </div>`;
+}
+function _stkCardPaint(){
+  const t = stkTally();
+  const set = (id, v) => { const e = document.getElementById(id); if(e) e.textContent = v; };
+  set('stkRepShort', _stkFmt(t.shortQty));
+  set('stkRepShortAed', t.shortQty ? `бут · ${fmt(Math.round(t.shortAed))} AED` : 'бут');
+  set('stkRepOver', _stkFmt(t.overQty));
+}
+
+// Промежуточный отчёт — страницей, по последнему сохранению. Не сохраняли —
+// отчёта ещё нет, и об этом говорим, а не показываем пустоту.
+async function stkAuditLive(){
+  if(!STK.sheet) return;
+  if(!STK.sheet.saved){ _toast('Сначала сохраните ревизию — отчёт строится по сохранённому'); return; }
+  let res;
+  try{ res = await ownerApi.ownerFetch('/api/owner/stock/result',
+        {params:{district: STK.district, day: STK.sheet.day}}); }
+  catch(e){ _toast('Отчёт ещё не сохранён'); return; }
+  stkResult(res);
+}
+
 function _stkProgress(){
+  _stkCardPaint();
   const total = (STK.sheet?.rows || []).length;
   const done = _stkMarked();
   const fill = document.getElementById('stkProgFill');
@@ -14017,6 +14105,7 @@ function _stkRedrawRow(id){
     if(!diff) d.remove();
     else { d.className = 'stk-i-d ' + (diff>0?'low':'high'); d.innerHTML = html; }
   }
+  _stkCardPaint();
   const st = stkStats();
   _setText('stkSub', STK.sheet.first_time
     ? `первый пересчёт · ${STK.sheet.total_count} позиций`
@@ -14058,8 +14147,9 @@ function stkFilter(){ STK.q = document.getElementById('stkSearch').value || ''; 
 // ── сохранение ──────────────────────────────────────────────────────────────
 async function stkSubmit(){
   if(!await accAskBack(STK.audit ? 'Ревизия' : 'Пересчёт склада')) return;
-  const btn = document.getElementById('stkSaveBtn');
-  btn.disabled = true; btn.textContent = 'Сохраняю…';
+  const btn = document.getElementById('stkSaveFoot') || document.getElementById('stkSaveBtn');
+  const label = btn ? btn.innerHTML : '';
+  if(btn){ btn.disabled = true; btn.textContent = 'Сохраняю…'; }
   // Сохраняем весь район целиком, иначе завтра сравнивать будет не с чем: остаток
   // берётся из прошлого пересчёта, и выпавшая позиция обнулилась бы. Но строки без
   // движения помечаем auto — их никто не смотрел, они перенесены расчётом и
@@ -14077,14 +14167,14 @@ async function stkSubmit(){
       body:{district:STK.district, day:STK.sheet.day, lines, as:_meName(),
             audit: STK.audit, finish: !!STK._finishing}});
   }catch(e){
-    btn.disabled = false; btn.textContent = 'Сохранить';
+    if(btn){ btn.disabled = false; btn.innerHTML = label; }
     const fin = document.getElementById('stkFinBtn');
     if(fin){ fin.disabled = false; fin.textContent = 'Завершить ревизию'; }
     _toast(String(e && e.message || '').includes('409')
       ? 'Отмечены не все позиции' : 'Не удалось сохранить');
     return;
   }
-  btn.disabled = false; btn.textContent = 'Сохранить';
+  if(btn){ btn.disabled = false; btn.innerHTML = label; }
   if(res.finished) stkAuditReport(res); else stkResult(res);
 }
 
@@ -14137,8 +14227,10 @@ function stkAuditReport(res){
 
 function stkResult(res){
   STK.view = 'result';
+  const промеж = !!(res.audit_started_at || res.audit) && !res.audit_finished_at && !res.finished;
   _stkHead(res.short_qty || res.over_qty ? 'Есть расхождения' : 'Всё сошлось',
-           `${STK.sheet.district_code} ${STK.sheet.district_name} · ${res.day}`, false);
+           `${STK.sheet.district_code} ${STK.sheet.district_name} · ${res.day}${
+             промеж ? ' · ревизия не закрыта' : ''}`, false);
   if(res.first_time){
     document.getElementById('stkMid').innerHTML = `<div class="stk-res">
       <div class="stk-res-num stk-res-ok">✓</div>

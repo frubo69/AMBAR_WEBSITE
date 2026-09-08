@@ -913,6 +913,7 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   background:var(--bg2);border-top:1px solid var(--border2);
   box-shadow:0 -6px 20px rgba(0,0,0,.45)}
 .stk-bar.on{display:flex}
+.stk-bar.hi{z-index:130}
 .stk-bar-b{width:40px;height:40px;flex-shrink:0;border-radius:10px;cursor:pointer;
   border:1px solid var(--border3);background:var(--card2);color:var(--gold2);
   display:flex;align-items:center;justify-content:center}
@@ -2679,6 +2680,47 @@ button.path:active{transform:scale(.995)}
   align-items:center;justify-content:center;font-family:'Space Grotesk',sans-serif;font-size:15px;
   font-weight:800;color:#1a1408;background:linear-gradient(135deg,#E8C98A,#C9A96E)}
 .xs-skip{font-size:12.5px;color:var(--muted);text-align:center;padding:8px 12px 4px}
+/* Поток доп. заявки: когда и откуда, четыре шага, подсказка, строка цен. */
+.xf-card{margin:0 0 12px;padding:14px 16px;border-radius:16px;background:var(--card);border:1px solid var(--border2)}
+.xf-meta{font-size:11.5px;color:var(--muted)}
+.xf-steps{display:flex;align-items:center;margin-top:12px}
+.xf-s{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:52px}
+.xf-s b{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-family:'Space Grotesk',sans-serif;font-size:12px;font-weight:700;color:var(--muted);
+  background:var(--card3);border:1px solid var(--border2)}
+.xf-s b svg{width:12px;height:12px}
+.xf-s i{font-style:normal;font-size:10px;font-weight:700;letter-spacing:.6px;text-transform:uppercase;color:var(--muted)}
+.xf-s.on b{color:#1a1408;background:linear-gradient(135deg,var(--gold),var(--gold2));border-color:transparent}
+.xf-s.on i{color:var(--gold2)}
+.xf-s.done b{color:var(--up);background:rgba(76,175,125,.16);border-color:rgba(76,175,125,.4)}
+.xf-s.done i{color:var(--up)}
+.xf-steps u{flex:1;height:1px;background:var(--border2);margin:0 4px 16px}
+.xf-hint{margin-top:12px;font-size:13.5px;font-weight:600;line-height:1.35}
+.xf-prices{display:flex;align-items:center;gap:10px;width:100%;margin-top:12px;padding:11px 12px;
+  border-radius:12px;border:1px solid var(--border2);background:var(--card2);cursor:pointer;
+  font-family:inherit;color:var(--text);text-align:left}
+.xf-prices span{flex:1;font-size:13px;font-weight:600}
+.xf-prices b{font-family:'Space Grotesk',sans-serif;font-size:13px;font-weight:700;color:var(--gold2)}
+.xf-prices.warn b{color:var(--warn)}
+.xf-prices em{display:flex;color:var(--muted)}
+/* Цены закупки: строка на позицию, поле справа. */
+.xp-head{padding:4px 2px 12px}
+.xp-head b{display:block;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700}
+.xp-head i{display:block;font-style:normal;font-size:12px;color:var(--muted);margin-top:4px;line-height:1.4}
+.xp-row{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:14px;background:var(--card);
+  border:1px solid var(--border2);margin-bottom:8px}
+.xp-row.ok{border-color:rgba(76,175,125,.35)}
+.xp-b{flex:1;min-width:0}
+.xp-b b{display:block;font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.xp-b i{display:block;font-style:normal;font-size:11.5px;color:var(--muted);margin-top:2px}
+.xp-in{flex:0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:3px}
+.xp-in input{width:92px;height:42px;padding:0 10px;border-radius:11px;border:1px solid var(--border2);
+  background:var(--card3);color:var(--text);font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;
+  text-align:right;outline:none}
+.xp-in input:focus{border-color:rgba(201,169,110,.55)}
+.xp-in u{text-decoration:none;font-size:9.5px;font-weight:700;letter-spacing:.4px;text-transform:uppercase;color:var(--muted)}
+.xp-tot{display:flex;align-items:center;justify-content:space-between;padding:12px 4px 4px;font-size:13px;color:var(--muted)}
+.xp-tot b{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:var(--gold2)}
 /* Правка строки до первого скана: − n + в размер золотой плашки. */
 .xs-step{flex-shrink:0;display:flex;align-items:center;height:32px;border-radius:10px;
   background:var(--card3);border:1px solid var(--border2);overflow:hidden}
@@ -14166,7 +14208,9 @@ function stkFocus(inp){
   stkBarShow();
 }
 
-function _stkInputs(){ return [...document.querySelectorAll('#stkMid .stk-qty')]; }
+// Поля с полосой живут не только в ревизии: цены доп. заявки — те же поля в
+// карточке. Имя берём из листа, а нет листа — из data-name самого поля.
+function _stkInputs(){ return [...document.querySelectorAll('#stkMid .stk-qty, #accMid .stk-qty')]; }
 
 function stkBarShow(){
   const bar = document.getElementById('stkBar'); if(!bar) return;
@@ -14174,8 +14218,10 @@ function stkBarShow(){
   const i = all.findIndex(x => x.dataset.stk === STK.focus);
   const r = (STK.sheet?.rows || []).find(x => x.id === STK.focus);
   bar.classList.add('on');
+  // В карточке (z-index 120) полоса обязана быть выше неё.
+  bar.classList.toggle('hi', !!document.querySelector('#accMid .stk-qty'));
   document.getElementById('stkBarPos').textContent = i >= 0 ? `${i+1} из ${all.length}` : '';
-  document.getElementById('stkBarName').textContent = r ? r.name : '';
+  document.getElementById('stkBarName').textContent = r ? r.name : ((all[i] || {}).dataset || {}).name || '';
   document.getElementById('stkBarPrev').disabled = i <= 0;
   document.getElementById('stkBarNext').disabled = i < 0 || i >= all.length - 1;
   _stkBarPlace();
@@ -14206,13 +14252,13 @@ function stkNext(dir){
   const el = all[j];
   el.focus(); try{ el.select(); }catch(e){}
   STK.focus = el.dataset.stk;
-  el.closest('.stk-wrap')?.scrollIntoView({block:'center', behavior:'smooth'});
+  el.closest('.stk-wrap, .xp-row')?.scrollIntoView({block:'center', behavior:'smooth'});
   stkBarShow();
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
 
 function stkDone(){
-  const el = document.querySelector('#stkMid .stk-qty:focus');
+  const el = document.querySelector('.stk-qty:focus');
   if(el) el.blur();
   stkBarHide();
 }
@@ -18410,7 +18456,7 @@ function xSupRender(d){
         <span class="xs-top-s">${done} из ${all} ${pluralize(all,'района','районов','районов')} приняли</span></span>
       <span class="xs-top-n">${fmt(got)}<i>из ${fmt(need)} ${pluralize(need,'бутылки','бутылок','бутылок')}</i></span>
       <span class="xs-bar"><i style="width:${need ? Math.min(100, Math.round(got / need * 100)) : 0}%"></i></span>
-    </div><div id="supWho">${cards || '<div class="exp-empty">Районов нет</div>'}</div>`;
+    </div>${extra ? xFlowCard(d) : ''}<div id="supWho">${cards || '<div class="exp-empty">Районов нет</div>'}</div>`;
   supActShow();
   supFoot();
   const goto = SUP_GOTO === 'who' ? 'supWho'
@@ -18573,7 +18619,8 @@ function xSupToggle(oid){
 let XS = null;
 
 async function xNew(){
-  XS = {step: 1, di: 0, base: '', q: '', cat: '', rows: {}, dist: null, all: null, order: {}};
+  XS = {step: 1, di: 0, base: '', q: '', cat: '', rows: {}, dist: null, all: null, order: {},
+        src: 'manual', from: ''};
   document.getElementById('accAct').innerHTML = '';
   xRender();
   xLoad();
@@ -18611,6 +18658,8 @@ async function xLoad(){
           Object.entries(r.by_district || {}).forEach(([o, n]) => { if(n > 0) by[o] = n; });
           if(Object.keys(by).length) XS.rows[r.id] = {name: r.name, by};
         });
+      // Состав пришёл из недобора магазина — так и подпишем заявку.
+      if(XS && Object.keys(XS.rows).length){ XS.src = 'shortfall'; XS.from = main.supply_id; }
     }catch(e){}
   }
   if(XS && XS.step === 2) xRender();
@@ -18618,6 +18667,24 @@ async function xLoad(){
 
 // Назад идёт по тем же шагам, что и вперёд: с итога — на последний район,
 // с района — на предыдущий, с первого района — на базу.
+// Стрелка ведёт на шаг назад (район за районом), а сюда — сразу к списку
+// баз. Набранное не выбрасываем молча: спрашиваем.
+function xLeave(){
+  if(!XS || !xTotal()){ XS = null; accExtra(); return; }
+  closePinPop();
+  const back = document.createElement('div');
+  back.className = 'pin-back';
+  back.addEventListener('click', closePinPop);
+  const box = document.createElement('div');
+  box.className = 'pin-pop crw-ask';
+  box.innerHTML = `
+    <div class="crw-ask-t">Уйти к другим базам?</div>
+    <div class="crw-ask-s">Набранная заявка пропадёт — она ещё не создана.</div>
+    <button class="crw-ask-b bad" onclick="closePinPop(); XS = null; accExtra()">Уйти</button>
+    <button class="crw-ask-b go" onclick="closePinPop()">Остаться</button>`;
+  document.body.append(back, box);
+}
+
 function xBack(){
   if(!XS){ accExtra(); return; }
   XS.q = ''; XS.cat = '';
@@ -18641,6 +18708,10 @@ function xRender(){
   const cur = s === 1 ? 1 : s === 2 ? 2 + XS.di : nSteps;
   _setText('accTitle', 'Новая заявка');
   _setText('accSub', s === 2 && dist.length ? `район ${XS.di + 1} из ${dist.length}` : `шаг ${cur} из ${nSteps}`);
+  // Справа в шапке — выход к списку баз одним нажатием: стрелка идёт по
+  // районам назад, а сюда попадают с любого шага.
+  const act = document.getElementById('accAct');
+  if(act) act.innerHTML = `<button class="acc-act" onclick="xLeave()">Другие базы</button>`;
   const steps = `<div class="xs-steps">${Array.from({length: nSteps}, (_, i) =>
     `<span class="${i + 1 <= cur ? 'on' : ''}"></span>`).join('')}</div>`;
   const mid = document.getElementById('accMid');
@@ -18751,7 +18822,7 @@ function xTile(r){
          onerror="this.style.visibility='hidden'"></div>
     <div class="xt-nm">${escS(r.name)}</div>
     <div class="xt-bot">${n ? '<span class="xt-b" data-d="-1">−</span>' : ''}
-      <div class="xt-info"><div class="xt-pr">${fmt(r.price || 0)} ${unit}</div></div>
+      <div class="xt-info"><div class="xt-pr">${r.unit > 1 ? `<small>${escS(r.unit_name || 'ящик')}</small>` : ''}</div></div>
       ${n ? '<span class="xt-b" data-d="1">+</span>' : ''}</div>
   </div>`;
 }
@@ -18855,7 +18926,8 @@ async function xCreate(){
     .filter(x => Object.keys(x.by_district).length);
   try{
     await ownerApi.ownerFetch('/api/owner/supply/extra',
-      {method:'POST', body:{base: XS.base.trim(), items, as: _meName()}});
+      {method:'POST', body:{base: XS.base.trim(), items, as: _meName(),
+                            source: XS.src || 'manual', from_supply: XS.from || ''}});
     try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
     _toast('Заявка создана — водители её видят');
     XS = null; ACC_SUP = null;
@@ -19066,11 +19138,161 @@ const _hm = iso => {
 // содержимого, а не экрана, и на длинном списке висела посреди строк, накрыв
 // их полосой в цвет фона.
 function supFoot(){
-  // Подвал появляется только с черновиком: одна кнопка, сколько строк уйдёт.
-  // Без правок экран приёмки ничего не отдаёт наружу.
+  // У доп. заявки внизу — следующий шаг потока. У основной подвал появляется
+  // только с черновиком: одна кнопка, сколько строк уйдёт.
+  if(SUP_D && SUP_D.kind === 'extra'){ document.getElementById('accFoot').innerHTML = xFlowFoot(SUP_D); return; }
   const n = xsDraftCount();
   document.getElementById('accFoot').innerHTML = n ? `<div class="qb-wrap">
       <button class="qb" id="xsSaveBtn" onclick="xsSave()">Сохранить · ${n}</button></div>` : '';
+}
+
+// ── Доп. заявка: поток по шагам ────────────────────────────────────────────
+// Цены на другой базе заранее не известны, а состав мог прийти из недобора
+// магазина. Поэтому экран ведёт за руку: взять → вписать цены → принять
+// (сканом или без) → готово. Один шаг — одна главная кнопка внизу; цены можно
+// править и после, в течение смены.
+function _xItems(d){
+  const by = {};
+  (d.tasks || []).forEach(t => (t.lines || []).forEach(l => {
+    const r = by[l.id] || (by[l.id] = {id: l.id, name: l.name, qty: 0, got: 0});
+    r.qty += l.need || 0; r.got += l.got || 0;
+  }));
+  return Object.values(by);
+}
+function xFlow(d){
+  const tasks = d.tasks || [];
+  const items = _xItems(d), buys = d.buys || {};
+  const priced = items.filter(i => buys[i.id] && buys[i.id].price > 0).length;
+  const takenAll = tasks.length > 0 && tasks.every(t => t.driver || t.done_at);
+  const doneAll = tasks.length > 0 && tasks.every(t => t.done_at);
+  const next = tasks.find(t => !t.done_at) || null;
+  const step = d.status === 'cancelled' ? 0
+             : (d.status !== 'open' || doneAll) ? 4
+             : !takenAll ? 1 : priced < items.length ? 2 : 3;
+  const cost = items.reduce((a, i) => a + ((buys[i.id] || {}).price > 0 ? buys[i.id].price * (buys[i.id].qty || i.qty) : 0), 0);
+  return {step, items, priced, n: items.length, takenAll, doneAll, next, cost};
+}
+function xFlowCard(d){
+  const f = xFlow(d);
+  const when = `${_dayName(d.day || String(d.at || '').slice(0, 10))}${d.at ? ' ' + _hm(d.at) : ''}`;
+  const src = d.source === 'shortfall' ? 'из недобора магазина' : 'вручную';
+  const meta = [when, d.by_name, src].filter(Boolean).join(' · ');
+  const STEPS = ['Взять', 'Цены', 'Приём', 'Готово'];
+  const HINT = {
+    0: 'Заявка отменена',
+    1: 'Возьмите заявку на себя и поезжайте на базу',
+    2: 'Товар куплен — впишите, что сколько стоило',
+    3: 'Отсканируйте бутылки по районам или примите без сканирования',
+    4: 'Заявка принята — цены можно поправить до конца смены',
+  };
+  return `<div class="xf-card">
+    <div class="xf-meta">${escS(meta)}</div>
+    <div class="xf-steps">${STEPS.map((t, i) => {
+      const k = i + 1, cls = f.step > k || f.step === 4 && k === 4 ? 'done' : f.step === k ? 'on' : '';
+      return `<span class="xf-s ${cls}"><b>${cls === 'done' ? IC('check', 12) : k}</b><i>${t}</i></span>`;
+    }).join('<u></u>')}</div>
+    <div class="xf-hint">${HINT[f.step] || ''}</div>
+    <button class="xf-prices${f.priced < f.n ? ' warn' : ''}" onclick="xPrices('${escS(d.supply_id)}')">
+      <span>Цены закупки</span>
+      <b>${f.priced} из ${f.n}${f.cost ? ` · ${fmt(Math.round(f.cost))} AED` : ''}</b>
+      <em>${ICO_CHEV}</em>
+    </button>
+  </div>`;
+}
+function xFlowFoot(d){
+  const f = xFlow(d);
+  if(f.step === 1) return `<div class="qb-wrap"><button class="qb" onclick="xTakeAll()">Взять всю заявку на себя</button></div>`;
+  if(f.step === 2) return `<div class="qb-wrap"><button class="qb" onclick="xPrices('${escS(d.supply_id)}')">Вписать цены · ${f.priced} из ${f.n}</button></div>`;
+  if(f.step === 3 && f.next){
+    const x = (d.districts || {})[f.next.district] || {};
+    return `<div class="qb-wrap"><button class="qb" onclick="rcvOpen('${escS(f.next.district)}')">Принять · ${escS(x.code || '')} ${escS(x.name || f.next.district)}</button></div>`;
+  }
+  return '';
+}
+// Взять все свободные районы разом: заявка на базу — одна поездка, а не пять
+// «взять на себя» по карточкам.
+async function xTakeAll(){
+  if(!SUP_D || RCV_BUSY) return;
+  const free = (SUP_D.tasks || []).filter(t => !t.driver && !t.done_at).map(t => t.district);
+  if(!free.length) return;
+  RCV_BUSY = true;
+  let bad = 0;
+  for(const oid of free){
+    try{
+      await ownerApi.ownerFetch(`/api/owner/supply/${encodeURIComponent(SUP_ID)}/task/claim`,
+        {method:'POST', body:{district: oid, as: _rcvMe()}});
+    }catch(e){ bad++; }
+  }
+  RCV_BUSY = false;
+  try{ Telegram.WebApp.HapticFeedback.notificationOccurred(bad ? 'warning' : 'success'); }catch(e){}
+  if(bad) _toast(`${bad} ${pluralize(bad,'район уже взял','района уже взяли','районов уже взяли')} водители`);
+  await supLoad(SUP_ID);
+}
+
+// ── Цены закупки: что сколько стоило ──
+// Одно поле на позицию, полоса со стрелками и «Готово» над клавиатурой — как
+// в ревизии. Каждая цена сохраняется сама, как только её вписали.
+function _xUnit(pid){
+  const p = (PRODUCTS || []).find(x => x.id === pid) || ((XS && XS.all) || []).find(x => x.id === pid);
+  return p && p.unit > 1 ? {n: p.unit, name: p.unit_name || 'ящик'} : {n: 1, name: 'бутылку'};
+}
+async function xPrices(sid){
+  if(!SUP_D || SUP_D.supply_id !== sid) await supLoad(sid);
+  const d = SUP_D; if(!d) return;
+  ACC_BACK = () => xOpen(sid);
+  _setText('accTitle', 'Цены закупки');
+  _setText('accSub', d.base || '');
+  document.getElementById('accAct').innerHTML = '';
+  if(!PRODUCTS.length && !catLoading) loadCatalog().then(() => { if(ACC_VIEW && document.querySelector('.xp-row')) xPricesPaint(); });
+  xPricesPaint();
+}
+function xPricesPaint(){
+  const d = SUP_D; if(!d) return;
+  const f = xFlow(d), buys = d.buys || {};
+  document.getElementById('accMid').innerHTML = `<div class="xp-head">
+      <b>Что сколько стоило</b>
+      <i>Цена за одну единицу, как в чеке базы. Впишите — и она сохранится сама.</i>
+    </div>
+    ${f.items.map(it => {
+      const b = buys[it.id] || {}, u = _xUnit(it.id);
+      return `<div class="xp-row${b.price > 0 ? ' ok' : ''}" id="xp-${escS(it.id)}">
+        <img class="xr-img" src="/products/${escS(it.id)}.webp" alt="" loading="lazy" onerror="this.style.visibility='hidden'">
+        <span class="xp-b"><b>${escS(it.name)}</b><i>${fmt(it.qty)} ${pluralize(it.qty,'бутылка','бутылки','бутылок')}${
+          b.price > 0 ? ` · = ${fmt(Math.round(b.price * (b.qty || it.qty)))} AED` : ''}</i></span>
+        <span class="xp-in">
+          <input class="stk-qty" inputmode="decimal" enterkeyhint="next" placeholder="0"
+                 data-stk="${escS(it.id)}" data-name="${escS(it.name)}" value="${b.price > 0 ? b.price : ''}"
+                 onfocus="stkFocus(this)" onchange="xPriceSave('${escS(it.id)}')"
+                 onkeydown="if(event.key==='Enter'){event.preventDefault();stkNext(1)}">
+          <u>AED / ${escS(u.name)}</u>
+        </span>
+      </div>`; }).join('')}
+    <div class="xp-tot"><span>Итого закупка</span><b id="xpTot">${fmt(Math.round(f.cost))} AED</b></div>`;
+  document.getElementById('accFoot').innerHTML = `<div class="qb-wrap">
+    <button class="qb" onclick="xOpen('${escS(d.supply_id)}')">${f.priced >= f.n ? 'Готово' : `Готово · ${f.priced} из ${f.n}`}</button></div>`;
+}
+async function xPriceSave(pid){
+  const d = SUP_D; if(!d) return;
+  const inp = document.querySelector(`#xp-${CSS.escape(pid)} .stk-qty`); if(!inp) return;
+  const price = parseFloat(String(inp.value || '').replace(',', '.').replace(/[^\d.]/g, '')) || 0;
+  const it = _xItems(d).find(x => x.id === pid) || {qty: 0};
+  const u = _xUnit(pid);
+  try{
+    const r = await ownerApi.ownerFetch(`/api/owner/supply/${encodeURIComponent(d.supply_id)}/buy`,
+      {method:'POST', body:{product_id: pid, price, qty: Math.max(1, Math.round(it.qty / u.n)), as: _meName()}});
+    d.buys = r.buys || {};
+  }catch(e){ _toast('Не удалось сохранить цену'); return; }
+  // Перерисовываем не всё: поле с фокусом должно остаться под пальцем.
+  const f = xFlow(d), b = d.buys[pid] || {};
+  const row = document.getElementById('xp-' + pid);
+  if(row){
+    row.classList.toggle('ok', b.price > 0);
+    const i = row.querySelector('.xp-b i');
+    if(i) i.textContent = `${fmt(it.qty)} ${pluralize(it.qty,'бутылка','бутылки','бутылок')}${b.price > 0 ? ` · = ${fmt(Math.round(b.price * (b.qty || it.qty)))} AED` : ''}`;
+  }
+  _setText('xpTot', `${fmt(Math.round(f.cost))} AED`);
+  const btn = document.querySelector('#accFoot .qb');
+  if(btn) btn.textContent = f.priced >= f.n ? 'Готово' : `Готово · ${f.priced} из ${f.n}`;
 }
 
 async function supImport(inp, btnId){

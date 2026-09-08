@@ -1213,6 +1213,7 @@ def _sup_brief(sup: dict) -> dict:
         "status": sup.get("status") or "open",
         "kind": sup.get("kind") or "main", "base": sup.get("base") or "",
         "by_name": sup.get("by_name") or "",
+        "source": sup.get("source") or "", "from_supply": sup.get("from_supply") or "",
         "cancelled_at": str(sup.get("cancelled_at") or ""),
         "asked_qty": int(sup.get("asked_qty") or 0),
         "total_qty": int(sup.get("total_qty") or 0),
@@ -1249,6 +1250,7 @@ async def _supply_view(sup: dict) -> dict:
         "status": sup.get("status") or "open",
         "kind": sup.get("kind") or "main", "base": sup.get("base") or "",
         "by_name": sup.get("by_name") or "",
+        "source": sup.get("source") or "", "from_supply": sup.get("from_supply") or "",
         "closed_at": str(sup.get("closed_at") or ""),
         "cancelled_at": str(sup.get("cancelled_at") or ""),
         "cancelled_by": sup.get("cancelled_by") or "",
@@ -1491,6 +1493,13 @@ async def handle_buy(request):
     pid = str(body.get("product_id") or "").strip()
     short = _shortfall(sup)
     row = next((r for r in short["rows"] if r["id"] == pid), None)
+    # У доп. заявки недобора нет — там цену вписывают на каждую позицию
+    # состава: это и есть то, что купили на базе. Цена уходит в стоимость
+    # склада тем же путём (stock_value.cost_map читает buys всех поставок).
+    if not row and (sup.get("kind") or "main") == "extra":
+        it = next((i for i in (sup.get("items") or []) if i.get("id") == pid), None)
+        if it:
+            row = {"id": pid, "name": it.get("name") or "", "gap": int(it.get("qty") or 0)}
     if not row:
         return web.json_response({"error": "not_in_shortfall"}, status=400,
                                  headers=CORS_HEADERS)
@@ -1873,9 +1882,14 @@ async def handle_extra_create(request):
     now = datetime.now(timezone.utc)
     sid = "X" + now.strftime("%y%m%d-%H%M%S")
     who = _owner_name(request, body)
+    # Откуда взялся состав: «shortfall» — подставлен из недобора основной
+    # заявки (магазин дал не всё), «manual» — набран руками. На экране заявки
+    # это подпись «из недобора магазина» рядом со временем и автором.
+    source = "shortfall" if str(body.get("source") or "") == "shortfall" else "manual"
+    from_supply = str(body.get("from_supply") or "").strip()[:40]
     doc = {"_id": sid, "at": now, "status": "open",
            "day": datetime.now(ZoneInfo("Asia/Dubai")).strftime("%Y-%m-%d"),
-           "kind": "extra", "base": base,
+           "kind": "extra", "base": base, "source": source, "from_supply": from_supply,
            "by": request.get("owner_id") or 0, "by_name": who,
            "items": items, "dropped": [], "short": [], "extra": [], "unknown": [],
            "tasks": tasks,

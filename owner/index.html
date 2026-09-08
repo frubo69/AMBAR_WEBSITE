@@ -2321,6 +2321,14 @@ button.path:active{transform:scale(.995)}
    экране, после которой человек садится в машину. «Отдать» рядом остаётся
    служебной, поэтому веса ей не добавляем. */
 .rt-acts{display:flex;gap:7px;margin-top:10px}
+.rt-take.alt{background:var(--card2);color:var(--gold2);border:1px solid rgba(201,169,110,.45)}
+/* Окно «кто принимает»: список районов с чипами, листается внутри. */
+.ra-box{width:min(92vw,360px);text-align:left}
+.ra-box .crw-ask-t{text-align:center;margin-bottom:10px}
+.ra-list{max-height:60vh;overflow-y:auto;margin:0 -4px;padding:0 4px}
+.ra-g{padding:8px 0;border-top:1px solid var(--border2)}
+.ra-g:first-child{border-top:0;padding-top:0}
+.ra-gh{display:flex;align-items:center;gap:8px;font-size:12px;font-weight:700;color:var(--muted);margin-bottom:6px}
 .rt-acts .rt-rel{margin-top:0}
 .rt-take{flex:1;padding:8px 12px;border-radius:9px;cursor:pointer;
   font-family:inherit;font-size:11.5px;font-weight:700;color:#1a1408;border:0;
@@ -19402,8 +19410,10 @@ function rtActs(t, d){
     <button class="rt-rel" onclick="supRelease('${escS(t.district)}')">Отдать</button></div>`;
   if(t.driver) return `<button class="rt-rel"
     onclick="supRelease('${escS(t.district)}')">Снять с водителя</button>`;
+  // Свободный район: взять самому или отдать водителю — две кнопки в ряд.
   return `<div class="rt-acts">
-    <button class="rt-take" onclick="rcvClaim('${escS(t.district)}')">Взять на себя</button></div>`;
+    <button class="rt-take" onclick="rcvClaim('${escS(t.district)}')">Взять на себя</button>
+    <button class="rt-take alt" onclick="rcvAssignPick('${escS(t.district)}')">Назначить водителя</button></div>`;
 }
 
 async function supRelease(oid){
@@ -19445,6 +19455,49 @@ async function rcvClaim(oid){
     _toast(who ? `Уже взял ${who}` : 'Не удалось взять');
     supLoad(SUP_ID);
   }finally{ RCV_BUSY = false; }
+}
+
+// Назначить водителя: окно по центру, люди чипами по районам — как в окне
+// удержания. Один тап — район у водителя, ему уходит сообщение в бот.
+async function rcvAssignPick(oid){
+  if(!CREW) try{ CREW = await ownerApi.ownerFetch('/api/owner/staff'); }catch(e){ CREW = null; }
+  const nm = n => typeof n === 'string' ? n : (n && n.name) || '';
+  const dist = [...((CREW || {}).districts || [])].sort((a, b) => (b.id === oid) - (a.id === oid));
+  const x = ((SUP_D || {}).districts || {})[oid] || {};
+  const chips = dist.map(d => `<div class="ra-g">
+      <div class="ra-gh"><span class="crew-code">${escS(d.code || '')}</span>${escS(d.name || '')}</div>
+      <div class="crw-c-b">${(d.drivers || []).map(nm).filter(Boolean).map(n => `
+        <button class="crw-p" onclick="rcvAssign('${escS(oid)}','${escS(n)}')">
+          <span class="crw-p-a">${IC('car', 15)}</span><span class="crw-p-n">${escS(n)}</span></button>`).join('')
+        || '<span class="crw-none">никого нет</span>'}</div>
+    </div>`).join('');
+  closePinPop();
+  const back = document.createElement('div');
+  back.className = 'pin-back';
+  back.addEventListener('click', closePinPop);
+  const box = document.createElement('div');
+  box.className = 'pin-pop crw-ask ra-box';
+  box.innerHTML = `
+    <div class="crw-ask-t">Кто принимает ${escS(x.code || '')} ${escS(x.name || '')}</div>
+    <div class="ra-list">${chips || '<div class="crw-ask-s">Список смены пуст</div>'}</div>
+    <button class="crw-ask-b" onclick="closePinPop()">Отмена</button>`;
+  document.body.append(back, box);
+  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+async function rcvAssign(oid, name){
+  closePinPop();
+  if(RCV_BUSY) return; RCV_BUSY = true;
+  try{
+    await ownerApi.ownerFetch(`/api/owner/supply/${encodeURIComponent(SUP_ID)}/task/assign`,
+      {method:'POST', body:{district: oid, driver: name, as: _rcvMe()}});
+    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    const x = ((SUP_D || {}).districts || {})[oid] || {};
+    _toast(`${name} · ${x.code || ''} ${x.name || oid} — назначен, ему написали`);
+  }catch(e){
+    const who = ((e || {}).payload || {}).driver;
+    _toast(who ? `Уже взял ${who}` : 'Не удалось назначить');
+  }finally{ RCV_BUSY = false; }
+  supLoad(SUP_ID);
 }
 
 async function rcvOpen(oid){

@@ -1759,6 +1759,47 @@ async def handle_own_claim(request):
 
 
 @require_owner
+async def handle_own_assign(request):
+    """Назначить район водителю: {district, driver, as}.
+
+    Тот же захват, что «взять на себя», только имя — водителя из штата: у него
+    задача появится в «Моей приёмке», как если бы он взял её сам. Занятый
+    район не переназначаем молча — 409 с именем, сперва «Снять с водителя».
+    Водителю уходит сообщение в бот."""
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    sid = request.match_info.get("sid") or ""
+    oid = str(body.get("district") or "").strip()
+    name = str(body.get("driver") or "").strip()[:60]
+    import config_staff as _staff
+    if name not in set(_staff.driver_names()):
+        return web.json_response({"error": "unknown_driver"}, status=400, headers=CORS_HEADERS)
+    if oid not in OFFICE_IDS:
+        return web.json_response({"error": "bad_district"}, status=400, headers=CORS_HEADERS)
+    ok, task = await db.supply_task_claim(sid, oid, name, int(_staff.DRIVER_IDS.get(name) or 0),
+                                          datetime.now(timezone.utc))
+    if not ok:
+        return web.json_response({"ok": False, "error": "taken",
+                                  "driver": (task or {}).get("driver") or ""},
+                                 status=409, headers=CORS_HEADERS)
+    кто = _owner_name(request, body)
+    log.info(f"[supply] {кто} назначил {name} на приёмку {sid}/{oid}")
+    sup = await db.supply_get(sid) or {}
+    try:
+        from operator_routes import tell_driver
+        base = f" · {sup.get('base')}" if (sup.get("kind") or "main") == "extra" and sup.get("base") else ""
+        await tell_driver(name, f"📦 Вам назначили приёмку: {OFFICE_CODES.get(oid, oid)} "
+                                f"{OFFICE_NAMES.get(oid, '')}{base}. Откройте «Закупку» в приложении.")
+    except Exception as e:                                   # noqa: BLE001
+        log.warning(f"[supply] водителю о назначении не ушло: {e}")
+    return web.json_response(
+        _task_view(sid, sup, oid, (sup.get("tasks") or {}).get(oid) or {}, кто),
+        headers=CORS_HEADERS, dumps=lambda o: __import__("json").dumps(o, default=str))
+
+
+@require_owner
 async def handle_own_release(request):
     """Отдать район обратно: не еду."""
     try:
@@ -1936,6 +1977,7 @@ def setup(app):
         # отдать район.
         ("/api/owner/supply/{sid}/tasks",           handle_own_tasks,    "GET"),
         ("/api/owner/supply/{sid}/task/claim",      handle_own_claim,    "POST"),
+        ("/api/owner/supply/{sid}/task/assign",     handle_own_assign,   "POST"),
         ("/api/owner/supply/{sid}/task/release",    handle_own_release,  "POST"),
         ("/api/owner/supply/{sid}/task/scan",       handle_own_scan,     "POST"),
         ("/api/owner/supply/{sid}/task/undo",       handle_own_undo,     "POST"),

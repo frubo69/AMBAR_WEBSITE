@@ -797,18 +797,136 @@ MOVE_SAY = {
 
 
 def _move_reply(verdict: str, **extra):
-    return web.json_response({"ok": verdict == "ok", "verdict": verdict,
-                              "say": MOVE_SAY.get(verdict, ""), **extra},
-                             headers=CORS_HEADERS)
+    return web.json_response(_move_res(verdict, **extra), headers=CORS_HEADERS)
+
+
+def _move_res(verdict: str, **extra) -> dict:
+    return {"ok": verdict == "ok", "verdict": verdict,
+            "say": MOVE_SAY.get(verdict, ""), **extra}
+
+
+async def move_by_code(code: str, dst: str, by, by_name: str = "",
+                       by_kind: str = "owner", day: str = "") -> dict:
+    """Перевезти одну бутылку по коду с крышки — ядро, общее для старшего и
+    водителя. Ответ — словарь с вердиктом, не HTTP: кто спрашивал, тот и
+    завернёт. Отказ — не ошибка запроса, а ответ про бутылку: списанную и уже
+    уехавшую камера ловит так же легко, как обычную, и человеку надо сказать
+    словами, что с ней не так, а не показать красный сбой.
+
+    В книге переездов остаётся, кто вёз: by_kind «driver»/«owner» и имя. По
+    ним водитель отменяет только своё, а старший видит в истории, чей переезд."""
+    doc = await db.qr_get(code)
+    if not doc:
+        return _move_res("unknown", code=code)
+    name = doc.get("product_name") or ""
+    label = doc.get("label") or ""
+    # Везти можно только то, что числится в остатке. Список негодных статусов
+    # уже однажды отстал от жизни — мимо «убрана из реестра» промахнулись все
+    # сканеры сразу. Поэтому разрешаем один статус, а не запрещаем известные.
+    st = (doc.get("status") or "active").strip()
+    if st != "active":
+        return _move_res(st, code=code, name=name, label=label)
+    src = (doc.get("district") or "").strip()
+    if src == dst:
+        return _move_res("same", code=code, name=name, label=label,
+                         **{"from": src, "from_code": OFFICE_CODES.get(src, "")})
+    if src not in OFFICE_IDS:
+        return _move_res("nohome", code=code, name=name, label=label)
+    pid = str(doc.get("product_id") or "")
+    p = _catalog().get(pid)
+    if not p:
+        return _move_res("no_item", code=code, name=name, label=label)
+
+    # Количество — в учётных единицах позиции: бутылка крепкого это единица, а
+    # бутылка пива — двадцать четвёртая часть ящика. Не округляем: округлит
+    # лист, сложив все переезды позиции за день.
+    qty = 1 / _unit(p)
+    day = str(day or "").strip() or _biz_day()
+    at = datetime.now(timezone.utc).isoformat()
+    tid = await db.add_stock_transfer(
+        {"day": day, "from": src, "to": dst, "product_id": pid,
+         "product_name": p.get("name", ""), "qty": qty, "src": "qr", "code": code,
+         "by": by, "by_name": str(by_name or "")[:60], "by_kind": by_kind, "at": at})
+    if not await db.qr_move(code, src, dst, tid, by, at):
+        # Бутылку успели перевезти между чтением и записью — поправку к остатку
+        # оставлять нельзя, иначе она уедет дважды.
+        await db.delete_stock_transfer(tid)
+        return _move_res("busy", code=code, name=name, label=label)
+    log.info(f"[stock] переезд по коду {code}: {src} → {dst} ({pid}) — {by_kind} {by_name}")
+    return _move_res("ok", code=code, name=p.get("name", "") or name, label=label,
+                     transfer_id=tid, bottles=1, to=dst,
+                     to_code=OFFICE_CODES.get(dst, ""),
+                     **{"from": src, "from_code": OFFICE_CODES.get(src, "")})
+
+
+async def move_undo_by_code(code: str, only_driver: str = None) -> tuple:
+    """Отменить последний переезд бутылки. (status, payload).
+
+    only_driver — имя водителя: отменить можно только переезд, который сделал
+    он сам; чужой (и переезд старшего) — «not_yours», бутылка остаётся."""
+    d = await db.qr_get(code)
+    last = ((d or {}).get("moves") or [])[-1:]
+    if not last:
+        return 404, {"error": "not_moved"}
+    tid = str(last[0].get("transfer") or "")
+    if only_driver is not None:
+        tr = await db.get_stock_transfer(tid) if tid else None
+        if not tr or tr.get("by_kind") != "driver" or (tr.get("by_name") or "") != only_driver:
+            return 403, {"error": "not_yours"}
+    last = await db.qr_move_undo(code)
+    if not last:
+        return 404, {"error": "not_moved"}
+    if last.get("transfer"):
+        await db.delete_stock_transfer(str(last["transfer"]))
+    log.info(f"[stock] переезд отменён {code}: назад на {last.get('from')}")
+    return 200, {"ok": True, "code": code, "to": last.get("from") or ""}
+
+
+def group_transfers(rows: list, days: int = 0) -> list:
+    """Переезды сканом — одной строкой на позицию.
+
+    Скан пишет строку на каждую бутылку: это правда учёта, но не то, что
+    человек хочет читать. Тридцать одинаковых строк «B1 → B3» — это «перевезли
+    тридцать бутылок», и показывать надо так. Кто вёз — в ключе группы:
+    переезд водителя и переезд старшего той же позиции тем же путём — разные
+    строки, у них разные права на отмену."""
+    groups, out = {}, []
+    for r in rows:
+        r["id"] = str(r.pop("_id", ""))
+        r["from_name"] = OFFICE_NAMES.get(r.get("from"), r.get("from"))
+        r["to_name"] = OFFICE_NAMES.get(r.get("to"), r.get("to"))
+        r["from_code"] = OFFICE_CODES.get(r.get("from"), "")
+        r["to_code"] = OFFICE_CODES.get(r.get("to"), "")
+        r["by_kind"] = r.get("by_kind") or "owner"
+        r["by_name"] = r.get("by_name") or ""
+        r.pop("by", None)                      # числовой id наружу не отдаём
+        if (r.get("src") or "") != "qr":
+            r["ids"] = [r["id"]]
+            r["bottles"] = 0
+            out.append(r)
+            continue
+        key = (r.get("day"), r.get("from"), r.get("to"), r.get("product_id"),
+               r["by_kind"], r["by_name"])
+        g = groups.get(key)
+        if not g:
+            g = dict(r, ids=[], codes=[], bottles=0, qty=0.0, id="")
+            groups[key] = g
+            out.append(g)
+        g["ids"].append(r["id"])
+        g["codes"].append(str(r.get("code") or ""))
+        g["bottles"] += 1
+        g["qty"] = round(g["qty"] + float(r.get("qty") or 0), 4)
+    for g in out:
+        if g.get("bottles"):
+            g["qty"] = _num(g["qty"])
+    if days > 0:
+        out.sort(key=lambda g: (str(g.get("day") or ""), str(g.get("at") or "")), reverse=True)
+    return out
 
 
 @require_owner
 async def handle_transfer_scan(request):
-    """Перевезти одну бутылку по коду с крышки. body: {code, to, day?}
-
-    Отказ — не ошибка запроса, а ответ про бутылку: списанную и уже уехавшую
-    камера ловит так же легко, как обычную, и человеку надо сказать словами,
-    что с ней не так, а не показать красный сбой."""
+    """Перевезти одну бутылку по коду с крышки. body: {code, to, day?, as?}"""
     try:
         body = await request.json()
     except Exception:
@@ -819,49 +937,10 @@ async def handle_transfer_scan(request):
         return web.json_response({"error": "no_code"}, status=400, headers=CORS_HEADERS)
     if dst not in OFFICE_IDS:
         return web.json_response({"error": "bad_districts"}, status=400, headers=CORS_HEADERS)
-
-    doc = await db.qr_get(code)
-    if not doc:
-        return _move_reply("unknown", code=code)
-    name = doc.get("product_name") or ""
-    label = doc.get("label") or ""
-    # Везти можно только то, что числится в остатке. Список негодных статусов
-    # уже однажды отстал от жизни — мимо «убрана из реестра» промахнулись все
-    # сканеры сразу. Поэтому разрешаем один статус, а не запрещаем известные.
-    st = (doc.get("status") or "active").strip()
-    if st != "active":
-        return _move_reply(st, code=code, name=name, label=label)
-    src = (doc.get("district") or "").strip()
-    if src == dst:
-        return _move_reply("same", code=code, name=name, label=label,
-                           **{"from": src, "from_code": OFFICE_CODES.get(src, "")})
-    if src not in OFFICE_IDS:
-        return _move_reply("nohome", code=code, name=name, label=label)
-    pid = str(doc.get("product_id") or "")
-    p = _catalog().get(pid)
-    if not p:
-        return _move_reply("no_item", code=code, name=name, label=label)
-
-    # Количество — в учётных единицах позиции: бутылка крепкого это единица, а
-    # бутылка пива — двадцать четвёртая часть ящика. Не округляем: округлит
-    # лист, сложив все переезды позиции за день.
-    qty = 1 / _unit(p)
-    day = str(body.get("day") or "").strip() or _biz_day()
-    at = datetime.now(timezone.utc).isoformat()
-    tid = await db.add_stock_transfer(
-        {"day": day, "from": src, "to": dst, "product_id": pid,
-         "product_name": p.get("name", ""), "qty": qty, "src": "qr", "code": code,
-         "by": request["owner_id"], "at": at})
-    if not await db.qr_move(code, src, dst, tid, request["owner_id"], at):
-        # Бутылку успели перевезти между чтением и записью — поправку к остатку
-        # оставлять нельзя, иначе она уедет дважды.
-        await db.delete_stock_transfer(tid)
-        return _move_reply("busy", code=code, name=name, label=label)
-    log.info(f"[stock] переезд по коду {code}: {src} → {dst} ({pid})")
-    return _move_reply("ok", code=code, name=p.get("name", "") or name, label=label,
-                       transfer_id=tid, bottles=1, to=dst,
-                       to_code=OFFICE_CODES.get(dst, ""),
-                       **{"from": src, "from_code": OFFICE_CODES.get(src, "")})
+    res = await move_by_code(code, dst, request["owner_id"],
+                             str(body.get("as") or "").strip(), "owner",
+                             str(body.get("day") or ""))
+    return web.json_response(res, headers=CORS_HEADERS)
 
 
 @require_owner
@@ -869,7 +948,8 @@ async def handle_transfer_scan_undo(request):
     """Отменить последний переезд бутылки. body: {code}
 
     Рука быстрее головы: не ту бутылку поднесли к камере — и это должно
-    отменяться там же, где случилось, а не поиском строки в списке."""
+    отменяться там же, где случилось, а не поиском строки в списке. Старший
+    отменяет любой переезд — и свой, и водительский."""
     try:
         body = await request.json()
     except Exception:
@@ -877,14 +957,8 @@ async def handle_transfer_scan_undo(request):
     code = str(body.get("code") or "").strip()
     if not code:
         return web.json_response({"error": "no_code"}, status=400, headers=CORS_HEADERS)
-    last = await db.qr_move_undo(code)
-    if not last:
-        return web.json_response({"error": "not_moved"}, status=404, headers=CORS_HEADERS)
-    if last.get("transfer"):
-        await db.delete_stock_transfer(str(last["transfer"]))
-    log.info(f"[stock] переезд отменён {code}: назад на {last.get('from')}")
-    return web.json_response({"ok": True, "code": code,
-                              "to": last.get("from") or ""}, headers=CORS_HEADERS)
+    st, payload = await move_undo_by_code(code)
+    return web.json_response(payload, status=st, headers=CORS_HEADERS)
 
 
 @require_owner
@@ -921,30 +995,7 @@ async def handle_transfers(request):
         rows = await db.get_stock_transfers_since(since.strftime("%Y-%m-%d"))
     else:
         rows = await db.get_stock_transfers(day)
-    groups, out = {}, []
-    for r in rows:
-        r["id"] = str(r.pop("_id", ""))
-        r["from_name"] = OFFICE_NAMES.get(r.get("from"), r.get("from"))
-        r["to_name"] = OFFICE_NAMES.get(r.get("to"), r.get("to"))
-        if (r.get("src") or "") != "qr":
-            r["ids"] = [r["id"]]
-            r["bottles"] = 0
-            out.append(r)
-            continue
-        key = (r.get("day"), r.get("from"), r.get("to"), r.get("product_id"))
-        g = groups.get(key)
-        if not g:
-            g = dict(r, ids=[], bottles=0, qty=0.0, id="")
-            groups[key] = g
-            out.append(g)
-        g["ids"].append(r["id"])
-        g["bottles"] += 1
-        g["qty"] = round(g["qty"] + float(r.get("qty") or 0), 4)
-    for g in out:
-        if g.get("bottles"):
-            g["qty"] = _num(g["qty"])
-    if days > 0:
-        out.sort(key=lambda g: (str(g.get("day") or ""), str(g.get("at") or "")), reverse=True)
+    out = group_transfers(rows, days)
     return web.json_response({"day": day, "days": days, "transfers": out},
                              headers=CORS_HEADERS,
                              dumps=lambda o: __import__("json").dumps(o, default=str))

@@ -382,7 +382,23 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
 .wo-btn:active{transform:scale(.985)}
 .wo-btn svg{flex:0 0 auto;width:19px;height:19px;color:var(--dn);opacity:.85}
 /* Место под приклеенную кнопку, чтобы последняя запись не пряталась под ней. */
-.wo-sp{height:86px}
+.wo-sp{height:150px}
+/* Внизу «Товара» две кнопки: списание главной, перемещение тише. */
+.wo-fix .wo-btn + .wo-btn{margin-top:8px}
+.wo-btn.ghost{padding:14px 12px;font-size:14.5px;color:var(--sub);background:var(--card);
+  border-color:var(--border2)}
+/* Перемещение: куда везём — пять кодов в ряд над камерой, выбранный золотом. */
+.mv-to{display:flex;gap:6px;margin:0 0 10px}
+.mv-to button{flex:1;height:40px;border-radius:12px;cursor:pointer;font-family:inherit;
+  font-size:12px;font-weight:800;letter-spacing:.4px;color:var(--gold2);
+  background:var(--card3);border:1px solid var(--border2)}
+.mv-to button.on{background:var(--gold-soft);border-color:rgba(201,169,110,.55);color:var(--text)}
+.mv-x{flex:0 0 auto;width:30px;height:30px;border-radius:9px;cursor:pointer;font-family:inherit;
+  font-size:14px;line-height:1;color:var(--muted);background:none;border:1px solid var(--border2)}
+.mv-x:active{color:var(--dn);transform:scale(.92)}
+.mv-ret{flex:0 0 auto;padding:8px 11px;border-radius:9px;cursor:pointer;font-family:inherit;
+  font-size:11.5px;font-weight:700;color:var(--sub);background:none;border:1px solid var(--border2)}
+.mv-ret:active{transform:scale(.96)}
 
 /* Списанное за смену — короткой строкой, чтобы было видно, что запись прошла */
 .wo-done{display:flex;align-items:center;gap:10px;padding:12px 14px;border-radius:14px;
@@ -2784,6 +2800,35 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
     </div>
   </div>
 </div>
+<!-- Перемещение сканом: сначала куда везём, потом крышки одна за другой.
+     Каждая уезжает сразу, в обе книги; «✕» на строке возвращает свою. -->
+<div class="sheet" id="mvSheet" onclick="if(event.target===this)mvDone()">
+  <div class="sheet-in">
+    <div class="wo-add-hd">
+      <div>
+        <div class="sheet-t">Переместить</div>
+        <div class="wo-add-s" id="mvS">одна крышка — одна бутылка</div>
+      </div>
+      <button class="wo-add-x" onclick="mvDone()" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="mv-to" id="mvTo"></div>
+    <div class="cam">
+      <video id="mvV" playsinline muted autoplay></video>
+      <div class="cam-frame" id="mvF">
+        <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+        <div class="cam-badge" id="mvB"></div>
+      </div>
+    </div>
+    <div class="wo-why" id="mvSay" style="margin:0 2px">Выберите, куда везём</div>
+    <div class="wo-feed" id="mvFeed"></div>
+    <div class="wo-add-foot">
+      <button class="wo-go" onclick="mvDone()">Готово</button>
+    </div>
+  </div>
+</div>
 <!-- Скан бутылки для охраны. Отдельным листом, а не внутри карточки: камера
      на четверть экрана бесполезна, а карточка с камерой перестаёт быть строкой
      учёта. Один скан — и лист закрывается сам: бутылка отдаётся одна. -->
@@ -3242,6 +3287,7 @@ let TAB = 'orders', EDIT_OID = null, EDIT_TAGS = [];
 let OPEN_OID = '';   // какой из активных заказов раскрыт
 
 const ICO = {
+  move: '<path d="M4 7h11M11 3l4 4-4 4"/><path d="M20 17H9M13 13l-4 4 4 4"/>',
   pin:  '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0"/><circle cx="12" cy="10" r="3"/>',
   edit: '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.1 2.1 0 0 1 3 3L12 15l-4 1 1-4z"/>',
   warn: '<path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0"/><path d="M12 9v4M12 17h.01"/>',
@@ -4390,6 +4436,154 @@ function woScanDone(){
     woClose();
     render();
   }
+}
+
+// ── перемещение сканом ──────────────────────────────────────────────────────
+// Водитель перевозит бутылки между районами так же, как старший: код с крышки
+// и район назначения. Район выбирается один раз на проход — в машине обычно
+// партия в одно место, — дальше крышки одна за другой. Каждый переезд пишется
+// сразу в обе книги; «✕» на строке возвращает бутылку, но только свою.
+var MV = {to: '', rows: [], total: 0, busy: false};
+var MV_D = [], MV_LOG = [], MV_DAY = '', _mvAt = 0;
+
+async function mvLoad(force){
+  if(!force && Date.now() - _mvAt < 30000) return;
+  _mvAt = Date.now();
+  try{
+    const r = await drvApi.drvFetch('/api/driver/stock/moves');
+    MV_LOG = r.rows || []; MV_DAY = r.day || MV_DAY;
+    if(r.districts && r.districts.length) MV_D = r.districts;
+    if(TAB === 'supply') renderSupply();
+  }catch(e){}
+}
+
+async function mvOpen(){
+  MV = {to: '', rows: [], total: 0, busy: false};
+  if(!MV_D.length) await mvLoad(true);
+  if(!MV_D.length){ toast('Не удалось загрузить районы', 'err'); return; }
+  document.getElementById('mvSheet').classList.add('show');
+  mvToPaint();
+  _mvSay('Выберите, куда везём', '');
+  mvFeedPaint();
+  try{
+    await SCAN.start(document.getElementById('mvV'), mvCode, null,
+                     () => _mvSay('эта уже отсканирована', 'err'), null);
+  }catch(e){
+    toast('Нет доступа к камере', 'err');
+    mvDone();
+  }
+}
+
+function mvToPaint(){
+  const box = document.getElementById('mvTo'); if(!box) return;
+  box.innerHTML = MV_D.map(d => `<button class="${MV.to === d.id ? 'on' : ''}"
+      onclick="mvPick('${esc(d.id)}')" aria-label="${esc(d.name)}">${esc(d.code || d.id)}</button>`).join('');
+}
+
+function mvPick(id){
+  MV.to = id; mvToPaint();
+  const d = MV_D.find(x => x.id === id) || {};
+  _mvSay(`Везём на ${d.code || ''} ${d.name || ''} — наведите на код крышки`, '');
+  try{ tg.HapticFeedback.selectionChanged(); }catch(e){}
+}
+
+function _mvSay(текст, вид){
+  const f = document.getElementById('mvF'), b = document.getElementById('mvSay');
+  if(b) b.textContent = текст;
+  if(f) f.className = 'cam-frame' + (вид ? ' ' + вид : '');
+}
+
+async function mvCode(code){
+  if(MV.busy) return;
+  if(!MV.to){
+    _mvSay('Сначала выберите, куда везём', 'err');
+    SCAN.seen.delete(code); SCAN.seenAt.delete(code);
+    return;
+  }
+  MV.busy = true;
+  const row = {code, name: '', state: 'sending', say: 'отправляю…'};
+  MV.rows.unshift(row); mvFeedPaint();
+  try{
+    const r = await drvApi.drvFetch('/api/driver/stock/move', {method: 'POST', body: {code, to: MV.to}});
+    row.name = r.name || r.label || code;
+    if(r.ok){
+      row.state = 'ok'; row.say = `${r.from_code || ''} → ${r.to_code || ''}`;
+      MV.total++;
+      _mvSay(`${row.name} · переехала`, 'ok');
+      try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    }else{
+      row.state = 'dup'; row.say = r.say || 'не переехала';
+      _mvSay(row.say, 'err');
+      try{ tg.HapticFeedback.notificationOccurred('error'); }catch(e){}
+    }
+  }catch(e){
+    row.state = 'fail'; row.say = 'не отправилось, поднесите ещё раз';
+    _mvSay(row.say, 'err');
+    SCAN.seen.delete(code); SCAN.seenAt.delete(code);
+  }finally{
+    mvFeedPaint();
+    setTimeout(() => { MV.busy = false; }, 700);
+  }
+}
+
+function mvFeedPaint(){
+  const box = document.getElementById('mvFeed'); if(!box) return;
+  const s = document.getElementById('mvS');
+  if(s) s.textContent = MV.total
+    ? `${MV.total} ${plural(MV.total, 'бутылка', 'бутылки', 'бутылок')} ${MV.total === 1 ? 'переехала' : 'переехали'}`
+    : 'одна крышка — одна бутылка';
+  box.innerHTML = MV.rows.slice(0, 40).map(r => {
+    const cls = r.state === 'ok' ? '' : r.state === 'sending' ? '' : 'no';
+    return `<div class="wo-done ${cls}">
+      ${svg(ICO.move, 17)}
+      <span class="wo-done-b">
+        <span class="wo-done-t">${esc(r.name || r.code)}</span>
+        <span class="wo-done-v ${r.state === 'ok' ? 'ok' : cls || 'wait'}">${esc(r.say)}</span>
+      </span>
+      ${r.state === 'ok' ? `<button class="mv-x" onclick="mvUndo('${esc(r.code)}')" aria-label="Вернуть">✕</button>` : ''}
+    </div>`;
+  }).join('');
+}
+
+// Не ту бутылку поднесли — вернуть там же, где случилось. Сервер вернёт
+// только мой последний переезд этой бутылки.
+async function mvUndo(code){
+  try{ await drvApi.drvFetch('/api/driver/stock/move/undo', {method: 'POST', body: {code}}); }
+  catch(e){
+    toast(e && e.status === 403 ? 'Это не ваш переезд' : 'Не удалось вернуть', 'err');
+    return;
+  }
+  MV.rows = MV.rows.filter(r => r.code !== code);
+  MV.total = Math.max(0, MV.total - 1);
+  SCAN.seen.delete(code); SCAN.seenAt.delete(code);
+  mvFeedPaint();
+  _mvSay('Бутылка вернулась', '');
+  try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
+}
+
+function mvDone(){
+  SCAN.stop();
+  document.getElementById('mvSheet').classList.remove('show');
+  if(MV.total){
+    toast(`Перевезли ${MV.total} ${plural(MV.total, 'бутылку', 'бутылки', 'бутылок')}`);
+    mvLoad(true);
+  }
+}
+
+// Строка своей истории: все бутылки группы едут обратно. Свою — можно, и
+// только пока её не увёз кто-то ещё дальше.
+async function mvDel(i){
+  const m = MV_LOG[i]; if(!m) return;
+  const n = m.bottles || 0;
+  if(!confirm(`Вернуть ${n} ${plural(n, 'бутылку', 'бутылки', 'бутылок')} «${m.product_name || ''}» обратно на ${m.from_name}?`)) return;
+  let bad = 0;
+  for(const id of (m.ids || [])){
+    try{ await drvApi.drvFetch('/api/driver/stock/move/' + id, {method: 'DELETE'}); }
+    catch(e){ bad++; }
+  }
+  if(bad) toast(bad === (m.ids || []).length ? 'Не удалось вернуть — бутылки уже увезли дальше' : `${bad} не вернулись — их уже увезли дальше`, 'err');
+  else toast('Бутылки вернулись');
+  await mvLoad(true);
 }
 
 /* ═══ Расчёт наличными и долги ══════════════════════════════════════════
@@ -6636,7 +6830,7 @@ async function supLoad(){
   try{ SUP = await drvApi.drvFetch('/api/driver/supply'); }
   catch(e){ SUP = SUP || {mine:[], free:[], taken:[]}; }
   supBadge();
-  woLoad();
+  woLoad(); mvLoad();
   if(TAB === 'supply') renderSupply();
 }
 
@@ -6785,12 +6979,29 @@ function woFoot(){
     </span>
     <span class="wo-done-n">−${w.qty}</span>
   </div>`; }).join('');
+  // Свои переезды за неделю — там же, где списание: это тоже «что я сделал с
+  // бутылками». Каждую строку можно вернуть, пока бутылки не уехали дальше.
+  const mv = MV_LOG.map((m, i) => `<div class="wo-done">
+    ${svg(ICO.move, 17)}
+    <span class="wo-done-b">
+      <span class="wo-done-t">${esc(m.product_name || m.product_id || '')}</span>
+      <span class="wo-done-s">${esc(m.from_code || m.from_name || '')} → ${esc(m.to_code || m.to_name || '')} · ${hhmm(m.at)}${
+        m.day && m.day !== MV_DAY ? ' · ' + esc(m.day.slice(8, 10) + '.' + m.day.slice(5, 7)) : ''}</span>
+    </span>
+    <span class="wo-done-n">${m.bottles || m.qty || 0}</span>
+    <button class="mv-ret" onclick="mvDel(${i})">Вернуть</button>
+  </div>`).join('');
   return `${WO_LOG.length ? `<div class="sect" style="margin-top:26px">
       <span class="sect-t">Списание</span>
       <span class="sect-v">${WO_LOG.length}</span></div>${log}` : ''}
+    ${MV_LOG.length ? `<div class="sect" style="margin-top:26px">
+      <span class="sect-t">Перемещения</span>
+      <span class="sect-v">${MV_LOG.length}</span></div>${mv}` : ''}
     <div class="wo-sp"></div>
     <div class="wo-fix"><button class="wo-btn" onclick="woOpen()">
-      ${svg(ICO.trash, 19)}<span>Списать бой или брак</span></button></div>`;
+      ${svg(ICO.trash, 19)}<span>Списать бой или брак</span></button>
+      <button class="wo-btn ghost" onclick="mvOpen()">
+      ${svg(ICO.move, 18)}<span>Переместить бутылки</span></button></div>`;
 }
 
 async function supClaim(sid, oid){

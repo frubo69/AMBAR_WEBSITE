@@ -3969,6 +3969,15 @@ async def get_stock_transfers_since(day_from: str) -> list:
         .sort([("day", -1), ("at", -1)]).to_list(length=5000)
 
 
+async def get_stock_transfers_by_driver(name: str, day_from: str) -> list:
+    """Переезды одного водителя с этого дня — для его истории и отмены."""
+    db = _db_or_none()
+    if db is None: return []
+    return await db.stock_transfers.find(
+        {"by_kind": "driver", "by_name": name, "day": {"$gte": day_from}}) \
+        .sort([("day", -1), ("at", -1)]).to_list(length=2000)
+
+
 async def get_stock_transfer(tid: str) -> dict | None:
     from bson import ObjectId
     db = _db_or_none()

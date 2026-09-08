@@ -12538,11 +12538,11 @@ async function stkMovesHist(){
         <span class="stk-dr-b">
           <span class="stk-dr-n">${escS(m.product_name || m.product_id || '')}</span>
           <span class="stk-dr-s">${escS(m.from_name || '')} → ${escS(m.to_name || '')}${
-            m.bottles ? ' · сканом' : ''}</span>
+            m.bottles ? ' · сканом' : ''}${_mvWho(m)}</span>
         </span>
         <span class="stk-dr-v">${m.bottles || m.qty || 0}<i>${m.bottles ? 'бут' : 'шт'}</i></span>
-        ${d === today
-          ? `<button class="stk-mvr-x" title="Убрать" onclick="stkMoveDel(${i})">✕</button>` : ''}
+        ${d === today || m.by_kind === 'driver'
+          ? `<button class="stk-mvr-x" title="Вернуть" onclick="stkMoveDel(${i})">✕</button>` : ''}
       </div>`; }).join('')}</div>`).join('')
     : '<div class="stk-empty">За 30 дней ничего не перевозили</div>';
 }
@@ -12679,7 +12679,7 @@ async function stkMovesPage(){
           <span class="stk-mvr-n">${escS(m.product_name || m.product_id)}</span>
           <span class="stk-mvr-s">${escS(m.from_name)} → ${escS(m.to_name)} · ${m.bottles
             ? m.bottles + ' ' + pluralize(m.bottles,'бутылка','бутылки','бутылок') + ' сканом'
-            : m.qty + ' шт'}</span>
+            : m.qty + ' шт'}${_mvWho(m)}</span>
         </span>
         <button class="stk-mvr-x" title="Убрать" onclick="stkMoveDel(${i})">✕</button>
       </div>`).join('')
@@ -12704,7 +12704,7 @@ async function stkLoadMoves(){
         <span class="stk-mvr-n">${escS(m.product_name || m.product_id)}</span>
         <span class="stk-mvr-s">${escS(m.from_name)} → ${escS(m.to_name)} · ${m.bottles
           ? m.bottles + ' ' + pluralize(m.bottles,'бутылка','бутылки','бутылок')
-          : m.qty + ' шт'}</span>
+          : m.qty + ' шт'}${_mvWho(m)}</span>
       </span>
       <button class="stk-mvr-x" title="Убрать" onclick="stkMoveDel(${i})">✕</button>
     </div>`).join('')
@@ -12715,6 +12715,12 @@ async function stkLoadMoves(){
   // чёрного поля читается как обрыв, будто не догрузилось.
   box.innerHTML = rows ||
     '<div class="stk-none">Сегодня ничего не перевозили</div>';
+}
+
+// Чей переезд — в подписи, когда вёз водитель: старший видит его в общей
+// истории и может вернуть; свои строки подписи не требуют.
+function _mvWho(m){
+  return m && m.by_kind === 'driver' ? ` · водитель ${escS(m.by_name || '')}` : '';
 }
 
 // Убрать переезд сканом — значит вернуть бутылки на прежний офис и в реестре:

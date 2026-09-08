@@ -719,6 +719,85 @@ async def _writeoff_tell(wid: str, me: dict, p: dict, qty: int, kind: str,
         log.warning(f"[writeoff] владельцу не ушло: {e}")
 
 
+# ── перемещение бутылок ──────────────────────────────────────────────────────
+# Водитель перевозит бутылки между районами так же, как старший: код с
+# крышки, район назначения, одна крышка — один переезд в обе книги (реестр +
+# stock_transfers). Отменить может только свой переезд; старший — любой.
+
+@require_driver
+async def handle_move_scan(request):
+    """{code, to} → вердикт как у старшего (ok / same / unknown / …)."""
+    import stock_routes
+    from config_offices import OFFICE_IDS
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    code = re.sub(r"\s+", "", str(body.get("code") or ""))[:120]
+    dst = str(body.get("to") or "").strip()
+    if not code:
+        return web.json_response({"error": "no_code"}, status=400, headers=CORS_HEADERS)
+    if dst not in OFFICE_IDS:
+        return web.json_response({"error": "bad_district"}, status=400, headers=CORS_HEADERS)
+    res = await stock_routes.move_by_code(code, dst, request["tg"].get("id") or 0,
+                                         me["name"], "driver")
+    return web.json_response(res, headers=CORS_HEADERS)
+
+
+@require_driver
+async def handle_move_undo(request):
+    """{code} — вернуть бутылку: только если последний переезд — мой."""
+    import stock_routes
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    code = re.sub(r"\s+", "", str(body.get("code") or ""))[:120]
+    if not code:
+        return web.json_response({"error": "no_code"}, status=400, headers=CORS_HEADERS)
+    st, payload = await stock_routes.move_undo_by_code(code, only_driver=me["name"])
+    return web.json_response(payload, status=st, headers=CORS_HEADERS)
+
+
+@require_driver
+async def handle_move_del(request):
+    """Убрать строку своей истории: бутылка едет обратно в обе книги."""
+    me = request["driver"]
+    tid = (request.match_info.get("tid") or "").strip()
+    doc = await db.get_stock_transfer(tid)
+    if not doc:
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    if doc.get("by_kind") != "driver" or (doc.get("by_name") or "") != me["name"]:
+        return web.json_response({"error": "not_yours"}, status=403, headers=CORS_HEADERS)
+    if (doc.get("src") or "") == "qr" and doc.get("code"):
+        back = await db.qr_move_undo(str(doc["code"]), tid)
+        if not back:
+            # Бутылку после меня перевёз кто-то ещё — мой переезд уже история,
+            # возвращать её «ко мне» значило бы перечеркнуть чужой.
+            return web.json_response({"error": "moved_on"}, status=409, headers=CORS_HEADERS)
+    ok = await db.delete_stock_transfer(tid)
+    return web.json_response({"ok": ok}, status=200 if ok else 404, headers=CORS_HEADERS)
+
+
+@require_driver
+async def handle_moves(request):
+    """Мои переезды за неделю, сгруппированные как у старшего, плюс районы —
+    их список водителю нужен, чтобы выбрать, куда везёт."""
+    import stock_routes
+    from config_offices import OFFICE_IDS, OFFICE_NAMES, OFFICE_CODES
+    me = request["driver"]
+    since = (datetime.strptime(stock_routes._biz_day(), "%Y-%m-%d") - timedelta(days=6))
+    rows = await db.get_stock_transfers_by_driver(me["name"], since.strftime("%Y-%m-%d"))
+    out = stock_routes.group_transfers(rows, days=7)
+    return web.json_response(
+        {"day": stock_routes._biz_day(), "rows": out,
+         "districts": [{"id": o, "code": OFFICE_CODES.get(o, ""), "name": OFFICE_NAMES.get(o, o)}
+                       for o in OFFICE_IDS]},
+        headers=CORS_HEADERS, dumps=lambda o: json.dumps(o, default=str))
+
+
 @require_driver
 async def handle_writeoffs(request):
     """Мои списания за сегодня — чтобы видеть, что запись прошла."""
@@ -1885,6 +1964,10 @@ def setup(app):
         ("/api/driver/writeoff",                handle_writeoff_add, "POST"),
         ("/api/driver/writeoff/scan",           handle_writeoff_scan, "POST"),
         ("/api/driver/writeoffs",               handle_writeoffs,   "GET"),
+        ("/api/driver/stock/moves",             handle_moves,       "GET"),
+        ("/api/driver/stock/move",              handle_move_scan,   "POST"),
+        ("/api/driver/stock/move/undo",         handle_move_undo,   "POST"),
+        ("/api/driver/stock/move/{tid}",        handle_move_del,    "DELETE"),
         ("/api/driver/shift",                   handle_shift,       "GET"),
         ("/api/driver/shift/open",              handle_shift_open,  "POST"),
         ("/api/driver/shift/close",             handle_shift_close, "POST"),

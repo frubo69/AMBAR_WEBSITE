@@ -3195,6 +3195,17 @@ async def handle_owner_panic(request):
     except Exception as e:
         log.error(f"[owner] чат не почищен: {e}")
     await _cover_send(oid)
+    # Второй заход — всё, что ниже прикрытия, диапазоном номеров. Это ловит
+    # то, чего в реестре не было. Ответ не ждёт: панель уже спряталась.
+    try:
+        cover = await db.get_cover_msg_id(int(oid))
+        if cover:
+            async def _below():
+                m = await owner_sweep.wipe_below(int(oid), int(cover))
+                log.warning(f"[owner] штора у {oid}: диапазоном ещё {m}")
+            asyncio.create_task(_below())
+    except Exception as e:
+        log.error(f"[owner] штора, диапазон: {e}")
     return web.json_response({"ok": True}, headers=CORS_HEADERS)
 
 

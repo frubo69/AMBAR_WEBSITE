@@ -169,6 +169,31 @@ CHECKS = [check_services, check_mongo, check_errors, check_backup,
           check_offsite, check_disk, check_mem, check_api]
 
 
+
+def _remember(chat_id: str, res_bytes: bytes) -> None:
+    """Записать номер отправленного сообщения в реестр стирания STAR-чата.
+
+    Бот стирает переписку по этому реестру — на восьмом часу и по тревоге.
+    Сообщение, ушедшее мимо реестра, оставалось в чате навсегда: через двое
+    суток его уже нельзя стереть никому."""
+    try:
+        import json as _j
+        mid = ((_j.loads(res_bytes or b"{}").get("result") or {}).get("message_id"))
+        uri = _env("MONGO_URI")
+        if not mid or not uri:
+            return
+        import pymongo
+        from datetime import datetime, timezone
+        c = pymongo.MongoClient(uri, serverSelectionTimeoutMS=5000)
+        c["ambar"].owner_msgs.update_one(
+            {"_id": f"{chat_id}:{mid}"},
+            {"$setOnInsert": {"chat_id": int(chat_id), "message_id": int(mid),
+                              "event_key": "tools", "at": datetime.now(timezone.utc).isoformat()}},
+            upsert=True)
+    except Exception as e:
+        print(f"реестр: {e}")
+
+
 def notify(text: str) -> None:
     token = _env("AMBAR_OWNER_BOT_TOKEN")
     ids = [i for i in _env("AMBAR_OWNER_IDS").replace(" ", "").split(",") if i.isdigit()]
@@ -179,8 +204,9 @@ def notify(text: str) -> None:
         data = urllib.parse.urlencode({"chat_id": uid, "text": text,
                                        "parse_mode": "Markdown"}).encode()
         try:
-            urllib.request.urlopen(
-                f"https://api.telegram.org/bot{token}/sendMessage", data=data, timeout=15)
+            with urllib.request.urlopen(
+                    f"https://api.telegram.org/bot{token}/sendMessage", data=data, timeout=15) as r:
+                _remember(uid, r.read())
         except Exception as e:
             print(f"не отправилось {uid}: {e}")
 

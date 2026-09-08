@@ -3997,6 +3997,23 @@ async def owner_msg_drop(chat_id: int, message_id: int) -> None:
     await db.owner_msgs.delete_one({"_id": f"{chat_id}:{message_id}"})
 
 
+# Диапазонный проход: до какого номера сообщения чат уже вычищен подряд.
+# Номера в личном чате идут по порядку, и всё, что ниже отметки, — старше
+# уже стёртого, а значит тоже подлежит стиранию.
+async def owner_sweep_mark_get(chat_id: int) -> int:
+    db = _db_or_none()
+    if db is None: return 0
+    d = await db.owner_sweep_state.find_one({"_id": int(chat_id)})
+    return int((d or {}).get("swept_to") or 0)
+
+
+async def owner_sweep_mark_set(chat_id: int, swept_to: int) -> None:
+    db = _db_or_none()
+    if db is None: return
+    await db.owner_sweep_state.update_one(
+        {"_id": int(chat_id)}, {"$max": {"swept_to": int(swept_to)}}, upsert=True)
+
+
 async def notifications_search(keys: list | None = None, q: str = "",
                                frm: str = "", to: str = "",
                                limit: int = 50, offset: int = 0,

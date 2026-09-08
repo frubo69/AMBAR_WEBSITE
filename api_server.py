@@ -412,6 +412,46 @@ async def tg_delete(token, chat_id, message_id):
         log.debug(f"tg_delete {chat_id}/{message_id}: {e}")
         return None
 
+# Ответ телеграма на удаление: сообщения уже нет (удалили раньше или его не
+# было) — это тоже «готово». Всё остальное — сбой, и запись в реестре надо
+# оставить до следующего прохода: телеграм даёт на удаление двое суток, а
+# раз выброшенная из реестра строка оставалась в чате навсегда.
+_TG_GONE = ("message to delete not found", "message_id_invalid", "message can't be deleted",
+            "not found")
+def tg_deleted(res) -> bool:
+    if not res:
+        return False
+    if res.get("ok"):
+        return True
+    d = str(res.get("description") or "").lower()
+    return any(x in d for x in _TG_GONE)
+
+
+async def tg_delete_many(token, chat_id, ids):
+    """Удалить пачку сообщений по номерам. deleteMessages берёт до ста номеров
+    за раз и молча пропускает те, которых нет, — этим и добираем сообщения,
+    которые в реестр не попали. Отказал на пачке — добираем по одному."""
+    ids = sorted({int(i) for i in ids if int(i) > 0})
+    done = 0
+    for k in range(0, len(ids), 100):
+        chunk = ids[k:k + 100]
+        res = None
+        try:
+            async with _aiohttp.ClientSession(timeout=_aiohttp.ClientTimeout(total=20)) as session:
+                async with session.post(f"https://api.telegram.org/bot{token}/deleteMessages",
+                                        json={"chat_id": chat_id, "message_ids": chunk}) as resp:
+                    res = await resp.json()
+        except Exception as e:
+            log.debug(f"tg_delete_many {chat_id}: {e}")
+        if res and res.get("ok"):
+            done += len(chunk)
+            continue
+        for mid in chunk:
+            r = await tg_delete(token, chat_id, mid)
+            if r and r.get("ok"):
+                done += 1
+    return done
+
 async def tg_send_photo(token, chat_id, photo_path, caption=""):
     url  = f"https://api.telegram.org/bot{token}/sendPhoto"
     data = _aiohttp.FormData()

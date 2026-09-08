@@ -3529,6 +3529,12 @@ button.path:active{transform:scale(.995)}
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .pk-slug{display:block;font-family:'Space Grotesk',sans-serif;font-size:10.5px;
   color:var(--dim);letter-spacing:.4px;margin-top:2px}
+/* Позиция без кодов — красная: имя и число справа. Это очередь на камеру. */
+.pk-row.need .pk-name{color:var(--dn)}
+.pk-n.dn{color:var(--dn);display:flex;flex-direction:column;align-items:flex-end;line-height:1}
+.pk-n.dn i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:8.5px;font-weight:700;
+  letter-spacing:.4px;text-transform:uppercase;color:var(--dn);opacity:.8;margin-top:3px}
+.shl-v b.dn{color:var(--dn)}
 .pk-n{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
   color:var(--gold2);font-variant-numeric:tabular-nums}
 .pk-busy,.pk-mine{flex-shrink:0;font-size:10px;font-weight:700;letter-spacing:.5px;
@@ -14296,8 +14302,9 @@ function accRender(){
       return [ACC_ORDER ? fmt(ACC_ORDER.total_qty) : null,
               ACC_ORDER ? pluralize(ACC_ORDER.total_qty,'штука','штуки','штук') : 'штук'];
     })(),
-    qr:       [ACC_QR    ? fmt(ACC_QR.totals.active) : null,
-               ACC_QR ? pluralize(ACC_QR.totals.active,'бутылка','бутылки','бутылок') : 'бутылок'],
+    // На плитке — не сколько внесено, а сколько ещё лежит мимо реестра: это
+    // работа, а не справка.
+    qr:       [ACC_QR    ? fmt(ACC_QR.unscanned_total || 0) : null, 'не отсканировано'],
     supply:   [ACC_SUP ? (ACC_SUP.open ? fmt(ACC_SUP.open.total_qty) : '—') : null,
                ACC_SUP && ACC_SUP.open
                  ? pluralize(ACC_SUP.open.total_qty,'бутылка','бутылки','бутылок')
@@ -16671,28 +16678,23 @@ async function qrDistrict(force){
   const без = (ACC_QR && ACC_QR.unscanned_total) || 0;
   // Сводка — карточкой с шапкой, как «Закупаем» в заявке: в реестре и сколько
   // не отсканировано. Районы — одной слитной карточкой, как везде.
-  const шапка = t.active ? `<div class="ord-sumc">
-      <div class="ord-cap">Реестр</div>
-      <div class="ord-sum" style="grid-template-columns:1fr 1fr">
-        <span class="ord-sum-c"><b>${fmt(t.active)}</b><i>в реестре</i></span>
-        <span class="ord-sum-c ${без ? 'warn' : 'ok'}"><b>${без ? fmt(без) : '✓'}</b><i>${
-          без ? 'не отсканировано' : 'всё отсканировано'}</i></span>
-      </div>
-    </div>` : '';
-  document.getElementById('accMid').innerHTML = head + `<div class="qd-page">` + шапка +
+  // Сводки сверху нет: работа стоит на каждой точке своим числом, и общая
+  // цифра ничего к этому не добавляла.
+  const безПоТочкам = (ACC_QR && ACC_QR.unscanned) || {};
+  document.getElementById('accMid').innerHTML = head + `<div class="qd-page">` +
     `<div class="ord-dists">` + ((STK.districts || []).map(d => {
       // Справа — что внесли на этой точке ЗА ЭТУ СМЕНУ, а не весь реестр:
       // сюда приходят вносить, и число отвечает «сколько я уже занёс». Пока
       // ничего — пусто, без прочерков; с новой сменой счёт с нуля.
-      const n = added[d.id] || 0;
+      // Справа — сколько бутылок на точке лежит мимо реестра, красным: это
+      // и есть работа, ради которой сюда идут. Ноль — ничего не пишем.
+      const без = безПоТочкам[d.id] || 0;
       const b = busy[d.id] || 0;
-      const [sub, cls] = b
-        ? [`считают ${b} ${pluralize(b,'позицию','позиции','позиций')}`, 'warn']
-        : (n ? ['внесли за смену', ''] : ['', '']);
+      const sub = b ? `считают ${b} ${pluralize(b,'позицию','позиции','позиций')}` : '';
       return `<div class="shl-card"><button class="shl-h ord-dh" onclick="qrGo('${d.id}')">
         <span class="shl-code">${escS(d.code || '')}</span>
-        <span class="shl-b"><b>${escS(d.name || '')}</b>${sub ? `<i class="${cls}">${sub}</i>` : ''}</span>
-        ${n ? `<span class="shl-v"><b>${fmt(n)}</b><i>${pluralize(n,'бутылка','бутылки','бутылок')}</i></span>` : ''}
+        <span class="shl-b"><b>${escS(d.name || '')}</b>${sub ? `<i class="warn">${sub}</i>` : ''}</span>
+        ${без ? `<span class="shl-v"><b class="dn">${fmt(без)}</b><i>без кодов</i></span>` : ''}
         <span class="ord-dh-go">${ICO_CHEV}</span>
       </button></div>`;
     }).join('') || '<div class="scan-empty">Точки не загрузились</div>') + `</div></div>`;
@@ -16758,6 +16760,9 @@ function qrRenderList(){
   // точкам, и на B3 стояли числа B4: человек видел «41 Absolut» там, где не
   // заведено ни одной бутылки.
   const have = ((ACC_QR && ACC_QR.by_product_district) || {})[QR_DIST] || {};
+  // Позиции, у которых на полке лежит больше, чем заведено кодами, — красным:
+  // они ждут камеры. Число справа у них — сколько ещё без кодов.
+  const need = ((ACC_QR && ACC_QR.unscanned_by_product) || {})[QR_DIST] || {};
   const slugs = (ACC_QR && ACC_QR.slugs) || {};
   // Порядок — как в рабочей таблице и на бумажном листе: 1…123. Считают,
   // стоя у полки, и алфавит здесь означал бы прыгать по залу.
@@ -16772,10 +16777,12 @@ function qrRenderList(){
     // Своя бронь — не «занято», а «продолжить»: это та же сессия, просто
     // человек выходил назад посмотреть список.
     const busy = lock && !lock.mine;
+    const n = need[p.id] || 0;
     const tag = busy ? `<span class="pk-busy">${escS(lock.name)}</span>`
               : lock ? `<span class="pk-mine">вы считаете</span>`
+              : n ? `<span class="pk-n dn">${fmt(n)}<i>без кодов</i></span>`
               : `<span class="pk-n">${have[p.id] ? fmt(have[p.id]) : '—'}</span>`;
-    return `<button class="pk-row ${busy ? 'off' : ''}" ${busy ? 'disabled' : ''}
+    return `<button class="pk-row ${busy ? 'off' : ''}${n ? ' need' : ''}" ${busy ? 'disabled' : ''}
         onclick="qrStart('${p.id}')">
         <span class="pk-no">${p.no || ''}</span>
         <span class="pk-row-b">

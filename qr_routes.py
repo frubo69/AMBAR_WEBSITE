@@ -141,7 +141,7 @@ def _clean(code: str) -> str:
     return re.sub(r"\s+", "", str(code or ""))[:MAX_CODE]
 
 
-async def unscanned_by_district(by_pd: dict = None) -> tuple:
+async def unscanned_by_district(by_pd: dict = None, detail: dict = None) -> tuple:
     """Сколько бутылок лежит на полке мимо реестра — по каждой точке.
 
     Это и есть работа, которая осталась: пока позиция не заведена кодами,
@@ -154,7 +154,11 @@ async def unscanned_by_district(by_pd: dict = None) -> tuple:
     не с чем: такую точку в число не считаем и называем отдельно.
 
     Второе значение — как раз такие точки. Считает и сводка реестра, и пульт
-    смены: вопрос один, и ответ должен быть один."""
+    смены: вопрос один, и ответ должен быть один.
+
+    detail — словарь, который наполняется тем же счётом по позициям:
+    {точка: {позиция: бутылок без кодов}}. Только положительные: экран точки
+    красит ими строки, которые ждут камеры."""
     unscanned, no_count = {}, []
     try:
         import stock_routes as SR
@@ -171,6 +175,16 @@ async def unscanned_by_district(by_pd: dict = None) -> tuple:
                 no_count.append(oid)
                 continue
             unscanned[oid] = max(0, bottles - coded)
+            if detail is not None:
+                got = by_pd.get(oid) or {}
+                per = {}
+                for pid, q in have.items():
+                    if pid not in cat or not q:
+                        continue
+                    n = round(float(q) * SR._unit(cat.get(pid) or {})) - int(got.get(pid) or 0)
+                    if n > 0:
+                        per[pid] = n
+                detail[oid] = per
     except Exception as e:                       # noqa: BLE001
         log.warning(f"[qr] не посчитано, сколько без кодов: {e}")
         return {}, []
@@ -221,7 +235,8 @@ async def handle_stats(request):
         left = dict(by_district)
     # Сколько лежит мимо реестра — тем же счётом, что и в пульте смены.
     _t2 = _t.monotonic()
-    unscanned, no_count = await unscanned_by_district(by_prod_dist)
+    unscanned_detail = {}
+    unscanned, no_count = await unscanned_by_district(by_prod_dist, unscanned_detail)
 
     # Экран открывают у полки, с телефона, и ждут его молча. Если сборка
     # заняла больше секунды — пусть в журнале останется, на чём именно.
@@ -246,6 +261,7 @@ async def handle_stats(request):
     return web.json_response({
         "locks": locks,
         "unscanned": unscanned,
+        "unscanned_by_product": unscanned_detail,
         "unscanned_total": sum(unscanned.values()),
         "no_count": no_count,
         "added_shift": added_shift,

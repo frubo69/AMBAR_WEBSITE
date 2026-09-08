@@ -8991,10 +8991,29 @@ window.addEventListener('resize', () => {
   heroSideFit(document.getElementById('offSide'));
 });
 
+// Плитки, уходящие под прижатую карточку, гаснут заранее, а не режутся её
+// кромкой. Полоска под кромкой в 18 точек прятала только самый край: как
+// только плитка уходила под карточку больше чем наполовину, снизу торчал её
+// закруглённый низ — на широком экране айпада это читалось как сломанная
+// вёрстка. Теперь доля плитки ниже кромки решает прозрачность: ниже 15% —
+// не видно вовсе, от 85% — целая. Погасшая не ловит нажатия.
+// edge — кромка в окне; null — карточка не прижата, всё возвращаем.
+window.heroFadeUnder = (edge, els) => {
+  els.forEach(el => {
+    const r = el.getBoundingClientRect();
+    if(!r.height) return;
+    const vis = edge == null ? 1 : (r.bottom - edge) / r.height;
+    const o = Math.max(0, Math.min(1, (vis - .15) / .7));
+    el.style.opacity = o >= 1 ? '' : o.toFixed(3);
+    el.style.pointerEvents = o > 0 ? '' : 'none';
+  });
+};
+
 (function heroShrink(){
   const hero = document.querySelector('#pg-overview .hero');
   const pbar = document.querySelector('.period-bar');
   if(!hero || !pbar) return;
+  const tiles = [...document.querySelectorAll('#pg-overview .bento .card')];
   const lbl   = hero.querySelector('#heroLbl');
   const side  = hero.querySelector('.hero-side');
   const spark = hero.querySelector('.hero-spark');
@@ -9047,6 +9066,7 @@ window.addEventListener('resize', () => {
   // Развёрнутое состояние — это просто снятые инлайновые стили.
   const reset = () => {
     veil.classList.remove('on');
+    heroFadeUnder(null, tiles);
     hero.classList.remove('tight');
     hero.style.height = FULL_() + 'px';
     hero.style.paddingTop = ''; hero.style.paddingBottom = '';
@@ -9088,6 +9108,7 @@ window.addEventListener('resize', () => {
     // плитки пошли под карточку. До этого её низ и так вровень с ними.
     veil.style.top = (top + h) + 'px';
     veil.classList.toggle('on', p >= 1);
+    heroFadeUnder(top + h, tiles);
 
     // Всё, что объясняет число, гаснет вдвое быстрее самой карточки: к
     // середине пути на экране остаётся только число и стрелки.
@@ -9206,13 +9227,17 @@ window.addEventListener('resize', () => {
     raf = null;
     const pg = document.getElementById('pg-offices');
     if(!pg || !pg.classList.contains('active')) return;
+    const rows = [...pg.querySelectorAll('.off-card')];
     if(!PIN.off){                        // открепили — карточка едет со страницей
       if(window.HERO_VEIL) HERO_VEIL(null);
+      heroFadeUnder(null, rows);
       return;
     }
     const top   = parseFloat(getComputedStyle(card).top) || 0;
     const stuck = card.getBoundingClientRect().top <= top + .5;
-    if(window.HERO_VEIL) HERO_VEIL(stuck ? card.getBoundingClientRect().bottom : null);
+    const edge  = stuck ? card.getBoundingClientRect().bottom : null;
+    if(window.HERO_VEIL) HERO_VEIL(edge);
+    heroFadeUnder(edge, rows);
   };
 
   window.OFF_HERO_APPLY = apply;

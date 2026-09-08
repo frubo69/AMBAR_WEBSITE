@@ -8972,6 +8972,34 @@ try{ if(window.Telegram && Telegram.WebApp){
   держать();
 })();
 
+// ── Где мы были — на случай перезагрузки ─────────────────────────────────
+// «Перезагрузить» в меню телеграма грузит страницу заново, и раньше она
+// всегда открывалась на «Обзоре». Место запоминаем в sessionStorage: он
+// живёт ровно столько, сколько живёт это окно вебвью — переживает
+// перезагрузку, но не закрытие приложения. Закрыли и открыли снова —
+// хранилище пустое, и приложение честно начинает с «Обзора».
+function _navSave(){
+  try{
+    const pg = (document.querySelector('.tb.on') || {}).dataset?.pg || 'overview';
+    const stock = document.getElementById('stkOv')?.classList.contains('show') ? 1 : 0;
+    sessionStorage.setItem('ambar_nav', JSON.stringify({pg, acc: ACC_VIEW || '', stock}));
+  }catch(e){}
+}
+function _navRestore(){
+  let nav = null;
+  try{ nav = JSON.parse(sessionStorage.getItem('ambar_nav') || 'null'); }catch(e){}
+  if(!nav || HIDE) return;
+  try{
+    const btn = document.querySelector(`.tb[data-pg="${nav.pg}"]`);
+    if(btn && !btn.classList.contains('on')) btn.click();
+    // Раздел учёта или склад открываем на их корне: середина сканирования
+    // или лист района после перезагрузки не восстановимы, а корень — да.
+    if(nav.stock) setTimeout(openStock, 250);
+    else if(nav.acc && nav.acc !== 'stock') setTimeout(() => accOpen(nav.acc), 250);
+  }catch(e){}
+}
+window.addEventListener('load', () => setTimeout(_navRestore, 600));
+
 // Tab switching
 document.querySelectorAll('.tb').forEach(btn=>{
   btn.addEventListener('click',()=>{
@@ -8980,6 +9008,7 @@ document.querySelectorAll('.tb').forEach(btn=>{
     btn.classList.add('on');
     document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
     document.getElementById('pg-'+pg).classList.add('active');
+    _navSave();
     window.scrollTo({top:0,behavior:'instant'});
     // Команда живёт на странице районов — тянем её при первом заходе туда.
     if(pg === 'offices' && !OPS.data && !OPS.loading && window.ownerApi) loadOperators();
@@ -12158,6 +12187,7 @@ function distMoreTile(onclick, label){
 
 function openStock(){
   document.getElementById('stkOv').classList.add('show');
+  _navSave();
   try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
   // Всегда со списка районов. Открываться на последнем выбранном казалось
   // удобным, но ревизию ведут по всем пяти, и первый вопрос тут не «что в
@@ -12196,6 +12226,7 @@ function closeStock(){
   if(STK.view === 'scan' || STK.view === 'move-scan'){ try{ SCAN.stop(); }catch(e){} }
   _setRail('stkRail', '');
   document.getElementById('stkOv').classList.remove('show');
+  _navSave();
   accLoadSummaries();              // плитка «Пересчёт склада» в «Учёте» — с новыми цифрами
 }
 // Крестик уводит на шаг назад, а не сразу из экрана: из списка — к районам,
@@ -15196,6 +15227,7 @@ function accOpen(id){
   _setRail('accRail', '');
   document.getElementById('accOv').classList.add('show');
   ACC_VIEW = id;
+  _navSave();
   document.getElementById('accMid').innerHTML = '<div class="exp-empty">Загрузка…</div>';
   document.getElementById('accMid').classList.remove('xs-fix');
   document.getElementById('accFoot').innerHTML = '';   // подвал у каждого свой
@@ -15246,6 +15278,7 @@ function _accClose(){
   SCAN.stop();
   document.getElementById('accOv').classList.remove('show');
   ACC_VIEW = null;
+  _navSave();
   CREW_D = null;
   accRender(); mktRender(); promoBlockRender(); giftBlockRender(); walBlockRender();
 }

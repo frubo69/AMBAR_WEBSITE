@@ -3166,6 +3166,10 @@ button.path:active{transform:scale(.995)}
 .crw-ask-b.go{background:linear-gradient(135deg,var(--gold),var(--gold2));
   color:#1a1408;border-color:transparent}
 .crw-ask-b:active{transform:scale(.98)}
+.crw-ask .crw-ask-b{justify-content:center;text-align:center}
+/* За окном-вопросом фон темнеет и мылится: окно — единственное, что сейчас
+   спрашивают, остальному экрану полагается отойти. */
+.pin-back.ask{background:rgba(4,4,10,.45);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
 .crw-ask-b.bad{background:rgba(226,106,106,.14);border-color:rgba(226,106,106,.5);color:var(--dn)}
 
 /* Заголовок группы водителей: чей это район и кто на нём принимает. */
@@ -18552,7 +18556,7 @@ function xsAsk(after){
   closePinPop();
   const n = xsDraftCount();
   const back = document.createElement('div');
-  back.className = 'pin-back';
+  back.className = 'pin-back ask';
   back.addEventListener('click', () => { closePinPop(); XS_AFTER = null; });
   const box = document.createElement('div');
   box.className = 'pin-pop crw-ask';
@@ -18702,7 +18706,7 @@ function xLeave(){
   }
   closePinPop();
   const back = document.createElement('div');
-  back.className = 'pin-back';
+  back.className = 'pin-back ask';
   back.addEventListener('click', closePinPop);
   const box = document.createElement('div');
   box.className = 'pin-pop crw-ask';
@@ -19509,7 +19513,7 @@ async function rcvAssignPick(oid){
     </div>`; }).join('');
   closePinPop();
   const back = document.createElement('div');
-  back.className = 'pin-back';
+  back.className = 'pin-back ask';
   back.addEventListener('click', closePinPop);
   const box = document.createElement('div');
   box.className = 'pin-pop crw-ask ra-box';
@@ -21253,7 +21257,7 @@ function xeAskNoReceipt(k){
   return new Promise(resolve => {
     closePinPop();
     const back = document.createElement('div');
-    back.className = 'pin-back';
+    back.className = 'pin-back ask';
     back.addEventListener('click', () => { closePinPop(); resolve('cancel'); });
     const box = document.createElement('div');
     box.className = 'pin-pop crw-ask';
@@ -25786,7 +25790,7 @@ async function crewApply(){
 function crewAsk(){
   closePinPop();
   const back = document.createElement('div');
-  back.className = 'pin-back';
+  back.className = 'pin-back ask';
   back.addEventListener('click', () => { closePinPop(); });
   const box = document.createElement('div');
   box.className = 'pin-pop crw-ask';

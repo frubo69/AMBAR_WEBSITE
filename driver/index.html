@@ -4351,7 +4351,8 @@ function woFeedPaint(){
   const box = document.getElementById('woFeed'); if(!box) return;
   const s = document.getElementById('woScanS');
   if(s) s.textContent = WOS.total
-    ? `${WOS.total} ${plural(WOS.total, 'бутылка', 'бутылки', 'бутылок')} — ждут решения`
+    ? `${WOS.total} ${plural(WOS.total, 'бутылка', 'бутылки', 'бутылок')} — ${
+        WOS.total === 1 ? 'ждёт' : 'ждут'} решения`
     : 'одна крышка — одна бутылка';
   box.innerHTML = WOS.rows.slice(0, 40).map(r => {
     const cls = r.state === 'ok' ? 'wait' : r.state === 'sending' ? '' : 'no';

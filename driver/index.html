@@ -341,6 +341,13 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',-apple-system,
   border:1px solid var(--border2);background:var(--card);color:var(--text);
   font-family:inherit;font-size:13.5px;outline:none}
 .wo-note2:focus{border-color:rgba(201,169,110,.5)}
+.wo-tip{margin:14px 2px 0;font-size:11.5px;line-height:1.5;color:var(--dim)}
+/* Лента отсканированного: строка на бутылку, тем же рядом, что и список
+   списаний в карточке. Не растёт бесконечно — прокручивается. */
+.wo-feed{display:flex;flex-direction:column;gap:6px;margin-top:10px;
+  max-height:min(30dvh,240px);overflow-y:auto;-webkit-overflow-scrolling:touch}
+.wo-feed .wo-done{padding:10px 12px}
+.wo-feed .wo-done-t{font-size:13.5px}
 /* Кнопка приклеена к низу: тело окна прокручивается под ней, а не уезжает
    вместе с ней за край. */
 .wo-add-foot{position:sticky;bottom:0;z-index:2;margin-top:18px;padding:12px 0 0;
@@ -2718,7 +2725,7 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
     <div class="wo-add-hd">
       <div>
         <div class="sheet-t">Списать товар</div>
-        <div class="wo-add-s">Только то, что физически исчезло</div>
+        <div class="wo-add-s">уйдёт старшему на согласование</div>
       </div>
       <button class="wo-add-x" onclick="woClose()" aria-label="Закрыть">
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
@@ -2734,6 +2741,35 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 <input type="file" id="woFile" accept="image/*" capture="environment"
   style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none"
   onchange="woShot(this)">
+<!-- Списание сканом: бой, брак и просрочку не описывают словами — код с крышки
+     знает позицию и точку, одна крышка — одна бутылка. Снимок один на всё, что
+     списывают сейчас; каждая бутылка уходит старшему отдельным вопросом. -->
+<div class="sheet" id="woScanSheet" onclick="if(event.target===this)woScanDone()">
+  <div class="sheet-in">
+    <div class="wo-add-hd">
+      <div>
+        <div class="sheet-t">Списать сканом</div>
+        <div class="wo-add-s" id="woScanS">одна крышка — одна бутылка</div>
+      </div>
+      <button class="wo-add-x" onclick="woScanDone()" aria-label="Закрыть">
+        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
+      </button>
+    </div>
+    <div class="cam">
+      <video id="woV" playsinline muted autoplay></video>
+      <div class="cam-frame" id="woF">
+        <i class="c tl"></i><i class="c tr"></i><i class="c bl"></i><i class="c br"></i>
+        <div class="cam-badge" id="woB"></div>
+      </div>
+    </div>
+    <div class="wo-why" id="woSay" style="margin:0 2px">Наведите на код крышки</div>
+    <div class="wo-feed" id="woFeed"></div>
+    <div class="wo-add-foot">
+      <button class="wo-go" onclick="woScanDone()">Готово</button>
+    </div>
+  </div>
+</div>
 <!-- Скан бутылки для охраны. Отдельным листом, а не внутри карточки: камера
      на четверть экрана бесполезна, а карточка с камерой перестаёт быть строкой
      учёта. Один скан — и лист закрывается сам: бутылка отдаётся одна. -->
@@ -4058,7 +4094,7 @@ const WO_ERR = {no_item: 'Выберите позицию', bad_qty: 'Прове
   photo_big: 'Фотография слишком тяжёлая, снимите ещё раз'};
 
 async function woOpen(pid){
-  WO = {item: '', name: '', q: '', qty: 1, kind: '', photo: '', thumb: '', note: ''};
+  WO = {item: '', name: '', q: '', qty: 1, kind: 'бой', photo: '', thumb: '', note: ''};
   document.getElementById('woSheet').classList.add('show');
   woPaint();
   try{ tg.HapticFeedback.impactOccurred('light'); }catch(e){}
@@ -4166,23 +4202,36 @@ function woPaint(){
          <span>видно товар и что с ним случилось</span>
        </button>`;
 
-  box.innerHTML = причины
-    + `<div class="wo-l2">Что списываем</div>` + позиция
-    + `<div class="wo-l2">Сколько бутылок</div>
-       <div class="wo-amt">
-         <button class="wo-sb" onclick="woQty(-1)" ${WO.qty <= 1 ? 'disabled' : ''}
-           aria-label="Меньше">−</button>
-         <input value="${WO.qty}" inputmode="numeric" aria-label="Количество"
-           oninput="WO.qty=Math.max(1,Math.min(240,parseInt(this.value,10)||1))">
-         <button class="wo-sb" onclick="woQty(1)" aria-label="Больше">+</button>
-       </div>
-       <div class="wo-l2">Фотография</div>` + снимок
-    + `<input class="wo-note2" maxlength="200" placeholder="Комментарий, если нужен"
-        value="${esc(WO.note || '')}" oninput="woNote(this.value)">`;
+  // То же устройство, что у старшего. Бой, брак и просрочку не описывают
+  // словами: код с крышки знает позицию и точку, одна крышка — одна бутылка.
+  // Поэтому здесь только снимок и комментарий, а дальше камера. Потеря —
+  // другой случай: бутылки нет, сканировать нечего, и остаётся сказать руками,
+  // что пропало и сколько; снимок отсутствующей бутылки ничего не доказывает.
+  const утеря = WO.kind === 'потеря';
+  box.innerHTML = причины + (утеря
+    ? `<div class="wo-l2">Что списываем</div>` + позиция
+      + `<div class="wo-l2">Сколько бутылок</div>
+         <div class="wo-amt">
+           <button class="wo-sb" onclick="woQty(-1)" ${WO.qty <= 1 ? 'disabled' : ''}
+             aria-label="Меньше">−</button>
+           <input value="${WO.qty}" inputmode="numeric" aria-label="Количество"
+             oninput="WO.qty=Math.max(1,Math.min(240,parseInt(this.value,10)||1))">
+           <button class="wo-sb" onclick="woQty(1)" aria-label="Больше">+</button>
+         </div>
+         <input class="wo-note2" maxlength="200" placeholder="Комментарий — что произошло"
+          value="${esc(WO.note || '')}" oninput="woNote(this.value)">`
+    : `<div class="wo-l2">Фотография</div>` + снимок
+      + `<input class="wo-note2" maxlength="200" placeholder="Комментарий — что произошло"
+          value="${esc(WO.note || '')}" oninput="woNote(this.value)">
+         <div class="wo-tip">Дальше камера: одна крышка — одна бутылка, позиция и
+           точка возьмутся из кода.</div>`);
 
   woSegPill();
   const go = document.getElementById('woGo');
-  if(go) go.disabled = !(WO.item && WO.kind && WO.photo);
+  if(go){
+    go.textContent = утеря ? 'Списать' : 'Сканировать крышки';
+    go.disabled = утеря ? !(WO.item && WO.qty > 0) : !WO.photo;
+  }
 }
 
 // Пилюля встаёт под выбранным словом. Пока не выбрано ничего — её нет вовсе:
@@ -4212,16 +4261,19 @@ function woUnpick(){
 
 async function woSend(){
   if(!WO) return;
-  if(!WO.item)  return toast('Выберите позицию', 'err');
   if(!WO.kind)  return toast('Выберите причину', 'err');
-  if(!WO.photo) return toast('Нужна фотография', 'err');
+  if(WO.kind !== 'потеря'){
+    if(!WO.photo) return toast('Нужна фотография', 'err');
+    woScanStart(); return;
+  }
+  if(!WO.item)  return toast('Выберите позицию', 'err');
   const go = document.getElementById('woGo');
   go.disabled = true; go.textContent = 'Отправляем…';
   const snap = {name: WO.name, qty: WO.qty, kind: WO.kind};
   try{
     await drvApi.drvFetch('/api/driver/writeoff', {method: 'POST', body: {
       item: WO.item, qty: WO.qty, kind: WO.kind, note: WO.note || '',
-      photo: WO.photo, thumb: WO.thumb || ''}});
+      photo: WO.photo || '', thumb: WO.thumb || ''}});
     WO_LOG.unshift({...snap, state:'pending', at: new Date().toISOString()});
     toast(`Списали: ${snap.name} × ${snap.qty}`);
     try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
@@ -4230,6 +4282,98 @@ async function woSend(){
   }catch(e){
     go.disabled = false; go.textContent = 'Списать';
     toast(WO_ERR[(e.payload || {}).error] || 'Не отправилось, попробуйте ещё раз', 'err');
+  }
+}
+
+// ── списание сканом ─────────────────────────────────────────────────────────
+// Крышка в руке отвечает на всё, что спрашивала форма: что за позиция, на
+// какой точке и что это одна бутылка. Каждая уходит старшему отдельным
+// вопросом с тем же снимком; до его решения бутылка остаётся в остатке.
+var WOS = {rows: [], total: 0, busy: false};
+
+async function woScanStart(){
+  if(!WO) return;
+  WOS = {rows: [], total: 0, busy: false};
+  document.getElementById('woScanSheet').classList.add('show');
+  _woSay('Наведите на код крышки', '');
+  woFeedPaint();
+  try{
+    await SCAN.start(document.getElementById('woV'), woScanCode, null,
+                     () => _woSay('эта уже отсканирована', 'err'), null);
+  }catch(e){
+    toast('Нет доступа к камере', 'err');
+    woScanDone();
+  }
+}
+
+function _woSay(текст, вид){
+  const f = document.getElementById('woF'), b = document.getElementById('woSay');
+  if(b) b.textContent = текст;
+  if(f) f.className = 'cam-frame' + (вид ? ' ' + вид : '');
+}
+
+async function woScanCode(code){
+  if(WOS.busy || !WO) return;
+  WOS.busy = true;
+  const row = {code, name: '', state: 'sending', say: 'отправляю…'};
+  WOS.rows.unshift(row); woFeedPaint();
+  try{
+    const r = await drvApi.drvFetch('/api/driver/writeoff/scan', {method: 'POST', body: {
+      code, kind: WO.kind, note: WO.note || '', photo: WO.photo, thumb: WO.thumb || ''}});
+    row.name = r.name || r.label || code;
+    if(r.ok){
+      row.state = 'ok'; row.say = 'ждёт решения старшего';
+      WOS.total++;
+      WO_LOG.unshift({name: row.name, qty: 1, kind: WO.kind, state: 'pending',
+                      at: new Date().toISOString()});
+      _woSay(row.name, 'ok');
+      try{ tg.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    }else{
+      row.state = 'dup'; row.say = r.say || 'не списана';
+      _woSay(row.say, 'err');
+      try{ tg.HapticFeedback.notificationOccurred('error'); }catch(e){}
+    }
+  }catch(e){
+    row.state = 'fail';
+    row.say = WO_ERR[(e.payload || {}).error] || 'не отправилось, поднесите ещё раз';
+    _woSay(row.say, 'err');
+    // Не дошло — код забываем у сканера, иначе бутылку нечем пересканировать.
+    SCAN.seen.delete(code); SCAN.seenAt.delete(code);
+  }finally{
+    woFeedPaint();
+    // Одна и та же крышка читается каждый кадр: без паузы ответ мигал бы
+    // двенадцать раз в секунду.
+    setTimeout(() => { WOS.busy = false; }, 700);
+  }
+}
+
+function woFeedPaint(){
+  const box = document.getElementById('woFeed'); if(!box) return;
+  const s = document.getElementById('woScanS');
+  if(s) s.textContent = WOS.total
+    ? `${WOS.total} ${plural(WOS.total, 'бутылка', 'бутылки', 'бутылок')} — ждут решения`
+    : 'одна крышка — одна бутылка';
+  box.innerHTML = WOS.rows.slice(0, 40).map(r => {
+    const cls = r.state === 'ok' ? 'wait' : r.state === 'sending' ? '' : 'no';
+    return `<div class="wo-done ${cls}">
+      ${svg(ICO.trash, 17)}
+      <span class="wo-done-b">
+        <span class="wo-done-t">${esc(r.name || r.code)}</span>
+        <span class="wo-done-v ${cls || 'wait'}">${esc(r.say)}</span>
+      </span>
+    </div>`;
+  }).join('');
+}
+
+// Выход из камеры — конец прохода. Списанное уже у старшего; окно списания
+// закрывается, а в карточке появляются строки «ждёт решения».
+function woScanDone(){
+  SCAN.stop();
+  document.getElementById('woScanSheet').classList.remove('show');
+  if(WOS.total){
+    toast(`Списали сканом: ${WOS.total} ${plural(WOS.total, 'бутылку', 'бутылки', 'бутылок')}`);
+    woClose();
+    render();
   }
 }
 

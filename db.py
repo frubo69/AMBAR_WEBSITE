@@ -2476,7 +2476,7 @@ async def writeoff_decide(wid: str, ok: bool, by: int, by_name: str = "",
     db = _db_or_none()
     if db is None or not wid: return None
     from pymongo import ReturnDocument
-    return await db.writeoffs.find_one_and_update(
+    doc = await db.writeoffs.find_one_and_update(
         {"_id": wid, "state": "pending"},
         {"$set": {"state": "ok" if ok else "no",
                   "decided_at": datetime.now(timezone.utc),
@@ -2484,6 +2484,26 @@ async def writeoff_decide(wid: str, ok: bool, by: int, by_name: str = "",
                   "decided_by_name": str(by_name or "")[:60],
                   "decided_note": str(note or "")[:200]}},
         projection={"img": 0}, return_document=ReturnDocument.AFTER)
+    # Списание сканом от водителя: бутылка известна по коду, но до решения она
+    # остаётся в остатке — реестр не трогаем при скане. Согласовали — теперь
+    # она списана и в реестре, одним движением здесь, потому что решение
+    # принимают из двух мест (панель и кнопка в боте) и оба зовут сюда.
+    # Отклонили — бутылка так и стоит в остатке и вылезет недостачей.
+    if doc and ok and doc.get("code") and not doc.get("own"):
+        try:
+            await qr_write_off(str(doc["code"]), wid)
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[writeoff] {wid}: бутылка {doc.get('code')} не помечена: {e}")
+    return doc
+
+
+async def writeoff_pending_by_code(code: str) -> dict | None:
+    """Ждёт ли уже решения списание этой самой бутылки. Пока оно висит,
+    бутылка в реестре активна — и вторую запись на неё делать нельзя."""
+    db = _db_or_none()
+    if db is None or not code: return None
+    return await db.writeoffs.find_one({"code": code, "state": "pending"},
+                                       {"_id": 1, "by": 1, "at": 1})
 
 
 async def writeoff_compensate(wid: str, who: str, amount: int, note: str,

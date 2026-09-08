@@ -553,8 +553,13 @@ async def handle_writeoff_add(request):
         photo = b""
     # Проверяем не длину строки, а начало файла: пустая или битая картинка
     # ничего не доказывает, а выглядит в истории точно так же.
+    # Та же логика, что у старшего: снимок нужен там, где он что-то
+    # доказывает. Потеря — это отсутствие предмета, снимать нечего; она всё
+    # равно уйдёт на согласование, и решать будут по слову и остатку.
     if len(photo) < 2000 or photo[:2] not in (b"\xff\xd8", b"\x89P"):
-        return web.json_response({"error": "no_photo"}, status=400, headers=CORS_HEADERS)
+        if kind != "потеря" or raw:
+            return web.json_response({"error": "no_photo"}, status=400, headers=CORS_HEADERS)
+        photo = b""
 
     # Превью лежит в самой записи: иначе список списаний открывается пустыми
     # квадратами, а ради квадратов раздел никто открывать не станет.
@@ -568,7 +573,9 @@ async def handle_writeoff_add(request):
         "name": cat[pid].get("name", ""), "qty": qty, "kind": kind,
         "note": (body.get("note") or "").strip()[:200],
         "district": me.get("district") or "", "district_code": me.get("district_code") or "",
-        "by": me["name"], "by_id": int(me.get("id") or 0),
+        # telegram_id, не id: id водителя — это его ключ-слово («hudoba»),
+        # и int() на нём ронял запрос целиком — «Не отправилось».
+        "by": me["name"], "by_id": int(me.get("telegram_id") or 0),
         "supply_id": (body.get("supply_id") or "").strip()[:40],
     }, photo)
     try:
@@ -582,6 +589,87 @@ async def handle_writeoff_add(request):
                          (body.get("note") or "").strip()[:200], photo)
     return web.json_response({"ok": True, "id": wid, "state": "pending"},
                              headers=CORS_HEADERS)
+
+
+@require_driver
+async def handle_writeoff_scan(request):
+    """Списать бутылку по коду с крышки — как у старшего, но в ожидании
+    решения. body: {code, kind, note?, photo, thumb?}
+
+    Код знает позицию, район и что это ровно одна бутылка; водителю остаётся
+    сказать, что случилось, и показать. В реестре бутылка при скане НЕ
+    помечается: до согласования списание — заявление, а не факт, и остаток
+    трогать нельзя. Помечает её решение (db.writeoff_decide). Утеря сюда не
+    ходит: потерянную бутылку к камере не поднесёшь."""
+    me = request["driver"]
+    try:
+        body = await request.json()
+    except Exception:
+        body = {}
+    code = str(body.get("code") or "").strip()
+    kind = str(body.get("kind") or "").strip()
+    if not code:
+        return web.json_response({"error": "no_code"}, status=400, headers=CORS_HEADERS)
+    if kind not in db.WRITEOFF_KINDS or kind == "потеря":
+        return web.json_response({"error": "bad_kind"}, status=400, headers=CORS_HEADERS)
+    from config_offices import OFFICE_IDS, OFFICE_CODES
+    from stock_routes import WO_SAY, _wo_say
+    doc = await db.qr_get(code)
+    if not doc:
+        return _wo_say("unknown", code=code)
+    name = doc.get("product_name") or ""
+    st = (doc.get("status") or "active").strip()
+    if st == "written":
+        return _wo_say("already", code=code, name=name)
+    if st != "active":
+        return _wo_say(st if st in WO_SAY else "gone", code=code, name=name)
+    if await db.writeoff_pending_by_code(code):
+        return _wo_say("already", code=code, name=name)
+    from operator_routes import _load_catalog
+    cat = {p.get("id"): p for p in _load_catalog()}
+    pid = str(doc.get("product_id") or "")
+    p = cat.get(pid)
+    if not p:
+        return _wo_say("no_item", code=code, name=name)
+    district = (doc.get("district") or "").strip()
+    if district not in OFFICE_IDS:
+        return _wo_say("nohome", code=code, name=p.get("name", ""))
+
+    raw = (body.get("photo") or "")
+    if "," in raw[:64]:
+        raw = raw.split(",", 1)[1]
+    if len(raw) > WO_MAX_PHOTO:
+        return web.json_response({"error": "photo_big"}, status=400, headers=CORS_HEADERS)
+    try:
+        import base64
+        photo = base64.b64decode(raw, validate=True) if raw else b""
+    except Exception:
+        photo = b""
+    if len(photo) < 2000 or photo[:2] not in (b"\xff\xd8", b"\x89P"):
+        return web.json_response({"error": "no_photo"}, status=400, headers=CORS_HEADERS)
+    thumb = (body.get("thumb") or "")
+    if not thumb.startswith("data:image/") or len(thumb) > WO_MAX_THUMB:
+        thumb = ""
+    note = (body.get("note") or "").strip()[:200]
+    now = datetime.now(timezone.utc)
+    wid = await db.writeoff_add({
+        "at": now, "day": _biz_day(), "item": pid, "thumb": thumb,
+        "name": p.get("name", ""), "qty": 1, "kind": kind, "note": note,
+        "district": district, "district_code": OFFICE_CODES.get(district, ""),
+        "by": me["name"], "by_id": int(me.get("telegram_id") or 0),
+        "code": code, "label": doc.get("label") or "",
+    }, photo)
+    try:
+        import stock_routes
+        stock_routes.base_drop()
+    except Exception as e:
+        log.warning(f"[writeoff] кэш заявки не сброшен: {e}")
+    log.info(f"[writeoff] {me['name']} сканом: {kind} · {p.get('name','')} · "
+             f"{OFFICE_CODES.get(district, district)} · ждёт согласования")
+    await _writeoff_tell(wid, me, p, 1, kind, note, photo)
+    return _wo_say("ok", code=code, id=wid, name=p.get("name", ""),
+                   label=doc.get("label") or "", district=district,
+                   district_code=OFFICE_CODES.get(district, ""), state="pending")
 
 
 async def _writeoff_tell(wid: str, me: dict, p: dict, qty: int, kind: str,
@@ -1793,6 +1881,7 @@ def setup(app):
         ("/api/driver/bottle",                  handle_bottle_look, "GET"),
         ("/api/driver/supply",                  handle_supply_list, "GET"),
         ("/api/driver/writeoff",                handle_writeoff_add, "POST"),
+        ("/api/driver/writeoff/scan",           handle_writeoff_scan, "POST"),
         ("/api/driver/writeoffs",               handle_writeoffs,   "GET"),
         ("/api/driver/shift",                   handle_shift,       "GET"),
         ("/api/driver/shift/open",              handle_shift_open,  "POST"),

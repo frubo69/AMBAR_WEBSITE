@@ -780,6 +780,26 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
    нижних; общий шов «слева у каждой следующей» ставил черту и первой плитке
    второго ряда. */
 .stk-tiles{margin-top:2px;flex:0 0 auto}
+/* Две колонки склада: главная плитка сверху, её история — половинкой снизу. */
+.stk-tiles2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:2px}
+.stk-col{display:flex;flex-direction:column;gap:8px;min-width:0}
+.stk-col .acc-cell{border-radius:16px;background:var(--card);border:1px solid var(--border2);
+  box-shadow:none;min-height:118px}
+.stk-sub{display:flex;align-items:center;gap:8px;padding:10px 12px;border-radius:14px;
+  cursor:pointer;text-align:left;font-family:inherit;color:var(--sub);
+  background:var(--card);border:1px solid var(--border2);min-width:0}
+.stk-sub:active{transform:scale(.98)}
+.stk-sub-i{width:26px;height:26px;flex:0 0 auto;border-radius:8px;display:flex;
+  align-items:center;justify-content:center;color:var(--gold2);background:var(--gold-soft);
+  border:1px solid rgba(201,169,110,.22)}
+.stk-sub-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.stk-sub-t{font-size:10px;font-weight:700;letter-spacing:.7px;text-transform:uppercase;
+  color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.stk-sub-n{display:flex;align-items:baseline;gap:4px;line-height:1;
+  font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--gold2);
+  font-variant-numeric:tabular-nums}
+.stk-sub-n i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:8.5px;font-weight:600;
+  letter-spacing:.3px;text-transform:uppercase;color:var(--muted)}
 .stk-tiles .acc-cell:nth-child(3){box-shadow:inset 0 1px 0 var(--border2)}
 .stk-tiles .acc-cell:nth-child(4){box-shadow:inset 1px 1px 0 var(--border2)}
 /* Выбор офиса поверх камеры перемещения: лист снизу, камера за ним темнеет. */
@@ -4760,7 +4780,9 @@ button.exp-wait:active{transform:scale(.99)}
    закупкой, и она переехала в подпись своей зоны. */
 .stkv{margin:2px 0 12px;border-radius:20px;background:var(--card);
   border:1px solid var(--border2);overflow:hidden}
-.stkv-g{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:13px}
+.stkv-cap{padding:13px 16px 0;font-family:'Space Grotesk',sans-serif;font-size:12.5px;
+  font-weight:700;letter-spacing:.8px;text-transform:uppercase;color:var(--text)}
+.stkv-g{display:grid;grid-template-columns:repeat(3,1fr);gap:7px;padding:11px 13px 13px}
 .stkv-c{position:relative;min-width:0;padding:11px 10px 13px;border-radius:14px;
   background:var(--card2);border:1px solid var(--border2)}
 /* Доля полок с известной закупкой — в угол зоны, а не в подпись: в строке она
@@ -12346,17 +12368,31 @@ async function stkPicker(){
   const I_HAUD = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
   const I_HMOV = '<circle cx="12" cy="12" r="9"/><path d="M8 12h8M13 9l3 3-3 3"/>';
   const nAud = (STK.audits || []).length, nMov = (STK.moves30 || []).length;
+  // Две колонки: слева ревизия, справа перемещение, у каждой под низом
+  // своя история — плиткой вдвое ниже, как дополнение к главной, а не
+  // равная ей.
+  const sub = (go, ico, t, v, u) => `<button class="stk-sub" onclick="${go}">
+      <span class="stk-sub-i"><svg viewBox="0 0 24 24" width="15" height="15" fill="none"
+        stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ico}</svg></span>
+      <span class="stk-sub-b">
+        <span class="stk-sub-t">${t}</span>
+        <span class="stk-sub-n">${v}<i>${escS(u)}</i></span>
+      </span>
+    </button>`;
   document.getElementById('stkMid').innerHTML =
     stkValueCard(reg) +
-    `<div class="acc-group stk-tiles">
-      ${tile('stkAuditPick()', I_AUD, 'Ревизия', fmt(st.done || 0), `из ${st.total || 0}`,
-             'район / камера / список')}
-      ${tile('stkMoveStart()', I_MOV, 'Перемещение', fmt(сегодня), 'сегодня',
-             'скан / куда везём')}
-      ${tile('stkAudits()', I_HAUD, 'История ревизий', fmt(nAud),
-             pluralize(nAud, 'ревизия', 'ревизии', 'ревизий'), 'по районам / расхождения')}
-      ${tile('stkMovesHist()', I_HMOV, 'История перемещений', fmt(nMov), 'за 30 дней',
-             'по дням / откуда и куда')}
+    `<div class="stk-tiles2">
+      <div class="stk-col">
+        ${tile('stkAuditPick()', I_AUD, 'Ревизия', fmt(st.done || 0), `из ${st.total || 0}`,
+               'район / камера / список')}
+        ${sub('stkAudits()', I_HAUD, 'История', fmt(nAud),
+              pluralize(nAud, 'ревизия', 'ревизии', 'ревизий'))}
+      </div>
+      <div class="stk-col">
+        ${tile('stkMoveStart()', I_MOV, 'Перемещение', fmt(сегодня), 'сегодня',
+               'скан / куда везём')}
+        ${sub('stkMovesHist()', I_HMOV, 'История', fmt(nMov), 'за 30 дней')}
+      </div>
     </div>`;
 }
 
@@ -12468,6 +12504,7 @@ function stkValueCard(reg){
   const без = (reg && reg.unscanned_total) || 0;
   const cover = v ? (v.cost_cover || 0) : 0;
   return `<div class="stkv">
+    <div class="stkv-cap">Всего на всех складах</div>
     <div class="stkv-g">
       <div class="stkv-c">
         <div class="stkv-l">Количество<small>шт</small></div>

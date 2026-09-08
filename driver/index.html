@@ -2057,6 +2057,16 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
   display:flex;align-items:center;justify-content:center;color:var(--gold2);
   background:rgba(0,0,0,.55);border:1px solid rgba(201,169,110,.45);
   backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px)}
+/* Текстовая плитка — бутылка охране: название и цена вместо снимка. */
+.exp-tiles .exp-tile.txt{background:var(--card2);aspect-ratio:auto;height:auto;min-height:0;
+  padding:14px 14px 14px 52px;align-items:flex-start;justify-content:center;gap:0}
+.exp-tile.txt .exp-pin{top:50%;transform:translateY(-50%);left:12px}
+.exp-tile.txt .exp-tile-b{display:block;text-align:left;color:var(--text)}
+.exp-tile.txt .exp-tile-b b{display:block;font-size:14.5px;font-weight:700;line-height:1.2}
+.exp-tile.txt .exp-tile-b i{display:block;font-style:normal;font-family:'Space Grotesk',sans-serif;
+  font-size:13px;font-weight:700;color:var(--gold2);margin-top:3px}
+.exp-tile.txt .exp-tile-c{position:absolute;right:14px;top:50%;transform:translateY(-50%);
+  left:auto;bottom:auto;padding:0;background:none;text-shadow:none;color:var(--muted);text-align:right}
 .exp-tile.bad{border:1.5px solid var(--dn)}
 .exp-tile.bad .exp-pin{color:#fff;background:var(--dn);border-color:transparent}
 .exp-tile.bad .exp-tile-c{color:#ff9a9a}
@@ -4828,11 +4838,12 @@ function otherBox(x){
 // снимки. Пока водитель заполняет, старая запись для карточки как будто
 // исчезла (EXP_REDO); отправка обновит ту же запись на сервере.
 let EXP_REDO = new Set();
-const _expSent = kind => EXP_REDO.has(kind) ? null
+const _expSent = kind => (EXP_REDO.has(kind) || (kind !== 'fuel' && kind !== 'wash')) ? null
   : ((EXP.extras || []).find(x => x.kind === kind) || null);
 // Та же запись, но глазами снимков: при заполнении заново остаются только те
 // снимки, которые старший принял отдельно, — переснимают лишь отклонённое.
 function _expKept(kind){
+  if(kind !== 'fuel' && kind !== 'wash') return null;
   const s = (EXP.extras || []).find(x => x.kind === kind) || null;
   if(!s || !EXP_REDO.has(kind)) return s;
   // То же правило, что на сервере: отклонён один снимок — второй годен, пока
@@ -5312,18 +5323,22 @@ function expKindCards(){
     // Цена стоит там же, где у соседей сумма, а бутылка — отдельной полосой,
     // как чек: в одно поле имя, цена и действие не влезают, и первым обрезается
     // имя — единственное, ради чего строку читают.
+    // Сумма у охраны — цена бутылки, её называет код, не человек: поле не
+    // редактируется и пусто, пока бутылку не отсканировали.
     const поле = k.id === 'guard'
       ? `<div class="exp-field sent"><span class="exp-none">${
-          GUARD.code ? (GUARD.cost ? fmt(GUARD.cost) + ' AED' : 'цена не заведена')
-                     : 'по коду бутылки'}</span></div>`
+          GUARD.code ? (GUARD.cost ? fmt(GUARD.cost) + ' AED' : 'цена не заведена') : '—'}</span></div>`
       : `<div class="exp-field">
           <input class="amt" id="k_${k.id}" type="text" inputmode="numeric" placeholder="AED"
             autocomplete="off" oninput="expKindTyped('${k.id}')">
         </div>`;
+    // Плитка-вложение там, где оно есть: чек у парковки, бутылка у охраны.
+    const плитка = k.id === 'guard' ? guardTile() : expTiles(k.id, null);
     return `<div class="card exp-card${k.plus ? ' plus' : ''}">
       <div class="exp-hd">${svg(ico, 17)}<span class="exp-t">${esc(k.t)}${
           k.plus ? ' <b class="exp-pl">+</b>' : ''}</span>
         ${k.plus ? '<span class="exp-sum plus">приходом</span>' : ''}</div>
+      ${плитка}
       <div class="exp-row">
         ${поле}
         <button class="btn btn-gh exp-go" id="kb_${k.id}" disabled
@@ -5331,26 +5346,31 @@ function expKindCards(){
       </div>
       <div class="exp-row exp-row-c">
         <div class="exp-field cmt"><input id="kc_${k.id}" type="text"
-          placeholder="${esc(EXP_HINT[k.id] || 'комментарий')}" autocomplete="off"
+          placeholder="${esc(EXP_HINT[k.id] || EXP_CMT[k.id] || 'за что')}" autocomplete="off"
           oninput="expKindTyped('${k.id}')"></div>
       </div>
-      ${k.id === 'guard' ? guardStrip() : expRcp(k.id, null)}
     </div>`;
   }).join('');
 }
 
-// Бутылка — той же полосой, что снимок чека: и там и тут это доказательство,
-// которое прикладывают к записи, а не поле для ввода.
-function guardStrip(){
-  return GUARD.code
-    ? `<button class="exp-rcp set" onclick="guardClear()">
-         ${svg(ICO.box, 22)}
-         <span class="exp-rcp-t">${esc(GUARD.name)}
-           <i>нажмите, чтобы сменить</i></span></button>`
-    : `<button class="exp-rcp" onclick="guardScan()">
-         ${svg(ICO.cam, 22)}
-         <span class="exp-rcp-t">Сканировать бутылку
-           <i>код с крышки скажет, какая и почём</i></span></button>`;
+// Подпись поля «за что» — по смыслу вида: у парковки спрашивают где, у охраны
+// кому отдали. Долги — в EXP_HINT, там ответ обязателен.
+const EXP_CMT = {parking: 'где парковались', guard: 'кому отдали', kfc: 'кому', other: 'за что'};
+
+// Бутылка охране — плиткой, как снимок: это вложение к записи. Пустая —
+// пунктир и значок; отсканированная — название и цена, тап меняет.
+function guardTile(){
+  return `<div class="exp-tiles">${GUARD.code
+    ? `<button class="exp-tile set txt" onclick="guardClear()" aria-label="Бутылка">
+         <span class="exp-pin">${svg(ICO.box, 15)}</span>
+         <span class="exp-tile-b"><b>${esc(GUARD.name || 'бутылка')}</b><i>${
+           GUARD.cost ? fmt(GUARD.cost) + ' AED' : 'цена не заведена'}</i></span>
+         <span class="exp-tile-c">Бутылка</span>
+       </button>`
+    : `<button class="exp-tile" onclick="guardScan()" aria-label="Бутылка">
+         <span class="exp-tile-ico">${svg(ICO.box, 30)}</span>
+         <span class="exp-tile-c">Бутылка</span>
+       </button>`}</div>`;
 }
 
 // Бутылка, отданная охране. Со склада она уйдёт не сейчас, а когда старший

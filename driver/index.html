@@ -2271,12 +2271,9 @@ body.callbar-on #body{padding-top:calc(76px + var(--safe-top) + 36px)}
 .exp-row[hidden]{display:none}   /* display:flex у .exp-row перебивает hidden */
 /* Итог не уезжает вверх вместе со списком: сколько сегодня набежало —
    единственное число, ради которого водитель сюда заходит. */
-.exp-sp{height:96px}
-.exp-bar{position:fixed;left:0;right:0;bottom:var(--tabbar);z-index:40;padding:0 13px 12px;
-  background:linear-gradient(180deg,rgba(4,4,10,0),var(--bg) 42%)}
-.exp-bar-in{display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:17px;
-  background:var(--bg3);border:1px solid rgba(201,169,110,.28);
-  box-shadow:0 -4px 26px rgba(0,0,0,.6)}
+/* Итог смены — карточкой наверху страницы, той же, что раньше висела внизу. */
+.exp-top{display:flex;align-items:center;gap:12px;padding:14px 18px;border-radius:17px;
+  margin-bottom:4px;background:var(--bg3);border:1px solid rgba(201,169,110,.28)}
 .exp-bar-l{font-size:10px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
   color:var(--muted);line-height:1.3}
 .exp-bar-l i{display:block;font-style:normal;font-size:10px;letter-spacing:.2px;
@@ -5681,7 +5678,14 @@ function renderExpenses(){
   const total = live.reduce((a, x) => a + (x.amount || 0), 0);
   const pend = live.filter(x => EXP_ST(x) === 'pending').reduce((a, x) => a + (x.amount || 0), 0);
   const other = (EXP.extras || []).filter(x => x.kind !== 'fuel' && x.kind !== 'wash');
+  // Итог смены — наверху, первой карточкой: за ним сюда и заходят. Внизу
+  // закреплено единственное действие, которое нужно в любой момент, —
+  // списать бой или брак.
   box.innerHTML = `
+    <div class="exp-top">
+      <div class="exp-bar-l">Всего за смену${pend ? `<i>ждут решения ${fmt(pend)} AED</i>` : ''}</div>
+      <div class="exp-bar-v ${total ? '' : 'zero'}">${total ? '−' + fmt(total) : '0'}<i>AED</i></div>
+    </div>
     <div class="sect"><span class="sect-t">Каждый день</span>
       ${(EXP.pending_answer || []).length
         ? `<span class="sect-v ask">не сдано: ${(EXP.pending_answer || [])
@@ -5702,14 +5706,10 @@ function renderExpenses(){
       : `<button class="exp-add" onclick="EXP_MORE=true;render()">
           ${svg(ICO.plus2, 15)} Ещё расход</button>`}
     <!-- Бой и брак — тоже потеря за смену, и искать её на «Закупке» водитель
-         не должен: списание открывается отсюда тем же листом. -->
-    <button class="exp-add" onclick="woOpen()">${svg(ICO.trash, 15)} Списать бой или брак</button>
-
-    <div class="exp-sp"></div>
-    <div class="exp-bar"><div class="exp-bar-in">
-      <div class="exp-bar-l">Всего за смену${pend ? `<i>ждут решения ${fmt(pend)} AED</i>` : ''}</div>
-      <div class="exp-bar-v ${total ? '' : 'zero'}">${total ? '−' + fmt(total) : '0'}<i>AED</i></div>
-    </div></div>`;
+         не должен: кнопка закреплена внизу, тем же листом, что на «Закупке». -->
+    <div class="wo-sp"></div>
+    <div class="wo-fix"><button class="wo-btn" onclick="woOpen()">
+      ${svg(ICO.trash, 19)}<span>Списать бой или брак</span></button></div>`;
 }
 
 

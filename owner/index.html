@@ -4223,7 +4223,7 @@ button.path:active{transform:scale(.995)}
    полоску и смотрят. День со стрелками уезжает вправо: он теперь подпись к
    числу, а не наоборот. Всё это одной долей --fold, поэтому по дороге между
    развёрнутым и свёрнутым ничего не прыгает. */
-.exp-day-v{order:-1;margin-right:auto;display:flex;align-items:baseline;gap:4px;
+.exp-day-v{display:flex;align-items:baseline;gap:4px;
   overflow:hidden;white-space:nowrap;font-family:'Space Grotesk',sans-serif;
   font-weight:700;color:var(--gold2);letter-spacing:-.5px;
   font-size:calc(15px + var(--fold,0) * 13px);
@@ -4231,11 +4231,10 @@ button.path:active{transform:scale(.995)}
   transform:translateY(calc((1 - var(--fold,0)) * 6px))}
 .exp-day-v i{font-style:normal;font-weight:600;color:var(--muted);letter-spacing:.4px;
   font-size:calc(9px + var(--fold,0) * 2px)}
-/* Пока развёрнуто — день посередине; сворачиваемся — перестаёт тянуться и
-   встаёт справа, рядом со стрелками. */
-.exp-day .ds-txt{flex-grow:calc(1 - var(--fold,0));flex-shrink:1;flex-basis:auto;
-  padding:0 1px}
-.exp-day .ds-arw{width:calc(30px - var(--fold,0) * 8px)}
+.exp-day-nav{margin-left:auto;display:flex;align-items:center;gap:0;min-width:0;
+  flex-grow:calc(1 - var(--fold,0));flex-shrink:1;flex-basis:auto}
+.exp-day .ds-txt{flex-grow:calc(1 - var(--fold,0));flex-shrink:1;flex-basis:auto;padding:0 1px}
+.exp-day .ds-arw{width:calc(32px - var(--fold,0) * 10px)}
 .exp-day .cal-btn{margin-left:6px}
 .exp-day .ds-txt b{font-size:calc(14.5px - var(--fold,0) * 1.5px)}
 .exp-day .ds-txt i{font-size:calc(10.5px - var(--fold,0) * .5px)}
@@ -4249,9 +4248,10 @@ button.path:active{transform:scale(.995)}
    не «дату», листают расходы за день, и ехать должно то, на что смотрят.
    Части слайдера разобраны по местам: стрелки по краям строки, день в центре,
    календарь справа за волоском. */
-/* Стрелки прижаты к слову: между ними было по тридцать точек пустой кнопки, и
-   «Вчера» висело посреди полоски отдельно от них. Сама тройка уезжает вправо,
-   к календарю, — слева её место занял итог. */
+/* Развёрнутая полоска — как была: день посередине, стрелки по краям. Всё
+   меняется только при сворачивании: группа перестаёт тянуться, стрелки
+   съезжаются к слову, и вся тройка уходит вправо к календарю — слева
+   освобождается место, туда и приходит итог. */
 .exp-day{display:flex;align-items:center;gap:0;
   margin:-4px -6px calc(10px * (1 - var(--fold,0)));
   padding-bottom:calc(9px * (1 - var(--fold,0)));
@@ -14973,12 +14973,14 @@ function expDayRow(итог){
       stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
       ><path d="${p}"/></svg>`;
   return `<div class="exp-day${DAY_OFFSET ? ' back' : ''}">
-    <button class="ds-arw" onclick="dayBarArrow(this,1)" aria-label="День назад"
-      >${стрелка('M15 5l-7 7 7 7')}</button>
-    <span class="ds-txt" onclick="dayBarHome(this)"><b>${имя}</b><i>${дата}</i></span>
     ${итог == null ? '' : `<span class="exp-day-v">${fmt(итог)}<i>AED</i></span>`}
-    <button class="ds-arw" onclick="dayBarArrow(this,-1)" aria-label="День вперёд"
-      ${DAY_OFFSET ? '' : 'disabled'}>${стрелка('M9 5l7 7-7 7')}</button>
+    <span class="exp-day-nav">
+      <button class="ds-arw" onclick="dayBarArrow(this,1)" aria-label="День назад"
+        >${стрелка('M15 5l-7 7 7 7')}</button>
+      <span class="ds-txt" onclick="dayBarHome(this)"><b>${имя}</b><i>${дата}</i></span>
+      <button class="ds-arw" onclick="dayBarArrow(this,-1)" aria-label="День вперёд"
+        ${DAY_OFFSET ? '' : 'disabled'}>${стрелка('M9 5l7 7-7 7')}</button>
+    </span>
     ${DAY_OFFSET ? `<button class="dn-home" onclick="dayBarHome(this)"
       aria-label="Вернуться к сегодня" title="Вернуться к сегодня"><svg viewBox="0 0 24 24"
       fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"

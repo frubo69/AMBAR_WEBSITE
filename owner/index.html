@@ -4204,21 +4204,41 @@ button.path:active{transform:scale(.995)}
 /* Карточки расходов начинаются чуть ниже закреплённой шапки — так видно, что
    они уезжают под неё, а не приклеены к ней. */
 #expList{margin-top:12px}
-/* Листаем вниз — числа уезжают вверх, остаётся полоска дня. Внизу списка они
-   не нужны: там смотрят, кто сколько взял, а итог за день уже прочитан. Назад
-   к началу — возвращаются сами. */
-.exp-fold{overflow:hidden;max-height:320px;opacity:1;
-  transition:max-height .26s var(--e1),opacity .18s var(--e1)}
-.exp-sum.min .exp-fold{max-height:0;opacity:0}
-.exp-sum.min .exp-day{margin-bottom:0;padding-bottom:0;border-bottom-color:transparent}
-.exp-sum{transition:padding .26s var(--e1)}
-.exp-sum.min{padding-top:9px;padding-bottom:9px}
+/* Листаем вниз — числа уезжают вверх, в полоску дня, и там остаётся итог
+   мелким. Доводки до конца нет: --fold идёт ровно за пальцем, палец
+   остановился — остановилось и сворачивание. Поэтому здесь ни одного
+   перехода: движение и есть прокрутка.
+   Итог за день не пропадает, а переезжает: большой гаснет, мелкий в полоске
+   проявляется и раздвигает себе место. */
+.exp-fold{overflow:hidden;max-height:calc(var(--foldH,340px) * (1 - var(--fold,0)));
+  opacity:calc(1 - var(--fold,0) * 1.25)}
+/* Браузер держит содержимое «на якоре»: когда шапка над списком сжимается, он
+   сам подтягивает прокрутку, чтобы строки не прыгали. Здесь это замыкает
+   петлю — сжались, прокрутка уехала назад, развернулись, и так по кругу.
+   Якорь выключаем: за положением тут следим мы. */
+.stk-mid{overflow-anchor:none}
+.exp-day{transition:none}
+.exp-sum{--fold:0}
+.exp-day-v{display:flex;align-items:baseline;gap:3px;overflow:hidden;white-space:nowrap;
+  font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;color:var(--gold2);
+  opacity:calc(var(--fold,0) * 1.4 - .25);max-width:calc(var(--fold,0) * 92px);
+  transform:translateY(calc((1 - var(--fold,0)) * 6px))}
+.exp-day-v i{font-style:normal;font-size:9px;font-weight:600;color:var(--muted);
+  letter-spacing:.4px}
+/* Возврат к сегодня — та же кнопка, что на карточке выручки: круглая, золотом,
+   и появляется, только когда есть куда возвращаться. */
+.exp-day .dn-home{width:26px;height:26px;margin:0 0 0 4px;flex:0 0 auto}
+/* Вкладка брака: день нужен, сводка по водителям — нет. */
+.exp-sum.only-day .exp-fold,.exp-sum.only-day .exp-day-v{display:none}
+.exp-sum.only-day .exp-day{margin-bottom:0;padding-bottom:0;border-bottom:0}
 /* День живёт в самой плашке расходов, а не отдельной полосой над ней: листают
    не «дату», листают расходы за день, и ехать должно то, на что смотрят.
    Части слайдера разобраны по местам: стрелки по краям строки, день в центре,
    календарь справа за волоском. */
-.exp-day{display:flex;align-items:center;gap:2px;margin:-4px -6px 10px;
-  padding-bottom:9px;border-bottom:1px solid var(--border2)}
+.exp-day{display:flex;align-items:center;gap:2px;
+  margin:-4px -6px calc(10px * (1 - var(--fold,0)));
+  padding-bottom:calc(9px * (1 - var(--fold,0)));
+  border-bottom:1px solid rgba(255,255,255,calc(.06 * (1 - var(--fold,0))))}
 .exp-day .ds-txt{flex:1;min-width:0}
 .exp-day .ds-txt b{font-size:14.5px}
 .exp-day.back .ds-txt b{color:var(--gold2)}
@@ -14927,6 +14947,32 @@ function dayBarHtml(id){
 
 function accDayBar(id){ return dayBarHtml(id); }
 
+// Строка дня в плашке расходов: стрелки, день, итог (проявляется при
+// сворачивании), календарь и возврат к сегодня. Живёт отдельно от сводки
+// водителей, потому что нужна и на вкладке брака, где сводки нет.
+function expDayRow(итог){
+  const {имя, дата} = dayBarLabels(DAY_OFFSET);
+  const стрелка = p => `<svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+      stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
+      ><path d="${p}"/></svg>`;
+  return `<div class="exp-day${DAY_OFFSET ? ' back' : ''}">
+    <button class="ds-arw" onclick="dayBarArrow(this,1)" aria-label="День назад"
+      >${стрелка('M15 5l-7 7 7 7')}</button>
+    <span class="ds-txt" onclick="dayBarHome(this)"><b>${имя}</b><i>${дата}</i></span>
+    ${итог == null ? '' : `<span class="exp-day-v">${fmt(итог)}<i>AED</i></span>`}
+    <button class="ds-arw" onclick="dayBarArrow(this,-1)" aria-label="День вперёд"
+      ${DAY_OFFSET ? '' : 'disabled'}>${стрелка('M9 5l7 7-7 7')}</button>
+    ${DAY_OFFSET ? `<button class="dn-home" onclick="dayBarHome(this)"
+      aria-label="Вернуться к сегодня" title="Вернуться к сегодня"><svg viewBox="0 0 24 24"
+      fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"
+      stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v4h4"/></svg></button>` : ''}
+    <button class="cal-btn" onclick="openDate('expDay')" aria-label="Выбрать день"
+      ><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5"
+        width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></button>
+  </div>`;
+}
+
 // Шаг по дням у полосы раздела — тем же путём, что у карточки выручки:
 // сперва улетает карточка, данные догоняют. Некуда шагать — false, и жест сам
 // вернёт её на место.
@@ -14962,19 +15008,18 @@ function pinWatch(){
   const mid = document.getElementById('accMid');
   if(!mid || mid.dataset.pin) return;
   mid.dataset.pin = '1';
+  // Доля свёрнутости: 0 — числа целиком, 1 — осталась полоска дня. Считается
+  // прямо из прокрутки, поэтому останавливается там же, где палец. Порогов и
+  // доводки нет: экран не должен доезжать сам, если человек его придержал.
+  const ХОД = 64;                       // на скольких точках прокрутки сворачиваемся
   const глянуть = () => {
     const sum = document.getElementById('expSum');
     if(!sum) return;
-    const свёрнут = sum.classList.contains('min');
-    const надо = свёрнут ? mid.scrollTop >= 12 : mid.scrollTop > 40;
-    if(надо === свёрнут) return;
-    sum.classList.toggle('min', надо);
-    // Сворачивание укорачивает содержимое, и прокрутка может сама уехать
-    // вверх — нового события при этом не будет, и плашка залипла бы свёрнутой
-    // на самом верху списка. Поэтому дочитываем состояние следующим кадром.
-    requestAnimationFrame(глянуть);
+    const t = Math.max(0, Math.min(1, (mid.scrollTop - 6) / ХОД));
+    sum.style.setProperty('--fold', t.toFixed(3));
   };
   mid.addEventListener('scroll', глянуть, {passive:true});
+  глянуть();
 }
 
 function bindDayBars(){
@@ -16234,7 +16279,7 @@ async function accExpDay(){
   // жест и на ней же играет полёт, пересоздавать её на каждый день нельзя.
   // В теле — только список, он и перерисовывается.
   const sum = document.getElementById('expSum');
-  if(sum) sum.hidden = false;
+  if(sum){ sum.hidden = false; sum.classList.remove('only-day'); }
   pinWatch();
   if(!document.getElementById('expList'))
     body.innerHTML = '<div id="expList"></div>';
@@ -20762,24 +20807,16 @@ function renderExpenses(){
   const t = d.totals;
   const sum = document.getElementById('expSum');
   if(!sum) return;                    // экран раздела не открыт — рисовать негде
-  const {имя, дата} = dayBarLabels(DAY_OFFSET);
-  const стрелка = p => `<svg viewBox="0 0 24 24" width="17" height="17" fill="none"
-      stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
-      ><path d="${p}"/></svg>`;
-  requestAnimationFrame(bindDayBars);
-  if(sum) sum.innerHTML = `
-    <div class="exp-day${DAY_OFFSET ? ' back' : ''}">
-      <button class="ds-arw" onclick="dayBarArrow(this,1)" aria-label="День назад"
-        >${стрелка('M15 5l-7 7 7 7')}</button>
-      <span class="ds-txt" onclick="dayBarHome(this)"><b>${имя}</b><i>${дата}</i></span>
-      <button class="ds-arw" onclick="dayBarArrow(this,-1)" aria-label="День вперёд"
-        ${DAY_OFFSET ? '' : 'disabled'}>${стрелка('M9 5l7 7-7 7')}</button>
-      <button class="cal-btn" onclick="openDate('expDay')" aria-label="Выбрать день"
-        ><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-          stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5"
-          width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></button>
-    </div>
-    <div class="exp-fold">
+  // Высоту сворачиваемой части меряем после отрисовки: с запасом «на глаз»
+  // сжатие начиналось только под конец хода, а первую половину пальца ничего
+  // не происходило. Состав меняется от дня ко дню — удержания то есть, то нет.
+  requestAnimationFrame(() => {
+    bindDayBars();
+    const f = sum && sum.querySelector('.exp-fold');
+    if(f) sum.style.setProperty('--foldH', f.scrollHeight + 'px');
+  });
+  if(sum) sum.innerHTML = expDayRow(t.all) + `
+    <div class="exp-fold">    <div class="exp-fold">
     <div class="exp-tot">
       <span class="exp-tot-v">${fmt(t.all)}</span>
       <span class="exp-tot-u">AED<br>за день</span>
@@ -24993,11 +25030,9 @@ async function accWriteoffs(){
 function woHome(){
   const w = ACC_WO || {rows: [], pending: [], by_kind: [], by_driver: []};
   const pend = w.pending || [];
-  _setText('accSub', pend.length
-    ? `${pend.length} ${pluralize(pend.length,'ждёт','ждут','ждут')} решения`
-    : (w.rows.length
-        ? `${fmt(w.total_qty)} ${pluralize(w.total_qty,'бутылка','бутылки','бутылок')} за 30 дней`
-        : 'за 30 дней ничего не списывали'));
+  // Подписи в шапке нет: сколько ждёт решения, написано на самой вкладке
+  // счётчиком, а под заголовком раздела оно повторялось третьим шрифтом.
+  _setText('accSub', '');
   const mid = document.getElementById('accMid');
   if(!w.rows.length && !pend.length){
     mid.innerHTML = `<div class="scan-empty">Списаний нет.<br>
@@ -25042,8 +25077,15 @@ function woHome(){
 
 async function accWoAll(){
   const body = document.getElementById('expBody'); if(!body) return;
-  // Сводка по водителям к браку не относится — на этой вкладке её нет.
-  const sum = document.getElementById('expSum'); if(sum) sum.hidden = true;
+  // День остаётся и здесь: брак тоже смотрят за конкретную смену. А сводка по
+  // водителям к нему не относится — от плашки остаётся одна строка дня.
+  const sum = document.getElementById('expSum');
+  if(sum){
+    sum.hidden = false;
+    sum.classList.add('only-day');
+    if(!sum.querySelector('.exp-day')) sum.innerHTML = expDayRow(null);
+    pinWatch(); requestAnimationFrame(bindDayBars);
+  }
   body.innerHTML = '<div class="exp-empty">Загрузка…</div>';
   try{
     if(!ACC_WO) ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs',
@@ -25066,9 +25108,7 @@ function woKindBody(){
   const qty  = ok.reduce((a, r) => a + (r.qty || 0), 0);
   const aed  = ok.reduce((a, r) => a + (r.aed || 0), 0);
   const held = ok.reduce((a, r) => a + ((r.comp || {}).amount || 0), 0);
-  _setText('accSub', pend.length
-    ? `${pend.length} ${pluralize(pend.length,'ждёт','ждут','ждут')} решения`
-    : 'всё разобрано');
+  _setText('accSub', '');      // счётчик ждущих стоит на самой вкладке
   if(!pend.length && !rows.length){
     body.innerHTML = shEmpty('all');
     return;

@@ -843,6 +843,19 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .stk-byg .aud-t.on .aud-tl{color:var(--gold2)}
 .aud-tv.is-skel{min-width:44px;height:.9em;border-radius:7px}
 .stkbd-n.is-skel{min-width:28px;height:.9em;border-radius:6px}
+/* Плашка «Остатки» на «По районам» — та же механика, что у плашки расходов
+   (.exp-pin/.exp-sum/.exp-fold), в коже карточки склада: строка дня как шапка
+   карточки, под ней плитки; в полоске на месте названия — число. */
+.stk-bysum{background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
+  border:1px solid rgba(201,169,110,.28);border-radius:16px;padding:12px 16px 14px}
+.stk-bysum .exp-day{margin:-3px 0 calc(10px * (1 - var(--fold,0)))}
+.stk-bysum .exp-day-t{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
+  letter-spacing:.6px;color:var(--text);display:flex;align-items:baseline;gap:10px;min-width:0}
+.stk-bysum .exp-day-t i{font-family:'DM Sans',sans-serif;font-style:normal;font-size:11px;
+  font-weight:600;letter-spacing:.2px;text-transform:none;color:var(--muted);
+  overflow:hidden;text-overflow:ellipsis}
+.stk-bysum .exp-fold .aud-g{padding:2px 0 0}
+#stkByBody{padding-top:2px}
 /* ── История ревизий: строка одной ревизии ── */
 .hst-r{display:flex;align-items:center;gap:12px;width:100%;padding:11px 16px;border:0;
   border-top:1px solid rgba(255,255,255,.05);background:transparent;cursor:pointer;
@@ -2007,7 +2020,12 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   letter-spacing:-1.6px;line-height:1;font-variant-numeric:tabular-nums}
 /* «4/7» одним кеглем: дробь читается как счёт, а не как число с примечанием. */
 .ck-h-v u{text-decoration:none;font-size:36px;font-weight:700;color:var(--sub);
-  margin-left:4px;letter-spacing:-.4px}
+  letter-spacing:-.4px}
+/* Косая в дроби «3/8»: у Space Grotesk её штрих вылезает за свою ширину
+   вправо, и цифра после неё стояла вплотную, а перед ней был просвет. Поля
+   считаны по чернилам глифов: слева и справа от штриха — по одному зазору. */
+.sl{font-style:normal;text-decoration:none;letter-spacing:0;margin:0 .08em 0 .06em}
+.aud-chip .sl{margin:0 .03em 0 .02em}
 /* Имя карточки — над числом, а не рядом с ним: это заголовок ежедневника, а
    не подпись к цифре. */
 .ck-h-l{font-size:10.5px;font-weight:700;letter-spacing:1.4px;text-transform:uppercase;
@@ -13510,32 +13528,68 @@ function stkByMode(m){
 
 function stkByReload(){ STK.val = null; daySkel('stkMid'); stkByDistrict(true); }
 
-// ── По районам: полоса дня, плитки-переключатель, районы и таблица ──────
-// Плитки «Количество / Цена закупки / Цена продажи» — те же, что на складе, и
-// они же переключают, чем заполнена таблица: нажал «Цена закупки» — числа у
-// районов и в клетках стали деньгами. Пока район не выбран, на плитках весь
-// склад; выбрал район — его числа, а таблица оставляет один его столбец.
-// День листается полосой сверху, как на складе: остаток — величина на дату.
+// Левая половина строки дня плашки «Остатки»: развёрнутая показывает название
+// карточки и чьи это числа, свёрнутая — на том же месте число выбранной
+// величины с подписью, что это и чьё. Меняются местами долей --fold, как на
+// плашке расходов.
+function stkByDayL(src, sel){
+  const val = STK.by === 'qty' ? [fmt(src.bottles || 0), 'бут']
+    : [fmt(Math.round(STK.by === 'cost' ? (src.cost || 0) : (src.list || 0))), 'AED'];
+  const чьё = sel ? `${sel.code || ''} · ${sel.name || ''}` : 'все районы';
+  // В развёрнутой шапке рядом с названием только код выбранного района: и
+  // «все районы», и имя района упирались в пилюлю дня и резались
+  // многоточием. Целиком, чьи это числа, написано в полоске.
+  return `<span class="exp-day-t">Остатки${sel ? `<i>${escS(sel.code || '')}</i>` : ''}</span>
+    <span class="exp-day-v"><b>${val[0]}</b><i>${val[1]}</i>
+      <span class="exp-day-p">
+        <span><i>${escS(STK_BY[STK.by].t.toLowerCase())}</i></span>
+        <span><i>${escS(чьё)}</i></span>
+      </span></span>`;
+}
+function stkByDayRow(src, sel){
+  return `<div class="exp-day${DAY_OFFSET ? ' back' : ''}">
+    <span class="exp-day-l">${stkByDayL(src, sel)}</span>
+    ${_dayNav('stkByDay')}
+  </div>`;
+}
+// Три плитки — и они же переключатель, чем заполнена таблица.
+function stkByTiles(src){
+  const плитка = (k, val, u) => `<button class="aud-t tap${STK.by === k ? ' on' : ''}${
+      k === 'qty' ? '' : ' gold'}" onclick="stkByMode('${k}')" aria-pressed="${STK.by === k}">
+      <span class="aud-tl">${STK_BY[k].t}</span>
+      <b class="aud-tv">${val}</b><span class="aud-tu">${u}</span></button>`;
+  return `<div class="aud-g stk-byg">
+    ${плитка('qty', fmt(src.bottles || 0), 'бут')}
+    ${плитка('cost', fmt(Math.round(src.cost || 0)), 'AED')}
+    ${плитка('sell', fmt(Math.round(src.list || 0)), 'AED')}
+  </div>`;
+}
+
+// ── По районам: закреплённая плашка «Остатки», районы и таблица ─────────
+// Плашка — как плашка расходов: строка дня с пилюлей, под ней три плитки;
+// листаем список — плитки уезжают вверх за пальцем и остаётся полоска с
+// числом; смахнули плашку вбок — сменился день. Плитки же переключают, чем
+// заполнена таблица. Район не выбран — на плитках весь склад, выбран — его
+// числа, а таблица оставляет один его столбец.
 async function stkByDistrict(тихо){
   STK.view = 'bydist';
   STK.by = STK_BY[STK.by] ? STK.by : 'qty';
   _setRail('stkRail', '');
+  const mid = document.getElementById('stkMid');
   const day = accDay();
   if(!STK.val || STK.val.day !== day){
-    if(!тихо){
+    if(!тихо || !document.getElementById('stkBySum')){
       _stkHead('По районам', 'загрузка…', false);
-      document.getElementById('stkMid').innerHTML =
-        accDayBar('stkByDay') + '<div class="stk-empty">Загрузка…</div>';
+      mid.innerHTML = '<div class="stk-empty">Загрузка…</div>';
     }
     try{ STK.val = await ownerApi.ownerFetch('/api/owner/stock/value', {params:{day}}); }
     catch(e){ STK.val = null; }
-    if(STK.view !== 'bydist') return;
+    if(STK.view !== 'bydist' || accDay() !== day) return;   // ушли или перелистнули дальше
   }
   const v = STK.val;
   if(!v){
     _stkHead('По районам', 'нет данных', false);
-    document.getElementById('stkMid').innerHTML =
-      accDayBar('stkByDay') + '<div class="stk-empty">Стоимость не посчиталась</div>';
+    mid.innerHTML = '<div class="stk-empty">Стоимость не посчиталась</div>';
     return;
   }
   const режим = STK_BY[STK.by], ds = v.districts || [], t = v.totals || {};
@@ -13552,20 +13606,7 @@ async function stkByDistrict(тихо){
   const shown = sel ? [sel] : ds;
   const числоРайона = c => STK.by === 'qty' ? fmt(c.bottles || 0)
     : fmt(Math.round(STK.by === 'cost' ? (c.cost || 0) : (c.list || 0)));
-  const плитка = (k, val, u) => `<button class="aud-t tap${STK.by === k ? ' on' : ''}${
-      k === 'qty' ? '' : ' gold'}" onclick="stkByMode('${k}')" aria-pressed="${STK.by === k}">
-      <span class="aud-tl">${STK_BY[k].t}</span>
-      <b class="aud-tv">${val}</b><span class="aud-tu">${u}</span></button>`;
-  document.getElementById('stkMid').innerHTML = accDayBar('stkByDay') + `
-    <div class="sc">
-      <div class="sc-cap"><span>Остатки</span><i>${sel
-        ? escS((sel.code || '') + ' · ' + (sel.name || '')) : 'все районы'}</i></div>
-      <div class="aud-g stk-byg">
-        ${плитка('qty', fmt(src.bottles || 0), 'бут')}
-        ${плитка('cost', fmt(Math.round(src.cost || 0)), 'AED')}
-        ${плитка('sell', fmt(Math.round(src.list || 0)), 'AED')}
-      </div>
-    </div>
+  const body = `
     <div class="stkbd-strip">${ds.map(d => {
       const c = колонка(d);
       return `<button class="stkbd-d ${(STK.by === 'qty' ? c.bottles : (STK.by === 'cost'
@@ -13620,6 +13661,25 @@ async function stkByDistrict(тихо){
            под закупкой на складе и стоит доля покрытия.`
         : `Числа — сколько выручим по прайсу за то, что лежит в районе. Цена
            приложения ниже: её итог виден на карточке склада.`}</div>`;
+  // Плашка живёт одна: день, режим и район меняют только её содержимое. На
+  // узле висит жест смахивания и на нём же играет полёт карточки — подменять
+  // его значило бы обрывать и то и другое на середине.
+  const sum = document.getElementById('stkBySum');
+  if(sum){
+    // Узел остаётся, содержимое — заново: так же живёт плашка расходов, и
+    // кнопка возврата к сегодня появляется, как только день не сегодняшний.
+    sum.innerHTML = stkByDayRow(src, sel) + `<div class="exp-fold">${stkByTiles(src)}</div>`;
+    document.getElementById('stkByBody').innerHTML = body;
+  }else{
+    mid.innerHTML = `<div class="exp-pin" id="stkByPin">
+        <div class="exp-sum stk-bysum" id="stkBySum" data-day="общий">${stkByDayRow(src, sel)}
+          <div class="exp-fold">${stkByTiles(src)}</div>
+        </div>
+      </div>
+      <div id="stkByBody">${body}</div>`;
+    pinWatch('stkMid', 'stkBySum');
+  }
+  requestAnimationFrame(() => { bindDayBars(); pinMeasure('stkBySum', 'stkMid'); });
 }
 
 // Выбор района на складе: цифры внизу — только по нему. Второе нажатие или
@@ -14364,7 +14424,7 @@ function audChipSet(name, n, exp){
   chip.style.width = 'auto';
   _setText('audChipN', name);
   const c = document.getElementById('audChipC');
-  c.textContent = `${fmt(n)}/${fmt(exp)}`;
+  c.innerHTML = `${fmt(n)}<s class="sl">/</s>${fmt(exp)}`;
   c.className = n === exp ? 'ok' : n > exp ? 'over' : '';
   const w1 = chip.offsetWidth;
   if(first){ chip.style.width = w1 + 'px'; chip.classList.remove('off'); }
@@ -15248,21 +15308,14 @@ function accDayBar(id){ return dayBarHtml(id); }
 // раскладкой по питанию и доп. расходам), справа пилюля со стрелками, днём,
 // возвратом к сегодня и календарём. Живёт отдельно от сводки водителей,
 // потому что нужна и на вкладке брака, где сводки нет — там итога не передают.
-function expDayRow(t){
+// Пилюля дня: стрелки, день, возврат к сегодня и календарь. Одна на плашку
+// расходов и плашку остатков — второй экземпляр разошёлся бы с первым молча.
+function _dayNav(calId){
   const {имя, дата} = dayBarLabels(DAY_OFFSET);
   const стрелка = p => `<svg viewBox="0 0 24 24" width="17" height="17" fill="none"
       stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
       ><path d="${p}"/></svg>`;
-  return `<div class="exp-day${DAY_OFFSET ? ' back' : ''}">
-    <span class="exp-day-l">
-      <span class="exp-day-t">За день</span>
-      ${t ? `<span class="exp-day-v"><b>${fmt(t.all)}</b><i>AED</i>
-        <span class="exp-day-p">
-          <span><i>питание</i><b>${fmt(t.meal)}</b></span>
-          <span><i>доп. расходы</i><b>${fmt(t.extra)}</b></span>
-        </span></span>` : ''}
-    </span>
-    <span class="exp-day-nav">
+  return `<span class="exp-day-nav">
       <button class="ds-arw" onclick="dayBarArrow(this,1)" aria-label="День назад"
         >${стрелка('M15 5l-7 7 7 7')}</button>
       <span class="ds-txt" onclick="dayBarHome(this)"><b>${имя}</b><i>${дата}</i></span>
@@ -15272,11 +15325,23 @@ function expDayRow(t){
         aria-label="Вернуться к сегодня" title="Вернуться к сегодня"><svg viewBox="0 0 24 24"
         fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"
         stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v4h4"/></svg></button>` : ''}
-      <button class="cal-btn" onclick="openDate('expDay')" aria-label="Выбрать день"
+      <button class="cal-btn" onclick="openDate('${calId}')" aria-label="Выбрать день"
         ><svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
           stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5"
           width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></button>
+    </span>`;
+}
+function expDayRow(t){
+  return `<div class="exp-day${DAY_OFFSET ? ' back' : ''}">
+    <span class="exp-day-l">
+      <span class="exp-day-t">За день</span>
+      ${t ? `<span class="exp-day-v"><b>${fmt(t.all)}</b><i>AED</i>
+        <span class="exp-day-p">
+          <span><i>питание</i><b>${fmt(t.meal)}</b></span>
+          <span><i>доп. расходы</i><b>${fmt(t.extra)}</b></span>
+        </span></span>` : ''}
     </span>
+    ${_dayNav('expDay')}
   </div>`;
 }
 
@@ -15311,15 +15376,42 @@ function dayBarHome(win){
 // вверх, остаётся полоска дня; вернулись к началу — числа приходят обратно.
 // Слушатель вешается на раздел один раз и переживает смену экранов: без
 // плашки на экране глянутьПлашку просто ничего не делает.
-function pinWatch(){
-  const mid = document.getElementById('accMid');
+function pinWatch(midId, sumId){
+  midId = midId || 'accMid'; sumId = sumId || 'expSum';
+  const mid = document.getElementById(midId);
   if(!mid || mid.dataset.pin) return;
   mid.dataset.pin = '1';
   // Доля свёрнутости: 0 — числа целиком, 1 — осталась полоска дня. Считается
   // прямо из прокрутки, поэтому останавливается там же, где палец. Порогов и
   // доводки нет: экран не должен доезжать сам, если человек его придержал.
-  mid.addEventListener('scroll', глянутьПлашку, {passive:true});
-  глянутьПлашку();
+  mid.addEventListener('scroll', () => глянутьПлашку(midId, sumId), {passive:true});
+  глянутьПлашку(midId, sumId);
+}
+
+// Высота сворачиваемой части — по факту, после отрисовки: с запасом «на глаз»
+// сжатие начиналось только под конец хода. Мерить надо со снятым
+// ограничением: у свёрнутой плашки max-height ноль, и scrollHeight тоже ноль —
+// записав его, мы запирали числа навсегда. Одна на плашку расходов и плашку
+// остатков: копия разошлась бы с оригиналом молча.
+function pinMeasure(sumId, midId){
+  const sum = document.getElementById(sumId || 'expSum'); if(!sum) return;
+  const f = sum.querySelector('.exp-fold'); if(!f) return;
+  const было = f.style.maxHeight;
+  f.style.maxHeight = 'none';
+  const h = f.scrollHeight;
+  f.style.maxHeight = было;
+  if(h > 0){
+    const pin = expPin(sum);
+    pin.style.setProperty('--foldH', h + 'px');
+    // Вся плашка ужимается больше, чем на высоту чисел: строка дня отдаёт и
+    // свой отступ снизу. Меряем разницу целиком, свернув плашку на кадр.
+    const fold = pin.style.getPropertyValue('--fold');
+    pin.style.setProperty('--fold', '0'); const h0 = sum.offsetHeight;
+    pin.style.setProperty('--fold', '1'); const h1 = sum.offsetHeight;
+    pin.style.setProperty('--fold', fold || '0');
+    pin.style.setProperty('--foldAll', Math.max(h, h0 - h1) + 'px');
+  }
+  глянутьПлашку(midId, sumId);      // с настоящей высотой доля считается заново
 }
 
 // Где лежат --fold и --foldH: на закреплённой шапке, а не на плашке — их
@@ -15330,9 +15422,9 @@ function expPin(sum){ return sum.closest('.exp-pin') || sum; }
 // дня. Считается прямо из прокрутки, поэтому останавливается там же, где
 // палец; порогов и доводки нет. Живёт отдельно от pinWatch: её зовёт и
 // прокрутка, и перерисовка после смены дня, и переход между вкладками.
-function глянутьПлашку(){
-  const mid = document.getElementById('accMid');
-  const sum = document.getElementById('expSum');
+function глянутьПлашку(midId, sumId){
+  const mid = document.getElementById(midId || 'accMid');
+  const sum = document.getElementById(sumId || 'expSum');
   if(!mid || !sum) return;
   const pin = expPin(sum);
   // На вкладке брака сворачивать нечего: строка дня стоит как стоит, а не
@@ -15391,7 +15483,7 @@ function accDayGo(off){
   DAY_OFFSET = off;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   accLoadSummaries();                     // плитки учёта — за тот же день
-  if(document.getElementById('stkByDay')){ stkByReload(); return; }
+  if(document.getElementById('stkBySum')){ stkByReload(); return; }
   if(document.getElementById('stkDay')){
     ACC_STOCK = null; daySkel('stkMid'); stkPicker(true); return;
   }
@@ -15500,7 +15592,7 @@ function accRender(){
   // читается как «данных нет», хотя они просто едут; шиммер честнее.
   const num = {
     expenses: [t ? fmt(t.all) : null, 'AED · ' + accDayWord()],
-    stock:    [ACC_STOCK ? `${ACC_STOCK.done}/${ACC_STOCK.total}` : null,
+    stock:    [ACC_STOCK ? `${ACC_STOCK.done}<s class="sl">/</s>${ACC_STOCK.total}` : null,
                ACC_STOCK ? pluralize(ACC_STOCK.total,'район','района','районов') : 'районов'],
     order:    (() => {
       const sup = ACC_SUP && ACC_SUP.open;
@@ -15779,7 +15871,7 @@ function chkRender(){
   const head = `<div class="ck-head${всё ? ' all' : ''}">
     <div class="ck-h-l">Статус смены</div>
     <div class="ck-h-n">
-      <span class="ck-h-v">${c.done || 0}<u>/${rows.length}</u></span>
+      <span class="ck-h-v">${c.done || 0}<u><s class="sl">/</s>${rows.length}</u></span>
       <span class="ck-h-w">${всё ? 'смена закрыта' : 'выполнено'}</span>
     </div>
     <div class="ck-track"><i style="width:${доля}%"></i></div>
@@ -21155,28 +21247,7 @@ function renderExpenses(){
   // не происходило. Состав меняется от дня ко дню — удержания то есть, то нет.
   requestAnimationFrame(() => {
     bindDayBars();
-    const f = sum && sum.querySelector('.exp-fold');
-    if(!f) return;
-    // Мерить надо со снятым ограничением. Если день сменили на свёрнутой
-    // плашке, у блока стоит max-height:0 — и его scrollHeight тоже ноль.
-    // Записав такой ноль, мы запирали числа навсегда: высота нулевая, значит
-    // и развернуться некуда. Отсюда «застревает и дальше не едет».
-    const было = f.style.maxHeight;
-    f.style.maxHeight = 'none';
-    const h = f.scrollHeight;
-    f.style.maxHeight = было;
-    if(h > 0){
-      const pin = expPin(sum);
-      pin.style.setProperty('--foldH', h + 'px');
-      // Вся плашка ужимается больше, чем на высоту чисел: строка дня отдаёт и
-      // свой отступ снизу. Меряем разницу целиком, свернув плашку на кадр.
-      const fold = pin.style.getPropertyValue('--fold');
-      pin.style.setProperty('--fold', '0'); const h0 = sum.offsetHeight;
-      pin.style.setProperty('--fold', '1'); const h1 = sum.offsetHeight;
-      pin.style.setProperty('--fold', fold || '0');
-      pin.style.setProperty('--foldAll', Math.max(h, h0 - h1) + 'px');
-    }
-    глянутьПлашку();                 // с настоящей высотой доля считается заново
+    pinMeasure('expSum', 'accMid');
   });
   if(sum) sum.innerHTML = expDayRow(t) + `
     <div class="exp-fold">

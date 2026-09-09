@@ -2505,6 +2505,13 @@ async def writeoff_none_clear(day: str) -> None:
     await db.writeoff_none.delete_one({"_id": day})
 
 
+async def writeoff_by_cid(cid: str) -> dict | None:
+    """Запись по ключу окна списания — защита от двойной отправки."""
+    db = _db_or_none()
+    if db is None or not cid: return None
+    return await db.writeoffs.find_one({"cid": cid}, {"img": 0})
+
+
 async def writeoff_none_get(day: str) -> dict | None:
     db = _db_or_none()
     if db is None or not day: return None

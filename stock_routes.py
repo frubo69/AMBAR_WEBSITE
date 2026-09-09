@@ -2424,8 +2424,17 @@ async def handle_writeoff_add(request):
     who = str(body.get("as") or "").strip()[:60] or "владелец"
     day = str(body.get("day") or "").strip() or _biz_day()
     now = datetime.now(timezone.utc)
+    # Ключ от двойной отправки: сеть моргнула, кнопку нажали ещё раз — запись
+    # одна. Ключ придумывает окно списания при открытии и шлёт с каждой
+    # попыткой; вторая попытка получает ту же запись, а не вторую.
+    cid = str(body.get("cid") or "").strip()[:48]
+    if cid:
+        dup = await db.writeoff_by_cid(cid)
+        if dup:
+            return web.json_response({"ok": True, "id": dup.get("_id"), "dup": True,
+                                      "comp": _comp_view(dup)}, headers=CORS_HEADERS)
     wid = await db.writeoff_add({
-        "at": now, "day": day, "item": pid, "thumb": thumb,
+        "at": now, "day": day, "item": pid, "thumb": thumb, "cid": cid,
         "name": cat[pid].get("name", ""), "qty": qty, "kind": kind,
         "note": str(body.get("note") or "").strip()[:200],
         "district": district, "district_code": OFFICE_CODES.get(district, ""),

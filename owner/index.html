@@ -4724,10 +4724,10 @@ button.shl-p:active{transform:scale(.96)}
 #shTabs button{white-space:nowrap;font-size:13px;padding-left:6px;padding-right:6px;
   flex-direction:row;gap:6px}
 #shTabs .sh-n{margin-left:0}
-.sh-n{display:none;min-width:16px;height:16px;margin-left:6px;padding:0 4px;
+.sh-n{display:none;min-width:16px;height:16px;margin:-4px 0 -4px 6px;padding:0 4px;
   border-radius:999px;align-items:center;justify-content:center;
   background:var(--warn);color:#1a1408;
-  font-style:normal;font-size:10px;font-weight:800;line-height:1;vertical-align:1px}
+  font-style:normal;font-size:10px;font-weight:800;line-height:1;vertical-align:-3px}
 .sh-n.has{display:inline-flex}
 /* Число за месяц на чипе вида — тише счётчика ждущих: одно говорит «есть
    работа», другое просто «столько было». */
@@ -4781,18 +4781,6 @@ button.shl-p:active{transform:scale(.96)}
 
 /* Своё списание и отметка «ничего не было». Форма живёт в той же шторке, что
    удержание: это тот же разговор — что случилось, сколько и почему. */
-.wo-none{width:100%;padding-top:14px;margin-top:14px;border-top:1px solid var(--border2)}
-.wo-none.on{border-top:0;margin-top:0;padding-top:0;display:flex;flex-direction:column;
-  align-items:center;gap:3px}
-.wo-none-t{font-size:13px;font-weight:600;color:var(--up)}
-.wo-none-s{font-size:11px;color:var(--muted)}
-.wo-none-b{width:100%;padding:12px;border-radius:13px;cursor:pointer;font-family:inherit;
-  font-size:13.5px;font-weight:700;color:var(--sub);background:var(--card2);
-  border:1px solid var(--border2)}
-.wo-none-b:active{transform:scale(.98)}
-.wo-none-x{margin-top:8px;padding:8px 14px;border-radius:10px;cursor:pointer;
-  font-family:inherit;font-size:12px;font-weight:600;color:var(--muted);
-  background:none;border:1px solid var(--border2)}
 .wo-a-item{display:flex;align-items:center;justify-content:space-between;gap:10px;
   width:100%;padding:11px 13px;border-radius:12px;cursor:pointer;font-family:inherit;
   font-size:13.5px;font-weight:600;color:var(--gold2);background:var(--gold-soft);
@@ -4965,58 +4953,55 @@ button.shl-p:active{transform:scale(.96)}
 .wo-c-acts button:active{transform:scale(.98)}
 .wo-c-acts button:disabled{opacity:.4;pointer-events:none}
 .wo-c-acts button:disabled{opacity:.5}
-/* Строка удержания в списке — жёлтым: это не убыток компании, а долг человека,
-   и цветом он отличается от того и от другого. */
-.wo-st.held{color:var(--warn);background:rgba(243,180,74,.1);
-  border:1px solid rgba(243,180,74,.28);cursor:pointer}
-.wo-act.hold{color:var(--warn);border-color:rgba(243,180,74,.3)}
-/* Одна кнопка — на всю ширину: половинка рядом с пустотой выглядит обрубком. */
-.wo-acts.one{grid-template-columns:1fr}
 
 /* ── Списания ────────────────────────────────────────────────────────────
-   Сверху деньги и причины — ответ на «много ли». Ниже строки со снимками —
-   ответ на «что именно». */
-.wo-sum{display:flex;align-items:center;gap:14px;padding:16px;border-radius:16px;
-  background:var(--card);border:1px solid var(--border);margin-bottom:12px}
-.wo-sum-l{flex:1;min-width:0}
-.wo-sum-n{font-family:'Space Grotesk',sans-serif;font-size:28px;font-weight:700;
-  letter-spacing:-.8px;line-height:1;color:var(--dn)}
-.wo-sum-n i{font-style:normal;font-size:10px;color:var(--muted);margin-left:5px;
-  letter-spacing:1px}
-.wo-sum-s{font-size:11.5px;color:var(--muted);margin-top:5px}
-.wo-ks{display:flex;gap:14px;flex-shrink:0}
-.wo-k{text-align:center}
-.wo-k-n{display:block;font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700}
-.wo-k-t{display:block;font-size:10px;color:var(--muted);margin-top:2px}
-.wo-drv{display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px}
-.wo-drv-i{padding:6px 11px;border-radius:9px;font-size:11.5px;color:var(--muted);
-  background:var(--card);border:1px solid var(--border)}
-.wo-drv-i b{color:var(--text);font-weight:600;margin-right:5px}
-.wo-rows{display:flex;flex-direction:column;gap:8px}
-.wo-row{display:flex;align-items:center;gap:12px;padding:12px;border-radius:14px;
-  cursor:pointer;background:var(--card);border:1px solid var(--border)}
-.wo-row:active{transform:scale(.995);border-color:var(--border2)}
-.wo-th{width:46px;height:46px;flex-shrink:0;border-radius:11px;overflow:hidden;
-  background:var(--bg2);border:1px solid var(--border);display:flex;
-  align-items:center;justify-content:center}
-/* Пустая рамка вместо снимка, пока его не открывали: :empty гаснет сам,
-   как только внутрь попадает картинка. */
-.wo-th:empty::after{content:'';width:15px;height:13px;border-radius:3px;
-  border:1.6px solid var(--muted);opacity:.5}
-.wo-th img{width:100%;height:100%;object-fit:cover}
-.wo-b{flex:1;min-width:0}
-.wo-n{font-size:14px;font-weight:600;overflow:hidden;text-overflow:ellipsis;
-  white-space:nowrap}
-.wo-q{color:var(--muted);font-weight:400;margin-left:5px}
-.wo-m{font-size:11.5px;color:var(--muted);margin-top:3px;overflow:hidden;
-  text-overflow:ellipsis;white-space:nowrap}
-.wo-note-t{font-size:12px;color:var(--sub);margin-top:4px;line-height:1.35}
-.wo-aed{flex-shrink:0;font-family:'Space Grotesk',sans-serif;font-size:15px;
-  font-weight:700;color:var(--sub);font-variant-numeric:tabular-nums}
-.wo-aed i{font-style:normal;font-size:9px;color:var(--muted);margin-left:3px}
-/* Очередь согласования. Пока владелец не решил, товар со склада не вычтен —
-   поэтому очередь стоит выше истории и выглядит как вопрос, а не как список:
-   рамка тёплая, кнопки крупные, читать нечего кроме сути. */
+   Строка записи: снимок, название и «× сколько», кто и когда, справа сумма и
+   слово решения. Одна и та же строка в очереди и в истории, у очереди под
+   ней две кнопки. Снимок нажимается — открывается во весь экран. */
+.wo-i + .wo-i{border-top:1px solid rgba(255,255,255,.05)}
+.wo-i-h{display:flex;align-items:center;gap:12px;width:100%;padding:11px 16px;border:0;
+  background:transparent;color:var(--text);font-family:inherit;text-align:left;cursor:pointer;
+  -webkit-tap-highlight-color:transparent}
+.wo-i-h + .wo-i-h{border-top:1px solid rgba(255,255,255,.05)}
+.wo-i-h:active{background:var(--card2)}
+.wo-i-h.off{opacity:.55}
+.wo-ph{flex:0 0 auto;width:52px;height:52px;border-radius:13px;overflow:hidden;
+  background:var(--card2);border:1px solid var(--border2);display:flex;align-items:center;
+  justify-content:center;color:var(--dim)}
+.wo-ph.sm{width:40px;height:40px;border-radius:11px}
+.wo-ph img{width:100%;height:100%;object-fit:cover;display:block}
+.wo-ph i{display:flex}
+.wo-i-b{flex:1;min-width:0}
+.wo-i-b b{display:block;font-size:13.5px;font-weight:700;line-height:1.2;white-space:nowrap;
+  overflow:hidden;text-overflow:ellipsis}
+.wo-i-b b u{text-decoration:none;font-weight:500;color:var(--muted)}
+.wo-i-b i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.wo-i-v{flex:0 0 auto;text-align:right}
+.wo-i-v b{display:block;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
+  line-height:1;font-variant-numeric:tabular-nums}
+.wo-i-v b.warn{color:var(--warn)}
+.wo-i-v b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:9px;font-weight:600;
+  color:var(--muted);margin-left:3px;letter-spacing:.4px}
+.wo-i-v i{display:block;font-style:normal;font-size:9.5px;font-weight:700;letter-spacing:.5px;
+  text-transform:uppercase;margin-top:4px}
+.wo-i-v i.ok{color:var(--up)} .wo-i-v i.dn{color:var(--dn)} .wo-i-v i.warn{color:var(--warn)}
+.aud-b.soft.dn{color:var(--dn);background:var(--dn-soft);border-color:rgba(224,85,85,.3)}
+/* Числа в шапке карточки — как в разделах отчёта ревизии. */
+.sc-cap b{font-family:'Space Grotesk',sans-serif;font-size:15px;font-weight:700;
+  font-variant-numeric:tabular-nums;letter-spacing:0}
+.sc-cap b + b{margin-left:12px}
+.sc-cap b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:9px;font-weight:600;
+  letter-spacing:.4px;color:var(--muted);margin-left:4px;text-transform:uppercase}
+/* Пустой день: одна строка и одно действие; отметка «не было» — строкой с галочкой. */
+.wo-empty{padding:18px 16px 14px;font-size:13px;color:var(--muted);text-align:center}
+.wo-lnk{border:0;background:none;padding:6px 0;color:var(--gold2);font-family:inherit;
+  font-size:12.5px;font-weight:700;cursor:pointer}
+.wo-none-r{display:flex;align-items:center;gap:12px;padding:13px 16px;font-size:13px}
+.wo-none-r .ok{display:flex;color:var(--up)}
+.wo-none-r .t{flex:1;min-width:0;font-weight:600}
+.wo-none-r .t i{display:block;font-style:normal;font-size:11px;color:var(--muted);margin-top:2px;font-weight:500}
+/* Недовоз в приёмке закупки: сколько бутылок не доехало (страница «не доехало»). */
 .wo-q-head{display:flex;align-items:center;gap:12px;padding:14px;border-radius:16px;
   margin-bottom:10px;background:var(--warn-soft);border:1px solid rgba(243,180,74,.3)}
 .wo-q-v{font-family:'Space Grotesk',sans-serif;font-size:30px;font-weight:700;
@@ -5025,24 +5010,6 @@ button.shl-p:active{transform:scale(.96)}
 .wo-q-aed{margin-left:auto;text-align:right;font-size:11.5px;color:var(--muted)}
 .wo-q-aed b{display:block;font-family:'Space Grotesk',sans-serif;font-size:16px;
   font-weight:700;color:var(--sub)}
-.wo-row.pend{border-color:rgba(243,180,74,.34);flex-wrap:wrap}
-/* Кнопка удержания живёт на согласованной строке — значит переносить строку
-   надо и там. Без этого она вставала четвёртым предметом в ряд и выдавливала
-   название за край: у строки оставались миниатюра, сумма и кнопка. */
-.wo-row.hold{flex-wrap:wrap}
-.wo-acts{display:grid;grid-template-columns:1fr 1fr;gap:8px;width:100%;margin-top:11px;
-  padding-top:11px;border-top:1px solid var(--border2)}
-.wo-act{padding:11px 10px;border-radius:12px;font-family:inherit;font-size:13px;
-  font-weight:700;cursor:pointer;background:var(--card2);border:1px solid var(--border2);
-  color:var(--sub)}
-.wo-act:active{transform:scale(.985)}
-.wo-act.ok{color:var(--up);border-color:rgba(90,190,130,.35)}
-.wo-act.no{color:var(--dn);border-color:rgba(226,106,106,.32)}
-.wo-act[disabled]{opacity:.5}
-.wo-st{display:inline-flex;align-items:center;gap:5px;margin-top:5px;padding:3px 8px;
-  border-radius:8px;font-size:10.5px;font-weight:700;letter-spacing:.3px}
-.wo-st.wait{color:var(--warn);background:var(--warn-soft)}
-.wo-st.no{color:var(--dn);background:rgba(226,106,106,.12)}
 /* Снимок во весь экран: сам кадр и подпись, закрывается нажатием куда угодно. */
 /* ── Расход, который ждёт решения ──────────────────────────────────────────
    Не строка среди принятых, а карточка: что и сколько, снимки крупно и два
@@ -5111,9 +5078,15 @@ button.exp-wait:active{transform:scale(.99)}
    между снимками одной записи листают смахиванием, внутри рамки снимок
    приближают двумя пальцами или двойным нажатием. Под рамкой — какой это
    снимок, и решение по нему одному: принять или отклонить с причиной. */
-.phv{position:fixed;inset:0;z-index:210;display:none;flex-direction:column;background:var(--bg);
-  color:var(--text)}
-.phv.show{display:flex}
+.phv{position:fixed;inset:0;z-index:210;display:flex;flex-direction:column;background:var(--bg);
+  color:var(--text);opacity:0;pointer-events:none;transform:translateY(14px) scale(.985);
+  transition:opacity .22s var(--e1),transform .26s cubic-bezier(.22,.9,.25,1)}
+.phv.show{opacity:1;pointer-events:auto;transform:none}
+/* Запись без снимка — пустая рамка со значком, той же ширины, что кадр. */
+.phv-none{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;
+  width:100%;height:100%;color:var(--muted);font-size:10.5px;font-weight:700;letter-spacing:.8px;
+  text-transform:uppercase;background:var(--card2)}
+.phv-none svg{width:34px;height:34px;opacity:.55}
 .phv-top{display:flex;align-items:center;gap:10px;flex-shrink:0;
   padding:calc(10px + var(--safe-top)) 16px 10px}
 .phv-tt{flex:1;min-width:0}
@@ -5138,6 +5111,7 @@ button.exp-wait:active{transform:scale(.99)}
   background:rgba(0,0,0,.5);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px)}
 .phv-rej svg{width:14px;height:14px;fill:none;stroke:currentColor;stroke-width:2.4;stroke-linecap:round}
 .phv-rej.on{color:#fff;background:rgba(224,85,85,.85);border-color:transparent}
+.phv-rej[hidden]{display:none}
 .phv-rej:active{transform:scale(.96)}
 .phv-track{display:flex;height:100%;will-change:transform}
 .phv-slide{flex:0 0 100%;height:100%;display:flex;align-items:center;justify-content:center;
@@ -5194,6 +5168,7 @@ button.exp-wait:active{transform:scale(.99)}
 .phv-st{text-align:center;font-size:11.5px;color:var(--muted);margin-top:10px;min-height:14px}
 .phv-st.ok{color:var(--up)}
 .phv-st.no{color:var(--dn)}
+.phv-st.warn{color:var(--warn)}
 /* Ответ по снимку — меткой на превью в списке. */
 .exp-ph,.exp-done-th{position:relative}
 .exp-ph-v{position:absolute;top:4px;right:4px;width:18px;height:18px;border-radius:9px;
@@ -21215,7 +21190,15 @@ function _phvEl(){
 function _phvFit(){
   const el = document.getElementById('phv'); if(!el || !el.classList.contains('show')) return;
   const mid = document.getElementById('phvMid'), fr = document.getElementById('phvFrame');
-  const img = _phvImg(); if(!mid || !fr || !img || !img.naturalWidth) return;
+  if(!mid || !fr) return;
+  const img = _phvImg();
+  if(!img){
+    // Пустая рамка — 4:3, той же ширины, что был бы снимок.
+    const W = mid.clientWidth - 32;
+    fr.style.width = W + 'px'; fr.style.height = Math.min(mid.clientHeight - 4, Math.round(W * .75)) + 'px';
+    return;
+  }
+  if(!img.naturalWidth) return;
   const W = mid.clientWidth - 32, H = mid.clientHeight - 4;
   const k = Math.min(W / img.naturalWidth, H / img.naturalHeight);
   fr.style.width = Math.round(img.naturalWidth * k) + 'px';
@@ -21241,9 +21224,13 @@ function phvOpenExp(driver, id, i){
 function phvOpen(list, i, ctx){
   const el = _phvEl();
   PHV = {...PHV, list, i, ctx: ctx || null, s: 1, tx: 0, ty: 0};
-  document.getElementById('phvTrack').innerHTML = list.map(p =>
-    `<div class="phv-slide"><img src="${PHV.cache[p.key] || p.thumb || ''}" alt="" draggable="false"></div>`
+  // Записи без снимка (утеря) — пустая рамка со значком, а не сломанная картинка.
+  document.getElementById('phvTrack').innerHTML = list.map(p => (p.path || p.thumb)
+    ? `<div class="phv-slide"><img src="${PHV.cache[p.key] || p.thumb || ''}" alt="" draggable="false"></div>`
+    : `<div class="phv-slide"><div class="phv-none">${_WO_NOPH}<span>без снимка</span></div></div>`
   ).join('');
+  const fr = document.getElementById('phvFrame');
+  fr.style.transform = ''; fr.style.opacity = '';
   el.classList.add('show');
   phvGo(i, false);
   [...document.getElementById('phvTrack').querySelectorAll('img')].forEach(im => { im.onload = _phvFit; });
@@ -21261,6 +21248,7 @@ function phvClose(){
 // Живая запись — из данных страницы: после решения она уже другая.
 function _phvE(){
   const c = PHV.ctx; if(!c) return null;
+  if(c.kind === 'wo') return _woFind(c.id);
   const f = _expFind(c.driver, c.id);
   return f ? f.e : null;
 }
@@ -21290,6 +21278,7 @@ function _phvPeek(){
 }
 
 function phvPaint(){
+  if(PHV.ctx && PHV.ctx.kind === 'wo'){ _phvPaintWo(); return; }
   const e = _phvE(); const p = PHV.list[PHV.i]; if(!p) return;
   _setText('phvT', (e && (e.kind_t || e.comment)) || 'Расход');
   _setText('phvS', e ? `${PHV.ctx.driver} · ${fmt(e.amount)} AED` : '');
@@ -21322,7 +21311,7 @@ function phvPaint(){
 }
 
 async function _phvLoad(k){
-  const p = PHV.list[k]; if(!p || PHV.cache[p.key]) return;
+  const p = PHV.list[k]; if(!p || !p.path || PHV.cache[p.key]) return;
   try{
     const url = await ownerApi.ownerBlob(p.path);
     PHV.cache[p.key] = url;
@@ -21472,7 +21461,8 @@ function _phvGestures(fr){
       }
       lastTap = now;
       if(PHV.s > 1) drag = {x: t.clientX, y: t.clientY, tx0: PHV.tx, ty0: PHV.ty};
-      else swipe = {x: t.clientX, y: t.clientY, dx: 0, w: fr.getBoundingClientRect().width};
+      else swipe = {x: t.clientX, y: t.clientY, dx: 0, dy: 0, axis: 0,
+                    w: fr.getBoundingClientRect().width};
     }
   }, {passive: false});
   fr.addEventListener('touchmove', e => {
@@ -21493,7 +21483,19 @@ function _phvGestures(fr){
       _phvApply(false);
     }else if(swipe && e.touches.length === 1){
       const t = e.touches[0];
-      swipe.dx = t.clientX - swipe.x;
+      swipe.dx = t.clientX - swipe.x; swipe.dy = t.clientY - swipe.y;
+      if(!swipe.axis && (Math.abs(swipe.dx) > 8 || Math.abs(swipe.dy) > 8))
+        swipe.axis = Math.abs(swipe.dy) > Math.abs(swipe.dx) ? 2 : 1;
+      // Вниз — карточка едет за пальцем и уменьшается: отпустил далеко — закрылась.
+      if(swipe.axis === 2){
+        e.preventDefault();
+        const dy = Math.max(0, swipe.dy);
+        fr.style.transition = 'none';
+        fr.style.transform = `translateY(${dy * .9}px) scale(${Math.max(.86, 1 - dy / 900)})`;
+        fr.style.opacity = String(Math.max(.4, 1 - dy / 500));
+        return;
+      }
+      if(swipe.axis !== 1) return;
       // У края лента упирается: дальше первого и последнего снимка не тянется.
       const край = (PHV.i === 0 && swipe.dx > 0) || (PHV.i === PHV.list.length - 1 && swipe.dx < 0);
       const dx = край ? swipe.dx * .25 : swipe.dx;
@@ -21505,6 +21507,17 @@ function _phvGestures(fr){
   fr.addEventListener('touchend', e => {
     if(e.touches.length < 2) pinch = null;
     if(!e.touches.length){
+      if(swipe && swipe.axis === 2){
+        const far = swipe.dy > 110;
+        fr.style.transition = 'transform .28s cubic-bezier(.22,.9,.25,1), opacity .28s var(--e1)';
+        if(far){
+          fr.style.transform = 'translateY(60vh) scale(.8)'; fr.style.opacity = '0';
+          try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(err){}
+          setTimeout(() => { phvClose(); fr.style.transform = ''; fr.style.opacity = ''; }, 120);
+        }else{ fr.style.transform = ''; fr.style.opacity = ''; }
+        swipe = null; drag = null;
+        return;
+      }
       if(swipe){
         const n = PHV.list.length;
         let i = PHV.i;
@@ -25121,77 +25134,21 @@ async function nmReset(pid){
   }catch(e){ _toast('Не вернулось к расчёту'); }
 }
 
-/* ── Списания ──────────────────────────────────────────────────────────────
-   Раздел существует ради фотографий. Список сам по себе доказывает только то,
-   что кто-то его написал; поэтому снимок открывается в один палец, а не
-   «по запросу в поддержку».                                                */
+/* ── Списания: вкладка «Брак / бой / утеря» ─────────────────────────────────
+   Три карточки одной анатомии. Что ждёт решения — снимок, кто и сколько, две
+   кнопки. Что списано за выбранный день — строками. История — по дням,
+   нажатие переводит день. Снимок в каждой строке; нажатие на строку
+   открывает его во весь экран, и решение принимают там же, глядя на кадр. */
 let ACC_WO = null;
 const WO_TINT = {'бой': 'var(--dn)', 'брак': 'var(--warn)',
                  'просрочка': 'var(--warn)', 'потеря': 'var(--dn)', 'недостача': 'var(--dn)'};
 
+// Раздел «Списания» из «Учёта» — та же вкладка в «Расходах смены»: один экран
+// на одну вещь, а не два экрана, спорящие числами.
 async function accWriteoffs(){
-  ACC_BACK = null;
-  _setText('accTitle', 'Списания');
-  _setText('accSub', 'загрузка…');
-  document.getElementById('accFoot').innerHTML = '';
-  try{
-    ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs',
-      {params:{days:30, day: accDay()}});
-  }catch(e){
-    document.getElementById('accMid').innerHTML =
-      '<div class="scan-empty" style="color:var(--dn)">Не удалось загрузить</div>';
-    return;
-  }
-  woHome();
+  SH_TAB = 'wo';
+  await accExpenses();
 }
-
-function woHome(){
-  const w = ACC_WO || {rows: [], pending: [], by_kind: [], by_driver: []};
-  const pend = w.pending || [];
-  // Подписи в шапке нет: сколько ждёт решения, написано на самой вкладке
-  // счётчиком, а под заголовком раздела оно повторялось третьим шрифтом.
-  _setText('accSub', '');
-  const mid = document.getElementById('accMid');
-  if(!w.rows.length && !pend.length){
-    mid.innerHTML = `<div class="scan-empty">Списаний нет.<br>
-      Водитель записывает бой и брак в своём приложении — с фотографией.</div>`;
-    return;
-  }
-  // Очередь согласования — выше всего остального и без окна в тридцать дней.
-  // Пока решения нет, эти бутылки числятся на полке: заявка их не заказывает,
-  // ревизия ищет их глазами. Забытая на неделю строка — это расхождение,
-  // которое некому объяснить, поэтому старые идут первыми.
-  const queue = pend.length ? `
-    <div class="wo-q-head">
-      <span class="wo-q-v">${pend.length}</span>
-      <span class="wo-q-u">${pluralize(pend.length,'списание','списания','списаний')}<br>ждёт решения</span>
-      <span class="wo-q-aed"><b>${fmt(w.pending_aed || 0)}</b>AED по прайсу</span>
-    </div>
-    <div class="wo-rows" id="woQueue">${pend.map(woRow).join('')}</div>
-    <div class="exp-grp">История</div>` : '';
-  // Сверху — деньги и причины: это ответ на вопрос «много ли», ради которого
-  // раздел и открывают. Строки ниже отвечают уже на «что именно».
-  const kinds = (w.by_kind || []).map(k => `<div class="wo-k">
-      <span class="wo-k-n" style="color:${WO_TINT[k.kind] || 'var(--sub)'}">${fmt(k.qty)}</span>
-      <span class="wo-k-t">${escS(k.kind)}</span></div>`).join('');
-  mid.innerHTML = queue + `
-    <div class="wo-sum">
-      <div class="wo-sum-l">
-        <div class="wo-sum-n">${fmt(w.total_aed)}<i>AED</i></div>
-        <div class="wo-sum-s">по прайсу, за 30 дней</div>
-      </div>
-      <div class="wo-ks">${kinds}</div>
-    </div>
-    ${(w.by_driver || []).length > 1 ? `<div class="wo-drv">${
-      w.by_driver.map(d => `<span class="wo-drv-i"><b>${escS(d.driver)}</b> ${fmt(d.qty)}</span>`)
-        .join('')}</div>` : ''}
-    <div class="wo-rows">${w.rows.map(woRow).join('')}</div>`;
-}
-
-// ── Вкладка одного вида: брак, бой, утеря, просрочка ───────────────────────
-// Один вид на экране — это ответ на вопрос «сколько мы бьём», который по
-// общему списку не читался: бой, брак и просрочка лежали вперемешку, и чтобы
-// понять, чего именно много, приходилось считать строки глазами.
 
 async function accWoAll(){
   const body = document.getElementById('expBody'); if(!body) return;
@@ -25215,95 +25172,132 @@ async function accWoAll(){
   woKindBody();
 }
 
-function woKindBody(){
-  const body = document.getElementById('expBody'); if(!body) return;
-  // Всё вместе, без деления по видам: вопрос один — что ждёт решения, — и он
-  // общий для боя, брака, утери и просрочки. Вид написан в самой строке.
-  const w = ACC_WO || {rows: [], pending: []};
-  const pend = w.pending || [];
-  const rows = w.rows || [];
-  const ok   = rows.filter(r => r.state !== 'no');
-  const qty  = ok.reduce((a, r) => a + (r.qty || 0), 0);
-  const aed  = ok.reduce((a, r) => a + (r.aed || 0), 0);
-  const held = ok.reduce((a, r) => a + ((r.comp || {}).amount || 0), 0);
-  _setText('accSub', '');      // счётчик ждущих стоит на самой вкладке
-  if(!pend.length && !rows.length){
-    body.innerHTML = shEmpty('all');
-    return;
-  }
-  // Очередь — выше всего: пока решения нет, эти бутылки числятся на полке,
-  // заявка их не заказывает, а ревизия ищет глазами.
-  const queue = pend.length ? `
-    <div class="wo-q-head">
-      <span class="wo-q-v">${pend.length}</span>
-      <span class="wo-q-u">${pluralize(pend.length,'ждёт','ждут','ждут')}<br>решения</span>
-      <span class="wo-q-aed"><b>${fmt(Math.round(pend.reduce((a,r)=>a+(r.aed||0),0)))}</b>AED по прайсу</span>
-    </div>
-    <div class="wo-rows">${pend.map(woRow).join('')}</div>` : '';
-  body.innerHTML = queue + `
-    <div class="wo-sum">
-      <div class="wo-sum-l">
-        <div class="wo-sum-n">${fmt(Math.round(aed))}<i>AED</i></div>
-        <div class="wo-sum-s">по прайсу</div>
-      </div>
-      <div class="wo-ks">
-        <div class="wo-k"><span class="wo-k-n" style="color:var(--sub)">${fmt(qty)}</span>
-          <span class="wo-k-t">${pluralize(qty,'штука','штуки','штук')}</span></div>
-        <div class="wo-k"><span class="wo-k-n" style="color:${held ? 'var(--warn)' : 'var(--muted)'}">${fmt(held)}</span>
-          <span class="wo-k-t">удержано</span></div>
-      </div>
-    </div>
-    ${pend.length ? '<div class="exp-grp">История</div>' : ''}
-    <div class="wo-rows">${rows.map(woRow).join('')}</div>`;
+// Перечитать и перерисовать — после любого решения. Экран показывает то, что
+// лежит на сервере, а не то, что мы думаем о нажатии.
+async function woReload(){
+  try{ ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs',
+        {params:{days:30, day: accDay()}}); }
+  catch(e){}
+  if(document.getElementById('shTabs') && SH_TAB === 'wo'){ woKindBody(); shCounts(); }
 }
 
-// Пустая страница — тоже страница. Строчка серым посреди чёрного поля не
-// говорит ни что случилось, ни что делать: пусто это хорошая новость или
-// сломалось? Поэтому знак, заголовок ответом и строка о том, откуда записи
-// вообще берутся.
-function shEmpty(kind){
-  const V = {
-    all: ['<path d="M20 6 9 17l-5-5"/>', 'Ничего не списывали',
-          'Ни боя, ни брака, ни утери.', 'ok'],
-    err: ['<path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0"/>',
-          'Не удалось загрузить', 'Связь пропала или сервер не ответил.', 'err'],
-  }[kind] || [];
-  return `<div class="sh-empty ${V[3] || ''}">
-    <span class="sh-empty-i"><svg viewBox="0 0 24 24" width="24" height="24" fill="none"
-      stroke="currentColor" stroke-width="1.9" stroke-linecap="round"
-      stroke-linejoin="round">${V[0] || ''}</svg></span>
-    <div class="sh-empty-t">${V[1] || ''}</div>
-    <div class="sh-empty-s">${V[2] || ''}</div>
-    ${kind === 'err'
-      ? '<button class="sh-empty-b" onclick="ACC_WO=null;shTab(SH_TAB)">Ещё раз</button>'
-      : woNoneBlock()}
+function _woFind(id){
+  const w = ACC_WO || {};
+  return [...(w.pending || []), ...(w.rows || [])].find(x => x.id === id) || null;
+}
+function _woWhen(r){
+  const d = _dtParse(r.at);
+  return d ? d.toLocaleTimeString('ru-RU', {hour:'2-digit', minute:'2-digit', timeZone:'Asia/Dubai'}) : '';
+}
+function _woDayName(day){
+  for(let o = 0; o < 60; o++) if(_dayIsoFor(o) === day) return dayBarLabels(o).имя;
+  const d = _dtParse(day + 'T12:00:00Z');
+  return d ? `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}` : day;
+}
+function _woSub(r){
+  return [r.kind, r.by, r.district_code, _woWhen(r)].filter(Boolean).join(' · ');
+}
+const _WO_NOPH = `<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+  stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round">
+  <path d="M4 8h3l1.5-2.5h7L17 8h3v11H4z"/><circle cx="12" cy="13" r="3.4"/></svg>`;
+function _woThumb(r){
+  return r.thumb ? `<img src="${escS(r.thumb)}" alt="">` : `<i>${_WO_NOPH}</i>`;
+}
+
+// Ожидающая запись: строка со снимком и под ней две кнопки. Строка — кнопка,
+// открывает снимок во весь экран с тем же решением внизу.
+function woPendRow(r){
+  return `<div class="wo-i" id="wo-${escS(r.id)}">
+    <button class="wo-i-h" onclick="phvOpenWo('${escS(r.id)}')">
+      <span class="wo-ph">${_woThumb(r)}</span>
+      <span class="wo-i-b"><b>${escS(r.name)} <u>× ${fmt(r.qty)}</u></b>
+        <i>${escS(_woSub(r))}${r.note ? ' · ' + escS(r.note) : ''}</i></span>
+      <span class="wo-i-v"><b class="warn">${fmt(r.aed)}<u>AED</u></b></span>
+    </button>
+    <div class="aud-act">
+      <button class="aud-b soft dn" onclick="woDecide(event,'${escS(r.id)}',false)">Отклонить</button>
+      <button class="aud-b go" onclick="woCompOpen(event,'${escS(r.id)}','approve')">Согласовать</button>
+    </div>
   </div>`;
 }
 
-// «Ничего не списывали» — отметка, а не пустота.
-//
-// Пустой список отвечает сразу на два вопроса и ни на один честно: то ли за
-// день ничего не разбили, то ли забыли записать. Отметка отвечает на первый,
-// и у неё есть автор: сказать «ничего не было» — утверждение, и оно должно
-// быть чьим-то. Поэтому кнопка, а не молчание.
-function woNoneBlock(){
-  const n = (ACC_WO || {}).none;
-  if(n) return `<div class="wo-none on">
-      <span class="wo-none-t">Отмечено: списаний не было</span>
-      <span class="wo-none-s">${escS(n.by_name || '—')}${
-        n.at ? ' · ' + escS(_when(n.at)) : ''}</span>
-      <button class="wo-none-x" onclick="woNoneSet(false)">Снять отметку</button>
-    </div>`;
-  // Абзац про то, откуда берутся списания, отсюда убран: он повторял то, что
-  // и так стоит кнопкой внизу экрана, а заголовок повторял сам себя ещё и в
-  // подписи на кнопке. Осталось одно утверждение и одно действие.
-  return `<div class="wo-none">
-      <button class="wo-none-b" onclick="woNoneSet(true)">Отметить, что не было</button>
-    </div>`;
+// Решённая запись — той же строкой, тише: справа сумма и слово решения.
+function woRow(r){
+  const no = r.state === 'no';
+  const st = no ? ['отклонено', 'dn']
+           : r.comp ? [`удержано ${fmt(r.comp.amount)}`, 'warn'] : ['списано', 'ok'];
+  return `<button class="wo-i-h${no ? ' off' : ''}" id="wo-${escS(r.id)}" onclick="phvOpenWo('${escS(r.id)}')">
+    <span class="wo-ph sm">${_woThumb(r)}</span>
+    <span class="wo-i-b"><b>${escS(r.name)} <u>× ${fmt(r.qty)}</u></b><i>${escS(_woSub(r))}</i></span>
+    <span class="wo-i-v"><b>${fmt(r.aed)}<u>AED</u></b><i class="${st[1]}">${st[0]}</i></span>
+  </button>`;
 }
 
+function woKindBody(){
+  const body = document.getElementById('expBody'); if(!body) return;
+  const w = ACC_WO || {rows: [], pending: []};
+  const pend = w.pending || [], rows = w.rows || [];
+  const day = accDay();
+  _setText('accSub', '');      // счётчик ждущих стоит на самой вкладке
+  // Ждёт решения — всегда сверху, любым днём: пока решения нет, бутылки
+  // числятся на полке, заявка их не заказывает, а ревизия ищет глазами.
+  const pendAed = pend.reduce((a, r) => a + (r.aed || 0), 0);
+  const queue = pend.length ? `<div class="sc">
+      <div class="sc-cap"><span>Ждёт решения</span><b>${fmt(Math.round(pendAed))}<u>AED</u></b></div>
+      ${pend.map(woPendRow).join('')}</div>` : '';
+  // За выбранный день — что списали. Пусто — тоже ответ, и у него есть
+  // автор: «не было» говорят кнопкой, а не молчанием.
+  const today = rows.filter(r => r.day === day);
+  const ok = today.filter(r => r.state !== 'no');
+  const qty = ok.reduce((a, r) => a + (r.qty || 0), 0), aed = ok.reduce((a, r) => a + (r.aed || 0), 0);
+  const none = w.none;
+  let dayBody;
+  if(today.length) dayBody = today.map(woRow).join('');
+  else if(none) dayBody = `<div class="wo-none-r"><span class="ok">${_AUD_CHECK}</span>
+      <span class="t">Списаний не было<i>${escS(none.by_name || '—')}${none.at ? ' · ' + escS(_when(none.at)) : ''}</i></span>
+      <button class="wo-lnk" onclick="woNoneSet(false)">Снять</button></div>`;
+  else dayBody = `<div class="wo-empty">Ничего не списывали</div>
+      <div class="aud-act"><button class="aud-b soft" onclick="woNoneSet(true)">Отметить, что не было</button></div>`;
+  const dayCard = `<div class="sc">
+      <div class="sc-cap"><span>Списания</span>${today.length
+        ? `<b>${fmt(qty)}<u>${pluralize(qty, 'бут', 'бут', 'бут')}</u></b><b>${fmt(Math.round(aed))}<u>AED</u></b>` : ''}</div>
+      ${dayBody}</div>`;
+  // История — по дням, без строк: день открывается нажатием, как стрелками.
+  const by = {};
+  rows.forEach(r => {
+    if(r.day === day) return;
+    const d = by[r.day] || (by[r.day] = {n: 0, aed: 0});
+    d.n++; if(r.state !== 'no') d.aed += r.aed || 0;
+  });
+  const days = Object.keys(by).sort().reverse();
+  const hist = days.length ? `<div class="sc">
+      <div class="sc-cap"><span>История</span><i>30 дней</i></div>
+      ${days.map(d => `<button class="sc-r" onclick="woDayGo('${d}')"><span>${escS(_woDayName(d))}</span>
+        <b>${fmt(by[d].n)}<u>${pluralize(by[d].n, 'запись', 'записи', 'записей')}</u></b>${
+        by[d].aed ? `<b>${fmt(Math.round(by[d].aed))}<u>AED</u></b>` : ''}<em>${_SC_CHEV}</em></button>`).join('')}
+    </div>` : '';
+  body.innerHTML = queue + dayCard + hist;
+}
+
+// Строка истории переводит день — тем же путём, что стрелки над списком.
+function woDayGo(day){
+  for(let o = 0; o < 60; o++) if(_dayIsoFor(o) === day){ accDayGo(o); return; }
+}
+
+// Пустая страница — тоже страница: знак, заголовок ответом и путь назад.
+function shEmpty(kind){
+  return `<div class="sh-empty err">
+    <span class="sh-empty-i"><svg viewBox="0 0 24 24" width="24" height="24" fill="none"
+      stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M12 9v4M12 17h.01"/><path d="M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0"/></svg></span>
+    <div class="sh-empty-t">Не удалось загрузить</div>
+    <button class="sh-empty-b" onclick="ACC_WO=null;shTab(SH_TAB)">Ещё раз</button>
+  </div>`;
+}
+
+// «Списаний не было» — отметка с автором, а не пустота.
 async function woNoneSet(on){
-  if(on && !confirm(`Отметить, что за ${accDayWord()} ничего не списывали?`)) return;
+  if(on && !await askDialog('Списаний не было?', `${accDayWord()} · отметка с вашим именем`, 'Отметить', 'Не надо')) return;
   if(!await accAskBack('Отметка «списаний не было»')) return;
   try{
     await ownerApi.ownerFetch('/api/owner/stock/writeoff/none',
@@ -25314,9 +25308,8 @@ async function woNoneSet(on){
       : 'Не удалось отметить');
     return;
   }
-  ACC_WO = null;
-  shTab('wo');
-  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+  _audHap(on ? 'ok' : 'light');
+  await woReload();
 }
 
 // ── своё списание ───────────────────────────────────────────────────────────
@@ -25343,7 +25336,9 @@ let WOA = null;      // {kind, item, name, qty, note, photo, thumb, district}
 async function woAddOpen(){
   if(!await accAskBack('Списание')) return;
   WOA = {kind:'бой', item:'', name:'', qty:1, note:'', photo:'', thumb:'',
-         district: '', q:'', districts: (STK.districts || []), cat: [], busy: true};
+         district: '', q:'', districts: (STK.districts || []), cat: [], busy: true,
+         // Ключ окна: повторная отправка после сбоя сети даёт ту же запись.
+         cid: Math.random().toString(36).slice(2, 10) + Date.now().toString(36)};
   WOA.district = (WOA.districts[0] || {}).id || '';
   woAddPaint();
   document.getElementById('woAddOv').classList.add('show');
@@ -25470,7 +25465,7 @@ async function woAddSave(){
   if(go){ go.disabled = true; go.textContent = 'Записываю…'; }
   try{
     await ownerApi.ownerFetch('/api/owner/stock/writeoff', {method:'POST', body:{
-      item: w.item, qty: w.qty, kind: w.kind, district: w.district,
+      item: w.item, qty: w.qty, kind: w.kind, district: w.district, cid: w.cid,
       note: w.note, day: accDay(), photo: w.photo, thumb: w.thumb, as: _meName()}});
   }catch(e){
     if(go){ go.disabled = false; go.textContent = 'Списать'; }
@@ -25482,9 +25477,10 @@ async function woAddSave(){
     return;
   }
   woAddClose();
+  _audHap('ok');
+  _toast('Списано');
   ACC_WO = null;
   shTab('wo');
-  try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
 }
 
 // ── списание сканом ─────────────────────────────────────────────────────────
@@ -25814,10 +25810,7 @@ async function woSplitSave(){
     return;
   }
   woCompClose();
-  try{ ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs', {params:{days:30}}); }
-  catch(e){}
-  if(SH_TAB === 'wo') woKindBody(); else woHome();
-  shCounts();
+  await woReload();
 }
 
 function woCompClose(){
@@ -25864,10 +25857,7 @@ async function woCompSave(on){
     return;
   }
   woCompClose();
-  try{ ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs', {params:{days:30}}); }
-  catch(e){}
-  if(SH_TAB === 'wo') woKindBody(); else woHome();
-  shCounts();
+  await woReload();
 }
 
 // Решение принимается здесь же, в строке: уводить ради двух кнопок на
@@ -25877,74 +25867,84 @@ async function woCompSave(on){
 // значит эти бутылки вылезут недостачей в ближайшем пересчёте, у того, у кого
 // они пропали. Так что «Отклонить» это не спор о фотографии, а возврат вопроса
 // на полку, и переспрашивать перед ним есть о чём.
+// Решение по ожидающей записи. Отклонить — с вопросом: бутылки останутся
+// недостачей у водителя. Кнопки гаснут на время запроса — второго нажатия не
+// бывает; второй владелец мог решить первым — это новость, а не ошибка.
 async function woDecide(ev, id, ok){
-  ev.stopPropagation();
-  if(!ok && !confirm('Отклонить списание? Бутылки останутся недостачей на водителе.')) return;
-  const row = document.getElementById('wo-' + id);
-  row?.querySelectorAll('.wo-act').forEach(b => b.disabled = true);
+  if(ev && ev.stopPropagation) ev.stopPropagation();
+  const r = _woFind(id);
+  if(!ok){
+    const yes = await askDialog('Отклонить списание?',
+      r ? `${r.name} × ${fmt(r.qty)} · останется недостачей${r.by ? ' у ' + r.by : ''}`
+        : 'Бутылки останутся недостачей на водителе', 'Отклонить', 'Не надо', 'bad');
+    if(!yes) return false;
+  }
+  const box = document.getElementById('wo-' + id);
+  if(box) box.querySelectorAll('button').forEach(b => b.disabled = true);
+  let done = false;
   try{
     await ownerApi.ownerFetch('/api/owner/stock/writeoff/' + encodeURIComponent(id) + '/decide',
       {method:'POST', body:{ok: !!ok, as: _meName()}});
-    try{ Telegram.WebApp.HapticFeedback.notificationOccurred('success'); }catch(e){}
+    _audHap(ok ? 'ok' : 'warn');
     _toast(ok ? 'Согласовано — списано со склада' : 'Отклонено — осталось недостачей');
+    done = true;
   }catch(e){
-    // Второй владелец мог решить первым: это не ошибка, а новость. Показываем
-    // её словами и обновляем экран — спорить тут не о чем.
     const p = (e || {}).payload || {};
     _toast(p.error === 'already_decided'
       ? 'Уже решено' + (p.by ? ' — ' + p.by : '')
       : 'Не удалось — попробуйте ещё раз');
-    row?.querySelectorAll('.wo-act').forEach(b => b.disabled = false);
+    if(box) box.querySelectorAll('button').forEach(b => b.disabled = false);
   }
-  try{ ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs', {params:{days:30}}); }
-  catch(e){}
-  // Решение принимают из двух мест: со вкладки вида в «Расходах смены» и со
-  // старого общего списка. Перерисовываем то, что открыто, — иначе с одного
-  // из них строка исчезает, а с другого нет.
-  if(document.getElementById('shTabs') && SH_TAB === 'wo'){ woKindBody(); shCounts(); }
-  else woHome();
+  await woReload();
+  return done;
 }
 
-function woRow(r){
-  const d = new Date(/Z$|[+-]\d{2}:?\d{2}$/.test(r.at) ? r.at : r.at + 'Z');
-  const when = isNaN(d) ? (r.day || '') : d.toLocaleString('ru-RU',
-    {day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit', timeZone:'Asia/Dubai'});
-  const wait = r.state === 'pending', no = r.state === 'no';
-  return `<div class="wo-row ${wait ? 'pend' : ''}${
-       (!wait && !no && !r.comp) ? ' hold' : ''}" id="wo-${escS(r.id)}"
-       onclick="woShot('${escS(r.id)}','${escS(r.name)}')">
-    <div class="wo-th" id="woth-${escS(r.id)}">${
-      r.thumb ? `<img src="${escS(r.thumb)}" alt="">` : ''}</div>
-    <div class="wo-b">
-      <div class="wo-n">${escS(r.name)}
-        <span class="wo-q">× ${fmt(r.qty)}</span></div>
-      <div class="wo-m"><span style="color:${WO_TINT[r.kind] || 'var(--sub)'}">${escS(r.kind)}</span>
-        · ${escS(r.by)}${r.district_code ? ' · ' + escS(r.district_code) : ''} · ${when}</div>
-      ${r.note ? `<div class="wo-note-t">${escS(r.note)}</div>` : ''}
-      ${wait ? '<span class="wo-st wait">не вычтено со склада</span>' : ''}
-      ${no ? `<span class="wo-st no">отклонено${
-        r.decided_by_name ? ' · ' + escS(r.decided_by_name) : ''}</span>` : ''}
-      ${r.comp ? `<span class="wo-st held" onclick="woCompOpen(event,'${escS(r.id)}')">удержано
-        ${fmt(r.comp.amount)} AED · ${r.comp.split
-          ? r.comp.split.map(x => `${escS(x.who)} ${fmt(x.amount)}`).join(', ')
-          : escS(r.comp.who)}${
-          r.comp.note ? ' · ' + escS(r.comp.note) : ''}</span>` : ''}
-    </div>
-    <div class="wo-aed" ${no ? 'style="text-decoration:line-through;opacity:.55"' : ''}>${
-      fmt(r.aed)}<i>AED</i></div>
-    ${wait ? `<div class="wo-acts">
-      <button class="wo-act no" onclick="woDecide(event,'${escS(r.id)}',false)">Отклонить</button>
-      <button class="wo-act ok" onclick="woCompOpen(event,'${escS(r.id)}','approve')">Согласовать</button>
-    </div>` : ''}
-    ${(!wait && !no && !r.comp) ? `<div class="wo-acts one">
-      <button class="wo-act hold" onclick="woCompOpen(event,'${escS(r.id)}')">Удержать с виновного</button>
-    </div>` : ''}
-  </div>`;
+// Снимок записи во весь экран — тем же просмотром, что чеки водителей:
+// приближение двумя пальцами и двойным нажатием, смахивание вниз закрывает.
+// Внизу — решение по записи, глядя на кадр. Утеря без снимка открывается
+// той же карточкой с пустой рамкой: строка одна на всех, и путь у неё один.
+function phvOpenWo(id){
+  const r = _woFind(id); if(!r) return;
+  const есть = !!r.thumb || r.kind !== 'потеря';
+  phvOpen([{key: 'wo:' + id, which: 'wo', thumb: r.thumb || '', label: 'Снимок',
+            path: есть ? '/api/owner/stock/writeoff/' + encodeURIComponent(id) + '/photo' : ''}],
+          0, {kind: 'wo', id});
+}
+function _phvPaintWo(){
+  const r = _phvE(); if(!r) return;
+  _setText('phvT', `${r.name} × ${fmt(r.qty)}`);
+  _setText('phvS', _woSub(r) + (r.note ? ' · ' + r.note : ''));
+  document.getElementById('phvCap').innerHTML = '';
+  document.getElementById('phvRej').hidden = true;
+  const pend = r.state === 'pending', no = r.state === 'no';
+  document.getElementById('phvActs').innerHTML = pend
+    ? `<button class="phv-no" onclick="phvWoReject()">Отклонить</button>
+       <button class="phv-ok" onclick="phvWoApprove()">Согласовать</button>`
+    : (!no && !r.comp)
+      ? `<button class="phv-ok" onclick="phvWoHold()">Удержать с виновного</button>` : '';
+  const st = document.getElementById('phvSt');
+  st.className = 'phv-st ' + (pend ? 'warn' : no ? 'no' : 'ok');
+  st.textContent = pend ? `Ждёт решения · ${fmt(r.aed)} AED по прайсу`
+    : no ? `Отклонено${r.decided_by_name ? ' · ' + r.decided_by_name : ''}`
+    : r.comp ? `Удержано ${fmt(r.comp.amount)} AED · ${r.comp.who}`
+    : `Списано · ${fmt(r.aed)} AED по прайсу`;
+}
+async function phvWoReject(){
+  const c = PHV.ctx; if(!c || c.kind !== 'wo') return;
+  if(await woDecide(null, c.id, false)) phvClose();
+}
+function phvWoApprove(){
+  const c = PHV.ctx; if(!c || c.kind !== 'wo') return;
+  phvClose(); woCompOpen(null, c.id, 'approve');
+}
+function phvWoHold(){
+  const c = PHV.ctx; if(!c || c.kind !== 'wo') return;
+  phvClose(); woCompOpen(null, c.id);
 }
 
 // Снимок для окна списания.
 //
-// Раньше оба поля камеры вели на woShot — а это просмотрщик уже сохранённого
+// Раньше оба поля камеры вели на просмотрщик уже сохранённого
 // кадра, он ходит на сервер за фотографией по номеру записи. Ему передавали
 // само поле ввода, он делал из него адрес и получал отказ: отсюда и «снимка не
 // нашлось» в ответ на попытку сфотографировать. Кадр при этом никуда не
@@ -25974,28 +25974,6 @@ function woAddShot(inp){
   };
   img.onerror = () => _toast('Не смогли прочитать снимок');
   fr.readAsDataURL(f);
-}
-
-// Снимок во весь экран по нажатию на строку. Заодно кладём его в саму строку —
-// один раз загруженный кадр дальше виден списком, без второго запроса.
-const _woImg = {};
-async function woShot(id, name){
-  let url = _woImg[id];
-  try{
-    if(!url){ url = _woImg[id] = await ownerApi.ownerBlob(
-      '/api/owner/stock/writeoff/' + encodeURIComponent(id) + '/photo'); }
-  }catch(e){ _toast('Снимка не нашлось'); return; }
-  const th = document.getElementById('woth-' + id);
-  if(th && !th.firstChild) th.innerHTML = `<img src="${url}" alt="">`;
-  let ov = document.getElementById('woFull');
-  if(!ov){
-    ov = document.createElement('div'); ov.id = 'woFull'; ov.className = 'wo-full';
-    ov.onclick = () => ov.classList.remove('show');
-    document.body.appendChild(ov);
-  }
-  ov.innerHTML = `<img src="${url}" alt="Снимок списания"><span>${escS(name || '')}</span>`;
-  ov.classList.add('show');
-  try{ Telegram.WebApp.HapticFeedback.impactOccurred('light'); }catch(e){}
 }
 
 async function accCheck(){

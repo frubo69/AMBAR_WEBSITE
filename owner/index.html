@@ -4180,8 +4180,21 @@ button.path:active{transform:scale(.995)}
   font-variant-numeric:tabular-nums;min-width:56px;text-align:right;flex-shrink:0}
 
 /* Расходы: сводка дня и строки водителей */
+/* Вкладки и плашка дня закреплены наверху: список водителей длинный, а
+   переключиться и перевести день хочется с любого места — иначе за этим надо
+   каждый раз возвращаться к началу. Фон под ними непрозрачный: сквозь щель
+   между вкладками и плашкой иначе просвечивал бы уезжающий список. */
+/* Прилипает к самому краю раздела, а не к его внутреннему полю: липкий
+   элемент отсчитывает top от поля контейнера, и в эти десять точек над ним
+   пролезал уезжающий список. Поэтому поднимаем блок на них же и возвращаем
+   их своим паддингом — полоса фона закрывает щель. */
+.exp-pin{position:sticky;top:-10px;z-index:4;background:var(--bg);
+  margin:-10px -14px 0;padding:12px 14px 8px}
 .exp-sum{border:1px solid var(--border2);border-radius:14px;background:var(--card);
-  padding:13px 15px;margin-bottom:4px}
+  padding:13px 15px;margin-bottom:0}
+/* Карточки расходов начинаются чуть ниже закреплённой шапки — так видно, что
+   они уезжают под неё, а не приклеены к ней. */
+#expList{margin-top:12px}
 /* День живёт в самой плашке расходов, а не отдельной полосой над ней: листают
    не «дату», листают расходы за день, и ехать должно то, на что смотрят.
    Части слайдера разобраны по местам: стрелки по краям строки, день в центре,
@@ -16112,10 +16125,13 @@ async function accExpenses(тихо){
   // Полоса дня — под вкладками: сперва выбирают, о чём смотреть, и только
   // потом за какой день. Сверху она отделяла вкладки от их же содержимого.
   document.getElementById('accMid').innerHTML = `
+    <div class="exp-pin">
     <div class="periods" id="shTabs" style="margin:2px 0 10px">
       <div class="period-pill"></div>
       <button class="${SH_TAB === 'exp' ? 'on' : ''}" onclick="shTab('exp')">Водители</button>
       <button class="${SH_TAB === 'wo' ? 'on' : ''}" onclick="shTab('wo')">Брак / бой / утеря<i class="sh-n"></i></button>
+    </div>
+      <div class="exp-sum" id="expSum" data-day="общий" hidden></div>
     </div>
     <div id="expBody"><div class="exp-empty">Загрузка…</div></div>`;
   const g = document.getElementById('shTabs'); if(g) requestAnimationFrame(()=>movePill(g));
@@ -16173,12 +16189,13 @@ async function accExpDay(){
   // День больше не пишем в шапку: его говорит полоса под ней, и второй раз
   // мелким шрифтом он только спорит сам с собой.
   _setText('accSub', '');
-  // Каркас ставим один раз. Пересоздавать его на каждый день нельзя: на
-  // плашке висит жест и на ней же играет полёт — после подмены узла жест
-  // остался бы на элементе, которого на странице уже нет.
-  if(!document.getElementById('expSum'))
-    body.innerHTML = '<div class="exp-sum" id="expSum" data-day="общий"></div>'
-                   + '<div id="expList"></div>';
+  // Плашка дня стоит в закреплённой шапке и живёт весь раздел: на ней висит
+  // жест и на ней же играет полёт, пересоздавать её на каждый день нельзя.
+  // В теле — только список, он и перерисовывается.
+  const sum = document.getElementById('expSum');
+  if(sum) sum.hidden = false;
+  if(!document.getElementById('expList'))
+    body.innerHTML = '<div id="expList"></div>';
   renderExpenses();
 }
 
@@ -24982,6 +24999,8 @@ function woHome(){
 
 async function accWoAll(){
   const body = document.getElementById('expBody'); if(!body) return;
+  // Сводка по водителям к браку не относится — на этой вкладке её нет.
+  const sum = document.getElementById('expSum'); if(sum) sum.hidden = true;
   body.innerHTML = '<div class="exp-empty">Загрузка…</div>';
   try{
     if(!ACC_WO) ACC_WO = await ownerApi.ownerFetch('/api/owner/stock/writeoffs',

@@ -2107,6 +2107,9 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
    одна, и двигается она целиком. Разделяет их волосок, а не зазор. */
 .ck-daybar{display:block;margin:0 0 12px}
 .ck-daybar .dayslide{width:100%}
+/* Возврат к сегодня — тем же кружком, что в пилюле плашки; прячется на сегодня. */
+.dayslide .dn-home{width:26px;height:26px;margin:0 6px 0 2px;flex:0 0 auto}
+.dayslide .dn-home[hidden]{display:none}
 .ck-daybar .cal-btn{width:40px;align-self:stretch;flex:0 0 auto;
   margin:-3px -4px -3px 2px;border:0;border-left:1px solid var(--border2);
   border-radius:0 10px 10px 0;background:none}
@@ -13111,6 +13114,24 @@ async function stkPicker(тихо){
     document.getElementById('stkMid').innerHTML =
       '<div class="stk-empty">Загрузка…</div>';
   }
+  // Полоса дня двигает только «Остатки всего»: ревизия и перемещение живут
+  // сегодняшним днём, у них своя история и свои полосы внутри. Листаем день
+  // на уже собранной странице — перечитываем одну стоимость и меняем одну
+  // карточку; плитки и полоса остаются на месте.
+  const card = document.getElementById('stkValCard');
+  if(тихо && card){
+    const day = accDay();
+    let val = null;
+    try{ val = await ownerApi.ownerFetch('/api/owner/stock/value', {params:{day}}); }catch(e){}
+    if(STK.view !== 'pick' || accDay() !== day) return;
+    STK.val = val;
+    const now = document.getElementById('stkValCard');
+    if(now) now.outerHTML = stkValueCard(STK.reg);
+    // Полоса дня остаётся — значит день на ней пишем сами (из календаря сюда
+    // приходят без перекраски, стрелки красят её ещё раз, это не страшно).
+    dayBarPaint(document.getElementById('stkDay'));
+    return;
+  }
   let st, reg;
   try{
     // Реестр кодов — вторым запросом рядом: он отвечает на первый вопрос
@@ -13120,7 +13141,7 @@ async function stkPicker(тихо){
     // районов значило бы показывать плитки с пустыми цифрами.
     let aud, tr;
     [st, reg, STK.val, aud, tr] = await Promise.all([
-      ownerApi.ownerFetch('/api/owner/stock/status', {params:{day: accDay()}}),
+      ownerApi.ownerFetch('/api/owner/stock/status'),
       ownerApi.ownerFetch('/api/owner/qr').catch(() => null),
       ownerApi.ownerFetch('/api/owner/stock/value', {params:{day: accDay()}})
         .catch(() => null),
@@ -13318,7 +13339,7 @@ function stkValueCard(reg){
   // Три величины — три плитки той же анатомии, что в ревизии: подпись,
   // число, единица. Золото — на деньгах, количество белым. Цены — кнопки:
   // за ними закупочные цены по позициям.
-  return `<div class="sc">
+  return `<div class="sc" id="stkValCard">
     <div class="sc-cap"><span>Остатки всего</span></div>
     <div class="aud-g">
       <div class="aud-t"><span class="aud-tl">Количество</span>
@@ -15273,6 +15294,9 @@ function dayBarPaint(el){
   (el.querySelector('.exp-day') || el).classList.toggle('back', off > 0);
   const вперёд = el.querySelectorAll('.ds-arw')[1];
   if(вперёд) вперёд.disabled = off <= 0;
+  // Возврат к сегодня есть, только когда есть куда возвращаться.
+  const домой = el.querySelector('.dayslide .dn-home, :scope > .dn-home');
+  if(домой) домой.hidden = off <= 0;
 }
 
 function dayBarHtml(id){
@@ -15294,6 +15318,10 @@ function dayBarHtml(id){
       </div>
       <button class="ds-arw" onclick="dayBarArrow(this,-1)" aria-label="День вперёд"
         ${off ? '' : 'disabled'}>${стрелка('M9 5l7 7-7 7')}</button>
+      <button class="dn-home" onclick="dayBarHome(this)" ${off ? '' : 'hidden'}
+        aria-label="Вернуться к сегодня" title="Вернуться к сегодня"><svg viewBox="0 0 24 24"
+        fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"
+        stroke-linejoin="round"><path d="M4 12a8 8 0 1 0 2.5-5.8"/><path d="M4 4v4h4"/></svg></button>
       <button class="cal-btn" onclick="openDate('${id}')" aria-label="Выбрать день"
         ><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
           stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5"
@@ -15485,7 +15513,7 @@ function accDayGo(off){
   accLoadSummaries();                     // плитки учёта — за тот же день
   if(document.getElementById('stkBySum')){ stkByReload(); return; }
   if(document.getElementById('stkDay')){
-    ACC_STOCK = null; daySkel('stkMid'); stkPicker(true); return;
+    ACC_STOCK = null; daySkel('stkValCard'); stkPicker(true); return;
   }
   if(document.getElementById('expSum')){
     EXP.data = null; ACC_WO = null; daySkel('accMid'); accExpenses(true);

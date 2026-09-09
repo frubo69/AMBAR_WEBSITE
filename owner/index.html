@@ -5796,28 +5796,14 @@ button.exp-wait:active{transform:scale(.99)}
 
 <!-- ============ MONEY ============ -->
 <div class="page" id="pg-money">
-  <!-- Учёт живёт днями, а не неделями: расходы смены, пересчёт склада, заявка —
-       всё это записи одного дня. Неделя и месяц отвечали на вопрос, которого
-       здесь не задают, поэтому вместо них окошко с днём: листается свайпом и
-       стрелками, календарь рядом — для дальнего дня. -->
-  <div class="period-bar">
-    <div class="dayslide" id="moneyDay">
-      <button class="ds-arw" onclick="accDayStep(1)" aria-label="День назад">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-             stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
-      <div class="ds-win" id="moneyDayWin">
-        <span class="ds-txt" id="mdTxt"><b id="mdName">Сегодня</b><i id="mdDate">—</i></span>
-      </div>
-      <button class="ds-arw" id="mdNext" onclick="accDayStep(-1)" aria-label="День вперёд" disabled>
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-             stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
-    </div>
-    <button class="ds-home" id="mdHome" onclick="accDayHome()" style="display:none">Сегодня</button>
-    <button class="cal-btn" onclick="openDate('moneyDay')" aria-label="Выбрать день">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg>
-    </button>
-  </div>
-  <div class="range-chip" id="rangeChip-moneyDay" style="display:none"><span class="rc-icon"><svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 10h18M8 3v4M16 3v4"/></svg></span><span class="rc-text"></span><button class="rc-x" onclick="accDayHome()">✕</button></div>
+  <!-- Полосы дня здесь больше нет. Учёт — страница входов: она отвечает, куда
+       идти, а не за какой день, и день над плитками спрашивали редко — зато
+       он занимал первую строку экрана. Там, где день действительно листают,
+       полоса своя: в чек-листе (ckDayBar, свой CKL_OFF, снаружи ни на что не
+       влияет) и на «Обзоре». Сам день никуда не делся: DAY_OFFSET общий на
+       приложение, плитки берут его через accDay(), а «Расходы смены» так и
+       пишут под числом, за какой он день. Правки задним числом и вопрос перед
+       ними (accAskBack) работают как работали. -->
 
   <!-- Панель учёта: от общего к частному. Здесь только вход в разделы и
        короткая сводка по каждому — вся работа внутри, чтобы страница не

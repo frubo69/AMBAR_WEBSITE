@@ -741,11 +741,24 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .aud-r .ord-r-n{font-size:13px}
 .aud-r-s{display:block;font-size:10.5px;font-weight:600;margin-top:2px;color:var(--muted)}
 .aud-r-s.dn{color:var(--dn)}
-.aud-n{flex:0 0 auto;display:flex;align-items:baseline;gap:4px;font-variant-numeric:tabular-nums}
-.aud-n b{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;color:var(--dn);
-  min-width:22px;text-align:right}
+.aud-n{flex:0 0 auto;display:flex;align-items:baseline;gap:5px;font-variant-numeric:tabular-nums}
+.aud-n b{font-family:'Space Grotesk',sans-serif;font-size:22px;font-weight:700;color:var(--dn);
+  min-width:26px;text-align:right;letter-spacing:-.4px}
 .aud-n b.ok{color:var(--up)} .aud-n b.over{color:var(--warn)} .aud-n b.dim{color:var(--dim)}
-.aud-n i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:12px;font-weight:600;color:var(--muted)}
+.aud-n i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;color:var(--sub)}
+/* Состояние ревизии на строке района — плашкой с точкой, а не строкой текста. */
+.aud-st{display:inline-flex;align-items:center;gap:6px;width:max-content;max-width:100%;
+  margin-top:4px;padding:4px 9px 4px 8px;border-radius:8px;font-size:10px;font-weight:700;
+  letter-spacing:.6px;text-transform:uppercase;color:var(--muted);
+  background:rgba(255,255,255,.05);border:1px solid var(--border2);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.aud-st::before{content:'';flex:0 0 auto;width:6px;height:6px;border-radius:50%;
+  background:currentColor;opacity:.9}
+.aud-st u{text-decoration:none;font-family:'Space Grotesk',sans-serif;font-size:11px;
+  letter-spacing:0;margin-left:2px}
+.aud-st.run,.aud-st.warn{color:var(--gold2);background:var(--gold-soft);border-color:rgba(201,169,110,.3)}
+.aud-st.dn{color:var(--dn);background:var(--dn-soft);border-color:rgba(224,85,85,.3)}
+.aud-st.ok{color:var(--up);background:var(--up-soft);border-color:rgba(76,175,125,.3)}
 .aud-r.dim .ord-r-n{color:var(--sub)}
 .aud-r.dim .ord-r-img{opacity:.6}
 /* Позиции, которых на этом складе нет, сложены под последней строкой. */
@@ -770,7 +783,18 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   display:flex;align-items:center;gap:10px;height:44px;padding:0 14px;box-sizing:border-box;
   border-radius:15px;background:rgba(14,14,22,.55);border:1px solid rgba(255,255,255,.12);
   backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);
-  white-space:nowrap;overflow:hidden;transition:width .3s cubic-bezier(.2,.9,.25,1)}
+  white-space:nowrap;overflow:hidden;
+  transition:width .3s cubic-bezier(.2,.9,.25,1),opacity .25s var(--e1),transform .25s var(--e1)}
+.aud-chip.off{opacity:0;transform:translateY(-6px);pointer-events:none}
+/* Общий счёт по району — справа, перед фонариком, той же высоты и стекла. */
+.aud-tot{display:inline-flex;align-items:center;gap:3px;height:44px;padding:0 14px;
+  border-radius:15px;background:rgba(14,14,22,.5);border:1px solid rgba(255,255,255,.14);
+  backdrop-filter:blur(18px);-webkit-backdrop-filter:blur(18px);
+  font-family:'Space Grotesk',sans-serif;font-variant-numeric:tabular-nums;line-height:1}
+.aud-tot b{font-size:17px;font-weight:700;color:#fff}
+.aud-tot b.e{color:rgba(255,255,255,.55)}
+.aud-tot i{font-style:normal;font-size:14px;font-weight:600;color:rgba(255,255,255,.35)}
+.aud-tot.ok b{color:#6FD79E}
 .aud-chip span{font-size:13px;font-weight:700;color:#fff;overflow:hidden;text-overflow:ellipsis;
   max-width:52vw}
 .aud-chip b{font-family:'Space Grotesk',sans-serif;font-size:17px;font-weight:700;
@@ -4225,11 +4249,17 @@ button.path:active{transform:scale(.995)}
 /* Подсказка «наведите на код» — тонкой строкой над лентой, пока не начали. */
 /* Подсказку держим под самой рамкой, а не у нижнего края: человек смотрит в
    кадр, туда и слово. Под словом-итогом (badge), чтобы они не налезали. */
-.scan-tip{position:absolute;left:0;right:0;bottom:auto;
+/* Подсказка — стеклянной пилюлей того же рода, что плашки сверху, а не голой
+   строкой по кадру. Пустая — не видна. */
+.scan-tip{position:absolute;left:50%;transform:translateX(-50%);width:max-content;max-width:80vw;
   top:calc(46% + min(64vw,264px) / 2 + 54px);
-  text-align:center;font-size:12.5px;color:rgba(255,255,255,.6);
-  text-shadow:0 1px 8px rgba(0,0,4,.9);pointer-events:none}
-.scan-tip.warn{color:#F3CE6A}
+  padding:8px 14px;border-radius:12px;font-size:12px;font-weight:600;letter-spacing:.2px;
+  color:rgba(255,255,255,.85);background:rgba(14,14,22,.5);border:1px solid rgba(255,255,255,.12);
+  backdrop-filter:blur(18px) saturate(160%);-webkit-backdrop-filter:blur(18px) saturate(160%);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+  pointer-events:none;transition:opacity .2s var(--e1)}
+.scan-tip:empty{opacity:0}
+.scan-tip.warn{color:#F3CE6A;border-color:rgba(243,206,106,.35)}
 
 /* Низ: лента отсканированных — их листают, чтобы просмотреть, — и кнопки. */
 .scan-hud-bot{position:absolute;left:0;right:0;bottom:0;
@@ -13074,16 +13104,16 @@ async function stkAuditPick(){
 
 function audDistRow(d, left, без){
   const n = left[d.id] || 0, b = (без || {})[d.id] || 0;
-  const [sub, cls] = d.audit === 'running' ? ['идёт ревизия', 'warn']
+  const [sub, cls] = d.audit === 'running' ? ['идёт ревизия', 'run']
     : d.audit === 'pending' ? ['ждёт решения', 'dn']
     : d.audit === 'closed'
-      ? (d.short_aed ? [`закрыта · не хватает ${fmt(d.short_aed)} AED`, 'dn'] : ['закрыта · всё сошлось', 'ok'])
-    : b ? [`QR код не внесён · ${fmt(b)}`, 'warn'] : ['не начата', ''];
+      ? (d.short_aed ? [`не хватает <u>${fmt(d.short_aed)} AED</u>`, 'dn'] : ['закрыта · всё сошлось', 'ok'])
+    : b ? [`QR код не внесён <u>${fmt(b)}</u>`, 'warn'] : ['не начата', 'idle'];
   return `<button class="stk-dr" onclick="stkAuditGo('${d.id}')">
     <span class="stk-dr-c">${escS(d.code || '')}</span>
     <span class="stk-dr-b">
       <span class="stk-dr-n">${escS(d.name || '')}</span>
-      <span class="stk-dr-s ${cls}">${sub}</span>
+      <span class="aud-st ${cls}">${sub}</span>
     </span>
     <span class="stk-dr-v ${n ? '' : 'dim'}">${n ? fmt(n) : '—'}${n ? '<i>бут</i>' : ''}</span>
     <span class="stk-dr-go">›</span>
@@ -13706,9 +13736,11 @@ function audPage(){
     <button class="aud-more${STK.audMore ? ' open' : ''}" onclick="audMore()">${
       live.length ? '' : 'на складе пусто · '}ещё ${rest.length}${_CHEV}</button>${
       STK.audMore ? rest.map(audRow).join('') : ''}` : ''}</div>`;
+  // Внизу — всегда следующий шаг работы. У завершённой это «возобновить»:
+  // забыли полку, спутали район — всякое бывает; отчёт открывается из карточки.
   const go = st === 'idle'    ? ['audStart()', 'Начать ревизию']
            : st === 'running' ? ['audScanOpen()', 'Продолжить сканирование']
-           :                    ['audReportGo()', 'Отчёт'];
+           :                    ['audReopen()', 'Возобновить ревизию'];
   document.getElementById('stkFoot').innerHTML =
     `<div class="qb-wrap"><button class="qb" onclick="${go[0]}">${go[1]}</button></div>`;
 }
@@ -13768,6 +13800,25 @@ async function audReportGo(){
   catch(e){ _toast('Отчёт не найден'); return; }
   STK.repFrom = 'sheet';
   audReport(rep);
+}
+
+// Завершили рано — вернулись. Всё, что ревизия успела записать, сервер
+// откатывает: пересчёт, списания недостачи с удержанием, переезды излишка.
+// Сканы остаются, камера открывается там же, где остановились.
+async function audReopen(){
+  const sh = STK.sheet; if(!sh) return;
+  const a = sh.audit || {};
+  const решено = !!((a.short && a.short.resolved_at) || (a.over && a.over.resolved_at));
+  const ok = await askDialog('Возобновить ревизию?',
+    решено ? 'Удержание снимется, переезды вернутся, пересчёт запишется заново'
+           : 'Пересчёт запишется заново при завершении', 'Возобновить', 'Не надо');
+  if(!ok) return;
+  try{ await ownerApi.ownerFetch('/api/owner/stock/audit/reopen', {method:'POST',
+        body:{district: STK.district, day: sh.day, as: _meName()}}); }
+  catch(e){ _toast('Не удалось возобновить'); return; }
+  _audHap('medium');
+  await audOpen(STK.district, true);
+  audScanOpen();
 }
 
 // ── отчёт ───────────────────────────────────────────────────────────────────
@@ -14002,6 +14053,8 @@ async function audScanOpen(){
   const old = document.getElementById('audCam'); if(old) old.remove();
   const lay = document.createElement('div');
   lay.className = 'aud-cam'; lay.id = 'audCam';
+  // Слева — последняя бутылка и «столько из стольких» по ней (появляется с
+  // первым сканом), справа перед фонариком — общий счёт по району.
   lay.innerHTML = `<div class="scan-cam" id="qrCam">
       <video id="qrVideo" playsinline muted autoplay></video>
       <div class="scan-frame" id="qrFrame">
@@ -14009,9 +14062,10 @@ async function audScanOpen(){
         <div class="scan-badge" id="qrBadge"></div>
       </div>
       <div class="scan-hud">
-        <div class="aud-chip" id="audChip"><span id="audChipN">Ревизия</span><b id="audChipC" class="dim">0/0</b></div>
+        <div class="aud-chip off" id="audChip"><span id="audChipN"></span><b id="audChipC"></b></div>
         <div class="scan-hud-top" style="justify-content:flex-end">
           <div class="scan-tools">
+            <div class="aud-tot" id="audTot"><b id="audTotN">0</b><i>/</i><b class="e" id="audTotE">0</b></div>
             <button class="scan-tool" id="qrTorch" onclick="qrTorch(this)" style="display:none">
               <svg viewBox="0 0 24 24" width="19" height="19" fill="none" stroke="currentColor"
                 stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -14031,8 +14085,6 @@ async function audScanOpen(){
   scanLive('stkOv');
   _stkHead(`${sh.district_code || ''} ${sh.district_name || ''}`.trim(), '', false);
   document.getElementById('stkBackBtn').style.display = 'none';
-  const chip = document.getElementById('audChip');
-  chip.style.width = chip.offsetWidth + 'px';       // от точной ширины и тянется
   requestAnimationFrame(() => requestAnimationFrame(() => lay.classList.add('on')));
   audLoadState();
   try{
@@ -14059,24 +14111,26 @@ async function audScanClose(){
   await audOpen(STK.district, true);
 }
 
-// Плашка: название и «столько из стольких». Ширина едет за названием, само
-// число коротко подпрыгивает — видно, что счёт сдвинулся. Пока ни одной
-// бутылки не отсканировали, в плашке общий счёт по району, тихим цветом.
-function audChipSet(name, n, exp, dim){
+// Плашка: последняя бутылка и «столько из стольких» по ней. До первого скана
+// её нет; появляется сразу нужной ширины, дальше ширина едет за названием, а
+// число коротко подпрыгивает — видно, что счёт сдвинулся.
+function audChipSet(name, n, exp){
   const chip = document.getElementById('audChip'); if(!chip) return;
+  const first = chip.classList.contains('off');
   const w0 = chip.offsetWidth;
   chip.style.width = 'auto';
   _setText('audChipN', name);
   const c = document.getElementById('audChipC');
   c.textContent = `${fmt(n)}/${fmt(exp)}`;
-  c.className = dim ? 'dim' : n === exp ? 'ok' : n > exp ? 'over' : '';
+  c.className = n === exp ? 'ok' : n > exp ? 'over' : '';
   const w1 = chip.offsetWidth;
-  chip.style.width = w0 + 'px'; void chip.offsetWidth; chip.style.width = w1 + 'px';
+  if(first){ chip.style.width = w1 + 'px'; chip.classList.remove('off'); }
+  else { chip.style.width = w0 + 'px'; void chip.offsetWidth; chip.style.width = w1 + 'px'; }
   // Доехала — отпускаем ширину: замер мог пройти до догрузки шрифта, и
   // зажатая в пикселях плашка обрезала бы слово многоточием.
   clearTimeout(chip._fit);
   chip._fit = setTimeout(() => { chip.style.width = 'auto'; }, 360);
-  if(!dim){ c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop'); }
+  c.classList.remove('pop'); void c.offsetWidth; c.classList.add('pop');
 }
 
 // Проход прерывают и возвращаются к нему: ревизия большого района — это час
@@ -14128,8 +14182,9 @@ function audDone(err, r, job){
 function audPaint(){
   const done = Object.values(AUD.counts).reduce((a, b) => a + (b || 0), 0);
   const exp = ((STK.sheet || {}).totals || {}).expected || 0;
-  _setText('stkSub', `${fmt(done)} из ${fmt(exp)} бутылок`);
-  if(!AUD.chipPid) audChipSet('Ревизия', done, exp, true);
+  _setText('audTotN', fmt(done)); _setText('audTotE', fmt(exp));
+  const tot = document.getElementById('audTot');
+  if(tot) tot.classList.toggle('ok', !!exp && done === exp);
   const feed = document.getElementById('audFeed'); if(!feed) return;
   feed.innerHTML = AUD.rows.slice(0, 40).map((r, i) => {
     const [, say, color] = AUD_V[r.verdict] || ['', 'отправляю…', 'var(--muted)'];

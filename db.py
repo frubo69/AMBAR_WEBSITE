@@ -3411,6 +3411,37 @@ async def audit_set(district: str, day: str, fields: dict) -> dict:
     return doc or {}
 
 
+async def audit_unset(district: str, day: str, fields: list) -> dict:
+    """Снять поля состояния — так ревизия возвращается из «завершена» в «идёт»."""
+    db = _db_or_none()
+    if db is None: return {}
+    from pymongo import ReturnDocument
+    doc = await db.stock_audits.find_one_and_update(
+        {"district": district, "day": day},
+        {"$unset": {f: "" for f in fields}},
+        projection={"_id": 0}, return_document=ReturnDocument.AFTER)
+    return doc or {}
+
+
+async def delete_stock_count(district: str, day: str) -> bool:
+    """Стереть пересчёт дня — когда ревизию возобновили и снимок запишут заново."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.stock_counts.delete_one({"district": district, "day": day})
+    return r.deleted_count > 0
+
+
+async def qr_unrestore(code: str, status: str) -> bool:
+    """Обратное qr_restore: возобновили ревизию — бутылка снова числится
+    списанной (или проданной), как до внесения излишка."""
+    db = _db_or_none()
+    if db is None or status not in ("written", "sold"): return False
+    r = await db.qr_codes.update_one(
+        {"_id": code, "status": "active"},
+        {"$set": {"status": status}, "$pop": {"restored": 1}})
+    return r.matched_count > 0
+
+
 async def audits_by_day(day: str) -> dict:
     """{район: состояние} за день — для списка районов."""
     db = _db_or_none()

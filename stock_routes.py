@@ -1961,6 +1961,71 @@ async def handle_audit_over(request):
 
 
 @require_owner
+async def handle_audit_reopen(request):
+    """Возобновить завершённую ревизию. body: {district, day?, as?}
+
+    Завершить можно рано — забыли полку, спутали район. Всё, что ревизия
+    успела записать, откатывается: пересчёт стирается (снимок запишется заново
+    при завершении), списания недостачи удаляются, а снятое удержание уходит
+    водителю сообщением; переезды излишка возвращаются, бутылки, возвращённые
+    в остаток, снова помечаются как были. Сканы остаются — продолжают с того
+    места, где остановились."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    district, day = _district_of(request, body)
+    if district not in OFFICE_IDS:
+        return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+    a = await db.audit_get(district, day) or {}
+    if not a.get("finished_at"):
+        return web.json_response({"error": "not_finished"}, status=409, headers=CORS_HEADERS)
+    now_iso = datetime.now(timezone.utc).isoformat()
+    by_name = str(body.get("as") or "").strip()[:60]
+    undone = {"writeoffs": 0, "moves": 0, "restored": 0}
+    short = a.get("short") or {}
+    if short.get("resolved_at"):
+        for wid in short.get("writeoffs") or []:
+            doc = await db.writeoff_get(wid)
+            if not doc:
+                continue
+            comp = doc.get("comp") or {}
+            if comp.get("amount"):
+                # Каждому, с кого удерживали, — что удержание снято.
+                for part in comp.get("split") or [{"who": comp.get("who")}]:
+                    try:
+                        await _writeoff_comp_tell({**doc, "comp": {}, "by": part.get("who") or ""})
+                    except Exception as e:                  # noqa: BLE001
+                        log.warning(f"[audit] о снятом удержании не сообщили: {e}")
+            if await db.writeoff_del(wid):
+                undone["writeoffs"] += 1
+    over = a.get("over") or {}
+    if over.get("resolved_at"):
+        for l in over.get("lines") or []:
+            for c in l.get("codes") or []:
+                code, v = c.get("code") or "", c.get("verdict") or ""
+                if not code:
+                    continue
+                if v == "other":
+                    st, _ = await move_undo_by_code(code)
+                    if st == 200:
+                        undone["moves"] += 1
+                elif v in ("written", "sold"):
+                    if await db.qr_unrestore(code, v):
+                        undone["restored"] += 1
+    await db.delete_stock_count(district, day)
+    a = await db.audit_unset(district, day, ["finished_at", "finished_by", "finished_by_name",
+                                            "closed_at", "short", "over", "alien", "result", "lines"])
+    a = await db.audit_set(district, day, {"reopened_at": now_iso, "reopened_by_name": by_name,
+                                          "reopens": int(a.get("reopens") or 0) + 1})
+    base_drop()
+    log.info(f"[audit] {district} {day}: возобновлена — снято списаний {undone['writeoffs']}, "
+             f"переездов {undone['moves']}, возвратов {undone['restored']}")
+    return web.json_response({"ok": True, "audit": _audit_view(a), "undone": undone},
+                             headers=CORS_HEADERS)
+
+
+@require_owner
 async def handle_audit_report(request):
     """Отчёт ревизии: чем кончилась и что решено. ?district=&day="""
     district, day = _district_of(request)
@@ -2825,6 +2890,7 @@ def setup(app):
         ("/api/owner/stock/audit/short",  handle_audit_short,  "POST"),
         ("/api/owner/stock/audit/over",   handle_audit_over,   "POST"),
         ("/api/owner/stock/audit/report", handle_audit_report, "GET"),
+        ("/api/owner/stock/audit/reopen", handle_audit_reopen, "POST"),
         ("/api/owner/stock/count",     handle_save,      "POST"),
         ("/api/owner/stock/transfer",  handle_transfer,  "POST"),
         ("/api/owner/stock/transfer/scan",      handle_transfer_scan,      "POST"),

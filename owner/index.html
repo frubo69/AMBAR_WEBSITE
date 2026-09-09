@@ -2021,10 +2021,12 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 /* «4/7» одним кеглем: дробь читается как счёт, а не как число с примечанием. */
 .ck-h-v u{text-decoration:none;font-size:36px;font-weight:700;color:var(--sub);
   letter-spacing:-.4px}
-/* Косая в дроби «3/8»: у Space Grotesk её штрих вылезает за свою ширину
-   вправо, и цифра после неё стояла вплотную, а перед ней был просвет. Поля
-   считаны по чернилам глифов: слева и справа от штриха — по одному зазору. */
-.sl{font-style:normal;text-decoration:none;letter-spacing:0;margin:0 .08em 0 .06em}
+/* Косая в дроби «4/8»: глаз меряет зазор по концам штриха — нижний конец
+   стоит у ноги цифры слева, верхний висит над цифрой справа, — поэтому поля
+   несимметричные и подобраны глазом по крупному пробнику (владелец: «чтобы
+   и 4 и 8 были ровно относительно /»). Считать по чернилам глифов
+   не помогло: по среднему зазору косая уже была «ровно». */
+.sl{font-style:normal;text-decoration:none;letter-spacing:0;margin:0 .04em 0 .1em}
 .aud-chip .sl{margin:0 .03em 0 .02em}
 /* Имя карточки — над числом, а не рядом с ним: это заголовок ежедневника, а
    не подпись к цифре. */
@@ -13161,10 +13163,13 @@ async function stkPicker(тихо){
   STK.districts = st.districts;
   // Подпись — оглавление раздела через косую, как на плитке «Учёта».
   _stkHead('Склад', 'остатки / ревизия / перемещение', false);
-  const today = st.day || accDay();
-  const сегодня = (STK.moves30 || []).filter(m => m.day === today)
-    .reduce((a, m) => a + (m.bottles || m.qty || 0), 0);
-  const nAud = (STK.audits || []).length, nMov = (STK.moves30 || []).length;
+  // На плитках — сколько раз за последние 30 дней: ревизий и перемещений.
+  // На полке «История» — когда было последнее, чтобы число не повторялось.
+  const с30 = _dayIsoFor(30);
+  const nAud = (STK.audits || []).filter(a => (a.day || '') >= с30).length;
+  const nMov = (STK.moves30 || []).length;
+  const lastAud = (STK.audits || []).map(a => a.day || '').sort().pop() || '';
+  const lastMov = (STK.moves30 || []).map(m => m.day || '').sort().pop() || '';
   // Две колонки, как плитки «Учёта»: сверху главное действие — ревизия и
   // перемещение, — под каждым его история половинкой. Карточки со строками
   // здесь не прижились: «кнопки на панели» читаются с одного взгляда.
@@ -13192,15 +13197,14 @@ async function stkPicker(тихо){
     accDayBar('stkDay') + stkValueCard(reg) + `
     <div class="stk-tiles2">
       <div class="stk-col">
-        ${tile('stkAuditPick()', I_AUD, 'Ревизия', fmt(st.done || 0), `из ${st.total || 0}`,
+        ${tile('stkAuditPick()', I_AUD, 'Ревизия', fmt(nAud), 'в месяц',
                'район / камера / отчёт')}
-        ${sub('stkAudits()', I_HAUD, 'История', fmt(nAud),
-              pluralize(nAud, 'ревизия', 'ревизии', 'ревизий'))}
+        ${sub('stkAudits()', I_HAUD, 'История', lastAud ? escS(_hstDay(lastAud)) : '—', '')}
       </div>
       <div class="stk-col">
-        ${tile('stkMoveStart()', I_MOV, 'Перемещение', fmt(сегодня), 'сегодня',
+        ${tile('stkMoveStart()', I_MOV, 'Перемещение', fmt(nMov), 'в месяц',
                'скан / куда везём')}
-        ${sub('stkMovesHist()', I_HMOV, 'История', fmt(nMov), 'за 30 дней')}
+        ${sub('stkMovesHist()', I_HMOV, 'История', lastMov ? escS(_hstDay(lastMov)) : '—', '')}
       </div>
     </div></div>`;
 }
@@ -15620,7 +15624,7 @@ function accRender(){
   // читается как «данных нет», хотя они просто едут; шиммер честнее.
   const num = {
     expenses: [t ? fmt(t.all) : null, 'AED · ' + accDayWord()],
-    stock:    [ACC_STOCK ? `${ACC_STOCK.done}<s class="sl">/</s>${ACC_STOCK.total}` : null,
+    stock:    [ACC_STOCK ? fmt(ACC_STOCK.total || 0) : null,
                ACC_STOCK ? pluralize(ACC_STOCK.total,'район','района','районов') : 'районов'],
     order:    (() => {
       const sup = ACC_SUP && ACC_SUP.open;

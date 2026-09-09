@@ -51,7 +51,7 @@ async def post_init(app):
         log.warning(f"база недоступна, чистка чата работать не будет: {e}")
     try:
         await app.bot.set_chat_menu_button(
-            menu_button=MenuButtonWebApp(text="Заказы", web_app=WebAppInfo(url=DRIVER_WEBAPP_URL)))
+            menu_button=MenuButtonWebApp(text="Панель", web_app=WebAppInfo(url=DRIVER_WEBAPP_URL)))
         log.info("кнопка приложения установлена")
     except Exception as e:
         log.warning(f"set_chat_menu_button: {e}")
@@ -76,7 +76,7 @@ async def cmd_start(update: Update, ctx: ContextTypes.DEFAULT_TYPE):
         f"Ваш район: {me['district_code']} {me['district_name']}\n\n"
         "В приложении — заказы на смену, отметка доставки и расходы.",
         reply_markup=InlineKeyboardMarkup([[
-            InlineKeyboardButton("Открыть заказы", web_app=WebAppInfo(url=DRIVER_WEBAPP_URL))]]))
+            InlineKeyboardButton("Открыть панель", web_app=WebAppInfo(url=DRIVER_WEBAPP_URL))]]))
     await _remember(sent)
     # Заодно снимаем старую клавиатуру, если она осталась с прошлых версий.
     kb = await update.message.reply_text(

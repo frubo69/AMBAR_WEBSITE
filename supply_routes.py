@@ -1388,7 +1388,11 @@ async def handle_own_line(request):
                              dumps=lambda o: __import__("json").dumps(o, default=str))
 
 
+@require_owner
 async def handle_one(request):
+    """Одна поставка целиком. Единственная ручка набора, которая стояла без
+    проверки прав: соседний список её имел, а эта — нет, и полный документ
+    закупа (состав, цены, районы, имена водителей) отдавался кому угодно."""
     sup = await db.supply_get(request.match_info.get("sid") or "")
     if not sup:
         return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)

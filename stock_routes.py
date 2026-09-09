@@ -1960,6 +1960,97 @@ async def handle_audit_over(request):
     return web.json_response(await _audit_report(district, day, a), headers=CORS_HEADERS)
 
 
+async def _audit_undo_short(a: dict) -> int:
+    """Снять решение по недостаче: списания стираются, каждому, с кого
+    удерживали, уходит «Удержание снято». Сколько записей стёрто."""
+    short = (a or {}).get("short") or {}
+    if not short.get("resolved_at"):
+        return 0
+    n = 0
+    for wid in short.get("writeoffs") or []:
+        doc = await db.writeoff_get(wid)
+        if not doc:
+            continue
+        comp = doc.get("comp") or {}
+        if comp.get("amount"):
+            for part in comp.get("split") or [{"who": comp.get("who")}]:
+                try:
+                    await _writeoff_comp_tell({**doc, "comp": {}, "by": part.get("who") or ""})
+                except Exception as e:                      # noqa: BLE001
+                    log.warning(f"[audit] о снятом удержании не сообщили: {e}")
+        if await db.writeoff_del(wid):
+            n += 1
+    return n
+
+
+async def _audit_undo_over(a: dict) -> tuple:
+    """Вернуть внесённый излишек: переезды назад, возвращённые в остаток
+    бутылки снова помечаются как были. (переездов, возвратов)."""
+    over = (a or {}).get("over") or {}
+    if not over.get("resolved_at"):
+        return 0, 0
+    moves = restored = 0
+    for l in over.get("lines") or []:
+        for c in l.get("codes") or []:
+            code, v = c.get("code") or "", c.get("verdict") or ""
+            if not code:
+                continue
+            if v == "other":
+                st, _ = await move_undo_by_code(code)
+                if st == 200:
+                    moves += 1
+            elif v in ("written", "sold"):
+                if await db.qr_unrestore(code, v):
+                    restored += 1
+    return moves, restored
+
+
+def _fresh(block: dict, keys: tuple) -> dict:
+    """Решение снято — от блока остаётся только то, что нашла ревизия."""
+    return {k: v for k, v in (block or {}).items() if k in keys}
+
+
+@require_owner
+async def handle_audit_short_undo(request):
+    """Снять решение по недостаче и выбрать заново. body: {district, day?}
+    Ревизия при этом снова «ждёт решения»."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    district, day = _district_of(request, body)
+    a = await db.audit_get(district, day) or {}
+    short = a.get("short") or {}
+    if not a.get("finished_at") or not short.get("resolved_at"):
+        return web.json_response({"error": "not_resolved"}, status=409, headers=CORS_HEADERS)
+    n = await _audit_undo_short(a)
+    await db.audit_set(district, day, {"short": _fresh(short, ("qty", "aed", "lines"))})
+    a = await db.audit_unset(district, day, ["closed_at"])
+    base_drop()
+    log.info(f"[audit] {district} {day}: решение по недостаче снято, списаний стёрто {n}")
+    return web.json_response(await _audit_report(district, day, a), headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_audit_over_undo(request):
+    """Вернуть внесённый излишек и решить заново. body: {district, day?}"""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    district, day = _district_of(request, body)
+    a = await db.audit_get(district, day) or {}
+    over = a.get("over") or {}
+    if not a.get("finished_at") or not over.get("resolved_at"):
+        return web.json_response({"error": "not_resolved"}, status=409, headers=CORS_HEADERS)
+    moves, restored = await _audit_undo_over(a)
+    await db.audit_set(district, day, {"over": _fresh(over, ("qty", "lines"))})
+    a = await db.audit_unset(district, day, ["closed_at"])
+    base_drop()
+    log.info(f"[audit] {district} {day}: излишек возвращён — переездов {moves}, возвратов {restored}")
+    return web.json_response(await _audit_report(district, day, a), headers=CORS_HEADERS)
+
+
 @require_owner
 async def handle_audit_reopen(request):
     """Возобновить завершённую ревизию. body: {district, day?, as?}
@@ -1982,37 +2073,8 @@ async def handle_audit_reopen(request):
         return web.json_response({"error": "not_finished"}, status=409, headers=CORS_HEADERS)
     now_iso = datetime.now(timezone.utc).isoformat()
     by_name = str(body.get("as") or "").strip()[:60]
-    undone = {"writeoffs": 0, "moves": 0, "restored": 0}
-    short = a.get("short") or {}
-    if short.get("resolved_at"):
-        for wid in short.get("writeoffs") or []:
-            doc = await db.writeoff_get(wid)
-            if not doc:
-                continue
-            comp = doc.get("comp") or {}
-            if comp.get("amount"):
-                # Каждому, с кого удерживали, — что удержание снято.
-                for part in comp.get("split") or [{"who": comp.get("who")}]:
-                    try:
-                        await _writeoff_comp_tell({**doc, "comp": {}, "by": part.get("who") or ""})
-                    except Exception as e:                  # noqa: BLE001
-                        log.warning(f"[audit] о снятом удержании не сообщили: {e}")
-            if await db.writeoff_del(wid):
-                undone["writeoffs"] += 1
-    over = a.get("over") or {}
-    if over.get("resolved_at"):
-        for l in over.get("lines") or []:
-            for c in l.get("codes") or []:
-                code, v = c.get("code") or "", c.get("verdict") or ""
-                if not code:
-                    continue
-                if v == "other":
-                    st, _ = await move_undo_by_code(code)
-                    if st == 200:
-                        undone["moves"] += 1
-                elif v in ("written", "sold"):
-                    if await db.qr_unrestore(code, v):
-                        undone["restored"] += 1
+    undone = {"writeoffs": await _audit_undo_short(a)}
+    undone["moves"], undone["restored"] = await _audit_undo_over(a)
     await db.delete_stock_count(district, day)
     a = await db.audit_unset(district, day, ["finished_at", "finished_by", "finished_by_name",
                                             "closed_at", "short", "over", "alien", "result", "lines"])
@@ -2891,6 +2953,8 @@ def setup(app):
         ("/api/owner/stock/audit/over",   handle_audit_over,   "POST"),
         ("/api/owner/stock/audit/report", handle_audit_report, "GET"),
         ("/api/owner/stock/audit/reopen", handle_audit_reopen, "POST"),
+        ("/api/owner/stock/audit/short/undo", handle_audit_short_undo, "POST"),
+        ("/api/owner/stock/audit/over/undo",  handle_audit_over_undo,  "POST"),
         ("/api/owner/stock/count",     handle_save,      "POST"),
         ("/api/owner/stock/transfer",  handle_transfer,  "POST"),
         ("/api/owner/stock/transfer/scan",      handle_transfer_scan,      "POST"),

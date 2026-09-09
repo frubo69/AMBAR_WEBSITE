@@ -13888,9 +13888,115 @@ function audReport(rep){
   }
   if(a.alien) secs += `<div class="aud-note">Кодов не из реестра: ${fmt(a.alien)}</div>`;
   document.getElementById('stkMid').innerHTML = head + secs;
-  document.getElementById('stkFoot').innerHTML = `<div class="qb-wrap">
-    <button class="qb${closed ? '' : ' quiet'}" onclick="${STK.repFrom === 'audits' ? 'stkAudits()' : 'stkAuditPick()'}">${
-      STK.repFrom === 'audits' ? 'К истории' : 'К районам'}</button></div>`;
+  // Внизу — то, что ждёт человека: принять решение, пока оно не принято, и
+  // изменить, когда принято. Назад ведёт стрелка в шапке; сошедшейся ревизии
+  // решать нечего, и подвала у неё нет.
+  const pend = !!((short && !short.resolved_at) || (over && !over.resolved_at));
+  const done = !!((short && short.resolved_at) || (over && over.resolved_at));
+  document.getElementById('stkFoot').innerHTML = pend
+    ? '<div class="qb-wrap"><button class="qb" onclick="audDecide()">Принять решение</button></div>'
+    : done ? '<div class="qb-wrap"><button class="qb quiet" onclick="audRedo()">Изменить решение</button></div>'
+    : '';
+}
+
+// Окно-выбор в стиле панели: строки — карточки с значком, названием и числом;
+// золотая — главный ответ, синяя — выход ничего не сделав.
+const I_AUD_HOLD = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+  stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="8" r="3.5"/>
+  <path d="M3.5 20v-1a6 6 0 0 1 6-6h1.5"/><circle cx="17.5" cy="17" r="3.5"/><path d="M17.5 15.5v3M16 17h3"/></svg>`;
+const I_AUD_NONE = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+  stroke-linecap="round" stroke-linejoin="round"><path d="M3 21h18"/><path d="M5 21V8l7-4 7 4v13"/>
+  <path d="M9.5 21v-5h5v5"/></svg>`;
+const I_AUD_IN = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9"
+  stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11"/><path d="M8 10l4 4 4-4"/>
+  <path d="M4 15v3a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-3"/></svg>`;
+function _audAsk(title, html, exitLabel){
+  closePinPop();
+  const back = document.createElement('div');
+  back.className = 'pin-back ask';
+  back.addEventListener('click', closePinPop);
+  const box = document.createElement('div');
+  box.className = 'pin-pop crw-ask crw-pick';
+  box.innerHTML = `<div class="crw-ask-t">${escS(title)}</div>${html}
+    <button class="crw-ask-b no" onclick="closePinPop()">${escS(exitLabel)}</button>`;
+  document.body.append(back, box);
+  _audHap('light');
+}
+function _audRow(main, ico, t, sub, q, u, go){
+  return `<button class="crw-ask-r${main ? ' main' : ''}" onclick="closePinPop(); ${go}">
+    <span class="crw-ask-i">${ico}</span>
+    <span class="crw-ask-n"><b>${escS(t)}</b>${sub ? `<i>${escS(sub)}</i>` : ''}</span>
+    ${q ? `<span class="crw-ask-q">${escS(q)}<u>${escS(u || '')}</u></span>` : ''}
+  </button>`;
+}
+
+// Что решаем — одним окном, строки только по тому, что ещё не решено.
+function audDecide(){
+  const rep = STK.report; if(!rep) return;
+  const a = rep.audit || {}, s = a.short, o = a.over;
+  let html = '';
+  if(s && !s.resolved_at){
+    html += `<div class="crw-ask-g">Недостача · ${fmt(s.qty)} ${pluralize(s.qty, 'бутылка', 'бутылки', 'бутылок')}</div>
+      <div class="crw-ask-box">${
+        _audRow(true, I_AUD_HOLD, 'Удержать с виновного', 'с кого и сколько',
+                s.aed ? fmt(s.aed) : '', 'AED', 'audHoldOpen()')}${
+        _audRow(false, I_AUD_NONE, 'Без виновного', 'за счёт компании', '', '', 'audShortNone()')}</div>`;
+  }
+  if(o && !o.resolved_at){
+    html += `<div class="crw-ask-g">Излишек · ${fmt(o.qty)} ${pluralize(o.qty, 'бутылка', 'бутылки', 'бутылок')}</div>
+      <div class="crw-ask-box">${
+        _audRow(true, I_AUD_IN, 'Внести на район', `${rep.district_code} ${rep.district_name}`,
+                fmt(o.qty), 'бут', 'audOver()')}</div>`;
+  }
+  if(!html) return;
+  _audAsk('Что решаем?', html, 'Позже');
+}
+
+// Решение можно переиграть: строка снимает его, и выбор возвращается.
+function audRedo(){
+  const rep = STK.report; if(!rep) return;
+  const a = rep.audit || {}, s = a.short, o = a.over;
+  let html = '';
+  if(s && s.resolved_at){
+    html += `<div class="crw-ask-g">Недостача</div><div class="crw-ask-box">${
+      _audRow(true, s.blame ? I_AUD_HOLD : I_AUD_NONE,
+              s.blame ? `Удержано ${fmt(s.amount)} AED` : 'Без виновного',
+              s.blame ? (s.who || '') : 'за счёт компании', '', '', 'audShortUndo()')}</div>`;
+  }
+  if(o && o.resolved_at){
+    html += `<div class="crw-ask-g">Излишек</div><div class="crw-ask-box">${
+      _audRow(true, I_AUD_IN, `Внесено на ${rep.district_code}`,
+              `перевезено ${fmt(o.moved || 0)} · возвращено ${fmt(o.restored || 0)}`, '', '', 'audOverUndo()')}</div>`;
+  }
+  if(!html) return;
+  _audAsk('Изменить решение', html, 'Оставить');
+}
+
+async function audShortUndo(){
+  const rep = STK.report, s = rep && rep.audit && rep.audit.short; if(!s) return;
+  const ok = await askDialog('Снять решение по недостаче?',
+    s.blame ? `Удержание ${fmt(s.amount)} AED · ${s.who || ''} снимется, водителю уйдёт сообщение`
+            : 'Списание без виновного отменится', 'Снять', 'Оставить');
+  if(!ok) return;
+  let r;
+  try{ r = await ownerApi.ownerFetch('/api/owner/stock/audit/short/undo', {method:'POST',
+        body:{district: rep.district, day: rep.day, as: _meName()}}); }
+  catch(e){ _toast('Не удалось — попробуйте ещё раз'); return; }
+  _audHap('warn'); _toast('Решение снято — выберите заново');
+  audReport(r); audDecide();
+}
+
+async function audOverUndo(){
+  const rep = STK.report, o = rep && rep.audit && rep.audit.over; if(!o) return;
+  const ok = await askDialog('Вернуть излишек?',
+    'Переезды вернутся, списанное снова будет списанным', 'Вернуть', 'Оставить');
+  if(!ok) return;
+  let r;
+  try{ r = await ownerApi.ownerFetch('/api/owner/stock/audit/over/undo', {method:'POST',
+        body:{district: rep.district, day: rep.day, as: _meName()}}); }
+  catch(e){ _toast('Не удалось — попробуйте ещё раз'); return; }
+  _audHap('warn'); _toast('Излишек возвращён — решите заново');
+  audReport(r); audDecide();
 }
 
 async function audShortNone(){

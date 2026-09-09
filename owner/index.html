@@ -810,9 +810,63 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .stk-mid:has(> .sc-page){display:flex;flex-direction:column}
 .sc-page{flex:1;display:flex;flex-direction:column;min-height:100%}
 .sc-page .ck-daybar{margin-bottom:10px}
+.sc-page > .sc{flex:0 0 auto}
 .sc-page .sc.grow{flex:1 1 0;display:flex;flex-direction:column;min-height:0}
 .sc-page .sc.grow .sc-r{flex:1 1 0;min-height:52px;max-height:80px}
 .sc-page .sc.grow:last-child{margin-bottom:0}
+/* ── Район в ревизии: карточка с полкой «История» внизу ── */
+.stk-drw{display:flex;flex-direction:column;border-radius:14px;overflow:hidden;
+  background:var(--card);border:1px solid var(--border2)}
+.stk-drw .stk-dr{border:0;border-radius:0;background:none;flex:1 1 auto}
+.stk-drw .stk-dr:active{transform:none;background:var(--card2)}
+.stk-dr-h{display:flex;align-items:center;gap:10px;min-height:42px;padding:0 14px 0 16px;border:0;
+  border-top:1px solid rgba(255,255,255,.06);background:rgba(255,255,255,.025);cursor:pointer;
+  font-family:inherit;color:var(--sub);text-align:left;-webkit-tap-highlight-color:transparent}
+.stk-dr-h:active{background:var(--card2)}
+.stk-dr-h > span{flex:1;font-size:12.5px;font-weight:600}
+.stk-dr-h b{flex:0 0 auto;font-family:'Space Grotesk',sans-serif;font-size:14px;font-weight:700;
+  color:var(--gold2);font-variant-numeric:tabular-nums;line-height:1}
+.stk-dr-h b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:9.5px;font-weight:600;
+  color:var(--muted);margin-left:4px;letter-spacing:.2px}
+.stk-dr-h i{flex:0 0 auto;font-style:normal;font-size:11px;color:var(--muted)}
+.stk-dr-h em{flex:0 0 auto;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;color:var(--gold2);background:var(--gold-soft);font-style:normal}
+.stk-dr-h em svg{width:11px;height:11px}
+.qd-page > .stk-drs > .stk-drw{flex:1 1 0;min-height:106px;max-height:186px}
+.qd-page .stk-dr-h{padding-left:18px}
+/* ── По районам: плитки и есть переключатель ── */
+.stk-byg .aud-t{transition:border-color .2s var(--e1),background-color .2s var(--e1)}
+.stk-byg .aud-t::after{display:none}
+.stk-byg .aud-t .aud-tl{padding-right:0}
+.stk-byg .aud-t.on{border-color:rgba(201,169,110,.8);
+  background:linear-gradient(180deg,rgba(201,169,110,.22),rgba(201,169,110,.08))}
+.stk-byg .aud-t.on .aud-tl{color:var(--gold2)}
+.aud-tv.is-skel{min-width:44px;height:.9em;border-radius:7px}
+.stkbd-n.is-skel{min-width:28px;height:.9em;border-radius:6px}
+/* ── История ревизий: строка одной ревизии ── */
+.hst-r{display:flex;align-items:center;gap:12px;width:100%;padding:11px 16px;border:0;
+  border-top:1px solid rgba(255,255,255,.05);background:transparent;cursor:pointer;
+  font-family:inherit;color:var(--text);text-align:left;-webkit-tap-highlight-color:transparent}
+.sc-cap + .hst-r{border-top:0}
+.hst-r:active{background:var(--card2)}
+.hst-b{flex:1;min-width:0;display:flex;flex-direction:column;gap:3px}
+.hst-b b{display:flex;align-items:baseline;gap:8px;min-width:0;font-size:13.5px;font-weight:700;line-height:1.2}
+.hst-b b s{text-decoration:none;font-size:11px;font-weight:500;color:var(--muted);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hst-b i{font-style:normal;font-size:11.5px;font-weight:600;line-height:1.3;color:var(--muted)}
+.hst-b i.ok{color:var(--up)} .hst-b i.dn{color:var(--dn)} .hst-b i.warn{color:var(--warn)}
+.hst-v{flex:0 0 auto;text-align:right}
+.hst-v b{display:block;font-family:'Space Grotesk',sans-serif;font-size:16px;font-weight:700;
+  color:var(--gold2);line-height:1;font-variant-numeric:tabular-nums}
+.hst-v b u{text-decoration:none;font-family:'DM Sans',sans-serif;font-size:9px;font-weight:600;
+  color:var(--muted);margin-left:4px;letter-spacing:.2px}
+.hst-r em{flex:0 0 auto;width:26px;height:26px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;color:var(--gold2);background:var(--gold-soft);font-style:normal}
+.hst-none{padding:16px;font-size:12.5px;color:var(--muted);text-align:center}
+/* Пришли с карточки района — его карточка вспыхивает золотом и гаснет до обычной рамки. */
+.sc.focus{animation:hstFocus 2.4s var(--e1) both}
+@keyframes hstFocus{0%,30%{border-color:rgba(232,201,138,.95);box-shadow:0 0 0 3px rgba(201,169,110,.22)}
+  100%{border-color:rgba(201,169,110,.28);box-shadow:0 0 0 0 rgba(201,169,110,0)}}
 
 /* Камера ревизии — слоем поверх списка: выезжает снизу и уезжает обратно, а
    список всё это время стоит под ней на своём месте. */
@@ -990,17 +1044,20 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
    нижних; общий шов «слева у каждой следующей» ставил черту и первой плитке
    второго ряда. */
 .stk-tiles{margin-top:2px;flex:0 0 auto}
-/* Две колонки склада: главная плитка сверху, её история — половинкой снизу. */
-.stk-tiles2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:2px}
-/* Колонка — одна карточка: главная плитка сверху, история приклеена снизу
-   через волосяной шов. Так видно, что история принадлежит именно ей. */
+/* Две колонки склада: главная плитка сверху, её история — половинкой снизу.
+   Колонка одета как карточка «Остатков»: один градиент и одна золотая рамка
+   на всю страницу, а не три разных приёма. Плитки тянутся до низа экрана. */
+.stk-tiles2{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:0;flex:1 1 auto}
 .stk-col{display:flex;flex-direction:column;gap:0;min-width:0;border-radius:16px;
-  background:var(--card);border:1px solid var(--border2);overflow:hidden}
-.stk-col .acc-cell{border:0;border-radius:0;background:none;box-shadow:none;min-height:118px}
-.stk-sub{display:flex;align-items:center;gap:8px;padding:10px 12px;border:0;
-  border-top:1px solid var(--border2);border-radius:0;cursor:pointer;text-align:left;
-  font-family:inherit;color:var(--sub);background:rgba(255,255,255,.025);min-width:0}
-.stk-sub:active{transform:scale(.98)}
+  background:linear-gradient(180deg,#161629 0%,#0F0F20 100%);
+  border:1px solid rgba(201,169,110,.28);overflow:hidden}
+.stk-col .acc-cell{border:0;border-radius:0;background:none;box-shadow:none;min-height:118px;
+  flex:1 1 auto;padding:14px 16px 12px}
+.stk-sub{display:flex;align-items:center;gap:9px;padding:10px 12px 10px 16px;border:0;
+  border-top:1px solid rgba(201,169,110,.14);border-radius:0;cursor:pointer;text-align:left;
+  font-family:inherit;color:var(--sub);background:rgba(255,255,255,.025);min-width:0;
+  -webkit-tap-highlight-color:transparent}
+.stk-sub:active{background:var(--card2)}
 .stk-sub-i{width:26px;height:26px;flex:0 0 auto;border-radius:8px;display:flex;
   align-items:center;justify-content:center;color:var(--gold2);background:var(--gold-soft);
   border:1px solid rgba(201,169,110,.22)}
@@ -1012,6 +1069,9 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
   font-variant-numeric:tabular-nums}
 .stk-sub-n i{font-style:normal;font-family:'DM Sans',sans-serif;font-size:8.5px;font-weight:600;
   letter-spacing:.3px;text-transform:uppercase;color:var(--muted)}
+.stk-sub em{flex:0 0 auto;width:22px;height:22px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;color:var(--gold2);background:var(--gold-soft);font-style:normal}
+.stk-sub em svg{width:11px;height:11px}
 .stk-tiles .acc-cell:nth-child(3){box-shadow:inset 0 1px 0 var(--border2)}
 .stk-tiles .acc-cell:nth-child(4){box-shadow:inset 1px 1px 0 var(--border2)}
 /* Выбор офиса поверх камеры перемещения: лист снизу, камера за ним темнеет. */
@@ -10320,7 +10380,7 @@ function dpApply(){
   // Полосы дня внутри разделов — расходы и склад. Из выбранного берём начало
   // и встаём на этот день, как в чек-листе: календарь тут способ уйти дальше,
   // чем удобно листать пальцем, а не выбрать отрезок.
-  if(dpTarget === 'expDay' || dpTarget === 'stkDay'){
+  if(dpTarget === 'expDay' || dpTarget === 'stkDay' || dpTarget === 'stkByDay'){
     const т = _bizToday(), в = new Date(dpFrom.getFullYear(), dpFrom.getMonth(), dpFrom.getDate());
     const cal = document.querySelector(`.cal-btn[onclick*="'${dpTarget}'"]`);
     if(cal) cal.classList.remove('on');
@@ -12966,10 +13026,12 @@ function stkBack(){
   if(STK.view === 'move-scan'){ movCancel(); stkMoveDone(); return; }
   if(STK.view === 'move-pick'){ stkMoveDone(); return; }
   // Отчёт открывают и со страницы района, и из истории — назад туда же.
-  if(STK.view === 'report'){ if(STK.repFrom === 'audits') stkAudits(); else stkAuditPick(); return; }
+  if(STK.view === 'report'){
+    if(STK.repFrom === 'audits') stkAudits(STK.audFocus, STK.audFrom); else stkAuditPick(); return; }
   if(STK.view === 'sheet'){ stkAuditPick(); return; }
-  if(STK.view === 'moves' || STK.view === 'moves-hist' || STK.view === 'audits'
-     || STK.view === 'audit-pick'){ stkPicker(); return; }
+  // История открывается и с плитки склада, и с карточки района — назад туда же.
+  if(STK.view === 'audits'){ if(STK.audFrom === 'pick') stkAuditPick(); else stkPicker(); return; }
+  if(STK.view === 'moves' || STK.view === 'moves-hist' || STK.view === 'audit-pick'){ stkPicker(); return; }
   if(STK.view === 'pick') closeStock(); else stkPicker();
 }
 
@@ -13042,29 +13104,47 @@ async function stkPicker(тихо){
   STK.districts = st.districts;
   // Подпись — оглавление раздела через косую, как на плитке «Учёта».
   _stkHead('Склад', 'остатки / ревизия / перемещение', false);
-  // Три карточки одной анатомии: шапка заглавными с волоском, под ней плитки
-  // или строки. Раньше здесь были плитки на три лада — карточка стоимости с
-  // заголовком-простынёй, две большие плитки «Учёта» и их истории половинками,
-  // — и страница читалась как склад разных приёмов, а не одна вещь.
   const today = st.day || accDay();
   const сегодня = (STK.moves30 || []).filter(m => m.day === today)
     .reduce((a, m) => a + (m.bottles || m.qty || 0), 0);
   const nAud = (STK.audits || []).length, nMov = (STK.moves30 || []).length;
+  // Две колонки, как плитки «Учёта»: сверху главное действие — ревизия и
+  // перемещение, — под каждым его история половинкой. Карточки со строками
+  // здесь не прижились: «кнопки на панели» читаются с одного взгляда.
+  const tile = (go, ico, t, v, u, sub) => `<button class="acc-cell" onclick="${go}">
+      <span class="acc-ico"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+        stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${ico}</svg></span>
+      <span class="acc-t">${t}</span>
+      <span class="acc-n"><span class="acc-v">${v}</span><i>${escS(u)}</i></span>
+      <span class="acc-s">${escS(sub)}</span>
+    </button>`;
+  const sub = (go, ico, t, v, u) => `<button class="stk-sub" onclick="${go}">
+      <span class="stk-sub-i"><svg viewBox="0 0 24 24" width="15" height="15" fill="none"
+        stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">${ico}</svg></span>
+      <span class="stk-sub-b">
+        <span class="stk-sub-t">${t}</span>
+        <span class="stk-sub-n">${v}<i>${escS(u)}</i></span>
+      </span>
+      <em>${_SC_CHEV}</em>
+    </button>`;
+  const I_AUD = '<path d="M9 11l2 2 4-4"/><path d="M20 12v7a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h9"/>';
+  const I_MOV = '<path d="M4 8h14M15 5l3 3-3 3M20 16H6M9 13l-3 3 3 3"/>';
+  const I_HAUD = '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>';
+  const I_HMOV = '<circle cx="12" cy="12" r="9"/><path d="M8 12h8M13 9l3 3-3 3"/>';
   document.getElementById('stkMid').innerHTML = `<div class="sc-page">` +
     accDayBar('stkDay') + stkValueCard(reg) + `
-    <div class="sc grow">
-      <div class="sc-cap"><span>Ревизия</span></div>
-      <button class="sc-r" onclick="stkAuditPick()"><span>По районам</span>
-        <b>${fmt(st.done || 0)}<u>из ${st.total || 0}</u></b><em>${_SC_CHEV}</em></button>
-      <button class="sc-r" onclick="stkAudits()"><span>История</span>
-        <b>${fmt(nAud)}<u>${pluralize(nAud, 'ревизия', 'ревизии', 'ревизий')}</u></b><em>${_SC_CHEV}</em></button>
-    </div>
-    <div class="sc grow">
-      <div class="sc-cap"><span>Перемещение</span></div>
-      <button class="sc-r" onclick="stkMoveStart()"><span>Сканировать</span>${
-        сегодня ? `<b>${fmt(сегодня)}<u>сегодня</u></b>` : ''}<em>${_SC_CHEV}</em></button>
-      <button class="sc-r" onclick="stkMovesHist()"><span>История</span>
-        <b>${fmt(nMov)}<u>за 30 дней</u></b><em>${_SC_CHEV}</em></button>
+    <div class="stk-tiles2">
+      <div class="stk-col">
+        ${tile('stkAuditPick()', I_AUD, 'Ревизия', fmt(st.done || 0), `из ${st.total || 0}`,
+               'район / камера / отчёт')}
+        ${sub('stkAudits()', I_HAUD, 'История', fmt(nAud),
+              pluralize(nAud, 'ревизия', 'ревизии', 'ревизий'))}
+      </div>
+      <div class="stk-col">
+        ${tile('stkMoveStart()', I_MOV, 'Перемещение', fmt(сегодня), 'сегодня',
+               'скан / куда везём')}
+        ${sub('stkMovesHist()', I_HMOV, 'История', fmt(nMov), 'за 30 дней')}
+      </div>
     </div></div>`;
 }
 
@@ -13079,10 +13159,15 @@ async function stkAuditPick(){
   const box = document.getElementById('stkMid');
   box.innerHTML = '<div class="stk-empty">Загрузка…</div>';
   try{
-    const [st, reg] = await Promise.all([
+    // История — третьим запросом тем же залпом: под каждым районом стоит,
+    // сколько раз его считали, и ждать её после районов значило бы показать
+    // карточки с пустым низом.
+    const [st, reg, aud] = await Promise.all([
       ownerApi.ownerFetch('/api/owner/stock/status', {params:{day: accDay()}}),
-      ownerApi.ownerFetch('/api/owner/qr').catch(() => null)]);
+      ownerApi.ownerFetch('/api/owner/qr').catch(() => null),
+      ownerApi.ownerFetch('/api/owner/stock/audits', {params:{limit: 120}}).catch(() => null)]);
     STK.status = st; STK.reg = reg; STK.districts = st.districts;
+    if(aud && aud.audits) STK.audits = aud.audits;
   }catch(e){
     box.innerHTML = '<div class="stk-empty" style="color:var(--dn)">Не удалось загрузить</div>';
     return;
@@ -13090,27 +13175,41 @@ async function stkAuditPick(){
   if(STK.view !== 'audit-pick') return;
   const left = (STK.reg && STK.reg.left_by_district) || {};
   const без = (STK.reg && STK.reg.unscanned) || {};
+  const по = {};
+  (STK.audits || []).forEach(a => { (по[a.district] = по[a.district] || []).push(a); });
   box.innerHTML = `<div class="qd-page"><div class="stk-drs">${
-    (STK.status.districts || []).map(d => audDistRow(d, left, без)).join('')
+    (STK.status.districts || []).map(d => audDistRow(d, left, без, по[d.id] || [])).join('')
   }</div></div>`;
 }
 
-function audDistRow(d, left, без){
+// Карточка района: сверху — сам район и состояние ревизии за день, снизу
+// строкой «История» — сколько раз его считали. Обе ведут на страницы, и та,
+// что снизу, открывает общую историю уже на этом районе.
+function audDistRow(d, left, без, hist){
   const n = left[d.id] || 0, b = (без || {})[d.id] || 0;
+  hist = hist || [];
   const [sub, cls] = d.audit === 'running' ? ['идёт ревизия', 'run']
     : d.audit === 'pending' ? ['ждёт решения', 'dn']
     : d.audit === 'closed'
       ? (d.short_aed ? [`не хватает <u>${fmt(d.short_aed)} AED</u>`, 'dn'] : ['закрыта · всё сошлось', 'ok'])
     : b ? [`QR код не внесён <u>${fmt(b)}</u>`, 'warn'] : ['не начата', 'idle'];
-  return `<button class="stk-dr" onclick="stkAuditGo('${d.id}')">
-    <span class="stk-dr-c">${escS(d.code || '')}</span>
-    <span class="stk-dr-b">
-      <span class="stk-dr-n">${escS(d.name || '')}</span>
-      <span class="aud-st ${cls}">${sub}</span>
-    </span>
-    <span class="stk-dr-v ${n ? '' : 'dim'}">${n ? fmt(n) : '—'}${n ? '<i>бут</i>' : ''}</span>
-    <span class="stk-dr-go">›</span>
-  </button>`;
+  const k = hist.length;
+  return `<div class="stk-drw">
+    <button class="stk-dr" onclick="stkAuditGo('${d.id}')">
+      <span class="stk-dr-c">${escS(d.code || '')}</span>
+      <span class="stk-dr-b">
+        <span class="stk-dr-n">${escS(d.name || '')}</span>
+        <span class="aud-st ${cls}">${sub}</span>
+      </span>
+      <span class="stk-dr-v ${n ? '' : 'dim'}">${n ? fmt(n) : '—'}${n ? '<i>бут</i>' : ''}</span>
+      <span class="stk-dr-go">›</span>
+    </button>
+    <button class="stk-dr-h" onclick="stkAudits('${d.id}', 'pick')">
+      <span>История</span>${k
+        ? `<b>${fmt(k)}<u>${pluralize(k, 'ревизия', 'ревизии', 'ревизий')}</u></b>`
+        : '<i>ещё не считали</i>'}<em>${_SC_CHEV}</em>
+    </button>
+  </div>`;
 }
 
 // ── История перемещений: своя страница, по дням ─────────────────────────────
@@ -13184,7 +13283,7 @@ function stkValueCard(reg){
   // число, единица. Золото — на деньгах, количество белым. Цены — кнопки:
   // за ними закупочные цены по позициям.
   return `<div class="sc">
-    <div class="sc-cap"><span>Остатки</span></div>
+    <div class="sc-cap"><span>Остатки всего</span></div>
     <div class="aud-g">
       <div class="aud-t"><span class="aud-tl">Количество</span>
         <b class="aud-tv">${fmt(bottles)}</b><span class="aud-tu">бут</span></div>
@@ -13391,36 +13490,64 @@ function stkByMode(m){
   stkByDistrict(true);
 }
 
-function stkByDistrict(тихо){
+function stkByReload(){ STK.val = null; daySkel('stkMid'); stkByDistrict(true); }
+
+// ── По районам: полоса дня, плитки-переключатель, районы и таблица ──────
+// Плитки «Количество / Цена закупки / Цена продажи» — те же, что на складе, и
+// они же переключают, чем заполнена таблица: нажал «Цена закупки» — числа у
+// районов и в клетках стали деньгами. Пока район не выбран, на плитках весь
+// склад; выбрал район — его числа, а таблица оставляет один его столбец.
+// День листается полосой сверху, как на складе: остаток — величина на дату.
+async function stkByDistrict(тихо){
   STK.view = 'bydist';
   STK.by = STK_BY[STK.by] ? STK.by : 'qty';
   _setRail('stkRail', '');
+  const day = accDay();
+  if(!STK.val || STK.val.day !== day){
+    if(!тихо){
+      _stkHead('По районам', 'загрузка…', false);
+      document.getElementById('stkMid').innerHTML =
+        accDayBar('stkByDay') + '<div class="stk-empty">Загрузка…</div>';
+    }
+    try{ STK.val = await ownerApi.ownerFetch('/api/owner/stock/value', {params:{day}}); }
+    catch(e){ STK.val = null; }
+    if(STK.view !== 'bydist') return;
+  }
   const v = STK.val;
-  if(!v){ _stkHead('По районам', 'нет данных', false);
+  if(!v){
+    _stkHead('По районам', 'нет данных', false);
     document.getElementById('stkMid').innerHTML =
-      '<div class="stk-empty">Стоимость не посчиталась</div>'; return; }
+      accDayBar('stkByDay') + '<div class="stk-empty">Стоимость не посчиталась</div>';
+    return;
+  }
   const режим = STK_BY[STK.by], ds = v.districts || [], t = v.totals || {};
   const items = v.items || [];
-  // Итог в шапке — того же вида, что и выбранная величина: второй раз те же
-  // три числа показывать незачем, а одно нужное — как раз здесь.
-  const итог = STK.by === 'qty' ? `${fmt(t.bottles || 0)} ${
-      pluralize(t.bottles || 0,'бутылка','бутылки','бутылок')}`
-    : `${fmt(Math.round(STK.by === 'cost' ? (t.cost || 0) : (t.list || 0)))} AED`;
+  const колонка = d => (v.by_district || {})[d.id] || {};
+  const sel = STK.dsel ? ds.find(d => d.id === STK.dsel) : null;
+  if(!sel) STK.dsel = null;
+  const src = sel ? колонка(sel) : t;       // чьи числа стоят на плитках
+  // Подпись — только то, чего нет на экране: сколько позиций и у скольких
+  // есть остаток. Итог стоит на плитке.
   _stkHead('По районам', `${items.length} ${
     pluralize(items.length,'позиция','позиции','позиций')}${
-    v.items_with_stock != null ? `, с остатком ${v.items_with_stock}` : ''} · ${итог}`, false);
-  const колонка = d => (v.by_district || {})[d.id] || {};
-  // Нажали на район — в таблице остаётся только его столбец, и он же итог.
-  const shown = STK.dsel ? ds.filter(d => d.id === STK.dsel) : ds;
+    v.items_with_stock != null ? `, с остатком ${v.items_with_stock}` : ''}`, false);
+  const shown = sel ? [sel] : ds;
   const числоРайона = c => STK.by === 'qty' ? fmt(c.bottles || 0)
     : fmt(Math.round(STK.by === 'cost' ? (c.cost || 0) : (c.list || 0)));
-  document.getElementById('stkMid').innerHTML = `
-    <div class="periods stkby" id="stkByTabs">
-      <div class="period-pill"></div>
-      ${Object.keys(STK_BY).map(k => `<button class="${STK.by === k ? 'on' : ''}"
-        onclick="stkByMode('${k}')">${STK_BY[k].t}</button>`).join('')}
+  const плитка = (k, val, u) => `<button class="aud-t tap${STK.by === k ? ' on' : ''}${
+      k === 'qty' ? '' : ' gold'}" onclick="stkByMode('${k}')" aria-pressed="${STK.by === k}">
+      <span class="aud-tl">${STK_BY[k].t}</span>
+      <b class="aud-tv">${val}</b><span class="aud-tu">${u}</span></button>`;
+  document.getElementById('stkMid').innerHTML = accDayBar('stkByDay') + `
+    <div class="sc">
+      <div class="sc-cap"><span>Остатки</span><i>${sel
+        ? escS((sel.code || '') + ' · ' + (sel.name || '')) : 'все районы'}</i></div>
+      <div class="aud-g stk-byg">
+        ${плитка('qty', fmt(src.bottles || 0), 'бут')}
+        ${плитка('cost', fmt(Math.round(src.cost || 0)), 'AED')}
+        ${плитка('sell', fmt(Math.round(src.list || 0)), 'AED')}
+      </div>
     </div>
-    <div class="stk-grp2"><span>Районы</span></div>
     <div class="stkbd-strip">${ds.map(d => {
       const c = колонка(d);
       return `<button class="stkbd-d ${(STK.by === 'qty' ? c.bottles : (STK.by === 'cost'
@@ -13429,16 +13556,15 @@ function stkByDistrict(тихо){
         <span class="stkbd-n">${числоРайона(c)}</span>
       </button>`;
     }).join('')}</div>
-    <div class="stk-grp2"><span>${STK.dsel
-      ? 'Каталог · ' + escS((ds.find(d => d.id === STK.dsel) || {}).code || '') : 'Каталог'}</span>${
-      STK.dsel ? `<button class="stk-unsel" onclick="stkByDist(null)">
+    <div class="stk-grp2"><span>${sel ? 'Каталог · ' + escS(sel.code || '') : 'Каталог'}</span>${
+      sel ? `<button class="stk-unsel" onclick="stkByDist(null)">
         <svg viewBox="0 0 24 24" width="12" height="12" fill="none" stroke="currentColor"
           stroke-width="2.6" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>
         Показать все районы</button>` : ''}</div>
-    <div class="stkbd-wrap"><table class="stkbd${STK.dsel ? ' one' : ''}">
+    <div class="stkbd-wrap"><table class="stkbd${sel ? ' one' : ''}">
       <thead><tr><th class="nm">№ и позиция</th>${
         shown.map(d => `<th>${escS(d.code || '')}</th>`).join('')}${
-        STK.dsel ? '' : '<th class="tot">Всего</th>'}</tr></thead>
+        sel ? '' : '<th class="tot">Всего</th>'}</tr></thead>
       <tbody>${items.map(r => {
         const сумма = режим.сумма(r);
         // «Вносили ли вообще» присылает сервер, но полагаться на одно поле
@@ -13459,7 +13585,7 @@ function stkByDistrict(тихо){
             return val == null ? '<td class="z">—</td>'
               : `<td>${режим.деньги ? fmt(Math.round(val)) : fmt(val)}</td>`;
           }).join('')}
-          ${STK.dsel ? '' : `<td class="tot ${(сумма == null || !известна) ? 'z' : (r.bottles ? '' : 'nil')}">${
+          ${sel ? '' : `<td class="tot ${(сумма == null || !известна) ? 'z' : (r.bottles ? '' : 'nil')}">${
             !известна ? '—' : (сумма == null ? '—'
               : (режим.деньги ? fmt(Math.round(сумма)) : fmt(r.bottles)))}</td>`}
         </tr>`;
@@ -13476,8 +13602,6 @@ function stkByDistrict(тихо){
            под закупкой на складе и стоит доля покрытия.`
         : `Числа — сколько выручим по прайсу за то, что лежит в районе. Цена
            приложения ниже: её итог виден на карточке склада.`}</div>`;
-  const g = document.getElementById('stkByTabs');
-  if(g) (тихо ? movePill(g) : requestAnimationFrame(() => movePill(g)));
 }
 
 // Выбор района на складе: цифры внизу — только по нему. Второе нажатие или
@@ -14326,39 +14450,125 @@ async function audDrop(i){
 }
 
 // ── история ревизий ─────────────────────────────────────────────────────────
-async function stkAudits(){
+// ── История ревизий ────────────────────────────────────────────────
+// Одна страница на оба входа. С плитки склада — сверху, без акцента: сводка
+// за 30 дней и карточки районов по порядку. С карточки района — та же самая
+// страница, прокрученная к его карточке и подсвеченная: человек нажал
+// «История» у B4 и должен увидеть B4, а не искать его глазами.
+async function stkAudits(district, from){
   STK.view = 'audits'; _setRail('stkRail', '');
+  STK.audFocus = district || null;
+  STK.audFrom = from || (district ? 'pick' : 'stock');
   _stkHead('История ревизий', 'загрузка…', false);
   const box = document.getElementById('stkMid');
   box.innerHTML = '<div class="stk-empty">Загрузка…</div>';
   let res;
-  try{ res = await ownerApi.ownerFetch('/api/owner/stock/audits'); }
+  try{ res = await ownerApi.ownerFetch('/api/owner/stock/audits', {params:{limit: 120}}); }
   catch(e){ box.innerHTML = '<div class="stk-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
+  if(STK.view !== 'audits') return;
+  await stkLoadContext();
   const list = res.audits || [];
   STK.audits = list;
-  if(!list.length){
-    _stkHead('История ревизий', 'пока пусто', false);
-    box.innerHTML = '<div class="stk-empty">Ни одной ревизии</div>';
-    return;
+  const n = list.length;
+  _stkHead('История ревизий', n
+    ? `${n} ${pluralize(n, 'ревизия', 'ревизии', 'ревизий')} · с ${_hstDay(list[n - 1].day)}`
+    : 'пока пусто', false);
+  const районы = [...(STK.districts || [])].sort((a, b) => String(a.code || '').localeCompare(String(b.code || '')));
+  box.innerHTML = `<div class="sc-page">${hstSummary(list)}${
+    районы.map(d => hstDistCard(d, list)).join('')}</div>`;
+  if(!STK.audFocus) return;
+  // Акцент на районе: его карточка подсвечивается и подъезжает под шапку.
+  const el = document.getElementById('hst-' + STK.audFocus);
+  if(!el) return;
+  el.classList.add('focus');
+  // Сразу, без плавного хода: страница открывается уже на районе, а вспышка
+  // рамки говорит, куда смотреть.
+  requestAnimationFrame(() => {
+    box.scrollTop = Math.max(0, el.getBoundingClientRect().top - box.getBoundingClientRect().top + box.scrollTop - 8);
+  });
+}
+
+function _hstDay(day){
+  if(day === _dayIsoFor(0)) return 'Сегодня';
+  if(day === _dayIsoFor(1)) return 'Вчера';
+  const s = _dayName(day), y = String(day || '').slice(0, 4);
+  return y && +y !== _bizToday().getFullYear() ? `${s} ${y}` : s;
+}
+function _hstDur(m){
+  m = Math.max(0, Math.round(m || 0));
+  if(m < 60) return `${m} мин`;
+  const h = Math.floor(m / 60), r = m % 60;
+  return r ? `${h} ч ${r} мин` : `${h} ч`;
+}
+
+// Сводка — три плитки той же анатомии, что на складе: сколько провели, во
+// сколько обошлась недостача и сколько ревизий сошлось. Окно — 30 дней, а если
+// в нём пусто, то всё, что было: пустые плитки не отвечают ни на что.
+function hstSummary(list){
+  const since = _dayIsoFor(30);
+  let src = list.filter(a => a.day >= since), окно = 'за 30 дней';
+  if(!src.length){ src = list; окно = 'за всё время'; }
+  const n = src.length;
+  const short = src.reduce((s, a) => s + (a.short_aed || 0), 0);
+  const ok = src.filter(a => !(a.short_qty || 0) && !(a.over_qty || 0)).length;
+  return `<div class="sc">
+    <div class="sc-cap"><span>Ревизии</span><i>${окно}</i></div>
+    <div class="aud-g">
+      <div class="aud-t${n ? '' : ' dim'}"><span class="aud-tl">Проведено</span>
+        <b class="aud-tv">${fmt(n)}</b><span class="aud-tu">${pluralize(n, 'ревизия', 'ревизии', 'ревизий')}</span></div>
+      <div class="aud-t${short ? ' dn' : ' dim'}"><span class="aud-tl">Недостача</span>
+        <b class="aud-tv">${fmt(short)}</b><span class="aud-tu">AED</span></div>
+      <div class="aud-t${ok ? ' ok' : ' dim'}"><span class="aud-tl">Сошлось</span>
+        <b class="aud-tv">${fmt(ok)}</b><span class="aud-tu">из ${fmt(n)}</span></div>
+    </div>
+  </div>`;
+}
+
+function hstDistCard(d, list){
+  const rows = list.filter(a => a.district === d.id);     // свежие первыми
+  const k = rows.length;
+  return `<div class="sc hst" id="hst-${escS(d.id)}">
+    <div class="sc-cap"><span>${escS(d.code || '')} · ${escS(d.name || '')}</span>${
+      k ? `<b>${fmt(k)}<u>${pluralize(k, 'ревизия', 'ревизии', 'ревизий')}</u></b>` : ''}</div>
+    ${k ? rows.map(hstRow).join('') : '<div class="hst-none">Ревизий ещё не было</div>'}
+  </div>`;
+}
+
+// Строка ревизии: день и кто считал, исход цветом, чем кончилось решение.
+// Справа — сколько бутылок насчитала камера; нажатие открывает отчёт.
+function hstRow(a){
+  const i = (STK.audits || []).indexOf(a);
+  const pend = a.state === 'pending';
+  const short = +a.short_qty || 0, over = +a.over_qty || 0;
+  let res, cls;
+  if(!short && !over){ res = 'всё сошлось'; cls = 'ok'; }
+  else{
+    const p = [];
+    if(short) p.push(`не хватает ${fmt(short)} бут · ${fmt(a.short_aed || 0)} AED`);
+    if(over) p.push(`излишек ${fmt(over)} бут`);
+    res = p.join(' · '); cls = short ? 'dn' : 'warn';
   }
-  const pend = list.filter(a => a.state === 'pending').length;
-  _stkHead('История ревизий', `${list.length} ${pluralize(list.length, 'ревизия', 'ревизии', 'ревизий')}${
-    pend ? ` · ${pend} ${pluralize(pend, 'ждёт', 'ждут', 'ждут')} решения` : ''}`, false);
-  box.innerHTML = '<div class="stkd">' + list.map((a, i) => {
-    const [sub, cls] = a.state === 'pending' ? ['ждёт решения', 'dn']
-      : a.mismatched
-        ? [`не хватает ${fmt(a.short_qty || 0)} · ${fmt(a.short_aed || 0)} AED${
-             a.over_qty ? ` · излишек ${fmt(a.over_qty)}` : ''}`, 'dn']
-        : ['всё сошлось', 'ok'];
-    return `<button class="stk-dr" onclick="stkAuditOpen(${i})">
-      <span class="stk-dr-c">${escS(a.district_code)}</span>
-      <span class="stk-dr-b">
-        <span class="stk-dr-n">${escS(a.district_name)}</span>
-        <span class="stk-dr-s ${cls}">${escS(_dayName(a.day))} · ${sub}</span>
-      </span>
-      <span class="stk-dr-v">${fmt(a.scan_qty || 0)}<i>бут</i></span>
-      <span class="stk-dr-go">›</span>
-    </button>`; }).join('') + '</div>';
+  const tail = [];
+  if(pend) tail.push('ждёт решения');
+  else{
+    if(short && a.short_resolved)
+      tail.push(a.short_blame && a.short_who
+        ? `удержано с ${a.short_who}${a.short_amount ? ' · ' + fmt(a.short_amount) + ' AED' : ''}`
+        : 'за счёт компании');
+    if(over && a.over_resolved){
+      if(a.over_moved) tail.push(`внесено на район ${fmt(a.over_moved)}`);
+      if(a.over_restored) tail.push(`возвращено в учёт ${fmt(a.over_restored)}`);
+    }
+  }
+  const meta = [a.finished_by || a.started_by || '', a.minutes != null ? _hstDur(a.minutes) : '']
+    .filter(Boolean).join(' · ');
+  return `<button class="hst-r" onclick="stkAuditOpen(${i})">
+    <span class="hst-b"><b>${escS(_hstDay(a.day))}${meta ? `<s>${escS(meta)}</s>` : ''}</b>
+      <i class="${cls}">${escS(res)}</i>${tail.length
+        ? `<i class="${pend ? 'dn' : ''}">${escS(tail.join(' · '))}</i>` : ''}</span>
+    <span class="hst-v"><b>${fmt(a.scan_qty || 0)}<u>бут</u></b></span>
+    <em>${_SC_CHEV}</em>
+  </button>`;
 }
 
 async function stkAuditOpen(i){
@@ -15107,7 +15317,7 @@ function bindDayBars(){
 // читается как «всё пропало», и глазу потом заново искать, куда он смотрел.
 //
 // Тот же приём, что на «Обзоре»: там числа выручки шиммерят, а плитки стоят.
-const DAY_SKEL = '.exp-tot-v, .exp-tot-r b, .exp-day-v > b, .exp-day-p b, .acc-v, .stk-sub-n, .ck-h-v';
+const DAY_SKEL = '.exp-tot-v, .exp-tot-r b, .exp-day-v > b, .exp-day-p b, .acc-v, .stk-sub-n, .ck-h-v, .aud-tv, .stkbd-n';
 function daySkel(rootId){
   const box = document.getElementById(rootId); if(!box) return;
   box.querySelectorAll(DAY_SKEL).forEach(e => e.classList.add('is-skel'));
@@ -15122,6 +15332,7 @@ function accDayGo(off){
   DAY_OFFSET = off;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   accLoadSummaries();                     // плитки учёта — за тот же день
+  if(document.getElementById('stkByDay')){ stkByReload(); return; }
   if(document.getElementById('stkDay')){
     ACC_STOCK = null; daySkel('stkMid'); stkPicker(true); return;
   }

@@ -2107,33 +2107,67 @@ async def handle_audit_report(request):
     return web.json_response(await _audit_report(district, day, a), headers=CORS_HEADERS)
 
 
+def _minutes_between(a, b):
+    """Сколько минут прошло между двумя отметками ISO; не разобрать — None."""
+    try:
+        t1 = datetime.fromisoformat(str(a).replace("Z", "+00:00").replace(" ", "T"))
+        t2 = datetime.fromisoformat(str(b).replace("Z", "+00:00").replace(" ", "T"))
+    except (TypeError, ValueError):
+        return None
+    if t1.tzinfo is None: t1 = t1.replace(tzinfo=timezone.utc)
+    if t2.tzinfo is None: t2 = t2.replace(tzinfo=timezone.utc)
+    return max(0, int((t2 - t1).total_seconds() // 60))
+
+
 @require_owner
 async def handle_audits(request):
     """История ревизий: что и когда закрывали. Только заголовки — сами позиции
     приходят с /stock/result, когда открывают конкретную."""
-    rows = await db.get_finished_audits(limit=40)
+    try:
+        limit = max(1, min(200, int(request.query.get("limit", "60") or 60)))
+    except ValueError:
+        limit = 60
+    rows = await db.get_finished_audits(limit=limit)
     out = []
     for c in rows:
         a = await db.audit_get(c.get("district", ""), c.get("day", "")) or {}
         v = _audit_view(a)
+        short, over = (v["short"] or {}), (v["over"] or {})
+        res = v["result"] or {}
+        started = c.get("audit_started_at", "")
+        finished = c.get("audit_finished_at", "")
         out.append({
             "state": v["state"] if a else "closed",
             "closed_at": v["closed_at"],
-            "short_open": bool(v["short"] and not (v["short"] or {}).get("resolved_at")),
-            "over_open": bool(v["over"] and not (v["over"] or {}).get("resolved_at")),
+            "short_open": bool(short and not short.get("resolved_at")),
+            "over_open": bool(over and not over.get("resolved_at")),
             "district": c.get("district", ""),
             "district_code": OFFICE_CODES.get(c.get("district"), ""),
             "district_name": OFFICE_NAMES.get(c.get("district"), c.get("district", "")),
             "day": c.get("day", ""),
             "scan_qty": int(c.get("scan_qty") or 0),
-            "started_at": c.get("audit_started_at", ""),
-            "finished_at": c.get("audit_finished_at", ""),
+            "started_at": started,
+            "finished_at": finished,
             "total": int(c.get("total_qty") or 0),
             "matched": int(c.get("matched_qty") or 0),
             "mismatched": int(c.get("mismatch_qty") or 0),
             "short_qty": c.get("short_qty") or 0,
             "short_aed": int(c.get("short_aed") or 0),
             "over_qty": c.get("over_qty") or 0,
+            # Для страницы истории: кто считал и сколько это заняло, чем
+            # кончилось решение по недостаче и куда делся излишек.
+            "started_by": v["started_by"],
+            "finished_by": a.get("finished_by_name", "") or "",
+            "minutes": _minutes_between(started, finished),
+            "expected": res.get("expected"), "actual": res.get("actual"),
+            "positions": res.get("positions"), "alien": v["alien"],
+            "short_resolved": bool(short.get("resolved_at")),
+            "short_blame": bool(short.get("blame")),
+            "short_who": short.get("who", "") or "",
+            "short_amount": int(short.get("amount") or 0),
+            "over_resolved": bool(over.get("resolved_at")),
+            "over_moved": int(over.get("moved") or 0),
+            "over_restored": int(over.get("restored") or 0),
         })
     return web.json_response({"audits": out}, headers=CORS_HEADERS)
 

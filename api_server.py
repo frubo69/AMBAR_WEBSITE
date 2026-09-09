@@ -948,18 +948,11 @@ async def _finalize_accepted_order(src: dict, user: dict, oid: str, *,
                               referred_by=referred_by, referrer_username=referrer_username)
         log.info(f"[order] #{oid} held for verification — operator notification delayed (ref={referrer_username})")
     else:
-        op_buttons = [
-            [
-                {"text": "✅ Принять",   "callback_data": f"acc_{oid}_{uid}"},
-                {"text": "❌ Отклонить", "callback_data": f"dec_{oid}_{uid}"},
-            ],
-            [
-                {"text": "✏️ Редактировать", "callback_data": f"edit_{oid}"},
-                {"text": "📍 Геолокация",    "callback_data": f"loc_{oid}"},
-            ],
-            [{"text": "👤 Клиент", "callback_data": f"client_{oid}_{uid}"}],
-        ]
-        op_kb = {"inline_keyboard": op_buttons}
+        # Вид карточки живёт в op_card: сейчас это заказ и одна кнопка
+        # «Открыть в приложении», прежние пять кнопок собраны там же и
+        # возвращаются переключателем CARD / AMBAR_OP_CARD.
+        import op_card
+        op_kb = op_card.order_kb_for(oid, uid)
         # Кому именно уходит заказ, решает район: свой оператор, а если он в
         # скрытом режиме — оператор ближайшего района, с пометкой, что заказ
         # чужой. Старший и планшет получают всё и всегда. Пока операторам не

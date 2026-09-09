@@ -97,9 +97,13 @@ async def chats(district: str = "") -> list:
 
 
 async def send(text: str, district: str = "", parse_mode: str = "HTML",
-               reply_markup: dict = None, register: bool = True) -> dict:
+               reply_markup=None, register: bool = True) -> dict:
     """Разослать по маршруту. Возвращает {chat_id: message_id} — по ним заказ
-    потом правят и по ним же чистят чат, если человек уйдёт в скрытый режим."""
+    потом правят и по ним же чистят чат, если человек уйдёт в скрытый режим.
+
+    reply_markup — словарь на всех или функция от chat_id: кнопка мини-аппа
+    живёт только в личке, и в групповом чате её надо заменить, а не потерять
+    вместе со всем сообщением."""
     from api_server import tg_send, OPERATOR_BOT_TOKEN
     from datetime import datetime, timezone
     out = {}
@@ -107,9 +111,11 @@ async def send(text: str, district: str = "", parse_mode: str = "HTML",
         return out
     for цель in await chats(district):
         try:
+            разметка = (reply_markup(цель["chat_id"]) if callable(reply_markup)
+                        else reply_markup)
             res = await tg_send(OPERATOR_BOT_TOKEN, цель["chat_id"],
                                 (цель["prefix"] or "") + text,
-                                parse_mode=parse_mode, reply_markup=reply_markup)
+                                parse_mode=parse_mode, reply_markup=разметка)
         except Exception as e:                   # noqa: BLE001
             log.error(f"[route] {цель['chat_id']}: {e}")
             continue

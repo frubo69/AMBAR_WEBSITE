@@ -204,7 +204,8 @@ async def _registry_was(district: str, day: str) -> dict:
     try:
         # skip_coded: считаем ОТ РЕЕСТРА, а списанная сканом бутылка из него
         # уже вышла — вычитать её ещё раз значит потерять её дважды.
-        for pid, n in ((await db.writeoff_since({district: since}, skip_coded=True))
+        for pid, n in ((await db.writeoff_since({district: since}, skip_coded=True,
+                                                skip_audit=False))
                        .get(district) or {}).items():
             if pid in out:
                 out[pid] -= n / _unit(cat.get(pid) or {})
@@ -1293,9 +1294,12 @@ async def handle_status(request):
     day = (request.query.get("day") or "").strip() or _biz_day()
     counts = await db.get_stock_counts_for_day(day)
     by_d = {c["district"]: c for c in counts}
+    auds = await db.audits_by_day(day)
     districts = [{
         "id": oid, "code": OFFICE_CODES.get(oid, ""), "name": OFFICE_NAMES.get(oid, oid),
         "done": oid in by_d,
+        # Ревизия за этот день: idle / running / pending / closed.
+        "audit": _audit_view(auds.get(oid))["state"] if auds.get(oid) else "idle",
         "first_time": bool((by_d.get(oid) or {}).get("first_time")),
         "short_qty": int((by_d.get(oid) or {}).get("short_qty") or 0),
         "short_aed": int((by_d.get(oid) or {}).get("short_aed") or 0),
@@ -1471,6 +1475,503 @@ async def handle_audit_scan_reset(request):
     return web.json_response({"ok": True, "removed": n}, headers=CORS_HEADERS)
 
 
+# ── ревизия: ожидаемое, лист, старт, завершение, решения ────────────────────
+# Ревизия отвечает на вопрос «совпадает ли то, что числится, с тем, что
+# лежит». Числится — по кодам: склад это внесённое кодами, а бутылки без кодов
+# лежат отдельным красным долгом «QR код не внесён» и в ожидаемое не идут —
+# камера их всё равно не увидит, и записать их недостачей было бы враньём.
+# Лежит — то, что увидела камера: по коду, поштучно.
+#
+# Жизнь ревизии: начата → идёт проход → завершена (пересчёт записан) →
+# закрыта, когда по недостаче решено, кто платит, а излишек внесён на район.
+# Пока не закрыта — район горит «ждёт решения», и это намеренно: программа
+# ведёт человека по шагам, а не оставляет расхождение висеть молча.
+#
+# Всё здесь — в бутылках. Остальной склад считает учётными единицами (у пива
+# это ящик), но человек у полки сканирует бутылки, и в отчёте «не хватает 3»
+# должно значить три бутылки. В пересчёт (stock_counts) итог записывается в
+# единицах — тем же документом, что и раньше, чтобы заявка и стоимость склада
+# читали его как обычный пересчёт.
+
+def _bottles(units, unit: int) -> int:
+    return int(round(float(units or 0) * unit))
+
+
+async def _moves_since_count(district: str, cnt: dict, cat: dict) -> dict:
+    """Перемещения после последнего пересчёта — в бутылках, со знаком.
+
+    Основа заявки переездов не знает; для ревизии они обязательны: бутылка,
+    увезённая вчера на B2, — не недостача на B5."""
+    if not cnt or not cnt.get("day"):
+        return {}
+    since_at = str(cnt.get("counted_at") or "")
+    out: dict = {}
+    for m in await db.get_stock_transfers_since(cnt["day"]):
+        if since_at and str(m.get("at") or "") <= since_at:
+            continue
+        pid = m.get("product_id")
+        if not pid or pid not in cat:
+            continue
+        q = _bottles(m.get("qty") or 0, _unit(cat[pid]))
+        if not q:
+            continue
+        if m.get("to") == district:
+            out[pid] = out.get(pid, 0) + q
+        if m.get("from") == district:
+            out[pid] = out.get(pid, 0) - q
+    return out
+
+
+async def _audit_expected(district: str, day: str) -> tuple:
+    """({позиция: ожидается бутылок}, {позиция: бутылок без кодов}, был ли пересчёт).
+
+    Пересчёт был — от него, как основа заявки и стоимость склада: снимок +
+    приход − продажи − списания, плюс переезды после снимка, минус бутылки без
+    кодов. Так число в ревизии совпадает с тем, что показывает карточка склада.
+    Пересчёта не было — от реестра, как лист."""
+    cat = _catalog()
+    base = await _district_base(day)
+    b = base.get(district) or {}
+    exp: dict = {}
+    noqr: dict = {}
+    if b.get("counted"):
+        have = b.get("have") or {}
+        detail: dict = {}
+        try:
+            import qr_routes
+            await qr_routes.unscanned_by_district(None, detail)
+        except Exception as e:                       # noqa: BLE001
+            log.warning(f"[audit] невнесённые не посчитаны ({district}): {e}")
+        miss = detail.get(district) or {}
+        cnt = await db.get_last_stock_count(district)
+        moved = await _moves_since_count(district, cnt, cat)
+        for pid, p in cat.items():
+            n = _bottles(have.get(pid) or 0, _unit(p)) + int(moved.get(pid) or 0)
+            noqr[pid] = int(miss.get(pid) or 0)
+            exp[pid] = max(0, n - noqr[pid])
+        return exp, noqr, True
+    reg = await _registry_was(district, day)
+    sold = await _sold(day, district)
+    mv = _moves_by_pid(await db.get_stock_transfers(day), district)
+    for pid, p in cat.items():
+        v = float(reg.get(pid) or 0) + float(mv.get(pid) or 0) - float(sold.get(pid) or 0)
+        exp[pid] = max(0, _bottles(v, _unit(p)))
+        noqr[pid] = 0
+    return exp, noqr, False
+
+
+async def _audit_lines(district: str, day: str) -> tuple:
+    """Строки ревизии: ожидается / увидела камера / разница — в бутылках."""
+    exp, noqr, counted = await _audit_expected(district, day)
+    counts = await db.audit_scan_counts(district, day)
+    cat = _catalog()
+    await _loss_load()
+    lines = []
+    for pid, p in cat.items():
+        e = int(exp.get(pid) or 0)
+        a = int(counts.get(pid) or 0)
+        d = e - a
+        lines.append({
+            "id": pid, "name": p.get("name", ""), "cat": p.get("cat", ""),
+            "no": order_key(pid) + 1, "unit": _unit(p),
+            "price": _price(p),                        # прайс за учётную единицу
+            "expected": e, "actual": a, "diff": d,     # >0 — не хватает бутылок
+            "noqr": int(noqr.get(pid) or 0),
+            "loss": _loss_of(pid, d) if d > 0 else 0,  # закупка за пропавшие
+        })
+    lines.sort(key=lambda r: r["no"])
+    return lines, counted
+
+
+def _audit_totals(lines: list) -> dict:
+    short = [l for l in lines if l["diff"] > 0]
+    over = [l for l in lines if l["diff"] < 0]
+    live = [l for l in lines if l["expected"] or l["actual"]]
+    return {
+        "expected": sum(l["expected"] for l in lines),
+        "actual": sum(l["actual"] for l in lines),
+        "short_qty": sum(l["diff"] for l in short),
+        "short_aed": sum(l["loss"] for l in short),
+        "over_qty": sum(-l["diff"] for l in over),
+        "noqr": sum(l["noqr"] for l in lines),
+        "positions": len(live),
+        "matched": sum(1 for l in live if not l["diff"]),
+        "mismatched": len(short) + len(over),
+    }
+
+
+def _audit_view(a: dict | None) -> dict:
+    """Состояние ревизии для экрана — одно на лист, отчёт и список районов."""
+    a = a or {}
+    fin = bool(a.get("finished_at"))
+    state = ("closed" if a.get("closed_at") else "pending" if fin
+             else "running" if a.get("started_at") else "idle")
+    return {
+        "state": state,
+        "started_at": a.get("started_at", ""), "started_by": a.get("started_by_name", ""),
+        "finished_at": a.get("finished_at", ""), "closed_at": a.get("closed_at", ""),
+        "short": a.get("short") or None, "over": a.get("over") or None,
+        "alien": int(a.get("alien") or 0),
+        "result": a.get("result") or None,
+    }
+
+
+def _audit_rows_saved(a: dict) -> list:
+    """Строки завершённой ревизии — из сохранённого, с именами из каталога.
+    Живой пересчёт после завершения показал бы нули: пересчёт уже записан,
+    и ожидаемое сравнялось с фактом."""
+    cat = _catalog()
+    rows = []
+    for l in (a or {}).get("lines") or []:
+        p = cat.get(l.get("id")) or {}
+        rows.append({**l, "name": p.get("name", ""), "cat": p.get("cat", ""),
+                     "no": order_key(l.get("id") or "") + 1, "unit": _unit(p),
+                     "price": _price(p)})
+    rows.sort(key=lambda r: r["no"])
+    return rows
+
+
+async def _audit_report(district: str, day: str, a: dict = None) -> dict:
+    a = a if a is not None else (await db.audit_get(district, day) or {})
+    rows = [r for r in _audit_rows_saved(a) if r.get("diff")]
+    rows.sort(key=lambda r: (-abs(r.get("loss") or 0), -abs(r["diff"])))
+    return {
+        "district": district,
+        "district_name": OFFICE_NAMES.get(district, district),
+        "district_code": OFFICE_CODES.get(district, ""),
+        "day": day, "audit": _audit_view(a), "rows": rows,
+        "totals": a.get("result") or {},
+    }
+
+
+def _district_of(request, body: dict = None) -> tuple:
+    src = body if body is not None else request.query
+    district = str(src.get("district") or "").strip()
+    day = str(src.get("day") or "").strip() or _biz_day()
+    return district, day
+
+
+@require_owner
+async def handle_audit_sheet(request):
+    """Лист ревизии: что числится и что увидела камера. ?district=&day=
+
+    Идёт — считается живьём от каждого скана. Завершена — из сохранённого,
+    чтобы страница района и после закрытия показывала, чем ревизия кончилась."""
+    district, day = _district_of(request)
+    if district not in OFFICE_IDS:
+        return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+    a = await db.audit_get(district, day) or {}
+    if a.get("finished_at"):
+        rows = _audit_rows_saved(a)
+        counted = True
+        totals = a.get("result") or _audit_totals(rows)
+    else:
+        rows, counted = await _audit_lines(district, day)
+        totals = _audit_totals(rows)
+    stats = await db.audit_scan_stats(district, day)
+    return web.json_response({
+        "district": district,
+        "district_name": OFFICE_NAMES.get(district, district),
+        "district_code": OFFICE_CODES.get(district, ""),
+        "day": day, "counted": counted, "rows": rows, "totals": totals,
+        "audit": _audit_view(a), "scan": stats,
+    }, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_audit_start(request):
+    """Начать ревизию района. body: {district, day?, as?}. Повтор — не ошибка:
+    ревизию прерывают и возвращаются к ней."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    district, day = _district_of(request, body)
+    if district not in OFFICE_IDS:
+        return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+    a = await db.audit_get(district, day) or {}
+    if a.get("finished_at"):
+        return web.json_response({"error": "finished", "audit": _audit_view(a)},
+                                 status=409, headers=CORS_HEADERS)
+    if not a.get("started_at"):
+        a = await db.audit_set(district, day, {
+            "started_at": datetime.now(timezone.utc).isoformat(),
+            "started_by": int(request["owner_id"] or 0),
+            "started_by_name": str(body.get("as") or "").strip()[:60]})
+        log.info(f"[audit] {district} {day}: ревизия начата")
+    return web.json_response({"ok": True, "audit": _audit_view(a)}, headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_audit_finish(request):
+    """Завершить ревизию: записать пересчёт по камере и разобрать, чего не
+    хватает и чего лишнее. body: {district, day?, as?}
+
+    Сошлось — ревизия закрыта сразу. Иначе она ждёт решений: по недостаче —
+    кто платит, по излишку — внести на район."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    district, day = _district_of(request, body)
+    if district not in OFFICE_IDS:
+        return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+    a = await db.audit_get(district, day) or {}
+    if a.get("finished_at"):
+        return web.json_response({"error": "finished", "audit": _audit_view(a)},
+                                 status=409, headers=CORS_HEADERS)
+    if not a.get("started_at"):
+        return web.json_response({"error": "not_started"}, status=409, headers=CORS_HEADERS)
+
+    lines, counted = await _audit_lines(district, day)
+    tot = _audit_totals(lines)
+    stats = await db.audit_scan_stats(district, day)
+    codes = await db.audit_scan_codes(district, day)
+    alien = sum(1 for c in codes if (c.get("verdict") or "") == "alien")
+    by_pid: dict = {}
+    for c in codes:
+        pid = c.get("product_id") or ""
+        if pid and (c.get("verdict") or "ok") != "ok":
+            by_pid.setdefault(pid, []).append({
+                "code": c.get("code", ""), "verdict": c.get("verdict", ""),
+                "home": c.get("home", ""), "home_code": OFFICE_CODES.get(c.get("home") or "", "")})
+    short_lines = [{"id": l["id"], "name": l["name"], "qty": l["diff"],
+                    "loss": l["loss"], "price": l["price"], "unit": l["unit"]}
+                   for l in lines if l["diff"] > 0]
+    over_lines = []
+    for l in lines:
+        if l["diff"] >= 0:
+            continue
+        odd = by_pid.get(l["id"]) or []
+        over_lines.append({
+            "id": l["id"], "name": l["name"], "qty": -l["diff"], "unit": l["unit"],
+            "other": sum(1 for c in odd if c["verdict"] == "other"),
+            "written": sum(1 for c in odd if c["verdict"] == "written"),
+            "sold": sum(1 for c in odd if c["verdict"] == "sold"),
+            "codes": odd})
+    short = ({"qty": tot["short_qty"], "aed": tot["short_aed"], "lines": short_lines}
+             if short_lines else None)
+    over = ({"qty": tot["over_qty"], "lines": over_lines} if over_lines else None)
+
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    who = str(body.get("as") or "").strip()[:60]
+    # Пересчёт — обычным документом, в учётных единицах: с него дальше живут
+    # заявка и стоимость склада, и ревизия для них — просто свежий снимок.
+    doc_lines = []
+    for l in lines:
+        u = l["unit"]
+        e, act = _num(l["expected"] / u), _num(l["actual"] / u)
+        doc_lines.append({"id": l["id"], "name": l["name"], "price": l["price"], "unit": u,
+                          "was": e, "income": 0, "moved_qty": 0, "sold": 0,
+                          "expected": e, "actual": act, "diff": _num(e - act),
+                          "counted": True, "mark": "ok" if not l["diff"] else "diff"})
+    doc = {"district": district, "district_name": OFFICE_NAMES.get(district, district),
+           "day": day, "first_time": False,
+           "counted_by": request["owner_id"], "counted_at": now_iso,
+           "lines": doc_lines,
+           "short_qty": tot["short_qty"], "short_aed": tot["short_aed"],
+           "over_qty": tot["over_qty"],
+           "counted_qty": len(doc_lines), "total_qty": len(doc_lines),
+           "scan_qty": int(stats.get("total") or 0),
+           "audit_started_at": a.get("started_at") or now_iso,
+           "audit_finished_at": now_iso, "audit_by": request["owner_id"],
+           "marked_qty": len(doc_lines), "matched_qty": tot["matched"],
+           "mismatch_qty": tot["mismatched"]}
+    await db.save_stock_count(district, day, doc)
+    base_drop()
+    fields = {
+        "finished_at": now_iso, "finished_by": int(request["owner_id"] or 0),
+        "finished_by_name": who, "short": short, "over": over, "alien": alien,
+        "result": {**tot, "scan_qty": int(stats.get("total") or 0), "counted": counted},
+        "lines": [{"id": l["id"], "expected": l["expected"], "actual": l["actual"],
+                   "diff": l["diff"], "noqr": l["noqr"], "loss": l["loss"]} for l in lines],
+    }
+    if not short and not over:
+        fields["closed_at"] = now_iso
+    a = await db.audit_set(district, day, fields)
+    log.info(f"[audit] {district} {day}: завершена — не хватает {tot['short_qty']} бут "
+             f"/ {tot['short_aed']} AED, излишек {tot['over_qty']}, камерой {stats.get('total', 0)}")
+    await backdate.notify(day, who, "ревизия",
+                          f"{OFFICE_CODES.get(district, district)} — камерой {stats.get('total', 0)}"
+                          + (f", не хватает {tot['short_aed']} AED" if tot["short_aed"] else ""))
+    return web.json_response(await _audit_report(district, day, a), headers=CORS_HEADERS)
+
+
+def _audit_close_if_done(a: dict, fields: dict, now_iso: str) -> None:
+    """Закрыть ревизию, когда решено всё, что требовало решения."""
+    short = fields.get("short", a.get("short"))
+    over = fields.get("over", a.get("over"))
+    if (not short or short.get("resolved_at")) and (not over or over.get("resolved_at")):
+        if not a.get("closed_at"):
+            fields["closed_at"] = now_iso
+
+
+@require_owner
+async def handle_audit_short(request):
+    """Решение по недостаче. body: {district, day?, blame: bool, who?, amount?,
+    split?: [{who, amount}], note?, as?}
+
+    Недостача записывается списаниями вида «недостача» — по одному на позицию,
+    своей рукой владельца, сразу учтёнными. Со склада они ничего не вычитают:
+    пересчёт ревизии уже записан без этих бутылок (см. writeoff_since,
+    skip_audit). Удержание, если виновный назван, ставится на первое из них —
+    тем же удержанием, что у боя: водителю уходит сообщение, в финансах это
+    долг."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    district, day = _district_of(request, body)
+    a = await db.audit_get(district, day) or {}
+    short = a.get("short")
+    if not a.get("finished_at") or not short:
+        return web.json_response({"error": "no_short"}, status=409, headers=CORS_HEADERS)
+    if short.get("resolved_at"):
+        return web.json_response({"error": "resolved"}, status=409, headers=CORS_HEADERS)
+    blame = bool(body.get("blame"))
+    who = str(body.get("who") or "").strip()[:60]
+    note = str(body.get("note") or "").strip()[:200]
+    try:
+        amount = max(0, int(round(float(body.get("amount") or 0))))
+    except (TypeError, ValueError):
+        amount = 0
+    split = _split_parse(body)
+    if split:
+        who = ", ".join(x["who"] for x in split)
+        amount = sum(x["amount"] for x in split)
+    if blame and (not who or not amount):
+        return web.json_response({"error": "who_and_amount"}, status=400, headers=CORS_HEADERS)
+
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    by_name = str(body.get("as") or "").strip()[:60] or "владелец"
+    cat = _catalog()
+    wids = []
+    for l in short.get("lines") or []:
+        pid = l.get("id")
+        if pid not in cat or not int(l.get("qty") or 0):
+            continue
+        wid = await db.writeoff_add({
+            "at": now, "day": day, "item": pid, "thumb": "",
+            "name": cat[pid].get("name", ""), "qty": int(l["qty"]), "kind": "недостача",
+            "note": note, "district": district,
+            "district_code": OFFICE_CODES.get(district, ""),
+            "by": by_name, "by_id": int(request["owner_id"] or 0),
+            "own": True, "state": "ok",
+            "decided_at": now, "decided_by": int(request["owner_id"] or 0),
+            "decided_by_name": by_name,
+            "src": "audit", "audit_day": day,
+        }, b"")
+        wids.append(wid)
+    try:
+        await db.writeoff_none_clear(day)
+    except Exception:                               # noqa: BLE001
+        pass
+    comp = None
+    if blame and wids:
+        doc = await db.writeoff_compensate(wids[0], who, amount, note,
+                                           request.get("owner_id") or 0, by_name, split)
+        if doc:
+            comp = _comp_view(doc)
+            try:
+                await _writeoff_comp_tell(doc)
+            except Exception as e:                  # noqa: BLE001
+                log.warning(f"[audit] про удержание не сообщили: {e}")
+    short = {**short, "resolved_at": now_iso, "blame": blame,
+             "who": who if blame else "", "amount": amount if blame else 0,
+             "split": split if blame else None, "note": note, "writeoffs": wids,
+             "by_name": by_name}
+    fields = {"short": short}
+    _audit_close_if_done(a, fields, now_iso)
+    a = await db.audit_set(district, day, fields)
+    base_drop()
+    log.info(f"[audit] {district} {day}: недостача — "
+             f"{'удержано %s с %s' % (amount, who) if blame else 'без виновного'}"
+             f" · списаний {len(wids)}")
+    return web.json_response({**(await _audit_report(district, day, a)), "comp": comp},
+                             headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_audit_over(request):
+    """Внести излишек на район. body: {district, day?, as?}
+
+    Бутылка с чужой точки переезжает сюда — реестр и книга переездов, как у
+    обычного перемещения. Но переезд датируется до пересчёта ревизии: сам
+    пересчёт эту бутылку уже видел здесь, и поправка «плюс один» после него
+    посчитала бы её дважды. У точки-отправителя поправка работает как надо —
+    там пересчёт старше. Списанная или проданная, а на полке живая —
+    возвращается в остаток."""
+    try:
+        body = await request.json()
+    except Exception:
+        return web.json_response({"error": "invalid_json"}, status=400, headers=CORS_HEADERS)
+    district, day = _district_of(request, body)
+    a = await db.audit_get(district, day) or {}
+    over = a.get("over")
+    if not a.get("finished_at") or not over:
+        return web.json_response({"error": "no_over"}, status=409, headers=CORS_HEADERS)
+    if over.get("resolved_at"):
+        return web.json_response({"error": "resolved"}, status=409, headers=CORS_HEADERS)
+    now = datetime.now(timezone.utc)
+    now_iso = now.isoformat()
+    by_name = str(body.get("as") or "").strip()[:60]
+    me = int(request["owner_id"] or 0)
+    cat = _catalog()
+    # Секундой раньше пересчёта — см. пояснение выше.
+    try:
+        fin = datetime.fromisoformat(str(a.get("finished_at")))
+        before = (fin - timedelta(seconds=1)).isoformat()
+    except Exception:                               # noqa: BLE001
+        before = now_iso
+    moved = restored = 0
+    for l in over.get("lines") or []:
+        pid = l.get("id")
+        p = cat.get(pid) or {}
+        for c in l.get("codes") or []:
+            code, v = c.get("code") or "", c.get("verdict") or ""
+            if not code:
+                continue
+            if v == "other":
+                src = (await db.qr_get(code) or {}).get("district") or ""
+                if src == district:
+                    continue
+                tid = await db.add_stock_transfer(
+                    {"day": day, "from": src, "to": district, "product_id": pid,
+                     "product_name": p.get("name", ""), "qty": 1 / max(1, _unit(p)),
+                     "src": "qr", "code": code, "by": me, "by_name": by_name,
+                     "by_kind": "owner", "audit": day, "at": before})
+                if await db.qr_move(code, src, district, tid, me, before):
+                    moved += 1
+                else:
+                    await db.delete_stock_transfer(tid)
+            elif v in ("written", "sold"):
+                if await db.qr_restore(code, district, me, now_iso):
+                    restored += 1
+    over = {**over, "resolved_at": now_iso, "moved": moved, "restored": restored,
+            "by_name": by_name}
+    fields = {"over": over}
+    _audit_close_if_done(a, fields, now_iso)
+    a = await db.audit_set(district, day, fields)
+    base_drop()
+    log.info(f"[audit] {district} {day}: излишек внесён — перевезено {moved}, "
+             f"возвращено {restored}")
+    return web.json_response(await _audit_report(district, day, a), headers=CORS_HEADERS)
+
+
+@require_owner
+async def handle_audit_report(request):
+    """Отчёт ревизии: чем кончилась и что решено. ?district=&day="""
+    district, day = _district_of(request)
+    if district not in OFFICE_IDS:
+        return web.json_response({"error": "unknown_district"}, status=400, headers=CORS_HEADERS)
+    a = await db.audit_get(district, day)
+    if not a or not a.get("finished_at"):
+        return web.json_response({"error": "not_found"}, status=404, headers=CORS_HEADERS)
+    return web.json_response(await _audit_report(district, day, a), headers=CORS_HEADERS)
+
+
 @require_owner
 async def handle_audits(request):
     """История ревизий: что и когда закрывали. Только заголовки — сами позиции
@@ -1478,7 +1979,13 @@ async def handle_audits(request):
     rows = await db.get_finished_audits(limit=40)
     out = []
     for c in rows:
+        a = await db.audit_get(c.get("district", ""), c.get("day", "")) or {}
+        v = _audit_view(a)
         out.append({
+            "state": v["state"] if a else "closed",
+            "closed_at": v["closed_at"],
+            "short_open": bool(v["short"] and not (v["short"] or {}).get("resolved_at")),
+            "over_open": bool(v["over"] and not (v["over"] or {}).get("resolved_at")),
             "district": c.get("district", ""),
             "district_code": OFFICE_CODES.get(c.get("district"), ""),
             "district_name": OFFICE_NAMES.get(c.get("district"), c.get("district", "")),
@@ -2312,6 +2819,12 @@ def setup(app):
         ("/api/owner/stock/audit/scan",       handle_audit_scan,       "POST"),
         ("/api/owner/stock/audit/scan/undo",  handle_audit_scan_undo,  "POST"),
         ("/api/owner/stock/audit/scan/reset", handle_audit_scan_reset, "POST"),
+        ("/api/owner/stock/audit/sheet",  handle_audit_sheet,  "GET"),
+        ("/api/owner/stock/audit/start",  handle_audit_start,  "POST"),
+        ("/api/owner/stock/audit/finish", handle_audit_finish, "POST"),
+        ("/api/owner/stock/audit/short",  handle_audit_short,  "POST"),
+        ("/api/owner/stock/audit/over",   handle_audit_over,   "POST"),
+        ("/api/owner/stock/audit/report", handle_audit_report, "GET"),
         ("/api/owner/stock/count",     handle_save,      "POST"),
         ("/api/owner/stock/transfer",  handle_transfer,  "POST"),
         ("/api/owner/stock/transfer/scan",      handle_transfer_scan,      "POST"),

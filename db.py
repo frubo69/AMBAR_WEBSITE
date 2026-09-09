@@ -56,6 +56,7 @@ async def connect():
         # Проход камерой по полке: счёт по позициям спрашивается после каждого
         # скана, и без индекса это перебор всего прохода на каждую бутылку.
         await _db.audit_scans.create_index([("district", 1), ("day", 1)])
+        await _db.stock_audits.create_index([("district", 1), ("day", 1)], unique=True)
         await _db.shift_days.create_index([("day", 1)])
         # Страховка на случай незакрытой смены: полтора суток без обновлений —
         # и запись о положении водителя уходит сама. Срок считается от «at», а
@@ -2646,12 +2647,19 @@ async def writeoff_list(since=None, district: str = "", by: str = "",
     return await cur.to_list(length=int(limit))
 
 
-async def writeoff_since(since: dict, skip_coded: bool = False) -> dict:
+async def writeoff_since(since: dict, skip_coded: bool = False,
+                         skip_audit: bool = True) -> dict:
     """Сколько бутылок списано после пересчёта: {район: {позиция: шт}}.
 
     Тому же расчёту, что учитывает приход и продажи: разбитая бутылка ушла со
     склада так же честно, как проданная, и заявка должна знать об этом раньше,
-    чем следующий пересчёт."""
+    чем следующий пересчёт.
+
+    skip_audit — не считать недостачу, записанную ревизией (src=audit): она
+    уже сидит в самом пересчёте, которым ревизия закончилась, — фактический
+    остаток записан без этих бутылок. Вычесть её ещё раз значит потерять
+    бутылку дважды. Тот, кто считает ОТ РЕЕСТРА, наоборот, обязан её вычесть:
+    коды пропавших бутылок в реестре остались активными."""
     db = _db_or_none()
     out = {}
     if db is None or not since: return out
@@ -2663,7 +2671,8 @@ async def writeoff_since(since: dict, skip_coded: bool = False) -> dict:
                         # статус сменился, и она не считается активной. Тому,
                         # кто считает ОТ РЕЕСТРА, вычитать её второй раз нельзя;
                         # тому, кто считает от ручного пересчёта, — обязательно.
-                        **({"code": {"$in": [None, ""]}} if skip_coded else {})}},
+                        **({"code": {"$in": [None, ""]}} if skip_coded else {}),
+                        **({"src": {"$ne": "audit"}} if skip_audit else {})}},
             {"$group": {"_id": "$item", "n": {"$sum": "$qty"}}},
         ])
         got = {d["_id"]: int(d["n"] or 0) for d in await cur.to_list(length=500) if d["_id"]}
@@ -3365,6 +3374,71 @@ async def audit_scan_clear(district: str, day: str) -> int:
     if db is None: return 0
     r = await db.audit_scans.delete_many({"district": district, "day": day})
     return int(r.deleted_count)
+
+
+async def audit_scan_codes(district: str, day: str) -> list:
+    """Все бутылки прохода с вердиктом: по ним излишек разбирают поштучно —
+    чужую перевозят сюда, списанную возвращают в остаток."""
+    db = _db_or_none()
+    if db is None: return []
+    cur = db.audit_scans.find({"district": district, "day": day},
+                              {"_id": 0, "code": 1, "product_id": 1, "verdict": 1,
+                               "home": 1, "product_name": 1})
+    return await cur.to_list(length=5000)
+
+
+# ── ревизия: состояние по району и дню ──────────────────────────────────────
+# Пересчёт (stock_counts) рождается только в конце ревизии: до него он был бы
+# документом без строк, а такой документ остальной учёт принял бы за
+# «последний пересчёт» и увидел бы пустой склад. Поэтому «начата», «завершена»
+# и решения по недостаче и излишку живут отдельно, здесь.
+
+async def audit_get(district: str, day: str) -> dict | None:
+    db = _db_or_none()
+    if db is None: return None
+    return await db.stock_audits.find_one({"district": district, "day": day}, {"_id": 0})
+
+
+async def audit_set(district: str, day: str, fields: dict) -> dict:
+    """Дописать поля состояния ревизии. Возвращает документ целиком."""
+    db = _db_or_none()
+    if db is None: return {}
+    from pymongo import ReturnDocument
+    doc = await db.stock_audits.find_one_and_update(
+        {"district": district, "day": day},
+        {"$set": {**fields, "district": district, "day": day}},
+        upsert=True, projection={"_id": 0}, return_document=ReturnDocument.AFTER)
+    return doc or {}
+
+
+async def audits_by_day(day: str) -> dict:
+    """{район: состояние} за день — для списка районов."""
+    db = _db_or_none()
+    if db is None: return {}
+    rows = await db.stock_audits.find({"day": day}, {"_id": 0}).to_list(length=50)
+    return {r.get("district"): r for r in rows}
+
+
+async def audits_pending() -> list:
+    """Завершённые, но не закрытые: недостача или излишек ждут решения."""
+    db = _db_or_none()
+    if db is None: return []
+    return await db.stock_audits.find(
+        {"finished_at": {"$exists": True}, "closed_at": {"$exists": False}},
+        {"_id": 0}).to_list(length=100)
+
+
+async def qr_restore(code: str, district: str, by: int, at) -> bool:
+    """Вернуть в остаток бутылку, которая по бумагам ушла (списана, продана),
+    а на полке нашлась ревизией. Активную не трогаем — ей и так хорошо."""
+    db = _db_or_none()
+    if db is None: return False
+    r = await db.qr_codes.update_one(
+        {"_id": code, "status": {"$in": ["written", "sold"]}},
+        {"$set": {"status": "active", "district": district},
+         "$unset": {"writeoff": "", "written_at": ""},
+         "$push": {"restored": {"at": at, "by": by, "district": district}}})
+    return r.matched_count > 0
 
 
 async def qr_by_product_district(district: str) -> dict:

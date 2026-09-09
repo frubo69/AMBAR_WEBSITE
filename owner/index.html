@@ -2485,6 +2485,9 @@ button.path:active{transform:scale(.995)}
   font-size:13.5px;font-weight:700;color:var(--gold2);background:var(--gold-soft);
   border:1px solid rgba(201,169,110,.3)}
 .xe-fold:active{transform:scale(.99)}
+/* Та же кнопка, но в конце длинного списка: своя высота полей, чтобы не
+   слипалась с последней строкой и с краем карточки. */
+.list-fold{margin:8px 0 2px;padding:11px}
 /* «Отправить» — как у водителя: тихая кнопка, загорается, когда есть что
    отправлять; пустая карточка не зовёт нажимать. */
 .xe-go{flex:0 0 auto;padding:0 20px;border-radius:11px;cursor:pointer;font-family:inherit;
@@ -11541,6 +11544,31 @@ function IC(name, size){
     stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
 }
 
+// ── Свернуть длинный список ────────────────────────────────────────────────
+// Заголовок, которым список сворачивают, у длинного списка уехал вверх на сто
+// строк, и чтобы закрыть его, надо прокрутить обратно — то есть проделать
+// весь путь второй раз. Кнопка в конце закрывает список там же, где человек
+// дочитал. Ставим её только у длинных: короткий виден целиком вместе со своим
+// заголовком, и вторая кнопка под ним — лишняя строка на пустом месте.
+const FOLD_MIN = 8;                       // строк, после которых список длинный
+
+function foldEnd(n, вызов){
+  if((n || 0) < FOLD_MIN) return '';
+  return `<button class="xe-fold list-fold" onclick="${вызов}">
+    ${xsvg('<path d="M6 15l6-6 6 6"/>', 16)}<span>Свернуть список</span></button>`;
+}
+
+// Свернули из конца — возвращаем карточку на глаза. Содержимое под пальцем
+// только что исчезло, страница стала короче, и без этого человек оказывается
+// посреди чужой строки, а то и в другом районе. Судят по тому, что видно.
+function foldSeen(key){
+  requestAnimationFrame(() => {
+    let el = null;
+    try{ el = document.querySelector(`[data-fold="${CSS.escape(String(key))}"]`); }catch(e){}
+    if(el) el.scrollIntoView({block: 'start', behavior: 'smooth'});
+  });
+}
+
 const _SKEL_IDS = [
   'heroRev','heroPrev','heroDelta',
   'kOrders','kOrdersAvg','kOrdersDelta','kDeclined','kPending','kDone',
@@ -15299,7 +15327,7 @@ function crCard(x){
   // Главное число отвечает на один вопрос: сколько водитель кладёт на стол.
   // Ушёл в минус — значит потратил больше, чем собрал, и это ему доплата.
   const net = x.net, minus = net < 0;
-  return `<div class="cr-card${x.done ? ' done' : ''}" id="cr-${escS(x.id)}">
+  return `<div class="cr-card${x.done ? ' done' : ''}" id="cr-${escS(x.id)}" data-fold="cr-${escS(x.id)}">
     <div class="cr-h">
       <span class="shl-code">${escS(x.code)}</span>
       <span class="cr-hb"><b>${escS(x.name)}</b><i>${escS(team)}</i></span>
@@ -15317,7 +15345,8 @@ function crCard(x){
     ${n ? `<button class="cr-fold${open ? ' on' : ''}" onclick="crFold('${escS(x.id)}')">
         <span>Расходы за смену · ${n}</span>
         <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-      </button>${open ? `<div class="cr-items">${x.items.map(crItem).join('')}</div>` : ''}`
+      </button>${open ? `<div class="cr-items">${x.items.map(crItem).join('')}${
+        foldEnd(n, `crFold('${escS(x.id)}', 1)`)}</div>` : ''}`
       : '<div class="cr-noexp">Расходов за смену не было</div>'}
     <button class="cr-ok${x.done ? ' on' : ''}" onclick="crToggle('${escS(x.id)}')">
       ${x.done ? `${IC('check', 16)}Собрано · снять отметку` : 'Собрано'}
@@ -15339,10 +15368,11 @@ function crItem(e){
   </div>`;
 }
 
-function crFold(id){
+function crFold(id, снизу){
   if(CR_OPEN.has(id)) CR_OPEN.delete(id); else CR_OPEN.add(id);
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   crRender();
+  if(снизу) foldSeen('cr-' + id);
 }
 
 // Галочка ставится и снимается одним нажатием, без вопросов: действие
@@ -15592,7 +15622,7 @@ function finRender(){
     return `<div class="fin-grp">${FIN_ROLE[k][0]}</div>` + g.map(r => {
       const open = FIN_OPEN.has(r.name);
       const cls = r.net > 0 ? 'up' : r.net < 0 ? 'dn' : '';
-      return `<div class="fin-r ${open ? 'open' : ''}">
+      return `<div class="fin-r ${open ? 'open' : ''}" data-fold="finr-${escS(r.name)}">
         <button class="fin-h" onclick="finToggle('${escS(r.name)}')">
           <span class="fin-a ini">${escS(String(r.name || '?').trim().slice(0, 2).toUpperCase())}</span>
           <span class="fin-b"><b>${escS(r.name)}</b>
@@ -15604,7 +15634,8 @@ function finRender(){
             <span class="fin-i-d">${escS(String(x.day || '').slice(5).replace('-', '.'))}</span>
             <span class="fin-i-b"><b>${escS(x.t)}</b>${x.comment ? `<i>${escS(x.comment)}</i>` : ''}</span>
             <span class="fin-i-v ${x.kind === 'owed_us' || x.kind === 'comp' || x.kind === 'we_gave' ? 'up' : 'dn'}">${
-              fmt(x.amount)}</span></div>`).join('')}</div>` : ''}
+              fmt(x.amount)}</span></div>`).join('')}${
+          foldEnd(r.items.length, `finToggle('${escS(r.name)}', 1)`)}</div>` : ''}
       </div>`;
     }).join('');
   }).join('');
@@ -15638,10 +15669,11 @@ function finGo(id){
   el.scrollIntoView({block: 'start', behavior: 'smooth'});
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
 }
-function finToggle(n){
+function finToggle(n, снизу){
   if(FIN_OPEN.has(n)) FIN_OPEN.delete(n); else FIN_OPEN.add(n);
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   finRender();
+  if(снизу) foldSeen('finr-' + n);
 }
 
 // Прайс: закупка и продажа. Сама таблица — на своём экране, здесь три числа.
@@ -16222,7 +16254,7 @@ function ordSeparate(d, dist){
   // название заглавными, оглавление через косую, справа сколько. Слова о том,
   // что их берут не в магазине, тут нет: это и так известно всем, кто закупает.
   return `<div class="ord-dists" style="margin-top:10px">
-    <div class="shl-card ord-dc${open ? ' open' : ''}">
+    <div class="shl-card ord-dc${open ? ' open' : ''}" data-fold="ordd-tobacco">
       <button class="shl-h ord-dh" onclick="ordFold('tobacco')">
         <span class="shl-code"><svg viewBox="0 0 24 24" width="18" height="18" fill="none"
           stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
@@ -16243,7 +16275,7 @@ function ordSeparate(d, dist){
             .map(([o, c]) => `${escS(code(o))}·${c.need}`).join(' ') || 'по норме хватает'}</span>
           <span class="ord-r-v">${fmt(r.need_total)}</span>
         </div>
-      </div>`).join('')}</div>` : ''}
+      </div>`).join('')}${foldEnd(rows.length, "ordFold('tobacco', 1)")}</div>` : ''}
     </div>
   </div>`;
 }
@@ -16364,7 +16396,7 @@ function ordDistricts(list, dist, q){
     // без ста строк под ней; список раскрывают, когда надо править. Поиск
     // раскрывает все: искали позицию — её надо увидеть.
     const open = !!q || !!(ORD.fold || {})[x.id];
-    return `<div class="shl-card ord-dc${open ? ' open' : ''}">
+    return `<div class="shl-card ord-dc${open ? ' open' : ''}" data-fold="ordd-${escS(x.id)}">
       <button class="shl-h ord-dh" onclick="ordFold('${x.id}')">
         <span class="shl-code">${escS(x.code || '')}</span>
         <span class="shl-b"><b>${escS(x.name || x.id)}</b>
@@ -16372,7 +16404,8 @@ function ordDistricts(list, dist, q){
         <span class="shl-v"><b>${fmt(Math.round(aed))}<u>AED</u></b><i>прайс</i></span>
         <span class="ord-dh-go">${ICO_CHEV}</span>
       </button>
-      ${open ? `<div class="ord-dl">${rows.map(r => ordRow(r, x, num[r.id])).join('')}</div>` : ''}
+      ${open ? `<div class="ord-dl">${rows.map(r => ordRow(r, x, num[r.id])).join('')}${
+        foldEnd(rows.length, `ordFold('${x.id}', 1)`)}</div>` : ''}
     </div>`;
   }).filter(Boolean);
   if(!cards.length) return '<div class="exp-empty">' + (q ? 'Ничего не нашлось'
@@ -16382,11 +16415,12 @@ function ordDistricts(list, dist, q){
   return `<div class="ord-dists">${cards.join('')}</div>`;
 }
 
-function ordFold(id){
+function ordFold(id, снизу){
   if(!ORD.fold) ORD.fold = {};
   ORD.fold[id] = !ORD.fold[id];
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   ordRender();
+  if(снизу) foldSeen('ordd-' + id);
 }
 
 // Строка позиции в карточке района. Свёрнутая — что и сколько; раскрытая —
@@ -18536,7 +18570,8 @@ function xSupRender(d){
       </div>`).join('') + (edit ? xsAddRow(t.district) : '');
     const lock = t.locked && !t.done_at
       ? `<span class="xs-lock">${IC('lock', 12)}правки закрыты${t.lock_at ? ' · с ' + _hm(t.lock_at) : ''}</span>` : '';
-    return `<div class="xs-dcard ${t.done_at ? 'done' : ns ? 'noscan' : t.driver ? 'live' : ''}" id="xsd-${escS(t.district)}">
+    return `<div class="xs-dcard ${t.done_at ? 'done' : ns ? 'noscan' : t.driver ? 'live' : ''}"
+      id="xsd-${escS(t.district)}" data-fold="xsd-${escS(t.district)}">
       <div class="xs-dcard-h">
         <span class="xs-dc">${escS(x.code || '')}</span>
         <span class="xs-dcard-b"><b>${escS(x.name || t.district)}</b><i>${who}</i>${lock}</span>
@@ -18546,7 +18581,8 @@ function xSupRender(d){
           <span>${lines.length} ${pluralize(lines.length,'позиция','позиции','позиций')}${
             t.left && (t.driver || t.done_at || ns) ? ` · ${t.done_at ? 'не хватает' : ns ? 'не отсканировано' : 'осталось'} ${fmt(t.left)}` : ''}</span>
           <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>
-        </button>${open ? `<div class="xs-fold-b">${list}</div>` : ''}`}
+        </button>${open ? `<div class="xs-fold-b">${list}${
+          foldEnd(rows.length, `xSupToggle('${escS(t.district)}', 1)`)}</div>` : ''}`}
       ${marks.length ? `<div class="rt-fl">${escS(marks.join(' · '))}</div>` : ''}
       ${t.note ? `<div class="rt-note">${escS(t.note)}</div>` : ''}
       ${rtActs(t, d)}
@@ -18710,10 +18746,11 @@ async function supPollTick(){
   finally{ _supPollBusy = false; }
 }
 
-function xSupToggle(oid){
+function xSupToggle(oid, снизу){
   if(SUP_OPEN.has(oid)) SUP_OPEN.delete(oid); else SUP_OPEN.add(oid);
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   supRender();
+  if(снизу) foldSeen('xsd-' + oid);
 }
 
 // ── мастер: куда → что → готово ──
@@ -20210,10 +20247,11 @@ function prTab(id){
   prRender();
 }
 
-function prOpen(k){
+function prOpen(k, снизу){
   PR.open = PR.open === k ? null : k;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   prRender();
+  if(снизу) foldSeen('pre-' + k);
 }
 
 // Переход к самому сообщению. Ссылка телеграмная, и открывать её надо не
@@ -20299,7 +20337,7 @@ function prPosts(rows){
     </div>`;
   return head + `<div class="exp-grp">Публикации · ${rows.length}</div>` + rows.map((e, i) => {
     const k = 'p' + i, open = PR.open === k;
-    return `<div class="pr-ev${open?' open':''}">
+    return `<div class="pr-ev${open?' open':''}" data-fold="pre-${k}">
       <button class="pr-ev-h" onclick="prOpen('${k}')">
         <span class="pr-ev-t">
           <span class="pr-ev-n">Пост · метка «${escS(e.tag || 'all')}»</span>
@@ -20309,7 +20347,8 @@ function prPosts(rows){
           e.by_name ? ' · опубликовал ' + escS(e.by_name) : ''} · пришло ${e.users}</span>
       </button>
       ${open ? `<div class="pr-ev-b">${e.users ? prWho(e.people)
-        : '<div class="pr-ev-s">По этой публикации пока никто не пришёл</div>'}</div>` : ''}
+        : '<div class="pr-ev-s">По этой публикации пока никто не пришёл</div>'}${
+        foldEnd((e.people || []).length, `prOpen('${k}', 1)`)}</div>` : ''}
     </div>`;
   }).join('');
 }

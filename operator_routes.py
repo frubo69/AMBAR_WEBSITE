@@ -2851,7 +2851,6 @@ async def _drv_cover(name: str, on: bool) -> None:
         log.error(f"[where] прикрытие водителю не отправлено: {e}")
 
 
-@require_operator
 async def drv_panic(name: str, on: bool, кто: str, откуда: str = "планшета") -> None:
     """Скрытый режим водителя, включённый за него другим человеком.
 
@@ -2890,6 +2889,7 @@ async def drv_panic(name: str, on: bool, кто: str, откуда: str = "пл�
         log.error(f"[where] владельцу не сказали: {e}")
 
 
+@require_operator
 async def handle_drv_panic(request):
     """Включить или снять скрытый режим водителя с планшета."""
     try:

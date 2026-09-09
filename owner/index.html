@@ -9977,15 +9977,14 @@ function dpApply(){
     const т = _bizToday(), в = new Date(dpFrom.getFullYear(), dpFrom.getMonth(), dpFrom.getDate());
     ckDaySet(Math.max(0, Math.round((т - в) / 86400000)));
   }
-  if(dpTarget === 'moneyDay'){
+  // Полосы дня внутри разделов — расходы и склад. Из выбранного берём начало
+  // и встаём на этот день, как в чек-листе: календарь тут способ уйти дальше,
+  // чем удобно листать пальцем, а не выбрать отрезок.
+  if(dpTarget === 'expDay' || dpTarget === 'stkDay'){
     const т = _bizToday(), в = new Date(dpFrom.getFullYear(), dpFrom.getMonth(), dpFrom.getDate());
-    const off = Math.round((т - в) / 86400000);
-    const chip = document.getElementById('rangeChip-moneyDay');
-    if(chip) chip.style.display = 'none';
-    const cal = document.querySelector('.cal-btn[onclick*="moneyDay"]');
+    const cal = document.querySelector(`.cal-btn[onclick*="'${dpTarget}'"]`);
     if(cal) cal.classList.remove('on');
-    accDaySet(Math.max(0, off));
-    accDayPaint();
+    accDayGo(Math.max(0, Math.round((т - в) / 86400000)));
   }
   closeDate();
   try{Telegram.WebApp.HapticFeedback.notificationOccurred('success')}catch(e){}
@@ -12676,7 +12675,10 @@ async function stkPicker(){
     return;
   }
   STK.districts = st.districts;
-  _stkHead('Склад', `${st.done} из ${st.total} районов · ${_dayName(st.day)}`, false);
+  // Дата ушла из подписи: её теперь говорит полоса дня под шапкой, и повторять
+  // её вторым мелким шрифтом незачем.
+  _stkHead('Склад', `${st.done} из ${st.total} ${
+    pluralize(st.total || 0, 'район', 'района', 'районов')}`, false);
   // Плитками, а не строками: пять строк во всю ширину оставляли под собой
   // полэкрана пустоты. Число на плитке — то, ради чего сюда заходят: недостача
   // в деньгах там, где считали, и прочерк там, где ещё нет.
@@ -12710,7 +12712,7 @@ async function stkPicker(){
       </span>
     </button>`;
   document.getElementById('stkMid').innerHTML =
-    stkValueCard(reg) +
+    accDayBar('stkDay') + stkValueCard(reg) +
     `<div class="stk-tiles2">
       <div class="stk-col">
         ${tile('stkAuditPick()', I_AUD, 'Ревизия', fmt(st.done || 0), `из ${st.total || 0}`,
@@ -14730,6 +14732,51 @@ function accDayPaint(dir){
   }
 }
 
+// Полоса дня внутри раздела. Разделы, которые живут одним днём, — расходы и
+// склад — спрашивают день у себя, а не над плитками: там он стоял над всем
+// учётом и мешал, а здесь он часть работы.
+//
+// День общий на приложение (DAY_OFFSET), а не свой у каждого раздела: на него
+// смотрит вопрос о правке задним числом (accAskBack), и разойдись они — расход
+// записался бы в один день, а предупреждение спросило бы про другой.
+function accDayBar(id){
+  const d = _bizToday(); d.setDate(d.getDate() - DAY_OFFSET);
+  const имя = DAY_OFFSET === 0 ? 'Сегодня' : DAY_OFFSET === 1 ? 'Вчера'
+            : DAY_OFFSET === 2 ? 'Позавчера' : `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
+  const дата = DAY_OFFSET > 2 ? `${ACC_WDF[d.getDay()]} · ${d.getFullYear()}`
+             : `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}, ${ACC_WDF[d.getDay()]}`;
+  const стрелка = t => `<svg viewBox="0 0 24 24" width="17" height="17" fill="none"
+      stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
+      ><path d="${t}"/></svg>`;
+  return `<div class="ck-daybar">
+    <div class="dayslide${DAY_OFFSET ? ' back' : ''}" id="${id}">
+      <button class="ds-arw" onclick="accDayGo(${DAY_OFFSET + 1})" aria-label="День назад"
+        >${стрелка('M15 5l-7 7 7 7')}</button>
+      <div class="ds-win" onclick="accDayGo(0)">
+        <span class="ds-txt"><b>${имя}</b><i>${дата}</i></span>
+      </div>
+      <button class="ds-arw" onclick="accDayGo(${DAY_OFFSET - 1})" aria-label="День вперёд"
+        ${DAY_OFFSET ? '' : 'disabled'}>${стрелка('M9 5l7 7-7 7')}</button>
+    </div>
+    <button class="cal-btn" onclick="openDate('${id}')" aria-label="Выбрать день"
+      ><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5"
+        width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></button>
+  </div>`;
+}
+
+// Перевели день — раздел перечитывает себя сам. Какой именно, видно по тому,
+// чья полоса сейчас на экране: обработчик один на оба.
+function accDayGo(off){
+  off = Math.max(0, Math.min(365, off | 0));
+  if(off === DAY_OFFSET) return;
+  DAY_OFFSET = off;
+  try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
+  accLoadSummaries();                     // плитки учёта — за тот же день
+  if(document.getElementById('stkDay')){ ACC_STOCK = null; stkPicker(); return; }
+  if(document.getElementById('expDay')){ EXP.data = null; ACC_WO = null; accExpenses(); }
+}
+
 function accDaySet(off){
   off = Math.max(0, Math.min(365, off | 0));
   if(off === DAY_OFFSET) return;
@@ -15887,7 +15934,7 @@ let SH_TAB = 'exp';            // exp | wo
 async function accExpenses(){
   _setText('accTitle', 'Расходы смены');
   _setText('accSub', 'загрузка…');
-  document.getElementById('accMid').innerHTML = `
+  document.getElementById('accMid').innerHTML = accDayBar('expDay') + `
     <div class="periods" id="shTabs" style="margin:2px 0 12px">
       <div class="period-pill"></div>
       <button class="${SH_TAB === 'exp' ? 'on' : ''}" onclick="shTab('exp')">Водители</button>
@@ -15944,7 +15991,9 @@ async function accExpDay(){
   const d = EXP.data, body = document.getElementById('expInner');
   if(!body) return;
   if(!d){ body.innerHTML = '<div class="exp-empty" style="color:var(--dn)">Не удалось загрузить</div>'; return; }
-  _setText('accSub', d.day === d.today ? `сегодня · ${d.day}` : d.day);
+  // День больше не пишем в шапку: его говорит полоса под ней, и второй раз
+  // мелким шрифтом он только спорит сам с собой.
+  _setText('accSub', '');
   body.innerHTML = '<div class="exp-sum" id="expSum"></div><div id="expList"></div>';
   renderExpenses();
 }

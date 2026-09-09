@@ -1799,7 +1799,17 @@ body.anim-hold *,body.anim-hold *::before,body.anim-hold *::after{
 .ck-h-s{font-size:13px;font-weight:700;color:var(--dn)}
 .ck-h-s b{font-weight:800;color:var(--dn)}
 
-.ck-daybar{display:flex;align-items:stretch;gap:8px;margin:0 0 12px}
+/* Полоса дня и календарь — одна карточка во всю ширину, а не две встык.
+   Календарь остался на своём месте и того же размера, но живёт внутри: рамка
+   одна, и двигается она целиком. Разделяет их волосок, а не зазор. */
+.ck-daybar{display:block;margin:0 0 12px}
+.ck-daybar .dayslide{width:100%}
+.ck-daybar .cal-btn{width:40px;align-self:stretch;flex:0 0 auto;
+  margin:-3px -4px -3px 2px;border:0;border-left:1px solid var(--border2);
+  border-radius:0 10px 10px 0;background:none}
+.ck-daybar .cal-btn:active{transform:none;background:var(--gold-soft)}
+.ck-daybar .cal-btn.on{background:var(--gold-soft);border-left-color:rgba(201,169,110,.35)}
+.ck-daybar .dayslide.back .cal-btn{border-left-color:rgba(201,169,110,.3);color:var(--gold2)}
 .ck-list{display:flex;flex-direction:column;gap:10px}
 /* Строка — та же плитка, что вход в чек-лист и настройки: 66 ростом,
    скруглена на 16, золотая кромка, название заглавными, подпись под ним,
@@ -14781,30 +14791,46 @@ function accDayPaint(dir){
 // День общий на приложение (DAY_OFFSET), а не свой у каждого раздела: на него
 // смотрит вопрос о правке задним числом (accAskBack), и разойдись они — расход
 // записался бы в один день, а предупреждение спросило бы про другой.
-function accDayBar(id){
-  const d = _bizToday(); d.setDate(d.getDate() - DAY_OFFSET);
-  const имя = DAY_OFFSET === 0 ? 'Сегодня' : DAY_OFFSET === 1 ? 'Вчера'
-            : DAY_OFFSET === 2 ? 'Позавчера' : `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
-  const дата = DAY_OFFSET > 2 ? `${ACC_WDF[d.getDay()]} · ${d.getFullYear()}`
+// Куда листнули в прошлый раз: 1 — назад во времени, −1 — вперёд, 0 — не
+// листали. Полоса перерисовывается целиком, поэтому класс анимации ставится
+// прямо в разметке: навесить его на элемент после отрисовки нельзя — элемент
+// каждый раз новый, и старый успевал бы моргнуть без движения.
+let _dayDir = 0;
+
+// Разметка полосы дня — одна на все места, где она стоит. Различаются они
+// только тем, чей день листают: у чек-листа свой, у расходов и склада общий.
+function dayBarHtml(id, off, шаг, домой){
+  const d = _bizToday(); d.setDate(d.getDate() - off);
+  const имя = off === 0 ? 'Сегодня' : off === 1 ? 'Вчера'
+            : off === 2 ? 'Позавчера' : `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
+  const дата = off > 2 ? `${ACC_WDF[d.getDay()]} · ${d.getFullYear()}`
              : `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}, ${ACC_WDF[d.getDay()]}`;
   const стрелка = t => `<svg viewBox="0 0 24 24" width="17" height="17" fill="none"
       stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"
       ><path d="${t}"/></svg>`;
+  // Новый день въезжает с той стороны, в которую листнули: без этого непонятно,
+  // сменился день или экран моргнул. Та же анимация, что у полосы на «Обзоре».
+  const ход = _dayDir > 0 ? ' go-back' : _dayDir < 0 ? ' go-fwd' : '';
+  _dayDir = 0;
   return `<div class="ck-daybar">
-    <div class="dayslide${DAY_OFFSET ? ' back' : ''}" id="${id}">
-      <button class="ds-arw" onclick="accDayGo(${DAY_OFFSET + 1})" aria-label="День назад"
+    <div class="dayslide${off ? ' back' : ''}" id="${id}">
+      <button class="ds-arw" onclick="${шаг}(${off + 1})" aria-label="День назад"
         >${стрелка('M15 5l-7 7 7 7')}</button>
-      <div class="ds-win" onclick="accDayGo(0)">
-        <span class="ds-txt"><b>${имя}</b><i>${дата}</i></span>
+      <div class="ds-win" onclick="${домой}">
+        <span class="ds-txt${ход}"><b>${имя}</b><i>${дата}</i></span>
       </div>
-      <button class="ds-arw" onclick="accDayGo(${DAY_OFFSET - 1})" aria-label="День вперёд"
-        ${DAY_OFFSET ? '' : 'disabled'}>${стрелка('M9 5l7 7-7 7')}</button>
+      <button class="ds-arw" onclick="${шаг}(${off - 1})" aria-label="День вперёд"
+        ${off ? '' : 'disabled'}>${стрелка('M9 5l7 7-7 7')}</button>
+      <button class="cal-btn" onclick="openDate('${id}')" aria-label="Выбрать день"
+        ><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
+          stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5"
+          width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></button>
     </div>
-    <button class="cal-btn" onclick="openDate('${id}')" aria-label="Выбрать день"
-      ><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor"
-        stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5"
-        width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></button>
   </div>`;
+}
+
+function accDayBar(id){
+  return dayBarHtml(id, DAY_OFFSET, 'accDayGo', 'accDayGo(0)');
 }
 
 // Перевели день — раздел перечитывает себя сам. Какой именно, видно по тому,
@@ -14812,6 +14838,7 @@ function accDayBar(id){
 function accDayGo(off){
   off = Math.max(0, Math.min(365, off | 0));
   if(off === DAY_OFFSET) return;
+  _dayDir = off > DAY_OFFSET ? 1 : -1;      // назад во времени или к сегодня
   DAY_OFFSET = off;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   accLoadSummaries();                     // плитки учёта — за тот же день
@@ -15216,34 +15243,16 @@ function chkRender(){
 // Полоса дня внутри чек-листа: та же, что в учёте, — стрелки, окошко,
 // календарь справа, — но своя: день здесь ни на что снаружи не влияет.
 function ckDayBar(){
-  const d = _bizToday(); d.setDate(d.getDate() - CKL_OFF);
-  const имя = CKL_OFF === 0 ? 'Сегодня' : CKL_OFF === 1 ? 'Вчера'
-            : CKL_OFF === 2 ? 'Позавчера' : `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}`;
-  const дата = CKL_OFF > 2 ? `${ACC_WDF[d.getDay()]} · ${d.getFullYear()}`
-             : `${d.getDate()} ${MONTHS_GEN[d.getMonth()]}, ${ACC_WDF[d.getDay()]}`;
-  return `<div class="ck-daybar">
-    <div class="dayslide" id="ckDay">
-      <button class="ds-arw" onclick="ckDayStep(1)" aria-label="День назад">
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-             stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
-      <div class="ds-win" onclick="ckDaySet(0)">
-        <span class="ds-txt"><b>${имя}</b><i>${дата}</i></span>
-      </div>
-      <button class="ds-arw" onclick="ckDayStep(-1)" aria-label="День вперёд" ${CKL_OFF ? '' : 'disabled'}>
-        <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor"
-             stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 5l7 7-7 7"/></svg></button>
-    </div>
-    <button class="cal-btn" onclick="openDate('ckDay')" aria-label="Выбрать день"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M8 3v4M16 3v4M3 10h18"/></svg></button>
-  </div>`;
+  return dayBarHtml('ckDay', CKL_OFF, 'ckDaySet', 'ckDaySet(0)');
 }
 function ckDaySet(off){
   off = Math.max(0, Math.min(365, off | 0));
   if(off === CKL_OFF) return;
+  _dayDir = off > CKL_OFF ? 1 : -1;         // как у общей полосы
   CKL_OFF = off;
   try{ Telegram.WebApp.HapticFeedback.selectionChanged(); }catch(e){}
   accChecklist(true);
 }
-function ckDayStep(delta){ ckDaySet(CKL_OFF + delta); }
 
 function chkRow(r){
   const st = CK_ST[r.state] || CK_ST.soon;
